@@ -1,0 +1,6 @@
+# raw Poly Haven downloads (hundreds of MB); processed copies live in public/assets
+assets-src
+node_modules
+dist
+.claude
+*.log

@@ -1,0 +1,1195 @@
+// The game: owns every system, runs the frame loop, and decides who is in charge of
+// what. Offline, this browser runs the whole world (loot economy, crates, save file).
+// Online, the server does, and this file mirrors it and reports what the player does.
+
+import * as THREE from 'three';
+import type { Renderer } from '../core/renderer';
+import { physics, USE_GROUPS, SHOT_GROUPS, SOLID_GROUPS } from '../core/physics';
+import { audio } from '../core/audio';
+import { Input, NULL_INPUT } from '../core/input';
+import type { Atmosphere } from '../world/atmosphere';
+import type { Terrain } from '../world/terrain';
+import type { Vegetation } from '../world/vegetation';
+import type { Grass } from '../world/grass';
+import { Door, type Buildings } from '../world/buildings';
+import { heightAt, type World } from '../world/worldgen';
+import { ITEMS, capacityOf, hasMod, makeItem, newUid, type ItemInstance, type Slot } from '../sim/items';
+import { PlayerInventory, SLOT_ORDER, type Container } from '../sim/inventory';
+import { Economy, type WorldLoot } from '../sim/economy';
+import { CRATE_RESTOCK, CRATE_SPECS, fillCrate } from '../sim/crates';
+import { loadSave, writeSave, type SaveData } from '../sim/save';
+import { Net, playerName, setPlayerName } from '../net/client';
+import { F_AIM, F_CROUCH, F_DEAD, F_GROUND, F_SPRINT, crateId, type CorpseInfo, type PlayerInfo, type Pose, type S2C, type StashInfo } from '../net/protocol';
+import { Player } from './player';
+import { Avatar, AVATAR_LAYER, FP_BODY_LAYER } from './avatar';
+import { Dummy } from './character';
+import { CorpseBody, RemotePlayer } from './remote';
+import { CameraDirector } from './camera';
+import { Effects } from './effects';
+import { Weapons, type HitInfo, type UseKind } from './weapons';
+import { LootManager, Stash, WorldItem } from './loot';
+import { HUD, type HotbarEntry } from '../ui/hud';
+import { InventoryUI } from '../ui/inventory-ui';
+import { renderDoll, renderIcons } from '../ui/icons';
+import { Perf } from '../core/perf';
+
+export interface WorldSystems {
+  r: Renderer;
+  world: World;
+  atmo: Atmosphere;
+  terrain: Terrain;
+  veg: Vegetation;
+  grass: Grass;
+  buildings: Buildings;
+}
+
+interface TimedAction {
+  label: string;
+  t: number;
+  dur: number;
+  sound: 'eat' | 'drink' | 'bandage' | null;
+  soundT: number;
+  done: () => void;
+}
+
+/** bump when the map's loot points change: spawned loot from older saves is re-rolled */
+const LOOT_REV = 5;
+const QUICK_KEYS = ['Digit5', 'Digit6', 'Digit7', 'Digit8'];
+const SEND_HZ = 15;
+
+export class Game {
+  input: Input;
+  player: Player;
+  avatar = new Avatar();
+  director: CameraDirector;
+  inv = new PlayerInventory();
+  net = new Net();
+  effects!: Effects;
+  weapons!: Weapons;
+  loot!: LootManager;
+  economy!: Economy;
+  hud!: HUD;
+  invUI!: InventoryUI;
+  dummies: Dummy[] = [];
+  remotes = new Map<number, RemotePlayer>();
+  /** item ids on the quick-use keys 5-8 */
+  quick: (string | null)[] = [null, null, null, null];
+  private corpses = new Map<string, { stash: Stash; body: CorpseBody }>();
+  private last = performance.now();
+  private fpsAcc = 0;
+  private fpsN = 0;
+  fps = 0;
+  private started = false;
+  private joining = false;
+  private use: TimedAction | null = null;
+  private saveT = 0;
+  private econT = 0;
+  private poi: string | null = null;
+  private prompt: string | null = null;
+  private focus: unknown = null;
+  private openStash: Stash | null = null;
+  private indoors = false;
+  private deathInfo = '';
+  private deathSent = false;
+  private warned = { hunger: false, thirst: false };
+  private heldKey = '';
+  // --- multiplayer bookkeeping
+  private sendT = 0;
+  private meT = 0;
+  private meDirty = false;
+  private pendingTakes = new Map<string, { item: ItemInstance; id: string; qty: number }>();
+  private localDrops = new Set<string>();
+
+  perf: Perf;
+
+  constructor(public s: WorldSystems) {
+    this.perf = new Perf(s.r.renderer);
+    this.input = new Input(s.r.renderer.domElement);
+    this.player = new Player(s.terrain);
+    this.director = new CameraDirector(s.r.camera, this.player);
+    this.director.onDropPlayer = (x, y, z, yaw) => this.player.spawn(x, y, z, yaw);
+    this.director.groundAt = (x, z) => heightAt(s.world.heights, x, z);
+  }
+
+  get online() {
+    return this.net.online;
+  }
+
+  async init(progress: (label: string) => void) {
+    const { r, atmo, buildings, veg, world } = this.s;
+    await this.avatar.load(atmo, AVATAR_LAYER, true);
+    r.scene.add(this.avatar.root, this.avatar.fpRoot);
+    for (const l of atmo.csm.lights) l.shadow.camera.layers.enable(AVATAR_LAYER);
+
+    this.effects = new Effects(r.scene, atmo);
+    progress('loading loot');
+    this.loot = new LootManager(r.scene, atmo, buildings.lootPoints);
+    await this.loot.preload();
+    this.loot.onPlaced = (l) => this.lootPlaced(l);
+    this.economy = new Economy(buildings.lootPoints, {
+      spawn: (l) => this.loot.spawn(l),
+      despawn: (l) => this.loot.despawn(l),
+    });
+    // crates standing around the map become searchable containers
+    for (const c of veg.crates) {
+      const spec = CRATE_SPECS[c.kind];
+      if (!spec) continue;
+      const st = new Stash(crateId(c.x, c.z), c.x, c.y, c.z, c.rot, spec.w, spec.h, spec.label);
+      st.kind = c.kind;
+      st.adopt(c.collider);
+      this.loot.crates.push(st);
+    }
+
+    progress('loading weapons');
+    this.weapons = new Weapons(r.vmScene, r.vmCamera, atmo, this.player, this.inv, this.effects);
+    await this.weapons.load();
+    this.weapons.mainCam = r.camera;
+    this.weapons.itemModels = this.loot.models;
+    this.weapons.onSlungChange = (obj) => this.avatar.setSlung(obj);
+    this.weapons.resolveTarget = (owner) => (owner instanceof Dummy || owner instanceof RemotePlayer ? owner : null);
+    this.weapons.onHit = (h) => this.onHit(h);
+    this.weapons.onShot = (s) => this.net.send({ t: 'shot', o: s.origin.toArray(), d: s.dir.toArray(), w: s.weapon, sup: s.suppressed });
+    progress('compiling shaders');
+    this.weapons.precompile(r.renderer);
+    // every loot model's material, so entering a house never compiles mid-game
+    const warm = new THREE.Group();
+    for (const id of Object.keys(ITEMS)) warm.add((await this.loot.models.get(id)).group.clone());
+    warm.position.copy(r.camera.position);
+    r.scene.add(warm);
+    r.renderer.compile(r.scene, r.camera);
+    r.scene.remove(warm);
+    progress('rendering icons');
+    const icons = await renderIcons(r.renderer, this.loot.models, atmo.envMap);
+    const doll = await renderDoll(r.renderer, atmo.envMap);
+
+    this.hud = new HUD(icons);
+    this.hud.setName(playerName());
+    this.invUI = new InventoryUI(this.inv, {
+      take: (w) => this.takeWorldItem(w),
+      drop: (item) => this.dropItem(item),
+      use: (item) => this.useItem(item),
+      open: (item) => this.openBox(item),
+      unload: (item) => this.unloadWeapon(item),
+      place: (item) => this.placeStash(item),
+      attachTargets: (att) => this.attachTargets(att),
+      attach: (att, weapon) => this.attachMod(att, weapon),
+      detach: (weapon, mod) => this.detachMod(weapon, mod),
+      assignQuick: (item, i) => this.assignQuick(i, item.id),
+      quickIndex: (id) => this.quick.indexOf(id),
+      changed: () => this.inventoryChanged(),
+      sound: (k) => audio.ui(k),
+    });
+    this.invUI.icons = icons;
+    this.invUI.doll = doll;
+
+    // one physics step so placement queries see every collider
+    physics.step(physics.fixedDt);
+    // somewhere to stand while the start screen is up
+    const sp = world.spawn;
+    this.player.spawn(sp.x, heightAt(world.heights, sp.x, sp.z) + 0.05, sp.z, sp.yaw);
+
+    this.player.onDamage = (amt, cause) => {
+      if (cause === 'fall' && amt > 5) this.hud.note('You hurt yourself in the fall', 'warn');
+    };
+    this.hud.onStart(() => this.resume());
+    this.hud.onRespawn(() => this.respawn());
+    this.hud.showStart(true);
+    // FPS mouse: play only while the mouse is captured. Esc releases it -> pause menu;
+    // clicking the menu captures it again and play resumes.
+    this.input.onLockChange = (locked) => {
+      if (locked) {
+        if (this.started) this.unpause();
+      } else if (!this.invUI.isOpen && !this.player.dead && this.started) this.pause();
+    };
+    window.addEventListener('beforeunload', () => this.save());
+    window.addEventListener('keydown', (e) => {
+      if (e.code !== 'Escape') return;
+      if (this.invUI?.isOpen) this.toggleInventory(false);
+    });
+    this.director.update(0.016);
+  }
+
+  // ------------------------------------------------------------ entering the world
+
+  /** First click on Play: find a server (multiplayer) or fall back to the local world. */
+  private async join() {
+    this.joining = true;
+    const name = this.hud.nameValue() || `Survivor${Math.floor(100 + Math.random() * 900)}`;
+    setPlayerName(name);
+    this.hud.showStart(true, false, 'Connecting…');
+    const welcome = await this.net.connect(name);
+    if (welcome) await this.enterOnline(welcome);
+    else await this.enterOffline();
+    this.joining = false;
+    this.started = true;
+    if (!this.weapons.equippedItem) {
+      const slot = (['primary', 'secondary', 'holster'] as const).find((k) => this.inv.slots[k]);
+      if (slot) this.weapons.equip(slot);
+    }
+    if (this.input.locked) this.unpause();
+    else this.hud.showStart(true, true);
+  }
+
+  private async enterOffline() {
+    const save = loadSave();
+    if (save) await this.restore(save);
+    else this.fresh();
+    await this.spawnDummies();
+    this.hud.setNet('Offline · single player');
+  }
+
+  private fresh() {
+    this.spawnAtEdge();
+    this.economy.populate();
+    for (const c of this.loot.crates) fillCrate(c.container, c.kind);
+    this.freshKit();
+  }
+
+  private spawnAtEdge() {
+    const { world } = this.s;
+    const sp = world.spawns[Math.floor(Math.random() * world.spawns.length)] ?? world.spawn;
+    this.player.spawn(sp.x, heightAt(world.heights, sp.x, sp.z) + 0.05, sp.z, sp.yaw);
+  }
+
+  /** A new life: bare hands, one thing to eat and one thing to drink. Everything else is out there. */
+  private freshKit() {
+    this.inv.clear();
+    this.quick = [null, null, null, null];
+    const pick = (ids: string[]) => ids[Math.floor(Math.random() * ids.length)];
+    this.inv.add(makeItem(pick(['sprats', 'beans', 'sardines', 'tomatoes'])));
+    this.inv.add(makeItem(pick(['thermos', 'milk'])));
+    this.player.vitals = { health: 100, energy: 80, water: 80, stamina: 100, bleeding: false };
+    this.weapons.validate();
+    this.refreshQuick();
+  }
+
+  private async restore(save: SaveData) {
+    const e = save.economy;
+    const sameMap = e.rev === LOOT_REV;
+    this.economy.time = e.time;
+    this.economy.lastRestock = sameMap ? e.lastRestock : {};
+    this.economy.restore(e.loot, sameMap);
+    if (!sameMap) this.economy.populate();
+    for (const sd of save.stashes) {
+      const st = new Stash(sd.uid, sd.x, sd.y, sd.z, sd.rot);
+      st.container.load(sd.container as never);
+      await this.loot.addStash(st);
+    }
+    const saved = new Map((save.crates ?? []).map((c) => [c.uid, c]));
+    for (const c of this.loot.crates) {
+      const sc = saved.get(c.uid);
+      if (sc) {
+        c.container.load(sc.container as never);
+        c.emptiedAt = sc.emptiedAt;
+      } else fillCrate(c.container, c.kind);
+    }
+    const p = save.player;
+    if (p && sameMap) {
+      this.player.spawn(p.x, p.y + 0.05, p.z, p.yaw);
+      Object.assign(this.player.vitals, p.vitals);
+      // pockets are smaller than they used to be: whatever no longer fits lands at your feet
+      for (const it of this.inv.load(p.inventory)) this.dropItem(it, this.player.pos, 0.8);
+      if (p.quick) this.quick = [0, 1, 2, 3].map((i) => (p.quick![i] && ITEMS[p.quick![i]!] ? p.quick![i] : null));
+      this.refreshQuick();
+      this.weapons.validate();
+    } else {
+      // the map changed under the old character (or they were dead): a new life on the edge
+      this.spawnAtEdge();
+      this.freshKit();
+    }
+    // top the world back up if the save is sparse
+    this.economy.tick(0, [this.player.pos]);
+  }
+
+  /** Offline only: the server owns the world and your character when you play online. */
+  save() {
+    if (!this.economy || this.online || !this.started) return;
+    const p = this.player;
+    writeSave({
+      version: 1,
+      savedAt: Date.now(),
+      player: p.dead ? null : { x: p.pos.x, y: p.pos.y, z: p.pos.z, yaw: p.yaw, vitals: { ...p.vitals }, inventory: this.inv.serialize(), quick: this.quick },
+      economy: { ...this.economy.serialize(), rev: LOOT_REV },
+      stashes: this.loot.stashes.map((s) => s.serialize()),
+      crates: this.loot.crates.map((c) => ({ uid: c.uid, emptiedAt: c.emptiedAt, container: c.container.serialize() })),
+    });
+  }
+
+  // ------------------------------------------------------------ multiplayer
+
+  private async enterOnline(w: Extract<S2C, { t: 'welcome' }>) {
+    const { world, buildings } = this.s;
+    for (const l of w.loot) this.economy.inject(l);
+    for (const [i, open, swing] of w.doors) buildings.doors[i]?.setOpen(open, swing);
+    for (const s of w.stashes) await this.addRemoteStash(s);
+    for (const c of w.corpses) void this.addCorpse(c);
+    for (const p of w.players) void this.addRemote(p);
+    const y = w.spawn.y ?? heightAt(world.heights, w.spawn.x, w.spawn.z);
+    this.player.spawn(w.spawn.x, y + 0.05, w.spawn.z, w.spawn.yaw);
+    if (w.me) {
+      for (const it of this.inv.load(w.me.inv)) this.dropItem(it, this.player.pos, 0.8);
+      Object.assign(this.player.vitals, w.me.vitals);
+      this.weapons.validate();
+      this.refreshQuick();
+    } else this.freshKit();
+    this.meDirty = true;
+
+    const net = this.net;
+    net.on('join', (m) => {
+      void this.addRemote(m.p);
+      this.hud.feed(`${m.p.name} joined`);
+    });
+    net.on('leave', (m) => {
+      const r = this.remotes.get(m.id);
+      if (!r) return;
+      this.hud.feed(`${r.name} left`);
+      r.dispose();
+      this.remotes.delete(m.id);
+    });
+    net.on('ps', (m) => {
+      const now = performance.now();
+      for (const s of m.s) {
+        const r = this.remotes.get(s[0]);
+        if (!r) continue;
+        r.push([s[1], s[2], s[3], s[4], s[5], s[6]], now);
+        r.setWeapon(s[7], s[8]);
+        if (!(s[6] & F_DEAD)) r.setAlive(true);
+      }
+    });
+    net.on('shot', (m) => this.weapons.remoteShot(new THREE.Vector3(...m.o), new THREE.Vector3(...m.d), m.w, m.sup));
+    net.on('dmg', (m) => this.takeHit(m));
+    net.on('death', (m) => {
+      const k = m.k;
+      const me = k.id === net.id;
+      const zone = k.zone === 'head' ? ' · headshot' : '';
+      const how = k.by !== null ? `${k.byName} killed ${k.name} · ${ITEMS[k.w]?.name ?? (k.w === 'fists' ? 'fists' : k.w)}${zone}${k.dist > 3 ? ` · ${k.dist} m` : ''}` : `${k.name} died (${k.w})`;
+      this.hud.feed(how, k.by === net.id || me);
+      if (k.by === net.id) {
+        this.weapons.confirmKill();
+        this.hud.note(`You killed ${k.name}${zone}${k.dist > 3 ? ` · ${k.dist} m` : ''}`, 'good');
+      }
+      if (me) this.deathInfo = k.by !== null ? `Killed by ${k.byName} with ${ITEMS[k.w]?.name ?? 'bare hands'}${zone}. Your body and gear are where you fell.` : `You died of ${k.w}. Your body and gear are where you fell.`;
+      else this.remotes.get(k.id)?.setAlive(false);
+      if (m.corpse) void this.addCorpse(m.corpse);
+    });
+    net.on('alive', (m) => this.remotes.get(m.id)?.setAlive(true));
+    net.on('loot+', (m) => this.economy.inject(m.l));
+    net.on('loot-', (m) => {
+      this.economy.take(m.uid);
+      if (this.invUI.isOpen) this.invUI.refresh(this.loot.near(this.player.pos, 2.3), this.openStash);
+    });
+    net.on('denied', (m) => {
+      // someone got there first: hand it back
+      const t = this.pendingTakes.get(m.uid);
+      if (!t) return;
+      this.pendingTakes.delete(m.uid);
+      if (this.inv.find((i) => i === t.item)) this.inv.remove(t.item);
+      else this.inv.take(t.id, t.qty);
+      this.hud.note('Someone else took it first', 'warn');
+      this.inventoryChanged();
+      if (this.invUI.isOpen) this.invUI.render();
+    });
+    net.on('cdata', (m) => {
+      const st = this.findBox(m.cid);
+      if (!st) return;
+      st.container.load({ items: m.items });
+      st.known = true;
+      if (this.openStash === st) this.invUI.setStashState('');
+    });
+    net.on('cbusy', (m) => {
+      if (this.openStash?.uid !== m.cid) return;
+      this.hud.note('Someone else is searching that', 'warn');
+      this.openStash = null;
+      if (this.invUI.isOpen) this.invUI.refresh(this.loot.near(this.player.pos, 2.3), null);
+    });
+    net.on('stash+', (m) => void this.addRemoteStash(m.s));
+    net.on('stash-', (m) => {
+      const st = this.loot.stashes.find((s) => s.uid === m.uid);
+      if (st) this.loot.removeStash(st);
+    });
+    net.on('corpse-', (m) => this.removeCorpse(m.uid));
+    net.on('door', (m) => {
+      const d = buildings.doors[m.i];
+      if (!d || d.open === m.open) return;
+      d.set(m.open, m.swing);
+      audio.door(m.open, d.pivot.position);
+    });
+    net.on('spawn', (m) => {
+      const p = this.player;
+      p.spawn(m.x, heightAt(world.heights, m.x, m.z) + 0.05, m.z, m.yaw);
+      this.freshKit();
+      this.deathSent = false;
+      this.deathInfo = '';
+      this.meDirty = true;
+      this.resume();
+    });
+    net.on('chat', (m) => this.hud.feed(`${m.from}: ${m.text}`));
+    net.onClose = (reason) => {
+      this.paused = true;
+      this.input.unlock();
+      this.hud.fatal(reason);
+    };
+    this.hud.setNet(`Online · ${w.players.length + 1} / ${w.max} players`);
+  }
+
+  private makeHeld = (id: string | null, mods: string[]) => {
+    if (!id) return null;
+    const def = ITEMS[id];
+    const obj = this.weapons.worldModel(id, mods);
+    const grips = this.weapons.gripsOf(id);
+    if (!obj || !grips || !def?.weapon) return null;
+    return { obj, grips, kind: def.weapon.kind };
+  };
+
+  private async addRemote(p: PlayerInfo) {
+    if (p.id === this.net.id || this.remotes.has(p.id)) return;
+    const r = new RemotePlayer(p.id, p.name, this.makeHeld);
+    this.remotes.set(p.id, r);
+    await r.load(this.s.atmo, this.s.r.scene, p.pose);
+    r.setWeapon(p.w, p.m);
+    r.setAlive(p.alive);
+    this.hud.setNet(`Online · ${this.remotes.size + 1} players`);
+  }
+
+  private async addRemoteStash(s: StashInfo) {
+    if (this.loot.stashes.some((x) => x.uid === s.uid)) return;
+    await this.loot.addStash(new Stash(s.uid, s.x, s.y, s.z, s.rot));
+  }
+
+  private async addCorpse(c: CorpseInfo) {
+    if (this.corpses.has(c.uid)) return;
+    const stash = new Stash(c.uid, c.x, c.y, c.z, c.rot, 8, 10, `${c.name}'s body`);
+    stash.corpse = true;
+    stash.trigger(0.45, 0.25, 0.95);
+    const body = new CorpseBody();
+    this.corpses.set(c.uid, { stash, body });
+    // let the fall animation of the player finish before the body appears
+    await new Promise((r) => setTimeout(r, 1400));
+    if (this.corpses.has(c.uid)) await body.load(this.s.atmo, this.s.r.scene, c.x, c.y, c.z, c.rot);
+  }
+
+  private removeCorpse(uid: string) {
+    const c = this.corpses.get(uid);
+    if (!c) return;
+    if (this.openStash === c.stash) this.toggleInventory(false);
+    physics.tags.delete(c.stash.collider.handle);
+    physics.world.removeCollider(c.stash.collider, false);
+    c.body.dispose();
+    this.corpses.delete(uid);
+  }
+
+  /** any server-held container by id: map crate, stash or body */
+  private findBox(cid: string): Stash | undefined {
+    return this.loot.crates.find((c) => c.uid === cid) ?? this.loot.stashes.find((c) => c.uid === cid) ?? this.corpses.get(cid)?.stash;
+  }
+
+  /** the server says someone hit us */
+  private takeHit(m: Extract<S2C, { t: 'dmg' }>) {
+    const p = this.player;
+    if (p.dead) return;
+    let amount = m.amount;
+    if (m.zone === 'torso') for (const a of this.inv.wear('armor')) amount *= a;
+    const melee = !ITEMS[m.w]?.weapon;
+    p.damage(amount, melee ? 'a beating' : 'gunshot wounds');
+    if (!melee && amount > 12 && Math.random() < 0.55) p.vitals.bleeding = true;
+    if (melee && amount > 25 && Math.random() < 0.3) p.vitals.bleeding = true;
+    this.weapons.flinch(melee ? 0.5 : 1);
+    this.hud.hitFrom(Math.atan2(m.dir[0], m.dir[2]) - (p.yaw + Math.PI));
+    if (this.use) {
+      this.use = null;
+      this.weapons.endUse();
+    }
+    this.meDirty = true;
+  }
+
+  private sendState(dt: number) {
+    if (!this.online) return;
+    const p = this.player;
+    this.sendT += dt;
+    if (this.sendT >= 1 / SEND_HZ) {
+      this.sendT = 0;
+      const it = this.weapons.equippedItem;
+      const flags = (p.crouched ? F_CROUCH : 0) | (p.sprinting ? F_SPRINT : 0) | (this.weapons.aiming ? F_AIM : 0) | (p.grounded ? F_GROUND : 0) | (p.dead ? F_DEAD : 0);
+      const pose: Pose = [p.pos.x, p.pos.y, p.pos.z, p.yaw, p.pitch, flags];
+      this.net.send({ t: 's', p: pose, w: it?.id ?? null, m: it?.mods ?? [] });
+    }
+    // the server keeps a copy of what we carry so it can leave a body with our gear on it
+    this.meT += dt;
+    if (!p.dead && ((this.meDirty && this.meT > 0.6) || this.meT > 8)) {
+      this.meT = 0;
+      this.meDirty = false;
+      this.net.send({ t: 'me', inv: this.inv.serialize(), vitals: { ...p.vitals } });
+    }
+  }
+
+  /** an item finished settling: tell the server about the ones this player dropped */
+  private lootPlaced(l: WorldLoot) {
+    if (!this.localDrops.delete(l.uid)) return;
+    this.net.send({ t: 'drop', l });
+  }
+
+  private syncOpenBox() {
+    const st = this.openStash;
+    if (!this.online || !st || !st.known) return;
+    this.net.send({ t: 'cset', cid: st.uid, items: st.container.serialize().items });
+  }
+
+  // ------------------------------------------------------------ targets (offline)
+
+  /** Training dummies with real hit zones: something to shoot and punch when nobody else is around. */
+  private async spawnDummies() {
+    const { world, atmo, r } = this.s;
+    const camp = world.pois.find((q) => q.name === 'Military Checkpoint');
+    const village = world.pois.find((q) => q.name === 'Zelenaya Dolina');
+    const spots: [number, number][] = [];
+    if (village) spots.push([village.x - 22, village.z + 26], [village.x + 34, village.z - 20], [village.x - 48, village.z - 12]);
+    if (camp) spots.push([camp.x - 9, camp.z + 11], [camp.x - 15, camp.z + 17]);
+    for (const [sx, sz] of spots) {
+      // nudge off anything solid (trees, walls, props)
+      let x = sx, z = sz;
+      for (let k = 0; k < 24; k++) {
+        const y = heightAt(world.heights, x, z);
+        if (!physics.boxOverlaps({ x, y: y + 1.0, z }, 0, 0.4, 0.8, 0.4, SOLID_GROUPS)) break;
+        const a = k * 2.4;
+        x = sx + Math.cos(a) * (1 + k * 0.4);
+        z = sz + Math.sin(a) * (1 + k * 0.4);
+      }
+      const y = heightAt(world.heights, x, z);
+      const d = new Dummy(new THREE.Vector3(x, y, z), Math.random() * Math.PI * 2);
+      await d.load(atmo, r.scene);
+      this.dummies.push(d);
+    }
+  }
+
+  private onHit(h: HitInfo) {
+    if (h.victim instanceof RemotePlayer) {
+      const it = this.weapons.equippedItem;
+      const bonus = this.inv.wear('fist').reduce((a, b) => a + b, 0);
+      this.net.send({ t: 'hit', to: h.victim.id, zone: h.zone, w: h.weapon, dist: h.distance, sup: hasMod(it, 'suppressor_9'), bonus: h.weapon === 'fists' ? bonus : 0 });
+      return;
+    }
+    if (!h.killed) return;
+    const how = h.melee ? '' : ` · ${Math.round(h.distance)} m`;
+    this.hud.note(`${h.target} down${h.zone === 'head' ? ' · headshot' : ''}${how}`, 'good');
+  }
+
+  // ------------------------------------------------------------ flow
+
+  paused = true;
+
+  private resume() {
+    if (this.joining) return;
+    // keys must reach the game, not the name field
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    audio.start();
+    // capture the mouse in the same click; play begins once we are in the world and locked
+    if (!this.input.locked) this.input.lock();
+    if (!this.started) {
+      void this.join();
+      return;
+    }
+    if (this.input.locked) this.unpause();
+  }
+
+  private unpause() {
+    this.paused = false;
+    this.hud.showStart(false);
+  }
+
+  private pause() {
+    this.paused = true;
+    this.save();
+    this.hud.showStart(true, true);
+    this.input.unlock();
+  }
+
+  private respawn() {
+    if (this.online) {
+      // the server picks the spawn and answers with 'spawn'
+      this.net.send({ t: 'respawn' });
+      return;
+    }
+    const p = this.player;
+    // everything you carried stays where you fell
+    for (const it of this.inv.topLevel()) this.dropItem(it, p.pos, 1.2);
+    this.spawnAtEdge();
+    this.freshKit();
+    this.deathInfo = '';
+    this.save();
+    this.resume();
+  }
+
+  start() {
+    const loop = () => {
+      this.frame();
+      requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
+  }
+
+  // ------------------------------------------------------------ inventory ops
+
+  private takeWorldItem(w: WorldItem): ItemInstance | null {
+    const l = this.economy.take(w.loot.uid);
+    if (!l) return null;
+    if (this.online) {
+      this.pendingTakes.set(l.uid, { item: l.item, id: l.item.id, qty: l.item.qty });
+      setTimeout(() => this.pendingTakes.delete(l.uid), 5000);
+      this.net.send({ t: 'take', uid: l.uid });
+    }
+    return l.item;
+  }
+
+  dropItem(item: ItemInstance, at?: THREE.Vector3, spread = 0.5) {
+    const p = at ?? this.player.pos;
+    const a = Math.random() * Math.PI * 2;
+    const r = 0.35 + Math.random() * spread;
+    const fwd = new THREE.Vector3(-Math.sin(this.player.yaw), 0, -Math.cos(this.player.yaw));
+    const x = p.x + (at ? Math.cos(a) * r : fwd.x * 0.7 + Math.cos(a) * 0.2);
+    const z = p.z + (at ? Math.sin(a) * r : fwd.z * 0.7 + Math.sin(a) * 0.2);
+    const hit = physics.raycast({ x, y: p.y + 1.2, z }, { x: 0, y: -1, z: 0 }, 4, SOLID_GROUPS);
+    const y = hit && hit.toi > 1e-3 ? hit.point.y : p.y;
+    // the loot manager then slides it clear of walls and furniture and lays it on the surface
+    if (this.online) this.localDrops.add(item.uid);
+    this.economy.drop(item, x, y + 0.005, z, Math.random() * Math.PI * 2);
+    this.weapons.validate();
+  }
+
+  private inventoryChanged() {
+    this.weapons.validate();
+    this.refreshQuick();
+    this.meDirty = true;
+    this.syncOpenBox();
+    this.save();
+  }
+
+  // ------------------------------------------------------------ quick slots (5-8)
+
+  private assignQuick(i: number, id: string | null) {
+    if (id) this.quick = this.quick.map((q) => (q === id ? null : q));
+    this.quick[i] = id;
+    this.save();
+  }
+
+  /** New kinds of food, drink and medical supplies take the first free quick key on their own. */
+  private refreshQuick() {
+    for (const c of this.inv.containers) {
+      for (const pl of c.items) {
+        const id = pl.item.id;
+        if (!ITEMS[id].use || this.quick.includes(id)) continue;
+        const i = this.quick.findIndex((q) => q === null || this.countOf(q) === 0);
+        if (i >= 0) this.quick[i] = id;
+      }
+    }
+  }
+
+  /** how many uses of an item type are in the pockets (stack quantity, or number of items) */
+  private countOf(id: string) {
+    const stack = !!ITEMS[id].stack;
+    let n = 0;
+    for (const c of this.inv.containers) for (const p of c.items) if (p.item.id === id) n += stack ? p.item.qty : 1;
+    return n;
+  }
+
+  private useQuick(i: number) {
+    const id = this.quick[i];
+    if (!id) {
+      this.hud.note(`Quick key ${i + 5} is empty: hover an item in the inventory and press ${i + 5}`, 'info');
+      return;
+    }
+    const item = this.inv.containers.flatMap((c) => c.items).find((pl) => pl.item.id === id)?.item;
+    if (!item) {
+      this.hud.note(`No ${ITEMS[id].name} left`, 'warn');
+      return;
+    }
+    const def = ITEMS[item.id];
+    if (def.use) this.useItem(item);
+    else if (def.open) this.openBox(item);
+  }
+
+  // ------------------------------------------------------------ item actions
+
+  private startUse(label: string, dur: number, itemId: string, kind: UseKind, sound: TimedAction['sound'], done: () => void) {
+    this.toggleInventory(false);
+    this.use = { label, t: 0, dur, sound, soundT: 0, done };
+    this.weapons.beginUse(itemId, kind, dur);
+  }
+
+  /** wherever the item currently is: player inventory or the open crate */
+  private consume(item: ItemInstance, from: Container | null) {
+    const def = ITEMS[item.id];
+    if (def.stack && item.qty > 1) {
+      item.qty--;
+      return;
+    }
+    this.inv.remove(item);
+    from?.remove(item);
+  }
+
+  private useItem(item: ItemInstance) {
+    const def = ITEMS[item.id];
+    if (!def.use || this.use || this.player.dead) return;
+    const u = def.use;
+    const from = this.openStash?.container.has(item) ? this.openStash.container : null;
+    if (from) {
+      // take it out of the crate first, so the crate can be closed while we eat
+      from.remove(item);
+      this.syncOpenBox();
+    }
+    this.startUse(`${u.verb} ${def.name}`, u.time, item.id, u.sound, u.sound, () => {
+      const v = this.player.vitals;
+      if (u.energy) v.energy = THREE.MathUtils.clamp(v.energy + u.energy, 0, 100);
+      if (u.water) v.water = THREE.MathUtils.clamp(v.water + u.water, 0, 100);
+      if (u.health) v.health = Math.min(100, v.health + u.health);
+      if (u.stopBleed && v.bleeding) {
+        v.bleeding = false;
+        this.hud.note('The bleeding has stopped', 'good');
+      }
+      const gained = [u.energy ? `${u.energy > 0 ? '+' : ''}${u.energy} energy` : '', u.water ? `${u.water > 0 ? '+' : ''}${u.water} water` : '', u.health ? `+${u.health} health` : ''].filter(Boolean).join(' · ');
+      if (gained) this.hud.note(gained, 'good');
+      this.consume(item, null);
+      this.inventoryChanged();
+    });
+  }
+
+  /** Sealed ammo box -> a stack of loose rounds. */
+  private openBox(item: ItemInstance) {
+    const def = ITEMS[item.id];
+    if (!def.open || this.use || this.player.dead) return;
+    const o = def.open;
+    const from = this.openStash?.container.has(item) ? this.openStash.container : null;
+    if (from) {
+      from.remove(item);
+      this.syncOpenBox();
+    }
+    audio.ui('open');
+    this.startUse(`Open ${def.name}`, o.time, item.id, 'open', null, () => {
+      this.inv.remove(item);
+      const left = this.inv.add(makeItem(o.gives, o.qty));
+      if (left) this.dropItem(left);
+      audio.ui('pickup');
+      this.hud.note(`${o.qty} × ${ITEMS[o.gives].name}`, 'good');
+      this.inventoryChanged();
+    });
+  }
+
+  /** Take the rounds out of a weapon and put them back in the pockets. */
+  private unloadWeapon(item: ItemInstance) {
+    const def = ITEMS[item.id];
+    const n = item.loaded ?? 0;
+    if (!def.weapon || n <= 0 || this.weapons.busy) return;
+    item.loaded = 0;
+    const left = this.inv.add(makeItem(def.weapon.ammo, n));
+    if (left) this.dropItem(left);
+    audio.click(2200, 0.4, 0.03);
+    audio.click(1500, 0.4, 0.04, 0.12);
+    this.hud.note(`Unloaded ${n} × ${ITEMS[def.weapon.ammo].name}`, 'good');
+    this.inventoryChanged();
+  }
+
+  // ------------------------------------------------------------ attachments
+
+  /** weapons the player carries that this attachment can go on right now */
+  private attachTargets(att: ItemInstance): ItemInstance[] {
+    const a = ITEMS[att.id].attach;
+    if (!a) return [];
+    const out: ItemInstance[] = [];
+    const consider = (w: ItemInstance) => {
+      if (!a.fits.includes(w.id)) return;
+      // one attachment per mount point
+      if ((w.mods ?? []).some((m) => ITEMS[m]?.attach?.slot === a.slot)) return;
+      out.push(w);
+    };
+    for (const it of this.inv.topLevel()) consider(it);
+    for (const c of this.inv.containers) for (const p of c.items) if (!out.includes(p.item)) consider(p.item);
+    return out;
+  }
+
+  private attachMod(att: ItemInstance, weapon: ItemInstance) {
+    if (!this.attachTargets(att).includes(weapon) || this.weapons.busy) return;
+    this.inv.remove(att);
+    this.openStash?.container.remove(att);
+    (weapon.mods ??= []).push(att.id);
+    audio.click(2600, 0.4, 0.03);
+    audio.click(1900, 0.45, 0.05, 0.14);
+    this.hud.note(`${ITEMS[att.id].name} fitted to ${ITEMS[weapon.id].name}`, 'good');
+    this.inventoryChanged();
+  }
+
+  private detachMod(weapon: ItemInstance, mod: string) {
+    if (!weapon.mods?.includes(mod) || this.weapons.busy) return;
+    weapon.mods = weapon.mods.filter((m) => m !== mod);
+    // rounds that no longer fit come back out
+    const extra = (weapon.loaded ?? 0) - capacityOf(weapon);
+    const back: ItemInstance[] = [makeItem(mod)];
+    if (extra > 0) {
+      weapon.loaded = capacityOf(weapon);
+      back.push(makeItem(ITEMS[weapon.id].weapon!.ammo, extra));
+    }
+    for (const it of back) {
+      const left = this.inv.add(it);
+      if (left) this.dropItem(left);
+    }
+    audio.click(1900, 0.45, 0.05);
+    this.inventoryChanged();
+  }
+
+  private placeStash(item: ItemInstance) {
+    const p = this.player;
+    const fwd = new THREE.Vector3(-Math.sin(p.yaw), 0, -Math.cos(p.yaw));
+    const x = p.pos.x + fwd.x * 1.6, z = p.pos.z + fwd.z * 1.6;
+    const hit = physics.raycast({ x, y: p.pos.y + 1.5, z }, { x: 0, y: -1, z: 0 }, 5, SOLID_GROUPS);
+    if (!hit || hit.toi < 1e-3 || hit.point.y > p.pos.y + 0.6 || physics.boxOverlaps({ x, y: hit.point.y + 0.3, z }, p.yaw, 0.6, 0.22, 0.26)) {
+      this.hud.note('Not enough room to place the crate here', 'warn');
+      return;
+    }
+    this.inv.remove(item);
+    this.openStash?.container.remove(item);
+    const st = new Stash(newUid(), x, hit.point.y, z, p.yaw);
+    st.known = true;
+    void this.loot.addStash(st).then(() => this.save());
+    this.net.send({ t: 'stash+', s: { uid: st.uid, x: st.x, y: st.y, z: st.z, rot: st.rot } });
+    this.toggleInventory(false);
+    this.inventoryChanged();
+    audio.ui('drop');
+    this.hud.note('Stash crate placed. Look at it and press F to open it.', 'good');
+  }
+
+  private nearbyStash(): Stash | null {
+    if (this.focus instanceof Stash) return this.focus;
+    const p = this.player.pos;
+    let best: Stash | null = null;
+    let bd = 2.2;
+    for (const s of [...this.loot.stashes, ...this.loot.crates, ...[...this.corpses.values()].map((c) => c.stash)]) {
+      const d = Math.hypot(s.x - p.x, s.z - p.z);
+      if (d < bd && Math.abs(s.y - p.y) < 1.5) {
+        bd = d;
+        best = s;
+      }
+    }
+    return best;
+  }
+
+  toggleInventory(open?: boolean) {
+    const want = open ?? !this.invUI.isOpen;
+    if (want === this.invUI.isOpen) return;
+    if (want) {
+      this.openStash = this.nearbyStash();
+      this.invUI.open(this.loot.near(this.player.pos, 2.3), this.openStash, this.player.vitals);
+      if (this.online && this.openStash) {
+        // the server holds what is inside; show it once it answers
+        this.invUI.setStashState('Opening…');
+        this.net.send({ t: 'copen', cid: this.openStash.uid });
+      }
+      this.input.uiMode = true;
+      this.input.unlock();
+      audio.ui('open');
+    } else {
+      if (this.online && this.openStash) {
+        this.syncOpenBox();
+        this.net.send({ t: 'cclose', cid: this.openStash.uid });
+      }
+      this.invUI.close();
+      this.input.uiMode = false;
+      this.openStash = null;
+      if (this.started) this.input.lock();
+      // if the browser refuses the re-capture, fall back to the pause menu
+      setTimeout(() => {
+        if (this.started && !this.paused && !this.invUI.isOpen && !this.input.locked && !this.player.dead) this.pause();
+      }, 400);
+      audio.ui('close');
+      this.save();
+    }
+  }
+
+  // ------------------------------------------------------------ interaction
+
+  private updateInteraction(cam: THREE.PerspectiveCamera) {
+    this.prompt = null;
+    this.focus = null;
+    if (this.player.dead || this.invUI.isOpen || this.director.mode === 'free' || this.use) return;
+    const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
+    const range = 2.6 + (this.director.mode === 'orbit' ? this.director.orbit.dist : 0);
+    const hit = physics.raycast(cam.position, dir, range, USE_GROUPS, this.player.collider);
+    const owner = hit?.tag?.owner;
+    if (!owner) {
+      // nobody has a name floating over their head: you only learn it by looking right at them, up close
+      const c = new THREE.Vector3();
+      for (const r of this.remotes.values()) {
+        if (!r.alive) continue;
+        r.chest(c).sub(cam.position);
+        const d = c.length();
+        if (d < 18 && c.normalize().dot(dir) > 0.992) this.prompt = `<small>${r.name}</small>`;
+      }
+      return;
+    }
+    this.focus = owner;
+    const key = this.input.pressed('KeyF');
+    if (owner instanceof WorldItem) {
+      const item = owner.loot.item;
+      const d = ITEMS[item.id];
+      const qty = d.stack ? ` <small>×${item.qty}</small>` : d.weapon ? ` <small>${item.loaded ?? 0}/${capacityOf(item)}</small>` : item.cargo?.length ? ` <small>${item.cargo.length} inside</small>` : '';
+      this.prompt = `<kbd>F</kbd>Take ${d.name}${qty}`;
+      if (key) {
+        if (!this.inv.hasRoom(item)) {
+          this.hud.note(d.slot ? `No free ${d.slot === 'long' ? 'weapon' : d.slot} slot and no room in your pockets` : 'No room: find a vest or a bag', 'warn');
+          return;
+        }
+        if (!this.takeWorldItem(owner)) return;
+        const left = this.inv.add(item);
+        if (left) this.dropItem(left);
+        audio.ui('pickup');
+        this.hud.note(`${d.name}${d.stack ? ` ×${item.qty}` : ''}`, 'good');
+        this.inventoryChanged();
+      }
+    } else if (owner instanceof Door) {
+      const door = owner;
+      this.prompt = `<kbd>F</kbd>${door.open ? 'Close' : 'Open'} door`;
+      if (key) {
+        door.toggle(this.player.pos);
+        audio.door(door.open, door.pivot.position);
+        this.net.send({ t: 'door', i: this.s.buildings.doors.indexOf(door), open: door.open, swing: door.swingDir });
+      }
+    } else if (owner instanceof Stash) {
+      const canPack = !owner.fixed && owner.container.items.length === 0 && (!this.online || owner.known);
+      this.prompt = owner.fixed
+        ? `<kbd>F</kbd>Search ${owner.label}`
+        : `<kbd>F</kbd>Open ${owner.label}${canPack ? ' <small>G to pack up</small>' : ''}`;
+      if (key) this.toggleInventory(true);
+      if (canPack && this.input.pressed('KeyG')) {
+        const kit = makeItem('stash_kit', 1);
+        if (!this.inv.hasRoom(kit)) {
+          this.hud.note('No room to carry the crate', 'warn');
+          return;
+        }
+        this.inv.add(kit);
+        this.loot.removeStash(owner);
+        this.net.send({ t: 'stash-', uid: owner.uid });
+        audio.ui('pickup');
+        this.inventoryChanged();
+      }
+    }
+  }
+
+  /** offline: emptied map crates refill after a while, once nobody is around to see it */
+  private tickCrates() {
+    const p = this.player.pos;
+    for (const c of this.loot.crates) {
+      if (c.container.items.length) {
+        c.emptiedAt = -1;
+        continue;
+      }
+      if (c.emptiedAt < 0) c.emptiedAt = this.economy.time;
+      else if (this.economy.time - c.emptiedAt > CRATE_RESTOCK && c !== this.openStash && Math.hypot(c.x - p.x, c.z - p.z) > 60) {
+        fillCrate(c.container, c.kind);
+        c.emptiedAt = -1;
+      }
+    }
+  }
+
+  private hotbar(): HotbarEntry[] {
+    const out: HotbarEntry[] = [];
+    SLOT_ORDER.forEach((s: Slot, i) => {
+      const it = this.inv.slots[s];
+      const d = it ? ITEMS[it.id] : null;
+      out.push({ key: String(i + 1), id: it?.id ?? null, label: it && d?.weapon ? String(it.loaded ?? 0) : '', active: this.inv.active === s, dim: false });
+    });
+    this.quick.forEach((id, i) => {
+      const n = id ? this.countOf(id) : 0;
+      out.push({ key: String(i + 5), id, label: id ? String(n) : '', active: false, dim: !!id && n === 0 });
+    });
+    return out;
+  }
+
+  /** keep the third-person body's hands in step with what is equipped */
+  private syncHeld() {
+    const it = this.weapons.equippedItem;
+    const key = it ? `${it.id}|${(it.mods ?? []).join(',')}` : '';
+    if (key === this.heldKey) return;
+    this.heldKey = key;
+    const h = it ? this.makeHeld(it.id, it.mods ?? []) : null;
+    this.avatar.setHeld(h?.obj ?? null, h?.grips ?? null, h?.kind);
+  }
+
+  // ------------------------------------------------------------ frame
+
+  private frame() {
+    const now = performance.now();
+    this.perf.begin(now);
+    const dt = Math.min((now - this.last) / 1000, 0.1);
+    this.last = now;
+    const { r, veg, grass, buildings, atmo, world } = this.s;
+    const input = this.input;
+    const p = this.player;
+    const cam = r.camera;
+    const playing = this.started && !this.paused && !p.dead;
+
+    if (input.pressed('Tab') && playing) this.toggleInventory();
+    const uiOpen = this.invUI.isOpen;
+
+    // camera modes consume the mouse in orbit / free
+    const consumed = !uiOpen && !this.paused && this.director.handleInput(input, dt);
+    const sens = this.weapons.scoped ? 0.28 : this.weapons.aiming ? 0.7 : 1;
+    if (!consumed && !uiOpen && playing) p.look(input, sens);
+
+    const canMove = this.director.controlsPlayer && !uiOpen && playing;
+    const moveInput = canMove ? input : NULL_INPUT;
+    p.weightKg = this.inv.weight();
+    p.fallMult = this.inv.wear('fall').reduce((a, b) => a * b, 1);
+    const steps = physics.step(dt, (h) => {
+      p.step(h, moveInput);
+      buildings.update(h);
+    });
+    if (steps > 0) input.consumeFixed();
+    if (this.started) p.tickVitals(dt);
+
+    // quick-use keys
+    if (playing && !uiOpen && !this.use && this.director.controlsPlayer) {
+      QUICK_KEYS.forEach((k, i) => {
+        if (input.pressed(k)) this.useQuick(i);
+      });
+    }
+
+    // timed item use (eat, drink, bandage, open a box): shown in the hands, RMB cancels
+    if (this.use) {
+      const u = this.use;
+      u.t += dt;
+      u.soundT += dt;
+      if (u.sound && u.soundT > 1.05 && u.t < u.dur - 0.4) {
+        u.soundT = 0;
+        audio.ui(u.sound);
+      }
+      if (p.dead || (input.pressed('Mouse2') && !uiOpen)) {
+        this.use = null;
+        this.weapons.endUse();
+        if (!p.dead) this.hud.note('Cancelled', 'info');
+      } else if (u.t >= u.dur) {
+        this.use = null;
+        this.weapons.endUse();
+        u.done();
+      }
+    }
+
+    // weapons + fov
+    const fpLive = this.director.mode === 'first' && this.director.blend > 0.9;
+    this.weapons.update(dt, input, cam, fpLive && !uiOpen && playing && !this.use);
+    const kind = this.weapons.equippedItem ? ITEMS[this.weapons.equippedItem.id].weapon?.kind : undefined;
+    this.director.fovMul = this.weapons.scoped ? 0.3 : this.weapons.aiming ? (kind === 'rifle' ? 0.78 : 0.88) : 1;
+    this.syncHeld();
+
+    this.director.update(dt);
+    if (this.director.avatarVisible) cam.layers.enable(AVATAR_LAYER);
+    else cam.layers.disable(AVATAR_LAYER);
+    // your own body below the camera, first person only
+    const fpView = this.director.viewmodelVisible && !p.dead;
+    if (fpView) cam.layers.enable(FP_BODY_LAYER);
+    else cam.layers.disable(FP_BODY_LAYER);
+    r.vmScene.visible = fpView;
+    const interp = new THREE.Vector3().lerpVectors(p.prevPos, p.pos, physics.alpha);
+    const first = this.director.mode === 'first';
+    this.avatar.update(dt, interp, p.vel, p.yaw, p.crouched, p.dead, first, first ? 0 : p.pitch);
+    for (const d of this.dummies) {
+      if (Math.abs(d.pos.x - interp.x) + Math.abs(d.pos.z - interp.z) < 260) d.update(dt);
+    }
+    for (const rp of this.remotes.values()) rp.update(dt, now, cam.position);
+
+    this.updateInteraction(cam);
+    this.effects.update(dt);
+    this.loot.update(cam.position);
+
+    // world simulation ticks (the server does this when online)
+    this.econT += dt;
+    if (this.econT > 5) {
+      if (!this.online && this.started) {
+        this.economy.tick(this.econT, [p.pos]);
+        this.tickCrates();
+      }
+      this.econT = 0;
+      if (this.invUI.isOpen) this.invUI.refresh(this.loot.near(p.pos, 2.3), this.openStash);
+    }
+    this.saveT += dt;
+    if (this.saveT > 20 && playing) {
+      this.saveT = 0;
+      this.save();
+    }
+    this.sendState(dt);
+
+    // points of interest
+    const here = world.pois.find((q) => Math.hypot(q.x - p.pos.x, q.z - p.pos.z) < q.radius);
+    if (here && here.name !== this.poi && this.started) this.hud.area(here.name);
+    this.poi = here?.name ?? null;
+
+    // vitals warnings
+    const v = p.vitals;
+    if (v.energy < 25 && !this.warned.hunger) {
+      this.hud.note('You are hungry', 'warn');
+      this.warned.hunger = true;
+    } else if (v.energy > 35) this.warned.hunger = false;
+    if (v.water < 25 && !this.warned.thirst) {
+      this.hud.note('You are thirsty', 'warn');
+      this.warned.thirst = true;
+    } else if (v.water > 35) this.warned.thirst = false;
+    if (p.dead && !this.deathSent) {
+      this.deathSent = true;
+      if (!this.deathInfo) this.deathInfo = `You died of ${p.lastCause || 'your injuries'}. Your gear lies where you fell.`;
+      if (this.invUI.isOpen) this.toggleInventory(false);
+      this.input.unlock();
+      if (this.online) {
+        // last word on what we were carrying, then the server leaves a body with it
+        this.net.send({ t: 'me', inv: this.inv.serialize(), vitals: { ...p.vitals } });
+        this.net.send({ t: 'died', cause: p.lastCause || 'injuries' });
+        this.inv.clear();
+        this.weapons.validate();
+      }
+    } else if (!p.dead) this.deathSent = false;
+
+    atmo.update();
+    veg.update(dt, cam);
+    grass.update(cam, interp);
+
+    // audio
+    const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
+    audio.setListener(cam.position, fwd, new THREE.Vector3(0, 1, 0));
+    if (Math.random() < 0.1) this.indoors = physics.raycast(cam.position, { x: 0, y: 1, z: 0 }, 12, SHOT_GROUPS, p.collider) !== null;
+    audio.updateAmbience(dt, cam.position, this.indoors);
+
+    // post-fx reacting to state
+    const hurt = p.hurt;
+    r.chroma.offset.set(hurt * 0.004 + (v.health < 25 ? 0.0015 : 0), hurt * 0.002);
+    r.vignette.darkness = 0.42 + (this.weapons.aiming ? 0.12 : 0) + (v.health < 25 ? 0.25 : 0);
+
+    const hasCompass = !!this.inv.find((i) => i.id === 'compass');
+    const heading = THREE.MathUtils.radToDeg(-p.yaw);
+    this.hud.update({
+      vitals: v,
+      prompt: this.prompt,
+      weapon: this.weapons.status(),
+      aiming: this.weapons.aiming,
+      scoped: this.weapons.scoped,
+      hitMarker: this.weapons.hitMarker,
+      kill: this.weapons.killMarker,
+      hurt,
+      heading: hasCompass && !uiOpen ? heading : null,
+      progress: this.use ? { label: this.use.label, t: this.use.t / this.use.dur } : null,
+      hotbar: this.hotbar(),
+      fps: this.fps,
+      ping: this.online ? this.net.ping : null,
+      dead: p.dead,
+      deadText: this.deathInfo,
+      hidden: uiOpen || this.director.mode === 'free',
+    });
+
+    this.perf.beforeRender();
+    r.render(dt);
+    this.perf.afterRender();
+    input.endFrame();
+
+    this.fpsAcc += dt;
+    this.fpsN++;
+    if (this.fpsAcc > 0.5) {
+      this.fps = this.fpsN / this.fpsAcc;
+      this.fpsAcc = 0;
+      this.fpsN = 0;
+    }
+  }
+}

@@ -1,0 +1,128 @@
+:root {
+  --ink: #e9e4d8;
+  --ink-dim: rgba(233, 228, 216, 0.62);
+  --ink-faint: rgba(233, 228, 216, 0.32);
+  --panel: rgba(14, 16, 15, 0.78);
+  --panel-solid: #121413;
+  --line: rgba(233, 228, 216, 0.14);
+  --accent: #c9b27c;
+  --danger: #c4523d;
+  --ok: #8fae6b;
+  --cell: 46px;
+  --font: 'Barlow Condensed', system-ui, sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #0b0c0c;
+  color: var(--ink);
+  font-family: var(--font);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#game {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  display: block;
+  cursor: crosshair;
+}
+
+#ui {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------ loading */
+#loading {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(ellipse at 50% 40%, #1b1e1c 0%, #0b0c0c 70%);
+  z-index: 50;
+  transition: opacity 0.9s ease;
+}
+#loading.done {
+  opacity: 0;
+  pointer-events: none;
+}
+.load-inner {
+  width: min(420px, 80vw);
+  text-align: center;
+}
+.load-title {
+  font-size: 84px;
+  font-weight: 700;
+  letter-spacing: 0.32em;
+  margin-right: -0.32em;
+  color: var(--ink);
+}
+.load-sub {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-top: 4px;
+}
+.load-bar {
+  margin-top: 46px;
+  height: 2px;
+  background: var(--line);
+  overflow: hidden;
+}
+.load-fill {
+  height: 100%;
+  width: 0;
+  background: var(--accent);
+  transition: width 0.25s ease;
+}
+.load-label {
+  margin-top: 12px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-faint);
+  height: 14px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* ------------------------------------------------------------ camera mode label */
+.cam-label {
+  position: fixed;
+  left: 22px;
+  bottom: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+.cam-mode {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+.cam-hints {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-dim);
+}
+.cam-hints b {
+  color: var(--accent);
+  font-weight: 600;
+}

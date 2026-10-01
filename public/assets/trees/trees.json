@@ -1,0 +1,192 @@
+{
+ "pine_a": {
+  "url": "assets/trees/pine_a.glb",
+  "lod1": "assets/trees/pine_a_lod1.glb",
+  "height": 19,
+  "radius": 5.74,
+  "trunkRadius": 0.388,
+  "center": [
+   0.27,
+   10.53,
+   -0.33
+  ],
+  "bark": "pine",
+  "leaf": "pine",
+  "alphaTest": 0.3,
+  "tris": {
+   "lod0": 19872,
+   "lod1": 4998
+  }
+ },
+ "pine_b": {
+  "url": "assets/trees/pine_b.glb",
+  "lod1": "assets/trees/pine_b_lod1.glb",
+  "height": 17,
+  "radius": 5.51,
+  "trunkRadius": 0.352,
+  "center": [
+   -0.67,
+   9.32,
+   0.29
+  ],
+  "bark": "pine",
+  "leaf": "pine",
+  "alphaTest": 0.3,
+  "tris": {
+   "lod0": 19872,
+   "lod1": 4997
+  }
+ },
+ "pine_c": {
+  "url": "assets/trees/pine_c.glb",
+  "lod1": "assets/trees/pine_c_lod1.glb",
+  "height": 24,
+  "radius": 7.64,
+  "trunkRadius": 0.451,
+  "center": [
+   0.07,
+   12.08,
+   0.63
+  ],
+  "bark": "pine",
+  "leaf": "pine",
+  "alphaTest": 0.3,
+  "tris": {
+   "lod0": 19392,
+   "lod1": 4527
+  }
+ },
+ "pine_d": {
+  "url": "assets/trees/pine_d.glb",
+  "lod1": "assets/trees/pine_d_lod1.glb",
+  "height": 13,
+  "radius": 2.99,
+  "trunkRadius": 2.49,
+  "center": [
+   0.18,
+   6.28,
+   -0.3
+  ],
+  "bark": "pine",
+  "leaf": "pine",
+  "alphaTest": 0.3,
+  "tris": {
+   "lod0": 18756,
+   "lod1": 4427
+  }
+ },
+ "birch_a": {
+  "url": "assets/trees/birch_a.glb",
+  "lod1": "assets/trees/birch_a_lod1.glb",
+  "height": 16,
+  "radius": 3.69,
+  "trunkRadius": 0.164,
+  "center": [
+   -0.34,
+   11.51,
+   -0.36
+  ],
+  "bark": "birch",
+  "leaf": "aspen",
+  "alphaTest": 0.5,
+  "tris": {
+   "lod0": 7200,
+   "lod1": 1540
+  }
+ },
+ "birch_b": {
+  "url": "assets/trees/birch_b.glb",
+  "lod1": "assets/trees/birch_b_lod1.glb",
+  "height": 14,
+  "radius": 3.08,
+  "trunkRadius": 0.142,
+  "center": [
+   0.05,
+   10.06,
+   -0.26
+  ],
+  "bark": "birch",
+  "leaf": "aspen",
+  "alphaTest": 0.5,
+  "tris": {
+   "lod0": 7200,
+   "lod1": 1545
+  }
+ },
+ "oak_a": {
+  "url": "assets/trees/oak_a.glb",
+  "lod1": "assets/trees/oak_a_lod1.glb",
+  "height": 13,
+  "radius": 5.6,
+  "trunkRadius": 0.273,
+  "center": [
+   0.11,
+   7.57,
+   0.1
+  ],
+  "bark": "oak",
+  "leaf": "oak",
+  "alphaTest": 0.5,
+  "tris": {
+   "lod0": 13806,
+   "lod1": 4082
+  }
+ },
+ "ash_a": {
+  "url": "assets/trees/ash_a.glb",
+  "lod1": "assets/trees/ash_a_lod1.glb",
+  "height": 15,
+  "radius": 6.31,
+  "trunkRadius": 0.375,
+  "center": [
+   1.37,
+   8.17,
+   0.8
+  ],
+  "bark": "oak",
+  "leaf": "ash",
+  "alphaTest": 0.5,
+  "tris": {
+   "lod0": 20000,
+   "lod1": 5105
+  }
+ },
+ "bush_a": {
+  "url": "assets/trees/bush_a.glb",
+  "lod1": "assets/trees/bush_a_lod1.glb",
+  "height": 2.2,
+  "radius": 1.5,
+  "trunkRadius": 1.101,
+  "center": [
+   0.16,
+   0.96,
+   -0.02
+  ],
+  "bark": "oak",
+  "leaf": "ash",
+  "alphaTest": 0.5,
+  "tris": {
+   "lod0": 13872,
+   "lod1": 2862
+  }
+ },
+ "bush_b": {
+  "url": "assets/trees/bush_b.glb",
+  "lod1": "assets/trees/bush_b_lod1.glb",
+  "height": 1.8,
+  "radius": 1.08,
+  "trunkRadius": 0.125,
+  "center": [
+   0.01,
+   0.99,
+   0.02
+  ],
+  "bark": "oak",
+  "leaf": "aspen",
+  "alphaTest": 0.5,
+  "tris": {
+   "lod0": 4760,
+   "lod1": 1036
+  }
+ }
+}

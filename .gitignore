@@ -1,0 +1,9 @@
+node_modules
+dist
+# raw Poly Haven downloads (hundreds of MB); the processed copies in public/assets are committed
+assets-src
+# server world save
+data
+.vercel
+*.log
+.DS_Store

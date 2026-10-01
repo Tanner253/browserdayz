@@ -1,0 +1,20 @@
+# Render Blueprint: one web service that serves the game client and runs the
+# multiplayer server (WebSocket at /ws) from the same URL.
+#
+# Deploy: Render dashboard -> New -> Blueprint -> pick this repository.
+services:
+  - type: web
+    name: browserdayz
+    runtime: node
+    plan: free
+    region: oregon
+    # devDependencies (TypeScript, Vite) are needed to build the client
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: MAX_PLAYERS
+        value: "24"
