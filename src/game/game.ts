@@ -193,6 +193,17 @@ export class Game {
     this.player.onDamage = (amt, cause) => {
       if (cause === 'fall' && amt > 5) this.hud.note('You hurt yourself in the fall', 'warn');
     };
+    this.hud.onChat(
+      (ch, text) => {
+        if (this.online) this.net.send({ t: 'chat', ch, text });
+        else {
+          this.hud.chatLine(ch, playerName() || 'You', text);
+          this.hud.chatLine('system', '', 'You are playing offline: nobody can hear you.');
+        }
+      },
+      // the keyboard is the game's again
+      () => this.input.releaseAll(),
+    );
     this.hud.onStart(() => this.resume());
     this.hud.onRespawn(() => this.respawn());
     this.hud.showStart(true);
@@ -346,11 +357,13 @@ export class Game {
       void this.addRemote(m.p);
       this.updateOnline();
       this.hud.feed(`${m.p.name} joined`);
+      this.hud.chatLine('system', '', `${m.p.name} joined`);
     });
     net.on('leave', (m) => {
       const r = this.remotes.get(m.id);
       if (!r) return;
       this.hud.feed(`${r.name} left`);
+      this.hud.chatLine('system', '', `${r.name} left`);
       r.dispose();
       this.remotes.delete(m.id);
       this.updateOnline();
@@ -432,7 +445,7 @@ export class Game {
       this.meDirty = true;
       this.resume();
     });
-    net.on('chat', (m) => this.hud.feed(`${m.from}: ${m.text}`));
+    net.on('chat', (m) => this.hud.chatLine(m.ch ?? 'global', m.from, m.text));
     net.onClose = (reason) => {
       this.paused = true;
       this.input.unlock();
@@ -1043,13 +1056,20 @@ export class Game {
 
     if (input.pressed('Tab') && playing) this.toggleInventory();
     const uiOpen = this.invUI.isOpen;
+    // Enter opens the chat box; while typing the character stands still and the gun stays quiet
+    if (input.pressed('Enter') && playing && !uiOpen && this.director.controlsPlayer && !this.hud.chatOpen) {
+      input.releaseAll();
+      this.hud.openChat();
+    }
+    if (this.hud.chatOpen && (!playing || uiOpen)) this.hud.closeChat();
+    const typing = this.hud.chatOpen;
 
     // camera modes consume the mouse in orbit / free
     const consumed = !uiOpen && !this.paused && this.director.handleInput(input, dt);
     const sens = this.weapons.scoped ? 0.28 : this.weapons.aiming ? 0.7 : 1;
     if (!consumed && !uiOpen && playing) p.look(input, sens);
 
-    const canMove = this.director.controlsPlayer && !uiOpen && playing;
+    const canMove = this.director.controlsPlayer && !uiOpen && playing && !typing;
     const moveInput = canMove ? input : NULL_INPUT;
     p.weightKg = this.inv.weight();
     p.fallMult = this.inv.wear('fall').reduce((a, b) => a * b, 1);
@@ -1061,7 +1081,7 @@ export class Game {
     if (this.started) p.tickVitals(dt);
 
     // quick-use keys
-    if (playing && !uiOpen && !this.use && this.director.controlsPlayer) {
+    if (playing && !uiOpen && !typing && !this.use && this.director.controlsPlayer) {
       QUICK_KEYS.forEach((k, i) => {
         if (input.pressed(k)) this.useQuick(i);
       });
@@ -1089,7 +1109,7 @@ export class Game {
 
     // weapons + fov
     const fpLive = this.director.mode === 'first' && this.director.blend > 0.9;
-    this.weapons.update(dt, input, cam, fpLive && !uiOpen && playing && !this.use);
+    this.weapons.update(dt, input, cam, fpLive && !uiOpen && playing && !this.use && !typing);
     const kind = this.weapons.equippedItem ? ITEMS[this.weapons.equippedItem.id].weapon?.kind : undefined;
     this.director.fovMul = this.weapons.scoped ? 0.3 : this.weapons.aiming ? (kind === 'rifle' ? 0.78 : 0.88) : 1;
     this.syncHeld();

@@ -2,6 +2,10 @@
 // prompts only when relevant. Plain DOM; updated once per frame with cheap diffs.
 
 import type { Vitals } from '../game/player';
+import type { ChatChannel } from '../net/protocol';
+
+const CHANNELS: ChatChannel[] = ['global', 'near'];
+const CHANNEL_LABEL: Record<ChatChannel | 'system', string> = { global: 'Global', near: 'Proximity', system: '' };
 
 const ICONS = {
   health: '<path d="M12 21s-7-4.5-9.5-9A5.5 5.5 0 0 1 12 6a5.5 5.5 0 0 1 9.5 6C19 16.5 12 21 12 21z"/>',
@@ -48,6 +52,11 @@ export class HUD {
       </div>
       <div class="hud-stamina"><div></div></div>
       <div class="hud-hotbar"></div>
+      <div class="hud-chat">
+        <div class="chat-log"></div>
+        <div class="chat-entry"><span class="chat-ch"></span><input class="chat-input" maxlength="160" spellcheck="false" autocomplete="off"></div>
+        <div class="chat-hint"><b>Tab</b> switch channel · <b>Enter</b> send · empty <b>Enter</b> closes</div>
+      </div>
       <div class="hud-scope">
         <svg viewBox="-100 -100 200 200" preserveAspectRatio="xMidYMid meet">
           <defs><radialGradient id="sv" r="1"><stop offset="0.82" stop-color="#000" stop-opacity="0"/><stop offset="0.97" stop-color="#000" stop-opacity="0.85"/></radialGradient></defs>
@@ -91,19 +100,38 @@ export class HUD {
             <div><b>1 2</b> primary · secondary</div><div><b>3 4</b> pistol · melee</div>
             <div><b>5 – 8</b> eat · drink · bandage</div><div><b>Wheel</b> cycle weapons</div>
             <div><b>F</b> take · doors · search crates</div><div><b>Tab</b> inventory (right-click items)</div>
-            <div><b>V</b> third person · <b>P</b> free cam</div><div><b>Esc</b> release mouse / pause</div>
+            <div><b>Enter</b> chat · <b>Tab</b> switches channel</div><div><b>Esc</b> release mouse / pause</div>
+            <div><b>V</b> third person · <b>P</b> free cam</div><div><b>F3</b> performance</div>
           </div>
           <div class="start-hint">You wake up on the edge of the map with empty hands, something to eat and something to drink. The best loot is in the middle: the police station in Zelenaya Dolina has guns and attachments. Clothes and bags let you carry more. Other survivors can kill you and take everything.</div>
         </div>
       </div>
     `;
     document.getElementById('ui')!.appendChild(this.root);
-    for (const k of ['cross', 'hit', 'prompt', 'progress', 'compass', 'area', 'weapon', 'vitals', 'stamina', 'hotbar', 'scope', 'damage', 'hitdir', 'fps', 'online', 'net', 'feed', 'fatal', 'dead', 'start']) {
+    for (const k of ['cross', 'hit', 'prompt', 'progress', 'compass', 'area', 'weapon', 'vitals', 'stamina', 'hotbar', 'chat', 'scope', 'damage', 'hitdir', 'fps', 'online', 'net', 'feed', 'fatal', 'dead', 'start']) {
       this.el[k] = this.root.querySelector(`.hud-${k}`) as HTMLElement;
     }
     this.notes = this.root.querySelector('.hud-notes') as HTMLDivElement;
     this.buildCompass();
     (this.root.querySelector('.fatal-btn') as HTMLButtonElement).onclick = () => location.reload();
+    const chat = this.root.querySelector('.chat-input') as HTMLInputElement;
+    chat.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Tab') {
+        // same box, different audience
+        e.preventDefault();
+        this.setChannel(CHANNELS[(CHANNELS.indexOf(this.channel) + (e.shiftKey ? CHANNELS.length - 1 : 1)) % CHANNELS.length]);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        // the key that opened the box is still held down
+        if (e.repeat) return;
+        const text = chat.value.trim();
+        this.closeChat();
+        if (text) this.chatSend(this.channel, text);
+      } else if (e.key === 'Escape') this.closeChat();
+    });
+    chat.addEventListener('blur', () => this.chatOpen && this.closeChat());
+    this.setChannel('global');
     // typing a name must not start the game
     const name = this.root.querySelector('.start-name') as HTMLInputElement;
     name.addEventListener('click', (e) => e.stopPropagation());
@@ -189,6 +217,66 @@ export class HUD {
     const e = this.root.querySelector('.start-online') as HTMLElement;
     e.textContent = count === null ? '' : count === 0 ? 'Nobody else is online yet' : `${count} survivor${count === 1 ? '' : 's'} online`;
     this.toggle(e, 'show', count !== null);
+  }
+
+  // ---------------------------------------------------------------- chat
+
+  /** channel the next message goes to (remembered between messages) */
+  channel: ChatChannel = 'global';
+  chatOpen = false;
+  private chatSend: (ch: ChatChannel, text: string) => void = () => {};
+  private chatClosed: () => void = () => {};
+
+  onChat(send: (ch: ChatChannel, text: string) => void, closed: () => void) {
+    this.chatSend = send;
+    this.chatClosed = closed;
+  }
+
+  private setChannel(ch: ChatChannel) {
+    this.channel = ch;
+    const tag = this.root.querySelector('.chat-ch') as HTMLElement;
+    tag.textContent = CHANNEL_LABEL[ch];
+    tag.dataset.ch = ch;
+  }
+
+  openChat() {
+    if (this.chatOpen) return;
+    this.chatOpen = true;
+    this.toggle(this.el.chat, 'open', true);
+    const input = this.root.querySelector('.chat-input') as HTMLInputElement;
+    input.value = '';
+    input.focus();
+    const log = this.root.querySelector('.chat-log') as HTMLElement;
+    log.scrollTop = log.scrollHeight;
+  }
+
+  closeChat() {
+    if (!this.chatOpen) return;
+    this.chatOpen = false;
+    this.toggle(this.el.chat, 'open', false);
+    (this.root.querySelector('.chat-input') as HTMLInputElement).blur();
+    this.chatClosed();
+  }
+
+  /** every channel lands in the one log, tagged and coloured by channel */
+  chatLine(ch: ChatChannel | 'system', from: string, text: string) {
+    const log = this.root.querySelector('.chat-log') as HTMLElement;
+    const n = document.createElement('div');
+    n.className = 'chat-line';
+    n.dataset.ch = ch;
+    if (ch !== 'system') {
+      const tag = document.createElement('i');
+      tag.textContent = CHANNEL_LABEL[ch];
+      const who = document.createElement('b');
+      who.textContent = from;
+      n.append(tag, who);
+    }
+    const body = document.createElement('span');
+    body.textContent = text;
+    n.appendChild(body);
+    log.appendChild(n);
+    while (log.children.length > 60) log.firstChild?.remove();
+    log.scrollTop = log.scrollHeight;
   }
 
   /** connection line under the frame counter */

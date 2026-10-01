@@ -13,6 +13,11 @@ import type { HitZone } from '../sim/combat';
 
 export const PROTOCOL = 2;
 
+/** chat channels: everyone on the server, or only players standing near the speaker */
+export type ChatChannel = 'global' | 'near';
+/** how far proximity chat carries, metres */
+export const CHAT_RANGE = 50;
+
 /** player state flags */
 export const F_CROUCH = 1, F_SPRINT = 2, F_AIM = 4, F_GROUND = 8, F_DEAD = 16;
 
@@ -78,7 +83,7 @@ export type C2S =
   | { t: 'me'; inv: SerializedInventory; vitals: Vitals }
   | { t: 'died'; cause: string }
   | { t: 'respawn' }
-  | { t: 'chat'; text: string }
+  | { t: 'chat'; ch?: ChatChannel; text: string }
   | { t: 'ping'; n: number };
 
 export type S2C =
@@ -115,7 +120,7 @@ export type S2C =
   | { t: 'corpse-'; uid: string }
   | { t: 'door'; i: number; open: boolean; swing: number }
   | { t: 'spawn'; x: number; z: number; yaw: number }
-  | { t: 'chat'; from: string; text: string }
+  | { t: 'chat'; ch?: ChatChannel; from: string; text: string }
   | { t: 'pong'; n: number }
   | { t: 'kick'; reason: string };
 

@@ -16,7 +16,7 @@ import { Container, type SerializedInventory } from '../src/sim/inventory';
 import { ITEMS, sanitizeItem, type ItemInstance } from '../src/sim/items';
 import { CRATE_RESTOCK, CRATE_SPECS, fillCrate } from '../src/sim/crates';
 import { WEAPON_RULES, hitDamage, type HitZone } from '../src/sim/combat';
-import { F_DEAD, PROTOCOL, type C2S, type CorpseInfo, type KillInfo, type PlayerInfo, type Pose, type S2C, type StashInfo, type StoredItem, type Vitals } from '../src/net/protocol';
+import { CHAT_RANGE, F_DEAD, PROTOCOL, type C2S, type CorpseInfo, type KillInfo, type PlayerInfo, type Pose, type S2C, type StashInfo, type StoredItem, type Vitals } from '../src/net/protocol';
 
 const PORT = Number(process.env.PORT ?? 8080);
 const ROOT = process.cwd();
@@ -141,6 +141,7 @@ interface Client {
   inv: SerializedInventory | null;
   vitals: Vitals | null;
   lastHit: number;
+  lastChat: number;
   lastHitBy: { id: number; name: string; w: string; zone: HitZone; dist: number; at: number } | null;
   openCid: string | null;
   joinedAt: number;
@@ -408,8 +409,17 @@ function handle(c: Client, m: C2S) {
       return;
     }
     case 'chat': {
-      const text = String(m.text ?? '').replace(/[\u0000-\u001f]/g, '').trim().slice(0, 140);
-      if (text) broadcast({ t: 'chat', from: c.name, text });
+      const text = String(m.text ?? '').replace(/[\u0000-\u001f]/g, '').trim().slice(0, 160);
+      const now = Date.now();
+      if (!text || now - c.lastChat < 500) return;
+      c.lastChat = now;
+      if (m.ch === 'near') {
+        // proximity: only players standing within earshot get it (the speaker included)
+        const out: S2C = { t: 'chat', ch: 'near', from: c.name, text };
+        for (const o of clients.values()) {
+          if (Math.hypot(o.pose[0] - c.pose[0], o.pose[1] - c.pose[1], o.pose[2] - c.pose[2]) <= CHAT_RANGE) send(o, out);
+        }
+      } else broadcast({ t: 'chat', ch: 'global', from: c.name, text });
       return;
     }
     case 'ping':
@@ -446,7 +456,7 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
     pose: [sp.x, 'y' in sp && sp.y !== undefined ? sp.y : world.groundAt(sp.x, sp.z), sp.z, sp.yaw, 0, 0],
     w: null, m: [], alive: true,
     inv: resume?.inv ?? null, vitals: resume?.vitals ?? null,
-    lastHit: 0, lastHitBy: null, openCid: null, joinedAt: Date.now(), msgCount: 0, msgWindow: Date.now(),
+    lastHit: 0, lastChat: 0, lastHitBy: null, openCid: null, joinedAt: Date.now(), msgCount: 0, msgWindow: Date.now(),
   };
   records.delete(key);
   const others = [...clients.values()].map(info);
@@ -547,7 +557,9 @@ const server = http.createServer((req, res) => {
   const ext = path.extname(file);
   const headers: Record<string, string> = {
     'content-type': MIME[ext] ?? 'application/octet-stream',
-    'cache-control': rel.startsWith('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache',
+    // asset lists are always re-checked; everything else under /assets is either content-hashed
+    // (the built script) or requested with a version in the URL, so it can be kept for good
+    'cache-control': rel.startsWith('/assets/') && ext !== '.json' ? 'public, max-age=31536000, immutable' : 'no-cache',
   };
   if (COMPRESS.has(ext) && /\bgzip\b/.test(String(req.headers['accept-encoding'] ?? ''))) {
     let body = gz.get(file);

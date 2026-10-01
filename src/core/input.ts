@@ -68,6 +68,12 @@ export class Input {
     });
   }
 
+  /** let go of every held key (a text field is taking the keyboard) */
+  releaseAll() {
+    for (const k of this.down) this.releasedSet.add(k);
+    this.down.clear();
+  }
+
   /** Capture the mouse (call from a click or key press). */
   lock() {
     if (this.locked) return;

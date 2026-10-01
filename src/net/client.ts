@@ -124,7 +124,12 @@ export class Net {
       clearTimeout(giveUp);
       onStatus('Connecting…');
     }
-    return this.open(name, remote ? 12_000 : 4000);
+    const timeout = remote ? 12_000 : 4000;
+    const first = await this.open(name, timeout);
+    if (first || this.kicked) return first;
+    // one more try: a proxy or a server that has only just started can drop the first connection
+    await new Promise((r) => setTimeout(r, 400));
+    return this.open(name, timeout);
   }
 
   private open(name: string, timeout: number): Promise<Welcome | null> {

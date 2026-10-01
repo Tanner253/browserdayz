@@ -14,6 +14,8 @@ export interface ModelEntry {
 }
 
 export interface Manifest {
+  /** when the asset pipeline last ran: used to version every asset URL */
+  generated?: string;
   hdri: { background: string; env: string };
   textures: Record<string, { diff: string; nor: string; arm: string }>;
   models: Record<string, ModelEntry>;
@@ -56,12 +58,15 @@ export class Assets {
   }
 
   async init() {
+    // Always ask the server for the current asset list: a browser holding last week's copy
+    // would not know about models added since, and the game would fail to start.
     const [m, t] = await Promise.all([
-      fetch(`${BASE}assets/manifest.json`).then((r) => r.json()),
-      fetch(`${BASE}assets/trees/trees.json`).then((r) => r.json()),
+      fetch(`${BASE}assets/manifest.json`, { cache: 'no-cache' }).then((r) => r.json()),
+      fetch(`${BASE}assets/trees/trees.json`, { cache: 'no-cache' }).then((r) => r.json()),
     ]);
     this.manifest = m;
     this.trees = t;
+    this.version = String(m.generated ?? '').replace(/\D/g, '').slice(0, 14);
   }
 
   private idleWaiters: (() => void)[] = [];
@@ -86,8 +91,11 @@ export class Assets {
     return new Promise((r) => this.idleWaiters.push(r));
   }
 
+  /** changes whenever the assets are rebuilt, so cached models and textures are never stale */
+  private version = '';
+
   url(rel: string) {
-    return `${BASE}${rel}`;
+    return `${BASE}${rel}${this.version ? `?v=${this.version}` : ''}`;
   }
 
   loadGLTF(url: string): Promise<GLTF> {
