@@ -1,20 +1,35 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "vite",
-  "buildCommand": "npm run build",
+  "buildCommand": "VITE_SERVER_URL=https://browserdayz.onrender.com npm run build",
   "outputDirectory": "dist",
   "headers": [
     {
       "source": "/assets/(.*)",
-      "headers": [{ "key": "Cache-Control", "value": "public, max-age=86400, stale-while-revalidate=604800" }]
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400, stale-while-revalidate=604800"
+        }
+      ]
     },
     {
       "source": "/assets/(.*)\\.glb",
-      "headers": [{ "key": "Content-Type", "value": "model/gltf-binary" }]
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "model/gltf-binary"
+        }
+      ]
     },
     {
       "source": "/assets/hdri/(.*)",
-      "headers": [{ "key": "Content-Type", "value": "application/octet-stream" }]
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/octet-stream"
+        }
+      ]
     }
   ]
 }

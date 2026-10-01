@@ -42,7 +42,7 @@ Things to know about the free plan:
 - There is no persistent disk. The world (loot, stashes) is saved to `data/world.json` every minute and on shutdown, but that file is lost whenever the service restarts or redeploys. Add a Render disk mounted at `/opt/render/project/src/data` (or set `DATA_DIR`) to keep stashes across restarts.
 - Characters are remembered by the server for 30 minutes after you disconnect, in memory.
 
-To host the client elsewhere (for example Vercel) and only the server on Render, build the client with `VITE_SERVER_URL=https://your-service.onrender.com`.
+The client can also be hosted on its own (Vercel): `vercel.json` builds it with `VITE_SERVER_URL=https://browserdayz.onrender.com`, so that copy plays on the Render server. If the Render service is asleep the game waits for it to wake up before joining. Change the URL there if the server moves.
 
 ## Controls
 

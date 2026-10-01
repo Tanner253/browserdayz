@@ -71,6 +71,7 @@ export class HUD {
       <div class="hud-damage"></div>
       <div class="hud-hitdir"><i></i></div>
       <div class="hud-fps"></div>
+      <div class="hud-online"><i></i><b></b><span></span></div>
       <div class="hud-net"></div>
       <div class="hud-feed"></div>
       <div class="hud-fatal"><div class="fatal-title">Disconnected</div><div class="fatal-sub"></div><button class="dead-btn fatal-btn">Reconnect</button></div>
@@ -81,6 +82,7 @@ export class HUD {
           <div class="start-sub">vertical slice · Zelenaya Dolina</div>
           <div class="start-nameRow"><label>Name</label><input class="start-name" maxlength="16" spellcheck="false" autocomplete="off" placeholder="Survivor"></div>
           <button class="start-btn">Click to play</button>
+          <div class="start-online"></div>
           <div class="start-keys">
             <div><b>WASD</b> move · <b>Alt</b> walk</div><div><b>Shift</b> sprint · hold breath (scoped)</div>
             <div><b>C</b> crouch · <b>Space</b> jump</div><div><b>Q / E</b> lean</div>
@@ -96,7 +98,7 @@ export class HUD {
       </div>
     `;
     document.getElementById('ui')!.appendChild(this.root);
-    for (const k of ['cross', 'hit', 'prompt', 'progress', 'compass', 'area', 'weapon', 'vitals', 'stamina', 'hotbar', 'scope', 'damage', 'hitdir', 'fps', 'net', 'feed', 'fatal', 'dead', 'start']) {
+    for (const k of ['cross', 'hit', 'prompt', 'progress', 'compass', 'area', 'weapon', 'vitals', 'stamina', 'hotbar', 'scope', 'damage', 'hitdir', 'fps', 'online', 'net', 'feed', 'fatal', 'dead', 'start']) {
       this.el[k] = this.root.querySelector(`.hud-${k}`) as HTMLElement;
     }
     this.notes = this.root.querySelector('.hud-notes') as HTMLDivElement;
@@ -170,6 +172,23 @@ export class HUD {
 
   nameValue() {
     return (this.root.querySelector('.start-name') as HTMLInputElement).value.trim().slice(0, 16);
+  }
+
+  /** players connected to the server right now (null = playing offline) */
+  setOnline(count: number | null, max = 0) {
+    const e = this.el.online;
+    this.toggle(e, 'show', count !== null);
+    if (count === null) return;
+    (e.querySelector('b') as HTMLElement).textContent = String(count);
+    (e.querySelector('span') as HTMLElement).textContent = `${max ? ` / ${max}` : ''} online`;
+    this.setStartOnline(count);
+  }
+
+  /** the same number on the start / pause screen */
+  setStartOnline(count: number | null) {
+    const e = this.root.querySelector('.start-online') as HTMLElement;
+    e.textContent = count === null ? '' : count === 0 ? 'Nobody else is online yet' : `${count} survivor${count === 1 ? '' : 's'} online`;
+    this.toggle(e, 'show', count !== null);
   }
 
   /** connection line under the frame counter */

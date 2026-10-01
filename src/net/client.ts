@@ -1,20 +1,52 @@
-// Client side of the game connection. If no server answers (static hosting, or the
-// dev server running on its own) the game simply plays offline.
+// Client side of the game connection. If no server answers (static hosting with no
+// server configured, or the dev server running on its own) the game plays offline.
 
 import { PROTOCOL, type C2S, type S2C } from './protocol';
 
 type Handler<T extends S2C['t']> = (m: Extract<S2C, { t: T }>) => void;
+type Welcome = Extract<S2C, { t: 'welcome' }>;
 
 const KEY_STORE = 'zona.player.key';
 const NAME_STORE = 'zona.player.name';
 
-/** where the game server lives: same host by default, `?server=wss://…` or VITE_SERVER_URL to point elsewhere */
-function serverUrl(): string {
+/**
+ * Address of a game server on another host (`?server=https://…` or VITE_SERVER_URL at
+ * build time, e.g. the client on Vercel and the server on Render). Null when the game
+ * server is the host that served this page.
+ */
+export function remoteServer(): string | null {
   const q = new URLSearchParams(location.search).get('server');
   const env = (import.meta as { env?: { VITE_SERVER_URL?: string } }).env?.VITE_SERVER_URL;
-  const base = q || env;
-  if (base) return base.replace(/^http/, 'ws').replace(/\/$/, '') + (base.endsWith('/ws') ? '' : '/ws');
+  const base = (q || env || '').trim().replace(/\/ws$/, '').replace(/\/$/, '');
+  if (!base) return null;
+  try {
+    if (new URL(base).host === location.host) return null;
+  } catch {
+    return null;
+  }
+  return base;
+}
+
+function wsUrl(): string {
+  const remote = remoteServer();
+  if (remote) return remote.replace(/^http/, 'ws') + '/ws';
   return `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
+}
+
+/** How many people are on the server right now (for the start screen). Null if it can't be reached. */
+export async function serverStatus(timeout = 6000): Promise<{ players: number } | null> {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), timeout);
+  try {
+    const r = await fetch(`${remoteServer() ?? ''}/healthz`, { cache: 'no-store', signal: ctl.signal });
+    if (!r.ok) return null;
+    const j = (await r.json()) as { players?: number };
+    return typeof j.players === 'number' ? { players: j.players } : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export function playerName(): string {
@@ -57,6 +89,11 @@ export class Net {
   ping = 0;
   private ws: WebSocket | null = null;
   private handlers = new Map<string, ((m: S2C) => void)[]>();
+  private kicked = '';
+  /** why the server turned us away before we got in (full, outdated client) */
+  get refused() {
+    return this.online ? '' : this.kicked;
+  }
   onClose: (reason: string) => void = () => {};
 
   on<T extends S2C['t']>(t: T, h: Handler<T>) {
@@ -64,11 +101,36 @@ export class Net {
     this.handlers.get(t)!.push(h as (m: S2C) => void);
   }
 
-  /** Resolves with the welcome message, or null when there is no server to play on. */
-  connect(name: string, timeout = 4000): Promise<Extract<S2C, { t: 'welcome' }> | null> {
+  /**
+   * Resolves with the welcome message, or null when there is no server to play on.
+   * A server on a free host sleeps when nobody is around: `onStatus` reports the wait
+   * while it wakes up (the first request can take a minute).
+   */
+  async connect(name: string, onStatus: (text: string) => void = () => {}): Promise<Welcome | null> {
+    const remote = remoteServer();
+    if (remote) {
+      // any answer at all means it is awake; the request itself is what wakes it
+      const slow = setTimeout(() => onStatus('Waking the server… this can take a minute'), 3500);
+      const ctl = new AbortController();
+      const giveUp = setTimeout(() => ctl.abort(), 90_000);
+      try {
+        await fetch(`${remote}/healthz`, { mode: 'no-cors', cache: 'no-store', signal: ctl.signal });
+      } catch {
+        clearTimeout(slow);
+        clearTimeout(giveUp);
+        return null;
+      }
+      clearTimeout(slow);
+      clearTimeout(giveUp);
+      onStatus('Connecting…');
+    }
+    return this.open(name, remote ? 12_000 : 4000);
+  }
+
+  private open(name: string, timeout: number): Promise<Welcome | null> {
     return new Promise((resolve) => {
       let settled = false;
-      const done = (v: Extract<S2C, { t: 'welcome' }> | null) => {
+      const done = (v: Welcome | null) => {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
@@ -84,7 +146,7 @@ export class Net {
       }, timeout);
       let ws: WebSocket;
       try {
-        ws = new WebSocket(serverUrl());
+        ws = new WebSocket(wsUrl());
       } catch {
         done(null);
         return;
@@ -108,7 +170,7 @@ export class Net {
         if (m.t === 'welcome') {
           this.online = true;
           this.id = m.you;
-          this.startPing();
+          setInterval(() => this.send({ t: 'ping', n: performance.now() }), 4000);
           done(m);
           return;
         }
@@ -121,12 +183,6 @@ export class Net {
         if (hs) for (const h of hs) h(m);
       };
     });
-  }
-
-  private kicked = '';
-
-  private startPing() {
-    setInterval(() => this.send({ t: 'ping', n: performance.now() }), 4000);
   }
 
   send(m: C2S) {

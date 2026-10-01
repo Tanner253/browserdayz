@@ -18,7 +18,7 @@ import { PlayerInventory, SLOT_ORDER, type Container } from '../sim/inventory';
 import { Economy, type WorldLoot } from '../sim/economy';
 import { CRATE_RESTOCK, CRATE_SPECS, fillCrate } from '../sim/crates';
 import { loadSave, writeSave, type SaveData } from '../sim/save';
-import { Net, playerName, setPlayerName } from '../net/client';
+import { Net, playerName, remoteServer, serverStatus, setPlayerName } from '../net/client';
 import { F_AIM, F_CROUCH, F_DEAD, F_GROUND, F_SPRINT, crateId, type CorpseInfo, type PlayerInfo, type Pose, type S2C, type StashInfo } from '../net/protocol';
 import { Player } from './player';
 import { Avatar, AVATAR_LAYER, FP_BODY_LAYER } from './avatar';
@@ -164,6 +164,8 @@ export class Game {
 
     this.hud = new HUD(icons);
     this.hud.setName(playerName());
+    // how many people are in the world, shown before you click Play
+    void serverStatus().then((s) => this.hud.setStartOnline(s ? s.players : null));
     this.invUI = new InventoryUI(this.inv, {
       take: (w) => this.takeWorldItem(w),
       drop: (item) => this.dropItem(item),
@@ -217,9 +219,13 @@ export class Game {
     const name = this.hud.nameValue() || `Survivor${Math.floor(100 + Math.random() * 900)}`;
     setPlayerName(name);
     this.hud.showStart(true, false, 'Connecting…');
-    const welcome = await this.net.connect(name);
+    const welcome = await this.net.connect(name, (text) => this.hud.showStart(true, false, text));
     if (welcome) await this.enterOnline(welcome);
-    else await this.enterOffline();
+    else {
+      if (this.net.refused) this.hud.note(this.net.refused, 'warn');
+      else if (remoteServer()) this.hud.note('The server could not be reached: playing offline', 'warn');
+      await this.enterOffline();
+    }
     this.joining = false;
     this.started = true;
     if (!this.weapons.equippedItem) {
@@ -236,6 +242,7 @@ export class Game {
     else this.fresh();
     await this.spawnDummies();
     this.hud.setNet('Offline · single player');
+    this.hud.setOnline(null);
   }
 
   private fresh() {
@@ -337,6 +344,7 @@ export class Game {
     const net = this.net;
     net.on('join', (m) => {
       void this.addRemote(m.p);
+      this.updateOnline();
       this.hud.feed(`${m.p.name} joined`);
     });
     net.on('leave', (m) => {
@@ -345,6 +353,7 @@ export class Game {
       this.hud.feed(`${r.name} left`);
       r.dispose();
       this.remotes.delete(m.id);
+      this.updateOnline();
     });
     net.on('ps', (m) => {
       const now = performance.now();
@@ -429,7 +438,16 @@ export class Game {
       this.input.unlock();
       this.hud.fatal(reason);
     };
-    this.hud.setNet(`Online · ${w.players.length + 1} / ${w.max} players`);
+    this.maxPlayers = w.max;
+    this.hud.setNet('Online');
+    this.updateOnline();
+  }
+
+  private maxPlayers = 0;
+
+  /** everyone connected to the server, this player included */
+  private updateOnline() {
+    this.hud.setOnline(this.online ? this.remotes.size + 1 : null, this.maxPlayers);
   }
 
   private makeHeld = (id: string | null, mods: string[]) => {
@@ -448,7 +466,6 @@ export class Game {
     await r.load(this.s.atmo, this.s.r.scene, p.pose);
     r.setWeapon(p.w, p.m);
     r.setAlive(p.alive);
-    this.hud.setNet(`Online · ${this.remotes.size + 1} players`);
   }
 
   private async addRemoteStash(s: StashInfo) {

@@ -4,3 +4,5 @@ node_modules
 dist
 .claude
 *.log
+# local server save
+data

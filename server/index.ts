@@ -521,7 +521,8 @@ const gz = new Map<string, Buffer>();
 const server = http.createServer((req, res) => {
   const url = new URL(req.url ?? '/', 'http://x');
   if (url.pathname === '/healthz') {
-    res.writeHead(200, { 'content-type': 'application/json' });
+    // readable from a client hosted somewhere else (e.g. Vercel) for the start-screen player count
+    res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'no-store' });
     res.end(JSON.stringify({ ok: true, players: clients.size, uptime: Math.round(process.uptime()), loot: economy.loot.size }));
     return;
   }
