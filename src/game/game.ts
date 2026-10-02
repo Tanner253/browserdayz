@@ -12,7 +12,7 @@ import type { Terrain } from '../world/terrain';
 import type { Vegetation } from '../world/vegetation';
 import type { Grass } from '../world/grass';
 import { Door, type Buildings } from '../world/buildings';
-import { heightAt, type World } from '../world/worldgen';
+import { PLAY_RADIUS, heightAt, type World } from '../world/worldgen';
 import { ITEMS, TAG_HOLD, capacityOf, hasMod, makeItem, newUid, tagClock, tagOwner, type ItemInstance, type Slot } from '../sim/items';
 import { PlayerInventory, SLOT_ORDER, type Container } from '../sim/inventory';
 import { Economy, type WorldLoot } from '../sim/economy';
@@ -106,6 +106,8 @@ export class Game {
   /** graphics options the player picked in the Esc menu */
   gfx: Graphics = loadGraphics();
   private tagT = 0;
+  /** opens the rewards modal once the entrance has played */
+  private entryModal: () => void = () => {};
   private slowFor = 0;
   private slowHinted = false;
 
@@ -231,10 +233,23 @@ export class Game {
     );
     // dog tags and creator rewards: explained on entering the site, and again from the menu
     if (REWARDS_UI) {
-      const modal = new RewardsModal(document.getElementById('ui')!);
+      const modal = new RewardsModal(document.getElementById('ui')!, () => this.hud.nameValue());
       this.hud.onRewards(() => modal.open());
-      modal.openAtEntry();
+      this.entryModal = () => modal.openAtEntry();
     }
+    // the briefing map is drawn from the world itself
+    const town = world.pois[0];
+    const station = world.buildings.find((b) => b.type === 'police');
+    this.hud.setBriefing({
+      radius: PLAY_RADIUS,
+      spawns: world.spawns,
+      centre: town,
+      places: [
+        { name: town.name, x: town.x, z: town.z, kind: 'town' },
+        ...(station ? [{ name: 'Police station', x: station.x, z: station.z, kind: 'police' as const }] : []),
+        ...world.pois.slice(1).map((q) => ({ name: q.name, x: q.x, z: q.z, kind: 'post' as const })),
+      ],
+    });
     this.hud.showStart(true);
     // FPS mouse: play only while the mouse is captured. Esc releases it -> pause menu;
     // clicking the menu captures it again and play resumes.
@@ -268,6 +283,8 @@ export class Game {
     }
     this.joining = false;
     this.started = true;
+    // out of the aerial shot and down into the character's eyes
+    this.director.flyIn();
     if (!this.weapons.equippedItem) {
       const slot = (['primary', 'secondary', 'holster'] as const).find((k) => this.inv.slots[k]);
       if (slot) this.weapons.equip(slot);
@@ -759,7 +776,29 @@ export class Game {
     grass.setDensity(density);
   }
 
+  /** A slow circuit above the village: what the entrance menu is laid over. */
+  private menuCamera(now: number) {
+    const { r, world } = this.s;
+    const cam = r.camera;
+    const c = world.pois[0];
+    const a = now * 0.000028 + 2.2;
+    const x = c.x + Math.cos(a) * 128;
+    const z = c.z + Math.sin(a) * 128;
+    const ground = heightAt(world.heights, c.x, c.z);
+    cam.position.set(x, Math.max(ground + 44, heightAt(world.heights, x, z) + 20), z);
+    // the menu covers the left of the screen: keep the village in the right half
+    const fx = c.x - x, fz = c.z - z;
+    const len = Math.hypot(fx, fz) || 1;
+    cam.lookAt(c.x + (fz / len) * 34, ground + 7, c.z - (fx / len) * 34);
+    cam.fov = 50;
+    cam.updateProjectionMatrix();
+    cam.updateMatrixWorld();
+  }
+
   start() {
+    // the loading screen lifts: title and panels arrive, then the rewards briefing
+    setTimeout(() => this.hud.entrance(), 400);
+    setTimeout(() => !this.started && !this.joining && this.entryModal(), 3600);
     let due = 0;
     const loop = (t: number) => {
       requestAnimationFrame(loop);
@@ -1253,7 +1292,9 @@ export class Game {
     if (this.director.avatarVisible) cam.layers.enable(AVATAR_LAYER);
     else cam.layers.disable(AVATAR_LAYER);
     // your own body below the camera, first person only
-    const fpView = this.director.viewmodelVisible && !p.dead;
+    // before you deploy, the menu looks down on the middle of the map from the air
+    if (!this.started) this.menuCamera(now);
+    const fpView = this.started && this.director.viewmodelVisible && !p.dead;
     if (fpView) cam.layers.enable(FP_BODY_LAYER);
     else cam.layers.disable(FP_BODY_LAYER);
     r.vmScene.visible = fpView;
@@ -1348,7 +1389,7 @@ export class Game {
       ping: this.online ? this.net.ping : null,
       dead: p.dead,
       deadText: this.deathInfo,
-      hidden: uiOpen || this.director.mode === 'free',
+      hidden: uiOpen || this.director.mode === 'free' || !this.started,
     });
 
     this.perf.beforeRender();

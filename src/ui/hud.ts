@@ -88,30 +88,74 @@ export class HUD {
       <div class="hud-fatal"><div class="fatal-title">Disconnected</div><div class="fatal-sub"></div><button class="dead-btn fatal-btn">Reconnect</button></div>
       <div class="hud-dead"><div class="dead-title">You are dead</div><div class="dead-sub"></div><button class="dead-btn">Respawn</button></div>
       <div class="hud-start">
-        <div class="start-card">
-          <div class="start-title">ZONA</div>
-          <div class="start-sub">vertical slice · Zelenaya Dolina</div>
-          <div class="start-nameRow"><label>Name</label><input class="start-name" maxlength="16" spellcheck="false" autocomplete="off" placeholder="Survivor"></div>
-          <button class="start-btn">Click to play</button>
-          <div class="start-online"></div>
-          <div class="start-tabs">
-            <button data-tab="keys" class="on">Controls</button>
-            <button data-tab="gfx">Graphics</button>
-            <button data-tab="rewards" hidden>Rewards</button>
+        <div class="start-shell">
+          <div class="start-id">
+            <div class="start-kicker">Zelenaya Dolina · one persistent world</div>
+            <div class="start-title" aria-label="ZONA"><span style="--i:0">Z</span><span style="--i:1">O</span><span style="--i:2">N</span><span style="--i:3">A</span></div>
+            <div class="start-sub">Loot. Fight. Stay alive for thirty minutes.</div>
+            <div class="tagplate">
+              <svg class="tagplate-chain" viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="52" fill="none" stroke="currentColor" stroke-width="5" stroke-dasharray="0.1 9" stroke-linecap="round"/></svg>
+              <label for="start-name">Stamp your dog tag</label>
+              <input id="start-name" class="start-name" maxlength="16" spellcheck="false" autocomplete="off" placeholder="Survivor">
+              <div class="tagplate-meta"><span>ZONA</span><span>Survivor</span></div>
+            </div>
+            <button class="start-btn">Deploy</button>
+            <div class="start-online"></div>
           </div>
-          <div class="start-gfx"></div>
-          <div class="start-keys">
-            <div><b>WASD</b> move · <b>Alt</b> walk</div><div><b>Shift</b> sprint · hold breath (scoped)</div>
-            <div><b>C</b> crouch · <b>Space</b> jump</div><div><b>Q / E</b> lean</div>
-            <div><b>LMB</b> fire · punch</div><div><b>RMB</b> aim · raise fists</div>
-            <div><b>R</b> reload</div><div><b>X</b> holster (bare hands)</div>
-            <div><b>1 2</b> primary · secondary</div><div><b>3 4</b> pistol · melee</div>
-            <div><b>5 – 8</b> eat · drink · bandage</div><div><b>Wheel</b> cycle weapons</div>
-            <div><b>F</b> take · doors · search crates</div><div><b>Tab</b> inventory (right-click items)</div>
-            <div><b>Enter</b> chat · <b>Tab</b> switches channel</div><div><b>Esc</b> release mouse / pause</div>
-            <div><b>V</b> third person · <b>P</b> free cam</div><div><b>F3</b> performance</div>
+          <div class="start-brief" data-tab="brief">
+            <div class="start-tabs">
+              <button data-tab="brief" class="on">Briefing</button>
+              <button data-tab="keys">Controls</button>
+              <button data-tab="gfx">Graphics</button>
+              <button data-tab="rewards" hidden>Rewards</button>
+            </div>
+            <div class="start-pane pane-brief">
+              <figure class="start-map"></figure>
+              <ol class="start-loop">
+                <li style="--i:0"><i class="loop-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" stroke-dasharray="2 3"/><path d="M12 3v7M9 8l3 3 3-3"/></svg></i><div><b>Drop in</b><span>On the edge of the map. Bare hands, one meal, one drink.</span></div></li>
+                <li style="--i:1"><i class="loop-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9l8-4 8 4v8l-8 4-8-4z"/><path d="M4 9l8 4 8-4M12 13v8"/></svg></i><div><b>Loot inward</b><span>The best gear is in the middle. The police station has guns.</span></div></li>
+                <li style="--i:2"><i class="loop-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/></svg></i><div><b>Fight</b><span>Anyone you meet can kill you and take everything.</span></div></li>
+                <li style="--i:3"><i class="loop-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="8" width="14" height="9" rx="3"/><circle cx="8.5" cy="12.5" r="1"/><path d="M12 11h4M12 14h3M8 8c-3-5 3-7 5-3"/></svg></i><div><b>Take their tag</b><span>Every body carries a dog tag. Loot it.</span></div></li>
+                <li style="--i:4"><i class="loop-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6"/></svg></i><div><b>Hold 30:00</b><span>Stay alive with it for thirty minutes to cash it in.</span></div></li>
+              </ol>
+            </div>
+            <div class="start-pane pane-keys">
+              <div class="kb">
+                <div class="kb-group">
+                  <h4>Move</h4>
+                  <div class="kb-wasd"><kbd>Q</kbd><kbd class="hot">W</kbd><kbd>E</kbd><kbd class="hot">A</kbd><kbd class="hot">S</kbd><kbd class="hot">D</kbd></div>
+                  <p><kbd>Q</kbd><kbd>E</kbd> lean</p>
+                  <p><kbd class="wide">Shift</kbd> sprint · hold breath</p>
+                  <p><kbd class="wide">Space</kbd> jump</p>
+                  <p><kbd>C</kbd> crouch <kbd class="wide">Alt</kbd> walk</p>
+                </div>
+                <div class="kb-group">
+                  <h4>Fight</h4>
+                  <svg class="kb-mouse" viewBox="0 0 120 150" aria-hidden="true">
+                    <rect x="30" y="8" width="60" height="100" rx="30" fill="none" stroke="currentColor" stroke-width="2"/>
+                    <path d="M60 8v38M30 46h60" stroke="currentColor" stroke-width="2" fill="none"/>
+                    <path class="m-l" d="M58 10C44 11 32 22 32 38v6h26z"/><path class="m-r" d="M62 10c14 1 26 12 26 28v6H62z"/>
+                    <rect x="56" y="20" width="8" height="16" rx="4" fill="currentColor"/>
+                    <text x="26" y="128" text-anchor="end">FIRE</text><text x="94" y="128">AIM</text><text x="60" y="146" text-anchor="middle">WHEEL · NEXT WEAPON</text>
+                    <path d="M40 46v62H28M80 46v62h12" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="2 3"/>
+                  </svg>
+                  <p><kbd>R</kbd> reload <kbd>X</kbd> holster</p>
+                </div>
+                <div class="kb-group">
+                  <h4>Gear</h4>
+                  <div class="kb-row"><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>4</kbd><em>primary · secondary · pistol · melee</em></div>
+                  <div class="kb-row"><kbd>5</kbd><kbd>6</kbd><kbd>7</kbd><kbd>8</kbd><em>eat · drink · bandage</em></div>
+                  <p><kbd>F</kbd> take · doors · search</p>
+                  <p><kbd class="wide">Tab</kbd> inventory</p>
+                  <p><kbd class="wide">Enter</kbd> chat</p>
+                  <p><kbd>V</kbd> third person <kbd>P</kbd> free cam</p>
+                  <p><kbd class="wide">Esc</kbd> this menu</p>
+                  <p><kbd class="wide">F3</kbd> performance</p>
+                </div>
+              </div>
+            </div>
+            <div class="start-pane pane-gfx start-gfx"></div>
           </div>
-          <div class="start-hint">You wake up on the edge of the map with empty hands, something to eat and something to drink. The best loot is in the middle: the police station in Zelenaya Dolina has guns and attachments. Clothes and bags let you carry more. Other survivors can kill you and take everything.</div>
         </div>
       </div>
     `;
@@ -142,20 +186,31 @@ export class HUD {
     this.setChannel('global');
     // typing a name must not start the game
     const name = this.root.querySelector('.start-name') as HTMLInputElement;
-    name.addEventListener('click', (e) => e.stopPropagation());
+    const plate = this.root.querySelector('.tagplate') as HTMLElement;
+    plate.addEventListener('click', (e) => {
+      e.stopPropagation();
+      name.focus();
+    });
+    // every letter is struck into the plate
+    name.addEventListener('input', () => {
+      plate.classList.remove('stamp');
+      void plate.offsetWidth;
+      plate.classList.add('stamp');
+    });
     name.addEventListener('keydown', (e) => {
       e.stopPropagation();
       if (e.key === 'Enter') name.blur();
     });
     // the menu under the Play button: its clicks are not "click to play"
-    const card = this.root.querySelector('.start-card') as HTMLElement;
+    const card = this.root.querySelector('.start-brief') as HTMLElement;
+    card.addEventListener('click', (e) => e.stopPropagation());
     const tabs = this.root.querySelector('.start-tabs') as HTMLElement;
     tabs.addEventListener('click', (e) => {
       e.stopPropagation();
       const tab = (e.target as HTMLElement).closest('button')?.dataset.tab;
       if (!tab) return;
       if (tab === 'rewards') return this.rewardsClicked();
-      card.classList.toggle('tab-gfx', tab === 'gfx');
+      card.dataset.tab = tab;
       for (const b of tabs.querySelectorAll('button')) b.classList.toggle('on', b.dataset.tab === tab);
       if (tab === 'gfx') this.renderGraphics();
     });
@@ -222,7 +277,54 @@ export class HUD {
   showStart(on: boolean, paused = false, text = '') {
     this.toggle(this.el.start, 'show', on);
     this.toggle(this.el.start, 'paused', paused);
-    (this.root.querySelector('.start-btn') as HTMLButtonElement).textContent = text || (paused ? 'Paused · click to resume' : 'Click to play');
+    (this.root.querySelector('.start-btn') as HTMLButtonElement).textContent = text || (paused ? 'Resume' : 'Deploy');
+    if (!on) this.el.start.classList.remove('enter');
+  }
+
+  /** The loading screen is lifting: play the entrance (title, panels) once. */
+  entrance() {
+    if (this.el.start.classList.contains('show')) this.el.start.classList.add('enter');
+  }
+
+  /**
+   * The briefing map, drawn from the world itself: where fresh characters start, where
+   * the landmarks are, and which way the loot gets better.
+   */
+  setBriefing(d: { radius: number; spawns: { x: number; z: number }[]; centre: { x: number; z: number }; places: { name: string; x: number; z: number; kind: 'town' | 'police' | 'post' }[] }) {
+    const n = (v: number) => v.toFixed(0);
+    const c = d.centre;
+    const flows = d.spawns
+      .filter((_, i) => i % 3 === 0)
+      .map((s, i) => {
+        const dx = c.x - s.x, dz = c.z - s.z;
+        const len = Math.hypot(dx, dz) || 1;
+        const ux = dx / len, uz = dz / len;
+        return `<path class="m-flow" style="--i:${i}" d="M${n(s.x + ux * 26)} ${n(s.z + uz * 26)}L${n(c.x - ux * 150)} ${n(c.z - uz * 150)}" marker-end="url(#m-arrow)"/>`;
+      })
+      .join('');
+    const spawns = d.spawns.map((s, i) => `<g class="m-spawn" style="--i:${i % 8}"><circle class="m-pulse" cx="${n(s.x)}" cy="${n(s.z)}" r="9"/><circle cx="${n(s.x)}" cy="${n(s.z)}" r="5.5"/></g>`).join('');
+    const places = d.places
+      .map((p) => {
+        const mark = p.kind === 'police' ? `<path d="M0-13L11-7V4C11 11 0 15 0 15S-11 11-11 4V-7Z"/>` : p.kind === 'town' ? '' : `<rect x="-8" y="-8" width="16" height="16"/>`;
+        // labels step away from the middle so they never sit on top of each other
+        const below = p.kind === 'town';
+        return `<g class="m-place m-${p.kind}" transform="translate(${n(p.x)} ${n(p.z)})">${mark}<text y="${below ? 62 : -26}" text-anchor="middle">${p.name}</text></g>`;
+      })
+      .join('');
+    const R = d.radius;
+    (this.root.querySelector('.start-map') as HTMLElement).innerHTML = `
+      <svg viewBox="${-R - 70} ${-R - 70} ${2 * R + 140} ${2 * R + 140}" role="img" aria-label="Map: you start on the outer ring, the best loot is in the middle">
+        <defs>
+          <radialGradient id="m-heat"><stop offset="0" stop-color="#c9b27c" stop-opacity="0.55"/><stop offset="0.55" stop-color="#c9b27c" stop-opacity="0.14"/><stop offset="1" stop-color="#c9b27c" stop-opacity="0"/></radialGradient>
+          <marker id="m-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M1 1L9 5L1 9" fill="none" stroke="#c9b27c" stroke-width="1.6"/></marker>
+        </defs>
+        <circle cx="${n(c.x)}" cy="${n(c.z)}" r="${n(R * 0.72)}" fill="url(#m-heat)"/>
+        <circle class="m-tier" cx="${n(c.x)}" cy="${n(c.z)}" r="${n(R * 0.36)}"/>
+        <circle class="m-tier" cx="${n(c.x)}" cy="${n(c.z)}" r="${n(R * 0.68)}"/>
+        <circle class="m-edge" cx="0" cy="0" r="${n(R)}"/>
+        ${flows}${spawns}${places}
+      </svg>
+      <figcaption><span class="lg-spawn"></span>you start here<span class="lg-loot"></span>better loot</figcaption>`;
   }
 
   setName(name: string) {

@@ -110,6 +110,19 @@ export class CameraDirector {
     this.onModeChange(mode);
   }
 
+  /**
+   * Fly from wherever the camera is now (the menu's aerial shot) into the current mode:
+   * up and over the forest, down into the character's eyes.
+   */
+  flyIn(duration = 3.4) {
+    this.snapshot();
+    this.computeTarget(0);
+    this.dur = duration;
+    this.arc = 22;
+    this.t = 0;
+    this.blend = 0;
+  }
+
   private updateLabel() {
     const names: Record<CamMode, string> = { first: 'First person', orbit: 'Third person', free: 'Free camera' };
     const hints: Record<CamMode, string> = {

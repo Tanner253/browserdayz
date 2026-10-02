@@ -1,13 +1,8 @@
-// Dog tags and creator rewards: the explanation a player sees on entering the site, and
-// the wallet address they give. The address is kept in this browser and nowhere else;
-// payouts are not live, and the text says so.
+// Dog tags and creator rewards: the illustrated explanation a player sees on entering
+// the site, and the wallet address they give. The address is kept on this device.
 
-/**
- * Whether the wallet modal and the Rewards button are shown. Off: what the modal tells
- * players about payouts has to match what the payout system really does before it goes
- * in front of them. Dog tags, their countdown and the cash-in announcement work either way.
- */
-export const REWARDS_UI = false;
+/** whether the wallet modal and the Rewards button are shown */
+export const REWARDS_UI = true;
 
 const WALLET = 'zona.wallet';
 const CASHED = 'zona.tags.cashed';
@@ -47,12 +42,28 @@ export function addCashedTag(): number {
   return n;
 }
 
+/** a small dog tag for the diagrams (drawn around 0,0) */
+const tag = (name: string, cls = '') => `
+  <g class="${cls}">
+    <rect class="t-plate" x="-30" y="-17" width="60" height="34" rx="9"/>
+    <circle class="t-hole" cx="-22" cy="0" r="3"/>
+    <text class="t-name" x="5" y="-1" text-anchor="middle">${name}</text>
+    <path class="t-line" d="M-12 8h34"/>
+  </g>`;
+
+/** seconds of the countdown shown per second of animation, and how long the "cashed in" tick stays */
+const RING = 2 * Math.PI * 34;
+const LOOP_MS = 7200;
+const RUN_MS = 5600;
+
 export class RewardsModal {
   private root: HTMLDivElement;
   private input: HTMLInputElement;
   private err: HTMLElement;
+  private timer = 0;
 
-  constructor(parent: HTMLElement) {
+  /** @param playerName what is stamped on the player's own tag in the first picture */
+  constructor(parent: HTMLElement, private playerName: () => string = () => '') {
     this.root = document.createElement('div');
     this.root.className = 'rw';
     this.root.innerHTML = `
@@ -60,18 +71,45 @@ export class RewardsModal {
         <div class="rw-kicker">Creator rewards</div>
         <h2 id="rw-title">Enter your Robinhood ETH wallet address to receive rewards</h2>
         <ol class="rw-steps">
-          <li><b>Everyone carries a dog tag.</b> Yours has your name stamped on it.</li>
-          <li><b>Kill another survivor and loot the body.</b> Their dog tag is in there with the rest of their gear.</li>
-          <li><b>Stay alive with it for 30 minutes.</b> The tag then leaves your inventory and is cashed in. Die first and whoever loots you takes it, and their 30 minutes start from zero.</li>
+          <li>
+            <svg class="rw-art" viewBox="0 0 160 104" aria-hidden="true">
+              <path class="t-chain" d="M58 46C20 30 34 -6 80 6s64 28 22 42"/>
+              <g transform="translate(80 58) rotate(-6) scale(1.5)" class="rw-mine"></g>
+            </svg>
+            <b>Your tag</b><span>Everyone carries a dog tag with their name on it.</span>
+          </li>
+          <li>
+            <svg class="rw-art" viewBox="0 0 160 104" aria-hidden="true">
+              <circle class="a-ring" cx="34" cy="50" r="22"/><path class="a-x" d="M27 43l14 14M41 43L27 57"/>
+              <circle class="a-ring" cx="126" cy="50" r="22"/><text class="a-label" x="126" y="53" text-anchor="middle">YOU</text>
+              <path class="a-dash" d="M58 50h44"/>
+              <g transform="translate(34 50) scale(0.62)">${tag('', 'a-move')}</g>
+              <text class="a-label" x="34" y="92" text-anchor="middle">THEM</text>
+            </svg>
+            <b>Take theirs</b><span>Kill another survivor and loot the tag from the body.</span>
+          </li>
+          <li>
+            <svg class="rw-art" viewBox="0 0 160 104" aria-hidden="true">
+              <circle class="c-track" cx="80" cy="52" r="34"/>
+              <circle class="c-ring" cx="80" cy="52" r="34" stroke-dasharray="${RING.toFixed(1)}" stroke-dashoffset="0"/>
+              <text class="c-time" x="80" y="57" text-anchor="middle">30:00</text>
+            </svg>
+            <b>Hold 30:00</b><span>Stay alive with it. At zero it is cashed in. Die, and the clock restarts for whoever loots you.</span>
+          </li>
         </ol>
-        <p class="rw-why"><b>Why we ask for a wallet.</b> Creator rewards are planned for every tag you cash in, paid in ETH, so we need an address to pay you at. Paste the Ethereum address of your Robinhood wallet: it starts with <code>0x</code>. That is a public address. Never give anyone a seed phrase or a private key; we will never ask for one.</p>
-        <p class="rw-status"><b>Payouts are not switched on yet.</b> Nothing is sent today. Your address stays in this browser, ready for when they are.</p>
+        <div class="rw-pay">
+          <svg viewBox="0 0 26 40" aria-hidden="true"><path d="M13 1L1 20l12 7 12-7z" fill="currentColor" opacity="0.55"/><path d="M13 1v26l12-7z" fill="currentColor"/><path d="M1 23l12 16 12-16-12 7z" fill="currentColor" opacity="0.8"/></svg>
+          <p>Cashed-in tags are what creator rewards will be paid on, in ETH, to the wallet you enter here.<small>Payouts roll out shortly after launch</small></p>
+        </div>
         <div class="rw-row">
           <input class="rw-input" placeholder="0x…" maxlength="42" spellcheck="false" autocomplete="off" aria-label="Ethereum wallet address">
           <button class="rw-save">Save address</button>
         </div>
         <div class="rw-err" role="alert"></div>
-        <div class="rw-foot"><span class="rw-count"></span><button class="rw-skip">Not now</button></div>
+        <div class="rw-foot">
+          <span class="rw-fine">Use the public address of your Robinhood wallet: it starts with 0x. Never share a seed phrase or private key. Saved on this device.</span>
+          <button class="rw-skip">Not now</button>
+        </div>
       </div>`;
     parent.appendChild(this.root);
     this.input = this.root.querySelector('.rw-input') as HTMLInputElement;
@@ -106,21 +144,40 @@ export class RewardsModal {
     const saved = walletAddress();
     this.input.value = saved;
     this.err.textContent = '';
-    const n = cashedTags();
-    (this.root.querySelector('.rw-count') as HTMLElement).textContent = n ? `Dog tags cashed in so far: ${n}` : '';
     (this.root.querySelector('.rw-skip') as HTMLElement).textContent = saved ? 'Close' : 'Not now';
+    // the player's own name on the first tag (short enough to fit the plate)
+    const name = (this.playerName() || 'Survivor').replace(/[<>&"']/g, '').toUpperCase().slice(0, 8);
+    (this.root.querySelector('.rw-mine') as SVGGElement).innerHTML = tag(name);
     this.root.classList.add('show');
     this.input.focus();
+    this.runClock();
   }
 
   close() {
     this.root.classList.remove('show');
     this.input.blur();
+    clearInterval(this.timer);
     try {
       sessionStorage.setItem(SEEN, '1');
     } catch {
       /* private mode */
     }
+  }
+
+  /** the third picture: thirty minutes run down in a few seconds, then the tag is cashed in */
+  private runClock() {
+    const ring = this.root.querySelector('.c-ring') as SVGCircleElement;
+    const text = this.root.querySelector('.c-time') as SVGTextElement;
+    clearInterval(this.timer);
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const t0 = performance.now();
+    this.timer = window.setInterval(() => {
+      const t = Math.min(1, ((performance.now() - t0) % LOOP_MS) / RUN_MS);
+      const left = Math.round(1800 * (1 - t));
+      ring.setAttribute('stroke-dashoffset', (RING * t).toFixed(1));
+      text.textContent = t >= 1 ? '✓' : `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+      text.classList.toggle('c-done', t >= 1);
+    }, 60);
   }
 
   private save() {
