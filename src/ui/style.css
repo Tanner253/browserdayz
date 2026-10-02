@@ -61,6 +61,9 @@ body {
 }
 #rotate b { font-size: 26px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; }
 #rotate span { font-family: var(--mono); font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-faint); }
+#rotate-go { margin-top: 22px; padding: 14px 30px; font-family: var(--font); font-size: 18px; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; color: #121413; background: var(--accent); border: 0; cursor: pointer; }
+#rotate-go[hidden] { display: none; }
+#rotate-hint { max-width: 300px; margin: 6px 0 0; font-size: 15px; line-height: 1.4; color: var(--ink-dim); }
 .rot-phone { position: relative; width: 52px; height: 92px; margin-bottom: 18px; border: 3px solid var(--ink); border-radius: 11px; animation: rot-phone 2.6s cubic-bezier(0.6, 0, 0.3, 1) infinite; }
 .rot-phone::after { content: ''; position: absolute; left: 50%; bottom: 5px; width: 14px; height: 3px; margin-left: -7px; border-radius: 2px; background: var(--accent); }
 @keyframes rot-phone { 0%, 22% { transform: rotate(0); } 58%, 100% { transform: rotate(-90deg); } }

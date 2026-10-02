@@ -11,6 +11,10 @@ import { Grass } from './world/grass';
 import { Buildings } from './world/buildings';
 import { buildRoad } from './world/road';
 import { Game } from './game/game';
+import { initRotatePrompt } from './ui/rotate';
+
+// before anything loads: a phone held upright needs a way forward straight away
+initRotatePrompt();
 
 const canvas = document.getElementById('game') as HTMLCanvasElement;
 const loading = document.getElementById('loading')!;

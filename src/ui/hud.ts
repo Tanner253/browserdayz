@@ -239,6 +239,8 @@ export class HUD {
     });
     fit();
     window.addEventListener('resize', fit);
+    window.addEventListener('orientationchange', () => setTimeout(fit, 250));
+    document.addEventListener('fullscreenchange', () => setTimeout(fit, 250));
   }
 
   private buildCompass() {

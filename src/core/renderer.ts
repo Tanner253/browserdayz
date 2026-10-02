@@ -60,7 +60,13 @@ export class Renderer {
     this.vmCamera.layers.enableAll();
     this.buildComposer();
     this.resize();
-    window.addEventListener('resize', () => this.resize());
+    // a phone changes size on rotation, on entering full screen and when its address bar hides,
+    // and not every browser reports all of those as a plain resize
+    const onResize = () => this.resize();
+    window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', () => setTimeout(onResize, 250));
+    document.addEventListener('fullscreenchange', () => setTimeout(onResize, 250));
+    window.visualViewport?.addEventListener('resize', onResize);
   }
 
   get maxAnisotropy() {
