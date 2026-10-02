@@ -33,6 +33,8 @@ import { InventoryUI } from '../ui/inventory-ui';
 import { renderDoll, renderIcons } from '../ui/icons';
 import { Perf } from '../core/perf';
 import { loadGraphics, type Graphics } from '../core/settings';
+import { TOUCH } from '../core/device';
+import { TouchControls } from '../ui/touch';
 import { REWARDS_UI, RewardsModal, addCashedTag, cashedTags } from '../ui/rewards';
 
 export interface WorldSystems {
@@ -106,6 +108,8 @@ export class Game {
   /** graphics options the player picked in the Esc menu */
   gfx: Graphics = loadGraphics();
   private tagT = 0;
+  /** phones and tablets: on-screen stick and buttons */
+  private touch: TouchControls | null = null;
   /** opens the rewards modal once the entrance has played */
   private entryModal: () => void = () => {};
   private slowFor = 0;
@@ -223,6 +227,18 @@ export class Game {
     );
     this.hud.onStart(() => this.resume());
     this.hud.onRespawn(() => this.respawn());
+    if (TOUCH) {
+      this.input.touch = true;
+      this.touch = new TouchControls(this.input, {
+        menu: () => this.input.unlock(),
+        inventory: () => this.started && !this.player.dead && this.toggleInventory(),
+      });
+    }
+    // tapping (or clicking) a hotbar slot is the same as pressing its number
+    this.hud.onHotbar((key) => {
+      this.input.simulate(`Digit${key}`, true);
+      setTimeout(() => this.input.simulate(`Digit${key}`, false), 80);
+    });
     this.hud.bindGraphics(
       this.gfx,
       (g) => this.applyGraphics(g),
@@ -724,6 +740,14 @@ export class Game {
     // keys must reach the game, not the name field
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     audio.start();
+    // a phone goes full screen and stays on its side, where the browser allows it
+    if (TOUCH && !document.fullscreenElement) {
+      const orient = screen.orientation as unknown as { lock?: (o: string) => Promise<void> } | undefined;
+      document.documentElement
+        .requestFullscreen?.({ navigationUI: 'hide' })
+        .then(() => orient?.lock?.('landscape'))
+        .catch(() => {});
+    }
     // capture the mouse in the same click; play begins once we are in the world and locked
     if (!this.input.locked) this.input.lock();
     if (!this.started) {
@@ -1375,7 +1399,8 @@ export class Game {
     const heading = THREE.MathUtils.radToDeg(-p.yaw);
     this.hud.update({
       vitals: v,
-      prompt: this.prompt,
+      // no keyboard on a phone: the Use button lights up instead of naming a key
+      prompt: this.touch ? (this.prompt?.replace(/<kbd>F<\/kbd>/, '').replace(/ <small>G to pack up<\/small>/, '') ?? null) : this.prompt,
       weapon: this.weapons.status(),
       aiming: this.weapons.aiming,
       scoped: this.weapons.scoped,
@@ -1392,6 +1417,7 @@ export class Game {
       hidden: uiOpen || this.director.mode === 'free' || !this.started,
     });
 
+    this.touch?.update(playing && !uiOpen && !typing && this.director.controlsPlayer, uiOpen, !!this.prompt?.includes('<kbd>F'));
     this.perf.beforeRender();
     r.render(dt);
     this.perf.afterRender();
@@ -1405,8 +1431,8 @@ export class Game {
       this.slowFor = playing && this.fps < 28 && !(this.gfx.fpsLimit && this.gfx.fpsLimit <= 30) ? this.slowFor + this.fpsAcc : 0;
       if (this.slowFor > 8 && !this.slowHinted) {
         this.slowHinted = true;
-        this.hud.note('Low frame rate: press Esc and open Graphics', 'warn');
-        this.hud.chatLine('system', '', 'The frame rate is low. Press Esc and open Graphics to turn the settings down.');
+        this.hud.note(TOUCH ? 'Low frame rate: open the menu, then Graphics' : 'Low frame rate: press Esc and open Graphics', 'warn');
+        this.hud.chatLine('system', '', `The frame rate is low. ${TOUCH ? 'Open the menu' : 'Press Esc'} and open Graphics to turn the settings down.`);
       }
       this.fpsAcc = 0;
       this.fpsN = 0;

@@ -3,6 +3,7 @@
 
 import type { Vitals } from '../game/player';
 import type { ChatChannel } from '../net/protocol';
+import { TOUCH } from '../core/device';
 import { AO_MODES, DEFAULT_GRAPHICS, FPS_LIMITS, LEVELS, MSAA, PRESETS, SCALES, presetOf, saveGraphics, type Graphics, type PresetName } from '../core/settings';
 
 const CHANNELS: ChatChannel[] = ['global', 'near'];
@@ -222,11 +223,20 @@ export class HUD {
     });
     // scale the whole HUD with the window so it reads the same on a laptop and a 1440p monitor
     const fit = () => {
-      const z = Math.round(Math.max(0.7, Math.min(1.7, window.innerHeight / 860, window.innerWidth / 1400)) * 100) / 100;
-      document.documentElement.style.setProperty('--ui-zoom', String(z));
-      // dialogs grow with a big screen but never shrink below their designed size
-      document.documentElement.style.setProperty('--dialog-zoom', String(Math.max(1, z)));
+      const w = window.innerWidth, h = window.innerHeight;
+      const css = document.documentElement.style;
+      const z = Math.round(Math.max(0.7, Math.min(1.7, h / 860, w / 1400)) * 100) / 100;
+      css.setProperty('--ui-zoom', String(z));
+      // dialogs grow with a big screen but never shrink below their designed size...
+      css.setProperty('--dialog-zoom', String(TOUCH ? Math.max(0.55, Math.min(1, h / 640, w / 760)) : Math.max(1, z)));
+      // ...except on a phone, where they and the inventory have to fit a small screen whole
+      css.setProperty('--inv-zoom', String(TOUCH ? Math.max(0.5, Math.min(1.7, h / 700, w / 1340)) : z));
     };
+    document.body.classList.toggle('touch', TOUCH);
+    this.el.hotbar.addEventListener('pointerdown', (e) => {
+      const key = (e.target as HTMLElement).closest('.hb')?.querySelector('b')?.textContent;
+      if (key) this.hotbarTapped(key);
+    });
     fit();
     window.addEventListener('resize', fit);
   }
@@ -350,6 +360,13 @@ export class HUD {
     const e = this.root.querySelector('.start-online') as HTMLElement;
     e.textContent = count === null ? '' : count === 0 ? 'Nobody else is online yet' : `${count} survivor${count === 1 ? '' : 's'} online`;
     this.toggle(e, 'show', count !== null);
+  }
+
+  private hotbarTapped: (key: string) => void = () => {};
+
+  /** a hotbar slot was tapped or clicked: `key` is the number printed on it */
+  onHotbar(cb: (key: string) => void) {
+    this.hotbarTapped = cb;
   }
 
   // ---------------------------------------------------------------- menu: graphics, rewards

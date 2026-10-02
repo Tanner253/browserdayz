@@ -1,5 +1,7 @@
 // Graphics options (Esc menu). The player picks them and they are kept in this browser;
-// nothing here changes by itself while playing. The default is everything at full.
+// nothing here changes by itself while playing.
+
+import { TOUCH } from './device';
 
 export type AoMode = 'off' | 'half' | 'full';
 export type Level = 'low' | 'medium' | 'high';
@@ -31,7 +33,8 @@ export const AO_MODES: AoMode[] = ['off', 'half', 'full'];
 export const LEVELS: Level[] = ['low', 'medium', 'high'];
 export const FPS_LIMITS = [30, 40, 60, 120, 0];
 
-export const DEFAULT_GRAPHICS: Graphics = { ...PRESETS.ultra, fpsLimit: 0 };
+/** Everything at full on a computer. A phone starts on Low: its GPU is a fraction of a laptop's. */
+export const DEFAULT_GRAPHICS: Graphics = { ...(TOUCH ? PRESETS.low : PRESETS.ultra), fpsLimit: 0 };
 
 const STORE = 'zona.gfx';
 

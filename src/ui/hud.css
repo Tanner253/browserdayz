@@ -412,7 +412,7 @@
   display: none;
   pointer-events: auto;
   z-index: 10;
-  zoom: var(--ui-zoom, 1);
+  zoom: var(--inv-zoom, var(--ui-zoom, 1));
   background: radial-gradient(ellipse at 50% 35%, rgba(12, 15, 13, 0.78), rgba(4, 5, 5, 0.94));
   backdrop-filter: blur(7px) saturate(0.65);
 }
@@ -862,4 +862,54 @@ kbd.hot { color: #121413; background: linear-gradient(#d8c594, #b89f66); border-
 
 @media (prefers-reduced-motion: reduce) {
   .hud-start *, .rw * { animation: none !important; }
+}
+
+/* ------------------------------------------------------------ touch controls (phones, tablets) */
+.tc { position: fixed; inset: 0; z-index: 6; display: none; pointer-events: none; touch-action: none; user-select: none; -webkit-user-select: none; }
+.tc.on, .tc.bag { display: block; }
+.tc.bag > :not(.tc-close) { display: none; }
+.tc-move, .tc-look, .tc-b { pointer-events: auto; touch-action: none; }
+.tc-move { position: absolute; left: 0; top: 24%; bottom: 0; width: 42%; }
+.tc-look { position: absolute; right: 0; top: 0; bottom: 0; width: 58%; }
+/* the stick rests bottom left and jumps under the thumb when touched */
+.tc-base { position: absolute; left: calc(92px + env(safe-area-inset-left)); bottom: 86px; width: 112px; height: 112px; margin: -56px 0 0 -56px; border-radius: 50%; background: rgba(10, 12, 11, 0.28); border: 1.5px solid rgba(233, 228, 216, 0.28); opacity: 0.6; }
+.tc-base:not(.live) { margin-bottom: -56px; }
+.tc-base.live { opacity: 1; border-color: rgba(233, 228, 216, 0.5); }
+.tc-base i { position: absolute; left: 50%; top: -34px; width: 22px; height: 22px; margin-left: -11px; border-top: 2px solid rgba(233, 228, 216, 0.4); border-left: 2px solid rgba(233, 228, 216, 0.4); transform: rotate(45deg) scale(0.8); opacity: 0; }
+.tc-base.live i { opacity: 1; }
+.tc-base.run i { border-color: var(--accent); }
+.tc-knob { position: absolute; left: 50%; top: 50%; width: 52px; height: 52px; margin: -26px 0 0 -26px; border-radius: 50%; background: rgba(233, 228, 216, 0.3); border: 1.5px solid rgba(233, 228, 216, 0.6); }
+.tc-base.run .tc-knob { background: rgba(201, 178, 124, 0.55); border-color: var(--accent); }
+
+.tc-b { position: absolute; display: grid; place-items: center; width: 56px; height: 56px; padding: 0; font-family: var(--font); font-size: 13px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink); background: rgba(10, 12, 11, 0.38); border: 1.5px solid rgba(233, 228, 216, 0.34); border-radius: 50%; -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
+.tc-b svg { width: 24px; height: 24px; }
+.tc-b.down { color: #121413; background: var(--accent); border-color: var(--accent); }
+.tc-fire { right: calc(26px + env(safe-area-inset-right)); bottom: 34px; width: 86px; height: 86px; border-color: rgba(201, 178, 124, 0.75); }
+.tc-fire svg { width: 34px; height: 34px; }
+.tc-aim { right: calc(128px + env(safe-area-inset-right)); bottom: 22px; width: 62px; height: 62px; }
+.tc-jump { right: calc(28px + env(safe-area-inset-right)); bottom: 136px; }
+.tc-reload { right: calc(112px + env(safe-area-inset-right)); bottom: 104px; width: 50px; height: 50px; }
+.tc-crouch { right: calc(206px + env(safe-area-inset-right)); bottom: 20px; width: 50px; height: 50px; }
+/* Use appears only when something is in reach */
+.tc-use { right: calc(100px + env(safe-area-inset-right)); bottom: 172px; width: 64px; height: 64px; display: none; color: #121413; background: var(--accent); border-color: var(--accent); animation: tc-use 1.4s ease-in-out infinite; }
+.tc.use .tc-use { display: grid; }
+@keyframes tc-use { 50% { box-shadow: 0 0 0 9px rgba(201, 178, 124, 0.16); } }
+.tc-top { position: absolute; left: calc(12px + env(safe-area-inset-left)); top: 10px; display: flex; gap: 10px; }
+.tc-top .tc-b { position: static; width: 46px; height: 46px; }
+.tc-close { display: none; right: calc(14px + env(safe-area-inset-right)); bottom: 12px; width: auto; height: 40px; padding: 0 20px; border-radius: 0; color: #121413; background: var(--accent); border-color: var(--accent); }
+.tc.bag .tc-close { display: grid; z-index: 20; }
+.tc.bag { z-index: 20; }
+
+/* a phone has no keyboard or mouse wheel: the HUD takes taps instead */
+body.touch .hud-hotbar { pointer-events: auto; touch-action: manipulation; }
+/* the thumbs own the bottom corners: messages and carried tags move to the top left */
+body.touch .hud-tags { top: 12px; left: calc(132px + env(safe-area-inset-left)); }
+body.touch .hud-chat { top: 70px; bottom: auto; left: calc(14px + env(safe-area-inset-left)); width: 360px; }
+body.touch .chat-entry, body.touch .chat-hint { display: none; }
+body.touch .cam-label { display: none; }
+body.touch .start-tabs [data-tab='keys'] { display: none; }
+body.touch .inv-item, body.touch .inv-ground-row { touch-action: none; }
+body.touch .hud-start, body.touch .rw, body.touch .inv-wrap, body.touch .inv-col { touch-action: pan-x pan-y; }
+@media (prefers-reduced-motion: reduce) {
+  .tc-use { animation: none; }
 }

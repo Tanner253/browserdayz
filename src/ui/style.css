@@ -19,6 +19,11 @@
 
 html,
 body {
+  /* no pinch or double-tap zoom, no pull-to-refresh, no grey flash on tap */
+  touch-action: manipulation;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
   margin: 0;
   height: 100%;
   overflow: hidden;
@@ -34,8 +39,36 @@ body {
   inset: 0;
   width: 100vw;
   height: 100vh;
+  /* a phone's address bar comes and goes: fill what is actually visible */
+  height: 100dvh;
   display: block;
   cursor: crosshair;
+  touch-action: none;
+}
+
+/* ------------------------------------------------------------ phone held upright */
+#rotate {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: none;
+  place-content: center;
+  justify-items: center;
+  gap: 12px;
+  padding: 24px;
+  text-align: center;
+  background: #0b0c0c;
+}
+#rotate b { font-size: 26px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; }
+#rotate span { font-family: var(--mono); font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-faint); }
+.rot-phone { position: relative; width: 52px; height: 92px; margin-bottom: 18px; border: 3px solid var(--ink); border-radius: 11px; animation: rot-phone 2.6s cubic-bezier(0.6, 0, 0.3, 1) infinite; }
+.rot-phone::after { content: ''; position: absolute; left: 50%; bottom: 5px; width: 14px; height: 3px; margin-left: -7px; border-radius: 2px; background: var(--accent); }
+@keyframes rot-phone { 0%, 22% { transform: rotate(0); } 58%, 100% { transform: rotate(-90deg); } }
+@media (orientation: portrait) and (pointer: coarse) {
+  #rotate { display: grid; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rot-phone { animation: none; transform: rotate(-90deg); }
 }
 
 #ui {

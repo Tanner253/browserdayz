@@ -11,6 +11,11 @@ export class Input {
   mouseDY = 0;
   wheel = 0;
   locked = false;
+  /**
+   * Touch screen: there is no mouse to capture, so "locked" simply means the game has
+   * the screen, and aiming and buttons come from the on-screen controls.
+   */
+  touch = false;
   /** set by UI screens that need the cursor (inventory, menus) */
   uiMode = false;
   onLockChange: (locked: boolean) => void = () => {};
@@ -34,6 +39,8 @@ export class Input {
       this.down.clear();
     });
     el.addEventListener('mousedown', (e) => {
+      // a tap also arrives as a mouse click: on a touch screen the buttons do the shooting
+      if (this.touch) return;
       // clicking the game while the cursor is free captures it (the click is not a shot)
       if (!this.locked && !this.uiMode) {
         this.lock();
@@ -44,13 +51,14 @@ export class Input {
       this.pressedSet.add(k);
     });
     window.addEventListener('mouseup', (e) => {
+      if (this.touch) return;
       const k = `Mouse${e.button}`;
       this.down.delete(k);
       this.releasedSet.add(k);
     });
     window.addEventListener('mousemove', (e) => {
       // standard FPS mouse: only a captured (pointer-locked) mouse aims
-      if (!this.locked) return;
+      if (!this.locked || this.touch) return;
       this.mouseDX += e.movementX;
       this.mouseDY += e.movementY;
     });
@@ -59,12 +67,8 @@ export class Input {
     }, { passive: true });
     window.addEventListener('contextmenu', (e) => e.preventDefault());
     document.addEventListener('pointerlockchange', () => {
-      this.locked = document.pointerLockElement === this.el;
-      if (!this.locked) {
-        for (const k of this.down) if (k.startsWith('Mouse')) this.releasedSet.add(k);
-        for (const k of [...this.down]) if (k.startsWith('Mouse')) this.down.delete(k);
-      }
-      this.onLockChange(this.locked);
+      if (this.touch) return;
+      this.setLocked(document.pointerLockElement === this.el);
     });
   }
 
@@ -74,15 +78,36 @@ export class Input {
     this.down.clear();
   }
 
+  private setLocked(locked: boolean) {
+    this.locked = locked;
+    if (!locked) {
+      for (const k of this.down) if (k.startsWith('Mouse')) this.releasedSet.add(k);
+      for (const k of [...this.down]) if (k.startsWith('Mouse')) this.down.delete(k);
+    }
+    this.onLockChange(locked);
+  }
+
+  /** Aim input from a finger dragging across the screen, in mouse pixels. */
+  look(dx: number, dy: number) {
+    if (!this.locked) return;
+    this.mouseDX += dx;
+    this.mouseDY += dy;
+  }
+
   /** Capture the mouse (call from a click or key press). */
   lock() {
     if (this.locked) return;
+    if (this.touch) return this.setLocked(true);
     // raw (unaccelerated) mouse input like native shooters, where the browser supports it
     const r = this.el.requestPointerLock({ unadjustedMovement: true } as never) as unknown as Promise<void> | undefined;
     r?.catch?.(() => (this.el.requestPointerLock() as unknown as Promise<void> | undefined)?.catch?.(() => {}));
   }
 
   unlock() {
+    if (this.touch) {
+      if (this.locked) this.setLocked(false);
+      return;
+    }
     if (document.pointerLockElement) document.exitPointerLock();
   }
 
