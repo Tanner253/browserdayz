@@ -57,7 +57,9 @@ export async function renderIcons(renderer: THREE.WebGLRenderer, models: ItemMod
     if (!upright && !iconLandscape) pivot.rotation.x = Math.PI / 2;
     if (modelLong === 'z' && !upright) pivot.rotation.y = Math.PI / 2;
     pivot.rotation.y += 0.35;
-    pivot.rotation.x += upright ? 0.15 : 0.55;
+    // something as flat as a dog tag is looked at from above, or it is only a sliver
+    const flat = size.y < Math.min(size.x, size.z) * 0.1;
+    pivot.rotation.x += upright ? 0.15 : flat ? 1.15 : 0.55;
     scene.add(pivot);
     pivot.updateMatrixWorld(true);
     const b2 = new THREE.Box3().setFromObject(pivot);

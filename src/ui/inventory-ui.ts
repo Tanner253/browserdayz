@@ -6,7 +6,7 @@
 // Drag & drop with rotation (R), right-click for everything an item can do,
 // double-click for its main action, hover + 5-8 to put it on a quick key.
 
-import { GEAR_SLOTS, ITEMS, SLOT_KIND, SLOT_LABEL, capacityOf, itemWeight, type ItemInstance, type Slot } from '../sim/items';
+import { GEAR_SLOTS, ITEMS, SLOT_KIND, SLOT_LABEL, capacityOf, itemName, itemWeight, tagClock, tagOwner, type ItemInstance, type Slot } from '../sim/items';
 import { Container, type PlayerInventory } from '../sim/inventory';
 import type { WorldItem, Stash } from '../game/loot';
 import type { Vitals } from '../game/player';
@@ -61,6 +61,8 @@ export class InventoryUI {
   icons: Record<string, string> = {};
   /** portrait of the survivor for the paper doll */
   doll = '';
+  /** this player's public id: tells their own dog tag from the ones they took */
+  selfId = '';
   private vicinity: WorldItem[] = [];
   private stash: Stash | null = null;
   private stashState = '';
@@ -138,6 +140,21 @@ export class InventoryUI {
 
   // ------------------------------------------------------------ rendering
 
+  /** carried tags whose countdown is on screen (by uid) */
+  private clocks = new Map<string, ItemInstance>();
+
+  private counting(item: ItemInstance) {
+    return item.id === 'dogtag' && item.pid !== this.selfId && item.holder === this.selfId;
+  }
+
+  /** once a second while the inventory is open: move the countdowns on without redrawing everything */
+  tickTags() {
+    for (const el of this.root.querySelectorAll<HTMLElement>('[data-clock]')) {
+      const it = this.clocks.get(el.dataset.clock!);
+      if (it) el.textContent = tagClock(it);
+    }
+  }
+
   private tags(item: ItemInstance): string {
     const d = ITEMS[item.id];
     const t: string[] = [];
@@ -145,6 +162,11 @@ export class InventoryUI {
     if (d.weapon) t.push(`<span class="qty">${item.loaded ?? 0}/${capacityOf(item)}</span>`);
     if (item.mods?.length) t.push(`<span class="mods">+${item.mods.length}</span>`);
     if (item.cargo?.length) t.push(`<span class="qty">${item.cargo.length} in</span>`);
+    // somebody else's dog tag, carried: time left until it is cashed in
+    if (this.counting(item)) {
+      this.clocks.set(item.uid, item);
+      t.push(`<span class="tagclock" data-clock="${item.uid}">${tagClock(item)}</span>`);
+    }
     const qi = this.actions.quickIndex(item.id);
     if (qi >= 0) t.push(`<span class="qkey">${qi + 5}</span>`);
     return t.join('');
@@ -176,7 +198,7 @@ export class InventoryUI {
     }
     el.appendChild(img);
     el.insertAdjacentHTML('beforeend', this.tags(item));
-    el.title = d.name;
+    el.title = itemName(item);
     return el;
   }
 
@@ -208,7 +230,7 @@ export class InventoryUI {
       el.className = 'inv-item in-slot' + (item === this.selected ? ' sel' : '') + (this.inv.active === slot ? ' active' : '');
       const url = this.icons[item.id];
       el.innerHTML = `<div class="inv-item-img fit" style="${url ? `background-image:url(${url})` : ''}"></div>${this.tags(item)}`;
-      el.title = ITEMS[item.id].name;
+      el.title = itemName(item);
       this.bindItem(el, { kind: 'slot', slot, item });
       s.appendChild(el);
     } else s.classList.add('empty');
@@ -219,6 +241,7 @@ export class InventoryUI {
     const inv = this.inv;
     const r = this.root;
     r.innerHTML = '';
+    this.clocks.clear();
     this.hover = null;
     const wrap = document.createElement('div');
     wrap.className = 'inv-wrap';
@@ -240,7 +263,7 @@ export class InventoryUI {
       ic.innerHTML = `<div class="inv-item-img fit" style="background-image:url(${this.icons[w.loot.item.id] ?? ''})"></div>`;
       row.appendChild(ic);
       const extra = d.stack ? ` <span>×${w.loot.item.qty}</span>` : d.weapon ? ` <span>${w.loot.item.loaded ?? 0}/${capacityOf(w.loot.item)}</span>` : w.loot.item.cargo?.length ? ` <span>${w.loot.item.cargo.length} inside</span>` : '';
-      row.insertAdjacentHTML('beforeend', `<div class="g-name">${d.name}${extra}<small>${d.category}</small></div>`);
+      row.insertAdjacentHTML('beforeend', `<div class="g-name">${itemName(w.loot.item)}${extra}<small>${d.category}</small></div>`);
       this.bindItem(row, { kind: 'ground', w, item: w.loot.item });
       ground.appendChild(row);
     }
@@ -327,12 +350,16 @@ export class InventoryUI {
     if (d.wear?.fall) stats.push(`<div><span>Fall damage</span><b>−${Math.round((1 - d.wear.fall) * 100)}%</b></div>`);
     if (d.attach) stats.push(`<div><span>Fits</span><b>${d.attach.fits.map((f) => ITEMS[f].name).join(', ')}</b></div>`);
     if (it.mods?.length) stats.push(`<div><span>Fitted</span><b>${it.mods.map((m) => ITEMS[m].name).join(', ')}</b></div>`);
+    if (it.id === 'dogtag') {
+      stats.push(`<div><span>Owner</span><b>${tagOwner(it)}</b></div>`);
+      stats.push(`<div><span>Cashes in</span><b${this.counting(it) ? ` data-clock="${it.uid}"` : ''}>${it.pid === this.selfId ? 'never: it is yours' : this.counting(it) ? tagClock(it) : 'after 30 min carried'}</b></div>`);
+    }
     box.innerHTML = `
       <div class="ins-head">
         <div class="ins-img" style="background-image:url(${this.icons[it.id] ?? ''})"></div>
         <div>
           <div class="ins-cat">${d.category}</div>
-          <div class="ins-name">${d.name}</div>
+          <div class="ins-name">${itemName(it)}</div>
         </div>
       </div>
       <div class="ins-desc">${d.desc}</div>
@@ -459,7 +486,7 @@ export class InventoryUI {
     this.render();
     const m = document.createElement('div');
     m.className = 'inv-menu';
-    m.innerHTML = `<div class="inv-menu-title">${ITEMS[src.item.id].name}</div>`;
+    m.innerHTML = `<div class="inv-menu-title">${itemName(src.item)}</div>`;
     for (const act of this.actionsFor(src)) {
       const b = document.createElement('button');
       b.textContent = act.label;

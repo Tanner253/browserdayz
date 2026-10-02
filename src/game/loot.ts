@@ -133,6 +133,8 @@ export class ItemModels {
 export class WorldItem {
   obj: THREE.Object3D;
   collider: RAPIER.Collider;
+  private meshes: THREE.Mesh[] = [];
+  private shadows = true;
   constructor(public loot: WorldLoot, tpl: ItemTemplate, scene: THREE.Scene, normal: THREE.Vector3 | null) {
     this.obj = tpl.group.clone();
     this.obj.position.set(loot.x, loot.y, loot.z);
@@ -140,6 +142,9 @@ export class WorldItem {
     // on sloped ground the item lies flat on the slope
     if (normal && normal.y < 0.9995) q.premultiply(new THREE.Quaternion().setFromUnitVectors(UP, normal));
     this.obj.quaternion.copy(q);
+    this.obj.traverse((o) => {
+      if ((o as THREE.Mesh).isMesh) this.meshes.push(o as THREE.Mesh);
+    });
     scene.add(this.obj);
     const hx = Math.max(0.08, tpl.size.x / 2 + 0.03);
     const hy = Math.max(0.06, tpl.size.y / 2 + 0.02);
@@ -151,6 +156,13 @@ export class WorldItem {
       .setCollisionGroups(TRIGGER_GROUPS);
     this.collider = physics.world.createCollider(desc);
     physics.tag(this.collider, { surface: 'cloth', owner: this });
+  }
+
+  /** each shadow-casting mesh is drawn once per shadow cascade: only worth it up close */
+  setShadows(on: boolean) {
+    if (on === this.shadows) return;
+    this.shadows = on;
+    for (const m of this.meshes) m.castShadow = on;
   }
 
   dispose(scene: THREE.Scene) {
@@ -399,11 +411,16 @@ export class LootManager {
     return out;
   }
 
+  /** graphics option: beyond this distance small items stop casting shadows */
+  shadowDist = Infinity;
+
   /** distance culling: tiny items vanish past 70 m */
   update(cam: THREE.Vector3) {
+    const s2 = this.shadowDist * this.shadowDist;
     for (const w of this.items.values()) {
       const d2 = (w.loot.x - cam.x) ** 2 + (w.loot.z - cam.z) ** 2;
       w.obj.visible = d2 < 70 * 70;
+      w.setShadows(d2 < s2);
     }
   }
 }

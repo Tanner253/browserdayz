@@ -13,7 +13,7 @@ import { WebSocketServer, type WebSocket } from 'ws';
 import { buildWorldData } from './world';
 import { Economy, type WorldLoot } from '../src/sim/economy';
 import { Container, type SerializedInventory } from '../src/sim/inventory';
-import { ITEMS, sanitizeItem, type ItemInstance } from '../src/sim/items';
+import { ITEMS, TAG_HOLD, sanitizeItem, type ItemInstance } from '../src/sim/items';
 import { CRATE_RESTOCK, CRATE_SPECS, fillCrate } from '../src/sim/crates';
 import { WEAPON_RULES, hitDamage, type HitZone } from '../src/sim/combat';
 import { CHAT_RANGE, F_DEAD, PROTOCOL, type C2S, type CorpseInfo, type KillInfo, type PlayerInfo, type Pose, type S2C, type StashInfo, type StoredItem, type Vitals } from '../src/net/protocol';
@@ -208,6 +208,13 @@ function cleanItem(raw: unknown, depth = 0): ItemInstance | null {
     it.loaded = Math.max(0, Math.min(def.weapon.capacity + 4, Math.floor(Number(r.loaded) || 0)));
     if (Array.isArray(r.mods)) it.mods = r.mods.filter((m) => typeof m === 'string').slice(0, 4);
   }
+  if (r.id === 'dogtag') {
+    const short = (v: unknown) => (typeof v === 'string' ? v.slice(0, 24) : undefined);
+    it.owner = cleanName(r.owner);
+    it.pid = short(r.pid);
+    it.holder = short(r.holder);
+    it.held = Math.max(0, Math.min(TAG_HOLD, Number(r.held) || 0));
+  }
   if (def.wear?.cargo && Array.isArray(r.cargo)) {
     it.cargo = [];
     for (const p of r.cargo.slice(0, 40)) {
@@ -242,6 +249,31 @@ function cleanInventory(raw: unknown): SerializedInventory | null {
 function releaseLock(c: Client) {
   if (c.openCid && locks.get(c.openCid) === c.id) locks.delete(c.openCid);
   c.openCid = null;
+}
+
+/** an item the server knows this player is carrying (pockets, slots, worn bags) */
+function findCarried(c: Client, uid: unknown): ItemInstance | null {
+  if (!c.inv || typeof uid !== 'string') return null;
+  const walk = (it: ItemInstance | null | undefined): ItemInstance | null => {
+    if (!it) return null;
+    if (it.uid === uid) return it;
+    for (const p of it.cargo ?? []) {
+      const hit = walk(p.item);
+      if (hit) return hit;
+    }
+    return null;
+  };
+  for (const it of Object.values(c.inv.slots)) {
+    const hit = walk(it);
+    if (hit) return hit;
+  }
+  for (const cont of c.inv.containers) {
+    for (const it of cont.items) {
+      const hit = walk(it);
+      if (hit) return hit;
+    }
+  }
+  return null;
 }
 
 /** everything a character carried goes into a body that can be searched for a while */
@@ -420,6 +452,18 @@ function handle(c: Client, m: C2S) {
           if (Math.hypot(o.pose[0] - c.pose[0], o.pose[1] - c.pose[1], o.pose[2] - c.pose[2]) <= CHAT_RANGE) send(o, out);
         }
       } else broadcast({ t: 'chat', ch: 'global', from: c.name, text });
+      return;
+    }
+    case 'cash': {
+      // the tag has to be one this player really carries, with its time (nearly) served:
+      // our copy of their inventory is a few seconds behind theirs
+      const tag = findCarried(c, m.uid);
+      if (!tag || tag.id !== 'dogtag' || (tag.held ?? 0) < TAG_HOLD - 30) return;
+      tag.held = 0;
+      const owner = tag.owner ?? 'Survivor';
+      // this is where a payout would be issued once rewards are live
+      log(`${c.name} cashed in ${owner}'s dog tag`);
+      broadcast({ t: 'cashed', id: c.id, name: c.name, owner });
       return;
     }
     case 'ping':

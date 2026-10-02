@@ -13,12 +13,12 @@ import type { Vegetation } from '../world/vegetation';
 import type { Grass } from '../world/grass';
 import { Door, type Buildings } from '../world/buildings';
 import { heightAt, type World } from '../world/worldgen';
-import { ITEMS, capacityOf, hasMod, makeItem, newUid, type ItemInstance, type Slot } from '../sim/items';
+import { ITEMS, TAG_HOLD, capacityOf, hasMod, makeItem, newUid, tagClock, tagOwner, type ItemInstance, type Slot } from '../sim/items';
 import { PlayerInventory, SLOT_ORDER, type Container } from '../sim/inventory';
 import { Economy, type WorldLoot } from '../sim/economy';
 import { CRATE_RESTOCK, CRATE_SPECS, fillCrate } from '../sim/crates';
 import { loadSave, writeSave, type SaveData } from '../sim/save';
-import { Net, playerName, remoteServer, serverStatus, setPlayerName } from '../net/client';
+import { Net, playerName, publicId, remoteServer, serverStatus, setPlayerName } from '../net/client';
 import { F_AIM, F_CROUCH, F_DEAD, F_GROUND, F_SPRINT, crateId, type CorpseInfo, type PlayerInfo, type Pose, type S2C, type StashInfo } from '../net/protocol';
 import { Player } from './player';
 import { Avatar, AVATAR_LAYER, FP_BODY_LAYER } from './avatar';
@@ -32,6 +32,8 @@ import { HUD, type HotbarEntry } from '../ui/hud';
 import { InventoryUI } from '../ui/inventory-ui';
 import { renderDoll, renderIcons } from '../ui/icons';
 import { Perf } from '../core/perf';
+import { loadGraphics, type Graphics } from '../core/settings';
+import { REWARDS_UI, RewardsModal, addCashedTag, cashedTags } from '../ui/rewards';
 
 export interface WorldSystems {
   r: Renderer;
@@ -101,6 +103,11 @@ export class Game {
   private localDrops = new Set<string>();
 
   perf: Perf;
+  /** graphics options the player picked in the Esc menu */
+  gfx: Graphics = loadGraphics();
+  private tagT = 0;
+  private slowFor = 0;
+  private slowHinted = false;
 
   constructor(public s: WorldSystems) {
     this.perf = new Perf(s.r.renderer);
@@ -126,6 +133,7 @@ export class Game {
     this.loot = new LootManager(r.scene, atmo, buildings.lootPoints);
     await this.loot.preload();
     this.loot.onPlaced = (l) => this.lootPlaced(l);
+    this.applyGraphics(this.gfx);
     this.economy = new Economy(buildings.lootPoints, {
       spawn: (l) => this.loot.spawn(l),
       despawn: (l) => this.loot.despawn(l),
@@ -150,13 +158,19 @@ export class Game {
     this.weapons.onHit = (h) => this.onHit(h);
     this.weapons.onShot = (s) => this.net.send({ t: 'shot', o: s.origin.toArray(), d: s.dir.toArray(), w: s.weapon, sup: s.suppressed });
     progress('compiling shaders');
-    this.weapons.precompile(r.renderer);
+    this.weapons.precompile((scene, camera) => r.precompile(scene, camera));
     // every loot model's material, so entering a house never compiles mid-game
     const warm = new THREE.Group();
-    for (const id of Object.keys(ITEMS)) warm.add((await this.loot.models.get(id)).group.clone());
+    for (const id of Object.keys(ITEMS)) {
+      warm.add((await this.loot.models.get(id)).group.clone());
+      // and every weapon as it looks in somebody's hands: the first armed player to walk
+      // into view must not cost a frame
+      const held = this.weapons.worldModel(id);
+      if (held) warm.add(held);
+    }
     warm.position.copy(r.camera.position);
     r.scene.add(warm);
-    r.renderer.compile(r.scene, r.camera);
+    r.precompile(r.scene, r.camera);
     r.scene.remove(warm);
     progress('rendering icons');
     const icons = await renderIcons(r.renderer, this.loot.models, atmo.envMap);
@@ -183,6 +197,7 @@ export class Game {
     });
     this.invUI.icons = icons;
     this.invUI.doll = doll;
+    this.invUI.selfId = publicId();
 
     // one physics step so placement queries see every collider
     physics.step(physics.fixedDt);
@@ -206,6 +221,20 @@ export class Game {
     );
     this.hud.onStart(() => this.resume());
     this.hud.onRespawn(() => this.respawn());
+    this.hud.bindGraphics(
+      this.gfx,
+      (g) => this.applyGraphics(g),
+      () => {
+        const cv = r.renderer.domElement;
+        return `Rendering ${cv.width} × ${cv.height} · ${((cv.width * cv.height) / 1e6).toFixed(1)} million pixels a frame`;
+      },
+    );
+    // dog tags and creator rewards: explained on entering the site, and again from the menu
+    if (REWARDS_UI) {
+      const modal = new RewardsModal(document.getElementById('ui')!);
+      this.hud.onRewards(() => modal.open());
+      modal.openAtEntry();
+    }
     this.hud.showStart(true);
     // FPS mouse: play only while the mouse is captured. Esc releases it -> pause menu;
     // clicking the menu captures it again and play resumes.
@@ -276,9 +305,67 @@ export class Game {
     const pick = (ids: string[]) => ids[Math.floor(Math.random() * ids.length)];
     this.inv.add(makeItem(pick(['sprats', 'beans', 'sardines', 'tomatoes'])));
     this.inv.add(makeItem(pick(['thermos', 'milk'])));
+    this.inv.add(this.makeTag());
     this.player.vitals = { health: 100, energy: 80, water: 80, stamina: 100, bleeding: false };
     this.weapons.validate();
     this.refreshQuick();
+  }
+
+  /** Every survivor carries a dog tag stamped with their own name. */
+  private makeTag(): ItemInstance {
+    const it = makeItem('dogtag');
+    it.owner = playerName() || 'Survivor';
+    it.pid = publicId();
+    return it;
+  }
+
+  /** characters from before dog tags existed get theirs now */
+  private ensureTag() {
+    const me = publicId();
+    if (!this.inv.find((it) => it.id === 'dogtag' && it.pid === me)) this.inv.add(this.makeTag());
+  }
+
+  /**
+   * Somebody else's tag in your pockets counts up while you are alive. After TAG_HOLD
+   * seconds it is cashed in and leaves the inventory. The clock belongs to whoever is
+   * carrying the tag: when it changes hands it starts again.
+   */
+  private tickTags(dt: number) {
+    const me = publicId();
+    const done: ItemInstance[] = [];
+    const carried: { name: string; clock: string }[] = [];
+    this.inv.find((it) => {
+      if (it.id !== 'dogtag' || it.pid === me) return false;
+      if (it.holder !== me) {
+        it.holder = me;
+        it.held = 0;
+        this.meDirty = true;
+        this.hud.note(`${tagOwner(it)}'s dog tag: stay alive for 30 minutes to cash it in`, 'good');
+      }
+      it.held = (it.held ?? 0) + dt;
+      if (it.held >= TAG_HOLD) done.push(it);
+      else carried.push({ name: tagOwner(it), clock: tagClock(it) });
+      return false;
+    });
+    // the countdown is on screen the whole time, and on the tag itself in the inventory
+    this.hud.setTags(carried);
+    if (this.invUI.isOpen) this.invUI.tickTags();
+    if (!done.length) return;
+    for (const it of done) {
+      this.inv.remove(it);
+      const n = addCashedTag();
+      const owner = tagOwner(it);
+      this.hud.note(`Dog tag cashed in: ${owner}`, 'good');
+      // online the server checks the tag and announces it to everyone; a payout would be issued there
+      if (this.online) this.net.send({ t: 'cash', uid: it.uid });
+      else {
+        this.hud.chatLine('system', '', `${playerName() || 'You'} cashed in ${owner}'s dog tag.`);
+        this.hud.chatLine('system', '', `That is ${n} cashed in so far.`);
+      }
+    }
+    audio.ui('pickup');
+    this.inventoryChanged();
+    if (this.invUI.isOpen) this.invUI.refresh(this.loot.near(this.player.pos, 2.3), this.openStash);
   }
 
   private async restore(save: SaveData) {
@@ -308,6 +395,7 @@ export class Game {
       // pockets are smaller than they used to be: whatever no longer fits lands at your feet
       for (const it of this.inv.load(p.inventory)) this.dropItem(it, this.player.pos, 0.8);
       if (p.quick) this.quick = [0, 1, 2, 3].map((i) => (p.quick![i] && ITEMS[p.quick![i]!] ? p.quick![i] : null));
+      this.ensureTag();
       this.refreshQuick();
       this.weapons.validate();
     } else {
@@ -347,6 +435,7 @@ export class Game {
     if (w.me) {
       for (const it of this.inv.load(w.me.inv)) this.dropItem(it, this.player.pos, 0.8);
       Object.assign(this.player.vitals, w.me.vitals);
+      this.ensureTag();
       this.weapons.validate();
       this.refreshQuick();
     } else this.freshKit();
@@ -446,6 +535,12 @@ export class Game {
       this.resume();
     });
     net.on('chat', (m) => this.hud.chatLine(m.ch ?? 'global', m.from, m.text));
+    net.on('cashed', (m) => {
+      const text = `${m.name} cashed in ${m.owner}'s dog tag.`;
+      this.hud.chatLine('system', '', text);
+      this.hud.feed(text, m.id === net.id);
+      if (m.id === net.id) this.hud.chatLine('system', '', `That is ${cashedTags()} cashed in so far.`);
+    });
     net.onClose = (reason) => {
       this.paused = true;
       this.input.unlock();
@@ -649,10 +744,34 @@ export class Game {
     this.resume();
   }
 
+  /** Graphics options from the Esc menu: applied at once, nothing needs a reload. */
+  applyGraphics(g: Graphics) {
+    this.gfx = g;
+    const { r, atmo, veg, grass } = this.s;
+    r.applyQuality({ renderScale: g.scale, msaa: g.msaa, ao: g.ao !== 'off', aoHalfRes: g.ao === 'half' });
+    // shadow map size per cascade, and how far from the camera shadows are drawn
+    const [size, reach] = { low: [1024, 70], medium: [1024, 110], high: [2048, 160] }[g.shadows];
+    atmo.setShadows(size, reach);
+    this.loot.shadowDist = g.shadows === 'high' ? Infinity : 22;
+    // reach of the full-detail trees, and blades of grass per patch
+    const [detail, density] = { low: [0.45, 0.4], medium: [0.7, 0.7], high: [1, 1] }[g.foliage];
+    veg.setDetail(detail);
+    grass.setDensity(density);
+  }
+
   start() {
-    const loop = () => {
-      this.frame();
+    let due = 0;
+    const loop = (t: number) => {
       requestAnimationFrame(loop);
+      const limit = this.gfx.fpsLimit;
+      if (limit > 0) {
+        // frame limit: skip display refreshes until the next frame is due (1 ms of slack,
+        // so asking for 60 on a 60 Hz screen still shows every refresh)
+        const step = 1000 / limit;
+        if (t < due - 1) return;
+        due = Math.max(due + step, t - step);
+      }
+      this.frame();
     };
     requestAnimationFrame(loop);
   }
@@ -686,6 +805,7 @@ export class Game {
   }
 
   private inventoryChanged() {
+    this.slowT = 1; // refresh carried weight on the next frame
     this.weapons.validate();
     this.refreshQuick();
     this.meDirty = true;
@@ -1017,6 +1137,9 @@ export class Game {
     }
   }
 
+  private slowT = 1;
+  private hasCompass = false;
+
   private hotbar(): HotbarEntry[] {
     const out: HotbarEntry[] = [];
     SLOT_ORDER.forEach((s: Slot, i) => {
@@ -1071,8 +1194,20 @@ export class Game {
 
     const canMove = this.director.controlsPlayer && !uiOpen && playing && !typing;
     const moveInput = canMove ? input : NULL_INPUT;
-    p.weightKg = this.inv.weight();
-    p.fallMult = this.inv.wear('fall').reduce((a, b) => a * b, 1);
+    // carried weight and gear effects only change with the inventory: a few times a second is plenty
+    this.slowT += dt;
+    if (this.slowT > 0.2) {
+      this.slowT = 0;
+      p.weightKg = this.inv.weight();
+      p.fallMult = this.inv.wear('fall').reduce((a, b) => a * b, 1);
+      this.hasCompass = !!this.inv.find((i) => i.id === 'compass');
+    }
+    this.tagT += dt;
+    if (this.tagT >= 1) {
+      if (this.started && !p.dead) this.tickTags(this.tagT);
+      else this.hud.setTags([]);
+      this.tagT = 0;
+    }
     const steps = physics.step(dt, (h) => {
       p.step(h, moveInput);
       buildings.update(h);
@@ -1195,7 +1330,7 @@ export class Game {
     r.chroma.offset.set(hurt * 0.004 + (v.health < 25 ? 0.0015 : 0), hurt * 0.002);
     r.vignette.darkness = 0.42 + (this.weapons.aiming ? 0.12 : 0) + (v.health < 25 ? 0.25 : 0);
 
-    const hasCompass = !!this.inv.find((i) => i.id === 'compass');
+    const hasCompass = this.hasCompass;
     const heading = THREE.MathUtils.radToDeg(-p.yaw);
     this.hud.update({
       vitals: v,
@@ -1225,6 +1360,13 @@ export class Game {
     this.fpsN++;
     if (this.fpsAcc > 0.5) {
       this.fps = this.fpsN / this.fpsAcc;
+      // struggling for a while: point at the options once (the game never lowers them itself)
+      this.slowFor = playing && this.fps < 28 && !(this.gfx.fpsLimit && this.gfx.fpsLimit <= 30) ? this.slowFor + this.fpsAcc : 0;
+      if (this.slowFor > 8 && !this.slowHinted) {
+        this.slowHinted = true;
+        this.hud.note('Low frame rate: press Esc and open Graphics', 'warn');
+        this.hud.chatLine('system', '', 'The frame rate is low. Press Esc and open Graphics to turn the settings down.');
+      }
       this.fpsAcc = 0;
       this.fpsN = 0;
     }

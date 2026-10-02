@@ -161,6 +161,11 @@ const D: ItemDef[] = [
   { id: 'cigarettes', name: 'Cigarettes', model: 'cigarette_pack', w: 1, h: 1, weight: 0.03, category: 'misc', desc: 'Kentucky Ace. Universal currency.' },
   { id: 'jerrycan', name: 'Jerrycan', model: 'metal_jerrycan_green', w: 3, h: 4, weight: 3.5, category: 'misc', desc: '20 L fuel can, half full.' },
   { id: 'grenade', name: 'Stick Grenade', model: 'stick_grenade', w: 1, h: 3, weight: 0.6, category: 'misc', desc: 'Old and unreliable. Not yet throwable in this build.' },
+  // ---------------------------------------------------------------- identity
+  {
+    id: 'dogtag', name: 'Dog Tag', model: '@dogtag', scale: 1.5, w: 1, h: 1, weight: 0.02, category: 'misc',
+    desc: 'Stamped steel on a ball chain. Every survivor carries their own. Take one off a body and stay alive with it for 30 minutes to cash it in.',
+  },
   // ---------------------------------------------------------------- base building
   { id: 'stash_kit', name: 'Stash Crate', model: 'wooden_military_crate', w: 4, h: 3, weight: 6, category: 'stash', scale: 0.55, desc: 'A crate you can put down anywhere (right-click → Place). It stays in the world and keeps whatever you store in it.' },
 ];
@@ -185,6 +190,32 @@ export interface ItemInstance {
   mods?: string[];
   /** contents of a bag or vest: they stay inside it when it is dropped or handed over */
   cargo?: Placed[];
+  /** dog tag: the name stamped on it and that player's public id */
+  owner?: string;
+  pid?: string;
+  /** dog tag: public id of whoever carries it now, and for how many seconds they have */
+  holder?: string;
+  held?: number;
+}
+
+/** seconds somebody else's dog tag has to be carried before it is cashed in */
+export const TAG_HOLD = 30 * 60;
+
+/** time left on a carried dog tag, as m:ss */
+export function tagClock(it: ItemInstance): string {
+  const left = Math.max(0, Math.ceil(TAG_HOLD - (it.held ?? 0)));
+  return `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+}
+
+/** what an item is called: a dog tag carries its owner's name */
+export function itemName(it: ItemInstance): string {
+  const d = ITEMS[it.id];
+  return it.id === 'dogtag' && it.owner ? `${tagOwner(it)}'s Dog Tag` : d.name;
+}
+
+/** the name stamped on a tag, safe to put into markup (it was typed by another player) */
+export function tagOwner(it: ItemInstance): string {
+  return (it.owner ?? '').replace(/[<>&"']/g, '').slice(0, 16) || 'Survivor';
 }
 
 let uidCounter = 0;

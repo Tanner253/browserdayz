@@ -366,7 +366,7 @@ export class Weapons {
   }
 
   /** Compile every viewmodel shader up front so the first equip / first shot never stalls. */
-  precompile(renderer: THREE.WebGLRenderer) {
+  precompile(compile: (scene: THREE.Scene, camera: THREE.Camera) => void) {
     const added: THREE.Object3D[] = [];
     for (const m of this.models.values()) {
       if (!m.root.parent) {
@@ -381,7 +381,7 @@ export class Weapons {
         hidden.push(o);
       }
     });
-    renderer.compile(this.vmScene, this.vmCamera);
+    compile(this.vmScene, this.vmCamera);
     hidden.forEach((o) => (o.visible = false));
     added.forEach((o) => this.vmRoot.remove(o));
   }

@@ -170,6 +170,9 @@ export class Terrain {
     this.mesh.castShadow = true;
     this.mesh.name = 'terrain';
     this.mesh.matrixAutoUpdate = false;
+    // drawn after everything else that is opaque: in a forest most of the ground is hidden behind
+    // trunks, leaves and grass, and those pixels then skip the terrain's heavy shader entirely
+    this.mesh.renderOrder = 5;
     scene.add(this.mesh);
 
     // --- physics heightfield (column-major, rows along Z)

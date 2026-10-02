@@ -81,8 +81,14 @@ class LodSet {
   scale: Float32Array;
   n: number;
 
+  // scratch space for sorting the visible instances nearest-first
+  private order: Uint32Array;
+  private dist: Float32Array;
+
   constructor(public instances: Instance[], private opts: LodSetOpts) {
     this.n = instances.length;
+    this.order = new Uint32Array(this.n);
+    this.dist = new Float32Array(this.n);
     this.matrices = new Float32Array(this.n * 16);
     this.pos = new Float32Array(this.n * 3);
     this.scale = new Float32Array(this.n);
@@ -107,6 +113,9 @@ class LodSet {
       im.receiveShadow = true;
       im.matrixAutoUpdate = false;
       im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      // Nearest detail level is drawn first, the terrain last: whatever ends up hidden behind
+      // closer trees is rejected by the depth test before its (expensive) shading runs.
+      im.renderOrder = -10 + this.levels.length;
       scene.add(im);
       return im;
     });
@@ -116,6 +125,8 @@ class LodSet {
   update(cam: THREE.Vector3, frustum: THREE.Frustum) {
     for (const l of this.levels) l.count = 0;
     const { cullRadius, shadowRadius } = this.opts;
+    const { order, dist } = this;
+    let m = 0;
     for (let i = 0; i < this.n; i++) {
       const x = this.pos[i * 3], y = this.pos[i * 3 + 1], z = this.pos[i * 3 + 2];
       const dx = x - cam.x, dy = y - cam.y, dz = z - cam.z;
@@ -128,6 +139,14 @@ class LodSet {
         _sphere.radius = cullRadius * this.scale[i];
         if (!frustum.intersectsSphere(_sphere)) continue;
       }
+      dist[i] = d;
+      order[m++] = i;
+    }
+    // nearest first: each instance's leaves hide the ones drawn after it (see renderOrder above)
+    if (m > 1) order.subarray(0, m).sort((a, b) => dist[a] - dist[b]);
+    for (let k0 = 0; k0 < m; k0++) {
+      const i = order[k0];
+      const d = dist[i];
       for (const l of this.levels) {
         if (d < l.near || d > l.far) continue;
         const off = l.count * 16;
@@ -379,6 +398,8 @@ void main() {
 
 export class Vegetation {
   private sets: LodSet[] = [];
+  /** trees and bushes: the range of the full-detail model, which the foliage option scales */
+  private detail: { set: LodSet; full: { value: THREE.Vector4 }[]; simple: { value: THREE.Vector4 }[]; base: [number, number]; out: [number, number] }[] = [];
   private impostors = new Impostors();
   private frustum = new THREE.Frustum();
   private projView = new THREE.Matrix4();
@@ -470,24 +491,20 @@ export class Vegetation {
       const m1 = this.treeMaterials(e, true, sway);
       const instances = byKind.get(k) ?? [];
       const set = new LodSet(instances, { cullRadius: Math.max(e.radius, e.height) * 0.8, shadowRadius: 34 });
-      if (isBush) {
-        setLodFade(m0.barkLod, null, [32, 40]);
-        setLodFade(m0.leafLod, null, [32, 40]);
-        setLodFade(m1.barkLod, [32, 40], [95, 110]);
-        setLodFade(m1.leafLod, [32, 40], [95, 110]);
-        set.addLevel(scene, [{ geometry: lod0.bark, material: m0.bark }, { geometry: lod0.leaves, material: m0.leaves }], 0, 0, 32, 40, false);
-        set.addLevel(scene, [{ geometry: lod1.bark, material: m1.bark }, { geometry: lod1.leaves, material: m1.leaves }], 32, 40, 95, 110, true);
-        set.addLevel(scene, [{ geometry: lod1.bark, material: m1.bark }, { geometry: lod1.leaves, material: m1.leaves }], 0, 0, 32, 40, true, true);
-      } else {
-        setLodFade(m0.barkLod, null, [40, 50]);
-        setLodFade(m0.leafLod, null, [40, 50]);
-        // full 3D trees out to ~120 m, then baked impostors for the far forest
-        setLodFade(m1.barkLod, [40, 50], [115, 130]);
-        setLodFade(m1.leafLod, [40, 50], [115, 130]);
-        // full-detail canopies are visual only; their shadows come from the LOD1 proxy below
-        set.addLevel(scene, [{ geometry: lod0.bark, material: m0.bark }, { geometry: lod0.leaves, material: m0.leaves }], 0, 0, 40, 50, false);
-        set.addLevel(scene, [{ geometry: lod1.bark, material: m1.bark }, { geometry: lod1.leaves, material: m1.leaves }], 40, 50, 115, 130, true);
-        set.addLevel(scene, [{ geometry: lod1.bark, material: m1.bark }, { geometry: lod1.leaves, material: m1.leaves }], 0, 0, 40, 50, true, true);
+      // full-detail model up close, the simpler one beyond (for trees: out to ~120 m, then
+      // baked impostors for the far forest)
+      const base: [number, number] = isBush ? [32, 40] : [40, 50];
+      const out: [number, number] = isBush ? [95, 110] : [115, 130];
+      setLodFade(m0.barkLod, null, base);
+      setLodFade(m0.leafLod, null, base);
+      setLodFade(m1.barkLod, base, out);
+      setLodFade(m1.leafLod, base, out);
+      // full-detail canopies are visual only; their shadows come from the simpler stand-in below
+      set.addLevel(scene, [{ geometry: lod0.bark, material: m0.bark }, { geometry: lod0.leaves, material: m0.leaves }], 0, 0, base[0], base[1], false);
+      set.addLevel(scene, [{ geometry: lod1.bark, material: m1.bark }, { geometry: lod1.leaves, material: m1.leaves }], base[0], base[1], out[0], out[1], true);
+      set.addLevel(scene, [{ geometry: lod1.bark, material: m1.bark }, { geometry: lod1.leaves, material: m1.leaves }], 0, 0, base[0], base[1], true, true);
+      this.detail.push({ set, full: [m0.barkLod, m0.leafLod], simple: [m1.barkLod, m1.leafLod], base, out });
+      if (!isBush) {
         const bm = this.treeMaterials(e, false, 0);
         bakeKinds.push({ name: k, parts: [{ name: 'bark', geometry: lod0.bark, material: bm.bark }, { name: 'leaves', geometry: lod0.leaves, material: bm.leaves }], entry: e });
         // trunk colliders
@@ -588,6 +605,18 @@ export class Vegetation {
     // ---- impostors for the far forest (baked under the real sun + sky)
     this.impostors.bake(renderer, this.atmo, bakeKinds);
     this.impostors.build(scene, this.world.trees, bakeKinds.length);
+  }
+
+  /** Graphics option: how far the full-detail trees and bushes reach (1 = as built). */
+  setDetail(k: number) {
+    for (const d of this.detail) {
+      const fade: [number, number] = [d.base[0] * k, d.base[1] * k];
+      for (const u of d.full) setLodFade(u, null, fade);
+      for (const u of d.simple) setLodFade(u, fade, d.out);
+      const [full, simple, shadow] = d.set.levels;
+      full.farFull = shadow.farFull = simple.near = fade[0];
+      full.far = shadow.far = simple.nearFull = fade[1];
+    }
   }
 
   update(dt: number, camera: THREE.Camera) {

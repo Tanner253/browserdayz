@@ -19,6 +19,8 @@ interface GrassLevel {
   mesh: THREE.InstancedMesh;
   maxDist: number;
   count: number;
+  /** share of the patch's blades drawn at this distance */
+  frac: number;
 }
 
 export const grassUniforms = {
@@ -114,8 +116,14 @@ export class Grass {
       mesh.matrixAutoUpdate = false;
       mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       scene.add(mesh);
-      this.levels.push({ mesh, maxDist, count: 0 });
+      this.levels.push({ mesh, maxDist, count: 0, frac });
     }
+  }
+
+  /** Graphics option: how thick the grass is (1 = as built). */
+  setDensity(k: number) {
+    const tris = (SEGMENTS * 2 - 1) * 3;
+    for (const l of this.levels) l.mesh.geometry.setDrawRange(0, Math.floor(BLADES * l.frac * k) * tris);
   }
 
   private material(widthScale: number) {

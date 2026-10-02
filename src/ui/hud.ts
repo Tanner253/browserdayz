@@ -3,6 +3,7 @@
 
 import type { Vitals } from '../game/player';
 import type { ChatChannel } from '../net/protocol';
+import { AO_MODES, DEFAULT_GRAPHICS, FPS_LIMITS, LEVELS, MSAA, PRESETS, SCALES, presetOf, saveGraphics, type Graphics, type PresetName } from '../core/settings';
 
 const CHANNELS: ChatChannel[] = ['global', 'near'];
 const CHANNEL_LABEL: Record<ChatChannel | 'system', string> = { global: 'Global', near: 'Proximity', system: '' };
@@ -83,6 +84,7 @@ export class HUD {
       <div class="hud-online"><i></i><b></b><span></span></div>
       <div class="hud-net"></div>
       <div class="hud-feed"></div>
+      <div class="hud-tags"></div>
       <div class="hud-fatal"><div class="fatal-title">Disconnected</div><div class="fatal-sub"></div><button class="dead-btn fatal-btn">Reconnect</button></div>
       <div class="hud-dead"><div class="dead-title">You are dead</div><div class="dead-sub"></div><button class="dead-btn">Respawn</button></div>
       <div class="hud-start">
@@ -92,6 +94,12 @@ export class HUD {
           <div class="start-nameRow"><label>Name</label><input class="start-name" maxlength="16" spellcheck="false" autocomplete="off" placeholder="Survivor"></div>
           <button class="start-btn">Click to play</button>
           <div class="start-online"></div>
+          <div class="start-tabs">
+            <button data-tab="keys" class="on">Controls</button>
+            <button data-tab="gfx">Graphics</button>
+            <button data-tab="rewards" hidden>Rewards</button>
+          </div>
+          <div class="start-gfx"></div>
           <div class="start-keys">
             <div><b>WASD</b> move · <b>Alt</b> walk</div><div><b>Shift</b> sprint · hold breath (scoped)</div>
             <div><b>C</b> crouch · <b>Space</b> jump</div><div><b>Q / E</b> lean</div>
@@ -108,7 +116,7 @@ export class HUD {
       </div>
     `;
     document.getElementById('ui')!.appendChild(this.root);
-    for (const k of ['cross', 'hit', 'prompt', 'progress', 'compass', 'area', 'weapon', 'vitals', 'stamina', 'hotbar', 'chat', 'scope', 'damage', 'hitdir', 'fps', 'online', 'net', 'feed', 'fatal', 'dead', 'start']) {
+    for (const k of ['cross', 'hit', 'prompt', 'progress', 'compass', 'area', 'weapon', 'vitals', 'stamina', 'hotbar', 'chat', 'scope', 'damage', 'hitdir', 'fps', 'online', 'net', 'feed', 'tags', 'fatal', 'dead', 'start']) {
       this.el[k] = this.root.querySelector(`.hud-${k}`) as HTMLElement;
     }
     this.notes = this.root.querySelector('.hud-notes') as HTMLDivElement;
@@ -139,8 +147,31 @@ export class HUD {
       e.stopPropagation();
       if (e.key === 'Enter') name.blur();
     });
+    // the menu under the Play button: its clicks are not "click to play"
+    const card = this.root.querySelector('.start-card') as HTMLElement;
+    const tabs = this.root.querySelector('.start-tabs') as HTMLElement;
+    tabs.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const tab = (e.target as HTMLElement).closest('button')?.dataset.tab;
+      if (!tab) return;
+      if (tab === 'rewards') return this.rewardsClicked();
+      card.classList.toggle('tab-gfx', tab === 'gfx');
+      for (const b of tabs.querySelectorAll('button')) b.classList.toggle('on', b.dataset.tab === tab);
+      if (tab === 'gfx') this.renderGraphics();
+    });
+    const gfx = this.root.querySelector('.start-gfx') as HTMLElement;
+    gfx.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const b = (e.target as HTMLElement).closest('button');
+      if (b?.dataset.k) this.setGraphic(b.dataset.k, b.dataset.v ?? '');
+    });
     // scale the whole HUD with the window so it reads the same on a laptop and a 1440p monitor
-    const fit = () => document.documentElement.style.setProperty('--ui-zoom', String(Math.round(Math.max(0.7, Math.min(1.7, window.innerHeight / 860, window.innerWidth / 1400)) * 100) / 100));
+    const fit = () => {
+      const z = Math.round(Math.max(0.7, Math.min(1.7, window.innerHeight / 860, window.innerWidth / 1400)) * 100) / 100;
+      document.documentElement.style.setProperty('--ui-zoom', String(z));
+      // dialogs grow with a big screen but never shrink below their designed size
+      document.documentElement.style.setProperty('--dialog-zoom', String(Math.max(1, z)));
+    };
     fit();
     window.addEventListener('resize', fit);
   }
@@ -219,6 +250,54 @@ export class HUD {
     this.toggle(e, 'show', count !== null);
   }
 
+  // ---------------------------------------------------------------- menu: graphics, rewards
+
+  private gfx: Graphics = { ...DEFAULT_GRAPHICS };
+  private gfxChanged: (g: Graphics) => void = () => {};
+  private gfxInfo: () => string = () => '';
+  private rewardsClicked: () => void = () => {};
+
+  /** the current options, what to do when the player changes one, and a line describing what is rendered */
+  bindGraphics(g: Graphics, changed: (g: Graphics) => void, info: () => string) {
+    this.gfx = { ...g };
+    this.gfxChanged = changed;
+    this.gfxInfo = info;
+    this.renderGraphics();
+  }
+
+  /** the Rewards button appears once there is something for it to open */
+  onRewards(cb: () => void) {
+    this.rewardsClicked = cb;
+    (this.root.querySelector('.start-tabs [data-tab="rewards"]') as HTMLElement).hidden = false;
+  }
+
+  private setGraphic(key: string, value: string) {
+    const g = this.gfx;
+    if (key === 'preset') Object.assign(g, PRESETS[value as PresetName]);
+    else if (key === 'scale' || key === 'msaa' || key === 'fpsLimit') g[key] = Number(value);
+    else if (key === 'ao') g.ao = value as Graphics['ao'];
+    else if (key === 'shadows' || key === 'foliage') g[key] = value as Graphics['shadows'];
+    saveGraphics(g);
+    this.gfxChanged({ ...g });
+    this.renderGraphics();
+  }
+
+  private renderGraphics() {
+    const g = this.gfx;
+    const row = (label: string, key: string, current: string | number | null, options: [string | number, string][]) =>
+      `<div class="gfx-row"><span>${label}</span><div class="gfx-opts">${options.map(([v, t]) => `<button data-k="${key}" data-v="${v}"${v === current ? ' class="on"' : ''}>${t}</button>`).join('')}</div></div>`;
+    const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
+    (this.root.querySelector('.start-gfx') as HTMLElement).innerHTML =
+      row('Preset', 'preset', presetOf(g), (Object.keys(PRESETS) as PresetName[]).map((p) => [p, cap(p)])) +
+      row('Resolution', 'scale', g.scale, SCALES.map((s) => [s, `${Math.round(s * 100)}%`])) +
+      row('Anti-aliasing', 'msaa', g.msaa, MSAA.map((m) => [m, m ? `${m}×` : 'Off'])) +
+      row('Ambient occlusion', 'ao', g.ao, AO_MODES.map((a) => [a, a === 'off' ? 'Off' : a === 'half' ? 'Standard' : 'High'])) +
+      row('Shadows', 'shadows', g.shadows, LEVELS.map((l) => [l, cap(l)])) +
+      row('Foliage', 'foliage', g.foliage, LEVELS.map((l) => [l, cap(l)])) +
+      row('Frame limit', 'fpsLimit', g.fpsLimit, FPS_LIMITS.map((f) => [f, f ? String(f) : 'Off'])) +
+      `<div class="gfx-info">${this.gfxInfo()}</div>`;
+  }
+
   // ---------------------------------------------------------------- chat
 
   /** channel the next message goes to (remembered between messages) */
@@ -294,6 +373,12 @@ export class HUD {
     setTimeout(() => n.classList.add('out'), 6500);
     setTimeout(() => n.remove(), 7300);
     while (this.el.feed.children.length > 6) this.el.feed.firstChild?.remove();
+  }
+
+  /** other players' dog tags being carried, each with the time left until it is cashed in */
+  setTags(list: { name: string; clock: string }[]) {
+    const esc = (s: string) => s.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
+    this.set('tags', this.el.tags, list.map((t) => `<div class="tag-row"><i></i><span>${esc(t.name)}</span><b>${t.clock}</b></div>`).join(''), 'html');
   }
 
   /** flash an arc on the side the hit came from (angle relative to where you are looking) */

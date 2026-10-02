@@ -116,10 +116,19 @@ export class Renderer {
     this.composer.addPass(new EffectPass(this.camera, tone, this.grade, this.contrast, this.vignette, grain));
   }
 
+  /** The player changed a graphics option (Esc menu). */
+  applyQuality(q: Partial<QualitySettings>) {
+    Object.assign(this.quality, q);
+    this.composer.multisampling = this.quality.msaa;
+    this.ao.enabled = this.quality.ao;
+    if (this.ao.configuration.halfRes !== this.quality.aoHalfRes) this.ao.configuration.halfRes = this.quality.aoHalfRes;
+    this.resize();
+  }
+
   resize() {
     const w = window.innerWidth;
     const h = window.innerHeight;
-    // fixed full quality: always the screen's native pixels, never scaled down at runtime
+    // the screen's own pixels times the share the player chose: never changed behind their back
     const pr = Math.min(window.devicePixelRatio, 2) * this.quality.renderScale;
     this.renderer.setPixelRatio(pr);
     this.renderer.setSize(w, h, false);
@@ -128,6 +137,19 @@ export class Renderer {
     this.camera.updateProjectionMatrix();
     this.vmCamera.aspect = w / h;
     this.vmCamera.updateProjectionMatrix();
+  }
+
+  /**
+   * Build a scene's shader programs ahead of time. Everything is drawn into the composer's
+   * linear buffer rather than straight to the canvas, and three builds a different program
+   * for each of the two. Warming up against the canvas builds a set that is never used and
+   * leaves the real ones to be compiled, one freeze at a time, as things first come into view.
+   */
+  precompile(scene: THREE.Scene, camera: THREE.Camera) {
+    const prev = this.renderer.getRenderTarget();
+    this.renderer.setRenderTarget(this.composer.inputBuffer);
+    this.renderer.compile(scene, camera);
+    this.renderer.setRenderTarget(prev);
   }
 
   render(dt: number) {

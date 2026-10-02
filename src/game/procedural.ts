@@ -1,7 +1,8 @@
 // The few meshes that have no scanned model: small machined parts built from a lathe
-// profile, with a parkerised-steel material.
+// profile, with a parkerised-steel material, and the stamped dog tag.
 
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { MeshPart } from '../core/gltf-utils';
 
 let steel: THREE.MeshStandardMaterial | null = null;
@@ -40,7 +41,41 @@ export function suppressorGeometry(): THREE.BufferGeometry {
   return g;
 }
 
+let tagSteel: THREE.MeshStandardMaterial | null = null;
+
+/** Two stamped plates fanned on a ball chain, lying flat. */
+export function dogTagGeometry(): THREE.BufferGeometry {
+  const L = 0.05, W = 0.029, R = 0.009, T = 0.0012;
+  const plate = new THREE.Shape();
+  plate.moveTo(-L / 2 + R, -W / 2);
+  plate.lineTo(L / 2 - R, -W / 2);
+  plate.absarc(L / 2 - R, -W / 2 + R, R, -Math.PI / 2, 0, false);
+  plate.lineTo(L / 2, W / 2 - R);
+  plate.absarc(L / 2 - R, W / 2 - R, R, 0, Math.PI / 2, false);
+  plate.lineTo(-L / 2 + R, W / 2);
+  plate.absarc(-L / 2 + R, W / 2 - R, R, Math.PI / 2, Math.PI, false);
+  plate.lineTo(-L / 2, -W / 2 + R);
+  plate.absarc(-L / 2 + R, -W / 2 + R, R, Math.PI, Math.PI * 1.5, false);
+  // the hole the chain runs through
+  const hx = -L / 2 + 0.006;
+  const hole = new THREE.Path();
+  hole.absarc(hx, 0, 0.0022, 0, Math.PI * 2, true);
+  plate.holes.push(hole);
+  const flat = () => new THREE.ExtrudeGeometry(plate, { depth: T, bevelEnabled: false, curveSegments: 6 }).rotateX(-Math.PI / 2);
+  // the second plate swings out around the hole and rests on the first
+  const lower = flat();
+  const upper = flat().translate(-hx, T * 1.15, 0).rotateY(0.5).translate(hx, 0, 0);
+  const chain = new THREE.TorusGeometry(0.016, 0.0009, 5, 30).rotateX(Math.PI / 2).translate(hx - 0.016, T * 1.2, 0).toNonIndexed();
+  const g = mergeGeometries([lower, upper, chain], false)!;
+  g.computeVertexNormals();
+  return g;
+}
+
 export function proceduralParts(model: string): MeshPart[] {
+  if (model === '@dogtag') {
+    tagSteel ??= new THREE.MeshStandardMaterial({ color: 0xd2d0c8, metalness: 0.75, roughness: 0.48, name: 'tag-steel' });
+    return [{ name: 'dogtag', geometry: dogTagGeometry(), material: tagSteel }];
+  }
   if (model === '@suppressor') return [{ name: 'suppressor', geometry: suppressorGeometry(), material: gunSteel() }];
   throw new Error(`unknown procedural model ${model}`);
 }

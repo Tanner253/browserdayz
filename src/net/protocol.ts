@@ -11,7 +11,7 @@ import type { SerializedInventory } from '../sim/inventory';
 import type { WorldLoot } from '../sim/economy';
 import type { HitZone } from '../sim/combat';
 
-export const PROTOCOL = 2;
+export const PROTOCOL = 3;
 
 /** chat channels: everyone on the server, or only players standing near the speaker */
 export type ChatChannel = 'global' | 'near';
@@ -84,6 +84,8 @@ export type C2S =
   | { t: 'died'; cause: string }
   | { t: 'respawn' }
   | { t: 'chat'; ch?: ChatChannel; text: string }
+  /** a dog tag taken from another player has been carried for the full time */
+  | { t: 'cash'; uid: string }
   | { t: 'ping'; n: number };
 
 export type S2C =
@@ -121,6 +123,8 @@ export type S2C =
   | { t: 'door'; i: number; open: boolean; swing: number }
   | { t: 'spawn'; x: number; z: number; yaw: number }
   | { t: 'chat'; ch?: ChatChannel; from: string; text: string }
+  /** somebody cashed in a dog tag: announced to everyone */
+  | { t: 'cashed'; id: number; name: string; owner: string }
   | { t: 'pong'; n: number }
   | { t: 'kick'; reason: string };
 

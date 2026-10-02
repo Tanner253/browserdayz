@@ -65,8 +65,29 @@ export function setPlayerName(name: string) {
   }
 }
 
+let key = '';
+
 /** stable anonymous identity so the server can give you your character back after a reconnect */
 function playerKey(): string {
+  key ||= readKey();
+  return key;
+}
+
+/**
+ * Short public id derived from the private key. It is stamped on this player's dog tag,
+ * so everyone can tell whose tag it is without learning the key itself.
+ */
+export function publicId(): string {
+  const k = playerKey();
+  let a = 2166136261, b = 5381;
+  for (let i = 0; i < k.length; i++) {
+    a = Math.imul(a ^ k.charCodeAt(i), 16777619);
+    b = (Math.imul(b, 33) ^ k.charCodeAt(i)) | 0;
+  }
+  return (a >>> 0).toString(36) + (b >>> 0).toString(36);
+}
+
+function readKey(): string {
   try {
     // ?key= lets two tabs on one machine be two different players (testing)
     const q = new URLSearchParams(location.search).get('key');

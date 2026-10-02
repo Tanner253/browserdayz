@@ -98,6 +98,23 @@ export class Atmosphere {
     }
   }
 
+  /** Graphics option: shadow map resolution (per cascade) and how far from the camera shadows reach. */
+  setShadows(size: number, far: number) {
+    const csm = this.csm;
+    if (csm.shadowMapSize !== size) {
+      csm.shadowMapSize = size;
+      for (const l of csm.lights) {
+        l.shadow.mapSize.set(size, size);
+        l.shadow.map?.dispose();
+        l.shadow.map = null;
+      }
+    }
+    if (csm.maxFar !== far) {
+      csm.maxFar = far;
+      csm.updateFrustums();
+    }
+  }
+
   /** Brightest texel = sun. Also averages the horizon band for the fog colour. */
   private analyseSky(tex: THREE.DataTexture) {
     const { data, width, height } = tex.image as { data: Uint16Array | Float32Array; width: number; height: number };

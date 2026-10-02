@@ -52,7 +52,7 @@ async function boot() {
   await game.init((l) => (label.textContent = l));
   await assets.idle();
   // warm up shader programs before revealing the world
-  r.renderer.compile(r.scene, r.camera);
+  r.precompile(r.scene, r.camera);
   assets.releaseModels();
   (window as unknown as Record<string, unknown>).__game = game;
   if (import.meta.env.DEV) (await import('./dev/harness')).installHarness(game);

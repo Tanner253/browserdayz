@@ -186,7 +186,9 @@ export class Perf {
     const s = this.summary();
     const info = this.renderer.info;
     const mem = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory;
+    const cv = this.renderer.domElement;
     const lines = [
+      `render ${cv.width}×${cv.height} (${((cv.width * cv.height) / 1e6).toFixed(1)} MP)${s.gpu > s.vsync * 0.9 ? '  · GPU-bound: the graphics card is the limit here' : ''}`,
       `frame ${s.interval.toFixed(1)} ms  (${(1000 / Math.max(s.interval, 1)).toFixed(0)} fps, display ~${(1000 / s.vsync).toFixed(0)} Hz)`,
       `cpu   logic ${s.logic.toFixed(2)} ms  render-submit ${s.submit.toFixed(2)} ms`,
       `gpu   ${this.ext ? s.gpu.toFixed(2) + ' ms' : 'n/a (timer queries not exposed by this browser)'}`,
