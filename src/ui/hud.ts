@@ -527,7 +527,8 @@ export class HUD {
   }
 
   onRespawn(cb: () => void) {
-    (this.root.querySelector('.dead-btn') as HTMLButtonElement).onclick = cb;
+    // the Disconnected screen's Reconnect button shares the style: pick the one on the death screen
+    (this.root.querySelector('.hud-dead .dead-btn') as HTMLButtonElement).onclick = cb;
   }
 
   update(s: {
