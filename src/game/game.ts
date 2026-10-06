@@ -22,6 +22,7 @@ import { Net, playerName, publicId, remoteServer, serverStatus, setPlayerName } 
 import { F_AIM, F_CROUCH, F_DEAD, F_GROUND, F_SPRINT, crateId, type CorpseInfo, type PlayerInfo, type Pose, type S2C, type StashInfo } from '../net/protocol';
 import { Player } from './player';
 import { Avatar, AVATAR_LAYER, FP_BODY_LAYER } from './avatar';
+import { lookFor } from './look';
 import { Dummy } from './character';
 import { CorpseBody, RemotePlayer } from './remote';
 import { CameraDirector } from './camera';
@@ -129,7 +130,7 @@ export class Game {
 
   async init(progress: (label: string) => void) {
     const { r, atmo, buildings, veg, world } = this.s;
-    await this.avatar.load(atmo, AVATAR_LAYER, true);
+    await this.avatar.load(atmo, AVATAR_LAYER, true, lookFor(playerName()));
     r.scene.add(this.avatar.root, this.avatar.fpRoot);
     for (const l of atmo.csm.lights) l.shadow.camera.layers.enable(AVATAR_LAYER);
 
@@ -159,6 +160,7 @@ export class Game {
     this.weapons.mainCam = r.camera;
     this.weapons.itemModels = this.loot.models;
     this.weapons.onSlungChange = (obj) => this.avatar.setSlung(obj);
+    this.weapons.setLook(lookFor(playerName()));
     this.weapons.resolveTarget = (owner) => (owner instanceof Dummy || owner instanceof RemotePlayer ? owner : null);
     this.weapons.onHit = (h) => this.onHit(h);
     this.weapons.onShot = (s) => this.net.send({ t: 'shot', o: s.origin.toArray(), d: s.dir.toArray(), w: s.weapon, sup: s.suppressed });
@@ -179,7 +181,7 @@ export class Game {
     r.scene.remove(warm);
     progress('rendering icons');
     const icons = await renderIcons(r.renderer, this.loot.models, atmo.envMap);
-    const doll = await renderDoll(r.renderer, atmo.envMap);
+    const doll = await renderDoll(r.renderer, atmo.envMap, lookFor(playerName()));
 
     this.hud = new HUD(icons);
     this.hud.setName(playerName());
@@ -288,7 +290,9 @@ export class Game {
   private async join() {
     this.joining = true;
     const name = this.hud.nameValue() || `Survivor${Math.floor(100 + Math.random() * 900)}`;
+    const renamed = name !== playerName();
     setPlayerName(name);
+    this.dress(name, renamed);
     this.hud.showStart(true, false, 'Connecting…');
     const welcome = await this.net.connect(name, (text) => this.hud.showStart(true, false, text));
     if (welcome) await this.enterOnline(welcome);
@@ -307,6 +311,15 @@ export class Game {
     }
     if (this.input.locked) this.unpause();
     else this.hud.showStart(true, true);
+  }
+
+  /** What this player looks like follows from their name: body, first-person sleeves, inventory portrait. */
+  private dress(name: string, portrait: boolean) {
+    const look = lookFor(name);
+    this.avatar.setLook(look);
+    this.weapons.setLook(look);
+    const { r, atmo } = this.s;
+    if (portrait) void renderDoll(r.renderer, atmo.envMap, look).then((doll) => (this.invUI.doll = doll));
   }
 
   private async enterOffline() {
@@ -618,12 +631,13 @@ export class Game {
     if (this.corpses.has(c.uid)) return;
     const stash = new Stash(c.uid, c.x, c.y, c.z, c.rot, 8, 10, `${c.name}'s body`);
     stash.corpse = true;
-    stash.trigger(0.45, 0.25, 0.95);
+    // the body lies on its back, feet where the player stood and head a body's length behind
+    stash.trigger(0.48, 0.25, 0.85, 0.48);
     const body = new CorpseBody();
     this.corpses.set(c.uid, { stash, body });
     // let the fall animation of the player finish before the body appears
-    await new Promise((r) => setTimeout(r, 1400));
-    if (this.corpses.has(c.uid)) await body.load(this.s.atmo, this.s.r.scene, c.x, c.y, c.z, c.rot);
+    await new Promise((r) => setTimeout(r, 1800));
+    if (this.corpses.has(c.uid)) await body.load(this.s.atmo, this.s.r.scene, c.x, c.y, c.z, c.rot, c.name);
   }
 
   private removeCorpse(uid: string) {

@@ -3,9 +3,9 @@
 
 import * as THREE from 'three';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
-import { assets } from '../core/assets';
 import { ITEMS } from '../sim/items';
 import type { ItemModels } from '../game/loot';
+import { BEARD, HAIR_STYLES, loadCharacter, lookPatch, lookUniforms, setLookUniforms, type Look } from '../game/look';
 
 const PX = 64; // pixels per grid cell
 
@@ -96,39 +96,34 @@ export async function renderIcons(renderer: THREE.WebGLRenderer, models: ItemMod
 }
 
 /** Portrait of the survivor for the inventory screen's paper doll (transparent PNG data URL). */
-export async function renderDoll(renderer: THREE.WebGLRenderer, env: THREE.Texture): Promise<string> {
-  const gltf = await assets.loadGLTF('assets/characters/soldier.glb');
+export async function renderDoll(renderer: THREE.WebGLRenderer, env: THREE.Texture, look: Look): Promise<string> {
+  const gltf = await loadCharacter();
   const model = SkeletonUtils.clone(gltf.scene) as THREE.Group;
+  model.updateMatrixWorld(true);
+  // one hair style (and maybe a beard), carried by the head
+  const head = model.getObjectByName('Head');
+  [...HAIR_STYLES, BEARD].forEach((name, i) => {
+    const o = model.getObjectByName(name);
+    if (!o) return;
+    head?.attach(o);
+    o.visible = name === BEARD ? look.beard : i === look.hair;
+  });
+  const uniforms = lookUniforms();
+  setLookUniforms(uniforms, look);
+  const own: THREE.Material[] = [];
   model.traverse((o) => {
     const m = o as THREE.SkinnedMesh;
     if (!m.isMesh) return;
     m.frustumCulled = false;
     const c = (m.material as THREE.MeshStandardMaterial).clone();
-    if (c.defines) {
-      delete c.defines.USE_CSM;
-      delete c.defines.CSM_CASCADES;
-      delete c.defines.CSM_FADE;
-    }
-    const visor = m.name.toLowerCase().includes('visor');
-    if (visor) c.color.set(0x1a1c1a);
-    c.roughness = Math.max(0.7, c.roughness);
-    c.metalness = 0;
-    // same worn olive drab as the in-world body
-    c.onBeforeCompile = (shader) => {
-      if (visor) return;
-      shader.fragmentShader = shader.fragmentShader.replace(
-        '#include <map_fragment>',
-        `#include <map_fragment>
-{
-  float l = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
-  diffuseColor.rgb = mix(vec3(l), diffuseColor.rgb, 0.15) * vec3(0.5, 0.55, 0.4) * (0.35 + 0.5 * l);
-}`,
-      );
-    };
-    c.customProgramCacheKey = () => (visor ? 'doll-visor' : 'doll');
+    if (m.name === 'body') {
+      c.onBeforeCompile = (shader) => lookPatch(shader, uniforms);
+      c.customProgramCacheKey = () => 'doll';
+    } else if (c.name.includes('Hair')) c.color.copy(look.hairColor);
     m.material = c;
+    own.push(c);
   });
-  const idle = gltf.animations.find((a) => a.name === 'Idle');
+  const idle = gltf.animations.find((a) => a.name === 'idle');
   if (idle) {
     const mixer = new THREE.AnimationMixer(model);
     mixer.clipAction(idle).play();
@@ -138,17 +133,17 @@ export async function renderDoll(renderer: THREE.WebGLRenderer, env: THREE.Textu
   scene.environment = env;
   scene.environmentIntensity = 0.7;
   const key = new THREE.DirectionalLight(0xfff1dc, 2.2);
-  key.position.set(2.5, 3.5, -4);
+  key.position.set(2.5, 3.5, 4);
   const rim = new THREE.DirectionalLight(0x9fc0ff, 1.4);
-  rim.position.set(-3, 2.5, 3);
+  rim.position.set(-3, 2.5, -3);
   scene.add(key, rim, model);
-  // the rig faces -Z: turn it a little so it reads as a figure, not a mugshot
-  model.rotation.y = 0.35;
+  // the model faces +Z: turn it a little so it reads as a figure, not a mugshot
+  model.rotation.y = -0.35;
   model.updateMatrixWorld(true);
   const W = 420, H = 840;
   const rt = new THREE.WebGLRenderTarget(W, H, { samples: 4, colorSpace: THREE.SRGBColorSpace });
   const cam = new THREE.OrthographicCamera(-0.52, 0.52, 1.93, -0.15, 0.01, 50);
-  cam.position.set(0, 0, -10);
+  cam.position.set(0, 0, 10);
   cam.lookAt(0, 0, 0);
   const prev = renderer.getRenderTarget();
   renderer.setRenderTarget(rt);
@@ -166,5 +161,6 @@ export async function renderDoll(renderer: THREE.WebGLRenderer, env: THREE.Textu
   for (let y = 0; y < H; y++) img.data.set(buf.subarray((H - 1 - y) * W * 4, (H - y) * W * 4), y * W * 4);
   ctx.putImageData(img, 0, 0);
   rt.dispose();
+  for (const m of own) m.dispose();
   return canvas.toDataURL('image/png');
 }

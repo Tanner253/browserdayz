@@ -7,6 +7,7 @@ import type RAPIER from '@dimforge/rapier3d-compat';
 import { physics, GLASS_GROUPS, HITBOX_GROUPS } from '../core/physics';
 import type { Atmosphere } from '../world/atmosphere';
 import { Avatar } from './avatar';
+import { lookFor } from './look';
 import type { Damageable, HitZone } from './weapons';
 
 const ZERO = new THREE.Vector3();
@@ -26,7 +27,7 @@ export class Dummy implements Damageable {
   constructor(public pos: THREE.Vector3, public yaw: number) {}
 
   async load(atmo: Atmosphere, scene: THREE.Scene) {
-    await this.avatar.load(atmo, 0);
+    await this.avatar.load(atmo, 0, false, lookFor(`dummy ${this.pos.x.toFixed(1)} ${this.pos.z.toFixed(1)}`));
     scene.add(this.avatar.root);
     const R = physics.R;
     const half = this.yaw / 2;
@@ -38,9 +39,9 @@ export class Dummy implements Damageable {
       physics.tag(c, { surface: 'flesh', owner: this, zone: z });
       this.colliders.push(c);
     };
-    zone(R.ColliderDesc.ball(0.125).setTranslation(0, 1.67, -0.02), 'head');
+    zone(R.ColliderDesc.ball(0.125).setTranslation(0, 1.64, -0.02), 'head');
     zone(R.ColliderDesc.cuboid(0.25, 0.31, 0.14).setTranslation(0, 1.21, 0), 'torso');
-    zone(R.ColliderDesc.cuboid(0.18, 0.45, 0.13).setTranslation(0, 0.45, 0), 'legs');
+    zone(R.ColliderDesc.cuboid(0.18, 0.45, 0.14).setTranslation(0, 0.45, 0.03), 'legs');
     // you can't walk through it, but shots are only stopped by the hit zones
     this.colliders.push(physics.world.createCollider(R.ColliderDesc.capsule(0.55, 0.27).setTranslation(0, 0.83, 0).setCollisionGroups(GLASS_GROUPS), this.body));
     this.update(0);
@@ -50,6 +51,7 @@ export class Dummy implements Damageable {
     if (this.dead) return false;
     this.health -= amount;
     this.flinch = 1;
+    this.avatar.hit();
     // lean away from where the hit came from
     const side = new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
     this.flinchSide = Math.sign(dir.dot(side)) || 1;
@@ -75,8 +77,8 @@ export class Dummy implements Damageable {
     } else if (this.flinch > 0) {
       // rock back from the hit, away from where it came from
       const r = this.avatar.root;
-      r.rotation.x += this.flinch * 0.12;
-      r.rotation.z += this.flinch * 0.1 * this.flinchSide;
+      r.rotation.x += this.flinch * 0.05;
+      r.rotation.z += this.flinch * 0.06 * this.flinchSide;
     }
   }
 }

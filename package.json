@@ -11,6 +11,7 @@
     "start": "tsx server/index.ts",
     "preview": "vite preview",
     "assets": "node scripts/fetch-assets.mjs",
+    "character": "node scripts/build-character.mjs",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.server.json"
   },
   "dependencies": {

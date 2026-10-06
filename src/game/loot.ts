@@ -247,11 +247,12 @@ export class Stash {
   }
 
   /** interaction-only volume (bodies): you can look at it and search it, but walk through it */
-  trigger(hx: number, hy: number, hz: number) {
+  /** @param back how far behind the container's own position the middle of the box lies (a body falls backwards) */
+  trigger(hx: number, hy: number, hz: number, back = 0) {
     const half = this.rot / 2;
     const desc = physics.R.ColliderDesc.cuboid(hx, hy, hz)
       .setSensor(true)
-      .setTranslation(this.x, this.y + hy, this.z)
+      .setTranslation(this.x + Math.sin(this.rot) * back, this.y + hy, this.z + Math.cos(this.rot) * back)
       .setRotation({ x: 0, y: Math.sin(half), z: 0, w: Math.cos(half) })
       .setCollisionGroups(TRIGGER_GROUPS);
     this.collider = physics.world.createCollider(desc);

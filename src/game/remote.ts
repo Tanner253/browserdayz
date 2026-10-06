@@ -9,6 +9,7 @@ import { audio } from '../core/audio';
 import type { Atmosphere } from '../world/atmosphere';
 import { F_CROUCH, F_DEAD, F_GROUND, type Pose } from '../net/protocol';
 import { Avatar } from './avatar';
+import { lookFor } from './look';
 import type { Damageable, HitZone } from './weapons';
 import type { Grips } from './arms';
 
@@ -49,7 +50,7 @@ export class RemotePlayer implements Damageable {
   constructor(public id: number, public name: string, private makeHeld: HeldFactory) {}
 
   async load(atmo: Atmosphere, scene: THREE.Scene, pose: Pose) {
-    await this.avatar.load(atmo, 0);
+    await this.avatar.load(atmo, 0, false, lookFor(this.name));
     scene.add(this.avatar.root);
     const R = physics.R;
     this.body = physics.world.createRigidBody(R.RigidBodyDesc.kinematicPositionBased().setTranslation(pose[0], pose[1], pose[2]));
@@ -58,12 +59,14 @@ export class RemotePlayer implements Damageable {
       physics.tag(c, { surface: 'flesh', owner: this, zone: z });
       list.push(c);
     };
-    zone(this.stand, R.ColliderDesc.ball(0.125).setTranslation(0, 1.67, -0.02), 'head');
+    // measured on the body: x to its right, z behind it
+    zone(this.stand, R.ColliderDesc.ball(0.125).setTranslation(0, 1.64, -0.02), 'head');
     zone(this.stand, R.ColliderDesc.cuboid(0.25, 0.31, 0.14).setTranslation(0, 1.21, 0), 'torso');
-    zone(this.stand, R.ColliderDesc.cuboid(0.18, 0.45, 0.13).setTranslation(0, 0.45, 0), 'legs');
-    zone(this.crouch, R.ColliderDesc.ball(0.125).setTranslation(0, 1.0, -0.14), 'head');
-    zone(this.crouch, R.ColliderDesc.cuboid(0.25, 0.22, 0.17).setTranslation(0, 0.65, -0.04), 'torso');
-    zone(this.crouch, R.ColliderDesc.cuboid(0.21, 0.22, 0.27).setTranslation(0, 0.22, -0.2), 'legs');
+    zone(this.stand, R.ColliderDesc.cuboid(0.18, 0.45, 0.14).setTranslation(0, 0.45, 0.03), 'legs');
+    // crouched it leans forward over one knee, hips well behind the head
+    zone(this.crouch, R.ColliderDesc.ball(0.125).setTranslation(-0.07, 1.03, -0.12), 'head');
+    zone(this.crouch, R.ColliderDesc.cuboid(0.24, 0.24, 0.2).setTranslation(-0.07, 0.72, 0.1), 'torso');
+    zone(this.crouch, R.ColliderDesc.cuboid(0.25, 0.24, 0.3).setTranslation(-0.02, 0.24, 0.07), 'legs');
     for (const c of this.crouch) c.setEnabled(false);
     // players can't walk through each other; shots are only stopped by the hit zones
     this.blocker = physics.world.createCollider(R.ColliderDesc.capsule(0.5, 0.27).setTranslation(0, 0.8, 0).setCollisionGroups(GLASS_GROUPS), this.body);
@@ -107,6 +110,7 @@ export class RemotePlayer implements Damageable {
   /** your shot or blow landed on them: the server decides what it did, this is just the flinch */
   damage(): boolean {
     this.flinch = 1;
+    this.avatar.hit();
     return false;
   }
 
@@ -157,11 +161,11 @@ export class RemotePlayer implements Damageable {
     const r = this.avatar.root;
     if (!this.alive) {
       // they go down, lie there for a moment, then the body on the ground takes over
-      this.fall = Math.min(4, this.fall + dt * 2.6);
+      this.fall = Math.min(4, this.fall + dt * 2.1);
       if (this.fall >= 4) r.visible = false;
     } else if (this.flinch > 0) {
-      r.rotation.x += this.flinch * 0.1;
-      r.rotation.z += this.flinch * 0.08;
+      r.rotation.x += this.flinch * 0.05;
+      r.rotation.z += this.flinch * 0.04;
     }
 
     // --- footsteps you can hear coming
@@ -194,8 +198,9 @@ export class RemotePlayer implements Damageable {
 /** A dead player's body lying where they fell. Purely visual: the game pairs it with a searchable container. */
 export class CorpseBody {
   private avatar = new Avatar();
-  async load(atmo: Atmosphere, scene: THREE.Scene, x: number, y: number, z: number, yaw: number) {
-    await this.avatar.load(atmo, 0);
+  /** @param name whose body it is: it is dressed the way they were */
+  async load(atmo: Atmosphere, scene: THREE.Scene, x: number, y: number, z: number, yaw: number, name: string) {
+    await this.avatar.load(atmo, 0, false, lookFor(name));
     scene.add(this.avatar.root);
     this.avatar.layDown();
     this.avatar.update(0, new THREE.Vector3(x, y, z), new THREE.Vector3(), yaw, false, true);

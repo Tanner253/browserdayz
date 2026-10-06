@@ -16,6 +16,7 @@ import type { Player } from './player';
 import type { Effects } from './effects';
 import { flashTexture } from './effects';
 import { FPArms, type Grips, type HandGrip } from './arms';
+import type { Look } from './look';
 import type { ItemModels } from './loot';
 
 export type HitZone = 'head' | 'torso' | 'legs';
@@ -205,6 +206,11 @@ export class Weapons {
     this.sunLight = new THREE.DirectionalLight(atmo.sunColor, atmo.sunIntensity);
     this.sunLight.position.copy(atmo.sunDir).multiplyScalar(10);
     vmScene.add(this.sunLight);
+  }
+
+  /** sleeves and hands of the first-person arms */
+  setLook(look: Look) {
+    this.arms.setLook(look);
   }
 
   async load() {

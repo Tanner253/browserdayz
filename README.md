@@ -62,7 +62,7 @@ The client can also be hosted on its own (Vercel): `vercel.json` builds it with 
 
 ## How it is built
 
-- **Client**: TypeScript, three.js (WebGL, cascaded shadows, post-processing), Rapier physics, Vite. Assets are CC0 from Poly Haven, processed by `npm run assets`.
+- **Client**: TypeScript, three.js (WebGL, cascaded shadows, post-processing), Rapier physics, Vite. Assets are CC0: props and textures from Poly Haven, processed by `npm run assets`; the player character from Quaternius, built by `npm run character`.
 - **Server**: Node + `ws`, run with `tsx` (`server/`). It imports the same world generator and item / economy code as the client (`src/sim`, `src/world`), so loot points, crates and spawn points line up without sending the map.
 - **Who decides what** (`src/net/protocol.ts`):
   - the server owns the loot economy, who picked an item up first, what is inside crates, stashes and bodies, door states, how much a hit hurts, who is alive and where you spawn;

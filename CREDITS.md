@@ -1,7 +1,13 @@
 # Asset credits
 
-All assets below are CC0 (public domain) from [Poly Haven](https://polyhaven.com). Attribution is not
-required but is given anyway. Procedural trees are generated with
+All assets below are CC0 (public domain). Attribution is not required but is given anyway.
+
+The player character is built by `npm run character` from two packs by
+[Quaternius](https://quaternius.com): the body, face and hair from Universal Base Characters and the
+animations from the Universal Animation Library. Its clothes, gloves and boots, its build and its
+standing pose are made by that script.
+
+Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees are generated with
 [EZ-Tree](https://github.com/dgreenheck/ez-tree) (MIT, Daniel Greenheck).
 
 | Type | Asset | Authors |

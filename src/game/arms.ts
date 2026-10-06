@@ -1,12 +1,12 @@
-// First-person arms. The arm/hand geometry is cut out of the animated survivor
-// (Mixamo skeleton: 3-joint fingers + thumb) and posed every frame with analytic
+// First-person arms. The forearm and hand geometry is cut out of the survivor's body
+// (3-joint fingers + thumb) and posed every frame with analytic
 // two-bone IK so the hands sit on the weapon's grip points, with palm orientation and
 // finger curl per hand. Because the targets live in weapon space, hands follow every
 // bob, recoil kick, bolt cycle and reload animation automatically.
 
 import * as THREE from 'three';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
-import { assets } from '../core/assets';
+import { loadCharacter, lookPatch, lookUniforms, setLookUniforms, type Look } from './look';
 
 /** A hand placement in weapon (model) space: wrist position, finger direction, palm normal. */
 export interface HandGrip {
@@ -37,6 +37,8 @@ interface Arm {
   palmLocal: THREE.Vector3;
   fingers: THREE.Bone[][]; // [index, middle, ring, pinky] each 3 joints
   thumb: THREE.Bone[];
+  /** toward the thumb side of the hand, in the hand's own space */
+  radialLocal: THREE.Vector3;
   pole: THREE.Vector3; // elbow hint in camera space
   /** virtual shoulder in camera space (upper arms are not rendered, so this is free) */
   shoulder: THREE.Vector3;
@@ -51,6 +53,9 @@ const _q3 = new THREE.Quaternion();
 const _m1 = new THREE.Matrix4();
 const _m2 = new THREE.Matrix4();
 
+/** the arms are a little smaller than life: at this distance from the lens full size fills the screen */
+const ARM_SCALE = 0.86;
+
 export class FPArms {
   root = new THREE.Group();
   private model!: THREE.Object3D;
@@ -59,44 +64,36 @@ export class FPArms {
   private right!: Arm;
   private left!: Arm;
   private meshes: THREE.SkinnedMesh[] = [];
+  private uniforms = lookUniforms();
 
   async load() {
-    const gltf = await assets.loadGLTF('assets/characters/soldier.glb');
+    const gltf = await loadCharacter();
     this.model = SkeletonUtils.clone(gltf.scene);
-    // the rig faces -Z like the camera; head sits just behind the eye
-    // viewmodel cheat: shoulders a little ahead of and below the eye so elbows bend naturally
-    this.model.position.set(0, -1.6, -0.06);
-    // the survivor rig has oversized gauntlets; scale the whole arm rig down a touch
-    this.model.scale.multiplyScalar(0.84);
+    // the model faces +Z, the camera -Z; its head sits just behind the eye
+    this.model.rotation.y = Math.PI;
+    this.model.position.set(0, -1.6, 0.06);
+    this.model.scale.multiplyScalar(ARM_SCALE);
     this.root.add(this.model);
 
     this.model.traverse((o) => {
       const b = o as THREE.Bone;
-      if (b.isBone) this.bones.set(b.name.replace('mixamorig', ''), b);
+      if (b.isBone) this.bones.set(b.name, b);
     });
-
-    // T-pose from the bundled clip gives a known rest (palms down, arms out)
-    const tpose = gltf.animations.find((a) => a.name === 'TPose');
-    if (tpose) {
-      const mixer = new THREE.AnimationMixer(this.model);
-      mixer.clipAction(tpose).play();
-      mixer.update(0);
-      mixer.stopAllAction();
-    }
+    // the model is stored at rest in a T-pose: arms out, palms down
     for (const b of this.bones.values()) this.rest.set(b, { p: b.position.clone(), q: b.quaternion.clone() });
 
-    // keep only the arm + hand triangles of the body mesh
+    // keep only the forearm + hand triangles of the body mesh
     this.model.traverse((o) => {
       const sm = o as THREE.SkinnedMesh;
-      if (!sm.isSkinnedMesh) return;
-      if (sm.name.toLowerCase().includes('visor')) {
+      if (!(o as THREE.Mesh).isMesh) return;
+      if (!sm.isSkinnedMesh || sm.name !== 'body') {
         sm.visible = false;
         return;
       }
       const armSet = new Set<number>();
       sm.skeleton.bones.forEach((b, i) => {
-        // forearms + hands only: upper arms sit right against the lens and read as blobs
-        if (/(Left|Right)(ForeArm|Hand)/.test(b.name)) armSet.add(i);
+        // upper arms sit right against the lens and read as blobs
+        if (/^(lowerarm|hand|index|middle|ring|pinky|thumb)_/.test(b.name)) armSet.add(i);
       });
       const g = sm.geometry.clone();
       const si = g.getAttribute('skinIndex');
@@ -118,73 +115,50 @@ export class FPArms {
         if (armSet.has(dominant(src[t])) && armSet.has(dominant(src[t + 1])) && armSet.has(dominant(src[t + 2]))) keep.push(src[t], src[t + 1], src[t + 2]);
       }
       g.setIndex(keep);
-      // per-vertex glove mask: 1 where the hand bones dominate
-      const handSet = new Set<number>();
-      sm.skeleton.bones.forEach((bn, i) => {
-        if (/Hand/.test(bn.name)) handSet.add(i);
-      });
-      const glove = new Float32Array(si.count);
-      for (let v = 0; v < si.count; v++) glove[v] = handSet.has(dominant(v)) ? 1 : 0;
-      g.setAttribute('aGlove', new THREE.BufferAttribute(glove, 1));
       sm.geometry = g;
       sm.frustumCulled = false;
       sm.castShadow = false;
+      // the same jacket sleeves and skin as this player's body
       const mat = (sm.material as THREE.MeshStandardMaterial).clone();
-      mat.roughness = Math.max(0.7, mat.roughness);
-      mat.metalness = 0;
-      if (mat.defines) {
-        delete mat.defines.USE_CSM;
-        delete mat.defines.CSM_CASCADES;
-        delete mat.defines.CSM_FADE;
-      }
-      // olive sleeves + dark leather gloves instead of the stock sci-fi armour
-      mat.onBeforeCompile = (shader) => {
-        shader.vertexShader = shader.vertexShader
-          .replace('#include <common>', '#include <common>\nattribute float aGlove;\nvarying float vGlove;')
-          .replace('#include <begin_vertex>', '#include <begin_vertex>\nvGlove = aGlove;');
-        shader.fragmentShader = shader.fragmentShader
-          .replace('#include <common>', '#include <common>\nvarying float vGlove;')
-          .replace(
-            '#include <map_fragment>',
-            `#include <map_fragment>
-{
-  // keep the armour's surface detail only as light/dark variation
-  float l = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
-  float detail = 0.6 + 0.7 * l;
-  vec3 sleeve = vec3(0.17, 0.19, 0.12);
-  vec3 glove = vec3(0.10, 0.085, 0.07);
-  diffuseColor.rgb = mix(sleeve, glove, smoothstep(0.3, 0.7, vGlove)) * detail;
-}`,
-          )
-          .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(0.85, 0.55, vGlove);');
-      };
+      const uniforms = this.uniforms;
+      mat.onBeforeCompile = (shader) => lookPatch(shader, uniforms);
       mat.customProgramCacheKey = () => 'fp-arms';
       sm.material = mat;
       this.meshes.push(sm);
     });
 
-    this.right = this.makeArm('Right', new THREE.Vector3(0.75, -1, 0.35), new THREE.Vector3(0.26, -0.4, 0.12));
-    this.left = this.makeArm('Left', new THREE.Vector3(-0.9, -0.8, 0.15), new THREE.Vector3(-0.22, -0.36, -0.12));
+    this.right = this.makeArm('r', new THREE.Vector3(0.75, -1, 0.35), new THREE.Vector3(0.26, -0.4, 0.12));
+    this.left = this.makeArm('l', new THREE.Vector3(-0.9, -0.8, 0.15), new THREE.Vector3(-0.22, -0.36, -0.12));
     this.root.visible = false;
   }
 
-  private makeArm(side: 'Left' | 'Right', pole: THREE.Vector3, shoulder: THREE.Vector3): Arm {
-    const B = (n: string) => this.bones.get(side + n)!;
-    const arm = B('Arm'), fore = B('ForeArm'), hand = B('Hand');
+  /** Sleeves and skin of this player (see look.ts). */
+  setLook(look: Look) {
+    setLookUniforms(this.uniforms, look);
+  }
+
+  private makeArm(side: 'l' | 'r', pole: THREE.Vector3, shoulder: THREE.Vector3): Arm {
+    const B = (n: string) => this.bones.get(`${n}_${side}`)!;
+    const arm = B('upperarm'), fore = B('lowerarm'), hand = B('hand');
     this.resetPose();
     this.model.updateMatrixWorld(true);
-    const pa = arm.getWorldPosition(new THREE.Vector3());
-    const pf = fore.getWorldPosition(new THREE.Vector3());
-    const ph = hand.getWorldPosition(new THREE.Vector3());
-    const pm = B('HandMiddle1').getWorldPosition(new THREE.Vector3());
-    // hand frame in its own local space, measured in the T-pose (palms face down)
+    const at = (b: THREE.Object3D) => b.getWorldPosition(new THREE.Vector3());
+    const pa = at(arm), pf = at(fore), ph = at(hand), pm = at(B('middle_01'));
+    // hand frame in its own local space: along the fingers, and out of the palm (from the
+    // hand's own shape: across the knuckles, index to pinky)
     const hq = hand.getWorldQuaternion(new THREE.Quaternion()).invert();
-    const rootDown = new THREE.Vector3(0, -1, 0).applyQuaternion(this.model.getWorldQuaternion(new THREE.Quaternion()));
-    const fingersLocal = pm.clone().sub(ph).normalize().applyQuaternion(hq);
-    const palmLocal = rootDown.applyQuaternion(hq).normalize();
-    const fingers = ['Index', 'Middle', 'Ring', 'Pinky'].map((f) => [1, 2, 3].map((i) => B(`Hand${f}${i}`)).filter(Boolean));
-    const thumb = [1, 2, 3].map((i) => B(`HandThumb${i}`)).filter(Boolean);
-    return { arm, fore, hand, la: pa.distanceTo(pf), lb: pf.distanceTo(ph), lh: pm.distanceTo(ph), fingersLocal, palmLocal, fingers, thumb, pole: pole.normalize(), shoulder };
+    const fingersW = pm.clone().sub(ph).normalize();
+    const palmW = new THREE.Vector3().crossVectors(fingersW, at(B('pinky_01')).sub(at(B('index_01')))).normalize();
+    if (side === 'l') palmW.negate();
+    const radialLocal = at(B('index_01')).sub(at(B('pinky_01'))).normalize().applyQuaternion(hq);
+    const fingersLocal = fingersW.applyQuaternion(hq);
+    const palmLocal = palmW.applyQuaternion(hq);
+    const fingers = ['index', 'middle', 'ring', 'pinky'].map((f) => [1, 2, 3].map((i) => B(`${f}_0${i}`)).filter(Boolean));
+    // the last entry is only the thumb's tip, to aim the last joint at
+    const thumb = [1, 2, 3].map((i) => B(`thumb_0${i}`)).filter(Boolean);
+    const tip = B('thumb_04_leaf');
+    if (tip) thumb.push(tip);
+    return { radialLocal, arm, fore, hand, la: pa.distanceTo(pf), lb: pf.distanceTo(ph), lh: pm.distanceTo(ph), fingersLocal, palmLocal, fingers, thumb, pole: pole.normalize(), shoulder };
   }
 
   private resetPose() {
@@ -261,11 +235,20 @@ export class FPArms {
         this.setWorldQuat(bone, _q2);
       });
     });
-    a.thumb.forEach((bone, j) => {
-      bone.getWorldQuaternion(_q2);
-      _q2.premultiply(_q1.setFromAxisAngle(F, grip.thumb * (j === 0 ? 0.6 : 0.4)));
-      this.setWorldQuat(bone, _q2);
-    });
+    // The thumb is laid out from the hand's own shape rather than turned from wherever the
+    // rig leaves it: out to the side of the index finger, swung toward the palm by the grip,
+    // each joint a little further round and a little more along the fingers.
+    {
+      const Fh = Lf.clone().applyQuaternion(handWorld), Nh = Lp.clone().applyQuaternion(handWorld);
+      const R = a.radialLocal.clone().applyQuaternion(handWorld);
+      R.sub(Fh.clone().multiplyScalar(R.dot(Fh))).sub(Nh.clone().multiplyScalar(R.dot(Nh))).normalize();
+      for (let j = 0; j < a.thumb.length - 1; j++) {
+        const along = 0.95 - j * 0.22, round = grip.thumb * (1.1 + j * 0.5);
+        const want = Fh.clone().multiplyScalar(Math.cos(along)).addScaledVector(R, Math.sin(along) * Math.cos(round)).addScaledVector(Nh, Math.sin(along) * Math.sin(round));
+        const o = a.thumb[j].getWorldPosition(new THREE.Vector3());
+        this.aim(a.thumb[j], a.thumb[j + 1].getWorldPosition(new THREE.Vector3()), o.clone().add(want), o);
+      }
+    }
     if (grip.tuck) {
       // closed fist: bend the thumb over the front of the curled fingers
       const wrist = a.hand.getWorldPosition(new THREE.Vector3());
