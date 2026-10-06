@@ -82,14 +82,10 @@ export const TYPES: Record<string, TypeRule> = {
   sack_pack: { nominal: 6, min: 3, lifetime: 3600, restock: 600, usage: ['Village', 'Town', 'Farm', 'Industrial'] },
   suitcase: { nominal: 3, min: 1, lifetime: 3600, restock: 1200, usage: ['Village', 'Town'] },
   // tools and odds and ends
-  flashlight: { nominal: 3, min: 1, lifetime: 3600, restock: 900, usage: ['Village', 'Industrial', 'Hunting', 'Police'] },
   binoculars: { nominal: 2, min: 1, lifetime: 3600, restock: 1200, usage: ['Military', 'Hunting', 'Police'] },
   compass: { nominal: 3, min: 1, lifetime: 3600, restock: 1200, usage: ['Military', 'Hunting', 'Village'] },
-  watch: { nominal: 3, min: 1, lifetime: 3600, restock: 900, usage: ['Village', 'Town'] },
-  radio: { nominal: 1, min: 0, lifetime: 7200, restock: 3600, usage: ['Military', 'Police'] },
   cigarettes: { nominal: 6, min: 2, lifetime: 2400, restock: 600, usage: ['Village', 'Town', 'Military', 'Industrial'] },
-  jerrycan: { nominal: 3, min: 1, lifetime: 3600, restock: 900, usage: ['Farm', 'Industrial'] },
-  grenade: { nominal: 1, min: 0, lifetime: 3600, restock: 2400, usage: ['Military'] },
+  grenade: { nominal: 5, min: 2, lifetime: 3600, restock: 1200, usage: ['Military', 'Police'] },
   stash_kit: { nominal: 3, min: 1, lifetime: 7200, restock: 1800, usage: ['Farm', 'Industrial', 'Hunting'] },
 };
 

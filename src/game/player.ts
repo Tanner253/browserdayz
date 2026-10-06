@@ -46,6 +46,8 @@ export class Player {
   /** externally supplied (weapons): ADS + weapon weight slow the player */
   aiming = false;
   weightKg = 0;
+  /** how fast thirst grows, from headwear */
+  thirstMult = 1;
   /** fall damage multiplier from footwear */
   fallMult = 1;
   /** how the last damage was dealt (shown on the death screen, sent to the server) */
@@ -278,7 +280,7 @@ export class Player {
     if (this.dead) return;
     const exertion = this.sprinting ? 2.4 : this.moving > 0.1 ? 1.3 : 1;
     v.energy = Math.max(0, v.energy - 0.045 * exertion * dt);
-    v.water = Math.max(0, v.water - 0.07 * exertion * dt);
+    v.water = Math.max(0, v.water - 0.07 * exertion * this.thirstMult * dt);
     // An open wound costs about one health a second. Left alone it closes in the end, at a
     // price most of a bandage's worth of health; a bandage stops it there and then.
     if (v.bleeding) {

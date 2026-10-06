@@ -709,7 +709,45 @@ export class AudioEngine {
     n.connect(f).connect(g).connect(pos ? this.out(pos, 2, 1.5) : this.sfx);
   }
 
-  ui(kind: 'pickup' | 'drop' | 'open' | 'close' | 'eat' | 'drink' | 'bandage' | 'move') {
+  /**
+   * A grenade going off. Close, it is a crack and a blow to the chest; far off, a dull thump
+   * and the hills answering.
+   */
+  explosion(pos: V3, distance: number) {
+    if (!this.ready) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime + distance / 343;
+    const out = this.out(pos, 14, 1, distance);
+    const fall = Math.pow(14 / (14 + Math.max(0, distance - 14)), 0.75);
+    const send = ctx.createGain();
+    send.gain.value = 1.1 * fall;
+    out.connect(send);
+    send.connect(this.reverbSend);
+    send.connect(this.echo);
+    send.connect(this.roomSend);
+    const crack = this.noise(t, 0.08);
+    const ch = this.filter('highpass', 1800);
+    const cg = ctx.createGain();
+    this.env(cg, t, 2.2, 0.001, 0.06);
+    crack.connect(ch).connect(cg).connect(out);
+    const body = this.noise(t, 1.4);
+    const bl = this.filter('lowpass', 2600, 0.8);
+    bl.frequency.setValueAtTime(2600, t);
+    bl.frequency.exponentialRampToValueAtTime(120, t + 0.9);
+    const bg = ctx.createGain();
+    this.env(bg, t, 3, 0.004, 1.2);
+    body.connect(bl).connect(bg).connect(out);
+    const o = ctx.createOscillator();
+    o.frequency.setValueAtTime(78, t);
+    o.frequency.exponentialRampToValueAtTime(24, t + 0.7);
+    const og = ctx.createGain();
+    this.env(og, t, 2.6, 0.003, 0.9);
+    o.connect(og).connect(out);
+    o.start(t);
+    o.stop(t + 1.2);
+  }
+
+  ui(kind: 'pickup' | 'drop' | 'open' | 'close' | 'eat' | 'drink' | 'bandage' | 'move' | 'smoke') {
     if (!this.ready) return;
     const t = this.ctx.currentTime;
     const rustle = (dur: number, freq: number, vol: number, at = 0) => {
@@ -755,6 +793,12 @@ export class AudioEngine {
         break;
       case 'move':
         rustle(0.07, 1200, 0.12);
+        break;
+      case 'smoke':
+        // the lighter, a long draw in, a longer breath out
+        this.click(3600, 0.3, 0.02);
+        rustle(0.5, 2400, 0.07, 0.2);
+        rustle(0.75, 900, 0.1, 0.85);
         break;
     }
   }

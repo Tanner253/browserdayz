@@ -38,7 +38,11 @@ export interface ItemDef {
   category: Category;
   stack?: number;
   slot?: SlotKind;
-  use?: { verb: string; time: number; energy?: number; water?: number; health?: number; stopBleed?: boolean; sound: 'eat' | 'drink' | 'bandage' };
+  use?: { verb: string; time: number; energy?: number; water?: number; health?: number; stopBleed?: boolean; sound: 'eat' | 'drink' | 'bandage' | 'smoke' };
+  /** thrown when used: seconds of fuse, damage at the centre, metres it reaches */
+  throw?: { fuse: number; damage: number; radius: number };
+  /** looked through when used: how much of the normal field of view is left (0.2 = five times closer) */
+  look?: number;
   weapon?: { kind: 'rifle' | 'pistol' | 'auto'; ammo: string; capacity: number; modes?: ('semi' | 'auto')[] };
   melee?: { damage: number; range: number; rate: number };
   /** sealed container (ammo box): opening it replaces the item with loose contents */
@@ -46,7 +50,7 @@ export interface ItemDef {
   /** world model shows this many copies of the mesh in a small pile (loose rounds) */
   pile?: number;
   /** worn gear: cargo grid it adds, damage it soaks */
-  wear?: { cargo?: [number, number]; /** torso damage multiplier */ armor?: number; /** fall damage multiplier */ fall?: number; /** extra punch damage */ fist?: number };
+  wear?: { cargo?: [number, number]; /** torso damage multiplier */ armor?: number; /** head damage multiplier */ head?: number; /** fall damage multiplier */ fall?: number; /** extra punch damage */ fist?: number; /** how fast thirst grows, as a multiplier */ thirst?: number };
   /** weapon attachment: which weapons take it and where it mounts */
   attach?: { fits: string[]; slot: AttachSlot };
   /** camera hint for the icon renderer */
@@ -126,15 +130,15 @@ const D: ItemDef[] = [
   // ---------------------------------------------------------------- clothing & bags
   {
     id: 'boonie_hat', name: 'Boonie Hat', model: 'fishermans_hat', w: 2, h: 2, weight: 0.12, category: 'clothing', slot: 'head',
-    desc: 'Wide-brimmed canvas hat. Keeps the sun and the rain off.', wear: {},
+    desc: 'Wide-brimmed canvas hat. Keeps the sun off: you get thirsty a fifth more slowly while you wear it.', wear: { thirst: 0.8 },
   },
   {
     id: 'gasmask', name: 'Gas Mask', model: 'old_gas_mask', w: 2, h: 2, weight: 0.7, category: 'clothing', slot: 'face',
-    desc: 'GP-5 pattern mask. Filter long expired, but it hides your face.', wear: {},
+    desc: 'GP-5 pattern mask. Thick rubber and glass: a fifth less damage from anything that hits your head.', wear: { head: 0.8 },
   },
   {
     id: 'life_vest', name: 'Flotation Vest', model: 'life_jacket', w: 3, h: 3, weight: 0.8, category: 'clothing', slot: 'vest',
-    desc: 'Foam-filled vest with deep pockets. Adds 12 slots and takes the edge off hits to the chest.', wear: { cargo: [4, 3], armor: 0.85 },
+    desc: 'Foam-filled vest with deep pockets. 12 more slots, and a quarter less damage from every hit to the body.', wear: { cargo: [4, 3], armor: 0.75 },
   },
   {
     id: 'work_gloves', name: 'Work Gloves', model: 'garden_gloves_01', w: 2, h: 1, weight: 0.1, category: 'clothing', slot: 'hands',
@@ -154,13 +158,13 @@ const D: ItemDef[] = [
   },
   // ---------------------------------------------------------------- tools & misc
   { id: 'flashlight', name: 'Flashlight', model: 'vintage_flashlight', w: 1, h: 2, weight: 0.4, category: 'tool', desc: 'Battery lantern.' },
-  { id: 'binoculars', name: 'Binoculars', model: 'binoculars', w: 2, h: 2, weight: 0.6, category: 'tool', desc: '8x field binoculars.' },
-  { id: 'compass', name: 'Compass', model: 'seadogs_compass', w: 1, h: 1, weight: 0.1, category: 'tool', desc: 'Shows your heading on the HUD while carried.' },
+  { id: 'binoculars', name: 'Binoculars', model: 'binoculars', w: 2, h: 2, weight: 0.6, category: 'tool', desc: 'Field binoculars. Use them to look five times closer; any other action puts them away.', use: { verb: 'Look through', time: 0.35, sound: 'bandage' }, look: 0.2 },
+  { id: 'compass', name: 'Compass', model: 'seadogs_compass', w: 1, h: 1, weight: 0.1, category: 'tool', desc: 'Brass pocket compass. While you carry it, your exact bearing in degrees is shown under the compass strip.' },
   { id: 'watch', name: 'Wrist Watch', model: 'digital_wrist_watch', w: 1, h: 1, weight: 0.05, category: 'tool', desc: 'Still ticking.' },
   { id: 'radio', name: 'Field Radio', model: 'vintage_radio_transceiver', w: 4, h: 3, weight: 6.5, category: 'misc', desc: 'Military transceiver. Heavy, valuable to the right people.' },
-  { id: 'cigarettes', name: 'Cigarettes', model: 'cigarette_pack', w: 1, h: 1, weight: 0.03, category: 'misc', desc: 'Kentucky Ace. Universal currency.' },
+  { id: 'cigarettes', name: 'Cigarettes', model: 'cigarette_pack', w: 1, h: 1, weight: 0.03, category: 'misc', stack: 5, desc: 'Kentucky Ace. A smoke steadies you: each one gives back 12 health.', use: { verb: 'Smoke', time: 4, health: 12, sound: 'smoke' } },
   { id: 'jerrycan', name: 'Jerrycan', model: 'metal_jerrycan_green', w: 3, h: 4, weight: 3.5, category: 'misc', desc: '20 L fuel can, half full.' },
-  { id: 'grenade', name: 'Stick Grenade', model: 'stick_grenade', w: 1, h: 3, weight: 0.6, category: 'misc', desc: 'Old and unreliable. Not yet throwable in this build.' },
+  { id: 'grenade', name: 'Stick Grenade', model: 'stick_grenade', w: 1, h: 3, weight: 0.6, category: 'misc', desc: 'Pull the cord and throw. Four seconds, then everything within nine metres is hurt, you included.', use: { verb: 'Throw', time: 0.75, sound: 'bandage' }, throw: { fuse: 4, damage: 150, radius: 9 } },
   // ---------------------------------------------------------------- identity
   {
     id: 'dogtag', name: 'Dog Tag', model: '@dogtag', scale: 1.5, w: 1, h: 1, weight: 0.02, category: 'misc',

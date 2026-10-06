@@ -40,5 +40,11 @@
         }
       ]
     }
+  ],
+  "rewrites": [
+    {
+      "source": "/payouts",
+      "destination": "/api/cashins"
+    }
   ]
 }

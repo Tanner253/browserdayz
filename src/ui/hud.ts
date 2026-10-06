@@ -1,5 +1,5 @@
-// Minimal, diegetic-leaning HUD in the DayZ tradition: no minimap, small vitals,
-// prompts only when relevant. Plain DOM; updated once per frame with cheap diffs.
+// A lean HUD: small vitals, a compass strip, a corner map (src/ui/minimap.ts), prompts
+// only when relevant. Plain DOM; updated once per frame with cheap diffs.
 
 import type { Vitals } from '../game/player';
 import { MAX_STAMINA, type ChatChannel } from '../net/protocol';
@@ -43,6 +43,7 @@ export class HUD {
       <div class="hud-prompt"></div>
       <div class="hud-progress"><div class="hud-progress-label"></div><div class="hud-progress-bar"><div></div></div></div>
       <div class="hud-compass"><div class="hud-compass-strip"></div><div class="hud-compass-needle"></div></div>
+      <div class="hud-bearing"></div>
       <div class="hud-area"></div>
       <div class="hud-notes"></div>
       <div class="hud-weapon"><div class="hud-weapon-name"></div><div class="hud-weapon-ammo"></div></div>
@@ -149,7 +150,7 @@ export class HUD {
                   <div class="kb-row"><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>4</kbd><em>primary · secondary · pistol · melee</em></div>
                   <div class="kb-row"><kbd>5</kbd><kbd>6</kbd><kbd>7</kbd><kbd>8</kbd><em>eat · drink · bandage</em></div>
                   <p><kbd>F</kbd> take · doors · search</p>
-                  <p><kbd class="wide">Tab</kbd> inventory</p>
+                  <p><kbd class="wide">Tab</kbd> inventory <kbd>M</kbd> map</p>
                   <p><kbd class="wide">Enter</kbd> chat</p>
                   <p><kbd>V</kbd> third person</p>
                   <p><kbd class="wide">Esc</kbd> this menu</p>
@@ -163,7 +164,7 @@ export class HUD {
       </div>
     `;
     document.getElementById('ui')!.appendChild(this.root);
-    for (const k of ['cross', 'hit', 'prompt', 'progress', 'compass', 'area', 'weapon', 'vitals', 'stamina', 'hotbar', 'chat', 'scope', 'damage', 'bleedfx', 'bleed', 'hitdir', 'fps', 'online', 'net', 'feed', 'tags', 'fatal', 'dead', 'start']) {
+    for (const k of ['cross', 'hit', 'prompt', 'progress', 'compass', 'bearing', 'area', 'weapon', 'vitals', 'stamina', 'hotbar', 'chat', 'scope', 'damage', 'bleedfx', 'bleed', 'hitdir', 'fps', 'online', 'net', 'feed', 'tags', 'fatal', 'dead', 'start']) {
       this.el[k] = this.root.querySelector(`.hud-${k}`) as HTMLElement;
     }
     this.notes = this.root.querySelector('.hud-notes') as HTMLDivElement;
@@ -540,6 +541,8 @@ export class HUD {
     vitals: Vitals;
     prompt: string | null;
     weapon: { name: string; ammo: { loaded: number; reserve: number; cap: number } | null; action: string | null; mode: string | null } | null;
+    /** looking through binoculars */
+    glass: boolean;
     aiming: boolean;
     /** how wide the next shot can go, radians (0 = nothing that shoots in the hands) */
     spread: number;
@@ -552,6 +555,8 @@ export class HUD {
     /** an open wound: what to do about it (html), or null when not bleeding */
     bleed: string | null;
     heading: number | null;
+    /** carrying a compass: the heading is also given in degrees */
+    bearing: boolean;
     progress: { label: string; t: number } | null;
     hotbar: HotbarEntry[];
     fps: number;
@@ -562,7 +567,7 @@ export class HUD {
   }) {
     const e = this.el;
     this.toggle(this.root, 'hidden', s.hidden);
-    this.toggle(e.cross, 'off', s.aiming || s.scoped || s.dead);
+    this.toggle(e.cross, 'off', s.aiming || s.scoped || s.glass || s.dead);
     // the four ticks stand as far out as the shot can land: half the cone, at this field of view
     this.toggle(e.cross, 'gun', s.spread > 0);
     const gap = String(Math.round(3 + s.spread * 357));
@@ -570,7 +575,8 @@ export class HUD {
       this.last.gap = gap;
       e.cross.style.setProperty('--gap', gap + 'px');
     }
-    this.toggle(e.scope, 'show', s.scoped);
+    this.toggle(e.scope, 'show', s.scoped || s.glass);
+    this.toggle(e.scope, 'glass', s.glass && !s.scoped);
     this.toggle(e.hit, 'show', s.hitMarker > 0);
     this.toggle(e.hit, 'kill', s.kill);
     this.toggle(e.hit, 'head', s.head && !s.kill);
@@ -623,7 +629,12 @@ export class HUD {
       this.toggle(e.compass, 'show', true);
       const deg = ((s.heading % 360) + 360) % 360;
       (e.compass.firstElementChild as HTMLElement).style.transform = `translateX(${-deg * 4}px)`;
-    } else this.toggle(e.compass, 'show', false);
+      this.toggle(e.bearing, 'show', s.bearing);
+      if (s.bearing) this.set('bearing', e.bearing, `${String(Math.round(deg) % 360).padStart(3, '0')}°`);
+    } else {
+      this.toggle(e.compass, 'show', false);
+      this.toggle(e.bearing, 'show', false);
+    }
 
     if (s.progress) {
       this.toggle(e.progress, 'show', true);

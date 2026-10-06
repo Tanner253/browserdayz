@@ -220,8 +220,8 @@ export function generateWorld(seed = WORLD_SEED): World {
   };
   // just inside the ring of starting points (see the spawns below: three of them to each place)
   const OUTER: [string, SiteKind][] = [
-    ["Forester's Lodge", 'lodge'], ['Kamenka Farm', 'farm'], ['North Ranger Post', 'post'], ['Old Sawmill', 'yard'],
-    ["Trapper's Camp", 'lodge'], ['Berezovo Dacha', 'dacha'], ['South Ranger Post', 'post'], ['Lugovoe Farm', 'farm'],
+    ["Forester's Lodge", 'lodge'], ['Kamenka Farm', 'farm'], ['South Ranger Post', 'post'], ['Old Sawmill', 'yard'],
+    ["Trapper's Camp", 'lodge'], ['Berezovo Dacha', 'dacha'], ['North Ranger Post', 'post'], ['Lugovoe Farm', 'farm'],
   ];
   OUTER.forEach(([name, kind], j) => place(name, kind, ((3 * j + 1) / 24) * Math.PI * 2 + 0.13, [305, 295, 315, 285, 325, 275]));
   // and half way in, where the hills have nothing else

@@ -11,7 +11,7 @@ import type { SerializedInventory } from '../sim/inventory';
 import type { WorldLoot } from '../sim/economy';
 import type { HitZone } from '../sim/combat';
 
-export const PROTOCOL = 5;
+export const PROTOCOL = 6;
 
 /** chat channels: everyone on the server, or only players standing near the speaker */
 export type ChatChannel = 'global' | 'near';
@@ -85,6 +85,8 @@ export type C2S =
   | { t: 's'; p: Pose; w: string | null; m: string[] }
   | { t: 'shot'; o: [number, number, number]; d: [number, number, number]; w: string; sup: boolean }
   | { t: 'swing' }
+  /** a grenade left the hand: where, and how fast */
+  | { t: 'nade'; o: [number, number, number]; v: [number, number, number] }
   | { t: 'act'; a: Act; d: number }
   | { t: 'gear'; g: string[] }
   | { t: 'hit'; to: number; zone: HitZone; w: string; dist: number; sup: boolean; bonus: number }
@@ -101,7 +103,7 @@ export type C2S =
   | { t: 'respawn' }
   | { t: 'chat'; ch?: ChatChannel; text: string }
   /** a dog tag taken from another player has been carried for the full time */
-  | { t: 'cash'; uid: string }
+  | { t: 'cash'; uid: string; /** where a reward for it should go, if the player has given an address */ wallet?: string }
   | { t: 'ping'; n: number };
 
 export type S2C =
@@ -125,6 +127,7 @@ export type S2C =
   | { t: 'ps'; s: [number, ...Pose, string | null, string[]][] }
   | { t: 'shot'; id: number; o: [number, number, number]; d: [number, number, number]; w: string; sup: boolean }
   | { t: 'swing'; id: number }
+  | { t: 'nade'; id: number; o: [number, number, number]; v: [number, number, number] }
   | { t: 'act'; id: number; a: Act; d: number }
   | { t: 'gear'; id: number; g: string[] }
   | { t: 'dmg'; from: number; amount: number; zone: HitZone; w: string; dir: [number, number, number] }

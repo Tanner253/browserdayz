@@ -1,5 +1,6 @@
 // Dog tags and creator rewards: the illustrated explanation a player sees on entering
-// the site, and the wallet address they give. The address is kept on this device.
+// the site, and the wallet address they give. The address is kept on this device and sent
+// to the server with each tag the player cashes in, where it is listed for a reward.
 
 /** whether the wallet modal and the Rewards button are shown */
 export const REWARDS_UI = true;
@@ -107,7 +108,7 @@ export class RewardsModal {
         </div>
         <div class="rw-err" role="alert"></div>
         <div class="rw-foot">
-          <span class="rw-fine">Use the public Solana address of your Robinhood wallet. Never share a seed phrase or private key. Saved on this device.</span>
+          <span class="rw-fine">Use the public Solana address of your Robinhood wallet. Never share a seed phrase or private key. Saved on this device, and sent with each tag you cash in so it can be listed for a reward.</span>
           <button class="rw-skip">Not now</button>
         </div>
       </div>`;

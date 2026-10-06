@@ -28,7 +28,7 @@ const TICK_HZ = 15;
 const CORPSE_LIFETIME = 600; // seconds
 const RECORD_LIFETIME = 30 * 60 * 1000; // a logged-out character is remembered this long
 /** bump when loot points change: world loot from an older save is re-rolled */
-const WORLD_REV = 6;
+const WORLD_REV = 7;
 
 const log = (...a: unknown[]) => console.log(new Date().toISOString().slice(11, 19), ...a);
 
@@ -128,6 +128,65 @@ function saveWorld() {
   }
 }
 
+// ------------------------------------------------------------------ cashed-in tags
+//
+// A tag counts for a reward only if this server watched it happen: the tag came off a body
+// the server itself made when its owner died, somebody else has carried it, and thirty
+// minutes of the server's own clock have passed since the server first saw it in their
+// pockets. What a client says about its own inventory is not enough.
+
+/** the website keeps the list (this server has no disk): it is told the id and asks back for the entry */
+const SITE_URL = process.env.SITE_URL ?? 'https://www.zonapvp.fun';
+/** seconds a tag must be seen carried; a minute of slack for the gap between a client's reports */
+const CASH_HOLD_MS = (Number(process.env.CASH_HOLD_S) || TAG_HOLD - 60) * 1000;
+
+interface CashIn {
+  id: string;
+  at: string;
+  name: string;
+  owner: string;
+  wallet: string;
+}
+const cashins: CashIn[] = [];
+/** tags taken off bodies this server made: tag uid -> whose it was */
+const lootedTags = new Map<string, { owner: string; ownerKey: string }>();
+/** `${player key}|${tag uid}` -> when the server first saw that player carrying it */
+const tagSeen = new Map<string, number>();
+const isWallet = (s: unknown): s is string => typeof s === 'string' && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(s);
+
+function recordCashIn(c: Client, owner: string, wallet: string) {
+  const entry: CashIn = { id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`, at: new Date().toISOString(), name: c.name, owner, wallet };
+  cashins.push(entry);
+  if (cashins.length > 2000) cashins.shift();
+  // also in the server's own log, which the host keeps for a few days whatever else happens
+  log('CASHIN', JSON.stringify(entry));
+  const tell = (attempt: number) => {
+    fetch(`${SITE_URL}/api/cashin?id=${entry.id}`, { method: 'POST' })
+      .then((r) => {
+        if (!r.ok) throw new Error(`${r.status}`);
+      })
+      .catch((e) => {
+        log(`could not hand cash-in ${entry.id} to the site (${(e as Error).message}), attempt ${attempt}`);
+        if (attempt < 6) setTimeout(() => tell(attempt + 1), attempt * 15000);
+      });
+  };
+  tell(1);
+}
+
+/** every dog tag in what a player says they carry */
+function carriedTags(inv: SerializedInventory | null): ItemInstance[] {
+  const out: ItemInstance[] = [];
+  const walk = (it: ItemInstance | null | undefined) => {
+    if (!it) return;
+    if (it.id === 'dogtag') out.push(it);
+    for (const p of it.cargo ?? []) walk(p.item);
+  };
+  if (!inv) return out;
+  for (const it of Object.values(inv.slots)) walk(it);
+  for (const cont of inv.containers) for (const it of cont.items) walk(it);
+  return out;
+}
+
 // ------------------------------------------------------------------ players
 
 interface Client {
@@ -143,6 +202,9 @@ interface Client {
   inv: SerializedInventory | null;
   vitals: Vitals | null;
   lastHit: number;
+  /** when this player last threw a grenade, and how many hits have been claimed for it */
+  lastNade: number;
+  nadeHits: number;
   lastChat: number;
   lastHitBy: { id: number; name: string; w: string; zone: HitZone; dist: number; at: number } | null;
   openCid: string | null;
@@ -294,6 +356,9 @@ function makeCorpse(c: Client, v: number): CorpseInfo | null {
   if (inv) {
     for (const it of Object.values(inv.slots)) put(it);
     for (const cont of inv.containers) for (const s of cont.items) put(cleanItem(s));
+    // their own tag (one, however many they claim to carry) can now be taken and cashed in
+    const own = carriedTags(inv).find((t) => !lootedTags.has(t.uid) && (t.owner ?? '') === c.name);
+    if (own) lootedTags.set(own.uid, { owner: c.name, ownerKey: c.key });
   }
   for (const it of spill) {
     const a = Math.random() * Math.PI * 2;
@@ -312,6 +377,7 @@ function kill(c: Client, cause: string, v = 0) {
   const by = c.lastHitBy && now - c.lastHitBy.at < 15000 ? c.lastHitBy : null;
   const k: KillInfo = { id: c.id, name: c.name, by: by?.id ?? null, byName: by?.name ?? null, w: by?.w ?? cause, zone: by?.zone ?? null, dist: Math.round(by?.dist ?? 0), v };
   const corpse = makeCorpse(c, v);
+  for (const k of [...tagSeen.keys()]) if (k.startsWith(`${c.key}|`)) tagSeen.delete(k);
   c.inv = null;
   c.vitals = null;
   c.lastHitBy = null;
@@ -339,6 +405,15 @@ function handle(c: Client, m: C2S) {
       if (c.alive) broadcast({ t: 'swing', id: c.id }, c);
       return;
     }
+    case 'nade': {
+      if (!c.alive || !isVec3(m.o) || !isVec3(m.v)) return;
+      // it has to leave from where the thrower is, at a speed an arm can give it
+      if (Math.hypot(m.o[0] - c.pose[0], m.o[2] - c.pose[2]) > 4 || Math.hypot(...m.v) > 40) return;
+      c.lastNade = Date.now();
+      c.nadeHits = 0;
+      broadcast({ t: 'nade', id: c.id, o: m.o, v: m.v }, c);
+      return;
+    }
     case 'act': {
       if (!c.alive || !ACTS.includes(m.a)) return;
       broadcast({ t: 'act', id: c.id, a: m.a, d: num(m.d) ? Math.max(0, Math.min(12, m.d)) : 1 }, c);
@@ -355,14 +430,24 @@ function handle(c: Client, m: C2S) {
       const rule = WEAPON_RULES[m.w];
       if (!target || !target.alive || !c.alive || !rule || target === c) return;
       if (!['head', 'torso', 'legs'].includes(m.zone)) return;
-      // you can only hit with what you are holding (fists are always there)
-      if (m.w !== 'fists' && c.w !== m.w) return;
       const now = Date.now();
-      if (now - c.lastHit < rule.interval * 700) return;
       const d = Math.hypot(c.pose[0] - target.pose[0], c.pose[1] - target.pose[1], c.pose[2] - target.pose[2]);
       if (d > rule.range + 4) return;
-      c.lastHit = now;
-      const amount = hitDamage(m.w, m.zone, d, !!m.sup, num(m.bonus) ? m.bonus : 0);
+      let amount: number;
+      if (rule.blast) {
+        // a grenade is not held when it goes off: it has to have been thrown in the last few
+        // seconds, and one grenade only reaches so many people
+        if (now - c.lastNade > 9000 || ++c.nadeHits > 12 || !num(m.dist)) return;
+        amount = hitDamage(m.w, 'torso', Math.max(0, m.dist));
+        m.zone = 'torso';
+      } else {
+        // you can only hit with what you are holding (fists are always there)
+        if (m.w !== 'fists' && c.w !== m.w) return;
+        if (now - c.lastHit < rule.interval * 700) return;
+        c.lastHit = now;
+        amount = hitDamage(m.w, m.zone, d, !!m.sup, num(m.bonus) ? m.bonus : 0);
+      }
+      if (amount <= 0) return;
       const len = Math.max(0.001, Math.hypot(target.pose[0] - c.pose[0], target.pose[2] - c.pose[2]));
       target.lastHitBy = { id: c.id, name: c.name, w: m.w, zone: m.zone, dist: d, at: now };
       send(target, { t: 'dmg', from: c.id, amount, zone: m.zone, w: m.w, dir: [(target.pose[0] - c.pose[0]) / len, 0, (target.pose[2] - c.pose[2]) / len] });
@@ -438,6 +523,11 @@ function handle(c: Client, m: C2S) {
     case 'me': {
       if (!c.alive) return;
       c.inv = cleanInventory(m.inv);
+      // the clock on a looted tag starts the first time the server sees it in somebody else's pockets
+      for (const t of carriedTags(c.inv)) {
+        const from = lootedTags.get(t.uid);
+        if (from && from.ownerKey !== c.key && !tagSeen.has(`${c.key}|${t.uid}`)) tagSeen.set(`${c.key}|${t.uid}`, Date.now());
+      }
       const v = m.vitals;
       if (v && num(v.health) && num(v.energy) && num(v.water)) c.vitals = { health: v.health, energy: v.energy, water: v.water, stamina: num(v.stamina) ? v.stamina : MAX_STAMINA, bleeding: !!v.bleeding };
       return;
@@ -478,8 +568,16 @@ function handle(c: Client, m: C2S) {
       if (!tag || tag.id !== 'dogtag' || (tag.held ?? 0) < TAG_HOLD - 30) return;
       tag.held = 0;
       const owner = tag.owner ?? 'Survivor';
-      // this is where a payout would be issued once rewards are live
-      log(`${c.name} cashed in ${owner}'s dog tag`);
+      const from = lootedTags.get(tag.uid);
+      const since = tagSeen.get(`${c.key}|${tag.uid}`);
+      const earned = !!from && from.ownerKey !== c.key && since !== undefined && Date.now() - since >= CASH_HOLD_MS;
+      log(`${c.name} cashed in ${owner}'s dog tag${earned ? '' : ' (not one this server saw taken and held: not listed for a reward)'}`);
+      if (earned) {
+        // one tag, one reward
+        lootedTags.delete(tag.uid);
+        tagSeen.delete(`${c.key}|${tag.uid}`);
+        recordCashIn(c, from!.owner, isWallet(m.wallet) ? m.wallet : '');
+      }
       broadcast({ t: 'cashed', id: c.id, name: c.name, owner });
       return;
     }
@@ -517,7 +615,7 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
     pose: [sp.x, 'y' in sp && sp.y !== undefined ? sp.y : world.groundAt(sp.x, sp.z), sp.z, sp.yaw, 0, 0],
     w: null, m: [], g: [], alive: true,
     inv: resume?.inv ?? null, vitals: resume?.vitals ?? null,
-    lastHit: 0, lastChat: 0, lastHitBy: null, openCid: null, joinedAt: Date.now(), msgCount: 0, msgWindow: Date.now(),
+    lastHit: 0, lastNade: 0, nadeHits: 0, lastChat: 0, lastHitBy: null, openCid: null, joinedAt: Date.now(), msgCount: 0, msgWindow: Date.now(),
   };
   records.delete(key);
   const others = [...clients.values()].map(info);
@@ -595,6 +693,14 @@ const server = http.createServer((req, res) => {
     // readable from a client hosted somewhere else (e.g. Vercel) for the start-screen player count
     res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'no-store' });
     res.end(JSON.stringify({ ok: true, players: clients.size, uptime: Math.round(process.uptime()), loot: economy.loot.size }));
+    return;
+  }
+  // the website's function asks here whether a cash-in it was told about is real
+  if (url.pathname.startsWith('/cashins')) {
+    const id = url.pathname.split('/')[2];
+    const body = id ? cashins.find((e) => e.id === id) : cashins;
+    res.writeHead(body ? 200 : 404, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+    res.end(JSON.stringify(body ?? { error: 'unknown' }));
     return;
   }
   let rel = decodeURIComponent(url.pathname);

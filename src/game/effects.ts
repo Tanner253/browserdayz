@@ -462,6 +462,50 @@ export class Effects {
     }
   }
 
+  /** A grenade: a flash, a ball of fire that is smoke a moment later, earth thrown up, and the ground left black. */
+  explode(at: THREE.Vector3) {
+    this.flashLight.position.copy(at).setY(at.y + 0.6);
+    this.flashLight.color.setRGB(1, 0.72, 0.4);
+    this.flashLight.intensity = 260;
+    this.flashLight.distance = 30;
+    this.flashT = 0.11;
+    const far = THREE.MathUtils.clamp(at.distanceTo(this.eye) / 40, 1, 2.5);
+    const rand = () => new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5);
+    // the fire: a moment, but long enough to see
+    for (let i = 0; i < 22; i++) {
+      this.spawn({ p: at.clone().add(rand().multiplyScalar(0.7)), v: rand().multiplyScalar(6).setY(1.5 + Math.random() * 5), max: 0.34 + Math.random() * 0.3, size: 1.0 * far, grow: 3.4, color: new THREE.Color(5, 2.4, 0.6), alpha: 0.95, gravity: -1.5, drag: 2.6, additive: true });
+    }
+    // the smoke it turns into: dark, tall, and there for a while
+    for (let i = 0; i < 44; i++) {
+      const out = rand().multiplyScalar(6);
+      out.y = Math.abs(out.y) * 1.3 + 1.2;
+      const k = 0.07 + Math.random() * 0.1;
+      this.spawn({ p: at.clone().add(rand().multiplyScalar(0.9)), v: out, max: 3 + Math.random() * 3.2, size: 1.2, grow: 4.5 + Math.random() * 2.6, color: new THREE.Color(k, k, k * 0.95), alpha: 0.82, gravity: -0.7, drag: 2 });
+    }
+    // dust rolling out along the ground
+    for (let i = 0; i < 24; i++) {
+      const a2 = (i / 24) * Math.PI * 2 + Math.random() * 0.3;
+      this.spawn({ p: at.clone(), v: new THREE.Vector3(Math.cos(a2) * (7 + Math.random() * 4), 0.6 + Math.random(), Math.sin(a2) * (7 + Math.random() * 4)), max: 1.6 + Math.random() * 1.2, size: 0.8, grow: 3.2, color: new THREE.Color(0.42, 0.36, 0.28), alpha: 0.5, gravity: 0, drag: 2.8 });
+    }
+    for (let i = 0; i < 46; i++) {
+      const out = rand().multiplyScalar(15);
+      out.y = Math.abs(out.y) + 2.5;
+      this.spawn({ p: at.clone(), v: out, max: 0.9 + Math.random() * 0.9, size: 0.045 + Math.random() * 0.05, grow: 0, color: new THREE.Color(0.2, 0.16, 0.11), alpha: 1, gravity: 9.8, drag: 0.35 });
+    }
+    for (let i = 0; i < 26; i++) {
+      this.spawn({ p: at.clone(), v: rand().multiplyScalar(22).setY(Math.random() * 11), max: 0.25 + Math.random() * 0.3, size: 0.03, color: new THREE.Color(4, 2.2, 0.8), alpha: 1, gravity: 9.8, drag: 0.6, additive: true });
+    }
+    // the ground it leaves behind
+    const g = physics.raycast(at.clone().setY(at.y + 0.5), _DOWN, 3, SOLID_GROUPS);
+    if (g && g.toi > 0.02) {
+      const n = new THREE.Vector3(g.normal.x, g.normal.y, g.normal.z);
+      for (let i = 0; i < 5; i++) {
+        const p = new THREE.Vector3(g.point.x + (Math.random() - 0.5) * 1.4, g.point.y, g.point.z + (Math.random() - 0.5) * 1.4);
+        this.decal(p, n, 'soil', undefined, 5 + Math.random() * 4);
+      }
+    }
+  }
+
   /** drops off an open wound: a few fall, and one lands */
   drip(from: THREE.Vector3) {
     for (let i = 0; i < 2; i++) {
@@ -508,8 +552,8 @@ export class Effects {
     this.bloodCell.needsUpdate = true;
   }
 
-  decal(point: THREE.Vector3, normal: THREE.Vector3, kind: HoleKind, attachTo?: THREE.Object3D) {
-    const size = HOLE_SIZE[kind] * (0.85 + Math.random() * 0.35);
+  decal(point: THREE.Vector3, normal: THREE.Vector3, kind: HoleKind, attachTo?: THREE.Object3D, scale = 1) {
+    const size = HOLE_SIZE[kind] * (0.85 + Math.random() * 0.35) * scale;
     this._q.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
     // wood splinters follow the (vertical) grain; others get a random spin
     const spin = kind === 'wood' ? 0 : Math.random() * Math.PI * 2;
@@ -536,6 +580,8 @@ export class Effects {
   muzzle(worldPos: THREE.Vector3, dir: THREE.Vector3, big: boolean, suppressed = false) {
     if (!suppressed) {
       this.flashLight.position.copy(worldPos);
+      this.flashLight.color.set(0xffb060);
+      this.flashLight.distance = 14;
       this.flashLight.intensity = big ? 45 : 25;
       this.flashT = 0.055;
     }
@@ -548,7 +594,11 @@ export class Effects {
   update(dt: number) {
     if (this.flashT > 0) {
       this.flashT -= dt;
-      if (this.flashT <= 0) this.flashLight.intensity = 0;
+      if (this.flashT <= 0) {
+        this.flashLight.intensity = 0;
+        this.flashLight.distance = 14;
+        this.flashLight.color.set(0xffb060);
+      }
     }
     let n = 0, na = 0;
     const ca = this.colorAttr.array as Float32Array;

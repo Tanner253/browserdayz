@@ -30,14 +30,16 @@ import { CameraDirector } from './camera';
 import { Effects } from './effects';
 import { Weapons, type HitInfo, type UseKind } from './weapons';
 import { LootManager, Stash, WorldItem } from './loot';
+import { Grenades } from './grenades';
 import { HUD, type HotbarEntry } from '../ui/hud';
 import { InventoryUI } from '../ui/inventory-ui';
+import { Minimap } from '../ui/minimap';
 import { renderDoll, renderIcons } from '../ui/icons';
 import { Perf } from '../core/perf';
 import { loadGraphics, type Graphics } from '../core/settings';
 import { TOUCH } from '../core/device';
 import { TouchControls } from '../ui/touch';
-import { REWARDS_UI, RewardsModal, addCashedTag, cashedTags } from '../ui/rewards';
+import { REWARDS_UI, RewardsModal, addCashedTag, cashedTags, walletAddress } from '../ui/rewards';
 
 export interface WorldSystems {
   r: Renderer;
@@ -53,13 +55,13 @@ interface TimedAction {
   label: string;
   t: number;
   dur: number;
-  sound: 'eat' | 'drink' | 'bandage' | null;
+  sound: 'eat' | 'drink' | 'bandage' | 'smoke' | null;
   soundT: number;
   done: () => void;
 }
 
 /** bump when the map's loot points change: spawned loot from older saves is re-rolled */
-const LOOT_REV = 6;
+const LOOT_REV = 7;
 const QUICK_KEYS = ['Digit5', 'Digit6', 'Digit7', 'Digit8'];
 const SEND_HZ = 15;
 const _drip = new THREE.Vector3();
@@ -74,8 +76,10 @@ export class Game {
   effects!: Effects;
   weapons!: Weapons;
   loot!: LootManager;
+  grenades!: Grenades;
   economy!: Economy;
   hud!: HUD;
+  minimap!: Minimap;
   invUI!: InventoryUI;
   dummies: Dummy[] = [];
   remotes = new Map<number, RemotePlayer>();
@@ -141,6 +145,9 @@ export class Game {
     this.loot = new LootManager(r.scene, atmo, buildings.lootPoints);
     await this.loot.preload();
     this.loot.onPlaced = (l) => this.lootPlaced(l);
+    this.grenades = new Grenades(r.scene, this.loot.models);
+    await this.grenades.preload();
+    this.grenades.onExplode = (at, mine) => this.explode(at, mine);
     this.loot.lift = (x, z) => roadLift(world, x, z);
     this.applyGraphics(this.gfx);
     this.economy = new Economy(buildings.lootPoints, {
@@ -201,6 +208,8 @@ export class Game {
 
     this.hud = new HUD(icons);
     this.hud.setName(playerName());
+    this.minimap = new Minimap(world);
+    this.hud.root.insertBefore(this.minimap.root, this.hud.root.firstChild);
     // how many people are in the world, shown before you click Play
     void serverStatus().then((s) => this.hud.setStartOnline(s ? s.players : null));
     this.invUI = new InventoryUI(this.inv, {
@@ -426,7 +435,12 @@ export class Game {
       const owner = tagOwner(it);
       this.hud.note(`Dog tag cashed in: ${owner}`, 'good');
       // online the server checks the tag and announces it to everyone; a payout would be issued there
-      if (this.online) this.net.send({ t: 'cash', uid: it.uid });
+      // the address goes with it: the tag is listed for a reward under it
+      if (this.online) {
+        const wallet = walletAddress();
+        this.net.send({ t: 'cash', uid: it.uid, ...(wallet ? { wallet } : {}) });
+        if (!wallet && REWARDS_UI) this.hud.note('No wallet address saved: add one under Rewards in the menu', 'warn');
+      }
       else {
         this.hud.chatLine('system', '', `${playerName() || 'You'} cashed in ${owner}'s dog tag.`);
         this.hud.chatLine('system', '', `That is ${n} cashed in so far.`);
@@ -542,6 +556,7 @@ export class Game {
     });
     net.on('shot', (m) => this.weapons.remoteShot(new THREE.Vector3(...m.o), new THREE.Vector3(...m.d), m.w, m.sup));
     net.on('swing', (m) => this.remotes.get(m.id)?.swing());
+    net.on('nade', (m) => this.grenades.throw(new THREE.Vector3(...m.o), new THREE.Vector3(...m.v), ITEMS.grenade.throw!.fuse - 0.75, false));
     net.on('act', (m) => this.remotes.get(m.id)?.act(m.a, m.d, cam().position));
     net.on('gear', (m) => this.remotes.get(m.id) && void this.wear(this.remotes.get(m.id)!.avatar, m.g));
     net.on('dmg', (m) => this.takeHit(m));
@@ -729,8 +744,11 @@ export class Game {
     if (p.dead) return;
     let amount = m.amount;
     if (m.zone === 'torso') for (const a of this.inv.wear('armor')) amount *= a;
-    const melee = !ITEMS[m.w]?.weapon;
-    p.damage(amount, melee ? 'a beating' : 'gunshot wounds');
+    if (m.zone === 'head') for (const a of this.inv.wear('head')) amount *= a;
+    const blast = m.w === 'grenade';
+    const melee = !blast && !ITEMS[m.w]?.weapon;
+    p.damage(amount, blast ? 'an explosion' : melee ? 'a beating' : 'gunshot wounds');
+    this.glass = 0;
     // a bullet nearly always opens a wound, a blade often, a fist or a bat seldom
     const blade = m.w === 'knife' || m.w === 'machete' || m.w === 'hatchet';
     if (!p.dead && Math.random() < (melee ? (blade ? 0.6 : amount > 25 ? 0.25 : 0) : amount > 12 ? 0.85 : 0.4)) p.bleed();
@@ -1043,6 +1061,7 @@ export class Game {
   private useItem(item: ItemInstance) {
     const def = ITEMS[item.id];
     if (!def.use || this.use || this.player.dead) return;
+    if (def.look && performance.now() - this.glassDown < 150) return;
     const u = def.use;
     const from = this.openStash?.container.has(item) ? this.openStash.container : null;
     if (from) {
@@ -1050,7 +1069,23 @@ export class Game {
       from.remove(item);
       this.syncOpenBox();
     }
-    this.startUse(`${u.verb} ${def.name}`, u.time, item.id, u.sound, u.sound, () => {
+    // how the hands hold it while it is used: a smoke goes to the mouth, a grenade is worked with both
+    const kind: UseKind = def.throw ? 'open' : def.look ? 'drink' : u.sound === 'smoke' ? 'eat' : u.sound;
+    const sound: TimedAction['sound'] = def.throw || def.look ? null : u.sound;
+    this.glass = 0;
+    this.startUse(def.throw ? 'Pulling the cord' : def.look ? 'Binoculars' : `${u.verb} ${def.name}`, u.time, item.id, kind, sound, () => {
+      if (def.throw) {
+        this.consume(item, null);
+        this.inventoryChanged();
+        this.throwGrenade(def.throw);
+        return;
+      }
+      if (def.look) {
+        // kept, and held up: see the frame loop for what puts them down again
+        if (from) this.inv.add(item);
+        this.glass = def.look;
+        return;
+      }
       const v = this.player.vitals;
       if (u.energy) v.energy = THREE.MathUtils.clamp(v.energy + u.energy, 0, 100);
       if (u.water) v.water = THREE.MathUtils.clamp(v.water + u.water, 0, 100);
@@ -1062,9 +1097,85 @@ export class Game {
       }
       const gained = [u.energy ? `${u.energy > 0 ? '+' : ''}${u.energy} energy` : '', u.water ? `${u.water > 0 ? '+' : ''}${u.water} water` : '', u.health ? `+${u.health} health` : ''].filter(Boolean).join(' · ');
       if (gained) this.hud.note(gained, 'good');
+      if (u.sound === 'smoke') {
+        // what is left of it, in front of the face
+        const cam = this.s.r.camera;
+        this.effects.muzzle(cam.position.clone().add(new THREE.Vector3(0, -0.12, -0.35).applyQuaternion(cam.quaternion)), new THREE.Vector3(0, 0.3, -1).applyQuaternion(cam.quaternion), true, true);
+      }
       this.consume(item, null);
       this.inventoryChanged();
     });
+  }
+
+  /** binoculars at the eyes: how much of the field of view is left (0 = put away) */
+  private glass = 0;
+  /** when they were last put down: the same key press must not bring them straight back up */
+  private glassDown = 0;
+
+  /** The cord is pulled: it leaves the hand the way the player is looking, and everyone is told. */
+  private throwGrenade(spec: { fuse: number; damage: number; radius: number }) {
+    const cam = this.s.r.camera, p = this.player;
+    const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
+    const o = cam.position.clone().addScaledVector(dir, 0.5).add(new THREE.Vector3(0.18, -0.1, 0).applyQuaternion(cam.quaternion));
+    // thrown, not dropped: forward and up, plus whatever the thrower was doing
+    const v = dir.multiplyScalar(15).add(new THREE.Vector3(p.vel.x, 3.2 + Math.max(0, p.vel.y), p.vel.z));
+    this.grenades.throw(o, v, spec.fuse - 0.75, true);
+    this.net.send({ t: 'nade', o: o.toArray(), v: v.toArray() });
+    this.weapons.onSwing();
+    audio.whoosh(0.5);
+  }
+
+  /** A grenade has gone off somewhere in the world. */
+  private explode(at: THREE.Vector3, mine: boolean) {
+    const spec = ITEMS.grenade.throw!;
+    const p = this.player, cam = this.s.r.camera;
+    const far = at.distanceTo(cam.position);
+    this.effects.explode(at);
+    audio.explosion(at, far);
+    if (far < 40) this.weapons.flinch(THREE.MathUtils.clamp(2.2 - far / 14, 0.2, 2));
+    /** how much of the blast reaches a point: nothing through a wall, less with every metre */
+    const reach = (to: THREE.Vector3) => {
+      const d = to.distanceTo(at);
+      if (d > spec.radius) return 0;
+      const ray = to.clone().sub(at);
+      if (physics.raycast(at, ray.normalize(), Math.max(0, d - 0.3), SOLID_GROUPS)) return 0;
+      return Math.pow(1 - d / spec.radius, 1.3);
+    };
+    // your own body: this game decides it for your own grenade; another player's reaches you through the server
+    if (mine && !p.dead && this.started) {
+      const chest = new THREE.Vector3(p.pos.x, p.pos.y + (p.crouched ? 0.6 : 1.1), p.pos.z);
+      const k = reach(chest);
+      if (k > 0) {
+        let amount = spec.damage * k;
+        for (const a of this.inv.wear('armor')) amount *= a;
+        p.damage(amount, 'your own grenade');
+        if (amount > 12) p.bleed();
+        this.hud.hitFrom(Math.atan2(p.pos.x - at.x, p.pos.z - at.z) - (p.yaw + Math.PI));
+        this.meDirty = true;
+      }
+    }
+    if (!mine) return;
+    // everyone else it reached: reported one by one, like any other hit
+    for (const rp of this.remotes.values()) {
+      if (!rp.alive) continue;
+      const chest = rp.chest(new THREE.Vector3());
+      const d = chest.distanceTo(at);
+      if (reach(chest) <= 0) continue;
+      const dir = chest.clone().sub(at).normalize();
+      rp.damage(0, chest, dir, 'torso');
+      this.effects.bleed(chest, dir, 0.8);
+      rp.avatar.wound(chest.clone().addScaledVector(dir, -0.2), dir, 0.09, false);
+      this.net.send({ t: 'hit', to: rp.id, zone: 'torso', w: 'grenade', dist: d, sup: false, bonus: 0 });
+    }
+    for (const d of this.dummies) {
+      const chest = new THREE.Vector3(d.pos.x, d.pos.y + 1.2, d.pos.z);
+      const k = reach(chest);
+      if (k <= 0 || d.dead) continue;
+      const dir = chest.clone().sub(at).normalize();
+      this.effects.bleed(chest, dir, 0.8);
+      d.avatar.wound(chest.clone().addScaledVector(dir, -0.2), dir, 0.09, false);
+      if (d.damage(spec.damage * k, chest, dir, 'torso')) this.hud.note('Training dummy down · grenade', 'good');
+    }
   }
 
   /** Sealed ammo box -> a stack of loose rounds. */
@@ -1360,6 +1471,9 @@ export class Game {
     const playing = this.started && !this.paused && !p.dead;
 
     if (input.pressed('Tab') && playing) this.toggleInventory();
+    // M: the map, large; any way out of play puts it away again
+    if (input.pressed('KeyM') && playing && !this.invUI.isOpen && !this.hud.chatOpen) this.minimap.toggle();
+    else if (this.minimap.big && (!playing || this.invUI.isOpen)) this.minimap.toggle(false);
     const uiOpen = this.invUI.isOpen;
     // Enter opens the chat box; while typing the character stands still and the gun stays quiet
     if (input.pressed('Enter') && playing && !uiOpen && !this.hud.chatOpen) {
@@ -1371,7 +1485,12 @@ export class Game {
 
     // third person: the mouse turns the camera around the character
     const consumed = !uiOpen && !this.paused && this.director.handleInput(input);
-    const sens = this.weapons.scoped ? 0.28 : this.weapons.aiming ? 0.7 : 1;
+    // binoculars come down for anything else: a trigger, a sprint, the pockets, a hit
+    if (this.glass && (!playing || uiOpen || this.use || input.pressed('Mouse0') || input.pressed('Mouse2') || p.sprinting || QUICK_KEYS.some((k) => input.pressed(k)))) {
+      this.glass = 0;
+      this.glassDown = now;
+    }
+    const sens = this.glass ? 0.22 : this.weapons.scoped ? 0.28 : this.weapons.aiming ? 0.7 : 1;
     if (!consumed && !uiOpen && playing) p.look(input, sens);
 
     const canMove = !uiOpen && playing && !typing;
@@ -1382,6 +1501,7 @@ export class Game {
       this.slowT = 0;
       p.weightKg = this.inv.weight();
       p.fallMult = this.inv.wear('fall').reduce((a, b) => a * b, 1);
+      p.thirstMult = this.inv.wear('thirst').reduce((a, b) => a * b, 1);
       this.hasCompass = !!this.inv.find((i) => i.id === 'compass');
     }
     this.tagT += dt;
@@ -1429,10 +1549,11 @@ export class Game {
 
     // weapons + fov
     const fpLive = this.director.mode === 'first' && this.director.blend > 0.9;
-    this.weapons.update(dt, input, cam, fpLive && !uiOpen && playing && !this.use && !typing);
+    this.weapons.update(dt, input, cam, fpLive && !uiOpen && playing && !this.use && !typing && !this.glass);
+    this.grenades.update(dt);
     const kind = this.weapons.equippedItem ? ITEMS[this.weapons.equippedItem.id].weapon?.kind : undefined;
     // a sprint opens the view a touch: speed you can feel
-    this.director.fovMul = this.weapons.scoped ? 0.3 : this.weapons.aiming ? (kind === 'rifle' ? 0.78 : 0.88) : p.sprinting && p.moving > 0.6 ? 1.055 : 1;
+    this.director.fovMul = this.glass ? this.glass : this.weapons.scoped ? 0.3 : this.weapons.aiming ? (kind === 'rifle' ? 0.78 : 0.88) : p.sprinting && p.moving > 0.6 ? 1.055 : 1;
     this.syncHeld();
 
     this.director.update(dt);
@@ -1444,7 +1565,7 @@ export class Game {
     const fpView = this.started && this.director.viewmodelVisible && !p.dead;
     if (fpView) cam.layers.enable(FP_BODY_LAYER);
     else cam.layers.disable(FP_BODY_LAYER);
-    r.vmScene.visible = fpView;
+    r.vmScene.visible = fpView && !this.glass;
     const interp = new THREE.Vector3().lerpVectors(p.prevPos, p.pos, physics.alpha);
     const first = this.director.mode === 'first';
     this.avatar.update(dt, interp, p.vel, p.yaw, p.crouched, p.dead, first, first ? 0 : p.pitch, p.grounded, this.weapons.aiming);
@@ -1465,6 +1586,7 @@ export class Game {
     }
 
     this.updateInteraction(cam);
+    this.minimap.update(interp.x, interp.z, p.yaw);
     this.effects.eye.copy(cam.position);
     this.effects.update(dt);
     this.loot.update(cam.position, dt);
@@ -1555,12 +1677,14 @@ export class Game {
       aiming: this.weapons.aiming,
       spread: this.weapons.spread,
       scoped: this.weapons.scoped,
+      glass: !!this.glass,
       hitMarker: this.weapons.hitMarker,
       kill: this.weapons.killMarker,
       head: this.weapons.headMarker,
       hurt,
       bleed: v.bleeding && !p.dead ? this.bleedHint() : null,
-      heading: hasCompass && !uiOpen ? heading : null,
+      heading: !uiOpen ? heading : null,
+      bearing: hasCompass,
       progress: this.use ? { label: this.use.label, t: this.use.t / this.use.dur } : null,
       hotbar: this.hotbar(),
       fps: this.fps,

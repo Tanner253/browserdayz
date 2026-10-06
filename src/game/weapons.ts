@@ -368,6 +368,46 @@ export class Weapons {
         }
         body.add(mesh);
       }
+      // Which way the head faces. An axe's edge, a crowbar's claw: the side of the head that
+      // stands furthest off the handle leads the swing, away from whoever holds it. Two of the
+      // models are drawn the other way round and were held edge-first toward the face.
+      if (longAxis === 'y') {
+        const L = size.y;
+        let hx = 0, hz = 0, n = 0, far = -1e9, near = 1e9;
+        const each = (fn: (x: number, y: number, z: number) => void) => {
+          for (const mesh of body.children as THREE.Mesh[]) {
+            const P = mesh.geometry.getAttribute('position');
+            for (let i = 0; i < P.count; i += 2) fn(P.getX(i) + mesh.position.x, P.getY(i) + mesh.position.y, P.getZ(i) + mesh.position.z);
+          }
+        };
+        each((x, y, z) => {
+          if (y < L * 0.3) {
+            hx += x;
+            hz += z;
+            n++;
+          }
+        });
+        hx /= Math.max(1, n);
+        hz /= Math.max(1, n);
+        each((_x, y, z) => {
+          if (y > L * 0.72) {
+            far = Math.max(far, z - hz);
+            near = Math.min(near, z - hz);
+          }
+        });
+        // toward +z is toward the eye: turn it about the handle so it faces out
+        if (far > -near * 1.3 && far > 0.03) {
+          const turn = new THREE.Group();
+          turn.position.set(hx, 0, hz);
+          turn.rotation.y = Math.PI;
+          for (const mesh of [...body.children]) {
+            mesh.position.x -= hx;
+            mesh.position.z -= hz;
+            turn.add(mesh);
+          }
+          body.add(turn);
+        }
+      }
       if (longAxis === 'x') body.rotation.z = Math.PI / 2;
       if (longAxis === 'z') body.rotation.x = -Math.PI / 2;
       // grip near the bottom of the handle, tilted forward
