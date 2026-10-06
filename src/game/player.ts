@@ -16,6 +16,13 @@ const EYE_STAND = 1.64;
 const EYE_CROUCH = 1.02;
 /** how long an untreated wound bleeds, seconds */
 const BLEED_TIME = 42;
+/** the gap the character controller keeps from whatever it stands on or touches */
+const SKIN = 0.03;
+/** how hard the body is held to the ground, m/s: a fall starts from this too */
+const PRESS = 1.5;
+/** the steepest ground a step is laid along (46°); past it the controller's own slope rules decide */
+const FOLLOW_MAX = 1.035;
+const FOLLOW_NY = 0.69;
 
 export interface Vitals {
   health: number;
@@ -95,7 +102,7 @@ export class Player {
         this.body,
       );
       physics.tag(this.collider, { surface: 'flesh', owner: this });
-      this.kcc = physics.world.createCharacterController(0.03);
+      this.kcc = physics.world.createCharacterController(SKIN);
       this.kcc.setUp({ x: 0, y: 1, z: 0 });
       this.kcc.setMaxSlopeClimbAngle((50 * Math.PI) / 180);
       this.kcc.setMinSlopeSlideAngle((58 * Math.PI) / 180);
@@ -176,6 +183,10 @@ export class Player {
     const k = 1 - Math.exp(-accel * h);
     this.vel.x += (target.x - this.vel.x) * k;
     this.vel.z += (target.z - this.vel.z) * k;
+    // Coming to rest is exact. The pace only ever halves its way toward nothing, and while any
+    // of it was left pointing downhill the controller read it as meaning to go down and let the
+    // press slide the body after it: a pace or two of drift after stopping on a slope.
+    if (target.x === 0 && target.z === 0 && Math.hypot(this.vel.x, this.vel.z) < 0.12) this.vel.x = this.vel.z = 0;
 
     // Jumping forgives a little: pressed just before landing it still fires on touchdown,
     // and for a moment after running off an edge the ground still counts.
@@ -191,11 +202,22 @@ export class Player {
       audio.jump();
     }
     this.vel.y -= 9.81 * 1.35 * h;
-    if (this.grounded && this.vel.y < 0) this.vel.y = -1.5;
+    if (this.grounded && this.vel.y < 0) this.vel.y = -PRESS;
 
     const desired = { x: this.vel.x * h, y: this.vel.y * h, z: this.vel.z * h };
+    const laid = this.grounded && this.vel.y < 0 ? this.alongGround(desired, h) : 0;
     this.kcc.computeColliderMovement(this.collider, desired, physics.R.QueryFilterFlags.EXCLUDE_SENSORS, PLAYER_GROUPS);
-    const mv = this.kcc.computedMovement();
+    let mv = this.kcc.computedMovement();
+    // Something stood in the way (a trunk, a wall, a crate). A step laid along a slope slides
+    // round such things worse than a level one, and a rising one would carry the body up their
+    // face: take the step again the plain way.
+    if (laid > 0 && Math.hypot(mv.x, mv.z) < laid * 0.9) {
+      desired.x = this.vel.x * h;
+      desired.y = this.vel.y * h;
+      desired.z = this.vel.z * h;
+      this.kcc.computeColliderMovement(this.collider, desired, physics.R.QueryFilterFlags.EXCLUDE_SENSORS, PLAYER_GROUPS);
+      mv = this.kcc.computedMovement();
+    }
     const t = this.body.translation();
     const next = { x: t.x + mv.x, y: t.y + mv.y, z: t.z + mv.z };
     this.body.setNextKinematicTranslation(next);
@@ -241,6 +263,45 @@ export class Player {
       if (physics.raycast(eyeP, side, 0.55, SHOT_GROUPS, this.collider)) lt = 0;
     }
     this.lean += (lt - this.lean) * (1 - Math.exp(-10 * h));
+  }
+
+  /** what the feet would stand on at a spot: anything that stops this body, from knee height down */
+  private groundBelow(x: number, z: number) {
+    const hit = physics.raycast({ x, y: this.pos.y + 0.5, z }, { x: 0, y: -1, z: 0 }, 1.1, PLAYER_GROUPS, this.collider);
+    return hit ? { y: hit.point.y, n: hit.normal } : null;
+  }
+
+  /**
+   * Lays a step along the ground it is about to cover. Left to itself the controller flattens
+   * a level step onto the slope, and the press that holds the body down turns into a pull back
+   * downhill: a 20° rise cost a quarter of the pace and 30° nearly half, which is what made
+   * the hills feel like glue. The step is aimed at the ground ahead instead and the press made
+   * square to the surface, so a climb costs only its own extra length. Anything but open
+   * walkable ground under this step (a ledge, a sill, a crate, too steep a bank) is left to
+   * the controller exactly as before.
+   * @returns how far over the ground the laid step should carry, or 0 if the step was left alone
+   */
+  private alongGround(d: { x: number; y: number; z: number }, h: number) {
+    // (standing still the plain press does: one square to a slope lets the body creep on it)
+    const run = Math.hypot(d.x, d.z);
+    if (run < 0.002) return 0;
+    const from = this.groundBelow(this.pos.x, this.pos.z);
+    const to = this.groundBelow(this.pos.x + d.x, this.pos.z + d.z);
+    if (!from || !to) return 0;
+    const n = from.n;
+    // resting on what lies under the middle of the body, not hung on an edge beside it
+    if (n.y < FOLLOW_NY || Math.abs(this.pos.y - from.y - ((RADIUS + SKIN) / n.y - RADIUS)) > 0.06) return 0;
+    const rise = to.y - from.y;
+    // the same face carried on, near enough: not a step up and not a drop
+    if (Math.abs(rise + (n.x * d.x + n.z * d.z) / n.y) > 0.03 || Math.abs(rise) > run * FOLLOW_MAX) return 0;
+    // (level ground: the step is right as it stands)
+    if (n.y > 0.99999 && Math.abs(rise) < 1e-5) return 0;
+    const k = rise > 0 ? run / Math.hypot(run, rise) : 1;
+    const press = PRESS * h;
+    d.x = d.x * k - n.x * press;
+    d.y = rise * k - n.y * press;
+    d.z = d.z * k - n.z * press;
+    return run * k;
   }
 
   private land(vy: number) {

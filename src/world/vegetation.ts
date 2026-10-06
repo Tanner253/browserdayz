@@ -7,7 +7,7 @@ import { CRATE_KINDS } from './buildings';
 import { assets, type TreeEntry } from '../core/assets';
 import { physics, type Surface } from '../core/physics';
 import { extractParts, groundParts, type MeshPart } from '../core/gltf-utils';
-import { antiFirefly, type Atmosphere } from './atmosphere';
+import { antiFirefly, SHADOW_FRUSTA, type Atmosphere } from './atmosphere';
 import { foliagePatch, setLodFade, wind } from './foliage';
 import type { Instance, World } from './worldgen';
 
@@ -63,8 +63,13 @@ const SOLID: Record<string, [Surface, number]> = {
   Television_01: ['metal', 0.9],
 };
 
-/** objects on this layer are drawn only into shadow maps (cheap LOD stand-ins for close trees) */
-export const SHADOW_ONLY_LAYER = 3;
+/**
+ * Where a tree's simpler model gives way to its baked card, metres. It was 115-130, which from
+ * a yard in the woods kept five or six hundred models on screen, over a million triangles
+ * most of them smaller than a pixel. Past 85 m a card cannot be told from the model, and
+ * handing over there took 3-11 % off the frame wherever a wood is in view.
+ */
+const HANDOVER: [number, number] = [85, 100];
 
 const _m = new THREE.Matrix4();
 const _q = new THREE.Quaternion();
@@ -118,7 +123,11 @@ class LodSet {
       im.count = 0;
       im.frustumCulled = false;
       im.castShadow = castShadow;
-      if (shadowOnly) im.layers.set(SHADOW_ONLY_LAYER);
+      if (shadowOnly) {
+        // in the shadow maps and not in the view: three asks this of every pass it draws
+        im.frustumCulled = true;
+        im.intersectsFrustum = (f) => SHADOW_FRUSTA.has(f);
+      }
       im.receiveShadow = true;
       im.matrixAutoUpdate = false;
       im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -321,7 +330,7 @@ class Impostors {
         tAtlas: { value: this.atlas.texture },
         uInfo: { value: info },
         uRows: { value: rows },
-        uFade: { value: new THREE.Vector2(115, 130) },
+        uFade: { value: new THREE.Vector2(...HANDOVER) },
         fogColor: { value: fog.color },
         fogDensity: { value: fog.density },
       },
@@ -346,8 +355,9 @@ class Impostors {
     const all = this.all;
     for (let i = 0; i < all.length; i++) {
       const t = all[i];
-      const dx = t.x - cam.x, dz = t.z - cam.z;
-      const d2 = dx * dx + dz * dz;
+      // (the same measure the model fades by: from the eye to the foot of the tree)
+      const dx = t.x - cam.x, dy = t.y - cam.y, dz = t.z - cam.z;
+      const d2 = dx * dx + dy * dy + dz * dz;
       if (d2 < near * near) continue;
       _sphere.center.set(t.x, t.y + 8, t.z);
       _sphere.radius = 14 * t.s;
@@ -422,7 +432,9 @@ void main() {
   vec4 c = mix(a, b, smoothstep(0.25, 0.75, t));
   float fade = smoothstep(uFade.x, uFade.y, vDist);
   float ign = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
-  if (c.a < 0.45 || fade <= ign) discard;
+  // the model dissolves over the same stretch by the same pattern (see foliagePatch): the card
+  // takes just the pixels it gives up, so the two never leave a hole or draw twice
+  if (c.a < 0.45 || (fade < 0.999 && ign < 1.0 - fade)) discard;
   gl_FragColor = vec4(c.rgb, 1.0);
   #include <fog_fragment>
 }`;
@@ -432,7 +444,7 @@ void main() {
 export class Vegetation {
   private sets: LodSet[] = [];
   /** trees and bushes: the range of the full-detail model, which the foliage option scales */
-  private detail: { set: LodSet; full: { value: THREE.Vector4 }[]; simple: { value: THREE.Vector4 }[]; base: [number, number]; out: [number, number] }[] = [];
+  private detail: { set: LodSet; full: { value: THREE.Vector4 }[]; simple: { value: THREE.Vector4 }[]; base: [number, number]; mid: [number, number] }[] = [];
   private impostors = new Impostors();
   private frustum = new THREE.Frustum();
   private projView = new THREE.Matrix4();
@@ -524,19 +536,24 @@ export class Vegetation {
       const m1 = this.treeMaterials(e, true, sway);
       const instances = byKind.get(k) ?? [];
       const set = new LodSet(instances, { cullRadius: Math.max(e.radius, e.height) * 0.8, shadowRadius: 34 }, k);
-      // full-detail model up close, the simpler one beyond (for trees: out to ~120 m, then
-      // baked impostors for the far forest)
+      // full-detail model up close, the simpler one beyond; a tree is then handed over to its
+      // baked card (a bush has none, and is simply gone past 110 m)
       const base: [number, number] = isBush ? [32, 40] : [40, 50];
       const out: [number, number] = isBush ? [95, 110] : [115, 130];
+      const mid = isBush ? out : HANDOVER;
       setLodFade(m0.barkLod, null, base);
       setLodFade(m0.leafLod, null, base);
-      setLodFade(m1.barkLod, base, out);
-      setLodFade(m1.leafLod, base, out);
-      // full-detail canopies are visual only; their shadows come from the simpler stand-in below
+      setLodFade(m1.barkLod, base, mid);
+      setLodFade(m1.leafLod, base, mid);
+      const simple = [{ geometry: lod1.bark, material: m1.bark }, { geometry: lod1.leaves, material: m1.leaves }];
+      // Shadows come from the simpler model, drawn into the shadow maps and nowhere else: from
+      // the foot of the tree (the full-detail canopy would cost several times as much to draw
+      // there a second time) out to 130 m, well past where a tree has become its card, so the
+      // ground under a far wood stays shaded.
       set.addLevel(scene, [{ geometry: lod0.bark, material: m0.bark }, { geometry: lod0.leaves, material: m0.leaves }], 0, 0, base[0], base[1], false);
-      set.addLevel(scene, [{ geometry: lod1.bark, material: m1.bark }, { geometry: lod1.leaves, material: m1.leaves }], base[0], base[1], out[0], out[1], true);
-      set.addLevel(scene, [{ geometry: lod1.bark, material: m1.bark }, { geometry: lod1.leaves, material: m1.leaves }], 0, 0, base[0], base[1], true, true);
-      this.detail.push({ set, full: [m0.barkLod, m0.leafLod], simple: [m1.barkLod, m1.leafLod], base, out });
+      set.addLevel(scene, simple, base[0], base[1], mid[0], mid[1], false);
+      set.addLevel(scene, simple, 0, 0, out[0], out[1], true, true);
+      this.detail.push({ set, full: [m0.barkLod, m0.leafLod], simple: [m1.barkLod, m1.leafLod], base, mid });
       if (!isBush) {
         const bm = this.treeMaterials(e, false, 0);
         bakeKinds.push({ name: k, parts: [{ name: 'bark', geometry: lod0.bark, material: bm.bark }, { name: 'leaves', geometry: lod0.leaves, material: bm.leaves }], entry: e });
@@ -652,10 +669,10 @@ export class Vegetation {
     for (const d of this.detail) {
       const fade: [number, number] = [d.base[0] * k, d.base[1] * k];
       for (const u of d.full) setLodFade(u, null, fade);
-      for (const u of d.simple) setLodFade(u, fade, d.out);
-      const [full, simple, shadow] = d.set.levels;
-      full.farFull = shadow.farFull = simple.near = fade[0];
-      full.far = shadow.far = simple.nearFull = fade[1];
+      for (const u of d.simple) setLodFade(u, fade, d.mid);
+      const [full, simple] = d.set.levels;
+      full.farFull = simple.near = fade[0];
+      full.far = simple.nearFull = fade[1];
       d.set.invalidate();
     }
   }
@@ -666,6 +683,6 @@ export class Vegetation {
     this.projView.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     this.frustum.setFromProjectionMatrix(this.projView);
     for (const s of this.sets) s.update(cam, this.frustum);
-    this.impostors.update(cam, this.frustum, 115);
+    this.impostors.update(cam, this.frustum, HANDOVER[0]);
   }
 }

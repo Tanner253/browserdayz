@@ -34,6 +34,14 @@ export interface LootPoint {
 /** props that are searched as containers (loot is inside, never lying on top) */
 export const CRATE_KINDS = new Set(['wooden_crate_01', 'wooden_military_crate', 'old_military_crate']);
 
+/**
+ * Walls and doors are drawn before anything that grows or lies about (trees, grass and props
+ * sit at -10 and up, see LodSet): whatever a wall hides is then thrown out by the depth test
+ * before it is shaded. Drawn after them, as they were, a room in the woods paid for every
+ * tree behind its walls: a fifth of the frame inside the outlying houses, more on a hot GPU.
+ */
+const WALLS_FIRST = -20;
+
 /** how far in from the model's edge items may sit: [along, deep] in metres; shelves have posts and a back panel */
 const SURFACE_INSET: Record<string, [number, number]> = {
   Shelf_01: [0.07, 0.035],
@@ -392,6 +400,7 @@ export class Door {
     this.pivot.quaternion.copy(this.baseQuat);
     const panel = new THREE.Mesh(boxGeo(0, width - 0.02, 0, height - 0.02, -0.025, 0.025, 1.2, new THREE.Matrix4()), mat);
     panel.castShadow = panel.receiveShadow = true;
+    panel.renderOrder = WALLS_FIRST;
     const handle = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.03, 0.05), handleMat);
     handle.position.set(width - 0.12, 1.0, 0.05);
     const handle2 = handle.clone();
@@ -534,6 +543,23 @@ export class Buildings {
     physics.addStaticQuat(physics.R.ColliderDesc.cuboid(hx, hy, hz), surface, p, q, undefined, groups);
   }
 
+  /**
+   * Outside a doorway the ground lies a hand's breadth under the floor. A body's round foot rode
+   * that lip like a steep bank and lost most of its pace for a few steps at every doorway.
+   * An unseen ramp carries it up instead, from the ground half a pace out to the floor's edge
+   * in the middle of the wall. It stops feet and nothing else: loot, grenades and bullets go
+   * through it to the ground and the wall behind.
+   * @param F the wall's frame (x along it, z outward), a..b the opening along x
+   */
+  private doorstep(F: THREE.Matrix4, a: number, b: number) {
+    const DROP = 0.11, LEN = 0.6, HALF = 0.03;
+    const tilt = Math.atan2(DROP, LEN);
+    const m = new THREE.Matrix4()
+      .makeTranslation((a + b) / 2, -DROP / 2 - HALF * Math.cos(tilt), LEN / 2 - HALF * Math.sin(tilt))
+      .multiply(new THREE.Matrix4().makeRotationX(tilt));
+    this.collider((b - a) / 2 + 0.3, HALF, Math.hypot(DROP, LEN) / 2, F.clone().multiply(m), 'wood', GLASS_GROUPS);
+  }
+
   private planBuilding(plot: BuildingPlot) {
     const rng = new RNG(plot.seed);
     const firstPoint = this.lootPoints.length;
@@ -627,6 +653,8 @@ export class Buildings {
           const hinge = F.clone().multiply(new THREE.Matrix4().makeTranslation(o.a + fw, 0, 0));
           this.doorSpecs.push({ m: hinge, w: o.b - o.a - fw * 2, h: o.top - fw, id: `${plot.id}_door${this.doorSpecs.length}`, open: rng.chance(0.35), swing: rng.chance(0.5) ? 1 : -1 });
         }
+        // (a barn's open front has the same lip as a door)
+        if (o.kind !== 'window' && wd.side !== 'inner') this.doorstep(F, o.a, o.b);
       }
     }
 
@@ -829,7 +857,7 @@ export class Buildings {
       mesh.receiveShadow = true;
       mesh.matrixAutoUpdate = false;
       mesh.name = `building:${key}`;
-      if (key === 'glass') mesh.renderOrder = 2;
+      mesh.renderOrder = key === 'glass' ? 2 : WALLS_FIRST;
       group.add(mesh);
     }
     scene.add(group);

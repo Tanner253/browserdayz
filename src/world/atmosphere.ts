@@ -30,6 +30,14 @@ export const antiFirefly: ShaderPatch = (shader) => {
 
 const _dir = new THREE.Vector3();
 
+/**
+ * The frusta the sun's shadow maps are drawn through. Something meant to be drawn into the
+ * shadow maps and nowhere else answers three's frustum test with "is it one of these?".
+ * (Render layers cannot do it: the shadow pass tests an object's layers against the view
+ * camera's, not the light's, so a layer the view leaves out is left out of the shadows too.)
+ */
+export const SHADOW_FRUSTA = new Set<THREE.Frustum | THREE.FrustumArray>();
+
 export class Atmosphere {
   sunDir = new THREE.Vector3(0.4, 0.7, 0.3).normalize(); // points toward the sun
   sunColor = new THREE.Color(1, 0.95, 0.88);
@@ -40,6 +48,8 @@ export class Atmosphere {
   csm!: CSM;
   private registered = new WeakSet<THREE.Material>();
   private frame = 0;
+  /** the shape of the view the cascades were last cut for (width over height) */
+  private aspect = 0;
   /** where the camera was, and which way it faced, when each cascade was last drawn */
   private drawn: { pos: THREE.Vector3; dir: THREE.Vector3 }[] = [];
 
@@ -96,10 +106,9 @@ export class Atmosphere {
     this.csm.fade = true;
     for (const l of this.csm.lights) {
       l.color.copy(this.sunColor);
-      // shadow-only stand-ins (layer 3) and the player body (layer 2) cast shadows
       l.shadow.camera.layers.enable(2);
-      l.shadow.camera.layers.enable(3);
       l.shadow.normalBias = 0.035;
+      SHADOW_FRUSTA.add(l.shadow.getFrustum());
     }
     this.padCascades();
   }
@@ -291,6 +300,16 @@ export class Atmosphere {
   }
 
   update() {
+    // The cascades are cut from the shape of the view, and were cut once, when the game
+    // started. Resize the window or go full screen and they went on covering the old shape:
+    // on a screen that had become wider, nothing off to the sides was shadowed. (And started
+    // in a window with no size yet, they covered nothing at all.)
+    const shape = this.camera.aspect;
+    if (shape > 0 && shape !== this.aspect) {
+      this.aspect = shape;
+      this.csm.updateFrustums();
+      this.padCascades();
+    }
     this.csm.update();
     // Shadows are the most expensive thing drawn: every caster again, once per cascade.
     // The nearest cascade is redrawn every frame. The two wider ones cover ground further
