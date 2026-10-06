@@ -1,0 +1,98 @@
+/* The trailer's titles, laid over the game in the same page so one photograph takes both. */
+
+body.filming { cursor: none; }
+/* things a film has no use for */
+body.filming .cam-label,
+body.filming .hud-fps,
+body.filming .hud-net,
+body.filming .hud-online,
+body.filming .hud-chat,
+body.filming .hud-area,
+body.filming .hud-start,
+body.filming #rotate { display: none !important; }
+body.filming.tr-hud-off #hud { visibility: hidden; }
+body.filming, body.filming #hud, body.filming .inv { font-family: var(--trailer-font); }
+
+#tr-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+  overflow: hidden;
+  font-family: var(--trailer-font);
+  color: #f3efe6;
+}
+/* letterbox for the shots filmed from outside a head */
+#tr-overlay::before,
+#tr-overlay::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  background: #000;
+  z-index: 1;
+}
+#tr-overlay::before { top: 0; }
+#tr-overlay::after { bottom: 0; }
+body.tr-bars #tr-overlay::before,
+body.tr-bars #tr-overlay::after { height: 9.2vh; }
+
+.tr-title {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 2;
+  white-space: nowrap;
+  text-align: center;
+  transform: translate(-50%, -50%) scale(var(--k, 1));
+  text-transform: uppercase;
+  font-weight: 700;
+  font-stretch: condensed;
+  letter-spacing: 0.06em;
+  text-shadow: 0 0.06em 0.5em rgba(0, 0, 0, 0.75), 0 0 0.04em rgba(0, 0, 0, 0.9);
+}
+.tr-title.big { font-size: 9.6vh; top: 76%; }
+.tr-title.top { font-size: 7.4vh; top: 11%; }
+.tr-title.gold { color: #ffd35a; top: 44%; font-size: 15vh; text-shadow: 0 0.05em 0.6em rgba(120, 70, 0, 0.9), 0 0 0.05em #000; }
+.tr-title.small { font-size: 3.4vh; top: 88%; letter-spacing: 0.5em; font-weight: 600; color: #d8cfb8; }
+.tr-title.name { font-size: 5.4vh; top: 80%; letter-spacing: 0.22em; }
+.tr-title.kicker { font-size: 3.4vh; top: 61%; letter-spacing: 0.6em; color: #ffd35a; font-weight: 600; }
+.tr-title.stat,
+.tr-title.soon { font-size: 6.6vh; top: 72%; letter-spacing: 0.08em; padding: 0.35em 0.9em; background: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.62) 18%, rgba(0, 0, 0, 0.62) 82%, transparent); }
+.tr-title.stat b { color: #ffd35a; font-size: 1.5em; vertical-align: -0.06em; }
+.tr-title.soon { top: 72%; }
+/* said small, and said the whole time the money is on screen */
+.tr-title.dev { top: auto; bottom: 11.5vh; z-index: 4; font-size: 2.6vh; font-weight: 500; letter-spacing: 0.34em; text-transform: lowercase; opacity: 0.5 !important; transform: translate(-50%, 0); }
+.tr-title.end {
+  inset: 0;
+  left: 0;
+  top: 0;
+  transform: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.6vh;
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.72), rgba(0, 0, 0, 0.94));
+}
+.end-logo { font-size: 30vh; line-height: 0.9; letter-spacing: 0.16em; margin-right: -0.16em; transform: scale(var(--k, 1)); }
+.end-line { font-size: 4.2vh; letter-spacing: 0.42em; margin-right: -0.42em; color: #d8cfb8; font-weight: 500; }
+.end-url { margin-top: 2.4vh; padding: 0.3em 1em; font-size: 6.4vh; letter-spacing: 0.2em; color: #14110b; background: #ffd35a; }
+
+.tr-money { position: absolute; z-index: 2; line-height: 1; filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.55)); }
+.tr-cursor {
+  position: absolute;
+  z-index: 3;
+  width: 0;
+  height: 0;
+  border-left: 15px solid #fff;
+  border-top: 5px solid transparent;
+  border-bottom: 17px solid transparent;
+  transform: rotate(-22deg);
+  filter: drop-shadow(0 1px 3px #000);
+}
+.tr-cursor.down { transform: rotate(-22deg) scale(0.82); }
+
+/* the tag's own countdown, big enough to read in a film */
+body.filming .hud-tags { transform: scale(2.1); transform-origin: top left; }

@@ -7,3 +7,5 @@ data
 .vercel
 *.log
 .DS_Store
+# trailer takes
+trailer/out

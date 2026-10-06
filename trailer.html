@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ZONA: trailer stage</title>
+    <!-- the film is made with no network: the game's fonts are swapped for ones on the machine -->
+    <style>
+      :root { --trailer-font: 'Bahnschrift', 'Arial Narrow', 'Segoe UI', sans-serif; }
+    </style>
+    <!-- must run before any game code: see trailer/clock.js -->
+    <script src="/trailer/clock.js"></script>
+  </head>
+  <body class="filming">
+    <canvas id="game"></canvas>
+    <div id="ui"></div>
+    <div id="rotate" role="alert" hidden>
+      <div class="rot-phone"></div>
+      <b></b><span></span>
+      <button id="rotate-go"></button>
+      <p id="rotate-hint"></p>
+    </div>
+    <div id="loading">
+      <div class="load-inner">
+        <div class="load-title">ZONA</div>
+        <div class="load-sub">trailer stage</div>
+        <div class="load-bar"><div class="load-fill"></div></div>
+        <div class="load-label">initialising</div>
+      </div>
+    </div>
+    <div id="tr-overlay"></div>
+    <script type="module" src="/src/main.ts"></script>
+    <script type="module" src="/src/trailer/director.ts"></script>
+  </body>
+</html>
