@@ -927,7 +927,10 @@ export class Weapons {
     const kind = ITEMS[weaponId]?.weapon?.kind;
     if (!kind) return;
     const b = BALLISTICS[kind];
-    this.bullets.push({ pos: origin.clone(), vel: dir.clone().normalize().multiplyScalar(b.muzzleVel), drag: b.drag, damage: 0, life: 4, travelled: 0, weapon: weaponId, ghost: true });
+    // The shot is reported from the shooter's eye, which in this world is inside their own
+    // head hit zone: the bullet starts a forearm's length out, or it would land on them.
+    const out = dir.clone().normalize();
+    this.bullets.push({ pos: origin.clone().addScaledVector(out, 0.35), vel: out.clone().multiplyScalar(b.muzzleVel), drag: b.drag, damage: 0, life: 4, travelled: 0.35, weapon: weaponId, ghost: true });
     const d = this.mainCam ? origin.distanceTo(this.mainCam.position) : 0;
     this.fx.muzzle(origin.clone().addScaledVector(dir, 0.6), dir, kind !== 'pistol', suppressed);
     audio.gunshot(kind === 'auto' ? 'rifle' : kind, origin, d, false, suppressed);
