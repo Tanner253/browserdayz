@@ -542,7 +542,9 @@ export class Vegetation {
         bakeKinds.push({ name: k, parts: [{ name: 'bark', geometry: lod0.bark, material: bm.bark }, { name: 'leaves', geometry: lod0.leaves, material: bm.leaves }], entry: e });
         // trunk colliders
         for (const t of instances) {
-          const r = Math.max(0.12, e.trunkRadius * t.scale * 0.9);
+          // (one young pine is measured across its lowest boughs, not its trunk: without the cap
+          // every one of them stood inside an unseen pillar four metres across)
+          const r = Math.max(0.12, Math.min(e.trunkRadius, 0.5) * t.scale * 0.9);
           const h = Math.min(8, e.height * t.scale * 0.5);
           physics.addStatic(physics.R.ColliderDesc.cylinder(h / 2, r), 'wood', { x: t.x, y: t.y + h / 2, z: t.z });
         }

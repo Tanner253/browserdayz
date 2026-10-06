@@ -17,6 +17,7 @@ import type { Effects } from './effects';
 import { flashTexture } from './effects';
 import { FPArms, type Grips, type HandGrip } from './arms';
 import type { Look } from './look';
+import { MAX_STAMINA } from '../net/protocol';
 import type { ItemModels } from './loot';
 
 export type HitZone = 'head' | 'torso' | 'legs';
@@ -176,6 +177,8 @@ export class Weapons {
   killMarker = false;
   onHit: (info: HitInfo) => void = () => {};
   onShot: (info: ShotInfo) => void = () => {};
+  /** a punch or a melee swing has started */
+  onSwing: () => void = () => {};
   /** loot models, so consumables can be shown in the hands while they are used */
   itemModels: ItemModels | null = null;
   // bare hands: fists come up to punch (LMB) or guard (RMB) and drop again after a moment
@@ -347,7 +350,12 @@ export class Weapons {
       const c = box.getCenter(new THREE.Vector3());
       const longAxis = size.y >= size.x && size.y >= size.z ? 'y' : size.x >= size.z ? 'x' : 'z';
       for (const p of parts) {
-        const mesh = new THREE.Mesh(p.geometry, plainMaterial(p.material));
+        // bare steel with nothing around it to reflect draws as a black cut-out this close to
+        // the eye: let a blade or an axe head take the light like worn metal does
+        const mat = plainMaterial(p.material) as THREE.MeshStandardMaterial;
+        mat.metalness = Math.min(mat.metalness, 0.45);
+        mat.roughness = Math.max(mat.roughness, 0.5);
+        const mesh = new THREE.Mesh(p.geometry, mat);
         mesh.position.set(-c.x, -box.min.y, -c.z);
         if (longAxis === 'x') {
           mesh.position.set(-box.min.x, -c.y, -c.z);
@@ -360,7 +368,10 @@ export class Weapons {
       body.position.y = -Math.max(size.x, size.y, size.z) * 0.18;
       const holder = new THREE.Group();
       holder.add(body);
-      holder.rotation.set(-0.55, 0.15, -0.2);
+      // the longer the weapon the further it leans away from the eye: a bat held as upright as
+      // a knife is a pole across the screen with its end out of the top of the picture
+      const reach = THREE.MathUtils.clamp(Math.max(size.x, size.y, size.z) - 0.4, 0, 0.45);
+      holder.rotation.set(-0.55 - reach * 1.15, 0.15, -0.2 - reach * 0.5);
       root.add(holder);
       const flash = mkFlash();
       this.models.set(id, {
@@ -369,8 +380,9 @@ export class Weapons {
           right: { pos: new THREE.Vector3(0.0, Math.max(size.x, size.y, size.z) * 0.12, 0.04), fingers: new THREE.Vector3(-0.2, -0.3, -1), palm: new THREE.Vector3(-1, 0, 0), curl: [1.1, 1.15, 1.2, 1.2], thumb: 0.6 },
           left: null,
         },
-        hip: new THREE.Vector3(0.24, -0.3, -0.42),
-        ads: new THREE.Vector3(0.18, -0.26, -0.42),
+        // high enough that the fist on the handle is in the picture, not only the head
+        hip: new THREE.Vector3(0.22, -0.215, -0.42),
+        ads: new THREE.Vector3(0.17, -0.19, -0.42),
         muzzle: new THREE.Vector3(),
       });
     }
@@ -597,7 +609,7 @@ export class Weapons {
     }
 
     // ----- scope sway (applied to the aim, so bullets follow it)
-    const tired = 1 + (1 - p.vitals.stamina / 100) * 2.5;
+    const tired = 1 + (1 - p.vitals.stamina / MAX_STAMINA) * 2.5;
     const swayAmp = (this.scoped ? 0.0035 : this.aiming ? 0.0022 : 0.0012) * tired * (this.breath.held ? 0.15 : 1) * (p.crouched ? 0.6 : 1) * (hasMod(item, 'rifle_wrap') ? 0.75 : 1);
     const t = this.time;
     const breathSway = new THREE.Vector2(Math.sin(t * 0.9) * 0.7 + Math.sin(t * 2.1) * 0.3, Math.sin(t * 1.3 + 1) * 0.6 + Math.cos(t * 0.7) * 0.4).multiplyScalar(swayAmp);
@@ -733,6 +745,7 @@ export class Weapons {
     audio.whoosh();
     const dmg = FIST.damage + this.inv.wear('fist').reduce((a, b) => a + b, 0);
     this.start('punch', FIST.rate * 0.95, undefined, { hit: 0, dmg, range: FIST.range, hand: this.punchHand });
+    this.onSwing();
   }
 
   /** Show an item in the hands while it is being used; the weapon drops out of the way. */
@@ -776,6 +789,7 @@ export class Weapons {
     this.player.vitals.stamina = Math.max(0, this.player.vitals.stamina - 6);
     audio.ui('move');
     this.start('swing', melee.rate * 0.9, undefined, { hit: 0, dmg: melee.damage, range: melee.range });
+    this.onSwing();
     void camera;
   }
 

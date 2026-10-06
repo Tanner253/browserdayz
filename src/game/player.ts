@@ -7,6 +7,7 @@ import { physics, PLAYER_GROUPS, SHOT_GROUPS, type Surface } from '../core/physi
 import type { Input, MoveInput } from '../core/input';
 import { audio } from '../core/audio';
 import type { Terrain } from '../world/terrain';
+import { MAX_STAMINA } from '../net/protocol';
 
 const STAND_HALF = 0.56;
 const CROUCH_HALF = 0.26;
@@ -38,7 +39,7 @@ export class Player {
   moving = 0; // 0..1 horizontal speed fraction
   eye = EYE_STAND;
   lean = 0;
-  vitals: Vitals = { health: 100, energy: 85, water: 85, stamina: 100, bleeding: false };
+  vitals: Vitals = { health: 100, energy: 85, water: 85, stamina: MAX_STAMINA, bleeding: false };
   dead = false;
   /** externally supplied (weapons): ADS + weapon weight slow the player */
   aiming = false;
@@ -209,7 +210,7 @@ export class Player {
       this.staminaDelay -= h;
     } else {
       const regen = (v.energy < 20 || v.water < 20 ? 5 : 11) * (this.crouched ? 1.3 : 1);
-      v.stamina = Math.min(100, v.stamina + regen * h);
+      v.stamina = Math.min(MAX_STAMINA, v.stamina + regen * h);
     }
 
     // footsteps

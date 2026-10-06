@@ -2,7 +2,7 @@
 // prompts only when relevant. Plain DOM; updated once per frame with cheap diffs.
 
 import type { Vitals } from '../game/player';
-import type { ChatChannel } from '../net/protocol';
+import { MAX_STAMINA, type ChatChannel } from '../net/protocol';
 import { TOUCH } from '../core/device';
 import { AO_MODES, DEFAULT_GRAPHICS, FPS_LIMITS, LEVELS, MSAA, PRESETS, SCALES, VOLUMES, presetOf, saveGraphics, type Graphics, type PresetName } from '../core/settings';
 
@@ -113,8 +113,8 @@ export class HUD {
             <div class="start-pane pane-brief">
               <figure class="start-map"></figure>
               <ol class="start-loop">
-                <li style="--i:0"><i class="loop-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" stroke-dasharray="2 3"/><path d="M12 3v7M9 8l3 3 3-3"/></svg></i><div><b>Drop in</b><span>On the edge of the map. Bare hands, one meal, one drink.</span></div></li>
-                <li style="--i:1"><i class="loop-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9l8-4 8 4v8l-8 4-8-4z"/><path d="M4 9l8 4 8-4M12 13v8"/></svg></i><div><b>Loot inward</b><span>The best gear is in the middle. The police station has guns.</span></div></li>
+                <li style="--i:0"><i class="loop-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" stroke-dasharray="2 3"/><path d="M12 3v7M9 8l3 3 3-3"/></svg></i><div><b>Drop in</b><span>On the edge of the map, bare hands. The nearest marked place always has a weapon.</span></div></li>
+                <li style="--i:1"><i class="loop-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9l8-4 8 4v8l-8 4-8-4z"/><path d="M4 9l8 4 8-4M12 13v8"/></svg></i><div><b>Loot inward</b><span>Any building can hold a gun. The police station in the middle holds the most.</span></div></li>
                 <li style="--i:2"><i class="loop-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/></svg></i><div><b>Fight</b><span>Anyone you meet can kill you and take everything.</span></div></li>
                 <li style="--i:3"><i class="loop-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="8" width="14" height="9" rx="3"/><circle cx="8.5" cy="12.5" r="1"/><path d="M12 11h4M12 14h3M8 8c-3-5 3-7 5-3"/></svg></i><div><b>Take their tag</b><span>Every body carries a dog tag. Loot it.</span></div></li>
                 <li style="--i:4"><i class="loop-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6"/></svg></i><div><b>Hold 30:00</b><span>Stay alive with it for thirty minutes to cash it in.</span></div></li>
@@ -302,7 +302,7 @@ export class HUD {
    * The briefing map, drawn from the world itself: where fresh characters start, where
    * the landmarks are, and which way the loot gets better.
    */
-  setBriefing(d: { radius: number; spawns: { x: number; z: number }[]; centre: { x: number; z: number }; places: { name: string; x: number; z: number; kind: 'town' | 'police' | 'post' }[] }) {
+  setBriefing(d: { radius: number; spawns: { x: number; z: number }[]; centre: { x: number; z: number }; places: { name: string; x: number; z: number; kind: 'town' | 'police' | 'post' | 'site' }[] }) {
     const n = (v: number) => v.toFixed(0);
     const c = d.centre;
     const flows = d.spawns
@@ -317,6 +317,8 @@ export class HUD {
     const spawns = d.spawns.map((s, i) => `<g class="m-spawn" style="--i:${i % 8}"><circle class="m-pulse" cx="${n(s.x)}" cy="${n(s.z)}" r="9"/><circle cx="${n(s.x)}" cy="${n(s.z)}" r="5.5"/></g>`).join('');
     const places = d.places
       .map((p) => {
+        // the outlying places are many and small: a mark each, no name (the name shows when you get there)
+        if (p.kind === 'site') return `<g class="m-place m-site" transform="translate(${n(p.x)} ${n(p.z)})"><title>${p.name}</title><rect x="-11" y="-11" width="22" height="22" transform="rotate(45)"/></g>`;
         const mark = p.kind === 'police' ? `<path d="M0-13L11-7V4C11 11 0 15 0 15S-11 11-11 4V-7Z"/>` : p.kind === 'town' ? '' : `<rect x="-8" y="-8" width="16" height="16"/>`;
         // labels step away from the middle so they never sit on top of each other
         const below = p.kind === 'town';
@@ -336,7 +338,7 @@ export class HUD {
         <circle class="m-edge" cx="0" cy="0" r="${n(R)}"/>
         ${flows}${spawns}${places}
       </svg>
-      <figcaption><span class="lg-spawn"></span>you start here<span class="lg-loot"></span>better loot</figcaption>`;
+      <figcaption><span class="lg-spawn"></span>start<span class="lg-site"></span>weapon here<span class="lg-loot"></span>better loot</figcaption>`;
   }
 
   setName(name: string) {
@@ -585,8 +587,9 @@ export class HUD {
     }
     const bleed = e.vitals.querySelector('[data-k="bleed"]') as HTMLElement;
     this.toggle(bleed, 'show', v.bleeding);
-    (e.stamina.firstElementChild as HTMLElement).style.width = `${v.stamina}%`;
-    this.toggle(e.stamina, 'show', v.stamina < 99);
+    const reserve = (v.stamina / MAX_STAMINA) * 100;
+    (e.stamina.firstElementChild as HTMLElement).style.width = `${reserve}%`;
+    this.toggle(e.stamina, 'show', reserve < 99.5);
 
     if (s.weapon) {
       this.toggle(e.weapon, 'show', true);

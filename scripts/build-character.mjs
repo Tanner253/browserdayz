@@ -384,54 +384,107 @@ const frame = (u, v, u0, u1, v0, v1, w = 0.0045) => {
   const inner = u > u0 + w && u < u1 - w && v > v0 + w && v < v1 - w;
   return inside && !inner ? 1 : 0;
 };
+// Two passes. The first decides, for every texel, what is worn there and how far the cloth
+// stands up or sinks at that point (seams, pocket patches, folds). The second colours it and
+// turns the heights into the normal map.
+const TEXELS = TEX * TEX;
+const tx = { dressed: new Float32Array(TEXELS), jk: new Float32Array(TEXELS), tr: new Float32Array(TEXELS), bt: new Float32Array(TEXELS), dark: new Float32Array(TEXELS), zip: new Uint8Array(TEXELS), h: new Float32Array(TEXELS) };
+const wave = (v, period) => Math.sin((v * 2 * Math.PI) / period);
+const patch = (u, v, u0, u1, v0, v1, s = 0.003) => band(u, u0, u1, s) * band(v, v0, v1, s);
+/** lumpy noise through space, so folds are not ruled lines */
+const lumpy = (X, Y, Z) => vnoise(X * 30 + Z * 21 + 13.1, Y * 30 - Z * 12 + 7.7);
+/** 0 over most of the cloth, rising to 1 in patches: where a fold happens to form */
+const gathers = (X, Y, Z) => smooth(0.48, 0.7, vnoise(X * 9 + Z * 6 + 3.3, Y * 7 - Z * 5 + 1.9));
+for (let o = 0; o < TEXELS; o++) {
+  const o3 = o * 3;
+  // how much of this texel is dressed at all, then which garment has it: where two meet
+  // (hem over trousers, trousers over boots) one hands over to the other with no skin between
+  const m0 = mk[o3], m1 = mk[o3 + 1], m2 = mk[o3 + 2], all = m0 + m1 + m2;
+  const dressed = cov[o] ? smooth(0.4, 0.6, all) : 0;
+  const bt = all > 1e-4 ? dressed * smooth(0.42, 0.58, m2 / all) : 0;
+  const jk = m0 + m1 > 1e-4 ? (dressed - bt) * smooth(0.42, 0.58, m0 / (m0 + m1)) : 0;
+  const tr = dressed - bt - jk;
+  const X = px[o3], Y = px[o3 + 1], Z = px[o3 + 2];
+  const ax = Math.abs(X);
+  let dark = 1; // seams and trim, darker than the cloth around them
+  let zip = 0, h = 0;
+  if (jk > 0.5) {
+    const front = Z > 0 ? 1 : 0;
+    if (front && ax < 0.0065 && Y > 0.93 && Y < 1.52) zip = 1;
+    else if (front && band(ax, 0.02, 0.0245, 0.0015) && Y > 0.93 && Y < 1.5) dark = 0.8; // placket stitching
+    dark *= 1 - 0.24 * band(Y, 0.9, 0.945); // ribbed hem
+    dark *= 1 - 0.22 * band(ax, 0.622, 0.682); // cuffs
+    dark *= 1 - 0.2 * smooth(1.5, 1.52, Y); // collar
+    if (Y > 1.36 && Y < 1.54 && band(ax, 0.184, 0.191, 0.0015) > 0.5) dark *= 0.82; // shoulder seam
+    if (front && frame(ax, Y, 0.06, 0.15, 1.26, 1.345)) dark *= 0.78; // chest pockets
+    if (front && Y > 1.318 && Y < 1.345 && ax > 0.06 && ax < 0.15) dark *= 0.9; // their flaps
+    if (front && frame(ax, Y, 0.05, 0.16, 0.965, 1.06)) dark *= 0.8; // hand pockets
+    // trim and patches stand proud of the cloth
+    h += 0.0012 * band(Y, 0.9, 0.945) + 0.0012 * band(ax, 0.622, 0.682) + 0.0014 * smooth(1.5, 1.52, Y);
+    if (Y > 1.36 && Y < 1.54) h += 0.0008 * band(ax, 0.182, 0.193, 0.002);
+    if (front) {
+      if (Y > 0.93 && Y < 1.5) h += 0.0009 * band(ax, 0.007, 0.0245, 0.002) - 0.001 * zip;
+      h += 0.0009 * patch(ax, Y, 0.06, 0.15, 1.26, 1.345) + 0.0008 * patch(ax, Y, 0.06, 0.15, 1.318, 1.345);
+      h += 0.0008 * patch(ax, Y, 0.05, 0.16, 0.965, 1.06);
+    }
+    // folds: where a sleeve bends, under the arm, and where the jacket sits on the hips
+    const lumps = lumpy(X, Y, Z), some = gathers(X, Y, Z);
+    if (ax > 0.25) h += 0.0014 * wave(ax + 0.014 * lumps, 0.04) * Math.exp(-(((ax - 0.435) / 0.04) ** 2));
+    h += 0.001 * some * wave(Y - 0.55 * ax + 0.03 * lumps, 0.06) * band(ax, 0.13, 0.25, 0.03) * band(Y, 1.22, 1.4, 0.03);
+    h += 0.0011 * some * wave(Y + 0.03 * lumps, 0.055) * band(Y, 0.97, 1.12, 0.03) * smooth(0.05, 0.15, ax);
+    h += 0.0007 * (lumps - 0.5);
+  }
+  if (tr > 0.5) {
+    const side = Math.abs(Z + 0.03) < 0.075 && ax > 0.15;
+    if (side && frame(Z + 0.03, Y, -0.062, 0.062, 0.6, 0.76, 0.005)) dark *= 0.78; // cargo pockets
+    dark *= 1 - 0.1 * band(Y, 0.49, 0.58) * (Z > 0 ? 1 : 0); // worn knees
+    if (Z > 0 && ax < 0.006 && Y > 0.8) dark *= 0.8; // fly
+    const lumps = lumpy(X, Y, Z);
+    // behind the knee, stacked on the boot, and pulled from the crotch out to the hips
+    const some = gathers(X, Y, Z);
+    h += 0.0013 * wave(Y + 0.014 * lumps, 0.042) * Math.exp(-(((Y - 0.52) / 0.04) ** 2)) * (Z < -0.03 ? 1 : 0.3);
+    h += 0.0014 * wave(Y + 0.012 * lumps, 0.04) * band(Y, 0.345, 0.42, 0.02);
+    h += 0.001 * some * wave(Y - 0.6 * ax + 0.03 * lumps, 0.06) * band(Y, 0.76, 0.88, 0.03) * (Z > 0 ? 1 : 0.5);
+    if (ax > 0.16) h += 0.0008 * band(Z + 0.03, -0.004, 0.004, 0.002); // outseam
+    if (side) h += 0.0011 * patch(Z + 0.03, Y, -0.062, 0.062, 0.6, 0.76) + 0.0008 * patch(Z + 0.03, Y, -0.062, 0.062, 0.73, 0.76);
+    h += 0.0008 * (lumps - 0.5);
+  }
+  tx.dressed[o] = dressed; tx.jk[o] = zip ? 0 : jk; tx.tr[o] = tr; tx.bt[o] = bt; tx.dark[o] = dark; tx.zip[o] = zip; tx.h[o] = h * (jk + tr);
+}
+/** slope of the cloth across a texel, in texture space; nothing across the gap between two islands */
+const slope = (o, step) => {
+  const a = o - step, b = o + step;
+  if (a < 0 || b >= TEXELS || !cov[a] || !cov[b]) return 0;
+  const d = Math.hypot(px[b * 3] - px[a * 3], px[b * 3 + 1] - px[a * 3 + 1], px[b * 3 + 2] - px[a * 3 + 2]);
+  return d > 1e-5 && d < 0.02 ? (tx.h[b] - tx.h[a]) / d : 0;
+};
 for (let y = 0; y < TEX; y++) {
   for (let x = 0; x < TEX; x++) {
     const o = y * TEX + x, o3 = o * 3;
-    // how much of this texel is dressed at all, then which garment has it: where two meet
-    // (hem over trousers, trousers over boots) one hands over to the other with no skin between
-    const m0 = mk[o3], m1 = mk[o3 + 1], m2 = mk[o3 + 2], all = m0 + m1 + m2;
-    const dressed = cov[o] ? smooth(0.4, 0.6, all) : 0;
-    const bt = all > 1e-4 ? dressed * smooth(0.42, 0.58, m2 / all) : 0;
-    let jk = m0 + m1 > 1e-4 ? (dressed - bt) * smooth(0.42, 0.58, m0 / (m0 + m1)) : 0;
-    const tr = dressed - bt - jk;
-    const X = px[o3], Y = px[o3 + 1], Z = px[o3 + 2];
-    const ax = Math.abs(X);
+    const dressed = tx.dressed[o], bt = tx.bt[o], jk = tx.jk[o], tr = tx.tr[o], zip = tx.zip[o];
+    const Y = px[o3 + 1], Z = px[o3 + 2], ax = Math.abs(px[o3]);
     // cloth: a woven grey the game multiplies by each player's colours
     const weave = 0.5 + 0.5 * Math.sin(x * 2.4) * Math.sin(y * 2.4);
     const worn = vnoise(x / 46, y / 46) * 0.6 + vnoise(x / 11, y / 11) * 0.4;
     let cloth = 0.8 * (0.9 + 0.08 * weave + 0.12 * (worn - 0.5) + 0.05 * (hash(x, y) - 0.5));
-    let dark = 1; // seams and trim, darker than the cloth around them
-    let zip = 0;
-    if (jk > 0.5) {
-      const front = Z > 0 ? 1 : 0;
-      if (front && ax < 0.0065 && Y > 0.93 && Y < 1.52) zip = 1;
-      else if (front && band(ax, 0.02, 0.0245, 0.0015) && Y > 0.93 && Y < 1.5) dark = 0.8; // placket stitching
-      dark *= 1 - 0.24 * band(Y, 0.9, 0.945); // ribbed hem
-      dark *= 1 - 0.22 * band(ax, 0.622, 0.682); // cuffs
-      dark *= 1 - 0.2 * smooth(1.5, 1.52, Y); // collar
-      if (Y > 1.36 && Y < 1.54 && band(ax, 0.184, 0.191, 0.0015) > 0.5) dark *= 0.82; // shoulder seam
-      if (front && frame(ax, Y, 0.06, 0.15, 1.26, 1.345)) dark *= 0.78; // chest pockets
-      if (front && Y > 1.318 && Y < 1.345 && ax > 0.06 && ax < 0.15) dark *= 0.9; // their flaps
-      if (front && frame(ax, Y, 0.05, 0.16, 0.965, 1.06)) dark *= 0.8; // hand pockets
-    }
-    if (tr > 0.5) {
-      const side = Math.abs(Z + 0.03) < 0.075 && ax > 0.15;
-      if (side && frame(Z + 0.03, Y, -0.062, 0.062, 0.6, 0.76, 0.005)) dark *= 0.78; // cargo pockets
-      dark *= 1 - 0.1 * band(Y, 0.49, 0.58) * (Z > 0 ? 1 : 0); // worn knees
-      if (Z > 0 && ax < 0.006 && Y > 0.8) dark *= 0.8; // fly
-      cloth *= 0.97;
-    }
-    const tint = jk + tr;
+    if (tr > 0.5) cloth *= 0.97;
+    // the bottom of a fold sits in its own shadow
+    const shade = Math.min(1.04, Math.max(0.86, 1 + tx.h[o] * 32));
+    const tint = jk + tr + (zip ? tx.dressed[o] - bt - tr : 0);
     let r = base[o3], g = base[o3 + 1], b = base[o3 + 2];
-    const c = Math.round(255 * Math.min(1, cloth * dark));
+    const c = Math.round(255 * Math.min(1, cloth * tx.dark[o] * shade));
     // skin where nothing is worn, cloth where it is (boot leather is added below)
     r = r * (1 - dressed) + c * tint; g = g * (1 - dressed) + c * tint; b = b * (1 - dressed) + c * tint;
     let rgh = rough[o], nr = normal[o3], ng = normal[o3 + 1], nb = normal[o3 + 2];
-    // under cloth the body's muscle definition is gone; the weave gives it a little tooth instead
+    // under cloth the body's muscle definition is gone: the normal map there is the cloth's own
+    // folds and seams, with the weave for a little tooth
     const flat = dressed * 0.93;
-    nr += (128 + (weave - 0.5) * 9 - nr) * flat; ng += (128 + (hash(y, x) - 0.5) * 7 - ng) * flat; nb += (255 - nb) * flat;
+    const sx = slope(o, 1), sy = slope(o, TEX);
+    const len = Math.hypot(sx, sy, 1);
+    const fx = 128 + (127 * -sx) / len + (weave - 0.5) * 9, fy = 128 + (127 * sy) / len + (hash(y, x) - 0.5) * 7, fz = 128 + 127 / len;
+    nr += (fx - nr) * flat; ng += (fy - ng) * flat; nb += (fz - nb) * flat;
     rgh = rgh * (1 - dressed) + 236 * tint;
-    if (zip) { r = 44; g = 44; b = 46; rgh = 96; jk = 0; }
+    if (zip) { r = 44; g = 44; b = 46; rgh = 96; }
     if (bt > 0.001) {
       // leather. Boots: dark, a lighter cuff at the top, near-black soles. Work gloves (the
       // only leather above the knee): browner, scuffed paler across the knuckles and fingers.
@@ -577,6 +630,10 @@ const poser = (wb, hip) => {
         turn(B(`upperarm_${s}`), [0, 0, Math.sin(h), Math.cos(h)]); // about the way the body faces
       }
     },
+    /** elbows less bent: the forearm part of the way back into line with the upper arm */
+    unbend(k) {
+      for (const s of ['l', 'r']) P.point(`lowerarm_${s}`, `hand_${s}`, qrot(wb.get(B(`upperarm_${s}`)), vnorm(B(`lowerarm_${s}`).getTranslation())), k);
+    },
     /** feet under the hips, legs nearly straight, and the hips at the height that leaves the feet on the ground */
     stand(k) {
       P.toRest('pelvis', k);
@@ -607,8 +664,8 @@ const poser = (wb, hip) => {
 /** what is done to each clip after it is transferred */
 const TOUCH_UP = {
   idle: (p) => { p.stand(0.72); p.upright(0.45); p.hangArms(0.8); p.openHands(0.6); },
-  walk: (p) => { p.tuckArms(0.12); p.openHands(0.55); },
-  run: (p) => { p.tuckArms(0.08); p.openHands(0.4); },
+  walk: (p) => { p.tuckArms(0.2); p.unbend(0.4); p.openHands(0.55); },
+  run: (p) => { p.tuckArms(0.2); p.openHands(0.4); },
   crouchIdle: (p) => { p.openHands(0.5); },
   crouchWalk: (p) => { p.openHands(0.5); },
   jumpLoop: (p) => { p.openHands(0.5); },

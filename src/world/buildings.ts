@@ -10,7 +10,7 @@ import { assets } from '../core/assets';
 import { physics, GLASS_GROUPS, type Surface } from '../core/physics';
 import { RNG } from '../core/noise';
 import type { Atmosphere } from './atmosphere';
-import { heightAt, type BuildingPlot, type Instance, type World } from './worldgen';
+import { BUILDING_FOOTPRINT, heightAt, type BuildingPlot, type Instance, type SiteKind, type World } from './worldgen';
 
 export type Usage = 'Village' | 'Town' | 'Farm' | 'Industrial' | 'Military' | 'Hunting' | 'Medic' | 'Police';
 
@@ -22,6 +22,11 @@ export interface LootPoint {
   building: string;
   /** on the floor (room for long items) rather than on furniture */
   floor: boolean;
+  /**
+   * kept stocked with something to fight with (see Economy), never left empty for long:
+   * a firearm where firearms were kept (police, guard posts), any weapon elsewhere
+   */
+  arms?: 'guns' | 'any';
   /** the furniture surface this point sits on: world-space centre, yaw and usable half extents */
   surf?: { x: number; z: number; rot: number; hx: number; hz: number; /** free height above the surface */ clear: number };
 }
@@ -479,6 +484,38 @@ export class Buildings {
   plan() {
     for (const plot of this.world.buildings) this.planBuilding(plot);
     this.planVillageProps();
+    this.planSiteProps();
+  }
+
+  /** What stands in the yard of each outlying place: crates to search, and what makes it look lived in. */
+  private planSiteProps() {
+    const rng = new RNG(9173);
+    const inBuilding = (x: number, z: number, pad: number) =>
+      this.world.buildings.some((b) => {
+        const [w, d] = BUILDING_FOOTPRINT[b.type];
+        const dx = x - b.x, dz = z - b.z, c = Math.cos(b.rot), s = Math.sin(b.rot);
+        return Math.abs(dx * c - dz * s) < w / 2 + pad && Math.abs(dx * s + dz * c) < d / 2 + pad;
+      });
+    // [kind, right, forward] in the site's own frame (forward = the way its doors face)
+    const DRESSING: Record<SiteKind, [string, number, number][]> = {
+      lodge: [['stone_fire_pit', -3.5, 7], ['wooden_crate_01', 4, 6.5], ['Barrel_01', 5.2, 5.8], ['dry_branches_medium_01', -6, 9]],
+      farm: [['wooden_crate_01', 2, 6], ['wooden_crate_01', 3.2, 6.6], ['old_tyre', -1, 7.5], ['barrel_03', 15, 6], ['covered_car', -14, -8]],
+      post: [['concrete_road_barrier', -4, 9], ['concrete_road_barrier', 0, 10], ['concrete_road_barrier', 4, 9], ['wooden_military_crate', 5.5, 3], ['old_military_crate@0', 6.6, 1.2], ['Barrel_01', -4.5, -6]],
+      yard: [['wooden_crate_01', -4, 8], ['wooden_crate_01', -5.4, 8.6], ['wooden_crate_01', 5, 9], ['Barrel_01', 7, 8], ['barrel_03', 7.9, 8.9], ['old_tyre', 2, 11], ['dry_branches_medium_01', -9, 11]],
+      dacha: [['covered_car', 9, -6], ['wooden_crate_01', -7, 5], ['metal_trash_can@0', -6.2, 3.4], ['trashbag', -8, 3]],
+    };
+    for (const st of this.world.sites) {
+      const c = Math.cos(st.rot), s = Math.sin(st.rot);
+      for (const [kind, right, fwd] of DRESSING[st.kind]) {
+        const x = st.x + right * c + fwd * s, z = st.z - right * s + fwd * c;
+        if (inBuilding(x, z, kind === 'covered_car' ? 2.6 : 1.1)) continue;
+        // nor on top of what already lies in the yard
+        const room = kind === 'covered_car' ? 3.2 : 1.15;
+        if (this.world.props.some((q) => !q.far && Math.hypot(q.x - x, q.z - z) < (q.kind.startsWith('covered_car') ? 3.2 : room))) continue;
+        const turn = kind === 'concrete_road_barrier' ? st.rot + Math.atan2(right, 9) * 0.6 : kind === 'covered_car' ? st.rot + rng.range(-0.3, 0.3) : rng.range(0, Math.PI * 2);
+        this.world.props.push({ kind, x, y: heightAt(this.world.heights, x, z) + (kind === 'old_tyre' ? 0.08 : 0), z, rot: turn, scale: 1 });
+      }
+    }
   }
 
   private push(key: MatKey, g: THREE.BufferGeometry) {
@@ -499,6 +536,7 @@ export class Buildings {
 
   private planBuilding(plot: BuildingPlot) {
     const rng = new RNG(plot.seed);
+    const firstPoint = this.lootPoints.length;
     const bp = blueprint(plot.type, rng);
     const B = new THREE.Matrix4().compose(
       new THREE.Vector3(plot.x, plot.floorY, plot.z),
@@ -695,9 +733,17 @@ export class Buildings {
       });
     }
 
+    // where a weapon is always to be found: on the floor first (anything fits there)
+    if (plot.arms) {
+      const mine = this.lootPoints.slice(firstPoint);
+      const pick = [...mine.filter((p) => p.floor), ...mine.filter((p) => !p.floor)].slice(0, plot.arms);
+      for (const p of pick) p.arms = plot.type === 'police' || plot.type === 'guardpost' ? 'guns' : 'any';
+    }
+
     // yard clutter
     const yard = ['Barrel_01', 'barrel_03', 'wooden_crate_01', 'cardboard_box_01', 'metal_trash_can', 'old_tyre', 'trashbag', 'trashbag', 'cardboard_box_01'];
     const n = plot.type === 'guardpost' ? 1 : rng.int(2, 5);
+    const placed: THREE.Vector3[] = [];
     for (let i = 0; i < n; i++) {
       const side = rng.int(0, 3);
       let lx: number, lz: number;
@@ -706,6 +752,9 @@ export class Buildings {
       else if (side === 2) { lx = hw + rng.range(0.5, 1.4); lz = rng.range(-hd, hd); }
       else { lx = rng.chance(0.5) ? -hw + 0.6 : hw - 0.6; lz = hd + rng.range(0.6, 1.4); }
       const p = new THREE.Vector3(lx, 0, lz).applyMatrix4(B);
+      // never two things in the one spot
+      if (placed.some((q) => Math.hypot(q.x - p.x, q.z - p.z) < 1.15)) continue;
+      placed.push(p);
       let kind = rng.pick(yard);
       // one can per placement (the source file has a clean and a rusty one)
       if (kind === 'metal_trash_can') kind += rng.chance(0.5) ? '@0' : '@1';
@@ -719,7 +768,8 @@ export class Buildings {
     }
     if ((plot.type === 'house_small' || plot.type === 'house_brick') && rng.chance(0.3)) {
       const p = new THREE.Vector3(hw + 2.6, 0, rng.range(-1, 1)).applyMatrix4(B);
-      this.world.props.push({ kind: 'covered_car', x: p.x, y: heightAt(this.world.heights, p.x, p.z), z: p.z, rot: plot.rot + rng.range(-0.15, 0.15), scale: 1 });
+      // (not parked on the bins)
+      if (!placed.some((q) => Math.hypot(q.x - p.x, q.z - p.z) < 2.6)) this.world.props.push({ kind: 'covered_car', x: p.x, y: heightAt(this.world.heights, p.x, p.z), z: p.z, rot: plot.rot + rng.range(-0.15, 0.15), scale: 1 });
     }
     if (plot.type === 'cabin') {
       const p = new THREE.Vector3(-1.5, 0, hd + 3.2).applyMatrix4(B);

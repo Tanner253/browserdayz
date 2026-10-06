@@ -7,7 +7,7 @@ import type RAPIER from '@dimforge/rapier3d-compat';
 import { physics, GLASS_GROUPS, HITBOX_GROUPS, SOLID_GROUPS, type Surface } from '../core/physics';
 import { audio } from '../core/audio';
 import type { Atmosphere } from '../world/atmosphere';
-import { F_CROUCH, F_DEAD, F_GROUND, type Pose } from '../net/protocol';
+import { F_AIM, F_CROUCH, F_DEAD, F_GROUND, type Pose } from '../net/protocol';
 import { Avatar } from './avatar';
 import { lookFor } from './look';
 import type { Damageable, HitZone } from './weapons';
@@ -43,6 +43,7 @@ export class RemotePlayer implements Damageable {
   private stride = 0;
   private fall = 0;
   private grounded = true;
+  private aiming = false;
   private flinch = 0;
   private ready = false;
   private heldKey = '';
@@ -107,6 +108,11 @@ export class RemotePlayer implements Damageable {
     for (const c of this.crouch) c.setEnabled(this.alive && this.crouched);
   }
 
+  /** they threw a punch or swung what they are holding */
+  swing() {
+    if (this.ready && this.alive) this.avatar.swing();
+  }
+
   /** your shot or blow landed on them: the server decides what it did, this is just the flinch */
   damage(): boolean {
     this.flinch = 1;
@@ -141,6 +147,7 @@ export class RemotePlayer implements Damageable {
       this.yaw = lerpAngle(a.p[3], b.p[3], Math.min(1, k));
       this.pitch = a.p[4] + (b.p[4] - a.p[4]) * Math.min(1, k);
       this.grounded = !!(b.p[5] & F_GROUND);
+      this.aiming = !!(b.p[5] & F_AIM);
       const crouched = !!(b.p[5] & F_CROUCH);
       if (crouched !== this.crouched) {
         this.crouched = crouched;
@@ -157,7 +164,7 @@ export class RemotePlayer implements Damageable {
     this.body.setNextKinematicRotation({ x: 0, y: Math.sin(half), z: 0, w: Math.cos(half) });
 
     this.flinch = Math.max(0, this.flinch - dt * 4);
-    this.avatar.update(dt, this.pos, this.vel, this.yaw, this.crouched, !this.alive, false, this.pitch, this.grounded);
+    this.avatar.update(dt, this.pos, this.vel, this.yaw, this.crouched, !this.alive, false, this.pitch, this.grounded, this.aiming);
     const r = this.avatar.root;
     if (!this.alive) {
       // they go down, lie there for a moment, then the body on the ground takes over

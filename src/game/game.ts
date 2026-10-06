@@ -19,10 +19,11 @@ import { Economy, type WorldLoot } from '../sim/economy';
 import { CRATE_RESTOCK, CRATE_SPECS, fillCrate } from '../sim/crates';
 import { loadSave, writeSave, type SaveData } from '../sim/save';
 import { Net, playerName, publicId, remoteServer, serverStatus, setPlayerName } from '../net/client';
-import { F_AIM, F_CROUCH, F_DEAD, F_GROUND, F_SPRINT, crateId, type CorpseInfo, type PlayerInfo, type Pose, type S2C, type StashInfo } from '../net/protocol';
+import { F_AIM, F_CROUCH, F_DEAD, F_GROUND, F_SPRINT, MAX_STAMINA, crateId, type CorpseInfo, type PlayerInfo, type Pose, type S2C, type StashInfo } from '../net/protocol';
 import { Player } from './player';
 import { Avatar, AVATAR_LAYER, FP_BODY_LAYER } from './avatar';
 import { lookFor } from './look';
+import { roadLift } from '../world/road';
 import { Dummy } from './character';
 import { CorpseBody, RemotePlayer } from './remote';
 import { CameraDirector } from './camera';
@@ -58,7 +59,7 @@ interface TimedAction {
 }
 
 /** bump when the map's loot points change: spawned loot from older saves is re-rolled */
-const LOOT_REV = 5;
+const LOOT_REV = 6;
 const QUICK_KEYS = ['Digit5', 'Digit6', 'Digit7', 'Digit8'];
 const SEND_HZ = 15;
 
@@ -139,6 +140,7 @@ export class Game {
     this.loot = new LootManager(r.scene, atmo, buildings.lootPoints);
     await this.loot.preload();
     this.loot.onPlaced = (l) => this.lootPlaced(l);
+    this.loot.lift = (x, z) => roadLift(world, x, z);
     this.applyGraphics(this.gfx);
     this.economy = new Economy(buildings.lootPoints, {
       spawn: (l) => this.loot.spawn(l),
@@ -164,6 +166,11 @@ export class Game {
     this.weapons.resolveTarget = (owner) => (owner instanceof Dummy || owner instanceof RemotePlayer ? owner : null);
     this.weapons.onHit = (h) => this.onHit(h);
     this.weapons.onShot = (s) => this.net.send({ t: 'shot', o: s.origin.toArray(), d: s.dir.toArray(), w: s.weapon, sup: s.suppressed });
+    // a punch or a swing: your own body throws it, and everyone near you sees it
+    this.weapons.onSwing = () => {
+      this.avatar.swing();
+      this.net.send({ t: 'swing' });
+    };
     progress('compiling shaders');
     this.weapons.precompile((scene, camera) => r.precompile(scene, camera));
     // every loot model's material, so entering a house never compiles mid-game
@@ -265,7 +272,7 @@ export class Game {
       places: [
         { name: town.name, x: town.x, z: town.z, kind: 'town' },
         ...(station ? [{ name: 'Police station', x: station.x, z: station.z, kind: 'police' as const }] : []),
-        ...world.pois.slice(1).map((q) => ({ name: q.name, x: q.x, z: q.z, kind: 'post' as const })),
+        ...world.pois.slice(1).map((q) => ({ name: q.name, x: q.x, z: q.z, kind: world.sites.some((st) => st.name === q.name) ? ('site' as const) : ('post' as const) })),
       ],
     });
     this.hud.showStart(true);
@@ -352,7 +359,7 @@ export class Game {
     this.inv.add(makeItem(pick(['sprats', 'beans', 'sardines', 'tomatoes'])));
     this.inv.add(makeItem(pick(['thermos', 'milk'])));
     this.inv.add(this.makeTag());
-    this.player.vitals = { health: 100, energy: 80, water: 80, stamina: 100, bleeding: false };
+    this.player.vitals = { health: 100, energy: 80, water: 80, stamina: MAX_STAMINA, bleeding: false };
     this.weapons.validate();
     this.refreshQuick();
   }
@@ -514,6 +521,7 @@ export class Game {
       }
     });
     net.on('shot', (m) => this.weapons.remoteShot(new THREE.Vector3(...m.o), new THREE.Vector3(...m.d), m.w, m.sup));
+    net.on('swing', (m) => this.remotes.get(m.id)?.swing());
     net.on('dmg', (m) => this.takeHit(m));
     net.on('death', (m) => {
       const k = m.k;
@@ -609,8 +617,9 @@ export class Game {
     const def = ITEMS[id];
     const obj = this.weapons.worldModel(id, mods);
     const grips = this.weapons.gripsOf(id);
-    if (!obj || !grips || !def?.weapon) return null;
-    return { obj, grips, kind: def.weapon.kind };
+    if (!obj || !grips) return null;
+    if (def?.weapon) return { obj, grips, kind: def.weapon.kind };
+    return def?.melee ? { obj, grips, kind: 'melee' as const } : null;
   };
 
   private async addRemote(p: PlayerInfo) {
@@ -1343,7 +1352,7 @@ export class Game {
     r.vmScene.visible = fpView;
     const interp = new THREE.Vector3().lerpVectors(p.prevPos, p.pos, physics.alpha);
     const first = this.director.mode === 'first';
-    this.avatar.update(dt, interp, p.vel, p.yaw, p.crouched, p.dead, first, first ? 0 : p.pitch, p.grounded);
+    this.avatar.update(dt, interp, p.vel, p.yaw, p.crouched, p.dead, first, first ? 0 : p.pitch, p.grounded, this.weapons.aiming);
     for (const d of this.dummies) {
       if (Math.abs(d.pos.x - interp.x) + Math.abs(d.pos.z - interp.z) < 260) d.update(dt);
     }
@@ -1413,7 +1422,8 @@ export class Game {
       this.inForest = this.s.terrain.surfaceAt(p.pos.x, p.pos.z) === 'dirt';
     }
     audio.updateAmbience(dt, cam.position, this.indoors, this.inForest);
-    if (this.started) audio.body(dt, v.stamina, v.health, !p.dead);
+    // breathing follows how much of the reserve is left, as a percentage
+    if (this.started) audio.body(dt, (v.stamina / MAX_STAMINA) * 100, v.health, !p.dead);
 
     // post-fx reacting to state
     const hurt = p.hurt;

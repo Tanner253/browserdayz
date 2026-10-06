@@ -302,6 +302,8 @@ export class LootManager {
 
   /** Can this item type lie at this loot point without hanging off or poking through it? */
   fits = fitsPoint;
+  /** extra height of the visible surface over the ground that is collided with (the road's asphalt) */
+  lift: (x: number, z: number) => number = () => 0;
 
   spawn(l: WorldLoot) {
     this.pending.add(l.uid);
@@ -414,7 +416,7 @@ export class LootManager {
           }
           if (!supported) continue;
           l.x = x;
-          l.y = y + 0.004;
+          l.y = y + 0.004 + this.lift(x, z);
           l.z = z;
           l.rot = rot;
           return n;

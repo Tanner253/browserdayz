@@ -11,7 +11,7 @@ import type { SerializedInventory } from '../sim/inventory';
 import type { WorldLoot } from '../sim/economy';
 import type { HitZone } from '../sim/combat';
 
-export const PROTOCOL = 3;
+export const PROTOCOL = 4;
 
 /** chat channels: everyone on the server, or only players standing near the speaker */
 export type ChatChannel = 'global' | 'near';
@@ -23,6 +23,9 @@ export const F_CROUCH = 1, F_SPRINT = 2, F_AIM = 4, F_GROUND = 8, F_DEAD = 16;
 
 /** [x, y, z, yaw, pitch, flags] */
 export type Pose = [number, number, number, number, number, number];
+
+/** a full stamina reserve: about 27 seconds of sprinting */
+export const MAX_STAMINA = 300;
 
 export interface Vitals {
   health: number;
@@ -71,6 +74,7 @@ export type C2S =
   | { t: 'hello'; v: number; key: string; name: string }
   | { t: 's'; p: Pose; w: string | null; m: string[] }
   | { t: 'shot'; o: [number, number, number]; d: [number, number, number]; w: string; sup: boolean }
+  | { t: 'swing' }
   | { t: 'hit'; to: number; zone: HitZone; w: string; dist: number; sup: boolean; bonus: number }
   | { t: 'take'; uid: string }
   | { t: 'drop'; l: WorldLoot }
@@ -108,6 +112,7 @@ export type S2C =
   | { t: 'leave'; id: number }
   | { t: 'ps'; s: [number, ...Pose, string | null, string[]][] }
   | { t: 'shot'; id: number; o: [number, number, number]; d: [number, number, number]; w: string; sup: boolean }
+  | { t: 'swing'; id: number }
   | { t: 'dmg'; from: number; amount: number; zone: HitZone; w: string; dir: [number, number, number] }
   | { t: 'hitok'; to: number; amount: number; zone: HitZone }
   | { t: 'death'; k: KillInfo; corpse: CorpseInfo | null }

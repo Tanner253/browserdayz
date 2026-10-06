@@ -738,7 +738,9 @@
 .start-map .m-police path { fill: var(--accent); }
 .start-map text { fill: var(--ink); font-family: var(--font); font-size: 40px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; paint-order: stroke; stroke: #0b0d0c; stroke-width: 8px; }
 .start-map figcaption { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 10px; white-space: nowrap; font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); }
+.start-map .m-site rect { fill: var(--accent); stroke: var(--panel-solid); stroke-width: 3; }
 .lg-spawn { width: 8px; height: 8px; border-radius: 50%; background: var(--ink); }
+.lg-site { width: 7px; height: 7px; margin-left: 10px; background: var(--accent); transform: rotate(45deg); }
 .lg-loot { width: 14px; height: 8px; margin-left: 10px; background: linear-gradient(90deg, rgba(201, 178, 124, 0.1), var(--accent)); }
 
 .start-loop { list-style: none; margin: 0; padding: 0; }

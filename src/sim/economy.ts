@@ -20,28 +20,46 @@ export interface TypeRule {
   usage: Usage[];
   qty?: [number, number]; // stack quantity range as fraction of max stack
   loaded?: [number, number]; // rounds loaded for weapons
+  /** how much likelier a point of that kind of building is to get it (1 when not listed) */
+  favour?: Partial<Record<Usage, number>>;
 }
+
+/** every kind of building there is */
+const ANYWHERE: Usage[] = ['Village', 'Town', 'Farm', 'Industrial', 'Military', 'Hunting', 'Medic', 'Police'];
+/** guns turn up everywhere, but the armoury and the army's posts are where they were kept */
+const ARMOURY = { Police: 12, Military: 5, Hunting: 2 };
+
+/**
+ * What is left at an armed loot point (the first building of every outlying place, the
+ * guard posts, the police armoury): always something to fight with, put back a few
+ * minutes after it is taken. [item, weight]
+ */
+const ARMS: [string, number][] = [['p38', 2.4], ['mosin', 1.2], ['hatchet', 1.6], ['bat', 1.6], ['crowbar', 1.4], ['machete', 1.4], ['knife', 1]];
+/** seconds an armed point stays bare once its weapon has been taken */
+export const ARMS_RESTOCK = 240;
 
 export const TYPES: Record<string, TypeRule> = {
   // firearms: the police station in the middle of the map and the military checkpoint
-  mosin: { nominal: 4, min: 2, lifetime: 7200, restock: 1500, usage: ['Military', 'Police', 'Hunting'], loaded: [0, 3] },
-  p38: { nominal: 6, min: 3, lifetime: 7200, restock: 1000, usage: ['Police', 'Military', 'Town'], loaded: [0, 4] },
+  // firearms: in any building, far more of them in the police station in the middle of the
+  // map and at the army's posts
+  mosin: { nominal: 14, min: 9, lifetime: 7200, restock: 420, usage: ANYWHERE, favour: ARMOURY, loaded: [1, 4] },
+  p38: { nominal: 20, min: 13, lifetime: 7200, restock: 300, usage: ANYWHERE, favour: ARMOURY, loaded: [2, 6] },
   // loose rounds turn up in small handfuls; sealed boxes are the real find
-  ammo_762: { nominal: 5, min: 2, lifetime: 3600, restock: 600, usage: ['Military', 'Police', 'Hunting'], qty: [0.15, 0.5] },
-  ammo_9mm: { nominal: 7, min: 3, lifetime: 3600, restock: 600, usage: ['Police', 'Military', 'Town', 'Village'], qty: [0.15, 0.5] },
-  box_762: { nominal: 4, min: 2, lifetime: 3600, restock: 900, usage: ['Military', 'Police', 'Hunting'] },
-  box_9mm: { nominal: 6, min: 3, lifetime: 3600, restock: 900, usage: ['Police', 'Military', 'Town'] },
+  ammo_762: { nominal: 18, min: 11, lifetime: 3600, restock: 240, usage: ANYWHERE, favour: ARMOURY, qty: [0.15, 0.5] },
+  ammo_9mm: { nominal: 24, min: 15, lifetime: 3600, restock: 240, usage: ANYWHERE, favour: ARMOURY, qty: [0.15, 0.5] },
+  box_762: { nominal: 9, min: 5, lifetime: 3600, restock: 480, usage: ['Military', 'Police', 'Hunting', 'Farm', 'Industrial'], favour: ARMOURY },
+  box_9mm: { nominal: 12, min: 7, lifetime: 3600, restock: 480, usage: ['Police', 'Military', 'Town', 'Village'], favour: ARMOURY },
   // attachments
   pu_scope: { nominal: 2, min: 1, lifetime: 7200, restock: 1800, usage: ['Police', 'Military'] },
   rifle_wrap: { nominal: 2, min: 1, lifetime: 7200, restock: 1500, usage: ['Military', 'Hunting'] },
   suppressor_9: { nominal: 2, min: 1, lifetime: 7200, restock: 1800, usage: ['Police'] },
   mag_p38_ext: { nominal: 3, min: 1, lifetime: 7200, restock: 1200, usage: ['Police', 'Military'] },
   // melee
-  hatchet: { nominal: 3, min: 1, lifetime: 3600, restock: 900, usage: ['Farm', 'Hunting', 'Village'] },
-  machete: { nominal: 2, min: 1, lifetime: 3600, restock: 900, usage: ['Farm', 'Village'] },
-  crowbar: { nominal: 3, min: 1, lifetime: 3600, restock: 900, usage: ['Industrial', 'Farm'] },
-  bat: { nominal: 3, min: 1, lifetime: 3600, restock: 900, usage: ['Village', 'Town'] },
-  knife: { nominal: 5, min: 2, lifetime: 3600, restock: 600, usage: ['Village', 'Town', 'Farm', 'Hunting'] },
+  hatchet: { nominal: 10, min: 6, lifetime: 3600, restock: 240, usage: ANYWHERE, favour: { Farm: 2, Hunting: 2 } },
+  machete: { nominal: 8, min: 5, lifetime: 3600, restock: 240, usage: ANYWHERE, favour: { Farm: 2 } },
+  crowbar: { nominal: 10, min: 6, lifetime: 3600, restock: 240, usage: ANYWHERE, favour: { Industrial: 2 } },
+  bat: { nominal: 10, min: 6, lifetime: 3600, restock: 240, usage: ANYWHERE, favour: { Village: 2, Town: 2 } },
+  knife: { nominal: 16, min: 10, lifetime: 3600, restock: 240, usage: ANYWHERE },
   // food and drink
   sprats: { nominal: 10, min: 5, lifetime: 2400, restock: 300, usage: ['Village', 'Town'] },
   condensed: { nominal: 6, min: 3, lifetime: 2400, restock: 300, usage: ['Village', 'Town', 'Military'] },
@@ -112,22 +130,35 @@ export class Economy {
     return n;
   }
 
-  private pickPoint(id: string, usage: Usage[]): number {
+  private pickPoint(id: string, rule: TypeRule): number {
     const candidates: number[] = [];
+    const weights: number[] = [];
+    let total = 0;
     this.points.forEach((p, i) => {
-      if (this.pointBusy.has(i)) return;
-      if (!p.usage.some((u) => usage.includes(u))) return;
+      // armed points are stocked on their own (see arm)
+      if (p.arms || this.pointBusy.has(i)) return;
+      if (!p.usage.some((u) => rule.usage.includes(u))) return;
       // a rifle never spawns on a narrow shelf, a jerrycan never on a barrel
-      if (this.fits(id, p)) candidates.push(i);
+      if (!this.fits(id, p)) return;
+      let w = 1;
+      if (rule.favour) for (const u of p.usage) w = Math.max(w, rule.favour[u] ?? 1);
+      candidates.push(i);
+      weights.push(w);
+      total += w;
     });
     if (!candidates.length) return -1;
-    return candidates[Math.floor(this.rng.next() * candidates.length)];
+    let r = this.rng.next() * total;
+    for (let k = 0; k < candidates.length; k++) {
+      r -= weights[k];
+      if (r <= 0) return candidates[k];
+    }
+    return candidates[candidates.length - 1];
   }
 
-  private spawnType(id: string): boolean {
+  private spawnType(id: string, at = -1): boolean {
     const rule = TYPES[id];
     const def = ITEMS[id];
-    const pi = this.pickPoint(id, rule.usage);
+    const pi = at >= 0 ? at : this.pickPoint(id, rule);
     if (pi < 0) return false;
     const p = this.points[pi];
     const item = makeItem(id);
@@ -149,8 +180,43 @@ export class Economy {
     return true;
   }
 
+  /** when each armed point was found bare */
+  private bare = new Map<number, number>();
+
+  /** Puts a weapon at every armed point that has been bare long enough (at once, when `now`). */
+  private arm(now = false) {
+    this.points.forEach((p, i) => {
+      if (!p.arms) return;
+      if (this.pointBusy.has(i)) {
+        this.bare.delete(i);
+        return;
+      }
+      if (!now) {
+        if (!this.bare.has(i)) this.bare.set(i, this.time);
+        if (this.time - this.bare.get(i)! < ARMS_RESTOCK) return;
+      }
+      // a few tries: a rifle will not lie on a shelf
+      const table = p.arms === 'guns' ? ARMS.filter(([id]) => ITEMS[id].weapon) : ARMS;
+      const total = table.reduce((s, [, w]) => s + w, 0);
+      for (let tries = 0; tries < 6; tries++) {
+        let r = this.rng.next() * total;
+        let id = table[0][0];
+        for (const [tid, w] of table) {
+          r -= w;
+          if (r <= 0) {
+            id = tid;
+            break;
+          }
+        }
+        if (this.fits(id, p) && this.spawnType(id, i)) break;
+      }
+      this.bare.delete(i);
+    });
+  }
+
   /** Initial fill up to nominal. */
   populate() {
+    this.arm(true);
     // interleave types so scarce ones still find free points
     const ids = Object.keys(TYPES);
     let progress = true;
@@ -210,6 +276,7 @@ export class Economy {
       const life = rule ? rule.lifetime : 3600;
       if (this.time - l.spawnedAt > life && !near(l)) this.take(l.uid);
     }
+    this.arm();
     for (const [id, rule] of Object.entries(TYPES)) {
       const n = this.count(id);
       if (n >= rule.min) continue;

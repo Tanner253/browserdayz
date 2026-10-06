@@ -51,10 +51,34 @@ export const POSE = {
   maxTwist: 1.35,
   /** how much of the body a hit takes over at its peak */
   flinch: 0.75,
+  /** landing: how far into the crouch the knees give, and for how long (seconds) */
+  landing: [0.5, 0.34] as [number, number],
+  /** how long a blow with the right arm takes, seconds */
+  swing: 0.42,
+  /** how much of the aim's pitch the neck and head add on top of the chest's lean */
+  headPitch: 0.5,
   /** A weapon in the hands: where it sits from the shoulder pivot, and how the body takes it up. */
   hold: {
-    long: [0.065, -0.06, -0.635] as [number, number, number],
-    pistol: [0.06, 0.02, -0.42] as [number, number, number],
+    /**
+     * Three ways of holding each kind, blended by what the player is doing. `p` is where the
+     * weapon's own origin sits from the point between the shoulders (x right, y up, z back),
+     * `r` how it is turned from pointing down the aim: [nose up, nose left, roll], radians.
+     *   ready: standing or walking, not aiming. Butt in the shoulder, muzzle dipped.
+     *   aim:   sights up to the eye.
+     *   carry: jogging or sprinting. A long gun goes across the chest, a pistol points at the ground.
+     */
+    long: {
+      ready: { p: [0.065, -0.19, -0.65], r: [-0.16, 0, 0] },
+      aim: { p: [0.05, 0.1, -0.6], r: [0, 0, 0] },
+      carry: { p: [-0.07, -0.07, -0.34], r: [0.656, 0.88, 0] },
+    } as Stances,
+    pistol: {
+      ready: { p: [0.05, -0.1, -0.32], r: [-0.25, 0, 0] },
+      aim: { p: [0.035, 0.115, -0.44], r: [0, 0, 0] },
+      carry: { p: [0.08, -0.24, -0.24], r: [-0.75, 0, 0] },
+    } as Stances,
+    /** the point the weapon hangs from, measured from midway between the shoulder joints: [up, back] */
+    pivot: [0.04, -0.04] as [number, number],
     /** long guns: the chest turns this far off the aim, left shoulder leading, radians */
     blade: 0.5,
     /** and the left shoulder comes forward this much more */
@@ -63,6 +87,12 @@ export const POSE = {
     slide: 0.3,
   },
 };
+
+interface Stance {
+  p: [number, number, number];
+  r: [number, number, number];
+}
+type Stances = Record<'ready' | 'aim' | 'carry', Stance>;
 
 interface ArmRig {
   arm: THREE.Bone;
@@ -86,6 +116,9 @@ const _m2 = new THREE.Matrix4();
 const _aimQ = new THREE.Quaternion();
 const _right = new THREE.Vector3();
 const _slide = new THREE.Vector3();
+const _qa = new THREE.Quaternion();
+const _qb = new THREE.Quaternion();
+const _euler = new THREE.Euler();
 const UP = new THREE.Vector3(0, 1, 0);
 
 const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
@@ -122,6 +155,9 @@ export class Avatar {
   private downT = 0;
   /** seconds into the flinch from a hit (-1 = none) */
   private hitT = -1;
+  /** seconds since the feet came back down after being in the air (-1 = long ago) */
+  private landT = -1;
+  private wasAir = false;
   private clock = Math.random() * 10;
   /** where in the stride the legs are, 0..1: shared by every stepping clip so they blend in step */
   private phase = Math.random();
@@ -131,7 +167,14 @@ export class Avatar {
   private layerMask = 1;
   /** weapon in the hands: pivot (at the shoulders, pitches with the aim) > the model */
   private heldPivot = new THREE.Group();
-  private held: { obj: THREE.Object3D; grips: Grips; long: boolean } | null = null;
+  private held: { obj: THREE.Object3D; grips: Grips; long: boolean; base: THREE.Quaternion } | null = null;
+  /** a one-handed weapon in the right fist */
+  private inHand: { obj: THREE.Object3D; curl: [number, number, number, number] } | null = null;
+  /** seconds into a swing of the right arm (-1 = not swinging) */
+  private swingT = -1;
+  // how far the weapon is up at the eye, and how far it is in its running carry, 0..1
+  private aimT = 0;
+  private carryT = 0;
   slung = new THREE.Group();
   private uniforms?: LookUniforms;
   private hair: (THREE.Object3D | undefined)[] = [];
@@ -186,7 +229,15 @@ export class Avatar {
           atmo.register(mat);
           this.hairMats.push(mat);
           m.material = mat;
-        } else atmo.register(src);
+        } else {
+          // the whites of the eyes are modelled paper white, which glows in a shaded face
+          if (!src.userData.toned) {
+            src.userData.toned = true;
+            src.color.multiplyScalar(0.72);
+            src.roughness = Math.max(src.roughness, 0.5);
+          }
+          atmo.register(src);
+        }
         mats.set(m.name, m.material as THREE.Material);
       }
       o.layers.set(layer);
@@ -307,14 +358,44 @@ export class Avatar {
   setHeld(obj: THREE.Object3D | null, grips: Grips | null, kind: 'rifle' | 'pistol' | 'auto' | 'melee' = 'rifle') {
     this.heldPivot.clear();
     this.held = null;
-    if (!obj || !grips || kind === 'melee') return;
+    this.inHand?.obj.removeFromParent();
+    this.inHand = null;
+    if (!obj || !grips) return;
     obj.traverse((o) => {
       o.layers.mask = this.layerMask;
       const m = o as THREE.Mesh;
       if (m.isMesh) m.castShadow = true;
     });
+    if (kind === 'melee') {
+      // A hatchet, a bat: carried in the right fist, so it swings with the arm as the body
+      // walks. The grip (wrist position, finger and palm directions in the weapon's own
+      // space) is laid onto the hand's own frame.
+      const r = this.armR, g = grips.right;
+      if (!r || !g) return;
+      // the grip is written in the weapon's own space: bring it out through the weapon's own
+      // placement first, so it is right however the model happens to be turned
+      obj.updateMatrix();
+      const P = g.pos.clone().applyMatrix4(obj.matrix);
+      const F = g.fingers.clone().applyQuaternion(obj.quaternion).normalize();
+      const N = g.palm.clone().applyQuaternion(obj.quaternion);
+      N.sub(F.clone().multiplyScalar(N.dot(F))).normalize();
+      const Lf = r.fingersLocal;
+      const Lp = r.palmLocal.clone().sub(Lf.clone().multiplyScalar(r.palmLocal.dot(Lf))).normalize();
+      _m1.makeBasis(F, N, new THREE.Vector3().crossVectors(F, N));
+      _m2.makeBasis(Lf, Lp, new THREE.Vector3().crossVectors(Lf, Lp));
+      const fist = new THREE.Group();
+      fist.quaternion.setFromRotationMatrix(_m2.multiply(_m1.transpose()));
+      // the hand is a bone of a scaled body: the weapon keeps its own size
+      const k = 1 / BODY_SCALE;
+      fist.scale.setScalar(k);
+      fist.position.copy(P).applyQuaternion(fist.quaternion).multiplyScalar(-k);
+      fist.add(obj);
+      r.hand.add(fist);
+      this.inHand = { obj: fist, curl: g.curl };
+      return;
+    }
     this.heldPivot.add(obj);
-    this.held = { obj, grips, long: kind !== 'pistol' };
+    this.held = { obj, grips, long: kind !== 'pistol', base: obj.quaternion.clone() };
   }
 
   private setWorldQuat(bone: THREE.Object3D, world: THREE.Quaternion) {
@@ -372,11 +453,23 @@ export class Avatar {
     _m2.makeBasis(F, N, new THREE.Vector3().crossVectors(F, N));
     const handWorld = new THREE.Quaternion().setFromRotationMatrix(_m2.multiply(_m1.transpose()));
     this.setWorldQuat(r.hand, handWorld);
+    this.curl(r, grip.curl, handWorld);
+  }
+
+  /** close the fingers toward the palm, each by its own amount */
+  private curl(r: ArmRig, curl: [number, number, number, number], handWorld: THREE.Quaternion) {
+    const Lf = r.fingersLocal;
+    const Lp = r.palmLocal.clone().sub(Lf.clone().multiplyScalar(r.palmLocal.dot(Lf))).normalize();
     const curlAxis = new THREE.Vector3().crossVectors(Lf, Lp).applyQuaternion(handWorld).normalize();
     r.fingers.forEach((chain, fi) => {
-      const c = grip.curl[fi];
+      const c = curl[fi];
       chain.forEach((bone, j) => this.turn(bone, curlAxis, c * (j === 0 ? 0.8 : j === 1 ? 1.1 : 0.8)));
     });
+  }
+
+  /** A blow with whatever is in the right hand (or the fist). */
+  swing() {
+    this.swingT = 0;
   }
 
   /** A shot or a blow landed: the body jolts. */
@@ -393,8 +486,9 @@ export class Avatar {
    * @param firstPerson the body squares up to the look direction (it is what you see when you look down)
    * @param pitch aim pitch in radians: the chest and the held weapon follow it
    * @param grounded feet on the ground (false while jumping or falling)
+   * @param aiming weapon up at the eye
    */
-  update(dt: number, pos: THREE.Vector3, velocity: THREE.Vector3, facingYaw: number, crouched: boolean, dead: boolean, firstPerson = false, pitch = 0, grounded = true) {
+  update(dt: number, pos: THREE.Vector3, velocity: THREE.Vector3, facingYaw: number, crouched: boolean, dead: boolean, firstPerson = false, pitch = 0, grounded = true, aiming = false) {
     const ease = (rate: number) => 1 - Math.exp(-rate * dt);
     const speedNow = Math.hypot(velocity.x, velocity.z);
     this.speed += (speedNow - this.speed) * ease(12);
@@ -430,9 +524,20 @@ export class Avatar {
 
     // --- how much of each clip
     const down = dead ? Math.min(1, this.downT / 0.15) : 0;
+    // coming down from a jump or a drop, the knees give for a moment: a dip into the crouch
+    const inAir = !grounded && !dead;
+    if (this.wasAir && !inAir && this.airT > 0.45) this.landT = 0;
+    this.wasAir = inAir;
+    let give = 0;
+    if (this.landT >= 0) {
+      this.landT += dt;
+      if (this.landT > POSE.landing[1]) this.landT = -1;
+      else give = POSE.landing[0] * Math.sin(Math.PI * Math.pow(this.landT / POSE.landing[1], 0.6));
+    }
+    const bent = Math.max(this.crouchT, give);
     const feet = (1 - this.airT) * (1 - down);
-    const stand = feet * (1 - this.crouchT);
-    const duck = feet * this.crouchT;
+    const stand = feet * (1 - bent);
+    const duck = feet * bent;
     const move = this.moveT;
     const runK = THREE.MathUtils.clamp((speed - POSE.walkTop) / (POSE.pace.run - POSE.walkTop), 0, 1);
     let hit = 0;
@@ -484,7 +589,9 @@ export class Avatar {
     this.root.rotation.set(0, this.yaw + this.twist, 0);
     this.heldPivot.visible = !dead;
     this.heldPivot.rotation.set(pitch, -this.twist, 0);
-    if (this.held) this.held.obj.position.fromArray(this.held.long ? POSE.hold.long : POSE.hold.pistol);
+    this.aimT += ((aiming && !dead ? 1 : 0) - this.aimT) * ease(12);
+    this.carryT += (THREE.MathUtils.smoothstep(speed, 2.6, 3.6) * (1 - this.aimT) - this.carryT) * ease(7);
+    const carry = this.carryT * (1 - this.aimT);
 
     const lean = !dead && (this.held || Math.abs(pitch) > 0.02);
     const lift = POSE.crouchLift * this.crouchT;
@@ -496,24 +603,69 @@ export class Avatar {
       _right.set(1, 0, 0).applyQuaternion(aimQ);
       // a long gun is held across the body: chest turned off the aim, left shoulder leading,
       // the head still looking down the barrel
-      const blade = this.held?.long ? POSE.hold.blade : 0;
+      // (and square again for a run, the gun carried across the chest)
+      const blade = this.held?.long ? POSE.hold.blade * (1 - carry) : 0;
       for (const b of this.spine) {
         this.turn(b, UP, (-this.twist - blade) / n);
         if (lift) this.turn(b, _right, lift / n);
       }
-      if (blade) {
-        for (const b of this.neck) this.turn(b, UP, blade / this.neck.length);
-        if (this.collarL) this.turn(this.collarL, UP, -POSE.hold.reach);
-      }
+      if (blade) for (const b of this.neck) this.turn(b, UP, blade / this.neck.length);
       if (lean) {
         if (this.chest) this.turn(this.chest, _right, pitch * 0.45);
-        if (this.held) {
+        // and the head goes the rest of the way: you can see where somebody is looking
+        for (const b of this.neck) this.turn(b, _right, (pitch * POSE.headPitch) / this.neck.length);
+        if (this.held && this.armR && this.armL) {
+          // The weapon hangs from the shoulders, wherever the clips have taken them: down
+          // into a crouch, up and down with each stride.
+          const mid = this.armL.arm.getWorldPosition(_a).add(this.armR.arm.getWorldPosition(_b)).multiplyScalar(0.5);
+          this.root.worldToLocal(mid);
+          this.heldPivot.position.copy(_b.set(0, POSE.hold.pivot[0], POSE.hold.pivot[1]).applyAxisAngle(UP, -this.twist)).add(mid);
+          const { obj, grips, long, base } = this.held;
+          const set = long ? POSE.hold.long : POSE.hold.pistol;
+          const wAim = this.aimT, wReady = 1 - wAim - carry;
+          obj.position.set(0, 0, 0);
+          for (const [s, w] of [[set.ready, wReady], [set.carry, carry], [set.aim, wAim]] as [Stance, number][]) {
+            obj.position.x += s.p[0] * w;
+            obj.position.y += s.p[1] * w;
+            obj.position.z += s.p[2] * w;
+          }
+          const turned = (s: Stance, q: THREE.Quaternion) => q.setFromEuler(_euler.set(s.r[0], s.r[1], s.r[2], 'YXZ'));
+          turned(set.ready, _qa);
+          if (carry > 0.001) _qa.slerp(turned(set.carry, _qb), carry / Math.max(1e-4, 1 - wAim));
+          if (wAim > 0.001) _qa.slerp(turned(set.aim, _qb), wAim);
+          obj.quaternion.copy(_qa).multiply(base);
           this.heldPivot.updateMatrixWorld(true);
-          const { obj, grips } = this.held;
-          if (grips.right && this.armR) this.solveArm(this.armR, grips.right, obj, aimQ);
-          // the forward hand may sit further back along the stock than the first-person arms have it
-          if (grips.left && this.armL) this.solveArm(this.armL, grips.left, obj, aimQ, grips.right ? _slide.set(0, 0, 1).applyQuaternion(this.heldPivot.getWorldQuaternion(_q1)) : undefined);
+          // the leading shoulder comes forward to the gun
+          if (blade && this.collarL) this.turn(this.collarL, UP, -POSE.hold.reach * (1 - carry));
+          if (grips.right) this.solveArm(this.armR, grips.right, obj, aimQ);
+          // the forward hand may sit further back along the stock than the first-person arms
+          // have it: these arms are only so long
+          if (grips.left) this.solveArm(this.armL, grips.left, obj, aimQ, grips.right ? _slide.set(0, 0, 1).applyQuaternion(_qa).applyQuaternion(this.heldPivot.getWorldQuaternion(_q1)) : undefined);
         }
+      }
+    }
+
+    // --- the right arm on its own: a blow, and the fist closed round a handle
+    if (!dead && this.armR && (this.swingT >= 0 || this.inHand)) {
+      const r = this.armR;
+      if (this.swingT >= 0) {
+        this.swingT += dt;
+        const u = this.swingT / POSE.swing;
+        if (u >= 1) this.swingT = -1;
+        else {
+          // wound up behind the shoulder, then brought down across the body
+          const wind = Math.sin(Math.PI * Math.min(1, u / 0.4)) * (u < 0.4 ? 1 : 0), strike = THREE.MathUtils.smoothstep(u, 0.3, 0.6) * (1 - THREE.MathUtils.smoothstep(u, 0.7, 1));
+          this.root.updateMatrixWorld(true);
+          _right.set(1, 0, 0).applyQuaternion(_aimQ.setFromAxisAngle(UP, this.yaw));
+          this.turn(r.arm, _right, 1.5 * wind + 0.9 * strike);
+          this.turn(r.fore, _right, 0.9 * wind + 0.2 * strike);
+          this.turn(r.arm, UP, 0.5 * strike);
+          if (this.chest) this.turn(this.chest, UP, 0.25 * strike - 0.15 * wind);
+        }
+      }
+      if (this.inHand) {
+        r.hand.updateWorldMatrix(true, false);
+        this.curl(r, this.inHand.curl, r.hand.getWorldQuaternion(_qa));
       }
     }
 

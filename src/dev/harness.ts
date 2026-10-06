@@ -6,7 +6,9 @@ import * as THREE from 'three';
 import { physics } from '../core/physics';
 import { heightAt } from '../world/worldgen';
 import { makeItem } from '../sim/items';
-import { POSE } from '../game/avatar';
+import { Avatar, POSE } from '../game/avatar';
+import { lookFor } from '../game/look';
+import { MAX_STAMINA } from '../net/protocol';
 import type { Game } from '../game/game';
 
 export function installHarness(g: Game) {
@@ -28,6 +30,8 @@ export function installHarness(g: Game) {
   anyG.frame = () => {
     if (!frozen) realFrame();
   };
+  const row: Avatar[] = [];
+  let sheet: { from: THREE.Vector3; to: THREE.Vector3 } | null = null;
   const T = {
     physics,
     errors: [] as string[],
@@ -57,7 +61,7 @@ export function installHarness(g: Game) {
     },
     revive() {
       const p = g.player;
-      p.vitals = { health: 100, energy: 80, water: 80, stamina: 100, bleeding: false };
+      p.vitals = { health: 100, energy: 80, water: 80, stamina: MAX_STAMINA, bleeding: false };
       p.dead = false;
       if (g.paused && anyG.started) anyG.unpause();
     },
@@ -109,6 +113,67 @@ export function installHarness(g: Game) {
       T.aim(l.x, l.y + 0.05, l.z);
       await T.run(300);
       return { id, y: +l.y.toFixed(2), prompt: anyG.prompt as string | null };
+    },
+    /**
+     * A row of bodies frozen at successive moments of one movement, to look at an animation
+     * as a contact sheet. The camera is left looking at the row; call again to replace it.
+     * @param o.speed ground speed; o.dir which way it travels relative to where it faces (0 ahead, 1.57 to its left)
+     * @param o.view 'side' | 'front' | 'back' | 'three' (three-quarter)
+     */
+    async lineup(o: { speed?: number; dir?: number; crouch?: boolean; weapon?: string | string[]; n?: number; dead?: number; air?: boolean; pitch?: number; aim?: boolean; view?: string; name?: string; hit?: boolean; dist?: number } = {}) {
+      for (const a of row) a.dispose();
+      row.length = 0;
+      const n = o.n ?? 8;
+      const p = g.player.pos;
+      const base = new THREE.Vector3(p.x, p.y, p.z);
+      const face = o.view === 'front' ? Math.PI : o.view === 'back' ? 0 : o.view === 'three' ? Math.PI * 0.75 : Math.PI / 2;
+      const speed = o.speed ?? 0, dir = o.dir ?? 0;
+      // the way it faces is yaw: forward = (-sin, 0, -cos); travel is that turned by dir
+      const vel = new THREE.Vector3(-Math.sin(face + dir) * speed, 0, -Math.cos(face + dir) * speed);
+      for (let i = 0; i < n; i++) {
+        const a = new Avatar();
+        await a.load(g.s.atmo, 0, false, lookFor(o.name ?? `row ${i}`));
+        g.s.r.scene.add(a.root);
+        const at = new THREE.Vector3(base.x + (i - (n - 1) / 2) * 1.05, heightAt(g.s.world.heights, base.x + (i - (n - 1) / 2) * 1.05, base.z - 5), base.z - 5);
+        const wid = Array.isArray(o.weapon) ? o.weapon[i % o.weapon.length] : o.weapon;
+        if (wid) {
+          const h = anyG.makeHeld(wid, []);
+          a.setHeld(h?.obj ?? null, h?.grips ?? null, h?.kind);
+        }
+        const any = a as unknown as Record<string, any>;
+        const dead = o.dead !== undefined;
+        for (let k = 0; k < 40; k++) a.update(0.05, at, vel, face, !!o.crouch, false, false, o.pitch ?? 0, !o.air, !!o.aim);
+        any.phase = i / n;
+        if (dead) {
+          a.update(0.016, at, vel, face, !!o.crouch, true, false, 0, true);
+          any.downT = (o.dead! * (i + 1)) / n;
+        }
+        if (o.hit) {
+          a.hit();
+          any.hitT = ((i + 0.5) / n) * any.dur.hit;
+        }
+        a.update(0, at, vel, face, !!o.crouch, dead, false, o.pitch ?? 0, !o.air, !!o.aim);
+        row.push(a);
+      }
+      const cam = g.s.r.camera;
+      const d = o.dist ?? Math.max(4.2, n * 0.72);
+      const mid = new THREE.Vector3(base.x, heightAt(g.s.world.heights, base.x, base.z - 5) + (o.crouch || o.dead !== undefined ? 0.6 : 0.95), base.z - 5);
+      sheet = { from: new THREE.Vector3(mid.x, mid.y + 0.25, mid.z + d), to: mid };
+      void cam;
+    },
+    /** render the contact sheet's view over whatever the game just drew */
+    sheet() {
+      if (!sheet) return;
+      const cam = g.s.r.camera;
+      cam.position.copy(sheet.from);
+      cam.lookAt(sheet.to);
+      cam.fov = 40;
+      cam.layers.disable(2);
+      cam.layers.disable(4);
+      cam.updateProjectionMatrix();
+      cam.updateMatrixWorld();
+      g.s.r.vmScene.visible = false;
+      g.s.r.render(0);
     },
     vec: (x: number, y: number, z: number) => new THREE.Vector3(x, y, z),
     /** crouch / air / collapse pose angles, live-editable */

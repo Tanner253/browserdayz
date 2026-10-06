@@ -6,6 +6,24 @@ import { assets } from '../core/assets';
 import type { Atmosphere } from './atmosphere';
 import { heightAt, type World } from './worldgen';
 
+/** the asphalt is a ribbon laid just above the ground, so the two never fight for the same pixels */
+const ROAD_LIFT = 0.035;
+
+/**
+ * How far the road surface stands above the ground under this spot (0 away from the road).
+ * The ground is what things collide with: anything set down on the road is raised by this,
+ * or a knife dropped there lies under the asphalt.
+ */
+export function roadLift(world: World, x: number, z: number): number {
+  const p = world.road.points, reach = world.road.width / 2 + 0.2;
+  for (let i = 0; i < p.length / 3 - 1; i++) {
+    const ax = p[i * 3], az = p[i * 3 + 2], dx = p[i * 3 + 3] - ax, dz = p[i * 3 + 5] - az;
+    const t = Math.min(1, Math.max(0, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz || 1)));
+    if (Math.hypot(x - ax - dx * t, z - az - dz * t) < reach) return ROAD_LIFT + 0.006;
+  }
+  return 0;
+}
+
 export function buildRoad(world: World, atmo: Atmosphere, scene: THREE.Scene) {
   const pts = world.road.points;
   const n = pts.length / 3;
@@ -27,7 +45,7 @@ export function buildRoad(world: World, atmo: Atmosphere, scene: THREE.Scene) {
     for (let k = 0; k <= ACROSS; k++) {
       const s = k / ACROSS - 0.5;
       const px = x + nx * s * W, pz = z + nz * s * W;
-      pos.push(px, heightAt(world.heights, px, pz) + 0.035, pz);
+      pos.push(px, heightAt(world.heights, px, pz) + ROAD_LIFT, pz);
       uv.push((s + 0.5) * (W / TILE), along / TILE);
       edge.push(Math.abs(s) * 2);
     }

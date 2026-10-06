@@ -12,11 +12,13 @@ const MILITARY: Table = [
   ['box_762', 3], ['box_9mm', 3], ['ammo_762', 2], ['ammo_9mm', 2], ['bandage', 2], ['firstaid', 1],
   ['condensed', 1.5], ['thermos', 1], ['binoculars', 0.5], ['gasmask', 0.5], ['grenade', 0.3], ['p38', 0.5], ['compass', 0.5],
   ['mag_p38_ext', 0.5], ['pu_scope', 0.3], ['rifle_wrap', 0.4], ['suppressor_9', 0.25], ['life_vest', 0.4],
+  ['mosin', 0.9], ['p38', 1], ['machete', 0.4],
 ];
 const CIVILIAN: Table = [
   ['beans', 2], ['sardines', 2], ['sprats', 2], ['tomatoes', 1.5], ['apple', 1.5], ['milk', 1], ['thermos', 0.6],
   ['bandage', 1.5], ['flashlight', 0.8], ['cigarettes', 1.2], ['watch', 0.5], ['box_9mm', 0.4], ['ammo_9mm', 0.5],
   ['knife', 0.8], ['work_gloves', 0.8], ['boonie_hat', 0.6], ['sack_pack', 0.8], ['rubber_boots', 0.5],
+  ['hatchet', 0.8], ['bat', 0.7], ['crowbar', 0.7], ['machete', 0.5], ['p38', 0.6], ['mosin', 0.25], ['ammo_762', 0.5],
 ];
 
 export interface CrateSpec {

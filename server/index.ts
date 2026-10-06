@@ -16,7 +16,7 @@ import { Container, type SerializedInventory } from '../src/sim/inventory';
 import { ITEMS, TAG_HOLD, sanitizeItem, type ItemInstance } from '../src/sim/items';
 import { CRATE_RESTOCK, CRATE_SPECS, fillCrate } from '../src/sim/crates';
 import { WEAPON_RULES, hitDamage, type HitZone } from '../src/sim/combat';
-import { CHAT_RANGE, F_DEAD, PROTOCOL, type C2S, type CorpseInfo, type KillInfo, type PlayerInfo, type Pose, type S2C, type StashInfo, type StoredItem, type Vitals } from '../src/net/protocol';
+import { CHAT_RANGE, F_DEAD, MAX_STAMINA, PROTOCOL, type C2S, type CorpseInfo, type KillInfo, type PlayerInfo, type Pose, type S2C, type StashInfo, type StoredItem, type Vitals } from '../src/net/protocol';
 
 const PORT = Number(process.env.PORT ?? 8080);
 const ROOT = process.cwd();
@@ -28,7 +28,7 @@ const TICK_HZ = 15;
 const CORPSE_LIFETIME = 600; // seconds
 const RECORD_LIFETIME = 30 * 60 * 1000; // a logged-out character is remembered this long
 /** bump when loot points change: world loot from an older save is re-rolled */
-const WORLD_REV = 5;
+const WORLD_REV = 6;
 
 const log = (...a: unknown[]) => console.log(new Date().toISOString().slice(11, 19), ...a);
 
@@ -333,6 +333,10 @@ function handle(c: Client, m: C2S) {
       broadcast({ t: 'shot', id: c.id, o: m.o, d: m.d, w: m.w, sup: !!m.sup }, c);
       return;
     }
+    case 'swing': {
+      if (c.alive) broadcast({ t: 'swing', id: c.id }, c);
+      return;
+    }
     case 'hit': {
       const target = clients.get(m.to);
       const rule = WEAPON_RULES[m.w];
@@ -422,7 +426,7 @@ function handle(c: Client, m: C2S) {
       if (!c.alive) return;
       c.inv = cleanInventory(m.inv);
       const v = m.vitals;
-      if (v && num(v.health) && num(v.energy) && num(v.water)) c.vitals = { health: v.health, energy: v.energy, water: v.water, stamina: num(v.stamina) ? v.stamina : 100, bleeding: !!v.bleeding };
+      if (v && num(v.health) && num(v.energy) && num(v.water)) c.vitals = { health: v.health, energy: v.energy, water: v.water, stamina: num(v.stamina) ? v.stamina : MAX_STAMINA, bleeding: !!v.bleeding };
       return;
     }
     case 'died': {
@@ -512,7 +516,7 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
     stashes: [...boxes.values()].filter((b) => b.kind === 'stash').map((b) => ({ uid: b.cid, x: b.x, y: b.y, z: b.z, rot: b.rot })),
     corpses: [...boxes.values()].filter((b) => b.kind === 'corpse').map((b) => ({ uid: b.cid, x: b.x, y: b.y, z: b.z, rot: b.rot, name: b.name ?? 'Survivor' })),
     spawn: sp,
-    me: resume ? { inv: resume.inv!, vitals: resume.vitals ?? { health: 100, energy: 80, water: 80, stamina: 100, bleeding: false } } : null,
+    me: resume ? { inv: resume.inv!, vitals: resume.vitals ?? { health: 100, energy: 80, water: 80, stamina: MAX_STAMINA, bleeding: false } } : null,
     max: MAX_PLAYERS,
   });
   broadcast({ t: 'join', p: info(c) }, c);
