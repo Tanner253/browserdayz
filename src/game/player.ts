@@ -62,9 +62,18 @@ export class Player {
   private landVel = 0;
   private staminaDelay = 0;
   private lastFallSpeed = 0;
+  /** seconds since the feet last touched the ground, and since jump was last pressed */
+  private airT = 0;
+  private jumpWish = 1;
+  /** a hard landing knocks the pace out of you for a moment */
+  private stumble = 0;
+  /** camera roll from sidestepping */
+  private strafeRoll = 0;
   private hurtTimer = 0;
   onDamage: (amount: number, cause: string) => void = () => {};
   onFootstep: (surface: string) => void = () => {};
+  /** touched down after a fall or a jump, at this speed (m/s) */
+  onLand: (speed: number) => void = () => {};
 
   constructor(private terrain: Terrain) {}
 
@@ -146,6 +155,10 @@ export class Player {
     if (this.aiming) speed = Math.min(speed, this.crouched ? 1.2 : 1.9);
     if (fwd < 0) speed *= 0.75;
     speed *= Math.max(0.55, 1 - enc) * (v.health < 30 ? 0.8 : 1);
+    if (this.stumble > 0) {
+      this.stumble = Math.max(0, this.stumble - h);
+      speed *= 1 - Math.min(0.6, this.stumble * 1.6);
+    }
 
     const wish = new THREE.Vector3(str, 0, -fwd);
     if (wish.lengthSq() > 0) wish.normalize().applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yaw);
@@ -155,11 +168,18 @@ export class Player {
     this.vel.x += (target.x - this.vel.x) * k;
     this.vel.z += (target.z - this.vel.z) * k;
 
-    if (this.grounded && input.pressedFixed('Space') && v.stamina > 12 && !this.crouched) {
+    // Jumping forgives a little: pressed just before landing it still fires on touchdown,
+    // and for a moment after running off an edge the ground still counts.
+    this.airT = this.grounded ? 0 : this.airT + h;
+    this.jumpWish = input.pressedFixed('Space') ? 0 : this.jumpWish + h;
+    if (this.jumpWish < 0.13 && (this.grounded || (this.airT < 0.11 && this.vel.y <= 0)) && v.stamina > 12 && !this.crouched) {
       this.vel.y = 4.4;
       v.stamina -= 14;
       this.staminaDelay = 1.2;
       this.grounded = false;
+      this.jumpWish = 1;
+      this.airT = 1;
+      audio.jump();
     }
     this.vel.y -= 9.81 * 1.35 * h;
     if (this.grounded && this.vel.y < 0) this.vel.y = -1.5;
@@ -198,7 +218,7 @@ export class Player {
       this.stepPhase += h * (hs * 1.65 + 1.2);
       if (Math.floor(prev / Math.PI) !== Math.floor(this.stepPhase / Math.PI)) {
         const s = this.surface();
-        audio.footstep(s as Surface, hs * (this.crouched ? 0.4 : 1));
+        audio.footstep(s as Surface, hs * (this.crouched ? 0.4 : 1), undefined, this.weightKg);
         this.onFootstep(s);
       }
     }
@@ -217,7 +237,10 @@ export class Player {
   private land(vy: number) {
     const s = Math.max(0, -vy);
     this.landVel = -Math.min(s * 0.035, 0.22);
-    if (s > 3) audio.footstep(this.surface() as Surface, 4);
+    if (s > 2.5) audio.land(this.surface() as Surface, s);
+    // from a height your legs take the fall before you can run on
+    if (s > 6.5) this.stumble = Math.min(0.5, (s - 6.5) * 0.09);
+    this.onLand(s);
     if (s > 9.5) {
       const dmg = (s - 9.5) * 14 * this.fallMult;
       this.damage(dmg, 'fall');
@@ -290,9 +313,17 @@ export class Player {
     cam.position.set(p.x, p.y + this.eye + this.landDip + this.bob.y, p.z);
     cam.position.addScaledVector(side, this.bob.x + lean * 0.42);
     if (lean !== 0) cam.position.y -= Math.abs(lean) * 0.08;
-    const roll = -lean * 0.21 + (this.dead ? 1.2 : 0) + Math.cos(ph) * 0.004 * amp;
+    // sidestepping tips the view a touch into the movement
+    const lateral = this.dead ? 0 : (this.vel.x * side.x + this.vel.z * side.z) / 6.2;
+    this.strafeRoll += (THREE.MathUtils.clamp(lateral, -1, 1) * -0.022 - this.strafeRoll) * (1 - Math.exp(-9 * dt));
+    const roll = -lean * 0.21 + (this.dead ? 1.2 : 0) + Math.cos(ph) * 0.004 * amp + this.strafeRoll;
     cam.quaternion.setFromEuler(new THREE.Euler(this.pitch + this.aimOffset.y, this.yaw + this.aimOffset.x, roll, 'YXZ'));
     cam.updateMatrixWorld();
+  }
+
+  /** sideways speed, -1 (left) .. 1 (right), for the weapon to lean with */
+  get strafe() {
+    return this.strafeRoll / -0.022;
   }
 
   /** Bob values the viewmodel follows */

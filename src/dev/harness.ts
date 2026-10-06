@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { physics } from '../core/physics';
 import { heightAt } from '../world/worldgen';
 import { makeItem } from '../sim/items';
+import { POSE } from '../game/avatar';
 import type { Game } from '../game/game';
 
 export function installHarness(g: Game) {
@@ -110,6 +111,8 @@ export function installHarness(g: Game) {
       return { id, y: +l.y.toFixed(2), prompt: anyG.prompt as string | null };
     },
     vec: (x: number, y: number, z: number) => new THREE.Vector3(x, y, z),
+    /** crouch / air / collapse pose angles, live-editable */
+    pose: POSE,
   };
   window.addEventListener('error', (e) => T.errors.push(String(e.message)));
   window.addEventListener('unhandledrejection', (e) => T.errors.push(String((e.reason && e.reason.message) || e.reason)));

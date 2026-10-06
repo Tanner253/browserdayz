@@ -1,4 +1,4 @@
-// Graphics options (Esc menu). The player picks them and they are kept in this browser;
+// Graphics and sound options (Esc menu, Settings tab). The player picks them and they are kept in this browser;
 // nothing here changes by itself while playing.
 
 import { TOUCH } from './device';
@@ -18,9 +18,11 @@ export interface Graphics {
   foliage: Level;
   /** frames per second, 0 = as many as the display shows */
   fpsLimit: number;
+  /** master sound volume, 0..1 */
+  volume: number;
 }
 
-export const PRESETS: Record<PresetName, Omit<Graphics, 'fpsLimit'>> = {
+export const PRESETS: Record<PresetName, Omit<Graphics, 'fpsLimit' | 'volume'>> = {
   low: { scale: 0.5, msaa: 0, ao: 'off', shadows: 'low', foliage: 'low' },
   medium: { scale: 0.75, msaa: 2, ao: 'half', shadows: 'medium', foliage: 'medium' },
   high: { scale: 1, msaa: 4, ao: 'half', shadows: 'high', foliage: 'medium' },
@@ -32,15 +34,16 @@ export const MSAA = [0, 2, 4];
 export const AO_MODES: AoMode[] = ['off', 'half', 'full'];
 export const LEVELS: Level[] = ['low', 'medium', 'high'];
 export const FPS_LIMITS = [30, 40, 60, 120, 0];
+export const VOLUMES = [0, 0.25, 0.5, 0.75, 1];
 
 /** Everything at full on a computer. A phone starts on Low: its GPU is a fraction of a laptop's. */
-export const DEFAULT_GRAPHICS: Graphics = { ...(TOUCH ? PRESETS.low : PRESETS.ultra), fpsLimit: 0 };
+export const DEFAULT_GRAPHICS: Graphics = { ...(TOUCH ? PRESETS.low : PRESETS.ultra), fpsLimit: 0, volume: 1 };
 
 const STORE = 'zona.gfx';
 
 /** the preset these settings amount to, or null when they were mixed by hand */
 export function presetOf(g: Graphics): PresetName | null {
-  for (const [name, p] of Object.entries(PRESETS) as [PresetName, Omit<Graphics, 'fpsLimit'>][]) {
+  for (const [name, p] of Object.entries(PRESETS) as [PresetName, Omit<Graphics, 'fpsLimit' | 'volume'>][]) {
     if (p.scale === g.scale && p.msaa === g.msaa && p.ao === g.ao && p.shadows === g.shadows && p.foliage === g.foliage) return name;
   }
   return null;
@@ -57,6 +60,7 @@ export function loadGraphics(): Graphics {
       if (LEVELS.includes(raw.shadows as Level)) g.shadows = raw.shadows as Level;
       if (LEVELS.includes(raw.foliage as Level)) g.foliage = raw.foliage as Level;
       if (FPS_LIMITS.includes(raw.fpsLimit as number)) g.fpsLimit = raw.fpsLimit as number;
+      if (VOLUMES.includes(raw.volume as number)) g.volume = raw.volume as number;
     }
   } catch {
     /* private mode or a damaged entry: defaults */

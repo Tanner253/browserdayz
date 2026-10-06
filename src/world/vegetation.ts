@@ -84,15 +84,24 @@ class LodSet {
   // scratch space for sorting the visible instances nearest-first
   private order: Uint32Array;
   private dist: Float32Array;
+  /** per-instance draw distance */
+  private far: Float32Array;
+  // what is on the GPU now: which instances at which level, how many, and where the camera was
+  private sig = 0;
+  private shown = 0;
+  private at = new THREE.Vector3(Infinity, 0, 0);
 
-  constructor(public instances: Instance[], private opts: LodSetOpts) {
+  /** @param name what this is (tree or prop kind): shows up in profiles */
+  constructor(public instances: Instance[], private opts: LodSetOpts, public name = '') {
     this.n = instances.length;
     this.order = new Uint32Array(this.n);
     this.dist = new Float32Array(this.n);
     this.matrices = new Float32Array(this.n * 16);
     this.pos = new Float32Array(this.n * 3);
     this.scale = new Float32Array(this.n);
+    this.far = new Float32Array(this.n);
     instances.forEach((it, i) => {
+      this.far[i] = it.far ?? Infinity;
       _q.setFromAxisAngle(UP, it.rot);
       _s.setScalar(it.scale);
       _p.set(it.x, it.y, it.z);
@@ -116,24 +125,31 @@ class LodSet {
       // Nearest detail level is drawn first, the terrain last: whatever ends up hidden behind
       // closer trees is rejected by the depth test before its (expensive) shading runs.
       im.renderOrder = -10 + this.levels.length;
+      im.name = `${this.name}:${this.levels.length}${shadowOnly ? 's' : ''}`;
       scene.add(im);
       return im;
     });
     this.levels.push({ meshes, near, nearFull, farFull, far, count: 0 });
   }
 
+  /** level distances changed (graphics option): redo the buffers on the next update */
+  invalidate() {
+    this.at.x = Infinity;
+  }
+
   update(cam: THREE.Vector3, frustum: THREE.Frustum) {
-    for (const l of this.levels) l.count = 0;
     const { cullRadius, shadowRadius } = this.opts;
-    const { order, dist } = this;
+    const { order, dist, levels } = this;
     let m = 0;
+    let sig = 0;
     for (let i = 0; i < this.n; i++) {
       const x = this.pos[i * 3], y = this.pos[i * 3 + 1], z = this.pos[i * 3 + 2];
       const dx = x - cam.x, dy = y - cam.y, dz = z - cam.z;
       const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
-      let visible = false;
-      for (const l of this.levels) if (d >= l.near && d <= l.far) visible = true;
-      if (!visible) continue;
+      if (d > this.far[i]) continue;
+      let mask = 0;
+      for (let l = 0; l < levels.length; l++) if (d >= levels[l].near && d <= levels[l].far) mask |= 1 << l;
+      if (!mask) continue;
       if (d > shadowRadius) {
         _sphere.center.set(x, y + cullRadius * this.scale[i] * 0.5, z);
         _sphere.radius = cullRadius * this.scale[i];
@@ -141,7 +157,15 @@ class LodSet {
       }
       dist[i] = d;
       order[m++] = i;
+      sig = (Math.imul(sig, 31) + i * 8 + mask) | 0;
     }
+    // The same instances at the same detail levels as last time, and the camera has barely
+    // moved: what is on the GPU is still right, so nothing is sorted, copied or uploaded.
+    if (sig === this.sig && m === this.shown && this.at.distanceToSquared(cam) < 6.25) return;
+    this.sig = sig;
+    this.shown = m;
+    this.at.copy(cam);
+    for (const l of levels) l.count = 0;
     // nearest first: each instance's leaves hide the ones drawn after it (see renderOrder above)
     if (m > 1) order.subarray(0, m).sort((a, b) => dist[a] - dist[b]);
     for (let k0 = 0; k0 < m; k0++) {
@@ -312,11 +336,16 @@ class Impostors {
     scene.add(this.mesh);
   }
 
+  private sig = 0;
+
   update(cam: THREE.Vector3, frustum: THREE.Frustum, near: number) {
     let n = 0;
+    let sig = 0;
     const p = this.iPos.array as Float32Array;
     const v = this.iVar.array as Float32Array;
-    for (const t of this.all) {
+    const all = this.all;
+    for (let i = 0; i < all.length; i++) {
+      const t = all[i];
       const dx = t.x - cam.x, dz = t.z - cam.z;
       const d2 = dx * dx + dz * dz;
       if (d2 < near * near) continue;
@@ -329,7 +358,11 @@ class Impostors {
       p[n * 4 + 3] = t.s;
       v[n] = t.v;
       n++;
+      sig = (Math.imul(sig, 31) + i) | 0;
     }
+    // the same trees as last frame, in the same order: the buffers are already right
+    if (sig === this.sig && n === this.geo.instanceCount) return;
+    this.sig = sig;
     this.geo.instanceCount = n;
     this.iPos.clearUpdateRanges();
     this.iPos.addUpdateRange(0, n * 4);
@@ -490,7 +523,7 @@ export class Vegetation {
       const m0 = this.treeMaterials(e, true, sway);
       const m1 = this.treeMaterials(e, true, sway);
       const instances = byKind.get(k) ?? [];
-      const set = new LodSet(instances, { cullRadius: Math.max(e.radius, e.height) * 0.8, shadowRadius: 34 });
+      const set = new LodSet(instances, { cullRadius: Math.max(e.radius, e.height) * 0.8, shadowRadius: 34 }, k);
       // full-detail model up close, the simpler one beyond (for trees: out to ~120 m, then
       // baked impostors for the far forest)
       const base: [number, number] = isBush ? [32, 40] : [40, 50];
@@ -552,7 +585,7 @@ export class Vegetation {
           const size = box.getSize(new THREE.Vector3());
           const isRock = id.startsWith('rock') || id.startsWith('boulder');
           const isFern = id.startsWith('fern') || id.startsWith('dry_branches');
-          const set = new LodSet(instances, { cullRadius: Math.max(size.x, size.y, size.z), shadowRadius: 20 });
+          const set = new LodSet(instances, { cullRadius: Math.max(size.x, size.y, size.z), shadowRadius: 20 }, kind);
           const mats = (parts: MeshPart[], fadeIn: [number, number] | null, fadeOut: [number, number] | null) =>
             parts.map((p) => {
               const m = (p.material as THREE.MeshStandardMaterial).clone();
@@ -565,12 +598,17 @@ export class Vegetation {
               this.atmo.register(m, fp.patch, `${isFern ? 'fern' : 'prop'}`);
               return { geometry: p.geometry, material: m as THREE.Material };
             });
+          // Full detail up close, the far version (a few hundred triangles) beyond. How soon
+          // depends on how big the thing is: a crate can swap at 18 m, a car not before 60.
+          const biggest = instances.reduce((a, it) => Math.max(a, it.scale), 0) || 1;
+          const swap = THREE.MathUtils.clamp(Math.max(size.x, size.y, size.z) * biggest * 20, 18, 60);
+          const fade: [number, number] = [swap, swap + Math.max(4, swap * 0.18)];
+          const out: [number, number] = isRock ? [330, 350] : isFern ? [58, 70] : [128, 140];
           if (p1) {
-            set.addLevel(scene, mats(p0, null, [55, 65]), 0, 0, 55, 65, true);
-            set.addLevel(scene, mats(p1, [55, 65], [330, 350]), 55, 65, 330, 350, true);
+            set.addLevel(scene, mats(p0, null, fade), 0, 0, fade[0], fade[1], !isFern);
+            set.addLevel(scene, mats(p1, fade, out), fade[0], fade[1], out[0], out[1], !isFern);
           } else {
-            const far = isFern ? 70 : 140;
-            set.addLevel(scene, mats(p0, null, [far - 12, far]), 0, 0, far - 12, far, !isFern);
+            set.addLevel(scene, mats(p0, null, out), 0, 0, out[0], out[1], !isFern);
           }
           this.sets.push(set);
 
@@ -616,6 +654,7 @@ export class Vegetation {
       const [full, simple, shadow] = d.set.levels;
       full.farFull = shadow.farFull = simple.near = fade[0];
       full.far = shadow.far = simple.nearFull = fade[1];
+      d.set.invalidate();
     }
   }
 

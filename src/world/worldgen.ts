@@ -41,6 +41,8 @@ export interface Instance {
   z: number;
   rot: number;
   scale: number;
+  /** drawn only within this many metres (furniture indoors is invisible from across the map) */
+  far?: number;
 }
 
 export interface POI {

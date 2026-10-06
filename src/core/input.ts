@@ -155,5 +155,5 @@ export interface MoveInput {
   pressedFixed(code: string): boolean;
 }
 
-/** Input that never reports anything (player body idles while the free camera flies). */
+/** Input that never reports anything (the character stands still while a menu or the chat box has the keyboard). */
 export const NULL_INPUT: MoveInput = { held: () => false, pressedFixed: () => false };

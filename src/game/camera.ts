@@ -1,18 +1,16 @@
-// Camera director: first-person, third-person orbit and free (fly) camera, with
-// eased, arcing transitions between any two modes. Each mode produces a live
-// target pose; during a transition we blend from a frozen snapshot of the previous
-// pose toward the (still moving) target, so arrival is always seamless.
+// Camera director: first person and third-person orbit, with eased transitions between
+// them. Each mode produces a live target pose; during a transition we blend from a frozen
+// snapshot of the previous pose toward the (still moving) target, so arrival is always
+// seamless.
 //
 //   V      first person <-> third-person orbit (wheel zooms in orbit; zoom fully in = first person)
-//   P      toggle free camera (crane shot out of the player, fly with WASD / Space / Ctrl)
-//   Enter  (free cam) drop the player where you're looking and fly back into their eyes
 
 import * as THREE from 'three';
 import { physics, SHOT_GROUPS } from '../core/physics';
 import type { Input } from '../core/input';
 import type { Player } from './player';
 
-export type CamMode = 'first' | 'orbit' | 'free';
+export type CamMode = 'first' | 'orbit';
 
 interface Pose {
   pos: THREE.Vector3;
@@ -32,7 +30,6 @@ export class CameraDirector {
   fovMul = 1;
 
   orbit = { yaw: 0, pitch: -0.25, dist: 4.2, wantDist: 4.2, shoulder: 0.42 };
-  free = { pos: new THREE.Vector3(), vel: new THREE.Vector3(), yaw: 0, pitch: 0, speed: 14 };
 
   private from: Pose = { pos: new THREE.Vector3(), quat: new THREE.Quaternion(), fov: 62 };
   private target: Pose = { pos: new THREE.Vector3(), quat: new THREE.Quaternion(), fov: 62 };
@@ -42,10 +39,6 @@ export class CameraDirector {
   private arc = 0;
   private label: HTMLDivElement;
   onModeChange: (mode: CamMode) => void = () => {};
-  /** set by the game: called when the free camera drops the player somewhere */
-  onDropPlayer: (x: number, y: number, z: number, yaw: number) => void = () => {};
-  /** terrain height lookup so the free camera can't fly underground */
-  groundAt: (x: number, z: number) => number = () => -1e9;
 
   constructor(private cam: THREE.PerspectiveCamera, private player: Player) {
     this.label = document.createElement('div');
@@ -60,9 +53,6 @@ export class CameraDirector {
   /** avatar visible to the main camera */
   get avatarVisible() {
     return this.mode !== 'first' || this.blend < 0.8;
-  }
-  get controlsPlayer() {
-    return this.mode !== 'free';
   }
 
   private snapshot() {
@@ -81,29 +71,15 @@ export class CameraDirector {
       this.orbit.pitch = THREE.MathUtils.clamp(this.player.pitch - 0.18, -1.2, 0.6);
       if (prev === 'first') this.orbit.dist = 0.4;
       this.orbit.wantDist = Math.max(this.orbit.wantDist, 2.5);
-    } else if (mode === 'free') {
-      // crane up and back out of the player's head, looking down at them
-      const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(this.cam.quaternion);
-      fwd.y = 0;
-      fwd.normalize();
-      const p = this.player.pos;
-      this.free.pos.set(p.x, p.y + 1.6, p.z).addScaledVector(fwd, -7.5);
-      this.free.pos.y += 4.5;
-      const look = new THREE.Vector3(p.x, p.y + 1.2, p.z).sub(this.free.pos);
-      this.free.yaw = Math.atan2(-look.x, -look.z);
-      this.free.pitch = Math.atan2(look.y, Math.hypot(look.x, look.z));
-      this.free.vel.set(0, 0, 0);
     } else if (mode === 'first' && prev === 'orbit') {
       this.player.yaw = this.orbit.yaw;
       this.player.pitch = THREE.MathUtils.clamp(this.orbit.pitch + 0.18, -1.4, 1.4);
-    } else if (mode === 'first' && prev === 'free') {
-      this.player.pitch = 0;
     }
     // compute the new target once so the arc height reflects the real travel distance
     this.computeTarget(0);
     const dist = this.from.pos.distanceTo(this.target.pos);
     this.dur = duration ?? THREE.MathUtils.clamp(0.55 + dist / 22, 0.6, 2.4);
-    this.arc = THREE.MathUtils.clamp(dist * 0.22, 0, 18) * (mode === 'orbit' || prev === 'orbit' ? 0.3 : 1);
+    this.arc = THREE.MathUtils.clamp(dist * 0.22, 0, 18) * 0.3;
     this.t = 0;
     this.blend = 0;
     this.updateLabel();
@@ -124,19 +100,17 @@ export class CameraDirector {
   }
 
   private updateLabel() {
-    const names: Record<CamMode, string> = { first: 'First person', orbit: 'Third person', free: 'Free camera' };
+    const names: Record<CamMode, string> = { first: 'First person', orbit: 'Third person' };
     const hints: Record<CamMode, string> = {
-      first: '<b>V</b> third person · <b>P</b> free cam',
-      orbit: '<b>V</b> first person · <b>wheel</b> zoom · <b>P</b> free cam',
-      free: '<b>WASD</b> fly · <b>Space/Ctrl</b> up/down · <b>Shift</b> fast · <b>wheel</b> speed · <b>Enter</b> drop here · <b>P</b> back',
+      first: '<b>V</b> third person',
+      orbit: '<b>V</b> first person · <b>wheel</b> zoom',
     };
     this.label.innerHTML = `<span class="cam-mode">${names[this.mode]}</span><span class="cam-hints">${hints[this.mode]}</span>`;
   }
 
   /** Handles mode keys + per-mode input. Returns true if the mouse was consumed (no player look). */
-  handleInput(input: Input, dt: number): boolean {
-    if (input.pressed('KeyV')) this.setMode(this.mode === 'orbit' ? 'first' : this.mode === 'free' ? 'orbit' : 'orbit');
-    if (input.pressed('KeyP')) this.setMode(this.mode === 'free' ? 'first' : 'free');
+  handleInput(input: Input): boolean {
+    if (input.pressed('KeyV')) this.setMode(this.mode === 'orbit' ? 'first' : 'orbit');
 
     const sens = this.player.sensitivity;
     if (this.mode === 'orbit') {
@@ -150,47 +124,7 @@ export class CameraDirector {
       this.player.yaw = this.orbit.yaw;
       return true;
     }
-    if (this.mode === 'free') {
-      const f = this.free;
-      f.yaw -= input.mouseDX * sens;
-      f.pitch = THREE.MathUtils.clamp(f.pitch - input.mouseDY * sens, -1.55, 1.55);
-      if (input.wheel) f.speed = THREE.MathUtils.clamp(f.speed * (1 - input.wheel * 0.12), 1.5, 160);
-      const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(f.pitch, f.yaw, 0, 'YXZ'));
-      const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(q);
-      const right = new THREE.Vector3(1, 0, 0).applyQuaternion(q);
-      const wish = new THREE.Vector3();
-      if (input.held('KeyW')) wish.add(fwd);
-      if (input.held('KeyS')) wish.sub(fwd);
-      if (input.held('KeyD')) wish.add(right);
-      if (input.held('KeyA')) wish.sub(right);
-      if (input.held('Space') || input.held('KeyE')) wish.y += 1;
-      if (input.held('ControlLeft') || input.held('KeyQ') || input.held('KeyC')) wish.y -= 1;
-      if (wish.lengthSq() > 0) wish.normalize();
-      const speed = f.speed * (input.held('ShiftLeft') ? 3.5 : 1);
-      f.vel.lerp(wish.multiplyScalar(speed), 1 - Math.exp(-5 * dt));
-      f.pos.addScaledVector(f.vel, dt);
-      const floor = this.groundAt(f.pos.x, f.pos.z) + 0.6;
-      if (f.pos.y < floor) {
-        f.pos.y = floor;
-        if (f.vel.y < 0) f.vel.y = 0;
-      }
-      if (input.pressed('Enter') || input.pressed('NumpadEnter')) this.dropPlayer(fwd);
-      return true;
-    }
     return false;
-  }
-
-  private dropPlayer(fwd: THREE.Vector3) {
-    const origin = this.free.pos;
-    let hit = physics.raycast(origin, fwd, 800, SHOT_GROUPS, this.player.collider);
-    if (!hit) hit = physics.raycast(origin, { x: 0, y: -1, z: 0 }, 2000, SHOT_GROUPS, this.player.collider);
-    if (!hit) return;
-    // land on top of whatever was hit
-    const down = physics.raycast({ x: hit.point.x, y: hit.point.y + 2, z: hit.point.z }, { x: 0, y: -1, z: 0 }, 10, SHOT_GROUPS, this.player.collider);
-    const p = down ? down.point : hit.point;
-    this.onDropPlayer(p.x, p.y + 0.05, p.z, this.free.yaw);
-    this.player.yaw = this.free.yaw;
-    this.setMode('first');
   }
 
   private computeTarget(dt: number) {
@@ -200,7 +134,7 @@ export class CameraDirector {
       tp.pos.copy(this.proxy.position);
       tp.quat.copy(this.proxy.quaternion);
       tp.fov = this.baseFov * this.fovMul;
-    } else if (this.mode === 'orbit') {
+    } else {
       const o = this.orbit;
       o.dist += (o.wantDist - o.dist) * (1 - Math.exp(-8 * Math.max(dt, 0.016)));
       const p = new THREE.Vector3().lerpVectors(this.player.prevPos, this.player.pos, physics.alpha);
@@ -217,11 +151,6 @@ export class CameraDirector {
       tp.pos.copy(pivot).addScaledVector(back, d);
       tp.quat.copy(q);
       tp.fov = this.baseFov + 4;
-    } else {
-      const f = this.free;
-      tp.pos.copy(f.pos);
-      tp.quat.setFromEuler(new THREE.Euler(f.pitch, f.yaw, 0, 'YXZ'));
-      tp.fov = this.baseFov + 6;
     }
   }
 

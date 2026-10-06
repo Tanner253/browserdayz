@@ -346,6 +346,32 @@ function prismGeo(halfBase: number, rise: number, thick: number, tile: number, f
   return g;
 }
 
+/**
+ * Right-angled wedge that closes a side wall under a single-pitch roof: it runs from
+ * z = 0 (no height) to z = len (full `rise`), `thick` wide along x.
+ */
+function wedgeGeo(len: number, rise: number, thick: number, tile: number, frame: THREE.Matrix4) {
+  const pos: number[] = [];
+  const uvs: number[] = [];
+  const tri = (a: number[], b: number[], c: number[]) => {
+    pos.push(...a, ...b, ...c);
+    for (const p of [a, b, c]) uvs.push(p[2] / tile, p[1] / tile);
+  };
+  const x0 = -thick / 2, x1 = thick / 2;
+  // outer faces (one each side), wound so both face outwards
+  tri([x1, 0, 0], [x1, rise, len], [x1, 0, len]);
+  tri([x0, 0, 0], [x0, 0, len], [x0, rise, len]);
+  // the sloped top, in case the roof sheet ever sits proud of it
+  tri([x0, 0, 0], [x0, rise, len], [x1, rise, len]);
+  tri([x0, 0, 0], [x1, rise, len], [x1, 0, 0]);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  g.computeVertexNormals();
+  g.applyMatrix4(frame);
+  return g;
+}
+
 // ------------------------------------------------------------------ doors
 
 export class Door {
@@ -591,31 +617,30 @@ export class Buildings {
       // ridge cap
       addBox('trim', -hw - oh, hw + oh, h + rise + 0.02, h + rise + 0.14, -0.12, 0.12, B, false);
     } else if (bp.roofType === 'shed') {
+      // single pitch: highest over the door, falling to the back wall
       const rise = 0.55;
       const ang = Math.atan2(rise, d);
       const R = B.clone()
-        .multiply(new THREE.Matrix4().makeTranslation(0, h + rise, -hd))
-        .multiply(new THREE.Matrix4().makeRotationX(ang));
-      addBox(bp.roof, -hw - 0.35, hw + 0.35, 0, 0.08, -0.35, d / Math.cos(ang) + 0.4, R);
-      // fill the triangular gap above side walls
+        .multiply(new THREE.Matrix4().makeTranslation(0, h + rise, hd))
+        .multiply(new THREE.Matrix4().makeRotationX(-ang));
+      addBox(bp.roof, -hw - 0.3, hw + 0.3, 0, 0.08, -(d / Math.cos(ang) + 0.35), 0.35, R);
+      // the front wall carries on up to the high edge of the roof
+      addBox(bp.ext, -hw, hw, h, h + rise, hd - T, hd, B, false);
+      // and each side wall is closed by a wedge under the slope
       for (const sx of [1, -1]) {
-        const G = B.clone().multiply(new THREE.Matrix4().makeTranslation(sx * (hw - T / 2), h, -hd)).multiply(new THREE.Matrix4().makeRotationY(Math.PI / 2));
-        const g = new THREE.BufferGeometry();
-        const p = [0, 0, 0, d, 0, 0, 0, rise, 0];
-        g.setAttribute('position', new THREE.Float32BufferAttribute([...p, ...[0, 0, 0, 0, rise, 0, d, 0, 0]], 3));
-        g.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, d / 2.4, 0, 0, rise / 2.4, 0, 0, 0, rise / 2.4, d / 2.4, 0], 2));
-        g.computeVertexNormals();
-        g.applyMatrix4(G);
-        this.push(bp.ext, g);
+        const G = B.clone().multiply(new THREE.Matrix4().makeTranslation(sx * (hw - T / 2), h, -hd));
+        this.push(bp.ext, wedgeGeo(d, rise, T, this.tile(bp.ext), G));
       }
     } else {
       addBox(bp.roof, -hw - 0.25, hw + 0.25, h, h + 0.22, -hd - 0.25, hd + 0.25, B);
     }
 
-    // furniture
+    // furniture: indoors, so it only has to be drawn from close by (through a window or the door).
+    // A barn stands open at the front and shows its insides from further off.
+    const indoorFar = plot.type === 'barn' ? 95 : 46;
     const inst = (id: string, lx: number, lz: number, rot: number, scale = 1, y = 0) => {
       const p = new THREE.Vector3(lx, y, lz).applyMatrix4(B);
-      this.world.props.push({ kind: id, x: p.x, y: p.y, z: p.z, rot: rot + plot.rot, scale });
+      this.world.props.push({ kind: id, x: p.x, y: p.y, z: p.z, rot: rot + plot.rot, scale, far: indoorFar });
     };
     for (const f of bp.furniture) inst(f.id, f.x, f.z, f.rot, f.scale ?? 1, f.y ?? 0);
 
@@ -753,6 +778,7 @@ export class Buildings {
       mesh.castShadow = key !== 'glass';
       mesh.receiveShadow = true;
       mesh.matrixAutoUpdate = false;
+      mesh.name = `building:${key}`;
       if (key === 'glass') mesh.renderOrder = 2;
       group.add(mesh);
     }

@@ -4,7 +4,7 @@
 import type { Vitals } from '../game/player';
 import type { ChatChannel } from '../net/protocol';
 import { TOUCH } from '../core/device';
-import { AO_MODES, DEFAULT_GRAPHICS, FPS_LIMITS, LEVELS, MSAA, PRESETS, SCALES, presetOf, saveGraphics, type Graphics, type PresetName } from '../core/settings';
+import { AO_MODES, DEFAULT_GRAPHICS, FPS_LIMITS, LEVELS, MSAA, PRESETS, SCALES, VOLUMES, presetOf, saveGraphics, type Graphics, type PresetName } from '../core/settings';
 
 const CHANNELS: ChatChannel[] = ['global', 'near'];
 const CHANNEL_LABEL: Record<ChatChannel | 'system', string> = { global: 'Global', near: 'Proximity', system: '' };
@@ -107,7 +107,7 @@ export class HUD {
             <div class="start-tabs">
               <button data-tab="brief" class="on">Briefing</button>
               <button data-tab="keys">Controls</button>
-              <button data-tab="gfx">Graphics</button>
+              <button data-tab="gfx">Settings</button>
               <button data-tab="rewards" hidden>Rewards</button>
             </div>
             <div class="start-pane pane-brief">
@@ -149,7 +149,7 @@ export class HUD {
                   <p><kbd>F</kbd> take · doors · search</p>
                   <p><kbd class="wide">Tab</kbd> inventory</p>
                   <p><kbd class="wide">Enter</kbd> chat</p>
-                  <p><kbd>V</kbd> third person <kbd>P</kbd> free cam</p>
+                  <p><kbd>V</kbd> third person</p>
                   <p><kbd class="wide">Esc</kbd> this menu</p>
                   <p><kbd class="wide">F3</kbd> performance</p>
                 </div>
@@ -395,7 +395,7 @@ export class HUD {
   private setGraphic(key: string, value: string) {
     const g = this.gfx;
     if (key === 'preset') Object.assign(g, PRESETS[value as PresetName]);
-    else if (key === 'scale' || key === 'msaa' || key === 'fpsLimit') g[key] = Number(value);
+    else if (key === 'scale' || key === 'msaa' || key === 'fpsLimit' || key === 'volume') g[key] = Number(value);
     else if (key === 'ao') g.ao = value as Graphics['ao'];
     else if (key === 'shadows' || key === 'foliage') g[key] = value as Graphics['shadows'];
     saveGraphics(g);
@@ -416,6 +416,7 @@ export class HUD {
       row('Shadows', 'shadows', g.shadows, LEVELS.map((l) => [l, cap(l)])) +
       row('Foliage', 'foliage', g.foliage, LEVELS.map((l) => [l, cap(l)])) +
       row('Frame limit', 'fpsLimit', g.fpsLimit, FPS_LIMITS.map((f) => [f, f ? String(f) : 'Off'])) +
+      row('Volume', 'volume', g.volume, VOLUMES.map((v) => [v, v ? `${v * 100}%` : 'Off'])) +
       `<div class="gfx-info">${this.gfxInfo()}</div>`;
   }
 

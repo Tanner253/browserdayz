@@ -7,7 +7,7 @@ import type RAPIER from '@dimforge/rapier3d-compat';
 import { physics, GLASS_GROUPS, HITBOX_GROUPS, SOLID_GROUPS, type Surface } from '../core/physics';
 import { audio } from '../core/audio';
 import type { Atmosphere } from '../world/atmosphere';
-import { F_CROUCH, F_DEAD, type Pose } from '../net/protocol';
+import { F_CROUCH, F_DEAD, F_GROUND, type Pose } from '../net/protocol';
 import { Avatar } from './avatar';
 import type { Damageable, HitZone } from './weapons';
 import type { Grips } from './arms';
@@ -41,6 +41,7 @@ export class RemotePlayer implements Damageable {
   private vel = new THREE.Vector3();
   private stride = 0;
   private fall = 0;
+  private grounded = true;
   private flinch = 0;
   private ready = false;
   private heldKey = '';
@@ -60,9 +61,9 @@ export class RemotePlayer implements Damageable {
     zone(this.stand, R.ColliderDesc.ball(0.125).setTranslation(0, 1.67, -0.02), 'head');
     zone(this.stand, R.ColliderDesc.cuboid(0.25, 0.31, 0.14).setTranslation(0, 1.21, 0), 'torso');
     zone(this.stand, R.ColliderDesc.cuboid(0.18, 0.45, 0.13).setTranslation(0, 0.45, 0), 'legs');
-    zone(this.crouch, R.ColliderDesc.ball(0.125).setTranslation(0, 1.2, -0.05), 'head');
-    zone(this.crouch, R.ColliderDesc.cuboid(0.25, 0.23, 0.16).setTranslation(0, 0.86, 0), 'torso');
-    zone(this.crouch, R.ColliderDesc.cuboid(0.2, 0.32, 0.16).setTranslation(0, 0.32, 0), 'legs');
+    zone(this.crouch, R.ColliderDesc.ball(0.125).setTranslation(0, 1.0, -0.14), 'head');
+    zone(this.crouch, R.ColliderDesc.cuboid(0.25, 0.22, 0.17).setTranslation(0, 0.65, -0.04), 'torso');
+    zone(this.crouch, R.ColliderDesc.cuboid(0.21, 0.22, 0.27).setTranslation(0, 0.22, -0.2), 'legs');
     for (const c of this.crouch) c.setEnabled(false);
     // players can't walk through each other; shots are only stopped by the hit zones
     this.blocker = physics.world.createCollider(R.ColliderDesc.capsule(0.5, 0.27).setTranslation(0, 0.8, 0).setCollisionGroups(GLASS_GROUPS), this.body);
@@ -111,7 +112,7 @@ export class RemotePlayer implements Damageable {
 
   /** chest position, for name tags and aim checks */
   chest(out: THREE.Vector3) {
-    return out.set(this.pos.x, this.pos.y + (this.crouched ? 0.85 : 1.25), this.pos.z);
+    return out.set(this.pos.x, this.pos.y + (this.crouched ? 0.68 : 1.25), this.pos.z);
   }
 
   update(dt: number, now: number, listener: THREE.Vector3) {
@@ -135,6 +136,7 @@ export class RemotePlayer implements Damageable {
       this.pos.set(a.p[0] + (b.p[0] - a.p[0]) * k, a.p[1] + (b.p[1] - a.p[1]) * k, a.p[2] + (b.p[2] - a.p[2]) * k);
       this.yaw = lerpAngle(a.p[3], b.p[3], Math.min(1, k));
       this.pitch = a.p[4] + (b.p[4] - a.p[4]) * Math.min(1, k);
+      this.grounded = !!(b.p[5] & F_GROUND);
       const crouched = !!(b.p[5] & F_CROUCH);
       if (crouched !== this.crouched) {
         this.crouched = crouched;
@@ -151,17 +153,15 @@ export class RemotePlayer implements Damageable {
     this.body.setNextKinematicRotation({ x: 0, y: Math.sin(half), z: 0, w: Math.cos(half) });
 
     this.flinch = Math.max(0, this.flinch - dt * 4);
-    this.avatar.update(this.alive ? dt : 0, this.pos, this.vel, this.yaw, this.crouched, false, false, this.pitch);
+    this.avatar.update(dt, this.pos, this.vel, this.yaw, this.crouched, !this.alive, false, this.pitch, this.grounded);
     const r = this.avatar.root;
     if (!this.alive) {
-      // topple, lie there for a moment, then the body on the ground takes over
+      // they go down, lie there for a moment, then the body on the ground takes over
       this.fall = Math.min(4, this.fall + dt * 2.6);
-      const tip = this.fall < 1 ? 1 - Math.pow(1 - this.fall, 2) : 1;
-      r.rotation.set(tip * Math.PI * 0.5, this.yaw, 0, 'YXZ');
-      r.position.y = this.pos.y + tip * 0.14;
       if (this.fall >= 4) r.visible = false;
     } else if (this.flinch > 0) {
-      r.rotation.set(this.flinch * 0.1, this.yaw, this.flinch * 0.08, 'YXZ');
+      r.rotation.x += this.flinch * 0.1;
+      r.rotation.z += this.flinch * 0.08;
     }
 
     // --- footsteps you can hear coming
@@ -197,6 +197,7 @@ export class CorpseBody {
   async load(atmo: Atmosphere, scene: THREE.Scene, x: number, y: number, z: number, yaw: number) {
     await this.avatar.load(atmo, 0);
     scene.add(this.avatar.root);
+    this.avatar.layDown();
     this.avatar.update(0, new THREE.Vector3(x, y, z), new THREE.Vector3(), yaw, false, true);
   }
   dispose() {

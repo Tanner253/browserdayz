@@ -28,6 +28,8 @@ export const antiFirefly: ShaderPatch = (shader) => {
     );
 };
 
+const _dir = new THREE.Vector3();
+
 export class Atmosphere {
   sunDir = new THREE.Vector3(0.4, 0.7, 0.3).normalize(); // points toward the sun
   sunColor = new THREE.Color(1, 0.95, 0.88);
@@ -37,6 +39,9 @@ export class Atmosphere {
   background!: THREE.Texture;
   csm!: CSM;
   private registered = new WeakSet<THREE.Material>();
+  private frame = 0;
+  /** where the camera was, and which way it faced, when each cascade was last drawn */
+  private drawn: { pos: THREE.Vector3; dir: THREE.Vector3 }[] = [];
 
   constructor(
     private renderer: THREE.WebGLRenderer,
@@ -96,6 +101,26 @@ export class Atmosphere {
       l.shadow.camera.layers.enable(3);
       l.shadow.normalBias = 0.035;
     }
+    this.padCascades();
+  }
+
+  /**
+   * The two wider cascades are not redrawn every frame (see update), so each covers a
+   * little more ground than its slice of the view needs: a map that is a frame or two old
+   * still reaches the edges of the screen after the camera has moved on.
+   */
+  private padCascades() {
+    this.csm.lights.forEach((l, i) => {
+      if (i === 0) return;
+      const c = l.shadow.camera;
+      const k = 1.08;
+      c.left *= k;
+      c.right *= k;
+      c.top *= k;
+      c.bottom *= k;
+      c.updateProjectionMatrix();
+    });
+    this.drawn.length = 0;
   }
 
   /** Graphics option: shadow map resolution (per cascade) and how far from the camera shadows reach. */
@@ -112,6 +137,7 @@ export class Atmosphere {
     if (csm.maxFar !== far) {
       csm.maxFar = far;
       csm.updateFrustums();
+      this.padCascades();
     }
   }
 
@@ -266,5 +292,24 @@ export class Atmosphere {
 
   update() {
     this.csm.update();
+    // Shadows are the most expensive thing drawn: every caster again, once per cascade.
+    // The nearest cascade is redrawn every frame. The two wider ones cover ground further
+    // off, where a shadow a few frames old cannot be told from a fresh one, so they take
+    // turns: unless the camera has moved or turned enough to need them straight away.
+    const cam = this.camera;
+    cam.getWorldDirection(_dir);
+    this.frame++;
+    this.csm.lights.forEach((l, i) => {
+      const s = l.shadow;
+      s.autoUpdate = false;
+      const at = (this.drawn[i] ??= { pos: new THREE.Vector3(Infinity, 0, 0), dir: new THREE.Vector3() });
+      const turn = i === 1 ? this.frame % 2 === 0 : this.frame % 4 === 1;
+      const moved = at.pos.distanceToSquared(cam.position) > (i === 1 ? 0.5 : 4) || at.dir.dot(_dir) < (i === 1 ? 0.9986 : 0.9976);
+      if (i === 0 || turn || moved || !s.map) {
+        s.needsUpdate = true;
+        at.pos.copy(cam.position);
+        at.dir.copy(_dir);
+      }
+    });
   }
 }

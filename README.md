@@ -56,7 +56,7 @@ The client can also be hosted on its own (Vercel): `vercel.json` builds it with 
 | 5 6 7 8 | quick keys: eat, drink, bandage (hover an item in the inventory and press the number to assign) |
 | F · G | take / open doors / search crates and bodies · pack up an empty stash |
 | Tab | inventory (right-click an item for everything it can do) |
-| V · P | third person · free camera |
+| V | third person |
 | Esc | release the mouse / pause |
 | F3 | performance overlay |
 

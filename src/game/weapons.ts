@@ -74,6 +74,8 @@ const HANDLING: Record<GunKind, { interval: number; kickV: number; kickH: number
 };
 
 interface Bullet {
+  /** someone else's bullet has already been heard going past */
+  heard?: boolean;
   pos: THREE.Vector3;
   vel: THREE.Vector3;
   drag: number;
@@ -84,6 +86,8 @@ interface Bullet {
   /** someone else's bullet: flies and lands for show, the shooter's own game decides what it hit */
   ghost?: boolean;
 }
+
+const _toCam = new THREE.Vector3();
 
 /** critically-damped-ish spring for procedural motion */
 class Spring {
@@ -154,6 +158,7 @@ export class Weapons {
   private aimRecoil = new Spring(90, 13);
   private adsT = 0;
   private sprintT = 0;
+  private airT = 0;
   private boltReady = true;
   private chamberEmpty = false;
   private fireCooldown = 0;
@@ -459,7 +464,7 @@ export class Weapons {
       if (this.current) {
         this.vmRoot.add(this.current.root);
         this.boltReady = true;
-        audio.ui('move');
+        audio.equip(ITEMS[next!.id].weapon ? 'gun' : 'melee');
         this.start('equip', 0.45);
       } else {
         this.action = null;
@@ -840,6 +845,14 @@ export class Weapons {
   confirmKill() {
     this.hitMarker = 0.6;
     this.killMarker = true;
+    audio.hitTick(true);
+  }
+
+  /** the ground came up: the weapon dips with the knees */
+  landed(speed: number) {
+    const k = Math.min(1, speed / 9);
+    this.kick.v.y -= 0.9 + k * 2.6;
+    this.kickRot.v.x -= 2 + k * 6;
   }
 
   /** we were hit: the view and the weapon jolt */
@@ -853,6 +866,7 @@ export class Weapons {
   private markHit(killed: boolean) {
     this.hitMarker = killed ? 0.5 : 0.25;
     this.killMarker = killed;
+    audio.hitTick(killed);
   }
 
   /**
@@ -951,6 +965,17 @@ export class Weapons {
           dead = true;
           break;
         }
+        // somebody else's bullet going past your head: you hear the crack before you know where from
+        if (b.ghost && !b.heard && this.mainCam && b.travelled > 6) {
+          const toCam = _toCam.copy(this.mainCam.position).sub(b.pos);
+          const along = toCam.dot(dir);
+          if (along <= len) {
+            // the nearest point of this step's path
+            b.heard = true;
+            const miss = toCam.addScaledVector(dir, -Math.max(0, along)).length();
+            if (miss < 5) audio.whiz(_toCam.copy(b.pos).addScaledVector(dir, Math.max(0, along)), miss, 0, speed > 343);
+          }
+        }
         b.pos.add(step);
         b.travelled += len;
       }
@@ -1015,6 +1040,13 @@ export class Weapons {
     // sway
     rot.y += sw.x * (1 - ads * 0.7) * 4;
     rot.x += sw.y * (1 - ads * 0.7) * 4;
+    // sidestepping: the gun rolls and trails a little behind the move
+    rot.z += p.strafe * -0.045 * (1 - ads * 0.6);
+    pos.x += p.strafe * -0.006 * (1 - ads);
+    // off the ground: it rides up a touch with the arms
+    this.airT += ((p.grounded ? 0 : 1) - this.airT) * (1 - Math.exp(-7 * dt));
+    pos.y += this.airT * 0.012 * (1 - ads);
+    rot.x += this.airT * 0.05 * (1 - ads);
 
     // actions
     const a = this.action;

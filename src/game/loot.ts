@@ -158,6 +158,42 @@ export class WorldItem {
     physics.tag(this.collider, { surface: 'cloth', owner: this });
   }
 
+  // a dropped item leaves the hand, turns over in the air and comes to rest
+  private toss: { from: THREE.Vector3; to: THREE.Vector3; rest: THREE.Quaternion; spin: THREE.Quaternion; t: number } | null = null;
+
+  /** Dropped from `from` (the hands): fall to the resting place instead of appearing on it. */
+  tossFrom(from: THREE.Vector3) {
+    const spin = new THREE.Quaternion().setFromEuler(new THREE.Euler((Math.random() - 0.5) * 2.4, Math.random() * 3, (Math.random() - 0.5) * 2.4));
+    this.toss = { from: from.clone(), to: this.obj.position.clone(), rest: this.obj.quaternion.clone(), spin: spin.multiply(this.obj.quaternion), t: 0 };
+    this.obj.position.copy(from);
+    this.obj.quaternion.copy(this.toss.spin);
+  }
+
+  /** advance the fall; true once it has landed */
+  private fly(dt: number) {
+    const a = this.toss;
+    if (!a) return;
+    a.t = Math.min(1, a.t + dt / 0.42);
+    const k = a.t;
+    // out and down like something let go of: steady sideways, speeding up as it falls
+    this.obj.position.lerpVectors(a.from, a.to, k);
+    this.obj.position.y = a.from.y + (a.to.y - a.from.y) * k * k + Math.sin(k * Math.PI) * 0.08;
+    this.obj.quaternion.slerpQuaternions(a.spin, a.rest, 1 - (1 - k) * (1 - k));
+    if (k >= 1) {
+      this.obj.position.copy(a.to);
+      this.obj.quaternion.copy(a.rest);
+      this.toss = null;
+    }
+  }
+
+  get flying() {
+    return !!this.toss;
+  }
+
+  update(dt: number) {
+    this.fly(dt);
+  }
+
   /** each shadow-casting mesh is drawn once per shadow cascade: only worth it up close */
   setShadows(on: boolean) {
     if (on === this.shadows) return;
@@ -259,6 +295,10 @@ export class LootManager {
     await Promise.all(Object.keys(ITEMS).map((id) => this.models.get(id)));
   }
 
+  /** where each item about to appear was let go of (uid -> hand position): it falls from there */
+  hands = new Map<string, THREE.Vector3>();
+  private falling = new Set<WorldItem>();
+
   /** Can this item type lie at this loot point without hanging off or poking through it? */
   fits = fitsPoint;
 
@@ -268,7 +308,14 @@ export class LootManager {
       if (!this.pending.has(l.uid)) return; // despawned before the model loaded
       this.pending.delete(l.uid);
       const normal = this.place(l, tpl);
-      this.items.set(l.uid, new WorldItem(l, tpl, this.scene, normal));
+      const w = new WorldItem(l, tpl, this.scene, normal);
+      this.items.set(l.uid, w);
+      const hand = this.hands.get(l.uid);
+      if (hand) {
+        this.hands.delete(l.uid);
+        w.tossFrom(hand);
+        this.falling.add(w);
+      }
       this.onPlaced(l);
     });
   }
@@ -411,15 +458,22 @@ export class LootManager {
     return out;
   }
 
-  /** graphics option: beyond this distance small items stop casting shadows */
-  shadowDist = Infinity;
+  /** beyond this distance small items stop casting shadows (a graphics option shortens it) */
+  shadowDist = 26;
 
-  /** distance culling: tiny items vanish past 70 m */
-  update(cam: THREE.Vector3) {
+  /**
+   * Distance culling. Every item is its own draw call, and one more in each shadow
+   * cascade: a tin of beans is a few pixels at 55 m and its shadow is less than one at 26.
+   */
+  update(cam: THREE.Vector3, dt = 0) {
+    for (const w of this.falling) {
+      w.update(dt);
+      if (!w.flying) this.falling.delete(w);
+    }
     const s2 = this.shadowDist * this.shadowDist;
     for (const w of this.items.values()) {
       const d2 = (w.loot.x - cam.x) ** 2 + (w.loot.z - cam.z) ** 2;
-      w.obj.visible = d2 < 70 * 70;
+      w.obj.visible = d2 < 55 * 55;
       w.setShadows(d2 < s2);
     }
   }

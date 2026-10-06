@@ -69,8 +69,12 @@ function macroNoiseTexture(): THREE.DataTexture {
   return t;
 }
 
+/** quads along one side of a ground tile */
+const TILE_QUADS = 64;
+
 export class Terrain {
-  mesh!: THREE.Mesh;
+  /** the ground, as a group of tiles */
+  mesh!: THREE.Group;
   heightTex!: THREE.DataTexture;
   splatTex!: THREE.DataTexture;
   grassTex!: THREE.DataTexture;
@@ -103,22 +107,40 @@ export class Terrain {
         nrm[i * 3 + 2] = nz / l;
       }
     }
-    const index = new Uint32Array((N - 1) * (N - 1) * 6);
-    let k = 0;
-    for (let iz = 0; iz < N - 1; iz++) {
-      for (let ix = 0; ix < N - 1; ix++) {
-        const a = idx(ix, iz), b = idx(ix + 1, iz), c = idx(ix, iz + 1), d = idx(ix + 1, iz + 1);
-        // triangles (a, c, b) and (b, c, d): diagonal b-c, counter-clockwise from above
-        index[k++] = a; index[k++] = c; index[k++] = b;
-        index[k++] = b; index[k++] = c; index[k++] = d;
+    // The ground is cut into tiles that share one set of vertices. Each tile is culled on
+    // its own, by the camera and by every shadow cascade. As a single piece all 524 000
+    // triangles were drawn four times a frame, whichever way you looked.
+    const posAttr = new THREE.BufferAttribute(pos, 3);
+    const nrmAttr = new THREE.BufferAttribute(nrm, 3);
+    const tiles: THREE.BufferGeometry[] = [];
+    for (let tz = 0; tz < N - 1; tz += TILE_QUADS) {
+      for (let tx = 0; tx < N - 1; tx += TILE_QUADS) {
+        const x1 = Math.min(tx + TILE_QUADS, N - 1), z1 = Math.min(tz + TILE_QUADS, N - 1);
+        const index = new Uint32Array((x1 - tx) * (z1 - tz) * 6);
+        let k = 0;
+        let lo = Infinity, hi = -Infinity;
+        for (let iz = tz; iz < z1; iz++) {
+          for (let ix = tx; ix < x1; ix++) {
+            const a = idx(ix, iz), b = idx(ix + 1, iz), c = idx(ix, iz + 1), d = idx(ix + 1, iz + 1);
+            // triangles (a, c, b) and (b, c, d): diagonal b-c, counter-clockwise from above
+            index[k++] = a; index[k++] = c; index[k++] = b;
+            index[k++] = b; index[k++] = c; index[k++] = d;
+            lo = Math.min(lo, heights[a], heights[b], heights[c], heights[d]);
+            hi = Math.max(hi, heights[a], heights[b], heights[c], heights[d]);
+          }
+        }
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', posAttr);
+        geo.setAttribute('normal', nrmAttr);
+        geo.setIndex(new THREE.BufferAttribute(index, 1));
+        geo.boundingBox = new THREE.Box3(
+          new THREE.Vector3(-half + tx * CELL, lo, -half + tz * CELL),
+          new THREE.Vector3(-half + x1 * CELL, hi, -half + z1 * CELL),
+        );
+        geo.boundingSphere = geo.boundingBox.getBoundingSphere(new THREE.Sphere());
+        tiles.push(geo);
       }
     }
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    geo.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
-    geo.setIndex(new THREE.BufferAttribute(index, 1));
-    geo.computeBoundingSphere();
-    geo.computeBoundingBox();
 
     // --- data textures shared with grass / vegetation shaders
     const hf = new Float32Array(N * N);
@@ -165,14 +187,19 @@ export class Terrain {
         .replace('#include <aomap_fragment>', TERRAIN_AO);
     }, 'terrain');
 
-    this.mesh = new THREE.Mesh(geo, mat);
-    this.mesh.receiveShadow = true;
-    this.mesh.castShadow = true;
+    this.mesh = new THREE.Group();
     this.mesh.name = 'terrain';
-    this.mesh.matrixAutoUpdate = false;
-    // drawn after everything else that is opaque: in a forest most of the ground is hidden behind
-    // trunks, leaves and grass, and those pixels then skip the terrain's heavy shader entirely
-    this.mesh.renderOrder = 5;
+    for (const geo of tiles) {
+      const tile = new THREE.Mesh(geo, mat);
+      tile.receiveShadow = true;
+      tile.castShadow = true;
+      tile.name = 'terrain';
+      tile.matrixAutoUpdate = false;
+      // drawn after everything else that is opaque: in a forest most of the ground is hidden behind
+      // trunks, leaves and grass, and those pixels then skip the terrain's heavy shader entirely
+      tile.renderOrder = 5;
+      this.mesh.add(tile);
+    }
     scene.add(this.mesh);
 
     // --- physics heightfield (column-major, rows along Z)

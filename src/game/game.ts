@@ -93,6 +93,7 @@ export class Game {
   private focus: unknown = null;
   private openStash: Stash | null = null;
   private indoors = false;
+  private inForest = false;
   private deathInfo = '';
   private deathSent = false;
   private warned = { hunger: false, thirst: false };
@@ -120,8 +121,6 @@ export class Game {
     this.input = new Input(s.r.renderer.domElement);
     this.player = new Player(s.terrain);
     this.director = new CameraDirector(s.r.camera, this.player);
-    this.director.onDropPlayer = (x, y, z, yaw) => this.player.spawn(x, y, z, yaw);
-    this.director.groundAt = (x, z) => heightAt(s.world.heights, x, z);
   }
 
   get online() {
@@ -211,6 +210,7 @@ export class Game {
     const sp = world.spawn;
     this.player.spawn(sp.x, heightAt(world.heights, sp.x, sp.z) + 0.05, sp.z, sp.yaw);
 
+    this.player.onLand = (speed) => this.weapons.landed(speed);
     this.player.onDamage = (amt, cause) => {
       if (cause === 'fall' && amt > 5) this.hud.note('You hurt yourself in the fall', 'warn');
     };
@@ -793,11 +793,12 @@ export class Game {
     // shadow map size per cascade, and how far from the camera shadows are drawn
     const [size, reach] = { low: [1024, 70], medium: [1024, 110], high: [2048, 160] }[g.shadows];
     atmo.setShadows(size, reach);
-    this.loot.shadowDist = g.shadows === 'high' ? Infinity : 22;
+    this.loot.shadowDist = g.shadows === 'high' ? 26 : 18;
     // reach of the full-detail trees, and blades of grass per patch
     const [detail, density] = { low: [0.45, 0.4], medium: [0.7, 0.7], high: [1, 1] }[g.foliage];
     veg.setDetail(detail);
     grass.setDensity(density);
+    audio.setVolume(g.volume);
   }
 
   /** A slow circuit above the village: what the entrance menu is laid over. */
@@ -863,6 +864,8 @@ export class Game {
     const y = hit && hit.toi > 1e-3 ? hit.point.y : p.y;
     // the loot manager then slides it clear of walls and furniture and lays it on the surface
     if (this.online) this.localDrops.add(item.uid);
+    // it falls from the hands (or from the body it was on) to where it comes to rest
+    this.loot.hands.set(item.uid, new THREE.Vector3(at ? p.x : p.x + fwd.x * 0.35, p.y + (at ? 0.9 : 1.15), at ? p.z : p.z + fwd.z * 0.35));
     this.economy.drop(item, x, y + 0.005, z, Math.random() * Math.PI * 2);
     this.weapons.validate();
   }
@@ -1120,7 +1123,7 @@ export class Game {
   private updateInteraction(cam: THREE.PerspectiveCamera) {
     this.prompt = null;
     this.focus = null;
-    if (this.player.dead || this.invUI.isOpen || this.director.mode === 'free' || this.use) return;
+    if (this.player.dead || this.invUI.isOpen || this.use) return;
     const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
     const range = 2.6 + (this.director.mode === 'orbit' ? this.director.orbit.dist : 0);
     const hit = physics.raycast(cam.position, dir, range, USE_GROUPS, this.player.collider);
@@ -1243,19 +1246,19 @@ export class Game {
     if (input.pressed('Tab') && playing) this.toggleInventory();
     const uiOpen = this.invUI.isOpen;
     // Enter opens the chat box; while typing the character stands still and the gun stays quiet
-    if (input.pressed('Enter') && playing && !uiOpen && this.director.controlsPlayer && !this.hud.chatOpen) {
+    if (input.pressed('Enter') && playing && !uiOpen && !this.hud.chatOpen) {
       input.releaseAll();
       this.hud.openChat();
     }
     if (this.hud.chatOpen && (!playing || uiOpen)) this.hud.closeChat();
     const typing = this.hud.chatOpen;
 
-    // camera modes consume the mouse in orbit / free
-    const consumed = !uiOpen && !this.paused && this.director.handleInput(input, dt);
+    // third person: the mouse turns the camera around the character
+    const consumed = !uiOpen && !this.paused && this.director.handleInput(input);
     const sens = this.weapons.scoped ? 0.28 : this.weapons.aiming ? 0.7 : 1;
     if (!consumed && !uiOpen && playing) p.look(input, sens);
 
-    const canMove = this.director.controlsPlayer && !uiOpen && playing && !typing;
+    const canMove = !uiOpen && playing && !typing;
     const moveInput = canMove ? input : NULL_INPUT;
     // carried weight and gear effects only change with the inventory: a few times a second is plenty
     this.slowT += dt;
@@ -1271,15 +1274,17 @@ export class Game {
       else this.hud.setTags([]);
       this.tagT = 0;
     }
-    const steps = physics.step(dt, (h) => {
+    physics.step(dt, (h) => {
       p.step(h, moveInput);
+      // A key press belongs to one simulation step, however many of them this frame needs:
+      // seen by two, a single tap of C crouches and stands straight back up.
+      input.consumeFixed();
       buildings.update(h);
     });
-    if (steps > 0) input.consumeFixed();
     if (this.started) p.tickVitals(dt);
 
     // quick-use keys
-    if (playing && !uiOpen && !typing && !this.use && this.director.controlsPlayer) {
+    if (playing && !uiOpen && !typing && !this.use) {
       QUICK_KEYS.forEach((k, i) => {
         if (input.pressed(k)) this.useQuick(i);
       });
@@ -1324,7 +1329,7 @@ export class Game {
     r.vmScene.visible = fpView;
     const interp = new THREE.Vector3().lerpVectors(p.prevPos, p.pos, physics.alpha);
     const first = this.director.mode === 'first';
-    this.avatar.update(dt, interp, p.vel, p.yaw, p.crouched, p.dead, first, first ? 0 : p.pitch);
+    this.avatar.update(dt, interp, p.vel, p.yaw, p.crouched, p.dead, first, first ? 0 : p.pitch, p.grounded);
     for (const d of this.dummies) {
       if (Math.abs(d.pos.x - interp.x) + Math.abs(d.pos.z - interp.z) < 260) d.update(dt);
     }
@@ -1332,7 +1337,7 @@ export class Game {
 
     this.updateInteraction(cam);
     this.effects.update(dt);
-    this.loot.update(cam.position);
+    this.loot.update(cam.position, dt);
 
     // world simulation ticks (the server does this when online)
     this.econT += dt;
@@ -1368,6 +1373,7 @@ export class Game {
     } else if (v.water > 35) this.warned.thirst = false;
     if (p.dead && !this.deathSent) {
       this.deathSent = true;
+      audio.death();
       if (!this.deathInfo) this.deathInfo = `You died of ${p.lastCause || 'your injuries'}. Your gear lies where you fell.`;
       if (this.invUI.isOpen) this.toggleInventory(false);
       this.input.unlock();
@@ -1387,8 +1393,13 @@ export class Game {
     // audio
     const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
     audio.setListener(cam.position, fwd, new THREE.Vector3(0, 1, 0));
-    if (Math.random() < 0.1) this.indoors = physics.raycast(cam.position, { x: 0, y: 1, z: 0 }, 12, SHOT_GROUPS, p.collider) !== null;
-    audio.updateAmbience(dt, cam.position, this.indoors);
+    if (Math.random() < 0.1) {
+      this.indoors = physics.raycast(cam.position, { x: 0, y: 1, z: 0 }, 12, SHOT_GROUPS, p.collider) !== null;
+      // forest floor underfoot means trees overhead: leaves instead of open-field insects
+      this.inForest = this.s.terrain.surfaceAt(p.pos.x, p.pos.z) === 'dirt';
+    }
+    audio.updateAmbience(dt, cam.position, this.indoors, this.inForest);
+    if (this.started) audio.body(dt, v.stamina, v.health, !p.dead);
 
     // post-fx reacting to state
     const hurt = p.hurt;
@@ -1414,10 +1425,10 @@ export class Game {
       ping: this.online ? this.net.ping : null,
       dead: p.dead,
       deadText: this.deathInfo,
-      hidden: uiOpen || this.director.mode === 'free' || !this.started,
+      hidden: uiOpen || !this.started,
     });
 
-    this.touch?.update(playing && !uiOpen && !typing && this.director.controlsPlayer, uiOpen, !!this.prompt?.includes('<kbd>F'));
+    this.touch?.update(playing && !uiOpen && !typing, uiOpen, !!this.prompt?.includes('<kbd>F'));
     this.perf.beforeRender();
     r.render(dt);
     this.perf.afterRender();
@@ -1431,8 +1442,8 @@ export class Game {
       this.slowFor = playing && this.fps < 28 && !(this.gfx.fpsLimit && this.gfx.fpsLimit <= 30) ? this.slowFor + this.fpsAcc : 0;
       if (this.slowFor > 8 && !this.slowHinted) {
         this.slowHinted = true;
-        this.hud.note(TOUCH ? 'Low frame rate: open the menu, then Graphics' : 'Low frame rate: press Esc and open Graphics', 'warn');
-        this.hud.chatLine('system', '', `The frame rate is low. ${TOUCH ? 'Open the menu' : 'Press Esc'} and open Graphics to turn the settings down.`);
+        this.hud.note(TOUCH ? 'Low frame rate: open the menu, then Settings' : 'Low frame rate: press Esc and open Settings', 'warn');
+        this.hud.chatLine('system', '', `The frame rate is low. ${TOUCH ? 'Open the menu' : 'Press Esc'} and open Settings to turn the graphics down.`);
       }
       this.fpsAcc = 0;
       this.fpsN = 0;

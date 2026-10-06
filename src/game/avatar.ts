@@ -32,6 +32,18 @@ interface ArmRig {
   pole: THREE.Vector3;
 }
 
+/**
+ * The rig only has idle, walk and run clips. Crouching, being in the air and collapsing
+ * are posed on top of them by bending the legs and spine (angles in radians about each
+ * bone's own X axis, hip drop in metres).
+ */
+export const POSE = {
+  // measured on the rig: feet flat on the ground, head where the crouched camera is (eye at 1.02 m)
+  crouch: { thigh: -1.0, knee: 1.85, foot: -0.82, drop: 0.58, spine: 0.28 },
+  air: { thigh: -0.5, knee: 0.9, foot: 0.25, drop: 0, spine: 0.06 },
+  down: { thigh: -0.55, knee: 1.0, foot: 0.3, drop: 0, spine: -0.12, arms: 0.75 },
+};
+
 const _a = new THREE.Vector3();
 const _b = new THREE.Vector3();
 const _q1 = new THREE.Quaternion();
@@ -52,6 +64,15 @@ export class Avatar {
   private fpBones: [THREE.Object3D, THREE.Object3D, boolean][] = [];
   private armR?: ArmRig;
   private armL?: ArmRig;
+  private legs: { hips?: THREE.Bone; spine?: THREE.Bone; thigh: (THREE.Bone | undefined)[]; knee: (THREE.Bone | undefined)[]; foot: (THREE.Bone | undefined)[]; arm: (THREE.Bone | undefined)[] } = { thigh: [], knee: [], foot: [], arm: [] };
+  // how far into each pose the body is, 0..1
+  private crouchT = 0;
+  private airT = 0;
+  private downT = 0;
+  /** which way the body twists as it goes down, so no two fall alike */
+  private twist = 0;
+  /** one metre straight down, in the space the hip bone moves in (the rig is in centimetres and lies on its back) */
+  private hipDown = new THREE.Vector3(0, -1, 0);
   private layerMask = 1;
   /** weapon in the hands: pivot (at the shoulders, pitches with the aim) > the model */
   private heldPivot = new THREE.Group();
@@ -107,6 +128,21 @@ export class Avatar {
     this.root.add(model);
     this.heldPivot.position.set(0, 1.43, 0);
     this.root.add(this.heldPivot);
+    const bone = (n: string) => model.getObjectByName(`mixamorig${n}`) as THREE.Bone | undefined;
+    this.legs = {
+      hips: bone('Hips'),
+      spine: bone('Spine'),
+      thigh: [bone('LeftUpLeg'), bone('RightUpLeg')],
+      knee: [bone('LeftLeg'), bone('RightLeg')],
+      foot: [bone('LeftFoot'), bone('RightFoot')],
+      arm: [bone('LeftArm'), bone('RightArm')],
+    };
+    if (this.legs.hips?.parent) {
+      this.root.updateMatrixWorld(true);
+      const parent = this.legs.hips.parent;
+      const rel = this.root.getWorldQuaternion(new THREE.Quaternion()).invert().multiply(parent.getWorldQuaternion(new THREE.Quaternion()));
+      this.hipDown.set(0, -1, 0).applyQuaternion(rel.invert()).divideScalar(parent.getWorldScale(new THREE.Vector3()).y || 1);
+    }
     this.spine = model.getObjectByName('mixamorigSpine2');
     this.chest = model.getObjectByName('mixamorigSpine1') as THREE.Bone | undefined;
     if (this.spine) this.spine.add(this.slung);
@@ -263,11 +299,28 @@ export class Avatar {
     });
   }
 
+  /** A body that was already lying there when we arrived: no fall to watch. */
+  layDown() {
+    this.downT = 1;
+  }
+
+  /** bend the legs and spine on top of whatever clip is playing */
+  private pose(p: { thigh: number; knee: number; foot: number; drop: number; spine: number }, k: number) {
+    const L = this.legs;
+    if (!L.hips || k < 0.004) return;
+    L.hips.position.addScaledVector(this.hipDown, p.drop * k);
+    for (const b of L.thigh) b?.rotateX(p.thigh * k);
+    for (const b of L.knee) b?.rotateX(p.knee * k);
+    for (const b of L.foot) b?.rotateX(p.foot * k);
+    L.spine?.rotateX(p.spine * k);
+  }
+
   /**
    * @param firstPerson the body squares up to the look direction (it is what you see when you look down)
    * @param pitch aim pitch in radians: the chest and the held weapon follow it
+   * @param grounded feet on the ground (false while jumping or falling)
    */
-  update(dt: number, pos: THREE.Vector3, velocity: THREE.Vector3, facingYaw: number, crouched: boolean, dead: boolean, firstPerson = false, pitch = 0) {
+  update(dt: number, pos: THREE.Vector3, velocity: THREE.Vector3, facingYaw: number, crouched: boolean, dead: boolean, firstPerson = false, pitch = 0, grounded = true) {
     const speed = Math.hypot(velocity.x, velocity.z);
     const armed = !!this.held;
     // face the movement direction when running unarmed, else the look direction
@@ -277,14 +330,27 @@ export class Avatar {
     d = Math.atan2(Math.sin(d), Math.cos(d));
     this.yaw += d * (1 - Math.exp(-(firstPerson ? 40 : armed ? 18 : 10) * dt));
     this.root.position.copy(pos);
+    // Dying: the knees go first, then the body tips over backwards and settles. It speeds
+    // up as it falls, the way a body does, and twists a little to one side.
+    if (dead) {
+      if (this.downT === 0) this.twist = (Math.random() - 0.5) * 0.9;
+      this.downT = Math.min(1, this.downT + dt / 0.85);
+    } else this.downT = 0;
+    const fall = this.downT * this.downT;
+    const settle = this.downT >= 1 ? 1 : fall * (1 + 0.08 * Math.sin(this.downT * Math.PI));
     // the rig faces -Z, the same convention as the camera
-    this.root.rotation.set(dead ? Math.PI / 2 : 0, this.yaw, 0, 'YXZ');
-    if (dead) this.root.position.y += 0.15;
-    this.root.scale.set(1, crouched ? 0.72 : 1, 1);
+    this.root.rotation.set(settle * Math.PI * 0.5, this.yaw + this.twist * fall, this.twist * 0.25 * fall, 'YXZ');
+    this.root.position.y += fall * 0.14;
+    this.crouchT += ((crouched && !dead ? 1 : 0) - this.crouchT) * (1 - Math.exp(-11 * dt));
+    this.airT += ((grounded || dead ? 0 : 1) - this.airT) * (1 - Math.exp(-9 * dt));
 
-    const walkW = THREE.MathUtils.clamp(speed / 1.8, 0, 1) * (1 - THREE.MathUtils.clamp((speed - 3) / 2.5, 0, 1));
-    const runW = THREE.MathUtils.clamp((speed - 3) / 2.5, 0, 1);
-    const idleW = 1 - THREE.MathUtils.clamp(speed / 1.8, 0, 1);
+    // moving backwards (weapon up, facing the threat) plays the steps in reverse
+    const ahead = -(velocity.x * Math.sin(this.yaw) + velocity.z * Math.cos(this.yaw));
+    const dirSign = ahead < -0.4 && speed > 0.5 ? -1 : 1;
+    const onFeet = 1 - this.airT;
+    const walkW = THREE.MathUtils.clamp(speed / 1.8, 0, 1) * (1 - THREE.MathUtils.clamp((speed - 3) / 2.5, 0, 1)) * onFeet;
+    const runW = THREE.MathUtils.clamp((speed - 3) / 2.5, 0, 1) * onFeet;
+    const idleW = 1 - walkW - runW;
     const set = (n: string, w: number) => {
       const a = this.actions[n];
       if (a) a.setEffectiveWeight(THREE.MathUtils.lerp(a.getEffectiveWeight(), w, 1 - Math.exp(-12 * dt)));
@@ -292,9 +358,18 @@ export class Avatar {
     set('Idle', idleW);
     set('Walk', walkW);
     set('Run', runW);
-    if (this.actions.Walk) this.actions.Walk.timeScale = THREE.MathUtils.clamp(speed / 1.6, 0.6, 2.4);
-    if (this.actions.Run) this.actions.Run.timeScale = THREE.MathUtils.clamp(speed / 5.2, 0.8, 1.3);
+    if (this.actions.Walk) this.actions.Walk.timeScale = THREE.MathUtils.clamp(speed / (1.6 - this.crouchT * 0.5), 0.6, 2.4) * dirSign;
+    if (this.actions.Run) this.actions.Run.timeScale = THREE.MathUtils.clamp(speed / 5.2, 0.8, 1.3) * dirSign;
     this.mixer.update(dead ? 0 : dt);
+    // the clips have just written every bone: now bend them into the stance
+    this.pose(POSE.crouch, this.crouchT);
+    this.pose(POSE.air, this.airT);
+    if (this.downT > 0) {
+      const limp = Math.min(1, this.downT * 1.6);
+      this.pose(POSE.down, limp);
+      this.legs.arm[0]?.rotateZ(-POSE.down.arms * limp);
+      this.legs.arm[1]?.rotateZ(POSE.down.arms * limp);
+    }
 
     if (!dead && (this.held || Math.abs(pitch) > 0.02)) {
       this.root.updateMatrixWorld(true);

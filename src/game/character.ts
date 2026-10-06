@@ -19,7 +19,6 @@ export class Dummy implements Damageable {
   private avatar = new Avatar();
   private body!: RAPIER.RigidBody;
   private colliders: RAPIER.Collider[] = [];
-  private fall = 0;
   private down = 0;
   private flinch = 0;
   private flinchSide = 0;
@@ -64,23 +63,20 @@ export class Dummy implements Damageable {
   }
 
   update(dt: number) {
-    this.avatar.update(this.dead ? 0 : dt, this.pos, ZERO, this.yaw, false, false);
+    this.avatar.update(dt, this.pos, ZERO, this.yaw, false, this.dead);
     this.flinch = Math.max(0, this.flinch - dt * 4);
     if (this.dead) {
-      this.fall = Math.min(1, this.fall + dt * 2.6);
       this.down -= dt;
       if (this.down <= 0) {
         this.dead = false;
         this.health = 100;
-        this.fall = 0;
         for (const c of this.colliders) c.setEnabled(true);
       }
+    } else if (this.flinch > 0) {
+      // rock back from the hit, away from where it came from
+      const r = this.avatar.root;
+      r.rotation.x += this.flinch * 0.12;
+      r.rotation.z += this.flinch * 0.1 * this.flinchSide;
     }
-    const r = this.avatar.root;
-    // topple backwards with a little bounce at the end
-    const k = this.fall;
-    const tip = k < 1 ? 1 - Math.pow(1 - k, 2) : 1;
-    r.rotation.set(tip * Math.PI * 0.5 + this.flinch * 0.12, this.yaw, this.flinch * 0.1 * this.flinchSide, 'YXZ');
-    r.position.y = this.pos.y + tip * 0.14;
   }
 }

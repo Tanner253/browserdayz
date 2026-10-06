@@ -13,8 +13,21 @@ export class AudioEngine {
   private reverb!: ConvolverNode;
   private reverbSend!: GainNode;
   private echo!: DelayNode;
+  private echoGain!: GainNode;
+  /** small-room reverb: what a shot sounds like under a roof */
+  private roomSend!: GainNode;
+  /** everything that is "the outdoors": dulled and turned down when you step inside */
+  private amb!: GainNode;
+  private ambLP!: BiquadFilterNode;
   private noiseBuf!: AudioBuffer;
-  private ambience: { wind?: GainNode; birdsT: number; indoors?: boolean } = { birdsT: 3 };
+  private ambience: { wind?: GainNode; leaves?: GainNode; insects?: GainNode; birdsT: number; crowT: number; indoors?: boolean; forest?: boolean } = { birdsT: 3, crowT: 20 };
+  private volume = 1;
+  private indoors = false;
+  // the body: breathing when out of breath, heartbeat when badly hurt
+  private breathT = 0;
+  private breathIn = true;
+  private heartT = 0;
+  private stepSide = 1;
   ready = false;
 
   /** Must be called from a user gesture. */
@@ -32,7 +45,7 @@ export class AudioEngine {
     comp.attack.value = 0.002;
     comp.release.value = 0.25;
     this.master = ctx.createGain();
-    this.master.gain.value = 0.8;
+    this.master.gain.value = 0.8 * this.volume;
     this.master.connect(comp).connect(ctx.destination);
     this.sfx = ctx.createGain();
     this.sfx.connect(this.master);
@@ -64,7 +77,7 @@ export class AudioEngine {
     // valley slap-back echo for gunshots
     this.echo = ctx.createDelay(2);
     this.echo.delayTime.value = 0.62;
-    const echoGain = ctx.createGain();
+    const echoGain = (this.echoGain = ctx.createGain());
     echoGain.gain.value = 0.28;
     const echoLP = ctx.createBiquadFilter();
     echoLP.type = 'lowpass';
@@ -72,8 +85,51 @@ export class AudioEngine {
     this.echo.connect(echoLP).connect(echoGain).connect(this.reverbSend);
     echoGain.connect(this.master);
 
+    // a room: short, bright, close reflections. Silent until you are under a roof.
+    const room = ctx.createConvolver();
+    const rl = Math.floor(ctx.sampleRate * 0.5);
+    const rir = ctx.createBuffer(2, rl, ctx.sampleRate);
+    for (let c = 0; c < 2; c++) {
+      const ch = rir.getChannelData(c);
+      for (let i = 0; i < rl; i++) {
+        const t = i / ctx.sampleRate;
+        // a few hard early reflections off the walls, then a quick diffuse tail
+        const early = i % Math.floor(ctx.sampleRate * (0.011 + c * 0.003)) === 0 && t < 0.09 ? 0.9 : 0;
+        ch[i] = ((Math.random() * 2 - 1) * Math.exp(-t * 11) + early * Math.exp(-t * 20)) * (t < 0.004 ? t / 0.004 : 1);
+      }
+    }
+    room.buffer = rir;
+    this.roomSend = ctx.createGain();
+    this.roomSend.gain.value = 0;
+    this.roomSend.connect(room).connect(this.master);
+
+    this.amb = ctx.createGain();
+    this.ambLP = this.filter('lowpass', 18000, 0.5);
+    this.amb.connect(this.ambLP).connect(this.master);
+
     this.startAmbience();
     this.ready = true;
+  }
+
+  /** player setting, 0..1 */
+  setVolume(v: number) {
+    this.volume = Math.max(0, Math.min(1, v));
+    if (this.ready) this.master.gain.setTargetAtTime(0.8 * this.volume, this.ctx.currentTime, 0.05);
+  }
+
+  /**
+   * Under a roof or out in the open. Indoors a shot is a hard, close slap with no valley
+   * echo, and the wind and the birds are on the other side of a wall.
+   */
+  setEnvironment(indoors: boolean) {
+    if (!this.ready || indoors === this.indoors) return;
+    this.indoors = indoors;
+    const t = this.ctx.currentTime;
+    this.roomSend.gain.setTargetAtTime(indoors ? 0.55 : 0, t, 0.25);
+    this.reverbSend.gain.setTargetAtTime(indoors ? 0.1 : 0.35, t, 0.25);
+    this.echoGain.gain.setTargetAtTime(indoors ? 0.04 : 0.28, t, 0.25);
+    this.ambLP.frequency.setTargetAtTime(indoors ? 900 : 18000, t, 0.4);
+    this.amb.gain.setTargetAtTime(indoors ? 0.45 : 1, t, 0.4);
   }
 
   setListener(pos: V3, fwd: V3, up: V3) {
@@ -168,6 +224,7 @@ export class AudioEngine {
     out.connect(send);
     send.connect(this.reverbSend);
     send.connect(this.echo);
+    send.connect(this.roomSend);
 
     // 1. supersonic crack / mechanical transient
     const crack = this.noise(t, 0.05);
@@ -267,6 +324,180 @@ export class AudioEngine {
     for (let i = 0; i < 3; i++) this.click(5200 + Math.random() * 1500, 0.08 / (i + 1), 0.04, delay + i * 0.09 + Math.random() * 0.03);
   }
 
+  /**
+   * A bullet going past your head: the crack of a supersonic round and the zip of air
+   * behind it. `pos` is the nearest point of its path, `miss` how close it came (metres).
+   */
+  whiz(pos: V3, miss: number, delay = 0, supersonic = true) {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime + delay;
+    const near = Math.max(0, 1 - miss / 5);
+    const out = this.out(pos, 2, 1);
+    if (supersonic) {
+      const c = this.noise(t, 0.03);
+      const hp = this.filter('highpass', 3200);
+      const cg = this.ctx.createGain();
+      this.env(cg, t, 0.5 + near * 0.9, 0.0006, 0.02);
+      c.connect(hp).connect(cg).connect(out);
+    }
+    const n = this.noise(t, 0.2);
+    const f = this.filter('bandpass', 4200, 5);
+    f.frequency.setValueAtTime(4600, t);
+    f.frequency.exponentialRampToValueAtTime(700, t + 0.16);
+    const g = this.ctx.createGain();
+    this.env(g, t, 0.18 + near * 0.35, 0.004, 0.15);
+    n.connect(f).connect(g).connect(out);
+  }
+
+  /** your shot landed on somebody (a dry tick), or killed them (a heavier double) */
+  hitTick(kill: boolean) {
+    if (!this.ready) return;
+    if (!kill) {
+      this.click(1900, 0.22, 0.012);
+      return;
+    }
+    const t = this.ctx.currentTime;
+    this.click(1300, 0.3, 0.02);
+    const o = this.ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(190, t + 0.03);
+    o.frequency.exponentialRampToValueAtTime(80, t + 0.2);
+    const g = this.ctx.createGain();
+    this.env(g, t + 0.03, 0.4, 0.004, 0.2);
+    o.connect(g).connect(this.sfx);
+    o.start(t + 0.03);
+    o.stop(t + 0.3);
+  }
+
+  /** a weapon coming up into the hands: sling and cloth, then metal settling */
+  equip(kind: 'gun' | 'melee' | 'hands') {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    const n = this.noise(t, 0.22);
+    const f = this.filter('bandpass', 1700, 0.7);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.16, t + 0.06);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+    n.connect(f).connect(g).connect(this.sfx);
+    if (kind === 'gun') {
+      this.click(2300, 0.16, 0.02, 0.1);
+      this.click(1500, 0.14, 0.03, 0.17);
+    } else if (kind === 'melee') this.click(3800, 0.1, 0.03, 0.12);
+  }
+
+  /** kit shifting on the body with every step: louder the more you carry */
+  private gear(t: number, vol: number) {
+    const n = this.noise(t, 0.09);
+    const f = this.filter('bandpass', 2600 + Math.random() * 1400, 1.2);
+    const g = this.ctx.createGain();
+    this.env(g, t, vol, 0.012, 0.06);
+    n.connect(f).connect(g).connect(this.sfx);
+  }
+
+  /** pushing off the ground */
+  jump() {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    this.gear(t, 0.09);
+    const n = this.noise(t, 0.16);
+    const f = this.filter('bandpass', 1100, 1.5);
+    const g = this.ctx.createGain();
+    this.env(g, t, 0.07, 0.03, 0.1);
+    n.connect(f).connect(g).connect(this.sfx);
+  }
+
+  /** coming down: the feet, the weight behind them, and the kit catching up */
+  land(surface: Surface | 'grass' | 'dirt' | 'gravel', speed: number) {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    const k = Math.min(1, speed / 11);
+    this.footstep(surface, 3 + k * 5);
+    const o = this.ctx.createOscillator();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(110, t);
+    o.frequency.exponentialRampToValueAtTime(42, t + 0.14);
+    const g = this.ctx.createGain();
+    this.env(g, t, 0.15 + k * 0.55, 0.003, 0.14);
+    o.connect(g).connect(this.sfx);
+    o.start(t);
+    o.stop(t + 0.25);
+    this.gear(t + 0.03, 0.06 + k * 0.12);
+  }
+
+  /** the last breath going out, and the body hitting the ground */
+  death() {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    const n = this.noise(t, 1.1);
+    const f = this.filter('bandpass', 620, 1.6);
+    f.frequency.setValueAtTime(760, t);
+    f.frequency.exponentialRampToValueAtTime(330, t + 1);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.2, t + 0.12);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.05);
+    n.connect(f).connect(g).connect(this.sfx);
+    const o = this.ctx.createOscillator();
+    o.frequency.setValueAtTime(95, t + 0.45);
+    o.frequency.exponentialRampToValueAtTime(38, t + 0.62);
+    const og = this.ctx.createGain();
+    this.env(og, t + 0.45, 0.6, 0.004, 0.2);
+    o.connect(og).connect(this.sfx);
+    o.start(t + 0.45);
+    o.stop(t + 0.8);
+  }
+
+  /**
+   * Call every frame. Out of breath: you hear yourself breathing, faster and louder the
+   * emptier the lungs. Badly hurt: your own pulse.
+   */
+  body(dt: number, stamina: number, health: number, alive: boolean) {
+    if (!this.ready || !alive) return;
+    const ctx = this.ctx;
+    const tired = Math.max(0, Math.min(1, (48 - stamina) / 48));
+    if (tired > 0.04) {
+      this.breathT -= dt;
+      if (this.breathT <= 0) {
+        const inhale = this.breathIn;
+        this.breathIn = !inhale;
+        const cycle = 1.7 - tired * 0.95;
+        this.breathT = cycle * (inhale ? 0.45 : 0.55);
+        const t = ctx.currentTime;
+        const dur = this.breathT * 0.82;
+        const n = this.noise(t, dur);
+        const f = this.filter('bandpass', inhale ? 2100 : 1050, inhale ? 1.1 : 0.8);
+        const g = ctx.createGain();
+        const peak = (0.035 + tired * 0.11) * (inhale ? 0.8 : 1);
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.linearRampToValueAtTime(peak, t + dur * (inhale ? 0.55 : 0.2));
+        g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        n.connect(f).connect(g).connect(this.sfx);
+      }
+    } else {
+      this.breathT = 0;
+      this.breathIn = true;
+    }
+    const hurt = Math.max(0, Math.min(1, (36 - health) / 36));
+    if (hurt > 0) {
+      this.heartT -= dt;
+      if (this.heartT <= 0) {
+        this.heartT = 1.0 - hurt * 0.38;
+        const t = ctx.currentTime;
+        for (const [at, f0, v] of [[0, 62, 1], [0.17, 50, 0.7]] as const) {
+          const o = ctx.createOscillator();
+          o.frequency.setValueAtTime(f0, t + at);
+          o.frequency.exponentialRampToValueAtTime(f0 * 0.6, t + at + 0.1);
+          const g = ctx.createGain();
+          this.env(g, t + at, (0.2 + hurt * 0.4) * v, 0.006, 0.11);
+          o.connect(g).connect(this.sfx);
+          o.start(t + at);
+          o.stop(t + at + 0.2);
+        }
+      }
+    }
+  }
+
   // ------------------------------------------------------------ world
 
   /** latch click + hinge creak (opening) or a soft thud (closing) */
@@ -361,11 +592,20 @@ export class AudioEngine {
     n.connect(f).connect(g).connect(out);
   }
 
-  footstep(surface: Surface | 'grass' | 'dirt' | 'gravel', speed: number, pos?: V3) {
+  /** @param carried weight on the player's back (own steps only): the kit shifts with each one */
+  footstep(surface: Surface | 'grass' | 'dirt' | 'gravel', speed: number, pos?: V3, carried = 0) {
     if (!this.ready) return;
     const t = this.ctx.currentTime;
     const vol = Math.min(1, 0.15 + speed * 0.07);
-    const out = this.out(pos, 2, 1.5);
+    let out = this.out(pos, 2, 1.5);
+    if (!pos) {
+      // your own feet: one a little to the left, the next a little to the right
+      const pan = this.ctx.createStereoPanner();
+      pan.pan.value = 0.14 * (this.stepSide = -this.stepSide);
+      pan.connect(this.sfx);
+      out = pan;
+      if (speed > 2.4) this.gear(t + 0.02, Math.min(0.1, 0.012 + carried * 0.004 + speed * 0.004));
+    }
     const layer = (type: BiquadFilterType, freq: number, q: number, v: number, a: number, d: number, at = 0) => {
       const n = this.noise(t + at, a + d + 0.02);
       const f = this.filter(type, freq * (0.85 + Math.random() * 0.3), q);
@@ -464,19 +704,40 @@ export class AudioEngine {
     }
   }
 
+  /** being hit: the blow landing, and the grunt it knocks out of you */
   hurt() {
     if (!this.ready) return;
-    const t = this.ctx.currentTime;
-    const o = this.ctx.createOscillator();
-    o.type = 'sawtooth';
-    o.frequency.setValueAtTime(180, t);
-    o.frequency.exponentialRampToValueAtTime(110, t + 0.25);
-    const f = this.filter('lowpass', 900, 1);
-    const g = this.ctx.createGain();
-    this.env(g, t, 0.18, 0.01, 0.25);
-    o.connect(f).connect(g).connect(this.sfx);
-    o.start(t);
-    o.stop(t + 0.35);
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    // the blow
+    const th = ctx.createOscillator();
+    th.frequency.setValueAtTime(120, t);
+    th.frequency.exponentialRampToValueAtTime(48, t + 0.09);
+    const tg = ctx.createGain();
+    this.env(tg, t, 0.5, 0.002, 0.1);
+    th.connect(tg).connect(this.sfx);
+    th.start(t);
+    th.stop(t + 0.2);
+    // the grunt: a voiced buzz shaped by two formants, falling in pitch, with breath on top
+    const pitch = 105 + Math.random() * 30;
+    const v = ctx.createOscillator();
+    v.type = 'sawtooth';
+    v.frequency.setValueAtTime(pitch * 1.25, t + 0.02);
+    v.frequency.exponentialRampToValueAtTime(pitch * 0.8, t + 0.26);
+    const f1 = this.filter('bandpass', 620, 5);
+    const f2 = this.filter('bandpass', 1150, 6);
+    const vg = ctx.createGain();
+    this.env(vg, t + 0.02, 0.5, 0.015, 0.22);
+    v.connect(f1).connect(vg);
+    v.connect(f2).connect(vg);
+    vg.connect(this.sfx);
+    v.start(t + 0.02);
+    v.stop(t + 0.32);
+    const n = this.noise(t + 0.02, 0.24);
+    const nf = this.filter('bandpass', 1500, 1);
+    const ng = ctx.createGain();
+    this.env(ng, t + 0.02, 0.09, 0.02, 0.2);
+    n.connect(nf).connect(ng).connect(this.sfx);
   }
 
   zombie(pos: V3, distance: number, aggressive: boolean) {
@@ -527,21 +788,112 @@ export class AudioEngine {
     const glg = ctx.createGain();
     glg.gain.value = 0.025;
     glfo.connect(glg).connect(g.gain);
-    src.connect(f).connect(g).connect(this.master);
+    src.connect(f).connect(g).connect(this.amb);
     src.start();
     lfo.start();
     glfo.start();
     this.ambience.wind = g;
+
+    // leaves: a brighter hiss that comes and goes with the gusts, loud only among trees
+    const lsrc = ctx.createBufferSource();
+    lsrc.buffer = this.noiseBuf;
+    lsrc.loop = true;
+    lsrc.playbackRate.value = 0.7;
+    const lf = this.filter('bandpass', 3400, 0.6);
+    const gust = ctx.createGain();
+    gust.gain.value = 0.55;
+    const gl = ctx.createOscillator();
+    gl.frequency.value = 0.083;
+    const glg2 = ctx.createGain();
+    glg2.gain.value = 0.45;
+    gl.connect(glg2).connect(gust.gain);
+    const leaves = ctx.createGain();
+    leaves.gain.value = 0.006;
+    lsrc.connect(lf).connect(gust).connect(leaves).connect(this.amb);
+    lsrc.start();
+    gl.start();
+    this.ambience.leaves = leaves;
+
+    // insects: a thin, pulsing trill that sits under everything out in the grass
+    const ins = ctx.createOscillator();
+    ins.type = 'sine';
+    ins.frequency.value = 5400;
+    const trem = ctx.createGain();
+    trem.gain.value = 0.5;
+    const tl = ctx.createOscillator();
+    tl.type = 'square';
+    tl.frequency.value = 31;
+    const tlg = ctx.createGain();
+    tlg.gain.value = 0.5;
+    tl.connect(tlg).connect(trem.gain);
+    const swell = ctx.createGain();
+    swell.gain.value = 0.5;
+    const sl = ctx.createOscillator();
+    sl.frequency.value = 0.19;
+    const slg = ctx.createGain();
+    slg.gain.value = 0.5;
+    sl.connect(slg).connect(swell.gain);
+    const insects = ctx.createGain();
+    insects.gain.value = 0.0045;
+    ins.connect(trem).connect(swell).connect(insects).connect(this.amb);
+    ins.start();
+    tl.start();
+    sl.start();
+    this.ambience.insects = insects;
   }
 
-  /** call each frame: occasional birdsong from random directions */
-  updateAmbience(dt: number, listener: V3, indoors: boolean) {
+  /** a crow somewhere off in the trees */
+  private crow(listener: V3) {
+    const a = Math.random() * Math.PI * 2;
+    const r = 60 + Math.random() * 90;
+    const pos = { x: listener.x + Math.cos(a) * r, y: listener.y + 14 + Math.random() * 12, z: listener.z + Math.sin(a) * r };
+    const out = this.out(pos, 14, 1, r);
+    const tail = this.ctx.createGain();
+    tail.gain.value = 0.5;
+    out.connect(tail).connect(this.reverbSend);
+    const t0 = this.ctx.currentTime;
+    const caws = 2 + Math.floor(Math.random() * 3);
+    const pitch = 400 + Math.random() * 90;
+    for (let i = 0; i < caws; i++) {
+      const t = t0 + i * (0.33 + Math.random() * 0.08);
+      const o = this.ctx.createOscillator();
+      o.type = 'sawtooth';
+      o.frequency.setValueAtTime(pitch * 1.12, t);
+      o.frequency.linearRampToValueAtTime(pitch * 0.86, t + 0.2);
+      const rasp = this.ctx.createOscillator();
+      rasp.frequency.value = 58;
+      const rg = this.ctx.createGain();
+      rg.gain.value = pitch * 0.22;
+      rasp.connect(rg).connect(o.frequency);
+      const f = this.filter('bandpass', 1500, 2.2);
+      const g = this.ctx.createGain();
+      this.env(g, t, 0.34, 0.02, 0.2);
+      o.connect(f).connect(g).connect(out);
+      o.start(t);
+      rasp.start(t);
+      o.stop(t + 0.3);
+      rasp.stop(t + 0.3);
+    }
+  }
+
+  /**
+   * Call each frame: occasional birdsong and crows from random directions.
+   * @param forest among trees (leaves in the wind) rather than out in the open (insects in the grass)
+   */
+  updateAmbience(dt: number, listener: V3, indoors: boolean, forest = false) {
     if (!this.ready) return;
-    // only schedule a fade when going in or out, not every frame
-    if (this.ambience.wind && indoors !== this.ambience.indoors) {
-      this.ambience.indoors = indoors;
-      this.ambience.wind.gain.cancelScheduledValues(this.ctx.currentTime);
-      this.ambience.wind.gain.setTargetAtTime(indoors ? 0.018 : 0.045, this.ctx.currentTime, 0.6);
+    this.setEnvironment(indoors);
+    // only schedule a fade when the surroundings change, not every frame
+    if (forest !== this.ambience.forest) {
+      this.ambience.forest = forest;
+      const t = this.ctx.currentTime;
+      this.ambience.leaves?.gain.setTargetAtTime(forest ? 0.03 : 0.006, t, 2.5);
+      this.ambience.insects?.gain.setTargetAtTime(forest ? 0.0015 : 0.0045, t, 2.5);
+    }
+    this.ambience.crowT -= dt;
+    if (this.ambience.crowT <= 0) {
+      this.ambience.crowT = 28 + Math.random() * 55;
+      if (!indoors) this.crow(listener);
     }
     this.ambience.birdsT -= dt;
     if (this.ambience.birdsT > 0) return;

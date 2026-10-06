@@ -10,7 +10,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
-import { dedup, prune, weld, simplify, textureCompress, meshopt, getBounds } from '@gltf-transform/functions';
+import { dedup, prune, weld, textureCompress, meshopt, getBounds } from '@gltf-transform/functions';
 import { MeshoptEncoder, MeshoptSimplifier } from 'meshoptimizer';
 import sharp from 'sharp';
 import { HDRI, TEXTURES, MODELS } from './assets.config.mjs';
@@ -138,6 +138,47 @@ function countTris(doc) {
   return Math.round(tris);
 }
 
+/**
+ * Reduce a model to about `target` triangles in total. First the careful way (edge
+ * collapses that keep silhouettes and texture seams); scans whose surface is torn into
+ * unconnected pieces will not collapse like that, so those fall back to clustering
+ * vertices, which always reaches the target and is plenty for something seen from afar.
+ */
+function decimate(doc, target) {
+  const before = countTris(doc);
+  if (before <= target) return;
+  const ratio = target / before;
+  for (const mesh of doc.getRoot().listMeshes()) {
+    for (const prim of mesh.listPrimitives()) {
+      const posAcc = prim.getAttribute('POSITION');
+      const positions = new Float32Array(posAcc.getArray());
+      const idxAcc = prim.getIndices();
+      const indices = idxAcc ? new Uint32Array(idxAcc.getArray()) : Uint32Array.from({ length: posAcc.getCount() }, (_, i) => i);
+      const want = Math.max(36, Math.floor((indices.length * ratio) / 3) * 3);
+      if (indices.length <= want) continue;
+      let [out] = MeshoptSimplifier.simplify(indices, positions, 3, want, 0.06);
+      if (out.length > want * 1.35) [out] = MeshoptSimplifier.simplifySloppy(indices, positions, 3, null, want, 0.6);
+      if (out.length < 3) continue;
+      // drop the vertices nothing refers to any more
+      const [remap, unique] = MeshoptSimplifier.compactMesh(out);
+      for (const semantic of prim.listSemantics()) {
+        const acc = prim.getAttribute(semantic);
+        const src = acc.getArray();
+        const size = acc.getElementSize();
+        const dst = new src.constructor(unique * size);
+        for (let i = 0; i < remap.length; i++) {
+          const j = remap[i];
+          if (j === 0xffffffff) continue;
+          for (let k = 0; k < size; k++) dst[j * size + k] = src[i * size + k];
+        }
+        prim.setAttribute(semantic, acc.clone().setArray(dst));
+      }
+      const idx = (idxAcc ? idxAcc.clone() : doc.createAccessor().setType('SCALAR')).setArray(unique > 65535 ? out : new Uint16Array(out));
+      prim.setIndices(idx);
+    }
+  }
+}
+
 async function processModel(id) {
   const cfg = MODELS[id];
   const files = await getJSON(`${API}/files/${id}`);
@@ -151,13 +192,17 @@ async function processModel(id) {
 
   const io = await getIO();
   const dest = path.join(OUT, 'models', `${id}.glb`);
-  const lodPaths = (cfg.lods || []).map((_, i) => path.join(OUT, 'models', `${id}_lod${i + 1}.glb`));
+  const lodPath = path.join(OUT, 'models', `${id}_lod1.glb`);
+  // reprocess when the settings for this model change, not only when files are missing
+  const stamp = JSON.stringify({ tex: cfg.tex, budget: cfg.budget ?? null, far: cfg.far ?? null, v: 2 });
   let meta;
 
   const metaPath = path.join(SRC, 'models', id, '_meta.json');
-  if (!FORCE && (await exists(dest)) && (await exists(metaPath)) && (await Promise.all(lodPaths.map(exists))).every(Boolean)) {
+  if (!FORCE && (await exists(dest)) && (await exists(metaPath)) && (!cfg.far || (await exists(lodPath)))) {
     meta = JSON.parse(await fs.readFile(metaPath, 'utf8'));
-  } else {
+    if (meta.stamp !== stamp) meta = undefined;
+  }
+  if (!meta) {
     const base = async () => {
       const doc = await io.read(gltfPath);
       await doc.transform(dedup(), prune(), weld());
@@ -166,31 +211,35 @@ async function processModel(id) {
 
     const doc = await base();
     const srcTris = countTris(doc);
-    if (cfg.simplify) {
-      await doc.transform(simplify({ simplifier: MeshoptSimplifier, ratio: cfg.simplify, error: 0.002 }));
-    }
-    const tris = countTris(doc);
+    // the footprint comes from the untouched model, so it does not shift when the budget changes
     const bounds = getBounds(doc.getRoot().listScenes()[0]);
+    if (cfg.budget) decimate(doc, cfg.budget);
+    const tris = countTris(doc);
     await doc.transform(
+      prune(),
       textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [cfg.tex, cfg.tex], quality: 88 }),
       meshopt({ encoder: MeshoptEncoder, level: 'medium' }),
     );
     await fs.mkdir(path.dirname(dest), { recursive: true });
     await io.write(dest, doc);
 
+    // the version drawn from a distance: a few hundred triangles and small textures
     const lods = [];
-    for (let i = 0; i < (cfg.lods || []).length; i++) {
+    if (cfg.far) {
       const ld = await base();
+      decimate(ld, cfg.far);
+      const lodTris = countTris(ld);
       await ld.transform(
-        simplify({ simplifier: MeshoptSimplifier, ratio: cfg.lods[i], error: 0.02 }),
+        prune(),
         textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [256, 256], quality: 80 }),
         meshopt({ encoder: MeshoptEncoder, level: 'medium' }),
       );
-      await io.write(lodPaths[i], ld);
-      lods.push({ url: `assets/models/${id}_lod${i + 1}.glb`, tris: countTris(ld) });
+      await io.write(lodPath, ld);
+      lods.push({ url: `assets/models/${id}_lod1.glb`, tris: lodTris });
     }
 
     meta = {
+      stamp,
       srcTris,
       tris,
       min: bounds.min.map((v) => +v.toFixed(4)),
@@ -202,8 +251,9 @@ async function processModel(id) {
 
   const st = await fs.stat(dest);
   await credit(id, 'model');
-  console.log(`model ${id.padEnd(28)} ${String(meta.tris).padStart(7)} tris  ${(st.size / 1024).toFixed(0).padStart(6)} KB`);
-  return { url: `assets/models/${id}.glb`, tags: cfg.tags || [], bytes: st.size, ...meta };
+  const { stamp: _stamp, ...out } = meta;
+  console.log(`model ${id.padEnd(28)} ${String(meta.srcTris).padStart(7)} -> ${String(meta.tris).padStart(6)} tris${meta.lods[0] ? `, far ${String(meta.lods[0].tris).padStart(5)}` : '           '}  ${(st.size / 1024).toFixed(0).padStart(6)} KB`);
+  return { url: `assets/models/${id}.glb`, tags: cfg.tags || [], bytes: st.size, ...out };
 }
 
 // ---------------------------------------------------------------- main

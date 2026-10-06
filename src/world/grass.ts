@@ -80,6 +80,7 @@ function bladeGeometry(): THREE.BufferGeometry {
 export class Grass {
   private levels: GrassLevel[] = [];
   private frustum = new THREE.Frustum();
+  private sig = 0;
   private pv = new THREE.Matrix4();
   private box = new THREE.Box3();
   readonly radius = 72;
@@ -114,6 +115,7 @@ export class Grass {
       mesh.castShadow = false;
       mesh.receiveShadow = true;
       mesh.matrixAutoUpdate = false;
+      mesh.name = `grass:${this.levels.length}`;
       mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       scene.add(mesh);
       this.levels.push({ mesh, maxDist, count: 0, frac });
@@ -183,6 +185,7 @@ reflectedLight.indirectSpecular *= 0.35;`,
     this.pv.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     this.frustum.setFromProjectionMatrix(this.pv);
     for (const l of this.levels) l.count = 0;
+    let sig = 0;
     const cx = camera.position.x;
     const cz = camera.position.z;
     const r = this.radius;
@@ -214,8 +217,12 @@ reflectedLight.indirectSpecular *= 0.35;`,
         arr[o + 8] = 0; arr[o + 9] = 0; arr[o + 10] = 1; arr[o + 11] = 0;
         arr[o + 12] = px; arr[o + 13] = 0; arr[o + 14] = pz; arr[o + 15] = 1;
         lvl.count++;
+        sig = (Math.imul(sig, 31) + Math.imul(px, 73) + Math.imul(pz, 19) + this.levels.indexOf(lvl)) | 0;
       }
     }
+    // the same patches at the same detail as last frame: nothing to send to the GPU
+    if (sig === this.sig) return;
+    this.sig = sig;
     for (const l of this.levels) {
       l.mesh.count = l.count;
       l.mesh.instanceMatrix.clearUpdateRanges();
