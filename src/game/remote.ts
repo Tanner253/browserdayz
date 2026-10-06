@@ -7,7 +7,8 @@ import type RAPIER from '@dimforge/rapier3d-compat';
 import { physics, GLASS_GROUPS, HITBOX_GROUPS, SOLID_GROUPS, type Surface } from '../core/physics';
 import { audio } from '../core/audio';
 import type { Atmosphere } from '../world/atmosphere';
-import { F_AIM, F_CROUCH, F_DEAD, F_GROUND, type Pose } from '../net/protocol';
+import { F_AIM, F_BLEED, F_CROUCH, F_DEAD, F_GROUND, type Act, type Pose } from '../net/protocol';
+import { ITEMS } from '../sim/items';
 import { Avatar } from './avatar';
 import { lookFor } from './look';
 import type { Damageable, HitZone } from './weapons';
@@ -33,7 +34,10 @@ export class RemotePlayer implements Damageable {
   crouched = false;
   weapon: string | null = null;
   mods: string[] = [];
-  private avatar = new Avatar();
+  readonly avatar = new Avatar();
+  /** they have an open wound: it drips as they go */
+  bleeding = false;
+  dripT = 0;
   private body!: RAPIER.RigidBody;
   private stand: RAPIER.Collider[] = [];
   private crouch: RAPIER.Collider[] = [];
@@ -97,6 +101,8 @@ export class RemotePlayer implements Damageable {
   setAlive(alive: boolean) {
     if (alive === this.alive) return;
     this.alive = alive;
+    // back from the dead is a new life in clean clothes
+    if (alive) this.avatar.clearWounds();
     this.fall = 0;
     this.avatar.root.visible = true;
     this.applyZones();
@@ -110,15 +116,30 @@ export class RemotePlayer implements Damageable {
 
   /** they threw a punch or swung what they are holding */
   swing() {
-    if (this.ready && this.alive) this.avatar.swing();
+    if (!this.ready || !this.alive) return;
+    this.avatar.swing();
+    if (this.pos.distanceToSquared(this.heard) < 30 * 30) audio.whoosh(this.weapon ? 0.6 : 0, this.pos);
   }
 
-  /** your shot or blow landed on them: the server decides what it did, this is just the flinch */
-  damage(): boolean {
+  /** they are working the bolt, reloading, eating, dressing a wound: seen, and heard if close */
+  act(a: Act, dur: number, listener: THREE.Vector3) {
+    if (!this.ready || !this.alive) return;
+    if (a === 'stop') return this.avatar.act(null);
+    this.avatar.act(a, dur);
+    if (this.pos.distanceToSquared(listener) > 40 * 40) return;
+    if (a === 'bolt') audio.boltCycle(0, this.pos);
+    else if (a === 'reload') audio.reloadNear(this.pos, dur, ITEMS[this.weapon ?? '']?.weapon?.kind === 'pistol');
+  }
+
+  /** your shot or blow landed on them: the server decides what it did, this is the flinch and the grunt */
+  damage(_amount: number, point: THREE.Vector3, _dir: THREE.Vector3, zone: HitZone): boolean {
     this.flinch = 1;
-    this.avatar.hit();
+    this.avatar.hit(zone === 'head');
+    audio.hurt(point, point.distanceTo(this.heard));
     return false;
   }
+  /** where the local player is listening from (kept by update) */
+  private heard = new THREE.Vector3();
 
   /** chest position, for name tags and aim checks */
   chest(out: THREE.Vector3) {
@@ -127,6 +148,7 @@ export class RemotePlayer implements Damageable {
 
   update(dt: number, now: number, listener: THREE.Vector3) {
     if (!this.ready) return;
+    this.heard.copy(listener);
     // --- interpolate between the two poses around (now - delay)
     const t = now - INTERP_DELAY;
     const s = this.snaps;
@@ -148,6 +170,7 @@ export class RemotePlayer implements Damageable {
       this.pitch = a.p[4] + (b.p[4] - a.p[4]) * Math.min(1, k);
       this.grounded = !!(b.p[5] & F_GROUND);
       this.aiming = !!(b.p[5] & F_AIM);
+      this.bleeding = !!(b.p[5] & F_BLEED);
       const crouched = !!(b.p[5] & F_CROUCH);
       if (crouched !== this.crouched) {
         this.crouched = crouched;
@@ -206,10 +229,10 @@ export class RemotePlayer implements Damageable {
 export class CorpseBody {
   private avatar = new Avatar();
   /** @param name whose body it is: it is dressed the way they were */
-  async load(atmo: Atmosphere, scene: THREE.Scene, x: number, y: number, z: number, yaw: number, name: string) {
+  async load(atmo: Atmosphere, scene: THREE.Scene, x: number, y: number, z: number, yaw: number, name: string, variant = 0) {
     await this.avatar.load(atmo, 0, false, lookFor(name));
     scene.add(this.avatar.root);
-    this.avatar.layDown();
+    this.avatar.layDown(variant);
     this.avatar.update(0, new THREE.Vector3(x, y, z), new THREE.Vector3(), yaw, false, true);
   }
   dispose() {

@@ -14,6 +14,8 @@ const CROUCH_HALF = 0.26;
 const RADIUS = 0.3;
 const EYE_STAND = 1.64;
 const EYE_CROUCH = 1.02;
+/** how long an untreated wound bleeds, seconds */
+const BLEED_TIME = 42;
 
 export interface Vitals {
   health: number;
@@ -71,6 +73,10 @@ export class Player {
   /** camera roll from sidestepping */
   private strafeRoll = 0;
   private hurtTimer = 0;
+  /** seconds the current wound has been open */
+  private bleedT = 0;
+  /** an untreated wound closed by itself */
+  onClot: () => void = () => {};
   onDamage: (amount: number, cause: string) => void = () => {};
   onFootstep: (surface: string) => void = () => {};
   /** touched down after a fall or a jump, at this speed (m/s) */
@@ -245,7 +251,7 @@ export class Player {
     if (s > 9.5) {
       const dmg = (s - 9.5) * 14 * this.fallMult;
       this.damage(dmg, 'fall');
-      if (s > 13) this.vitals.bleeding = true;
+      if (s > 13) this.bleed();
     }
   }
 
@@ -273,7 +279,16 @@ export class Player {
     const exertion = this.sprinting ? 2.4 : this.moving > 0.1 ? 1.3 : 1;
     v.energy = Math.max(0, v.energy - 0.045 * exertion * dt);
     v.water = Math.max(0, v.water - 0.07 * exertion * dt);
-    if (v.bleeding) this.damageQuiet(1.1 * dt, 'blood loss');
+    // An open wound costs about one health a second. Left alone it closes in the end, at a
+    // price most of a bandage's worth of health; a bandage stops it there and then.
+    if (v.bleeding) {
+      this.damageQuiet(1.0 * dt, 'blood loss');
+      this.bleedT += dt;
+      if (this.bleedT > BLEED_TIME && !this.dead) {
+        v.bleeding = false;
+        this.onClot();
+      }
+    } else this.bleedT = 0;
     if (v.energy <= 0 || v.water <= 0) this.damageQuiet(0.35 * dt, v.water <= 0 ? 'thirst' : 'hunger');
     else if (v.energy > 60 && v.water > 60 && !v.bleeding && v.health < 100) v.health = Math.min(100, v.health + 0.12 * dt);
     if (this.hurtTimer > 0) this.hurtTimer -= dt;
@@ -285,6 +300,12 @@ export class Player {
       this.lastCause = cause;
       this.dead = true;
     }
+  }
+
+  /** a fresh wound (or a second one): the clock on it starts again */
+  bleed() {
+    this.vitals.bleeding = true;
+    this.bleedT = 0;
   }
 
   get hurt() {

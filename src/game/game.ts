@@ -19,9 +19,9 @@ import { Economy, type WorldLoot } from '../sim/economy';
 import { CRATE_RESTOCK, CRATE_SPECS, fillCrate } from '../sim/crates';
 import { loadSave, writeSave, type SaveData } from '../sim/save';
 import { Net, playerName, publicId, remoteServer, serverStatus, setPlayerName } from '../net/client';
-import { F_AIM, F_CROUCH, F_DEAD, F_GROUND, F_SPRINT, MAX_STAMINA, crateId, type CorpseInfo, type PlayerInfo, type Pose, type S2C, type StashInfo } from '../net/protocol';
+import { F_AIM, F_BLEED, F_CROUCH, F_DEAD, F_GROUND, F_SPRINT, MAX_STAMINA, crateId, type Act, type CorpseInfo, type PlayerInfo, type Pose, type S2C, type StashInfo } from '../net/protocol';
 import { Player } from './player';
-import { Avatar, AVATAR_LAYER, FP_BODY_LAYER } from './avatar';
+import { Avatar, AVATAR_LAYER, DEATH_REST, FP_BODY_LAYER, GEAR_SHOWN } from './avatar';
 import { lookFor } from './look';
 import { roadLift } from '../world/road';
 import { Dummy } from './character';
@@ -62,6 +62,7 @@ interface TimedAction {
 const LOOT_REV = 6;
 const QUICK_KEYS = ['Digit5', 'Digit6', 'Digit7', 'Digit8'];
 const SEND_HZ = 15;
+const _drip = new THREE.Vector3();
 
 export class Game {
   input: Input;
@@ -165,7 +166,15 @@ export class Game {
     this.weapons.setLook(lookFor(playerName()));
     this.weapons.resolveTarget = (owner) => (owner instanceof Dummy || owner instanceof RemotePlayer ? owner : null);
     this.weapons.onHit = (h) => this.onHit(h);
+    // whoever is hit carries the blood on their clothes where it landed
+    this.weapons.onFlesh = (owner, pt, dir, power) => {
+      if (power < 0.4) return;
+      const body = owner instanceof RemotePlayer || owner instanceof Dummy ? owner.avatar : owner === this.player ? this.avatar : null;
+      body?.wound(pt, dir, 0.05 + power * 0.04, power > 0.58);
+    };
     this.weapons.onShot = (s) => this.net.send({ t: 'shot', o: s.origin.toArray(), d: s.dir.toArray(), w: s.weapon, sup: s.suppressed });
+    // the bolt, a reload: the same
+    this.weapons.onAct = (a, d) => this.act(a, d);
     // a punch or a swing: your own body throws it, and everyone near you sees it
     this.weapons.onSwing = () => {
       this.avatar.swing();
@@ -222,6 +231,10 @@ export class Game {
     this.player.onLand = (speed) => this.weapons.landed(speed);
     this.player.onDamage = (amt, cause) => {
       if (cause === 'fall' && amt > 5) this.hud.note('You hurt yourself in the fall', 'warn');
+    };
+    this.player.onClot = () => {
+      this.hud.note('The bleeding has stopped on its own', 'good');
+      this.meDirty = true;
     };
     this.hud.onChat(
       (ch, text) => {
@@ -358,8 +371,11 @@ export class Game {
     const pick = (ids: string[]) => ids[Math.floor(Math.random() * ids.length)];
     this.inv.add(makeItem(pick(['sprats', 'beans', 'sardines', 'tomatoes'])));
     this.inv.add(makeItem(pick(['thermos', 'milk'])));
+    // one dressing: the first wound is survivable, the second is yours to deal with
+    this.inv.add(makeItem('bandage'));
     this.inv.add(this.makeTag());
     this.player.vitals = { health: 100, energy: 80, water: 80, stamina: MAX_STAMINA, bleeding: false };
+    this.avatar.clearWounds();
     this.weapons.validate();
     this.refreshQuick();
   }
@@ -493,8 +509,12 @@ export class Game {
       this.refreshQuick();
     } else this.freshKit();
     this.meDirty = true;
+    // the server has not heard what we are wearing yet
+    this.gearKey = '\u0000';
+    this.syncGear();
 
     const net = this.net;
+    const cam = () => this.s.r.camera;
     net.on('join', (m) => {
       void this.addRemote(m.p);
       this.updateOnline();
@@ -522,6 +542,8 @@ export class Game {
     });
     net.on('shot', (m) => this.weapons.remoteShot(new THREE.Vector3(...m.o), new THREE.Vector3(...m.d), m.w, m.sup));
     net.on('swing', (m) => this.remotes.get(m.id)?.swing());
+    net.on('act', (m) => this.remotes.get(m.id)?.act(m.a, m.d, cam().position));
+    net.on('gear', (m) => this.remotes.get(m.id) && void this.wear(this.remotes.get(m.id)!.avatar, m.g));
     net.on('dmg', (m) => this.takeHit(m));
     net.on('death', (m) => {
       const k = m.k;
@@ -533,6 +555,7 @@ export class Game {
         this.weapons.confirmKill();
         this.hud.note(`You killed ${k.name}${zone}${k.dist > 3 ? ` · ${k.dist} m` : ''}`, 'good');
       }
+      if (!me) this.remotes.get(k.id)?.avatar.setDeath(k.v ?? 0);
       if (me) this.deathInfo = k.by !== null ? `Killed by ${k.byName} with ${ITEMS[k.w]?.name ?? 'bare hands'}${zone}. Your body and gear are where you fell.` : `You died of ${k.w}. Your body and gear are where you fell.`;
       else this.remotes.get(k.id)?.setAlive(false);
       if (m.corpse) void this.addCorpse(m.corpse);
@@ -628,8 +651,37 @@ export class Game {
     this.remotes.set(p.id, r);
     await r.load(this.s.atmo, this.s.r.scene, p.pose);
     r.setWeapon(p.w, p.m);
+    void this.wear(r.avatar, p.g ?? []);
     r.setAlive(p.alive);
   }
+
+  /** something the hands do that shows on the body: your own, and (through the server) the copy of you everyone else sees */
+  private act(a: Act, d = 1) {
+    if (a === 'stop') this.avatar.act(null);
+    else this.avatar.act(a, d);
+    this.net.send({ t: 'act', a, d });
+  }
+
+  /** hat, vest and pack as they sit on a body */
+  private async wear(body: Avatar, ids: string[]) {
+    const out: { id: string; obj: THREE.Object3D }[] = [];
+    for (const id of ids) {
+      if (!GEAR_SHOWN.has(id)) continue;
+      out.push({ id, obj: (await this.loot.models.get(id)).group.clone() });
+    }
+    body.setGear(out);
+  }
+
+  /** what this player wears that shows, kept in step with the inventory (and told to the server when it changes) */
+  private syncGear() {
+    const ids = (['head', 'vest', 'back'] as const).map((s) => this.inv.slots[s]?.id).filter((x): x is string => !!x);
+    const key = ids.join(',');
+    if (key === this.gearKey) return;
+    this.gearKey = key;
+    void this.wear(this.avatar, ids);
+    this.net.send({ t: 'gear', g: ids });
+  }
+  private gearKey = '';
 
   private async addRemoteStash(s: StashInfo) {
     if (this.loot.stashes.some((x) => x.uid === s.uid)) return;
@@ -640,13 +692,20 @@ export class Game {
     if (this.corpses.has(c.uid)) return;
     const stash = new Stash(c.uid, c.x, c.y, c.z, c.rot, 8, 10, `${c.name}'s body`);
     stash.corpse = true;
-    // the body lies on its back, feet where the player stood and head a body's length behind
-    stash.trigger(0.48, 0.25, 0.85, 0.48);
+    // the box to search is where the body lies: behind where they stood if they went over
+    // backwards, ahead if they went down on their face, beside it if they folded up
+    const v = c.v ?? 0;
+    const [ahead, left] = DEATH_REST[v] ?? DEATH_REST[0];
+    if (v === 2) stash.trigger(0.6, 0.25, 0.6, -ahead, left);
+    else stash.trigger(0.48, 0.25, 0.85, -ahead * 0.56, left);
     const body = new CorpseBody();
     this.corpses.set(c.uid, { stash, body });
     // let the fall animation of the player finish before the body appears
     await new Promise((r) => setTimeout(r, 1800));
-    if (this.corpses.has(c.uid)) await body.load(this.s.atmo, this.s.r.scene, c.x, c.y, c.z, c.rot, c.name);
+    if (!this.corpses.has(c.uid)) return;
+    await body.load(this.s.atmo, this.s.r.scene, c.x, c.y, c.z, c.rot, c.name, v);
+    // and what has run out of it by then
+    this.effects.pool(c.x - Math.sin(c.rot) * ahead * 0.75 - Math.cos(c.rot) * left, c.y, c.z - Math.cos(c.rot) * ahead * 0.75 + Math.sin(c.rot) * left);
   }
 
   private removeCorpse(uid: string) {
@@ -672,13 +731,27 @@ export class Game {
     if (m.zone === 'torso') for (const a of this.inv.wear('armor')) amount *= a;
     const melee = !ITEMS[m.w]?.weapon;
     p.damage(amount, melee ? 'a beating' : 'gunshot wounds');
-    if (!melee && amount > 12 && Math.random() < 0.55) p.vitals.bleeding = true;
-    if (melee && amount > 25 && Math.random() < 0.3) p.vitals.bleeding = true;
+    // a bullet nearly always opens a wound, a blade often, a fist or a bat seldom
+    const blade = m.w === 'knife' || m.w === 'machete' || m.w === 'hatchet';
+    if (!p.dead && Math.random() < (melee ? (blade ? 0.6 : amount > 25 ? 0.25 : 0) : amount > 12 ? 0.85 : 0.4)) p.bleed();
     this.weapons.flinch(melee ? 0.5 : 1);
+    this.lastHit = { x: m.dir[0], z: m.dir[2], at: performance.now() };
+    // Bullets in this world pass through your own body (the server said you were hit, not
+    // this game): put the wound where the hit zone is, on the side it came from, so your own
+    // clothes carry it and the ground behind you is marked.
+    {
+      const dir = new THREE.Vector3(m.dir[0], 0, m.dir[2]).normalize();
+      const up = m.zone === 'head' ? (p.crouched ? 1.0 : 1.6) : m.zone === 'legs' ? (p.crouched ? 0.3 : 0.55) : p.crouched ? 0.72 : 1.22;
+      const at = new THREE.Vector3(p.pos.x, p.pos.y + up, p.pos.z).addScaledVector(dir, m.zone === 'head' ? -0.12 : -0.16);
+      const power = melee ? (m.w === 'fists' ? 0.2 : 0.55) : ITEMS[m.w]?.weapon?.kind === 'pistol' ? 0.6 : 1;
+      this.effects.bleed(at, dir, power, true);
+      if (power >= 0.4) this.avatar.wound(at, dir, 0.05 + power * 0.04, power > 0.58);
+    }
     this.hud.hitFrom(Math.atan2(m.dir[0], m.dir[2]) - (p.yaw + Math.PI));
     if (this.use) {
       this.use = null;
       this.weapons.endUse();
+      this.act('stop');
     }
     this.meDirty = true;
   }
@@ -690,7 +763,7 @@ export class Game {
     if (this.sendT >= 1 / SEND_HZ) {
       this.sendT = 0;
       const it = this.weapons.equippedItem;
-      const flags = (p.crouched ? F_CROUCH : 0) | (p.sprinting ? F_SPRINT : 0) | (this.weapons.aiming ? F_AIM : 0) | (p.grounded ? F_GROUND : 0) | (p.dead ? F_DEAD : 0);
+      const flags = (p.crouched ? F_CROUCH : 0) | (p.sprinting ? F_SPRINT : 0) | (this.weapons.aiming ? F_AIM : 0) | (p.grounded ? F_GROUND : 0) | (p.dead ? F_DEAD : 0) | (p.vitals.bleeding ? F_BLEED : 0);
       const pose: Pose = [p.pos.x, p.pos.y, p.pos.z, p.yaw, p.pitch, flags];
       this.net.send({ t: 's', p: pose, w: it?.id ?? null, m: it?.mods ?? [] });
     }
@@ -896,6 +969,7 @@ export class Game {
   private inventoryChanged() {
     this.slowT = 1; // refresh carried weight on the next frame
     this.weapons.validate();
+    this.syncGear();
     this.refreshQuick();
     this.meDirty = true;
     this.syncOpenBox();
@@ -952,6 +1026,7 @@ export class Game {
     this.toggleInventory(false);
     this.use = { label, t: 0, dur, sound, soundT: 0, done };
     this.weapons.beginUse(itemId, kind, dur);
+    this.act(kind, dur);
   }
 
   /** wherever the item currently is: player inventory or the open crate */
@@ -983,6 +1058,7 @@ export class Game {
       if (u.stopBleed && v.bleeding) {
         v.bleeding = false;
         this.hud.note('The bleeding has stopped', 'good');
+        this.meDirty = true;
       }
       const gained = [u.energy ? `${u.energy > 0 ? '+' : ''}${u.energy} energy` : '', u.water ? `${u.water > 0 ? '+' : ''}${u.water} water` : '', u.health ? `+${u.health} health` : ''].filter(Boolean).join(' · ');
       if (gained) this.hud.note(gained, 'good');
@@ -1243,6 +1319,23 @@ export class Game {
     return out;
   }
 
+  /** What to do about an open wound, in as few words as it takes: the key that holds a dressing, if there is one. */
+  private bleedHint(): string {
+    if (this.use?.sound === 'bandage') return 'Dressing the wound…';
+    const i = this.quick.findIndex((id) => !!id && !!ITEMS[id].use?.stopBleed && this.countOf(id) > 0);
+    if (i >= 0) {
+      const d = ITEMS[this.quick[i]!];
+      return this.touch ? `Tap the ${d.name} below to stop it` : `<kbd>${i + 5}</kbd>${d.name}: stop the bleeding`;
+    }
+    const carried = this.inv.find((it) => !!ITEMS[it.id].use?.stopBleed);
+    if (carried) return `${this.touch ? 'Open your pack' : '<kbd>Tab</kbd>'} and use the ${ITEMS[carried.id].name}`;
+    return 'Find a bandage or a first aid kit';
+  }
+
+  private dripT = 0;
+  /** the last hit taken: which way it was travelling, and when */
+  private lastHit: { x: number; z: number; at: number } | null = null;
+
   /** keep the third-person body's hands in step with what is equipped */
   private syncHeld() {
     const it = this.weapons.equippedItem;
@@ -1325,6 +1418,7 @@ export class Game {
       if (p.dead || (input.pressed('Mouse2') && !uiOpen)) {
         this.use = null;
         this.weapons.endUse();
+        this.act('stop');
         if (!p.dead) this.hud.note('Cancelled', 'info');
       } else if (u.t >= u.dur) {
         this.use = null;
@@ -1337,7 +1431,8 @@ export class Game {
     const fpLive = this.director.mode === 'first' && this.director.blend > 0.9;
     this.weapons.update(dt, input, cam, fpLive && !uiOpen && playing && !this.use && !typing);
     const kind = this.weapons.equippedItem ? ITEMS[this.weapons.equippedItem.id].weapon?.kind : undefined;
-    this.director.fovMul = this.weapons.scoped ? 0.3 : this.weapons.aiming ? (kind === 'rifle' ? 0.78 : 0.88) : 1;
+    // a sprint opens the view a touch: speed you can feel
+    this.director.fovMul = this.weapons.scoped ? 0.3 : this.weapons.aiming ? (kind === 'rifle' ? 0.78 : 0.88) : p.sprinting && p.moving > 0.6 ? 1.055 : 1;
     this.syncHeld();
 
     this.director.update(dt);
@@ -1356,9 +1451,21 @@ export class Game {
     for (const d of this.dummies) {
       if (Math.abs(d.pos.x - interp.x) + Math.abs(d.pos.z - interp.z) < 260) d.update(dt);
     }
-    for (const rp of this.remotes.values()) rp.update(dt, now, cam.position);
+    for (const rp of this.remotes.values()) {
+      rp.update(dt, now, cam.position);
+      if (rp.bleeding && rp.alive && (rp.dripT -= dt) <= 0) {
+        rp.dripT = 0.3 + Math.random() * 0.35;
+        if (rp.pos.distanceToSquared(cam.position) < 90 * 90) this.effects.drip(_drip.set(rp.pos.x, rp.pos.y + (rp.crouched ? 0.55 : 0.95), rp.pos.z));
+      }
+    }
+    // your own wound leaves the same trail: it is how you are followed
+    if (p.vitals.bleeding && !p.dead && this.started && (this.dripT -= dt) <= 0) {
+      this.dripT = 0.3 + Math.random() * 0.35;
+      this.effects.drip(_drip.set(interp.x, interp.y + (p.crouched ? 0.55 : 0.95), interp.z));
+    }
 
     this.updateInteraction(cam);
+    this.effects.eye.copy(cam.position);
     this.effects.update(dt);
     this.loot.update(cam.position, dt);
 
@@ -1397,13 +1504,21 @@ export class Game {
     if (p.dead && !this.deathSent) {
       this.deathSent = true;
       audio.death();
+      // Which way the body goes: away from what killed it. With nothing to throw it (blood
+      // loss, a fall, hunger) it folds up where it stands.
+      let variant = Math.random() < 0.5 ? 1 : 2;
+      if (this.lastHit && now - this.lastHit.at < 2500) {
+        const along = this.lastHit.x * -Math.sin(p.yaw) + this.lastHit.z * -Math.cos(p.yaw);
+        variant = along > 0.4 ? 1 : along < -0.4 ? 0 : 2;
+      }
+      this.avatar.setDeath(variant);
       if (!this.deathInfo) this.deathInfo = `You died of ${p.lastCause || 'your injuries'}. Your gear lies where you fell.`;
       if (this.invUI.isOpen) this.toggleInventory(false);
       this.input.unlock();
       if (this.online) {
         // last word on what we were carrying, then the server leaves a body with it
         this.net.send({ t: 'me', inv: this.inv.serialize(), vitals: { ...p.vitals } });
-        this.net.send({ t: 'died', cause: p.lastCause || 'injuries' });
+        this.net.send({ t: 'died', cause: p.lastCause || 'injuries', v: variant });
         this.inv.clear();
         this.weapons.validate();
       }
@@ -1423,7 +1538,7 @@ export class Game {
     }
     audio.updateAmbience(dt, cam.position, this.indoors, this.inForest);
     // breathing follows how much of the reserve is left, as a percentage
-    if (this.started) audio.body(dt, (v.stamina / MAX_STAMINA) * 100, v.health, !p.dead);
+    if (this.started) audio.body(dt, (v.stamina / MAX_STAMINA) * 100, v.health, !p.dead, v.bleeding);
 
     // post-fx reacting to state
     const hurt = p.hurt;
@@ -1438,10 +1553,13 @@ export class Game {
       prompt: this.touch ? (this.prompt?.replace(/<kbd>F<\/kbd>/, '').replace(/ <small>G to pack up<\/small>/, '') ?? null) : this.prompt,
       weapon: this.weapons.status(),
       aiming: this.weapons.aiming,
+      spread: this.weapons.spread,
       scoped: this.weapons.scoped,
       hitMarker: this.weapons.hitMarker,
       kill: this.weapons.killMarker,
+      head: this.weapons.headMarker,
       hurt,
+      bleed: v.bleeding && !p.dead ? this.bleedHint() : null,
       heading: hasCompass && !uiOpen ? heading : null,
       progress: this.use ? { label: this.use.label, t: this.use.t / this.use.dur } : null,
       hotbar: this.hotbar(),

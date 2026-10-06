@@ -218,9 +218,13 @@ export class AudioEngine {
     const big = kind === 'rifle';
     // 7.62x39: sharper and shorter than the full-power Mosin round
     const mid = intermediate ? 0.72 : 1;
-    const out = this.out(pos, big ? 30 : 15, 0.8, distance);
+    const out = this.out(pos, big ? 12 : 8, 1, distance);
     const send = ctx.createGain();
-    send.gain.value = big ? 0.9 : 0.6;
+    // the echo off the hills is taken before the sound is placed in space: it has to fall off
+    // with distance by itself, or a shot across the valley rings as loud as your own
+    const ref = big ? 12 : 8;
+    const fall = pos ? Math.pow(ref / (ref + Math.max(0, distance - ref)), 0.75) : 1;
+    send.gain.value = (big ? 0.9 : 0.6) * fall;
     out.connect(send);
     send.connect(this.reverbSend);
     send.connect(this.echo);
@@ -254,36 +258,55 @@ export class AudioEngine {
     o.stop(t + 0.6);
   }
 
+  /** the hammer falling on nothing: it has to be heard over a fight */
   dryFire() {
-    this.click(4200, 0.35, 0.015);
+    this.click(3800, 1.3, 0.022);
+    this.click(1900, 0.7, 0.03, 0.012);
   }
 
   /** short metallic click (bolt, mag, hammer) */
-  click(freq = 3000, vol = 0.4, dur = 0.02, delay = 0) {
+  click(freq = 3000, vol = 0.4, dur = 0.02, delay = 0, pos?: V3) {
     if (!this.ready) return;
     const t = this.ctx.currentTime + delay;
+    // somebody else's weapon: the same sound, from where they are
+    const to = pos ? this.out(pos, 3, 1.2) : this.sfx;
+    if (pos) vol *= 1.6;
     const n = this.noise(t, dur + 0.03);
     const f = this.filter('bandpass', freq * (0.9 + Math.random() * 0.2), 6);
     const g = this.ctx.createGain();
     this.env(g, t, vol, 0.0008, dur);
-    n.connect(f).connect(g).connect(this.sfx);
+    n.connect(f).connect(g).connect(to);
     const ring = this.ctx.createOscillator();
     ring.type = 'triangle';
     ring.frequency.value = freq * 0.71;
     const rg = this.ctx.createGain();
     this.env(rg, t, vol * 0.15, 0.001, dur * 2.5);
-    ring.connect(rg).connect(this.sfx);
+    ring.connect(rg).connect(to);
     ring.start(t);
     ring.stop(t + dur * 3 + 0.05);
   }
 
-  boltCycle(start = 0) {
-    this.click(2400, 0.45, 0.025, start); // handle up
-    this.click(1700, 0.5, 0.06, start + 0.18); // pull back
-    this.slide(start + 0.18, 0.14, 900);
-    this.click(2000, 0.5, 0.05, start + 0.42); // push forward
-    this.slide(start + 0.36, 0.1, 1100);
-    this.click(2800, 0.45, 0.025, start + 0.6); // handle down
+  boltCycle(start = 0, pos?: V3) {
+    this.click(2400, 0.45, 0.025, start, pos); // handle up
+    this.click(1700, 0.5, 0.06, start + 0.18, pos); // pull back
+    if (!pos) this.slide(start + 0.18, 0.14, 900);
+    this.click(2000, 0.5, 0.05, start + 0.42, pos); // push forward
+    if (!pos) this.slide(start + 0.36, 0.1, 1100);
+    this.click(2800, 0.45, 0.025, start + 0.6, pos); // handle down
+  }
+
+  /** another player near you reloading: what of it carries */
+  reloadNear(pos: V3, dur: number, pistol: boolean) {
+    if (pistol) {
+      this.click(1500, 0.4, 0.05, 0.1, pos);
+      this.click(1900, 0.55, 0.04, Math.max(0.4, dur - 0.5), pos);
+    } else {
+      this.click(2400, 0.45, 0.025, 0, pos);
+      this.click(1700, 0.5, 0.06, 0.15, pos);
+      for (let t = 0.55; t < dur - 0.5; t += 0.48) this.click(3400, 0.3, 0.02, t, pos);
+      this.click(2000, 0.5, 0.05, Math.max(0.3, dur - 0.45), pos);
+      this.click(2800, 0.45, 0.025, Math.max(0.4, dur - 0.27), pos);
+    }
   }
 
   private slide(start: number, dur: number, freq: number) {
@@ -350,10 +373,35 @@ export class AudioEngine {
   }
 
   /** your shot landed on somebody (a dry tick), or killed them (a heavier double) */
-  hitTick(kill: boolean) {
+  hitTick(kill: boolean, head = false) {
     if (!this.ready) return;
     if (!kill) {
-      this.click(1900, 0.22, 0.012);
+      // a dry tick you can pick out under your own gunfire
+      const t0 = this.ctx.currentTime;
+      const tick = this.ctx.createOscillator();
+      tick.type = 'triangle';
+      tick.frequency.setValueAtTime(1750, t0);
+      tick.frequency.exponentialRampToValueAtTime(1250, t0 + 0.035);
+      const tg = this.ctx.createGain();
+      tg.gain.setValueAtTime(0.85, t0);
+      tg.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.07);
+      tick.connect(tg).connect(this.sfx);
+      tick.start(t0);
+      tick.stop(t0 + 0.09);
+      this.click(2600, 0.5, 0.012);
+      // a head shot rings: you know it before you see them drop
+      if (head) {
+        const t = this.ctx.currentTime;
+        const o = this.ctx.createOscillator();
+        o.type = 'triangle';
+        o.frequency.value = 2350;
+        const g = this.ctx.createGain();
+        g.gain.setValueAtTime(0.5, t);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
+        o.connect(g).connect(this.sfx);
+        o.start(t);
+        o.stop(t + 0.24);
+      }
       return;
     }
     const t = this.ctx.currentTime;
@@ -452,7 +500,7 @@ export class AudioEngine {
    * Call every frame. Out of breath: you hear yourself breathing, faster and louder the
    * emptier the lungs. Badly hurt: your own pulse.
    */
-  body(dt: number, stamina: number, health: number, alive: boolean) {
+  body(dt: number, stamina: number, health: number, alive: boolean, bleeding = false) {
     if (!this.ready || !alive) return;
     const ctx = this.ctx;
     const tired = Math.max(0, Math.min(1, (48 - stamina) / 48));
@@ -478,7 +526,8 @@ export class AudioEngine {
       this.breathT = 0;
       this.breathIn = true;
     }
-    const hurt = Math.max(0, Math.min(1, (36 - health) / 36));
+    // an open wound: the pulse is there from the start, quiet, and grows as the health goes
+    const hurt = Math.max(bleeding ? 0.22 : 0, Math.min(1, (36 - health) / 36));
     if (hurt > 0) {
       this.heartT -= dt;
       if (this.heartT <= 0) {
@@ -521,8 +570,8 @@ export class AudioEngine {
       const f = this.filter('bandpass', 1100, 4);
       const g = this.ctx.createGain();
       g.gain.setValueAtTime(0.0001, t + 0.05);
-      g.gain.linearRampToValueAtTime(0.09, t + 0.18);
-      g.gain.linearRampToValueAtTime(0.05, t + 0.5);
+      g.gain.linearRampToValueAtTime(0.22, t + 0.18);
+      g.gain.linearRampToValueAtTime(0.12, t + 0.5);
       g.gain.exponentialRampToValueAtTime(0.0001, t + 0.8);
       o.connect(f).connect(g).connect(out);
       o.start(t + 0.05);
@@ -588,7 +637,7 @@ export class AudioEngine {
         dec = 0.1;
     }
     const g = this.ctx.createGain();
-    this.env(g, t, peak, 0.001, dec);
+    this.env(g, t, peak * 2.4, 0.001, dec);
     n.connect(f).connect(g).connect(out);
   }
 
@@ -596,8 +645,8 @@ export class AudioEngine {
   footstep(surface: Surface | 'grass' | 'dirt' | 'gravel', speed: number, pos?: V3, carried = 0) {
     if (!this.ready) return;
     const t = this.ctx.currentTime;
-    const vol = Math.min(1, 0.15 + speed * 0.07);
-    let out = this.out(pos, 2, 1.5);
+    const vol = Math.min(1, 0.15 + speed * 0.07) * (pos ? 5.5 : 3.2);
+    let out = this.out(pos, 4, 1.1);
     if (!pos) {
       // your own feet: one a little to the left, the next a little to the right
       const pan = this.ctx.createStereoPanner();
@@ -615,8 +664,8 @@ export class AudioEngine {
     };
     switch (surface) {
       case 'wood':
-        layer('bandpass', 320, 2, 0.6, 0.003, 0.07);
-        layer('bandpass', 1400, 4, 0.12, 0.002, 0.05, 0.01);
+        layer('bandpass', 320, 1.2, 1.7, 0.003, 0.07);
+        layer('bandpass', 1400, 3, 0.4, 0.002, 0.05, 0.01);
         break;
       case 'gravel':
       case 'rock':
@@ -625,8 +674,8 @@ export class AudioEngine {
         break;
       case 'concrete':
       case 'asphalt':
-        layer('bandpass', 900, 1.2, 0.35, 0.002, 0.05);
-        layer('highpass', 4000, 1, 0.08, 0.001, 0.03, 0.01);
+        layer('bandpass', 900, 1.2, 0.8, 0.002, 0.05);
+        layer('highpass', 4000, 1, 0.16, 0.001, 0.03, 0.01);
         break;
       case 'metal':
         layer('bandpass', 1800, 8, 0.4, 0.002, 0.12);
@@ -640,18 +689,24 @@ export class AudioEngine {
     }
   }
 
-  /** arm cutting through the air (punches, swings) */
-  whoosh() {
+  /**
+   * Arm cutting through the air (punches, swings).
+   * @param weight 0 = a fist, 1 = a bat or a crowbar: lower, longer and louder
+   * @param pos somebody else's swing, heard from where they stand
+   */
+  whoosh(weight = 0, pos?: V3) {
     if (!this.ready) return;
     const t = this.ctx.currentTime;
-    const n = this.noise(t, 0.2);
+    const len = 0.18 + weight * 0.1;
+    const n = this.noise(t, len + 0.04);
     const f = this.filter('bandpass', 500, 1.4);
-    f.frequency.setValueAtTime(350, t);
-    f.frequency.exponentialRampToValueAtTime(1500, t + 0.09);
-    f.frequency.exponentialRampToValueAtTime(500, t + 0.18);
+    const top = 1500 - weight * 550;
+    f.frequency.setValueAtTime(350 - weight * 110, t);
+    f.frequency.exponentialRampToValueAtTime(top, t + len * 0.5);
+    f.frequency.exponentialRampToValueAtTime(top / 3, t + len);
     const g = this.ctx.createGain();
-    this.env(g, t, 0.22, 0.05, 0.12);
-    n.connect(f).connect(g).connect(this.sfx);
+    this.env(g, t, 0.36 + weight * 0.22, len * 0.3, len * 0.7);
+    n.connect(f).connect(g).connect(pos ? this.out(pos, 2, 1.5) : this.sfx);
   }
 
   ui(kind: 'pickup' | 'drop' | 'open' | 'close' | 'eat' | 'drink' | 'bandage' | 'move') {
@@ -704,10 +759,32 @@ export class AudioEngine {
     }
   }
 
-  /** being hit: the blow landing, and the grunt it knocks out of you */
-  hurt() {
+  /**
+   * Being hit: the blow landing, and the grunt it knocks out of you.
+   * @param pos somebody else being hit: their grunt, from where they are, when the sound gets here
+   */
+  hurt(pos?: V3, distance = 0) {
     if (!this.ready) return;
     const ctx = this.ctx;
+    if (pos) {
+      const t = ctx.currentTime + distance / 343;
+      const out = this.out(pos, 3, 1.3, distance);
+      const pitch = 100 + Math.random() * 40;
+      const v = ctx.createOscillator();
+      v.type = 'sawtooth';
+      v.frequency.setValueAtTime(pitch * 1.25, t);
+      v.frequency.exponentialRampToValueAtTime(pitch * 0.8, t + 0.24);
+      const f1 = this.filter('bandpass', 620, 5);
+      const f2 = this.filter('bandpass', 1150, 6);
+      const vg = ctx.createGain();
+      this.env(vg, t, 1.0, 0.015, 0.22);
+      v.connect(f1).connect(vg);
+      v.connect(f2).connect(vg);
+      vg.connect(out);
+      v.start(t);
+      v.stop(t + 0.32);
+      return;
+    }
     const t = ctx.currentTime;
     // the blow
     const th = ctx.createOscillator();

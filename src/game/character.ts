@@ -17,12 +17,14 @@ export class Dummy implements Damageable {
   readonly name = 'Training dummy';
   health = 100;
   dead = false;
-  private avatar = new Avatar();
+  readonly avatar = new Avatar();
   private body!: RAPIER.RigidBody;
   private colliders: RAPIER.Collider[] = [];
   private down = 0;
   private flinch = 0;
   private flinchSide = 0;
+  /** how it last went down (index into the avatar's deaths) */
+  variant = 0;
 
   constructor(public pos: THREE.Vector3, public yaw: number) {}
 
@@ -47,15 +49,20 @@ export class Dummy implements Damageable {
     this.update(0);
   }
 
-  damage(amount: number, _point: THREE.Vector3, dir: THREE.Vector3, _zone: HitZone): boolean {
+  damage(amount: number, _point: THREE.Vector3, dir: THREE.Vector3, zone: HitZone): boolean {
     if (this.dead) return false;
     this.health -= amount;
     this.flinch = 1;
-    this.avatar.hit();
+    this.avatar.hit(zone === 'head');
     // lean away from where the hit came from
     const side = new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
     this.flinchSide = Math.sign(dir.dot(side)) || 1;
     if (this.health <= 0) {
+      // away from the shot: onto its back from the front, onto its face from behind, else to the side
+      const fwd = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
+      const along = dir.x * fwd.x + dir.z * fwd.z;
+      this.variant = along > 0.4 ? 1 : along < -0.4 ? 0 : 2;
+      this.avatar.setDeath(this.variant);
       this.dead = true;
       this.down = RESPAWN_AFTER;
       for (const c of this.colliders) c.setEnabled(false);
@@ -72,6 +79,7 @@ export class Dummy implements Damageable {
       if (this.down <= 0) {
         this.dead = false;
         this.health = 100;
+        this.avatar.clearWounds();
         for (const c of this.colliders) c.setEnabled(true);
       }
     } else if (this.flinch > 0) {

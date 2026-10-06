@@ -34,7 +34,8 @@ const TEX = 1024;
 const CLIPS = {
   idle: 'Idle_Loop', walk: 'Walk_Loop', run: 'Jog_Fwd_Loop',
   crouchIdle: 'Crouch_Idle_Loop', crouchWalk: 'Crouch_Fwd_Loop',
-  jumpLoop: 'Jump_Loop', death: 'Death01', hit: 'Hit_Chest',
+  jumpStart: 'Jump_Start', jumpLoop: 'Jump_Loop', jumpLand: 'Jump_Land',
+  death: 'Death01', hit: 'Hit_Chest', hitHead: 'Hit_Head',
 };
 const HAIR = { hair_buzzed: 'Hair_Buzzed', hair_parted: 'Hair_SimpleParted', hair_long: 'Hair_Long', hair_beard: 'Hair_Beard' };
 /** the long style is cut for the other body in the pack, whose head sits lower and a touch further forward */
@@ -652,6 +653,17 @@ const poser = (wb, hip) => {
       const back = qrot(qinv(rootQ), w);
       hip[0] = back[0]; hip[1] = back[1]; hip[2] = back[2];
     },
+    /** turn a bone, and everything hanging off it, by a rotation given in the world */
+    spin(name, q) {
+      turn(B(name), q);
+    },
+    /** the hips part of the way to the height they stand at */
+    hipHeight(k) {
+      const w = qrot(rootQ, hip), rest = qrot(rootQ, hipsB.getTranslation());
+      w[1] += (rest[1] - w[1]) * k;
+      const back = qrot(qinv(rootQ), w);
+      hip[0] = back[0]; hip[1] = back[1]; hip[2] = back[2];
+    },
     /** a straighter back and a level head */
     upright(k) {
       for (const b of ['spine_01', 'spine_02', 'spine_03']) P.toRest(b, k);
@@ -668,13 +680,46 @@ const TOUCH_UP = {
   run: (p) => { p.tuckArms(0.2); p.openHands(0.4); },
   crouchIdle: (p) => { p.openHands(0.5); },
   crouchWalk: (p) => { p.openHands(0.5); },
+  // the game lifts the body through a jump: here the hips stay at standing height and the legs come up under them
+  jumpStart: (p, t) => { p.openHands(0.5); p.hipHeight(smooth(0.02, 0.2, t)); },
   jumpLoop: (p) => { p.openHands(0.5); },
+  jumpLand: (p) => { p.openHands(0.5); },
   death: (p) => { p.openHands(0.6); },
   hit: (p) => { p.openHands(0.5); },
+  hitHead: (p) => { p.openHands(0.5); },
 };
 
 const FPS = 30;
 let total = 0;
+/** how each clip stands on its first frame: the poses the made-up clips below are built from */
+const firstPose = {};
+/** world rotations of one frame -> each bone's rotation against its parent, into the clip's tracks */
+const toLocal = (wb, rot, f) => {
+  for (const b of mine) {
+    const p = myParent.get(b);
+    const pw = p ? wb.get(p) ?? worldRot([p], myParent, new Map()).get(p) : [0, 0, 0, 1];
+    rot.get(b).set(qnorm(qmul(qinv(pw), wb.get(b))), f * 4);
+  }
+};
+const writeClip = (name, times, rot, hip, dur) => {
+  const frames = times.length;
+  // keep each quaternion on the same side as the one before it, or interpolation takes the long way round
+  for (const arr of rot.values()) {
+    for (let f = 1; f < frames; f++) {
+      const o = f * 4, q = o - 4;
+      if (arr[o] * arr[q] + arr[o + 1] * arr[q + 1] + arr[o + 2] * arr[q + 2] + arr[o + 3] * arr[q + 3] < 0) for (let k = 0; k < 4; k++) arr[o + k] = -arr[o + k];
+    }
+  }
+  const anim = doc.createAnimation(name);
+  const input = doc.createAccessor(`${name}_t`).setType('SCALAR').setArray(times);
+  const add = (node, pathName, type, array) => {
+    const s = doc.createAnimationSampler().setInput(input).setOutput(doc.createAccessor().setType(type).setArray(array)).setInterpolation('LINEAR');
+    anim.addSampler(s).addChannel(doc.createAnimationChannel().setTargetNode(node).setTargetPath(pathName).setSampler(s));
+  };
+  for (const [node, arr] of rot) add(node, 'rotation', 'VEC4', arr);
+  add(hipsB, 'translation', 'VEC3', hip);
+  total += dur;
+};
 for (const [name, source] of Object.entries(CLIPS)) {
   const clip = lib.getRoot().listAnimations().find((a) => a.getName() === source);
   if (!clip) { console.log('missing clip', source); continue; }
@@ -714,30 +759,90 @@ for (const [name, source] of Object.entries(CLIPS)) {
     const r0 = hipsA.getTranslation(), b0 = hipsB.getTranslation();
     const at = [0, 0, 0];
     for (let k = 0; k < 3; k++) at[k] = b0[k] + (hipT[k] - r0[k]) * legScale;
-    TOUCH_UP[name]?.(poser(wb, at));
-    for (const b of mine) {
-      const p = myParent.get(b);
-      const pw = p ? wb.get(p) ?? worldRot([p], myParent, new Map()).get(p) : [0, 0, 0, 1];
-      rot.get(b).set(qnorm(qmul(qinv(pw), wb.get(b))), f * 4);
-    }
+    TOUCH_UP[name]?.(poser(wb, at), time);
+    if (f === 0) firstPose[name] = { wb: new Map(wb), at: [...at] };
+    toLocal(wb, rot, f);
     hip.set(at, f * 3);
   }
-  // keep each quaternion on the same side as the one before it, or interpolation takes the long way round
-  for (const arr of rot.values()) {
-    for (let f = 1; f < frames; f++) {
-      const o = f * 4, q = o - 4;
-      if (arr[o] * arr[q] + arr[o + 1] * arr[q + 1] + arr[o + 2] * arr[q + 2] + arr[o + 3] * arr[q + 3] < 0) for (let k = 0; k < 4; k++) arr[o + k] = -arr[o + k];
-    }
-  }
-  const anim = doc.createAnimation(name);
-  const input = doc.createAccessor(`${name}_t`).setType('SCALAR').setArray(times);
-  const add = (node, pathName, type, array) => {
-    const s = doc.createAnimationSampler().setInput(input).setOutput(doc.createAccessor().setType(type).setArray(array)).setInterpolation('LINEAR');
-    anim.addSampler(s).addChannel(doc.createAnimationChannel().setTargetNode(node).setTargetPath(pathName).setSampler(s));
+  writeClip(name, times, rot, hip, dur);
+}
+
+// ---------------------------------------------------------------- deaths the library does not have
+// It has one: thrown onto the back. These two are built from poses instead: the knees go
+// (the crouch), and the body pitches onto its face, or folds over onto its side. The lying
+// pose is the body as it stands at rest, laid over, with every limb then pointed where it
+// should lie; all of that is in the plane of the ground, so nothing ends up under it.
+{
+  const axisQ = (ax, ang) => { const h = ang / 2, s = Math.sin(h); return [ax[0] * s, ax[1] * s, ax[2] * s, Math.cos(h)]; };
+  const lying = (base, shape) => {
+    const wb = new Map(mine.map((b) => [b, qnorm(qmul(base, myRest.get(b)))]));
+    shape(poser(wb, [0, 0, 0]));
+    return wb;
   };
-  for (const [node, arr] of rot) add(node, 'rotation', 'VEC4', arr);
-  add(hipsB, 'translation', 'VEC3', hip);
-  total += dur;
+  const limb = (P, part, next, dir) => P.point(part, next, dir, 1);
+  const DEATHS = {
+    // face down, head the way it was facing, one arm thrown up past the head and one down by the hip
+    deathFront: {
+      hip: [0, 0.12, 0.9],
+      wb: lying(axisQ([1, 0, 0], Math.PI / 2), (P) => {
+        limb(P, 'upperarm_l', 'lowerarm_l', [0.78, -0.1, 0.62]);
+        limb(P, 'lowerarm_l', 'hand_l', [-0.25, -0.1, 0.96]);
+        limb(P, 'upperarm_r', 'lowerarm_r', [-0.86, -0.1, -0.5]);
+        limb(P, 'lowerarm_r', 'hand_r', [-0.4, -0.08, -0.91]);
+        limb(P, 'thigh_l', 'calf_l', [0.17, 0, -0.985]);
+        limb(P, 'calf_l', 'foot_l', [0.08, -0.04, -0.99]);
+        limb(P, 'thigh_r', 'calf_r', [-0.36, 0, -0.93]);
+        limb(P, 'calf_r', 'foot_r', [0.16, -0.04, -0.985]);
+        limb(P, 'foot_l', 'ball_l', [0.25, 0.08, -0.96]);
+        limb(P, 'foot_r', 'ball_r', [-0.3, 0.08, -0.95]);
+        P.spin('Head', axisQ([0, 0, 1], 1.05));
+        P.openHands(0.8);
+      }),
+      // how far into the crouch the knees get before the body is past saving, and when it lands
+      buckle: 0.8, fall: [0.16, 0.74],
+    },
+    // on its left side, knees drawn up, the arms in front of the chest
+    deathSide: {
+      hip: [0.36, 0.17, 0.04],
+      wb: lying(axisQ([0, 0, 1], -Math.PI / 2), (P) => {
+        limb(P, 'thigh_l', 'calf_l', [-0.6, 0, 0.8]);
+        limb(P, 'calf_l', 'foot_l', [-0.72, 0, -0.69]);
+        limb(P, 'thigh_r', 'calf_r', [-0.8, -0.08, 0.6]);
+        limb(P, 'calf_r', 'foot_r', [-0.86, -0.14, -0.49]);
+        limb(P, 'upperarm_l', 'lowerarm_l', [0.12, -0.06, 0.99]);
+        limb(P, 'lowerarm_l', 'hand_l', [0.72, 0, 0.69]);
+        limb(P, 'upperarm_r', 'lowerarm_r', [-0.3, -0.46, 0.84]);
+        limb(P, 'lowerarm_r', 'hand_r', [0.12, -0.6, 0.79]);
+        P.spin('Head', axisQ([0, 0, 1], -0.38));
+        P.spin('spine_02', axisQ([0, 1, 0], 0.16));
+        P.openHands(0.7);
+      }),
+      buckle: 0.9, fall: [0.2, 0.82],
+    },
+  };
+  const p0 = firstPose.idle, p1 = firstPose.crouchIdle;
+  for (const [name, d] of Object.entries(DEATHS)) {
+    const dur = 1.5;
+    const frames = Math.round(dur * FPS) + 1;
+    const times = new Float32Array(frames);
+    const rot = new Map(mine.map((t) => [t, new Float32Array(frames * 4)]));
+    const hip = new Float32Array(frames * 3);
+    const end = qrot(qinv(rootQ), d.hip);
+    for (let f = 0; f < frames; f++) {
+      const t = (times[f] = f / FPS);
+      const a = smooth(0, 0.3, t) * d.buckle;
+      // it tips slowly and lands fast
+      const b = Math.pow(Math.min(1, Math.max(0, (t - d.fall[0]) / (d.fall[1] - d.fall[0]))), 2.1);
+      const wb = new Map();
+      for (const bone of mine) wb.set(bone, qslerp(qslerp(p0.wb.get(bone), p1.wb.get(bone), a), d.wb.get(bone), b));
+      toLocal(wb, rot, f);
+      for (let k = 0; k < 3; k++) {
+        const mid = p0.at[k] + (p1.at[k] - p0.at[k]) * a;
+        hip[f * 3 + k] = mid + (end[k] - mid) * b;
+      }
+    }
+    writeClip(name, times, rot, hip, dur);
+  }
 }
 
 // ================================================================ 4. write

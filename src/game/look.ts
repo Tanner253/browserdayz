@@ -78,7 +78,12 @@ export function lookFor(seed: string): Look {
 /** the painted cloth is a mid grey: this brings a colour multiplied into it back up to itself */
 const CLOTH_GAIN = 1.85;
 
+/** how many bloodstains one body can carry at once (the oldest is painted over) */
+export const MAX_WOUNDS = 8;
+
 export interface LookUniforms {
+  /** bloodstains: where on the body at rest (xyz) and how big (w, 0 = none) */
+  uWounds: { value: THREE.Vector4[] };
   tLook: { value: THREE.Texture };
   uJacket: { value: THREE.Color };
   uTrousers: { value: THREE.Color };
@@ -89,7 +94,7 @@ export function lookUniforms(): LookUniforms {
   const tLook = assets.texture(MASK_URL);
   // glTF texture coordinates: the image is not flipped
   tLook.flipY = false;
-  return { tLook: { value: tLook }, uJacket: { value: new THREE.Color(1, 1, 1) }, uTrousers: { value: new THREE.Color(1, 1, 1) }, uSkin: { value: new THREE.Color(1, 1, 1) } };
+  return { uWounds: { value: Array.from({ length: MAX_WOUNDS }, () => new THREE.Vector4(0, 0, 0, 0)) }, tLook: { value: tLook }, uJacket: { value: new THREE.Color(1, 1, 1) }, uTrousers: { value: new THREE.Color(1, 1, 1) }, uSkin: { value: new THREE.Color(1, 1, 1) } };
 }
 
 export function setLookUniforms(u: LookUniforms, look: Look) {
@@ -99,10 +104,21 @@ export function setLookUniforms(u: LookUniforms, look: Look) {
 }
 
 /** Shader patch for the body material (it must have a colour map). */
-export function lookPatch(shader: { uniforms: Record<string, THREE.IUniform>; fragmentShader: string }, u: LookUniforms) {
+export function lookPatch(shader: { uniforms: Record<string, THREE.IUniform>; vertexShader: string; fragmentShader: string }, u: LookUniforms) {
   Object.assign(shader.uniforms, u);
+  // A stain is a small sphere fixed to the body as it stands at rest: whatever skin or cloth
+  // is inside it is soaked. The vertex position before skinning is that rest position, so a
+  // stain moves with the limb it is on at no cost.
+  shader.vertexShader = shader.vertexShader
+    .replace('#include <common>', '#include <common>\nvarying vec3 vRest;')
+    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvRest = position;');
   shader.fragmentShader = shader.fragmentShader
-    .replace('#include <common>', '#include <common>\nuniform sampler2D tLook;\nuniform vec3 uJacket;\nuniform vec3 uTrousers;\nuniform vec3 uSkin;')
+    .replace('#include <common>', `#include <common>\nuniform sampler2D tLook;\nuniform vec3 uJacket;\nuniform vec3 uTrousers;\nuniform vec3 uSkin;\nuniform vec4 uWounds[${MAX_WOUNDS}];\nvarying vec3 vRest;\nfloat woundK;`)
+    .replace(
+      '#include <roughnessmap_fragment>',
+      `#include <roughnessmap_fragment>
+roughnessFactor = mix(roughnessFactor, 0.28, woundK);`,
+    )
     .replace(
       '#include <map_fragment>',
       `#include <map_fragment>
@@ -112,6 +128,15 @@ export function lookPatch(shader: { uniforms: Record<string, THREE.IUniform>; fr
   tint = mix(tint, uJacket, lk.r);
   tint = mix(tint, uTrousers, lk.g);
   diffuseColor.rgb *= tint;
+  woundK = 0.0;
+  // a ragged edge, so a stain is a blot and not a disc
+  float rag = sin(vRest.x * 211.0 + vRest.y * 97.0) * sin(vRest.y * 173.0 - vRest.z * 131.0) * 0.16 + sin(vRest.x * 61.0 - vRest.z * 83.0 + vRest.y * 47.0) * 0.12;
+  for (int i = 0; i < ${MAX_WOUNDS}; i++) {
+    vec4 wd = uWounds[i];
+    if (wd.w > 0.0) woundK = max(woundK, 1.0 - smoothstep(0.5, 1.0, distance(vRest, wd.xyz) / wd.w + rag));
+  }
+  // soaked through in the middle, thinner and brighter at the edge
+  diffuseColor.rgb = mix(diffuseColor.rgb, mix(vec3(0.22, 0.01, 0.007), vec3(0.085, 0.004, 0.003), smoothstep(0.35, 1.0, woundK)), min(1.0, woundK * 1.25) * 0.94);
 }`,
     );
 }

@@ -11,7 +11,7 @@ import type { SerializedInventory } from '../sim/inventory';
 import type { WorldLoot } from '../sim/economy';
 import type { HitZone } from '../sim/combat';
 
-export const PROTOCOL = 4;
+export const PROTOCOL = 5;
 
 /** chat channels: everyone on the server, or only players standing near the speaker */
 export type ChatChannel = 'global' | 'near';
@@ -19,7 +19,11 @@ export type ChatChannel = 'global' | 'near';
 export const CHAT_RANGE = 50;
 
 /** player state flags */
-export const F_CROUCH = 1, F_SPRINT = 2, F_AIM = 4, F_GROUND = 8, F_DEAD = 16;
+export const F_CROUCH = 1, F_SPRINT = 2, F_AIM = 4, F_GROUND = 8, F_DEAD = 16, F_BLEED = 32;
+
+/** things a player does with their hands that the people around them can see (and hear) */
+export const ACTS = ['bolt', 'reload', 'eat', 'drink', 'bandage', 'open', 'stop'] as const;
+export type Act = (typeof ACTS)[number];
 
 /** [x, y, z, yaw, pitch, flags] */
 export type Pose = [number, number, number, number, number, number];
@@ -42,6 +46,8 @@ export interface PlayerInfo {
   /** item id in hands (null = bare hands) and its attachments */
   w: string | null;
   m: string[];
+  /** what they wear that shows: hat, vest, pack */
+  g: string[];
   alive: boolean;
 }
 
@@ -58,6 +64,8 @@ export interface StashInfo {
 
 export interface CorpseInfo extends StashInfo {
   name: string;
+  /** how it fell, so it lies the same way for everyone: 0 on its back, 1 on its face, 2 on its side */
+  v?: number;
 }
 
 export interface KillInfo {
@@ -68,6 +76,8 @@ export interface KillInfo {
   w: string;
   zone: HitZone | null;
   dist: number;
+  /** how they went down (see CorpseInfo.v) */
+  v: number;
 }
 
 export type C2S =
@@ -75,6 +85,8 @@ export type C2S =
   | { t: 's'; p: Pose; w: string | null; m: string[] }
   | { t: 'shot'; o: [number, number, number]; d: [number, number, number]; w: string; sup: boolean }
   | { t: 'swing' }
+  | { t: 'act'; a: Act; d: number }
+  | { t: 'gear'; g: string[] }
   | { t: 'hit'; to: number; zone: HitZone; w: string; dist: number; sup: boolean; bonus: number }
   | { t: 'take'; uid: string }
   | { t: 'drop'; l: WorldLoot }
@@ -85,7 +97,7 @@ export type C2S =
   | { t: 'stash-'; uid: string }
   | { t: 'door'; i: number; open: boolean; swing: number }
   | { t: 'me'; inv: SerializedInventory; vitals: Vitals }
-  | { t: 'died'; cause: string }
+  | { t: 'died'; cause: string; v?: number }
   | { t: 'respawn' }
   | { t: 'chat'; ch?: ChatChannel; text: string }
   /** a dog tag taken from another player has been carried for the full time */
@@ -113,6 +125,8 @@ export type S2C =
   | { t: 'ps'; s: [number, ...Pose, string | null, string[]][] }
   | { t: 'shot'; id: number; o: [number, number, number]; d: [number, number, number]; w: string; sup: boolean }
   | { t: 'swing'; id: number }
+  | { t: 'act'; id: number; a: Act; d: number }
+  | { t: 'gear'; id: number; g: string[] }
   | { t: 'dmg'; from: number; amount: number; zone: HitZone; w: string; dir: [number, number, number] }
   | { t: 'hitok'; to: number; amount: number; zone: HitZone }
   | { t: 'death'; k: KillInfo; corpse: CorpseInfo | null }

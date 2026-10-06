@@ -120,7 +120,7 @@ export function installHarness(g: Game) {
      * @param o.speed ground speed; o.dir which way it travels relative to where it faces (0 ahead, 1.57 to its left)
      * @param o.view 'side' | 'front' | 'back' | 'three' (three-quarter)
      */
-    async lineup(o: { speed?: number; dir?: number; crouch?: boolean; weapon?: string | string[]; n?: number; dead?: number; air?: boolean; pitch?: number; aim?: boolean; view?: string; name?: string; hit?: boolean; dist?: number } = {}) {
+    async lineup(o: { speed?: number; dir?: number; crouch?: boolean; weapon?: string | string[]; n?: number; dead?: number; air?: boolean; pitch?: number; aim?: boolean; view?: string; name?: string; hit?: boolean; dist?: number; clip?: string; from?: number; to?: number; death?: number; gear?: string[]; act?: string; actDur?: number; step?: number } = {}) {
       for (const a of row) a.dispose();
       row.length = 0;
       const n = o.n ?? 8;
@@ -134,7 +134,8 @@ export function installHarness(g: Game) {
         const a = new Avatar();
         await a.load(g.s.atmo, 0, false, lookFor(o.name ?? `row ${i}`));
         g.s.r.scene.add(a.root);
-        const at = new THREE.Vector3(base.x + (i - (n - 1) / 2) * 1.05, heightAt(g.s.world.heights, base.x + (i - (n - 1) / 2) * 1.05, base.z - 5), base.z - 5);
+        const gap = o.step ?? 1.05;
+        const at = new THREE.Vector3(base.x + (i - (n - 1) / 2) * gap, heightAt(g.s.world.heights, base.x + (i - (n - 1) / 2) * gap, base.z - 5), base.z - 5);
         const wid = Array.isArray(o.weapon) ? o.weapon[i % o.weapon.length] : o.weapon;
         if (wid) {
           const h = anyG.makeHeld(wid, []);
@@ -152,13 +153,25 @@ export function installHarness(g: Game) {
           a.hit();
           any.hitT = ((i + 0.5) / n) * any.dur.hit;
         }
+        if (o.death !== undefined) a.setDeath(o.death);
+        if (o.gear) await anyG.wear(a, o.gear);
+        if (o.act) {
+          a.act(o.act as never, o.actDur ?? 2);
+          any.gesture.t = ((i + 0.5) / n) * (o.actDur ?? 2);
+        }
         a.update(0, at, vel, face, !!o.crouch, dead, false, o.pitch ?? 0, !o.air, !!o.aim);
+        if (o.clip) {
+          const len = a.clipLength(o.clip as never);
+          const t0 = o.from ?? 0, t1 = o.to ?? len;
+          a.debugPose(o.clip as never, t0 + ((t1 - t0) * i) / Math.max(1, n - 1));
+        }
         row.push(a);
       }
       const cam = g.s.r.camera;
-      const d = o.dist ?? Math.max(4.2, n * 0.72);
+      const d = o.dist ?? Math.max(4.2, n * 0.72 * ((o.step ?? 1.05) / 1.05));
       const mid = new THREE.Vector3(base.x, heightAt(g.s.world.heights, base.x, base.z - 5) + (o.crouch || o.dead !== undefined ? 0.6 : 0.95), base.z - 5);
-      sheet = { from: new THREE.Vector3(mid.x, mid.y + 0.25, mid.z + d), to: mid };
+      // never from under a slope: the camera stands on the ground wherever it is put
+      sheet = { from: new THREE.Vector3(mid.x, Math.max(mid.y + 0.25, heightAt(g.s.world.heights, mid.x, mid.z + d) + 1.2), mid.z + d), to: mid };
       void cam;
     },
     /** render the contact sheet's view over whatever the game just drew */
@@ -174,6 +187,31 @@ export function installHarness(g: Game) {
       cam.updateMatrixWorld();
       g.s.r.vmScene.visible = false;
       g.s.r.render(0);
+    },
+    wait: (ms: number) => new Promise<void>((r) => setTimeout(r, ms)),
+    /** everything a test wants first: in the world, the entry modal gone, frames running whether or not the tab shows */
+    async boot() {
+      (window as unknown as Record<string, unknown>).__run = T.run(280000);
+      await T.join();
+      (g.director as unknown as { t: number }).t = 1;
+      [...document.querySelectorAll('button')].find((b) => /not now/i.test(b.textContent ?? ''))?.click();
+      await T.wait(300);
+    },
+    /** stand `dist` metres from a dummy (in front of it, or `side` radians round it), looking `h` metres up it */
+    async face(i = 0, dist = 6, h = 1.25, side = 0) {
+      const d = g.dummies[i];
+      const a = d.yaw + side;
+      T.tp(d.pos.x - Math.sin(a) * dist, d.pos.z - Math.cos(a) * dist, 0);
+      await T.wait(300);
+      T.aim(d.pos.x, d.pos.y + h, d.pos.z);
+      await T.wait(150);
+      return d;
+    },
+    /** pull the trigger */
+    async fire(holdMs = 50) {
+      g.input.simulate('Mouse0', true);
+      await T.wait(holdMs);
+      g.input.simulate('Mouse0', false);
     },
     vec: (x: number, y: number, z: number) => new THREE.Vector3(x, y, z),
     /** crouch / air / collapse pose angles, live-editable */

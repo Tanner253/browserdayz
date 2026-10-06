@@ -23,6 +23,24 @@
 .hud-cross.off {
   opacity: 0;
 }
+/* with a gun in the hands: four ticks, as far apart as the shot can go */
+.hud-cross i {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: none;
+  width: 7px;
+  height: 2px;
+  margin: -1px 0 0 -3.5px;
+  background: rgba(233, 228, 216, 0.8);
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.8);
+  transition: transform 0.08s linear;
+}
+.hud-cross.gun i { display: block; }
+.hud-cross i:nth-child(1) { transform: translateX(calc(-1 * var(--gap, 10px) - 3.5px)); }
+.hud-cross i:nth-child(2) { transform: translateX(calc(var(--gap, 10px) + 3.5px)); }
+.hud-cross i:nth-child(3) { transform: translateY(calc(-1 * var(--gap, 10px) - 3.5px)) rotate(90deg); }
+.hud-cross i:nth-child(4) { transform: translateY(calc(var(--gap, 10px) + 3.5px)) rotate(90deg); }
 .hud-hit {
   position: absolute;
   left: 50%;
@@ -213,6 +231,7 @@
 .hud-stamina div { height: 100%; background: rgba(233, 228, 216, 0.75); }
 
 .hud-hit.kill i { background: #ff5a44; }
+.hud-hit.head i { background: #ffc94a; width: 10px; }
 
 .hud-hotbar {
   position: absolute;
@@ -314,6 +333,52 @@
   opacity: 0;
   background: radial-gradient(ellipse at center, transparent 45%, rgba(120, 0, 0, 0.55) 100%);
 }
+/* an open wound: the edges of the view beat red, and a line says what to press */
+.hud-bleedfx {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.5s;
+  background:
+    radial-gradient(ellipse at 50% 50%, transparent 56%, rgba(120, 0, 0, 0.42) 100%),
+    radial-gradient(circle at 0% 100%, rgba(100, 0, 0, 0.5), transparent 34%),
+    radial-gradient(circle at 100% 100%, rgba(100, 0, 0, 0.5), transparent 34%);
+}
+.hud-bleedfx.show { animation: bleedfx 1.15s ease-in-out infinite; }
+@keyframes bleedfx { 0%, 100% { opacity: 0.45; } 10% { opacity: 1; } 26% { opacity: 0.6; } 38% { opacity: 0.92; } 60% { opacity: 0.45; } }
+.hud-bleed {
+  position: absolute;
+  left: 50%;
+  top: calc(50% + 118px);
+  transform: translateX(-50%);
+  display: none;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 16px 7px 11px;
+  white-space: nowrap;
+  font-size: 15px;
+  color: #ffdcd5;
+  background: rgba(58, 6, 4, 0.78);
+  border-left: 3px solid #ff4a3a;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  animation: bleedline 1.15s ease-in-out infinite;
+}
+.hud-bleed.show { display: flex; }
+.hud-bleed svg { width: 19px; height: 19px; color: #ff5a44; flex: none; }
+.hud-bleed b { font-family: var(--mono); font-size: 12px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: #ff6f5c; }
+.hud-bleed kbd {
+  display: inline-block;
+  min-width: 20px;
+  margin-right: 8px;
+  padding: 1px 6px;
+  font-family: var(--mono);
+  font-size: 13px;
+  text-align: center;
+  color: #1a0503;
+  background: #ffb9ad;
+  border-radius: 3px;
+}
+@keyframes bleedline { 0%, 100% { background: rgba(58, 6, 4, 0.78); } 10% { background: rgba(120, 12, 8, 0.86); } 38% { background: rgba(100, 10, 6, 0.84); } }
 .hud-fps { position: absolute; top: 10px; right: 14px; font-family: var(--mono); font-size: 11px; color: var(--ink-faint); }
 .hud-online {
   position: absolute;

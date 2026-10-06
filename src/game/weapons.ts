@@ -175,8 +175,14 @@ export class Weapons {
   hitMarker = 0;
   /** the last hit marker was a kill (HUD draws it red) */
   killMarker = false;
+  /** the last hit was to the head */
+  headMarker = false;
   onHit: (info: HitInfo) => void = () => {};
   onShot: (info: ShotInfo) => void = () => {};
+  /** the hands started on something others can see: working the bolt, reloading (seconds it takes) */
+  onAct: (act: 'bolt' | 'reload', dur: number) => void = () => {};
+  /** something hit a body (anyone's): where, which way it was travelling, and how hard (1 = a rifle round) */
+  onFlesh: (owner: unknown, point: THREE.Vector3, dir: THREE.Vector3, power: number) => void = () => {};
   /** a punch or a melee swing has started */
   onSwing: () => void = () => {};
   /** loot models, so consumables can be shown in the hands while they are used */
@@ -326,8 +332,8 @@ export class Weapons {
         hip: new THREE.Vector3(0.075, -0.11, -0.38),
         hipRot: new THREE.Euler(0.02, 0.06, -0.03),
         grips: {
-          right: { pos: new THREE.Vector3(-0.072, -0.018, 0.032), fingers: new THREE.Vector3(0.9, -0.15, -0.3), palm: new THREE.Vector3(0.3, 0, -1), curl: [0.35, 1.25, 1.3, 1.35], thumb: 0.6 },
-          left: { pos: new THREE.Vector3(-0.065, -0.06, -0.055), fingers: new THREE.Vector3(0.85, -0.2, 0.35), palm: new THREE.Vector3(0, 0.4, 1), curl: [1.05, 1.1, 1.15, 1.2], thumb: 0.45 },
+          right: { pos: new THREE.Vector3(-0.072, -0.018, 0.032), fingers: new THREE.Vector3(0.9, -0.15, -0.3), palm: new THREE.Vector3(0.3, 0, -1), curl: [0.35, 1.25, 1.3, 1.35], thumb: 1.25 },
+          left: { pos: new THREE.Vector3(-0.065, -0.06, -0.055), fingers: new THREE.Vector3(0.85, -0.2, 0.35), palm: new THREE.Vector3(0, 0.4, 1), curl: [1.05, 1.1, 1.15, 1.2], thumb: 1.2 },
         },
         ads: new THREE.Vector3(0.0, -0.081, -0.34),
         muzzle: new THREE.Vector3(0, 0.06, -0.19),
@@ -539,6 +545,7 @@ export class Weapons {
     this.fireCooldown = Math.max(0, this.fireCooldown - dt);
     this.hitMarker = Math.max(0, this.hitMarker - dt);
     this.updateBullets(dt);
+    this.updateBrass(dt);
 
     if (enabled && !this.player.dead) {
       if (input.pressed('Digit1')) this.equip('primary');
@@ -558,6 +565,7 @@ export class Weapons {
     // ----- aiming
     const canAim = enabled && !!m && !p.sprinting && (!this.action || this.action.name === 'bolt') && !p.dead;
     this.aiming = canAim && input.held('Mouse2');
+    this.spread = def?.weapon ? this.spreadNow(def.weapon.kind) : 0;
     p.aiming = this.aiming;
     this.adsT += ((this.aiming ? 1 : 0) - this.adsT) * (1 - Math.exp(-(this.aiming ? 14 : 11) * dt));
     this.scoped = !!m && m.kind === 'rifle' && hasMod(this.currentItem, 'pu_scope') && this.adsT > 0.9 && this.aiming;
@@ -620,6 +628,23 @@ export class Weapons {
   }
 
   private burst = 0;
+  /**
+   * How far off the line of sight the next shot can land, radians (the full width of the
+   * cone). Standing still it is the weapon's own figure; moving opens it, being off the
+   * ground opens it wide, crouching closes it a little. The crosshair is drawn this wide.
+   */
+  spread = 0;
+
+  private spreadNow(kind: GunKind): number {
+    const p = this.player;
+    const hd = HANDLING[kind];
+    const move = p.movingSmooth;
+    const air = p.grounded ? 0 : 1;
+    const bloom = kind === 'auto' ? Math.min(Math.max(0, this.burst - 1), 8) * 0.0025 : 0;
+    const hip = hd.spread * (1 + move * 1.3) * (p.crouched ? 0.75 : 1) + air * 0.035;
+    const ads = 0.002 + move * 0.007 + air * 0.02;
+    return THREE.MathUtils.lerp(hip, ads, this.adsT) + bloom;
+  }
 
   private tryFire(m: VmModel, item: ItemInstance, camera: THREE.PerspectiveCamera, trigger: boolean) {
     if (this.action || this.fireCooldown > 0) return;
@@ -641,10 +666,8 @@ export class Weapons {
     const elev = (0.5 * 9.81 * t0 * t0) / b.zero;
     const up = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
     dir.addScaledVector(up, elev).normalize();
-    // hip fire is less precise
-    // hip fire is less precise; sustained auto fire blooms
-    const bloom = kind === 'auto' ? Math.min(this.burst - 1, 8) * 0.0025 : 0;
-    const spread = (this.aiming ? 0.002 : hd.spread) + bloom;
+    // hip fire is less precise, moving less still; sustained auto fire blooms
+    const spread = this.spreadNow(kind);
     dir.x += (Math.random() - 0.5) * spread;
     dir.y += (Math.random() - 0.5) * spread;
     dir.z += (Math.random() - 0.5) * spread;
@@ -685,6 +708,7 @@ export class Weapons {
     } else {
       this.fireCooldown = hd.interval;
       this.slideKick = 1;
+      this.eject(m, false);
       audio.shellDrop();
       if ((item.loaded ?? 0) === 0) this.chamberEmpty = true;
     }
@@ -692,12 +716,55 @@ export class Weapons {
 
   private slideKick = 0;
 
+  // spent cases: thrown out of the action to the right, seen for the half second it takes them to leave the picture
+  private brass: { mesh: THREE.Mesh; v: THREE.Vector3; spin: THREE.Vector3; life: number }[] = [];
+  private brassGeo: Record<'short' | 'long', THREE.CylinderGeometry> | null = null;
+  private brassMat: THREE.MeshStandardMaterial | null = null;
+
+  private eject(m: VmModel, long: boolean) {
+    this.brassGeo ??= { short: new THREE.CylinderGeometry(0.0048, 0.0048, 0.019, 8), long: new THREE.CylinderGeometry(0.0061, 0.0061, 0.053, 8) };
+    this.brassMat ??= new THREE.MeshStandardMaterial({ color: 0xb8923e, metalness: 0.85, roughness: 0.36 });
+    let b = this.brass.find((x) => x.life <= 0);
+    if (!b) {
+      if (this.brass.length >= 8) return;
+      b = { mesh: new THREE.Mesh(this.brassGeo.short, this.brassMat), v: new THREE.Vector3(), spin: new THREE.Vector3(), life: 0 };
+      b.mesh.castShadow = false;
+      this.brass.push(b);
+    }
+    b.mesh.geometry = long ? this.brassGeo.long : this.brassGeo.short;
+    // the port is on top of the action, a hand's width behind the weapon's middle
+    b.mesh.position.copy(m.root.position).add(_toCam.set(0.012, long ? 0.062 : 0.068, long ? 0.2 : 0.05).applyEuler(m.root.rotation));
+    b.mesh.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3);
+    // up and out to the right, slow enough to be seen leaving
+    b.v.set(0.4 + Math.random() * 0.35, 1.0 + Math.random() * 0.5, -0.15 + Math.random() * 0.25);
+    b.spin.set(8 + Math.random() * 14, Math.random() * 10, 6 + Math.random() * 12);
+    b.life = 0.7;
+    this.vmRoot.add(b.mesh);
+  }
+
+  private updateBrass(dt: number) {
+    for (const b of this.brass) {
+      if (b.life <= 0) continue;
+      b.life -= dt;
+      if (b.life <= 0) {
+        b.mesh.removeFromParent();
+        continue;
+      }
+      b.v.y -= 9.81 * dt;
+      b.mesh.position.addScaledVector(b.v, dt);
+      b.mesh.rotation.x += b.spin.x * dt;
+      b.mesh.rotation.y += b.spin.y * dt;
+      b.mesh.rotation.z += b.spin.z * dt;
+    }
+  }
+
   private cycleBolt(m: VmModel) {
     audio.boltCycle();
     audio.shellDrop(0.5);
     this.start('bolt', 0.78, () => {
       this.boltReady = true;
-    });
+    }, { out: 0 });
+    this.onAct('bolt', 0.78);
     void m;
   }
 
@@ -712,6 +779,7 @@ export class Weapons {
       const n = Math.min(need, have);
       audio.click(2400, 0.45, 0.025);
       audio.click(1700, 0.5, 0.06, 0.15);
+      this.onAct('reload', 0.55 + n * 0.48 + 0.5);
       this.start('reload', 0.55 + n * 0.48 + 0.5, () => {
         audio.click(2000, 0.5, 0.05);
         audio.click(2800, 0.45, 0.025, 0.18);
@@ -729,6 +797,7 @@ export class Weapons {
         } else audio.slideRack(1.55);
       }
       const dur = long ? (locked ? 2.35 : 1.9) : locked ? 1.95 : 1.55;
+      this.onAct('reload', dur);
       this.start('magswap', dur, () => {
         const got = this.inv.take(def.weapon!.ammo, capacityOf(item) - (item.loaded ?? 0));
         item.loaded = (item.loaded ?? 0) + got;
@@ -787,7 +856,8 @@ export class Weapons {
   private swing(melee: NonNullable<(typeof ITEMS)[string]['melee']>, camera: THREE.PerspectiveCamera) {
     this.fireCooldown = melee.rate;
     this.player.vitals.stamina = Math.max(0, this.player.vitals.stamina - 6);
-    audio.ui('move');
+    // the heavier the thing, the lower and longer it cuts the air
+    audio.whoosh(THREE.MathUtils.clamp((melee.rate - 0.4) / 0.45, 0, 1));
     this.start('swing', melee.rate * 0.9, undefined, { hit: 0, dmg: melee.damage, range: melee.range });
     this.onSwing();
     void camera;
@@ -823,7 +893,9 @@ export class Weapons {
           const killed = target.damage(dmg, pt, dir, zone);
           this.markHit(killed);
           this.onHit({ victim: target, weapon: a.name === 'punch' ? 'fists' : this.currentItem?.id ?? 'fists', target: target.name, zone, damage: dmg, killed, distance: hit.toi, melee: true });
-          this.fx.impact('flesh', pt, n, false);
+          const power = a.name === 'punch' ? 0.2 : 0.55;
+          this.fx.bleed(pt, dir, power);
+          this.onFlesh(hit.tag?.owner, pt, dir, power);
           audio.impact('flesh', pt, 1);
         } else {
           const s = (hit.tag?.surface ?? 'dirt') as Surface;
@@ -883,10 +955,11 @@ export class Weapons {
     this.kick.v.y -= 0.5 * k;
   }
 
-  private markHit(killed: boolean) {
+  private markHit(killed: boolean, head = false) {
     this.hitMarker = killed ? 0.5 : 0.25;
     this.killMarker = killed;
-    audio.hitTick(killed);
+    this.headMarker = head;
+    audio.hitTick(killed, head);
   }
 
   /**
@@ -965,15 +1038,19 @@ export class Weapons {
           const target = this.resolveTarget(hit.tag?.owner);
           const dist = b.travelled + hit.toi;
           const energy = (speed * speed) / (BALLISTICS.rifle.muzzleVel * BALLISTICS.rifle.muzzleVel);
-          if (target) {
-            if (!b.ghost) {
+          if (target || hit.tag?.surface === 'flesh') {
+            if (target && !b.ghost) {
               const zone = hit.tag?.zone ?? 'torso';
               const dmg = b.damage * Math.max(0.35, Math.min(1, energy * 1.6 + 0.4)) * ZONE_MULT[zone][0];
               const killed = target.damage(dmg, pt, dir, zone);
-              this.markHit(killed);
+              this.markHit(killed, zone === 'head');
               this.onHit({ victim: target, weapon: b.weapon, target: target.name, zone, damage: dmg, killed, distance: dist, melee: false });
             }
-            this.fx.impact('flesh', pt, n, false);
+            // a body: yours, somebody else's, or one lying on the ground
+            const power = ITEMS[b.weapon]?.weapon?.kind === 'pistol' ? 0.6 : 1;
+            const owner = hit.tag?.owner;
+            this.fx.bleed(pt, dir, power, owner === this.player);
+            this.onFlesh(owner, pt, dir, power);
             audio.impact('flesh', pt, b.ghost ? pt.distanceTo(this.mainCam?.position ?? pt) : dist);
           } else {
             const s = (hit.tag?.surface ?? 'dirt') as Surface;
@@ -1085,6 +1162,10 @@ export class Weapons {
         const seg = (t0: number, t1: number) => THREE.MathUtils.smoothstep(k, t0, t1);
         const up = seg(0.05, 0.22) - seg(0.72, 0.9);
         const back = seg(0.22, 0.45) - seg(0.48, 0.7);
+        if (k > 0.4 && a.data && !a.data.out) {
+          a.data.out = 1;
+          this.eject(m, true);
+        }
         m.bolt.rotation.x = -up * 1.25;
         m.boltSlide.position.x = -back * 0.075;
         rot.z += bell * 0.28 * (1 - ads * 0.5);

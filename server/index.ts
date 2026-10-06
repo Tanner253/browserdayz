@@ -16,7 +16,7 @@ import { Container, type SerializedInventory } from '../src/sim/inventory';
 import { ITEMS, TAG_HOLD, sanitizeItem, type ItemInstance } from '../src/sim/items';
 import { CRATE_RESTOCK, CRATE_SPECS, fillCrate } from '../src/sim/crates';
 import { WEAPON_RULES, hitDamage, type HitZone } from '../src/sim/combat';
-import { CHAT_RANGE, F_DEAD, MAX_STAMINA, PROTOCOL, type C2S, type CorpseInfo, type KillInfo, type PlayerInfo, type Pose, type S2C, type StashInfo, type StoredItem, type Vitals } from '../src/net/protocol';
+import { ACTS, CHAT_RANGE, F_DEAD, MAX_STAMINA, PROTOCOL, type C2S, type CorpseInfo, type KillInfo, type PlayerInfo, type Pose, type S2C, type StashInfo, type StoredItem, type Vitals } from '../src/net/protocol';
 
 const PORT = Number(process.env.PORT ?? 8080);
 const ROOT = process.cwd();
@@ -52,9 +52,10 @@ interface Box {
   /** crate prop kind (loot table) */
   crate?: string;
   emptiedAt: number;
-  /** corpse: owner name, expiry (economy time) */
+  /** corpse: owner name, expiry (economy time), how it fell */
   name?: string;
   expires?: number;
+  v?: number;
 }
 
 const boxes = new Map<string, Box>();
@@ -137,6 +138,7 @@ interface Client {
   pose: Pose;
   w: string | null;
   m: string[];
+  g: string[];
   alive: boolean;
   inv: SerializedInventory | null;
   vitals: Vitals | null;
@@ -170,7 +172,7 @@ function broadcast(m: S2C, except?: Client) {
   for (const c of clients.values()) if (c !== except && c.ws.readyState === 1) c.ws.send(s);
 }
 
-const info = (c: Client): PlayerInfo => ({ id: c.id, name: c.name, pose: c.pose, w: c.w, m: c.m, alive: c.alive });
+const info = (c: Client): PlayerInfo => ({ id: c.id, name: c.name, pose: c.pose, w: c.w, m: c.m, g: c.g, alive: c.alive });
 
 /** a spawn point on the edge of the map, as far from everyone else as possible */
 function pickSpawn() {
@@ -277,7 +279,7 @@ function findCarried(c: Client, uid: unknown): ItemInstance | null {
 }
 
 /** everything a character carried goes into a body that can be searched for a while */
-function makeCorpse(c: Client): CorpseInfo | null {
+function makeCorpse(c: Client, v: number): CorpseInfo | null {
   const inv = c.inv;
   const [x, , z, yaw] = c.pose;
   const y = c.pose[1];
@@ -298,18 +300,18 @@ function makeCorpse(c: Client): CorpseInfo | null {
     economy.drop(it, x + Math.cos(a) * 0.9, y, z + Math.sin(a) * 0.9, Math.random() * 6.28);
   }
   if (!box.items.length) return null;
-  boxes.set(uid, { cid: uid, kind: 'corpse', w: 8, h: 10, items: box.serialize().items, x, y, z, rot: yaw, emptiedAt: -1, name: c.name, expires: economy.time + CORPSE_LIFETIME });
-  return { uid, x, y, z, rot: yaw, name: c.name };
+  boxes.set(uid, { cid: uid, kind: 'corpse', w: 8, h: 10, items: box.serialize().items, x, y, z, rot: yaw, emptiedAt: -1, name: c.name, expires: economy.time + CORPSE_LIFETIME, v });
+  return { uid, x, y, z, rot: yaw, name: c.name, v };
 }
 
-function kill(c: Client, cause: string) {
+function kill(c: Client, cause: string, v = 0) {
   if (!c.alive) return;
   c.alive = false;
   releaseLock(c);
   const now = Date.now();
   const by = c.lastHitBy && now - c.lastHitBy.at < 15000 ? c.lastHitBy : null;
-  const k: KillInfo = { id: c.id, name: c.name, by: by?.id ?? null, byName: by?.name ?? null, w: by?.w ?? cause, zone: by?.zone ?? null, dist: Math.round(by?.dist ?? 0) };
-  const corpse = makeCorpse(c);
+  const k: KillInfo = { id: c.id, name: c.name, by: by?.id ?? null, byName: by?.name ?? null, w: by?.w ?? cause, zone: by?.zone ?? null, dist: Math.round(by?.dist ?? 0), v };
+  const corpse = makeCorpse(c, v);
   c.inv = null;
   c.vitals = null;
   c.lastHitBy = null;
@@ -335,6 +337,17 @@ function handle(c: Client, m: C2S) {
     }
     case 'swing': {
       if (c.alive) broadcast({ t: 'swing', id: c.id }, c);
+      return;
+    }
+    case 'act': {
+      if (!c.alive || !ACTS.includes(m.a)) return;
+      broadcast({ t: 'act', id: c.id, a: m.a, d: num(m.d) ? Math.max(0, Math.min(12, m.d)) : 1 }, c);
+      return;
+    }
+    case 'gear': {
+      // only things that are worn, and only as many as there are places to wear them
+      c.g = (Array.isArray(m.g) ? m.g : []).filter((x) => typeof x === 'string' && !!ITEMS[x]?.wear).slice(0, 6);
+      broadcast({ t: 'gear', id: c.id, g: c.g }, c);
       return;
     }
     case 'hit': {
@@ -430,7 +443,7 @@ function handle(c: Client, m: C2S) {
       return;
     }
     case 'died': {
-      kill(c, typeof m.cause === 'string' ? m.cause.slice(0, 24) : 'unknown');
+      kill(c, typeof m.cause === 'string' ? m.cause.slice(0, 24) : 'unknown', num(m.v) ? Math.max(0, Math.min(2, Math.floor(m.v))) : 0);
       return;
     }
     case 'respawn': {
@@ -502,7 +515,7 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
   const c: Client = {
     ws, id: nextId++, key, name: cleanName(m.name),
     pose: [sp.x, 'y' in sp && sp.y !== undefined ? sp.y : world.groundAt(sp.x, sp.z), sp.z, sp.yaw, 0, 0],
-    w: null, m: [], alive: true,
+    w: null, m: [], g: [], alive: true,
     inv: resume?.inv ?? null, vitals: resume?.vitals ?? null,
     lastHit: 0, lastChat: 0, lastHitBy: null, openCid: null, joinedAt: Date.now(), msgCount: 0, msgWindow: Date.now(),
   };
@@ -514,7 +527,7 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
     loot: [...economy.loot.values()],
     doors: [...doors].map(([i, [open, swing]]) => [i, open, swing]),
     stashes: [...boxes.values()].filter((b) => b.kind === 'stash').map((b) => ({ uid: b.cid, x: b.x, y: b.y, z: b.z, rot: b.rot })),
-    corpses: [...boxes.values()].filter((b) => b.kind === 'corpse').map((b) => ({ uid: b.cid, x: b.x, y: b.y, z: b.z, rot: b.rot, name: b.name ?? 'Survivor' })),
+    corpses: [...boxes.values()].filter((b) => b.kind === 'corpse').map((b) => ({ uid: b.cid, x: b.x, y: b.y, z: b.z, rot: b.rot, name: b.name ?? 'Survivor', v: b.v ?? 0 })),
     spawn: sp,
     me: resume ? { inv: resume.inv!, vitals: resume.vitals ?? { health: 100, energy: 80, water: 80, stamina: MAX_STAMINA, bleeding: false } } : null,
     max: MAX_PLAYERS,

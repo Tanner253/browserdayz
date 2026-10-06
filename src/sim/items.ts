@@ -121,7 +121,7 @@ const D: ItemDef[] = [
   { id: 'water_jug', name: 'Water Jug', model: 'plastic_bottle_gallon', w: 2, h: 3, weight: 2.2, category: 'drink', desc: 'Two litres of clean water.', use: { verb: 'Drink', time: 3, water: 60, sound: 'drink' } },
   { id: 'thermos', name: 'Thermos', model: 'plastic_thermos', w: 1, h: 3, weight: 0.8, category: 'drink', desc: 'Lukewarm tea. Better than nothing.', use: { verb: 'Drink', time: 2.5, water: 35, energy: 5, sound: 'drink' } },
   // ---------------------------------------------------------------- medical
-  { id: 'bandage', name: 'Bandage Roll', model: 'medical_tape', scale: 1.7, w: 1, h: 1, weight: 0.05, category: 'medical', desc: 'Stops bleeding.', use: { verb: 'Bandage', time: 3.5, stopBleed: true, health: 5, sound: 'bandage' } },
+  { id: 'bandage', name: 'Bandage Roll', model: 'medical_tape', scale: 1.7, w: 1, h: 1, weight: 0.05, category: 'medical', desc: 'Stops bleeding.', use: { verb: 'Apply', time: 3.5, stopBleed: true, health: 5, sound: 'bandage' } },
   { id: 'firstaid', name: 'First Aid Kit', model: 'medical_box', w: 3, h: 2, weight: 0.9, category: 'medical', desc: 'Dressings and antiseptic. Treats wounds properly.', use: { verb: 'Treat wounds', time: 6, stopBleed: true, health: 45, sound: 'bandage' } },
   // ---------------------------------------------------------------- clothing & bags
   {

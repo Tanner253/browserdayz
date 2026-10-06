@@ -38,7 +38,7 @@ export class HUD {
     this.root = document.createElement('div');
     this.root.id = 'hud';
     this.root.innerHTML = `
-      <div class="hud-cross"></div>
+      <div class="hud-cross"><i></i><i></i><i></i><i></i></div>
       <div class="hud-hit"><i></i><i></i><i></i><i></i></div>
       <div class="hud-prompt"></div>
       <div class="hud-progress"><div class="hud-progress-label"></div><div class="hud-progress-bar"><div></div></div></div>
@@ -80,6 +80,8 @@ export class HUD {
         </svg>
       </div>
       <div class="hud-damage"></div>
+      <div class="hud-bleedfx"></div>
+      <div class="hud-bleed">${svg(ICONS.blood)}<b>Bleeding</b><span></span></div>
       <div class="hud-hitdir"><i></i></div>
       <div class="hud-fps"></div>
       <div class="hud-online"><i></i><b></b><span></span></div>
@@ -161,7 +163,7 @@ export class HUD {
       </div>
     `;
     document.getElementById('ui')!.appendChild(this.root);
-    for (const k of ['cross', 'hit', 'prompt', 'progress', 'compass', 'area', 'weapon', 'vitals', 'stamina', 'hotbar', 'chat', 'scope', 'damage', 'hitdir', 'fps', 'online', 'net', 'feed', 'tags', 'fatal', 'dead', 'start']) {
+    for (const k of ['cross', 'hit', 'prompt', 'progress', 'compass', 'area', 'weapon', 'vitals', 'stamina', 'hotbar', 'chat', 'scope', 'damage', 'bleedfx', 'bleed', 'hitdir', 'fps', 'online', 'net', 'feed', 'tags', 'fatal', 'dead', 'start']) {
       this.el[k] = this.root.querySelector(`.hud-${k}`) as HTMLElement;
     }
     this.notes = this.root.querySelector('.hud-notes') as HTMLDivElement;
@@ -539,10 +541,16 @@ export class HUD {
     prompt: string | null;
     weapon: { name: string; ammo: { loaded: number; reserve: number; cap: number } | null; action: string | null; mode: string | null } | null;
     aiming: boolean;
+    /** how wide the next shot can go, radians (0 = nothing that shoots in the hands) */
+    spread: number;
     scoped: boolean;
     hitMarker: number;
     kill: boolean;
+    /** the hit was to the head */
+    head: boolean;
     hurt: number;
+    /** an open wound: what to do about it (html), or null when not bleeding */
+    bleed: string | null;
     heading: number | null;
     progress: { label: string; t: number } | null;
     hotbar: HotbarEntry[];
@@ -555,9 +563,17 @@ export class HUD {
     const e = this.el;
     this.toggle(this.root, 'hidden', s.hidden);
     this.toggle(e.cross, 'off', s.aiming || s.scoped || s.dead);
+    // the four ticks stand as far out as the shot can land: half the cone, at this field of view
+    this.toggle(e.cross, 'gun', s.spread > 0);
+    const gap = String(Math.round(3 + s.spread * 357));
+    if (s.spread > 0 && this.last.gap !== gap) {
+      this.last.gap = gap;
+      e.cross.style.setProperty('--gap', gap + 'px');
+    }
     this.toggle(e.scope, 'show', s.scoped);
     this.toggle(e.hit, 'show', s.hitMarker > 0);
     this.toggle(e.hit, 'kill', s.kill);
+    this.toggle(e.hit, 'head', s.head && !s.kill);
 
     // hotbar: rebuilt only when something on it changes
     let sig = '';
@@ -587,6 +603,10 @@ export class HUD {
     }
     const bleed = e.vitals.querySelector('[data-k="bleed"]') as HTMLElement;
     this.toggle(bleed, 'show', v.bleeding);
+    // and said in words, with the key to press: an icon in the corner is easy to bleed out under
+    this.toggle(e.bleed, 'show', s.bleed !== null);
+    this.toggle(e.bleedfx, 'show', s.bleed !== null);
+    if (s.bleed !== null) this.set('bleed', e.bleed.lastElementChild as HTMLElement, s.bleed, 'html');
     const reserve = (v.stamina / MAX_STAMINA) * 100;
     (e.stamina.firstElementChild as HTMLElement).style.width = `${reserve}%`;
     this.toggle(e.stamina, 'show', reserve < 99.5);
