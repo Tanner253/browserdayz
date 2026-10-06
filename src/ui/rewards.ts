@@ -23,8 +23,8 @@ const write = (k: string, v: string) => {
   }
 };
 
-/** a plain Ethereum address: 0x and forty hex digits */
-export const isWallet = (s: string) => /^0x[0-9a-fA-F]{40}$/.test(s.trim());
+/** a Solana address: 32 to 44 base58 characters (no 0, O, I or l) */
+export const isWallet = (s: string) => /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(s.trim());
 
 export function walletAddress(): string {
   const a = read(WALLET);
@@ -69,7 +69,7 @@ export class RewardsModal {
     this.root.innerHTML = `
       <div class="rw-card" role="dialog" aria-modal="true" aria-labelledby="rw-title">
         <div class="rw-kicker">Creator rewards</div>
-        <h2 id="rw-title">Enter your Robinhood ETH wallet address to receive rewards</h2>
+        <h2 id="rw-title">Enter your Robinhood SOL wallet address to receive rewards</h2>
         <ol class="rw-steps">
           <li>
             <svg class="rw-art" viewBox="0 0 160 104" aria-hidden="true">
@@ -98,16 +98,16 @@ export class RewardsModal {
           </li>
         </ol>
         <div class="rw-pay">
-          <svg viewBox="0 0 26 40" aria-hidden="true"><path d="M13 1L1 20l12 7 12-7z" fill="currentColor" opacity="0.55"/><path d="M13 1v26l12-7z" fill="currentColor"/><path d="M1 23l12 16 12-16-12 7z" fill="currentColor" opacity="0.8"/></svg>
-          <p>Cashed-in tags are what creator rewards will be paid on, in ETH, to the wallet you enter here.<small>Payouts roll out shortly after launch</small></p>
+          <svg viewBox="0 0 40 32" aria-hidden="true"><path d="M8 2h30l-6 7H2z" fill="currentColor"/><path d="M2 12.5h30l6 7H8z" fill="currentColor" opacity="0.8"/><path d="M8 23h30l-6 7H2z" fill="currentColor" opacity="0.6"/></svg>
+          <p>Cashed-in tags are what creator rewards will be paid on, in SOL, to the wallet you enter here.<small>Payouts roll out shortly after launch</small></p>
         </div>
         <div class="rw-row">
-          <input class="rw-input" placeholder="0x…" maxlength="42" spellcheck="false" autocomplete="off" aria-label="Ethereum wallet address">
+          <input class="rw-input" placeholder="Your Solana address" maxlength="44" spellcheck="false" autocomplete="off" aria-label="Solana wallet address">
           <button class="rw-save">Save address</button>
         </div>
         <div class="rw-err" role="alert"></div>
         <div class="rw-foot">
-          <span class="rw-fine">Use the public address of your Robinhood wallet: it starts with 0x. Never share a seed phrase or private key. Saved on this device.</span>
+          <span class="rw-fine">Use the public Solana address of your Robinhood wallet. Never share a seed phrase or private key. Saved on this device.</span>
           <button class="rw-skip">Not now</button>
         </div>
       </div>`;
@@ -183,7 +183,7 @@ export class RewardsModal {
   private save() {
     const v = this.input.value.trim();
     if (!isWallet(v)) {
-      this.err.textContent = 'That does not look like an Ethereum address: it should be 0x followed by 40 letters and digits.';
+      this.err.textContent = 'That does not look like a Solana address: it should be 32 to 44 letters and digits.';
       return;
     }
     write(WALLET, v);
