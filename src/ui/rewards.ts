@@ -70,7 +70,7 @@ export class RewardsModal {
     this.root.innerHTML = `
       <div class="rw-card" role="dialog" aria-modal="true" aria-labelledby="rw-title">
         <div class="rw-kicker">Creator rewards</div>
-        <h2 id="rw-title">Enter your Robinhood SOL wallet address to receive rewards</h2>
+        <h2 id="rw-title">Enter your SOL wallet address to receive rewards</h2>
         <ol class="rw-steps">
           <li>
             <svg class="rw-art" viewBox="0 0 160 104" aria-hidden="true">
@@ -108,7 +108,7 @@ export class RewardsModal {
         </div>
         <div class="rw-err" role="alert"></div>
         <div class="rw-foot">
-          <span class="rw-fine">Use the public Solana address of your Robinhood wallet. Never share a seed phrase or private key. Saved on this device, and sent with each tag you cash in so it can be listed for a reward.</span>
+          <span class="rw-fine">Use the public Solana address of your wallet. Never share a seed phrase or private key. Saved on this device, and sent with each tag you cash in so it can be listed for a reward.</span>
           <button class="rw-skip">Not now</button>
         </div>
       </div>`;

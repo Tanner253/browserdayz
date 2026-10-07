@@ -33,15 +33,15 @@ function wsUrl(): string {
   return `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
 }
 
-/** How many people are on the server right now (for the start screen). Null if it can't be reached. */
-export async function serverStatus(timeout = 6000): Promise<{ players: number } | null> {
+/** How many people are on the server right now, how many it holds and how many are waiting to get in (for the start screen). Null if it can't be reached. */
+export async function serverStatus(timeout = 6000): Promise<{ players: number; max: number; queue: number } | null> {
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), timeout);
   try {
     const r = await fetch(`${remoteServer() ?? ''}/healthz`, { cache: 'no-store', signal: ctl.signal });
     if (!r.ok) return null;
-    const j = (await r.json()) as { players?: number };
-    return typeof j.players === 'number' ? { players: j.players } : null;
+    const j = (await r.json()) as { players?: number; max?: number; queue?: number };
+    return typeof j.players === 'number' ? { players: j.players, max: j.max ?? 0, queue: j.queue ?? 0 } : null;
   } catch {
     return null;
   } finally {
@@ -116,6 +116,27 @@ export class Net {
     return this.online ? '' : this.kicked;
   }
   onClose: (reason: string) => void = () => {};
+  /**
+   * The server is full and we are waiting in line for it: our place (1 = next), how many are
+   * waiting, how many the server holds. Called again whenever the line moves. connect()
+   * answers with the welcome when our turn comes, however long that takes.
+   */
+  onQueue: (pos: number, of: number, max: number) => void = () => {};
+  private left = false;
+  /** the player gave up their place in the line */
+  get leftQueue() {
+    return this.left;
+  }
+
+  /** Give up the place in the line: connect() then answers null. */
+  leaveQueue() {
+    this.left = true;
+    try {
+      this.ws?.close();
+    } catch {
+      /* already closed */
+    }
+  }
 
   on<T extends S2C['t']>(t: T, h: Handler<T>) {
     if (!this.handlers.has(t)) this.handlers.set(t, []);
@@ -146,8 +167,9 @@ export class Net {
       onStatus('Connecting…');
     }
     const timeout = remote ? 12_000 : 4000;
+    this.left = false;
     const first = await this.open(name, timeout);
-    if (first || this.kicked) return first;
+    if (first || this.kicked || this.left) return first;
     // one more try: a proxy or a server that has only just started can drop the first connection
     await new Promise((r) => setTimeout(r, 400));
     return this.open(name, timeout);
@@ -198,6 +220,12 @@ export class Net {
           this.id = m.you;
           setInterval(() => this.send({ t: 'ping', n: performance.now() }), 4000);
           done(m);
+          return;
+        }
+        if (m.t === 'queue') {
+          // in line: there is no giving up on a slow answer now, the welcome comes when it comes
+          clearTimeout(timer);
+          this.onQueue(m.pos, m.of, m.max);
           return;
         }
         if (m.t === 'kick') this.kicked = m.reason;

@@ -106,6 +106,7 @@ export class HUD {
             </div>
             <button class="start-btn">Deploy</button>
             <div class="start-online"></div>
+            <div class="start-queue"><div class="sq-pos"></div><div class="sq-sub"></div><button class="sq-leave" type="button">Play on your own instead</button></div>
           </div>
           <div class="start-brief" data-tab="brief">
             <div class="start-tabs">
@@ -363,11 +364,40 @@ export class HUD {
     this.setStartOnline(count);
   }
 
-  /** the same number on the start / pause screen */
-  setStartOnline(count: number | null) {
+  /**
+   * The same number on the start / pause screen.
+   * @param max how many the server holds, when known: a full server says so, and how long the line is
+   * @param waiting how many are in line for it
+   */
+  setStartOnline(count: number | null, max = 0, waiting = 0) {
     const e = this.root.querySelector('.start-online') as HTMLElement;
-    e.textContent = count === null ? '' : count === 0 ? 'Nobody else is online yet' : `${count} survivor${count === 1 ? '' : 's'} online`;
+    const full = max > 0 && count !== null && count >= max;
+    e.textContent =
+      count === null ? ''
+      : full ? `Server full (${count}/${max})${waiting ? ` · ${waiting} waiting` : ''}: you will be put in line`
+      : count === 0 ? 'Nobody else is online yet'
+      : `${count} survivor${count === 1 ? '' : 's'} online`;
     this.toggle(e, 'show', count !== null);
+    this.toggle(e, 'full', full);
+  }
+
+  /**
+   * Waiting in line for a full server: the place in it, and a way out. Null puts it away.
+   * @param leave the player would rather play on their own than wait
+   */
+  setQueue(q: { pos: number; of: number; max: number } | null, leave?: () => void) {
+    const e = this.root.querySelector('.start-queue') as HTMLElement;
+    this.toggle(e, 'show', !!q);
+    this.toggle(this.el.start, 'queued', !!q);
+    if (!q) return;
+    const nth = (n: number) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`;
+    (e.querySelector('.sq-pos') as HTMLElement).textContent = q.pos === 1 ? 'You are next in line' : `You are ${nth(q.pos)} in line`;
+    (e.querySelector('.sq-sub') as HTMLElement).textContent = `The server is full (${q.max} playing, ${q.of} waiting). Keep this tab open: you go in the moment a place is free.`;
+    const b = e.querySelector('.sq-leave') as HTMLButtonElement;
+    b.onclick = (ev) => {
+      ev.stopPropagation();
+      leave?.();
+    };
   }
 
   private hotbarTapped: (key: string) => void = () => {};

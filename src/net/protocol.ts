@@ -155,6 +155,12 @@ export type S2C =
    * where this player stands in the whole list (-1 = not on it yet) and their own two counts.
    */
   | { t: 'board'; rows: [string, number, number][]; me: number; mine: [number, number] }
+  /**
+   * The server is full and this player is waiting to get in: their place in the line (1 =
+   * next), how many are waiting, and how many the server holds. Sent again whenever the line
+   * moves; a 'welcome' follows, on the same connection, when their turn comes.
+   */
+  | { t: 'queue'; pos: number; of: number; max: number }
   /** a supply drop has been set down (see src/sim/drops.ts), and one has been cleared away */
   | { t: 'drop+'; d: DropInfo }
   | { t: 'drop-'; uid: string }

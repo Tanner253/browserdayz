@@ -63,9 +63,15 @@ export class Player {
   /** recoil / sway offsets applied on top of yaw/pitch for the camera */
   aimOffset = new THREE.Vector2();
 
-  private stepPhase = 0;
+  /**
+   * Where the legs are in their stride, as an angle that passes a multiple of π each time a
+   * foot comes down. Set from the body (Avatar.stride): the view and the weapon bob to it, so
+   * the step that is seen, the one that is felt and the one that is heard are the same step.
+   */
+  stride = 0;
+  /** how fast it is really getting over the ground, m/s (up against a wall, less than it is trying to) */
+  private groundSpeed = 0;
   // previous fixed-step values, so render frames can interpolate (no 60 Hz stepping on 144 Hz screens)
-  private prevStepPhase = 0;
   private prevLean = 0;
   private prevMoving = 0;
   private alpha = 1;
@@ -151,7 +157,6 @@ export class Player {
   /** Fixed-step movement. */
   step(h: number, input: MoveInput) {
     this.prevPos.copy(this.pos);
-    this.prevStepPhase = this.stepPhase;
     this.prevLean = this.lean;
     this.prevMoving = this.moving;
     if (this.dead) return;
@@ -231,6 +236,7 @@ export class Player {
     this.pos.set(next.x, next.y - this.half() - RADIUS, next.z);
     const hs = Math.hypot(mv.x, mv.z) / h;
     this.moving = THREE.MathUtils.clamp(hs / 6.2, 0, 1);
+    this.groundSpeed = hs;
 
     // stamina
     if (this.sprinting && hs > 1) {
@@ -243,17 +249,6 @@ export class Player {
       v.stamina = Math.min(MAX_STAMINA, v.stamina + regen * h);
     }
 
-    // footsteps
-    if (this.grounded && hs > 0.5) {
-      const prev = this.stepPhase;
-      this.stepPhase += h * (hs * 1.65 + 1.2);
-      if (Math.floor(prev / Math.PI) !== Math.floor(this.stepPhase / Math.PI)) {
-        const s = this.surface();
-        audio.footstep(s as Surface, hs * (this.crouched ? 0.4 : 1), undefined, this.weightKg);
-        this.onFootstep(s);
-      }
-    }
-
     // leaning (Q/E), blocked by walls
     const leanTarget = (input.held('KeyE') ? 1 : 0) - (input.held('KeyQ') ? 1 : 0);
     let lt = leanTarget;
@@ -263,6 +258,14 @@ export class Player {
       if (physics.raycast(eyeP, side, 0.55, SHOT_GROUPS, this.collider)) lt = 0;
     }
     this.lean += (lt - this.lean) * (1 - Math.exp(-10 * h));
+  }
+
+  /** A foot of the body has come down (Avatar.footfall): the sound of it, if it is really getting anywhere. */
+  footfall() {
+    if (!this.grounded || this.dead || this.groundSpeed <= 0.5) return;
+    const s = this.surface();
+    audio.footstep(s as Surface, this.groundSpeed * (this.crouched ? 0.4 : 1), undefined, this.weightKg);
+    this.onFootstep(s);
   }
 
   /** what the feet would stand on at a spot: anything that stops this body, from knee height down */
@@ -413,7 +416,7 @@ export class Player {
 
   /** Bob values the viewmodel follows */
   get bobPhase() {
-    return this.prevStepPhase + (this.stepPhase - this.prevStepPhase) * this.alpha;
+    return this.stride;
   }
 
   /** interpolated horizontal speed fraction for render-rate effects */

@@ -211,6 +211,8 @@ interface Client {
   lastChat: number;
   lastHitBy: { id: number; name: string; w: string; zone: HitZone; dist: number; at: number } | null;
   openCid: string | null;
+  /** when they last moved, looked about or did anything (see kickIdle) */
+  activeAt: number;
   joinedAt: number;
   msgCount: number;
   msgWindow: number;
@@ -396,9 +398,14 @@ function kill(c: Client, cause: string, v = 0) {
 }
 
 function handle(c: Client, m: C2S) {
+  // anything a person does counts as being there; what the game reports on its own does not
+  if (m.t !== 's' && m.t !== 'me' && m.t !== 'ping' && m.t !== 'gear') c.activeAt = Date.now();
   switch (m.t) {
     case 's': {
       if (!isPose(m.p)) return;
+      // (a step, or a turn of the head)
+      const was = c.pose;
+      if (Math.abs(m.p[0] - was[0]) + Math.abs(m.p[2] - was[2]) > 0.02 || Math.abs(m.p[3] - was[3]) + Math.abs(m.p[4] - was[4]) > 0.004) c.activeAt = Date.now();
       c.pose = m.p;
       const w = typeof m.w === 'string' && ITEMS[m.w] ? m.w : null;
       c.w = w;
@@ -602,12 +609,7 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
     ws.close();
     return null;
   }
-  if (clients.size >= MAX_PLAYERS) {
-    ws.send(JSON.stringify({ t: 'kick', reason: 'The server is full.' } satisfies S2C));
-    ws.close();
-    return null;
-  }
-  const key = typeof m.key === 'string' && m.key.length >= 8 && m.key.length <= 64 ? m.key : `anon-${Math.random().toString(36).slice(2)}`;
+  const key = keyOf(m) || `anon-${Math.random().toString(36).slice(2)}`;
   // the same character can only be in the world once
   for (const o of clients.values()) {
     if (o.key === key) {
@@ -624,7 +626,7 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
     pose: [sp.x, 'y' in sp && sp.y !== undefined ? sp.y : world.groundAt(sp.x, sp.z), sp.z, sp.yaw, 0, 0],
     w: null, m: [], g: [], alive: true,
     inv: resume?.inv ?? null, vitals: resume?.vitals ?? null,
-    lastHit: 0, lastNade: 0, nadeHits: 0, lastChat: 0, lastHitBy: null, openCid: null, joinedAt: Date.now(), msgCount: 0, msgWindow: Date.now(),
+    lastHit: 0, lastNade: 0, nadeHits: 0, lastChat: 0, lastHitBy: null, openCid: null, activeAt: Date.now(), joinedAt: Date.now(), msgCount: 0, msgWindow: Date.now(),
   };
   records.delete(key);
   const others = [...clients.values()].map(info);
@@ -657,6 +659,7 @@ function drop(c: Client) {
   records.set(c.key, { pose: c.pose, inv: c.inv, vitals: c.vitals, alive: c.alive, leftAt: Date.now() });
   broadcast({ t: 'leave', id: c.id });
   log(`- ${c.name} (#${c.id}) — ${clients.size} online`);
+  fillFromQueue();
 }
 
 // ------------------------------------------------------------------ loops
@@ -670,6 +673,108 @@ setInterval(() => {
   }
   broadcast({ t: 'ps', s });
 }, 1000 / TICK_HZ);
+
+// ------------------------------------------------------------------ the queue
+//
+// The server holds MAX_PLAYERS. Anyone who turns up beyond that waits in line, first come
+// first served, on the connection they turned up with, and is let in the moment somebody
+// leaves. A player whose connection dropped a moment ago goes to the front: they were
+// playing, not arriving. And while anybody is waiting, a player who has not moved or done
+// anything for five minutes gives up their place.
+
+interface Waiting {
+  ws: WebSocket;
+  hello: Extract<C2S, { t: 'hello' }>;
+  key: string;
+  /** they were in the game until a moment ago */
+  back: boolean;
+  /** called with the player they have become, once they are in */
+  enter: (c: Client) => void;
+}
+const queue: Waiting[] = [];
+const QUEUE_MAX = Number(process.env.QUEUE_MAX ?? 200);
+/** how long after dropping out a player still goes to the front of the line, ms */
+const REJOIN_GRACE_MS = (Number(process.env.REJOIN_GRACE_S) || 120) * 1000;
+/** with people waiting, how long a player may do nothing before their place goes to the next in line, ms */
+const IDLE_KICK_MS = (Number(process.env.IDLE_KICK_S) || 300) * 1000;
+
+const keyOf = (m: { key?: unknown }) => (typeof m.key === 'string' && m.key.length >= 8 && m.key.length <= 64 ? m.key : '');
+
+/** no room for this player right now? (Somebody taking over their own character from another tab needs none.) */
+function mustWait(m: Extract<C2S, { t: 'hello' }>) {
+  if (m.v !== PROTOCOL) return false; // join() turns them away itself
+  const key = keyOf(m);
+  if (key && [...clients.values()].some((o) => o.key === key)) return false;
+  return clients.size >= MAX_PLAYERS || queue.length > 0;
+}
+
+/** when the line was last told where it stands */
+let queueToldAt = 0;
+
+function tellQueue() {
+  queueToldAt = Date.now();
+  queue.forEach((w, i) => {
+    if (w.ws.readyState === 1) w.ws.send(JSON.stringify({ t: 'queue', pos: i + 1, of: queue.length, max: MAX_PLAYERS } satisfies S2C));
+  });
+}
+
+function enqueue(ws: WebSocket, hello: Extract<C2S, { t: 'hello' }>, enter: (c: Client) => void): Waiting | null {
+  if (queue.length >= QUEUE_MAX) {
+    ws.send(JSON.stringify({ t: 'kick', reason: 'The server is full, and so is the line for it. Try again in a while.' } satisfies S2C));
+    ws.close();
+    return null;
+  }
+  const key = keyOf(hello);
+  // the same player waiting twice (a second tab): the new connection takes the old one's place
+  const twice = key ? queue.findIndex((w) => w.key === key) : -1;
+  const rec = key ? records.get(key) : undefined;
+  const w: Waiting = { ws, hello, key, back: !!rec && Date.now() - rec.leftAt < REJOIN_GRACE_MS, enter };
+  if (twice >= 0) {
+    const old = queue[twice];
+    queue[twice] = { ...w, back: old.back || w.back };
+    old.ws.send(JSON.stringify({ t: 'kick', reason: 'You joined the line from another tab.' } satisfies S2C));
+    old.ws.close();
+  } else if (w.back) {
+    // behind anyone else who is also on their way back in
+    const at = queue.findIndex((q) => !q.back);
+    queue.splice(at < 0 ? queue.length : at, 0, w);
+  } else queue.push(w);
+  log(`~ ${cleanName(hello.name)} is waiting (${queue.indexOf(queue.find((q) => q.ws === ws)!) + 1} of ${queue.length})`);
+  tellQueue();
+  return queue.find((q) => q.ws === ws) ?? null;
+}
+
+function leaveQueue(ws: WebSocket) {
+  const i = queue.findIndex((w) => w.ws === ws);
+  if (i < 0) return;
+  queue.splice(i, 1);
+  tellQueue();
+}
+
+/** somebody has left: the next in line comes in */
+function fillFromQueue() {
+  let moved = false;
+  while (clients.size < MAX_PLAYERS && queue.length) {
+    const w = queue.shift()!;
+    moved = true;
+    if (w.ws.readyState !== 1) continue;
+    const c = join(w.ws, w.hello);
+    if (c) w.enter(c);
+  }
+  if (moved) tellQueue();
+}
+
+/** every five seconds: with people waiting, whoever has done nothing for too long makes room */
+function kickIdle(now: number) {
+  if (!queue.length) return;
+  for (const c of [...clients.values()]) {
+    if (now - c.activeAt < IDLE_KICK_MS) continue;
+    send(c, { t: 'kick', reason: 'You were away while others were waiting to play. Reconnect to join the line.' });
+    log(`${c.name} was idle with ${queue.length} waiting: their place goes to the next in line`);
+    c.ws.close();
+    drop(c);
+  }
+}
 
 // ------------------------------------------------------------------ leaderboard
 //
@@ -778,6 +883,9 @@ setInterval(() => {
     }
   }
   tickDrops(alive.length > 0);
+  kickIdle(now);
+  // a line that is not moving still hears from us: a connection that says nothing for long is cut off on the way
+  if (queue.length && Date.now() - queueToldAt > 20_000) tellQueue();
   for (const [k, r] of records) if (now - r.leftAt > RECORD_LIFETIME) records.delete(k);
 }, 5000);
 
@@ -798,7 +906,7 @@ const server = http.createServer((req, res) => {
   if (url.pathname === '/healthz') {
     // readable from a client hosted somewhere else (e.g. Vercel) for the start-screen player count
     res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'no-store' });
-    res.end(JSON.stringify({ ok: true, players: clients.size, uptime: Math.round(process.uptime()), loot: economy.loot.size }));
+    res.end(JSON.stringify({ ok: true, players: clients.size, max: MAX_PLAYERS, queue: queue.length, uptime: Math.round(process.uptime()), loot: economy.loot.size }));
     return;
   }
   // the website's function asks here whether a cash-in it was told about is real
@@ -860,7 +968,8 @@ server.on('upgrade', (req, socket, head) => {
 
 wss.on('connection', (ws) => {
   let c: Client | null = null;
-  const hello = setTimeout(() => !c && ws.close(), 8000);
+  let waiting = false;
+  const hello = setTimeout(() => !c && !waiting && ws.close(), 8000);
   ws.on('message', (data) => {
     let m: C2S;
     try {
@@ -870,7 +979,13 @@ wss.on('connection', (ws) => {
     }
     if (!m || typeof m !== 'object' || typeof m.t !== 'string') return;
     if (!c) {
-      if (m.t === 'hello') c = join(ws, m);
+      if (m.t !== 'hello' || waiting) return;
+      if (mustWait(m)) {
+        waiting = !!enqueue(ws, m, (client) => {
+          waiting = false;
+          c = client;
+        });
+      } else c = join(ws, m);
       return;
     }
     // crude flood guard: nobody legitimately sends more than ~80 messages a second
@@ -888,6 +1003,7 @@ wss.on('connection', (ws) => {
   });
   ws.on('close', () => {
     clearTimeout(hello);
+    if (waiting) leaveQueue(ws);
     if (c) drop(c);
   });
   ws.on('error', () => ws.close());

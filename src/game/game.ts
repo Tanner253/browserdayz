@@ -107,6 +107,8 @@ export class Game {
   private drops = new Map<string, { stash: Stash; until: number; at: THREE.Vector3; smoke: { owed: number } }>();
   /** playing alone: game time the next one is due (-1 until the clock is first read) */
   private nextDrop = -1;
+  /** the page's own title: the tab shows the place in the line, and "your turn", over it */
+  private title = document.title;
   /** times at which the open inventory should look again at what lies on the ground (see drop) */
   private vicinityDue: number[] = [];
   /** the pockets were closed but the mouse is not the game's yet: one click and it is */
@@ -228,7 +230,7 @@ export class Game {
     this.minimap = new Minimap(world);
     this.hud.root.insertBefore(this.minimap.root, this.hud.root.firstChild);
     // how many people are in the world, shown before you click Play
-    void serverStatus().then((s) => this.hud.setStartOnline(s ? s.players : null));
+    void serverStatus().then((s) => this.hud.setStartOnline(s ? s.players : null, s?.max, s?.queue));
     this.invUI = new InventoryUI(this.inv, {
       take: (w) => this.takeWorldItem(w),
       drop: (item) => {
@@ -350,10 +352,32 @@ export class Game {
     setPlayerName(name);
     this.dress(name, renamed);
     this.hud.showStart(true, false, 'Connecting…');
+    // A full server puts us in line. The wait can be long: the mouse goes back to the player,
+    // the screen says where they stand, and they can give it up and play on their own.
+    let waited = false;
+    this.net.onQueue = (pos, of, max) => {
+      if (!waited) {
+        waited = true;
+        this.input.unlock();
+      }
+      this.hud.showStart(true, false, 'In line');
+      this.hud.setQueue({ pos, of, max }, () => this.net.leaveQueue());
+      document.title = `(${pos}) in line · ${this.title}`;
+    };
     const welcome = await this.net.connect(name, (text) => this.hud.showStart(true, false, text));
-    if (welcome) await this.enterOnline(welcome);
-    else {
-      if (this.net.refused) this.hud.note(this.net.refused, 'warn');
+    this.hud.setQueue(null);
+    document.title = this.title;
+    if (welcome) {
+      await this.enterOnline(welcome);
+      if (waited) {
+        // their turn, quite possibly while they were looking at something else
+        audio.ui('open');
+        document.title = `Your turn! · ${this.title}`;
+        this.hud.note('A place came free: you are in', 'good');
+      }
+    } else {
+      if (this.net.leftQueue) this.hud.note('You left the line: playing on your own', 'warn');
+      else if (this.net.refused) this.hud.note(this.net.refused, 'warn');
       else if (remoteServer()) this.hud.note('The server could not be reached: playing offline', 'warn');
       await this.enterOffline();
     }
@@ -366,7 +390,7 @@ export class Game {
       if (slot) this.weapons.equip(slot);
     }
     if (this.input.locked) this.unpause();
-    else this.hud.showStart(true, true);
+    else this.hud.showStart(true, true, waited && welcome ? 'You are in: click to play' : '');
   }
 
   /** What this player looks like follows from their name: body, first-person sleeves, inventory portrait. */
@@ -954,6 +978,7 @@ export class Game {
 
   private resume() {
     if (this.joining) return;
+    document.title = this.title;
     // keys must reach the game, not the name field
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     audio.start();
@@ -1745,6 +1770,9 @@ export class Game {
     const interp = new THREE.Vector3().lerpVectors(p.prevPos, p.pos, physics.alpha);
     const first = this.director.mode === 'first';
     this.avatar.update(dt, interp, p.vel, p.yaw, p.crouched, p.dead, first, first ? 0 : p.pitch, p.grounded, this.weapons.aiming);
+    // the step you hear and the bob you see are the body's own
+    p.stride = this.avatar.stride;
+    if (this.avatar.footfall) p.footfall();
     for (const d of this.dummies) {
       if (Math.abs(d.pos.x - interp.x) + Math.abs(d.pos.z - interp.z) < 260) d.update(dt);
     }

@@ -65,6 +65,14 @@ export const POSE = {
   walkTop: 2.1,
   /** where in each stepping clip the left foot is furthest forward, as a fraction of the clip: lines the cycles up */
   offset: { walk: 0, run: 0.95, crouchWalk: 0 } as Record<Stride, number>,
+  /**
+   * Where in the stride a foot is set down (the other one half a stride later), read off the
+   * clips: at a walk or a flat-out run, at the jog half way between them, and crouched. The
+   * step is heard here and the view dips here, so the sound keeps time with the legs at any
+   * speed: a sprint is longer strides, not many more of them. Stepping backwards the stride
+   * runs the other way, and a foot is set down where going forwards it would be picked up.
+   */
+  plant: { fwd: [0.1, 0.165, 0], back: [0.375, 0.25, 0.285] },
   /** how far the back straightens while crouched, radians: brings the head up to where the crouched camera is */
   crouchLift: 0.37,
   /** how fast the death clip is played */
@@ -206,6 +214,15 @@ export class Avatar {
   private clock = Math.random() * 10;
   /** where in the stride the legs are, 0..1: shared by every stepping clip so they blend in step */
   private phase = Math.random();
+  /** a foot came down during the last update (see POSE.plant): the step that is heard */
+  footfall = false;
+  /** seconds since the last one */
+  private sinceStep = 1;
+  /** half strides gone by, counted from where a foot comes down: a whole number is passed as each one lands */
+  private halves = 0;
+  /** where a foot came down, and which way the legs were stepping, at the last update */
+  private plantWas = 0;
+  private dirWas = 0;
   /** legs turned away from the chest, radians */
   private twist = 0;
   private backing = false;
@@ -671,6 +688,19 @@ export class Avatar {
     return this.dur[clip];
   }
 
+  private get plantAt() {
+    const k = THREE.MathUtils.clamp((this.speed - POSE.walkTop) / (POSE.pace.run - POSE.walkTop), 0, 1);
+    const [walk, jog, low] = this.backing ? POSE.plant.back : POSE.plant.fwd;
+    // backwards nobody gets beyond a slow jog, and the feet are already landing as at one well before that
+    const stand = walk + (jog - walk) * (this.backing ? Math.min(1, k * 4) : 4 * k * (1 - k));
+    return stand + (low - stand) * this.crouchT;
+  }
+
+  /** the stride as an angle that passes a multiple of π each time a foot comes down: what the view bobs to */
+  get stride() {
+    return (this.phase - this.plantAt) * Math.PI * 2;
+  }
+
   /**
    * @param firstPerson the body squares up to the look direction (it is what you see when you look down)
    * @param pitch aim pitch in radians: the chest and the held weapon follow it
@@ -789,7 +819,28 @@ export class Avatar {
       cadence += (w[n] * rate[n]) / this.dur[n];
       stepping += w[n];
     }
-    if (stepping > 1e-3) this.phase = (((this.phase + (cadence / stepping) * dt * dirSign) % 1) + 1) % 1;
+    // Twice a stride a foot comes down. Where in the stride that is moves with the pace, so
+    // it is counted against where it is now: a change of pace that carries the place past the
+    // legs is a foot landing too, and not one that goes unheard.
+    let footfall = false;
+    const plant = this.plantAt;
+    if (stepping > 1e-3 && dirSign === this.dirWas) {
+      const adv = (cadence / stepping) * dt * dirSign;
+      this.phase = (((this.phase + adv) % 1) + 1) % 1;
+      const at = this.halves + (adv - (plant - this.plantWas)) * 2;
+      footfall = dirSign > 0 ? Math.floor(at) > Math.floor(this.halves) : Math.ceil(at) < Math.ceil(this.halves);
+      this.halves = at;
+    } else {
+      // standing, in the air, or the legs have just turned to step the other way: count afresh
+      if (stepping > 1e-3) this.phase = (((this.phase + (cadence / stepping) * dt * dirSign) % 1) + 1) % 1;
+      this.halves = (this.phase - plant) * 2;
+    }
+    this.plantWas = plant;
+    this.dirWas = dirSign;
+    // (not two in a breath: the place moving the other way can bring the same foot past it twice)
+    this.sinceStep += dt;
+    this.footfall = footfall && stepping > 0.35 && speedNow > 0.5 && this.sinceStep > 0.25;
+    if (this.footfall) this.sinceStep = 0;
     this.clock += dt;
     for (const n of CLIPS) {
       const a = this.actions[n];

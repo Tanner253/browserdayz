@@ -899,6 +899,17 @@
 .hud-start.paused .start-id .start-btn { margin-top: 30px; }
 .start-online { display: none; font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; color: var(--ok); }
 .start-online.show { display: block; }
+.start-online.full { color: var(--accent); }
+.start-online.full::before { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+/* waiting in line for a full server */
+.start-queue { display: none; margin-top: 2px; cursor: default; }
+.start-queue.show { display: block; }
+.hud-start.queued .start-btn { opacity: 0.55; pointer-events: none; }
+.hud-start.queued .start-online { display: none; }
+.sq-pos { font-size: 26px; font-weight: 600; letter-spacing: 0.06em; color: var(--ink); }
+.sq-sub { max-width: 330px; margin: 6px 0 14px; font-size: 14px; line-height: 1.45; color: var(--ink-dim); }
+.sq-leave { padding: 7px 16px; font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-dim); background: transparent; border: 1px solid var(--line); cursor: pointer; }
+.sq-leave:hover { color: var(--ink); border-color: var(--ink-dim); }
 .start-online.show::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 6px var(--ok); vertical-align: 1px; animation: live-dot 2.4s ease-in-out infinite; }
 @keyframes live-dot { 50% { opacity: 0.35; } }
 

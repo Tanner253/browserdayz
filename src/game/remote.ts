@@ -44,7 +44,6 @@ export class RemotePlayer implements Damageable {
   private blocker!: RAPIER.Collider;
   private snaps: Snap[] = [];
   private vel = new THREE.Vector3();
-  private stride = 0;
   private fall = 0;
   private grounded = true;
   private aiming = false;
@@ -199,19 +198,11 @@ export class RemotePlayer implements Damageable {
     }
 
     // --- footsteps you can hear coming
-    if (this.alive) {
+    if (this.alive && this.avatar.footfall) {
       const speed = Math.hypot(this.vel.x, this.vel.z);
-      if (speed > 0.6) {
-        this.stride += speed * dt;
-        const stepLen = speed > 4.8 ? 1.25 : 0.82;
-        if (this.stride > stepLen) {
-          this.stride = 0;
-          const dist = this.pos.distanceTo(listener);
-          if (dist < 45) {
-            const hit = physics.raycast({ x: this.pos.x, y: this.pos.y + 0.4, z: this.pos.z }, { x: 0, y: -1, z: 0 }, 1, SOLID_GROUPS);
-            audio.footstep((hit?.tag?.surface ?? 'grass') as Surface, speed * (this.crouched ? 0.4 : 1), this.pos);
-          }
-        }
+      if (speed > 0.6 && this.pos.distanceTo(listener) < 45) {
+        const hit = physics.raycast({ x: this.pos.x, y: this.pos.y + 0.4, z: this.pos.z }, { x: 0, y: -1, z: 0 }, 1, SOLID_GROUPS);
+        audio.footstep((hit?.tag?.surface ?? 'grass') as Surface, speed * (this.crouched ? 0.4 : 1), this.pos);
       }
     }
   }
