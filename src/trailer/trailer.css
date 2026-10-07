@@ -2,7 +2,6 @@
 
 body.filming { cursor: none; }
 /* things a film has no use for */
-body.filming .cam-label,
 body.filming .hud-fps,
 body.filming .hud-net,
 body.filming .hud-online,

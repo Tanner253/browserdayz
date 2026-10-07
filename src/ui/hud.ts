@@ -154,7 +154,6 @@ export class HUD {
                   <p><kbd>F</kbd> take · doors · search <kbd>G</kbd> hold: drop what you hold</p>
                   <p><kbd class="wide">Tab</kbd> inventory <kbd>M</kbd> map</p>
                   <p><kbd class="wide">Enter</kbd> chat</p>
-                  <p><kbd>V</kbd> third person</p>
                   <p><kbd class="wide">Esc</kbd> this menu</p>
                   <p><kbd class="wide">F3</kbd> performance</p>
                 </div>
@@ -587,6 +586,8 @@ export class HUD {
 
   update(s: {
     vitals: Vitals;
+    /** out of breath: no sprinting until the bar has come back a way */
+    winded: boolean;
     prompt: string | null;
     /** where on screen the thing the prompt is about sits, as fractions of the screen (null = no marker) */
     mark: [number, number] | null;
@@ -674,6 +675,7 @@ export class HUD {
     const reserve = (v.stamina / MAX_STAMINA) * 100;
     (e.stamina.firstElementChild as HTMLElement).style.width = `${reserve}%`;
     this.toggle(e.stamina, 'show', reserve < 99.5);
+    this.toggle(e.stamina, 'spent', s.winded);
 
     if (s.weapon) {
       this.toggle(e.weapon, 'show', true);

@@ -1,5 +1,5 @@
-// The survivor's body. Used for the local player (third-person view, shadow, and the body
-// you see when you look down in first person) and for every other character in the world.
+// The survivor's body. Used for the local player (the shadow, the flight in from the menu, and
+// the body you see when you look down) and for every other character in the world.
 //
 // Standing, walking, jogging, sprinting, crouching, falling and dying are clips blended by
 // what the character is doing. On top of the clips: the legs turn toward the way the feet
@@ -13,7 +13,7 @@ import type { Atmosphere } from '../world/atmosphere';
 import type { Grips, HandGrip } from './arms';
 import { BEARD, HAIR_STYLES, MAX_WOUNDS, loadCharacter, lookFor, lookPatch, lookUniforms, setLookUniforms, type Look, type LookUniforms } from './look';
 
-/** local player's full body: seen by the shadow cameras always, by the main camera only in third person */
+/** local player's full body: seen by the shadow cameras always, by the main camera only on the flight in from the menu */
 export const AVATAR_LAYER = 2;
 /** local player's first-person body (no head, no arms): main camera only, first person only */
 export const FP_BODY_LAYER = 4;

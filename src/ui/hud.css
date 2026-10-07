@@ -282,6 +282,9 @@
 }
 .hud-stamina.show { opacity: 1; }
 .hud-stamina div { height: 100%; background: rgba(233, 228, 216, 0.75); }
+/* out of breath: the bar has to fill to the mark before the next sprint */
+.hud-stamina.spent div { background: #c8553d; }
+.hud-stamina.spent::after { content: ''; position: absolute; left: 15%; top: -2px; width: 1px; height: 7px; background: rgba(233, 228, 216, 0.7); }
 
 .hud-hit.kill i { background: #ff5a44; }
 .hud-hit.head i { background: #ffc94a; width: 10px; }
@@ -1054,8 +1057,6 @@ kbd.hot { color: #121413; background: linear-gradient(#d8c594, #b89f66); border-
   .rw-row { flex-direction: column; }
 }
 
-/* the menu is the only thing on screen before you deploy */
-#ui:has(.hud-start.show:not(.paused)) .cam-label { opacity: 0; }
 
 @media (prefers-reduced-motion: reduce) {
   .hud-start *, .rw * { animation: none !important; }
@@ -1107,7 +1108,6 @@ body.touch .hud-minimap { top: 12px; left: calc(132px + env(safe-area-inset-left
 body.touch .hud-minimap span { display: none; }
 body.touch .hud-chat { top: 70px; bottom: auto; left: calc(14px + env(safe-area-inset-left)); width: 360px; }
 body.touch .chat-entry, body.touch .chat-hint { display: none; }
-body.touch .cam-label { display: none; }
 body.touch .start-tabs [data-tab='keys'] { display: none; }
 body.touch .inv-item, body.touch .inv-ground-row { touch-action: none; }
 body.touch .hud-start, body.touch .rw, body.touch .inv-wrap, body.touch .inv-col { touch-action: pan-x pan-y; }

@@ -1077,7 +1077,7 @@ export class Game {
         if (t < due - 1) return;
         due = Math.max(due + step, t - step);
       }
-      this.frame();
+      this.frame(t);
     };
     requestAnimationFrame(loop);
   }
@@ -1473,7 +1473,7 @@ export class Game {
     this.focus = null;
     if (this.player.dead || this.invUI.isOpen || this.use) return;
     const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
-    const range = 2.6 + (this.director.mode === 'orbit' ? this.director.orbit.dist : 0);
+    const range = 2.6;
     const hit = physics.raycast(cam.position, dir, range, USE_GROUPS, this.player.collider);
     const owner = hit?.tag?.owner ?? this.nearestLoose(cam, dir, range);
     if (!owner) {
@@ -1631,7 +1631,7 @@ export class Game {
   /** the last hit taken: which way it was travelling, and when */
   private lastHit: { x: number; z: number; at: number } | null = null;
 
-  /** keep the third-person body's hands in step with what is equipped */
+  /** keep the body's hands in step with what is equipped */
   private syncHeld() {
     const it = this.weapons.equippedItem;
     const key = it ? `${it.id}|${(it.mods ?? []).join(',')}` : '';
@@ -1643,11 +1643,16 @@ export class Game {
 
   // ------------------------------------------------------------ frame
 
-  private frame() {
+  /** @param stamp when the display refresh this frame is for began (the browser's own stamp) */
+  private frame(stamp = performance.now()) {
     const now = performance.now();
     this.perf.begin(now);
-    const dt = Math.min((now - this.last) / 1000, 0.1);
-    this.last = now;
+    // How far the world moves this frame is measured between refreshes, not between the moments
+    // the browser got round to calling us. Those wander by a millisecond or two with whatever
+    // else the page is doing, while the picture goes up on the even beat of the display: a
+    // step measured on the wandering clock and shown on the even one is motion that judders.
+    const dt = Math.min(Math.max(0, stamp - this.last) / 1000, 0.1);
+    this.last = stamp;
     const { r, veg, grass, buildings, atmo, world } = this.s;
     const input = this.input;
     const p = this.player;
@@ -1684,15 +1689,13 @@ export class Game {
     if (this.hud.chatOpen && (!playing || uiOpen)) this.hud.closeChat();
     const typing = this.hud.chatOpen;
 
-    // third person: the mouse turns the camera around the character
-    const consumed = !uiOpen && !this.paused && this.director.handleInput(input);
     // binoculars come down for anything else: a trigger, a sprint, the pockets, a hit
     if (this.glass && (!playing || uiOpen || this.use || input.pressed('Mouse0') || input.pressed('Mouse2') || p.sprinting || QUICK_KEYS.some((k) => input.pressed(k)))) {
       this.glass = 0;
       this.glassDown = now;
     }
     const sens = this.glass ? 0.22 : this.weapons.scoped ? 0.28 : this.weapons.aiming ? 0.7 : 1;
-    if (!consumed && !uiOpen && playing) p.look(input, sens);
+    if (!uiOpen && playing) p.look(input, sens);
 
     const canMove = !uiOpen && playing && !typing;
     const moveInput = canMove ? input : NULL_INPUT;
@@ -1749,7 +1752,7 @@ export class Game {
     }
 
     // weapons + fov
-    const fpLive = this.director.mode === 'first' && this.director.blend > 0.9;
+    const fpLive = this.director.blend > 0.9;
     this.weapons.update(dt, input, cam, fpLive && !uiOpen && playing && !this.use && !typing && !this.glass);
     this.grenades.update(dt);
     const kind = this.weapons.equippedItem ? ITEMS[this.weapons.equippedItem.id].weapon?.kind : undefined;
@@ -1768,8 +1771,7 @@ export class Game {
     else cam.layers.disable(FP_BODY_LAYER);
     r.vmScene.visible = fpView && !this.glass;
     const interp = new THREE.Vector3().lerpVectors(p.prevPos, p.pos, physics.alpha);
-    const first = this.director.mode === 'first';
-    this.avatar.update(dt, interp, p.vel, p.yaw, p.crouched, p.dead, first, first ? 0 : p.pitch, p.grounded, this.weapons.aiming);
+    this.avatar.update(dt, interp, p.vel, p.yaw, p.crouched, p.dead, true, 0, p.grounded, this.weapons.aiming);
     // the step you hear and the bob you see are the body's own
     p.stride = this.avatar.stride;
     if (this.avatar.footfall) p.footfall();
@@ -1878,6 +1880,7 @@ export class Game {
     const heading = THREE.MathUtils.radToDeg(-p.yaw);
     this.hud.update({
       vitals: v,
+      winded: p.outOfBreath,
       // no keyboard on a phone: the Use button lights up instead of naming a key
       prompt: this.awaitClick ? '<kbd>Click</kbd>to look around' : this.touch ? (this.prompt?.replace(/<kbd>F<\/kbd>/, '').replace(/ <small>G to pack up<\/small>/, '') ?? null) : this.prompt,
       mark: this.awaitClick ? null : this.mark,

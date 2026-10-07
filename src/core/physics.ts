@@ -16,6 +16,10 @@ export const G_HITBOX = 0x0040; // character hit zones: stop bullets and melee, 
 export const groups = (member: number, filter: number) => (member << 16) | filter;
 
 export const WORLD_GROUPS = groups(G_WORLD, 0xffff);
+/** a door that is open or swinging: part of the world for a shot, a thrown thing or a look, but no body is stopped by it */
+export const AJAR_GROUPS = groups(G_WORLD, 0xffff & ~G_PLAYER);
+/** finds the bodies of players (for asking whether one stands in a given place) */
+export const BODY_QUERY = groups(0xffff, G_PLAYER);
 export const GLASS_GROUPS = groups(G_GLASS, G_PLAYER);
 export const PLAYER_GROUPS = groups(G_PLAYER, G_WORLD | G_ITEM | G_GLASS);
 export const ITEM_GROUPS = groups(G_ITEM, G_WORLD | G_ITEM);

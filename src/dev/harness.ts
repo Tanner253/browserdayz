@@ -27,8 +27,8 @@ export function installHarness(g: Game) {
   const anyG = g as unknown as Record<string, any>;
   const realFrame = anyG.frame.bind(g);
   let frozen = false;
-  anyG.frame = () => {
-    if (!frozen) realFrame();
+  anyG.frame = (stamp?: number) => {
+    if (!frozen) realFrame(stamp);
   };
   const row: Avatar[] = [];
   let sheet: { from: THREE.Vector3; to: THREE.Vector3 } | null = null;

@@ -23,6 +23,11 @@ const PRESS = 1.5;
 /** the steepest ground a step is laid along (46°); past it the controller's own slope rules decide */
 const FOLLOW_MAX = 1.035;
 const FOLLOW_NY = 0.69;
+/** how far above its resting height the body is carried over level ground (see alongGround) */
+const HOVER = 0.004;
+/** stamina at which a sprint gives out, and how much has to come back before the next one */
+const WINDED_AT = 4;
+const WIND_BACK = 45;
 
 export interface Vitals {
   health: number;
@@ -78,7 +83,12 @@ export class Player {
   private bob = new THREE.Vector3();
   private landDip = 0;
   private landVel = 0;
+  /** what the eye still has to make up after the body was set up or down a step in one go */
+  private stepOff = 0;
+  private prevStepOff = 0;
   private staminaDelay = 0;
+  /** out of breath: no sprinting until some stamina is back (see step) */
+  private winded = false;
   private lastFallSpeed = 0;
   /** seconds since the feet last touched the ground, and since jump was last pressed */
   private airT = 0;
@@ -122,6 +132,8 @@ export class Player {
     this.pos.set(x, y, z);
     this.prevPos.copy(this.pos);
     this.vel.set(0, 0, 0);
+    this.stepOff = this.prevStepOff = 0;
+    this.winded = false;
     this.yaw = yaw;
     this.pitch = 0;
     this.dead = false;
@@ -159,6 +171,7 @@ export class Player {
     this.prevPos.copy(this.pos);
     this.prevLean = this.lean;
     this.prevMoving = this.moving;
+    this.prevStepOff = this.stepOff;
     if (this.dead) return;
     const v = this.vitals;
 
@@ -168,7 +181,13 @@ export class Player {
     const str = (input.held('KeyD') ? 1 : 0) - (input.held('KeyA') ? 1 : 0);
     const wantsSprint = input.held('ShiftLeft') && fwd > 0 && !this.aiming && !this.crouched;
     const walk = input.held('AltLeft');
-    this.sprinting = wantsSprint && v.stamina > 4 && this.grounded;
+    // Out of breath is a state, not a line to hover on. With only the line, a player who kept
+    // Shift down after running dry sprinted for one step each second: the pace and the view
+    // twitched every time, and because each of those steps put off the recovery, the stamina
+    // never came back at all while the key was held.
+    if (v.stamina <= WINDED_AT) this.winded = true;
+    else if (v.stamina >= WIND_BACK) this.winded = false;
+    this.sprinting = wantsSprint && !this.winded && this.grounded;
 
     const enc = Math.max(0, this.weightKg - 18) * 0.012; // encumbrance
     let speed = this.crouched ? 1.9 : walk ? 1.7 : 4.0;
@@ -197,9 +216,10 @@ export class Player {
     // and for a moment after running off an edge the ground still counts.
     this.airT = this.grounded ? 0 : this.airT + h;
     this.jumpWish = input.pressedFixed('Space') ? 0 : this.jumpWish + h;
-    if (this.jumpWish < 0.13 && (this.grounded || (this.airT < 0.11 && this.vel.y <= 0)) && v.stamina > 12 && !this.crouched) {
+    // (a jump costs stamina but never waits for it: feet that will not leave the ground read as a fault)
+    if (this.jumpWish < 0.13 && (this.grounded || (this.airT < 0.11 && this.vel.y <= 0)) && !this.crouched) {
       this.vel.y = 4.4;
-      v.stamina -= 14;
+      v.stamina = Math.max(0, v.stamina - 14);
       this.staminaDelay = 1.2;
       this.grounded = false;
       this.jumpWish = 1;
@@ -232,6 +252,16 @@ export class Player {
     if (Math.abs(mv.y - desired.y) > 1e-4 && this.vel.y > 0 && mv.y < desired.y * 0.5) this.vel.y = 0;
     if (!wasGrounded && this.grounded) this.land(this.lastFallSpeed);
     if (!this.grounded) this.lastFallSpeed = this.vel.y;
+    // A stump, a crate or a kerb is taken in one step of the simulation: the body is simply
+    // set on top of it, or down off it. The eye is not. It stays where it was and makes the
+    // height up over the next fifth of a second, the way a knee gives, so a low thing run
+    // over is a step and not a jolt. (Whatever a step rises or falls beyond what a 35° bank
+    // would is held back; ground that is merely steep is followed as it comes.)
+    this.stepOff *= Math.exp(-10 * h);
+    if (wasGrounded && this.grounded) {
+      const over = Math.abs(mv.y) - (Math.hypot(mv.x, mv.z) * 0.7 + 0.012);
+      if (over > 0) this.stepOff = THREE.MathUtils.clamp(this.stepOff - Math.sign(mv.y) * over, -0.5, 0.5);
+    }
 
     this.pos.set(next.x, next.y - this.half() - RADIUS, next.z);
     const hs = Math.hypot(mv.x, mv.z) / h;
@@ -260,6 +290,11 @@ export class Player {
     this.lean += (lt - this.lean) * (1 - Math.exp(-10 * h));
   }
 
+  /** too spent to sprint (the stamina bar says so) */
+  get outOfBreath() {
+    return this.winded;
+  }
+
   /** A foot of the body has come down (Avatar.footfall): the sound of it, if it is really getting anywhere. */
   footfall() {
     if (!this.grounded || this.dead || this.groundSpeed <= 0.5) return;
@@ -282,7 +317,8 @@ export class Player {
    * square to the surface, so a climb costs only its own extra length. Anything but open
    * walkable ground under this step (a ledge, a sill, a crate, too steep a bank) is left to
    * the controller exactly as before.
-   * @returns how far over the ground the laid step should carry, or 0 if the step was left alone
+   * @returns how far over the ground the laid step should carry, or 0 if the step was left
+   * alone or the ground is level
    */
   private alongGround(d: { x: number; y: number; z: number }, h: number) {
     // (standing still the plain press does: one square to a slope lets the body creep on it)
@@ -297,8 +333,20 @@ export class Player {
     const rise = to.y - from.y;
     // the same face carried on, near enough: not a step up and not a drop
     if (Math.abs(rise + (n.x * d.x + n.z * d.z) / n.y) > 0.03 || Math.abs(rise) > run * FOLLOW_MAX) return 0;
-    // (level ground: the step is right as it stands)
-    if (n.y > 0.99999 && Math.abs(rise) < 1e-5) return 0;
+    // Level ground: a floor, a flat roof, the pad a building stands on. There is nothing to
+    // follow and nothing to press against, and the press does harm here. The controller asks
+    // of every step that touches the ground whether its downward part would slide the body
+    // downhill, and stops the sliding if so. On a dead level slab "downhill" is rounding
+    // error: whenever it came out the wrong way the whole step was thrown away, which on the
+    // police station's floor was more than one step in five. With no downward part the
+    // question has one answer, and the body stays down because the ground does not fall away.
+    // It is carried a hair above where it would rest, too: a step along a wall is taken in
+    // two parts, and the second must not graze the floor and have the question asked again.
+    if (n.y > 0.99999 && Math.abs(rise) < 1e-5) {
+      // (come off a lip a little high, it is let down to that height rather than left afloat)
+      d.y = THREE.MathUtils.clamp(from.y + SKIN + HOVER - this.pos.y, -0.02, HOVER);
+      return 0;
+    }
     const k = rise > 0 ? run / Math.hypot(run, rise) : 1;
     const press = PRESS * h;
     d.x = d.x * k - n.x * press;
@@ -398,7 +446,8 @@ export class Player {
     this.bob.lerp(tb, 1 - Math.exp(-14 * dt));
 
     const side = new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
-    cam.position.set(p.x, p.y + this.eye + this.landDip + this.bob.y, p.z);
+    const step = this.prevStepOff + (this.stepOff - this.prevStepOff) * alpha;
+    cam.position.set(p.x, p.y + this.eye + this.landDip + this.bob.y + step, p.z);
     cam.position.addScaledVector(side, this.bob.x + lean * 0.42);
     if (lean !== 0) cam.position.y -= Math.abs(lean) * 0.08;
     // sidestepping tips the view a touch into the movement

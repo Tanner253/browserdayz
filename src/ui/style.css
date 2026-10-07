@@ -136,29 +136,3 @@ body {
   text-overflow: ellipsis;
 }
 
-/* ------------------------------------------------------------ camera mode label */
-.cam-label {
-  position: fixed;
-  left: 22px;
-  bottom: 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
-}
-.cam-mode {
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--ink);
-}
-.cam-hints {
-  font-family: var(--mono);
-  font-size: 11px;
-  color: var(--ink-dim);
-}
-.cam-hints b {
-  color: var(--accent);
-  font-weight: 600;
-}

@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type RAPIER from '@dimforge/rapier3d-compat';
 import { assets } from '../core/assets';
-import { physics, GLASS_GROUPS, type Surface } from '../core/physics';
+import { physics, AJAR_GROUPS, BODY_QUERY, GLASS_GROUPS, WORLD_GROUPS, type Surface } from '../core/physics';
 import { RNG } from '../core/noise';
 import type { Atmosphere } from './atmosphere';
 import { BUILDING_FOOTPRINT, heightAt, type BuildingPlot, type Instance, type SiteKind, type World } from './worldgen';
@@ -393,6 +393,16 @@ export class Door {
   open = false;
   angle = 0;
   private baseQuat = new THREE.Quaternion();
+  private collider: RAPIER.Collider;
+  private half: { x: number; y: number; z: number };
+  /**
+   * Whether it stops a body. Only a door that is shut and still does. One that is swinging
+   * went through whoever was walking at it (the body is moved by hand and a moving door is
+   * no obstacle to that until the two already overlap) and then held them fast for a second
+   * or two; one standing open is a leaf sticking into the room to catch on. Shots, thrown
+   * things and the eye are stopped by it at any angle.
+   */
+  private solid = true;
 
   constructor(world: THREE.Matrix4, width: number, height: number, mat: THREE.Material, handleMat: THREE.Material, public id: string) {
     // pivot sits on the hinge edge; panel extends along +x
@@ -412,8 +422,30 @@ export class Door {
         .setTranslation(this.pivot.position.x, this.pivot.position.y, this.pivot.position.z)
         .setRotation(this.baseQuat),
     );
-    const c = physics.world.createCollider(R.ColliderDesc.cuboid(width / 2 - 0.02, height / 2, 0.03).setTranslation(width / 2, height / 2, 0), this.body);
-    physics.tag(c, { surface: 'wood', owner: this });
+    this.half = { x: width / 2 - 0.02, y: height / 2, z: 0.03 };
+    this.collider = physics.world.createCollider(
+      R.ColliderDesc.cuboid(this.half.x, this.half.y, this.half.z).setTranslation(width / 2, height / 2, 0).setCollisionGroups(WORLD_GROUPS).setSolverGroups(WORLD_GROUPS),
+      this.body,
+    );
+    physics.tag(this.collider, { surface: 'wood', owner: this });
+  }
+
+  /** shut, still, and nobody standing where the leaf is: then it is a wall. Otherwise bodies pass. */
+  private settle() {
+    const shut = !this.open && this.angle === 0 && this.vel === 0;
+    let solid = shut;
+    if (shut && !this.solid) {
+      // it closed on somebody: they walk out of it before it holds anyone
+      const R = physics.R;
+      const at = this.collider.translation();
+      const pad = new R.Cuboid(this.half.x + 0.02, this.half.y, this.half.z + 0.02);
+      if (physics.world.intersectionWithShape(at, this.collider.rotation(), pad, undefined, BODY_QUERY) !== null) solid = false;
+    }
+    if (solid === this.solid) return;
+    this.solid = solid;
+    const g = solid ? WORLD_GROUPS : AJAR_GROUPS;
+    this.collider.setCollisionGroups(g);
+    this.collider.setSolverGroups(g);
   }
 
   /** +1 swings toward the door's local +z side, -1 toward -z */
@@ -447,7 +479,9 @@ export class Door {
     this.open = open;
     this.swing = swing;
     this.angle = open ? this.target() : 0;
+    this.vel = 0;
     this.apply(true);
+    this.settle();
   }
 
   private target() {
@@ -465,7 +499,16 @@ export class Door {
   update(dt: number) {
     const target = this.target();
     const err = target - this.angle;
-    if (Math.abs(err) < 1e-3 && Math.abs(this.vel) < 1e-3) return;
+    if (Math.abs(err) < 1e-3 && Math.abs(this.vel) < 1e-3) {
+      // at rest (a hair short of home counts as home)
+      if (this.angle !== target || this.vel !== 0) {
+        this.angle = target;
+        this.vel = 0;
+        this.apply();
+      }
+      if (!this.open && !this.solid) this.settle();
+      return;
+    }
     // damped spring: quick start, soft settle (no instant snap)
     this.vel += (err * 38 - this.vel * 10.5) * dt;
     this.vel = THREE.MathUtils.clamp(this.vel, -3.2, 3.2);
@@ -475,6 +518,7 @@ export class Door {
       this.vel = 0;
     }
     this.apply();
+    this.settle();
   }
 }
 
