@@ -4,7 +4,7 @@
 
 import * as THREE from 'three';
 import type { Renderer } from '../core/renderer';
-import { physics, USE_GROUPS, SHOT_GROUPS, SOLID_GROUPS } from '../core/physics';
+import { physics, USE_GROUPS, SHOT_GROUPS, SOLID_GROUPS, SIGHT_GROUPS } from '../core/physics';
 import { audio } from '../core/audio';
 import { Input, NULL_INPUT } from '../core/input';
 import type { Atmosphere } from '../world/atmosphere';
@@ -13,7 +13,7 @@ import type { Vegetation } from '../world/vegetation';
 import type { Grass } from '../world/grass';
 import { Door, type Buildings } from '../world/buildings';
 import { PLAY_RADIUS, heightAt, type World } from '../world/worldgen';
-import { ITEMS, TAG_HOLD, capacityOf, hasMod, makeItem, newUid, tagClock, tagOwner, type ItemInstance, type Slot } from '../sim/items';
+import { ITEMS, itemName, TAG_HOLD, capacityOf, hasMod, makeItem, newUid, tagClock, tagOwner, type ItemInstance, type Slot } from '../sim/items';
 import { PlayerInventory, SLOT_ORDER, type Container } from '../sim/inventory';
 import { Economy, type WorldLoot } from '../sim/economy';
 import { CRATE_RESTOCK, CRATE_SPECS, fillCrate } from '../sim/crates';
@@ -97,6 +97,15 @@ export class Game {
   private econT = 0;
   private poi: string | null = null;
   private prompt: string | null = null;
+  /** where on screen the thing the prompt is about sits (fractions of the screen) */
+  private mark: [number, number] | null = null;
+  /** times at which the open inventory should look again at what lies on the ground (see drop) */
+  private vicinityDue: number[] = [];
+  /** the pockets were closed but the mouse is not the game's yet: one click and it is */
+  private awaitClick = false;
+  /** seconds G has been held (drop what is in the hands), and whether that press has done its work */
+  private dropHeld = 0;
+  private dropDone = false;
   private focus: unknown = null;
   private openStash: Stash | null = null;
   private indoors = false;
@@ -214,7 +223,12 @@ export class Game {
     void serverStatus().then((s) => this.hud.setStartOnline(s ? s.players : null));
     this.invUI = new InventoryUI(this.inv, {
       take: (w) => this.takeWorldItem(w),
-      drop: (item) => this.dropItem(item),
+      drop: (item) => {
+        this.dropItem(item);
+        // it lands a moment later: the list of what lies about is read again then, and once more
+        // after it has settled (left to the five-second tick, a dropped thing seemed to vanish)
+        this.vicinityDue = [performance.now() + 150, performance.now() + 700];
+      },
       use: (item) => this.useItem(item),
       open: (item) => this.openBox(item),
       unload: (item) => this.unloadWeapon(item),
@@ -308,7 +322,12 @@ export class Game {
     window.addEventListener('beforeunload', () => this.save());
     window.addEventListener('keydown', (e) => {
       if (e.code !== 'Escape') return;
-      if (this.invUI?.isOpen) this.toggleInventory(false);
+      if (this.invUI?.isOpen) this.toggleInventory(false, true);
+      // a second Escape, with the mouse still free, is the menu
+      else if (this.awaitClick) {
+        this.awaitClick = false;
+        if (this.started && !this.player.dead) this.pause();
+      }
     });
     this.director.update(0.016);
   }
@@ -556,7 +575,11 @@ export class Game {
     });
     net.on('shot', (m) => this.weapons.remoteShot(new THREE.Vector3(...m.o), new THREE.Vector3(...m.d), m.w, m.sup));
     net.on('swing', (m) => this.remotes.get(m.id)?.swing());
-    net.on('nade', (m) => this.grenades.throw(new THREE.Vector3(...m.o), new THREE.Vector3(...m.v), ITEMS.grenade.throw!.fuse - 0.75, false));
+    net.on('nade', (m) => {
+      this.grenades.throw(new THREE.Vector3(...m.o), new THREE.Vector3(...m.v), ITEMS.grenade.throw!.fuse - 0.75, false);
+      // the arm that threw it
+      this.remotes.get(m.id)?.avatar.swing(true);
+    });
     net.on('act', (m) => this.remotes.get(m.id)?.act(m.a, m.d, cam().position));
     net.on('gear', (m) => this.remotes.get(m.id) && void this.wear(this.remotes.get(m.id)!.avatar, m.g));
     net.on('dmg', (m) => this.takeHit(m));
@@ -627,6 +650,20 @@ export class Game {
       this.resume();
     });
     net.on('chat', (m) => this.hud.chatLine(m.ch ?? 'global', m.from, m.text));
+    // everyone carrying a tag they took, shown on the map for a few seconds
+    net.on('tags', (m) => {
+      const me = m.p.some(([id]) => id === net.id);
+      const others = m.p.filter(([id]) => id !== net.id);
+      this.minimap.ping(others.map(([, x, z]) => ({ x, z })), me);
+      const now = performance.now();
+      if (me && now - this.markedSaid > 300_000) {
+        this.markedSaid = now;
+        this.hud.note('You carry a tag you took: every 30 seconds the map shows everyone where you are', 'warn');
+      } else if (others.length && now - this.pingSaid > 300_000) {
+        this.pingSaid = now;
+        this.hud.note('Someone is carrying a tag: they are marked on the map (M)', 'good');
+      }
+    });
     net.on('cashed', (m) => {
       const text = `${m.name} cashed in ${m.owner}'s dog tag.`;
       this.hud.chatLine('system', '', text);
@@ -1111,6 +1148,9 @@ export class Game {
   private glass = 0;
   /** when they were last put down: the same key press must not bring them straight back up */
   private glassDown = 0;
+  // when the player was last told what the marks on the map mean (said once in a while, not every half minute)
+  private markedSaid = -1e9;
+  private pingSaid = -1e9;
 
   /** The cord is pulled: it leaves the hand the way the player is looking, and everyone is told. */
   private throwGrenade(spec: { fuse: number; damage: number; radius: number }) {
@@ -1121,7 +1161,7 @@ export class Game {
     const v = dir.multiplyScalar(15).add(new THREE.Vector3(p.vel.x, 3.2 + Math.max(0, p.vel.y), p.vel.z));
     this.grenades.throw(o, v, spec.fuse - 0.75, true);
     this.net.send({ t: 'nade', o: o.toArray(), v: v.toArray() });
-    this.weapons.onSwing();
+    this.avatar.swing(true);
     audio.whoosh(0.5);
   }
 
@@ -1296,7 +1336,12 @@ export class Game {
     return best;
   }
 
-  toggleInventory(open?: boolean) {
+  /**
+   * @param byEscape closed with Escape. A browser will not give the mouse back on that key
+   *   (only on a click), and sending the player to the pause menu for closing their pockets
+   *   was the wrong answer: the game carries on, and the next click takes the mouse.
+   */
+  toggleInventory(open?: boolean, byEscape = false) {
     const want = open ?? !this.invUI.isOpen;
     if (want === this.invUI.isOpen) return;
     if (want) {
@@ -1318,10 +1363,11 @@ export class Game {
       this.invUI.close();
       this.input.uiMode = false;
       this.openStash = null;
-      if (this.started) this.input.lock();
-      // if the browser refuses the re-capture, fall back to the pause menu
+      if (byEscape && !this.input.touch) this.awaitClick = true;
+      else if (this.started) this.input.lock();
+      // if the browser refuses the re-capture, the next click on the game takes it (see awaitClick)
       setTimeout(() => {
-        if (this.started && !this.paused && !this.invUI.isOpen && !this.input.locked && !this.player.dead) this.pause();
+        if (this.started && !this.paused && !this.invUI.isOpen && !this.input.locked && !this.player.dead) this.awaitClick = true;
       }, 400);
       audio.ui('close');
       this.save();
@@ -1332,12 +1378,13 @@ export class Game {
 
   private updateInteraction(cam: THREE.PerspectiveCamera) {
     this.prompt = null;
+    this.mark = null;
     this.focus = null;
     if (this.player.dead || this.invUI.isOpen || this.use) return;
     const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
     const range = 2.6 + (this.director.mode === 'orbit' ? this.director.orbit.dist : 0);
     const hit = physics.raycast(cam.position, dir, range, USE_GROUPS, this.player.collider);
-    const owner = hit?.tag?.owner;
+    const owner = hit?.tag?.owner ?? this.nearestLoose(cam, dir, range);
     if (!owner) {
       // nobody has a name floating over their head: you only learn it by looking right at them, up close
       const c = new THREE.Vector3();
@@ -1345,7 +1392,8 @@ export class Game {
         if (!r.alive) continue;
         r.chest(c).sub(cam.position);
         const d = c.length();
-        if (d < 18 && c.normalize().dot(dir) > 0.992) this.prompt = `<small>${r.name}</small>`;
+        // (and only with nothing in between: it used to be read straight through walls)
+        if (d < 18 && c.normalize().dot(dir) > 0.992 && !physics.raycast(cam.position, c, d - 0.5, SIGHT_GROUPS)) this.prompt = `<small>${r.name}</small>`;
       }
       return;
     }
@@ -1356,6 +1404,9 @@ export class Game {
       const d = ITEMS[item.id];
       const qty = d.stack ? ` <small>×${item.qty}</small>` : d.weapon ? ` <small>${item.loaded ?? 0}/${capacityOf(item)}</small>` : item.cargo?.length ? ` <small>${item.cargo.length} inside</small>` : '';
       this.prompt = `<kbd>F</kbd>Take ${d.name}${qty}`;
+      // four corners round it, so there is no doubt which thing that is
+      const at = new THREE.Vector3(owner.loot.x, owner.loot.y + 0.05, owner.loot.z).project(cam);
+      if (at.z < 1) this.mark = [at.x * 0.5 + 0.5, 0.5 - at.y * 0.5];
       if (key) {
         if (!this.inv.hasRoom(item)) {
           this.hud.note(d.slot ? `No free ${d.slot === 'long' ? 'weapon' : d.slot} slot and no room in your pockets` : 'No room: find a vest or a bag', 'warn');
@@ -1395,6 +1446,48 @@ export class Game {
         this.inventoryChanged();
       }
     }
+  }
+
+  /**
+   * The loose item nearest the middle of the view, for when the eye is not dead on anything.
+   * A tin on a shelf is a few pixels across: nobody should have to thread the cross-hair onto
+   * it. Within reach, within a hand's spread of the cross-hair, and in plain sight.
+   */
+  private nearestLoose(cam: THREE.PerspectiveCamera, dir: THREE.Vector3, range: number): WorldItem | null {
+    let best: WorldItem | null = null;
+    // the widest it reaches: about 24 degrees off the cross-hair for something at arm's length
+    let score = 0.42;
+    const to = new THREE.Vector3();
+    for (const w of this.loot.near(this.player.pos, range)) {
+      to.set(w.loot.x, w.loot.y + 0.05, w.loot.z).sub(cam.position);
+      const d = to.length();
+      if (d > range || d < 0.05) continue;
+      to.divideScalar(d);
+      // nearest the cross-hair wins; of two as near to it, the one closer to hand
+      const s = Math.acos(Math.min(1, to.dot(dir))) + d * 0.04;
+      if (s >= score) continue;
+      // (a shelf or a wall in the way: it stops just short of the thing itself, which lies on a surface)
+      if (physics.raycast(cam.position, to, Math.max(0, d - 0.22), SIGHT_GROUPS)) continue;
+      score = s;
+      best = w;
+    }
+    return best;
+  }
+
+  /** G, held a moment: what is in the hands goes on the ground in front of you. */
+  private dropInHands() {
+    const slot = this.inv.active;
+    const item = slot ? this.inv.slots[slot] : null;
+    if (!slot || !item) {
+      this.hud.note('Nothing in your hands to drop', 'warn');
+      return;
+    }
+    this.inv.slots[slot] = null;
+    this.inv.active = null;
+    this.dropItem(item);
+    audio.ui('drop');
+    this.hud.note(`Dropped ${itemName(item)}`);
+    this.inventoryChanged();
   }
 
   /** offline: emptied map crates refill after a while, once nobody is around to see it */
@@ -1471,6 +1564,23 @@ export class Game {
     const playing = this.started && !this.paused && !p.dead;
 
     if (input.pressed('Tab') && playing) this.toggleInventory();
+    if (this.awaitClick && (this.input.locked || !playing || this.invUI.isOpen)) this.awaitClick = false;
+    if (this.vicinityDue.length && now >= this.vicinityDue[0]) {
+      this.vicinityDue.shift();
+      if (this.invUI.isOpen) this.invUI.refresh(this.loot.near(p.pos, 2.3), this.openStash);
+    }
+    // G held for a third of a second drops what is in the hands (a tap next to F does nothing;
+    // looking at an empty crate of your own, G packs it up instead: see updateInteraction)
+    if (playing && !this.invUI.isOpen && !this.hud.chatOpen && !this.use && input.held('KeyG') && !(this.focus instanceof Stash)) {
+      this.dropHeld += dt;
+      if (this.dropHeld > 0.33 && !this.dropDone) {
+        this.dropDone = true;
+        this.dropInHands();
+      }
+    } else {
+      this.dropHeld = 0;
+      this.dropDone = false;
+    }
     // M: the map, large; any way out of play puts it away again
     if (input.pressed('KeyM') && playing && !this.invUI.isOpen && !this.hud.chatOpen) this.minimap.toggle();
     else if (this.minimap.big && (!playing || this.invUI.isOpen)) this.minimap.toggle(false);
@@ -1672,7 +1782,8 @@ export class Game {
     this.hud.update({
       vitals: v,
       // no keyboard on a phone: the Use button lights up instead of naming a key
-      prompt: this.touch ? (this.prompt?.replace(/<kbd>F<\/kbd>/, '').replace(/ <small>G to pack up<\/small>/, '') ?? null) : this.prompt,
+      prompt: this.awaitClick ? '<kbd>Click</kbd>to look around' : this.touch ? (this.prompt?.replace(/<kbd>F<\/kbd>/, '').replace(/ <small>G to pack up<\/small>/, '') ?? null) : this.prompt,
+      mark: this.awaitClick ? null : this.mark,
       weapon: this.weapons.status(),
       aiming: this.weapons.aiming,
       spread: this.weapons.spread,

@@ -147,6 +147,8 @@ export type S2C =
   | { t: 'chat'; ch?: ChatChannel; from: string; text: string }
   /** somebody cashed in a dog tag: announced to everyone */
   | { t: 'cashed'; id: number; name: string; owner: string }
+  /** where everyone carrying a tag they took is standing right now: [player id, x, z]. Sent to all, every half minute. */
+  | { t: 'tags'; p: [number, number, number][] }
   | { t: 'pong'; n: number }
   | { t: 'kick'; reason: string };
 

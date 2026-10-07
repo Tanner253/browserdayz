@@ -4,7 +4,11 @@
 //              feet) and the four weapon slots underneath
 //   Carried    every cargo grid you have right now (pockets, vest, bag), the inspector
 // Drag & drop with rotation (R), right-click for everything an item can do,
-// double-click for its main action, hover + 5-8 to put it on a quick key.
+// double-click (or shift-click) for its main action, hover + 5-8 to put it on a quick key,
+// hover + G to drop. While something is being dragged every place it can go is lit: the
+// slots that take it, the grids with room, the survivor (drop it anywhere on them to wear,
+// equip, use or take it) and the ground (the whole left column). Over a grid the outline is where it will land,
+// which is the nearest free spot to the pointer, not only the cell under it.
 
 import { GEAR_SLOTS, ITEMS, SLOT_KIND, SLOT_LABEL, capacityOf, itemName, itemWeight, tagClock, tagOwner, type ItemInstance, type Slot } from '../sim/items';
 import { Container, type PlayerInventory } from '../sim/inventory';
@@ -89,6 +93,14 @@ export class InventoryUI {
         this.styleGhost();
         this.onMove(e as unknown as PointerEvent);
       }
+      // hover an item and press G: it goes on the ground
+      if (e.code === 'KeyG' && !this.drag && this.hover && this.hover.kind !== 'ground') {
+        const src = this.hover;
+        this.detach(src);
+        this.actions.drop(src.item);
+        this.finish('drop');
+        return;
+      }
       // hover an item and press 5-8 to put it on that quick key
       const q = ['Digit5', 'Digit6', 'Digit7', 'Digit8'].indexOf(e.code);
       if (q >= 0 && this.hover && this.hover.kind !== 'ground' && this.usable(this.hover.item)) {
@@ -109,6 +121,7 @@ export class InventoryUI {
   }
 
   open(vicinity: WorldItem[], stash: Stash | null, vitals: Vitals) {
+    this.cancelDrag();
     this.vicinity = vicinity;
     this.stash = stash;
     this.stashState = '';
@@ -249,6 +262,8 @@ export class InventoryUI {
     // ---- vicinity
     const vic = document.createElement('div');
     vic.className = 'inv-col inv-vicinity';
+    // the whole column is the ground: let go anywhere on it and the item is dropped
+    vic.dataset.ground = '1';
     vic.innerHTML = `<h3>Vicinity</h3>`;
     const ground = document.createElement('div');
     ground.className = 'inv-ground';
@@ -277,6 +292,7 @@ export class InventoryUI {
     // ---- character: paper doll with gear slots, weapons underneath
     const gear = document.createElement('div');
     gear.className = 'inv-col inv-gear';
+    gear.dataset.char = '1';
     gear.innerHTML = `<h3>Character</h3>`;
     const doll = document.createElement('div');
     doll.className = 'inv-doll';
@@ -321,7 +337,7 @@ export class InventoryUI {
       const bar = (label: string, val: number, cls: string) => `<div class="vbar ${cls}"><span>${label}</span><div><i style="width:${Math.max(0, Math.min(100, val))}%"></i></div><b>${Math.round(val)}</b></div>`;
       cargo.insertAdjacentHTML('beforeend', `<div class="inv-status"><h3>Status</h3>${bar('Health', v.health, v.health < 30 ? 'bad' : '')}${bar('Energy', v.energy, v.energy < 25 ? 'bad' : '')}${bar('Water', v.water, v.water < 25 ? 'bad' : '')}${v.bleeding ? '<div class="bleeding">Bleeding: use a bandage</div>' : ''}</div>`);
     }
-    cargo.insertAdjacentHTML('beforeend', `<div class="inv-help"><b>Drag</b> to move · <b>R</b> rotate · <b>Right-click</b> for actions · <b>Double-click</b> to use, wear or take · hover + <b>5</b>–<b>8</b> for a quick key · <b>Tab</b> close</div>`);
+    cargo.insertAdjacentHTML('beforeend', `<div class="inv-help"><b>Drag</b> to move: onto your character to wear, equip or use, onto the left side to drop · <b>R</b> rotate · <b>Double-click</b> or <b>Shift-click</b> to use, wear or take · <b>Right-click</b> for everything else · hover + <b>G</b> drop · hover + <b>5</b>–<b>8</b> quick key · <b>Tab</b> or <b>Esc</b> close</div>`);
 
     wrap.append(vic, gear, cargo);
     r.appendChild(wrap);
@@ -530,6 +546,11 @@ export class InventoryUI {
     el.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;
       e.preventDefault();
+      if (e.shiftKey) {
+        this.selected = src.item;
+        this.quickMove(src);
+        return;
+      }
       this.selected = src.item;
       const z = this.z;
       const rect = el.getBoundingClientRect();
@@ -570,7 +591,11 @@ export class InventoryUI {
       if (h.dataset?.container) return { kind: 'grid' as const, el: h, id: h.dataset.container };
       if (h.dataset?.slot) return { kind: 'slot' as const, el: h, slot: h.dataset.slot as Slot };
       if (h.dataset?.ground) return { kind: 'ground' as const, el: h };
+      if (h.dataset?.char) return { kind: 'char' as const, el: h };
     }
+    // off the edge of the inventory altogether: let go there and it is dropped
+    const wrap = this.root.querySelector('.inv-wrap')?.getBoundingClientRect();
+    if (wrap && (x < wrap.left || x > wrap.right || y < wrap.top || y > wrap.bottom)) return { kind: 'out' as const, el: this.root };
     return null;
   }
 
@@ -588,34 +613,160 @@ export class InventoryUI {
     return [Math.floor((lx + CELL / 2) / CELL), Math.floor((ly + CELL / 2) / CELL)];
   }
 
+  /**
+   * Where an item held over a grid will land: the cell under it if that is free, else the
+   * free spot nearest to it, turned the other way if that is the only way it goes in.
+   */
+  private landing(c: Container, item: ItemInstance, cx: number, cy: number, rot: boolean): { x: number; y: number; rot: boolean } | null {
+    if (c.fits(item, cx, cy, rot, item)) return { x: cx, y: cy, rot };
+    let best: { x: number; y: number; rot: boolean } | null = null;
+    let bd = Infinity;
+    for (const r of [rot, !rot]) {
+      const [w, h] = Container.size(item, r);
+      for (let y = 0; y <= c.h - h; y++) {
+        for (let x = 0; x <= c.w - w; x++) {
+          // (a turn counts as a little further away: it is only taken when it has to be)
+          const dist = Math.hypot(x - cx, y - cy) + (r === rot ? 0 : 0.75);
+          if (dist < bd && c.fits(item, x, y, r, item)) {
+            bd = dist;
+            best = { x, y, rot: r };
+          }
+        }
+      }
+    }
+    return best;
+  }
+
+  /** the item lying under a grid cell, if any */
+  private under(c: Container, cx: number, cy: number) {
+    return c.items.find((p) => {
+      const [w, h] = Container.size(p.item, p.rot);
+      return cx >= p.x && cx < p.x + w && cy >= p.y && cy < p.y + h;
+    });
+  }
+
+  /** dropped on that item, the dragged one goes into it: more of the same stack, or a part the weapon takes */
+  private joins(d: Drag, onto: ItemInstance): 'stack' | 'attach' | null {
+    const item = d.src.item;
+    const def = ITEMS[item.id];
+    if (onto === item) return null;
+    if (def.stack && onto.id === item.id && onto.qty < def.stack) return 'stack';
+    if (def.attach && d.src.kind !== 'ground' && this.actions.attachTargets(item).includes(onto)) return 'attach';
+    return null;
+  }
+
+  /**
+   * What letting go over the survivor does with an item: the one obvious thing, or nothing.
+   * Clothes are worn and weapons slung; a part goes onto the weapon that takes it; food,
+   * drink and dressings are used; anything else lying about or in a crate is pocketed.
+   */
+  private onCharacter(src: Source): Action | null {
+    const it = src.item;
+    const d = ITEMS[it.id];
+    const mine = src.kind === 'slot' || (src.kind === 'container' && this.inv.containers.includes(src.c));
+    if (d.slot) return src.kind === 'slot' ? null : { label: d.category === 'clothing' ? 'Wear' : 'Equip', run: () => this.equip(src) };
+    if (d.attach && mine) {
+      const w = this.actions.attachTargets(it)[0];
+      if (w) return { label: `Fit to ${ITEMS[w.id].name}`, run: () => this.actions.attach(it, w) };
+    }
+    if (mine) {
+      if (d.use) return { label: d.use.verb, run: () => this.actions.use(it) };
+      if (d.open) return { label: 'Open', run: () => this.actions.open(it) };
+      return null;
+    }
+    if (!this.inv.hasRoom(it)) return null;
+    return { label: 'Take', run: () => (src.kind === 'ground' ? this.quickMove(src) : this.transfer(src)) };
+  }
+
+  /** Light up every place the dragged item can go. */
+  private showTargets(d: Drag) {
+    const item = d.src.item;
+    const def = ITEMS[item.id];
+    this.root.classList.add('dragging');
+    for (const el of this.root.querySelectorAll<HTMLElement>('.inv-slot')) {
+      const slot = el.dataset.slot as Slot;
+      const occupant = this.inv.slots[slot];
+      const fits = def.slot === SLOT_KIND[slot] && !(d.src.kind === 'slot' && d.src.slot === slot);
+      const part = !!occupant && this.joins(d, occupant) === 'attach';
+      el.classList.toggle('drop-hint', fits || part);
+    }
+    for (const el of this.root.querySelectorAll<HTMLElement>('.inv-grid')) {
+      const c = this.containerById(el.dataset.container!);
+      if (!c) continue;
+      const room = c.has(item) || c.hasRoom(item);
+      el.classList.toggle('grid-ok', room);
+      el.classList.toggle('grid-full', !room);
+    }
+    const act = this.onCharacter(d.src);
+    const gear = this.root.querySelector<HTMLElement>('.inv-gear');
+    const fig = this.root.querySelector<HTMLElement>('.doll-fig');
+    gear?.classList.toggle('char-ok', !!act);
+    if (fig) fig.dataset.drop = act ? act.label : '';
+    this.root.querySelector('.inv-ground')?.classList.toggle('ground-ok', d.src.kind !== 'ground');
+  }
+
+  private clearTargets() {
+    this.root.classList.remove('dragging');
+    this.root.querySelectorAll('.drop-hint, .drop-ok, .drop-bad, .grid-ok, .grid-full, .char-ok, .char-over, .ground-ok, .ground-over').forEach((el) => el.classList.remove('drop-hint', 'drop-ok', 'drop-bad', 'grid-ok', 'grid-full', 'char-ok', 'char-over', 'ground-ok', 'ground-over'));
+  }
+
   private onMove(e: PointerEvent) {
     const d = this.drag;
     if (!d) return;
-    if (Math.hypot(e.clientX - this.dragStart.x, e.clientY - this.dragStart.y) > 4) this.dragStart.moved = true;
+    const started = !this.dragStart.moved && Math.hypot(e.clientX - this.dragStart.x, e.clientY - this.dragStart.y) > 4;
+    if (started) {
+      this.dragStart.moved = true;
+      this.showTargets(d);
+    }
     const z = this.z;
     d.ghost.style.left = `${e.clientX / z - d.offX}px`;
     d.ghost.style.top = `${e.clientY / z - d.offY}px`;
     d.ghost.style.display = this.dragStart.moved ? 'block' : 'none';
-    const t = this.target(e.clientX, e.clientY);
     const o = this.hoverOutline;
     o.style.display = 'none';
-    this.root.querySelectorAll('.inv-slot.drop-ok, .inv-slot.drop-bad').forEach((s) => s.classList.remove('drop-ok', 'drop-bad'));
+    o.textContent = '';
+    this.root.querySelectorAll('.drop-ok, .drop-bad, .char-over, .ground-over').forEach((el) => el.classList.remove('drop-ok', 'drop-bad', 'char-over', 'ground-over'));
     if (!this.dragStart.moved) return;
+    const t = this.target(e.clientX, e.clientY);
+    const box = (rect: DOMRect, x: number, y: number, w: number, h: number, cls: string, label = '') => {
+      o.style.display = 'block';
+      o.style.left = `${rect.left / z + x * CELL}px`;
+      o.style.top = `${rect.top / z + y * CELL}px`;
+      o.style.width = `${w * CELL}px`;
+      o.style.height = `${h * CELL}px`;
+      o.className = 'inv-outline ' + cls;
+      o.textContent = label;
+    };
     if (t?.kind === 'grid') {
       const c = this.containerById(t.id!);
       if (!c) return;
       const rect = t.el.getBoundingClientRect();
       const [cx, cy] = this.cellAt(e, t.el, d);
-      const [w, h] = Container.size(d.src.item, d.rot);
-      const ok = c.fits(d.src.item, cx, cy, d.rot, d.src.item);
-      o.style.display = 'block';
-      o.style.left = `${rect.left / z + cx * CELL}px`;
-      o.style.top = `${rect.top / z + cy * CELL}px`;
-      o.style.width = `${w * CELL}px`;
-      o.style.height = `${h * CELL}px`;
-      o.className = 'inv-outline ' + (ok ? 'ok' : 'bad');
+      // over something it goes into: that thing is what lights up
+      const [px, py] = [Math.floor(((e.clientX - rect.left) / z) / CELL), Math.floor(((e.clientY - rect.top) / z) / CELL)];
+      const onto = this.under(c, px, py);
+      const how = onto ? this.joins(d, onto.item) : null;
+      if (onto && how) {
+        const [w, h] = Container.size(onto.item, onto.rot);
+        box(rect, onto.x, onto.y, w, h, 'join', how === 'stack' ? 'Add' : 'Fit');
+        return;
+      }
+      const at = this.landing(c, d.src.item, cx, cy, d.rot);
+      if (at) {
+        const [w, h] = Container.size(d.src.item, at.rot);
+        box(rect, at.x, at.y, w, h, 'ok');
+      } else {
+        const [w, h] = Container.size(d.src.item, d.rot);
+        box(rect, cx, cy, w, h, 'bad', 'No room');
+      }
     } else if (t?.kind === 'slot') {
-      t.el.classList.add(ITEMS[d.src.item.id].slot === SLOT_KIND[t.slot] ? 'drop-ok' : 'drop-bad');
+      const occupant = this.inv.slots[t.slot];
+      const part = !!occupant && this.joins(d, occupant) === 'attach';
+      t.el.classList.add(part || ITEMS[d.src.item.id].slot === SLOT_KIND[t.slot] ? 'drop-ok' : 'drop-bad');
+    } else if (t?.kind === 'char') {
+      if (this.onCharacter(d.src)) t.el.classList.add('char-over');
+    } else if ((t?.kind === 'ground' || t?.kind === 'out') && d.src.kind !== 'ground') {
+      this.root.querySelector('.inv-ground')?.classList.add('ground-over');
     }
   }
 
@@ -634,54 +785,47 @@ export class InventoryUI {
     if (t.kind === 'grid') {
       const c = this.containerById(t.id!);
       if (!c) return this.render();
+      const z = this.z;
+      const rect = t.el.getBoundingClientRect();
       const [cx, cy] = this.cellAt(e, t.el, d);
-      // stack onto an identical item under the cursor
-      if (def.stack) {
-        const under = c.items.find((p) => {
-          const [w, h] = Container.size(p.item, p.rot);
-          return p.item !== item && p.item.id === item.id && cx >= p.x && cx < p.x + w && cy >= p.y && cy < p.y + h;
-        });
-        if (under && under.item.qty < def.stack) {
-          const src = this.materialize(d.src);
-          if (!src) return this.render();
-          const move = Math.min(def.stack - under.item.qty, item.qty);
-          under.item.qty += move;
-          item.qty -= move;
-          if (item.qty <= 0) this.removeFrom(d.src);
-          else if (d.src.kind === 'ground') {
-            // the rest of a ground stack goes into cargo (or back on the ground)
-            this.removeFrom(d.src);
-            const left = this.inv.add(item);
-            if (left) this.actions.drop(left);
-          }
-          this.finish('move');
-          return;
+      const onto = this.under(c, Math.floor(((e.clientX - rect.left) / z) / CELL), Math.floor(((e.clientY - rect.top) / z) / CELL));
+      const how = onto ? this.joins(d, onto.item) : null;
+      // more of the same, let go on the stack
+      if (onto && how === 'stack') {
+        if (!this.materialize(d.src)) return this.render();
+        const move = Math.min(def.stack! - onto.item.qty, item.qty);
+        onto.item.qty += move;
+        item.qty -= move;
+        if (item.qty <= 0) this.removeFrom(d.src);
+        else if (d.src.kind === 'ground') {
+          // the rest of a ground stack goes into cargo (or back on the ground)
+          this.removeFrom(d.src);
+          const left = this.inv.add(item);
+          if (left) this.actions.drop(left);
         }
+        this.finish('move');
+        return;
       }
-      // an attachment dropped onto a weapon it fits goes on the weapon
-      if (def.attach) {
-        const under = c.items.find((p) => {
-          const [w, h] = Container.size(p.item, p.rot);
-          return cx >= p.x && cx < p.x + w && cy >= p.y && cy < p.y + h;
-        });
-        if (under && d.src.kind !== 'ground' && this.actions.attachTargets(item).includes(under.item)) {
-          this.actions.attach(item, under.item);
-          return this.render();
-        }
+      // a part, let go on a weapon it fits
+      if (onto && how === 'attach') {
+        this.actions.attach(item, onto.item);
+        return this.render();
       }
-      if (!c.fits(item, cx, cy, d.rot, item)) return this.render();
+      const at = this.landing(c, item, cx, cy, d.rot);
+      if (!at) return this.render();
       if (!this.materialize(d.src)) return this.render();
       this.removeFrom(d.src);
-      c.place(item, cx, cy, d.rot);
+      c.place(item, at.x, at.y, at.rot);
       this.finish(d.src.kind === 'ground' ? 'pickup' : 'move');
     } else if (t.kind === 'slot') {
       const occupant = this.inv.slots[t.slot];
       // an attachment dropped onto the weapon in a slot
-      if (def.attach && occupant && d.src.kind !== 'ground' && this.actions.attachTargets(item).includes(occupant)) {
+      if (occupant && this.joins(d, occupant) === 'attach') {
         this.actions.attach(item, occupant);
         return this.render();
       }
-      if (def.slot !== SLOT_KIND[t.slot]) return this.render();
+      // not what that slot takes: do what letting go anywhere on the survivor would
+      if (def.slot !== SLOT_KIND[t.slot]) return this.dropOnCharacter(d.src);
       if (d.src.kind === 'slot' && d.src.slot === t.slot) return this.render();
       if (!this.materialize(d.src)) return this.render();
       this.removeFrom(d.src);
@@ -692,12 +836,20 @@ export class InventoryUI {
         else this.stow(occupant);
       }
       this.finish(d.src.kind === 'ground' ? 'pickup' : 'move');
-    } else if (t.kind === 'ground') {
+    } else if (t.kind === 'char') {
+      this.dropOnCharacter(d.src);
+    } else if (t.kind === 'ground' || t.kind === 'out') {
       if (d.src.kind === 'ground') return this.render();
       this.removeFrom(d.src);
       this.actions.drop(item);
       this.finish('drop');
     }
+  }
+
+  private dropOnCharacter(src: Source) {
+    const act = this.onCharacter(src);
+    if (act) act.run();
+    this.render();
   }
 
   /** ground items must be taken out of the world before being placed */
@@ -750,6 +902,6 @@ export class InventoryUI {
     if (this.drag) this.drag.ghost.remove();
     this.drag = null;
     this.hoverOutline.style.display = 'none';
-    this.root.querySelectorAll('.inv-slot.drop-ok, .inv-slot.drop-bad').forEach((s) => s.classList.remove('drop-ok', 'drop-bad'));
+    this.clearTargets();
   }
 }

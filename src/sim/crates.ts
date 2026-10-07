@@ -35,8 +35,8 @@ export const CRATE_SPECS: Record<string, CrateSpec> = {
   wooden_crate_01: { label: 'Wooden Crate', w: 6, h: 3, table: CIVILIAN, count: [1, 3] },
 };
 
-/** seconds an emptied crate stays empty before it refills (only while nobody is near) */
-export const CRATE_RESTOCK = 1200;
+/** seconds an emptied crate stays empty before it refills (only while nobody is near): five minutes, it was twenty */
+export const CRATE_RESTOCK = 300;
 
 export function fillCrate(c: Container, kind: string, rnd: () => number = Math.random) {
   const spec = CRATE_SPECS[kind];

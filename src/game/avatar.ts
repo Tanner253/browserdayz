@@ -81,6 +81,8 @@ export const POSE = {
   jump: [0.04, 0.5] as [number, number],
   /** how long a blow with the right arm takes, seconds */
   swing: 0.42,
+  /** a punch: how long it takes, and how long the fists stay up after one, seconds */
+  punch: [0.38, 2.6] as [number, number],
   /** how much of the aim's pitch the neck and head add on top of the chest's lean */
   headPitch: 0.5,
   /** A weapon in the hands: where it sits from the shoulder pivot, and how the body takes it up. */
@@ -215,6 +217,11 @@ export class Avatar {
   private inHand: { obj: THREE.Object3D; curl: [number, number, number, number] } | null = null;
   /** seconds into a swing of the right arm (-1 = not swinging) */
   private swingT = -1;
+  // bare hands: seconds into a punch (-1 = none) and whose it is, how long the fists stay up, how far up they are
+  private punchT = -1;
+  private punchSide = -1;
+  private fistsHold = 0;
+  private fistsT = 0;
   // how far the weapon is up at the eye, and how far it is in its running carry, 0..1
   private aimT = 0;
   private carryT = 0;
@@ -611,9 +618,19 @@ export class Avatar {
     if (this.uniforms) for (const w of this.uniforms.uWounds.value) w.set(0, 0, 0, 0);
   }
 
-  /** A blow with whatever is in the right hand (or the fist). */
-  swing() {
-    this.swingT = 0;
+  /**
+   * A blow. With something in the right hand it is swung, overhand; with nothing a punch is
+   * thrown from a guard, left and right in turn.
+   * @param overhand swing the empty arm all the same (a throw)
+   */
+  swing(overhand = false) {
+    if (overhand || this.inHand || this.held) {
+      this.swingT = 0;
+      return;
+    }
+    this.punchSide = -this.punchSide;
+    this.punchT = 0;
+    this.fistsHold = POSE.punch[1];
   }
 
   /** A shot or a blow landed: the body jolts (the head snaps back if that is where it landed). */
@@ -674,8 +691,13 @@ export class Avatar {
     // eating, drinking, dressing a wound: whatever was in the hands is put away for it
     const using = !!ges && ges.kind !== 'bolt' && ges.kind !== 'reload';
     const held = using ? null : this.held;
-    // face the movement direction when running unarmed, else the look direction
-    const free = !firstPerson && !armed;
+    // fists come up for a punch and stay up a while after it
+    this.fistsHold = Math.max(0, this.fistsHold - dt);
+    const fists = this.fistsHold > 0 && !dead && !armed && !this.inHand && !using;
+    this.fistsT += ((fists ? 1 : 0) - this.fistsT) * ease(fists ? 14 : 6);
+    if (!fists) this.punchT = -1;
+    // face the movement direction when running unarmed, else the look direction (a punch goes where the eyes do)
+    const free = !firstPerson && !armed && !fists;
     const velYaw = Math.atan2(-velocity.x, -velocity.z);
     const targetYaw = free && speedNow > 0.6 ? velYaw : facingYaw;
     if (this.placed) this.yaw += wrap(targetYaw - this.yaw) * ease(firstPerson ? 40 : armed ? 18 : 10);
@@ -885,6 +907,44 @@ export class Avatar {
       if (this.inHand) {
         r.hand.updateWorldMatrix(true, false);
         this.curl(r, this.inHand.curl, r.hand.getWorldQuaternion(_qa));
+      }
+    }
+
+    // --- bare hands: a guard, the left leading, and a punch thrown from it
+    if (this.fistsT > 0.02 && this.armR && this.armL && this.neck.length) {
+      let out = 0, wind = 0;
+      if (this.punchT >= 0) {
+        this.punchT += dt;
+        const k = this.punchT / POSE.punch[0];
+        if (k >= 1) this.punchT = -1;
+        else {
+          // the same shape as the first-person arms throw: drawn back, out fast, held, home slower
+          wind = Math.sin(Math.PI * Math.min(1, k / 0.14));
+          const go = THREE.MathUtils.clamp((k - 0.06) / 0.22, 0, 1);
+          out = (1 - Math.pow(1 - go, 3)) * (1 - THREE.MathUtils.smootherstep(k, 0.42, 1));
+        }
+      }
+      const side = this.punchT >= 0 ? this.punchSide : 0;
+      // the shoulder goes in behind the punch
+      if (this.chest) this.turn(this.chest, UP, side * (side > 0 ? 0.38 : 0.26) * out - side * 0.08 * wind * (1 - out));
+      this.root.updateMatrixWorld(true);
+      const aimQ = _aimQ.setFromAxisAngle(UP, this.yaw);
+      const fwd = _fwd.set(0, 0, -1).applyQuaternion(aimQ);
+      _right.set(1, 0, 0).applyQuaternion(aimQ);
+      const head = this.neck[this.neck.length - 1].getWorldPosition(_head);
+      const at = (f: number, u: number, r: number) => new THREE.Vector3().copy(head).addScaledVector(fwd, f).addScaledVector(UP, u).addScaledVector(_right, r);
+      const dirOf = (f: number, u: number, r: number) => new THREE.Vector3().addScaledVector(fwd, f).addScaledVector(UP, u).addScaledVector(_right, r);
+      for (const s of [1, -1] as const) {
+        const strike = s === side ? out : 0;
+        // the right fist by the chin, the left a hand's length out in front of it
+        const guard = s > 0 ? at(0.2, -0.2, 0.13) : at(0.3, -0.16, -0.11);
+        const end = s > 0 ? at(0.64, -0.13, 0.02) : at(0.62, -0.11, -0.03);
+        const to = guard.lerp(end, strike);
+        if (s === side) to.addScaledVector(fwd, -0.05 * wind * (1 - out));
+        // palms in toward each other in the guard; the fist turns over, palm down, as it goes out
+        const F = dirOf(0.5, 0.8, -s * 0.2).lerp(dirOf(1, 0.1, -s * 0.15), strike);
+        const N = dirOf(-0.3, -0.1, -s).lerp(dirOf(0, -1, -s * 0.2), strike);
+        this.reach(s > 0 ? this.armR : this.armL, to, F, N, [1.7, 1.72, 1.74, 1.76], aimQ, this.fistsT);
       }
     }
 

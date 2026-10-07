@@ -1,7 +1,7 @@
 // A small map in the corner of the screen: the ground, the forest, the road, the buildings,
 // and an arrow for where you are and which way you face. North is up. Nobody else is on
-// it: finding people is still done with your eyes and ears. M opens it large, with the
-// places named.
+// it, with one exception: whoever carries a tag they took is shown to everyone for a few
+// seconds, every half minute (see ping). M opens it large, with the places named.
 
 import { BUILDING_FOOTPRINT, PLAY_RADIUS, WORLD_RES, WORLD_SIZE, type World } from '../world/worldgen';
 
@@ -9,6 +9,8 @@ import { BUILDING_FOOTPRINT, PLAY_RADIUS, WORLD_RES, WORLD_SIZE, type World } fr
 const SCALE = 1;
 /** metres across shown in the corner */
 const SPAN = 260;
+/** seconds a tag carrier's mark stays on the map */
+const PING_LIFE = 12;
 
 export class Minimap {
   root: HTMLDivElement;
@@ -18,6 +20,10 @@ export class Minimap {
   private ctx: CanvasRenderingContext2D;
   private last = { x: 1e9, z: 1e9, yaw: 9, big: false };
   private world: World;
+  /** where tag carriers were last seen, and when (seconds, performance clock) */
+  private pings: { x: number; z: number; at: number }[] = [];
+  /** when this player was last shown to everyone else */
+  private marked = -1e9;
 
   constructor(world: World) {
     this.world = world;
@@ -118,11 +124,26 @@ export class Minimap {
     this.resize();
   }
 
+  /**
+   * Tag carriers, as the server last saw them. They pulse on the map for a few seconds and
+   * fade: a place to go looking, not a tracker.
+   * @param me this player is one of them
+   */
+  ping(at: { x: number; z: number }[], me: boolean) {
+    const now = performance.now() / 1000;
+    this.pings = at.map((p) => ({ ...p, at: now }));
+    if (me) this.marked = now;
+  }
+
   /** @param yaw the way the player faces, radians (0 = north, turning left is positive) */
   update(x: number, z: number, yaw: number) {
     const l = this.last;
-    // redrawn only when something on it has moved a pixel's worth
-    if (Math.abs(l.x - x) < 0.35 && Math.abs(l.z - z) < 0.35 && Math.abs(l.yaw - yaw) < 0.012 && l.big === this.big) return;
+    const now = performance.now() / 1000;
+    if (this.pings.length && now - this.pings[0].at > PING_LIFE) this.pings = [];
+    const live = this.pings.length > 0 || now - this.marked < PING_LIFE + 0.2;
+    this.root.classList.toggle('marked', now - this.marked < PING_LIFE);
+    // redrawn only when something on it has moved a pixel's worth (or a mark is pulsing)
+    if (!live && Math.abs(l.x - x) < 0.35 && Math.abs(l.z - z) < 0.35 && Math.abs(l.yaw - yaw) < 0.012 && l.big === this.big) return;
     l.x = x;
     l.z = z;
     l.yaw = yaw;
@@ -150,6 +171,35 @@ export class Minimap {
         g.fillText(p.name.toUpperCase(), lx, lz - W / 70);
       }
     }
+    // tag carriers: a ring that beats, fading out; in the corner view one off the edge sits on the rim
+    for (const p of this.pings) {
+      const age = now - p.at;
+      const fade = Math.min(1, age / 0.25) * (1 - smooth((age - (PING_LIFE - 3)) / 3));
+      let qx = (p.x - cx + span / 2) * k, qz = (p.z - cz + span / 2) * k;
+      const r0 = this.big ? W / 90 : W / 22;
+      let off = false;
+      if (!this.big) {
+        const dx = qx - W / 2, dz = qz - W / 2, d = Math.hypot(dx, dz), rim = W / 2 - r0 * 1.3;
+        if (d > rim) {
+          qx = W / 2 + (dx / d) * rim;
+          qz = W / 2 + (dz / d) * rim;
+          off = true;
+        }
+      }
+      const beat = (age * 1.4) % 1;
+      g.lineWidth = Math.max(1.5, r0 * 0.28);
+      g.strokeStyle = `rgba(255, 92, 60, ${0.9 * fade * (1 - beat)})`;
+      g.beginPath();
+      g.arc(qx, qz, r0 * (0.6 + beat * 1.9), 0, Math.PI * 2);
+      g.stroke();
+      g.fillStyle = `rgba(255, 92, 60, ${fade})`;
+      g.strokeStyle = `rgba(0, 0, 0, ${0.8 * fade})`;
+      g.lineWidth = Math.max(1, r0 * 0.2);
+      g.beginPath();
+      g.arc(qx, qz, r0 * (off ? 0.45 : 0.62), 0, Math.PI * 2);
+      g.fill();
+      g.stroke();
+    }
     // you: an arrow pointing the way you face
     const s = this.big ? W / 70 : W / 13;
     g.save();
@@ -172,4 +222,10 @@ export class Minimap {
 
 function clamp(v: number, lo: number, hi: number) {
   return Math.min(hi, Math.max(lo, v));
+}
+
+/** 0 below 0, 1 above 1, eased between */
+function smooth(t: number) {
+  const u = clamp(t, 0, 1);
+  return u * u * (3 - 2 * u);
 }

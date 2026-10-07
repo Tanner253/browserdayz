@@ -79,6 +79,24 @@
   white-space: nowrap;
 }
 .hud-prompt.show { opacity: 1; }
+/* four corners round the thing F would take: it need not be dead under the cross-hair */
+.hud-mark {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  margin: -13px 0 0 -13px;
+  opacity: 0;
+  transition: opacity 0.1s;
+  pointer-events: none;
+  background:
+    linear-gradient(var(--accent), var(--accent)) left top / 8px 2px, linear-gradient(var(--accent), var(--accent)) left top / 2px 8px,
+    linear-gradient(var(--accent), var(--accent)) right top / 8px 2px, linear-gradient(var(--accent), var(--accent)) right top / 2px 8px,
+    linear-gradient(var(--accent), var(--accent)) left bottom / 8px 2px, linear-gradient(var(--accent), var(--accent)) left bottom / 2px 8px,
+    linear-gradient(var(--accent), var(--accent)) right bottom / 8px 2px, linear-gradient(var(--accent), var(--accent)) right bottom / 2px 8px;
+  background-repeat: no-repeat;
+  filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.9));
+}
+.hud-mark.show { opacity: 0.95; }
 .hud-prompt kbd {
   display: inline-block;
   min-width: 22px;
@@ -144,6 +162,8 @@
   background: #1b1f17;
 }
 .hud-minimap canvas { display: block; width: 100%; height: 100%; }
+/* this player has just been shown to everyone (they carry a tag they took) */
+.hud-minimap.marked { box-shadow: 0 0 0 2px rgba(255, 92, 60, 0.85), 0 0 18px rgba(255, 92, 60, 0.45); }
 .hud-minimap b { position: absolute; top: 3px; left: 50%; transform: translateX(-50%); font-size: 13px; font-weight: 700; color: #fff; text-shadow: 0 0 3px #000, 0 0 3px #000; }
 .hud-minimap span { position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 11px; color: rgba(233, 228, 216, 0.85); text-shadow: 0 0 3px #000, 0 0 3px #000; }
 .hud-minimap kbd { font-family: var(--mono); font-size: 10px; padding: 0 4px; margin-right: 3px; border: 1px solid rgba(233, 228, 216, 0.6); border-radius: 3px; }
@@ -623,6 +643,57 @@
 .inv-outline { position: fixed; display: none; pointer-events: none; z-index: 19; border: 2px solid; }
 .inv-outline.ok { border-color: rgba(143, 174, 107, 0.9); background: rgba(143, 174, 107, 0.12); }
 .inv-outline.bad { border-color: rgba(196, 82, 61, 0.9); background: rgba(196, 82, 61, 0.12); }
+/* over a stack it adds to, or a weapon it fits */
+.inv-outline.join { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 22%, transparent); }
+.inv-outline { overflow: hidden; padding-top: 3px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em; text-align: center; text-transform: uppercase; color: #fff; text-shadow: 0 1px 2px #000, 0 0 3px #000; }
+
+/* While something is dragged, every place it can go is lit, and the rest stands back. */
+.inv.dragging, .inv.dragging * { cursor: grabbing !important; }
+.inv-slot.drop-hint { border-color: var(--accent); animation: inv-pulse 1.1s ease-in-out infinite; }
+.inv-slot.drop-hint.drop-ok { border-color: var(--ok); background: rgba(143, 174, 107, 0.2); animation: none; box-shadow: 0 0 0 1px var(--ok); }
+@keyframes inv-pulse {
+  0%, 100% { box-shadow: 0 0 0 1px var(--accent), 0 0 16px -3px var(--accent); }
+  50% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent), 0 0 4px -3px var(--accent); }
+}
+.inv-grid.grid-ok { box-shadow: 0 0 0 1px rgba(143, 174, 107, 0.6); }
+.inv-grid.grid-full { opacity: 0.4; }
+/* the survivor: let go anywhere on them and the item is worn, equipped, used or pocketed */
+.doll-fig { position: relative; }
+.inv-gear.char-ok .doll-fig { outline: 1px dashed var(--accent); outline-offset: -4px; }
+.inv-gear.char-ok .doll-fig::after {
+  content: attr(data-drop);
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  padding: 3px 10px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: #121413;
+  background: var(--accent);
+}
+.inv-gear.char-over { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+.inv-gear.char-over .doll-fig { outline-style: solid; outline-width: 2px; }
+/* the ground, and anywhere off the edge of the window */
+.inv-ground { position: relative; }
+.inv-ground.ground-ok { border-color: var(--ink-dim); }
+.inv-ground.ground-ok::after {
+  content: 'Drop here';
+  position: absolute;
+  right: 6px;
+  bottom: 5px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  pointer-events: none;
+}
+.inv-ground.ground-over { border-style: solid; border-color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, transparent); }
+.inv-ground.ground-over::after { color: var(--accent); }
 
 /* right-click menu */
 .inv-menu {

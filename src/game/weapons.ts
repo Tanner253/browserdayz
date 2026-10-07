@@ -1304,7 +1304,10 @@ export class Weapons {
     this.arms.update(m.body ?? null, this.actionGrips(m), this.vmCamera.quaternion, !this.scoped);
   }
 
-  /** Bare hands: a loose guard that comes up to punch or block, driven through the same arm IK as weapons. */
+  /**
+   * Bare hands, driven through the same arm IK as weapons: a boxer's guard that comes up to
+   * punch or block, a jab from the left that leads and a cross from the right behind it.
+   */
   private animateFists(dt: number) {
     const p = this.player;
     this.guardHold = Math.max(0, this.guardHold - dt);
@@ -1319,31 +1322,42 @@ export class Weapons {
     const ph = p.bobPhase;
     const bob = new THREE.Vector3(Math.cos(ph) * 0.01 * bobA, -Math.abs(Math.sin(ph)) * 0.012 * bobA + Math.sin(this.time * 1.7) * 0.003, 0);
     const lerp3 = (a: THREE.Vector3, b: THREE.Vector3, t: number) => a.clone().lerp(b, t);
-    const hand = (side: 1 | -1, strike: number): HandGrip => {
-      const down = new THREE.Vector3(side * 0.23, -0.58, -0.22);
-      // orthodox stance: left leads, right sits back by the chin
-      const guard = side > 0 ? new THREE.Vector3(0.135, -0.16, -0.4) : new THREE.Vector3(-0.125, -0.14, -0.46);
-      const out = new THREE.Vector3(side * 0.035, -0.085, -0.74);
-      const pos = lerp3(lerp3(down, guard, g), out, strike).add(bob);
-      // guard shows the backs of the fists, knuckles up; the fist turns over (palm down) as the punch extends
-      const fingers = lerp3(new THREE.Vector3(-side * 0.2, 0.9, -0.35), new THREE.Vector3(-side * 0.08, 0.05, -1), strike).normalize();
-      const palm = lerp3(new THREE.Vector3(-side * 0.45, -0.25, -1), new THREE.Vector3(-side * 0.15, -1, 0), strike).normalize();
-      return { pos, fingers, palm, curl: [1.85, 1.9, 1.9, 1.9], thumb: 0.6, tuck: 1 };
-    };
-    let sr = 0, sl = 0;
+    // the punch in the air: whose it is, how far out it is, and how far it is drawn back first
+    let thrown = 0, out = 0, wind = 0;
     const a = this.action;
     if (a && a.name === 'punch' && a.data) {
       const k = Math.min(1, a.t / a.dur);
-      // snap out, short hold, pull back
-      const ext = THREE.MathUtils.smoothstep(k, 0, 0.3) * (1 - THREE.MathUtils.smoothstep(k, 0.42, 1));
-      if (a.data.hand) sr = ext;
-      else sl = ext;
+      thrown = a.data.hand ? 1 : -1;
+      // Drawn back a touch, thrown fast (it lands at 0.28 of the way through, see the action
+      // timeline), held a moment on the end of the arm and brought home slower than it went.
+      wind = Math.sin(Math.PI * Math.min(1, k / 0.14));
+      const go = THREE.MathUtils.clamp((k - 0.06) / 0.22, 0, 1);
+      out = (1 - Math.pow(1 - go, 3)) * (1 - THREE.MathUtils.smootherstep(k, 0.42, 1));
     }
+    const hand = (side: 1 | -1): HandGrip => {
+      const strike = side === thrown ? out : 0;
+      const down = new THREE.Vector3(side * 0.23, -0.58, -0.22);
+      // orthodox stance: the left leads, the right sits back by the chin
+      const guard = side > 0 ? new THREE.Vector3(0.15, -0.165, -0.36) : new THREE.Vector3(-0.13, -0.135, -0.43);
+      const end = side > 0 ? new THREE.Vector3(0, -0.075, -0.68) : new THREE.Vector3(-0.02, -0.07, -0.66);
+      const pos = lerp3(lerp3(down, guard, g), end, strike).add(bob);
+      if (side === thrown) pos.add(new THREE.Vector3(side * 0.015, -0.012, 0.035).multiplyScalar(wind * (1 - out)));
+      // the other fist comes in to cover as the shoulders turn behind the punch
+      else if (thrown) pos.add(new THREE.Vector3(-side * 0.012, 0.012, 0.03).multiplyScalar(out));
+      // In the guard the palms face each other, so the eye sees the thumb side of each fist:
+      // the curled forefinger with the thumb laid over it. Thrown, the fist turns over, palm
+      // down, and the arm is seen along its length from behind.
+      const fingers = lerp3(new THREE.Vector3(-side * 0.15, 0.75, -0.6), new THREE.Vector3(-side * 0.2, 0.3, -0.93), strike).normalize();
+      const palm = lerp3(new THREE.Vector3(-side * 0.9, -0.1, 0.35), new THREE.Vector3(-side * 0.25, -0.95, -0.1), strike).normalize();
+      return { pos, fingers, palm, curl: [1.75, 1.77, 1.79, 1.81], thumb: 0.6, tuck: 1 };
+    };
     this.kick.step(dt);
     const kr = this.kickRot.step(dt);
     this.fistAnchor.position.set(0, 0, 0);
-    this.fistAnchor.rotation.set(kr.x * 0.004, 0, 0);
-    this.arms.update(this.fistAnchor, { right: hand(1, sr), left: hand(-1, sl) }, this.vmCamera.quaternion, true);
+    // the shoulders turn into it: more behind the cross than the jab
+    this.fistAnchor.rotation.set(kr.x * 0.004, thrown * (thrown > 0 ? 0.07 : 0.05) * out, -thrown * 0.03 * out);
+    // (the whole arm is drawn: thrown out with the forearm alone, a punch was a sleeve with a hole in the near end)
+    this.arms.update(this.fistAnchor, { right: hand(1), left: hand(-1) }, this.vmCamera.quaternion, true, true);
   }
 
   /** Item in use: brought up from below, worked on (bites, sips, wraps), then put away. */

@@ -655,6 +655,23 @@ setInterval(() => {
   broadcast({ t: 'ps', s });
 }, 1000 / TICK_HZ);
 
+// A tag taken off somebody is worth a reward once it has been carried for half an hour, so
+// the safest thing to do with one was to sit in a bush until the clock ran out. Every half
+// minute the map shows everybody where each carrier is: the tag has to be defended, or run with.
+const TAG_PING_MS = (Number(process.env.TAG_PING_S) || 30) * 1000;
+setInterval(() => {
+  const p: [number, number, number][] = [];
+  for (const c of clients.values()) {
+    if (!c.alive) continue;
+    const takes = carriedTags(c.inv).some((t) => {
+      const from = lootedTags.get(t.uid);
+      return !!from && from.ownerKey !== c.key;
+    });
+    if (takes) p.push([c.id, Math.round(c.pose[0]), Math.round(c.pose[2])]);
+  }
+  if (p.length) broadcast({ t: 'tags', p });
+}, TAG_PING_MS);
+
 let lastEcon = Date.now();
 setInterval(() => {
   const now = Date.now();

@@ -64,6 +64,8 @@ export class FPArms {
   private right!: Arm;
   private left!: Arm;
   private meshes: THREE.SkinnedMesh[] = [];
+  /** the upper arms: drawn for bare hands only, where a thrown punch shows the whole arm */
+  private upper: THREE.SkinnedMesh[] = [];
   private uniforms = lookUniforms();
 
   async load() {
@@ -83,6 +85,7 @@ export class FPArms {
     for (const b of this.bones.values()) this.rest.set(b, { p: b.position.clone(), q: b.quaternion.clone() });
 
     // keep only the forearm + hand triangles of the body mesh
+    const wholeArms: [THREE.SkinnedMesh, THREE.BufferGeometry][] = [];
     this.model.traverse((o) => {
       const sm = o as THREE.SkinnedMesh;
       if (!(o as THREE.Mesh).isMesh) return;
@@ -91,11 +94,14 @@ export class FPArms {
         return;
       }
       const armSet = new Set<number>();
+      const upperSet = new Set<number>();
       sm.skeleton.bones.forEach((b, i) => {
-        // upper arms sit right against the lens and read as blobs
+        // upper arms sit right against the lens and read as blobs: holding a weapon they are left out
         if (/^(lowerarm|hand|index|middle|ring|pinky|thumb)_/.test(b.name)) armSet.add(i);
+        else if (/^upperarm_/.test(b.name)) upperSet.add(i);
       });
       const g = sm.geometry.clone();
+      const gu = sm.geometry.clone();
       const si = g.getAttribute('skinIndex');
       const sw = g.getAttribute('skinWeight');
       const dominant = (v: number) => {
@@ -111,10 +117,28 @@ export class FPArms {
       };
       const src = g.index!.array;
       const keep: number[] = [];
+      const keepUpper: number[] = [];
       for (let t = 0; t < src.length; t += 3) {
-        if (armSet.has(dominant(src[t])) && armSet.has(dominant(src[t + 1])) && armSet.has(dominant(src[t + 2]))) keep.push(src[t], src[t + 1], src[t + 2]);
+        const d = [dominant(src[t]), dominant(src[t + 1]), dominant(src[t + 2])];
+        if (d.every((b) => armSet.has(b))) keep.push(src[t], src[t + 1], src[t + 2]);
+        else if (d.every((b) => armSet.has(b) || upperSet.has(b))) keepUpper.push(src[t], src[t + 1], src[t + 2]);
       }
       g.setIndex(keep);
+      // The upper arm follows the arm's own bones and nothing else: whatever pull its skin
+      // had from the shoulder and chest would string it back to where the body stands, a
+      // metre and a half below the lens.
+      const iu = gu.getAttribute('skinIndex'), wu = gu.getAttribute('skinWeight');
+      for (const v of new Set(keepUpper)) {
+        let sum = 0;
+        for (let k = 0; k < 4; k++) {
+          const b = iu.getComponent(v, k);
+          if (!armSet.has(b) && !upperSet.has(b)) wu.setComponent(v, k, 0);
+          sum += wu.getComponent(v, k);
+        }
+        for (let k = 0; k < 4; k++) wu.setComponent(v, k, wu.getComponent(v, k) / sum);
+      }
+      gu.setIndex(keepUpper);
+      wholeArms.push([sm, gu]);
       sm.geometry = g;
       sm.frustumCulled = false;
       sm.castShadow = false;
@@ -126,6 +150,15 @@ export class FPArms {
       sm.material = mat;
       this.meshes.push(sm);
     });
+    for (const [sm, gu] of wholeArms) {
+      const up = new THREE.SkinnedMesh(gu, sm.material);
+      up.bind(sm.skeleton, sm.bindMatrix);
+      up.frustumCulled = false;
+      up.castShadow = false;
+      up.visible = false;
+      sm.parent!.add(up);
+      this.upper.push(up);
+    }
 
     this.right = this.makeArm('r', new THREE.Vector3(0.75, -1, 0.35), new THREE.Vector3(0.26, -0.4, 0.12));
     this.left = this.makeArm('l', new THREE.Vector3(-0.9, -0.8, 0.15), new THREE.Vector3(-0.22, -0.36, -0.12));
@@ -250,21 +283,28 @@ export class FPArms {
       }
     }
     if (grip.tuck) {
-      // closed fist: bend the thumb over the front of the curled fingers
-      const wrist = a.hand.getWorldPosition(new THREE.Vector3());
-      const target = wrist.clone().addScaledVector(F, a.lh * 0.92).addScaledVector(N, a.lh * 0.5);
+      // A closed fist: the thumb lies across the middle joints of the first two fingers,
+      // wherever the curl has put them. (Aimed at a fixed spot off the palm it stood out
+      // from the fist like a handle.)
+      const at = (b: THREE.Object3D) => b.getWorldPosition(new THREE.Vector3());
+      const over = (f: number) => at(a.fingers[f][1]).lerp(at(a.fingers[f][2]), 0.5).addScaledVector(N, 0.012);
+      const first = over(0), second = over(1);
       for (let j = 0; j < a.thumb.length - 1; j++) {
-        const o = a.thumb[j].getWorldPosition(new THREE.Vector3());
-        const child = a.thumb[j + 1].getWorldPosition(new THREE.Vector3());
-        const to = child.clone().lerp(target, grip.tuck * (j === 0 ? 0.75 : 1));
+        const o = at(a.thumb[j]);
+        const child = at(a.thumb[j + 1]);
+        const to = child.clone().lerp(j < 2 ? first : second, grip.tuck * (j === 0 ? 0.7 : 1));
         this.aim(a.thumb[j], child, to, o);
       }
     }
   }
 
-  /** Pose the arms onto `weapon` (the object whose local space the grips are written in). */
-  update(weapon: THREE.Object3D | null, grips: Grips | null, camQ: THREE.Quaternion, visible: boolean) {
+  /**
+   * Pose the arms onto `weapon` (the object whose local space the grips are written in).
+   * @param whole draw the upper arms too (bare hands)
+   */
+  update(weapon: THREE.Object3D | null, grips: Grips | null, camQ: THREE.Quaternion, visible: boolean, whole = false) {
     this.root.visible = visible && !!weapon && !!grips;
+    for (const m of this.upper) m.visible = whole;
     if (!this.root.visible || !weapon || !grips) return;
     this.resetPose();
     this.model.updateMatrixWorld(true);

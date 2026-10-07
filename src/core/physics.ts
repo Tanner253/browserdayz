@@ -23,6 +23,8 @@ export const ITEM_GROUPS = groups(G_ITEM, G_WORLD | G_ITEM);
 export const SHOT_GROUPS = groups(0xffff, G_WORLD | G_ITEM | G_FOLIAGE | G_HITBOX);
 /** solid world only (terrain, buildings, props): used to rest loot on surfaces */
 export const SOLID_GROUPS = groups(0xffff, G_WORLD);
+/** what hides one person from another: walls, ground, trunks, rocks and bushes (glass does not) */
+export const SIGHT_GROUPS = groups(0xffff, G_WORLD | G_FOLIAGE);
 export const HITBOX_GROUPS = groups(G_HITBOX, 0xffff);
 /** what the player's interaction ray can hit */
 export const USE_GROUPS = groups(0xffff, G_WORLD | G_ITEM | G_TRIGGER);

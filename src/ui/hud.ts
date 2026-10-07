@@ -41,6 +41,7 @@ export class HUD {
       <div class="hud-cross"><i></i><i></i><i></i><i></i></div>
       <div class="hud-hit"><i></i><i></i><i></i><i></i></div>
       <div class="hud-prompt"></div>
+      <div class="hud-mark"></div>
       <div class="hud-progress"><div class="hud-progress-label"></div><div class="hud-progress-bar"><div></div></div></div>
       <div class="hud-compass"><div class="hud-compass-strip"></div><div class="hud-compass-needle"></div></div>
       <div class="hud-bearing"></div>
@@ -149,7 +150,7 @@ export class HUD {
                   <h4>Gear</h4>
                   <div class="kb-row"><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>4</kbd><em>primary · secondary · pistol · melee</em></div>
                   <div class="kb-row"><kbd>5</kbd><kbd>6</kbd><kbd>7</kbd><kbd>8</kbd><em>eat · drink · bandage</em></div>
-                  <p><kbd>F</kbd> take · doors · search</p>
+                  <p><kbd>F</kbd> take · doors · search <kbd>G</kbd> hold: drop what you hold</p>
                   <p><kbd class="wide">Tab</kbd> inventory <kbd>M</kbd> map</p>
                   <p><kbd class="wide">Enter</kbd> chat</p>
                   <p><kbd>V</kbd> third person</p>
@@ -164,7 +165,7 @@ export class HUD {
       </div>
     `;
     document.getElementById('ui')!.appendChild(this.root);
-    for (const k of ['cross', 'hit', 'prompt', 'progress', 'compass', 'bearing', 'area', 'weapon', 'vitals', 'stamina', 'hotbar', 'chat', 'scope', 'damage', 'bleedfx', 'bleed', 'hitdir', 'fps', 'online', 'net', 'feed', 'tags', 'fatal', 'dead', 'start']) {
+    for (const k of ['cross', 'hit', 'prompt', 'mark', 'progress', 'compass', 'bearing', 'area', 'weapon', 'vitals', 'stamina', 'hotbar', 'chat', 'scope', 'damage', 'bleedfx', 'bleed', 'hitdir', 'fps', 'online', 'net', 'feed', 'tags', 'fatal', 'dead', 'start']) {
       this.el[k] = this.root.querySelector(`.hud-${k}`) as HTMLElement;
     }
     this.notes = this.root.querySelector('.hud-notes') as HTMLDivElement;
@@ -540,6 +541,8 @@ export class HUD {
   update(s: {
     vitals: Vitals;
     prompt: string | null;
+    /** where on screen the thing the prompt is about sits, as fractions of the screen (null = no marker) */
+    mark: [number, number] | null;
     weapon: { name: string; ammo: { loaded: number; reserve: number; cap: number } | null; action: string | null; mode: string | null } | null;
     /** looking through binoculars */
     glass: boolean;
@@ -596,6 +599,14 @@ export class HUD {
 
     this.set('prompt', e.prompt, s.prompt ? s.prompt : '', 'html');
     this.toggle(e.prompt, 'show', !!s.prompt);
+    this.toggle(e.mark, 'show', !!s.mark);
+    if (s.mark) {
+      const at = `${(s.mark[0] * 100).toFixed(1)}%|${(s.mark[1] * 100).toFixed(1)}%`;
+      if (this.last.mark !== at) {
+        this.last.mark = at;
+        [e.mark.style.left, e.mark.style.top] = at.split('|');
+      }
+    }
 
     // vitals: colour bands like DayZ (hidden when healthy)
     const v = s.vitals;

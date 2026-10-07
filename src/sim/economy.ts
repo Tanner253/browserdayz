@@ -36,30 +36,35 @@ const ARMOURY = { Police: 12, Military: 5, Hunting: 2 };
  */
 const ARMS: [string, number][] = [['p38', 2.4], ['mosin', 1.2], ['hatchet', 1.6], ['bat', 1.6], ['crowbar', 1.4], ['machete', 1.4], ['knife', 1]];
 /** seconds an armed point stays bare once its weapon has been taken */
-export const ARMS_RESTOCK = 240;
+export const ARMS_RESTOCK = 180;
 
 export const TYPES: Record<string, TypeRule> = {
   // firearms: the police station in the middle of the map and the military checkpoint
   // firearms: in any building, far more of them in the police station in the middle of the
   // map and at the army's posts
-  mosin: { nominal: 14, min: 9, lifetime: 7200, restock: 420, usage: ANYWHERE, favour: ARMOURY, loaded: [1, 4] },
-  p38: { nominal: 20, min: 13, lifetime: 7200, restock: 300, usage: ANYWHERE, favour: ARMOURY, loaded: [2, 6] },
-  // loose rounds turn up in small handfuls; sealed boxes are the real find
-  ammo_762: { nominal: 18, min: 11, lifetime: 3600, restock: 240, usage: ANYWHERE, favour: ARMOURY, qty: [0.15, 0.5] },
-  ammo_9mm: { nominal: 24, min: 15, lifetime: 3600, restock: 240, usage: ANYWHERE, favour: ARMOURY, qty: [0.15, 0.5] },
-  box_762: { nominal: 9, min: 5, lifetime: 3600, restock: 480, usage: ['Military', 'Police', 'Hunting', 'Farm', 'Industrial'], favour: ARMOURY },
-  box_9mm: { nominal: 12, min: 7, lifetime: 3600, restock: 480, usage: ['Police', 'Military', 'Town', 'Village'], favour: ARMOURY },
+  // Weapons and what they fire come back fast: a gun taken off a shelf is back somewhere on
+  // the map within three minutes, rounds within two. (At seven minutes for a rifle, and none
+  // of it restocked until a third of the map's supply was gone, a busy server ran dry: people
+  // who played fast were out of ammunition for good.) `min` one under `nominal` means every
+  // one taken is put back at the next restock, not only once the world is well short.
+  mosin: { nominal: 14, min: 13, lifetime: 7200, restock: 180, usage: ANYWHERE, favour: ARMOURY, loaded: [1, 4] },
+  p38: { nominal: 20, min: 19, lifetime: 7200, restock: 180, usage: ANYWHERE, favour: ARMOURY, loaded: [2, 6] },
+  // loose rounds turn up in handfuls; sealed boxes are the real find
+  ammo_762: { nominal: 26, min: 25, lifetime: 3600, restock: 120, usage: ANYWHERE, favour: ARMOURY, qty: [0.25, 0.6] },
+  ammo_9mm: { nominal: 32, min: 31, lifetime: 3600, restock: 120, usage: ANYWHERE, favour: ARMOURY, qty: [0.25, 0.6] },
+  box_762: { nominal: 12, min: 11, lifetime: 3600, restock: 180, usage: ['Military', 'Police', 'Hunting', 'Farm', 'Industrial'], favour: ARMOURY },
+  box_9mm: { nominal: 16, min: 15, lifetime: 3600, restock: 180, usage: ['Police', 'Military', 'Town', 'Village'], favour: ARMOURY },
   // attachments
   pu_scope: { nominal: 2, min: 1, lifetime: 7200, restock: 1800, usage: ['Police', 'Military'] },
   rifle_wrap: { nominal: 2, min: 1, lifetime: 7200, restock: 1500, usage: ['Military', 'Hunting'] },
   suppressor_9: { nominal: 2, min: 1, lifetime: 7200, restock: 1800, usage: ['Police'] },
   mag_p38_ext: { nominal: 3, min: 1, lifetime: 7200, restock: 1200, usage: ['Police', 'Military'] },
   // melee
-  hatchet: { nominal: 10, min: 6, lifetime: 3600, restock: 240, usage: ANYWHERE, favour: { Farm: 2, Hunting: 2 } },
-  machete: { nominal: 8, min: 5, lifetime: 3600, restock: 240, usage: ANYWHERE, favour: { Farm: 2 } },
-  crowbar: { nominal: 10, min: 6, lifetime: 3600, restock: 240, usage: ANYWHERE, favour: { Industrial: 2 } },
-  bat: { nominal: 10, min: 6, lifetime: 3600, restock: 240, usage: ANYWHERE, favour: { Village: 2, Town: 2 } },
-  knife: { nominal: 16, min: 10, lifetime: 3600, restock: 240, usage: ANYWHERE },
+  hatchet: { nominal: 10, min: 8, lifetime: 3600, restock: 180, usage: ANYWHERE, favour: { Farm: 2, Hunting: 2 } },
+  machete: { nominal: 8, min: 6, lifetime: 3600, restock: 180, usage: ANYWHERE, favour: { Farm: 2 } },
+  crowbar: { nominal: 10, min: 8, lifetime: 3600, restock: 180, usage: ANYWHERE, favour: { Industrial: 2 } },
+  bat: { nominal: 10, min: 8, lifetime: 3600, restock: 180, usage: ANYWHERE, favour: { Village: 2, Town: 2 } },
+  knife: { nominal: 16, min: 13, lifetime: 3600, restock: 180, usage: ANYWHERE },
   // food and drink
   sprats: { nominal: 10, min: 5, lifetime: 2400, restock: 300, usage: ['Village', 'Town'] },
   condensed: { nominal: 6, min: 3, lifetime: 2400, restock: 300, usage: ['Village', 'Town', 'Military'] },
