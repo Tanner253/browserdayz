@@ -34,6 +34,7 @@ import { Grenades } from './grenades';
 import { HUD, type HotbarEntry } from '../ui/hud';
 import { InventoryUI } from '../ui/inventory-ui';
 import { Minimap } from '../ui/minimap';
+import { DROP, describeSpot, fillDrop, pickDropSite, type DropInfo } from '../sim/drops';
 import { renderDoll, renderIcons } from '../ui/icons';
 import { Perf } from '../core/perf';
 import { loadGraphics, type Graphics } from '../core/settings';
@@ -99,6 +100,13 @@ export class Game {
   private prompt: string | null = null;
   /** where on screen the thing the prompt is about sits (fractions of the screen) */
   private mark: [number, number] | null = null;
+  /**
+   * Supply drops standing in the world (see src/sim/drops.ts): the crate, when it is due to
+   * be cleared away (performance clock, ms), and its column of smoke.
+   */
+  private drops = new Map<string, { stash: Stash; until: number; at: THREE.Vector3; smoke: { owed: number } }>();
+  /** playing alone: game time the next one is due (-1 until the clock is first read) */
+  private nextDrop = -1;
   /** times at which the open inventory should look again at what lies on the ground (see drop) */
   private vicinityDue: number[] = [];
   /** the pockets were closed but the mouse is not the game's yet: one click and it is */
@@ -531,6 +539,7 @@ export class Game {
     for (const [i, open, swing] of w.doors) buildings.doors[i]?.setOpen(open, swing);
     for (const s of w.stashes) await this.addRemoteStash(s);
     for (const c of w.corpses) void this.addCorpse(c);
+    for (const d of w.drops ?? []) void this.addDrop(d);
     for (const p of w.players) void this.addRemote(p);
     const y = w.spawn.y ?? heightAt(world.heights, w.spawn.x, w.spawn.z);
     this.player.spawn(w.spawn.x, y + 0.05, w.spawn.z, w.spawn.yaw);
@@ -634,6 +643,9 @@ export class Game {
       if (st) this.loot.removeStash(st);
     });
     net.on('corpse-', (m) => this.removeCorpse(m.uid));
+    net.on('board', (m) => this.hud.setBoard(m.rows, m.me, m.mine, playerName()));
+    net.on('drop+', (m) => void this.addDrop(m.d));
+    net.on('drop-', (m) => this.removeDrop(m.uid));
     net.on('door', (m) => {
       const d = buildings.doors[m.i];
       if (!d || d.open === m.open) return;
@@ -772,7 +784,61 @@ export class Game {
 
   /** any server-held container by id: map crate, stash or body */
   private findBox(cid: string): Stash | undefined {
-    return this.loot.crates.find((c) => c.uid === cid) ?? this.loot.stashes.find((c) => c.uid === cid) ?? this.corpses.get(cid)?.stash;
+    return this.loot.crates.find((c) => c.uid === cid) ?? this.loot.stashes.find((c) => c.uid === cid) ?? this.corpses.get(cid)?.stash ?? this.drops.get(cid)?.stash;
+  }
+
+  // ------------------------------------------------------------ supply drops
+
+  /**
+   * A supply drop has been set down: the crate, the smoke over it, the mark on the map, and
+   * word of where it is.
+   * @param fill playing alone: nobody else holds what is inside, so it is packed here
+   */
+  private async addDrop(d: DropInfo, fill = false) {
+    if (this.drops.has(d.uid)) return;
+    const stash = new Stash(d.uid, d.x, d.y, d.z, d.rot, DROP.w, DROP.h, DROP.label);
+    if (fill) {
+      fillDrop(stash.container);
+      stash.known = true;
+    }
+    this.drops.set(d.uid, { stash, until: performance.now() + d.left * 1000, at: new THREE.Vector3(d.x, d.y, d.z), smoke: { owed: 0 } });
+    this.minimap.setDrops([...this.drops.values()].map((x) => x.at));
+    const where = describeSpot(this.s.world, d.x, d.z);
+    const mins = Math.max(1, Math.round(d.left / 60));
+    this.hud.note(`Supply drop ${where}: there for ${mins} min, marked on the map (M)`, 'good');
+    this.hud.feed(`Supply drop ${where}`);
+    this.hud.chatLine('system', '', `A supply drop has come down ${where}.`);
+    await this.loot.addDrop(stash);
+    // (cleared away while its crate was still being fetched)
+    if (this.drops.get(d.uid)?.stash !== stash) this.loot.removeStash(stash);
+  }
+
+  private removeDrop(uid: string) {
+    const d = this.drops.get(uid);
+    if (!d) return;
+    this.drops.delete(uid);
+    if (this.openStash === d.stash) this.toggleInventory(false);
+    if (d.stash.obj) this.loot.removeStash(d.stash);
+    this.minimap.setDrops([...this.drops.values()].map((x) => x.at));
+    this.hud.feed('The supply drop is gone');
+  }
+
+  /** Playing alone: the same clock the server keeps (see tickDrops in server/index.ts). */
+  private tickDrops() {
+    const t = this.economy.time;
+    for (const [uid, d] of this.drops) {
+      const s = d.stash;
+      if (s.container.items.length) s.emptiedAt = -1;
+      else if (s.emptiedAt < 0) s.emptiedAt = t;
+      const done = performance.now() > d.until || (s.emptiedAt >= 0 && t - s.emptiedAt > DROP.linger);
+      if (done && this.openStash !== s) this.removeDrop(uid);
+    }
+    if (this.nextDrop < 0) this.nextDrop = t + DROP.first;
+    else if (t >= this.nextDrop && !this.drops.size) {
+      this.nextDrop = t + DROP.every;
+      const at = pickDropSite(this.s.world);
+      if (at) void this.addDrop({ uid: `drop-${newUid()}`, ...at, rot: Math.random() * Math.PI * 2, left: DROP.life }, true);
+    }
   }
 
   /** the server says someone hit us */
@@ -1326,7 +1392,7 @@ export class Game {
     const p = this.player.pos;
     let best: Stash | null = null;
     let bd = 2.2;
-    for (const s of [...this.loot.stashes, ...this.loot.crates, ...[...this.corpses.values()].map((c) => c.stash)]) {
+    for (const s of [...this.loot.stashes, ...this.loot.crates, ...[...this.corpses.values()].map((c) => c.stash), ...[...this.drops.values()].map((d) => d.stash)]) {
       const d = Math.hypot(s.x - p.x, s.z - p.z);
       if (d < bd && Math.abs(s.y - p.y) < 1.5) {
         bd = d;
@@ -1698,6 +1764,8 @@ export class Game {
     this.updateInteraction(cam);
     this.minimap.update(interp.x, interp.z, p.yaw);
     this.effects.eye.copy(cam.position);
+    // the smoke over each supply drop (not from the far side of the map: nobody could see it)
+    for (const d of this.drops.values()) if (d.at.distanceToSquared(cam.position) < 420 * 420) this.effects.signal(d.at, d.smoke, dt);
     this.effects.update(dt);
     this.loot.update(cam.position, dt);
 
@@ -1707,6 +1775,7 @@ export class Game {
       if (!this.online && this.started) {
         this.economy.tick(this.econT, [p.pos]);
         this.tickCrates();
+        this.tickDrops();
       }
       this.econT = 0;
       if (this.invUI.isOpen) this.invUI.refresh(this.loot.near(p.pos, 2.3), this.openStash);

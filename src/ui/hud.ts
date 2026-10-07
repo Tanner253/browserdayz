@@ -89,7 +89,7 @@ export class HUD {
       <div class="hud-online"><i></i><b></b><span></span></div>
       <div class="hud-net"></div>
       <div class="hud-feed"></div>
-      <div class="hud-tags"></div>
+      <div class="hud-under"><div class="hud-board"></div><div class="hud-tags"></div></div>
       <div class="hud-fatal"><div class="fatal-title">Disconnected</div><div class="fatal-sub"></div><button class="dead-btn fatal-btn">Reconnect</button></div>
       <div class="hud-dead"><div class="dead-title">You are dead</div><div class="dead-sub"></div><button class="dead-btn">Respawn</button></div>
       <div class="hud-start">
@@ -165,7 +165,7 @@ export class HUD {
       </div>
     `;
     document.getElementById('ui')!.appendChild(this.root);
-    for (const k of ['cross', 'hit', 'prompt', 'mark', 'progress', 'compass', 'bearing', 'area', 'weapon', 'vitals', 'stamina', 'hotbar', 'chat', 'scope', 'damage', 'bleedfx', 'bleed', 'hitdir', 'fps', 'online', 'net', 'feed', 'tags', 'fatal', 'dead', 'start']) {
+    for (const k of ['cross', 'hit', 'prompt', 'mark', 'progress', 'compass', 'bearing', 'area', 'weapon', 'vitals', 'stamina', 'hotbar', 'chat', 'scope', 'damage', 'bleedfx', 'bleed', 'hitdir', 'fps', 'online', 'net', 'feed', 'board', 'tags', 'fatal', 'dead', 'start']) {
       this.el[k] = this.root.querySelector(`.hud-${k}`) as HTMLElement;
     }
     this.notes = this.root.querySelector('.hud-notes') as HTMLDivElement;
@@ -501,6 +501,23 @@ export class HUD {
     setTimeout(() => n.classList.add('out'), 6500);
     setTimeout(() => n.remove(), 7300);
     while (this.el.feed.children.length > 6) this.el.feed.firstChild?.remove();
+  }
+
+  /**
+   * The leaderboard under the map: the five at the top, this player's own line picked out,
+   * and added underneath when they are further down. Null takes it away (playing alone).
+   * @param rows [name, kills, tags cashed in], best first
+   * @param me where this player stands in the whole list (-1 = not on it)
+   * @param mine their own kills and tags
+   */
+  setBoard(rows: [string, number, number][] | null, me = -1, mine: [number, number] = [0, 0], name = '') {
+    const esc = (s: string) => s.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
+    if (!rows) return this.set('board', this.el.board, '', 'html');
+    const row = (n: number, r: [string, number, number], own: boolean) => `<div class="lb-row${own ? ' me' : ''}"><i>${n}</i><span>${esc(r[0])}</span><b>${r[1]}</b><b>${r[2]}</b></div>`;
+    let html = `<div class="lb-head"><span>Leaderboard</span><b title="kills">Kills</b><b title="tags cashed in">Tags</b></div>`;
+    html += rows.length ? rows.map((r, i) => row(i + 1, r, i === me)).join('') : `<div class="lb-none">No kills or tags yet</div>`;
+    if (me >= rows.length) html += `<div class="lb-gap"></div>` + row(me + 1, [name || 'You', mine[0], mine[1]], true);
+    this.set('board', this.el.board, html, 'html');
   }
 
   /** other players' dog tags being carried, each with the time left until it is cashed in */

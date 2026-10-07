@@ -10,6 +10,7 @@ import type { ItemInstance } from '../sim/items';
 import type { SerializedInventory } from '../sim/inventory';
 import type { WorldLoot } from '../sim/economy';
 import type { HitZone } from '../sim/combat';
+import type { DropInfo } from '../sim/drops';
 
 export const PROTOCOL = 6;
 
@@ -120,6 +121,8 @@ export type S2C =
       spawn: { x: number; y?: number; z: number; yaw: number };
       /** the character the server remembers for this player (null = new life) */
       me: { inv: SerializedInventory; vitals: Vitals } | null;
+      /** supply drops standing in the world now */
+      drops?: DropInfo[];
       max: number;
     }
   | { t: 'join'; p: PlayerInfo }
@@ -147,6 +150,14 @@ export type S2C =
   | { t: 'chat'; ch?: ChatChannel; from: string; text: string }
   /** somebody cashed in a dog tag: announced to everyone */
   | { t: 'cashed'; id: number; name: string; owner: string }
+  /**
+   * The leaderboard: the top five since the server started, as [name, kills, tags cashed in],
+   * where this player stands in the whole list (-1 = not on it yet) and their own two counts.
+   */
+  | { t: 'board'; rows: [string, number, number][]; me: number; mine: [number, number] }
+  /** a supply drop has been set down (see src/sim/drops.ts), and one has been cleared away */
+  | { t: 'drop+'; d: DropInfo }
+  | { t: 'drop-'; uid: string }
   /** where everyone carrying a tag they took is standing right now: [player id, x, z]. Sent to all, every half minute. */
   | { t: 'tags'; p: [number, number, number][] }
   | { t: 'pong'; n: number }

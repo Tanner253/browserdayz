@@ -7,6 +7,7 @@ import { generateWorld, heightAt } from '../src/world/worldgen';
 import { Buildings, CRATE_KINDS } from '../src/world/buildings';
 import { assets } from '../src/core/assets';
 import { crateId } from '../src/net/protocol';
+import { pickDropSite } from '../src/sim/drops';
 
 export interface CrateSpot {
   cid: string;
@@ -34,5 +35,7 @@ export function buildWorldData(root: string) {
     spawns: world.spawns,
     doorCount: buildings.doorSpecs.length,
     groundAt: (x: number, z: number) => heightAt(world.heights, x, z),
+    /** somewhere open and level to set a supply drop down */
+    dropSite: (rnd?: () => number) => pickDropSite(world, rnd),
   };
 }

@@ -796,7 +796,22 @@
 .gfx-info { margin-top: 12px; font-family: var(--mono); font-size: 11px; color: var(--ink-faint); text-align: center; }
 
 /* ------------------------------------------------------------ carried dog tags */
-.hud-tags { position: absolute; top: 204px; left: 16px; display: flex; flex-direction: column; gap: 4px; }
+/* under the map, one below the other: the leaderboard, then the tags being carried */
+.hud-under { position: absolute; top: 200px; left: 16px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.hud-tags { display: flex; flex-direction: column; gap: 4px; }
+.hud-board { width: 176px; font-size: 13px; color: var(--ink-dim); background: var(--panel); border-top: 2px solid rgba(233, 228, 216, 0.55); }
+.hud-board:empty { display: none; }
+.lb-head, .lb-row { display: grid; grid-template-columns: 14px minmax(0, 1fr) 30px 30px; align-items: center; gap: 4px; padding: 2px 8px; }
+.lb-head { grid-template-columns: minmax(0, 1fr) 30px 30px; padding: 4px 8px 3px; font-family: var(--mono); font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-faint); border-bottom: 1px solid var(--line); }
+.lb-head b { font-weight: 400; text-align: right; letter-spacing: 0.06em; }
+.lb-row i { font-family: var(--mono); font-size: 10px; font-style: normal; color: var(--ink-faint); }
+.lb-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lb-row b { font-family: var(--mono); font-size: 12px; font-weight: 500; text-align: right; color: var(--ink); font-variant-numeric: tabular-nums; }
+.lb-row.me { color: var(--accent); background: rgba(255, 255, 255, 0.05); }
+.lb-row.me b, .lb-row.me i { color: var(--accent); }
+.lb-row:last-child { padding-bottom: 5px; }
+.lb-gap { height: 1px; margin: 2px 8px; background: var(--line); }
+.lb-none { padding: 5px 8px 6px; font-size: 12px; color: var(--ink-faint); }
 .tag-row { display: flex; align-items: center; gap: 8px; padding: 3px 10px 3px 8px; font-size: 15px; color: var(--ink-dim); background: var(--panel); border-left: 2px solid var(--accent); }
 .tag-row i { width: 13px; height: 8px; border: 1.5px solid var(--accent); border-radius: 3px; }
 .tag-row b { margin-left: 6px; font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
@@ -1074,7 +1089,9 @@ kbd.hot { color: #121413; background: linear-gradient(#d8c594, #b89f66); border-
 /* a phone has no keyboard or mouse wheel: the HUD takes taps instead */
 body.touch .hud-hotbar { pointer-events: auto; touch-action: manipulation; }
 /* the thumbs own the bottom corners: messages and carried tags move to the top left */
-body.touch .hud-tags { top: 146px; left: calc(132px + env(safe-area-inset-left)); }
+body.touch .hud-under { top: 146px; left: calc(132px + env(safe-area-inset-left)); }
+/* (no room for the board between the thumbs on a phone) */
+body.touch .hud-board { display: none; }
 body.touch .hud-minimap { top: 12px; left: calc(132px + env(safe-area-inset-left)); width: 124px; height: 124px; }
 body.touch .hud-minimap span { display: none; }
 body.touch .hud-chat { top: 70px; bottom: auto; left: calc(14px + env(safe-area-inset-left)); width: 360px; }

@@ -14,6 +14,7 @@ import { buildWorldData } from './world';
 import { Economy, type WorldLoot } from '../src/sim/economy';
 import { Container, type SerializedInventory } from '../src/sim/inventory';
 import { ITEMS, TAG_HOLD, sanitizeItem, type ItemInstance } from '../src/sim/items';
+import { DROP, fillDrop, type DropInfo } from '../src/sim/drops';
 import { CRATE_RESTOCK, CRATE_SPECS, fillCrate } from '../src/sim/crates';
 import { WEAPON_RULES, hitDamage, type HitZone } from '../src/sim/combat';
 import { ACTS, CHAT_RANGE, F_DEAD, MAX_STAMINA, PROTOCOL, type C2S, type CorpseInfo, type KillInfo, type PlayerInfo, type Pose, type S2C, type StashInfo, type StoredItem, type Vitals } from '../src/net/protocol';
@@ -41,7 +42,7 @@ log(`world ready in ${Date.now() - t0} ms: ${world.lootPoints.length} loot point
 
 interface Box {
   cid: string;
-  kind: 'crate' | 'stash' | 'corpse';
+  kind: 'crate' | 'stash' | 'corpse' | 'drop';
   w: number;
   h: number;
   items: StoredItem[];
@@ -52,7 +53,7 @@ interface Box {
   /** crate prop kind (loot table) */
   crate?: string;
   emptiedAt: number;
-  /** corpse: owner name, expiry (economy time), how it fell */
+  /** corpse and supply drop: expiry (economy time). Corpse: owner name, how it fell */
   name?: string;
   expires?: number;
   v?: number;
@@ -119,7 +120,7 @@ function saveWorld() {
     const data = {
       rev: WORLD_REV,
       economy: economy.serialize(),
-      boxes: [...boxes.values()].filter((b) => b.kind !== 'corpse'),
+      boxes: [...boxes.values()].filter((b) => b.kind !== 'corpse' && b.kind !== 'drop'),
       doors: [...doors].map(([i, [open, swing]]) => [i, open, swing]),
     };
     writeFileSync(SAVE_FILE, JSON.stringify(data));
@@ -158,6 +159,8 @@ function recordCashIn(c: Client, owner: string, wallet: string) {
   const entry: CashIn = { id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`, at: new Date().toISOString(), name: c.name, owner, wallet };
   cashins.push(entry);
   if (cashins.length > 2000) cashins.shift();
+  scoreOf(c).tags++;
+  sendBoard();
   // also in the server's own log, which the host keeps for a few days whatever else happens
   log('CASHIN', JSON.stringify(entry));
   const tell = (attempt: number) => {
@@ -383,6 +386,12 @@ function kill(c: Client, cause: string, v = 0) {
   c.lastHitBy = null;
   c.pose[5] |= F_DEAD;
   broadcast({ t: 'death', k, corpse });
+  // a kill on the board for whoever did it (never for doing it to yourself)
+  const killer = by ? clients.get(by.id) : undefined;
+  if (killer && killer !== c) {
+    scoreOf(killer).kills++;
+    sendBoard();
+  }
   log(by ? `${c.name} was killed by ${by.name} (${by.w}, ${k.dist} m)` : `${c.name} died (${cause})`);
 }
 
@@ -487,7 +496,7 @@ function handle(c: Client, m: C2S) {
       const b = boxes.get(m.cid);
       if (!b || locks.get(m.cid) !== c.id) return;
       b.items = cleanStored(m.items);
-      if (b.kind === 'crate') b.emptiedAt = b.items.length ? -1 : b.emptiedAt < 0 ? economy.time : b.emptiedAt;
+      if (b.kind === 'crate' || b.kind === 'drop') b.emptiedAt = b.items.length ? -1 : b.emptiedAt < 0 ? economy.time : b.emptiedAt;
       return;
     }
     case 'cclose': {
@@ -626,11 +635,18 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
     doors: [...doors].map(([i, [open, swing]]) => [i, open, swing]),
     stashes: [...boxes.values()].filter((b) => b.kind === 'stash').map((b) => ({ uid: b.cid, x: b.x, y: b.y, z: b.z, rot: b.rot })),
     corpses: [...boxes.values()].filter((b) => b.kind === 'corpse').map((b) => ({ uid: b.cid, x: b.x, y: b.y, z: b.z, rot: b.rot, name: b.name ?? 'Survivor', v: b.v ?? 0 })),
+    drops: [...boxes.values()].filter((b) => b.kind === 'drop').map(dropInfo),
     spawn: sp,
     me: resume ? { inv: resume.inv!, vitals: resume.vitals ?? { health: 100, energy: 80, water: 80, stamina: MAX_STAMINA, bleeding: false } } : null,
     max: MAX_PLAYERS,
   });
   broadcast({ t: 'join', p: info(c) }, c);
+  // back under another name: the board says so, to everybody
+  const had = scores.get(c.key);
+  if (had && had.name !== c.name) {
+    had.name = c.name;
+    sendBoard();
+  } else sendBoard(c);
   log(`+ ${c.name} (#${c.id})${resume ? ' resumed' : ''} — ${clients.size} online`);
   return c;
 }
@@ -654,6 +670,78 @@ setInterval(() => {
   }
   broadcast({ t: 'ps', s });
 }, 1000 / TICK_HZ);
+
+// ------------------------------------------------------------------ leaderboard
+//
+// Kills, and tags cashed in for a reward, since this server started. Counted by the player's
+// key, so a new name or a dropped connection keeps the count. Ranked by tags, then kills:
+// a tag is the harder thing to bring home.
+
+const scores = new Map<string, { name: string; kills: number; tags: number }>();
+
+function scoreOf(c: Client) {
+  let s = scores.get(c.key);
+  if (!s) scores.set(c.key, (s = { name: c.name, kills: 0, tags: 0 }));
+  s.name = c.name;
+  return s;
+}
+
+/** tell everyone (or one player who has just joined) how the board stands */
+function sendBoard(only?: Client) {
+  const ranked = [...scores.entries()].filter(([, s]) => s.kills || s.tags).sort((a, b) => b[1].tags - a[1].tags || b[1].kills - a[1].kills || a[1].name.localeCompare(b[1].name));
+  const rows = ranked.slice(0, 5).map(([, s]) => [s.name, s.kills, s.tags] as [string, number, number]);
+  for (const c of only ? [only] : clients.values()) {
+    const mine = scores.get(c.key);
+    send(c, { t: 'board', rows, me: ranked.findIndex(([k]) => k === c.key), mine: [mine?.kills ?? 0, mine?.tags ?? 0] });
+  }
+}
+
+// ------------------------------------------------------------------ supply drops
+//
+// See src/sim/drops.ts. One at a time, and only while somebody is alive to go and get it.
+
+const DROP_EVERY = Number(process.env.DROP_EVERY_S) || DROP.every;
+const DROP_FIRST = Number(process.env.DROP_FIRST_S) || DROP.first;
+const DROP_LIFE = Number(process.env.DROP_LIFE_S) || DROP.life;
+const DROP_LINGER = Number(process.env.DROP_LINGER_S) || DROP.linger;
+/** economy time the next one is due (-1 until the clock is first read) */
+let nextDrop = -1;
+
+function dropInfo(b: Box): DropInfo {
+  return { uid: b.cid, x: b.x, y: b.y, z: b.z, rot: b.rot, left: Math.max(0, Math.round((b.expires ?? 0) - economy.time)) };
+}
+
+function spawnDrop() {
+  const at = world.dropSite();
+  if (!at) return;
+  const uid = `drop-${Math.round(economy.time)}-${Math.random().toString(36).slice(2, 7)}`;
+  const c = new Container(uid, DROP.label, DROP.w, DROP.h, [], true);
+  fillDrop(c);
+  const b: Box = { cid: uid, kind: 'drop', w: DROP.w, h: DROP.h, items: c.serialize().items, x: at.x, y: at.y, z: at.z, rot: Math.random() * Math.PI * 2, emptiedAt: -1, expires: economy.time + DROP_LIFE };
+  boxes.set(uid, b);
+  broadcast({ t: 'drop+', d: dropInfo(b) });
+  log(`supply drop at ${Math.round(at.x)}, ${Math.round(at.z)} (${b.items.length} items)`);
+}
+
+/** every five seconds: clear away the one that is done with, set the next one down when it is due */
+function tickDrops(anyoneAlive: boolean) {
+  let standing = false;
+  for (const b of [...boxes.values()]) {
+    if (b.kind !== 'drop') continue;
+    // (never from under somebody who has it open)
+    const done = economy.time > (b.expires ?? 0) || (b.emptiedAt >= 0 && economy.time - b.emptiedAt > DROP_LINGER);
+    if (done && !locks.has(b.cid)) {
+      boxes.delete(b.cid);
+      broadcast({ t: 'drop-', uid: b.cid });
+    } else standing = true;
+  }
+  // with nobody about the clock waits: the first one comes a minute and a half after somebody turns up
+  if (nextDrop < 0 || !anyoneAlive) nextDrop = Math.max(nextDrop, economy.time + DROP_FIRST);
+  else if (economy.time >= nextDrop && !standing) {
+    nextDrop = economy.time + DROP_EVERY;
+    spawnDrop();
+  }
+}
 
 // A tag taken off somebody is worth a reward once it has been carried for half an hour, so
 // the safest thing to do with one was to sit in a bush until the clock ran out. Every half
@@ -689,6 +777,7 @@ setInterval(() => {
       broadcast({ t: 'corpse-', uid: b.cid });
     }
   }
+  tickDrops(alive.length > 0);
   for (const [k, r] of records) if (now - r.leftAt > RECORD_LIFETIME) records.delete(k);
 }, 5000);
 

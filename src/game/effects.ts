@@ -506,6 +506,31 @@ export class Effects {
     }
   }
 
+  /**
+   * Signal smoke: an orange column standing forty metres over a supply drop, to be seen
+   * from across a valley. Call every frame it should burn.
+   * @param state the caller's own count of how much smoke is owed (so each column keeps its own pace)
+   */
+  signal(at: THREE.Vector3, state: { owed: number }, dt: number) {
+    state.owed = Math.min(3, state.owed + dt * 5);
+    while (state.owed >= 1) {
+      state.owed -= 1;
+      const k = 0.85 + Math.random() * 0.3;
+      this.spawn({
+        p: new THREE.Vector3(at.x + (Math.random() - 0.5) * 0.3, at.y + 0.9, at.z + (Math.random() - 0.5) * 0.3),
+        // it climbs, and leans a little with the wind as it goes
+        v: new THREE.Vector3(0.5 + (Math.random() - 0.5) * 0.5, 1.4, 0.3 + (Math.random() - 0.5) * 0.5),
+        max: 7 + Math.random() * 2.5,
+        size: 0.9,
+        grow: 6.5,
+        color: new THREE.Color(1.05 * k, 0.4 * k, 0.1 * k),
+        alpha: 0.7,
+        gravity: -3.3,
+        drag: 0.58,
+      });
+    }
+  }
+
   /** drops off an open wound: a few fall, and one lands */
   drip(from: THREE.Vector3) {
     for (let i = 0; i < 2; i++) {

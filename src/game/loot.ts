@@ -448,6 +448,16 @@ export class LootManager {
     this.stashes.push(s);
   }
 
+  /**
+   * A supply drop: the crate a stash kit puts down, but nobody's own. It is not kept with the
+   * player's stashes (those are saved, and can be packed up and carried off).
+   */
+  async addDrop(s: Stash) {
+    const tpl = await this.models.get('stash_kit');
+    s.spawn(tpl, this.scene);
+    s.fixed = true;
+  }
+
   removeStash(s: Stash) {
     s.dispose(this.scene);
     this.stashes = this.stashes.filter((x) => x !== s);

@@ -24,6 +24,8 @@ export class Minimap {
   private pings: { x: number; z: number; at: number }[] = [];
   /** when this player was last shown to everyone else */
   private marked = -1e9;
+  /** supply drops standing in the world */
+  private drops: { x: number; z: number }[] = [];
 
   constructor(world: World) {
     this.world = world;
@@ -135,6 +137,13 @@ export class Minimap {
     if (me) this.marked = now;
   }
 
+  /** Supply drops, marked for as long as they stand. */
+  setDrops(at: { x: number; z: number }[]) {
+    this.drops = at;
+    // drawn again at the next update, wherever the player is
+    this.last.x = 1e9;
+  }
+
   /** @param yaw the way the player faces, radians (0 = north, turning left is positive) */
   update(x: number, z: number, yaw: number) {
     const l = this.last;
@@ -170,6 +179,36 @@ export class Minimap {
         g.fillStyle = '#f1e7c8';
         g.fillText(p.name.toUpperCase(), lx, lz - W / 70);
       }
+    }
+    // supply drops: a crate, there as long as the drop is; in the corner view one off the edge sits on the rim
+    for (const d of this.drops) {
+      let qx = (d.x - cx + span / 2) * k, qz = (d.z - cz + span / 2) * k;
+      const r0 = this.big ? W / 80 : W / 19;
+      let off = false;
+      if (!this.big) {
+        const dx = qx - W / 2, dz = qz - W / 2, dist = Math.hypot(dx, dz), rim = W / 2 - r0 * 1.2;
+        if (dist > rim) {
+          qx = W / 2 + (dx / dist) * rim;
+          qz = W / 2 + (dz / dist) * rim;
+          off = true;
+        }
+      }
+      const h = r0 * (off ? 0.6 : 0.8);
+      g.fillStyle = '#ffb347';
+      g.strokeStyle = 'rgba(0, 0, 0, 0.9)';
+      g.lineWidth = Math.max(1.5, r0 * 0.22);
+      g.beginPath();
+      g.rect(qx - h, qz - h * 0.8, h * 2, h * 1.6);
+      g.fill();
+      g.stroke();
+      // the lid and the straps: it reads as a crate, not a dot
+      g.beginPath();
+      g.moveTo(qx - h, qz - h * 0.25);
+      g.lineTo(qx + h, qz - h * 0.25);
+      g.moveTo(qx, qz - h * 0.8);
+      g.lineTo(qx, qz + h * 0.8);
+      g.lineWidth = Math.max(1, r0 * 0.14);
+      g.stroke();
     }
     // tag carriers: a ring that beats, fading out; in the corner view one off the edge sits on the rim
     for (const p of this.pings) {
