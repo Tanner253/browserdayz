@@ -8,6 +8,7 @@ import { Buildings, CRATE_KINDS } from '../src/world/buildings';
 import { assets } from '../src/core/assets';
 import { crateId } from '../src/net/protocol';
 import { pickDropSite } from '../src/sim/drops';
+import { barrelSpots } from '../src/sim/barrels';
 
 export interface CrateSpot {
   cid: string;
@@ -32,6 +33,8 @@ export function buildWorldData(root: string) {
   return {
     lootPoints: buildings.lootPoints,
     crates,
+    /** the fuel drums, numbered as the game numbers them */
+    barrels: barrelSpots(world.props).map((p) => ({ x: p.x, y: p.y, z: p.z })),
     spawns: world.spawns,
     doorCount: buildings.doorSpecs.length,
     groundAt: (x: number, z: number) => heightAt(world.heights, x, z),

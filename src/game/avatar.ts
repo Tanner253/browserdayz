@@ -12,6 +12,7 @@ import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import type { Atmosphere } from '../world/atmosphere';
 import type { Grips, HandGrip } from './arms';
 import { BEARD, HAIR_STYLES, MAX_WOUNDS, loadCharacter, lookFor, lookPatch, lookUniforms, setLookUniforms, type Look, type LookUniforms } from './look';
+import type { Emote } from '../sim/emotes';
 
 /** local player's full body: seen by the shadow cameras always, by the main camera only on the flight in from the menu */
 export const AVATAR_LAYER = 2;
@@ -29,7 +30,7 @@ const FP_BACK = 0.3;
 /** the limbs a bloodstain can sit on: it goes on whichever is nearest the hit */
 const WOUND_BONES: [string, string | null][] = [['pelvis', 'spine_01'], ['spine_01', 'spine_02'], ['spine_02', 'spine_03'], ['spine_03', 'neck_01'], ['neck_01', 'Head'], ['Head', null], ['upperarm_l', 'lowerarm_l'], ['upperarm_r', 'lowerarm_r'], ['lowerarm_l', 'hand_l'], ['lowerarm_r', 'hand_r'], ['thigh_l', 'calf_l'], ['thigh_r', 'calf_r'], ['calf_l', 'foot_l'], ['calf_r', 'foot_r'], ['foot_l', 'ball_l'], ['foot_r', 'ball_r']];
 
-const CLIPS = ['idle', 'walk', 'run', 'crouchIdle', 'crouchWalk', 'jumpStart', 'jumpLoop', 'jumpLand', 'death', 'deathFront', 'deathSide', 'hit', 'hitHead'] as const;
+const CLIPS = ['idle', 'walk', 'run', 'crouchIdle', 'crouchWalk', 'jumpStart', 'jumpLoop', 'jumpLand', 'death', 'deathFront', 'deathSide', 'hit', 'hitHead', 'dance'] as const;
 type Clip = (typeof CLIPS)[number];
 const STRIDES = ['walk', 'run', 'crouchWalk'] as const;
 type Stride = (typeof STRIDES)[number];
@@ -40,6 +41,9 @@ export const DEATH_REST: [number, number][] = [[-0.85, 0], [0.9, 0], [0.05, 0.36
 
 /** what the hands can be seen doing */
 export type Gesture = 'bolt' | 'reload' | 'eat' | 'drink' | 'bandage' | 'open';
+/** from the wheel (src/sim/emotes.ts): what the arms do with a call, and what the body keeps up until told otherwise */
+export type Move = NonNullable<Emote['move']>;
+export type Hold = NonNullable<Emote['hold']>;
 
 /**
  * Worn things that are drawn on the body. `p`, `r`, `s` place the item's model on the body
@@ -201,6 +205,11 @@ export class Avatar {
   /** seconds since the feet left the ground in a jump (-1 = not jumping: a drop has no take-off) */
   private jumpT = -1;
   private gesture: { kind: Gesture; t: number; dur: number } | null = null;
+  private move: { kind: Move; t: number; dur: number } | null = null;
+  private hold: Hold | null = null;
+  // how far into the dance, and how far up the hands are, 0..1
+  private danceT = 0;
+  private handsT = 0;
   private gearRest = new Map<string, { bone: THREE.Object3D; inv: THREE.Matrix4 }>();
   private gearObjs: THREE.Object3D[] = [];
   /** a pack is worn: a slung weapon rides outside it */
@@ -672,6 +681,16 @@ export class Avatar {
     this.gesture = kind ? { kind, t: 0, dur } : null;
   }
 
+  /** A call from the wheel: what the arms do with it (a wave, a point). null drops them. */
+  emote(kind: Move | null, dur = 1.5) {
+    this.move = kind ? { kind, t: 0, dur } : null;
+  }
+
+  /** Dancing, standing with the hands up, or neither. */
+  setHold(hold: Hold | null) {
+    this.hold = hold;
+  }
+
   /** Development: stand in one clip at one moment, nothing blended. */
   debugPose(clip: Clip, time: number) {
     for (const n of CLIPS) {
@@ -718,8 +737,15 @@ export class Avatar {
       if (this.gesture.t >= this.gesture.dur || dead) this.gesture = null;
     }
     const ges = this.gesture;
-    // eating, drinking, dressing a wound: whatever was in the hands is put away for it
-    const using = !!ges && ges.kind !== 'bolt' && ges.kind !== 'reload';
+    if (this.move) {
+      this.move.t += dt;
+      if (this.move.t >= this.move.dur || dead) this.move = null;
+    }
+    const mv = this.move;
+    this.danceT += ((this.hold === 'dance' && !dead ? 1 : 0) - this.danceT) * ease(7);
+    this.handsT += ((this.hold === 'surrender' && !dead ? 1 : 0) - this.handsT) * ease(9);
+    // eating, drinking, dressing a wound, waving, dancing: whatever was in the hands is put away for it
+    const using = (!!ges && ges.kind !== 'bolt' && ges.kind !== 'reload') || !!mv || this.danceT > 0.25 || this.handsT > 0.25;
     const held = using ? null : this.held;
     // fists come up for a punch and stay up a while after it
     this.fistsHold = Math.max(0, this.fistsHold - dt);
@@ -791,10 +817,13 @@ export class Avatar {
       else hit = POSE.flinch * Math.sin((Math.PI * this.hitT) / hitLen) * (1 - down);
     }
     const rest = 1 - hit;
+    // the dance takes the place of standing and walking; nobody dances crouched or in the air
+    const dn = this.danceT;
     const w: Record<Clip, number> = {
-      idle: stand * (1 - move) * rest,
-      walk: stand * move * (1 - runK) * rest,
-      run: stand * move * runK * rest,
+      idle: stand * (1 - move) * (1 - dn) * rest,
+      walk: stand * move * (1 - runK) * (1 - dn) * rest,
+      run: stand * move * runK * (1 - dn) * rest,
+      dance: stand * dn * rest,
       crouchIdle: duck * (1 - move) * rest,
       crouchWalk: duck * move * rest,
       jumpStart: air * push * rest,
@@ -1023,6 +1052,54 @@ export class Avatar {
         const a = ges.t * (ges.kind === 'bandage' ? 5.5 : 9);
         const r = l.clone().addScaledVector(_right, 0.08).addScaledVector(UP, 0.05 + Math.cos(a) * 0.045).addScaledVector(fwd, 0.02 + Math.sin(a) * 0.045);
         this.reach(this.armR, r, dirOf(0.4, 0, -1), dirOf(0, -1, 0), [0.9, 0.95, 1, 1.05], aimQ, wgt);
+      }
+    }
+
+    // --- a call from the wheel, or the hands kept up: the arms say it as well
+    if (!dead && (mv || this.handsT > 0.02) && this.armR && this.armL && this.neck.length) {
+      this.root.updateMatrixWorld(true);
+      const aimQ = _aimQ.setFromAxisAngle(UP, this.yaw);
+      const fwd = _fwd.set(0, 0, -1).applyQuaternion(aimQ);
+      _right.set(1, 0, 0).applyQuaternion(aimQ);
+      const head = this.neck[this.neck.length - 1].getWorldPosition(_head);
+      const at = (f: number, u: number, r: number) => new THREE.Vector3().copy(head).addScaledVector(fwd, f).addScaledVector(UP, u).addScaledVector(_right, r);
+      const dirOf = (f: number, u: number, r: number) => new THREE.Vector3().addScaledVector(fwd, f).addScaledVector(UP, u).addScaledVector(_right, r);
+      const open: [number, number, number, number] = [0.12, 0.1, 0.12, 0.18];
+      const R = this.armR, L = this.armL;
+      const arm = (s: number) => (s > 0 ? R : L);
+      // hands up beside the head, palms out, and kept there
+      if (this.handsT > 0.02) {
+        const tire = Math.sin(this.clock * 1.3) * 0.012;
+        for (const s of [1, -1]) this.reach(arm(s), at(0.1, 0.2 + tire * s, s * 0.34), dirOf(0, 1, s * 0.12), dirOf(1, 0, 0), open, aimQ, this.handsT);
+      }
+      if (mv) {
+        const k = mv.t;
+        const wgt = THREE.MathUtils.smoothstep(k, 0, 0.22) * (1 - THREE.MathUtils.smoothstep(k, mv.dur - 0.3, mv.dur)) * (1 - this.handsT);
+        if (mv.kind === 'wave') {
+          // a hand up beside the head, waved from the elbow
+          const s = Math.sin(k * 16);
+          this.reach(R, at(0.14, 0.3, 0.33 + s * 0.11), dirOf(0, 1, s * 0.45), dirOf(1, 0, 0), open, aimQ, wgt);
+        } else if (mv.kind === 'beckon') {
+          // the whole arm over the head, swung wide and slow: made to be seen from a long way off
+          const s = Math.sin(k * 10.5);
+          this.reach(R, at(0.06, 0.46, 0.2 + s * 0.24), dirOf(0, 1, s * 0.6), dirOf(1, 0, 0), open, aimQ, wgt);
+        } else if (mv.kind === 'distress') {
+          // both arms over the head, crossing and parting
+          const s = Math.sin(k * 11);
+          for (const side of [1, -1]) this.reach(arm(side), at(0.06, 0.44, side * (0.24 + s * 0.2)), dirOf(0, 1, side * s * 0.5), dirOf(1, 0, 0), open, aimQ, wgt);
+        } else if (mv.kind === 'palms') {
+          // both hands shown, open and empty, in front of the shoulders
+          const s = Math.sin(k * 9) * 0.02;
+          for (const side of [1, -1]) this.reach(arm(side), at(0.3, -0.12 + s, side * 0.3), dirOf(0.2, 1, side * 0.15), dirOf(1, 0, 0), open, aimQ, wgt);
+        } else if (mv.kind === 'point') {
+          // the arm out straight the way they are looking, one finger along it
+          const up = Math.sin(pitch);
+          this.reach(R, at(0.6, -0.22 + up * 0.5, 0.2), dirOf(1, up, 0), dirOf(0, -1, 0), [0.05, 1.5, 1.6, 1.7], aimQ, wgt);
+        } else {
+          // two fingers to the brow, and away
+          const out = THREE.MathUtils.smoothstep(k, mv.dur * 0.45, mv.dur * 0.75);
+          this.reach(R, at(0.13, 0.03, 0.17).lerp(at(0.34, 0.08, 0.36), out), dirOf(0.1, 0.5, -0.85).lerp(dirOf(0.6, 0.7, -0.2), out), dirOf(0.3, -0.9, 0), [0.1, 0.12, 1.4, 1.5], aimQ, wgt);
+        }
       }
     }
 

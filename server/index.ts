@@ -17,6 +17,8 @@ import { ITEMS, TAG_HOLD, sanitizeItem, type ItemInstance } from '../src/sim/ite
 import { DROP, fillDrop, type DropInfo } from '../src/sim/drops';
 import { CRATE_RESTOCK, CRATE_SPECS, fillCrate } from '../src/sim/crates';
 import { WEAPON_RULES, hitDamage, type HitZone } from '../src/sim/combat';
+import { BARREL } from '../src/sim/barrels';
+import { EMOTE, EMOTE_GAP, SHOUT_RANGE } from '../src/sim/emotes';
 import { ACTS, CHAT_RANGE, F_DEAD, MAX_STAMINA, PROTOCOL, type C2S, type CorpseInfo, type KillInfo, type PlayerInfo, type Pose, type S2C, type StashInfo, type StoredItem, type Vitals } from '../src/net/protocol';
 
 const PORT = Number(process.env.PORT ?? 8080);
@@ -29,7 +31,7 @@ const TICK_HZ = 15;
 const CORPSE_LIFETIME = 600; // seconds
 const RECORD_LIFETIME = 30 * 60 * 1000; // a logged-out character is remembered this long
 /** bump when loot points change: world loot from an older save is re-rolled */
-const WORLD_REV = 7;
+const WORLD_REV = 8;
 
 const log = (...a: unknown[]) => console.log(new Date().toISOString().slice(11, 19), ...a);
 
@@ -38,7 +40,7 @@ const log = (...a: unknown[]) => console.log(new Date().toISOString().slice(11, 
 log('generating world…');
 const t0 = Date.now();
 const world = buildWorldData(ROOT);
-log(`world ready in ${Date.now() - t0} ms: ${world.lootPoints.length} loot points, ${world.crates.length} crates, ${world.spawns.length} spawns`);
+log(`world ready in ${Date.now() - t0} ms: ${world.lootPoints.length} loot points, ${world.crates.length} crates, ${world.barrels.length} fuel drums, ${world.spawns.length} spawns`);
 
 interface Box {
   cid: string;
@@ -62,6 +64,9 @@ interface Box {
 const boxes = new Map<string, Box>();
 const locks = new Map<string, number>(); // cid -> client id
 const doors = new Map<number, [boolean, number]>();
+/** fuel drums that have gone up (see src/sim/barrels.ts): which one -> when a new one may be stood there */
+const barrelsGone = new Map<number, number>();
+const BARREL_RESPAWN = Number(process.env.BARREL_RESPAWN_S) || BARREL.respawn;
 
 const economy = new Economy(world.lootPoints, {
   spawn: (l) => broadcast({ t: 'loot+', l }),
@@ -208,6 +213,9 @@ interface Client {
   /** when this player last threw a grenade, and how many hits have been claimed for it */
   lastNade: number;
   nadeHits: number;
+  /** the fuel drums this player has just set off, and how many hits have been claimed for each */
+  blasts: { i: number; at: number; hits: number }[];
+  lastEmote: number;
   lastChat: number;
   lastHitBy: { id: number; name: string; w: string; zone: HitZone; dist: number; at: number } | null;
   openCid: string | null;
@@ -430,6 +438,32 @@ function handle(c: Client, m: C2S) {
       broadcast({ t: 'nade', id: c.id, o: m.o, v: m.v }, c);
       return;
     }
+    case 'barrel': {
+      const b = world.barrels[m.i];
+      if (!c.alive || !Number.isInteger(m.i) || !b || barrelsGone.has(m.i)) return;
+      const now = Date.now();
+      c.blasts = c.blasts.filter((q) => now - q.at < 5000);
+      // a bullet's reach, or the next drum along from one of theirs that has just gone up
+      const near = Math.hypot(b.x - c.pose[0], b.z - c.pose[2]) < WEAPON_RULES.barrel.range;
+      const chained = c.blasts.some((q) => Math.hypot(world.barrels[q.i].x - b.x, world.barrels[q.i].y - b.y, world.barrels[q.i].z - b.z) < WEAPON_RULES.barrel.blast! + 1);
+      if ((!near && !chained) || c.blasts.length >= 12) return;
+      barrelsGone.set(m.i, now + BARREL_RESPAWN * 1000);
+      c.blasts.push({ i: m.i, at: now, hits: 0 });
+      broadcast({ t: 'boom', i: m.i, by: c.id }, c);
+      return;
+    }
+    case 'emote': {
+      const e = EMOTE[m.e];
+      const now = Date.now();
+      if (!c.alive || !e?.say || now - c.lastEmote < EMOTE_GAP * 800) return;
+      c.lastEmote = now;
+      // a voice carries so far and no further
+      const s = JSON.stringify({ t: 'emote', id: c.id, e: e.id } satisfies S2C);
+      for (const o of clients.values()) {
+        if (o !== c && o.ws.readyState === 1 && Math.hypot(o.pose[0] - c.pose[0], o.pose[1] - c.pose[1], o.pose[2] - c.pose[2]) < SHOUT_RANGE) o.ws.send(s);
+      }
+      return;
+    }
     case 'act': {
       if (!c.alive || !ACTS.includes(m.a)) return;
       broadcast({ t: 'act', id: c.id, a: m.a, d: num(m.d) ? Math.max(0, Math.min(12, m.d)) : 1 }, c);
@@ -450,7 +484,23 @@ function handle(c: Client, m: C2S) {
       const d = Math.hypot(c.pose[0] - target.pose[0], c.pose[1] - target.pose[1], c.pose[2] - target.pose[2]);
       if (d > rule.range + 4) return;
       let amount: number;
-      if (rule.blast) {
+      /** where it came from, for the one who is hit: the shooter, or whatever went off */
+      let from: [number, number] = [c.pose[0], c.pose[2]];
+      if (m.w === 'barrel') {
+        // a drum they set off in the last moments, near enough to the one it is said to have reached
+        const reach = rule.blast! + 1.5;
+        let best: { q: (typeof c.blasts)[number]; d: number } | null = null;
+        for (const q of c.blasts) {
+          const b = world.barrels[q.i];
+          const bd = Math.hypot(b.x - target.pose[0], b.y + BARREL.centre - (target.pose[1] + 1.1), b.z - target.pose[2]);
+          if (now - q.at < 4000 && bd < reach && (!best || bd < best.d)) best = { q, d: bd };
+        }
+        if (!best || ++best.q.hits > 12 || !num(m.dist)) return;
+        // the game says how far off they were; it is not believed by more than a couple of metres
+        amount = hitDamage(m.w, 'torso', Math.max(0, m.dist, best.d - 2));
+        m.zone = 'torso';
+        from = [world.barrels[best.q.i].x, world.barrels[best.q.i].z];
+      } else if (rule.blast) {
         // a grenade is not held when it goes off: it has to have been thrown in the last few
         // seconds, and one grenade only reaches so many people
         if (now - c.lastNade > 9000 || ++c.nadeHits > 12 || !num(m.dist)) return;
@@ -464,9 +514,9 @@ function handle(c: Client, m: C2S) {
         amount = hitDamage(m.w, m.zone, d, !!m.sup, num(m.bonus) ? m.bonus : 0);
       }
       if (amount <= 0) return;
-      const len = Math.max(0.001, Math.hypot(target.pose[0] - c.pose[0], target.pose[2] - c.pose[2]));
+      const len = Math.max(0.001, Math.hypot(target.pose[0] - from[0], target.pose[2] - from[1]));
       target.lastHitBy = { id: c.id, name: c.name, w: m.w, zone: m.zone, dist: d, at: now };
-      send(target, { t: 'dmg', from: c.id, amount, zone: m.zone, w: m.w, dir: [(target.pose[0] - c.pose[0]) / len, 0, (target.pose[2] - c.pose[2]) / len] });
+      send(target, { t: 'dmg', from: c.id, amount, zone: m.zone, w: m.w, dir: [(target.pose[0] - from[0]) / len, 0, (target.pose[2] - from[1]) / len] });
       send(c, { t: 'hitok', to: target.id, amount, zone: m.zone });
       return;
     }
@@ -626,7 +676,7 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
     pose: [sp.x, 'y' in sp && sp.y !== undefined ? sp.y : world.groundAt(sp.x, sp.z), sp.z, sp.yaw, 0, 0],
     w: null, m: [], g: [], alive: true,
     inv: resume?.inv ?? null, vitals: resume?.vitals ?? null,
-    lastHit: 0, lastNade: 0, nadeHits: 0, lastChat: 0, lastHitBy: null, openCid: null, activeAt: Date.now(), joinedAt: Date.now(), msgCount: 0, msgWindow: Date.now(),
+    lastHit: 0, lastNade: 0, nadeHits: 0, blasts: [], lastEmote: 0, lastChat: 0, lastHitBy: null, openCid: null, activeAt: Date.now(), joinedAt: Date.now(), msgCount: 0, msgWindow: Date.now(),
   };
   records.delete(key);
   const others = [...clients.values()].map(info);
@@ -638,6 +688,7 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
     stashes: [...boxes.values()].filter((b) => b.kind === 'stash').map((b) => ({ uid: b.cid, x: b.x, y: b.y, z: b.z, rot: b.rot })),
     corpses: [...boxes.values()].filter((b) => b.kind === 'corpse').map((b) => ({ uid: b.cid, x: b.x, y: b.y, z: b.z, rot: b.rot, name: b.name ?? 'Survivor', v: b.v ?? 0 })),
     drops: [...boxes.values()].filter((b) => b.kind === 'drop').map(dropInfo),
+    barrels: [...barrelsGone.keys()],
     spawn: sp,
     me: resume ? { inv: resume.inv!, vitals: resume.vitals ?? { health: 100, energy: 80, water: 80, stamina: MAX_STAMINA, bleeding: false } } : null,
     max: MAX_PLAYERS,
@@ -848,7 +899,7 @@ function tickDrops(anyoneAlive: boolean) {
   }
 }
 
-// A tag taken off somebody is worth a reward once it has been carried for half an hour, so
+// A tag taken off somebody is worth a reward once it has been carried for ten minutes, so
 // the safest thing to do with one was to sit in a bush until the clock ran out. Every half
 // minute the map shows everybody where each carrier is: the tag has to be defended, or run with.
 const TAG_PING_MS = (Number(process.env.TAG_PING_S) || 30) * 1000;
@@ -883,6 +934,13 @@ setInterval(() => {
     }
   }
   tickDrops(alive.length > 0);
+  // a new drum where one went up, once its time has come and nobody is standing on the spot
+  for (const [i, at] of barrelsGone) {
+    const b = world.barrels[i];
+    if (now < at || alive.some((p) => Math.hypot(p.x - b.x, p.z - b.z) < BARREL.clear)) continue;
+    barrelsGone.delete(i);
+    broadcast({ t: 'barrel+', i });
+  }
   kickIdle(now);
   // a line that is not moving still hears from us: a connection that says nothing for long is cut off on the way
   if (queue.length && Date.now() - queueToldAt > 20_000) tellQueue();

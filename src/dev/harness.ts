@@ -120,7 +120,7 @@ export function installHarness(g: Game) {
      * @param o.speed ground speed; o.dir which way it travels relative to where it faces (0 ahead, 1.57 to its left)
      * @param o.view 'side' | 'front' | 'back' | 'three' (three-quarter)
      */
-    async lineup(o: { speed?: number; dir?: number; crouch?: boolean; weapon?: string | string[]; n?: number; dead?: number; air?: boolean; pitch?: number; aim?: boolean; view?: string; name?: string; hit?: boolean; dist?: number; clip?: string; from?: number; to?: number; death?: number; gear?: string[]; act?: string; actDur?: number; step?: number } = {}) {
+    async lineup(o: { speed?: number; dir?: number; crouch?: boolean; weapon?: string | string[]; n?: number; dead?: number; air?: boolean; pitch?: number; aim?: boolean; view?: string; name?: string; hit?: boolean; dist?: number; clip?: string; from?: number; to?: number; death?: number; gear?: string[]; act?: string; actDur?: number; step?: number; emote?: string; emoteDur?: number; hold?: string } = {}) {
       for (const a of row) a.dispose();
       row.length = 0;
       const n = o.n ?? 8;
@@ -158,6 +158,16 @@ export function installHarness(g: Game) {
         if (o.act) {
           a.act(o.act as never, o.actDur ?? 2);
           any.gesture.t = ((i + 0.5) / n) * (o.actDur ?? 2);
+        }
+        // from the wheel: a call's arm movement at successive moments, or a hold (the dance spread over its loop)
+        if (o.hold) {
+          a.setHold(o.hold as never);
+          for (let k = 0; k < 30; k++) a.update(0.05, at, vel, face, false, false);
+          any.clock = (i / n) * any.dur.dance;
+        }
+        if (o.emote) {
+          a.emote(o.emote as never, o.emoteDur ?? 1.6);
+          any.move.t = ((i + 0.5) / n) * (o.emoteDur ?? 1.6);
         }
         a.update(0, at, vel, face, !!o.crouch, dead, false, o.pitch ?? 0, !o.air, !!o.aim);
         if (o.clip) {

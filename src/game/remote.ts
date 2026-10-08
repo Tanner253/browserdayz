@@ -7,7 +7,8 @@ import type RAPIER from '@dimforge/rapier3d-compat';
 import { physics, GLASS_GROUPS, HITBOX_GROUPS, SOLID_GROUPS, type Surface } from '../core/physics';
 import { audio } from '../core/audio';
 import type { Atmosphere } from '../world/atmosphere';
-import { F_AIM, F_BLEED, F_CROUCH, F_DEAD, F_GROUND, type Act, type Pose } from '../net/protocol';
+import { F_AIM, F_BLEED, F_CROUCH, F_DANCE, F_DEAD, F_GROUND, F_SURRENDER, type Act, type Pose } from '../net/protocol';
+import { SHOUT_RANGE, voiceOf, type Emote } from '../sim/emotes';
 import { ITEMS } from '../sim/items';
 import { Avatar } from './avatar';
 import { lookFor } from './look';
@@ -130,6 +131,15 @@ export class RemotePlayer implements Damageable {
     else if (a === 'reload') audio.reloadNear(this.pos, dur, ITEMS[this.weapon ?? '']?.weapon?.kind === 'pistol');
   }
 
+  /** they called something out (see src/sim/emotes.ts): heard from where their head is, and the arms go with it */
+  call(e: Emote, listener: THREE.Vector3) {
+    if (!this.ready || !this.alive) return;
+    if (e.move) this.avatar.emote(e.move, e.dur);
+    const head = this.head(new THREE.Vector3());
+    const d = head.distanceTo(listener);
+    if (d < SHOUT_RANGE) audio.shout(e.id, head, d, voiceOf(this.name));
+  }
+
   /** your shot or blow landed on them: the server decides what it did, this is the flinch and the grunt */
   damage(_amount: number, point: THREE.Vector3, _dir: THREE.Vector3, zone: HitZone): boolean {
     this.flinch = 1;
@@ -143,6 +153,11 @@ export class RemotePlayer implements Damageable {
   /** chest position, for name tags and aim checks */
   chest(out: THREE.Vector3) {
     return out.set(this.pos.x, this.pos.y + (this.crouched ? 0.68 : 1.25), this.pos.z);
+  }
+
+  /** where the mouth is, near enough */
+  head(out: THREE.Vector3) {
+    return out.set(this.pos.x, this.pos.y + (this.crouched ? 1.02 : 1.62), this.pos.z);
   }
 
   update(dt: number, now: number, listener: THREE.Vector3) {
@@ -170,6 +185,9 @@ export class RemotePlayer implements Damageable {
       this.grounded = !!(b.p[5] & F_GROUND);
       this.aiming = !!(b.p[5] & F_AIM);
       this.bleeding = !!(b.p[5] & F_BLEED);
+      this.avatar.setHold(b.p[5] & F_DANCE ? 'dance' : b.p[5] & F_SURRENDER ? 'surrender' : null);
+      // (a weapon coming up to the eye is the end of a wave)
+      if (this.aiming) this.avatar.emote(null);
       const crouched = !!(b.p[5] & F_CROUCH);
       if (crouched !== this.crouched) {
         this.crouched = crouched;

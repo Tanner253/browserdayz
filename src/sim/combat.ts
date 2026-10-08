@@ -26,6 +26,8 @@ export const WEAPON_RULES: Record<string, WeaponRule> = {
   bat: { damage: 30, melee: true, range: 3.9, interval: 0.5, falloff: 1 },
   knife: { damage: 27, melee: true, range: 3.3, interval: 0.3, falloff: 1 },
   grenade: { damage: 150, melee: false, range: 70, interval: 0, falloff: 1, blast: 9 },
+  // a fuel drum somebody shot (see src/sim/barrels.ts): whoever fired may be a rifle shot away
+  barrel: { damage: 140, melee: false, range: 900, interval: 0, falloff: 1, blast: 8 },
 };
 
 const ZONE: Record<HitZone, [bullet: number, melee: number]> = { head: [3.2, 1.6], torso: [1, 1], legs: [0.6, 0.7] };

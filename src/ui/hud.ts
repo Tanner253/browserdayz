@@ -4,6 +4,7 @@
 import type { Vitals } from '../game/player';
 import { MAX_STAMINA, type ChatChannel } from '../net/protocol';
 import { TOUCH } from '../core/device';
+import { EMOTES } from '../sim/emotes';
 import { TAG_HOLD_MIN } from '../sim/items';
 import { AO_MODES, DEFAULT_GRAPHICS, FPS_LIMITS, LEVELS, MSAA, PRESETS, SCALES, VOLUMES, presetOf, saveGraphics, type Graphics, type PresetName } from '../core/settings';
 
@@ -33,6 +34,23 @@ export interface HotbarEntry {
 const X_HANDLE = 'zonaSOL_';
 const CONTRACT = 'GvfAzdPF466PJsPJMzXQeX3TSqmJm9YxAG8xBJ6ypump';
 
+/** the wheel: eight wedges round a hub, the first at the top and the rest clockwise (the order of EMOTES) */
+function wheelSvg() {
+  const n = EMOTES.length, half = Math.PI / n - 0.022, r0 = 58, r1 = 152;
+  const pt = (r: number, a: number) => `${(Math.sin(a) * r).toFixed(1)} ${(-Math.cos(a) * r).toFixed(1)}`;
+  const wedges = EMOTES.map((e, i) => {
+    const a = (i / n) * Math.PI * 2;
+    const d = `M${pt(r0, a - half)}L${pt(r1, a - half)}A${r1} ${r1} 0 0 1 ${pt(r1, a + half)}L${pt(r0, a + half)}A${r0} ${r0} 0 0 0 ${pt(r0, a - half)}Z`;
+    const [x, y] = pt(108, a).split(' ');
+    // two words go on two lines
+    const words = e.label.split(' ');
+    const lines = words.length > 2 ? [words.slice(0, 2).join(' '), words.slice(2).join(' ')] : words.length === 2 && e.label.length > 9 ? words : [e.label];
+    const text = lines.map((l, k) => `<text x="${x}" y="${(Number(y) + (k - (lines.length - 1) / 2) * 17).toFixed(1)}">${l}</text>`).join('');
+    return `<g class="${e.hold ? 'keeps' : ''}"><path d="${d}"/>${text}</g>`;
+  });
+  return `<svg viewBox="-160 -160 320 320" aria-hidden="true">${wedges.join('')}</svg>`;
+}
+
 export class HUD {
   root: HTMLDivElement;
   private el: Record<string, HTMLElement> = {};
@@ -47,6 +65,8 @@ export class HUD {
       <div class="hud-hit"><i></i><i></i><i></i><i></i></div>
       <div class="hud-prompt"></div>
       <div class="hud-mark"></div>
+      <div class="hud-says"></div>
+      <div class="hud-wheel">${wheelSvg()}<i class="wheel-dot"></i><div class="wheel-mid"><b></b><span></span></div></div>
       <div class="hud-progress"><div class="hud-progress-label"></div><div class="hud-progress-bar"><div></div></div></div>
       <div class="hud-compass"><div class="hud-compass-strip"></div><div class="hud-compass-needle"></div></div>
       <div class="hud-bearing"></div>
@@ -162,7 +182,7 @@ export class HUD {
                   <div class="kb-row"><kbd>5</kbd><kbd>6</kbd><kbd>7</kbd><kbd>8</kbd><em>eat · drink · bandage</em></div>
                   <p><kbd>F</kbd> take · doors · search <kbd>G</kbd> hold: drop what you hold</p>
                   <p><kbd class="wide">Tab</kbd> inventory <kbd>M</kbd> map</p>
-                  <p><kbd class="wide">Enter</kbd> chat</p>
+                  <p><kbd class="wide">Enter</kbd> chat <kbd>T</kbd> hold: call out · dance</p>
                   <p><kbd class="wide">Esc</kbd> this menu</p>
                   <p><kbd class="wide">F3</kbd> performance</p>
                 </div>
@@ -178,6 +198,7 @@ export class HUD {
       this.el[k] = this.root.querySelector(`.hud-${k}`) as HTMLElement;
     }
     this.notes = this.root.querySelector('.hud-notes') as HTMLDivElement;
+    for (const [k, sel] of [['wheel', '.hud-wheel'], ['wheelDot', '.wheel-dot'], ['wheelB', '.wheel-mid b'], ['wheelS', '.wheel-mid span'], ['says', '.hud-says']]) this.el[k] = this.root.querySelector(sel) as HTMLElement;
     this.buildCompass();
     (this.root.querySelector('.fatal-btn') as HTMLButtonElement).onclick = () => location.reload();
     const chat = this.root.querySelector('.chat-input') as HTMLInputElement;
@@ -305,6 +326,54 @@ export class HUD {
 
   private toggle(el: HTMLElement, cls: string, on: boolean) {
     if (el.classList.contains(cls) !== on) el.classList.toggle(cls, on);
+  }
+
+  /**
+   * The wheel (hold T).
+   * @param pick the entry the mouse is on (-1 = none) and where the mouse is from the middle, each way -1..1
+   * @param held the id of the thing the body is keeping up now (picking it again stops it)
+   * @param last what a tap of T on its own repeats
+   */
+  wheel(open: boolean, pick = -1, at: [number, number] = [0, 0], held: string | null = null, last = '') {
+    const w = this.el.wheel;
+    this.toggle(w, 'show', open);
+    if (!open) return;
+    w.querySelectorAll('g').forEach((g, i) => {
+      this.toggle(g as unknown as HTMLElement, 'on', i === pick);
+      this.toggle(g as unknown as HTMLElement, 'held', EMOTES[i].id === held);
+    });
+    const dot = this.el.wheelDot.style;
+    dot.setProperty('--x', at[0].toFixed(3));
+    dot.setProperty('--y', at[1].toFixed(3));
+    const e = pick >= 0 ? EMOTES[pick] : null;
+    this.set('wheelB', this.el.wheelB, e ? (e.id === held ? 'Stop' : e.say ?? e.label) : 'Move the mouse');
+    this.set('wheelS', this.el.wheelS, e ? 'let go of T' : last ? `tap T: ${last}` : 'let go to close');
+  }
+
+  private says = new Map<number, HTMLElement>();
+  /**
+   * What somebody near called out, over their head.
+   * @param at where their head is on screen, as fractions of it; null takes the words away
+   * @param age seconds since it was said (it pops in)
+   */
+  say(who: number, text: string, at: [number, number] | null, age = 1) {
+    let el = this.says.get(who);
+    if (!at) {
+      el?.remove();
+      this.says.delete(who);
+      return;
+    }
+    if (!el) {
+      el = document.createElement('div');
+      el.className = 'say';
+      this.el.says.appendChild(el);
+      this.says.set(who, el);
+    }
+    if (el.textContent !== text) el.textContent = text;
+    el.style.left = `${at[0] * 100}%`;
+    el.style.top = `${at[1] * 100}%`;
+    const k = Math.min(1, age / 0.12);
+    el.style.setProperty('--k', (k < 1 ? 0.4 + k * 0.75 : 1.15 - Math.min(0.15, (age - 0.12) * 1.2)).toFixed(3));
   }
 
   note(text: string, kind: 'info' | 'warn' | 'good' = 'info') {

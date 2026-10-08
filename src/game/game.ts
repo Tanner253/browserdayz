@@ -9,7 +9,7 @@ import { audio } from '../core/audio';
 import { Input, NULL_INPUT } from '../core/input';
 import type { Atmosphere } from '../world/atmosphere';
 import type { Terrain } from '../world/terrain';
-import type { Vegetation } from '../world/vegetation';
+import { Barrel, type Vegetation } from '../world/vegetation';
 import type { Grass } from '../world/grass';
 import { Door, type Buildings } from '../world/buildings';
 import { PLAY_RADIUS, heightAt, type World } from '../world/worldgen';
@@ -17,11 +17,14 @@ import { ITEMS, itemName, TAG_HOLD, TAG_HOLD_MIN, capacityOf, hasMod, makeItem, 
 import { PlayerInventory, SLOT_ORDER, type Container } from '../sim/inventory';
 import { Economy, type WorldLoot } from '../sim/economy';
 import { CRATE_RESTOCK, CRATE_SPECS, fillCrate } from '../sim/crates';
+import { WEAPON_RULES } from '../sim/combat';
+import { BARREL } from '../sim/barrels';
+import { EMOTE, EMOTES, EMOTE_GAP, SAY_RANGE, SAY_TIME, voiceOf } from '../sim/emotes';
 import { loadSave, writeSave, type SaveData } from '../sim/save';
 import { Net, playerName, publicId, remoteServer, serverStatus, setPlayerName } from '../net/client';
-import { F_AIM, F_BLEED, F_CROUCH, F_DEAD, F_GROUND, F_SPRINT, MAX_STAMINA, crateId, type Act, type CorpseInfo, type PlayerInfo, type Pose, type S2C, type StashInfo } from '../net/protocol';
+import { F_AIM, F_BLEED, F_CROUCH, F_DANCE, F_DEAD, F_GROUND, F_SPRINT, F_SURRENDER, MAX_STAMINA, crateId, type Act, type CorpseInfo, type PlayerInfo, type Pose, type S2C, type StashInfo } from '../net/protocol';
 import { Player } from './player';
-import { Avatar, AVATAR_LAYER, DEATH_REST, FP_BODY_LAYER, GEAR_SHOWN } from './avatar';
+import { Avatar, AVATAR_LAYER, DEATH_REST, FP_BODY_LAYER, GEAR_SHOWN, type Hold } from './avatar';
 import { lookFor } from './look';
 import { roadLift } from '../world/road';
 import { Dummy } from './character';
@@ -62,8 +65,10 @@ interface TimedAction {
 }
 
 /** bump when the map's loot points change: spawned loot from older saves is re-rolled */
-const LOOT_REV = 7;
+const LOOT_REV = 8;
 const QUICK_KEYS = ['Digit5', 'Digit6', 'Digit7', 'Digit8'];
+/** the wheel: how far the mouse travels from its middle to its rim (pixels), and how far out an entry is picked */
+const WHEEL_REACH = 120, WHEEL_PICK = 0.35;
 const SEND_HZ = 15;
 const _drip = new THREE.Vector3();
 
@@ -199,6 +204,10 @@ export class Game {
       body?.wound(pt, dir, 0.05 + power * 0.04, power > 0.58);
     };
     this.weapons.onShot = (s) => this.net.send({ t: 'shot', o: s.origin.toArray(), d: s.dir.toArray(), w: s.weapon, sup: s.suppressed });
+    // a bullet in a fuel drum
+    this.weapons.onStruck = (owner) => {
+      if (owner instanceof Barrel) this.blowBarrel(owner.i, true);
+    };
     // the bolt, a reload: the same
     this.weapons.onAct = (a, d) => this.act(a, d);
     // a punch or a swing: your own body throws it, and everyone near you sees it
@@ -564,6 +573,9 @@ export class Game {
     for (const s of w.stashes) await this.addRemoteStash(s);
     for (const c of w.corpses) void this.addCorpse(c);
     for (const d of w.drops ?? []) void this.addDrop(d);
+    // the fuel drums that are gone at the moment
+    this.fuses.length = this.drumsBack.length = 0;
+    for (const b of this.s.veg.barrels) b?.setThere(!w.barrels?.includes(b.i));
     for (const p of w.players) void this.addRemote(p);
     const y = w.spawn.y ?? heightAt(world.heights, w.spawn.x, w.spawn.z);
     this.player.spawn(w.spawn.x, y + 0.05, w.spawn.z, w.spawn.yaw);
@@ -606,7 +618,11 @@ export class Game {
         if (!(s[6] & F_DEAD)) r.setAlive(true);
       }
     });
-    net.on('shot', (m) => this.weapons.remoteShot(new THREE.Vector3(...m.o), new THREE.Vector3(...m.d), m.w, m.sup));
+    net.on('shot', (m) => {
+      this.weapons.remoteShot(new THREE.Vector3(...m.o), new THREE.Vector3(...m.d), m.w, m.sup);
+      // (nobody shoots and waves at once)
+      this.remotes.get(m.id)?.avatar.emote(null);
+    });
     net.on('swing', (m) => this.remotes.get(m.id)?.swing());
     net.on('nade', (m) => {
       this.grenades.throw(new THREE.Vector3(...m.o), new THREE.Vector3(...m.v), ITEMS.grenade.throw!.fuse - 0.75, false);
@@ -614,20 +630,29 @@ export class Game {
       this.remotes.get(m.id)?.avatar.swing(true);
     });
     net.on('act', (m) => this.remotes.get(m.id)?.act(m.a, m.d, cam().position));
+    net.on('emote', (m) => {
+      const r = this.remotes.get(m.id), e = EMOTE[m.e];
+      if (!r?.alive || !e?.say) return;
+      r.call(e, cam().position);
+      this.said.set(m.id, { text: e.say, at: performance.now() });
+    });
+    net.on('boom', (m) => this.blowBarrel(m.i, false));
+    net.on('barrel+', (m) => this.s.veg.barrels[m.i]?.setThere(true));
     net.on('gear', (m) => this.remotes.get(m.id) && void this.wear(this.remotes.get(m.id)!.avatar, m.g));
     net.on('dmg', (m) => this.takeHit(m));
     net.on('death', (m) => {
       const k = m.k;
       const me = k.id === net.id;
       const zone = k.zone === 'head' ? ' · headshot' : '';
-      const how = k.by !== null ? `${k.byName} killed ${k.name} · ${ITEMS[k.w]?.name ?? (k.w === 'fists' ? 'fists' : k.w)}${zone}${k.dist > 3 ? ` · ${k.dist} m` : ''}` : `${k.name} died (${k.w})`;
+      const drum = k.w === 'barrel';
+      const how = k.by !== null ? `${k.byName} killed ${k.name} · ${ITEMS[k.w]?.name ?? (drum ? 'fuel drum' : k.w)}${zone}${k.dist > 3 ? ` · ${k.dist} m` : ''}` : `${k.name} died (${k.w})`;
       this.hud.feed(how, k.by === net.id || me);
       if (k.by === net.id) {
         this.weapons.confirmKill();
         this.hud.note(`You killed ${k.name}${zone}${k.dist > 3 ? ` · ${k.dist} m` : ''}`, 'good');
       }
       if (!me) this.remotes.get(k.id)?.avatar.setDeath(k.v ?? 0);
-      if (me) this.deathInfo = k.by !== null ? `Killed by ${k.byName} with ${ITEMS[k.w]?.name ?? 'bare hands'}${zone}. Your body and gear are where you fell.` : `You died of ${k.w}. Your body and gear are where you fell.`;
+      if (me) this.deathInfo = k.by !== null ? `Killed by ${k.byName} with ${drum ? 'a fuel drum' : ITEMS[k.w]?.name ?? 'bare hands'}${zone}. Your body and gear are where you fell.` : `You died of ${k.w}. Your body and gear are where you fell.`;
       else this.remotes.get(k.id)?.setAlive(false);
       if (m.corpse) void this.addCorpse(m.corpse);
     });
@@ -872,10 +897,11 @@ export class Game {
     let amount = m.amount;
     if (m.zone === 'torso') for (const a of this.inv.wear('armor')) amount *= a;
     if (m.zone === 'head') for (const a of this.inv.wear('head')) amount *= a;
-    const blast = m.w === 'grenade';
+    const blast = m.w === 'grenade' || m.w === 'barrel';
     const melee = !blast && !ITEMS[m.w]?.weapon;
     p.damage(amount, blast ? 'an explosion' : melee ? 'a beating' : 'gunshot wounds');
     this.glass = 0;
+    this.setHold(null);
     // a bullet nearly always opens a wound, a blade often, a fist or a bat seldom
     const blade = m.w === 'knife' || m.w === 'machete' || m.w === 'hatchet';
     if (!p.dead && Math.random() < (melee ? (blade ? 0.6 : amount > 25 ? 0.25 : 0) : amount > 12 ? 0.85 : 0.4)) p.bleed();
@@ -908,7 +934,7 @@ export class Game {
     if (this.sendT >= 1 / SEND_HZ) {
       this.sendT = 0;
       const it = this.weapons.equippedItem;
-      const flags = (p.crouched ? F_CROUCH : 0) | (p.sprinting ? F_SPRINT : 0) | (this.weapons.aiming ? F_AIM : 0) | (p.grounded ? F_GROUND : 0) | (p.dead ? F_DEAD : 0) | (p.vitals.bleeding ? F_BLEED : 0);
+      const flags = (p.crouched ? F_CROUCH : 0) | (p.sprinting ? F_SPRINT : 0) | (this.weapons.aiming ? F_AIM : 0) | (p.grounded ? F_GROUND : 0) | (p.dead ? F_DEAD : 0) | (p.vitals.bleeding ? F_BLEED : 0) | (this.hold === 'dance' ? F_DANCE : 0) | (this.hold === 'surrender' ? F_SURRENDER : 0);
       const pose: Pose = [p.pos.x, p.pos.y, p.pos.z, p.yaw, p.pitch, flags];
       this.net.send({ t: 's', p: pose, w: it?.id ?? null, m: it?.mods ?? [] });
     }
@@ -1256,20 +1282,162 @@ export class Game {
     audio.whoosh(0.5);
   }
 
-  /** A grenade has gone off somewhere in the world. */
-  private explode(at: THREE.Vector3, mine: boolean) {
-    const spec = ITEMS.grenade.throw!;
+  // --- the wheel (hold T, see src/sim/emotes.ts)
+  private wheelOn = false;
+  private wheelAt = new THREE.Vector2();
+  private wheelSince = 0;
+  /** what a tap of T on its own repeats, and when we last called anything out */
+  private lastCall = 'hey';
+  private calledAt = -1e9;
+  /** what the body is keeping up (a dance, hands up), and until when the arms are busy with a call */
+  private hold: Hold | null = null;
+  private armsUntil = 0;
+  /** what the people near have just called out: who, the words, when */
+  private said = new Map<number, { text: string; at: number }>();
+
+  /** From the wheel: call something out, or start (or stop) something the body keeps up. */
+  private emote(id: string) {
+    const e = EMOTE[id], p = this.player;
+    if (!e || p.dead || this.use) return;
+    if (e.hold) {
+      this.setHold(this.hold === e.hold ? null : e.hold);
+      return;
+    }
+    const now = performance.now();
+    if (now - this.calledAt < EMOTE_GAP * 1000) return;
+    this.calledAt = now;
+    this.lastCall = id;
+    // a dance stops for it; hands that are up stay up
+    if (this.hold === 'dance') this.setHold(null);
+    if (e.move && !this.hold) {
+      this.avatar.emote(e.move, e.dur);
+      this.armsUntil = now + (e.dur ?? 1.5) * 1000;
+    }
+    audio.shout(id, undefined, 0, voiceOf(playerName()));
+    this.hud.note('“' + e.say + '”');
+    this.net.send({ t: 'emote', e: id });
+  }
+
+  private setHold(h: Hold | null) {
+    if (h === this.hold) return;
+    const p = this.player;
+    // (nobody dances crouched, or in the air)
+    if (h && (!p.grounded || (h === 'dance' && p.crouched))) {
+      this.hud.note(p.grounded ? 'Stand up to dance' : 'Not in the air', 'warn');
+      return;
+    }
+    this.hold = h;
+    this.avatar.setHold(h);
+    if (h) {
+      this.armsUntil = 0;
+      this.avatar.emote(null);
+      this.hud.note(h === 'dance' ? 'Dancing · move to stop' : 'Hands up · move to stop');
+    }
+  }
+
+  /** T held: the mouse picks from the wheel instead of turning the head, and letting go does it. */
+  private updateWheel(ok: boolean, now: number) {
+    const input = this.input;
+    if (ok && !this.wheelOn && input.pressed('KeyT')) {
+      this.wheelOn = true;
+      this.wheelAt.set(0, 0);
+      this.wheelSince = now;
+    }
+    if (!this.wheelOn) return;
+    const at = this.wheelAt;
+    at.x += input.mouseDX / WHEEL_REACH;
+    at.y += input.mouseDY / WHEEL_REACH;
+    if (at.length() > 1) at.normalize();
+    // the first entry is at the top, the rest follow clockwise
+    const n = EMOTES.length;
+    const pick = at.length() > WHEEL_PICK ? ((Math.round((Math.atan2(at.x, -at.y) / (Math.PI * 2)) * n) % n) + n) % n : -1;
+    if (!ok || !input.held('KeyT')) {
+      this.wheelOn = false;
+      // (a tap, the mouse left alone, is the last call again)
+      if (ok) {
+        if (pick >= 0) this.emote(EMOTES[pick].id);
+        else if (now - this.wheelSince < 220) this.emote(this.lastCall);
+      }
+    }
+    this.hud.wheel(this.wheelOn, pick, [at.x, at.y], this.hold, EMOTE[this.lastCall]?.say ?? '');
+  }
+
+  /** The words people near have called out, over their heads: for whoever is close and can see them. */
+  private updateSaid(now: number) {
+    if (!this.said.size) return;
+    const cam = this.s.r.camera;
+    const head = new THREE.Vector3(), dir = new THREE.Vector3();
+    for (const [id, s] of this.said) {
+      const r = this.remotes.get(id);
+      const age = (now - s.at) / 1000;
+      let at: [number, number] | null = null;
+      if (r?.alive && age < SAY_TIME) {
+        r.head(head).y += 0.36;
+        const d = dir.copy(head).sub(cam.position).length();
+        if (d < SAY_RANGE && !physics.raycast(cam.position, dir.divideScalar(d), Math.max(0, d - 0.7), SIGHT_GROUPS)) {
+          head.project(cam);
+          if (head.z < 1 && Math.abs(head.x) < 1.15 && Math.abs(head.y) < 1.15) at = [head.x * 0.5 + 0.5, 0.5 - head.y * 0.5];
+        }
+      } else this.said.delete(id);
+      this.hud.say(id, s.text, at, age);
+    }
+  }
+
+  // fuel drums (see src/sim/barrels.ts): the ones a blast of ours has reached and that are about
+  // to go up, and, playing alone, the ones that are gone and when each is stood up again
+  private fuses: { i: number; t: number }[] = [];
+  private drumsBack: { i: number; t: number }[] = [];
+
+  /**
+   * A fuel drum goes up.
+   * @param mine set off by this player (a bullet, or a blast of theirs that reached it), who
+   *   tells the server and answers for whoever it reaches
+   */
+  private blowBarrel(i: number, mine: boolean) {
+    const b = this.s.veg.barrels[i];
+    if (!b?.there) return;
+    b.setThere(false);
+    // (the server has to hear that it went up before it hears who was hurt)
+    if (mine) this.net.send({ t: 'barrel', i });
+    if (!this.online) this.drumsBack.push({ i, t: BARREL.respawn });
+    this.explode(new THREE.Vector3(b.x, b.y + BARREL.centre, b.z), mine, 'barrel', b.collider);
+  }
+
+  private updateBarrels(dt: number) {
+    for (let k = this.fuses.length - 1; k >= 0; k--) {
+      const f = this.fuses[k];
+      if ((f.t -= dt) > 0) continue;
+      this.fuses.splice(k, 1);
+      this.blowBarrel(f.i, true);
+    }
+    for (let k = this.drumsBack.length - 1; k >= 0; k--) {
+      const f = this.drumsBack[k];
+      const b = this.s.veg.barrels[f.i];
+      // (never stood up round somebody's legs)
+      if ((f.t -= dt) > 0 || Math.hypot(b.x - this.player.pos.x, b.z - this.player.pos.z) < BARREL.clear) continue;
+      this.drumsBack.splice(k, 1);
+      b.setThere(true);
+    }
+  }
+
+  /**
+   * Something has gone off somewhere in the world: a grenade, or a fuel drum.
+   * @param skip what went up, if it is still standing in the way of its own blast
+   */
+  private explode(at: THREE.Vector3, mine: boolean, what: 'grenade' | 'barrel' = 'grenade', skip?: Barrel['collider']) {
+    const drum = what === 'barrel';
+    const spec = drum ? { damage: WEAPON_RULES.barrel.damage, radius: WEAPON_RULES.barrel.blast! } : ITEMS.grenade.throw!;
     const p = this.player, cam = this.s.r.camera;
     const far = at.distanceTo(cam.position);
-    this.effects.explode(at);
-    audio.explosion(at, far);
+    this.effects.explode(at, drum);
+    audio.explosion(at, far, drum);
     if (far < 40) this.weapons.flinch(THREE.MathUtils.clamp(2.2 - far / 14, 0.2, 2));
     /** how much of the blast reaches a point: nothing through a wall, less with every metre */
-    const reach = (to: THREE.Vector3) => {
+    const reach = (to: THREE.Vector3, short = 0.3) => {
       const d = to.distanceTo(at);
       if (d > spec.radius) return 0;
       const ray = to.clone().sub(at);
-      if (physics.raycast(at, ray.normalize(), Math.max(0, d - 0.3), SOLID_GROUPS)) return 0;
+      if (physics.raycast(at, ray.normalize(), Math.max(0, d - short), SOLID_GROUPS, skip)) return 0;
       return Math.pow(1 - d / spec.radius, 1.3);
     };
     // your own body: this game decides it for your own grenade; another player's reaches you through the server
@@ -1279,13 +1447,20 @@ export class Game {
       if (k > 0) {
         let amount = spec.damage * k;
         for (const a of this.inv.wear('armor')) amount *= a;
-        p.damage(amount, 'your own grenade');
+        p.damage(amount, drum ? 'a fuel drum you set off' : 'your own grenade');
         if (amount > 12) p.bleed();
         this.hud.hitFrom(Math.atan2(p.pos.x - at.x, p.pos.z - at.z) - (p.yaw + Math.PI));
         this.meDirty = true;
       }
     }
     if (!mine) return;
+    // the next drum along goes up a moment later
+    for (const b of this.s.veg.barrels) {
+      if (!b?.there || this.fuses.some((f) => f.i === b.i)) continue;
+      const c = new THREE.Vector3(b.x, b.y + BARREL.centre, b.z);
+      // (the look stops short of the drum's own sides, which are in the way of its middle)
+      if (c.distanceTo(at) < spec.radius * BARREL.chainReach && reach(c, 0.5) > 0) this.fuses.push({ i: b.i, t: BARREL.chainDelay + Math.random() * 0.15 });
+    }
     // everyone else it reached: reported one by one, like any other hit
     for (const rp of this.remotes.values()) {
       if (!rp.alive) continue;
@@ -1296,7 +1471,7 @@ export class Game {
       rp.damage(0, chest, dir, 'torso');
       this.effects.bleed(chest, dir, 0.8);
       rp.avatar.wound(chest.clone().addScaledVector(dir, -0.2), dir, 0.09, false);
-      this.net.send({ t: 'hit', to: rp.id, zone: 'torso', w: 'grenade', dist: d, sup: false, bonus: 0 });
+      this.net.send({ t: 'hit', to: rp.id, zone: 'torso', w: what, dist: d, sup: false, bonus: 0 });
     }
     for (const d of this.dummies) {
       const chest = new THREE.Vector3(d.pos.x, d.pos.y + 1.2, d.pos.z);
@@ -1305,7 +1480,7 @@ export class Game {
       const dir = chest.clone().sub(at).normalize();
       this.effects.bleed(chest, dir, 0.8);
       d.avatar.wound(chest.clone().addScaledVector(dir, -0.2), dir, 0.09, false);
-      if (d.damage(spec.damage * k, chest, dir, 'torso')) this.hud.note('Training dummy down · grenade', 'good');
+      if (d.damage(spec.damage * k, chest, dir, 'torso')) this.hud.note(drum ? 'Training dummy down · fuel drum' : 'Training dummy down · grenade', 'good');
     }
   }
 
@@ -1694,8 +1869,17 @@ export class Game {
       this.glass = 0;
       this.glassDown = now;
     }
+    this.updateWheel(playing && !uiOpen && !typing && !TOUCH, now);
+    // a dance, or hands that are up, ends with the first step, shot or anything else done
+    if (this.hold && (!playing || uiOpen || typing || !!this.use || !p.grounded || ['KeyW', 'KeyA', 'KeyS', 'KeyD'].some((k) => input.held(k)) || ['Space', 'KeyC', 'ControlLeft', 'Mouse0', 'Mouse2', 'KeyR', 'KeyG'].some((k) => input.pressed(k)))) this.setHold(null);
+    // and a wave with a trigger pulled or a sight raised
+    if (this.armsUntil > now && (input.pressed('Mouse0') || input.pressed('Mouse2'))) {
+      this.armsUntil = 0;
+      this.avatar.emote(null);
+    }
+    this.weapons.stowed = !!this.hold || this.armsUntil > now;
     const sens = this.glass ? 0.22 : this.weapons.scoped ? 0.28 : this.weapons.aiming ? 0.7 : 1;
-    if (!uiOpen && playing) p.look(input, sens);
+    if (!uiOpen && playing && !this.wheelOn) p.look(input, sens);
 
     const canMove = !uiOpen && playing && !typing;
     const moveInput = canMove ? input : NULL_INPUT;
@@ -1753,8 +1937,9 @@ export class Game {
 
     // weapons + fov
     const fpLive = this.director.blend > 0.9;
-    this.weapons.update(dt, input, cam, fpLive && !uiOpen && playing && !this.use && !typing && !this.glass);
+    this.weapons.update(dt, input, cam, fpLive && !uiOpen && playing && !this.use && !typing && !this.glass && !this.wheelOn && !this.hold);
     this.grenades.update(dt);
+    this.updateBarrels(dt);
     const kind = this.weapons.equippedItem ? ITEMS[this.weapons.equippedItem.id].weapon?.kind : undefined;
     // a sprint opens the view a touch: speed you can feel
     this.director.fovMul = this.glass ? this.glass : this.weapons.scoped ? 0.3 : this.weapons.aiming ? (kind === 'rifle' ? 0.78 : 0.88) : p.sprinting && p.moving > 0.6 ? 1.055 : 1;
@@ -1878,6 +2063,7 @@ export class Game {
 
     const hasCompass = this.hasCompass;
     const heading = THREE.MathUtils.radToDeg(-p.yaw);
+    this.updateSaid(now);
     this.hud.update({
       vitals: v,
       winded: p.outOfBreath,

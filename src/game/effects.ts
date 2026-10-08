@@ -463,17 +463,27 @@ export class Effects {
   }
 
   /** A grenade: a flash, a ball of fire that is smoke a moment later, earth thrown up, and the ground left black. */
-  explode(at: THREE.Vector3) {
+  /** @param fuel a drum of petrol rather than a grenade: more fire, and it burns on where it stood */
+  explode(at: THREE.Vector3, fuel = false) {
     this.flashLight.position.copy(at).setY(at.y + 0.6);
-    this.flashLight.color.setRGB(1, 0.72, 0.4);
-    this.flashLight.intensity = 260;
-    this.flashLight.distance = 30;
-    this.flashT = 0.11;
+    this.flashLight.color.setRGB(1, fuel ? 0.62 : 0.72, fuel ? 0.3 : 0.4);
+    this.flashLight.intensity = fuel ? 420 : 260;
+    this.flashLight.distance = fuel ? 42 : 30;
+    this.flashT = fuel ? 0.17 : 0.11;
     const far = THREE.MathUtils.clamp(at.distanceTo(this.eye) / 40, 1, 2.5);
     const rand = () => new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5);
     // the fire: a moment, but long enough to see
     for (let i = 0; i < 22; i++) {
       this.spawn({ p: at.clone().add(rand().multiplyScalar(0.7)), v: rand().multiplyScalar(6).setY(1.5 + Math.random() * 5), max: 0.34 + Math.random() * 0.3, size: 1.0 * far, grow: 3.4, color: new THREE.Color(5, 2.4, 0.6), alpha: 0.95, gravity: -1.5, drag: 2.6, additive: true });
+    }
+    if (fuel) {
+      // the ball of fire rolling up off it, and what is left burning on the ground
+      for (let i = 0; i < 26; i++) {
+        this.spawn({ p: at.clone().add(rand().multiplyScalar(0.9)).setY(at.y + Math.random() * 0.8), v: rand().multiplyScalar(3.4).setY(3.5 + Math.random() * 5.5), max: 0.55 + Math.random() * 0.5, size: 1.3 * far, grow: 4.2, color: new THREE.Color(3.4, 1.15, 0.18), alpha: 0.95, gravity: -2.4, drag: 1.9, additive: true });
+      }
+      for (let i = 0; i < 14; i++) {
+        this.spawn({ p: at.clone().add(rand().multiplyScalar(1.5)).setY(at.y - 0.3 + Math.random() * 0.25), v: new THREE.Vector3((Math.random() - 0.5) * 0.5, 0.9 + Math.random() * 1.3, (Math.random() - 0.5) * 0.5), max: 1.6 + Math.random() * 2.2, size: 0.5 * far, grow: 0.9, color: new THREE.Color(2.8, 0.95, 0.15), alpha: 0.85, gravity: -0.6, drag: 1.2, additive: true });
+      }
     }
     // the smoke it turns into: dark, tall, and there for a while
     for (let i = 0; i < 44; i++) {

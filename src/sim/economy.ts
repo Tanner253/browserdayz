@@ -8,7 +8,7 @@
 // and in the browser when playing offline.
 
 import type { Usage, LootPoint } from '../world/buildings';
-import { ITEMS, makeItem, type ItemInstance } from './items';
+import { ITEMS, fitAtRandom, makeItem, type ItemInstance } from './items';
 import { fitsPoint } from './placement';
 import { RNG } from '../core/noise';
 
@@ -165,6 +165,7 @@ export class Economy {
     const item = makeItem(id);
     if (def.stack && rule.qty) item.qty = Math.max(1, Math.round(def.stack * this.rng.range(rule.qty[0], rule.qty[1])));
     if (def.weapon && rule.loaded) item.loaded = this.rng.int(rule.loaded[0], Math.min(rule.loaded[1], def.weapon.capacity));
+    if (def.weapon) fitAtRandom(item, () => this.rng.next());
     const l: WorldLoot = {
       uid: item.uid,
       item,

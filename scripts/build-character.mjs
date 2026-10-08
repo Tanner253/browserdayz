@@ -36,6 +36,8 @@ const CLIPS = {
   crouchIdle: 'Crouch_Idle_Loop', crouchWalk: 'Crouch_Fwd_Loop',
   jumpStart: 'Jump_Start', jumpLoop: 'Jump_Loop', jumpLand: 'Jump_Land',
   death: 'Death01', hit: 'Hit_Chest', hitHead: 'Hit_Head',
+  // from the wheel (src/sim/emotes.ts)
+  dance: 'Dance_Loop',
 };
 /**
  * `--emotes`: the same body with a few more clips from the library, written to
@@ -43,7 +45,7 @@ const CLIPS = {
  * mask are left exactly as they are.
  */
 const EMOTES = process.argv.includes('--emotes');
-if (EMOTES) Object.assign(CLIPS, { dance: 'Dance_Loop', talk: 'Idle_Talking_Loop', point: 'Spell_Simple_Shoot', hail: 'Spell_Simple_Idle_Loop', reach: 'Interact', sit: 'Sitting_Idle_Loop', sitTalk: 'Sitting_Talking_Loop' });
+if (EMOTES) Object.assign(CLIPS, { talk: 'Idle_Talking_Loop', point: 'Spell_Simple_Shoot', hail: 'Spell_Simple_Idle_Loop', reach: 'Interact', sit: 'Sitting_Idle_Loop', sitTalk: 'Sitting_Talking_Loop' });
 const HAIR = { hair_buzzed: 'Hair_Buzzed', hair_parted: 'Hair_SimpleParted', hair_long: 'Hair_Long', hair_beard: 'Hair_Beard' };
 /** the long style is cut for the other body in the pack, whose head sits lower and a touch further forward */
 const HAIR_SHIFT = { hair_long: [0, 0.045, -0.004] };

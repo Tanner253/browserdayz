@@ -183,6 +183,8 @@ export class Weapons {
   onAct: (act: 'bolt' | 'reload', dur: number) => void = () => {};
   /** something hit a body (anyone's): where, which way it was travelling, and how hard (1 = a rifle round) */
   onFlesh: (owner: unknown, point: THREE.Vector3, dir: THREE.Vector3, power: number) => void = () => {};
+  /** one of our own bullets landed on something that is not a body: what it belongs to, if anything */
+  onStruck: (owner: unknown) => void = () => {};
   /** a punch or a melee swing has started */
   onSwing: () => void = () => {};
   /** loot models, so consumables can be shown in the hands while they are used */
@@ -196,6 +198,8 @@ export class Weapons {
   private held: { root: THREE.Group; kind: UseKind; t: number; dur: number; size: THREE.Vector3; ending: number } | null = null;
   private heldCache = new Map<string, { root: THREE.Group; size: THREE.Vector3 }>();
   private lowerT = 0;
+  /** the hands are busy with something that is not a weapon (a wave, a dance): it is let down out of the way */
+  stowed = false;
   /** lets the game resolve a collider owner to a damageable entity */
   resolveTarget: (owner: unknown) => Damageable | null = () => null;
   onSlungChange: (obj: THREE.Object3D | null) => void = () => {};
@@ -1101,6 +1105,7 @@ export class Weapons {
             const pivot = (hit.tag?.owner as { pivot?: THREE.Object3D } | undefined)?.pivot;
             this.fx.impact(s, pt, n, true, pivot);
             audio.impact(s, pt, b.ghost ? pt.distanceTo(this.mainCam?.position ?? pt) : dist);
+            if (!b.ghost && hit.tag?.owner) this.onStruck(hit.tag.owner);
           }
           dead = true;
           break;
@@ -1141,7 +1146,7 @@ export class Weapons {
     this.vmScene.environmentIntensity = 0.9 * this.skyVis;
 
     // an item in use takes over the hands; whatever was held drops out of view
-    this.lowerT += ((this.held && !this.held.ending ? 1 : 0) - this.lowerT) * (1 - Math.exp(-10 * dt));
+    this.lowerT += ((this.stowed || (this.held && !this.held.ending) ? 1 : 0) - this.lowerT) * (1 - Math.exp(-10 * dt));
     if (this.held) {
       if (m) m.root.visible = false;
       this.animateHeld(dt);

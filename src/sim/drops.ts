@@ -4,7 +4,7 @@
 // where people meet. Rules and data only: the server runs them in multiplayer, the game
 // itself when playing alone.
 
-import { ITEMS, makeItem } from './items';
+import { ITEMS, fitAtRandom, makeItem } from './items';
 import type { Container } from './inventory';
 import { BUILDING_FOOTPRINT, heightAt, type World } from '../world/worldgen';
 
@@ -51,7 +51,10 @@ export function fillDrop(c: Container, rnd: () => number = Math.random) {
   const put = (id: string, qty?: number) => {
     const def = ITEMS[id];
     const item = makeItem(id, qty ?? (def.stack ? def.stack : 1));
-    if (def.weapon) item.loaded = def.weapon.capacity;
+    if (def.weapon) {
+      item.loaded = def.weapon.capacity;
+      fitAtRandom(item, rnd);
+    }
     c.add(item);
   };
   for (const id of ['mosin', 'p38', 'box_762', 'box_9mm', 'firstaid', 'bandage', 'bandage']) put(id);

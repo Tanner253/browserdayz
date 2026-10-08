@@ -12,7 +12,7 @@ import type { WorldLoot } from '../sim/economy';
 import type { HitZone } from '../sim/combat';
 import type { DropInfo } from '../sim/drops';
 
-export const PROTOCOL = 6;
+export const PROTOCOL = 7;
 
 /** chat channels: everyone on the server, or only players standing near the speaker */
 export type ChatChannel = 'global' | 'near';
@@ -21,6 +21,8 @@ export const CHAT_RANGE = 50;
 
 /** player state flags */
 export const F_CROUCH = 1, F_SPRINT = 2, F_AIM = 4, F_GROUND = 8, F_DEAD = 16, F_BLEED = 32;
+/** what the body is doing for as long as it is left to (see src/sim/emotes.ts): dancing, hands up */
+export const F_DANCE = 64, F_SURRENDER = 128;
 
 /** things a player does with their hands that the people around them can see (and hear) */
 export const ACTS = ['bolt', 'reload', 'eat', 'drink', 'bandage', 'open', 'stop'] as const;
@@ -89,6 +91,10 @@ export type C2S =
   /** a grenade left the hand: where, and how fast */
   | { t: 'nade'; o: [number, number, number]; v: [number, number, number] }
   | { t: 'act'; a: Act; d: number }
+  /** something called out, with the movement that goes with it (an id from src/sim/emotes.ts) */
+  | { t: 'emote'; e: string }
+  /** a bullet of ours found fuel drum number i (see src/sim/barrels.ts), or our blast reached it */
+  | { t: 'barrel'; i: number }
   | { t: 'gear'; g: string[] }
   | { t: 'hit'; to: number; zone: HitZone; w: string; dist: number; sup: boolean; bonus: number }
   | { t: 'take'; uid: string }
@@ -123,6 +129,8 @@ export type S2C =
       me: { inv: SerializedInventory; vitals: Vitals } | null;
       /** supply drops standing in the world now */
       drops?: DropInfo[];
+      /** fuel drums that have gone up and not been stood up again yet */
+      barrels?: number[];
       max: number;
     }
   | { t: 'join'; p: PlayerInfo }
@@ -132,6 +140,10 @@ export type S2C =
   | { t: 'swing'; id: number }
   | { t: 'nade'; id: number; o: [number, number, number]; v: [number, number, number] }
   | { t: 'act'; id: number; a: Act; d: number }
+  | { t: 'emote'; id: number; e: string }
+  /** fuel drum number i went up, set off by this player; and a new one has been stood in its place */
+  | { t: 'boom'; i: number; by: number }
+  | { t: 'barrel+'; i: number }
   | { t: 'gear'; id: number; g: string[] }
   | { t: 'dmg'; from: number; amount: number; zone: HitZone; w: string; dir: [number, number, number] }
   | { t: 'hitok'; to: number; amount: number; zone: HitZone }

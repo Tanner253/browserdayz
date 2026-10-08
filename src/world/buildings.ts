@@ -832,8 +832,9 @@ export class Buildings {
       if (kind === 'metal_trash_can') kind += rng.chance(0.5) ? '@0' : '@1';
       const gy = heightAt(this.world.heights, p.x, p.z) + (kind === 'old_tyre' ? 0.08 : 0);
       this.world.props.push({ kind, x: p.x, y: gy, z: p.z, rot: rng.range(0, Math.PI * 2), scale: 1 });
-      if (kind === 'Barrel_01' || kind === 'barrel_03') {
-        // small things get left on top of a barrel
+      if (kind === 'barrel_03') {
+        // small things get left on top of a barrel (a water barrel: nothing is left on a
+        // fuel drum, which may not be there in a minute)
         const top = assets.manifest.models[kind].max[1];
         this.lootPoints.push({ x: p.x, y: gy + top + 0.003, z: p.z, usage: bp.usage, building: plot.id, floor: false, surf: { x: p.x, z: p.z, rot: 0, hx: 0.17, hz: 0.17, clear: 10 } });
       }

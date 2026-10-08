@@ -6,6 +6,80 @@ import type { Surface } from './physics';
 
 type V3 = { x: number; y: number; z: number };
 
+/**
+ * How much of a loud sound comes back from round about: [in the open, under a roof]. Open
+ * country answers once, quietly, and rumbles for a second; it is not a cave. With these a
+ * rifle's echo is some 14 dB under the shot itself (it was 5), and a room has none.
+ */
+const WET = { tail: [0.15, 0.04], slap: [0.075, 0.01], room: [0, 0.4] } as const;
+
+// What is called out from the wheel (src/sim/emotes.ts). There are no recordings in this
+// game, and a voice is made the way everything else in it is: a buzz at the pitch of the
+// throat, three resonances that move as the mouth does, breath for an H and hiss for an S.
+
+/** where the mouth is for each sound: its three resonances, Hz */
+const MOUTH: Record<string, [number, number, number]> = {
+  i: [300, 2250, 2950], // bEAt
+  I: [410, 1950, 2550], // bIt
+  e: [490, 2050, 2650], // the start of hEY
+  E: [600, 1800, 2500], // bEt
+  a: [720, 1700, 2450], // bAt
+  A: [760, 1180, 2550], // fAther, and the start of mY
+  o: [540, 920, 2450], // the start of Over
+  U: [410, 950, 2350], // and the end of it
+  R: [480, 1320, 1650], // hER
+  l: [360, 1050, 2750],
+  r: [340, 1100, 1500],
+  w: [300, 650, 2300],
+  m: [270, 1050, 2300],
+  n: [270, 1550, 2550],
+  N: [270, 2050, 2650], // thaNks
+};
+
+/**
+ * One sound of a word. m: the mouth; d: seconds; v: how much voice (1 unless said); h: breath
+ * through the mouth; s: [pitch, level] of a hiss made at the teeth, which the mouth does not
+ * shape; p: the mouth is shut for this long and opens with a puff at [pitch, level]; g:
+ * seconds the mouth takes to get here from the sound before.
+ */
+interface Phone {
+  m: string;
+  d: number;
+  v?: number;
+  h?: number;
+  s?: [number, number];
+  p?: [number, number];
+  g?: number;
+}
+
+/** each call: its sounds, and its tune as [how far through, pitch as a multiple of the speaker's own] */
+const CALLS: Record<string, { say: Phone[]; tune: [number, number][] }> = {
+  hey: {
+    say: [{ m: 'e', d: 0.08, v: 0, h: 1 }, { m: 'e', d: 0.15 }, { m: 'i', d: 0.26, g: 0.2 }],
+    tune: [[0, 1.2], [0.3, 1.5], [1, 0.82]],
+  },
+  here: {
+    say: [{ m: 'o', d: 0.11 }, { m: 'U', d: 0.07, g: 0.07 }, { m: 'U', d: 0.055, v: 0.45, s: [3200, 0.1] }, { m: 'R', d: 0.13, g: 0.06 }, { m: 'I', d: 0.07, v: 0, h: 1 }, { m: 'I', d: 0.13 }, { m: 'R', d: 0.24, g: 0.16 }],
+    tune: [[0, 1.35], [0.2, 1.2], [0.5, 1.1], [0.62, 1.55], [1, 0.85]],
+  },
+  help: {
+    say: [{ m: 'E', d: 0.07, v: 0, h: 1 }, { m: 'E', d: 0.17 }, { m: 'l', d: 0.12, v: 0.8, g: 0.08 }, { m: 'l', d: 0.075, v: 0, p: [900, 0.5] }, { m: 'E', d: 0.06, v: 0, h: 0.5 }],
+    tune: [[0, 1.3], [0.35, 1.6], [1, 1.05]],
+  },
+  friendly: {
+    say: [{ m: 'r', d: 0.09, v: 0, s: [5200, 0.3] }, { m: 'r', d: 0.07, v: 0.8 }, { m: 'E', d: 0.14, g: 0.07 }, { m: 'n', d: 0.07, v: 0.5 }, { m: 'n', d: 0.035, v: 0.2, p: [3600, 0.22] }, { m: 'l', d: 0.07, v: 0.8 }, { m: 'i', d: 0.22, g: 0.08 }],
+    tune: [[0, 1.2], [0.3, 1.5], [0.6, 1.15], [1, 0.95]],
+  },
+  omw: {
+    say: [{ m: 'A', d: 0.13 }, { m: 'n', d: 0.07, v: 0.5 }, { m: 'm', d: 0.07, v: 0.5 }, { m: 'A', d: 0.1 }, { m: 'I', d: 0.1, g: 0.1 }, { m: 'w', d: 0.08, v: 0.7, g: 0.06 }, { m: 'e', d: 0.14, g: 0.07 }, { m: 'i', d: 0.2, g: 0.15 }],
+    tune: [[0, 1.15], [0.15, 1.3], [0.45, 1.2], [0.7, 1.5], [1, 0.85]],
+  },
+  thanks: {
+    say: [{ m: 'a', d: 0.085, v: 0, s: [6200, 0.13] }, { m: 'a', d: 0.2 }, { m: 'N', d: 0.09, v: 0.5 }, { m: 'N', d: 0.05, v: 0, p: [1900, 0.4] }, { m: 'N', d: 0.17, v: 0, s: [6500, 0.26] }],
+    tune: [[0, 1.45], [0.35, 1.3], [1, 0.9]],
+  },
+};
+
 export class AudioEngine {
   ctx!: AudioContext;
   private master!: GainNode;
@@ -57,18 +131,18 @@ export class AudioEngine {
 
     // outdoor reverb: diffuse decaying noise impulse
     this.reverb = ctx.createConvolver();
-    const len = ctx.sampleRate * 3.2;
+    const len = Math.floor(ctx.sampleRate * 2.2);
     const ir = ctx.createBuffer(2, len, ctx.sampleRate);
     for (let c = 0; c < 2; c++) {
       const ch = ir.getChannelData(c);
       for (let i = 0; i < len; i++) {
         const t = i / ctx.sampleRate;
-        ch[i] = (Math.random() * 2 - 1) * Math.exp(-t * 2.1) * (t < 0.02 ? t / 0.02 : 1);
+        ch[i] = (Math.random() * 2 - 1) * Math.exp(-t * 3.2) * (t < 0.02 ? t / 0.02 : 1);
       }
     }
     this.reverb.buffer = ir;
     this.reverbSend = ctx.createGain();
-    this.reverbSend.gain.value = 0.35;
+    this.reverbSend.gain.value = WET.tail[0];
     const revLP = ctx.createBiquadFilter();
     revLP.type = 'lowpass';
     revLP.frequency.value = 2400;
@@ -78,7 +152,7 @@ export class AudioEngine {
     this.echo = ctx.createDelay(2);
     this.echo.delayTime.value = 0.62;
     const echoGain = (this.echoGain = ctx.createGain());
-    echoGain.gain.value = 0.28;
+    echoGain.gain.value = WET.slap[0];
     const echoLP = ctx.createBiquadFilter();
     echoLP.type = 'lowpass';
     echoLP.frequency.value = 900;
@@ -87,20 +161,22 @@ export class AudioEngine {
 
     // a room: short, bright, close reflections. Silent until you are under a roof.
     const room = ctx.createConvolver();
-    const rl = Math.floor(ctx.sampleRate * 0.5);
+    const rl = Math.floor(ctx.sampleRate * 0.35);
     const rir = ctx.createBuffer(2, rl, ctx.sampleRate);
+    // a few hard early reflections off the walls, then a quick diffuse tail. The reflections
+    // come at uneven moments: evenly spaced they are a note, and the room rings like a pipe.
+    const early: [number, number][] = [[0.007, 0.8], [0.0125, -0.65], [0.019, 0.55], [0.0275, -0.45], [0.037, 0.35], [0.049, -0.27], [0.064, 0.2]];
     for (let c = 0; c < 2; c++) {
       const ch = rir.getChannelData(c);
       for (let i = 0; i < rl; i++) {
         const t = i / ctx.sampleRate;
-        // a few hard early reflections off the walls, then a quick diffuse tail
-        const early = i % Math.floor(ctx.sampleRate * (0.011 + c * 0.003)) === 0 && t < 0.09 ? 0.9 : 0;
-        ch[i] = ((Math.random() * 2 - 1) * Math.exp(-t * 11) + early * Math.exp(-t * 20)) * (t < 0.004 ? t / 0.004 : 1);
+        ch[i] = (Math.random() * 2 - 1) * Math.exp(-t * 16) * (t < 0.004 ? t / 0.004 : 1) * 0.5;
       }
+      for (const [at, v] of early) ch[Math.floor(ctx.sampleRate * at * (c ? 1.13 : 1))] += v;
     }
     room.buffer = rir;
     this.roomSend = ctx.createGain();
-    this.roomSend.gain.value = 0;
+    this.roomSend.gain.value = WET.room[0];
     this.roomSend.connect(room).connect(this.master);
 
     this.amb = ctx.createGain();
@@ -125,9 +201,10 @@ export class AudioEngine {
     if (!this.ready || indoors === this.indoors) return;
     this.indoors = indoors;
     const t = this.ctx.currentTime;
-    this.roomSend.gain.setTargetAtTime(indoors ? 0.55 : 0, t, 0.25);
-    this.reverbSend.gain.setTargetAtTime(indoors ? 0.1 : 0.35, t, 0.25);
-    this.echoGain.gain.setTargetAtTime(indoors ? 0.04 : 0.28, t, 0.25);
+    const i = indoors ? 1 : 0;
+    this.roomSend.gain.setTargetAtTime(WET.room[i], t, 0.25);
+    this.reverbSend.gain.setTargetAtTime(WET.tail[i], t, 0.25);
+    this.echoGain.gain.setTargetAtTime(WET.slap[i], t, 0.25);
     this.ambLP.frequency.setTargetAtTime(indoors ? 900 : 18000, t, 0.4);
     this.amb.gain.setTargetAtTime(indoors ? 0.45 : 1, t, 0.4);
   }
@@ -218,7 +295,15 @@ export class AudioEngine {
     const big = kind === 'rifle';
     // 7.62x39: sharper and shorter than the full-power Mosin round
     const mid = intermediate ? 0.72 : 1;
-    const out = this.out(pos, big ? 12 : 8, 1, distance);
+    let out = this.out(pos, big ? 12 : 8, 1, distance);
+    if (!pos) {
+      // your own shot plays into a node of its own. What goes to the hills is tapped from
+      // here, and tapping the shared one sent every other sound in the game there as well,
+      // for good: one more helping with each shot fired, until a footstep rang like a cave.
+      const own = ctx.createGain();
+      own.connect(this.sfx);
+      out = own;
+    }
     const send = ctx.createGain();
     // the echo off the hills is taken before the sound is placed in space: it has to fall off
     // with distance by itself, or a shot across the valley rings as loud as your own
@@ -712,8 +797,9 @@ export class AudioEngine {
   /**
    * A grenade going off. Close, it is a crack and a blow to the chest; far off, a dull thump
    * and the hills answering.
+   * @param drum a fuel drum rather than a grenade: the steel tearing, and the fuel going up after it
    */
-  explosion(pos: V3, distance: number) {
+  explosion(pos: V3, distance: number, drum = false) {
     if (!this.ready) return;
     const ctx = this.ctx;
     const t = ctx.currentTime + distance / 343;
@@ -745,6 +831,25 @@ export class AudioEngine {
     o.connect(og).connect(out);
     o.start(t);
     o.stop(t + 1.2);
+    if (!drum) return;
+    // the drum itself: a struck, hollow ring that drops as it tears open
+    const ring = this.noise(t, 0.7);
+    const rf = this.filter('bandpass', 520, 9);
+    rf.frequency.setValueAtTime(560, t);
+    rf.frequency.exponentialRampToValueAtTime(240, t + 0.55);
+    const rg = ctx.createGain();
+    this.env(rg, t, 3.2, 0.002, 0.55);
+    ring.connect(rf).connect(rg).connect(out);
+    // and the fuel: a slower, softer rush of flame behind the bang
+    const rush = this.noise(t + 0.06, 1.7);
+    const wf = this.filter('lowpass', 900, 0.6);
+    wf.frequency.setValueAtTime(1400, t + 0.06);
+    wf.frequency.exponentialRampToValueAtTime(180, t + 1.5);
+    const wg = ctx.createGain();
+    wg.gain.setValueAtTime(0.0001, t + 0.06);
+    wg.gain.exponentialRampToValueAtTime(1.5, t + 0.3);
+    wg.gain.exponentialRampToValueAtTime(0.0001, t + 1.7);
+    rush.connect(wf).connect(wg).connect(out);
   }
 
   ui(kind: 'pickup' | 'drop' | 'open' | 'close' | 'eat' | 'drink' | 'bandage' | 'move' | 'smoke') {
@@ -887,6 +992,115 @@ export class AudioEngine {
     lfo.start(t);
     o.stop(t + 1);
     lfo.stop(t + 1);
+  }
+
+  // ------------------------------------------------------------ voices
+
+  /**
+   * Somebody calls out (see CALLS above, and src/sim/emotes.ts).
+   * @param pos where they stand (their head); none for the player's own voice
+   * @param voice whose voice, 0..1: from a low, broad one to a higher, thinner one
+   */
+  shout(id: string, pos?: V3, distance = 0, voice = 0.5) {
+    const call = CALLS[id];
+    if (!this.ready || !call) return;
+    const ctx = this.ctx;
+    const t0 = ctx.currentTime + 0.02 + distance / 343;
+    const total = call.say.reduce((s, p) => s + p.d, 0);
+    const end = t0 + total;
+    const pitch = 108 + voice * 52;
+    const size = 0.95 + voice * 0.11;
+    // a node of this voice's own (see gunshot): out in the world from where they stand, or
+    // straight to the ears, a little quieter, when it is your own
+    const bus = ctx.createGain();
+    bus.gain.value = pos ? 1 : 0.55;
+    bus.connect(pos ? this.out(pos, 6, 1.1, distance) : this.sfx);
+    // a raised voice carries a little way into the country as well
+    const far = ctx.createGain();
+    far.gain.value = 0.3 * (pos ? Math.pow(6 / (6 + Math.max(0, distance - 6)), 0.9) : 1);
+    bus.connect(far);
+    far.connect(this.reverbSend);
+    far.connect(this.roomSend);
+
+    // the throat: never quite steady, and rough with the effort of shouting
+    const osc = ctx.createOscillator();
+    osc.type = 'sawtooth';
+    for (const [k, mul] of call.tune) {
+      if (k === 0) osc.frequency.setValueAtTime(pitch * mul, t0);
+      else osc.frequency.linearRampToValueAtTime(pitch * mul, t0 + k * total);
+    }
+    const waver = (hz: number, cents: number) => {
+      const o = ctx.createOscillator();
+      o.frequency.value = hz;
+      const g = ctx.createGain();
+      g.gain.value = cents;
+      o.connect(g).connect(osc.detune);
+      o.start(t0);
+      o.stop(end + 0.3);
+    };
+    waver(5.4 + voice, 16);
+    waver(29 + voice * 9, 9);
+    const voiced = ctx.createGain();
+    voiced.gain.value = 0;
+    osc.connect(this.filter('lowpass', 3400, 0.5)).connect(voiced);
+    // breath, through the same mouth
+    const breath = ctx.createGain();
+    breath.gain.value = 0;
+    this.noise(t0, total + 0.15).connect(this.filter('bandpass', 1800, 0.4)).connect(breath);
+    // the mouth: its three resonances side by side, each as loud as it should be (the upper two
+    // are what tell an EE from an OO, and a shout has plenty of both). Every other one is
+    // turned over, or they cancel each other in between.
+    const mouth = [this.filter('bandpass', 500, 5), this.filter('bandpass', 1500, 8), this.filter('bandpass', 2500, 9)];
+    const lips = ctx.createGain();
+    lips.gain.value = 0.8;
+    const low = this.filter('highpass', 130);
+    low.connect(lips).connect(bus);
+    mouth.forEach((f, i) => {
+      const g = ctx.createGain();
+      g.gain.value = [1, -0.62, 0.4][i];
+      voiced.connect(f);
+      breath.connect(f);
+      f.connect(g).connect(low);
+    });
+    // hiss made at the teeth, and the puff as a shut mouth opens: neither is shaped by it
+    const hissAt = this.filter('bandpass', 5000, 1.6);
+    const hiss = ctx.createGain();
+    hiss.gain.value = 0;
+    this.noise(t0, total + 0.15).connect(hissAt).connect(hiss).connect(bus);
+    const puffAt = this.filter('bandpass', 1500, 1.2);
+    const puff = ctx.createGain();
+    puff.gain.value = 0;
+    this.noise(t0, total + 0.15).connect(puffAt).connect(puff).connect(bus);
+
+    let t = t0;
+    let was: number[] | null = null;
+    for (const ph of call.say) {
+      // (a shout opens the jaw: the lowest resonance sits higher than in talk)
+      const to = MOUTH[ph.m].map((f, i) => f * size * (i ? 1 : 1.08));
+      const glide = Math.min(ph.d, ph.g ?? 0.05);
+      mouth.forEach((f, i) => {
+        if (!was) f.frequency.setValueAtTime(to[i], t);
+        else {
+          f.frequency.setValueAtTime(was[i], t);
+          f.frequency.linearRampToValueAtTime(to[i], t + glide);
+        }
+      });
+      was = to;
+      const v = ph.v ?? (ph.p ? 0 : 1);
+      voiced.gain.setTargetAtTime(v, t, ph.p ? 0.006 : 0.014);
+      breath.gain.setTargetAtTime(ph.p ? 0 : (ph.h ?? 0) * 1.5 + v * 0.05, t, 0.012);
+      if (ph.s) hissAt.frequency.setValueAtTime(ph.s[0], t);
+      hiss.gain.setTargetAtTime(ph.s ? ph.s[1] : 0, t, 0.012);
+      t += ph.d;
+      if (ph.p) {
+        puffAt.frequency.setValueAtTime(ph.p[0], t);
+        puff.gain.setValueAtTime(ph.p[1], t);
+        puff.gain.setTargetAtTime(0, t + 0.004, 0.011);
+      }
+    }
+    for (const g of [voiced, breath, hiss]) g.gain.setTargetAtTime(0, end, 0.03);
+    osc.start(t0);
+    osc.stop(end + 0.3);
   }
 
   // ------------------------------------------------------------ ambience

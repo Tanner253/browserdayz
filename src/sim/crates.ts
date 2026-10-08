@@ -3,7 +3,7 @@
 // opened, and refill some time after being emptied. Pure data + rules, shared with the
 // future server.
 
-import { ITEMS, makeItem } from './items';
+import { ITEMS, fitAtRandom, makeItem } from './items';
 import type { Container } from './inventory';
 
 type Table = [id: string, weight: number][];
@@ -55,7 +55,10 @@ export function fillCrate(c: Container, kind: string, rnd: () => number = Math.r
     }
     const def = ITEMS[id];
     const item = makeItem(id, def.stack ? Math.max(1, Math.round(def.stack * (0.2 + rnd() * 0.45))) : 1);
-    if (def.weapon) item.loaded = Math.floor(rnd() * (def.weapon.capacity / 2 + 1));
+    if (def.weapon) {
+      item.loaded = Math.floor(rnd() * (def.weapon.capacity / 2 + 1));
+      fitAtRandom(item, rnd);
+    }
     c.add(item);
   }
 }

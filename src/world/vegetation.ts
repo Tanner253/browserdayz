@@ -10,6 +10,7 @@ import { extractParts, groundParts, type MeshPart } from '../core/gltf-utils';
 import { antiFirefly, SHADOW_FRUSTA, type Atmosphere } from './atmosphere';
 import { foliagePatch, setLodFade, wind } from './foliage';
 import type { Instance, World } from './worldgen';
+import { BARREL } from '../sim/barrels';
 
 interface Level {
   meshes: THREE.InstancedMesh[];
@@ -144,6 +145,12 @@ class LodSet {
   /** level distances changed (graphics option): redo the buffers on the next update */
   invalidate() {
     this.at.x = Infinity;
+  }
+
+  /** take one of them out of the world, or put it back */
+  show(i: number, on: boolean) {
+    this.far[i] = on ? this.instances[i].far ?? Infinity : -1;
+    this.invalidate();
   }
 
   update(cam: THREE.Vector3, frustum: THREE.Frustum) {
@@ -441,6 +448,22 @@ void main() {
 
 // ------------------------------------------------------------------ system
 
+/** A fuel drum (see src/sim/barrels.ts): the red barrel that goes up when a bullet finds it. */
+export class Barrel {
+  /** false from going up until a new one is stood in its place */
+  there = true;
+  collider!: RAPIER.Collider;
+
+  /** @param i its number: the same drum has the same one in every game and on the server */
+  constructor(readonly i: number, readonly x: number, readonly y: number, readonly z: number, private set: LodSet) {}
+
+  setThere(on: boolean) {
+    this.there = on;
+    this.set.show(this.i, on);
+    this.collider.setEnabled(on);
+  }
+}
+
 export class Vegetation {
   private sets: LodSet[] = [];
   /** trees and bushes: the range of the full-detail model, which the foliage option scales */
@@ -451,6 +474,8 @@ export class Vegetation {
   barkMats = new Map<string, THREE.MeshStandardMaterial>();
   /** crate props (with their colliders) that the game turns into searchable containers */
   crates: { kind: string; x: number; y: number; z: number; rot: number; collider: RAPIER.Collider }[] = [];
+  /** the fuel drums, by number */
+  barrels: Barrel[] = [];
 
   constructor(private world: World, private atmo: Atmosphere) {}
 
@@ -649,11 +674,14 @@ export class Vegetation {
             }
           } else if (SOLID[id]) {
             const [surface, shrink] = SOLID[id];
-            for (const it of instances) {
+            instances.forEach((it, n) => {
               const hx = (size.x * it.scale) / 2, hy = (size.y * it.scale) / 2, hz = (size.z * it.scale) / 2;
-              const col = physics.addStatic(physics.R.ColliderDesc.cuboid(hx * shrink, hy, hz * shrink), surface, { x: it.x, y: it.y + hy, z: it.z }, it.rot);
+              // a bullet that lands on a fuel drum has to know which one it was
+              const drum = kind === BARREL.kind ? (this.barrels[n] = new Barrel(n, it.x, it.y, it.z, set)) : undefined;
+              const col = physics.addStatic(physics.R.ColliderDesc.cuboid(hx * shrink, hy, hz * shrink), surface, { x: it.x, y: it.y + hy, z: it.z }, it.rot, drum);
+              if (drum) drum.collider = col;
               if (CRATE_KINDS.has(id)) this.crates.push({ kind: id, x: it.x, y: it.y, z: it.z, rot: it.rot, collider: col });
-            }
+            });
           }
         }
       }),

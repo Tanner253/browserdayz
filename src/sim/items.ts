@@ -237,6 +237,24 @@ export function makeItem(id: string, qty?: number): ItemInstance {
   return it;
 }
 
+/**
+ * Now and then a gun is found with something already fitted to it: [what, how often], one
+ * roll each. The scope is the best thing on the map and stays the rarest: one rifle in
+ * forty has one on it. (Each is still found on its own as well: see TYPES in economy.ts.)
+ */
+export const FITTED: Record<string, [string, number][]> = {
+  mosin: [['pu_scope', 0.025], ['rifle_wrap', 0.12]],
+  p38: [['suppressor_9', 0.08], ['mag_p38_ext', 0.12]],
+};
+
+/** Rolls for what a gun put into the world comes with. @param rnd 0..1, the caller's own dice */
+export function fitAtRandom(item: ItemInstance, rnd: () => number): ItemInstance {
+  for (const [mod, chance] of FITTED[item.id] ?? []) {
+    if (rnd() < chance && !item.mods?.includes(mod)) (item.mods ??= []).push(mod);
+  }
+  return item;
+}
+
 export function hasMod(it: ItemInstance | null | undefined, id: string) {
   return !!it?.mods?.includes(id);
 }
