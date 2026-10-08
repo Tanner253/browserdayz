@@ -725,6 +725,11 @@ export class Game {
         this.hud.note('Someone is carrying a tag: they are marked on the map (M)', 'good');
       }
     });
+    // what became of a tag we cashed in (paid, on its way, why not)
+    net.on('tell', (m) => {
+      this.hud.note(m.text, m.kind);
+      this.hud.chatLine('system', '', m.text);
+    });
     net.on('cashed', (m) => {
       const text = `${m.name} cashed in ${m.owner}'s dog tag.`;
       this.hud.chatLine('system', '', text);

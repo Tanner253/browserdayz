@@ -1052,6 +1052,8 @@ kbd.hot { color: #121413; background: linear-gradient(#d8c594, #b89f66); border-
 .rw-pay svg { flex: none; width: 38px; height: 30px; color: var(--accent); }
 .rw-pay p { margin: 0; font-size: 16px; line-height: 1.35; color: var(--ink); }
 .rw-pay small { display: block; margin-top: 3px; font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); }
+.rw-pay small a { color: inherit; }
+.rw-pay b { color: var(--accent); }
 .rw-row { display: flex; gap: 8px; }
 .rw-input { flex: 1; min-width: 0; padding: 10px 11px; font-family: var(--mono); font-size: 13px; color: var(--ink); background: rgba(233, 228, 216, 0.06); border: 1px solid var(--line); outline: none; user-select: text; -webkit-user-select: text; }
 .rw-input:focus { border-color: var(--accent); }

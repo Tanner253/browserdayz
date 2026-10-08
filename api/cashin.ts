@@ -1,30 +1,37 @@
-// Called by the game server when a dog tag has been held for the full ten minutes.
-// The call carries only an id. This function then asks the game server itself for that
-// entry, so nobody can add a name to the payout list by calling this address: the game
-// server is the only source of what was cashed in. The entry is kept in Vercel Blob, where
-// it outlives the game server's restarts (it has no disk of its own).
+// Called by the game server when a dog tag has been held for the full ten minutes, and
+// again for as long as that tag has not been settled.
+//
+// The call carries only an id. This function asks the game server itself for that entry, so
+// nobody can add a name to the payout list, or have a wallet paid, by calling this address:
+// the game server is the only source of what was cashed in, and an id it does not know is
+// turned away before anything else is done. The entry is kept in Vercel Blob, which outlives
+// the game server's restarts; the tag is then paid, if payouts are on: see _lib/payouts.ts.
+// (A tag still unsettled when the game server restarts and forgets it is finished by the
+// housekeeping, api/tick.ts, from the book.)
 
-import { put } from '@vercel/blob';
+import { live } from './_lib/live.js';
+import { handle, readBook, type Entry, type World } from './_lib/payouts.js';
 
 const GAME = process.env.GAME_SERVER_URL ?? 'https://browserdayz.onrender.com';
 
-async function record(request: Request): Promise<Response> {
+export async function record(request: Request, w: World = live(), game = GAME): Promise<Response> {
   const id = new URL(request.url).searchParams.get('id') ?? '';
   if (!/^[a-z0-9]{8,40}$/.test(id)) return Response.json({ error: 'bad id' }, { status: 400 });
-  const r = await fetch(`${GAME}/cashins/${id}`, { cache: 'no-store' }).catch(() => null);
+  const r = await fetch(`${game}/cashins/${id}`, { cache: 'no-store', signal: AbortSignal.timeout(15_000) }).catch(() => null);
   if (!r || !r.ok) return Response.json({ error: 'the game server does not know that cash-in' }, { status: 404 });
   const e = (await r.json()) as Record<string, unknown>;
-  const entry = {
+  const entry: Entry = {
     id,
-    at: String(e.at ?? new Date().toISOString()).slice(0, 30),
+    at: String(e.at ?? new Date(w.now()).toISOString()).slice(0, 30),
     name: String(e.name ?? '').slice(0, 24),
     owner: String(e.owner ?? '').slice(0, 24),
     wallet: String(e.wallet ?? '').slice(0, 44),
   };
-  // one small file per cash-in: nothing to lose if two arrive at once
-  await put(`cashins/${entry.at.replace(/[^0-9TZ-]/g, '-')}_${id}.json`, JSON.stringify(entry), { access: 'public', contentType: 'application/json', addRandomSuffix: false, allowOverwrite: true });
-  return Response.json({ ok: true });
+  // one small file per cash-in, written the first time it is heard of: the record as it came, whatever happens to the book
+  if (!(await readBook(w.store)).rows.some((x) => x.id === id)) await w.store.create(`cashins/${entry.at.replace(/[^0-9TZ-]/g, '-')}_${id}.json`, entry);
+  const payout = await handle(w, entry);
+  return Response.json({ ok: true, payout }, { headers: { 'cache-control': 'no-store' } });
 }
 
-export const GET = record;
-export const POST = record;
+export const GET = (request: Request) => record(request);
+export const POST = (request: Request) => record(request);

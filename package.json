@@ -7,13 +7,15 @@
     "dev": "vite",
     "server": "tsx server/index.ts",
     "dev:server": "tsx watch server/index.ts",
-    "build": "tsc --noEmit && tsc -p tsconfig.server.json && vite build",
+    "build": "tsc --noEmit && tsc -p tsconfig.server.json && tsc -p tsconfig.api.json && vite build",
     "start": "tsx server/index.ts",
     "preview": "vite preview",
     "assets": "node scripts/fetch-assets.mjs",
     "character": "node scripts/build-character.mjs",
-    "typecheck": "tsc --noEmit && tsc -p tsconfig.server.json",
-    "film": "node scripts/film.mjs"
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.server.json && tsc -p tsconfig.api.json",
+    "film": "node scripts/film.mjs",
+    "test:payouts": "tsx test/solana.test.ts && tsx test/payouts.test.ts && tsx test/api.test.ts",
+    "treasury": "tsx scripts/treasury.ts"
   },
   "dependencies": {
     "@dgreenheck/ez-tree": "^1.1.0",

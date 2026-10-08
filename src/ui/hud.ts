@@ -134,6 +134,7 @@ export class HUD {
             <div class="start-queue"><div class="sq-pos"></div><div class="sq-sub"></div><button class="sq-leave" type="button">Play on your own instead</button></div>
             <div class="start-links">
               <a class="sl-x" href="https://x.com/${X_HANDLE}" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M18.9 2H22l-6.8 7.8L23.2 22h-6.3l-4.9-6.9L6.3 22H3.2l7.3-8.3L.8 2h6.4l4.5 6.3L18.9 2zm-1.1 18h1.7L6.3 3.9H4.5L17.8 20z"/></svg>@${X_HANDLE}</a>
+              <a class="sl-x" href="/payouts" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M5 4h14v16l-3.5-2-3.5 2-3.5-2L5 20zM9 9h6M9 13h6"/></svg>Payouts</a>
               <button class="sl-ca" type="button" title="Copy the contract address"><span><b>Contract address</b><em>Copy</em></span><code>${CONTRACT}</code></button>
             </div>
           </div>

@@ -154,6 +154,23 @@ export class RewardsModal {
     this.root.classList.add('show');
     this.input.focus();
     this.runClock();
+    void this.showPay();
+  }
+
+  /**
+   * What a tag pays right now, if the site is paying: asked of the site each time the window
+   * opens (see api/cashins.ts). With no answer, or payouts not on, the words stay as they are.
+   */
+  private async showPay() {
+    try {
+      const s = (await (await fetch('/api/cashins?format=status')).json()) as { on?: boolean; tagPays?: number | null; share?: number; floor?: number };
+      if (!s.on || typeof s.tagPays !== 'number' || typeof s.share !== 'number' || typeof s.floor !== 'number') return;
+      const round = (n: number) => String(Math.round(n * 10_000) / 10_000);
+      const p = this.root.querySelector('.rw-pay p') as HTMLElement;
+      p.innerHTML = `A tag you cash in pays <b>${round(s.tagPays)} SOL</b> right now: ${round(s.share * 100)}% of the reward treasury, ${round(s.floor)} SOL at least, sent to the wallet you enter here.<small>Every payment is listed at <a href="/payouts" target="_blank" rel="noopener">zonapvp.fun/payouts</a></small>`;
+    } catch {
+      /* no site behind this page (the game served from somewhere else, or playing offline) */
+    }
   }
 
   close() {

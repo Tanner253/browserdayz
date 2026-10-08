@@ -154,11 +154,53 @@ interface CashIn {
   wallet: string;
 }
 const cashins: CashIn[] = [];
-/** tags taken off bodies this server made: tag uid -> whose it was */
-const lootedTags = new Map<string, { owner: string; ownerKey: string }>();
+/** a tag taken off a body this server made: whose it was, where they were playing from, and how long that life had lasted */
+interface Looted {
+  owner: string;
+  ownerKey: string;
+  ownerIp: string;
+  livedMs: number;
+}
+/** tag uid -> that */
+const lootedTags = new Map<string, Looted>();
 /** `${player key}|${tag uid}` -> when the server first saw that player carrying it */
 const tagSeen = new Map<string, number>();
 const isWallet = (s: unknown): s is string => typeof s === 'string' && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(s);
+
+// Tags are paid for in SOL now (the site does it: api/_lib/payouts.ts), and the cheapest way
+// to a tag is a second window of one's own. So a tag is listed for a reward only if, as well
+// as having been taken and held under this server's eyes: its owner was not playing from the
+// same connection as whoever cashes it in; its owner had been alive a couple of minutes (a
+// body that only exists to be killed again is worth nothing); and the same two players have
+// not just done this. None of it stops two people in two houses who are set on it: what the
+// site will pay in a day, and to one wallet, is what bounds that.
+const TAG_MIN_LIFE_MS = (Number(process.env.TAG_MIN_LIFE_S) || 120) * 1000;
+const TAG_PAIR_GAP_MS = (Number(process.env.TAG_PAIR_GAP_S) || 3 * 3600) * 1000;
+/** `${who cashed in}>${whose tag}` (each a player's key, or "ip:" and where they play from) -> when */
+const pairPaidAt = new Map<string, number>();
+
+/** where a connection comes from, as near as the host lets it be known */
+function addressOf(req: http.IncomingMessage): string {
+  const first = (v: string | string[] | undefined) => ((Array.isArray(v) ? v[0] : v) ?? '').split(',')[0].trim();
+  return first(req.headers['cf-connecting-ip']) || first(req.headers['true-client-ip']) || first(req.headers['x-forwarded-for']) || req.socket.remoteAddress || '';
+}
+const ipOf = new WeakMap<WebSocket, string>();
+/** addresses only mean something while they tell players apart: if three or more are on and all seem to come from one place, the host is hiding them */
+const ipsTellApart = () => clients.size < 3 || new Set([...clients.values()].map((x) => x.ip)).size > 1;
+
+/** the two names a player goes by here: their key, and (when it means anything) where they play from */
+const namesOf = (key: string, ip: string) => (ip && ipsTellApart() ? [key, `ip:${ip}`] : [key]);
+
+/** Why a tag earns nothing, or null if it does. */
+function notEarned(c: Client, from: Looted, since: number | undefined, now: number): string | null {
+  if (from.ownerKey === c.key) return 'it is your own';
+  if (since === undefined || now - since < CASH_HOLD_MS) return 'it was not held for the full time';
+  if (c.ip && from.ownerIp === c.ip && ipsTellApart()) return 'its owner was playing from the same connection as you';
+  if (from.livedMs < TAG_MIN_LIFE_MS) return `its owner had been alive for less than ${TAG_MIN_LIFE_MS >= 60000 ? `${Math.round(TAG_MIN_LIFE_MS / 60000)} minutes` : `${Math.round(TAG_MIN_LIFE_MS / 1000)} seconds`}`;
+  const theirs = namesOf(from.ownerKey, from.ownerIp);
+  if (namesOf(c.key, c.ip).some((a) => theirs.some((b) => now - (pairPaidAt.get(`${a}>${b}`) ?? -Infinity) < TAG_PAIR_GAP_MS))) return `you cashed in another of their tags less than ${Math.round(TAG_PAIR_GAP_MS / 3600000)} hours ago`;
+  return null;
+}
 
 function recordCashIn(c: Client, owner: string, wallet: string) {
   const entry: CashIn = { id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`, at: new Date().toISOString(), name: c.name, owner, wallet };
@@ -168,17 +210,54 @@ function recordCashIn(c: Client, owner: string, wallet: string) {
   sendBoard();
   // also in the server's own log, which the host keeps for a few days whatever else happens
   log('CASHIN', JSON.stringify(entry));
-  const tell = (attempt: number) => {
-    fetch(`${SITE_URL}/api/cashin?id=${entry.id}`, { method: 'POST' })
-      .then((r) => {
-        if (!r.ok) throw new Error(`${r.status}`);
-      })
-      .catch((e) => {
-        log(`could not hand cash-in ${entry.id} to the site (${(e as Error).message}), attempt ${attempt}`);
-        if (attempt < 6) setTimeout(() => tell(attempt + 1), attempt * 15000);
-      });
+  follow(entry, c.key, 1, Date.now());
+}
+
+/** what the site answers about a tag (see Outcome in api/_lib/payouts.ts) */
+interface SitePayout {
+  state: 'paid' | 'sending' | 'waiting' | 'skipped' | 'off';
+  lamports?: number;
+  signature?: string;
+  why?: string;
+}
+
+/**
+ * Hands a cash-in to the site, which lists it and pays it, and tells the player what became
+ * of it. A tag the site has not settled (the payment is on its way, the treasury is empty,
+ * the day's limit is reached) is asked about again, for up to a day: the site also looks at
+ * such tags itself once a day, so one this server forgets in a restart is not lost.
+ */
+function follow(entry: CashIn, key: string, attempt: number, began: number) {
+  const again = (ms: number) => void setTimeout(() => follow(entry, key, attempt + 1, began), ms).unref();
+  const say = (kind: 'good' | 'warn' | 'info', text: string) => {
+    const who = [...clients.values()].find((x) => x.key === key);
+    if (who) send(who, { t: 'tell', kind, text });
   };
-  tell(1);
+  fetch(`${SITE_URL}/api/cashin?id=${entry.id}`, { method: 'POST', signal: AbortSignal.timeout(75_000) })
+    .then(async (r) => {
+      if (!r.ok) throw new Error(`${r.status}`);
+      const p = ((await r.json()) as { payout?: SitePayout }).payout;
+      // (payouts not switched on: it is listed, and that is all)
+      if (!p || p.state === 'off') return;
+      if (p.state === 'paid') {
+        log('PAID', entry.id, p.signature);
+        say('good', `${Math.round((p.lamports ?? 0) / 1e5) / 1e4} SOL sent to ${entry.wallet.slice(0, 4)}…${entry.wallet.slice(-4)} for ${entry.owner}'s tag.`);
+        // with this one seen to, the site collects its rewards if there are any and looks at whatever else is waiting
+        fetch(`${SITE_URL}/api/tick`, { signal: AbortSignal.timeout(75_000) }).catch(() => {});
+        return;
+      }
+      if (p.state === 'skipped') {
+        log('NOT PAID', entry.id, p.why);
+        say('warn', `${entry.owner}'s tag is listed and not paid: ${p.why}.`);
+        return;
+      }
+      if (attempt === 1) say('info', p.state === 'sending' ? `Your reward for ${entry.owner}'s tag is on its way.` : `Your reward for ${entry.owner}'s tag is waiting: ${p.why}.`);
+      if (Date.now() - began < 24 * 3600 * 1000) again(p.state === 'sending' && attempt < 20 ? 25_000 : 5 * 60_000);
+    })
+    .catch((e) => {
+      log(`could not hand cash-in ${entry.id} to the site (${(e as Error).message}), attempt ${attempt}`);
+      if (attempt < 8) again(attempt * 15000);
+    });
 }
 
 /** every dog tag in what a player says they carry */
@@ -222,6 +301,9 @@ interface Client {
   /** when they last moved, looked about or did anything (see kickIdle) */
   activeAt: number;
   joinedAt: number;
+  /** where they connect from, and when the life they are living began (see notEarned) */
+  ip: string;
+  lifeAt: number;
   msgCount: number;
   msgWindow: number;
 }
@@ -371,7 +453,7 @@ function makeCorpse(c: Client, v: number): CorpseInfo | null {
     for (const cont of inv.containers) for (const s of cont.items) put(cleanItem(s));
     // their own tag (one, however many they claim to carry) can now be taken and cashed in
     const own = carriedTags(inv).find((t) => !lootedTags.has(t.uid) && (t.owner ?? '') === c.name);
-    if (own) lootedTags.set(own.uid, { owner: c.name, ownerKey: c.key });
+    if (own) lootedTags.set(own.uid, { owner: c.name, ownerKey: c.key, ownerIp: c.ip, livedMs: Date.now() - c.lifeAt });
   }
   for (const it of spill) {
     const a = Math.random() * Math.PI * 2;
@@ -606,6 +688,7 @@ function handle(c: Client, m: C2S) {
       if (c.alive) return;
       const sp = pickSpawn();
       c.alive = true;
+      c.lifeAt = Date.now();
       c.inv = null;
       c.vitals = null;
       c.pose = [sp.x, world.groundAt(sp.x, sp.z), sp.z, sp.yaw, 0, 0];
@@ -635,15 +718,17 @@ function handle(c: Client, m: C2S) {
       tag.held = 0;
       const owner = tag.owner ?? 'Survivor';
       const from = lootedTags.get(tag.uid);
-      const since = tagSeen.get(`${c.key}|${tag.uid}`);
-      const earned = !!from && from.ownerKey !== c.key && since !== undefined && Date.now() - since >= CASH_HOLD_MS;
-      log(`${c.name} cashed in ${owner}'s dog tag${earned ? '' : ' (not one this server saw taken and held: not listed for a reward)'}`);
-      if (earned) {
+      const now = Date.now();
+      // (a tag this server did not see taken: it has restarted since, and no longer knows whose pockets it came out of)
+      const why = from ? notEarned(c, from, tagSeen.get(`${c.key}|${tag.uid}`), now) : 'the server restarted while you were carrying it';
+      log(`${c.name} cashed in ${owner}'s dog tag${why ? ` (not listed for a reward: ${why})` : ''}`);
+      lootedTags.delete(tag.uid);
+      tagSeen.delete(`${c.key}|${tag.uid}`);
+      if (from && !why) {
         // one tag, one reward
-        lootedTags.delete(tag.uid);
-        tagSeen.delete(`${c.key}|${tag.uid}`);
-        recordCashIn(c, from!.owner, isWallet(m.wallet) ? m.wallet : '');
-      }
+        for (const a of namesOf(c.key, c.ip)) for (const b of namesOf(from.ownerKey, from.ownerIp)) pairPaidAt.set(`${a}>${b}`, now);
+        recordCashIn(c, from.owner, isWallet(m.wallet) ? m.wallet : '');
+      } else send(c, { t: 'tell', kind: 'warn', text: `No reward for ${owner}'s tag: ${why}.` });
       broadcast({ t: 'cashed', id: c.id, name: c.name, owner });
       return;
     }
@@ -676,7 +761,7 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
     pose: [sp.x, 'y' in sp && sp.y !== undefined ? sp.y : world.groundAt(sp.x, sp.z), sp.z, sp.yaw, 0, 0],
     w: null, m: [], g: [], alive: true,
     inv: resume?.inv ?? null, vitals: resume?.vitals ?? null,
-    lastHit: 0, lastNade: 0, nadeHits: 0, blasts: [], lastEmote: 0, lastChat: 0, lastHitBy: null, openCid: null, activeAt: Date.now(), joinedAt: Date.now(), msgCount: 0, msgWindow: Date.now(),
+    lastHit: 0, lastNade: 0, nadeHits: 0, blasts: [], lastEmote: 0, lastChat: 0, lastHitBy: null, openCid: null, activeAt: Date.now(), joinedAt: Date.now(), ip: ipOf.get(ws) ?? '', lifeAt: Date.now(), msgCount: 0, msgWindow: Date.now(),
   };
   records.delete(key);
   const others = [...clients.values()].map(info);
@@ -949,6 +1034,14 @@ setInterval(() => {
 
 setInterval(saveWorld, 60_000);
 
+// The site's housekeeping (api/tick.ts: payments still on their way, tags waiting for the
+// treasury, creator rewards to collect) is given a nudge every ten minutes while anybody is
+// playing, and once shortly after this server starts: what it was following before a restart
+// it no longer knows about.
+const nudge = () => void fetch(`${SITE_URL}/api/tick`, { signal: AbortSignal.timeout(75_000) }).catch(() => {});
+setTimeout(nudge, 30_000).unref();
+setInterval(() => clients.size && nudge(), 10 * 60_000).unref();
+
 // ------------------------------------------------------------------ http + ws
 
 const MIME: Record<string, string> = {
@@ -964,13 +1057,15 @@ const server = http.createServer((req, res) => {
   if (url.pathname === '/healthz') {
     // readable from a client hosted somewhere else (e.g. Vercel) for the start-screen player count
     res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'no-store' });
-    res.end(JSON.stringify({ ok: true, players: clients.size, max: MAX_PLAYERS, queue: queue.length, uptime: Math.round(process.uptime()), loot: economy.loot.size }));
+    // (places: how many different addresses the players come from. One, with several players on, means the host is not passing addresses through.)
+    res.end(JSON.stringify({ ok: true, players: clients.size, max: MAX_PLAYERS, queue: queue.length, uptime: Math.round(process.uptime()), loot: economy.loot.size, places: new Set([...clients.values()].map((c) => c.ip)).size }));
     return;
   }
   // the website's function asks here whether a cash-in it was told about is real
   if (url.pathname.startsWith('/cashins')) {
+    // (one at a time, by its id, which only the site is told: the list is not given out)
     const id = url.pathname.split('/')[2];
-    const body = id ? cashins.find((e) => e.id === id) : cashins;
+    const body = id ? cashins.find((e) => e.id === id) : undefined;
     res.writeHead(body ? 200 : 404, { 'content-type': 'application/json', 'cache-control': 'no-store' });
     res.end(JSON.stringify(body ?? { error: 'unknown' }));
     return;
@@ -1024,7 +1119,8 @@ server.on('upgrade', (req, socket, head) => {
   wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
 });
 
-wss.on('connection', (ws) => {
+wss.on('connection', (ws, req: http.IncomingMessage) => {
+  ipOf.set(ws, addressOf(req));
   let c: Client | null = null;
   let waiting = false;
   const hello = setTimeout(() => !c && !waiting && ws.close(), 8000);

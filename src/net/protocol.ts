@@ -179,6 +179,8 @@ export type S2C =
   /** where everyone carrying a tag they took is standing right now: [player id, x, z]. Sent to all, every half minute. */
   | { t: 'tags'; p: [number, number, number][] }
   | { t: 'pong'; n: number }
+  /** something the server has to say to this player alone (what became of a tag they cashed in) */
+  | { t: 'tell'; text: string; kind: 'good' | 'warn' | 'info' }
   | { t: 'kick'; reason: string };
 
 /** deterministic id of a crate that is part of the map (same on every client and the server) */

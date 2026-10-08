@@ -46,5 +46,16 @@
       "source": "/payouts",
       "destination": "/api/cashins"
     }
+  ],
+  "functions": {
+    "api/*.ts": {
+      "maxDuration": 60
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/tick",
+      "schedule": "17 5 * * *"
+    }
   ]
 }
