@@ -1,4 +1,4 @@
-// Called by the game server when a dog tag has been held for the full thirty minutes.
+// Called by the game server when a dog tag has been held for the full ten minutes.
 // The call carries only an id. This function then asks the game server itself for that
 // entry, so nobody can add a name to the payout list by calling this address: the game
 // server is the only source of what was cashed in. The entry is kept in Vercel Blob, where

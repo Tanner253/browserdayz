@@ -168,7 +168,7 @@ const D: ItemDef[] = [
   // ---------------------------------------------------------------- identity
   {
     id: 'dogtag', name: 'Dog Tag', model: '@dogtag', scale: 1.5, w: 1, h: 1, weight: 0.02, category: 'misc',
-    desc: 'Stamped steel on a ball chain. Every survivor carries their own. Take one off a body and stay alive with it for 30 minutes to cash it in.',
+    desc: 'Stamped steel on a ball chain. Every survivor carries their own. Take one off a body and stay alive with it for 10 minutes to cash it in.',
   },
   // ---------------------------------------------------------------- base building
   { id: 'stash_kit', name: 'Stash Crate', model: 'wooden_military_crate', w: 4, h: 3, weight: 6, category: 'stash', scale: 0.55, desc: 'A crate you can put down anywhere (right-click → Place). It stays in the world and keeps whatever you store in it.' },
@@ -203,7 +203,9 @@ export interface ItemInstance {
 }
 
 /** seconds somebody else's dog tag has to be carried before it is cashed in */
-export const TAG_HOLD = 30 * 60;
+export const TAG_HOLD = 10 * 60;
+/** the same in minutes, for everything that says so in words */
+export const TAG_HOLD_MIN = TAG_HOLD / 60;
 
 /** time left on a carried dog tag, as m:ss */
 export function tagClock(it: ItemInstance): string {

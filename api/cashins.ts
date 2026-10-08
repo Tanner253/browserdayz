@@ -1,4 +1,4 @@
-// The payout list: every dog tag that was held for the full thirty minutes, newest first,
+// The payout list: every dog tag that was held for the full ten minutes, newest first,
 // with the wallet address the player gave. Served at /payouts (see vercel.json).
 // Add ?format=json for the raw list.
 
@@ -64,7 +64,7 @@ export async function GET(request: Request): Promise<Response> {
 <body>
 <main>
   <h1>Cashed-in dog tags</h1>
-  <p>${entries.length} ${entries.length === 1 ? 'entry' : 'entries'}, newest first. Each is a tag taken from another player and held for thirty minutes. The tick boxes are your own notes: they are remembered in this browser only.</p>
+  <p>${entries.length} ${entries.length === 1 ? 'entry' : 'entries'}, newest first. Each is a tag taken from another player and held for the full ten minutes. The tick boxes are your own notes: they are remembered in this browser only.</p>
   <div class="wrap">
   <table>
     <thead><tr><th>Paid</th><th>When</th><th>Player</th><th>Whose tag</th><th>Wallet</th></tr></thead>

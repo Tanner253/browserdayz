@@ -13,7 +13,7 @@ import type { Vegetation } from '../world/vegetation';
 import type { Grass } from '../world/grass';
 import { Door, type Buildings } from '../world/buildings';
 import { PLAY_RADIUS, heightAt, type World } from '../world/worldgen';
-import { ITEMS, itemName, TAG_HOLD, capacityOf, hasMod, makeItem, newUid, tagClock, tagOwner, type ItemInstance, type Slot } from '../sim/items';
+import { ITEMS, itemName, TAG_HOLD, TAG_HOLD_MIN, capacityOf, hasMod, makeItem, newUid, tagClock, tagOwner, type ItemInstance, type Slot } from '../sim/items';
 import { PlayerInventory, SLOT_ORDER, type Container } from '../sim/inventory';
 import { Economy, type WorldLoot } from '../sim/economy';
 import { CRATE_RESTOCK, CRATE_SPECS, fillCrate } from '../sim/crates';
@@ -469,7 +469,7 @@ export class Game {
         it.holder = me;
         it.held = 0;
         this.meDirty = true;
-        this.hud.note(`${tagOwner(it)}'s dog tag: stay alive for 30 minutes to cash it in`, 'good');
+        this.hud.note(`${tagOwner(it)}'s dog tag: stay alive for ${TAG_HOLD_MIN} minutes to cash it in`, 'good');
       }
       it.held = (it.held ?? 0) + dt;
       if (it.held >= TAG_HOLD) done.push(it);

@@ -132,9 +132,9 @@ function saveWorld() {
 // ------------------------------------------------------------------ cashed-in tags
 //
 // A tag counts for a reward only if this server watched it happen: the tag came off a body
-// the server itself made when its owner died, somebody else has carried it, and thirty
-// minutes of the server's own clock have passed since the server first saw it in their
-// pockets. What a client says about its own inventory is not enough.
+// the server itself made when its owner died, somebody else has carried it, and the hold
+// time (TAG_HOLD, ten minutes) of the server's own clock has passed since the server first
+// saw it in their pockets. What a client says about its own inventory is not enough.
 
 /** the website keeps the list (this server has no disk): it is told the id and asks back for the entry */
 const SITE_URL = process.env.SITE_URL ?? 'https://www.zonapvp.fun';

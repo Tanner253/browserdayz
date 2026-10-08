@@ -10,7 +10,7 @@
 // equip, use or take it) and the ground (the whole left column). Over a grid the outline is where it will land,
 // which is the nearest free spot to the pointer, not only the cell under it.
 
-import { GEAR_SLOTS, ITEMS, SLOT_KIND, SLOT_LABEL, capacityOf, itemName, itemWeight, tagClock, tagOwner, type ItemInstance, type Slot } from '../sim/items';
+import { GEAR_SLOTS, ITEMS, SLOT_KIND, SLOT_LABEL, TAG_HOLD_MIN, capacityOf, itemName, itemWeight, tagClock, tagOwner, type ItemInstance, type Slot } from '../sim/items';
 import { Container, type PlayerInventory } from '../sim/inventory';
 import type { WorldItem, Stash } from '../game/loot';
 import type { Vitals } from '../game/player';
@@ -368,7 +368,7 @@ export class InventoryUI {
     if (it.mods?.length) stats.push(`<div><span>Fitted</span><b>${it.mods.map((m) => ITEMS[m].name).join(', ')}</b></div>`);
     if (it.id === 'dogtag') {
       stats.push(`<div><span>Owner</span><b>${tagOwner(it)}</b></div>`);
-      stats.push(`<div><span>Cashes in</span><b${this.counting(it) ? ` data-clock="${it.uid}"` : ''}>${it.pid === this.selfId ? 'never: it is yours' : this.counting(it) ? tagClock(it) : 'after 30 min carried'}</b></div>`);
+      stats.push(`<div><span>Cashes in</span><b${this.counting(it) ? ` data-clock="${it.uid}"` : ''}>${it.pid === this.selfId ? 'never: it is yours' : this.counting(it) ? tagClock(it) : `after ${TAG_HOLD_MIN} min carried`}</b></div>`);
     }
     box.innerHTML = `
       <div class="ins-head">

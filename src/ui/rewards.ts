@@ -2,6 +2,8 @@
 // the site, and the wallet address they give. The address is kept on this device and sent
 // to the server with each tag the player cashes in, where it is listed for a reward.
 
+import { TAG_HOLD, TAG_HOLD_MIN } from '../sim/items';
+
 /** whether the wallet modal and the Rewards button are shown */
 export const REWARDS_UI = true;
 
@@ -93,9 +95,9 @@ export class RewardsModal {
             <svg class="rw-art" viewBox="0 0 160 104" aria-hidden="true">
               <circle class="c-track" cx="80" cy="52" r="34"/>
               <circle class="c-ring" cx="80" cy="52" r="34" stroke-dasharray="${RING.toFixed(1)}" stroke-dashoffset="0"/>
-              <text class="c-time" x="80" y="57" text-anchor="middle">30:00</text>
+              <text class="c-time" x="80" y="57" text-anchor="middle">${TAG_HOLD_MIN}:00</text>
             </svg>
-            <b>Hold 30:00</b><span>Stay alive with it. At zero it is cashed in. Die, and the clock restarts for whoever loots you.</span>
+            <b>Hold ${TAG_HOLD_MIN}:00</b><span>Stay alive with it. At zero it is cashed in. Die, and the clock restarts for whoever loots you.</span>
           </li>
         </ol>
         <div class="rw-pay">
@@ -165,7 +167,7 @@ export class RewardsModal {
     }
   }
 
-  /** the third picture: thirty minutes run down in a few seconds, then the tag is cashed in */
+  /** the third picture: the hold time run down in a few seconds, then the tag is cashed in */
   private runClock() {
     const ring = this.root.querySelector('.c-ring') as SVGCircleElement;
     const text = this.root.querySelector('.c-time') as SVGTextElement;
@@ -174,7 +176,7 @@ export class RewardsModal {
     const t0 = performance.now();
     this.timer = window.setInterval(() => {
       const t = Math.min(1, ((performance.now() - t0) % LOOP_MS) / RUN_MS);
-      const left = Math.round(1800 * (1 - t));
+      const left = Math.round(TAG_HOLD * (1 - t));
       ring.setAttribute('stroke-dashoffset', (RING * t).toFixed(1));
       text.textContent = t >= 1 ? '✓' : `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
       text.classList.toggle('c-done', t >= 1);
