@@ -8,7 +8,8 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { assets } from '../core/assets';
 import { physics, G_TRIGGER, groups, WORLD_GROUPS, SOLID_GROUPS } from '../core/physics';
 import { extractParts, groundParts, type MeshPart } from '../core/gltf-utils';
-import { ITEMS, type ItemInstance } from '../sim/items';
+import { ITEMS, type ItemInstance, pieceShown } from '../sim/items';
+import { liftPack } from './rig';
 import { fitsPoint } from '../sim/placement';
 import { proceduralParts } from './procedural';
 import { Container } from '../sim/inventory';
@@ -63,14 +64,13 @@ export class ItemModels {
       const scene = await assets.model(def.model);
       const re = def.nodeRe ? new RegExp(def.nodeRe) : null;
       parts = re ? extractParts(scene, (n) => re.test(n)) : def.node ? extractParts(scene, (n) => n === def.node) : extractParts(scene);
-      // the file shows the magazine beside the pistol as a display piece; the seated one is inside the grip
-      if (id === 'p38') parts = extractParts(scene, (n) => /_a$/.test(n));
-      // bare rifle: the scope and the wrap are attachments
-      if (id === 'mosin') {
-        parts = extractParts(scene).filter((p) => {
-          const n = p.owner ?? p.name;
-          return !n.includes('bullet') && (mods.includes('pu_scope') || !n.includes('scope')) && (mods.includes('rifle_wrap') || !n.includes('wrap'));
-        });
+      // a gun lies there as it is: bare, or with whatever is fitted to it
+      if (def.weapon) parts = parts.filter((p) => pieceShown(id, p.name.replace(/_\d+$/, ''), mods));
+      // (what came out of a weapon pack is painted near black: lifted once, for the ground and the icon alike)
+      if (assets.manifest.models[def.model]?.holds) {
+        for (const p of parts) {
+          if (!p.material.userData.lifted) liftPack(p.material).userData.lifted = true;
+        }
       }
     }
     // guns rest on their side when dropped, not balanced on the magazine

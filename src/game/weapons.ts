@@ -8,13 +8,14 @@ import { physics, SHOT_GROUPS, type Surface } from '../core/physics';
 import { audio } from '../core/audio';
 import type { Input } from '../core/input';
 import { extractParts } from '../core/gltf-utils';
-import { ITEMS, capacityOf, handlingOf, hasMod, type ItemInstance, type Slot } from '../sim/items';
+import { ITEMS, capacityOf, handlingOf, hasMod, pieceShown, type ItemInstance, type Slot } from '../sim/items';
 import { suppressorGeometry } from './procedural';
 import { SLOT_ORDER, type PlayerInventory } from '../sim/inventory';
 import type { Atmosphere } from '../world/atmosphere';
 import type { Player } from './player';
 import type { Effects } from './effects';
 import { flashTexture } from './effects';
+import { WeaponRig, liftPack } from './rig';
 import { FPArms, type Grips, type HandGrip } from './arms';
 import type { Look } from './look';
 import { MAX_STAMINA } from '../net/protocol';
@@ -129,9 +130,32 @@ interface VmModel {
   suppressor?: THREE.Object3D;
   /** aim position without an optic */
   adsIron?: THREE.Vector3;
+  /**
+   * A weapon pack (see rig.ts): its own arms and its own gun, moved by its own animation.
+   * Nothing here is reached out to with the game's arms, and none of the gun's pieces is
+   * moved by hand below: a movement of the pack is asked for by name.
+   */
+  rig?: WeaponRig;
+  /** the gun alone, as everybody else sees it held and as it hangs on a back (packs only: the others show `body`) */
+  world?: THREE.Object3D;
+  /** a gun riding in another pack's hands: the pack's own spent case is not its case, and the game throws one */
+  brass?: boolean;
+  /** seconds since it last fired, and which of the pack's movements that shot is */
+  shotT?: number;
+  shotClip?: string;
 }
 
 type Action = { name: 'equip' | 'unequip' | 'bolt' | 'reload' | 'swing' | 'magswap' | 'use' | 'punch'; t: number; dur: number; done?: () => void; data?: Record<string, number> };
+
+/**
+ * Where each pack is held from: the eye, in the pack's space as the pipeline turns it
+ * (x right, y up, metres; the muzzle points away down -z). Tuned by eye, like every other
+ * hip position here.
+ */
+const HELD = {
+  sniper: new THREE.Vector3(0.14, -0.22, -0.36),
+  m9: new THREE.Vector3(0.095, -0.135, -0.31),
+};
 
 /** Clone a glTF material for the viewmodel scene (no CSM, no shared shader hooks). */
 function plainMaterial(m: THREE.Material): THREE.Material {
@@ -146,6 +170,9 @@ function plainMaterial(m: THREE.Material): THREE.Material {
   c.envMapIntensity = 1;
   return c;
 }
+
+/** a weapon pack's material for the hands' own scene: plain, and lifted out of the dark (see liftPack) */
+const packMaterial = (m: THREE.Material) => liftPack(plainMaterial(m));
 
 export class Weapons {
   private vmRoot = new THREE.Group();
@@ -248,113 +275,13 @@ export class Weapons {
       return s;
     };
 
-    // ---- Mosin with PU scope (muzzle +X in model space)
-    const rifleScene = await assets.model('bolt_action_rifle_7_62');
-    {
-      const root = new THREE.Group();
-      const body = new THREE.Group();
-      body.rotation.y = Math.PI / 2; // +X -> -Z
-      root.add(body);
-      const parts = extractParts(rifleScene);
-      const bolt = new THREE.Group();
-      const boltSlide = new THREE.Group();
-      // bolt rotates about its own axis: pivot at the bolt body centre
-      boltSlide.position.set(0, 0.0525, 0.0025);
-      boltSlide.add(bolt);
-      body.add(boltSlide);
-      let round: THREE.Object3D | undefined;
-      let wrap: THREE.Object3D | undefined;
-      // the scope is two meshes under one node
-      const scope = new THREE.Group();
-      scope.visible = false;
-      body.add(scope);
-      for (const p of parts) {
-        const mesh = new THREE.Mesh(p.geometry, plainMaterial(p.material));
-        mesh.castShadow = false;
-        // every node is called bolt_action_rifle_7_62_<part>: go by the part suffix
-        const part = (p.owner ?? p.name).replace('bolt_action_rifle_7_62', '');
-        if (part.startsWith('_bolt')) {
-          mesh.position.set(0, -0.0525, -0.0025);
-          bolt.add(mesh);
-        } else if (part.startsWith('_bullet')) {
-          mesh.visible = false;
-          round = mesh;
-          body.add(mesh);
-        } else if (part.startsWith('_scope')) {
-          scope.add(mesh);
-        } else {
-          if (part.startsWith('_wrap')) {
-            wrap = mesh;
-            mesh.visible = false;
-          }
-          body.add(mesh);
-        }
-      }
-      const flash = mkFlash();
-      flash.position.set(0, 0.035, -0.62);
-      flash.scale.setScalar(0.32);
-      root.add(flash);
-      const m: VmModel = {
-        root, kind: 'rifle', flash, bolt, boltSlide, round, body, scope, wrap,
-        adsIron: new THREE.Vector3(0.0, -0.074, -0.52),
-        hip: new THREE.Vector3(0.105, -0.135, -0.5),
-        hipRot: new THREE.Euler(0.03, 0.06, -0.06),
-        grips: {
-          right: { pos: new THREE.Vector3(-0.425, 0.0, 0.034), fingers: new THREE.Vector3(0.75, -0.55, -0.3), palm: new THREE.Vector3(0.15, -0.1, -1), curl: [0.4, 1.2, 1.25, 1.3], thumb: 0.5 },
-          left: { pos: new THREE.Vector3(0.0, -0.082, -0.038), fingers: new THREE.Vector3(0.35, 0.1, 0.93), palm: new THREE.Vector3(0, 1, 0.1), curl: [1.0, 1.05, 1.1, 1.15], thumb: 0.4 },
-        },
-        ads: new THREE.Vector3(0.007, -0.071, -0.33),
-        muzzle: new THREE.Vector3(0, 0.035, -0.6),
-      };
-      this.models.set('mosin', m);
-    }
-
-    // ---- P38 (muzzle +X). Only the "_a" variant and the loaded magazine are used.
-    const pistolScene = await assets.model('service_pistol');
-    {
-      const root = new THREE.Group();
-      const body = new THREE.Group();
-      body.rotation.y = Math.PI / 2;
-      root.add(body);
-      const parts = extractParts(pistolScene, (n) => /_a$|magazine_loaded|bullet/.test(n));
-      let slide: THREE.Object3D | undefined;
-      let mag: THREE.Object3D | undefined;
-      for (const p of parts) {
-        const mesh = new THREE.Mesh(p.geometry, plainMaterial(p.material));
-        if (p.name.includes('bullet')) continue;
-        body.add(mesh);
-        if (p.name.includes('slide')) slide = mesh;
-        if (p.name.includes('magazine')) {
-          // the source file parks the magazine behind the grip; move it into the mag well
-          mesh.position.set(0.075, -0.026, 0);
-          mesh.visible = false;
-          const holder = new THREE.Group();
-          body.remove(mesh);
-          holder.add(mesh);
-          body.add(holder);
-          mag = holder;
-        }
-      }
-      const flash = mkFlash();
-      flash.position.set(0, 0.06, -0.2);
-      flash.scale.setScalar(0.2);
-      root.add(flash);
-      const suppressor = new THREE.Mesh(suppressorGeometry(), new THREE.MeshStandardMaterial({ color: 0x1c1d1f, metalness: 0.85, roughness: 0.55 }));
-      suppressor.position.set(0.168, 0.0605, 0);
-      suppressor.visible = false;
-      body.add(suppressor);
-      this.models.set('p38', {
-        root, kind: 'pistol', flash, slide, mag, body, suppressor,
-        hip: new THREE.Vector3(0.075, -0.11, -0.38),
-        hipRot: new THREE.Euler(0.02, 0.06, -0.03),
-        grips: {
-          right: { pos: new THREE.Vector3(-0.072, -0.018, 0.032), fingers: new THREE.Vector3(0.9, -0.15, -0.3), palm: new THREE.Vector3(0.3, 0, -1), curl: [0.35, 1.25, 1.3, 1.35], thumb: 1.25 },
-          left: { pos: new THREE.Vector3(-0.065, -0.06, -0.055), fingers: new THREE.Vector3(0.85, -0.2, 0.35), palm: new THREE.Vector3(0, 0.4, 1), curl: [1.05, 1.1, 1.15, 1.2], thumb: 1.2 },
-        },
-        ads: new THREE.Vector3(0.0, -0.081, -0.34),
-        muzzle: new THREE.Vector3(0, 0.06, -0.19),
-      });
-    }
+    // ---- the guns that come as packs: arms, gun and every movement in one file
+    this.models.set('mosin', await this.packGun({ pack: 'sniper', item: 'mosin', kind: 'rifle', hip: HELD.sniper, flashSize: 0.32, flash: mkFlash() }));
+    this.models.set('m9', await this.packGun({ pack: 'm9', item: 'm9', kind: 'pistol', hip: HELD.m9, flashSize: 0.2, flash: mkFlash() }));
+    // The Pistol 43 came with arms that are not its maker's to give. It is held in the other
+    // pistol's hands and moved as that pistol is: its frame, slide and magazine ride on the
+    // pack's, in place of the pack's own.
+    this.models.set('p38', await this.packGun({ pack: 'm9', item: 'p38', gun: 'pistol_43', kind: 'pistol', hip: HELD.m9, flashSize: 0.2, flash: mkFlash() }));
 
     // ---- melee weapons: held upright in the right hand
     for (const id of ['hatchet', 'machete', 'crowbar', 'bat', 'knife']) {
@@ -450,6 +377,100 @@ export class Weapons {
     }
   }
 
+  /**
+   * A gun out of a weapon pack.
+   * @param o.pack the pack whose arms and movements it is held with
+   * @param o.gun the gun-alone model shown in them, if it is not the pack's own (its `base`, `slide` and `mag` ride on the pack's)
+   */
+  private sleeves: THREE.Material | null = null;
+
+  private async packGun(o: { pack: string; item: string; gun?: string; kind: GunKind; hip: THREE.Vector3; flash: THREE.Sprite; flashSize: number }): Promise<VmModel> {
+    const entry = assets.manifest.models[`${o.pack}_fp`];
+    const rig = new WeaponRig(await assets.gltfOf(`${o.pack}_fp`), entry.rig!, packMaterial);
+    // one pair of sleeves and gloves whatever is held: the first pack's (the packs are one maker's, on one pair of arms)
+    const sleeves = rig.material(/arm/i);
+    if (this.sleeves) rig.repaint(/arm/i, this.sleeves);
+    else if (sleeves) this.sleeves = sleeves;
+    const aloneId = o.gun ?? o.pack;
+    const holds = assets.manifest.models[aloneId].holds!;
+    // the gun alone (x along the barrel, y up): what is seen of it in everybody else's hands
+    const alone = extractParts(await assets.model(aloneId));
+    const world = new THREE.Group();
+    world.rotation.y = Math.PI / 2;
+    const span = new THREE.Box3();
+    const top = new THREE.Box3();
+    for (const p of alone) {
+      const piece = p.name.replace(/_\d+$/, '');
+      const mesh = new THREE.Mesh(p.geometry, packMaterial(p.material));
+      mesh.name = piece;
+      mesh.castShadow = false;
+      world.add(mesh);
+      p.geometry.computeBoundingBox();
+      if (piece === 'base' || piece === 'slide') span.union(p.geometry.boundingBox!);
+      if (piece === 'slide' || (piece === 'base' && o.kind === 'rifle')) top.union(p.geometry.boundingBox!);
+    }
+    // the muzzle, in the gun's own space: the front of the barrel, at the height of the bore
+    const bore = o.kind === 'pistol' ? top.max.y - (top.max.y - top.min.y) * 0.42 : THREE.MathUtils.lerp(span.min.y, span.max.y, 0.62);
+    const mouth = new THREE.Vector3(span.max.x, bore, (span.min.z + span.max.z) / 2);
+    let suppressor: THREE.Object3D | undefined;
+    if (o.kind === 'pistol') {
+      const steel = new THREE.MeshStandardMaterial({ color: 0x1c1d1f, metalness: 0.85, roughness: 0.55 });
+      const far = new THREE.Mesh(suppressorGeometry(), steel);
+      far.name = 'suppressor';
+      far.position.copy(mouth);
+      world.add(far);
+      suppressor = new THREE.Mesh(suppressorGeometry(), steel);
+      suppressor.position.copy(mouth);
+      suppressor.visible = false;
+      rig.hang(suppressor, 'base');
+    }
+    if (o.gun) {
+      rig.strip(['base', 'slide', 'mag', 'hammer', 'trigger', 'stopper', 'shell_1']);
+      for (const piece of ['base', 'slide', 'mag']) {
+        const g = new THREE.Group();
+        for (const c of world.children) if (c.name === piece) g.add(c.clone());
+        rig.hang(g, piece);
+      }
+    }
+    for (const piece of ITEMS[o.item].weapon?.never ?? []) rig.show(piece, false);
+    // where things are in the eye's space with the pack at rest and not yet moved to the hip
+    const sight = rig.box(o.kind === 'rifle' ? 'glass' : 'slide');
+    const frame = rig.box('base');
+    const c = sight.getCenter(new THREE.Vector3());
+    const root = new THREE.Group();
+    const body = new THREE.Group();
+    body.add(rig.root);
+    root.add(body);
+    // aimed: the sights on the middle of the picture, a hand's width nearer than from the hip
+    const ads = o.kind === 'rifle' ? new THREE.Vector3(-c.x, -c.y, -sight.max.z - 0.075) : new THREE.Vector3(-c.x, -sight.max.y - 0.012, o.hip.z + 0.07);
+    const fc = frame.getCenter(new THREE.Vector3());
+    const m: VmModel = {
+      root, kind: o.kind, flash: o.flash, body, rig, world, suppressor, brass: !!o.gun,
+      scope: rig.node('scope') ?? undefined,
+      wrap: rig.node('cheekrest') ?? undefined,
+      hip: o.hip.clone(),
+      hipRot: new THREE.Euler(0, 0, 0),
+      ads,
+      // without the scope the eye goes along the top of the action
+      adsIron: o.kind === 'rifle' ? new THREE.Vector3(-fc.x, -frame.max.y - 0.018, o.hip.z + 0.1) : undefined,
+      muzzle: new THREE.Vector3(fc.x, o.kind === 'rifle' ? THREE.MathUtils.lerp(frame.min.y, frame.max.y, 0.62) : c.y, frame.min.z),
+      // (for whoever is seen holding it: the hands are where the pack's own hands are)
+      grips: o.kind === 'rifle'
+        ? {
+            right: { pos: new THREE.Vector3(...holds.right), fingers: new THREE.Vector3(0.75, -0.55, -0.3), palm: new THREE.Vector3(0.15, -0.1, -1), curl: [0.4, 1.2, 1.25, 1.3], thumb: 0.5 },
+            left: { pos: new THREE.Vector3(...holds.left), fingers: new THREE.Vector3(0.35, 0.1, 0.93), palm: new THREE.Vector3(0, 1, 0.1), curl: [1.0, 1.05, 1.1, 1.15], thumb: 0.4 },
+          }
+        : {
+            right: { pos: new THREE.Vector3(...holds.right), fingers: new THREE.Vector3(0.9, -0.15, -0.3), palm: new THREE.Vector3(0.3, 0, -1), curl: [0.35, 1.25, 1.3, 1.35], thumb: 1.25 },
+            left: { pos: new THREE.Vector3(...holds.left), fingers: new THREE.Vector3(0.85, -0.2, 0.35), palm: new THREE.Vector3(0, 0.4, 1), curl: [1.05, 1.1, 1.15, 1.2], thumb: 1.2 },
+          },
+    };
+    o.flash.position.copy(m.muzzle);
+    o.flash.scale.setScalar(o.flashSize);
+    root.add(o.flash);
+    return m;
+  }
+
   /** Compile every viewmodel shader up front so the first equip / first shot never stalls. */
   precompile(compile: (scene: THREE.Scene, camera: THREE.Camera) => void) {
     const added: THREE.Object3D[] = [];
@@ -476,13 +497,22 @@ export class Weapons {
     const it = [this.inv.slots.primary, this.inv.slots.secondary].find((i) => i && i !== this.currentItem);
     if (!it) return null;
     const m = this.models.get(it.id);
+    if (m?.world) return this.dressed(m, it.id, it.mods ?? []);
     return m ? m.root.children[0] : null;
+  }
+
+  /** a pack's gun alone, with the pieces that go with what is fitted to it */
+  private dressed(m: VmModel, id: string, mods: string[]): THREE.Object3D {
+    const c = m.world!.clone();
+    for (const piece of c.children) piece.visible = piece.name === 'suppressor' ? mods.includes('suppressor_9') : pieceShown(id, piece.name, mods);
+    return c;
   }
 
   /** a copy of a weapon's body for showing in someone's hands in the world (third person) */
   worldModel(id: string, mods: string[] = []): THREE.Object3D | null {
     const m = this.models.get(id);
     if (!m) return null;
+    if (m.world) return this.dressed(m, id, mods);
     const src = m.body ?? m.root.children[0];
     const wasVisible = [m.scope, m.wrap, m.suppressor, m.mag].map((o) => o?.visible);
     if (m.scope) m.scope.visible = mods.includes('pu_scope');
@@ -545,7 +575,10 @@ export class Weapons {
         this.vmRoot.add(this.current.root);
         this.boltReady = true;
         audio.equip(ITEMS[next!.id].weapon ? 'gun' : 'melee');
-        this.start('equip', 0.45);
+        // (a pack has its own way of coming up, and takes as long as that does)
+        const rig = this.current.rig;
+        this.start('equip', rig ? this.drawTime(rig) : 0.45);
+        this.current.shotT = 9;
       } else {
         this.action = null;
       }
@@ -749,10 +782,12 @@ export class Weapons {
     const feel = handlingOf(item) ?? { ergo: 80, weight: 0.5, recoil: 1 };
     const stance = (this.player.crouched ? 0.7 : 1) * (this.aiming ? 0.85 : 1) * feel.recoil * (1 + (1 - this.armStamina) * 0.5) * THREE.MathUtils.lerp(1.12, 0.92, feel.ergo / 100);
     const drift = kind === 'auto' ? (this.burst < 4 ? 0.12 : Math.sin(this.burst * 1.7) * 0.28) : (Math.random() - 0.5);
-    this.kick.v.z += hd.vmKick;
-    this.kick.v.y += big ? 0.25 : 0.4;
-    this.kickRot.v.x += big ? 9 : kind === 'auto' ? 5.5 : 7;
-    this.kickRot.v.z += (Math.random() - 0.5) * (big ? 3 : 2);
+    // (a pack's hands take the shot themselves: on top of that, half the kick the game gives a still model)
+    const own = m.rig ? 0.5 : 1;
+    this.kick.v.z += hd.vmKick * own;
+    this.kick.v.y += (big ? 0.25 : 0.4) * own;
+    this.kickRot.v.x += (big ? 9 : kind === 'auto' ? 5.5 : 7) * own;
+    this.kickRot.v.z += (Math.random() - 0.5) * (big ? 3 : 2) * own;
     this.aimRecoil.v.y += hd.kickV * stance;
     this.aimRecoil.v.x += drift * hd.kickH * stance;
     this.player.pitch += hd.climb * stance; // part of the kick stays: you have to pull down
@@ -767,16 +802,19 @@ export class Weapons {
     this.fx.muzzle(muzzleWorld, new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion), big || kind === 'auto', suppressed);
     audio.gunshot(kind === 'auto' ? 'rifle' : kind, undefined, 0, kind === 'auto', suppressed);
 
+    m.shotT = 0;
+    m.shotClip = m.rig?.has('fireLast') && (item.loaded ?? 0) === 0 ? 'fireLast' : 'fire';
     if (kind === 'rifle') {
       this.boltReady = false;
       this.fireCooldown = hd.interval;
       setTimeout(() => {
         if (this.current === m && !this.action) this.cycleBolt(m);
-      }, 260);
+      }, m.rig ? 300 : 260);
     } else {
       this.fireCooldown = hd.interval;
       this.slideKick = 1;
-      this.eject(m, false);
+      // (a pack throws its own case)
+      if (!m.rig || m.brass) this.eject(m, false);
       audio.shellDrop();
       if ((item.loaded ?? 0) === 0) this.chamberEmpty = true;
     }
@@ -829,11 +867,12 @@ export class Weapons {
   private cycleBolt(m: VmModel) {
     audio.boltCycle();
     audio.shellDrop(0.5);
-    this.start('bolt', 0.78, () => {
+    // (the pack's hand has further to go than a bolt moved by itself: a little longer)
+    const dur = m.rig ? 0.95 : 0.78;
+    this.start('bolt', dur, () => {
       this.boltReady = true;
     }, { out: 0 });
-    this.onAct('bolt', 0.78);
-    void m;
+    this.onAct('bolt', dur);
   }
 
   private reload(m: VmModel, item: ItemInstance) {
@@ -842,6 +881,25 @@ export class Weapons {
     const need = capacityOf(item) - (item.loaded ?? 0);
     const have = this.inv.count(def.weapon.ammo);
     if (need <= 0 || have <= 0) return;
+    if (m.rig) {
+      // A pack's gun is fed by its magazine, and its hands do it at their own pace: out with
+      // the old one, in with the new, and the slide or the bolt if the gun had run dry.
+      const empty = m.kind === 'pistol' && this.chamberEmpty && m.rig.has('reloadEmpty');
+      const clip = empty ? 'reloadEmpty' : 'reload';
+      // (at very nearly the pace it was drawn at: hurried, the hands stop looking like hands)
+      const dur = m.rig.seconds(clip) * (m.kind === 'pistol' ? 0.92 : 1);
+      audio.magOut(dur * (m.kind === 'pistol' ? 0.12 : 0.28));
+      audio.magIn(dur * (m.kind === 'pistol' ? (empty ? 0.36 : 0.48) : 0.62));
+      if (empty) audio.slideRack(dur * 0.7);
+      this.onAct('reload', dur);
+      this.start('magswap', dur, () => {
+        const got = this.inv.take(def.weapon!.ammo, capacityOf(item) - (item.loaded ?? 0));
+        item.loaded = (item.loaded ?? 0) + got;
+        this.chamberEmpty = false;
+        this.boltReady = true;
+      }, { empty: empty ? 1 : 0 });
+      return;
+    }
     if (m.kind === 'rifle') {
       // open bolt, push rounds in one by one, close bolt
       const n = Math.min(need, have);
@@ -1231,7 +1289,8 @@ export class Weapons {
 
     // actions
     const a = this.action;
-    if (a) {
+    if (m.rig) this.poseRig(m, dt);
+    else if (a) {
       const k = Math.min(1, a.t / a.dur);
       const bell = Math.sin(k * Math.PI);
       if (a.name === 'equip') {
@@ -1342,7 +1401,41 @@ export class Weapons {
     m.root.rotation.copy(rot);
     // scope view takes over once fully aimed down the PU scope
     m.root.visible = !this.scoped;
-    this.arms.update(m.body ?? null, this.actionGrips(m), this.vmCamera.quaternion, !this.scoped);
+    // (a pack brings its own arms)
+    if (m.rig) this.arms.update(null, null, this.vmCamera.quaternion, false);
+    else this.arms.update(m.body ?? null, this.actionGrips(m), this.vmCamera.quaternion, !this.scoped);
+  }
+
+  /**
+   * How a pack's gun comes up. A pistol's own drawing of it ends with the slide being racked,
+   * a second and a half of it: right once, wrong every time a gun is changed. Its putting away
+   * played backwards is the same lift without the rack.
+   */
+  private drawTime(rig: WeaponRig) {
+    return rig.has('holster') ? rig.seconds('holster') * 1.15 : rig.seconds('draw');
+  }
+
+  /** A pack's gun: which of its movements it is in this frame, and how far through. */
+  private poseRig(m: VmModel, dt: number) {
+    const rig = m.rig!;
+    const a = this.action;
+    m.shotT = (m.shotT ?? 9) + dt;
+    if (a) {
+      const k = Math.min(1, a.t / a.dur);
+      if (a.name === 'equip') rig.has('holster') ? rig.pose('holster', 1 - k) : rig.pose('draw', k);
+      else if (a.name === 'unequip') rig.has('holster') ? rig.pose('holster', k) : rig.pose('draw', 1 - k);
+      else if (a.name === 'bolt') rig.pose('bolt', k);
+      else if (a.name === 'magswap') rig.pose(a.data?.empty ? 'reloadEmpty' : 'reload', k);
+      else rig.rest();
+      return;
+    }
+    const shot = m.shotClip ?? 'fire';
+    const len = rig.seconds(shot);
+    if (m.shotT < len) rig.pose(shot, m.shotT / len);
+    // run dry, a pistol stays as its last shot left it: slide back
+    else if (m.kind === 'pistol' && this.chamberEmpty && rig.has('fireLast')) rig.pose('fireLast', 1);
+    else if (rig.has('idle') && !this.aiming) rig.pose('idle', (this.time % rig.seconds('idle')) / rig.seconds('idle'));
+    else rig.rest();
   }
 
   /**

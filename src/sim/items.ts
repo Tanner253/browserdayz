@@ -44,7 +44,16 @@ export interface ItemDef {
   /** looked through when used: how much of the normal field of view is left (0.2 = five times closer) */
   look?: number;
   /** ergo: how handy it is, 0..100. A handy gun comes up to the eye fast and follows a turn closely; a long heavy one does neither. */
-  weapon?: { kind: 'rifle' | 'pistol' | 'auto'; ammo: string; capacity: number; ergo: number; modes?: ('semi' | 'auto')[] };
+  weapon?: {
+    kind: 'rifle' | 'pistol' | 'auto';
+    ammo: string;
+    capacity: number;
+    ergo: number;
+    modes?: ('semi' | 'auto')[];
+    /** pieces of its model that are only there with an attachment on it (attachment -> pieces), and pieces that never are */
+    shows?: Record<string, string[]>;
+    never?: string[];
+  };
   melee?: { damage: number; range: number; rate: number };
   /** sealed container (ammo box): opening it replaces the item with loose contents */
   open?: { gives: string; qty: number; time: number };
@@ -61,14 +70,19 @@ export interface ItemDef {
 const D: ItemDef[] = [
   // ---------------------------------------------------------------- weapons
   {
-    id: 'mosin', name: 'Mosin 91/30', model: 'bolt_action_rifle_7_62', w: 9, h: 2, weight: 4.1, category: 'weapon', slot: 'long',
-    desc: 'Bolt-action rifle with iron sights. Five-round internal magazine fed with 7.62x54R. Slow, loud and devastating. Takes a PU scope and a burlap wrap.',
-    weapon: { kind: 'rifle', ammo: 'ammo_762', capacity: 5, ergo: 40 }, iconYaw: 0,
+    id: 'mosin', name: 'Sniper Rifle', model: 'sniper', w: 9, h: 2, weight: 4.1, category: 'weapon', slot: 'long',
+    desc: 'Bolt-action rifle in 7.62. Five rounds in a box magazine, and the bolt worked by hand after every one. Slow, loud and devastating. Takes a scope and a cheek rest.',
+    weapon: { kind: 'rifle', ammo: 'ammo_762', capacity: 5, ergo: 40, shows: { pu_scope: ['scope', 'glass'], rifle_wrap: ['cheekrest'] }, never: ['silencer'] }, iconYaw: 0,
   },
   {
-    id: 'p38', name: 'P38 Pistol', model: 'service_pistol', node: 'service_pistol_pistol_a', w: 3, h: 2, weight: 0.95, category: 'weapon', slot: 'holster',
-    desc: 'Double-action 9x19mm service pistol. Eight-round magazine. Takes a suppressor and an extended magazine.',
-    weapon: { kind: 'pistol', ammo: 'ammo_9mm', capacity: 8, ergo: 82 }, iconYaw: 0,
+    id: 'p38', name: 'Pistol 43', model: 'pistol_43', w: 3, h: 2, weight: 0.75, category: 'weapon', slot: 'holster',
+    desc: 'Slim 9x19mm pistol. Eight-round magazine. Takes a suppressor and an extended magazine.',
+    weapon: { kind: 'pistol', ammo: 'ammo_9mm', capacity: 8, ergo: 86 }, iconYaw: 0,
+  },
+  {
+    id: 'm9', name: 'M9 Pistol', model: 'm9', w: 3, h: 2, weight: 1.0, category: 'weapon', slot: 'holster',
+    desc: 'Full-size 9x19mm service pistol. Fifteen rounds in the magazine, and heavier in the hand for it. Takes a suppressor.',
+    weapon: { kind: 'pistol', ammo: 'ammo_9mm', capacity: 15, ergo: 74 }, iconYaw: 0,
   },
   {
     id: 'ammo_762', name: '7.62x54R Rounds', model: 'bolt_action_rifle_7_62', node: 'bolt_action_rifle_7_62_bullet_54mm', w: 1, h: 1, weight: 0.022, category: 'ammo', stack: 20, scale: 1.25, pile: 5,
@@ -90,23 +104,23 @@ const D: ItemDef[] = [
   },
   // ---------------------------------------------------------------- attachments
   {
-    id: 'pu_scope', name: 'PU 3.5x Scope', model: 'bolt_action_rifle_7_62', node: 'bolt_action_rifle_7_62_scope', w: 2, h: 1, weight: 0.27, category: 'attachment',
-    desc: 'Side-mounted 3.5x telescopic sight for the Mosin. Turns the rifle into a sniper, and makes it a little slower to bring up.',
+    id: 'pu_scope', name: 'Rifle Scope 3.5x', model: 'sniper', nodeRe: '^(scope|glass)', w: 2, h: 1, weight: 0.27, category: 'attachment',
+    desc: 'A 3.5x telescopic sight for the sniper rifle. What makes the rifle a sniper, and a little slower to bring up.',
     attach: { fits: ['mosin'], slot: 'optic', ergo: -7 },
   },
   {
-    id: 'rifle_wrap', name: 'Burlap Rifle Wrap', model: 'bolt_action_rifle_7_62', node: 'bolt_action_rifle_7_62_wrap', w: 2, h: 1, weight: 0.2, category: 'attachment',
-    desc: 'Burlap strips wound round the stock. Steadies the rifle: a quarter less sway, and a surer grip.',
+    id: 'rifle_wrap', name: 'Cheek Rest', model: 'sniper', nodeRe: '^cheekrest', w: 2, h: 1, weight: 0.2, category: 'attachment',
+    desc: 'A raised rest for the cheek, strapped to the stock. Steadies the rifle: a quarter less sway, and a surer hold.',
     attach: { fits: ['mosin'], slot: 'wrap', ergo: 6 },
   },
   {
     id: 'suppressor_9', name: '9mm Suppressor', model: '@suppressor', w: 2, h: 1, weight: 0.3, category: 'attachment',
-    desc: 'Screw-on sound suppressor for the P38. Much quieter, no muzzle flash, slightly less punch. Softer kick, but the pistol is longer and slower in the hand.',
-    attach: { fits: ['p38'], slot: 'muzzle', ergo: -8, recoil: 0.85 },
+    desc: 'Screw-on sound suppressor for either pistol. Much quieter, no muzzle flash, slightly less punch. Softer kick, but the pistol is longer and slower in the hand.',
+    attach: { fits: ['p38', 'm9'], slot: 'muzzle', ergo: -8, recoil: 0.85 },
   },
   {
-    id: 'mag_p38_ext', name: 'P38 Extended Magazine', model: 'service_pistol', node: 'service_pistol_magazine_empty', w: 1, h: 2, weight: 0.12, category: 'attachment', scale: 1.15,
-    desc: 'Twelve-round magazine for the P38: four more shots before you reload.',
+    id: 'mag_p38_ext', name: 'Pistol 43 Extended Magazine', model: 'pistol_43', nodeRe: '^mag', w: 1, h: 2, weight: 0.12, category: 'attachment', scale: 1.15,
+    desc: 'Twelve-round magazine for the Pistol 43: four more shots before you reload.',
     attach: { fits: ['p38'], slot: 'magazine', ergo: -4 },
   },
   // ---------------------------------------------------------------- melee
@@ -246,6 +260,7 @@ export function makeItem(id: string, qty?: number): ItemInstance {
 export const FITTED: Record<string, [string, number][]> = {
   mosin: [['pu_scope', 0.025], ['rifle_wrap', 0.12]],
   p38: [['suppressor_9', 0.08], ['mag_p38_ext', 0.12]],
+  m9: [['suppressor_9', 0.06]],
 };
 
 /** Rolls for what a gun put into the world comes with. @param rnd 0..1, the caller's own dice */
@@ -258,6 +273,15 @@ export function fitAtRandom(item: ItemInstance, rnd: () => number): ItemInstance
 
 export function hasMod(it: ItemInstance | null | undefined, id: string) {
   return !!it?.mods?.includes(id);
+}
+
+/** Is this piece of a gun's model there, with these attachments on the gun? (see `shows` and `never` on the weapon) */
+export function pieceShown(id: string, piece: string, mods: string[] = []): boolean {
+  const w = ITEMS[id]?.weapon;
+  if (!w) return true;
+  if (w.never?.includes(piece)) return false;
+  for (const [mod, pieces] of Object.entries(w.shows ?? {})) if (pieces.includes(piece)) return mods.includes(mod);
+  return true;
 }
 
 /** magazine capacity including an extended magazine */

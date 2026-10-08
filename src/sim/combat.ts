@@ -19,6 +19,7 @@ export interface WeaponRule {
 export const WEAPON_RULES: Record<string, WeaponRule> = {
   mosin: { damage: 95, melee: false, range: 900, interval: 0.8, falloff: 0.6 },
   p38: { damage: 34, melee: false, range: 220, interval: 0.1, falloff: 0.45 },
+  m9: { damage: 34, melee: false, range: 220, interval: 0.1, falloff: 0.45 },
   fists: { damage: 14, melee: true, range: 3.2, interval: 0.3, falloff: 1 },
   hatchet: { damage: 45, melee: true, range: 3.6, interval: 0.5, falloff: 1 },
   machete: { damage: 38, melee: true, range: 3.8, interval: 0.4, falloff: 1 },

@@ -13,7 +13,8 @@ import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { dedup, prune, weld, textureCompress, meshopt, getBounds, transformMesh } from '@gltf-transform/functions';
 import { MeshoptEncoder, MeshoptSimplifier } from 'meshoptimizer';
 import sharp from 'sharp';
-import { HDRI, TEXTURES, MODELS, LOCAL_MODELS } from './assets.config.mjs';
+import { HDRI, TEXTURES, MODELS, LOCAL_MODELS, WEAPON_PACKS } from './assets.config.mjs';
+import { processWeaponPack } from './weapon-packs.mjs';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
 const SRC = path.join(ROOT, 'assets-src');
@@ -368,12 +369,19 @@ const modelIds = Object.keys(MODELS);
 const modelOut = await pool(modelIds, 3, processModel);
 const localIds = Object.keys(LOCAL_MODELS);
 const localOut = await pool(localIds, 1, processLocal);
+// the weapon packs: each makes the gun alone and (most of them) the pack whole, for first person
+const packEntries = {};
+for (const [id, cfg] of Object.entries(WEAPON_PACKS)) {
+  const made = await processWeaponPack(id, cfg, { io: await getIO(), SRC, OUT, FORCE, exists, countTris });
+  Object.assign(packEntries, made.entries);
+  localCredits.push(made.credit);
+}
 
 const manifest = {
   generated: new Date().toISOString(),
   hdri,
   textures: Object.fromEntries(texIds.map((id, i) => [id, texOut[i]])),
-  models: Object.fromEntries([...modelIds.map((id, i) => [id, modelOut[i]]), ...localIds.map((id, i) => [id, localOut[i]])]),
+  models: { ...Object.fromEntries([...modelIds.map((id, i) => [id, modelOut[i]]), ...localIds.map((id, i) => [id, localOut[i]])]), ...packEntries },
 };
 await fs.writeFile(path.join(OUT, 'manifest.json'), JSON.stringify(manifest, null, 1));
 

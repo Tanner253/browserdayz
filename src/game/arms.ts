@@ -1,12 +1,22 @@
-// First-person arms. The forearm and hand geometry is cut out of the survivor's body
-// (3-joint fingers + thumb) and posed every frame with analytic
-// two-bone IK so the hands sit on the weapon's grip points, with palm orientation and
-// finger curl per hand. Because the targets live in weapon space, hands follow every
-// bob, recoil kick, bolt cycle and reload animation automatically.
+// First-person arms, for everything that is held and has no hands of its own: a hatchet,
+// a tin of beans, bare fists. They are posed every frame with analytic two-bone IK so the
+// hands sit on the grip points of whatever is held, with palm orientation and finger curl
+// per hand. Because the targets live in the held thing's space, hands follow every bob,
+// swing and kick automatically.
+//
+// The arms themselves are the ones out of the weapon packs (see rig.ts), so the hands on
+// an axe are the hands on the rifle. (Where the game has no pack they are cut out of the
+// survivor's own body, as they used to be.) The guns out of the packs are not held by
+// these: they bring the same arms already moving.
 
 import * as THREE from 'three';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { loadCharacter, lookPatch, lookUniforms, setLookUniforms, type Look } from './look';
+import { assets } from '../core/assets';
+import { liftPack } from './rig';
+
+/** the weapon pack whose arms these are */
+const ARMS_PACK = 'sniper_fp';
 
 /** A hand placement in weapon (model) space: wrist position, finger direction, palm normal. */
 export interface HandGrip {
@@ -44,6 +54,17 @@ interface Arm {
   shoulder: THREE.Vector3;
 }
 
+/** the bones of one arm, whatever the skeleton calls them */
+interface ArmBones {
+  arm: THREE.Bone;
+  fore: THREE.Bone;
+  hand: THREE.Bone;
+  /** [index, middle, ring, pinky], each from the knuckle out */
+  fingers: THREE.Bone[][];
+  /** from its root out; the last is only the tip, to aim the last joint at */
+  thumb: THREE.Bone[];
+}
+
 const _v1 = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
 const _v3 = new THREE.Vector3();
@@ -69,6 +90,7 @@ export class FPArms {
   private uniforms = lookUniforms();
 
   async load() {
+    if (assets.manifest.models[ARMS_PACK]?.rig) return this.loadPack();
     const gltf = await loadCharacter();
     this.model = SkeletonUtils.clone(gltf.scene);
     // the model faces +Z, the camera -Z; its head sits just behind the eye
@@ -160,8 +182,79 @@ export class FPArms {
       this.upper.push(up);
     }
 
-    this.right = this.makeArm('r', new THREE.Vector3(0.75, -1, 0.35), new THREE.Vector3(0.26, -0.4, 0.12));
-    this.left = this.makeArm('l', new THREE.Vector3(-0.9, -0.8, 0.15), new THREE.Vector3(-0.22, -0.36, -0.12));
+    const of = (side: 'l' | 'r'): ArmBones => {
+      const B = (n: string) => this.bones.get(`${n}_${side}`)!;
+      // the last entry is only the thumb's tip, to aim the last joint at
+      const thumb = [1, 2, 3].map((i) => B(`thumb_0${i}`)).filter(Boolean);
+      const tip = B('thumb_04_leaf');
+      if (tip) thumb.push(tip);
+      return { arm: B('upperarm'), fore: B('lowerarm'), hand: B('hand'), fingers: ['index', 'middle', 'ring', 'pinky'].map((f) => [1, 2, 3].map((i) => B(`${f}_0${i}`)).filter(Boolean)), thumb };
+    };
+    this.right = this.makeArm(of('r'), 'r', new THREE.Vector3(0.75, -1, 0.35), new THREE.Vector3(0.26, -0.4, 0.12));
+    this.left = this.makeArm(of('l'), 'l', new THREE.Vector3(-0.9, -0.8, 0.15), new THREE.Vector3(-0.22, -0.36, -0.12));
+    this.root.visible = false;
+  }
+
+  /**
+   * The arms out of a weapon pack. Only the arms are kept of it; they are stood as their
+   * skeleton was bound (hands open, which is what the curl of each grip is counted from),
+   * and from there reached out like any others.
+   */
+  private async loadPack() {
+    const entry = assets.manifest.models[ARMS_PACK];
+    const gltf = await assets.gltfOf(ARMS_PACK);
+    const scene = SkeletonUtils.clone(gltf.scene);
+    const holder = new THREE.Group();
+    holder.matrixAutoUpdate = false;
+    holder.matrix.fromArray(entry.rig!.view);
+    holder.add(scene);
+    this.model = holder;
+    this.root.add(holder);
+    let arms: THREE.SkinnedMesh | null = null;
+    scene.traverse((o) => {
+      const sm = o as THREE.SkinnedMesh;
+      if (!(o as THREE.Mesh).isMesh) return;
+      if (!sm.isSkinnedMesh) {
+        o.visible = false;
+        return;
+      }
+      arms = sm;
+      sm.frustumCulled = false;
+      sm.castShadow = false;
+      const mat = (sm.material as THREE.MeshStandardMaterial).clone();
+      mat.customProgramCacheKey = () => 'vm';
+      sm.material = liftPack(mat);
+      this.meshes.push(sm);
+    });
+    if (!arms) throw new Error(`${ARMS_PACK} has no arms`);
+    const sk = (arms as THREE.SkinnedMesh).skeleton;
+    const p = new THREE.Vector3(), sc = new THREE.Vector3();
+    sk.bones.forEach((b, i) => {
+      this.bones.set(b.name, b);
+      const pi = sk.bones.indexOf(b.parent as THREE.Bone);
+      if (pi < 0) {
+        this.rest.set(b, { p: b.position.clone(), q: b.quaternion.clone() });
+        return;
+      }
+      // where it was bound, against where its parent was
+      const q = new THREE.Quaternion();
+      _m1.copy(sk.boneInverses[pi]).multiply(_m2.copy(sk.boneInverses[i]).invert()).decompose(p, q, sc);
+      this.rest.set(b, { p: p.clone(), q });
+    });
+    const named = (side: string) => (part: string) => {
+      const re = new RegExp(`^${side}_${part}(_\\d+)?$`);
+      return [...this.bones.values()].find((b) => re.test(b.name));
+    };
+    const of = (side: string): ArmBones => {
+      const B = named(side);
+      const chain = (f: string) => [1, 2, 3].map((i) => B(`${f}${i}`)).filter((b): b is THREE.Bone => !!b);
+      const thumb = chain('thumb');
+      const tip = thumb[thumb.length - 1]?.children.find((c) => (c as THREE.Bone).isBone) as THREE.Bone | undefined;
+      if (tip) thumb.push(tip);
+      return { arm: B('arm')!, fore: B('elbow')!, hand: B('wrist')!, fingers: ['point', 'middle', 'ring', 'pink'].map(chain), thumb };
+    };
+    this.right = this.makeArm(of('R'), 'r', new THREE.Vector3(0.75, -1, 0.35), new THREE.Vector3(0.26, -0.4, 0.12));
+    this.left = this.makeArm(of('L'), 'l', new THREE.Vector3(-0.9, -0.8, 0.15), new THREE.Vector3(-0.22, -0.36, -0.12));
     this.root.visible = false;
   }
 
@@ -170,27 +263,22 @@ export class FPArms {
     setLookUniforms(this.uniforms, look);
   }
 
-  private makeArm(side: 'l' | 'r', pole: THREE.Vector3, shoulder: THREE.Vector3): Arm {
-    const B = (n: string) => this.bones.get(`${n}_${side}`)!;
-    const arm = B('upperarm'), fore = B('lowerarm'), hand = B('hand');
+  private makeArm(b: ArmBones, side: 'l' | 'r', pole: THREE.Vector3, shoulder: THREE.Vector3): Arm {
+    const { arm, fore, hand, fingers, thumb } = b;
+    const [index, middle, , pinky] = fingers;
     this.resetPose();
     this.model.updateMatrixWorld(true);
-    const at = (b: THREE.Object3D) => b.getWorldPosition(new THREE.Vector3());
-    const pa = at(arm), pf = at(fore), ph = at(hand), pm = at(B('middle_01'));
+    const at = (o: THREE.Object3D) => o.getWorldPosition(new THREE.Vector3());
+    const pa = at(arm), pf = at(fore), ph = at(hand), pm = at(middle[0]);
     // hand frame in its own local space: along the fingers, and out of the palm (from the
     // hand's own shape: across the knuckles, index to pinky)
     const hq = hand.getWorldQuaternion(new THREE.Quaternion()).invert();
     const fingersW = pm.clone().sub(ph).normalize();
-    const palmW = new THREE.Vector3().crossVectors(fingersW, at(B('pinky_01')).sub(at(B('index_01')))).normalize();
+    const palmW = new THREE.Vector3().crossVectors(fingersW, at(pinky[0]).sub(at(index[0]))).normalize();
     if (side === 'l') palmW.negate();
-    const radialLocal = at(B('index_01')).sub(at(B('pinky_01'))).normalize().applyQuaternion(hq);
+    const radialLocal = at(index[0]).sub(at(pinky[0])).normalize().applyQuaternion(hq);
     const fingersLocal = fingersW.applyQuaternion(hq);
     const palmLocal = palmW.applyQuaternion(hq);
-    const fingers = ['index', 'middle', 'ring', 'pinky'].map((f) => [1, 2, 3].map((i) => B(`${f}_0${i}`)).filter(Boolean));
-    // the last entry is only the thumb's tip, to aim the last joint at
-    const thumb = [1, 2, 3].map((i) => B(`thumb_0${i}`)).filter(Boolean);
-    const tip = B('thumb_04_leaf');
-    if (tip) thumb.push(tip);
     return { radialLocal, arm, fore, hand, la: pa.distanceTo(pf), lb: pf.distanceTo(ph), lh: pm.distanceTo(ph), fingersLocal, palmLocal, fingers, thumb, pole: pole.normalize(), shoulder };
   }
 

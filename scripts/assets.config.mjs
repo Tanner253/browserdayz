@@ -49,6 +49,7 @@ export const TEXTURES = {
  */
 export const LOCAL_MODELS = {
   uaz_469: {
+    kind: 'vehicle',
     file: 'scene.gltf',
     tex: 2048,
     small: /Glass/,
@@ -61,6 +62,96 @@ export const LOCAL_MODELS = {
       author: 'Yo.Ri',
       line: '"Uaz-469" (https://skfb.ly/6x8RE) by Yo.Ri is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).',
       changes: 'Scaled to metres and turned to face the way the game drives; each wheel re-centred on its own middle; textures re-encoded as WebP; geometry compressed.',
+    },
+  },
+};
+
+/**
+ * First-person weapon packs that are not from Poly Haven: a gun in rigid pieces, a pair of
+ * arms on a skeleton, and one long animation with every movement in it one after another.
+ * Each is written out twice:
+ *   <id>_fp.glb  the pack as it came (arms, gun, animation), for the hands of whoever holds it
+ *   <id>.glb     the gun alone, standing still, in metres with its muzzle toward +x: for the
+ *                ground, the icon, and everybody else's view of it
+ *   scale     – what brings the pack to metres (or `length`: how long the gun should come out, metres)
+ *   forward, up – which way the pack has its muzzle and its top
+ *   parts     – node in the pack -> name of the piece in the gun-alone file (what is not named is left out of it)
+ *   wrists    – the two wrist joints: the gun-alone file has its origin `origin` (metres, muzzle-right-up
+ *               as x-y-z... x along the barrel, y up, z to the right) from the right one, so the hands
+ *               of the old models' holders land on the new grip
+ *   clips     – where each movement begins and ends in the long animation, in frames at `fps`
+ *   skinned   – the gun is one skinned shape: joint -> piece (and the pack's arms are not wanted: `fp: false`)
+ *   level     – a piece that runs straight up and down the gun: the gun is rolled about its barrel until it does
+ *   fit       – instead of `origin`: put it where another pack's gun is, one piece on the other's (and its
+ *               holder's wrists are then that gun's)
+ */
+export const WEAPON_PACKS = {
+  sniper: {
+    dir: 'sniper',
+    file: 'scene.gltf',
+    tex: 2048,
+    aloneTex: 1024,
+    armsTex: 1024,
+    scale: 0.01,
+    forward: [0, 0, 1],
+    up: [0, 1, 0],
+    parts: { base: 'base', scope: 'scope', glass: 'glass', boltrear: 'boltrear', bolt: 'bolt', cheekrest: 'cheekrest', trigger: 'trigger', clip: 'mag', silencer: 'silencer' },
+    wrists: { right: 'R_wrist_026', left: 'L_wrist_02' },
+    origin: [0.425, 0, -0.034],
+    fps: 30,
+    clips: { fire: [0, 10], bolt: [10, 48], reload: [49, 97], draw: [182, 200], idle: [148, 180], check: [98, 147] },
+    credit: {
+      name: 'sniper animated',
+      url: 'https://sketchfab.com/3d-models/sniper-animated-b48999a250b2433da59f705c371a49b2',
+      author: 'DJMaesen',
+      line: '"sniper animated" (https://sketchfab.com/3d-models/sniper-animated-b48999a250b2433da59f705c371a49b2) by DJMaesen is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).',
+      changes: 'Scaled to metres; its one long animation cut into the movements the game plays; a copy of the rifle alone, standing still, made for the ground and for other players; textures re-encoded as WebP; geometry compressed.',
+    },
+  },
+  m9: {
+    dir: 'pistol_m9',
+    file: 'scene.gltf',
+    tex: 2048,
+    aloneTex: 1024,
+    armsTex: 1024,
+    scale: 1,
+    forward: [0, 0, 1],
+    up: [0, 1, 0],
+    parts: { base: 'base', slide: 'slide', mag: 'mag', hammer: 'hammer', trigger: 'trigger', stopper: 'stopper' },
+    wrists: { right: 'R_wrist_028', left: 'L_wrist_03' },
+    origin: [0.072, 0.018, -0.032],
+    fps: 30,
+    clips: { fire: [0, 11], reload: [12, 82], fireLast: [83, 94], reloadEmpty: [95, 175], holster: [176, 187], draw: [187, 233], idle: [234, 264] },
+    credit: {
+      name: 'animated pistol',
+      url: 'https://skfb.ly/ooPqJ',
+      author: 'DJMaesen',
+      line: '"animated pistol" (https://skfb.ly/ooPqJ) by DJMaesen is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).',
+      changes: 'Its one long animation cut into the movements the game plays; a copy of the pistol alone, standing still, made for the ground and for other players; textures re-encoded as WebP; geometry compressed.',
+    },
+  },
+  pistol_43: {
+    dir: 'pistol_43',
+    file: 'scene.gltf',
+    tex: 2048,
+    fp: false,
+    // (over life size: it is held in hands that were drawn round a bigger pistol, and this is the size at which its grip fills them)
+    length: 0.213,
+    forward: [0, 0, 1],
+    up: [0, 1, 0],
+    // set where the other pistol is, slide to slide (the back of it, the top of it): it is held in that pistol's hands
+    fit: { to: 'm9', piece: 'slide' },
+    // (it is bound to its skeleton held over on its side: stood up by its magazine, which hangs straight down a pistol)
+    level: 'mag',
+    skinned: { mesh: 'Glock', joints: { Slide_051: 'slide', Magazine_054: 'mag', Bullet_055: 'mag', Magazine2_056: null }, rest: 'base' },
+    wrists: { right: 'r_wrist_027', left: 'l_wrist_03' },
+    origin: [0.072, 0.018, -0.032],
+    credit: {
+      name: 'Pistol 43 Tactical | FPS Animations',
+      url: 'https://skfb.ly/oMt7u',
+      author: 'Vlasov Daniil',
+      line: '"Pistol 43 Tactical | FPS Animations" (https://skfb.ly/oMt7u) by Vlasov Daniil is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).',
+      changes: 'Only the pistol is used: the arms that came with it, its lights and its animation are left out. The pistol is taken off its skeleton and set in rigid pieces (frame, slide, magazine), scaled to metres; textures re-encoded as WebP; geometry compressed.',
     },
   },
 };

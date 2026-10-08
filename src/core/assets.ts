@@ -11,6 +11,10 @@ export interface ModelEntry {
   min: [number, number, number];
   max: [number, number, number];
   lods: { url: string; tris: number }[];
+  /** a gun out of a weapon pack: where the two wrists of whoever holds it are, in the model's own space */
+  holds?: { right: [number, number, number]; left: [number, number, number] };
+  /** a weapon pack whole (arms, gun and its movements): see src/game/rig.ts */
+  rig?: { fps: number; clips: Record<string, [number, number]>; view: number[]; frame: number[] };
 }
 
 export interface Manifest {
@@ -113,6 +117,13 @@ export class Assets {
    */
   releaseModels() {
     this.models.clear();
+  }
+
+  /** A model file whole: its scene graph and whatever animation came with it. */
+  async gltfOf(id: string): Promise<GLTF> {
+    const entry = this.manifest.models[id];
+    if (!entry) throw new Error(`unknown model ${id}`);
+    return this.loadGLTF(entry.url);
   }
 
   /** Loads a Poly Haven model by id and returns its (shared) scene graph. */

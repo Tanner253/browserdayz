@@ -13,7 +13,7 @@ import type { HitZone } from '../sim/combat';
 import type { DropInfo } from '../sim/drops';
 import type { VehicleInfo, VState } from '../sim/vehicles';
 
-export const PROTOCOL = 9;
+export const PROTOCOL = 10;
 
 /** chat channels: everyone on the server, or only players standing near the speaker */
 export type ChatChannel = 'global' | 'near';

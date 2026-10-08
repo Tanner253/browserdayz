@@ -48,7 +48,9 @@ export const TYPES: Record<string, TypeRule> = {
   // who played fast were out of ammunition for good.) `min` one under `nominal` means every
   // one taken is put back at the next restock, not only once the world is well short.
   mosin: { nominal: 14, min: 13, lifetime: 7200, restock: 180, usage: ANYWHERE, favour: ARMOURY, loaded: [1, 4] },
-  p38: { nominal: 20, min: 19, lifetime: 7200, restock: 180, usage: ANYWHERE, favour: ARMOURY, loaded: [2, 6] },
+  p38: { nominal: 14, min: 13, lifetime: 7200, restock: 180, usage: ANYWHERE, favour: ARMOURY, loaded: [2, 6] },
+  // the service pistol, with nearly twice the magazine: where there were police and soldiers
+  m9: { nominal: 7, min: 6, lifetime: 7200, restock: 240, usage: ['Police', 'Military', 'Town', 'Hunting'], favour: ARMOURY, loaded: [3, 10] },
   // loose rounds turn up in handfuls; sealed boxes are the real find
   ammo_762: { nominal: 26, min: 25, lifetime: 3600, restock: 120, usage: ANYWHERE, favour: ARMOURY, qty: [0.25, 0.6] },
   ammo_9mm: { nominal: 32, min: 31, lifetime: 3600, restock: 120, usage: ANYWHERE, favour: ARMOURY, qty: [0.25, 0.6] },

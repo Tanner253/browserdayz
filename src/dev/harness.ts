@@ -44,7 +44,8 @@ export function installHarness(g: Game) {
       const now = performance.now();
       if (now - last >= 15.5) {
         last = now;
-        realFrame();
+        // (a frozen game stays frozen: whatever was drawn last, a contact sheet say, is left on the screen)
+        if (!frozen) realFrame();
         for (const j of [...jobs]) j.each?.();
       }
       for (let k = jobs.length - 1; k >= 0; k--) {
@@ -144,7 +145,7 @@ export function installHarness(g: Game) {
      * @param o.speed ground speed; o.dir which way it travels relative to where it faces (0 ahead, 1.57 to its left)
      * @param o.view 'side' | 'front' | 'back' | 'three' (three-quarter)
      */
-    async lineup(o: { speed?: number; dir?: number; crouch?: boolean; weapon?: string | string[]; n?: number; dead?: number; air?: boolean; pitch?: number; aim?: boolean; view?: string; name?: string; hit?: boolean; dist?: number; clip?: string; from?: number; to?: number; death?: number; gear?: string[]; act?: string; actDur?: number; step?: number; emote?: string; emoteDur?: number; hold?: string } = {}) {
+    async lineup(o: { speed?: number; dir?: number; crouch?: boolean; weapon?: string | string[]; mods?: string[][]; n?: number; dead?: number; air?: boolean; pitch?: number; aim?: boolean; view?: string; name?: string; hit?: boolean; dist?: number; clip?: string; from?: number; to?: number; death?: number; gear?: string[]; act?: string; actDur?: number; step?: number; emote?: string; emoteDur?: number; hold?: string } = {}) {
       for (const a of row) a.dispose();
       row.length = 0;
       const n = o.n ?? 8;
@@ -162,7 +163,7 @@ export function installHarness(g: Game) {
         const at = new THREE.Vector3(base.x + (i - (n - 1) / 2) * gap, heightAt(g.s.world.heights, base.x + (i - (n - 1) / 2) * gap, base.z - 5), base.z - 5);
         const wid = Array.isArray(o.weapon) ? o.weapon[i % o.weapon.length] : o.weapon;
         if (wid) {
-          const h = anyG.makeHeld(wid, []);
+          const h = anyG.makeHeld(wid, o.mods?.[i % o.mods.length] ?? []);
           a.setHeld(h?.obj ?? null, h?.grips ?? null, h?.kind);
         }
         const any = a as unknown as Record<string, any>;
