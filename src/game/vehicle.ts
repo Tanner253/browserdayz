@@ -22,18 +22,18 @@ export type Ground = 'asphalt' | 'gravel' | 'grass' | 'dirt' | 'rock';
 
 export const DRIVE = {
   mass: 1650,
-  /** the tub: half its width, height and length, and how round its edges are */
-  hull: [0.86, 0.36, 1.98, 0.16] as [number, number, number, number],
+  /** the tub (everything below the windows): half its width, height and length, how round its edges are, and how far its middle is above the body's */
+  hull: [0.88, 0.47, 2.02, 0.16, 0.11] as [number, number, number, number, number],
   /** the roof: half its width, thickness and length, and where its middle is (up, back) */
-  roof: [0.74, 0.04, 1.12, 1.15, 0.72] as [number, number, number, number, number],
+  roof: [0.78, 0.07, 1.26, 1.25, 0.72] as [number, number, number, number, number],
   /** the weight sits this far below the middle of the tub (it is what brings it down on its wheels) */
   low: 0.34,
   /** how hard it is to turn over, to pitch and to spin, against a plain box of its size */
   inertia: [1.25, 1.0, 1.9] as [number, number, number],
-  /** wheels: half the track, half the wheelbase, radius */
-  track: 0.72,
-  base: 1.19,
-  radius: 0.39,
+  /** wheels: half the track, half the wheelbase, radius (taken from the model when there is one: see Garage.load) */
+  track: 0.702,
+  base: 1.271,
+  radius: 0.418,
   /** springs: length unloaded, how far they move either way, stiffness, damping going in and coming out */
   rest: 0.36,
   travel: 0.26,
@@ -41,6 +41,12 @@ export const DRIVE = {
   comp: 1.5,
   relax: 2.7,
   maxForce: 90000,
+  /**
+   * The last of each spring's travel is that many times stiffer than the rest of it: what a
+   * rubber stop does. Without it a dip in the road taken flat out put the nose on the ground,
+   * and the ground is something it has run into.
+   */
+  stop: 3.5,
   /** the engine: push at a standstill (newtons), and the fastest it will go on each kind of ground (m/s) */
   force: 9800,
   top: { asphalt: 22, gravel: 19.5, grass: 17.5, dirt: 16, rock: 14 } as Record<Ground, number>,
@@ -158,7 +164,7 @@ export class Jeep {
   /** @param visual the model: its body, and four wheels each turning about its own middle (in the order of `wheels`) */
   build(scene: THREE.Scene, s: VState, visual: { body: THREE.Object3D; wheels: THREE.Object3D[] }) {
     const R = physics.R, D = DRIVE;
-    const [hx, hy, hz, round] = D.hull;
+    const [hx, hy, hz, round, hullUp] = D.hull;
     const w = hx * 2, h = hy * 2, l = hz * 2;
     const m = D.mass / 12;
     this.body = physics.world.createRigidBody(
@@ -178,7 +184,7 @@ export class Jeep {
       physics.tag(c, { surface: 'metal', owner: this });
       this.colliders.push(c);
     };
-    add(R.ColliderDesc.roundCuboid(hx - round, hy - round, hz - round, round));
+    add(R.ColliderDesc.roundCuboid(hx - round, hy - round, hz - round, round).setTranslation(0, hullUp, 0));
     // the roof: what it lies on when it is on its back, and what keeps the rain off. Between
     // it and the tub there is nothing: whoever sits in it can be seen, and shot.
     add(R.ColliderDesc.cuboid(D.roof[0], D.roof[1], D.roof[2]).setTranslation(0, D.roof[3], D.roof[4]));
@@ -305,7 +311,8 @@ export class Jeep {
     const lv = b.linvel();
     // What the last step did to it that the springs and the engine did not: it ran into something.
     if (this.hasPost) {
-      const hard = Math.hypot(lv.x - this.post.x, lv.y - this.post.y + 9.81 * h, lv.z - this.post.z);
+      // (a knock from underneath counts for half: coming down hard on its belly is not driving into a wall)
+      const hard = Math.hypot(lv.x - this.post.x, (lv.y - this.post.y + 9.81 * h) * 0.5, lv.z - this.post.z);
       if (hard > D.crash) this.onCrash(hard);
     }
     _q.copy(this.prevQuat);
@@ -375,6 +382,10 @@ export class Jeep {
       ctrl.setWheelEngineForce(i, hand && rear ? 0 : drive / 4);
       ctrl.setWheelSteering(i, rear ? 0 : this.steer);
       ctrl.setWheelFrictionSlip(i, grips[i] * (rear ? D.rear * (hand ? D.hand : 1) : 1));
+      // the stop at the end of the spring: nothing until it is squeezed past where the weight alone holds it
+      const sag = 9.81 / (4 * D.stiff);
+      const squeezed = THREE.MathUtils.clamp((D.rest - this.susp[i] - sag) / Math.max(0.01, D.travel - sag), 0, 1);
+      ctrl.setWheelSuspensionStiffness(i, D.stiff * (1 + D.stop * squeezed * squeezed * squeezed));
     }
     if (thr || hand || Math.abs(want - this.steer) > 1e-3) b.wakeUp();
 

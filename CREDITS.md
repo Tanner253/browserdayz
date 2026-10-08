@@ -1,6 +1,14 @@
 # Asset credits
 
-All assets below are CC0 (public domain). Attribution is not required but is given anyway.
+Everything in the table below is CC0 (public domain): attribution is not required but is given anyway.
+What is not CC0 is listed first, with the credit its licence asks for.
+
+## Attribution required
+
+- "Uaz-469" (https://skfb.ly/6x8RE) by Yo.Ri is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
+  Changes made: Scaled to metres and turned to face the way the game drives; each wheel re-centred on its own middle; textures re-encoded as WebP; geometry compressed.
+
+## Public domain (CC0)
 
 The player character is built by `npm run character` from two packs by
 [Quaternius](https://quaternius.com): the body, face and hair from Universal Base Characters and the

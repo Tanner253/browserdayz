@@ -164,7 +164,7 @@ const D: ItemDef[] = [
   { id: 'watch', name: 'Wrist Watch', model: 'digital_wrist_watch', w: 1, h: 1, weight: 0.05, category: 'tool', desc: 'Still ticking.' },
   { id: 'radio', name: 'Field Radio', model: 'vintage_radio_transceiver', w: 4, h: 3, weight: 6.5, category: 'misc', desc: 'Military transceiver. Heavy, valuable to the right people.' },
   { id: 'cigarettes', name: 'Cigarettes', model: 'cigarette_pack', w: 1, h: 1, weight: 0.03, category: 'misc', stack: 5, desc: 'Kentucky Ace. A smoke steadies you: each one gives back 12 health.', use: { verb: 'Smoke', time: 4, health: 12, sound: 'smoke' } },
-  { id: 'jerrycan', name: 'Jerrycan', model: 'metal_jerrycan_green', w: 3, h: 4, weight: 3.5, category: 'misc', desc: '20 L fuel can, half full.' },
+  { id: 'jerrycan', name: 'Jerrycan', model: 'metal_jerrycan_green', w: 2, h: 3, weight: 8.5, category: 'misc', desc: 'Ten litres of fuel, a quarter of what a jeep holds. Look at a jeep and press G to pour it in.' },
   { id: 'grenade', name: 'Stick Grenade', model: 'stick_grenade', w: 1, h: 3, weight: 0.6, category: 'misc', desc: 'Pull the cord and throw. Four seconds, then everything within nine metres is hurt, you included.', use: { verb: 'Throw', time: 0.75, sound: 'bandage' }, throw: { fuse: 4, damage: 150, radius: 9 } },
   // ---------------------------------------------------------------- identity
   {

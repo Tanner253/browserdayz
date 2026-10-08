@@ -60,6 +60,7 @@ export function installHarness(g: Game) {
   let drive = 0;
   const T = {
     physics,
+    THREE,
     errors: [] as string[],
     /**
      * Run the game for `ms` of wall time regardless of tab visibility. Any number of these
@@ -292,8 +293,9 @@ export function installHarness(g: Game) {
       const P = (i: number) => [pts[i * 3], pts[i * 3 + 2]];
       const wrap = (x: number) => Math.atan2(Math.sin(x), Math.cos(x));
       const keys: Record<string, boolean> = { KeyW: false, KeyA: false, KeyD: false, KeyS: false };
+      // (asked of the game each time, not remembered: a window that loses the focus lets go of every key)
       const set = (k: string, on: boolean) => {
-        if (keys[k] !== on) g.input.simulate(k, (keys[k] = on));
+        if (g.input.held(k) !== on) g.input.simulate(k, on);
       };
       const log: string[] = [];
       let i = from, maxV = 0, maxSide = 0, minUp = 1, off = 0, air = 0, n = 0, done = false;

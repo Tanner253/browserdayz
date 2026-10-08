@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-08T20:03:07.308Z",
+ "generated": "2026-10-08T21:00:16.567Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr"
@@ -1576,6 +1576,26 @@
      "tris": 419
     }
    ]
+  },
+  "uaz_469": {
+   "url": "assets/models/uaz_469.glb",
+   "tags": [
+    "vehicle"
+   ],
+   "bytes": 534816,
+   "srcTris": 12488,
+   "tris": 12488,
+   "min": [
+    -0.9133,
+    0,
+    -2.0781
+   ],
+   "max": [
+    0.9133,
+    2.1543,
+    2.0546
+   ],
+   "lods": []
   }
  }
 }

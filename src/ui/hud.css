@@ -1224,3 +1224,9 @@ body.touch .hud-start, body.touch .rw, body.touch .inv-wrap, body.touch .inv-col
 .ride-bars i { display: block; height: 100%; margin-left: auto; background: rgba(233, 228, 216, 0.8); }
 .ride-fuel i { background: rgba(233, 196, 120, 0.85); }
 .ride-bars > div.low i { background: #c8553d; }
+
+/* the survivor's own dog tag, under the character: worn, never carried */
+.inv-neck { display: flex; align-items: center; gap: 10px; margin: 8px 0 10px; padding: 6px 10px; border: 1px solid rgba(255, 255, 255, 0.07); background: rgba(0, 0, 0, 0.22); cursor: default; }
+.inv-neck .inv-item-img { position: static; width: 34px; height: 34px; flex: none; }
+.inv-neck b { display: block; font-size: 13px; font-weight: 600; letter-spacing: 0.04em; color: var(--ink); }
+.inv-neck span { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint); }

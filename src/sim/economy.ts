@@ -92,6 +92,8 @@ export const TYPES: Record<string, TypeRule> = {
   cigarettes: { nominal: 6, min: 2, lifetime: 2400, restock: 600, usage: ['Village', 'Town', 'Military', 'Industrial'] },
   grenade: { nominal: 5, min: 2, lifetime: 3600, restock: 1200, usage: ['Military', 'Police'] },
   stash_kit: { nominal: 3, min: 1, lifetime: 7200, restock: 1800, usage: ['Farm', 'Industrial', 'Hunting'] },
+  // fuel for the jeeps (src/sim/vehicles.ts): where there are sheds, yards and soldiers
+  jerrycan: { nominal: 6, min: 4, lifetime: 3600, restock: 600, usage: ['Farm', 'Industrial', 'Military', 'Village'] },
 };
 
 export interface WorldLoot {

@@ -232,6 +232,17 @@ export class InventoryUI {
     return g;
   }
 
+  /**
+   * The survivor's own dog tag, round their neck: shown, and that is all. It is not picked
+   * up, moved or dropped; whoever kills them takes it off the body.
+   */
+  private neckEl() {
+    const tag = this.inv.neck;
+    if (!tag) return '';
+    const url = this.icons[tag.id];
+    return `<div class="inv-neck" title="Your own dog tag. It hangs round your neck: it cannot be moved or dropped, and whoever kills you takes it off your body."><div class="inv-item-img fit" style="${url ? `background-image:url(${url})` : ''}"></div><div><b>${itemName(tag)}</b><span>Round your neck · cannot be dropped</span></div></div>`;
+  }
+
   private slotEl(slot: Slot, hint = '') {
     const s = document.createElement('div');
     s.className = `inv-slot slot-${slot}`;
@@ -306,6 +317,7 @@ export class InventoryUI {
     doll.prepend(left);
     doll.appendChild(right);
     gear.appendChild(doll);
+    gear.insertAdjacentHTML('beforeend', this.neckEl());
     const long = document.createElement('div');
     long.className = 'inv-slots';
     long.append(this.slotEl('primary', '1'), this.slotEl('secondary', '2'));
@@ -323,7 +335,7 @@ export class InventoryUI {
     for (const c of inv.containers) {
       const box = document.createElement('div');
       box.className = 'inv-gridbox';
-      box.innerHTML = `<h4>${c.name} <span>${c.w}×${c.h}</span></h4>`;
+      box.innerHTML = c === inv.tags ? `<h4>${c.name} <span>${c.items.length} / ${c.w * c.h} · taken off others</span></h4>` : `<h4>${c.name} <span>${c.w}×${c.h}</span></h4>`;
       box.appendChild(this.gridEl(c));
       grids.appendChild(box);
     }

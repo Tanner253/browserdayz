@@ -2,6 +2,11 @@
 // What a character can carry comes from what they wear: the built-in jacket and trouser
 // pockets, plus the cargo grid of a vest and of whatever is on their back. A bag's
 // contents live inside the bag item, so they travel with it when it is dropped.
+//
+// Dog tags have places of their own. A survivor's own tag hangs round their neck: it is not
+// in a pocket, cannot be moved or dropped, and is on the body when they die. Tags taken off
+// other people go in a pouch of ten, so they do not fill the pockets; an eleventh goes
+// wherever there is room.
 
 import { ALL_SLOTS, GEAR_SLOTS, ITEMS, SLOT_KIND, WEAPON_SLOTS, itemWeight, sanitizeItem, type ItemInstance, type Placed, type Slot } from './items';
 
@@ -18,6 +23,9 @@ export class Container {
    */
   constructor(public id: string, public name: string, public w: number, public h: number, public items: Placed[] = [], public holdsBags = false) {}
 
+  /** the one kind of item this is for (null: anything) */
+  only: string | null = null;
+
   static size(item: ItemInstance, rot: boolean): [number, number] {
     const d = ITEMS[item.id];
     return rot ? [d.h, d.w] : [d.w, d.h];
@@ -25,6 +33,7 @@ export class Container {
 
   /** a bag can't go inside itself, and a packed bag can't be stuffed into pockets */
   accepts(item: ItemInstance): boolean {
+    if (this.only && item.id !== this.only) return false;
     if (this.id === `gear:${item.uid}`) return false;
     if (item.cargo?.length && !this.holdsBags) return false;
     return true;
@@ -138,6 +147,10 @@ export class PlayerInventory {
   slots: Record<Slot, ItemInstance | null> = EMPTY_SLOTS();
   jacket = new Container('jacket', 'Jacket', 4, 3);
   pants = new Container('pants', 'Trousers', 4, 2);
+  /** the pouch: ten places for dog tags taken off other people, and for nothing else */
+  tags = Object.assign(new Container('tags', 'Dog tags', 5, 2), { only: 'dogtag' });
+  /** the survivor's own dog tag, round their neck */
+  neck: ItemInstance | null = null;
   /** which slot is in hands: weapon/melee, or null = bare hands */
   active: Slot | null = null;
   private gearCargo = new Map<string, Container>();
@@ -155,9 +168,9 @@ export class PlayerInventory {
     return c;
   }
 
-  /** every grid the player can put things in right now: pockets first, then vest and bag */
+  /** every grid the player can put things in right now: the tag pouch (which takes only tags), pockets, then vest and bag */
   get containers(): Container[] {
-    const out = [this.jacket, this.pants];
+    const out = [this.tags, this.jacket, this.pants];
     for (const s of GEAR_SLOTS) {
       const it = this.slots[s];
       const c = it ? this.cargoOf(it) : null;
@@ -171,7 +184,30 @@ export class PlayerInventory {
     this.active = null;
     this.jacket.items = [];
     this.pants.items = [];
+    this.tags.items = [];
+    this.neck = null;
     this.gearCargo.clear();
+  }
+
+  /**
+   * Dog tags put where they belong: the survivor's own round their neck, the rest in the
+   * pouch for as long as it has room. (Characters from before there was a pouch carry theirs
+   * in their pockets.)
+   * @param own is this tag the survivor's own
+   */
+  sortTags(own: (tag: ItemInstance) => boolean) {
+    for (const c of this.containers) {
+      for (const p of [...c.items]) {
+        if (p.item.id !== 'dogtag') continue;
+        if (own(p.item)) {
+          c.remove(p.item);
+          this.neck ??= p.item;
+        } else if (c !== this.tags && this.tags.findSpace(p.item)) {
+          c.remove(p.item);
+          this.tags.add(p.item);
+        }
+      }
+    }
   }
 
   add(item: ItemInstance): ItemInstance | null {
@@ -225,6 +261,7 @@ export class PlayerInventory {
       const it = this.slots[s];
       if (it && pred(it)) return it;
     }
+    if (this.neck && pred(this.neck)) return this.neck;
     for (const c of this.containers) for (const p of c.items) if (pred(p.item)) return p.item;
     return null;
   }
@@ -233,14 +270,18 @@ export class PlayerInventory {
     return this.containers.find((c) => c.has(item)) ?? null;
   }
 
-  /** every top-level item carried: worn / slung things (bags keep their contents) and pocket contents */
+  /**
+   * Every top-level item carried: worn / slung things (bags keep their contents), pocket
+   * contents and the tags in the pouch. Not the survivor's own tag: that is not carried, and
+   * is never among what is dropped.
+   */
   topLevel(): ItemInstance[] {
     const out: ItemInstance[] = [];
     for (const s of ALL_SLOTS) {
       const it = this.slots[s];
       if (it) out.push(it);
     }
-    for (const c of [this.jacket, this.pants]) for (const p of c.items) out.push(p.item);
+    for (const c of [this.tags, this.jacket, this.pants]) for (const p of c.items) out.push(p.item);
     return out;
   }
 
@@ -262,7 +303,8 @@ export class PlayerInventory {
   }
 
   serialize(): SerializedInventory {
-    return { slots: this.slots, active: this.active, containers: [this.jacket, this.pants].map((c) => c.serialize()) };
+    // (the tag round the neck goes with the slots: to the server it is one more thing worn, and so it is on the body)
+    return { slots: { ...this.slots, neck: this.neck }, active: this.active, containers: [this.tags, this.jacket, this.pants].map((c) => c.serialize()) };
   }
 
   /** Returns items that no longer fit anywhere (the caller drops them at the player's feet). */
@@ -280,8 +322,11 @@ export class PlayerInventory {
       else overflow.push(it);
     }
     this.active = null;
+    const neck = raw.neck ? sanitizeItem(raw.neck) : null;
+    this.neck = neck?.id === 'dogtag' ? neck : null;
+    this.tags.items = [];
     for (const cd of d.containers ?? []) {
-      const c = cd.id === 'jacket' ? this.jacket : cd.id === 'pants' ? this.pants : null;
+      const c = cd.id === 'jacket' ? this.jacket : cd.id === 'pants' ? this.pants : cd.id === 'tags' ? this.tags : null;
       if (c) overflow.push(...c.load(cd as never));
     }
     // things that fell out of a shrunken pocket go wherever there is room

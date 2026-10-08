@@ -10,10 +10,10 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
-import { dedup, prune, weld, textureCompress, meshopt, getBounds } from '@gltf-transform/functions';
+import { dedup, prune, weld, textureCompress, meshopt, getBounds, transformMesh } from '@gltf-transform/functions';
 import { MeshoptEncoder, MeshoptSimplifier } from 'meshoptimizer';
 import sharp from 'sharp';
-import { HDRI, TEXTURES, MODELS } from './assets.config.mjs';
+import { HDRI, TEXTURES, MODELS, LOCAL_MODELS } from './assets.config.mjs';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
 const SRC = path.join(ROOT, 'assets-src');
@@ -256,6 +256,107 @@ async function processModel(id) {
   return { url: `assets/models/${id}.glb`, tags: cfg.tags || [], bytes: st.size, ...out };
 }
 
+// ---------------------------------------------------------------- models that are not Poly Haven's
+const mat4 = {
+  mul(a, b) {
+    const o = new Array(16).fill(0);
+    for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) o[c * 4 + r] += a[k * 4 + r] * b[c * 4 + k];
+    return o;
+  },
+  move: (x, y, z) => [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, z, 1],
+  scale: (s) => [s, 0, 0, 0, 0, s, 0, 0, 0, 0, s, 0, 0, 0, 0, 1],
+  turnY: (a) => [Math.cos(a), 0, -Math.sin(a), 0, 0, 1, 0, 0, Math.sin(a), 0, Math.cos(a), 0, 0, 0, 0, 1],
+  point: (m, p) => [0, 1, 2].map((r) => m[r] * p[0] + m[4 + r] * p[1] + m[8 + r] * p[2] + m[12 + r]),
+};
+
+/** the corners of everything a node draws, where they stand under a matrix: [min, max] */
+function boundsUnder(node, m) {
+  const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+  for (const prim of node.getMesh().listPrimitives()) {
+    const pos = prim.getAttribute('POSITION');
+    const v = [0, 0, 0];
+    for (let i = 0; i < pos.getCount(); i++) {
+      const p = mat4.point(m, pos.getElement(i, v));
+      for (let k = 0; k < 3; k++) {
+        lo[k] = Math.min(lo[k], p[k]);
+        hi[k] = Math.max(hi[k], p[k]);
+      }
+    }
+  }
+  return [lo, hi];
+}
+
+const localCredits = [];
+async function processLocal(id) {
+  const cfg = LOCAL_MODELS[id];
+  const dir = path.join(SRC, 'models', id);
+  const gltfPath = path.join(dir, cfg.file);
+  if (!(await exists(gltfPath))) throw new Error(`${id}: put its glTF download in assets-src/models/${id}/ (${cfg.file} is not there)`);
+  localCredits.push({ id, ...cfg.credit });
+  const io = await getIO();
+  const dest = path.join(OUT, 'models', `${id}.glb`);
+  const stamp = JSON.stringify({ tex: cfg.tex, scale: cfg.scale, turn: cfg.turn, v: 1 });
+  const metaPath = path.join(dir, '_meta.json');
+  let meta;
+  if (!FORCE && (await exists(dest)) && (await exists(metaPath))) {
+    meta = JSON.parse(await fs.readFile(metaPath, 'utf8'));
+    if (meta.stamp !== stamp) meta = undefined;
+  }
+  if (!meta) {
+    const doc = await io.read(gltfPath);
+    // (nothing is merged before the pieces are set in place: four wheels drawn from one shape must become four shapes)
+    await doc.transform(prune(), weld());
+    const srcTris = countTris(doc);
+    const scene = doc.getRoot().listScenes()[0];
+    const drawn = doc.getRoot().listNodes().filter((n) => n.getMesh());
+    const wheels = drawn.filter((n) => /wheel/i.test(`${n.getName()} ${n.getParentNode()?.getName() ?? ''}`));
+    if (wheels.length !== 4) throw new Error(`${id}: expected four wheels, found ${wheels.length}`);
+    // To metres, nose toward -z: and then stood on y = 0 with the middle of its wheelbase at the origin.
+    const turned = mat4.mul(mat4.turnY(cfg.turn ?? 0), mat4.scale(cfg.scale ?? 1));
+    const at = wheels.map((n) => boundsUnder(n, mat4.mul(turned, n.getWorldMatrix())));
+    const mid = [0, 2].map((k) => at.reduce((s, [lo, hi]) => s + (lo[k] + hi[k]) / 2, 0) / 4);
+    const ground = Math.min(...at.map(([lo]) => lo[1]));
+    const place = mat4.mul(mat4.move(-mid[0], -ground, -mid[1]), turned);
+    const parts = [];
+    for (const n of drawn) {
+      const m = mat4.mul(place, n.getWorldMatrix());
+      const mesh = n.getMesh();
+      const label = `${n.getName()} ${n.getParentNode()?.getName() ?? ''}`;
+      let name = /glass/i.test(label) ? 'glass' : /helm|steer/i.test(label) ? 'helm' : 'body';
+      let centre = [0, 0, 0];
+      if (wheels.includes(n)) {
+        // a wheel turns about its own middle: its points are kept about that, and the middle is where its node stands
+        const [lo, hi] = boundsUnder(n, m);
+        centre = lo.map((v, k) => (v + hi[k]) / 2);
+        name = `wheel_${centre[2] < 0 ? 'f' : 'r'}${centre[0] < 0 ? 'l' : 'r'}`;
+      }
+      if (mesh.listParents().filter((p) => p.propertyType === 'Node').length > 1) throw new Error(`${id}: ${name} shares its shape with another piece`);
+      transformMesh(mesh, mat4.mul(mat4.move(-centre[0], -centre[1], -centre[2]), m));
+      mesh.setName(name);
+      parts.push(doc.createNode(name).setMesh(mesh).setTranslation(centre));
+    }
+    for (const child of scene.listChildren()) scene.removeChild(child);
+    for (const n of drawn) n.setMesh(null);
+    for (const p of parts) scene.addChild(p);
+    await doc.transform(prune());
+    const bounds = getBounds(scene);
+    const tris = countTris(doc);
+    await doc.transform(
+      ...(cfg.small ? [textureCompress({ encoder: sharp, targetFormat: 'webp', pattern: cfg.small, resize: [64, 64], quality: 88 })] : []),
+      textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [cfg.tex, cfg.tex], quality: 88 }),
+      meshopt({ encoder: MeshoptEncoder, level: 'medium' }),
+    );
+    await fs.mkdir(path.dirname(dest), { recursive: true });
+    await io.write(dest, doc);
+    meta = { stamp, srcTris, tris, min: bounds.min.map((v) => +v.toFixed(4)), max: bounds.max.map((v) => +v.toFixed(4)), lods: [] };
+    await fs.writeFile(metaPath, JSON.stringify(meta));
+  }
+  const st = await fs.stat(dest);
+  const { stamp: _stamp, ...out } = meta;
+  console.log(`model ${id.padEnd(28)} ${String(meta.srcTris).padStart(7)} -> ${String(meta.tris).padStart(6)} tris             ${(st.size / 1024).toFixed(0).padStart(6)} KB  (not Poly Haven: ${cfg.credit.author})`);
+  return { url: `assets/models/${id}.glb`, tags: cfg.tags || [], bytes: st.size, ...out };
+}
+
 // ---------------------------------------------------------------- main
 const t0 = Date.now();
 await fs.mkdir(OUT, { recursive: true });
@@ -265,12 +366,14 @@ const texIds = Object.keys(TEXTURES);
 const texOut = await pool(texIds, 4, processTexture);
 const modelIds = Object.keys(MODELS);
 const modelOut = await pool(modelIds, 3, processModel);
+const localIds = Object.keys(LOCAL_MODELS);
+const localOut = await pool(localIds, 1, processLocal);
 
 const manifest = {
   generated: new Date().toISOString(),
   hdri,
   textures: Object.fromEntries(texIds.map((id, i) => [id, texOut[i]])),
-  models: Object.fromEntries(modelIds.map((id, i) => [id, modelOut[i]])),
+  models: Object.fromEntries([...modelIds.map((id, i) => [id, modelOut[i]]), ...localIds.map((id, i) => [id, localOut[i]])]),
 };
 await fs.writeFile(path.join(OUT, 'manifest.json'), JSON.stringify(manifest, null, 1));
 
@@ -278,8 +381,12 @@ credits.sort((a, b) => a.type.localeCompare(b.type) || a.id.localeCompare(b.id))
 const md = [
   '# Asset credits',
   '',
-  "All assets below are CC0 (public domain). Attribution is not required but is given anyway.",
+  "Everything in the table below is CC0 (public domain): attribution is not required but is given anyway.",
+  "What is not CC0 is listed first, with the credit its licence asks for.",
   "",
+  ...(localCredits.length
+    ? ['## Attribution required', '', ...localCredits.flatMap((c) => [`- ${c.line}`, `  Changes made: ${c.changes}`]), '', '## Public domain (CC0)', '']
+    : []),
   "The player character is built by `npm run character` from two packs by",
   "[Quaternius](https://quaternius.com): the body, face and hair from Universal Base Characters and the",
   "animations from the Universal Animation Library. Its clothes, gloves and boots, its build and its",

@@ -35,6 +35,36 @@ export const TEXTURES = {
   bark_brown_02: { res: '1k', tex: 1024 },
 };
 
+/**
+ * Models that are not from Poly Haven. Their files are put in assets-src/models/<id>/ by
+ * hand (the glTF download, unpacked), and the credit their licence asks for goes into
+ * CREDITS.md word for word.
+ *   file   – the .gltf in that folder
+ *   scale  – what brings it to metres
+ *   turn   – what brings its nose round to -z, radians about the upright
+ *   small  – textures matching this are flat colour and are kept tiny
+ * A vehicle is written out in the pieces the game moves: `body`, `glass`, `helm` (the
+ * steering wheel) and `wheel_fl`, `wheel_fr`, `wheel_rl`, `wheel_rr`, each wheel about its
+ * own middle, the whole standing on y = 0 with the middle of its wheelbase at the origin.
+ */
+export const LOCAL_MODELS = {
+  uaz_469: {
+    file: 'scene.gltf',
+    tex: 2048,
+    small: /Glass/,
+    scale: 0.01,
+    turn: Math.PI,
+    tags: ['vehicle'],
+    credit: {
+      name: 'Uaz-469',
+      url: 'https://skfb.ly/6x8RE',
+      author: 'Yo.Ri',
+      line: '"Uaz-469" (https://skfb.ly/6x8RE) by Yo.Ri is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).',
+      changes: 'Scaled to metres and turned to face the way the game drives; each wheel re-centred on its own middle; textures re-encoded as WebP; geometry compressed.',
+    },
+  },
+};
+
 export const MODELS = {
   // weapons (viewmodels get 2k textures)
   bolt_action_rifle_7_62: { res: '2k', tex: 2048, tags: ['weapon'] },

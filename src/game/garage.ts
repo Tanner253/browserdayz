@@ -8,8 +8,9 @@ import { assets } from '../core/assets';
 import { audio, type EngineVoice } from '../core/audio';
 import type { Input, MoveInput } from '../core/input';
 import { physics, SOLID_GROUPS } from '../core/physics';
+import type { Atmosphere } from '../world/atmosphere';
 import { WEAPON_RULES } from '../sim/combat';
-import { JEEP, SEATS, crashDamage, jeepSpots, restState, type VehicleInfo, type VState } from '../sim/vehicles';
+import { JEEP, RIDE_HEIGHT, SEATS, crashDamage, jeepSpots, restState, type VehicleInfo, type VState } from '../sim/vehicles';
 import type { Net } from '../net/client';
 import { roadLift } from '../world/road';
 import type { World } from '../world/worldgen';
@@ -25,17 +26,22 @@ import { DRIVE, Jeep, groundOf, type Controls } from './vehicle';
  * y up, z back): the driver on the left, then beside them, then the two behind.
  */
 export const SEAT_AT: [number, number, number][] = [
-  [-0.4, -0.36, 0.12],
-  [0.4, -0.36, 0.12],
-  [-0.4, -0.36, 1.08],
-  [0.4, -0.36, 1.08],
+  [-0.41, -0.34, 0.06],
+  [0.41, -0.34, 0.06],
+  [-0.41, -0.34, 1.0],
+  [0.41, -0.34, 1.0],
 ];
+/** how bright the lamps burn while somebody is at the wheel */
+const LAMPS = 1.8;
+/** how much of the metal the model's paint is drawn with is kept (see fromModel) */
+const PAINT_METAL = 0.25;
 /** the view from behind it: how far back, how high the point it looks at is, and the widest it opens at speed */
 const VIEW = { back: 7.4, up: 2.15, fov: 1.1 };
 const SEND_HZ = 15;
 
 export interface GarageHost {
   scene: THREE.Scene;
+  atmo: Atmosphere;
   world: World;
   terrain: Terrain;
   player: Player;
@@ -56,6 +62,9 @@ export interface GarageHost {
 }
 
 interface Extra {
+  /** this jeep's own copies of whatever on it glows: its lamps are lit while somebody drives it */
+  lamps: THREE.MeshStandardMaterial[];
+  lit: boolean;
   smoke: { owed: number };
   dust: { owed: number };
   voice: EngineVoice | null;
@@ -95,15 +104,43 @@ export class Garage {
   /** The model, if the game has one. Without it there are no jeeps (in development a plain stand-in is drawn instead). */
   async load() {
     if (assets.manifest.models[JEEP.model]) {
-      const scene = await assets.model(JEEP.model);
-      this.proto = fromModel(scene);
+      const m = fromModel(await assets.model(JEEP.model));
+      this.proto = m;
+      // the springs stand where the model's wheels are, and its tyres are the size it is drawn with
+      DRIVE.radius = m.radius;
+      DRIVE.track = m.track;
+      DRIVE.base = m.base;
     } else if ((import.meta as { env?: { DEV?: boolean } }).env?.DEV) this.proto = standIn();
     this.ready = !!this.proto;
   }
 
+  /** One jeep's worth of the model: the shapes are shared, the paint is its own (one burns black, another has its lamps on). */
   private make() {
     const p = this.proto!;
-    return { body: p.body.clone(true), wheels: p.wheels.map((w) => w.clone(true)) };
+    const body = p.body.clone(true), wheels = p.wheels.map((w) => w.clone(true));
+    const own = new Map<THREE.Material, THREE.Material>();
+    const lamps: THREE.MeshStandardMaterial[] = [];
+    const paint = (src: THREE.Material) => {
+      let mat = own.get(src);
+      if (!mat) {
+        mat = src.clone();
+        this.h.atmo.register(mat);
+        own.set(src, mat);
+        const std = mat as THREE.MeshStandardMaterial;
+        if (std.emissiveMap) {
+          std.emissiveIntensity = 0;
+          lamps.push(std);
+        }
+      }
+      return mat;
+    };
+    for (const o of [body, ...wheels]) {
+      o.traverse((c) => {
+        const mesh = c as THREE.Mesh;
+        if (mesh.isMesh) mesh.material = Array.isArray(mesh.material) ? mesh.material.map(paint) : paint(mesh.material);
+      });
+    }
+    return { body, wheels, lamps };
   }
 
   private groundAt = (x: number, z: number) => (roadLift(this.h.world, x, z) > 0 ? 'asphalt' : groundOf(this.h.terrain.surfaceAt(x, z)));
@@ -111,11 +148,12 @@ export class Garage {
   add(v: VehicleInfo) {
     if (!this.ready || this.jeeps.has(v.i)) return;
     const j = new Jeep(v.i, this.groundAt);
-    j.build(this.h.scene, v.s, this.make());
+    const made = this.make();
+    j.build(this.h.scene, v.s, made);
     j.hp = v.hp;
     j.fuel = v.fuel;
     this.jeeps.set(v.i, j);
-    this.extra.set(j, { smoke: { owed: 0 }, dust: { owed: 0 }, voice: null, rpm: 0, hitAt: new Map(), crashAt: 0, dryAt: 0 });
+    this.extra.set(j, { lamps: made.lamps, lit: false, smoke: { owed: 0 }, dust: { owed: 0 }, voice: null, rpm: 0, hitAt: new Map(), crashAt: 0, dryAt: 0 });
     j.onCrash = (hard) => this.crashed(j, hard);
     if (v.hp <= 0) this.char(j);
     this.seats(v.i, v.seats, v.sim);
@@ -503,23 +541,34 @@ export class Garage {
     }
   }
 
-  /** burned out: black, and going nowhere */
+  /** burned out: black, its glass gone, and going nowhere */
   private char(j: Jeep) {
     j.wreck = true;
     this.extra.get(j)?.voice?.stop();
     const x = this.extra.get(j);
     if (x) x.voice = null;
+    const burnt = new Map<THREE.Material, THREE.Material>();
     j.root.traverse((o) => {
       const m = o as THREE.Mesh;
       if (!m.isMesh) return;
-      const mats = (Array.isArray(m.material) ? m.material : [m.material]).map((mat) => {
-        const c = (mat as THREE.MeshStandardMaterial).clone();
-        c.color?.multiplyScalar(0.09);
-        if ('roughness' in c) c.roughness = 1;
-        if ('metalness' in c) c.metalness = 0;
+      if (m.name === 'glass' || m.parent?.name === 'glass') {
+        m.visible = false;
+        return;
+      }
+      const char = (mat: THREE.Material) => {
+        let c = burnt.get(mat) as THREE.MeshStandardMaterial | undefined;
+        if (!c) {
+          c = (mat as THREE.MeshStandardMaterial).clone();
+          c.color?.multiplyScalar(0.09);
+          if ('roughness' in c) c.roughness = 1;
+          if ('metalness' in c) c.metalness = 0;
+          if ('emissiveIntensity' in c) c.emissiveIntensity = 0;
+          this.h.atmo.register(c);
+          burnt.set(mat, c);
+        }
         return c;
-      });
-      m.material = Array.isArray(m.material) ? mats : mats[0];
+      };
+      m.material = Array.isArray(m.material) ? m.material.map(char) : char(m.material);
     });
   }
 
@@ -542,6 +591,12 @@ export class Garage {
 
   private looks(j: Jeep, x: Extra, dt: number) {
     const fx = this.h.effects;
+    // lamps on while somebody is at the wheel
+    const lit = !j.wreck && j.seats[0] !== null;
+    if (lit !== x.lit) {
+      x.lit = lit;
+      for (const m of x.lamps) m.emissiveIntensity = lit ? LAMPS : 0;
+    }
     const left = j.hp / JEEP.hp;
     if (!j.wreck && left < JEEP.smokeAt) fx.engineSmoke(j.point(0, 0.5, -1.45, _a), x.smoke, dt, left < JEEP.fireAt, 1 - left / JEEP.smokeAt);
     else if (j.wreck) fx.engineSmoke(j.point(0, 0.6, -0.4, _a), x.smoke, dt * 0.5, false, 0.6);
@@ -591,13 +646,14 @@ function standIn() {
     mesh.castShadow = mesh.receiveShadow = true;
     body.add(mesh);
   };
-  const [hx, hy, hz] = DRIVE.hull;
+  const [hx, hy, hz, , D_UP] = DRIVE.hull;
   box(hx * 2, hy * 2 - 0.1, hz * 2, 0, -0.05, 0);
   box(hx * 2 - 0.16, 0.34, 1.25, 0, hy + 0.1, -hz + 0.72);
   box(hx * 2, 0.3, 2.5, 0, hy + 0.08, 0.72);
   box(DRIVE.roof[0] * 2, DRIVE.roof[1] * 2, DRIVE.roof[2] * 2, 0, DRIVE.roof[3], DRIVE.roof[4]);
   for (const x of [-DRIVE.roof[0] + 0.04, DRIVE.roof[0] - 0.04]) for (const z of [-0.36, 0.7, 1.8]) box(0.07, 0.62, 0.07, x, DRIVE.roof[3] - 0.34, z);
   box(0.5, 0.5, 0.2, 0, 0.3, hz + 0.08, dark);
+  body.position.y = D_UP;
   const wheels: THREE.Object3D[] = [];
   for (let i = 0; i < 4; i++) {
     const w = new THREE.Group();
@@ -608,46 +664,63 @@ function standIn() {
     w.add(tyre, cap);
     wheels.push(w);
   }
-  return { body, wheels };
+  return { body, wheels, radius: DRIVE.radius, track: DRIVE.track, base: DRIVE.base };
 }
 
 /**
- * The model, taken apart: its four wheels (whatever in it is named for one) each set to turn
- * about its own middle, and everything else as the body, with the body's own middle put
- * where the simulation's is.
+ * The model as the asset pipeline writes a vehicle (scripts/assets.config.mjs): standing on
+ * y = 0 with the middle of its wheelbase at the origin and its nose toward -z, in pieces
+ * named `body`, `glass`, `helm` and `wheel_fl`, `wheel_fr`, `wheel_rl`, `wheel_rr`, each wheel
+ * about its own middle. Here the wheels are lifted out to be moved by the springs, the rest
+ * is set down where the simulation's body is, and the wheels are measured.
  */
 function fromModel(scene: THREE.Group) {
   const root = scene.clone(true);
   root.updateMatrixWorld(true);
-  const found: THREE.Object3D[] = [];
-  root.traverse((o) => {
-    if (/wheel|tyre|tire|koleso/i.test(o.name) && !found.some((f) => f === o.parent || isUnder(o, f))) found.push(o);
-  });
-  const wheels: THREE.Object3D[] = [];
-  const centre = (o: THREE.Object3D) => new THREE.Box3().setFromObject(o).getCenter(new THREE.Vector3());
-  // front left, front right, rear left, rear right (the front is -z, its right is +x)
-  const order = found
-    .map((o) => ({ o, c: centre(o) }))
-    .sort((a, b) => (Math.sign(a.c.z - b.c.z) || a.c.x - b.c.x))
-    .slice(0, 4);
-  order.sort((a, b) => (a.c.z < 0 === b.c.z < 0 ? a.c.x - b.c.x : a.c.z - b.c.z));
-  for (const { o, c } of order) {
+  const box = new THREE.Box3(), at = new THREE.Vector3(), size = new THREE.Vector3();
+  let radius = 0, track = 0, base = 0;
+  const wheels = ['wheel_fl', 'wheel_fr', 'wheel_rl', 'wheel_rr'].map((name) => {
+    const o = root.getObjectByName(name);
+    if (!o) throw new Error(`the jeep's model has no ${name}`);
+    box.setFromObject(o).getCenter(at);
+    box.getSize(size);
+    radius += size.y / 8;
+    track += Math.abs(at.x) / 4;
+    base += Math.abs(at.z) / 4;
     const g = new THREE.Group();
-    o.parent?.remove(o);
-    o.position.sub(c);
+    o.removeFromParent();
+    o.position.sub(at);
     g.add(o);
-    wheels.push(g);
-  }
+    return g;
+  });
   root.traverse((o) => {
     const m = o as THREE.Mesh;
-    if (m.isMesh) m.castShadow = m.receiveShadow = true;
+    if (!m.isMesh) return;
+    m.castShadow = m.receiveShadow = true;
+    const mat = m.material as THREE.MeshStandardMaterial;
+    if (mat.transparent || /glass/i.test(mat.name)) {
+      // glass that can be seen through: whoever sits behind it is there to be shot at
+      mat.transparent = true;
+      mat.opacity = 0.3;
+      mat.depthWrite = false;
+      mat.roughness = 0.08;
+      mat.metalness = 0;
+      m.castShadow = false;
+      m.renderOrder = 2;
+    } else if (mat.metalnessMap) {
+      // Its paint is drawn as bare metal, which under a studio's lamps is olive and under this
+      // sky is black (metal shows only what it reflects). Mostly paint, with a little of the sheen.
+      mat.metalness = PAINT_METAL;
+    }
   });
+  for (const w of wheels) {
+    w.traverse((o) => {
+      if ((o as THREE.Mesh).isMesh) o.castShadow = o.receiveShadow = true;
+    });
+  }
+  // (the simulation's body has its middle RIDE_HEIGHT above the ground it stands on)
+  root.position.y = -RIDE_HEIGHT;
   const body = new THREE.Group();
   body.add(root);
-  return { body, wheels };
-}
-
-function isUnder(o: THREE.Object3D, top: THREE.Object3D) {
-  for (let p = o.parent; p; p = p.parent) if (p === top) return true;
-  return false;
+  return { body, wheels, radius, track, base };
 }

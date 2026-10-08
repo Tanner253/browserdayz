@@ -182,6 +182,7 @@ export class Game {
     this.grenades.onExplode = (at, mine) => this.explode(at, mine);
     this.garage = new Garage({
       scene: r.scene,
+      atmo,
       world,
       terrain: this.s.terrain,
       player: this.player,
@@ -472,14 +473,14 @@ export class Game {
     this.inv.add(makeItem(pick(['thermos', 'milk'])));
     // one dressing: the first wound is survivable, the second is yours to deal with
     this.inv.add(makeItem('bandage'));
-    this.inv.add(this.makeTag());
+    this.inv.neck = this.makeTag();
     this.player.vitals = { health: 100, energy: 80, water: 80, stamina: MAX_STAMINA, bleeding: false };
     this.avatar.clearWounds();
     this.weapons.validate();
     this.refreshQuick();
   }
 
-  /** Every survivor carries a dog tag stamped with their own name. */
+  /** Every survivor wears a dog tag stamped with their own name, round their neck (see PlayerInventory.neck). */
   private makeTag(): ItemInstance {
     const it = makeItem('dogtag');
     it.owner = playerName() || 'Survivor';
@@ -490,7 +491,9 @@ export class Game {
   /** characters from before dog tags existed get theirs now */
   private ensureTag() {
     const me = publicId();
-    if (!this.inv.find((it) => it.id === 'dogtag' && it.pid === me)) this.inv.add(this.makeTag());
+    // (and from before tags had places of their own: the one in the pocket goes round the neck, the taken ones into the pouch)
+    this.inv.sortTags((tag) => tag.pid === me);
+    this.inv.neck ??= this.makeTag();
   }
 
   /**
@@ -782,10 +785,10 @@ export class Game {
   }
 
   private maxPlayers = 0;
-  /** carrying a tag taken off somebody (their own does not count): no jeep takes them (see Garage.use) */
+  /** carrying a tag taken off somebody (the one round their own neck does not count): no jeep takes them (see Garage.use) */
   private get tagged() {
     const me = publicId();
-    return !!this.inv.find((it) => it.id === 'dogtag' && it.pid !== me);
+    return !!this.inv.find((it) => it.id === 'dogtag' && it !== this.inv.neck && it.pid !== me);
   }
 
   /**
