@@ -197,7 +197,10 @@ interface Looted {
 const lootedTags = new Map<string, Looted>();
 /** `${player key}|${tag uid}` -> when the server first saw that player carrying it */
 const tagSeen = new Map<string, number>();
-const isWallet = (s: unknown): s is string => typeof s === 'string' && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(s);
+/** an EVM address, which the game asks for now */
+const isEvmWallet = (s: unknown): s is string => typeof s === 'string' && /^0x[0-9a-fA-F]{40}$/.test(s);
+/** that, or a Solana address: what the game asked for before, and a page left open since then still sends */
+const isWallet = (s: unknown): s is string => isEvmWallet(s) || (typeof s === 'string' && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(s));
 
 // Tags are paid for in SOL now (the site does it: api/_lib/payouts.ts), and the cheapest way
 // to a tag is a second window of one's own. So a tag is listed for a reward only if, as well
@@ -281,7 +284,9 @@ function follow(entry: CashIn, key: string, attempt: number, began: number) {
       }
       if (p.state === 'skipped') {
         log('NOT PAID', entry.id, p.why);
-        say('warn', `${entry.owner}'s tag is listed and not paid: ${p.why}.`);
+        // (the site's machine sends SOL: a tag cashed in against an EVM wallet is listed there, and that is what the player is told)
+        if (isEvmWallet(entry.wallet)) say('good', `${entry.owner}'s tag is listed for a reward, against the EVM wallet ${entry.wallet.slice(0, 6)}…${entry.wallet.slice(-4)}.`);
+        else say('warn', `${entry.owner}'s tag is listed and not paid: ${p.why}.`);
         return;
       }
       if (attempt === 1) say('info', p.state === 'sending' ? `Your reward for ${entry.owner}'s tag is on its way.` : `Your reward for ${entry.owner}'s tag is waiting: ${p.why}.`);

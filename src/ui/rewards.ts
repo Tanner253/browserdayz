@@ -1,13 +1,14 @@
-// Dog tags and creator rewards: the illustrated explanation a player sees on entering
-// the site, and the wallet address they give. The address is kept on this device and sent
-// to the server with each tag the player cashes in, where it is listed for a reward.
+// Dog tags and rewards: the illustrated explanation a player sees on entering the site, and
+// the EVM wallet address they give. The address is kept on this device and sent to the
+// server with each tag the player cashes in, where it is listed for a reward.
 
 import { TAG_HOLD, TAG_HOLD_MIN } from '../sim/items';
 
 /** whether the wallet modal and the Rewards button are shown */
 export const REWARDS_UI = true;
 
-const WALLET = 'zona.wallet';
+// (its own place: what was kept under 'zona.wallet' is a Solana address from before the game asked for an EVM one)
+const WALLET = 'zona.wallet.evm';
 const CASHED = 'zona.tags.cashed';
 const SEEN = 'zona.rewards.seen';
 
@@ -26,8 +27,8 @@ const write = (k: string, v: string) => {
   }
 };
 
-/** a Solana address: 32 to 44 base58 characters (no 0, O, I or l) */
-export const isWallet = (s: string) => /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(s.trim());
+/** an EVM address: 0x and forty hex digits */
+export const isWallet = (s: string) => /^0x[0-9a-fA-F]{40}$/.test(s.trim());
 
 export function walletAddress(): string {
   const a = read(WALLET);
@@ -85,8 +86,8 @@ export class RewardsModal {
     this.root.className = 'rw';
     this.root.innerHTML = `
       <div class="rw-card" role="dialog" aria-modal="true" aria-labelledby="rw-title">
-        <div class="rw-kicker">Creator rewards</div>
-        <h2 id="rw-title">Enter your SOL wallet address to receive rewards</h2>
+        <div class="rw-kicker">Rewards</div>
+        <h2 id="rw-title">Enter your EVM wallet address to receive rewards</h2>
         <ol class="rw-steps">
           <li>
             <svg class="rw-art" viewBox="0 0 160 104" aria-hidden="true">
@@ -115,16 +116,16 @@ export class RewardsModal {
           </li>
         </ol>
         <div class="rw-pay">
-          <svg viewBox="0 0 40 32" aria-hidden="true"><path d="M8 2h30l-6 7H2z" fill="currentColor"/><path d="M2 12.5h30l6 7H8z" fill="currentColor" opacity="0.8"/><path d="M8 23h30l-6 7H2z" fill="currentColor" opacity="0.6"/></svg>
-          <p>Cashed-in tags are what creator rewards will be paid on, in SOL, to the wallet you enter here.<small>Payouts roll out shortly after launch</small></p>
+          <svg viewBox="0 0 40 32" aria-hidden="true"><circle cx="20" cy="16" r="13" fill="none" stroke="currentColor" stroke-width="2.4"/><circle cx="20" cy="16" r="7.5" fill="currentColor" opacity="0.75"/></svg>
+          <p>Cashed-in tags are what rewards will be paid on, to the EVM wallet you enter here.</p>
         </div>
         <div class="rw-row">
-          <input class="rw-input" placeholder="Your Solana address" maxlength="44" spellcheck="false" autocomplete="off" aria-label="Solana wallet address">
+          <input class="rw-input" placeholder="Your EVM wallet address (0x…)" maxlength="42" spellcheck="false" autocomplete="off" aria-label="EVM wallet address">
           <button class="rw-save">Save address</button>
         </div>
         <div class="rw-err" role="alert"></div>
         <div class="rw-foot">
-          <span class="rw-fine">Use the public Solana address of your wallet. Never share a seed phrase or private key. Saved on this device, and sent with each tag you cash in so it can be listed for a reward.</span>
+          <span class="rw-fine">Use the public address of your EVM wallet: it starts with 0x. Never share a seed phrase or private key. Saved on this device, and sent with each tag you cash in so it can be listed for a reward.</span>
           <button class="rw-skip">Not now</button>
         </div>
       </div>`;
@@ -168,23 +169,6 @@ export class RewardsModal {
     this.root.classList.add('show');
     this.input.focus();
     this.runClock();
-    void this.showPay();
-  }
-
-  /**
-   * What a tag pays right now, if the site is paying: asked of the site each time the window
-   * opens (see api/cashins.ts). With no answer, or payouts not on, the words stay as they are.
-   */
-  private async showPay() {
-    try {
-      const s = await siteStatus();
-      if (!s.on || typeof s.tagPays !== 'number' || typeof s.share !== 'number' || typeof s.floor !== 'number') return;
-      const round = (n: number) => String(Math.round(n * 10_000) / 10_000);
-      const p = this.root.querySelector('.rw-pay p') as HTMLElement;
-      p.innerHTML = `A tag you cash in pays <b>${round(s.tagPays)} SOL</b> right now: ${round(s.share * 100)}% of the reward treasury, ${round(s.floor)} SOL at least, sent to the wallet you enter here.<small>Every payment is listed at <a href="/payouts" target="_blank" rel="noopener">zonapvp.fun/payouts</a></small>`;
-    } catch {
-      /* no site behind this page (the game served from somewhere else, or playing offline) */
-    }
   }
 
   close() {
@@ -217,7 +201,7 @@ export class RewardsModal {
   private save() {
     const v = this.input.value.trim();
     if (!isWallet(v)) {
-      this.err.textContent = 'That does not look like a Solana address: it should be 32 to 44 letters and digits.';
+      this.err.textContent = 'That does not look like an EVM wallet address: it should be 0x followed by 40 letters and digits.';
       return;
     }
     write(WALLET, v);

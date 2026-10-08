@@ -222,6 +222,8 @@ await test('what is not paid, and why', async () => {
   };
   assert.match(await why(tag(w, '')), /no wallet/);
   assert.match(await why(tag(w, 'not-a-wallet-at-all-not-a-wallet-at-all')), /not a wallet address/);
+  // the game asks for an EVM wallet now: listed against it, and nothing sent to it from here
+  assert.match(await why(tag(w, '0x52908400098527886E0F7030069857D2E4169EE7')), /listed against an EVM wallet/);
   assert.match(await why(tag(w, TREASURY.address)), /cannot be paid|can be paid/);
   const tokenAccount = wallet(500);
   w.chain.programOwned.add(tokenAccount);

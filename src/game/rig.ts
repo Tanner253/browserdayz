@@ -53,6 +53,8 @@ export function liftPack<T extends THREE.Material>(mat: T): T {
   return mat;
 }
 
+const _box = new THREE.Box3();
+
 export class WeaponRig {
   /** in the eye's space: x right, y up, the muzzle away down -z, metres */
   readonly root = new THREE.Group();
@@ -144,13 +146,21 @@ export class WeaponRig {
     }
   }
 
-  /** Where a piece is at rest, as a box in the space of `root` (which must not have been moved yet). */
+  /**
+   * Where a piece is at rest, as a box in the space of `root` (which must not have been moved
+   * yet). Only what is seen of it: not the pack's own shape where another gun rides on it, nor
+   * anything hung there that is not fitted.
+   */
   box(name: string): THREE.Box3 {
     this.rest();
     this.root.updateMatrixWorld(true);
     const box = new THREE.Box3();
-    const n = this.node(name);
-    if (n) box.setFromObject(n);
+    this.node(name)?.traverseVisible((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+      box.union(_box.copy(mesh.geometry.boundingBox!).applyMatrix4(mesh.matrixWorld));
+    });
     return box;
   }
 

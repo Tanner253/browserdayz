@@ -180,6 +180,18 @@ export async function processWeaponPack(id, cfg, { io, SRC, OUT, FORCE, exists, 
       B = mul([1, 0, 0, 0, 0, c, sn, 0, 0, -sn, c, 0, 0, 0, 0, 1], B);
       console.log(`  ${id}: rolled ${((roll * 180) / Math.PI).toFixed(1)} degrees about its barrel to stand it up`);
     }
+    if (cfg.trim) {
+      // What is left once it stands: how its slide still lies, in degrees (nose to the right,
+      // nose up, right side up). The slide's own length and its own right are made the gun's.
+      const t = (deg) => Math.tan(((deg ?? 0) * Math.PI) / 180);
+      const unit = (v) => v.map((x) => x / Math.hypot(...v));
+      const e1 = unit([1, t(cfg.trim.pitch), t(cfg.trim.yaw)]);
+      const b = [0, t(cfg.trim.roll), 1];
+      const k = b[0] * e1[0] + b[1] * e1[1] + b[2] * e1[2];
+      const e3 = unit(b.map((v, i) => v - k * e1[i]));
+      const e2 = cross(e3, e1);
+      B = mul([e1[0], e2[0], e3[0], 0, e1[1], e2[1], e3[1], 0, e1[2], e2[2], e3[2], 0, 0, 0, 0, 1], B);
+    }
     // each piece's box along the gun's own axes (not yet set down anywhere)
     const pieceBox = new Map();
     const into = (piece, p) => {

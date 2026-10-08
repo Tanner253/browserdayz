@@ -157,6 +157,9 @@ const HELD = {
   m9: new THREE.Vector3(0.095, -0.135, -0.31),
 };
 
+/** A pack gun standing in the hands: how much of the pack's own idle sway is used, and seconds to a breath. */
+const IDLE = { part: 0.22, every: 4.4 };
+
 /** Clone a glTF material for the viewmodel scene (no CSM, no shared shader hooks). */
 function plainMaterial(m: THREE.Material): THREE.Material {
   const c = m.clone() as THREE.MeshStandardMaterial;
@@ -441,8 +444,10 @@ export class Weapons {
     const body = new THREE.Group();
     body.add(rig.root);
     root.add(body);
-    // aimed: the sights on the middle of the picture, a hand's width nearer than from the hip
-    const ads = o.kind === 'rifle' ? new THREE.Vector3(-c.x, -c.y, -sight.max.z - 0.075) : new THREE.Vector3(-c.x, -sight.max.y - 0.012, o.hip.z + 0.07);
+    // aimed: the sights on the middle of the picture, a hand's width nearer than from the hip.
+    // (A pistol's: the eye level with the top of them, so that what is aimed at sits on the front
+    // post. A centimetre higher and the shot went into the air over the gun, with nothing to say where.)
+    const ads = o.kind === 'rifle' ? new THREE.Vector3(-c.x, -c.y, -sight.max.z - 0.075) : new THREE.Vector3(-c.x, -sight.max.y - 0.002, o.hip.z + 0.07);
     const fc = frame.getCenter(new THREE.Vector3());
     const m: VmModel = {
       root, kind: o.kind, flash: o.flash, body, rig, world, suppressor, brass: !!o.gun,
@@ -1434,7 +1439,11 @@ export class Weapons {
     if (m.shotT < len) rig.pose(shot, m.shotT / len);
     // run dry, a pistol stays as its last shot left it: slide back
     else if (m.kind === 'pistol' && this.chamberEmpty && rig.has('fireLast')) rig.pose('fireLast', 1);
-    else if (rig.has('idle') && !this.aiming) rig.pose('idle', (this.time % rig.seconds('idle')) / rig.seconds('idle'));
+    // Standing with it: a slow breath. A pack's own drawing of this is a straight line out and a
+    // straight line back once a second (the pistol tips seven degrees and comes back two
+    // centimetres: it rocked like a chair). Its first half is the way out, so a part of that,
+    // eased in and out over a few seconds, is the same movement at a size and a pace to live with.
+    else if (rig.has('idle')) rig.pose('idle', 0.5 * IDLE.part * (0.5 - 0.5 * Math.cos((this.time * Math.PI * 2) / IDLE.every)) * (1 - this.adsT));
     else rig.rest();
   }
 

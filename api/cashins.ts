@@ -13,7 +13,7 @@
 // the page (and the game, from the status) calls the housekeeping, api/tick.ts.
 
 import { live } from './_lib/live.js';
-import { cached, dayOf, editBook, freshBook, glanceBook, refOf, snapshot, sol, type Book, type Entry, type Row, type Snapshot, type World } from './_lib/payouts.js';
+import { cached, dayOf, editBook, freshBook, glanceBook, isEvm, refOf, snapshot, sol, type Book, type Entry, type Row, type Snapshot, type World } from './_lib/payouts.js';
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 /** an amount of SOL, to as many places as it needs and no more than four */
@@ -54,6 +54,7 @@ function outcome(r: Row): string {
   if (r.state === 'paid') return `<b class="sol">${amount(r.lamports ?? 0)} SOL</b> ${link}`;
   if (r.state === 'sending') return `<span class="go">${amount(r.lamports ?? 0)} SOL on its way</span> ${link}`;
   if (r.state === 'waiting') return `<span class="go">waiting</span> <i>${esc(r.why ?? '')}</i>`;
+  if (r.state === 'skipped' && isEvm(r.wallet)) return '<i>listed for a reward, against an EVM wallet</i>';
   if (r.state === 'skipped') return `<i>not paid: ${esc(r.why ?? '')}</i>`;
   return '<i>listed (payouts were not on)</i>';
 }
@@ -81,7 +82,7 @@ function page(book: Book, s: Snapshot, now: number): string {
         <td>${when(r.at)}</td>
         <td>${esc(r.name)}</td>
         <td>${esc(r.owner)}</td>
-        <td class="w">${r.wallet ? `<a href="https://solscan.io/account/${esc(r.wallet)}" target="_blank" rel="noopener"><code>${esc(short(r.wallet))}</code></a>` : '<i>none given</i>'}</td>
+        <td class="w">${!r.wallet ? '<i>none given</i>' : isEvm(r.wallet) ? `<code title="an EVM wallet">${esc(short(r.wallet))}</code>` : `<a href="https://solscan.io/account/${esc(r.wallet)}" target="_blank" rel="noopener"><code>${esc(short(r.wallet))}</code></a>`}</td>
         <td>${outcome(r)}</td>
       </tr>`,
     )
@@ -167,6 +168,7 @@ function page(book: Book, s: Snapshot, now: number): string {
     <li>No more than ${Math.round(s.dayShare * 100)}% of the treasury leaves it in one day, and one wallet is paid for at most ${s.walletDayTags} tags in one day. A tag over either limit waits, and is paid when the limit allows, for up to three days.</li>
     <li>A tag is paid once, and the chain itself sees to it: each payment leaves a receipt, an account of its own, and a second payment for the same tag cannot be made while that receipt stands. Each payment also carries a note, "ZONA dog tag" and the reference shown beside it here.</li>
     <li>A tag cashed in with no wallet given is listed and not paid. The wallet is asked for in the game, on the rewards window.</li>
+    <li>The game asks for an EVM wallet now (an address that starts with 0x). A tag cashed in against one is listed here for a reward. What this page counts and pays is SOL, to Solana wallets: it sends nothing to an EVM wallet.</li>
   </ul>
 </main>
 <script>

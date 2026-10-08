@@ -1,4 +1,5 @@
-// Jeeps. A handful stand along the road; anybody can get in one and drive it, three more
+// Jeeps. A handful stand along the road and a few more out at the edge of the map, behind
+// the outlying places; anybody can get in one and drive it, three more
 // can ride, and it can be shot until it burns. It is the fast way across the map and the
 // loud one: everybody hears it coming.
 //
@@ -12,8 +13,10 @@ import { BUILDING_FOOTPRINT, PLAY_RADIUS, heightAt, type World } from '../world/
 export const JEEP = {
   /** the model it is drawn with (see scripts/assets.config.mjs): without it there are no jeeps */
   model: 'uaz_469',
-  /** how many stand in the world */
+  /** how many stand along the road */
   count: 5,
+  /** and how many more out at the edge of the map, away from the road, each behind one of the outlying places */
+  outlying: 3,
   /** what it takes before it burns: a rifle round takes 95 of it, a pistol round 34 */
   hp: 600,
   /** under this it smokes, under this it is on fire and goes up a few seconds later */
@@ -82,21 +85,21 @@ export function restState(x: number, ground: number, z: number, yaw: number): VS
 
 /**
  * Where the jeeps stand when the world is new: pulled up on the verge, spread along the
- * whole length of the road, on ground that is level and clear. The same on every game and
- * on the server.
+ * whole length of the road, on ground that is level and clear; and then a few out where
+ * people start, far from the road. The same on every game and on the server.
  */
-export function jeepSpots(world: World, count = JEEP.count): { x: number; y: number; z: number; yaw: number }[] {
+export function jeepSpots(world: World, count = JEEP.count, outlying = JEEP.outlying): { x: number; y: number; z: number; yaw: number }[] {
   const p = world.road.points, n = p.length / 3;
   const H = world.heights;
   const out: { x: number; y: number; z: number; yaw: number }[] = [];
-  const clear = (x: number, z: number) => {
+  const clear = (x: number, z: number, trees = 3.2) => {
     const y = heightAt(H, x, z);
     for (const [dx, dz] of [[2.2, 0], [-2.2, 0], [0, 2.2], [0, -2.2]]) if (Math.abs(heightAt(H, x + dx, z + dz) - y) > 0.45) return false;
     if (world.buildings.some((b) => {
       const [w, d] = BUILDING_FOOTPRINT[b.type];
       return Math.hypot(b.x - x, b.z - z) < Math.hypot(w, d) / 2 + 4;
     })) return false;
-    if (world.trees.some((t) => Math.hypot(t.x - x, t.z - z) < 3.2)) return false;
+    if (world.trees.some((t) => Math.hypot(t.x - x, t.z - z) < trees)) return false;
     if (world.rocks.some((t) => Math.hypot(t.x - x, t.z - z) < 3.4) || world.props.some((t) => Math.hypot(t.x - x, t.z - z) < 3)) return false;
     // (inside the part of the map people play in: the road runs on up into the hills at both ends)
     return Math.hypot(x, z) < PLAY_RADIUS - 30;
@@ -117,6 +120,30 @@ export function jeepSpots(world: World, count = JEEP.count): { x: number; y: num
           out.push({ x, y: heightAt(H, x, z), z, yaw: Math.atan2(-tx, -tz) + (side > 0 ? 0 : Math.PI) });
           break search;
         }
+      }
+    }
+  }
+  // Out at the edge. The outlying places far from the road, taken one at a time: whichever is
+  // furthest from every jeep there is so far. It stands behind the buildings, on the side
+  // toward the middle of the map, nose pointing home. (A place's own frame: its doors face
+  // out toward the map's edge, and what lies about its yard lies in front of them; behind is
+  // ground that was levelled with the rest and has nothing put on it.)
+  const toRoad = (x: number, z: number) => {
+    let d = Infinity;
+    for (let i = 0; i < n; i++) d = Math.min(d, Math.hypot(p[i * 3] - x, p[i * 3 + 2] - z));
+    return d;
+  };
+  const BEHIND: [number, number][] = [[0, -17], [7, -18], [-7, -18], [0, -22], [13, -19], [-13, -19], [0, -27], [9, -26], [-9, -26]];
+  const far = world.sites.filter((st) => toRoad(st.x, st.z) > 150);
+  for (let k = 0; k < outlying; k++) {
+    const alone = (st: { x: number; z: number }) => Math.min(...out.map((o) => Math.hypot(o.x - st.x, o.z - st.z)));
+    place: for (const st of far.filter((s) => alone(s) > 60).sort((a, b) => alone(b) - alone(a))) {
+      const c = Math.cos(st.rot), sn = Math.sin(st.rot);
+      for (const [right, fwd] of BEHIND) {
+        const x = st.x + right * c + fwd * sn, z = st.z - right * sn + fwd * c;
+        if (!clear(x, z, 4.5)) continue;
+        out.push({ x, y: heightAt(H, x, z), z, yaw: st.rot });
+        break place;
       }
     }
   }

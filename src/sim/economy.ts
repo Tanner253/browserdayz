@@ -34,7 +34,7 @@ const ARMOURY = { Police: 12, Military: 5, Hunting: 2 };
  * guard posts, the police armoury): always something to fight with, put back a few
  * minutes after it is taken. [item, weight]
  */
-const ARMS: [string, number][] = [['p38', 2.4], ['mosin', 1.2], ['hatchet', 1.6], ['bat', 1.6], ['crowbar', 1.4], ['machete', 1.4], ['knife', 1]];
+const ARMS: [string, number][] = [['p38', 2.4], ['m9', 1.8], ['mosin', 1.2], ['hatchet', 1.6], ['bat', 1.6], ['crowbar', 1.4], ['machete', 1.4], ['knife', 1]];
 /** seconds an armed point stays bare once its weapon has been taken */
 export const ARMS_RESTOCK = 180;
 
@@ -49,8 +49,9 @@ export const TYPES: Record<string, TypeRule> = {
   // one taken is put back at the next restock, not only once the world is well short.
   mosin: { nominal: 14, min: 13, lifetime: 7200, restock: 180, usage: ANYWHERE, favour: ARMOURY, loaded: [1, 4] },
   p38: { nominal: 14, min: 13, lifetime: 7200, restock: 180, usage: ANYWHERE, favour: ARMOURY, loaded: [2, 6] },
-  // the service pistol, with nearly twice the magazine: where there were police and soldiers
-  m9: { nominal: 7, min: 6, lifetime: 7200, restock: 240, usage: ['Police', 'Military', 'Town', 'Hunting'], favour: ARMOURY, loaded: [3, 10] },
+  // the service pistol, with nearly twice the magazine: as easy to come by as the other one
+  // (at half as many, and in half the kinds of building, nobody could find one)
+  m9: { nominal: 14, min: 13, lifetime: 7200, restock: 180, usage: ANYWHERE, favour: ARMOURY, loaded: [3, 10] },
   // loose rounds turn up in handfuls; sealed boxes are the real find
   ammo_762: { nominal: 26, min: 25, lifetime: 3600, restock: 120, usage: ANYWHERE, favour: ARMOURY, qty: [0.25, 0.6] },
   ammo_9mm: { nominal: 32, min: 31, lifetime: 3600, restock: 120, usage: ANYWHERE, favour: ARMOURY, qty: [0.25, 0.6] },

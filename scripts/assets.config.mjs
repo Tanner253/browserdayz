@@ -143,6 +143,9 @@ export const WEAPON_PACKS = {
     fit: { to: 'm9', piece: 'slide' },
     // (it is bound to its skeleton held over on its side: stood up by its magazine, which hangs straight down a pistol)
     level: 'mag',
+    // (and it is bound a little askew besides, which shows along the sights: under a degree each
+    // way, measured in the game along the sides and the underside of its slide once it stood up)
+    trim: { yaw: 0.83, pitch: 0.6, roll: 0.4 },
     skinned: { mesh: 'Glock', joints: { Slide_051: 'slide', Magazine_054: 'mag', Bullet_055: 'mag', Magazine2_056: null }, rest: 'base' },
     wrists: { right: 'r_wrist_027', left: 'l_wrist_03' },
     origin: [0.072, 0.018, -0.032],
