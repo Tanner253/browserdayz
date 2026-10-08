@@ -7,6 +7,7 @@
 //   node scripts/film.mjs --stills 30         also keep every 30th frame, and lay them out as contact sheets
 //   node scripts/film.mjs --no-video          stills and contact sheets only (fastest way to look at a cut)
 //   node scripts/film.mjs --twice             film the stretch twice and report how many frames differ
+//   node scripts/film.mjs --cut 2             the second trailer (src/trailer/shots2.ts) -> zona-trailer-2.mp4
 //
 // The dev server must not reload during a take: do not edit game source while this runs.
 
@@ -31,8 +32,9 @@ const to = arg('to', null) === null ? null : Number(arg('to'));
 const stills = Number(arg('stills', 0));
 const noVideo = !!arg('no-video', false);
 const twice = !!arg('twice', false);
-const name = String(arg('out', draft ? 'draft' : 'zona-trailer'));
-const URL_ = String(arg('url', 'http://localhost:5173/trailer.html'));
+const cut = String(arg('cut', '1'));
+const name = String(arg('out', (draft ? 'draft' : 'zona-trailer') + (cut === '1' ? '' : `-${cut}`)));
+const URL_ = String(arg('url', `http://localhost:5173/trailer.html${cut === '1' ? '' : `?cut=${cut}`}`));
 const PORT = 9333;
 const CHROME = ['C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'].find((p) => fs.existsSync(p));
 if (!CHROME) throw new Error('no Chrome or Edge found');

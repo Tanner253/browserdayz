@@ -95,3 +95,28 @@ body.tr-bars #tr-overlay::after { height: 9.2vh; }
 
 /* the tag's own countdown, big enough to read in a film */
 body.filming .hud-tags { transform: scale(2.1); transform-origin: top left; }
+/* and the leaderboard above it (a scaled box keeps its old place in the layout: the margin makes the room) */
+body.filming .hud-board { transform: scale(1.55); transform-origin: top left; margin-bottom: 78px; }
+
+/* the kill feed too */
+body.filming .hud-feed { transform: scale(1.6); transform-origin: top right; }
+/* one shot is about the map: it is shown larger, and what hangs under it moves down to make room */
+body.tr-map-big .hud-minimap { transform: scale(1.7); transform-origin: top left; }
+body.tr-map-big .hud-under { top: 326px; }
+/* the scenes of things not in the game yet say so across the top */
+.tr-title.soonbar { top: 13%; font-size: 5.2vh; letter-spacing: 0.5em; margin-right: -0.5em; color: #14110b; background: #ffd35a; padding: 0.12em 0.9em 0.12em 1.4em; text-shadow: none; }
+
+/* the second trailer: a list down the left, one line at a time */
+.tr-title.head { left: 9%; top: 15%; transform: translate(0, -50%); font-size: 3.4vh; letter-spacing: 0.6em; color: #ffd35a; font-weight: 600; text-align: left; }
+.tr-title.li { left: 9%; transform: translate(0, -50%) scale(var(--k, 1)); transform-origin: left center; font-size: 6.2vh; text-align: left; letter-spacing: 0.05em; padding: 0.05em 0.5em 0.05em 0.45em; border-left: 0.14em solid #ffd35a; background: linear-gradient(90deg, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.35) 70%, transparent); }
+.tr-title.li-0 { top: 25%; }
+.tr-title.li-1 { top: 33.4%; }
+.tr-title.li-2 { top: 41.8%; }
+.tr-title.li-3 { top: 50.2%; }
+.tr-title.li-4 { top: 58.6%; }
+.tr-title.li-5 { top: 67%; }
+.tr-title.li-6 { top: 75.4%; }
+.tr-title.li-7 { top: 83.8%; }
+/* something called out, over the head of whoever called it (a scene that says COMING SOON) */
+.tr-say { position: absolute; z-index: 2; transform: translate(-50%, -100%) scale(var(--k, 1)); transform-origin: 50% 100%; padding: 0.18em 0.6em 0.2em; font-size: 6.4vh; font-weight: 800; font-stretch: condensed; letter-spacing: 0.04em; white-space: nowrap; color: #14110b; background: #f3efe6; border-radius: 0.22em; box-shadow: 0 0.08em 0.5em rgba(0, 0, 0, 0.55); }
+.tr-say::after { content: ''; position: absolute; left: 50%; top: 100%; margin-left: -0.28em; border: 0.28em solid transparent; border-top-color: #f3efe6; border-bottom: 0; }

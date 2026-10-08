@@ -9,3 +9,5 @@ data
 .DS_Store
 # trailer takes
 trailer/out
+# clips for the trailer, built by: npm run character -- --emotes
+trailer/emotes.glb

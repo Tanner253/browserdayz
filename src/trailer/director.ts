@@ -8,14 +8,15 @@
 
 import * as THREE from 'three';
 import { Muxer, ArrayBufferTarget } from 'mp4-muxer';
+import { assets } from '../core/assets';
 import { audio, AudioEngine } from '../core/audio';
 import { physics, SHOT_GROUPS } from '../core/physics';
 import { RemotePlayer } from '../game/remote';
 import { heightAt } from '../world/worldgen';
 import { wind } from '../world/foliage';
 import { makeItem, type ItemInstance } from '../sim/items';
-import { buildShots, SECONDS } from './shots';
-import { scoreMusic } from './music';
+import { SECONDS } from './shots';
+import { scoreMusic, type Arrangement } from './music';
 import './trailer.css';
 
 type Any = Record<string, any>;
@@ -89,6 +90,27 @@ export class Actor {
   /** called when it goes down */
   onDeath: (() => void) | null = null;
   private corpse: string | null = null;
+  /** a clip from trailer/emotes.glb laid over whatever the game is playing on this body */
+  private emoting: { act: THREE.AnimationAction; dur: number; t0: number; loop: boolean; speed: number; phase: number } | null = null;
+
+  /**
+   * Dance, talk with the hands, point: movements the game does not have yet, for the scenes
+   * that say what is coming. Null goes back to the game's own animation.
+   */
+  emote(name: string | null, o: { loop?: boolean; speed?: number; phase?: number } = {}) {
+    if (this.emoting) {
+      this.emoting.act.stop();
+      this.emoting = null;
+    }
+    const clip = name ? this.S.emotes.get(name) : null;
+    if (!clip) return this;
+    const act = ((this.rp.avatar as unknown as Any).mixer as THREE.AnimationMixer).clipAction(clip);
+    act.reset().play();
+    // the game sets its own clips' weights (they add up to one) every frame: this one outweighs them
+    act.setEffectiveWeight(80);
+    this.emoting = { act, dur: clip.duration, t0: performance.now(), loop: o.loop ?? true, speed: o.speed ?? 1, phase: o.phase ?? 0 };
+    return this;
+  }
 
   constructor(private S: Stage, public id: number, public name: string) {
     this.rp = new RemotePlayer(id, name, S.g.makeHeld);
@@ -115,11 +137,11 @@ export class Actor {
     this.hp = 100;
     this.foe = null;
     this.onDeath = null;
+    this.emote(null);
     this.weapon = weapon;
     const rp = this.rp as unknown as Any;
     rp.snaps.length = 0;
     rp.vel.set(0, 0, 0);
-    rp.stride = 0;
     rp.flinch = 0;
     rp.dripT = 0;
     this.rp.pos.copy(this.pos);
@@ -162,6 +184,11 @@ export class Actor {
     return d < 0.05;
   }
   push(ago = 0) {
+    const e = this.emoting;
+    if (e) {
+      const t = ((performance.now() - e.t0) / 1000) * e.speed + e.phase * e.dur;
+      e.act.time = e.loop ? t % e.dur : Math.min(e.dur - 1e-3, t);
+    }
     const f = (this.crouch ? F_CROUCH : 0) | (this.sprint ? F_SPRINT : 0) | (this.aim ? F_AIM : 0) | F_GROUND | (this.bleeding ? F_BLEED : 0);
     this.rp.push([this.pos.x, this.pos.y, this.pos.z, this.yaw, this.pitch, f], performance.now() + ago);
   }
@@ -228,6 +255,10 @@ export class Stage {
   world!: Any;
   bullet!: THREE.Group;
   trail!: THREE.Mesh;
+  /** a shot's setup can run the clock on unseen (smoke building, a body settling): what the game plays meanwhile is not for the soundtrack */
+  mute = false;
+  /** clips for Actor.emote, by name (empty when trailer/emotes.glb has not been built) */
+  emotes = new Map<string, THREE.AnimationClip>();
 
   private seed = 1;
   /** start the film's own dice again from a known place */
@@ -321,6 +352,14 @@ export class Stage {
     this.bullet.visible = this.trail.visible = false;
   }
   actor(i: number) { return this.actors[i]; }
+  /** the local player's own grenade in the air or on the ground, if there is one */
+  myNade(): { pos: THREE.Vector3; vel: THREE.Vector3; fuse: number; resting: boolean } | null {
+    return this.g.grenades.list.find((n: Any) => n.mine) ?? null;
+  }
+  /** a line in the kill feed, worded as the game words it */
+  feedKill(by: string, name: string, weapon: string, dist = 0, mine = true) {
+    this.g.hud.feed(`${by} killed ${name} · ${weapon}${dist > 3 ? ` · ${Math.round(dist)} m` : ''}`, mine);
+  }
   /** the local player's own bullet in flight, if there is one */
   myBullet(): { pos: THREE.Vector3; vel: THREE.Vector3; travelled: number } | null {
     return this.g.weapons.bullets.find((b: Any) => !b.ghost) ?? null;
@@ -330,6 +369,9 @@ export class Stage {
 // ------------------------------------------------------------------------------------------ runtime
 
 const S = new Stage();
+/** which trailer: trailer.html?cut=2 is the second one (shots2.ts); anything else the first */
+const CUT = new URLSearchParams(location.search).get('cut') === '2' ? 2 : 1;
+let arrangement: Arrangement | undefined;
 let shots: Shot[] = [];
 let current: Shot | null = null;
 let fps = 60;
@@ -354,10 +396,10 @@ let pumping = true;
 /** Every sound the game asks for is written down instead of played; the soundtrack is rendered from the list afterwards. */
 function hookAudio() {
   const plain = (v: unknown): unknown => (v && typeof v === 'object' && 'x' in (v as Any) ? { x: (v as Any).x, y: (v as Any).y, z: (v as Any).z } : v);
-  const names = ['gunshot', 'dryFire', 'click', 'boltCycle', 'reloadNear', 'roundInsert', 'magOut', 'magIn', 'slideRack', 'shellDrop', 'whiz', 'hitTick', 'equip', 'jump', 'land', 'death', 'body', 'door', 'impact', 'footstep', 'whoosh', 'ui', 'hurt', 'setListener', 'updateAmbience'];
+  const names = ['gunshot', 'dryFire', 'click', 'boltCycle', 'reloadNear', 'roundInsert', 'magOut', 'magIn', 'slideRack', 'shellDrop', 'whiz', 'hitTick', 'equip', 'jump', 'land', 'death', 'body', 'door', 'impact', 'footstep', 'whoosh', 'explosion', 'ui', 'hurt', 'setListener', 'updateAmbience'];
   for (const n of names) {
     (audio as unknown as Any)[n] = (...a: unknown[]) => {
-      if (logging) soundLog.push({ t: frameIndex / fps, n, a: a.map(plain) });
+      if (logging && !S.mute) soundLog.push({ t: frameIndex / fps, n, a: a.map(plain) });
     };
   }
 }
@@ -384,6 +426,19 @@ async function stage() {
   // the game's own hint about a slow frame rate measures a clock that is not running at real speed here
   g.slowHinted = true;
   document.getElementById('loading')?.classList.add('done');
+  // supply drops come when the film asks for one, not when the game's own clock says
+  g.nextDrop = 1e12;
+  // a grenade's blast reaches the stand-in players as it would real ones: the game draws it, this keeps the score
+  const explode = g.explode.bind(g);
+  g.grenades.onExplode = (at: THREE.Vector3, mine: boolean) => {
+    explode(at, mine);
+    for (const a of S.actors) {
+      if (!a.alive) continue;
+      const chest = a.chest(), d = chest.distanceTo(at);
+      if (d > 9 || !S.clearLine(at, chest)) continue;
+      a.hurt(150 * Math.pow(1 - d / 9, 1.3), chest.clone().sub(at).normalize());
+    }
+  };
   // the training dummies are not in this film
   for (const d of g.dummies) {
     d.avatar.root.visible = false;
@@ -407,8 +462,8 @@ async function stage() {
     cam.updateProjectionMatrix();
     cam.updateMatrixWorld();
   };
-  Object.defineProperty(dir, 'viewmodelVisible', { get: () => !S.cam && dir.mode === 'first' && dir.blend > 0.92 });
-  Object.defineProperty(dir, 'avatarVisible', { get: () => !!S.cam || dir.mode !== 'first' || dir.blend < 0.8 });
+  Object.defineProperty(dir, 'viewmodelVisible', { get: () => !S.cam && dir.blend > 0.92 });
+  Object.defineProperty(dir, 'avatarVisible', { get: () => !!S.cam || dir.blend < 0.8 });
 
   // hits on the stand-in players count: the game draws the blood, this keeps the score
   const flesh = g.weapons.onFlesh;
@@ -417,6 +472,16 @@ async function stage() {
     const a = S.actors.find((x) => x.rp === owner);
     if (a) a.hurt(power >= 1 ? 95 : power > 0.58 ? 34 : power > 0.4 ? 50 : 14, d, pt.y - a.pos.y > (a.crouch ? 0.92 : 1.5));
   };
+
+  // movements for the "coming soon" scenes (npm run character -- --emotes)
+  if (CUT === 2) {
+    try {
+      const em = await assets.gltf.loadAsync('/trailer/emotes.glb');
+      for (const clip of em.animations) S.emotes.set(clip.name, clip);
+    } catch {
+      console.log('[tr] trailer/emotes.glb is missing: run "npm run character -- --emotes"');
+    }
+  }
 
   // the cast
   const names = ['Volkov', 'Mira', 'Kestrel', 'Dmitri', 'Oksana', 'Bear'];
@@ -441,7 +506,11 @@ async function stage() {
   S.bullet.visible = S.trail.visible = false;
   g.s.r.scene.add(S.bullet, S.trail);
 
-  shots = buildShots(S);
+  if (CUT === 2) {
+    const cut = await import('./shots2');
+    shots = cut.buildShots(S);
+    arrangement = cut.ARRANGEMENT;
+  } else shots = (await import('./shots')).buildShots(S);
   // let everything that was asked for arrive (models, the cast's clothes), then stop the clock
   for (let i = 0; i < 40; i++) await realSleep(50);
   pumping = false;
@@ -593,7 +662,7 @@ async function renderSound(): Promise<AudioBuffer> {
   const eng = new AudioEngine() as unknown as Any;
   try { eng.start(); } finally { (window as unknown as Any).AudioContext = Real; }
   eng.master.gain.value = 0.62;
-  scoreMusic(off, off.destination);
+  scoreMusic(off, off.destination, arrangement);
   const groups = new Map<number, typeof soundLog>();
   for (const ev of soundLog) {
     const q = Math.round((ev.t * SR) / 128);

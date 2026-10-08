@@ -55,3 +55,40 @@ trailer (face the enemy, shoot when the weapon allows, miss sometimes); the came
 titles; the money falling when the tag is cashed in (marked "in development"); a drawn
 bullet and trail for the one shot that follows the bullet (the game does not draw its
 bullets); the tag's thirty minutes run in under four seconds.
+
+## The second trailer (the update)
+
+`src/trailer/shots2.ts` is a second cut with none of the first one's scenes: a fist fight, a
+raid on the police station, a supply drop and the grenade that ends the fight over it, a tag
+taken and the map giving its carrier away, a cabin door held until the clock runs out; then
+two facts, the list of what is new, what is coming, eight quick endings and the name.
+
+```bash
+npm run character -- --emotes     # once: writes trailer/emotes.glb (the dancing and the gestures)
+npm run film -- --cut 2           # trailer/out/zona-trailer-2.mp4, about 14 minutes
+npm run film -- --cut 2 --draft --no-video --stills 12 --out d    # the cut as contact sheets, about 3 minutes
+```
+
+`--cut 2` loads `trailer.html?cut=2`; without it everything above still films the first
+trailer. The score is the same band on the same grid with its own rows, in E minor
+(`ARRANGEMENT` at the top of `shots2.ts`).
+
+The game in it: everything the first trailer lists, and also the fists, the doors, the
+inventory answering a real drag, the supply drop with its smoke and its mark on the map, the
+grenade and its blast, the kill feed, the leaderboard, the map ping on whoever carries a tag,
+the tag's clock.
+
+The film's own, besides cameras, titles and the money (still marked "in development"):
+
+- The five at the crate are already hurt from fighting each other when the grenade lands.
+  At full health the game's grenade kills inside about two and a half metres; these five
+  stand within that of where it lands, and are set to 60 health as well.
+- The grenade goes off when the film says (on the bar line), not when its four seconds are up.
+- The leaderboard's other names and scores, and the hero's name (Sable).
+- The tag's thirty minutes run in a few seconds, twice.
+- A lamp in the cabin (`lamp`, `handLamp`): the room has one small window.
+- Everything under COMING SOON: the dancing and the hand gestures are clips from the same
+  free animation library the character's own movements come from, played on the game's
+  bodies; the speech bubbles are drawn by the film. Neither is in the game.
+- The queue outside the police station is a picture of the server's waiting line, not a
+  thing players stand in.

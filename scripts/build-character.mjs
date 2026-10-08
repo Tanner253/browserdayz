@@ -37,6 +37,13 @@ const CLIPS = {
   jumpStart: 'Jump_Start', jumpLoop: 'Jump_Loop', jumpLand: 'Jump_Land',
   death: 'Death01', hit: 'Hit_Chest', hitHead: 'Hit_Head',
 };
+/**
+ * `--emotes`: the same body with a few more clips from the library, written to
+ * trailer/emotes.glb for the trailer's "coming soon" scenes. The game's own file and its
+ * mask are left exactly as they are.
+ */
+const EMOTES = process.argv.includes('--emotes');
+if (EMOTES) Object.assign(CLIPS, { dance: 'Dance_Loop', talk: 'Idle_Talking_Loop', point: 'Spell_Simple_Shoot', hail: 'Spell_Simple_Idle_Loop', reach: 'Interact', sit: 'Sitting_Idle_Loop', sitTalk: 'Sitting_Talking_Loop' });
 const HAIR = { hair_buzzed: 'Hair_Buzzed', hair_parted: 'Hair_SimpleParted', hair_long: 'Hair_Long', hair_beard: 'Hair_Beard' };
 /** the long style is cut for the other body in the pack, whose head sits lower and a touch further forward */
 const HAIR_SHIFT = { hair_long: [0, 0.045, -0.004] };
@@ -516,7 +523,7 @@ await fs.mkdir(OUT, { recursive: true });
 const PREVIEW = path.join(ROOT, 'assets-src', 'characters', 'preview');
 await fs.mkdir(PREVIEW, { recursive: true });
 await sharp(outBase, { raw: { width: TEX, height: TEX, channels: 3 } }).jpeg({ quality: 85 }).toFile(path.join(PREVIEW, 'survivor_base.jpg'));
-await sharp(outMask, { raw: { width: TEX, height: TEX, channels: 3 } }).webp({ quality: 92, effort: 5 }).toFile(path.join(OUT, 'survivor_mask.webp'));
+if (!EMOTES) await sharp(outMask, { raw: { width: TEX, height: TEX, channels: 3 } }).webp({ quality: 92, effort: 5 }).toFile(path.join(OUT, 'survivor_mask.webp'));
 
 // ================================================================ 2. hair to choose from
 for (const [name, file] of Object.entries(HAIR)) {
@@ -853,10 +860,10 @@ await doc.transform(
   textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [TEX, TEX], quality: 90 }),
   meshopt({ encoder: MeshoptEncoder, level: 'medium' }),
 );
-const dest = path.join(OUT, 'survivor.glb');
+const dest = EMOTES ? path.join(ROOT, 'trailer', 'emotes.glb') : path.join(OUT, 'survivor.glb');
 await io.write(dest, doc);
 // asset addresses carry the manifest's date: move it on, so no browser keeps the old body
-{
+if (!EMOTES) {
   const file = path.join(ROOT, 'public', 'assets', 'manifest.json');
   const manifest = JSON.parse(await fs.readFile(file, 'utf8'));
   manifest.generated = new Date().toISOString();
@@ -864,4 +871,4 @@ await io.write(dest, doc);
 }
 const st = await fs.stat(dest);
 const triangles = root.listMeshes().reduce((n, m) => n + m.listPrimitives().reduce((k, p) => k + (p.getIndices()?.getCount() ?? p.getAttribute('POSITION').getCount()) / 3, 0), 0);
-console.log(`survivor.glb  ${(st.size / 1048576).toFixed(2)} MB  ${Math.round(triangles)} triangles  ${root.listAnimations().length} clips (${total.toFixed(1)} s)  bones matched ${pairs.length}/${libJoints.length}`);
+console.log(`${path.basename(dest)}  ${(st.size / 1048576).toFixed(2)} MB  ${Math.round(triangles)} triangles  ${root.listAnimations().length} clips (${total.toFixed(1)} s)  bones matched ${pairs.length}/${libJoints.length}`);

@@ -5,9 +5,9 @@
 import { BAR, BARS } from './shots';
 
 const BEAT = BAR / 4;
-type Level = 'low' | 'pulse' | 'tick' | 'build' | 'tense' | 'drive' | 'full' | 'top' | 'bright' | 'end';
+export type Level = 'low' | 'pulse' | 'tick' | 'build' | 'tense' | 'drive' | 'full' | 'top' | 'bright' | 'end';
 // [root (MIDI), minor?, how it is played]
-const ROWS: [number, boolean, Level][] = [
+const ROWS_1: [number, boolean, Level][] = [
   [38, true, 'low'], [38, true, 'low'], [34, false, 'low'], [33, false, 'low'],
   [38, true, 'pulse'], [38, true, 'pulse'], [34, false, 'pulse'], [36, false, 'pulse'],
   [31, true, 'build'], [33, false, 'build'],
@@ -21,12 +21,20 @@ const ROWS: [number, boolean, Level][] = [
   [38, true, 'end'], [38, true, 'end'],
 ];
 /** moments in the picture the band hits, in seconds (bar lines unless said): the drop, the bullet landing, the tag cashed in */
-const HITS: [number, number][] = [[10 * BAR, 1], [13 * BAR + 3.05, 1.1], [16 * BAR, 0.9], [24 * BAR + 0.45, 0.9], [26 * BAR, 1], [30 * BAR, 0.9], [34 * BAR, 1], [38 * BAR, 1.2]];
-const RISERS: [number, number, number][] = [[3 * BAR, 4 * BAR, 0.35], [8 * BAR, 10 * BAR - BEAT * 0.5, 0.9], [13 * BAR + 0.9, 13 * BAR + 3.05, 0.5], [23 * BAR, 24 * BAR + 0.45, 0.6], [36 * BAR, 38 * BAR, 1]];
+const HITS_1: [number, number][] = [[10 * BAR, 1], [13 * BAR + 3.05, 1.1], [16 * BAR, 0.9], [24 * BAR + 0.45, 0.9], [26 * BAR, 1], [30 * BAR, 0.9], [34 * BAR, 1], [38 * BAR, 1.2]];
+const RISERS_1: [number, number, number][] = [[3 * BAR, 4 * BAR, 0.35], [8 * BAR, 10 * BAR - BEAT * 0.5, 0.9], [13 * BAR + 0.9, 13 * BAR + 3.05, 0.5], [23 * BAR, 24 * BAR + 0.45, 0.6], [36 * BAR, 38 * BAR, 1]];
 
 const hz = (m: number) => 440 * Math.pow(2, (m - 69) / 12);
 
-export function scoreMusic(ctx: BaseAudioContext, out: AudioNode) {
+/** a cut's own score: one row per bar, the moments the band hits, and the rises into them */
+export interface Arrangement {
+  rows: [number, boolean, Level][];
+  hits: [number, number][];
+  risers: [number, number, number][];
+}
+
+export function scoreMusic(ctx: BaseAudioContext, out: AudioNode, arr?: Arrangement) {
+  const ROWS = arr?.rows ?? ROWS_1, HITS = arr?.hits ?? HITS_1, RISERS = arr?.risers ?? RISERS_1;
   const master = ctx.createGain();
   master.gain.value = 0.5;
   // the last bar and a half fade out with the picture
