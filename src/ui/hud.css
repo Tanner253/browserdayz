@@ -903,6 +903,18 @@
 .start-online { display: none; font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; color: var(--ok); }
 .start-online.show { display: block; }
 .start-online.full { color: var(--accent); }
+/* the X account and the contract address, under everything else in the column */
+.start-links { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; width: 306px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); cursor: default; }
+.sl-x { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 13px; letter-spacing: 0.06em; color: var(--ink); text-decoration: none; }
+.sl-x svg { width: 15px; height: 15px; }
+.sl-x:hover { color: var(--accent); }
+.sl-ca { display: block; width: 100%; padding: 7px 9px 8px; text-align: left; color: var(--ink-dim); background: rgba(0, 0, 0, 0.28); border: 1px solid var(--line); cursor: pointer; }
+.sl-ca:hover { border-color: var(--ink-dim); }
+.sl-ca span { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; font-family: var(--mono); font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; }
+.sl-ca b { font-weight: 500; color: var(--ink-faint); }
+.sl-ca em { font-style: normal; color: var(--accent); }
+.sl-ca.done em { color: var(--ok); }
+.sl-ca code { display: block; font-family: var(--mono); font-size: 10.4px; letter-spacing: 0; color: var(--ink); word-break: break-all; user-select: all; }
 .start-online.full::before { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
 /* waiting in line for a full server */
 .start-queue { display: none; margin-top: 2px; cursor: default; }
@@ -975,6 +987,7 @@ kbd.hot { color: #121413; background: linear-gradient(#d8c594, #b89f66); border-
 .hud-start.enter:not(.paused) .tagplate { animation: enter-tag 0.7s cubic-bezier(0.2, 0.8, 0.3, 1.2) both 1.15s; }
 .hud-start.enter:not(.paused) .start-btn { animation: enter-up 0.7s ease both 1.45s; }
 .hud-start.enter:not(.paused) .start-online { animation: enter-fade 0.8s ease both 1.7s; }
+.hud-start.enter:not(.paused) .start-links { animation: enter-fade 0.8s ease both 1.9s; }
 .hud-start.enter:not(.paused) .start-brief { animation: enter-side 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both 1s; }
 @keyframes enter-letter { from { opacity: 0; transform: translateY(26px); filter: blur(8px); } to { opacity: 1; transform: none; filter: none; } }
 @keyframes enter-fade { from { opacity: 0; } to { opacity: 1; } }

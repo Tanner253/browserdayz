@@ -28,6 +28,10 @@ export interface HotbarEntry {
   dim: boolean;
 }
 
+/** where the game is talked about, and its token's address on Solana: both shown on the main menu */
+const X_HANDLE = 'zonaSOL_';
+const CONTRACT = 'GvfAzdPF466PJsPJMzXQeX3TSqmJm9YxAG8xBJ6ypump';
+
 export class HUD {
   root: HTMLDivElement;
   private el: Record<string, HTMLElement> = {};
@@ -107,6 +111,10 @@ export class HUD {
             <button class="start-btn">Deploy</button>
             <div class="start-online"></div>
             <div class="start-queue"><div class="sq-pos"></div><div class="sq-sub"></div><button class="sq-leave" type="button">Play on your own instead</button></div>
+            <div class="start-links">
+              <a class="sl-x" href="https://x.com/${X_HANDLE}" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M18.9 2H22l-6.8 7.8L23.2 22h-6.3l-4.9-6.9L6.3 22H3.2l7.3-8.3L.8 2h6.4l4.5 6.3L18.9 2zm-1.1 18h1.7L6.3 3.9H4.5L17.8 20z"/></svg>@${X_HANDLE}</a>
+              <button class="sl-ca" type="button" title="Copy the contract address"><span><b>Contract address</b><em>Copy</em></span><code>${CONTRACT}</code></button>
+            </div>
           </div>
           <div class="start-brief" data-tab="brief">
             <div class="start-tabs">
@@ -189,6 +197,32 @@ export class HUD {
     });
     chat.addEventListener('blur', () => this.chatOpen && this.closeChat());
     this.setChannel('global');
+    // nor does following a link, or copying the contract address
+    const links = this.root.querySelector('.start-links') as HTMLElement;
+    links.addEventListener('click', (e) => e.stopPropagation());
+    const ca = links.querySelector('.sl-ca') as HTMLButtonElement;
+    ca.addEventListener('click', () => {
+      const said = ca.querySelector('em') as HTMLElement;
+      const done = (ok: boolean) => {
+        said.textContent = ok ? 'Copied' : 'Select and copy';
+        ca.classList.toggle('done', ok);
+        setTimeout(() => {
+          said.textContent = 'Copy';
+          ca.classList.remove('done');
+        }, 1600);
+      };
+      const pick = () => {
+        // no clipboard to write to (an old browser, a page not served securely): leave it selected for the player to copy
+        const r = document.createRange();
+        r.selectNodeContents(ca.querySelector('code')!);
+        const sel = getSelection();
+        sel?.removeAllRanges();
+        sel?.addRange(r);
+        done(false);
+      };
+      if (navigator.clipboard?.writeText) navigator.clipboard.writeText(CONTRACT).then(() => done(true), pick);
+      else pick();
+    });
     // typing a name must not start the game
     const name = this.root.querySelector('.start-name') as HTMLInputElement;
     const plate = this.root.querySelector('.tagplate') as HTMLElement;
