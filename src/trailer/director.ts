@@ -15,6 +15,10 @@ import { RemotePlayer } from '../game/remote';
 import { heightAt } from '../world/worldgen';
 import { wind } from '../world/foliage';
 import { makeItem, type ItemInstance } from '../sim/items';
+import { EMOTE } from '../sim/emotes';
+import { WEAPON_RULES } from '../sim/combat';
+import { F_DANCE, F_SURRENDER } from '../net/protocol';
+import { setPlayerName } from '../net/client';
 import { SECONDS } from './shots';
 import { scoreMusic, type Arrangement } from './music';
 import './trailer.css';
@@ -89,6 +93,9 @@ export class Actor {
   skill = 0.5;
   /** called when it goes down */
   onDeath: (() => void) | null = null;
+  /** what the body keeps up, as a player sets it from the wheel: told in the pose, as it is to a server */
+  dance = false;
+  surrender = false;
   private corpse: string | null = null;
   /** a clip from trailer/emotes.glb laid over whatever the game is playing on this body */
   private emoting: { act: THREE.AnimationAction; dur: number; t0: number; loop: boolean; speed: number; phase: number } | null = null;
@@ -115,6 +122,17 @@ export class Actor {
   constructor(private S: Stage, public id: number, public name: string) {
     this.rp = new RemotePlayer(id, name, S.g.makeHeld);
   }
+  /**
+   * Calls something out, as a player does from the wheel (src/sim/emotes.ts): the game's own
+   * voice from where the head is, the arms that go with it, and the words over the head.
+   */
+  call(id: string) {
+    const e = EMOTE[id];
+    if (!e?.say || !this.alive) return;
+    this.aim = false;
+    this.rp.call(e, this.S.g.s.r.camera.position);
+    this.S.g.said.set(this.id, { text: e.say, at: performance.now() });
+  }
   async load() {
     await this.rp.load(this.S.g.s.atmo, this.S.g.s.r.scene, [0, -200, 0, 0, 0, F_GROUND]);
     this.S.g.remotes.set(this.id, this.rp);
@@ -132,7 +150,7 @@ export class Actor {
     this.pos.set(x, S.ground(x, z), z);
     this.yaw = yaw;
     this.pitch = 0;
-    this.crouch = this.aim = this.sprint = this.bleeding = false;
+    this.crouch = this.aim = this.sprint = this.bleeding = this.dance = this.surrender = false;
     this.alive = true;
     this.hp = 100;
     this.foe = null;
@@ -189,7 +207,7 @@ export class Actor {
       const t = ((performance.now() - e.t0) / 1000) * e.speed + e.phase * e.dur;
       e.act.time = e.loop ? t % e.dur : Math.min(e.dur - 1e-3, t);
     }
-    const f = (this.crouch ? F_CROUCH : 0) | (this.sprint ? F_SPRINT : 0) | (this.aim ? F_AIM : 0) | F_GROUND | (this.bleeding ? F_BLEED : 0);
+    const f = (this.crouch ? F_CROUCH : 0) | (this.sprint ? F_SPRINT : 0) | (this.aim ? F_AIM : 0) | F_GROUND | (this.bleeding ? F_BLEED : 0) | (this.dance ? F_DANCE : 0) | (this.surrender ? F_SURRENDER : 0);
     this.rp.push([this.pos.x, this.pos.y, this.pos.z, this.yaw, this.pitch, f], performance.now() + ago);
   }
   /** a shot at a point, off by up to `err` radians: a real bullet in the game's world, with everything that follows from it */
@@ -369,9 +387,12 @@ export class Stage {
 // ------------------------------------------------------------------------------------------ runtime
 
 const S = new Stage();
-/** which trailer: trailer.html?cut=2 is the second one (shots2.ts); anything else the first */
-const CUT = new URLSearchParams(location.search).get('cut') === '2' ? 2 : 1;
+/** which trailer: trailer.html?cut=2 is the second one (shots2.ts), ?cut=3 the third (shots3.ts); anything else the first */
+const CUT = Number(new URLSearchParams(location.search).get('cut')) || 1;
 let arrangement: Arrangement | undefined;
+/** how long this cut runs, and (for a cut that brings its own) its score */
+let seconds = SECONDS;
+let ownScore: ((ctx: BaseAudioContext, out: AudioNode) => void) | undefined;
 let shots: Shot[] = [];
 let current: Shot | null = null;
 let fps = 60;
@@ -396,7 +417,7 @@ let pumping = true;
 /** Every sound the game asks for is written down instead of played; the soundtrack is rendered from the list afterwards. */
 function hookAudio() {
   const plain = (v: unknown): unknown => (v && typeof v === 'object' && 'x' in (v as Any) ? { x: (v as Any).x, y: (v as Any).y, z: (v as Any).z } : v);
-  const names = ['gunshot', 'dryFire', 'click', 'boltCycle', 'reloadNear', 'roundInsert', 'magOut', 'magIn', 'slideRack', 'shellDrop', 'whiz', 'hitTick', 'equip', 'jump', 'land', 'death', 'body', 'door', 'impact', 'footstep', 'whoosh', 'explosion', 'ui', 'hurt', 'setListener', 'updateAmbience'];
+  const names = ['gunshot', 'dryFire', 'click', 'boltCycle', 'reloadNear', 'roundInsert', 'magOut', 'magIn', 'slideRack', 'shellDrop', 'whiz', 'hitTick', 'equip', 'jump', 'land', 'death', 'body', 'door', 'impact', 'footstep', 'whoosh', 'explosion', 'ui', 'hurt', 'shout', 'setListener', 'updateAmbience'];
   for (const n of names) {
     (audio as unknown as Any)[n] = (...a: unknown[]) => {
       if (logging && !S.mute) soundLog.push({ t: frameIndex / fps, n, a: a.map(plain) });
@@ -414,6 +435,8 @@ async function stage() {
   g.input.locked = true;
   g.input.lock = () => {};
   g.input.unlock = () => {};
+  // (the third cut's hero has a name, and the voice that goes with it)
+  if (CUT === 3) setPlayerName('Sable');
   // the world: the game's own single-player one, from the same seed every take
   clock.reseed(7001);
   await g.enterOffline();
@@ -437,6 +460,19 @@ async function stage() {
       const chest = a.chest(), d = chest.distanceTo(at);
       if (d > 9 || !S.clearLine(at, chest)) continue;
       a.hurt(150 * Math.pow(1 - d / 9, 1.3), chest.clone().sub(at).normalize());
+    }
+  };
+  // a fuel drum going up reaches them too (the game draws it and throws the blood: this keeps the score)
+  const boom = g.explode.bind(g);
+  g.explode = (at: THREE.Vector3, mine: boolean, what?: string, skip?: unknown) => {
+    boom(at, mine, what, skip);
+    if (what !== 'barrel') return;
+    const rule = WEAPON_RULES.barrel;
+    for (const a of S.actors) {
+      if (!a.alive) continue;
+      const chest = a.chest(), d = chest.distanceTo(at);
+      if (d > rule.blast! || !S.clearLine(at.clone().setY(at.y + 0.5), chest)) continue;
+      a.hurt(rule.damage * Math.pow(1 - d / rule.blast!, 1.3), chest.clone().sub(at).normalize());
     }
   };
   // the training dummies are not in this film
@@ -484,7 +520,7 @@ async function stage() {
   }
 
   // the cast
-  const names = ['Volkov', 'Mira', 'Kestrel', 'Dmitri', 'Oksana', 'Bear'];
+  const names = CUT === 3 ? ['Sable', 'Mira', 'Volkov', 'Kestrel', 'Dmitri', 'Oksana', 'Bear'] : ['Volkov', 'Mira', 'Kestrel', 'Dmitri', 'Oksana', 'Bear'];
   for (let i = 0; i < names.length; i++) {
     const a = new Actor(S, 900 + i, names[i]);
     await a.load();
@@ -506,7 +542,12 @@ async function stage() {
   S.bullet.visible = S.trail.visible = false;
   g.s.r.scene.add(S.bullet, S.trail);
 
-  if (CUT === 2) {
+  if (CUT === 3) {
+    const cut = await import('./shots3');
+    shots = cut.buildShots(S);
+    seconds = cut.SECONDS3;
+    ownScore = cut.score;
+  } else if (CUT === 2) {
     const cut = await import('./shots2');
     shots = cut.buildShots(S);
     arrangement = cut.ARRANGEMENT;
@@ -617,7 +658,7 @@ let pieces: string[] = [];
 tr.info = () => {
   const gl = S.g.s.r.renderer.getContext() as WebGLRenderingContext;
   const ext = gl.getExtension('WEBGL_debug_renderer_info');
-  return { gpu: ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : 'unknown', seconds: SECONDS, shots: shots.map((s) => [s.name, s.start, s.end]) };
+  return { gpu: ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : 'unknown', seconds, shots: shots.map((s) => [s.name, s.start, s.end]) };
 };
 
 tr.begin = async (o: { fps: number; first: number; last: number; width: number; height: number; video: boolean }) => {
@@ -656,13 +697,14 @@ tr.encodeFrame = async (b64: string, k: number) => {
 /** The whole soundtrack in one go: the score, and every sound the game asked for at the moment it asked. */
 async function renderSound(): Promise<AudioBuffer> {
   const SR = 48000;
-  const off = new OfflineAudioContext(2, Math.ceil(SECONDS * SR), SR);
+  const off = new OfflineAudioContext(2, Math.ceil(seconds * SR), SR);
   const Real = window.AudioContext;
   (window as unknown as Any).AudioContext = function () { return off; };
   const eng = new AudioEngine() as unknown as Any;
   try { eng.start(); } finally { (window as unknown as Any).AudioContext = Real; }
   eng.master.gain.value = 0.62;
-  scoreMusic(off, off.destination, arrangement);
+  if (ownScore) ownScore(off, off.destination);
+  else scoreMusic(off, off.destination, arrangement);
   const groups = new Map<number, typeof soundLog>();
   for (const ev of soundLog) {
     const q = Math.round((ev.t * SR) / 128);
@@ -675,7 +717,7 @@ async function renderSound(): Promise<AudioBuffer> {
   };
   for (const [q, evs] of groups) {
     if (q <= 0) play(evs);
-    else if ((q * 128) / SR < SECONDS - 0.01) void off.suspend((q * 128) / SR).then(() => { play(evs); void off.resume(); });
+    else if ((q * 128) / SR < seconds - 0.01) void off.suspend((q * 128) / SR).then(() => { play(evs); void off.resume(); });
   }
   const buf = await off.startRendering();
   let peak = 0, sum = 0;

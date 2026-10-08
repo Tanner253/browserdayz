@@ -8,7 +8,7 @@ import { physics, SHOT_GROUPS, type Surface } from '../core/physics';
 import { audio } from '../core/audio';
 import type { Input } from '../core/input';
 import { extractParts } from '../core/gltf-utils';
-import { ITEMS, capacityOf, hasMod, type ItemInstance, type Slot } from '../sim/items';
+import { ITEMS, capacityOf, handlingOf, hasMod, type ItemInstance, type Slot } from '../sim/items';
 import { suppressorGeometry } from './procedural';
 import { SLOT_ORDER, type PlayerInventory } from '../sim/inventory';
 import type { Atmosphere } from '../world/atmosphere';
@@ -165,6 +165,18 @@ export class Weapons {
   private chamberEmpty = false;
   private fireCooldown = 0;
   private breath = { held: false, t: 0 };
+  /**
+   * What is left in the arms, 0..1. Holding a gun up to the eye uses it (a heavy one faster,
+   * and holding the breath faster still); with the gun down it comes back in a few seconds.
+   * As it goes the sights wander more and the gun kicks harder.
+   */
+  armStamina = 1;
+  /**
+   * Where the gun is pointing, off the middle of the screen, radians (x to the left, y up).
+   * A gun has weight: turn fast and it trails the eye, then swings on a little past it.
+   * Shots go where the gun points, and the crosshair is drawn there.
+   */
+  lag = new THREE.Vector2();
   private time = 0;
   private sunLight: THREE.DirectionalLight;
   private sunVis = 1;
@@ -184,7 +196,7 @@ export class Weapons {
   /** something hit a body (anyone's): where, which way it was travelling, and how hard (1 = a rifle round) */
   onFlesh: (owner: unknown, point: THREE.Vector3, dir: THREE.Vector3, power: number) => void = () => {};
   /** one of our own bullets landed on something that is not a body: what it belongs to, if anything */
-  onStruck: (owner: unknown) => void = () => {};
+  onStruck: (owner: unknown, weapon: string) => void = () => {};
   /** a punch or a melee swing has started */
   onSwing: () => void = () => {};
   /** loot models, so consumables can be shown in the hands while they are used */
@@ -611,18 +623,25 @@ export class Weapons {
     this.aiming = canAim && input.held('Mouse2');
     this.spread = def?.weapon ? this.spreadNow(def.weapon.kind) : 0;
     p.aiming = this.aiming;
-    this.adsT += ((this.aiming ? 1 : 0) - this.adsT) * (1 - Math.exp(-(this.aiming ? 14 : 11) * dt));
+    // a handy gun is at the eye in a fifth of a second; a long heavy one takes twice that
+    const hd = handlingOf(item) ?? { ergo: 80, weight: 0.5, recoil: 1 };
+    const upIn = THREE.MathUtils.lerp(0.46, 0.17, THREE.MathUtils.clamp((hd.ergo - 30) / 60, 0, 1));
+    this.adsT += ((this.aiming ? 1 : 0) - this.adsT) * (1 - Math.exp(-(3 / upIn) * (this.aiming ? 1 : 0.85) * dt));
     this.scoped = !!m && m.kind === 'rifle' && hasMod(this.currentItem, 'pu_scope') && this.adsT > 0.9 && this.aiming;
     this.applyMods();
     this.sprintT += ((p.sprinting && p.moving > 0.4 ? 1 : 0) - this.sprintT) * (1 - Math.exp(-8 * dt));
 
-    // ----- hold breath while scoped (Shift)
-    const wantBreath = this.scoped && input.held('ShiftLeft') && p.vitals.stamina > 5;
+    // ----- hold breath while aiming (Shift): steadier for a few seconds, and hard on the arms
+    const wantBreath = this.aiming && this.adsT > 0.85 && input.held('ShiftLeft') && p.vitals.stamina > 5 && this.armStamina > 0.06;
     if (wantBreath) {
       this.breath.t += dt;
       p.vitals.stamina = Math.max(0, p.vitals.stamina - 9 * dt);
     } else this.breath.t = Math.max(0, this.breath.t - dt * 2);
     this.breath.held = wantBreath && this.breath.t < 6;
+    // ----- the arms: tiring while the gun is up, resting while it is down
+    // (down on a knee the elbow has somewhere to rest: the gun stays up half as long again)
+    if (this.aiming && def?.weapon) this.armStamina = Math.max(0, this.armStamina - (0.028 + hd.weight * 0.011) * (this.breath.held ? 2.6 : 1) * (p.crouched ? 0.65 : 1) * dt);
+    else this.armStamina = Math.min(1, this.armStamina + 0.3 * dt);
 
     // ----- trigger / actions
     if (enabled && m && item && def && !p.dead) {
@@ -662,7 +681,9 @@ export class Weapons {
 
     // ----- scope sway (applied to the aim, so bullets follow it)
     const tired = 1 + (1 - p.vitals.stamina / MAX_STAMINA) * 2.5;
-    const swayAmp = (this.scoped ? 0.0035 : this.aiming ? 0.0022 : 0.0012) * tired * (this.breath.held ? 0.15 : 1) * (p.crouched ? 0.6 : 1) * (hasMod(item, 'rifle_wrap') ? 0.75 : 1);
+    const heft = THREE.MathUtils.clamp((100 - hd.ergo) / 60, 0.25, 1.2);
+    const armsK = 1 + Math.pow(1 - this.armStamina, 2) * 2.6;
+    const swayAmp = (this.scoped ? 0.0035 : this.aiming ? 0.0022 : 0.0012) * tired * (this.breath.held ? 0.15 : 1) * (p.crouched ? 0.6 : 1) * (hasMod(item, 'rifle_wrap') ? 0.75 : 1) * armsK * (0.75 + heft * 0.5);
     const t = this.time;
     const breathSway = new THREE.Vector2(Math.sin(t * 0.9) * 0.7 + Math.sin(t * 2.1) * 0.3, Math.sin(t * 1.3 + 1) * 0.6 + Math.cos(t * 0.7) * 0.4).multiplyScalar(swayAmp);
     const rec = this.aimRecoil.step(dt);
@@ -704,8 +725,9 @@ export class Weapons {
     const b = BALLISTICS[kind];
     const hd = HANDLING[kind];
     this.burst++;
-    // eye-origin shot with zeroing elevation (bullet crosses line of sight at the zero range)
-    const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+    // eye-origin shot with zeroing elevation (bullet crosses line of sight at the zero range),
+    // along the way the gun is pointing: on the eye's own line unless it is still catching up with a turn
+    const dir = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(this.lag.y, this.lag.x, 0, 'YXZ')).applyQuaternion(camera.quaternion);
     const t0 = b.zero / b.muzzleVel;
     const elev = (0.5 * 9.81 * t0 * t0) / b.zero;
     const up = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
@@ -723,7 +745,9 @@ export class Weapons {
     // feel: recoil springs, camera kick, flash, sound. Auto fire climbs up and
     // drifts right, sawing left/right after the first few rounds.
     const big = kind === 'rifle';
-    const stance = (this.player.crouched ? 0.7 : 1) * (this.aiming ? 0.85 : 1);
+    // (tired arms and an unhandy gun kick harder; what is screwed on the muzzle takes some of it)
+    const feel = handlingOf(item) ?? { ergo: 80, weight: 0.5, recoil: 1 };
+    const stance = (this.player.crouched ? 0.7 : 1) * (this.aiming ? 0.85 : 1) * feel.recoil * (1 + (1 - this.armStamina) * 0.5) * THREE.MathUtils.lerp(1.12, 0.92, feel.ergo / 100);
     const drift = kind === 'auto' ? (this.burst < 4 ? 0.12 : Math.sin(this.burst * 1.7) * 0.28) : (Math.random() - 0.5);
     this.kick.v.z += hd.vmKick;
     this.kick.v.y += big ? 0.25 : 0.4;
@@ -1105,7 +1129,7 @@ export class Weapons {
             const pivot = (hit.tag?.owner as { pivot?: THREE.Object3D } | undefined)?.pivot;
             this.fx.impact(s, pt, n, true, pivot);
             audio.impact(s, pt, b.ghost ? pt.distanceTo(this.mainCam?.position ?? pt) : dist);
-            if (!b.ghost && hit.tag?.owner) this.onStruck(hit.tag.owner);
+            if (!b.ghost && hit.tag?.owner) this.onStruck(hit.tag.owner, b.weapon);
           }
           dead = true;
           break;
@@ -1149,10 +1173,12 @@ export class Weapons {
     this.lowerT += ((this.stowed || (this.held && !this.held.ending) ? 1 : 0) - this.lowerT) * (1 - Math.exp(-10 * dt));
     if (this.held) {
       if (m) m.root.visible = false;
+      this.lag.set(0, 0);
       this.animateHeld(dt);
       return;
     }
     if (!m) {
+      this.lag.set(0, 0);
       this.animateFists(dt);
       return;
     }
@@ -1160,8 +1186,18 @@ export class Weapons {
     // springs
     const kick = this.kick.step(dt);
     const kr = this.kickRot.step(dt);
-    // mouse sway: weapon lags behind the look direction
-    const sw = this.sway.step(dt, new THREE.Vector3(input.mouseDX * 0.0009, input.mouseDY * 0.0009, 0).clampScalar(-0.06, 0.06));
+    // the gun has weight: it trails the eye through a turn and swings on a little after it. How far
+    // goes by how fast the head is turning (not by how many frames that took), and by the gun.
+    const feel = handlingOf(this.currentItem);
+    const heft = feel ? THREE.MathUtils.clamp((100 - feel.ergo) / 60, 0.25, 1.2) : 0.6;
+    this.sway.k = THREE.MathUtils.lerp(150, 85, heft / 1.2);
+    this.sway.d = THREE.MathUtils.lerp(16, 12, heft / 1.2);
+    const turn = dt > 1e-4 ? 0.000015 / dt : 0;
+    const sw = this.sway.step(Math.min(dt, 0.05), new THREE.Vector3(input.mouseDX * turn, input.mouseDY * turn, 0).clampScalar(-0.06, 0.06));
+    const trail = 4 * (1 - this.adsT * 0.7) * (0.7 + heft * 0.5);
+    // (from the hip only a part of it reaches the shot: the rest is the arms, not the barrel. Through a scope the eye and the barrel are one.)
+    const follow = feel && !this.scoped ? THREE.MathUtils.lerp(0.3, 1, this.adsT) : 0;
+    this.lag.set(sw.x * trail * follow, sw.y * trail * follow);
 
     const ads = this.adsT;
     const adsPos = m.adsIron && !hasMod(this.currentItem, 'pu_scope') ? m.adsIron : m.ads;
@@ -1183,8 +1219,8 @@ export class Weapons {
     rot.y += 0.65 * sp;
     rot.z += 0.35 * sp;
     // sway
-    rot.y += sw.x * (1 - ads * 0.7) * 4;
-    rot.x += sw.y * (1 - ads * 0.7) * 4;
+    rot.y += sw.x * trail;
+    rot.x += sw.y * trail;
     // sidestepping: the gun rolls and trails a little behind the move
     rot.z += p.strafe * -0.045 * (1 - ads * 0.6);
     pos.x += p.strafe * -0.006 * (1 - ads);

@@ -423,8 +423,8 @@ async function watch(w: World, tx: Signed, forMs = WATCH_MS): Promise<boolean> {
   return false;
 }
 
-/** where the coin's rewards stand, asked of the chain at most twice a minute */
-const coin = (w: World) => cached(w, 'coin', 30_000, () => (w.coin ?? coinState)(w.rpc, w.cfg.mint));
+/** where the coin's rewards stand, asked of the chain at most four times a minute (and no staler than what the treasury is seen to hold: the page shows the two side by side) */
+const coin = (w: World) => cached(w, 'coin', 15_000, () => (w.coin ?? coinState)(w.rpc, w.cfg.mint));
 const treasuryHolds = (w: World) => cached(w, 'balance', 15_000, () => w.rpc.balance(w.cfg.treasury!));
 
 /**

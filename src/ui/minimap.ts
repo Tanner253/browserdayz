@@ -26,6 +26,9 @@ export class Minimap {
   private marked = -1e9;
   /** supply drops standing in the world */
   private drops: { x: number; z: number }[] = [];
+  /** jeeps standing empty */
+  private jeeps: { x: number; z: number }[] = [];
+  private jeepKey = '';
 
   constructor(world: World) {
     this.world = world;
@@ -137,6 +140,15 @@ export class Minimap {
     if (me) this.marked = now;
   }
 
+  /** Jeeps standing empty: where to go to find one. (One that somebody is in is not shown: the map is not a way of following people.) */
+  setJeeps(at: { x: number; z: number }[]) {
+    const key = at.map((j) => `${Math.round(j.x)},${Math.round(j.z)}`).join(';');
+    if (key === this.jeepKey) return;
+    this.jeepKey = key;
+    this.jeeps = at;
+    this.last.x = 1e9;
+  }
+
   /** Supply drops, marked for as long as they stand. */
   setDrops(at: { x: number; z: number }[]) {
     this.drops = at;
@@ -179,6 +191,24 @@ export class Minimap {
         g.fillStyle = '#f1e7c8';
         g.fillText(p.name.toUpperCase(), lx, lz - W / 70);
       }
+    }
+    // jeeps nobody is in: a small pale block with a wheel at each end
+    for (const j of this.jeeps) {
+      const qx = (j.x - cx + span / 2) * k, qz = (j.z - cz + span / 2) * k;
+      if (qx < 0 || qz < 0 || qx > W || qz > W) continue;
+      const h = this.big ? W / 150 : W / 32;
+      g.fillStyle = '#d9dfc8';
+      g.strokeStyle = 'rgba(0, 0, 0, 0.9)';
+      g.lineWidth = Math.max(1.2, h * 0.3);
+      g.beginPath();
+      g.rect(qx - h * 1.5, qz - h * 0.75, h * 3, h * 1.5);
+      g.fill();
+      g.stroke();
+      g.fillStyle = 'rgba(0, 0, 0, 0.9)';
+      g.beginPath();
+      g.arc(qx - h * 0.85, qz + h * 0.85, h * 0.45, 0, Math.PI * 2);
+      g.arc(qx + h * 0.85, qz + h * 0.85, h * 0.45, 0, Math.PI * 2);
+      g.fill();
     }
     // supply drops: a crate, there as long as the drop is; in the corner view one off the edge sits on the rim
     for (const d of this.drops) {

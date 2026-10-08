@@ -9,6 +9,7 @@ import { assets } from '../src/core/assets';
 import { crateId } from '../src/net/protocol';
 import { pickDropSite } from '../src/sim/drops';
 import { barrelSpots } from '../src/sim/barrels';
+import { JEEP, jeepSpots } from '../src/sim/vehicles';
 
 export interface CrateSpot {
   cid: string;
@@ -22,7 +23,8 @@ export function buildWorldData(root: string) {
   const manifestPath = [path.join(root, 'dist/assets/manifest.json'), path.join(root, 'public/assets/manifest.json')].find((p) => existsSync(p));
   if (!manifestPath) throw new Error('assets manifest not found (run the client build first)');
   // furniture sizes come from the model manifest; nothing is downloaded or rendered here
-  (assets as { manifest: unknown }).manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as { models?: Record<string, unknown> };
+  (assets as { manifest: unknown }).manifest = manifest;
   const world = generateWorld();
   const buildings = new Buildings(world, null as never);
   buildings.plan();
@@ -35,6 +37,8 @@ export function buildWorldData(root: string) {
     crates,
     /** the fuel drums, numbered as the game numbers them */
     barrels: barrelSpots(world.props).map((p) => ({ x: p.x, y: p.y, z: p.z })),
+    /** where the jeeps stand to begin with: none, for as long as the game has no model to draw one with */
+    jeeps: manifest.models?.[JEEP.model] || process.env.JEEPS === 'on' ? jeepSpots(world) : [],
     spawns: world.spawns,
     doorCount: buildings.doorSpecs.length,
     groundAt: (x: number, z: number) => heightAt(world.heights, x, z),

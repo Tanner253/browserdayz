@@ -38,6 +38,8 @@ const CLIPS = {
   death: 'Death01', hit: 'Hit_Chest', hitHead: 'Hit_Head',
   // from the wheel (src/sim/emotes.ts)
   dance: 'Dance_Loop',
+  // in a jeep's seat (src/game/garage.ts)
+  sit: 'Sitting_Idle_Loop',
 };
 /**
  * `--emotes`: the same body with a few more clips from the library, written to

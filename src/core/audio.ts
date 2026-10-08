@@ -80,6 +80,20 @@ const CALLS: Record<string, { say: Phone[]; tune: [number, number][] }> = {
   },
 };
 
+/** A jeep's engine, running: told every frame where it is and what it is doing, until it is stopped. */
+export interface EngineVoice {
+  /**
+   * @param rpm engine speed
+   * @param load how hard it is being driven, 0..1
+   * @param speed over the ground, m/s
+   * @param slide how sideways the tyres are going, 0..1
+   * @param road on a made road (tyres sing; off it they rumble)
+   * @param inside heard from the seats, not from the verge
+   */
+  set(pos: V3, rpm: number, load: number, speed: number, slide: number, road: boolean, inside: boolean): void;
+  stop(): void;
+}
+
 export class AudioEngine {
   ctx!: AudioContext;
   private master!: GainNode;
@@ -1215,6 +1229,116 @@ export class AudioEngine {
    * Call each frame: occasional birdsong and crows from random directions.
    * @param forest among trees (leaves in the wind) rather than out in the open (insects in the grass)
    */
+  /**
+   * A jeep's engine. Four cylinders: two bangs to every turn of the crank, which is the note;
+   * a rougher one an octave under it, which is the body; and the tyres and the wind, which
+   * are all that is left of it from far off downwind. One of these per running jeep.
+   */
+  engine(): EngineVoice | null {
+    if (!this.ready) return null;
+    const ctx = this.ctx;
+    const pan = ctx.createPanner();
+    pan.panningModel = 'equalpower';
+    pan.distanceModel = 'inverse';
+    pan.refDistance = 7;
+    pan.rolloffFactor = 1.15;
+    pan.maxDistance = 2000;
+    const out = ctx.createGain();
+    out.gain.value = 0;
+    const lp = this.filter('lowpass', 700, 0.9);
+    const shape = ctx.createWaveShaper();
+    const curve = new Float32Array(257);
+    for (let i = 0; i < 257; i++) curve[i] = Math.tanh(((i - 128) / 128) * 2.4);
+    shape.curve = curve;
+    const mix = ctx.createGain();
+    mix.gain.value = 0.5;
+    const voices: [OscillatorType, number, number][] = [['sawtooth', 1, 0.55], ['square', 0.5, 0.5], ['sawtooth', 2.01, 0.16], ['triangle', 1.5, 0.2]];
+    const oscs = voices.map(([type, , gain]) => {
+      const o = ctx.createOscillator();
+      o.type = type;
+      const g = ctx.createGain();
+      g.gain.value = gain;
+      o.connect(g).connect(mix);
+      o.start();
+      return o;
+    });
+    mix.connect(shape).connect(lp).connect(out);
+    // the tyres on the ground
+    const road = ctx.createBufferSource();
+    road.buffer = this.noiseBuf;
+    road.loop = true;
+    const roadBP = this.filter('bandpass', 420, 0.6);
+    const roadG = ctx.createGain();
+    roadG.gain.value = 0;
+    road.connect(roadBP).connect(roadG).connect(out);
+    road.start();
+    // and across it
+    const skid = ctx.createBufferSource();
+    skid.buffer = this.noiseBuf;
+    skid.loop = true;
+    skid.playbackRate.value = 1.3;
+    const skidBP = this.filter('bandpass', 1500, 5);
+    const skidG = ctx.createGain();
+    skidG.gain.value = 0;
+    skid.connect(skidBP).connect(skidG).connect(out);
+    skid.start();
+    out.connect(pan).connect(this.sfx);
+    let live = true;
+    let level = 0;
+    return {
+      set: (pos, rpm, load, speed, slide, onRoad, inside) => {
+        if (!live) return;
+        pan.positionX.value = pos.x;
+        pan.positionY.value = pos.y;
+        pan.positionZ.value = pos.z;
+        const f = (rpm / 60) * 2;
+        voices.forEach(([, mul], i) => (oscs[i].frequency.value = f * mul));
+        // open the throttle and it brightens before it gets louder
+        lp.frequency.value = 260 + rpm * 0.2 + load * 900;
+        level += (1 - level) * 0.08;
+        out.gain.value = level * (inside ? 0.5 : 0.85) * (0.34 + load * 0.3 + Math.min(0.2, rpm / 20000));
+        roadG.gain.value = Math.min(0.5, speed / 30) * (onRoad ? 0.5 : 0.85);
+        roadBP.frequency.value = onRoad ? 520 + speed * 18 : 260 + speed * 9;
+        skidG.gain.value = slide * (onRoad ? 0.5 : 0.22);
+        skidBP.frequency.value = onRoad ? 1450 + slide * 300 : 700;
+        skidBP.Q.value = onRoad ? 5 : 0.8;
+      },
+      stop: () => {
+        if (!live) return;
+        live = false;
+        const t = ctx.currentTime;
+        out.gain.setTargetAtTime(0, t, 0.12);
+        for (const o of oscs) o.stop(t + 0.6);
+        road.stop(t + 0.6);
+        skid.stop(t + 0.6);
+        setTimeout(() => out.disconnect(), 800);
+      },
+    };
+  }
+
+  /** A jeep running into something: tin, and the weight behind it. @param k how hard, 0..1 */
+  crash(pos: V3, k: number) {
+    if (!this.ready) return;
+    const ctx = this.ctx, t = ctx.currentTime;
+    const out = this.out(pos, 8, 1.1);
+    const thud = ctx.createOscillator();
+    thud.type = 'sine';
+    thud.frequency.setValueAtTime(95, t);
+    thud.frequency.exponentialRampToValueAtTime(38, t + 0.16);
+    const tg = ctx.createGain();
+    this.env(tg, t, 0.5 + k * 0.5, 0.004, 0.22);
+    thud.connect(tg).connect(out);
+    thud.start(t);
+    thud.stop(t + 0.3);
+    const n = this.noise(t, 0.35);
+    const bp = this.filter('bandpass', 1100 + k * 900, 1.2);
+    const ng = ctx.createGain();
+    this.env(ng, t, 0.25 + k * 0.55, 0.002, 0.12 + k * 0.2);
+    n.connect(bp).connect(ng).connect(out);
+    // something loose in it rattles on after
+    for (let i = 0; i < 3; i++) this.click(600 + Math.random() * 900, 0.12 + k * 0.2, 0.03, 0.05 + i * 0.07 + Math.random() * 0.04, pos);
+  }
+
   updateAmbience(dt: number, listener: V3, indoors: boolean, forest = false) {
     if (!this.ready) return;
     this.setEnvironment(indoors);

@@ -7,13 +7,14 @@ import type RAPIER from '@dimforge/rapier3d-compat';
 import { physics, GLASS_GROUPS, HITBOX_GROUPS, SOLID_GROUPS, type Surface } from '../core/physics';
 import { audio } from '../core/audio';
 import type { Atmosphere } from '../world/atmosphere';
-import { F_AIM, F_BLEED, F_CROUCH, F_DANCE, F_DEAD, F_GROUND, F_SURRENDER, type Act, type Pose } from '../net/protocol';
+import { F_AIM, F_BLEED, F_CROUCH, F_DANCE, F_DEAD, F_GROUND, F_LEAN_L, F_LEAN_R, F_SURRENDER, type Act, type Pose } from '../net/protocol';
 import { SHOUT_RANGE, voiceOf, type Emote } from '../sim/emotes';
 import { ITEMS } from '../sim/items';
 import { Avatar } from './avatar';
 import { lookFor } from './look';
 import type { Damageable, HitZone } from './weapons';
 import type { Grips } from './arms';
+import type { Jeep } from './vehicle';
 
 /** render other players this far in the past: long enough to always have two poses to blend between */
 const INTERP_DELAY = 110;
@@ -26,6 +27,8 @@ interface Snap {
 const lerpAngle = (a: number, b: number, t: number) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * t;
 
 export type HeldFactory = (id: string | null, mods: string[]) => { obj: THREE.Object3D; grips: Grips; kind: 'rifle' | 'pistol' | 'auto' | 'melee' } | null;
+
+const _head = new THREE.Vector3(), _neck = new THREE.Vector3(), _pelvis = new THREE.Vector3();
 
 export class RemotePlayer implements Damageable {
   alive = true;
@@ -49,6 +52,13 @@ export class RemotePlayer implements Damageable {
   private grounded = true;
   private aiming = false;
   private flinch = 0;
+  /** leaning out, -1 (left) .. 1 (right) */
+  lean = 0;
+  /** sitting in a jeep: which one, and where in it their feet are (in the jeep's own frame) */
+  seat: { jeep: Jeep; at: [number, number, number] } | null = null;
+  private sat = false;
+  /** the middle of the head, in the world, as of the last frame (null until the body has been seen) */
+  private headAt: THREE.Vector3 | null = null;
   private ready = false;
   private heldKey = '';
 
@@ -106,7 +116,30 @@ export class RemotePlayer implements Damageable {
     this.fall = 0;
     this.avatar.root.visible = true;
     this.applyZones();
-    this.blocker.setEnabled(alive);
+    this.blocker.setEnabled(alive && !this.sat);
+  }
+
+  /**
+   * The head and the chest that count are the head and the chest that are seen: each frame
+   * they are put where the body's own joints are, so they are right standing, crouched over a
+   * rifle, leaning out round a corner, and in whatever the body learns to do next. (The legs
+   * stay under the hips: they do not go anywhere the feet do not.)
+   */
+  private placeZones() {
+    if (!this.alive || !this.avatar.frame(_head, _neck, _pelvis)) return;
+    (this.headAt ??= new THREE.Vector3()).copy(_head);
+    // into the body's own frame: x to its right, z behind it
+    const c = Math.cos(this.yaw), s = Math.sin(this.yaw);
+    for (const v of [_head, _neck, _pelvis]) {
+      const x = v.x - this.pos.x, z = v.z - this.pos.z;
+      v.set(x * c - z * s, v.y - this.pos.y, x * s + z * c);
+    }
+    const set = this.crouched ? this.crouch : this.stand;
+    set[0].setTranslationWrtParent(_head);
+    // the chest: between the hips and the neck, and over to one side as far as the back is
+    const roll = Math.atan2(_neck.x - _pelvis.x, _neck.y - _pelvis.y);
+    set[1].setTranslationWrtParent(_pelvis.lerp(_neck, 0.54));
+    set[1].setRotationWrtParent({ x: 0, y: 0, z: Math.sin(-roll / 2), w: Math.cos(-roll / 2) });
   }
 
   private applyZones() {
@@ -157,7 +190,7 @@ export class RemotePlayer implements Damageable {
 
   /** where the mouth is, near enough */
   head(out: THREE.Vector3) {
-    return out.set(this.pos.x, this.pos.y + (this.crouched ? 1.02 : 1.62), this.pos.z);
+    return this.headAt && this.alive ? out.copy(this.headAt) : out.set(this.pos.x, this.pos.y + (this.crouched ? 1.02 : 1.62), this.pos.z);
   }
 
   update(dt: number, now: number, listener: THREE.Vector3) {
@@ -188,6 +221,10 @@ export class RemotePlayer implements Damageable {
       this.avatar.setHold(b.p[5] & F_DANCE ? 'dance' : b.p[5] & F_SURRENDER ? 'surrender' : null);
       // (a weapon coming up to the eye is the end of a wave)
       if (this.aiming) this.avatar.emote(null);
+      const out = !this.alive ? 0 : b.p[5] & F_LEAN_R ? 1 : b.p[5] & F_LEAN_L ? -1 : 0;
+      this.lean += (out - this.lean) * (1 - Math.exp(-10 * dt));
+      if (Math.abs(this.lean) < 0.002 && !out) this.lean = 0;
+      this.avatar.setLean(this.lean);
       const crouched = !!(b.p[5] & F_CROUCH);
       if (crouched !== this.crouched) {
         this.crouched = crouched;
@@ -198,6 +235,26 @@ export class RemotePlayer implements Damageable {
         this.vel.lerp(v, 1 - Math.exp(-12 * dt));
       } else this.vel.set(0, 0, 0);
     }
+    // In a jeep they are wherever their seat is: the jeep is drawn from its own reports, and
+    // a body placed from other ones would slide about in it.
+    const seat = this.alive ? this.seat : null;
+    if (seat) {
+      seat.jeep.point(seat.at[0], seat.at[1], seat.at[2], this.pos);
+      this.yaw = seat.jeep.yaw;
+      this.pitch = 0;
+      this.vel.set(0, 0, 0);
+      this.grounded = true;
+      this.aiming = false;
+      if (this.crouched) {
+        this.crouched = false;
+        this.applyZones();
+      }
+    }
+    if (!!seat !== this.sat) {
+      this.sat = !!seat;
+      this.avatar.setSeat(this.sat);
+      this.blocker.setEnabled(this.alive && !this.sat);
+    }
 
     const half = this.yaw / 2;
     this.body.setNextKinematicTranslation(this.pos);
@@ -205,6 +262,9 @@ export class RemotePlayer implements Damageable {
 
     this.flinch = Math.max(0, this.flinch - dt * 4);
     this.avatar.update(dt, this.pos, this.vel, this.yaw, this.crouched, !this.alive, false, this.pitch, this.grounded, this.aiming);
+    // (sat in it, they lean and tip as it does)
+    if (seat) this.avatar.root.quaternion.copy(seat.jeep.quat);
+    this.placeZones();
     const r = this.avatar.root;
     if (!this.alive) {
       // they go down, lie there for a moment, then the body on the ground takes over

@@ -11,8 +11,9 @@ import type { SerializedInventory } from '../sim/inventory';
 import type { WorldLoot } from '../sim/economy';
 import type { HitZone } from '../sim/combat';
 import type { DropInfo } from '../sim/drops';
+import type { VehicleInfo, VState } from '../sim/vehicles';
 
-export const PROTOCOL = 7;
+export const PROTOCOL = 8;
 
 /** chat channels: everyone on the server, or only players standing near the speaker */
 export type ChatChannel = 'global' | 'near';
@@ -23,6 +24,16 @@ export const CHAT_RANGE = 50;
 export const F_CROUCH = 1, F_SPRINT = 2, F_AIM = 4, F_GROUND = 8, F_DEAD = 16, F_BLEED = 32;
 /** what the body is doing for as long as it is left to (see src/sim/emotes.ts): dancing, hands up */
 export const F_DANCE = 64, F_SURRENDER = 128;
+/**
+ * Leaning out to one side (Q, E). The eyes of whoever leans go half a pace sideways: so do
+ * their head and shoulders as everybody else sees them, and as everybody else's bullets
+ * find them. (A game that was never told of these simply shows nobody leaning.)
+ */
+export const F_LEAN_L = 256, F_LEAN_R = 512;
+/** sitting in a jeep (which one, and where in it, the server says: see 'vseat') */
+export const F_SEAT = 1024;
+/** how far the head goes sideways at a full lean, metres (the camera's own figure: see Player.updateCamera) */
+export const LEAN_REACH = 0.34;
 
 /** things a player does with their hands that the people around them can see (and hear) */
 export const ACTS = ['bolt', 'reload', 'eat', 'drink', 'bandage', 'open', 'stop'] as const;
@@ -111,6 +122,20 @@ export type C2S =
   | { t: 'chat'; ch?: ChatChannel; text: string }
   /** a dog tag taken from another player has been carried for the full time */
   | { t: 'cash'; uid: string; /** where a reward for it should go, if the player has given an address */ wallet?: string }
+  /** getting into jeep number i (see src/sim/vehicles.ts), in this seat; and getting out of whatever we are in */
+  | { t: 'vin'; i: number; seat: number }
+  | { t: 'vout' }
+  /** where the jeep this game is moving has got to, and when by this game's own clock (milliseconds) */
+  | { t: 'v'; i: number; s: VState; at: number }
+  /** it has come to rest: nobody need move it any more */
+  | { t: 'vrest'; i: number; s: VState }
+  /** a jeep on its side that nobody is in: this game will stand it up */
+  | { t: 'vflip'; i: number }
+  /** a round of ours hit it (with this weapon), or it ran into something this hard while we were moving it (m/s) */
+  | { t: 'vhit'; i: number; w: string }
+  | { t: 'vcrash'; i: number; n: number }
+  /** a jerrycan emptied into its tank */
+  | { t: 'vfuel'; i: number }
   | { t: 'ping'; n: number };
 
 export type S2C =
@@ -131,6 +156,8 @@ export type S2C =
       drops?: DropInfo[];
       /** fuel drums that have gone up and not been stood up again yet */
       barrels?: number[];
+      /** the jeeps: where each stands, what state it is in and who is in it */
+      vehicles?: VehicleInfo[];
       max: number;
     }
   | { t: 'join'; p: PlayerInfo }
@@ -178,6 +205,21 @@ export type S2C =
   | { t: 'drop-'; uid: string }
   /** where everyone carrying a tag they took is standing right now: [player id, x, z]. Sent to all, every half minute. */
   | { t: 'tags'; p: [number, number, number][] }
+  /**
+   * Jeeps that are moving: [number, when, ...where and how]. `when` is the clock of the game
+   * that is moving it: a jeep at speed covers a metre and a half between two reports, and
+   * drawn by when each happened to arrive it shudders.
+   */
+  | { t: 'vs'; s: [number, number, ...VState][] }
+  /** who is in a jeep now and whose game moves it; with `s`, where it has come to rest */
+  | { t: 'vseat'; i: number; seats: (number | null)[]; sim: number | null; s?: VState }
+  /** what it has left after being hit, and what is in its tank */
+  | { t: 'vhp'; i: number; hp: number; by: number }
+  | { t: 'vfuel'; i: number; fuel: number }
+  /** it went up (set off by this player); it has been cleared away; a new one stands somewhere */
+  | { t: 'vboom'; i: number; by: number }
+  | { t: 'v-'; i: number }
+  | { t: 'v+'; v: VehicleInfo }
   | { t: 'pong'; n: number }
   /** something the server has to say to this player alone (what became of a tag they cashed in) */
   | { t: 'tell'; text: string; kind: 'good' | 'warn' | 'info' }

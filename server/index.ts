@@ -19,6 +19,7 @@ import { DROP, fillDrop, type DropInfo } from '../src/sim/drops';
 import { CRATE_RESTOCK, CRATE_SPECS, fillCrate } from '../src/sim/crates';
 import { WEAPON_RULES, hitDamage, type HitZone } from '../src/sim/combat';
 import { BARREL } from '../src/sim/barrels';
+import { JEEP, SEATS, crashDamage, restState, type VehicleInfo, type VState } from '../src/sim/vehicles';
 import { EMOTE, EMOTE_GAP, SHOUT_RANGE } from '../src/sim/emotes';
 import { ACTS, CHAT_RANGE, F_DEAD, MAX_STAMINA, PROTOCOL, type C2S, type CorpseInfo, type KillInfo, type PlayerInfo, type Pose, type S2C, type StashInfo, type StoredItem, type Vitals } from '../src/net/protocol';
 
@@ -68,6 +69,36 @@ const doors = new Map<number, [boolean, number]>();
 /** fuel drums that have gone up (see src/sim/barrels.ts): which one -> when a new one may be stood there */
 const barrelsGone = new Map<number, number>();
 const BARREL_RESPAWN = Number(process.env.BARREL_RESPAWN_S) || BARREL.respawn;
+
+/**
+ * The jeeps (see src/sim/vehicles.ts). The server keeps where each one is, what it has left
+ * and who sits in it; the game of whoever drives it (`sim`) says how it moves.
+ */
+interface Veh extends VehicleInfo {
+  /** which of the world's spots it started on */
+  home: number;
+  /** when the game moving it last said where it was */
+  heard: number;
+  /** burning: when it goes up, and who set it alight (0: it is not) */
+  burnAt: number;
+  by: number;
+  /** burned out: when the wreck is cleared away (0: it is whole) */
+  goneAt: number;
+}
+const vehicles = new Map<number, Veh>();
+/** spots whose jeep burned: which -> when a new one may be stood there */
+const jeepsDue = new Map<number, number>();
+let nextVeh = 1;
+function standJeep(home: number): Veh {
+  const p = world.jeeps[home];
+  const v: Veh = { i: nextVeh++, s: restState(p.x, p.y, p.z, p.yaw), hp: JEEP.hp, fuel: Math.round(JEEP.tank * (0.3 + Math.random() * 0.45)), seats: Array(SEATS).fill(null), sim: null, home, heard: 0, burnAt: 0, by: 0, goneAt: 0 };
+  vehicles.set(v.i, v);
+  return v;
+}
+world.jeeps.forEach((_, k) => standJeep(k));
+const vehInfo = (v: Veh): VehicleInfo => ({ i: v.i, s: v.s, hp: v.goneAt ? 0 : v.hp, fuel: v.fuel, seats: v.seats, sim: v.sim });
+const tellSeats = (v: Veh, rest = false) => broadcast({ t: 'vseat', i: v.i, seats: v.seats, sim: v.sim, ...(rest ? { s: v.s } : {}) });
+const isVState = (s: unknown): s is VState => Array.isArray(s) && s.length === 12 && s.every(num) && Math.abs(s[0]) < 600 && Math.abs(s[2]) < 600 && Math.abs(s[1]) < 500 && Math.abs(Math.hypot(s[3], s[4], s[5], s[6]) - 1) < 0.02 && Math.hypot(s[7], s[8], s[9]) < 60;
 
 const economy = new Economy(world.lootPoints, {
   spawn: (l) => broadcast({ t: 'loot+', l }),
@@ -278,6 +309,17 @@ function carriedTags(inv: SerializedInventory | null): ItemInstance[] {
 
 // ------------------------------------------------------------------ players
 
+/**
+ * Carrying a tag they took off somebody (their own does not count). Such a player is shown
+ * on the map every half minute, and goes on foot: no jeep will take them.
+ */
+function takenTag(c: Client): boolean {
+  return carriedTags(c.inv).some((t) => {
+    const from = lootedTags.get(t.uid);
+    return !!from && from.ownerKey !== c.key;
+  });
+}
+
 interface Client {
   ws: WebSocket;
   id: number;
@@ -291,6 +333,9 @@ interface Client {
   inv: SerializedInventory | null;
   vitals: Vitals | null;
   lastHit: number;
+  /** when a round of theirs last hit a jeep, and when they got into the seat they are in (0: on foot) */
+  lastVHit: number;
+  seatAt: number;
   /** when this player last threw a grenade, and how many hits have been claimed for it */
   lastNade: number;
   nadeHits: number;
@@ -437,6 +482,98 @@ function findCarried(c: Client, uid: unknown): ItemInstance | null {
   return null;
 }
 
+/**
+ * A tag's clock belongs to whoever is carrying it alive. On a body it stops, and whoever
+ * takes the tag next starts from nothing: the one who died too, if they come back for it
+ * (the server's own clock for them was cleared when they died: see kill).
+ */
+function stopTagClocks(it: ItemInstance) {
+  if (it.id === 'dogtag') {
+    it.holder = undefined;
+    it.held = 0;
+  }
+  for (const p of it.cargo ?? []) stopTagClocks(p.item);
+}
+
+/** the jeep a player sits in, and which seat */
+function seatOf(c: Client): { v: Veh; seat: number } | null {
+  if (!c.seatAt) return null;
+  for (const v of vehicles.values()) {
+    const seat = v.seats.indexOf(c.id);
+    if (seat >= 0) return { v, seat };
+  }
+  return null;
+}
+
+/** out of whatever they are sitting in (they got out, died, or are gone) */
+function leaveSeat(c: Client, gone = false) {
+  const at = seatOf(c);
+  c.seatAt = 0;
+  if (!at) {
+    // (not in a seat, but perhaps still the one moving a jeep they got out of)
+    if (gone) for (const v of vehicles.values()) if (v.sim === c.id) {
+      v.sim = null;
+      v.s = [v.s[0], v.s[1], v.s[2], v.s[3], v.s[4], v.s[5], v.s[6], 0, 0, 0, 0, 0];
+      tellSeats(v, true);
+    }
+    return;
+  }
+  const { v, seat } = at;
+  v.seats[seat] = null;
+  // The game that was moving it goes on doing so until it has rolled to a stop (see 'vrest'):
+  // unless that game is gone, and then it stops where it was last seen.
+  if (gone && v.sim === c.id) {
+    v.sim = null;
+    v.s = [v.s[0], v.s[1], v.s[2], v.s[3], v.s[4], v.s[5], v.s[6], 0, 0, 0, 0, 0];
+    tellSeats(v, true);
+  } else tellSeats(v);
+}
+
+/** a jeep is hit: what it has left, and what follows from that */
+function hurtJeep(v: Veh, amount: number, by: Client) {
+  if (v.goneAt || amount <= 0) return;
+  v.hp = Math.max(0, v.hp - amount);
+  broadcast({ t: 'vhp', i: v.i, hp: Math.round(v.hp), by: by.id });
+  if (v.hp <= 0) return blowJeep(v, by.id);
+  // on fire: it goes up in a few seconds, and everybody in it knows it
+  if (v.hp <= JEEP.hp * JEEP.fireAt && !v.burnAt) {
+    v.burnAt = Date.now() + JEEP.fuse * 1000;
+    v.by = by.id;
+  }
+}
+
+function blowJeep(v: Veh, byId: number) {
+  if (v.goneAt) return;
+  const now = Date.now();
+  v.hp = 0;
+  v.burnAt = 0;
+  v.goneAt = now + 120_000;
+  jeepsDue.set(v.home, now + (Number(process.env.JEEP_RESPAWN_S) || JEEP.respawn) * 1000);
+  const by = clients.get(byId);
+  broadcast({ t: 'vboom', i: v.i, by: byId });
+  // whoever is in it, and whoever is standing by it
+  const rule = WEAPON_RULES.barrel;
+  for (const c of clients.values()) {
+    if (!c.alive) continue;
+    const inside = v.seats.includes(c.id);
+    const d = Math.hypot(c.pose[0] - v.s[0], c.pose[1] + 1 - v.s[1], c.pose[2] - v.s[2]);
+    const amount = inside ? 400 : hitDamage('barrel', 'torso', Math.max(0, d - 1.5));
+    if (amount <= 0 || d > rule.blast! + 3) continue;
+    if (by && by !== c) c.lastHitBy = { id: by.id, name: by.name, w: 'fire', zone: 'torso', dist: d, at: now };
+    const len = Math.max(0.001, Math.hypot(c.pose[0] - v.s[0], c.pose[2] - v.s[2]));
+    send(c, { t: 'dmg', from: byId, amount, zone: 'torso', w: 'fire', dir: [(c.pose[0] - v.s[0]) / len, 0, (c.pose[2] - v.s[2]) / len] });
+  }
+  for (const id of v.seats) {
+    const c = id === null ? undefined : clients.get(id);
+    if (c) c.seatAt = 0;
+  }
+  v.seats = Array(SEATS).fill(null);
+  v.sim = null;
+  v.s = [v.s[0], v.s[1], v.s[2], v.s[3], v.s[4], v.s[5], v.s[6], 0, 0, 0, 0, 0];
+  tellSeats(v, true);
+  log(`jeep #${v.i} burned out${by ? ` (${by.name})` : ''}`);
+}
+
 /** everything a character carried goes into a body that can be searched for a while */
 function makeCorpse(c: Client, v: number): CorpseInfo | null {
   const inv = c.inv;
@@ -447,6 +584,7 @@ function makeCorpse(c: Client, v: number): CorpseInfo | null {
   const spill: ItemInstance[] = [];
   const put = (it: ItemInstance | null) => {
     if (!it) return;
+    stopTagClocks(it);
     const left = box.add(it);
     if (left) spill.push(left);
   };
@@ -470,6 +608,7 @@ function kill(c: Client, cause: string, v = 0) {
   if (!c.alive) return;
   c.alive = false;
   releaseLock(c);
+  leaveSeat(c);
   const now = Date.now();
   const by = c.lastHitBy && now - c.lastHitBy.at < 15000 ? c.lastHitBy : null;
   const k: KillInfo = { id: c.id, name: c.name, by: by?.id ?? null, byName: by?.name ?? null, w: by?.w ?? cause, zone: by?.zone ?? null, dist: Math.round(by?.dist ?? 0), v };
@@ -590,6 +729,15 @@ function handle(c: Client, m: C2S) {
         if (now - c.lastNade > 9000 || ++c.nadeHits > 12 || !num(m.dist)) return;
         amount = hitDamage(m.w, 'torso', Math.max(0, m.dist));
         m.zone = 'torso';
+      } else if (m.w === 'jeep') {
+        // run down: by whoever is at the wheel of a jeep that is right there, going fast enough
+        const at = seatOf(c);
+        if (!at || at.seat !== 0 || !num(m.dist) || now - c.lastHit < rule.interval * 1000) return;
+        if (Math.hypot(at.v.s[0] - target.pose[0], at.v.s[2] - target.pose[2]) > 7) return;
+        c.lastHit = now;
+        const speed = Math.min(m.dist, Math.hypot(at.v.s[7], at.v.s[8], at.v.s[9]) + 3);
+        amount = Math.max(0, speed - JEEP.bumpFrom) * JEEP.bumpPer;
+        m.zone = 'torso';
       } else {
         // you can only hit with what you are holding (fists are always there)
         if (m.w !== 'fists' && c.w !== m.w) return;
@@ -607,7 +755,8 @@ function handle(c: Client, m: C2S) {
     case 'take': {
       if (typeof m.uid !== 'string' || !c.alive) return;
       // first request wins; the economy's despawn event tells everyone it is gone
-      if (!economy.take(m.uid)) send(c, { t: 'denied', uid: m.uid });
+      // (and nobody reaches the ground from a jeep's seat)
+      if (c.seatAt || !economy.take(m.uid)) send(c, { t: 'denied', uid: m.uid });
       return;
     }
     case 'drop': {
@@ -620,7 +769,8 @@ function handle(c: Client, m: C2S) {
     }
     case 'copen': {
       const b = boxes.get(m.cid);
-      if (!b || !c.alive) return;
+      // (a body, a crate, a stash, a drop: none of them is searched from a jeep's seat)
+      if (!b || !c.alive || c.seatAt) return;
       if (Math.hypot(b.x - c.pose[0], b.z - c.pose[2]) > 6) return;
       const holder = locks.get(m.cid);
       if (holder !== undefined && holder !== c.id && clients.has(holder)) {
@@ -635,7 +785,7 @@ function handle(c: Client, m: C2S) {
     }
     case 'cset': {
       const b = boxes.get(m.cid);
-      if (!b || locks.get(m.cid) !== c.id) return;
+      if (!b || locks.get(m.cid) !== c.id || c.seatAt) return;
       b.items = cleanStored(m.items);
       if (b.kind === 'crate' || b.kind === 'drop') b.emptiedAt = b.items.length ? -1 : b.emptiedAt < 0 ? economy.time : b.emptiedAt;
       return;
@@ -678,6 +828,11 @@ function handle(c: Client, m: C2S) {
         const from = lootedTags.get(t.uid);
         if (from && from.ownerKey !== c.key && !tagSeen.has(`${c.key}|${t.uid}`)) tagSeen.set(`${c.key}|${t.uid}`, Date.now());
       }
+      // (there is no honest way to come by one in a seat: see 'take' and 'copen')
+      if (c.seatAt && takenTag(c)) {
+        leaveSeat(c);
+        send(c, { t: 'tell', kind: 'warn', text: JEEP.noTag });
+      }
       const v = m.vitals;
       if (v && num(v.health) && num(v.energy) && num(v.water)) c.vitals = { health: v.health, energy: v.energy, water: v.water, stamina: num(v.stamina) ? v.stamina : MAX_STAMINA, bleeding: !!v.bleeding };
       return;
@@ -710,6 +865,111 @@ function handle(c: Client, m: C2S) {
           if (Math.hypot(o.pose[0] - c.pose[0], o.pose[1] - c.pose[1], o.pose[2] - c.pose[2]) <= CHAT_RANGE) send(o, out);
         }
       } else broadcast({ t: 'chat', ch: 'global', from: c.name, text });
+      return;
+    }
+    case 'vin': {
+      const v = vehicles.get(m.i);
+      if (!v || !c.alive || v.goneAt || c.seatAt || !Number.isInteger(m.seat) || m.seat < 0 || m.seat >= SEATS || v.seats[m.seat] !== null) return;
+      if (Math.hypot(c.pose[0] - v.s[0], c.pose[1] - v.s[1], c.pose[2] - v.s[2]) > JEEP.reach + 3) return;
+      // A tag taken off somebody is carried on foot, for ten minutes, with the map showing
+      // everybody where: not driven round in circles.
+      if (takenTag(c)) {
+        send(c, { t: 'tell', kind: 'warn', text: JEEP.noTag });
+        return;
+      }
+      // (and whatever they were searching is shut: nothing is searched from a seat)
+      releaseLock(c);
+      v.seats[m.seat] = c.id;
+      c.seatAt = Date.now();
+      // whoever takes the wheel moves it from now on; a passenger changes nothing about that
+      if (m.seat === 0) {
+        v.sim = c.id;
+        v.heard = Date.now();
+      }
+      tellSeats(v);
+      return;
+    }
+    case 'vout': {
+      leaveSeat(c);
+      return;
+    }
+    case 'v': {
+      const v = vehicles.get(m.i);
+      if (!v || v.sim !== c.id || v.goneAt || !isVState(m.s) || !num(m.at)) return;
+      const now = Date.now();
+      // passed straight on, not held for the next tick: every wait here is a wobble there
+      broadcast({ t: 'vs', s: [[v.i, m.at, ...m.s]] }, c);
+      // what the engine burns: flat out for a minute is JEEP.burn litres
+      if (v.seats[0] === c.id && v.fuel > 0) {
+        const had = v.fuel;
+        v.fuel = Math.max(0, v.fuel - (Math.abs(m.s[11]) * JEEP.burn * Math.min(1, (now - v.heard) / 1000)) / 60);
+        if (Math.floor(had) !== Math.floor(v.fuel) || !v.fuel) broadcast({ t: 'vfuel', i: v.i, fuel: Math.round(v.fuel * 10) / 10 });
+      }
+      v.s = m.s;
+      v.heard = now;
+      return;
+    }
+    case 'vrest': {
+      const v = vehicles.get(m.i);
+      if (!v || v.sim !== c.id || !isVState(m.s)) return;
+      v.s = [m.s[0], m.s[1], m.s[2], m.s[3], m.s[4], m.s[5], m.s[6], 0, 0, 0, 0, 0];
+      // (with somebody still at the wheel it is only standing, not left)
+      if (v.seats[0] === c.id) return;
+      v.sim = null;
+      tellSeats(v, true);
+      return;
+    }
+    case 'vflip': {
+      const v = vehicles.get(m.i);
+      if (!v || !c.alive || v.goneAt || v.sim !== null || v.seats.some((s) => s !== null)) return;
+      if (Math.hypot(c.pose[0] - v.s[0], c.pose[2] - v.s[2]) > JEEP.reach + 3) return;
+      // their game stands it up and lets it settle, then hands it back (see 'vrest')
+      v.sim = c.id;
+      v.heard = Date.now();
+      tellSeats(v);
+      return;
+    }
+    case 'vhit': {
+      const v = vehicles.get(m.i);
+      const rule = WEAPON_RULES[m.w];
+      if (!v || !c.alive || !rule || rule.melee || v.goneAt) return;
+      const now = Date.now();
+      const d = Math.hypot(c.pose[0] - v.s[0], c.pose[1] - v.s[1], c.pose[2] - v.s[2]);
+      if (d > rule.range + 6) return;
+      let amount = rule.damage;
+      if (rule.blast) {
+        // a grenade thrown or a drum set off in the last moments, near enough to reach it
+        const recent = m.w === 'barrel' ? c.blasts.some((q) => now - q.at < 4000) : now - c.lastNade < 9000;
+        if (!recent) return;
+        amount = rule.damage * 2;
+      } else {
+        if (c.w !== m.w || now - c.lastVHit < rule.interval * 700) return;
+      }
+      c.lastVHit = now;
+      hurtJeep(v, amount, c);
+      return;
+    }
+    case 'vcrash': {
+      const v = vehicles.get(m.i);
+      if (!v || v.sim !== c.id || v.goneAt || !num(m.n) || m.n <= 0) return;
+      // the jeep takes it first; from a real smash, so does everybody in it
+      const cost = crashDamage(Math.min(40, m.n));
+      const riders = v.seats.slice();
+      hurtJeep(v, cost.jeep, c);
+      if (cost.people > 0) {
+        for (const id of riders) {
+          const o = id === null ? undefined : clients.get(id);
+          if (o?.alive) send(o, { t: 'dmg', from: 0, amount: cost.people, zone: 'torso', w: 'crash', dir: [0, 0, 0] });
+        }
+      }
+      return;
+    }
+    case 'vfuel': {
+      const v = vehicles.get(m.i);
+      if (!v || !c.alive || v.goneAt || v.fuel >= JEEP.tank - 0.5) return;
+      if (Math.hypot(c.pose[0] - v.s[0], c.pose[2] - v.s[2]) > JEEP.reach + 3) return;
+      v.fuel = Math.min(JEEP.tank, v.fuel + JEEP.can);
+      broadcast({ t: 'vfuel', i: v.i, fuel: Math.round(v.fuel * 10) / 10 });
       return;
     }
     case 'cash': {
@@ -763,7 +1023,7 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
     pose: [sp.x, 'y' in sp && sp.y !== undefined ? sp.y : world.groundAt(sp.x, sp.z), sp.z, sp.yaw, 0, 0],
     w: null, m: [], g: [], alive: true,
     inv: resume?.inv ?? null, vitals: resume?.vitals ?? null,
-    lastHit: 0, lastNade: 0, nadeHits: 0, blasts: [], lastEmote: 0, lastChat: 0, lastHitBy: null, openCid: null, activeAt: Date.now(), joinedAt: Date.now(), ip: ipOf.get(ws) ?? '', lifeAt: Date.now(), msgCount: 0, msgWindow: Date.now(),
+    lastHit: 0, lastVHit: 0, seatAt: 0, lastNade: 0, nadeHits: 0, blasts: [], lastEmote: 0, lastChat: 0, lastHitBy: null, openCid: null, activeAt: Date.now(), joinedAt: Date.now(), ip: ipOf.get(ws) ?? '', lifeAt: Date.now(), msgCount: 0, msgWindow: Date.now(),
   };
   records.delete(key);
   const others = [...clients.values()].map(info);
@@ -776,6 +1036,7 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
     corpses: [...boxes.values()].filter((b) => b.kind === 'corpse').map((b) => ({ uid: b.cid, x: b.x, y: b.y, z: b.z, rot: b.rot, name: b.name ?? 'Survivor', v: b.v ?? 0 })),
     drops: [...boxes.values()].filter((b) => b.kind === 'drop').map(dropInfo),
     barrels: [...barrelsGone.keys()],
+    vehicles: [...vehicles.values()].map(vehInfo),
     spawn: sp,
     me: resume ? { inv: resume.inv!, vitals: resume.vitals ?? { health: 100, energy: 80, water: 80, stamina: MAX_STAMINA, bleeding: false } } : null,
     max: MAX_PLAYERS,
@@ -794,6 +1055,7 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
 function drop(c: Client) {
   if (!clients.delete(c.id)) return;
   releaseLock(c);
+  leaveSeat(c, true);
   records.set(c.key, { pose: c.pose, inv: c.inv, vitals: c.vitals, alive: c.alive, leftAt: Date.now() });
   broadcast({ t: 'leave', id: c.id });
   log(`- ${c.name} (#${c.id}) — ${clients.size} online`);
@@ -811,6 +1073,35 @@ setInterval(() => {
   }
   broadcast({ t: 'ps', s });
 }, 1000 / TICK_HZ);
+
+setInterval(() => {
+  const now = Date.now();
+  for (const v of [...vehicles.values()]) {
+    if (v.burnAt && now >= v.burnAt) blowJeep(v, v.by);
+    else if (v.goneAt && now >= v.goneAt) {
+      vehicles.delete(v.i);
+      broadcast({ t: 'v-', i: v.i });
+    } else if (!v.goneAt && (v.s[1] < JEEP.floor || Math.abs(v.s[0]) > 540 || Math.abs(v.s[2]) > 540) && v.seats.every((s) => s === null)) {
+      // off the edge of the world, or through the bottom of it: stood back where it started
+      const p = world.jeeps[v.home];
+      v.s = restState(p.x, p.y, p.z, p.yaw);
+      v.sim = null;
+      tellSeats(v, true);
+    } else if (v.sim !== null && v.seats[0] !== v.sim && now - v.heard > 6000) {
+      // the game that was letting it roll to a stop has gone quiet
+      v.sim = null;
+      v.s = [v.s[0], v.s[1], v.s[2], v.s[3], v.s[4], v.s[5], v.s[6], 0, 0, 0, 0, 0];
+      tellSeats(v, true);
+    }
+  }
+  // a new one for each that burned, once its time has come and nobody is standing on the spot
+  for (const [home, at] of jeepsDue) {
+    const p = world.jeeps[home];
+    if (now < at || [...clients.values()].some((c) => c.alive && Math.hypot(c.pose[0] - p.x, c.pose[2] - p.z) < 25) || [...vehicles.values()].some((v) => Math.hypot(v.s[0] - p.x, v.s[2] - p.z) < 8)) continue;
+    jeepsDue.delete(home);
+    broadcast({ t: 'v+', v: vehInfo(standJeep(home)) });
+  }
+}, 1000);
 
 // ------------------------------------------------------------------ the queue
 //
@@ -993,12 +1284,7 @@ const TAG_PING_MS = (Number(process.env.TAG_PING_S) || 30) * 1000;
 setInterval(() => {
   const p: [number, number, number][] = [];
   for (const c of clients.values()) {
-    if (!c.alive) continue;
-    const takes = carriedTags(c.inv).some((t) => {
-      const from = lootedTags.get(t.uid);
-      return !!from && from.ownerKey !== c.key;
-    });
-    if (takes) p.push([c.id, Math.round(c.pose[0]), Math.round(c.pose[2])]);
+    if (c.alive && takenTag(c)) p.push([c.id, Math.round(c.pose[0]), Math.round(c.pose[2])]);
   }
   if (p.length) broadcast({ t: 'tags', p });
 }, TAG_PING_MS);

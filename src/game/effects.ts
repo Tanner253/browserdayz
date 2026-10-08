@@ -517,6 +517,63 @@ export class Effects {
   }
 
   /**
+   * A jeep that has been shot up: smoke off the bonnet, thicker the less it has left, and
+   * flames in it once it is alight. Call every frame it should burn.
+   */
+  engineSmoke(at: THREE.Vector3, state: { owed: number }, dt: number, fire: boolean, amount: number) {
+    state.owed = Math.min(4, state.owed + dt * (4 + amount * 9));
+    while (state.owed >= 1) {
+      state.owed -= 1;
+      const k = fire ? 0.05 + Math.random() * 0.06 : 0.16 + Math.random() * 0.12 - amount * 0.08;
+      this.spawn({
+        p: new THREE.Vector3(at.x + (Math.random() - 0.5) * 0.5, at.y, at.z + (Math.random() - 0.5) * 0.5),
+        v: new THREE.Vector3((Math.random() - 0.5) * 0.6 + 0.3, 1.2 + Math.random() * 0.8, (Math.random() - 0.5) * 0.6 + 0.2),
+        max: 2 + Math.random() * 1.6 + amount * 1.5,
+        size: 0.35,
+        grow: 1.6 + amount * 1.6,
+        color: new THREE.Color(k, k, k),
+        alpha: 0.35 + amount * 0.35,
+        gravity: -0.9,
+        drag: 0.9,
+      });
+      if (fire) {
+        this.spawn({
+          p: new THREE.Vector3(at.x + (Math.random() - 0.5) * 0.7, at.y - 0.1, at.z + (Math.random() - 0.5) * 0.7),
+          v: new THREE.Vector3((Math.random() - 0.5) * 0.5, 1.4 + Math.random() * 1.4, (Math.random() - 0.5) * 0.5),
+          max: 0.35 + Math.random() * 0.35,
+          size: 0.45,
+          grow: 0.8,
+          color: new THREE.Color(3.2, 1.2, 0.2),
+          alpha: 0.9,
+          gravity: -1.2,
+          drag: 1.4,
+          additive: true,
+        });
+      }
+    }
+  }
+
+  /** What a tyre throws up behind it: the colour of what it is on, more of it the faster it goes. */
+  dust(at: THREE.Vector3, vel: THREE.Vector3, surface: string, amount: number, state: { owed: number }, dt: number) {
+    state.owed = Math.min(3, state.owed + dt * amount * 11);
+    while (state.owed >= 1) {
+      state.owed -= 1;
+      const c = new THREE.Color(SURF_DUST[surface as Surface] ?? 0x6f6448).multiplyScalar(0.9 + Math.random() * 0.25);
+      this.spawn({
+        p: new THREE.Vector3(at.x + (Math.random() - 0.5) * 0.3, at.y + 0.1, at.z + (Math.random() - 0.5) * 0.3),
+        v: new THREE.Vector3(vel.x * 0.25 + (Math.random() - 0.5) * 1.2, 0.5 + Math.random() * 0.9, vel.z * 0.25 + (Math.random() - 0.5) * 1.2),
+        max: 0.9 + Math.random() * 0.9,
+        size: 0.4,
+        grow: 2.2,
+        color: c,
+        alpha: surface === 'asphalt' ? 0.16 : 0.3,
+        gravity: -0.2,
+        drag: 1.6,
+      });
+    }
+  }
+
+  /**
    * Signal smoke: an orange column standing forty metres over a supply drop, to be seen
    * from across a valley. Call every frame it should burn.
    * @param state the caller's own count of how much smoke is owed (so each column keeps its own pace)

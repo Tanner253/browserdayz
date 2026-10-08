@@ -9,6 +9,7 @@ import { makeItem } from '../sim/items';
 import { Avatar, POSE } from '../game/avatar';
 import { lookFor } from '../game/look';
 import { MAX_STAMINA } from '../net/protocol';
+import { DRIVE } from '../game/vehicle';
 import type { Game } from '../game/game';
 
 export function installHarness(g: Game) {
@@ -32,22 +33,44 @@ export function installHarness(g: Game) {
   };
   const row: Avatar[] = [];
   let sheet: { from: THREE.Vector3; to: THREE.Vector3 } | null = null;
+  const jobs: { until: number; each?: () => void; done: () => void }[] = [];
+  let pumping = false;
+  const pump = async () => {
+    if (pumping) return;
+    pumping = true;
+    let last = 0;
+    while (jobs.length) {
+      await tick();
+      const now = performance.now();
+      if (now - last >= 15.5) {
+        last = now;
+        realFrame();
+        for (const j of [...jobs]) j.each?.();
+      }
+      for (let k = jobs.length - 1; k >= 0; k--) {
+        if (now < jobs[k].until) continue;
+        const [j] = jobs.splice(k, 1);
+        j.done();
+      }
+    }
+    pumping = false;
+  };
+  const riding = () => g.garage.ride;
+  /** which drive of the jeep by the harness is the one going on now: an older one stops when it sees it is not */
+  let drive = 0;
   const T = {
     physics,
     errors: [] as string[],
-    /** run the game for `ms` of wall time regardless of tab visibility */
-    async run(ms: number, each?: () => void) {
-      const t0 = performance.now();
-      let last = 0;
-      while (performance.now() - t0 < ms) {
-        await tick();
-        const now = performance.now();
-        if (now - last >= 15.5) {
-          last = now;
-          realFrame();
-          each?.();
-        }
-      }
+    /**
+     * Run the game for `ms` of wall time regardless of tab visibility. Any number of these
+     * can be going at once (a drive started and left to itself, and a wait for it): one pump
+     * turns the frames for all of them.
+     */
+    run(ms: number, each?: () => void) {
+      return new Promise<void>((done) => {
+        jobs.push({ until: performance.now() + ms, each, done });
+        void pump();
+      });
     },
     /** stop the world (the last rendered frame stays on screen for a screenshot) */
     freeze(on = true) {
@@ -226,6 +249,140 @@ export function installHarness(g: Game) {
     vec: (x: number, y: number, z: number) => new THREE.Vector3(x, y, z),
     /** crouch / air / collapse pose angles, live-editable */
     pose: POSE,
+    /** how the jeep drives, live-editable (call tune() on a jeep after changing its springs) */
+    drive: DRIVE,
+    /** into the driver's seat of a jeep (the nearest, or the one numbered), wherever it is */
+    async ride(i?: number) {
+      const p = g.player;
+      if (p.dead) T.revive();
+      p.vitals.water = p.vitals.energy = 100;
+      if (g.garage.ride) return g.garage.ride.jeep;
+      const all = [...g.garage.jeeps.values()].filter((j) => !j.wreck);
+      const j = i !== undefined ? g.garage.jeeps.get(i) : all.sort((a, b) => a.pos.distanceTo(p.pos) - b.pos.distanceTo(p.pos))[0];
+      if (!j) return null;
+      const at = j.point(-2.2, 0, 0.1, new THREE.Vector3());
+      T.tp(at.x, at.z, 0);
+      await T.run(250);
+      g.garage.use(j);
+      await T.run(600);
+      return riding()?.jeep ?? null;
+    },
+    /** the jeep being ridden, stood on the road at its point number `from`, nose toward the next one */
+    onRoad(from: number, dir = 1) {
+      const j = g.garage.ride?.jeep;
+      const pts = g.s.world.road.points;
+      if (!j) return null;
+      const a = [pts[from * 3], pts[from * 3 + 1], pts[from * 3 + 2]], b = [pts[(from + dir) * 3], 0, pts[(from + dir) * 3 + 2]];
+      const yaw = Math.atan2(-(b[0] - a[0]), -(b[2] - a[2]));
+      j.place([a[0], a[1] + 0.85, a[2], 0, Math.sin(yaw / 2), 0, Math.cos(yaw / 2), 0, 0, 0, 0, 0]);
+      j.hp = 600;
+      j.fuel = 40;
+      g.player.yaw = yaw;
+      return j;
+    },
+    /**
+     * Drive the road by itself, flat out, from one of its points to another: how fast it got,
+     * how far off the middle, how sideways, how near to going over. The answer is left in T.result.
+     */
+    lap(from: number, to: number, secs: number, o: { look?: number; lookK?: number; brakeAt?: number; cap?: number } = {}) {
+      const dir = Math.sign(to - from);
+      const j = T.onRoad(from, dir);
+      if (!j) return;
+      const pts = g.s.world.road.points;
+      const P = (i: number) => [pts[i * 3], pts[i * 3 + 2]];
+      const wrap = (x: number) => Math.atan2(Math.sin(x), Math.cos(x));
+      const keys: Record<string, boolean> = { KeyW: false, KeyA: false, KeyD: false, KeyS: false };
+      const set = (k: string, on: boolean) => {
+        if (keys[k] !== on) g.input.simulate(k, (keys[k] = on));
+      };
+      const log: string[] = [];
+      let i = from, maxV = 0, maxSide = 0, minUp = 1, off = 0, air = 0, n = 0, done = false;
+      const t0 = performance.now();
+      const mine = ++drive;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        for (const k in keys) set(k, false);
+        T.result = { secs: +((performance.now() - t0) / 1000).toFixed(1), reached: i, maxV: +maxV.toFixed(1), maxSide: +maxSide.toFixed(1), minUp: +minUp.toFixed(2), off: +off.toFixed(1), air, frames: n, hp: Math.round(j.hp), fuel: +j.fuel.toFixed(1), log };
+      };
+      T.result = null;
+      void T.run(secs * 1000, () => {
+        const t = (performance.now() - t0) / 1000;
+        if (mine !== drive) done = true;
+        if (done || t < 0.8) return;
+        while (i !== to && Math.hypot(P(i)[0] - j.pos.x, P(i)[1] - j.pos.z) > Math.hypot(P(i + dir)[0] - j.pos.x, P(i + dir)[1] - j.pos.z)) i += dir;
+        if (i === to) return finish();
+        let ahead = i, d = 0;
+        const want = (o.look ?? 7) + Math.abs(j.speed) * (o.lookK ?? 0.55);
+        while (ahead !== to && d < want) {
+          d += Math.hypot(P(ahead + dir)[0] - P(ahead)[0], P(ahead + dir)[1] - P(ahead)[1]);
+          ahead += dir;
+        }
+        const err = wrap(Math.atan2(-(P(ahead)[0] - j.pos.x), -(P(ahead)[1] - j.pos.z)) - j.yaw);
+        set('KeyA', err > 0.03);
+        set('KeyD', err < -0.03);
+        const hot = Math.abs(err) > (o.brakeAt ?? 0.4) && j.speed > 9;
+        set('KeyW', !hot && !(o.cap && j.speed > o.cap));
+        set('KeyS', hot);
+        const up = new THREE.Vector3(0, 1, 0).applyQuaternion(j.quat).y;
+        const side = Math.abs(j.vel.dot(new THREE.Vector3(1, 0, 0).applyQuaternion(j.quat)));
+        const away = Math.hypot(P(i)[0] - j.pos.x, P(i)[1] - j.pos.z);
+        maxV = Math.max(maxV, j.speed);
+        maxSide = Math.max(maxSide, side);
+        minUp = Math.min(minUp, up);
+        off = Math.max(off, away);
+        if (!j.grounded) air++;
+        if (++n % 45 === 0) log.push(`${t.toFixed(1)} #${i} v ${j.speed.toFixed(1)} ${j.ground} side ${side.toFixed(1)} up ${up.toFixed(2)} off ${away.toFixed(1)} gnd ${j.grounded}`);
+      }).then(() => mine === drive && finish());
+    },
+    /**
+     * A set piece from a standing start on the road: a list of [seconds, keys held].
+     * What the jeep did all the way through is left in T.result.
+     */
+    manoeuvre(from: number, steps: [number, string[]][], every = 15) {
+      const j = T.onRoad(from);
+      if (!j) return;
+      const all = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space'];
+      const wrap = (x: number) => Math.atan2(Math.sin(x), Math.cos(x));
+      const log: string[] = [];
+      const t0 = performance.now();
+      const total = steps.reduce((s, x) => s + x[0], 0);
+      const start = j.pos.clone();
+      let n = 0, done = false, lastYaw = j.yaw, lastT = 0, minUp = 1, maxSide = 0, maxY = -1e9;
+      const mine = ++drive;
+      T.result = null;
+      void T.run((total + 1) * 1000, () => {
+        const t = (performance.now() - t0) / 1000 - 0.8;
+        if (mine !== drive) done = true;
+        if (done || t < 0) return;
+        let acc = 0, held: string[] | null = null;
+        for (const [d, k] of steps) {
+          if (t < acc + d) {
+            held = k;
+            break;
+          }
+          acc += d;
+        }
+        for (const k of all) g.input.simulate(k, !!held?.includes(k));
+        const up = new THREE.Vector3(0, 1, 0).applyQuaternion(j.quat).y;
+        const side = j.vel.dot(new THREE.Vector3(1, 0, 0).applyQuaternion(j.quat));
+        minUp = Math.min(minUp, up);
+        maxSide = Math.max(maxSide, Math.abs(side));
+        maxY = Math.max(maxY, j.pos.y);
+        if (!held) {
+          done = true;
+          T.result = { minUp: +minUp.toFixed(2), maxSide: +maxSide.toFixed(1), hp: Math.round(j.hp), moved: +j.pos.distanceTo(start).toFixed(1), rose: +(maxY - start.y).toFixed(2), log };
+          return;
+        }
+        if (++n % every === 0) {
+          const rate = wrap(j.yaw - lastYaw) / Math.max(1e-3, t - lastT);
+          lastYaw = j.yaw;
+          lastT = t;
+          log.push(`${t.toFixed(2)} ${held.join('+').replace(/Key/g, '') || '-'} v ${j.speed.toFixed(1)} side ${side.toFixed(1)} turn ${rate.toFixed(2)} lean ${((Math.acos(Math.min(1, up)) * 180) / Math.PI).toFixed(0)} gnd ${j.grounded} ${j.ground} at ${j.pos.distanceTo(start).toFixed(1)}`);
+        }
+      });
+    },
+    result: null as unknown,
   };
   window.addEventListener('error', (e) => T.errors.push(String(e.message)));
   window.addEventListener('unhandledrejection', (e) => T.errors.push(String((e.reason && e.reason.message) || e.reason)));

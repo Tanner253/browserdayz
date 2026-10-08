@@ -30,7 +30,7 @@ const FP_BACK = 0.3;
 /** the limbs a bloodstain can sit on: it goes on whichever is nearest the hit */
 const WOUND_BONES: [string, string | null][] = [['pelvis', 'spine_01'], ['spine_01', 'spine_02'], ['spine_02', 'spine_03'], ['spine_03', 'neck_01'], ['neck_01', 'Head'], ['Head', null], ['upperarm_l', 'lowerarm_l'], ['upperarm_r', 'lowerarm_r'], ['lowerarm_l', 'hand_l'], ['lowerarm_r', 'hand_r'], ['thigh_l', 'calf_l'], ['thigh_r', 'calf_r'], ['calf_l', 'foot_l'], ['calf_r', 'foot_r'], ['foot_l', 'ball_l'], ['foot_r', 'ball_r']];
 
-const CLIPS = ['idle', 'walk', 'run', 'crouchIdle', 'crouchWalk', 'jumpStart', 'jumpLoop', 'jumpLand', 'death', 'deathFront', 'deathSide', 'hit', 'hitHead', 'dance'] as const;
+const CLIPS = ['idle', 'walk', 'run', 'crouchIdle', 'crouchWalk', 'jumpStart', 'jumpLoop', 'jumpLand', 'death', 'deathFront', 'deathSide', 'hit', 'hitHead', 'dance', 'sit'] as const;
 type Clip = (typeof CLIPS)[number];
 const STRIDES = ['walk', 'run', 'crouchWalk'] as const;
 type Stride = (typeof STRIDES)[number];
@@ -79,6 +79,9 @@ export const POSE = {
   plant: { fwd: [0.1, 0.165, 0], back: [0.375, 0.25, 0.285] },
   /** how far the back straightens while crouched, radians: brings the head up to where the crouched camera is */
   crouchLift: 0.37,
+  /** leaning out (Q, E): how far over the body goes from the waist up, radians, and how far the hips go with it, metres */
+  leanAngle: 0.64,
+  leanHips: 0.1,
   /** how fast the death clip is played */
   deathRate: 1.15,
   /** the most the legs turn away from the chest when walking sideways, radians */
@@ -209,6 +212,9 @@ export class Avatar {
   private hold: Hold | null = null;
   // how far into the dance, and how far up the hands are, 0..1
   private danceT = 0;
+  /** in a seat, and how far into sitting the body has got */
+  private seated = false;
+  private seatT = 0;
   private handsT = 0;
   private gearRest = new Map<string, { bone: THREE.Object3D; inv: THREE.Matrix4 }>();
   private gearObjs: THREE.Object3D[] = [];
@@ -234,6 +240,10 @@ export class Avatar {
   private dirWas = 0;
   /** legs turned away from the chest, radians */
   private twist = 0;
+  /** leaning out to one side, -1 (left) .. 1 (right): the body from the waist up goes over, the feet stay */
+  private leanT = 0;
+  /** the joints a shot is judged by (see frame) */
+  private joints: { head?: THREE.Bone; neck?: THREE.Bone; pelvis?: THREE.Bone } = {};
   private backing = false;
   private layerMask = 1;
   /** weapon in the hands: pivot (at the shoulders, pitches with the aim) > the model */
@@ -338,6 +348,7 @@ export class Avatar {
     this.spine = ['spine_01', 'spine_02', 'spine_03'].map(bone).filter((b): b is THREE.Bone => !!b);
     this.chest = bone('spine_02');
     this.neck = ['neck_01', 'Head'].map(bone).filter((b): b is THREE.Bone => !!b);
+    this.joints = { head: bone('Head') ?? undefined, neck: bone('neck_01') ?? undefined, pelvis: bone('pelvis') ?? undefined };
     this.collarL = bone('clavicle_l');
     // a shouldered weapon rides on the upper back: placed where it should be on the standing
     // body, then handed to the spine so it follows every lean and step
@@ -691,6 +702,33 @@ export class Avatar {
     this.hold = hold;
   }
 
+  /**
+   * Where the body is, in the world, as it stands this frame: the middle of the head, the
+   * base of the neck and the hips. Whatever is to be hit is hung on these, so that a shot at
+   * the head that is seen is a shot at the head that counts, whatever the body is doing.
+   * @returns false until the body has been loaded
+   */
+  frame(head: THREE.Vector3, neck: THREE.Vector3, pelvis: THREE.Vector3): boolean {
+    const j = this.joints;
+    if (!j.head || !j.neck || !j.pelvis) return false;
+    j.head.updateWorldMatrix(true, false);
+    // (the joint is at the base of the skull: the middle of the head is a hand's breadth up it)
+    head.setFromMatrixPosition(j.head.matrixWorld).addScaledVector(_a.setFromMatrixColumn(j.head.matrixWorld, 1).normalize(), 0.097);
+    neck.setFromMatrixPosition(j.neck.matrixWorld);
+    pelvis.setFromMatrixPosition(j.pelvis.matrixWorld);
+    return true;
+  }
+
+  /** Sitting in a jeep's seat (whoever seats it puts it there and turns it with the jeep: see Garage.seatBody). */
+  setSeat(on: boolean) {
+    this.seated = on;
+  }
+
+  /** Leaning out to one side: -1 all the way left, 1 all the way right, 0 upright. */
+  setLean(lean: number) {
+    this.leanT = THREE.MathUtils.clamp(lean, -1, 1);
+  }
+
   /** Development: stand in one clip at one moment, nothing blended. */
   debugPose(clip: Clip, time: number) {
     for (const n of CLIPS) {
@@ -745,7 +783,9 @@ export class Avatar {
     this.danceT += ((this.hold === 'dance' && !dead ? 1 : 0) - this.danceT) * ease(7);
     this.handsT += ((this.hold === 'surrender' && !dead ? 1 : 0) - this.handsT) * ease(9);
     // eating, drinking, dressing a wound, waving, dancing: whatever was in the hands is put away for it
-    const using = (!!ges && ges.kind !== 'bolt' && ges.kind !== 'reload') || !!mv || this.danceT > 0.25 || this.handsT > 0.25;
+    this.seatT += ((this.seated && !dead ? 1 : 0) - this.seatT) * ease(9);
+    // (and sat in a jeep it is slung)
+    const using = (!!ges && ges.kind !== 'bolt' && ges.kind !== 'reload') || !!mv || this.danceT > 0.25 || this.handsT > 0.25 || this.seatT > 0.25;
     const held = using ? null : this.held;
     // fists come up for a punch and stay up a while after it
     this.fistsHold = Math.max(0, this.fistsHold - dt);
@@ -834,7 +874,14 @@ export class Avatar {
       deathSide: 0,
       hit: this.hitClip === 'hit' ? hit : 0,
       hitHead: this.hitClip === 'hitHead' ? hit : 0,
+      sit: 0,
     };
+    // sat down, sitting is all of it but the flinch
+    const st = this.seatT * (1 - down);
+    if (st > 0) {
+      for (const n of CLIPS) if (n !== 'hit' && n !== 'hitHead') w[n] *= 1 - st;
+      w.sit = st * rest;
+    }
     w[this.deathClip] = down;
     // --- and where in each. One stride clock for every stepping clip, so the same foot is
     // down in all of them and a blend of two is still a step.
@@ -897,7 +944,10 @@ export class Avatar {
 
     const lean = !dead && (held || Math.abs(pitch) > 0.02);
     const lift = POSE.crouchLift * this.crouchT;
-    if (!dead && (lean || Math.abs(this.twist) > 0.003 || Math.abs(lift) > 0.003)) {
+    const over = dead ? 0 : this.leanT;
+    // (leaning, the hips go a little the same way: the head ends up where the eyes of whoever is leaning are)
+    if (over) this.root.position.addScaledVector(_right.set(Math.cos(this.yaw), 0, -Math.sin(this.yaw)), over * POSE.leanHips);
+    if (!dead && (lean || Math.abs(this.twist) > 0.003 || Math.abs(lift) > 0.003 || Math.abs(over) > 0.003)) {
       this.root.updateMatrixWorld(true);
       // the legs have turned; from the waist up the body still faces the aim
       const n = this.spine.length;
@@ -907,10 +957,15 @@ export class Avatar {
       // the head still looking down the barrel
       // (and square again for a run, the gun carried across the chest)
       const blade = held?.long ? POSE.hold.blade * (1 - carry) : 0;
+      _fwd.set(0, 0, -1).applyQuaternion(aimQ);
       for (const b of this.spine) {
         this.turn(b, UP, (-this.twist - blade) / n);
         if (lift) this.turn(b, _right, lift / n);
+        // leaning out: over from the waist, about the line the body is facing along
+        if (over) this.turn(b, _fwd, (over * POSE.leanAngle) / n);
       }
+      // (the head stays level: it is the eyes that are being put round the corner)
+      if (over) for (const b of this.neck) this.turn(b, _fwd, (-over * POSE.leanAngle * 0.55) / this.neck.length);
       if (blade) for (const b of this.neck) this.turn(b, UP, blade / this.neck.length);
       if (lean) {
         if (this.chest) this.turn(this.chest, _right, pitch * 0.45);

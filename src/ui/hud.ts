@@ -31,8 +31,8 @@ export interface HotbarEntry {
 }
 
 /** where the game is talked about, and its token's address on Solana: both shown on the main menu */
-const X_HANDLE = 'zonaSOL_';
-const CONTRACT = 'GvfAzdPF466PJsPJMzXQeX3TSqmJm9YxAG8xBJ6ypump';
+export const X_HANDLE = 'zonaSOL_';
+export const CONTRACT = 'GvfAzdPF466PJsPJMzXQeX3TSqmJm9YxAG8xBJ6ypump';
 
 /** the wheel: eight wedges round a hub, the first at the top and the rest clockwise (the order of EMOTES) */
 function wheelSvg() {
@@ -79,7 +79,9 @@ export class HUD {
         <div class="vital" data-k="water">${svg(ICONS.water)}</div>
         <div class="vital bleed" data-k="bleed">${svg(ICONS.blood)}</div>
       </div>
+      <div class="hud-arms"><div></div></div>
       <div class="hud-stamina"><div></div></div>
+      <div class="hud-ride"><b>0</b><small>km/h</small><div class="ride-bars"><div class="ride-fuel" title="fuel"><i></i></div><div class="ride-hp" title="the jeep"><i></i></div></div></div>
       <div class="hud-hotbar"></div>
       <div class="hud-chat">
         <div class="chat-log"></div>
@@ -195,7 +197,7 @@ export class HUD {
       </div>
     `;
     document.getElementById('ui')!.appendChild(this.root);
-    for (const k of ['cross', 'hit', 'prompt', 'mark', 'progress', 'compass', 'bearing', 'area', 'weapon', 'vitals', 'stamina', 'hotbar', 'chat', 'scope', 'damage', 'bleedfx', 'bleed', 'hitdir', 'fps', 'online', 'net', 'feed', 'board', 'tags', 'fatal', 'dead', 'start']) {
+    for (const k of ['cross', 'hit', 'prompt', 'mark', 'progress', 'compass', 'bearing', 'area', 'weapon', 'vitals', 'stamina', 'arms', 'ride', 'hotbar', 'chat', 'scope', 'damage', 'bleedfx', 'bleed', 'hitdir', 'fps', 'online', 'net', 'feed', 'board', 'tags', 'fatal', 'dead', 'start']) {
       this.el[k] = this.root.querySelector(`.hud-${k}`) as HTMLElement;
     }
     this.notes = this.root.querySelector('.hud-notes') as HTMLDivElement;
@@ -702,6 +704,12 @@ export class HUD {
     aiming: boolean;
     /** how wide the next shot can go, radians (0 = nothing that shoots in the hands) */
     spread: number;
+    /** where the gun is pointing, off the middle of the screen, in pixels (it trails a fast turn) */
+    lag: [number, number];
+    /** what is left in the arms, 0..1 (see Weapons.armStamina) */
+    arms: number;
+    /** sat in a jeep: how fast it is going, and what it has left in the tank and in itself (0..1) */
+    ride?: { kmh: number; fuel: number; hp: number; driver: boolean } | null;
     scoped: boolean;
     hitMarker: number;
     kill: boolean;
@@ -723,9 +731,14 @@ export class HUD {
   }) {
     const e = this.el;
     this.toggle(this.root, 'hidden', s.hidden);
-    this.toggle(e.cross, 'off', s.aiming || s.scoped || s.glass || s.dead);
+    this.toggle(e.cross, 'off', s.aiming || s.scoped || s.glass || s.dead || !!s.ride);
     // the four ticks stand as far out as the shot can land: half the cone, at this field of view
     this.toggle(e.cross, 'gun', s.spread > 0);
+    const lag = `${s.lag[0].toFixed(1)}px,${s.lag[1].toFixed(1)}px`;
+    if (this.last.lag !== lag) {
+      this.last.lag = lag;
+      e.cross.style.translate = lag.replace(',', ' ');
+    }
     const gap = String(Math.round(3 + s.spread * 357));
     if (s.spread > 0 && this.last.gap !== gap) {
       this.last.gap = gap;
@@ -781,6 +794,18 @@ export class HUD {
     (e.stamina.firstElementChild as HTMLElement).style.width = `${reserve}%`;
     this.toggle(e.stamina, 'show', reserve < 99.5);
     this.toggle(e.stamina, 'spent', s.winded);
+    (e.arms.firstElementChild as HTMLElement).style.width = `${s.arms * 100}%`;
+    this.toggle(e.arms, 'show', s.arms < 0.995);
+    this.toggle(e.arms, 'spent', s.arms < 0.15);
+    this.toggle(e.ride, 'show', !!s.ride);
+    if (s.ride) {
+      this.set('kmh', e.ride.firstElementChild as HTMLElement, String(Math.round(s.ride.kmh)));
+      const [fuel, hp] = [...e.ride.querySelectorAll('i')] as HTMLElement[];
+      fuel.style.width = `${Math.round(s.ride.fuel * 100)}%`;
+      hp.style.width = `${Math.round(s.ride.hp * 100)}%`;
+      this.toggle(fuel.parentElement!, 'low', s.ride.fuel < 0.15);
+      this.toggle(hp.parentElement!, 'low', s.ride.hp < 0.4);
+    }
 
     if (s.weapon) {
       this.toggle(e.weapon, 'show', true);

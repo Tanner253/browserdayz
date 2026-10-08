@@ -7,7 +7,7 @@ import { physics, PLAYER_GROUPS, SHOT_GROUPS, type Surface } from '../core/physi
 import type { Input, MoveInput } from '../core/input';
 import { audio } from '../core/audio';
 import type { Terrain } from '../world/terrain';
-import { MAX_STAMINA } from '../net/protocol';
+import { LEAN_REACH, MAX_STAMINA } from '../net/protocol';
 
 const STAND_HALF = 0.56;
 const CROUCH_HALF = 0.26;
@@ -55,6 +55,8 @@ export class Player {
   lean = 0;
   vitals: Vitals = { health: 100, energy: 85, water: 85, stamina: MAX_STAMINA, bleeding: false };
   dead = false;
+  /** sitting in a jeep: carried, not walking (see Garage) */
+  seated = false;
   /** externally supplied (weapons): ADS + weapon weight slow the player */
   aiming = false;
   weightKg = 0;
@@ -139,6 +141,26 @@ export class Player {
     this.dead = false;
   }
 
+  /** into a seat, or out of one: sat down, nothing in the world runs into this body */
+  seat(on: boolean) {
+    this.seated = on;
+    if (on && this.crouched) this.setCrouch(false);
+    this.collider.setEnabled(!on);
+    if (on) {
+      this.grounded = true;
+      this.moving = this.prevMoving = 0;
+      this.lean = this.prevLean = 0;
+    }
+  }
+
+  /** carried along: where the seat is this frame, and how fast it is going */
+  ride(at: THREE.Vector3, vel: THREE.Vector3) {
+    this.pos.copy(at);
+    this.prevPos.copy(at);
+    this.vel.copy(vel);
+    this.body.setTranslation({ x: at.x, y: at.y + STAND_HALF + RADIUS, z: at.z }, false);
+  }
+
   private half() {
     return this.crouched ? CROUCH_HALF : STAND_HALF;
   }
@@ -174,6 +196,14 @@ export class Player {
     this.prevStepOff = this.stepOff;
     if (this.dead) return;
     const v = this.vitals;
+    if (this.seated) {
+      // carried: the legs get their breath back, and that is all they do
+      this.sprinting = false;
+      this.staminaDelay = Math.max(0, this.staminaDelay - h);
+      if (this.staminaDelay <= 0) v.stamina = Math.min(MAX_STAMINA, v.stamina + 14 * h);
+      this.lean += (0 - this.lean) * (1 - Math.exp(-10 * h));
+      return;
+    }
 
     if (input.pressedFixed('KeyC') || input.pressedFixed('ControlLeft')) this.setCrouch(!this.crouched);
 
@@ -448,7 +478,8 @@ export class Player {
     const side = new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
     const step = this.prevStepOff + (this.stepOff - this.prevStepOff) * alpha;
     cam.position.set(p.x, p.y + this.eye + this.landDip + this.bob.y + step, p.z);
-    cam.position.addScaledVector(side, this.bob.x + lean * 0.42);
+    const reach = LEAN_REACH * THREE.MathUtils.lerp(1, 0.74, THREE.MathUtils.clamp((EYE_STAND - this.eye) / (EYE_STAND - EYE_CROUCH), 0, 1));
+    cam.position.addScaledVector(side, this.bob.x + lean * reach);
     if (lean !== 0) cam.position.y -= Math.abs(lean) * 0.08;
     // sidestepping tips the view a touch into the movement
     const lateral = this.dead ? 0 : (this.vel.x * side.x + this.vel.z * side.z) / 6.2;

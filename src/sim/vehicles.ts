@@ -1,0 +1,124 @@
+// Jeeps. A handful stand along the road; anybody can get in one and drive it, three more
+// can ride, and it can be shot until it burns. It is the fast way across the map and the
+// loud one: everybody hears it coming.
+//
+// Rules and data only, shared by the game and the server. How it drives is in
+// src/game/vehicle.ts. The server keeps count of where each one stands, who sits in it and
+// what state it is in; whoever is driving works out how it moves (as each player does for
+// their own two feet) and the server passes that on.
+
+import { BUILDING_FOOTPRINT, PLAY_RADIUS, heightAt, type World } from '../world/worldgen';
+
+export const JEEP = {
+  /** the model it is drawn with (see scripts/assets.config.mjs): without it there are no jeeps */
+  model: 'uaz_469',
+  /** how many stand in the world */
+  count: 5,
+  /** what it takes before it burns: a rifle round takes 95 of it, a pistol round 34 */
+  hp: 600,
+  /** under this it smokes, under this it is on fire and goes up a few seconds later */
+  smokeAt: 0.4,
+  fireAt: 0.12,
+  fuse: 7,
+  /** seconds before a new one is stood up for one that burned */
+  respawn: 420,
+  /** litres in a full tank, litres burned in a minute flat out, and what a jerrycan pours in */
+  tank: 40,
+  burn: 2.4,
+  can: 10,
+  /** how near the door a player has to be to get in, metres from the middle of the jeep */
+  reach: 3.4,
+  /** being run over: slower than this nothing happens (m/s), then this much damage for every m/s over it */
+  bumpFrom: 3,
+  bumpPer: 13,
+  /**
+   * Running into things: a knock of this many m/s is nothing, each one over it costs the jeep
+   * this much (up to a most), and from a harder one still everybody in it is hurt as well.
+   */
+  crash: { from: 4, per: 9, most: 160, hurtFrom: 11, hurtPer: 6, hurtMost: 50 },
+  /** what somebody carrying a tag they took is told at the door: they go on foot */
+  noTag: 'Not while you carry a tag you took: it goes on foot.',
+  /** a jeep that left the map or fell through it is stood back up where it started */
+  floor: -40,
+};
+
+/**
+ * Where a jeep is and how it is moving: position, rotation (a quaternion), velocity, and
+ * the two things that show on it, how far the wheels are turned and how hard it is driven.
+ * [x, y, z, qx, qy, qz, qw, vx, vy, vz, steer, throttle]
+ */
+export type VState = [number, number, number, number, number, number, number, number, number, number, number, number];
+
+export interface VehicleInfo {
+  i: number;
+  s: VState;
+  hp: number;
+  fuel: number;
+  /** who sits where (player ids): seat 0 drives */
+  seats: (number | null)[];
+  /** whose game is working out how it moves (null: it stands still) */
+  sim: number | null;
+}
+
+export const SEATS = 4;
+
+/** what a knock of `hard` m/s takes off a jeep, and off each of the people in it */
+export function crashDamage(hard: number): { jeep: number; people: number } {
+  const c = JEEP.crash;
+  return { jeep: Math.min(c.most, Math.max(0, hard - c.from) * c.per), people: Math.min(c.hurtMost, Math.max(0, hard - c.hurtFrom) * c.hurtPer) };
+}
+
+/** a quaternion for standing level, turned to face `yaw` (the game's yaw: 0 looks down -z) */
+export function yawQuat(yaw: number): [number, number, number, number] {
+  return [0, Math.sin(yaw / 2), 0, Math.cos(yaw / 2)];
+}
+
+/** how high above the ground the middle of the body is when it stands on its wheels */
+export const RIDE_HEIGHT = 0.8;
+
+export function restState(x: number, ground: number, z: number, yaw: number): VState {
+  return [x, ground + RIDE_HEIGHT, z, ...yawQuat(yaw), 0, 0, 0, 0, 0];
+}
+
+/**
+ * Where the jeeps stand when the world is new: pulled up on the verge, spread along the
+ * whole length of the road, on ground that is level and clear. The same on every game and
+ * on the server.
+ */
+export function jeepSpots(world: World, count = JEEP.count): { x: number; y: number; z: number; yaw: number }[] {
+  const p = world.road.points, n = p.length / 3;
+  const H = world.heights;
+  const out: { x: number; y: number; z: number; yaw: number }[] = [];
+  const clear = (x: number, z: number) => {
+    const y = heightAt(H, x, z);
+    for (const [dx, dz] of [[2.2, 0], [-2.2, 0], [0, 2.2], [0, -2.2]]) if (Math.abs(heightAt(H, x + dx, z + dz) - y) > 0.45) return false;
+    if (world.buildings.some((b) => {
+      const [w, d] = BUILDING_FOOTPRINT[b.type];
+      return Math.hypot(b.x - x, b.z - z) < Math.hypot(w, d) / 2 + 4;
+    })) return false;
+    if (world.trees.some((t) => Math.hypot(t.x - x, t.z - z) < 3.2)) return false;
+    if (world.rocks.some((t) => Math.hypot(t.x - x, t.z - z) < 3.4) || world.props.some((t) => Math.hypot(t.x - x, t.z - z) < 3)) return false;
+    // (inside the part of the map people play in: the road runs on up into the hills at both ends)
+    return Math.hypot(x, z) < PLAY_RADIUS - 30;
+  };
+  for (let k = 0; k < count; k++) {
+    // the middle of each stretch first, then further and further either way along it
+    const mid = Math.round(((k + 0.5) / count) * (n - 1));
+    search: for (let off = 0; off < n / count / 2; off++) {
+      for (const i of off ? [mid + off, mid - off] : [mid]) {
+        if (i < 1 || i > n - 2) continue;
+        const tx = p[(i + 1) * 3] - p[(i - 1) * 3], tz = p[(i + 1) * 3 + 2] - p[(i - 1) * 3 + 2];
+        const tl = Math.hypot(tx, tz) || 1;
+        for (const side of k % 2 ? [1, -1] : [-1, 1]) {
+          const d = world.road.width / 2 + 2.4;
+          const x = p[i * 3] + (-tz / tl) * d * side, z = p[i * 3 + 2] + (tx / tl) * d * side;
+          if (!clear(x, z) || out.some((o) => Math.hypot(o.x - x, o.z - z) < 40)) continue;
+          // nose along the road, the way the road runs (yaw 0 looks down -z)
+          out.push({ x, y: heightAt(H, x, z), z, yaw: Math.atan2(-tx, -tz) + (side > 0 ? 0 : Math.PI) });
+          break search;
+        }
+      }
+    }
+  }
+  return out;
+}

@@ -22,7 +22,7 @@ import { BARREL } from '../sim/barrels';
 import { EMOTE, EMOTES, EMOTE_GAP, SAY_RANGE, SAY_TIME, voiceOf } from '../sim/emotes';
 import { loadSave, writeSave, type SaveData } from '../sim/save';
 import { Net, playerName, publicId, remoteServer, serverStatus, setPlayerName } from '../net/client';
-import { F_AIM, F_BLEED, F_CROUCH, F_DANCE, F_DEAD, F_GROUND, F_SPRINT, F_SURRENDER, MAX_STAMINA, crateId, type Act, type CorpseInfo, type PlayerInfo, type Pose, type S2C, type StashInfo } from '../net/protocol';
+import { F_AIM, F_BLEED, F_CROUCH, F_DANCE, F_DEAD, F_GROUND, F_LEAN_L, F_LEAN_R, F_SEAT, F_SPRINT, F_SURRENDER, MAX_STAMINA, crateId, type Act, type CorpseInfo, type PlayerInfo, type Pose, type S2C, type StashInfo } from '../net/protocol';
 import { Player } from './player';
 import { Avatar, AVATAR_LAYER, DEATH_REST, FP_BODY_LAYER, GEAR_SHOWN, type Hold } from './avatar';
 import { lookFor } from './look';
@@ -34,6 +34,9 @@ import { Effects } from './effects';
 import { Weapons, type HitInfo, type UseKind } from './weapons';
 import { LootManager, Stash, WorldItem } from './loot';
 import { Grenades } from './grenades';
+import { Garage } from './garage';
+import { Jeep } from './vehicle';
+import { JEEP } from '../sim/vehicles';
 import { HUD, type HotbarEntry } from '../ui/hud';
 import { InventoryUI } from '../ui/inventory-ui';
 import { Minimap } from '../ui/minimap';
@@ -71,6 +74,7 @@ const QUICK_KEYS = ['Digit5', 'Digit6', 'Digit7', 'Digit8'];
 const WHEEL_REACH = 120, WHEEL_PICK = 0.35;
 const SEND_HZ = 15;
 const _drip = new THREE.Vector3();
+const _still = new THREE.Vector3();
 
 export class Game {
   input: Input;
@@ -83,6 +87,8 @@ export class Game {
   weapons!: Weapons;
   loot!: LootManager;
   grenades!: Grenades;
+  /** the jeeps (see garage.ts) */
+  garage!: Garage;
   economy!: Economy;
   hud!: HUD;
   minimap!: Minimap;
@@ -140,6 +146,8 @@ export class Game {
   /** graphics options the player picked in the Esc menu */
   gfx: Graphics = loadGraphics();
   private tagT = 0;
+  /** when the player last got into a jeep (the keys are shown for a few seconds) */
+  private rideAt = -1e9;
   /** phones and tablets: on-screen stick and buttons */
   private touch: TouchControls | null = null;
   /** opens the rewards modal once the entrance has played */
@@ -172,6 +180,26 @@ export class Game {
     this.grenades = new Grenades(r.scene, this.loot.models);
     await this.grenades.preload();
     this.grenades.onExplode = (at, mine) => this.explode(at, mine);
+    this.garage = new Garage({
+      scene: r.scene,
+      world,
+      terrain: this.s.terrain,
+      player: this.player,
+      avatar: this.avatar,
+      net: this.net,
+      effects: this.effects,
+      input: this.input,
+      remotes: this.remotes,
+      online: () => this.online,
+      note: (text, kind) => this.hud.note(text, kind),
+      boom: (at, mine) => this.explode(at, mine, 'jeep'),
+      bump: (at, half, quat, speed) => this.bumpDummies(at, half, quat, speed),
+      hurt: (amount, cause) => {
+        this.player.damage(amount, cause);
+        this.meDirty = true;
+      },
+    });
+    await this.garage.load();
     this.loot.lift = (x, z) => roadLift(world, x, z);
     this.applyGraphics(this.gfx);
     this.economy = new Economy(buildings.lootPoints, {
@@ -205,8 +233,9 @@ export class Game {
     };
     this.weapons.onShot = (s) => this.net.send({ t: 'shot', o: s.origin.toArray(), d: s.dir.toArray(), w: s.weapon, sup: s.suppressed });
     // a bullet in a fuel drum
-    this.weapons.onStruck = (owner) => {
+    this.weapons.onStruck = (owner, weapon) => {
       if (owner instanceof Barrel) this.blowBarrel(owner.i, true);
+      else if (owner instanceof Jeep) this.garage.struck(owner, weapon);
     };
     // the bolt, a reload: the same
     this.weapons.onAct = (a, d) => this.act(a, d);
@@ -416,6 +445,7 @@ export class Game {
     if (save) await this.restore(save);
     else this.fresh();
     await this.spawnDummies();
+    this.garage.startAlone();
     this.hud.setNet('Offline · single player');
     this.hud.setOnline(null);
   }
@@ -508,7 +538,7 @@ export class Game {
     }
     audio.ui('pickup');
     this.inventoryChanged();
-    if (this.invUI.isOpen) this.invUI.refresh(this.loot.near(this.player.pos, 2.3), this.openStash);
+    if (this.invUI.isOpen) this.invUI.refresh(this.around(), this.openStash);
   }
 
   private async restore(save: SaveData) {
@@ -577,6 +607,9 @@ export class Game {
     this.fuses.length = this.drumsBack.length = 0;
     for (const b of this.s.veg.barrels) b?.setThere(!w.barrels?.includes(b.i));
     for (const p of w.players) void this.addRemote(p);
+    this.garage.clear();
+    for (const v of w.vehicles ?? []) this.garage.add(v);
+    this.garage.bind();
     const y = w.spawn.y ?? heightAt(world.heights, w.spawn.x, w.spawn.z);
     this.player.spawn(w.spawn.x, y + 0.05, w.spawn.z, w.spawn.yaw);
     if (w.me) {
@@ -602,6 +635,7 @@ export class Game {
     net.on('leave', (m) => {
       const r = this.remotes.get(m.id);
       if (!r) return;
+      r.seat = null;
       this.hud.feed(`${r.name} left`);
       this.hud.chatLine('system', '', `${r.name} left`);
       r.dispose();
@@ -645,14 +679,15 @@ export class Game {
       const me = k.id === net.id;
       const zone = k.zone === 'head' ? ' · headshot' : '';
       const drum = k.w === 'barrel';
-      const how = k.by !== null ? `${k.byName} killed ${k.name} · ${ITEMS[k.w]?.name ?? (drum ? 'fuel drum' : k.w)}${zone}${k.dist > 3 ? ` · ${k.dist} m` : ''}` : `${k.name} died (${k.w})`;
+      const jeep = k.w === 'jeep' || k.w === 'fire';
+      const how = k.by !== null ? `${k.byName} killed ${k.name} · ${ITEMS[k.w]?.name ?? (drum ? 'fuel drum' : k.w === 'fire' ? 'burning jeep' : k.w)}${zone}${k.dist > 3 && !jeep ? ` · ${k.dist} m` : ''}` : `${k.name} died (${k.w})`;
       this.hud.feed(how, k.by === net.id || me);
       if (k.by === net.id) {
         this.weapons.confirmKill();
         this.hud.note(`You killed ${k.name}${zone}${k.dist > 3 ? ` · ${k.dist} m` : ''}`, 'good');
       }
       if (!me) this.remotes.get(k.id)?.avatar.setDeath(k.v ?? 0);
-      if (me) this.deathInfo = k.by !== null ? `Killed by ${k.byName} with ${drum ? 'a fuel drum' : ITEMS[k.w]?.name ?? 'bare hands'}${zone}. Your body and gear are where you fell.` : `You died of ${k.w}. Your body and gear are where you fell.`;
+      if (me) this.deathInfo = k.by !== null ? `Killed by ${k.byName} with ${drum ? 'a fuel drum' : k.w === 'fire' ? 'a burning jeep' : jeep ? 'a jeep' : ITEMS[k.w]?.name ?? 'bare hands'}${zone}. Your body and gear are where you fell.` : `You died of ${k.w}. Your body and gear are where you fell.`;
       else this.remotes.get(k.id)?.setAlive(false);
       if (m.corpse) void this.addCorpse(m.corpse);
     });
@@ -660,7 +695,7 @@ export class Game {
     net.on('loot+', (m) => this.economy.inject(m.l));
     net.on('loot-', (m) => {
       this.economy.take(m.uid);
-      if (this.invUI.isOpen) this.invUI.refresh(this.loot.near(this.player.pos, 2.3), this.openStash);
+      if (this.invUI.isOpen) this.invUI.refresh(this.around(), this.openStash);
     });
     net.on('denied', (m) => {
       // someone got there first: hand it back
@@ -684,7 +719,7 @@ export class Game {
       if (this.openStash?.uid !== m.cid) return;
       this.hud.note('Someone else is searching that', 'warn');
       this.openStash = null;
-      if (this.invUI.isOpen) this.invUI.refresh(this.loot.near(this.player.pos, 2.3), null);
+      if (this.invUI.isOpen) this.invUI.refresh(this.around(), null);
     });
     net.on('stash+', (m) => void this.addRemoteStash(m.s));
     net.on('stash-', (m) => {
@@ -747,6 +782,36 @@ export class Game {
   }
 
   private maxPlayers = 0;
+  /** carrying a tag taken off somebody (their own does not count): no jeep takes them (see Garage.use) */
+  private get tagged() {
+    const me = publicId();
+    return !!this.inv.find((it) => it.id === 'dogtag' && it.pid !== me);
+  }
+
+  /**
+   * What lies within reach on the ground, for the open pockets to show. From a jeep's seat
+   * that is nothing: whatever is wanted from the ground, a body or a crate is got out for.
+   */
+  private around() {
+    return this.garage.ride ? [] : this.loot.near(this.player.pos, 2.3);
+  }
+  /** the jeep the view was last behind (so going in and out of one is a move of the view, not a cut) */
+  private rode: Jeep | null = null;
+
+  /** playing alone: the training dummies a jeep driven here has just gone into */
+  private bumpDummies(at: THREE.Vector3, half: THREE.Vector3, quat: THREE.Quaternion, speed: number) {
+    const inv = quat.clone().invert();
+    const rel = new THREE.Vector3();
+    for (const d of this.dummies) {
+      if (d.dead) continue;
+      rel.copy(d.pos).sub(at).applyQuaternion(inv);
+      if (Math.abs(rel.x) > half.x || Math.abs(rel.z) > half.z || rel.y > 0.6 || rel.y < -2.6) continue;
+      const chest = new THREE.Vector3(d.pos.x, d.pos.y + 1.2, d.pos.z);
+      const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(quat);
+      this.effects.bleed(chest, dir, 0.8);
+      if (d.damage(Math.max(0, speed - JEEP.bumpFrom) * JEEP.bumpPer, chest, dir, 'torso')) this.hud.note('Training dummy down · jeep', 'good');
+    }
+  }
 
   /** everyone connected to the server, this player included */
   private updateOnline() {
@@ -771,6 +836,8 @@ export class Game {
     r.setWeapon(p.w, p.m);
     void this.wear(r.avatar, p.g ?? []);
     r.setAlive(p.alive);
+    // (they may have been sitting in a jeep since before this game knew of them)
+    this.garage.reseat();
   }
 
   /** something the hands do that shows on the body: your own, and (through the server) the copy of you everyone else sees */
@@ -902,9 +969,17 @@ export class Game {
     let amount = m.amount;
     if (m.zone === 'torso') for (const a of this.inv.wear('armor')) amount *= a;
     if (m.zone === 'head') for (const a of this.inv.wear('head')) amount *= a;
-    const blast = m.w === 'grenade' || m.w === 'barrel';
+    // the jeep they are in ran into something: no wound, and nobody to look round for
+    if (m.w === 'crash') {
+      p.damage(m.amount, 'a crash');
+      this.weapons.flinch(1);
+      this.meDirty = true;
+      return;
+    }
+    // (a jeep that ran them down is 'jeep'; one that burned with them in it, or beside them, is 'fire')
+    const blast = m.w === 'grenade' || m.w === 'barrel' || m.w === 'fire';
     const melee = !blast && !ITEMS[m.w]?.weapon;
-    p.damage(amount, blast ? 'an explosion' : melee ? 'a beating' : 'gunshot wounds');
+    p.damage(amount, m.w === 'fire' ? 'a burning jeep' : m.w === 'jeep' ? 'being run down' : blast ? 'an explosion' : melee ? 'a beating' : 'gunshot wounds');
     this.glass = 0;
     this.setHold(null);
     // a bullet nearly always opens a wound, a blade often, a fist or a bat seldom
@@ -939,7 +1014,7 @@ export class Game {
     if (this.sendT >= 1 / SEND_HZ) {
       this.sendT = 0;
       const it = this.weapons.equippedItem;
-      const flags = (p.crouched ? F_CROUCH : 0) | (p.sprinting ? F_SPRINT : 0) | (this.weapons.aiming ? F_AIM : 0) | (p.grounded ? F_GROUND : 0) | (p.dead ? F_DEAD : 0) | (p.vitals.bleeding ? F_BLEED : 0) | (this.hold === 'dance' ? F_DANCE : 0) | (this.hold === 'surrender' ? F_SURRENDER : 0);
+      const flags = (p.crouched ? F_CROUCH : 0) | (p.sprinting ? F_SPRINT : 0) | (this.weapons.aiming ? F_AIM : 0) | (p.grounded ? F_GROUND : 0) | (p.dead ? F_DEAD : 0) | (p.vitals.bleeding ? F_BLEED : 0) | (p.lean > 0.3 ? F_LEAN_R : p.lean < -0.3 ? F_LEAN_L : 0) | (this.hold === 'dance' ? F_DANCE : 0) | (this.hold === 'surrender' ? F_SURRENDER : 0) | (this.garage.ride ? F_SEAT : 0);
       const pose: Pose = [p.pos.x, p.pos.y, p.pos.z, p.yaw, p.pitch, flags];
       this.net.send({ t: 's', p: pose, w: it?.id ?? null, m: it?.mods ?? [] });
     }
@@ -1300,6 +1375,13 @@ export class Game {
   /** what the people near have just called out: who, the words, when */
   private said = new Map<number, { text: string; at: number }>();
 
+  /** Where the gun is pointing, as pixels off the middle of the screen (see Weapons.lag). */
+  private lagPx(): [number, number] {
+    const cam = this.s.r.camera, lag = this.weapons.lag;
+    const k = innerHeight / 2 / Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2);
+    return [-Math.tan(lag.x) * k, -Math.tan(lag.y) * k];
+  }
+
   /** From the wheel: call something out, or start (or stop) something the body keeps up. */
   private emote(id: string) {
     const e = EMOTE[id], p = this.player;
@@ -1429,8 +1511,10 @@ export class Game {
    * Something has gone off somewhere in the world: a grenade, or a fuel drum.
    * @param skip what went up, if it is still standing in the way of its own blast
    */
-  private explode(at: THREE.Vector3, mine: boolean, what: 'grenade' | 'barrel' = 'grenade', skip?: Barrel['collider']) {
-    const drum = what === 'barrel';
+  private explode(at: THREE.Vector3, mine: boolean, what: 'grenade' | 'barrel' | 'jeep' = 'grenade', skip?: Barrel['collider']) {
+    // (a jeep goes up as a drum of fuel does; online the server says who it reached)
+    const jeep = what === 'jeep';
+    const drum = what === 'barrel' || jeep;
     const spec = drum ? { damage: WEAPON_RULES.barrel.damage, radius: WEAPON_RULES.barrel.blast! } : ITEMS.grenade.throw!;
     const p = this.player, cam = this.s.r.camera;
     const far = at.distanceTo(cam.position);
@@ -1446,13 +1530,13 @@ export class Game {
       return Math.pow(1 - d / spec.radius, 1.3);
     };
     // your own body: this game decides it for your own grenade; another player's reaches you through the server
-    if (mine && !p.dead && this.started) {
+    if (mine && !p.dead && this.started && !(jeep && this.online)) {
       const chest = new THREE.Vector3(p.pos.x, p.pos.y + (p.crouched ? 0.6 : 1.1), p.pos.z);
       const k = reach(chest);
       if (k > 0) {
         let amount = spec.damage * k;
         for (const a of this.inv.wear('armor')) amount *= a;
-        p.damage(amount, drum ? 'a fuel drum you set off' : 'your own grenade');
+        p.damage(amount, jeep ? 'a burning jeep' : drum ? 'a fuel drum you set off' : 'your own grenade');
         if (amount > 12) p.bleed();
         this.hud.hitFrom(Math.atan2(p.pos.x - at.x, p.pos.z - at.z) - (p.yaw + Math.PI));
         this.meDirty = true;
@@ -1468,7 +1552,7 @@ export class Game {
     }
     // everyone else it reached: reported one by one, like any other hit
     for (const rp of this.remotes.values()) {
-      if (!rp.alive) continue;
+      if (!rp.alive || jeep) continue;
       const chest = rp.chest(new THREE.Vector3());
       const d = chest.distanceTo(at);
       if (reach(chest) <= 0) continue;
@@ -1486,6 +1570,10 @@ export class Game {
       this.effects.bleed(chest, dir, 0.8);
       d.avatar.wound(chest.clone().addScaledVector(dir, -0.2), dir, 0.09, false);
       if (d.damage(spec.damage * k, chest, dir, 'torso')) this.hud.note(drum ? 'Training dummy down · fuel drum' : 'Training dummy down · grenade', 'good');
+    }
+    // and any jeep standing in it
+    if (!jeep) {
+      for (const j of this.garage.jeeps.values()) if (!j.wreck && j.pos.distanceTo(at) < spec.radius * 0.7 && reach(j.pos.clone().setY(j.pos.y + 0.9), 2.2) > 0) this.garage.struck(j, what);
     }
   }
 
@@ -1593,6 +1681,8 @@ export class Game {
   }
 
   private nearbyStash(): Stash | null {
+    // (nothing is searched from a jeep's seat)
+    if (this.garage.ride) return null;
     if (this.focus instanceof Stash) return this.focus;
     const p = this.player.pos;
     let best: Stash | null = null;
@@ -1617,7 +1707,8 @@ export class Game {
     if (want === this.invUI.isOpen) return;
     if (want) {
       this.openStash = this.nearbyStash();
-      this.invUI.open(this.loot.near(this.player.pos, 2.3), this.openStash, this.player.vitals);
+      this.invUI.open(this.around(), this.openStash, this.player.vitals);
+      if (this.garage.ride && this.loot.near(this.player.pos, 2.3).length) this.hud.note('Nothing is picked up from a seat: get out for it', 'info');
       if (this.online && this.openStash) {
         // the server holds what is inside; show it once it answers
         this.invUI.setStashState('Opening…');
@@ -1652,6 +1743,12 @@ export class Game {
     this.mark = null;
     this.focus = null;
     if (this.player.dead || this.invUI.isOpen || this.use) return;
+    // sat in a jeep there is one thing to do with F
+    if (this.garage.ride) {
+      if (this.input.pressed('KeyF') && !this.hud.chatOpen) this.garage.out();
+      else if (this.touch || performance.now() - this.rideAt < 7000) this.prompt = this.garage.ride.seat === 0 ? '<kbd>F</kbd>Get out <small>W A S D to drive · Space is the handbrake</small>' : '<kbd>F</kbd>Get out';
+      return;
+    }
     const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
     const range = 2.6;
     const hit = physics.raycast(cam.position, dir, range, USE_GROUPS, this.player.collider);
@@ -1697,6 +1794,22 @@ export class Game {
         door.toggle(this.player.pos);
         audio.door(door.open, door.pivot.position);
         this.net.send({ t: 'door', i: this.s.buildings.doors.indexOf(door), open: door.open, swing: door.swingDir });
+      }
+    } else if (owner instanceof Jeep) {
+      const can = this.inv.find((i) => i.id === 'jerrycan');
+      const tagged = this.tagged;
+      this.prompt = this.garage.prompt(owner, !!can, tagged);
+      if (key) this.garage.use(owner, tagged);
+      else if (can && !owner.wreck && owner.fuel < JEEP.tank - 0.5 && this.input.pressed('KeyG')) {
+        const jeep = owner;
+        this.startUse('Filling the tank', 4, 'jerrycan', 'drink', null, () => {
+          if (jeep.wreck || jeep.pos.distanceTo(this.player.pos) > JEEP.reach + 1 || !this.inv.find((i) => i === can)) return;
+          this.inv.remove(can);
+          this.garage.refuel(jeep);
+          audio.ui('drink');
+          this.hud.note(`${JEEP.can} litres into the tank`, 'good');
+          this.inventoryChanged();
+        });
       }
     } else if (owner instanceof Stash) {
       const canPack = !owner.fixed && owner.container.items.length === 0 && (!this.online || owner.known);
@@ -1843,11 +1956,11 @@ export class Game {
     if (this.awaitClick && (this.input.locked || !playing || this.invUI.isOpen)) this.awaitClick = false;
     if (this.vicinityDue.length && now >= this.vicinityDue[0]) {
       this.vicinityDue.shift();
-      if (this.invUI.isOpen) this.invUI.refresh(this.loot.near(p.pos, 2.3), this.openStash);
+      if (this.invUI.isOpen) this.invUI.refresh(this.around(), this.openStash);
     }
     // G held for a third of a second drops what is in the hands (a tap next to F does nothing;
     // looking at an empty crate of your own, G packs it up instead: see updateInteraction)
-    if (playing && !this.invUI.isOpen && !this.hud.chatOpen && !this.use && input.held('KeyG') && !(this.focus instanceof Stash)) {
+    if (playing && !this.invUI.isOpen && !this.hud.chatOpen && !this.use && input.held('KeyG') && !(this.focus instanceof Stash) && !(this.focus instanceof Jeep)) {
       this.dropHeld += dt;
       if (this.dropHeld > 0.33 && !this.dropDone) {
         this.dropDone = true;
@@ -1882,7 +1995,21 @@ export class Game {
       this.armsUntil = 0;
       this.avatar.emote(null);
     }
-    this.weapons.stowed = !!this.hold || this.armsUntil > now;
+    // In a jeep: the view is from behind it, the hands are on the wheel (or in the lap), and
+    // getting in or out of one moves the view there rather than cutting to it.
+    const ride = this.garage.ride;
+    if ((ride?.jeep ?? null) !== this.rode) {
+      this.rode = ride?.jeep ?? null;
+      this.director.third = ride ? this.garage.view : null;
+      this.director.shift(ride ? 0.5 : 0.35);
+      if (ride) {
+        this.rideAt = now;
+        this.setHold(null);
+        this.glass = 0;
+        if (this.minimap.big) this.minimap.toggle(false);
+      }
+    }
+    this.weapons.stowed = !!this.hold || this.armsUntil > now || !!ride;
     const sens = this.glass ? 0.22 : this.weapons.scoped ? 0.28 : this.weapons.aiming ? 0.7 : 1;
     if (!uiOpen && playing && !this.wheelOn) p.look(input, sens);
 
@@ -1899,11 +2026,13 @@ export class Game {
     }
     this.tagT += dt;
     if (this.tagT >= 1) {
+      this.minimap.setJeeps([...this.garage.jeeps.values()].filter((j) => !j.wreck && j.mode === 'parked' && j.seats.every((s) => s === null)).map((j) => ({ x: j.pos.x, z: j.pos.z })));
       if (this.started && !p.dead) this.tickTags(this.tagT);
       else this.hud.setTags([]);
       this.tagT = 0;
     }
     physics.step(dt, (h) => {
+      this.garage.step(h, moveInput);
       p.step(h, moveInput);
       // A key press belongs to one simulation step, however many of them this frame needs:
       // seen by two, a single tap of C crouches and stands straight back up.
@@ -1942,12 +2071,13 @@ export class Game {
 
     // weapons + fov
     const fpLive = this.director.blend > 0.9;
-    this.weapons.update(dt, input, cam, fpLive && !uiOpen && playing && !this.use && !typing && !this.glass && !this.wheelOn && !this.hold);
+    this.garage.frame(dt, now, physics.alpha, cam.position);
+    this.weapons.update(dt, input, cam, fpLive && !uiOpen && playing && !this.use && !typing && !this.glass && !this.wheelOn && !this.hold && !ride);
     this.grenades.update(dt);
     this.updateBarrels(dt);
     const kind = this.weapons.equippedItem ? ITEMS[this.weapons.equippedItem.id].weapon?.kind : undefined;
     // a sprint opens the view a touch: speed you can feel
-    this.director.fovMul = this.glass ? this.glass : this.weapons.scoped ? 0.3 : this.weapons.aiming ? (kind === 'rifle' ? 0.78 : 0.88) : p.sprinting && p.moving > 0.6 ? 1.055 : 1;
+    this.director.fovMul = ride ? this.garage.fov : this.glass ? this.glass : this.weapons.scoped ? 0.3 : this.weapons.aiming ? (kind === 'rifle' ? 0.78 : 0.88) : p.sprinting && p.moving > 0.6 ? 1.055 : 1;
     this.syncHeld();
 
     this.director.update(dt);
@@ -1956,12 +2086,16 @@ export class Game {
     // your own body below the camera, first person only
     // before you deploy, the menu looks down on the middle of the map from the air
     if (!this.started) this.menuCamera(now);
-    const fpView = this.started && this.director.viewmodelVisible && !p.dead;
+    const fpView = this.started && this.director.viewmodelVisible && !p.dead && !this.garage.ride;
     if (fpView) cam.layers.enable(FP_BODY_LAYER);
     else cam.layers.disable(FP_BODY_LAYER);
     r.vmScene.visible = fpView && !this.glass;
     const interp = new THREE.Vector3().lerpVectors(p.prevPos, p.pos, physics.alpha);
-    this.avatar.update(dt, interp, p.vel, p.yaw, p.crouched, p.dead, true, 0, p.grounded, this.weapons.aiming);
+    this.avatar.setLean(p.dead ? 0 : p.lean);
+    if (this.garage.ride) {
+      this.avatar.update(dt, p.pos, _still, this.garage.ride.jeep.yaw, false, p.dead, true, 0, true, false);
+      this.garage.seatBody();
+    } else this.avatar.update(dt, interp, p.vel, p.yaw, p.crouched, p.dead, true, 0, p.grounded, this.weapons.aiming);
     // the step you hear and the bob you see are the body's own
     p.stride = this.avatar.stride;
     if (this.avatar.footfall) p.footfall();
@@ -1998,7 +2132,7 @@ export class Game {
         this.tickDrops();
       }
       this.econT = 0;
-      if (this.invUI.isOpen) this.invUI.refresh(this.loot.near(p.pos, 2.3), this.openStash);
+      if (this.invUI.isOpen) this.invUI.refresh(this.around(), this.openStash);
     }
     this.saveT += dt;
     if (this.saveT > 20 && playing) {
@@ -2075,9 +2209,12 @@ export class Game {
       // no keyboard on a phone: the Use button lights up instead of naming a key
       prompt: this.awaitClick ? '<kbd>Click</kbd>to look around' : this.touch ? (this.prompt?.replace(/<kbd>F<\/kbd>/, '').replace(/ <small>G to pack up<\/small>/, '') ?? null) : this.prompt,
       mark: this.awaitClick ? null : this.mark,
-      weapon: this.weapons.status(),
+      weapon: this.garage.ride ? null : this.weapons.status(),
       aiming: this.weapons.aiming,
       spread: this.weapons.spread,
+      lag: this.lagPx(),
+      arms: this.weapons.armStamina,
+      ride: this.garage.ride && !p.dead ? { kmh: Math.abs(this.garage.ride.jeep.speed) * 3.6, fuel: this.garage.ride.jeep.fuel / JEEP.tank, hp: this.garage.ride.jeep.hp / JEEP.hp, driver: this.garage.ride.seat === 0 } : null,
       scoped: this.weapons.scoped,
       glass: !!this.glass,
       hitMarker: this.weapons.hitMarker,

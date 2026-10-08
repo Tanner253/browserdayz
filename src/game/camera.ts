@@ -21,6 +21,11 @@ export class CameraDirector {
   baseFov = 62;
   /** extra FOV multiplier from gameplay (ADS zoom) */
   fovMul = 1;
+  /**
+   * Set while the view is not from the survivor's eyes but from somewhere outside them (behind
+   * the jeep they are sitting in): whatever this does to the camera is where the view goes.
+   */
+  third: ((cam: THREE.PerspectiveCamera, dt: number) => void) | null = null;
 
   private from: Pose = { pos: new THREE.Vector3(), quat: new THREE.Quaternion(), fov: 62 };
   private target: Pose = { pos: new THREE.Vector3(), quat: new THREE.Quaternion(), fov: 62 };
@@ -32,11 +37,23 @@ export class CameraDirector {
   constructor(private cam: THREE.PerspectiveCamera, private player: Player) {}
 
   get viewmodelVisible() {
-    return this.blend > 0.92;
+    return !this.third && this.blend > 0.92;
   }
-  /** the whole body is seen by the main camera: only while flying in toward it */
+  /** the whole body is seen by the main camera: while flying in toward it, and from outside it */
   get avatarVisible() {
-    return this.blend < 0.8;
+    return !!this.third || this.blend < 0.8;
+  }
+
+  /** The view moves from where it is to where it now belongs (into a seat's view, or back to the eyes), not in one cut. */
+  shift(duration = 0.45) {
+    if (this.t < 1) return;
+    this.from.pos.copy(this.cam.position);
+    this.from.quat.copy(this.cam.quaternion);
+    this.from.fov = this.cam.fov;
+    this.dur = duration;
+    this.arc = 0;
+    this.t = 0;
+    this.blend = 0;
   }
 
   /**
@@ -55,7 +72,8 @@ export class CameraDirector {
   }
 
   private computeTarget(dt: number) {
-    this.player.updateCamera(this.proxy, Math.max(dt, 1e-4), physics.alpha);
+    if (this.third) this.third(this.proxy, Math.max(dt, 1e-4));
+    else this.player.updateCamera(this.proxy, Math.max(dt, 1e-4), physics.alpha);
     this.target.pos.copy(this.proxy.position);
     this.target.quat.copy(this.proxy.quaternion);
     this.target.fov = this.baseFov * this.fovMul;
