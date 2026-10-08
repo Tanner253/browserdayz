@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ZONA: first payout</title>
+<!-- A banner, 1500x500. Rendered to marketing/zona-first-payout.png by: node scripts/card.mjs first-payout 1500 500
+     The picture behind it is a frame of the game (the run at a supply drop, from the second trailer).
+     What it says is the owner's statement of a payment they made by hand. -->
+<style>
+  :root { --gold: #ffd35a; --ink: #f3efe6; --dim: #d8cfb8; --dark: #0c0d0b; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1500px; height: 500px; overflow: hidden; background: var(--dark); }
+  body { position: relative; font-family: 'Bahnschrift', 'Arial Narrow', 'Segoe UI', sans-serif; font-stretch: condensed; color: var(--ink); text-transform: uppercase; }
+  .shot { position: absolute; inset: 0; background: url('src-drop-run.jpg') no-repeat; background-size: 1500px 844px; background-position: -70px -212px; filter: contrast(1.08) saturate(1.18) brightness(0.97); }
+  .shade { position: absolute; inset: 0; background:
+    linear-gradient(90deg, rgba(8, 9, 7, 0) 36%, rgba(8, 9, 7, 0.82) 50%, rgba(8, 9, 7, 0.95) 100%),
+    linear-gradient(180deg, rgba(8, 9, 7, 0.5) 0%, rgba(8, 9, 7, 0) 30%, rgba(8, 9, 7, 0) 72%, rgba(8, 9, 7, 0.7) 100%); }
+  .frame { position: absolute; inset: 14px; border: 2px solid rgba(243, 239, 230, 0.22); }
+
+  .logo { position: absolute; left: 44px; top: 34px; font-size: 76px; font-weight: 700; line-height: 0.9; letter-spacing: 0.16em; text-shadow: 0 4px 24px rgba(0, 0, 0, 0.85); }
+  .logo small { display: block; margin-top: 10px; font-size: 15px; font-weight: 500; letter-spacing: 0.42em; color: var(--dim); }
+
+  .col { position: absolute; left: 726px; right: 44px; top: 50px; }
+  .head { display: flex; align-items: center; gap: 16px; font-size: 62px; font-weight: 700; letter-spacing: 0.07em; line-height: 1; white-space: nowrap; }
+  .head svg { width: 54px; height: 54px; flex: none; color: var(--gold); margin-top: -4px; }
+  .sum { margin-top: 6px; font-size: 168px; font-weight: 700; line-height: 1; letter-spacing: 0.02em; color: var(--gold); white-space: nowrap; text-shadow: 0 6px 40px rgba(0, 0, 0, 0.6); }
+  .sum span { font-size: 0.56em; letter-spacing: 0.12em; margin-left: 0.12em; }
+  .to { margin-top: 10px; padding: 11px 18px 13px; background: rgba(12, 13, 11, 0.82); border: 1px solid rgba(243, 239, 230, 0.26); border-left: 6px solid var(--gold); }
+  .to label { display: block; font-size: 14px; font-weight: 600; letter-spacing: 0.4em; color: var(--dim); }
+  .to code { display: block; margin-top: 5px; font-family: 'Cascadia Mono', 'Consolas', monospace; font-stretch: normal; font-size: 24.5px; letter-spacing: 0; text-transform: none; white-space: nowrap; }
+  .foot { display: flex; align-items: center; gap: 22px; margin-top: 14px; font-size: 22px; font-weight: 600; letter-spacing: 0.1em; text-transform: none; color: var(--dim); }
+  .foot svg { width: 19px; height: 19px; margin: -3px 8px 0 0; vertical-align: middle; }
+  .foot b { font-weight: 600; text-transform: uppercase; letter-spacing: 0.14em; color: var(--ink); }
+</style>
+</head>
+<body>
+  <div class="shot"></div>
+  <div class="shade"></div>
+  <div class="frame"></div>
+
+  <div class="logo">ZONA<small>PvP survival · in your browser</small></div>
+
+  <div class="col">
+    <div class="head"><svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="44" fill="none" stroke="currentColor" stroke-width="9"/><path d="M28 52l15 15 30-34" fill="none" stroke="currentColor" stroke-width="11" stroke-linecap="square"/></svg>First payout sent</div>
+    <div class="sum">0.5<span>SOL</span></div>
+    <div class="to"><label>To wallet</label><code>C8C2LwicsKUzaJse5gN9hnMRinDV5rNy2EmGqFyA8NaY</code></div>
+    <div class="foot"><span><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M18.9 2H22l-6.8 7.8L23.2 22h-6.3l-4.9-6.9L6.3 22H3.2l7.3-8.3L.8 2h6.4l4.5 6.3L18.9 2zm-1.1 18h1.7L6.3 3.9H4.5L17.8 20z"/></svg>@zonaSOL_</span><b>www.zonapvp.fun</b></div>
+  </div>
+</body>
+</html>
