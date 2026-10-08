@@ -6,10 +6,14 @@
 //   ?format=status   the few numbers the game shows on its rewards window
 //
 // Everything on it comes from the book (_lib/payouts.ts) and from the chain as it stands. It
-// is put together at most once in twenty seconds however many people look at it.
+// is put together at most once in twenty seconds however many people look at it, from a copy
+// of the book that may be a minute behind (reading that costs nothing: see _lib/store.ts).
+//
+// Looking is also what sets the collecting of creator rewards off: when enough are waiting,
+// the page (and the game, from the status) calls the housekeeping, api/tick.ts.
 
 import { live } from './_lib/live.js';
-import { dayOf, editBook, readBook, snapshot, sol, type Book, type Entry, type Row, type Snapshot, type World } from './_lib/payouts.js';
+import { cached, dayOf, editBook, freshBook, glanceBook, refOf, snapshot, sol, type Book, type Entry, type Row, type Snapshot, type World } from './_lib/payouts.js';
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 /** an amount of SOL, to as many places as it needs and no more than four */
@@ -24,21 +28,29 @@ const when = (at: string) => `<time datetime="${esc(at)}">${esc(at.replace('T', 
  */
 async function withOldEntries(w: World, book: Book): Promise<Book> {
   if (book.seeded) return book;
+  // (the copy at hand may be behind: the book itself is asked before anything is listed)
+  const held = await freshBook(w.store);
+  if (held.book.seeded) return held.book;
   const paths = await w.store.list('cashins/');
   const old = (await Promise.all(paths.map((p) => w.store.read<Entry>(p).then((r) => r?.data ?? null, () => null)))).filter((e): e is Entry => !!e && typeof e.id === 'string' && typeof e.at === 'string');
-  return editBook(w, (b) => {
+  const done = await editBook(w, (b) => {
+    if (b.seeded) return false;
     b.seeded = true;
     for (const e of old) {
-      if (b.rows.some((r) => r.id === e.id)) continue;
-      b.rows.push({ id: e.id, at: e.at, name: String(e.name ?? ''), owner: String(e.owner ?? ''), wallet: String(e.wallet ?? ''), state: 'off' });
+      if (b.rows.some((r) => r.ref === refOf(e.id))) continue;
+      b.rows.push({ ref: refOf(e.id), at: e.at, name: String(e.name ?? ''), owner: String(e.owner ?? ''), wallet: String(e.wallet ?? ''), state: 'off' });
       b.tags++;
     }
-  });
+  }, held);
+  return done.book;
 }
 
 function outcome(r: Row): string {
-  // (the note on the transaction itself reads "ZONA dog tag" and this reference)
-  const link = `<a href="${tx(r.signature ?? '')}" target="_blank" rel="noopener" title="the transaction carries the note: ZONA dog tag ${esc(r.ref ?? '')}">${esc(short(r.signature ?? ''))}</a>${r.ref ? ` <small>${esc(r.ref)}</small>` : ''}`;
+  // (the note on the transaction itself reads "ZONA dog tag" and this reference; its receipt is an account of its own)
+  const link =
+    (r.signature ? `<a href="${tx(r.signature)}" target="_blank" rel="noopener" title="the transaction carries the note: ZONA dog tag ${esc(r.ref)}">${esc(short(r.signature))}</a>` : '') +
+    (r.receipt ? ` <a class="rc" href="https://solscan.io/account/${esc(r.receipt)}" target="_blank" rel="noopener" title="the receipt this payment left on the chain: while it stands, this tag cannot be paid again">receipt</a>` : '') +
+    ` <small>${esc(r.ref)}</small>`;
   if (r.state === 'paid') return `<b class="sol">${amount(r.lamports ?? 0)} SOL</b> ${link}`;
   if (r.state === 'sending') return `<span class="go">${amount(r.lamports ?? 0)} SOL on its way</span> ${link}`;
   if (r.state === 'waiting') return `<span class="go">waiting</span> <i>${esc(r.why ?? '')}</i>`;
@@ -49,11 +61,14 @@ function outcome(r: Row): string {
 function page(book: Book, s: Snapshot, now: number): string {
   const today = book.rows.filter((r) => r.day === dayOf(now) && (r.state === 'paid' || r.state === 'sending'));
   const spent = today.reduce((n, r) => n + (r.lamports ?? 0), 0);
-  const limit = s.balance === null ? null : Math.round((s.balance + spent) * s.dayShare);
+  // (a share of the most the treasury has been seen to hold today)
+  const limit = s.balance === null ? null : Math.round(Math.max(s.balance, book.most?.day === dayOf(now) ? book.most.lamports : 0) * s.dayShare);
   const wallets = new Set(book.rows.filter((r) => r.state === 'paid').map((r) => r.wallet)).size;
   const open = book.rows.filter((r) => r.state === 'sending' || r.state === 'waiting').length;
   const state =
-    s.mode === 'on'
+    s.mode === 'on' && s.problem
+      ? ['bad', 'Automatic payouts are held', `Nothing is paid as things stand: ${s.problem}.`]
+      : s.mode === 'on'
       ? ['on', 'Automatic payouts are on', 'A tag cashed in is paid within a minute or so, straight from the treasury to the wallet the player gave.']
       : s.mode === 'dry'
         ? ['dry', 'Automatic payouts are on trial', 'Each payment is worked out and tried, and not sent.']
@@ -72,7 +87,7 @@ function page(book: Book, s: Snapshot, now: number): string {
     )
     .join('');
   const claims = book.claims
-    .map((c) => `<tr><td>${when(c.at)}</td><td><b class="sol">${amount(c.lamports)} SOL</b>${c.done ? '' : ' <i>sent, not seen to arrive yet</i>'}</td><td>${c.from === 'pool' ? 'PumpSwap' : 'bonding curve'}</td><td><a href="${tx(c.signature)}" target="_blank" rel="noopener">${esc(short(c.signature))}</a></td></tr>`)
+    .map((c) => `<tr><td>${when(c.at)}</td><td><b class="sol">${amount(c.lamports)} SOL</b></td><td>${c.from === 'pool' ? 'PumpSwap' : 'bonding curve'}</td><td><a href="${tx(c.signature)}" target="_blank" rel="noopener">${esc(short(c.signature))}</a></td></tr>`)
     .join('');
   const tile = (big: string, label: string, small = '') => `<div class="tile"><b>${big}</b><span>${label}</span>${small ? `<small>${small}</small>` : ''}</div>`;
   return `<!doctype html>
@@ -110,6 +125,7 @@ function page(book: Book, s: Snapshot, now: number): string {
   tr.skipped td, tr.off td { color: #8d8877; }
   i { color: #a9a391; }
   td small { margin-left: 6px; font: 11px ui-monospace, Consolas, monospace; color: #8d8877; }
+  a.rc { font-size: 12px; color: #a9a391; text-decoration: underline; }
   .wrap { overflow-x: auto; }
   ul { margin: 0; padding-left: 20px; color: #a9a391; max-width: 78ch; }
   li { margin: 4px 0; }
@@ -124,7 +140,7 @@ function page(book: Book, s: Snapshot, now: number): string {
     ${tile(s.balance === null ? '?' : amount(s.balance), 'SOL in the treasury', s.treasury ? `<a href="https://solscan.io/account/${esc(s.treasury)}" target="_blank" rel="noopener">${esc(short(s.treasury))}</a>${s.madeTheCoin ? ', the wallet that made the coin' : ''}` : '')}
     ${tile(s.tagPays === null ? '?' : amount(s.tagPays), 'SOL a tag pays now', `${Math.round(s.share * 1000) / 10}% of the treasury, ${amount(s.floor)} at least`)}
     ${tile(String(book.paid), book.paid === 1 ? 'tag paid' : 'tags paid', `${amount(book.paidLamports)} SOL in all${wallets ? ` · ${wallets} ${wallets === 1 ? 'wallet' : 'wallets'}` : ''}${open ? ` · ${open} on the way or waiting` : ''}`)}
-    ${tile(amount(book.claimedLamports), 'SOL of creator rewards collected', s.waiting !== null ? `${amount(s.waiting)} waiting to be collected` : esc(s.waitingNote ?? ''))}
+    ${tile(amount(book.claimedLamports), 'SOL of creator rewards collected', (s.waiting !== null ? `${amount(s.waiting)} waiting to be collected` : '') + (s.waitingNote ? `${s.waiting !== null ? '. ' : ''}${esc(s.waitingNote)}` : ''))}
     ${tile(`${amount(spent)}${limit === null ? '' : ` / ${amount(limit)}`}`, 'SOL paid today / the most that may be', `days are counted in UTC`)}
   </div>
   ${book.claimNote ? `<div class="state bad"><b>Collecting creator rewards did not work the last time it was tried</b>${esc(book.claimNote)}</div>` : ''}
@@ -148,13 +164,14 @@ function page(book: Book, s: Snapshot, now: number): string {
   <h2>The rules the machine pays by</h2>
   <ul>
     <li>A tag pays ${Math.round(s.share * 1000) / 10}% of what the treasury holds at the moment it is paid, and never less than ${amount(s.floor)} SOL. The treasury is filled by the coin's creator rewards on pump.fun, collected automatically.</li>
-    <li>No more than ${Math.round(s.dayShare * 100)}% of the treasury leaves it in one day, and one wallet is paid for at most ${s.walletDayTags} tags in one day. A tag over either limit is not lost: it is paid the next day.</li>
-    <li>A tag is paid once. If a payment does not arrive it is sent again only when the first can no longer arrive. Each payment carries a note on the chain, "ZONA dog tag" and the reference shown beside it here.</li>
+    <li>No more than ${Math.round(s.dayShare * 100)}% of the treasury leaves it in one day, and one wallet is paid for at most ${s.walletDayTags} tags in one day. A tag over either limit waits, and is paid when the limit allows, for up to three days.</li>
+    <li>A tag is paid once, and the chain itself sees to it: each payment leaves a receipt, an account of its own, and a second payment for the same tag cannot be made while that receipt stands. Each payment also carries a note, "ZONA dog tag" and the reference shown beside it here.</li>
     <li>A tag cashed in with no wallet given is listed and not paid. The wallet is asked for in the game, on the rewards window.</li>
   </ul>
 </main>
 <script>
   for (const t of document.querySelectorAll('time')) t.title = new Date(t.dateTime).toLocaleString();
+  ${s.due || open ? "fetch('/api/tick').catch(() => {});" : ''}
 </script>
 </body>
 </html>`;
@@ -162,15 +179,16 @@ function page(book: Book, s: Snapshot, now: number): string {
 
 export async function show(request: Request, w: World = live()): Promise<Response> {
   const format = new URL(request.url).searchParams.get('format');
-  const s = await snapshot(w);
+  const s = await cached(w, 'snapshot', 20_000, () => snapshot(w));
   if (format === 'status') {
-    return Response.json({ on: s.mode === 'on', tagPays: s.tagPays === null ? null : sol(s.tagPays), share: s.share, floor: sol(s.floor), treasury: s.treasury }, { headers: { 'cache-control': 'public, s-maxage=60, stale-while-revalidate=600' } });
+    // (due: enough rewards are waiting to be collected; whoever is told so calls api/tick, which collects them)
+    return Response.json({ on: s.mode === 'on' && !s.problem, tagPays: s.tagPays === null ? null : sol(s.tagPays), share: s.share, floor: sol(s.floor), treasury: s.treasury, due: s.due }, { headers: { 'cache-control': 'public, s-maxage=30, stale-while-revalidate=120' } });
   }
-  const book = await withOldEntries(w, await readBook(w.store));
-  const cache = { 'cache-control': 'public, s-maxage=20, stale-while-revalidate=120' };
+  const book = await cached(w, 'book', 20_000, async () => withOldEntries(w, await glanceBook(w.store)));
+  const cache = { 'cache-control': 'public, s-maxage=20, stale-while-revalidate=60' };
   if (format === 'json') {
-    // (a tag's id is what the game server calls this site with: it is not handed out)
-    const rows = book.rows.map(({ id: _id, ...r }) => r);
+    // (a tag not paid yet goes by no name here: its reference is where the receipt of its payment will be)
+    const rows = book.rows.map(({ tries: _tries, ...r }) => (r.state === 'paid' ? r : { ...r, ref: undefined }));
     return Response.json({ status: s, since: book.since, tags: book.tags, paid: book.paid, paidSol: sol(book.paidLamports), claimedSol: sol(book.claimedLamports), rows, claims: book.claims }, { headers: cache });
   }
   return new Response(page(book, s, w.now()), { headers: { 'content-type': 'text/html; charset=utf-8', ...cache } });

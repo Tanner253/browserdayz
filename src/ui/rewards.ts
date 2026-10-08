@@ -59,6 +59,20 @@ const RING = 2 * Math.PI * 34;
 const LOOP_MS = 7200;
 const RUN_MS = 5600;
 
+/**
+ * Where the site's payouts stand (see api/cashins.ts). When it says creator rewards are
+ * waiting to be collected, asking is also what gets them collected: the site's housekeeping
+ * (api/tick.ts) is called, and does it.
+ */
+async function siteStatus() {
+  const s = (await (await fetch('/api/cashins?format=status')).json()) as { on?: boolean; tagPays?: number | null; share?: number; floor?: number; due?: boolean };
+  if (s.due) void fetch('/api/tick').catch(() => {});
+  return s;
+}
+// (asked when the game is opened, and every ten minutes while it stays open)
+void siteStatus().catch(() => {});
+setInterval(() => void siteStatus().catch(() => {}), 10 * 60_000);
+
 export class RewardsModal {
   private root: HTMLDivElement;
   private input: HTMLInputElement;
@@ -163,7 +177,7 @@ export class RewardsModal {
    */
   private async showPay() {
     try {
-      const s = (await (await fetch('/api/cashins?format=status')).json()) as { on?: boolean; tagPays?: number | null; share?: number; floor?: number };
+      const s = await siteStatus();
       if (!s.on || typeof s.tagPays !== 'number' || typeof s.share !== 'number' || typeof s.floor !== 'number') return;
       const round = (n: number) => String(Math.round(n * 10_000) / 10_000);
       const p = this.root.querySelector('.rw-pay p') as HTMLElement;

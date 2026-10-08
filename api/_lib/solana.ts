@@ -133,6 +133,15 @@ export function programAddress(seeds: (Bytes | string)[], program: Bytes): Bytes
   throw new Error('no address for these seeds');
 }
 
+/**
+ * An address made from a wallet and a word: no key of its own, and only that wallet can
+ * create an account there (see receipt, below).
+ */
+export function seeded(base: Bytes, seed: string, program: Bytes = SYSTEM_PROGRAM): Bytes {
+  if (seed.length > 32) throw new Error('the seed is too long');
+  return Uint8Array.from(createHash('sha256').update(base).update(seed).update(program).digest());
+}
+
 /** The account that holds somebody's tokens of one kind. */
 export const tokenAccount = (owner: Bytes, mint: Bytes, tokenProgram = TOKEN_PROGRAM) => programAddress([owner, tokenProgram, mint], ASSOCIATED_TOKEN_PROGRAM);
 
@@ -179,6 +188,25 @@ export const transfer = (from: Bytes, to: Bytes, lamports: bigint): Instruction 
   keys: [{ pubkey: from, signer: true, writable: true }, { pubkey: to, writable: true }],
   data: cat(u32(2), u64(lamports)),
 });
+/** what an account with nothing in it must hold for the chain to keep it */
+export const EMPTY_ACCOUNT_RENT = 890_880n;
+
+/**
+ * Creates an empty account at seeded(from, seed), paid for by `from`. It fails if there is
+ * already an account there, and takes the whole transaction down with it: put in front of a
+ * payment, it makes that payment one that can only ever happen once, whatever is sent and
+ * however many times. The account is the receipt.
+ */
+export function receipt(from: Bytes, seed: string): Instruction {
+  const text = utf8(seed);
+  return {
+    program: SYSTEM_PROGRAM,
+    keys: [{ pubkey: from, signer: true, writable: true }, { pubkey: seeded(from, seed), writable: true }],
+    // create-with-seed (3): the base, the seed with its length, what it holds, its size, who owns it
+    data: cat(u32(3), from, u64(text.length), text, u64(EMPTY_ACCOUNT_RENT), u64(0), SYSTEM_PROGRAM),
+  };
+}
+
 /** How much work the transaction may do, and what it bids per unit of it (millionths of a lamport). */
 export const computeLimit = (units: number): Instruction => ({ program: COMPUTE_BUDGET_PROGRAM, keys: [], data: cat([2], u32(units)) });
 export const computePrice = (microLamports: number): Instruction => ({ program: COMPUTE_BUDGET_PROGRAM, keys: [], data: cat([3], u64(microLamports)) });
@@ -346,6 +374,17 @@ export class Rpc {
       { encoding: 'base64', sigVerify: false, replaceRecentBlockhash: true, commitment: 'confirmed', accounts: { encoding: 'base64', addresses: watch.map(b58) } },
     ]);
     return { err: r.value.err, logs: r.value.logs ?? [], lamports: (r.value.accounts ?? []).map((a) => (a ? BigInt(a.lamports) : null)), units: r.value.unitsConsumed ?? 0 };
+  }
+
+  /**
+   * What a transaction that has arrived did to one wallet's balance, read off the transaction
+   * itself (so nothing else going on at the time is mixed into it). Null if the node cannot say.
+   */
+  async gained(signature: string, who: Bytes): Promise<bigint | null> {
+    const r = await this.call<{ transaction: { message: { accountKeys: string[] } }; meta: { err: unknown; preBalances: number[]; postBalances: number[] } | null } | null>('getTransaction', [signature, { encoding: 'json', commitment: 'confirmed', maxSupportedTransactionVersion: 0 }]);
+    const i = r?.transaction.message.accountKeys.indexOf(b58(who)) ?? -1;
+    if (!r?.meta || r.meta.err || i < 0) return null;
+    return BigInt(r.meta.postBalances[i]) - BigInt(r.meta.preBalances[i]);
   }
 
   /** An account's contents, or null if there is no such account. */

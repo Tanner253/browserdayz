@@ -4,13 +4,13 @@
 // The call carries only an id. This function asks the game server itself for that entry, so
 // nobody can add a name to the payout list, or have a wallet paid, by calling this address:
 // the game server is the only source of what was cashed in, and an id it does not know is
-// turned away before anything else is done. The entry is kept in Vercel Blob, which outlives
-// the game server's restarts; the tag is then paid, if payouts are on: see _lib/payouts.ts.
+// turned away before anything else is done. The tag is then written in the book, which
+// outlives the game server's restarts, and paid, if payouts are on: see _lib/payouts.ts.
 // (A tag still unsettled when the game server restarts and forgets it is finished by the
 // housekeeping, api/tick.ts, from the book.)
 
 import { live } from './_lib/live.js';
-import { handle, readBook, type Entry, type World } from './_lib/payouts.js';
+import { handle, type Entry, type World } from './_lib/payouts.js';
 
 const GAME = process.env.GAME_SERVER_URL ?? 'https://browserdayz.onrender.com';
 
@@ -27,8 +27,6 @@ export async function record(request: Request, w: World = live(), game = GAME): 
     owner: String(e.owner ?? '').slice(0, 24),
     wallet: String(e.wallet ?? '').slice(0, 44),
   };
-  // one small file per cash-in, written the first time it is heard of: the record as it came, whatever happens to the book
-  if (!(await readBook(w.store)).rows.some((x) => x.id === id)) await w.store.create(`cashins/${entry.at.replace(/[^0-9TZ-]/g, '-')}_${id}.json`, entry);
   const payout = await handle(w, entry);
   return Response.json({ ok: true, payout }, { headers: { 'cache-control': 'no-store' } });
 }

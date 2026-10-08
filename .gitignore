@@ -11,3 +11,5 @@ data
 trailer/out
 # clips for the trailer, built by: npm run character -- --emotes
 trailer/emotes.glb
+# settings and keys never go in the repository
+.env*

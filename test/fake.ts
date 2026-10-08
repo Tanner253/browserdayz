@@ -1,15 +1,18 @@
 // A chain made up for the tests: one that reads the very bytes the real one would be sent,
 // checks the signature, moves balances only for a transaction it can parse, and can be told
-// to lose transactions, take its time, refuse, or fail them. And a world built round it.
+// to lose transactions, take its time, refuse, fail them, or forget what it has seen. And a
+// world built round it.
 
 import assert from 'node:assert/strict';
 import { Keypair, LAMPORTS, SYSTEM_PROGRAM, address, b58, same, verify, type Bytes, type Signed, type Status } from '../api/_lib/solana';
 import { PUMP, type CoinState } from '../api/_lib/pump';
 import { MemoryStore } from '../api/_lib/store';
-import { config, type Entry, type World } from '../api/_lib/payouts';
+import { config, refOf, type Book, type Entry, type Try, type World } from '../api/_lib/payouts';
 
 export const SOL = (n: number) => BigInt(Math.round(n * LAMPORTS));
 const hex = (s: string) => Uint8Array.from(Buffer.from(s, 'hex'));
+/** what a receipt holds, and what every transaction costs */
+export const RENT = 890_880n, FEE = 5000n;
 
 // ------------------------------------------------------------------ a chain
 
@@ -17,8 +20,11 @@ export interface Parsed {
   payer: Bytes;
   blockhash: string;
   transfers: { from: Bytes; to: Bytes; lamports: bigint }[];
+  /** accounts it creates (a payment's receipt): it fails as a whole if one of them is there already */
+  creates: { at: Bytes; lamports: bigint }[];
   memos: string[];
-  collects: boolean;
+  /** it collects creator rewards, and for whom */
+  collects: Bytes | null;
 }
 
 /** Reads a transaction the way a validator does, and refuses one that is not well formed or not signed by its payer. */
@@ -32,18 +38,23 @@ export function parse(wire: Bytes, checkSignature = true): Parsed {
       if (!(b & 128)) return n;
     }
   };
+  const u64 = (data: Bytes, from: number) => {
+    let v = 0n;
+    for (let i = from + 7; i >= from; i--) v = (v << 8n) | BigInt(data[i]);
+    return v;
+  };
   const sigs = short();
   assert.equal(sigs, 1);
   const sig = wire.subarray(at, (at += 64));
   const msg = wire.subarray(at);
-  const [signers] = [wire[at], wire[at + 1], wire[at + 2]];
+  const signers = wire[at];
   at += 3;
   assert.equal(signers, 1);
   const keys: Bytes[] = [];
   for (let n = short(); n > 0; n--) keys.push(wire.subarray(at, (at += 32)));
   const blockhash = b58(wire.subarray(at, (at += 32)));
   if (checkSignature) assert.ok(verify(msg, sig, keys[0]), 'the payer did not sign this');
-  const out: Parsed = { payer: keys[0], blockhash, transfers: [], memos: [], collects: false };
+  const out: Parsed = { payer: keys[0], blockhash, transfers: [], creates: [], memos: [], collects: null };
   for (let n = short(); n > 0; n--) {
     const program = keys[wire[at++]];
     const accounts: number[] = [];
@@ -51,12 +62,17 @@ export function parse(wire: Bytes, checkSignature = true): Parsed {
     const len = short();
     const data = wire.subarray(at, (at += len));
     if (same(program, SYSTEM_PROGRAM) && data[0] === 2 && data.length === 12) {
-      let v = 0n;
-      for (let i = 11; i >= 4; i--) v = (v << 8n) | BigInt(data[i]);
       assert.equal(accounts[0], 0, 'only the signer can be the one who pays');
-      out.transfers.push({ from: keys[accounts[0]], to: keys[accounts[1]], lamports: v });
+      out.transfers.push({ from: keys[accounts[0]], to: keys[accounts[1]], lamports: u64(data, 4) });
+    } else if (same(program, SYSTEM_PROGRAM) && data[0] === 3) {
+      // create-with-seed: the base, the seed and its length, what it holds, its size, its owner
+      assert.equal(accounts[0], 0, 'only the signer can pay for an account');
+      assert.ok(same(data.subarray(4, 36), keys[0]), 'the base has to be the signer');
+      const seedLen = Number(u64(data, 36));
+      assert.equal(data.length, 4 + 32 + 8 + seedLen + 8 + 8 + 32);
+      out.creates.push({ at: keys[accounts[1]], lamports: u64(data, 44 + seedLen) });
     } else if (b58(program) === 'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr') out.memos.push(new TextDecoder().decode(data));
-    else if (same(program, PUMP) && data[0] === 207) out.collects = true;
+    else if (same(program, PUMP) && data[0] === 207) out.collects = keys[accounts[0]];
   }
   assert.equal(at, wire.length, 'bytes left over');
   return out;
@@ -68,7 +84,7 @@ export class FakeChain {
   /** addresses that belong to a program, not to a person */
   programOwned = new Set<string>();
   private hashes = new Map<string, number>();
-  private landedAt = new Map<string, { height: number; err: unknown }>();
+  private landedAt = new Map<string, { height: number; err: unknown; gains: Map<string, bigint> }>();
   private flying: { sig: string; tx: Parsed; due: number; lastValid: number }[] = [];
   /** every transaction handed in, in order (the same one twice is two entries) */
   handedIn: string[] = [];
@@ -77,11 +93,33 @@ export class FakeChain {
   refuse = false;
   landAfter = 2;
   failNext = false;
+  simFails = false;
+  /** how often it claims never to have seen a transaction it has in fact included (a node with no memory), 0..1 */
+  forgets = 0;
   /** creator rewards waiting to be collected */
   rewards = 0n;
-  statusCalls = 0;
 
   private bal = (k: Bytes) => this.balances.get(b58(k)) ?? 0n;
+
+  /** what a transaction would do to the balances, or why it would fail */
+  private apply(tx: Parsed, to: Map<string, bigint>, forceFail = false): unknown {
+    const get = (k: Bytes) => to.get(b58(k)) ?? 0n;
+    const add = (k: Bytes, d: bigint) => to.set(b58(k), get(k) + d);
+    const need = tx.transfers.reduce((s, t) => s + t.lamports, 0n) + tx.creates.reduce((s, c) => s + c.lamports, 0n) + FEE;
+    // (an account that is there already cannot be created again: the whole thing fails)
+    if (tx.creates.some((c) => to.has(b58(c.at)))) return { InstructionError: [2, { Custom: 0 }] };
+    if (forceFail || get(tx.payer) < need) return { InstructionError: [3, { Custom: 1 }] };
+    for (const c of tx.creates) {
+      add(tx.payer, -c.lamports);
+      to.set(b58(c.at), c.lamports);
+    }
+    for (const t of tx.transfers) {
+      add(t.from, -t.lamports);
+      add(t.to, t.lamports);
+    }
+    if (tx.collects) add(tx.collects, this.rewards);
+    return null;
+  }
 
   /** the chain moves on by this many blocks */
   tick(blocks = 1) {
@@ -90,22 +128,19 @@ export class FakeChain {
       for (const f of this.flying.filter((x) => x.due <= this.height)) {
         this.flying.splice(this.flying.indexOf(f), 1);
         if (this.height > f.lastValid || this.landedAt.has(f.sig)) continue;
-        const need = f.tx.transfers.reduce((s, t) => s + t.lamports, 0n) + 5000n;
-        let err: unknown = null;
-        if (this.failNext || this.bal(f.tx.payer) < need) err = { InstructionError: [2, { Custom: 1 }] };
+        const before = new Map(this.balances);
+        const trial = new Map(this.balances);
+        const err = this.apply(f.tx, trial, this.failNext);
         this.failNext = false;
-        this.balances.set(b58(f.tx.payer), this.bal(f.tx.payer) - 5000n);
         if (!err) {
-          for (const t of f.tx.transfers) {
-            this.balances.set(b58(t.from), this.bal(t.from) - t.lamports);
-            this.balances.set(b58(t.to), this.bal(t.to) + t.lamports);
-          }
-          if (f.tx.collects) {
-            this.balances.set(b58(f.tx.payer), this.bal(f.tx.payer) + this.rewards);
-            this.rewards = 0n;
-          }
+          this.balances = trial;
+          if (f.tx.collects) this.rewards = 0n;
         }
-        this.landedAt.set(f.sig, { height: this.height, err });
+        // the fee is paid either way
+        this.balances.set(b58(f.tx.payer), this.bal(f.tx.payer) - FEE);
+        const gains = new Map<string, bigint>();
+        for (const [k, v] of this.balances) if (v !== (before.get(k) ?? 0n)) gains.set(k, v - (before.get(k) ?? 0n));
+        this.landedAt.set(f.sig, { height: this.height, err, gains });
       }
     }
   }
@@ -131,26 +166,22 @@ export class FakeChain {
     this.flying.push({ sig: tx.signature, tx: p, due: this.height + this.landAfter, lastValid });
   }
   async statuses(sigs: string[]): Promise<(Status | null)[]> {
-    this.statusCalls++;
     return sigs.map((s) => {
       const l = this.landedAt.get(s);
-      return l ? { slot: l.height, err: l.err, confirmationStatus: this.height - l.height >= 32 ? 'finalized' : 'confirmed' } : null;
+      if (!l || Math.random() < this.forgets) return null;
+      return { slot: l.height, err: l.err, confirmationStatus: this.height - l.height >= 32 ? 'finalized' : 'confirmed' };
     });
   }
-  simFails = false;
   async simulate(wire: Bytes, watch: Bytes[] = []) {
-    const p = parse(wire, false);
     const out = new Map(this.balances);
-    const need = p.transfers.reduce((s, t) => s + t.lamports, 0n) + 5000n;
-    const err = this.simFails || (out.get(b58(p.payer)) ?? 0n) < need ? { InstructionError: [1, 'Custom'] } : null;
-    if (!err) {
-      out.set(b58(p.payer), (out.get(b58(p.payer)) ?? 0n) - 5000n + (p.collects ? this.rewards : 0n));
-      for (const t of p.transfers) {
-        out.set(b58(t.from), (out.get(b58(t.from)) ?? 0n) - t.lamports);
-        out.set(b58(t.to), (out.get(b58(t.to)) ?? 0n) + t.lamports);
-      }
-    }
+    const p = parse(wire, false);
+    const err = this.apply(p, out, this.simFails);
+    if (!err) out.set(b58(p.payer), (out.get(b58(p.payer)) ?? 0n) - FEE);
     return { err, logs: err ? ['Program log: no'] : [], lamports: watch.map((k) => out.get(b58(k)) ?? null), units: 5000 };
+  }
+  async gained(signature: string, who: Bytes) {
+    const l = this.landedAt.get(signature);
+    return l && !l.err ? (l.gains.get(b58(who)) ?? 0n) : null;
   }
   async account(who: Bytes) {
     const k = b58(who);
@@ -178,13 +209,15 @@ export function wallet(n: number) {
   return wallets.get(n)!;
 }
 
+/** @param treasurySol what the treasury starts with */
 export function world(treasurySol: number, env: Record<string, string> = {}) {
   const chain = new FakeChain();
   chain.balances.set(TREASURY.address, SOL(treasurySol));
   const store = new MemoryStore();
   let clock = Date.parse('2026-10-08T12:00:00Z');
+  const cfg = config({ PAYOUTS: 'on', TREASURY_SECRET_KEY: KEY, ...env });
   const w: World & { chain: FakeChain; store: MemoryStore; skip(ms: number): void; coinState: CoinState } = {
-    cfg: config({ PAYOUTS: 'on', TREASURY_SECRET_KEY: KEY, ...env }),
+    cfg,
     rpc: chain,
     store,
     chain,
@@ -208,4 +241,14 @@ export function world(treasurySol: number, env: Record<string, string> = {}) {
 let seq = 0;
 export const tag = (w: World, to: string | number, over: Partial<Entry> = {}): Entry => ({ id: `t${(++seq).toString(36).padStart(9, '0')}`, at: new Date(w.now() - 1000).toISOString(), name: 'Sable', owner: 'Victim', wallet: typeof to === 'number' ? wallet(to) : to, ...over });
 export const got = (w: { chain: FakeChain }, to: number | string) => w.chain.balances.get(typeof to === 'number' ? wallet(to) : to) ?? 0n;
-export const tries = (w: { store: MemoryStore }, id: string) => [...w.store.files.keys()].filter((k) => k.startsWith(`ledger/try/${id}/`)).length;
+/** the attempts ever written in the book for a tag (they are dropped from it once it is paid: this looks at every version there has been) */
+export function attempts(w: { store: MemoryStore }, id: string): Try[] {
+  let most: Try[] = [];
+  for (const v of w.store.history) {
+    if (v.path !== 'ledger/book.json') continue;
+    const made = (JSON.parse(v.text) as Book).rows.find((r) => r.ref === refOf(id))?.tries ?? [];
+    if (made.length > most.length) most = made;
+  }
+  return most;
+}
+export const tries = (w: { store: MemoryStore }, id: string) => attempts(w, id).length;

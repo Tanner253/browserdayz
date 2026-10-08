@@ -6,6 +6,7 @@
 // hurts. Clients own their movement, aim and inventory.
 
 import http from 'node:http';
+import { randomBytes } from 'node:crypto';
 import { createReadStream, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
@@ -203,7 +204,8 @@ function notEarned(c: Client, from: Looted, since: number | undefined, now: numb
 }
 
 function recordCashIn(c: Client, owner: string, wallet: string) {
-  const entry: CashIn = { id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`, at: new Date().toISOString(), name: c.name, owner, wallet };
+  // (its id is what the site is called with, and what the receipt of its payment is made from: not to be guessed)
+  const entry: CashIn = { id: randomBytes(16).toString('hex'), at: new Date().toISOString(), name: c.name, owner, wallet };
   cashins.push(entry);
   if (cashins.length > 2000) cashins.shift();
   scoreOf(c).tags++;
@@ -1053,6 +1055,16 @@ const COMPRESS = new Set(['.html', '.js', '.css', '.json', '.svg']);
 const gz = new Map<string, Buffer>();
 
 const server = http.createServer((req, res) => {
+  // (an address that cannot be read is a bad request, not the end of the server)
+  try {
+    serve(req, res);
+  } catch {
+    if (!res.headersSent) res.writeHead(400, { 'content-type': 'text/plain' });
+    res.end('bad request');
+  }
+});
+
+function serve(req: http.IncomingMessage, res: http.ServerResponse) {
   const url = new URL(req.url ?? '/', 'http://x');
   if (url.pathname === '/healthz') {
     // readable from a client hosted somewhere else (e.g. Vercel) for the start-screen player count
@@ -1108,11 +1120,17 @@ const server = http.createServer((req, res) => {
   }
   res.writeHead(200, headers);
   createReadStream(file).pipe(res);
-});
+}
 
 const wss = new WebSocketServer({ noServer: true, maxPayload: 256 * 1024 });
 server.on('upgrade', (req, socket, head) => {
-  if (new URL(req.url ?? '/', 'http://x').pathname !== '/ws') {
+  let wanted = '';
+  try {
+    wanted = new URL(req.url ?? '/', 'http://x').pathname;
+  } catch {
+    /* not an address at all */
+  }
+  if (wanted !== '/ws') {
     socket.destroy();
     return;
   }

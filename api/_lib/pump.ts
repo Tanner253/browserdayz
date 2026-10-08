@@ -23,7 +23,7 @@
 // fee is paid, the page says the claim failed, and payouts carry on from what the treasury
 // already holds.
 
-import { ASSOCIATED_TOKEN_PROGRAM, SYSTEM_PROGRAM, TOKEN_PROGRAM, WRAPPED_SOL, address, closeTokenAccount, openTokenAccount, programAddress, readU64, same, tokenAccount, type Bytes, type Instruction, type Rpc } from './solana.js';
+import { ASSOCIATED_TOKEN_PROGRAM, SYSTEM_PROGRAM, TOKEN_PROGRAM, WRAPPED_SOL, address, openTokenAccount, programAddress, readU64, same, tokenAccount, EMPTY_ACCOUNT_RENT, type Bytes, type Instruction, type Rpc } from './solana.js';
 
 /** the two questions asked of the chain here */
 export type Reader = Pick<Rpc, 'account' | 'tokenBalance'>;
@@ -38,8 +38,6 @@ const SWEEP_CREATOR_FEE = Uint8Array.of(32, 246, 191, 52, 8, 201, 73, 186);
 const COLLECT_CREATOR_FEE_V2 = Uint8Array.of(207, 17, 138, 242, 4, 34, 19, 56);
 const COLLECT_COIN_CREATOR_FEE = Uint8Array.of(160, 57, 89, 42, 181, 139, 43, 66);
 
-/** what an account with nothing in it must hold to be left alone by the chain: the vault keeps this much back */
-const EMPTY_ACCOUNT_RENT = 890_880n;
 
 const isKind = (data: Bytes, kind: number[]) => data.length >= 8 && kind.every((v, i) => data[i] === v);
 const u16le = (n: number) => Uint8Array.of(n & 255, n >> 8);
@@ -142,11 +140,12 @@ export function claimCurve(payer: Bytes, mint: Bytes, creator: Bytes): Instructi
 }
 
 /**
- * Pool side: sweep what is waiting into the vault, the vault to the creator's wrapped-SOL
- * account (opened first if there is none), and that account closed, which hands its
- * contents over as plain SOL. The creator signs: only the owner may close their account.
+ * Pool side: sweep what is waiting into the vault, and the vault to the creator's wrapped-SOL
+ * account (opened first if there is none). Whoever pays signs; the creator need not. What
+ * arrives is wrapped SOL: closing that account, which only its owner can do, hands it over
+ * as plain SOL (closeTokenAccount in solana.ts).
  */
-export function claimPool(creator: Bytes, pool: Bytes, poolQuote: Bytes): Instruction[] {
+export function claimPool(payer: Bytes, creator: Bytes, pool: Bytes, poolQuote: Bytes): Instruction[] {
   const authority = programAddress(['creator_vault', creator], PUMP_AMM);
   const events = programAddress(['__event_authority'], PUMP_AMM);
   const mine = tokenAccount(creator, WRAPPED_SOL);
@@ -155,7 +154,7 @@ export function claimPool(creator: Bytes, pool: Bytes, poolQuote: Bytes): Instru
       program: PUMP_AMM,
       data: SWEEP_CREATOR_FEE,
       keys: [
-        { pubkey: creator, signer: true, writable: true },
+        { pubkey: payer, signer: true, writable: true },
         { pubkey: programAddress(['global_config'], PUMP_AMM) },
         { pubkey: pool, writable: true },
         { pubkey: WRAPPED_SOL },
@@ -169,7 +168,7 @@ export function claimPool(creator: Bytes, pool: Bytes, poolQuote: Bytes): Instru
         { pubkey: PUMP_AMM },
       ],
     },
-    openTokenAccount(creator, creator, WRAPPED_SOL),
+    openTokenAccount(payer, creator, WRAPPED_SOL),
     {
       program: PUMP_AMM,
       data: COLLECT_COIN_CREATOR_FEE,
@@ -184,6 +183,5 @@ export function claimPool(creator: Bytes, pool: Bytes, poolQuote: Bytes): Instru
         { pubkey: PUMP_AMM },
       ],
     },
-    closeTokenAccount(mine, creator, creator),
   ];
 }

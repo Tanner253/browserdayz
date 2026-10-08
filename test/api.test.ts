@@ -8,7 +8,8 @@ import { writeFileSync } from 'node:fs';
 import { record } from '../api/cashin';
 import { tick } from '../api/tick';
 import { show } from '../api/cashins';
-import { config, readBook, type Entry } from '../api/_lib/payouts';
+import { address } from '../api/_lib/solana';
+import { config, readBook, refOf, type Entry } from '../api/_lib/payouts';
 import { KEY, SOL, TREASURY, got, tag, wallet, world } from './fake';
 
 // what the game server knows: it is asked for a cash-in by its id, and for nothing else
@@ -51,20 +52,22 @@ await test('a tag reported by the game server is filed, paid, and answered for',
   assert.equal(r.body.payout?.state, 'paid');
   assert.equal(r.body.payout?.lamports, Number(SOL(0.2)));
   assert.equal(got(w, 1), SOL(0.2));
-  assert.equal([...w.store.files.keys()].filter((k) => k.startsWith('cashins/') && k.endsWith(`_${first.id}.json`)).length, 1);
+  // one file holds everything: the book
+  assert.deepEqual([...w.store.files.keys()], ['ledger/book.json']);
+  assert.equal((await readBook(w.store)).rows.find((x) => x.ref === refOf(first.id))?.state, 'paid');
 });
 
 await test('reported again: answered from the book, nothing sent; an id the game server does not know touches nothing', async () => {
-  const sent = w.chain.handedIn.length, made = w.store.ops.create;
+  const sent = w.chain.handedIn.length, before = { ...w.store.ops };
   assert.equal((await call(w, first.id)).body.payout?.state, 'paid');
   assert.equal(w.chain.handedIn.length, sent);
-  assert.equal(w.store.ops.create, made);
+  assert.deepEqual([w.store.ops.swap, w.store.ops.read], [before.swap, before.read]);
   assert.equal(got(w, 1), SOL(0.2));
   // the game server has restarted and forgotten it: anybody calling with that id now is turned away at the door
   known.delete(first.id);
-  const reads = w.store.ops.read;
+  const asked = { ...w.store.ops };
   assert.equal((await call(w, first.id)).status, 404);
-  assert.equal(w.store.ops.read, reads);
+  assert.deepEqual(w.store.ops, asked);
   assert.equal(got(w, 1), SOL(0.2));
 });
 
@@ -84,16 +87,17 @@ await test('a tag with no wallet, a slow one, and the housekeeping that finishes
 });
 
 await test('tags from before there was a book are read into it once, as listed', async () => {
-  w.store.files.set('cashins/2026-10-07T20-11-05-123Z_oldentry0001.json', { text: JSON.stringify({ id: 'oldentry0001', at: '2026-10-07T20:11:05.123Z', name: 'Early', owner: 'Bird', wallet: wallet(77) }), mark: 9999 });
+  w.store.put('cashins/2026-10-07T20-11-05-123Z_oldentry0001.json', JSON.stringify({ id: 'oldentry0001', at: '2026-10-07T20:11:05.123Z', name: 'Early', owner: 'Bird', wallet: wallet(77) }));
   await show(new Request('https://site.test/payouts'), w);
   const lists = w.store.ops.list;
   await show(new Request('https://site.test/payouts'), w);
   assert.equal(w.store.ops.list, lists);
-  const row = (await readBook(w.store)).rows.find((r) => r.id === 'oldentry0001');
+  const row = (await readBook(w.store)).rows.find((r) => r.ref === refOf('oldentry0001'));
   assert.equal(row?.state, 'off');
-  // the housekeeping then settles it for good: not paid, and why
-  await tick(new Request('https://site.test/api/tick'), w);
-  assert.match((await readBook(w.store)).rows.find((r) => r.id === 'oldentry0001')?.why ?? '', /before automatic payouts began/);
+  // and listed is how it stays: the housekeeping does not pay what was cashed in before payouts were on
+  const t = (await (await tick(new Request('https://site.test/api/tick'), w)).json()) as { tried: number };
+  assert.equal(t.tried, 0);
+  assert.equal((await readBook(w.store)).rows.find((r) => r.ref === refOf('oldentry0001'))?.state, 'off');
   assert.equal(got(w, 77), 0n);
 });
 
@@ -101,7 +105,7 @@ await test('the page, the data behind it, and what the game is told', async () =
   w.chain.rewards = SOL(0.03);
   const html = await (await show(new Request('https://site.test/payouts'), w)).text();
   if (process.argv[2]) writeFileSync(process.argv[2], html);
-  for (const want of ['Automatic payouts are on', 'SOL in the treasury', `${TREASURY.address.slice(0, 4)}…${TREASURY.address.slice(-4)}`, 'Sable', 'Brick', '0.2 SOL', 'https://solscan.io/tx/', 'none given', 'not paid: no wallet given', 'before automatic payouts began', '0.03 waiting to be collected']) assert.ok(html.includes(want), `the page does not say "${want}"`);
+  for (const want of ['Automatic payouts are on', 'SOL in the treasury', `${TREASURY.address.slice(0, 4)}…${TREASURY.address.slice(-4)}`, 'Sable', 'Brick', '0.2 SOL', 'https://solscan.io/tx/', 'none given', 'not paid: no wallet given', 'listed (payouts were not on)', '0.03 waiting to be collected', 'receipt</a>']) assert.ok(html.includes(want), `the page does not say "${want}"`);
   // (nothing a player typed gets onto the page as markup, and no id or key is on it)
   const evil = tag(w, 3, { name: '<img src=x onerror=1>', owner: '"><script>' });
   known.set(evil.id, evil);
@@ -114,9 +118,46 @@ await test('the page, the data behind it, and what the game is told', async () =
   assert.equal(data.paid, 3);
   assert.ok(data.rows.every((r) => !('id' in r)));
   assert.ok(!JSON.stringify(data).includes(KEY));
-  const status = (await (await show(new Request('https://site.test/payouts?format=status'), w)).json()) as { on: boolean; tagPays: number; share: number; floor: number };
-  assert.deepEqual([status.on, status.share, status.floor], [true, 0.02, 0.02]);
+  assert.ok(!JSON.stringify(data).includes('"tries"') && !JSON.stringify(data).includes('"wire"'));
+  const status = (await (await show(new Request('https://site.test/payouts?format=status'), w)).json()) as { on: boolean; tagPays: number; share: number; floor: number; due: boolean };
+  assert.deepEqual([status.on, status.share, status.floor, status.due], [true, 0.02, 0.02, false]);
   assert.ok(status.tagPays > 0.18 && status.tagPays <= 0.2);
+  // nothing worth collecting, nothing on its way: the page does not call the housekeeping
+  assert.ok(!html2.includes("fetch('/api/tick')"));
+});
+
+await test('looking is what sets the collecting off; and however many look, it is done once', async () => {
+  // enough rewards are waiting: the page and the status both say so, and whoever reads them calls the housekeeping
+  w.chain.rewards = SOL(0.4);
+  const status = (await (await show(new Request('https://site.test/payouts?format=status'), w)).json()) as { due: boolean };
+  assert.equal(status.due, true);
+  assert.ok((await (await show(new Request('https://site.test/payouts'), w)).text()).includes("fetch('/api/tick')"));
+  const before = got(w, TREASURY.address), sent = w.chain.handedIn.length;
+  // (as it runs for real, with its answers kept for a moment: ten calls at once are one run)
+  w.memo = new Map();
+  const answers = await Promise.all(Array.from({ length: 10 }, () => tick(new Request('https://site.test/api/tick'), w).then((r) => r.json() as Promise<{ claim: string }>)));
+  assert.ok(answers.every((a) => /collected/.test(a.claim)));
+  assert.equal(w.chain.handedIn.length, sent + 1);
+  assert.equal(got(w, TREASURY.address), before + SOL(0.4) - 5000n);
+  assert.equal(w.chain.rewards, 0n);
+  w.memo = undefined;
+  const html = await (await show(new Request('https://site.test/payouts'), w)).text();
+  assert.ok(html.includes('SOL of creator rewards collected') && html.includes('bonding curve') && !html.includes("fetch('/api/tick')"));
+  assert.equal((await readBook(w.store)).claims.length, 1);
+});
+
+await test("the wrong wallet’s key: nothing is paid, and the page and the game are told", async () => {
+  const wrong = world(1);
+  wrong.coinState = { ...wrong.coinState, creator: address(wallet(321)) };
+  const e = tag(wrong, 6);
+  known.set(e.id, e);
+  const r = await call(wrong, e.id);
+  assert.equal(r.body.payout?.state, 'waiting');
+  assert.equal(wrong.chain.handedIn.length, 0);
+  const html = await (await show(new Request('https://site.test/payouts'), wrong)).text();
+  assert.ok(html.includes('Automatic payouts are held') && html.includes('nothing is paid until the key of that wallet is given'));
+  const status = (await (await show(new Request('https://site.test/payouts?format=status'), wrong)).json()) as { on: boolean; due: boolean };
+  assert.deepEqual([status.on, status.due], [false, false]);
 });
 
 await test('switched off: listed, not paid, and the page says so', async () => {
