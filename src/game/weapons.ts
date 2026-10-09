@@ -386,6 +386,13 @@ const SEAT = {
  */
 const HELD_RIFLE = 0.9;
 
+/**
+ * Coming out of a sprint to shoot: how far down the gun may still be for a shot to go (a share
+ * of the sprint pose), how long a trigger pulled before that is remembered, and how long after
+ * the trigger or the sights the legs will not sprint. Seconds.
+ */
+const SPRINT_OUT = { up: 0.22, keep: 0.45, lock: 0.4 };
+
 /** how long the flame at the muzzle is, metres */
 const FLAME: Record<GunKind, number> = { pistol: 0.2, rifle: 0.42, auto: 0.3 };
 
@@ -422,6 +429,8 @@ export class Weapons {
   private aimRecoil = new Spring(90, 13);
   private adsT = 0;
   private sprintT = 0;
+  /** seconds for which a trigger pulled on the run is remembered: the shot goes when the gun has come up */
+  private wantShot = 0;
   private airT = 0;
   private boltReady = true;
   /**
@@ -1010,13 +1019,24 @@ export class Weapons {
     else this.armStamina = Math.min(1, this.armStamina + 0.3 * dt);
 
     // ----- trigger / actions
+    this.wantShot = Math.max(0, this.wantShot - dt);
     if (enabled && m && item && def && !p.dead) {
       if (def.weapon) {
         const auto = this.fireMode(item) === 'auto';
+        // Nobody shoots on the run. Sprinting, the gun is down across the body: the trigger
+        // (or the other button, for the sights) stops the sprint, and the shot goes when the
+        // gun has come up, a fifth of a second later. While it is being fired there is no
+        // breaking back into a sprint between shots.
+        const up = this.sprintT < SPRINT_OUT.up;
+        if (input.held('Mouse0') || input.held('Mouse2')) p.sprintLock = Math.max(p.sprintLock, SPRINT_OUT.lock);
         if (input.pressed('Mouse0')) {
           this.burst = 0;
+          if (up) this.tryFire(m, item, camera, true);
+          else this.wantShot = SPRINT_OUT.keep;
+        } else if (this.wantShot > 0 && up) {
+          this.wantShot = 0;
           this.tryFire(m, item, camera, true);
-        } else if (auto && input.held('Mouse0')) {
+        } else if (auto && input.held('Mouse0') && up) {
           this.tryFire(m, item, camera, false);
         }
         if (!input.held('Mouse0')) this.burst = 0;

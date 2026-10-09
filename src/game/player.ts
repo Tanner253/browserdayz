@@ -94,6 +94,11 @@ export class Player {
   private staminaDelay = 0;
   /** out of breath: no sprinting until some stamina is back (see step) */
   private winded = false;
+  /**
+   * Seconds for which the legs will not sprint, whatever is held: set by the gun (the trigger
+   * pulled, the sights wanted). Nobody runs flat out and shoots: the run is what stops.
+   */
+  sprintLock = 0;
   private lastFallSpeed = 0;
   /** seconds since the feet last touched the ground, and since jump was last pressed */
   private airT = 0;
@@ -224,7 +229,8 @@ export class Player {
     // never came back at all while the key was held.
     if (v.stamina <= WINDED_AT) this.winded = true;
     else if (v.stamina >= WIND_BACK) this.winded = false;
-    this.sprinting = wantsSprint && !this.winded && this.grounded && !v.broken;
+    this.sprintLock = Math.max(0, this.sprintLock - h);
+    this.sprinting = wantsSprint && !this.winded && this.grounded && !v.broken && this.sprintLock <= 0;
 
     const enc = Math.max(0, this.weightKg - 18) * 0.012; // encumbrance
     let speed = this.crouched ? 1.9 : walk ? 1.7 : 4.0;
