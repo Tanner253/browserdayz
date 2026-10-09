@@ -8,6 +8,7 @@ import { audio } from '../core/audio';
 import { TOUCH } from '../core/device';
 import { GAS, breathe, freshLungs, gasDepth, gasEdge, type GasZone } from '../sim/gas';
 import type { Atmosphere } from '../world/atmosphere';
+import { heightAt, type World } from '../world/worldgen';
 
 export interface GasHost {
   /** something is worn on the face that keeps it out */
@@ -23,6 +24,44 @@ export interface GasHost {
 const WISP = { far: 34, near: [1.6, 6] as [number, number], size: [5, 11] as [number, number], alpha: 0.17 };
 /** how much of the daylight, and of the light of the sky, is lost at the eye in the thick of it */
 const DIM = { sun: 0.42, sky: 0.3 };
+/** the warning boards round it: how many, how far outside the rim they stand, and how big each is (across, up, and the height of its post), metres */
+const SIGNS = { n: 12, out: 5, board: [0.86, 0.6] as [number, number], post: 1.95 };
+
+/** the board itself, painted: what is on every one of them */
+function signPaint(): THREE.CanvasTexture {
+  const c = document.createElement('canvas');
+  c.width = 512;
+  c.height = 358;
+  const g = c.getContext('2d')!;
+  g.fillStyle = '#d2ae1c';
+  g.fillRect(0, 0, 512, 358);
+  g.strokeStyle = '#16140f';
+  g.lineWidth = 12;
+  g.strokeRect(14, 14, 484, 330);
+  g.fillStyle = '#16140f';
+  g.textAlign = 'center';
+  g.font = '700 30px Arial, sans-serif';
+  g.fillText('ОПАСНО', 256, 66);
+  g.font = '700 132px "Arial Narrow", Arial, sans-serif';
+  g.fillText('ГАЗЫ', 256, 190);
+  g.fillRect(60, 214, 392, 6);
+  g.font = '700 44px "Arial Narrow", Arial, sans-serif';
+  g.fillText('DANGER · GAS', 256, 268);
+  g.font = '700 28px Arial, sans-serif';
+  g.fillText('NO ENTRY WITHOUT A MASK', 256, 312);
+  // years of weather: streaks run down it, and the paint has gone from the corners
+  let s = 4211;
+  const rnd = () => ((s = (Math.imul(s, 1664525) + 1013904223) | 0) >>> 0) / 4294967296;
+  for (let i = 0; i < 220; i++) {
+    g.fillStyle = `rgba(${(60 + rnd() * 50) | 0}, ${(44 + rnd() * 34) | 0}, 22, ${(rnd() * 0.17).toFixed(3)})`;
+    const w = 2 + rnd() * 9;
+    g.fillRect(rnd() * 512, rnd() * 358, w, w * (1 + rnd() * 16));
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 8;
+  return tex;
+}
 
 export class Gas {
   /** how deep in it the eye is, 0..1 */
@@ -41,6 +80,7 @@ export class Gas {
   private dimmed = 0;
   private clock = 0;
   private env0: number;
+  private ground: (x: number, z: number) => number;
 
   constructor(
     private zone: GasZone | null,
@@ -48,9 +88,11 @@ export class Gas {
     private scene: THREE.Scene,
     private host: GasHost,
     hud: HTMLElement,
-    private ground: (x: number, z: number) => number,
+    world: World,
   ) {
+    this.ground = (x, z) => heightAt(world.heights, x, z);
     this.env0 = scene.environmentIntensity;
+    if (zone) this.signs(zone, world);
     this.veil = document.createElement('div');
     this.veil.className = 'hud-gas';
     this.tag = document.createElement('div');
@@ -102,6 +144,41 @@ export class Gas {
     mesh.renderOrder = 4;
     scene.add(mesh);
     this.mesh = mesh;
+  }
+
+  /**
+   * Boards on posts all round it, a few metres outside the rim and facing out: what is read
+   * by whoever walks up to it from any side. One is left out where a tree, a rock or a wall
+   * stands in its place, or where the ground falls away.
+   */
+  private signs(z: GasZone, world: World) {
+    const wood = new THREE.MeshStandardMaterial({ color: 0x4d3c2a, roughness: 0.92 });
+    const face = new THREE.MeshStandardMaterial({ map: signPaint(), roughness: 0.6, metalness: 0.15 });
+    const back = new THREE.MeshStandardMaterial({ color: 0x6b5a2a, roughness: 0.8, metalness: 0.15 });
+    for (const m of [wood, face, back]) this.atmo.register(m);
+    const [bw, bh] = SIGNS.board;
+    const post = new THREE.BoxGeometry(0.07, SIGNS.post, 0.07), board = new THREE.BoxGeometry(bw, bh, 0.025);
+    const near = (list: { x: number; z: number }[], x: number, zz: number, r: number) => list.some((o) => Math.abs(o.x - x) < r && Math.abs(o.z - zz) < r);
+    for (let k = 0; k < SIGNS.n; k++) {
+      const a = (k / SIGNS.n) * Math.PI * 2 + 0.2;
+      const x = z.x + Math.sin(a) * (z.r + SIGNS.out), zz = z.z + Math.cos(a) * (z.r + SIGNS.out);
+      const y = this.ground(x, zz);
+      if (near(world.trees, x, zz, 1.6) || near(world.rocks, x, zz, 2.2) || near(world.props, x, zz, 1.6) || near(world.buildings, x, zz, 9)) continue;
+      if (Math.abs(this.ground(x + 1, zz) - y) + Math.abs(this.ground(x, zz + 1) - y) > 0.7) continue;
+      const sign = new THREE.Group();
+      const p = new THREE.Mesh(post, wood);
+      p.position.y = SIGNS.post / 2 - 0.25;
+      const b = new THREE.Mesh(board, [back, back, back, back, face, back]);
+      b.position.set(0, SIGNS.post - 0.25 - bh / 2 - 0.04, 0.05);
+      sign.add(p, b);
+      // (out, away from the gas, and none of them quite straight)
+      sign.position.set(x, y, zz);
+      sign.rotation.set(Math.sin(k * 7.3) * 0.035, a + Math.sin(k * 3.1) * 0.12, Math.cos(k * 5.7) * 0.045, 'YXZ');
+      sign.traverse((o) => {
+        o.castShadow = o.receiveShadow = true;
+      });
+      this.scene.add(sign);
+    }
   }
 
   /**

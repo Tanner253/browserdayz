@@ -316,7 +316,7 @@ export class Game {
       hurt: (amount) => this.player.sicken(amount, 'the gas'),
       cough: (hard) => this.weapons.flinch(hard),
       note: (text, kind) => this.hud.note(text, kind),
-    }, this.hud.root, (x, z) => heightAt(world.heights, x, z));
+    }, this.hud.root, world);
     // how many people are in the world, shown before you click Play
     void serverStatus().then((s) => this.hud.setStartOnline(s ? s.players : null, s?.max, s?.queue));
     this.invUI = new InventoryUI(this.inv, {
