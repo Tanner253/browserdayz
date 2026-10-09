@@ -1293,3 +1293,8 @@ body.touch .hud-start, body.touch .rw, body.touch .inv-wrap, body.touch .inv-col
 /* a broken leg, for as long as it is one (under the word about the gas or the fire, which may be up at the same time) */
 .hud-leg-tag { position: absolute; top: 126px; left: 50%; transform: translateX(-50%); padding: 6px 14px 6px 12px; font: 700 13px/1 'Barlow Condensed', 'Bahnschrift', sans-serif; letter-spacing: 0.2em; color: #ffe2d6; background: rgba(60, 16, 10, 0.78); border-left: 3px solid #ff6a4a; opacity: 0; transition: opacity 0.35s; white-space: nowrap; pointer-events: none; }
 .hud-leg-tag.on { opacity: 1; }
+/* the briefing map: the works under its gas */
+.start-map .m-gas circle { fill: rgba(178, 198, 52, 0.2); stroke: rgba(214, 232, 96, 0.85); stroke-width: 3; stroke-dasharray: 9 7; }
+.start-map .m-gas path { fill: #e4f07a; stroke: var(--panel-solid); stroke-width: 3; }
+.start-map .m-gas text { fill: #e4f07a; }
+.start-map .m-gas .m-sub { font-size: 0.62em; letter-spacing: 0.14em; }

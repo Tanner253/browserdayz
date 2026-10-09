@@ -12,7 +12,7 @@ import type { Terrain } from '../world/terrain';
 import { Barrel, type Vegetation } from '../world/vegetation';
 import type { Grass } from '../world/grass';
 import { Door, type Buildings } from '../world/buildings';
-import { PLAY_RADIUS, heightAt, type World } from '../world/worldgen';
+import { PLAY_RADIUS, heightAt, playOutline, type World } from '../world/worldgen';
 import { ITEMS, itemName, TAG_HOLD, TAG_HOLD_MIN, capacityOf, hasMod, makeItem, newUid, tagClock, tagOwner, type ItemInstance, type Slot } from '../sim/items';
 import { PlayerInventory, SLOT_ORDER, type Container } from '../sim/inventory';
 import { Economy, type WorldLoot } from '../sim/economy';
@@ -77,7 +77,7 @@ interface TimedAction {
 }
 
 /** bump when the map's loot points change: spawned loot from older saves is re-rolled */
-const LOOT_REV = 11;
+const LOOT_REV = 12;
 const QUICK_KEYS = ['Digit5', 'Digit6', 'Digit7', 'Digit8'];
 /** what can be held, in the order of the keys 1 to 4 */
 const HAND_SLOTS = ['primary', 'secondary', 'holster', 'melee'] as const;
@@ -456,12 +456,13 @@ export class Game {
     const station = world.buildings.find((b) => b.type === 'police');
     this.hud.setBriefing({
       radius: PLAY_RADIUS,
+      outline: playOutline(),
       spawns: world.spawns,
       centre: town,
       places: [
         { name: town.name, x: town.x, z: town.z, kind: 'town' },
         ...(station ? [{ name: 'Police station', x: station.x, z: station.z, kind: 'police' as const }] : []),
-        ...world.pois.slice(1).map((q) => ({ name: q.name, x: q.x, z: q.z, kind: world.sites.some((st) => st.name === q.name) ? ('site' as const) : ('post' as const) })),
+        ...world.pois.slice(1).map((q) => ({ name: q.name, x: q.x, z: q.z, kind: q.name === GAS.place ? ('gas' as const) : world.sites.some((st) => st.name === q.name) ? ('site' as const) : ('post' as const) })),
       ],
     });
     this.hud.showStart(true);

@@ -3,7 +3,7 @@
 // it, with one exception: whoever carries a tag they took is shown to everyone for a few
 // seconds, every half minute (see ping). M opens it large, with the places named.
 
-import { BUILDING_FOOTPRINT, PLAY_RADIUS, WORLD_RES, WORLD_SIZE, heightAt, type World } from '../world/worldgen';
+import { BUILDING_FOOTPRINT, WORLD_RES, WORLD_SIZE, heightAt, playOutline, type World } from '../world/worldgen';
 import { gasZone, type GasZone } from '../sim/gas';
 
 /** pixels of the drawn map per metre of world */
@@ -115,9 +115,20 @@ export class Minimap {
     g.strokeStyle = 'rgba(240, 220, 160, 0.55)';
     g.lineWidth = 2;
     g.setLineDash([10, 8]);
-    g.beginPath();
-    g.arc(X(0), Y(0), PLAY_RADIUS * SCALE, 0, Math.PI * 2);
-    g.stroke();
+    // (the valley, and the cirque that has been added to it: one line round the two)
+    for (const a of playOutline()) {
+      g.beginPath();
+      g.arc(X(a.x), Y(a.z), a.r * SCALE, a.from, a.to);
+      g.stroke();
+    }
+    g.setLineDash([]);
+    // the chimney and the tanks of the works
+    g.fillStyle = '#8f8a7c';
+    for (const s of world.solids) {
+      g.beginPath();
+      g.arc(X(s.x), Y(s.z), Math.max(1.2, s.r) * SCALE, 0, Math.PI * 2);
+      g.fill();
+    }
     return c;
   }
 

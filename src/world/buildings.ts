@@ -806,6 +806,20 @@ export class Buildings {
       dacha: [['covered_car', 9, -6], ['wooden_crate_01', -7, 5], ['metal_trash_can@0', -6.2, 3.4], ['trashbag', -8, 3]],
       hamlet: [['wooden_crate_01', -6.5, 6], ['wooden_crate_01', -7.6, 6.8], ['metal_trash_can@1', 6.5, 5.2], ['trashbag', 7.6, 5.6], ['old_tyre', 3, 8.5], ['covered_car', 8.5, 9.5], ['stone_fire_pit', -3, -8], ['Barrel_01', -11, -14]],
       depot: [['concrete_road_barrier', -5, 11.5], ['concrete_road_barrier', 0, 12.5], ['concrete_road_barrier', 5, 11.5], ['weapons_case', 5.5, 3.6], ['weapons_case', 6.7, 2], ['Barrel_01', -8, 5.5], ['Barrel_01', -8.9, 6.3], ['old_tyre', -12.5, 7.5], ['covered_car', -4, 8]],
+      // The works (forward is the way in, the track coming up the middle of the yard). Blocks
+      // across the gate with a lorry's width left between them; drums wherever drums were
+      // filled, most of them the blue sort and a few that burn; the army's cases in front of
+      // the office, where they were being loaded when it was left; and what a yard has.
+      works: [
+        ['concrete_road_barrier', -6.5, 74], ['concrete_road_barrier', -10.5, 75], ['concrete_road_barrier', 7.5, 76], ['concrete_road_barrier', 11.5, 77],
+        ['weapons_case', -5.5, -37.5], ['weapons_case', -6.9, -36.2], ['weapons_case', 6.2, -38], ['wooden_military_crate', 8.4, -36.6], ['old_military_crate@0', -9.5, -38.4], ['old_military_crate@1', 10.8, -38.2],
+        ['barrel_03', -22, 3], ['barrel_03', -21, 4.4], ['Barrel_01', -23.3, 4.3], ['barrel_03', -22.4, 15], ['barrel_03', -21.2, 16.2],
+        ['barrel_03', 21.5, 28], ['Barrel_01', 22.7, 29.1], ['barrel_03', 20.9, 30.3], ['barrel_03', 22.2, 41], ['Barrel_01', 21, 42.2],
+        ['barrel_03', -43, -31], ['barrel_03', -41.7, -30.2], ['Barrel_01', -43.4, -29.4], ['barrel_03', 44, -37], ['barrel_03', 45.2, -36],
+        ['wooden_crate_01', 22.5, 1], ['wooden_crate_01', 23.8, 2.2], ['wooden_crate_01', -22, 31], ['wooden_crate_01', -21, 44],
+        ['covered_car', -11, 22], ['covered_car', 12.5, -6], ['covered_car', 14, 50],
+        ['utility_box_01', -25, 24], ['utility_box_01', 25.5, 15], ['metal_trash_can@1', 24.5, -8], ['trashbag', 25.6, -9.2], ['old_tyre', -17, 33], ['old_tyre', 16, 20], ['old_tyre', -14, -26],
+      ],
     };
     for (const st of this.world.sites) {
       const c = Math.cos(st.rot), s = Math.sin(st.rot);

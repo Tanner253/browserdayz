@@ -138,12 +138,38 @@ export class Economy {
   private rng = new RNG(20260930);
   time = 0;
 
+  /**
+   * How many times over each sort of thing is kept, for the places under the gas. Those places
+   * were added to the map (its first expansion), and what lies in them is over and above what
+   * the map held before: without this, a sixth of everything would have moved in under the
+   * gas and the rest of the map gone that much shorter.
+   */
+  private more: Record<string, number> = {};
+
   constructor(
     private points: LootPoint[],
     private events: EconomyEvents,
     /** can this item type physically lie at this loot point? */
     private fits: (id: string, p: LootPoint) => boolean = fitsPoint,
-  ) {}
+  ) {
+    for (const [id, rule] of Object.entries(TYPES)) {
+      let all = 0, old = 0;
+      for (const p of points) {
+        if (p.arms || !p.usage.some((u) => rule.usage.includes(u))) continue;
+        all++;
+        if (!p.usage.includes('Gas')) old++;
+      }
+      this.more[id] = old > 0 ? all / old : 1;
+    }
+  }
+
+  /** how many of a sort the world is kept stocked with, and below how many more are put out */
+  nominal(id: string) {
+    return Math.round(TYPES[id].nominal * (this.more[id] ?? 1));
+  }
+  private least(id: string) {
+    return Math.round(TYPES[id].min * (this.more[id] ?? 1));
+  }
 
   /** Count of a type currently in the world (on the ground). */
   count(id: string) {
@@ -246,7 +272,7 @@ export class Economy {
     while (progress) {
       progress = false;
       for (const id of ids) {
-        if (this.count(id) < TYPES[id].nominal && this.spawnType(id)) progress = true;
+        if (this.count(id) < this.nominal(id) && this.spawnType(id)) progress = true;
       }
     }
   }
@@ -302,11 +328,11 @@ export class Economy {
     this.arm();
     for (const [id, rule] of Object.entries(TYPES)) {
       const n = this.count(id);
-      if (n >= rule.min) continue;
+      if (n >= this.least(id)) continue;
       const last = this.lastRestock[id] ?? -1e9;
       if (this.time - last < rule.restock) continue;
       this.lastRestock[id] = this.time;
-      for (let k = n; k < rule.nominal; k++) if (!this.spawnType(id)) break;
+      for (let k = n, want = this.nominal(id); k < want; k++) if (!this.spawnType(id)) break;
     }
   }
 

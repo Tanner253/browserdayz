@@ -13,6 +13,7 @@ import { buildRoad } from './world/road';
 import { Game } from './game/game';
 import { initRotatePrompt } from './ui/rotate';
 import { gasZone } from './sim/gas';
+import { buildWorks } from './world/works';
 
 // before anything loads: a phone held upright needs a way forward straight away
 initRotatePrompt();
@@ -48,6 +49,7 @@ async function boot() {
   buildings.plan();
   buildings.build(r.scene);
   buildRoad(world, atmo, r.scene);
+  buildWorks(world, atmo, r.scene);
   label.textContent = 'growing forest';
   await frame();
   const veg = new Vegetation(world, atmo);

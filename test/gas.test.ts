@@ -77,18 +77,28 @@ ok('breathed without a mask: a cough at once, a few seconds of grace, then it ki
   assert.ok(t > 12 && t < 25, `dead just inside the rim in ${t.toFixed(1)} s`);
 });
 
-ok('a run in to the buildings and out again, unmasked, is not survived twice', () => {
-  // in from the rim to forty metres from the middle and straight back, at a sprint
+/** in from the rim at a sprint to so many metres from the middle, and straight back out: the health left */
+const dash = (turn: number) => {
   const lungs = freshLungs();
   let health = 100;
-  const speed = 6.2, turn = 40;
+  const speed = 6.2;
   for (let t = 0, d = zone.r; ; t += 1 / 60) {
     const going = t < (zone.r - turn) / speed;
     d += (going ? -speed : speed) / 60;
     if (!going && d >= zone.r) break;
     health -= breathe(lungs, gasDepth(zone, zone.x + d, zone.y + 1.6, zone.z), false, 1 / 60).hurt;
   }
-  assert.ok(health > 5 && health < 70, `left with ${health.toFixed(0)} health`);
+  return health;
+};
+
+ok('unmasked, a dash to the gate and back is survived and no more than that; a run into the yard is not', () => {
+  // the gate posts are the nearest of its buildings to the way in
+  const works = world.pois.find((q) => q.name === GAS.place)!;
+  const gate = Math.max(...world.buildings.filter((b) => b.type === 'guardpost' && Math.hypot(b.x - works.x, b.z - works.z) < works.radius).map((b) => Math.hypot(b.x - works.x, b.z - works.z)));
+  assert.ok(gate > 40 && gate < zone.r, 'no gate to the place');
+  const left = dash(gate);
+  assert.ok(left > 5 && left < 75, `back from the gate with ${left.toFixed(0)} health`);
+  assert.ok(dash(15) <= 0, 'into the middle of the yard and out again, alive');
 });
 
 ok('a mask on the face keeps all of it out, and the gas mask is such a mask', () => {
@@ -141,7 +151,8 @@ ok('what is kept under the gas is marked so, and the masks are kept out of it, i
     assert.equal(gasDepth(zone, l.x, l.y, l.z), 0, 'a gas mask under the gas');
   }
   // and what the gas is worth going into for is there more often than its share of the places would give it
-  const share = under.length / data.lootPoints.filter((q) => q.usage.includes('Military') || q.usage.includes('Police')).length;
+  const kept = data.lootPoints.filter((q) => !q.arms && (q.usage.includes('Military') || q.usage.includes('Police')));
+  const share = kept.filter((q) => q.usage.includes('Gas')).length / kept.length;
   let inGas = 0, all = 0;
   for (let k = 0; k < 30; k++) {
     const e = new Economy(data.lootPoints, { spawn: () => {}, despawn: () => {} });

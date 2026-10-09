@@ -255,7 +255,7 @@ export function buildShots(S: Stage): Shot[] {
   scene.traverse((o) => { if ((o as THREE.Light).isLight) lights.push([o as THREE.Light, (o as THREE.Light).intensity]); });
   // (Since this was first filmed the world has gas of its own, over the same checkpoint: where
   // it has, those shots are filmed in the game's gas as it is, and the film adds none.)
-  const real: { r: number } | null = g.s.atmo.gas ?? null;
+  const real: { x: number; z: number; r: number } | null = g.s.atmo.gas ?? null;
   let gassed = false;
   const gas = (on: boolean, thick = 0.021) => {
     gassed = on;
@@ -828,15 +828,17 @@ export function buildShots(S: Stage): Shot[] {
       return new THREE.Vector3(police.x + lx * co + lz * si, police.floorY + up, police.z - lx * si + lz * co);
     };
     // the way in to the camp: from the village side
-    const toCamp = new THREE.Vector3(camp.x - c.x, 0, camp.z - c.z).normalize();
-    const edge = (back: number, side = 0, up = 0) => P(camp.x - toCamp.x * back + toCamp.z * side, camp.z - toCamp.z * back - toCamp.x * side, up);
+    // (where the gas is: over the works behind the checkpoint, in the game's own; over the checkpoint itself, in the film's)
+    const zone = real ?? camp;
+    const toCamp = real ? new THREE.Vector3(real.x - camp.x, 0, real.z - camp.z).normalize() : new THREE.Vector3(camp.x - c.x, 0, camp.z - c.z).normalize();
+    const edge = (back: number, side = 0, up = 0) => P(zone.x - toCamp.x * back + toCamp.z * side, zone.z - toCamp.z * back - toCamp.x * side, up);
     const lamp = new THREE.PointLight(0xfff0d0, 0, 9, 1.5);
     scene.add(lamp);
     const handLamp = new THREE.DirectionalLight(0xfff0d0, 0);
     g.weapons.vmScene.add(handLamp);
     let walked = 0;
     // where the man stands to look at it (in the game's own gas: far enough in for the camp to be made out, and with a mask on)
-    const STOOD = real ? real.r - 22 : 37;
+    const STOOD = real ? real.r - 24 : 37;
 
     add(1.5, {
       name: 'next-zone',

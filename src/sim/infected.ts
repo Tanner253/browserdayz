@@ -18,7 +18,7 @@ import { BUILDING_FOOTPRINT, heightAt, type World } from '../world/worldgen';
 
 export const INFECTED = {
   /** as many as are ever alive at once, over the whole map */
-  max: 33,
+  max: 39,
   /** what each has to begin with: a rifle round anywhere, a pistol round in the head, three in the chest */
   hp: 90,
   /** how long a body lies there, and how long after that before another turns up about the same place, seconds */
@@ -142,7 +142,9 @@ export interface Home {
 }
 
 // (the outlying places are where somebody new finds a first weapon: one or two there, the crowd in the village)
-const ABOUT: Record<string, number> = { hamlet: 4, depot: 4, post: 3, yard: 2, farm: 2, lodge: 1, dacha: 1 };
+const ABOUT: Record<string, number> = { hamlet: 4, depot: 4, post: 3, yard: 2, farm: 2, lodge: 1, dacha: 1, works: 0 };
+/** how many keep to the works (said apart from the small places: it comes high in the list, so it is never the one that goes short) */
+const AT_WORKS = 6;
 
 /** Where the infected live: the village most of all, the checkpoint, and a few about every outlying place. */
 export function infectedHomes(world: World): Home[] {
@@ -151,6 +153,8 @@ export function infectedHomes(world: World): Home[] {
   if (village) homes.push({ x: village.x, z: village.z, r: Math.max(70, village.radius), n: 13 });
   const camp = world.pois.find((p) => p.name === 'Military Checkpoint');
   if (camp) homes.push({ x: camp.x, z: camp.z, r: 38, n: 5 });
+  const works = world.sites.find((s) => s.kind === 'works');
+  if (works) homes.push({ x: works.x, z: works.z, r: 62, n: AT_WORKS });
   for (const s of world.sites) homes.push({ x: s.x, z: s.z, r: 34, n: ABOUT[s.kind] ?? 1 });
   // (never more than the map is meant to hold: the places furthest down the list go short)
   let left = INFECTED.max;
@@ -172,6 +176,7 @@ export function openGround(world: World, x: number, z: number) {
     if (Math.abs(dx * c - dz * s) < w / 2 + 1.6 && Math.abs(dx * s + dz * c) < d / 2 + 1.6) return false;
   }
   const near = (list: { x: number; z: number }[], r: number) => list.some((t) => Math.abs(t.x - x) < r && Math.abs(t.z - z) < r && Math.hypot(t.x - x, t.z - z) < r);
+  if (world.solids.some((s) => Math.hypot(s.x - x, s.z - z) < s.r + 1.6)) return false;
   return !near(world.trees, 1.8) && !near(world.rocks, 2.2) && !near(world.props, 1.6);
 }
 

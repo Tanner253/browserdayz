@@ -10,6 +10,47 @@ export const WORLD_SIZE = 1024; // metres, square, centred on the origin
 export const WORLD_RES = 513; // height samples per side
 export const CELL = WORLD_SIZE / (WORLD_RES - 1); // 2 m
 export const PLAY_RADIUS = 400;
+/**
+ * The map's first expansion. The valley the map began as is ringed by hills; behind the
+ * Military Checkpoint a cirque has been cut into them, open toward the checkpoint and walled
+ * on every other side, and the Chemical Works stands on its floor. It lies wholly outside the
+ * ring the map used to end at. `floor` is how far out from its middle the ground is level,
+ * `wall` how much further the hillside takes to come back up to where it was, `level` how
+ * high the floor lies over the lowest of the ground on the way in.
+ */
+export const EXPANSION = { name: 'Chemical Works', x: -368, z: 368, floor: 84, wall: 56, level: 12 };
+/** Where the map is played: the valley, and what has been added to it. */
+export const PLAY_AREAS: { x: number; z: number; r: number }[] = [
+  { x: 0, z: 0, r: PLAY_RADIUS },
+  { x: EXPANSION.x, z: EXPANSION.z, r: EXPANSION.floor + EXPANSION.wall },
+];
+/** is this place inside the part of the map that is played in */
+export function inPlay(x: number, z: number, margin = 0): boolean {
+  return PLAY_AREAS.some((a) => Math.hypot(x - a.x, z - a.z) < a.r - margin);
+}
+/**
+ * The line round the played part of the map: for each of its rounds, the arcs of it that are
+ * not inside another (angles as Math.atan2(z, x) gives them, each arc going the positive way
+ * from `from` to `to`).
+ */
+export function playOutline(): { x: number; z: number; r: number; from: number; to: number }[] {
+  const out: { x: number; z: number; r: number; from: number; to: number }[] = [];
+  for (const a of PLAY_AREAS) {
+    let from = 0, to = Math.PI * 2;
+    for (const b of PLAY_AREAS) {
+      if (a === b) continue;
+      const d = Math.hypot(b.x - a.x, b.z - a.z);
+      if (d >= a.r + b.r || d <= Math.abs(a.r - b.r)) continue;
+      // the part of this round that lies inside the other is so far either side of the line between them
+      const toward = Math.atan2(b.z - a.z, b.x - a.x);
+      const half = Math.acos((a.r * a.r + d * d - b.r * b.r) / (2 * a.r * d));
+      from = toward + half;
+      to = toward - half + Math.PI * 2;
+    }
+    out.push({ ...a, from, to });
+  }
+  return out;
+}
 
 export type BuildingType = 'house_small' | 'house_brick' | 'barn' | 'shed' | 'cabin' | 'guardpost' | 'police' | 'clinic' | 'store' | 'barracks' | 'garage' | 'house_two' | 'tower';
 
@@ -43,7 +84,7 @@ export interface BuildingPlot {
 }
 
 /** what stands at an outlying place */
-export type SiteKind = 'lodge' | 'farm' | 'post' | 'yard' | 'dacha' | 'hamlet' | 'depot';
+export type SiteKind = 'lodge' | 'farm' | 'post' | 'yard' | 'dacha' | 'hamlet' | 'depot' | 'works';
 
 /** A small place away from the village: a couple of buildings in a clearing. */
 export interface Site {
@@ -68,6 +109,18 @@ export interface Instance {
   far?: number;
 }
 
+/** Something big standing in the world that is neither a building to go into nor a prop off a shelf: a round thing of masonry or steel. */
+export interface Solid {
+  kind: 'stack' | 'tank';
+  x: number;
+  /** the ground it stands on */
+  y: number;
+  z: number;
+  /** how far out from its middle it reaches, and how high it stands, metres */
+  r: number;
+  h: number;
+}
+
 export interface POI {
   name: string;
   x: number;
@@ -88,6 +141,8 @@ export interface World {
   props: Instance[];
   pois: POI[];
   sites: Site[];
+  /** the chimney and the tanks of the works */
+  solids: Solid[];
   /** default spawn (first of the ring) */
   spawn: { x: number; z: number; yaw: number };
   /** fresh characters start at one of these, out on the edge of the map, facing inward */
@@ -409,6 +464,8 @@ export function generateWorld(seed = WORLD_SEED): World {
     hamlet: [['store', 0, 0, 0], ['house_small', -14.5, 0.5, 0.12], ['house_brick', 16, 0, -0.1], ['barn', -4, -17, 0.2], ['shed', 13, -13.5, -0.4]],
     // the army's: a barracks, a workshop for its vehicles, a post on the way in
     depot: [['barracks', 0, -3, 0], ['garage', -16.5, -1, 0.22], ['guardpost', 13.5, 3.5, -0.3], ['shed', 12.5, -12.5, -0.5]],
+    // (laid out where it is made, at the end: see the first expansion)
+    works: [],
   };
   for (const st of sites) {
     const c = Math.cos(st.rot), sn = Math.sin(st.rot);
@@ -467,10 +524,13 @@ export function generateWorld(seed = WORLD_SEED): World {
   for (const b of buildings) pad(b, 3.2, 2.2);
 
   // --- masks
+  /** the floor of the expansion, once it has been cut (nothing, while the map is made as it first was) */
+  let cleared: { x: number; z: number; r: number } | null = null;
   const forestMask = (x: number, z: number) => {
     let f = n2.fbm(x * 0.0055 + 70, z * 0.0055 - 40, 4) * 0.9 + 0.12 * n3.noise(x * 0.04, z * 0.04);
     const r = Math.hypot(x, z);
     f += 0.35 * smoothstep(260, 420, r); // dense forest on the outer hills hides the map edge
+    if (cleared) f -= 1.1 * (1 - smoothstep(cleared.r - 16, cleared.r + 8, Math.hypot(x - cleared.x, z - cleared.z)));
     f -= 0.9 * (1 - smoothstep(85, 140, Math.hypot(x - VILLAGE.x, z - VILLAGE.z)));
     f -= 0.8 * (1 - smoothstep(35, 60, Math.hypot(x - CAMP.x, z - CAMP.z)));
     f -= 0.8 * (1 - smoothstep(10, 22, Math.hypot(x - CABIN.x, z - CABIN.z)));
@@ -510,6 +570,8 @@ export function generateWorld(seed = WORLD_SEED): World {
       if (insideBuilding(x, z, 1.5 + n3.noise(x * 0.3, z * 0.3))) gravel = Math.max(gravel, 0.9);
       const campD = Math.hypot(x - CAMP.x, z - CAMP.z);
       gravel = Math.max(gravel, (1 - smoothstep(18, 32, campD)) * 0.75);
+      // (the floor of the works: years of lorries, and whatever leaked. Nothing has grown back.)
+      if (cleared) gravel = Math.max(gravel, (1 - smoothstep(cleared.r - 30, cleared.r - 6, Math.hypot(x - cleared.x, z - cleared.z) + 9 * n3.noise(x * 0.05, z * 0.05))) * 0.88);
       for (const st of sites) {
         const d = Math.hypot(x - st.x, z - st.z);
         // trodden bare in the middle, with a short ragged edge: a wide half-and-half band shows
@@ -771,6 +833,167 @@ export function generateWorld(seed = WORLD_SEED): World {
     for (const k of again) paint(k % N, Math.floor(k / N));
   }
 
+  // --- the first expansion: the Chemical Works, in a cirque cut into the hills behind the
+  // checkpoint (see EXPANSION). Laid over everything above, by the same rule as what was
+  // built later: its own dice, nothing that was there before moved or renumbered, and the
+  // ground only touched where it stands and along the track that goes up to it.
+  const solids: Solid[] = [];
+  {
+    const E = EXPANSION;
+    const first = buildings.length;
+    const before = heights.slice();
+    const rng3 = new RNG(seed + 7001);
+    const cell = (x: number, z: number) => idx(clamp(Math.round((x + half) / CELL), 0, N - 1), clamp(Math.round((z + half) / CELL), 0, N - 1));
+    // the way in: from the works toward the checkpoint (the site's "forward"), and what is to the right of that
+    const inl = Math.hypot(CAMP.x - E.x, CAMP.z - E.z);
+    const ux = (CAMP.x - E.x) / inl, uz = (CAMP.z - E.z) / inl;
+    const rot = Math.atan2(ux, uz);
+    const at = (right: number, fwd: number): [number, number] => [E.x + right * Math.cos(rot) + fwd * Math.sin(rot), E.z - right * Math.sin(rot) + fwd * Math.cos(rot)];
+
+    // 1. the cirque: a level floor, and the hillside brought down to it all round. Toward the
+    // checkpoint the hillside is already as low as the floor: that side is the way in.
+    let low = 1e9;
+    for (let d = E.floor; d < inl - 40; d += 4) low = Math.min(low, heightAt(before, E.x + ux * d, E.z + uz * d));
+    const floorY = low + E.level;
+    const R = E.floor + E.wall;
+    for (let iz = Math.max(0, Math.floor((E.z - R + half) / CELL)); iz <= Math.min(N - 1, Math.ceil((E.z + R + half) / CELL)); iz++) {
+      for (let ix = Math.max(0, Math.floor((E.x - R + half) / CELL)); ix <= Math.min(N - 1, Math.ceil((E.x + R + half) / CELL)); ix++) {
+        const x = -half + ix * CELL, z = -half + iz * CELL;
+        const d = Math.hypot(x - E.x, z - E.z);
+        if (d >= R) continue;
+        // (the foot of the wall wanders in and out by a dozen metres: drawn with a compass, it is a crater)
+        const wander = 13 * n2.fbm(x * 0.011 + 9, z * 0.011 - 4, 3) * smoothstep(E.floor - 26, E.floor - 6, d) * (1 - smoothstep(R - 22, R - 4, d));
+        const t = clamp((d + wander - E.floor) / E.wall, 0, 1);
+        // (mostly a straight run up, eased at its foot and its head: eased all the way, the middle of it is a cliff)
+        const w = 1 - (0.3 * smoothstep(0, 1, t) + 0.7 * t);
+        const i = idx(ix, iz);
+        const level = floorY + 0.35 * n3.fbm(x * 0.02, z * 0.02, 3);
+        // a little of the hillside's own shape is left in the wall, so it is not a turned bowl
+        heights[i] = lerp(heights[i], level + (heights[i] - level) * 0.12 * t, w);
+      }
+    }
+
+    // 2. the track up to it from the checkpoint: out of the far side of the checkpoint's
+    // yard, across the dip and up through the mouth, to the middle of the works' own yard
+    const side = (k: number): [number, number] => [-uz * k, ux * k];
+    const leg = inl - 30 - 12;
+    const ctrl: [number, number][] = [0, 0.3, 0.5, 0.68, 1].map((f, k) => {
+      const d = 30 + leg * f, [sx, sz] = side([0, 13, -10, 0, 0][k]);
+      return [CAMP.x - ux * d + sx, CAMP.z - uz * d + sz] as [number, number];
+    });
+    const track = catmullRom(ctrl, 4);
+    const raw = track.map(([x, z]) => heightAt(heights, x, z));
+    const ys = raw.map((_, i) => {
+      let s = 0, c = 0;
+      for (let k = -9; k <= 9; k++) {
+        const w = 1 - Math.abs(k) / 10;
+        s += raw[clamp(i + k, 0, raw.length - 1)] * w;
+        c += w;
+      }
+      return s / c;
+    });
+    const newDist = new Float32Array(N * N).fill(1e9), newH = new Float32Array(N * N);
+    rasterLine(track, ys, 9, newDist, newH);
+    for (let i = 0; i < N * N; i++) {
+      if (newDist[i] >= 9) continue;
+      const x = -half + (i % N) * CELL, z = -half + Math.floor(i / N) * CELL;
+      // (not the checkpoint's own yard, nor the ground a building there stands on)
+      const w = (1 - smoothstep(1.8, 9, newDist[i])) * 0.85 * smoothstep(24, 34, Math.hypot(x - CAMP.x, z - CAMP.z));
+      heights[i] = lerp(heights[i], newH[i], w);
+      if (newDist[i] < trackDist[i]) {
+        trackDist[i] = newDist[i];
+        trackH[i] = newH[i];
+      }
+    }
+
+    // 3. the place itself
+    cleared = { x: E.x, z: E.z, r: E.floor };
+    sites.push({ name: E.name, kind: 'works', x: E.x, z: E.z, rot, later: true });
+    pois.push({ name: E.name, x: E.x, z: E.z, radius: 74 });
+    // the chimney and the tanks: stood first, so that no building is put where one is
+    const stand = (kind: Solid['kind'], right: number, fwd: number, r: number, h: number) => {
+      const [x, z] = at(right, fwd);
+      solids.push({ kind, x, y: heightAt(heights, x, z), z, r, h });
+      blocked.push({ x, z, r: r + 1.5 });
+    };
+    stand('stack', 5, -70, 2.1, 46);
+    stand('tank', -50, -40, 4.4, 6.6);
+    stand('tank', -39, -57, 4.4, 6.6);
+    stand('tank', -60, -24, 3.6, 8.2);
+    stand('tank', 51, -45, 4.4, 6.6);
+    // [type, right, forward, turn, weapons kept]: forward is toward the way in, and a building's own front is turned from that
+    const PLAN: [BuildingType, number, number, number, number][] = [
+      // the office at the back of the yard, its door to it; the guard's block and a tower beside it
+      ['barracks', 0, -46, 0, 2],
+      ['house_two', 25, -43, -0.35, 0],
+      ['tower', -23, -41, 0.5, 1],
+      // down the left of the track: a store, a workshop, a shed
+      ['barn', -31, 37, Math.PI / 2, 0],
+      ['garage', -32, 9, Math.PI / 2, 0],
+      ['shed', -30, -15, 1.25, 0],
+      // down the right of it: a workshop, the works' own sick bay, a shed
+      ['garage', 31, 36, -Math.PI / 2, 0],
+      ['clinic', 33, 7, -Math.PI / 2, 0],
+      ['shed', 31, -19, -1.2, 0],
+      // and the gate: a post either side of the way in
+      ['guardpost', -10, 63, 0, 1],
+      ['guardpost', 11, 66, 0, 1],
+    ];
+    for (const [type, right, fwd, turn, arms] of PLAN) {
+      const [x, z] = at(right, fwd);
+      const [w, d] = BUILDING_FOOTPRINT[type];
+      const r = Math.hypot(w, d) / 2;
+      if (blocked.some((b) => Math.hypot(b.x - x, b.z - z) < b.r + r + 2.5) || newDist[cell(x, z)] < r + 2.5) continue;
+      blocked.push({ x, z, r });
+      buildings.push({ id: `${type}_${buildings.length}`, type, x, z, rot: rot + turn, floorY: 0, seed: Math.floor(rng3.next() * 1e9), ...(arms ? { arms } : {}) });
+    }
+    const added = buildings.slice(first);
+    for (const b of added) seat(b);
+    for (const b of added) pad(b, 3.2, 2.2);
+    for (const s of solids) s.y = heightAt(heights, s.x, s.z);
+
+    // 4. what grew or lay there: nothing on the floor, nothing on the track, nothing left
+    // hanging on a face too steep to stand on; the rest stands on the ground as it now is
+    const inAdded = (x: number, z: number, margin: number) =>
+      added.some((b) => {
+        const [w, d] = BUILDING_FOOTPRINT[b.type];
+        const dx = x - b.x, dz = z - b.z, c = Math.cos(b.rot), s = Math.sin(b.rot);
+        return Math.abs(dx * c - dz * s) < w / 2 + margin && Math.abs(dx * s + dz * c) < d / 2 + margin;
+      });
+    const settle = (list: Instance[], keep: (t: Instance, d: number) => boolean) => {
+      for (let k = list.length - 1; k >= 0; k--) {
+        const t = list[k];
+        const d = Math.hypot(t.x - E.x, t.z - E.z);
+        if (d > R + 2 && newDist[cell(t.x, t.z)] > 12) continue;
+        if (!keep(t, d)) list.splice(k, 1);
+        else t.y += heightAt(heights, t.x, t.z) - heightAt(before, t.x, t.z);
+      }
+    };
+    settle(trees, (t, d) => {
+      if (newDist[cell(t.x, t.z)] < 4 || inAdded(t.x, t.z, 4) || solids.some((s) => Math.hypot(s.x - t.x, s.z - t.z) < s.r + 3)) return false;
+      if (d >= R) return true;
+      if (slopeAt(heights, t.x, t.z) > 1.05) return false;
+      // (the same rule the trees were planted by, with the floor of the works now a clearing in it)
+      const f = forestMask(t.x, t.z);
+      const hv = hash2(Math.round(t.x * 7), Math.round(t.z * 7), seed + 3);
+      if (f > 0.08) return hv <= smoothstep(0.08, 0.3, f) * 0.92;
+      return (f > -0.25 && hv < 0.025) || (f > -0.15 && hv > 0.97);
+    });
+    const loose = (t: Instance, d: number) => newDist[cell(t.x, t.z)] >= 3 && !inAdded(t.x, t.z, 2.5) && d > E.floor + 4 && (d >= R || slopeAt(heights, t.x, t.z) < 1.2);
+    settle(rocks, loose);
+    settle(props, loose);
+
+    // 5. and the ground is painted again wherever any of this reaches
+    const again = new Set<number>();
+    const mark = (cx: number, cz: number, r: number) => {
+      for (let iz = Math.max(0, Math.floor((cz - r + half) / CELL)); iz <= Math.min(N - 1, Math.ceil((cz + r + half) / CELL)); iz++)
+        for (let ix = Math.max(0, Math.floor((cx - r + half) / CELL)); ix <= Math.min(N - 1, Math.ceil((cx + r + half) / CELL)); ix++) again.add(iz * N + ix);
+    };
+    mark(E.x, E.z, R + 6);
+    for (const [x, z] of track) mark(x, z, 13);
+    for (const k of again) paint(k % N, Math.floor(k / N));
+  }
+
   return {
     heights,
     splat,
@@ -782,6 +1005,7 @@ export function generateWorld(seed = WORLD_SEED): World {
     props,
     pois,
     sites,
+    solids,
     spawn,
     spawns,
   };

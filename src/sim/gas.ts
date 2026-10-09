@@ -1,4 +1,5 @@
-// The gas. One place on the map is sunk in it: a low dome of it lies over the place, thickest
+// The gas. One place on the map is sunk in it (the Chemical Works, in the cirque behind the
+// checkpoint: the map's first expansion). A low dome of it lies over the place, thickest
 // at the middle and thinning to nothing at the rim. It is not breathed for long. A gas mask on
 // the face is all that is needed to walk about in it; the infected do not breathe at all.
 //
@@ -8,10 +9,10 @@
 
 export const GAS = {
   /** the place that is sunk in it, by its name on the map */
-  place: 'Military Checkpoint',
+  place: 'Chemical Works',
   /** how far out from the middle of the place it reaches along the ground, and how high it stands over the middle, metres */
-  radius: 64,
-  height: 28,
+  radius: 96,
+  height: 36,
   /** how much of what is seen through it is lost to each metre of it, at its thickest */
   thick: 0.04,
   /** how deep in (0 at the rim, 1 at the middle) it is thick enough to be breathed */

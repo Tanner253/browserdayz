@@ -413,7 +413,7 @@ export class HUD {
    * The briefing map, drawn from the world itself: where fresh characters start, where
    * the landmarks are, and which way the loot gets better.
    */
-  setBriefing(d: { radius: number; spawns: { x: number; z: number }[]; centre: { x: number; z: number }; places: { name: string; x: number; z: number; kind: 'town' | 'police' | 'post' | 'site' }[] }) {
+  setBriefing(d: { radius: number; outline: { x: number; z: number; r: number; from: number; to: number }[]; spawns: { x: number; z: number }[]; centre: { x: number; z: number }; places: { name: string; x: number; z: number; kind: 'town' | 'police' | 'post' | 'site' | 'gas' }[] }) {
     const n = (v: number) => v.toFixed(0);
     const c = d.centre;
     const flows = d.spawns
@@ -430,6 +430,8 @@ export class HUD {
       .map((p) => {
         // the outlying places are many and small: a mark each, no name (the name shows when you get there)
         if (p.kind === 'site') return `<g class="m-place m-site" transform="translate(${n(p.x)} ${n(p.z)})"><title>${p.name}</title><rect x="-11" y="-11" width="22" height="22" transform="rotate(45)"/></g>`;
+        // the works, under its gas: a hazard mark, and said in words (nobody should walk up to it finding out)
+        if (p.kind === 'gas') return `<g class="m-place m-gas" transform="translate(${n(p.x)} ${n(p.z)})"><circle r="62"/><path d="M0-17L15 10H-15Z"/><text x="-84" y="-74" text-anchor="start">${p.name}</text><text class="m-sub" y="40" text-anchor="middle">GAS · MASK NEEDED</text></g>`;
         const mark = p.kind === 'police' ? `<path d="M0-13L11-7V4C11 11 0 15 0 15S-11 11-11 4V-7Z"/>` : p.kind === 'town' ? '' : `<rect x="-8" y="-8" width="16" height="16"/>`;
         // labels step away from the middle so they never sit on top of each other
         const below = p.kind === 'town';
@@ -446,7 +448,12 @@ export class HUD {
         <circle cx="${n(c.x)}" cy="${n(c.z)}" r="${n(R * 0.72)}" fill="url(#m-heat)"/>
         <circle class="m-tier" cx="${n(c.x)}" cy="${n(c.z)}" r="${n(R * 0.36)}"/>
         <circle class="m-tier" cx="${n(c.x)}" cy="${n(c.z)}" r="${n(R * 0.68)}"/>
-        <circle class="m-edge" cx="0" cy="0" r="${n(R)}"/>
+        <path class="m-edge" d="${d.outline
+          .map((a, i) => {
+            const at = (t: number) => `${n(a.x + Math.cos(t) * a.r)} ${n(a.z + Math.sin(t) * a.r)}`;
+            return `${i ? 'L' : 'M'}${at(a.from)}A${n(a.r)} ${n(a.r)} 0 ${a.to - a.from > Math.PI ? 1 : 0} 1 ${at(a.to)}`;
+          })
+          .join('')}Z"/>
         ${flows}${spawns}${places}
       </svg>
       <figcaption><span class="lg-spawn"></span>start<span class="lg-site"></span>weapon here<span class="lg-loot"></span>better loot</figcaption>`;
