@@ -922,6 +922,21 @@ export class Buildings {
           }
           skirt(L);
         }
+        {
+          // a board along the foot of the wall indoors (on both faces of a wall between two rooms), broken at the doors
+          let from = 0;
+          const board = (to: number) => {
+            if (to - from < 0.08) return;
+            addBox('trim', from, to, 0, 0.085, -T / 2 - 0.014, -T / 2, F, false);
+            if (wd.side === 'inner') addBox('trim', from, to, 0, 0.085, T / 2, T / 2 + 0.014, F, false);
+          };
+          for (const o of ops) {
+            if (o.kind === 'window') continue;
+            board(o.a);
+            from = o.b;
+          }
+          board(L);
+        }
         const layers: [MatKey, number, number][] = [
           [wd.int, -T / 2, 0],
           [wd.ext, 0, T / 2],
@@ -1272,6 +1287,25 @@ export class Buildings {
       for (const s of [-1, 1]) {
         box('planks', -E, E, y, y + 0.14, s * E - 0.06, s * E + 0.06, false);
         box('planks', s * E - 0.06, s * E + 0.06, y, y + 0.14, -E, E, false);
+      }
+    }
+    // braces: a cross of boards between the legs, under the landing on three sides and above it on all four
+    const brace = (xa: number, za: number, xb: number, zb: number, ya: number, yb: number) => {
+      const flat = Math.hypot(xb - xa, zb - za), len = Math.hypot(flat, yb - ya);
+      const R = B.clone()
+        .multiply(new THREE.Matrix4().makeTranslation(xa, ya, za))
+        .multiply(new THREE.Matrix4().makeRotationY(Math.atan2(xb - xa, zb - za)))
+        .multiply(new THREE.Matrix4().makeRotationX(-Math.atan2(yb - ya, flat)));
+      this.push('planks', boxGeo(-0.02, 0.02, -0.06, 0.06, 0, len, this.tile('planks'), R));
+    };
+    for (const [y0, y1, front] of [[0.15, MID - 0.3, false], [MID + 0.1, TOP - 0.45, true]] as [number, number, boolean][]) {
+      for (const s of [-1, 1]) {
+        brace(s * E, -E, s * E, E, y0, y1);
+        brace(s * E, E, s * E, -E, y0, y1);
+        if (s < 0 || front) {
+          brace(-E, s * E, E, s * E, y0, y1);
+          brace(E, s * E, -E, s * E, y0, y1);
+        }
       }
     }
     // up one side to the landing across the back, and up the other to the platform
