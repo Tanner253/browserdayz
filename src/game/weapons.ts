@@ -263,6 +263,12 @@ type Stroke = { at: number; pitch: number; yaw: number; by: [number, number, num
 /** how a kind of thing is held, how it is put up to stop a blow, the blows struck with it one after another, where the elbow rests, and whether it takes both hands */
 interface MeleeStyle {
   idle: Stance;
+  /**
+   * Where it is carried when nothing is being done with it, if that is not where it is held
+   * to strike from (a bat lies back on the shoulder). It is brought from there to `idle` as a
+   * blow begins, and laid back there after: the blows themselves are all said from `idle`.
+   */
+  rest?: Stance;
   guard: Stance;
   strokes: Stroke[];
   elbow: [number, number, number];
@@ -318,6 +324,8 @@ const MELEE_STYLE: Record<string, MeleeStyle> = {
   },
   bat: {
     idle: { p: [0.13, -0.15, -0.4], tip: [-0.42, 0.84, -0.34], edge: [-0.3, -0.45, -0.84] },
+    // (carried, it lies back over the right shoulder: up the right of the picture and out of the top of it)
+    rest: { p: [0.12, -0.13, -0.42], tip: [0.2, 0.86, 0.42], edge: [-0.3, -0.45, -0.84] },
     guard: { p: [0.21, -0.07, -0.4], tip: [-0.97, 0.2, -0.1], edge: [0.05, -0.1, -1] },
     strokes: [CUT, BACK],
     elbow: [0.34, -0.36, -0.18],
@@ -465,6 +473,9 @@ export class Weapons {
   // bare hands: fists come up to punch (LMB) or guard (RMB) and drop again after a moment
   private fistAnchor = new THREE.Object3D();
   private guardT = 0;
+  /** how far the fists on something carried at rest (see `rest` in MeleeStyle) have gone to where a blow is struck from, 0..1, and how far it is itself still laid back */
+  private readyT = 0;
+  private cockT = 1;
   private guardHold = 0;
   /** the guard button is down, with the fists or something to strike with in the hands */
   private guardHeld = false;
@@ -639,7 +650,7 @@ export class Weapons {
         grips: {
           // (the wrist stands off to the right of the handle and behind it: the palm is what is laid on it)
           // (a fist round the handle: the thumb comes over the fingers, not out along the handle)
-          right: { pos: rightAt.add(new THREE.Vector3(MELEE.wrist[0], MELEE.wrist[1], MELEE.wrist[2])), fingers: new THREE.Vector3(-0.2, -0.3, -1), palm: new THREE.Vector3(-1, 0, 0), curl: MELEE.curl, thumb: 0.9, tuck: 0.9 },
+          right: { pos: rightAt.add(new THREE.Vector3(MELEE.wrist[0], MELEE.wrist[1], MELEE.wrist[2])), fingers: new THREE.Vector3(-0.2, -0.3, -1), palm: new THREE.Vector3(-1, 0, 0), curl: MELEE.curl, thumb: 0.9, tuck: 0.9, shoulder: !!style.rest },
           left: style.two ? { pos: leftAt.add(new THREE.Vector3(-MELEE.wrist[0], MELEE.wrist[1], MELEE.wrist[2])), fingers: new THREE.Vector3(0.2, -0.3, -1), palm: new THREE.Vector3(1, 0, 0), curl: MELEE.curl, thumb: 0.9, tuck: 0.9 } : null,
         },
         // high enough that the fist on the handle is in the picture, not only the head
@@ -1840,6 +1851,22 @@ export class Weapons {
       const swing = turned(round0 + yaw, up0 + pitch, _mq2).multiply(turned(round0, up0, _mq3).invert());
       pos.copy(fore.applyQuaternion(swing)).add(elbow);
       quat.premultiply(swing);
+    }
+    // Carried, it lies where its style rests it. For a blow the fists go at once to where it is
+    // struck from; what is in them stays laid back while the arms are drawn up, and comes over
+    // the top as they start down (the first blow of a run: one that comes back the other way
+    // has it to hand before it is drawn across). It is laid back again as the arms come home.
+    if (st.rest) {
+      const swung = a && a.name === 'swing' ? Math.min(1, a.t / a.dur) : -1;
+      this.readyT += ((swung >= 0 ? 1 : 0) - this.readyT) * (1 - Math.exp(-(swung >= 0 ? 24 : 7) * dt));
+      if (swung < 0) this.cockT += (1 - this.cockT) * (1 - Math.exp(-7 * dt));
+      else if (swung < 0.5) this.cockT = Math.min(this.cockT, 1 - ((a!.data?.stroke ?? 0) % st.strokes.length === 0 ? THREE.MathUtils.smoothstep(swung, 0.1, 0.34) : THREE.MathUtils.smoothstep(swung, 0, 0.12)));
+      else this.cockT = Math.max(this.cockT, THREE.MathUtils.smoothstep(swung, 0.66, 1));
+      if (this.readyT < 0.999) pos.lerp(_mv.set(...st.rest.p), 1 - this.readyT);
+      if (this.cockT > 0.001) quat.slerp(stanceQuat(st.rest, _mq2), this.cockT);
+    } else {
+      this.readyT = 0;
+      this.cockT = 1;
     }
     // on guard it is put across in front, whatever the arm was doing
     if (g > 0.001) {

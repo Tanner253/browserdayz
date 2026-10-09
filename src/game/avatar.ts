@@ -188,6 +188,18 @@ const LAID: [RegExp, number][] = [
 /** how far the middle of the thumb lies from the middle of the finger it is laid against, metres */
 const THUMB_BESIDE = 0.02;
 
+/**
+ * A bat carried on the shoulder: where the right wrist is from the head (ahead of it, above it,
+ * to its right, metres), and which way the fingers and the palm of that hand are turned (the
+ * same three: ahead, up, right).
+ */
+const SHOULDER = {
+  at: [0.2, -0.42, 0.21] as [number, number, number],
+  fingers: [0.93, 0.36, 0] as [number, number, number],
+  // (turned a little up as well as in: the bat leans out over the shoulder, clear of the ear)
+  palm: [0, 0.14, -1] as [number, number, number],
+};
+
 interface ArmRig {
   arm: THREE.Bone;
   fore: THREE.Bone;
@@ -313,7 +325,9 @@ export class Avatar {
   private heldPivot = new THREE.Group();
   private held: { obj: THREE.Object3D; grips: Grips; long: boolean; base: THREE.Quaternion } | null = null;
   /** a one-handed weapon in the right fist */
-  private inHand: { obj: THREE.Object3D; curl: [number, number, number, number] } | null = null;
+  private inHand: { obj: THREE.Object3D; curl: [number, number, number, number]; shoulder: boolean } | null = null;
+  /** how far what is in the fist has been laid back on the shoulder (see `shoulder` in HandGrip), 0..1 */
+  private shoulderT = 0;
   /** seconds into a swing of the right arm (-1 = not swinging) */
   private swingT = -1;
   // bare hands: seconds into a punch (-1 = none) and whose it is, how long the fists stay up, how far up they are
@@ -632,7 +646,7 @@ export class Avatar {
       fist.position.copy(P).applyQuaternion(fist.quaternion).multiplyScalar(-k);
       fist.add(obj);
       r.hand.add(fist);
-      this.inHand = { obj: fist, curl: g.curl };
+      this.inHand = { obj: fist, curl: g.curl, shoulder: !!g.shoulder };
       return;
     }
     this.heldPivot.add(obj);
@@ -1353,6 +1367,24 @@ export class Avatar {
       if (this.inHand) {
         r.hand.updateWorldMatrix(true, false);
         this.curl(r, this.inHand.curl, r.hand.getWorldQuaternion(_qa));
+      }
+    }
+
+    // --- a bat, carried: laid back over the right shoulder, the fist on it in front of the chest
+    {
+      const laid = !!this.inHand?.shoulder && !dead && !using && this.strikeT < 0 && this.swingT < 0 && this.fistsT < 0.02;
+      this.shoulderT += ((laid ? 1 : 0) - this.shoulderT) * ease(laid ? 6 : 14);
+      if (this.shoulderT > 0.02 && this.inHand && this.armR && this.neck.length) {
+        this.root.updateMatrixWorld(true);
+        const aimQ = _aimQ.setFromAxisAngle(UP, this.yaw);
+        const fwd = _fwd.set(0, 0, -1).applyQuaternion(aimQ);
+        _right.set(1, 0, 0).applyQuaternion(aimQ);
+        const head = this.neck[this.neck.length - 1].getWorldPosition(_head);
+        const dirOf = (f: number, u: number, r: number) => new THREE.Vector3().addScaledVector(fwd, f).addScaledVector(UP, u).addScaledVector(_right, r);
+        // (the knuckles forward and a little up, the palm in toward the chest: what is in the fist
+        // stands out of the thumb's side of it, up and back, and comes down on the shoulder)
+        const to = new THREE.Vector3().copy(head).addScaledVector(fwd, SHOULDER.at[0]).addScaledVector(UP, SHOULDER.at[1]).addScaledVector(_right, SHOULDER.at[2]);
+        this.reach(this.armR, to, dirOf(...SHOULDER.fingers), dirOf(...SHOULDER.palm), this.inHand.curl, aimQ, this.shoulderT);
       }
     }
 
