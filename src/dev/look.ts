@@ -8,6 +8,7 @@
 
 import * as THREE from 'three';
 import type { Game } from '../game/game';
+import { heightAt } from '../world/worldgen';
 
 type Any = Record<string, any>;
 
@@ -136,6 +137,102 @@ export function installLook(g: Game, T: { freeze(on?: boolean): void }) {
         return scene;
       });
       return snap(name);
+    },
+    /**
+     * A movement as a strip of pictures: the game is stepped `stepMs` between each of `n`,
+     * and each is taken from where `at` says for that moment ([x, y, z of what is looked at,
+     * round, up, how far, field of view]). `before(k)` runs ahead of picture k (to start
+     * something on a given frame).
+     */
+    async film(name: string, n: number, stepMs: number, at: (k: number) => [number, number, number, number, number, number, number?], before?: (k: number) => void, tile: [number, number] = [300, 380]) {
+      const cols = Math.min(n, 6), rows = Math.ceil(n / cols);
+      const [tw, th] = tile;
+      const strip = document.createElement('canvas');
+      strip.width = cols * tw;
+      strip.height = rows * th;
+      const ctx = strip.getContext('2d')!;
+      const pr = R.getPixelRatio();
+      for (let k = 0; k < n; k++) {
+        before?.(k);
+        if (stepMs > 0) D.step(stepMs);
+        scene.updateMatrixWorld(true);
+        const [x, y, z, az, el, dist, fov] = at(k);
+        cam.up.set(0, 1, 0);
+        cam.position.set(x + Math.sin(az) * Math.cos(el) * dist, y + Math.sin(el) * dist, z + Math.cos(az) * Math.cos(el) * dist);
+        cam.lookAt(x, y, z);
+        cam.fov = fov ?? 30;
+        cam.aspect = tw / th;
+        cam.updateProjectionMatrix();
+        cam.updateMatrixWorld();
+        const size = R.getSize(new THREE.Vector2());
+        R.setRenderTarget(null);
+        R.setScissorTest(true);
+        R.setViewport(0, 0, tw, th);
+        R.setScissor(0, 0, tw, th);
+        R.setClearColor(new THREE.Color(0x808080), 1);
+        R.clear();
+        R.render(scene, cam);
+        R.setScissorTest(false);
+        R.setViewport(0, 0, size.x, size.y);
+        ctx.drawImage(R.domElement, 0, R.domElement.height - th * pr, tw * pr, th * pr, (k % cols) * tw, Math.floor(k / cols) * th, tw, th);
+      }
+      const bin = atob(strip.toDataURL('image/jpeg', 0.9).split(',')[1]);
+      const buf = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+      await fetch(`http://127.0.0.1:5199/save?name=${name}`, { method: 'POST', body: buf });
+      return name;
+    },
+    /**
+     * One of the infected this game moves, stood on open ground at (x, z) facing `yaw`, with
+     * the director told where it is. `senses` false leaves it blind and deaf (to film it at
+     * rest with the player standing by).
+     */
+    infectedAt(x: number, z: number, yaw: number, senses = true, nth = 0): Any | null {
+      const b = [...anyG.horde.all.values()].filter((q: Any) => q.ready && !q.dead && q.mine)[nth] as Any;
+      if (!b) return null;
+      b.pos.set(x, heightAt(g.s.world.heights, x, z), z);
+      b.fallTo = b.pos.y;
+      b.home.copy(b.pos);
+      const body = anyG.horde.director?.bodies.get(b.i);
+      if (body) {
+        body.s[0] = b.pos.x;
+        body.s[1] = b.pos.y;
+        body.s[2] = b.pos.z;
+        body.heard = anyG.last;
+      }
+      b.mode = 0;
+      b.after = 0;
+      b.waitT = 99;
+      b.yaw = yaw;
+      b._think ??= b.think;
+      b.think = senses ? b._think : () => {};
+      return b;
+    },
+    /**
+     * The infected as four strips: standing, drifting, running at the player, and striking.
+     * (Playing alone, with the player stood at (x, z) on open ground.)
+     */
+    async infected(name: string, x = 20, z = 14) {
+      const T2 = T as unknown as Any;
+      T2.revive();
+      T2.tp(x, z, 0);
+      let b = D.infectedAt(x + 14, z, 1.2, false) as Any;
+      if (!b) return 'none of them is this game\'s yet';
+      D.step(1500);
+      const mid = () => [b.pos.x, b.pos.y + 0.95, b.pos.z] as [number, number, number];
+      await D.film(`${name}_idle`, 6, 450, (k) => [...mid(), b.yaw + Math.PI + (k < 3 ? 0.5 : -1.57), 0.08, 3.4, 34]);
+      b.goal.set(b.pos.x - 12, 0, b.pos.z);
+      b.mode = 1;
+      b.waitT = 14;
+      D.step(900);
+      await D.film(`${name}_wander`, 12, 180, (k) => [...mid(), b.yaw + (k < 6 ? Math.PI / 2 : Math.PI + 0.4), 0.05, 3.6, 34]);
+      b = D.infectedAt(x + 20, z, Math.PI / 2, true) as Any;
+      D.step(700);
+      await D.film(`${name}_run`, 6, 110, () => [...mid(), b.yaw + Math.PI / 2, 0.05, 3.6, 34]);
+      for (let k = 0; k < 200 && b.mode !== 4; k++) D.step(50);
+      await D.film(`${name}_claw`, 12, 85, () => [b.pos.x, b.pos.y + 1.1, b.pos.z, b.yaw + Math.PI + 0.75, 0.1, 2.9, 34]);
+      await D.film(`${name}_hands`, 3, 200, (k) => [b.pos.x, b.pos.y + 1.15, b.pos.z, b.yaw + Math.PI + [0.3, -0.5, 1.2][k], 0.15, 1.5, 34]);
+      return { mode: b.mode, hp: Math.round(g.player.vitals.health) };
     },
     /** every bone of that name in the world, with where it is (to point `world` at a hand or a head) */
     bones(name: string) {

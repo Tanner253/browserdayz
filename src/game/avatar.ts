@@ -162,6 +162,8 @@ interface ArmRig {
   fingersLocal: THREE.Vector3;
   palmLocal: THREE.Vector3;
   fingers: THREE.Bone[][];
+  /** how each joint of each finger is turned on an open hand (the body at rest) */
+  open: THREE.Quaternion[][];
   /** from its root out; the last is only the tip */
   thumb: THREE.Bone[];
   pole: THREE.Vector3;
@@ -476,7 +478,7 @@ export class Avatar {
     if (side === 'l') palmW.negate();
     const fingers = ['index', 'middle', 'ring', 'pinky'].map((f) => [1, 2, 3].map((i) => B(`${f}_0${i}`)).filter((b): b is THREE.Bone => !!b));
     const thumb = ['thumb_01', 'thumb_02', 'thumb_03', 'thumb_04_leaf'].map(B).filter((b): b is THREE.Bone => !!b);
-    return { arm, fore, hand, la: pa.distanceTo(pf), lb: pf.distanceTo(ph), fingersLocal: fingersW.applyQuaternion(hq), palmLocal: palmW.applyQuaternion(hq), fingers, thumb, pole: pole.normalize() };
+    return { arm, fore, hand, la: pa.distanceTo(pf), lb: pf.distanceTo(ph), fingersLocal: fingersW.applyQuaternion(hq), palmLocal: palmW.applyQuaternion(hq), fingers, open: fingers.map((chain) => chain.map((b) => b.quaternion.clone())), thumb, pole: pole.normalize() };
   }
 
   /** Puts a copy of the shouldered weapon on the back. */
@@ -766,15 +768,32 @@ export class Avatar {
     const fwd = _fwd.set(0, 0, -1).applyQuaternion(aimQ);
     _right.set(1, 0, 0).applyQuaternion(aimQ);
     const side = s.seed % 2 < 1 ? 1 : -1;
-    const lurch = Math.sin(t * 1.9) * 0.05;
+    const slack = 1 - s.roused;
+    // At a walk it limps: once a stride the hips roll over the bad leg and the back goes with them.
+    const going = THREE.MathUtils.clamp(this.speed / 0.5, 0, 1) * slack;
+    const limp = Math.sin(this.phase * Math.PI * 2) * going;
+    // Standing it is never still: a slow sway, and every few seconds something goes through it.
+    const sway = Math.sin(t * 0.83) * 0.035 + Math.sin(t * 1.9) * 0.02;
+    const jerk = Math.pow(Math.max(0, Math.sin(t * 0.61 + s.seed)), 40) * Math.sin(t * 31) * 0.1;
+    const pelvis = this.joints.pelvis;
+    if (pelvis) {
+      this.turn(pelvis, fwd, side * (0.05 + limp * 0.12));
+      this.turn(pelvis, UP, side * 0.1 * slack + limp * 0.09);
+    }
     // (about its right, a turn the positive way tips the body back: forward is the other)
-    for (const b of this.spine) this.turn(b, _right, -(0.085 + 0.035 * s.roused) + lurch * 0.3);
-    if (this.spine[1]) this.turn(this.spine[1], fwd, side * 0.07 + lurch);
+    for (const b of this.spine) this.turn(b, _right, -(0.1 + 0.03 * s.roused + 0.03 * going) + sway * 0.4);
+    if (this.spine[1]) this.turn(this.spine[1], fwd, side * 0.08 - limp * 0.08 + sway + jerk);
     const head = this.neck[this.neck.length - 1];
     if (head) {
-      this.turn(head, fwd, side * (0.3 - 0.12 * s.roused) + Math.sin(t * 0.7) * 0.08);
-      this.turn(head, _right, 0.2 * s.roused - 0.1);
+      this.turn(head, fwd, side * (0.32 - 0.14 * s.roused) + Math.sin(t * 0.7) * 0.08 + jerk * 2);
+      this.turn(head, _right, 0.22 * s.roused - 0.12);
     }
+    // The hands are not fists: the fingers hang half closed, and are hooked when it is after
+    // somebody. (Whatever the movement playing has done with them is put aside first.)
+    for (const r of [this.armR, this.armL]) r?.fingers.forEach((chain, f) => chain.forEach((b, j) => b.quaternion.copy(r.open[f][j])));
+    // one arm hangs, the other is carried bent and jumps when the rest of it does
+    const carried = side > 0 ? this.armL : this.armR;
+    if (carried && slack > 0.02) this.turn(carried.fore, _right, (0.5 + jerk * 3) * slack);
     let strike = 0;
     if (s.claw >= 0) {
       s.claw += dt;
@@ -784,7 +803,10 @@ export class Avatar {
       else strike = k < 0.3 ? -Math.sin((k / 0.3) * Math.PI) * 0.5 : THREE.MathUtils.smoothstep(k, 0.3, 0.46) * (1 - THREE.MathUtils.smootherstep(k, 0.62, 1));
     }
     const w = Math.max(s.roused * 0.9, Math.abs(strike));
-    if (w < 0.02 || !this.armR || !this.armL || !head) return;
+    if (w < 0.02 || !this.armR || !this.armL || !head) {
+      for (const r of [this.armR, this.armL]) if (r) this.curl(r, [0.5, 0.58, 0.66, 0.74], r.hand.getWorldQuaternion(_qa));
+      return;
+    }
     this.root.updateMatrixWorld(true);
     const from = head.getWorldPosition(_head);
     const at = (f: number, u: number, r: number) => new THREE.Vector3().copy(from).addScaledVector(fwd, f).addScaledVector(UP, u).addScaledVector(_right, r);
@@ -797,7 +819,7 @@ export class Avatar {
       const to = strike < 0 ? out.lerp(at(0.24, 0.16, sd * 0.24), -strike * 2) : out.lerp(at(0.5, -0.5, sd * 0.1), strike);
       const F = dirOf(1, -0.25 - Math.max(0, strike) * 0.8, -sd * 0.1);
       const N = dirOf(-0.2, -1, -sd * 0.15);
-      this.reach(sd > 0 ? this.armR : this.armL, to, F, N, [0.75, 0.85, 0.95, 1.05], aimQ, w);
+      this.reach(sd > 0 ? this.armR : this.armL, to, F, N, [0.5, 0.58, 0.66, 0.74], aimQ, w);
     }
   }
 

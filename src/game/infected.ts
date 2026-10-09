@@ -130,6 +130,11 @@ export class Infected implements Damageable {
     const r = (n: number) => ((this.i * 9301 + n * 49297) % 233280) / 233280;
     this.avatar.wound(_head.clone().addScaledVector(fwd, 0.1).addScaledVector(UP, -0.09), fwd.clone().negate(), 0.075);
     this.avatar.wound(_neck.clone().lerp(_pelvis, 0.3 + r(1) * 0.4).addScaledVector(fwd, 0.14), fwd.clone().negate(), 0.1 + r(2) * 0.08);
+    // and on its hands
+    for (const n of ['hand_r', 'hand_l']) {
+      const h = this.avatar.root.getObjectByName(n);
+      if (h && r(n.length + (n.endsWith('r') ? 5 : 6)) < 0.75) this.avatar.wound(h.getWorldPosition(new THREE.Vector3()), fwd, 0.09);
+    }
     if (r(3) < 0.6) this.avatar.wound(_pelvis.clone().addScaledVector(fwd, 0.1).add(new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw)).multiplyScalar((r(4) - 0.5) * 0.4)), fwd.clone().negate(), 0.09);
   }
 
@@ -145,6 +150,11 @@ export class Infected implements Damageable {
     this.mine = mine;
     this.snaps.length = 0;
     this.strikeT = -1;
+    if (!mine && !this.dead) {
+      // nobody is moving it for the moment: it stands where it is, slack, not frozen in mid-stride with its arms out
+      this.mode = I_IDLE;
+      this.after = 0;
+    }
     if (mine) {
       // it stays about where it was found
       this.home.copy(this.pos);

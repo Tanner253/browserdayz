@@ -27,7 +27,7 @@ export const INFECTED = {
   /** none turns up within this of somebody living, metres */
   clear: 75,
   /** metres a second: drifting about, going to see what a noise was, and after somebody (a jog is 4, a sprint 6.2) */
-  wander: 0.85,
+  wander: 0.7,
   look: 2.4,
   chase: 5.0,
   /** how far they see a standing person in front of them, a crouched one, and anybody at all whichever way they face */
@@ -154,9 +154,10 @@ export class Director {
     });
   }
 
-  private stand(home: number, now: number): Body | null {
+  /** one more about a home, somewhere nobody living is near enough to watch it appear (null: no such spot this time) */
+  private stand(home: number, now: number, living: Somebody[]): Body | null {
     const at = this.spot(this.homes[home]);
-    if (!at) return null;
+    if (!at || living.some((p) => Math.hypot(p.x - at.x, p.z - at.z) < INFECTED.clear)) return null;
     const b: Body = { i: this.next++, s: [at.x, at.y, at.z, this.rnd() * Math.PI * 2, I_IDLE, 0], hp: INFECTED.hp, own: null, home, diedAt: 0, heard: now, struck: 0 };
     this.bodies.set(b.i, b);
     return b;
@@ -175,12 +176,12 @@ export class Director {
         this.due.push({ home: b.home, at: now + INFECTED.respawn * 1000 });
       }
     }
-    // the ones that are owed, where nobody is standing to watch them appear
+    // The ones that are owed. (It is the spot that has to be clear of the living, not the
+    // whole place: somebody is nearly always somewhere in the village, and it would never
+    // fill again.)
     for (const d of [...this.due]) {
       if (now < d.at) continue;
-      const h = this.homes[d.home];
-      if (living.some((p) => Math.hypot(p.x - h.x, p.z - h.z) < h.r + INFECTED.clear)) continue;
-      const b = this.stand(d.home, now);
+      const b = this.stand(d.home, now, living);
       if (!b) continue;
       this.due.splice(this.due.indexOf(d), 1);
       turn.added.push(b);
