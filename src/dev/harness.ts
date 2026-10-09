@@ -75,6 +75,10 @@ export function installHarness(g: Game) {
         void pump();
       });
     },
+    /** hold the hour at a share of the day (0 first light, 0.3 day, 0.72 dusk, 0.85 night), or let the clock run again (null) */
+    hour(p: number | null) {
+      g.hourHeld = p;
+    },
     /** stop the world (the last rendered frame stays on screen for a screenshot) */
     freeze(on = true) {
       frozen = on;

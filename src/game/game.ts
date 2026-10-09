@@ -51,6 +51,7 @@ import { TouchControls } from '../ui/touch';
 import { REWARDS_UI, RewardsModal, addCashedTag, cashedTags, walletAddress } from '../ui/rewards';
 import { Gas } from './gas';
 import { GAS, underGas } from '../sim/gas';
+import { DAY, hourAt, phaseOf } from '../sim/daynight';
 import { FIRE, Hearths } from '../sim/fires';
 import { Fires } from './fires';
 import { breaksOnHit } from '../sim/injury';
@@ -737,6 +738,8 @@ export class Game {
 
   private async enterOnline(w: Extract<S2C, { t: 'welcome' }>) {
     const { world, buildings } = this.s;
+    // the server's hour, from which this game's clock runs on
+    if (typeof w.hour === 'number') this.hourBase = { phase: w.hour, at: performance.now() };
     for (const l of w.loot) this.economy.inject(l);
     for (const [i, open, swing] of w.doors) buildings.doors[i]?.setOpen(open, swing);
     for (const s of w.stashes) await this.addRemoteStash(s);
@@ -1355,6 +1358,16 @@ export class Game {
     veg.setDetail(detail);
     grass.setDensity(density);
     audio.setVolume(g.volume);
+  }
+
+  /** the hour as it was at some moment (the server's, or mid morning when playing alone), from which the clock runs on */
+  private hourBase = { phase: DAY.start, at: performance.now() };
+  /** the hour held still (for looking at a time of day: see T.hour in the harness), or null */
+  hourHeld: number | null = null;
+  private wasNight: boolean | null = null;
+  /** which share of the day it is now */
+  hourNow() {
+    return this.hourHeld ?? phaseOf(this.hourBase.phase * DAY.length + (performance.now() - this.hourBase.at) / 1000);
   }
 
   /** A slow circuit above the village: what the entrance menu is laid over. */
@@ -2515,6 +2528,13 @@ export class Game {
       }
     } else if (!p.dead) this.deathSent = false;
 
+    // the hour: before a game has begun it is always day behind the menu
+    const hour = hourAt(this.started ? this.hourNow() : DAY.menu);
+    atmo.setHour(hour.light, hour.low);
+    if (this.started && hour.night !== this.wasNight) {
+      if (this.wasNight !== null) this.hud.note(hour.night ? 'Night has fallen' : 'First light', hour.night ? 'warn' : 'good');
+      this.wasNight = hour.night;
+    }
     atmo.update();
     veg.update(dt, cam);
     grass.update(cam, interp);

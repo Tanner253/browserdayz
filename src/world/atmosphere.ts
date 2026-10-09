@@ -13,6 +13,17 @@ import { GAS, type GasZone } from '../sim/gas';
 /** the colour of the gas where the light is in it (linear, before the picture is finished) */
 const GAS_COLOR = new THREE.Color(0.3, 0.36, 0.1);
 
+/**
+ * Night, as shares of what the day has: the moon for the sun (it stands where the sun stood:
+ * the sky is a photograph, and the brightest thing in it is the one place a light can come
+ * from), the sky's own light, the sky as it is seen, and the light that grass, leaves and
+ * smoke carry baked into them. And the colours: of moonlight, of the low sun, of the air at night.
+ */
+const NIGHT = { sun: 0.1, sky: 0.09, back: 0.06, amb: 0.085 };
+const MOON = new THREE.Color(0.6, 0.72, 1.0);
+const LOW_SUN = new THREE.Color(1.0, 0.56, 0.3);
+const NIGHT_AIR = new THREE.Color(0.018, 0.026, 0.046);
+
 export type ShaderPatch = (shader: THREE.WebGLProgramParametersWithUniforms) => void;
 
 /**
@@ -47,6 +58,30 @@ export class Atmosphere {
   sunColor = new THREE.Color(1, 0.95, 0.88);
   sunIntensity = 3.4;
   fogColor = new THREE.Color(0.62, 0.68, 0.74);
+  /**
+   * How much of the day's own light there is at this hour (1 by day, a few hundredths at
+   * night). One object, handed as a uniform (`uDaylight`) to every shader that has light of
+   * its own written into it and takes none from the lamps of the scene: the glow through
+   * grass and leaves, the far trees' cards, smoke.
+   */
+  readonly daylight = { value: 1 };
+  /** how far into the night it is: 0 by day, 1 at night */
+  night = 0;
+  /**
+   * What is left of the hour's light where the eye is, by what is over it: the gas, the
+   * ground. Each that dims sets its own entry (1 and 1 when it does not).
+   */
+  cover: Record<string, { sun: number; sky: number }> = {};
+  /** the sun's strength and colour and the sky's light as they are now, the hour and the cover both counted (the hands and the gun are lit by the same) */
+  sunNow = 3.4;
+  skyNow = 0.9;
+  readonly sunTint = new THREE.Color(1, 0.95, 0.88);
+  /** what the hour alone leaves: of the sun, the sky's light, the sky as seen, and the air's colour */
+  private hour = { sun: 1, sky: 1, back: 1, air: new THREE.Color() };
+  /** how low the sun stands (0..1): what the glow along the horizon is drawn by */
+  private low = 0;
+  private glow: THREE.Mesh | null = null;
+  private stars: THREE.Points | null = null;
   /** Where the gas lies, if the world has any: said before init, which writes it into every shader that takes fog. */
   gas: GasZone | null = null;
   /** the gas seen against the sky, where there is nothing behind it to be dimmed by it */
@@ -97,6 +132,8 @@ export class Atmosphere {
 
     this.installFogChunks();
     this.buildGasDome();
+    this.buildStars();
+    this.setHour(1, 0);
 
     this.csm = new CSM({
       camera: this.camera,
@@ -303,6 +340,7 @@ export class Atmosphere {
   #define GAS_THICK ${GAS.thick.toFixed(5)}
   #define GAS_COLOR ${vec3(GAS_COLOR.r, GAS_COLOR.g, GAS_COLOR.b)}
   #define GAS_SUN ${vec3(s.x, s.y, s.z)}
+  #define GAS_DAY_AIR ${(this.fogColor.r + this.fogColor.g + this.fogColor.b).toFixed(5)}
   float gasAmount( vec3 ro, vec3 rd, float dist ) {
     vec3 q = ( ro - GAS_C ) * GAS_INV;
     vec3 d = rd * GAS_INV;
@@ -317,8 +355,9 @@ export class Atmosphere {
     return 1.0 - exp( -GAS_THICK * max( i1 - i2, 0.0 ) );
   }
   vec3 gasColor( vec3 rd ) {
-    // a little lit through, looking toward the sun
-    return GAS_COLOR * ( 1.0 + 0.45 * pow( max( dot( rd, GAS_SUN ), 0.0 ), 4.0 ) );
+    // a little lit through, looking toward the sun; and no brighter than the air is at this hour
+    float lit = clamp( dot( fogColor, vec3( 1.0 ) ) / GAS_DAY_AIR, 0.0, 1.0 );
+    return GAS_COLOR * lit * ( 1.0 + 0.45 * pow( max( dot( rd, GAS_SUN ), 0.0 ), 4.0 ) );
   }`;
   }
 
@@ -335,6 +374,8 @@ export class Atmosphere {
       transparent: true,
       depthWrite: false,
       fog: false,
+      // (the air's colour, which the gas is no brighter than: the same object the fog has, so it is the hour's)
+      uniforms: { fogColor: { value: (this.scene.fog as THREE.FogExp2).color } },
       vertexShader: /* glsl */ `
         varying vec3 vWorld;
         void main() {
@@ -343,6 +384,7 @@ export class Atmosphere {
           gl_Position = projectionMatrix * viewMatrix * w;
         }`,
       fragmentShader: /* glsl */ `
+        uniform vec3 fogColor;
         varying vec3 vWorld;
         ${this.gasGlsl()}
         void main() {
@@ -378,6 +420,9 @@ export class Atmosphere {
     const csmHook = mat.onBeforeCompile;
     mat.onBeforeCompile = (shader, r) => {
       csmHook.call(mat, shader, r);
+      // (the hour, for whatever a patch writes into the shader that is light of its own)
+      shader.uniforms.uDaylight = this.daylight;
+      shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uDaylight;');
       patch?.(shader);
       antiFirefly(shader);
     };
@@ -394,7 +439,122 @@ export class Atmosphere {
     });
   }
 
+  /**
+   * The hour.
+   * @param light how much of the day's light there is: 1 by day, 0 at night
+   * @param low how low the sun stands: 0 by day and by night, up to 1 in the middle of first light and of dusk
+   */
+  setHour(light: number, low: number) {
+    const h = this.hour, L = THREE.MathUtils.lerp;
+    this.night = 1 - light;
+    // (the low sun is weaker as well as redder)
+    h.sun = L(NIGHT.sun, 1, light) * (1 - 0.4 * low);
+    h.sky = L(NIGHT.sky, 1, light);
+    // (the sky goes sooner than the ground does: a bright noon sky over dim ground is no evening)
+    h.back = L(NIGHT.back, 1, Math.pow(light, 2.4));
+    this.low = low;
+    this.daylight.value = L(NIGHT.amb, 1, light);
+    this.sunTint.copy(MOON).lerp(this.sunColor, light).lerp(LOW_SUN, low * 0.75);
+    h.air.copy(NIGHT_AIR).lerp(this.fogColor, light);
+    // (and the air takes a little of the low sun's colour)
+    h.air.r *= 1 + 0.22 * low;
+    h.air.b *= 1 - 0.18 * low;
+  }
+
+  /** Puts the hour's light, less what is over the eye, on everything that carries it. */
+  private applyLight() {
+    const h = this.hour;
+    let sun = h.sun, sky = h.sky;
+    for (const k in this.cover) {
+      sun *= this.cover[k].sun;
+      sky *= this.cover[k].sky;
+    }
+    this.sunNow = this.sunIntensity * sun;
+    this.skyNow = 0.9 * sky;
+    for (const l of this.csm.lights) {
+      l.intensity = this.sunNow;
+      l.color.copy(this.sunTint);
+    }
+    this.scene.environmentIntensity = this.skyNow;
+    this.scene.backgroundIntensity = h.back;
+    (this.scene.fog as THREE.FogExp2).color.copy(h.air);
+    if (this.glow) {
+      this.glow.position.copy(this.camera.position);
+      this.glow.visible = this.low > 0.01;
+      (this.glow.material as THREE.ShaderMaterial).uniforms.uLow.value = this.low;
+    }
+    if (this.stars) {
+      this.stars.position.copy(this.camera.position);
+      const seen = Math.max(0, this.night - 0.5) / 0.5;
+      this.stars.visible = seen > 0.01;
+      (this.stars.material as THREE.PointsMaterial).opacity = seen * seen;
+    }
+  }
+
+  /** The stars: seen at night, where the sky is. (The sky itself is a photograph of a day, turned down.) */
+  private buildStars() {
+    const N = 1400;
+    const pos = new Float32Array(N * 3), col = new Float32Array(N * 3);
+    let s = 20261009;
+    const rnd = () => ((s = (Math.imul(s, 1664525) + 1013904223) | 0) >>> 0) / 4294967296;
+    for (let i = 0; i < N; i++) {
+      // evenly over the upper sky, none down at the hills
+      const y = 0.08 + rnd() * 0.92, a = rnd() * Math.PI * 2, r = Math.sqrt(1 - y * y);
+      pos.set([Math.cos(a) * r * 1500, y * 1500, Math.sin(a) * r * 1500], i * 3);
+      // most are faint; a few are bright, and a few of those are a little blue or a little yellow
+      const b = 0.25 + Math.pow(rnd(), 5) * 1.6, t = rnd();
+      col.set([b * (t > 0.8 ? 1 : 0.9), b * 0.92, b * (t < 0.2 ? 1.1 : 0.95)], i * 3);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    const stars = new THREE.Points(geo, new THREE.PointsMaterial({ size: 1.7, sizeAttenuation: false, vertexColors: true, transparent: true, opacity: 0, depthWrite: false, fog: false }));
+    stars.frustumCulled = false;
+    stars.renderOrder = -10;
+    stars.visible = false;
+    this.scene.add(stars);
+    this.stars = stars;
+
+    // The low sun's colour along the horizon, strongest toward where the sun is. (The sky is a
+    // photograph and cannot be tinted: this is laid over it, behind everything else.)
+    const sx = this.sunDir.x, sz = this.sunDir.z, sl = Math.hypot(sx, sz) || 1;
+    const glow = new THREE.Mesh(
+      new THREE.SphereGeometry(1400, 32, 16),
+      new THREE.ShaderMaterial({
+        side: THREE.BackSide,
+        transparent: true,
+        depthWrite: false,
+        fog: false,
+        uniforms: { uLow: { value: 0 }, uSun: { value: new THREE.Vector2(sx / sl, sz / sl) } },
+        vertexShader: /* glsl */ `
+          varying vec3 vDir;
+          void main() {
+            vDir = position;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+          }`,
+        fragmentShader: /* glsl */ `
+          uniform float uLow;
+          uniform vec2 uSun;
+          varying vec3 vDir;
+          void main() {
+            vec3 d = normalize( vDir );
+            float toward = max( dot( normalize( d.xz + 1e-5 ), uSun ), 0.0 );
+            float band = smoothstep( 0.42, 0.0, d.y ) * smoothstep( -0.12, 0.0, d.y );
+            float a = uLow * band * ( 0.3 + 0.7 * toward * toward );
+            vec3 c = mix( vec3( 1.0, 0.42, 0.14 ), vec3( 0.9, 0.5, 0.42 ), clamp( d.y * 3.0, 0.0, 1.0 ) );
+            gl_FragColor = vec4( c * 0.85, a * 0.8 );
+          }`,
+      }),
+    );
+    glow.frustumCulled = false;
+    glow.renderOrder = -9;
+    glow.visible = false;
+    this.scene.add(glow);
+    this.glow = glow;
+  }
+
   update() {
+    this.applyLight();
     // The cascades are cut from the shape of the view, and were cut once, when the game
     // started. Resize the window or go full screen and they went on covering the old shape:
     // on a screen that had become wider, nothing off to the sides was shadowed. (And started

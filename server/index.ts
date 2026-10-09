@@ -18,6 +18,7 @@ import { ITEMS, TAG_HOLD, makeItem, sanitizeItem, type ItemInstance } from '../s
 import { DROP, fillDrop, type DropInfo } from '../src/sim/drops';
 import { CRATE_RESTOCK, CRATE_SPECS, fillCrate } from '../src/sim/crates';
 import { underGas } from '../src/sim/gas';
+import { phaseOf } from '../src/sim/daynight';
 import { WEAPON_RULES, hitDamage, type HitZone } from '../src/sim/combat';
 import { BARREL } from '../src/sim/barrels';
 import { JEEP, SEATS, crashDamage, restState, type VehicleInfo, type VState } from '../src/sim/vehicles';
@@ -1115,6 +1116,8 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
     fires: hearths.alight(Date.now() / 1000),
     vehicles: [...vehicles.values()].map(vehInfo),
     infected: horde.list(),
+    // (the hour is the wall clock's: every game on the server is at the same one, and a restart does not put it back)
+    hour: phaseOf(Date.now() / 1000),
     spawn: sp,
     me: resume ? { inv: resume.inv!, vitals: resume.vitals ?? { health: 100, energy: 80, water: 80, stamina: MAX_STAMINA, bleeding: false } } : null,
     max: MAX_PLAYERS,

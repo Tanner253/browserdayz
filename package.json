@@ -14,6 +14,7 @@
     "character": "node scripts/build-character.mjs",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.server.json && tsc -p tsconfig.api.json",
     "film": "node scripts/film.mjs",
+    "test:daynight": "tsx test/daynight.test.ts",
     "test:payouts": "tsx test/solana.test.ts && tsx test/payouts.test.ts && tsx test/api.test.ts",
     "test:infected": "tsx test/infected.test.ts",
     "test:gas": "tsx test/gas.test.ts",

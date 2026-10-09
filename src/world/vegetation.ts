@@ -244,8 +244,11 @@ class Impostors {
   atlas!: THREE.WebGLRenderTarget;
   private all: { x: number; y: number; z: number; s: number; v: number; r: number }[] = [];
   material!: THREE.ShaderMaterial;
+  /** how much of the day's light there is (the atmosphere's own figure, once the cards have been photographed) */
+  private daylight: { value: number } = { value: 1 };
 
   bake(renderer: THREE.WebGLRenderer, atmo: Atmosphere, kinds: { name: string; parts: MeshPart[]; entry: TreeEntry }[]) {
+    this.daylight = atmo.daylight;
     const rows = kinds.length;
     this.atlas = new THREE.WebGLRenderTarget(FRAME_W * FRAMES, FRAME_H * rows, {
       type: THREE.HalfFloatType,
@@ -351,6 +354,8 @@ class Impostors {
         uFade: { value: new THREE.Vector2(...HANDOVER) },
         fogColor: { value: fog.color },
         fogDensity: { value: fog.density },
+        // (the cards were photographed by day: at night they are turned down with the rest)
+        uDaylight: this.daylight,
       },
       defines: { NV: rows, USE_FOG: '', FOG_EXP2: '' },
       vertexShader: IMPOSTOR_VS,
@@ -433,6 +438,7 @@ const IMPOSTOR_FS = /* glsl */ `
 uniform sampler2D tAtlas;
 uniform float uRows;
 uniform vec2 uFade;
+uniform float uDaylight;
 varying vec2 vUv;
 varying float vFrame;
 varying float vRow;
@@ -453,7 +459,7 @@ void main() {
   // the model dissolves over the same stretch by the same pattern (see foliagePatch): the card
   // takes just the pixels it gives up, so the two never leave a hole or draw twice
   if (c.a < 0.45 || (fade < 0.999 && ign < 1.0 - fade)) discard;
-  gl_FragColor = vec4(c.rgb, 1.0);
+  gl_FragColor = vec4(c.rgb * uDaylight, 1.0);
   #include <fog_fragment>
 }`;
 

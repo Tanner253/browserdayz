@@ -1641,8 +1641,10 @@ export class Weapons {
     const roof = physics.raycast(eye, { x: 0, y: 1, z: 0 }, 30, SHOT_GROUPS, p.collider) !== null;
     this.sunVis += ((sunBlocked ? 0.06 : 1) - this.sunVis) * (1 - Math.exp(-8 * dt));
     this.skyVis += ((roof ? 0.35 : 1) - this.skyVis) * (1 - Math.exp(-4 * dt));
-    this.sunLight.intensity = this.atmo.sunIntensity * this.sunVis;
-    this.vmScene.environmentIntensity = 0.9 * this.skyVis;
+    // (the hands and the gun are lit by the hour's light as the world is, and by what is over the eye)
+    this.sunLight.intensity = this.atmo.sunNow * this.sunVis;
+    this.sunLight.color.copy(this.atmo.sunTint);
+    this.vmScene.environmentIntensity = this.atmo.skyNow * this.skyVis;
 
     // an item in use takes over the hands; whatever was held drops out of view
     this.lowerT += ((this.stowed || (this.held && !this.held.ending) ? 1 : 0) - this.lowerT) * (1 - Math.exp(-10 * dt));

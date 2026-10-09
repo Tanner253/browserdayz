@@ -81,7 +81,6 @@ export class Gas {
   private warned = false;
   private dimmed = 0;
   private clock = 0;
-  private env0: number;
   private ground: (x: number, z: number) => number;
 
   constructor(
@@ -93,7 +92,6 @@ export class Gas {
     world: World,
   ) {
     this.ground = (x, z) => heightAt(world.heights, x, z);
-    this.env0 = scene.environmentIntensity;
     if (zone) this.signs(zone, world);
     this.veil = document.createElement('div');
     this.veil.className = 'hud-gas';
@@ -120,7 +118,7 @@ export class Gas {
       transparent: true,
       depthWrite: false,
       fog: false,
-      uniforms: { uColor: { value: new THREE.Color(0.46, 0.54, 0.17) } },
+      uniforms: { uColor: { value: new THREE.Color(0.46, 0.54, 0.17) }, uDaylight: atmo.daylight },
       vertexShader: /* glsl */ `
         attribute vec4 aWisp;
         attribute float aFade;
@@ -136,12 +134,13 @@ export class Gas {
         }`,
       fragmentShader: /* glsl */ `
         uniform vec3 uColor;
+        uniform float uDaylight;
         varying vec2 vUv;
         varying float vFade;
         void main() {
           float r = length( vUv - 0.5 ) * 2.0;
           float a = smoothstep( 1.0, 0.0, r );
-          gl_FragColor = vec4( uColor, a * a * vFade );
+          gl_FragColor = vec4( uColor * uDaylight, a * a * vFade );
         }`,
     });
     const mesh = new THREE.InstancedMesh(geo, mat, n);
@@ -201,8 +200,7 @@ export class Gas {
     const dim = Math.min(1, this.depth * 1.6);
     if (Math.abs(dim - this.dimmed) > 0.002 || (dim === 0 && this.dimmed !== 0)) {
       this.dimmed = dim;
-      for (const l of this.atmo.csm.lights) l.intensity = this.atmo.sunIntensity * (1 - DIM.sun * dim);
-      this.scene.environmentIntensity = this.env0 * (1 - DIM.sky * dim);
+      this.atmo.cover.gas = { sun: 1 - DIM.sun * dim, sky: 1 - DIM.sky * dim };
     }
 
     // --- the wisps of it near the eye

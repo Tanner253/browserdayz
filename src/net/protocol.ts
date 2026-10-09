@@ -14,7 +14,7 @@ import type { DropInfo } from '../sim/drops';
 import type { VehicleInfo, VState } from '../sim/vehicles';
 import type { IState, InfectedInfo } from '../sim/infected';
 
-export const PROTOCOL = 16;
+export const PROTOCOL = 17;
 
 /** chat channels: everyone on the server, or only players standing near the speaker */
 export type ChatChannel = 'global' | 'near';
@@ -177,6 +177,8 @@ export type S2C =
       vehicles?: VehicleInfo[];
       /** the infected, standing and lying */
       infected?: InfectedInfo[];
+      /** the hour: which share of the day it is at the moment of this message (see src/sim/daynight.ts) */
+      hour?: number;
       max: number;
     }
   | { t: 'join'; p: PlayerInfo }

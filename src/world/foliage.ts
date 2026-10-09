@@ -99,7 +99,7 @@ varying vec3 vFolWorld;`,
 {
   vec3 Vw = normalize(cameraPosition - vFolWorld);
   float back = pow(max(dot(-Vw, vec3(${f(sd.x)}, ${f(sd.y)}, ${f(sd.z)})), 0.0), 3.0);
-  reflectedLight.directDiffuse += diffuseColor.rgb * vec3(${f(sc.r)}, ${f(sc.g)}, ${f(sc.b)}) * (${f(trans)} * (0.25 + 1.6 * back));
+  reflectedLight.directDiffuse += diffuseColor.rgb * vec3(${f(sc.r)}, ${f(sc.g)}, ${f(sc.b)}) * (${f(trans)} * (0.25 + 1.6 * back)) * uDaylight;
 }`,
       );
     }

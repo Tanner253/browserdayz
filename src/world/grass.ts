@@ -168,7 +168,7 @@ reflectedLight.directDiffuse *= mix(0.55, 1.0, gAO);`,
             '#include <lights_fragment_end>',
             `#include <lights_fragment_end>
 // soft transmission so backlit grass glows
-reflectedLight.directDiffuse += diffuseColor.rgb * ${this.atmo.sunColor.r.toFixed(3)} * 0.18 * clamp(vGrassAO, 0.0, 1.0);
+reflectedLight.directDiffuse += diffuseColor.rgb * ${this.atmo.sunColor.r.toFixed(3)} * 0.18 * clamp(vGrassAO, 0.0, 1.0) * uDaylight;
 // thin blades at grazing angles produce sub-pixel sun glints (Fresnel -> 1) that
 // sparkle through bloom; grass is effectively a diffuse canopy at this scale
 reflectedLight.directSpecular = min(reflectedLight.directSpecular * 0.12, vec3(0.08));

@@ -271,7 +271,8 @@ export class Effects {
     const smoke = smokeTexture();
     const mk = (additive: boolean) => {
       const mat = new THREE.ShaderMaterial({
-        uniforms: { tMap: { value: smoke } },
+        // (smoke and dust have no light of their own: they are as bright as the hour. Flame and sparks are their own light.)
+        uniforms: { tMap: { value: smoke }, uLight: additive ? { value: 1 } : atmo.daylight },
         vertexShader: /* glsl */ `
           attribute vec4 iColor;
           varying vec4 vColor;
@@ -287,12 +288,13 @@ export class Effects {
           }`,
         fragmentShader: /* glsl */ `
           uniform sampler2D tMap;
+          uniform float uLight;
           varying vec4 vColor;
           varying vec2 vUv;
           void main() {
             float a = texture2D(tMap, vUv).a * vColor.a;
             if (a < 0.01) discard;
-            gl_FragColor = vec4(vColor.rgb, a);
+            gl_FragColor = vec4(vColor.rgb * uLight, a);
           }`,
         transparent: true,
         depthWrite: false,
