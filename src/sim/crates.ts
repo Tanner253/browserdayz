@@ -32,6 +32,8 @@ export interface CrateSpec {
 export const CRATE_SPECS: Record<string, CrateSpec> = {
   wooden_military_crate: { label: 'Military Crate', w: 8, h: 4, table: MILITARY, count: [2, 4] },
   old_military_crate: { label: 'Ammunition Crate', w: 8, h: 4, table: MILITARY, count: [2, 4] },
+  // (the hard case that stands wherever a military crate or an ammunition crate stood, and a little better filled)
+  weapons_case: { label: 'Weapons Case', w: 8, h: 4, table: MILITARY, count: [2, 5] },
   wooden_crate_01: { label: 'Wooden Crate', w: 6, h: 3, table: CIVILIAN, count: [1, 3] },
 };
 

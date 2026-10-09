@@ -15,7 +15,8 @@
     "typecheck": "tsc --noEmit && tsc -p tsconfig.server.json && tsc -p tsconfig.api.json",
     "film": "node scripts/film.mjs",
     "test:payouts": "tsx test/solana.test.ts && tsx test/payouts.test.ts && tsx test/api.test.ts",
-    "treasury": "tsx scripts/treasury.ts"
+    "treasury": "tsx scripts/treasury.ts",
+    "sounds": "node scripts/sounds.mjs"
   },
   "dependencies": {
     "@dgreenheck/ez-tree": "^1.1.0",

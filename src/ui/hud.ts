@@ -30,7 +30,7 @@ export interface HotbarEntry {
   dim: boolean;
 }
 
-/** where the game was talked about, and the address its first token had: on the main menu once, and still in the third trailer's end card (src/trailer/shots3.ts) */
+/** where the game is talked about, and its token's address on Solana: both shown on the main menu */
 export const X_HANDLE = 'zonaSOL_';
 export const CONTRACT = 'GvfAzdPF466PJsPJMzXQeX3TSqmJm9YxAG8xBJ6ypump';
 
@@ -135,7 +135,9 @@ export class HUD {
             <div class="start-online"></div>
             <div class="start-queue"><div class="sq-pos"></div><div class="sq-sub"></div><button class="sq-leave" type="button">Play on your own instead</button></div>
             <div class="start-links">
+              <a class="sl-x" href="https://x.com/${X_HANDLE}" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M18.9 2H22l-6.8 7.8L23.2 22h-6.3l-4.9-6.9L6.3 22H3.2l7.3-8.3L.8 2h6.4l4.5 6.3L18.9 2zm-1.1 18h1.7L6.3 3.9H4.5L17.8 20z"/></svg>@${X_HANDLE}</a>
               <a class="sl-x" href="/payouts" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M5 4h14v16l-3.5-2-3.5 2-3.5-2L5 20zM9 9h6M9 13h6"/></svg>Payouts</a>
+              <button class="sl-ca" type="button" title="Copy the contract address"><span><b>Contract address</b><em>Copy</em></span><code>${CONTRACT}</code></button>
             </div>
           </div>
           <div class="start-brief" data-tab="brief">
@@ -180,7 +182,7 @@ export class HUD {
                 <div class="kb-group">
                   <h4>Gear</h4>
                   <div class="kb-row"><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>4</kbd><em>primary · secondary · pistol · melee</em></div>
-                  <div class="kb-row"><kbd>5</kbd><kbd>6</kbd><kbd>7</kbd><kbd>8</kbd><em>eat · drink · bandage</em></div>
+                  <div class="kb-row"><kbd>5</kbd><kbd>6</kbd><kbd>7</kbd><kbd>8</kbd><em>eat · drink · heal</em></div>
                   <p><kbd>F</kbd> take · doors · search <kbd>G</kbd> hold: drop what you hold</p>
                   <p><kbd class="wide">Tab</kbd> inventory <kbd>M</kbd> map</p>
                   <p><kbd class="wide">Enter</kbd> chat <kbd>T</kbd> hold: call out · dance</p>
@@ -220,9 +222,32 @@ export class HUD {
     });
     chat.addEventListener('blur', () => this.chatOpen && this.closeChat());
     this.setChannel('global');
-    // nor does following a link
+    // nor does following a link, or copying the contract address
     const links = this.root.querySelector('.start-links') as HTMLElement;
     links.addEventListener('click', (e) => e.stopPropagation());
+    const ca = links.querySelector('.sl-ca') as HTMLButtonElement;
+    ca.addEventListener('click', () => {
+      const said = ca.querySelector('em') as HTMLElement;
+      const done = (ok: boolean) => {
+        said.textContent = ok ? 'Copied' : 'Select and copy';
+        ca.classList.toggle('done', ok);
+        setTimeout(() => {
+          said.textContent = 'Copy';
+          ca.classList.remove('done');
+        }, 1600);
+      };
+      const pick = () => {
+        // no clipboard to write to (an old browser, a page not served securely): leave it selected for the player to copy
+        const r = document.createRange();
+        r.selectNodeContents(ca.querySelector('code')!);
+        const sel = getSelection();
+        sel?.removeAllRanges();
+        sel?.addRange(r);
+        done(false);
+      };
+      if (navigator.clipboard?.writeText) navigator.clipboard.writeText(CONTRACT).then(() => done(true), pick);
+      else pick();
+    });
     // typing a name must not start the game
     const name = this.root.querySelector('.start-name') as HTMLInputElement;
     const plate = this.root.querySelector('.tagplate') as HTMLElement;
@@ -686,6 +711,8 @@ export class HUD {
     /** sat in a jeep: how fast it is going, and what it has left in the tank and in itself (0..1) */
     ride?: { kmh: number; fuel: number; hp: number; driver: boolean } | null;
     scoped: boolean;
+    /** aimed with a gun that has no sights: the mark stays on the screen */
+    sightless?: boolean;
     hitMarker: number;
     kill: boolean;
     /** the hit was to the head */
@@ -706,7 +733,7 @@ export class HUD {
   }) {
     const e = this.el;
     this.toggle(this.root, 'hidden', s.hidden);
-    this.toggle(e.cross, 'off', s.aiming || s.scoped || s.glass || s.dead || !!s.ride);
+    this.toggle(e.cross, 'off', (s.aiming && !s.sightless) || s.scoped || s.glass || s.dead || !!s.ride);
     // the four ticks stand as far out as the shot can land: half the cone, at this field of view
     this.toggle(e.cross, 'gun', s.spread > 0);
     const lag = `${s.lag[0].toFixed(1)}px,${s.lag[1].toFixed(1)}px`;

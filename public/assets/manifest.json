@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-08T22:17:59.099Z",
+ "generated": "2026-10-09T00:45:43.035Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr"
@@ -1577,6 +1577,152 @@
     }
    ]
   },
+  "plate_carrier": {
+   "url": "assets/models/plate_carrier.glb",
+   "tags": [
+    "loot",
+    "gear"
+   ],
+   "bytes": 308492,
+   "srcTris": 2960,
+   "tris": 2960,
+   "min": [
+    -0.2252,
+    0,
+    -0.2504
+   ],
+   "max": [
+    0.2252,
+    0.56,
+    0.2504
+   ],
+   "lods": []
+  },
+  "weapons_case": {
+   "url": "assets/models/weapons_case.glb",
+   "tags": [
+    "prop",
+    "crate"
+   ],
+   "bytes": 1434100,
+   "srcTris": 9964,
+   "tris": 9964,
+   "min": [
+    -0.625,
+    0,
+    -0.2632
+   ],
+   "max": [
+    0.625,
+    0.4329,
+    0.2632
+   ],
+   "lods": []
+  },
+  "patrol_cap": {
+   "url": "assets/models/patrol_cap.glb",
+   "tags": [
+    "loot",
+    "gear"
+   ],
+   "bytes": 40964,
+   "srcTris": 31771,
+   "tris": 1036,
+   "min": [
+    -0.0926,
+    0,
+    -0.165
+   ],
+   "max": [
+    0.0926,
+    0.1761,
+    0.165
+   ],
+   "lods": []
+  },
+  "combat_boots": {
+   "url": "assets/models/combat_boots.glb",
+   "tags": [
+    "loot",
+    "gear"
+   ],
+   "bytes": 109868,
+   "srcTris": 31771,
+   "tris": 604,
+   "min": [
+    -0.15,
+    0,
+    -0.1443
+   ],
+   "max": [
+    0.15,
+    0.1617,
+    0.1443
+   ],
+   "lods": []
+  },
+  "tactical_gloves": {
+   "url": "assets/models/tactical_gloves.glb",
+   "tags": [
+    "loot",
+    "gear"
+   ],
+   "bytes": 811440,
+   "srcTris": 59114,
+   "tris": 5000,
+   "min": [
+    -0.1341,
+    0.0009,
+    -0.051
+   ],
+   "max": [
+    0.1336,
+    0.2339,
+    0.0521
+   ],
+   "lods": []
+  },
+  "military_backpack": {
+   "url": "assets/models/military_backpack.glb",
+   "tags": [
+    "loot",
+    "gear"
+   ],
+   "bytes": 746108,
+   "srcTris": 180052,
+   "tris": 13994,
+   "min": [
+    -0.1603,
+    0.0002,
+    -0.218
+   ],
+   "max": [
+    0.1601,
+    0.56,
+    0.2181
+   ],
+   "lods": []
+  },
+  "syringe": {
+   "url": "assets/models/syringe.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 107864,
+   "srcTris": 12052,
+   "tris": 1940,
+   "min": [
+    -0.0308,
+    0,
+    -0.07
+   ],
+   "max": [
+    0.0308,
+    0.0672,
+    0.07
+   ],
+   "lods": []
+  },
   "uaz_469": {
    "url": "assets/models/uaz_469.glb",
    "tags": [
@@ -1663,10 +1809,6 @@
       49,
       97
      ],
-     "draw": [
-      182,
-      200
-     ],
      "idle": [
       148,
       180
@@ -1674,6 +1816,10 @@
      "check": [
       98,
       147
+     ],
+     "melee": [
+      180,
+      200
      ]
     },
     "view": [

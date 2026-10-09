@@ -5,7 +5,8 @@ import * as THREE from 'three';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { ITEMS } from '../sim/items';
 import type { ItemModels } from '../game/loot';
-import { BEARD, HAIR_STYLES, loadCharacter, lookPatch, lookUniforms, setLookUniforms, type Look } from '../game/look';
+import { BEARD, HAIR_STYLES, loadCharacter, lookPatch, lookUniforms, setLookUniforms, suitPatch, type Look } from '../game/look';
+import { BODY_SCALE, GEAR, WORN } from '../game/avatar';
 
 const PX = 64; // pixels per grid cell
 
@@ -60,11 +61,24 @@ export async function renderIcons(renderer: THREE.WebGLRenderer, models: ItemMod
     // something as flat as a dog tag is looked at from above, or it is only a sliver
     const flat = size.y < Math.min(size.x, size.z) * 0.1;
     pivot.rotation.x += upright ? 0.15 : flat ? 1.15 : 0.55;
-    scene.add(pivot);
-    pivot.updateMatrixWorld(true);
-    const b2 = new THREE.Box3().setFromObject(pivot);
+    // (in a frame of its own, which is what is turned if the turns above left it across the picture)
+    const frame = new THREE.Group();
+    frame.add(pivot);
+    scene.add(frame);
+    frame.updateMatrixWorld(true);
+    let b2 = new THREE.Box3().setFromObject(frame);
+    let s2 = b2.getSize(new THREE.Vector3());
+    // However the model lies as it comes, its long side goes along the picture's long side. (A
+    // bat comes lying along x and is six cells tall: it was drawn across the middle of its
+    // picture, a hair's width of it, and looked like no picture at all.)
+    const across = s2.x > s2.y * 1.3, along = s2.y > s2.x * 1.3;
+    if ((across && h > w) || (along && w > h)) {
+      frame.rotation.z = across ? Math.PI / 2 : -Math.PI / 2;
+      frame.updateMatrixWorld(true);
+      b2 = new THREE.Box3().setFromObject(frame);
+      s2 = b2.getSize(new THREE.Vector3());
+    }
     const c2 = b2.getCenter(new THREE.Vector3());
-    const s2 = b2.getSize(new THREE.Vector3());
     const aspect = w / h;
     const half = Math.max(s2.x / 2, s2.y / 2 * aspect) * 1.08;
     cam.left = -half;
@@ -88,18 +102,41 @@ export async function renderIcons(renderer: THREE.WebGLRenderer, models: ItemMod
     for (let y = 0; y < h * 2; y++) img.data.set(buf.subarray((h * 2 - 1 - y) * w * 2 * 4, (h * 2 - y) * w * 2 * 4), y * w * 2 * 4);
     ctx.putImageData(img, 0, 0);
     out[id] = canvas.toDataURL('image/png');
-    scene.remove(pivot);
+    scene.remove(frame);
     rt.dispose();
   }
   renderer.setRenderTarget(prevTarget);
   return out;
 }
 
-/** Portrait of the survivor for the inventory screen's paper doll (transparent PNG data URL). */
-export async function renderDoll(renderer: THREE.WebGLRenderer, env: THREE.Texture, look: Look): Promise<string> {
+/**
+ * Portrait of the survivor for the inventory screen's paper doll (transparent PNG data URL).
+ * @param worn what is in the slots that show on a body (head, vest, back): the portrait wears it
+ * @param models where a pack's own model comes from (the cap, the headset and the plate carrier are pieces of the body itself)
+ */
+export async function renderDoll(renderer: THREE.WebGLRenderer, env: THREE.Texture, look: Look, worn: string[] = [], models?: ItemModels): Promise<string> {
   const gltf = await loadCharacter();
   const model = SkeletonUtils.clone(gltf.scene) as THREE.Group;
   model.updateMatrixWorld(true);
+  const suit = !!model.getObjectByName('pads');
+  const shown = new Set(worn.flatMap((id) => WORN[id] ?? []));
+  // a pack hangs where it hangs on a body in the world: set on the body as it stands at rest, and carried by the spine from there
+  const carried: THREE.Object3D[] = [];
+  if (models) {
+    for (const id of worn) {
+      const g = GEAR[id], bone = g && model.getObjectByName(g.bone);
+      if (!g || !bone) continue;
+      const holder = new THREE.Group();
+      holder.matrixAutoUpdate = false;
+      // (GEAR is written for a body in the world: turned to face the way the game faces, and at the game's size. This one is as its file has it.)
+      const place = new THREE.Matrix4().compose(new THREE.Vector3(...g.p), new THREE.Quaternion().setFromEuler(new THREE.Euler(g.r[0], g.r[1], g.r[2], 'XYZ')), new THREE.Vector3(...g.s));
+      const toFile = new THREE.Matrix4().makeScale(1 / BODY_SCALE, 1 / BODY_SCALE, 1 / BODY_SCALE).multiply(new THREE.Matrix4().makeRotationY(Math.PI));
+      holder.matrix.copy(bone.matrixWorld).invert().multiply(toFile).multiply(place);
+      holder.add((await models.get(id)).group.clone());
+      bone.add(holder);
+      carried.push(holder);
+    }
+  }
   // one hair style (and maybe a beard), carried by the head
   const head = model.getObjectByName('Head');
   [...HAIR_STYLES, BEARD].forEach((name, i) => {
@@ -115,11 +152,25 @@ export async function renderDoll(renderer: THREE.WebGLRenderer, env: THREE.Textu
     const m = o as THREE.SkinnedMesh;
     if (!m.isMesh) return;
     m.frustumCulled = false;
+    // (the pieces of the suit that are worn or not: only what is worn)
+    if (m.name.startsWith('gear_') && !shown.has(m.name)) m.visible = false;
     const c = (m.material as THREE.MeshStandardMaterial).clone();
-    if (m.name === 'body') {
+    if (c.defines) {
+      delete c.defines.USE_CSM;
+      delete c.defines.CSM_CASCADES;
+      delete c.defines.CSM_FADE;
+    }
+    if (suit && m.isSkinnedMesh) {
+      c.onBeforeCompile = (shader) => suitPatch(shader, uniforms);
+      c.customProgramCacheKey = () => 'doll-suit';
+    } else if (m.name === 'body') {
       c.onBeforeCompile = (shader) => lookPatch(shader, uniforms);
       c.customProgramCacheKey = () => 'doll';
     } else if (c.name.includes('Hair')) c.color.copy(look.hairColor);
+    else {
+      c.onBeforeCompile = () => {};
+      c.customProgramCacheKey = () => 'icon';
+    }
     m.material = c;
     own.push(c);
   });

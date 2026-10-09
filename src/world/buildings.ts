@@ -32,7 +32,7 @@ export interface LootPoint {
 }
 
 /** props that are searched as containers (loot is inside, never lying on top) */
-export const CRATE_KINDS = new Set(['wooden_crate_01', 'wooden_military_crate', 'old_military_crate']);
+export const CRATE_KINDS = new Set(['wooden_crate_01', 'wooden_military_crate', 'old_military_crate', 'weapons_case']);
 
 /**
  * Walls and doors are drawn before anything that grows or lies about (trees, grass and props
@@ -273,8 +273,8 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
           // armoury
           { id: 'steel_frame_shelves_01', x: 6.5, z: 0.6, rot: Math.PI / 2, scale: 0.1 },
           { id: 'steel_frame_shelves_01', x: 5.0, z: -4.02, rot: 0, scale: 0.1 },
-          { id: 'wooden_military_crate', x: 4.1, z: 3.75, rot: 0 },
-          { id: 'wooden_military_crate', x: 5.7, z: 3.75, rot: 0.05 },
+          { id: 'weapons_case', x: 4.1, z: 3.75, rot: 0 },
+          { id: 'weapons_case', x: 5.7, z: 3.75, rot: 0.05 },
           { id: 'metal_office_desk', x: 4.3, z: 0.9, rot: Math.PI / 2 },
           // holding cell
           { id: 'old_bed_frame', x: -6.25, z: -3.2, rot: 0 },
@@ -304,7 +304,7 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
         furniture: [
           { id: 'metal_office_desk', x: 0, z: -1.6, rot: 0 },
           { id: 'SchoolChair_01', x: 0.2, z: -0.7, rot: Math.PI },
-          { id: 'wooden_military_crate', x: 1.35, z: 1.25, rot: Math.PI / 2 },
+          { id: 'weapons_case', x: 1.35, z: 1.25, rot: Math.PI / 2 },
           { id: 'Shelf_01', x: -1.85, z: 0.6, rot: Math.PI / 2 },
         ],
         loot: [[-0.5, 0.81, -1.6], [0.5, 0.81, -1.6], [1.35, 0.48, 1.25], [-1.88, 0.44, 0.6], [-1.88, 1.24, 0.6], [-0.6, 0.02, 1.2]],
@@ -553,7 +553,7 @@ export class Buildings {
     const DRESSING: Record<SiteKind, [string, number, number][]> = {
       lodge: [['stone_fire_pit', -3.5, 7], ['wooden_crate_01', 4, 6.5], ['Barrel_01', 5.2, 5.8], ['dry_branches_medium_01', -6, 9]],
       farm: [['wooden_crate_01', 2, 6], ['wooden_crate_01', 3.2, 6.6], ['old_tyre', -1, 7.5], ['barrel_03', 15, 6], ['covered_car', -14, -8]],
-      post: [['concrete_road_barrier', -4, 9], ['concrete_road_barrier', 0, 10], ['concrete_road_barrier', 4, 9], ['wooden_military_crate', 5.5, 3], ['old_military_crate@0', 6.6, 1.2], ['Barrel_01', -4.5, -6]],
+      post: [['concrete_road_barrier', -4, 9], ['concrete_road_barrier', 0, 10], ['concrete_road_barrier', 4, 9], ['weapons_case', 5.5, 3], ['weapons_case', 6.6, 1.2], ['Barrel_01', -4.5, -6]],
       yard: [['wooden_crate_01', -4, 8], ['wooden_crate_01', -5.4, 8.6], ['wooden_crate_01', 5, 9], ['Barrel_01', 7, 8], ['barrel_03', 7.9, 8.9], ['old_tyre', 2, 11], ['dry_branches_medium_01', -9, 11]],
       dacha: [['covered_car', 9, -6], ['wooden_crate_01', -7, 5], ['metal_trash_can@0', -6.2, 3.4], ['trashbag', -8, 3]],
     };
@@ -878,7 +878,7 @@ export class Buildings {
       const px = camp.x + Math.cos(a) * 21, pz = camp.z + Math.sin(a) * 21;
       this.world.props.push({ kind: 'concrete_road_barrier', x: px, y: heightAt(this.world.heights, px, pz), z: pz, rot: -a, scale: 1 });
     }
-    const crates: [number, number, string][] = [[6, 4, 'old_military_crate@0'], [7.5, 6.5, 'wooden_military_crate'], [4.5, 7, 'wooden_military_crate'], [-3, 12, 'old_military_crate@1']];
+    const crates: [number, number, string][] = [[6, 4, 'weapons_case'], [7.5, 6.5, 'weapons_case'], [4.5, 7, 'weapons_case'], [-3, 12, 'weapons_case']];
     for (const [ox, oz, kind] of crates) {
       const px = camp.x + ox, pz = camp.z + oz;
       const y = heightAt(this.world.heights, px, pz);

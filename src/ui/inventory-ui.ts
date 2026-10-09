@@ -137,6 +137,11 @@ export class InventoryUI {
     if (this.isOpen && !this.drag && !this.menu) this.render();
   }
 
+  /** something it shows has changed that it was not told about through `refresh` (the figure of the survivor) */
+  redraw() {
+    if (this.isOpen && !this.drag && !this.menu) this.render();
+  }
+
   /** a message in place of the open container's grid (waiting for the server), '' to show the grid */
   setStashState(text: string) {
     this.stashState = text;
@@ -286,7 +291,8 @@ export class InventoryUI {
       row.className = 'inv-ground-row';
       const ic = document.createElement('div');
       ic.className = 'inv-item mini';
-      ic.innerHTML = `<div class="inv-item-img fit" style="background-image:url(${this.icons[w.loot.item.id] ?? ''})"></div>`;
+      // (a bat is six cells tall and one wide: stood up in this little box its picture is a hair. Long things are laid on their side here.)
+      ic.innerHTML = `<div class="inv-item-img fit${d.h > d.w ? ' lying' : ''}" style="background-image:url(${this.icons[w.loot.item.id] ?? ''})"></div>`;
       row.appendChild(ic);
       const extra = d.stack ? ` <span>×${w.loot.item.qty}</span>` : d.weapon ? ` <span>${w.loot.item.loaded ?? 0}/${capacityOf(w.loot.item)}</span>` : w.loot.item.cargo?.length ? ` <span>${w.loot.item.cargo.length} inside</span>` : '';
       row.insertAdjacentHTML('beforeend', `<div class="g-name">${itemName(w.loot.item)}${extra}<small>${d.category}</small></div>`);

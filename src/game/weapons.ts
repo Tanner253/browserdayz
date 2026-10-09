@@ -14,7 +14,7 @@ import { SLOT_ORDER, type PlayerInventory } from '../sim/inventory';
 import type { Atmosphere } from '../world/atmosphere';
 import type { Player } from './player';
 import type { Effects } from './effects';
-import { flashTexture } from './effects';
+import { MuzzleFlash, muzzleArt } from './muzzle';
 import { WeaponRig, liftPack } from './rig';
 import { FPArms, type Grips, type HandGrip } from './arms';
 import type { Look } from './look';
@@ -24,7 +24,7 @@ import type { ItemModels } from './loot';
 export type HitZone = 'head' | 'torso' | 'legs';
 /** damage multiplier per hit zone: bullets / melee */
 const ZONE_MULT: Record<HitZone, [number, number]> = { head: [3.2, 1.6], torso: [1, 1], legs: [0.6, 0.7] };
-export type UseKind = 'eat' | 'drink' | 'bandage' | 'open';
+export type UseKind = 'eat' | 'drink' | 'bandage' | 'inject' | 'smoke' | 'open';
 const FIST = { damage: 14, range: 1.35, rate: 0.4, stamina: 5 };
 
 export type FireMode = 'semi' | 'auto';
@@ -123,7 +123,7 @@ interface VmModel {
   selector?: THREE.Object3D;
   mag?: THREE.Object3D;
   round?: THREE.Object3D;
-  flash: THREE.Sprite;
+  flash: MuzzleFlash;
   /** attachment meshes, shown when the item has the mod */
   scope?: THREE.Object3D;
   wrap?: THREE.Object3D;
@@ -156,6 +156,45 @@ const HELD = {
   sniper: new THREE.Vector3(0.14, -0.22, -0.36),
   m9: new THREE.Vector3(0.095, -0.135, -0.31),
 };
+
+/** A smoke: where it hangs between draws and where it is at the lips (the eye's space), how long before it is first lifted, and how long each draw takes. */
+const SMOKE = {
+  low: new THREE.Vector3(0.115, -0.105, -0.33),
+  lips: new THREE.Vector3(0.012, -0.08, -0.215),
+  lift: 0.35,
+  every: (dur: number) => Math.max(1.3, (dur - 0.7) / 2),
+};
+
+/** One cigarette: paper, filter, and the coal at the end of it. It lies along z, filter to the mouth (+z). */
+function cigarette() {
+  const root = new THREE.Group();
+  const paper = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.058, 12), new THREE.MeshStandardMaterial({ color: 0xe9e6dc, roughness: 0.9 }));
+  const filter = new THREE.Mesh(new THREE.CylinderGeometry(0.0041, 0.0041, 0.024, 12), new THREE.MeshStandardMaterial({ color: 0xb98344, roughness: 0.85 }));
+  const ash = new THREE.Mesh(new THREE.CylinderGeometry(0.0039, 0.0036, 0.006, 12), new THREE.MeshStandardMaterial({ color: 0x6f6b66, roughness: 1 }));
+  const coal = new THREE.Mesh(new THREE.SphereGeometry(0.0036, 10, 8), new THREE.MeshBasicMaterial({ color: new THREE.Color(2, 0.5, 0.1), toneMapped: false }));
+  for (const m of [paper, filter, ash]) m.rotation.x = Math.PI / 2;
+  paper.position.z = -0.012;
+  filter.position.z = 0.029;
+  ash.position.z = -0.042;
+  coal.position.z = -0.045;
+  root.add(paper, filter, ash, coal);
+  return { root, coal };
+}
+
+/** melee weapons whose model is drawn with its edge toward whoever holds it */
+const EDGE_IN = new Set(['machete']);
+/**
+ * A tool in the fist: where the wrist is from the point of the handle that is held (to its
+ * right, up it, toward the eye), how far the fingers close, and where the fist is held from
+ * the eye.
+ */
+const MELEE = { wrist: [0.03, 0, 0.05] as [number, number, number], curl: [1.1, 1.15, 1.2, 1.2] as [number, number, number, number], hip: [0.2, -0.165, -0.42] as [number, number, number] };
+
+/** What seats the body's hands on a pack's gun (see `grips` in packGun), in the gun's own space: x toward the muzzle, y up. */
+const SEAT = { pistol: new THREE.Vector3(0.034, 0.03, 0), rifle: new THREE.Vector3(0.05, 0.004, 0) };
+
+/** how long the flame at the muzzle is, metres */
+const FLAME: Record<GunKind, number> = { pistol: 0.2, rifle: 0.42, auto: 0.3 };
 
 /** A pack gun standing in the hands: how much of the pack's own idle sway is used, and seconds to a breath. */
 const IDLE = { part: 0.22, every: 4.4 };
@@ -214,6 +253,14 @@ export class Weapons {
   private skyVis = 1;
   scoped = false;
   aiming = false;
+  /**
+   * Aimed, with nothing on the gun to aim by: the rifle without its scope has no sights of
+   * its own, and the eye is laid along the top of it. The mark on the screen stays, to say
+   * where that is.
+   */
+  get sightless() {
+    return this.aiming && this.current?.kind === 'rifle' && !!this.current.adsIron && !hasMod(this.currentItem, 'pu_scope');
+  }
   hitMarker = 0;
   /** the last hit marker was a kill (HUD draws it red) */
   killMarker = false;
@@ -237,8 +284,9 @@ export class Weapons {
   private guardHold = 0;
   private punchHand = 0;
   // item being used in the hands (food, drink, bandage, ammo box)
-  private held: { root: THREE.Group; kind: UseKind; t: number; dur: number; size: THREE.Vector3; ending: number } | null = null;
+  private held: { root: THREE.Group; kind: UseKind; t: number; dur: number; size: THREE.Vector3; ending: number; coal?: THREE.Mesh; puffs?: number; wispT?: number } | null = null;
   private heldCache = new Map<string, { root: THREE.Group; size: THREE.Vector3 }>();
+  private smoke: ReturnType<typeof cigarette> | null = null;
   private lowerT = 0;
   /** the hands are busy with something that is not a weapon (a wave, a dance): it is let down out of the way */
   stowed = false;
@@ -271,12 +319,8 @@ export class Weapons {
   async load() {
     await this.arms.load();
     this.vmRoot.add(this.arms.root);
-    const flashTex = flashTexture();
-    const mkFlash = () => {
-      const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: flashTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, color: new THREE.Color(4, 3, 2) }));
-      s.visible = false;
-      return s;
-    };
+    const art = await muzzleArt();
+    const mkFlash = () => new MuzzleFlash(art);
 
     // ---- the guns that come as packs: arms, gun and every movement in one file
     this.models.set('mosin', await this.packGun({ pack: 'sniper', item: 'mosin', kind: 'rifle', hip: HELD.sniper, flashSize: 0.32, flash: mkFlash() }));
@@ -342,7 +386,9 @@ export class Weapons {
           }
         });
         // toward +z is toward the eye: turn it about the handle so it faces out
-        if (far > -near * 1.3 && far > 0.03) {
+        // (a machete's blade stands off its handle no more one way than the other, and this
+        // one is drawn edge to the eye: it is turned because it is known to be)
+        if ((far > -near * 1.3 && far > 0.03) || EDGE_IN.has(id)) {
           const turn = new THREE.Group();
           turn.position.set(hx, 0, hz);
           turn.rotation.y = Math.PI;
@@ -356,8 +402,12 @@ export class Weapons {
       }
       if (longAxis === 'x') body.rotation.z = Math.PI / 2;
       if (longAxis === 'z') body.rotation.x = -Math.PI / 2;
-      // grip near the bottom of the handle, tilted forward
-      body.position.y = -Math.max(size.x, size.y, size.z) * 0.18;
+      // Where along it the fist closes: a hand's width up from the butt of a long handle, the
+      // middle of a short one. That point is what is held out in front: the fist is in the
+      // picture whatever the length of the thing.
+      const long = Math.max(size.x, size.y, size.z);
+      const held = long < 0.25 ? long * 0.25 : Math.max(0.07, long * 0.12);
+      body.position.y = -held;
       const holder = new THREE.Group();
       holder.add(body);
       // the longer the weapon the further it leans away from the eye: a bat held as upright as
@@ -369,12 +419,13 @@ export class Weapons {
       this.models.set(id, {
         root, kind: 'melee', flash, body,
         grips: {
-          right: { pos: new THREE.Vector3(0.0, Math.max(size.x, size.y, size.z) * 0.12, 0.04), fingers: new THREE.Vector3(-0.2, -0.3, -1), palm: new THREE.Vector3(-1, 0, 0), curl: [1.1, 1.15, 1.2, 1.2], thumb: 0.6 },
+          // (the wrist stands off to the right of the handle and behind it: the palm is what is laid on it)
+          right: { pos: new THREE.Vector3(MELEE.wrist[0], held + MELEE.wrist[1], MELEE.wrist[2]), fingers: new THREE.Vector3(-0.2, -0.3, -1), palm: new THREE.Vector3(-1, 0, 0), curl: MELEE.curl, thumb: 0.6 },
           left: null,
         },
         // high enough that the fist on the handle is in the picture, not only the head
-        hip: new THREE.Vector3(0.22, -0.215, -0.42),
-        ads: new THREE.Vector3(0.17, -0.19, -0.42),
+        hip: new THREE.Vector3(...MELEE.hip),
+        ads: new THREE.Vector3(MELEE.hip[0] - 0.05, MELEE.hip[1] + 0.025, MELEE.hip[2]),
         muzzle: new THREE.Vector3(),
       });
     }
@@ -387,7 +438,7 @@ export class Weapons {
    */
   private sleeves: THREE.Material | null = null;
 
-  private async packGun(o: { pack: string; item: string; gun?: string; kind: GunKind; hip: THREE.Vector3; flash: THREE.Sprite; flashSize: number }): Promise<VmModel> {
+  private async packGun(o: { pack: string; item: string; gun?: string; kind: GunKind; hip: THREE.Vector3; flash: MuzzleFlash; flashSize: number }): Promise<VmModel> {
     const entry = assets.manifest.models[`${o.pack}_fp`];
     const rig = new WeaponRig(await assets.gltfOf(`${o.pack}_fp`), entry.rig!, packMaterial);
     // one pair of sleeves and gloves whatever is held: the first pack's (the packs are one maker's, on one pair of arms)
@@ -459,20 +510,24 @@ export class Weapons {
       // without the scope the eye goes along the top of the action
       adsIron: o.kind === 'rifle' ? new THREE.Vector3(-fc.x, -frame.max.y - 0.018, o.hip.z + 0.1) : undefined,
       muzzle: new THREE.Vector3(fc.x, o.kind === 'rifle' ? THREE.MathUtils.lerp(frame.min.y, frame.max.y, 0.62) : c.y, frame.min.z),
-      // (for whoever is seen holding it: the hands are where the pack's own hands are)
+      // For whoever is seen holding it. The hands start where the pack's own hands are, and are
+      // then moved by what it took, looking close, to seat the body's hands on it: they are
+      // bigger than the pack's and their wrists are further from their palms, so set down wrist
+      // on wrist they held a pistol by the bottom of its grip, and a rifle a hand's breadth
+      // behind its trigger. The first finger is kept nearly straight: it lies in the guard.
       grips: o.kind === 'rifle'
         ? {
-            right: { pos: new THREE.Vector3(...holds.right), fingers: new THREE.Vector3(0.75, -0.55, -0.3), palm: new THREE.Vector3(0.15, -0.1, -1), curl: [0.4, 1.2, 1.25, 1.3], thumb: 0.5 },
+            right: { pos: new THREE.Vector3(...holds.right).add(SEAT.rifle), fingers: new THREE.Vector3(0.75, -0.55, -0.3), palm: new THREE.Vector3(0.15, -0.1, -1), curl: [0.25, 1.2, 1.25, 1.3], thumb: 0.5 },
             left: { pos: new THREE.Vector3(...holds.left), fingers: new THREE.Vector3(0.35, 0.1, 0.93), palm: new THREE.Vector3(0, 1, 0.1), curl: [1.0, 1.05, 1.1, 1.15], thumb: 0.4 },
           }
         : {
-            right: { pos: new THREE.Vector3(...holds.right), fingers: new THREE.Vector3(0.9, -0.15, -0.3), palm: new THREE.Vector3(0.3, 0, -1), curl: [0.35, 1.25, 1.3, 1.35], thumb: 1.25 },
-            left: { pos: new THREE.Vector3(...holds.left), fingers: new THREE.Vector3(0.85, -0.2, 0.35), palm: new THREE.Vector3(0, 0.4, 1), curl: [1.05, 1.1, 1.15, 1.2], thumb: 1.2 },
+            right: { pos: new THREE.Vector3(...holds.right).add(SEAT.pistol), fingers: new THREE.Vector3(0.9, -0.15, -0.3), palm: new THREE.Vector3(0.3, 0, -1), curl: [0.22, 1.25, 1.3, 1.35], thumb: 1.25 },
+            left: { pos: new THREE.Vector3(...holds.left).add(SEAT.pistol), fingers: new THREE.Vector3(0.85, -0.2, 0.35), palm: new THREE.Vector3(0, 0.4, 1), curl: [1.05, 1.1, 1.15, 1.2], thumb: 1.2 },
           },
     };
-    o.flash.position.copy(m.muzzle);
-    o.flash.scale.setScalar(o.flashSize);
-    root.add(o.flash);
+    // (the flash rides on the gun, so it goes where the barrel goes in the kick)
+    o.flash.root.position.copy(m.muzzle);
+    body.add(o.flash.root);
     return m;
   }
 
@@ -640,6 +695,7 @@ export class Weapons {
     this.hitMarker = Math.max(0, this.hitMarker - dt);
     this.updateBullets(dt);
     this.updateBrass(dt);
+    for (const m of this.models.values()) m.flash.update(dt);
 
     if (enabled && !this.player.dead) {
       if (input.pressed('Digit1')) this.equip('primary');
@@ -799,10 +855,7 @@ export class Weapons {
     this.player.yaw -= drift * hd.climb * 0.35 * stance;
     const muzzleWorld = camera.position.clone().add(new THREE.Vector3(0.12, -0.1, -0.9).applyQuaternion(camera.quaternion));
     if (!suppressed) {
-      m.flash.visible = true;
-      m.flash.material.rotation = Math.random() * Math.PI * 2;
-      m.flash.scale.setScalar((kind === 'auto' ? 0.22 : big ? 0.32 : 0.2) * (0.8 + Math.random() * 0.4));
-      setTimeout(() => (m.flash.visible = false), 40);
+      m.flash.fire(FLAME[kind]);
     }
     this.fx.muzzle(muzzleWorld, new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion), big || kind === 'auto', suppressed);
     audio.gunshot(kind === 'auto' ? 'rifle' : kind, undefined, 0, kind === 'auto', suppressed);
@@ -826,6 +879,25 @@ export class Weapons {
   }
 
   private slideKick = 0;
+  /**
+   * How a bare fist is made and how the two are held up (the left's mirrored): which way the
+   * hand runs and the palm faces, in the eye's space, and how far each finger and each of
+   * its joints is closed. (Kept where the dev harness can reach it while looking: it took
+   * looking to get a glove to read as a fist.)
+   */
+  fists = {
+    // The hands stand up, knuckles to the sky, and the palms are turned most of the way round
+    // to the face: what the eye sees of each is the row of closed fingers and the thumb laid
+    // along the top of them, which is what says "fist". Seen from the back a gloved fist is a
+    // stump. And they are not closed all the way: these are thick gloves, and a finger folded
+    // as far as a bare one goes ends up inside itself.
+    fingers: [0.12, 0.9, -0.4] as [number, number, number],
+    palm: [0.55, -0.05, 0.83] as [number, number, number],
+    curl: [1.3, 1.33, 1.36, 1.4] as [number, number, number, number],
+    fold: [1.05, 1.0, 0.5] as [number, number, number],
+    thumb: 0.9,
+    tuck: 0.55,
+  };
 
   // spent cases: thrown out of the action to the right, seen for the half second it takes them to leave the picture
   private brass: { mesh: THREE.Mesh; v: THREE.Vector3; spin: THREE.Vector3; life: number }[] = [];
@@ -893,8 +965,8 @@ export class Weapons {
       const clip = empty ? 'reloadEmpty' : 'reload';
       // (at very nearly the pace it was drawn at: hurried, the hands stop looking like hands)
       const dur = m.rig.seconds(clip) * (m.kind === 'pistol' ? 0.92 : 1);
-      audio.magOut(dur * (m.kind === 'pistol' ? 0.12 : 0.28));
-      audio.magIn(dur * (m.kind === 'pistol' ? (empty ? 0.36 : 0.48) : 0.62));
+      audio.magOut(dur * (m.kind === 'pistol' ? 0.12 : 0.28), m.kind !== 'pistol');
+      audio.magIn(dur * (m.kind === 'pistol' ? (empty ? 0.36 : 0.48) : 0.62), m.kind !== 'pistol');
       if (empty) audio.slideRack(dur * 0.7);
       this.onAct('reload', dur);
       this.start('magswap', dur, () => {
@@ -919,8 +991,8 @@ export class Weapons {
     } else {
       const long = m.kind === 'auto';
       const locked = this.chamberEmpty;
-      audio.magOut(long ? 0.25 : 0.1);
-      audio.magIn(long ? 1.35 : 1.05);
+      audio.magOut(long ? 0.25 : 0.1, long);
+      audio.magIn(long ? 1.35 : 1.05, long);
       if (locked) {
         if (long) {
           audio.click(1500, 0.55, 0.05, 1.85);
@@ -950,6 +1022,14 @@ export class Weapons {
 
   /** Show an item in the hands while it is being used; the weapon drops out of the way. */
   beginUse(id: string, kind: UseKind, dur: number) {
+    if (kind === 'smoke') {
+      // (not the packet: one out of it)
+      const c = (this.smoke ??= cigarette());
+      if (this.held) this.vmRoot.remove(this.held.root);
+      this.held = { root: c.root, kind, t: 0, dur, size: new THREE.Vector3(0.008, 0.008, 0.082), ending: 0, coal: c.coal, puffs: 0, wispT: 0 };
+      this.vmRoot.add(c.root);
+      return;
+    }
     if (!this.itemModels) return;
     void this.itemModels.get(id).then((tpl) => {
       let h = this.heldCache.get(id);
@@ -1043,6 +1123,16 @@ export class Weapons {
 
   mainCam: THREE.PerspectiveCamera | null = null;
 
+  /**
+   * A place in the hands' own picture, said as a place in the world (for smoke, which is in
+   * the world). The hands are drawn through a narrower lens than the world is: what is at the
+   * edge of one is not at the edge of the other unless that is allowed for.
+   */
+  private toWorld(v: THREE.Vector3, cam: THREE.PerspectiveCamera): THREE.Vector3 {
+    const k = Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2) / Math.tan(THREE.MathUtils.degToRad(this.vmCamera.fov) / 2);
+    return new THREE.Vector3(v.x * k, v.y * k, v.z).applyQuaternion(cam.quaternion).add(cam.position);
+  }
+
   /** show or hide attachment meshes to match the item in hand */
   private applyMods() {
     const m = this.current;
@@ -1063,7 +1153,7 @@ export class Weapons {
     const out = dir.clone().normalize();
     this.bullets.push({ pos: origin.clone().addScaledVector(out, 0.35), vel: out.clone().multiplyScalar(b.muzzleVel), drag: b.drag, damage: 0, life: 4, travelled: 0.35, weapon: weaponId, ghost: true });
     const d = this.mainCam ? origin.distanceTo(this.mainCam.position) : 0;
-    this.fx.muzzle(origin.clone().addScaledVector(dir, 0.6), dir, kind !== 'pistol', suppressed);
+    this.fx.muzzle(origin.clone().addScaledVector(dir, 0.6), dir, kind !== 'pistol', suppressed, FLAME[kind]);
     audio.gunshot(kind === 'auto' ? 'rifle' : kind, origin, d, false, suppressed);
   }
 
@@ -1295,7 +1385,8 @@ export class Weapons {
     // actions
     const a = this.action;
     if (m.rig) this.poseRig(m, dt);
-    else if (a) {
+    // (a pack with no drawing of its coming up is lifted into the picture the way a still model is)
+    if (a && (!m.rig || ((a.name === 'equip' || a.name === 'unequip') && !m.rig.has('holster') && !m.rig.has('draw')))) {
       const k = Math.min(1, a.t / a.dur);
       const bell = Math.sin(k * Math.PI);
       if (a.name === 'equip') {
@@ -1417,7 +1508,7 @@ export class Weapons {
    * played backwards is the same lift without the rack.
    */
   private drawTime(rig: WeaponRig) {
-    return rig.has('holster') ? rig.seconds('holster') * 1.15 : rig.seconds('draw');
+    return rig.has('holster') ? rig.seconds('holster') * 1.15 : rig.has('draw') ? rig.seconds('draw') : 0.5;
   }
 
   /** A pack's gun: which of its movements it is in this frame, and how far through. */
@@ -1427,8 +1518,8 @@ export class Weapons {
     m.shotT = (m.shotT ?? 9) + dt;
     if (a) {
       const k = Math.min(1, a.t / a.dur);
-      if (a.name === 'equip') rig.has('holster') ? rig.pose('holster', 1 - k) : rig.pose('draw', k);
-      else if (a.name === 'unequip') rig.has('holster') ? rig.pose('holster', k) : rig.pose('draw', 1 - k);
+      if (a.name === 'equip') rig.has('holster') ? rig.pose('holster', 1 - k) : rig.has('draw') ? rig.pose('draw', k) : rig.rest();
+      else if (a.name === 'unequip') rig.has('holster') ? rig.pose('holster', k) : rig.has('draw') ? rig.pose('draw', 1 - k) : rig.rest();
       else if (a.name === 'bolt') rig.pose('bolt', k);
       else if (a.name === 'magswap') rig.pose(a.data?.empty ? 'reloadEmpty' : 'reload', k);
       else rig.rest();
@@ -1481,18 +1572,21 @@ export class Weapons {
       const strike = side === thrown ? out : 0;
       const down = new THREE.Vector3(side * 0.23, -0.58, -0.22);
       // orthodox stance: the left leads, the right sits back by the chin
-      const guard = side > 0 ? new THREE.Vector3(0.15, -0.165, -0.36) : new THREE.Vector3(-0.13, -0.135, -0.43);
-      const end = side > 0 ? new THREE.Vector3(0, -0.075, -0.68) : new THREE.Vector3(-0.02, -0.07, -0.66);
+      const guard = side > 0 ? new THREE.Vector3(0.14, -0.175, -0.4) : new THREE.Vector3(-0.125, -0.16, -0.46);
+      // (where the wrist ends up: the fist is a hand's length on from it and the shoulders turn
+      // behind it, and it is the fist that has to land on the middle of the picture)
+      const end = side > 0 ? new THREE.Vector3(0.06, -0.085, -0.66) : new THREE.Vector3(-0.055, -0.08, -0.64);
       const pos = lerp3(lerp3(down, guard, g), end, strike).add(bob);
       if (side === thrown) pos.add(new THREE.Vector3(side * 0.015, -0.012, 0.035).multiplyScalar(wind * (1 - out)));
-      // the other fist comes in to cover as the shoulders turn behind the punch
-      else if (thrown) pos.add(new THREE.Vector3(-side * 0.012, 0.012, 0.03).multiplyScalar(out));
-      // In the guard the palms face each other, so the eye sees the thumb side of each fist:
-      // the curled forefinger with the thumb laid over it. Thrown, the fist turns over, palm
-      // down, and the arm is seen along its length from behind.
-      const fingers = lerp3(new THREE.Vector3(-side * 0.15, 0.75, -0.6), new THREE.Vector3(-side * 0.2, 0.3, -0.93), strike).normalize();
-      const palm = lerp3(new THREE.Vector3(-side * 0.9, -0.1, 0.35), new THREE.Vector3(-side * 0.25, -0.95, -0.1), strike).normalize();
-      return { pos, fingers, palm, curl: [1.75, 1.77, 1.79, 1.81], thumb: 0.6, tuck: 1 };
+      // the other fist is drawn back and aside as the shoulders turn behind the punch: out of the way of what is being hit
+      else if (thrown) pos.add(new THREE.Vector3(side * 0.04, -0.03, 0.05).multiplyScalar(out));
+      // In the guard the fists stand up either side of the middle of the picture (see `fists`
+      // for which way they are turned and why). Thrown, the fist turns over, palm down, and the
+      // arm is seen along its length from behind.
+      const F = this.fists;
+      const fingers = lerp3(new THREE.Vector3(-side * F.fingers[0], F.fingers[1], F.fingers[2]), new THREE.Vector3(-side * 0.08, 0.2, -0.97), strike).normalize();
+      const palm = lerp3(new THREE.Vector3(-side * F.palm[0], F.palm[1], F.palm[2]), new THREE.Vector3(-side * 0.22, -0.96, -0.1), strike).normalize();
+      return { pos, fingers, palm, curl: F.curl, fold: F.fold, thumb: F.thumb, tuck: F.tuck };
     };
     this.kick.step(dt);
     const kr = this.kickRot.step(dt);
@@ -1523,7 +1617,11 @@ export class Weapons {
     const wide = Math.min(h.size.x, h.size.z);
     const pos = new THREE.Vector3(0.11 - wide * 0.3, -0.16 - sy * 0.25, -(0.36 + sy * 0.35));
     const rot = new THREE.Euler(0, 0, 0);
-    const two = h.kind === 'bandage' || h.kind === 'open' || Math.min(h.size.x, h.size.z) > 0.16;
+    const two = h.kind === 'bandage' || h.kind === 'inject' || h.kind === 'open' || (h.kind !== 'smoke' && Math.min(h.size.x, h.size.z) > 0.16);
+    // a smoke: how near the mouth it is (0 held low, 1 at the lips)
+    let drawn = -1;
+    // an injection: where the left hand is held out to take it (in the eye's space), and how far the shot has gone in
+    let offered: { pos: THREE.Vector3; fingers: THREE.Vector3; palm: THREE.Vector3 } | null = null;
     if (h.kind === 'eat' || h.kind === 'drink') {
       // up to the mouth and back, once per bite / gulp
       const period = h.kind === 'eat' ? 0.95 : 1.25;
@@ -1535,6 +1633,56 @@ export class Weapons {
     } else if (h.kind === 'bandage') {
       pos.set(-0.02 + Math.cos(t * 5.5) * 0.035, -0.17 + Math.sin(t * 5.5) * 0.03, -0.38);
       rot.set(0.5, t * 5.5 * 0.15, 0.3);
+    } else if (h.kind === 'smoke') {
+      // Two draws on it. Each: up to the mouth (which is under the bottom of the picture: it
+      // goes most of the way out of sight), held there while the coal brightens, and let down
+      // again to hang from the fingers while the smoke is breathed out. The sounds, in
+      // audio.ui, keep the same time.
+      const every = SMOKE.every(h.dur);
+      const w = Math.max(0, t - SMOKE.lift) / every;
+      const k = w - Math.floor(w);
+      drawn = w >= 2 ? 0 : THREE.MathUtils.smoothstep(k, 0, 0.2) * (1 - THREE.MathUtils.smoothstep(k, 0.58, 0.8));
+      pos.lerpVectors(SMOKE.low, SMOKE.lips, drawn);
+      rot.set(THREE.MathUtils.lerp(0.55, 0.1, drawn), THREE.MathUtils.lerp(-0.55, -0.1, drawn), THREE.MathUtils.lerp(0.15, 0, drawn));
+      const coal = h.coal!.material as THREE.MeshBasicMaterial;
+      const lit = 0.35 + 0.65 * THREE.MathUtils.smoothstep(k, 0.22, 0.4) * (1 - THREE.MathUtils.smoothstep(k, 0.55, 0.62)) * (w < 2 ? 1 : 0);
+      coal.color.setRGB(0.5 + 4.2 * lit, 0.12 + 0.95 * lit, 0.03 + 0.12 * lit);
+      // what comes off it: a thread from the coal all the while, and a breath of it after each draw
+      const cam = this.mainCam;
+      if (cam && enter > 0.9 && !exit) {
+        const out = (v: THREE.Vector3) => this.toWorld(v, cam);
+        h.wispT = (h.wispT ?? 0) - dt;
+        if (h.wispT <= 0 && drawn < 0.5) {
+          h.wispT = 0.16;
+          this.fx.wisp(out(new THREE.Vector3(0, 0, -0.043).applyEuler(rot).add(pos)));
+        }
+        if (Math.floor(w + 0.14) > (h.puffs ?? 0) && w < 2.2) {
+          h.puffs = Math.floor(w + 0.14);
+          this.fx.muzzle(out(new THREE.Vector3(0, -0.075, -0.16)), new THREE.Vector3(0, -0.12, -1).applyQuaternion(cam.quaternion), true, true);
+        }
+      }
+    } else if (h.kind === 'inject') {
+      // The left forearm is held out across the bottom of the picture, wrist turned up. The
+      // right fist brings the injector over it nose down, the cap comes off with a twist, it
+      // is driven in, held while it empties, and lifted away. (Its sounds, in audio.ui, fall
+      // on the same clock: the cap at 1.05 s, the spring at 1.47.)
+      const seg = (a: number, b: number) => THREE.MathUtils.smoothstep(t, a, b);
+      const out = seg(0.2, 0.8) * (1 - seg(h.dur - 0.3, h.dur));
+      const axis = new THREE.Vector3(0.8, 0.1, -0.59).normalize();
+      const wrist = new THREE.Vector3(0.07, -0.112 - (1 - out) * 0.22, -0.45);
+      offered = { pos: wrist, fingers: axis, palm: new THREE.Vector3(0, 1, 0.15) };
+      // where it goes in: a hand's breadth up the forearm from the wrist, on top
+      const mark = wrist.clone().addScaledVector(axis, -0.085).add(new THREE.Vector3(0, 0.034, 0));
+      const down = new THREE.Vector3(0.1, -0.95, -0.28).normalize();
+      const jab = seg(1.3, 1.47), off = seg(h.dur - 0.38, h.dur - 0.12);
+      const above = THREE.MathUtils.lerp(0.07, 0, jab) + off * 0.09 + (1 - seg(0.3, 0.95)) * 0.1;
+      const tremble = jab * (1 - off) * Math.sin(t * 31) * 0.0012;
+      pos.copy(mark).addScaledVector(down, -(h.size.z / 2 + above + tremble));
+      // (the model lies along z with its middle a little under the root: see beginUse)
+      const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, -1), down);
+      // the twist that takes the cap off
+      q.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.sin(seg(1.0, 1.18) * Math.PI) * 0.5));
+      rot.setFromQuaternion(q);
     } else {
       pos.set(0, -0.17 - sy * 0.25 + Math.sin(t * 9) * 0.004, -(0.38 + sy * 0.3));
       rot.set(0.45, 0.25 + Math.sin(t * 4.5) * 0.05, 0);
@@ -1555,6 +1703,23 @@ export class Weapons {
     });
     let right = grip(1);
     let left: HandGrip | null = two ? grip(-1) : null;
+    // between the first two fingers, near the filter, the hand under it and its palm to the face
+    if (drawn >= 0) right = { pos: new THREE.Vector3(-0.009, -0.168, 0.05), fingers: new THREE.Vector3(0, 0.97, -0.24), palm: new THREE.Vector3(0, 0.24, 0.97), curl: [0.08, 0.12, 1.0, 1.1], thumb: 0.55 };
+    if (offered) {
+      // Both hands are said in the eye's space and turned into the injector's own, which is what
+      // the arms are posed in. The right is a fist round the barrel of it, thumb uppermost on
+      // the end that is pressed: it comes in from the right and its fingers close round the far side.
+      const inv = h.root.quaternion.clone().invert();
+      const local = (v: THREE.Vector3) => v.applyQuaternion(inv);
+      right = { pos: local(new THREE.Vector3(0.024, 0.012, -0.018)), fingers: local(new THREE.Vector3(-0.6, 0, -0.8)), palm: local(new THREE.Vector3(-0.8, 0, 0.6)), curl: [1.4, 1.45, 1.5, 1.55], thumb: 0.9 };
+      left = {
+        pos: offered.pos.clone().sub(h.root.position).applyQuaternion(inv),
+        fingers: offered.fingers.clone().applyQuaternion(inv),
+        palm: offered.palm.clone().applyQuaternion(inv),
+        curl: [0.55, 0.6, 0.7, 0.8],
+        thumb: 0.3,
+      };
+    }
     if (h.kind === 'open') {
       // left hand holds the box, right hand pries the latch on top
       const w = 0.5 + 0.5 * Math.sin(t * 6);

@@ -15,6 +15,8 @@ import { MeshoptEncoder, MeshoptSimplifier } from 'meshoptimizer';
 import sharp from 'sharp';
 import { HDRI, TEXTURES, MODELS, LOCAL_MODELS, WEAPON_PACKS } from './assets.config.mjs';
 import { processWeaponPack } from './weapon-packs.mjs';
+import { processProp } from './props.mjs';
+import { buildFx } from './fx.mjs';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
 const SRC = path.join(ROOT, 'assets-src');
@@ -290,6 +292,13 @@ function boundsUnder(node, m) {
 const localCredits = [];
 async function processLocal(id) {
   const cfg = LOCAL_MODELS[id];
+  if (cfg.kind !== 'vehicle') {
+    const made = await processProp(id, cfg, { io: await getIO(), SRC, OUT, FORCE, exists, countTris });
+    // (several things may be made out of one download: it is credited once)
+    if (!localCredits.some((c) => c.line === made.credit.line)) localCredits.push(made.credit);
+    else localCredits.find((c) => c.line === made.credit.line).changes += ` ${made.credit.changes}`;
+    return made.entry;
+  }
   const dir = path.join(SRC, 'models', id);
   const gltfPath = path.join(dir, cfg.file);
   if (!(await exists(gltfPath))) throw new Error(`${id}: put its glTF download in assets-src/models/${id}/ (${cfg.file} is not there)`);
@@ -376,6 +385,8 @@ for (const [id, cfg] of Object.entries(WEAPON_PACKS)) {
   Object.assign(packEntries, made.entries);
   localCredits.push(made.credit);
 }
+// pictures for effects (the flash at a muzzle)
+localCredits.push(...(await buildFx({ SRC, OUT, exists })));
 
 const manifest = {
   generated: new Date().toISOString(),
@@ -395,10 +406,17 @@ const md = [
   ...(localCredits.length
     ? ['## Attribution required', '', ...localCredits.flatMap((c) => [`- ${c.line}`, `  Changes made: ${c.changes}`]), '', '## Public domain (CC0)', '']
     : []),
-  "The player character is built by `npm run character` from two packs by",
-  "[Quaternius](https://quaternius.com): the body, face and hair from Universal Base Characters and the",
-  "animations from the Universal Animation Library. Its clothes, gloves and boots, its build and its",
-  "standing pose are made by that script.",
+  "The player character is built by `npm run character`. Its skeleton and every movement it makes are",
+  "from two packs by [Quaternius](https://quaternius.com): Universal Base Characters and the Universal",
+  "Animation Library. What is seen of it (the suit, the head, the plate carrier, pouches, pads, cap and",
+  "headset) is the military tactical suit credited above, put onto that skeleton by `scripts/suit.mjs`.",
+  "",
+  "The flash at a muzzle, seen from the side, is out of the Particle Pack by [Kenney](https://kenney.nl) (CC0).",
+  "",
+  "Gunshots, the bolt, magazines and the slide are recordings (cut and converted by `npm run sounds`): from",
+  "[Snake's Authentic Gun Sounds](https://f8studios.itch.io/snakes-authentic-gun-sounds) by Snake (free to use,",
+  "credit not asked for and given gladly) and from [The Free Firearm Sound Library](https://opengameart.org/content/the-free-firearm-sound-library)",
+  "by Ben Jaszczak, Brian Nelson, Kevin Heras and Matthew Nanney (CC0). Every other sound is made by the game as it plays.",
   "",
   "Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees are generated with",
   "[EZ-Tree](https://github.com/dgreenheck/ez-tree) (MIT, Daniel Greenheck).",

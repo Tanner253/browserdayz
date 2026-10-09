@@ -37,9 +37,12 @@ export interface Look {
   beard: boolean;
 }
 
-// worn outdoor clothing: nothing brighter than it would be after a month in the woods
-const JACKETS = [0x4b5235, 0x5a4a36, 0x2f3b4a, 0x4d4f4c, 0x6b3f2a, 0x33452f, 0x232527, 0x7a6a4c, 0x5a2e30, 0x3d4f57, 0x6a6048, 0x2b3327];
-const TROUSERS = [0x2c3644, 0x6b5f47, 0x3d4430, 0x2a2b2d, 0x4a3b2c, 0x555a5c, 0x343d33];
+// Field clothing: olive, coyote, ranger green, field grey, khaki, black. (There were a rust,
+// a maroon, a teal and two blues among these when the body wore a civilian's jacket. On a
+// soldier's suit they were a tracksuit. There are as many colours as there were, so nobody's
+// other looks change with it.)
+const JACKETS = [0x4b5235, 0x5a4a36, 0x3a3f45, 0x4d4f4c, 0x5c4a34, 0x33452f, 0x232527, 0x7a6a4c, 0x54563c, 0x454a3a, 0x6a6048, 0x2b3327];
+const TROUSERS = [0x3a3d38, 0x6b5f47, 0x3d4430, 0x2a2b2d, 0x4a3b2c, 0x555a5c, 0x343d33];
 const SKIN = [0xffffff, 0xfff1e6, 0xe2cdbf, 0xb9957f, 0x8a6a57, 0x5e4538];
 const HAIR = [0x17120e, 0x2b1d14, 0x4a3221, 0x6e5235, 0x8d7448, 0x7c7a76, 0x5c2a17];
 
@@ -103,31 +106,9 @@ export function setLookUniforms(u: LookUniforms, look: Look) {
   u.uSkin.value.copy(look.skin);
 }
 
-/** Shader patch for the body material (it must have a colour map). */
-export function lookPatch(shader: { uniforms: Record<string, THREE.IUniform>; vertexShader: string; fragmentShader: string }, u: LookUniforms) {
-  Object.assign(shader.uniforms, u);
-  // A stain is a small sphere fixed to the body as it stands at rest: whatever skin or cloth
-  // is inside it is soaked. The vertex position before skinning is that rest position, so a
-  // stain moves with the limb it is on at no cost.
-  shader.vertexShader = shader.vertexShader
-    .replace('#include <common>', '#include <common>\nvarying vec3 vRest;')
-    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvRest = position;');
-  shader.fragmentShader = shader.fragmentShader
-    .replace('#include <common>', `#include <common>\nuniform sampler2D tLook;\nuniform vec3 uJacket;\nuniform vec3 uTrousers;\nuniform vec3 uSkin;\nuniform vec4 uWounds[${MAX_WOUNDS}];\nvarying vec3 vRest;\nfloat woundK;`)
-    .replace(
-      '#include <roughnessmap_fragment>',
-      `#include <roughnessmap_fragment>
-roughnessFactor = mix(roughnessFactor, 0.28, woundK);`,
-    )
-    .replace(
-      '#include <map_fragment>',
-      `#include <map_fragment>
-{
-  vec3 lk = texture2D(tLook, vMapUv).rgb;
-  vec3 tint = mix(uSkin, vec3(1.0), min(1.0, lk.r + lk.g + lk.b));
-  tint = mix(tint, uJacket, lk.r);
-  tint = mix(tint, uTrousers, lk.g);
-  diffuseColor.rgb *= tint;
+/** what every body's material is told about bloodstains: declared with the rest, worked out after the colour map */
+const WOUND_DECL = `uniform vec4 uWounds[${MAX_WOUNDS}];\nfloat woundK;`;
+const WOUND_CODE = `
   woundK = 0.0;
   // a ragged edge, so a stain is a blot and not a disc
   float rag = sin(vRest.x * 211.0 + vRest.y * 97.0) * sin(vRest.y * 173.0 - vRest.z * 131.0) * 0.16 + sin(vRest.x * 61.0 - vRest.z * 83.0 + vRest.y * 47.0) * 0.12;
@@ -136,7 +117,52 @@ roughnessFactor = mix(roughnessFactor, 0.28, woundK);`,
     if (wd.w > 0.0) woundK = max(woundK, 1.0 - smoothstep(0.5, 1.0, distance(vRest, wd.xyz) / wd.w + rag));
   }
   // soaked through in the middle, thinner and brighter at the edge
-  diffuseColor.rgb = mix(diffuseColor.rgb, mix(vec3(0.22, 0.01, 0.007), vec3(0.085, 0.004, 0.003), smoothstep(0.35, 1.0, woundK)), min(1.0, woundK * 1.25) * 0.94);
-}`,
-    );
+  diffuseColor.rgb = mix(diffuseColor.rgb, mix(vec3(0.22, 0.01, 0.007), vec3(0.085, 0.004, 0.003), smoothstep(0.35, 1.0, woundK)), min(1.0, woundK * 1.25) * 0.94);`;
+
+type Shader = { uniforms: Record<string, THREE.IUniform>; vertexShader: string; fragmentShader: string };
+
+// A stain is a small sphere fixed to the body as it stands at rest: whatever skin or cloth
+// is inside it is soaked. The vertex position before skinning is that rest position, so a
+// stain moves with the limb it is on at no cost.
+function stained(shader: Shader, vertexDecl: string, vertexCode: string, fragmentDecl: string, tint: string) {
+  shader.vertexShader = shader.vertexShader
+    .replace('#include <common>', `#include <common>\nvarying vec3 vRest;\n${vertexDecl}`)
+    .replace('#include <begin_vertex>', `#include <begin_vertex>\nvRest = position;\n${vertexCode}`);
+  shader.fragmentShader = shader.fragmentShader
+    .replace('#include <common>', `#include <common>\nvarying vec3 vRest;\n${fragmentDecl}\n${WOUND_DECL}`)
+    .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.28, woundK);')
+    .replace('#include <map_fragment>', `#include <map_fragment>\n{\n${tint}\n${WOUND_CODE}\n}`);
+}
+
+/** Shader patch for the body material of the plain body (it must have a colour map): clothes by the mask texture. */
+export function lookPatch(shader: Shader, u: LookUniforms) {
+  Object.assign(shader.uniforms, u);
+  stained(shader, '', '', 'uniform sampler2D tLook;\nuniform vec3 uJacket;\nuniform vec3 uTrousers;\nuniform vec3 uSkin;', `
+  vec3 lk = texture2D(tLook, vMapUv).rgb;
+  vec3 tint = mix(uSkin, vec3(1.0), min(1.0, lk.r + lk.g + lk.b));
+  tint = mix(tint, uJacket, lk.r);
+  tint = mix(tint, uTrousers, lk.g);
+  diffuseColor.rgb *= tint;`);
+}
+
+/**
+ * What the suit's cloth is, on average, as light. A player's own colour is put in its place:
+ * the weave, the seams and the wear stay, and the olive becomes that colour. (The uniforms
+ * carry CLOTH_GAIN, which the painted grey of the plain body needed; it is taken off here.)
+ */
+const SUIT_CLOTH = [0.0818, 0.0744, 0.0435].map((v) => (1 / (v * CLOTH_GAIN)).toFixed(3)).join(', ');
+/** how far toward the player's colour it goes: all the way looked dyed */
+const SUIT_OWN = '0.7';
+
+/**
+ * Shader patch for every material of the suit (scripts/suit.mjs). Which of the body shape is
+ * jacket and which trousers is said point by point (`_tone`: red, green); the other pieces
+ * have no such thing and keep their own colour.
+ */
+export function suitPatch(shader: Shader, u: LookUniforms) {
+  Object.assign(shader.uniforms, { uWounds: u.uWounds, uJacket: u.uJacket, uTrousers: u.uTrousers });
+  stained(shader, 'attribute vec4 _tone;\nvarying vec3 vTone;', 'vTone = _tone.rgb;', 'uniform vec3 uJacket;\nuniform vec3 uTrousers;\nvarying vec3 vTone;', `
+  vec3 own = mix(vec3(1.0), uJacket * vec3(${SUIT_CLOTH}), vTone.r * ${SUIT_OWN});
+  own = mix(own, uTrousers * vec3(${SUIT_CLOTH}), vTone.g * ${SUIT_OWN});
+  diffuseColor.rgb *= own;`);
 }

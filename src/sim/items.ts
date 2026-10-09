@@ -38,7 +38,7 @@ export interface ItemDef {
   category: Category;
   stack?: number;
   slot?: SlotKind;
-  use?: { verb: string; time: number; energy?: number; water?: number; health?: number; stopBleed?: boolean; sound: 'eat' | 'drink' | 'bandage' | 'smoke' };
+  use?: { verb: string; time: number; energy?: number; water?: number; health?: number; stopBleed?: boolean; sound: 'eat' | 'drink' | 'bandage' | 'inject' | 'smoke' };
   /** thrown when used: seconds of fuse, damage at the centre, metres it reaches */
   throw?: { fuse: number; damage: number; radius: number };
   /** looked through when used: how much of the normal field of view is left (0.2 = five times closer) */
@@ -140,36 +140,45 @@ const D: ItemDef[] = [
   { id: 'water_jug', name: 'Water Jug', model: 'plastic_bottle_gallon', w: 2, h: 3, weight: 2.2, category: 'drink', desc: 'Two litres of clean water.', use: { verb: 'Drink', time: 3, water: 60, sound: 'drink' } },
   { id: 'thermos', name: 'Thermos', model: 'plastic_thermos', w: 1, h: 3, weight: 0.8, category: 'drink', desc: 'Lukewarm tea. Better than nothing.', use: { verb: 'Drink', time: 2.5, water: 35, energy: 5, sound: 'drink' } },
   // ---------------------------------------------------------------- medical
-  { id: 'bandage', name: 'Bandage Roll', model: 'medical_tape', scale: 1.7, w: 1, h: 1, weight: 0.05, category: 'medical', desc: 'Stops bleeding.', use: { verb: 'Apply', time: 3.5, stopBleed: true, health: 5, sound: 'bandage' } },
+  // (The item is still `bandage`: it is what the roll of tape was, in every loot table and every
+  // pocket. What it is now is an auto-injector: quicker than winding a dressing, and it gives
+  // something back.)
+  { id: 'bandage', name: 'Combat Injector', model: 'syringe', w: 1, h: 1, weight: 0.06, category: 'medical', desc: 'Clotting agent and a painkiller in one spring-loaded shot. Stops bleeding and gives back 15 health.', use: { verb: 'Use', time: 2.4, stopBleed: true, health: 15, sound: 'inject' } },
   { id: 'firstaid', name: 'First Aid Kit', model: 'medical_box', w: 3, h: 2, weight: 0.9, category: 'medical', desc: 'Dressings and antiseptic. Treats wounds properly.', use: { verb: 'Treat wounds', time: 6, stopBleed: true, health: 45, sound: 'bandage' } },
   // ---------------------------------------------------------------- clothing & bags
   {
-    id: 'boonie_hat', name: 'Boonie Hat', model: 'fishermans_hat', w: 2, h: 2, weight: 0.12, category: 'clothing', slot: 'head',
-    desc: 'Wide-brimmed canvas hat. Keeps the sun off: you get thirsty a fifth more slowly while you wear it.', wear: { thirst: 0.8 },
+    // (still `boonie_hat`: a field cap now, with the headset that goes over it)
+    id: 'boonie_hat', name: 'Patrol Cap', model: 'patrol_cap', w: 2, h: 2, weight: 0.45, category: 'clothing', slot: 'head',
+    desc: 'Field cap and an ear-defender headset. Keeps the sun off: you get thirsty a fifth more slowly. The headset takes a tenth off anything that hits your head.', wear: { thirst: 0.8, head: 0.9 },
   },
   {
     id: 'gasmask', name: 'Gas Mask', model: 'old_gas_mask', w: 2, h: 2, weight: 0.7, category: 'clothing', slot: 'face',
     desc: 'GP-5 pattern mask. Thick rubber and glass: a fifth less damage from anything that hits your head.', wear: { head: 0.8 },
   },
   {
-    id: 'life_vest', name: 'Flotation Vest', model: 'life_jacket', w: 3, h: 3, weight: 0.8, category: 'clothing', slot: 'vest',
-    desc: 'Foam-filled vest with deep pockets. 12 more slots, and a quarter less damage from every hit to the body.', wear: { cargo: [4, 3], armor: 0.75 },
+    // (still `life_vest`, which is what was worn here before: it is a plate carrier now)
+    id: 'life_vest', name: 'Plate Carrier', model: 'plate_carrier', w: 3, h: 3, weight: 5.2, category: 'clothing', slot: 'vest',
+    desc: 'Hard plates front and back, pouches all round. 12 more slots, and 40% less damage from every hit to the body.', wear: { cargo: [4, 3], armor: 0.6 },
   },
   {
-    id: 'work_gloves', name: 'Work Gloves', model: 'garden_gloves_01', w: 2, h: 1, weight: 0.1, category: 'clothing', slot: 'hands',
-    desc: 'Thick canvas gloves. Your punches land harder.', wear: { fist: 5 },
+    // (still `work_gloves`)
+    id: 'work_gloves', name: 'Tactical Gloves', model: 'tactical_gloves', w: 2, h: 1, weight: 0.15, category: 'clothing', slot: 'hands',
+    desc: 'Padded leather gloves with hard knuckles. Your punches land harder.', wear: { fist: 5 },
   },
   {
-    id: 'rubber_boots', name: 'Rubber Boots', model: 'rubber_boots', nodeRe: '^rubber_boots_[lr]$', w: 2, h: 3, weight: 1.1, category: 'clothing', slot: 'feet',
-    desc: 'Tall wellingtons. Cushions a bad landing: a third less fall damage.', wear: { fall: 0.67 },
+    // (still `rubber_boots`)
+    id: 'rubber_boots', name: 'Combat Boots', model: 'combat_boots', w: 2, h: 3, weight: 1.4, category: 'clothing', slot: 'feet',
+    desc: 'Laced leather boots with a stiff sole. Cushions a bad landing: a third less fall damage.', wear: { fall: 0.67 },
   },
   {
-    id: 'sack_pack', name: 'Refuse Sack', model: 'trashbag', scale: 0.7, w: 3, h: 3, weight: 0.2, category: 'clothing', slot: 'back',
-    desc: 'A heavy-duty sack slung over the shoulder. Crude, but it holds 16 slots.', wear: { cargo: [4, 4] },
+    // (still `sack_pack`: the smaller of two packs, both the one military backpack at two sizes)
+    id: 'sack_pack', name: 'Patrol Pack', model: 'military_backpack', scale: 0.98, w: 3, h: 3, weight: 0.9, category: 'clothing', slot: 'back',
+    desc: 'A small camouflage day pack. 16 slots.', wear: { cargo: [4, 4] },
   },
   {
-    id: 'suitcase', name: 'Strapped Suitcase', model: 'vintage_suitcase', nodeRe: '^vintage_suitcase_01_', scale: 0.8, w: 4, h: 3, weight: 2.4, category: 'clothing', slot: 'back',
-    desc: 'An old travel case with rope shoulder straps. Heavy, awkward, and 30 slots of space.', wear: { cargo: [6, 5] },
+    // (still `suitcase`)
+    id: 'suitcase', name: 'Field Rucksack', model: 'military_backpack', scale: 1.22, w: 4, h: 3, weight: 1.8, category: 'clothing', slot: 'back',
+    desc: 'A full-size military backpack, with room for 30 slots.', wear: { cargo: [6, 5] },
   },
   // ---------------------------------------------------------------- tools & misc
   { id: 'flashlight', name: 'Flashlight', model: 'vintage_flashlight', w: 1, h: 2, weight: 0.4, category: 'tool', desc: 'Battery lantern.' },
@@ -186,7 +195,7 @@ const D: ItemDef[] = [
     desc: 'Stamped steel on a ball chain. Every survivor carries their own. Take one off a body and stay alive with it for 10 minutes to cash it in.',
   },
   // ---------------------------------------------------------------- base building
-  { id: 'stash_kit', name: 'Stash Crate', model: 'wooden_military_crate', w: 4, h: 3, weight: 6, category: 'stash', scale: 0.55, desc: 'A crate you can put down anywhere (right-click → Place). It stays in the world and keeps whatever you store in it.' },
+  { id: 'stash_kit', name: 'Stash Case', model: 'weapons_case', w: 4, h: 3, weight: 6, category: 'stash', scale: 0.55, desc: 'A hard case you can put down anywhere (right-click → Place). It stays in the world and keeps whatever you store in it.' },
 ];
 
 export const ITEMS: Record<string, ItemDef> = Object.fromEntries(D.map((d) => [d.id, d]));

@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { physics, SOLID_GROUPS, type Surface } from '../core/physics';
 import type { Atmosphere } from '../world/atmosphere';
+import { MuzzleFlash, muzzleArt } from './muzzle';
 
 const MAX_P = 600;
 const MAX_DECALS = 160;
@@ -255,6 +256,9 @@ export class Effects {
   eye = new THREE.Vector3();
   flashLight: THREE.PointLight;
   private flashT = 0;
+  /** the flames at other people's muzzles: a few, used in turn */
+  private flames: MuzzleFlash[] = [];
+  private flame = 0;
   private _m = new THREE.Matrix4();
   private _q = new THREE.Quaternion();
   private _s = new THREE.Vector3();
@@ -364,6 +368,14 @@ export class Effects {
 
     this.flashLight = new THREE.PointLight(0xffb060, 0, 14, 2);
     scene.add(this.flashLight);
+    // (once their pictures are here: nobody shoots before that)
+    void muzzleArt().then((art) => {
+      for (let i = 0; i < 6; i++) {
+        const f = new MuzzleFlash(art);
+        scene.add(f.root);
+        this.flames.push(f);
+      }
+    });
   }
 
   private spawn(o: Partial<Particle> & { p: THREE.Vector3 }) {
@@ -669,7 +681,22 @@ export class Effects {
     d.mesh.instanceMatrix.needsUpdate = true;
   }
 
-  muzzle(worldPos: THREE.Vector3, dir: THREE.Vector3, big: boolean, suppressed = false) {
+  /** A thread of smoke off something that smoulders. */
+  wisp(p: THREE.Vector3) {
+    this.spawn({ p, v: new THREE.Vector3((Math.random() - 0.5) * 0.03, 0.14 + Math.random() * 0.06, (Math.random() - 0.5) * 0.03), max: 1.2 + Math.random() * 0.5, size: 0.01, grow: 0.06, color: new THREE.Color(0.8, 0.8, 0.8), alpha: 0.14, gravity: -0.04, drag: 0.7 });
+  }
+
+  /** @param flame the flame is drawn here too, this long (somebody else's shot: the player's own gun carries its own) */
+  muzzle(worldPos: THREE.Vector3, dir: THREE.Vector3, big: boolean, suppressed = false, flame = 0) {
+    if (!suppressed && flame > 0) {
+      const f = this.flames[this.flame++ % this.flames.length];
+      if (!f) return;
+      f.root.position.copy(worldPos);
+      f.root.lookAt(worldPos.x + dir.x, worldPos.y + dir.y, worldPos.z + dir.z);
+      // (lookAt points +z at it; the flame goes down -z)
+      f.root.rotateY(Math.PI);
+      f.fire(flame);
+    }
     if (!suppressed) {
       this.flashLight.position.copy(worldPos);
       this.flashLight.color.set(0xffb060);
@@ -684,6 +711,7 @@ export class Effects {
   }
 
   update(dt: number) {
+    for (const f of this.flames) f.update(dt);
     if (this.flashT > 0) {
       this.flashT -= dt;
       if (this.flashT <= 0) {

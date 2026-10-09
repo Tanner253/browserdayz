@@ -75,6 +75,8 @@ function standSkin(node) {
   });
 }
 
+export { standSkin, mul, move, scaleBy, point };
+
 /**
  * @returns the manifest entries this pack makes ({ id: entry }), and its credit
  */

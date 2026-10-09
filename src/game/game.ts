@@ -62,7 +62,7 @@ interface TimedAction {
   label: string;
   t: number;
   dur: number;
-  sound: 'eat' | 'drink' | 'bandage' | 'smoke' | null;
+  sound: 'eat' | 'drink' | 'bandage' | 'inject' | 'smoke' | null;
   soundT: number;
   done: () => void;
 }
@@ -437,8 +437,7 @@ export class Game {
     const look = lookFor(name);
     this.avatar.setLook(look);
     this.weapons.setLook(look);
-    const { r, atmo } = this.s;
-    if (portrait) void renderDoll(r.renderer, atmo.envMap, look).then((doll) => (this.invUI.doll = doll));
+    if (portrait) this.portrait();
   }
 
   private async enterOffline() {
@@ -868,7 +867,22 @@ export class Game {
     this.gearKey = key;
     void this.wear(this.avatar, ids);
     this.net.send({ t: 'gear', g: ids });
+    this.portrait();
   }
+
+  /** The figure in the inventory window, drawn again as the player is now: their colours, and what they have on. */
+  private portrait() {
+    const { r, atmo } = this.s;
+    const worn = this.gearKey && this.gearKey !== '\u0000' ? this.gearKey.split(',') : [];
+    const mine = ++this.portraitN;
+    void renderDoll(r.renderer, atmo.envMap, lookFor(playerName()), worn, this.loot.models).then((doll) => {
+      // (a later one may have been asked for while this was drawn)
+      if (mine !== this.portraitN || !this.invUI) return;
+      this.invUI.doll = doll;
+      this.invUI.redraw();
+    });
+  }
+  private portraitN = 0;
   private gearKey = '';
 
   private async addRemoteStash(s: StashInfo) {
@@ -1281,7 +1295,10 @@ export class Game {
     this.toggleInventory(false);
     this.use = { label, t: 0, dur, sound, soundT: 0, done };
     this.weapons.beginUse(itemId, kind, dur);
-    this.act(kind, dur);
+    // (what everybody else sees of an injection is the hands at work on a wound, as with a dressing)
+    this.act(kind === 'inject' ? 'bandage' : kind === 'smoke' ? 'eat' : kind, dur);
+    // (a smoke is one sound from the lighter to the last breath of it, made once)
+    if (sound === 'smoke') audio.ui('smoke');
   }
 
   /** wherever the item currently is: player inventory or the open crate */
@@ -1307,7 +1324,7 @@ export class Game {
       this.syncOpenBox();
     }
     // how the hands hold it while it is used: a smoke goes to the mouth, a grenade is worked with both
-    const kind: UseKind = def.throw ? 'open' : def.look ? 'drink' : u.sound === 'smoke' ? 'eat' : u.sound;
+    const kind: UseKind = def.throw ? 'open' : def.look ? 'drink' : u.sound;
     const sound: TimedAction['sound'] = def.throw || def.look ? null : u.sound;
     this.glass = 0;
     this.startUse(def.throw ? 'Pulling the cord' : def.look ? 'Binoculars' : `${u.verb} ${def.name}`, u.time, item.id, kind, sound, () => {
@@ -1912,7 +1929,7 @@ export class Game {
 
   /** What to do about an open wound, in as few words as it takes: the key that holds a dressing, if there is one. */
   private bleedHint(): string {
-    if (this.use?.sound === 'bandage') return 'Dressing the wound…';
+    if (this.use?.sound === 'bandage' || this.use?.sound === 'inject') return 'Treating the wound…';
     const i = this.quick.findIndex((id) => !!id && !!ITEMS[id].use?.stopBleed && this.countOf(id) > 0);
     if (i >= 0) {
       const d = ITEMS[this.quick[i]!];
@@ -1920,7 +1937,7 @@ export class Game {
     }
     const carried = this.inv.find((it) => !!ITEMS[it.id].use?.stopBleed);
     if (carried) return `${this.touch ? 'Open your pack' : '<kbd>Tab</kbd>'} and use the ${ITEMS[carried.id].name}`;
-    return 'Find a bandage or a first aid kit';
+    return 'Find an injector or a first aid kit';
   }
 
   private dripT = 0;
@@ -2056,7 +2073,7 @@ export class Game {
       const u = this.use;
       u.t += dt;
       u.soundT += dt;
-      if (u.sound && u.soundT > 1.05 && u.t < u.dur - 0.4) {
+      if (u.sound && u.sound !== 'smoke' && u.soundT > 1.05 && u.t < u.dur - 0.4) {
         u.soundT = 0;
         audio.ui(u.sound);
       }
@@ -2219,6 +2236,7 @@ export class Game {
       arms: this.weapons.armStamina,
       ride: this.garage.ride && !p.dead ? { kmh: Math.abs(this.garage.ride.jeep.speed) * 3.6, fuel: this.garage.ride.jeep.fuel / JEEP.tank, hp: this.garage.ride.jeep.hp / JEEP.hp, driver: this.garage.ride.seat === 0 } : null,
       scoped: this.weapons.scoped,
+      sightless: this.weapons.sightless,
       glass: !!this.glass,
       hitMarker: this.weapons.hitMarker,
       kill: this.weapons.killMarker,

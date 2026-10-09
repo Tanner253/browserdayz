@@ -5,6 +5,18 @@ What is not CC0 is listed first, with the credit its licence asks for.
 
 ## Attribution required
 
+- This work is based on "Tactical Plate Carrier Vest - Game Ready" (https://sketchfab.com/3d-models/tactical-plate-carrier-vest-game-ready-3b51e6329dbb4b0aa14e43f12eb6c42a) by Exactly (https://sketchfab.com/txyrm70) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Changes made: Scaled to metres and stood on the ground; its texture re-encoded as WebP; geometry compressed.
+- This work is based on "Military Weapons Container" (https://sketchfab.com/3d-models/military-weapons-container-8a1c32f395f549b8b22265b8a459fa8e) by MeshSlinger (https://sketchfab.com/thelastphysician) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Changes made: Scaled to metres and stood on the ground; textures re-encoded as WebP; geometry compressed.
+- This work is based on "Military tactical suit (LowPolyGameReady)" (https://sketchfab.com/3d-models/military-tactical-suit-lowpolygameready-ef698ce36b1545a78ce592dd3db4c7ed) by DanlyVostok (https://sketchfab.com/1799danly) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Changes made: The suit is put onto the skeleton of the game's own character by scripts/suit.mjs: every point of it is moved from the joints it was made on to that skeleton's, and stretched along the bones that are longer there. Its cap and its boots are also used alone, standing still, as things to be found. Textures re-encoded as WebP at a quarter of their size; geometry compressed; its own animation is not used. 
+- This work is based on "Military Tactical Gloves - MultiCam Hard Knuckle" (https://sketchfab.com/3d-models/military-tactical-gloves-multicam-hard-knuckle-72342e418cd743209395bba607d5504e) by Exactly (https://sketchfab.com/txyrm70) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Changes made: Scaled to metres and stood on the ground; brought down to about five thousand triangles; textures re-encoded as WebP; geometry compressed.
+- This work is based on "Military Backpack" (https://sketchfab.com/3d-models/military-backpack-06be5c0f15aa4aa3af8ebcc4c83d02a3) by Neslihan Çakmak (https://sketchfab.com/neslihancakmak) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Changes made: Scaled to metres and stood on the ground; brought down to about fourteen thousand triangles; textures re-encoded as WebP, the flat-coloured ones at a small size; geometry compressed.
+- This work is based on "Medical syringe healing FPS Animation" (https://sketchfab.com/3d-models/medical-syringe-healing-fps-animation-8de32be8633a4c87ba7ed1d125b45ec9) by BURNER (https://sketchfab.com/Alexander_Ovelar) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Changes made: Only the syringe is used, taken off its skeleton as it is held at rest and scaled to metres: the arms that came with it and its animation are left out. Textures re-encoded as WebP; geometry compressed.
 - "Uaz-469" (https://skfb.ly/6x8RE) by Yo.Ri is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
   Changes made: Scaled to metres and turned to face the way the game drives; each wheel re-centred on its own middle; textures re-encoded as WebP; geometry compressed.
 - "sniper animated" (https://sketchfab.com/3d-models/sniper-animated-b48999a250b2433da59f705c371a49b2) by DJMaesen is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
@@ -13,13 +25,22 @@ What is not CC0 is listed first, with the credit its licence asks for.
   Changes made: Its one long animation cut into the movements the game plays; a copy of the pistol alone, standing still, made for the ground and for other players; textures re-encoded as WebP; geometry compressed.
 - "Pistol 43 Tactical | FPS Animations" (https://skfb.ly/oMt7u) by Vlasov Daniil is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
   Changes made: Only the pistol is used: the arms that came with it, its lights and its animation are left out. The pistol is taken off its skeleton and set in rigid pieces (frame, slide, magazine), scaled to metres; textures re-encoded as WebP; geometry compressed.
+- This work is based on "Machine Gun Muzzle Flash Test effect" (https://sketchfab.com/3d-models/machine-gun-muzzle-flash-test-effect-b96c7578853a4fa98c7893aa8f777636) by maxi.ariani (https://sketchfab.com/maxi.ariani) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Changes made: Only its picture is used: the eighteen frames are cut out of it and set in an even grid; the planes it came on and their animation are not. Re-encoded as WebP.
 
 ## Public domain (CC0)
 
-The player character is built by `npm run character` from two packs by
-[Quaternius](https://quaternius.com): the body, face and hair from Universal Base Characters and the
-animations from the Universal Animation Library. Its clothes, gloves and boots, its build and its
-standing pose are made by that script.
+The player character is built by `npm run character`. Its skeleton and every movement it makes are
+from two packs by [Quaternius](https://quaternius.com): Universal Base Characters and the Universal
+Animation Library. What is seen of it (the suit, the head, the plate carrier, pouches, pads, cap and
+headset) is the military tactical suit credited above, put onto that skeleton by `scripts/suit.mjs`.
+
+The flash at a muzzle, seen from the side, is out of the Particle Pack by [Kenney](https://kenney.nl) (CC0).
+
+Gunshots, the bolt, magazines and the slide are recordings (cut and converted by `npm run sounds`): from
+[Snake's Authentic Gun Sounds](https://f8studios.itch.io/snakes-authentic-gun-sounds) by Snake (free to use,
+credit not asked for and given gladly) and from [The Free Firearm Sound Library](https://opengameart.org/content/the-free-firearm-sound-library)
+by Ben Jaszczak, Brian Nelson, Kevin Heras and Matthew Nanney (CC0). Every other sound is made by the game as it plays.
 
 Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees are generated with
 [EZ-Tree](https://github.com/dgreenheck/ez-tree) (MIT, Daniel Greenheck).

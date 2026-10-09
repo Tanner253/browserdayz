@@ -11,7 +11,7 @@ import * as THREE from 'three';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import type { Atmosphere } from '../world/atmosphere';
 import type { Grips, HandGrip } from './arms';
-import { BEARD, HAIR_STYLES, MAX_WOUNDS, loadCharacter, lookFor, lookPatch, lookUniforms, setLookUniforms, type Look, type LookUniforms } from './look';
+import { BEARD, HAIR_STYLES, MAX_WOUNDS, loadCharacter, lookFor, lookPatch, lookUniforms, setLookUniforms, suitPatch, type Look, type LookUniforms } from './look';
 import type { Emote } from '../sim/emotes';
 
 /** local player's full body: seen by the shadow cameras always, by the main camera only on the flight in from the menu */
@@ -49,13 +49,20 @@ export type Hold = NonNullable<Emote['hold']>;
  * Worn things that are drawn on the body. `p`, `r`, `s` place the item's model on the body
  * as it stands at rest (x to its right, y up, z behind it); the bone then carries it.
  */
-const GEAR: Record<string, { bone: 'Head' | 'spine_03'; p: [number, number, number]; r: [number, number, number]; s: [number, number, number]; pack?: boolean }> = {
-  boonie_hat: { bone: 'Head', p: [0, 1.672, -0.005], r: [0, 0, 0], s: [1.05, 1.05, 1.05] },
-  life_vest: { bone: 'spine_03', p: [0, 1.22, -0.155], r: [Math.PI / 2, 0, 0], s: [0.6, 1.85, 0.52] },
-  sack_pack: { bone: 'spine_03', p: [0, 1.0, 0.3], r: [0.08, 0, 0], s: [1, 1, 1], pack: true },
-  suitcase: { bone: 'spine_03', p: [0, 0.92, 0.235], r: [0.06, 0, 0], s: [0.85, 0.85, 0.85], pack: true },
+export const GEAR: Record<string, { bone: 'Head' | 'spine_03'; p: [number, number, number]; r: [number, number, number]; s: [number, number, number]; pack?: boolean }> = {
+  // (the one backpack at two sizes: its straps are toward the body as its model comes, so it is not turned)
+  sack_pack: { bone: 'spine_03', p: [0, 0.97, 0.2], r: [0.05, 0, 0], s: [1, 1, 1], pack: true },
+  suitcase: { bone: 'spine_03', p: [0, 0.87, 0.215], r: [0.05, 0, 0], s: [1, 1, 1], pack: true },
 };
-export const GEAR_SHOWN = new Set(Object.keys(GEAR));
+/**
+ * Worn things that are part of the body itself: pieces of the suit (scripts/suit.mjs), on its
+ * skeleton and cut to it, that are there or not. [what is worn]: the pieces it shows.
+ */
+export const WORN: Record<string, string[]> = {
+  life_vest: ['gear_plate', 'gear_pouches'],
+  boonie_hat: ['gear_cap', 'gear_headset'],
+};
+export const GEAR_SHOWN = new Set([...Object.keys(GEAR), ...Object.keys(WORN)]);
 
 /** Live-tunable numbers for how the clips are played (the dev harness exposes them as T.pose). */
 export const POSE = {
@@ -266,6 +273,8 @@ export class Avatar {
   /** the body mesh, and the bones a wound can be pinned to (index into its skeleton, and the bone it runs to) */
   private skin?: THREE.SkinnedMesh;
   private woundBones: [number, THREE.Object3D | undefined][] = [];
+  /** the pieces of the suit that are there only when what they are is worn */
+  private pieces = new Map<string, THREE.Object3D>();
   private woundN = 0;
   private hair: (THREE.Object3D | undefined)[] = [];
   private beard?: THREE.Object3D;
@@ -302,6 +311,8 @@ export class Avatar {
     this.uniforms = lookUniforms();
     const uniforms = this.uniforms;
     const mats = new Map<string, THREE.Material>();
+    // the suit, or the plain body the game had before it (the character build can still make either)
+    const suit = !!model.getObjectByName('pads');
     model.traverse((o) => {
       const m = o as THREE.SkinnedMesh;
       if (m.isMesh) {
@@ -309,7 +320,17 @@ export class Avatar {
         m.receiveShadow = true;
         if (m.isSkinnedMesh) m.frustumCulled = false;
         const src = m.material as THREE.MeshStandardMaterial;
-        if (m.name === 'body') {
+        if (suit) {
+          // every piece of it takes this body's stains; the cloth takes its colours as well
+          const mat = src.clone();
+          atmo.register(mat, (shader) => suitPatch(shader, uniforms), 'suit');
+          m.material = mat;
+          if (m.name === 'body') this.skin = m;
+          if (m.name.startsWith('gear_')) {
+            this.pieces.set(m.name, m);
+            m.visible = false;
+          }
+        } else if (m.name === 'body') {
           const mat = src.clone();
           atmo.register(mat, (shader) => lookPatch(shader, uniforms), 'survivor');
           m.material = mat;
@@ -460,7 +481,12 @@ export class Avatar {
     for (const o of this.gearObjs) o.removeFromParent();
     this.gearObjs = [];
     this.packOut = 0;
+    for (const p of this.pieces.values()) p.visible = false;
     for (const { id, obj } of items) {
+      for (const name of WORN[id] ?? []) {
+        const p = this.pieces.get(name);
+        if (p) p.visible = true;
+      }
       const g = GEAR[id];
       const rest = g && this.gearRest.get(g.bone);
       if (!g || !rest) continue;

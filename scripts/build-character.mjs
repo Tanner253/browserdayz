@@ -21,6 +21,7 @@ import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { dedup, prune, mergeDocuments, unpartition, textureCompress, meshopt } from '@gltf-transform/functions';
 import { MeshoptEncoder } from 'meshoptimizer';
 import sharp from 'sharp';
+import { wearSuit } from './suit.mjs';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
 const SRC = path.join(ROOT, 'assets-src', 'characters', 'src');
@@ -529,26 +530,36 @@ await fs.mkdir(PREVIEW, { recursive: true });
 await sharp(outBase, { raw: { width: TEX, height: TEX, channels: 3 } }).jpeg({ quality: 85 }).toFile(path.join(PREVIEW, 'survivor_base.jpg'));
 if (!EMOTES) await sharp(outMask, { raw: { width: TEX, height: TEX, channels: 3 } }).webp({ quality: 92, effort: 5 }).toFile(path.join(OUT, 'survivor_mask.webp'));
 
-// ================================================================ 2. hair to choose from
-for (const [name, file] of Object.entries(HAIR)) {
-  const h = await io.read(path.join(SRC, 'hair', `${file}.gltf`));
-  const before = new Set(root.listNodes());
-  mergeDocuments(doc, h);
-  for (const n of root.listNodes()) {
-    if (before.has(n)) continue;
-    if (n.getMesh()) {
-      n.setName(name);
-      if (HAIR_SHIFT[name]) n.setTranslation(HAIR_SHIFT[name]);
-      for (const p of n.getMesh().listPrimitives()) for (const s of p.listSemantics()) if (/^(COLOR_|TEXCOORD_[1-9])/.test(s)) p.setAttribute(s, null);
-      root.listScenes()[0].addChild(n);
+// ================================================================ 2. what it wears
+// The body dressed above is not what is drawn any more: a suit made for another skeleton is
+// brought onto this one (scripts/suit.mjs), head and all. The body is still built, because
+// its skeleton is this character's and every movement below is fitted to it. (`--plain`
+// keeps the old body and its hair, for looking at the two side by side.)
+const PLAIN = process.argv.includes('--plain');
+let worn = '';
+if (PLAIN) {
+  for (const [name, file] of Object.entries(HAIR)) {
+    const h = await io.read(path.join(SRC, 'hair', `${file}.gltf`));
+    const before = new Set(root.listNodes());
+    mergeDocuments(doc, h);
+    for (const n of root.listNodes()) {
+      if (before.has(n)) continue;
+      if (n.getMesh()) {
+        n.setName(name);
+        if (HAIR_SHIFT[name]) n.setTranslation(HAIR_SHIFT[name]);
+        for (const p of n.getMesh().listPrimitives()) for (const s of p.listSemantics()) if (/^(COLOR_|TEXCOORD_[1-9])/.test(s)) p.setAttribute(s, null);
+        root.listScenes()[0].addChild(n);
+      }
     }
   }
+  // everything ended up in one scene; drop the extra ones the merge brought along
+  for (const s of root.listScenes().slice(1)) s.dispose();
+  nodes.get('Eyebrows')?.setName('eyebrows');
+  nodes.get('Eyes')?.setName('eyes');
+  bodyNode.setName('body');
+} else {
+  worn = await wearSuit({ doc, io, bodyNode, dir: path.join(ROOT, 'assets-src', 'models', 'tactical_suit'), old: [nodes.get('Eyebrows'), nodes.get('Eyes')] });
 }
-// everything ended up in one scene; drop the extra ones the merge brought along
-for (const s of root.listScenes().slice(1)) s.dispose();
-nodes.get('Eyebrows')?.setName('eyebrows');
-nodes.get('Eyes')?.setName('eyes');
-bodyNode.setName('body');
 
 // ================================================================ 3. animations
 const libNodes = new Map(lib.getRoot().listNodes().map((n) => [n.getName(), n]));
@@ -626,12 +637,16 @@ const poser = (wb, hip) => {
     openHands(k) {
       for (const f of FINGERS) P.uncurl(f, k);
     },
-    /** arms hanging at the sides, a little bend at the elbow */
+    /**
+     * Arms hanging at the sides, a little bend at the elbow. They hang off the body, not down
+     * it: what is worn is a padded jacket over baggy trousers, a hand's breadth wider than the
+     * body under it, and an arm let straight down from the shoulder hangs inside the cloth.
+     */
     hangArms(k) {
       for (const [s, sx] of [['l', 1], ['r', -1]]) {
         P.toRest(`clavicle_${s}`, k * 0.6);
-        P.point(`upperarm_${s}`, `lowerarm_${s}`, [0.12 * sx, -0.99, 0.02], k);
-        P.point(`lowerarm_${s}`, `hand_${s}`, [0.07 * sx, -0.96, 0.25], k);
+        P.point(`upperarm_${s}`, `lowerarm_${s}`, [0.27 * sx, -0.96, 0.03], k);
+        P.point(`lowerarm_${s}`, `hand_${s}`, [0.1 * sx, -0.96, 0.24], k);
         P.uncurl(B(`hand_${s}`), k * 0.6);
       }
     },
@@ -686,9 +701,12 @@ const poser = (wb, hip) => {
 };
 /** what is done to each clip after it is transferred */
 const TOUCH_UP = {
-  idle: (p) => { p.stand(0.72); p.upright(0.45); p.hangArms(0.8); p.openHands(0.6); },
-  walk: (p) => { p.tuckArms(0.2); p.unbend(0.4); p.openHands(0.55); },
-  run: (p) => { p.tuckArms(0.2); p.openHands(0.4); },
+  // (Walking and running, the arms were tucked in to the ribs by a fifth of a radian: that was
+  // for a body in a shirt, and in this jacket they swung through it. They are left nearly as
+  // the library drew them, which is clear of it.)
+  idle: (p) => { p.stand(0.72); p.upright(0.8); p.hangArms(0.9); p.openHands(0.6); },
+  walk: (p) => { p.tuckArms(0.04); p.upright(0.35); p.unbend(0.4); p.openHands(0.55); },
+  run: (p) => { p.tuckArms(0.04); p.openHands(0.4); },
   crouchIdle: (p) => { p.openHands(0.5); },
   crouchWalk: (p) => { p.openHands(0.5); },
   // the game lifts the body through a jump: here the hips stay at standing height and the legs come up under them
@@ -875,4 +893,5 @@ if (!EMOTES) {
 }
 const st = await fs.stat(dest);
 const triangles = root.listMeshes().reduce((n, m) => n + m.listPrimitives().reduce((k, p) => k + (p.getIndices()?.getCount() ?? p.getAttribute('POSITION').getCount()) / 3, 0), 0);
+if (worn) console.log(worn);
 console.log(`${path.basename(dest)}  ${(st.size / 1048576).toFixed(2)} MB  ${Math.round(triangles)} triangles  ${root.listAnimations().length} clips (${total.toFixed(1)} s)  bones matched ${pairs.length}/${libJoints.length}`);

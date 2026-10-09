@@ -168,11 +168,6 @@ export const tagOf = (e: Entry): Tag => ({ ref: refOf(e.id), at: e.at, name: e.n
  */
 export type Hold = 'funds' | 'day' | 'setup' | 'hand';
 
-/** an EVM address: 0x and forty hex digits */
-export const isEvm = (wallet: string) => /^0x[0-9a-fA-F]{40}$/.test(wallet);
-/** why a tag cashed in against one is not paid from here */
-export const EVM_LISTED = 'listed against an EVM wallet, which is not paid from this treasury';
-
 export type Outcome =
   | { state: 'paid'; lamports: number; signature: string; at: string; receipt?: string }
   /** its attempt is written down, its place in the day's limits is taken, and its payment is on the way */
@@ -486,9 +481,6 @@ async function settle(w: World, t: Tag, at: { held: Held }): Promise<Outcome> {
   }
 
   if (!t.wallet) return { state: 'skipped', why: 'no wallet given' };
-  // The game asks for an EVM wallet now. This machine holds SOL and sends SOL: it has nothing
-  // to send to such an address, and says so rather than calling it no address at all.
-  if (isEvm(t.wallet)) return { state: 'skipped', why: EVM_LISTED };
   let to: Bytes;
   try {
     to = address(t.wallet);

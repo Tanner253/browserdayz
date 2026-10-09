@@ -46,8 +46,69 @@ export const TEXTURES = {
  * A vehicle is written out in the pieces the game moves: `body`, `glass`, `helm` (the
  * steering wheel) and `wheel_fl`, `wheel_fr`, `wheel_rl`, `wheel_rr`, each wheel about its
  * own middle, the whole standing on y = 0 with the middle of its wheelbase at the origin.
+ * Anything else is a thing that stands still (see scripts/props.mjs for its settings); its
+ * credit is read out of the licence that came with the download.
  */
 export const LOCAL_MODELS = {
+  plate_carrier: {
+    dir: 'plate_carrier',
+    size: 0.56,
+    tex: 1024,
+    metal: 0,
+    rough: 0.92,
+    tags: ['loot', 'gear'],
+    changes: 'Scaled to metres and stood on the ground; its texture re-encoded as WebP; geometry compressed.',
+  },
+  weapons_case: {
+    dir: 'weapons_container',
+    size: 1.25,
+    tex: 2048,
+    tags: ['prop', 'crate'],
+    changes: 'Scaled to metres and stood on the ground; textures re-encoded as WebP; geometry compressed.',
+  },
+  // (two things out of the suit the player's body is made of: as they lie about to be found)
+  patrol_cap: {
+    dir: 'tactical_suit',
+    only: /GreenCap/,
+    size: 0.33,
+    tex: 512,
+    tags: ['loot', 'gear'],
+    changes: 'The suit is put onto the skeleton of the game\'s own character by scripts/suit.mjs: every point of it is moved from the joints it was made on to that skeleton\'s, and stretched along the bones that are longer there. Its cap and its boots are also used alone, standing still, as things to be found. Textures re-encoded as WebP at a quarter of their size; geometry compressed; its own animation is not used.',
+  },
+  combat_boots: {
+    dir: 'tactical_suit',
+    only: /Mil_Suit_R5\.002/,
+    pair: true,
+    size: 0.3,
+    tex: 512,
+    tags: ['loot', 'gear'],
+    changes: '',
+  },
+  tactical_gloves: {
+    dir: 'tactical_gloves_sf',
+    budget: 5000,
+    size: 0.27,
+    tex: 1024,
+    tags: ['loot', 'gear'],
+    changes: 'Scaled to metres and stood on the ground; brought down to about five thousand triangles; textures re-encoded as WebP; geometry compressed.',
+  },
+  military_backpack: {
+    dir: 'military_backpack',
+    budget: 14000,
+    small: /buckle|plate|slider|zipper/,
+    size: 0.56,
+    tex: 1024,
+    tags: ['loot', 'gear'],
+    changes: 'Scaled to metres and stood on the ground; brought down to about fourteen thousand triangles; textures re-encoded as WebP, the flat-coloured ones at a small size; geometry compressed.',
+  },
+  syringe: {
+    dir: 'syringe',
+    only: /Syringe/,
+    size: 0.14,
+    tex: 512,
+    tags: ['loot'],
+    changes: 'Only the syringe is used, taken off its skeleton as it is held at rest and scaled to metres: the arms that came with it and its animation are left out. Textures re-encoded as WebP; geometry compressed.',
+  },
   uaz_469: {
     kind: 'vehicle',
     file: 'scene.gltf',
@@ -99,7 +160,10 @@ export const WEAPON_PACKS = {
     wrists: { right: 'R_wrist_026', left: 'L_wrist_02' },
     origin: [0.425, 0, -0.034],
     fps: 30,
-    clips: { fire: [0, 10], bolt: [10, 48], reload: [49, 97], draw: [182, 200], idle: [148, 180], check: [98, 147] },
+    // (It has no drawing of its coming up: the rifle is lifted into the picture by the game. What
+    // its last frames are is a blow with it, a fast turn of the whole rifle and a slow way back,
+    // which was played as the draw until somebody said what it looked like.)
+    clips: { fire: [0, 10], bolt: [10, 48], reload: [49, 97], idle: [148, 180], check: [98, 147], melee: [180, 200] },
     credit: {
       name: 'sniper animated',
       url: 'https://sketchfab.com/3d-models/sniper-animated-b48999a250b2433da59f705c371a49b2',

@@ -49,6 +49,7 @@ const SOLID: Record<string, [Surface, number]> = {
   concrete_road_barrier: ['concrete', 0.95],
   wooden_military_crate: ['wood', 0.95],
   old_military_crate: ['wood', 0.95],
+  weapons_case: ['metal', 0.95],
   stone_fire_pit: ['rock', 0.85],
   street_lamp_01: ['metal', 0.25],
   old_bed_frame: ['metal', 0.95],

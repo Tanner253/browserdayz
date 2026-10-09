@@ -28,6 +28,8 @@ export interface HandGrip {
   thumb: number;
   /** 0..1: fold the thumb across the curled fingers (a closed fist) */
   tuck?: number;
+  /** how the curl is shared between a finger's three joints, knuckle first (0.8, 1.1, 0.8 when not given) */
+  fold?: [number, number, number];
 }
 
 export interface Grips {
@@ -350,7 +352,7 @@ export class FPArms {
     a.fingers.forEach((chain, fi) => {
       const c = grip.curl[fi];
       chain.forEach((bone, j) => {
-        const ang = c * (j === 0 ? 0.8 : j === 1 ? 1.1 : 0.8);
+        const ang = c * (grip.fold?.[j] ?? (j === 0 ? 0.8 : j === 1 ? 1.1 : 0.8));
         bone.getWorldQuaternion(_q2);
         _q2.premultiply(_q1.setFromAxisAngle(curlAxis, ang));
         this.setWorldQuat(bone, _q2);

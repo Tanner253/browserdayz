@@ -94,6 +94,37 @@ export interface EngineVoice {
   stop(): void;
 }
 
+/**
+ * Recordings, played in place of sounds this file would otherwise make up (scripts/sounds.mjs
+ * cuts them out of two free libraries of real guns): [name]: how many takes of it there are.
+ * One take is played, any of them. Until they have arrived, and wherever one is missing, the
+ * made-up sound is what is heard.
+ */
+const RECORDED: Record<string, number> = { shot_rifle: 1, shot_pistol: 3, shot_quiet: 1, bolt: 1, rifle_mag_out: 1, rifle_mag_in: 1, pistol_mag_out: 1, pistol_mag_in: 1, rack: 1 };
+const bank = new Map<string, AudioBuffer[]>();
+let fetched: Promise<void> | null = null;
+/** Fetches the recordings, once. (They are kept apart from any one engine: the trailer renders its soundtrack on an engine of its own.) */
+export function recordings(): Promise<void> {
+  return (fetched ??= (async () => {
+    // (decoding needs a context, and any will do: this one makes no sound)
+    const dec = new OfflineAudioContext(1, 1, 44100);
+    await Promise.all(
+      Object.entries(RECORDED).flatMap(([name, takes]) =>
+        Array.from({ length: takes }, async (_, k) => {
+          try {
+            const res = await fetch(`assets/sounds/${name}${k ? `_${k + 1}` : ''}.wav`);
+            if (!res.ok) return;
+            const buf = await dec.decodeAudioData(await res.arrayBuffer());
+            bank.set(name, [...(bank.get(name) ?? []), buf]);
+          } catch {
+            // not there, or not sound: the made-up one stands in
+          }
+        }),
+      ),
+    );
+  })());
+}
+
 export class AudioEngine {
   ctx!: AudioContext;
   private master!: GainNode;
@@ -126,6 +157,7 @@ export class AudioEngine {
     }
     this.ctx = new AudioContext({ latencyHint: 'interactive' });
     const ctx = this.ctx;
+    void recordings();
     const comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -10;
     comp.knee.value = 12;
@@ -282,6 +314,26 @@ export class AudioEngine {
     return lp as AudioNode;
   }
 
+  /**
+   * Plays a recording, if it is here.
+   * @param to where it goes (a place in the world, or straight to the ears)
+   * @param at when, on the context's clock
+   * @returns whether it did: if not, the caller makes the sound up as it used to
+   */
+  private rec(name: string, to: AudioNode, at: number, gain = 1): boolean {
+    const takes = bank.get(name);
+    if (!this.ready || !takes?.length) return false;
+    const src = this.ctx.createBufferSource();
+    src.buffer = takes[Math.floor(Math.random() * takes.length)];
+    // (no two shots from one gun are the same pitch to a hair, and one take played over and over is heard as one take)
+    src.playbackRate.value = 0.97 + Math.random() * 0.06;
+    const g = this.ctx.createGain();
+    g.gain.value = gain;
+    src.connect(g).connect(to);
+    src.start(Math.max(at, this.ctx.currentTime));
+    return true;
+  }
+
   // ------------------------------------------------------------ weapons
 
   gunshot(kind: 'rifle' | 'pistol', pos?: V3, distance = 0, intermediate = false, suppressed = false) {
@@ -291,6 +343,7 @@ export class AudioEngine {
     if (suppressed) {
       // suppressed: a flat, dull snap and the action cycling; carries a fraction of the distance
       const o2 = this.out(pos, 5, 1.6, distance * 3);
+      if (this.rec('shot_quiet', o2, t, pos ? 1.6 : 1.1)) return;
       const n = this.noise(t, 0.12);
       const f = this.filter('bandpass', 1300, 0.8);
       const g = ctx.createGain();
@@ -328,6 +381,9 @@ export class AudioEngine {
     send.connect(this.reverbSend);
     send.connect(this.echo);
     send.connect(this.roomSend);
+
+    // a recording of the real thing, where there is one: it goes the way the made-up one went (placed, dulled by distance, sent to the hills)
+    if (this.rec(big ? 'shot_rifle' : 'shot_pistol', out, t, (big ? 2.5 : 1.9) * mid)) return;
 
     // 1. supersonic crack / mechanical transient
     const crack = this.noise(t, 0.05);
@@ -386,6 +442,7 @@ export class AudioEngine {
   }
 
   boltCycle(start = 0, pos?: V3) {
+    if (this.ready && this.rec('bolt', pos ? this.out(pos, 3, 1.2) : this.sfx, this.ctx.currentTime + start, pos ? 1.5 : 0.95)) return;
     this.click(2400, 0.45, 0.025, start, pos); // handle up
     this.click(1700, 0.5, 0.06, start + 0.18, pos); // pull back
     if (!pos) this.slide(start + 0.18, 0.14, 900);
@@ -396,6 +453,12 @@ export class AudioEngine {
 
   /** another player near you reloading: what of it carries */
   reloadNear(pos: V3, dur: number, pistol: boolean) {
+    if (this.ready) {
+      const now = this.ctx.currentTime, kind = pistol ? 'pistol' : 'rifle';
+      const a = this.rec(`${kind}_mag_out`, this.out(pos, 3, 1.2), now + dur * (pistol ? 0.12 : 0.28), 1.4);
+      const b = this.rec(`${kind}_mag_in`, this.out(pos, 3, 1.2), now + dur * (pistol ? 0.48 : 0.62), 1.4);
+      if (a && b) return;
+    }
     if (pistol) {
       this.click(1500, 0.4, 0.05, 0.1, pos);
       this.click(1900, 0.55, 0.04, Math.max(0.4, dur - 0.5), pos);
@@ -425,17 +488,21 @@ export class AudioEngine {
     this.click(2100, 0.35, 0.03, delay + 0.06);
   }
 
-  magOut(delay = 0) {
+  /** @param long a rifle's magazine (a pistol's, if not) */
+  magOut(delay = 0, long = false) {
+    if (this.ready && this.rec(long ? 'rifle_mag_out' : 'pistol_mag_out', this.sfx, this.ctx.currentTime + delay, 0.95)) return;
     this.click(1500, 0.4, 0.05, delay);
     this.slide(delay, 0.08, 800);
   }
 
-  magIn(delay = 0) {
+  magIn(delay = 0, long = false) {
+    if (this.ready && this.rec(long ? 'rifle_mag_in' : 'pistol_mag_in', this.sfx, this.ctx.currentTime + delay, 0.95)) return;
     this.slide(delay, 0.06, 700);
     this.click(1900, 0.55, 0.04, delay + 0.06);
   }
 
   slideRack(delay = 0) {
+    if (this.ready && this.rec('rack', this.sfx, this.ctx.currentTime + delay, 0.95)) return;
     this.click(2600, 0.45, 0.03, delay);
     this.slide(delay, 0.09, 1300);
     this.click(3300, 0.5, 0.03, delay + 0.12);
@@ -866,7 +933,7 @@ export class AudioEngine {
     rush.connect(wf).connect(wg).connect(out);
   }
 
-  ui(kind: 'pickup' | 'drop' | 'open' | 'close' | 'eat' | 'drink' | 'bandage' | 'move' | 'smoke') {
+  ui(kind: 'pickup' | 'drop' | 'open' | 'close' | 'eat' | 'drink' | 'bandage' | 'inject' | 'move' | 'smoke') {
     if (!this.ready) return;
     const t = this.ctx.currentTime;
     const rustle = (dur: number, freq: number, vol: number, at = 0) => {
@@ -910,14 +977,24 @@ export class AudioEngine {
       case 'bandage':
         for (let i = 0; i < 5; i++) rustle(0.14, 1800, 0.15, i * 0.3);
         break;
+      case 'inject':
+        // the cap twisted off, the spring going, and what it drives hissing home
+        this.click(2800, 0.22, 0.015);
+        this.click(1500, 0.34, 0.03, 0.42);
+        this.click(900, 0.2, 0.05, 0.44);
+        rustle(0.42, 5200, 0.07, 0.46);
+        break;
       case 'move':
         rustle(0.07, 1200, 0.12);
         break;
       case 'smoke':
-        // the lighter, a long draw in, a longer breath out
-        this.click(3600, 0.3, 0.02);
-        rustle(0.5, 2400, 0.07, 0.2);
-        rustle(0.75, 900, 0.1, 0.85);
+        // the lighter, and then twice over: a long draw in, a longer breath out (in time with the hand: see weapons.ts, SMOKE)
+        this.click(3600, 0.3, 0.02, 0.08);
+        this.click(2500, 0.16, 0.03, 0.14);
+        for (const at of [0.7, 2.35]) {
+          rustle(0.55, 2400, 0.07, at);
+          rustle(0.8, 900, 0.1, at + 0.85);
+        }
         break;
     }
   }
