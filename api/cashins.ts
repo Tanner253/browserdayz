@@ -59,10 +59,6 @@ function outcome(r: Row): string {
 }
 
 function page(book: Book, s: Snapshot, now: number): string {
-  const today = book.rows.filter((r) => r.day === dayOf(now) && (r.state === 'paid' || r.state === 'sending'));
-  const spent = today.reduce((n, r) => n + (r.lamports ?? 0), 0);
-  // (a share of the most the treasury has been seen to hold today)
-  const limit = s.balance === null ? null : Math.round(Math.max(s.balance, book.most?.day === dayOf(now) ? book.most.lamports : 0) * s.dayShare);
   const wallets = new Set(book.rows.filter((r) => r.state === 'paid').map((r) => r.wallet)).size;
   const open = book.rows.filter((r) => r.state === 'sending' || r.state === 'waiting').length;
   const state =
@@ -141,7 +137,6 @@ function page(book: Book, s: Snapshot, now: number): string {
     ${tile(s.tagPays === null ? '?' : amount(s.tagPays), 'SOL a tag pays now', `${Math.round(s.share * 1000) / 10}% of the treasury, ${amount(s.floor)} at least`)}
     ${tile(String(book.paid), book.paid === 1 ? 'tag paid' : 'tags paid', `${amount(book.paidLamports)} SOL in all${wallets ? ` · ${wallets} ${wallets === 1 ? 'wallet' : 'wallets'}` : ''}${open ? ` · ${open} on the way or waiting` : ''}`)}
     ${tile(amount(book.claimedLamports), 'SOL of creator rewards collected', (s.waiting !== null ? `${amount(s.waiting)} waiting to be collected` : '') + (s.waitingNote ? `${s.waiting !== null ? '. ' : ''}${esc(s.waitingNote)}` : ''))}
-    ${tile(`${amount(spent)}${limit === null ? '' : ` / ${amount(limit)}`}`, 'SOL paid today / the most that may be', `days are counted in UTC`)}
   </div>
   ${book.claimNote ? `<div class="state bad"><b>Collecting creator rewards did not work the last time it was tried</b>${esc(book.claimNote)}</div>` : ''}
 
@@ -164,7 +159,7 @@ function page(book: Book, s: Snapshot, now: number): string {
   <h2>The rules the machine pays by</h2>
   <ul>
     <li>A tag pays ${Math.round(s.share * 1000) / 10}% of what the treasury holds at the moment it is paid, and never less than ${amount(s.floor)} SOL. The treasury is filled by the coin's creator rewards on pump.fun, collected automatically.</li>
-    <li>No more than ${Math.round(s.dayShare * 100)}% of the treasury leaves it in one day, and one wallet is paid for at most ${s.walletDayTags} tags in one day. A tag over either limit waits, and is paid when the limit allows, for up to three days.</li>
+    <li>No more than ${Math.round(s.dayShare * 100)}% of the treasury leaves it in one day, and one wallet is paid for at most ${s.walletDayTags} tags in one day. A tag over either limit waits, and is paid when the limit allows (days are counted in UTC), for up to three days.</li>
     <li>A tag is paid once, and the chain itself sees to it: each payment leaves a receipt, an account of its own, and a second payment for the same tag cannot be made while that receipt stands. Each payment also carries a note, "ZONA dog tag" and the reference shown beside it here.</li>
     <li>A tag cashed in with no wallet given is listed and not paid. The wallet is asked for in the game, on the rewards window.</li>
   </ul>

@@ -115,7 +115,7 @@ export function config(env: Record<string, string | undefined> = process.env): C
     floor,
     ceiling: lamports(Math.max(sol(floor), num(env.TAG_PAY_MAX_SOL, 5, 0.001, 1000))),
     keep: lamports(num(env.TREASURY_KEEP_SOL, 0.01, 0.002, 1000)),
-    dayShare: num(env.PAYOUT_DAY_CAP_PERCENT, 50, 1, 100) / 100,
+    dayShare: num(env.PAYOUT_DAY_CAP_PERCENT, 75, 1, 100) / 100,
     walletDayTags: Math.round(num(env.PAYOUT_WALLET_DAY_TAGS, 3, 1, 1000)),
     claimAt: lamports(num(env.CLAIM_MIN_SOL, 0.05, 0.001, 1000)),
     bid: Math.round(num(env.PRIORITY_MICROLAMPORTS, 20_000, 0, 5_000_000)),
@@ -162,7 +162,8 @@ export const tagOf = (e: Entry): Tag => ({ ref: refOf(e.id), at: e.at, name: e.n
  * Why a tag is waiting, where that says when it is worth looking at again: asking costs, and
  * most waits end at a time that can be told without asking.
  *   funds  the treasury is short: when it holds enough again
- *   day    a limit on the day: tomorrow
+ *   day    a limit on the day: tomorrow, or sooner if there is room under it again (the treasury
+ *          has been filled since, or the limit has been raised)
  *   setup  payouts are not set up to pay (a dry run, the wrong key): when they are
  *   hand   something a person has to look at: never by itself
  */
@@ -441,11 +442,33 @@ export async function setup(w: World): Promise<string | null> {
   return same(s.creator, cfg.treasury) ? null : `the key given is for the wallet ${b58(cfg.treasury)}, and the coin was made by ${b58(s.creator)}: nothing is paid until the key of that wallet is given`;
 }
 
-/** Whether a tag that is not settled is worth looking at again now. */
-async function due(w: World, r: Row): Promise<boolean> {
+/**
+ * Whether there is room under today's limits for a tag that was held by them: the treasury
+ * has been filled since (the limit is a share of the most it has held today), or the limit
+ * itself has been raised. The same sum that is done, with the book in hand, when it is paid:
+ * this one is done from a copy that may be a minute old, and only decides whether to ask.
+ */
+async function roomToday(w: World, r: Row, book: Book): Promise<boolean> {
+  const cfg = w.cfg, day = dayOf(w.now());
+  if (!cfg.treasury) return false;
+  const today = book.rows.filter((x) => x.ref !== r.ref && x.day === day && (x.state === 'paid' || x.state === 'sending'));
+  if (today.filter((x) => x.wallet === r.wallet).length >= cfg.walletDayTags) return false;
+  if (!today.length) return true;
+  const balance = await treasuryHolds(w);
+  const most = Math.max(book.most?.day === day ? book.most.lamports : 0, Number(balance));
+  const allowed = (BigInt(most) * BigInt(Math.round(cfg.dayShare * 1000))) / 1000n;
+  const spent = today.reduce((s, x) => s + BigInt(x.lamports ?? 0), 0n);
+  return spent + price(balance, cfg) <= allowed;
+}
+
+/**
+ * Whether a tag that is not settled is worth looking at again now.
+ * @param book the book as it was glanced at (a tag held by the day's limits is weighed against it)
+ */
+async function due(w: World, r: Row, book: Book): Promise<boolean> {
   if (r.state === 'sending') return true;
   if (r.state !== 'waiting' || r.hold === 'hand') return false;
-  if (r.hold === 'day') return r.heldOn !== dayOf(w.now());
+  if (r.hold === 'day') return r.heldOn !== dayOf(w.now()) || roomToday(w, r, book);
   if (r.hold === 'setup') return w.cfg.mode === 'on' && (await setup(w).catch(() => 'not known')) === null;
   if (r.hold === 'funds' && w.cfg.treasury) {
     // (when the treasury, with whatever rewards could be collected into it, would cover a tag)
@@ -575,7 +598,7 @@ async function settle(w: World, t: Tag, at: { held: Held }): Promise<Outcome> {
         const allowed = (BigInt(b.most.lamports) * BigInt(Math.round(cfg.dayShare * 1000))) / 1000n;
         if (today.filter((r) => r.wallet === t.wallet).length >= cfg.walletDayTags) said.wait = { state: 'waiting', why: `this wallet has been paid for ${cfg.walletDayTags} tags today: the rest wait for tomorrow`, hold: 'day' };
         // (the first of the day always goes: a limit smaller than one tag would stop everything)
-        else if (today.length && spent + amount > allowed) said.wait = { state: 'waiting', why: "today's limit on what leaves the treasury has been reached: this one waits for tomorrow", hold: 'day' };
+        else if (today.length && spent + amount > allowed) said.wait = { state: 'waiting', why: "today's limit on what leaves the treasury has been reached: this one is paid when there is room again", hold: 'day' };
         if (said.wait) return row && says(row, said.wait, day) ? false : enter(b, t, said.wait, day);
       }
       enter(b, t, { state: 'sending', lamports: Number(amount), signature: attempt.signature }, day).tries = [...tries, attempt];
@@ -696,9 +719,10 @@ export async function handleTag(w: World, t: Tag, from?: Held): Promise<Outcome>
   const off = w.cfg.mode === 'off' || !w.cfg.treasury;
   if (!from) {
     // a look that costs nothing first: most asking is about tags whose answer will not change
-    // (paid is paid), or cannot change yet (waiting for tomorrow)
-    const seen = (await glanceBook(w.store)).rows.find((r) => r.ref === t.ref);
-    if (seen && (settled(seen) || off || !(await due(w, seen)))) return told(seen);
+    // (paid is paid), or cannot change yet (waiting for room under the day's limits)
+    const glanced = await glanceBook(w.store);
+    const seen = glanced.rows.find((r) => r.ref === t.ref);
+    if (seen && (settled(seen) || off || !(await due(w, seen, glanced)))) return told(seen);
   }
   const at = { held: from ?? (await freshBook(w.store)) };
   try {
@@ -747,7 +771,8 @@ export async function sweep(w: World, limit = 200): Promise<{ tried: number; pai
   let tried = 0, paid = 0;
   if (w.cfg.mode !== 'off') {
     const waiting: Row[] = [];
-    for (const r of (await glanceBook(w.store)).rows) if (open(r) && w.now() - Date.parse(r.at) < MAX_AGE_MS + 24 * 3600 * 1000 && (await due(w, r))) waiting.push(r);
+    const glanced = await glanceBook(w.store);
+    for (const r of glanced.rows) if (open(r) && w.now() - Date.parse(r.at) < MAX_AGE_MS + 24 * 3600 * 1000 && (await due(w, r, glanced))) waiting.push(r);
     if (waiting.length) {
       const held = await freshBook(w.store);
       const began = w.now();

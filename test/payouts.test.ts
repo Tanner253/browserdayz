@@ -258,24 +258,75 @@ await test('one wallet, so many tags a day', async () => {
   assert.equal((await readBook(w.store)).rows.filter((r) => r.wallet === wallet(12) && r.state === 'paid').length, 4);
 });
 
-await test('no more than half the treasury in a day', async () => {
+await test('no more than three quarters of the treasury in a day', async () => {
   const w = world(0.21);
   const states: string[] = [];
   const held: Entry[] = [];
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 10; i++) {
     const e = tag(w, 20 + i);
     const o = await handle(w, e);
     states.push(o.state);
     if (o.state === 'waiting') held.push(e);
   }
-  assert.deepEqual(states, ['paid', 'paid', 'paid', 'paid', 'paid', 'waiting', 'waiting', 'waiting']);
-  assert.ok(got(w, TREASURY.address) > SOL(0.099));
-  // the day after, the ones that waited are paid until that day's half is gone too
+  assert.deepEqual(states, ['paid', 'paid', 'paid', 'paid', 'paid', 'paid', 'paid', 'waiting', 'waiting', 'waiting']);
+  assert.ok(got(w, TREASURY.address) > SOL(0.21 * 0.25));
+  // asked about again the same day, with nothing changed: nothing is asked of the file service, and nothing is sent
+  const before = { ...w.store.ops, sent: w.chain.handedIn.length };
+  for (const e of held) assert.equal((await handle(w, e)).state, 'waiting');
+  assert.equal((await sweep(w)).tried, 0);
+  assert.deepEqual([w.store.ops.read, w.store.ops.swap, w.chain.handedIn.length], [before.read, before.swap, before.sent]);
+  // the day after, the ones that waited are paid until three quarters of what is left has gone too
   w.skip(13 * 3600 * 1000);
   const r = await sweep(w);
   assert.equal(r.paid, 2);
-  assert.deepEqual([25, 26, 27].map((i) => got(w, i)).sort(), [0n, SOL(0.02), SOL(0.02)]);
+  assert.deepEqual([27, 28, 29].map((i) => got(w, i)).sort(), [0n, SOL(0.02), SOL(0.02)]);
   assert.equal(held.length, 3);
+});
+
+await test('held by the day\'s limit, and paid the same day when the treasury is filled', async () => {
+  const w = world(0.21, { PAYOUT_DAY_CAP_PERCENT: '50' });
+  const held: Entry[] = [];
+  for (let i = 0; i < 8; i++) {
+    const e = tag(w, 700 + i);
+    if ((await handle(w, e)).state === 'waiting') held.push(e);
+  }
+  assert.equal(held.length, 3);
+  assert.equal((await sweep(w)).tried, 0);
+  // creator rewards come in: the limit is a share of the most the treasury has held today, and there is room again
+  w.chain.balances.set(TREASURY.address, got(w, TREASURY.address) + SOL(0.3));
+  w.skip(60_000);
+  const r = await sweep(w);
+  assert.equal(r.paid, 3);
+  for (let i = 5; i < 8; i++) assert.equal(got(w, 700 + i), SOL(0.02));
+  // and not twice
+  w.skip(60_000);
+  assert.equal((await sweep(w)).tried, 0);
+  assert.equal((await readBook(w.store)).rows.filter((x) => x.state === 'paid').length, 8);
+});
+
+await test('a limit that is raised lets through what the lower one held, and no more than it allows', async () => {
+  const low = world(0.21, { PAYOUT_DAY_CAP_PERCENT: '50' });
+  const held: Entry[] = [];
+  for (let i = 0; i < 9; i++) {
+    const e = tag(low, 720 + i);
+    if ((await handle(low, e)).state === 'waiting') held.push(e);
+  }
+  assert.equal(held.length, 4);
+  // the same book and the same chain, the limit raised: 0.21 x 75% = 0.1575, so seven in the day
+  Object.assign(low, { cfg: { ...low.cfg, dayShare: 0.75 } });
+  low.skip(60_000);
+  const r = await sweep(low);
+  assert.equal(r.paid, 2);
+  assert.equal((await readBook(low.store)).rows.filter((x) => x.state === 'paid').length, 7);
+  assert.equal((await readBook(low.store)).rows.filter((x) => x.state === 'waiting').length, 2);
+  // the wallet's own limit still holds whatever the treasury's is
+  const w = world(5);
+  for (let i = 0; i < 3; i++) await handle(w, tag(w, 740));
+  const fourth = tag(w, 740);
+  assert.equal((await handle(w, fourth)).state, 'waiting');
+  w.chain.balances.set(TREASURY.address, got(w, TREASURY.address) + SOL(5));
+  w.skip(60_000);
+  assert.equal((await sweep(w)).tried, 0);
 });
 
 await test('thirty at once cannot slip under the limits together', async () => {
@@ -288,14 +339,14 @@ await test('thirty at once cannot slip under the limits together', async () => {
   assert.equal(got(one, 14) > 0n, true);
   assert.equal((await readBook(one.store)).rows.filter((r) => r.state === 'paid').length, 3);
   assert.equal(new Set(one.chain.handedIn).size, 3);
-  // to thirty wallets: no more than half of what the treasury began the day with
+  // to thirty wallets: no more than three quarters of what the treasury began the day with
   const many = world(0.5);
   const each = Array.from({ length: 30 }, (_, i) => tag(many, 600 + i));
   await Promise.all(each.map((e) => handle(many, e)));
   many.skip(5000);
   for (const e of each) await handle(many, e);
   const paid = (await readBook(many.store)).rows.filter((r) => r.state === 'paid');
-  assert.ok(paid.length >= 10 && paid.length <= 12, `${paid.length} paid`);
+  assert.ok(paid.length >= 15 && paid.length <= 18, `${paid.length} paid`);
   // (thirty at once keep each other waiting at the book: some of their transactions are too old to be taken by the
   // time they are sent, and are made again. What matters is what left the treasury, and that is what is counted.)
   assert.equal(SOL(0.5) - got(many, TREASURY.address), BigInt(paid.length) * (SOL(0.02) + COST));
