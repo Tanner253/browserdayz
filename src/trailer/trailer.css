@@ -319,3 +319,31 @@ body.tr-cut4.tr-bars #tr-overlay::after { height: 11.2vh; }
 .t5 .t4-logo { font-size: 19vh; letter-spacing: 0.1em; margin-right: -0.1em; line-height: 1; color: #f3e6d0; }
 .t5 .t4-line { color: #ffd35a; }
 .t5 { background: radial-gradient(ellipse at 50% 45%, rgba(20, 0, 0, 0.25), rgba(0, 0, 0, 0.78)); }
+/* the fifth film: the gas (the picture turned a sick green), and the bar over what is not in the game yet */
+body.tr-g-gas canvas { filter: saturate(1.05) contrast(1.14) brightness(0.97); }
+.next5 { inset: auto; top: 7.5%; left: 50%; transform: translateX(-50%); opacity: calc(min(1, var(--t, 0) * 5)); }
+.next5 span { display: block; padding: 0.42em 1.2em 0.42em 1.7em; font-size: 3.3vh; font-weight: 800; font-stretch: condensed; letter-spacing: 0.5em; color: #14110b; background: #ffd35a; }
+
+/* the fifth film: the picture behind its card and its board (dimmed, and still to be made out) */
+body.tr-g-dim5 canvas { filter: saturate(0.5) contrast(1.1) brightness(0.6) blur(1.4px); }
+/* the board: how far the infected see and hear, drawn to scale */
+.b5 { background: linear-gradient(90deg, rgba(5, 7, 5, 0.9), rgba(5, 7, 5, 0.78) 55%, rgba(5, 7, 5, 0.62)); text-transform: uppercase; font-weight: 600; }
+.b5-head { position: absolute; left: 6vw; top: 8.5vh; font-size: 7.6vh; line-height: 1; font-weight: 800; font-stretch: condensed; letter-spacing: 0.12em; color: #f3efe6; }
+.b5-head::before { content: 'THE INFECTED'; display: block; margin-bottom: 1vh; font-size: 2.5vh; letter-spacing: 0.6em; color: #ffd35a; }
+.b5 svg { position: absolute; left: 5vw; top: 23vh; width: 50vw; height: 70vh; overflow: visible; }
+.b5 svg .in { opacity: var(--o, 0); }
+.b5 .see { fill: rgba(255, 211, 90, 0.15); stroke: #ffd35a; stroke-width: 1.3; }
+.b5 .see.near { fill: rgba(255, 211, 90, 0.3); }
+.b5 .hear { fill: none; stroke: #efe8d6; stroke-width: 1.3; stroke-dasharray: 5 4; }
+.b5 .hear.quiet { stroke: #7fd0ff; stroke-dasharray: none; stroke-width: 1.8; }
+.b5 text { font-size: 11.5px; letter-spacing: 0.14em; fill: #efe8d6; font-weight: 700; }
+.b5 text.far { fill: #ff8a6a; }
+.b5 .it { fill: #ff5a44; }
+.b5-rows { position: absolute; right: 4.5vw; top: 24.5vh; width: 42vw; display: flex; flex-direction: column; gap: 1.5vh; }
+.b5-row { display: flex; align-items: center; gap: 1.5vw; padding: 1.25vh 1.3vw 1.25vh 1vw; background: rgba(12, 14, 12, 0.86); border-left: 0.5vh solid #ffd35a; opacity: var(--o, 0); transform: translateX(calc((1 - var(--o, 0)) * 2vw)); }
+.b5-row b { flex: none; width: 10.5vw; font-size: 6.4vh; line-height: 1; font-weight: 800; font-stretch: condensed; color: #ffd35a; font-variant-numeric: tabular-nums; text-align: right; text-transform: none; }
+.b5-row span { font-size: 2.8vh; line-height: 1.25; letter-spacing: 0.15em; color: #e2d9c2; }
+.b5-row:nth-child(5) { border-left-color: #7fd0ff; }
+.b5-row:nth-child(5) b { color: #7fd0ff; }
+.b5-row:nth-child(6) { border-left-color: #ff8a6a; }
+.b5-row:nth-child(6) b { color: #ff8a6a; }
