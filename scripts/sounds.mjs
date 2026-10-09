@@ -1,5 +1,5 @@
-// Recordings the game plays in place of sounds it used to make up: gunshots, the bolt, a
-// magazine going out and in, a slide racked.
+// Recordings the game plays in place of sounds it used to make up: gunshots, a magazine
+// going out and in, a slide racked.
 //
 //   node scripts/sounds.mjs        (npm run sounds)
 //
@@ -55,7 +55,6 @@ const SOUNDS = {
     ],
   },
   shot_quiet: { src: snake('Full Sound/.22LR/WAV/22LR Single WAV.wav'), len: 0.9, rate: 44100, gain: 0.8 },
-  bolt: { src: snake('Reloads, Cycling & More/WAV/Mosin Bolt Cycle WAV.wav'), rate: 32000, gain: 0.8 },
   rifle_mag_out: { src: snake('Reloads, Cycling & More/WAV/308 Magazine Part 1 WAV.wav'), rate: 32000, gain: 0.75 },
   rifle_mag_in: { src: snake('Reloads, Cycling & More/WAV/308 Magazine Part 2 WAV.wav'), rate: 32000, gain: 0.75 },
   pistol_mag_out: { src: snake('Reloads, Cycling & More/WAV/Angel Mag Reload Part 1 WAV.wav'), rate: 32000, gain: 0.7 },

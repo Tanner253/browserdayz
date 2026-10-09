@@ -1203,7 +1203,6 @@ export class Weapons {
   }
 
   private cycleBolt(m: VmModel) {
-    audio.boltCycle();
     audio.shellDrop(0.5);
     // (the pack's hand has further to go than a bolt moved by itself: a little longer)
     const dur = m.rig ? 0.95 : 0.78;

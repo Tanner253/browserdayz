@@ -100,7 +100,7 @@ export interface EngineVoice {
  * One take is played, any of them. Until they have arrived, and wherever one is missing, the
  * made-up sound is what is heard.
  */
-const RECORDED: Record<string, number> = { shot_rifle: 1, shot_pistol: 3, shot_quiet: 1, bolt: 1, rifle_mag_out: 1, rifle_mag_in: 1, pistol_mag_out: 1, pistol_mag_in: 1, rack: 1 };
+const RECORDED: Record<string, number> = { shot_rifle: 1, shot_pistol: 3, shot_quiet: 1, rifle_mag_out: 1, rifle_mag_in: 1, pistol_mag_out: 1, pistol_mag_in: 1, rack: 1 };
 const bank = new Map<string, AudioBuffer[]>();
 let fetched: Promise<void> | null = null;
 /** Fetches the recordings, once. (They are kept apart from any one engine: the trailer renders its soundtrack on an engine of its own.) */
@@ -447,14 +447,10 @@ export class AudioEngine {
     ring.stop(t + dur * 3 + 0.05);
   }
 
-  // A bolt worked, a magazine changed, a slide racked: these are recordings and nothing else.
-  // (They used to be made up out of clicks, and the made-up ones stood in wherever a recording
-  // was missing: the old reload, a click for every round pushed in, went on being heard that
-  // way. There is no made-up one now. Until a recording has arrived there is no sound.)
-
-  boltCycle(start = 0, pos?: V3) {
-    if (this.ready) this.rec('bolt', pos ? this.out(pos, 3, 1.2) : this.sfx, this.ctx.currentTime + start, pos ? 1.5 : 0.95);
-  }
+  // A magazine changed, a slide racked: these are recordings and nothing else. (They used to
+  // be made up out of clicks, and the made-up ones stood in wherever a recording was missing:
+  // there is no made-up one now.) A bolt worked makes no sound at all: the recording of one was
+  // the old Mosin's, heard after every shot from every rifle near by, and it was taken out.
 
   /** another player close by reloading: a magazine out and one in, from where they stand (it is not heard across a field) */
   reloadNear(pos: V3, dur: number, pistol: boolean) {

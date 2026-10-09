@@ -456,7 +456,7 @@ export function buildShots(S: Stage): Shot[] {
     </div>`);
 
   // --- what it sounds like: the recordings themselves, drawn, and played as they are drawn
-  const WAVES: [string, string, string][] = [['shot_rifle', '7.62×54R RIFLE', 'recorded'], ['shot_pistol', '9 mm PISTOL', 'recorded'], ['shot_quiet', 'SUPPRESSED', 'recorded'], ['bolt', 'THE BOLT', 'recorded'], ['pistol_mag_in', 'A MAGAZINE GOING IN', 'recorded']];
+  const WAVES: [string, string, string][] = [['shot_rifle', '7.62×54R RIFLE', 'recorded'], ['shot_pistol', '9 mm PISTOL', 'recorded'], ['shot_quiet', 'SUPPRESSED', 'recorded'], ['pistol_mag_in', 'A MAGAZINE GOING IN', 'recorded']];
   const sound = g4('eco', `
     <div class="eco-kicker">WHAT IT SOUNDS LIKE</div>
     <div class="eco-head">REAL GUNS, <b>RECORDED</b></div>
@@ -1232,7 +1232,6 @@ export function buildShots(S: Stage): Shot[] {
       [0.55, () => audio.gunshot('rifle'), 1.6],
       [1.6, () => audio.gunshot('pistol'), 1.0],
       [2.45, () => audio.gunshot('pistol', undefined, 0, false, true), 0.6],
-      [3.05, () => audio.boltCycle(), 1.1],
       [4.05, () => audio.magIn(0), 0.9],
     ];
     add(3, {
