@@ -79,8 +79,11 @@ export class RewardsModal {
   private err: HTMLElement;
   private timer = 0;
 
-  /** @param playerName what is stamped on the player's own tag in the first picture */
-  constructor(parent: HTMLElement, private playerName: () => string = () => '') {
+  /**
+   * @param playerName what is stamped on the player's own tag in the first picture
+   * @param closed told when the window is shut (an address may have been given in it)
+   */
+  constructor(parent: HTMLElement, private playerName: () => string = () => '', private closed: () => void = () => {}) {
     this.root = document.createElement('div');
     this.root.className = 'rw';
     this.root.innerHTML = `
@@ -196,6 +199,7 @@ export class RewardsModal {
     } catch {
       /* private mode */
     }
+    this.closed();
   }
 
   /** the third picture: the hold time run down in a few seconds, then the tag is cashed in */

@@ -12,7 +12,7 @@ import type { Terrain } from '../world/terrain';
 import { Barrel, type Vegetation } from '../world/vegetation';
 import type { Grass } from '../world/grass';
 import { Door, type Buildings } from '../world/buildings';
-import { PLAY_RADIUS, heightAt, playOutline, type World } from '../world/worldgen';
+import { WORLD_SIZE, heightAt, type SiteKind, type World } from '../world/worldgen';
 import { ITEMS, itemName, TAG_HOLD, TAG_HOLD_MIN, capacityOf, hasMod, makeItem, newUid, tagClock, tagOwner, type ItemInstance, type Slot } from '../sim/items';
 import { PlayerInventory, SLOT_ORDER, type Container } from '../sim/inventory';
 import { Economy, type WorldLoot } from '../sim/economy';
@@ -54,6 +54,8 @@ import { GAS } from '../sim/gas';
 import { FIRE, Hearths } from '../sim/fires';
 import { Fires } from './fires';
 import { breaksOnHit } from '../sim/injury';
+import { MenuScenes } from './menu-scenes';
+import type { MenuSpot } from '../ui/hud';
 
 const _gasHead = new THREE.Vector3();
 
@@ -106,8 +108,10 @@ export class Game {
   invUI!: InventoryUI;
   dummies: Dummy[] = [];
   /** the infected (src/game/infected.ts) */
-  /** the gas over the checkpoint: the breathing of it, and what is seen of it close to */
+  /** the gas over the works: the breathing of it, and what is seen of it close to */
   gas!: Gas;
+  /** what goes on behind the menu before a game is started */
+  private menu!: MenuScenes;
   /** the fireplaces: which are alight, and the look and sound of them */
   fires!: Fires;
   /** which are alight, kept by this game when it is played alone (the server keeps it otherwise) */
@@ -203,7 +207,6 @@ export class Game {
   /** on a phone: the player put the weapon away themselves, so nothing is drawn for them until they pick one */
   private handsFree = false;
   /** opens the rewards modal once the entrance has played */
-  private entryModal: () => void = () => {};
   private slowFor = 0;
   private slowHinted = false;
 
@@ -445,26 +448,47 @@ export class Game {
         return `Rendering ${cv.width} × ${cv.height} · ${((cv.width * cv.height) / 1e6).toFixed(1)} million pixels a frame`;
       },
     );
-    // dog tags and creator rewards: explained on entering the site, and again from the menu
+    // Dog tags and creator rewards: a line under the way in says a wallet is wanted (or is
+    // given), and opens the window that explains it; so does Rewards in the menu. (The window
+    // used to come up by itself a few seconds after the page did, over the menu somebody had
+    // just started to read.)
     if (REWARDS_UI) {
-      const modal = new RewardsModal(document.getElementById('ui')!, () => this.hud.nameValue());
+      const modal = new RewardsModal(document.getElementById('ui')!, () => this.hud.nameValue(), () => this.hud.setWallet(walletAddress()));
       this.hud.onRewards(() => modal.open());
-      this.entryModal = () => modal.openAtEntry();
+      this.hud.setWallet(walletAddress());
     }
-    // the briefing map is drawn from the world itself
-    const town = world.pois[0];
-    const station = world.buildings.find((b) => b.type === 'police');
-    this.hud.setBriefing({
-      radius: PLAY_RADIUS,
-      outline: playOutline(),
-      spawns: world.spawns,
-      centre: town,
-      places: [
-        { name: town.name, x: town.x, z: town.z, kind: 'town' },
-        ...(station ? [{ name: 'Police station', x: station.x, z: station.z, kind: 'police' as const }] : []),
-        ...world.pois.slice(1).map((q) => ({ name: q.name, x: q.x, z: q.z, kind: q.name === GAS.place ? ('gas' as const) : world.sites.some((st) => st.name === q.name) ? ('site' as const) : ('post' as const) })),
-      ],
-    });
+    // the menu's map: the game's own, and what is said of each place on it
+    {
+      const town = world.pois[0];
+      const spots: MenuSpot[] = world.spawns.map((sp) => ({ x: sp.x, z: sp.z, name: 'A start', tip: 'New survivors drop in out here on the edge, with bare hands. The nearest marked place always has a weapon.', kind: 'spawn' as const }));
+      const SITE: Record<SiteKind, [string, string]> = {
+        lodge: ['a lodge', 'A cabin and a shed, with a fire ring to rest by. A weapon is always left here.'],
+        farm: ['a farm', 'A house, a barn and a shed. A weapon is always left here.'],
+        post: ['a ranger post', 'A guard post and a shed: a gun is kept here, and the army left its cases.'],
+        yard: ['a yard', 'A barn, sheds and a workshop: tools, fuel, crates. A weapon is always left here.'],
+        dacha: ['a dacha', 'A brick house and a shed. A weapon is always left here.'],
+        hamlet: ['a hamlet', 'A shop between houses, a barn behind, a fire ring to rest by.'],
+        depot: ['an army depot', 'A barracks, a workshop and a watchtower: rifles and kit.'],
+        works: ['', ''],
+      };
+      for (const q of world.pois.slice(1)) {
+        const site = world.sites.find((st) => st.name === q.name);
+        if (q.name === GAS.place) spots.push({ x: q.x, z: q.z, name: q.name, tip: 'Under gas: you need a gas mask on to breathe here. Scopes and grenades are likelier here than anywhere.', kind: 'gas', label: true });
+        else if (site) spots.push({ x: q.x, z: q.z, name: q.name, tip: SITE[site.kind][1], kind: site.kind === 'depot' || site.kind === 'post' ? 'army' : 'site' });
+        else if (/checkpoint/i.test(q.name)) spots.push({ x: q.x, z: q.z, name: q.name, tip: 'Guard posts, a barracks and a watchtower: rifles, plate carriers, grenades. The track to the works starts here.', kind: 'army', label: true });
+        else spots.push({ x: q.x, z: q.z, name: q.name, tip: 'A cabin in the hills, with a fire ring to rest by. A weapon is always left here.', kind: 'site' });
+      }
+      spots.push({ x: town.x, z: town.z + 46, name: town.name, tip: 'The village: police station, clinic, shop, workshop. The best loot on the map, and the most people after it.', kind: 'town', label: true });
+      const inTown = (b: { x: number; z: number }) => Math.hypot(b.x - town.x, b.z - town.z) < town.radius;
+      for (const b of world.buildings.filter(inTown)) {
+        if (b.type === 'police') spots.push({ x: b.x, z: b.z, name: 'Police station', tip: 'More guns than anywhere else. Gas masks are kept here, and the 9 mm suppressor.', kind: 'police' });
+        else if (b.type === 'clinic') spots.push({ x: b.x, z: b.z, name: 'Clinic', tip: 'Injectors, first aid kits, and tape to splint a broken leg.', kind: 'clinic' });
+        else if (b.type === 'store') spots.push({ x: b.x, z: b.z, name: 'Shop', tip: 'Food and drink.', kind: 'shop' });
+      }
+      this.hud.setMenuMap(this.minimap.poster(), WORLD_SIZE, spots, atmo.gas);
+    }
+    this.menu = new MenuScenes({ world, atmo, scene: r.scene, effects: this.effects, held: (id, mods) => this.makeHeld(id, mods), wear: (body, ids) => this.wear(body, ids) });
+    void this.menu.load();
     this.hud.showStart(true);
     // FPS mouse: play only while the mouse is captured. Esc releases it -> pause menu;
     // clicking the menu captures it again and play resumes.
@@ -527,6 +551,8 @@ export class Game {
     }
     this.joining = false;
     this.started = true;
+    this.menu.dispose();
+    this.hud.menuScene('', 0);
     // out of the aerial shot and down into the character's eyes
     this.director.flyIn();
     if (!this.weapons.equippedItem) {
@@ -1345,9 +1371,8 @@ export class Game {
   }
 
   start() {
-    // the loading screen lifts: title and panels arrive, then the rewards briefing
+    // the loading screen lifts: the way in arrives
     setTimeout(() => this.hud.entrance(), 400);
-    setTimeout(() => !this.started && !this.joining && this.entryModal(), 3600);
     let due = 0;
     const loop = (t: number) => {
       requestAnimationFrame(loop);
@@ -2379,8 +2404,12 @@ export class Game {
     if (this.director.avatarVisible) cam.layers.enable(AVATAR_LAYER);
     else cam.layers.disable(AVATAR_LAYER);
     // your own body below the camera, first person only
-    // before you deploy, the menu looks down on the middle of the map from the air
-    if (!this.started) this.menuCamera(now);
+    // before you deploy: something going on in the Zone behind the menu, or (between those, and
+    // until their people have arrived) the middle of the map from the air
+    if (!this.started) {
+      if (!this.menu.update(dt, cam)) this.menuCamera(now);
+      this.hud.menuScene(this.menu.caption, this.menu.fade);
+    }
     const fpView = this.started && this.director.viewmodelVisible && !p.dead && !this.garage.ride;
     if (fpView) cam.layers.enable(FP_BODY_LAYER);
     else cam.layers.disable(FP_BODY_LAYER);

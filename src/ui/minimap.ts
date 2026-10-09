@@ -46,6 +46,11 @@ export class Minimap {
     this.resize();
   }
 
+  /** the whole map as it was drawn once: for the menu's map sheet, which shows the same picture */
+  poster(): HTMLCanvasElement {
+    return this.base;
+  }
+
   /** the whole map, drawn once */
   private draw(world: World): HTMLCanvasElement {
     const N = Math.round(WORLD_SIZE * SCALE);

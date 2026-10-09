@@ -6,6 +6,8 @@ import { MAX_STAMINA, type ChatChannel } from '../net/protocol';
 import { TOUCH } from '../core/device';
 import { EMOTES } from '../sim/emotes';
 import { TAG_HOLD_MIN } from '../sim/items';
+import { INFECTED } from '../sim/infected';
+import { GAS } from '../sim/gas';
 import { AO_MODES, DEFAULT_GRAPHICS, FPS_LIMITS, LEVELS, MSAA, PRESETS, SCALES, VOLUMES, presetOf, saveGraphics, type Graphics, type PresetName } from '../core/settings';
 
 const CHANNELS: ChatChannel[] = ['global', 'near'];
@@ -20,6 +22,17 @@ const ICONS = {
 
 function svg(path: string) {
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
+}
+
+/** A mark on the menu's map: where it is in the world, what it is called, and what is said of it when it is pointed at. */
+export interface MenuSpot {
+  x: number;
+  z: number;
+  name: string;
+  tip: string;
+  kind: 'town' | 'police' | 'clinic' | 'shop' | 'army' | 'site' | 'gas' | 'spawn';
+  /** its name is always shown, not only when pointed at */
+  label?: boolean;
 }
 
 export interface HotbarEntry {
@@ -120,36 +133,54 @@ export class HUD {
       <div class="hud-fatal"><div class="fatal-title">Disconnected</div><div class="fatal-sub"></div><button class="dead-btn fatal-btn">Reconnect</button></div>
       <div class="hud-dead"><div class="dead-title">You are dead</div><div class="dead-sub"></div><button class="dead-btn">Respawn</button></div>
       <div class="hud-start">
-        <div class="start-shell">
-          <div class="start-id">
-            <img class="start-mark" src="/brand/zona-mark-plain.svg" alt="">
-            <div class="start-kicker">Zelenaya Dolina · one persistent world</div>
-            <div class="start-title" aria-label="ZONA"><span style="--i:0">Z</span><span style="--i:1">O</span><span style="--i:2">N</span><span style="--i:3">A</span></div>
-            <div class="start-sub">Loot. Fight. Stay alive for ${TAG_HOLD_MIN} minutes.</div>
-            <div class="tagplate">
-              <svg class="tagplate-chain" viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="52" fill="none" stroke="currentColor" stroke-width="5" stroke-dasharray="0.1 9" stroke-linecap="round"/></svg>
-              <label for="start-name">Stamp your dog tag</label>
-              <input id="start-name" class="start-name" maxlength="16" spellcheck="false" autocomplete="off" placeholder="Survivor">
-              <div class="tagplate-meta"><span>ZONA</span><span>Survivor</span></div>
-            </div>
-            <button class="start-btn">Deploy</button>
-            <div class="start-online"></div>
-            <div class="start-queue"><div class="sq-pos"></div><div class="sq-sub"></div><button class="sq-leave" type="button">Play on your own instead</button></div>
-            <div class="start-links">
-              <a class="sl-x" href="https://x.com/${X_HANDLE}" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M18.9 2H22l-6.8 7.8L23.2 22h-6.3l-4.9-6.9L6.3 22H3.2l7.3-8.3L.8 2h6.4l4.5 6.3L18.9 2zm-1.1 18h1.7L6.3 3.9H4.5L17.8 20z"/></svg>@${X_HANDLE}</a>
-              <a class="sl-x" href="/payouts" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M5 4h14v16l-3.5-2-3.5 2-3.5-2L5 20zM9 9h6M9 13h6"/></svg>Payouts</a>
-              <button class="sl-ca" type="button" title="Copy the contract address"><span><b>Contract address</b><em>Copy</em></span><code>${CONTRACT}</code></button>
-            </div>
+        <div class="sm-cut"></div>
+        <header class="sm-top">
+          <div class="sm-brand"><img src="/brand/zona-mark-plain.svg" alt=""><b>ZONA</b></div>
+          <nav class="sm-nav start-tabs" aria-label="Menu">
+            <button type="button" data-tab="play" class="on">Play</button>
+            <button type="button" data-tab="map">Map</button>
+            <button type="button" data-tab="brief">How to play</button>
+            <button type="button" data-tab="keys">Controls</button>
+            <button type="button" data-tab="gfx">Settings</button>
+            <button type="button" data-tab="rewards" hidden>Rewards</button>
+          </nav>
+          <div class="sm-status">
+            <span class="start-online"></span>
           </div>
-          <div class="start-brief" data-tab="brief">
-            <div class="start-tabs">
-              <button data-tab="brief" class="on">Briefing</button>
-              <button data-tab="keys">Controls</button>
-              <button data-tab="gfx">Settings</button>
-              <button data-tab="rewards" hidden>Rewards</button>
+        </header>
+        <div class="sm-main">
+          <section class="sm-hero start-id">
+            <div class="start-kicker"><span>PvP survival shooter</span><em>Play to earn</em></div>
+            <div class="start-title" aria-label="ZONA"><span style="--i:0">Z</span><span style="--i:1">O</span><span style="--i:2">N</span><span style="--i:3">A</span></div>
+            <p class="start-sub">Players hunt you. So do the infected.</p>
+            <p class="start-sub2">Take a dog tag off another player, stay alive ${TAG_HOLD_MIN} minutes, cash it in.</p>
+            <div class="sm-enter">
+              <label class="sm-name"><span>Callsign · stamped on your dog tag</span><input id="start-name" class="start-name" maxlength="16" spellcheck="false" autocomplete="off" enterkeyhint="go" placeholder="Survivor"></label>
+              <button class="start-btn" type="button"><span>Deploy</span></button>
+            </div>
+            <div class="start-queue"><div class="sq-pos"></div><div class="sq-sub"></div><button class="sq-leave" type="button">Play on your own instead</button></div>
+            <ol class="sm-loop" aria-label="How a life goes">
+              <li><i>1</i>Drop in</li><li><i>2</i>Loot</li><li><i>3</i>Take a tag</li><li><i>4</i>Hold ${TAG_HOLD_MIN}:00</li><li><i>5</i>Cash in</li>
+            </ol>
+            <button class="sm-wallet" type="button" hidden><b></b><span></span></button>
+          </section>
+          <aside class="sm-sheet start-brief" data-tab="play">
+            <div class="sm-sheet-head"><h2></h2><button class="sm-close" type="button" aria-label="Close">&times;</button></div>
+            <div class="start-pane pane-map">
+              <div class="mm"><canvas width="720" height="720"></canvas><div class="mm-spots"></div><div class="mm-tip" role="tooltip"></div></div>
+              <div class="mm-side">
+                <p class="mm-hint"></p>
+                <div class="mm-said"></div>
+                <ul class="mm-legend">
+                  <li><i class="k-spawn"></i>You start here</li>
+                  <li><i class="k-site"></i>A place with a weapon</li>
+                  <li><i class="k-police"></i>Police station</li>
+                  <li><i class="k-army"></i>The army's</li>
+                  <li><i class="k-gas"></i>Gas: mask needed</li>
+                </ul>
+              </div>
             </div>
             <div class="start-pane pane-brief">
-              <figure class="start-map"></figure>
               <ol class="start-loop">
                 <li style="--i:0"><i class="loop-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" stroke-dasharray="2 3"/><path d="M12 3v7M9 8l3 3 3-3"/></svg></i><div><b>Drop in</b><span>On the edge of the map, bare hands. The nearest marked place always has a weapon.</span></div></li>
                 <li style="--i:1"><i class="loop-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9l8-4 8 4v8l-8 4-8-4z"/><path d="M4 9l8 4 8-4M12 13v8"/></svg></i><div><b>Loot inward</b><span>Any building can hold a gun. The police station in the middle holds the most.</span></div></li>
@@ -157,6 +188,11 @@ export class HUD {
                 <li style="--i:3"><i class="loop-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="8" width="14" height="9" rx="3"/><circle cx="8.5" cy="12.5" r="1"/><path d="M12 11h4M12 14h3M8 8c-3-5 3-7 5-3"/></svg></i><div><b>Take their tag</b><span>Every body carries a dog tag. Loot it.</span></div></li>
                 <li style="--i:4"><i class="loop-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6"/></svg></i><div><b>Hold ${TAG_HOLD_MIN}:00</b><span>Stay alive with it for ${TAG_HOLD_MIN} minutes to cash it in.</span></div></li>
               </ol>
+              <div class="sm-threats">
+                <div><b>Other players</b><span>Anyone you meet can kill you and take everything you carry, your tag with it.</span></div>
+                <div><b>The infected</b><span>They see ${INFECTED.sight} m in front of them and hear a shot from ${INFECTED.hearShot} m. Crouch past them, or fit a suppressor.</span></div>
+                <div><b>The gas</b><span>The ${GAS.place} lies under it. A gas mask lets you breathe there: the police station keeps them.</span></div>
+              </div>
             </div>
             <div class="start-pane pane-keys">
               <div class="kb">
@@ -193,8 +229,14 @@ export class HUD {
               </div>
             </div>
             <div class="start-pane pane-gfx start-gfx"></div>
-          </div>
+          </aside>
         </div>
+        <footer class="sm-foot start-links">
+          <button class="sl-ca" type="button" title="Copy the contract address"><b>CA</b><code>${CONTRACT}</code><em>Copy</em></button>
+          <a class="sl-x" href="/payouts" target="_blank" rel="noopener">Payouts</a>
+          <a class="sl-x" href="https://x.com/${X_HANDLE}" target="_blank" rel="noopener noreferrer">@${X_HANDLE}</a>
+          <div class="sm-live"><i></i><span></span></div>
+        </footer>
       </div>
     `;
     document.getElementById('ui')!.appendChild(this.root);
@@ -223,9 +265,8 @@ export class HUD {
     });
     chat.addEventListener('blur', () => this.chatOpen && this.closeChat());
     this.setChannel('global');
-    // nor does following a link, or copying the contract address
+    // the contract address, copied
     const links = this.root.querySelector('.start-links') as HTMLElement;
-    links.addEventListener('click', (e) => e.stopPropagation());
     const ca = links.querySelector('.sl-ca') as HTMLButtonElement;
     ca.addEventListener('click', () => {
       const said = ca.querySelector('em') as HTMLElement;
@@ -249,42 +290,34 @@ export class HUD {
       if (navigator.clipboard?.writeText) navigator.clipboard.writeText(CONTRACT).then(() => done(true), pick);
       else pick();
     });
-    // typing a name must not start the game
+    // the name: keys typed into it are not the game's, and Enter in it is the Deploy button
     const name = this.root.querySelector('.start-name') as HTMLInputElement;
-    const plate = this.root.querySelector('.tagplate') as HTMLElement;
-    plate.addEventListener('click', (e) => {
-      e.stopPropagation();
-      name.focus();
-    });
-    // every letter is struck into the plate
-    name.addEventListener('input', () => {
-      plate.classList.remove('stamp');
-      void plate.offsetWidth;
-      plate.classList.add('stamp');
-    });
     name.addEventListener('keydown', (e) => {
       e.stopPropagation();
-      if (e.key === 'Enter') name.blur();
+      if (e.key !== 'Enter' || e.repeat) return;
+      name.blur();
+      this.startClicked();
     });
-    // the menu under the Play button: its clicks are not "click to play"
-    const card = this.root.querySelector('.start-brief') as HTMLElement;
-    card.addEventListener('click', (e) => e.stopPropagation());
+    // the menu along the top: Play is the way in itself; the rest open a sheet beside it
     const tabs = this.root.querySelector('.start-tabs') as HTMLElement;
     tabs.addEventListener('click', (e) => {
-      e.stopPropagation();
       const tab = (e.target as HTMLElement).closest('button')?.dataset.tab;
       if (!tab) return;
-      if (tab === 'rewards') return this.rewardsClicked();
-      card.dataset.tab = tab;
-      for (const b of tabs.querySelectorAll('button')) b.classList.toggle('on', b.dataset.tab === tab);
-      if (tab === 'gfx') this.renderGraphics();
+      if (tab === 'rewards') this.rewardsClicked();
+      else this.sheet(tab);
+    });
+    (this.root.querySelector('.sm-close') as HTMLButtonElement).onclick = () => this.sheet('play');
+    (this.root.querySelector('.sm-wallet') as HTMLButtonElement).onclick = () => this.rewardsClicked();
+    window.addEventListener('keydown', (e) => {
+      // (Escape shuts an open sheet before it does anything else: the game's own Escape is the pause, and that is this menu)
+      if (e.code === 'Escape' && this.el.start.classList.contains('sheet') && !this.el.start.classList.contains('paused')) this.sheet('play');
     });
     const gfx = this.root.querySelector('.start-gfx') as HTMLElement;
     gfx.addEventListener('click', (e) => {
-      e.stopPropagation();
       const b = (e.target as HTMLElement).closest('button');
       if (b?.dataset.k) this.setGraphic(b.dataset.k, b.dataset.v ?? '');
     });
+    this.mapTips();
     // scale the whole HUD with the window so it reads the same on a laptop and a 1440p monitor
     const fit = () => {
       const w = window.innerWidth, h = window.innerHeight;
@@ -398,11 +431,60 @@ export class HUD {
     a.classList.add('show');
   }
 
+  /**
+   * The way in (before a game) and the pause (during one).
+   * @param text what the button says while something is going on: connecting, in line
+   */
   showStart(on: boolean, paused = false, text = '') {
     this.toggle(this.el.start, 'show', on);
     this.toggle(this.el.start, 'paused', paused);
-    (this.root.querySelector('.start-btn') as HTMLButtonElement).textContent = text || (paused ? 'Resume' : 'Deploy');
-    if (!on) this.el.start.classList.remove('enter');
+    // (something is going on: the button says what, and is not to be pressed again)
+    this.toggle(this.el.start, 'busy', on && !paused && !!text);
+    this.set('startBtn', this.root.querySelector('.start-btn span') as HTMLElement, text || (paused ? 'Resume' : 'Deploy'));
+    this.set('startKick', this.root.querySelector('.start-kicker span') as HTMLElement, paused ? 'Paused' : 'PvP survival shooter');
+    this.set('startSub', this.root.querySelector('.start-sub') as HTMLElement, paused ? 'The Zone does not stop for you: you can still be killed.' : 'Players hunt you. So do the infected.');
+    if (!on) {
+      this.el.start.classList.remove('enter');
+      this.sheet('play');
+    }
+  }
+
+  /** Which sheet is open beside the way in: the map, how to play, the controls, the settings; 'play' is none. */
+  private sheet(tab: string) {
+    const card = this.root.querySelector('.start-brief') as HTMLElement;
+    if (card.dataset.tab === tab && tab !== 'play') tab = 'play';
+    card.dataset.tab = tab;
+    this.toggle(this.el.start, 'sheet', tab !== 'play');
+    for (const b of this.root.querySelectorAll<HTMLButtonElement>('.start-tabs button')) b.classList.toggle('on', b.dataset.tab === tab);
+    (card.querySelector('h2') as HTMLElement).textContent = { map: 'The map', brief: 'How to play', keys: 'Controls', gfx: 'Settings' }[tab] ?? '';
+    if (tab === 'gfx') this.renderGraphics();
+    (this.root.querySelector('.mm-tip') as HTMLElement).classList.remove('on');
+  }
+
+  /**
+   * What goes on behind the way in, said in a corner of it, and the cut between one scene and
+   * the next (see src/game/menu-scenes.ts).
+   * @param fade how far the picture is faded out, 0..1
+   */
+  menuScene(caption: string, fade: number) {
+    const live = this.root.querySelector('.sm-live') as HTMLElement;
+    this.toggle(live, 'on', !!caption);
+    if (caption) this.set('scene', live.lastElementChild as HTMLElement, caption);
+    const v = fade <= 0.004 ? '0' : fade.toFixed(2);
+    if (this.last.cut !== v) {
+      this.last.cut = v;
+      (this.root.querySelector('.sm-cut') as HTMLElement).style.opacity = v;
+    }
+  }
+
+  /** The line about being paid, under the way in: whether a wallet is given yet. Pressing it opens the rewards window. */
+  setWallet(address: string | null) {
+    const b = this.root.querySelector('.sm-wallet') as HTMLButtonElement;
+    b.hidden = address === null;
+    if (address === null) return;
+    b.classList.toggle('set', !!address);
+    (b.firstElementChild as HTMLElement).textContent = address ? 'Payout wallet set' : 'Play to earn';
+    (b.lastElementChild as HTMLElement).textContent = address ? `${address.slice(0, 4)}…${address.slice(-4)} · change` : 'Add a wallet to be paid for the tags you cash in';
   }
 
   /** The loading screen is lifting: play the entrance (title, panels) once. */
@@ -411,53 +493,71 @@ export class HUD {
   }
 
   /**
-   * The briefing map, drawn from the world itself: where fresh characters start, where
-   * the landmarks are, and which way the loot gets better.
+   * The map sheet: the game's own map (the picture the M key shows), with what is where said
+   * when a mark is pointed at or tapped.
+   * @param picture the whole map, drawn once (see Minimap.poster)
+   * @param size how many metres across it is
    */
-  setBriefing(d: { radius: number; outline: { x: number; z: number; r: number; from: number; to: number }[]; spawns: { x: number; z: number }[]; centre: { x: number; z: number }; places: { name: string; x: number; z: number; kind: 'town' | 'police' | 'post' | 'site' | 'gas' }[] }) {
-    const n = (v: number) => v.toFixed(0);
-    const c = d.centre;
-    const flows = d.spawns
-      .filter((_, i) => i % 3 === 0)
-      .map((s, i) => {
-        const dx = c.x - s.x, dz = c.z - s.z;
-        const len = Math.hypot(dx, dz) || 1;
-        const ux = dx / len, uz = dz / len;
-        return `<path class="m-flow" style="--i:${i}" d="M${n(s.x + ux * 26)} ${n(s.z + uz * 26)}L${n(c.x - ux * 150)} ${n(c.z - uz * 150)}" marker-end="url(#m-arrow)"/>`;
-      })
+  setMenuMap(picture: HTMLCanvasElement, size: number, spots: MenuSpot[], gas: { x: number; z: number; r: number } | null) {
+    const c = this.root.querySelector('.mm canvas') as HTMLCanvasElement;
+    const g = c.getContext('2d')!, W = c.width, k = W / size;
+    g.imageSmoothingEnabled = true;
+    g.drawImage(picture, 0, 0, picture.width, picture.height, 0, 0, W, W);
+    if (gas) {
+      g.beginPath();
+      g.arc((gas.x + size / 2) * k, (gas.z + size / 2) * k, gas.r * k, 0, Math.PI * 2);
+      g.fillStyle = 'rgba(178, 198, 52, 0.26)';
+      g.fill();
+      g.setLineDash([7, 5]);
+      g.lineWidth = 2;
+      g.strokeStyle = 'rgba(218, 236, 98, 0.92)';
+      g.stroke();
+    }
+    const at = (v: number) => (((v + size / 2) / size) * 100).toFixed(2);
+    (this.root.querySelector('.mm-spots') as HTMLElement).innerHTML = spots
+      .map((sp, i) => `<button type="button" class="mm-spot k-${sp.kind}" data-i="${i}" style="left:${at(sp.x)}%;top:${at(sp.z)}%" aria-label="${sp.name}">${sp.label ? `<span>${sp.name}</span>` : ''}</button>`)
       .join('');
-    const spawns = d.spawns.map((s, i) => `<g class="m-spawn" style="--i:${i % 8}"><circle class="m-pulse" cx="${n(s.x)}" cy="${n(s.z)}" r="9"/><circle cx="${n(s.x)}" cy="${n(s.z)}" r="5.5"/></g>`).join('');
-    const places = d.places
-      .map((p) => {
-        // the outlying places are many and small: a mark each, no name (the name shows when you get there)
-        if (p.kind === 'site') return `<g class="m-place m-site" transform="translate(${n(p.x)} ${n(p.z)})"><title>${p.name}</title><rect x="-11" y="-11" width="22" height="22" transform="rotate(45)"/></g>`;
-        // the works, under its gas: a hazard mark, and said in words (nobody should walk up to it finding out)
-        if (p.kind === 'gas') return `<g class="m-place m-gas" transform="translate(${n(p.x)} ${n(p.z)})"><circle r="62"/><path d="M0-17L15 10H-15Z"/><text x="-84" y="-74" text-anchor="start">${p.name}</text><text class="m-sub" y="40" text-anchor="middle">GAS · MASK NEEDED</text></g>`;
-        const mark = p.kind === 'police' ? `<path d="M0-13L11-7V4C11 11 0 15 0 15S-11 11-11 4V-7Z"/>` : p.kind === 'town' ? '' : `<rect x="-8" y="-8" width="16" height="16"/>`;
-        // labels step away from the middle so they never sit on top of each other
-        const below = p.kind === 'town';
-        return `<g class="m-place m-${p.kind}" transform="translate(${n(p.x)} ${n(p.z)})">${mark}<text y="${below ? 62 : -26}" text-anchor="middle">${p.name}</text></g>`;
-      })
-      .join('');
-    const R = d.radius;
-    (this.root.querySelector('.start-map') as HTMLElement).innerHTML = `
-      <svg viewBox="${-R - 70} ${-R - 70} ${2 * R + 140} ${2 * R + 140}" role="img" aria-label="Map: you start on the outer ring, the best loot is in the middle">
-        <defs>
-          <radialGradient id="m-heat"><stop offset="0" stop-color="#c9b27c" stop-opacity="0.55"/><stop offset="0.55" stop-color="#c9b27c" stop-opacity="0.14"/><stop offset="1" stop-color="#c9b27c" stop-opacity="0"/></radialGradient>
-          <marker id="m-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M1 1L9 5L1 9" fill="none" stroke="#c9b27c" stroke-width="1.6"/></marker>
-        </defs>
-        <circle cx="${n(c.x)}" cy="${n(c.z)}" r="${n(R * 0.72)}" fill="url(#m-heat)"/>
-        <circle class="m-tier" cx="${n(c.x)}" cy="${n(c.z)}" r="${n(R * 0.36)}"/>
-        <circle class="m-tier" cx="${n(c.x)}" cy="${n(c.z)}" r="${n(R * 0.68)}"/>
-        <path class="m-edge" d="${d.outline
-          .map((a, i) => {
-            const at = (t: number) => `${n(a.x + Math.cos(t) * a.r)} ${n(a.z + Math.sin(t) * a.r)}`;
-            return `${i ? 'L' : 'M'}${at(a.from)}A${n(a.r)} ${n(a.r)} 0 ${a.to - a.from > Math.PI ? 1 : 0} 1 ${at(a.to)}`;
-          })
-          .join('')}Z"/>
-        ${flows}${spawns}${places}
-      </svg>
-      <figcaption><span class="lg-spawn"></span>start<span class="lg-site"></span>weapon here<span class="lg-loot"></span>better loot</figcaption>`;
+    this.spots = spots;
+    (this.root.querySelector('.mm-hint') as HTMLElement).textContent = TOUCH ? 'Tap a mark to see what is there.' : 'Point at a mark to see what is there.';
+  }
+
+  private spots: MenuSpot[] = [];
+
+  /** the map's marks say what they are: under the mouse, or when tapped */
+  private mapTips() {
+    const map = this.root.querySelector('.mm') as HTMLElement, tip = map.querySelector('.mm-tip') as HTMLElement;
+    // (on a phone the map is small and a finger is on it: there it is said beside the map)
+    const said = this.root.querySelector('.mm-said') as HTMLElement;
+    let stuck: HTMLElement | null = null;
+    const show = (el: HTMLElement | null) => {
+      const sp = el ? this.spots[Number(el.dataset.i)] : null;
+      tip.classList.toggle('on', !!sp);
+      said.classList.toggle('on', !!sp);
+      map.querySelectorAll('.mm-spot.on').forEach((o) => o.classList.remove('on'));
+      if (!sp || !el) return;
+      el.classList.add('on');
+      tip.innerHTML = said.innerHTML = `<b>${sp.name}</b><span>${sp.tip}</span>`;
+      // beside the mark, on whichever side of it has the room
+      const x = parseFloat(el.style.left), y = parseFloat(el.style.top);
+      tip.style.left = x < 55 ? `calc(${x}% + 16px)` : 'auto';
+      tip.style.right = x < 55 ? 'auto' : `calc(${100 - x}% + 16px)`;
+      tip.style.top = y < 70 ? `calc(${y}% - 10px)` : 'auto';
+      tip.style.bottom = y < 70 ? 'auto' : `calc(${100 - y}% - 10px)`;
+    };
+    const spotOf = (e: Event) => (e.target as HTMLElement).closest<HTMLElement>('.mm-spot');
+    map.addEventListener('pointerover', (e) => {
+      if ((e as PointerEvent).pointerType !== 'touch' && spotOf(e)) show(spotOf(e));
+    });
+    map.addEventListener('pointerout', (e) => {
+      if ((e as PointerEvent).pointerType !== 'touch' && spotOf(e)) show(stuck);
+    });
+    map.addEventListener('focusin', (e) => show(spotOf(e)));
+    map.addEventListener('click', (e) => {
+      // (a tap, or a click: it stays up until another is picked, or the map itself is pressed)
+      const el = spotOf(e);
+      stuck = el && el !== stuck ? el : null;
+      show(stuck);
+    });
   }
 
   setName(name: string) {
@@ -488,9 +588,9 @@ export class HUD {
     const full = max > 0 && count !== null && count >= max;
     e.textContent =
       count === null ? ''
-      : full ? `Server full (${count}/${max})${waiting ? ` · ${waiting} waiting` : ''}: you will be put in line`
-      : count === 0 ? 'Nobody else is online yet'
-      : `${count} survivor${count === 1 ? '' : 's'} online`;
+      : full ? `Full (${count}/${max})${waiting ? ` · ${waiting} waiting` : ''} · you will be put in line`
+      : count === 0 ? 'Nobody else online yet'
+      : `${count}${max ? ` / ${max}` : ''} online`;
     this.toggle(e, 'show', count !== null);
     this.toggle(e, 'full', full);
   }
@@ -686,9 +786,22 @@ export class HUD {
     this.toggle(this.el.start, 'show', false);
   }
 
-  /** the whole overlay is a click target so the click that resumes also captures the mouse */
+  private startClicked: () => void = () => {};
+
+  /**
+   * The click that starts a game, or goes back into one. Before a game it is the button and
+   * nothing else (a stray click on the way in should not take the mouse); from the pause it is
+   * the button or anywhere on the picture behind the menu, as it always was. Either way it is
+   * the same click that captures the mouse.
+   */
   onStart(cb: () => void) {
+    this.startClicked = cb;
     this.el.start.onclick = (e) => {
+      const t = e.target as HTMLElement;
+      const paused = this.el.start.classList.contains('paused');
+      const bare = t === this.el.start || t.classList.contains('sm-main') || t.classList.contains('sm-hero') || t.classList.contains('sm-cut');
+      if (!t.closest('.start-btn') && !(paused && bare)) return;
+      if (this.el.start.classList.contains('busy')) return;
       e.preventDefault();
       cb();
     };
