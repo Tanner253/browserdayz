@@ -20,6 +20,7 @@ import { CRATE_RESTOCK, CRATE_SPECS, fillCrate } from '../src/sim/crates';
 import { WEAPON_RULES, hitDamage, type HitZone } from '../src/sim/combat';
 import { BARREL } from '../src/sim/barrels';
 import { JEEP, SEATS, crashDamage, restState, type VehicleInfo, type VState } from '../src/sim/vehicles';
+import { Director, INFECTED } from '../src/sim/infected';
 import { EMOTE, EMOTE_GAP, SHOUT_RANGE } from '../src/sim/emotes';
 import { ACTS, CHAT_RANGE, F_DEAD, MAX_STAMINA, PROTOCOL, type C2S, type CorpseInfo, type KillInfo, type PlayerInfo, type Pose, type S2C, type StashInfo, type StoredItem, type Vitals } from '../src/net/protocol';
 
@@ -68,6 +69,8 @@ const locks = new Map<string, number>(); // cid -> client id
 const doors = new Map<number, [boolean, number]>();
 /** fuel drums that have gone up (see src/sim/barrels.ts): which one -> when a new one may be stood there */
 const barrelsGone = new Map<number, number>();
+// the infected: how many there are, what each has left, and whose game moves it (src/sim/infected.ts)
+const horde = new Director(process.env.INFECTED === 'off' ? [] : world.homes, world.homeSpot);
 const BARREL_RESPAWN = Number(process.env.BARREL_RESPAWN_S) || BARREL.respawn;
 
 /**
@@ -752,6 +755,49 @@ function handle(c: Client, m: C2S) {
       send(c, { t: 'hitok', to: target.id, amount, zone: m.zone });
       return;
     }
+    case 'is': {
+      // where the infected this player's game moves have got to: passed on to everybody else
+      const s = horde.report(c.id, m.s, Date.now());
+      if (s.length) broadcast({ t: 'is', s }, c);
+      return;
+    }
+    case 'ihit': {
+      const b = horde.bodies.get(m.i);
+      const rule = WEAPON_RULES[m.w];
+      if (!b || b.diedAt || !c.alive || !rule || m.w === 'infected' || m.w === 'jeep') return;
+      if (!['head', 'torso', 'legs'].includes(m.zone)) return;
+      const now = Date.now();
+      const d = Math.hypot(c.pose[0] - b.s[0], c.pose[1] - b.s[1], c.pose[2] - b.s[2]);
+      if (d > rule.range + 6) return;
+      let amount: number;
+      if (rule.blast) {
+        // something of theirs went off in the last few seconds: a grenade thrown, or a drum set off
+        const since = m.w === 'grenade' ? now - c.lastNade : Math.min(...c.blasts.map((q) => now - q.at), Infinity);
+        if (since > 9000 || !num(m.dist)) return;
+        amount = hitDamage(m.w, 'torso', Math.max(0, m.dist));
+        m.zone = 'torso';
+      } else {
+        if (m.w !== 'fists' && c.w !== m.w) return;
+        if (now - c.lastHit < rule.interval * 700) return;
+        c.lastHit = now;
+        amount = hitDamage(m.w, m.zone, d, !!m.sup, num(m.bonus) ? m.bonus : 0);
+      }
+      const r = horde.hurt(m.i, amount, now);
+      if (!r) return;
+      const len = Math.max(0.001, Math.hypot(b.s[0] - c.pose[0], b.s[2] - c.pose[2]));
+      broadcast({ t: 'ihp', i: m.i, hp: r.hp, dead: r.dead, by: c.id, zone: m.zone, dir: [(b.s[0] - c.pose[0]) / len, (b.s[2] - c.pose[2]) / len] });
+      return;
+    }
+    case 'iatk': {
+      // one of them that this player's game moves has struck somebody (as likely as not, this player)
+      const target = clients.get(m.to);
+      const b = horde.bodies.get(m.i);
+      if (!b || !target?.alive) return;
+      if (!horde.strikes(m.i, c.id, { id: target.id, x: target.pose[0], z: target.pose[2] }, Date.now())) return;
+      const len = Math.max(0.001, Math.hypot(target.pose[0] - b.s[0], target.pose[2] - b.s[2]));
+      send(target, { t: 'dmg', from: 0, amount: INFECTED.damage + Math.round((Math.random() - 0.5) * 6), zone: 'torso', w: 'infected', dir: [(target.pose[0] - b.s[0]) / len, 0, (target.pose[2] - b.s[2]) / len] });
+      return;
+    }
     case 'take': {
       if (typeof m.uid !== 'string' || !c.alive) return;
       // first request wins; the economy's despawn event tells everyone it is gone
@@ -1037,6 +1083,7 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
     drops: [...boxes.values()].filter((b) => b.kind === 'drop').map(dropInfo),
     barrels: [...barrelsGone.keys()],
     vehicles: [...vehicles.values()].map(vehInfo),
+    infected: horde.list(),
     spawn: sp,
     me: resume ? { inv: resume.inv!, vitals: resume.vitals ?? { health: 100, energy: 80, water: 80, stamina: MAX_STAMINA, bleeding: false } } : null,
     max: MAX_PLAYERS,
@@ -1094,6 +1141,11 @@ setInterval(() => {
       tellSeats(v, true);
     }
   }
+  // the infected: new ones where nobody is looking, the dead cleared away, and whose game moves each
+  const turn = horde.tick(now, [...clients.values()].filter((c) => c.alive).map((c) => ({ id: c.id, x: c.pose[0], z: c.pose[2] })));
+  for (const i of turn.gone) broadcast({ t: 'i-', i });
+  for (const b of turn.added) broadcast({ t: 'i+', b: { i: b.i, s: b.s, hp: b.hp, own: b.own } });
+  for (const [i, to] of turn.owned) broadcast({ t: 'iown', i, to });
   // a new one for each that burned, once its time has come and nobody is standing on the spot
   for (const [home, at] of jeepsDue) {
     const p = world.jeeps[home];

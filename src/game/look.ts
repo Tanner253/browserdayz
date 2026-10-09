@@ -10,17 +10,21 @@ import * as THREE from 'three';
 import type { GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { assets } from '../core/assets';
 
-const CHARACTER_URL = 'assets/characters/survivor.glb';
 const MASK_URL = 'assets/characters/survivor_mask.webp';
 
-let character: Promise<GLTF> | null = null;
+/** the bodies there are: a survivor (every player), and one of the infected (the plain body in a civilian's clothes) */
+export type BodyFile = 'survivor' | 'infected';
+
+const characters = new Map<BodyFile, Promise<GLTF>>();
 
 /**
- * The character file, parsed once and kept for good: every body in the world is a copy of
- * it, sharing its geometry and textures, however late that player walks in.
+ * A character file, parsed once and kept for good: every body in the world is a copy of
+ * one, sharing its geometry and textures, however late it walks in.
  */
-export function loadCharacter(): Promise<GLTF> {
-  return (character ??= assets.loadGLTF(CHARACTER_URL));
+export function loadCharacter(file: BodyFile = 'survivor'): Promise<GLTF> {
+  let c = characters.get(file);
+  if (!c) characters.set(file, (c = assets.loadGLTF(`assets/characters/${file}.glb`)));
+  return c;
 }
 
 export const HAIR_STYLES = ['hair_buzzed', 'hair_parted', 'hair_long'] as const;
@@ -76,6 +80,30 @@ export function lookFor(seed: string): Look {
     hair: style < HAIR_STYLES.length ? style : -1,
     beard,
   };
+}
+
+// What the people who lived here were wearing when it took them: the colours a civilian's
+// jacket comes in (the ones that were taken off the soldiers), gone dull with weather and dirt.
+const TOWN_JACKETS = [0x6b3a2a, 0x5a2d33, 0x2f5a57, 0x34486a, 0x4a5a78, 0x6a6048, 0x4d4f4c, 0x7a6a4c, 0x3c4a35, 0x705a3c];
+const TOWN_TROUSERS = [0x3a3d38, 0x4a3b2c, 0x2a2b2d, 0x2f3a52, 0x555a5c, 0x5a5340];
+/** what the sickness does to skin of any colour: grey, with the green of a bruise in it */
+const SICK = [0.6, 0.66, 0.56];
+
+/** One of the infected: somebody's neighbour, in what they had on, a long time unwashed. */
+export function infectedLook(seed: number): Look {
+  const l = lookFor(`infected ${seed}`);
+  let h = hash(`town ${seed}`);
+  const pick = (n: number) => {
+    h = (Math.imul(h, 1664525) + 1013904223) >>> 0;
+    return Math.floor((h / 4294967296) * n);
+  };
+  l.jacket.setHex(TOWN_JACKETS[pick(TOWN_JACKETS.length)]).multiplyScalar(0.62);
+  l.trousers.setHex(TOWN_TROUSERS[pick(TOWN_TROUSERS.length)]).multiplyScalar(0.6);
+  l.skin.r *= SICK[0];
+  l.skin.g *= SICK[1];
+  l.skin.b *= SICK[2];
+  l.hairColor.multiplyScalar(0.7);
+  return l;
 }
 
 /** the painted cloth is a mid grey: this brings a colour multiplied into it back up to itself */

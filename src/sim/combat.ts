@@ -31,6 +31,8 @@ export const WEAPON_RULES: Record<string, WeaponRule> = {
   barrel: { damage: 140, melee: false, range: 900, interval: 0, falloff: 1, blast: 8 },
   // run down by a jeep (see src/sim/vehicles.ts): how much it hurts is how fast the jeep was going
   jeep: { damage: 0, melee: true, range: 8, interval: 0.4, falloff: 1 },
+  // the arms of one of the infected (see src/sim/infected.ts): never a player's to hit with
+  infected: { damage: 13, melee: true, range: 3.4, interval: 1, falloff: 1 },
 };
 
 const ZONE: Record<HitZone, [bullet: number, melee: number]> = { head: [3.2, 1.6], torso: [1, 1], legs: [0.6, 0.7] };

@@ -44,6 +44,8 @@ import { DROP, describeSpot, fillDrop, pickDropSite, type DropInfo } from '../si
 import { renderDoll, renderIcons } from '../ui/icons';
 import { Perf } from '../core/perf';
 import { loadGraphics, type Graphics } from '../core/settings';
+import { Horde, Infected } from './infected';
+import { INFECTED } from '../sim/infected';
 import { TOUCH } from '../core/device';
 import { TouchControls } from '../ui/touch';
 import { REWARDS_UI, RewardsModal, addCashedTag, cashedTags, walletAddress } from '../ui/rewards';
@@ -96,6 +98,25 @@ export class Game {
   minimap!: Minimap;
   invUI!: InventoryUI;
   dummies: Dummy[] = [];
+  /** the infected (src/game/infected.ts) */
+  readonly horde: Horde = new Horde({
+    atmo: () => this.s.atmo,
+    scene: () => this.s.r.scene,
+    world: () => this.s.world,
+    me: () => ({ id: this.net.id || 1, pos: this.player.pos, crouched: this.player.crouched, speed: Math.hypot(this.player.vel.x, this.player.vel.z), alive: this.started && !this.player.dead, seated: !!this.garage.ride }),
+    others: () => this.remotes.values(),
+    online: () => this.online,
+    send: (m) => this.net.send(m),
+    struck: (amount, from) => {
+      const p = this.player.pos;
+      const len = Math.max(0.001, Math.hypot(p.x - from.x, p.z - from.z));
+      this.takeHit({ t: 'dmg', from: 0, amount, zone: 'torso', w: 'infected', dir: [(p.x - from.x) / len, 0, (p.z - from.z) / len] });
+    },
+    killed: (zone, distance) => {
+      this.weapons.confirmKill();
+      this.hud.note(`Infected down${zone === 'head' ? ' · headshot' : ''}${distance > 8 ? ` · ${Math.round(distance)} m` : ''}`, 'good');
+    },
+  });
   remotes = new Map<number, RemotePlayer>();
   /** item ids on the quick-use keys 5-8 */
   quick: (string | null)[] = [null, null, null, null];
@@ -228,15 +249,19 @@ export class Game {
     this.weapons.itemModels = this.loot.models;
     this.weapons.onSlungChange = (obj) => this.avatar.setSlung(obj);
     this.weapons.setLook(lookFor(playerName()));
-    this.weapons.resolveTarget = (owner) => (owner instanceof Dummy || owner instanceof RemotePlayer ? owner : null);
+    this.weapons.resolveTarget = (owner) => (owner instanceof Dummy || owner instanceof RemotePlayer || owner instanceof Infected ? owner : null);
     this.weapons.onHit = (h) => this.onHit(h);
     // whoever is hit carries the blood on their clothes where it landed
     this.weapons.onFlesh = (owner, pt, dir, power) => {
       if (power < 0.4) return;
-      const body = owner instanceof RemotePlayer || owner instanceof Dummy ? owner.avatar : owner === this.player ? this.avatar : null;
+      const body = owner instanceof RemotePlayer || owner instanceof Dummy || owner instanceof Infected ? owner.avatar : owner === this.player ? this.avatar : null;
       body?.wound(pt, dir, 0.05 + power * 0.04, power > 0.58);
     };
-    this.weapons.onShot = (s) => this.net.send({ t: 'shot', o: s.origin.toArray(), d: s.dir.toArray(), w: s.weapon, sup: s.suppressed });
+    this.weapons.onShot = (s) => {
+      this.net.send({ t: 'shot', o: s.origin.toArray(), d: s.dir.toArray(), w: s.weapon, sup: s.suppressed });
+      // the infected hear it as well as anybody
+      this.horde.noise(s.origin.x, s.origin.z, s.suppressed ? INFECTED.hearQuiet : INFECTED.hearShot);
+    };
     // a bullet in a fuel drum
     this.weapons.onStruck = (owner, weapon) => {
       if (owner instanceof Barrel) this.blowBarrel(owner.i, true);
@@ -472,6 +497,7 @@ export class Game {
     else this.fresh();
     await this.spawnDummies();
     this.garage.startAlone();
+    this.horde.alone();
     this.hud.setNet('Offline · single player');
     this.hud.setOnline(null);
   }
@@ -638,6 +664,7 @@ export class Game {
     this.garage.clear();
     for (const v of w.vehicles ?? []) this.garage.add(v);
     this.garage.bind();
+    this.horde.online(w.infected ?? []);
     const y = w.spawn.y ?? heightAt(world.heights, w.spawn.x, w.spawn.z);
     this.player.spawn(w.spawn.x, y + 0.05, w.spawn.z, w.spawn.yaw);
     if (w.me) {
@@ -680,8 +707,14 @@ export class Game {
         if (!(s[6] & F_DEAD)) r.setAlive(true);
       }
     });
+    net.on('i+', (m) => this.horde.add(m.b));
+    net.on('i-', (m) => this.horde.remove(m.i));
+    net.on('iown', (m) => this.horde.own(m.i, m.to));
+    net.on('is', (m) => this.horde.states(m.s, performance.now()));
+    net.on('ihp', (m) => this.horde.hp(m.i, m.dead, m.by, m.zone, m.dir));
     net.on('shot', (m) => {
       this.weapons.remoteShot(new THREE.Vector3(...m.o), new THREE.Vector3(...m.d), m.w, m.sup);
+      this.horde.noise(m.o[0], m.o[2], m.sup ? INFECTED.hearQuiet : INFECTED.hearShot);
       // (nobody shoots and waves at once)
       this.remotes.get(m.id)?.avatar.emote(null);
     });
@@ -1022,12 +1055,13 @@ export class Game {
     // (a jeep that ran them down is 'jeep'; one that burned with them in it, or beside them, is 'fire')
     const blast = m.w === 'grenade' || m.w === 'barrel' || m.w === 'fire';
     const melee = !blast && !ITEMS[m.w]?.weapon;
-    p.damage(amount, m.w === 'fire' ? 'a burning jeep' : m.w === 'jeep' ? 'being run down' : blast ? 'an explosion' : melee ? 'a beating' : 'gunshot wounds');
+    const sick = m.w === 'infected';
+    p.damage(amount, sick ? 'the infected' : m.w === 'fire' ? 'a burning jeep' : m.w === 'jeep' ? 'being run down' : blast ? 'an explosion' : melee ? 'a beating' : 'gunshot wounds');
     this.glass = 0;
     this.setHold(null);
     // a bullet nearly always opens a wound, a blade often, a fist or a bat seldom
     const blade = m.w === 'knife' || m.w === 'machete' || m.w === 'hatchet';
-    if (!p.dead && Math.random() < (melee ? (blade ? 0.6 : amount > 25 ? 0.25 : 0) : amount > 12 ? 0.85 : 0.4)) p.bleed();
+    if (!p.dead && Math.random() < (sick ? INFECTED.bleed : melee ? (blade ? 0.6 : amount > 25 ? 0.25 : 0) : amount > 12 ? 0.85 : 0.4)) p.bleed();
     this.weapons.flinch(melee ? 0.5 : 1);
     this.lastHit = { x: m.dir[0], z: m.dir[2], at: performance.now() };
     // Bullets in this world pass through your own body (the server said you were hit, not
@@ -1111,6 +1145,12 @@ export class Game {
   }
 
   private onHit(h: HitInfo) {
+    if (h.victim instanceof Infected) {
+      // (alone, this game has already decided what it did; on a server the server does)
+      if (this.online) this.net.send({ t: 'ihit', i: h.victim.i, zone: h.zone, w: h.weapon, dist: h.distance, sup: hasMod(this.weapons.equippedItem, 'suppressor_9'), bonus: h.weapon === 'fists' ? this.inv.wear('fist').reduce((a, b) => a + b, 0) : 0 });
+      else if (h.killed) this.hud.note(`Infected down${h.zone === 'head' ? ' · headshot' : ''}${h.melee || h.distance < 8 ? '' : ` · ${Math.round(h.distance)} m`}`, 'good');
+      return;
+    }
     if (h.victim instanceof RemotePlayer) {
       const it = this.weapons.equippedItem;
       const bonus = this.inv.wear('fist').reduce((a, b) => a + b, 0);
@@ -1655,6 +1695,18 @@ export class Game {
       this.effects.bleed(chest, dir, 0.8);
       rp.avatar.wound(chest.clone().addScaledVector(dir, -0.2), dir, 0.09, false);
       this.net.send({ t: 'hit', to: rp.id, zone: 'torso', w: what, dist: d, sup: false, bonus: 0 });
+    }
+    // the infected standing in it
+    for (const b of this.horde.all.values()) {
+      if (b.dead || !b.ready) continue;
+      const chest = new THREE.Vector3(b.pos.x, b.pos.y + 1.2, b.pos.z);
+      const k = reach(chest);
+      if (k <= 0) continue;
+      const dir = chest.clone().sub(at).normalize();
+      this.effects.bleed(chest, dir, 0.8);
+      b.avatar.wound(chest.clone().addScaledVector(dir, -0.2), dir, 0.09, false);
+      if (b.damage(spec.damage * k, chest, dir, 'torso')) this.hud.note(drum ? 'Infected down · fuel drum' : 'Infected down · grenade', 'good');
+      if (this.online && !jeep) this.net.send({ t: 'ihit', i: b.i, zone: 'torso', w: what, dist: chest.distanceTo(at), sup: false, bonus: 0 });
     }
     for (const d of this.dummies) {
       const chest = new THREE.Vector3(d.pos.x, d.pos.y + 1.2, d.pos.z);
@@ -2211,6 +2263,7 @@ export class Game {
     for (const d of this.dummies) {
       if (Math.abs(d.pos.x - interp.x) + Math.abs(d.pos.z - interp.z) < 260) d.update(dt);
     }
+    this.horde.update(dt, now, cam.position);
     for (const rp of this.remotes.values()) {
       rp.update(dt, now, cam.position);
       if (rp.bleeding && rp.alive && (rp.dripT -= dt) <= 0) {

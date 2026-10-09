@@ -1091,6 +1091,66 @@ export class AudioEngine {
   // ------------------------------------------------------------ voices
 
   /**
+   * The noises the infected make (src/game/infected.ts): a throat with nothing left behind
+   * it. Each is one rough note bent through its length, with breath over it: low and long
+   * when nothing is happening, a shriek when it has seen somebody, a snarl as the arms come
+   * down.
+   * @param seed which of them: each has its own pitch
+   */
+  infected(kind: 'groan' | 'growl' | 'alert' | 'attack' | 'hurt' | 'die', pos: V3, distance = 0, seed = 0) {
+    if (!this.ready || distance > 140) return;
+    const ctx = this.ctx;
+    // [how long, how loud, the note at the start, in the middle and at the end (times its own pitch), how rough, how much breath, the mouth's two resonances]
+    const V = {
+      groan: [1.5, 0.3, 0.85, 0.95, 0.7, 14, 0.25, 480, 900],
+      growl: [0.95, 0.5, 1.1, 1.3, 0.95, 31, 0.35, 560, 1100],
+      alert: [0.9, 0.95, 1.7, 3.6, 2.4, 38, 0.6, 900, 2300],
+      attack: [0.42, 0.8, 1.5, 2.3, 1.3, 44, 0.7, 760, 1800],
+      hurt: [0.28, 0.6, 2.0, 1.5, 1.1, 30, 0.4, 700, 1500],
+      die: [1.3, 0.6, 1.6, 1.0, 0.5, 18, 0.5, 520, 1000],
+    }[kind];
+    const [dur, loud, n0, n1, n2, rough, breath, f1, f2] = V;
+    const pitch = 82 + ((seed * 37) % 34);
+    const t = ctx.currentTime + 0.01 + distance / 343;
+    const out = this.out(pos, kind === 'alert' ? 9 : 4, 1.15, distance);
+    const bus = ctx.createGain();
+    bus.gain.setValueAtTime(0.0001, t);
+    bus.gain.exponentialRampToValueAtTime(loud, t + Math.min(0.08, dur * 0.2));
+    bus.gain.setValueAtTime(loud, t + dur * 0.55);
+    bus.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    bus.connect(out);
+    const osc = ctx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(pitch * n0, t);
+    osc.frequency.linearRampToValueAtTime(pitch * n1, t + dur * 0.4);
+    osc.frequency.linearRampToValueAtTime(pitch * n2, t + dur);
+    // the rattle in it: the note cut in and out a few dozen times a second
+    const rattle = ctx.createOscillator();
+    rattle.frequency.value = rough * (0.9 + Math.random() * 0.2);
+    const depth = ctx.createGain();
+    depth.gain.value = 0.45;
+    const cut = ctx.createGain();
+    cut.gain.value = 0.55;
+    rattle.connect(depth).connect(cut.gain);
+    osc.connect(cut);
+    for (const [f, q, g] of [[f1, 4, 1], [f2, 6, 0.6]]) {
+      const band = this.filter('bandpass', f, q);
+      const lvl = ctx.createGain();
+      lvl.gain.value = g;
+      cut.connect(band).connect(lvl).connect(bus);
+    }
+    const air = this.noise(t, dur);
+    const airBand = this.filter('bandpass', f2 * 1.2, 1.2);
+    const airLvl = ctx.createGain();
+    airLvl.gain.value = breath * 0.5;
+    air.connect(airBand).connect(airLvl).connect(bus);
+    osc.start(t);
+    rattle.start(t);
+    osc.stop(t + dur + 0.05);
+    rattle.stop(t + dur + 0.05);
+  }
+
+  /**
    * Somebody calls out (see CALLS above, and src/sim/emotes.ts).
    * @param pos where they stand (their head); none for the player's own voice
    * @param voice whose voice, 0..1: from a low, broad one to a higher, thinner one

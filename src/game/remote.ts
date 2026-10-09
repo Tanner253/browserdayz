@@ -183,6 +183,14 @@ export class RemotePlayer implements Damageable {
   /** where the local player is listening from (kept by update) */
   private heard = new THREE.Vector3();
 
+  /** metres a second over the ground, and whether they are sitting in a jeep (what the infected go by: src/game/infected.ts) */
+  get speed() {
+    return Math.hypot(this.vel.x, this.vel.z);
+  }
+  get seated() {
+    return !!this.seat;
+  }
+
   /** chest position, for name tags and aim checks */
   chest(out: THREE.Vector3) {
     return out.set(this.pos.x, this.pos.y + (this.crouched ? 0.68 : 1.25), this.pos.z);

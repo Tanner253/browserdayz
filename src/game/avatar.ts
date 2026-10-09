@@ -11,7 +11,7 @@ import * as THREE from 'three';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import type { Atmosphere } from '../world/atmosphere';
 import { bent, type Grips, type HandGrip } from './arms';
-import { BEARD, HAIR_STYLES, MAX_WOUNDS, loadCharacter, lookFor, lookPatch, lookUniforms, setLookUniforms, suitPatch, type Look, type LookUniforms } from './look';
+import { BEARD, HAIR_STYLES, MAX_WOUNDS, loadCharacter, lookFor, lookPatch, lookUniforms, setLookUniforms, suitPatch, type BodyFile, type Look, type LookUniforms } from './look';
 import type { Emote } from '../sim/emotes';
 
 /** local player's full body: seen by the shadow cameras always, by the main camera only on the flight in from the menu */
@@ -145,6 +145,10 @@ interface Stance {
   r: [number, number, number];
 }
 type Stances = Record<'ready' | 'aim' | 'carry', Stance>;
+
+/** how long the infected's blow takes from the arms going up to their coming back, seconds */
+const CLAW = 0.95;
+const _sickEye = new THREE.Color(1.0, 0.72, 0.55);
 
 /** how far the middle of the thumb lies from the middle of the finger it is laid against, metres */
 const THUMB_BESIDE = 0.02;
@@ -291,9 +295,10 @@ export class Avatar {
    * @param layer render layer of the full body (0 = an ordinary object everyone sees)
    * @param firstPersonBody also build the headless, armless copy for the local first-person view
    * @param look clothes, skin and hair (see setLook)
+   * @param file which body (see BodyFile)
    */
-  async load(atmo: Atmosphere, layer = AVATAR_LAYER, firstPersonBody = false, look: Look = lookFor('')) {
-    const gltf = await loadCharacter();
+  async load(atmo: Atmosphere, layer = AVATAR_LAYER, firstPersonBody = false, look: Look = lookFor(''), file: BodyFile = 'survivor') {
+    const gltf = await loadCharacter(file);
     const model = SkeletonUtils.clone(gltf.scene) as THREE.Group;
     // the model faces +Z; everything in the game (and the camera) faces -Z
     const rig = new THREE.Group();
@@ -354,6 +359,8 @@ export class Avatar {
             src.userData.toned = true;
             src.color.multiplyScalar(0.72);
             src.roughness = Math.max(src.roughness, 0.5);
+            // (the infected's are gone the yellow-red of an old bruise)
+            if (file === 'infected') src.color.multiply(_sickEye);
           }
           atmo.register(src);
         }
@@ -733,6 +740,65 @@ export class Avatar {
   hit(head = false) {
     this.hitT = 0;
     this.hitClip = head ? 'hitHead' : 'hit';
+  }
+
+  /**
+   * One of the infected: how it carries itself. `roused` is how far it is after somebody
+   * (0 slack and shambling, 1 arms out and coming); `claw` is the blow it is throwing (seconds
+   * into it, -1 none); `seed` keeps one from swaying in time with the next.
+   */
+  sick: { roused: number; claw: number; seed: number } | null = null;
+
+  /** The infected strike: both arms brought down on whoever is in front of them. */
+  claw() {
+    if (this.sick) this.sick.claw = 0;
+  }
+
+  /**
+   * The carriage of the infected, laid over whatever movement is playing: the back bent,
+   * the head hung over to one side and rolling, and once it is roused the arms held out at
+   * whoever it is after and thrown at them when it strikes.
+   */
+  private sicken(dt: number) {
+    const s = this.sick!;
+    const t = this.clock + s.seed;
+    const aimQ = _aimQ.setFromAxisAngle(UP, this.yaw);
+    const fwd = _fwd.set(0, 0, -1).applyQuaternion(aimQ);
+    _right.set(1, 0, 0).applyQuaternion(aimQ);
+    const side = s.seed % 2 < 1 ? 1 : -1;
+    const lurch = Math.sin(t * 1.9) * 0.05;
+    // (about its right, a turn the positive way tips the body back: forward is the other)
+    for (const b of this.spine) this.turn(b, _right, -(0.085 + 0.035 * s.roused) + lurch * 0.3);
+    if (this.spine[1]) this.turn(this.spine[1], fwd, side * 0.07 + lurch);
+    const head = this.neck[this.neck.length - 1];
+    if (head) {
+      this.turn(head, fwd, side * (0.3 - 0.12 * s.roused) + Math.sin(t * 0.7) * 0.08);
+      this.turn(head, _right, 0.2 * s.roused - 0.1);
+    }
+    let strike = 0;
+    if (s.claw >= 0) {
+      s.claw += dt;
+      const k = s.claw / CLAW;
+      if (k >= 1) s.claw = -1;
+      // up and back, down hard, and a moment hanging there before the arms come up again
+      else strike = k < 0.3 ? -Math.sin((k / 0.3) * Math.PI) * 0.5 : THREE.MathUtils.smoothstep(k, 0.3, 0.46) * (1 - THREE.MathUtils.smootherstep(k, 0.62, 1));
+    }
+    const w = Math.max(s.roused * 0.9, Math.abs(strike));
+    if (w < 0.02 || !this.armR || !this.armL || !head) return;
+    this.root.updateMatrixWorld(true);
+    const from = head.getWorldPosition(_head);
+    const at = (f: number, u: number, r: number) => new THREE.Vector3().copy(from).addScaledVector(fwd, f).addScaledVector(UP, u).addScaledVector(_right, r);
+    const dirOf = (f: number, u: number, r: number) => new THREE.Vector3().addScaledVector(fwd, f).addScaledVector(UP, u).addScaledVector(_right, r);
+    for (const sd of [1, -1] as const) {
+      // one arm higher than the other, both groping; in the blow they go up together and come down in front of the chest
+      const uneven = sd === side ? 0.07 : -0.05;
+      const grope = Math.sin(t * 3.1 + sd) * 0.03;
+      const out = at(0.42 + grope, -0.2 + uneven, sd * 0.2);
+      const to = strike < 0 ? out.lerp(at(0.24, 0.16, sd * 0.24), -strike * 2) : out.lerp(at(0.5, -0.5, sd * 0.1), strike);
+      const F = dirOf(1, -0.25 - Math.max(0, strike) * 0.8, -sd * 0.1);
+      const N = dirOf(-0.2, -1, -sd * 0.15);
+      this.reach(sd > 0 ? this.armR : this.armL, to, F, N, [0.75, 0.85, 0.95, 1.05], aimQ, w);
+    }
   }
 
   /** Which way it goes down the next time it dies: an index into DEATHS. */
@@ -1226,6 +1292,7 @@ export class Avatar {
       }
     }
 
+    if (this.sick && !dead && this.downT <= 0) this.sicken(dt);
     if (this.armR) this.thumb(this.armR);
     if (this.armL) this.thumb(this.armL);
 

@@ -48,6 +48,13 @@ const CLIPS = {
  * mask are left exactly as they are.
  */
 const EMOTES = process.argv.includes('--emotes');
+/**
+ * `--infected`: the plain body in its civilian's jacket, as it was before the suit, written to
+ * infected.glb beside the survivor. It is what the infected are drawn with (src/game/infected.ts):
+ * the game colours it sick and bloody. The survivor's file and the mask are left as they are
+ * (the mask is the same painting either way).
+ */
+const INFECTED = process.argv.includes('--infected');
 if (EMOTES) Object.assign(CLIPS, { talk: 'Idle_Talking_Loop', point: 'Spell_Simple_Shoot', hail: 'Spell_Simple_Idle_Loop', reach: 'Interact', sit: 'Sitting_Idle_Loop', sitTalk: 'Sitting_Talking_Loop' });
 const HAIR = { hair_buzzed: 'Hair_Buzzed', hair_parted: 'Hair_SimpleParted', hair_long: 'Hair_Long', hair_beard: 'Hair_Beard' };
 /** the long style is cut for the other body in the pack, whose head sits lower and a touch further forward */
@@ -528,14 +535,14 @@ await fs.mkdir(OUT, { recursive: true });
 const PREVIEW = path.join(ROOT, 'assets-src', 'characters', 'preview');
 await fs.mkdir(PREVIEW, { recursive: true });
 await sharp(outBase, { raw: { width: TEX, height: TEX, channels: 3 } }).jpeg({ quality: 85 }).toFile(path.join(PREVIEW, 'survivor_base.jpg'));
-if (!EMOTES) await sharp(outMask, { raw: { width: TEX, height: TEX, channels: 3 } }).webp({ quality: 92, effort: 5 }).toFile(path.join(OUT, 'survivor_mask.webp'));
+if (!EMOTES && !INFECTED) await sharp(outMask, { raw: { width: TEX, height: TEX, channels: 3 } }).webp({ quality: 92, effort: 5 }).toFile(path.join(OUT, 'survivor_mask.webp'));
 
 // ================================================================ 2. what it wears
 // The body dressed above is not what is drawn any more: a suit made for another skeleton is
 // brought onto this one (scripts/suit.mjs), head and all. The body is still built, because
 // its skeleton is this character's and every movement below is fitted to it. (`--plain`
 // keeps the old body and its hair, for looking at the two side by side.)
-const PLAIN = process.argv.includes('--plain');
+const PLAIN = process.argv.includes('--plain') || INFECTED;
 let worn = '';
 if (PLAIN) {
   for (const [name, file] of Object.entries(HAIR)) {
@@ -882,10 +889,10 @@ await doc.transform(
   textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [TEX, TEX], quality: 90 }),
   meshopt({ encoder: MeshoptEncoder, level: 'medium' }),
 );
-const dest = EMOTES ? path.join(ROOT, 'trailer', 'emotes.glb') : path.join(OUT, 'survivor.glb');
+const dest = EMOTES ? path.join(ROOT, 'trailer', 'emotes.glb') : path.join(OUT, INFECTED ? 'infected.glb' : 'survivor.glb');
 await io.write(dest, doc);
 // asset addresses carry the manifest's date: move it on, so no browser keeps the old body
-if (!EMOTES) {
+if (!EMOTES && !INFECTED) {
   const file = path.join(ROOT, 'public', 'assets', 'manifest.json');
   const manifest = JSON.parse(await fs.readFile(file, 'utf8'));
   manifest.generated = new Date().toISOString();

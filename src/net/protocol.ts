@@ -12,8 +12,9 @@ import type { WorldLoot } from '../sim/economy';
 import type { HitZone } from '../sim/combat';
 import type { DropInfo } from '../sim/drops';
 import type { VehicleInfo, VState } from '../sim/vehicles';
+import type { IState, InfectedInfo } from '../sim/infected';
 
-export const PROTOCOL = 13;
+export const PROTOCOL = 14;
 
 /** chat channels: everyone on the server, or only players standing near the speaker */
 export type ChatChannel = 'global' | 'near';
@@ -136,6 +137,12 @@ export type C2S =
   | { t: 'vcrash'; i: number; n: number }
   /** a jerrycan emptied into its tank */
   | { t: 'vfuel'; i: number }
+  /** where the infected this game is moving have got to (see src/sim/infected.ts): [which, ...where and what it is doing] */
+  | { t: 'is'; s: [number, ...IState][] }
+  /** a round or a blow of ours landed on one of them */
+  | { t: 'ihit'; i: number; zone: HitZone; w: string; dist: number; sup: boolean; bonus: number }
+  /** one of them that this game moves has brought its arms down on this player */
+  | { t: 'iatk'; i: number; to: number }
   | { t: 'ping'; n: number };
 
 export type S2C =
@@ -158,6 +165,8 @@ export type S2C =
       barrels?: number[];
       /** the jeeps: where each stands, what state it is in and who is in it */
       vehicles?: VehicleInfo[];
+      /** the infected, standing and lying */
+      infected?: InfectedInfo[];
       max: number;
     }
   | { t: 'join'; p: PlayerInfo }
@@ -220,6 +229,14 @@ export type S2C =
   | { t: 'vboom'; i: number; by: number }
   | { t: 'v-'; i: number }
   | { t: 'v+'; v: VehicleInfo }
+  /** one of the infected has turned up; one has been cleared away; whose game moves one from now on (null: nobody's) */
+  | { t: 'i+'; b: InfectedInfo }
+  | { t: 'i-'; i: number }
+  | { t: 'iown'; i: number; to: number | null }
+  /** where the games that move them say they are */
+  | { t: 'is'; s: [number, ...IState][] }
+  /** one was hit by this player: what it has left, whether that was the end of it, where on it and which way the blow was going */
+  | { t: 'ihp'; i: number; hp: number; dead: boolean; by: number; zone: HitZone; dir: [number, number] }
   | { t: 'pong'; n: number }
   /** something the server has to say to this player alone (what became of a tag they cashed in) */
   | { t: 'tell'; text: string; kind: 'good' | 'warn' | 'info' }

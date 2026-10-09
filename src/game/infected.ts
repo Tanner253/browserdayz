@@ -1,0 +1,641 @@
+// The infected, as this game draws and (for the ones near its own player) moves them.
+// The rules, and who decides what, are in src/sim/infected.ts.
+//
+// One that is this game's to move has a mind: it sees and hears the people about it, goes
+// after them round whatever is in the way, and strikes when it has them. One that is some
+// other game's is drawn where that game says it is, a moment in the past, like another player.
+
+import * as THREE from 'three';
+import type RAPIER from '@dimforge/rapier3d-compat';
+import { physics, GLASS_GROUPS, HITBOX_GROUPS, PLAYER_GROUPS, SIGHT_GROUPS, SOLID_GROUPS } from '../core/physics';
+import { audio } from '../core/audio';
+import type { Atmosphere } from '../world/atmosphere';
+import { heightAt, type World } from '../world/worldgen';
+import { Director, INFECTED, I_ALERT, I_ATTACK, I_CHASE, I_DEAD, I_IDLE, I_WANDER, homeSpot, infectedHomes, type IState, type InfectedInfo } from '../sim/infected';
+import type { C2S } from '../net/protocol';
+import { Avatar } from './avatar';
+import { infectedLook } from './look';
+import type { Damageable, HitZone } from './weapons';
+
+/** somebody an infected might notice */
+export interface Person {
+  id: number;
+  pos: THREE.Vector3;
+  crouched: boolean;
+  /** metres a second over the ground */
+  speed: number;
+  alive: boolean;
+  /** in a jeep: heard, not seen, and not to be dragged out of it */
+  seated: boolean;
+}
+
+export interface HordeHost {
+  atmo(): Atmosphere;
+  scene(): THREE.Scene;
+  world(): World;
+  /** this game's own player, and everybody else it knows of */
+  me(): Person;
+  others(): Iterable<Person>;
+  online(): boolean;
+  send(m: C2S): void;
+  /** one of them has hit this game's own player (playing alone: online the server says so) */
+  struck(amount: number, from: THREE.Vector3): void;
+  /** one of them is dead, by this player's hand */
+  killed(zone: HitZone, distance: number): void;
+}
+
+const INTERP_DELAY = 150;
+/** drawn and moved in full within this of the eye; past it they are not there to be seen */
+const DRAWN = 150;
+const UP = new THREE.Vector3(0, 1, 0);
+const _head = new THREE.Vector3(), _neck = new THREE.Vector3(), _pelvis = new THREE.Vector3();
+const _v = new THREE.Vector3();
+const lerpAngle = (a: number, b: number, t: number) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * t;
+const turnTo = (a: number, b: number, max: number) => a + THREE.MathUtils.clamp(Math.atan2(Math.sin(b - a), Math.cos(b - a)), -max, max);
+
+export class Infected implements Damageable {
+  readonly name = 'Infected';
+  readonly avatar = new Avatar();
+  pos = new THREE.Vector3();
+  yaw = 0;
+  mode = I_IDLE;
+  /** who it is after (a player's number, 0 nobody) */
+  after = 0;
+  dead = false;
+  /** this game moves it */
+  mine = false;
+  ready = false;
+  private gone = false;
+  private body!: RAPIER.RigidBody;
+  private zones: RAPIER.Collider[] = [];
+  private blocker!: RAPIER.Collider;
+  private snaps: { t: number; s: IState }[] = [];
+  private vel = new THREE.Vector3();
+  private flinch = 0;
+  private shape!: RAPIER.Cuboid;
+  // --- its mind (only when it is this game's)
+  private home = new THREE.Vector3();
+  private goal = new THREE.Vector3();
+  private thinkT = Math.random() * 0.15;
+  private waitT = 1 + Math.random() * 5;
+  private seenAt = -1e9;
+  private lastSeen = new THREE.Vector3();
+  private strikeT = -1;
+  private struck = false;
+  private side = Math.random() < 0.5 ? 1 : -1;
+  private sideT = 0;
+  private stuckT = 0;
+  private groanT = 4 + Math.random() * 14;
+  /** it has changed what it is doing since this game last said where it was */
+  dirty = true;
+  private said: IState = [0, 0, 0, 0, -1, 0];
+
+  constructor(public i: number, private host: HordeHost, private horde: Horde) {}
+
+  async load(info: InfectedInfo) {
+    const [x, y, z, yaw] = info.s;
+    this.pos.set(x, y, z);
+    this.home.copy(this.pos);
+    this.yaw = yaw;
+    this.mode = info.s[4];
+    this.after = info.s[5];
+    this.fallTo = y;
+    await this.avatar.load(this.host.atmo(), 0, false, infectedLook(this.i), 'infected');
+    if (this.gone) return this.avatar.dispose();
+    this.avatar.sick = { roused: 0, claw: -1, seed: (this.i * 7.31) % 20 };
+    this.host.scene().add(this.avatar.root);
+    const R = physics.R;
+    this.shape = new R.Cuboid(0.24, 0.5, 0.24);
+    this.body = physics.world.createRigidBody(R.RigidBodyDesc.kinematicPositionBased().setTranslation(x, y, z));
+    const zone = (desc: RAPIER.ColliderDesc, z: HitZone) => {
+      const c = physics.world.createCollider(desc.setCollisionGroups(HITBOX_GROUPS), this.body);
+      physics.tag(c, { surface: 'flesh', owner: this, zone: z });
+      this.zones.push(c);
+    };
+    zone(R.ColliderDesc.ball(0.13).setTranslation(0, 1.6, -0.06), 'head');
+    zone(R.ColliderDesc.cuboid(0.25, 0.31, 0.15).setTranslation(0, 1.18, -0.02), 'torso');
+    zone(R.ColliderDesc.cuboid(0.18, 0.45, 0.14).setTranslation(0, 0.45, 0.03), 'legs');
+    // nobody walks through one; shots are stopped only by the hit zones
+    this.blocker = physics.world.createCollider(R.ColliderDesc.capsule(0.5, 0.27).setTranslation(0, 0.8, 0).setCollisionGroups(GLASS_GROUPS), this.body);
+    this.ready = true;
+    this.avatar.update(0, this.pos, this.vel, this.yaw, false, false);
+    this.stain();
+    if (info.s[4] === I_DEAD || info.hp <= 0) this.die(0, true);
+  }
+
+  /** what it has been doing with its mouth and its hands */
+  private stain() {
+    if (!this.avatar.frame(_head, _neck, _pelvis)) return;
+    const fwd = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
+    const r = (n: number) => ((this.i * 9301 + n * 49297) % 233280) / 233280;
+    this.avatar.wound(_head.clone().addScaledVector(fwd, 0.1).addScaledVector(UP, -0.09), fwd.clone().negate(), 0.075);
+    this.avatar.wound(_neck.clone().lerp(_pelvis, 0.3 + r(1) * 0.4).addScaledVector(fwd, 0.14), fwd.clone().negate(), 0.1 + r(2) * 0.08);
+    if (r(3) < 0.6) this.avatar.wound(_pelvis.clone().addScaledVector(fwd, 0.1).add(new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw)).multiplyScalar((r(4) - 0.5) * 0.4)), fwd.clone().negate(), 0.09);
+  }
+
+  /** where its owner says it is */
+  push(s: IState, now: number) {
+    this.snaps.push({ t: now, s });
+    if (this.snaps.length > 12) this.snaps.shift();
+  }
+
+  /** this game is to move it from here on, or no longer is */
+  setMine(mine: boolean) {
+    if (mine === this.mine) return;
+    this.mine = mine;
+    this.snaps.length = 0;
+    this.strikeT = -1;
+    if (mine) {
+      // it stays about where it was found
+      this.home.copy(this.pos);
+      this.fallTo = this.floor(this.pos.x, this.pos.z, this.pos.y);
+      if (this.mode >= I_ALERT) this.mode = I_ALERT;
+      this.goal.copy(this.pos);
+      this.dirty = true;
+    }
+  }
+
+  /** your shot or blow landed on it: the jolt, the blood and the noise (what it did to it, the director says) */
+  damage(amount: number, _point: THREE.Vector3, dir: THREE.Vector3, zone: HitZone): boolean {
+    if (this.dead) return false;
+    this.flinch = 1;
+    this.avatar.hit(zone === 'head');
+    audio.infected('hurt', this.pos, this.pos.distanceTo(this.horde.eye), this.i);
+    // whoever hit it has its attention, wherever they did it from
+    if (this.mine) this.hearAt(this.horde.host.me().pos, true);
+    return this.horde.hurt(this, amount, dir);
+  }
+
+  /** it is down for good: which way it falls (0 on its back, 1 on its face, 2 on its side) */
+  die(variant: number, already = false) {
+    if (this.dead) return;
+    this.dead = true;
+    this.mode = I_DEAD;
+    this.after = 0;
+    this.mine = false;
+    this.vel.set(0, 0, 0);
+    if (!this.ready) return;
+    for (const c of this.zones) c.setEnabled(false);
+    this.blocker.setEnabled(false);
+    if (already) this.avatar.layDown(variant);
+    else {
+      this.avatar.setDeath(variant);
+      audio.infected('die', this.pos, this.pos.distanceTo(this.horde.eye), this.i);
+    }
+  }
+
+  /** a noise, or somebody it has just been hurt by: it goes to see (and if it was hurt, it knows who) */
+  hearAt(at: THREE.Vector3, sure = false) {
+    if (this.dead || !this.mine || this.mode >= I_CHASE) return;
+    this.goal.copy(at);
+    if (this.mode !== I_ALERT) this.dirty = true;
+    this.mode = I_ALERT;
+    this.waitT = 3;
+    if (sure) this.thinkT = 0;
+  }
+
+  // ------------------------------------------------------------ the mind
+
+  private sees(p: Person): boolean {
+    const eye = _v.set(this.pos.x, this.pos.y + 1.55, this.pos.z);
+    const to = new THREE.Vector3(p.pos.x - eye.x, p.pos.y + (p.crouched ? 0.8 : 1.4) - eye.y, p.pos.z - eye.z);
+    const d = to.length();
+    if (d < 0.5) return true;
+    return physics.raycast(eye, to.divideScalar(d), d - 0.3, SIGHT_GROUPS) === null;
+  }
+
+  private think(now: number) {
+    const I = INFECTED;
+    let best: Person | null = null, bd = Infinity;
+    let heard: Person | null = null, hd = Infinity;
+    const consider = (p: Person) => {
+      if (!p.alive) return;
+      const dx = p.pos.x - this.pos.x, dz = p.pos.z - this.pos.z;
+      const d = Math.hypot(dx, dz);
+      if (d > I.hearJeep + 5 || Math.abs(p.pos.y - this.pos.y) > 9) return;
+      if (p.seated) {
+        if (d < I.hearJeep && p.speed > 1.5 && d < hd) [heard, hd] = [p, d];
+        return;
+      }
+      // (in front of it is the way it faces: yaw 0 looks down -z)
+      const ahead = Math.abs(Math.atan2(Math.sin(Math.atan2(-dx, -dz) - this.yaw), Math.cos(Math.atan2(-dx, -dz) - this.yaw))) < I.view;
+      const near = d < I.sightAround && (!p.crouched || ahead);
+      const inView = ahead && d < (p.crouched ? I.sightCrouched : I.sight);
+      // (somebody it is already after is kept in sight a good deal further, and round behind it)
+      const kept = this.after === p.id && d < I.sight * 1.25;
+      if ((near || inView || kept) && d < bd && this.sees(p)) [best, bd] = [p, d];
+      else if (!p.crouched && ((p.speed > 5.3 && d < I.hearSprint) || (p.speed > 3 && d < I.hearJog)) && d < hd) [heard, hd] = [p, d];
+    };
+    consider(this.host.me());
+    for (const p of this.host.others()) consider(p);
+    const seen = best as Person | null, noise = heard as Person | null;
+    if (seen) {
+      this.seenAt = now;
+      this.lastSeen.copy(seen.pos);
+      if (this.mode < I_CHASE) {
+        // the moment it knows: it says so, and everything near it hears
+        audio.infected('alert', this.pos, this.pos.distanceTo(this.horde.eye), this.i);
+        this.horde.cry(this, seen.pos);
+        this.mode = I_CHASE;
+        this.dirty = true;
+      }
+      if (this.after !== seen.id) this.dirty = true;
+      this.after = seen.id;
+    } else if (this.mode === I_CHASE && now - this.seenAt > I.forget * 1000) {
+      // lost them: to where they were last seen, and a look about
+      this.mode = I_ALERT;
+      this.after = 0;
+      this.goal.copy(this.lastSeen);
+      this.waitT = 3;
+      this.dirty = true;
+    } else if (noise && this.mode < I_CHASE) this.hearAt(noise.pos);
+  }
+
+  /** where the floor is at a spot, for something standing at `y` now (null: nothing to stand on within reach) */
+  private floor(x: number, z: number, y: number): number {
+    const ground = heightAt(this.host.world().heights, x, z);
+    const hit = physics.raycast({ x, y: y + 1.25, z }, { x: 0, y: -1, z: 0 }, 4.5, SOLID_GROUPS);
+    const f = hit ? y + 1.25 - hit.toi : -1e9;
+    return f > ground + 0.04 ? f : ground;
+  }
+
+  /** go there if there is room to stand, up no more than a step */
+  private tryAt(x: number, z: number): boolean {
+    const y = this.floor(x, z, this.pos.y);
+    if (y - this.pos.y > 0.6) return false;
+    if (physics.world.intersectionWithShape({ x, y: Math.max(y, this.pos.y - 0.3) + 1.02, z }, { x: 0, y: 0, z: 0, w: 1 }, this.shape, undefined, PLAYER_GROUPS, undefined, this.body) !== null) return false;
+    this.pos.x = x;
+    this.pos.z = z;
+    // (down a drop it falls, it is not set down)
+    this.pos.y = y < this.pos.y - 0.4 ? this.pos.y : y;
+    this.fallTo = y;
+    return true;
+  }
+  private fallTo = 0;
+
+  /** a step toward a point at a speed; false when it could not move at all */
+  private walk(tx: number, tz: number, speed: number, dt: number): boolean {
+    const dx = tx - this.pos.x, dz = tz - this.pos.z;
+    const d = Math.hypot(dx, dz);
+    if (d < 0.05) return true;
+    const want = Math.atan2(-dx, -dz);
+    this.yaw = turnTo(this.yaw, want, dt * (speed > 3 ? 7 : 3.2));
+    // (it goes the way it faces, not sideways: it has to come round first, and it does not overshoot)
+    const off = Math.abs(Math.atan2(Math.sin(want - this.yaw), Math.cos(want - this.yaw)));
+    const step = Math.min(d, speed * dt * Math.max(0.15, 1 - off / 1.6));
+    this.sideT -= dt;
+    const dirs = this.sideT > 0 ? [this.side * 1.0, 0, this.side * 1.7, -this.side * 1.0, this.side * 2.4] : [0, this.side * 0.95, -this.side * 0.95, this.side * 1.7, -this.side * 1.7];
+    for (const a of dirs) {
+      const h = this.yaw + a;
+      if (!this.tryAt(this.pos.x - Math.sin(h) * step, this.pos.z - Math.cos(h) * step)) continue;
+      if (a !== 0 && this.sideT <= 0) {
+        // round an obstacle: keep to the side that worked for a moment, or it dithers in front of it
+        this.side = Math.sign(a) || this.side;
+        this.sideT = 0.7;
+      }
+      this.stuckT = 0;
+      return true;
+    }
+    this.stuckT += dt;
+    if (this.stuckT > 0.8) {
+      this.side = -this.side;
+      this.sideT = 0;
+      this.stuckT = 0.3;
+    }
+    return false;
+  }
+
+  private act(dt: number, now: number) {
+    const I = INFECTED;
+    if ((this.thinkT -= dt) <= 0) {
+      this.thinkT = 0.13;
+      this.think(now);
+    }
+    const quarry = this.after ? this.horde.person(this.after) : null;
+    switch (this.mode) {
+      case I_IDLE:
+        if ((this.waitT -= dt) <= 0) {
+          const a = Math.random() * Math.PI * 2, r = 3 + Math.random() * 12;
+          this.goal.set(this.home.x + Math.cos(a) * r, 0, this.home.z + Math.sin(a) * r);
+          this.mode = I_WANDER;
+          this.waitT = 14;
+          this.dirty = true;
+        }
+        break;
+      case I_WANDER:
+        this.waitT -= dt;
+        if (!this.walk(this.goal.x, this.goal.z, I.wander, dt)) this.waitT -= dt * 4;
+        if (this.waitT <= 0 || Math.hypot(this.goal.x - this.pos.x, this.goal.z - this.pos.z) < 0.8) {
+          this.mode = I_IDLE;
+          this.waitT = 2 + Math.random() * 7;
+          this.dirty = true;
+        }
+        break;
+      case I_ALERT:
+        if (Math.hypot(this.goal.x - this.pos.x, this.goal.z - this.pos.z) > 1.2) {
+          if (!this.walk(this.goal.x, this.goal.z, I.look, dt)) this.waitT -= dt;
+        } else {
+          // there: a look about, then it loses interest
+          this.yaw += dt * 0.9 * this.side;
+          this.waitT -= dt;
+        }
+        if (this.waitT <= 0) {
+          this.mode = I_IDLE;
+          this.waitT = 1 + Math.random() * 3;
+          this.dirty = true;
+        }
+        break;
+      case I_CHASE: {
+        const at = quarry?.alive && now - this.seenAt < 900 ? quarry.pos : this.lastSeen;
+        const d = Math.hypot(at.x - this.pos.x, at.z - this.pos.z);
+        if (quarry?.alive && !quarry.seated && d < I.reach * 0.82 && Math.abs(quarry.pos.y - this.pos.y) < 1.4) {
+          this.mode = I_ATTACK;
+          this.strikeT = 0;
+          this.struck = false;
+          this.avatar.claw();
+          audio.infected('attack', this.pos, this.pos.distanceTo(this.horde.eye), this.i);
+          this.dirty = true;
+        } else if (d > 0.4) this.walk(at.x, at.z, I.chase, dt);
+        break;
+      }
+      case I_ATTACK: {
+        if (quarry) this.yaw = turnTo(this.yaw, Math.atan2(-(quarry.pos.x - this.pos.x), -(quarry.pos.z - this.pos.z)), dt * 5);
+        this.strikeT += dt;
+        if (!this.struck && this.strikeT >= I.windup) {
+          this.struck = true;
+          // it lands on whoever is still inside its arms when they come down
+          if (quarry?.alive && Math.hypot(quarry.pos.x - this.pos.x, quarry.pos.z - this.pos.z) < I.reach + 0.3 && Math.abs(quarry.pos.y - this.pos.y) < 1.6) this.horde.strike(this, quarry);
+        }
+        if (this.strikeT >= I.swing) {
+          this.mode = I_CHASE;
+          this.dirty = true;
+        }
+        break;
+      }
+    }
+    // a drop: it falls
+    if (this.pos.y > this.fallTo + 0.02) this.pos.y = Math.max(this.fallTo, this.pos.y - 7 * dt);
+  }
+
+  // ------------------------------------------------------------ every frame
+
+  /** what this game says of it to the director, if anything has changed worth saying */
+  report(force: boolean): [number, ...IState] | null {
+    const s: IState = [Math.round(this.pos.x * 100) / 100, Math.round(this.pos.y * 100) / 100, Math.round(this.pos.z * 100) / 100, Math.round(this.yaw * 100) / 100, this.mode, this.after];
+    const o = this.said;
+    if (!force && !this.dirty && Math.abs(s[0] - o[0]) + Math.abs(s[2] - o[2]) < 0.03 && Math.abs(s[3] - o[3]) < 0.05) return null;
+    this.said = s;
+    this.dirty = false;
+    return [this.i, ...s];
+  }
+
+  update(dt: number, now: number, eye: THREE.Vector3) {
+    if (!this.ready) return;
+    const before = _v.copy(this.pos);
+    const px = before.x, py = before.y, pz = before.z;
+    if (this.dead) {
+      // (nothing more happens to it)
+    } else if (this.mine) this.act(dt, now);
+    else if (this.snaps.length) {
+      const t = now - INTERP_DELAY;
+      let a = this.snaps[0], b = this.snaps[this.snaps.length - 1];
+      for (let k = this.snaps.length - 1; k > 0; k--) {
+        if (this.snaps[k - 1].t <= t) {
+          a = this.snaps[k - 1];
+          b = this.snaps[k];
+          break;
+        }
+      }
+      const u = b.t > a.t ? THREE.MathUtils.clamp((t - a.t) / (b.t - a.t), 0, 1) : 1;
+      this.pos.set(a.s[0] + (b.s[0] - a.s[0]) * u, a.s[1] + (b.s[1] - a.s[1]) * u, a.s[2] + (b.s[2] - a.s[2]) * u);
+      this.yaw = lerpAngle(a.s[3], b.s[3], u);
+      const mode = b.s[4];
+      if (mode !== this.mode) {
+        const d = this.pos.distanceTo(eye);
+        if (mode === I_ATTACK) {
+          this.avatar.claw();
+          audio.infected('attack', this.pos, d, this.i);
+        } else if (mode === I_CHASE && this.mode < I_CHASE) audio.infected('alert', this.pos, d, this.i);
+        this.mode = mode;
+      }
+      this.after = b.s[5];
+    }
+    const far = this.pos.distanceToSquared(eye) > DRAWN * DRAWN;
+    this.avatar.root.visible = !far;
+    if (dt > 0) {
+      const k = 1 - Math.exp(-14 * dt);
+      this.vel.x += ((this.pos.x - px) / dt - this.vel.x) * k;
+      this.vel.z += ((this.pos.z - pz) / dt - this.vel.z) * k;
+      this.vel.y = (this.pos.y - py) / dt;
+    }
+    this.body.setNextKinematicTranslation(this.pos);
+    const half = this.yaw / 2;
+    this.body.setNextKinematicRotation({ x: 0, y: Math.sin(half), z: 0, w: Math.cos(half) });
+    if (far) return;
+    const sick = this.avatar.sick!;
+    const roused = this.dead ? 0 : this.mode >= I_CHASE ? 1 : this.mode === I_ALERT ? 0.45 : 0;
+    sick.roused += (roused - sick.roused) * (1 - Math.exp(-5 * dt));
+    this.avatar.update(dt, this.pos, this.vel, this.yaw, false, this.dead, false, 0, true, false);
+    if (!this.dead) {
+      // the head and the chest that count are where the bent body has them
+      if (this.avatar.frame(_head, _neck, _pelvis)) {
+        const c = Math.cos(this.yaw), s = Math.sin(this.yaw);
+        for (const v of [_head, _neck, _pelvis]) {
+          const x = v.x - this.pos.x, z = v.z - this.pos.z;
+          v.set(x * c - z * s, v.y - this.pos.y, x * s + z * c);
+        }
+        this.zones[0].setTranslationWrtParent(_head);
+        this.zones[1].setTranslationWrtParent(_pelvis.lerp(_neck, 0.54));
+      }
+      this.flinch = Math.max(0, this.flinch - dt * 4);
+      if (this.flinch > 0) this.avatar.root.rotation.x += this.flinch * 0.06;
+      // the noises they make when nothing is happening: only the near ones, and not all at once
+      if ((this.groanT -= dt) <= 0) {
+        this.groanT = 7 + Math.random() * 16;
+        const d = this.pos.distanceTo(eye);
+        if (d < 45) audio.infected(this.mode >= I_CHASE ? 'growl' : 'groan', this.pos, d, this.i);
+      }
+    }
+  }
+
+  dispose() {
+    this.gone = true;
+    if (!this.ready) return;
+    this.ready = false;
+    this.avatar.dispose();
+    for (const c of [...this.zones, this.blocker]) {
+      physics.tags.delete(c.handle);
+      physics.world.removeCollider(c, false);
+    }
+    physics.world.removeRigidBody(this.body);
+  }
+}
+
+export class Horde {
+  readonly all = new Map<number, Infected>();
+  /** where this game's player is listening and looking from */
+  readonly eye = new THREE.Vector3();
+  /** playing alone: this game is the director too */
+  private director: Director | null = null;
+  private dirT = 0;
+  private sayT = 0;
+  private keepT = 0;
+  private people = new Map<number, Person>();
+  /** the game's clock, milliseconds, as of this frame */
+  private now = 0;
+
+  constructor(readonly host: HordeHost) {}
+
+  /** Playing alone: the infected of the whole map are this game's to keep and to move. */
+  alone() {
+    this.clear();
+    const world = this.host.world();
+    this.director = new Director(infectedHomes(world), (h) => homeSpot(world, h, Math.random));
+  }
+
+  /** On a server: what it says is standing in the world now. */
+  online(list: InfectedInfo[]) {
+    this.clear();
+    this.director = null;
+    for (const b of list) this.add(b);
+  }
+
+  clear() {
+    for (const b of this.all.values()) b.dispose();
+    this.all.clear();
+  }
+
+  add(info: InfectedInfo) {
+    if (this.all.has(info.i)) return;
+    const b = new Infected(info.i, this.host, this);
+    this.all.set(info.i, b);
+    void b.load(info).then(() => {
+      if (info.own !== null && info.own === this.host.me().id) b.setMine(true);
+    });
+  }
+
+  remove(i: number) {
+    this.all.get(i)?.dispose();
+    this.all.delete(i);
+  }
+
+  own(i: number, to: number | null) {
+    this.all.get(i)?.setMine(to !== null && to === this.host.me().id);
+  }
+
+  /** where the games that move the others say they are */
+  states(rows: [number, ...IState][], now: number) {
+    for (const [i, ...s] of rows) {
+      const b = this.all.get(i);
+      if (b && !b.mine && !b.dead) b.push(s as IState, now);
+    }
+  }
+
+  /** the director says what a hit left one with */
+  hp(i: number, dead: boolean, by: number, zone: HitZone, dir: [number, number]) {
+    const b = this.all.get(i);
+    if (!b) return;
+    const mine = by === this.host.me().id;
+    if (!mine && !dead && b.ready) b.avatar.hit(zone === 'head');
+    if (dead && !b.dead) {
+      // away from the blow: onto its back from the front, onto its face from behind
+      const along = -Math.sin(b.yaw) * dir[0] - Math.cos(b.yaw) * dir[1];
+      b.die(along > 0.4 ? 1 : along < -0.4 ? 0 : 2);
+      if (mine) this.host.killed(zone, b.pos.distanceTo(this.eye));
+    }
+  }
+
+  person(id: number): Person | null {
+    return this.people.get(id) ?? null;
+  }
+
+  /** A noise at a place, heard this far off: the ones this game moves go to see. */
+  noise(x: number, z: number, range: number) {
+    const at = new THREE.Vector3(x, 0, z);
+    for (const b of this.all.values()) {
+      if (!b.mine || b.dead) continue;
+      const d = Math.hypot(b.pos.x - x, b.pos.z - z);
+      if (d < range) b.hearAt(at.set(x, b.pos.y, z));
+    }
+  }
+
+  /** one of them has seen somebody and said so: the others within earshot of it turn that way */
+  cry(from: Infected, at: THREE.Vector3) {
+    for (const b of this.all.values()) {
+      if (b === from || !b.mine || b.dead) continue;
+      if (b.pos.distanceToSquared(from.pos) < 28 * 28) b.hearAt(at);
+    }
+  }
+
+  /** a shot or a blow of this player's landed on one: true if that was the end of it (known at once only when playing alone) */
+  hurt(b: Infected, amount: number, dir: THREE.Vector3): boolean {
+    if (!this.director) return false;
+    const r = this.director.hurt(b.i, amount, this.now);
+    if (!r?.dead) return false;
+    const along = -Math.sin(b.yaw) * dir.x - Math.cos(b.yaw) * dir.z;
+    b.die(along > 0.4 ? 1 : along < -0.4 ? 0 : 2);
+    return true;
+  }
+
+  /** one this game moves has brought its arms down on somebody */
+  strike(b: Infected, on: Person) {
+    if (this.director) {
+      // (alone there is nobody else to hit)
+      if (this.director.strikes(b.i, on.id, { id: on.id, x: on.pos.x, z: on.pos.z }, this.now)) this.host.struck(INFECTED.damage + Math.round((Math.random() - 0.5) * 6), b.pos);
+      return;
+    }
+    this.host.send({ t: 'iatk', i: b.i, to: on.id });
+  }
+
+  update(dt: number, now: number, eye: THREE.Vector3) {
+    this.eye.copy(eye);
+    this.now = now;
+    const me = this.host.me();
+    this.people.clear();
+    this.people.set(me.id, me);
+    for (const p of this.host.others()) this.people.set(p.id, p);
+    if (this.director) {
+      this.dirT += dt;
+      if (this.dirT > 1) {
+        this.dirT = 0;
+        const turn = this.director.tick(now, me.alive ? [{ id: me.id, x: me.pos.x, z: me.pos.z }] : []);
+        for (const i of turn.gone) this.remove(i);
+        for (const b of turn.added) this.add(b);
+        for (const [i, to] of turn.owned) this.own(i, to);
+      }
+    }
+    // the ones this game moves keep out of each other
+    const mine: Infected[] = [];
+    for (const b of this.all.values()) {
+      b.update(dt, now, eye);
+      if (b.mine && !b.dead && b.ready) mine.push(b);
+    }
+    for (let a = 0; a < mine.length; a++) {
+      for (let c = a + 1; c < mine.length; c++) {
+        const dx = mine[c].pos.x - mine[a].pos.x, dz = mine[c].pos.z - mine[a].pos.z;
+        const d = Math.hypot(dx, dz);
+        if (d > 0.62 || d < 1e-3) continue;
+        const push = ((0.62 - d) / 2 / d) * 0.5;
+        mine[a].pos.x -= dx * push;
+        mine[a].pos.z -= dz * push;
+        mine[c].pos.x += dx * push;
+        mine[c].pos.z += dz * push;
+      }
+    }
+    // say where they are: eight times a second what has moved, all of them once a second
+    this.sayT += dt;
+    this.keepT += dt;
+    if (this.sayT < 0.125) return;
+    this.sayT = 0;
+    const all = this.keepT > 1;
+    if (all) this.keepT = 0;
+    const rows: [number, ...IState][] = [];
+    for (const b of mine) {
+      const r = b.report(all);
+      if (r) rows.push(r);
+    }
+    if (!rows.length) return;
+    if (this.director) this.director.report(me.id, rows, now);
+    else this.host.send({ t: 'is', s: rows });
+  }
+}

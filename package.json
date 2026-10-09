@@ -15,6 +15,7 @@
     "typecheck": "tsc --noEmit && tsc -p tsconfig.server.json && tsc -p tsconfig.api.json",
     "film": "node scripts/film.mjs",
     "test:payouts": "tsx test/solana.test.ts && tsx test/payouts.test.ts && tsx test/api.test.ts",
+    "test:infected": "tsx test/infected.test.ts",
     "treasury": "tsx scripts/treasury.ts",
     "sounds": "node scripts/sounds.mjs"
   },

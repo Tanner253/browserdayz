@@ -10,6 +10,7 @@ import { crateId } from '../src/net/protocol';
 import { pickDropSite } from '../src/sim/drops';
 import { barrelSpots } from '../src/sim/barrels';
 import { JEEP, jeepSpots } from '../src/sim/vehicles';
+import { homeSpot, infectedHomes, type Home } from '../src/sim/infected';
 
 export interface CrateSpot {
   cid: string;
@@ -40,6 +41,9 @@ export function buildWorldData(root: string) {
     /** where the jeeps stand to begin with: none, for as long as the game has no model to draw one with */
     jeeps: manifest.models?.[JEEP.model] || process.env.JEEPS === 'on' ? jeepSpots(world) : [],
     spawns: world.spawns,
+    /** where the infected live, and somewhere to stand one about such a place (see src/sim/infected.ts) */
+    homes: infectedHomes(world),
+    homeSpot: (h: Home) => homeSpot(world, h, Math.random),
     doorCount: buildings.doorSpecs.length,
     groundAt: (x: number, z: number) => heightAt(world.heights, x, z),
     /** somewhere open and level to set a supply drop down */
