@@ -14,13 +14,14 @@ const MILITARY: Table = [
   ['mag_p38_ext', 0.5], ['pu_scope', 0.1], ['rifle_wrap', 0.4], ['suppressor_9', 0.25], ['life_vest', 0.2],
   // (the service pistol was in no crate at all, and the other one was in this table twice)
   ['mosin', 0.9], ['p38', 0.9], ['m9', 0.9], ['machete', 0.4], ['rubber_boots', 0.3], ['work_gloves', 0.3], ['suitcase', 0.3],
+  ['flask', 0.8], ['gun_light', 0.25], ['mag_m9_ext', 0.2],
 ];
 const CIVILIAN: Table = [
   ['beans', 2], ['sardines', 2], ['sprats', 2], ['tomatoes', 1.5], ['apple', 1.5], ['milk', 1], ['thermos', 0.6],
   ['bandage', 1.5], ['cigarettes', 1.2], ['box_9mm', 0.4], ['ammo_9mm', 0.5],
   ['knife', 0.8], ['work_gloves', 0.8], ['boonie_hat', 0.12], ['sack_pack', 0.8], ['rubber_boots', 0.5],
   ['hatchet', 0.8], ['bat', 0.7], ['crowbar', 0.7], ['machete', 0.5], ['p38', 0.45], ['m9', 0.3], ['mosin', 0.25], ['ammo_762', 0.5],
-  ['water_jug', 0.8],
+  ['water_jug', 0.8], ['flask', 0.5],
 ];
 
 /** what is in any crate that stands under the gas, whatever sort of crate it is: the best of everything */
@@ -28,6 +29,7 @@ const UNDER_GAS: Table = [
   ['box_762', 3], ['box_9mm', 3], ['ammo_762', 1.5], ['ammo_9mm', 1.5], ['mosin', 1.4], ['m9', 1.4], ['p38', 1],
   ['boonie_hat', 2], ['life_vest', 2], ['pu_scope', 1.6], ['grenade', 1.5], ['firstaid', 1.5], ['bandage', 1.5],
   ['suppressor_9', 0.8], ['mag_p38_ext', 0.8], ['rifle_wrap', 0.6], ['binoculars', 0.4], ['condensed', 0.8], ['thermos', 0.8], ['suitcase', 0.4],
+  ['deagle', 0.8], ['ammo_50', 1.2], ['red_dot', 0.6], ['gun_light', 0.6], ['suppressor_762', 0.4], ['mag_m9_ext', 0.4], ['mag_deagle_ext', 0.3], ['flask', 0.5],
 ];
 
 export interface CrateSpec {

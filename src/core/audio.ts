@@ -324,13 +324,13 @@ export class AudioEngine {
    * @param at when, on the context's clock
    * @returns whether it did: if not, the caller makes the sound up as it used to
    */
-  private rec(name: string, to: AudioNode, at: number, gain = 1): boolean {
+  private rec(name: string, to: AudioNode, at: number, gain = 1, rate = 1): boolean {
     const takes = bank.get(name);
     if (!this.ready || !takes?.length) return false;
     const src = this.ctx.createBufferSource();
     src.buffer = takes[Math.floor(Math.random() * takes.length)];
     // (no two shots from one gun are the same pitch to a hair, and one take played over and over is heard as one take)
-    src.playbackRate.value = 0.97 + Math.random() * 0.06;
+    src.playbackRate.value = (0.97 + Math.random() * 0.06) * rate;
     const g = this.ctx.createGain();
     g.gain.value = gain;
     src.connect(g).connect(to);
@@ -340,7 +340,8 @@ export class AudioEngine {
 
   // ------------------------------------------------------------ weapons
 
-  gunshot(kind: 'rifle' | 'pistol', pos?: V3, distance = 0, intermediate = false, suppressed = false) {
+  /** @param voice a gun that is deeper and louder than its kind: its recording played that much slower and that much louder */
+  gunshot(kind: 'rifle' | 'pistol', pos?: V3, distance = 0, intermediate = false, suppressed = false, voice?: { rate: number; gain: number }) {
     if (!this.ready) return;
     const ctx = this.ctx;
     const t = ctx.currentTime + (distance > 0 ? distance / 343 : 0);
@@ -389,7 +390,7 @@ export class AudioEngine {
     // a recording of the real thing, where there is one: it goes the way the made-up one went (placed, dulled by distance, sent to the hills)
     // (A pistol is a few decibels under a rifle and over sooner: scripts/sounds.mjs says what
     // it is made of, and why it was a click before.)
-    if (this.rec(big ? 'shot_rifle' : 'shot_pistol', out, t, big ? 2.5 * mid : 2.2)) return;
+    if (this.rec(big ? 'shot_rifle' : 'shot_pistol', out, t, (big ? 2.5 * mid : 2.2) * (voice?.gain ?? 1), voice?.rate ?? 1)) return;
 
     // 1. supersonic crack / mechanical transient
     const crack = this.noise(t, 0.05);

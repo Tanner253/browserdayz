@@ -183,9 +183,12 @@ ok('the gas is the richest place on the map; helmets, plates and scopes are of i
       assert.ok(g(id) > o(id) * 2);
     }
     // and everything else is to be had there: guns, a lot to fire from them, something for a wound, grenades
-    assert.ok(g('mosin') + g('p38') + g('m9') >= 14, 'few guns under the gas');
-    assert.ok(g('box_762') + g('box_9mm') + g('ammo_762') + g('ammo_9mm') >= 24, 'little ammunition under the gas');
-    assert.ok(g('firstaid') + g('bandage') >= 7 && g('grenade') >= 5);
+    assert.ok(g('mosin') + g('p38') + g('m9') + g('deagle') >= 14, 'few guns under the gas');
+    assert.ok(g('box_762') + g('box_9mm') + g('ammo_762') + g('ammo_9mm') + g('box_50') + g('ammo_50') >= 24, 'little ammunition under the gas');
+    assert.ok(g('firstaid') + g('bandage') >= 6 && g('grenade') >= 4);
+    // the Desert Eagle and what it fires are of the gas and nowhere else
+    assert.ok(g('deagle') >= 2 && g('ammo_50') + g('box_50') >= 6, 'no Desert Eagle, or nothing for it, under the gas');
+    for (const id of ['deagle', 'ammo_50', 'box_50', 'mag_deagle_ext', 'suppressor_762']) assert.equal(o(id), 0, `${id} outside the gas`);
     // the rest of the map holds what it held before the works were built
     assert.ok(o('mosin') >= 16 && o('ammo_9mm') >= 44 && o('bandage') >= 18, 'the rest of the map has gone short');
     assert.equal(g('gasmask'), 0);

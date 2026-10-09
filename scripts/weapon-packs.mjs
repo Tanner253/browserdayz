@@ -144,7 +144,9 @@ export async function processWeaponPack(id, cfg, { io, SRC, OUT, FORCE, exists, 
       }
     }
     const size = hi.map((v, k) => v - lo[k]), mid = hi.map((v, k) => (v + lo[k]) / 2);
-    const wristR = named(doc, cfg.wrists.right).getWorldTranslation(), wristL = named(doc, cfg.wrists.left).getWorldTranslation();
+    // (a gun that came with no hands is held in another pack's: it says itself which way it points, and is fitted to that pack's gun)
+    if (!cfg.wrists && !(cfg.fit && cfg.forward && cfg.up)) throw new Error(`${id}: with no hands of its own it has to say which way it points (forward, up) and what it is fitted to (fit)`);
+    const wristR = cfg.wrists ? named(doc, cfg.wrists.right).getWorldTranslation() : [0, 0, 0], wristL = cfg.wrists ? named(doc, cfg.wrists.left).getWorldTranslation() : [0, 0, 0];
     const order = [0, 1, 2].sort((a, b) => size[b] - size[a]);
     const axis = (k, sign) => [0, 1, 2].map((i) => (i === k ? sign : 0));
     // the hand is at the back of the gun and under it

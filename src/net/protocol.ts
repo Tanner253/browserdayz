@@ -116,7 +116,7 @@ export type C2S =
   /** we have lit fireplace number i (see src/sim/fires.ts), standing beside it */
   | { t: 'fire'; i: number }
   | { t: 'gear'; g: string[] }
-  | { t: 'hit'; to: number; zone: HitZone; w: string; dist: number; sup: boolean; bonus: number }
+  | { t: 'hit'; to: number; zone: HitZone; w: string; dist: number; sup: boolean; bonus: number; /** a shotgun: how many of the shot's pellets landed */ n?: number }
   | { t: 'take'; uid: string }
   | { t: 'drop'; l: WorldLoot }
   | { t: 'copen'; cid: string }
@@ -148,7 +148,7 @@ export type C2S =
   /** where the infected this game is moving have got to (see src/sim/infected.ts): [which, ...where and what it is doing] */
   | { t: 'is'; s: [number, ...IState][] }
   /** a round or a blow of ours landed on one of them */
-  | { t: 'ihit'; i: number; zone: HitZone; w: string; dist: number; sup: boolean; bonus: number }
+  | { t: 'ihit'; i: number; zone: HitZone; w: string; dist: number; sup: boolean; bonus: number; n?: number }
   /** one of them that this game moves has brought its arms down on this player */
   | { t: 'iatk'; i: number; to: number }
   | { t: 'ping'; n: number };

@@ -18,7 +18,7 @@ export const SLOT_LABEL: Record<Slot, string> = {
   head: 'Head', face: 'Face', vest: 'Vest', back: 'Back', hands: 'Hands', feet: 'Feet',
 };
 
-export type AttachSlot = 'optic' | 'muzzle' | 'magazine' | 'wrap';
+export type AttachSlot = 'optic' | 'muzzle' | 'magazine' | 'wrap' | 'light';
 
 export interface ItemDef {
   id: string;
@@ -53,6 +53,19 @@ export interface ItemDef {
     /** pieces of its model that are only there with an attachment on it (attachment -> pieces), and pieces that never are */
     shows?: Record<string, string[]>;
     never?: string[];
+    /** how it is made ready after a shot, where its kind does not say: by hand (a bolt), or by itself */
+    action?: 'bolt' | 'self';
+    /**
+     * What it fires, where that is not what its kind fires (see BALLISTICS in weapons.ts): the
+     * speed it leaves at (m/s), how fast the air slows it, what one of them does, the range it
+     * is sighted for; how many leave at once, and how wide they go (radians across).
+     */
+    round?: { muzzleVel: number; drag: number; damage: number; zero: number; pellets?: number; cone?: number };
+    /** its kick, and the least time between its shots, as multiples of its kind's */
+    kick?: number;
+    pace?: number;
+    /** fed one at a time into a tube under the barrel, not by a magazine */
+    tube?: boolean;
   };
   melee?: { damage: number; range: number; rate: number };
   /** sealed container (ammo box): opening it replaces the item with loose contents */
@@ -62,7 +75,7 @@ export interface ItemDef {
   /** worn gear: cargo grid it adds, damage it soaks */
   wear?: { cargo?: [number, number]; /** torso damage multiplier */ armor?: number; /** head damage multiplier */ head?: number; /** fall damage multiplier */ fall?: number; /** extra punch damage */ fist?: number; /** how fast thirst grows, as a multiplier */ thirst?: number; /** over the face, it keeps the gas out (see src/sim/gas.ts) */ gas?: number };
   /** weapon attachment: which weapons take it and where it mounts; what it does to the gun's handling score, and to its kick (a multiplier) */
-  attach?: { fits: string[]; slot: AttachSlot; ergo?: number; recoil?: number };
+  attach?: { fits: string[]; slot: AttachSlot; ergo?: number; recoil?: number; /** rounds more than the gun's own magazine holds */ rounds?: number; /** on the muzzle: it quiets the shot and hides the flash */ quiet?: boolean };
   /** camera hint for the icon renderer */
   iconYaw?: number;
 }
@@ -71,18 +84,29 @@ const D: ItemDef[] = [
   // ---------------------------------------------------------------- weapons
   {
     id: 'mosin', name: 'Sniper Rifle', model: 'sniper', w: 9, h: 2, weight: 4.1, category: 'weapon', slot: 'long',
-    desc: 'Bolt-action rifle in 7.62. Five rounds in a box magazine, and the bolt worked by hand after every one. Slow, loud and devastating. Takes a scope and a cheek rest.',
-    weapon: { kind: 'rifle', ammo: 'ammo_762', capacity: 5, ergo: 40, shows: { pu_scope: ['scope', 'glass'], rifle_wrap: ['cheekrest'] }, never: ['silencer'] }, iconYaw: 0,
+    desc: 'Bolt-action rifle in 7.62. Five rounds in a box magazine, and the bolt worked by hand after every one. Slow, loud and devastating. Takes a scope, a cheek rest, a suppressor and a light.',
+    weapon: { kind: 'rifle', ammo: 'ammo_762', capacity: 5, ergo: 40, shows: { pu_scope: ['scope', 'glass'], rifle_wrap: ['cheekrest'], suppressor_762: ['silencer'] } }, iconYaw: 0,
   },
   {
     id: 'p38', name: 'Pistol 43', model: 'pistol_43', w: 3, h: 2, weight: 0.75, category: 'weapon', slot: 'holster',
-    desc: 'Slim 9x19mm pistol. Eight-round magazine. Takes a suppressor and an extended magazine.',
+    desc: 'Slim 9x19mm pistol. Eight-round magazine. Takes a suppressor, an extended magazine, a holographic sight and a light.',
     weapon: { kind: 'pistol', ammo: 'ammo_9mm', capacity: 8, ergo: 86 }, iconYaw: 0,
   },
   {
     id: 'm9', name: 'M9 Pistol', model: 'm9', w: 3, h: 2, weight: 1.0, category: 'weapon', slot: 'holster',
-    desc: 'Full-size 9x19mm service pistol. Fifteen rounds in the magazine, and heavier in the hand for it. Takes a suppressor.',
+    desc: 'Full-size 9x19mm service pistol. Fifteen rounds in the magazine, and heavier in the hand for it. Takes a suppressor, an extended magazine, a holographic sight and a light.',
     weapon: { kind: 'pistol', ammo: 'ammo_9mm', capacity: 15, ergo: 74 }, iconYaw: 0,
+  },
+  {
+    id: 'deagle', name: 'Desert Eagle', model: 'desert_eagle', w: 3, h: 2, weight: 2.0, category: 'weapon', slot: 'holster',
+    desc: 'A .50 pistol the size of a brick. Seven rounds, a kick to match, and two of them end most arguments. Takes an extended magazine and nothing else.',
+    // (a .50 AE leaves at about 440 m/s and hits much harder than a 9 mm: two to the body, where a 9 mm takes three)
+    weapon: { kind: 'pistol', ammo: 'ammo_50', capacity: 7, ergo: 56, round: { muzzleVel: 440, drag: 0.0017, damage: 58, zero: 30 }, kick: 2.1, pace: 2.1 }, iconYaw: 0,
+  },
+  {
+    id: 'benelli', name: 'Benelli M3', model: 'benelli_m3', w: 8, h: 2, weight: 3.5, category: 'weapon', slot: 'long',
+    desc: 'Twelve-gauge shotgun, self-loading. Seven shells in the tube, nine pellets a shell: nothing is worse to meet in a corridor, and little is less use across a field. Takes a holographic sight, a suppressor and a light.',
+    weapon: { kind: 'rifle', ammo: 'ammo_12', capacity: 7, ergo: 52, action: 'self', tube: true, round: { muzzleVel: 400, drag: 0.011, damage: 14, zero: 25, pellets: 9, cone: 0.075 }, kick: 1.3, pace: 1.7, shows: { red_dot: ['sight'], suppressor_12: ['silencer'] } }, iconYaw: 0,
   },
   {
     id: 'ammo_762', name: '7.62x54R Rounds', model: 'bolt_action_rifle_7_62', node: 'bolt_action_rifle_7_62_bullet_54mm', w: 1, h: 1, weight: 0.022, category: 'ammo', stack: 20, scale: 1.25, pile: 5,
@@ -91,6 +115,24 @@ const D: ItemDef[] = [
   {
     id: 'ammo_9mm', name: '9x19mm Rounds', model: 'service_pistol', node: 'service_pistol_bullet', w: 1, h: 1, weight: 0.012, category: 'ammo', stack: 25, scale: 1.6, pile: 6,
     desc: 'Loose pistol cartridges. Common among police and military.',
+  },
+  {
+    id: 'ammo_50', name: '.50 AE Rounds', model: 'round_50', w: 1, h: 1, weight: 0.03, category: 'ammo', stack: 14, scale: 1.5, pile: 4,
+    desc: 'Loose .50 cartridges. Only the Desert Eagle fires them.',
+  },
+  {
+    id: 'ammo_12', name: '12 Gauge Shells', model: 'shell_12', w: 1, h: 1, weight: 0.045, category: 'ammo', stack: 16, scale: 1.3, pile: 5,
+    desc: 'Buckshot: nine pellets a shell. For the shotgun.',
+  },
+  {
+    id: 'box_50', name: '.50 AE Ammo Box', model: 'ammo_box', w: 2, h: 1, weight: 0.5, category: 'ammo', scale: 0.6,
+    desc: 'Sealed box of 14 .50 cartridges. Open it to get the rounds out.',
+    open: { gives: 'ammo_50', qty: 14, time: 1.5 },
+  },
+  {
+    id: 'box_12', name: '12 Gauge Shell Box', model: 'ammo_box', w: 2, h: 2, weight: 0.8, category: 'ammo', scale: 0.8,
+    desc: 'Sealed box of 16 buckshot shells. Open it to get them out.',
+    open: { gives: 'ammo_12', qty: 16, time: 1.8 },
   },
   {
     id: 'box_762', name: '7.62x54R Ammo Box', model: 'ammo_box', w: 2, h: 2, weight: 0.6, category: 'ammo', scale: 0.8,
@@ -115,13 +157,43 @@ const D: ItemDef[] = [
   },
   {
     id: 'suppressor_9', name: '9mm Suppressor', model: '@suppressor', w: 2, h: 1, weight: 0.3, category: 'attachment',
-    desc: 'Screw-on sound suppressor for either pistol. Much quieter, no muzzle flash, slightly less punch. Softer kick, but the pistol is longer and slower in the hand.',
-    attach: { fits: ['p38', 'm9'], slot: 'muzzle', ergo: -8, recoil: 0.85 },
+    desc: 'Screw-on sound suppressor for either 9 mm pistol. Much quieter, no muzzle flash, slightly less punch. Softer kick, but the pistol is longer and slower in the hand.',
+    attach: { fits: ['p38', 'm9'], slot: 'muzzle', ergo: -8, recoil: 0.85, quiet: true },
+  },
+  {
+    id: 'suppressor_762', name: 'Sniper Suppressor', model: 'sniper', nodeRe: '^silencer', w: 3, h: 1, weight: 0.55, category: 'attachment',
+    desc: 'A suppressor for the sniper rifle. A shot with it on is not heard across the valley, and shows no flash: a little less punch, and a longer rifle to swing.',
+    attach: { fits: ['mosin'], slot: 'muzzle', ergo: -9, recoil: 0.88, quiet: true },
+  },
+  {
+    id: 'suppressor_12', name: 'Shotgun Suppressor', model: 'benelli_m3', nodeRe: '^silencer', w: 4, h: 1, weight: 0.9, category: 'attachment',
+    desc: 'The long can for the shotgun. It takes the worst of the noise and all of the flash, and makes a long gun longer.',
+    attach: { fits: ['benelli'], slot: 'muzzle', ergo: -12, recoil: 0.85, quiet: true },
+  },
+  {
+    id: 'red_dot', name: 'Holographic Sight', model: 'holo_sight', w: 2, h: 1, weight: 0.3, category: 'attachment',
+    desc: 'A holographic sight: a lit ring and dot that lie on whatever the gun points at. Fits either 9 mm pistol and the shotgun. Faster to aim with than irons.',
+    attach: { fits: ['p38', 'm9', 'benelli'], slot: 'optic', ergo: 3 },
+  },
+  {
+    id: 'gun_light', name: 'Weapon Light', model: 'gun_light', w: 1, h: 1, weight: 0.15, category: 'attachment',
+    desc: 'A light clamped under the barrel, switched with L. It shows you the dark, and shows the dark where you are. Fits everything but the Desert Eagle.',
+    attach: { fits: ['mosin', 'p38', 'm9', 'benelli'], slot: 'light', ergo: -2 },
+  },
+  {
+    id: 'mag_m9_ext', name: 'M9 Extended Magazine', model: 'm9', nodeRe: '^mag', w: 1, h: 2, weight: 0.16, category: 'attachment', scale: 1.15,
+    desc: 'Twenty-round magazine for the M9: five more shots before you reload.',
+    attach: { fits: ['m9'], slot: 'magazine', ergo: -4, rounds: 5 },
+  },
+  {
+    id: 'mag_deagle_ext', name: 'Desert Eagle Extended Magazine', model: 'desert_eagle', nodeRe: '^mag', w: 1, h: 2, weight: 0.2, category: 'attachment', scale: 1.15,
+    desc: 'Ten-round magazine for the Desert Eagle: three more shots before you reload.',
+    attach: { fits: ['deagle'], slot: 'magazine', ergo: -4, rounds: 3 },
   },
   {
     id: 'mag_p38_ext', name: 'Pistol 43 Extended Magazine', model: 'pistol_43', nodeRe: '^mag', w: 1, h: 2, weight: 0.12, category: 'attachment', scale: 1.15,
     desc: 'Twelve-round magazine for the Pistol 43: four more shots before you reload.',
-    attach: { fits: ['p38'], slot: 'magazine', ergo: -4 },
+    attach: { fits: ['p38'], slot: 'magazine', ergo: -4, rounds: 4 },
   },
   // ---------------------------------------------------------------- melee
   { id: 'hatchet', name: 'Hatchet', model: 'hatchet', w: 1, h: 3, weight: 0.8, category: 'melee', slot: 'melee', desc: 'Chops wood and anything else.', melee: { damage: 45, range: 1.7, rate: 0.75 } },
@@ -138,6 +210,7 @@ const D: ItemDef[] = [
   { id: 'apple', name: 'Apple', model: 'food_apple_01', w: 1, h: 1, weight: 0.15, category: 'food', desc: 'Crisp and sour.', use: { verb: 'Eat', time: 1.5, energy: 10, water: 8, sound: 'eat' } },
   { id: 'milk', name: 'Milk Carton', model: 'long_life_food', node: 'long_life_food_milk', w: 1, h: 2, weight: 1.0, category: 'drink', desc: 'UHT milk. Still sealed.', use: { verb: 'Drink', time: 2.5, energy: 10, water: 30, sound: 'drink' } },
   { id: 'water_jug', name: 'Water Jug', model: 'plastic_bottle_gallon', w: 2, h: 3, weight: 2.2, category: 'drink', desc: 'Two litres of clean water.', use: { verb: 'Drink', time: 3, water: 60, sound: 'drink' } },
+  { id: 'flask', name: 'Water Flask', model: 'flask', w: 2, h: 2, weight: 1.1, category: 'drink', desc: 'A soldier\'s litre of water in a hard flask.', use: { verb: 'Drink', time: 2.5, water: 48, sound: 'drink' } },
   { id: 'thermos', name: 'Thermos', model: 'plastic_thermos', w: 1, h: 3, weight: 0.8, category: 'drink', desc: 'Lukewarm tea. Better than nothing.', use: { verb: 'Drink', time: 2.5, water: 35, energy: 5, sound: 'drink' } },
   // ---------------------------------------------------------------- medical
   // (The item is still `bandage`: it is what the roll of tape was, in every loot table and every
@@ -268,9 +341,11 @@ export function makeItem(id: string, qty?: number): ItemInstance {
  * forty has one on it. (Each is still found on its own as well: see TYPES in economy.ts.)
  */
 export const FITTED: Record<string, [string, number][]> = {
-  mosin: [['pu_scope', 0.025], ['rifle_wrap', 0.12]],
-  p38: [['suppressor_9', 0.08], ['mag_p38_ext', 0.12]],
-  m9: [['suppressor_9', 0.06]],
+  mosin: [['pu_scope', 0.025], ['rifle_wrap', 0.12], ['suppressor_762', 0.02]],
+  p38: [['suppressor_9', 0.08], ['mag_p38_ext', 0.12], ['red_dot', 0.03]],
+  m9: [['suppressor_9', 0.06], ['mag_m9_ext', 0.08], ['red_dot', 0.03]],
+  deagle: [['mag_deagle_ext', 0.1]],
+  benelli: [['red_dot', 0.25], ['gun_light', 0.2]],
 };
 
 /** Rolls for what a gun put into the world comes with. @param rnd 0..1, the caller's own dice */
@@ -298,7 +373,14 @@ export function pieceShown(id: string, piece: string, mods: string[] = []): bool
 export function capacityOf(it: ItemInstance): number {
   const w = ITEMS[it.id].weapon;
   if (!w) return 0;
-  return w.capacity + (hasMod(it, 'mag_p38_ext') ? 4 : 0);
+  let n = w.capacity;
+  for (const m of it.mods ?? []) n += ITEMS[m]?.attach?.rounds ?? 0;
+  return n;
+}
+
+/** Is something on its muzzle that quiets it? (a quieted shot shows no flash, carries a fraction as far, and hits a little softer) */
+export function quietOf(it: ItemInstance | null | undefined): boolean {
+  return !!it?.mods?.some((m) => ITEMS[m]?.attach?.quiet);
 }
 
 /** weight of an item with everything fitted to it and packed inside it */

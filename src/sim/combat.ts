@@ -14,12 +14,17 @@ export interface WeaponRule {
   falloff: number;
   /** an explosion: the damage falls to nothing this many metres from where it went off */
   blast?: number;
+  /** a shotgun: `damage` is one pellet's, and no shot is believed to land more than this many */
+  pellets?: number;
 }
 
 export const WEAPON_RULES: Record<string, WeaponRule> = {
   mosin: { damage: 95, melee: false, range: 900, interval: 0.8, falloff: 0.6 },
   p38: { damage: 34, melee: false, range: 220, interval: 0.1, falloff: 0.45 },
   m9: { damage: 34, melee: false, range: 220, interval: 0.1, falloff: 0.45 },
+  deagle: { damage: 58, melee: false, range: 260, interval: 0.2, falloff: 0.5 },
+  // (buckshot: nine pellets, each little by itself and spent within a field's width)
+  benelli: { damage: 14, melee: false, range: 70, interval: 0.25, falloff: 0.3, pellets: 9 },
   fists: { damage: 14, melee: true, range: 3.2, interval: 0.3, falloff: 1 },
   hatchet: { damage: 45, melee: true, range: 3.6, interval: 0.5, falloff: 1 },
   machete: { damage: 38, melee: true, range: 3.8, interval: 0.4, falloff: 1 },
@@ -41,13 +46,17 @@ export function zoneMultiplier(zone: HitZone, melee: boolean) {
   return ZONE[zone]?.[melee ? 1 : 0] ?? 1;
 }
 
-/** Damage of one hit before the victim's armour. `bonus` is flat extra melee damage (gloves). */
-export function hitDamage(weapon: string, zone: HitZone, distance: number, suppressed = false, bonus = 0): number {
+/**
+ * Damage of one hit before the victim's armour. `bonus` is flat extra melee damage (gloves).
+ * @param pellets how many of a shotgun's pellets are said to have landed (no more are believed than it fires)
+ */
+export function hitDamage(weapon: string, zone: HitZone, distance: number, suppressed = false, bonus = 0, pellets = 1): number {
   const r = WEAPON_RULES[weapon];
   if (!r) return 0;
   // a blast: `distance` is how far the victim was from it
   if (r.blast) return r.damage * Math.pow(Math.min(1, Math.max(0, 1 - distance / r.blast)), 1.3);
   const k = r.melee ? 1 : 1 - (1 - r.falloff) * Math.min(1, Math.max(0, distance) / r.range);
   const base = r.melee ? r.damage + Math.min(10, Math.max(0, bonus)) : r.damage * (suppressed ? 0.9 : 1);
-  return base * k * zoneMultiplier(zone, r.melee);
+  const n = r.pellets ? Math.max(1, Math.min(r.pellets, Math.floor(pellets) || 1)) : 1;
+  return base * k * zoneMultiplier(zone, r.melee) * n;
 }

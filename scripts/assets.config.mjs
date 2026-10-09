@@ -50,6 +50,60 @@ export const TEXTURES = {
  * credit is read out of the licence that came with the download.
  */
 export const LOCAL_MODELS = {
+  // Out of the packs of 2026-10-09. What goes on a gun is laid with its length along x (the
+  // way a barrel runs in a gun's own file) and left life size; where it sits on each gun is
+  // said in the game (src/game/weapons.ts).
+  gun_light: {
+    dir: 'gun_attachments',
+    only: /^FlashLight/,
+    rot: [0, Math.PI / 2, 0],
+    scale: 1,
+    tex: 512,
+    tags: ['loot', 'attachment'],
+    changes: 'Only its flashlight is used here: laid along the barrel, stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.',
+  },
+  rifle_suppressor: {
+    dir: 'gun_attachments',
+    only: /^Supressor/,
+    rot: [0, Math.PI / 2, 0],
+    scale: 1,
+    tex: 512,
+    tags: ['loot', 'attachment'],
+    changes: 'Only its suppressor is used here: laid along the barrel, stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.',
+  },
+  holo_sight: {
+    dir: 'eotech_exps3',
+    scale: 0.01,
+    tex: 1024,
+    tags: ['loot', 'attachment'],
+    changes: 'Scaled to metres and stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed. In the game it is drawn smaller than life where it is fitted to a pistol.',
+  },
+  flask: {
+    dir: 'bottle_pouch',
+    only: /^portable_bottle_portable_bottle_pouch/,
+    size: 0.22,
+    tex: 1024,
+    budget: 6000,
+    tags: ['loot', 'drink'],
+    changes: 'Only the bottle is used, without its pouch: stood on the ground about its own middle, brought down to about six thousand triangles; textures re-encoded as WebP; geometry compressed.',
+  },
+  round_50: {
+    dir: 'desert_eagle',
+    // (the cartridge and its case; not the ejector, whose name begins the same way)
+    only: /^Bullet(Case)?_low/,
+    scale: 0.01,
+    tex: 256,
+    tags: ['loot', 'ammo'],
+    changes: 'Only its cartridge is used here: scaled to metres and stood on the ground; textures re-encoded as WebP; geometry compressed.',
+  },
+  shell_12: {
+    dir: 'benelli_m3',
+    only: /^Shell_Low/,
+    scale: 1,
+    tex: 512,
+    tags: ['loot', 'ammo'],
+    changes: 'Only its shell is used here: stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.',
+  },
   plate_carrier: {
     dir: 'plate_carrier',
     size: 0.56,
@@ -248,6 +302,48 @@ export const WEAPON_PACKS = {
       author: 'Vlasov Daniil',
       line: '"Pistol 43 Tactical | FPS Animations" (https://skfb.ly/oMt7u) by Vlasov Daniil is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).',
       changes: 'Only the pistol is used: the arms that came with it, its lights and its animation are left out. The pistol is taken off its skeleton and set in rigid pieces (frame, slide, magazine), scaled to metres; textures re-encoded as WebP; geometry compressed.',
+    },
+  },
+  // The Desert Eagle came as a pistol and nothing else: it is held in the other pistol's
+  // hands and moved as that pistol is, like the Pistol 43. Its barrel is part of its frame
+  // (the slide runs back round it), and the cartridge that came lying in it is the .50's own model.
+  desert_eagle: {
+    dir: 'desert_eagle',
+    file: 'scene.gltf',
+    tex: 2048,
+    fp: false,
+    length: 0.262,
+    forward: [0, 0, 1],
+    up: [0, 1, 0],
+    fit: { to: 'm9', piece: 'slide' },
+    parts: { Group001: 'slide', Magazine_low: 'mag', MagazineBase_low: 'mag', BaseInside_low: 'mag', Barrel_low: 'base', Trigger_low: 'base', Hammer_low: 'base', FrontSight_low: 'base', SlideHolder_low: 'base', Button_03_low: 'base', Button_02_low: 'base', Button_01_low: 'base', SideSwitch_low: 'base', SideSwitchHolder_low: 'base', GripBolt_low: 'base', BackPart_low: 'base', BulletThrow_low: 'base', Frame_low: 'base', Grip_low: 'base' },
+    credit: {
+      name: 'Desert Eagle',
+      url: 'https://sketchfab.com/3d-models/desert-eagle-cabde59f5cf24effaf80536e35d04e95',
+      author: 'ELIZION',
+      line: 'This work is based on "Desert Eagle" (https://sketchfab.com/3d-models/desert-eagle-cabde59f5cf24effaf80536e35d04e95) by ELIZION (https://sketchfab.com/ELIZION) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)',
+      changes: 'Set in three rigid pieces (frame with its barrel, slide, magazine), scaled to metres and laid along the barrel; the cartridge that came with it is a model of its own. Textures re-encoded as WebP; geometry compressed.',
+    },
+  },
+  // The shotgun, likewise: held in the rifle's hands. Its sight and the long can on its
+  // muzzle are pieces of their own, there only when they are fitted.
+  benelli_m3: {
+    dir: 'benelli_m3',
+    file: 'scene.gltf',
+    tex: 2048,
+    aloneTex: 1024,
+    fp: false,
+    scale: 1,
+    forward: [0, 0, -1],
+    up: [0, 1, 0],
+    fit: { to: 'sniper', piece: 'base' },
+    parts: { Benelli_M3: 'base', Eotech: 'sight', Silencel_Low: 'silencer', forend_Low: 'forend' },
+    credit: {
+      name: 'Benelli M3 Tactical',
+      url: 'https://sketchfab.com/3d-models/benelli-m3-tactical-1eaea0239fdf43ad92eb276fbf9c60dd',
+      author: 'Amapsis',
+      line: 'This work is based on "Benelli M3 Tactical" (https://sketchfab.com/3d-models/benelli-m3-tactical-1eaea0239fdf43ad92eb276fbf9c60dd) by Amapsis (https://sketchfab.com/Amapsis) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)',
+      changes: 'Set in rigid pieces (the gun, its fore-end, its sight, the can on its muzzle) and laid along the barrel; its shell is a model of its own. Textures re-encoded as WebP; geometry compressed.',
     },
   },
 };

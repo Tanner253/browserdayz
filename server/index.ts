@@ -758,7 +758,7 @@ function handle(c: Client, m: C2S) {
         if (m.w !== 'fists' && c.w !== m.w) return;
         if (now - c.lastHit < rule.interval * 700) return;
         c.lastHit = now;
-        amount = hitDamage(m.w, m.zone, d, !!m.sup, num(m.bonus) ? m.bonus : 0);
+        amount = hitDamage(m.w, m.zone, d, !!m.sup, num(m.bonus) ? m.bonus : 0, num(m.n) ? m.n : 1);
       }
       if (amount <= 0) return;
       const len = Math.max(0.001, Math.hypot(target.pose[0] - from[0], target.pose[2] - from[1]));
@@ -798,7 +798,7 @@ function handle(c: Client, m: C2S) {
         if (m.w !== 'fists' && c.w !== m.w) return;
         if (now - c.lastHit < rule.interval * 700) return;
         c.lastHit = now;
-        amount = hitDamage(m.w, m.zone, d, !!m.sup, num(m.bonus) ? m.bonus : 0);
+        amount = hitDamage(m.w, m.zone, d, !!m.sup, num(m.bonus) ? m.bonus : 0, num(m.n) ? m.n : 1);
       }
       const r = horde.hurt(m.i, amount, now);
       if (!r) return;

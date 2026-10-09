@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-09T20:14:01.117Z",
+ "generated": "2026-10-09T23:36:29.050Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr"
@@ -2033,6 +2033,196 @@
     0.1317
    ],
    "lods": []
+  },
+  "gun_light": {
+   "url": "assets/models/gun_light.glb",
+   "tags": [
+    "loot",
+    "attachment"
+   ],
+   "bytes": 195768,
+   "srcTris": 13361,
+   "tris": 5256,
+   "min": [
+    -0.051,
+    0,
+    -0.0224
+   ],
+   "max": [
+    0.051,
+    0.0575,
+    0.0224
+   ],
+   "lods": []
+  },
+  "rifle_suppressor": {
+   "url": "assets/models/rifle_suppressor.glb",
+   "tags": [
+    "loot",
+    "attachment"
+   ],
+   "bytes": 193948,
+   "srcTris": 13361,
+   "tris": 5234,
+   "min": [
+    -0.0858,
+    0,
+    -0.0203
+   ],
+   "max": [
+    0.0858,
+    0.0406,
+    0.0203
+   ],
+   "lods": []
+  },
+  "holo_sight": {
+   "url": "assets/models/holo_sight.glb",
+   "tags": [
+    "loot",
+    "attachment"
+   ],
+   "bytes": 424144,
+   "srcTris": 6889,
+   "tris": 6889,
+   "min": [
+    -0.0482,
+    0,
+    -0.0295
+   ],
+   "max": [
+    0.0482,
+    0.0736,
+    0.0295
+   ],
+   "lods": []
+  },
+  "flask": {
+   "url": "assets/models/flask.glb",
+   "tags": [
+    "loot",
+    "drink"
+   ],
+   "bytes": 541200,
+   "srcTris": 52520,
+   "tris": 6000,
+   "min": [
+    -0.0677,
+    0,
+    -0.0603
+   ],
+   "max": [
+    0.0677,
+    0.22,
+    0.0603
+   ],
+   "lods": []
+  },
+  "round_50": {
+   "url": "assets/models/round_50.glb",
+   "tags": [
+    "loot",
+    "ammo"
+   ],
+   "bytes": 36288,
+   "srcTris": 13279,
+   "tris": 478,
+   "min": [
+    -0.0058,
+    0,
+    -0.0201
+   ],
+   "max": [
+    0.0058,
+    0.0116,
+    0.0201
+   ],
+   "lods": []
+  },
+  "shell_12": {
+   "url": "assets/models/shell_12.glb",
+   "tags": [
+    "loot",
+    "ammo"
+   ],
+   "bytes": 89456,
+   "srcTris": 22636,
+   "tris": 308,
+   "min": [
+    -0.0122,
+    0,
+    -0.0349
+   ],
+   "max": [
+    0.0122,
+    0.0244,
+    0.0349
+   ],
+   "lods": []
+  },
+  "desert_eagle": {
+   "url": "assets/models/desert_eagle.glb",
+   "tags": [
+    "weapon"
+   ],
+   "bytes": 4800476,
+   "srcTris": 12801,
+   "tris": 12801,
+   "min": [
+    -0.0373,
+    -0.0514,
+    -0.0197
+   ],
+   "max": [
+    0.2247,
+    0.0977,
+    0.0268
+   ],
+   "lods": [],
+   "holds": {
+    "right": [
+     -0.072,
+     -0.018,
+     0.032
+    ],
+    "left": [
+     -0.06924,
+     -0.07081,
+     -0.0353
+    ]
+   }
+  },
+  "benelli_m3": {
+   "url": "assets/models/benelli_m3.glb",
+   "tags": [
+    "weapon"
+   ],
+   "bytes": 1037516,
+   "srcTris": 22328,
+   "tris": 22328,
+   "min": [
+    -0.703,
+    -0.0952,
+    -0.0419
+   ],
+   "max": [
+    0.6084,
+    0.1397,
+    0.03
+   ],
+   "lods": [],
+   "holds": {
+    "right": [
+     -0.425,
+     0,
+     0.034
+    ],
+    "left": [
+     -0.04121,
+     -0.01573,
+     -0.06406
+    ]
+   }
   }
  }
 }

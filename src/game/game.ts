@@ -13,7 +13,7 @@ import { Barrel, type Vegetation } from '../world/vegetation';
 import type { Grass } from '../world/grass';
 import { Door, type Buildings } from '../world/buildings';
 import { WORLD_SIZE, heightAt, type SiteKind, type World } from '../world/worldgen';
-import { ITEMS, itemName, TAG_HOLD, TAG_HOLD_MIN, capacityOf, hasMod, makeItem, newUid, tagClock, tagOwner, type ItemInstance, type Slot } from '../sim/items';
+import { ITEMS, itemName, TAG_HOLD, TAG_HOLD_MIN, capacityOf, makeItem, newUid, tagClock, tagOwner, type ItemInstance, type Slot, quietOf } from '../sim/items';
 import { PlayerInventory, SLOT_ORDER, type Container } from '../sim/inventory';
 import { Economy, type WorldLoot } from '../sim/economy';
 import { CRATE_RESTOCK, CRATE_SPECS, fillCrate } from '../sim/crates';
@@ -1259,19 +1259,42 @@ export class Game {
     this.meDirty = true;
   }
 
+  /** a shell's pellets that have landed on somebody and not been told to the server yet: [who, how many in each zone] */
+  private pellets = new Map<unknown, { h: HitInfo; zones: Record<string, number>; n: number }>();
+
   private onHit(h: HitInfo) {
+    // A shotgun: nine hits in a few hundredths of a second. The server is told once for each
+    // body, a moment later: how many landed, and where most of them did.
+    if (!h.melee && ITEMS[h.weapon]?.weapon?.round?.pellets && !this.pelletsOut && (h.victim instanceof Infected || h.victim instanceof RemotePlayer)) {
+      const got = this.pellets.get(h.victim) ?? { h, zones: {}, n: 0 };
+      got.zones[h.zone] = (got.zones[h.zone] ?? 0) + 1;
+      got.n++;
+      got.h = h.killed ? h : got.h;
+      if (!this.pellets.has(h.victim)) {
+        this.pellets.set(h.victim, got);
+        setTimeout(() => {
+          this.pellets.delete(h.victim);
+          const zone = Object.entries(got.zones).sort((a, b) => b[1] - a[1])[0][0] as HitInfo['zone'];
+          this.pelletsOut = got.n;
+          this.onHit({ ...got.h, zone });
+          this.pelletsOut = 0;
+        }, 90);
+      }
+      return;
+    }
+    const n = this.pelletsOut || 1;
     if (h.victim instanceof Infected) {
       // (stopped where it stands for a moment: at once if it is this game's to move, when the server says so if not)
       h.victim.stagger(h.melee ? INFECTED.stopStruck : INFECTED.stopShot);
       // (alone, this game has already decided what it did; on a server the server does)
-      if (this.online) this.net.send({ t: 'ihit', i: h.victim.i, zone: h.zone, w: h.weapon, dist: h.distance, sup: hasMod(this.weapons.equippedItem, 'suppressor_9'), bonus: h.weapon === 'fists' ? this.inv.wear('fist').reduce((a, b) => a + b, 0) : 0 });
+      if (this.online) this.net.send({ t: 'ihit', i: h.victim.i, zone: h.zone, w: h.weapon, dist: h.distance, sup: quietOf(this.weapons.equippedItem), n, bonus: h.weapon === 'fists' ? this.inv.wear('fist').reduce((a, b) => a + b, 0) : 0 });
       else if (h.killed) this.hud.note(`Infected down${h.zone === 'head' ? ' · headshot' : ''}${h.melee || h.distance < 8 ? '' : ` · ${Math.round(h.distance)} m`}`, 'good');
       return;
     }
     if (h.victim instanceof RemotePlayer) {
       const it = this.weapons.equippedItem;
       const bonus = this.inv.wear('fist').reduce((a, b) => a + b, 0);
-      this.net.send({ t: 'hit', to: h.victim.id, zone: h.zone, w: h.weapon, dist: h.distance, sup: hasMod(it, 'suppressor_9'), bonus: h.weapon === 'fists' ? bonus : 0 });
+      this.net.send({ t: 'hit', to: h.victim.id, zone: h.zone, w: h.weapon, dist: h.distance, sup: quietOf(it), n, bonus: h.weapon === 'fists' ? bonus : 0 });
       return;
     }
     if (!h.killed) return;
@@ -1361,6 +1384,8 @@ export class Game {
   }
 
   /** the hour as it was at some moment (the server's, or mid morning when playing alone), from which the clock runs on */
+  /** how many pellets the hit being told to the server now stands for (0: an ordinary hit) */
+  private pelletsOut = 0;
   private hourBase = { phase: DAY.start, at: performance.now() };
   /** the hour held still (for looking at a time of day: see T.hour in the harness), or null */
   hourHeld: number | null = null;
