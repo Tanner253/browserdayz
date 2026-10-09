@@ -57,8 +57,8 @@ export const TYPES: Record<string, TypeRule> = {
   // (at half as many, and in half the kinds of building, nobody could find one)
   m9: { nominal: 16, min: 15, lifetime: 7200, restock: 180, usage: ANYWHERE, favour: ARMOURY, loaded: [3, 10] },
   // loose rounds turn up in handfuls; sealed boxes are the real find
-  ammo_762: { nominal: 32, min: 31, lifetime: 3600, restock: 120, usage: ANYWHERE, favour: ARMOURY, qty: [0.25, 0.6] },
-  ammo_9mm: { nominal: 40, min: 39, lifetime: 3600, restock: 120, usage: ANYWHERE, favour: ARMOURY, qty: [0.25, 0.6] },
+  ammo_762: { nominal: 36, min: 35, lifetime: 3600, restock: 120, usage: ANYWHERE, favour: ARMOURY, qty: [0.25, 0.6] },
+  ammo_9mm: { nominal: 46, min: 45, lifetime: 3600, restock: 120, usage: ANYWHERE, favour: ARMOURY, qty: [0.25, 0.6] },
   box_762: { nominal: 14, min: 13, lifetime: 3600, restock: 180, usage: ['Military', 'Police', 'Hunting', 'Farm', 'Industrial'], favour: ARMOURY },
   box_9mm: { nominal: 18, min: 17, lifetime: 3600, restock: 180, usage: ['Police', 'Military', 'Town', 'Village'], favour: ARMOURY },
   // attachments
@@ -75,9 +75,9 @@ export const TYPES: Record<string, TypeRule> = {
   // food and drink
   sprats: { nominal: 14, min: 8, lifetime: 2400, restock: 300, usage: ['Village', 'Town'] },
   condensed: { nominal: 8, min: 4, lifetime: 2400, restock: 300, usage: ['Village', 'Town', 'Military'] },
-  beans: { nominal: 12, min: 7, lifetime: 2400, restock: 300, usage: ['Village', 'Town', 'Farm'] },
+  beans: { nominal: 14, min: 8, lifetime: 2400, restock: 300, usage: ['Village', 'Town', 'Farm'] },
   tomatoes: { nominal: 8, min: 4, lifetime: 2400, restock: 300, usage: ['Village', 'Farm'] },
-  sardines: { nominal: 9, min: 5, lifetime: 2400, restock: 300, usage: ['Village', 'Town', 'Hunting'] },
+  sardines: { nominal: 11, min: 6, lifetime: 2400, restock: 300, usage: ['Village', 'Town', 'Hunting'] },
   apple: { nominal: 8, min: 4, lifetime: 1200, restock: 300, usage: ['Village', 'Farm'] },
   milk: { nominal: 6, min: 3, lifetime: 1800, restock: 300, usage: ['Village', 'Town'] },
   // (there was a third as much to drink on the map as to eat, and thirst runs as fast as hunger)
@@ -86,8 +86,8 @@ export const TYPES: Record<string, TypeRule> = {
   // medical
   // What stops bleeding is what a fight is lost for want of: twelve things on the whole map
   // was too few of it. More, sooner back, and most of it where it was kept: the clinic.
-  bandage: { nominal: 16, min: 10, lifetime: 2400, restock: 240, usage: ['Village', 'Town', 'Military', 'Medic', 'Police', 'Hunting', 'Farm'], favour: { Medic: 6, Military: 2 } },
-  firstaid: { nominal: 6, min: 3, lifetime: 3600, restock: 600, usage: ['Military', 'Medic', 'Town', 'Police'], favour: { Medic: 8 } },
+  bandage: { nominal: 20, min: 13, lifetime: 2400, restock: 240, usage: ['Village', 'Town', 'Military', 'Medic', 'Police', 'Hunting', 'Farm'], favour: { Medic: 6, Military: 2 } },
+  firstaid: { nominal: 8, min: 4, lifetime: 3600, restock: 600, usage: ['Military', 'Medic', 'Town', 'Police'], favour: { Medic: 8 } },
   // clothing and bags: this is how you carry more
   // (What these are now is a soldier's kit, and their rules were written for a sun hat, a
   // life jacket and a pair of rubber boots: plates were found in a cow shed and never at an
