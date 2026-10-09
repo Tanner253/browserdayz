@@ -366,7 +366,25 @@ function stanceQuat(s: Stance, out: THREE.Quaternion) {
 }
 
 /** What seats the body's hands on a pack's gun (see `grips` in packGun), in the gun's own space: x toward the muzzle, y up. */
-const SEAT = { pistol: new THREE.Vector3(0.034, 0.03, 0), rifle: new THREE.Vector3(0.05, 0.004, 0) };
+const SEAT = {
+  pistol: new THREE.Vector3(0.034, 0.03, 0),
+  rifle: new THREE.Vector3(0.05, 0.004, 0),
+  /**
+   * The hand under a rifle. The pack's own left hand holds it hard up against the magazine
+   * (seen from its own eyes, that is where a hand is in the picture); on a body seen from
+   * outside that is two fists together under the action. It goes a hand's breadth up the
+   * fore-end, where a rifle is held.
+   */
+  fore: new THREE.Vector3(0.074, -0.006, 0.004),
+};
+/**
+ * How big a rifle is drawn in somebody else's hands, of its own size, kept where it is at the
+ * butt. The pack's rifle is long in the stock for the body that holds it (44 cm from butt to
+ * trigger, against arms 48 cm from shoulder to wrist): at its full size the hand under it
+ * could not reach the fore-end, and came back along the stock to the magazine. A tenth
+ * smaller, with the body turned a little more side on (POSE.hold.blade), it reaches.
+ */
+const HELD_RIFLE = 0.9;
 
 /** how long the flame at the muzzle is, metres */
 const FLAME: Record<GunKind, number> = { pistol: 0.2, rifle: 0.42, auto: 0.3 };
@@ -717,6 +735,14 @@ export class Weapons {
       }
     }
     for (const piece of ITEMS[o.item].weapon?.never ?? []) rig.show(piece, false);
+    // (the rifle as others see it held: smaller, from the butt. Its pieces are moved along it
+    // so that, drawn smaller, the butt is where it was; the hands' places move with them.)
+    const seen = new THREE.Vector3();
+    if (o.kind === 'rifle') {
+      seen.x = span.min.x * (1 / HELD_RIFLE - 1);
+      for (const c of world.children) c.position.x += seen.x;
+      world.scale.setScalar(HELD_RIFLE);
+    }
     // where things are in the eye's space with the pack at rest and not yet moved to the hip
     const sight = rig.box(o.kind === 'rifle' ? 'glass' : 'slide');
     const frame = rig.box('base');
@@ -747,8 +773,8 @@ export class Weapons {
       // behind its trigger. The first finger is kept nearly straight: it lies in the guard.
       grips: o.kind === 'rifle'
         ? {
-            right: { pos: new THREE.Vector3(...holds.right).add(SEAT.rifle), fingers: new THREE.Vector3(0.75, -0.55, -0.3), palm: new THREE.Vector3(0.15, -0.1, -1), curl: [0.25, 1.2, 1.25, 1.3], thumb: 0.5 },
-            left: { pos: new THREE.Vector3(...holds.left), fingers: new THREE.Vector3(0.35, 0.1, 0.93), palm: new THREE.Vector3(0, 1, 0.1), curl: [1.0, 1.05, 1.1, 1.15], thumb: 0.4 },
+            right: { pos: new THREE.Vector3(...holds.right).add(SEAT.rifle).add(seen), fingers: new THREE.Vector3(0.75, -0.55, -0.3), palm: new THREE.Vector3(0.15, -0.1, -1), curl: [0.25, 1.2, 1.25, 1.3], thumb: 0.5 },
+            left: { pos: new THREE.Vector3(...holds.left).add(SEAT.fore).add(seen), fingers: new THREE.Vector3(0.35, 0.1, 0.93), palm: new THREE.Vector3(0, 1, 0.1), curl: [1.0, 1.05, 1.1, 1.15], thumb: 0.4 },
           }
         : {
             right: { pos: new THREE.Vector3(...holds.right).add(SEAT.pistol), fingers: new THREE.Vector3(0.9, -0.15, -0.3), palm: new THREE.Vector3(0.3, 0, -1), curl: [0.22, 1.25, 1.3, 1.35], thumb: 1.25 },

@@ -161,8 +161,8 @@ export const POSE = {
     pivot: [0.04, -0.04] as [number, number],
     /** where the head is from that same point with the body standing, which is what `aim` was set for: [up, back] */
     eye: [0.146, -0.028] as [number, number],
-    /** long guns: the chest turns this far off the aim, left shoulder leading, radians */
-    blade: 0.5,
+    /** long guns: the chest turns this far off the aim, left shoulder leading, radians (at 0.5 the left hand could not reach a rifle's fore-end) */
+    blade: 0.75,
     /** and the left shoulder comes forward this much more */
     reach: 0.3,
     /** the most the left hand moves back along the stock toward the right when the grip is beyond its reach, metres */

@@ -88,6 +88,8 @@ const pose = (o) => `(async () => {
   const lit = Math.atan2(-sun.x, -sun.z);
   const a = S.actors[0].place(${o.x}, ${o.z}, lit + ${o.turn}, ${JSON.stringify(o.weapon)}, ${JSON.stringify(o.gear)});
   a.rp.avatar.setSlung(${o.slung ? `g.weapons.worldModel(${JSON.stringify(o.slung)})` : 'null'});
+  // (what is fitted to what he holds: a rifle's scope)
+  ${o.mods ? `a.rp.setWeapon(${JSON.stringify(o.weapon)}, ${JSON.stringify(o.mods)});` : ''}
   a.aim = ${!!o.aim};
   const fwd = S.v(-Math.sin(a.yaw), 0, -Math.cos(a.yaw)), left = S.v(-Math.cos(a.yaw), 0, Math.sin(a.yaw));
   const eye = a.eye();
@@ -179,7 +181,10 @@ const pose = (o) => `(async () => {
     words(html) { document.getElementById('game').style.visibility = html ? 'hidden' : ''; document.getElementById('tr-overlay').innerHTML = html || ''; document.documentElement.style.background = document.body.style.background = html ? 'transparent' : ''; },
   };
   window.__still.plain();
-  return 'ok';
+  // (said back, to be printed: how far apart his hands are on what he holds)
+  const av = a.rp.avatar;
+  const hands = av.armL && av.armR ? av.armL.hand.getWorldPosition(S.v(0, 0, 0)).distanceTo(av.armR.hand.getWorldPosition(S.v(0, 0, 0))) : 0;
+  return 'hands ' + hands.toFixed(3) + ' m apart';
 })()`;
 
 const png = async () => Buffer.from((await cdp('Page.captureScreenshot', { format: 'png' })).data, 'base64');
@@ -191,7 +196,7 @@ const png = async () => Buffer.from((await cdp('Page.captureScreenshot', { forma
 async function shoot(name, width, height, o, sizes) {
   await cdp('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
   await sleep(300);
-  await run(pose(o));
+  console.log(`  ${await run(pose(o))}`);
   await sleep(120);
   let out = sharp(await png()).removeAlpha();
   if (o.blur) {
@@ -260,23 +265,24 @@ if (want('pfp-3')) await shoot('zona-pfp-3', 1000, 1000, { ...SPOT, turn: 0.35, 
 if (want('banner')) {
   const mark = fs.readFileSync(path.join(ROOT, 'public', 'brand', 'zona-mark-plain.svg'), 'utf8').replace(/<\?xml[^>]*>/, '');
   await shoot('zona-banner', 1500, 500, {
-    ...SPOT, turn: 0.35, weapon: 'mosin', gear: ['boonie_hat', 'life_vest', 'sack_pack'], aim: true, gaze: 0.3, gazeUp: 0.0,
+    ...SPOT, turn: 0.35, weapon: 'mosin', mods: ['pu_scope'], gear: ['boonie_hat', 'life_vest', 'sack_pack'], aim: true, gaze: 0.3, gazeUp: 0.0,
     cam: [1.75, -0.6, -0.02], look: [1.42, -0.1], fov: 30, fill: 2.5, blur: 2.2, dim: 0.98,
     // three of them coming up behind him, under the rifle: two near, one further back between them
     zombies: [[-0.37, 5.4, 2], [-0.1, 6.3, 0], [-0.24, 10.5, 1]], run: 3.4, runFrames: 84,
     overlay: `
       <div style="position:absolute;inset:0;background:linear-gradient(90deg, rgba(6,8,6,0) 45%, rgba(6,8,6,0.74) 59%, rgba(6,8,6,0.9) 100%)"></div>
       <div style="position:absolute;inset:0;box-shadow:inset 0 0 120px rgba(0,0,0,0.75)"></div>
-      <div style="position:absolute;left:52%;right:2.5%;top:50%;transform:translateY(-51%);text-align:center;${FONT}color:#f3efe6;">
+      <div style="position:absolute;left:52%;right:2.5%;top:50%;transform:translateY(-50%);text-align:center;${FONT}color:#f3efe6;">
         <div style="display:flex;align-items:center;justify-content:center;gap:26px">
           <div style="width:150px;height:150px;flex:none;filter:drop-shadow(0 6px 22px rgba(0,0,0,0.8))">${mark.replace('width="512" height="512"', 'width="150" height="150"')}</div>
           <div style="font-size:186px;font-weight:700;line-height:0.86;letter-spacing:0.14em;margin-right:-0.14em;text-shadow:0 8px 40px rgba(0,0,0,0.8)">ZONA</div>
         </div>
         <div style="margin-top:20px;display:flex;align-items:center;justify-content:center;gap:18px;font-size:25px;font-weight:600;letter-spacing:0.24em;white-space:nowrap">
-          <span style="color:#ffd35a;text-shadow:0 2px 8px #000">SURVIVE THE INFECTED</span>
+          <span style="color:#ffd35a;text-shadow:0 2px 8px #000">PVP SURVIVAL SHOOTER</span>
           <span style="padding:5px 12px 5px 16px;color:#14110b;background:#ffd35a;font-weight:700">PLAY TO EARN</span>
         </div>
-        <div style="margin-top:14px;font-size:20px;font-weight:500;letter-spacing:0.5em;margin-right:-0.5em;color:#cfc7b2;opacity:0.85">WWW.ZONAPVP.FUN</div>
+        <div style="margin-top:13px;font-size:19px;font-weight:600;letter-spacing:0.3em;margin-right:-0.3em;color:#f3efe6;text-shadow:0 2px 8px #000;white-space:nowrap">PLAYERS HUNT YOU · SO DO THE INFECTED</div>
+        <div style="margin-top:12px;font-size:19px;font-weight:500;letter-spacing:0.5em;margin-right:-0.5em;color:#cfc7b2;opacity:0.85">WWW.ZONAPVP.FUN</div>
       </div>`,
   }, [[600, 200]]);
   // what a link to the site shows (1200x630): the banner, whole, on the page's own dark, with the hazard yellow ruled above and below it
