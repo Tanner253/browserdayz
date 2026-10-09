@@ -881,8 +881,11 @@ export class Buildings {
     // walls: of one floor, whose foot is at y0 and which is h high
     const outside: { F: THREE.Matrix4; a: number; b: number; front: boolean }[] = [];
     const panes: { F: THREE.Matrix4; a: number; b: number; bottom: number; top: number; L: number }[] = [];
-    const raise = (walls: WallDef[], y0: number, h: number) => {
+    /** @param under how high a wall between two rooms goes, when a floor is laid over it (the outside walls go on up past the floor's edge) */
+    const raise = (walls: WallDef[], y0: number, tall: number, under = tall) => {
       for (const wd of walls) {
+        // (a wall between rooms stops under the floor above: carried up through it, its top lay in the same plane as the boards and the two flickered through each other)
+        const h = wd.side === 'inner' ? under : tall;
         let a: THREE.Vector2, b: THREE.Vector2;
         switch (wd.side) {
           case 'front': a = new THREE.Vector2(-hw, hd - T / 2); b = new THREE.Vector2(hw, hd - T / 2); break;
@@ -984,7 +987,7 @@ export class Buildings {
       }
     };
     // (under a floor above, the walls go on up past the edge of it: the outside of the house is one wall from the ground to the roof)
-    raise(bp.walls, 0, bp.upper ? h + SLAB : h);
+    raise(bp.walls, 0, bp.upper ? h + SLAB : h, h);
 
     // --- the floor above, and the stairs to it
     if (bp.upper && bp.stairs) {
