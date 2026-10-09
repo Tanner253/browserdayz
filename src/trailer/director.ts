@@ -419,7 +419,7 @@ let pumping = true;
 /** Every sound the game asks for is written down instead of played; the soundtrack is rendered from the list afterwards. */
 function hookAudio() {
   const plain = (v: unknown): unknown => (v && typeof v === 'object' && 'x' in (v as Any) ? { x: (v as Any).x, y: (v as Any).y, z: (v as Any).z } : v);
-  const names = ['gunshot', 'dryFire', 'click', 'boltCycle', 'reloadNear', 'roundInsert', 'magOut', 'magIn', 'slideRack', 'shellDrop', 'whiz', 'hitTick', 'equip', 'jump', 'land', 'death', 'body', 'door', 'impact', 'footstep', 'whoosh', 'explosion', 'ui', 'hurt', 'shout', 'setListener', 'updateAmbience'];
+  const names = ['gunshot', 'dryFire', 'click', 'boltCycle', 'reloadNear', 'roundInsert', 'magOut', 'magIn', 'slideRack', 'shellDrop', 'whiz', 'hitTick', 'equip', 'jump', 'land', 'death', 'body', 'door', 'impact', 'footstep', 'whoosh', 'explosion', 'ui', 'hurt', 'shout', 'infected', 'setListener', 'updateAmbience'];
   for (const n of names) {
     (audio as unknown as Any)[n] = (...a: unknown[]) => {
       if (logging && !S.mute) soundLog.push({ t: frameIndex / fps, n, a: a.map(plain) });
@@ -453,6 +453,12 @@ async function stage() {
   document.getElementById('loading')?.classList.add('done');
   // supply drops come when the film asks for one, not when the game's own clock says
   g.nextDrop = 1e12;
+  // The infected are in one film only (the fifth, which stands its own: see shots5.ts). The
+  // others were made before there were any, and are played as they were made.
+  if (CUT !== 5) {
+    g.horde.clear();
+    g.horde.director = null;
+  }
   // a grenade's blast reaches the stand-in players as it would real ones: the game draws it, this keeps the score
   const explode = g.explode.bind(g);
   g.grenades.onExplode = (at: THREE.Vector3, mine: boolean) => {
@@ -545,7 +551,12 @@ async function stage() {
   S.bullet.visible = S.trail.visible = false;
   g.s.r.scene.add(S.bullet, S.trail);
 
-  if (CUT === 4) {
+  if (CUT === 5) {
+    const cut = await import('./shots5');
+    shots = cut.buildShots(S);
+    arrangement = cut.ARRANGEMENT;
+    seconds = cut.SECONDS5;
+  } else if (CUT === 4) {
     const cut = await import('./shots4');
     shots = cut.buildShots(S);
     arrangement = cut.ARRANGEMENT;
