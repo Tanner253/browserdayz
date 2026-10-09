@@ -155,7 +155,12 @@ export class HUD {
             <p class="start-sub">Players hunt you. So do the infected.</p>
             <p class="start-sub2">Take a dog tag off another player, stay alive ${TAG_HOLD_MIN} minutes, cash it in.</p>
             <div class="sm-enter">
-              <label class="sm-name"><span>Callsign · stamped on your dog tag</span><input id="start-name" class="start-name" maxlength="16" spellcheck="false" autocomplete="off" enterkeyhint="go" placeholder="Survivor"></label>
+              <label class="sm-name tagplate">
+                <svg class="tagplate-chain" viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="52" fill="none" stroke="currentColor" stroke-width="5" stroke-dasharray="0.1 9" stroke-linecap="round"/></svg>
+                <span>Stamp your dog tag</span>
+                <input id="start-name" class="start-name" maxlength="16" spellcheck="false" autocomplete="off" enterkeyhint="go" placeholder="Survivor">
+                <i class="tagplate-meta"><b>ZONA</b><b>Survivor</b></i>
+              </label>
               <button class="start-btn" type="button"><span>Deploy</span></button>
             </div>
             <div class="start-queue"><div class="sq-pos"></div><div class="sq-sub"></div><button class="sq-leave" type="button">Play on your own instead</button></div>
@@ -292,6 +297,13 @@ export class HUD {
     });
     // the name: keys typed into it are not the game's, and Enter in it is the Deploy button
     const name = this.root.querySelector('.start-name') as HTMLInputElement;
+    // every letter is struck into the plate
+    const plate = this.root.querySelector('.tagplate') as HTMLElement;
+    name.addEventListener('input', () => {
+      plate.classList.remove('stamp');
+      void plate.offsetWidth;
+      plate.classList.add('stamp');
+    });
     name.addEventListener('keydown', (e) => {
       e.stopPropagation();
       if (e.key !== 'Enter' || e.repeat) return;
