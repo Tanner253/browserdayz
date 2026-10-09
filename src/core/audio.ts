@@ -1010,6 +1010,19 @@ export class AudioEngine {
    * Being hit: the blow landing, and the grunt it knocks out of you.
    * @param pos somebody else being hit: their grunt, from where they are, when the sound gets here
    */
+  /** a bone going: one dull crack, your own */
+  snap() {
+    if (!this.ready) return;
+    const ctx = this.ctx, t = ctx.currentTime;
+    const src = this.noise(t, 0.06);
+    const lo = this.filter('bandpass', 260, 1.2), hi = this.filter('highpass', 2400, 0.8);
+    const g = ctx.createGain(), gh = ctx.createGain();
+    this.env(g, t, 0.5, 0.003, 0.07);
+    this.env(gh, t, 0.22, 0.001, 0.02);
+    src.connect(lo).connect(g).connect(this.sfx);
+    src.connect(hi).connect(gh).connect(this.sfx);
+  }
+
   /**
    * A fire burning near by: the hiss of it, and wood cracking in it.
    * @param distance metres to the nearest one that is alight (-1 = none near enough to hear)

@@ -35,6 +35,8 @@ export const F_LEAN_L = 256, F_LEAN_R = 512;
 export const F_SEAT = 1024;
 /** on guard: fists up, or something to strike with held across, to stop a blow (see INFECTED.guardArc) */
 export const F_GUARD = 2048;
+/** on a broken leg: it shows in how they walk */
+export const F_LIMP = 4096;
 /** how far the head goes sideways at a full lean, metres (the camera's own figure: see Player.updateCamera) */
 export const LEAN_REACH = 0.34;
 
@@ -54,6 +56,8 @@ export interface Vitals {
   water: number;
   stamina: number;
   bleeding: boolean;
+  /** a broken leg (see src/sim/injury.ts) */
+  broken?: boolean;
 }
 
 export interface PlayerInfo {

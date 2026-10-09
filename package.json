@@ -18,6 +18,7 @@
     "test:infected": "tsx test/infected.test.ts",
     "test:gas": "tsx test/gas.test.ts",
     "test:fires": "tsx test/fires.test.ts",
+    "test:injury": "tsx test/injury.test.ts",
     "treasury": "tsx scripts/treasury.ts",
     "sounds": "node scripts/sounds.mjs"
   },

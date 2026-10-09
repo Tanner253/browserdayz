@@ -909,7 +909,7 @@ function handle(c: Client, m: C2S) {
         send(c, { t: 'tell', kind: 'warn', text: JEEP.noTag });
       }
       const v = m.vitals;
-      if (v && num(v.health) && num(v.energy) && num(v.water)) c.vitals = { health: v.health, energy: v.energy, water: v.water, stamina: num(v.stamina) ? v.stamina : MAX_STAMINA, bleeding: !!v.bleeding };
+      if (v && num(v.health) && num(v.energy) && num(v.water)) c.vitals = { health: v.health, energy: v.energy, water: v.water, stamina: num(v.stamina) ? v.stamina : MAX_STAMINA, bleeding: !!v.bleeding, broken: !!v.broken };
       return;
     }
     case 'died': {

@@ -8,6 +8,7 @@ import type { Input, MoveInput } from '../core/input';
 import { audio } from '../core/audio';
 import type { Terrain } from '../world/terrain';
 import { LEAN_REACH, MAX_STAMINA } from '../net/protocol';
+import { LEG, breaksOnLanding } from '../sim/injury';
 
 const STAND_HALF = 0.56;
 const CROUCH_HALF = 0.26;
@@ -35,6 +36,8 @@ export interface Vitals {
   water: number;
   stamina: number;
   bleeding: boolean;
+  /** a broken leg: no running and no jumping until it is set, or has knitted (see src/sim/injury.ts) */
+  broken?: boolean;
 }
 
 export class Player {
@@ -97,6 +100,10 @@ export class Player {
   private jumpWish = 1;
   /** a hard landing knocks the pace out of you for a moment */
   private stumble = 0;
+  /** seconds this leg has been broken */
+  private brokenT = 0;
+  onBreak: () => void = () => {};
+  onSet: (by: boolean) => void = () => {};
   /** camera roll from sidestepping */
   private strafeRoll = 0;
   private hurtTimer = 0;
@@ -217,7 +224,7 @@ export class Player {
     // never came back at all while the key was held.
     if (v.stamina <= WINDED_AT) this.winded = true;
     else if (v.stamina >= WIND_BACK) this.winded = false;
-    this.sprinting = wantsSprint && !this.winded && this.grounded;
+    this.sprinting = wantsSprint && !this.winded && this.grounded && !v.broken;
 
     const enc = Math.max(0, this.weightKg - 18) * 0.012; // encumbrance
     let speed = this.crouched ? 1.9 : walk ? 1.7 : 4.0;
@@ -229,6 +236,8 @@ export class Player {
       this.stumble = Math.max(0, this.stumble - h);
       speed *= 1 - Math.min(0.6, this.stumble * 1.6);
     }
+    // on a broken leg it is a limp, whatever is asked of it
+    if (v.broken) speed = Math.min(speed, LEG.limp);
 
     const wish = new THREE.Vector3(str, 0, -fwd);
     if (wish.lengthSq() > 0) wish.normalize().applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yaw);
@@ -247,7 +256,7 @@ export class Player {
     this.airT = this.grounded ? 0 : this.airT + h;
     this.jumpWish = input.pressedFixed('Space') ? 0 : this.jumpWish + h;
     // (a jump costs stamina but never waits for it: feet that will not leave the ground read as a fault)
-    if (this.jumpWish < 0.13 && (this.grounded || (this.airT < 0.11 && this.vel.y <= 0)) && !this.crouched) {
+    if (this.jumpWish < 0.13 && (this.grounded || (this.airT < 0.11 && this.vel.y <= 0)) && !this.crouched && !v.broken) {
       this.vel.y = 4.4;
       v.stamina = Math.max(0, v.stamina - 14);
       this.staminaDelay = 1.2;
@@ -396,6 +405,8 @@ export class Player {
       const dmg = (s - 9.5) * 14 * this.fallMult;
       this.damage(dmg, 'fall');
       if (s > 13) this.bleed();
+      // (boots that take a fall take it off the leg as well)
+      if (breaksOnLanding(9.5 + (s - 9.5) * this.fallMult, Math.random())) this.breakLeg();
     }
   }
 
@@ -436,6 +447,28 @@ export class Player {
     if (v.energy <= 0 || v.water <= 0) this.damageQuiet(0.35 * dt, v.water <= 0 ? 'thirst' : 'hunger');
     else if (v.energy > 60 && v.water > 60 && !v.bleeding && v.health < 100) v.health = Math.min(100, v.health + 0.12 * dt);
     if (this.hurtTimer > 0) this.hurtTimer -= dt;
+    // a broken leg knits by itself in the end: nobody is left a cripple for the want of a roll of tape
+    if (v.broken) {
+      this.brokenT += dt;
+      if (this.brokenT > LEG.knits) this.setLeg();
+    } else this.brokenT = 0;
+  }
+
+  /** a leg breaks (nothing happens to one already broken, or to the dead) */
+  breakLeg() {
+    if (this.dead || this.vitals.broken) return;
+    this.vitals.broken = true;
+    this.brokenT = 0;
+    this.sprinting = false;
+    this.onBreak();
+  }
+
+  /** it is set, or has knitted: `by` says which (true = somebody did something for it) */
+  setLeg(by = false) {
+    if (!this.vitals.broken) return;
+    this.vitals.broken = false;
+    this.brokenT = 0;
+    this.onSet(by);
   }
 
   /** health put back by rest (beside a fire): not while a wound is open, and not on an empty stomach or a dry mouth */
@@ -485,7 +518,9 @@ export class Player {
     // head bob (figure-eight), scaled by speed; reduced while aiming
     const amp = moving * (this.aiming ? 0.25 : 1) * (this.grounded ? 1 : 0);
     const ph = this.bobPhase;
-    const tb = new THREE.Vector3(Math.cos(ph) * 0.035 * amp, Math.abs(Math.sin(ph)) * 0.05 * amp, 0);
+    // on a broken leg the head drops over it once a stride, and the view tips after it
+    const lame = this.vitals.broken && this.grounded ? Math.max(0, Math.sin(ph)) * Math.min(1, moving * 5) : 0;
+    const tb = new THREE.Vector3(Math.cos(ph) * 0.035 * amp, Math.abs(Math.sin(ph)) * 0.05 * amp - lame * 0.085, 0);
     this.bob.lerp(tb, 1 - Math.exp(-14 * dt));
 
     const side = new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
@@ -497,7 +532,7 @@ export class Player {
     // sidestepping tips the view a touch into the movement
     const lateral = this.dead ? 0 : (this.vel.x * side.x + this.vel.z * side.z) / 6.2;
     this.strafeRoll += (THREE.MathUtils.clamp(lateral, -1, 1) * -0.022 - this.strafeRoll) * (1 - Math.exp(-9 * dt));
-    const roll = -lean * 0.21 + (this.dead ? 1.2 : 0) + Math.cos(ph) * 0.004 * amp + this.strafeRoll;
+    const roll = -lean * 0.21 + (this.dead ? 1.2 : 0) + Math.cos(ph) * 0.004 * amp + this.strafeRoll - lame * 0.035;
     cam.quaternion.setFromEuler(new THREE.Euler(this.pitch + this.aimOffset.y, this.yaw + this.aimOffset.x, roll, 'YXZ'));
     cam.updateMatrixWorld();
   }

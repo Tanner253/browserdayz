@@ -38,7 +38,7 @@ export interface ItemDef {
   category: Category;
   stack?: number;
   slot?: SlotKind;
-  use?: { verb: string; time: number; energy?: number; water?: number; health?: number; stopBleed?: boolean; sound: 'eat' | 'drink' | 'bandage' | 'inject' | 'smoke' };
+  use?: { verb: string; time: number; energy?: number; water?: number; health?: number; stopBleed?: boolean; /** sets a broken leg (see src/sim/injury.ts) */ splint?: boolean; sound: 'eat' | 'drink' | 'bandage' | 'inject' | 'smoke' };
   /** thrown when used: seconds of fuse, damage at the centre, metres it reaches */
   throw?: { fuse: number; damage: number; radius: number };
   /** looked through when used: how much of the normal field of view is left (0.2 = five times closer) */
@@ -144,7 +144,8 @@ const D: ItemDef[] = [
   // pocket. What it is now is an auto-injector: quicker than winding a dressing, and it gives
   // something back.)
   { id: 'bandage', name: 'Combat Injector', model: 'syringe', w: 1, h: 1, weight: 0.06, category: 'medical', desc: 'Clotting agent and a painkiller in one spring-loaded shot. Stops bleeding and gives back 15 health.', use: { verb: 'Use', time: 2.4, stopBleed: true, health: 15, sound: 'inject' } },
-  { id: 'firstaid', name: 'First Aid Kit', model: 'medical_box', w: 3, h: 2, weight: 0.9, category: 'medical', desc: 'Dressings and antiseptic. Treats wounds properly.', use: { verb: 'Treat wounds', time: 6, stopBleed: true, health: 45, sound: 'bandage' } },
+  { id: 'firstaid', name: 'First Aid Kit', model: 'medical_box', w: 3, h: 2, weight: 0.9, category: 'medical', desc: 'Dressings, antiseptic and a splint. Treats wounds properly, and sets a broken leg.', use: { verb: 'Treat wounds', time: 6, stopBleed: true, health: 45, splint: true, sound: 'bandage' } },
+  { id: 'splint', name: 'Splint Tape', model: 'medical_tape', w: 1, h: 1, weight: 0.12, category: 'medical', desc: 'A roll of strapping tape. Bound round a broken leg with whatever is to hand, it lets you run on it again.', use: { verb: 'Splint your leg with', time: 5, splint: true, sound: 'bandage' } },
   // ---------------------------------------------------------------- clothing & bags
   {
     // (still `boonie_hat`: a field cap now, with the headset that goes over it)

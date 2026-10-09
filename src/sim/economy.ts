@@ -89,6 +89,8 @@ export const TYPES: Record<string, TypeRule> = {
   // was too few of it. More, sooner back, and most of it where it was kept: the clinic.
   bandage: { nominal: 20, min: 13, lifetime: 2400, restock: 240, usage: ['Village', 'Town', 'Military', 'Medic', 'Police', 'Hunting', 'Farm'], favour: { Medic: 6, Military: 2 } },
   firstaid: { nominal: 8, min: 4, lifetime: 3600, restock: 600, usage: ['Military', 'Medic', 'Town', 'Police'], favour: { Medic: 8 } },
+  // (what sets a broken leg and does nothing else: commoner than the kit, and where there are ladders and lofts to fall off)
+  splint: { nominal: 12, min: 7, lifetime: 3600, restock: 420, usage: ['Medic', 'Village', 'Town', 'Farm', 'Hunting', 'Industrial', 'Police'], favour: { Medic: 5 } },
   // clothing and bags: this is how you carry more
   // (What these are now is a soldier's kit, and their rules were written for a sun hat, a
   // life jacket and a pair of rubber boots: plates were found in a cow shed and never at an

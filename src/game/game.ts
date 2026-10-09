@@ -22,7 +22,7 @@ import { BARREL } from '../sim/barrels';
 import { EMOTE, EMOTES, EMOTE_GAP, SAY_RANGE, SAY_TIME, voiceOf } from '../sim/emotes';
 import { loadSave, writeSave, type SaveData } from '../sim/save';
 import { Net, playerName, publicId, remoteServer, serverStatus, setPlayerName } from '../net/client';
-import { F_AIM, F_BLEED, F_CROUCH, F_DANCE, F_DEAD, F_GROUND, F_GUARD, F_LEAN_L, F_LEAN_R, F_SEAT, F_SPRINT, F_SURRENDER, MAX_STAMINA, crateId, type Act, type CorpseInfo, type PlayerInfo, type Pose, type S2C, type StashInfo } from '../net/protocol';
+import { F_AIM, F_BLEED, F_CROUCH, F_DANCE, F_DEAD, F_GROUND, F_GUARD, F_LEAN_L, F_LEAN_R, F_LIMP, F_SEAT, F_SPRINT, F_SURRENDER, MAX_STAMINA, crateId, type Act, type CorpseInfo, type PlayerInfo, type Pose, type S2C, type StashInfo } from '../net/protocol';
 import { Player } from './player';
 import { Avatar, AVATAR_LAYER, DEATH_REST, FP_BODY_LAYER, GEAR_SHOWN, type Hold, facepiece } from './avatar';
 import { lookFor } from './look';
@@ -53,6 +53,7 @@ import { Gas } from './gas';
 import { GAS } from '../sim/gas';
 import { FIRE, Hearths } from '../sim/fires';
 import { Fires } from './fires';
+import { breaksOnHit } from '../sim/injury';
 
 const _gasHead = new THREE.Vector3();
 
@@ -114,6 +115,8 @@ export class Game {
   private byFire = false;
   /** a word at the top of the screen for as long as the survivor is resting by a fire */
   private fireTag = document.createElement('div');
+  /** and one for as long as a leg is broken */
+  private legTag = document.createElement('div');
   readonly horde: Horde = new Horde({
     atmo: () => this.s.atmo,
     scene: () => this.s.r.scene,
@@ -224,6 +227,8 @@ export class Game {
     this.effects = new Effects(r.scene, atmo);
     this.fires = new Fires(world, r.scene, this.effects, atmo);
     this.fireTag.className = 'hud-fire-tag';
+    this.legTag.className = 'hud-leg-tag';
+    this.legTag.textContent = 'BROKEN LEG · SPLINT IT, OR USE A FIRST AID KIT';
     this.hearths = new Hearths(this.fires.spots);
     progress('loading loot');
     this.loot = new LootManager(r.scene, atmo, buildings.lootPoints);
@@ -324,7 +329,7 @@ export class Game {
     this.hud.setName(playerName());
     this.minimap = new Minimap(world);
     this.hud.root.insertBefore(this.minimap.root, this.hud.root.firstChild);
-    this.hud.root.appendChild(this.fireTag);
+    this.hud.root.append(this.fireTag, this.legTag);
     this.gas = new Gas(atmo.gas, atmo, r.scene, {
       masked: () => this.inv.wear('gas').length > 0,
       hurt: (amount) => this.player.sicken(amount, 'the gas'),
@@ -371,6 +376,16 @@ export class Game {
     this.player.onLand = (speed) => this.weapons.landed(speed);
     this.player.onDamage = (amt, cause) => {
       if (cause === 'fall' && amt > 5) this.hud.note('You hurt yourself in the fall', 'warn');
+    };
+    this.player.onBreak = () => {
+      audio.snap();
+      this.weapons.flinch(1.6);
+      this.hud.note('Your leg is broken: you cannot run or jump. A splint or a first aid kit sets it', 'warn');
+      this.meDirty = true;
+    };
+    this.player.onSet = (by) => {
+      this.hud.note(by ? 'Your leg is set: you can run on it again' : 'Your leg has knitted: you can run on it again', 'good');
+      this.meDirty = true;
     };
     this.player.onClot = () => {
       this.hud.note('The bleeding has stopped on its own', 'good');
@@ -1116,6 +1131,8 @@ export class Game {
     // a bullet nearly always opens a wound, a blade often, a fist or a bat seldom
     const blade = m.w === 'knife' || m.w === 'machete' || m.w === 'hatchet';
     if (!p.dead && Math.random() < (sick ? INFECTED.bleed : melee ? (blade ? 0.6 : amount > 25 ? 0.25 : 0) : amount > 12 ? 0.85 : 0.4)) p.bleed();
+    // in the legs, a bullet as often as not breaks one, and so now and then does something swung (not their hands, and not a blast)
+    if (!blast && !sick && m.w !== 'fists' && m.w !== 'jeep' && breaksOnHit(m.zone, melee, Math.random())) p.breakLeg();
     this.weapons.flinch(melee ? 0.5 : 1);
     this.lastHit = { x: m.dir[0], z: m.dir[2], at: performance.now() };
     // Bullets in this world pass through your own body (the server said you were hit, not
@@ -1146,7 +1163,7 @@ export class Game {
     if (this.sendT >= 1 / SEND_HZ) {
       this.sendT = 0;
       const it = this.weapons.equippedItem;
-      const flags = (p.crouched ? F_CROUCH : 0) | (p.sprinting ? F_SPRINT : 0) | (this.weapons.aiming ? F_AIM : 0) | (p.grounded ? F_GROUND : 0) | (p.dead ? F_DEAD : 0) | (p.vitals.bleeding ? F_BLEED : 0) | (p.lean > 0.3 ? F_LEAN_R : p.lean < -0.3 ? F_LEAN_L : 0) | (this.hold === 'dance' ? F_DANCE : 0) | (this.hold === 'surrender' ? F_SURRENDER : 0) | (this.garage.ride ? F_SEAT : 0) | (this.weapons.guarding ? F_GUARD : 0);
+      const flags = (p.crouched ? F_CROUCH : 0) | (p.sprinting ? F_SPRINT : 0) | (this.weapons.aiming ? F_AIM : 0) | (p.grounded ? F_GROUND : 0) | (p.dead ? F_DEAD : 0) | (p.vitals.bleeding ? F_BLEED : 0) | (p.lean > 0.3 ? F_LEAN_R : p.lean < -0.3 ? F_LEAN_L : 0) | (this.hold === 'dance' ? F_DANCE : 0) | (this.hold === 'surrender' ? F_SURRENDER : 0) | (this.garage.ride ? F_SEAT : 0) | (this.weapons.guarding ? F_GUARD : 0) | (p.vitals.broken ? F_LIMP : 0);
       const pose: Pose = [p.pos.x, p.pos.y, p.pos.z, p.yaw, p.pitch, flags];
       this.net.send({ t: 's', p: pose, w: it?.id ?? null, m: it?.mods ?? [] });
     }
@@ -1541,6 +1558,10 @@ export class Game {
         v.bleeding = false;
         this.hud.note('The bleeding has stopped', 'good');
         this.meDirty = true;
+      }
+      if (u.splint) {
+        if (v.broken) this.player.setLeg(true);
+        else if (!u.stopBleed) this.hud.note('Nothing is broken: the tape is used up all the same', 'info');
       }
       const good = (n: number) => (n > 0 ? Math.round(n * hot) : n);
       const gained = [u.energy ? `${u.energy > 0 ? '+' : ''}${good(u.energy)} energy` : '', u.water ? `${u.water > 0 ? '+' : ''}${good(u.water)} water` : '', u.health ? `+${u.health} health` : ''].filter(Boolean).join(' · ');
@@ -2290,6 +2311,9 @@ export class Game {
     this.gas.update(dt, this.s.r.camera.position, _gasHead.set(p.pos.x, p.pos.y + (p.crouched ? 1.0 : 1.6), p.pos.z), this.started && !p.dead);
     // the fires: the infected hear one crackle, and whoever is beside one mends
     for (const at of this.fires.update(dt, this.s.r.camera.position)) this.horde.noise(at.x, at.z, FIRE.heard);
+    // a broken leg, said for as long as it is one
+    const lame = this.started && !p.dead && !!p.vitals.broken;
+    if (lame !== this.legTag.classList.contains('on')) this.legTag.classList.toggle('on', lame);
     const resting = this.started && !p.dead && this.fires.warm(p.pos);
     const mending = resting && p.rest(FIRE.heal * dt);
     if (resting !== this.byFire) {
@@ -2367,6 +2391,7 @@ export class Game {
       this.garage.seatBody();
     } else {
       this.avatar.guarding = this.weapons.guarding;
+      this.avatar.limping = !!p.vitals.broken;
       this.avatar.update(dt, interp, p.vel, p.yaw, p.crouched, p.dead, true, 0, p.grounded, this.weapons.aiming);
     }
     // the step you hear and the bob you see are the body's own

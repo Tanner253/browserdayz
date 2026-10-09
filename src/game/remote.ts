@@ -7,7 +7,7 @@ import type RAPIER from '@dimforge/rapier3d-compat';
 import { physics, GLASS_GROUPS, HITBOX_GROUPS, SOLID_GROUPS, type Surface } from '../core/physics';
 import { audio } from '../core/audio';
 import type { Atmosphere } from '../world/atmosphere';
-import { F_AIM, F_BLEED, F_CROUCH, F_DANCE, F_DEAD, F_GROUND, F_GUARD, F_LEAN_L, F_LEAN_R, F_SURRENDER, type Act, type Pose } from '../net/protocol';
+import { F_AIM, F_BLEED, F_CROUCH, F_DANCE, F_DEAD, F_GROUND, F_GUARD, F_LEAN_L, F_LEAN_R, F_LIMP, F_SURRENDER, type Act, type Pose } from '../net/protocol';
 import { SHOUT_RANGE, voiceOf, type Emote } from '../sim/emotes';
 import { ITEMS } from '../sim/items';
 import { Avatar } from './avatar';
@@ -227,6 +227,7 @@ export class RemotePlayer implements Damageable {
       this.grounded = !!(b.p[5] & F_GROUND);
       this.aiming = !!(b.p[5] & F_AIM);
       this.avatar.guarding = this.alive && !!(b.p[5] & F_GUARD);
+      this.avatar.limping = this.alive && !!(b.p[5] & F_LIMP);
       this.bleeding = !!(b.p[5] & F_BLEED);
       this.avatar.setHold(b.p[5] & F_DANCE ? 'dance' : b.p[5] & F_SURRENDER ? 'surrender' : null);
       // (a weapon coming up to the eye is the end of a wave)

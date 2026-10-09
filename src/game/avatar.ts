@@ -368,6 +368,9 @@ export class Avatar {
   private sickRun = 0;
   /** on guard: the fists are up (and what is in the right one with them) for as long as this is set */
   guarding = false;
+  /** on a broken leg (see src/sim/injury.ts): it is seen in how they go */
+  limping = false;
+  private limpT = 0;
   // how far the weapon is up at the eye, and how far it is in its running carry, 0..1
   private aimT = 0;
   private carryT = 0;
@@ -1531,6 +1534,25 @@ export class Avatar {
     }
 
     if (this.sick && !dead && this.downT <= 0) this.sicken(dt);
+    // on a broken leg: once a stride the hips drop over it and the back goes after them
+    this.limpT += ((this.limping && !dead ? 1 : 0) - this.limpT) * ease(5);
+    if (this.limpT > 0.02 && !this.sick && this.downT <= 0) {
+      const aimQ = _aimQ.setFromAxisAngle(UP, this.yaw);
+      const fwd = _fwd.set(0, 0, -1).applyQuaternion(aimQ);
+      _right.set(1, 0, 0).applyQuaternion(aimQ);
+      const going = THREE.MathUtils.clamp(this.speed / 0.5, 0, 1) * this.limpT;
+      // (down on the bad side for half of each stride, and quickly off it again)
+      const drop = Math.max(0, Math.sin(this.phase * Math.PI * 2)) * going;
+      const pelvis = this.joints.pelvis;
+      if (pelvis) {
+        this.lean(pelvis, fwd, 0.05 * this.limpT + drop * 0.21);
+        this.lean(pelvis, UP, drop * 0.09);
+      }
+      for (const b of this.spine) this.lean(b, _right, -(0.04 * this.limpT + drop * 0.05));
+      if (this.spine[1]) this.lean(this.spine[1], fwd, -drop * 0.13);
+      const head = this.neck[this.neck.length - 1];
+      if (head) this.lean(head, fwd, -drop * 0.08);
+    }
     // (a thumb is not seen from across the street, nor on the body the eye is in)
     if (!firstPerson && this.root.position.distanceToSquared(Avatar.eye) < THUMB_SEEN * THUMB_SEEN) {
       if (this.armR) this.thumb(this.armR);
