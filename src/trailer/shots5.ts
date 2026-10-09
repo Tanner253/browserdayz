@@ -253,9 +253,13 @@ export function buildShots(S: Stage): Shot[] {
   // (the light of the day comes down through it, and less of it arrives)
   const lights: [THREE.Light, number][] = [];
   scene.traverse((o) => { if ((o as THREE.Light).isLight) lights.push([o as THREE.Light, (o as THREE.Light).intensity]); });
+  // (Since this was first filmed the world has gas of its own, over the same checkpoint: where
+  // it has, those shots are filmed in the game's gas as it is, and the film adds none.)
+  const real: { r: number } | null = g.s.atmo.gas ?? null;
   let gassed = false;
   const gas = (on: boolean, thick = 0.021) => {
     gassed = on;
+    if (real) return;
     fog.color.copy(on ? GAS : air.color);
     fog.density = on ? thick : air.density;
     // (no sky to be seen from inside it: what is far off goes into the same green the air is)
@@ -831,6 +835,8 @@ export function buildShots(S: Stage): Shot[] {
     const handLamp = new THREE.DirectionalLight(0xfff0d0, 0);
     g.weapons.vmScene.add(handLamp);
     let walked = 0;
+    // where the man stands to look at it (in the game's own gas: far enough in for the camp to be made out, and with a mask on)
+    const STOOD = real ? real.r - 22 : 37;
 
     add(1.5, {
       name: 'next-zone',
@@ -842,15 +848,15 @@ export function buildShots(S: Stage): Shot[] {
         gas(true);
         walked = 0;
         const k = A(2);
-        const from = edge(37, 0.9);
-        k.place(from.x, from.z, yawOf(toCamp), 'mosin', ['life_vest', 'sack_pack', 'boonie_hat']);
+        const from = edge(STOOD, 0.9);
+        k.place(from.x, from.z, yawOf(toCamp), 'mosin', ['life_vest', 'sack_pack', ...(real ? ['gasmask'] : ['boonie_hat'])]);
         // (the air has been standing here a long time: it is full of it before anybody looks)
-        await preroll(240, undefined, () => drift(edge(21), 1.6, 24));
+        await preroll(240, undefined, () => drift(edge(STOOD - 16), 1.6, 24));
       },
       // he has stopped where it begins, and goes no farther
       tick: (_t, _S, dt) => {
         void walked;
-        drift(edge(21), 96 * dt, 24);
+        drift(edge(STOOD - 16), 96 * dt, 24);
       },
       // past his shoulder, and on by him: the camp ahead, sunk in it
       cam: (t) => {

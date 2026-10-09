@@ -10,9 +10,11 @@ import { assets } from '../core/assets';
 import { physics, AJAR_GROUPS, BODY_QUERY, GLASS_GROUPS, WORLD_GROUPS, type Surface } from '../core/physics';
 import { RNG } from '../core/noise';
 import type { Atmosphere } from './atmosphere';
+import { GAS, gasDepth, gasZone } from '../sim/gas';
 import { BUILDING_FOOTPRINT, heightAt, type BuildingPlot, type Instance, type SiteKind, type World } from './worldgen';
 
-export type Usage = 'Village' | 'Town' | 'Farm' | 'Industrial' | 'Military' | 'Hunting' | 'Medic' | 'Police';
+/** (`Gas` is not a kind of building: it is whatever stands under the gas, whatever else it is. See src/sim/gas.ts.) */
+export type Usage = 'Village' | 'Town' | 'Farm' | 'Industrial' | 'Military' | 'Hunting' | 'Medic' | 'Police' | 'Gas';
 
 export interface LootPoint {
   x: number;
@@ -781,6 +783,9 @@ export class Buildings {
     for (const plot of this.world.buildings) this.planBuilding(plot);
     this.planVillageProps();
     this.planSiteProps();
+    // what is kept under the gas is marked so: there are things that lie nowhere else (see the economy)
+    const gas = gasZone(this.world.pois, (x, z) => heightAt(this.world.heights, x, z));
+    for (const p of this.lootPoints) if (gasDepth(gas, p.x, p.y, p.z) > GAS.breathe) p.usage = [...p.usage, 'Gas'];
   }
 
   /** What stands in the yard of each outlying place: crates to search, and what makes it look lived in. */

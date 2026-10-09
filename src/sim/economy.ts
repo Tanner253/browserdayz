@@ -62,7 +62,8 @@ export const TYPES: Record<string, TypeRule> = {
   box_762: { nominal: 14, min: 13, lifetime: 3600, restock: 180, usage: ['Military', 'Police', 'Hunting', 'Farm', 'Industrial'], favour: ARMOURY },
   box_9mm: { nominal: 18, min: 17, lifetime: 3600, restock: 180, usage: ['Police', 'Military', 'Town', 'Village'], favour: ARMOURY },
   // attachments
-  pu_scope: { nominal: 2, min: 1, lifetime: 7200, restock: 1800, usage: ['Police', 'Military'] },
+  // (the scope and the grenades are likelier under the gas than anywhere: something worth a mask)
+  pu_scope: { nominal: 2, min: 1, lifetime: 7200, restock: 1800, usage: ['Police', 'Military'], favour: { Gas: 4 } },
   rifle_wrap: { nominal: 2, min: 1, lifetime: 7200, restock: 1500, usage: ['Military', 'Hunting'] },
   suppressor_9: { nominal: 2, min: 1, lifetime: 7200, restock: 1800, usage: ['Police'] },
   mag_p38_ext: { nominal: 3, min: 1, lifetime: 7200, restock: 1200, usage: ['Police', 'Military'] },
@@ -93,7 +94,10 @@ export const TYPES: Record<string, TypeRule> = {
   // life jacket and a pair of rubber boots: plates were found in a cow shed and never at an
   // army post. They are still about the farms, where people took them; most are where they were issued.)
   boonie_hat: { nominal: 5, min: 3, lifetime: 3600, restock: 900, usage: ['Village', 'Farm', 'Hunting', 'Military'], favour: { Military: 3 } },
-  gasmask: { nominal: 2, min: 1, lifetime: 3600, restock: 1200, usage: ['Military', 'Police'] },
+  // (The mask is what lets anybody into the gas, so it is not kept IN the gas, where most of
+  // the army's things are: it is in the police station, and the three of them there are
+  // what the whole map has to share, bar what a crate or a supply drop turns up.)
+  gasmask: { nominal: 3, min: 2, lifetime: 3600, restock: 900, usage: ['Police'] },
   life_vest: { nominal: 5, min: 3, lifetime: 3600, restock: 900, usage: ['Military', 'Police', 'Industrial', 'Town'], favour: { Military: 5, Police: 5 } },
   work_gloves: { nominal: 5, min: 3, lifetime: 3600, restock: 900, usage: ['Farm', 'Industrial', 'Village', 'Military', 'Police'], favour: { Military: 2 } },
   rubber_boots: { nominal: 5, min: 3, lifetime: 3600, restock: 900, usage: ['Farm', 'Village', 'Military', 'Industrial'], favour: { Military: 2 } },
@@ -103,7 +107,7 @@ export const TYPES: Record<string, TypeRule> = {
   binoculars: { nominal: 3, min: 1, lifetime: 3600, restock: 1200, usage: ['Military', 'Hunting', 'Police'] },
   compass: { nominal: 4, min: 2, lifetime: 3600, restock: 1200, usage: ['Military', 'Hunting', 'Village'] },
   cigarettes: { nominal: 8, min: 3, lifetime: 2400, restock: 600, usage: ['Village', 'Town', 'Military', 'Industrial'] },
-  grenade: { nominal: 6, min: 3, lifetime: 3600, restock: 1200, usage: ['Military', 'Police'] },
+  grenade: { nominal: 6, min: 3, lifetime: 3600, restock: 1200, usage: ['Military', 'Police'], favour: { Gas: 4 } },
   stash_kit: { nominal: 3, min: 1, lifetime: 7200, restock: 1800, usage: ['Farm', 'Industrial', 'Hunting'] },
   // fuel for the jeeps (src/sim/vehicles.ts): where there are sheds, yards and soldiers
   jerrycan: { nominal: 8, min: 5, lifetime: 3600, restock: 600, usage: ['Farm', 'Industrial', 'Military', 'Village'] },

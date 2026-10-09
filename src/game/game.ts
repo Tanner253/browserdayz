@@ -74,7 +74,7 @@ interface TimedAction {
 }
 
 /** bump when the map's loot points change: spawned loot from older saves is re-rolled */
-const LOOT_REV = 10;
+const LOOT_REV = 11;
 const QUICK_KEYS = ['Digit5', 'Digit6', 'Digit7', 'Digit8'];
 /** what can be held, in the order of the keys 1 to 4 */
 const HAND_SLOTS = ['primary', 'secondary', 'holster', 'melee'] as const;

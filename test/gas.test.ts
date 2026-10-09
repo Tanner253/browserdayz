@@ -7,6 +7,9 @@ import { GAS, breathe, freshLungs, gasDepth, gasEdge, gasZone } from '../src/sim
 import { ITEMS } from '../src/sim/items';
 import { pickDropSite } from '../src/sim/drops';
 import { generateWorld, heightAt } from '../src/world/worldgen';
+import { Economy } from '../src/sim/economy';
+import { RNG } from '../src/core/noise';
+import { buildWorldData } from '../server/world';
 
 let n = 0;
 const ok = (name: string, fn: () => void) => {
@@ -118,6 +121,40 @@ ok('nobody starts in it, and nothing is dropped into it', () => {
     const at = pickDropSite(world, rnd);
     if (at) assert.ok(gasEdge(zone, at.x, at.z) > 0, 'a supply drop came down in the gas');
   }
+});
+
+ok('what is kept under the gas is marked so, and the masks are kept out of it, in the police station', () => {
+  const data = buildWorldData(process.cwd());
+  const under = data.lootPoints.filter((p) => p.usage.includes('Gas'));
+  assert.ok(under.length >= 8, `only ${under.length} places to find anything under the gas`);
+  for (const p of data.lootPoints) assert.equal(p.usage.includes('Gas'), gasDepth(zone, p.x, p.y, p.z) > GAS.breathe);
+  // stocked as a fresh server stocks it: every mask is in the police station, none under the gas
+  const police = world.buildings.filter((b) => b.type === 'police').map((b) => b.id);
+  assert.ok(police.length >= 1, 'no police station on this map');
+  const eco = new Economy(data.lootPoints, { spawn: () => {}, despawn: () => {} });
+  eco.populate();
+  const masks = [...eco.loot.values()].filter((l) => l.item.id === 'gasmask');
+  assert.ok(masks.length >= 2, `${masks.length} gas masks on the whole map`);
+  for (const l of masks) {
+    const at = data.lootPoints.find((q) => Math.hypot(q.x - l.x, q.z - l.z) < 0.6 && Math.abs(q.y - l.y) < 0.6);
+    assert.ok(at && police.includes(at.building), 'a gas mask somewhere other than the police station');
+    assert.equal(gasDepth(zone, l.x, l.y, l.z), 0, 'a gas mask under the gas');
+  }
+  // and what the gas is worth going into for is there more often than its share of the places would give it
+  const share = under.length / data.lootPoints.filter((q) => q.usage.includes('Military') || q.usage.includes('Police')).length;
+  let inGas = 0, all = 0;
+  for (let k = 0; k < 30; k++) {
+    const e = new Economy(data.lootPoints, { spawn: () => {}, despawn: () => {} });
+    // (its own dice, thrown from a different place each time)
+    (e as unknown as { rng: RNG }).rng = new RNG(1000 + k * 7919);
+    e.populate();
+    for (const l of e.loot.values()) {
+      if (l.item.id !== 'grenade') continue;
+      all++;
+      if (gasDepth(zone, l.x, l.y, l.z) > GAS.breathe) inGas++;
+    }
+  }
+  assert.ok(all > 0 && inGas / all > share, `grenades under the gas: ${inGas} of ${all}, where its share of such places is ${(share * 100).toFixed(0)}%`);
 });
 
 console.log(`\n${n} checks passed`);

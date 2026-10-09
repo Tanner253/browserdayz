@@ -39,7 +39,8 @@ async function boot() {
   console.log(`worldgen ${(performance.now() - t0).toFixed(0)}ms, trees ${world.trees.length}, buildings ${world.buildings.length}`);
 
   const atmo = new Atmosphere(r.renderer, r.scene, r.camera);
-  atmo.gas = gasZone(world.pois, (x, z) => heightAt(world.heights, x, z));
+  // (`?nogas` on a development build leaves it out of the shaders, to measure what it costs)
+  atmo.gas = import.meta.env.DEV && new URLSearchParams(location.search).has('nogas') ? null : gasZone(world.pois, (x, z) => heightAt(world.heights, x, z));
   await atmo.init();
   const terrain = new Terrain(world, atmo);
   await terrain.build(r.scene);
