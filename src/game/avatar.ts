@@ -643,6 +643,20 @@ export class Avatar {
    * Puts a weapon in the hands (null = empty hands). `obj` is the weapon body in its own
    * model space, the same space the grips are written in.
    */
+  /**
+   * Where the end of the barrel in its hands is, in the world, and which way the barrel
+   * points: for the flash of a shot. Null if it holds no gun, or one whose barrel is not known.
+   */
+  muzzle(pos = new THREE.Vector3(), dir = new THREE.Vector3()): { pos: THREE.Vector3; dir: THREE.Vector3 } | null {
+    const obj = this.held?.obj, at = obj?.userData.muzzle as number[] | undefined;
+    if (!obj || !at || !this.root.visible) return null;
+    obj.updateWorldMatrix(true, false);
+    pos.set(at[0], at[1], at[2]).applyMatrix4(obj.matrixWorld);
+    // (the gun lies along its own x)
+    dir.set(at[0] + 1, at[1], at[2]).applyMatrix4(obj.matrixWorld).sub(pos).normalize();
+    return { pos, dir };
+  }
+
   setHeld(obj: THREE.Object3D | null, grips: Grips | null, kind: 'rifle' | 'pistol' | 'auto' | 'melee' = 'rifle') {
     this.heldPivot.clear();
     this.held = null;

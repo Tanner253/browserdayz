@@ -801,7 +801,7 @@ export class Game {
     net.on('ihp', (m) => this.horde.hp(m.i, m.dead, m.by, m.zone, m.dir, !!m.melee));
     net.on('iblk', (m) => this.horde.blocked(m.i, m.to));
     net.on('shot', (m) => {
-      this.weapons.remoteShot(new THREE.Vector3(...m.o), new THREE.Vector3(...m.d), m.w, m.sup);
+      this.weapons.remoteShot(new THREE.Vector3(...m.o), new THREE.Vector3(...m.d), m.w, m.sup, this.remotes.get(m.id)?.muzzle());
       this.horde.noise(m.o[0], m.o[2], m.sup ? INFECTED.hearQuiet : INFECTED.hearShot);
       // (nobody shoots and waves at once)
       this.remotes.get(m.id)?.avatar.emote(null);

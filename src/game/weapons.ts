@@ -714,6 +714,18 @@ export class Weapons {
     // the muzzle, in the gun's own space: the front of the barrel, at the height of the bore
     const bore = o.kind === 'pistol' ? top.max.y - (top.max.y - top.min.y) * 0.42 : THREE.MathUtils.lerp(span.min.y, span.max.y, 0.62);
     const mouth = new THREE.Vector3(span.max.x, bore, (span.min.z + span.max.z) / 2);
+    if (o.kind === 'rifle') {
+      // (a rifle's body goes down to the bottom of its grip and its barrel lies along the top of
+      // it: the mouth is the middle of the foremost ring of the barrel itself, not a share of the height)
+      const ring = new THREE.Box3();
+      const v = new THREE.Vector3();
+      for (const p of alone) {
+        if (p.name.replace(/_\d+$/, '') !== 'base') continue;
+        const P = p.geometry.getAttribute('position');
+        for (let i = 0; i < P.count; i++) if (v.fromBufferAttribute(P, i).x > span.max.x - 0.01) ring.expandByPoint(v);
+      }
+      if (!ring.isEmpty()) ring.getCenter(mouth).setX(span.max.x);
+    }
     let suppressor: THREE.Object3D | undefined;
     if (o.kind === 'pistol') {
       const steel = new THREE.MeshStandardMaterial({ color: 0x1c1d1f, metalness: 0.85, roughness: 0.55 });
@@ -743,6 +755,8 @@ export class Weapons {
       for (const c of world.children) c.position.x += seen.x;
       world.scale.setScalar(HELD_RIFLE);
     }
+    // where the barrel ends on the gun as it is held, for the flash of a shot somebody else fires (see Avatar.muzzle)
+    world.userData.muzzle = [mouth.x + seen.x, mouth.y, mouth.z];
     // where things are in the eye's space with the pack at rest and not yet moved to the hip
     const sight = rig.box(o.kind === 'rifle' ? 'glass' : 'slide');
     const frame = rig.box('base');
@@ -765,7 +779,8 @@ export class Weapons {
       ads,
       // without the scope the eye goes along the top of the action
       adsIron: o.kind === 'rifle' ? new THREE.Vector3(-fc.x, -frame.max.y - 0.018, o.hip.z + 0.1) : undefined,
-      muzzle: new THREE.Vector3(fc.x, o.kind === 'rifle' ? THREE.MathUtils.lerp(frame.min.y, frame.max.y, 0.62) : c.y, frame.min.z),
+      // (a rifle's: the mouth of the barrel itself. Three fifths of the way up its body is under the barrel.)
+      muzzle: (o.kind === 'rifle' ? rig.front('base') : null) ?? new THREE.Vector3(fc.x, o.kind === 'rifle' ? THREE.MathUtils.lerp(frame.min.y, frame.max.y, 0.62) : c.y, frame.min.z),
       // For whoever is seen holding it. The hands start where the pack's own hands are, and are
       // then moved by what it took, looking close, to seat the body's hands on it: they are
       // bigger than the pack's and their wrists are further from their palms, so set down wrist
@@ -1114,7 +1129,10 @@ export class Weapons {
     this.aimRecoil.v.x += drift * hd.kickH * stance;
     this.player.pitch += hd.climb * stance; // part of the kick stays: you have to pull down
     this.player.yaw -= drift * hd.climb * 0.35 * stance;
-    const muzzleWorld = camera.position.clone().add(new THREE.Vector3(0.12, -0.1, -0.9).applyQuaternion(camera.quaternion));
+    // (the light and the smoke of it are in the world: they come from where the barrel's end is seen to be)
+    const muzzleWorld = m.flash.root.parent
+      ? this.toWorld(this.vmCamera.worldToLocal(m.flash.root.getWorldPosition(new THREE.Vector3())), camera)
+      : camera.position.clone().add(new THREE.Vector3(0.12, -0.1, -0.9).applyQuaternion(camera.quaternion));
     if (!suppressed) {
       m.flash.fire(FLAME[kind]);
     }
@@ -1400,8 +1418,11 @@ export class Weapons {
     if (m.suppressor) m.suppressor.visible = hasMod(it, 'suppressor_9');
   }
 
-  /** Another player fired: their bullet flies in this world too, so you see and hear where it lands. */
-  remoteShot(origin: THREE.Vector3, dir: THREE.Vector3, weaponId: string, suppressed: boolean) {
+  /**
+   * Another player fired: their bullet flies in this world too, so you see and hear where it lands.
+   * @param from the end of the barrel on the body that fired, and which way it points, where that body is seen
+   */
+  remoteShot(origin: THREE.Vector3, dir: THREE.Vector3, weaponId: string, suppressed: boolean, from?: { pos: THREE.Vector3; dir: THREE.Vector3 } | null) {
     const kind = ITEMS[weaponId]?.weapon?.kind;
     if (!kind) return;
     const b = BALLISTICS[kind];
@@ -1410,7 +1431,13 @@ export class Weapons {
     const out = dir.clone().normalize();
     this.bullets.push({ pos: origin.clone().addScaledVector(out, 0.35), vel: out.clone().multiplyScalar(b.muzzleVel), drag: b.drag, damage: 0, life: 4, travelled: 0.35, weapon: weaponId, ghost: true });
     const d = this.mainCam ? origin.distanceTo(this.mainCam.position) : 0;
-    this.fx.muzzle(origin.clone().addScaledVector(dir, 0.6), dir, kind !== 'pistol', suppressed, FLAME[kind]);
+    // The flash is at the end of their barrel. (It was put three fifths of a metre out from
+    // their eye whatever they held: right for a pistol at arm's length, and for a rifle on top
+    // of the scope, two fifths of a metre short of the muzzle.) Where the body is not to be
+    // seen, a rifle's length out from the eye and a little under it.
+    const seen = from && from.pos.distanceTo(origin) < 2.5 ? from : null;
+    const at = seen ? seen.pos : origin.clone().addScaledVector(out, kind === 'pistol' ? 0.6 : 1).add(new THREE.Vector3(0, kind === 'pistol' ? 0 : -0.05, 0));
+    this.fx.muzzle(at, seen ? seen.dir : out, kind !== 'pistol', suppressed, FLAME[kind]);
     audio.gunshot(kind === 'auto' ? 'rifle' : kind, origin, d, false, suppressed);
   }
 

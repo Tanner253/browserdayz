@@ -179,6 +179,33 @@ export class WeaponRig {
   }
 
   /**
+   * The middle of a piece's foremost end, in the space box() speaks in: of a gun's body, the
+   * mouth of its barrel. (The middle of the box's front face is not it: a rifle's box goes
+   * down to the bottom of its grip, and the barrel lies along the top of it.)
+   */
+  front(name: string, within = 0.01): THREE.Vector3 | null {
+    this.rest();
+    this.root.updateMatrixWorld(true);
+    const pts: number[] = [];
+    let z0 = Infinity;
+    const v = new THREE.Vector3();
+    this.node(name)?.traverseVisible((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const P = mesh.geometry.getAttribute('position');
+      for (let i = 0; i < P.count; i++) {
+        v.fromBufferAttribute(P, i).applyMatrix4(mesh.matrixWorld);
+        pts.push(v.x, v.y, v.z);
+        z0 = Math.min(z0, v.z);
+      }
+    });
+    if (!pts.length) return null;
+    const ring = new THREE.Box3();
+    for (let i = 0; i < pts.length; i += 3) if (pts[i + 2] < z0 + within) ring.expandByPoint(v.set(pts[i], pts[i + 1], pts[i + 2]));
+    return ring.getCenter(new THREE.Vector3()).setZ(z0);
+  }
+
+  /**
    * Hang something on one of the pack's pieces, so that it moves as that piece does.
    * @param obj drawn in the space of the gun-alone file (x along the barrel, y up): another gun's slide, a suppressor
    */

@@ -147,6 +147,11 @@ export class RemotePlayer implements Damageable {
     for (const c of this.crouch) c.setEnabled(this.alive && this.crouched);
   }
 
+  /** the end of the barrel they are holding, and which way it points, as they are seen now (null if they are not, or hold no gun) */
+  muzzle() {
+    return this.ready && this.alive ? this.avatar.muzzle() : null;
+  }
+
   /** they threw a punch or swung what they are holding */
   swing() {
     if (!this.ready || !this.alive) return;

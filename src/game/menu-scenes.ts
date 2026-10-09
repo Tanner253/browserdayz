@@ -64,6 +64,8 @@ class Extra {
   }
   /** where the end of its barrel is */
   muzzle(out = new THREE.Vector3()) {
+    const real = this.body.muzzle(out);
+    if (real) return real.pos;
     const f = this.fwd(out);
     const up = this.crouch ? 1.02 : 1.5, reach = this.weapon === 'rifle' ? 0.95 : 0.62;
     return out.set(this.pos.x + f.x * reach - f.z * 0.08, this.pos.y + up, this.pos.z + f.z * reach + f.x * 0.08);
