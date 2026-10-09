@@ -24,6 +24,8 @@ export interface InvActions {
   use(item: ItemInstance): void;
   /** open a sealed ammo box */
   open(item: ItemInstance): void;
+  /** eat, drink, apply or open a thing where it lies, without it having to be picked up and put away first */
+  onGround(w: WorldItem, how: 'use' | 'open'): void;
   /** take the rounds out of a weapon */
   unload(item: ItemInstance): void;
   place(item: ItemInstance): void;
@@ -453,6 +455,13 @@ export class InventoryUI {
     if (loc.kind === 'ground') {
       out.push({ label: 'Take', run: () => this.quickMove(loc), primary: true });
       if (d.slot) out.push({ label: gearWord, run: () => this.equip(loc) });
+      // what can be done with a thing in the pockets can be done with it where it lies
+      const there = (how: 'use' | 'open') => () => {
+        this.vicinity = this.vicinity.filter((v) => v !== loc.w);
+        this.actions.onGround(loc.w, how);
+      };
+      if (d.use) out.push({ label: d.use.verb, run: there('use') });
+      if (d.open) out.push({ label: 'Open box', run: there('open') });
       return out;
     }
     const inStash = loc.kind === 'container' && !!this.stash && loc.c === this.stash.container;

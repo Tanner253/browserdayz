@@ -11,6 +11,7 @@ import { lookFor } from '../game/look';
 import { MAX_STAMINA } from '../net/protocol';
 import { DRIVE } from '../game/vehicle';
 import type { Game } from '../game/game';
+import { installLook } from './look';
 
 export function installHarness(g: Game) {
   const ch = new MessageChannel();
@@ -390,4 +391,5 @@ export function installHarness(g: Game) {
   window.addEventListener('error', (e) => T.errors.push(String(e.message)));
   window.addEventListener('unhandledrejection', (e) => T.errors.push(String((e.reason && e.reason.message) || e.reason)));
   (window as unknown as { T: typeof T }).T = T;
+  installLook(g, T);
 }

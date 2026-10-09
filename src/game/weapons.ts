@@ -489,7 +489,8 @@ export class Weapons {
         root, kind: 'melee', flash, body,
         grips: {
           // (the wrist stands off to the right of the handle and behind it: the palm is what is laid on it)
-          right: { pos: new THREE.Vector3(MELEE.wrist[0], held + MELEE.wrist[1], MELEE.wrist[2]), fingers: new THREE.Vector3(-0.2, -0.3, -1), palm: new THREE.Vector3(-1, 0, 0), curl: MELEE.curl, thumb: 0.6 },
+          // (a fist round the handle: the thumb comes over the fingers, not out along the handle)
+          right: { pos: new THREE.Vector3(MELEE.wrist[0], held + MELEE.wrist[1], MELEE.wrist[2]), fingers: new THREE.Vector3(-0.2, -0.3, -1), palm: new THREE.Vector3(-1, 0, 0), curl: MELEE.curl, thumb: 0.9, tuck: 0.9 },
           left: null,
         },
         // high enough that the fist on the handle is in the picture, not only the head
@@ -965,7 +966,7 @@ export class Weapons {
     curl: [1.3, 1.33, 1.36, 1.4] as [number, number, number, number],
     fold: [1.05, 1.0, 0.5] as [number, number, number],
     thumb: 0.9,
-    tuck: 0.55,
+    tuck: 1,
   };
 
   // spent cases: thrown out of the action to the right, seen for the half second it takes them to leave the picture
@@ -1834,7 +1835,7 @@ export class Weapons {
       const inv = h.root.quaternion.clone().invert();
       const away = new THREE.Vector3(0.2, -0.4, -0.3).sub(h.root.position).applyQuaternion(inv);
       const over = new THREE.Vector3(0.03 + Math.sin(t * 11) * 0.02 * inKit, h.size.y * 0.5 + 0.06, 0.05 + Math.cos(t * 7) * 0.015 * inKit);
-      right = { pos: away.lerp(over, inKit), fingers: new THREE.Vector3(-0.45, -0.55, -0.7), palm: new THREE.Vector3(-0.1, -1, 0.1), curl: [0.5 + inKit * 0.3, 0.6 + inKit * 0.3, 0.75, 0.85], thumb: 0.45 };
+      right = { pos: away.lerp(over, inKit), fingers: new THREE.Vector3(-0.45, -0.55, -0.7), palm: new THREE.Vector3(-0.1, -1, 0.1), curl: [0.5 + inKit * 0.3, 0.6 + inKit * 0.3, 0.75, 0.85], thumb: 0.7, spread: 0.55 };
       // (the left has the far edge of it, from underneath)
       left = { pos: new THREE.Vector3(-(h.size.x / 2 + 0.03), -h.size.y * 0.5 - 0.02, 0.07), fingers: new THREE.Vector3(0.55, 0.25, -0.8), palm: new THREE.Vector3(0.3, 0.95, 0), curl: [0.5, 0.55, 0.6, 0.65], thumb: 0.3 };
     }

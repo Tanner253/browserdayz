@@ -74,10 +74,10 @@ export class HUD {
       <div class="hud-notes"></div>
       <div class="hud-weapon"><div class="hud-weapon-name"></div><div class="hud-weapon-ammo"></div></div>
       <div class="hud-vitals">
-        <div class="vital" data-k="health">${svg(ICONS.health)}</div>
-        <div class="vital" data-k="energy">${svg(ICONS.food)}</div>
-        <div class="vital" data-k="water">${svg(ICONS.water)}</div>
-        <div class="vital bleed" data-k="bleed">${svg(ICONS.blood)}</div>
+        <div class="vital bleed" data-k="bleed">${svg(ICONS.blood)}<span>Bleeding</span></div>
+        <div class="vital" data-k="health" title="Health">${svg(ICONS.health)}<div class="vital-bar"><i></i></div><b>100</b></div>
+        <div class="vital" data-k="energy" title="Food">${svg(ICONS.food)}<div class="vital-bar"><i></i></div><b>100</b></div>
+        <div class="vital" data-k="water" title="Water">${svg(ICONS.water)}<div class="vital-bar"><i></i></div><b>100</b></div>
       </div>
       <div class="hud-arms"><div></div></div>
       <div class="hud-stamina"><div></div></div>
@@ -776,15 +776,19 @@ export class HUD {
       }
     }
 
-    // vitals: colour bands like DayZ (hidden when healthy)
+    // Vitals: each a bar and a number out of a hundred, always there to be read. (They were
+    // three faint icons that only changed colour, and nobody could tell how much they had.)
     const v = s.vitals;
     const band = (x: number) => (x > 70 ? 'ok' : x > 40 ? 'mid' : x > 15 ? 'low' : 'crit');
     for (const [k, val] of [['health', v.health], ['energy', v.energy], ['water', v.water]] as [string, number][]) {
+      // (never "0" on somebody still alive)
+      const n = String(Math.max(0, Math.min(100, Math.ceil(val))));
+      if (this.last[`vital ${k}`] === n) continue;
+      this.last[`vital ${k}`] = n;
       const el = e.vitals.querySelector(`[data-k="${k}"]`) as HTMLElement;
-      const b = band(val);
-      if (el.dataset.band !== b) {
-        el.dataset.band = b;
-      }
+      el.dataset.band = band(val);
+      (el.querySelector('i') as HTMLElement).style.width = `${n}%`;
+      (el.lastElementChild as HTMLElement).textContent = n;
     }
     const bleed = e.vitals.querySelector('[data-k="bleed"]') as HTMLElement;
     this.toggle(bleed, 'show', v.bleeding);

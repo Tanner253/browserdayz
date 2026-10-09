@@ -28,6 +28,8 @@ export interface HandGrip {
   thumb: number;
   /** 0..1: fold the thumb across the curled fingers (a closed fist) */
   tuck?: number;
+  /** how far out from the first finger the thumb stands, 1 as it comes (less for a hand at rest, its thumb in beside the finger) */
+  spread?: number;
   /** how the curl is shared between a finger's three joints, knuckle first (0.8, 1.1, 0.8 when not given) */
   fold?: [number, number, number];
   /**
@@ -85,6 +87,28 @@ const _m2 = new THREE.Matrix4();
 
 /** the arms are a little smaller than life: at this distance from the lens full size fills the screen */
 const ARM_SCALE = 0.86;
+/**
+ * The thumb of a closed fist (kept where the dev harness can reach it while looking).
+ * rests: how far the middle of the thumb is from the middle of a finger it lies on, metres
+ * (measured off the gloves: a finger is 1.0 cm thick to its middle, the end of the thumb 1.2);
+ * across: how far over from the first finger to the second its pad lies; straight: how nearly
+ * straight its last two bones are (1 is a line); proud: how much its knuckle stands toward
+ * the palm's side of the hand, not out to the thumb's.
+ */
+export const FIST_THUMB = { rests: 0.022, across: 0.6, straight: 0.8, proud: 0 };
+
+/**
+ * Where the joint between two bones goes: `la` from `from`, `lb` from `to` (or as near as their
+ * lengths let it be), bent out toward `side`.
+ */
+export function bent(from: THREE.Vector3, to: THREE.Vector3, la: number, lb: number, side: THREE.Vector3) {
+  const dir = to.clone().sub(from);
+  const d = THREE.MathUtils.clamp(dir.length(), Math.abs(la - lb) + 1e-4, (la + lb) * 0.999);
+  dir.normalize();
+  const cos = (la * la + d * d - lb * lb) / (2 * la * d);
+  const perp = side.clone().addScaledVector(dir, -side.dot(dir)).normalize();
+  return from.clone().addScaledVector(dir, la * cos).addScaledVector(perp, la * Math.sqrt(Math.max(0, 1 - cos * cos)));
+}
 
 export class FPArms {
   root = new THREE.Group();
@@ -258,8 +282,18 @@ export class FPArms {
       const B = named(side);
       const chain = (f: string) => [1, 2, 3].map((i) => B(`${f}${i}`)).filter((b): b is THREE.Bone => !!b);
       const thumb = chain('thumb');
-      const tip = thumb[thumb.length - 1]?.children.find((c) => (c as THREE.Bone).isBone) as THREE.Bone | undefined;
-      if (tip) thumb.push(tip);
+      // The end of the thumb. The rig has no bone there: what hangs off the last joint is a
+      // helper two hand's lengths away, back past the wrist, and aimed by that the end of the
+      // thumb was turned round into the hand in every pose made here. It is on the last joint's
+      // own axis, the one each bone of these hands runs along (the skin says so), a quarter
+      // further out than that joint is from the one before.
+      const last = thumb[thumb.length - 1];
+      if (last) {
+        const tip = new THREE.Bone();
+        tip.position.copy(this.rest.get(last)?.p ?? last.position).multiplyScalar(1.25);
+        last.add(tip);
+        thumb.push(tip);
+      }
       return { arm: B('arm')!, fore: B('elbow')!, hand: B('wrist')!, fingers: ['point', 'middle', 'ring', 'pink'].map(chain), thumb };
     };
     this.right = this.makeArm(of('R'), 'r', new THREE.Vector3(0.75, -1, 0.35), new THREE.Vector3(0.26, -0.4, 0.12));
@@ -371,29 +405,49 @@ export class FPArms {
     // The thumb is laid out from the hand's own shape rather than turned from wherever the
     // rig leaves it: out to the side of the index finger, swung toward the palm by the grip,
     // each joint a little further round and a little more along the fingers.
-    {
-      const Fh = Lf.clone().applyQuaternion(handWorld), Nh = Lp.clone().applyQuaternion(handWorld);
-      const R = a.radialLocal.clone().applyQuaternion(handWorld);
-      R.sub(Fh.clone().multiplyScalar(R.dot(Fh))).sub(Nh.clone().multiplyScalar(R.dot(Nh))).normalize();
-      for (let j = 0; j < a.thumb.length - 1; j++) {
-        const along = 0.95 - j * 0.22, round = grip.thumb * (1.1 + j * 0.5);
-        const want = Fh.clone().multiplyScalar(Math.cos(along)).addScaledVector(R, Math.sin(along) * Math.cos(round)).addScaledVector(Nh, Math.sin(along) * Math.sin(round));
-        const o = a.thumb[j].getWorldPosition(new THREE.Vector3());
-        this.aim(a.thumb[j], a.thumb[j + 1].getWorldPosition(new THREE.Vector3()), o.clone().add(want), o);
-      }
+    const Fh = Lf.clone().applyQuaternion(handWorld), Nh = Lp.clone().applyQuaternion(handWorld);
+    const R = a.radialLocal.clone().applyQuaternion(handWorld);
+    R.sub(Fh.clone().multiplyScalar(R.dot(Fh))).sub(Nh.clone().multiplyScalar(R.dot(Nh))).normalize();
+    for (let j = 0; j < a.thumb.length - 1; j++) {
+      const along = (0.95 - j * 0.22) * (grip.spread ?? 1), round = grip.thumb * (1.1 + j * 0.5);
+      const want = Fh.clone().multiplyScalar(Math.cos(along)).addScaledVector(R, Math.sin(along) * Math.cos(round)).addScaledVector(Nh, Math.sin(along) * Math.sin(round));
+      const o = a.thumb[j].getWorldPosition(new THREE.Vector3());
+      this.aim(a.thumb[j], a.thumb[j + 1].getWorldPosition(new THREE.Vector3()), o.clone().add(want), o);
     }
-    if (grip.tuck) {
-      // A closed fist: the thumb lies across the middle joints of the first two fingers,
-      // wherever the curl has put them. (Aimed at a fixed spot off the palm it stood out
-      // from the fist like a handle.)
+    if (grip.tuck && a.thumb.length === 4) {
+      // A closed fist. The pad of the thumb lies on the backs of the middle bones of the first
+      // two fingers, wherever the curl has put them, and the thumb comes to it the way a thumb
+      // does: its knuckle out to the side of the first finger, the joint after it standing
+      // off the fingers, bent a little and never through them. (Each joint used to be turned
+      // part of the way toward a spot on the fingers, which leaves a thumb where no thumb is:
+      // half way there, inside them.)
       const at = (b: THREE.Object3D) => b.getWorldPosition(new THREE.Vector3());
-      const over = (f: number) => at(a.fingers[f][1]).lerp(at(a.fingers[f][2]), 0.5).addScaledVector(N, 0.012);
-      const first = over(0), second = over(1);
-      for (let j = 0; j < a.thumb.length - 1; j++) {
-        const o = at(a.thumb[j]);
-        const child = at(a.thumb[j + 1]);
-        const to = child.clone().lerp(j < 2 ? first : second, grip.tuck * (j === 0 ? 0.7 : 1));
-        this.aim(a.thumb[j], child, to, o);
+      const [t1, t2, t3, tip] = a.thumb;
+      const laid = [t1, t2, t3].map((b) => b.quaternion.clone());
+      const outs: THREE.Vector3[] = [];
+      const back = (f: number) => {
+        const pip = at(a.fingers[f][1]), dip = at(a.fingers[f][2]);
+        // (the back of that bone of the finger: square to it, on the side it does not close to)
+        const out = dip.clone().sub(pip).cross(curlAxis).normalize();
+        outs.push(out);
+        return pip.lerp(dip, 0.5).addScaledVector(out, FIST_THUMB.rests);
+      };
+      const pad = back(0).lerp(back(1), FIST_THUMB.across);
+      const off = outs[0].add(outs[1]).normalize();
+      const c = at(t1), l1 = c.distanceTo(at(t2)), l2 = at(t2).distanceTo(at(t3)), l3 = at(t3).distanceTo(at(tip));
+      // the knuckle: as far from the pad as leaves the two bones after it nearly straight, and out on the thumb's side of the hand
+      const knuckle = bent(c, pad, l1, (l2 + l3) * FIST_THUMB.straight, R.clone().addScaledVector(Nh, FIST_THUMB.proud));
+      const joint = bent(knuckle, pad, l2, l3, off);
+      this.aim(t1, at(t2), knuckle, c);
+      this.aim(t2, at(t3), joint, at(t2));
+      this.aim(t3, at(tip), pad, at(t3));
+      // (less than a whole fist: that much of the way from where the thumb lay)
+      if (grip.tuck < 1) {
+        [t1, t2, t3].forEach((b, j) => {
+          _q1.copy(b.quaternion);
+          b.quaternion.copy(laid[j]).slerp(_q1, grip.tuck!);
+        });
+        t1.updateMatrixWorld(true);
       }
     }
   }

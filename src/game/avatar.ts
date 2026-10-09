@@ -10,7 +10,7 @@
 import * as THREE from 'three';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import type { Atmosphere } from '../world/atmosphere';
-import type { Grips, HandGrip } from './arms';
+import { bent, type Grips, type HandGrip } from './arms';
 import { BEARD, HAIR_STYLES, MAX_WOUNDS, loadCharacter, lookFor, lookPatch, lookUniforms, setLookUniforms, suitPatch, type Look, type LookUniforms } from './look';
 import type { Emote } from '../sim/emotes';
 
@@ -146,6 +146,9 @@ interface Stance {
 }
 type Stances = Record<'ready' | 'aim' | 'carry', Stance>;
 
+/** how far the middle of the thumb lies from the middle of the finger it is laid against, metres */
+const THUMB_BESIDE = 0.02;
+
 interface ArmRig {
   arm: THREE.Bone;
   fore: THREE.Bone;
@@ -155,6 +158,8 @@ interface ArmRig {
   fingersLocal: THREE.Vector3;
   palmLocal: THREE.Vector3;
   fingers: THREE.Bone[][];
+  /** from its root out; the last is only the tip */
+  thumb: THREE.Bone[];
   pole: THREE.Vector3;
 }
 
@@ -463,7 +468,8 @@ export class Avatar {
     const palmW = new THREE.Vector3().crossVectors(fingersW, at(pinky).sub(at(index))).normalize();
     if (side === 'l') palmW.negate();
     const fingers = ['index', 'middle', 'ring', 'pinky'].map((f) => [1, 2, 3].map((i) => B(`${f}_0${i}`)).filter((b): b is THREE.Bone => !!b));
-    return { arm, fore, hand, la: pa.distanceTo(pf), lb: pf.distanceTo(ph), fingersLocal: fingersW.applyQuaternion(hq), palmLocal: palmW.applyQuaternion(hq), fingers, pole: pole.normalize() };
+    const thumb = ['thumb_01', 'thumb_02', 'thumb_03', 'thumb_04_leaf'].map(B).filter((b): b is THREE.Bone => !!b);
+    return { arm, fore, hand, la: pa.distanceTo(pf), lb: pf.distanceTo(ph), fingersLocal: fingersW.applyQuaternion(hq), palmLocal: palmW.applyQuaternion(hq), fingers, thumb, pole: pole.normalize() };
   }
 
   /** Puts a copy of the shouldered weapon on the back. */
@@ -629,6 +635,31 @@ export class Avatar {
       r.hand.getWorldQuaternion(handWorld);
     }
     this.curl(r, curl.map((c) => c * w) as [number, number, number, number], handWorld);
+  }
+
+  /**
+   * Lays the thumb against the first finger, wherever the movement and the grip have left
+   * that. The movements this body was given were made for a hand drawn as a mitten: they close
+   * the fingers and leave the thumb out straight, which on a hand with a real thumb is a
+   * spike standing out of every fist. Done last, on both hands, every frame.
+   */
+  private thumb(r: ArmRig) {
+    const first = r.fingers[0], little = r.fingers[3];
+    if (r.thumb.length < 4 || first.length < 3 || !little.length) return;
+    const at = (b: THREE.Object3D) => b.getWorldPosition(new THREE.Vector3());
+    const [t1, t2, t3, tip] = r.thumb;
+    const p1 = at(first[0]), p2 = at(first[1]), p3 = at(first[2]);
+    // out to the thumb's side of the hand: from the little finger's knuckle to the first's
+    const side = p1.clone().sub(at(little[0])).normalize();
+    // how far closed the first finger is: its first bone against its second (0 straight, 1 square to it or more)
+    const closed = THREE.MathUtils.clamp(1 - _a.copy(p2).sub(p1).normalize().dot(_b.copy(p3).sub(p2).normalize()), 0, 1);
+    // its pad: beside the first bone of that finger on an open hand, beside the middle one on a closed
+    const pad = p1.clone().lerp(p2, 0.7).lerp(p2.clone().lerp(p3, 0.45), closed).addScaledVector(side, THUMB_BESIDE);
+    const c = at(t1), l1 = c.distanceTo(at(t2)), l2 = at(t2).distanceTo(at(t3)), l3 = at(t3).distanceTo(at(tip));
+    const knuckle = bent(c, pad, l1, (l2 + l3) * 0.92, side);
+    this.aim(t1, at(t2), knuckle, c);
+    this.aim(t2, at(t3), bent(knuckle, pad, l2, l3, side), at(t2));
+    this.aim(t3, at(tip), pad, at(t3));
   }
 
   /** close the fingers toward the palm, each by its own amount */
@@ -1194,6 +1225,9 @@ export class Avatar {
         }
       }
     }
+
+    if (this.armR) this.thumb(this.armR);
+    if (this.armL) this.thumb(this.armL);
 
     if (this.fpBones.length) {
       for (const [from, to, hidden] of this.fpBones) {

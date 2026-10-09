@@ -237,7 +237,7 @@
 .hud-weapon {
   position: absolute;
   right: 26px;
-  bottom: 74px;
+  bottom: 136px;
   text-align: right;
   opacity: 0;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
@@ -250,23 +250,23 @@
 .hud-weapon-ammo em::before { content: '+ '; }
 .hud-weapon-ammo i { font-style: normal; color: var(--accent); margin-left: 8px; }
 
-.hud-vitals { position: absolute; right: 22px; bottom: 24px; display: flex; gap: 8px; }
-.vital {
-  width: 38px;
-  height: 38px;
-  padding: 8px;
-  border-radius: 50%;
-  background: rgba(10, 12, 11, 0.45);
-  color: var(--ink);
-  transition: color 0.4s, background 0.4s, opacity 0.4s;
-}
-.vital svg { width: 100%; height: 100%; }
-.vital[data-band="ok"] { opacity: 0.35; }
+/* health, food and water: what each is, how full, and the number */
+.hud-vitals { position: absolute; right: 22px; bottom: 20px; width: 178px; display: grid; gap: 6px; padding: 8px 10px; background: rgba(10, 12, 11, 0.42); }
+.vital { display: grid; grid-template-columns: 17px 1fr 28px; align-items: center; gap: 8px; color: var(--ink); transition: color 0.4s; }
+.vital svg { width: 17px; height: 17px; }
+.vital-bar { height: 5px; background: rgba(233, 228, 216, 0.14); }
+.vital-bar i { display: block; height: 100%; width: 100%; background: currentColor; transition: width 0.3s; }
+.vital b { font-family: var(--mono); font-size: 13px; font-weight: 600; text-align: right; line-height: 1; }
+.vital[data-k="health"] .vital-bar { height: 8px; }
+.vital[data-k="health"] b { font-size: 15px; }
+.vital[data-band="ok"] { color: rgba(233, 228, 216, 0.86); }
 .vital[data-band="mid"] { color: #e3cf8f; }
-.vital[data-band="low"] { color: #e09356; background: rgba(60, 30, 10, 0.5); }
-.vital[data-band="crit"] { color: #ff5a44; background: rgba(80, 10, 6, 0.6); animation: pulse 1s infinite; }
-.vital.bleed { display: none; color: #ff4a3a; background: rgba(80, 10, 6, 0.6); animation: pulse 0.8s infinite; }
-.vital.bleed.show { display: block; }
+.vital[data-band="low"] { color: #e09356; }
+.vital[data-band="crit"] { color: #ff5a44; }
+.vital[data-band="crit"] b, .vital[data-band="crit"] svg { animation: pulse 1s infinite; }
+.vital.bleed { display: none; grid-template-columns: 17px 1fr; color: #ff4a3a; font-size: 12px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; }
+.vital.bleed svg { animation: pulse 0.8s infinite; }
+.vital.bleed.show { display: grid; }
 @keyframes pulse { 50% { transform: scale(1.12); } }
 
 .hud-stamina {
@@ -1259,7 +1259,7 @@ body.touch .hud-start, body.touch .rw, body.touch .inv-wrap, body.touch .inv-col
 .say::after { content: ''; position: absolute; left: 50%; top: 100%; margin-left: -5px; border: 5px solid transparent; border-top-color: #f3efe6; border-bottom: 0; }
 
 /* sat in a jeep: its speed, and under it what is in the tank and what the jeep itself has left */
-.hud-ride { position: absolute; right: 26px; bottom: 74px; text-align: right; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+.hud-ride { position: absolute; right: 26px; bottom: 136px; text-align: right; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
 .hud-ride.show { opacity: 1; }
 .hud-ride b { font-family: var(--mono); font-size: 38px; font-weight: 600; color: var(--ink); }
 .hud-ride small { margin-left: 6px; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-dim); }

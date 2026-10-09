@@ -284,6 +284,7 @@ export class Game {
       },
       use: (item) => this.useItem(item),
       open: (item) => this.openBox(item),
+      onGround: (w, how) => this.onGround(w, how),
       unload: (item) => this.unloadWeapon(item),
       place: (item) => this.placeStash(item),
       attachTargets: (att) => this.attachTargets(att),
@@ -1045,6 +1046,7 @@ export class Game {
       this.use = null;
       this.weapons.endUse();
       this.act('stop');
+      this.settle();
     }
     this.meDirty = true;
   }
@@ -1343,8 +1345,45 @@ export class Game {
       item.qty--;
       return;
     }
+    if (this.loose === item) this.loose = null;
     this.inv.remove(item);
     from?.remove(item);
+  }
+
+  /**
+   * A thing being used straight off the ground. It is in the hands for as long as that takes
+   * and nowhere else; whatever is left of it afterwards (all of it, if the use was broken
+   * off) goes into the pockets, or is put down again when they are full.
+   */
+  private loose: ItemInstance | null = null;
+
+  /** Eat, drink, apply or open a thing where it lies (the inventory's right-click on the ground list). */
+  private onGround(w: WorldItem, how: 'use' | 'open') {
+    const def = ITEMS[w.loot.item.id];
+    if (this.use || this.player.dead || !(how === 'use' ? def.use : def.open)) return;
+    const item = this.takeWorldItem(w);
+    if (!item) return;
+    // (binoculars are not used up: they are kept and held to the eyes, so they need a place first)
+    if (def.look) {
+      const left = this.inv.add(item);
+      if (left) return void this.dropItem(left);
+      this.inventoryChanged();
+      return this.useItem(item);
+    }
+    this.loose = item;
+    if (how === 'use') this.useItem(item);
+    else this.openBox(item);
+    if (!this.use) this.settle();
+  }
+
+  /** what was in the hands off the ground and is not used up: put away, or put down */
+  private settle() {
+    const item = this.loose;
+    this.loose = null;
+    if (!item) return;
+    const left = this.inv.add(item);
+    if (left) this.dropItem(left);
+    this.inventoryChanged();
   }
 
   private useItem(item: ItemInstance) {
@@ -1644,6 +1683,7 @@ export class Game {
     }
     audio.ui('open');
     this.startUse(`Open ${def.name}`, o.time, item.id, 'open', null, () => {
+      if (this.loose === item) this.loose = null;
       this.inv.remove(item);
       const left = this.inv.add(makeItem(o.gives, o.qty));
       if (left) this.dropItem(left);
@@ -2129,10 +2169,12 @@ export class Game {
         this.weapons.endUse();
         this.act('stop');
         if (!p.dead) this.hud.note('Cancelled', 'info');
+        this.settle();
       } else if (u.t >= u.dur) {
         this.use = null;
         this.weapons.endUse();
         u.done();
+        this.settle();
       }
     }
 
