@@ -60,7 +60,7 @@ export interface ItemDef {
   /** world model shows this many copies of the mesh in a small pile (loose rounds) */
   pile?: number;
   /** worn gear: cargo grid it adds, damage it soaks */
-  wear?: { cargo?: [number, number]; /** torso damage multiplier */ armor?: number; /** head damage multiplier */ head?: number; /** fall damage multiplier */ fall?: number; /** extra punch damage */ fist?: number; /** how fast thirst grows, as a multiplier */ thirst?: number };
+  wear?: { cargo?: [number, number]; /** torso damage multiplier */ armor?: number; /** head damage multiplier */ head?: number; /** fall damage multiplier */ fall?: number; /** extra punch damage */ fist?: number; /** how fast thirst grows, as a multiplier */ thirst?: number; /** over the face, it keeps the gas out (see src/sim/gas.ts) */ gas?: number };
   /** weapon attachment: which weapons take it and where it mounts; what it does to the gun's handling score, and to its kick (a multiplier) */
   attach?: { fits: string[]; slot: AttachSlot; ergo?: number; recoil?: number };
   /** camera hint for the icon renderer */
@@ -153,7 +153,7 @@ const D: ItemDef[] = [
   },
   {
     id: 'gasmask', name: 'Gas Mask', model: 'old_gas_mask', w: 2, h: 2, weight: 0.7, category: 'clothing', slot: 'face',
-    desc: 'GP-5 pattern mask. Thick rubber and glass: a fifth less damage from anything that hits your head.', wear: { head: 0.8 },
+    desc: 'GP-5 pattern mask. Worn on the face, it lets you breathe in the gas. Thick rubber and glass, too: a fifth less damage from anything that hits your head.', wear: { head: 0.8, gas: 1 },
   },
   {
     // (still `life_vest`, which is what was worn here before: it is a plate carrier now)

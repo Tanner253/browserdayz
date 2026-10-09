@@ -7,6 +7,7 @@
 import { ITEMS, fitAtRandom, makeItem } from './items';
 import type { Container } from './inventory';
 import { BUILDING_FOOTPRINT, heightAt, type World } from '../world/worldgen';
+import { gasEdge, gasZone } from './gas';
 
 export const DROP = {
   /** seconds from one drop to the next */
@@ -71,12 +72,15 @@ export function fillDrop(c: Container, rnd: () => number = Math.random) {
 export function pickDropSite(world: World, rnd: () => number = Math.random): { x: number; y: number; z: number } | null {
   const H = world.heights;
   const road = world.road.points;
+  const gas = gasZone(world.pois, (x, z) => heightAt(H, x, z));
   for (let tries = 0; tries < 200; tries++) {
     // anywhere from the village out to the ring of outlying places
     const a = rnd() * Math.PI * 2;
     const r = 40 + Math.sqrt(rnd()) * 250;
     const x = 15 + Math.cos(a) * r, z = 5 + Math.sin(a) * r;
     const y = heightAt(H, x, z);
+    // not into the gas: a drop is for whoever gets to it, not for whoever has a mask
+    if (gas && gasEdge(gas, x, z) < 12) continue;
     // level enough to stand a crate on, and to fight round
     let steep = 0;
     for (const [dx, dz] of [[2.5, 0], [-2.5, 0], [0, 2.5], [0, -2.5]]) steep = Math.max(steep, Math.abs(heightAt(H, x + dx, z + dz) - y));

@@ -286,7 +286,7 @@ export class PlayerInventory {
   }
 
   /** value of a worn-gear effect, e.g. the vest's torso armour */
-  wear<K extends 'armor' | 'head' | 'fall' | 'fist' | 'thirst'>(key: K): number[] {
+  wear<K extends 'armor' | 'head' | 'fall' | 'fist' | 'thirst' | 'gas'>(key: K): number[] {
     const out: number[] = [];
     for (const s of GEAR_SLOTS) {
       const it = this.slots[s];

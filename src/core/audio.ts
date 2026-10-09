@@ -145,6 +145,8 @@ export class AudioEngine {
   // the body: breathing when out of breath, heartbeat when badly hurt
   private breathT = 0;
   private breathIn = true;
+  private maskT = 0;
+  private maskIn = true;
   private heartT = 0;
   private stepSide = 1;
   ready = false;
@@ -1006,6 +1008,49 @@ export class AudioEngine {
    * Being hit: the blow landing, and the grunt it knocks out of you.
    * @param pos somebody else being hit: their grunt, from where they are, when the sound gets here
    */
+  /** a cough: your own, the gas coming back up */
+  cough(hard = 1) {
+    if (!this.ready) return;
+    const ctx = this.ctx, t = ctx.currentTime;
+    // two or three barks of breath, each a burst of air through a tight throat
+    const n = 2 + (Math.random() < 0.45 ? 1 : 0);
+    for (let i = 0; i < n; i++) {
+      const at = t + i * (0.16 + Math.random() * 0.06);
+      const src = this.noise(at, 0.15);
+      const lo = this.filter('bandpass', 480 + Math.random() * 140, 2.4), hi = this.filter('bandpass', 1450 + Math.random() * 350, 3);
+      const g = ctx.createGain();
+      this.env(g, at, (0.42 - i * 0.09) * hard, 0.012, 0.12);
+      src.connect(lo).connect(g);
+      src.connect(hi).connect(g);
+      g.connect(this.sfx);
+    }
+  }
+
+  /** breath through a gas mask, in the gas: drawn in through the filter, let out through the valve */
+  mask(dt: number, on: boolean) {
+    if (!this.ready || !on) {
+      this.maskT = 0.4;
+      return;
+    }
+    this.maskT -= dt;
+    if (this.maskT > 0) return;
+    const inhale = this.maskIn;
+    this.maskIn = !inhale;
+    this.maskT = inhale ? 1.5 : 1.9;
+    const ctx = this.ctx, t = ctx.currentTime, dur = inhale ? 1.15 : 1.3;
+    const src = ctx.createBufferSource();
+    src.buffer = this.noiseBuf;
+    src.loop = true;
+    src.start(t, Math.random());
+    src.stop(t + dur + 0.05);
+    const f = this.filter('bandpass', inhale ? 1500 : 620, inhale ? 1.4 : 1.0);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(inhale ? 0.05 : 0.07, t + dur * (inhale ? 0.6 : 0.18));
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(f).connect(g).connect(this.sfx);
+  }
+
   hurt(pos?: V3, distance = 0) {
     if (!this.ready) return;
     const ctx = this.ctx;

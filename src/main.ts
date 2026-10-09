@@ -3,7 +3,7 @@ import './ui/hud.css';
 import { Renderer } from './core/renderer';
 import { assets } from './core/assets';
 import { physics } from './core/physics';
-import { generateWorld } from './world/worldgen';
+import { generateWorld, heightAt } from './world/worldgen';
 import { Atmosphere } from './world/atmosphere';
 import { Terrain } from './world/terrain';
 import { Vegetation } from './world/vegetation';
@@ -12,6 +12,7 @@ import { Buildings } from './world/buildings';
 import { buildRoad } from './world/road';
 import { Game } from './game/game';
 import { initRotatePrompt } from './ui/rotate';
+import { gasZone } from './sim/gas';
 
 // before anything loads: a phone held upright needs a way forward straight away
 initRotatePrompt();
@@ -38,6 +39,7 @@ async function boot() {
   console.log(`worldgen ${(performance.now() - t0).toFixed(0)}ms, trees ${world.trees.length}, buildings ${world.buildings.length}`);
 
   const atmo = new Atmosphere(r.renderer, r.scene, r.camera);
+  atmo.gas = gasZone(world.pois, (x, z) => heightAt(world.heights, x, z));
   await atmo.init();
   const terrain = new Terrain(world, atmo);
   await terrain.build(r.scene);

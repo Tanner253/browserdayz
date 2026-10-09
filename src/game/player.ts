@@ -438,6 +438,11 @@ export class Player {
     if (this.hurtTimer > 0) this.hurtTimer -= dt;
   }
 
+  /** health lost to something that is not a blow (bad air): no flinch and no cry, only the loss */
+  sicken(amount: number, cause: string) {
+    if (!this.dead) this.damageQuiet(amount, cause);
+  }
+
   private damageQuiet(a: number, cause: string) {
     this.vitals.health = Math.max(0, this.vitals.health - a);
     if (this.vitals.health <= 0 && !this.dead) {

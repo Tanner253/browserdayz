@@ -1274,3 +1274,10 @@ body.touch .hud-start, body.touch .rw, body.touch .inv-wrap, body.touch .inv-col
 .inv-neck .inv-item-img { position: static; width: 34px; height: 34px; flex: none; }
 .inv-neck b { display: block; font-size: 13px; font-weight: 600; letter-spacing: 0.04em; color: var(--ink); }
 .inv-neck span { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint); }
+
+/* the gas: green in at the edges of the eyes as the lungs fill with it, and a word on what is being breathed */
+.hud-gas { position: absolute; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(ellipse at 50% 50%, rgba(150, 170, 40, 0) 28%, rgba(120, 140, 28, 0.42) 68%, rgba(64, 78, 12, 0.85) 100%); }
+.hud-gas-tag { position: absolute; top: 96px; left: 50%; transform: translateX(-50%); padding: 6px 14px 6px 12px; font: 700 13px/1 'Barlow Condensed', 'Bahnschrift', sans-serif; letter-spacing: 0.22em; color: #e3ecb4; background: rgba(28, 34, 10, 0.74); border-left: 3px solid #b9cc4a; opacity: 0; transition: opacity 0.35s; white-space: nowrap; pointer-events: none; }
+.hud-gas-tag.on { opacity: 1; }
+.hud-gas-tag.bad { color: #ffdccd; background: rgba(62, 14, 8, 0.8); border-left-color: #ff6a4a; animation: gas-bad 0.9s ease-in-out infinite; }
+@keyframes gas-bad { 50% { background: rgba(116, 24, 10, 0.88); } }

@@ -8,6 +8,10 @@
 import * as THREE from 'three';
 import { CSM } from 'three/addons/csm/CSM.js';
 import { assets } from '../core/assets';
+import { GAS, type GasZone } from '../sim/gas';
+
+/** the colour of the gas where the light is in it (linear, before the picture is finished) */
+const GAS_COLOR = new THREE.Color(0.3, 0.36, 0.1);
 
 export type ShaderPatch = (shader: THREE.WebGLProgramParametersWithUniforms) => void;
 
@@ -43,6 +47,10 @@ export class Atmosphere {
   sunColor = new THREE.Color(1, 0.95, 0.88);
   sunIntensity = 3.4;
   fogColor = new THREE.Color(0.62, 0.68, 0.74);
+  /** Where the gas lies, if the world has any: said before init, which writes it into every shader that takes fog. */
+  gas: GasZone | null = null;
+  /** the gas seen against the sky, where there is nothing behind it to be dimmed by it */
+  gasDome: THREE.Mesh | null = null;
   envMap!: THREE.Texture;
   background!: THREE.Texture;
   csm!: CSM;
@@ -88,6 +96,7 @@ export class Atmosphere {
     (this.scene.fog as THREE.FogExp2).color.copy(this.fogColor);
 
     this.installFogChunks();
+    this.buildGasDome();
 
     this.csm = new CSM({
       camera: this.camera,
@@ -225,6 +234,7 @@ export class Atmosphere {
   fogWorld = modelMatrix * fogWorld;
   vFogWorldPos = fogWorld.xyz;
 #endif`;
+    const gas = this.gasGlsl();
     THREE.ShaderChunk.fog_pars_fragment = /* glsl */ `
 #ifdef USE_FOG
   uniform vec3 fogColor;
@@ -256,6 +266,7 @@ export class Atmosphere {
     float sunAmt = pow( max( dot( rd, ATMO_SUN_DIR ), 0.0 ), 6.0 );
     return mix( fogColor, fogColor * ATMO_SUN_COLOR * 1.6, sunAmt * 0.55 );
   }
+  ${gas}
 #endif`;
     THREE.ShaderChunk.fog_fragment = /* glsl */ `
 #ifdef USE_FOG
@@ -265,8 +276,92 @@ export class Atmosphere {
     vec3 fogDir = fogRay / max( fogDist, 1e-4 );
     float fogAmt = atmoFogAmount( cameraPosition, fogDir, fogDist );
     gl_FragColor.rgb = mix( gl_FragColor.rgb, atmoFogColor( fogDir ), fogAmt );
+    #ifdef GAS_ZONE
+      // (what is seen through the gas is lost to it, by as much of it as lies in the way)
+      gl_FragColor.rgb = mix( gl_FragColor.rgb, gasColor( fogDir ), gasAmount( cameraPosition, fogDir, fogDist ) );
+    #endif
   }
 #endif`;
+  }
+
+  /**
+   * The gas, as the shaders know it: a low dome over one place, thickest at the middle and
+   * thinning to nothing at the rim. How much of it lies along a line of sight has an exact
+   * answer (the thickness is 1 - r squared, r being how far out toward the rim a point is),
+   * so it costs each pixel a square root and is right from outside, from inside and across
+   * the rim alike. Empty when the world has none.
+   */
+  private gasGlsl() {
+    const g = this.gas;
+    if (!g) return '';
+    const s = this.sunDir;
+    const vec3 = (x: number, y: number, z: number) => `vec3(${x.toFixed(5)}, ${y.toFixed(5)}, ${z.toFixed(5)})`;
+    return /* glsl */ `
+  #define GAS_ZONE
+  #define GAS_C ${vec3(g.x, g.y, g.z)}
+  #define GAS_INV ${vec3(1 / g.r, 1 / g.h, 1 / g.r)}
+  #define GAS_THICK ${GAS.thick.toFixed(5)}
+  #define GAS_COLOR ${vec3(GAS_COLOR.r, GAS_COLOR.g, GAS_COLOR.b)}
+  #define GAS_SUN ${vec3(s.x, s.y, s.z)}
+  float gasAmount( vec3 ro, vec3 rd, float dist ) {
+    vec3 q = ( ro - GAS_C ) * GAS_INV;
+    vec3 d = rd * GAS_INV;
+    float a = dot( d, d ), b = dot( q, d ), c = dot( q, q ) - 1.0;
+    float h = b * b - a * c;
+    if ( h <= 0.0 ) return 0.0;
+    h = sqrt( h );
+    float t1 = max( ( -b - h ) / a, 0.0 ), t2 = min( ( -b + h ) / a, dist );
+    if ( t2 <= t1 ) return 0.0;
+    float i1 = c * t1 + b * t1 * t1 + a * t1 * t1 * t1 / 3.0;
+    float i2 = c * t2 + b * t2 * t2 + a * t2 * t2 * t2 / 3.0;
+    return 1.0 - exp( -GAS_THICK * max( i1 - i2, 0.0 ) );
+  }
+  vec3 gasColor( vec3 rd ) {
+    // a little lit through, looking toward the sun
+    return GAS_COLOR * ( 1.0 + 0.45 * pow( max( dot( rd, GAS_SUN ), 0.0 ), 4.0 ) );
+  }`;
+  }
+
+  /**
+   * Where there is ground or a wall behind the gas, that is dimmed by it in its own shader.
+   * Where there is only sky there is nothing to dim: the far side of the dome is drawn, and
+   * coloured by as much gas as lies between the eye and it.
+   */
+  private buildGasDome() {
+    const g = this.gas;
+    if (!g) return;
+    const mat = new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      transparent: true,
+      depthWrite: false,
+      fog: false,
+      vertexShader: /* glsl */ `
+        varying vec3 vWorld;
+        void main() {
+          vec4 w = modelMatrix * vec4( position, 1.0 );
+          vWorld = w.xyz;
+          gl_Position = projectionMatrix * viewMatrix * w;
+        }`,
+      fragmentShader: /* glsl */ `
+        varying vec3 vWorld;
+        ${this.gasGlsl()}
+        void main() {
+          vec3 ray = vWorld - cameraPosition;
+          float dist = length( ray );
+          vec3 rd = ray / max( dist, 1e-4 );
+          gl_FragColor = vec4( gasColor( rd ), gasAmount( cameraPosition, rd, dist + 1.0 ) );
+        }`,
+    });
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 24), mat);
+    dome.scale.set(g.r, g.h, g.r);
+    dome.position.set(g.x, g.y, g.z);
+    dome.frustumCulled = false;
+    // (before anything else that is seen through: smoke and glass inside it are drawn over it)
+    dome.renderOrder = -5;
+    dome.matrixAutoUpdate = false;
+    dome.updateMatrix();
+    this.scene.add(dome);
+    this.gasDome = dome;
   }
 
   /**

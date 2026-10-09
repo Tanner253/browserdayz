@@ -49,6 +49,9 @@ import { INFECTED, guarded } from '../sim/infected';
 import { TOUCH } from '../core/device';
 import { TouchControls } from '../ui/touch';
 import { REWARDS_UI, RewardsModal, addCashedTag, cashedTags, walletAddress } from '../ui/rewards';
+import { Gas } from './gas';
+
+const _gasHead = new THREE.Vector3();
 
 export interface WorldSystems {
   r: Renderer;
@@ -99,6 +102,8 @@ export class Game {
   invUI!: InventoryUI;
   dummies: Dummy[] = [];
   /** the infected (src/game/infected.ts) */
+  /** the gas over the checkpoint: the breathing of it, and what is seen of it close to */
+  gas!: Gas;
   readonly horde: Horde = new Horde({
     atmo: () => this.s.atmo,
     scene: () => this.s.r.scene,
@@ -306,6 +311,12 @@ export class Game {
     this.hud.setName(playerName());
     this.minimap = new Minimap(world);
     this.hud.root.insertBefore(this.minimap.root, this.hud.root.firstChild);
+    this.gas = new Gas(atmo.gas, atmo, r.scene, {
+      masked: () => this.inv.wear('gas').length > 0,
+      hurt: (amount) => this.player.sicken(amount, 'the gas'),
+      cough: (hard) => this.weapons.flinch(hard),
+      note: (text, kind) => this.hud.note(text, kind),
+    }, this.hud.root, (x, z) => heightAt(world.heights, x, z));
     // how many people are in the world, shown before you click Play
     void serverStatus().then((s) => this.hud.setStartOnline(s ? s.players : null, s?.max, s?.queue));
     this.invUI = new InventoryUI(this.inv, {
@@ -2224,6 +2235,7 @@ export class Game {
       buildings.update(h);
     });
     if (this.started) p.tickVitals(dt);
+    this.gas.update(dt, this.s.r.camera.position, _gasHead.set(p.pos.x, p.pos.y + (p.crouched ? 1.0 : 1.6), p.pos.z), this.started && !p.dead);
 
     // quick-use keys
     if (playing && !uiOpen && !typing && !this.use) {

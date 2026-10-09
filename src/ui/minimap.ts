@@ -3,7 +3,8 @@
 // it, with one exception: whoever carries a tag they took is shown to everyone for a few
 // seconds, every half minute (see ping). M opens it large, with the places named.
 
-import { BUILDING_FOOTPRINT, PLAY_RADIUS, WORLD_RES, WORLD_SIZE, type World } from '../world/worldgen';
+import { BUILDING_FOOTPRINT, PLAY_RADIUS, WORLD_RES, WORLD_SIZE, heightAt, type World } from '../world/worldgen';
+import { gasZone, type GasZone } from '../sim/gas';
 
 /** pixels of the drawn map per metre of world */
 const SCALE = 1;
@@ -29,9 +30,12 @@ export class Minimap {
   /** jeeps standing empty */
   private jeeps: { x: number; z: number }[] = [];
   private jeepKey = '';
+  /** where the gas lies */
+  private gas: GasZone | null = null;
 
   constructor(world: World) {
     this.world = world;
+    this.gas = gasZone(world.pois, (x, z) => heightAt(world.heights, x, z));
     this.base = this.draw(world);
     this.root = document.createElement('div');
     this.root.className = 'hud-minimap';
@@ -180,6 +184,30 @@ export class Minimap {
     g.imageSmoothingEnabled = true;
     g.drawImage(this.base, sx, sz, span * SCALE, span * SCALE, 0, 0, W, W);
     const px = (x - cx + span / 2) * k, pz = (z - cz + span / 2) * k;
+    // the gas: the ground it lies on, hatched round
+    if (this.gas) {
+      const qx = (this.gas.x - cx + span / 2) * k, qz = (this.gas.z - cz + span / 2) * k, qr = this.gas.r * k;
+      if (qx > -qr && qz > -qr && qx < W + qr && qz < W + qr) {
+        g.save();
+        g.beginPath();
+        g.arc(qx, qz, qr, 0, Math.PI * 2);
+        g.fillStyle = 'rgba(178, 198, 52, 0.26)';
+        g.fill();
+        g.setLineDash([W / 80, W / 120]);
+        g.lineWidth = Math.max(1.5, W / 380);
+        g.strokeStyle = 'rgba(218, 236, 98, 0.92)';
+        g.stroke();
+        g.restore();
+        if (this.big) {
+          g.font = `700 ${Math.round(W / 66)}px 'Barlow Condensed', 'Bahnschrift', sans-serif`;
+          g.textAlign = 'center';
+          g.fillStyle = 'rgba(0, 0, 0, 0.7)';
+          g.fillText('GAS · MASK NEEDED', qx + 1, qz + W / 38 + 1);
+          g.fillStyle = '#e4f07a';
+          g.fillText('GAS · MASK NEEDED', qx, qz + W / 38);
+        }
+      }
+    }
     if (this.big) {
       // the places, by name
       g.font = `600 ${Math.round(W / 58)}px 'Barlow Condensed', 'Bahnschrift', sans-serif`;
