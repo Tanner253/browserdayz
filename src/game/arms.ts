@@ -30,6 +30,13 @@ export interface HandGrip {
   tuck?: number;
   /** how the curl is shared between a finger's three joints, knuckle first (0.8, 1.1, 0.8 when not given) */
   fold?: [number, number, number];
+  /**
+   * Where the elbow is, in the same space as `pos`: the forearm is laid from there to the wrist
+   * (as near there as its length lets it be). Without it the elbow is wherever the shoulder
+   * and the reach put it, which is right for a hand that holds something and no use for an
+   * arm that is itself the thing being shown.
+   */
+  elbow?: THREE.Vector3;
 }
 
 export interface Grips {
@@ -316,7 +323,10 @@ export class FPArms {
     // upper arms are never drawn, so slide the virtual shoulder in when the grip is out
     // of reach: the hand always lands on the gun and the forearm keeps its entry angle
     const reach = (a.la + a.lb) * 0.93;
-    if (sw.distanceTo(target) > reach) sw.sub(target).setLength(reach).add(target);
+    // (a forearm that is asked for: the shoulder, which is not drawn either, goes to wherever that leaves it)
+    const bend = grip.elbow ? grip.elbow.clone().applyMatrix4(weapon.matrixWorld).sub(target).setLength(a.lb).add(target) : null;
+    if (bend) sw.sub(bend).setLength(a.la).add(bend);
+    else if (sw.distanceTo(target) > reach) sw.sub(target).setLength(reach).add(target);
     a.arm.position.copy(a.arm.parent!.worldToLocal(sw));
     a.arm.updateMatrixWorld(true);
     const wq = weapon.getWorldQuaternion(new THREE.Quaternion());
@@ -329,8 +339,8 @@ export class FPArms {
     const sinA = Math.sqrt(Math.max(0, 1 - cosA * cosA));
     const pole = a.pole.clone().applyQuaternion(camQ);
     const perp = pole.sub(dir.clone().multiplyScalar(pole.dot(dir))).normalize();
-    const elbow = A.clone().addScaledVector(dir, a.la * cosA).addScaledVector(perp, a.la * sinA);
-    const handPos = A.clone().addScaledVector(dir, d);
+    const elbow = bend ?? A.clone().addScaledVector(dir, a.la * cosA).addScaledVector(perp, a.la * sinA);
+    const handPos = bend ? target : A.clone().addScaledVector(dir, d);
 
     this.aim(a.arm, a.fore.getWorldPosition(_v3).clone(), elbow, A);
     const E = a.fore.getWorldPosition(new THREE.Vector3());

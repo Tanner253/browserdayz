@@ -26,14 +26,34 @@ const lib = (p) => path.join(SRC, 'firearm-library', 'Prepared SFX Library', p);
 
 /**
  *   src   – the recording
+ *   side  – which of its two channels (both added together, if not given)
  *   takes – it holds several of the sound one after another: this many are cut out, each its own file (name, name_2, ...)
  *   len   – seconds kept of each (all of it, if not given)
  *   rate  – samples a second it is written at
  *   gain  – how loud against the rest (1: as loud as a recording can be)
+ *   with  – other recordings laid under it, each begun where it begins:
+ *             level – how loud against the first (1: as loud at its loudest)
+ *             after – seconds of its beginning left out (it comes in over the next 40 ms): what follows the shot, without the shot
+ *             low   – nothing of it above this many Hz
+ *             die   – it dies away sooner than it did: to a third in this many seconds, and so on
+ *   air   – how much is added to the top of it, above 3 kHz (1: as much again)
+ *   press – how hard the loudest of it is pressed down, so that the rest of it comes up (0: not at all)
  */
 const SOUNDS = {
   shot_rifle: { src: snake('Full Sound/7.62x54R/WAV/762x54r Single WAV.wav'), rate: 44100, gain: 1 },
-  shot_pistol: { src: lib('Walther PPQ/X_39P.wav'), takes: 3, len: 1.3, rate: 44100, gain: 1 },
+  // A pistol recorded close and in the open is a snap fifteen thousandths of a second long and
+  // then nothing: played as it is, beside a rifle that was made to be played in a game, it was
+  // a click. (And its two microphones stood either side of the muzzle and disagree: added
+  // together they cancel a third of each other.) So: the snap of the 9 mm from one microphone,
+  // the weight of another pistol's shot under it, and under both the air after a rifle shot,
+  // by whoever recorded the rifle. Then the top of it pressed down.
+  shot_pistol: {
+    src: lib('Walther PPQ/X_39P.wav'), side: 1, takes: 3, len: 1.5, rate: 44100, gain: 1, press: 1.4, air: 0.9,
+    with: [
+      { src: lib('Bersa/F_47P.wav'), side: 0, takes: 2, level: 0.6 },
+      { src: snake('Full Sound/5.56/WAV/556 Single WAV.wav'), level: 0.65, after: 0.012, die: 0.3 },
+    ],
+  },
   shot_quiet: { src: snake('Full Sound/.22LR/WAV/22LR Single WAV.wav'), len: 0.9, rate: 44100, gain: 0.8 },
   bolt: { src: snake('Reloads, Cycling & More/WAV/Mosin Bolt Cycle WAV.wav'), rate: 32000, gain: 0.8 },
   rifle_mag_out: { src: snake('Reloads, Cycling & More/WAV/308 Magazine Part 1 WAV.wav'), rate: 32000, gain: 0.75 },
@@ -43,8 +63,8 @@ const SOUNDS = {
   rack: { src: snake('Reloads, Cycling & More/WAV/Semi 22LR Rack WAV.wav'), rate: 32000, gain: 0.75 },
 };
 
-/** a .wav as one channel of numbers between -1 and 1 */
-async function readWav(file) {
+/** a .wav as one channel of numbers between -1 and 1: one of its channels, or all of them together */
+async function readWav(file, side) {
   const b = await fs.readFile(file);
   if (b.toString('latin1', 0, 4) !== 'RIFF' || b.toString('latin1', 8, 12) !== 'WAVE') throw new Error(`${file}: not a WAV file`);
   let fmt = null, data = null;
@@ -60,12 +80,30 @@ async function readWav(file) {
   for (let i = 0; i < frames; i++) {
     let sum = 0;
     for (let c = 0; c < fmt.channels; c++) {
+      if (side !== undefined && c !== Math.min(side, fmt.channels - 1)) continue;
       const o = (i * fmt.channels + c) * bytes;
       sum += bytes === 2 ? data.readInt16LE(o) / 32768 : bytes === 3 ? data.readIntLE(o, 3) / 8388608 : bytes === 4 ? data.readInt32LE(o) / 2147483648 : (data[o] - 128) / 128;
     }
-    out[i] = sum / fmt.channels;
+    out[i] = side !== undefined ? sum : sum / fmt.channels;
   }
   return { rate: fmt.rate, x: out };
+}
+
+/** one sound cut out of a recording: from where it begins, at the rate asked for, its loudest moment at 1 */
+function cutOut(x, rate, from, len, to) {
+  const end = Math.min(x.length, len ? from + Math.round(len * rate) : x.length);
+  const cut = resample(x.slice(from, end), rate, to);
+  let peak = 0;
+  for (const v of cut) peak = Math.max(peak, Math.abs(v));
+  return cut.map((v) => v / (peak || 1));
+}
+
+/** how loud a stretch of it is, in decibels under as loud as can be */
+function loud(x, rate, a, b) {
+  let s = 0;
+  const i0 = Math.round(a * rate), i1 = Math.min(x.length, Math.round(b * rate));
+  for (let i = i0; i < i1; i++) s += x[i] * x[i];
+  return (10 * Math.log10(s / Math.max(1, i1 - i0) + 1e-12)).toFixed(1);
 }
 
 /** where the sounds in it begin: the first sample of each that is loud, a breath before it */
@@ -131,12 +169,40 @@ await fs.mkdir(OUT, { recursive: true });
 let total = 0;
 const made = [];
 for (const [name, cfg] of Object.entries(SOUNDS)) {
-  const { rate, x } = await readWav(cfg.src);
+  const { rate, x } = await readWav(cfg.src, cfg.side);
   const starts = onsets(x, rate, (cfg.takes ?? 1) > 1).slice(0, cfg.takes ?? 1);
   if (!starts.length) throw new Error(`${name}: nothing loud in ${cfg.src}`);
+  const under = [];
+  for (const l of cfg.with ?? []) {
+    const w = await readWav(l.src, l.side);
+    const at = onsets(w.x, w.rate, (l.takes ?? 1) > 1).slice(0, l.takes ?? 1);
+    if (!at.length) throw new Error(`${name}: nothing loud in ${l.src}`);
+    under.push({ ...l, takes: at.map((from) => cutOut(w.x, w.rate, from, cfg.len, cfg.rate)) });
+  }
   for (const [k, from] of starts.entries()) {
-    const to = Math.min(x.length, cfg.len ? from + Math.round(cfg.len * rate) : x.length);
-    let cut = resample(x.slice(from, to), rate, cfg.rate);
+    let cut = cutOut(x, rate, from, cfg.len, cfg.rate);
+    for (const l of under) {
+      const y = l.takes[k % l.takes.length];
+      if (y.length > cut.length) cut = Float32Array.from({ length: y.length }, (_, i) => cut[i] ?? 0);
+      const skip = Math.round((l.after ?? 0) * cfg.rate), rise = Math.round(0.04 * cfg.rate);
+      const a = l.low ? Math.exp((-2 * Math.PI * l.low) / cfg.rate) : 0;
+      let low = 0;
+      for (let i = 0; i < y.length; i++) {
+        low = a * low + (1 - a) * y[i];
+        if (i >= skip) cut[i] += low * l.level * (l.after ? Math.min(1, (i - skip) / rise) : 1) * (l.die ? Math.exp(-i / (l.die * cfg.rate)) : 1);
+      }
+    }
+    if (cfg.air) {
+      // what is above 3 kHz, and that much of it again
+      const k = Math.exp((-2 * Math.PI * 3000) / cfg.rate);
+      let low = 0;
+      cut = cut.map((v) => {
+        low = k * low + (1 - k) * v;
+        return v + (v - low) * cfg.air;
+      });
+    }
+    // (pressed: what is over the top of it is bent down, not cut off)
+    if (cfg.press) cut = cut.map((v) => Math.tanh(v * cfg.press));
     let peak = 0;
     for (const v of cut) peak = Math.max(peak, Math.abs(v));
     const fade = Math.min(cut.length, Math.round(cfg.rate * 0.18));
@@ -144,7 +210,7 @@ for (const [name, cfg] of Object.entries(SOUNDS)) {
     const file = `${name}${k ? `_${k + 1}` : ''}.wav`;
     await writeWav(path.join(OUT, file), cut, cfg.rate);
     total += 44 + cut.length * 2;
-    made.push(`${file} ${(cut.length / cfg.rate).toFixed(2)} s (began ${(from / rate).toFixed(3)} s into ${path.basename(cfg.src)})`);
+    made.push(`${file} ${(cut.length / cfg.rate).toFixed(2)} s (began ${(from / rate).toFixed(3)} s into ${path.basename(cfg.src)}); loud ${loud(cut, cfg.rate, 0, 0.1)} dB in its first tenth of a second, ${loud(cut, cfg.rate, 0.1, 0.4)} over the next three`);
   }
 }
 console.log(made.join('\n'));

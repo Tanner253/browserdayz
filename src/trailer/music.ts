@@ -38,8 +38,10 @@ export function scoreMusic(ctx: BaseAudioContext, out: AudioNode, arr?: Arrangem
   const master = ctx.createGain();
   master.gain.value = 0.5;
   // the last bar and a half fade out with the picture
-  master.gain.setValueAtTime(0.5, (BARS - 0.6) * BAR);
-  master.gain.linearRampToValueAtTime(0.0001, BARS * BAR);
+  // (a cut that brings more bars than the first had runs to the end of its own)
+  const LAST = arr ? ROWS.length : BARS;
+  master.gain.setValueAtTime(0.5, (LAST - 0.6) * BAR);
+  master.gain.linearRampToValueAtTime(0.0001, LAST * BAR);
   const comp = ctx.createDynamicsCompressor();
   comp.threshold.value = -14;
   comp.ratio.value = 3;

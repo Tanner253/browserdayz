@@ -61,6 +61,8 @@ export class WeaponRig {
   private scene: THREE.Object3D;
   private mixer: THREE.AnimationMixer;
   private length: number;
+  /** where each piece is when the gun is simply held */
+  private atRest = new Map<THREE.Object3D, { p: THREE.Vector3; q: THREE.Quaternion }>();
 
   /** @param paint the material each of the pack's own is drawn with here */
   constructor(gltf: GLTF, private info: RigInfo, paint: (m: THREE.Material) => THREE.Material) {
@@ -86,6 +88,7 @@ export class WeaponRig {
     this.length = clip.duration;
     this.mixer.clipAction(clip).play();
     this.rest();
+    this.scene.traverse((o) => this.atRest.set(o, { p: o.position.clone(), q: o.quaternion.clone() }));
   }
 
   has(clip: string) {
@@ -107,6 +110,17 @@ export class WeaponRig {
   /** the pose the gun is simply held in */
   rest() {
     this.mixer.setTime(0);
+  }
+
+  /** These pieces put back where they are at rest, whatever the movement being played does with them. Call after `pose`. */
+  still(names: string[]) {
+    for (const name of names) {
+      const n = this.node(name);
+      const r = n && this.atRest.get(n);
+      if (!r) continue;
+      n.position.copy(r.p);
+      n.quaternion.copy(r.q);
+    }
   }
 
   node(name: string): THREE.Object3D | null {

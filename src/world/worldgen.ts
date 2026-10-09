@@ -11,7 +11,7 @@ export const WORLD_RES = 513; // height samples per side
 export const CELL = WORLD_SIZE / (WORLD_RES - 1); // 2 m
 export const PLAY_RADIUS = 400;
 
-export type BuildingType = 'house_small' | 'house_brick' | 'barn' | 'shed' | 'cabin' | 'guardpost' | 'police';
+export type BuildingType = 'house_small' | 'house_brick' | 'barn' | 'shed' | 'cabin' | 'guardpost' | 'police' | 'clinic' | 'store' | 'barracks' | 'garage';
 
 /** footprint (x = width, z = depth) in metres, used for terrain pads + spacing */
 export const BUILDING_FOOTPRINT: Record<BuildingType, [number, number]> = {
@@ -22,6 +22,10 @@ export const BUILDING_FOOTPRINT: Record<BuildingType, [number, number]> = {
   cabin: [6, 5],
   guardpost: [4.4, 4.4],
   police: [14, 9],
+  clinic: [11, 7.5],
+  store: [10, 7],
+  barracks: [13, 6.5],
+  garage: [9, 7],
 };
 
 export interface BuildingPlot {
@@ -37,7 +41,7 @@ export interface BuildingPlot {
 }
 
 /** what stands at an outlying place */
-export type SiteKind = 'lodge' | 'farm' | 'post' | 'yard' | 'dacha';
+export type SiteKind = 'lodge' | 'farm' | 'post' | 'yard' | 'dacha' | 'hamlet' | 'depot';
 
 /** A small place away from the village: a couple of buildings in a clearing. */
 export interface Site {
@@ -47,6 +51,8 @@ export interface Site {
   z: number;
   /** which way its doors and yard face: out toward the edge of the map, where people arrive from */
   rot: number;
+  /** built after the map was first made (see the end of generateWorld): nothing that was there before is moved for it */
+  later?: boolean;
 }
 
 export interface Instance {
@@ -191,14 +197,14 @@ export function generateWorld(seed = WORLD_SEED): World {
   // every start, and a few more lie between there and the village.
   const MID = { x: VILLAGE.x * 0.5, z: VILLAGE.z * 0.5 };
   const sites: Site[] = [];
-  const place = (name: string, kind: SiteKind, angle: number, radii: number[]) => {
+  const place = (name: string, kind: SiteKind, angle: number, radii: number[], offRoad = 48, later = false) => {
     // the most level spot near where it is wanted, clear of the road and of its neighbours
     let best: { x: number; z: number; cost: number } | null = null;
     for (const r of radii) {
       for (const da of [0, -0.05, 0.05, -0.1, 0.1]) {
         const x = MID.x + Math.cos(angle + da) * r, z = MID.z + Math.sin(angle + da) * r;
         if (Math.abs(x) > half - 90 || Math.abs(z) > half - 90) continue;
-        if (roadGap(x, z) < 48) continue;
+        if (roadGap(x, z) < offRoad) continue;
         if (pois.some((p) => Math.hypot(p.x - x, p.z - z) < p.radius + 60)) continue;
         // level where the buildings stand, and no bank to climb on the way in
         let lo = 1e9, hi = -1e9, lo2 = 1e9, hi2 = -1e9;
@@ -215,7 +221,7 @@ export function generateWorld(seed = WORLD_SEED): World {
       }
     }
     if (!best) return;
-    sites.push({ name, kind, x: best.x, z: best.z, rot: Math.atan2(best.x - MID.x, best.z - MID.z) });
+    sites.push({ name, kind, x: best.x, z: best.z, rot: Math.atan2(best.x - MID.x, best.z - MID.z), ...(later ? { later } : {}) });
     pois.push({ name, x: best.x, z: best.z, radius: 40 });
   };
   // just inside the ring of starting points (see the spawns below: three of them to each place)
@@ -397,6 +403,10 @@ export function generateWorld(seed = WORLD_SEED): World {
     post: [['guardpost', 0, -2, 0], ['shed', -8, 2, 0.4]],
     yard: [['barn', 0, -4, 0], ['shed', -12, 3, 0.5], ['shed', 12, 4, -0.5]],
     dacha: [['house_brick', 0, -3, 0], ['shed', 11, 4, -0.4]],
+    // a shop between two houses, a barn and a shed behind
+    hamlet: [['store', 0, 0, 0], ['house_small', -14.5, 0.5, 0.12], ['house_brick', 16, 0, -0.1], ['barn', -4, -17, 0.2], ['shed', 13, -13.5, -0.4]],
+    // the army's: a barracks, a workshop for its vehicles, a post on the way in
+    depot: [['barracks', 0, -3, 0], ['garage', -16.5, -1, 0.22], ['guardpost', 13.5, 3.5, -0.3], ['shed', 12.5, -12.5, -0.5]],
   };
   for (const st of sites) {
     const c = Math.cos(st.rot), sn = Math.sin(st.rot);
@@ -430,7 +440,7 @@ export function generateWorld(seed = WORLD_SEED): World {
       }
     }
   };
-  for (const b of buildings) {
+  const seat = (b: BuildingPlot) => {
     const [w, d] = BUILDING_FOOTPRINT[b.type];
     const c = Math.cos(b.rot), s = Math.sin(b.rot);
     let maxH = -1e9, sumH = 0, cnt = 0;
@@ -448,7 +458,8 @@ export function generateWorld(seed = WORLD_SEED): World {
     // on a slope the floor need not clear the very highest corner: the ground there is cut down to it
     b.floorY = Math.max(avg + 0.35, Math.min(maxH + 0.12, avg + 0.9));
     pad(b, 6, 0.3);
-  }
+  };
+  for (const b of buildings) seat(b);
   // a neighbour's wide skirt may have dragged the ground at this one's walls: the last word
   // on the ground a pace around each building is its own
   for (const b of buildings) pad(b, 3.2, 2.2);
@@ -482,8 +493,8 @@ export function generateWorld(seed = WORLD_SEED): World {
   // --- splat + grass
   const splat = new Uint8Array(N * N * 4);
   const grass = new Uint8Array(N * N);
-  for (let iz = 0; iz < N; iz++) {
-    for (let ix = 0; ix < N; ix++) {
+  const paint = (ix: number, iz: number) => {
+    {
       const x = -half + ix * CELL, z = -half + iz * CELL;
       const i = idx(ix, iz);
       const slope = slopeAt(heights, x, z);
@@ -522,7 +533,8 @@ export function generateWorld(seed = WORLD_SEED): World {
       g *= 0.75 + 0.25 * n1.noise(x * 0.08, z * 0.08);
       grass[i] = Math.round(clamp(g, 0, 1) * 255);
     }
-  }
+  };
+  for (let iz = 0; iz < N; iz++) for (let ix = 0; ix < N; ix++) paint(ix, iz);
 
   // --- vegetation
   const trees: Instance[] = [];
@@ -611,6 +623,128 @@ export function generateWorld(seed = WORLD_SEED): World {
     }
   }
   const spawn = spawns[0];
+
+  // --- what was built later: a clinic, a shop and a workshop in the village, a barracks at
+  // the checkpoint, a workshop at each yard, and two new places half way in.
+  //
+  // Everything above this line is the map as it first was, and stays exactly that: the same
+  // trees and stones, the same places to start, the same jeeps, every building where it was
+  // and numbered as it was (what is kept between restarts goes by those numbers). What follows
+  // is laid over it. It takes nothing from the dice the map was thrown with (it has its own),
+  // and where it needs ground it levels that ground and clears it, and leaves the road alone.
+  {
+    const firstLater = buildings.length;
+    const before = heights.slice();
+    const rng2 = new RNG(seed + 4242);
+    const cell = (x: number, z: number) => idx(clamp(Math.round((x + half) / CELL), 0, N - 1), clamp(Math.round((z + half) / CELL), 0, N - 1));
+    const addLater = (type: BuildingType, x: number, z: number, rot: number, arms = 0, gap = 4) => {
+      const [w, d] = BUILDING_FOOTPRINT[type];
+      const r = Math.hypot(w, d) / 2;
+      // (among the old buildings, a little further from its neighbours than they are from each other: a car may be parked beside a house)
+      for (const b of blocked) if (Math.hypot(b.x - x, b.z - z) < b.r + r + gap) return false;
+      if (roadNearest(x, z).d < r + ROAD_W / 2 + 2.5 || trackDist[cell(x, z)] < r + 3) return false;
+      blocked.push({ x, z, r });
+      buildings.push({ id: `${type}_${buildings.length}`, type, x, z, rot, floorY: 0, seed: Math.floor(rng2.next() * 1e9), ...(arms ? { arms } : {}) });
+      return true;
+    };
+    // on the village street, as near the middle of it as there is room: its door to the road
+    const onStreet = (type: BuildingType, back: number) => {
+      const order = path2
+        .map((p, i) => ({ i, d: Math.hypot(p[0] - VILLAGE.x, p[1] - VILLAGE.z) }))
+        .filter((q) => q.d < 104 && q.i < path2.length - 1)
+        .sort((a, b) => a.d - b.d);
+      for (const { i } of order) {
+        const [x, z] = path2[i], [nx, nz] = path2[i + 1];
+        const tl = Math.hypot(nx - x, nz - z);
+        const px = -(nz - z) / tl, pz = (nx - x) / tl;
+        const off = back + BUILDING_FOOTPRINT[type][1] / 2 + ROAD_W / 2;
+        for (const side of [1, -1]) if (addLater(type, x + px * off * side, z + pz * off * side, Math.atan2(-px * side, -pz * side))) return true;
+      }
+      return false;
+    };
+    onStreet('clinic', 9);
+    onStreet('store', 8);
+    onStreet('garage', 11);
+    // the checkpoint's barracks: on the far side of the yard from the way in, its door to the yard
+    for (const [ox, oz] of [[-3, 27], [-29, -5], [-27, 22], [27, 17]] as [number, number][]) {
+      if (addLater('barracks', CAMP.x + ox, CAMP.z + oz, Math.atan2(-ox, -oz), 2)) break;
+    }
+    // a workshop beside each yard's barn
+    for (const st of sites) {
+      if (st.kind !== 'yard') continue;
+      const c = Math.cos(st.rot), sn = Math.sin(st.rot);
+      addLater('garage', st.x + 20 * c - 7 * sn, st.z - 20 * sn - 7 * c, st.rot - 0.45);
+    }
+    // the two new places: well back from the road, which the levelling of them must not reach
+    const firstSite = sites.length;
+    place('Sosnovka', 'hamlet', 3.93, [230, 215, 245, 200, 260], 78, true);
+    place('Motor Pool', 'depot', 0.85, [205, 190, 220, 235, 175], 78, true);
+    const laterSites = sites.slice(firstSite);
+    for (const st of laterSites) {
+      const target = before[cell(st.x, st.z)];
+      const R = 60;
+      for (let iz = Math.max(0, Math.floor((st.z - R + half) / CELL)); iz <= Math.min(N - 1, Math.ceil((st.z + R + half) / CELL)); iz++) {
+        for (let ix = Math.max(0, Math.floor((st.x - R + half) / CELL)); ix <= Math.min(N - 1, Math.ceil((st.x + R + half) / CELL)); ix++) {
+          const x = -half + ix * CELL, z = -half + iz * CELL;
+          const d = Math.hypot(x - st.x, z - st.z);
+          if (d > R) continue;
+          const i = idx(ix, iz);
+          // (not the road's bed nor a track's, nor the ground a pace round a building that is already there)
+          const w = (1 - smoothstep(22, R, d)) * smoothstep(16, 30, roadDist[i]) * smoothstep(8, 16, trackDist[i]);
+          const local = target + 0.35 * n3.fbm(x * 0.02, z * 0.02, 3) + (heights[i] - target) * 0.25;
+          heights[i] = lerp(heights[i], local, w);
+        }
+      }
+      const c = Math.cos(st.rot), sn = Math.sin(st.rot);
+      LAYOUT[st.kind].forEach(([type, right, fwd, turn], i) => {
+        addLater(type, st.x + right * c + fwd * sn, st.z - right * sn + fwd * c, st.rot + turn, i === 0 ? (st.kind === 'depot' ? 2 : 1) : 0, 2.5);
+      });
+    }
+    const added = buildings.slice(firstLater);
+    for (const b of added) seat(b);
+    // (the last word on the ground a pace round a building is its own: said again for the new ones,
+    // and for any old one a new one's skirt could have reached)
+    const reach = (b: BuildingPlot) => Math.hypot(...BUILDING_FOOTPRINT[b.type]) / 2;
+    for (const b of buildings) if (added.some((n) => n === b || Math.hypot(n.x - b.x, n.z - b.z) < reach(n) + reach(b) + 9.5)) pad(b, 3.2, 2.2);
+
+    // what grew or lay where something now stands goes; a new place is a clearing, thinned as
+    // the first ones were; and whatever is left stands on the ground as it is now
+    const inAdded = (x: number, z: number, margin: number) =>
+      added.some((b) => {
+        const [w, d] = BUILDING_FOOTPRINT[b.type];
+        const dx = x - b.x, dz = z - b.z, c = Math.cos(b.rot), s = Math.sin(b.rot);
+        return Math.abs(dx * c - dz * s) < w / 2 + margin && Math.abs(dx * s + dz * c) < d / 2 + margin;
+      });
+    const nearLater = (x: number, z: number, r: number) => laterSites.some((st) => Math.hypot(st.x - x, st.z - z) < r);
+    const keepTree = (t: Instance) => {
+      if (inAdded(t.x, t.z, 4)) return false;
+      if (!nearLater(t.x, t.z, 34)) return true;
+      // (the same rule the trees were planted by, with the clearing now in it)
+      const f = forestMask(t.x, t.z);
+      const hv = hash2(Math.round(t.x * 7), Math.round(t.z * 7), seed + 3);
+      if (f > 0.08) return hv <= smoothstep(0.08, 0.3, f) * 0.92;
+      return (f > -0.25 && hv < 0.025) || (f > -0.15 && hv > 0.97);
+    };
+    const settle = (list: Instance[], keep: (t: Instance) => boolean) => {
+      for (let k = list.length - 1; k >= 0; k--) {
+        const t = list[k];
+        if (!keep(t)) list.splice(k, 1);
+        else t.y += heightAt(heights, t.x, t.z) - heightAt(before, t.x, t.z);
+      }
+    };
+    settle(trees, keepTree);
+    settle(rocks, (t) => !inAdded(t.x, t.z, 2.5) && !nearLater(t.x, t.z, 26));
+    settle(props, (t) => !inAdded(t.x, t.z, 2.5) && !nearLater(t.x, t.z, 26));
+    // and the ground is painted again wherever any of this reaches
+    const again = new Set<number>();
+    const mark = (cx: number, cz: number, R: number) => {
+      for (let iz = Math.max(0, Math.floor((cz - R + half) / CELL)); iz <= Math.min(N - 1, Math.ceil((cz + R + half) / CELL)); iz++)
+        for (let ix = Math.max(0, Math.floor((cx - R + half) / CELL)); ix <= Math.min(N - 1, Math.ceil((cx + R + half) / CELL)); ix++) again.add(iz * N + ix);
+    };
+    for (const st of laterSites) mark(st.x, st.z, 64);
+    for (const b of added) mark(b.x, b.z, 22);
+    for (const k of again) paint(k % N, Math.floor(k / N));
+  }
 
   return {
     heights,

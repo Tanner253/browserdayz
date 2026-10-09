@@ -165,6 +165,59 @@ const SMOKE = {
   every: (dur: number) => Math.max(1.3, (dur - 0.7) / 2),
 };
 
+/**
+ * Something held to be eaten, drunk or opened, in the eye's space: where it is held ([x, y, z],
+ * and how much further off for each metre of its width or height), where it is when it is at
+ * the mouth, and how far it is tipped there. (Set by looking, at the angle the hands are seen
+ * at now: what was here before was set for a wider one, and held everything under the bottom
+ * of the picture. A tin being eaten from was the lid of a tin; no hand was to be seen.)
+ */
+export const HOLD = {
+  rest: [0.09, -0.1, -0.46],
+  restBy: [-0.25, -0.12, -0.45],
+  mouth: [0.025, -0.075, -0.28],
+  mouthBy: [-0.1, -0.3],
+  tilt: { eat: 0.45, drink: 1.0 },
+  /** something worked on with both hands (a box of rounds, a grenade's cord) */
+  work: [0, -0.11, -0.46],
+  workBy: [-0.2, -0.4],
+  /** a first aid kit, open in the left hand: where, and how it is turned */
+  kit: [-0.06, -0.14, -0.52],
+  kitBy: [-0.15, -0.5],
+  kitTurn: [0.2, 0.5, 0.05],
+};
+
+/**
+ * An injection, in the eye's space. The left forearm stands up out of the bottom corner of the
+ * picture, its fist made; the right fist brings the injector to it from the right, lying nearly
+ * level so that it is seen from the side, and drives it in.
+ *   elbow, wrist – where the left forearm lies
+ *   palm         – which way the inside of that wrist is turned
+ *   at, skin     – how far up the forearm from the wrist the shot goes in (0..1), and how far off the bone the sleeve is there
+ *   down         – which way the injector's nose points
+ *   hit          – when it lands, seconds (the sound, in game.ts, goes by the same clock)
+ *   sunk         – how far it sinks into the sleeve
+ *   held         – how far up the barrel from its middle the right fist is
+ *   fingers      – which way that fist's fingers start out, before they close round the barrel
+ *   fist         – [how far the wrist is behind the barrel along the fingers, how far the barrel's middle is off the palm]
+ *   curl         – how far each finger closes
+ * (Kept where the dev harness can reach it: every one of these was set by looking.)
+ */
+export const INJECT = {
+  elbow: new THREE.Vector3(-0.22, -0.285, -0.38),
+  wrist: new THREE.Vector3(-0.07, -0.025, -0.52),
+  palm: new THREE.Vector3(0.7, 0, 0.7),
+  at: 0.24,
+  skin: 0.036,
+  down: new THREE.Vector3(-0.86, -0.2, -0.47).normalize(),
+  hit: 1.02,
+  sunk: 0.005,
+  held: 0.02,
+  fingers: new THREE.Vector3(-0.1, 0.9, -0.4),
+  fist: [0.07, 0.025] as [number, number],
+  curl: [1.25, 1.3, 1.35, 1.4] as [number, number, number, number],
+};
+
 /** One cigarette: paper, filter, and the coal at the end of it. It lies along z, filter to the mouth (+z). */
 function cigarette() {
   const root = new THREE.Group();
@@ -231,7 +284,23 @@ export class Weapons {
   private sprintT = 0;
   private airT = 0;
   private boltReady = true;
-  private chamberEmpty = false;
+  /**
+   * Guns that were shot dry and have not been fed since: a pistol's slide stays back, and its
+   * next magazine ends with the slide being let go. Kept by the gun, not by whoever holds it:
+   * kept as one flag it went from the pistol that ran dry to the next gun taken out, and a full
+   * pistol was held with its slide open until something was reloaded to the end.
+   */
+  private dry = new WeakSet<ItemInstance>();
+  private get chamberEmpty() {
+    const it = this.currentItem;
+    return !!it && (it.loaded ?? 0) === 0 && this.dry.has(it);
+  }
+  private set chamberEmpty(on: boolean) {
+    const it = this.currentItem;
+    if (!it) return;
+    if (on) this.dry.add(it);
+    else this.dry.delete(it);
+  }
   private fireCooldown = 0;
   private breath = { held: false, t: 0 };
   /**
@@ -874,7 +943,7 @@ export class Weapons {
       // (a pack throws its own case)
       if (!m.rig || m.brass) this.eject(m, false);
       audio.shellDrop();
-      if ((item.loaded ?? 0) === 0) this.chamberEmpty = true;
+      if ((item.loaded ?? 0) === 0) this.dry.add(item);
     }
   }
 
@@ -972,7 +1041,7 @@ export class Weapons {
       this.start('magswap', dur, () => {
         const got = this.inv.take(def.weapon!.ammo, capacityOf(item) - (item.loaded ?? 0));
         item.loaded = (item.loaded ?? 0) + got;
-        this.chamberEmpty = false;
+        this.dry.delete(item);
         this.boltReady = true;
       }, { empty: empty ? 1 : 0 });
       return;
@@ -1004,7 +1073,7 @@ export class Weapons {
       this.start('magswap', dur, () => {
         const got = this.inv.take(def.weapon!.ammo, capacityOf(item) - (item.loaded ?? 0));
         item.loaded = (item.loaded ?? 0) + got;
-        this.chamberEmpty = false;
+        this.dry.delete(item);
       });
     }
   }
@@ -1056,6 +1125,8 @@ export class Weapons {
       }
       if (this.held) this.vmRoot.remove(this.held.root);
       this.held = { root: h.root, kind, t: 0, dur, size: h.size, ending: 0 };
+      // (not seen until it has been put where it goes: it is made at the eye itself)
+      h.root.visible = false;
       this.vmRoot.add(h.root);
     });
   }
@@ -1521,7 +1592,12 @@ export class Weapons {
       if (a.name === 'equip') rig.has('holster') ? rig.pose('holster', 1 - k) : rig.has('draw') ? rig.pose('draw', k) : rig.rest();
       else if (a.name === 'unequip') rig.has('holster') ? rig.pose('holster', k) : rig.has('draw') ? rig.pose('draw', 1 - k) : rig.rest();
       else if (a.name === 'bolt') rig.pose('bolt', k);
-      else if (a.name === 'magswap') rig.pose(a.data?.empty ? 'reloadEmpty' : 'reload', k);
+      else if (a.name === 'magswap') {
+        rig.pose(a.data?.empty ? 'reloadEmpty' : 'reload', k);
+        // (the pack's plain reload has the slide back for the middle of it, as if the gun had
+        // run dry; with a round still in the chamber it stays shut)
+        if (!a.data?.empty && m.kind === 'pistol') rig.still(['slide', 'stopper']);
+      }
       else rig.rest();
       return;
     }
@@ -1615,24 +1691,30 @@ export class Weapons {
     // bigger things are held a little further out so the hand and the item both stay in frame
     const sy = h.size.y;
     const wide = Math.min(h.size.x, h.size.z);
-    const pos = new THREE.Vector3(0.11 - wide * 0.3, -0.16 - sy * 0.25, -(0.36 + sy * 0.35));
+    const H = HOLD;
+    const pos = new THREE.Vector3(H.rest[0] + wide * H.restBy[0], H.rest[1] + sy * H.restBy[1], H.rest[2] + sy * H.restBy[2]);
     const rot = new THREE.Euler(0, 0, 0);
     const two = h.kind === 'bandage' || h.kind === 'inject' || h.kind === 'open' || (h.kind !== 'smoke' && Math.min(h.size.x, h.size.z) > 0.16);
     // a smoke: how near the mouth it is (0 held low, 1 at the lips)
     let drawn = -1;
     // an injection: where the left hand is held out to take it (in the eye's space), and how far the shot has gone in
-    let offered: { pos: THREE.Vector3; fingers: THREE.Vector3; palm: THREE.Vector3 } | null = null;
+    let offered: { pos: THREE.Vector3; elbow: THREE.Vector3; fingers: THREE.Vector3; palm: THREE.Vector3; clench: number } | null = null;
     if (h.kind === 'eat' || h.kind === 'drink') {
       // up to the mouth and back, once per bite / gulp
       const period = h.kind === 'eat' ? 0.95 : 1.25;
       const cyc = 0.5 - 0.5 * Math.cos((Math.max(0, t - 0.3) / period) * Math.PI * 2);
       const m = h.kind === 'drink' ? Math.pow(cyc, 0.6) : cyc;
-      pos.lerp(new THREE.Vector3(0.03, -0.1 - sy * 0.3, -(0.24 + sy * 0.2)), m * 0.92);
-      rot.x = (h.kind === 'drink' ? 0.95 : 0.35) * m;
+      pos.lerp(new THREE.Vector3(H.mouth[0], H.mouth[1] + sy * H.mouthBy[0], H.mouth[2] + sy * H.mouthBy[1]), m * 0.92);
+      rot.x = (h.kind === 'drink' ? H.tilt.drink : H.tilt.eat) * m;
       rot.z = -0.15 * m;
     } else if (h.kind === 'bandage') {
-      pos.set(-0.02 + Math.cos(t * 5.5) * 0.035, -0.17 + Math.sin(t * 5.5) * 0.03, -0.38);
-      rot.set(0.5, t * 5.5 * 0.15, 0.3);
+      // A kit, open in the left hand, low and to the left. The right goes into it, comes out
+      // and goes down out of the picture to where the wound is, and comes back for more.
+      // (It was a roll of dressing once, wound round and round: the kit, which is a foot
+      // wide, was wound round and round in front of the face and filled half the picture.)
+      const across = Math.max(h.size.x, h.size.z);
+      pos.set(H.kit[0], H.kit[1] + sy * H.kitBy[0] + Math.sin(t * 2.3) * 0.004, H.kit[2] + across * H.kitBy[1]);
+      rot.set(H.kitTurn[0], H.kitTurn[1], H.kitTurn[2] + Math.sin(t * 1.7) * 0.02);
     } else if (h.kind === 'smoke') {
       // Two draws on it. Each: up to the mouth (which is under the bottom of the picture: it
       // goes most of the way out of sight), held there while the coal brightens, and let down
@@ -1662,29 +1744,44 @@ export class Weapons {
         }
       }
     } else if (h.kind === 'inject') {
-      // The left forearm is held out across the bottom of the picture, wrist turned up. The
-      // right fist brings the injector over it nose down, the cap comes off with a twist, it
-      // is driven in, held while it empties, and lifted away. (Its sounds, in audio.ui, fall
-      // on the same clock: the cap at 1.05 s, the spring at 1.47.)
+      // The left forearm is stood up in the picture and its fist made. The right fist brings the
+      // injector to it from the right, draws back and drives it in; the arm gives under it; it
+      // is held there while it empties, and taken away. (What was here before aimed at where
+      // the forearm would be if it lay level, and it does not: the shot was given to the air a
+      // hand's breadth above the sleeve, and seen end on besides.)
       const seg = (a: number, b: number) => THREE.MathUtils.smoothstep(t, a, b);
-      const out = seg(0.2, 0.8) * (1 - seg(h.dur - 0.3, h.dur));
-      const axis = new THREE.Vector3(0.8, 0.1, -0.59).normalize();
-      const wrist = new THREE.Vector3(0.07, -0.112 - (1 - out) * 0.22, -0.45);
-      offered = { pos: wrist, fingers: axis, palm: new THREE.Vector3(0, 1, 0.15) };
-      // where it goes in: a hand's breadth up the forearm from the wrist, on top
-      const mark = wrist.clone().addScaledVector(axis, -0.085).add(new THREE.Vector3(0, 0.034, 0));
-      const down = new THREE.Vector3(0.1, -0.95, -0.28).normalize();
-      const jab = seg(1.3, 1.47), off = seg(h.dur - 0.38, h.dur - 0.12);
-      const above = THREE.MathUtils.lerp(0.07, 0, jab) + off * 0.09 + (1 - seg(0.3, 0.95)) * 0.1;
-      const tremble = jab * (1 - off) * Math.sin(t * 31) * 0.0012;
-      pos.copy(mark).addScaledVector(down, -(h.size.z / 2 + above + tremble));
-      // (the model lies along z with its middle a little under the root: see beginUse)
-      const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, -1), down);
-      // the twist that takes the cap off
-      q.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.sin(seg(1.0, 1.18) * Math.PI) * 0.5));
-      rot.setFromQuaternion(q);
+      const I = INJECT;
+      const down = I.down.clone().normalize();
+      const leave = seg(h.dur - 0.3, h.dur - 0.02);
+      const shown = seg(0.04, 0.4) * (1 - leave);
+      // the blow landing: the arm goes with it and comes back
+      const since = t - I.hit;
+      const give = since > 0 ? Math.exp(-since * 11) * Math.cos(since * 17) * 0.012 : 0;
+      const moved = new THREE.Vector3(0, -(1 - shown) * 0.34, 0).addScaledVector(down, give);
+      const elbow = I.elbow.clone().add(moved), wrist = I.wrist.clone().add(moved);
+      const along = wrist.clone().sub(elbow).normalize();
+      const clench = seg(0.42, 0.8) * (1 - 0.6 * seg(I.hit + 0.4, I.hit + 0.9));
+      offered = { pos: wrist, elbow, fingers: along, palm: I.palm, clench };
+      // where it goes in: up the forearm from the wrist, on the side of the sleeve that is turned to the injector
+      const out = down.clone().negate();
+      out.addScaledVector(along, -out.dot(along)).normalize();
+      const mark = wrist.clone().lerp(elbow, I.at).addScaledVector(out, I.skin);
+      // how far off the sleeve its nose is: brought over, drawn back, driven in, held, taken away
+      const drive = THREE.MathUtils.clamp((t - (I.hit - 0.1)) / 0.1, 0, 1);
+      const away = seg(I.hit + 0.85, I.hit + 1.1);
+      const gap = THREE.MathUtils.lerp(0.12, 0.06, seg(0.35, 0.72)) + 0.03 * seg(I.hit - 0.3, I.hit - 0.1) - (0.09 + I.sunk) * drive * drive + away * (0.11 + I.sunk);
+      // (the spring going, a moment after it lands: the barrel jumps in the fist)
+      const sprung = t - (I.hit + 0.12);
+      const jump = sprung > 0 ? Math.exp(-sprung * 26) * 0.0035 : 0;
+      const tremble = drive * (1 - away) * Math.sin(t * 33) * 0.0009;
+      pos.copy(mark).addScaledVector(down, -(h.size.z / 2 + gap + jump + tremble));
+      // (it comes in from low on the right, and goes back there)
+      pos.add(new THREE.Vector3(0.05, -0.05, 0.03).multiplyScalar(1 - seg(0.25, 0.75) + away * 0.6));
+      pos.y -= leave * 0.34;
+      // (the model lies along z, nose to -z)
+      rot.setFromQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, -1), down));
     } else {
-      pos.set(0, -0.17 - sy * 0.25 + Math.sin(t * 9) * 0.004, -(0.38 + sy * 0.3));
+      pos.set(H.work[0], H.work[1] + sy * H.workBy[0] + Math.sin(t * 9) * 0.004, H.work[2] + sy * H.workBy[1]);
       rot.set(0.45, 0.25 + Math.sin(t * 4.5) * 0.05, 0);
     }
     pos.y -= (1 - up) * 0.4;
@@ -1707,18 +1804,39 @@ export class Weapons {
     if (drawn >= 0) right = { pos: new THREE.Vector3(-0.009, -0.168, 0.05), fingers: new THREE.Vector3(0, 0.97, -0.24), palm: new THREE.Vector3(0, 0.24, 0.97), curl: [0.08, 0.12, 1.0, 1.1], thumb: 0.55 };
     if (offered) {
       // Both hands are said in the eye's space and turned into the injector's own, which is what
-      // the arms are posed in. The right is a fist round the barrel of it, thumb uppermost on
-      // the end that is pressed: it comes in from the right and its fingers close round the far side.
+      // the arms are posed in. The right is a fist round the barrel, thumb at the end that is
+      // pressed: the barrel runs through the middle of it, so the wrist is set that far behind
+      // it (set down beside the barrel, the fist closed on nothing next to it).
+      const I = INJECT;
       const inv = h.root.quaternion.clone().invert();
-      const local = (v: THREE.Vector3) => v.applyQuaternion(inv);
-      right = { pos: local(new THREE.Vector3(0.024, 0.012, -0.018)), fingers: local(new THREE.Vector3(-0.6, 0, -0.8)), palm: local(new THREE.Vector3(-0.8, 0, 0.6)), curl: [1.4, 1.45, 1.5, 1.55], thumb: 0.9 };
+      const up = I.down.clone().normalize().negate();
+      const fingers = I.fingers.clone();
+      fingers.addScaledVector(up, -fingers.dot(up)).normalize();
+      const palm = new THREE.Vector3().crossVectors(up, fingers);
+      const holdAt = up.clone().multiplyScalar(I.held).addScaledVector(fingers, -I.fist[0]).addScaledVector(palm, -I.fist[1]);
+      right = { pos: holdAt.applyQuaternion(inv), fingers: fingers.applyQuaternion(inv), palm: palm.applyQuaternion(inv), curl: I.curl, thumb: 0.85, tuck: 0.35 };
+      const c = THREE.MathUtils.lerp(0.4, 1.3, offered.clench);
       left = {
         pos: offered.pos.clone().sub(h.root.position).applyQuaternion(inv),
+        elbow: offered.elbow.clone().sub(h.root.position).applyQuaternion(inv),
         fingers: offered.fingers.clone().applyQuaternion(inv),
         palm: offered.palm.clone().applyQuaternion(inv),
-        curl: [0.55, 0.6, 0.7, 0.8],
-        thumb: 0.3,
+        curl: [c, c + 0.03, c + 0.06, c + 0.1],
+        fold: [1.05, 1.0, 0.5],
+        thumb: 0.6,
+        tuck: 0.55 * offered.clench,
       };
+    }
+    if (h.kind === 'bandage') {
+      // in and out of the kit, once every second and a half: over it with the fingers down, then away low on the right
+      const k = (t % 1.5) / 1.5;
+      const inKit = THREE.MathUtils.smoothstep(k, 0.02, 0.24) * (1 - THREE.MathUtils.smoothstep(k, 0.5, 0.74));
+      const inv = h.root.quaternion.clone().invert();
+      const away = new THREE.Vector3(0.2, -0.4, -0.3).sub(h.root.position).applyQuaternion(inv);
+      const over = new THREE.Vector3(0.03 + Math.sin(t * 11) * 0.02 * inKit, h.size.y * 0.5 + 0.06, 0.05 + Math.cos(t * 7) * 0.015 * inKit);
+      right = { pos: away.lerp(over, inKit), fingers: new THREE.Vector3(-0.45, -0.55, -0.7), palm: new THREE.Vector3(-0.1, -1, 0.1), curl: [0.5 + inKit * 0.3, 0.6 + inKit * 0.3, 0.75, 0.85], thumb: 0.45 };
+      // (the left has the far edge of it, from underneath)
+      left = { pos: new THREE.Vector3(-(h.size.x / 2 + 0.03), -h.size.y * 0.5 - 0.02, 0.07), fingers: new THREE.Vector3(0.55, 0.25, -0.8), palm: new THREE.Vector3(0.3, 0.95, 0), curl: [0.5, 0.55, 0.6, 0.65], thumb: 0.3 };
     }
     if (h.kind === 'open') {
       // left hand holds the box, right hand pries the latch on top

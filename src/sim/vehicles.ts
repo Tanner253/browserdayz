@@ -134,7 +134,8 @@ export function jeepSpots(world: World, count = JEEP.count, outlying = JEEP.outl
     return d;
   };
   const BEHIND: [number, number][] = [[0, -17], [7, -18], [-7, -18], [0, -22], [13, -19], [-13, -19], [0, -27], [9, -26], [-9, -26]];
-  const far = world.sites.filter((st) => toRoad(st.x, st.z) > 150);
+  // (the places the map was first made with: one built later is not somewhere a jeep has always stood)
+  const far = world.sites.filter((st) => !st.later && toRoad(st.x, st.z) > 150);
   for (let k = 0; k < outlying; k++) {
     const alone = (st: { x: number; z: number }) => Math.min(...out.map((o) => Math.hypot(o.x - st.x, o.z - st.z)));
     place: for (const st of far.filter((s) => alone(s) > 60).sort((a, b) => alone(b) - alone(a))) {

@@ -383,7 +383,9 @@ export class AudioEngine {
     send.connect(this.roomSend);
 
     // a recording of the real thing, where there is one: it goes the way the made-up one went (placed, dulled by distance, sent to the hills)
-    if (this.rec(big ? 'shot_rifle' : 'shot_pistol', out, t, (big ? 2.5 : 1.9) * mid)) return;
+    // (A pistol is a few decibels under a rifle and over sooner: scripts/sounds.mjs says what
+    // it is made of, and why it was a click before.)
+    if (this.rec(big ? 'shot_rifle' : 'shot_pistol', out, t, big ? 2.5 * mid : 2.2)) return;
 
     // 1. supersonic crack / mechanical transient
     const crack = this.noise(t, 0.05);
@@ -978,11 +980,12 @@ export class AudioEngine {
         for (let i = 0; i < 5; i++) rustle(0.14, 1800, 0.15, i * 0.3);
         break;
       case 'inject':
-        // the cap twisted off, the spring going, and what it drives hissing home
-        this.click(2800, 0.22, 0.015);
-        this.click(1500, 0.34, 0.03, 0.42);
-        this.click(900, 0.2, 0.05, 0.44);
-        rustle(0.42, 5200, 0.07, 0.46);
+        // it lands on the sleeve, the spring goes, and what it drives hisses home (in time with the hands: weapons.ts, INJECT)
+        rustle(0.09, 700, 0.3, 0.03);
+        this.click(2600, 0.2, 0.015, 0.045);
+        this.click(1500, 0.36, 0.03, 0.16);
+        this.click(900, 0.22, 0.05, 0.175);
+        rustle(0.5, 5200, 0.075, 0.2);
         break;
       case 'move':
         rustle(0.07, 1200, 0.12);

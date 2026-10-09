@@ -9,7 +9,7 @@
 import * as THREE from 'three';
 import { Muxer, ArrayBufferTarget } from 'mp4-muxer';
 import { assets } from '../core/assets';
-import { audio, AudioEngine } from '../core/audio';
+import { audio, AudioEngine, recordings } from '../core/audio';
 import { physics, SHOT_GROUPS } from '../core/physics';
 import { RemotePlayer } from '../game/remote';
 import { heightAt } from '../world/worldgen';
@@ -66,6 +66,8 @@ export interface Shot {
   hud?: boolean;
   /** carries on from the shot before it: its people, its place (a take that starts here is replayed from where the run of shots begins) */
   chain?: boolean;
+  /** which throw of the film's dice it starts from, when that is not its place in this cut: a shot borrowed from another cut plays as it did there */
+  seed?: number;
   /** letterbox bars (on by default for free cameras) */
   bars?: boolean;
   titles?: Title[];
@@ -436,7 +438,7 @@ async function stage() {
   g.input.lock = () => {};
   g.input.unlock = () => {};
   // (the third cut's hero has a name, and the voice that goes with it)
-  if (CUT === 3) setPlayerName('Sable');
+  if (CUT === 3 || CUT === 4) setPlayerName('Sable');
   // the world: the game's own single-player one, from the same seed every take
   clock.reseed(7001);
   await g.enterOffline();
@@ -520,7 +522,8 @@ async function stage() {
   }
 
   // the cast
-  const names = CUT === 3 ? ['Sable', 'Mira', 'Volkov', 'Kestrel', 'Dmitri', 'Oksana', 'Bear'] : ['Volkov', 'Mira', 'Kestrel', 'Dmitri', 'Oksana', 'Bear'];
+  // (the fourth cut borrows shots from the second, which counts on its six in their order, and has one more behind them)
+  const names = CUT === 3 ? ['Sable', 'Mira', 'Volkov', 'Kestrel', 'Dmitri', 'Oksana', 'Bear'] : CUT === 4 ? ['Volkov', 'Mira', 'Kestrel', 'Dmitri', 'Oksana', 'Bear', 'Sable'] : ['Volkov', 'Mira', 'Kestrel', 'Dmitri', 'Oksana', 'Bear'];
   for (let i = 0; i < names.length; i++) {
     const a = new Actor(S, 900 + i, names[i]);
     await a.load();
@@ -542,7 +545,12 @@ async function stage() {
   S.bullet.visible = S.trail.visible = false;
   g.s.r.scene.add(S.bullet, S.trail);
 
-  if (CUT === 3) {
+  if (CUT === 4) {
+    const cut = await import('./shots4');
+    shots = cut.buildShots(S);
+    arrangement = cut.ARRANGEMENT;
+    seconds = cut.SECONDS4;
+  } else if (CUT === 3) {
     const cut = await import('./shots3');
     shots = cut.buildShots(S);
     seconds = cut.SECONDS3;
@@ -585,12 +593,13 @@ async function enter(shot: Shot) {
   if (current) for (const ti of current.titles ?? []) titleEls.get(ti)?.remove();
   current = shot;
   overlay.querySelectorAll('.tr-cursor').forEach((e) => ((e as HTMLElement).style.display = 'none'));
-  clock.reseed(9000 + shots.indexOf(shot) * 131);
-  if (!shot.chain) S.reseed(5000 + shots.indexOf(shot) * 977);
+  const dice = shot.seed ?? shots.indexOf(shot);
+  clock.reseed(9000 + dice * 131);
+  if (!shot.chain) S.reseed(5000 + dice * 977);
   // the world's slow housekeeping (restocking loot, saving) has no part in a film
   S.g.econT = -1e9;
   S.g.saveT = -1e9;
-  wind.uTime.value = 40 + shots.indexOf(shot) * 7;
+  wind.uTime.value = 40 + dice * 7;
   if (!shot.chain) {
     // clocks the game keeps for itself (the sway of the weapon, the local body's breathing, whose turn it
     // is among the shadow maps) start each run of shots from the same place
@@ -697,6 +706,8 @@ tr.encodeFrame = async (b64: string, k: number) => {
 /** The whole soundtrack in one go: the score, and every sound the game asked for at the moment it asked. */
 async function renderSound(): Promise<AudioBuffer> {
   const SR = 48000;
+  // (the shots, the bolt and the magazines are recordings now: they have to be here before any of them is asked for)
+  await recordings();
   const off = new OfflineAudioContext(2, Math.ceil(seconds * SR), SR);
   const Real = window.AudioContext;
   (window as unknown as Any).AudioContext = function () { return off; };

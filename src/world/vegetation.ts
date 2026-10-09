@@ -81,6 +81,14 @@ const _sphere = new THREE.Sphere();
 const UP = new THREE.Vector3(0, 1, 0);
 
 /** One kind of object (tree variant, rock, prop) drawn as instanced LOD levels. */
+/**
+ * Things whose model stands on edge and which lie flat in the world: a tyre left in a yard
+ * lies on its side. (They were always set down at half a tyre's thickness above the ground,
+ * which is where one lying down has its middle, and then drawn standing up, half sunk.)
+ */
+const LAID_FLAT = new Set(['old_tyre']);
+const _onItsSide = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
+
 class LodSet {
   levels: Level[] = [];
   matrices: Float32Array;
@@ -107,9 +115,11 @@ class LodSet {
     this.pos = new Float32Array(this.n * 3);
     this.scale = new Float32Array(this.n);
     this.far = new Float32Array(this.n);
+    const flat = LAID_FLAT.has(name.split(/[#@]/)[0]);
     instances.forEach((it, i) => {
       this.far[i] = it.far ?? Infinity;
       _q.setFromAxisAngle(UP, it.rot);
+      if (flat) _q.multiply(_onItsSide);
       _s.setScalar(it.scale);
       _p.set(it.x, it.y, it.z);
       _m.compose(_p, _q, _s);

@@ -31,7 +31,7 @@ import { Dummy } from './character';
 import { CorpseBody, RemotePlayer } from './remote';
 import { CameraDirector } from './camera';
 import { Effects } from './effects';
-import { Weapons, type HitInfo, type UseKind } from './weapons';
+import { INJECT, Weapons, type HitInfo, type UseKind } from './weapons';
 import { LootManager, Stash, WorldItem } from './loot';
 import { Grenades } from './grenades';
 import { Garage } from './garage';
@@ -68,7 +68,7 @@ interface TimedAction {
 }
 
 /** bump when the map's loot points change: spawned loot from older saves is re-rolled */
-const LOOT_REV = 8;
+const LOOT_REV = 9;
 const QUICK_KEYS = ['Digit5', 'Digit6', 'Digit7', 'Digit8'];
 /** the wheel: how far the mouse travels from its middle to its rim (pixels), and how far out an entry is picked */
 const WHEEL_REACH = 120, WHEEL_PICK = 0.35;
@@ -2073,7 +2073,13 @@ export class Game {
       const u = this.use;
       u.t += dt;
       u.soundT += dt;
-      if (u.sound && u.sound !== 'smoke' && u.soundT > 1.05 && u.t < u.dur - 0.4) {
+      if (u.sound === 'inject') {
+        // one sound, a breath before the shot lands (weapons.ts, INJECT.hit)
+        if (u.soundT >= 0 && u.t > INJECT.hit - 0.04) {
+          u.soundT = -1e9;
+          audio.ui('inject');
+        }
+      } else if (u.sound && u.sound !== 'smoke' && u.soundT > 1.05 && u.t < u.dur - 0.4) {
         u.soundT = 0;
         audio.ui(u.sound);
       }

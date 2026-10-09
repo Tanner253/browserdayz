@@ -129,6 +129,8 @@ export const POSE = {
     } as Stances,
     /** the point the weapon hangs from, measured from midway between the shoulder joints: [up, back] */
     pivot: [0.04, -0.04] as [number, number],
+    /** where the head is from that same point with the body standing, which is what `aim` was set for: [up, back] */
+    eye: [0.146, -0.028] as [number, number],
     /** long guns: the chest turns this far off the aim, left shoulder leading, radians */
     blade: 0.5,
     /** and the left shoulder comes forward this much more */
@@ -1003,6 +1005,15 @@ export class Avatar {
           const mid = this.armL.arm.getWorldPosition(_a).add(this.armR.arm.getWorldPosition(_b)).multiplyScalar(0.5);
           this.root.worldToLocal(mid);
           this.heldPivot.position.copy(_b.set(0, POSE.hold.pivot[0], POSE.hold.pivot[1]).applyAxisAngle(UP, -this.twist)).add(mid);
+          // Aimed, the sights come up to the eye, and the stances say where that is from the
+          // shoulders of somebody standing: the head a hand and a half above them. Crouched,
+          // the back is bent, and the head is forward of the shoulders and hardly above them:
+          // the gun was held a hand's breadth over the top of it. It goes where the head has gone.
+          if (this.joints.head && this.aimT > 0.001) {
+            const head = this.root.worldToLocal(this.joints.head.getWorldPosition(_w));
+            this.heldPivot.position.y += (head.y - mid.y - POSE.hold.eye[0]) * this.aimT;
+            this.heldPivot.position.z += (head.z - mid.z - POSE.hold.eye[1]) * this.aimT;
+          }
           const { obj, grips, long, base } = held;
           const set = long ? POSE.hold.long : POSE.hold.pistol;
           const wAim = this.aimT, wReady = 1 - wAim - carry;

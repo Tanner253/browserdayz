@@ -208,7 +208,7 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
           { id: 'wooden_crate_01', x: -4.4, z: 1.5, rot: -0.2 },
           { id: 'Barrel_01', x: 5.1, z: 3.1, rot: 0 },
           { id: 'barrel_03', x: 4.3, z: 3.2, rot: 1.2 },
-          { id: 'old_tyre', x: 5.0, z: -0.6, rot: 0, y: 0.3 },
+          { id: 'old_tyre', x: 5.0, z: -0.6, rot: 0, y: 0.08 },
           ...(rng.chance(0.45) ? [{ id: 'covered_car', x: 0.2, z: 0.4, rot: 0.04 }] : []),
         ],
         loot: [
@@ -290,6 +290,168 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
           [0.8, 0.02, 2.4], [-1.6, 0.02, 0.8], [-5.2, 0.02, 1.2], [-6.25, 0.48, -3.0],
         ],
         usage: ['Police'],
+      };
+    case 'clinic':
+      // A feldsher's post. The waiting room and its desk inside the door; a ward of three beds
+      // through the door on the left; the dispensary, which is where what a wound wants is
+      // kept, behind the desk on the right.
+      return {
+        w: 11, d: 7.5, h: 2.9, ext: 'plaster_ext', int: 'int_painted', floor: 'floor_lino', roof: 'roof_iron', roofType: 'gable',
+        walls: [
+          { side: 'front', ext: 'plaster_ext', int: 'int_painted', openings: [win(-4.5, -3.3), door(1.4, 2.4), win(3.6, 4.8)] },
+          { side: 'back', ext: 'plaster_ext', int: 'int_painted', openings: [win(-4.2, -3.2, 1.45, 2.1), win(-0.9, 0.1)] },
+          { side: 'left', ext: 'plaster_ext', int: 'int_painted', openings: [win(-0.6, 0.6)] },
+          { side: 'right', ext: 'plaster_ext', int: 'int_painted', openings: [win(0.9, 2.1)] },
+          { side: 'inner', from: [-1.2, -3.55], to: [-1.2, 3.55], ext: 'int_plaster', int: 'int_painted', openings: [door(0.4, 1.4)] },
+          { side: 'inner', from: [1.6, -3.55], to: [1.6, -0.8], ext: 'int_plaster', int: 'int_painted', openings: [] },
+          { side: 'inner', from: [1.7, -0.9], to: [5.3, -0.9], ext: 'int_plaster', int: 'int_painted', openings: [door(1.9, 2.9)] },
+        ],
+        furniture: [
+          // ward
+          { id: 'old_bed_frame', x: -4.8, z: -2.5, rot: 0 },
+          { id: 'old_bed_frame', x: -4.8, z: 1.7, rot: 0 },
+          { id: 'old_bed_frame', x: -2.6, z: -2.5, rot: 0 },
+          { id: 'painted_wooden_cabinet', x: -3.7, z: -3.2, rot: 0 },
+          { id: 'Shelf_01', x: -2.2, z: 3.5, rot: Math.PI },
+          { id: 'painted_wooden_chair_01', x: -3.5, z: 0.2, rot: 1.3 },
+          // waiting room
+          { id: 'metal_office_desk', x: 3.9, z: 1.4, rot: 0 },
+          { id: 'SchoolChair_01', x: 3.9, z: 0.4, rot: 0 },
+          { id: 'SchoolChair_01', x: -0.72, z: 2.2, rot: Math.PI / 2 },
+          { id: 'SchoolChair_01', x: -0.72, z: 2.95, rot: Math.PI / 2 },
+          { id: 'wooden_bookshelf_worn', x: 4.98, z: -0.1, rot: -Math.PI / 2 },
+          { id: 'painted_wooden_cabinet', x: 0.85, z: -3.2, rot: 0 },
+          // dispensary
+          { id: 'steel_frame_shelves_01', x: 2.6, z: -3.28, rot: 0, scale: 0.1 },
+          { id: 'steel_frame_shelves_01', x: 3.9, z: -3.28, rot: 0, scale: 0.1 },
+          { id: 'steel_frame_shelves_01', x: 5.03, z: -2.2, rot: -Math.PI / 2, scale: 0.1 },
+        ],
+        loot: [
+          [-4.8, 0.48, -2.1], [-4.8, 0.48, 2.1], [-2.6, 0.48, -2.1], [-3.7, 1.2, -3.2],
+          [-2.2, 0.44, 3.45], [-2.2, 1.24, 3.45],
+          [3.4, 0.81, 1.4], [4.4, 0.81, 1.4], [4.98, 0.56, -0.1], [4.98, 1.02, -0.1], [0.85, 1.2, -3.2],
+          [2.6, 0.14, -3.28], [2.6, 0.74, -3.28], [2.6, 1.34, -3.28], [3.9, 0.14, -3.28], [3.9, 0.74, -3.28], [3.9, 1.34, -3.28],
+          [5.03, 0.14, -2.2], [5.03, 0.74, -2.2], [5.03, 1.34, -2.2],
+          [3.2, 0.02, -2.0], [-3.4, 0.02, 1.2], [0.3, 0.02, 1.8], [0.2, 0.02, -1.8],
+        ],
+        usage: ['Medic', 'Town'],
+      };
+    case 'store':
+      // The village shop: two wide windows and the door between them, the counter across the
+      // floor with the shelves behind it, and the stock room at the back with its own door out.
+      return {
+        w: 10, d: 7, h: 3.0, ext, int: 'int_painted', floor: 'floor_lino', roof: 'concrete', roofType: 'flat',
+        walls: [
+          { side: 'front', ext, int: 'int_painted', openings: [win(-4.2, -1.9, 0.8, 2.3), door(-0.6, 0.6), win(1.9, 4.2, 0.8, 2.3)] },
+          { side: 'back', ext, int: 'int_plaster', openings: [door(-3.9, -2.9), win(-1.8, -0.8, 1.5, 2.1)] },
+          { side: 'left', ext, int: 'int_painted', openings: [win(0.6, 1.8)] },
+          { side: 'right', ext, int: 'int_painted', openings: [] },
+          { side: 'inner', from: [-4.8, -1.2], to: [4.8, -1.2], ext: 'int_painted', int: 'int_plaster', openings: [door(2.6, 3.6)] },
+        ],
+        furniture: [
+          { id: 'metal_office_desk', x: -1.9, z: 0.3, rot: 0 },
+          { id: 'metal_office_desk', x: 0.15, z: 0.3, rot: 0 },
+          { id: 'Shelf_01', x: -2.4, z: -1.08, rot: 0 },
+          { id: 'Shelf_01', x: -1.3, z: -1.08, rot: 0 },
+          { id: 'Shelf_01', x: -0.2, z: -1.08, rot: 0 },
+          { id: 'Shelf_01', x: 0.9, z: -1.08, rot: 0 },
+          { id: 'steel_frame_shelves_01', x: -4.53, z: -0.4, rot: Math.PI / 2, scale: 0.1 },
+          { id: 'steel_frame_shelves_01', x: 4.53, z: 0.0, rot: -Math.PI / 2, scale: 0.1 },
+          { id: 'steel_frame_shelves_01', x: 4.53, z: 1.3, rot: -Math.PI / 2, scale: 0.1 },
+          { id: 'wooden_bookshelf_worn', x: 2.3, z: 2.1, rot: Math.PI / 2 },
+          { id: 'wooden_crate_01', x: -3.9, z: 2.7, rot: 0.2 },
+          { id: 'cardboard_box_01', x: -2.95, z: 2.85, rot: 0.5 },
+          // stock room
+          { id: 'steel_frame_shelves_01', x: 1.0, z: -3.03, rot: 0, scale: 0.1 },
+          { id: 'steel_frame_shelves_01', x: 2.3, z: -3.03, rot: 0, scale: 0.1 },
+          { id: 'wooden_crate_01', x: 4.1, z: -2.95, rot: 0.1 },
+          { id: 'wooden_crate_01', x: -1.3, z: -2.95, rot: -0.15 },
+          { id: 'cardboard_box_01', x: -0.3, z: -2.9, rot: 0.2 },
+          { id: 'cardboard_box_01', x: -4.4, z: -1.9, rot: 1.4 },
+        ],
+        loot: [
+          [-2.4, 0.81, 0.3], [-1.4, 0.81, 0.3], [-0.35, 0.81, 0.3], [0.65, 0.81, 0.3],
+          [-2.4, 0.44, -1.02], [-2.4, 1.24, -1.02], [-1.3, 1.24, -1.02], [-0.2, 0.44, -1.02], [0.9, 0.44, -1.02], [0.9, 1.24, -1.02],
+          [-4.53, 0.14, -0.4], [-4.53, 0.74, -0.4], [-4.53, 1.34, -0.4],
+          [4.53, 0.74, 0.0], [4.53, 1.34, 0.0], [4.53, 0.14, 1.3], [4.53, 0.74, 1.3],
+          [2.3, 0.56, 2.1], [2.3, 1.02, 2.1],
+          [1.0, 0.14, -3.03], [1.0, 0.74, -3.03], [2.3, 0.74, -3.03], [2.3, 1.34, -3.03],
+          [-3.0, 0.02, 1.8], [0.6, 0.02, 2.3], [3.5, 0.02, -2.2], [-3.0, 0.02, -2.3],
+        ],
+        usage: ['Town', 'Village'],
+      };
+    case 'barracks':
+      // One long room of beds with a table to eat at, and at the end of it, behind a door, the
+      // room where the arms were kept.
+      return {
+        w: 13, d: 6.5, h: 2.8, ext: 'brick_ext', int: 'int_plaster', floor: 'floor_concrete', roof: 'roof_iron', roofType: 'gable',
+        walls: [
+          { side: 'front', ext: 'brick_ext', int: 'int_plaster', openings: [win(-5.4, -4.2), win(-2.7, -1.5), door(-0.5, 0.5), win(1.5, 2.7), win(4.4, 5.6, 1.4, 2.1)] },
+          { side: 'back', ext: 'brick_ext', int: 'int_plaster', openings: [win(-4.9, -3.9, 1.45, 2.1), win(-1.7, -0.7, 1.45, 2.1), win(4.4, 5.4, 1.5, 2.1)] },
+          { side: 'left', ext: 'brick_ext', int: 'int_plaster', openings: [win(-0.5, 0.5)] },
+          { side: 'right', ext: 'brick_ext', int: 'int_plaster', openings: [] },
+          { side: 'inner', from: [3.6, -3.05], to: [3.6, 3.05], ext: 'int_plaster', int: 'int_plaster', openings: [door(0.6, 1.6)] },
+        ],
+        furniture: [
+          { id: 'old_bed_frame', x: -5.6, z: -2.0, rot: 0 },
+          { id: 'old_bed_frame', x: -4.0, z: -2.0, rot: 0 },
+          { id: 'old_bed_frame', x: -2.4, z: -2.0, rot: 0 },
+          { id: 'old_bed_frame', x: -0.8, z: -2.0, rot: 0 },
+          { id: 'old_bed_frame', x: 0.8, z: -2.0, rot: 0 },
+          { id: 'painted_wooden_cabinet', x: 2.5, z: -2.75, rot: 0 },
+          { id: 'Shelf_01', x: -3.45, z: 3.03, rot: Math.PI },
+          { id: 'WoodenTable_01', x: -2.6, z: 1.4, rot: 0 },
+          { id: 'painted_wooden_chair_01', x: -2.9, z: 2.15, rot: Math.PI },
+          { id: 'painted_wooden_chair_01', x: -2.2, z: 0.7, rot: 0 },
+          { id: 'weapons_case', x: -5.95, z: 1.6, rot: Math.PI / 2 },
+          // the arms room
+          { id: 'steel_frame_shelves_01', x: 6.03, z: -2.0, rot: -Math.PI / 2, scale: 0.1 },
+          { id: 'steel_frame_shelves_01', x: 6.03, z: -0.7, rot: -Math.PI / 2, scale: 0.1 },
+          { id: 'metal_office_desk', x: 5.0, z: 2.35, rot: 0 },
+          { id: 'SchoolChair_01', x: 5.0, z: 1.45, rot: 0 },
+          { id: 'weapons_case', x: 4.7, z: -2.75, rot: 0 },
+          { id: 'weapons_case', x: 4.0, z: -1.1, rot: Math.PI / 2 },
+        ],
+        loot: [
+          [5.0, 0.02, 0.3], [4.9, 0.02, -1.6],
+          [-5.6, 0.48, -1.6], [-4.0, 0.48, -1.6], [-2.4, 0.48, -1.6], [-0.8, 0.48, -1.6], [0.8, 0.48, -1.6],
+          [2.5, 1.2, -2.75], [-3.45, 0.44, 2.98], [-3.45, 1.24, 2.98], [-2.9, 0.57, 1.4], [-2.3, 0.57, 1.4],
+          [6.03, 0.14, -2.0], [6.03, 0.74, -2.0], [6.03, 1.34, -2.0], [6.03, 0.14, -0.7], [6.03, 0.74, -0.7], [6.03, 1.34, -0.7],
+          [4.5, 0.81, 2.35], [5.5, 0.81, 2.35],
+          [-0.4, 0.02, 1.6], [2.2, 0.02, 0.6], [-4.8, 0.02, 0.2],
+        ],
+        usage: ['Military'],
+      };
+    case 'garage':
+      // A workshop: a bay a car is driven into, a bench and shelves down the other side
+      return {
+        w: 9, d: 7, h: 3.4, ext: 'concrete', int: 'concrete', floor: 'floor_concrete', roof: 'roof_iron', roofType: 'shed',
+        walls: [
+          { side: 'front', ext: 'concrete', int: 'concrete', openings: [gap(-3.7, -0.7, 2.8), door(1.7, 2.7)] },
+          { side: 'back', ext: 'concrete', int: 'concrete', openings: [win(-2.9, -1.9, 1.7, 2.4), win(1.6, 2.6, 1.7, 2.4)] },
+          { side: 'left', ext: 'concrete', int: 'concrete', openings: [win(-0.6, 0.6, 1.7, 2.4)] },
+          { side: 'right', ext: 'concrete', int: 'concrete', openings: [win(1.4, 2.4, 1.7, 2.4)] },
+        ],
+        furniture: [
+          ...(rng.chance(0.45) ? [{ id: 'covered_car', x: -2.2, z: 0.1, rot: 0.03 }] : []),
+          { id: 'metal_office_desk', x: 3.2, z: -2.8, rot: 0 },
+          { id: 'steel_frame_shelves_01', x: 4.03, z: -0.9, rot: -Math.PI / 2, scale: 0.1 },
+          { id: 'steel_frame_shelves_01', x: 4.03, z: 0.35, rot: -Math.PI / 2, scale: 0.1 },
+          { id: 'utility_box_01', x: 0.7, z: -3.05, rot: 0 },
+          { id: 'barrel_03', x: 1.5, z: -2.9, rot: 0.6 },
+          { id: 'Barrel_01', x: -4.0, z: 2.9, rot: 0 },
+          // (two tyres, one on the other)
+          { id: 'old_tyre', x: 3.85, z: 2.75, rot: 0.4, y: 0.08 },
+          { id: 'old_tyre', x: 3.82, z: 2.78, rot: 1.5, y: 0.24 },
+          { id: 'wooden_crate_01', x: 0.3, z: 2.6, rot: 0.2 },
+          { id: 'wooden_ladder', x: -4.05, z: -2.2, rot: Math.PI / 2 },
+        ],
+        loot: [
+          [2.7, 0.81, -2.8], [3.7, 0.81, -2.8],
+          [4.03, 0.14, -0.9], [4.03, 0.74, -0.9], [4.03, 1.34, -0.9], [4.03, 0.14, 0.35], [4.03, 0.74, 0.35], [4.03, 1.34, 0.35],
+          [-0.2, 0.02, -2.5], [1.4, 0.02, 0.8], [3.0, 0.02, 1.6], [-3.9, 0.02, -3.0],
+        ],
+        usage: ['Industrial'],
       };
     case 'guardpost':
     default:
@@ -556,6 +718,8 @@ export class Buildings {
       post: [['concrete_road_barrier', -4, 9], ['concrete_road_barrier', 0, 10], ['concrete_road_barrier', 4, 9], ['weapons_case', 5.5, 3], ['weapons_case', 6.6, 1.2], ['Barrel_01', -4.5, -6]],
       yard: [['wooden_crate_01', -4, 8], ['wooden_crate_01', -5.4, 8.6], ['wooden_crate_01', 5, 9], ['Barrel_01', 7, 8], ['barrel_03', 7.9, 8.9], ['old_tyre', 2, 11], ['dry_branches_medium_01', -9, 11]],
       dacha: [['covered_car', 9, -6], ['wooden_crate_01', -7, 5], ['metal_trash_can@0', -6.2, 3.4], ['trashbag', -8, 3]],
+      hamlet: [['wooden_crate_01', -6.5, 6], ['wooden_crate_01', -7.6, 6.8], ['metal_trash_can@1', 6.5, 5.2], ['trashbag', 7.6, 5.6], ['old_tyre', 3, 8.5], ['covered_car', 8.5, 9.5], ['stone_fire_pit', -3, -8], ['Barrel_01', -11, -14]],
+      depot: [['concrete_road_barrier', -5, 11.5], ['concrete_road_barrier', 0, 12.5], ['concrete_road_barrier', 5, 11.5], ['weapons_case', 5.5, 3.6], ['weapons_case', 6.7, 2], ['Barrel_01', -8, 5.5], ['Barrel_01', -8.9, 6.3], ['old_tyre', -12.5, 7.5], ['covered_car', -4, 8]],
     };
     for (const st of this.world.sites) {
       const c = Math.cos(st.rot), s = Math.sin(st.rot);
@@ -705,6 +869,9 @@ export class Buildings {
     if (plot.type === 'police') {
       this.signs.push({ m: B.clone().multiply(new THREE.Matrix4().makeTranslation(0, 2.55, hd + 0.03)), text: 'ПОЛИЦИЯ', sub: 'POLICE' });
     }
+    // (over their doors: a clinic's board is white with a red cross's red on it, a shop's is green)
+    if (plot.type === 'clinic') this.signs.push({ m: B.clone().multiply(new THREE.Matrix4().makeTranslation(1.9, 2.5, hd + 0.03)), text: 'МЕДПУНКТ', sub: 'CLINIC', board: '#e4e0d4', ink: '#8c1f1f' });
+    if (plot.type === 'store') this.signs.push({ m: B.clone().multiply(new THREE.Matrix4().makeTranslation(0, 2.64, hd + 0.03)), text: 'МАГАЗИН', sub: 'SHOP', board: '#2f4a33', ink: '#e8ebf0' });
 
     // roofs
     if (bp.roofType === 'gable') {
@@ -747,7 +914,7 @@ export class Buildings {
 
     // furniture: indoors, so it only has to be drawn from close by (through a window or the door).
     // A barn stands open at the front and shows its insides from further off.
-    const indoorFar = plot.type === 'barn' ? 95 : 46;
+    const indoorFar = plot.type === 'barn' || plot.type === 'garage' ? 95 : 46;
     const inst = (id: string, lx: number, lz: number, rot: number, scale = 1, y = 0) => {
       const p = new THREE.Vector3(lx, y, lz).applyMatrix4(B);
       this.world.props.push({ kind: id, x: p.x, y: p.y, z: p.z, rot: rot + plot.rot, scale, far: indoorFar });
@@ -809,7 +976,7 @@ export class Buildings {
     if (plot.arms) {
       const mine = this.lootPoints.slice(firstPoint);
       const pick = [...mine.filter((p) => p.floor), ...mine.filter((p) => !p.floor)].slice(0, plot.arms);
-      for (const p of pick) p.arms = plot.type === 'police' || plot.type === 'guardpost' ? 'guns' : 'any';
+      for (const p of pick) p.arms = plot.type === 'police' || plot.type === 'guardpost' || plot.type === 'barracks' ? 'guns' : 'any';
     }
 
     // yard clutter
@@ -852,7 +1019,7 @@ export class Buildings {
 
   doorSpecs: { m: THREE.Matrix4; w: number; h: number; id: string; open: boolean; swing: number }[] = [];
   /** sign boards to hang (police station): world matrix of the board's centre, facing +z */
-  private signs: { m: THREE.Matrix4; text: string; sub: string }[] = [];
+  private signs: { m: THREE.Matrix4; text: string; sub: string; board?: string; ink?: string }[] = [];
 
   private planVillageProps() {
     const rng = new RNG(4711);
@@ -912,12 +1079,12 @@ export class Buildings {
       c.width = 1024;
       c.height = 256;
       const g = c.getContext('2d')!;
-      g.fillStyle = '#16305c';
+      g.fillStyle = sg.board ?? '#16305c';
       g.fillRect(0, 0, 1024, 256);
-      g.strokeStyle = '#d9dde4';
+      g.strokeStyle = sg.ink ?? '#d9dde4';
       g.lineWidth = 10;
       g.strokeRect(14, 14, 996, 228);
-      g.fillStyle = '#e8ebf0';
+      g.fillStyle = sg.ink ?? '#e8ebf0';
       g.textAlign = 'center';
       g.font = '700 132px "Arial Narrow", Arial, sans-serif';
       g.fillText(sg.text, 512, 150);
