@@ -12,6 +12,11 @@
 //   budget – about how many triangles it is brought down to (a download drawn for a close-up may have a hundred thousand)
 //   small  – textures whose names match are flat colour: kept tiny
 //   pair   – it is a left and a right, worn a body's width apart (gloves, boots): they are brought together to lie side by side
+//   cut    – only a part of it is wanted, and the download does not have that part as a piece of its own (a helmet on a
+//            statue cast in one): `{ tall, keep(x, y, z) }`. The whole download is stood `tall` metres high about its own
+//            middle, feet on the ground, and what `keep` says yes to, of every corner of a triangle, is kept
+//   plain  – its glint map is left out (a thing seen small, whose map is mostly of what was cut away): `metal`, `rough` say what it is instead
+//   both   – it is a shell, seen from inside as well as out
 // A piece on a skeleton is taken as the skeleton holds it when nothing is moving.
 
 import fs from 'node:fs/promises';
@@ -35,6 +40,40 @@ export async function creditOf(dir) {
   return { name: field('title'), url: field('source'), author: field('author')?.replace(/\s*\(http.*\)$/, ''), licence: field('license type'), line };
 }
 
+/**
+ * Keeps of a shape only the triangles all three of whose corners `keep` says yes to, and of
+ * its points only those still used (what a file says its size is, is read off its points).
+ * @returns how many triangles are left
+ */
+function keepOf(doc, prim, keep) {
+  const pos = prim.getAttribute('POSITION'), n = pos.getCount();
+  const idx = prim.getIndices();
+  const index = idx ? idx.getArray() : Uint32Array.from({ length: n }, (_, i) => i);
+  const ok = new Uint8Array(n), v = [];
+  for (let i = 0; i < n; i++) {
+    pos.getElement(i, v);
+    ok[i] = keep(v[0], v[1], v[2]) ? 1 : 0;
+  }
+  const map = new Int32Array(n).fill(-1), out = [];
+  let m = 0;
+  for (let t = 0; t + 2 < index.length; t += 3) {
+    const a = index[t], b = index[t + 1], c = index[t + 2];
+    if (!(ok[a] && ok[b] && ok[c])) continue;
+    for (const i of [a, b, c]) {
+      if (map[i] < 0) map[i] = m++;
+      out.push(map[i]);
+    }
+  }
+  for (const sem of prim.listSemantics()) {
+    const acc = prim.getAttribute(sem), size = acc.getElementSize(), src = acc.getArray();
+    const dst = new src.constructor(m * size);
+    for (let i = 0; i < n; i++) if (map[i] >= 0) for (let e = 0; e < size; e++) dst[map[i] * size + e] = src[i * size + e];
+    prim.setAttribute(sem, acc.clone().setArray(dst));
+  }
+  prim.setIndices(doc.createAccessor().setType('SCALAR').setArray(m > 65535 ? new Uint32Array(out) : new Uint16Array(out)));
+  return out.length / 3;
+}
+
 /** @returns its manifest entry and its credit */
 export async function processProp(id, cfg, { io, SRC, OUT, FORCE, exists, countTris }) {
   const dir = path.join(SRC, 'models', cfg.dir ?? id);
@@ -43,7 +82,7 @@ export async function processProp(id, cfg, { io, SRC, OUT, FORCE, exists, countT
   const credit = { id, ...(await creditOf(dir)), changes: cfg.changes };
   if (!credit.line) throw new Error(`${id}: its licence asks for no credit line this script knows how to read (${credit.licence}): look at ${path.join(dir, 'license.txt')}`);
   const dest = path.join(OUT, 'models', `${id}.glb`);
-  const stamp = JSON.stringify({ ...cfg, only: cfg.only?.source, small: cfg.small?.source, v: 6 });
+  const stamp = JSON.stringify({ ...cfg, only: cfg.only?.source, small: cfg.small?.source, cut: cfg.cut ? `${cfg.cut.tall}: ${cfg.cut.keep}` : undefined, v: 6 });
   const metaPath = path.join(dir, `_meta_${id}.json`);
   let meta;
   if (!FORCE && (await exists(dest)) && (await exists(metaPath))) {
@@ -82,6 +121,21 @@ export async function processProp(id, cfg, { io, SRC, OUT, FORCE, exists, countT
     }
     for (const s of root.listSkins()) s.dispose();
     meshes.forEach((mesh, i) => scene.addChild(doc.createNode(meshes.length > 1 ? `${id}_${i}` : id).setMesh(mesh.setName(id))));
+    if (cfg.cut) {
+      // the whole of it stood so many metres tall about its own middle: the rule is said in those metres
+      const b0 = getBounds(scene);
+      const k = cfg.cut.tall / (b0.max[1] - b0.min[1]), cx = (b0.min[0] + b0.max[0]) / 2, cz = (b0.min[2] + b0.max[2]) / 2;
+      let left = 0;
+      for (const mesh of meshes) {
+        for (const prim of mesh.listPrimitives()) {
+          const n = keepOf(doc, prim, (x, y, z) => cfg.cut.keep((x - cx) * k, (y - b0.min[1]) * k, (z - cz) * k));
+          if (!n) mesh.removePrimitive(prim);
+          left += n;
+        }
+      }
+      for (const node of scene.listChildren()) if (!node.getMesh().listPrimitives().length) scene.removeChild(node.setMesh(null));
+      if (!left) throw new Error(`${id}: the cut keeps nothing`);
+    }
     if (cfg.pair) {
       // each half by which side of the middle it is on; moved in until a finger's width is left between them
       let left = Infinity, right = -Infinity;
@@ -114,6 +168,8 @@ export async function processProp(id, cfg, { io, SRC, OUT, FORCE, exists, countT
     const M = mul(scaleBy(s), move(-(b.min[0] + b.max[0]) / 2, -b.min[1], -(b.min[2] + b.max[2]) / 2));
     for (const mesh of meshes) transformMesh(mesh, M);
     for (const m of root.listMaterials()) {
+      if (cfg.both) m.setDoubleSided(true);
+      if (cfg.plain) m.setMetallicRoughnessTexture(null);
       if (m.getMetallicRoughnessTexture()) continue;
       if (cfg.metal !== undefined) m.setMetallicFactor(cfg.metal);
       if (cfg.rough !== undefined) m.setRoughnessFactor(cfg.rough);

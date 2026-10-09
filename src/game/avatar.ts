@@ -55,6 +55,8 @@ export const GEAR: Record<string, { bone: 'Head' | 'spine_03'; p: [number, numbe
   sack_pack: { bone: 'spine_03', p: [0, 0.97, 0.2], r: [0.05, 0, 0], s: [1, 1, 1], pack: true },
   suitcase: { bone: 'spine_03', p: [0, 0.87, 0.215], r: [0.05, 0, 0], s: [1, 1, 1], pack: true },
   // (the hood of it alone: see `facepiece`. As its model lies, the crown is toward -x and the eyepieces look along +z)
+  // (the helmet: its brow is toward +x as its model stands, so it is turned a quarter round)
+  boonie_hat: { bone: 'Head', p: [0, 1.593, 0.035], r: [0, Math.PI / 2, 0], s: [1, 1, 1] },
   // (a hood over the whole head, a little larger than life so the head and what is on it are inside it)
   gasmask: { bone: 'Head', p: [0.1155, 1.141, -0.04], r: [0, Math.PI, -Math.PI / 2], s: [1.1, 1.1, 1.1] },
 };
@@ -90,7 +92,6 @@ export function facepiece(obj: THREE.Object3D) {
  */
 export const WORN: Record<string, string[]> = {
   life_vest: ['gear_plate', 'gear_pouches'],
-  boonie_hat: ['gear_cap', 'gear_headset'],
 };
 export const GEAR_SHOWN = new Set([...Object.keys(GEAR), ...Object.keys(WORN)]);
 

@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-09T10:18:43.006Z",
+ "generated": "2026-10-09T20:14:01.117Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr"
@@ -2012,6 +2012,27 @@
      -0.0353
     ]
    }
+  },
+  "combat_helmet": {
+   "url": "assets/models/combat_helmet.glb",
+   "tags": [
+    "loot",
+    "gear"
+   ],
+   "bytes": 775636,
+   "srcTris": 378633,
+   "tris": 6996,
+   "min": [
+    -0.15,
+    0,
+    -0.1318
+   ],
+   "max": [
+    0.15,
+    0.2252,
+    0.1317
+   ],
+   "lods": []
   }
  }
 }

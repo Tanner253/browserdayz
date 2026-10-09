@@ -75,6 +75,35 @@ export const LOCAL_MODELS = {
     tags: ['loot', 'gear'],
     changes: 'The suit is put onto the skeleton of the game\'s own character by scripts/suit.mjs: every point of it is moved from the joints it was made on to that skeleton\'s, and stretched along the bones that are longer there. Its cap and its boots are also used alone, standing still, as things to be found. Textures re-encoded as WebP at a quarter of their size; geometry compressed; its own animation is not used.',
   },
+  // The helmet off a soldier cast in one piece: there is no helmet in the download to take, so
+  // what stands above its rim is cut out of the whole (the statue stood 1.8 m tall, facing +x,
+  // the middle of its head 17.5 cm forward of its own middle: it carries a pack). The rim is
+  // over the goggles in front, down over the ears at the sides, and above the collar behind.
+  combat_helmet: {
+    dir: 'tactical_soldier',
+    cut: {
+      tall: 1.8,
+      keep: (x, y, z) => {
+        if (Math.abs(z) > 0.145 || x < 0 || x > 0.36) return false;
+        const fwd = x - 0.175;
+        // (from the brow down to the pouch over the ear, along under it, and up again to the nape)
+        const ramp = (a, b, ya, yb) => ya + ((yb - ya) * (fwd - a)) / (b - a);
+        const rim = fwd > 0.09 ? 1.63 : fwd > 0.055 ? ramp(0.055, 0.09, 1.562, 1.63) : fwd > -0.045 ? 1.562 : fwd > -0.068 ? ramp(-0.068, -0.045, 1.618, 1.562) : 1.618;
+        // (behind the ears, low down, the straps of its pack come up beside the helmet: not those)
+        if (fwd < -0.062 && y < 1.628 && Math.abs(z) > 0.118) return false;
+        return y > rim;
+      },
+    },
+    size: 0.3,
+    tex: 2048,
+    budget: 7000,
+    plain: true,
+    both: true,
+    metal: 0.2,
+    rough: 0.72,
+    tags: ['loot', 'gear'],
+    changes: "Only its helmet is used: what stands above the helmet's rim is cut out of the statue, scaled to metres and stood on the ground, and brought down to about seven thousand triangles. Its colour texture is re-encoded as WebP; its glint map is left out.",
+  },
   combat_boots: {
     dir: 'tactical_suit',
     only: /Mil_Suit_R5\.002/,

@@ -148,9 +148,9 @@ const D: ItemDef[] = [
   { id: 'splint', name: 'Splint Tape', model: 'medical_tape', w: 1, h: 1, weight: 0.12, category: 'medical', desc: 'A roll of strapping tape. Bound round a broken leg with whatever is to hand, it lets you run on it again.', use: { verb: 'Splint your leg with', time: 5, splint: true, sound: 'bandage' } },
   // ---------------------------------------------------------------- clothing & bags
   {
-    // (still `boonie_hat`: a field cap now, with the headset that goes over it)
-    id: 'boonie_hat', name: 'Patrol Cap', model: 'patrol_cap', w: 2, h: 2, weight: 0.45, category: 'clothing', slot: 'head',
-    desc: 'Field cap and an ear-defender headset. Keeps the sun off: you get thirsty a fifth more slowly. The headset takes a tenth off anything that hits your head.', wear: { thirst: 0.8, head: 0.9 },
+    // (still `boonie_hat`, so that what is carried and what is kept in the world still means it: a helmet now)
+    id: 'boonie_hat', name: 'Combat Helmet', model: 'combat_helmet', w: 2, h: 2, weight: 1.4, category: 'clothing', slot: 'head',
+    desc: 'Ballistic helmet with a mount on the brow and pouches over the ears. Takes three tenths off anything that hits your head: a pistol round there is no longer the end of you.', wear: { head: 0.7 },
   },
   {
     id: 'gasmask', name: 'Gas Mask', model: 'old_gas_mask', w: 2, h: 2, weight: 0.7, category: 'clothing', slot: 'face',

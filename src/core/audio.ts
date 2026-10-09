@@ -447,71 +447,34 @@ export class AudioEngine {
     ring.stop(t + dur * 3 + 0.05);
   }
 
+  // A bolt worked, a magazine changed, a slide racked: these are recordings and nothing else.
+  // (They used to be made up out of clicks, and the made-up ones stood in wherever a recording
+  // was missing: the old reload, a click for every round pushed in, went on being heard that
+  // way. There is no made-up one now. Until a recording has arrived there is no sound.)
+
   boltCycle(start = 0, pos?: V3) {
-    if (this.ready && this.rec('bolt', pos ? this.out(pos, 3, 1.2) : this.sfx, this.ctx.currentTime + start, pos ? 1.5 : 0.95)) return;
-    this.click(2400, 0.45, 0.025, start, pos); // handle up
-    this.click(1700, 0.5, 0.06, start + 0.18, pos); // pull back
-    if (!pos) this.slide(start + 0.18, 0.14, 900);
-    this.click(2000, 0.5, 0.05, start + 0.42, pos); // push forward
-    if (!pos) this.slide(start + 0.36, 0.1, 1100);
-    this.click(2800, 0.45, 0.025, start + 0.6, pos); // handle down
+    if (this.ready) this.rec('bolt', pos ? this.out(pos, 3, 1.2) : this.sfx, this.ctx.currentTime + start, pos ? 1.5 : 0.95);
   }
 
-  /** another player near you reloading: what of it carries */
+  /** another player close by reloading: a magazine out and one in, from where they stand (it is not heard across a field) */
   reloadNear(pos: V3, dur: number, pistol: boolean) {
-    if (this.ready) {
-      const now = this.ctx.currentTime, kind = pistol ? 'pistol' : 'rifle';
-      const a = this.rec(`${kind}_mag_out`, this.out(pos, 3, 1.2), now + dur * (pistol ? 0.12 : 0.28), 1.4);
-      const b = this.rec(`${kind}_mag_in`, this.out(pos, 3, 1.2), now + dur * (pistol ? 0.48 : 0.62), 1.4);
-      if (a && b) return;
-    }
-    if (pistol) {
-      this.click(1500, 0.4, 0.05, 0.1, pos);
-      this.click(1900, 0.55, 0.04, Math.max(0.4, dur - 0.5), pos);
-    } else {
-      this.click(2400, 0.45, 0.025, 0, pos);
-      this.click(1700, 0.5, 0.06, 0.15, pos);
-      for (let t = 0.55; t < dur - 0.5; t += 0.48) this.click(3400, 0.3, 0.02, t, pos);
-      this.click(2000, 0.5, 0.05, Math.max(0.3, dur - 0.45), pos);
-      this.click(2800, 0.45, 0.025, Math.max(0.4, dur - 0.27), pos);
-    }
-  }
-
-  private slide(start: number, dur: number, freq: number) {
     if (!this.ready) return;
-    const t = this.ctx.currentTime + start;
-    const n = this.noise(t, dur);
-    const f = this.filter('bandpass', freq, 2);
-    const g = this.ctx.createGain();
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.linearRampToValueAtTime(0.18, t + dur * 0.3);
-    g.gain.linearRampToValueAtTime(0.0001, t + dur);
-    n.connect(f).connect(g).connect(this.sfx);
-  }
-
-  roundInsert(delay = 0) {
-    this.click(3400, 0.3, 0.02, delay);
-    this.click(2100, 0.35, 0.03, delay + 0.06);
+    const now = this.ctx.currentTime, kind = pistol ? 'pistol' : 'rifle';
+    this.rec(`${kind}_mag_out`, this.out(pos, 2, 1.7), now + dur * (pistol ? 0.12 : 0.28), 1.1);
+    this.rec(`${kind}_mag_in`, this.out(pos, 2, 1.7), now + dur * (pistol ? 0.48 : 0.62), 1.1);
   }
 
   /** @param long a rifle's magazine (a pistol's, if not) */
   magOut(delay = 0, long = false) {
-    if (this.ready && this.rec(long ? 'rifle_mag_out' : 'pistol_mag_out', this.sfx, this.ctx.currentTime + delay, 0.95)) return;
-    this.click(1500, 0.4, 0.05, delay);
-    this.slide(delay, 0.08, 800);
+    if (this.ready) this.rec(long ? 'rifle_mag_out' : 'pistol_mag_out', this.sfx, this.ctx.currentTime + delay, 0.95);
   }
 
   magIn(delay = 0, long = false) {
-    if (this.ready && this.rec(long ? 'rifle_mag_in' : 'pistol_mag_in', this.sfx, this.ctx.currentTime + delay, 0.95)) return;
-    this.slide(delay, 0.06, 700);
-    this.click(1900, 0.55, 0.04, delay + 0.06);
+    if (this.ready) this.rec(long ? 'rifle_mag_in' : 'pistol_mag_in', this.sfx, this.ctx.currentTime + delay, 0.95);
   }
 
   slideRack(delay = 0) {
-    if (this.ready && this.rec('rack', this.sfx, this.ctx.currentTime + delay, 0.95)) return;
-    this.click(2600, 0.45, 0.03, delay);
-    this.slide(delay, 0.09, 1300);
-    this.click(3300, 0.5, 0.03, delay + 0.12);
+    if (this.ready) this.rec('rack', this.sfx, this.ctx.currentTime + delay, 0.95);
   }
 
   shellDrop(delay = 0.35) {

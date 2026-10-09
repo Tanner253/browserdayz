@@ -1241,12 +1241,11 @@ export class Weapons {
     if (m.kind === 'rifle') {
       // open bolt, push rounds in one by one, close bolt
       const n = Math.min(need, have);
-      audio.click(2400, 0.45, 0.025);
-      audio.click(1700, 0.5, 0.06, 0.15);
+      // (a rifle with no pack of its own: it is heard as the others are, a magazine out and one in)
+      audio.magOut(0.15, true);
+      audio.magIn(0.55 + n * 0.48, true);
       this.onAct('reload', 0.55 + n * 0.48 + 0.5);
       this.start('reload', 0.55 + n * 0.48 + 0.5, () => {
-        audio.click(2000, 0.5, 0.05);
-        audio.click(2800, 0.45, 0.025, 0.18);
         this.boltReady = true;
       }, { rounds: n, inserted: 0, stop: 0 });
     } else {
@@ -1254,12 +1253,7 @@ export class Weapons {
       const locked = this.chamberEmpty;
       audio.magOut(long ? 0.25 : 0.1, long);
       audio.magIn(long ? 1.35 : 1.05, long);
-      if (locked) {
-        if (long) {
-          audio.click(1500, 0.55, 0.05, 1.85);
-          audio.click(2200, 0.6, 0.04, 2.0);
-        } else audio.slideRack(1.55);
-      }
+      if (locked) audio.slideRack(long ? 1.9 : 1.55);
       const dur = long ? (locked ? 2.35 : 1.9) : locked ? 1.95 : 1.55;
       this.onAct('reload', dur);
       this.start('magswap', dur, () => {
@@ -1347,7 +1341,6 @@ export class Weapons {
       while (a.data.inserted < due && !a.data.stop) {
         if (this.inv.take(def.weapon!.ammo, 1) === 1) {
           item.loaded = (item.loaded ?? 0) + 1;
-          audio.roundInsert();
         }
         a.data.inserted++;
       }

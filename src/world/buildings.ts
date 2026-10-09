@@ -1032,6 +1032,9 @@ export class Buildings {
       // (which side of it is open to the room: the other is against a wall)
       const open = st.x1 > hw - T - 0.1 ? st.x0 : st.x1, away = open === st.x0 ? -1 : 1;
       this.push('planks', wedgeGeo(L, y1 - rise, 0.04, this.tile('planks'), B.clone().multiply(new THREE.Matrix4().makeTranslation(open, 0, st.foot)).multiply(new THREE.Matrix4().makeRotationY(dz < 0 ? Math.PI : 0))));
+      // and its tall end, under the head of the flight, is boarded too: from behind, the
+      // backs of the steps were seen, and the hollow under them
+      this.push('planks', boxGeo(st.x0, st.x1, 0, h, Math.min(st.top, st.top + dz * 0.04), Math.max(st.top, st.top + dz * 0.04), this.tile('planks'), B));
       // rails: up the open side of the flight, and round the well on the floor above
       this.rail(B, open + away * 0.03, st.foot, open + away * 0.03, st.top, rise, y1);
       this.rail(B, open + away * 0.03, st.foot + dz * run, open + away * 0.03, st.top - dz * 0.02, y1, y1);
