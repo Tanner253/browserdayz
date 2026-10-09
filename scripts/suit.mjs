@@ -80,6 +80,113 @@ const M4 = (a) => new THREE.Matrix4().fromArray(a);
 const at = (m) => new THREE.Vector3().setFromMatrixPosition(m);
 
 /**
+ * The other way about: the SKELETON brought to the suit. wearSuit stretches a suit along every
+ * bone that is longer on the game's skeleton than on its own, and what is painted on it is
+ * stretched with it: a body whose thighs are a quarter shorter than the game's has the cloth
+ * on them pulled a quarter longer. A body that is nobody's but its own (one of the infected:
+ * nothing else is ever worn on its skeleton) keeps its own shape instead. Each joint of the
+ * character's skeleton is moved to where the suit has that joint (at the suit's size brought
+ * to this skeleton's height), the bones keep which way they turn, and every movement the
+ * character has still plays: they are all turns of bones, and the one thing in them that is
+ * a distance (how high the hips ride) is scaled to the new length of leg. Run before wearSuit,
+ * which then finds nothing to stretch.
+ * @returns what was done, for the build's last line
+ */
+export function fitSkeleton({ doc, bodyNode, suit, prefix = 'mixamorig:' }) {
+  const sSkin = suit.getRoot().listSkins()[0];
+  const sJoints = sSkin.listJoints();
+  const ibm = sSkin.getInverseBindMatrices();
+  const p = sJoints.map((_, k) => at(M4(ibm.getElement(k, [])).invert()));
+  const sName = sJoints.map((j) => ours(j.getName(), prefix));
+  const skin = bodyNode.getSkin();
+  const joints = skin.listJoints();
+  const jIndex = new Map(joints.map((j, i) => [j, i]));
+  const byName = new Map(joints.map((j, i) => [j.getName(), i]));
+  const r = joints.map((j) => at(M4(j.getWorldMatrix())));
+  const parent = joints.map((j) => {
+    for (let n = j.getParentNode(); n; n = n.getParentNode()) if (jIndex.has(n)) return jIndex.get(n);
+    return -1;
+  });
+  const suitOf = new Map();
+  sName.forEach((n, k) => n && byName.has(n) && suitOf.set(byName.get(n), k));
+  const S = (n) => suitOf.get(byName.get(n));
+  const scale = (r[byName.get('Head')].y - r[byName.get('foot_l')].y) / (p[S('Head')].y - p[S('foot_l')].y);
+  // the ground under the suit: the lowest point of anything that hangs on its skeleton
+  let floor = Infinity;
+  for (const n of suit.getRoot().listNodes()) {
+    if (!n.getMesh() || !n.getSkin()) continue;
+    for (const prim of n.getMesh().listPrimitives()) {
+      const pos = prim.getAttribute('POSITION');
+      for (let i = 0; i < pos.getCount(); i++) floor = Math.min(floor, pos.getElement(i, [])[1]);
+    }
+  }
+  const depth = (i) => {
+    let d = 0;
+    for (let a = parent[i]; a >= 0; a = parent[a]) d++;
+    return d;
+  };
+  const order = joints.map((_, i) => i).sort((a, b) => depth(a) - depth(b));
+  // which way each bone is turned to lie as the suit's lies (as wearSuit works it out: it
+  // goes by which way the bones point, which moving their ends along them does not change)
+  const turn = joints.map(() => new THREE.Quaternion());
+  for (const i of order) {
+    const up = parent[i];
+    const before = up < 0 ? new THREE.Quaternion() : turn[up];
+    turn[i].copy(before);
+    const k = suitOf.get(i), way = points(joints[i].getName());
+    const c = way && byName.get(way.to), kc = c !== undefined ? suitOf.get(c) : undefined;
+    if (k === undefined || kc === undefined) continue;
+    const want = p[kc].clone().sub(p[k]);
+    const has = r[c].clone().sub(r[i]);
+    turn[i].premultiply(new THREE.Quaternion().setFromUnitVectors(has.clone().applyQuaternion(before).normalize(), want.clone().normalize()));
+    if (way.across) {
+      const [a, b] = way.across.map((n) => byName.get(n)), [sa, sb] = way.across.map(S);
+      if (a === undefined || b === undefined || sa === undefined || sb === undefined) continue;
+      const axis = want.clone().normalize();
+      const from = r[b].clone().sub(r[a]).applyQuaternion(turn[i]).projectOnPlane(axis).normalize();
+      const to = p[sb].clone().sub(p[sa]).projectOnPlane(axis).normalize();
+      turn[i].premultiply(new THREE.Quaternion().setFromAxisAngle(axis, Math.atan2(new THREE.Vector3().crossVectors(from, to).dot(axis), from.dot(to))));
+    }
+  }
+  // where each joint goes: from the joint above it that the suit has too, as far and which way the suit has it (stood back up the way this skeleton rests)
+  const to = r.map((v) => v.clone());
+  const moved = new Set();
+  const hipsWas = joints[byName.get('pelvis')].getTranslation();
+  for (const i of order) {
+    const k = suitOf.get(i);
+    // (the ends of fingers and toes carry nothing and were bound nowhere in particular: like any joint the suit has not, they go with the bone they hang on)
+    if (k === undefined || joints[i].getName().includes('_leaf')) {
+      if (parent[i] >= 0) to[i].copy(r[i]).sub(r[parent[i]]).add(to[parent[i]]);
+      continue;
+    }
+    let up = parent[i];
+    while (up >= 0 && suitOf.get(up) === undefined) up = parent[up];
+    if (up < 0) to[i].set(r[i].x, (p[k].y - floor) * scale, r[i].z);
+    else to[i].copy(p[k]).sub(p[suitOf.get(up)]).multiplyScalar(scale).applyQuaternion(turn[up].clone().invert()).add(to[up]);
+    moved.add(i);
+  }
+  let most = 0;
+  for (const i of order) {
+    if (!moved.has(i)) continue;
+    const above = joints[i].getParentNode();
+    const local = to[i].clone().applyMatrix4(above ? M4(above.getWorldMatrix()).invert() : new THREE.Matrix4());
+    most = Math.max(most, to[i].distanceTo(r[i]));
+    joints[i].setTranslation(local.toArray());
+  }
+  // the one distance in its movements: how high the hips ride, which goes by the length of leg
+  const hipsNow = joints[byName.get('pelvis')].getTranslation();
+  const ride = Math.hypot(...hipsNow) / Math.hypot(...hipsWas);
+  for (const a of doc.getRoot().listAnimations()) {
+    for (const ch of a.listChannels()) {
+      if (ch.getTargetPath() !== 'translation' || ch.getTargetNode() !== joints[byName.get('pelvis')]) continue;
+      const out = ch.getSampler().getOutput();
+      out.setArray(out.getArray().map((v) => v * ride));
+    }
+  }
+  return `skeleton brought to it: ${moved.size} joints moved, the furthest ${(most * 100).toFixed(1)} cm, hips riding x${ride.toFixed(2)}`;
+}
+
+/**
  * @param doc      the character being built: its skeleton is the one the suit goes on
  * @param bodyNode the shape now on that skeleton (it and the other old shapes are taken out)
  * @param suit     what is put on, already read (otherwise it is read from `dir`); and for

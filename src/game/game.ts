@@ -22,7 +22,7 @@ import { BARREL } from '../sim/barrels';
 import { EMOTE, EMOTES, EMOTE_GAP, SAY_RANGE, SAY_TIME, voiceOf } from '../sim/emotes';
 import { loadSave, writeSave, type SaveData } from '../sim/save';
 import { Net, playerName, publicId, remoteServer, serverStatus, setPlayerName } from '../net/client';
-import { F_AIM, F_BLEED, F_CROUCH, F_DANCE, F_DEAD, F_GROUND, F_LEAN_L, F_LEAN_R, F_SEAT, F_SPRINT, F_SURRENDER, MAX_STAMINA, crateId, type Act, type CorpseInfo, type PlayerInfo, type Pose, type S2C, type StashInfo } from '../net/protocol';
+import { F_AIM, F_BLEED, F_CROUCH, F_DANCE, F_DEAD, F_GROUND, F_GUARD, F_LEAN_L, F_LEAN_R, F_SEAT, F_SPRINT, F_SURRENDER, MAX_STAMINA, crateId, type Act, type CorpseInfo, type PlayerInfo, type Pose, type S2C, type StashInfo } from '../net/protocol';
 import { Player } from './player';
 import { Avatar, AVATAR_LAYER, DEATH_REST, FP_BODY_LAYER, GEAR_SHOWN, type Hold } from './avatar';
 import { lookFor } from './look';
@@ -45,7 +45,7 @@ import { renderDoll, renderIcons } from '../ui/icons';
 import { Perf } from '../core/perf';
 import { loadGraphics, type Graphics } from '../core/settings';
 import { Horde, Infected } from './infected';
-import { INFECTED } from '../sim/infected';
+import { INFECTED, guarded } from '../sim/infected';
 import { TOUCH } from '../core/device';
 import { TouchControls } from '../ui/touch';
 import { REWARDS_UI, RewardsModal, addCashedTag, cashedTags, walletAddress } from '../ui/rewards';
@@ -109,10 +109,17 @@ export class Game {
     online: () => this.online,
     send: (m) => this.net.send(m),
     struck: (amount, from) => {
-      const p = this.player.pos;
+      const me = this.player, p = me.pos;
+      // on guard, facing it, with the wind to hold it off: nothing lands
+      if (this.weapons.guarding && me.vitals.stamina >= INFECTED.guardCost && guarded(p.x, p.z, me.yaw, from.x, from.z)) {
+        this.onGuarded();
+        return false;
+      }
       const len = Math.max(0.001, Math.hypot(p.x - from.x, p.z - from.z));
       this.takeHit({ t: 'dmg', from: 0, amount, zone: 'torso', w: 'infected', dir: [(p.x - from.x) / len, 0, (p.z - from.z) / len] });
+      return true;
     },
+    guarded: () => this.onGuarded(),
     dropped: (id, qty, at) => this.dropItem(makeItem(id, qty), at.clone().setY(at.y + 0.05), 0.4),
     killed: (zone, distance) => {
       this.weapons.confirmKill();
@@ -272,8 +279,8 @@ export class Game {
     // the bolt, a reload: the same
     this.weapons.onAct = (a, d) => this.act(a, d);
     // a punch or a swing: your own body throws it, and everyone near you sees it
-    this.weapons.onSwing = () => {
-      this.avatar.swing();
+    this.weapons.onSwing = (seconds) => {
+      this.avatar.swing(false, seconds);
       this.net.send({ t: 'swing' });
     };
     progress('compiling shaders');
@@ -713,7 +720,8 @@ export class Game {
     net.on('i-', (m) => this.horde.remove(m.i));
     net.on('iown', (m) => this.horde.own(m.i, m.to));
     net.on('is', (m) => this.horde.states(m.s, performance.now()));
-    net.on('ihp', (m) => this.horde.hp(m.i, m.dead, m.by, m.zone, m.dir));
+    net.on('ihp', (m) => this.horde.hp(m.i, m.dead, m.by, m.zone, m.dir, !!m.melee));
+    net.on('iblk', (m) => this.horde.blocked(m.i, m.to));
     net.on('shot', (m) => {
       this.weapons.remoteShot(new THREE.Vector3(...m.o), new THREE.Vector3(...m.d), m.w, m.sup);
       this.horde.noise(m.o[0], m.o[2], m.sup ? INFECTED.hearQuiet : INFECTED.hearShot);
@@ -1105,7 +1113,7 @@ export class Game {
     if (this.sendT >= 1 / SEND_HZ) {
       this.sendT = 0;
       const it = this.weapons.equippedItem;
-      const flags = (p.crouched ? F_CROUCH : 0) | (p.sprinting ? F_SPRINT : 0) | (this.weapons.aiming ? F_AIM : 0) | (p.grounded ? F_GROUND : 0) | (p.dead ? F_DEAD : 0) | (p.vitals.bleeding ? F_BLEED : 0) | (p.lean > 0.3 ? F_LEAN_R : p.lean < -0.3 ? F_LEAN_L : 0) | (this.hold === 'dance' ? F_DANCE : 0) | (this.hold === 'surrender' ? F_SURRENDER : 0) | (this.garage.ride ? F_SEAT : 0);
+      const flags = (p.crouched ? F_CROUCH : 0) | (p.sprinting ? F_SPRINT : 0) | (this.weapons.aiming ? F_AIM : 0) | (p.grounded ? F_GROUND : 0) | (p.dead ? F_DEAD : 0) | (p.vitals.bleeding ? F_BLEED : 0) | (p.lean > 0.3 ? F_LEAN_R : p.lean < -0.3 ? F_LEAN_L : 0) | (this.hold === 'dance' ? F_DANCE : 0) | (this.hold === 'surrender' ? F_SURRENDER : 0) | (this.garage.ride ? F_SEAT : 0) | (this.weapons.guarding ? F_GUARD : 0);
       const pose: Pose = [p.pos.x, p.pos.y, p.pos.z, p.yaw, p.pitch, flags];
       this.net.send({ t: 's', p: pose, w: it?.id ?? null, m: it?.mods ?? [] });
     }
@@ -1157,8 +1165,18 @@ export class Game {
     }
   }
 
+  /** a blow came down on this player's guard: it costs wind, and jolts the arms */
+  private onGuarded() {
+    const v = this.player.vitals;
+    v.stamina = Math.max(0, v.stamina - INFECTED.guardCost);
+    this.weapons.jolt();
+    this.meDirty = true;
+  }
+
   private onHit(h: HitInfo) {
     if (h.victim instanceof Infected) {
+      // (stopped where it stands for a moment: at once if it is this game's to move, when the server says so if not)
+      h.victim.stagger(h.melee ? INFECTED.stopStruck : INFECTED.stopShot);
       // (alone, this game has already decided what it did; on a server the server does)
       if (this.online) this.net.send({ t: 'ihit', i: h.victim.i, zone: h.zone, w: h.weapon, dist: h.distance, sup: hasMod(this.weapons.equippedItem, 'suppressor_9'), bonus: h.weapon === 'fists' ? this.inv.wear('fist').reduce((a, b) => a + b, 0) : 0 });
       else if (h.killed) this.hud.note(`Infected down${h.zone === 'head' ? ' · headshot' : ''}${h.melee || h.distance < 8 ? '' : ` · ${Math.round(h.distance)} m`}`, 'good');
@@ -2269,7 +2287,10 @@ export class Game {
     if (this.garage.ride) {
       this.avatar.update(dt, p.pos, _still, this.garage.ride.jeep.yaw, false, p.dead, true, 0, true, false);
       this.garage.seatBody();
-    } else this.avatar.update(dt, interp, p.vel, p.yaw, p.crouched, p.dead, true, 0, p.grounded, this.weapons.aiming);
+    } else {
+      this.avatar.guarding = this.weapons.guarding;
+      this.avatar.update(dt, interp, p.vel, p.yaw, p.crouched, p.dead, true, 0, p.grounded, this.weapons.aiming);
+    }
     // the step you hear and the bob you see are the body's own
     p.stride = this.avatar.stride;
     if (this.avatar.footfall) p.footfall();

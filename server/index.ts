@@ -20,9 +20,9 @@ import { CRATE_RESTOCK, CRATE_SPECS, fillCrate } from '../src/sim/crates';
 import { WEAPON_RULES, hitDamage, type HitZone } from '../src/sim/combat';
 import { BARREL } from '../src/sim/barrels';
 import { JEEP, SEATS, crashDamage, restState, type VehicleInfo, type VState } from '../src/sim/vehicles';
-import { Director, INFECTED, infectedDrop } from '../src/sim/infected';
+import { Director, INFECTED, guarded, infectedDrop } from '../src/sim/infected';
 import { EMOTE, EMOTE_GAP, SHOUT_RANGE } from '../src/sim/emotes';
-import { ACTS, CHAT_RANGE, F_DEAD, MAX_STAMINA, PROTOCOL, type C2S, type CorpseInfo, type KillInfo, type PlayerInfo, type Pose, type S2C, type StashInfo, type StoredItem, type Vitals } from '../src/net/protocol';
+import { ACTS, CHAT_RANGE, F_DEAD, F_GUARD, MAX_STAMINA, PROTOCOL, type C2S, type CorpseInfo, type KillInfo, type PlayerInfo, type Pose, type S2C, type StashInfo, type StoredItem, type Vitals } from '../src/net/protocol';
 
 const PORT = Number(process.env.PORT ?? 8080);
 const ROOT = process.cwd();
@@ -796,7 +796,7 @@ function handle(c: Client, m: C2S) {
         if (had) economy.drop(makeItem(had[0], had[1]), b.s[0] + (Math.random() - 0.5) * 0.8, b.s[1] + 0.03, b.s[2] + (Math.random() - 0.5) * 0.8, Math.random() * Math.PI * 2);
       }
       const len = Math.max(0.001, Math.hypot(b.s[0] - c.pose[0], b.s[2] - c.pose[2]));
-      broadcast({ t: 'ihp', i: m.i, hp: r.hp, dead: r.dead, by: c.id, zone: m.zone, dir: [(b.s[0] - c.pose[0]) / len, (b.s[2] - c.pose[2]) / len] });
+      broadcast({ t: 'ihp', i: m.i, hp: r.hp, dead: r.dead, by: c.id, zone: m.zone, dir: [(b.s[0] - c.pose[0]) / len, (b.s[2] - c.pose[2]) / len], melee: !!rule.melee && !rule.blast });
       return;
     }
     case 'iatk': {
@@ -805,6 +805,14 @@ function handle(c: Client, m: C2S) {
       const b = horde.bodies.get(m.i);
       if (!b || !target?.alive) return;
       if (!horde.strikes(m.i, c.id, { id: target.id, x: target.pose[0], z: target.pose[2] }, Date.now())) return;
+      // On guard (fists, or something in the hand to strike with), facing it, with the wind to
+      // hold it off: nothing lands, and the one that threw it is stopped for a moment.
+      const hands = target.w === null || WEAPON_RULES[target.w]?.melee;
+      if (target.pose[5] & F_GUARD && hands && (target.vitals?.stamina ?? MAX_STAMINA) >= INFECTED.guardCost && guarded(target.pose[0], target.pose[2], target.pose[3], b.s[0], b.s[2])) {
+        if (target.vitals) target.vitals.stamina -= INFECTED.guardCost;
+        broadcast({ t: 'iblk', i: m.i, to: target.id });
+        return;
+      }
       const len = Math.max(0.001, Math.hypot(target.pose[0] - b.s[0], target.pose[2] - b.s[2]));
       send(target, { t: 'dmg', from: 0, amount: INFECTED.damage + Math.round((Math.random() - 0.5) * 6), zone: 'torso', w: 'infected', dir: [(target.pose[0] - b.s[0]) / len, 0, (target.pose[2] - b.s[2]) / len] });
       return;
@@ -1155,7 +1163,7 @@ setInterval(() => {
   // the infected: new ones where nobody is looking, the dead cleared away, and whose game moves each
   const turn = horde.tick(now, [...clients.values()].filter((c) => c.alive).map((c) => ({ id: c.id, x: c.pose[0], z: c.pose[2] })));
   for (const i of turn.gone) broadcast({ t: 'i-', i });
-  for (const b of turn.added) broadcast({ t: 'i+', b: { i: b.i, s: b.s, hp: b.hp, own: b.own } });
+  for (const b of turn.added) broadcast({ t: 'i+', b: { i: b.i, s: b.s, hp: b.hp, own: b.own, h: b.h } });
   for (const [i, to] of turn.owned) broadcast({ t: 'iown', i, to });
   // a new one for each that burned, once its time has come and nobody is standing on the spot
   for (const [home, at] of jeepsDue) {

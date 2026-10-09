@@ -146,6 +146,10 @@ export function installHarness(g: Game) {
      * @param o.speed ground speed; o.dir which way it travels relative to where it faces (0 ahead, 1.57 to its left)
      * @param o.view 'side' | 'front' | 'back' | 'three' (three-quarter)
      */
+    /** the bodies the last lineup stood up */
+    get row() {
+      return row;
+    },
     async lineup(o: { speed?: number; dir?: number; crouch?: boolean; weapon?: string | string[]; mods?: string[][]; n?: number; dead?: number; air?: boolean; pitch?: number; aim?: boolean; view?: string; name?: string; hit?: boolean; dist?: number; clip?: string; from?: number; to?: number; death?: number; gear?: string[]; act?: string; actDur?: number; step?: number; emote?: string; emoteDur?: number; hold?: string } = {}) {
       for (const a of row) a.dispose();
       row.length = 0;

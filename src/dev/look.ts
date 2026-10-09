@@ -183,6 +183,31 @@ export function installLook(g: Game, T: { freeze(on?: boolean): void }) {
       return name;
     },
     /**
+     * A movement as the player sees it, as a strip of pictures: the game is stepped `stepMs`
+     * between each of `n`, and each is the game's own picture of that moment (hands and all),
+     * made small. `before(k)` runs ahead of picture k.
+     */
+    async eyeFilm(name: string, n: number, stepMs: number, before?: (k: number) => void, tile: [number, number] = [320, 240]) {
+      const cols = Math.min(n, 6), rows = Math.ceil(n / cols);
+      const [tw, th] = tile;
+      const strip = document.createElement('canvas');
+      strip.width = cols * tw;
+      strip.height = rows * th;
+      const ctx = strip.getContext('2d')!;
+      for (let k = 0; k < n; k++) {
+        before?.(k);
+        if (stepMs > 0) D.step(stepMs);
+        g.s.r.vmScene.visible = true;
+        g.s.r.render(0);
+        ctx.drawImage(R.domElement, 0, 0, R.domElement.width, R.domElement.height, (k % cols) * tw, Math.floor(k / cols) * th, tw, th);
+      }
+      const bin = atob(strip.toDataURL('image/jpeg', 0.9).split(',')[1]);
+      const buf = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+      await fetch(`http://127.0.0.1:5199/save?name=${name}`, { method: 'POST', body: buf });
+      return name;
+    },
+    /**
      * One of the infected this game moves, stood on open ground at (x, z) facing `yaw`, with
      * the director told where it is. `senses` false leaves it blind and deaf (to film it at
      * rest with the player standing by).

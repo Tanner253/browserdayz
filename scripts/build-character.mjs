@@ -41,6 +41,8 @@ const CLIPS = {
   dance: 'Dance_Loop',
   // in a jeep's seat (src/game/garage.ts)
   sit: 'Sitting_Idle_Loop',
+  // something in the fist to strike with: how it is stood with, and a blow (src/game/avatar.ts)
+  armed: 'Sword_Idle', strike: 'Sword_Attack',
 };
 /**
  * `--emotes`: the same body with a few more clips from the library, written to

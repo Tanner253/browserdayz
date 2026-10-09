@@ -40,8 +40,10 @@ export interface HordeHost {
   others(): Iterable<Person>;
   online(): boolean;
   send(m: C2S): void;
-  /** one of them has hit this game's own player (playing alone: online the server says so) */
-  struck(amount: number, from: THREE.Vector3): void;
+  /** one of them has hit this game's own player (playing alone: online the server says so). False: their guard stopped it. */
+  struck(amount: number, from: THREE.Vector3): boolean;
+  /** this player's guard stopped a blow from there (online: the server has said so) */
+  guarded(from: THREE.Vector3): void;
   /** one of them is dead, by this player's hand */
   killed(zone: HitZone, distance: number): void;
   /** playing alone: one went down with this on it (on a server the server puts it in the world) */
@@ -53,6 +55,8 @@ const INTERP_DELAY = 150;
 const DRAWN = 150;
 const _head = new THREE.Vector3(), _neck = new THREE.Vector3(), _pelvis = new THREE.Vector3();
 const _v = new THREE.Vector3();
+/** as near as two of them stand to each other, metres */
+const APART = 0.62;
 /** a way through a wall: the middle of a doorway, which way it faces (level), the door in it, and the building it belongs to */
 interface Doorway {
   plot: string;
@@ -93,6 +97,18 @@ export class Infected implements Damageable {
   private lastSeen = new THREE.Vector3();
   private strikeT = -1;
   private struck = false;
+  /** stopped in its tracks for this much longer: struck, shot, or its blow turned aside */
+  private stopT = 0;
+  /** when it was last stopped, and when it may strike again (the game's clock, milliseconds) */
+  private stoppedAt = -1e9;
+  private strikeAt = 0;
+  /** how fast it is going, metres a second: it gathers pace and loses it, it does not start and stop dead */
+  private gait = 0;
+  private stepped = false;
+  /** how long it has been looking for somebody with nothing to go on */
+  private alertT = 0;
+  /** on its way back to where it lives */
+  private returning = false;
   private side = Math.random() < 0.5 ? 1 : -1;
   private sideT = 0;
   private stuckT = 0;
@@ -120,7 +136,8 @@ export class Infected implements Damageable {
   async load(info: InfectedInfo) {
     const [x, y, z, yaw] = info.s;
     this.pos.set(x, y, z);
-    this.home.copy(this.pos);
+    // (where it lives is where it first turned up, however far it has been led since)
+    this.home.set(info.h?.[0] ?? x, y, info.h?.[1] ?? z);
     this.yaw = yaw;
     this.mode = info.s[4];
     this.after = info.s[5];
@@ -167,8 +184,6 @@ export class Infected implements Damageable {
     }
     this.lost();
     if (mine) {
-      // it stays about where it was found
-      this.home.copy(this.pos);
       this.fallTo = this.floor(this.pos.x, this.pos.z, this.pos.y);
       if (this.mode >= I_ALERT) this.mode = I_ALERT;
       this.goal.copy(this.pos);
@@ -212,8 +227,28 @@ export class Infected implements Damageable {
     this.goal.copy(at);
     if (this.mode !== I_ALERT) this.dirty = true;
     this.mode = I_ALERT;
-    this.waitT = 3;
+    this.waitT = INFECTED.search * 0.6;
+    this.alertT = 0;
     if (sure) this.thinkT = 0;
+  }
+
+  /**
+   * Stopped where it stands for a moment: it was struck or shot, or its blow was turned aside.
+   * An arm that was on its way up never comes down: this is when to hit it.
+   */
+  stagger(seconds: number) {
+    if (this.dead || !this.mine) return;
+    // (a blow turned aside always tells; shots and blows only once in a while)
+    const now = this.horde.clock;
+    if (seconds < INFECTED.stopBlocked && now - this.stoppedAt < INFECTED.stopAgain * 1000) return;
+    this.stoppedAt = now;
+    this.stopT = Math.max(this.stopT, seconds);
+    this.flinch = 1.2;
+    if (this.mode === I_ATTACK && !this.struck) {
+      this.mode = I_CHASE;
+      this.avatar.sick!.claw = -1;
+      this.dirty = true;
+    }
   }
 
   // ------------------------------------------------------------ the mind
@@ -257,7 +292,7 @@ export class Infected implements Damageable {
       const near = d < I.sightAround && (!p.crouched || ahead);
       const inView = ahead && d < (p.crouched ? I.sightCrouched : I.sight);
       // (somebody it is already after is kept in sight a good deal further, and round behind it)
-      const kept = this.after === p.id && d < I.sight * 1.25;
+      const kept = this.after === p.id && d < I.sight * 1.7;
       if ((near || inView || kept) && d < bd && this.sees(p)) [best, bd] = [p, d];
       else if (!p.crouched && ((p.speed > 5.3 && d < I.hearSprint) || (p.speed > 3 && d < I.hearJog)) && d < hd) [heard, hd] = [p, d];
     };
@@ -281,7 +316,8 @@ export class Infected implements Damageable {
       this.mode = I_ALERT;
       this.after = 0;
       this.goal.copy(this.lastSeen);
-      this.waitT = 3;
+      this.waitT = I.search;
+      this.alertT = 0;
       this.dirty = true;
     } else if (noise && this.mode < I_CHASE) this.hearAt(noise.pos);
   }
@@ -297,6 +333,8 @@ export class Infected implements Damageable {
 
   /** go there if there is room to stand, up no more than a step */
   private tryAt(x: number, z: number): boolean {
+    // (not into another of them: they go round each other, and wait their turn at a door)
+    if (this.horde.crowded(this, x, z)) return false;
     const y = this.floor(x, z, this.pos.y);
     if (y - this.pos.y > 0.6) return false;
     if (physics.world.intersectionWithShape({ x, y: Math.max(y, this.pos.y - 0.3) + 1.02, z }, { x: 0, y: 0, z: 0, w: 1 }, this.shape, undefined, PLAYER_GROUPS, undefined, this.body) !== null) return false;
@@ -318,8 +356,9 @@ export class Infected implements Damageable {
   private goTo(at: THREE.Vector3, speed: number, dt: number): boolean {
     const there = this.horde.plotAt(at.x, at.z), here = this.horde.plotAt(this.pos.x, this.pos.z);
     // On another floor of the building it is in: by the stairs, to their near end and then along them.
-    const dy = at.y - this.pos.y;
-    const other = !!here && here === there && Math.abs(dy) > 1.5;
+    // (And upstairs with somewhere to be that is not in this building at all: down them first.)
+    const dy = (here === there ? at.y : heightAt(this.host.world().heights, this.pos.x, this.pos.z)) - this.pos.y;
+    const other = !!here && Math.abs(dy) > 1.5 && (here === there || dy < 0);
     if (other && !this.onSteps && (!this.steps || this.steps.plot !== here || this.stepsUp !== dy > 0)) {
       const f = this.horde.flight(here, this.pos, dy > 0);
       // the way by it: to its near end, along it, and (at the top) clear of the well it comes up through
@@ -384,9 +423,12 @@ export class Infected implements Damageable {
     if (d < 0.05) return true;
     const want = Math.atan2(-dx, -dz);
     this.yaw = turnTo(this.yaw, want, dt * (speed > 3 ? 7 : 3.2));
+    // (it gathers pace over the first second and a bit: from standing to a run is not one step)
+    this.stepped = true;
+    this.gait += THREE.MathUtils.clamp(speed - this.gait, -8 * dt, 3.2 * dt);
     // (it goes the way it faces, not sideways: it has to come round first, and it does not overshoot)
     const off = Math.abs(Math.atan2(Math.sin(want - this.yaw), Math.cos(want - this.yaw)));
-    const step = Math.min(d, speed * dt * Math.max(0.15, 1 - off / 1.6));
+    const step = Math.min(d, this.gait * dt * Math.max(0.15, 1 - off / 1.6));
     this.sideT -= dt;
     const dirs = this.sideT > 0 ? [this.side * 1.0, 0, this.side * 1.7, -this.side * 1.0, this.side * 2.4] : [0, this.side * 0.95, -this.side * 0.95, this.side * 1.7, -this.side * 1.7];
     for (const a of dirs) {
@@ -416,27 +458,45 @@ export class Infected implements Damageable {
       this.think(now);
     }
     const quarry = this.after ? this.horde.person(this.after) : null;
+    // (whatever it does not walk this frame, it loses pace)
+    if (!this.stepped) this.gait = Math.max(0, this.gait - 8 * dt);
+    this.stepped = false;
+    if (this.stopT > 0) {
+      // stopped: it does nothing until it has its feet again (but it can still fall)
+      this.stopT -= dt;
+      if (this.pos.y > this.fallTo + 0.02) this.pos.y = Math.max(this.fallTo, this.pos.y - 7 * dt);
+      return;
+    }
     switch (this.mode) {
       case I_IDLE:
         if ((this.waitT -= dt) <= 0) {
-          const a = Math.random() * Math.PI * 2, r = 3 + Math.random() * 12;
-          this.goal.set(this.home.x + Math.cos(a) * r, 0, this.home.z + Math.sin(a) * r);
+          // Led off somewhere, it walks back to where it lives; there, it drifts about the place.
+          const away = Math.hypot(this.home.x - this.pos.x, this.home.z - this.pos.z) > I.stray;
+          const a = Math.random() * Math.PI * 2, r = away ? 2 + Math.random() * 5 : 3 + Math.random() * 12;
+          const gx = this.home.x + Math.cos(a) * r, gz = this.home.z + Math.sin(a) * r;
+          this.goal.set(gx, heightAt(this.host.world().heights, gx, gz), gz);
+          this.returning = away;
           this.mode = I_WANDER;
-          this.waitT = 14;
+          this.waitT = away ? 120 : 14;
           this.dirty = true;
           this.lost();
         }
         break;
       case I_WANDER:
         this.waitT -= dt;
-        if (!this.walk(this.goal.x, this.goal.z, I.wander, dt)) this.waitT -= dt * 4;
-        if (this.waitT <= 0 || Math.hypot(this.goal.x - this.pos.x, this.goal.z - this.pos.z) < 0.8) {
+        // (the way home may be out of a house and across the village: by the doors. A drift about the place is just a few steps.)
+        if (!(this.returning ? this.goTo(this.goal, I.back, dt) : this.walk(this.goal.x, this.goal.z, I.wander, dt))) this.waitT -= dt * 4;
+        if (this.waitT <= 0 || Math.hypot(this.goal.x - this.pos.x, this.goal.z - this.pos.z) < (this.returning ? 2 : 0.8)) {
           this.mode = I_IDLE;
-          this.waitT = 2 + Math.random() * 7;
+          this.waitT = this.returning && this.waitT > 0 ? 1 + Math.random() * 3 : 2 + Math.random() * 7;
+          this.returning = false;
           this.dirty = true;
         }
         break;
       case I_ALERT:
+        // It looks for only so long with nothing new to go on: at a door it cannot open, at a
+        // wall, up a blind alley. Then it gives up, and goes home.
+        this.alertT += dt;
         if (Math.hypot(this.goal.x - this.pos.x, this.goal.z - this.pos.z) > 1.2 || Math.abs(this.goal.y - this.pos.y) > 1.5 || this.onSteps) {
           if (!this.goTo(this.goal, I.look, dt)) this.waitT -= dt;
         } else {
@@ -444,9 +504,10 @@ export class Infected implements Damageable {
           this.yaw += dt * 0.9 * this.side;
           this.waitT -= dt;
         }
-        if (this.waitT <= 0) {
+        if (this.waitT <= 0 || this.alertT > I.patience) {
           this.mode = I_IDLE;
           this.waitT = 1 + Math.random() * 3;
+          this.lost();
           this.dirty = true;
         }
         break;
@@ -455,27 +516,39 @@ export class Infected implements Damageable {
         const d = Math.hypot(at.x - this.pos.x, at.z - this.pos.z);
         // (it strikes what it can see: not through a wall it happens to be standing against)
         if (quarry?.alive && now - this.seenAt < 500 && !(quarry.seated && quarry.speed > 2.5) && d < I.reach * 0.82 && Math.abs(quarry.pos.y - this.pos.y) < 1.4) {
-          this.mode = I_ATTACK;
-          this.strikeT = 0;
-          this.struck = false;
-          this.way = null;
-          this.avatar.claw();
-          audio.infected('attack', this.pos, this.pos.distanceTo(this.horde.eye), this.i);
-          this.dirty = true;
+          if (now >= this.strikeAt) {
+            this.mode = I_ATTACK;
+            this.strikeT = 0;
+            this.strikeAt = now + I.swing * 1000;
+            this.struck = false;
+            this.way = null;
+            this.avatar.claw();
+            audio.infected('attack', this.pos, this.pos.distanceTo(this.horde.eye), this.i);
+            this.dirty = true;
+            break;
+          }
+          // between one blow and the next it does not stand like a post: it keeps its face to them, and keeps at them
+          this.yaw = turnTo(this.yaw, Math.atan2(-(quarry.pos.x - this.pos.x), -(quarry.pos.z - this.pos.z)), dt * 5);
+          if (d > 1.0) this.walk(quarry.pos.x, quarry.pos.z, I.wander, dt);
           break;
         }
         if (d > 0.4) this.goTo(at, I.chase, dt);
         break;
       }
       case I_ATTACK: {
-        if (quarry) this.yaw = turnTo(this.yaw, Math.atan2(-(quarry.pos.x - this.pos.x), -(quarry.pos.z - this.pos.z)), dt * 5);
+        if (quarry) {
+          this.yaw = turnTo(this.yaw, Math.atan2(-(quarry.pos.x - this.pos.x), -(quarry.pos.z - this.pos.z)), dt * 5);
+          // (it throws itself the last of the way: whatever pace it had carries it in as the arm goes up)
+          if (this.strikeT < I.windup && Math.hypot(quarry.pos.x - this.pos.x, quarry.pos.z - this.pos.z) > 1.0) this.walk(quarry.pos.x, quarry.pos.z, this.gait * 0.5, dt);
+        }
         this.strikeT += dt;
         if (!this.struck && this.strikeT >= I.windup) {
           this.struck = true;
           // it lands on whoever is still inside its arms when they come down
           if (quarry?.alive && Math.hypot(quarry.pos.x - this.pos.x, quarry.pos.z - this.pos.z) < I.reach + 0.3 && Math.abs(quarry.pos.y - this.pos.y) < 1.6) this.horde.strike(this, quarry);
         }
-        if (this.strikeT >= I.swing) {
+        // (the lunge over, it is after them again at once: when it may strike next is another matter)
+        if (this.strikeT >= I.lunge) {
           this.mode = I_CHASE;
           this.dirty = true;
         }
@@ -598,6 +671,9 @@ export class Horde {
   private people = new Map<number, Person>();
   /** the game's clock, milliseconds, as of this frame */
   private now = 0;
+  get clock() {
+    return this.now;
+  }
 
   constructor(readonly host: HordeHost) {}
 
@@ -647,11 +723,12 @@ export class Horde {
   }
 
   /** the director says what a hit left one with */
-  hp(i: number, dead: boolean, by: number, zone: HitZone, dir: [number, number]) {
+  hp(i: number, dead: boolean, by: number, zone: HitZone, dir: [number, number], melee = false) {
     const b = this.all.get(i);
     if (!b) return;
     const mine = by === this.host.me().id;
     if (!mine && !dead && b.ready) b.avatar.hit(zone === 'head');
+    if (!dead) b.stagger(melee ? INFECTED.stopStruck : INFECTED.stopShot);
     if (dead && !b.dead) {
       // away from the blow: onto its back from the front, onto its face from behind
       const along = -Math.sin(b.yaw) * dir[0] - Math.cos(b.yaw) * dir[1];
@@ -722,6 +799,30 @@ export class Horde {
     return best;
   }
 
+  /**
+   * Whether a step to there would bring one of them into another: closer than shoulder to
+   * shoulder, and closer than it is now (stepping apart is always allowed).
+   */
+  crowded(b: Infected, x: number, z: number): boolean {
+    for (const o of this.all.values()) {
+      if (o === b || o.dead || !o.ready || Math.abs(o.pos.y - b.pos.y) > 1.2) continue;
+      const dx = o.pos.x - x, dz = o.pos.z - z;
+      if (Math.abs(dx) > APART || Math.abs(dz) > APART) continue;
+      const d2 = dx * dx + dz * dz;
+      if (d2 < APART * APART && d2 < (o.pos.x - b.pos.x) ** 2 + (o.pos.z - b.pos.z) ** 2 - 1e-5) return true;
+    }
+    return false;
+  }
+
+  /** the director (playing alone) or the server says a blow of one's was stopped by somebody's guard */
+  blocked(i: number, to: number) {
+    const b = this.all.get(i);
+    if (!b) return;
+    b.stagger(INFECTED.stopBlocked);
+    audio.impact('flesh', b.pos, b.pos.distanceTo(this.eye));
+    if (to === this.host.me().id) this.host.guarded(b.pos);
+  }
+
   /** A noise at a place, heard this far off: the ones this game moves go to see. */
   noise(x: number, z: number, range: number) {
     const at = new THREE.Vector3(x, 0, z);
@@ -756,7 +857,10 @@ export class Horde {
   strike(b: Infected, on: Person) {
     if (this.director) {
       // (alone there is nobody else to hit)
-      if (this.director.strikes(b.i, on.id, { id: on.id, x: on.pos.x, z: on.pos.z }, this.now)) this.host.struck(INFECTED.damage + Math.round((Math.random() - 0.5) * 6), b.pos);
+      if (this.director.strikes(b.i, on.id, { id: on.id, x: on.pos.x, z: on.pos.z }, this.now) && !this.host.struck(INFECTED.damage + Math.round((Math.random() - 0.5) * 4), b.pos)) {
+        b.stagger(INFECTED.stopBlocked);
+        audio.impact('flesh', b.pos, b.pos.distanceTo(this.eye));
+      }
       return;
     }
     this.host.send({ t: 'iatk', i: b.i, to: on.id });
@@ -789,8 +893,8 @@ export class Horde {
       for (let c = a + 1; c < mine.length; c++) {
         const dx = mine[c].pos.x - mine[a].pos.x, dz = mine[c].pos.z - mine[a].pos.z;
         const d = Math.hypot(dx, dz);
-        if (d > 0.62 || d < 1e-3) continue;
-        const push = ((0.62 - d) / 2 / d) * 0.5;
+        if (d > APART || d < 1e-3 || Math.abs(mine[c].pos.y - mine[a].pos.y) > 1.2) continue;
+        const push = (APART - d) / 2 / d;
         mine[a].nudge(-dx * push, -dz * push);
         mine[c].nudge(dx * push, dz * push);
       }

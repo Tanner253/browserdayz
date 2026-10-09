@@ -13,6 +13,7 @@ import type { Atmosphere } from '../world/atmosphere';
 import { bent, type Grips, type HandGrip } from './arms';
 import { BEARD, HAIR_STYLES, MAX_WOUNDS, loadCharacter, lookFor, lookPatch, lookUniforms, setLookUniforms, stainPatch, suitPatch, type BodyFile, type Look, type LookUniforms } from './look';
 import type { Emote } from '../sim/emotes';
+import { INFECTED } from '../sim/infected';
 
 /** local player's full body: seen by the shadow cameras always, by the main camera only on the flight in from the menu */
 export const AVATAR_LAYER = 2;
@@ -30,7 +31,7 @@ const FP_BACK = 0.3;
 /** the limbs a bloodstain can sit on: it goes on whichever is nearest the hit */
 const WOUND_BONES: [string, string | null][] = [['pelvis', 'spine_01'], ['spine_01', 'spine_02'], ['spine_02', 'spine_03'], ['spine_03', 'neck_01'], ['neck_01', 'Head'], ['Head', null], ['upperarm_l', 'lowerarm_l'], ['upperarm_r', 'lowerarm_r'], ['lowerarm_l', 'hand_l'], ['lowerarm_r', 'hand_r'], ['thigh_l', 'calf_l'], ['thigh_r', 'calf_r'], ['calf_l', 'foot_l'], ['calf_r', 'foot_r'], ['foot_l', 'ball_l'], ['foot_r', 'ball_r']];
 
-const CLIPS = ['idle', 'walk', 'run', 'crouchIdle', 'crouchWalk', 'jumpStart', 'jumpLoop', 'jumpLand', 'death', 'deathFront', 'deathSide', 'hit', 'hitHead', 'dance', 'sit'] as const;
+const CLIPS = ['idle', 'walk', 'run', 'crouchIdle', 'crouchWalk', 'jumpStart', 'jumpLoop', 'jumpLand', 'death', 'deathFront', 'deathSide', 'hit', 'hitHead', 'dance', 'sit', 'armed', 'strike'] as const;
 type Clip = (typeof CLIPS)[number];
 const STRIDES = ['walk', 'run', 'crouchWalk'] as const;
 type Stride = (typeof STRIDES)[number];
@@ -150,7 +151,39 @@ type Stances = Record<'ready' | 'aim' | 'carry', Stance>;
 const THUMB_SEEN = 16;
 
 /** how long the infected's blow takes from the arms going up to their coming back, seconds */
-const CLAW = 0.95;
+/** how long one of the infected's lunges takes (see src/sim/infected.ts) */
+const CLAW = INFECTED.lunge;
+/**
+ * How the infected get about. Their walk is the game's own, at whatever pace they are going;
+ * their run is another body's, drawn to another length with several strides in it, so it is
+ * not stepped in time with the walk (which played it at better than twice its pace): above
+ * `from` metres a second it is faded in over the walk, all of it by `to`, and it keeps its
+ * own time, at the pace it was drawn for (`pace`, metres a second) or as near as `give` lets it be.
+ */
+// (Measured on the body: a foot on the ground goes back under it at about 2.3 m/s as the clip
+// was drawn. Played at that pace under a body going 3.3, the feet slid a metre a second.)
+const SICK_GAIT = { from: 1.9, to: 2.7, pace: 2.3, give: [0.8, 1.5] };
+/** how far through it the blow lands */
+const CLAW_HIT = INFECTED.windup / CLAW;
+
+/**
+ * The blow the animation library draws (`strike`): the arm is drawn up and back until 0.3 s
+ * into it, comes down through whatever is in front at 0.43 s, hangs there, and is home by
+ * 1.1 s. A blow in the game lands a share `hit` of the way through its own time (0.35 for a
+ * player's, see Weapons.actionTick), so the drawing is run at whatever pace puts its 0.43 s
+ * there.
+ * @param u how far through the blow, 0..1
+ */
+export function strikeAt(u: number, hit = 0.35): number {
+  return u < hit ? THREE.MathUtils.lerp(0.07, 0.43, u / hit) : THREE.MathUtils.lerp(0.43, 1.1, (u - hit) / (1 - hit));
+}
+/** how much of the body is given over to it: taken up quickly at the start, handed back over the last quarter */
+export const strikeShare = (u: number) => THREE.MathUtils.smoothstep(u, 0, 0.1) * (1 - THREE.MathUtils.smoothstep(u, 0.74, 1));
+/** how much of a clip laid over the body each bone takes: all of it from the chest out, less at the waist and the head, none below the waist (unless the legs are given over too) */
+const LAID: [RegExp, number][] = [
+  [/^spine_01$/, 0.55], [/^spine_02$/, 0.85], [/^spine_03$/, 1], [/^neck_01$/, 0.6], [/^Head$/, 0.35],
+  [/^(clavicle|upperarm|lowerarm|hand|thumb|index|middle|ring|pinky)_/, 1],
+];
 
 /** how far the middle of the thumb lies from the middle of the finger it is laid against, metres */
 const THUMB_BESIDE = 0.02;
@@ -205,6 +238,14 @@ export class Avatar {
    * value has not changed, so posing the animated skeleton itself would pile up.)
    */
   private drive: [THREE.Object3D, THREE.Object3D][] = [];
+  /** the same pairs, with how much of a clip laid over the body each takes (see LAID) and whether it is below the waist (2: the hips themselves) */
+  private laid: [THREE.Object3D, THREE.Object3D, number, 0 | 1 | 2][] = [];
+  /** the two skeletons' own roots: a bone's turn is compared between them from there */
+  private driverRoot!: THREE.Object3D;
+  private modelRoot!: THREE.Object3D;
+  /** a blow with something in the fist: seconds into it (-1 none), and how long it takes */
+  private strikeT = -1;
+  private strikeDur = 0.6;
   private fpBones: [THREE.Object3D, THREE.Object3D, boolean][] = [];
   private yaw = 0;
   /** false until the first update: a body that appears is already facing its way, not turning to it */
@@ -280,6 +321,10 @@ export class Avatar {
   private punchSide = -1;
   private fistsHold = 0;
   private fistsT = 0;
+  /** where one of the infected is in its run, seconds */
+  private sickRun = 0;
+  /** on guard: the fists are up (and what is in the right one with them) for as long as this is set */
+  guarding = false;
   // how far the weapon is up at the eye, and how far it is in its running carry, 0..1
   private aimT = 0;
   private carryT = 0;
@@ -430,8 +475,12 @@ export class Avatar {
     });
     model.traverse((o) => {
       const from = (o as THREE.Bone).isBone ? src.get(o.name) : undefined;
-      if (from) this.drive.push([from, o]);
+      if (!from) return;
+      this.drive.push([from, o]);
+      this.laid.push([from, o, LAID.find(([re]) => re.test(o.name))?.[1] ?? 0, o.name === 'pelvis' ? 2 : /^(thigh|calf|foot|ball)_/.test(o.name) ? 1 : 0]);
     });
+    this.driverRoot = driver;
+    this.modelRoot = model;
     this.mixer = new THREE.AnimationMixer(driver);
     for (const name of CLIPS) {
       const clip = gltf.animations.find((c) => c.name === name);
@@ -766,8 +815,14 @@ export class Avatar {
    * thrown from a guard, left and right in turn.
    * @param overhand swing the empty arm all the same (a throw)
    */
-  swing(overhand = false) {
-    if (overhand || this.inHand || this.held) {
+  swing(overhand = false, seconds = 0.62) {
+    if (this.inHand && !overhand) {
+      // something in the fist to strike with: the blow the library draws
+      this.strikeT = 0;
+      this.strikeDur = seconds;
+      return;
+    }
+    if (overhand || this.held) {
       this.swingT = 0;
       return;
     }
@@ -841,15 +896,16 @@ export class Avatar {
     // one arm hangs, the other is carried bent and jumps when the rest of it does
     const carried = side > 0 ? this.armL : this.armR;
     if (carried && slack > 0.02) this.lean(carried.fore, _right, (0.5 + jerk * 3) * slack);
-    let strike = 0;
+    // (a blow is the library's drawing of one, laid over the body before this: the arms are left to it while it lasts)
+    const strike = 0;
+    let given = 0;
     if (s.claw >= 0) {
       s.claw += dt;
       const k = s.claw / CLAW;
       if (k >= 1) s.claw = -1;
-      // up and back, down hard, and a moment hanging there before the arms come up again
-      else strike = k < 0.3 ? -Math.sin((k / 0.3) * Math.PI) * 0.5 : THREE.MathUtils.smoothstep(k, 0.3, 0.46) * (1 - THREE.MathUtils.smootherstep(k, 0.62, 1));
+      else given = strikeShare(k);
     }
-    const w = Math.max(s.roused * 0.9, Math.abs(strike));
+    const w = s.roused * 0.9 * (1 - given);
     if (w < 0.02 || !this.armR || !this.armL || !head) {
       for (const r of [this.armR, this.armL]) if (r) this.curl(r, [0.5, 0.58, 0.66, 0.74], r.hand.getWorldQuaternion(_qa));
       return;
@@ -923,6 +979,39 @@ export class Avatar {
     this.leanT = THREE.MathUtils.clamp(lean, -1, 1);
   }
 
+  /**
+   * One clip at one moment, laid over the body as the others have left it: the chest, the
+   * arms and the head take it (see LAID), and the legs go on with what they were doing.
+   * @param legs 0..1: how far the hips and legs are given over to it as well (the whole body lunges)
+   */
+  private layer(clip: Clip, time: number, weight: number, legs = 0) {
+    if (weight <= 0.001) return;
+    for (const n of CLIPS) this.actions[n].setEffectiveWeight(n === clip ? 1 : 0);
+    this.actions[clip].time = THREE.MathUtils.clamp(time, 0, this.dur[clip] - 1e-3);
+    this.mixer.update(0);
+    // The clip turns its hips as it pleases (a blow is thrown side-on). When the hips are not
+    // given over to it, the lowest bone that is has to end up facing the way the CLIP has it
+    // face, not that way again from wherever these hips are: so that one is set by where it
+    // points from the root, and the ones above it follow from there as the clip has them.
+    let seam = legs < 0.999;
+    for (const [from, to, share, low] of this.laid) {
+      const k = weight * (low ? legs : Math.max(share, legs));
+      if (k <= 0.001) continue;
+      if (seam && !low) {
+        seam = false;
+        this.driverRoot.updateWorldMatrix(true, true);
+        this.modelRoot.updateWorldMatrix(true, false);
+        to.parent!.updateWorldMatrix(true, false);
+        const want = this.driverRoot.getWorldQuaternion(_q1).invert().multiply(from.getWorldQuaternion(_q2));
+        const have = this.modelRoot.getWorldQuaternion(_q3).invert().multiply(to.parent!.getWorldQuaternion(_q2));
+        to.quaternion.slerp(have.invert().multiply(want), k);
+        continue;
+      }
+      to.quaternion.slerp(from.quaternion, k);
+      if (low === 2) to.position.lerp(from.position, k);
+    }
+  }
+
   /** Development: stand in one clip at one moment, nothing blended. */
   debugPose(clip: Clip, time: number) {
     for (const n of CLIPS) {
@@ -981,9 +1070,9 @@ export class Avatar {
     // (and sat in a jeep it is slung)
     const using = (!!ges && ges.kind !== 'bolt' && ges.kind !== 'reload') || !!mv || this.danceT > 0.25 || this.handsT > 0.25 || this.seatT > 0.25;
     const held = using ? null : this.held;
-    // fists come up for a punch and stay up a while after it
+    // fists come up for a punch and stay up a while after it; and on guard they are up, with whatever is in them
     this.fistsHold = Math.max(0, this.fistsHold - dt);
-    const fists = this.fistsHold > 0 && !dead && !armed && !this.inHand && !using;
+    const fists = ((this.fistsHold > 0 && !this.inHand) || (this.guarding && this.strikeT < 0)) && !dead && !armed && !using;
     this.fistsT += ((fists ? 1 : 0) - this.fistsT) * ease(fists ? 14 : 6);
     if (!fists) this.punchT = -1;
     // face the movement direction when running unarmed, else the look direction (a punch goes where the eyes do)
@@ -1042,7 +1131,8 @@ export class Avatar {
     const air = this.airT * (1 - down) * (1 - land);
     const push = this.jumpT >= 0 ? 1 - THREE.MathUtils.smoothstep(this.jumpT, POSE.jump[1] * 0.4, POSE.jump[1]) : 0;
     const move = this.moveT;
-    const runK = THREE.MathUtils.clamp((speed - POSE.walkTop) / (POSE.pace.run - POSE.walkTop), 0, 1);
+    const runK = this.sick ? THREE.MathUtils.smoothstep(speed, SICK_GAIT.from, SICK_GAIT.to) : THREE.MathUtils.clamp((speed - POSE.walkTop) / (POSE.pace.run - POSE.walkTop), 0, 1);
+    if (this.sick) this.sickRun += dt * THREE.MathUtils.clamp(speed / SICK_GAIT.pace, SICK_GAIT.give[0], SICK_GAIT.give[1]);
     let hit = 0;
     const hitLen = this.dur[this.hitClip];
     if (this.hitT >= 0) {
@@ -1069,6 +1159,8 @@ export class Avatar {
       hit: this.hitClip === 'hit' ? hit : 0,
       hitHead: this.hitClip === 'hitHead' ? hit : 0,
       sit: 0,
+      armed: 0,
+      strike: 0,
     };
     // sat down, sitting is all of it but the flinch
     const st = this.seatT * (1 - down);
@@ -1086,6 +1178,8 @@ export class Avatar {
     };
     let cadence = 0, stepping = 0;
     for (const n of STRIDES) {
+      // (the infected's run keeps its own time: see SICK_GAIT)
+      if (this.sick && n === 'run') continue;
       cadence += (w[n] * rate[n]) / this.dur[n];
       stepping += w[n];
     }
@@ -1119,6 +1213,7 @@ export class Avatar {
       else if (n === 'hit' || n === 'hitHead') a.time = Math.min(Math.max(0, this.hitT), this.dur[n] - 1e-3);
       else if (n === 'jumpStart') a.time = Math.min(this.dur[n] - 1e-3, POSE.jump[0] + Math.max(0, this.jumpT));
       else if (n === 'jumpLand') a.time = Math.min(this.dur[n] - 1e-3, POSE.landFrom + Math.max(0, this.landT));
+      else if (n === 'run' && this.sick) a.time = this.sickRun % this.dur[n];
       else if (n === 'walk' || n === 'run' || n === 'crouchWalk') a.time = ((this.phase + POSE.offset[n]) % 1) * this.dur[n];
       else a.time = this.clock % this.dur[n];
     }
@@ -1126,6 +1221,19 @@ export class Avatar {
     for (const [from, to] of this.drive) {
       to.position.copy(from.position);
       to.quaternion.copy(from.quaternion);
+    }
+
+    // --- a blow with something in the fist, or one of the infected's: the library's drawing of one, laid over all that
+    if (this.strikeT >= 0) {
+      this.strikeT += dt;
+      const u = this.strikeT / this.strikeDur;
+      if (u >= 1 || dead) this.strikeT = -1;
+      else this.layer('strike', strikeAt(u), strikeShare(u));
+    }
+    if (this.sick && this.sick.claw >= 0 && !dead) {
+      // (it throws its whole body after its arm: the lunge is the clip's own)
+      const u = this.sick.claw / CLAW;
+      this.layer('strike', strikeAt(u, CLAW_HIT), strikeShare(u), 1);
     }
 
     this.root.position.copy(pos);

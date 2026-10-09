@@ -30,7 +30,7 @@ import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { dedup, prune, mergeDocuments, unpartition, textureCompress, meshopt, metalRough } from '@gltf-transform/functions';
 import { MeshoptDecoder, MeshoptEncoder } from 'meshoptimizer';
 import sharp from 'sharp';
-import { wearSuit, ours } from './suit.mjs';
+import { wearSuit, fitSkeleton, ours } from './suit.mjs';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
 const SRC = path.join(ROOT, 'assets-src', 'models');
@@ -64,7 +64,7 @@ const readCop = async () => {
 
 // ---------------------------------------------------------------- the cop's skeleton, as it was bound
 
-function rigOf(doc) {
+function rigOf(doc, prefix = '') {
   const skin = doc.getRoot().listSkins()[0];
   const joints = skin.listJoints();
   const ibm = skin.getInverseBindMatrices();
@@ -74,7 +74,7 @@ function rigOf(doc) {
     for (let n = j.getParentNode(); n; n = n.getParentNode()) if (index.has(n)) return index.get(n);
     return -1;
   });
-  const name = joints.map((j) => ours(j.getName(), ''));
+  const name = joints.map((j) => ours(j.getName(), prefix));
   const at = (n) => new THREE.Vector3().setFromMatrixPosition(bind[name.indexOf(n)]);
   return { skin, joints, bind, index, parent, name, at };
 }
@@ -449,21 +449,21 @@ async function likeTheCop(cop, statue) {
   const ys = [S.floor, S.crotch, S.armY, S.top], yc = [C.floor, C.crotch, C.armY, C.top];
   const as = all.map((p) => p.clone());
   /** @param wrists how far out each of its wrists is, and the cop's; or nothing, and its arms are laid fingertip to fingertip with the cop's */
-  const stand = (wrists) => {
-    all.forEach((p, i) => {
-      const o = as[i], ax = Math.abs(o.x), sg = o.x < 0 ? -1 : 1;
-      let x = steps(ax, [0, shoulderS, S.tip], [0, shoulderC, C.tip]);
-      if (wrists) {
-        // (the arm from shoulder to wrist is laid on the cop's; the hand beyond keeps its own shape, at the size of the rest of the body)
-        const [its, cops] = wrists[sg];
-        x = ax <= its ? steps(ax, [0, shoulderS, its], [0, shoulderC, cops]) : cops + (ax - its) * k;
-      }
-      // (an arm is not stretched up and down with the trunk it hangs beside: it is moved to the cop's arm, whole)
-      const arm = smooth(ax, shoulderS * 1.05, shoulderS * 1.4);
-      const y = THREE.MathUtils.lerp(steps(o.y, ys, yc), C.armY + (o.y - S.armY) * k, arm);
-      p.set(sg * x, y, C.chestZ + (o.z - S.chestZ) * k);
-    });
+  /** where a place on the statue is when it is stood to the cop */
+  const laid = (o, wrists, out = new THREE.Vector3()) => {
+    const ax = Math.abs(o.x), sg = o.x < 0 ? -1 : 1;
+    let x = steps(ax, [0, shoulderS, S.tip], [0, shoulderC, C.tip]);
+    if (wrists) {
+      // (the arm from shoulder to wrist is laid on the cop's; the hand beyond keeps its own shape, at the size of the rest of the body)
+      const [its, cops] = wrists[sg];
+      x = ax <= its ? steps(ax, [0, shoulderS, its], [0, shoulderC, cops]) : cops + (ax - its) * k;
+    }
+    // (an arm is not stretched up and down with the trunk it hangs beside: it is moved to the cop's arm, whole)
+    const arm = smooth(ax, shoulderS * 1.05, shoulderS * 1.4);
+    const y = THREE.MathUtils.lerp(steps(o.y, ys, yc), C.armY + (o.y - S.armY) * k, arm);
+    return out.set(sg * x, y, C.chestZ + (o.z - S.chestZ) * k);
   };
+  const stand = (wrists) => all.forEach((p, i) => laid(as[i], wrists, p));
   // Fingertip to fingertip first, to find its wrists by; then with its wrists at the cop's.
   // (The cop's hands are claws a hand and a half long: laid tip to tip, a statue's wrist was
   // most of the way up the cop's forearm, and its arm bent there.)
@@ -530,6 +530,37 @@ async function likeTheCop(cop, statue) {
   // (all but the hands: see fitHands)
   const hands = `${fitHands(shapes, rig, u)}; its wrists were ${arms} out along the cop's arms, laid fingertip to fingertip`;
 
+  // ---- and back into its own shape, with the cop's skeleton brought to IT
+  // It was stood to the cop only to learn from him which bones each point hangs on. Left
+  // like that it would wear his proportions, pulled a little longer here and shorter there,
+  // and what is painted on it pulled with it. So every point goes back where the statue has
+  // it (at the cop's size, and nothing else done to it), and each joint of the skeleton goes
+  // to the place on the statue that was laid where that joint is.
+  const own = (o) => new THREE.Vector3(o.x * k, C.floor + (o.y - S.floor) * k, C.chestZ + (o.z - S.chestZ) * k);
+  const back = (at) => {
+    const o = new THREE.Vector3(at.x / k, S.floor + (at.y - C.floor) / k, S.chestZ + (at.z - C.chestZ) / k), w = new THREE.Vector3();
+    for (let n = 0; n < 60; n++) {
+      laid(o, wrists, w);
+      o.x += ((at.x - w.x) / k) * 0.7;
+      o.y += ((at.y - w.y) / k) * 0.7;
+      o.z += (at.z - w.z) / k;
+    }
+    return o;
+  };
+  let slack = 0;
+  {
+    const ibm = rig.skin.getInverseBindMatrices();
+    rig.joints.forEach((_, j) => {
+      const was = new THREE.Vector3().setFromMatrixPosition(rig.bind[j]);
+      const o = back(was);
+      slack = Math.max(slack, laid(o, wrists).distanceTo(was));
+      rig.bind[j] = rig.bind[j].clone().setPosition(own(o));
+      ibm.setElement(j, rig.bind[j].clone().invert().elements);
+    });
+  }
+  all.forEach((p, i) => p.copy(own(as[i])));
+  if (slack > u * 0.5) throw new Error(`zombies: a joint could not be found again on the statue (out by ${(slack / u).toFixed(1)} cm)`);
+
   // ---- the cop's document, with these shapes on its bones in place of its own
   const root = cop.getRoot();
   const had = new Set(root.listMaterials());
@@ -569,11 +600,16 @@ async function likeTheCop(cop, statue) {
   return { doc: cop, hands, told: `stood to the cop: ${faces}, x${k.toFixed(3)} of its size, crotch at ${pct(S.crotch - S.floor, S.top - S.floor)} (the cop's ${pct(C.crotch - C.floor, C.top - C.floor)}), arms at ${pct(S.armY - S.floor, S.top - S.floor)} (${pct(C.armY - C.floor, C.top - C.floor)}), furthest point from one of the cop's ${(far / (C.top - C.floor) * 180).toFixed(1)} cm` };
 }
 
-// ---------------------------------------------------------------- the cop's running, on the game's skeleton
+// ---------------------------------------------------------------- the cop's running, and another's standing, on the game's skeleton
 
-/** how every one of the cop's bones is turned from where it was bound, frame by frame, and where its hips go */
-function runOf(cop) {
-  const rig = rigOf(cop);
+/**
+ * How every bone of a body with one movement in its file is turned from where it was bound,
+ * frame by frame, and where its hips go.
+ * @param prefix what stands before every joint's name in the file (see ours)
+ * @param onTheSpot a run: whatever way it drifts over its length is taken out, so it loops where it stands
+ */
+function runOf(cop, prefix = '', onTheSpot = true) {
+  const rig = rigOf(cop, prefix);
   const { joints, bind, parent } = rig;
   const n = joints.length;
   const order = joints.map((_, i) => i).sort((a, b) => depth(a) - depth(b));
@@ -584,23 +620,41 @@ function runOf(cop) {
   }
   const restT = joints.map((j) => new THREE.Vector3(...j.getTranslation())), restQ = joints.map((j) => new THREE.Quaternion(...j.getRotation())), restS = joints.map((j) => new THREE.Vector3(...j.getScale()));
   const top = order[0];
-  // (what stands above the skeleton in the file is whatever leaves its first bone where that was bound)
-  const above = bind[top].clone().multiply(new THREE.Matrix4().compose(restT[top], restQ[top], restS[top]).invert());
+  // What stands above the skeleton in the file: whatever leaves its first bone where that was
+  // bound, or (a file whose first "bone" is a bare knot bound nowhere) what the file itself
+  // has above it. Whichever of the two stands the rest of it where it was bound.
+  const aboves = [bind[top].clone().multiply(new THREE.Matrix4().compose(restT[top], restQ[top], restS[top]).invert())];
+  if (joints[top].getParentNode()) aboves.push(M4(joints[top].getParentNode().getWorldMatrix()));
+  let above = aboves[0];
+  // (a file may hang a bone on its parent bone by way of something that is no bone: an
+  // "armature" a hundredth the size, say. Whatever stands between the two is counted in.)
+  const between = joints.map((j, i) => {
+    const m = new THREE.Matrix4();
+    if (parent[i] < 0) return m;
+    for (let a = j.getParentNode(); a && a !== joints[parent[i]]; a = a.getParentNode()) m.premultiply(M4(a.getMatrix()));
+    return m;
+  });
   const pose = (Q, T) => {
     const W = new Array(n);
     for (const i of order) {
       const local = new THREE.Matrix4().compose(T[i], Q[i], restS[i]);
-      W[i] = (parent[i] < 0 ? above.clone() : W[parent[i]].clone()).multiply(local);
+      W[i] = (parent[i] < 0 ? above.clone() : W[parent[i]].clone().multiply(between[i])).multiply(local);
     }
     return W;
   };
   // is the pose in the file the pose it was bound in? (It has to be, for "turned from where it was bound" to mean anything.)
-  const still = pose(restQ, restT);
   const tall = new THREE.Vector3().setFromMatrixPosition(bind[rig.name.indexOf('Head')]).y;
-  let off = 0;
-  // (the ends of the fingers and the top of the head carry nothing and were bound nowhere in particular: they are not asked)
-  for (let i = 0; i < n; i++) if (rig.name[i] && !rig.name[i].includes('_leaf')) off = Math.max(off, new THREE.Vector3().setFromMatrixPosition(still[i]).distanceTo(new THREE.Vector3().setFromMatrixPosition(bind[i])));
-  if (off > tall * 0.02) throw new Error(`zombies: the cop does not stand in its file as it was bound (out by ${((off / tall) * 100).toFixed(1)}% of its height)`);
+  let off = Infinity;
+  for (const candidate of aboves) {
+    above = candidate;
+    const still = pose(restQ, restT);
+    let worst = 0;
+    // (the ends of the fingers and the top of the head carry nothing and were bound nowhere in particular: they are not asked)
+    for (let i = 0; i < n; i++) if (rig.name[i] && !rig.name[i].includes('_leaf')) worst = Math.max(worst, new THREE.Vector3().setFromMatrixPosition(still[i]).distanceTo(new THREE.Vector3().setFromMatrixPosition(bind[i])));
+    if (worst < off) off = worst;
+    if (worst <= tall * 0.02) break;
+  }
+  if (off > tall * 0.02) throw new Error(`zombies: a body does not stand in its file as it was bound (out by ${((off / tall) * 100).toFixed(1)}% of its height)`);
 
   const anim = cop.getRoot().listAnimations()[0];
   const tracks = new Map();
@@ -639,7 +693,7 @@ function runOf(cop) {
     moved.push(new THREE.Vector3().setFromMatrixPosition(W[hips]).sub(hipsAt));
   }
   // (it runs on the spot: whatever way it drifts over the two seconds is taken out)
-  const drift = moved[frames].clone().sub(moved[0]);
+  const drift = onTheSpot ? moved[frames].clone().sub(moved[0]) : new THREE.Vector3();
   moved.forEach((m, f) => m.addScaledVector(drift, -f / frames));
   const mean = moved.reduce((s, m) => s.add(m), new THREE.Vector3()).divideScalar(moved.length);
   for (const m of moved) {
@@ -649,8 +703,9 @@ function runOf(cop) {
   return { rig, dur, frames, turned, moved, hipsHigh: hipsAt.y };
 }
 
-/** `run` in the character's document made that running */
-function giveRun(doc, run) {
+const ID = new THREE.Quaternion();
+/** one of the character's movements (`run`, unless another is named) made the one that was read */
+function giveRun(doc, run, clip = 'run') {
   const root = doc.getRoot();
   const nodes = new Map(root.listNodes().map((n) => [n.getName(), n]));
   const parentOf = new Map();
@@ -671,6 +726,24 @@ function giveRun(doc, run) {
   };
   const mapped = new Map(mine.map(([k, node]) => [node, k]));
   const out = new Map(mine.map(([, node]) => [node, new Float32Array((run.frames + 1) * 4)]));
+  // "Turned from where it was bound" carries a movement between two bodies that were bound
+  // standing the SAME way. One bound with its arms hanging (most are) on this skeleton, which
+  // rests with them straight out, would hold them out sideways all through. So each limb bone
+  // is first laid the way the other body's lay when it was bound: along the same line.
+  const NEXT = { clavicle: 'upperarm', upperarm: 'lowerarm', lowerarm: 'hand', thigh: 'calf', calf: 'foot' };
+  const at = (n) => new THREE.Vector3().setFromMatrixPosition(M4(n.getWorldMatrix()));
+  const laid = new Map();
+  for (const [, node] of mine) {
+    const m = node.getName().match(/^(.+?)(_[lr])$/);
+    const next = m && NEXT[m[1]] && m[1] + m[2] && NEXT[m[1]] + m[2];
+    const to = next && nodes.get(next);
+    if (!to || !run.rig.name.includes(next)) continue;
+    const here = at(to).sub(at(node)).normalize(), there = run.rig.at(next).sub(run.rig.at(node.getName())).normalize();
+    // (a few degrees is the two riggers' taste, and is left alone)
+    if (here.angleTo(there) > 0.14) laid.set(node, new THREE.Quaternion().setFromUnitVectors(here, there));
+  }
+  // (a hand lies as its forearm does)
+  for (const s of ['_l', '_r']) if (laid.has(nodes.get(`lowerarm${s}`)) && nodes.get(`hand${s}`)) laid.set(nodes.get(`hand${s}`), laid.get(nodes.get(`lowerarm${s}`)));
   const pelvis = nodes.get('pelvis');
   const hip = new Float32Array((run.frames + 1) * 3);
   const scale = (pelvis.getWorldMatrix()[13]) / run.hipsHigh;
@@ -682,7 +755,7 @@ function giveRun(doc, run) {
       if (now.has(n)) return now.get(n);
       const k = mapped.get(n);
       // a bone the cop has: turned from its rest by what the cop's is turned by. One it has not: as it rests on the bone above.
-      const q = k !== undefined ? run.turned[f][k].clone().multiply(worldRest(n)) : world(parentOf.get(n)).clone().multiply(restQ(n));
+      const q = k !== undefined ? run.turned[f][k].clone().multiply(laid.get(n) ?? ID).multiply(worldRest(n)) : world(parentOf.get(n)).clone().multiply(restQ(n));
       now.set(n, q);
       return q;
     };
@@ -695,12 +768,12 @@ function giveRun(doc, run) {
     hip.set([t[0] + d.x, t[1] + d.y, t[2] + d.z], f * 3);
   }
   for (const a of root.listAnimations()) {
-    if (a.getName() !== 'run') continue;
+    if (a.getName() !== clip) continue;
     for (const c of a.listChannels()) c.dispose();
     for (const s of a.listSamplers()) s.dispose();
     a.dispose();
   }
-  const anim = doc.createAnimation('run');
+  const anim = doc.createAnimation(clip);
   const times = doc.createAccessor().setType('SCALAR').setArray(Float32Array.from({ length: run.frames + 1 }, (_, f) => (f / run.frames) * run.dur));
   const add = (node, what, type, values) => {
     const s = doc.createAnimationSampler().setInput(times).setOutput(doc.createAccessor().setType(type).setArray(values)).setInterpolation('LINEAR');
@@ -717,6 +790,9 @@ await fs.access(TEMPLATE).catch(() => {
   throw new Error('zombies: run "node scripts/build-character.mjs --infected" first (it makes assets-src/characters/plain.glb)');
 });
 const run = runOf(await readCop());
+// how they stand when they are going nowhere: "toxic Zombie 3 Idle (animated)" by vicente betoret
+// ferrero, seven seconds of it. Only its movement is used, on these bodies.
+const idle = runOf(await io.read(path.join(SRC, 'zombie_idle', 'scene.gltf')), 'mixamorig:', false);
 for (const z of ZOMBIES) {
   const doc = await io.read(TEMPLATE);
   const root = doc.getRoot();
@@ -725,6 +801,8 @@ for (const z of ZOMBIES) {
   let suit = await readCop(), told = '';
   let hands = '';
   if (z.statue) ({ doc: suit, told, hands } = await likeTheCop(suit, await io.read(path.join(SRC, z.dir, 'scene.gltf'))));
+  // (the skeleton to the body, not the body to the skeleton: see fitSkeleton)
+  const fitted = fitSkeleton({ doc, bodyNode: nodes.get('body'), suit, prefix: '' });
   const worn = await wearSuit({ doc, io, bodyNode: nodes.get('body'), old, suit, pieces: z.pieces, moved: {}, prefix: '' });
   // what it is painted with: all that it came with (colour, the lie of the surface, how rough
   // it is) but the map of its glints, which wants a costlier kind of material than anything
@@ -745,6 +823,7 @@ for (const z of ZOMBIES) {
     }
   }
   const ran = giveRun(doc, run);
+  const stood = giveRun(doc, idle, 'idle');
   await doc.transform(
     unpartition(),
     dedup(),
@@ -757,8 +836,9 @@ for (const z of ZOMBIES) {
   await io.write(dest, doc);
   const st = await fs.stat(dest);
   const triangles = root.listMeshes().reduce((n, m) => n + m.listPrimitives().reduce((k, p) => k + (p.getIndices()?.getCount() ?? 0) / 3, 0), 0);
-  console.log(`${path.basename(dest)}  ${(st.size / 1048576).toFixed(2)} MB  ${Math.round(triangles)} triangles  run: ${ran}`);
+  console.log(`${path.basename(dest)}  ${(st.size / 1048576).toFixed(2)} MB  ${Math.round(triangles)} triangles  run: ${ran}  idle: ${stood}`);
   if (told) console.log(`  ${told}`);
   if (hands) console.log(`  hands: ${hands}`);
+  console.log(`  ${fitted}`);
   console.log(`  ${worn}`);
 }

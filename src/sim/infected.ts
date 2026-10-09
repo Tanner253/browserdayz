@@ -18,7 +18,7 @@ import { BUILDING_FOOTPRINT, heightAt, type World } from '../world/worldgen';
 
 export const INFECTED = {
   /** as many as are ever alive at once, over the whole map */
-  max: 26,
+  max: 33,
   /** what each has to begin with: a rifle round anywhere, a pistol round in the head, three in the chest */
   hp: 90,
   /** how long a body lies there, and how long after that before another turns up about the same place, seconds */
@@ -26,10 +26,15 @@ export const INFECTED = {
   respawn: 210,
   /** none turns up within this of somebody living, metres */
   clear: 75,
-  /** metres a second: drifting about, going to see what a noise was, and after somebody (a jog is 4, a sprint 6.2) */
-  wander: 0.7,
-  look: 2.4,
-  chase: 5.0,
+  /**
+   * Metres a second: drifting about, walking back to where it lives, going to see what a noise
+   * was, and after somebody. A person jogs at 4 and sprints at 6.2: whoever keeps moving gets
+   * away from them, and whoever stops to fight, to loot or to dress a wound has them to deal with.
+   */
+  wander: 0.6,
+  back: 1.0,
+  look: 1.7,
+  chase: 3.3,
   /** how far they see a standing person in front of them, a crouched one, and anybody at all whichever way they face */
   sight: 34,
   sightCrouched: 15,
@@ -42,25 +47,55 @@ export const INFECTED = {
   hearJeep: 45,
   hearShot: 125,
   hearQuiet: 22,
-  /** how long they go on after somebody they can no longer see, seconds */
-  forget: 7,
-  /** an arm's length; how long the arm takes to come down; how long from one blow to the next; what it does */
+  /** how long they go on after somebody they can no longer see, seconds (and how long they then look about where they last saw them) */
+  forget: 14,
+  search: 9,
+  /**
+   * How long one goes on looking for somebody it has lost, or beating on a door with nobody to
+   * be seen or heard behind it, before it gives up and goes home, seconds. (Shut in a house,
+   * keep away from the windows and keep still or crouched, and they go.)
+   */
+  patience: 32,
+  /** further than this from where it lives with nothing to be after, it walks back there, metres */
+  stray: 24,
+  /** an arm's length; how long the arm takes to come down; how long the whole lunge takes; how long from one blow to the next; what it does */
   reach: 1.75,
-  windup: 0.45,
-  swing: 1.35,
-  damage: 13,
+  windup: 0.55,
+  lunge: 1.15,
+  swing: 1.6,
+  damage: 10,
   /** the chance a blow opens a wound */
-  bleed: 0.28,
+  bleed: 0.18,
+  /**
+   * A guard: fists up, or something held in the hand to strike with, and the guard button held.
+   * A blow from in front of whoever is on guard (within this of the way they face, radians) does
+   * nothing to them, takes this much of their wind, and stops the one that threw it for a moment:
+   * the moment to hit back in. With no wind left there is no guard.
+   */
+  guardArc: 1.35,
+  guardCost: 14,
+  /**
+   * How long one is stopped: by a blow of its that was blocked, by being shot, by being struck,
+   * seconds. And how long after being stopped before a shot or a blow can stop it again: it is
+   * checked, not held where it stands for as long as somebody goes on hitting it.
+   */
+  stopBlocked: 0.7,
+  stopShot: 0.18,
+  stopStruck: 0.28,
+  stopAgain: 1.1,
   /** a game moves the ones within this of its player; past it, with nobody nearer, they stand where they are */
   own: 170,
   /** the chance one has something on it worth picking up when it goes down */
-  carries: 0.45,
+  carries: 0.6,
 };
 
-/** what they had in their pockets: [what, the fewest, the most, how likely beside the others] */
+/**
+ * What they had in their pockets: [what, the fewest, the most, how likely beside the others].
+ * Rounds more than anything (about one in four of them has some), an injector on one in nine.
+ */
 const POCKETS: [string, number, number, number][] = [
-  ['ammo_9mm', 3, 8, 5], ['ammo_762', 2, 5, 3], ['bandage', 1, 1, 3], ['beans', 1, 1, 3], ['sardines', 1, 1, 2],
-  ['apple', 1, 1, 2], ['cigarettes', 1, 1, 3], ['watch', 1, 1, 1], ['compass', 1, 1, 1], ['knife', 1, 1, 1],
+  ['ammo_9mm', 3, 8, 7], ['ammo_762', 2, 5, 5], ['bandage', 1, 1, 5], ['beans', 1, 1, 2], ['sardines', 1, 1, 2],
+  ['apple', 1, 1, 2], ['cigarettes', 1, 1, 2], ['watch', 1, 1, 1], ['compass', 1, 1, 1], ['knife', 1, 1, 1],
 ];
 
 /** What one drops when it goes down, if anything: [item, how many]. */
@@ -85,6 +120,17 @@ export interface InfectedInfo {
   hp: number;
   /** the player whose game moves it (null: nobody is near enough, it stands where it is) */
   own: number | null;
+  /** where it lives: it turned up there, and goes back there when it has nobody to be after */
+  h: [number, number];
+}
+
+/**
+ * Whether a blow from `fx, fz` is stopped by somebody standing at `x, z` and facing `yaw`
+ * (0 looks down -z) with their guard up: only from in front of them.
+ */
+export function guarded(x: number, z: number, yaw: number, fx: number, fz: number): boolean {
+  const to = Math.atan2(-(fx - x), -(fz - z));
+  return Math.abs(Math.atan2(Math.sin(to - yaw), Math.cos(to - yaw))) < INFECTED.guardArc;
 }
 
 /** somewhere they live: the middle of it, how far out they are found, and how many */
@@ -96,15 +142,15 @@ export interface Home {
 }
 
 // (the outlying places are where somebody new finds a first weapon: one or two there, the crowd in the village)
-const ABOUT: Record<string, number> = { hamlet: 3, depot: 3, post: 2, yard: 2, farm: 1, lodge: 1, dacha: 1 };
+const ABOUT: Record<string, number> = { hamlet: 4, depot: 4, post: 3, yard: 2, farm: 2, lodge: 1, dacha: 1 };
 
 /** Where the infected live: the village most of all, the checkpoint, and a few about every outlying place. */
 export function infectedHomes(world: World): Home[] {
   const homes: Home[] = [];
   const village = world.pois[0];
-  if (village) homes.push({ x: village.x, z: village.z, r: Math.max(70, village.radius), n: 10 });
+  if (village) homes.push({ x: village.x, z: village.z, r: Math.max(70, village.radius), n: 13 });
   const camp = world.pois.find((p) => p.name === 'Military Checkpoint');
-  if (camp) homes.push({ x: camp.x, z: camp.z, r: 38, n: 4 });
+  if (camp) homes.push({ x: camp.x, z: camp.z, r: 38, n: 5 });
   for (const s of world.sites) homes.push({ x: s.x, z: s.z, r: 34, n: ABOUT[s.kind] ?? 1 });
   // (never more than the map is meant to hold: the places furthest down the list go short)
   let left = INFECTED.max;
@@ -177,7 +223,7 @@ export class Director {
   private stand(home: number, now: number, living: Somebody[]): Body | null {
     const at = this.spot(this.homes[home]);
     if (!at || living.some((p) => Math.hypot(p.x - at.x, p.z - at.z) < INFECTED.clear)) return null;
-    const b: Body = { i: this.next++, s: [at.x, at.y, at.z, this.rnd() * Math.PI * 2, I_IDLE, 0], hp: INFECTED.hp, own: null, home, diedAt: 0, heard: now, struck: 0 };
+    const b: Body = { i: this.next++, s: [at.x, at.y, at.z, this.rnd() * Math.PI * 2, I_IDLE, 0], hp: INFECTED.hp, own: null, h: [Math.round(at.x * 10) / 10, Math.round(at.z * 10) / 10], home, diedAt: 0, heard: now, struck: 0 };
     this.bodies.set(b.i, b);
     return b;
   }
@@ -281,6 +327,6 @@ export class Director {
 
   /** everything standing or lying, for somebody who has just arrived */
   list(): InfectedInfo[] {
-    return [...this.bodies.values()].map((b) => ({ i: b.i, s: b.s, hp: b.hp, own: b.own }));
+    return [...this.bodies.values()].map((b) => ({ i: b.i, s: b.s, hp: b.hp, own: b.own, h: b.h }));
   }
 }

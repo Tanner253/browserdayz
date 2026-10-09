@@ -33,6 +33,8 @@ export const F_DANCE = 64, F_SURRENDER = 128;
 export const F_LEAN_L = 256, F_LEAN_R = 512;
 /** sitting in a jeep (which one, and where in it, the server says: see 'vseat') */
 export const F_SEAT = 1024;
+/** on guard: fists up, or something to strike with held across, to stop a blow (see INFECTED.guardArc) */
+export const F_GUARD = 2048;
 /** how far the head goes sideways at a full lean, metres (the camera's own figure: see Player.updateCamera) */
 export const LEAN_REACH = 0.34;
 
@@ -235,8 +237,10 @@ export type S2C =
   | { t: 'iown'; i: number; to: number | null }
   /** where the games that move them say they are */
   | { t: 'is'; s: [number, ...IState][] }
-  /** one was hit by this player: what it has left, whether that was the end of it, where on it and which way the blow was going */
-  | { t: 'ihp'; i: number; hp: number; dead: boolean; by: number; zone: HitZone; dir: [number, number] }
+  /** one was hit by this player: what it has left, whether that was the end of it, where on it, which way the blow was going, and whether it was a blow and not a shot */
+  | { t: 'ihp'; i: number; hp: number; dead: boolean; by: number; zone: HitZone; dir: [number, number]; melee?: boolean }
+  /** a blow of one's was stopped by the guard of the player it was thrown at */
+  | { t: 'iblk'; i: number; to: number }
   | { t: 'pong'; n: number }
   /** something the server has to say to this player alone (what became of a tag they cashed in) */
   | { t: 'tell'; text: string; kind: 'good' | 'warn' | 'info' }

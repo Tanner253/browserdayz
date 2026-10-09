@@ -7,7 +7,7 @@ import type RAPIER from '@dimforge/rapier3d-compat';
 import { physics, GLASS_GROUPS, HITBOX_GROUPS, SOLID_GROUPS, type Surface } from '../core/physics';
 import { audio } from '../core/audio';
 import type { Atmosphere } from '../world/atmosphere';
-import { F_AIM, F_BLEED, F_CROUCH, F_DANCE, F_DEAD, F_GROUND, F_LEAN_L, F_LEAN_R, F_SURRENDER, type Act, type Pose } from '../net/protocol';
+import { F_AIM, F_BLEED, F_CROUCH, F_DANCE, F_DEAD, F_GROUND, F_GUARD, F_LEAN_L, F_LEAN_R, F_SURRENDER, type Act, type Pose } from '../net/protocol';
 import { SHOUT_RANGE, voiceOf, type Emote } from '../sim/emotes';
 import { ITEMS } from '../sim/items';
 import { Avatar } from './avatar';
@@ -150,7 +150,8 @@ export class RemotePlayer implements Damageable {
   /** they threw a punch or swung what they are holding */
   swing() {
     if (!this.ready || !this.alive) return;
-    this.avatar.swing();
+    const melee = this.weapon ? ITEMS[this.weapon]?.melee : undefined;
+    this.avatar.swing(false, melee ? melee.rate * 0.9 : undefined);
     if (this.pos.distanceToSquared(this.heard) < 30 * 30) audio.whoosh(this.weapon ? 0.6 : 0, this.pos);
   }
 
@@ -225,6 +226,7 @@ export class RemotePlayer implements Damageable {
       this.pitch = a.p[4] + (b.p[4] - a.p[4]) * Math.min(1, k);
       this.grounded = !!(b.p[5] & F_GROUND);
       this.aiming = !!(b.p[5] & F_AIM);
+      this.avatar.guarding = this.alive && !!(b.p[5] & F_GUARD);
       this.bleeding = !!(b.p[5] & F_BLEED);
       this.avatar.setHold(b.p[5] & F_DANCE ? 'dance' : b.p[5] & F_SURRENDER ? 'surrender' : null);
       // (a weapon coming up to the eye is the end of a wave)
