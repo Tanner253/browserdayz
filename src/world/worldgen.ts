@@ -710,7 +710,7 @@ export function generateWorld(seed = WORLD_SEED): World {
     for (const st of laterSites) {
       if (st.kind !== 'hamlet') continue;
       const c = Math.cos(st.rot), sn = Math.sin(st.rot);
-      for (const [right, fwd] of [[-17, -14], [19, -12], [-21, 8], [22, 10], [0, -22]]) {
+      for (const [right, fwd] of [[-17, -14], [19, -12], [-21, 8], [22, 10], [0, -22], [-27, -19], [28, -17], [-29, 13], [29, 15], [0, -31], [0, 31], [-34, 0], [34, 0]]) {
         if (addLater('house_two', st.x + right * c + fwd * sn, st.z - right * sn + fwd * c, st.rot + (right > 0 ? -0.4 : 0.4), 1, 2.5)) break;
       }
     }

@@ -103,7 +103,7 @@ export class Minimap {
       g.rotate(-b.rot);
       g.fillStyle = 'rgba(0, 0, 0, 0.5)';
       g.fillRect((-w / 2 - 1) * SCALE, (-d / 2 - 1) * SCALE, (w + 2) * SCALE, (d + 2) * SCALE);
-      g.fillStyle = b.type === 'police' ? '#6f9bd6' : b.type === 'guardpost' || b.type === 'barracks' ? '#b9a26a' : b.type === 'clinic' ? '#d99a92' : '#d6c9a8';
+      g.fillStyle = b.type === 'police' ? '#6f9bd6' : b.type === 'guardpost' || b.type === 'barracks' || b.type === 'tower' ? '#b9a26a' : b.type === 'clinic' ? '#d99a92' : '#d6c9a8';
       g.fillRect((-w / 2) * SCALE, (-d / 2) * SCALE, w * SCALE, d * SCALE);
       g.restore();
     }
