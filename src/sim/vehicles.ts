@@ -23,8 +23,15 @@ export const JEEP = {
   smokeAt: 0.4,
   fireAt: 0.12,
   fuse: 7,
-  /** seconds before a new one is stood up for one that burned */
-  respawn: 420,
+  /**
+   * Seconds before a new one is stood up for one that burned, where the old one first stood;
+   * and how near that spot somebody may be standing for it still to be stood there (it is
+   * not set down on top of anybody: it waits until they have moved off).
+   * (It was seven minutes and twenty-five metres. Along the village street somebody is nearly
+   * always within twenty-five metres, and a jeep that burned there seemed never to come back.)
+   */
+  respawn: 180,
+  respawnClear: 12,
   /** litres in a full tank, litres burned in a minute flat out, and what a jerrycan pours in */
   tank: 40,
   burn: 2.4,

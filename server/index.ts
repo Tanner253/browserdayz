@@ -1180,7 +1180,7 @@ setInterval(() => {
   // a new one for each that burned, once its time has come and nobody is standing on the spot
   for (const [home, at] of jeepsDue) {
     const p = world.jeeps[home];
-    if (now < at || [...clients.values()].some((c) => c.alive && Math.hypot(c.pose[0] - p.x, c.pose[2] - p.z) < 25) || [...vehicles.values()].some((v) => Math.hypot(v.s[0] - p.x, v.s[2] - p.z) < 8)) continue;
+    if (now < at || [...clients.values()].some((c) => c.alive && Math.hypot(c.pose[0] - p.x, c.pose[2] - p.z) < JEEP.respawnClear) || [...vehicles.values()].some((v) => Math.hypot(v.s[0] - p.x, v.s[2] - p.z) < 8)) continue;
     jeepsDue.delete(home);
     broadcast({ t: 'v+', v: vehInfo(standJeep(home)) });
   }
