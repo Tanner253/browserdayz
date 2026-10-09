@@ -146,6 +146,9 @@ interface Stance {
 }
 type Stances = Record<'ready' | 'aim' | 'carry', Stance>;
 
+/** how near the eye a hand has to be for its thumb to be worth laying, metres */
+const THUMB_SEEN = 16;
+
 /** how long the infected's blow takes from the arms going up to their coming back, seconds */
 const CLAW = 0.95;
 const _sickEye = new THREE.Color(1.0, 0.72, 0.55);
@@ -655,7 +658,15 @@ export class Avatar {
   private thumb(r: ArmRig) {
     const first = r.fingers[0], little = r.fingers[3];
     if (r.thumb.length < 4 || first.length < 3 || !little.length) return;
-    const at = (b: THREE.Object3D) => b.getWorldPosition(new THREE.Vector3());
+    // Everything here is in the hand's own space, worked from the joints' own turns: nothing
+    // of the world is read or brought up to date. (Done by where things are in the world it
+    // cost a tenth of a millisecond a body, every body, every frame.)
+    const hand = r.hand;
+    const at = (b: THREE.Object3D) => {
+      const p = new THREE.Vector3();
+      for (let o: THREE.Object3D | null = b; o && o !== hand; o = o.parent) p.applyQuaternion(o.quaternion).add(o.position);
+      return p;
+    };
     const [t1, t2, t3, tip] = r.thumb;
     const p1 = at(first[0]), p2 = at(first[1]), p3 = at(first[2]);
     // out to the thumb's side of the hand: from the little finger's knuckle to the first's
@@ -664,11 +675,22 @@ export class Avatar {
     const closed = THREE.MathUtils.clamp(1 - _a.copy(p2).sub(p1).normalize().dot(_b.copy(p3).sub(p2).normalize()), 0, 1);
     // its pad: beside the first bone of that finger on an open hand, beside the middle one on a closed
     const pad = p1.clone().lerp(p2, 0.7).lerp(p2.clone().lerp(p3, 0.45), closed).addScaledVector(side, THUMB_BESIDE);
-    const c = at(t1), l1 = c.distanceTo(at(t2)), l2 = at(t2).distanceTo(at(t3)), l3 = at(t3).distanceTo(at(tip));
+    const c = at(t1), l1 = t2.position.length(), l2 = t3.position.length(), l3 = tip.position.length();
     const knuckle = bent(c, pad, l1, (l2 + l3) * 0.92, side);
-    this.aim(t1, at(t2), knuckle, c);
-    this.aim(t2, at(t3), bent(knuckle, pad, l2, l3, side), at(t2));
-    this.aim(t3, at(tip), pad, at(t3));
+    const joint = bent(knuckle, pad, l2, l3, side);
+    // each joint is turned, in the hand's space, so that the next lies where it should: `Q` is how the bone before it stands there
+    const Q = _qa.identity();
+    for (let o: THREE.Object3D | null = t1.parent; o && o !== hand; o = o.parent) Q.premultiply(o.quaternion);
+    let from = c;
+    for (const [bone, next, to] of [[t1, t2, knuckle], [t2, t3, joint], [t3, tip, pad]] as const) {
+      const now = _a.copy(next.position).applyQuaternion(_q1.copy(Q).multiply(bone.quaternion)).normalize();
+      const want = _b.copy(to).sub(from).normalize();
+      // (turned in the hand's space, then said in the space of the bone it hangs from)
+      const turn = _q2.setFromUnitVectors(now, want);
+      bone.quaternion.copy(_q3.copy(Q).invert().multiply(turn).multiply(Q).multiply(bone.quaternion));
+      Q.multiply(bone.quaternion);
+      from = from.clone().add(_a.copy(next.position).applyQuaternion(Q));
+    }
   }
 
   /** close the fingers toward the palm, each by its own amount */
@@ -744,6 +766,9 @@ export class Avatar {
     this.hitClip = head ? 'hitHead' : 'hit';
   }
 
+  /** where the game is being looked at from: bodies spend less on what cannot be seen from there (set each frame by the game) */
+  static readonly eye = new THREE.Vector3();
+
   /**
    * One of the infected: how it carries itself. `roused` is how far it is after somebody
    * (0 slack and shambling, 1 arms out and coming); `claw` is the blow it is throwing (seconds
@@ -754,6 +779,12 @@ export class Avatar {
   /** The infected strike: both arms brought down on whoever is in front of them. */
   claw() {
     if (this.sick) this.sick.claw = 0;
+  }
+
+  /** a turn about a world axis that leaves the bones below it to be brought up to date later, all at once */
+  private lean(bone: THREE.Object3D, axis: THREE.Vector3, angle: number) {
+    bone.getWorldQuaternion(_q2).premultiply(_q1.setFromAxisAngle(axis, angle));
+    bone.quaternion.copy(bone.parent!.getWorldQuaternion(_q3).invert().multiply(_q2));
   }
 
   /**
@@ -777,23 +808,23 @@ export class Avatar {
     const jerk = Math.pow(Math.max(0, Math.sin(t * 0.61 + s.seed)), 40) * Math.sin(t * 31) * 0.1;
     const pelvis = this.joints.pelvis;
     if (pelvis) {
-      this.turn(pelvis, fwd, side * (0.05 + limp * 0.12));
-      this.turn(pelvis, UP, side * 0.1 * slack + limp * 0.09);
+      this.lean(pelvis, fwd, side * (0.05 + limp * 0.12));
+      this.lean(pelvis, UP, side * 0.1 * slack + limp * 0.09);
     }
     // (about its right, a turn the positive way tips the body back: forward is the other)
-    for (const b of this.spine) this.turn(b, _right, -(0.1 + 0.03 * s.roused + 0.03 * going) + sway * 0.4);
-    if (this.spine[1]) this.turn(this.spine[1], fwd, side * 0.08 - limp * 0.08 + sway + jerk);
+    for (const b of this.spine) this.lean(b, _right, -(0.1 + 0.03 * s.roused + 0.03 * going) + sway * 0.4);
+    if (this.spine[1]) this.lean(this.spine[1], fwd, side * 0.08 - limp * 0.08 + sway + jerk);
     const head = this.neck[this.neck.length - 1];
     if (head) {
-      this.turn(head, fwd, side * (0.32 - 0.14 * s.roused) + Math.sin(t * 0.7) * 0.08 + jerk * 2);
-      this.turn(head, _right, 0.22 * s.roused - 0.12);
+      this.lean(head, fwd, side * (0.32 - 0.14 * s.roused) + Math.sin(t * 0.7) * 0.08 + jerk * 2);
+      this.lean(head, _right, 0.22 * s.roused - 0.12);
     }
     // The hands are not fists: the fingers hang half closed, and are hooked when it is after
     // somebody. (Whatever the movement playing has done with them is put aside first.)
     for (const r of [this.armR, this.armL]) r?.fingers.forEach((chain, f) => chain.forEach((b, j) => b.quaternion.copy(r.open[f][j])));
     // one arm hangs, the other is carried bent and jumps when the rest of it does
     const carried = side > 0 ? this.armL : this.armR;
-    if (carried && slack > 0.02) this.turn(carried.fore, _right, (0.5 + jerk * 3) * slack);
+    if (carried && slack > 0.02) this.lean(carried.fore, _right, (0.5 + jerk * 3) * slack);
     let strike = 0;
     if (s.claw >= 0) {
       s.claw += dt;
@@ -1315,8 +1346,11 @@ export class Avatar {
     }
 
     if (this.sick && !dead && this.downT <= 0) this.sicken(dt);
-    if (this.armR) this.thumb(this.armR);
-    if (this.armL) this.thumb(this.armL);
+    // (a thumb is not seen from across the street, nor on the body the eye is in)
+    if (!firstPerson && this.root.position.distanceToSquared(Avatar.eye) < THUMB_SEEN * THUMB_SEEN) {
+      if (this.armR) this.thumb(this.armR);
+      if (this.armL) this.thumb(this.armL);
+    }
 
     if (this.fpBones.length) {
       for (const [from, to, hidden] of this.fpBones) {

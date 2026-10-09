@@ -2276,6 +2276,7 @@ export class Game {
     for (const d of this.dummies) {
       if (Math.abs(d.pos.x - interp.x) + Math.abs(d.pos.z - interp.z) < 260) d.update(dt);
     }
+    Avatar.eye.copy(cam.position);
     this.horde.update(dt, now, cam.position);
     for (const rp of this.remotes.values()) {
       rp.update(dt, now, cam.position);

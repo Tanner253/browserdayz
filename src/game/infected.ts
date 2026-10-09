@@ -106,6 +106,9 @@ export class Infected implements Damageable {
   private poundT = 0;
   /** it has changed what it is doing since this game last said where it was */
   dirty = true;
+  /** time its body has not been moved for (the far ones are posed every second or third frame) */
+  private poseDt = 0;
+  private frameNo = 0;
   private said: IState = [0, 0, 0, 0, -1, 0];
 
   constructor(public i: number, private host: HordeHost, private horde: Horde) {}
@@ -497,7 +500,8 @@ export class Infected implements Damageable {
       }
       this.after = b.s[5];
     }
-    const far = this.pos.distanceToSquared(eye) > DRAWN * DRAWN;
+    const off = this.pos.distanceToSquared(eye);
+    const far = off > DRAWN * DRAWN;
     this.avatar.root.visible = !far;
     if (dt > 0) {
       const k = 1 - Math.exp(-14 * dt);
@@ -509,6 +513,11 @@ export class Infected implements Damageable {
     const half = this.yaw / 2;
     this.body.setNextKinematicRotation({ x: 0, y: Math.sin(half), z: 0, w: Math.cos(half) });
     if (far) return;
+    // posing a body is most of what one of them costs: across the street it is done every other frame, further off every third
+    this.poseDt += dt;
+    if ((this.frameNo++ + this.i) % (off > 70 * 70 ? 3 : off > 30 * 30 ? 2 : 1) !== 0) return;
+    dt = this.poseDt;
+    this.poseDt = 0;
     const sick = this.avatar.sick!;
     const roused = this.dead ? 0 : this.mode >= I_CHASE ? 1 : this.mode === I_ALERT ? 0.45 : 0;
     sick.roused += (roused - sick.roused) * (1 - Math.exp(-5 * dt));
