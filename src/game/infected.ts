@@ -15,7 +15,7 @@ import type { Buildings } from '../world/buildings';
 import { Director, INFECTED, I_ALERT, I_ATTACK, I_CHASE, I_DEAD, I_IDLE, I_WANDER, homeSpot, infectedDrop, infectedHomes, type IState, type InfectedInfo } from '../sim/infected';
 import type { C2S } from '../net/protocol';
 import { Avatar } from './avatar';
-import { infectedLook } from './look';
+import { ZOMBIES, lookFor } from './look';
 import type { Damageable, HitZone } from './weapons';
 
 /** somebody an infected might notice */
@@ -51,7 +51,6 @@ export interface HordeHost {
 const INTERP_DELAY = 150;
 /** drawn and moved in full within this of the eye; past it they are not there to be seen */
 const DRAWN = 150;
-const UP = new THREE.Vector3(0, 1, 0);
 const _head = new THREE.Vector3(), _neck = new THREE.Vector3(), _pelvis = new THREE.Vector3();
 const _v = new THREE.Vector3();
 /** a way through a wall: the middle of a doorway, which way it faces (level), the door in it, and the building it belongs to */
@@ -126,7 +125,8 @@ export class Infected implements Damageable {
     this.mode = info.s[4];
     this.after = info.s[5];
     this.fallTo = y;
-    await this.avatar.load(this.host.atmo(), 0, false, infectedLook(this.i), 'infected');
+    // (which of the three bodies it is goes by its number: every game draws the same one)
+    await this.avatar.load(this.host.atmo(), 0, false, lookFor(''), ZOMBIES[this.i % ZOMBIES.length]);
     if (this.gone) return this.avatar.dispose();
     this.avatar.sick = { roused: 0, claw: -1, seed: (this.i * 7.31) % 20 };
     this.host.scene().add(this.avatar.root);
@@ -145,23 +145,7 @@ export class Infected implements Damageable {
     this.blocker = physics.world.createCollider(R.ColliderDesc.capsule(0.5, 0.27).setTranslation(0, 0.8, 0).setCollisionGroups(GLASS_GROUPS), this.body);
     this.ready = true;
     this.avatar.update(0, this.pos, this.vel, this.yaw, false, false);
-    this.stain();
     if (info.s[4] === I_DEAD || info.hp <= 0) this.die(0, true);
-  }
-
-  /** what it has been doing with its mouth and its hands */
-  private stain() {
-    if (!this.avatar.frame(_head, _neck, _pelvis)) return;
-    const fwd = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
-    const r = (n: number) => ((this.i * 9301 + n * 49297) % 233280) / 233280;
-    this.avatar.wound(_head.clone().addScaledVector(fwd, 0.1).addScaledVector(UP, -0.09), fwd.clone().negate(), 0.075);
-    this.avatar.wound(_neck.clone().lerp(_pelvis, 0.3 + r(1) * 0.4).addScaledVector(fwd, 0.14), fwd.clone().negate(), 0.1 + r(2) * 0.08);
-    // and on its hands
-    for (const n of ['hand_r', 'hand_l']) {
-      const h = this.avatar.root.getObjectByName(n);
-      if (h && r(n.length + (n.endsWith('r') ? 5 : 6)) < 0.75) this.avatar.wound(h.getWorldPosition(new THREE.Vector3()), fwd, 0.09);
-    }
-    if (r(3) < 0.6) this.avatar.wound(_pelvis.clone().addScaledVector(fwd, 0.1).add(new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw)).multiplyScalar((r(4) - 0.5) * 0.4)), fwd.clone().negate(), 0.09);
   }
 
   /** where its owner says it is */

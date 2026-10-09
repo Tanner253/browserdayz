@@ -11,7 +11,7 @@ import * as THREE from 'three';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import type { Atmosphere } from '../world/atmosphere';
 import { bent, type Grips, type HandGrip } from './arms';
-import { BEARD, HAIR_STYLES, MAX_WOUNDS, loadCharacter, lookFor, lookPatch, lookUniforms, setLookUniforms, suitPatch, type BodyFile, type Look, type LookUniforms } from './look';
+import { BEARD, HAIR_STYLES, MAX_WOUNDS, loadCharacter, lookFor, lookPatch, lookUniforms, setLookUniforms, stainPatch, suitPatch, type BodyFile, type Look, type LookUniforms } from './look';
 import type { Emote } from '../sim/emotes';
 
 /** local player's full body: seen by the shadow cameras always, by the main camera only on the flight in from the menu */
@@ -151,7 +151,6 @@ const THUMB_SEEN = 16;
 
 /** how long the infected's blow takes from the arms going up to their coming back, seconds */
 const CLAW = 0.95;
-const _sickEye = new THREE.Color(1.0, 0.72, 0.55);
 
 /** how far the middle of the thumb lies from the middle of the finger it is laid against, metres */
 const THUMB_BESIDE = 0.02;
@@ -328,8 +327,16 @@ export class Avatar {
     this.uniforms = lookUniforms();
     const uniforms = this.uniforms;
     const mats = new Map<string, THREE.Material>();
+    // where each shape's points are among the body shape's (worked out below, once the body shape is known)
+    const rests: [THREE.SkinnedMesh, THREE.Matrix4][] = [];
+    const rest = (m: THREE.SkinnedMesh) => {
+      const r = new THREE.Matrix4();
+      if (m.isSkinnedMesh) rests.push([m, r]);
+      return r;
+    };
     // the suit, or the plain body the game had before it (the character build can still make either)
     const suit = !!model.getObjectByName('pads');
+    const zombie = file !== 'survivor';
     model.traverse((o) => {
       const m = o as THREE.SkinnedMesh;
       if (m.isMesh) {
@@ -337,10 +344,16 @@ export class Avatar {
         m.receiveShadow = true;
         if (m.isSkinnedMesh) m.frustumCulled = false;
         const src = m.material as THREE.MeshStandardMaterial;
-        if (suit) {
+        if (zombie) {
+          // one of the infected: painted as it came, and bloodied by what is done to it
+          const mat = src.clone(), at = rest(m);
+          atmo.register(mat, (shader) => stainPatch(shader, uniforms, at), 'zombie');
+          m.material = mat;
+          if (m.name === 'body') this.skin = m;
+        } else if (suit) {
           // every piece of it takes this body's stains; the cloth takes its colours as well
-          const mat = src.clone();
-          atmo.register(mat, (shader) => suitPatch(shader, uniforms), 'suit');
+          const mat = src.clone(), at = rest(m);
+          atmo.register(mat, (shader) => suitPatch(shader, uniforms, at), 'suit');
           m.material = mat;
           if (m.name === 'body') this.skin = m;
           if (m.name.startsWith('gear_')) {
@@ -348,8 +361,8 @@ export class Avatar {
             m.visible = false;
           }
         } else if (m.name === 'body') {
-          const mat = src.clone();
-          atmo.register(mat, (shader) => lookPatch(shader, uniforms), 'survivor');
+          const mat = src.clone(), at = rest(m);
+          atmo.register(mat, (shader) => lookPatch(shader, uniforms, at), 'survivor');
           m.material = mat;
           this.skin = m;
         } else if (src.name.includes('Hair')) {
@@ -364,8 +377,6 @@ export class Avatar {
             src.userData.toned = true;
             src.color.multiplyScalar(0.72);
             src.roughness = Math.max(src.roughness, 0.5);
-            // (the infected's are gone the yellow-red of an old bruise)
-            if (file === 'infected') src.color.multiply(_sickEye);
           }
           atmo.register(src);
         }
@@ -375,6 +386,11 @@ export class Avatar {
     });
     this.layerMask = model.layers.mask;
     if (this.skin) {
+      // A file's shapes are each packed into a box of their own, and the unpacking is folded
+      // into where each one's bones are said to have been bound. From one shape's numbers to
+      // the body shape's is therefore: out through its own first bone, in through the body's.
+      const body = this.skin, into = new THREE.Matrix4().copy(body.skeleton.boneInverses[0]).multiply(body.bindMatrix).invert();
+      for (const [m, r] of rests) r.copy(into).multiply(m.skeleton.boneInverses[0]).multiply(m.bindMatrix);
       const bones = this.skin.skeleton.bones;
       for (const [name, next] of WOUND_BONES) {
         const i = bones.findIndex((b) => b.name === name);
@@ -729,7 +745,7 @@ export class Avatar {
           best = i;
         }
       }
-      // world -> that bone -> where the bone stands at rest -> the mesh's own space
+      // world -> that bone -> where the bone stands at rest -> the body shape's own space
       const p = at.clone().applyMatrix4(_m1.copy(skin.skeleton.bones[best].matrixWorld).invert()).applyMatrix4(_m2.copy(skin.skeleton.boneInverses[best]).invert()).applyMatrix4(_m1.copy(skin.bindMatrix).invert());
       // the stain is measured in the mesh's units: the body is drawn a little smaller than it is modelled
       this.uniforms!.uWounds.value[this.woundN++ % MAX_WOUNDS].set(p.x, p.y, p.z, r / BODY_SCALE);

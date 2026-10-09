@@ -49,10 +49,10 @@ const CLIPS = {
  */
 const EMOTES = process.argv.includes('--emotes');
 /**
- * `--infected`: the plain body in its civilian's jacket, as it was before the suit, written to
- * infected.glb beside the survivor. It is what the infected are drawn with (src/game/infected.ts):
- * the game colours it sick and bloody. The survivor's file and the mask are left as they are
- * (the mask is the same painting either way).
+ * `--infected`: the game's skeleton and every movement it has, on the plain body it had before
+ * the suit, written to assets-src/characters/plain.glb. Nothing of that is shipped: it is what
+ * scripts/zombies.mjs puts the infected's bodies on. The survivor's file and the mask are left
+ * as they are.
  */
 const INFECTED = process.argv.includes('--infected');
 if (EMOTES) Object.assign(CLIPS, { talk: 'Idle_Talking_Loop', point: 'Spell_Simple_Shoot', hail: 'Spell_Simple_Idle_Loop', reach: 'Interact', sit: 'Sitting_Idle_Loop', sitTalk: 'Sitting_Talking_Loop' });
@@ -889,7 +889,7 @@ await doc.transform(
   textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [TEX, TEX], quality: 90 }),
   meshopt({ encoder: MeshoptEncoder, level: 'medium' }),
 );
-const dest = EMOTES ? path.join(ROOT, 'trailer', 'emotes.glb') : path.join(OUT, INFECTED ? 'infected.glb' : 'survivor.glb');
+const dest = EMOTES ? path.join(ROOT, 'trailer', 'emotes.glb') : INFECTED ? path.join(ROOT, 'assets-src', 'characters', 'plain.glb') : path.join(OUT, 'survivor.glb');
 await io.write(dest, doc);
 // asset addresses carry the manifest's date: move it on, so no browser keeps the old body
 if (!EMOTES && !INFECTED) {

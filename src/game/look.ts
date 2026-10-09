@@ -12,8 +12,9 @@ import { assets } from '../core/assets';
 
 const MASK_URL = 'assets/characters/survivor_mask.webp';
 
-/** the bodies there are: a survivor (every player), and one of the infected (the plain body in a civilian's clothes) */
-export type BodyFile = 'survivor' | 'infected';
+/** the bodies there are: a survivor (every player), and the three the infected come in (scripts/zombies.mjs) */
+export type BodyFile = 'survivor' | 'zombie_cop' | 'zombie_male' | 'zombie_female';
+export const ZOMBIES: BodyFile[] = ['zombie_male', 'zombie_female', 'zombie_cop'];
 
 const characters = new Map<BodyFile, Promise<GLTF>>();
 
@@ -82,30 +83,6 @@ export function lookFor(seed: string): Look {
   };
 }
 
-// What the people who lived here were wearing when it took them: the colours a civilian's
-// jacket comes in (the ones that were taken off the soldiers), gone dull with weather and dirt.
-const TOWN_JACKETS = [0x6b3a2a, 0x5a2d33, 0x2f5a57, 0x34486a, 0x4a5a78, 0x6a6048, 0x4d4f4c, 0x7a6a4c, 0x3c4a35, 0x705a3c];
-const TOWN_TROUSERS = [0x3a3d38, 0x4a3b2c, 0x2a2b2d, 0x2f3a52, 0x555a5c, 0x5a5340];
-/** what the sickness does to skin of any colour: grey, with the green of a bruise in it */
-const SICK = [0.6, 0.66, 0.56];
-
-/** One of the infected: somebody's neighbour, in what they had on, a long time unwashed. */
-export function infectedLook(seed: number): Look {
-  const l = lookFor(`infected ${seed}`);
-  let h = hash(`town ${seed}`);
-  const pick = (n: number) => {
-    h = (Math.imul(h, 1664525) + 1013904223) >>> 0;
-    return Math.floor((h / 4294967296) * n);
-  };
-  l.jacket.setHex(TOWN_JACKETS[pick(TOWN_JACKETS.length)]).multiplyScalar(0.62);
-  l.trousers.setHex(TOWN_TROUSERS[pick(TOWN_TROUSERS.length)]).multiplyScalar(0.6);
-  l.skin.r *= SICK[0];
-  l.skin.g *= SICK[1];
-  l.skin.b *= SICK[2];
-  l.hairColor.multiplyScalar(0.7);
-  return l;
-}
-
 /** the painted cloth is a mid grey: this brings a colour multiplied into it back up to itself */
 const CLOTH_GAIN = 1.85;
 
@@ -135,15 +112,27 @@ export function setLookUniforms(u: LookUniforms, look: Look) {
 }
 
 /** what every body's material is told about bloodstains: declared with the rest, worked out after the colour map */
-const WOUND_DECL = `uniform vec4 uWounds[${MAX_WOUNDS}];\nfloat woundK;`;
+const WOUND_DECL = `uniform vec4 uWounds[${MAX_WOUNDS}];
+float woundK;
+float woundHash(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
+// (lumps of no shape in particular, a cell across: waves crossed with waves made a chequerboard of it)
+float woundNoise(vec3 p) {
+  vec3 i = floor(p), f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(
+    mix(mix(woundHash(i), woundHash(i + vec3(1.0, 0.0, 0.0)), f.x), mix(woundHash(i + vec3(0.0, 1.0, 0.0)), woundHash(i + vec3(1.0, 1.0, 0.0)), f.x), f.y),
+    mix(mix(woundHash(i + vec3(0.0, 0.0, 1.0)), woundHash(i + vec3(1.0, 0.0, 1.0)), f.x), mix(woundHash(i + vec3(0.0, 1.0, 1.0)), woundHash(i + vec3(1.0, 1.0, 1.0)), f.x), f.y),
+    f.z);
+}`;
 const WOUND_CODE = `
   woundK = 0.0;
-  // a ragged edge, so a stain is a blot and not a disc
-  float rag = sin(vRest.x * 211.0 + vRest.y * 97.0) * sin(vRest.y * 173.0 - vRest.z * 131.0) * 0.16 + sin(vRest.x * 61.0 - vRest.z * 83.0 + vRest.y * 47.0) * 0.12;
+  float woundNear = 9.0;
   for (int i = 0; i < ${MAX_WOUNDS}; i++) {
     vec4 wd = uWounds[i];
-    if (wd.w > 0.0) woundK = max(woundK, 1.0 - smoothstep(0.5, 1.0, distance(vRest, wd.xyz) / wd.w + rag));
+    if (wd.w > 0.0) woundNear = min(woundNear, distance(vRest, wd.xyz) / wd.w);
   }
+  // a ragged edge, so a stain is a blot and not a disc (worked out only for what is near one)
+  if (woundNear < 1.4) woundK = 1.0 - smoothstep(0.5, 1.0, woundNear + (woundNoise(vRest * 31.0) - 0.5) * 0.56 + (woundNoise(vRest * 84.0) - 0.5) * 0.22);
   // soaked through in the middle, thinner and brighter at the edge
   diffuseColor.rgb = mix(diffuseColor.rgb, mix(vec3(0.22, 0.01, 0.007), vec3(0.085, 0.004, 0.003), smoothstep(0.35, 1.0, woundK)), min(1.0, woundK * 1.25) * 0.94);`;
 
@@ -151,11 +140,14 @@ type Shader = { uniforms: Record<string, THREE.IUniform>; vertexShader: string; 
 
 // A stain is a small sphere fixed to the body as it stands at rest: whatever skin or cloth
 // is inside it is soaked. The vertex position before skinning is that rest position, so a
-// stain moves with the limb it is on at no cost.
-function stained(shader: Shader, vertexDecl: string, vertexCode: string, fragmentDecl: string, tint: string) {
+// stain moves with the limb it is on at no cost. Each shape of a body is packed to a scale of
+// its own, so its points are first put where the body shape's are (`rest`: see Avatar.load):
+// a stain has to fall on the shirt where it falls on the skin under it.
+function stained(shader: Shader, rest: THREE.Matrix4, vertexDecl: string, vertexCode: string, fragmentDecl: string, tint: string) {
+  shader.uniforms.uRest = { value: rest };
   shader.vertexShader = shader.vertexShader
-    .replace('#include <common>', `#include <common>\nvarying vec3 vRest;\n${vertexDecl}`)
-    .replace('#include <begin_vertex>', `#include <begin_vertex>\nvRest = position;\n${vertexCode}`);
+    .replace('#include <common>', `#include <common>\nuniform mat4 uRest;\nvarying vec3 vRest;\n${vertexDecl}`)
+    .replace('#include <begin_vertex>', `#include <begin_vertex>\nvRest = (uRest * vec4(position, 1.0)).xyz;\n${vertexCode}`);
   shader.fragmentShader = shader.fragmentShader
     .replace('#include <common>', `#include <common>\nvarying vec3 vRest;\n${fragmentDecl}\n${WOUND_DECL}`)
     .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.28, woundK);')
@@ -163,14 +155,23 @@ function stained(shader: Shader, vertexDecl: string, vertexCode: string, fragmen
 }
 
 /** Shader patch for the body material of the plain body (it must have a colour map): clothes by the mask texture. */
-export function lookPatch(shader: Shader, u: LookUniforms) {
+export function lookPatch(shader: Shader, u: LookUniforms, rest = new THREE.Matrix4()) {
   Object.assign(shader.uniforms, u);
-  stained(shader, '', '', 'uniform sampler2D tLook;\nuniform vec3 uJacket;\nuniform vec3 uTrousers;\nuniform vec3 uSkin;', `
+  stained(shader, rest, '', '', 'uniform sampler2D tLook;\nuniform vec3 uJacket;\nuniform vec3 uTrousers;\nuniform vec3 uSkin;', `
   vec3 lk = texture2D(tLook, vMapUv).rgb;
   vec3 tint = mix(uSkin, vec3(1.0), min(1.0, lk.r + lk.g + lk.b));
   tint = mix(tint, uJacket, lk.r);
   tint = mix(tint, uTrousers, lk.g);
   diffuseColor.rgb *= tint;`);
+}
+
+/**
+ * Shader patch for the bodies of the infected: they come painted as they are, and take
+ * nothing but the blood of what is done to them.
+ */
+export function stainPatch(shader: Shader, u: LookUniforms, rest = new THREE.Matrix4()) {
+  Object.assign(shader.uniforms, { uWounds: u.uWounds });
+  stained(shader, rest, '', '', '', '');
 }
 
 /**
@@ -187,9 +188,9 @@ const SUIT_OWN = '0.7';
  * jacket and which trousers is said point by point (`_tone`: red, green); the other pieces
  * have no such thing and keep their own colour.
  */
-export function suitPatch(shader: Shader, u: LookUniforms) {
+export function suitPatch(shader: Shader, u: LookUniforms, rest = new THREE.Matrix4()) {
   Object.assign(shader.uniforms, { uWounds: u.uWounds, uJacket: u.uJacket, uTrousers: u.uTrousers });
-  stained(shader, 'attribute vec4 _tone;\nvarying vec3 vTone;', 'vTone = _tone.rgb;', 'uniform vec3 uJacket;\nuniform vec3 uTrousers;\nvarying vec3 vTone;', `
+  stained(shader, rest, 'attribute vec4 _tone;\nvarying vec3 vTone;', 'vTone = _tone.rgb;', 'uniform vec3 uJacket;\nuniform vec3 uTrousers;\nvarying vec3 vTone;', `
   vec3 own = mix(vec3(1.0), uJacket * vec3(${SUIT_CLOTH}), vTone.r * ${SUIT_OWN});
   own = mix(own, uTrousers * vec3(${SUIT_CLOTH}), vTone.g * ${SUIT_OWN});
   diffuseColor.rgb *= own;`);

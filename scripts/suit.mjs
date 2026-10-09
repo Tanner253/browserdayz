@@ -31,9 +31,12 @@ import path from 'node:path';
 import * as THREE from 'three';
 import { mergeDocuments } from '@gltf-transform/functions';
 
-/** Mixamo's name for a joint, as Sketchfab writes it ("mixamorig:LeftArm_033") -> this game's */
-function ours(name) {
-  const m = name.match(/^mixamorig:(Left|Right)?(.+?)_\d+$/);
+/**
+ * Mixamo's name for a joint, as Sketchfab writes it ("mixamorig:LeftArm_033") -> this game's.
+ * @param prefix what stands before every joint's name in the file ('' when it was exported without one)
+ */
+export function ours(name, prefix = 'mixamorig:') {
+  const m = name.startsWith(prefix) && name.slice(prefix.length).match(/^(Left|Right)?(.+?)_\d+$/);
   if (!m) return null;
   const side = m[1] === 'Left' ? '_l' : m[1] === 'Right' ? '_r' : '';
   const t = { Hips: 'pelvis', Spine: 'spine_01', Spine1: 'spine_02', Spine2: 'spine_03', Neck: 'neck_01', Head: 'Head', Shoulder: 'clavicle', Arm: 'upperarm', ForeArm: 'lowerarm', Hand: 'hand', UpLeg: 'thigh', Leg: 'calf', Foot: 'foot', ToeBase: 'ball', Toe_End: 'ball_leaf' }[m[2]];
@@ -79,10 +82,13 @@ const at = (m) => new THREE.Vector3().setFromMatrixPosition(m);
 /**
  * @param doc      the character being built: its skeleton is the one the suit goes on
  * @param bodyNode the shape now on that skeleton (it and the other old shapes are taken out)
+ * @param suit     what is put on, already read (otherwise it is read from `dir`); and for
+ *                 anything other than the tactical suit: `pieces` (which of its shapes make
+ *                 which shape of the body, as PIECES), `moved` (as MOVED) and `prefix` (see ours)
  * @returns what was done, for the build's last line
  */
-export async function wearSuit({ doc, io, bodyNode, dir, old = [] }) {
-  const suit = await io.read(path.join(dir, 'scene.gltf'));
+export async function wearSuit({ doc, io, bodyNode, dir, old = [], suit: given, pieces = PIECES, moved: MOVED_ = MOVED, prefix = 'mixamorig:' }) {
+  const suit = given ?? (await io.read(path.join(dir, 'scene.gltf')));
   const sRoot = suit.getRoot();
   const sSkin = sRoot.listSkins()[0];
   const sJoints = sSkin.listJoints();
@@ -95,7 +101,7 @@ export async function wearSuit({ doc, io, bodyNode, dir, old = [] }) {
     for (let n = j.getParentNode(); n; n = n.getParentNode()) if (sIndex.has(n)) return sIndex.get(n);
     return -1;
   });
-  const sName = sJoints.map((j) => ours(j.getName()));
+  const sName = sJoints.map((j) => ours(j.getName(), prefix));
 
   const root = doc.getRoot();
   const skin = bodyNode.getSkin();
@@ -209,7 +215,7 @@ export async function wearSuit({ doc, io, bodyNode, dir, old = [] }) {
   // (at the top of the scene, which stands still: where a shape on a skeleton is drawn from is counted in by three.js)
   const home = root.listScenes()[0];
   let points_ = 0, faces = 0;
-  for (const [piece, sources] of Object.entries(PIECES)) {
+  for (const [piece, sources] of Object.entries(pieces)) {
     const P = [], N = [], T = [], UV = [], JI = [], JW = [], C = [], I = [];
     let material = null, tangents = true;
     for (const [re, tone] of sources) {
@@ -229,6 +235,7 @@ export async function wearSuit({ doc, io, bodyNode, dir, old = [] }) {
           }
           const base = P.length / 3, count = pos.getCount();
           const moved = new THREE.Vector3();
+          const MOVED = MOVED_;
           const v = new THREE.Vector3(), nv = new THREE.Vector3(), tv = new THREE.Vector3(), out = new THREE.Vector3(), sum = new THREE.Vector3(), e = [], a = [], w = [];
           const linear = lift ? new THREE.Matrix3().setFromMatrix4(lift) : null;
           for (let i = 0; i < count; i++) {
