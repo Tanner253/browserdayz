@@ -1106,32 +1106,72 @@ kbd.hot { color: #121413; background: linear-gradient(#d8c594, #b89f66); border-
 .tc-b { position: absolute; display: grid; place-items: center; width: 56px; height: 56px; padding: 0; font-family: var(--font); font-size: 13px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink); background: rgba(10, 12, 11, 0.38); border: 1.5px solid rgba(233, 228, 216, 0.34); border-radius: 50%; -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
 .tc-b svg { width: 24px; height: 24px; }
 .tc-b.down { color: #121413; background: var(--accent); border-color: var(--accent); }
-.tc-fire { right: calc(26px + env(safe-area-inset-right)); bottom: 34px; width: 86px; height: 86px; border-color: rgba(201, 178, 124, 0.75); }
+/* the right thumb's buttons, round the one that fires */
+.tc-fire { right: calc(22px + env(safe-area-inset-right)); bottom: 30px; width: 84px; height: 84px; border-color: rgba(201, 178, 124, 0.75); }
 .tc-fire svg { width: 34px; height: 34px; }
-.tc-aim { right: calc(128px + env(safe-area-inset-right)); bottom: 22px; width: 62px; height: 62px; }
-.tc-jump { right: calc(28px + env(safe-area-inset-right)); bottom: 136px; }
-.tc-reload { right: calc(112px + env(safe-area-inset-right)); bottom: 104px; width: 50px; height: 50px; }
-.tc-crouch { right: calc(206px + env(safe-area-inset-right)); bottom: 20px; width: 50px; height: 50px; }
-/* Use appears only when something is in reach */
-.tc-use { right: calc(100px + env(safe-area-inset-right)); bottom: 172px; width: 64px; height: 64px; display: none; color: #121413; background: var(--accent); border-color: var(--accent); animation: tc-use 1.4s ease-in-out infinite; }
+.tc-aim { right: calc(118px + env(safe-area-inset-right)); bottom: 14px; width: 60px; height: 60px; }
+.tc-jump { right: calc(26px + env(safe-area-inset-right)); bottom: 128px; width: 54px; height: 54px; }
+.tc-reload { right: calc(104px + env(safe-area-inset-right)); bottom: 90px; width: 50px; height: 50px; }
+.tc-crouch { right: calc(190px + env(safe-area-inset-right)); bottom: 62px; width: 48px; height: 48px; }
+.tc-swap { right: calc(190px + env(safe-area-inset-right)); bottom: 8px; width: 48px; height: 48px; }
+/* Use appears only when something is in reach, and beside it whatever G would do there */
+.tc-use { right: calc(96px + env(safe-area-inset-right)); bottom: 168px; width: 62px; height: 62px; display: none; color: #121413; background: var(--accent); border-color: var(--accent); animation: tc-use 1.4s ease-in-out infinite; }
 .tc.use .tc-use { display: grid; }
+.tc-act2 { right: calc(170px + env(safe-area-inset-right)); bottom: 172px; width: 58px; height: 58px; display: none; font-size: 12px; letter-spacing: 0.06em; border-color: rgba(201, 178, 124, 0.75); }
+.tc.g .tc-act2 { display: grid; }
 @keyframes tc-use { 50% { box-shadow: 0 0 0 9px rgba(201, 178, 124, 0.16); } }
-.tc-top { position: absolute; left: calc(12px + env(safe-area-inset-left)); top: 10px; display: flex; gap: 10px; }
+/* leaning: only with the gun up, and on the side of the thumb that is not aiming */
+.tc-lean { display: none; bottom: 168px; width: 48px; height: 48px; }
+.tc.ads .tc-lean { display: grid; }
+.tc-lean-l { left: calc(34px + env(safe-area-inset-left)); }
+.tc-lean-r { left: calc(92px + env(safe-area-inset-left)); }
+.tc-top { position: absolute; left: calc(12px + env(safe-area-inset-left)); top: 10px; display: flex; gap: 8px; }
 .tc-top .tc-b { position: static; width: 46px; height: 46px; }
+/* what can be called out: a list under the button that opens it */
+.tc-emotes { position: absolute; left: calc(12px + env(safe-area-inset-left)); top: 64px; display: none; grid-template-columns: repeat(2, 136px); gap: 6px; pointer-events: auto; touch-action: none; }
+.tc.emo .tc-emotes { display: grid; }
+.tc-e { height: 42px; padding: 0 10px; font-family: var(--font); font-size: 14px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink); background: rgba(10, 12, 11, 0.82); border: 1.5px solid rgba(233, 228, 216, 0.34); }
+.tc-e:active { color: #121413; background: var(--accent); border-color: var(--accent); }
 .tc-close { display: none; right: calc(14px + env(safe-area-inset-right)); bottom: 12px; width: auto; height: 40px; padding: 0 20px; border-radius: 0; color: #121413; background: var(--accent); border-color: var(--accent); }
 .tc.bag .tc-close { display: grid; z-index: 20; }
 .tc.bag { z-index: 20; }
 
-/* a phone has no keyboard or mouse wheel: the HUD takes taps instead */
-body.touch .hud-hotbar { pointer-events: auto; touch-action: manipulation; }
-/* the thumbs own the bottom corners: messages and carried tags move to the top left */
-body.touch .hud-under { top: 146px; left: calc(132px + env(safe-area-inset-left)); }
+/* A phone has no keyboard or mouse wheel: the HUD takes taps instead. The bar of what is
+   carried is two rows a thumb can hit (weapons over the quick things), and it lies OVER the
+   areas the thumbs steer and look with: under them, as it was, no tap ever reached it, and a
+   gun that was picked up could not be taken into the hands. */
+/* (The whole HUD is one layer, and it was under the thumbs' layer: nothing in it could be
+   raised over them one piece at a time. It is over them now, and lets every touch through
+   except on the few pieces that are there to be tapped; hidden, it takes none.) */
+body.touch #hud { z-index: 7; }
+body.touch #hud.hidden .hud-hotbar, body.touch #hud.hidden .hud-minimap { pointer-events: none; }
+body.touch .hud-hotbar { left: 46%; bottom: 10px; display: grid; grid-template-columns: repeat(4, 74px); gap: 5px; pointer-events: auto; touch-action: manipulation; }
+body.touch .hb { width: 74px; height: 54px; background: rgba(10, 12, 11, 0.55); border-color: rgba(233, 228, 216, 0.22); }
+body.touch .hb.on { border-width: 2px; }
+body.touch .hb b { font-size: 12px; }
+body.touch .hb em { font-size: 13px; }
+body.touch .hb-gap { display: none; }
+/* (what the thumbs cover is moved out from under them: rounds over the bar, the body's state by the map) */
+body.touch .hud-weapon, body.touch .hud-ride { right: auto; left: 46%; bottom: 134px; transform: translateX(-50%); text-align: center; white-space: nowrap; }
+body.touch .hud-stamina { left: 46%; bottom: 196px; }
+body.touch .hud-arms { left: 46%; bottom: 204px; }
+body.touch .hud-vitals { top: 16px; bottom: auto; right: calc(158px + env(safe-area-inset-right)); }
+body.touch .hud-fps { top: auto; right: auto; left: calc(8px + env(safe-area-inset-left)); bottom: 4px; }
+body.touch .hud-online { top: auto; right: auto; left: calc(8px + env(safe-area-inset-left)); bottom: 18px; }
+/* the map is in the top right corner, and takes a tap: big, and back again */
+body.touch .hud-minimap { top: 14px; left: auto; right: calc(16px + env(safe-area-inset-right)); width: 124px; height: 124px; pointer-events: auto; touch-action: manipulation; }
+body.touch .hud-minimap.big { top: 50%; left: 50%; right: auto; width: calc(min(86vh, 86vw) / var(--ui-zoom, 1)); height: calc(min(86vh, 86vw) / var(--ui-zoom, 1)); z-index: 8; }
+body.touch .hud-minimap span { display: none; }
+body.touch .hud-feed { top: 156px; right: calc(14px + env(safe-area-inset-right)); }
+/* messages and carried tags: under the buttons in the top left */
+body.touch .hud-under { top: 92px; left: calc(16px + env(safe-area-inset-left)); }
 /* (no room for the board between the thumbs on a phone) */
 body.touch .hud-board { display: none; }
-body.touch .hud-minimap { top: 12px; left: calc(132px + env(safe-area-inset-left)); width: 124px; height: 124px; }
-body.touch .hud-minimap span { display: none; }
-body.touch .hud-chat { top: 70px; bottom: auto; left: calc(14px + env(safe-area-inset-left)); width: 360px; }
-body.touch .chat-entry, body.touch .chat-hint { display: none; }
+body.touch .hud-notes { top: 70px; }
+/* the chat sits high, clear of the keyboard that comes up to type on */
+body.touch .hud-chat { top: 150px; bottom: auto; left: calc(14px + env(safe-area-inset-left)); width: 380px; z-index: 8; }
+body.touch .chat-hint { display: none; }
+body.touch .hud-chat.open .chat-entry input { font-size: 16px; }
 body.touch .start-tabs [data-tab='keys'] { display: none; }
 body.touch .inv-item, body.touch .inv-ground-row { touch-action: none; }
 body.touch .hud-start, body.touch .rw, body.touch .inv-wrap, body.touch .inv-col { touch-action: pan-x pan-y; }

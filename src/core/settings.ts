@@ -36,8 +36,17 @@ export const LEVELS: Level[] = ['low', 'medium', 'high'];
 export const FPS_LIMITS = [30, 40, 60, 120, 0];
 export const VOLUMES = [0, 0.25, 0.5, 0.75, 1];
 
-/** Everything at full on a computer. A phone starts on Low: its GPU is a fraction of a laptop's. */
-export const DEFAULT_GRAPHICS: Graphics = { ...(TOUCH ? PRESETS.low : PRESETS.ultra), fpsLimit: 0, volume: 1 };
+/**
+ * What a phone starts on. It started on Low, which draws half the pixels each way that the
+ * screen's sharpness would bear, with no smoothing of edges: on a phone's fine screen that is a
+ * picture blown up three times, and it was called too low to look at. This is the middle
+ * preset, a little sharper, without the darkening of corners (the one thing in it a phone
+ * pays dearly for and shows least).
+ */
+export const PHONE: Omit<Graphics, 'fpsLimit' | 'volume'> = { scale: 0.85, msaa: 2, ao: 'off', shadows: 'low', foliage: 'medium' };
+
+/** Everything at full on a computer; a phone starts on its own setting, and the menu has the rest either way. */
+export const DEFAULT_GRAPHICS: Graphics = { ...(TOUCH ? PHONE : PRESETS.ultra), fpsLimit: 0, volume: 1 };
 
 const STORE = 'zona.gfx';
 

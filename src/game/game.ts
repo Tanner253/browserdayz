@@ -70,6 +70,8 @@ interface TimedAction {
 /** bump when the map's loot points change: spawned loot from older saves is re-rolled */
 const LOOT_REV = 9;
 const QUICK_KEYS = ['Digit5', 'Digit6', 'Digit7', 'Digit8'];
+/** what can be held, in the order of the keys 1 to 4 */
+const HAND_SLOTS = ['primary', 'secondary', 'holster', 'melee'] as const;
 /** the wheel: how far the mouse travels from its middle to its rim (pixels), and how far out an entry is picked */
 const WHEEL_REACH = 120, WHEEL_PICK = 0.35;
 const SEND_HZ = 15;
@@ -150,6 +152,8 @@ export class Game {
   private rideAt = -1e9;
   /** phones and tablets: on-screen stick and buttons */
   private touch: TouchControls | null = null;
+  /** on a phone: the player put the weapon away themselves, so nothing is drawn for them until they pick one */
+  private handsFree = false;
   /** opens the rewards modal once the entrance has played */
   private entryModal: () => void = () => {};
   private slowFor = 0;
@@ -323,13 +327,34 @@ export class Game {
     this.hud.onRespawn(() => this.respawn());
     if (TOUCH) {
       this.input.touch = true;
+      const inPlay = () => this.started && !this.paused && !this.player.dead;
       this.touch = new TouchControls(this.input, {
         menu: () => this.input.unlock(),
         inventory: () => this.started && !this.player.dead && this.toggleInventory(),
+        swap: () => inPlay() && this.nextWeapon(),
+        emote: (id) => inPlay() && this.emote(id),
+        chat: () => {
+          if (!inPlay() || this.invUI.isOpen || this.hud.chatOpen) return;
+          this.input.releaseAll();
+          this.hud.openChat();
+        },
+      });
+      // a tap on the map makes it big, another puts it back (M on a keyboard)
+      this.minimap.root.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        if (inPlay() && !this.invUI.isOpen) this.minimap.toggle();
       });
     }
-    // tapping (or clicking) a hotbar slot is the same as pressing its number
+    // Tapping (or clicking) a hotbar slot is the same as pressing its number. On a phone a tap
+    // on the weapon that is already in the hands puts it away (X on a keyboard), and that is
+    // remembered: empty hands that were asked for are left empty (see the frame loop).
     this.hud.onHotbar((key) => {
+      const slot = HAND_SLOTS[Number(key) - 1];
+      if (this.touch && slot) {
+        const mine = this.inv.active === slot;
+        this.handsFree = mine;
+        if (mine) return this.weapons.equip(null);
+      }
       this.input.simulate(`Digit${key}`, true);
       setTimeout(() => this.input.simulate(`Digit${key}`, false), 80);
     });
@@ -1099,6 +1124,15 @@ export class Game {
 
   paused = true;
 
+  /** The next weapon carried, round and round (the mouse wheel, for a thumb: it never stops on empty hands). */
+  private nextWeapon() {
+    const have = HAND_SLOTS.filter((s) => this.inv.slots[s]);
+    if (!have.length || this.use || this.garage.ride) return;
+    const at = have.indexOf(this.inv.active as (typeof HAND_SLOTS)[number]);
+    this.handsFree = false;
+    this.weapons.equip(have[(at + 1) % have.length]);
+  }
+
   private resume() {
     if (this.joining) return;
     document.title = this.title;
@@ -1135,6 +1169,7 @@ export class Game {
   }
 
   private respawn() {
+    this.handsFree = false;
     if (this.online) {
       // the server picks the spawn and answers with 'spawn'
       this.net.send({ t: 'respawn' });
@@ -2001,6 +2036,12 @@ export class Game {
     }
     if (this.hud.chatOpen && (!playing || uiOpen)) this.hud.closeChat();
     const typing = this.hud.chatOpen;
+    // A phone has no row of number keys under the fingers: whatever is picked up to fight with
+    // comes into the hands by itself when they are empty, unless they were emptied on purpose.
+    if (this.touch && playing && !uiOpen && !this.use && !this.garage.ride && !this.handsFree && !this.weapons.equippedItem && !this.weapons.busy) {
+      const slot = HAND_SLOTS.find((s) => this.inv.slots[s]);
+      if (slot) this.weapons.equip(slot);
+    }
 
     // binoculars come down for anything else: a trigger, a sprint, the pockets, a hit
     if (this.glass && (!playing || uiOpen || this.use || input.pressed('Mouse0') || input.pressed('Mouse2') || p.sprinting || QUICK_KEYS.some((k) => input.pressed(k)))) {
@@ -2233,7 +2274,7 @@ export class Game {
       vitals: v,
       winded: p.outOfBreath,
       // no keyboard on a phone: the Use button lights up instead of naming a key
-      prompt: this.awaitClick ? '<kbd>Click</kbd>to look around' : this.touch ? (this.prompt?.replace(/<kbd>F<\/kbd>/, '').replace(/ <small>G to pack up<\/small>/, '') ?? null) : this.prompt,
+      prompt: this.awaitClick ? '<kbd>Click</kbd>to look around' : this.touch ? (this.prompt?.replace(/<kbd>F<\/kbd>/, '').replace(/ <small>G to [^<]*<\/small>/, '').replace('W A S D to drive · Space is the handbrake', 'the stick drives · the jump button is the handbrake') ?? null) : this.prompt,
       mark: this.awaitClick ? null : this.mark,
       weapon: this.garage.ride ? null : this.weapons.status(),
       aiming: this.weapons.aiming,
@@ -2260,7 +2301,11 @@ export class Game {
       hidden: uiOpen || !this.started,
     });
 
-    this.touch?.update(playing && !uiOpen && !typing, uiOpen, !!this.prompt?.includes('<kbd>F'));
+    // (what G would do here gets a button of its own beside Use)
+    this.touch?.update(playing && !uiOpen && !typing, uiOpen, !!this.prompt?.includes('<kbd>F'), {
+      g: this.prompt?.includes('G to pour') ? 'Fuel' : this.prompt?.includes('G to pack up') ? 'Pack' : null,
+      aiming: this.weapons.aiming,
+    });
     this.perf.beforeRender();
     r.render(dt);
     this.perf.afterRender();
