@@ -1281,3 +1281,9 @@ body.touch .hud-start, body.touch .rw, body.touch .inv-wrap, body.touch .inv-col
 .hud-gas-tag.on { opacity: 1; }
 .hud-gas-tag.bad { color: #ffdccd; background: rgba(62, 14, 8, 0.8); border-left-color: #ff6a4a; animation: gas-bad 0.9s ease-in-out infinite; }
 @keyframes gas-bad { 50% { background: rgba(116, 24, 10, 0.88); } }
+/* a gas mask from inside: the world through its two round eyepieces, their rims dark at the corners of the eyes */
+.hud-mask { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 0.4s; background: #060806;
+  -webkit-mask-image: radial-gradient(ellipse 36% 56% at 30% 50%, transparent 70%, #000 100%), radial-gradient(ellipse 36% 56% at 70% 50%, transparent 70%, #000 100%);
+  mask-image: radial-gradient(ellipse 36% 56% at 30% 50%, transparent 70%, #000 100%), radial-gradient(ellipse 36% 56% at 70% 50%, transparent 70%, #000 100%);
+  -webkit-mask-composite: source-in; mask-composite: intersect; }
+.hud-mask.on { opacity: 0.86; }

@@ -22,6 +22,8 @@ export const GAS = {
   damage: [6, 16] as [number, number],
   /** seconds from one cough to the next */
   cough: 1.5,
+  /** how far off a cough is heard by the infected, metres (a jog is heard at eleven) */
+  heard: 14,
 };
 
 export interface GasZone { x: number; y: number; z: number; r: number; h: number }

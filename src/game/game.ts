@@ -24,7 +24,7 @@ import { loadSave, writeSave, type SaveData } from '../sim/save';
 import { Net, playerName, publicId, remoteServer, serverStatus, setPlayerName } from '../net/client';
 import { F_AIM, F_BLEED, F_CROUCH, F_DANCE, F_DEAD, F_GROUND, F_GUARD, F_LEAN_L, F_LEAN_R, F_SEAT, F_SPRINT, F_SURRENDER, MAX_STAMINA, crateId, type Act, type CorpseInfo, type PlayerInfo, type Pose, type S2C, type StashInfo } from '../net/protocol';
 import { Player } from './player';
-import { Avatar, AVATAR_LAYER, DEATH_REST, FP_BODY_LAYER, GEAR_SHOWN, type Hold } from './avatar';
+import { Avatar, AVATAR_LAYER, DEATH_REST, FP_BODY_LAYER, GEAR_SHOWN, type Hold, facepiece } from './avatar';
 import { lookFor } from './look';
 import { roadLift } from '../world/road';
 import { Dummy } from './character';
@@ -50,6 +50,7 @@ import { TOUCH } from '../core/device';
 import { TouchControls } from '../ui/touch';
 import { REWARDS_UI, RewardsModal, addCashedTag, cashedTags, walletAddress } from '../ui/rewards';
 import { Gas } from './gas';
+import { GAS } from '../sim/gas';
 
 const _gasHead = new THREE.Vector3();
 
@@ -314,7 +315,11 @@ export class Game {
     this.gas = new Gas(atmo.gas, atmo, r.scene, {
       masked: () => this.inv.wear('gas').length > 0,
       hurt: (amount) => this.player.sicken(amount, 'the gas'),
-      cough: (hard) => this.weapons.flinch(hard),
+      cough: (hard) => {
+        this.weapons.flinch(hard);
+        // (and it is heard: whatever of theirs is near comes to see who is choking)
+        this.horde.noise(this.player.pos.x, this.player.pos.z, GAS.heard);
+      },
       note: (text, kind) => this.hud.note(text, kind),
     }, this.hud.root, world);
     // how many people are in the world, shown before you click Play
@@ -945,14 +950,15 @@ export class Game {
     const out: { id: string; obj: THREE.Object3D }[] = [];
     for (const id of ids) {
       if (!GEAR_SHOWN.has(id)) continue;
-      out.push({ id, obj: (await this.loot.models.get(id)).group.clone() });
+      const model = (await this.loot.models.get(id)).group.clone();
+      out.push({ id, obj: id === 'gasmask' ? facepiece(model) : model });
     }
     body.setGear(out);
   }
 
   /** what this player wears that shows, kept in step with the inventory (and told to the server when it changes) */
   private syncGear() {
-    const ids = (['head', 'vest', 'back'] as const).map((s) => this.inv.slots[s]?.id).filter((x): x is string => !!x);
+    const ids = (['head', 'face', 'vest', 'back'] as const).map((s) => this.inv.slots[s]?.id).filter((x): x is string => !!x);
     const key = ids.join(',');
     if (key === this.gearKey) return;
     this.gearKey = key;

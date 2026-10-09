@@ -73,6 +73,8 @@ export class Gas {
   private seeds: { x: number; z: number; up: number; size: number; ph: number; vx: number; vz: number }[] = [];
   private veil: HTMLDivElement;
   private tag: HTMLDivElement;
+  /** what is seen of the mask from inside it: the rims of its two eyepieces */
+  private lens: HTMLDivElement;
   private coughT = 0;
   private wasIn = false;
   private wasMasked = false;
@@ -97,6 +99,9 @@ export class Gas {
     this.veil.className = 'hud-gas';
     this.tag = document.createElement('div');
     this.tag.className = 'hud-gas-tag';
+    this.lens = document.createElement('div');
+    this.lens.className = 'hud-mask';
+    hud.prepend(this.lens);
     hud.append(this.veil, this.tag);
     const n = zone ? (TOUCH ? 14 : 40) : 0;
     this.at = new Float32Array(n * 4);
@@ -262,6 +267,7 @@ export class Gas {
     if (off > 60) this.warned = false;
     const choke = alive && !masked ? Math.min(1, this.lungs.held / GAS.hold) : 0;
     this.veil.style.opacity = (choke * (0.55 + 0.45 * this.coughT)).toFixed(3);
+    this.lens.classList.toggle('on', alive && masked);
     const show = alive && breathing;
     this.tag.classList.toggle('on', show);
     this.tag.classList.toggle('bad', show && !masked);
