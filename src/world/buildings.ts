@@ -106,10 +106,30 @@ interface Furn {
   y?: number;
 }
 
+/** A floor above the ground one: its own walls, what stands in it and what is found there (heights from its own floor). */
+interface Upper {
+  h: number;
+  int: MatKey;
+  floor: MatKey;
+  walls: WallDef[];
+  furniture: Furn[];
+  loot: [number, number, number][];
+}
+
+/** A straight flight of stairs along z: x0 to x1 wide, its foot at z = foot on the floor, its head at z = top on the floor above. */
+interface Stairs {
+  x0: number;
+  x1: number;
+  foot: number;
+  top: number;
+}
+
 interface Blueprint {
   w: number;
   d: number;
   h: number;
+  upper?: Upper;
+  stairs?: Stairs;
   ext: MatKey;
   int: MatKey;
   floor: MatKey;
@@ -122,6 +142,8 @@ interface Blueprint {
 }
 
 const T = 0.2; // wall thickness
+/** how thick the floor between two storeys is */
+const SLAB = 0.2;
 
 const win = (a: number, b: number, bottom = 0.9, top = 2.05): Opening => ({ a, b, bottom, top, kind: 'window' });
 const door = (a: number, b: number, top = 2.1): Opening => ({ a, b, bottom: 0, top, kind: 'door' });
@@ -453,6 +475,63 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
         ],
         usage: ['Industrial'],
       };
+    case 'house_two': {
+      // Two floors: a kitchen and a hall below, the stairs up the right-hand wall from the
+      // front of the hall to a landing at the back, and two rooms above.
+      const floor: MatKey = rng.chance(0.5) ? 'floor_wood' : 'floor_lino';
+      return {
+        w: 9, d: 7, h: 2.8, ext, int: 'int_painted', floor, roof: rng.chance(0.6) ? 'roof_tiles' : 'roof_iron', roofType: 'gable',
+        walls: [
+          { side: 'front', ext, int: 'int_painted', openings: [win(-3.7, -2.6), door(-0.5, 0.5), win(1.4, 2.5)] },
+          { side: 'back', ext, int: 'int_painted', openings: [win(-3.5, -2.4), win(-0.2, 0.9)] },
+          { side: 'left', ext, int: 'int_painted', openings: [win(-0.6, 0.6)] },
+          { side: 'right', ext, int: 'int_painted', openings: [] },
+          { side: 'inner', from: [-0.9, -3.3], to: [-0.9, 3.3], ext: 'int_plaster', int: 'int_painted', openings: [door(0.9, 1.8)] },
+        ],
+        stairs: { x0: 3.3, x1: 4.3, foot: 1.9, top: -2.1 },
+        furniture: [
+          { id: 'electric_stove', x: -3.9, z: -2.95, rot: 0 },
+          { id: 'painted_wooden_cabinet', x: -3.95, z: -1.9, rot: Math.PI / 2 },
+          { id: 'WoodenTable_01', x: -2.7, z: 0.6, rot: 0 },
+          { id: 'painted_wooden_chair_01', x: -2.5, z: 1.25, rot: Math.PI },
+          { id: 'painted_wooden_chair_01', x: -3.3, z: -0.1, rot: 0.2 },
+          { id: 'scandinavian_masonry_heater', x: -1.6, z: -2.75, rot: 0 },
+          { id: 'Shelf_01', x: -4.05, z: 2.4, rot: Math.PI / 2 },
+          { id: 'wooden_bookshelf_worn', x: 1.4, z: -3.0, rot: 0 },
+          { id: 'painted_wooden_cabinet', x: -0.42, z: -1.4, rot: -Math.PI / 2 },
+        ],
+        loot: [
+          [-3.9, 0.88, -2.95], [-3.95, 1.2, -1.9], [-2.9, 0.57, 0.6], [-2.5, 0.57, 0.6], [-4.05, 0.94, 2.4], [-4.05, 1.51, 2.4],
+          [1.4, 0.67, -3.0], [1.4, 1.28, -3.0], [-0.42, 1.2, -1.4], [1.6, 0.02, 0.8], [-2.0, 0.02, 2.6],
+        ],
+        upper: {
+          h: 2.6, int: 'int_painted', floor: 'floor_wood',
+          walls: [
+            { side: 'front', ext, int: 'int_painted', openings: [win(-3.7, -2.6), win(-0.6, 0.5), win(1.5, 2.6)] },
+            { side: 'back', ext, int: 'int_painted', openings: [win(-3.5, -2.4), win(0.5, 1.6)] },
+            { side: 'left', ext, int: 'int_painted', openings: [win(-0.6, 0.6)] },
+            { side: 'right', ext, int: 'int_painted', openings: [win(-0.5, 0.6)] },
+            { side: 'inner', from: [0.2, -3.3], to: [0.2, 3.3], ext: 'int_plaster', int: 'int_painted', openings: [door(-3.05, -2.15)] },
+          ],
+          furniture: [
+            { id: 'old_bed_frame', x: -3.3, z: -2.1, rot: 0 },
+            { id: 'wooden_bookshelf_worn', x: -4.02, z: 1.5, rot: Math.PI / 2 },
+            { id: 'painted_wooden_cabinet', x: -1.5, z: 3.0, rot: Math.PI },
+            { id: 'WoodenTable_01', x: -1.3, z: -0.3, rot: Math.PI / 2 },
+            { id: 'painted_wooden_chair_01', x: -1.95, z: -0.3, rot: Math.PI / 2 },
+            { id: 'metal_office_desk', x: 1.5, z: 2.78, rot: Math.PI },
+            { id: 'SchoolChair_01', x: 1.5, z: 2.0, rot: 0 },
+            { id: 'Shelf_01', x: 0.5, z: 0.6, rot: Math.PI / 2 },
+            { id: 'old_bed_frame', x: 1.9, z: -0.4, rot: Math.PI },
+          ],
+          loot: [
+            [-3.3, 0.48, -1.7], [-4.02, 0.67, 1.5], [-4.02, 1.28, 1.5], [-1.5, 1.2, 3.0], [-1.3, 0.57, -0.3],
+            [1.2, 0.81, 2.78], [1.8, 0.81, 2.78], [0.5, 0.94, 0.6], [0.5, 1.51, 0.6], [1.9, 0.48, -0.4], [-2.4, 0.02, 1.0], [2.4, 0.02, 1.2],
+          ],
+        },
+        usage: ['Village', 'Town'],
+      };
+    }
     case 'guardpost':
     default:
       return {
@@ -769,6 +848,7 @@ export class Buildings {
   }
 
   private planBuilding(plot: BuildingPlot) {
+    if (plot.type === 'tower') return this.planTower(plot);
     const rng = new RNG(plot.seed);
     const firstPoint = this.lootPoints.length;
     const bp = blueprint(plot.type, rng);
@@ -779,7 +859,7 @@ export class Buildings {
     );
     const { w, d, h } = bp;
     const hw = w / 2, hd = d / 2;
-    this.interiors.push({ x: plot.x, z: plot.z, hw: hw - T, hd: hd - T, rot: plot.rot, y0: plot.floorY - 0.2, y1: plot.floorY + h });
+    this.interiors.push({ x: plot.x, z: plot.z, hw: hw - T, hd: hd - T, rot: plot.rot, y0: plot.floorY - 0.2, y1: plot.floorY + (bp.upper ? h + SLAB + bp.upper.h : h) });
 
     // foundation + floor + ceiling
     const surf = (k: MatKey): Surface => (k === 'glass' ? 'glass' : MATS[k].surface);
@@ -792,78 +872,166 @@ export class Buildings {
     };
     addBox('concrete', -hw - 0.08, hw + 0.08, -1.4, -0.1, -hd - 0.08, hd + 0.08, B);
     addBox(bp.floor, -hw + T * 0.5, hw - T * 0.5, -0.12, 0, -hd + T * 0.5, hd - T * 0.5, B);
-    if (bp.roofType !== 'flat') addBox(bp.int, -hw + T, hw - T, h, h + 0.08, -hd + T, hd - T, B, false);
+    // (how high the walls stand in all: one floor, or two with the floor between them)
+    const H = bp.upper ? h + SLAB + bp.upper.h : h;
+    if (bp.roofType !== 'flat') addBox(bp.upper?.int ?? bp.int, -hw + T, hw - T, H, H + 0.08, -hd + T, hd - T, B, false);
 
-    // walls
-    for (const wd of bp.walls) {
-      let a: THREE.Vector2, b: THREE.Vector2;
-      switch (wd.side) {
-        case 'front': a = new THREE.Vector2(-hw, hd - T / 2); b = new THREE.Vector2(hw, hd - T / 2); break;
-        case 'back': a = new THREE.Vector2(hw, -hd + T / 2); b = new THREE.Vector2(-hw, -hd + T / 2); break;
-        case 'left': a = new THREE.Vector2(-hw + T / 2, -hd + T); b = new THREE.Vector2(-hw + T / 2, hd - T); break;
-        case 'right': a = new THREE.Vector2(hw - T / 2, hd - T); b = new THREE.Vector2(hw - T / 2, -hd + T); break;
-        default: a = new THREE.Vector2(...wd.from!); b = new THREE.Vector2(...wd.to!);
-      }
-      const dir = b.clone().sub(a);
-      const L = dir.length();
-      dir.normalize();
-      // wall frame: x along wall, y up, z outward
-      const W = new THREE.Matrix4().makeBasis(
-        new THREE.Vector3(dir.x, 0, dir.y),
-        new THREE.Vector3(0, 1, 0),
-        new THREE.Vector3(-dir.y, 0, dir.x),
-      ).setPosition(a.x, 0, a.y);
-      const F = B.clone().multiply(W);
-      // openings are given in building-local coordinates on the wall's axis
-      const axisCoord = (v: number) => {
-        // project a building-local coordinate onto "distance from a"
-        if (Math.abs(dir.x) > 0.5) return (v - a.x) * Math.sign(dir.x);
-        return (v - a.y) * Math.sign(dir.y);
-      };
-      const ops = wd.openings
-        .map((o) => {
-          const p0 = axisCoord(o.a), p1 = axisCoord(o.b);
-          return { ...o, a: Math.min(p0, p1), b: Math.max(p0, p1) };
-        })
-        .sort((x, y) => x.a - y.a);
-      const layers: [MatKey, number, number][] = [
-        [wd.int, -T / 2, 0],
-        [wd.ext, 0, T / 2],
-      ];
-      for (const [key, z0, z1] of layers) {
-        let cur = 0;
-        for (const o of ops) {
-          if (o.a > cur) addBox(key, cur, o.a, 0, h, z0, z1, F);
-          if (o.top < h) addBox(key, o.a, o.b, o.top, h, z0, z1, F);
-          if (o.bottom > 0) addBox(key, o.a, o.b, 0, o.bottom, z0, z1, F);
-          cur = o.b;
+    // walls: of one floor, whose foot is at y0 and which is h high
+    const outside: { F: THREE.Matrix4; a: number; b: number; front: boolean }[] = [];
+    const panes: { F: THREE.Matrix4; a: number; b: number; bottom: number; top: number; L: number }[] = [];
+    const raise = (walls: WallDef[], y0: number, h: number) => {
+      for (const wd of walls) {
+        let a: THREE.Vector2, b: THREE.Vector2;
+        switch (wd.side) {
+          case 'front': a = new THREE.Vector2(-hw, hd - T / 2); b = new THREE.Vector2(hw, hd - T / 2); break;
+          case 'back': a = new THREE.Vector2(hw, -hd + T / 2); b = new THREE.Vector2(-hw, -hd + T / 2); break;
+          case 'left': a = new THREE.Vector2(-hw + T / 2, -hd + T); b = new THREE.Vector2(-hw + T / 2, hd - T); break;
+          case 'right': a = new THREE.Vector2(hw - T / 2, hd - T); b = new THREE.Vector2(hw - T / 2, -hd + T); break;
+          default: a = new THREE.Vector2(...wd.from!); b = new THREE.Vector2(...wd.to!);
         }
-        if (cur < L) addBox(key, cur, L, 0, h, z0, z1, F);
-      }
-      // frames, glass, doors
-      for (const o of ops) {
-        const fw = 0.07;
-        const fz0 = -T / 2 - 0.01, fz1 = T / 2 + 0.01;
-        addBox('trim', o.a, o.a + fw, o.bottom, o.top, fz0, fz1, F, false);
-        addBox('trim', o.b - fw, o.b, o.bottom, o.top, fz0, fz1, F, false);
-        addBox('trim', o.a, o.b, o.top - fw, o.top, fz0, fz1, F, false);
-        if (o.kind === 'window') {
-          addBox('trim', o.a - 0.04, o.b + 0.04, o.bottom - 0.04, o.bottom + 0.02, fz0 - 0.04, fz1 + 0.06, F, false);
-          addBox('trim', (o.a + o.b) / 2 - 0.025, (o.a + o.b) / 2 + 0.025, o.bottom, o.top, -0.03, 0.03, F, false);
-          addBox('trim', o.a, o.b, (o.bottom + o.top) / 2 + 0.15, (o.bottom + o.top) / 2 + 0.2, -0.03, 0.03, F, false);
-          if (rng.chance(0.7)) {
-            this.push('glass', boxGeo(o.a + fw, o.b - fw, o.bottom, o.top - fw, -0.006, 0.006, 1, F));
+        const dir = b.clone().sub(a);
+        const L = dir.length();
+        dir.normalize();
+        // wall frame: x along wall, y up, z outward
+        const W = new THREE.Matrix4().makeBasis(
+          new THREE.Vector3(dir.x, 0, dir.y),
+          new THREE.Vector3(0, 1, 0),
+          new THREE.Vector3(-dir.y, 0, dir.x),
+        ).setPosition(a.x, y0, a.y);
+        const F = B.clone().multiply(W);
+        // openings are given in building-local coordinates on the wall's axis
+        const axisCoord = (v: number) => {
+          // project a building-local coordinate onto "distance from a"
+          if (Math.abs(dir.x) > 0.5) return (v - a.x) * Math.sign(dir.x);
+          return (v - a.y) * Math.sign(dir.y);
+        };
+        const ops = wd.openings
+          .map((o) => {
+            const p0 = axisCoord(o.a), p1 = axisCoord(o.b);
+            return { ...o, a: Math.min(p0, p1), b: Math.max(p0, p1) };
+          })
+          .sort((x, y) => x.a - y.a);
+        if (wd.side !== 'inner' && y0 === 0) {
+          // a skirt of concrete where the wall meets the ground, broken at the doors
+          let from = 0;
+          const skirt = (to: number) => to - from > 0.05 && addBox('concrete', from, to, -0.1, 0.26, T / 2, T / 2 + 0.04, F, false);
+          for (const o of ops) {
+            if (o.kind === 'window') continue;
+            skirt(o.a);
+            from = o.b;
           }
-          // windows block movement but not bullets
-          const c = new THREE.Matrix4().makeTranslation((o.a + o.b) / 2, (o.bottom + o.top) / 2, 0);
-          this.collider((o.b - o.a) / 2, (o.top - o.bottom) / 2, 0.05, F.clone().multiply(c), 'glass', GLASS_GROUPS);
-        } else if (o.kind === 'door') {
-          const hinge = F.clone().multiply(new THREE.Matrix4().makeTranslation(o.a + fw, 0, 0));
-          this.doorSpecs.push({ m: hinge, w: o.b - o.a - fw * 2, h: o.top - fw, id: `${plot.id}_door${this.doorSpecs.length}`, open: rng.chance(0.35), swing: rng.chance(0.5) ? 1 : -1 });
+          skirt(L);
         }
-        // (a barn's open front has the same lip as a door)
-        if (o.kind !== 'window' && wd.side !== 'inner') this.doorstep(F, o.a, o.b);
+        const layers: [MatKey, number, number][] = [
+          [wd.int, -T / 2, 0],
+          [wd.ext, 0, T / 2],
+        ];
+        for (const [key, z0, z1] of layers) {
+          let cur = 0;
+          for (const o of ops) {
+            if (o.a > cur) addBox(key, cur, o.a, 0, h, z0, z1, F);
+            if (o.top < h) addBox(key, o.a, o.b, o.top, h, z0, z1, F);
+            if (o.bottom > 0) addBox(key, o.a, o.b, 0, o.bottom, z0, z1, F);
+            cur = o.b;
+          }
+          if (cur < L) addBox(key, cur, L, 0, h, z0, z1, F);
+        }
+        // frames, glass, doors
+        for (const o of ops) {
+          const fw = 0.07;
+          const fz0 = -T / 2 - 0.01, fz1 = T / 2 + 0.01;
+          addBox('trim', o.a, o.a + fw, o.bottom, o.top, fz0, fz1, F, false);
+          addBox('trim', o.b - fw, o.b, o.bottom, o.top, fz0, fz1, F, false);
+          addBox('trim', o.a, o.b, o.top - fw, o.top, fz0, fz1, F, false);
+          if (o.kind === 'window') {
+            addBox('trim', o.a - 0.04, o.b + 0.04, o.bottom - 0.04, o.bottom + 0.02, fz0 - 0.04, fz1 + 0.06, F, false);
+            addBox('trim', (o.a + o.b) / 2 - 0.025, (o.a + o.b) / 2 + 0.025, o.bottom, o.top, -0.03, 0.03, F, false);
+            addBox('trim', o.a, o.b, (o.bottom + o.top) / 2 + 0.15, (o.bottom + o.top) / 2 + 0.2, -0.03, 0.03, F, false);
+            if (rng.chance(0.7)) {
+              this.push('glass', boxGeo(o.a + fw, o.b - fw, o.bottom, o.top - fw, -0.006, 0.006, 1, F));
+            }
+            // windows block movement but not bullets
+            const c = new THREE.Matrix4().makeTranslation((o.a + o.b) / 2, (o.bottom + o.top) / 2, 0);
+            this.collider((o.b - o.a) / 2, (o.top - o.bottom) / 2, 0.05, F.clone().multiply(c), 'glass', GLASS_GROUPS);
+          } else if (o.kind === 'door') {
+            const hinge = F.clone().multiply(new THREE.Matrix4().makeTranslation(o.a + fw, 0, 0));
+            this.doorSpecs.push({ m: hinge, w: o.b - o.a - fw * 2, h: o.top - fw, id: `${plot.id}_door${this.doorSpecs.length}`, open: rng.chance(0.35), swing: rng.chance(0.5) ? 1 : -1 });
+          }
+          // (a barn's open front has the same lip as a door)
+          if (o.kind !== 'window' && wd.side !== 'inner' && y0 === 0) {
+            this.doorstep(F, o.a, o.b);
+            outside.push({ F, a: o.a, b: o.b, front: wd.side === 'front' });
+          }
+          if (o.kind === 'window' && wd.side !== 'inner') panes.push({ F, a: o.a, b: o.b, bottom: o.bottom, top: o.top, L });
+        }
       }
+    };
+    // (under a floor above, the walls go on up past the edge of it: the outside of the house is one wall from the ground to the roof)
+    raise(bp.walls, 0, bp.upper ? h + SLAB : h);
+
+    // --- the floor above, and the stairs to it
+    if (bp.upper && bp.stairs) {
+      const up = bp.upper, st = bp.stairs;
+      const y1 = h + SLAB;
+      const zmin = Math.min(st.top, st.foot), zmax = Math.max(st.top, st.foot), dz = Math.sign(st.top - st.foot);
+      // the floor between the two: all of it but the well the stairs come up through
+      const slab = (xa: number, xb: number, za: number, zb: number) => xb - xa > 0.02 && zb - za > 0.02 && addBox(up.floor, xa, xb, h, y1, za, zb, B);
+      const x0i = -hw + T, x1i = hw - T, z0i = -hd + T, z1i = hd - T;
+      slab(x0i, st.x0, z0i, z1i);
+      slab(st.x1, x1i, z0i, z1i);
+      slab(st.x0, st.x1, z0i, zmin);
+      slab(st.x0, st.x1, zmax, z1i);
+      const L = zmax - zmin, xc = (st.x0 + st.x1) / 2;
+      // (off the head of them: onto the landing and round the end of the rail, into the room)
+      const { rise, run } = this.flight(B, plot.id, st, 0, y1, [st.x1 > hw - T - 0.1 ? st.x0 - 0.8 : st.x1 + 0.8, st.top + dz * 0.6]);
+      // under it the space is boarded in: solid to everything
+      for (let k = 1; k < 4; k++) {
+        const za = st.foot + dz * (k / 4) * L, zb = st.foot + dz * ((k + 1) / 4) * L;
+        const top = (k / 4) * y1 - 0.12;
+        this.collider((st.x1 - st.x0) / 2 - 0.02, top / 2, Math.abs(zb - za) / 2, B.clone().multiply(new THREE.Matrix4().makeTranslation(xc, top / 2, (za + zb) / 2)), 'wood');
+      }
+      // (which side of it is open to the room: the other is against a wall)
+      const open = st.x1 > hw - T - 0.1 ? st.x0 : st.x1, away = open === st.x0 ? -1 : 1;
+      this.push('planks', wedgeGeo(L, y1 - rise, 0.04, this.tile('planks'), B.clone().multiply(new THREE.Matrix4().makeTranslation(open, 0, st.foot)).multiply(new THREE.Matrix4().makeRotationY(dz < 0 ? Math.PI : 0))));
+      // rails: up the open side of the flight, and round the well on the floor above
+      this.rail(B, open + away * 0.03, st.foot, open + away * 0.03, st.top, rise, y1);
+      this.rail(B, open + away * 0.03, st.foot + dz * run, open + away * 0.03, st.top - dz * 0.02, y1, y1);
+      this.rail(B, st.x0, st.foot + dz * run, st.x1, st.foot + dz * run, y1, y1);
+      raise(up.walls, y1, up.h);
+    }
+
+    // --- what makes the outside of it a place somebody built
+    const lived = plot.type === 'house_small' || plot.type === 'house_brick' || plot.type === 'house_two' || plot.type === 'cabin';
+    // (dice of its own: nothing here may take a throw from the ones the yard is laid out with)
+    const rq = new RNG(plot.seed ^ 0x51ed5);
+    for (const o of outside) {
+      // a step at each door
+      addBox('concrete', o.a - 0.22, o.b + 0.22, -0.14, -0.012, T / 2, T / 2 + 0.72, o.F, false);
+      if (!o.front || !(lived || plot.type === 'clinic' || plot.type === 'store')) continue;
+      // and over the front one a little roof on two brackets
+      const mid = (o.a + o.b) / 2, half = (o.b - o.a) / 2 + 0.42;
+      const C = o.F.clone().multiply(new THREE.Matrix4().makeTranslation(mid, 2.3, T / 2)).multiply(new THREE.Matrix4().makeRotationX(0.3));
+      this.push(bp.roof, boxGeo(-half, half, 0.02, 0.07, 0, 0.95, this.tile(bp.roof), C));
+      for (const sx of [-1, 1]) {
+        this.push('trim', boxGeo(sx * (half - 0.12) - 0.03, sx * (half - 0.12) + 0.03, -0.03, 0.02, 0, 0.9, this.tile('trim'), C));
+        addBox('trim', mid + sx * (half - 0.12) - 0.03, mid + sx * (half - 0.12) + 0.03, 1.85, 2.3, T / 2, T / 2 + 0.05, o.F, false);
+      }
+    }
+    if (lived && rq.chance(0.6)) {
+      // shutters, hung open either side of each window
+      for (const p of panes) {
+        const wide = Math.min(0.42, (p.b - p.a) / 2);
+        if (p.a - wide < 0.12 || p.b + wide > p.L - 0.12) continue;
+        addBox('trim', p.a - wide, p.a - 0.03, p.bottom - 0.03, p.top + 0.03, T / 2 + 0.012, T / 2 + 0.042, p.F, false);
+        addBox('trim', p.b + 0.03, p.b + wide, p.bottom - 0.03, p.top + 0.03, T / 2 + 0.012, T / 2 + 0.042, p.F, false);
+      }
+    }
+    if (lived && bp.roofType === 'gable') {
+      // a chimney, up through the slope from the stove's side of the house
+      const cx = (rq.chance(0.5) ? -1 : 1) * hw * 0.42, cz = -hd * 0.3;
+      const roofAt = H + d * 0.32 * (1 - Math.abs(cz) / hd);
+      addBox('brick_ext', cx - 0.3, cx + 0.3, H + 0.1, roofAt + 0.85, cz - 0.3, cz + 0.3, B);
+      addBox('concrete', cx - 0.36, cx + 0.36, roofAt + 0.85, roofAt + 0.92, cz - 0.36, cz + 0.36, B, false);
     }
 
     if (plot.type === 'police') {
@@ -881,18 +1049,19 @@ export class Buildings {
       const slopeLen = hd / Math.cos(ang) + oh;
       for (const s of [1, -1]) {
         const R = B.clone()
-          .multiply(new THREE.Matrix4().makeTranslation(0, h + rise + 0.02, 0))
+          .multiply(new THREE.Matrix4().makeTranslation(0, H + rise + 0.02, 0))
           .multiply(new THREE.Matrix4().makeRotationX(s * ang));
         const z0 = s > 0 ? 0 : -slopeLen, z1 = s > 0 ? slopeLen : 0;
         addBox(bp.roof, -hw - oh, hw + oh, 0, 0.1, z0, z1, R);
       }
       // gable ends
       for (const sx of [1, -1]) {
-        const G = B.clone().multiply(new THREE.Matrix4().makeTranslation(sx * (hw - T / 2), h, 0));
+        const G = B.clone().multiply(new THREE.Matrix4().makeTranslation(sx * (hw - T / 2), H, 0));
         this.push(bp.ext, prismGeo(hd, rise, T, this.tile(bp.ext), G));
       }
       // ridge cap
-      addBox('trim', -hw - oh, hw + oh, h + rise + 0.02, h + rise + 0.14, -0.12, 0.12, B, false);
+      addBox('trim', -hw - oh, hw + oh, H + rise + 0.02, H + rise + 0.14, -0.12, 0.12, B, false);
+      this.eaves(B, hw, H + rise + 0.02, ang, slopeLen, oh);
     } else if (bp.roofType === 'shed') {
       // single pitch: highest over the door, falling to the back wall
       const rise = 0.55;
@@ -909,7 +1078,7 @@ export class Buildings {
         this.push(bp.ext, wedgeGeo(d, rise, T, this.tile(bp.ext), G));
       }
     } else {
-      addBox(bp.roof, -hw - 0.25, hw + 0.25, h, h + 0.22, -hd - 0.25, hd + 0.25, B);
+      addBox(bp.roof, -hw - 0.25, hw + 0.25, H, H + 0.22, -hd - 0.25, hd + 0.25, B);
     }
 
     // furniture: indoors, so it only has to be drawn from close by (through a window or the door).
@@ -919,58 +1088,63 @@ export class Buildings {
       const p = new THREE.Vector3(lx, y, lz).applyMatrix4(B);
       this.world.props.push({ kind: id, x: p.x, y: p.y, z: p.z, rot: rot + plot.rot, scale, far: indoorFar });
     };
-    for (const f of bp.furniture) inst(f.id, f.x, f.z, f.rot, f.scale ?? 1, f.y ?? 0);
+    // what stands on a floor (whose own level is y0), and where things are found on it
+    const stock = (furniture: Furn[], loot: [number, number, number][], y0: number) => {
+      for (const f of furniture) inst(f.id, f.x, f.z, f.rot, f.scale ?? 1, (f.y ?? 0) + y0);
 
-    // loot points: on the floor, or on the furniture surface underneath
-    const local = (f: Furn, lx: number, lz: number): [number, number] => {
-      const c = Math.cos(f.rot), s = Math.sin(f.rot);
-      const dx = lx - f.x, dz = lz - f.z;
-      return [c * dx - s * dz, s * dx + c * dz];
-    };
-    const bounds = (f: Furn) => {
-      const e = assets.manifest.models[f.id];
-      const k = f.scale ?? 1;
-      return { hx: ((e.max[0] - e.min[0]) / 2) * k, hz: ((e.max[2] - e.min[2]) / 2) * k, top: e.max[1] * k };
-    };
-    const onFurniture = new Map<string, { f: Furn; ly: number; pts: [number, number][] }>();
-    for (const [lx, ly, lz] of bp.loot) {
-      if (ly < 0.1) {
-        const p = new THREE.Vector3(lx, ly, lz).applyMatrix4(B);
-        this.lootPoints.push({ x: p.x, y: p.y, z: p.z, usage: bp.usage, building: plot.id, floor: true });
-        continue;
-      }
-      const f = bp.furniture.find((q) => {
-        const [ox, oz] = local(q, lx, lz);
-        const b = bounds(q);
-        return Math.abs(ox) < b.hx + 0.12 && Math.abs(oz) < b.hz + 0.12;
-      });
-      if (!f || CRATE_KINDS.has(f.id)) continue;
-      const key = `${bp.furniture.indexOf(f)}:${ly}`;
-      if (!onFurniture.has(key)) onFurniture.set(key, { f, ly, pts: [] });
-      onFurniture.get(key)!.pts.push(local(f, lx, lz));
-    }
-    // several points on one surface share it side by side, so their items never overlap
-    for (const { f, ly, pts } of onFurniture.values()) {
-      const b = bounds(f);
-      const [ix, iz] = SURFACE_INSET[f.id] ?? [0.05, 0.05];
-      const HX = b.hx - ix, HZ = b.hz - iz;
-      const along = HX >= HZ; // split along the longer side
-      const L = along ? HX : HZ;
-      pts.sort((p, q) => (along ? p[0] - q[0] : p[1] - q[1]));
-      pts.forEach((_, i) => {
-        const seg = L / pts.length;
-        const centre = -L + (2 * i + 1) * seg;
-        const ox = along ? centre : 0, oz = along ? 0 : centre;
+      // loot points: on the floor, or on the furniture surface underneath
+      const local = (f: Furn, lx: number, lz: number): [number, number] => {
         const c = Math.cos(f.rot), s = Math.sin(f.rot);
-        const levels = SHELF_LEVELS[f.id];
-        const sy = levels ? levels.reduce((best, l) => (Math.abs(l - ly) < Math.abs(best - ly) ? l : best)) + 0.003 : ly;
-        const p = new THREE.Vector3(f.x + ox * c + oz * s, TOP_SURFACE.has(f.id) ? b.top + 0.003 : sy, f.z - ox * s + oz * c).applyMatrix4(B);
-        this.lootPoints.push({
-          x: p.x, y: p.y, z: p.z, usage: bp.usage, building: plot.id, floor: false,
-          surf: { x: p.x, z: p.z, rot: f.rot + plot.rot, hx: along ? seg : HX, hz: along ? HZ : seg, clear: SHELF_CLEARANCE[f.id] ?? 10 },
+        const dx = lx - f.x, dz = lz - f.z;
+        return [c * dx - s * dz, s * dx + c * dz];
+      };
+      const bounds = (f: Furn) => {
+        const e = assets.manifest.models[f.id];
+        const k = f.scale ?? 1;
+        return { hx: ((e.max[0] - e.min[0]) / 2) * k, hz: ((e.max[2] - e.min[2]) / 2) * k, top: e.max[1] * k };
+      };
+      const onFurniture = new Map<string, { f: Furn; ly: number; pts: [number, number][] }>();
+      for (const [lx, ly, lz] of loot) {
+        if (ly < 0.1) {
+          const p = new THREE.Vector3(lx, ly + y0, lz).applyMatrix4(B);
+          this.lootPoints.push({ x: p.x, y: p.y, z: p.z, usage: bp.usage, building: plot.id, floor: true });
+          continue;
+        }
+        const f = furniture.find((q) => {
+          const [ox, oz] = local(q, lx, lz);
+          const b = bounds(q);
+          return Math.abs(ox) < b.hx + 0.12 && Math.abs(oz) < b.hz + 0.12;
         });
-      });
-    }
+        if (!f || CRATE_KINDS.has(f.id)) continue;
+        const key = `${furniture.indexOf(f)}:${ly}`;
+        if (!onFurniture.has(key)) onFurniture.set(key, { f, ly, pts: [] });
+        onFurniture.get(key)!.pts.push(local(f, lx, lz));
+      }
+      // several points on one surface share it side by side, so their items never overlap
+      for (const { f, ly, pts } of onFurniture.values()) {
+        const b = bounds(f);
+        const [ix, iz] = SURFACE_INSET[f.id] ?? [0.05, 0.05];
+        const HX = b.hx - ix, HZ = b.hz - iz;
+        const along = HX >= HZ; // split along the longer side
+        const L = along ? HX : HZ;
+        pts.sort((p, q) => (along ? p[0] - q[0] : p[1] - q[1]));
+        pts.forEach((_, i) => {
+          const seg = L / pts.length;
+          const centre = -L + (2 * i + 1) * seg;
+          const ox = along ? centre : 0, oz = along ? 0 : centre;
+          const c = Math.cos(f.rot), s = Math.sin(f.rot);
+          const levels = SHELF_LEVELS[f.id];
+          const sy = levels ? levels.reduce((best, l) => (Math.abs(l - ly) < Math.abs(best - ly) ? l : best)) + 0.003 : ly;
+          const p = new THREE.Vector3(f.x + ox * c + oz * s, (TOP_SURFACE.has(f.id) ? b.top + 0.003 : sy) + y0, f.z - ox * s + oz * c).applyMatrix4(B);
+          this.lootPoints.push({
+            x: p.x, y: p.y, z: p.z, usage: bp.usage, building: plot.id, floor: false,
+            surf: { x: p.x, z: p.z, rot: f.rot + plot.rot, hx: along ? seg : HX, hz: along ? HZ : seg, clear: SHELF_CLEARANCE[f.id] ?? 10 },
+          });
+        });
+      }
+    };
+    stock(bp.furniture, bp.loot, 0);
+    if (bp.upper) stock(bp.upper.furniture, bp.upper.loot, h + SLAB);
 
     // where a weapon is always to be found: on the floor first (anything fits there)
     if (plot.arms) {
@@ -1014,6 +1188,146 @@ export class Buildings {
     if (plot.type === 'cabin') {
       const p = new THREE.Vector3(-1.5, 0, hd + 3.2).applyMatrix4(B);
       this.world.props.push({ kind: 'stone_fire_pit', x: p.x, y: heightAt(this.world.heights, p.x, p.z), z: p.z, rot: 0, scale: 1 });
+    }
+  }
+
+  /**
+   * The stairs there are, for anything that has to find its way up or down by them: which
+   * building, where each begins and ends, and a spot on the floor above that is clear of the
+   * well and its rail (all in the world's space).
+   */
+  flights: { plot: string; foot: THREE.Vector3; head: THREE.Vector3; off: THREE.Vector3 }[] = [];
+
+  /**
+   * A flight of stairs from y0 up to y1: boards and risers to look at, and one slope to walk
+   * on, laid along the fronts of the steps from a tread before the first to a tread short of
+   * the last. A body goes up it as up a bank, with no step to catch its feet on; it stops
+   * feet and nothing else.
+   */
+  private flight(B: THREE.Matrix4, plot: string, st: Stairs, y0: number, y1: number, off?: [number, number]) {
+    const up = y1 - y0, dz = Math.sign(st.top - st.foot), L = Math.abs(st.top - st.foot);
+    const N = Math.round(up / 0.2), rise = up / N, run = L / N;
+    const tile = this.tile('planks');
+    for (let i = 0; i < N; i++) {
+      const za = st.foot + dz * i * run, zb = st.foot + dz * (i + 1) * run;
+      this.push('planks', boxGeo(st.x0, st.x1, y0 + (i + 1) * rise - 0.045, y0 + (i + 1) * rise, Math.min(za, zb) - 0.015, Math.max(za, zb) + 0.015, tile, B));
+      this.push('planks', boxGeo(st.x0 + 0.02, st.x1 - 0.02, y0 + i * rise, y0 + (i + 1) * rise - 0.045, Math.min(za, za + dz * 0.025), Math.max(za, za + dz * 0.025), tile, B));
+    }
+    const tilt = Math.atan2(up, L), HALF = 0.04, xc = (st.x0 + st.x1) / 2;
+    const ramp = new THREE.Matrix4()
+      .makeTranslation(xc, y0 + up / 2 - HALF * Math.cos(tilt), (st.foot + st.top) / 2 - dz * run + dz * HALF * Math.sin(tilt))
+      .multiply(new THREE.Matrix4().makeRotationX(-dz * tilt));
+    this.collider((st.x1 - st.x0) / 2, HALF, Math.hypot(up, L) / 2, B.clone().multiply(ramp), 'wood', GLASS_GROUPS);
+    // (and the last tread, level, from where the slope ends to the floor above: left open, whatever is found by looking straight down fell through it)
+    this.collider((st.x1 - st.x0) / 2, HALF, run / 2 + 0.03, B.clone().multiply(new THREE.Matrix4().makeTranslation(xc, y1 - HALF, st.top - (dz * run) / 2)), 'wood', GLASS_GROUPS);
+    const head = new THREE.Vector3(xc, y1, st.top + dz * 0.5).applyMatrix4(B);
+    this.flights.push({ plot, foot: new THREE.Vector3(xc, y0, st.foot - dz * 0.7).applyMatrix4(B), head, off: off ? new THREE.Vector3(off[0], y1, off[1]).applyMatrix4(B) : head });
+    return { rise, run };
+  }
+
+  /**
+   * A rail from one point to another (level, or up a flight): posts and two bars, and a body
+   * does not go through it or over it. (Nothing else is stopped: it is bars, and a bullet
+   * goes between them. What stops a body stands straight up from the line of the rail,
+   * whatever the slope: leant with the slope, as the bars are, the low end of it hung out
+   * over the landing at the height of a head.)
+   */
+  private rail(B: THREE.Matrix4, xa: number, za: number, xb: number, zb: number, ya: number, yb: number, key: MatKey = 'trim') {
+    const len = Math.hypot(xb - xa, zb - za, yb - ya), flat = Math.hypot(xb - xa, zb - za);
+    const tile = this.tile(key);
+    const turn = new THREE.Matrix4().makeRotationY(Math.atan2(xb - xa, zb - za));
+    const bar = (up: number, half: number) => {
+      const R = B.clone().multiply(new THREE.Matrix4().makeTranslation(xa, ya + up, za)).multiply(turn).multiply(new THREE.Matrix4().makeRotationX(-Math.atan2(yb - ya, flat)));
+      this.push(key, boxGeo(-half, half, -half, half, 0, len, tile, R));
+    };
+    bar(0.93, 0.03);
+    bar(0.47, 0.017);
+    const posts = Math.max(1, Math.round(flat / 0.95));
+    for (let k = 0; k <= posts; k++) {
+      const u = k / posts;
+      this.push(key, boxGeo(-0.025, 0.025, 0, 0.93, -0.025, 0.025, tile, B.clone().multiply(new THREE.Matrix4().makeTranslation(xa + (xb - xa) * u, ya + (yb - ya) * u, za + (zb - za) * u))));
+    }
+    const tall = Math.abs(yb - ya) + 1;
+    this.collider(0.03, tall / 2, flat / 2, B.clone().multiply(new THREE.Matrix4().makeTranslation((xa + xb) / 2, Math.min(ya, yb) + tall / 2, (za + zb) / 2)).multiply(turn), 'wood', GLASS_GROUPS);
+  }
+
+  /**
+   * A watchtower: four legs, a flight up one side to a landing across the back, a second up
+   * the other side to the platform, a boarded parapet round that and an iron roof over it.
+   * From the top a rifle sees over every roof about it; and whoever is up there is seen
+   * from everywhere.
+   */
+  private planTower(plot: BuildingPlot) {
+    const B = new THREE.Matrix4().compose(new THREE.Vector3(plot.x, plot.floorY, plot.z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), plot.rot), new THREE.Vector3(1, 1, 1));
+    const first = this.lootPoints.length;
+    const box = (key: MatKey, x0: number, x1: number, y0: number, y1: number, z0: number, z1: number, collide = true) => {
+      this.push(key, boxGeo(x0, x1, y0, y1, z0, z1, this.tile(key), B));
+      if (collide) this.collider((x1 - x0) / 2, (y1 - y0) / 2, (z1 - z0) / 2, B.clone().multiply(new THREE.Matrix4().makeTranslation((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2)), key === 'roof_iron' ? 'metal' : 'wood');
+    };
+    // (E: half its width. IN, OUT: the near and far edges of a flight from the middle. F: how far along the side a flight runs either way.)
+    const MID = 2.6, TOP = 5.2, ROOF = 7.5, E = 2.8, IN = 1.65, OUT = 2.65, F = 1.6, RIM = E - 0.11;
+    // legs, and the beams that tie them
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) box('planks', sx * E - 0.11, sx * E + 0.11, -0.7, ROOF, sz * E - 0.11, sz * E + 0.11);
+    for (const y of [MID - 0.16, TOP - 0.3]) {
+      for (const s of [-1, 1]) {
+        box('planks', -E, E, y, y + 0.14, s * E - 0.06, s * E + 0.06, false);
+        box('planks', s * E - 0.06, s * E + 0.06, y, y + 0.14, -E, E, false);
+      }
+    }
+    // up one side to the landing across the back, and up the other to the platform
+    const a: Stairs = { x0: -OUT, x1: -IN, foot: F, top: -F }, b: Stairs = { x0: IN, x1: OUT, foot: -F, top: F };
+    this.flight(B, plot.id, a, 0, MID);
+    this.flight(B, plot.id, b, MID, TOP, [IN - 0.9, F + 0.6]);
+    // the landing, railed on every side a body could go off it
+    box('planks', -RIM, RIM, MID - 0.1, MID, -RIM, -F);
+    this.rail(B, -RIM, -RIM, RIM, -RIM, MID, MID);
+    this.rail(B, -IN, -F, IN, -F, MID, MID);
+    this.rail(B, -RIM, -F, -RIM, -RIM, MID, MID);
+    this.rail(B, RIM, -RIM, RIM, -F, MID, MID);
+    // each flight between two rails
+    this.rail(B, -RIM, F, -RIM, -F, 0.17, MID);
+    this.rail(B, -IN + 0.03, F, -IN + 0.03, -F, 0.17, MID);
+    this.rail(B, RIM, -F, RIM, F, MID + 0.17, TOP);
+    this.rail(B, IN - 0.03, -F, IN - 0.03, F, MID + 0.17, TOP);
+    // the platform: all of it but the well the second flight comes up through (which has a rail across its foot)
+    box('planks', -E, b.x0, TOP - 0.14, TOP, -E, E);
+    box('planks', b.x1, E, TOP - 0.14, TOP, -E, E);
+    box('planks', b.x0, b.x1, TOP - 0.14, TOP, -E, b.foot);
+    box('planks', b.x0, b.x1, TOP - 0.14, TOP, b.top - 0.02, E);
+    this.rail(B, b.x0, b.foot, b.x1, b.foot, TOP, TOP);
+    this.rail(B, IN - 0.03, -F, IN - 0.03, F - 0.35, TOP, TOP);
+    // a parapet of boards, chest high, and a roof of iron on the legs
+    for (const s of [-1, 1]) {
+      box('planks_ext', -E, E, TOP, TOP + 1.05, s * E - 0.04, s * E + 0.04);
+      box('planks_ext', s * E - 0.04, s * E + 0.04, TOP, TOP + 1.05, -E, E);
+      box('trim', -E - 0.03, E + 0.03, TOP + 1.05, TOP + 1.1, s * E - 0.07, s * E + 0.07, false);
+      box('trim', s * E - 0.07, s * E + 0.07, TOP + 1.05, TOP + 1.1, -E - 0.03, E + 0.03, false);
+    }
+    const R = B.clone().multiply(new THREE.Matrix4().makeTranslation(0, ROOF, 0)).multiply(new THREE.Matrix4().makeRotationX(0.09));
+    this.push('roof_iron', boxGeo(-E - 0.45, E + 0.45, 0, 0.07, -E - 0.45, E + 0.45, this.tile('roof_iron'), R));
+    this.collider(E + 0.45, 0.04, E + 0.45, R, 'metal');
+    // what is kept up there: a case of arms, and whatever was left on the boards
+    const at = (lx: number, ly: number, lz: number) => new THREE.Vector3(lx, ly, lz).applyMatrix4(B);
+    const c = at(-1.9, TOP, -2.1);
+    this.world.props.push({ kind: 'weapons_case', x: c.x, y: c.y, z: c.z, rot: plot.rot + Math.PI / 2, scale: 1 });
+    for (const [lx, lz] of [[-0.2, -0.6], [-1.6, 1.4], [0.5, 2.0]]) {
+      const p = at(lx, TOP + 0.02, lz);
+      this.lootPoints.push({ x: p.x, y: p.y, z: p.z, usage: ['Military'], building: plot.id, floor: true });
+    }
+    if (plot.arms) for (const p of this.lootPoints.slice(first, first + plot.arms)) p.arms = 'guns';
+  }
+
+  /** The edges of a pitched roof: a board hung along each eave, and one down each slope at either end. */
+  private eaves(B: THREE.Matrix4, hw: number, ridge: number, ang: number, slopeLen: number, oh: number) {
+    const tile = this.tile('trim');
+    for (const s of [1, -1]) {
+      const R = B.clone().multiply(new THREE.Matrix4().makeTranslation(0, ridge, 0)).multiply(new THREE.Matrix4().makeRotationX(s * ang));
+      const z0 = s > 0 ? slopeLen - 0.02 : -slopeLen - 0.04;
+      this.push('trim', boxGeo(-hw - oh, hw + oh, -0.17, 0.1, z0, z0 + 0.06, tile, R));
+      for (const sx of [1, -1]) {
+        const x = sx * (hw + oh);
+        this.push('trim', boxGeo(x - 0.03, x + 0.03, -0.17, 0.12, s > 0 ? 0 : -slopeLen, s > 0 ? slopeLen : 0, tile, R));
+      }
     }
   }
 

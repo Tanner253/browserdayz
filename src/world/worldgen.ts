@@ -11,7 +11,7 @@ export const WORLD_RES = 513; // height samples per side
 export const CELL = WORLD_SIZE / (WORLD_RES - 1); // 2 m
 export const PLAY_RADIUS = 400;
 
-export type BuildingType = 'house_small' | 'house_brick' | 'barn' | 'shed' | 'cabin' | 'guardpost' | 'police' | 'clinic' | 'store' | 'barracks' | 'garage';
+export type BuildingType = 'house_small' | 'house_brick' | 'barn' | 'shed' | 'cabin' | 'guardpost' | 'police' | 'clinic' | 'store' | 'barracks' | 'garage' | 'house_two' | 'tower';
 
 /** footprint (x = width, z = depth) in metres, used for terrain pads + spacing */
 export const BUILDING_FOOTPRINT: Record<BuildingType, [number, number]> = {
@@ -26,6 +26,8 @@ export const BUILDING_FOOTPRINT: Record<BuildingType, [number, number]> = {
   store: [10, 7],
   barracks: [13, 6.5],
   garage: [9, 7],
+  house_two: [9, 7],
+  tower: [6, 6],
 };
 
 export interface BuildingPlot {
@@ -699,6 +701,29 @@ export function generateWorld(seed = WORLD_SEED): World {
       LAYOUT[st.kind].forEach(([type, right, fwd, turn], i) => {
         addLater(type, st.x + right * c + fwd * sn, st.z - right * sn + fwd * c, st.rot + turn, i === 0 ? (st.kind === 'depot' ? 2 : 1) : 0, 2.5);
       });
+    }
+    // Later still: houses of two floors. (Whatever is added goes here, after everything above:
+    // each building is numbered by where it comes in the list, and what is kept between
+    // restarts goes by those numbers.)
+    onStreet('house_two', 10);
+    onStreet('house_two', 12);
+    for (const st of laterSites) {
+      if (st.kind !== 'hamlet') continue;
+      const c = Math.cos(st.rot), sn = Math.sin(st.rot);
+      for (const [right, fwd] of [[-17, -14], [19, -12], [-21, 8], [22, 10], [0, -22]]) {
+        if (addLater('house_two', st.x + right * c + fwd * sn, st.z - right * sn + fwd * c, st.rot + (right > 0 ? -0.4 : 0.4), 1, 2.5)) break;
+      }
+    }
+    // and a watchtower: over the checkpoint's yard, and over the motor pool
+    for (const [ox, oz] of [[17, -19], [-19, -21], [21, 4], [-23, 8], [6, 26], [-8, -27]] as [number, number][]) {
+      if (addLater('tower', CAMP.x + ox, CAMP.z + oz, Math.atan2(-ox, -oz), 1, 2)) break;
+    }
+    for (const st of laterSites) {
+      if (st.kind !== 'depot') continue;
+      const c = Math.cos(st.rot), sn = Math.sin(st.rot);
+      for (const [right, fwd] of [[21, 12], [-22, 11], [20, -16], [-21, -15], [0, 24]]) {
+        if (addLater('tower', st.x + right * c + fwd * sn, st.z - right * sn + fwd * c, st.rot + Math.PI, 1, 2)) break;
+      }
     }
     const added = buildings.slice(firstLater);
     for (const b of added) seat(b);

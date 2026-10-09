@@ -204,6 +204,7 @@ export function installLook(g: Game, T: { freeze(on?: boolean): void }) {
       b.after = 0;
       b.waitT = 99;
       b.yaw = yaw;
+      b.lost();
       b._think ??= b.think;
       b.think = senses ? b._think : () => {};
       return b;

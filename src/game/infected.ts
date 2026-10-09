@@ -7,7 +7,7 @@
 
 import * as THREE from 'three';
 import type RAPIER from '@dimforge/rapier3d-compat';
-import { physics, GLASS_GROUPS, HITBOX_GROUPS, PLAYER_GROUPS, SIGHT_GROUPS, SOLID_GROUPS } from '../core/physics';
+import { physics, GLASS_GROUPS, HITBOX_GROUPS, PLAYER_GROUPS, SIGHT_GROUPS } from '../core/physics';
 import { audio } from '../core/audio';
 import type { Atmosphere } from '../world/atmosphere';
 import { BUILDING_FOOTPRINT, heightAt, type World } from '../world/worldgen';
@@ -104,6 +104,11 @@ export class Infected implements Damageable {
   private wayStage = 0;
   private wayT = 0;
   private poundT = 0;
+  /** the flight of stairs it is making for or on, whether it is going up them, and whether it has reached their near end */
+  private steps: { plot: string; way: THREE.Vector3[] } | null = null;
+  private stepsUp = true;
+  private stepsAt = 0;
+  private onSteps = false;
   /** it has changed what it is doing since this game last said where it was */
   dirty = true;
   /** time its body has not been moved for (the far ones are posed every second or third frame) */
@@ -176,6 +181,7 @@ export class Infected implements Damageable {
       this.mode = I_IDLE;
       this.after = 0;
     }
+    this.lost();
     if (mine) {
       // it stays about where it was found
       this.home.copy(this.pos);
@@ -218,6 +224,7 @@ export class Infected implements Damageable {
   /** a noise, or somebody it has just been hurt by: it goes to see (and if it was hurt, it knows who) */
   hearAt(at: THREE.Vector3, sure = false) {
     if (this.dead || !this.mine || this.mode >= I_CHASE) return;
+    if (this.mode !== I_ALERT) this.lost();
     this.goal.copy(at);
     if (this.mode !== I_ALERT) this.dirty = true;
     this.mode = I_ALERT;
@@ -226,6 +233,18 @@ export class Infected implements Damageable {
   }
 
   // ------------------------------------------------------------ the mind
+
+  /** whatever way it was making by a door or a flight of stairs is forgotten: it starts from where it stands */
+  lost() {
+    this.way = null;
+    this.steps = null;
+    this.onSteps = false;
+  }
+
+  /** shoved a little by another of them: only as far as there is room to go */
+  nudge(dx: number, dz: number) {
+    this.tryAt(this.pos.x + dx, this.pos.z + dz);
+  }
 
   private sees(p: Person): boolean {
     const eye = _v.set(this.pos.x, this.pos.y + 1.55, this.pos.z);
@@ -286,7 +305,8 @@ export class Infected implements Damageable {
   /** where the floor is at a spot, for something standing at `y` now (null: nothing to stand on within reach) */
   private floor(x: number, z: number, y: number): number {
     const ground = heightAt(this.host.world().heights, x, z);
-    const hit = physics.raycast({ x, y: y + 1.25, z }, { x: 0, y: -1, z: 0 }, 4.5, SOLID_GROUPS);
+    // (whatever a person's feet stand on: the slope laid over a flight of stairs is that and nothing else)
+    const hit = physics.raycast({ x, y: y + 1.25, z }, { x: 0, y: -1, z: 0 }, 4.5, PLAYER_GROUPS, this.blocker);
     const f = hit ? y + 1.25 - hit.toi : -1e9;
     return f > ground + 0.04 ? f : ground;
   }
@@ -313,6 +333,30 @@ export class Infected implements Damageable {
    */
   private goTo(at: THREE.Vector3, speed: number, dt: number): boolean {
     const there = this.horde.plotAt(at.x, at.z), here = this.horde.plotAt(this.pos.x, this.pos.z);
+    // On another floor of the building it is in: by the stairs, to their near end and then along them.
+    const dy = at.y - this.pos.y;
+    const other = !!here && here === there && Math.abs(dy) > 1.5;
+    if (other && !this.onSteps && (!this.steps || this.steps.plot !== here || this.stepsUp !== dy > 0)) {
+      const f = this.horde.flight(here, this.pos, dy > 0);
+      // the way by it: to its near end, along it, and (at the top) clear of the well it comes up through
+      this.steps = f && { plot: f.plot, way: dy > 0 ? [f.foot, f.head, f.off] : [f.off, f.head, f.foot] };
+      this.stepsUp = dy > 0;
+      this.stepsAt = 0;
+    }
+    // (once on a flight it goes to the end of it: half way up, whoever it is after is no longer "a floor away")
+    if (!other && !this.onSteps) this.steps = null;
+    const s = this.steps;
+    if (s) {
+      const to = s.way[this.stepsAt];
+      if (Math.hypot(to.x - this.pos.x, to.z - this.pos.z) < 0.5 && Math.abs(to.y - this.pos.y) < 1) {
+        this.stepsAt++;
+        this.onSteps = this.stepsAt < s.way.length;
+        if (!this.onSteps) this.steps = null;
+        return true;
+      }
+      return this.walk(to.x, to.z, speed, dt);
+    }
+    this.onSteps = false;
     if (there === here) this.way = null;
     else {
       const plot = (there ?? here)!;
@@ -396,6 +440,7 @@ export class Infected implements Damageable {
           this.mode = I_WANDER;
           this.waitT = 14;
           this.dirty = true;
+          this.lost();
         }
         break;
       case I_WANDER:
@@ -408,7 +453,7 @@ export class Infected implements Damageable {
         }
         break;
       case I_ALERT:
-        if (Math.hypot(this.goal.x - this.pos.x, this.goal.z - this.pos.z) > 1.2) {
+        if (Math.hypot(this.goal.x - this.pos.x, this.goal.z - this.pos.z) > 1.2 || Math.abs(this.goal.y - this.pos.y) > 1.5 || this.onSteps) {
           if (!this.goTo(this.goal, I.look, dt)) this.waitT -= dt;
         } else {
           // there: a look about, then it loses interest
@@ -653,6 +698,19 @@ export class Horde {
     return null;
   }
 
+  /** the stairs of a building to take from where something stands: the flight whose near end is at its own height, and the nearest of those */
+  flight(plot: string, from: THREE.Vector3, up: boolean) {
+    let best: Buildings['flights'][number] | null = null, bd = Infinity;
+    for (const f of this.host.buildings().flights) {
+      if (f.plot !== plot) continue;
+      const near = up ? f.foot : f.off;
+      if (Math.abs(near.y - from.y) > 1.2) continue;
+      const d = Math.hypot(near.x - from.x, near.z - from.z);
+      if (d < bd) [best, bd] = [f, d];
+    }
+    return best;
+  }
+
   /** the door of a building to go by, from one spot to another: an open one if there is one, and the least far round */
   doorway(plot: string, from: THREE.Vector3, to: THREE.Vector3): Doorway | null {
     if (!this.ways) {
@@ -749,10 +807,8 @@ export class Horde {
         const d = Math.hypot(dx, dz);
         if (d > 0.62 || d < 1e-3) continue;
         const push = ((0.62 - d) / 2 / d) * 0.5;
-        mine[a].pos.x -= dx * push;
-        mine[a].pos.z -= dz * push;
-        mine[c].pos.x += dx * push;
-        mine[c].pos.z += dz * push;
+        mine[a].nudge(-dx * push, -dz * push);
+        mine[c].nudge(dx * push, dz * push);
       }
     }
     // say where they are: eight times a second what has moved, all of them once a second
