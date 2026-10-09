@@ -884,7 +884,8 @@ export class Game {
       const d = buildings.doors[m.i];
       if (!d || d.open === m.open) return;
       d.set(m.open, m.swing);
-      audio.door(m.open, d.pivot.position);
+      // (somebody else's door is heard across a yard, not across the map)
+      if (d.pivot.position.distanceToSquared(cam().position) < 45 * 45) audio.door(m.open, d.pivot.position);
     });
     net.on('spawn', (m) => {
       const p = this.player;

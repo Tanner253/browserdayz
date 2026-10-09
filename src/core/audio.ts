@@ -685,7 +685,9 @@ export class AudioEngine {
     if (!this.ready) return;
     const t = this.ctx.currentTime;
     const out = this.out(pos, 3, 1.2);
-    this.click(opening ? 1400 : 900, 0.4, 0.04);
+    // (from where the door is, like the rest of it: with no place given, the click of every
+    // door on the map was heard by everybody, at full strength, wherever they stood)
+    this.click(opening ? 1400 : 900, 0.4, 0.04, 0, pos);
     if (opening) {
       const o = this.ctx.createOscillator();
       o.type = 'sawtooth';
@@ -715,7 +717,7 @@ export class AudioEngine {
       const g = this.ctx.createGain();
       this.env(g, t + 0.35, 0.7, 0.003, 0.12);
       n.connect(f).connect(g).connect(out);
-      this.click(700, 0.35, 0.05, 0.38);
+      this.click(700, 0.35, 0.05, 0.38, pos);
     }
   }
 
