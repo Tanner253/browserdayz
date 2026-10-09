@@ -3,7 +3,8 @@
 // `npx tsx test/infected.test.ts`.
 
 import assert from 'node:assert/strict';
-import { Director, INFECTED, I_CHASE, I_DEAD, I_IDLE, type Home } from '../src/sim/infected';
+import { Director, INFECTED, I_CHASE, I_DEAD, I_IDLE, infectedDrop, type Home } from '../src/sim/infected';
+import { ITEMS } from '../src/sim/items';
 
 let n = 0;
 const ok = (name: string, fn: () => void) => {
@@ -119,6 +120,24 @@ ok('hit enough it dies, lies a while, is cleared away, and another comes when no
   assert.equal(d.tick(due, [at(7, 20, 0)]).added.length, 0);
   assert.equal(d.tick(due + 1000, []).added.length, 1);
   assert.equal(d.bodies.size, 5);
+});
+
+ok('what one has on it is a real thing, a sensible number of them, and there about as often as is said', () => {
+  let seed = 12345;
+  const rnd = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296;
+  let had = 0;
+  const seen = new Set<string>();
+  for (let k = 0; k < 20000; k++) {
+    const d = infectedDrop(rnd);
+    if (!d) continue;
+    had++;
+    seen.add(d[0]);
+    assert.ok(ITEMS[d[0]], d[0]);
+    assert.ok(Number.isInteger(d[1]) && d[1] >= 1 && d[1] <= 8, `${d[0]} x ${d[1]}`);
+    assert.ok(!ITEMS[d[0]].weapon, 'no guns in dead men\'s pockets');
+  }
+  assert.ok(Math.abs(had / 20000 - INFECTED.carries) < 0.02, `${had / 20000}`);
+  assert.ok(seen.size >= 8);
 });
 
 console.log(`${n} checks passed`);

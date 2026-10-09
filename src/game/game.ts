@@ -103,6 +103,7 @@ export class Game {
     atmo: () => this.s.atmo,
     scene: () => this.s.r.scene,
     world: () => this.s.world,
+    buildings: () => this.s.buildings,
     me: () => ({ id: this.net.id || 1, pos: this.player.pos, crouched: this.player.crouched, speed: Math.hypot(this.player.vel.x, this.player.vel.z), alive: this.started && !this.player.dead, seated: !!this.garage.ride }),
     others: () => this.remotes.values(),
     online: () => this.online,
@@ -112,6 +113,7 @@ export class Game {
       const len = Math.max(0.001, Math.hypot(p.x - from.x, p.z - from.z));
       this.takeHit({ t: 'dmg', from: 0, amount, zone: 'torso', w: 'infected', dir: [(p.x - from.x) / len, 0, (p.z - from.z) / len] });
     },
+    dropped: (id, qty, at) => this.dropItem(makeItem(id, qty), at.clone().setY(at.y + 0.05), 0.4),
     killed: (zone, distance) => {
       this.weapons.confirmKill();
       this.hud.note(`Infected down${zone === 'head' ? ' · headshot' : ''}${distance > 8 ? ` · ${Math.round(distance)} m` : ''}`, 'good');
@@ -863,6 +865,17 @@ export class Game {
   private bumpDummies(at: THREE.Vector3, half: THREE.Vector3, quat: THREE.Quaternion, speed: number) {
     const inv = quat.clone().invert();
     const rel = new THREE.Vector3();
+    // the infected in the way of it (alone or not: on a server the server is told, and decides)
+    for (const b of this.horde.all.values()) {
+      if (b.dead || !b.ready) continue;
+      rel.copy(b.pos).sub(at).applyQuaternion(inv);
+      if (Math.abs(rel.x) > half.x || Math.abs(rel.z) > half.z || rel.y > 0.6 || rel.y < -2.6) continue;
+      const chest = new THREE.Vector3(b.pos.x, b.pos.y + 1.2, b.pos.z);
+      const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(quat);
+      this.effects.bleed(chest, dir, 0.8);
+      if (b.damage(Math.max(0, speed - JEEP.bumpFrom) * JEEP.bumpPer, chest, dir, 'torso')) this.hud.note('Infected down · jeep', 'good');
+      if (this.online) this.net.send({ t: 'ihit', i: b.i, zone: 'torso', w: 'jeep', dist: Math.round(speed * 10) / 10, sup: false, bonus: 0 });
+    }
     for (const d of this.dummies) {
       if (d.dead) continue;
       rel.copy(d.pos).sub(at).applyQuaternion(inv);

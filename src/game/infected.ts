@@ -10,8 +10,9 @@ import type RAPIER from '@dimforge/rapier3d-compat';
 import { physics, GLASS_GROUPS, HITBOX_GROUPS, PLAYER_GROUPS, SIGHT_GROUPS, SOLID_GROUPS } from '../core/physics';
 import { audio } from '../core/audio';
 import type { Atmosphere } from '../world/atmosphere';
-import { heightAt, type World } from '../world/worldgen';
-import { Director, INFECTED, I_ALERT, I_ATTACK, I_CHASE, I_DEAD, I_IDLE, I_WANDER, homeSpot, infectedHomes, type IState, type InfectedInfo } from '../sim/infected';
+import { BUILDING_FOOTPRINT, heightAt, type World } from '../world/worldgen';
+import type { Buildings } from '../world/buildings';
+import { Director, INFECTED, I_ALERT, I_ATTACK, I_CHASE, I_DEAD, I_IDLE, I_WANDER, homeSpot, infectedDrop, infectedHomes, type IState, type InfectedInfo } from '../sim/infected';
 import type { C2S } from '../net/protocol';
 import { Avatar } from './avatar';
 import { infectedLook } from './look';
@@ -33,6 +34,7 @@ export interface HordeHost {
   atmo(): Atmosphere;
   scene(): THREE.Scene;
   world(): World;
+  buildings(): Buildings;
   /** this game's own player, and everybody else it knows of */
   me(): Person;
   others(): Iterable<Person>;
@@ -42,6 +44,8 @@ export interface HordeHost {
   struck(amount: number, from: THREE.Vector3): void;
   /** one of them is dead, by this player's hand */
   killed(zone: HitZone, distance: number): void;
+  /** playing alone: one went down with this on it (on a server the server puts it in the world) */
+  dropped(id: string, qty: number, at: THREE.Vector3): void;
 }
 
 const INTERP_DELAY = 150;
@@ -50,6 +54,14 @@ const DRAWN = 150;
 const UP = new THREE.Vector3(0, 1, 0);
 const _head = new THREE.Vector3(), _neck = new THREE.Vector3(), _pelvis = new THREE.Vector3();
 const _v = new THREE.Vector3();
+/** a way through a wall: the middle of a doorway, which way it faces (level), the door in it, and the building it belongs to */
+interface Doorway {
+  plot: string;
+  mid: THREE.Vector3;
+  n: THREE.Vector3;
+  door: { open: boolean };
+}
+
 const lerpAngle = (a: number, b: number, t: number) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * t;
 const turnTo = (a: number, b: number, max: number) => a + THREE.MathUtils.clamp(Math.atan2(Math.sin(b - a), Math.cos(b - a)), -max, max);
 
@@ -86,6 +98,12 @@ export class Infected implements Damageable {
   private sideT = 0;
   private stuckT = 0;
   private groanT = 4 + Math.random() * 14;
+  /** the doorway it is making for, which side of it it started on, how far through it has got, and how long it has been at it */
+  private way: Doorway | null = null;
+  private waySide = 1;
+  private wayStage = 0;
+  private wayT = 0;
+  private poundT = 0;
   /** it has changed what it is doing since this game last said where it was */
   dirty = true;
   private said: IState = [0, 0, 0, 0, -1, 0];
@@ -223,8 +241,9 @@ export class Infected implements Damageable {
       const dx = p.pos.x - this.pos.x, dz = p.pos.z - this.pos.z;
       const d = Math.hypot(dx, dz);
       if (d > I.hearJeep + 5 || Math.abs(p.pos.y - this.pos.y) > 9) return;
-      if (p.seated) {
-        if (d < I.hearJeep && p.speed > 1.5 && d < hd) [heard, hd] = [p, d];
+      if (p.seated && p.speed > 2.5) {
+        // a jeep that is going is heard; one that has stopped is somebody sitting where they can be got at
+        if (d < I.hearJeep && d < hd) [heard, hd] = [p, d];
         return;
       }
       // (in front of it is the way it faces: yaw 0 looks down -z)
@@ -282,6 +301,50 @@ export class Infected implements Damageable {
     return true;
   }
   private fallTo = 0;
+
+  /**
+   * Toward a point, by the doors if a wall is in the way: when the point is in a building
+   * and it is not (or the other way about, or they are in two), it goes up to a door of that
+   * building on its own side, square on, and straight through. A door that is shut it beats
+   * on, which everything near can hear. False when it could not move.
+   */
+  private goTo(at: THREE.Vector3, speed: number, dt: number): boolean {
+    const there = this.horde.plotAt(at.x, at.z), here = this.horde.plotAt(this.pos.x, this.pos.z);
+    if (there === here) this.way = null;
+    else {
+      const plot = (there ?? here)!;
+      this.wayT += dt;
+      if (!this.way || this.way.plot !== plot || (this.wayStage === 0 && this.wayT > 5)) {
+        this.way = this.horde.doorway(plot, this.pos, at);
+        this.wayStage = 0;
+        this.wayT = 0;
+        if (this.way) this.waySide = Math.sign((this.pos.x - this.way.mid.x) * this.way.n.x + (this.pos.z - this.way.mid.z) * this.way.n.z) || 1;
+      }
+    }
+    const w = this.way;
+    if (!w) return this.walk(at.x, at.z, speed, dt);
+    const k = this.wayStage === 0 ? 1.15 : -1.25;
+    const tx = w.mid.x + w.n.x * this.waySide * k, tz = w.mid.z + w.n.z * this.waySide * k;
+    const left = Math.hypot(tx - this.pos.x, tz - this.pos.z);
+    if (this.wayStage === 0 && left < 0.45) {
+      if (w.door.open) this.wayStage = 1;
+      else {
+        this.yaw = turnTo(this.yaw, Math.atan2(w.n.x * this.waySide, w.n.z * this.waySide), dt * 5);
+        if ((this.poundT -= dt) <= 0) {
+          this.poundT = 1.5 + Math.random() * 0.8;
+          this.avatar.claw();
+          audio.impact('wood', w.mid, w.mid.distanceTo(this.horde.eye));
+          this.dirty = true;
+        }
+      }
+      return true;
+    }
+    if (this.wayStage === 1 && left < 0.5) {
+      this.way = null;
+      return true;
+    }
+    return this.walk(tx, tz, speed, dt);
+  }
 
   /** a step toward a point at a speed; false when it could not move at all */
   private walk(tx: number, tz: number, speed: number, dt: number): boolean {
@@ -343,7 +406,7 @@ export class Infected implements Damageable {
         break;
       case I_ALERT:
         if (Math.hypot(this.goal.x - this.pos.x, this.goal.z - this.pos.z) > 1.2) {
-          if (!this.walk(this.goal.x, this.goal.z, I.look, dt)) this.waitT -= dt;
+          if (!this.goTo(this.goal, I.look, dt)) this.waitT -= dt;
         } else {
           // there: a look about, then it loses interest
           this.yaw += dt * 0.9 * this.side;
@@ -358,14 +421,18 @@ export class Infected implements Damageable {
       case I_CHASE: {
         const at = quarry?.alive && now - this.seenAt < 900 ? quarry.pos : this.lastSeen;
         const d = Math.hypot(at.x - this.pos.x, at.z - this.pos.z);
-        if (quarry?.alive && !quarry.seated && d < I.reach * 0.82 && Math.abs(quarry.pos.y - this.pos.y) < 1.4) {
+        // (it strikes what it can see: not through a wall it happens to be standing against)
+        if (quarry?.alive && now - this.seenAt < 500 && !(quarry.seated && quarry.speed > 2.5) && d < I.reach * 0.82 && Math.abs(quarry.pos.y - this.pos.y) < 1.4) {
           this.mode = I_ATTACK;
           this.strikeT = 0;
           this.struck = false;
+          this.way = null;
           this.avatar.claw();
           audio.infected('attack', this.pos, this.pos.distanceTo(this.horde.eye), this.i);
           this.dirty = true;
-        } else if (d > 0.4) this.walk(at.x, at.z, I.chase, dt);
+          break;
+        }
+        if (d > 0.4) this.goTo(at, I.chase, dt);
         break;
       }
       case I_ATTACK: {
@@ -559,6 +626,51 @@ export class Horde {
     return this.people.get(id) ?? null;
   }
 
+  // --- walls and the ways through them
+  private plots: { id: string; x: number; z: number; c: number; s: number; hw: number; hd: number }[] | null = null;
+  private ways: Doorway[] | null = null;
+
+  /** which building a spot is inside (its id), or null for out of doors */
+  plotAt(x: number, z: number): string | null {
+    this.plots ??= this.host.world().buildings.map((b) => {
+      const [w, d] = BUILDING_FOOTPRINT[b.type];
+      return { id: b.id, x: b.x, z: b.z, c: Math.cos(b.rot), s: Math.sin(b.rot), hw: w / 2, hd: d / 2 };
+    });
+    for (const p of this.plots) {
+      const dx = x - p.x, dz = z - p.z;
+      if (Math.abs(dx) > p.hw + p.hd || Math.abs(dz) > p.hw + p.hd) continue;
+      if (Math.abs(dx * p.c - dz * p.s) < p.hw - 0.1 && Math.abs(dx * p.s + dz * p.c) < p.hd - 0.1) return p.id;
+    }
+    return null;
+  }
+
+  /** the door of a building to go by, from one spot to another: an open one if there is one, and the least far round */
+  doorway(plot: string, from: THREE.Vector3, to: THREE.Vector3): Doorway | null {
+    if (!this.ways) {
+      const b = this.host.buildings();
+      this.plotAt(0, 0);
+      this.ways = [];
+      b.doorSpecs.forEach((s, k) => {
+        const mid = new THREE.Vector3(s.w / 2, 0, 0).applyMatrix4(s.m);
+        const n = new THREE.Vector3(0, 0, 1).transformDirection(s.m).setY(0).normalize();
+        const plot = s.id.slice(0, s.id.lastIndexOf('_door'));
+        // (only the doors in the outside walls: one between two rooms leads nowhere but the next room)
+        const p = this.plots!.find((q) => q.id === plot);
+        if (!p || !b.doors[k]) return;
+        const dx = mid.x - p.x, dz = mid.z - p.z;
+        if (p.hw - Math.abs(dx * p.c - dz * p.s) > 0.6 && p.hd - Math.abs(dx * p.s + dz * p.c) > 0.6) return;
+        this.ways!.push({ plot, mid, n, door: b.doors[k] });
+      });
+    }
+    let best: Doorway | null = null, bd = Infinity;
+    for (const w of this.ways) {
+      if (w.plot !== plot || !w.door) continue;
+      const d = Math.hypot(w.mid.x - from.x, w.mid.z - from.z) + Math.hypot(w.mid.x - to.x, w.mid.z - to.z) + (w.door.open ? 0 : 40);
+      if (d < bd) [best, bd] = [w, d];
+    }
+    return best;
+  }
+
   /** A noise at a place, heard this far off: the ones this game moves go to see. */
   noise(x: number, z: number, range: number) {
     const at = new THREE.Vector3(x, 0, z);
@@ -582,6 +694,8 @@ export class Horde {
     if (!this.director) return false;
     const r = this.director.hurt(b.i, amount, this.now);
     if (!r?.dead) return false;
+    const had = infectedDrop();
+    if (had) this.host.dropped(had[0], had[1], b.pos);
     const along = -Math.sin(b.yaw) * dir.x - Math.cos(b.yaw) * dir.z;
     b.die(along > 0.4 ? 1 : along < -0.4 ? 0 : 2);
     return true;

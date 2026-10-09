@@ -14,13 +14,13 @@ import { WebSocketServer, type WebSocket } from 'ws';
 import { buildWorldData } from './world';
 import { Economy, type WorldLoot } from '../src/sim/economy';
 import { Container, type SerializedInventory } from '../src/sim/inventory';
-import { ITEMS, TAG_HOLD, sanitizeItem, type ItemInstance } from '../src/sim/items';
+import { ITEMS, TAG_HOLD, makeItem, sanitizeItem, type ItemInstance } from '../src/sim/items';
 import { DROP, fillDrop, type DropInfo } from '../src/sim/drops';
 import { CRATE_RESTOCK, CRATE_SPECS, fillCrate } from '../src/sim/crates';
 import { WEAPON_RULES, hitDamage, type HitZone } from '../src/sim/combat';
 import { BARREL } from '../src/sim/barrels';
 import { JEEP, SEATS, crashDamage, restState, type VehicleInfo, type VState } from '../src/sim/vehicles';
-import { Director, INFECTED } from '../src/sim/infected';
+import { Director, INFECTED, infectedDrop } from '../src/sim/infected';
 import { EMOTE, EMOTE_GAP, SHOUT_RANGE } from '../src/sim/emotes';
 import { ACTS, CHAT_RANGE, F_DEAD, MAX_STAMINA, PROTOCOL, type C2S, type CorpseInfo, type KillInfo, type PlayerInfo, type Pose, type S2C, type StashInfo, type StoredItem, type Vitals } from '../src/net/protocol';
 
@@ -764,7 +764,7 @@ function handle(c: Client, m: C2S) {
     case 'ihit': {
       const b = horde.bodies.get(m.i);
       const rule = WEAPON_RULES[m.w];
-      if (!b || b.diedAt || !c.alive || !rule || m.w === 'infected' || m.w === 'jeep') return;
+      if (!b || b.diedAt || !c.alive || !rule || m.w === 'infected') return;
       if (!['head', 'torso', 'legs'].includes(m.zone)) return;
       const now = Date.now();
       const d = Math.hypot(c.pose[0] - b.s[0], c.pose[1] - b.s[1], c.pose[2] - b.s[2]);
@@ -776,6 +776,12 @@ function handle(c: Client, m: C2S) {
         if (since > 9000 || !num(m.dist)) return;
         amount = hitDamage(m.w, 'torso', Math.max(0, m.dist));
         m.zone = 'torso';
+      } else if (m.w === 'jeep') {
+        // run down, by whoever is at the wheel of a jeep that is right there
+        const at = seatOf(c);
+        if (!at || at.seat !== 0 || !num(m.dist) || Math.hypot(at.v.s[0] - b.s[0], at.v.s[2] - b.s[2]) > 7) return;
+        amount = Math.max(0, Math.min(m.dist, Math.hypot(at.v.s[7], at.v.s[8], at.v.s[9]) + 3) - JEEP.bumpFrom) * JEEP.bumpPer;
+        m.zone = 'torso';
       } else {
         if (m.w !== 'fists' && c.w !== m.w) return;
         if (now - c.lastHit < rule.interval * 700) return;
@@ -784,6 +790,11 @@ function handle(c: Client, m: C2S) {
       }
       const r = horde.hurt(m.i, amount, now);
       if (!r) return;
+      if (r.dead) {
+        // what it had on it falls where it does
+        const had = infectedDrop();
+        if (had) economy.drop(makeItem(had[0], had[1]), b.s[0] + (Math.random() - 0.5) * 0.8, b.s[1] + 0.03, b.s[2] + (Math.random() - 0.5) * 0.8, Math.random() * Math.PI * 2);
+      }
       const len = Math.max(0.001, Math.hypot(b.s[0] - c.pose[0], b.s[2] - c.pose[2]));
       broadcast({ t: 'ihp', i: m.i, hp: r.hp, dead: r.dead, by: c.id, zone: m.zone, dir: [(b.s[0] - c.pose[0]) / len, (b.s[2] - c.pose[2]) / len] });
       return;

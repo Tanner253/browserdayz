@@ -53,7 +53,25 @@ export const INFECTED = {
   bleed: 0.28,
   /** a game moves the ones within this of its player; past it, with nobody nearer, they stand where they are */
   own: 170,
+  /** the chance one has something on it worth picking up when it goes down */
+  carries: 0.45,
 };
+
+/** what they had in their pockets: [what, the fewest, the most, how likely beside the others] */
+const POCKETS: [string, number, number, number][] = [
+  ['ammo_9mm', 3, 8, 5], ['ammo_762', 2, 5, 3], ['bandage', 1, 1, 3], ['beans', 1, 1, 3], ['sardines', 1, 1, 2],
+  ['apple', 1, 1, 2], ['cigarettes', 1, 1, 3], ['watch', 1, 1, 1], ['compass', 1, 1, 1], ['knife', 1, 1, 1],
+];
+
+/** What one drops when it goes down, if anything: [item, how many]. */
+export function infectedDrop(rnd: () => number = Math.random): [string, number] | null {
+  if (rnd() > INFECTED.carries) return null;
+  let roll = rnd() * POCKETS.reduce((n, p) => n + p[3], 0);
+  for (const [id, lo, hi, w] of POCKETS) {
+    if ((roll -= w) < 0) return [id, lo + Math.floor(rnd() * (hi - lo + 1))];
+  }
+  return null;
+}
 
 /** what one is doing: standing, drifting, going to look at a noise, after somebody, striking, dead */
 export const I_IDLE = 0, I_WANDER = 1, I_ALERT = 2, I_CHASE = 3, I_ATTACK = 4, I_DEAD = 5;
@@ -77,15 +95,16 @@ export interface Home {
   n: number;
 }
 
-const ABOUT: Record<string, number> = { hamlet: 3, depot: 3, post: 3, yard: 2, farm: 2, lodge: 1, dacha: 1 };
+// (the outlying places are where somebody new finds a first weapon: one or two there, the crowd in the village)
+const ABOUT: Record<string, number> = { hamlet: 3, depot: 3, post: 2, yard: 2, farm: 1, lodge: 1, dacha: 1 };
 
 /** Where the infected live: the village most of all, the checkpoint, and a few about every outlying place. */
 export function infectedHomes(world: World): Home[] {
   const homes: Home[] = [];
   const village = world.pois[0];
-  if (village) homes.push({ x: village.x, z: village.z, r: Math.max(70, village.radius), n: 8 });
+  if (village) homes.push({ x: village.x, z: village.z, r: Math.max(70, village.radius), n: 10 });
   const camp = world.pois.find((p) => p.name === 'Military Checkpoint');
-  if (camp) homes.push({ x: camp.x, z: camp.z, r: 38, n: 3 });
+  if (camp) homes.push({ x: camp.x, z: camp.z, r: 38, n: 4 });
   for (const s of world.sites) homes.push({ x: s.x, z: s.z, r: 34, n: ABOUT[s.kind] ?? 1 });
   // (never more than the map is meant to hold: the places furthest down the list go short)
   let left = INFECTED.max;
