@@ -1298,3 +1298,7 @@ body.touch .hud-start, body.touch .rw, body.touch .inv-wrap, body.touch .inv-col
 .start-map .m-gas path { fill: #e4f07a; stroke: var(--panel-solid); stroke-width: 3; }
 .start-map .m-gas text { fill: #e4f07a; }
 .start-map .m-gas .m-sub { font-size: 0.62em; letter-spacing: 0.14em; }
+/* the mark over the name on the way in (beside it, the name no longer fitted its column) */
+.start-mark { display: block; width: 96px; height: 96px; margin: 0 0 14px -6px; filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.7)); }
+.hud-start.paused .start-mark { width: 60px; height: 60px; margin-bottom: 8px; }
+.hud-start.enter:not(.paused) .start-mark { animation: enter-up 0.9s ease both 0.1s; }

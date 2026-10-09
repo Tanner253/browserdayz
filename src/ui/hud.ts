@@ -122,6 +122,7 @@ export class HUD {
       <div class="hud-start">
         <div class="start-shell">
           <div class="start-id">
+            <img class="start-mark" src="/brand/zona-mark-plain.svg" alt="">
             <div class="start-kicker">Zelenaya Dolina · one persistent world</div>
             <div class="start-title" aria-label="ZONA"><span style="--i:0">Z</span><span style="--i:1">O</span><span style="--i:2">N</span><span style="--i:3">A</span></div>
             <div class="start-sub">Loot. Fight. Stay alive for ${TAG_HOLD_MIN} minutes.</div>

@@ -98,6 +98,14 @@ body {
   width: min(420px, 80vw);
   text-align: center;
 }
+/* the mark: a gas mask over the biohazard sign (scripts/brand.mjs) */
+.load-mark {
+  display: block;
+  width: 132px;
+  height: 132px;
+  margin: 0 auto 10px;
+  filter: drop-shadow(0 8px 26px rgba(0, 0, 0, 0.7));
+}
 .load-title {
   font-size: 84px;
   font-weight: 700;

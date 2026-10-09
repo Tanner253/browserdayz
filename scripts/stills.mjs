@@ -55,7 +55,7 @@ const run = async (expression) => {
 await cdp('Page.enable');
 await cdp('Runtime.enable');
 await cdp('Emulation.setDeviceMetricsOverride', { width: 1500, height: 1000, deviceScaleFactor: 1, mobile: false });
-await cdp('Page.navigate', { url: 'http://localhost:5173/trailer.html' });
+await cdp('Page.navigate', { url: 'http://localhost:5173/trailer.html?cut=5' });
 process.stdout.write('loading the game');
 for (let i = 0; ; i++) {
   await sleep(1000);
@@ -78,6 +78,7 @@ const pose = (o) => `(async () => {
   const wait = (ms) => new Promise((r) => clock.real.setTimeout(r, ms));
   document.body.classList.add('tr-hud-off');
   document.body.classList.remove('tr-bars');
+  for (const c of [...document.body.classList]) if (c.startsWith('tr-g-')) document.body.classList.remove(c);
   document.getElementById('tr-overlay').innerHTML = '';
   document.getElementById('game').style.visibility = '';
   for (const a of S.actors) a.hide();
@@ -109,11 +110,62 @@ const pose = (o) => `(async () => {
     lamp.distance = 7;
   };
   fill();
+  // The infected, if the picture has any: the game's own, with their own minds. Each is put
+  // where it is wanted IN THE PICTURE (how far across it, -1 the left edge to 1 the right, and
+  // how far from the lens), a few paces further off than that, and let run at the man.
+  const wanted = ${JSON.stringify(o.zombies ?? [])};
+  const zeds = [];
+  if (wanted.length) {
+    const horde = g.horde, dir = horde.director;
+    horde.clear();
+    dir.bodies.clear();
+    dir.due = [];
+    dir.tick = () => ({ added: [], gone: [], owned: [] });
+    const me = horde.host.me().id;
+    wanted.forEach((w, n) => {
+      const i = 3000 + (w[2] ?? n);
+      const info = { i, s: [0, -300, 0, 0, 0, 0], hp: 90, own: me, h: [0, 0] };
+      dir.bodies.set(i, { ...info, home: 0, diedAt: 0, heard: 0, struck: 0 });
+      horde.add(info);
+      zeds.push(horde.all.get(i));
+    });
+    for (let k = 0; k < 600 && zeds.some((z) => !z.ready || !z.mine); k++) await wait(25);
+    const view = l.clone().sub(p).normalize(), right = S.v(0, 0, 0).crossVectors(view, S.v(0, 1, 0)).normalize();
+    const across = Math.tan((${o.fov} * Math.PI) / 360) * (innerWidth / innerHeight);
+    zeds.forEach((z, n) => {
+      const [sx, depth] = wanted[n];
+      const at = p.clone().addScaledVector(view, depth).addScaledVector(right, sx * across * depth);
+      // (back along the line it will come in by)
+      const from = at.clone().sub(a.pos).setY(0).normalize();
+      at.addScaledVector(from, ${o.run ?? 3.2});
+      const y = S.ground(at.x, at.z);
+      z.pos.set(at.x, y, at.z);
+      z.fallTo = y;
+      z.home.set(at.x, y, at.z);
+      const body = dir.bodies.get(z.i);
+      body.s[0] = at.x; body.s[1] = y; body.s[2] = at.z;
+      body.heard = performance.now();
+      z.mode = 0; z.after = 0; z.waitT = 999; z.gait = 0; z.stopT = 0; z.strikeAt = 0; z.seenAt = -1e9;
+      z.yaw = Math.atan2(-(a.pos.x - at.x), -(a.pos.z - at.z));
+      z.lost();
+      z._think ??= z.think;
+      z.think = () => {};
+    });
+  }
   for (let i = 0; i < 150; i++) {
     a.push();
     clock.advance(1000 / 60);
     fill();
     if (i % 15 === 14) await wait(40);
+  }
+  if (zeds.length) {
+    for (const z of zeds) z.think = z._think;
+    for (let i = 0; i < ${o.runFrames ?? 80}; i++) {
+      a.push();
+      clock.advance(1000 / 60);
+      fill();
+      if (i % 15 === 14) await wait(40);
+    }
   }
   // the same frame again, on request, three ways: as it is; with the man lit up alone (to
   // find where he is in the picture); and without him (the background, to be put out of focus)
@@ -206,18 +258,37 @@ if (want('pfp-2')) await shoot('zona-pfp-2', 1000, 1000, { ...SPOT, turn: 0.2, w
 if (want('pfp-3')) await shoot('zona-pfp-3', 1000, 1000, { ...SPOT, turn: 0.35, weapon: 'mosin', gear: ['boonie_hat'], aim: true, gaze: 0.3, cam: [2.9, -1.5, 0.02], look: [0.42, -0.1], fov: 17, fill: 4, blur: 14, overlay: VIGNETTE }, [[500, 500], [400, 400]]);
 
 if (want('banner')) {
+  const mark = fs.readFileSync(path.join(ROOT, 'public', 'brand', 'zona-mark-plain.svg'), 'utf8').replace(/<\?xml[^>]*>/, '');
   await shoot('zona-banner', 1500, 500, {
-    ...SPOT, turn: 0.35, weapon: 'mosin', gear: ['boonie_hat'], aim: true, gaze: 0.3, gazeUp: 0.0,
-    cam: [1.75, -0.6, -0.02], look: [1.42, -0.1], fov: 30, fill: 2.5, blur: 7, dim: 0.9,
+    ...SPOT, turn: 0.35, weapon: 'mosin', gear: ['boonie_hat', 'life_vest', 'sack_pack'], aim: true, gaze: 0.3, gazeUp: 0.0,
+    cam: [1.75, -0.6, -0.02], look: [1.42, -0.1], fov: 30, fill: 2.5, blur: 2.2, dim: 0.98,
+    // three of them coming up behind him, under the rifle: two near, one further back between them
+    zombies: [[-0.37, 5.4, 2], [-0.1, 6.3, 0], [-0.24, 10.5, 1]], run: 3.4, runFrames: 84,
     overlay: `
-      <div style="position:absolute;inset:0;background:linear-gradient(90deg, rgba(6,8,6,0) 34%, rgba(6,8,6,0.74) 54%, rgba(6,8,6,0.88) 100%)"></div>
+      <div style="position:absolute;inset:0;background:linear-gradient(90deg, rgba(6,8,6,0) 45%, rgba(6,8,6,0.74) 59%, rgba(6,8,6,0.9) 100%)"></div>
       <div style="position:absolute;inset:0;box-shadow:inset 0 0 120px rgba(0,0,0,0.75)"></div>
-      <div style="position:absolute;left:47%;right:3%;top:50%;transform:translateY(-52%);text-align:center;${FONT}color:#f3efe6;">
-        <div style="font-size:214px;font-weight:700;line-height:0.86;letter-spacing:0.16em;margin-right:-0.16em;text-shadow:0 8px 40px rgba(0,0,0,0.8)">ZONA</div>
-        <div style="margin-top:14px;font-size:28px;font-weight:600;letter-spacing:0.32em;margin-right:-0.32em;color:#ffd35a;text-shadow:0 2px 8px #000">LOOT · FIGHT · SURVIVE · CASH IN</div>
-        <div style="margin-top:16px;font-size:20px;font-weight:500;letter-spacing:0.5em;margin-right:-0.5em;color:#cfc7b2;opacity:0.85">WWW.ZONAPVP.FUN</div>
+      <div style="position:absolute;left:52%;right:2.5%;top:50%;transform:translateY(-51%);text-align:center;${FONT}color:#f3efe6;">
+        <div style="display:flex;align-items:center;justify-content:center;gap:26px">
+          <div style="width:150px;height:150px;flex:none;filter:drop-shadow(0 6px 22px rgba(0,0,0,0.8))">${mark.replace('width="512" height="512"', 'width="150" height="150"')}</div>
+          <div style="font-size:186px;font-weight:700;line-height:0.86;letter-spacing:0.14em;margin-right:-0.14em;text-shadow:0 8px 40px rgba(0,0,0,0.8)">ZONA</div>
+        </div>
+        <div style="margin-top:20px;display:flex;align-items:center;justify-content:center;gap:18px;font-size:25px;font-weight:600;letter-spacing:0.24em;white-space:nowrap">
+          <span style="color:#ffd35a;text-shadow:0 2px 8px #000">SURVIVE THE INFECTED</span>
+          <span style="padding:5px 12px 5px 16px;color:#14110b;background:#ffd35a;font-weight:700">PLAY TO EARN</span>
+        </div>
+        <div style="margin-top:14px;font-size:20px;font-weight:500;letter-spacing:0.5em;margin-right:-0.5em;color:#cfc7b2;opacity:0.85">WWW.ZONAPVP.FUN</div>
       </div>`,
   }, [[600, 200]]);
+  // what a link to the site shows (1200x630): the banner, whole, on the page's own dark, with the hazard yellow ruled above and below it
+  const brand = path.join(ROOT, 'public', 'brand');
+  fs.mkdirSync(brand, { recursive: true });
+  const strip = await sharp(path.join(OUT, 'zona-banner.png')).resize(1200, 400).toBuffer();
+  const rule = await sharp({ create: { width: 1200, height: 5, channels: 3, background: '#ffd35a' } }).png().toBuffer();
+  await sharp({ create: { width: 1200, height: 630, channels: 3, background: '#0d100c' } })
+    .composite([{ input: strip, left: 0, top: 115 }, { input: rule, left: 0, top: 104 }, { input: rule, left: 0, top: 521 }])
+    .jpeg({ quality: 90 })
+    .toFile(path.join(brand, 'og.jpg'));
+  console.log(`${path.join(brand, 'og.jpg')}  1200x630`);
 }
 ws.close();
 quit();

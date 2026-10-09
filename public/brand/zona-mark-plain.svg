@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <title>ZONA</title>
+  
+  <g transform="translate(256 264)">
+  <defs>
+    <mask id="p-cut" maskUnits="userSpaceOnUse" x="-336" y="-336" width="672" height="672">
+      <rect x="-336" y="-336" width="672" height="672" fill="#fff"/>
+      <circle cx="0.00" cy="-126.00" r="88.20" fill="#000"/><circle cx="109.12" cy="63.00" r="88.20" fill="#000"/><circle cx="-109.12" cy="63.00" r="88.20" fill="#000"/>
+      <circle r="25.200000000000003" fill="#000"/>
+      <rect x="0" y="-4.2" width="43.68000000000001" height="8.4" fill="#000" transform="rotate(-90)"/><rect x="0" y="-4.2" width="43.68000000000001" height="8.4" fill="#000" transform="rotate(30)"/><rect x="0" y="-4.2" width="43.68000000000001" height="8.4" fill="#000" transform="rotate(150)"/>
+      <rect x="168" y="-16.8" width="67.2" height="33.6" fill="#000" transform="rotate(-90)"/><rect x="168" y="-16.8" width="67.2" height="33.6" fill="#000" transform="rotate(30)"/><rect x="168" y="-16.8" width="67.2" height="33.6" fill="#000" transform="rotate(150)"/>
+    </mask>
+    <clipPath id="p-mouths"><circle cx="0.00" cy="-126.00" r="79.80" /><circle cx="109.12" cy="63.00" r="79.80" /><circle cx="-109.12" cy="63.00" r="79.80" /></clipPath>
+  </defs>
+  <g fill="#ffd35a">
+    <g mask="url(#p-cut)"><circle cx="0.00" cy="-92.40" r="126.00" /><circle cx="80.02" cy="46.20" r="126.00" /><circle cx="-80.02" cy="46.20" r="126.00" /></g>
+    <circle r="98.7" fill="none" stroke="#ffd35a" stroke-width="29.400000000000002" clip-path="url(#p-mouths)"/>
+  </g></g>
+  <g transform="translate(256 252) scale(0.95)">
+  <g stroke-linejoin="round">
+    <path d="M0-134C64-134 106-93 106-37C106 6 93 41 71 67C57 84 46 97 42 112L-42 112C-46 97-57 84-71 67C-93 41-106 6-106-37C-106-93-64-134 0-134Z" fill="#ece6d6" stroke="#0d100c" stroke-width="9"/>
+    <!-- the side of it away from the light -->
+    <path d="M0-134C64-134 106-93 106-37C106 6 93 41 71 67C57 84 46 97 42 112L10 112C22 60 40 20 40-37C40-90 24-124 0-134Z" fill="#b9b2a0" opacity="0.5"/>
+    <!-- the seam over the brow, and the folds from the eyes down to the can -->
+    <path d="M-70-104C-36-88 36-88 70-104" fill="none" stroke="#0d100c" stroke-width="5" stroke-linecap="round" opacity="0.55"/>
+    <path d="M-62 4C-52 40-36 66-30 92M62 4C52 40 36 66 30 92" fill="none" stroke="#0d100c" stroke-width="5" stroke-linecap="round" opacity="0.5"/>
+    
+    <circle cx="-49" cy="-38" r="39" fill="#0d100c"/>
+    <circle cx="-49" cy="-38" r="31" fill="#b9b2a0"/>
+    <circle cx="-49" cy="-38" r="25" fill="#141a15"/>
+    <path d="M-64-49A19 19 0 0 1 -45-57" fill="none" stroke="#ece6d6" stroke-width="5" stroke-linecap="round" opacity="0.55"/>
+    <circle cx="49" cy="-38" r="39" fill="#0d100c"/>
+    <circle cx="49" cy="-38" r="31" fill="#b9b2a0"/>
+    <circle cx="49" cy="-38" r="25" fill="#141a15"/>
+    <path d="M34-49A19 19 0 0 1 53-57" fill="none" stroke="#ece6d6" stroke-width="5" stroke-linecap="round" opacity="0.55"/>
+    <!-- the filter can, and what it screws into -->
+    <path d="M-40 66C-22 78 22 78 40 66L46 104H-46Z" fill="#b9b2a0" stroke="#0d100c" stroke-width="6"/>
+    <circle cy="118" r="52" fill="#0d100c"/>
+    <circle cy="118" r="44" fill="#ece6d6"/>
+    <circle cy="118" r="33" fill="#141a15"/>
+    <circle cy="118" r="20" fill="none" stroke="#b9b2a0" stroke-width="6"/>
+    <path d="M-33 118H33M0 85V151" stroke="#b9b2a0" stroke-width="6" stroke-linecap="round"/>
+    <circle cy="118" r="6" fill="#ece6d6"/>
+  </g></g>
+</svg>
