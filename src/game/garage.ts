@@ -145,6 +145,11 @@ export class Garage {
 
   private groundAt = (x: number, z: number) => (roadLift(this.h.world, x, z) > 0 ? 'asphalt' : groundOf(this.h.terrain.surfaceAt(x, z)));
 
+  /** the jeeps whose lamps are on (somebody is at the wheel): each throws its headlights when it is dark */
+  *lit(): Iterable<Jeep> {
+    for (const [j, x] of this.extra) if (x.lit && !j.wreck) yield j;
+  }
+
   add(v: VehicleInfo) {
     if (!this.ready || this.jeeps.has(v.i)) return;
     const j = new Jeep(v.i, this.groundAt);

@@ -159,6 +159,8 @@ interface VmModel {
   scope?: THREE.Object3D;
   wrap?: THREE.Object3D;
   suppressor?: THREE.Object3D;
+  /** the lit marks of its sights: drawn only when the gun is at the eye */
+  marks?: THREE.Object3D[];
   /** everything on it that is only there with something fitted: [what is drawn, the attachment it goes with] */
   shown?: [THREE.Object3D, string][];
   /** aim position without an optic */
@@ -581,6 +583,19 @@ export class Weapons {
    * its own, and the eye is laid along the top of it. The mark on the screen stays, to say
    * where that is.
    */
+  /** Is there a light on the gun in the hands? */
+  get hasLamp(): boolean {
+    return !!this.current?.lamp && hasMod(this.currentItem, 'gun_light');
+  }
+  /** Where the front of that light is, as a place in the world. */
+  lampWorld(camera: THREE.PerspectiveCamera, out: THREE.Vector3): THREE.Vector3 {
+    const m = this.current;
+    const body = m?.body;
+    if (!m?.lamp || !body?.parent) return out.copy(camera.position);
+    m.root.updateWorldMatrix(true, true);
+    return out.copy(this.toWorld(this.vmCamera.worldToLocal(body.localToWorld(out.copy(m.lamp))), camera));
+  }
+
   get sightless() {
     return this.aiming && this.current?.kind === 'rifle' && !!this.current.adsIron && !(this.current.optic && hasMod(this.currentItem, this.current.optic));
   }
@@ -833,6 +848,8 @@ export class Weapons {
     const top = new THREE.Box3();
     const nudge = o.nudge ?? new THREE.Vector3();
     const shown: [THREE.Object3D, string][] = [];
+    /** the lit marks of whatever sights it has: seen only with the eye behind the sight */
+    const marks: THREE.Object3D[] = [];
     const shows = ITEMS[o.item].weapon?.shows ?? {};
     /** the attachment a piece of the gun's own model goes with, if it is only there with one */
     const modOf = (piece: string) => Object.keys(shows).find((mod) => shows[mod].includes(piece));
@@ -930,8 +947,13 @@ export class Weapons {
         place(obj, box);
         return obj;
       };
-      world.add(await make());
+      // (the lit mark is for the eye behind the glass: on the gun as others see it, or lying on a shelf, there is none)
+      const theirs = await make();
+      theirs.getObjectByName('reticle')?.removeFromParent();
+      world.add(theirs);
       const mine = await make();
+      const mark = mine.getObjectByName('reticle');
+      if (mark) marks.push(mark);
       rig.hang(mine, on);
       shown.push([mine, name]);
       return mine;
@@ -1002,12 +1024,13 @@ export class Weapons {
       holder.updateWorldMatrix(true, false);
       mark.applyMatrix4(new THREE.Matrix4().copy(holder.matrixWorld).invert());
       holder.add(mark);
+      marks.push(mark);
     }
     const ads = o.kind === 'rifle' ? new THREE.Vector3(-c.x, -(hung.size ? glassY : c.y), -sight.max.z - (hung.size ? 0.2 : 0.075)) : dotAt ? new THREE.Vector3(-dotAt.x, -dotAt.y, o.hip.z + 0.07) : irons!;
     const fc = frame.getCenter(new THREE.Vector3());
     if (suppressor) shown.push([suppressor, 'suppressor_9']);
     const m: VmModel = {
-      root, kind: o.kind, flash: o.flash, body, rig, world, suppressor, brass: !!o.gun, shown,
+      root, kind: o.kind, flash: o.flash, body, rig, world, suppressor, brass: !!o.gun, shown, marks,
       scope: rig.node('scope') ?? undefined,
       wrap: rig.node('cheekrest') ?? undefined,
       hip: o.hip.clone(),
@@ -1691,6 +1714,7 @@ export class Weapons {
     if (m.wrap) m.wrap.visible = hasMod(it, 'rifle_wrap');
     if (m.suppressor) m.suppressor.visible = hasMod(it, 'suppressor_9');
     for (const [obj, mod] of m.shown ?? []) obj.visible = hasMod(it, mod);
+    for (const mark of m.marks ?? []) mark.visible = this.adsT > 0.75;
   }
 
   /**

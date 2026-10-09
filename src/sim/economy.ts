@@ -133,6 +133,8 @@ export const TYPES: Record<string, TypeRule> = {
   sack_pack: { nominal: 8, min: 4, lifetime: 3600, restock: 600, usage: ['Village', 'Town', 'Farm', 'Industrial', 'Military', 'Hunting'], gas: 1 },
   suitcase: { nominal: 4, min: 2, lifetime: 3600, restock: 1200, usage: ['Village', 'Town', 'Military', 'Hunting'], favour: { Military: 3 }, gas: 1 },
   // tools and odds and ends
+  // (a lantern is a thing of sheds, kitchens and lorries: common, because the night is everybody's)
+  flashlight: { nominal: 12, min: 8, lifetime: 3600, restock: 420, usage: ['Village', 'Town', 'Farm', 'Industrial', 'Hunting'], gas: 2 },
   binoculars: { nominal: 3, min: 1, lifetime: 3600, restock: 1200, usage: ['Military', 'Hunting', 'Police'], gas: 1 },
   compass: { nominal: 4, min: 2, lifetime: 3600, restock: 1200, usage: ['Military', 'Hunting', 'Village'] },
   cigarettes: { nominal: 8, min: 3, lifetime: 2400, restock: 600, usage: ['Village', 'Town', 'Military', 'Industrial'] },

@@ -37,6 +37,8 @@ export const F_SEAT = 1024;
 export const F_GUARD = 2048;
 /** on a broken leg: it shows in how they walk */
 export const F_LIMP = 4096;
+/** a light lit: the one on their gun if it has one, or the flashlight they carry */
+export const F_LIGHT = 8192;
 /** how far the head goes sideways at a full lean, metres (the camera's own figure: see Player.updateCamera) */
 export const LEAN_REACH = 0.34;
 

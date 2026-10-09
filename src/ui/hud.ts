@@ -226,6 +226,7 @@ export class HUD {
                   <div class="kb-row"><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>4</kbd><em>primary · secondary · pistol · melee</em></div>
                   <div class="kb-row"><kbd>5</kbd><kbd>6</kbd><kbd>7</kbd><kbd>8</kbd><em>eat · drink · heal</em></div>
                   <p><kbd>F</kbd> take · doors · search <kbd>G</kbd> hold: drop what you hold</p>
+                  <p><kbd>L</kbd> light: the one on your gun, or a flashlight you carry</p>
                   <p><kbd class="wide">Tab</kbd> inventory <kbd>M</kbd> map</p>
                   <p><kbd class="wide">Enter</kbd> chat <kbd>T</kbd> hold: call out · dance</p>
                   <p><kbd class="wide">Esc</kbd> this menu</p>

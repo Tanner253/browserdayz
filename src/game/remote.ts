@@ -7,7 +7,7 @@ import type RAPIER from '@dimforge/rapier3d-compat';
 import { physics, GLASS_GROUPS, HITBOX_GROUPS, SOLID_GROUPS, type Surface } from '../core/physics';
 import { audio } from '../core/audio';
 import type { Atmosphere } from '../world/atmosphere';
-import { F_AIM, F_BLEED, F_CROUCH, F_DANCE, F_DEAD, F_GROUND, F_GUARD, F_LEAN_L, F_LEAN_R, F_LIMP, F_SURRENDER, type Act, type Pose } from '../net/protocol';
+import { F_AIM, F_BLEED, F_CROUCH, F_LIGHT, F_DANCE, F_DEAD, F_GROUND, F_GUARD, F_LEAN_L, F_LEAN_R, F_LIMP, F_SURRENDER, type Act, type Pose } from '../net/protocol';
 import { SHOUT_RANGE, voiceOf, type Emote } from '../sim/emotes';
 import { ITEMS } from '../sim/items';
 import { Avatar } from './avatar';
@@ -35,6 +35,8 @@ export class RemotePlayer implements Damageable {
   pos = new THREE.Vector3();
   yaw = 0;
   pitch = 0;
+  /** they have a light lit */
+  lit = false;
   crouched = false;
   weapon: string | null = null;
   mods: string[] = [];
@@ -147,6 +149,21 @@ export class RemotePlayer implements Damageable {
     for (const c of this.crouch) c.setEnabled(this.alive && this.crouched);
   }
 
+  /**
+   * The lamp they have lit, if they have: where it is and which way it throws. The one on their
+   * gun if the gun has one (from the end of the barrel, along it); otherwise the flashlight
+   * they carry, from the chest, the way they are looking.
+   */
+  lamp(pos: THREE.Vector3, dir: THREE.Vector3): { power: number; wide: number } | null {
+    if (!this.lit || !this.ready || !this.alive) return null;
+    const gun = this.mods.includes('gun_light') ? this.avatar.muzzle(pos, dir) : null;
+    if (gun) return { power: 1.5, wide: 0.85 };
+    const cp = Math.cos(this.pitch);
+    dir.set(-Math.sin(this.yaw) * cp, Math.sin(this.pitch), -Math.cos(this.yaw) * cp);
+    pos.set(this.pos.x + dir.x * 0.25, this.pos.y + (this.crouched ? 0.85 : 1.32), this.pos.z + dir.z * 0.25);
+    return { power: 1, wide: 1.3 };
+  }
+
   /** the end of the barrel they are holding, and which way it points, as they are seen now (null if they are not, or hold no gun) */
   muzzle() {
     return this.ready && this.alive ? this.avatar.muzzle() : null;
@@ -230,6 +247,7 @@ export class RemotePlayer implements Damageable {
       this.pitch = a.p[4] + (b.p[4] - a.p[4]) * Math.min(1, k);
       this.grounded = !!(b.p[5] & F_GROUND);
       this.aiming = !!(b.p[5] & F_AIM);
+      this.lit = !!(b.p[5] & F_LIGHT);
       this.avatar.guarding = this.alive && !!(b.p[5] & F_GUARD);
       this.avatar.limping = this.alive && !!(b.p[5] & F_LIMP);
       this.bleeding = !!(b.p[5] & F_BLEED);

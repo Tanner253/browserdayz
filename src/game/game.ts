@@ -22,7 +22,7 @@ import { BARREL } from '../sim/barrels';
 import { EMOTE, EMOTES, EMOTE_GAP, SAY_RANGE, SAY_TIME, voiceOf } from '../sim/emotes';
 import { loadSave, writeSave, type SaveData } from '../sim/save';
 import { Net, playerName, publicId, remoteServer, serverStatus, setPlayerName } from '../net/client';
-import { F_AIM, F_BLEED, F_CROUCH, F_DANCE, F_DEAD, F_GROUND, F_GUARD, F_LEAN_L, F_LEAN_R, F_LIMP, F_SEAT, F_SPRINT, F_SURRENDER, MAX_STAMINA, crateId, type Act, type CorpseInfo, type PlayerInfo, type Pose, type S2C, type StashInfo } from '../net/protocol';
+import { F_AIM, F_BLEED, F_CROUCH, F_DANCE, F_DEAD, F_GROUND, F_GUARD, F_LEAN_L, F_LEAN_R, F_LIMP, F_LIGHT, F_SEAT, F_SPRINT, F_SURRENDER, MAX_STAMINA, crateId, type Act, type CorpseInfo, type PlayerInfo, type Pose, type S2C, type StashInfo } from '../net/protocol';
 import { Player } from './player';
 import { Avatar, AVATAR_LAYER, DEATH_REST, FP_BODY_LAYER, GEAR_SHOWN, type Hold, facepiece } from './avatar';
 import { lookFor } from './look';
@@ -57,8 +57,12 @@ import { Fires } from './fires';
 import { breaksOnHit } from '../sim/injury';
 import { MenuScenes } from './menu-scenes';
 import type { MenuSpot } from '../ui/hud';
+import { Lamps } from './lamps';
 
 const _gasHead = new THREE.Vector3();
+const _lampPos = new THREE.Vector3(), _lampDir = new THREE.Vector3();
+/** the colour of a street lamp's light (sodium: warm) */
+const STREET_LAMP = new THREE.Color(1, 0.72, 0.38);
 
 export interface WorldSystems {
   r: Renderer;
@@ -115,6 +119,11 @@ export class Game {
   private menu!: MenuScenes;
   /** the fireplaces: which are alight, and the look and sound of them */
   fires!: Fires;
+  /** every lit lamp: carried, driven behind, standing in the street */
+  lamps!: Lamps;
+  private streetLamps: THREE.Vector3[] = [];
+  /** the player has a light switched on (the one on the gun, or the flashlight carried) */
+  lit = false;
   /** which are alight, kept by this game when it is played alone (the server keeps it otherwise) */
   private hearths!: Hearths;
   private byFire = false;
@@ -230,6 +239,9 @@ export class Game {
 
     this.effects = new Effects(r.scene, atmo);
     this.fires = new Fires(world, r.scene, this.effects, atmo);
+    this.lamps = new Lamps(r.scene);
+    // the street lamps: where the head of each is
+    for (const q of world.props) if (q.kind.startsWith('street_lamp')) this.streetLamps.push(new THREE.Vector3(q.x, q.y + 3.55 * (q.scale ?? 1), q.z));
     this.fireTag.className = 'hud-fire-tag';
     this.legTag.className = 'hud-leg-tag';
     this.legTag.textContent = 'BROKEN LEG · SPLINT IT, OR USE A FIRST AID KIT';
@@ -324,6 +336,8 @@ export class Game {
     warm.position.copy(r.camera.position);
     r.scene.add(warm);
     r.precompile(r.scene, r.camera);
+    // (and once more with the lamps in the scene: see Lamps.warm)
+    this.lamps.warm(() => r.precompile(r.scene, r.camera));
     r.scene.remove(warm);
     progress('rendering icons');
     const icons = await renderIcons(r.renderer, this.loot.models, atmo.envMap);
@@ -1199,7 +1213,7 @@ export class Game {
     if (this.sendT >= 1 / SEND_HZ) {
       this.sendT = 0;
       const it = this.weapons.equippedItem;
-      const flags = (p.crouched ? F_CROUCH : 0) | (p.sprinting ? F_SPRINT : 0) | (this.weapons.aiming ? F_AIM : 0) | (p.grounded ? F_GROUND : 0) | (p.dead ? F_DEAD : 0) | (p.vitals.bleeding ? F_BLEED : 0) | (p.lean > 0.3 ? F_LEAN_R : p.lean < -0.3 ? F_LEAN_L : 0) | (this.hold === 'dance' ? F_DANCE : 0) | (this.hold === 'surrender' ? F_SURRENDER : 0) | (this.garage.ride ? F_SEAT : 0) | (this.weapons.guarding ? F_GUARD : 0) | (p.vitals.broken ? F_LIMP : 0);
+      const flags = (p.crouched ? F_CROUCH : 0) | (p.sprinting ? F_SPRINT : 0) | (this.weapons.aiming ? F_AIM : 0) | (p.grounded ? F_GROUND : 0) | (p.dead ? F_DEAD : 0) | (p.vitals.bleeding ? F_BLEED : 0) | (p.lean > 0.3 ? F_LEAN_R : p.lean < -0.3 ? F_LEAN_L : 0) | (this.hold === 'dance' ? F_DANCE : 0) | (this.hold === 'surrender' ? F_SURRENDER : 0) | (this.garage.ride ? F_SEAT : 0) | (this.weapons.guarding ? F_GUARD : 0) | (p.vitals.broken ? F_LIMP : 0) | (this.lit && !this.garage.ride ? F_LIGHT : 0);
       const pose: Pose = [p.pos.x, p.pos.y, p.pos.z, p.yaw, p.pitch, flags];
       this.net.send({ t: 's', p: pose, w: it?.id ?? null, m: it?.mods ?? [] });
     }
@@ -1381,6 +1395,45 @@ export class Game {
     veg.setDetail(detail);
     grass.setDensity(density);
     audio.setVolume(g.volume);
+  }
+
+  /**
+   * The lamps: L switches the player's own, and every lamp that is lit anywhere says so (see
+   * lamps.ts), by day as by night: a light is a light.
+   * @param free the player's hands and keys are their own (not typing, not in the inventory)
+   */
+  private lightStep(dt: number, free: boolean) {
+    const cam = this.s.r.camera, p = this.player, atmo = this.s.atmo;
+    const carried = this.weapons.hasLamp || this.inv.count('flashlight') > 0;
+    if (free && this.input.pressed('KeyL')) {
+      if (this.garage.ride) this.hud.note('The jeep lights its own lamps while somebody drives', 'warn');
+      else if (!carried) this.hud.note('Nothing to light: find a flashlight, or a weapon light for your gun', 'warn');
+      else {
+        this.lit = !this.lit;
+        audio.click(2400, 0.25, 0.012);
+      }
+    }
+    if (!carried || p.dead || !this.started) this.lit = false;
+    if (this.lit && !this.garage.ride) {
+      if (this.weapons.hasLamp) this.lamps.beam(this.weapons.lampWorld(cam, _lampPos), _lampDir.set(0, 0, -1).applyQuaternion(cam.quaternion), 1.5, 0.85);
+      // (the lantern: from the chest and tipped a little down, so that it lights the ground walked on; wide, and not far)
+      else this.lamps.beam(_lampPos.set(0.16, -0.3, -0.15).applyQuaternion(cam.quaternion).add(cam.position), _lampDir.set(0, -0.09, -1).applyQuaternion(cam.quaternion), 1, 1.3);
+    }
+    for (const r of this.remotes.values()) {
+      const l = r.lamp(_lampPos, _lampDir);
+      if (l) this.lamps.beam(_lampPos, _lampDir, l.power, l.wide);
+    }
+    const dark = atmo.night > 0.3;
+    // headlights: a jeep's lamps are on while it is driven, and after dark they light the road
+    if (dark) {
+      for (const j of this.garage.lit()) {
+        _lampDir.set(0, -0.07, -1).applyQuaternion(j.quat);
+        this.lamps.beam(_lampPos.set(0, 0.95, -2.0).applyQuaternion(j.quat).add(j.pos), _lampDir, 2.4, 1.5);
+      }
+      // the street lamps of the village, from dusk
+      for (const at of this.streetLamps) if (at.distanceToSquared(cam.position) < 260 * 260) this.lamps.glow(at, STREET_LAMP, Math.min(1, (atmo.night - 0.3) / 0.3), 22);
+    }
+    this.lamps.update(cam, dt);
   }
 
   /** the hour as it was at some moment (the server's, or mid morning when playing alone), from which the clock runs on */
@@ -2379,6 +2432,7 @@ export class Game {
     });
     if (this.started) p.tickVitals(dt);
     this.gas.update(dt, this.s.r.camera.position, _gasHead.set(p.pos.x, p.pos.y + (p.crouched ? 1.0 : 1.6), p.pos.z), this.started && !p.dead);
+    this.lightStep(dt, playing && !uiOpen && !typing);
     // the fires: the infected hear one crackle, and whoever is beside one mends
     for (const at of this.fires.update(dt, this.s.r.camera.position)) this.horde.noise(at.x, at.z, FIRE.heard);
     // a broken leg, said for as long as it is one
