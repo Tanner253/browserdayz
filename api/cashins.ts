@@ -13,7 +13,7 @@
 // the page (and the game, from the status) calls the housekeeping, api/tick.ts.
 
 import { live } from './_lib/live.js';
-import { cached, dayOf, editBook, freshBook, glanceBook, refOf, snapshot, sol, type Book, type Entry, type Row, type Snapshot, type World } from './_lib/payouts.js';
+import { cached, editBook, freshBook, glanceBook, refOf, snapshot, sol, type Book, type Entry, type Row, type Snapshot, type World } from './_lib/payouts.js';
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 /** an amount of SOL, to as many places as it needs and no more than four */
