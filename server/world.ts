@@ -12,6 +12,7 @@ import { barrelSpots } from '../src/sim/barrels';
 import { JEEP, jeepSpots } from '../src/sim/vehicles';
 import { homeSpot, infectedHomes, type Home } from '../src/sim/infected';
 import { fireSpots } from '../src/sim/fires';
+import { gasZone } from '../src/sim/gas';
 
 export interface CrateSpot {
   cid: string;
@@ -37,6 +38,8 @@ export function buildWorldData(root: string) {
   return {
     lootPoints: buildings.lootPoints,
     crates,
+    /** where the gas lies (a crate under it is filled with the best of everything) */
+    gas: gasZone(world.pois, (x, z) => heightAt(world.heights, x, z)),
     /** the fuel drums, numbered as the game numbers them */
     barrels: barrelSpots(world.props).map((p) => ({ x: p.x, y: p.y, z: p.z })),
     /** the fireplaces, numbered as the game numbers them */

@@ -42,6 +42,9 @@ export function gasDepth(g: GasZone | null, x: number, y: number, z: number): nu
   return Math.max(0, 1 - (qx * qx + qy * qy + qz * qz));
 }
 
+/** whether something standing there is under the gas: deep enough in it that it is breathed */
+export const underGas = (g: GasZone | null, x: number, y: number, z: number) => gasDepth(g, x, y, z) > GAS.breathe;
+
 /** how far along the ground from the middle of the gas a point is, in metres, less the gas's own reach: under 0 is inside */
 export function gasEdge(g: GasZone, x: number, z: number): number {
   return Math.hypot(x - g.x, z - g.z) - g.r;

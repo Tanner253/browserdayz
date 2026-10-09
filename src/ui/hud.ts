@@ -196,7 +196,7 @@ export class HUD {
               <div class="sm-threats">
                 <div><b>Other players</b><span>Anyone you meet can kill you and take everything you carry, your tag with it.</span></div>
                 <div><b>The infected</b><span>They see ${INFECTED.sight} m in front of them and hear a shot from ${INFECTED.hearShot} m. Crouch past them, or fit a suppressor.</span></div>
-                <div><b>The gas</b><span>The ${GAS.place} lies under it. A gas mask lets you breathe there: the police station keeps them.</span></div>
+                <div><b>The gas</b><span>The ${GAS.place} lies under it, and the best loot on the map is in there. A gas mask lets you breathe it: the police station keeps them.</span></div>
               </div>
             </div>
             <div class="start-pane pane-keys">

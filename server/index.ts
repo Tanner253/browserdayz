@@ -17,6 +17,7 @@ import { Container, type SerializedInventory } from '../src/sim/inventory';
 import { ITEMS, TAG_HOLD, makeItem, sanitizeItem, type ItemInstance } from '../src/sim/items';
 import { DROP, fillDrop, type DropInfo } from '../src/sim/drops';
 import { CRATE_RESTOCK, CRATE_SPECS, fillCrate } from '../src/sim/crates';
+import { underGas } from '../src/sim/gas';
 import { WEAPON_RULES, hitDamage, type HitZone } from '../src/sim/combat';
 import { BARREL } from '../src/sim/barrels';
 import { JEEP, SEATS, crashDamage, restState, type VehicleInfo, type VState } from '../src/sim/vehicles';
@@ -116,7 +117,7 @@ function fillBox(b: Box) {
   const spec = CRATE_SPECS[b.crate ?? ''];
   if (!spec) return;
   const c = new Container(b.cid, spec.label, spec.w, spec.h, [], true);
-  fillCrate(c, b.crate!);
+  fillCrate(c, b.crate!, Math.random, underGas(world.gas, b.x, b.y, b.z));
   b.items = c.serialize().items;
   b.emptiedAt = -1;
 }

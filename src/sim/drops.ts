@@ -46,7 +46,8 @@ function pick<T>(table: [T, number][], rnd: () => number): T {
 
 /**
  * What is in one: both guns, loaded, with a box of rounds each; something for a wound; a
- * part for one of the guns; and two or three of the things that are hard to come by.
+ * scope, always; another part for one of the guns; and two or three of the things that are
+ * hard to come by.
  */
 export function fillDrop(c: Container, rnd: () => number = Math.random) {
   const put = (id: string, qty?: number) => {
@@ -58,8 +59,8 @@ export function fillDrop(c: Container, rnd: () => number = Math.random) {
     }
     c.add(item);
   };
-  for (const id of ['mosin', 'p38', 'box_762', 'box_9mm', 'firstaid', 'bandage', 'bandage']) put(id);
-  put(pick([['pu_scope', 3], ['suppressor_9', 3], ['mag_p38_ext', 3], ['rifle_wrap', 2]], rnd));
+  for (const id of ['mosin', 'p38', 'box_762', 'box_9mm', 'firstaid', 'bandage', 'bandage', 'pu_scope']) put(id);
+  put(pick([['suppressor_9', 3], ['mag_p38_ext', 3], ['rifle_wrap', 2]], rnd));
   const extras: [string, number][] = [['grenade', 3], ['grenade', 2], ['gasmask', 2], ['life_vest', 2], ['binoculars', 1.5], ['condensed', 1.5], ['thermos', 1.5], ['ammo_762', 2], ['ammo_9mm', 2]];
   const n = 2 + Math.floor(rnd() * 2);
   for (let i = 0; i < n; i++) put(pick(extras, rnd));

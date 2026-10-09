@@ -50,7 +50,7 @@ import { TOUCH } from '../core/device';
 import { TouchControls } from '../ui/touch';
 import { REWARDS_UI, RewardsModal, addCashedTag, cashedTags, walletAddress } from '../ui/rewards';
 import { Gas } from './gas';
-import { GAS } from '../sim/gas';
+import { GAS, underGas } from '../sim/gas';
 import { FIRE, Hearths } from '../sim/fires';
 import { Fires } from './fires';
 import { breaksOnHit } from '../sim/injury';
@@ -473,7 +473,7 @@ export class Game {
       };
       for (const q of world.pois.slice(1)) {
         const site = world.sites.find((st) => st.name === q.name);
-        if (q.name === GAS.place) spots.push({ x: q.x, z: q.z, name: q.name, tip: 'Under gas: you need a gas mask on to breathe here. Scopes and grenades are likelier here than anywhere.', kind: 'gas', label: true });
+        if (q.name === GAS.place) spots.push({ x: q.x, z: q.z, name: q.name, tip: 'Under gas: you need a gas mask on to breathe here. The richest place on the map: rifles, ammunition, helmets, plate carriers and scopes.', kind: 'gas', label: true });
         else if (site) spots.push({ x: q.x, z: q.z, name: q.name, tip: SITE[site.kind][1], kind: site.kind === 'depot' || site.kind === 'post' ? 'army' : 'site' });
         else if (/checkpoint/i.test(q.name)) spots.push({ x: q.x, z: q.z, name: q.name, tip: 'Guard posts, a barracks and a watchtower: rifles, plate carriers, grenades. The track to the works starts here.', kind: 'army', label: true });
         else spots.push({ x: q.x, z: q.z, name: q.name, tip: 'A cabin in the hills, with a fire ring to rest by. A weapon is always left here.', kind: 'site' });
@@ -582,10 +582,15 @@ export class Game {
     this.hud.setOnline(null);
   }
 
+  /** a crate of the map filled (one under the gas with the best of everything) */
+  private fillCrate(c: Stash) {
+    fillCrate(c.container, c.kind, Math.random, underGas(this.s.atmo.gas, c.x, c.y, c.z));
+  }
+
   private fresh() {
     this.spawnAtEdge();
     this.economy.populate();
-    for (const c of this.loot.crates) fillCrate(c.container, c.kind);
+    for (const c of this.loot.crates) this.fillCrate(c);
     this.freshKit();
   }
 
@@ -693,7 +698,7 @@ export class Game {
       if (sc) {
         c.container.load(sc.container as never);
         c.emptiedAt = sc.emptiedAt;
-      } else fillCrate(c.container, c.kind);
+      } else this.fillCrate(c);
     }
     const p = save.player;
     if (p && sameMap) {
@@ -2172,7 +2177,7 @@ export class Game {
       }
       if (c.emptiedAt < 0) c.emptiedAt = this.economy.time;
       else if (this.economy.time - c.emptiedAt > CRATE_RESTOCK && c !== this.openStash && Math.hypot(c.x - p.x, c.z - p.z) > 60) {
-        fillCrate(c.container, c.kind);
+        this.fillCrate(c);
         c.emptiedAt = -1;
       }
     }

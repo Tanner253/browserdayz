@@ -36,8 +36,12 @@ console.log(`\nfirst stocking: ${total} things on ${points.length} points (${((t
 const cat = new Map<string, number>();
 for (const [id, n] of got) cat.set(ITEMS[id].category, (cat.get(ITEMS[id].category) ?? 0) + n);
 console.log('  by sort: ' + [...cat].sort((a, b) => b[1] - a[1]).map(([c, n]) => `${c} ${n}`).join(', '));
-console.log('\n  id                 want  got  where');
-for (const [id, rule] of Object.entries(TYPES)) {
+const gasPlaces = points.filter((p) => p.usage.includes('Gas') && !p.arms).length;
+const gasThings = [...eco.loot.values()].filter((l) => l.point >= 0 && points[l.point].usage.includes('Gas') && !points[l.point].arms).length;
+console.log(`  under the gas: ${gasThings} things on ${gasPlaces} places (${((gasThings / gasPlaces) * 100).toFixed(0)}% of them full)`);
+console.log('\n  id                 want  got  where   (want: the rest of the map + under the gas)');
+for (const [id, r] of Object.entries(TYPES)) {
+  const rule = { nominal: r.nominal + (r.gas ?? 0) };
   const n = got.get(id) ?? 0;
   const w = [...(where.get(id) ?? [])].sort((a, b) => b[1] - a[1]).map(([u, k]) => `${u} ${k}`).join(', ');
   console.log(`  ${id.padEnd(18)} ${String(rule.nominal).padStart(4)} ${String(n).padStart(4)}${n < rule.nominal ? ' SHORT' : '      '} ${w}`);

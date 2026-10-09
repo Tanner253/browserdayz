@@ -5,9 +5,10 @@
 import assert from 'node:assert/strict';
 import { GAS, breathe, freshLungs, gasDepth, gasEdge, gasZone } from '../src/sim/gas';
 import { ITEMS } from '../src/sim/items';
-import { pickDropSite } from '../src/sim/drops';
+import { fillDrop, pickDropSite } from '../src/sim/drops';
 import { generateWorld, heightAt } from '../src/world/worldgen';
-import { Economy } from '../src/sim/economy';
+import { Economy, GAS_RESTOCK } from '../src/sim/economy';
+import { fillCrate } from '../src/sim/crates';
 import { RNG } from '../src/core/noise';
 import { buildWorldData } from '../server/world';
 
@@ -150,22 +151,68 @@ ok('what is kept under the gas is marked so, and the masks are kept out of it, i
     assert.ok(at && police.includes(at.building), 'a gas mask somewhere other than the police station');
     assert.equal(gasDepth(zone, l.x, l.y, l.z), 0, 'a gas mask under the gas');
   }
-  // and what the gas is worth going into for is there more often than its share of the places would give it
-  const kept = data.lootPoints.filter((q) => !q.arms && (q.usage.includes('Military') || q.usage.includes('Police')));
-  const share = kept.filter((q) => q.usage.includes('Gas')).length / kept.length;
-  let inGas = 0, all = 0;
-  for (let k = 0; k < 30; k++) {
+});
+
+ok('the gas is the richest place on the map; helmets, plates and scopes are of it, and rare anywhere else', () => {
+  const data = buildWorldData(process.cwd());
+  const places = data.lootPoints.filter((p) => p.usage.includes('Gas') && !p.arms).length;
+  const tally = (seed: number) => {
     const e = new Economy(data.lootPoints, { spawn: () => {}, despawn: () => {} });
     // (its own dice, thrown from a different place each time)
-    (e as unknown as { rng: RNG }).rng = new RNG(1000 + k * 7919);
+    (e as unknown as { rng: RNG }).rng = new RNG(seed);
     e.populate();
+    const inGas = new Map<string, number>(), out = new Map<string, number>();
+    let gasThings = 0;
     for (const l of e.loot.values()) {
-      if (l.item.id !== 'grenade') continue;
-      all++;
-      if (gasDepth(zone, l.x, l.y, l.z) > GAS.breathe) inGas++;
+      const under = l.point >= 0 && data.lootPoints[l.point].usage.includes('Gas');
+      const m = under ? inGas : out;
+      m.set(l.item.id, (m.get(l.item.id) ?? 0) + 1);
+      if (under && !data.lootPoints[l.point].arms) gasThings++;
     }
+    return { e, inGas, out, gasThings };
+  };
+  for (let k = 0; k < 6; k++) {
+    const { inGas, out, gasThings } = tally(1000 + k * 7919);
+    const g = (id: string) => inGas.get(id) ?? 0, o = (id: string) => out.get(id) ?? 0;
+    // four places in five there have something lying in them (on the rest of the map it is three in five)
+    assert.ok(gasThings / places >= 0.8, `only ${gasThings} things on the ${places} places under the gas`);
+    // helmets, plates, scopes: common there, rare everywhere else
+    for (const [id, most] of [['boonie_hat', 2], ['life_vest', 2], ['pu_scope', 1]] as const) {
+      assert.ok(g(id) >= 5, `${g(id)} of ${id} under the gas`);
+      assert.ok(o(id) <= most, `${o(id)} of ${id} on the rest of the map`);
+      assert.ok(g(id) > o(id) * 2);
+    }
+    // and everything else is to be had there: guns, a lot to fire from them, something for a wound, grenades
+    assert.ok(g('mosin') + g('p38') + g('m9') >= 14, 'few guns under the gas');
+    assert.ok(g('box_762') + g('box_9mm') + g('ammo_762') + g('ammo_9mm') >= 24, 'little ammunition under the gas');
+    assert.ok(g('firstaid') + g('bandage') >= 7 && g('grenade') >= 5);
+    // the rest of the map holds what it held before the works were built
+    assert.ok(o('mosin') >= 16 && o('ammo_9mm') >= 44 && o('bandage') >= 18, 'the rest of the map has gone short');
+    assert.equal(g('gasmask'), 0);
   }
-  assert.ok(all > 0 && inGas / all > share, `grenades under the gas: ${inGas} of ${all}, where its share of such places is ${(share * 100).toFixed(0)}%`);
+  // what is taken under the gas is put back, and soon; a scope taken from the rest of the map is not back so soon
+  const { e } = tally(4242);
+  const scopes = [...e.loot.values()].filter((l) => l.item.id === 'pu_scope' && l.point >= 0 && data.lootPoints[l.point].usage.includes('Gas'));
+  for (const l of scopes.slice(0, 3)) e.take(l.uid);
+  assert.equal(e.held('pu_scope', true), scopes.length - 3);
+  for (let t = 0; t < GAS_RESTOCK + 10; t += 5) e.tick(5, []);
+  assert.equal(e.held('pu_scope', true), scopes.length, 'the scopes under the gas were not put back');
+  // a crate under the gas holds the best of everything, and every supply drop has a scope in it
+  const seen = new Map<string, number>();
+  let s = 99;
+  const rnd = () => ((s = (Math.imul(s, 1664525) + 1013904223) | 0) >>> 0) / 4294967296;
+  const box = () => ({ add: (it: { id: string }) => (seen.set(it.id, (seen.get(it.id) ?? 0) + 1), it) });
+  for (let k = 0; k < 300; k++) fillCrate(box() as never, 'weapons_case', rnd, true);
+  const rich = (id: string) => (seen.get(id) ?? 0) / 300;
+  assert.ok(rich('boonie_hat') > 0.2 && rich('life_vest') > 0.2 && rich('pu_scope') > 0.15, 'a crate under the gas is no better than another');
+  seen.clear();
+  for (let k = 0; k < 300; k++) fillCrate(box() as never, 'weapons_case', rnd, false);
+  assert.ok(rich('life_vest') < 0.06 && rich('pu_scope') < 0.04, 'plates and scopes are common in a crate outside the gas');
+  for (let k = 0; k < 60; k++) {
+    const got: string[] = [];
+    fillDrop({ add: (it: { id: string }) => (got.push(it.id), it) } as never, rnd);
+    assert.ok(got.includes('pu_scope'), 'a supply drop with no scope in it');
+  }
 });
 
 console.log(`\n${n} checks passed`);
