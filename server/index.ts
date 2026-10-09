@@ -23,6 +23,7 @@ import { JEEP, SEATS, crashDamage, restState, type VehicleInfo, type VState } fr
 import { Director, INFECTED, guarded, infectedDrop } from '../src/sim/infected';
 import { EMOTE, EMOTE_GAP, SHOUT_RANGE } from '../src/sim/emotes';
 import { ACTS, CHAT_RANGE, F_DEAD, F_GUARD, MAX_STAMINA, PROTOCOL, type C2S, type CorpseInfo, type KillInfo, type PlayerInfo, type Pose, type S2C, type StashInfo, type StoredItem, type Vitals } from '../src/net/protocol';
+import { FIRE, Hearths } from '../src/sim/fires';
 
 const PORT = Number(process.env.PORT ?? 8080);
 const ROOT = process.cwd();
@@ -102,6 +103,9 @@ world.jeeps.forEach((_, k) => standJeep(k));
 const vehInfo = (v: Veh): VehicleInfo => ({ i: v.i, s: v.s, hp: v.goneAt ? 0 : v.hp, fuel: v.fuel, seats: v.seats, sim: v.sim });
 const tellSeats = (v: Veh, rest = false) => broadcast({ t: 'vseat', i: v.i, seats: v.seats, sim: v.sim, ...(rest ? { s: v.s } : {}) });
 const isVState = (s: unknown): s is VState => Array.isArray(s) && s.length === 12 && s.every(num) && Math.abs(s[0]) < 600 && Math.abs(s[2]) < 600 && Math.abs(s[1]) < 500 && Math.abs(Math.hypot(s[3], s[4], s[5], s[6]) - 1) < 0.02 && Math.hypot(s[7], s[8], s[9]) < 60;
+
+/** the fireplaces, and which of them are alight */
+const hearths = new Hearths(world.fires);
 
 const economy = new Economy(world.lootPoints, {
   spawn: (l) => broadcast({ t: 'loot+', l }),
@@ -664,6 +668,12 @@ function handle(c: Client, m: C2S) {
       broadcast({ t: 'nade', id: c.id, o: m.o, v: m.v }, c);
       return;
     }
+    case 'fire': {
+      // lit by somebody standing beside it (a couple of metres' grace: where they are is told a moment late)
+      if (!c.alive || !hearths.light(m.i, c.pose[0], c.pose[2], Date.now() / 1000, 2.5)) return;
+      broadcast({ t: 'fire', i: m.i, left: FIRE.burns });
+      return;
+    }
     case 'barrel': {
       const b = world.barrels[m.i];
       if (!c.alive || !Number.isInteger(m.i) || !b || barrelsGone.has(m.i)) return;
@@ -1101,6 +1111,7 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
     corpses: [...boxes.values()].filter((b) => b.kind === 'corpse').map((b) => ({ uid: b.cid, x: b.x, y: b.y, z: b.z, rot: b.rot, name: b.name ?? 'Survivor', v: b.v ?? 0 })),
     drops: [...boxes.values()].filter((b) => b.kind === 'drop').map(dropInfo),
     barrels: [...barrelsGone.keys()],
+    fires: hearths.alight(Date.now() / 1000),
     vehicles: [...vehicles.values()].map(vehInfo),
     infected: horde.list(),
     spawn: sp,

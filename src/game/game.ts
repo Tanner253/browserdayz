@@ -51,6 +51,8 @@ import { TouchControls } from '../ui/touch';
 import { REWARDS_UI, RewardsModal, addCashedTag, cashedTags, walletAddress } from '../ui/rewards';
 import { Gas } from './gas';
 import { GAS } from '../sim/gas';
+import { FIRE, Hearths } from '../sim/fires';
+import { Fires } from './fires';
 
 const _gasHead = new THREE.Vector3();
 
@@ -105,6 +107,13 @@ export class Game {
   /** the infected (src/game/infected.ts) */
   /** the gas over the checkpoint: the breathing of it, and what is seen of it close to */
   gas!: Gas;
+  /** the fireplaces: which are alight, and the look and sound of them */
+  fires!: Fires;
+  /** which are alight, kept by this game when it is played alone (the server keeps it otherwise) */
+  private hearths!: Hearths;
+  private byFire = false;
+  /** a word at the top of the screen for as long as the survivor is resting by a fire */
+  private fireTag = document.createElement('div');
   readonly horde: Horde = new Horde({
     atmo: () => this.s.atmo,
     scene: () => this.s.r.scene,
@@ -213,6 +222,9 @@ export class Game {
     for (const l of atmo.csm.lights) l.shadow.camera.layers.enable(AVATAR_LAYER);
 
     this.effects = new Effects(r.scene, atmo);
+    this.fires = new Fires(world, r.scene, this.effects, atmo);
+    this.fireTag.className = 'hud-fire-tag';
+    this.hearths = new Hearths(this.fires.spots);
     progress('loading loot');
     this.loot = new LootManager(r.scene, atmo, buildings.lootPoints);
     await this.loot.preload();
@@ -312,6 +324,7 @@ export class Game {
     this.hud.setName(playerName());
     this.minimap = new Minimap(world);
     this.hud.root.insertBefore(this.minimap.root, this.hud.root.firstChild);
+    this.hud.root.appendChild(this.fireTag);
     this.gas = new Gas(atmo.gas, atmo, r.scene, {
       masked: () => this.inv.wear('gas').length > 0,
       hurt: (amount) => this.player.sicken(amount, 'the gas'),
@@ -685,6 +698,8 @@ export class Game {
     // the fuel drums that are gone at the moment
     this.fuses.length = this.drumsBack.length = 0;
     for (const b of this.s.veg.barrels) b?.setThere(!w.barrels?.includes(b.i));
+    this.fires.clear();
+    for (const [i, left] of w.fires ?? []) this.fires.set(i, left);
     for (const p of w.players) void this.addRemote(p);
     this.garage.clear();
     for (const v of w.vehicles ?? []) this.garage.add(v);
@@ -759,6 +774,7 @@ export class Game {
     });
     net.on('boom', (m) => this.blowBarrel(m.i, false));
     net.on('barrel+', (m) => this.s.veg.barrels[m.i]?.setThere(true));
+    net.on('fire', (m) => this.fires.set(m.i, m.left));
     net.on('gear', (m) => this.remotes.get(m.id) && void this.wear(this.remotes.get(m.id)!.avatar, m.g));
     net.on('dmg', (m) => this.takeHit(m));
     net.on('death', (m) => {
@@ -1426,6 +1442,19 @@ export class Game {
     if (sound === 'smoke') audio.ui('smoke');
   }
 
+  /** A few seconds of work at a fireplace, and it is alight: for everybody, once the server has been told. */
+  private lightFire(i: number) {
+    this.startUse('Lighting the fire', FIRE.lighting, 'cigarettes', 'open', null, () => {
+      const p = this.player.pos;
+      // (walked off from it meanwhile, or somebody else got it going first)
+      if (this.fires.at(p) !== i || this.fires.left[i] > 0) return;
+      if (this.online) this.net.send({ t: 'fire', i });
+      else if (this.hearths.light(i, p.x, p.z, performance.now() / 1000)) this.fires.set(i, FIRE.burns);
+      audio.ui('open');
+      this.hud.note('The fire is lit: its smoke can be seen a long way off', 'good');
+    });
+  }
+
   /** wherever the item currently is: player inventory or the open crate */
   private consume(item: ItemInstance, from: Container | null) {
     const def = ITEMS[item.id];
@@ -1503,16 +1532,19 @@ export class Game {
         return;
       }
       const v = this.player.vitals;
-      if (u.energy) v.energy = THREE.MathUtils.clamp(v.energy + u.energy, 0, 100);
-      if (u.water) v.water = THREE.MathUtils.clamp(v.water + u.water, 0, 100);
+      // (hot, beside a fire, what is eaten or drunk does more good)
+      const hot = (u.energy ?? 0) > 0 || (u.water ?? 0) > 0 ? (this.fires.warm(this.player.pos) ? FIRE.meal : 1) : 1;
+      if (u.energy) v.energy = THREE.MathUtils.clamp(v.energy + (u.energy > 0 ? Math.round(u.energy * hot) : u.energy), 0, 100);
+      if (u.water) v.water = THREE.MathUtils.clamp(v.water + (u.water > 0 ? Math.round(u.water * hot) : u.water), 0, 100);
       if (u.health) v.health = Math.min(100, v.health + u.health);
       if (u.stopBleed && v.bleeding) {
         v.bleeding = false;
         this.hud.note('The bleeding has stopped', 'good');
         this.meDirty = true;
       }
-      const gained = [u.energy ? `${u.energy > 0 ? '+' : ''}${u.energy} energy` : '', u.water ? `${u.water > 0 ? '+' : ''}${u.water} water` : '', u.health ? `+${u.health} health` : ''].filter(Boolean).join(' · ');
-      if (gained) this.hud.note(gained, 'good');
+      const good = (n: number) => (n > 0 ? Math.round(n * hot) : n);
+      const gained = [u.energy ? `${u.energy > 0 ? '+' : ''}${good(u.energy)} energy` : '', u.water ? `${u.water > 0 ? '+' : ''}${good(u.water)} water` : '', u.health ? `+${u.health} health` : ''].filter(Boolean).join(' · ');
+      if (gained) this.hud.note(hot > 1 ? `${gained} · warmed by the fire` : gained, 'good');
       if (u.sound === 'smoke') {
         // what is left of it, in front of the face
         const cam = this.s.r.camera;
@@ -1951,6 +1983,20 @@ export class Game {
     if (!owner) {
       // nobody has a name floating over their head: you only learn it by looking right at them, up close
       const c = new THREE.Vector3();
+      // a fireplace stood beside and looked at
+      const fi = this.fires.at(this.player.pos);
+      if (fi >= 0) {
+        const s = this.fires.spots[fi];
+        if (c.set(s.x, s.y + 0.3, s.z).sub(cam.position).normalize().dot(dir) > 0.78) {
+          const left = this.fires.left[fi];
+          if (left > 0) this.prompt = `<small>Fire · ${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')} left · rest beside it to mend</small>`;
+          else {
+            this.prompt = '<kbd>F</kbd>Light the fire';
+            if (this.input.pressed('KeyF') && !this.use) this.lightFire(fi);
+          }
+          return;
+        }
+      }
       for (const r of this.remotes.values()) {
         if (!r.alive) continue;
         r.chest(c).sub(cam.position);
@@ -2242,6 +2288,20 @@ export class Game {
     });
     if (this.started) p.tickVitals(dt);
     this.gas.update(dt, this.s.r.camera.position, _gasHead.set(p.pos.x, p.pos.y + (p.crouched ? 1.0 : 1.6), p.pos.z), this.started && !p.dead);
+    // the fires: the infected hear one crackle, and whoever is beside one mends
+    for (const at of this.fires.update(dt, this.s.r.camera.position)) this.horde.noise(at.x, at.z, FIRE.heard);
+    const resting = this.started && !p.dead && this.fires.warm(p.pos);
+    const mending = resting && p.rest(FIRE.heal * dt);
+    if (resting !== this.byFire) {
+      this.byFire = resting;
+      this.fireTag.classList.toggle('on', resting);
+    }
+    // (said for as long as they are beside it, and why it is doing them no good when it is not)
+    if (resting) {
+      const v = p.vitals;
+      const say = mending ? 'BY THE FIRE · MENDING' : v.bleeding ? 'BY THE FIRE · STOP THE BLEEDING FIRST' : v.energy <= 10 || v.water <= 10 ? 'BY THE FIRE · EAT AND DRINK FIRST' : 'BY THE FIRE';
+      if (this.fireTag.textContent !== say) this.fireTag.textContent = say;
+    }
 
     // quick-use keys
     if (playing && !uiOpen && !typing && !this.use) {

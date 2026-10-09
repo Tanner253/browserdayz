@@ -565,6 +565,61 @@ export class Effects {
     }
   }
 
+  /**
+   * A campfire: flames in the ring, a spark now and then, and grey smoke standing over it to
+   * be seen from a long way off. Call every frame it burns.
+   * @param state the caller's own count of what is owed (each fire keeps its own pace)
+   * @param life 1 burning well, down to 0 as it sinks to ash
+   * @param close near enough for its flames to be seen (far off, only its smoke is made)
+   */
+  campfire(at: THREE.Vector3, state: { flame: number; smoke: number }, dt: number, life: number, close: boolean) {
+    state.smoke = Math.min(3, state.smoke + dt * (1.6 + 3.2 * life));
+    while (state.smoke >= 1) {
+      state.smoke -= 1;
+      const k = 0.1 + Math.random() * 0.08;
+      this.spawn({
+        p: new THREE.Vector3(at.x + (Math.random() - 0.5) * 0.3, at.y + 0.8, at.z + (Math.random() - 0.5) * 0.3),
+        // it climbs, and leans with the same wind the signal smoke leans with
+        v: new THREE.Vector3(0.45 + (Math.random() - 0.5) * 0.4, 1.3, 0.28 + (Math.random() - 0.5) * 0.4),
+        max: 9 + Math.random() * 3,
+        size: 0.6,
+        grow: 9,
+        color: new THREE.Color(k, k, k * 1.05),
+        alpha: 0.42 + 0.26 * life,
+        gravity: -2.2,
+        drag: 0.6,
+      });
+    }
+    if (!close) return;
+    state.flame = Math.min(5, state.flame + dt * (8 + 22 * life));
+    while (state.flame >= 1) {
+      state.flame -= 1;
+      const a = Math.random() * Math.PI * 2, r = Math.random() * 0.2;
+      const hot = Math.random(), tall = 0.45 + 0.55 * life;
+      const p = new THREE.Vector3(at.x + Math.cos(a) * r, at.y + 0.14 + Math.random() * 0.1, at.z + Math.sin(a) * r);
+      const v = new THREE.Vector3((Math.random() - 0.5) * 0.35, (0.9 + Math.random() * 1.1) * tall, (Math.random() - 0.5) * 0.35);
+      // The body of the flame hides what is behind it: on sunlit grass a flame that only ADDS
+      // its light is a pale mist. (Kept short of dazzling: the brightest things in the picture
+      // are finished nearly white, and a fire is orange.)
+      this.spawn({ p, v, max: 0.32 + Math.random() * 0.3, size: 0.2 + Math.random() * 0.12, grow: 0.22, color: new THREE.Color(0.98 + hot * 0.3, 0.3 + hot * 0.3, 0.025 + hot * 0.035), alpha: 0.9, gravity: -1.0, drag: 1.3 });
+      // and the light in it, laid over that
+      if (Math.random() < 0.6) this.spawn({ p: p.clone(), v: v.clone().multiplyScalar(0.9), max: 0.25 + Math.random() * 0.25, size: 0.3, grow: 0.3, color: new THREE.Color(0.42, 0.14, 0.015), alpha: 0.55, gravity: -1.0, drag: 1.3, additive: true });
+      if (Math.random() < 0.07 * life) {
+        this.spawn({
+          p: new THREE.Vector3(p.x, at.y + 0.45, p.z),
+          v: new THREE.Vector3((Math.random() - 0.5) * 1.1, 1.8 + Math.random() * 1.8, (Math.random() - 0.5) * 1.1),
+          max: 0.7 + Math.random() * 0.8,
+          size: 0.022,
+          color: new THREE.Color(3, 1.4, 0.3),
+          alpha: 1,
+          gravity: 1.4,
+          drag: 0.7,
+          additive: true,
+        });
+      }
+    }
+  }
+
   /** What a tyre throws up behind it: the colour of what it is on, more of it the faster it goes. */
   dust(at: THREE.Vector3, vel: THREE.Vector3, surface: string, amount: number, state: { owed: number }, dt: number) {
     state.owed = Math.min(3, state.owed + dt * amount * 11);

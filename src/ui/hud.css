@@ -1287,3 +1287,6 @@ body.touch .hud-start, body.touch .rw, body.touch .inv-wrap, body.touch .inv-col
   mask-image: radial-gradient(ellipse 36% 56% at 30% 50%, transparent 70%, #000 100%), radial-gradient(ellipse 36% 56% at 70% 50%, transparent 70%, #000 100%);
   -webkit-mask-composite: source-in; mask-composite: intersect; }
 .hud-mask.on { opacity: 0.86; }
+/* beside a fire that is alight */
+.hud-fire-tag { position: absolute; top: 96px; left: 50%; transform: translateX(-50%); padding: 6px 14px 6px 12px; font: 700 13px/1 'Barlow Condensed', 'Bahnschrift', sans-serif; letter-spacing: 0.22em; color: #ffe6c2; background: rgba(46, 22, 6, 0.74); border-left: 3px solid #ff9a3c; opacity: 0; transition: opacity 0.35s; white-space: nowrap; pointer-events: none; }
+.hud-fire-tag.on { opacity: 1; }

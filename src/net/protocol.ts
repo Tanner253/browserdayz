@@ -14,7 +14,7 @@ import type { DropInfo } from '../sim/drops';
 import type { VehicleInfo, VState } from '../sim/vehicles';
 import type { IState, InfectedInfo } from '../sim/infected';
 
-export const PROTOCOL = 15;
+export const PROTOCOL = 16;
 
 /** chat channels: everyone on the server, or only players standing near the speaker */
 export type ChatChannel = 'global' | 'near';
@@ -109,6 +109,8 @@ export type C2S =
   | { t: 'emote'; e: string }
   /** a bullet of ours found fuel drum number i (see src/sim/barrels.ts), or our blast reached it */
   | { t: 'barrel'; i: number }
+  /** we have lit fireplace number i (see src/sim/fires.ts), standing beside it */
+  | { t: 'fire'; i: number }
   | { t: 'gear'; g: string[] }
   | { t: 'hit'; to: number; zone: HitZone; w: string; dist: number; sup: boolean; bonus: number }
   | { t: 'take'; uid: string }
@@ -165,6 +167,8 @@ export type S2C =
       drops?: DropInfo[];
       /** fuel drums that have gone up and not been stood up again yet */
       barrels?: number[];
+      /** the fireplaces that are alight: [which, seconds left] */
+      fires?: [number, number][];
       /** the jeeps: where each stands, what state it is in and who is in it */
       vehicles?: VehicleInfo[];
       /** the infected, standing and lying */
@@ -182,6 +186,8 @@ export type S2C =
   /** fuel drum number i went up, set off by this player; and a new one has been stood in its place */
   | { t: 'boom'; i: number; by: number }
   | { t: 'barrel+'; i: number }
+  /** fireplace number i is alight, with so many seconds of burning left */
+  | { t: 'fire'; i: number; left: number }
   | { t: 'gear'; id: number; g: string[] }
   | { t: 'dmg'; from: number; amount: number; zone: HitZone; w: string; dir: [number, number, number] }
   | { t: 'hitok'; to: number; amount: number; zone: HitZone }

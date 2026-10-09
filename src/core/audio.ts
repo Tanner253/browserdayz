@@ -147,6 +147,8 @@ export class AudioEngine {
   private breathIn = true;
   private maskT = 0;
   private maskIn = true;
+  private fireT = 0;
+  private crackT = 0;
   private heartT = 0;
   private stepSide = 1;
   ready = false;
@@ -1008,6 +1010,46 @@ export class AudioEngine {
    * Being hit: the blow landing, and the grunt it knocks out of you.
    * @param pos somebody else being hit: their grunt, from where they are, when the sound gets here
    */
+  /**
+   * A fire burning near by: the hiss of it, and wood cracking in it.
+   * @param distance metres to the nearest one that is alight (-1 = none near enough to hear)
+   */
+  fire(dt: number, distance: number) {
+    if (!this.ready || distance < 0 || distance > 26) {
+      this.fireT = 0.2;
+      this.crackT = 0.3;
+      return;
+    }
+    const ctx = this.ctx, t = ctx.currentTime;
+    const near = 1 / (1 + (distance * distance) / 30);
+    this.fireT -= dt;
+    if (this.fireT <= 0) {
+      // the hiss: one breath of it after another, each laid over the end of the last
+      this.fireT = 0.9;
+      const src = ctx.createBufferSource();
+      src.buffer = this.noiseBuf;
+      src.loop = true;
+      src.start(t, Math.random());
+      src.stop(t + 1.5);
+      const f = this.filter('bandpass', 420 + Math.random() * 120, 0.6);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(0.034 * near, t + 0.45);
+      g.gain.linearRampToValueAtTime(0.0001, t + 1.45);
+      src.connect(f).connect(g).connect(this.sfx);
+    }
+    this.crackT -= dt;
+    if (this.crackT <= 0) {
+      // a crack: sharp, dry, and never at an even pace
+      this.crackT = 0.07 + Math.random() * Math.random() * 0.9;
+      const src = this.noise(t, 0.03);
+      const f = this.filter('highpass', 1700 + Math.random() * 2200, 0.9);
+      const g = ctx.createGain();
+      this.env(g, t, (0.05 + Math.random() * 0.13) * near, 0.002, 0.018 + Math.random() * 0.03);
+      src.connect(f).connect(g).connect(this.sfx);
+    }
+  }
+
   /** a cough: your own, the gas coming back up */
   cough(hard = 1) {
     if (!this.ready) return;

@@ -11,6 +11,7 @@ import { pickDropSite } from '../src/sim/drops';
 import { barrelSpots } from '../src/sim/barrels';
 import { JEEP, jeepSpots } from '../src/sim/vehicles';
 import { homeSpot, infectedHomes, type Home } from '../src/sim/infected';
+import { fireSpots } from '../src/sim/fires';
 
 export interface CrateSpot {
   cid: string;
@@ -38,6 +39,8 @@ export function buildWorldData(root: string) {
     crates,
     /** the fuel drums, numbered as the game numbers them */
     barrels: barrelSpots(world.props).map((p) => ({ x: p.x, y: p.y, z: p.z })),
+    /** the fireplaces, numbered as the game numbers them */
+    fires: fireSpots(world.props).map((p) => ({ x: p.x, y: p.y, z: p.z })),
     /** where the jeeps stand to begin with: none, for as long as the game has no model to draw one with */
     jeeps: manifest.models?.[JEEP.model] || process.env.JEEPS === 'on' ? jeepSpots(world) : [],
     spawns: world.spawns,

@@ -438,6 +438,14 @@ export class Player {
     if (this.hurtTimer > 0) this.hurtTimer -= dt;
   }
 
+  /** health put back by rest (beside a fire): not while a wound is open, and not on an empty stomach or a dry mouth */
+  rest(amount: number): boolean {
+    const v = this.vitals;
+    if (this.dead || v.bleeding || v.energy <= 10 || v.water <= 10 || v.health >= 100) return false;
+    v.health = Math.min(100, v.health + amount);
+    return true;
+  }
+
   /** health lost to something that is not a blow (bad air): no flinch and no cry, only the loss */
   sicken(amount: number, cause: string) {
     if (!this.dead) this.damageQuiet(amount, cause);
