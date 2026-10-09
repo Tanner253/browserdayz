@@ -40,6 +40,9 @@ export interface Vitals {
   broken?: boolean;
 }
 
+/** metres a second hurrying in a crouch: creeping is 1.9, a jog upright 4, a sprint 6.2 */
+const CROUCH_RUN = 3.3;
+
 export class Player {
   body!: RAPIER.RigidBody;
   collider!: RAPIER.Collider;
@@ -53,6 +56,8 @@ export class Player {
   crouched = false;
   grounded = false;
   sprinting = false;
+  /** hurrying along in a crouch (Shift held while crouched): faster than creeping, slower than a sprint */
+  scurrying = false;
   moving = 0; // 0..1 horizontal speed fraction
   eye = EYE_STAND;
   lean = 0;
@@ -210,7 +215,7 @@ export class Player {
     const v = this.vitals;
     if (this.seated) {
       // carried: the legs get their breath back, and that is all they do
-      this.sprinting = false;
+      this.sprinting = this.scurrying = false;
       this.staminaDelay = Math.max(0, this.staminaDelay - h);
       if (this.staminaDelay <= 0) v.stamina = Math.min(MAX_STAMINA, v.stamina + 14 * h);
       this.lean += (0 - this.lean) * (1 - Math.exp(-10 * h));
@@ -230,10 +235,14 @@ export class Player {
     if (v.stamina <= WINDED_AT) this.winded = true;
     else if (v.stamina >= WIND_BACK) this.winded = false;
     this.sprintLock = Math.max(0, this.sprintLock - h);
-    this.sprinting = wantsSprint && !this.winded && this.grounded && !v.broken && this.sprintLock <= 0;
+    const fit = !this.winded && this.grounded && !v.broken && this.sprintLock <= 0;
+    this.sprinting = wantsSprint && fit;
+    // Shift while crouched: a hurried crouch, well short of a sprint and well over a creep.
+    // It takes breath as a sprint does (less of it), and the trigger stops it as it stops one.
+    this.scurrying = this.crouched && input.held('ShiftLeft') && fwd > 0 && !this.aiming && fit;
 
     const enc = Math.max(0, this.weightKg - 18) * 0.012; // encumbrance
-    let speed = this.crouched ? 1.9 : walk ? 1.7 : 4.0;
+    let speed = this.crouched ? (this.scurrying ? CROUCH_RUN : 1.9) : walk ? 1.7 : 4.0;
     if (this.sprinting) speed = 6.2;
     if (this.aiming) speed = Math.min(speed, this.crouched ? 1.2 : 1.9);
     if (fwd < 0) speed *= 0.75;
@@ -316,6 +325,9 @@ export class Player {
     // stamina
     if (this.sprinting && hs > 1) {
       v.stamina = Math.max(0, v.stamina - 11 * h);
+      this.staminaDelay = 1.0;
+    } else if (this.scurrying && hs > 1) {
+      v.stamina = Math.max(0, v.stamina - 6 * h);
       this.staminaDelay = 1.0;
     } else if (this.staminaDelay > 0) {
       this.staminaDelay -= h;
@@ -437,7 +449,7 @@ export class Player {
   tickVitals(dt: number) {
     const v = this.vitals;
     if (this.dead) return;
-    const exertion = this.sprinting ? 2.4 : this.moving > 0.1 ? 1.3 : 1;
+    const exertion = this.sprinting ? 2.4 : this.scurrying ? 1.8 : this.moving > 0.1 ? 1.3 : 1;
     v.energy = Math.max(0, v.energy - 0.045 * exertion * dt);
     v.water = Math.max(0, v.water - 0.07 * exertion * this.thirstMult * dt);
     // An open wound costs about one health a second. Left alone it closes in the end, at a

@@ -2,6 +2,7 @@
 
 import assert from 'node:assert/strict';
 import { DAY, clockAt, hourAt, phaseOf, untilDawn, untilNight } from '../src/sim/daynight';
+import { TAG_HOLD_MIN } from '../src/sim/items';
 
 let n = 0;
 const ok = (name: string, fn: () => void) => {
@@ -10,16 +11,21 @@ const ok = (name: string, fn: () => void) => {
   console.log('  ok  ' + name);
 };
 
-ok('a day is forty minutes, and a quarter of it is night', () => {
-  assert.equal(DAY.length, 2400);
+ok('a day is thirty-two minutes, a quarter of it night, and the dark is shorter than a dog tag has to be held', () => {
+  assert.equal(DAY.length, 1920);
+  assert.equal(DAY.night, 0.75);
   let night = 0, day = 0;
   for (let s = 0; s < DAY.length; s++) {
     const h = hourAt(phaseOf(s));
     if (h.night) night++;
     if (h.light === 1) day++;
   }
-  assert.equal(night, 600);
-  assert.ok(day >= 1550 && day <= 1570, `${day} s of full day`);
+  assert.equal(night, 480);
+  assert.ok(day >= 1280 && day <= 1290, `${day} s of full day`);
+  // (dark: night, and the darker half of dusk and of first light)
+  let dark = 0;
+  for (let s = 0; s < DAY.length; s++) if (hourAt(phaseOf(s)).light < 0.5) dark++;
+  assert.ok(dark < TAG_HOLD_MIN * 60, `${dark} s of dark against ${TAG_HOLD_MIN} minutes to hold a tag`);
 });
 
 ok('the light comes and goes without a jump, and the sun is low only while it does', () => {
@@ -36,8 +42,8 @@ ok('the light comes and goes without a jump, and the sun is low only while it do
 });
 
 ok('the hour runs on from any moment, and comes round', () => {
-  assert.ok(Math.abs(phaseOf(DAY.length * 7 + 600) - 0.25) < 1e-9);
-  assert.ok(Math.abs(phaseOf(-600) - 0.75) < 1e-9);
+  assert.ok(Math.abs(phaseOf(DAY.length * 7 + DAY.length / 4) - 0.25) < 1e-9);
+  assert.ok(Math.abs(phaseOf(-DAY.length / 4) - 0.75) < 1e-9);
   assert.equal(hourAt(1.3).light, hourAt(0.3).light);
   assert.equal(hourAt(-0.1).night, true);
 });

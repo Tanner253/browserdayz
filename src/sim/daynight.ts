@@ -1,17 +1,19 @@
-// Day and night. The Zone has a day of forty minutes: first light, a long day, dusk, and ten
-// minutes of night. Rules and numbers only: the server keeps the clock in multiplayer (every
+// Day and night. The Zone has a day of thirty-two minutes: three quarters of it light (first
+// light, a long day, dusk) and one quarter, eight minutes, night. The night is kept shorter
+// than the ten minutes a dog tag has to be held for: nobody sits a tag out in the dark.
+// Rules and numbers only: the server keeps the clock in multiplayer (every
 // game there is at the same hour), the game itself when playing alone; what the hour does to
 // the light is in src/world/atmosphere.ts.
 
 export const DAY = {
   /** seconds from one first light to the next */
-  length: 2400,
+  length: 1920,
   /**
    * Where in that each part begins, as a share of the whole. First light is 0; from `day` the
    * sun is full; at `dusk` it starts to go; from `night` it is gone until the whole comes round.
    */
-  day: 0.05,
-  dusk: 0.7,
+  day: 0.04,
+  dusk: 0.71,
   night: 0.75,
   /** the hour a game played alone begins at (mid morning), and the hour behind the menu (always day) */
   start: 0.15,
