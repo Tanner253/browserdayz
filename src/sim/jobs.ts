@@ -28,9 +28,10 @@ export interface JobBook {
 }
 
 const COMMON: [string, number][] = [['beans', 3], ['sardines', 3], ['sprats', 3], ['bandage', 2], ['water_jug', 2], ['flashlight', 1], ['compass', 1], ['work_gloves', 2]];
-const HARD: [string, number][] = [['gasmask', 1], ['red_dot', 1], ['pu_scope', 1], ['boonie_hat', 1], ['life_vest', 1], ['binoculars', 1], ['firstaid', 2], ['radio', 1]];
+const HARD: [string, number][] = [['gasmask', 1], ['red_dot', 1], ['pu_scope', 1], ['boonie_hat', 1], ['life_vest', 1], ['binoculars', 1], ['firstaid', 2]];
 /** how many times what a thing is worth over the counter it is worth when he has asked for it */
-const WANTED = 3;
+// (less than he asks for the same thing over the counter, or the job is done by buying from him)
+const WANTED = 2.5;
 
 /** the day a moment belongs to: days of the world's clock, so that everybody has the same one */
 export const dayOf = (ms: number) => Math.floor(ms / 86_400_000);

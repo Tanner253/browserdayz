@@ -63,6 +63,8 @@ ok('the day has three jobs, the same whoever asks, of real things, and they pay 
       assert.ok(ITEMS[j.item!], `${j.item} is not an item`);
       const over = pays(makeItem(j.item!, ITEMS[j.item!].stack ? 1 : undefined)) * j.n;
       assert.ok(j.pays > over, `${j.id}: the job pays ${j.pays}, the counter ${over}`);
+      // (and not so well that it is done by buying the thing from him)
+      if (STOCK.includes(j.item!)) assert.ok(j.pays < (asks(j.item!) / (ITEMS[j.item!].stack ?? 1)) * j.n, `${j.id}: the job pays ${j.pays}, and he sells them for ${asks(j.item!)}`);
     }
   }
   assert.ok(new Set(Array.from({ length: 60 }, (_, k) => jobsFor(20700 + k).map((j) => j.id).join())).size > 20, 'the days are all alike');

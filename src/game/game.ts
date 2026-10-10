@@ -220,6 +220,8 @@ export class Game {
   private traders: Traders | null = null;
   /** the radio a call has been made on and not yet answered */
   private radio: ItemInstance | null = null;
+  /** drops called down and not yet landed: where, when they land, and the smoke that marks the place meanwhile */
+  private calls: { at: THREE.Vector3; until: number; smoke: { owed: number } }[] = [];
   private shop!: ShopUI;
   /** what is written against this player in the trader's book: kept by the browser */
   private credit = Math.max(0, Math.floor(Number(localStorage.getItem('zona.credit')) || 0));
@@ -1251,7 +1253,7 @@ export class Game {
       stash.known = true;
     }
     this.drops.set(d.uid, { stash, until: performance.now() + d.left * 1000, at: new THREE.Vector3(d.x, d.y, d.z), smoke: { owed: 0 } });
-    this.minimap.setDrops([...this.drops.values()].map((x) => x.at));
+    this.markDrops();
     const where = describeSpot(this.s.world, d.x, d.z);
     const mins = Math.max(1, Math.round(d.left / 60));
     this.hud.note(`Supply drop ${where}: there for ${mins} min, marked on the map (M)`, 'good');
@@ -1268,7 +1270,7 @@ export class Game {
     this.drops.delete(uid);
     if (this.openStash === d.stash) this.toggleInventory(false);
     if (d.stash.obj) this.loot.removeStash(d.stash);
-    this.minimap.setDrops([...this.drops.values()].map((x) => x.at));
+    this.markDrops();
     this.hud.feed('The supply drop is gone');
   }
 
@@ -2232,6 +2234,11 @@ export class Game {
    *   (only on a click), and sending the player to the pause menu for closing their pockets
    *   was the wrong answer: the game carries on, and the next click takes the mouse.
    */
+  /** where the map shows a drop: the ones standing, and the places one has been called to */
+  private markDrops() {
+    this.minimap.setDrops([...[...this.drops.values()].map((x) => x.at), ...this.calls.map((c) => c.at)]);
+  }
+
   /** nothing between the player and the sky: a radio is heard from there, and a crate can come down there */
   private openSky() {
     const p = this.player.pos;
@@ -2251,6 +2258,9 @@ export class Game {
     }
     // (playing alone: there is nobody to refuse it, and the game sets the crate down itself)
     const p = this.player.pos.clone();
+    p.x -= Math.sin(this.player.yaw) * CALL.ahead;
+    p.z -= Math.cos(this.player.yaw) * CALL.ahead;
+    p.y = heightAt(this.s.world.heights, p.x, p.z);
     this.dropCalled(true, p.x, p.z, CALL.eta);
     setTimeout(() => void this.addDrop({ uid: `drop-call-${Math.round(performance.now())}`, x: p.x, y: p.y, z: p.z, rot: Math.random() * Math.PI * 2, left: DROP.life }, true), CALL.eta * 1000);
   }
@@ -2258,12 +2268,14 @@ export class Game {
   /** a drop has been called down: by this player (whose set is spent) or by somebody else (who has just told the map where they are) */
   private dropCalled(mine: boolean, x: number, z: number, eta: number) {
     const where = describeSpot(this.s.world, x, z);
+    this.calls.push({ at: new THREE.Vector3(x, heightAt(this.s.world.heights, x, z), z), until: performance.now() + eta * 1000, smoke: { owed: 0 } });
+    this.markDrops();
     if (mine && this.radio) {
       this.inv.remove(this.radio);
       this.radio = null;
       this.inventoryChanged();
     }
-    this.hud.note(mine ? `Drop called in: down in ${eta} s, right here. Everybody heard it` : `Somebody has called a supply drop in ${where}: down in ${eta} s`, mine ? 'good' : 'warn');
+    this.hud.note(mine ? `Drop called in: down in ${eta} s, three paces ahead, under the smoke. Everybody heard it` : `Somebody has called a supply drop in ${where}: down in ${eta} s`, mine ? 'good' : 'warn');
     this.hud.feed(`Supply drop called in ${where}`);
   }
 
@@ -2831,6 +2843,15 @@ export class Game {
     this.minimap.update(interp.x, interp.z, p.yaw);
     this.effects.eye.copy(cam.position);
     // the smoke over each supply drop (not from the far side of the map: nobody could see it)
+    // (and over each place one has been called to, until it lands)
+    if (this.calls.length) {
+      const nowMs = performance.now();
+      if (this.calls.some((c) => c.until < nowMs)) {
+        this.calls = this.calls.filter((c) => c.until >= nowMs);
+        this.markDrops();
+      }
+      for (const c of this.calls) if (c.at.distanceToSquared(cam.position) < 420 * 420) this.effects.signal(c.at, c.smoke, dt);
+    }
     for (const d of this.drops.values()) if (d.at.distanceToSquared(cam.position) < 420 * 420) this.effects.signal(d.at, d.smoke, dt);
     this.effects.update(dt);
     this.loot.update(cam.position, dt);

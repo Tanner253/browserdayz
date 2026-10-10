@@ -13,7 +13,7 @@ import { gasEdge, gasZone } from './gas';
  * A drop called down with a field radio: how long it takes to come (everybody is told where, and has that long
  * to get there), and how long after one call before the next is answered, map-wide.
  */
-export const CALL = { eta: 45, every: 300 };
+export const CALL = { eta: 45, every: 300, /** metres in front of the caller it comes down */ ahead: 3 };
 
 export const DROP = {
   /** seconds from one drop to the next */

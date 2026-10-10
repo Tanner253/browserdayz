@@ -870,7 +870,8 @@ function handle(c: Client, m: C2S) {
         return;
       }
       lastCall = economy.time;
-      const at = { x: c.pose[0], y: c.pose[1], z: c.pose[2] };
+      // (three paces in front of the caller: where they stand is where they may still be standing when it lands)
+      const at = { x: c.pose[0] - Math.sin(c.pose[3]) * CALL.ahead, y: c.pose[1], z: c.pose[2] - Math.cos(c.pose[3]) * CALL.ahead };
       broadcast({ t: 'radio+', by: c.id, x: at.x, z: at.z, eta: CALL.eta });
       setTimeout(() => spawnDrop(at), CALL.eta * 1000);
       log(`${c.name} called a supply drop to ${Math.round(at.x)}, ${Math.round(at.z)}`);

@@ -42,7 +42,7 @@ export function worth(id: string): number {
 }
 
 /** how many times what he pays for a thing he asks for it */
-const MARKUP = 2.5;
+const MARKUP = 3;
 
 /** what he pays for a thing as it is (a stack: for all of it). 0: he will not take it. */
 export function pays(item: ItemInstance): number {
