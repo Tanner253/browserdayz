@@ -202,12 +202,22 @@ export const LOCAL_MODELS = {
     changes: 'Stood on the ground about its own middle; its texture re-encoded as WebP at 2048; geometry compressed.',
   },
   // (inspired by a game's barrack and not taken out of it: the owner of this project says so, 2026-10-10)
+  // (It is a shell, and its windows and its door are boards with pictures of them on. Those boards are taken out:
+  // the game hangs a door there that opens and puts glass in the windows, and lines the inside. See `hut` in
+  // src/world/buildings.ts, where the same openings are written down.)
   old_barrack: {
     dir: 'old_barrack',
+    cut: {
+      tall: 4.72,
+      drop: (a, b, c) => {
+        const all = (f) => f(a) && f(b) && f(c);
+        return all((v) => Math.abs(Math.abs(v[2]) - 2.28) < 0.03 && Math.abs(v[0]) < 5.6 && v[1] > 0.9 && v[1] < 2.5) || all((v) => Math.abs(v[0] - 6.56) < 0.03 && v[2] > -1.9 && v[2] < -0.8 && v[1] < 2.3);
+      },
+    },
     size: 15.07,
     tex: 2048,
     tags: ['prop'],
-    changes: 'Stood on the ground about its own middle; its texture re-encoded as WebP at 2048; geometry compressed.',
+    changes: 'Stood on the ground about its own middle; the boards its windows and its door were painted on taken out (ten windows and a door: 22 triangles); its texture re-encoded as WebP at 2048; geometry compressed.',
   },
   // Armour for the body, lightest to heaviest (the tiers are in src/sim/items.ts): three vests out of one pack, and
   // the collared vest out of another. And containers and a crate, a piece at a time.
@@ -244,29 +254,16 @@ export const LOCAL_MODELS = {
     tags: ['loot', 'gear'],
     changes: 'The collared vest of the pack alone: scaled to a body and stood on the ground; brought down to about nine thousand triangles; textures re-encoded as WebP; geometry compressed.',
   },
-  container_a: {
-    dir: 'containers_barrels',
-    only: /^Object_4 /,
-    size: 6.0,
-    tex: 1024,
-    tags: ['prop'],
-    changes: 'One piece of the pack, stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.',
-  },
-  container_b: {
-    dir: 'containers_barrels',
-    only: /^Object_18 /,
-    size: 6.0,
-    tex: 1024,
-    tags: ['prop'],
-    changes: 'One piece of the pack, stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.',
-  },
-  container_open: {
+  // The container that can be gone into: the pack's open one, with the leaves it was drawn with cut away (they are
+  // hung on it in the game, where they open and shut: see CONTAINER in src/world/buildings.ts).
+  container_shell: {
     dir: 'containers_barrels',
     only: /^Object_12 /,
-    size: 8.34,
+    cut: { tall: 2.2, keep: (x, _y, z) => x > -1.13 && x < 1.33 && z > -3.05 && z < 3.01 },
+    size: 6.0,
     tex: 1024,
     tags: ['prop'],
-    changes: 'One piece of the pack, stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.',
+    changes: 'One piece of the pack with its two door leaves cut away, stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.',
   },
   crate_big: {
     dir: 'containers_barrels',

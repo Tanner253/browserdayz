@@ -75,7 +75,7 @@ export function playOutline(): { x: number; z: number; r: number; from: number; 
   return out;
 }
 
-export type BuildingType = 'house_small' | 'house_brick' | 'barn' | 'shed' | 'cabin' | 'guardpost' | 'police' | 'clinic' | 'store' | 'barracks' | 'garage' | 'house_two' | 'tower';
+export type BuildingType = 'house_small' | 'house_brick' | 'barn' | 'shed' | 'cabin' | 'guardpost' | 'police' | 'clinic' | 'store' | 'barracks' | 'garage' | 'house_two' | 'tower' | 'hut';
 
 /** footprint (x = width, z = depth) in metres, used for terrain pads + spacing */
 export const BUILDING_FOOTPRINT: Record<BuildingType, [number, number]> = {
@@ -92,6 +92,8 @@ export const BUILDING_FOOTPRINT: Record<BuildingType, [number, number]> = {
   garage: [9, 7],
   house_two: [9, 7],
   tower: [6, 6],
+  // (the long plastered hut: its walls, not its eaves)
+  hut: [13.6, 5],
 };
 
 export interface BuildingPlot {
@@ -500,7 +502,8 @@ export function generateWorld(seed = WORLD_SEED): World {
     // the army's: a barracks, a workshop for its vehicles, a post on the way in
     depot: [['barracks', 0, -3, 0], ['garage', -16.5, -1, 0.22], ['guardpost', 13.5, 3.5, -0.3], ['shed', 12.5, -12.5, -0.5]],
     // the trading post: the trader's shop, and his store shed behind it
-    market: [['store', 0, 0, 0], ['shed', 13.5, -12, -0.4]],
+    // (and a bunkhouse beside the trader's yard, its door to the way in)
+    market: [['store', 0, 0, 0], ['shed', 13.5, -12, -0.4], ['hut', -30, 3, -Math.PI / 2]],
     // (laid out where it is made, at the end: see the first expansion)
     works: [],
     // (nothing stands on it that is a building of the map's: what is there is made in world/bunker.ts)

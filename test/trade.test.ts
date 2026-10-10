@@ -55,7 +55,12 @@ ok('he has a place of his own, out of the towns, and nothing lies about in it fo
   // (well away from every other place on the map)
   for (const p of world.pois) if (p.name !== post.name) assert.ok(Math.hypot(p.x - post.x, p.z - post.z) > 120, `${p.name} is on top of it`);
   const data = buildWorldData(process.cwd());
-  assert.equal(data.lootPoints.filter((p: { x: number; z: number }) => Math.hypot(p.x - post.x, p.z - post.z) < 40).length, 0, 'something lies about at the trading post');
+  // (in his shop and his shed, that is. The bunkhouse along the yard is nobody's, and what is in it is found as anywhere.)
+  const here = data.lootPoints.filter((p: { x: number; z: number }) => Math.hypot(p.x - post.x, p.z - post.z) < 40);
+  assert.equal(here.filter((p: { building?: string }) => !p.building?.startsWith('hut_')).length, 0, 'something lies about at the trading post');
+  const hut = world.buildings.find((b) => b.type === 'hut' && Math.hypot(b.x - post.x, b.z - post.z) < 60);
+  assert.ok(hut, 'no bunkhouse stands by the yard');
+  assert.ok(data.lootPoints.filter((p: { building?: string }) => p.building === hut.id).length >= 12, 'the bunkhouse is bare');
 });
 
 ok('the day has three jobs, the same whoever asks, of real things, and they pay better than the counter', () => {

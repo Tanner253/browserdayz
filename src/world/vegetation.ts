@@ -3,7 +3,7 @@
 
 import * as THREE from 'three';
 import type RAPIER from '@dimforge/rapier3d-compat';
-import { CRATE_KINDS } from './buildings';
+import { CONTAINER, CRATE_KINDS, paintBlue } from './buildings';
 import { spotKey } from './bunker';
 import { assets, type TreeEntry } from '../core/assets';
 import { physics, type Surface } from '../core/physics';
@@ -50,8 +50,6 @@ const SOLID: Record<string, [Surface, number]> = {
   utility_box_01: ['metal', 0.95],
   covered_car: ['metal', 0.92],
   concrete_road_barrier: ['concrete', 0.95],
-  container_a: ['metal', 1],
-  container_b: ['metal', 1],
   crate_big: ['wood', 0.98],
   wooden_military_crate: ['wood', 0.95],
   old_military_crate: ['wood', 0.95],
@@ -102,7 +100,7 @@ const _onItsSide = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 
  * What stands on wheels lies to the ground under them. (Set down level on a slope a car had one end in the
  * bank and a wheel at the other a foot in the air: four of the eleven that stand out of doors.)
  */
-const ON_ITS_WHEELS = new Set(['covered_car', 'container_a', 'container_b']);
+const ON_ITS_WHEELS = new Set(['covered_car']);
 const _lean = new THREE.Quaternion(), _leanE = new THREE.Euler();
 /** how a thing `hx` by `hz` (half its width and length, its own measure) lies on the ground at its four sides */
 function leanOn(world: World, it: Instance, hx: number, hz: number): [number, number, number] | undefined {
@@ -681,6 +679,8 @@ export class Vegetation {
             return extractParts(scene, (n) => n === name);
           };
           const p0 = pick(s0);
+          // (the other container of the two: the same shell, in the blue of the other half of its picture)
+          if (kind === CONTAINER.blue) for (const p of p0) paintBlue(p.geometry);
           const box = groundParts(p0);
           const p1 = s1 ? pick(s1) : null;
           if (p1) {
@@ -713,7 +713,7 @@ export class Vegetation {
           const biggest = instances.reduce((a, it) => Math.max(a, it.scale), 0) || 1;
           const swap = THREE.MathUtils.clamp(Math.max(size.x, size.y, size.z) * biggest * 20, 18, 60);
           const fade: [number, number] = [swap, swap + Math.max(4, swap * 0.18)];
-          const out: [number, number] = isRock ? [330, 350] : isFern ? [58, 70] : [128, 140];
+          const out: [number, number] = isRock || id === CONTAINER.id ? [330, 350] : isFern ? [58, 70] : [128, 140];
           if (p1) {
             set.addLevel(scene, mats(p0, null, fade), 0, 0, fade[0], fade[1], !isFern);
             set.addLevel(scene, mats(p1, fade, out), fade[0], fade[1], out[0], out[1], !isFern);

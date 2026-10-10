@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-10T11:14:26.873Z",
+ "generated": "2026-10-10T11:45:44.725Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr"
@@ -1895,9 +1895,9 @@
    "tags": [
     "prop"
    ],
-   "bytes": 299944,
+   "bytes": 299480,
    "srcTris": 4598,
-   "tris": 4598,
+   "tris": 4576,
    "min": [
     -7.535,
     0,
@@ -1994,63 +1994,23 @@
    ],
    "lods": []
   },
-  "container_a": {
-   "url": "assets/models/container_a.glb",
+  "container_shell": {
+   "url": "assets/models/container_shell.glb",
    "tags": [
     "prop"
    ],
-   "bytes": 215392,
+   "bytes": 216216,
    "srcTris": 2808,
-   "tris": 12,
+   "tris": 44,
    "min": [
-    -1.2,
+    -1.1979,
     0,
     -3
    ],
    "max": [
-    1.2,
-    2.2,
+    1.1979,
+    2.1961,
     3
-   ],
-   "lods": []
-  },
-  "container_b": {
-   "url": "assets/models/container_b.glb",
-   "tags": [
-    "prop"
-   ],
-   "bytes": 216332,
-   "srcTris": 2808,
-   "tris": 48,
-   "min": [
-    -1.1966,
-    0,
-    -3
-   ],
-   "max": [
-    1.1966,
-    2.1939,
-    3
-   ],
-   "lods": []
-  },
-  "container_open": {
-   "url": "assets/models/container_open.glb",
-   "tags": [
-    "prop"
-   ],
-   "bytes": 216852,
-   "srcTris": 2808,
-   "tris": 64,
-   "min": [
-    -1.3,
-    0,
-    -4.17
-   ],
-   "max": [
-    1.3,
-    2.1995,
-    4.17
    ],
    "lods": []
   },

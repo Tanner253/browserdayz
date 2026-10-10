@@ -14,7 +14,8 @@
 //   pair   – it is a left and a right, worn a body's width apart (gloves, boots): they are brought together to lie side by side
 //   cut    – only a part of it is wanted, and the download does not have that part as a piece of its own (a helmet on a
 //            statue cast in one): `{ tall, keep(x, y, z) }`. The whole download is stood `tall` metres high about its own
-//            middle, feet on the ground, and what `keep` says yes to, of every corner of a triangle, is kept
+//            middle, feet on the ground, and what `keep` says yes to, of every corner of a triangle, is kept. Or
+//            `{ tall, drop(a, b, c) }`: a triangle is taken out when `drop` says yes to its three corners ([x, y, z] each)
 //   plain  – its glint map is left out (a thing seen small, whose map is mostly of what was cut away): `metal`, `rough` say what it is instead
 //   both   – it is a shell, seen from inside as well as out
 // A piece on a skeleton is taken as the skeleton holds it when nothing is moving.
@@ -45,7 +46,7 @@ export async function creditOf(dir) {
  * its points only those still used (what a file says its size is, is read off its points).
  * @returns how many triangles are left
  */
-function keepOf(doc, prim, keep) {
+function keepOf(doc, prim, keep, drop) {
   const pos = prim.getAttribute('POSITION'), n = pos.getCount();
   const idx = prim.getIndices();
   const index = idx ? idx.getArray() : Uint32Array.from({ length: n }, (_, i) => i);
@@ -59,6 +60,7 @@ function keepOf(doc, prim, keep) {
   for (let t = 0; t + 2 < index.length; t += 3) {
     const a = index[t], b = index[t + 1], c = index[t + 2];
     if (!(ok[a] && ok[b] && ok[c])) continue;
+    if (drop && drop(pos.getElement(a, []), pos.getElement(b, []), pos.getElement(c, []))) continue;
     for (const i of [a, b, c]) {
       if (map[i] < 0) map[i] = m++;
       out.push(map[i]);
@@ -82,7 +84,7 @@ export async function processProp(id, cfg, { io, SRC, OUT, FORCE, exists, countT
   const credit = { id, ...(await creditOf(dir)), changes: cfg.changes };
   if (!credit.line) throw new Error(`${id}: its licence asks for no credit line this script knows how to read (${credit.licence}): look at ${path.join(dir, 'license.txt')}`);
   const dest = path.join(OUT, 'models', `${id}.glb`);
-  const stamp = JSON.stringify({ ...cfg, only: cfg.only?.source, small: cfg.small?.source, cut: cfg.cut ? `${cfg.cut.tall}: ${cfg.cut.keep}` : undefined, v: 6 });
+  const stamp = JSON.stringify({ ...cfg, only: cfg.only?.source, small: cfg.small?.source, cut: cfg.cut ? `${cfg.cut.tall}: ${cfg.cut.keep} ${cfg.cut.drop}` : undefined, v: 6 });
   const metaPath = path.join(dir, `_meta_${id}.json`);
   let meta;
   if (!FORCE && (await exists(dest)) && (await exists(metaPath))) {
@@ -131,7 +133,8 @@ export async function processProp(id, cfg, { io, SRC, OUT, FORCE, exists, countT
       let left = 0;
       for (const mesh of meshes) {
         for (const prim of mesh.listPrimitives()) {
-          const n = keepOf(doc, prim, (x, y, z) => cfg.cut.keep((x - cx) * k, (y - b0.min[1]) * k, (z - cz) * k));
+          const at = (v) => [(v[0] - cx) * k, (v[1] - b0.min[1]) * k, (v[2] - cz) * k];
+          const n = keepOf(doc, prim, (x, y, z) => !cfg.cut.keep || cfg.cut.keep(...at([x, y, z])), cfg.cut.drop && ((a, b, c) => cfg.cut.drop(at(a), at(b), at(c))));
           if (!n) mesh.removePrimitive(prim);
           left += n;
         }

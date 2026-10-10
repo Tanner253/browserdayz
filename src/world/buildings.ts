@@ -11,7 +11,7 @@ import { physics, AJAR_GROUPS, BODY_QUERY, GLASS_GROUPS, WORLD_GROUPS, type Surf
 import { RNG } from '../core/noise';
 import type { Atmosphere } from './atmosphere';
 import { GAS, gasDepth, gasZone } from '../sim/gas';
-import { BUILDING_FOOTPRINT, bunkerPlace, heightAt, type BuildingPlot, type Instance, type SiteKind, type World } from './worldgen';
+import { BUILDING_FOOTPRINT, CELL, WORLD_RES, WORLD_SIZE, bunkerPlace, heightAt, idx, type BuildingPlot, type Instance, type SiteKind, type World } from './worldgen';
 import { bunkerAt, bunkerPlan, levelY } from '../sim/bunker';
 
 /** (`Gas` is not a kind of building: it is whatever stands under the gas, whatever else it is. See src/sim/gas.ts.) */
@@ -144,6 +144,13 @@ interface Blueprint {
   floor: MatKey;
   roof: MatKey;
   roofType: 'gable' | 'shed' | 'flat';
+  /**
+   * Its outside is a model (walls, plinth, roof): none of that is made here, only what a model that is a
+   * shell has not got. The inside faces of its walls, its floor and ceiling, glass, doors, and what stops a body.
+   * `lift`: how far the model's own ground is under the floor. `ridge`, `eave`: how high over the floor the top of
+   * its roof is, in the middle and at its edge, and `out`: how far from the middle that edge is.
+   */
+  shell?: { model: string; lift: number; ridge: number; eave: number; out: number };
   walls: WallDef[];
   furniture: Furn[];
   loot: [number, number, number][];
@@ -248,6 +255,51 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
         ],
         usage: ['Farm', 'Industrial'],
       };
+    case 'hut': {
+      // The long hut: a room of beds, and at the end the door is in, a lobby with a store room off it under the
+      // one small high window. The openings are the model's own, to the millimetre (see `old_barrack` in
+      // scripts/assets.config.mjs): where its picture of a window was there is a window, and a door where its door was.
+      const four = [win(-5.549, -4.371, 0.833, 2.178), win(-3.1, -1.922, 0.833, 2.178), win(-0.651, 0.527, 0.833, 2.178), win(1.798, 2.977, 0.833, 2.178)];
+      return {
+        w: 13.52, d: 4.96, h: 2.3, ext: 'plaster_ext', int: 'int_plaster', floor: 'floor_wood', roof: 'roof_iron', roofType: 'gable',
+        shell: { model: 'old_barrack', lift: 0.23, ridge: 3.33, eave: 2.22, out: 3.4 },
+        walls: [
+          { side: 'front', ext: 'plaster_ext', int: 'int_plaster', openings: [...four, win(4.248, 5.426, 1.711, 2.178)] },
+          { side: 'back', ext: 'plaster_ext', int: 'int_plaster', openings: [...four, win(4.248, 5.426, 0.833, 2.178)] },
+          { side: 'left', ext: 'plaster_ext', int: 'int_plaster', openings: [] },
+          { side: 'right', ext: 'plaster_ext', int: 'int_plaster', openings: [door(-1.79, -0.913, 2.003)] },
+          { side: 'inner', from: [3.6, -2.28], to: [3.6, 2.28], ext: 'int_plaster', int: 'int_plaster', openings: [door(-0.9, 0.0)] },
+          { side: 'inner', from: [3.7, 0.9], to: [6.56, 0.9], ext: 'int_plaster', int: 'int_plaster', openings: [door(4.0, 4.9)] },
+        ],
+        furniture: [
+          { id: 'old_bed_frame', x: -5.95, z: -1.25, rot: 0 },
+          { id: 'old_bed_frame', x: -4.35, z: -1.25, rot: 0 },
+          { id: 'old_bed_frame', x: -2.75, z: -1.25, rot: 0 },
+          { id: 'old_bed_frame', x: -1.15, z: -1.25, rot: 0 },
+          { id: 'old_bed_frame', x: 0.45, z: -1.25, rot: 0 },
+          { id: 'old_bed_frame', x: 2.05, z: -1.25, rot: 0 },
+          { id: 'painted_wooden_cabinet', x: -6.26, z: 1.2, rot: Math.PI / 2 },
+          { id: 'Shelf_01', x: -3.73, z: 2.26, rot: Math.PI },
+          { id: 'WoodenTable_01', x: -0.9, z: 1.5, rot: 0 },
+          { id: 'painted_wooden_chair_01', x: -1.3, z: 2.02, rot: Math.PI },
+          { id: 'painted_wooden_chair_01', x: -0.5, z: 0.9, rot: 0 },
+          { id: 'weapons_case', x: 2.8, z: 1.9, rot: 0 },
+          // the lobby
+          { id: 'Shelf_01', x: 6.0, z: 0.78, rot: Math.PI },
+          // the store room
+          { id: 'steel_frame_shelves_01', x: 6.29, z: 1.64, rot: -Math.PI / 2, scale: 0.1 },
+          { id: 'wooden_crate_01', x: 5.3, z: 1.95, rot: 0 },
+        ],
+        loot: [
+          [-5.95, 0.48, -0.85], [-4.35, 0.48, -0.85], [-2.75, 0.48, -0.85], [-1.15, 0.48, -0.85], [0.45, 0.48, -0.85], [2.05, 0.48, -0.85],
+          [-6.26, 1.2, 1.2], [-3.73, 0.44, 2.21], [-3.73, 1.24, 2.21], [-1.2, 0.57, 1.5], [-0.6, 0.57, 1.5],
+          [6.0, 0.44, 0.73], [6.0, 1.24, 0.73],
+          [6.29, 0.14, 1.64], [6.29, 0.74, 1.64], [6.29, 1.34, 1.64],
+          [-2.0, 0.02, 0.3], [1.0, 0.02, 0.9], [-5.0, 0.02, 1.0], [4.6, 0.02, -0.6],
+        ],
+        usage: ['Military', 'Hunting'],
+      };
+    }
     case 'shed':
       return {
         w: 4, d: 3.2, h: 2.4, ext: 'planks_ext', int: 'planks', floor: 'floor_wood', roof: 'roof_iron', roofType: 'shed',
@@ -643,6 +695,39 @@ function wedgeGeo(len: number, rise: number, thick: number, tile: number, frame:
   return g;
 }
 
+// ------------------------------------------------------------------ containers
+
+/**
+ * A shipping container that can be gone into. Its shell is the pack's open one (2.4 m by 2.2 by 6, a leaf's
+ * width left open at each end and the other half of the end plated), drawn with the props; what stops a body,
+ * and the two leaves, which open and shut as doors do, are made here. `@0` is the orange one and `@1` the blue.
+ */
+export const CONTAINER = { id: 'container_shell', orange: 'container_shell@0', blue: 'container_shell@1', hx: 1.2, hz: 3, h: 2.2, leaf: 1.2 };
+
+/** where a container stands, as it lies to the ground (the same as the props' pass draws it) */
+export function containerMatrix(it: Instance) {
+  const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), it.rot);
+  if (it.lean) q.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(it.lean[0], 0, it.lean[1])));
+  return new THREE.Matrix4().compose(new THREE.Vector3(it.x, it.lean ? it.lean[2] : it.y, it.z), q, new THREE.Vector3(1, 1, 1));
+}
+
+/** The picture the shell is painted from has two containers in it, the orange below the blue: this moves a shape from the one to the other. */
+export function paintBlue(g: THREE.BufferGeometry) {
+  const uv = g.getAttribute('uv');
+  for (let i = 0; i < uv.count; i++) uv.setY(i, 0.022 + (uv.getY(i) - 0.522) * 0.9776);
+  uv.needsUpdate = true;
+}
+
+/** one leaf: hinge at x = 0, across to +x, painted as that half of the end is (the same picture inside as out) */
+function containerLeaf(blue: boolean) {
+  const g = new THREE.BoxGeometry(CONTAINER.leaf - 0.008, CONTAINER.h, 0.03);
+  g.translate(CONTAINER.leaf / 2, CONTAINER.h / 2, 0);
+  const pos = g.getAttribute('position'), uv = g.getAttribute('uv');
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, 0.001 + (pos.getX(i) / CONTAINER.leaf) * 0.187, 0.99 - (pos.getY(i) / CONTAINER.h) * 0.468);
+  if (blue) paintBlue(g);
+  return g;
+}
+
 // ------------------------------------------------------------------ doors
 
 export class Door {
@@ -662,18 +747,27 @@ export class Door {
    */
   private solid = true;
 
-  constructor(world: THREE.Matrix4, width: number, height: number, mat: THREE.Material, handleMat: THREE.Material, public id: string) {
+  /** a leaf that is hung outside what it shuts (a container's): it opens outward, whoever opens it and from where */
+  private oneWay = false;
+
+  constructor(world: THREE.Matrix4, width: number, height: number, mat: THREE.Material, handleMat: THREE.Material, public id: string, leaf?: { mesh: THREE.Object3D; surface: Surface }) {
     // pivot sits on the hinge edge; panel extends along +x
     world.decompose(this.pivot.position, this.baseQuat, new THREE.Vector3());
     this.pivot.quaternion.copy(this.baseQuat);
-    const panel = new THREE.Mesh(boxGeo(0, width - 0.02, 0, height - 0.02, -0.025, 0.025, 1.2, new THREE.Matrix4()), mat);
-    panel.castShadow = panel.receiveShadow = true;
-    panel.renderOrder = WALLS_FIRST;
-    const handle = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.03, 0.05), handleMat);
-    handle.position.set(width - 0.12, 1.0, 0.05);
-    const handle2 = handle.clone();
-    handle2.position.z = -0.05;
-    this.pivot.add(panel, handle, handle2);
+    if (leaf) {
+      this.oneWay = true;
+      this.swing = 1;
+      this.pivot.add(leaf.mesh);
+    } else {
+      const panel = new THREE.Mesh(boxGeo(0, width - 0.02, 0, height - 0.02, -0.025, 0.025, 1.2, new THREE.Matrix4()), mat);
+      panel.castShadow = panel.receiveShadow = true;
+      panel.renderOrder = WALLS_FIRST;
+      const handle = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.03, 0.05), handleMat);
+      handle.position.set(width - 0.12, 1.0, 0.05);
+      const handle2 = handle.clone();
+      handle2.position.z = -0.05;
+      this.pivot.add(panel, handle, handle2);
+    }
     const R = physics.R;
     this.body = physics.world.createRigidBody(
       R.RigidBodyDesc.kinematicPositionBased()
@@ -685,7 +779,7 @@ export class Door {
       R.ColliderDesc.cuboid(this.half.x, this.half.y, this.half.z).setTranslation(width / 2, height / 2, 0).setCollisionGroups(WORLD_GROUPS).setSolverGroups(WORLD_GROUPS),
       this.body,
     );
-    physics.tag(this.collider, { surface: 'wood', owner: this });
+    physics.tag(this.collider, { surface: leaf?.surface ?? 'wood', owner: this });
   }
 
   /** shut, still, and nobody standing where the leaf is: then it is a wall. Otherwise bodies pass. */
@@ -713,7 +807,7 @@ export class Door {
 
   /** DayZ-style: the door always swings away from whoever opens it. */
   toggle(from?: THREE.Vector3) {
-    if (!this.open && from) {
+    if (!this.open && from && !this.oneWay) {
       const inv = new THREE.Matrix4().compose(this.pivot.position, this.baseQuat, new THREE.Vector3(1, 1, 1)).invert();
       const local = from.clone().applyMatrix4(inv);
       this.swing = local.z > 0 ? -1 : 1;
@@ -724,7 +818,7 @@ export class Door {
 
   /** another player moved the door: animate to that state */
   set(open: boolean, swing: number) {
-    if (open && !this.open) this.swing = swing;
+    if (open && !this.open && !this.oneWay) this.swing = swing;
     this.open = open;
   }
 
@@ -735,7 +829,7 @@ export class Door {
   /** set state without animation (world load / restore) */
   setOpen(open: boolean, swing = -1) {
     this.open = open;
-    this.swing = swing;
+    if (!this.oneWay) this.swing = swing;
     this.angle = open ? this.target() : 0;
     this.vel = 0;
     this.apply(true);
@@ -844,6 +938,52 @@ export class Buildings {
       }
       for (const sp of plan.spots) point(sp.r, sp.f, sp.y, sp.floor);
     }
+    // The leaves of the containers, one at each end: after every other door, so that none of those is renumbered.
+    const lot = new RNG(4471);
+    this.containers.forEach((it, n) => {
+      const m = containerMatrix(it);
+      const { hx, hz, h, leaf } = CONTAINER;
+      const ends = [new THREE.Matrix4().makeTranslation(-hx, 0, hz - 0.015), new THREE.Matrix4().makeTranslation(hx, 0, -hz + 0.015).multiply(new THREE.Matrix4().makeRotationY(Math.PI))];
+      ends.forEach((e, k) => this.doorSpecs.push({ m: m.clone().multiply(e), w: leaf, h, id: `container${n}_${k}`, open: lot.chance(0.5), swing: 1, leaf: it.kind === CONTAINER.blue ? 1 : 0 }));
+    });
+  }
+
+  /** buildings whose outsides are models: which, and where each stands */
+  private shells: { model: string; m: THREE.Matrix4 }[] = [];
+
+  /** the containers that stand about, in the order they were stood (their leaves are doors: see the end of `plan`) */
+  containers: Instance[] = [];
+
+  /**
+   * A container is laid to the ground as a car is, but not let into it: it is gone into, and ground coming up
+   * through its floor would be seen. It rests on the highest ground under it. And a crate is put in it, against
+   * the wall at the plated half of one end, to be searched.
+   */
+  private standContainer(it: Instance) {
+    const H = this.world.heights, c = Math.cos(it.rot), sn = Math.sin(it.rot);
+    const at = (lx: number, lz: number) => heightAt(H, it.x + lx * c + lz * sn, it.z - lx * sn + lz * c);
+    const { hx, hz } = CONTAINER;
+    const f = at(0, hz), b = at(0, -hz), l = at(-hx, 0), r = at(hx, 0);
+    const nose = -Math.atan2(f - b, 2 * hz), roll = Math.atan2(r - l, 2 * hx);
+    const y = (f + b + l + r) / 4;
+    let up = -Infinity;
+    for (const lx of [-hx, 0, hx]) for (const lz of [-hz, -hz / 2, 0, hz / 2, hz]) up = Math.max(up, at(lx, lz) - (y + lx * Math.sin(roll) - lz * Math.sin(nose)));
+    it.lean = [nose, roll, y + up];
+    this.containers.push(it);
+    // No grass in it, nor at the foot of its walls. (The map of where grass grows is coarse, a point every two
+    // metres and the blades thinned between points: cleared any less far out, blades stood up through the floor.)
+    const half = WORLD_SIZE / 2, reach = Math.hypot(hx, hz) + 3;
+    for (let ix = Math.floor((it.x - reach + half) / CELL); ix <= Math.ceil((it.x + reach + half) / CELL); ix++) {
+      for (let iz = Math.floor((it.z - reach + half) / CELL); iz <= Math.ceil((it.z + reach + half) / CELL); iz++) {
+        if (ix < 0 || iz < 0 || ix >= WORLD_RES || iz >= WORLD_RES) continue;
+        const dx = -half + ix * CELL - it.x, dz = -half + iz * CELL - it.z;
+        if (Math.abs(dx * c - dz * sn) < hx + 2.7 && Math.abs(dx * sn + dz * c) < hz + 2.7) this.world.grass[idx(ix, iz)] = 0;
+      }
+    }
+    const e = assets.manifest.models.wooden_crate_01;
+    const deep = e ? e.max[2] - e.min[2] : 0.41, long = e ? e.max[0] - e.min[0] : 0.83;
+    const p = new THREE.Vector3(hx - 0.04 - deep / 2 - 0.05, 0.02, hz - 0.05 - long / 2 - 0.5).applyMatrix4(containerMatrix(it));
+    this.world.props.push({ kind: 'wooden_crate_01', x: p.x, y: p.y, z: p.z, rot: it.rot + Math.PI / 2, scale: 1 });
   }
 
   /** What stands in the yard of each outlying place: crates to search, and what makes it look lived in. */
@@ -856,17 +996,18 @@ export class Buildings {
         return Math.abs(dx * c - dz * s) < w / 2 + pad && Math.abs(dx * s + dz * c) < d / 2 + pad;
       });
     // [kind, right, forward] in the site's own frame (forward = the way its doors face)
-    const DRESSING: Record<SiteKind, [string, number, number][]> = {
+    // (a container is also told which way it lies: its length to the site's forward, turned so much)
+    const DRESSING: Record<SiteKind, [string, number, number, number?][]> = {
       lodge: [['stone_fire_pit', -3.5, 7], ['wooden_crate_01', 4, 6.5], ['Barrel_01', 5.2, 5.8], ['dry_branches_medium_01', -6, 9]],
       farm: [['wooden_crate_01', 2, 6], ['wooden_crate_01', 3.2, 6.6], ['old_tyre', -1, 7.5], ['barrel_03', 15, 6], ['covered_car', -14, -8]],
       post: [['concrete_road_barrier', -4, 9], ['concrete_road_barrier', 0, 10], ['concrete_road_barrier', 4, 9], ['weapons_case', 5.5, 3], ['weapons_case', 6.6, 1.2], ['Barrel_01', -4.5, -6]],
-      yard: [['wooden_crate_01', -4, 8], ['wooden_crate_01', -5.4, 8.6], ['wooden_crate_01', 5, 9], ['Barrel_01', 7, 8], ['barrel_03', 7.9, 8.9], ['old_tyre', 2, 11], ['dry_branches_medium_01', -9, 11]],
+      yard: [['wooden_crate_01', -4, 8], ['wooden_crate_01', -5.4, 8.6], ['wooden_crate_01', 5, 9], ['Barrel_01', 7, 8], ['barrel_03', 7.9, 8.9], ['old_tyre', 2, 11], ['dry_branches_medium_01', -9, 11], [CONTAINER.orange, -18, 12, 0.3]],
       dacha: [['covered_car', 9, -6], ['wooden_crate_01', -7, 5], ['metal_trash_can@0', -6.2, 3.4], ['trashbag', -8, 3]],
       hamlet: [['wooden_crate_01', -6.5, 6], ['wooden_crate_01', -7.6, 6.8], ['metal_trash_can@1', 6.5, 5.2], ['trashbag', 7.6, 5.6], ['old_tyre', 3, 8.5], ['covered_car', 8.5, 9.5], ['stone_fire_pit', -3, -8], ['Barrel_01', -11, -14]],
       // the trading post: what he has not yet got indoors, a car under its sheet, and the way in marked off
       // (no crate that can be searched, and no barrel with something left on its lid: nothing here is for the taking)
-      market: [['cardboard_box_01', -5, 6], ['cardboard_box_01', -6.1, 6.8], ['Barrel_01', 6.5, 5.5], ['Barrel_01', 7.7, 6.3], ['covered_car', -12.5, -3], ['concrete_road_barrier', -4, 12], ['concrete_road_barrier', 4, 12.6], ['old_tyre', 9.5, 8.5], ['trashbag', 8.6, -4], ['container_a', -15.5, 9], ['container_b', 17, 5], ['crate_big', 9.2, 2.2], ['crate_big', 10.4, 2.6]],
-      depot: [['container_b', -24, 9], ['container_a', 24, 12], ['crate_big', 9, 8], ['concrete_road_barrier', -5, 11.5], ['concrete_road_barrier', 0, 12.5], ['concrete_road_barrier', 5, 11.5], ['weapons_case', 5.5, 3.6], ['weapons_case', 6.7, 2], ['Barrel_01', -8, 5.5], ['Barrel_01', -8.9, 6.3], ['old_tyre', -12.5, 7.5], ['covered_car', -4, 8]],
+      market: [['cardboard_box_01', -5, 6], ['cardboard_box_01', -6.1, 6.8], ['Barrel_01', 6.5, 5.5], ['Barrel_01', 7.7, 6.3], ['covered_car', -12.5, -3], ['concrete_road_barrier', -4, 12], ['concrete_road_barrier', 4, 12.6], ['old_tyre', 9.5, 8.5], ['trashbag', 8.6, -4], [CONTAINER.orange, -15.5, 9, 0.12], [CONTAINER.blue, 17.5, 5, Math.PI / 2 - 0.1], ['crate_big', 9.2, 2.2], ['crate_big', 10.4, 2.6]],
+      depot: [[CONTAINER.blue, -24, 9, 0.08], [CONTAINER.orange, 25, 23, Math.PI / 2 + 0.1], ['crate_big', 9, 8], ['concrete_road_barrier', -5, 11.5], ['concrete_road_barrier', 0, 12.5], ['concrete_road_barrier', 5, 11.5], ['weapons_case', 5.5, 3.6], ['weapons_case', 6.7, 2], ['Barrel_01', -8, 5.5], ['Barrel_01', -8.9, 6.3], ['old_tyre', -12.5, 7.5], ['covered_car', -4, 8]],
       // The works (forward is the way in, the track coming up the middle of the yard). Blocks
       // across the gate with a lorry's width left between them; drums wherever drums were
       // filled, most of them the blue sort and a few that burn; the army's cases in front of
@@ -885,14 +1026,17 @@ export class Buildings {
     };
     for (const st of this.world.sites) {
       const c = Math.cos(st.rot), s = Math.sin(st.rot);
-      for (const [kind, right, fwd] of DRESSING[st.kind]) {
+      for (const [kind, right, fwd, turned] of DRESSING[st.kind]) {
         const x = st.x + right * c + fwd * s, z = st.z - right * s + fwd * c;
-        if (inBuilding(x, z, kind === 'covered_car' ? 2.6 : 1.1)) continue;
+        const box = kind.startsWith(CONTAINER.id);
+        if (inBuilding(x, z, kind === 'covered_car' ? 2.6 : box ? 3.3 : 1.1)) continue;
         // nor on top of what already lies in the yard
-        const room = kind === 'covered_car' ? 3.2 : 1.15;
+        const room = kind === 'covered_car' ? 3.2 : box ? 3.4 : 1.15;
         if (this.world.props.some((q) => !q.far && Math.hypot(q.x - x, q.z - z) < (q.kind.startsWith('covered_car') ? 3.2 : room))) continue;
-        const turn = kind === 'concrete_road_barrier' ? st.rot + Math.atan2(right, 9) * 0.6 : kind === 'covered_car' ? st.rot + rng.range(-0.3, 0.3) : rng.range(0, Math.PI * 2);
-        this.world.props.push({ kind, x, y: heightAt(this.world.heights, x, z) + (kind === 'old_tyre' ? 0.08 : 0), z, rot: turn, scale: 1 });
+        const turn = kind === 'concrete_road_barrier' ? st.rot + Math.atan2(right, 9) * 0.6 : kind === 'covered_car' ? st.rot + rng.range(-0.3, 0.3) : turned !== undefined ? st.rot + turned : rng.range(0, Math.PI * 2);
+        const it: Instance = { kind, x, y: heightAt(this.world.heights, x, z) + (kind === 'old_tyre' ? 0.08 : 0), z, rot: turn, scale: 1 };
+        this.world.props.push(it);
+        if (box) this.standContainer(it);
       }
     }
   }
@@ -959,7 +1103,9 @@ export class Buildings {
         this.collider((x1 - x0) / 2, (y1 - y0) / 2, (z1 - z0) / 2, frame.clone().multiply(c), surf(key), groups);
       }
     };
-    addBox('concrete', -hw - 0.08, hw + 0.08, -1.4, -0.1, -hd - 0.08, hd + 0.08, B);
+    // (under a model, a finger inside its plinth: in the plane of that, the two flickered)
+    const proud = bp.shell ? 0.06 : 0.08;
+    addBox('concrete', -hw - proud, hw + proud, -1.4, -0.1, -hd - proud, hd + proud, B);
     addBox(bp.floor, -hw + T * 0.5, hw - T * 0.5, -0.12, 0, -hd + T * 0.5, hd - T * 0.5, B);
     // (how high the walls stand in all: one floor, or two with the floor between them)
     const H = bp.upper ? h + SLAB + bp.upper.h : h;
@@ -1003,7 +1149,7 @@ export class Buildings {
             return { ...o, a: Math.min(p0, p1), b: Math.max(p0, p1) };
           })
           .sort((x, y) => x.a - y.a);
-        if (wd.side !== 'inner' && y0 === 0) {
+        if (wd.side !== 'inner' && y0 === 0 && !bp.shell) {
           // a skirt of concrete where the wall meets the ground, broken at the doors
           let from = 0;
           const skirt = (to: number) => to - from > 0.05 && addBox('concrete', from, to, -0.1, 0.26, T / 2, T / 2 + 0.04, F, false);
@@ -1034,18 +1180,28 @@ export class Buildings {
           [wd.ext, 0, T / 2],
         ];
         for (const [key, z0, z1] of layers) {
+          // (Where the outside is a model's, the outer half of the wall is there to stop a body and is not drawn. And
+          // the inner half stands a hair back from each opening: its ends lay in the sides of the model's, and flickered.)
+          const modelled = !!bp.shell && wd.side !== 'inner';
+          const drawn = !(modelled && z1 > 0), e = modelled ? 0.006 : 0;
+          const part = (x0: number, x1: number, ya: number, yb: number) => {
+            if (x1 - x0 < 0.001 || yb - ya < 0.001) return;
+            if (drawn) addBox(key, x0, x1, ya, yb, z0, z1, F);
+            else this.collider((x1 - x0) / 2, (yb - ya) / 2, (z1 - z0) / 2, F.clone().multiply(new THREE.Matrix4().makeTranslation((x0 + x1) / 2, (ya + yb) / 2, (z0 + z1) / 2)), surf(key));
+          };
           let cur = 0;
           for (const o of ops) {
-            if (o.a > cur) addBox(key, cur, o.a, 0, h, z0, z1, F);
-            if (o.top < h) addBox(key, o.a, o.b, o.top, h, z0, z1, F);
-            if (o.bottom > 0) addBox(key, o.a, o.b, 0, o.bottom, z0, z1, F);
-            cur = o.b;
+            if (o.a > cur) part(cur, o.a - e, 0, h);
+            if (o.top < h) part(o.a - e, o.b + e, o.top + e, h);
+            if (o.bottom > 0) part(o.a - e, o.b + e, 0, o.bottom - e);
+            cur = o.b + e;
           }
-          if (cur < L) addBox(key, cur, L, 0, h, z0, z1, F);
+          if (cur < L) part(cur, L, 0, h);
         }
         // frames, glass, doors
         for (const o of ops) {
-          const fw = 0.07;
+          // (a model's doorway is as wide as it is: a thin frame, that the door left in it is one a body goes through)
+          const fw = bp.shell && o.kind === 'door' && wd.side !== 'inner' ? 0.035 : 0.07;
           const fz0 = -T / 2 - 0.01, fz1 = T / 2 + 0.01;
           addBox('trim', o.a, o.a + fw, o.bottom, o.top, fz0, fz1, F, false);
           addBox('trim', o.b - fw, o.b, o.bottom, o.top, fz0, fz1, F, false);
@@ -1152,7 +1308,17 @@ export class Buildings {
     if (plot.type === 'store') this.signs.push({ m: B.clone().multiply(new THREE.Matrix4().makeTranslation(0, 2.64, hd + 0.03)), text: 'МАГАЗИН', sub: 'SHOP', board: '#2f4a33', ink: '#e8ebf0' });
 
     // roofs
-    if (bp.roofType === 'gable') {
+    if (bp.shell) {
+      // The model's. Only what stops a body and a shot: a slab under each slope, and the two ends under them.
+      const { ridge, eave, out } = bp.shell;
+      const ang = Math.atan2(ridge - eave, out), len = Math.hypot(out, ridge - eave);
+      for (const s of [1, -1]) {
+        const R = B.clone().multiply(new THREE.Matrix4().makeTranslation(0, ridge, 0)).multiply(new THREE.Matrix4().makeRotationX(s * ang));
+        this.collider(hw + 0.78, 0.06, len / 2, R.multiply(new THREE.Matrix4().makeTranslation(0, -0.06, (s * len) / 2)), 'metal');
+      }
+      for (const sx of [1, -1]) this.collider(T / 2, (ridge - H) / 4, hd * 0.7, B.clone().multiply(new THREE.Matrix4().makeTranslation(sx * (hw - T / 2), H + (ridge - H) / 4, 0)), 'plaster');
+      this.shells.push({ model: bp.shell.model, m: B.clone().multiply(new THREE.Matrix4().makeTranslation(0, -bp.shell.lift, 0)) });
+    } else if (bp.roofType === 'gable') {
       const rise = d * (plot.type === 'barn' ? 0.36 : 0.32);
       const ang = Math.atan2(rise, hd);
       const oh = 0.45;
@@ -1262,7 +1428,8 @@ export class Buildings {
       }
     };
     // (at the trading post nothing is left lying for whoever walks in: what is there is the trader's, and is bought)
-    const his = this.world.sites.some((st) => st.kind === 'market' && Math.hypot(st.x - plot.x, st.z - plot.z) < 40);
+    // (his shop and his shed, that is: the bunkhouse along the yard is nobody's)
+    const his = plot.type !== 'hut' && this.world.sites.some((st) => st.kind === 'market' && Math.hypot(st.x - plot.x, st.z - plot.z) < 40);
     stock(bp.furniture, his ? [] : bp.loot, 0);
     if (bp.upper) stock(bp.upper.furniture, bp.upper.loot, h + SLAB);
 
@@ -1479,7 +1646,8 @@ export class Buildings {
     }
   }
 
-  doorSpecs: { m: THREE.Matrix4; w: number; h: number; id: string; open: boolean; swing: number }[] = [];
+  /** (`leaf`: it is a container's leaf, of the orange one (0) or the blue (1), and not a door of boards) */
+  doorSpecs: { m: THREE.Matrix4; w: number; h: number; id: string; open: boolean; swing: number; leaf?: number }[] = [];
   /** sign boards to hang (police station): world matrix of the board's centre, facing +z */
   private signs: { m: THREE.Matrix4; text: string; sub: string; board?: string; ink?: string }[] = [];
 
@@ -1572,11 +1740,66 @@ export class Buildings {
     const doorMat = this.material('planks') as THREE.MeshStandardMaterial;
     const handleMat = new THREE.MeshStandardMaterial({ color: 0x3a3a38, metalness: 0.9, roughness: 0.45 });
     this.atmo.register(handleMat);
+    // (a container's leaves: painted as the shell is, once that has come; not drawn from further off than the shell)
+    const leaves: THREE.Mesh[] = [];
+    const leafGeo = [containerLeaf(false), containerLeaf(true)];
+    const hang = (blue: number) => {
+      const mesh = new THREE.Mesh(leafGeo[blue], handleMat);
+      mesh.castShadow = mesh.receiveShadow = true;
+      leaves.push(mesh);
+      const lod = new THREE.LOD();
+      lod.addLevel(mesh, 0);
+      lod.addLevel(new THREE.Object3D(), 345);
+      return lod;
+    };
     for (const s of this.doorSpecs) {
-      const d = new Door(s.m, s.w, s.h, doorMat, handleMat, s.id);
+      const d = new Door(s.m, s.w, s.h, doorMat, handleMat, s.id, s.leaf === undefined ? undefined : { mesh: hang(s.leaf), surface: 'metal' });
       if (s.open) d.setOpen(true, s.swing);
       scene.add(d.pivot);
       this.doors.push(d);
+    }
+    if (leaves.length) {
+      void assets.model(CONTAINER.id).then((model) => {
+        let src: THREE.Material | undefined;
+        model.traverse((o) => {
+          const m = o as THREE.Mesh;
+          if (m.isMesh) src = m.material as THREE.Material;
+        });
+        if (!src) return;
+        const paint = src.clone();
+        this.atmo.register(paint);
+        for (const l of leaves) l.material = paint;
+      });
+    }
+    // the outsides that are models: each a copy of its model, painted as the walls are (in the weather, and before what grows)
+    const painted = new Map<THREE.Material, THREE.Material>();
+    for (const sh of this.shells) {
+      void assets.model(sh.model).then((src) => {
+        const obj = src.clone();
+        obj.applyMatrix4(sh.m);
+        obj.traverse((o) => {
+          const m = o as THREE.Mesh;
+          if (!m.isMesh) return;
+          m.castShadow = m.receiveShadow = true;
+          m.renderOrder = WALLS_FIRST;
+          const was = m.material as THREE.Material;
+          if (!painted.has(was)) {
+            const mine = was.clone();
+            this.atmo.register(mine);
+            painted.set(was, mine);
+          }
+          m.material = painted.get(was)!;
+        });
+        scene.add(obj);
+      });
+    }
+    // what of a container stops a body and a shot: its floor, its roof, its two sides, and the plated half of each end
+    for (const it of this.containers) {
+      const m = containerMatrix(it), q = new THREE.Quaternion().setFromRotationMatrix(m);
+      const { hx, hz, h } = CONTAINER;
+      for (const [cx, cy, cz, bx, by, bz] of [[0, -0.04, 0, hx, 0.06, hz], [0, h - 0.01, 0, hx, 0.03, hz], [-hx + 0.015, h / 2, 0, 0.03, h / 2, hz], [hx - 0.015, h / 2, 0, 0.03, h / 2, hz], [hx / 2, h / 2, hz - 0.015, hx / 2, h / 2, 0.03], [-hx / 2, h / 2, -hz + 0.015, hx / 2, h / 2, 0.03]]) {
+        physics.addStaticQuat(physics.R.ColliderDesc.cuboid(bx, by, bz), 'metal', new THREE.Vector3(cx, cy, cz).applyMatrix4(m), q);
+      }
     }
   }
 
