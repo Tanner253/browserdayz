@@ -130,6 +130,8 @@ export interface Instance {
   scale: number;
   /** drawn only within this many metres (furniture indoors is invisible from across the map) */
   far?: number;
+  /** how whatever draws it lays it to the ground it stands on: nose up, roll (radians), and how high its middle is then */
+  lean?: [number, number, number];
 }
 
 /** Something big standing in the world that is neither a building to go into nor a prop off a shelf: a round thing of masonry or steel. */

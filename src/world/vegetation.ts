@@ -10,7 +10,7 @@ import { physics, type Surface } from '../core/physics';
 import { extractParts, groundParts, type MeshPart } from '../core/gltf-utils';
 import { antiFirefly, SHADOW_FRUSTA, type Atmosphere } from './atmosphere';
 import { foliagePatch, setLodFade, wind } from './foliage';
-import type { Instance, World } from './worldgen';
+import { heightAt, type Instance, type World } from './worldgen';
 import { BARREL } from '../sim/barrels';
 
 interface Level {
@@ -95,6 +95,22 @@ const UP = new THREE.Vector3(0, 1, 0);
  */
 const LAID_FLAT = new Set(['old_tyre']);
 const _onItsSide = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
+/**
+ * What stands on wheels lies to the ground under them. (Set down level on a slope a car had one end in the
+ * bank and a wheel at the other a foot in the air: four of the eleven that stand out of doors.)
+ */
+const ON_ITS_WHEELS = new Set(['covered_car']);
+const _lean = new THREE.Quaternion(), _leanE = new THREE.Euler();
+/** how a thing `hx` by `hz` (half its width and length, its own measure) lies on the ground at its four sides */
+function leanOn(world: World, it: Instance, hx: number, hz: number): [number, number, number] | undefined {
+  // (only what was put on the ground: a car on a floor stays as the floor is)
+  if (Math.abs(it.y - heightAt(world.heights, it.x, it.z)) > 0.05) return undefined;
+  const c = Math.cos(it.rot), s = Math.sin(it.rot);
+  const at = (lx: number, lz: number) => heightAt(world.heights, it.x + lx * c + lz * s, it.z - lx * s + lz * c);
+  const wx = hx * it.scale * 0.8, wz = hz * it.scale * 0.8;
+  const f = at(0, wz), b = at(0, -wz), l = at(-wx, 0), r = at(wx, 0);
+  return [-Math.atan2(f - b, 2 * wz), Math.atan2(r - l, 2 * wx), (f + b + l + r) / 4];
+}
 
 class LodSet {
   levels: Level[] = [];
@@ -127,8 +143,9 @@ class LodSet {
       this.far[i] = it.far ?? Infinity;
       _q.setFromAxisAngle(UP, it.rot);
       if (flat) _q.multiply(_onItsSide);
+      if (it.lean) _q.multiply(_lean.setFromEuler(_leanE.set(it.lean[0], 0, it.lean[1])));
       _s.setScalar(it.scale);
-      _p.set(it.x, it.y, it.z);
+      _p.set(it.x, it.lean ? it.lean[2] : it.y, it.z);
       _m.compose(_p, _q, _s);
       _m.toArray(this.matrices, i * 16);
       this.pos.set([it.x, it.y, it.z], i * 3);
@@ -668,6 +685,7 @@ export class Vegetation {
           const size = box.getSize(new THREE.Vector3());
           const isRock = id.startsWith('rock') || id.startsWith('boulder');
           const isFern = id.startsWith('fern') || id.startsWith('dry_branches');
+          if (ON_ITS_WHEELS.has(id)) for (const it of instances) it.lean = leanOn(this.world, it, size.x / 2, size.z / 2);
           const set = new LodSet(instances, { cullRadius: Math.max(size.x, size.y, size.z), shadowRadius: 20 }, kind);
           const mats = (parts: MeshPart[], fadeIn: [number, number] | null, fadeOut: [number, number] | null) =>
             parts.map((p) => {
