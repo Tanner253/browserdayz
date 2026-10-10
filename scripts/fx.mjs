@@ -9,6 +9,9 @@
 //   public/assets/fx/muzzle_side.webp    five tiles in a row, the flame running to the right,
 //                                        its muzzle 0.22 of the way along each tile
 //   public/assets/fx/muzzle_front.webp   six by three tiles
+//   public/assets/fx/smoke.webp          two by two tiles: three puffs of smoke out of the same pack, and a
+//                                        plain soft dot (for what is not smoke: a spark, a chip, a drop).
+//                                        White is where it is, black where it is not (src/game/effects.ts)
 //
 // The sources are unpacked by hand into assets-src/kenney_particles/ and
 // assets-src/models/muzzle_flash_fx/. Run by scripts/fetch-assets.mjs (npm run assets).
@@ -21,6 +24,8 @@ import { creditOf } from './props.mjs';
 /** where along a side tile the muzzle is (see src/game/muzzle.ts, which must agree) */
 export const SIDE = { tiles: 5, px: 256, muzzle: 0.22 };
 export const FRONT = { cols: 6, rows: 3, px: 128 };
+/** the pack's own names for the three puffs that are used, and how big a tile of the sheet is */
+export const SMOKE = { puffs: ['smoke_01', 'smoke_04', 'smoke_07'], px: 256 };
 
 export async function buildFx({ SRC, OUT, exists }) {
   const kenney = path.join(SRC, 'kenney_particles', 'PNG (Black background)');
@@ -101,7 +106,19 @@ export async function buildFx({ SRC, OUT, exists }) {
     .webp({ quality: 92 })
     .toFile(path.join(out, 'muzzle_front.webp'));
 
-  const sizes = await Promise.all(['muzzle_side.webp', 'muzzle_front.webp'].map(async (f) => `${f} ${((await fs.stat(path.join(out, f))).size / 1024).toFixed(0)} KB`));
+  // ---- smoke
+  const puffs = [];
+  for (const name of SMOKE.puffs) puffs.push(await sharp(path.join(kenney, `${name}.png`)).removeAlpha().greyscale().resize(SMOKE.px, SMOKE.px).png().toBuffer());
+  // (the dot: all of it in the middle, nothing at the edge)
+  const dot = Buffer.alloc(SMOKE.px * SMOKE.px);
+  for (let y = 0; y < SMOKE.px; y++) for (let x = 0; x < SMOKE.px; x++) dot[y * SMOKE.px + x] = Math.round(255 * Math.max(0, 1 - Math.hypot(x - SMOKE.px / 2 + 0.5, y - SMOKE.px / 2 + 0.5) / (SMOKE.px / 2)) ** 1.6);
+  puffs.push(await sharp(dot, { raw: { width: SMOKE.px, height: SMOKE.px, channels: 1 } }).png().toBuffer());
+  await sharp({ create: { width: SMOKE.px * 2, height: SMOKE.px * 2, channels: 3, background: '#000' } })
+    .composite(puffs.map((input, i) => ({ input, left: (i % 2) * SMOKE.px, top: Math.floor(i / 2) * SMOKE.px })))
+    .webp({ quality: 90 })
+    .toFile(path.join(out, 'smoke.webp'));
+
+  const sizes = await Promise.all(['muzzle_side.webp', 'muzzle_front.webp', 'smoke.webp'].map(async (f) => `${f} ${((await fs.stat(path.join(out, f))).size / 1024).toFixed(0)} KB`));
   console.log(`fx    ${sizes.join(', ')}  (Kenney; maxi.ariani)`);
   return [{ id: 'muzzle_flash_fx', ...(await creditOf(flash)), changes: 'Only its picture is used: the eighteen frames are cut out of it and set in an even grid; the planes it came on and their animation are not. Re-encoded as WebP.' }];
 }

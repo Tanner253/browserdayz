@@ -106,8 +106,11 @@ const D: ItemDef[] = [
   {
     id: 'deagle', name: 'Desert Eagle', model: 'desert_eagle', w: 3, h: 2, weight: 2.0, category: 'weapon', slot: 'holster',
     desc: 'A .50 pistol the size of a brick. Seven rounds, a kick to match, and two of them end most arguments. Takes an extended magazine and nothing else.',
-    // (a .50 AE leaves at about 440 m/s and hits much harder than a 9 mm: two to the body, where a 9 mm takes three)
-    weapon: { kind: 'pistol', ammo: 'ammo_50', capacity: 7, ergo: 56, round: { muzzleVel: 440, drag: 0.0017, damage: 58, zero: 30 }, kick: 2.1, pace: 2.1 }, iconYaw: 0,
+    // (A .50 AE leaves at about 440 m/s. What a round does is its `damage` times how fast it is still going, and
+    // nothing as slow as a pistol's does all of it (see where a round lands in src/game/weapons.ts): at 58 this
+    // did 50 at the muzzle, and two to the body left a man standing with a sliver. At 82 it does 70: two to the
+    // body are the end of anybody not in plates, and of whoever wears the armoured vest, barely.)
+    weapon: { kind: 'pistol', ammo: 'ammo_50', capacity: 7, ergo: 56, round: { muzzleVel: 440, drag: 0.0017, damage: 82, zero: 30 }, kick: 2.1, pace: 2.1 }, iconYaw: 0,
   },
   {
     id: 'benelli', name: 'Benelli M3', model: 'benelli_m3', w: 8, h: 2, weight: 3.5, category: 'weapon', slot: 'long',

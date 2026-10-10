@@ -108,6 +108,11 @@ const dec = (n) => path.join(SRC, 'decoded', `${n}.wav`);
 const several = (name, files, o) => files.forEach((f, n) => (SOUNDS[`${name}${n ? `_${n + 1}` : ''}`] = { src: dec(f), ...o }));
 several('punch', [1, 2, 3, 4, 5].map((k) => `q-punch-${k}`), { rate: 32000, gain: 0.9 });
 several('blow', [0, 1, 2, 3, 4].map((k) => `k-impactPunch_heavy-${k}`), { rate: 32000, gain: 0.9 });
+// A door: wood meeting its frame as it shuts (Kenney's heavy blows on wood), and the latch as it is let go (his
+// light ones). There is no recording of a door among what was downloaded; these are the nearest things that are
+// real. (Decoded from Ogg by scripts/ogg.mjs.)
+several('door_close', ['k-impactWood_heavy-0', 'k-impactWood_heavy-2', 'k-impactWood_heavy-4'], { rate: 44100, gain: 0.9 });
+several('door_latch', ['k-impactWood_light-0', 'k-impactWood_light-2', 'k-impactWood_light-3'], { rate: 44100, gain: 0.7 });
 several('hit_metal', ['k-impactPlate_heavy-0', 'k-impactPlate_heavy-1', 'k-impactPlate_heavy-3', 'k-impactMetal_heavy-1', 'k-impactMetal_heavy-3', 'k-impactMetal_light-3'], { rate: 44100, gain: 0.9 });
 
 /** a .wav as one channel of numbers between -1 and 1: one of its channels, or all of them together */

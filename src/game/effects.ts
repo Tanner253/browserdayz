@@ -1,5 +1,6 @@
 // Impact / weapon effects: billboard particle pool (dust, debris, sparks, blood),
-// bullet-hole decals, muzzle flash light. Textures are generated procedurally.
+// bullet-hole decals, muzzle flash light. Smoke and dust are puffs out of Kenney's Particle Pack (see
+// scripts/fx.mjs); the rest of the textures are made here.
 
 import * as THREE from 'three';
 import { physics, SOLID_GROUPS, type Surface } from '../core/physics';
@@ -232,6 +233,10 @@ interface Particle {
   gravity: number;
   drag: number;
   additive: boolean;
+  /** which picture of the sheet it is drawn with (0 to 2 a puff of smoke, 3 a plain dot), how it is turned, and how fast it turns */
+  cell: number;
+  rot: number;
+  spin: number;
 }
 
 const SURF_DUST: Partial<Record<Surface | 'dirt' | 'gravel', number>> = {
@@ -245,6 +250,8 @@ export class Effects {
   private addMesh: THREE.InstancedMesh;
   private colorAttr: THREE.InstancedBufferAttribute;
   private addColorAttr: THREE.InstancedBufferAttribute;
+  private lookAttr: THREE.InstancedBufferAttribute;
+  private addLookAttr: THREE.InstancedBufferAttribute;
   private decals = new Map<HoleKind, { mesh: THREE.InstancedMesh; idx: number }>();
   private decalMats = new Map<HoleKind, THREE.Material>();
   private attached: THREE.Mesh[] = [];
@@ -265,34 +272,47 @@ export class Effects {
 
   constructor(scene: THREE.Scene, atmo: Atmosphere) {
     for (let i = 0; i < MAX_P; i++) {
-      this.particles.push({ alive: false, p: new THREE.Vector3(), v: new THREE.Vector3(), life: 0, max: 1, size: 1, grow: 0, color: new THREE.Color(), alpha: 1, gravity: 0, drag: 0, additive: false });
+      this.particles.push({ alive: false, p: new THREE.Vector3(), v: new THREE.Vector3(), life: 0, max: 1, size: 1, grow: 0, color: new THREE.Color(), alpha: 1, gravity: 0, drag: 0, additive: false, cell: 3, rot: 0, spin: 0 });
     }
     const quad = new THREE.PlaneGeometry(1, 1);
-    const smoke = smokeTexture();
+    // What everything is drawn with until the sheet of puffs has come (and for good, if it never does): the
+    // made-up blob. Then the sheet: two tiles by two, a particle's own tile, turned its own way.
+    const smoke = { value: smokeTexture() as THREE.Texture }, sheet = { value: 0 };
+    new THREE.TextureLoader().load('assets/fx/smoke.webp', (t) => {
+      t.colorSpace = THREE.NoColorSpace;
+      smoke.value = t;
+      sheet.value = 1;
+    }, undefined, () => {});
     const mk = (additive: boolean) => {
       const mat = new THREE.ShaderMaterial({
         // (smoke and dust have no light of their own: they are as bright as the hour. Flame and sparks are their own light.)
-        uniforms: { tMap: { value: smoke }, uLight: additive ? { value: 1 } : atmo.daylight },
+        uniforms: { tMap: smoke, uSheet: sheet, uLight: additive ? { value: 1 } : atmo.daylight },
         vertexShader: /* glsl */ `
           attribute vec4 iColor;
+          attribute vec2 iLook;
+          uniform float uSheet;
           varying vec4 vColor;
           varying vec2 vUv;
           void main() {
-            vUv = uv;
+            // (the sheet is laid out from its top; a picture is read from its foot)
+            vUv = mix(uv, (uv + vec2(mod(iLook.x, 2.0), 1.0 - floor(iLook.x * 0.5))) * 0.5, uSheet);
             vColor = iColor;
             vec3 c = instanceMatrix[3].xyz;
             float s = length(instanceMatrix[0].xyz);
             vec4 mv = viewMatrix * vec4(c, 1.0);
-            mv.xy += position.xy * s;
+            float co = cos(iLook.y), si = sin(iLook.y);
+            mv.xy += vec2(position.x * co - position.y * si, position.x * si + position.y * co) * s;
             gl_Position = projectionMatrix * mv;
           }`,
         fragmentShader: /* glsl */ `
           uniform sampler2D tMap;
           uniform float uLight;
+          uniform float uSheet;
           varying vec4 vColor;
           varying vec2 vUv;
           void main() {
-            float a = texture2D(tMap, vUv).a * vColor.a;
+            vec4 t = texture2D(tMap, vUv);
+            float a = mix(t.a, t.r, uSheet) * vColor.a;
             if (a < 0.01) discard;
             gl_FragColor = vec4(vColor.rgb * uLight, a);
           }`,
@@ -306,17 +326,22 @@ export class Effects {
       m.renderOrder = 5;
       const attr = new THREE.InstancedBufferAttribute(new Float32Array(MAX_P * 4), 4);
       attr.setUsage(THREE.DynamicDrawUsage);
+      const look = new THREE.InstancedBufferAttribute(new Float32Array(MAX_P * 2), 2);
+      look.setUsage(THREE.DynamicDrawUsage);
       m.geometry = quad.clone();
       m.geometry.setAttribute('iColor', attr);
+      m.geometry.setAttribute('iLook', look);
       scene.add(m);
-      return { m, attr };
+      return { m, attr, look };
     };
     const a = mk(false);
     const b = mk(true);
     this.mesh = a.m;
     this.colorAttr = a.attr;
+    this.lookAttr = a.look;
     this.addMesh = b.m;
     this.addColorAttr = b.attr;
+    this.addLookAttr = b.look;
 
     for (const kind of ['masonry', 'wood', 'metal', 'soil'] as HoleKind[]) {
       const dmat = new THREE.MeshStandardMaterial({
@@ -395,6 +420,12 @@ export class Effects {
     pt.gravity = o.gravity ?? 0;
     pt.drag = o.drag ?? 1;
     pt.additive = o.additive ?? false;
+    // What swells as it goes is smoke or dust, and is drawn as a puff, each its own and turned its own way; what
+    // does not (a spark, a chip of stone, a drop) is a dot. A light that swells (a flash) is a dot as well.
+    const puff = pt.grow > 0 && !pt.additive;
+    pt.cell = puff ? Math.floor(Math.random() * 3) : 3;
+    pt.rot = puff ? Math.random() * Math.PI * 2 : 0;
+    pt.spin = puff ? (Math.random() - 0.5) * 0.7 : 0;
   }
 
   /** attachTo: moving objects (doors) get their holes parented so they move with them */
@@ -781,6 +812,8 @@ export class Effects {
     let n = 0, na = 0;
     const ca = this.colorAttr.array as Float32Array;
     const cb = this.addColorAttr.array as Float32Array;
+    const la = this.lookAttr.array as Float32Array;
+    const lb = this.addLookAttr.array as Float32Array;
     for (const pt of this.particles) {
       if (!pt.alive) continue;
       pt.life -= dt;
@@ -798,15 +831,17 @@ export class Effects {
       if (pt.additive) {
         this.addMesh.setMatrixAt(na, this._m);
         cb[na * 4] = pt.color.r; cb[na * 4 + 1] = pt.color.g; cb[na * 4 + 2] = pt.color.b; cb[na * 4 + 3] = fade;
+        lb[na * 2] = pt.cell; lb[na * 2 + 1] = pt.rot + pt.spin * (pt.max - pt.life);
         na++;
       } else {
         this.mesh.setMatrixAt(n, this._m);
         ca[n * 4] = pt.color.r; ca[n * 4 + 1] = pt.color.g; ca[n * 4 + 2] = pt.color.b; ca[n * 4 + 3] = fade;
+        la[n * 2] = pt.cell; la[n * 2 + 1] = pt.rot + pt.spin * (pt.max - pt.life);
         n++;
       }
     }
     // upload only the live particles (nothing at all when none are alive)
-    const upload = (mesh: THREE.InstancedMesh, color: THREE.InstancedBufferAttribute, count: number) => {
+    const upload = (mesh: THREE.InstancedMesh, color: THREE.InstancedBufferAttribute, look: THREE.InstancedBufferAttribute, count: number) => {
       const was = mesh.count;
       mesh.count = count;
       if (!count && !was) return;
@@ -816,8 +851,11 @@ export class Effects {
       color.clearUpdateRanges();
       color.addUpdateRange(0, count * 4);
       color.needsUpdate = true;
+      look.clearUpdateRanges();
+      look.addUpdateRange(0, count * 2);
+      look.needsUpdate = true;
     };
-    upload(this.mesh, this.colorAttr, n);
-    upload(this.addMesh, this.addColorAttr, na);
+    upload(this.mesh, this.colorAttr, this.lookAttr, n);
+    upload(this.addMesh, this.addColorAttr, this.addLookAttr, na);
   }
 }
