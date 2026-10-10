@@ -1025,6 +1025,10 @@
 .mm-spot.k-gas span { color: #e4f07a; }
 .mm-tip { position: absolute; z-index: 3; width: max-content; max-width: 250px; padding: 8px 12px 10px; opacity: 0; pointer-events: none; background: rgba(8, 10, 9, 0.95); border: 1px solid var(--line); border-left: 2px solid var(--brand); transition: opacity 0.12s; }
 .mm-tip.on { opacity: 1; }
+/* (which step of the map the place is, in that step's colour; and under what is said of it, what is kept there) */
+.mm-tip i, .mm-said i { display: block; margin-top: 1px; font-style: normal; font-family: var(--mono); font-size: 11px; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; }
+.mm-tip em, .mm-said em { display: block; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line); font-style: normal; font-size: 14px; line-height: 1.3; color: var(--ink); }
+.mm-tip u, .mm-said u { text-decoration: none; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
 .mm-tip b { display: block; font-size: 15px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink); }
 .mm-tip span { display: block; margin-top: 2px; font-size: 14.5px; line-height: 1.3; color: var(--ink-dim); }
 .mm-said { display: none; }

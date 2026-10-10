@@ -3,7 +3,7 @@
 // `npx tsx test/expansion.test.ts`.
 
 import assert from 'node:assert/strict';
-import { BUNKER_AT, CELL, KAMENKA, NO_START, OUTLYING, PASS, TOWN, TRADE_AT, kamenkaQ, EXPANSION as E, PLAY_AREAS, PLAY_RADIUS, WORLD_RES, WORLD_SIZE, generateWorld, heightAt, inPlay, playOutline, slopeAt, BUILDING_FOOTPRINT } from '../src/world/worldgen';
+import { ARMY_CAMP, BUNKER_AT, CELL, KAMENKA, NO_START, OUTLYING, PASS, TOWN, TRADE_AT, kamenkaQ, EXPANSION as E, PLAY_AREAS, PLAY_RADIUS, WORLD_RES, WORLD_SIZE, generateWorld, heightAt, inPlay, playOutline, slopeAt, BUILDING_FOOTPRINT } from '../src/world/worldgen';
 import { buildWorldData } from '../server/world';
 import { GAS, gasDepth, gasZone } from '../src/sim/gas';
 import { INFECTED, openGround } from '../src/sim/infected';
@@ -33,7 +33,7 @@ const ok = (name: string, fn: () => void) => {
 // and the same four figures came off the map after.)
 // (The ground and the trees were counted again on 2026-10-09, from the same map, with the
 // bunker's hollow left out of the count as the works' is: taken before the bunker was dug.)
-const WAS = { cells: 196228, heights: 1576165764, buildings: 72, buildingsHash: 2448790248, lastId: 'tower_71', spawns: 2697513077, trees: 9671, treesHash: 312941347, lootPoints: 675, lootHash: 113905251, jeeps: 8, jeepsHash: 207674058, fires: 6 };
+const WAS = { cells: 191458, heights: 1415315074, buildings: 72, buildingsHash: 2448790248, lastId: 'tower_71', spawns: 2697513077, trees: 9494, treesHash: 1630127803, lootPoints: 675, lootHash: 113905251, jeeps: 8, jeepsHash: 207674058, fires: 6 };
 const hash = (parts: number[]) => {
   let h = 2166136261 >>> 0;
   for (const v of parts) {
@@ -72,6 +72,8 @@ const touched = (x: number, z: number) => {
   if (Math.hypot(x - E.x, z - E.z) < 160) return true;
   // (and the meadow the trading post was built in, later: 78 m round it)
   if (Math.hypot(x - TRADE_AT.x, z - TRADE_AT.z) < 78) return true;
+  // (and the clearing the army's camp was pitched in, 2026-10-11: 78 m round it, as round the trading post)
+  if (Math.hypot(x - ARMY_CAMP.x, z - ARMY_CAMP.z) < 78) return true;
   // (and where the long hut stands behind the depot's barracks: 24 m round it)
   if (Math.hypot(x - HUT_AT.x, z - HUT_AT.z) < 24) return true;
   // (and where one of each of the downloaded buildings was stood in the village, 2026-10-10: 24 m round each)
@@ -90,7 +92,7 @@ const inl = Math.hypot(camp.x - E.x, camp.z - E.z);
 const ux = (camp.x - E.x) / inl, uz = (camp.z - E.z) / inl;
 const works = world.sites.find((s) => s.kind === 'works')!;
 // (what was built with the works: not the trading post's two, which came later and stand in the old map's meadow)
-const added = world.buildings.slice(WAS.buildings).filter((b) => !['hut', 'townhouse', 'shanty'].includes(b.type) && Math.hypot(b.x - TRADE_AT.x, b.z - TRADE_AT.z) > 78 && inOld(b.x, b.z));
+const added = world.buildings.slice(WAS.buildings).filter((b) => !['hut', 'townhouse', 'shanty', 'tent'].includes(b.type) && Math.hypot(b.x - TRADE_AT.x, b.z - TRADE_AT.z) > 78 && Math.hypot(b.x - ARMY_CAMP.x, b.z - ARMY_CAMP.z) > 78 && inOld(b.x, b.z));
 
 // To take the old map's figures again after fencing off more ground (do it BEFORE building there): FIGURES=1 npx tsx test/expansion.test.ts
 if (process.env.FIGURES) {
@@ -124,7 +126,8 @@ ok('the map as it was is still exactly there: its ground, its buildings, its sta
   assert.equal(data.jeeps.length, WAS.jeeps);
   assert.equal(hash(data.jeeps.flatMap((j: { x: number; z: number }) => [j.x, j.z])), WAS.jeepsHash);
   // (the old six, and one each at the three places built in the east country)
-  assert.equal(data.fires.length, WAS.fires + 3);
+  // (and one where the lane crosses in the army's camp)
+  assert.equal(data.fires.length, WAS.fires + 4);
 });
 
 ok('it lies outside the ring the map used to end at, inside the ground there is, and the two are one place to play in', () => {

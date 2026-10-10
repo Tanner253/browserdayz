@@ -223,6 +223,28 @@ export const LOCAL_MODELS = {
     tags: ['prop'],
     changes: 'Stood on the ground about its own middle; the boards its windows and its door were painted on taken out (ten windows and a door: 22 triangles); its texture re-encoded as WebP at 2048; geometry compressed.',
   },
+  // The army's tent (2026-10-11): gone into, like a building (see `tent` in src/world/buildings.ts). Its guy ropes
+  // and their pegs are taken off: what stops a body in a building that is all a model is the model's own
+  // triangles, and a rope nobody sees until they have walked into it is a wall. Its cloth lies within 3 m of its
+  // middle line and ends 4.4 m toward its door; the pegs stand 5.5 m out.
+  tent_military: {
+    dir: 'tent_military',
+    cut: { tall: 4.001, keep: (x, _y, z) => Math.abs(x) < 3.4 && z < 4.4 },
+    scale: 1,
+    tex: 2048,
+    both: true,
+    tags: ['prop'],
+    changes: 'Its guy ropes and pegs taken off; stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.',
+  },
+  // The K6-3 (2026-10-11): the heaviest helmet there is, its visor up. Its brow is toward -z as it comes, which is
+  // the way a body faces. It came a hundred units wide: at this it is 29 cm, a size over the combat helmet.
+  helmet_k63: {
+    dir: 'helmet_k63',
+    scale: 0.00279,
+    tex: 1024,
+    tags: ['loot', 'gear'],
+    changes: 'Scaled to a head and stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.',
+  },
   // Armour for the body, lightest to heaviest (the tiers are in src/sim/items.ts): three vests out of one pack, and
   // the collared vest out of another. And containers and a crate, a piece at a time.
   vest_t0: {

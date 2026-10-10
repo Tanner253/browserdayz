@@ -24,7 +24,7 @@ export const CALL = { eta: 45, every: 300, /** metres in front of the caller it 
 export const CRASH = { every: 900, first: 300, life: 600, label: 'Helicopter Cargo', /** metres from the cargo to the middle of the wreck */ beside: 4.6 };
 
 /** one of these is in every wreck's cargo: the things the gas is gone into for */
-const CRASH_SURE = ['boonie_hat', 'life_vest', 'pu_scope', 'deagle'];
+const CRASH_SURE = ['boonie_hat', 'life_vest', 'pu_scope', 'mosin'];
 
 /**
  * What a wreck's cargo holds: little, and all of it of the fourth tier, the things kept under the gas (the

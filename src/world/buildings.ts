@@ -11,11 +11,12 @@ import { physics, AJAR_GROUPS, BODY_QUERY, GLASS_GROUPS, WORLD_GROUPS, type Surf
 import { RNG } from '../core/noise';
 import type { Atmosphere } from './atmosphere';
 import { GAS, gasDepth, gasZone } from '../sim/gas';
+import type { Tier } from '../sim/tiers';
 import { BUILDING_FOOTPRINT, CELL, TOWN, WORLD_RES, WORLD_SIZE, bunkerPlace, heightAt, idx, type BuildingPlot, type Instance, type SiteKind, type World } from './worldgen';
 import { bunkerAt, bunkerPlan, levelY } from '../sim/bunker';
 
 /** (`Gas` is not a kind of building: it is whatever stands under the gas, whatever else it is. See src/sim/gas.ts.) */
-export type Usage = 'Village' | 'Town' | 'Farm' | 'Industrial' | 'Military' | 'Hunting' | 'Medic' | 'Police' | 'Gas' | 'Bunker' | 'East';
+export type Usage = 'Village' | 'Town' | 'Farm' | 'Industrial' | 'Military' | 'Hunting' | 'Medic' | 'Police' | 'Shop' | 'Gas' | 'Bunker' | 'East';
 
 export interface LootPoint {
   x: number;
@@ -25,6 +26,8 @@ export interface LootPoint {
   building: string;
   /** on the floor (room for long items) rather than on furniture */
   floor: boolean;
+  /** which step of the map it is on, 1 (the outskirts) to 5 (the bunker): see src/sim/tiers.ts. Said once every place has been made. */
+  tier?: Tier;
   /**
    * kept stocked with something to fight with (see Economy), never left empty for long:
    * a firearm where firearms were kept (police, guard posts), any weapon elsewhere
@@ -326,6 +329,28 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
         ],
         usage: ['Hunting', 'Village', 'Industrial'],
       };
+    case 'tent':
+      // The army's tent (a download: `tent_military`), all of it the model's: canvas on a frame, one room, six
+      // windows, and its doorway in the end that is this building's front. It has no floor but the ground. Cots
+      // down one side, a table and the cases down the other. (Its walls lean in: nothing stands within half a
+      // metre of them.)
+      return {
+        w: 6.3, d: 8.5, h: 2.2, ext: 'planks_ext', int: 'planks', floor: 'floor_wood', roof: 'roof_iron', roofType: 'flat',
+        whole: { model: 'tent_military', lift: 0, surface: 'cloth', floors: [], doors: [] },
+        walls: [],
+        furniture: [
+          { id: 'old_bed_frame', x: -1.55, z: -2.9, rot: 0 },
+          { id: 'old_bed_frame', x: -1.55, z: -0.5, rot: 0 },
+          { id: 'old_bed_frame', x: 1.55, z: -2.9, rot: 0 },
+          { id: 'WoodenTable_01', x: 1.75, z: 0.3, rot: Math.PI / 2 },
+          { id: 'weapons_case', x: 1.5, z: 2.2, rot: 0.25 },
+        ],
+        loot: [
+          [-1.55, 0.5, -2.9], [-1.55, 0.5, -0.5], [1.55, 0.5, -2.9], [1.75, 0.57, 0.0], [1.75, 0.57, 0.6],
+          [0, 0.02, -3.3], [-1.5, 0.02, 1.6], [0.1, 0.02, 0.4],
+        ],
+        usage: ['Military'],
+      };
     case 'hut': {
       // The long hut: a room of beds, and at the end the door is in, a lobby with a store room off it under the
       // one small high window. The openings are the model's own, to the millimetre (see `old_barrack` in
@@ -532,7 +557,8 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
           [1.0, 0.14, -3.03], [1.0, 0.74, -3.03], [2.3, 0.74, -3.03], [2.3, 1.34, -3.03],
           [-3.0, 0.02, 1.8], [0.6, 0.02, 2.3], [3.5, 0.02, -2.2], [-3.0, 0.02, -2.3],
         ],
-        usage: ['Town', 'Village'],
+        // (a shop is its own kind of place as well: food, drink and dressings are kept here before anywhere)
+        usage: ['Shop', 'Town', 'Village'],
       };
     case 'barracks':
       // One long room of beds with a table to eat at, and at the end of it, behind a door, the
@@ -974,6 +1000,15 @@ export class Buildings {
     for (const p of this.lootPoints) if (gasDepth(gas, p.x, p.y, p.z) > GAS.breathe) p.usage = [...p.usage, 'Gas'];
     // and what is kept in Kamenka, the town in the east, is marked so too: it is stocked on its own (see `east` in the economy)
     for (const p of this.lootPoints) if (Math.hypot(p.x - TOWN.x, p.z - TOWN.z) < TOWN.stocked) p.usage = [...p.usage, 'East'];
+    // And every place for a thing is told which step of the map it is on (src/sim/tiers.ts): the economy keeps each
+    // sort of thing on the steps it belongs to. The second step is the village, the checkpoint, and the army's and
+    // the trader's places; whatever is none of those, nor in Kamenka, nor under the gas, is the outskirts.
+    const second = [
+      { x: this.world.pois[0].x, z: this.world.pois[0].z, r: 125 },
+      ...this.world.pois.filter((q) => /checkpoint/i.test(q.name)).map((q) => ({ x: q.x, z: q.z, r: 70 })),
+      ...this.world.sites.filter((st) => st.kind === 'depot' || st.kind === 'market' || st.kind === 'tents').map((st) => ({ x: st.x, z: st.z, r: 60 })),
+    ];
+    for (const p of this.lootPoints) p.tier = p.usage.includes('Gas') ? 4 : p.usage.includes('East') ? 3 : second.some((q) => Math.hypot(p.x - q.x, p.z - q.z) < q.r) ? 2 : 1;
     // The bunker: what stands in its rooms, and its places for things. After every other, so
     // that none of those is renumbered. Its places are of no kind of building: only what is
     // said to be kept in the bunker lies there.
@@ -984,7 +1019,7 @@ export class Buildings {
         const [x, wy, z] = bunkerAt(at, r, f, y);
         // (on the floor a thing lies a finger over it, as everywhere; on a table or a shelf it lies ON it: that
         // finger, and a mess table whose top was taken to be a metre up, had things hanging in the air over them)
-        this.lootPoints.push({ x, y: wy + (floor ? 0.02 : 0.003), z, usage: ['Bunker'], building: 'bunker', floor, ...(surf ? { surf } : {}) });
+        this.lootPoints.push({ x, y: wy + (floor ? 0.02 : 0.003), z, usage: ['Bunker'], building: 'bunker', floor, tier: 5, ...(surf ? { surf } : {}) });
       };
       for (const st of plan.stood) {
         const [x, y, z] = bunkerAt(at, st.r, st.f, Y + (st.y ?? 0));
@@ -1096,6 +1131,8 @@ export class Buildings {
         ['utility_box_01', -25, 24], ['utility_box_01', 25.5, 15], ['metal_trash_can@1', 24.5, -8], ['trashbag', 25.6, -9.2], ['old_tyre', -17, 33], ['old_tyre', 16, 20], ['old_tyre', -14, -26],
       ],
       bunker: [],
+      // the army's camp: a fire where the lane crosses, cases and drums about it, blocks across the way in past the tower
+      tents: [['stone_fire_pit', 0, 0], ['weapons_case', 2.4, -1.6], ['wooden_military_crate', -2.6, 1.4], ['old_military_crate@0', 2.2, 14.5], ['Barrel_01', -3.2, -14], ['barrel_03', -4.1, -13.1], ['crate_big', 3.4, -15], ['concrete_road_barrier', -5, 31], ['concrete_road_barrier', 0, 32], ['concrete_road_barrier', 5, 31], ['old_tyre', -4, 13], ['dry_branches_medium_01', 4.5, 3]],
       // Kamenka: cars left in the street, what a shop and a workshop put out, the way out of town shut with blocks,
       // and two containers in the yard behind the workshop
       town: [
@@ -1541,7 +1578,7 @@ export class Buildings {
     if (plot.arms) {
       const mine = this.lootPoints.slice(firstPoint);
       const pick = [...mine.filter((p) => p.floor), ...mine.filter((p) => !p.floor)].slice(0, plot.arms);
-      for (const p of pick) p.arms = plot.type === 'police' || plot.type === 'guardpost' || plot.type === 'barracks' ? 'guns' : 'any';
+      for (const p of pick) p.arms = plot.type === 'police' || plot.type === 'guardpost' || plot.type === 'barracks' || plot.type === 'tent' ? 'guns' : 'any';
     }
 
     // yard clutter

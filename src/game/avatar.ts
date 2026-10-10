@@ -66,12 +66,15 @@ export const SIT = { drop: 0.4, legs: 0.92 };
  */
 export const GEAR: Record<string, { bone: 'Head' | 'spine_03'; p: [number, number, number]; r: [number, number, number]; s: [number, number, number]; pack?: boolean }> = {
   // (the one backpack at two sizes: its straps are toward the body as its model comes, so it is not turned)
-  sack_pack: { bone: 'spine_03', p: [0, 1.02, 0.185], r: [0.05, 0, 0], s: [1, 1, 1], pack: true },
+  // (the day pack is the camping pack made small: higher on the back, and nearer it)
+  sack_pack: { bone: 'spine_03', p: [0, 1.0, 0.165], r: [0.05, 0, 0], s: [1, 1, 1], pack: true },
   camping_pack: { bone: 'spine_03', p: [0, 0.9, 0.2], r: [0.05, 0, 0], s: [1, 1, 1], pack: true },
   suitcase: { bone: 'spine_03', p: [0, 0.87, 0.215], r: [0.05, 0, 0], s: [1, 1, 1], pack: true },
   // (the hood of it alone: see `facepiece`. As its model lies, the crown is toward -x and the eyepieces look along +z)
   // (the helmet: its brow is toward +x as its model stands, so it is turned a quarter round)
   boonie_hat: { bone: 'Head', p: [0, 1.593, 0.035], r: [0, Math.PI / 2, 0], s: [1, 1, 1] },
+  // (the K6-3: its brow is toward -z as its model stands, the way a body faces. It comes down over the ears and the nape.)
+  helmet_k63: { bone: 'Head', p: [0, 1.55, -0.01], r: [0, 0, 0], s: [1, 1, 1] },
   // (vests that are things of their own, hung on the chest: the plate carrier is not one of these, it is part of the suit)
   // (Fitted by measure, 2026-10-10: rays cast at the body and at each vest from front and from behind at eleven
   // heights, and the size, lean and place found that leave a finger or two of air on both sides and no more. As

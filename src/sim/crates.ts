@@ -8,20 +8,22 @@ import type { Container } from './inventory';
 
 type Table = [id: string, weight: number][];
 
+// (By the steps of the map, 2026-10-11. One of the army's cases is of the second step wherever it stands: pistols
+// and what they fire, the army's kit; now and then something of the third, an armoured vest or a helmet; and a
+// gas mask, if you are lucky. No rifle, no scope, no plates: those are under the gas. A wooden crate is of the
+// first: food, tools, something to hit with, and no gun.)
 const MILITARY: Table = [
-  ['box_762', 3], ['box_9mm', 3], ['ammo_762', 2], ['ammo_9mm', 2], ['bandage', 2], ['firstaid', 1], ['stim', 0.8],
-  ['condensed', 1.5], ['thermos', 1], ['binoculars', 0.5], ['gasmask', 0.5], ['grenade', 0.9], ['compass', 0.5],
-  ['mag_p38_ext', 0.5], ['pu_scope', 0.1], ['rifle_wrap', 0.4], ['suppressor_9', 0.25], ['life_vest', 0.2],
-  // (the service pistol was in no crate at all, and the other one was in this table twice)
-  ['mosin', 0.9], ['p38', 0.9], ['m9', 0.9], ['machete', 0.4], ['rubber_boots', 0.3], ['work_gloves', 0.3], ['suitcase', 0.3],
-  ['flask', 0.8], ['gun_light', 0.25], ['mag_m9_ext', 0.2], ['flashlight', 0.5],
+  ['box_9mm', 3], ['ammo_9mm', 2.5], ['ammo_762', 1.2], ['bandage', 2], ['firstaid', 1], ['stim', 0.9],
+  ['condensed', 1.5], ['thermos', 1], ['flask', 0.9], ['binoculars', 0.5], ['compass', 0.5], ['grenade', 0.6],
+  ['p38', 1], ['m9', 1], ['mag_p38_ext', 0.5], ['mag_m9_ext', 0.3], ['suppressor_9', 0.25], ['gun_light', 0.3],
+  ['soft_vest', 0.6], ['patrol_cap', 0.6], ['rubber_boots', 0.4], ['work_gloves', 0.4], ['flashlight', 0.5], ['jerrycan', 0.4],
+  ['armor_vest', 0.22], ['boonie_hat', 0.2], ['gasmask', 0.3],
 ];
 const CIVILIAN: Table = [
-  ['beans', 2], ['sardines', 2], ['sprats', 2], ['tomatoes', 1.5], ['apple', 1.5], ['milk', 1], ['thermos', 0.6],
-  ['bandage', 1.5], ['cigarettes', 1.2], ['box_9mm', 0.4], ['ammo_9mm', 0.5],
-  ['knife', 0.8], ['work_gloves', 0.8], ['boonie_hat', 0.12], ['sack_pack', 0.8], ['rubber_boots', 0.5],
-  ['hatchet', 0.8], ['bat', 0.7], ['crowbar', 0.7], ['machete', 0.5], ['p38', 0.8], ['m9', 0.6], ['mosin', 0.45], ['ammo_762', 0.5],
-  ['water_jug', 0.8], ['flask', 0.5], ['flashlight', 0.7],
+  ['beans', 2], ['sardines', 2], ['sprats', 2], ['tomatoes', 1.5], ['apple', 1.5], ['milk', 1], ['thermos', 0.6], ['water_jug', 0.9], ['flask', 0.5],
+  ['bandage', 1.2], ['splint', 0.6], ['cigarettes', 1.2], ['ammo_9mm', 0.6], ['ammo_762', 0.3],
+  ['knife', 0.9], ['hatchet', 0.9], ['bat', 0.8], ['crowbar', 0.8], ['machete', 0.6],
+  ['garden_gloves', 0.8], ['fishermans_hat', 0.6], ['sack_pack', 0.8], ['chest_rig', 0.5], ['flashlight', 1], ['compass', 0.3], ['jerrycan', 0.4],
 ];
 
 /** what is in any crate that stands under the gas, whatever sort of crate it is: the best of everything */
@@ -29,19 +31,19 @@ export const UNDER_GAS: Table = [
   ['box_762', 3], ['box_9mm', 3], ['ammo_762', 1.5], ['ammo_9mm', 1.5], ['mosin', 1.4], ['m9', 1.4], ['p38', 1],
   ['boonie_hat', 2], ['life_vest', 2], ['pu_scope', 1.6], ['grenade', 1.5], ['firstaid', 1.5], ['bandage', 1.5], ['stim', 1.2],
   ['suppressor_9', 0.8], ['mag_p38_ext', 0.8], ['rifle_wrap', 0.6], ['binoculars', 0.4], ['condensed', 0.8], ['thermos', 0.8], ['suitcase', 0.4],
-  ['deagle', 0.8], ['ammo_50', 1.2], ['red_dot', 0.6], ['gun_light', 0.6], ['suppressor_762', 0.4], ['mag_m9_ext', 0.4], ['mag_deagle_ext', 0.3], ['flask', 0.5], ['keycard', 0.5],
+  ['red_dot', 0.6], ['gun_light', 0.6], ['suppressor_762', 0.5], ['mag_m9_ext', 0.4], ['flask', 0.5], ['keycard', 0.5],
 ];
 
 /**
  * What is in whatever is searched down the bunker: the fourth and (for now) the best of the
- * places things are kept. The shotgun and all that goes with it is here and nowhere else; the
- * Desert Eagle is the gas's own and is not.
+ * places things are kept. The shotgun, the Desert Eagle and all that goes with them, the heavy
+ * armour and the K6-3 helmet are here and nowhere else.
  */
 const IN_BUNKER: Table = [
   ['benelli', 1.5], ['ammo_12', 3.2], ['box_12', 2.2], ['suppressor_12', 0.9], ['red_dot', 1.1], ['gun_light', 1.1],
   ['mosin', 1.1], ['pu_scope', 1.5], ['suppressor_762', 0.9], ['box_762', 2.2], ['ammo_762', 1.2],
-  ['m9', 0.9], ['mag_m9_ext', 0.7], ['suppressor_9', 0.7], ['box_9mm', 1.8], ['ammo_50', 1.2], ['box_50', 0.6],
-  ['grenade', 1.8], ['boonie_hat', 1.8], ['life_vest', 1.8], ['heavy_armor', 0.5], ['firstaid', 2.2], ['bandage', 2.2], ['stim', 1.5], ['splint', 0.8],
+  ['m9', 0.9], ['mag_m9_ext', 0.7], ['suppressor_9', 0.7], ['box_9mm', 1.8], ['deagle', 1.2], ['ammo_50', 2], ['box_50', 1], ['mag_deagle_ext', 0.6],
+  ['grenade', 1.8], ['boonie_hat', 1.8], ['life_vest', 1.8], ['heavy_armor', 0.5], ['helmet_k63', 0.35], ['suitcase', 0.7], ['firstaid', 2.2], ['bandage', 2.2], ['stim', 1.5], ['splint', 0.8],
   ['flashlight', 0.9], ['flask', 0.9], ['condensed', 0.8], ['thermos', 0.6], ['water_jug', 0.7], ['beans', 0.7], ['sardines', 0.6],
 ];
 /** and on its racks, the long things */

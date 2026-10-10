@@ -198,14 +198,15 @@ ok('the gas is the richest place on the map; helmets, plates and scopes are of i
       assert.ok(g(id) > o(id) * 2);
     }
     // and everything else is to be had there: guns, a lot to fire from them, something for a wound, grenades
-    assert.ok(g('mosin') + g('p38') + g('m9') + g('deagle') >= 14, 'few guns under the gas');
+    assert.ok(g('mosin') + g('p38') + g('m9') >= 14 && g('mosin') >= 8, 'few guns under the gas');
     assert.ok(g('box_762') + g('box_9mm') + g('ammo_762') + g('ammo_9mm') + g('box_50') + g('ammo_50') >= 24, 'little ammunition under the gas');
     assert.ok(g('firstaid') + g('bandage') >= 6 && g('grenade') >= 4);
-    // the Desert Eagle and what it fires are of the gas and nowhere else
-    assert.ok(g('deagle') >= 2 && g('ammo_50') + g('box_50') >= 6, 'no Desert Eagle, or nothing for it, under the gas');
-    for (const id of ['deagle', 'ammo_50', 'box_50', 'mag_deagle_ext', 'suppressor_762']) assert.equal(o(id), 0, `${id} outside the gas`);
-    // the rest of the map holds what it held before the works were built
-    assert.ok(o('mosin') >= 16 && o('ammo_9mm') >= 44 && o('bandage') >= 18, 'the rest of the map has gone short');
+    // the Desert Eagle and what it fires are of the bunker and nowhere else (they were the gas's own until 2026-10-11)
+    assert.ok(b('deagle') >= 2 && b('ammo_50') + b('box_50') >= 6, 'no Desert Eagle, or nothing for it, in the bunker');
+    for (const id of ['deagle', 'ammo_50', 'box_50', 'mag_deagle_ext']) assert.equal(g(id) + o(id) + t(id), 0, `${id} outside the bunker`);
+    assert.equal(o('suppressor_762'), 0);
+    // the rest of the map: pistols and what they fire, something for a wound, and no rifle (see test/loot.test.ts)
+    assert.ok(o('mosin') === 0 && o('p38') + o('m9') >= 24 && o('ammo_9mm') >= 36 && o('bandage') >= 22, 'the rest of the map has gone short');
     assert.equal(g('gasmask'), 0);
   }
   // what is taken under the gas is put back, and soon; a scope taken from the rest of the map is not back so soon
@@ -238,7 +239,7 @@ ok('the gas is the richest place on the map; helmets, plates and scopes are of i
     fillCrash({ add: (it: { id: string }) => (got.push(it.id), it) } as never, rnd);
     assert.ok(got.length >= 4 && got.length <= 5, `a helicopter's cargo of ${got.length} things`);
     assert.ok(got.every((id) => kept.has(id)) && new Set(got).size === got.length, 'something in a helicopter that is not kept under the gas, or the same thing twice');
-    assert.ok(got.some((id) => ['boonie_hat', 'life_vest', 'pu_scope', 'deagle'].includes(id)), 'a helicopter with nothing in it worth the walk');
+    assert.ok(got.some((id) => ['boonie_hat', 'life_vest', 'pu_scope', 'mosin'].includes(id)), 'a helicopter with nothing in it worth the walk');
   }
 });
 

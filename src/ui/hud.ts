@@ -6,6 +6,7 @@ import { mountUpdates } from './updates';
 import { MAX_STAMINA, type ChatChannel } from '../net/protocol';
 import { TOUCH } from '../core/device';
 import { EMOTES } from '../sim/emotes';
+import { TIERS, type Tier } from '../sim/tiers';
 import { TAG_FRESH, TAG_HOLD_MIN } from '../sim/items';
 import { INFECTED } from '../sim/infected';
 import { GAS } from '../sim/gas';
@@ -34,6 +35,9 @@ export interface MenuSpot {
   kind: 'town' | 'police' | 'clinic' | 'shop' | 'trader' | 'army' | 'site' | 'gas' | 'spawn' | 'well';
   /** its name is always shown, not only when pointed at */
   label?: boolean;
+  /** which step of the map it is (src/sim/tiers.ts), and what is to be had there */
+  tier?: Tier;
+  finds?: string;
 }
 
 export interface HotbarEntry {
@@ -598,7 +602,9 @@ export class HUD {
       map.querySelectorAll('.mm-spot.on').forEach((o) => o.classList.remove('on'));
       if (!sp || !el) return;
       el.classList.add('on');
-      tip.innerHTML = said.innerHTML = `<b>${sp.name}</b><span>${sp.tip}</span>`;
+      // (its step of the map in that step's own colour, and what is kept there)
+      const step = sp.tier ? `<i style="color:${TIERS[sp.tier].colour}">${TIERS[sp.tier].name}</i>` : '';
+      tip.innerHTML = said.innerHTML = `<b>${sp.name}</b>${step}<span>${sp.tip}</span>${sp.finds ? `<em><u style="color:${sp.tier ? TIERS[sp.tier].colour : 'inherit'}">Here:</u> ${sp.finds}</em>` : ''}`;
       // beside the mark, on whichever side of it has the room
       const x = parseFloat(el.style.left), y = parseFloat(el.style.top);
       tip.style.left = x < 55 ? `calc(${x}% + 16px)` : 'auto';

@@ -57,7 +57,8 @@ ok('a splint sets it and so does a first aid kit; there are splints to be found,
   assert.ok(!ITEMS.bandage.use?.splint, 'the injector sets a leg');
   assert.ok(ITEMS.splint.use!.time >= 3 && ITEMS.splint.use!.time <= 8);
   assert.ok(TYPES.splint, 'splints are in no building');
-  assert.ok(TYPES.splint.nominal > TYPES.firstaid.nominal);
+  const all = (id: string) => TYPES[id].at.reduce((a, b) => a + b, 0);
+  assert.ok(all('splint') > all('firstaid'));
   assert.ok(TYPES.splint.usage.includes('Medic'));
 });
 

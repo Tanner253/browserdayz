@@ -44,6 +44,7 @@ import { Minimap } from '../ui/minimap';
 import { CALL, CRASH, DROP, describeSpot, fillCrash, fillDrop, pickDropSite, type DropInfo } from '../sim/drops';
 import { WELL, stage, wellSpots, type Well } from '../sim/wells';
 import { Voice } from './voice';
+import { TIERS, type Tier } from '../sim/tiers';
 import { renderDoll, renderIcons } from '../ui/icons';
 import { Perf } from '../core/perf';
 import { loadGraphics, type Graphics } from '../core/settings';
@@ -559,36 +560,40 @@ export class Game {
     {
       const town = world.pois[0];
       const spots: MenuSpot[] = world.spawns.map((sp) => ({ x: sp.x, z: sp.z, name: 'A start', tip: 'New survivors drop in out here on the edge, with bare hands. The nearest marked place always has a weapon.', kind: 'spawn' as const }));
-      const SITE: Record<SiteKind, [string, string]> = {
-        lodge: ['a lodge', 'A cabin and a shed, with a fire ring to rest by. A weapon is always left here.'],
-        farm: ['a farm', 'A house, a barn and a shed. A weapon is always left here.'],
-        post: ['a ranger post', 'A guard post and a shed: a gun is kept here, and the army left its cases.'],
-        yard: ['a yard', 'A barn, sheds and a workshop: tools, fuel, crates. A weapon is always left here.'],
-        dacha: ['a dacha', 'A brick house and a shed. A weapon is always left here.'],
-        hamlet: ['a hamlet', 'A shop between houses, a barn behind, a fire ring to rest by.'],
-        depot: ['an army depot', 'A barracks, a workshop and a watchtower: rifles and kit.'],
-        market: ['the trading post', 'A trader behind the counter: he buys what you bring, sells supplies, and has paid work every day.'],
-        works: ['', ''],
-        bunker: ['', ''],
-        town: ['a town', 'Brick houses two floors high down both sides of the road, plank houses, a police station, a clinic, a shop. Better stocked than the village: guns, ammunition, and armoured vests are kept here. Out of the valley by the paved road, and inside the Zona.'],
-        squat: ['a squat', 'A plank house on piles, three floors of it, far out in the south country. Outside the Zona: tags are not earned here.'],
-        camp: ['a camp', 'Two long huts and two containers in the north woods. Outside the Zona: tags are not earned here.'],
+      // (what is said of each kind of place, and which step of the map it is: see src/sim/tiers.ts. What is to be
+      // had at a step is said under it, unless the place has more to say for itself.)
+      const SITE: Record<SiteKind, [string, Tier, string?]> = {
+        lodge: ['A cabin and a shed, with a fire ring to rest by. Something to fight with is always left here.', 1],
+        farm: ['A house, a barn and a shed. Something to fight with is always left here.', 1],
+        post: ['A guard post and a shed. Something to fight with is always left here, and the army left its cases.', 1],
+        yard: ['A barn, sheds and a workshop: tools, fuel, crates. Something to fight with is always left here.', 1],
+        dacha: ['A brick house and a shed. Something to fight with is always left here.', 1],
+        hamlet: ['A shop between houses, a barn behind, a fire ring to rest by.', 1, 'Food and drink at the shop, melee weapons and tools in the barn and the shed.'],
+        depot: ['A barracks, a workshop and a watchtower.', 2, 'Pistols and 9 mm, soft vests, boots and gloves, fuel. Now and then an armoured vest.'],
+        market: ['A trader behind the counter: he buys what you bring, sells supplies, and has paid work every day.', 2, 'Whatever you can pay for.'],
+        tents: ['Four army tents and a watchtower in the wood south of the west road. A pistol is always left here.', 2, 'Pistols and 9 mm, soft vests, injectors, the army\'s cases. Now and then an armoured vest or a helmet, and a gas mask if you are lucky.'],
+        works: ['', 4],
+        bunker: ['', 5],
+        town: ['Brick houses two floors high down both sides of the road, plank houses, a police station, a clinic, a shop. Out of the valley by the paved road, and inside the Zona.', 3],
+        squat: ['A plank house on piles, three floors of it, far out in the south country. Outside the Zona: tags are not earned here.', 1],
+        camp: ['Two long huts and two containers in the north woods. Outside the Zona: tags are not earned here.', 1],
       };
+      const at = (q: { x: number; z: number; name: string }, tip: string, kind: MenuSpot['kind'], tier: Tier, finds?: string, label = false): MenuSpot => ({ x: q.x, z: q.z, name: q.name, tip, kind, tier, finds: finds ?? TIERS[tier].finds, ...(label ? { label } : {}) });
       for (const q of world.pois.slice(1)) {
         const site = world.sites.find((st) => st.name === q.name);
-        if (site?.kind === 'bunker') spots.push({ x: q.x, z: q.z, name: q.name, tip: 'Under the ground, in the dark: a dozen rooms off two passages. Its door opens to a keycard, and the keycards are in the gas. The shotgun is kept here, and nowhere else.', kind: 'army', label: true });
-        else if (q.name === GAS.place) spots.push({ x: q.x, z: q.z, name: q.name, tip: 'Under gas: you need a gas mask on to breathe here. The richest place on the map: rifles, ammunition, helmets, plate carriers and scopes.', kind: 'gas', label: true });
-        else if (site?.kind === 'town') spots.push({ x: q.x, z: q.z, name: q.name, tip: SITE.town[1], kind: 'town', label: true });
-        else if (site) spots.push({ x: q.x, z: q.z, name: q.name, tip: SITE[site.kind][1], kind: site.kind === 'market' ? 'trader' : site.kind === 'depot' || site.kind === 'post' ? 'army' : 'site' });
-        else if (/checkpoint/i.test(q.name)) spots.push({ x: q.x, z: q.z, name: q.name, tip: 'Guard posts, a barracks and a watchtower: rifles, plate carriers, grenades. The track to the works starts here.', kind: 'army', label: true });
-        else spots.push({ x: q.x, z: q.z, name: q.name, tip: 'A cabin in the hills, with a fire ring to rest by. A weapon is always left here.', kind: 'site' });
+        if (site?.kind === 'bunker') spots.push(at(q, 'Under the ground, in the dark: a dozen rooms off two passages. Its door opens to a keycard, and the keycards are under the gas.', 'army', 5, undefined, true));
+        else if (q.name === GAS.place) spots.push(at(q, 'Under gas: you need a gas mask on to breathe here, and the masks are at the police station in the village.', 'gas', 4, undefined, true));
+        else if (site?.kind === 'town') spots.push(at(q, SITE.town[0], 'town', 3, undefined, true));
+        else if (site) spots.push(at(q, SITE[site.kind][0], site.kind === 'market' ? 'trader' : site.kind === 'depot' || site.kind === 'post' || site.kind === 'tents' ? 'army' : 'site', SITE[site.kind][1], SITE[site.kind][2], site.kind === 'tents'));
+        else if (/checkpoint/i.test(q.name)) spots.push(at(q, 'Guard posts, a barracks and a watchtower. The track to the works starts here.', 'army', 2, 'Pistols and 9 mm, soft vests, grenades, the army\'s cases. Now and then an armoured vest or a helmet.', true));
+        else spots.push(at(q, 'A cabin in the hills, with a fire ring to rest by. Something to fight with is always left here.', 'site', 1));
       }
-      spots.push({ x: town.x, z: town.z + 46, name: town.name, tip: 'The village: police station, clinic, shop, workshop. The best loot on the map, and the most people after it.', kind: 'town', label: true });
+      spots.push(at({ x: town.x, z: town.z + 46, name: town.name }, 'The village: police station, clinic, shop, workshop. The first place to go from the edge, and the most people after it.', 'town', 2, undefined, true));
       const inTown = (b: { x: number; z: number }) => Math.hypot(b.x - town.x, b.z - town.z) < town.radius;
       for (const b of world.buildings.filter(inTown)) {
-        if (b.type === 'police') spots.push({ x: b.x, z: b.z, name: 'Police station', tip: 'More guns than anywhere else. Gas masks are kept here, and the 9 mm suppressor.', kind: 'police' });
-        else if (b.type === 'clinic') spots.push({ x: b.x, z: b.z, name: 'Clinic', tip: 'Injectors, first aid kits, and tape to splint a broken leg.', kind: 'clinic' });
-        else if (b.type === 'store') spots.push({ x: b.x, z: b.z, name: 'Shop', tip: 'Food and drink.', kind: 'shop' });
+        if (b.type === 'police') spots.push(at({ x: b.x, z: b.z, name: 'Police station' }, 'The armoury of the village. The gas masks are kept here: without one, nobody goes into the Chemical Works.', 'police', 2, 'Pistols, 9 mm, soft vests, gas masks, and what goes on a pistol.'));
+        else if (b.type === 'clinic') spots.push(at({ x: b.x, z: b.z, name: 'Clinic' }, 'Where the wounded were brought.', 'clinic', 2, 'Injectors, first aid kits, and tape to splint a broken leg.'));
+        else if (b.type === 'store') spots.push(at({ x: b.x, z: b.z, name: 'Shop' }, 'The village shop.', 'shop', 2, 'Food and drink, and dressings.'));
       }
       for (const w of wellSpots(world)) spots.push({ x: w.x, z: w.z, name: 'Well', tip: 'Drink your fill, and fill every bottle you carry.', kind: 'well' });
       this.hud.setMenuMap(this.minimap.poster(), WORLD_SIZE, spots, atmo.gas);

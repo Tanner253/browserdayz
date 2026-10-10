@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-10T15:14:49.815Z",
+ "generated": "2026-10-10T23:14:21.371Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr"
@@ -1907,6 +1907,47 @@
     7.535,
     4.7243,
     3.498
+   ],
+   "lods": []
+  },
+  "tent_military": {
+   "url": "assets/models/tent_military.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 2002592,
+   "srcTris": 38544,
+   "tris": 31248,
+   "min": [
+    -3.1409,
+    0,
+    -4.2284
+   ],
+   "max": [
+    3.1409,
+    3.9166,
+    4.2284
+   ],
+   "lods": []
+  },
+  "helmet_k63": {
+   "url": "assets/models/helmet_k63.glb",
+   "tags": [
+    "loot",
+    "gear"
+   ],
+   "bytes": 437520,
+   "srcTris": 4242,
+   "tris": 4242,
+   "min": [
+    -0.1452,
+    0,
+    -0.1886
+   ],
+   "max": [
+    0.1452,
+    0.2799,
+    0.1886
    ],
    "lods": []
   },

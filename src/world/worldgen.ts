@@ -128,7 +128,7 @@ export function playOutline(): { x: number; z: number; r: number; from: number; 
   return out;
 }
 
-export type BuildingType = 'house_small' | 'house_brick' | 'barn' | 'shed' | 'cabin' | 'guardpost' | 'police' | 'clinic' | 'store' | 'barracks' | 'garage' | 'house_two' | 'tower' | 'hut' | 'townhouse' | 'shanty';
+export type BuildingType = 'house_small' | 'house_brick' | 'barn' | 'shed' | 'cabin' | 'guardpost' | 'police' | 'clinic' | 'store' | 'barracks' | 'garage' | 'house_two' | 'tower' | 'hut' | 'townhouse' | 'shanty' | 'tent';
 
 /** footprint (x = width, z = depth) in metres, used for terrain pads + spacing */
 export const BUILDING_FOOTPRINT: Record<BuildingType, [number, number]> = {
@@ -150,6 +150,8 @@ export const BUILDING_FOOTPRINT: Record<BuildingType, [number, number]> = {
   // (two downloads that are whole buildings, rooms and stairs and all: the brick block of two floors, and the plank house on piles)
   townhouse: [11.4, 14.6],
   shanty: [9.9, 15.9],
+  // (the army's tent, another download gone into whole: its cloth, without the ropes)
+  tent: [6.3, 8.5],
 };
 
 export interface BuildingPlot {
@@ -165,13 +167,15 @@ export interface BuildingPlot {
 }
 
 /** what stands at an outlying place */
-export type SiteKind = 'lodge' | 'farm' | 'post' | 'yard' | 'dacha' | 'hamlet' | 'depot' | 'market' | 'works' | 'bunker' | 'town' | 'squat' | 'camp';
+export type SiteKind = 'lodge' | 'farm' | 'post' | 'yard' | 'dacha' | 'hamlet' | 'depot' | 'market' | 'works' | 'bunker' | 'town' | 'squat' | 'camp' | 'tents';
 /**
  * Where the trading post stands: a meadow east of the village, 175 m out of it, a hundred from the road and
  * further than that from every other place. (Said, not looked for: the ground round it is counted out of the
  * check that nothing else on the map has moved.)
  */
 export const TRADE_AT = { x: 200, z: -40 };
+/** The army's camp (2026-10-11): four tents and a watchtower in a clearing of the wood south of the west road, between the trapper's camp and the old sawmill. */
+export const ARMY_CAMP = { name: 'Army Camp', x: -240, z: 5 };
 
 /** A small place away from the village: a couple of buildings in a clearing. */
 export interface Site {
@@ -585,6 +589,9 @@ export function generateWorld(seed = WORLD_SEED): World {
     town: [],
     squat: [],
     camp: [],
+    // The army's camp: four tents, two a side of a lane with their doors to it, and a watchtower at the lane's
+    // end looking back down it. (A tent turned a quarter round lies with its length across the lane.)
+    tents: [['tent', 7.75, -7.5, -Math.PI / 2], ['tent', -7.75, -7.5, Math.PI / 2], ['tent', 7.75, 7.5, -Math.PI / 2], ['tent', -7.75, 7.5, Math.PI / 2], ['tower', 0, 25, Math.PI]],
     // (laid out where it is made, at the end: see the first expansion)
     works: [],
     // (nothing stands on it that is a building of the map's: what is there is made in world/bunker.ts)
@@ -1016,6 +1023,16 @@ export function generateWorld(seed = WORLD_SEED): World {
       addLater('townhouse', 44, -28, Math.PI / 2, 0, 2.5);
       addLater('shanty', 14, 50, Math.PI, 0, 2.5);
       addLater('hut', 46, 50, 0, 0, 2.5);
+    }
+    // And the army's camp (2026-10-11), in a clearing of the wood south of the west road. After everything, as
+    // above: none of what was there is renumbered.
+    {
+      const first = sites.length;
+      place(ARMY_CAMP.name, 'tents', 0, [], 0, true, ARMY_CAMP);
+      for (const st of sites.slice(first)) {
+        lay(st);
+        laterSites.push(st);
+      }
     }
     const added = buildings.slice(firstLater);
     for (const b of added) seat(b);
