@@ -208,7 +208,10 @@ export class Net {
         done(null);
         if (was) this.onClose(this.kicked || 'Connection to the server was lost.');
       };
+      ws.binaryType = 'arraybuffer';
       ws.onmessage = (e) => {
+        // (what is not words is somebody's speech)
+        if (typeof e.data !== 'string') return void this.onVoice(e.data as ArrayBuffer);
         let m: S2C;
         try {
           m = JSON.parse(e.data as string);
@@ -242,4 +245,11 @@ export class Net {
   send(m: C2S) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(m));
   }
+
+  /** a piece of the player's own speech, to be passed on to whoever is near */
+  sendVoice(piece: Uint8Array) {
+    if (this.online && this.ws && this.ws.readyState === WebSocket.OPEN) this.ws.send(piece as Uint8Array<ArrayBuffer>);
+  }
+  /** a piece of somebody else's, from the server */
+  onVoice: (packet: ArrayBuffer) => void = () => {};
 }

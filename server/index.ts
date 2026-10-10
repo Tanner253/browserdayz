@@ -21,6 +21,7 @@ import { WORLD_SIZE, inPlay } from '../src/world/worldgen';
 const EDGE = WORLD_SIZE / 2 + 8;
 import { CALL, CRASH, DROP, fillCrash, fillDrop, type DropInfo } from '../src/sim/drops';
 import { STOCK } from '../src/sim/trade';
+import { VOICE } from '../src/sim/voice';
 import { CRATE_RESTOCK, CRATE_SPECS, fillCrate } from '../src/sim/crates';
 import { underGas } from '../src/sim/gas';
 import { BUNKER, bunkerDark, inBunker } from '../src/sim/bunker';
@@ -805,6 +806,28 @@ function pidOf(key: string): string {
     b = (Math.imul(b, 33) ^ key.charCodeAt(i)) | 0;
   }
   return (a >>> 0).toString(36) + (b >>> 0).toString(36);
+}
+
+/**
+ * A piece of somebody's speech: passed on, with whose it is in front of it, to whoever is alive within earshot of
+ * them and to nobody else. Nothing is kept of it. One player sends no more than VOICE.rate pieces a second, none
+ * bigger than VOICE.bytes; the dead say nothing.
+ */
+const said = new Map<number, { at: number; n: number }>();
+function voice(c: Client, piece: Buffer) {
+  if (!c.alive || piece.length < 3 || piece.length > VOICE.bytes) return;
+  const now = Date.now();
+  let k = said.get(c.id);
+  if (!k || now - k.at > 1000) said.set(c.id, (k = { at: now, n: 0 }));
+  if (++k.n > VOICE.rate) return;
+  const out = Buffer.allocUnsafe(piece.length + 2);
+  out.writeUInt16LE(c.id & 0xffff, 0);
+  piece.copy(out, 2);
+  for (const o of clients.values()) {
+    if (o === c || !o.alive || o.ws.readyState !== 1) continue;
+    if (Math.hypot(o.pose[0] - c.pose[0], o.pose[1] - c.pose[1], o.pose[2] - c.pose[2]) > VOICE.range) continue;
+    o.ws.send(out, { binary: true });
+  }
 }
 
 /** an item the server knows this player is carrying (pockets, slots, worn bags) */
@@ -1979,7 +2002,12 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
   let c: Client | null = null;
   let waiting = false;
   const hello = setTimeout(() => !c && !waiting && ws.close(), 8000);
-  ws.on('message', (data) => {
+  ws.on('message', (data, isBinary) => {
+    // (what is not words is speech: see `voice`)
+    if (isBinary) {
+      if (c) voice(c, Buffer.isBuffer(data) ? data : Buffer.concat(Array.isArray(data) ? data : [Buffer.from(data as ArrayBuffer)]));
+      return;
+    }
     let m: C2S;
     try {
       m = JSON.parse(String(data));

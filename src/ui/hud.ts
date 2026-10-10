@@ -215,6 +215,7 @@ export class HUD {
                   <p><kbd class="wide">Shift</kbd> sprint · hold breath</p>
                   <p><kbd class="wide">Space</kbd> jump</p>
                   <p><kbd>C</kbd> crouch <kbd>Z</kbd> lie down <kbd class="wide">Alt</kbd> walk</p>
+                  <p><kbd>V</kbd> hold to talk to whoever is near</p>
                 </div>
                 <div class="kb-group">
                   <h4>Fight</h4>
@@ -627,6 +628,26 @@ export class HUD {
 
   nameValue() {
     return (this.root.querySelector('.start-name') as HTMLInputElement).value.trim().slice(0, 16);
+  }
+
+  private voiceEl: HTMLElement | null = null;
+  private voiceKey = '';
+  /** Who is talking near: the player themselves (the key is down), and whoever of the others is being heard. */
+  voice(self: boolean, names: string[]) {
+    const key = (self ? '1' : '0') + names.join('|');
+    if (key === this.voiceKey) return;
+    this.voiceKey = key;
+    if (!this.voiceEl) {
+      this.voiceEl = document.createElement('div');
+      this.voiceEl.className = 'hud-voice';
+      this.root.appendChild(this.voiceEl);
+    }
+    this.voiceEl.replaceChildren(...[...(self ? ['You'] : []), ...names.slice(0, 5)].map((n, i) => {
+      const row = document.createElement('div');
+      row.className = self && i === 0 ? 'me' : '';
+      row.textContent = n;
+      return row;
+    }));
   }
 
   /** players connected to the server right now (null = playing offline) */

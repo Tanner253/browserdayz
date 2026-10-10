@@ -43,6 +43,7 @@ import { InventoryUI } from '../ui/inventory-ui';
 import { Minimap } from '../ui/minimap';
 import { CALL, CRASH, DROP, describeSpot, fillCrash, fillDrop, pickDropSite, type DropInfo } from '../sim/drops';
 import { WELL, stage, wellSpots, type Well } from '../sim/wells';
+import { Voice } from './voice';
 import { renderDoll, renderIcons } from '../ui/icons';
 import { Perf } from '../core/perf';
 import { loadGraphics, type Graphics } from '../core/settings';
@@ -224,6 +225,9 @@ export class Game {
   private awaitClick = false;
   /** the men behind the shops' counters, and the counter itself (see src/sim/trade.ts) */
   private traders: Traders | null = null;
+  /** talking to whoever is near: hold V (src/game/voice.ts) */
+  readonly voice = new Voice(() => (audio.ready ? audio.ctx : null), () => audio.voiceBus(), (piece) => this.net.sendVoice(piece));
+  private voiceSaid = false;
   /** the wells of the two towns (src/sim/wells.ts) */
   private wells: Well[] = [];
   /** how hungry and how thirsty the player was last said to be: each is said once as it gets worse */
@@ -1051,6 +1055,7 @@ export class Game {
     net.on('fire', (m) => this.fires.set(m.i, m.left));
     net.on('bunker', (m) => this.bunker.setOpen(m.open));
     net.on('gear', (m) => this.remotes.get(m.id) && void this.wear(this.remotes.get(m.id)!.avatar, m.g));
+    net.onVoice = (packet) => this.voice.hear(packet);
     net.on('dmg', (m) => this.takeHit(m));
     net.on('death', (m) => {
       const k = m.k;
@@ -2943,6 +2948,18 @@ export class Game {
     // (are the hands empty: asked of what is in them, and every frame. It was asked five times a second, and of
     // which slot the inventory said was out, which is not the same thing when what was out has been dropped.)
     p.emptyHanded = this.weapons.handsEmpty && !this.use;
+    // talking: V held down (the first time it is, the browser asks whether this site may use the microphone)
+    if (this.online) {
+      if (playing && !typing && !uiOpen && input.pressed('KeyV')) {
+        void this.voice.talk().then((wrong) => {
+          if (wrong && !this.voiceSaid) this.hud.note(wrong, 'warn');
+          this.voiceSaid ||= !!wrong;
+        });
+      }
+      if (this.voice.talking && (!input.held('KeyV') || !playing)) this.voice.hush();
+      const speaking = this.voice.update((id) => this.remotes.get(id)?.pos ?? null, p.pos);
+      this.hud.voice(this.voice.talking, speaking.map((id) => this.remotes.get(id)?.name ?? '').filter(Boolean));
+    }
     // hunger and thirst, said once each as they get worse (and what they do is said with them)
     if (playing) {
       const now2 = [stage(p.vitals.energy), stage(p.vitals.water)];

@@ -1339,6 +1339,11 @@ export class AudioEngine {
    * @returns whether it will be said: not where there is no such voice, nor while one call is already waiting
    *   behind another (three people shouting at once are not said one after the other, long after)
    */
+  /** where a player's voice goes (src/game/voice.ts): with everything else that is heard, under the one volume */
+  voiceBus(): AudioNode | null {
+    return this.ready ? this.master : null;
+  }
+
   private speak(words: string, distance: number, voice: number): boolean {
     const synth = typeof speechSynthesis === 'undefined' ? null : speechSynthesis;
     // (not while a film's soundtrack is being made from the list of what was heard: that is not this machine's to say aloud)

@@ -1913,6 +1913,10 @@ export class Avatar {
         this.fpRoot.rotation.order = 'YXZ';
         this.fpRoot.rotation.copy(this.root.rotation);
       }
+      // (And it is not drawn on the way down or the way up: going down, the body fell forward through the eyes
+      // and hung in front of them for the half second it took. Lying, it is all behind them, and is drawn again:
+      // whoever looks back along themselves sees their own legs.)
+      this.fpRoot.visible = lying < 0.02 || lying > 0.97;
       this.fpRoot.scale.copy(this.root.scale);
     }
   }
