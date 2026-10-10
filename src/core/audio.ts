@@ -100,7 +100,7 @@ export interface EngineVoice {
  * One take is played, any of them. Until they have arrived, and wherever one is missing, the
  * made-up sound is what is heard.
  */
-const RECORDED: Record<string, number> = { shot_rifle: 1, shot_pistol: 3, shot_quiet: 1, rifle_mag_out: 1, rifle_mag_in: 1, pistol_mag_out: 1, pistol_mag_in: 1, rack: 1, shot_shotgun: 2, shot_magnum: 2, shell_in: 1, z_groan: 4, z_growl: 4, z_alert: 4, z_attack: 4, z_hurt: 4, z_die: 4 };
+const RECORDED: Record<string, number> = { shot_rifle: 1, shot_pistol: 3, shot_quiet: 1, bolt: 1, rifle_mag_out: 1, rifle_mag_in: 1, pistol_mag_out: 1, pistol_mag_in: 1, rack: 1, shot_shotgun: 2, shot_magnum: 2, shell_in: 1, z_groan: 4, z_growl: 4, z_alert: 4, z_attack: 4, z_hurt: 4, z_die: 4 };
 const bank = new Map<string, AudioBuffer[]>();
 let fetched: Promise<void> | null = null;
 /** Fetches the recordings, once. (They are kept apart from any one engine: the trailer renders its soundtrack on an engine of its own.) */
@@ -509,10 +509,18 @@ export class AudioEngine {
     ring.stop(t + dur * 3 + 0.05);
   }
 
-  // A magazine changed, a slide racked: these are recordings and nothing else. (They used to
-  // be made up out of clicks, and the made-up ones stood in wherever a recording was missing:
-  // there is no made-up one now.) A bolt worked makes no sound at all: the recording of one was
-  // the old Mosin's, heard after every shot from every rifle near by, and it was taken out.
+  // A bolt worked, a magazine changed, a slide racked: these are recordings and nothing else.
+  // (They used to be made up out of clicks, and the made-up ones stood in wherever a recording
+  // was missing: there is no made-up one now.)
+
+  /**
+   * The sniper's bolt worked: a recording of one. Heard by whoever works it, and by anybody within a few paces
+   * (`pos`). It was once heard forty metres off, after every shot from every rifle about, and was taken out for
+   * that; it is back for the rifle's own hands, and close by.
+   */
+  boltCycle(start = 0, pos?: V3) {
+    if (this.ready) this.rec('bolt', pos ? this.out(pos, 2, 1.6) : this.sfx, this.ctx.currentTime + start, pos ? 1.1 : 0.95);
+  }
 
   /** another player close by reloading: a magazine out and one in, from where they stand (it is not heard across a field) */
   reloadNear(pos: V3, dur: number, pistol: boolean) {

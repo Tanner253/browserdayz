@@ -182,8 +182,10 @@ export class RemotePlayer implements Damageable {
     if (!this.ready || !this.alive) return;
     if (a === 'stop') return this.avatar.act(null);
     this.avatar.act(a, dur);
-    // (a magazine going in is heard only by whoever is close; a bolt worked is seen and not heard)
-    if (a === 'reload' && this.pos.distanceToSquared(listener) < 22 * 22) audio.reloadNear(this.pos, dur, ITEMS[this.weapon ?? '']?.weapon?.kind === 'pistol');
+    // (a magazine going in is heard only by whoever is close, and a bolt worked by whoever is closer still)
+    const d2 = this.pos.distanceToSquared(listener);
+    if (a === 'bolt' && d2 < 12 * 12) audio.boltCycle(0, this.pos);
+    else if (a === 'reload' && d2 < 22 * 22) audio.reloadNear(this.pos, dur, ITEMS[this.weapon ?? '']?.weapon?.kind === 'pistol');
   }
 
   /** they called something out (see src/sim/emotes.ts): heard from where their head is, and the arms go with it */

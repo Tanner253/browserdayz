@@ -68,7 +68,7 @@ headset) is the military tactical suit credited above, put onto that skeleton by
 
 The flash at a muzzle, seen from the side, is out of the Particle Pack by [Kenney](https://kenney.nl) (CC0).
 
-Gunshots, magazines and the slide are recordings (cut and converted by `npm run sounds`): from
+Gunshots, the bolt, magazines and the slide are recordings (cut and converted by `npm run sounds`): from
 [Snake's Authentic Gun Sounds](https://f8studios.itch.io/snakes-authentic-gun-sounds) by Snake (free to use,
 credit not asked for and given gladly) and from [The Free Firearm Sound Library](https://opengameart.org/content/the-free-firearm-sound-library)
 by Ben Jaszczak, Brian Nelson, Kevin Heras and Matthew Nanney (CC0). What the infected say is from the

@@ -418,7 +418,7 @@ let pumping = true;
 /** Every sound the game asks for is written down instead of played; the soundtrack is rendered from the list afterwards. */
 function hookAudio() {
   const plain = (v: unknown): unknown => (v && typeof v === 'object' && 'x' in (v as Any) ? { x: (v as Any).x, y: (v as Any).y, z: (v as Any).z } : v);
-  const names = ['gunshot', 'dryFire', 'click', 'reloadNear', 'magOut', 'magIn', 'slideRack', 'shellDrop', 'whiz', 'hitTick', 'equip', 'jump', 'land', 'death', 'body', 'door', 'impact', 'footstep', 'whoosh', 'explosion', 'ui', 'hurt', 'shout', 'infected', 'setListener', 'updateAmbience'];
+  const names = ['gunshot', 'dryFire', 'click', 'boltCycle', 'reloadNear', 'magOut', 'magIn', 'slideRack', 'shellDrop', 'whiz', 'hitTick', 'equip', 'jump', 'land', 'death', 'body', 'door', 'impact', 'footstep', 'whoosh', 'explosion', 'ui', 'hurt', 'shout', 'infected', 'setListener', 'updateAmbience'];
   for (const n of names) {
     (audio as unknown as Any)[n] = (...a: unknown[]) => {
       if (logging && !S.mute) soundLog.push({ t: frameIndex / fps, n, a: a.map(plain) });

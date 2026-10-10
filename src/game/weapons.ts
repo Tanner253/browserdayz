@@ -7,7 +7,7 @@ import { assets } from '../core/assets';
 import { physics, SHOT_GROUPS, type Surface } from '../core/physics';
 import { audio } from '../core/audio';
 import type { Input } from '../core/input';
-import { extractParts } from '../core/gltf-utils';
+import { extractParts, type MeshPart } from '../core/gltf-utils';
 import { ITEMS, capacityOf, handlingOf, hasMod, pieceShown, type ItemInstance, type Slot, quietOf } from '../sim/items';
 import { suppressorGeometry } from './procedural';
 import { SLOT_ORDER, type PlayerInventory } from '../sim/inventory';
@@ -419,6 +419,19 @@ const SEAT = {
   fore: new THREE.Vector3(0.074, -0.006, 0.004),
 };
 /**
+ * A gun that rides in another pack's hands is not the size of the gun those hands were drawn on. The Desert
+ * Eagle is half as big again as the M9 whose hands it has: seated where the M9 is, a body held it up by the
+ * trigger guard with the whole grip hanging under its fist. Where the body's hands go on such a gun, from where
+ * they go on the pack's own (the gun's own space: x toward the muzzle, y up; metres).
+ */
+const SEAT_ON: Record<string, THREE.Vector3> = {
+  deagle: new THREE.Vector3(-0.014, -0.036, 0),
+};
+const NO_SEAT = new THREE.Vector3();
+/** how far under the ears of the shotgun's front sight the top of its post is (the eye is put level with the post) */
+const IRON_DROP = 0.004;
+
+/**
  * How big a rifle is drawn in somebody else's hands, of its own size, kept where it is at the
  * butt. The pack's rifle is long in the stock for the body that holds it (44 cm from butt to
  * trigger, against arms 48 cm from shoulder to wrist): at its full size the hand under it
@@ -527,38 +540,26 @@ function plainMaterial(m: THREE.Material): THREE.Material {
 /** a weapon pack's material for the hands' own scene: plain, and lifted out of the dark (see liftPack) */
 const packMaterial = (m: THREE.Material) => liftPack(plainMaterial(m));
 
-const _texels = new WeakMap<THREE.Texture, ImageData | null>();
 /**
- * Whether a piece of the sight is its pane of glass. The model has no glass in it: the pane is a slab like any
- * other piece, and is told from the rest only by being painted black (it was drawn so, a black window that nothing
- * was seen through). So: a piece of a few flat faces, every corner of which is black in the sight's own picture.
- * (It is not drawn at all: the window of the sight is open.)
+ * The holographic sight, for a gun that has none of its own: the shotgun's, taken off it. (The pistols had
+ * another model of one: a smaller-looking box whose window was a slab painted black. The shotgun's has glass
+ * in it, and is the one that looks right, so it is the one they all carry.) Stood on its foot at the middle of
+ * its length, looking along +x as it does on the shotgun, with the lit mark in its window: the mark's own
+ * picture comes with the other model, which is read for that and nothing else.
  */
-function isPane(geometry: THREE.BufferGeometry, material: THREE.Material): boolean {
-  const map = (material as THREE.MeshStandardMaterial).map, uv = geometry.getAttribute('uv');
-  const tris = (geometry.getIndex()?.count ?? geometry.getAttribute('position').count) / 3;
-  if (!map || !uv || tris > 16) return false;
-  if (!_texels.has(map)) {
-    let data: ImageData | null = null;
-    try {
-      const c = document.createElement('canvas');
-      c.width = c.height = 256;
-      const g = c.getContext('2d', { willReadFrequently: true })!;
-      g.drawImage(map.image as CanvasImageSource, 0, 0, 256, 256);
-      data = g.getImageData(0, 0, 256, 256);
-    } catch {
-      /* a picture that cannot be read: nothing is taken for glass */
-    }
-    _texels.set(map, data);
+async function holoParts(): Promise<MeshPart[]> {
+  const own = extractParts(await assets.model('benelli_m3'), (n) => n === 'sight');
+  const mark = extractParts(await assets.model('holo_sight')).find((p) => /crosshair/i.test((p.material as THREE.Material).name));
+  const box = new THREE.Box3();
+  for (const p of own) {
+    p.geometry.computeBoundingBox();
+    box.union(p.geometry.boundingBox!);
   }
-  const px = _texels.get(map);
-  if (!px) return false;
-  for (let i = 0; i < uv.count; i++) {
-    const u = uv.getX(i) - Math.floor(uv.getX(i)), v0 = uv.getY(i) - Math.floor(uv.getY(i)), v = map.flipY ? 1 - v0 : v0;
-    const k = (Math.min(255, Math.floor(v * 256)) * 256 + Math.min(255, Math.floor(u * 256))) * 4;
-    if (px.data[k] + px.data[k + 1] + px.data[k + 2] > 60) return false;
-  }
-  return true;
+  // (across, the gun's own middle is the middle: its box is not, with a knob on one side)
+  const mid = (box.min.x + box.max.x) / 2, tall = box.max.y - box.min.y;
+  const parts: MeshPart[] = own.map((p) => ({ ...p, geometry: p.geometry.clone().translate(-mid, -box.min.y, 0) }));
+  if (mark) parts.push({ name: 'reticle', owner: 'reticle', geometry: new THREE.PlaneGeometry(0.0085, 0.0085).rotateY(-Math.PI / 2).translate(0, tall * 0.7, 0), material: mark.material });
+  return parts;
 }
 
 export class Weapons {
@@ -988,11 +989,8 @@ export class Weapons {
       const make = async () => {
         const obj = new THREE.Group();
         obj.name = name;
-        for (const p of extractParts(await assets.model(modelId))) {
+        for (const p of modelId === 'holo' ? await holoParts() : extractParts(await assets.model(modelId))) {
           const reticle = /crosshair/i.test((p.material as THREE.Material).name);
-          // (Its pane is left out: see isPane. Drawn as glass, however faint, it was a veil over what was aimed at:
-          // the window is clear, with the lit mark in it.)
-          if (!reticle && isPane(p.geometry, p.material)) continue;
           const mesh = new THREE.Mesh(p.geometry, reticle ? reticleMaterial(p.material) : packMaterial(p.material));
           mesh.name = reticle ? 'reticle' : name;
           mesh.castShadow = false;
@@ -1026,7 +1024,7 @@ export class Weapons {
     };
     if (fit?.dot) {
       // (it stands on its foot: the model's own ground is the bottom of it)
-      const dot = await fitted('red_dot', 'holo_sight', fit.dot.at, fit.dot.size, o.kind === 'pistol' ? 'slide' : 'base', () => {});
+      const dot = await fitted('red_dot', 'holo', fit.dot.at, fit.dot.size, o.kind === 'pistol' ? 'slide' : 'base', () => {});
       const ret = dot.getObjectByName('reticle');
       if (ret) {
         rig.root.updateMatrixWorld(true);
@@ -1078,6 +1076,25 @@ export class Weapons {
     // (A pistol's: the eye level with the top of them, so that what is aimed at sits on the front
     // post. A centimetre higher and the shot went into the air over the gun, with nothing to say where.)
     const irons = o.kind === 'rifle' ? null : new THREE.Vector3(-c.x, -sight.max.y - 0.002, o.hip.z + 0.07);
+    // A gun in the rifle's hands with sights of its own (the shotgun: a post at the muzzle, a notch on the action)
+    // is aimed along them as a pistol is: the eye level with the top of the post, and in line with it. (It was
+    // aimed as the rifle is without its scope, from over the action: the sights lay under the middle of the
+    // picture and what was shot at was nowhere near them.) The post stands between two ears at the muzzle, which
+    // are the highest things there: it is in the middle of the gun, and a little lower than they are.
+    let post: THREE.Vector3 | null = null;
+    if (o.kind === 'rifle' && hung.has('base')) {
+      const base = hung.get('base')!, v = new THREE.Vector3();
+      base.updateWorldMatrix(true, true);
+      base.traverse((n) => {
+        const mesh = n as THREE.Mesh;
+        if (!mesh.isMesh) return;
+        const P = mesh.geometry.getAttribute('position');
+        for (let i = 0; i < P.count; i++) {
+          v.fromBufferAttribute(P, i).applyMatrix4(mesh.matrixWorld);
+          if (v.z < frame.min.z + 0.1 && (!post || v.y > post.y)) post = (post ?? new THREE.Vector3()).copy(v);
+        }
+      });
+    }
     // (through a holographic sight: the eye on the lit mark, a hand and a half behind the glass)
     // (a gun in the rifle's hands with a holographic sight of its own: the mark is put in its glass, which is the upper part of it)
     const glassY = THREE.MathUtils.lerp(sight.min.y, sight.max.y, 0.7);
@@ -1105,7 +1122,7 @@ export class Weapons {
       optic: o.kind === 'rifle' ? (hung.size ? 'red_dot' : 'pu_scope') : dotAt ? 'red_dot' : undefined,
       lamp: lamp ?? undefined,
       // without its optic the eye goes along the top of the action (a pistol's: along its own sights)
-      adsIron: o.kind === 'rifle' ? new THREE.Vector3(-fc.x, -frame.max.y - 0.018, o.hip.z + 0.1) : dotAt ? irons! : undefined,
+      adsIron: o.kind === 'rifle' ? (post ? new THREE.Vector3(-(frontOf(hung.get('base')!)?.x ?? fc.x), -(post as THREE.Vector3).y + IRON_DROP, o.hip.z + 0.1) : new THREE.Vector3(-fc.x, -frame.max.y - 0.018, o.hip.z + 0.1)) : dotAt ? irons! : undefined,
       // (a rifle's: the mouth of the barrel itself. Three fifths of the way up its body is under the barrel.)
       muzzle: (o.kind === 'rifle' ? (hung.has('base') ? frontOf(hung.get('base')!) : rig.front('base')) : null) ?? new THREE.Vector3(fc.x, o.kind === 'rifle' ? THREE.MathUtils.lerp(frame.min.y, frame.max.y, 0.62) : c.y, frame.min.z),
       // For whoever is seen holding it. The hands start where the pack's own hands are, and are
@@ -1119,8 +1136,8 @@ export class Weapons {
             left: { pos: new THREE.Vector3(...holds.left).add(SEAT.fore).add(seen), fingers: new THREE.Vector3(0.35, 0.1, 0.93), palm: new THREE.Vector3(0, 1, 0.1), curl: [1.0, 1.05, 1.1, 1.15], thumb: 0.4 },
           }
         : {
-            right: { pos: new THREE.Vector3(...holds.right).add(SEAT.pistol), fingers: new THREE.Vector3(0.9, -0.15, -0.3), palm: new THREE.Vector3(0.3, 0, -1), curl: [0.22, 1.25, 1.3, 1.35], thumb: 1.25 },
-            left: { pos: new THREE.Vector3(...holds.left).add(SEAT.pistol), fingers: new THREE.Vector3(0.85, -0.2, 0.35), palm: new THREE.Vector3(0, 0.4, 1), curl: [1.05, 1.1, 1.15, 1.2], thumb: 1.2 },
+            right: { pos: new THREE.Vector3(...holds.right).add(SEAT.pistol).add(SEAT_ON[o.item] ?? NO_SEAT), fingers: new THREE.Vector3(0.9, -0.15, -0.3), palm: new THREE.Vector3(0.3, 0, -1), curl: [0.22, 1.25, 1.3, 1.35], thumb: 1.25 },
+            left: { pos: new THREE.Vector3(...holds.left).add(SEAT.pistol).add(SEAT_ON[o.item] ?? NO_SEAT), fingers: new THREE.Vector3(0.85, -0.2, 0.35), palm: new THREE.Vector3(0, 0.4, 1), curl: [1.05, 1.1, 1.15, 1.2], thumb: 1.2 },
           },
     };
     // (the flash rides on the gun, so it goes where the barrel goes in the kick)
@@ -1571,6 +1588,7 @@ export class Weapons {
   }
 
   private cycleBolt(m: VmModel) {
+    audio.boltCycle();
     audio.shellDrop(0.5);
     // (the pack's hand has further to go than a bolt moved by itself: a little longer)
     const dur = m.rig ? 0.95 : 0.78;
