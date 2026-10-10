@@ -29,7 +29,7 @@ const UNDER_GAS: Table = [
   ['box_762', 3], ['box_9mm', 3], ['ammo_762', 1.5], ['ammo_9mm', 1.5], ['mosin', 1.4], ['m9', 1.4], ['p38', 1],
   ['boonie_hat', 2], ['life_vest', 2], ['pu_scope', 1.6], ['grenade', 1.5], ['firstaid', 1.5], ['bandage', 1.5],
   ['suppressor_9', 0.8], ['mag_p38_ext', 0.8], ['rifle_wrap', 0.6], ['binoculars', 0.4], ['condensed', 0.8], ['thermos', 0.8], ['suitcase', 0.4],
-  ['deagle', 0.8], ['ammo_50', 1.2], ['red_dot', 0.6], ['gun_light', 0.6], ['suppressor_762', 0.4], ['mag_m9_ext', 0.4], ['mag_deagle_ext', 0.3], ['flask', 0.5],
+  ['deagle', 0.8], ['ammo_50', 1.2], ['red_dot', 0.6], ['gun_light', 0.6], ['suppressor_762', 0.4], ['mag_m9_ext', 0.4], ['mag_deagle_ext', 0.3], ['flask', 0.5], ['keycard', 0.5],
 ];
 
 export interface CrateSpec {

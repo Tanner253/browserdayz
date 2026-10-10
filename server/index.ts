@@ -18,6 +18,7 @@ import { ITEMS, TAG_HOLD, makeItem, sanitizeItem, type ItemInstance } from '../s
 import { DROP, fillDrop, type DropInfo } from '../src/sim/drops';
 import { CRATE_RESTOCK, CRATE_SPECS, fillCrate } from '../src/sim/crates';
 import { underGas } from '../src/sim/gas';
+import { BUNKER } from '../src/sim/bunker';
 import { phaseOf } from '../src/sim/daynight';
 import { WEAPON_RULES, hitDamage, type HitZone } from '../src/sim/combat';
 import { BARREL } from '../src/sim/barrels';
@@ -37,7 +38,7 @@ const TICK_HZ = 15;
 const CORPSE_LIFETIME = 600; // seconds
 const RECORD_LIFETIME = 30 * 60 * 1000; // a logged-out character is remembered this long
 /** bump when loot points change: world loot from an older save is re-rolled */
-const WORLD_REV = 12;
+const WORLD_REV = 13;
 
 const log = (...a: unknown[]) => console.log(new Date().toISOString().slice(11, 19), ...a);
 
@@ -315,6 +316,23 @@ function carriedTags(inv: SerializedInventory | null): ItemInstance[] {
   for (const cont of inv.containers) for (const it of cont.items) walk(it);
   return out;
 }
+
+/** Is one of these among what somebody carries? (a keycard, like a tag that was taken, goes on foot) */
+function carries(inv: SerializedInventory | null, id: string): boolean {
+  let found = false;
+  const walk = (it: ItemInstance | null | undefined) => {
+    if (!it || found) return;
+    if (it.id === id) found = true;
+    for (const p of it.cargo ?? []) walk(p.item);
+  };
+  if (!inv) return false;
+  for (const it of Object.values(inv.slots)) walk(it);
+  for (const cont of inv.containers) for (const it of cont.items) walk(it);
+  return found;
+}
+
+/** when the bunker's door shuts again (a keycard opens it for a few minutes): 0, it is shut */
+let bunkerOpenUntil = 0;
 
 // ------------------------------------------------------------------ players
 
@@ -670,6 +688,14 @@ function handle(c: Client, m: C2S) {
       broadcast({ t: 'nade', id: c.id, o: m.o, v: m.v }, c);
       return;
     }
+    case 'bunker': {
+      // a keycard at the door, by somebody standing at it (the card is theirs to use up: what they carry is their own game's to say)
+      const d = world.bunkerDoor;
+      if (!c.alive || !d || Math.hypot(c.pose[0] - d[0], c.pose[1] - d[1], c.pose[2] - d[2]) > 6) return;
+      bunkerOpenUntil = Date.now() + BUNKER.door.open * 1000;
+      broadcast({ t: 'bunker', left: BUNKER.door.open });
+      return;
+    }
     case 'fire': {
       // lit by somebody standing beside it (a couple of metres' grace: where they are is told a moment late)
       if (!c.alive || !hearths.light(m.i, c.pose[0], c.pose[2], Date.now() / 1000, 2.5)) return;
@@ -950,7 +976,7 @@ function handle(c: Client, m: C2S) {
       if (Math.hypot(c.pose[0] - v.s[0], c.pose[1] - v.s[1], c.pose[2] - v.s[2]) > JEEP.reach + 3) return;
       // A tag taken off somebody is carried on foot, for ten minutes, with the map showing
       // everybody where: not driven round in circles.
-      if (takenTag(c)) {
+      if (takenTag(c) || carries(c.inv, 'keycard')) {
         send(c, { t: 'tell', kind: 'warn', text: JEEP.noTag });
         return;
       }
@@ -1114,6 +1140,7 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
     drops: [...boxes.values()].filter((b) => b.kind === 'drop').map(dropInfo),
     barrels: [...barrelsGone.keys()],
     fires: hearths.alight(Date.now() / 1000),
+    bunker: Math.max(0, (bunkerOpenUntil - Date.now()) / 1000),
     vehicles: [...vehicles.values()].map(vehInfo),
     infected: horde.list(),
     // (the hour is the wall clock's: every game on the server is at the same one, and a restart does not put it back)

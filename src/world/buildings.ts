@@ -11,10 +11,11 @@ import { physics, AJAR_GROUPS, BODY_QUERY, GLASS_GROUPS, WORLD_GROUPS, type Surf
 import { RNG } from '../core/noise';
 import type { Atmosphere } from './atmosphere';
 import { GAS, gasDepth, gasZone } from '../sim/gas';
-import { BUILDING_FOOTPRINT, heightAt, type BuildingPlot, type Instance, type SiteKind, type World } from './worldgen';
+import { BUILDING_FOOTPRINT, bunkerPlace, heightAt, type BuildingPlot, type Instance, type SiteKind, type World } from './worldgen';
+import { bunkerAt, bunkerLoot } from '../sim/bunker';
 
 /** (`Gas` is not a kind of building: it is whatever stands under the gas, whatever else it is. See src/sim/gas.ts.) */
-export type Usage = 'Village' | 'Town' | 'Farm' | 'Industrial' | 'Military' | 'Hunting' | 'Medic' | 'Police' | 'Gas';
+export type Usage = 'Village' | 'Town' | 'Farm' | 'Industrial' | 'Military' | 'Hunting' | 'Medic' | 'Police' | 'Gas' | 'Bunker';
 
 export interface LootPoint {
   x: number;
@@ -786,6 +787,19 @@ export class Buildings {
     // what is kept under the gas is marked so: there are things that lie nowhere else (see the economy)
     const gas = gasZone(this.world.pois, (x, z) => heightAt(this.world.heights, x, z));
     for (const p of this.lootPoints) if (gasDepth(gas, p.x, p.y, p.z) > GAS.breathe) p.usage = [...p.usage, 'Gas'];
+    // The bunker's own places: after every other, so that none of those is renumbered. They
+    // are of no kind of building: only what is said to be kept in the bunker lies there.
+    const at = bunkerPlace(this.world);
+    if (at) {
+      for (const s of bunkerLoot()) {
+        const [x, y, z] = bunkerAt(at, s.r, s.f, s.y);
+        const surf = s.surf && (() => {
+          const [sx, , sz] = bunkerAt(at, s.surf!.r, s.surf!.f);
+          return { x: sx, z: sz, rot: at.rot + s.surf!.turn, hx: s.surf!.hx, hz: s.surf!.hz, clear: 0.9 };
+        })();
+        this.lootPoints.push({ x, y: y + 0.02, z, usage: ['Bunker'], building: 'bunker', floor: s.floor, ...(surf ? { surf } : {}) });
+      }
+    }
   }
 
   /** What stands in the yard of each outlying place: crates to search, and what makes it look lived in. */
@@ -820,6 +834,7 @@ export class Buildings {
         ['covered_car', -11, 22], ['covered_car', 12.5, -6], ['covered_car', 14, 50],
         ['utility_box_01', -25, 24], ['utility_box_01', 25.5, 15], ['metal_trash_can@1', 24.5, -8], ['trashbag', 25.6, -9.2], ['old_tyre', -17, 33], ['old_tyre', 16, 20], ['old_tyre', -14, -26],
       ],
+      bunker: [],
     };
     for (const st of this.world.sites) {
       const c = Math.cos(st.rot), s = Math.sin(st.rot);

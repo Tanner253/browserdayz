@@ -3,7 +3,8 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { generateWorld, heightAt } from '../src/world/worldgen';
+import { bunkerPlace, generateWorld, heightAt } from '../src/world/worldgen';
+import { BUNKER, bunkerAt, levelY } from '../src/sim/bunker';
 import { Buildings, CRATE_KINDS } from '../src/world/buildings';
 import { assets } from '../src/core/assets';
 import { crateId } from '../src/net/protocol';
@@ -38,6 +39,11 @@ export function buildWorldData(root: string) {
   return {
     lootPoints: buildings.lootPoints,
     crates,
+    /** the middle of the bunker's door, which a keycard is held up to (null: the world has no bunker) */
+    bunkerDoor: (() => {
+      const at = bunkerPlace(world);
+      return at ? bunkerAt(at, 0, BUNKER.hall.front, levelY() + 1.2) : null;
+    })(),
     /** where the gas lies (a crate under it is filled with the best of everything) */
     gas: gasZone(world.pois, (x, z) => heightAt(world.heights, x, z)),
     /** the fuel drums, numbered as the game numbers them */

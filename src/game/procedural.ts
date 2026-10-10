@@ -42,6 +42,7 @@ export function suppressorGeometry(): THREE.BufferGeometry {
 }
 
 let tagSteel: THREE.MeshStandardMaterial | null = null;
+let keycardMat: THREE.MeshStandardMaterial[] | undefined;
 
 /** Two stamped plates fanned on a ball chain, lying flat. */
 export function dogTagGeometry(): THREE.BufferGeometry {
@@ -77,5 +78,12 @@ export function proceduralParts(model: string): MeshPart[] {
     return [{ name: 'dogtag', geometry: dogTagGeometry(), material: tagSteel }];
   }
   if (model === '@suppressor') return [{ name: 'suppressor', geometry: suppressorGeometry(), material: gunSteel() }];
+  if (model === '@keycard') {
+    // a pass card: red plastic with a white band across it
+    keycardMat ??= [new THREE.MeshStandardMaterial({ color: 0xb3261e, roughness: 0.45, name: 'card-red' }), new THREE.MeshStandardMaterial({ color: 0xe8e4d8, roughness: 0.5, name: 'card-band' })];
+    const card = new THREE.BoxGeometry(0.086, 0.003, 0.054), band = new THREE.BoxGeometry(0.0865, 0.0034, 0.014);
+    band.translate(0, 0, -0.012);
+    return [{ name: 'keycard', geometry: card, material: keycardMat[0] }, { name: 'keycard_band', geometry: band, material: keycardMat[1] }];
+  }
   throw new Error(`unknown procedural model ${model}`);
 }

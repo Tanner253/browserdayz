@@ -161,19 +161,24 @@ ok('the gas is the richest place on the map; helmets, plates and scopes are of i
     // (its own dice, thrown from a different place each time)
     (e as unknown as { rng: RNG }).rng = new RNG(seed);
     e.populate();
-    const inGas = new Map<string, number>(), out = new Map<string, number>();
+    const inGas = new Map<string, number>(), out = new Map<string, number>(), deep = new Map<string, number>();
     let gasThings = 0;
     for (const l of e.loot.values()) {
       const under = l.point >= 0 && data.lootPoints[l.point].usage.includes('Gas');
-      const m = under ? inGas : out;
+      // (the bunker is stocked apart as well: what is in it is neither of the gas nor of the rest of the map)
+      const m = under ? inGas : l.point >= 0 && data.lootPoints[l.point].usage.includes('Bunker') ? deep : out;
       m.set(l.item.id, (m.get(l.item.id) ?? 0) + 1);
       if (under && !data.lootPoints[l.point].arms) gasThings++;
     }
-    return { e, inGas, out, gasThings };
+    return { e, inGas, out, deep, gasThings };
   };
   for (let k = 0; k < 6; k++) {
-    const { inGas, out, gasThings } = tally(1000 + k * 7919);
-    const g = (id: string) => inGas.get(id) ?? 0, o = (id: string) => out.get(id) ?? 0;
+    const { inGas, out, deep, gasThings } = tally(1000 + k * 7919);
+    const g = (id: string) => inGas.get(id) ?? 0, o = (id: string) => out.get(id) ?? 0, b = (id: string) => deep.get(id) ?? 0;
+    // the shotgun, its shells and its can are of the bunker and nowhere else; what opens the bunker is under the gas
+    assert.ok(b('benelli') >= 2 && b('ammo_12') + b('box_12') >= 10, 'no shotgun, or nothing for it, in the bunker');
+    for (const id of ['benelli', 'ammo_12', 'box_12', 'suppressor_12']) assert.equal(g(id) + o(id), 0, `${id} outside the bunker`);
+    assert.ok(g('keycard') >= 1 && o('keycard') + b('keycard') === 0, 'the keycards are not under the gas, or not only there');
     // four places in five there have something lying in them (on the rest of the map it is three in five)
     assert.ok(gasThings / places >= 0.8, `only ${gasThings} things on the ${places} places under the gas`);
     // helmets, plates, scopes: common there, rare everywhere else

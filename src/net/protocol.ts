@@ -117,6 +117,8 @@ export type C2S =
   | { t: 'barrel'; i: number }
   /** we have lit fireplace number i (see src/sim/fires.ts), standing beside it */
   | { t: 'fire'; i: number }
+  /** a keycard was put to the bunker's door */
+  | { t: 'bunker' }
   | { t: 'gear'; g: string[] }
   | { t: 'hit'; to: number; zone: HitZone; w: string; dist: number; sup: boolean; bonus: number; /** a shotgun: how many of the shot's pellets landed */ n?: number }
   | { t: 'take'; uid: string }
@@ -181,6 +183,8 @@ export type S2C =
       infected?: InfectedInfo[];
       /** the hour: which share of the day it is at the moment of this message (see src/sim/daynight.ts) */
       hour?: number;
+      /** seconds the bunker's door still stands open (0: it is shut) */
+      bunker?: number;
       max: number;
     }
   | { t: 'join'; p: PlayerInfo }
@@ -196,6 +200,8 @@ export type S2C =
   | { t: 'barrel+'; i: number }
   /** fireplace number i is alight, with so many seconds of burning left */
   | { t: 'fire'; i: number; left: number }
+  /** the bunker's door stands open for so many seconds more */
+  | { t: 'bunker'; left: number }
   | { t: 'gear'; id: number; g: string[] }
   | { t: 'dmg'; from: number; amount: number; zone: HitZone; w: string; dir: [number, number, number] }
   | { t: 'hitok'; to: number; amount: number; zone: HitZone }

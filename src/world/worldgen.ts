@@ -4,6 +4,7 @@
 // on collision and spawn points.
 
 import { RNG, Simplex, hash2, clamp, lerp, smoothstep } from '../core/noise';
+import { BUNKER, bunkerAt, type Place } from '../sim/bunker';
 
 export const WORLD_SEED = 1337;
 export const WORLD_SIZE = 1024; // metres, square, centred on the origin
@@ -20,10 +21,23 @@ export const PLAY_RADIUS = 400;
  */
 export const EXPANSION = { name: 'Chemical Works', x: -368, z: 368, floor: 84, wall: 56, level: 12 };
 /** Where the map is played: the valley, and what has been added to it. */
+/** Where the bunker is (see src/sim/bunker.ts): straight across the map from the works, in the foot of the hills there. */
+export const BUNKER_AT = { x: (-EXPANSION.x / Math.hypot(EXPANSION.x, EXPANSION.z)) * BUNKER.out, z: (-EXPANSION.z / Math.hypot(EXPANSION.x, EXPANSION.z)) * BUNKER.out };
 export const PLAY_AREAS: { x: number; z: number; r: number }[] = [
   { x: 0, z: 0, r: PLAY_RADIUS },
   { x: EXPANSION.x, z: EXPANSION.z, r: EXPANSION.floor + EXPANSION.wall },
+  { x: BUNKER_AT.x, z: BUNKER_AT.z, r: BUNKER.floor + BUNKER.wall },
 ];
+
+/** Where the bunker stands in a world, and which way it faces: its pad's own level, not the hole under it. Null in a world that has none. */
+export function bunkerPlace(world: Pick<World, 'sites' | 'heights'>): Place | null {
+  const s = world.sites.find((q) => q.kind === 'bunker');
+  if (!s) return null;
+  const flat = { x: s.x, y: 0, z: s.z, rot: s.rot };
+  // (the level ground beside the pad: under the pad itself the ground is dug away)
+  const [x, , z] = bunkerAt(flat, BUNKER.pad.r + 3, 0);
+  return { ...flat, y: heightAt(world.heights, x, z) };
+}
 /** is this place inside the part of the map that is played in */
 export function inPlay(x: number, z: number, margin = 0): boolean {
   return PLAY_AREAS.some((a) => Math.hypot(x - a.x, z - a.z) < a.r - margin);
@@ -36,18 +50,27 @@ export function inPlay(x: number, z: number, margin = 0): boolean {
 export function playOutline(): { x: number; z: number; r: number; from: number; to: number }[] {
   const out: { x: number; z: number; r: number; from: number; to: number }[] = [];
   for (const a of PLAY_AREAS) {
-    let from = 0, to = Math.PI * 2;
+    // the parts of this round that lie inside another: [toward the other, how far either side of that]
+    const cuts: [number, number][] = [];
     for (const b of PLAY_AREAS) {
       if (a === b) continue;
       const d = Math.hypot(b.x - a.x, b.z - a.z);
       if (d >= a.r + b.r || d <= Math.abs(a.r - b.r)) continue;
-      // the part of this round that lies inside the other is so far either side of the line between them
-      const toward = Math.atan2(b.z - a.z, b.x - a.x);
-      const half = Math.acos((a.r * a.r + d * d - b.r * b.r) / (2 * a.r * d));
-      from = toward + half;
-      to = toward - half + Math.PI * 2;
+      cuts.push([Math.atan2(b.z - a.z, b.x - a.x), Math.acos((a.r * a.r + d * d - b.r * b.r) / (2 * a.r * d))]);
     }
-    out.push({ ...a, from, to });
+    if (!cuts.length) {
+      out.push({ ...a, from: 0, to: Math.PI * 2 });
+      continue;
+    }
+    // what is left: from the end of each cut, round to the start of the next
+    cuts.sort((p, q) => p[0] - q[0]);
+    cuts.forEach(([mid, half], k) => {
+      const next = cuts[(k + 1) % cuts.length];
+      const from = mid + half;
+      let to = next[0] - next[1];
+      while (to <= from) to += Math.PI * 2;
+      out.push({ ...a, from, to });
+    });
   }
   return out;
 }
@@ -84,7 +107,7 @@ export interface BuildingPlot {
 }
 
 /** what stands at an outlying place */
-export type SiteKind = 'lodge' | 'farm' | 'post' | 'yard' | 'dacha' | 'hamlet' | 'depot' | 'works';
+export type SiteKind = 'lodge' | 'farm' | 'post' | 'yard' | 'dacha' | 'hamlet' | 'depot' | 'works' | 'bunker';
 
 /** A small place away from the village: a couple of buildings in a clearing. */
 export interface Site {
@@ -466,6 +489,8 @@ export function generateWorld(seed = WORLD_SEED): World {
     depot: [['barracks', 0, -3, 0], ['garage', -16.5, -1, 0.22], ['guardpost', 13.5, 3.5, -0.3], ['shed', 12.5, -12.5, -0.5]],
     // (laid out where it is made, at the end: see the first expansion)
     works: [],
+    // (nothing stands on it that is a building of the map's: what is there is made in world/bunker.ts)
+    bunker: [],
   };
   for (const st of sites) {
     const c = Math.cos(st.rot), sn = Math.sin(st.rot);
@@ -992,6 +1017,62 @@ export function generateWorld(seed = WORLD_SEED): World {
     mark(E.x, E.z, R + 6);
     for (const [x, z] of track) mark(x, z, 13);
     for (const k of again) paint(k % N, Math.floor(k / N));
+  }
+
+  // --- the second expansion: the bunker (see src/sim/bunker.ts), in a hollow cut into the
+  // foot of the hills straight across the map from the works. By the same rule: nothing that
+  // was there before is moved or renumbered, and the ground is touched only where it stands.
+  // Its mouth opens straight onto the valley floor: there is no track to it.
+  {
+    const B = BUNKER;
+    const before = heights.slice();
+    const bx = BUNKER_AT.x, bz = BUNKER_AT.z, bl = Math.hypot(bx, bz);
+    // the way out of it: back toward the middle of the map
+    const ux = -bx / bl, uz = -bz / bl;
+    const rot = Math.atan2(ux, uz);
+    const R = B.floor + B.wall;
+    // level with the valley floor at its mouth
+    const floorY = heightAt(before, bx + ux * (R - 6), bz + uz * (R - 6)) + 0.3;
+    for (let iz = Math.max(0, Math.floor((bz - R + half) / CELL)); iz <= Math.min(N - 1, Math.ceil((bz + R + half) / CELL)); iz++) {
+      for (let ix = Math.max(0, Math.floor((bx - R + half) / CELL)); ix <= Math.min(N - 1, Math.ceil((bx + R + half) / CELL)); ix++) {
+        const x = -half + ix * CELL, z = -half + iz * CELL;
+        const d = Math.hypot(x - bx, z - bz);
+        if (d >= R) continue;
+        const wander = 7 * n2.fbm(x * 0.013 - 3, z * 0.013 + 11, 3) * smoothstep(B.floor - 10, B.floor - 3, d) * (1 - smoothstep(R - 14, R - 3, d));
+        const t = clamp((d + wander - B.floor) / B.wall, 0, 1);
+        const w = 1 - (0.3 * smoothstep(0, 1, t) + 0.7 * t);
+        const i = idx(ix, iz);
+        // (dead level under and about the pad: a slab is laid on it)
+        const level = floorY + 0.3 * n3.fbm(x * 0.02 + 5, z * 0.02, 3) * smoothstep(21, 28, d);
+        heights[i] = lerp(heights[i], level + (heights[i] - level) * 0.12 * t, w);
+        // the hole the first level stands in
+        const dx = x - bx, dz = z - bz;
+        const r = dx * Math.cos(rot) - dz * Math.sin(rot), f = dx * Math.sin(rot) + dz * Math.cos(rot);
+        if (Math.abs(r) <= B.pit.r && f >= B.pit.back && f <= B.pit.front) heights[i] = floorY - B.depth - 0.3;
+      }
+    }
+    sites.push({ name: B.name, kind: 'bunker', x: bx, z: bz, rot, later: true });
+    pois.push({ name: B.name, x: bx, z: bz, radius: 40 });
+    // what grew or lay there: nothing on its floor, nothing left hanging on the cut hillside
+    for (const list of [trees, rocks, props]) {
+      for (let k = list.length - 1; k >= 0; k--) {
+        const t = list[k];
+        const d = Math.hypot(t.x - bx, t.z - bz);
+        if (d > R + 2) continue;
+        if (d < B.floor + 4 || slopeAt(heights, t.x, t.z) > 1.05) list.splice(k, 1);
+        else t.y += heightAt(heights, t.x, t.z) - heightAt(before, t.x, t.z);
+      }
+    }
+    // and the ground is painted again where any of this reaches (its floor is gravel, as the works' is)
+    cleared = { x: bx, z: bz, r: B.floor };
+    for (let iz = Math.max(0, Math.floor((bz - R - 6 + half) / CELL)); iz <= Math.min(N - 1, Math.ceil((bz + R + 6 + half) / CELL)); iz++)
+      for (let ix = Math.max(0, Math.floor((bx - R - 6 + half) / CELL)); ix <= Math.min(N - 1, Math.ceil((bx + R + 6 + half) / CELL)); ix++) {
+        paint(ix, iz);
+        // (no grass under the pad, nor in the hole: it would stand up through the concrete)
+        const dx = -half + ix * CELL - bx, dz = -half + iz * CELL - bz;
+        const r = dx * Math.cos(rot) - dz * Math.sin(rot), f = dx * Math.sin(rot) + dz * Math.cos(rot);
+        if (Math.abs(r) <= B.pad.r + 2.5 && f >= B.pad.back - 2.5 && f <= B.hut.front + 3) grass[idx(ix, iz)] = 0;
+      }
   }
 
   return {

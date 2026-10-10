@@ -47,7 +47,7 @@ export const JEEP = {
    */
   crash: { from: 4, per: 9, most: 160, hurtFrom: 11, hurtPer: 6, hurtMost: 50 },
   /** what somebody carrying a tag they took is told at the door: they go on foot */
-  noTag: 'Not while you carry a tag you took: it goes on foot.',
+  noTag: 'Not while you carry a tag you took, or a keycard: they go on foot.',
   /** a jeep that left the map or fell through it is stood back up where it started */
   floor: -40,
 };

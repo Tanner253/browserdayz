@@ -58,11 +58,15 @@ import { breaksOnHit } from '../sim/injury';
 import { MenuScenes } from './menu-scenes';
 import type { MenuSpot } from '../ui/hud';
 import { Lamps } from './lamps';
+import { BunkerSite } from '../world/bunker';
+import { BUNKER, bunkerDark } from '../sim/bunker';
 
 const _gasHead = new THREE.Vector3();
 const _lampPos = new THREE.Vector3(), _lampDir = new THREE.Vector3();
 /** the colour of a street lamp's light (sodium: warm) */
 const STREET_LAMP = new THREE.Color(1, 0.72, 0.38);
+/** and of a bunker's lamp (an old bulb in a cage) */
+const BUNKER_LAMP = new THREE.Color(1, 0.84, 0.58);
 
 export interface WorldSystems {
   r: Renderer;
@@ -84,7 +88,7 @@ interface TimedAction {
 }
 
 /** bump when the map's loot points change: spawned loot from older saves is re-rolled */
-const LOOT_REV = 12;
+const LOOT_REV = 13;
 const QUICK_KEYS = ['Digit5', 'Digit6', 'Digit7', 'Digit8'];
 /** what can be held, in the order of the keys 1 to 4 */
 const HAND_SLOTS = ['primary', 'secondary', 'holster', 'melee'] as const;
@@ -119,6 +123,8 @@ export class Game {
   private menu!: MenuScenes;
   /** the fireplaces: which are alight, and the look and sound of them */
   fires!: Fires;
+  /** the bunker: what is built of it, its door and its lamps */
+  bunker!: BunkerSite;
   /** every lit lamp: carried, driven behind, standing in the street */
   lamps!: Lamps;
   private streetLamps: THREE.Vector3[] = [];
@@ -240,6 +246,7 @@ export class Game {
     this.effects = new Effects(r.scene, atmo);
     this.fires = new Fires(world, r.scene, this.effects, atmo);
     this.lamps = new Lamps(r.scene);
+    this.bunker = new BunkerSite(world, atmo, r.scene);
     // the street lamps: where the head of each is
     for (const q of world.props) if (q.kind.startsWith('street_lamp')) this.streetLamps.push(new THREE.Vector3(q.x, q.y + 3.55 * (q.scale ?? 1), q.z));
     this.fireTag.className = 'hud-fire-tag';
@@ -485,10 +492,12 @@ export class Game {
         hamlet: ['a hamlet', 'A shop between houses, a barn behind, a fire ring to rest by.'],
         depot: ['an army depot', 'A barracks, a workshop and a watchtower: rifles and kit.'],
         works: ['', ''],
+        bunker: ['', ''],
       };
       for (const q of world.pois.slice(1)) {
         const site = world.sites.find((st) => st.name === q.name);
-        if (q.name === GAS.place) spots.push({ x: q.x, z: q.z, name: q.name, tip: 'Under gas: you need a gas mask on to breathe here. The richest place on the map: rifles, ammunition, helmets, plate carriers and scopes.', kind: 'gas', label: true });
+        if (site?.kind === 'bunker') spots.push({ x: q.x, z: q.z, name: q.name, tip: 'Under the ground, in the dark. Its door opens to a keycard, and the keycards are in the gas. The shotgun is kept here, and nowhere else.', kind: 'army', label: true });
+        else if (q.name === GAS.place) spots.push({ x: q.x, z: q.z, name: q.name, tip: 'Under gas: you need a gas mask on to breathe here. The richest place on the map: rifles, ammunition, helmets, plate carriers and scopes.', kind: 'gas', label: true });
         else if (site) spots.push({ x: q.x, z: q.z, name: q.name, tip: SITE[site.kind][1], kind: site.kind === 'depot' || site.kind === 'post' ? 'army' : 'site' });
         else if (/checkpoint/i.test(q.name)) spots.push({ x: q.x, z: q.z, name: q.name, tip: 'Guard posts, a barracks and a watchtower: rifles, plate carriers, grenades. The track to the works starts here.', kind: 'army', label: true });
         else spots.push({ x: q.x, z: q.z, name: q.name, tip: 'A cabin in the hills, with a fire ring to rest by. A weapon is always left here.', kind: 'site' });
@@ -764,6 +773,7 @@ export class Game {
     for (const b of this.s.veg.barrels) b?.setThere(!w.barrels?.includes(b.i));
     this.fires.clear();
     for (const [i, left] of w.fires ?? []) this.fires.set(i, left);
+    this.bunker.setOpen(w.bunker ?? 0);
     for (const p of w.players) void this.addRemote(p);
     this.garage.clear();
     for (const v of w.vehicles ?? []) this.garage.add(v);
@@ -839,6 +849,10 @@ export class Game {
     net.on('boom', (m) => this.blowBarrel(m.i, false));
     net.on('barrel+', (m) => this.s.veg.barrels[m.i]?.setThere(true));
     net.on('fire', (m) => this.fires.set(m.i, m.left));
+    net.on('bunker', (m) => {
+      if (m.left > 0 && this.bunker.openFor <= 0 && this.bunker.place && Math.hypot(this.player.pos.x - this.bunker.place.x, this.player.pos.z - this.bunker.place.z) < 60) this.hud.note('The bunker door is opening', 'warn');
+      this.bunker.setOpen(m.left);
+    });
     net.on('gear', (m) => this.remotes.get(m.id) && void this.wear(this.remotes.get(m.id)!.avatar, m.g));
     net.on('dmg', (m) => this.takeHit(m));
     net.on('death', (m) => {
@@ -953,7 +967,7 @@ export class Game {
   /** carrying a tag taken off somebody (the one round their own neck does not count): no jeep takes them (see Garage.use) */
   private get tagged() {
     const me = publicId();
-    return !!this.inv.find((it) => it.id === 'dogtag' && it !== this.inv.neck && it.pid !== me);
+    return !!this.inv.find((it) => (it.id === 'dogtag' && it !== this.inv.neck && it.pid !== me) || it.id === 'keycard');
   }
 
   /**
@@ -1433,6 +1447,10 @@ export class Game {
       // the street lamps of the village, from dusk
       for (const at of this.streetLamps) if (at.distanceToSquared(cam.position) < 260 * 260) this.lamps.glow(at, STREET_LAMP, Math.min(1, (atmo.night - 0.3) / 0.3), 22);
     }
+    // the bunker: its door, its lamps, and the dark of it (no daylight comes down the stair)
+    this.bunker.update(dt, cam.position, (pos, burn) => this.lamps.glow(pos, BUNKER_LAMP, burn * 0.55, 9.5));
+    const under = bunkerDark(this.bunker.place, cam.position.x, cam.position.y, cam.position.z);
+    atmo.cover.ground = { sun: 1 - under, sky: 1 - 0.985 * under };
     this.lamps.update(cam, dt);
   }
 
@@ -2114,6 +2132,22 @@ export class Game {
     this.mark = null;
     this.focus = null;
     if (this.player.dead || this.invUI.isOpen || this.use) return;
+    // at the bunker's door, shut: a keycard is what F does there
+    const door = this.bunker.openFor <= 0 ? this.bunker.doorAt(_lampPos) : null;
+    if (door && door.distanceTo(cam.position) < 2.6 && !this.garage.ride) {
+      const has = this.inv.count('keycard') > 0;
+      this.prompt = has ? '<kbd>F</kbd>Use the keycard' : '<small>Locked. A keycard opens it: they are kept under the gas</small>';
+      if (has && this.input.pressed('KeyF') && !this.hud.chatOpen) {
+        this.inv.take('keycard', 1);
+        this.inventoryChanged();
+        audio.click(1800, 0.4, 0.03);
+        audio.click(2700, 0.4, 0.05, 0.18);
+        this.hud.note(`The reader takes the card. The door stands open for ${Math.round(BUNKER.door.open / 60)} minutes`, 'good');
+        if (this.online) this.net.send({ t: 'bunker' });
+        else this.bunker.setOpen(BUNKER.door.open);
+      }
+      return;
+    }
     // sat in a jeep there is one thing to do with F
     if (this.garage.ride) {
       if (this.input.pressed('KeyF') && !this.hud.chatOpen) this.garage.out();

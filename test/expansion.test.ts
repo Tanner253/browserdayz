@@ -3,7 +3,7 @@
 // `npx tsx test/expansion.test.ts`.
 
 import assert from 'node:assert/strict';
-import { CELL, EXPANSION as E, PLAY_AREAS, PLAY_RADIUS, WORLD_RES, WORLD_SIZE, generateWorld, heightAt, inPlay, playOutline, slopeAt, BUILDING_FOOTPRINT } from '../src/world/worldgen';
+import { BUNKER_AT, CELL, EXPANSION as E, PLAY_AREAS, PLAY_RADIUS, WORLD_RES, WORLD_SIZE, generateWorld, heightAt, inPlay, playOutline, slopeAt, BUILDING_FOOTPRINT } from '../src/world/worldgen';
 import { buildWorldData } from '../server/world';
 import { GAS, gasDepth, gasZone } from '../src/sim/gas';
 import { INFECTED, openGround } from '../src/sim/infected';
@@ -19,7 +19,9 @@ const ok = (name: string, fn: () => void) => {
  * The map before the expansion, as numbers taken off it the day before it was added (commit
  * f136435): the ground, the buildings, the starts, the trees, the loot points and the jeeps.
  */
-const WAS = { cells: 241540, heights: 3950402189, buildings: 72, buildingsHash: 2448790248, lastId: 'tower_71', spawns: 2697513077, trees: 11693, treesHash: 2254000829, lootPoints: 675, lootHash: 545356472, jeeps: 8, jeepsHash: 380833839, fires: 6 };
+// (The ground and the trees were counted again on 2026-10-09, from the same map, with the
+// bunker's hollow left out of the count as the works' is: taken before the bunker was dug.)
+const WAS = { cells: 234302, heights: 1986740555, buildings: 72, buildingsHash: 2448790248, lastId: 'tower_71', spawns: 2697513077, trees: 11269, treesHash: 3538601034, lootPoints: 675, lootHash: 545356472, jeeps: 8, jeepsHash: 380833839, fires: 6 };
 const hash = (parts: number[]) => {
   let h = 2166136261 >>> 0;
   for (const v of parts) {
@@ -38,6 +40,8 @@ const ground = (x: number, z: number) => heightAt(world.heights, x, z);
 /** the only ground the expansion may have touched: the cirque itself, and a strip along the track up to it from the checkpoint */
 const touched = (x: number, z: number) => {
   if (Math.hypot(x - E.x, z - E.z) < 160) return true;
+  // (and the bunker's hollow, on the far side of the map)
+  if (Math.hypot(x - BUNKER_AT.x, z - BUNKER_AT.z) < 96) return true;
   const dx = E.x - camp.x, dz = E.z - camp.z, l2 = dx * dx + dz * dz;
   const t = Math.max(0, Math.min(1, ((x - camp.x) * dx + (z - camp.z) * dz) / l2));
   return Math.hypot(x - (camp.x + dx * t), z - (camp.z + dz * t)) < 34 && Math.hypot(x - camp.x, z - camp.z) > 16;
@@ -71,14 +75,17 @@ ok('it lies outside the ring the map used to end at, inside the ground there is,
   assert.ok(Math.hypot(E.x, E.z) - E.floor > PLAY_RADIUS, 'its floor reaches into the old map');
   const R = E.floor + E.wall;
   assert.ok(Math.abs(E.x) + R < half && Math.abs(E.z) + R < half, 'it runs off the edge of the ground');
-  assert.equal(PLAY_AREAS.length, 2);
-  assert.ok(inPlay(0, 0) && inPlay(E.x, E.z) && inPlay(camp.x, camp.z));
-  assert.ok(!inPlay(-E.x, -E.z), 'the far corner of the map is not played in');
-  // one line round the two: each round's arc starts where the other's ends
-  const [a, b] = playOutline();
-  const at = (o: typeof a, t: number) => [o.x + Math.cos(t) * o.r, o.z + Math.sin(t) * o.r];
-  for (const [p, q] of [[at(a, a.to), at(b, b.from)], [at(b, b.to), at(a, a.from)]]) assert.ok(Math.hypot(p[0] - q[0], p[1] - q[1]) < 0.01, 'the line round the map does not meet itself');
-  assert.ok(a.to - a.from > Math.PI * 1.8 && b.to - b.from > Math.PI);
+  assert.equal(PLAY_AREAS.length, 3);
+  assert.ok(inPlay(0, 0) && inPlay(E.x, E.z) && inPlay(camp.x, camp.z) && inPlay(BUNKER_AT.x, BUNKER_AT.z));
+  assert.ok(!inPlay(E.x, -E.z) && !inPlay(-E.x, E.z), 'the other corners of the map are not played in');
+  // one line round the whole: every arc ends where another begins (the valley's round is in two pieces, between the two places added to it)
+  const arcs = playOutline();
+  assert.equal(arcs.length, 4);
+  const at = (o: (typeof arcs)[number], t: number) => [o.x + Math.cos(t) * o.r, o.z + Math.sin(t) * o.r];
+  for (const o of arcs) {
+    const end = at(o, o.to);
+    assert.ok(arcs.some((q) => q !== o && Math.hypot(at(q, q.from)[0] - end[0], at(q, q.from)[1] - end[1]) < 0.01), 'the line round the map does not meet itself');
+  }
 });
 
 ok('its floor is level, with a wall round it on every side but the way in', () => {
