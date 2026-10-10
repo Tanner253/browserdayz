@@ -229,12 +229,13 @@ export const LOCAL_MODELS = {
   // middle line and ends 4.4 m toward its door; the pegs stand 5.5 m out.
   tent_military: {
     dir: 'tent_military',
-    cut: { tall: 4.001, keep: (x, _y, z) => Math.abs(x) < 3.4 && z < 4.4 },
+    // (and the pole that stands on its middle line half a metre inside the doorway: whoever walked in, walked into it)
+    cut: { tall: 4.001, keep: (x, y, z) => Math.abs(x) < 3.4 && z < 4.4 && !(Math.abs(x) < 0.06 && y < 3 && z > 0.5 && z < 3.6) },
     scale: 1,
     tex: 2048,
     both: true,
     tags: ['prop'],
-    changes: 'Its guy ropes and pegs taken off; stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.',
+    changes: 'Its guy ropes and pegs taken off, and the pole inside its doorway; stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.',
   },
   // The K6-3 (2026-10-10): the heaviest helmet there is, its visor up. Its brow is toward -z as it comes, which is
   // the way a body faces. It came a hundred units wide: at this it is 29 cm, a size over the combat helmet.
