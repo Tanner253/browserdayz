@@ -1220,7 +1220,9 @@ export class AudioEngine {
     u.lang = u.voice.lang;
     u.pitch = 0.7 + voice * 0.6;
     u.rate = 1.25;
-    u.volume = Math.max(0.04, Math.min(1, this.volume * (distance > 0 ? 1 / (1 + distance / 12) : 0.85)));
+    // (Somebody else's call is as loud as this voice goes until they are a good way off: at twelve metres it was
+    // half, and nobody near heard it over anything. The browser's voice has no more to give than all of it.)
+    u.volume = Math.max(0.08, Math.min(1, this.volume * 1.8 * (distance > 0 ? 1 / (1 + distance / 45) : 0.6)));
     setTimeout(() => synth.speak(u), Math.min(400, (distance / 343) * 1000));
     return true;
   }
