@@ -37,10 +37,23 @@ export const BUNKER_AT = { x: (-EXPANSION.x / Math.hypot(EXPANSION.x, EXPANSION.
  * Zona's; `gate`: the round of the Zona that joins it to the valley, over the road between the two.
  */
 export const TOWN = { name: 'Kamenka', x: 625, z: 365, street: [0.349, 0.937] as [number, number], r: 150, /** how far from its middle a place for a thing is the town's own (see the economy) */ stocked: 118, gate: { x: 455, z: 203, r: 110 } };
-/** the line the road takes on from where it used to run off the old ground: round to the town's street, down it, and away through the hills */
+/**
+ * Kamenka lies in a valley of its own, as the old map lies in its valley: a level floor the shape of the town
+ * (longer down the street than across it), and a wooded rim all round that rises from it, crests and falls away
+ * again outside. This is how far out a spot is: 0 in the middle, 1 at the edge of the floor (95 m down the
+ * street, 58 m across it), 2.55 on the crest of the rim, 3.4 at its outer foot. West and north of the town the
+ * rim stands on ground of the old map, where there was nothing but the hill and its trees.
+ */
+export function kamenkaQ(x: number, z: number): number {
+  const l = Math.hypot(...TOWN.street), ux = TOWN.street[0] / l, uz = TOWN.street[1] / l, dx = x - TOWN.x, dz = z - TOWN.z;
+  return Math.hypot((dx * ux + dz * uz) / 95, (dx * uz - dz * ux) / 58);
+}
+export const KAMENKA = { floor: 1, crest: 2.55, foot: 3.4 };
+/** the line the road takes on from where it used to run off the old ground: round to the town's street, and down it */
 export function eastRoad(): [number, number][] {
   const l = Math.hypot(...TOWN.street), on = (k: number): [number, number] => [TOWN.x + (TOWN.street[0] / l) * k, TOWN.z + (TOWN.street[1] / l) * k];
-  return [[540, 230], [566, 243], [585, 262], on(-80), on(-30), on(30), on(80), [676, 486], [716, 538], [770, 596], [800, 628]];
+  // (and ends at the end of its street: carried on, it ran off the edge of the ground into nothing)
+  return [[540, 230], [566, 243], [585, 262], on(-80), on(-30), on(30), on(92)];
 }
 /** And two places far out in that country, outside the Zona: nothing is earned at them, and nobody is looking. */
 export const OUTLYING: { name: string; kind: 'squat' | 'camp'; x: number; z: number; rot: number }[] = [
@@ -302,34 +315,16 @@ export function generateWorld(seed = WORLD_SEED): World {
   };
   // The country the map was grown by is the top of the old valley's rim, and by the rule above it runs on level
   // to the edge of the ground and stops. It is to be what the old map was: a bowl. Mountains stand all along the
-  // new edge, hills stand round the town, and the road has a way through both. None of it is felt inside the old
-  // square (`mask`), so the old ground is the old ground.
-  const way = eastRoad();
-  const ringParts = (x: number, z: number) => {
-    const e = Math.max(Math.abs(x), Math.abs(z)), out = e - OLD_HALF;
-    if (out <= 0) return null;
-    let road = 1e9;
-    for (let k = 0; k < way.length - 1; k++) {
-      const [ax, az] = way[k], dx = way[k + 1][0] - ax, dz = way[k + 1][1] - az;
-      const t = clamp(((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz), 0, 1);
-      road = Math.min(road, Math.hypot(x - ax - dx * t, z - az - dz * t));
-    }
-    const dT = Math.hypot(x - TOWN.x, z - TOWN.z);
-    return {
-      mask: smoothstep(0, 64, out),
-      // how much of a mountain this is: nothing 120 m in from the edge, all of one at it
-      edge: 1 - smoothstep(12, 120, half - e),
-      // and of the hills that stand round the town, a street's length off
-      hill: smoothstep(120, 195, dT) * (1 - smoothstep(300, 400, dT)),
-      pass: smoothstep(16, 75, road),
-    };
+  // new edge, a long slope a wood can stand on, all the way round. None of it is felt inside the old square, so the
+  // old ground is the old ground. (The town has a valley of its own besides: see the east country, at the end.)
+  /** how much of a mountain a spot of that country is: nothing 185 m in from the new edge, all of one at it, and nothing at all on the old ground */
+  const edgeOf = (x: number, z: number) => {
+    const e = Math.max(Math.abs(x), Math.abs(z));
+    return e <= OLD_HALF ? 0 : (1 - smoothstep(10, 185, half - e)) * smoothstep(0, 64, e - OLD_HALF);
   };
   const ringShape = (x: number, z: number) => {
-    const q = ringParts(x, z);
-    if (!q) return 0;
-    const peak = 50 + 32 * (0.5 + 0.5 * n1.noise(x * 0.012 + 5, z * 0.012 - 9));
-    const knoll = 26 * (0.7 + 0.6 * (0.5 + 0.5 * n2.noise(x * 0.01 - 3, z * 0.01 + 7)));
-    return (Math.pow(q.edge, 1.3) * peak + q.hill * knoll * (1 - q.edge)) * q.pass * q.mask;
+    const m = edgeOf(x, z);
+    return m <= 0 ? 0 : Math.pow(m, 1.15) * (48 + 26 * (0.5 + 0.5 * n1.noise(x * 0.012 + 5, z * 0.012 - 9)));
   };
   const heights = new Float32Array(N * N);
   for (let iz = 0; iz < N; iz++) {
@@ -642,6 +637,13 @@ export function generateWorld(seed = WORLD_SEED): World {
   // --- masks
   /** the floor of the expansion, once it has been cut (nothing, while the map is made as it first was) */
   let cleared: { x: number; z: number; r: number } | null = null;
+  /** Kamenka's valley is made (see the east country, at the end): nothing, while the map is made as it first was */
+  let valley = false;
+  /** how much of the rim's height a spot is at: none on the floor, a steady climb to the crest, and down again outside */
+  const rimOf = (q: number) => {
+    const up = clamp((q - 1.15) / (KAMENKA.crest - 1.15), 0, 1);
+    return (0.55 * up + 0.45 * smoothstep(0, 1, up)) * (1 - smoothstep(KAMENKA.crest, KAMENKA.foot, q));
+  };
   const forestMask = (x: number, z: number) => {
     let f = n2.fbm(x * 0.0055 + 70, z * 0.0055 - 40, 4) * 0.9 + 0.12 * n3.noise(x * 0.04, z * 0.04);
     const r = Math.hypot(x, z);
@@ -660,11 +662,19 @@ export function generateWorld(seed = WORLD_SEED): World {
     if (out > 0) {
       let g = n2.fbm(x * 0.0042 + 40, z * 0.0042 - 23, 3) * 1.15 - 0.1 + 0.12 * n3.noise(x * 0.04, z * 0.04);
       // (the mountains at the edge and the hills round the town are wooded, as the old rim is: the open ground is between them)
-      const q = ringParts(x, z)!;
-      g += 0.55 * q.edge + 0.3 * q.hill * q.pass;
+      g += 0.75 * edgeOf(x, z);
       g -= 1.0 * (1 - smoothstep(70, 105, Math.hypot(x - TOWN.x, z - TOWN.z)));
       for (const o of OUTLYING) g -= 0.9 * (1 - smoothstep(22, 40, Math.hypot(x - o.x, z - o.z)));
       f = lerp(f, g, smoothstep(0, 60, out));
+    }
+    // Kamenka's valley, once it is made (and not before: the old map is planted and strewn by this rule as it always
+    // was). Wooded all the way up its rim and over, a clearing here and there, and the floor of it the town's.
+    if (valley) {
+      const q = kamenkaQ(x, z);
+      if (q < KAMENKA.foot) {
+        const wood = 0.12 + 0.5 * rimOf(q) + 0.42 * n2.fbm(x * 0.006 - 11, z * 0.006 + 29, 3) - 1.3 * (1 - smoothstep(1.0, 1.3, q));
+        f = lerp(f, wood, 1 - smoothstep(3.0, KAMENKA.foot, q));
+      }
     }
     return f;
   };
@@ -803,10 +813,11 @@ export function generateWorld(seed = WORLD_SEED): World {
       const y = heightAt(heights, x, z);
       if (f > 0.08) {
         const edge = f < 0.2;
-        if (hv > smoothstep(0.08, 0.3, f) * 0.92) continue;
+        // (two trees in three of what the old rule would plant: there is a third again as much ground out here)
+        if (hv > smoothstep(0.08, 0.3, f) * 0.62) continue;
         let kind: string;
-        if (edge && hv < 0.45) kind = hv < 0.18 ? 'bush_a' : hv < 0.3 ? 'bush_b' : 'birch_a';
-        else if (hv < 0.12) kind = 'birch_b';
+        if (edge && hv < 0.3) kind = hv < 0.12 ? 'bush_a' : hv < 0.2 ? 'bush_b' : 'birch_a';
+        else if (hv < 0.08) kind = 'birch_b';
         else kind = pines[Math.floor(hash2(Math.round(x), Math.round(z), 5) * pines.length)];
         trees.push({ kind, x, y, z, rot: hx * Math.PI * 2, scale: 0.85 + hz * 0.35 });
       } else if (f > -0.25 && hv < 0.025) {
@@ -1278,13 +1289,42 @@ export function generateWorld(seed = WORLD_SEED): World {
     const T = TOWN;
     const rng4 = new RNG(seed + 9001);
     const first = buildings.length;
+    const before = heights.slice();
     const cell = (x: number, z: number) => idx(clamp(Math.round((x + half) / CELL), 0, N - 1), clamp(Math.round((z + half) / CELL), 0, N - 1));
 
     // 1. level ground: for the town, and for each of the two places
-    // (twice over: once leaves a quarter of the hill it stands on, and a street of houses wall to wall wants less.
-    // With a quarter left, the floors down the street stepped a metre from house to house.)
-    flattenArea(T.x, T.z, 86, 112, 0.5);
-    flattenArea(T.x, T.z, 86, 112, 0.3);
+    // The town's is a valley of its own (see kamenkaQ), as the old map lies in one. Its rim is raised: on the new
+    // ground east and south of the town, where it runs up into the mountains of the edge, and on the old map's
+    // hill west and north of it, where there was nothing but the hill. A way is left through it where the road
+    // comes over from the old valley, wide enough that its sides are slopes and not walls. And its floor is level.
+    valley = true;
+    const through: [number, number][] = [...path2.filter(([x]) => x > 360), ...eastRoad()];
+    const fromRoad = (x: number, z: number) => {
+      let best = 1e9;
+      for (let k = 0; k < through.length - 1; k++) {
+        const [ax, az] = through[k], dx = through[k + 1][0] - ax, dz = through[k + 1][1] - az;
+        const t = clamp(((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz || 1), 0, 1);
+        best = Math.min(best, Math.hypot(x - ax - dx * t, z - az - dz * t));
+      }
+      return best;
+    };
+    const floorY = base(T.x, T.z), REACH = 345;
+    for (let iz = Math.max(0, Math.floor((T.z - REACH + half) / CELL)); iz <= Math.min(N - 1, Math.ceil((T.z + REACH + half) / CELL)); iz++) {
+      for (let ix = Math.max(0, Math.floor((T.x - REACH + half) / CELL)); ix <= Math.min(N - 1, Math.ceil((T.x + REACH + half) / CELL)); ix++) {
+        const x = -half + ix * CELL, z = -half + iz * CELL, q = kamenkaQ(x, z);
+        if (q >= KAMENKA.foot) continue;
+        const i = idx(ix, iz);
+        // (as high as a wood is tall three times over, and not the same height twice; where the mountains of the edge
+        // already stand, whichever of the two is the higher)
+        const crest = 38 + 16 * (0.5 + 0.5 * n1.noise(x * 0.011 - 7, z * 0.011 + 3)) + 5 * n3.fbm(x * 0.03, z * 0.03, 3);
+        // (Inside the valley the rim is the only hill there is: the mountains of the edge begin again at its crest.
+        // Left standing under it, they came down to the very edge of the floor east of the town, as a bare wall.)
+        const edge = ringShape(x, z);
+        heights[i] += Math.max(rimOf(q) * crest * smoothstep(18, 115, fromRoad(x, z)), edge * smoothstep(1.7, KAMENKA.crest, q)) - edge;
+        const level = 1 - smoothstep(1.0, 1.32, q);
+        if (level > 0) heights[i] = lerp(heights[i], floorY + 0.3 * n3.fbm(x * 0.02, z * 0.02, 3), level);
+      }
+    }
     for (const o of OUTLYING) flattenArea(o.x, o.z, 24, 52, 0.4);
 
     // 2. the road: on from its old end, round to the line of the town's street, down that, and away off the far
@@ -1390,7 +1430,8 @@ export function generateWorld(seed = WORLD_SEED): World {
     // (and once more, close in: they stand five metres apart down the street, and a neighbour's skirt reached the next one's wall)
     for (const b of added) pad(b, 2.0, 1.6);
 
-    // 4. what was planted there: nothing on the road, in a building or in a yard, and few trees in the town
+    // 4. What grows in the valley. Everything that grew there is taken up, the old map's trees on that hill too (it
+    // is another hill now), and it is planted again by the rule as it is there now: the rim wooded, the floor the town's.
     const inAdded = (x: number, z: number, margin: number) =>
       added.some((b) => {
         const [w, d] = BUILDING_FOOTPRINT[b.type];
@@ -1399,13 +1440,40 @@ export function generateWorld(seed = WORLD_SEED): World {
       });
     for (let k = trees.length - 1; k >= 0; k--) {
       const t = trees[k];
-      // (never a tree of the old map)
-      if (Math.abs(t.x) <= OLD_HALF && Math.abs(t.z) <= OLD_HALF) continue;
-      const dT = Math.hypot(t.x - T.x, t.z - T.z), far = OUTLYING.every((o) => Math.hypot(t.x - o.x, t.z - o.z) > 62);
-      if (dT > 128 && far && nd[cell(t.x, t.z)] > 19) continue;
-      const gone = nd[cell(t.x, t.z)] < ROAD_W / 2 + 4 || inAdded(t.x, t.z, 4) || OUTLYING.some((o) => Math.hypot(t.x - o.x, t.z - o.z) < 24) || (dT < 92 && (t.kind.startsWith('pine') || hash2(Math.round(t.x), Math.round(t.z), 77) < 0.6));
-      if (gone) trees.splice(k, 1);
-      else t.y = heightAt(heights, t.x, t.z);
+      if (kamenkaQ(t.x, t.z) < KAMENKA.foot || (!(Math.abs(t.x) <= OLD_HALF && Math.abs(t.z) <= OLD_HALF) && OUTLYING.some((o) => Math.hypot(t.x - o.x, t.z - o.z) < 24))) trees.splice(k, 1);
+      else if (OUTLYING.some((o) => Math.hypot(t.x - o.x, t.z - o.z) < 62)) t.y = heightAt(heights, t.x, t.z);
+    }
+    for (let gz = T.z - REACH; gz < T.z + REACH; gz += TREE_STEP) {
+      for (let gx = T.x - REACH; gx < T.x + REACH; gx += TREE_STEP) {
+        const hx = hash2(Math.round(gx * 10), Math.round(gz * 10), seed + 51);
+        const hz = hash2(Math.round(gz * 10), Math.round(gx * 10), seed + 57);
+        const x = gx + (hx - 0.5) * TREE_STEP * 0.9, z = gz + (hz - 0.5) * TREE_STEP * 0.9;
+        if (kamenkaQ(x, z) >= KAMENKA.foot || Math.abs(x) > half - 8 || Math.abs(z) > half - 8) continue;
+        const i = cell(x, z);
+        if (roadDist[i] < ROAD_W / 2 + 4 || trackDist[i] < 3 || inAdded(x, z, 4) || slopeAt(heights, x, z) > 1.05) continue;
+        const f = forestMask(x, z), hv = hash2(Math.round(x * 7), Math.round(z * 7), seed + 53), y = heightAt(heights, x, z);
+        if (f > 0.08) {
+          if (hv > smoothstep(0.08, 0.3, f) * 0.85) continue;
+          let kind: string;
+          if (f < 0.2 && hv < 0.4) kind = hv < 0.16 ? 'bush_a' : hv < 0.27 ? 'bush_b' : 'birch_a';
+          else if (hv < 0.11) kind = 'birch_b';
+          else kind = pines[Math.floor(hash2(Math.round(x), Math.round(z), 5) * pines.length)];
+          trees.push({ kind, x, y, z, rot: hx * Math.PI * 2, scale: 0.85 + hz * 0.35 });
+        } else if (f > -0.25 && hv < 0.025) {
+          trees.push({ kind: hv < 0.01 ? 'oak_a' : hv < 0.018 ? 'ash_a' : 'birch_a', x, y, z, rot: hx * Math.PI * 2, scale: 0.9 + hz * 0.3 });
+        } else if (f > -0.15 && hv > 0.97) {
+          trees.push({ kind: hv > 0.985 ? 'bush_a' : 'bush_b', x, y, z, rot: hx * Math.PI * 2, scale: 0.8 + hz * 0.5 });
+        }
+      }
+    }
+    // and what lay on that hill: gone from the floor and the road, and the rest on the ground as it is now
+    for (const list of [rocks, props]) {
+      for (let k = list.length - 1; k >= 0; k--) {
+        const t = list[k], q = kamenkaQ(t.x, t.z);
+        if (q >= KAMENKA.foot) continue;
+        if (q < 1.25 || roadDist[cell(t.x, t.z)] < ROAD_W / 2 + 2 || inAdded(t.x, t.z, 2.5)) list.splice(k, 1);
+        else t.y += heightAt(heights, t.x, t.z) - heightAt(before, t.x, t.z);
+      }
     }
 
     // 5. rocks and what lies in the woods, over all the new country: dice of their own
@@ -1414,7 +1482,7 @@ export function generateWorld(seed = WORLD_SEED): World {
       const x = rng4.range(-half + 14, half - 14), z = rng4.range(-half + 14, half - 14);
       const roll = rng4.next(), turn = rng4.range(0, 6.28), size = rng4.next(), which = rng4.int(0, 5), set = rng4.pick(rockKinds2);
       if (Math.abs(x) <= OLD_HALF + 2 && Math.abs(z) <= OLD_HALF + 2) continue;
-      if (roadDist[cell(x, z)] < ROAD_W / 2 + 2 || insideBuilding(x, z, 2) || Math.hypot(x - T.x, z - T.z) < 84 || OUTLYING.some((o) => Math.hypot(x - o.x, z - o.z) < 20)) continue;
+      if (roadDist[cell(x, z)] < ROAD_W / 2 + 2 || insideBuilding(x, z, 2) || kamenkaQ(x, z) < 1.25 || OUTLYING.some((o) => Math.hypot(x - o.x, z - o.z) < 20)) continue;
       const f = forestMask(x, z), y = heightAt(heights, x, z), slope = slopeAt(heights, x, z);
       if (f > 0.1) {
         if (roll < 0.45) props.push({ kind: 'fern_02', x, y, z, rot: turn, scale: 0.8 + size * 0.5 });
@@ -1435,7 +1503,9 @@ export function generateWorld(seed = WORLD_SEED): World {
       for (let iz = Math.max(0, Math.floor((cz - r + half) / CELL)); iz <= Math.min(N - 1, Math.ceil((cz + r + half) / CELL)); iz++)
         for (let ix = Math.max(0, Math.floor((cx - r + half) / CELL)); ix <= Math.min(N - 1, Math.ceil((cx + r + half) / CELL)); ix++) again.add(iz * N + ix);
     };
-    mark(T.x, T.z, 126);
+    for (let iz = Math.max(0, Math.floor((T.z - REACH + half) / CELL)); iz <= Math.min(N - 1, Math.ceil((T.z + REACH + half) / CELL)); iz++)
+      for (let ix = Math.max(0, Math.floor((T.x - REACH + half) / CELL)); ix <= Math.min(N - 1, Math.ceil((T.x + REACH + half) / CELL)); ix++)
+        if (kamenkaQ(-half + ix * CELL, -half + iz * CELL) < KAMENKA.foot + 0.05) again.add(iz * N + ix);
     for (const o of OUTLYING) mark(o.x, o.z, 62);
     for (const [x, z] of line) mark(x, z, 19);
     for (const b of added) mark(b.x, b.z, 24);

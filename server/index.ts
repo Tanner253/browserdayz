@@ -14,7 +14,7 @@ import { WebSocketServer, type WebSocket } from 'ws';
 import { buildWorldData } from './world';
 import { Economy, type WorldLoot } from '../src/sim/economy';
 import { Container, type SerializedInventory } from '../src/sim/inventory';
-import { ITEMS, TAG_HOLD, TAG_OUT, makeItem, sanitizeItem, type ItemInstance } from '../src/sim/items';
+import { ITEMS, TAG_FRESH, TAG_HOLD, TAG_OUT, makeItem, sanitizeItem, type ItemInstance } from '../src/sim/items';
 import { WORLD_SIZE, inPlay } from '../src/world/worldgen';
 
 /** how far from the middle anything may say it is: the edge of the ground, and a little (the walls stand 4 m inside it) */
@@ -226,6 +226,8 @@ const isWallet = (s: unknown): s is string => typeof s === 'string' && /^[1-9A-H
 // not just done this. None of it stops two people in two houses who are set on it: what the
 // site will pay in a day, and to one wallet, is what bounds that.
 const TAG_MIN_LIFE_MS = (Number(process.env.TAG_MIN_LIFE_S) || 120) * 1000;
+/** and there is no tag on a body at all until its owner had lived this long (see TAG_FRESH) */
+const TAG_FRESH_MS = (Number(process.env.TAG_FRESH_S) || TAG_FRESH) * 1000;
 const TAG_PAIR_GAP_MS = (Number(process.env.TAG_PAIR_GAP_S) || 3 * 3600) * 1000;
 /** `${who cashed in}>${whose tag}` (each a player's key, or "ip:" and where they play from) -> when */
 const pairPaidAt = new Map<string, number>();
@@ -665,8 +667,12 @@ function makeCorpse(c: Client, v: number): CorpseInfo | null {
   const uid = `corpse_${c.id}_${Date.now().toString(36)}`;
   const box = new Container(uid, 'Body', 8, 10, [], true);
   const spill: ItemInstance[] = [];
+  // their own tag (one, however many they claim to carry): on the body to be taken and cashed in, unless they had
+  // only just arrived. Somebody alive less than TAG_FRESH leaves no tag at all.
+  const own = inv ? carriedTags(inv).find((t) => !lootedTags.has(t.uid) && (t.owner ?? '') === c.name) : undefined;
+  const lived = Date.now() - c.lifeAt, fresh = lived < TAG_FRESH_MS;
   const put = (it: ItemInstance | null) => {
-    if (!it) return;
+    if (!it || (fresh && own && it.uid === own.uid)) return;
     stopTagClocks(it);
     const left = box.add(it);
     if (left) spill.push(left);
@@ -674,9 +680,12 @@ function makeCorpse(c: Client, v: number): CorpseInfo | null {
   if (inv) {
     for (const it of Object.values(inv.slots)) put(it);
     for (const cont of inv.containers) for (const s of cont.items) put(cleanItem(s));
-    // their own tag (one, however many they claim to carry) can now be taken and cashed in
-    const own = carriedTags(inv).find((t) => !lootedTags.has(t.uid) && (t.owner ?? '') === c.name);
-    if (own) lootedTags.set(own.uid, { owner: c.name, ownerKey: c.key, ownerIp: c.ip, livedMs: Date.now() - c.lifeAt });
+    if (own && !fresh) lootedTags.set(own.uid, { owner: c.name, ownerKey: c.key, ownerIp: c.ip, livedMs: lived });
+    else if (own) {
+      log(`${c.name} left no dog tag: alive ${Math.round(lived / 1000)} s`);
+      const by = c.lastHitBy && Date.now() - c.lastHitBy.at < 15000 ? clients.get(c.lastHitBy.id) : undefined;
+      if (by && by !== c) send(by, { t: 'tell', kind: 'info', text: `No dog tag on ${c.name}: alive less than ${Math.round(TAG_FRESH_MS / 60000)} minutes.` });
+    }
   }
   for (const it of spill) {
     const a = Math.random() * Math.PI * 2;

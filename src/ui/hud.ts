@@ -6,7 +6,7 @@ import { mountUpdates } from './updates';
 import { MAX_STAMINA, type ChatChannel } from '../net/protocol';
 import { TOUCH } from '../core/device';
 import { EMOTES } from '../sim/emotes';
-import { TAG_HOLD_MIN } from '../sim/items';
+import { TAG_FRESH, TAG_HOLD_MIN } from '../sim/items';
 import { INFECTED } from '../sim/infected';
 import { GAS } from '../sim/gas';
 import { AO_MODES, DEFAULT_GRAPHICS, FPS_LIMITS, LEVELS, MSAA, PRESETS, SCALES, VOLUMES, presetOf, saveGraphics, type Graphics, type PresetName } from '../core/settings';
@@ -159,7 +159,7 @@ export class HUD {
             <div class="start-kicker"><span>PvP survival shooter</span><em>Play to earn</em></div>
             <div class="start-title" aria-label="ZONA"><span style="--i:0">Z</span><span style="--i:1">O</span><span style="--i:2">N</span><span style="--i:3">A</span></div>
             <p class="start-sub">Players hunt you. So do the infected.</p>
-            <p class="start-sub2">Take a dog tag off another player, stay alive ${TAG_HOLD_MIN} minutes, cash it in.</p>
+            <p class="start-sub2">Take a dog tag off another player, stay alive ${TAG_HOLD_MIN} minutes, cash it in. Nobody has a tag in their first ${TAG_FRESH / 60} minutes alive, and a tag carried out of the Zona is void.</p>
             <div class="sm-enter">
               <label class="sm-name tagplate">
                 <svg class="tagplate-chain" viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="52" fill="none" stroke="currentColor" stroke-width="5" stroke-dasharray="0.1 9" stroke-linecap="round"/></svg>

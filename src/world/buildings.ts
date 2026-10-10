@@ -1093,7 +1093,7 @@ export class Buildings {
       // and two containers in the yard behind the workshop
       town: [
         ['covered_car', 5.3, -36], ['covered_car', -5.4, 30], ['covered_car', 5.2, 78], ['covered_car', -5.3, -70],
-        ['concrete_road_barrier', -2.2, 98, 0], ['concrete_road_barrier', 2.4, 99.5, 0],
+        ['concrete_road_barrier', -2.2, 93.5, 0], ['concrete_road_barrier', 2.4, 94.5, 0],
         ['wooden_crate_01', 17, -51], ['cardboard_box_01', 16.2, -38.5], ['Barrel_01', 17.2, -37.5], ['metal_trash_can@1', 5.6, 2], ['trashbag', 5.9, 3.2],
         ['old_tyre', 17.5, 61], ['Barrel_01', 17.8, 72], ['barrel_03', 18.9, 73], ['weapons_case', 18.5, 22],
         [CONTAINER.orange, 27, 80, 0.15], [CONTAINER.blue, 24, -74, Math.PI / 2], ['crate_big', 22, 76], ['crate_big', 23.2, 77],

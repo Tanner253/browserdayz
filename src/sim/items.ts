@@ -250,7 +250,7 @@ const D: ItemDef[] = [
   // body than the one before it, weighs more, and is harder to come by.
   {
     id: 'chest_rig', name: 'Chest Rig', model: 'vest_t0', w: 3, h: 2, weight: 0.9, category: 'clothing', slot: 'vest',
-    desc: 'Webbing and a belt of pouches. No protection at all: 8 slots, and it weighs nothing.', wear: { cargo: [4, 2] },
+    desc: 'Webbing and a belt of pouches, with a pad behind them. A tenth off every hit to the body, 8 slots, and it weighs next to nothing.', wear: { cargo: [4, 2], armor: 0.9 },
   },
   {
     id: 'soft_vest', name: 'Soft Armour Vest', model: 'vest_t1', w: 3, h: 3, weight: 2.4, category: 'clothing', slot: 'vest',
@@ -349,6 +349,11 @@ export const TAG_HOLD = 10 * 60;
  * over that line is void after this many seconds out there: no sitting out its ten minutes in the hills.
  */
 export const TAG_OUT = 15;
+/**
+ * Seconds somebody has to have been alive before there is a tag on their body at all. Whoever has just arrived
+ * has nothing on them worth a reward, and is not to be farmed for one where they are set down.
+ */
+export const TAG_FRESH = 5 * 60;
 /** the same in minutes, for everything that says so in words */
 export const TAG_HOLD_MIN = TAG_HOLD / 60;
 

@@ -17,7 +17,8 @@ const PORT = 8137;
 const dir = mkdtempSync(path.join(os.tmpdir(), 'zona-zone-'));
 // (the site it would report a cash-in to is nowhere: nothing in this test is paid, and nothing may be)
 const server = spawn(process.execPath, [path.join('node_modules', 'tsx', 'dist', 'cli.mjs'), 'server/index.ts'], {
-  env: { ...process.env, PORT: String(PORT), SITE_URL: 'http://127.0.0.1:9', DATA_DIR: dir, INFECTED: 'off' },
+  // (somebody has to have lived three seconds here before there is a tag on them: five minutes, in the game)
+  env: { ...process.env, PORT: String(PORT), SITE_URL: 'http://127.0.0.1:9', DATA_DIR: dir, INFECTED: 'off', TAG_FRESH_S: '3' },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
 let logged = '';
@@ -74,6 +75,17 @@ try {
   const ann = new Player('zone-test-key-ann-000000000000000001', 'Ann'), bee = new Player('zone-test-key-bee-000000000000000002', 'Bee');
   await ann.join();
   await bee.join();
+  // Cid has only just arrived when he dies: there is no tag on him, and carrying his changes nothing for anybody
+  const cid = new Player('zone-test-key-cid-000000000000000003', 'Cid');
+  await cid.join();
+  const fresh = { uid: 'zone-test-tag-cid', id: 'dogtag', qty: 1, owner: 'Cid', held: TAG_HOLD };
+  cid.carry([fresh]);
+  await sleep(300);
+  cid.send({ t: 'died', cause: 'test' });
+  await sleep(400);
+  assert.ok(/Cid left no dog tag/.test(logged), 'a tag was left on somebody who had only just arrived');
+  // (Bee has been alive long enough by the time she dies)
+  await sleep(3200);
   // Bee dies with her own tag round her neck: the server now knows that tag as one that can be taken
   const tag = { uid: 'zone-test-tag-bee', id: 'dogtag', qty: 1, owner: 'Bee', held: TAG_HOLD };
   bee.carry([tag]);
@@ -82,7 +94,8 @@ try {
   await sleep(500);
   // Ann has it in her pockets, and her own as well (which is nobody's business)
   const hers = { uid: 'zone-test-tag-ann', id: 'dogtag', qty: 1, owner: 'Ann' };
-  ann.carry([tag, hers]);
+  ann.carry([tag, hers, fresh]);
+  assert.ok(!/Bee left no dog tag/.test(logged), 'no tag on somebody who had lived long enough');
 
   // inside the line nothing happens, however long
   await ann.stand(...IN, 2);
@@ -98,10 +111,10 @@ try {
   await ann.stand(...OUT, 6.5);
   const gone = ann.got.filter((m) => m.t === 'void') as { t: 'void'; uids: string[] }[];
   assert.equal(gone.length, 1, `she was told ${gone.length} times`);
-  assert.deepEqual(gone[0].uids, [tag.uid], 'not the tag she took and that alone (her own is hers wherever she goes)');
+  assert.deepEqual(gone[0].uids, [tag.uid], 'not the tag she took and that alone (her own is hers wherever she goes, and Cid had none to take)');
 
   // she is not told again for the same tag, though she stays out and (a cheat) says she still has it
-  ann.carry([tag, hers]);
+  ann.carry([tag, hers, fresh]);
   await ann.stand(...OUT, 2);
   assert.equal(ann.got.filter((m) => m.t === 'void').length, 1);
   // and cashing it in is refused, in so many words
@@ -113,7 +126,7 @@ try {
   assert.ok(!/recorded|listed for a reward\b(?!:)/.test(logged.split('carried 1 dog tag')[1] ?? ''), 'something was listed for a reward afterwards');
   ann.ws.close();
   bee.ws.close();
-  console.log('  ok  a tag carried out of the Zona is void after', TAG_OUT, 'seconds, not before, not inside, and never her own');
+  console.log('  ok  a tag carried out of the Zona is void after', TAG_OUT, 'seconds, not before, not inside, and never her own; and nobody who has just arrived leaves a tag');
 } catch (e) {
   failed = e;
 } finally {

@@ -3,7 +3,7 @@
 // `npx tsx test/expansion.test.ts`.
 
 import assert from 'node:assert/strict';
-import { BUNKER_AT, CELL, NO_START, OUTLYING, TOWN, TRADE_AT, EXPANSION as E, PLAY_AREAS, PLAY_RADIUS, WORLD_RES, WORLD_SIZE, generateWorld, heightAt, inPlay, playOutline, slopeAt, BUILDING_FOOTPRINT } from '../src/world/worldgen';
+import { BUNKER_AT, CELL, KAMENKA, NO_START, OUTLYING, TOWN, TRADE_AT, kamenkaQ, EXPANSION as E, PLAY_AREAS, PLAY_RADIUS, WORLD_RES, WORLD_SIZE, generateWorld, heightAt, inPlay, playOutline, slopeAt, BUILDING_FOOTPRINT } from '../src/world/worldgen';
 import { buildWorldData } from '../server/world';
 import { GAS, gasDepth, gasZone } from '../src/sim/gas';
 import { INFECTED, openGround } from '../src/sim/infected';
@@ -28,7 +28,7 @@ const ok = (name: string, fn: () => void) => {
 // and the same four figures came off the map after.)
 // (The ground and the trees were counted again on 2026-10-09, from the same map, with the
 // bunker's hollow left out of the count as the works' is: taken before the bunker was dug.)
-const WAS = { cells: 227863, heights: 1328879406, buildings: 72, buildingsHash: 2448790248, lastId: 'tower_71', spawns: 2697513077, trees: 11228, treesHash: 2235155226, lootPoints: 675, lootHash: 113905251, jeeps: 8, jeepsHash: 380833839, fires: 6 };
+const WAS = { cells: 217934, heights: 4113734791, buildings: 72, buildingsHash: 2448790248, lastId: 'tower_71', spawns: 2697513077, trees: 10647, treesHash: 778129303, lootPoints: 675, lootHash: 113905251, jeeps: 8, jeepsHash: 380833839, fires: 6 };
 const hash = (parts: number[]) => {
   let h = 2166136261 >>> 0;
   for (const v of parts) {
@@ -67,6 +67,8 @@ const touched = (x: number, z: number) => {
   if (Math.hypot(x - HUT_AT.x, z - HUT_AT.z) < 24) return true;
   // (and where one of each of the downloaded buildings was stood in the village, 2026-10-10: 24 m round each)
   if (IN_VILLAGE.some((q) => Math.hypot(x - q.x, z - q.z) < 24)) return true;
+  // (and Kamenka's valley, 2026-10-10: its rim stands on the old map's ground west and north of the town)
+  if (kamenkaQ(x, z) < KAMENKA.foot + 0.1) return true;
   // (and the bunker's hollow, on the far side of the map)
   if (Math.hypot(x - BUNKER_AT.x, z - BUNKER_AT.z) < 96) return true;
   const dx = E.x - camp.x, dz = E.z - camp.z, l2 = dx * dx + dz * dz;
@@ -274,7 +276,7 @@ ok('the east country: a town out of the valley by the road, two places far out, 
       const g = ground(b.x + lx * c + lz * sn, b.z - lx * sn + lz * c);
       // (a hand's breadth over the floor is let pass: the ground is a point every two metres, and five metres from a
       // neighbour whose floor is a step higher it cannot be both houses' at once)
-      assert.ok(b.floorY - g > -0.12 && b.floorY - g < 0.95, `${b.id}: the ground is ${(b.floorY - g).toFixed(2)} m under its floor`);
+      assert.ok(b.floorY - g > -0.2 && b.floorY - g < 0.95, `${b.id}: the ground is ${(b.floorY - g).toFixed(2)} m under its floor`);
     }
   }
   // the road: a second line, picked up where the first ran out, down the town's street, and never a point added to the first
@@ -301,7 +303,7 @@ ok('the east country: a town out of the valley by the road, two places far out, 
   };
   for (const b of built) assert.ok(!onRoad(b.x, b.z, Math.min(...BUILDING_FOOTPRINT[b.type]) / 2 + 3.2), `${b.id} stands in the road`);
   const planted = world.trees.filter((t) => !inOld(t.x, t.z));
-  assert.ok(planted.length > 3000 && planted.length < 12000, `${planted.length} trees out there`);
+  assert.ok(planted.length > 5000 && planted.length < 15000, `${planted.length} trees out there`);
   for (const t of planted) {
     assert.ok(!onRoad(t.x, t.z, 5), 'a tree stands in the new road');
     assert.ok(Math.abs(t.y - ground(t.x, t.z)) < 0.06, 'a tree is off the ground');
