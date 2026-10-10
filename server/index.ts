@@ -361,6 +361,100 @@ function takenTag(c: Client): boolean {
   });
 }
 
+// ---------------------------------------------------------------- the server's own checks
+/**
+ * A player's own game says where it is and whom it has hit, and it is believed: a game that has been tampered with
+ * can say anything. These are the server's checks on what it is told. They are run one of three ways (CHECKS, in
+ * the environment):
+ *   watch   – what would have been refused is written down and let through. The default: a check is not let touch
+ *             what an honest player does until it has been seen, in the log, never to fire on one.
+ *   enforce – it is refused.
+ *   off     – it is not looked at.
+ * What is checked: that a player has not got somewhere faster than legs or a jeep go, and that a shot does not pass
+ * through a hill. (That a hit is by the weapon held, within its range, no faster than it fires, and does what that
+ * weapon does, was always the server's to say: see 'hit'.)
+ */
+const CHECKS = (['off', 'watch', 'enforce'].includes(process.env.CHECKS ?? '') ? process.env.CHECKS : 'watch') as 'off' | 'watch' | 'enforce';
+/**
+ *   foot  – the fastest anybody is let go on their own legs, m/s along the ground (a sprint with empty hands is 7.4)
+ *   seat  – and in a jeep (which is held to 60: see isVState)
+ *   carry – seconds of going that fast that may be saved up: what a connection that was held up sends all at once
+ *   grace – metres let go on top of that, every time
+ *   free  – ms after being set down somewhere (a start, a seat taken or left) in which where they are is not questioned
+ *   kick  – so many refusals inside a minute, and the connection is closed (when enforcing)
+ *   hill  – how far the ground may stand over the line of a shot before the shot is through a hill, metres
+ *   high  – how far over the ground, and for how many seconds, before it is written down that somebody is in the air
+ */
+const CHECK = { foot: 9.5, seat: 64, carry: 2, grace: 3, free: 2500, kick: 12, hill: 1.5, high: [30, 4] };
+let flagged = 0;
+
+/** Something a check fires on: counted, and written down (not more than once in five seconds for one player). @returns whether it is refused */
+function flag(c: Client, what: string, refuse = true): boolean {
+  c.check.flags++;
+  flagged++;
+  const now = Date.now();
+  if (now - c.check.said > 5000) {
+    c.check.said = now;
+    log(`[check:${CHECKS}] ${c.name} ${what} (${c.check.flags} so far)`);
+  }
+  return refuse && CHECKS === 'enforce';
+}
+
+/**
+ * Whether the place a player says they have got to is one they could have got to since they were last where
+ * they said. Refused, they are kept where they were for everybody else (and for what they can hit from there)
+ * until enough time has gone by to have run or driven the distance: nobody gets anywhere faster than that, and
+ * an honest player who was wrongly refused is right again in the time it takes to cover the ground.
+ */
+function moveCheck(c: Client, to: Pose, now: number): boolean {
+  const k = c.check;
+  if (CHECKS === 'off' || !c.alive || now < k.free) {
+    k.at = now;
+    k.carry = 0;
+    k.high = 0;
+    return true;
+  }
+  const dt = Math.min(600, Math.max(0, (now - k.at) / 1000)), most = c.seatAt ? CHECK.seat : CHECK.foot;
+  const dist = Math.hypot(to[0] - c.pose[0], to[2] - c.pose[2]), allow = most * dt + k.carry;
+  // (in the air: written down and never refused. There are towers and roofs, and there is falling off things.)
+  k.high = !c.seatAt && to[1] - world.groundAt(to[0], to[2]) > CHECK.high[0] ? k.high + Math.min(dt, 1) : 0;
+  if (k.high > CHECK.high[1]) {
+    k.high = 0;
+    flag(c, `is ${(to[1] - world.groundAt(to[0], to[2])).toFixed(0)} m over the ground at ${to[0].toFixed(0)}, ${to[2].toFixed(0)}`, false);
+  }
+  if (dist <= allow + CHECK.grace) {
+    k.at = now;
+    k.carry = Math.min(most * CHECK.carry, Math.max(0, allow - dist));
+    return true;
+  }
+  if (!flag(c, `moved ${dist.toFixed(0)} m in ${dt.toFixed(2)} s ${c.seatAt ? 'in a jeep' : 'on foot'}, to ${to[0].toFixed(0)}, ${to[2].toFixed(0)}`)) {
+    k.at = now;
+    k.carry = 0;
+    return true;
+  }
+  k.refused = k.refused.filter((t) => now - t < 60000);
+  k.refused.push(now);
+  if (k.refused.length >= CHECK.kick * 10) {
+    log(`[check] ${c.name} is put off the server: where they said they were was refused for ${Math.round(k.refused.length / 10)} seconds of a minute`);
+    c.ws.close(4008, 'position');
+  }
+  return false;
+}
+
+/** How far the ground stands over the line from one player's eye to another's chest, where it stands over it at all (0: it does not, or there is no saying). */
+function hillBetween(a: Pose, b: Pose): number {
+  const ax = a[0], ay = a[1] + 1.5, az = a[2], bx = b[0], by = b[1] + 1.1, bz = b[2];
+  const d = Math.hypot(bx - ax, bz - az);
+  // (near to, the ground between two people is nothing; and under the ground, in the bunker, the ground is over everything)
+  if (d < 14 || a[1] < world.groundAt(ax, az) - 2 || b[1] < world.groundAt(bx, bz) - 2) return 0;
+  let over = 0;
+  for (let s = 5; s < d - 5; s += 2) {
+    const t = s / d;
+    over = Math.max(over, world.groundAt(ax + (bx - ax) * t, az + (bz - az) * t) - (ay + (by - ay) * t));
+  }
+  return over > CHECK.hill ? over : 0;
+}
+
 /**
  * Whoever carries a tag they took off somebody over the line round the Zona has TAG_OUT seconds to turn back.
  * After that every such tag they carry is void: it is forgotten here (so nothing is ever paid on it), taken
@@ -438,6 +532,12 @@ interface Client {
   lifeAt: number;
   msgCount: number;
   msgWindow: number;
+  /**
+   * For the server's own checks (see CHECKS): when they were last where they said they were, how much going is
+   * saved up, until when where they are is not questioned, how long they have been high over the ground, how
+   * often a check has fired on them, when that was last written down, and when it last refused them.
+   */
+  check: { at: number; carry: number; free: number; high: number; flags: number; said: number; refused: number[] };
 }
 
 interface Record_ {
@@ -593,6 +693,8 @@ function seatOf(c: Client): { v: Veh; seat: number } | null {
 /** out of whatever they are sitting in (they got out, died, or are gone) */
 function leaveSeat(c: Client, gone = false) {
   const at = seatOf(c);
+  // (out of a jeep that is moving, a body goes on moving)
+  if (c.seatAt) c.check.free = Date.now() + CHECK.free;
   c.seatAt = 0;
   if (!at) {
     // (not in a seat, but perhaps still the one moving a jeep they got out of)
@@ -729,7 +831,8 @@ function handle(c: Client, m: C2S) {
       // (a step, or a turn of the head)
       const was = c.pose;
       if (Math.abs(m.p[0] - was[0]) + Math.abs(m.p[2] - was[2]) > 0.02 || Math.abs(m.p[3] - was[3]) + Math.abs(m.p[4] - was[4]) > 0.004) c.activeAt = Date.now();
-      c.pose = m.p;
+      // (somewhere they cannot have got to: they are kept where they were, and only the way they look is taken)
+      c.pose = moveCheck(c, m.p, Date.now()) ? m.p : [was[0], was[1], was[2], m.p[3], m.p[4], m.p[5]];
       zoneCheck(c);
       const w = typeof m.w === 'string' && ITEMS[m.w] ? m.w : null;
       c.w = w;
@@ -851,6 +954,9 @@ function handle(c: Client, m: C2S) {
         // you can only hit with what you are holding (fists are always there)
         if (m.w !== 'fists' && c.w !== m.w) return;
         if (now - c.lastHit < rule.interval * 700) return;
+        // (a round does not go through a hill)
+        const hill = rule.melee || CHECKS === 'off' ? 0 : hillBetween(c.pose, target.pose);
+        if (hill && flag(c, `shot ${target.name} through ${hill.toFixed(1)} m of hill at ${Math.round(d)} m`)) return;
         c.lastHit = now;
         amount = hitDamage(m.w, m.zone, d, !!m.sup, num(m.bonus) ? m.bonus : 0, num(m.n) ? m.n : 1);
       }
@@ -1036,6 +1142,7 @@ function handle(c: Client, m: C2S) {
       c.inv = null;
       c.vitals = null;
       c.pose = [sp.x, world.groundAt(sp.x, sp.z), sp.z, sp.yaw, 0, 0];
+      c.check.free = Date.now() + CHECK.free;
       send(c, { t: 'spawn', ...sp });
       broadcast({ t: 'alive', id: c.id }, c);
       return;
@@ -1068,6 +1175,7 @@ function handle(c: Client, m: C2S) {
       releaseLock(c);
       v.seats[m.seat] = c.id;
       c.seatAt = Date.now();
+      c.check.free = Date.now() + CHECK.free;
       // whoever takes the wheel moves it from now on; a passenger changes nothing about that
       if (m.seat === 0) {
         v.sim = c.id;
@@ -1213,7 +1321,7 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
     pose: [sp.x, 'y' in sp && sp.y !== undefined ? sp.y : world.groundAt(sp.x, sp.z), sp.z, sp.yaw, 0, 0],
     w: null, m: [], g: [], alive: true,
     inv: resume?.inv ?? null, vitals: resume?.vitals ?? null,
-    outAt: 0, lastHit: 0, lastVHit: 0, seatAt: 0, lastNade: 0, nadeHits: 0, blasts: [], lastEmote: 0, lastChat: 0, lastHitBy: null, openCid: null, activeAt: Date.now(), joinedAt: Date.now(), ip: ipOf.get(ws) ?? '', lifeAt: Date.now(), msgCount: 0, msgWindow: Date.now(),
+    outAt: 0, lastHit: 0, lastVHit: 0, seatAt: 0, lastNade: 0, nadeHits: 0, blasts: [], lastEmote: 0, lastChat: 0, lastHitBy: null, openCid: null, check: { at: Date.now(), carry: 0, free: Date.now() + CHECK.free, high: 0, flags: 0, said: 0, refused: [] }, activeAt: Date.now(), joinedAt: Date.now(), ip: ipOf.get(ws) ?? '', lifeAt: Date.now(), msgCount: 0, msgWindow: Date.now(),
   };
   records.delete(key);
   const others = [...clients.values()].map(info);
@@ -1579,7 +1687,7 @@ function serve(req: http.IncomingMessage, res: http.ServerResponse) {
     // readable from a client hosted somewhere else (e.g. Vercel) for the start-screen player count
     res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'no-store' });
     // (places: how many different addresses the players come from. One, with several players on, means the host is not passing addresses through.)
-    res.end(JSON.stringify({ ok: true, players: clients.size, max: MAX_PLAYERS, queue: queue.length, uptime: Math.round(process.uptime()), loot: economy.loot.size, places: new Set([...clients.values()].map((c) => c.ip)).size }));
+    res.end(JSON.stringify({ ok: true, players: clients.size, max: MAX_PLAYERS, queue: queue.length, uptime: Math.round(process.uptime()), checks: CHECKS, flagged, loot: economy.loot.size, places: new Set([...clients.values()].map((c) => c.ip)).size }));
     return;
   }
   // the website's function asks here whether a cash-in it was told about is real
