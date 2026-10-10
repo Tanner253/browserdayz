@@ -143,12 +143,13 @@ export const TYPES: Record<string, TypeRule> = {
   // what the whole map has to share, bar what a crate or a supply drop turns up.)
   gasmask: { nominal: 3, min: 2, lifetime: 3600, restock: 900, usage: ['Police'] },
   // (armour by weight: the rig anywhere, the soft vest where the police were, the armoured vest at the army's,
-  // the plate carrier rare, and the heavy armour only under the gas)
+  // the plate carrier rare, and the heavy armour only down the bunker)
   chest_rig: { nominal: 8, min: 4, lifetime: 3600, restock: 600, usage: ['Village', 'Farm', 'Hunting', 'Industrial', 'Town'] },
   soft_vest: { nominal: 5, min: 2, lifetime: 3600, restock: 900, usage: ['Police', 'Town', 'Military'], favour: { Police: 4 } },
   armor_vest: { nominal: 3, min: 1, lifetime: 3600, restock: 1200, usage: ['Military', 'Police'], favour: { Military: 3 }, gas: 2 },
   // (not down the bunker: its places are few, and what is kept there is the shotgun's)
-  heavy_armor: { nominal: 0, min: 0, lifetime: 7200, restock: 1800, usage: [], gas: 3 },
+  // (the heaviest is the bunker's, and is nowhere else: the bunker is the last place on the map, and the best of everything is in it)
+  heavy_armor: { nominal: 0, min: 0, lifetime: 7200, restock: 1800, usage: [], bunker: 3 },
   life_vest: { nominal: 2, min: 1, lifetime: 3600, restock: 900, usage: ['Military', 'Police', 'Industrial', 'Town'], favour: { Military: 5, Police: 5 }, gas: 7, bunker: 5 },
   work_gloves: { nominal: 5, min: 3, lifetime: 3600, restock: 900, usage: ['Farm', 'Industrial', 'Village', 'Military', 'Police'], favour: { Military: 2 } },
   rubber_boots: { nominal: 5, min: 3, lifetime: 3600, restock: 900, usage: ['Farm', 'Village', 'Military', 'Industrial'], favour: { Military: 2 } },

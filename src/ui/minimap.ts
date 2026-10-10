@@ -93,8 +93,9 @@ export class Minimap {
       g.fill();
     }
     // the road
-    const pts = world.road.points;
     g.lineJoin = g.lineCap = 'round';
+    for (const road of [world.road, ...world.roads]) {
+    const pts = road.points;
     for (const [w, col] of [[world.road.width + 3, 'rgba(20, 20, 18, 0.55)'], [world.road.width, '#9a9486']] as [number, string][]) {
       g.strokeStyle = col;
       g.lineWidth = w * SCALE;
@@ -104,6 +105,7 @@ export class Minimap {
         else g.lineTo(X(pts[i]), Y(pts[i + 2]));
       }
       g.stroke();
+    }
     }
     // buildings: their real footprints, the police station picked out
     for (const b of world.buildings) {

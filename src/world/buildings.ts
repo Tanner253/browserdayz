@@ -263,6 +263,62 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
         ],
         usage: ['Farm', 'Industrial'],
       };
+    case 'townhouse':
+      // The brick block of two floors (a download: `house_interior` in scripts/assets.config.mjs), all of it the
+      // model's: one room a floor in the shape of a cross, a stair that turns on itself, a balcony over the front
+      // door. Measured from its file: floors at 0.18 and 3.474 over its own ground, doorways where the leaves hang.
+      return {
+        w: 11.32, d: 14.6, h: 3.1, ext: 'brick_ext', int: 'int_plaster', floor: 'floor_wood', roof: 'roof_iron', roofType: 'flat',
+        whole: {
+          model: 'house_interior', lift: 0.18, surface: 'concrete', floors: [3.294, 3.302],
+          doors: [
+            // (the front doorway is as wide as a pair of doors: a leaf hung on each jamb)
+            { x: -3.88, y: 0, z: -3.346, rot: -Math.PI / 2, w: 0.915, h: 2.17 },
+            { x: -3.88, y: 0, z: -1.504, rot: Math.PI / 2, w: 0.915, h: 2.17 },
+            // the side door, and the one out onto the balcony
+            { x: 3.873, y: 0, z: 4.956, rot: -Math.PI / 2, w: 1.05, h: 2.17 },
+            { x: -3.88, y: 3.294, z: -4.508, rot: -Math.PI / 2, w: 1.05, h: 2.14 },
+          ],
+        },
+        walls: [],
+        furniture: [
+          { id: 'WoodenTable_01', x: 0.6, z: -5.6, rot: 0 },
+          { id: 'painted_wooden_chair_01', x: 0.2, z: -4.95, rot: Math.PI },
+          { id: 'painted_wooden_chair_01', x: 1.0, z: -6.25, rot: 0 },
+          { id: 'painted_wooden_cabinet', x: -1.4, z: -6.72, rot: 0 },
+          { id: 'Shelf_01', x: -1.6, z: 7.02, rot: Math.PI },
+          // upstairs
+          { id: 'old_bed_frame', x: -1.6, z: -5.95, rot: 0, y: 3.294 },
+          { id: 'old_bed_frame', x: 4.65, z: -4.3, rot: 0, y: 3.294 },
+          { id: 'painted_wooden_cabinet', x: 0.78, z: 6.72, rot: Math.PI, y: 3.294 },
+          { id: 'Shelf_01', x: -0.26, z: -7.02, rot: 0, y: 3.294 },
+        ],
+        loot: [
+          [0.3, 0.57, -5.6], [0.9, 0.57, -5.6], [-1.4, 1.2, -6.72], [-1.6, 0.44, 6.97], [-1.6, 1.24, 6.97],
+          [2.6, 0.02, -6.3], [-3.05, 0.02, -4.7], [4.6, 0.02, -4.5], [0.6, 0.02, -3.6], [-1.4, 0.02, 1.7], [0.2, 0.02, 3.1], [-1.3, 0.02, 4.7], [3.1, 0.02, 6.4],
+          [-1.6, 3.774, -5.55], [4.65, 3.774, -3.9], [0.78, 4.494, 6.72], [-0.26, 3.734, -6.97], [-0.26, 4.534, -6.97],
+          [2.6, 3.314, -6.3], [-3.0, 3.314, -4.8], [4.6, 3.314, -0.6], [0.6, 3.314, -3.6], [-1.4, 3.314, 1.7], [0.3, 3.314, 3.1], [-1.3, 3.314, 4.7], [3.0, 3.314, 6.3],
+          [-4.85, 3.322, -1.6],
+        ],
+        usage: ['Town', 'Village'],
+      };
+    case 'shanty':
+      // The plank house on piles (a download: `shanty_mansion`), all of it the model's: two rooms off the ground
+      // with a way under between them, a floor over the whole, and decks on the roof. Its floors are 0.65, 3.35 and
+      // 6.49 m over its own ground; it stands 0.3 m into the pad, so that the feet of its ramps are on the ground.
+      return {
+        w: 9.82, d: 15.8, h: 2.7, ext: 'planks_ext', int: 'planks', floor: 'floor_wood', roof: 'roof_iron', roofType: 'flat',
+        whole: { model: 'shanty_mansion', lift: 0.3, surface: 'wood', floors: [0.351, 3.052, 2.962, 6.19, 6.08], doors: [] },
+        walls: [],
+        furniture: [],
+        loot: [
+          [-1.9, 0.371, -6.4], [1.6, 0.371, -6.4], [3.6, 0.371, -5.9], [0.1, 0.371, -5.4], [-1.4, 0.371, 3.1], [1.6, 0.371, 3.6], [3.6, 0.371, 4.1],
+          // (measured in the game, a ray down from each: its first floor is boards at two heights nine centimetres apart)
+          [-3.9, 2.992, -5.9], [-0.9, 3.072, -6.4], [2.1, 3.072, -5.9], [3.6, 2.982, -3.4], [-1.4, 2.982, -0.4], [1.6, 2.982, 0.6], [3.1, 2.982, -0.9], [-0.9, 3.072, 3.1], [2.1, 3.072, 3.6], [3.6, 3.012, 6.6],
+          [3.6, 6.21, -3.4], [-1.9, 6.21, 0.1], [0.1, 6.1, 2.6],
+        ],
+        usage: ['Hunting', 'Village', 'Industrial'],
+      };
     case 'hut': {
       // The long hut: a room of beds, and at the end the door is in, a lobby with a store room off it under the
       // one small high window. The openings are the model's own, to the millimetre (see `old_barrack` in
@@ -1031,6 +1087,21 @@ export class Buildings {
         ['utility_box_01', -25, 24], ['utility_box_01', 25.5, 15], ['metal_trash_can@1', 24.5, -8], ['trashbag', 25.6, -9.2], ['old_tyre', -17, 33], ['old_tyre', 16, 20], ['old_tyre', -14, -26],
       ],
       bunker: [],
+      // Kamenka: cars left in the street, what a shop and a workshop put out, the way out of town shut with blocks,
+      // and two containers in the yard behind the workshop
+      town: [
+        ['covered_car', 5.3, -36], ['covered_car', -5.4, 30], ['covered_car', 5.2, 78], ['covered_car', -5.3, -70],
+        ['concrete_road_barrier', -2.2, 98, 0], ['concrete_road_barrier', 2.4, 99.5, 0],
+        ['wooden_crate_01', 17, -51], ['cardboard_box_01', 16.2, -38.5], ['Barrel_01', 17.2, -37.5], ['metal_trash_can@1', 5.6, 2], ['trashbag', 5.9, 3.2],
+        ['old_tyre', 17.5, 61], ['Barrel_01', 17.8, 72], ['barrel_03', 18.9, 73], ['weapons_case', 18.5, 22],
+        [CONTAINER.orange, 27, 80, 0.15], [CONTAINER.blue, 24, -74, Math.PI / 2], ['crate_big', 22, 76], ['crate_big', 23.2, 77],
+        ['metal_trash_can@0', -5.7, -14], ['trashbag', -6.4, 46], ['stone_fire_pit', -25, 24], ['dry_branches_medium_01', 26, 44],
+        ['wooden_crate_01', -24, -27], ['Barrel_01', -25, 6], ['old_tyre', -23, 47], ['wooden_crate_01', 26, -14],
+      ],
+      // the squat: a fire, drums, what was dragged there
+      squat: [['stone_fire_pit', 7.5, 13], ['Barrel_01', -7.5, 10], ['barrel_03', -8.4, 11.2], ['wooden_crate_01', 8, 9], ['old_tyre', 9, 4], ['dry_branches_medium_01', -5, 15], ['covered_car', -11, -2]],
+      // the camp: containers, crates, a fire between the huts
+      camp: [[CONTAINER.orange, 20, -12, 0.2], [CONTAINER.blue, -24, -2, Math.PI / 2 + 0.2], ['stone_fire_pit', 1, 4], ['wooden_crate_01', -3, 8], ['wooden_crate_01', -4.2, 8.8], ['Barrel_01', 4, -12], ['crate_big', 18, 2], ['old_tyre', -8, 16], ['dry_branches_medium_01', 6, 16]],
     };
     for (const st of this.world.sites) {
       const c = Math.cos(st.rot), s = Math.sin(st.rot);
@@ -1418,7 +1489,8 @@ export class Buildings {
         const f = furniture.find((q) => {
           const [ox, oz] = local(q, lx, lz);
           const b = bounds(q);
-          return Math.abs(ox) < b.hx + 0.12 && Math.abs(oz) < b.hz + 0.12;
+          // (and on the floor the thing stands on: what is upstairs in a house that is a model's is not under what is said to lie upstairs)
+          return Math.abs(ox) < b.hx + 0.12 && Math.abs(oz) < b.hz + 0.12 && ly > (q.y ?? 0) - 0.05 && ly < (q.y ?? 0) + 2.6;
         });
         if (!f || CRATE_KINDS.has(f.id)) continue;
         const key = `${furniture.indexOf(f)}:${ly}`;
@@ -1439,8 +1511,10 @@ export class Buildings {
           const ox = along ? centre : 0, oz = along ? 0 : centre;
           const c = Math.cos(f.rot), s = Math.sin(f.rot);
           const levels = SHELF_LEVELS[f.id];
-          const sy = levels ? levels.reduce((best, l) => (Math.abs(l - ly) < Math.abs(best - ly) ? l : best)) + 0.003 : ly;
-          const p = new THREE.Vector3(f.x + ox * c + oz * s, (f.id === 'old_bed_frame' ? BED.springs + BED.mattress + 0.003 : TOP_SURFACE.has(f.id) ? b.top + 0.003 : sy) + y0, f.z - ox * s + oz * c).applyMatrix4(B);
+          // (heights are from the floor the thing stands on: upstairs furniture said where it lay from the ground floor, and what was on it hung in the room below)
+          const up = f.y ?? 0, lh = ly - up;
+          const sy = levels ? levels.reduce((best, l) => (Math.abs(l - lh) < Math.abs(best - lh) ? l : best)) + 0.003 : lh;
+          const p = new THREE.Vector3(f.x + ox * c + oz * s, (f.id === 'old_bed_frame' ? BED.springs + BED.mattress + 0.003 : TOP_SURFACE.has(f.id) ? b.top + 0.003 : sy) + up + y0, f.z - ox * s + oz * c).applyMatrix4(B);
           this.lootPoints.push({
             x: p.x, y: p.y, z: p.z, usage: bp.usage, building: plot.id, floor: false,
             surf: { x: p.x, z: p.z, rot: f.rot + plot.rot, hx: along ? seg : HX, hz: along ? HZ : seg, clear: SHELF_CLEARANCE[f.id] ?? 10 },
@@ -1805,7 +1879,12 @@ export class Buildings {
           m.renderOrder = WALLS_FIRST;
           const was = m.material as THREE.Material;
           if (!painted.has(was)) {
-            const mine = was.clone();
+            // Its colour and its relief, and no more of what the download says of itself. (Its own word for how it
+            // shines, and the shade it has baked into it for the picture it was made for, made the brick house black
+            // indoors, where there is no sun and that shade took all the light there was.)
+            const src = was as THREE.MeshStandardMaterial;
+            const mine = new THREE.MeshStandardMaterial({ map: src.map, normalMap: src.normalMap, color: src.color, roughness: src.roughnessMap ? 0.9 : Math.max(0.6, src.roughness), metalness: 0, side: src.side, alphaTest: src.alphaTest, transparent: src.transparent, opacity: src.opacity });
+            mine.name = src.name;
             this.atmo.register(mine);
             painted.set(was, mine);
           }

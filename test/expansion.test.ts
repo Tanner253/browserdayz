@@ -3,7 +3,7 @@
 // `npx tsx test/expansion.test.ts`.
 
 import assert from 'node:assert/strict';
-import { BUNKER_AT, CELL, TRADE_AT, EXPANSION as E, PLAY_AREAS, PLAY_RADIUS, WORLD_RES, WORLD_SIZE, generateWorld, heightAt, inPlay, playOutline, slopeAt, BUILDING_FOOTPRINT } from '../src/world/worldgen';
+import { BUNKER_AT, CELL, NO_START, OUTLYING, TOWN, TRADE_AT, EXPANSION as E, PLAY_AREAS, PLAY_RADIUS, WORLD_RES, WORLD_SIZE, generateWorld, heightAt, inPlay, playOutline, slopeAt, BUILDING_FOOTPRINT } from '../src/world/worldgen';
 import { buildWorldData } from '../server/world';
 import { GAS, gasDepth, gasZone } from '../src/sim/gas';
 import { INFECTED, openGround } from '../src/sim/infected';
@@ -72,7 +72,7 @@ const inl = Math.hypot(camp.x - E.x, camp.z - E.z);
 const ux = (camp.x - E.x) / inl, uz = (camp.z - E.z) / inl;
 const works = world.sites.find((s) => s.kind === 'works')!;
 // (what was built with the works: not the trading post's two, which came later and stand in the old map's meadow)
-const added = world.buildings.slice(WAS.buildings).filter((b) => b.type !== 'hut' && Math.hypot(b.x - TRADE_AT.x, b.z - TRADE_AT.z) > 78);
+const added = world.buildings.slice(WAS.buildings).filter((b) => b.type !== 'hut' && Math.hypot(b.x - TRADE_AT.x, b.z - TRADE_AT.z) > 78 && inOld(b.x, b.z));
 
 // To take the old map's figures again after fencing off more ground (do it BEFORE building there): FIGURES=1 npx tsx test/expansion.test.ts
 if (process.env.FIGURES) {
@@ -89,7 +89,14 @@ ok('the map as it was is still exactly there: its ground, its buildings, its sta
   const old = world.buildings.slice(0, WAS.buildings);
   assert.equal(old[old.length - 1].id, WAS.lastId);
   assert.equal(hash(old.flatMap((b) => [b.x, b.z, b.rot, b.floorY])), WAS.buildingsHash, 'an old building has moved');
-  assert.equal(hash(world.spawns.flatMap((s) => [s.x, s.z, s.yaw])), WAS.spawns, 'a starting point has moved');
+  assert.equal(hash(world.spawnRing.flatMap((s) => [s.x, s.z, s.yaw])), WAS.spawns, 'a starting point has moved');
+  // (and of those, nobody is set down by the bunker any more, nor between the valley and the town in the east)
+  assert.ok(world.spawns.length >= 16 && world.spawns.length < world.spawnRing.length, `${world.spawns.length} starts left of ${world.spawnRing.length}`);
+  for (const sp of world.spawns) {
+    assert.ok(world.spawnRing.includes(sp), 'a start that is none of the ring');
+    assert.ok(Math.hypot(sp.x - BUNKER_AT.x, sp.z - BUNKER_AT.z) > NO_START.bunker, 'a start by the bunker');
+    assert.ok(Math.hypot(sp.x - TOWN.gate.x, sp.z - TOWN.gate.z) > NO_START.gate && Math.hypot(sp.x - TOWN.x, sp.z - TOWN.z) > NO_START.town, 'a start between the valley and the town');
+  }
   const trees = world.trees.filter((t) => inOld(t.x, t.z) && !touched(t.x, t.z));
   assert.equal(trees.length, WAS.trees);
   assert.equal(hash(trees.flatMap((t) => [t.x, t.y, t.z])), WAS.treesHash, 'a tree away from the works has moved');
@@ -98,19 +105,21 @@ ok('the map as it was is still exactly there: its ground, its buildings, its sta
   assert.equal(hash(points.flatMap((p) => [p.x, p.y, p.z])), WAS.lootHash, 'an old loot point has moved or been renumbered');
   assert.equal(data.jeeps.length, WAS.jeeps);
   assert.equal(hash(data.jeeps.flatMap((j: { x: number; z: number }) => [j.x, j.z])), WAS.jeepsHash);
-  assert.equal(data.fires.length, WAS.fires);
+  // (the old six, and one each at the three places built in the east country)
+  assert.equal(data.fires.length, WAS.fires + 3);
 });
 
 ok('it lies outside the ring the map used to end at, inside the ground there is, and the two are one place to play in', () => {
   assert.ok(Math.hypot(E.x, E.z) - E.floor > PLAY_RADIUS, 'its floor reaches into the old map');
   const R = E.floor + E.wall;
   assert.ok(Math.abs(E.x) + R < half && Math.abs(E.z) + R < half, 'it runs off the edge of the ground');
-  assert.equal(PLAY_AREAS.length, 3);
+  // (the valley, the works, the bunker; and since, the town in the east and the round over the road to it)
+  assert.equal(PLAY_AREAS.length, 5);
   assert.ok(inPlay(0, 0) && inPlay(E.x, E.z) && inPlay(camp.x, camp.z) && inPlay(BUNKER_AT.x, BUNKER_AT.z));
   assert.ok(!inPlay(E.x, -E.z) && !inPlay(-E.x, E.z), 'the other corners of the map are not played in');
   // one line round the whole: every arc ends where another begins (the valley's round is in two pieces, between the two places added to it)
   const arcs = playOutline();
-  assert.equal(arcs.length, 4);
+  assert.ok(arcs.length >= 6, `${arcs.length} arcs`);
   const at = (o: (typeof arcs)[number], t: number) => [o.x + Math.cos(t) * o.r, o.z + Math.sin(t) * o.r];
   for (const o of arcs) {
     const end = at(o, o.to);
@@ -196,11 +205,15 @@ ok('the infected keep to it too, and nowhere else has fewer for it', () => {
   // (and those that walk the ground over it)
   const over = homes.filter((h) => !h.inside && Math.hypot(h.x - below[0].x, h.z - below[0].z) < 1);
   assert.ok(over.length === 1 && over[0].n >= 6, 'none over the bunker');
-  assert.equal(INFECTED.max - here!.n - below[0].n - over[0].n, 33);
+  // (and the fifteen of the east country since: ten in the town, two at the squat, three at the camp)
+  assert.equal(INFECTED.max - here!.n - below[0].n - over[0].n, 33 + 15);
+  const east = homes.filter((h) => Math.abs(h.x) > 512 || Math.abs(h.z) > 512);
+  assert.equal(east.reduce((a, h) => a + h.n, 0), 15, 'the east country has not its fifteen');
 });
 
 ok('the long huts stand where they were meant to: beside the trading post, behind the depot, and on the track up to the works', () => {
-  const huts = world.buildings.filter((b) => b.type === 'hut');
+  // (three on the old map; the town's and the camp's two are the east country's, below)
+  const huts = world.buildings.filter((b) => b.type === 'hut' && inOld(b.x, b.z));
   assert.equal(huts.length, 3, `${huts.length} huts`);
   assert.ok(huts.some((b) => Math.hypot(b.x - TRADE_AT.x, b.z - TRADE_AT.z) < 60), 'none at the trading post');
   assert.ok(huts.some((b) => Math.hypot(b.x - HUT_AT.x, b.z - HUT_AT.z) < 2), 'none behind the depot, where the ground was fenced off for it');
@@ -217,6 +230,83 @@ ok('the long huts stand where they were meant to: beside the trading post, behin
     const g = ground(b.x + lx * c + lz * s, b.z - lx * s + lz * c);
     assert.ok(b.floorY - g > -0.05 && b.floorY - g < 0.75, `${b.id}: the ground is ${(b.floorY - g).toFixed(2)} m under its floor at ${lx}, ${lz}`);
   }
+});
+
+ok('the east country: a town out of the valley by the road, two places far out, and woods, all on ground the old map did not have', () => {
+  const town = world.sites.find((st) => st.kind === 'town')!;
+  assert.ok(town && town.name === TOWN.name && !inOld(town.x, town.z), 'no town, or it is on the old map');
+  const built = world.buildings.filter((b) => !inOld(b.x, b.z));
+  assert.ok(built.length >= 18, `${built.length} buildings out there`);
+  for (const b of built) assert.ok(Math.abs(b.x) < half - 20 && Math.abs(b.z) < half - 20, `${b.id} is off the ground`);
+  // every one of the downloaded buildings is used: the brick block four times in the town, the plank house far out, the long hut at both
+  const of = (type: string, x: number, z: number, r: number) => built.filter((b) => b.type === type && Math.hypot(b.x - x, b.z - z) < r).length;
+  // (and they are most of the town: the owner's word for it is that they dominate it)
+  assert.equal(of('townhouse', town.x, town.z, 110), 8);
+  assert.equal(of('hut', town.x, town.z, 110), 4);
+  assert.equal(of('shanty', town.x, town.z, 110), 3);
+  const inTown = built.filter((b) => Math.hypot(b.x - town.x, b.z - town.z) < 110);
+  assert.ok(inTown.length >= 24 && inTown.filter((b) => ['townhouse', 'hut', 'shanty'].includes(b.type)).length * 2 > inTown.length, 'the new buildings are not most of the town');
+  const squat = OUTLYING.find((o) => o.kind === 'squat')!, camp = OUTLYING.find((o) => o.kind === 'camp')!;
+  assert.equal(of('shanty', squat.x, squat.z, 30), 1);
+  assert.equal(of('hut', camp.x, camp.z, 40), 2);
+  for (const type of ['police', 'clinic', 'store', 'garage']) assert.equal(of(type, town.x, town.z, 110), 1, `the town has no ${type}`);
+  // nothing stands in anything else, and each stands on its floor
+  for (const b of built) {
+    // (neither's ground plan reaches into the other's: tried at the corners and the middles of the sides of each)
+    for (const o of built) {
+      if (o === b) continue;
+      const [ow, od] = BUILDING_FOOTPRINT[o.type], [bw, bd] = BUILDING_FOOTPRINT[b.type], oc = Math.cos(o.rot), os = Math.sin(o.rot), bc = Math.cos(b.rot), bs = Math.sin(b.rot);
+      for (const [fx, fz] of [[1, 1], [1, -1], [-1, 1], [-1, -1], [1, 0], [-1, 0], [0, 1], [0, -1], [0, 0]]) {
+        const lx = (fx * bw) / 2, lz = (fz * bd) / 2;
+        const wx = b.x + lx * bc + lz * bs - o.x, wz = b.z - lx * bs + lz * bc - o.z;
+        assert.ok(Math.abs(wx * oc - wz * os) > ow / 2 + 0.5 || Math.abs(wx * os + wz * oc) > od / 2 + 0.5, `${b.id} stands in ${o.id}`);
+      }
+    }
+    const [w, d] = BUILDING_FOOTPRINT[b.type], c = Math.cos(b.rot), sn = Math.sin(b.rot);
+    for (const [lx, lz] of [[w / 2 + 1.5, 0], [-w / 2 - 1.5, 0], [0, d / 2 + 1.5], [0, -d / 2 - 1.5]]) {
+      const g = ground(b.x + lx * c + lz * sn, b.z - lx * sn + lz * c);
+      // (a hand's breadth over the floor is let pass: the ground is a point every two metres, and five metres from a
+      // neighbour whose floor is a step higher it cannot be both houses' at once)
+      assert.ok(b.floorY - g > -0.12 && b.floorY - g < 0.95, `${b.id}: the ground is ${(b.floorY - g).toFixed(2)} m under its floor`);
+    }
+  }
+  // the road: a second line, picked up where the first ran out, down the town's street, and never a point added to the first
+  assert.equal(world.road.points.length, 295 * 3, 'the old road has been lengthened: jeeps and lamps are told off along it by number');
+  assert.equal(world.roads.length, 1);
+  const p = world.roads[0].points, n = p.length / 3, last = world.road.points.length - 3;
+  assert.ok(Math.hypot(p[0] - world.road.points[last], p[2] - world.road.points[last + 2]) < 0.01 && Math.abs(p[1] - world.road.points[last + 1]) < 0.01, 'the new road does not begin where the old one ends');
+  let nearest = 1e9, steep = 0;
+  for (let i = 0; i < n; i++) {
+    nearest = Math.min(nearest, Math.hypot(p[i * 3] - town.x, p[i * 3 + 2] - town.z));
+    assert.ok(!inOld(p[i * 3], p[i * 3 + 2]) || i === 0, 'the new road runs back onto the old map');
+    if (i) steep = Math.max(steep, Math.abs(p[i * 3 + 1] - p[i * 3 - 2]) / Math.hypot(p[i * 3] - p[i * 3 - 3], p[i * 3 + 2] - p[i * 3 - 1]));
+  }
+  assert.ok(nearest < 1, `the road passes ${nearest.toFixed(1)} m from the middle of the town`);
+  assert.ok(steep < 0.2, `the road climbs ${(steep * 100).toFixed(0)} in a hundred somewhere`);
+  // no building on the road, no tree on it or in a building
+  const onRoad = (x: number, z: number, r: number) => {
+    for (let i = 0; i < n - 1; i++) {
+      const ax = p[i * 3], az = p[i * 3 + 2], dx = p[i * 3 + 3] - ax, dz = p[i * 3 + 5] - az;
+      const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz || 1)));
+      if (Math.hypot(x - ax - dx * t, z - az - dz * t) < r) return true;
+    }
+    return false;
+  };
+  for (const b of built) assert.ok(!onRoad(b.x, b.z, Math.min(...BUILDING_FOOTPRINT[b.type]) / 2 + 3.2), `${b.id} stands in the road`);
+  const planted = world.trees.filter((t) => !inOld(t.x, t.z));
+  assert.ok(planted.length > 3000 && planted.length < 12000, `${planted.length} trees out there`);
+  for (const t of planted) {
+    assert.ok(!onRoad(t.x, t.z, 5), 'a tree stands in the new road');
+    assert.ok(Math.abs(t.y - ground(t.x, t.z)) < 0.06, 'a tree is off the ground');
+  }
+  // the Zona: the town is in it, joined to the valley over the road; the two far places are not
+  assert.ok(inPlay(town.x, town.z));
+  for (let i = 0; i < world.road.points.length / 3; i++) if (world.road.points[i * 3] > 0) assert.ok(inPlay(world.road.points[i * 3], world.road.points[i * 3 + 2]), 'the road east leaves the Zona before the town');
+  for (let i = 0; i < n; i++) if (Math.hypot(p[i * 3] - town.x, p[i * 3 + 2] - town.z) < 100 || p[i * 3 + 2] < town.z) assert.ok(inPlay(p[i * 3], p[i * 3 + 2]), 'the road to the town leaves the Zona on the way');
+  for (const o of OUTLYING) assert.ok(!inPlay(o.x, o.z), `${o.name} is inside the Zona`);
+  // loot: the new buildings have places for things, all after every place there was
+  const fresh = data.lootPoints.slice(WAS.lootPoints).filter((q: { x: number; z: number }) => !inOld(q.x, q.z));
+  assert.ok(fresh.length >= 150, `${fresh.length} places for things out there`);
 });
 
 console.log(`\n${n} checks passed`);

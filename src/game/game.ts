@@ -554,11 +554,15 @@ export class Game {
         market: ['the trading post', 'A trader behind the counter: he buys what you bring, sells supplies, and has paid work every day.'],
         works: ['', ''],
         bunker: ['', ''],
+        town: ['a town', 'Brick houses two floors high down both sides of the road, with a police station, a clinic and a shop. Out of the valley by the paved road, and inside the Zona.'],
+        squat: ['a squat', 'A plank house on piles, three floors of it, far out in the south country. Outside the Zona: tags are not earned here.'],
+        camp: ['a camp', 'Two long huts and two containers in the north woods. Outside the Zona: tags are not earned here.'],
       };
       for (const q of world.pois.slice(1)) {
         const site = world.sites.find((st) => st.name === q.name);
         if (site?.kind === 'bunker') spots.push({ x: q.x, z: q.z, name: q.name, tip: 'Under the ground, in the dark: a dozen rooms off two passages. Its door opens to a keycard, and the keycards are in the gas. The shotgun is kept here, and nowhere else.', kind: 'army', label: true });
         else if (q.name === GAS.place) spots.push({ x: q.x, z: q.z, name: q.name, tip: 'Under gas: you need a gas mask on to breathe here. The richest place on the map: rifles, ammunition, helmets, plate carriers and scopes.', kind: 'gas', label: true });
+        else if (site?.kind === 'town') spots.push({ x: q.x, z: q.z, name: q.name, tip: SITE.town[1], kind: 'town', label: true });
         else if (site) spots.push({ x: q.x, z: q.z, name: q.name, tip: SITE[site.kind][1], kind: site.kind === 'market' ? 'trader' : site.kind === 'depot' || site.kind === 'post' ? 'army' : 'site' });
         else if (/checkpoint/i.test(q.name)) spots.push({ x: q.x, z: q.z, name: q.name, tip: 'Guard posts, a barracks and a watchtower: rifles, plate carriers, grenades. The track to the works starts here.', kind: 'army', label: true });
         else spots.push({ x: q.x, z: q.z, name: q.name, tip: 'A cabin in the hills, with a fire ring to rest by. A weapon is always left here.', kind: 'site' });

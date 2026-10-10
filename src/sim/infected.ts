@@ -22,7 +22,8 @@ import { BUNKER, bunkerAt, bunkerPlan, levelY } from './bunker';
 
 export const INFECTED = {
   /** as many as are ever alive at once, over the whole map */
-  max: 63,
+  // (63, and the fifteen of the town and the two places built in the east country, 2026-10-10)
+  max: 78,
   /** what each has to begin with: a rifle round anywhere, a pistol round in the head, three in the chest */
   hp: 90,
   /** how long a body lies there, and how long after that before another turns up about the same place, seconds */
@@ -150,6 +151,13 @@ export interface Home {
 // (the outlying places are where somebody new finds a first weapon: one or two there, the crowd in the village)
 // (none at the trading post: it is the one place they keep away from)
 const ABOUT: Record<string, number> = { market: 0, hamlet: 4, depot: 4, post: 3, yard: 2, farm: 2, lodge: 1, dacha: 1, works: 0, bunker: 0 };
+/**
+ * And at the places of the east country (the town, and the two far out): theirs are over and above what the
+ * old map holds, so that nothing there goes short for them. (The old places are filled in list order from a
+ * fixed number, and the last of them already went short.)
+ */
+const EAST: Record<string, [n: number, r: number]> = { town: [10, 60], squat: [2, 30], camp: [3, 34] };
+const EAST_ALL = Object.values(EAST).reduce((a, [n]) => a + n, 0);
 /** how many keep to the works (said apart from the small places: it comes high in the list, so it is never the one that goes short) */
 // (half as many again as the six there were: the gas is where the best of everything is kept, and it was thinly guarded)
 const AT_WORKS = 9;
@@ -209,13 +217,14 @@ export function infectedHomes(world: World): Home[] {
   const below = bunkerSpots(world), bunker = world.sites.find((s) => s.kind === 'bunker');
   if (bunker && below.length) homes.push({ x: bunker.x, z: bunker.z, r: 30, n: IN_BUNKER, inside: below });
   if (bunker) homes.push({ x: bunker.x, z: bunker.z, r: 40, n: OVER_BUNKER });
-  for (const s of world.sites) homes.push({ x: s.x, z: s.z, r: 34, n: ABOUT[s.kind] ?? 1 });
+  for (const s of world.sites) if (!EAST[s.kind]) homes.push({ x: s.x, z: s.z, r: 34, n: ABOUT[s.kind] ?? 1 });
   // (never more than the map is meant to hold: the places furthest down the list go short)
-  let left = INFECTED.max;
+  let left = INFECTED.max - EAST_ALL;
   for (const h of homes) {
     h.n = Math.min(h.n, left);
     left -= h.n;
   }
+  for (const s of world.sites) if (EAST[s.kind]) homes.push({ x: s.x, z: s.z, r: EAST[s.kind][1], n: EAST[s.kind][0] });
   return homes.filter((h) => h.n > 0);
 }
 

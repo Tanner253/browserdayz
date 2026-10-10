@@ -278,7 +278,8 @@ export const LOCAL_MODELS = {
   },
   shanty_mansion: {
     dir: 'shanty_mansion',
-    size: 29.6,
+    // (as it came it was twice the size of a house: a floor of it was five metres high. At this, a floor is 2.7 m.)
+    size: 15.8,
     tex: 1024,
     tags: ['prop'],
     changes: 'Stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.',

@@ -31,10 +31,25 @@ export const EXPANSION = { name: 'Chemical Works', x: -368, z: 368, floor: 84, w
 /** Where the map is played: the valley, and what has been added to it. */
 /** Where the bunker is (see src/sim/bunker.ts): straight across the map from the works, in the foot of the hills there. */
 export const BUNKER_AT = { x: (-EXPANSION.x / Math.hypot(EXPANSION.x, EXPANSION.z)) * BUNKER.out, z: (-EXPANSION.z / Math.hypot(EXPANSION.x, EXPANSION.z)) * BUNKER.out };
+/**
+ * The town built on the ground the map was grown by (2026-10-10): out of the valley by the road, which is carried
+ * on to it and through it. `street`: the way its one street runs. `r`: how much of the country round it is the
+ * Zona's; `gate`: the round of the Zona that joins it to the valley, over the road between the two.
+ */
+export const TOWN = { name: 'Kamenka', x: 625, z: 365, street: [0.349, 0.937] as [number, number], r: 150, gate: { x: 455, z: 203, r: 110 } };
+/** And two places far out in that country, outside the Zona: nothing is earned at them, and nobody is looking. */
+export const OUTLYING: { name: string; kind: 'squat' | 'camp'; x: number; z: number; rot: number }[] = [
+  { name: "Squatters' House", kind: 'squat', x: -100, z: 640, rot: Math.PI },
+  { name: 'Logging Camp', kind: 'camp', x: 300, z: -640, rot: 0 },
+];
+/** how near the bunker, the way out to the town and the town itself nobody is set down when they start (metres) */
+export const NO_START = { bunker: 190, gate: 200, town: 320 };
 export const PLAY_AREAS: { x: number; z: number; r: number }[] = [
   { x: 0, z: 0, r: PLAY_RADIUS },
   { x: EXPANSION.x, z: EXPANSION.z, r: EXPANSION.floor + EXPANSION.wall },
   { x: BUNKER_AT.x, z: BUNKER_AT.z, r: BUNKER.floor + BUNKER.wall },
+  TOWN.gate,
+  { x: TOWN.x, z: TOWN.z, r: TOWN.r },
 ];
 
 /** Where the bunker stands in a world, and which way it faces: its pad's own level, not the hole under it. Null in a world that has none. */
@@ -83,7 +98,7 @@ export function playOutline(): { x: number; z: number; r: number; from: number; 
   return out;
 }
 
-export type BuildingType = 'house_small' | 'house_brick' | 'barn' | 'shed' | 'cabin' | 'guardpost' | 'police' | 'clinic' | 'store' | 'barracks' | 'garage' | 'house_two' | 'tower' | 'hut';
+export type BuildingType = 'house_small' | 'house_brick' | 'barn' | 'shed' | 'cabin' | 'guardpost' | 'police' | 'clinic' | 'store' | 'barracks' | 'garage' | 'house_two' | 'tower' | 'hut' | 'townhouse' | 'shanty';
 
 /** footprint (x = width, z = depth) in metres, used for terrain pads + spacing */
 export const BUILDING_FOOTPRINT: Record<BuildingType, [number, number]> = {
@@ -102,6 +117,9 @@ export const BUILDING_FOOTPRINT: Record<BuildingType, [number, number]> = {
   tower: [6, 6],
   // (the long plastered hut: its walls, not its eaves)
   hut: [13.6, 5],
+  // (two downloads that are whole buildings, rooms and stairs and all: the brick block of two floors, and the plank house on piles)
+  townhouse: [11.4, 14.6],
+  shanty: [9.9, 15.9],
 };
 
 export interface BuildingPlot {
@@ -117,7 +135,7 @@ export interface BuildingPlot {
 }
 
 /** what stands at an outlying place */
-export type SiteKind = 'lodge' | 'farm' | 'post' | 'yard' | 'dacha' | 'hamlet' | 'depot' | 'market' | 'works' | 'bunker';
+export type SiteKind = 'lodge' | 'farm' | 'post' | 'yard' | 'dacha' | 'hamlet' | 'depot' | 'market' | 'works' | 'bunker' | 'town' | 'squat' | 'camp';
 /**
  * Where the trading post stands: a meadow east of the village, 175 m out of it, a hundred from the road and
  * further than that from every other place. (Said, not looked for: the ground round it is counted out of the
@@ -178,6 +196,8 @@ export interface World {
   /** grass blade density 0..255 */
   grass: Uint8Array;
   road: { points: Float32Array; width: number };
+  /** roads laid since: each a line of its own. (Never added to the first one's points: jeeps and street lamps are told off along those by number.) */
+  roads: { points: Float32Array; width: number }[];
   buildings: BuildingPlot[];
   trees: Instance[];
   rocks: Instance[];
@@ -190,6 +210,8 @@ export interface World {
   spawn: { x: number; z: number; yaw: number };
   /** fresh characters start at one of these, out on the edge of the map, facing inward */
   spawns: { x: number; z: number; yaw: number }[];
+  /** every start of the ring as it was first laid, those nobody is set down at any more among them */
+  spawnRing: { x: number; z: number; yaw: number }[];
 }
 
 // ------------------------------------------------------------------ helpers
@@ -516,6 +538,10 @@ export function generateWorld(seed = WORLD_SEED): World {
     // the trading post: the trader's shop, and his store shed behind it
     // (and a bunkhouse beside the trader's yard, its door to the way in)
     market: [['store', 0, 0, 0], ['shed', 13.5, -12, -0.4], ['hut', -30, 3, -Math.PI / 2]],
+    // (laid out by hand where they are built: see the east country, at the end)
+    town: [],
+    squat: [],
+    camp: [],
     // (laid out where it is made, at the end: see the first expansion)
     works: [],
     // (nothing stands on it that is a building of the map's: what is there is made in world/bunker.ts)
@@ -591,6 +617,15 @@ export function generateWorld(seed = WORLD_SEED): World {
     for (const st of sites) {
       const d = Math.hypot(x - st.x, z - st.z);
       if (d < 34) f -= 0.85 * (1 - smoothstep(20, 34, d));
+    }
+    // The country the map was grown by: woods and open hillside by turns. (The old rule, carried on outward,
+    // is one unbroken wood to the edge.) Nothing of this is felt inside the old square.
+    const out = Math.max(Math.abs(x), Math.abs(z)) - OLD_HALF;
+    if (out > 0) {
+      let g = n2.fbm(x * 0.0042 + 40, z * 0.0042 - 23, 3) * 1.15 - 0.1 + 0.12 * n3.noise(x * 0.04, z * 0.04);
+      g -= 1.0 * (1 - smoothstep(70, 105, Math.hypot(x - TOWN.x, z - TOWN.z)));
+      for (const o of OUTLYING) g -= 0.9 * (1 - smoothstep(22, 40, Math.hypot(x - o.x, z - o.z)));
+      f = lerp(f, g, smoothstep(0, 60, out));
     }
     return f;
   };
@@ -692,6 +727,37 @@ export function generateWorld(seed = WORLD_SEED): World {
     }
   }
 
+  // The country the map was grown by is planted by the same rule, on a grid of its own: after every tree there
+  // was, so that none of those is moved or renumbered.
+  for (let gz = -half + 10; gz < half - 10; gz += TREE_STEP) {
+    for (let gx = -half + 10; gx < half - 10; gx += TREE_STEP) {
+      if (Math.abs(gx) < OLD_HALF - 4 && Math.abs(gz) < OLD_HALF - 4) continue;
+      const hx = hash2(Math.round(gx * 10), Math.round(gz * 10), seed + 41);
+      const hz = hash2(Math.round(gz * 10), Math.round(gx * 10), seed + 47);
+      const x = gx + (hx - 0.5) * TREE_STEP * 0.9;
+      const z = gz + (hz - 0.5) * TREE_STEP * 0.9;
+      if (Math.abs(x) <= OLD_HALF + 0.5 && Math.abs(z) <= OLD_HALF + 0.5) continue;
+      const f = forestMask(x, z);
+      const hv = hash2(Math.round(x * 7), Math.round(z * 7), seed + 43);
+      const i = idx(Math.round((x + half) / CELL), Math.round((z + half) / CELL));
+      if (roadDist[i] < ROAD_W / 2 + 4 || slopeAt(heights, x, z) > 1.05) continue;
+      const y = heightAt(heights, x, z);
+      if (f > 0.08) {
+        const edge = f < 0.2;
+        if (hv > smoothstep(0.08, 0.3, f) * 0.92) continue;
+        let kind: string;
+        if (edge && hv < 0.45) kind = hv < 0.18 ? 'bush_a' : hv < 0.3 ? 'bush_b' : 'birch_a';
+        else if (hv < 0.12) kind = 'birch_b';
+        else kind = pines[Math.floor(hash2(Math.round(x), Math.round(z), 5) * pines.length)];
+        trees.push({ kind, x, y, z, rot: hx * Math.PI * 2, scale: 0.85 + hz * 0.35 });
+      } else if (f > -0.25 && hv < 0.025) {
+        trees.push({ kind: hv < 0.01 ? 'oak_a' : hv < 0.018 ? 'ash_a' : 'birch_a', x, y, z, rot: hx * Math.PI * 2, scale: 0.9 + hz * 0.3 });
+      } else if (f > -0.15 && hv > 0.97) {
+        trees.push({ kind: hv > 0.985 ? 'bush_a' : 'bush_b', x, y, z, rot: hx * Math.PI * 2, scale: 0.8 + hz * 0.5 });
+      }
+    }
+  }
+
   // forest debris, rocks, ferns
   const rockKinds = ['rock_moss_set_01', 'rock_moss_set_02'];
   for (let k = 0; k < 2600; k++) {
@@ -740,7 +806,7 @@ export function generateWorld(seed = WORLD_SEED): World {
       break;
     }
   }
-  const spawn = spawns[0];
+  // (the first of them that anybody is still set down at is the one told to whoever asks for one: see `starts`, at the end)
 
   // --- what was built later: a clinic, a shop and a workshop in the village, a barracks at
   // the checkpoint, a workshop at each yard, and two new places half way in.
@@ -1138,12 +1204,196 @@ export function generateWorld(seed = WORLD_SEED): World {
       }
   }
 
+  // --- the third expansion (2026-10-10): the east country. The map grown to 1536 m gave a ring of upland
+  // round the old one (planted above). Here the road is carried on out of the valley and a town is built on it,
+  // Kamenka, of the buildings that were downloaded whole; and two places stand far out in the ring. By the
+  // rule of the others: own dice, everything after what there was, and nothing inside the old square touched
+  // (the road is picked up where it used to run off the ground, 28 m outside it).
+  const roads: { points: Float32Array; width: number }[] = [];
+  {
+    const T = TOWN;
+    const rng4 = new RNG(seed + 9001);
+    const first = buildings.length;
+    const cell = (x: number, z: number) => idx(clamp(Math.round((x + half) / CELL), 0, N - 1), clamp(Math.round((z + half) / CELL), 0, N - 1));
+
+    // 1. level ground: for the town, and for each of the two places
+    // (twice over: once leaves a quarter of the hill it stands on, and a street of houses wall to wall wants less.
+    // With a quarter left, the floors down the street stepped a metre from house to house.)
+    flattenArea(T.x, T.z, 86, 112, 0.5);
+    flattenArea(T.x, T.z, 86, 112, 0.3);
+    for (const o of OUTLYING) flattenArea(o.x, o.z, 24, 52, 0.4);
+
+    // 2. the road: on from its old end, round to the line of the town's street, down that, and away off the far
+    // edge of the ground as the old one went off the old edge
+    const ul = Math.hypot(T.street[0], T.street[1]), ux = T.street[0] / ul, uz = T.street[1] / ul;
+    const rot = Math.atan2(ux, uz);
+    const on = (k: number): [number, number] => [T.x + ux * k, T.z + uz * k];
+    const line = catmullRom([path2[path2.length - 1], [566, 243], [585, 262], on(-80), on(-30), on(30), on(80), [676, 486], [716, 538], [770, 596], [800, 628]], 4);
+    const raw = line.map(([x, z]) => heightAt(heights, x, z));
+    const ys = raw.map((_, i) => {
+      let sum = 0, c = 0;
+      for (let k = -12; k <= 12; k++) {
+        const w = 1 - Math.abs(k) / 13;
+        sum += raw[clamp(i + k, 0, raw.length - 1)] * w;
+        c += w;
+      }
+      return sum / c;
+    });
+    // (it leaves the old road at the old road's own height)
+    for (let i = 0; i < 12; i++) ys[i] = lerp(smooth[smooth.length - 1], ys[i], i / 12);
+    // And it is a road: nowhere steeper than eight in a hundred. (Left to follow the ground it went up the hill
+    // at the end of the street at one in four.) Where the ground is steeper it is cut into it, or banked up.
+    for (const from of [1, line.length - 2]) {
+      const dir = from === 1 ? 1 : -1;
+      for (let i = from; i > 0 && i < line.length; i += dir) {
+        const most = 0.08 * Math.hypot(line[i][0] - line[i - dir][0], line[i][1] - line[i - dir][1]);
+        ys[i] = clamp(ys[i], ys[i - dir] - most, ys[i - dir] + most);
+      }
+    }
+    const nd = new Float32Array(N * N).fill(1e9), nh = new Float32Array(N * N);
+    rasterLine(line, ys, 16, nd, nh);
+    for (let i = 0; i < N * N; i++) {
+      if (nd[i] >= 16) continue;
+      heights[i] = lerp(heights[i], nh[i] - 0.08, 1 - smoothstep(ROAD_W * 0.5 + 0.5, 16, nd[i]));
+      if (nd[i] < roadDist[i]) {
+        roadDist[i] = nd[i];
+        roadH[i] = nh[i];
+      }
+    }
+    const pts2 = new Float32Array(line.length * 3);
+    line.forEach(([x, z], i) => pts2.set([x, ys[i], z], i * 3));
+    roads.push({ points: pts2, width: ROAD_W });
+
+    // 3. what is built. [type, right, forward, turn, weapons kept]: forward is down the street, away from the valley.
+    // The brick blocks have their doors in their west walls (turn 0 on the right of the street, half a turn on the
+    // left); everything else has its door in its front (a quarter turn to face the street).
+    const Q = Math.PI / 2;
+    const lay2 = (cx: number, cz: number, r: number, plan: [BuildingType, number, number, number, number][]) => {
+      for (const [type, right, fwd, turn, arms] of plan) {
+        const x = cx + right * Math.cos(r) + fwd * Math.sin(r), z = cz - right * Math.sin(r) + fwd * Math.cos(r);
+        const [w, d] = BUILDING_FOOTPRINT[type];
+        blocked.push({ x, z, r: Math.hypot(w, d) / 2 });
+        buildings.push({ id: `${type}_${buildings.length}`, type, x, z, rot: r + turn, floorY: 0, seed: Math.floor(rng4.next() * 1e9), ...(arms ? { arms } : {}) });
+      }
+    };
+    // (The downloaded buildings are most of it: eight of the brick blocks, three of the plank houses, four of the long
+    // huts, in a town of twenty-six. The plank house and whatever has its door in its front face the street with a
+    // quarter turn; the brick block's door is in its west wall.)
+    lay2(T.x, T.z, rot, [
+      // down the right of the street
+      ['townhouse', 11.2, -62, 0, 0],
+      ['store', 10.5, -44, -Q, 0],
+      ['townhouse', 11.2, -27, 0, 0],
+      ['shanty', 15.6, -9, -Q, 0],
+      ['townhouse', 11.2, 10, 0, 0],
+      ['police', 11.5, 30, -Q, 1],
+      ['townhouse', 11.2, 49, 0, 0],
+      ['garage', 10.5, 66, -Q, 0],
+      // down the left of it
+      ['clinic', -10.75, -62, Q, 0],
+      ['townhouse', -11.2, -44, Math.PI, 0],
+      ['townhouse', -11.2, -24, Math.PI, 0],
+      ['hut', -9.6, -2, -Q, 0],
+      ['townhouse', -11.2, 17, Math.PI, 0],
+      ['shanty', -15.6, 37, Q, 0],
+      ['townhouse', -11.2, 55, Math.PI, 0],
+      ['house_two', -10.5, 72, Q, 0],
+      // and behind them, either side
+      ['hut', 36, -50, -Q, 0],
+      ['shed', 30, -30, -Q, 0],
+      ['shed', 31, 6, -Q, 0],
+      ['barn', 38, 30, -Q, 0],
+      ['hut', 36, 62, -Q, 0],
+      ['hut', -34, -44, Q, 0],
+      ['house_brick', -36, -12, Q, 0],
+      ['house_small', -35, 14, Q, 0],
+      ['barn', -38, 36, Q, 0],
+      ['shanty', -42, 60, Q, 0],
+    ]);
+    sites.push({ name: T.name, kind: 'town', x: T.x, z: T.z, rot, later: true });
+    pois.push({ name: T.name, x: T.x, z: T.z, radius: 95 });
+    const OUT_PLAN: Record<'squat' | 'camp', [BuildingType, number, number, number, number][]> = {
+      squat: [['shanty', 0, 0, 0, 0]],
+      camp: [['hut', -10, -6, 0, 0], ['hut', 12, 8, Q, 0], ['shed', -14, 12, 0.4, 0]],
+    };
+    for (const o of OUTLYING) {
+      lay2(o.x, o.z, o.rot, OUT_PLAN[o.kind]);
+      sites.push({ name: o.name, kind: o.kind, x: o.x, z: o.z, rot: o.rot, later: true });
+      pois.push({ name: o.name, x: o.x, z: o.z, radius: 40 });
+    }
+    const added = buildings.slice(first);
+    for (const b of added) seat(b);
+    for (const b of added) pad(b, 3.2, 2.2);
+    // (and once more, close in: they stand five metres apart down the street, and a neighbour's skirt reached the next one's wall)
+    for (const b of added) pad(b, 2.0, 1.6);
+
+    // 4. what was planted there: nothing on the road, in a building or in a yard, and few trees in the town
+    const inAdded = (x: number, z: number, margin: number) =>
+      added.some((b) => {
+        const [w, d] = BUILDING_FOOTPRINT[b.type];
+        const dx = x - b.x, dz = z - b.z, c = Math.cos(b.rot), sn = Math.sin(b.rot);
+        return Math.abs(dx * c - dz * sn) < w / 2 + margin && Math.abs(dx * sn + dz * c) < d / 2 + margin;
+      });
+    for (let k = trees.length - 1; k >= 0; k--) {
+      const t = trees[k];
+      // (never a tree of the old map)
+      if (Math.abs(t.x) <= OLD_HALF && Math.abs(t.z) <= OLD_HALF) continue;
+      const dT = Math.hypot(t.x - T.x, t.z - T.z), far = OUTLYING.every((o) => Math.hypot(t.x - o.x, t.z - o.z) > 62);
+      if (dT > 128 && far && nd[cell(t.x, t.z)] > 19) continue;
+      const gone = nd[cell(t.x, t.z)] < ROAD_W / 2 + 4 || inAdded(t.x, t.z, 4) || OUTLYING.some((o) => Math.hypot(t.x - o.x, t.z - o.z) < 24) || (dT < 92 && (t.kind.startsWith('pine') || hash2(Math.round(t.x), Math.round(t.z), 77) < 0.6));
+      if (gone) trees.splice(k, 1);
+      else t.y = heightAt(heights, t.x, t.z);
+    }
+
+    // 5. rocks and what lies in the woods, over all the new country: dice of their own
+    const rockKinds2 = ['rock_moss_set_01', 'rock_moss_set_02'];
+    for (let k = 0; k < 1500; k++) {
+      const x = rng4.range(-half + 14, half - 14), z = rng4.range(-half + 14, half - 14);
+      const roll = rng4.next(), turn = rng4.range(0, 6.28), size = rng4.next(), which = rng4.int(0, 5), set = rng4.pick(rockKinds2);
+      if (Math.abs(x) <= OLD_HALF + 2 && Math.abs(z) <= OLD_HALF + 2) continue;
+      if (roadDist[cell(x, z)] < ROAD_W / 2 + 2 || insideBuilding(x, z, 2) || Math.hypot(x - T.x, z - T.z) < 84 || OUTLYING.some((o) => Math.hypot(x - o.x, z - o.z) < 20)) continue;
+      const f = forestMask(x, z), y = heightAt(heights, x, z), slope = slopeAt(heights, x, z);
+      if (f > 0.1) {
+        if (roll < 0.45) props.push({ kind: 'fern_02', x, y, z, rot: turn, scale: 0.8 + size * 0.5 });
+        else if (roll < 0.6) rocks.push({ kind: `${set}#${which}`, x, y: y - 0.15, z, rot: turn, scale: 0.6 + size * 0.8 });
+        else if (roll < 0.68) props.push({ kind: 'dry_branches_medium_01', x, y, z, rot: turn, scale: 0.8 + size * 0.4 });
+        else if (roll < 0.74) props.push({ kind: 'tree_stump_01', x, y: y - 0.05, z, rot: turn, scale: 0.8 + size * 0.4 });
+        else if (roll < 0.79) props.push({ kind: 'dead_tree_trunk', x, y: y - 0.05, z, rot: turn, scale: 0.9 + size * 0.4 });
+      } else if (slope > 0.35 && roll < 0.5) {
+        rocks.push({ kind: roll < 0.1 ? 'boulder_01' : `${set}#${which}`, x, y: y - 0.25, z, rot: turn, scale: 1 + size * 1.2 });
+      } else if (roll < 0.04 && f > -0.2) {
+        rocks.push({ kind: `${set}#${which}`, x, y: y - 0.1, z, rot: turn, scale: 0.4 + size * 0.5 });
+      }
+    }
+
+    // 6. and the ground is painted again wherever any of this reaches (and is the ground that is seen, there)
+    const again = new Set<number>();
+    const mark = (cx: number, cz: number, r: number) => {
+      for (let iz = Math.max(0, Math.floor((cz - r + half) / CELL)); iz <= Math.min(N - 1, Math.ceil((cz + r + half) / CELL)); iz++)
+        for (let ix = Math.max(0, Math.floor((cx - r + half) / CELL)); ix <= Math.min(N - 1, Math.ceil((cx + r + half) / CELL)); ix++) again.add(iz * N + ix);
+    };
+    mark(T.x, T.z, 126);
+    for (const o of OUTLYING) mark(o.x, o.z, 62);
+    for (const [x, z] of line) mark(x, z, 19);
+    for (const b of added) mark(b.x, b.z, 24);
+    for (const k of again) {
+      paint(k % N, Math.floor(k / N));
+      if (surface) surface[k] = heights[k];
+    }
+  }
+
+  // Where anybody starts. The ring of starts was laid before there was a bunker, or a town in the east: nobody
+  // is now set down by the bunker (the last place on the map and the best), nor between the valley and the town.
+  // The ring itself is kept as it was first made (`spawnRing`), for whatever tells the old map by it.
+  const starts = spawns.filter((sp) => Math.hypot(sp.x - BUNKER_AT.x, sp.z - BUNKER_AT.z) > NO_START.bunker && Math.hypot(sp.x - TOWN.gate.x, sp.z - TOWN.gate.z) > NO_START.gate && Math.hypot(sp.x - TOWN.x, sp.z - TOWN.z) > NO_START.town);
+
   return {
     heights,
     surface: surface ?? heights,
     splat,
     grass,
     road: { points: roadPts, width: ROAD_W },
+    roads,
     buildings,
     trees,
     rocks,
@@ -1151,7 +1401,8 @@ export function generateWorld(seed = WORLD_SEED): World {
     pois,
     sites,
     solids,
-    spawn,
-    spawns,
+    spawn: starts[0],
+    spawns: starts,
+    spawnRing: spawns,
   };
 }

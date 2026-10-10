@@ -177,6 +177,8 @@ ok('the gas is the richest place on the map; helmets, plates and scopes are of i
     const g = (id: string) => inGas.get(id) ?? 0, o = (id: string) => out.get(id) ?? 0, b = (id: string) => deep.get(id) ?? 0;
     // the shotgun, its shells and its can are of the bunker and nowhere else; what opens the bunker is under the gas
     assert.ok(b('benelli') >= 2 && b('ammo_12') + b('box_12') >= 10, 'no shotgun, or nothing for it, in the bunker');
+    // and the heaviest armour there is: the bunker's, and nowhere else's (the bunker is the last place, and the best)
+    assert.ok(b('heavy_armor') >= 2 && g('heavy_armor') === 0 && o('heavy_armor') === 0, `heavy armour: ${b('heavy_armor')} in the bunker, ${g('heavy_armor')} under the gas, ${o('heavy_armor')} elsewhere`);
     for (const id of ['benelli', 'ammo_12', 'box_12', 'suppressor_12']) assert.equal(g(id) + o(id), 0, `${id} outside the bunker`);
     assert.ok(g('keycard') >= 1 && o('keycard') + b('keycard') === 0, 'the keycards are not under the gas, or not only there');
     // four places in five there have something lying in them (on the rest of the map it is three in five)

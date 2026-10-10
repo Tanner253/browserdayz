@@ -15,19 +15,25 @@ const ROAD_LIFT = 0.035;
  * or a knife dropped there lies under the asphalt.
  */
 export function roadLift(world: World, x: number, z: number): number {
-  const p = world.road.points, reach = world.road.width / 2 + 0.2;
-  for (let i = 0; i < p.length / 3 - 1; i++) {
-    const ax = p[i * 3], az = p[i * 3 + 2], dx = p[i * 3 + 3] - ax, dz = p[i * 3 + 5] - az;
-    const t = Math.min(1, Math.max(0, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz || 1)));
-    if (Math.hypot(x - ax - dx * t, z - az - dz * t) < reach) return ROAD_LIFT + 0.006;
+  for (const road of [world.road, ...world.roads]) {
+    const p = road.points, reach = road.width / 2 + 0.2;
+    for (let i = 0; i < p.length / 3 - 1; i++) {
+      const ax = p[i * 3], az = p[i * 3 + 2], dx = p[i * 3 + 3] - ax, dz = p[i * 3 + 5] - az;
+      const t = Math.min(1, Math.max(0, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz || 1)));
+      if (Math.hypot(x - ax - dx * t, z - az - dz * t) < reach) return ROAD_LIFT + 0.006;
+    }
   }
   return 0;
 }
 
 export function buildRoad(world: World, atmo: Atmosphere, scene: THREE.Scene) {
-  const pts = world.road.points;
+  // (the road, and whatever roads have been laid since: one ribbon each, of the one asphalt)
+  let mat: THREE.MeshStandardMaterial | null = null;
+  let firstMesh: THREE.Mesh | null = null;
+  for (const road of [world.road, ...world.roads]) {
+  const pts = road.points;
   const n = pts.length / 3;
-  const W = world.road.width - 0.6;
+  const W = road.width - 0.6;
   const ACROSS = 6;
   const TILE = 5;
   const pos: number[] = [];
@@ -63,8 +69,9 @@ export function buildRoad(world: World, atmo: Atmosphere, scene: THREE.Scene) {
   g.setIndex(idx);
   g.computeVertexNormals();
 
+  if (!mat) {
   const t = assets.pbr('asphalt_02');
-  const mat = new THREE.MeshStandardMaterial({
+  mat = new THREE.MeshStandardMaterial({
     map: t.map,
     normalMap: t.normalMap,
     roughnessMap: t.armMap,
@@ -98,10 +105,13 @@ export function buildRoad(world: World, atmo: Atmosphere, scene: THREE.Scene) {
     },
     'road',
   );
+  }
   const mesh = new THREE.Mesh(g, mat);
   mesh.receiveShadow = true;
   mesh.matrixAutoUpdate = false;
   mesh.name = 'road';
   scene.add(mesh);
-  return mesh;
+  firstMesh ??= mesh;
+  }
+  return firstMesh!;
 }
