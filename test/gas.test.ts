@@ -5,7 +5,8 @@
 import assert from 'node:assert/strict';
 import { GAS, breathe, freshLungs, gasDepth, gasEdge, gasZone } from '../src/sim/gas';
 import { ITEMS } from '../src/sim/items';
-import { fillDrop, pickDropSite } from '../src/sim/drops';
+import { fillCrash, fillDrop, pickDropSite } from '../src/sim/drops';
+import { UNDER_GAS } from '../src/sim/crates';
 import { generateWorld, heightAt } from '../src/world/worldgen';
 import { Economy, GAS_RESTOCK } from '../src/sim/economy';
 import { fillCrate } from '../src/sim/crates';
@@ -229,6 +230,15 @@ ok('the gas is the richest place on the map; helmets, plates and scopes are of i
     const got: string[] = [];
     fillDrop({ add: (it: { id: string }) => (got.push(it.id), it) } as never, rnd);
     assert.ok(got.includes('pu_scope'), 'a supply drop with no scope in it');
+  }
+  // a helicopter's cargo: four or five things, every one of them the gas's own, no two alike, and one of them what the gas is gone into for
+  const kept = new Set(UNDER_GAS.map(([id]) => id));
+  for (let k = 0; k < 60; k++) {
+    const got: string[] = [];
+    fillCrash({ add: (it: { id: string }) => (got.push(it.id), it) } as never, rnd);
+    assert.ok(got.length >= 4 && got.length <= 5, `a helicopter's cargo of ${got.length} things`);
+    assert.ok(got.every((id) => kept.has(id)) && new Set(got).size === got.length, 'something in a helicopter that is not kept under the gas, or the same thing twice');
+    assert.ok(got.some((id) => ['boonie_hat', 'life_vest', 'pu_scope', 'deagle'].includes(id)), 'a helicopter with nothing in it worth the walk');
   }
 });
 

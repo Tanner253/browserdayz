@@ -8,6 +8,7 @@ import { ITEMS, fitAtRandom, makeItem } from './items';
 import type { Container } from './inventory';
 import { BUILDING_FOOTPRINT, heightAt, type World } from '../world/worldgen';
 import { gasEdge, gasZone } from './gas';
+import { UNDER_GAS } from './crates';
 
 /**
  * A drop called down with a field radio: how long it takes to come (everybody is told where, and has that long
@@ -17,17 +18,30 @@ export const CALL = { eta: 45, every: 300, /** metres in front of the caller it 
 
 /**
  * A helicopter comes down. Now and then, somewhere open on the map: its wreck, smoke that is seen from a long
- * way off, and its cargo beside it, which is the army's and better than a supply drop's. Everybody is told
+ * way off, and its cargo beside it: a few things, of the kind kept under the gas. Everybody is told
  * where. One at a time; the wreck and whatever is left in it are cleared away after `life` seconds.
  */
 export const CRASH = { every: 900, first: 300, life: 600, label: 'Helicopter Cargo', /** metres from the cargo to the middle of the wreck */ beside: 4.6 };
 
-/** what a wreck's cargo holds: a supply drop's worth, and the army's own on top of it */
+/** one of these is in every wreck's cargo: the things the gas is gone into for */
+const CRASH_SURE = ['boonie_hat', 'life_vest', 'pu_scope', 'deagle'];
+
+/**
+ * What a wreck's cargo holds: little, and all of it of the fourth tier, the things kept under the gas (the
+ * table those crates are filled from). One of the four things the gas is gone into for, always, and three or
+ * four others, no two alike. (It held a supply drop's worth and eight things more: the most on the map, in a
+ * meadow, for whoever walked up to the smoke.)
+ */
 export function fillCrash(c: Container, rnd: () => number = Math.random) {
-  fillDrop(c, rnd);
-  for (const [id, qty] of [['m9', undefined], ['box_9mm', undefined], ['box_762', undefined], ['grenade', undefined], ['boonie_hat', undefined], ['life_vest', undefined], ['firstaid', undefined], ['red_dot', undefined]] as [string, number | undefined][]) {
+  const ids = [CRASH_SURE[Math.floor(rnd() * CRASH_SURE.length)]];
+  const more = 3 + Math.floor(rnd() * 2);
+  for (let tries = 0; ids.length < 1 + more && tries < 60; tries++) {
+    const id = pick(UNDER_GAS, rnd);
+    if (!ids.includes(id)) ids.push(id);
+  }
+  for (const id of ids) {
     const def = ITEMS[id];
-    const item = makeItem(id, qty ?? (def.stack ? def.stack : 1));
+    const item = makeItem(id, def.stack ? def.stack : 1);
     if (def.weapon) {
       item.loaded = def.weapon.capacity;
       fitAtRandom(item, rnd);

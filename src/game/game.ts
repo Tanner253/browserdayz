@@ -41,7 +41,7 @@ import { JEEP } from '../sim/vehicles';
 import { HUD, type HotbarEntry } from '../ui/hud';
 import { InventoryUI } from '../ui/inventory-ui';
 import { Minimap } from '../ui/minimap';
-import { CALL, CRASH, DROP, describeSpot, fillDrop, pickDropSite, type DropInfo } from '../sim/drops';
+import { CALL, CRASH, DROP, describeSpot, fillCrash, fillDrop, pickDropSite, type DropInfo } from '../sim/drops';
 import { renderDoll, renderIcons } from '../ui/icons';
 import { Perf } from '../core/perf';
 import { loadGraphics, type Graphics } from '../core/settings';
@@ -281,14 +281,17 @@ export class Game {
     this.fires = new Fires(world, r.scene, this.effects, atmo);
     this.lamps = new Lamps(r.scene);
     this.bunker = new BunkerSite(world, atmo, r.scene, this.s.terrain.lid);
-    // its door is loud: heard across the valley, by whoever is playing and by the infected
+    // Its door is loud: heard by everybody on the map, wherever they are, and from where it is. (It was heard
+    // within three hundred and fifty metres and by nobody else.) Far off it is as late and as dull as a far
+    // sound is, and is brought no nearer to the ear than a hundred and ten metres along the line to it: the
+    // ear is told which way, and it is never too faint to tell.
     this.bunker.onMove = (opening) => {
       const at = this.bunker.doorAt(new THREE.Vector3());
       if (!at) return;
-      const d = at.distanceTo(r.camera.position);
-      if (d < BUNKER.heard * 1.6) audio.blastDoor(at, d, opening);
+      const ear = r.camera.position, d = at.distanceTo(ear), near = Math.min(d, 110);
+      audio.blastDoor(d > near ? ear.clone().lerp(at, near / d) : at, d, opening);
       this.horde.noise(at.x, at.z, BUNKER.heard);
-      if (d < BUNKER.heard) this.hud.note(opening ? 'The bunker is opening' : 'The bunker is shutting', 'warn');
+      this.hud.note(opening ? 'The bunker is opening' : 'The bunker is shutting', 'warn');
     };
     // the street lamps: where the head of each is
     for (const q of world.props) if (q.kind.startsWith('street_lamp')) this.streetLamps.push(new THREE.Vector3(q.x, q.y + 3.55 * (q.scale ?? 1), q.z));
@@ -1318,7 +1321,8 @@ export class Game {
     if (this.drops.has(d.uid)) return;
     const stash = new Stash(d.uid, d.x, d.y, d.z, d.rot, DROP.w, DROP.h, d.heli ? CRASH.label : DROP.label);
     if (fill) {
-      fillDrop(stash.container);
+      if (d.heli) fillCrash(stash.container);
+      else fillDrop(stash.container);
       stash.known = true;
     }
     this.drops.set(d.uid, { stash, until: performance.now() + d.left * 1000, at: new THREE.Vector3(d.x, d.y, d.z), smoke: { owed: 0 } });
@@ -1329,11 +1333,14 @@ export class Game {
       void this.layWreck(d);
       this.hud.note(`A helicopter has come down ${where}: its cargo is there for ${mins} min, marked on the map (M)`, 'good');
       this.hud.feed(`Helicopter down ${where}`);
-      return;
+    } else {
+      this.hud.note(`Supply drop ${where}: there for ${mins} min, marked on the map (M)`, 'good');
+      this.hud.feed(`Supply drop ${where}`);
+      this.hud.chatLine('system', '', `A supply drop has come down ${where}.`);
     }
-    this.hud.note(`Supply drop ${where}: there for ${mins} min, marked on the map (M)`, 'good');
-    this.hud.feed(`Supply drop ${where}`);
-    this.hud.chatLine('system', '', `A supply drop has come down ${where}.`);
+    // (The cargo itself, beside the wreck as beside nothing: a wreck's was never set down at all. This line
+    // came after a `return` in the helicopter's case, and there was a wreck, smoke, a mark on the map and
+    // nothing to open.)
     await this.loot.addDrop(stash);
     // (cleared away while its crate was still being fetched)
     if (this.drops.get(d.uid)?.stash !== stash) this.loot.removeStash(stash);

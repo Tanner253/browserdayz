@@ -25,7 +25,7 @@ const CIVILIAN: Table = [
 ];
 
 /** what is in any crate that stands under the gas, whatever sort of crate it is: the best of everything */
-const UNDER_GAS: Table = [
+export const UNDER_GAS: Table = [
   ['box_762', 3], ['box_9mm', 3], ['ammo_762', 1.5], ['ammo_9mm', 1.5], ['mosin', 1.4], ['m9', 1.4], ['p38', 1],
   ['boonie_hat', 2], ['life_vest', 2], ['pu_scope', 1.6], ['grenade', 1.5], ['firstaid', 1.5], ['bandage', 1.5], ['stim', 1.2],
   ['suppressor_9', 0.8], ['mag_p38_ext', 0.8], ['rifle_wrap', 0.6], ['binoculars', 0.4], ['condensed', 0.8], ['thermos', 0.8], ['suitcase', 0.4],
