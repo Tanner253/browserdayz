@@ -246,6 +246,24 @@ const D: ItemDef[] = [
     id: 'gasmask', name: 'Gas Mask', model: 'old_gas_mask', w: 2, h: 2, weight: 0.7, category: 'clothing', slot: 'face',
     desc: 'GP-5 pattern mask. Worn on the face, it lets you breathe in the gas. Thick rubber and glass, too: a fifth less damage from anything that hits your head.', wear: { head: 0.8, gas: 1 },
   },
+  // Armour for the body in four weights, and a rig that is only for carrying. Each takes more off a hit to the
+  // body than the one before it, weighs more, and is harder to come by.
+  {
+    id: 'chest_rig', name: 'Chest Rig', model: 'vest_t0', w: 3, h: 2, weight: 0.9, category: 'clothing', slot: 'vest',
+    desc: 'Webbing and a belt of pouches. No protection at all: 8 slots, and it weighs nothing.', wear: { cargo: [4, 2] },
+  },
+  {
+    id: 'soft_vest', name: 'Soft Armour Vest', model: 'vest_t1', w: 3, h: 3, weight: 2.4, category: 'clothing', slot: 'vest',
+    desc: 'A policeman\'s soft vest. 15% less damage from every hit to the body, and 4 slots.', wear: { cargo: [2, 2], armor: 0.85 },
+  },
+  {
+    id: 'armor_vest', name: 'Armoured Vest', model: 'vest_t2', w: 3, h: 3, weight: 3.8, category: 'clothing', slot: 'vest',
+    desc: 'An army vest with plates sewn in. 28% less damage from every hit to the body, and 6 slots.', wear: { cargo: [3, 2], armor: 0.72 },
+  },
+  {
+    id: 'heavy_armor', name: 'Heavy Armour', model: 'heavy_armor', w: 3, h: 3, weight: 8.5, category: 'clothing', slot: 'vest',
+    desc: 'Plates front, back and sides, and a collar. Half the damage from every hit to the body. It weighs what it looks as if it weighs, and carries 6 slots.', wear: { cargo: [3, 2], armor: 0.5 },
+  },
   {
     // (still `life_vest`, which is what was worn here before: it is a plate carrier now)
     id: 'life_vest', name: 'Plate Carrier', model: 'plate_carrier', w: 3, h: 3, weight: 5.2, category: 'clothing', slot: 'vest',

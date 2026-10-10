@@ -58,6 +58,11 @@ export const GEAR: Record<string, { bone: 'Head' | 'spine_03'; p: [number, numbe
   // (the hood of it alone: see `facepiece`. As its model lies, the crown is toward -x and the eyepieces look along +z)
   // (the helmet: its brow is toward +x as its model stands, so it is turned a quarter round)
   boonie_hat: { bone: 'Head', p: [0, 1.593, 0.035], r: [0, Math.PI / 2, 0], s: [1, 1, 1] },
+  // (vests that are things of their own, hung on the chest: the plate carrier is not one of these, it is part of the suit)
+  chest_rig: { bone: 'spine_03', p: [0, 1.0, 0.0], r: [0, Math.PI, 0], s: [1.04, 1, 1.16] },
+  soft_vest: { bone: 'spine_03', p: [0, 1.0, -0.004], r: [0, 0, 0], s: [1.04, 1, 1.27] },
+  armor_vest: { bone: 'spine_03', p: [0, 1.0, -0.004], r: [0, 0, 0], s: [1.04, 1, 1.27] },
+  heavy_armor: { bone: 'spine_03', p: [0, 0.95, 0.0], r: [0, Math.PI, 0], s: [1.2, 1.06, 1.22] },
   // (the cap and the soft hat: their bands at the brow. The cap's peak is toward +z as its model lies, so it is turned round.)
   patrol_cap: { bone: 'Head', p: [0, 1.64, 0.01], r: [0, Math.PI, 0], s: [1, 1, 1] },
   fishermans_hat: { bone: 'Head', p: [0, 1.66, 0.0], r: [0, 0, 0], s: [1, 1, 1] },

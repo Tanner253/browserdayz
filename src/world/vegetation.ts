@@ -50,6 +50,9 @@ const SOLID: Record<string, [Surface, number]> = {
   utility_box_01: ['metal', 0.95],
   covered_car: ['metal', 0.92],
   concrete_road_barrier: ['concrete', 0.95],
+  container_a: ['metal', 1],
+  container_b: ['metal', 1],
+  crate_big: ['wood', 0.98],
   wooden_military_crate: ['wood', 0.95],
   old_military_crate: ['wood', 0.95],
   weapons_case: ['metal', 0.95],
@@ -99,7 +102,7 @@ const _onItsSide = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 
  * What stands on wheels lies to the ground under them. (Set down level on a slope a car had one end in the
  * bank and a wheel at the other a foot in the air: four of the eleven that stand out of doors.)
  */
-const ON_ITS_WHEELS = new Set(['covered_car']);
+const ON_ITS_WHEELS = new Set(['covered_car', 'container_a', 'container_b']);
 const _lean = new THREE.Quaternion(), _leanE = new THREE.Euler();
 /** how a thing `hx` by `hz` (half its width and length, its own measure) lies on the ground at its four sides */
 function leanOn(world: World, it: Instance, hx: number, hz: number): [number, number, number] | undefined {
