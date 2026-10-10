@@ -59,7 +59,7 @@ import { MenuScenes } from './menu-scenes';
 import type { MenuSpot } from '../ui/hud';
 import { Lamps } from './lamps';
 import { BunkerSite } from '../world/bunker';
-import { BUNKER, bunkerDark } from '../sim/bunker';
+import { BUNKER, bunkerDark, inBunker } from '../sim/bunker';
 
 const _gasHead = new THREE.Vector3();
 const _lampPos = new THREE.Vector3(), _lampDir = new THREE.Vector3();
@@ -125,6 +125,8 @@ export class Game {
   fires!: Fires;
   /** the bunker: what is built of it, its door and its lamps */
   bunker!: BunkerSite;
+  /** playing alone: seconds since this game was last inside it with its door open */
+  private bunkerEmpty = 0;
   /** every lit lamp: carried, driven behind, standing in the street */
   lamps!: Lamps;
   private streetLamps: THREE.Vector3[] = [];
@@ -247,6 +249,15 @@ export class Game {
     this.fires = new Fires(world, r.scene, this.effects, atmo);
     this.lamps = new Lamps(r.scene);
     this.bunker = new BunkerSite(world, atmo, r.scene);
+    // its door is loud: heard across the valley, by whoever is playing and by the infected
+    this.bunker.onMove = (opening) => {
+      const at = this.bunker.doorAt(new THREE.Vector3());
+      if (!at) return;
+      const d = at.distanceTo(r.camera.position);
+      if (d < BUNKER.heard * 1.6) audio.blastDoor(at, d, opening);
+      this.horde.noise(at.x, at.z, BUNKER.heard);
+      if (d < BUNKER.heard) this.hud.note(opening ? 'The bunker is opening' : 'The bunker is shutting', 'warn');
+    };
     // the street lamps: where the head of each is
     for (const q of world.props) if (q.kind.startsWith('street_lamp')) this.streetLamps.push(new THREE.Vector3(q.x, q.y + 3.55 * (q.scale ?? 1), q.z));
     this.fireTag.className = 'hud-fire-tag';
@@ -496,7 +507,7 @@ export class Game {
       };
       for (const q of world.pois.slice(1)) {
         const site = world.sites.find((st) => st.name === q.name);
-        if (site?.kind === 'bunker') spots.push({ x: q.x, z: q.z, name: q.name, tip: 'Under the ground, in the dark. Its door opens to a keycard, and the keycards are in the gas. The shotgun is kept here, and nowhere else.', kind: 'army', label: true });
+        if (site?.kind === 'bunker') spots.push({ x: q.x, z: q.z, name: q.name, tip: 'Under the ground, in the dark: a dozen rooms off two passages. Its door opens to a keycard, and the keycards are in the gas. The shotgun is kept here, and nowhere else.', kind: 'army', label: true });
         else if (q.name === GAS.place) spots.push({ x: q.x, z: q.z, name: q.name, tip: 'Under gas: you need a gas mask on to breathe here. The richest place on the map: rifles, ammunition, helmets, plate carriers and scopes.', kind: 'gas', label: true });
         else if (site) spots.push({ x: q.x, z: q.z, name: q.name, tip: SITE[site.kind][1], kind: site.kind === 'depot' || site.kind === 'post' ? 'army' : 'site' });
         else if (/checkpoint/i.test(q.name)) spots.push({ x: q.x, z: q.z, name: q.name, tip: 'Guard posts, a barracks and a watchtower: rifles, plate carriers, grenades. The track to the works starts here.', kind: 'army', label: true });
@@ -608,7 +619,7 @@ export class Game {
 
   /** a crate of the map filled (one under the gas with the best of everything) */
   private fillCrate(c: Stash) {
-    fillCrate(c.container, c.kind, Math.random, underGas(this.s.atmo.gas, c.x, c.y, c.z));
+    fillCrate(c.container, c.kind, Math.random, underGas(this.s.atmo.gas, c.x, c.y, c.z) || inBunker(this.bunker.place, c.x, c.y + 0.5, c.z));
   }
 
   private fresh() {
@@ -773,7 +784,7 @@ export class Game {
     for (const b of this.s.veg.barrels) b?.setThere(!w.barrels?.includes(b.i));
     this.fires.clear();
     for (const [i, left] of w.fires ?? []) this.fires.set(i, left);
-    this.bunker.setOpen(w.bunker ?? 0);
+    this.bunker.setOpen(!!w.bunker, true);
     for (const p of w.players) void this.addRemote(p);
     this.garage.clear();
     for (const v of w.vehicles ?? []) this.garage.add(v);
@@ -849,10 +860,7 @@ export class Game {
     net.on('boom', (m) => this.blowBarrel(m.i, false));
     net.on('barrel+', (m) => this.s.veg.barrels[m.i]?.setThere(true));
     net.on('fire', (m) => this.fires.set(m.i, m.left));
-    net.on('bunker', (m) => {
-      if (m.left > 0 && this.bunker.openFor <= 0 && this.bunker.place && Math.hypot(this.player.pos.x - this.bunker.place.x, this.player.pos.z - this.bunker.place.z) < 60) this.hud.note('The bunker door is opening', 'warn');
-      this.bunker.setOpen(m.left);
-    });
+    net.on('bunker', (m) => this.bunker.setOpen(m.open));
     net.on('gear', (m) => this.remotes.get(m.id) && void this.wear(this.remotes.get(m.id)!.avatar, m.g));
     net.on('dmg', (m) => this.takeHit(m));
     net.on('death', (m) => {
@@ -1447,11 +1455,18 @@ export class Game {
       // the street lamps of the village, from dusk
       for (const at of this.streetLamps) if (at.distanceToSquared(cam.position) < 260 * 260) this.lamps.glow(at, STREET_LAMP, Math.min(1, (atmo.night - 0.3) / 0.3), 22);
     }
+    // (alone, this game keeps the door as a server would: open while it is in there, shut a minute after it has gone)
+    if (!this.online && this.bunker.open) {
+      const p = this.player.pos;
+      this.bunkerEmpty = inBunker(this.bunker.place, p.x, p.y + 1, p.z, 2.5) && !this.player.dead ? 0 : this.bunkerEmpty + dt;
+      if (this.bunkerEmpty > BUNKER.door.shut) this.bunker.setOpen(false);
+    }
     // the bunker: its door, its lamps, and the dark of it (no daylight comes down the stair)
     this.bunker.update(dt, cam.position, (pos, burn) => this.lamps.glow(pos, BUNKER_LAMP, burn * 0.55, 9.5));
     const under = bunkerDark(this.bunker.place, cam.position.x, cam.position.y, cam.position.z);
     atmo.cover.ground = { sun: 1 - under, sky: 1 - 0.985 * under };
     this.lamps.update(cam, dt);
+    this.weapons.lampSpill.copy(this.lamps.spill);
   }
 
   /** the hour as it was at some moment (the server's, or mid morning when playing alone), from which the clock runs on */
@@ -1595,7 +1610,7 @@ export class Game {
     this.use = { label, t: 0, dur, sound, soundT: 0, done };
     this.weapons.beginUse(itemId, kind, dur);
     // (what everybody else sees of an injection is the hands at work on a wound, as with a dressing)
-    this.act(kind === 'inject' ? 'bandage' : kind === 'smoke' ? 'eat' : kind, dur);
+    this.act(kind === 'inject' ? 'bandage' : kind === 'smoke' ? 'eat' : kind === 'swipe' ? 'open' : kind, dur);
     // (a smoke is one sound from the lighter to the last breath of it, made once)
     if (sound === 'smoke') audio.ui('smoke');
   }
@@ -2133,18 +2148,24 @@ export class Game {
     this.focus = null;
     if (this.player.dead || this.invUI.isOpen || this.use) return;
     // at the bunker's door, shut: a keycard is what F does there
-    const door = this.bunker.openFor <= 0 ? this.bunker.doorAt(_lampPos) : null;
+    const door = this.bunker.open ? null : this.bunker.doorAt(_lampPos);
     if (door && door.distanceTo(cam.position) < 2.6 && !this.garage.ride) {
       const has = this.inv.count('keycard') > 0;
       this.prompt = has ? '<kbd>F</kbd>Use the keycard' : '<small>Locked. A keycard opens it: they are kept under the gas</small>';
       if (has && this.input.pressed('KeyF') && !this.hud.chatOpen) {
-        this.inv.take('keycard', 1);
-        this.inventoryChanged();
-        audio.click(1800, 0.4, 0.03);
-        audio.click(2700, 0.4, 0.05, 0.18);
-        this.hud.note(`The reader takes the card. The door stands open for ${Math.round(BUNKER.door.open / 60)} minutes`, 'good');
-        if (this.online) this.net.send({ t: 'bunker' });
-        else this.bunker.setOpen(BUNKER.door.open);
+        // the card is held out to the reader and pushed home, and only then does anything move
+        this.startUse('Putting the keycard in', 2.1, 'keycard', 'swipe', null, () => {
+          const at = this.bunker.doorAt(_lampPos);
+          if (!at || at.distanceTo(this.s.r.camera.position) > 3.4 || this.bunker.open || this.inv.count('keycard') < 1) return;
+          this.inv.take('keycard', 1);
+          this.inventoryChanged();
+          this.hud.note('The reader keeps the card. The door stays open while anybody is inside, and shuts a minute after', 'good');
+          if (this.online) this.net.send({ t: 'bunker' });
+          else {
+            this.bunkerEmpty = 0;
+            this.bunker.setOpen(true);
+          }
+        });
       }
       return;
     }

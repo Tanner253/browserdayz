@@ -18,7 +18,7 @@ import { ITEMS, TAG_HOLD, makeItem, sanitizeItem, type ItemInstance } from '../s
 import { DROP, fillDrop, type DropInfo } from '../src/sim/drops';
 import { CRATE_RESTOCK, CRATE_SPECS, fillCrate } from '../src/sim/crates';
 import { underGas } from '../src/sim/gas';
-import { BUNKER } from '../src/sim/bunker';
+import { BUNKER, bunkerDark, inBunker } from '../src/sim/bunker';
 import { phaseOf } from '../src/sim/daynight';
 import { WEAPON_RULES, hitDamage, type HitZone } from '../src/sim/combat';
 import { BARREL } from '../src/sim/barrels';
@@ -119,7 +119,8 @@ function fillBox(b: Box) {
   const spec = CRATE_SPECS[b.crate ?? ''];
   if (!spec) return;
   const c = new Container(b.cid, spec.label, spec.w, spec.h, [], true);
-  fillCrate(c, b.crate!, Math.random, underGas(world.gas, b.x, b.y, b.z));
+  // (a crate under the gas, or down in the bunker, is filled with the best of everything)
+  fillCrate(c, b.crate!, Math.random, underGas(world.gas, b.x, b.y, b.z) || inBunker(world.bunker, b.x, b.y + 0.5, b.z));
   b.items = c.serialize().items;
   b.emptiedAt = -1;
 }
@@ -331,8 +332,11 @@ function carries(inv: SerializedInventory | null, id: string): boolean {
   return found;
 }
 
-/** when the bunker's door shuts again (a keycard opens it for a few minutes): 0, it is shut */
-let bunkerOpenUntil = 0;
+/**
+ * The bunker's door. A keycard opens it; it stays open while anybody is inside (or stands in
+ * its doorway), and shuts a minute after the last of them has gone.
+ */
+const bunkerDoor = { open: false, /** when somebody was last inside, or the card was used */ emptyAt: 0 };
 
 // ------------------------------------------------------------------ players
 
@@ -692,8 +696,10 @@ function handle(c: Client, m: C2S) {
       // a keycard at the door, by somebody standing at it (the card is theirs to use up: what they carry is their own game's to say)
       const d = world.bunkerDoor;
       if (!c.alive || !d || Math.hypot(c.pose[0] - d[0], c.pose[1] - d[1], c.pose[2] - d[2]) > 6) return;
-      bunkerOpenUntil = Date.now() + BUNKER.door.open * 1000;
-      broadcast({ t: 'bunker', left: BUNKER.door.open });
+      bunkerDoor.emptyAt = Date.now();
+      if (bunkerDoor.open) return;
+      bunkerDoor.open = true;
+      broadcast({ t: 'bunker', open: true });
       return;
     }
     case 'fire': {
@@ -1120,7 +1126,10 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
   }
   const rec = records.get(key);
   const resume = rec && rec.alive && rec.inv && Date.now() - rec.leftAt < RECORD_LIFETIME ? rec : null;
-  const sp = resume ? { x: resume.pose[0], y: resume.pose[1], z: resume.pose[2], yaw: resume.pose[3] } : pickSpawn();
+  // (Somebody who left the game down in the bunker comes back with what they carried, at one
+  // of the map's own starting places: nobody waits behind its door for it to be opened for them.)
+  const under = !!resume && bunkerDark(world.bunker, resume.pose[0], resume.pose[1] + 1, resume.pose[2]) > 0;
+  const sp = resume && !under ? { x: resume.pose[0], y: resume.pose[1], z: resume.pose[2], yaw: resume.pose[3] } : pickSpawn();
   const c: Client = {
     ws, id: nextId++, key, name: cleanName(m.name),
     pose: [sp.x, 'y' in sp && sp.y !== undefined ? sp.y : world.groundAt(sp.x, sp.z), sp.z, sp.yaw, 0, 0],
@@ -1140,7 +1149,7 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
     drops: [...boxes.values()].filter((b) => b.kind === 'drop').map(dropInfo),
     barrels: [...barrelsGone.keys()],
     fires: hearths.alight(Date.now() / 1000),
-    bunker: Math.max(0, (bunkerOpenUntil - Date.now()) / 1000),
+    bunker: bunkerDoor.open,
     vehicles: [...vehicles.values()].map(vehInfo),
     infected: horde.list(),
     // (the hour is the wall clock's: every game on the server is at the same one, and a restart does not put it back)
@@ -1207,6 +1216,14 @@ setInterval(() => {
   for (const i of turn.gone) broadcast({ t: 'i-', i });
   for (const b of turn.added) broadcast({ t: 'i+', b: { i: b.i, s: b.s, hp: b.hp, own: b.own, h: b.h } });
   for (const [i, to] of turn.owned) broadcast({ t: 'iown', i, to });
+  // the bunker's door: open while anybody is in there, shut a minute after the last of them is gone
+  if (bunkerDoor.open) {
+    if ([...clients.values()].some((c) => c.alive && inBunker(world.bunker, c.pose[0], c.pose[1] + 1, c.pose[2], 2.5))) bunkerDoor.emptyAt = now;
+    else if (now - bunkerDoor.emptyAt > BUNKER.door.shut * 1000) {
+      bunkerDoor.open = false;
+      broadcast({ t: 'bunker', open: false });
+    }
+  }
   // a new one for each that burned, once its time has come and nobody is standing on the spot
   for (const [home, at] of jeepsDue) {
     const p = world.jeeps[home];

@@ -2,7 +2,7 @@
 // the hole it stands in, what is kept in it. `npx tsx test/bunker.test.ts`.
 
 import assert from 'node:assert/strict';
-import { BUNKER, bunkerAt, bunkerDark, bunkerLamps, bunkerLocal, bunkerLoot, bunkerRooms, bunkerShelves, inBunker, lampBurns, levelY } from '../src/sim/bunker';
+import { BUNKER, bunkerAt, bunkerDark, bunkerLocal, bunkerPlan, inBunker, lampBurns, levelY } from '../src/sim/bunker';
 import { BUNKER_AT, EXPANSION, PLAY_RADIUS, bunkerPlace, generateWorld, heightAt, inPlay } from '../src/world/worldgen';
 import { buildWorldData } from '../server/world';
 
@@ -54,38 +54,61 @@ ok('what it is to be inside it, and how dark it is there', () => {
   assert.equal(bunkerDark(null, 0, 0, 0), 0);
 });
 
-ok('five rooms and a sealed way down; benches, places for things, and lamps, all inside its walls', () => {
-  const rooms = bunkerRooms();
-  assert.equal(rooms.length, 6);
-  assert.equal(rooms.filter((r) => r.sealed).length, 1);
-  const inside = (r: number, f: number) => Math.abs(r) < BUNKER.hall.r && f > BUNKER.hall.back && f < BUNKER.hall.front;
-  for (const s of bunkerShelves()) assert.ok(inside(s.r, s.f) && Math.abs(s.r) > BUNKER.passage + 0.4, 'a bench outside its room');
-  const spots = bunkerLoot();
-  assert.ok(spots.length >= 45, `${spots.length} places for things`);
-  assert.ok(spots.filter((s) => s.floor).length >= 15, 'few places long enough for a shotgun');
-  for (const s of spots) assert.ok(inside(s.r, s.f), 'a place for things outside its walls');
-  // none of them in the room that is sealed
-  const shut = rooms.find((r) => r.sealed)!;
-  for (const s of spots) assert.ok(!(Math.sign(s.r) === shut.side && Math.abs(s.r) > BUNKER.passage + 0.3 && s.f > shut.back && s.f < shut.front), 'something is kept behind the sealed door');
-  const lamps = bunkerLamps();
-  assert.ok(lamps.length >= 8 && lamps.some((l) => l[3] >= 1) && lamps.some((l) => l[3] < 1));
-  for (let t = 0; t < 60; t += 0.37) for (let k = 0; k < lamps.length; k++) assert.ok(lampBurns(lamps[k][3], k, t) >= 0 && lampBurns(lamps[k][3], k, t) <= 1);
-  // a flickering lamp is sometimes lit and sometimes not
+ok('it is laid out by rule, the same every time: two passages, a dozen rooms, every one of them reached', () => {
+  const plan = bunkerPlan();
+  assert.equal(plan, bunkerPlan());
+  assert.ok(plan.rooms.length >= 10 && plan.rooms.length <= 20, `${plan.rooms.length} rooms`);
+  const H = BUNKER.hall;
+  for (const q of plan.rooms) {
+    assert.ok(q.r0 >= -H.r - 1e-6 && q.r1 <= H.r + 1e-6 && q.f0 >= H.back - 1e-6 && q.f1 <= H.front + 1e-6, `${q.name} is outside the walls`);
+    assert.ok(q.r1 - q.r0 >= 4.5 && q.f1 - q.f0 >= 4.5, `${q.name} is a cupboard`);
+    assert.ok(q.doors.length >= 1, `${q.name} has no way in`);
+  }
+  // no two rooms share ground
+  for (const a of plan.rooms) for (const b of plan.rooms) if (a !== b) assert.ok(a.r1 <= b.r0 + 1e-6 || b.r1 <= a.r0 + 1e-6 || a.f1 <= b.f0 + 1e-6 || b.f1 <= a.f0 + 1e-6, `${a.name} and ${b.name} overlap`);
+  // every room is reached from a passage: by a way of its own, or through rooms that are
+  const onPassage = (d: [number, number]) => Math.abs(Math.abs(d[0]) - BUNKER.passage) < 0.01 || Math.abs(Math.abs(d[1] - plan.cross) - BUNKER.across) < 0.01;
+  const reached = new Set(plan.rooms.filter((q) => q.doors.some(onPassage)));
+  for (let pass = 0; pass < 6; pass++) for (const q of plan.rooms) if (!reached.has(q) && q.doors.some((d) => [...reached].some((o) => o.doors.some((e) => e[0] === d[0] && e[1] === d[1])))) reached.add(q);
+  assert.equal(reached.size, plan.rooms.length, 'a room nobody can get into');
+  // it has the rooms a bunker has
+  const kinds = plan.rooms.map((q) => q.kind);
+  for (const k of ['plant', 'armoury', 'barracks', 'control', 'mess']) assert.ok(kinds.includes(k as never), `no ${k}`);
+  // no doorway is walled up: no wall stands, floor to ceiling, across the middle of a way in
+  for (const q of plan.rooms) for (const [dr, df] of q.doors) assert.ok(!plan.walls.some((w) => w.y0 === undefined && dr > w.r0 + 0.05 && dr < w.r1 - 0.05 && df > w.f0 + 0.05 && df < w.f1 - 0.05), `a way into ${q.name} is walled up`);
+});
+
+ok('what stands in it stands inside its walls and clear of the ways through; things are kept in it; lamps burn', () => {
+  const plan = bunkerPlan(), H = BUNKER.hall;
+  const inside = (r: number, f: number) => Math.abs(r) < H.r && f > H.back && f < H.front;
+  assert.ok(plan.stood.length >= 60 && plan.made.length >= 40, `${plan.stood.length} things stood, ${plan.made.length} made`);
+  for (const st of plan.stood) assert.ok(inside(st.r, st.f), `${st.id} outside the walls`);
+  for (const m of plan.made) assert.ok(Math.abs(m.r) <= H.r + 0.1 && m.f >= H.back - 0.1 && m.f <= H.front + 0.1, `${m.kind} outside the walls`);
+  // nothing solid stands in a doorway
+  const doors = plan.rooms.flatMap((q) => q.doors);
+  for (const m of plan.made) if (m.solid !== false && m.kind !== 'pillar') for (const [dr, df] of doors) assert.ok(Math.hypot(m.r - dr, m.f - df) > 0.9, `a ${m.kind} stands in a way through`);
+  for (const st of plan.stood) for (const [dr, df] of doors) assert.ok(Math.hypot(st.r - dr, st.f - df) > 0.8, `${st.id} stands in a way through`);
+  for (const sp of plan.spots) assert.ok(inside(sp.r, sp.f));
+  assert.ok(plan.spots.filter((sp) => sp.floor).length >= 12, 'few places long enough for a shotgun');
+  assert.ok(plan.lamps.length >= 20 && plan.lamps.some((l) => l[3] >= 1) && plan.lamps.some((l) => l[3] < 1));
+  for (let t = 0; t < 60; t += 0.37) for (let k = 0; k < plan.lamps.length; k++) assert.ok(lampBurns(plan.lamps[k][3], k, t) >= 0 && lampBurns(plan.lamps[k][3], k, t) <= 1);
   let on = 0, off = 0;
   for (let t = 0; t < 120; t += 0.1) lampBurns(0.4, 3, t) > 0.5 ? on++ : off++;
   assert.ok(on > 60 && off > 60, `lit ${on}, dark ${off}`);
 });
 
-ok('the server knows it as the game does: its places for things come after every other, and its door is where the game puts it', () => {
+ok('the server knows it as the game does: its places for things come after every other, its crates are to be searched, and its door is where the game puts it', () => {
   const data = buildWorldData(process.cwd());
   const mine = data.lootPoints.filter((p) => p.usage.includes('Bunker'));
-  assert.equal(mine.length, bunkerLoot().length);
+  assert.ok(mine.length >= 70, `${mine.length} places for things in the bunker`);
   assert.ok(data.lootPoints.slice(-mine.length).every((p) => p.usage.includes('Bunker')), 'a place of the bunker among the others');
-  for (const p of mine) assert.ok(inBunker(P, p.x, p.y + 0.5, p.z), 'a place for things that is not in the bunker');
+  for (const p of mine) assert.ok(inBunker(P, p.x, p.y + 0.3, p.z), 'a place for things that is not in the bunker');
+  assert.ok(mine.filter((p) => p.floor).length >= 12 && mine.filter((p) => p.surf).length >= 40);
   const d = data.bunkerDoor!;
   const [, f, y] = bunkerLocal(P, d[0], d[1], d[2]);
   assert.ok(Math.abs(f - BUNKER.hall.front) < 1e-6 && Math.abs(y - (levelY() + 1.2)) < 1e-6);
-  assert.ok(BUNKER.door.open >= 120 && BUNKER.door.open <= 300);
+  assert.ok(data.crates.filter((c) => inBunker(P, c.x, c.y + 0.5, c.z)).length >= 4, 'no crates to search in the bunker');
+  assert.equal(BUNKER.door.shut, 60);
 });
 
 console.log(`\n${n} checks passed`);

@@ -66,16 +66,16 @@ export const TYPES: Record<string, TypeRule> = {
   // of it restocked until a third of the map's supply was gone, a busy server ran dry: people
   // who played fast were out of ammunition for good.) `min` one under `nominal` means every
   // one taken is put back at the next restock, not only once the world is well short.
-  mosin: { nominal: 16, min: 15, lifetime: 7200, restock: 180, usage: ANYWHERE, favour: ARMOURY, loaded: [1, 4], gas: 5 },
+  mosin: { nominal: 16, min: 15, lifetime: 7200, restock: 180, usage: ANYWHERE, favour: ARMOURY, loaded: [1, 4], gas: 5, bunker: 3 },
   p38: { nominal: 16, min: 15, lifetime: 7200, restock: 180, usage: ANYWHERE, favour: ARMOURY, loaded: [2, 6], gas: 3 },
   // the service pistol, with nearly twice the magazine: as easy to come by as the other one
   // (at half as many, and in half the kinds of building, nobody could find one)
-  m9: { nominal: 16, min: 15, lifetime: 7200, restock: 180, usage: ANYWHERE, favour: ARMOURY, loaded: [3, 10], gas: 4 },
+  m9: { nominal: 16, min: 15, lifetime: 7200, restock: 180, usage: ANYWHERE, favour: ARMOURY, loaded: [3, 10], gas: 4, bunker: 3 },
   // loose rounds turn up in handfuls; sealed boxes are the real find
-  ammo_762: { nominal: 36, min: 35, lifetime: 3600, restock: 120, usage: ANYWHERE, favour: ARMOURY, qty: [0.25, 0.6], gas: 4 },
-  ammo_9mm: { nominal: 46, min: 45, lifetime: 3600, restock: 120, usage: ANYWHERE, favour: ARMOURY, qty: [0.25, 0.6], gas: 4 },
-  box_762: { nominal: 14, min: 13, lifetime: 3600, restock: 180, usage: ['Military', 'Police', 'Hunting', 'Farm', 'Industrial'], favour: ARMOURY, gas: 6, bunker: 3 },
-  box_9mm: { nominal: 18, min: 17, lifetime: 3600, restock: 180, usage: ['Police', 'Military', 'Town', 'Village'], favour: ARMOURY, gas: 6, bunker: 3 },
+  ammo_762: { nominal: 36, min: 35, lifetime: 3600, restock: 120, usage: ANYWHERE, favour: ARMOURY, qty: [0.25, 0.6], gas: 4, bunker: 6 },
+  ammo_9mm: { nominal: 46, min: 45, lifetime: 3600, restock: 120, usage: ANYWHERE, favour: ARMOURY, qty: [0.25, 0.6], gas: 4, bunker: 6 },
+  box_762: { nominal: 14, min: 13, lifetime: 3600, restock: 180, usage: ['Military', 'Police', 'Hunting', 'Farm', 'Industrial'], favour: ARMOURY, gas: 6, bunker: 6 },
+  box_9mm: { nominal: 18, min: 17, lifetime: 3600, restock: 180, usage: ['Police', 'Military', 'Town', 'Village'], favour: ARMOURY, gas: 6, bunker: 6 },
   // The Desert Eagle, and what it fires, are of the gas and nowhere else: `nominal` 0 and no
   // kind of building, so not one is ever put down on the rest of the map.
   deagle: { nominal: 0, min: 0, lifetime: 7200, restock: 600, usage: [], loaded: [2, 7], gas: 3 },
@@ -83,21 +83,21 @@ export const TYPES: Record<string, TypeRule> = {
   box_50: { nominal: 0, min: 0, lifetime: 3600, restock: 420, usage: [], gas: 3 },
   mag_deagle_ext: { nominal: 0, min: 0, lifetime: 7200, restock: 1200, usage: [], gas: 1 },
   // The shotgun, its shells and the can for its muzzle are of the bunker and nowhere else.
-  benelli: { nominal: 0, min: 0, lifetime: 7200, restock: 600, usage: [], loaded: [3, 7], bunker: 3 },
-  ammo_12: { nominal: 0, min: 0, lifetime: 3600, restock: 300, usage: [], qty: [0.4, 0.9], bunker: 8 },
-  box_12: { nominal: 0, min: 0, lifetime: 3600, restock: 420, usage: [], bunker: 5 },
-  suppressor_12: { nominal: 0, min: 0, lifetime: 7200, restock: 1200, usage: [], bunker: 2 },
+  benelli: { nominal: 0, min: 0, lifetime: 7200, restock: 600, usage: [], loaded: [3, 7], bunker: 4 },
+  ammo_12: { nominal: 0, min: 0, lifetime: 3600, restock: 300, usage: [], qty: [0.4, 0.9], bunker: 12 },
+  box_12: { nominal: 0, min: 0, lifetime: 3600, restock: 420, usage: [], bunker: 8 },
+  suppressor_12: { nominal: 0, min: 0, lifetime: 7200, restock: 1200, usage: [], bunker: 3 },
   // (and what opens the bunker is kept under the gas: the one place is the way into the other)
   keycard: { nominal: 0, min: 0, lifetime: 7200, restock: 600, usage: [], gas: 2 },
   // attachments
   suppressor_762: { nominal: 0, min: 0, lifetime: 7200, restock: 1800, usage: [], gas: 2 },
-  red_dot: { nominal: 1, min: 1, lifetime: 7200, restock: 1800, usage: ['Police'], gas: 3, bunker: 2 },
+  red_dot: { nominal: 1, min: 1, lifetime: 7200, restock: 1800, usage: ['Police'], gas: 3, bunker: 3 },
   // (not in the police station: its few shelves are where the gas masks are kept, and a mask that has nowhere to lie is a gas nobody can enter)
-  gun_light: { nominal: 3, min: 2, lifetime: 3600, restock: 900, usage: ['Military', 'Industrial'], gas: 3, bunker: 2 },
-  mag_m9_ext: { nominal: 2, min: 1, lifetime: 7200, restock: 1200, usage: ['Military'], gas: 2 },
+  gun_light: { nominal: 3, min: 2, lifetime: 3600, restock: 900, usage: ['Military', 'Industrial'], gas: 3, bunker: 3 },
+  mag_m9_ext: { nominal: 2, min: 1, lifetime: 7200, restock: 1200, usage: ['Military'], gas: 2, bunker: 2 },
   // (the scope is a thing of the gas: five are kept there, and one on all the rest of the map)
-  pu_scope: { nominal: 1, min: 1, lifetime: 7200, restock: 1800, usage: ['Police', 'Military'], gas: 5, bunker: 2 },
-  rifle_wrap: { nominal: 2, min: 1, lifetime: 7200, restock: 1500, usage: ['Military', 'Hunting'], gas: 2 },
+  pu_scope: { nominal: 1, min: 1, lifetime: 7200, restock: 1800, usage: ['Police', 'Military'], gas: 5, bunker: 3 },
+  rifle_wrap: { nominal: 2, min: 1, lifetime: 7200, restock: 1500, usage: ['Military', 'Hunting'], gas: 2, bunker: 2 },
   suppressor_9: { nominal: 2, min: 1, lifetime: 7200, restock: 1800, usage: ['Police'], gas: 2 },
   mag_p38_ext: { nominal: 3, min: 1, lifetime: 7200, restock: 1200, usage: ['Police', 'Military'], gas: 3 },
   // melee
@@ -105,52 +105,52 @@ export const TYPES: Record<string, TypeRule> = {
   machete: { nominal: 10, min: 8, lifetime: 3600, restock: 180, usage: ANYWHERE, favour: { Farm: 2 } },
   crowbar: { nominal: 12, min: 10, lifetime: 3600, restock: 180, usage: ANYWHERE, favour: { Industrial: 2 } },
   bat: { nominal: 12, min: 10, lifetime: 3600, restock: 180, usage: ANYWHERE, favour: { Village: 2, Town: 2 } },
-  knife: { nominal: 18, min: 15, lifetime: 3600, restock: 180, usage: ANYWHERE, gas: 1 },
+  knife: { nominal: 18, min: 15, lifetime: 3600, restock: 180, usage: ANYWHERE, gas: 1, bunker: 2 },
   // food and drink
   sprats: { nominal: 14, min: 8, lifetime: 2400, restock: 300, usage: ['Village', 'Town'] },
-  condensed: { nominal: 8, min: 4, lifetime: 2400, restock: 300, usage: ['Village', 'Town', 'Military'], gas: 1 },
-  beans: { nominal: 14, min: 8, lifetime: 2400, restock: 300, usage: ['Village', 'Town', 'Farm'], gas: 1 },
+  condensed: { nominal: 8, min: 4, lifetime: 2400, restock: 300, usage: ['Village', 'Town', 'Military'], gas: 1, bunker: 4 },
+  beans: { nominal: 14, min: 8, lifetime: 2400, restock: 300, usage: ['Village', 'Town', 'Farm'], gas: 1, bunker: 3 },
   tomatoes: { nominal: 8, min: 4, lifetime: 2400, restock: 300, usage: ['Village', 'Farm'] },
-  sardines: { nominal: 11, min: 6, lifetime: 2400, restock: 300, usage: ['Village', 'Town', 'Hunting'], gas: 1 },
+  sardines: { nominal: 11, min: 6, lifetime: 2400, restock: 300, usage: ['Village', 'Town', 'Hunting'], gas: 1, bunker: 3 },
   apple: { nominal: 8, min: 4, lifetime: 1200, restock: 300, usage: ['Village', 'Farm'] },
   milk: { nominal: 6, min: 3, lifetime: 1800, restock: 300, usage: ['Village', 'Town'] },
   // (there was a third as much to drink on the map as to eat, and thirst runs as fast as hunger)
-  water_jug: { nominal: 11, min: 6, lifetime: 2400, restock: 300, usage: ['Village', 'Town', 'Farm', 'Industrial'], gas: 1 },
-  flask: { nominal: 9, min: 5, lifetime: 2400, restock: 300, usage: ['Military', 'Hunting', 'Village', 'Farm'], gas: 2, bunker: 2 },
-  thermos: { nominal: 8, min: 4, lifetime: 2400, restock: 300, usage: ['Military', 'Hunting', 'Village', 'Police', 'Industrial'], gas: 1 },
+  water_jug: { nominal: 11, min: 6, lifetime: 2400, restock: 300, usage: ['Village', 'Town', 'Farm', 'Industrial'], gas: 1, bunker: 2 },
+  flask: { nominal: 9, min: 5, lifetime: 2400, restock: 300, usage: ['Military', 'Hunting', 'Village', 'Farm'], gas: 2, bunker: 4 },
+  thermos: { nominal: 8, min: 4, lifetime: 2400, restock: 300, usage: ['Military', 'Hunting', 'Village', 'Police', 'Industrial'], gas: 1, bunker: 3 },
   // medical
   // What stops bleeding is what a fight is lost for want of: twelve things on the whole map
   // was too few of it. More, sooner back, and most of it where it was kept: the clinic.
-  bandage: { nominal: 20, min: 13, lifetime: 2400, restock: 240, usage: ['Village', 'Town', 'Military', 'Medic', 'Police', 'Hunting', 'Farm'], favour: { Medic: 6, Military: 2 }, gas: 4, bunker: 3 },
-  firstaid: { nominal: 8, min: 4, lifetime: 3600, restock: 600, usage: ['Military', 'Medic', 'Town', 'Police'], favour: { Medic: 8 }, gas: 3, bunker: 3 },
+  bandage: { nominal: 20, min: 13, lifetime: 2400, restock: 240, usage: ['Village', 'Town', 'Military', 'Medic', 'Police', 'Hunting', 'Farm'], favour: { Medic: 6, Military: 2 }, gas: 4, bunker: 6 },
+  firstaid: { nominal: 8, min: 4, lifetime: 3600, restock: 600, usage: ['Military', 'Medic', 'Town', 'Police'], favour: { Medic: 8 }, gas: 3, bunker: 5 },
   // (what sets a broken leg and does nothing else: commoner than the kit, and where there are ladders and lofts to fall off)
-  splint: { nominal: 12, min: 7, lifetime: 3600, restock: 420, usage: ['Medic', 'Village', 'Town', 'Farm', 'Hunting', 'Industrial', 'Police'], favour: { Medic: 5 }, gas: 2 },
+  splint: { nominal: 12, min: 7, lifetime: 3600, restock: 420, usage: ['Medic', 'Village', 'Town', 'Farm', 'Hunting', 'Industrial', 'Police'], favour: { Medic: 5 }, gas: 2, bunker: 3 },
   // clothing and bags: this is how you carry more
   // (The helmet and the plates are things of the gas too: seven of each are kept there, and
   // two of each on all the rest of the map.)
   // (What these are now is a soldier's kit, and their rules were written for a sun hat, a
   // life jacket and a pair of rubber boots: plates were found in a cow shed and never at an
   // army post. They are still about the farms, where people took them; most are where they were issued.)
-  boonie_hat: { nominal: 2, min: 1, lifetime: 3600, restock: 900, usage: ['Village', 'Farm', 'Hunting', 'Military'], favour: { Military: 3 }, gas: 7, bunker: 3 },
+  boonie_hat: { nominal: 2, min: 1, lifetime: 3600, restock: 900, usage: ['Village', 'Farm', 'Hunting', 'Military'], favour: { Military: 3 }, gas: 7, bunker: 5 },
   // (The mask is what lets anybody into the gas, so it is not kept IN the gas, where most of
   // the army's things are: it is in the police station, and the three of them there are
   // what the whole map has to share, bar what a crate or a supply drop turns up.)
   gasmask: { nominal: 3, min: 2, lifetime: 3600, restock: 900, usage: ['Police'] },
-  life_vest: { nominal: 2, min: 1, lifetime: 3600, restock: 900, usage: ['Military', 'Police', 'Industrial', 'Town'], favour: { Military: 5, Police: 5 }, gas: 7, bunker: 3 },
+  life_vest: { nominal: 2, min: 1, lifetime: 3600, restock: 900, usage: ['Military', 'Police', 'Industrial', 'Town'], favour: { Military: 5, Police: 5 }, gas: 7, bunker: 5 },
   work_gloves: { nominal: 5, min: 3, lifetime: 3600, restock: 900, usage: ['Farm', 'Industrial', 'Village', 'Military', 'Police'], favour: { Military: 2 } },
   rubber_boots: { nominal: 5, min: 3, lifetime: 3600, restock: 900, usage: ['Farm', 'Village', 'Military', 'Industrial'], favour: { Military: 2 } },
-  sack_pack: { nominal: 8, min: 4, lifetime: 3600, restock: 600, usage: ['Village', 'Town', 'Farm', 'Industrial', 'Military', 'Hunting'], gas: 1 },
-  suitcase: { nominal: 4, min: 2, lifetime: 3600, restock: 1200, usage: ['Village', 'Town', 'Military', 'Hunting'], favour: { Military: 3 }, gas: 1 },
+  sack_pack: { nominal: 8, min: 4, lifetime: 3600, restock: 600, usage: ['Village', 'Town', 'Farm', 'Industrial', 'Military', 'Hunting'], gas: 1, bunker: 2 },
+  suitcase: { nominal: 4, min: 2, lifetime: 3600, restock: 1200, usage: ['Village', 'Town', 'Military', 'Hunting'], favour: { Military: 3 }, gas: 1, bunker: 2 },
   // tools and odds and ends
   // (a lantern is a thing of sheds, kitchens and lorries: common, because the night is everybody's)
-  flashlight: { nominal: 12, min: 8, lifetime: 3600, restock: 420, usage: ['Village', 'Town', 'Farm', 'Industrial', 'Hunting'], gas: 2 },
-  binoculars: { nominal: 3, min: 1, lifetime: 3600, restock: 1200, usage: ['Military', 'Hunting', 'Police'], gas: 1 },
+  flashlight: { nominal: 12, min: 8, lifetime: 3600, restock: 420, usage: ['Village', 'Town', 'Farm', 'Industrial', 'Hunting'], gas: 2, bunker: 4 },
+  binoculars: { nominal: 3, min: 1, lifetime: 3600, restock: 1200, usage: ['Military', 'Hunting', 'Police'], gas: 1, bunker: 2 },
   compass: { nominal: 4, min: 2, lifetime: 3600, restock: 1200, usage: ['Military', 'Hunting', 'Village'] },
-  cigarettes: { nominal: 8, min: 3, lifetime: 2400, restock: 600, usage: ['Village', 'Town', 'Military', 'Industrial'] },
-  grenade: { nominal: 4, min: 2, lifetime: 3600, restock: 1200, usage: ['Military', 'Police'], gas: 5, bunker: 3 },
+  cigarettes: { nominal: 8, min: 3, lifetime: 2400, restock: 600, usage: ['Village', 'Town', 'Military', 'Industrial'], bunker: 3 },
+  grenade: { nominal: 4, min: 2, lifetime: 3600, restock: 1200, usage: ['Military', 'Police'], gas: 5, bunker: 5 },
   stash_kit: { nominal: 3, min: 1, lifetime: 7200, restock: 1800, usage: ['Farm', 'Industrial', 'Hunting'] },
   // fuel for the jeeps (src/sim/vehicles.ts): where there are sheds, yards and soldiers
-  jerrycan: { nominal: 8, min: 5, lifetime: 3600, restock: 600, usage: ['Farm', 'Industrial', 'Military', 'Village'], gas: 1 },
+  jerrycan: { nominal: 8, min: 5, lifetime: 3600, restock: 600, usage: ['Farm', 'Industrial', 'Military', 'Village'], gas: 1, bunker: 2 },
 };
 
 /** the parts of the map that are stocked apart from the rest of it */

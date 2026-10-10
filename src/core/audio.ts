@@ -420,6 +420,67 @@ export class AudioEngine {
     o.stop(t + 0.6);
   }
 
+  /**
+   * The bunker's door: a klaxon, the bolts thrown, and three seconds of steel on a track.
+   * Loud: it is meant to be heard from across the valley. (Made up, like the rest of what
+   * this file makes up: nobody has recorded one.)
+   */
+  blastDoor(pos: V3, distance: number, opening: boolean) {
+    if (!this.ready) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime + distance / 343;
+    const out = this.out(pos, 16, 0.85, distance * 0.6);
+    // the klaxon: two notes, turn about, for as long as it moves
+    for (let k = 0; k < 6; k++) {
+      const o = ctx.createOscillator();
+      o.type = 'sawtooth';
+      o.frequency.value = k % 2 ? 392 : 523;
+      const f = this.filter('bandpass', 900, 1.2);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t + k * 0.5);
+      g.gain.linearRampToValueAtTime(0.9, t + k * 0.5 + 0.04);
+      g.gain.setValueAtTime(0.9, t + k * 0.5 + 0.4);
+      g.gain.linearRampToValueAtTime(0.0001, t + k * 0.5 + 0.48);
+      o.connect(f).connect(g).connect(out);
+      o.start(t + k * 0.5);
+      o.stop(t + k * 0.5 + 0.5);
+    }
+    // the bolts, at the start; and the stop it comes up against, at the end
+    for (const [at, vol] of [[0.05, 1.6], [0.32, 1.2], [3.05, 2.2]]) {
+      const o = ctx.createOscillator();
+      o.frequency.setValueAtTime(opening ? 120 : 95, t + at);
+      o.frequency.exponentialRampToValueAtTime(38, t + at + 0.2);
+      const g = ctx.createGain();
+      this.env(g, t + at, vol, 0.004, 0.3);
+      o.connect(g).connect(out);
+      o.start(t + at);
+      o.stop(t + at + 0.6);
+      const n = this.noise(t + at, 0.08);
+      const nf = this.filter('highpass', 1800);
+      const ng = ctx.createGain();
+      this.env(ng, t + at, vol * 0.5, 0.002, 0.06);
+      n.connect(nf).connect(ng).connect(out);
+    }
+    // the door itself: a low grinding, with a rattle in it
+    const run = this.noise(t + 0.3, 2.9);
+    const lp = this.filter('lowpass', 420, 2);
+    lp.frequency.setValueAtTime(opening ? 300 : 520, t + 0.3);
+    lp.frequency.linearRampToValueAtTime(opening ? 520 : 300, t + 3.1);
+    const rg = ctx.createGain();
+    rg.gain.setValueAtTime(0.0001, t + 0.3);
+    rg.gain.linearRampToValueAtTime(1.9, t + 0.6);
+    rg.gain.setValueAtTime(1.9, t + 2.8);
+    rg.gain.linearRampToValueAtTime(0.0001, t + 3.2);
+    const shake = ctx.createOscillator();
+    shake.frequency.value = 17;
+    const sg = ctx.createGain();
+    sg.gain.value = 0.7;
+    shake.connect(sg).connect(rg.gain);
+    run.connect(lp).connect(rg).connect(out);
+    shake.start(t + 0.3);
+    shake.stop(t + 3.3);
+  }
+
   /** the hammer falling on nothing: it has to be heard over a fight */
   dryFire() {
     this.click(3800, 1.3, 0.022);

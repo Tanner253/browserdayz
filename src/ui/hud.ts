@@ -197,7 +197,7 @@ export class HUD {
                 <div><b>Other players</b><span>Anyone you meet can kill you and take everything you carry, your tag with it.</span></div>
                 <div><b>The infected</b><span>They see ${INFECTED.sight} m in front of them and hear a shot from ${INFECTED.hearShot} m. Crouch past them, or fit a suppressor.</span></div>
                 <div><b>The gas</b><span>The ${GAS.place} lies under it, and the best loot on the map is in there. A gas mask lets you breathe it: the police station keeps them.</span></div>
-                <div><b>The bunker</b><span>Under the hills across the map from the works: dark, and shut. A keycard from the gas opens its door for three minutes. The shotgun is kept there and nowhere else.</span></div>
+                <div><b>The bunker</b><span>Under the hills across the map from the works: dark, and shut. A keycard from the gas opens its door, loudly: it stays open while anybody is inside. The shotgun is kept there and nowhere else.</span></div>
               </div>
             </div>
             <div class="start-pane pane-keys">

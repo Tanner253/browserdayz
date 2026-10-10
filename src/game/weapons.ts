@@ -24,7 +24,7 @@ import type { ItemModels } from './loot';
 export type HitZone = 'head' | 'torso' | 'legs';
 /** damage multiplier per hit zone: bullets / melee */
 const ZONE_MULT: Record<HitZone, [number, number]> = { head: [3.2, 1.6], torso: [1, 1], legs: [0.6, 0.7] };
-export type UseKind = 'eat' | 'drink' | 'bandage' | 'inject' | 'smoke' | 'open';
+export type UseKind = 'eat' | 'drink' | 'bandage' | 'inject' | 'smoke' | 'open' | 'swipe';
 const FIST = { damage: 14, range: 1.35, rate: 0.4, stamina: 5 };
 
 export type FireMode = 'semi' | 'auto';
@@ -120,6 +120,7 @@ interface Bullet {
 }
 
 const _toCam = new THREE.Vector3();
+const _cardV = new THREE.Vector3();
 
 /** critically-damped-ish spring for procedural motion */
 class Spring {
@@ -573,6 +574,9 @@ export class Weapons {
   lag = new THREE.Vector2();
   private time = 0;
   private sunLight: THREE.DirectionalLight;
+  /** the light of lamps on the hands and the gun: from over the eye, as strong and of the colour the game says (see Lamps.spill) */
+  private handLamp: THREE.DirectionalLight;
+  readonly lampSpill = new THREE.Color();
   private sunVis = 1;
   private arms = new FPArms();
   private skyVis = 1;
@@ -631,6 +635,26 @@ export class Weapons {
   private strokeAt = -9;
   private punchHand = 0;
   // item being used in the hands (food, drink, bandage, ammo box)
+  /**
+   * How a pass card is held and put to a reader. In the eye's own measure (x right, y up, z
+   * back toward the eye): where it is held up to be looked at and which way it lies there (its
+   * length, and what its front faces), where it is put and which way it lies then, how far it
+   * is pushed home, and how long each takes (seconds). In the card's own measure as it is held
+   * (x across it, y out of its front, z back along it from the end that goes in): where the
+   * wrist is, which way the fingers lie and the palm faces, and how the fingers and the thumb
+   * are bent.
+   */
+  card = {
+    show: [0.045, -0.032, -0.215], showAlong: [-0.5, 0.82, -0.22], showFace: [0.2, 0.3, 1],
+    put: [0.14, -0.1, -0.37], putAlong: [0.5, 0.35, -0.8], putFace: [-0.2, 0.7, 0.7], push: 0.07,
+    shown: 0.75, over: 0.5,
+    // (In these big gloves a card its true size is a stamp: it is drawn a third larger in the hand than it lies on a shelf.)
+    scale: 1.3,
+    // (These gloves' fingers are bent as they come, the last two most: each is straightened by as much as lays it flat
+    // behind the card, measured off the hand itself; and the hand is turned a little across the card, so that the thumb
+    // lies over its near end and all but the last finger are behind it. The wrist is said before the card is made larger.)
+    wrist: [-0.0315, -0.0215, 0.138], fingers: [0.247, -0.04, -0.968], palm: [0, 1, 0], curl: [-0.3, -0.42, -0.67, -0.95], fold: [1, 0.5, 1.3], thumb: 0.9, tuck: 0, spread: 0.3,
+  };
   private held: { root: THREE.Group; kind: UseKind; t: number; dur: number; size: THREE.Vector3; ending: number; coal?: THREE.Mesh; puffs?: number; wispT?: number } | null = null;
   private heldCache = new Map<string, { root: THREE.Group; size: THREE.Vector3 }>();
   private smoke: ReturnType<typeof cigarette> | null = null;
@@ -656,6 +680,8 @@ export class Weapons {
     this.sunLight = new THREE.DirectionalLight(atmo.sunColor, atmo.sunIntensity);
     this.sunLight.position.copy(atmo.sunDir).multiplyScalar(10);
     vmScene.add(this.sunLight);
+    this.handLamp = new THREE.DirectionalLight(0xffffff, 0);
+    vmScene.add(this.handLamp);
   }
 
   /** sleeves and hands of the first-person arms */
@@ -1928,6 +1954,12 @@ export class Weapons {
     this.sunLight.intensity = this.atmo.sunNow * this.sunVis;
     this.sunLight.color.copy(this.atmo.sunTint);
     this.vmScene.environmentIntensity = this.atmo.skyNow * this.skyVis;
+    // (and by the lamps about: down a bunker there is no other light on them)
+    const glow = Math.max(this.lampSpill.r, this.lampSpill.g, this.lampSpill.b);
+    this.handLamp.intensity = Math.min(2.6, glow * 4.2);
+    if (glow > 0.001) this.handLamp.color.copy(this.lampSpill).multiplyScalar(1 / glow);
+    this.handLamp.position.set(0, 0, 0.45).applyQuaternion(camera.quaternion);
+    this.handLamp.position.y += 1;
 
     // an item in use takes over the hands; whatever was held drops out of view
     this.lowerT += ((this.stowed || (this.held && !this.held.ending) ? 1 : 0) - this.lowerT) * (1 - Math.exp(-10 * dt));
@@ -2357,6 +2389,24 @@ export class Weapons {
       pos.lerp(new THREE.Vector3(H.mouth[0], H.mouth[1] + sy * H.mouthBy[0], H.mouth[2] + sy * H.mouthBy[1]), m * 0.92);
       rot.x = (h.kind === 'drink' ? H.tilt.drink : H.tilt.eat) * m;
       rot.z = -0.15 * m;
+    } else if (h.kind === 'swipe') {
+      // A card: held out to the reader beside the door, pushed home into its slot, held there a
+      // moment while the reader makes up its mind, and let go of.
+      // (It is looked at first: held up face on, between the thumb and the side of the first finger,
+      // as a card is held by anybody who has to find which end goes in.)
+      const C = this.card;
+      const reach = THREE.MathUtils.smoothstep(t, C.shown, C.shown + C.over), push = THREE.MathUtils.smoothstep(t, C.shown + C.over + 0.04, C.shown + C.over + 0.22);
+      const sway = Math.sin(t * 2.6) * 0.004 * (1 - reach);
+      pos.set(C.show[0], C.show[1] + sway, C.show[2]).lerp(_cardV.set(C.put[0], C.put[1], C.put[2]), reach).addScaledVector(_cardV.set(C.putAlong[0], C.putAlong[1], C.putAlong[2]).normalize(), C.push * push);
+      const turned = (along: number[], face: number[], out: THREE.Quaternion) => {
+        // (as it is held the card lies along its own z, the end that goes in at -z, and its front is to its own y: see beginUse)
+        const a = new THREE.Vector3(along[0], along[1], along[2]).normalize();
+        const n = new THREE.Vector3(face[0], face[1], face[2]);
+        n.addScaledVector(a, -n.dot(a)).normalize();
+        return out.setFromRotationMatrix(new THREE.Matrix4().makeBasis(new THREE.Vector3().crossVectors(a, n), n, a.clone().negate()));
+      };
+      rot.setFromQuaternion(turned(C.showAlong, C.showFace, new THREE.Quaternion()).slerp(turned(C.putAlong, C.putFace, new THREE.Quaternion()), reach));
+      h.root.scale.setScalar(C.scale);
     } else if (h.kind === 'bandage') {
       // A kit, open in the left hand, low and to the left. The right goes into it, comes out
       // and goes down out of the picture to where the wound is, and comes back for more.
@@ -2450,6 +2500,11 @@ export class Weapons {
     });
     let right = grip(1);
     let left: HandGrip | null = two ? grip(-1) : null;
+    // a card: by its near end, the fingers under it and the thumb laid on its face
+    if (h.kind === 'swipe') {
+      const C = this.card;
+      right = { pos: new THREE.Vector3(C.wrist[0], C.wrist[1], C.wrist[2]), fingers: new THREE.Vector3(C.fingers[0], C.fingers[1], C.fingers[2]).normalize(), palm: new THREE.Vector3(C.palm[0], C.palm[1], C.palm[2]).normalize(), curl: C.curl as [number, number, number, number], fold: C.fold as [number, number, number], thumb: C.thumb, tuck: C.tuck, spread: C.spread };
+    }
     // between the first two fingers, near the filter, the hand under it and its palm to the face
     if (drawn >= 0) right = { pos: new THREE.Vector3(-0.009, -0.168, 0.05), fingers: new THREE.Vector3(0, 0.97, -0.24), palm: new THREE.Vector3(0, 0.24, 0.97), curl: [0.08, 0.12, 1.0, 1.1], thumb: 0.55 };
     if (offered) {

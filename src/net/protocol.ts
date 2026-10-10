@@ -183,8 +183,8 @@ export type S2C =
       infected?: InfectedInfo[];
       /** the hour: which share of the day it is at the moment of this message (see src/sim/daynight.ts) */
       hour?: number;
-      /** seconds the bunker's door still stands open (0: it is shut) */
-      bunker?: number;
+      /** the bunker's door stands open */
+      bunker?: boolean;
       max: number;
     }
   | { t: 'join'; p: PlayerInfo }
@@ -200,8 +200,8 @@ export type S2C =
   | { t: 'barrel+'; i: number }
   /** fireplace number i is alight, with so many seconds of burning left */
   | { t: 'fire'; i: number; left: number }
-  /** the bunker's door stands open for so many seconds more */
-  | { t: 'bunker'; left: number }
+  /** the bunker's door: open, or shut (it stays open while anybody is inside, and shuts a minute after the last of them has gone) */
+  | { t: 'bunker'; open: boolean }
   | { t: 'gear'; id: number; g: string[] }
   | { t: 'dmg'; from: number; amount: number; zone: HitZone; w: string; dir: [number, number, number] }
   | { t: 'hitok'; to: number; amount: number; zone: HitZone }

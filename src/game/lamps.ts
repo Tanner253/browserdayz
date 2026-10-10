@@ -13,7 +13,9 @@
 import * as THREE from 'three';
 
 const SPOTS = 3;
-const POINTS = 3;
+const POINTS = 5;
+/** over how many metres the furthest of the real lights dims before it is given to a nearer lamp */
+const FADE = 3;
 const GLARES = 96;
 /** how strong a beam of power 1 is (candela, as three counts it), how far it carries, and how wide it is (radians, half) */
 const BEAM = { power: 170, reach: 75, half: 0.36, soft: 0.7 };
@@ -39,6 +41,8 @@ export class Lamps {
   private glareColor: THREE.InstancedBufferAttribute;
   /** seconds the real lights are still kept in the scene after the last lamp went out (so that one flickering does not take them in and out) */
   private keep = 0;
+  /** the light of all the lamps on what is at the eye itself: the hands and the gun are lit by it (they are drawn apart from the world) */
+  readonly spill = new THREE.Color();
 
   constructor(scene: THREE.Scene) {
     for (let i = 0; i < SPOTS; i++) {
@@ -157,15 +161,30 @@ export class Lamps {
       l.angle = Math.min(1.2, BEAM.half * b.wide);
       l.distance = BEAM.reach * Math.sqrt(b.power);
     });
+    // (a lamp is not put out the moment a nearer one is found: it dims as it falls back toward the first that has no real light,
+    // so that walking down a row of them none is seen to go out)
+    const next = glows[POINTS], edge = next && next.d2 < 70 * 70 ? Math.sqrt(next.d2) : Infinity;
     this.points.forEach((l, i) => {
       const w = glows[i];
       // (only a lamp near enough to light what the eye can see of the ground about it)
       if (!w || w.d2 > 70 * 70) return void (l.intensity = 0);
       l.position.copy(w.pos);
       l.color.copy(w.color);
-      l.intensity = 42 * w.power;
+      l.intensity = 42 * w.power * (edge === Infinity ? 1 : Math.min(1, Math.max(0, (edge - Math.sqrt(w.d2)) / FADE)));
       l.distance = w.reach;
     });
+
+    // what of it all falls on the eye's own hands: a lamp overhead by how near it is, a beam shone in the face, and a little of one's own lamp come back off the walls
+    this.spill.setRGB(0, 0, 0);
+    for (const w of glows) {
+      const k = w.power * Math.max(0, 1 - Math.sqrt(w.d2) / w.reach) ** 2;
+      if (k > 0) this.spill.r += w.color.r * k, this.spill.g += w.color.g * k, this.spill.b += w.color.b * k;
+    }
+    for (const b of beams) {
+      const d = Math.sqrt(b.d2);
+      const k = d < 0.6 ? 0.12 * Math.min(1.5, b.power) : 0.5 * Math.max(0, (_v.copy(eye).sub(b.pos).normalize().dot(b.dir) - 0.8) / 0.2) * Math.max(0, 1 - d / 30);
+      if (k > 0) this.spill.r += k, this.spill.g += 0.94 * k, this.spill.b += 0.8 * k;
+    }
 
     // the glare of each, facing the eye: bigger from further off (a lamp is a point of light at any distance), and a beam's only from in front of it
     let n = 0;

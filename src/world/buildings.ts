@@ -12,7 +12,7 @@ import { RNG } from '../core/noise';
 import type { Atmosphere } from './atmosphere';
 import { GAS, gasDepth, gasZone } from '../sim/gas';
 import { BUILDING_FOOTPRINT, bunkerPlace, heightAt, type BuildingPlot, type Instance, type SiteKind, type World } from './worldgen';
-import { bunkerAt, bunkerLoot } from '../sim/bunker';
+import { bunkerAt, bunkerPlan, levelY } from '../sim/bunker';
 
 /** (`Gas` is not a kind of building: it is whatever stands under the gas, whatever else it is. See src/sim/gas.ts.) */
 export type Usage = 'Village' | 'Town' | 'Farm' | 'Industrial' | 'Military' | 'Hunting' | 'Medic' | 'Police' | 'Gas' | 'Bunker';
@@ -787,18 +787,40 @@ export class Buildings {
     // what is kept under the gas is marked so: there are things that lie nowhere else (see the economy)
     const gas = gasZone(this.world.pois, (x, z) => heightAt(this.world.heights, x, z));
     for (const p of this.lootPoints) if (gasDepth(gas, p.x, p.y, p.z) > GAS.breathe) p.usage = [...p.usage, 'Gas'];
-    // The bunker's own places: after every other, so that none of those is renumbered. They
-    // are of no kind of building: only what is said to be kept in the bunker lies there.
+    // The bunker: what stands in its rooms, and its places for things. After every other, so
+    // that none of those is renumbered. Its places are of no kind of building: only what is
+    // said to be kept in the bunker lies there.
     const at = bunkerPlace(this.world);
     if (at) {
-      for (const s of bunkerLoot()) {
-        const [x, y, z] = bunkerAt(at, s.r, s.f, s.y);
-        const surf = s.surf && (() => {
-          const [sx, , sz] = bunkerAt(at, s.surf!.r, s.surf!.f);
-          return { x: sx, z: sz, rot: at.rot + s.surf!.turn, hx: s.surf!.hx, hz: s.surf!.hz, clear: 0.9 };
-        })();
-        this.lootPoints.push({ x, y: y + 0.02, z, usage: ['Bunker'], building: 'bunker', floor: s.floor, ...(surf ? { surf } : {}) });
+      const plan = bunkerPlan(), Y = levelY();
+      const point = (r: number, f: number, y: number, floor: boolean, surf?: LootPoint['surf']) => {
+        const [x, wy, z] = bunkerAt(at, r, f, y);
+        this.lootPoints.push({ x, y: wy + 0.02, z, usage: ['Bunker'], building: 'bunker', floor, ...(surf ? { surf } : {}) });
+      };
+      for (const st of plan.stood) {
+        const [x, y, z] = bunkerAt(at, st.r, st.f, Y + (st.y ?? 0));
+        this.world.props.push({ kind: st.id, x, y, z, rot: st.rot + at.rot, scale: st.scale ?? 1, far: 46 });
+        const e = assets.manifest.models[st.id];
+        if (!st.on || !e || CRATE_KINDS.has(st.id)) continue;
+        // where things are kept on it: on its top, or on each of its boards; two side by side where it is long enough
+        const k = st.scale ?? 1;
+        const [ix, iz] = SURFACE_INSET[st.id] ?? [0.05, 0.05];
+        const hx = ((e.max[0] - e.min[0]) / 2) * k - ix, hz = ((e.max[2] - e.min[2]) / 2) * k - iz;
+        const levels = SHELF_LEVELS[st.id];
+        const c = Math.cos(st.rot), sn = Math.sin(st.rot);
+        for (const h of st.on) {
+          const ly = TOP_SURFACE.has(st.id) ? e.max[1] * k : levels ? levels.reduce((best, l) => (Math.abs(l - h) < Math.abs(best - h) ? l : best)) * k : h;
+          const along = hx >= hz, n = (along ? hx : hz) > 0.62 ? 2 : 1, L = along ? hx : hz;
+          for (let i = 0; i < n; i++) {
+            const centre = -L + ((2 * i + 1) * L) / n;
+            const ox = along ? centre : 0, oz = along ? 0 : centre;
+            const r = st.r + ox * c + oz * sn, f = st.f - ox * sn + oz * c;
+            const [sx, , sz] = bunkerAt(at, r, f);
+            point(r, f, Y + (st.y ?? 0) + ly + 0.003, false, { x: sx, z: sz, rot: st.rot + at.rot, hx: along ? L / n : hx, hz: along ? hz : L / n, clear: SHELF_CLEARANCE[st.id] ?? 10 });
+          }
+        }
       }
+      for (const sp of plan.spots) point(sp.r, sp.f, sp.y, sp.floor);
     }
   }
 

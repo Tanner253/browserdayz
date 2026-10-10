@@ -39,6 +39,8 @@ export function buildWorldData(root: string) {
   return {
     lootPoints: buildings.lootPoints,
     crates,
+    /** where the bunker stands (null: the world has none) */
+    bunker: bunkerPlace(world),
     /** the middle of the bunker's door, which a keycard is held up to (null: the world has no bunker) */
     bunkerDoor: (() => {
       const at = bunkerPlace(world);
