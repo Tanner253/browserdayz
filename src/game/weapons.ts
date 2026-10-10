@@ -424,10 +424,12 @@ const SEAT = {
  * A gun that rides in another pack's hands is not the size of the gun those hands were drawn on. The Desert
  * Eagle is half as big again as the M9 whose hands it has: seated where the M9 is, a body held it up by the
  * trigger guard with the whole grip hanging under its fist. Where the body's hands go on such a gun, from where
- * they go on the pack's own (the gun's own space: x toward the muzzle, y up; metres).
+ * they go on the pack's own (the gun's own space: x toward the muzzle, y up; metres). (It was then put too far
+ * the other way, 3.6 cm down: the fists were under the foot of the grip and the gun rode up and forward of them.
+ * Set beside the M9 in a row and from both sides: the web of the hand under the tail of the frame, as there.)
  */
 const SEAT_ON: Record<string, THREE.Vector3> = {
-  deagle: new THREE.Vector3(-0.014, -0.036, 0),
+  deagle: new THREE.Vector3(-0.002, -0.012, 0),
 };
 const NO_SEAT = new THREE.Vector3();
 /** how far under the ears of the shotgun's front sight the top of its post is (the eye is put level with the post) */
@@ -966,23 +968,36 @@ export class Weapons {
     // blocks of steel made here, a few millimetres each, set on the barrel where its own shape is highest.
     let ironPost: THREE.Object3D | null = null;
     if (PLAIN_SIGHTS.has(o.item)) {
-      const v = new THREE.Vector3();
-      const xr = THREE.MathUtils.lerp(span.min.x, span.max.x, 0.56);
-      let muzzleTop = -Infinity, rearTop = -Infinity;
-      for (const p of alone) {
-        if (p.name.replace(/_\d+$/, '') !== 'base') continue;
-        const Pn = p.geometry.getAttribute('position');
-        for (let i = 0; i < Pn.count; i++) {
-          v.fromBufferAttribute(Pn, i);
-          // (a barrel is a few rings of points a long way apart: a hand's width of it is looked along, not a finger's)
-          if (Math.abs(v.z - mouth.z) > 0.014) continue;
-          if (v.x > span.max.x - 0.05) muzzleTop = Math.max(muzzleTop, v.y);
-          if (Math.abs(v.x - xr) < 0.06) rearTop = Math.max(rearTop, v.y);
+      // Where the gun's own top is under each of them is found by looking straight down on its shape there. (Not
+      // from its points: a barrel is a few rings of them a long way apart, and the nearest ring to the notch was
+      // the rail's, a finger higher than the barrel under it: the sights stood in the air over the gun.)
+      const solids = alone.filter((p) => p.name.replace(/_\d+$/, '') === 'base').map((p) => new THREE.Mesh(p.geometry, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide })));
+      const down = new THREE.Raycaster();
+      const topAt = (x: number, half = 0) => {
+        let top = -Infinity;
+        for (const dx of half ? [-half, 0, half] : [0]) {
+          down.set(new THREE.Vector3(x + dx, span.max.y + 1, mouth.z), new THREE.Vector3(0, -1, 0));
+          for (const solid of solids) for (const h of down.intersectObject(solid)) top = Math.max(top, h.point.y);
+        }
+        return top;
+      };
+      // The notch stands on the back end of the rail the scope goes on (the highest stretch of the gun's top,
+      // about its middle: anywhere ahead of it and the rail itself would be in the way of the eye), and the
+      // post on the barrel a finger back from its mouth, as tall as brings its tip level with the notch.
+      const long = span.max.x - span.min.x;
+      let peak = -Infinity, railBack = span.min.x + long * 0.56;
+      for (let k = 0; k <= 60; k++) peak = Math.max(peak, topAt(span.min.x + long * (0.3 + (0.4 * k) / 60)));
+      for (let k = 0; k <= 60; k++) {
+        const x = span.min.x + long * (0.3 + (0.4 * k) / 60);
+        if (topAt(x) > peak - 0.004) {
+          railBack = x;
+          break;
         }
       }
+      const xr = railBack + 0.016, xf = span.max.x - 0.02;
+      const rearTop = topAt(xr, 0.009), muzzleTop = topAt(xf, 0.006);
       if (Number.isFinite(muzzleTop) && Number.isFinite(rearTop)) {
-        // (the line of them: level, and over the higher of the two places they stand)
-        const line = Math.max(rearTop + 0.009, muzzleTop + 0.011);
+        const line = Math.max(rearTop + 0.0085, muzzleTop + 0.011);
         const steel = new THREE.MeshStandardMaterial({ color: 0x17181a, metalness: 0.8, roughness: 0.5 });
         const block = (w: number, h: number, d: number, x: number, y0: number, z: number) => {
           const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), steel);
@@ -993,19 +1008,23 @@ export class Weapons {
         const make = () => {
           const g = new THREE.Group();
           g.name = 'irons';
-          const xf = span.max.x - 0.016;
-          g.add(block(0.014, 0.004, 0.012, xf, muzzleTop - 0.001, mouth.z));
-          const blade = block(0.009, line - muzzleTop - 0.002, 0.0022, xf, muzzleTop + 0.002, mouth.z);
+          // (at the muzzle: a band let into the top of the barrel, a tower on it, and the blade on that)
+          g.add(block(0.018, 0.006, 0.014, xf, muzzleTop - 0.004, mouth.z));
+          g.add(block(0.012, line - 0.006 - muzzleTop, 0.007, xf, muzzleTop + 0.001, mouth.z));
+          const blade = block(0.005, 0.007, 0.0022, xf, line - 0.007, mouth.z);
           blade.name = 'post';
           g.add(blade);
-          g.add(block(0.02, Math.max(0.003, line - 0.0045 - rearTop + 0.001), 0.017, xr, rearTop - 0.001, mouth.z));
-          for (const side of [-1, 1]) g.add(block(0.004, 0.006, 0.0052, xr, line - 0.0045, mouth.z + side * 0.0052));
+          // (on the rail: a block let a little into its teeth, and the two ears of the notch)
+          g.add(block(0.022, line - 0.0045 - rearTop + 0.002, 0.018, xr, rearTop - 0.002, mouth.z));
+          for (const side of [-1, 1]) g.add(block(0.005, 0.0062, 0.0058, xr, line - 0.0045, mouth.z + side * 0.0056));
           return g;
         };
         world.add(make());
         const mine = make();
         mine.position.copy(nudge);
         rig.hang(mine, 'base');
+        // (they are under the scope when that is on, where its mount stands: with it, they are put away)
+        shown.push([mine, '!pu_scope']);
         ironPost = mine.getObjectByName('post') ?? null;
       }
     }
@@ -1259,7 +1278,7 @@ export class Weapons {
   /** a pack's gun alone, with the pieces that go with what is fitted to it */
   private dressed(m: VmModel, id: string, mods: string[]): THREE.Object3D {
     const c = m.world!.clone();
-    for (const piece of c.children) piece.visible = EXTRA[piece.name] ? mods.includes(EXTRA[piece.name]) : pieceShown(id, piece.name, mods);
+    for (const piece of c.children) piece.visible = piece.name === 'irons' ? !mods.includes('pu_scope') : EXTRA[piece.name] ? mods.includes(EXTRA[piece.name]) : pieceShown(id, piece.name, mods);
     return c;
   }
 
@@ -1885,7 +1904,8 @@ export class Weapons {
     if (m.scope) m.scope.visible = hasMod(it, 'pu_scope');
     if (m.wrap) m.wrap.visible = hasMod(it, 'rifle_wrap');
     if (m.suppressor) m.suppressor.visible = hasMod(it, 'suppressor_9');
-    for (const [obj, mod] of m.shown ?? []) obj.visible = hasMod(it, mod);
+    // (a piece said with a `!` is there when the part is NOT fitted: the plain sights a scope stands in the place of)
+    for (const [obj, mod] of m.shown ?? []) obj.visible = mod.startsWith('!') ? !hasMod(it, mod.slice(1)) : hasMod(it, mod);
     for (const mark of m.marks ?? []) mark.visible = this.adsT > 0.75;
   }
 
