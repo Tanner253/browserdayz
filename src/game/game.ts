@@ -50,7 +50,7 @@ import { TOUCH } from '../core/device';
 import { TouchControls } from '../ui/touch';
 import { REWARDS_UI, RewardsModal, addCashedTag, cashedTags, walletAddress } from '../ui/rewards';
 import { Gas } from './gas';
-import { GAS, underGas } from '../sim/gas';
+import { GAS, underGas, bunkerGas, bunkerGasEdge } from '../sim/gas';
 import { DAY, hourAt, phaseOf } from '../sim/daynight';
 import { FIRE, Hearths } from '../sim/fires';
 import { Fires } from './fires';
@@ -67,6 +67,7 @@ const _lampPos = new THREE.Vector3(), _lampDir = new THREE.Vector3();
 const STREET_LAMP = new THREE.Color(1, 0.72, 0.38);
 /** and of a bunker's lamp (an old bulb in a cage) */
 const BUNKER_LAMP = new THREE.Color(1, 0.84, 0.58);
+const _sealed = new THREE.Vector3(), _sealedDir = new THREE.Vector3(), _sealedLook = new THREE.Vector3();
 
 export interface WorldSystems {
   r: Renderer;
@@ -416,6 +417,9 @@ export class Game {
       changed: () => this.inventoryChanged(),
       sound: (k) => audio.ui(k),
     });
+    // (the bunker's own gas: over the ground above it and all through it, breathed like the works' and hardly seen)
+    this.gas.also = (x, y, z) => bunkerGas(this.bunker.place, x, y, z);
+    this.gas.alsoEdge = (x, z) => bunkerGasEdge(this.bunker.place, x, z);
     this.invUI.icons = icons;
     this.invUI.doll = doll;
     this.invUI.selfId = publicId();
@@ -2164,6 +2168,14 @@ export class Game {
     this.mark = null;
     this.focus = null;
     if (this.player.dead || this.invUI.isOpen || this.use) return;
+    // at the way down to the second level: it is not to be opened yet, and says so
+    {
+      const sealed = this.bunker.sealedAt(_sealed);
+      if (sealed && sealed.distanceTo(cam.position) < 3.2 && _sealedDir.copy(sealed).sub(cam.position).normalize().dot(_sealedLook.set(0, 0, -1).applyQuaternion(cam.quaternion)) > 0.75) {
+        this.prompt = '<small>Locked · requires a Level 2 keycard · coming soon</small>';
+        return;
+      }
+    }
     // at the bunker's door, shut: a keycard is what F does there
     const door = this.bunker.open ? null : this.bunker.doorAt(_lampPos);
     if (door && door.distanceTo(cam.position) < 2.6 && !this.garage.ride) {

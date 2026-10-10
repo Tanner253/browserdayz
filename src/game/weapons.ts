@@ -449,7 +449,7 @@ const NUDGE = {
  */
 const VOICE: Record<string, { rate: number; gain: number; rec?: string }> = {
   deagle: { rate: 0.86, gain: 1.5, rec: 'shot_magnum' },
-  benelli: { rate: 1, gain: 1.3, rec: 'shot_shotgun' },
+  benelli: { rate: 0.9, gain: 1.5, rec: 'shot_shotgun' },
 };
 
 /** The lit mark of a holographic sight: its own light, whatever the hour, drawn over whatever is behind the glass. */

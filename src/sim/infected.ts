@@ -15,11 +15,11 @@
 // the director believes a blow only when the two are standing together.
 
 import { BUILDING_FOOTPRINT, bunkerPlace, heightAt, type World } from '../world/worldgen';
-import { BUNKER, bunkerAt, bunkerLocal, bunkerPlan, levelY } from './bunker';
+import { BUNKER, bunkerAt, bunkerPlan, levelY } from './bunker';
 
 export const INFECTED = {
   /** as many as are ever alive at once, over the whole map */
-  max: 45,
+  max: 60,
   /** what each has to begin with: a rifle round anywhere, a pistol round in the head, three in the chest */
   hp: 90,
   /** how long a body lies there, and how long after that before another turns up about the same place, seconds */
@@ -149,7 +149,9 @@ const ABOUT: Record<string, number> = { hamlet: 4, depot: 4, post: 3, yard: 2, f
 /** how many keep to the works (said apart from the small places: it comes high in the list, so it is never the one that goes short) */
 const AT_WORKS = 6;
 /** and how many are shut in the bunker, in the dark */
-const IN_BUNKER = 6;
+const IN_BUNKER = 12;
+/** and how many walk the ground over it, in its gas */
+const OVER_BUNKER = 9;
 /** how far from the middle of the works one that turned up there may have done so */
 const WORKS_REACH = 62;
 
@@ -181,10 +183,9 @@ export function bunkerSpots(world: World): [number, number, number][] {
 export function suited(world: World, x: number, z: number): boolean {
   const works = world.sites.find((s) => s.kind === 'works');
   if (works && Math.hypot(x - works.x, z - works.z) < WORKS_REACH + 2) return true;
-  const P = bunkerPlace(world);
-  if (!P) return false;
-  const [r, f] = bunkerLocal(P, x, 0, z);
-  return Math.abs(r) < BUNKER.pad.r && f > BUNKER.pad.back && f < BUNKER.pad.front;
+  // (and every one within the bunker's gas, above ground or below)
+  const bunker = world.sites.find((q) => q.kind === 'bunker');
+  return !!bunker && Math.hypot(x - bunker.x, z - bunker.z) < 56;
 }
 
 /** Where the infected live: the village most of all, the checkpoint, and a few about every outlying place. */
@@ -198,6 +199,7 @@ export function infectedHomes(world: World): Home[] {
   if (works) homes.push({ x: works.x, z: works.z, r: WORKS_REACH, n: AT_WORKS });
   const below = bunkerSpots(world), bunker = world.sites.find((s) => s.kind === 'bunker');
   if (bunker && below.length) homes.push({ x: bunker.x, z: bunker.z, r: 30, n: IN_BUNKER, inside: below });
+  if (bunker) homes.push({ x: bunker.x, z: bunker.z, r: 40, n: OVER_BUNKER });
   for (const s of world.sites) homes.push({ x: s.x, z: s.z, r: 34, n: ABOUT[s.kind] ?? 1 });
   // (never more than the map is meant to hold: the places furthest down the list go short)
   let left = INFECTED.max;
@@ -210,8 +212,9 @@ export function infectedHomes(world: World): Home[] {
 
 /** Open ground: not in a building, a tree, a rock or a prop, and not on a slope. */
 export function openGround(world: World, x: number, z: number) {
-  const h0 = heightAt(world.heights, x, z);
-  for (const [dx, dz] of [[2, 0], [-2, 0], [0, 2], [0, -2]]) if (Math.abs(heightAt(world.heights, x + dx, z + dz) - h0) > 0.9) return false;
+  // (the ground as it is seen: over the bunker that is its roof, not the bottom of the hole under it)
+  const h0 = heightAt(world.surface, x, z);
+  for (const [dx, dz] of [[2, 0], [-2, 0], [0, 2], [0, -2]]) if (Math.abs(heightAt(world.surface, x + dx, z + dz) - h0) > 0.9) return false;
   for (const b of world.buildings) {
     const c = Math.cos(b.rot), s = Math.sin(b.rot);
     const dx = x - b.x, dz = z - b.z;
@@ -232,7 +235,7 @@ export function homeSpot(world: World, home: Home, rnd: () => number): { x: numb
   for (let k = 0; k < 14; k++) {
     const a = rnd() * Math.PI * 2, r = home.r * (0.25 + 0.75 * Math.sqrt(rnd()));
     const x = home.x + Math.cos(a) * r, z = home.z + Math.sin(a) * r;
-    if (openGround(world, x, z)) return { x, y: heightAt(world.heights, x, z), z };
+    if (openGround(world, x, z)) return { x, y: heightAt(world.surface, x, z), z };
   }
   return null;
 }

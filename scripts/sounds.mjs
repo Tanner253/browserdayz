@@ -73,8 +73,13 @@ const SOUNDS = {
   // The shotgun: a twelve bore recorded close (the library's Benelli Nova), and under it, as
   // under the pistol, the air after a rifle shot.
   shot_shotgun: {
-    src: lib('Nova/O_21P.wav'), side: 1, takes: 2, len: 1.8, rate: 44100, gain: 1, press: 1.2,
-    with: [{ src: snake('Full Sound/7.62x39/WAV/762x39 Single WAV.wav'), level: 0.55, after: 0.012, die: 0.35 }],
+    // (the gun itself, pressed hard; under it the bottom of the big rifle's shot, which is the thump a twelve bore
+    // has in the chest; and the air after a rifle shot, left to ring a good while)
+    src: lib('Nova/O_21P.wav'), side: 1, takes: 2, len: 2.2, rate: 44100, gain: 1, press: 1.6,
+    with: [
+      { src: snake('Full Sound/7.62x54R/WAV/762x54r Single WAV.wav'), level: 1.1, low: 520 },
+      { src: snake('Full Sound/7.62x39/WAV/762x39 Single WAV.wav'), level: 0.75, after: 0.012, die: 0.55 },
+    ],
   },
   // The big pistol: a .45 (the library's 1911), which is the heaviest pistol there is a
   // recording of, with the same air under it.

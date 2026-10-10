@@ -41,8 +41,8 @@ const IN_BUNKER: Table = [
   ['benelli', 1.5], ['ammo_12', 3.2], ['box_12', 2.2], ['suppressor_12', 0.9], ['red_dot', 1.1], ['gun_light', 1.1],
   ['mosin', 1.1], ['pu_scope', 1.5], ['suppressor_762', 0.9], ['box_762', 2.2], ['ammo_762', 1.2],
   ['m9', 0.9], ['mag_m9_ext', 0.7], ['suppressor_9', 0.7], ['box_9mm', 1.8], ['ammo_50', 1.2], ['box_50', 0.6],
-  ['grenade', 1.8], ['boonie_hat', 1.8], ['life_vest', 1.8], ['firstaid', 1.7], ['bandage', 1.5], ['splint', 0.6],
-  ['flashlight', 0.9], ['flask', 0.5], ['condensed', 0.6], ['thermos', 0.4],
+  ['grenade', 1.8], ['boonie_hat', 1.8], ['life_vest', 1.8], ['firstaid', 2.2], ['bandage', 2.2], ['splint', 0.8],
+  ['flashlight', 0.9], ['flask', 0.9], ['condensed', 0.8], ['thermos', 0.6], ['water_jug', 0.7], ['beans', 0.7], ['sardines', 0.6],
 ];
 /** and on its racks, the long things */
 const ON_RACKS: Table = [['benelli', 3], ['mosin', 2], ['ammo_12', 2], ['box_12', 1.5], ['box_762', 1.5], ['suppressor_12', 0.8], ['suppressor_762', 0.8], ['pu_scope', 1.2], ['red_dot', 0.8], ['gun_light', 0.8]];

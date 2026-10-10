@@ -7,6 +7,8 @@
 // breathing it does. The game draws it (src/world/atmosphere.ts, src/game/gas.ts) and takes
 // the health off (a survivor's health is their own game's to keep, as with a wound or thirst).
 
+import { BUNKER, bunkerLocal, type Place } from './bunker';
+
 export const GAS = {
   /** the place that is sunk in it, by its name on the map */
   place: 'Chemical Works',
@@ -28,6 +30,30 @@ export const GAS = {
 };
 
 export interface GasZone { x: number; y: number; z: number; r: number; h: number }
+
+/**
+ * The bunker has gas of its own: over the ground above it, and all through it. It is as bad to
+ * breathe as the works' and nothing like as thick to look at (it is hardly drawn at all: the
+ * place is not to be given away by a green cloud). Over the ground it is a low dome, `r` metres
+ * out from a point `back` metres behind the bunker's own middle and `h` high; under the ground
+ * it is everywhere, as deep as `under` says.
+ */
+export const BUNKER_GAS = { r: 46, back: 6, h: 14, under: 0.6 };
+
+/** how deep in the bunker's gas a point is: 0 outside it; as `gasDepth`, inside */
+export function bunkerGas(p: Place | null, x: number, y: number, z: number): number {
+  if (!p) return 0;
+  const G = BUNKER_GAS, [r, f, h] = bunkerLocal(p, x, y, z);
+  if (h < -0.8 && Math.abs(r) < BUNKER.hall.r + 1 && f > BUNKER.hall.back - 1 && f < BUNKER.stair.foot + BUNKER.stair.run + 1) return G.under;
+  return Math.max(0, 1 - ((r * r + (f + G.back) * (f + G.back)) / (G.r * G.r) + (h * h) / (G.h * G.h)));
+}
+
+/** how far along the ground a point is from where the bunker's gas begins, metres: under 0 is inside */
+export function bunkerGasEdge(p: Place | null, x: number, z: number): number {
+  if (!p) return Infinity;
+  const [r, f] = bunkerLocal(p, x, 0, z);
+  return Math.hypot(r, f + BUNKER_GAS.back) - BUNKER_GAS.r;
+}
 
 /** where the gas lies in a world: over the place named in GAS, standing on the ground there */
 export function gasZone(pois: { name: string; x: number; z: number }[], ground: (x: number, z: number) => number): GasZone | null {

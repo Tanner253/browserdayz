@@ -190,14 +190,20 @@ export class Gas {
    * @param head where the survivor's own head is (in a jeep's chase view the two are not one place)
    * @param alive false once dead, and before the game has begun: nothing is breathed then
    */
+  /** another gas than the one that is drawn: how deep in it a point is, and how far along the ground from its edge (the bunker's) */
+  also: ((x: number, y: number, z: number) => number) | null = null;
+  alsoEdge: ((x: number, z: number) => number) | null = null;
+
   update(dt: number, eye: THREE.Vector3, head: THREE.Vector3, alive: boolean) {
     const z = this.zone;
     if (!z) return;
     this.clock += dt;
     this.depth = gasDepth(z, eye.x, eye.y, eye.z);
+    // (the bunker's is seen as a faint dulling of the day and no more)
+    const faint = this.also ? this.also(eye.x, eye.y, eye.z) : 0;
 
     // --- the daylight, under it
-    const dim = Math.min(1, this.depth * 1.6);
+    const dim = Math.min(1, this.depth * 1.6 + faint * 0.14);
     if (Math.abs(dim - this.dimmed) > 0.002 || (dim === 0 && this.dimmed !== 0)) {
       this.dimmed = dim;
       this.atmo.cover.gas = { sun: 1 - DIM.sun * dim, sky: 1 - DIM.sky * dim };
@@ -232,7 +238,7 @@ export class Gas {
     }
 
     // --- the breathing of it
-    const deep = alive ? gasDepth(z, head.x, head.y, head.z) : 0;
+    const deep = alive ? Math.max(gasDepth(z, head.x, head.y, head.z), this.also ? this.also(head.x, head.y, head.z) : 0) : 0;
     const masked = this.host.masked();
     const breathing = deep >= GAS.breathe;
     if (alive) {
@@ -257,7 +263,7 @@ export class Gas {
     if (alive && !breathing && this.wasIn && !masked) this.host.note('Clean air', 'good');
     this.wasIn = breathing;
     this.wasMasked = masked;
-    const off = gasEdge(z, head.x, head.z);
+    const off = Math.min(gasEdge(z, head.x, head.z), this.alsoEdge ? this.alsoEdge(head.x, head.z) : Infinity);
     if (alive && !masked && !breathing && off < 22 && !this.warned) {
       this.warned = true;
       this.host.note('Gas ahead: do not go in without a gas mask', 'warn');

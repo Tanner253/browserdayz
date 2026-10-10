@@ -31,8 +31,8 @@ import path from 'node:path';
 import * as THREE from 'three';
 import { NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
-import { dedup, prune, mergeDocuments, unpartition, textureCompress, meshopt, metalRough } from '@gltf-transform/functions';
-import { MeshoptDecoder, MeshoptEncoder } from 'meshoptimizer';
+import { dedup, prune, mergeDocuments, unpartition, textureCompress, meshopt, metalRough, weld, simplify } from '@gltf-transform/functions';
+import { MeshoptDecoder, MeshoptEncoder, MeshoptSimplifier } from 'meshoptimizer';
 import sharp from 'sharp';
 import { wearSuit, fitSkeleton, ours } from './suit.mjs';
 
@@ -58,7 +58,9 @@ const ZOMBIES = [
   { id: 'male', dir: 'zombie_male', statue: true, pieces: { body: [[/^z_Body$/, null]], bottom: [[/^z_Bottom$/, null]], hair: [[/^z_Hair$/, null]], rest: [[/^z_material$/, null]] } },
   { id: 'female', dir: 'zombie_female', statue: true, pieces: { body: [[/^z_Body$/, null]], bottom: [[/^z_Bottom$/, null]], hair: [[/^z_Hair$/, null]], rest: [[/^z_material$/, null]] } },
   // (on its own skeleton, not the cop's: `own` is how its bones are named)
-  { id: 'hazmat', dir: 'zombie_idle', own: 'mixamorig:', pieces: { body: [[/^model_default/, null]] } },
+  // (It came with fifty thousand triangles, three times what any of the others has, and there are twenty of them
+  // about the bunker: it is brought down to `keep` of that, which at the distance they are seen from changes nothing.)
+  { id: 'hazmat', dir: 'zombie_idle', own: 'mixamorig:', keep: 0.36, pieces: { body: [[/^model_default/, null]] } },
 ];
 /** only these, if any are named on the command line (`node scripts/zombies.mjs hazmat`) */
 const ONLY = process.argv.slice(2);
@@ -833,6 +835,8 @@ for (const z of ZOMBIES) {
   }
   const ran = giveRun(doc, run);
   const stood = giveRun(doc, idle, 'idle');
+  await MeshoptSimplifier.ready;
+  if (z.keep) await doc.transform(weld(), simplify({ simplifier: MeshoptSimplifier, ratio: z.keep, error: 0.0015 }));
   await doc.transform(
     unpartition(),
     dedup(),

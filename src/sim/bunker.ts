@@ -453,7 +453,7 @@ function layOut(seed: number): Plan {
     stood.push({ id: pick(['wooden_military_crate', 'Barrel_01', 'cardboard_box_01', 'metal_trash_can', 'old_military_crate']), r, f, rot: between(-0.3, 0.3) + (rnd() < 0.5 ? 0 : Math.PI / 2) });
   }
   for (const f of [H.front - 2.5, cross + 4, cross - 5, H.back + 2.5]) spots.push({ r: pick([-0.9, 0.9]), f, y: Y, floor: true });
-  builtList.push({ kind: 'sign', r: 0, f: H.back + 0.02, rot: 0, w: 2.2, d: 0.02, h: 0.4, y: 2.42, text: 'LEVEL 2 · LEVEL 3', solid: false });
+  builtList.push({ kind: 'sign', r: 0, f: H.back + 0.02, rot: 0, w: 2.2, d: 0.02, h: 0.4, y: 2.42, text: 'LEVEL 2', solid: false });
   builtList.push({ kind: 'grate', r: 0, f: cross, rot: 0, w: 1.6, d: 1.6, h: 0.03, solid: false });
   // (the works of the place run down its walls: clusters of pipes, wherever there is neither a way through nor something standing)
   let side = 1;

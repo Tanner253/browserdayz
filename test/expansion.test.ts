@@ -163,7 +163,10 @@ ok('the infected keep to it too, and nowhere else has fewer for it', () => {
   // (the valley held thirty-three before there was a works, or a bunker with its own shut in it)
   const below = homes.filter((h) => h.inside);
   assert.ok(below.length === 1 && below[0].n >= 4 && below[0].inside!.length >= below[0].n * 2, 'none in the bunker, or nowhere for them to stand');
-  assert.equal(INFECTED.max - here!.n - below[0].n, 33);
+  // (and those that walk the ground over it)
+  const over = homes.filter((h) => !h.inside && Math.hypot(h.x - below[0].x, h.z - below[0].z) < 1);
+  assert.ok(over.length === 1 && over[0].n >= 6, 'none over the bunker');
+  assert.equal(INFECTED.max - here!.n - below[0].n - over[0].n, 33);
 });
 
 console.log(`\n${n} checks passed`);

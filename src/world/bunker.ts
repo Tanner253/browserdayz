@@ -568,8 +568,11 @@ export class BunkerSite {
     }
     // ---- and the way down to the levels below, at the far end of the passage: shut, for now
     {
-      const sealed = mat(new THREE.MeshStandardMaterial({ map: doorPaint(['SEALED', 'LEVEL 2 · LEVEL 3', 'NO ENTRY'], 73), roughness: 0.6, metalness: 0.55 }));
+      const sealed = mat(new THREE.MeshStandardMaterial({ map: doorPaint(['LEVEL 2', 'LEVEL 2 KEYCARD REQUIRED', 'COMING SOON'], 73), roughness: 0.6, metalness: 0.55 }));
       block(-Dr.half, Dr.half, L.back - 0.32, L.back - 0.1, Y, Y + Dr.tall, [steel, steel, steel, steel, sealed, sealed], { surface: 'metal', whole: true });
+      // its reader, on the passage's wall beside it: red, and it stays red
+      block(Dr.half + 0.18, Dr.half + 0.46, L.back, L.back + 0.07, Y + 1.08, Y + 1.44, steel, { solid: false });
+      block(Dr.half + 0.28, Dr.half + 0.36, L.back + 0.07, L.back + 0.08, Y + 1.34, Y + 1.39, atmo.register(new THREE.MeshStandardMaterial({ color: 0x111111, emissive: new THREE.Color(1, 0.1, 0.05), emissiveIntensity: 2.2 })), { solid: false });
     }
 
     // ---- the lamps: a caged fitting on the ceiling for each, lit as it burns (the ones that burn steadily share one glow)
@@ -681,6 +684,13 @@ export class BunkerSite {
       d.slide = open ? 1 : 0;
       this.doorSet();
     } else if (this.place) this.onMove(open);
+  }
+
+  /** Where the middle of the way down to the second level is, in the world (it is shut, and says why to whoever looks at it). */
+  sealedAt(out: THREE.Vector3): THREE.Vector3 | null {
+    if (!this.place) return null;
+    const [x, y, z] = bunkerAt(this.place, 0, BUNKER.hall.back, levelY() + 1.2);
+    return out.set(x, y, z);
   }
 
   /** Where the middle of the door is, in the world: what a keycard is held up to. */
