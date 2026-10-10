@@ -347,3 +347,53 @@ body.tr-g-dim5 canvas { filter: saturate(0.5) contrast(1.1) brightness(0.6) blur
 .b5-row:nth-child(5) b { color: #7fd0ff; }
 .b5-row:nth-child(6) { border-left-color: #ff8a6a; }
 .b5-row:nth-child(6) b { color: #ff8a6a; }
+
+/* ------------------------------------------------------------ the sixth cut: everything so far */
+.t6 .t4-logo { font-size: 30vh; letter-spacing: 0.16em; margin-right: -0.16em; }
+.t6 { background: radial-gradient(ellipse at 50% 45%, rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.82)); }
+.b6 { display: flex; flex-direction: column; justify-content: center; gap: 3.4vh; padding: 0 8vw; text-transform: uppercase; background: linear-gradient(90deg, rgba(4, 6, 4, 0.82), rgba(4, 6, 4, 0.5) 60%, rgba(4, 6, 4, 0.25)); opacity: calc(min(1, var(--t, 0) * 4)); }
+.b6-head { font-size: 7.6vh; font-weight: 800; font-stretch: condensed; letter-spacing: 0.1em; line-height: 1; color: #f3ead6; }
+.b6-head b { color: #ffd35a; }
+.b6-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.6vw; max-width: 84vw; }
+.b6-foot { font-size: 2.3vh; letter-spacing: 0.3em; font-weight: 600; color: #d8cfb8; opacity: 0.8; }
+.route6 { display: grid; grid-template-columns: 62vh minmax(0, 1fr); grid-template-rows: auto 1fr; gap: 2vh 5vw; align-content: center; align-items: center; }
+.route6 .b6-head { grid-column: 1 / -1; }
+.route6 svg { width: 62vh; height: 62vh; }
+.r6-rim { fill: rgba(10, 13, 10, 0.72); stroke: rgba(233, 228, 216, 0.3); stroke-width: 0.3; }
+.r6-road { fill: none; stroke: rgba(233, 228, 216, 0.34); stroke-width: 0.5; }
+.r6-gas { fill: rgba(150, 170, 40, 0.34); stroke: rgba(190, 210, 60, 0.7); stroke-width: 0.25; }
+.r6-way { fill: none; stroke: #ffd35a; stroke-width: 0.9; stroke-linecap: round; stroke-dasharray: 100; stroke-dashoffset: calc(100 - min(100, max(0, (var(--t, 0) - 0.5) * 55))); }
+.r6-spot circle { fill: #ffd35a; }
+.r6-spot text { font-size: 3.2px; font-weight: 800; text-anchor: middle; fill: #14110b; }
+.route6 ol { display: flex; flex-direction: column; gap: 2.6vh; margin: 0; padding: 0; list-style: none; }
+.route6 li { display: flex; align-items: center; gap: 1.4vw; opacity: calc(min(1, max(0, (var(--t, 0) - 0.5 - var(--i, 0) * 0.75) * 3))); }
+.route6 li:nth-child(2) { --i: 1; }
+.route6 li:nth-child(3) { --i: 2; }
+.route6 li > b { flex: none; width: 6.4vh; height: 6.4vh; font-size: 4.2vh; line-height: 6.4vh; text-align: center; font-weight: 800; color: #14110b; background: #ffd35a; }
+.route6 li strong { display: block; font-size: 5.4vh; line-height: 1; font-weight: 800; font-stretch: condensed; letter-spacing: 0.12em; color: #f3ead6; }
+.route6 li span { display: block; margin-top: 0.6vh; font-size: 2.5vh; letter-spacing: 0.2em; font-weight: 600; color: #d8cfb8; }
+.soon6 { align-items: center; text-align: center; background: radial-gradient(ellipse at 50% 50%, rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.8)); }
+.soon6 .b6-head { font-size: 11vh; letter-spacing: 0.3em; margin-right: -0.3em; }
+.soon6 ul { display: flex; flex-direction: column; gap: 1.5vh; margin: 0; padding: 0; list-style: none; }
+.soon6 li { font-size: 5vh; font-weight: 700; font-stretch: condensed; letter-spacing: 0.34em; margin-right: -0.34em; color: #f3ead6; opacity: calc(min(1, max(0, (var(--t, 0) - 0.6 - var(--i, 0) * 0.9) * 3))); transform: translateY(calc((1 - min(1, max(0, (var(--t, 0) - 0.6 - var(--i, 0) * 0.9) * 3))) * 1.4vh)); }
+.soon6 li:nth-child(2) { --i: 1; }
+.soon6 li:nth-child(3) { --i: 2; }
+.soon6 li:nth-child(4) { --i: 3; color: #ffd35a; }
+.end6 { gap: 1.2vh; background: radial-gradient(ellipse at 50% 45%, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.9)); opacity: calc(min(1, var(--t, 0) * 2)); }
+.end6 .t4-logo { font-size: 30vh; }
+.e6-url { margin-top: 2vh; padding: 0.35em 1.1em 0.35em 1.45em; font-size: 5.6vh; font-weight: 800; font-stretch: condensed; letter-spacing: 0.34em; color: #14110b; background: #ffd35a; }
+.e6-rows { display: flex; gap: 3vw; margin-top: 1.6vh; font-size: 2.6vh; letter-spacing: 0.26em; font-weight: 600; color: #e2d9c2; }
+.e6-ca { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 2vh; letter-spacing: 0.08em; text-transform: none; color: #d8cfb8; opacity: 0.75; }
+/* how fast the feet are going */
+.speed6 { inset: auto; right: 7%; top: 30%; display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 0.8vw; width: 26vh; padding: 1.4vh 1.6vw 1.6vh; background: rgba(10, 12, 10, 0.74); border-right: 0.5vh solid #d8cfb8; text-transform: uppercase; }
+.speed6 b { font-size: 11vh; line-height: 1; font-weight: 800; font-stretch: condensed; color: #f3ead6; font-variant-numeric: tabular-nums; }
+.speed6 span { font-size: 3vh; letter-spacing: 0.2em; font-weight: 600; color: #d8cfb8; }
+.speed6 em { width: 100%; margin-top: 0.4vh; font-style: normal; font-size: 2.6vh; letter-spacing: 0.3em; font-weight: 700; color: #d8cfb8; }
+.speed6.free { border-right-color: #ffd35a; }
+.speed6.free b, .speed6.free em { color: #ffd35a; }
+/* the game in a phone: the picture and its own touch controls drawn small, and a phone's edge round them */
+body.tr-phone6 { background: #0b0d0b; }
+body.tr-phone6 #game, body.tr-phone6 #ui, body.tr-phone6 .tc { transform: scale(0.66); transform-origin: 50% 54%; }
+body.tr-phone6 #game { border-radius: 4.5vh; }
+.tr-phone-frame6 { position: absolute; left: 17%; top: 20.3%; width: 66%; height: 66%; z-index: 1; pointer-events: none; border: 1.3vh solid #1b1e1b; border-radius: 5.6vh; box-shadow: 0 0 0 100vmax #0b0d0b, inset 0 0 0 0.3vh #3a3f3a; transform: scale(1.02); }
+

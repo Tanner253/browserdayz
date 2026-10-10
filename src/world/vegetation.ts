@@ -548,8 +548,16 @@ export class Vegetation {
       this.atmo.register(bark, barkP.patch, `bark-${sway}`);
       this.atmo.register(leaves, leafP.patch, `leaves-${sway}`);
     } else {
-      bark.onBeforeCompile = (sh) => { barkP.patch(sh); antiFirefly(sh); };
-      leaves.onBeforeCompile = (sh) => { leafP.patch(sh); antiFirefly(sh); };
+      // (The light that comes through a leaf is told the hour by a number every lit thing is handed when it is
+      // registered. These two are not registered: they are what a tree is photographed in for its far-off card.
+      // Without that number the leaves' shader did not compile, nothing of them was drawn, and every tree past
+      // the handover was a card of bare branches. The card is a picture of the tree at noon: the number is one.)
+      const noon = (sh: Parameters<THREE.Material['onBeforeCompile']>[0]) => {
+        sh.uniforms.uDaylight = { value: 1 };
+        sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uDaylight;');
+      };
+      bark.onBeforeCompile = (sh) => { noon(sh); barkP.patch(sh); antiFirefly(sh); };
+      leaves.onBeforeCompile = (sh) => { noon(sh); leafP.patch(sh); antiFirefly(sh); };
       bark.customProgramCacheKey = () => 'bake-bark';
       leaves.customProgramCacheKey = () => 'bake-leaves';
     }

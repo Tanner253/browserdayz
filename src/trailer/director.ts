@@ -454,7 +454,7 @@ async function stage() {
   g.nextDrop = 1e12;
   // The infected are in one film only (the fifth, which stands its own: see shots5.ts). The
   // others were made before there were any, and are played as they were made.
-  if (CUT !== 5) {
+  if (CUT !== 5 && CUT !== 6) {
     g.horde.clear();
     g.horde.director = null;
   }
@@ -550,7 +550,12 @@ async function stage() {
   S.bullet.visible = S.trail.visible = false;
   g.s.r.scene.add(S.bullet, S.trail);
 
-  if (CUT === 5) {
+  if (CUT === 6) {
+    const cut = await import('./shots6');
+    shots = cut.buildShots(S);
+    arrangement = cut.ARRANGEMENT;
+    seconds = cut.SECONDS6;
+  } else if (CUT === 5) {
     const cut = await import('./shots5');
     shots = cut.buildShots(S);
     arrangement = cut.ARRANGEMENT;

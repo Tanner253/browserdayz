@@ -241,7 +241,9 @@ export class Player {
     if (v.stamina <= WINDED_AT) this.winded = true;
     else if (v.stamina >= WIND_BACK) this.winded = false;
     this.sprintLock = Math.max(0, this.sprintLock - h);
-    const fit = !this.winded && this.grounded && !v.broken && this.sprintLock <= 0;
+    // (A sprint is begun on the ground and is not lost by leaving it: whoever jumps at a run comes down at a run.
+    // It was lost: with the feet off the ground the pace fell toward a jog, a quarter of it gone by the landing.)
+    const fit = !this.winded && !v.broken && this.sprintLock <= 0 && (this.grounded || this.sprinting);
     this.sprinting = wantsSprint && fit;
     // Shift while crouched: a hurried crouch, well short of a sprint and well over a creep.
     // It takes breath as a sprint does (less of it), and the trigger stops it as it stops one.
