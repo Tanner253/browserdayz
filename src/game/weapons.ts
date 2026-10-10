@@ -1079,10 +1079,17 @@ export class Weapons {
     world.userData.muzzle = [mouth.x + seen.x, mouth.y, mouth.z];
     // where things are in the eye's space with the pack at rest and not yet moved to the hip
     // (of a gun that rides in the pack's hands: its own pieces, where they hang there)
+    // (A pistol is measured without what has been fitted to it. A sight stood on the slide is not the slide: with
+    // it counted, the eye of a pistol that had NO sight on was set level with the top of the sight's hood and to
+    // one side by its knob, and the gun's own sights lay under the middle of the picture and beside it.)
+    const fittedOn = o.kind === 'rifle' ? [] : shown.map(([obj]) => [obj, obj.parent] as const).filter(([, parent]) => !!parent);
+    for (const [obj] of fittedOn) obj.removeFromParent();
     rig.root.updateMatrixWorld(true);
     const boxOf = (piece: string, fallback: string) => (hung.has(piece) ? new THREE.Box3().setFromObject(hung.get(piece)!) : rig.box(fallback));
     const sight = o.kind === 'rifle' ? (hung.size ? boxOf('sight', 'base') : rig.box('glass')) : boxOf('slide', 'slide');
     const frame = boxOf('base', 'base');
+    for (const [obj, parent] of fittedOn) parent!.add(obj);
+    rig.root.updateMatrixWorld(true);
     const c = sight.getCenter(new THREE.Vector3());
     const root = new THREE.Group();
     const body = new THREE.Group();

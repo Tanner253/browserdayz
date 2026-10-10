@@ -1245,7 +1245,11 @@ export class Game {
       this.effects.bleed(at, dir, power, true);
       if (power >= 0.4) this.avatar.wound(at, dir, 0.05 + power * 0.04, power > 0.58);
     }
-    this.hud.hitFrom(Math.atan2(m.dir[0], m.dir[2]) - (p.yaw + Math.PI));
+    // Which side it came from, as an angle round from straight ahead (clockwise, as the arc is turned). `dir` is
+    // the way the round was going, from whoever fired it to here; ahead is (-sin yaw, -cos yaw). (It was worked
+    // out with the turn the wrong way about: right only for a shot from exactly the left or the right, and a shot
+    // from in front was shown as from behind.)
+    this.hud.hitFrom(p.yaw - Math.atan2(m.dir[0], m.dir[2]));
     if (this.use) {
       this.use = null;
       this.weapons.endUse();
@@ -1956,7 +1960,7 @@ export class Game {
         for (const a of this.inv.wear('armor')) amount *= a;
         p.damage(amount, jeep ? 'a burning jeep' : drum ? 'a fuel drum you set off' : 'your own grenade');
         if (amount > 12) p.bleed();
-        this.hud.hitFrom(Math.atan2(p.pos.x - at.x, p.pos.z - at.z) - (p.yaw + Math.PI));
+        this.hud.hitFrom(p.yaw - Math.atan2(p.pos.x - at.x, p.pos.z - at.z));
         this.meDirty = true;
       }
     }
