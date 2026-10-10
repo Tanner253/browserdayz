@@ -38,7 +38,7 @@ export interface ItemDef {
   category: Category;
   stack?: number;
   slot?: SlotKind;
-  use?: { verb: string; time: number; energy?: number; water?: number; health?: number; stopBleed?: boolean; /** sets a broken leg (see src/sim/injury.ts) */ splint?: boolean; sound: 'eat' | 'drink' | 'bandage' | 'inject' | 'smoke' };
+  use?: { verb: string; time: number; energy?: number; water?: number; health?: number; stopBleed?: boolean; /** sets a broken leg (see src/sim/injury.ts) */ splint?: boolean; /** breath given back, in hundredths of all there is */ stamina?: number; /** seconds afterwards in which nothing costs any breath */ boost?: number; /** taken into the hand first and held there: a click then uses it (see `ready` in src/game/game.ts) */ hold?: boolean; sound: 'eat' | 'drink' | 'bandage' | 'inject' | 'smoke' };
   /** thrown when used: seconds of fuse, damage at the centre, metres it reaches */
   throw?: { fuse: number; damage: number; radius: number };
   /** used, it calls a supply drop down where its user stands (see CALL in src/sim/drops.ts) */
@@ -80,6 +80,8 @@ export interface ItemDef {
   attach?: { fits: string[]; slot: AttachSlot; ergo?: number; recoil?: number; /** rounds more than the gun's own magazine holds */ rounds?: number; /** on the muzzle: it quiets the shot and hides the flash */ quiet?: boolean };
   /** its model's colours are multiplied by this (0xrrggbb): one model, told apart from another thing made of it */
   tint?: number;
+  /** what is white on its model is painted this colour (0xrrggbb) and the rest keeps its own: see whiteTo in src/game/loot.ts */
+  paint?: number;
   /** camera hint for the icon renderer */
   iconYaw?: number;
 }
@@ -220,7 +222,9 @@ const D: ItemDef[] = [
   // (The item is still `bandage`: it is what the roll of tape was, in every loot table and every
   // pocket. What it is now is an auto-injector: quicker than winding a dressing, and it gives
   // something back.)
-  { id: 'bandage', name: 'Combat Injector', model: 'syringe', w: 1, h: 1, weight: 0.06, category: 'medical', desc: 'Clotting agent and a painkiller in one spring-loaded shot. Stops bleeding and gives back 15 health.', use: { verb: 'Use', time: 2.4, stopBleed: true, health: 15, sound: 'inject' } },
+  { id: 'bandage', name: 'Combat Injector', model: 'syringe', w: 1, h: 1, weight: 0.06, category: 'medical', desc: 'Clotting agent and a painkiller in one spring-loaded shot. Stops bleeding and gives back 15 health.', use: { verb: 'Use', time: 2.4, stopBleed: true, health: 15, hold: true, sound: 'inject' } },
+  // (the same injector with a yellow barrel: told from the other at a glance, on the ground and in the hand)
+  { id: 'stim', name: 'Adrenaline Injector', model: 'syringe', paint: 0xf0bd12, w: 1, h: 1, weight: 0.06, category: 'medical', desc: 'Adrenaline in a spring-loaded shot, its barrel yellow. Fills your stamina, and for ten seconds after it nothing you do costs any.', use: { verb: 'Use', time: 2.4, stamina: 100, boost: 10, hold: true, sound: 'inject' } },
   { id: 'firstaid', name: 'First Aid Kit', model: 'medical_box', w: 3, h: 2, weight: 0.9, category: 'medical', desc: 'Dressings, antiseptic and a splint. Treats wounds properly, and sets a broken leg.', use: { verb: 'Treat wounds', time: 6, stopBleed: true, health: 45, splint: true, sound: 'bandage' } },
   { id: 'splint', name: 'Splint Tape', model: 'medical_tape', w: 1, h: 1, weight: 0.12, category: 'medical', desc: 'A roll of strapping tape. Bound round a broken leg with whatever is to hand, it lets you run on it again.', use: { verb: 'Splint your leg with', time: 5, splint: true, sound: 'bandage' } },
   // ---------------------------------------------------------------- clothing & bags

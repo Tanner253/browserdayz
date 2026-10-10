@@ -103,6 +103,8 @@ export class Player {
   private stepOff = 0;
   private prevStepOff = 0;
   private staminaDelay = 0;
+  /** seconds left in which nothing costs any breath (the adrenaline injector) */
+  boost = 0;
   /** out of breath: no sprinting until some stamina is back (see step) */
   private winded = false;
   /**
@@ -219,6 +221,12 @@ export class Player {
     this.prevStepOff = this.stepOff;
     if (this.dead) return;
     const v = this.vitals;
+    // (adrenaline: whatever was spent since the last step is given back, and nobody on it is out of breath)
+    if (this.boost > 0) {
+      this.boost = Math.max(0, this.boost - h);
+      v.stamina = MAX_STAMINA;
+      this.winded = false;
+    }
     if (this.seated) {
       // carried: the legs get their breath back, and that is all they do
       this.sprinting = this.scurrying = false;

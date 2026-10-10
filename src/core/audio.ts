@@ -324,7 +324,30 @@ export class AudioEngine {
    * @param at when, on the context's clock
    * @returns whether it did: if not, the caller makes the sound up as it used to
    */
-  private rec(name: string, to: AudioNode, at: number, gain = 1, rate = 1): boolean {
+  /** what a reload has set to be heard later in it: taken back if the reload is broken off (see hush) */
+  private ahead: { src: AudioBufferSourceNode; at: number }[] = [];
+
+  /**
+   * A reload is broken off: the magazine that was to go in, the shells not yet pushed home and the slide are
+   * not heard. (They are all set going when the reload begins.) What has already begun is left to finish:
+   * a sound cut short is a click.
+   */
+  hush() {
+    if (!this.ready) return;
+    const now = this.ctx.currentTime;
+    for (const a of this.ahead) {
+      if (a.at <= now + 0.02) continue;
+      try {
+        a.src.stop();
+      } catch {
+        // (never started, or already over)
+      }
+    }
+    this.ahead = [];
+  }
+
+  /** @param later it belongs to a reload and can be taken back before it is heard */
+  private rec(name: string, to: AudioNode, at: number, gain = 1, rate = 1, later = false): boolean {
     const takes = bank.get(name);
     if (!this.ready || !takes?.length) return false;
     const src = this.ctx.createBufferSource();
@@ -335,6 +358,11 @@ export class AudioEngine {
     g.gain.value = gain;
     src.connect(g).connect(to);
     src.start(Math.max(at, this.ctx.currentTime));
+    if (later) {
+      const now = this.ctx.currentTime;
+      this.ahead = this.ahead.filter((a) => a.at > now);
+      this.ahead.push({ src, at });
+    }
     return true;
   }
 
@@ -532,20 +560,20 @@ export class AudioEngine {
 
   /** @param long a rifle's magazine (a pistol's, if not) */
   magOut(delay = 0, long = false) {
-    if (this.ready) this.rec(long ? 'rifle_mag_out' : 'pistol_mag_out', this.sfx, this.ctx.currentTime + delay, 0.95);
+    if (this.ready) this.rec(long ? 'rifle_mag_out' : 'pistol_mag_out', this.sfx, this.ctx.currentTime + delay, 0.95, 1, true);
   }
 
   magIn(delay = 0, long = false) {
-    if (this.ready) this.rec(long ? 'rifle_mag_in' : 'pistol_mag_in', this.sfx, this.ctx.currentTime + delay, 0.95);
+    if (this.ready) this.rec(long ? 'rifle_mag_in' : 'pistol_mag_in', this.sfx, this.ctx.currentTime + delay, 0.95, 1, true);
   }
 
   /** a shell pushed into a shotgun's tube */
   shellIn(delay = 0) {
-    if (this.ready && !this.rec('shell_in', this.sfx, this.ctx.currentTime + delay, 0.95)) this.magIn(delay, false);
+    if (this.ready && !this.rec('shell_in', this.sfx, this.ctx.currentTime + delay, 0.95, 1, true)) this.magIn(delay, false);
   }
 
   slideRack(delay = 0) {
-    if (this.ready) this.rec('rack', this.sfx, this.ctx.currentTime + delay, 0.95);
+    if (this.ready) this.rec('rack', this.sfx, this.ctx.currentTime + delay, 0.95, 1, true);
   }
 
   shellDrop(delay = 0.35) {

@@ -98,6 +98,8 @@ interface TimedAction {
 /** bump when the map's loot points change: spawned loot from older saves is re-rolled */
 const LOOT_REV = 17;
 const QUICK_KEYS = ['Digit5', 'Digit6', 'Digit7', 'Digit8'];
+/** the keys that put something else in the hands */
+const HAND_KEYS = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'KeyX'];
 /** what can be held, in the order of the keys 1 to 4 */
 const HAND_SLOTS = ['primary', 'secondary', 'holster', 'melee'] as const;
 /** the wheel: how far the mouse travels from its middle to its rim (pixels), and how far out an entry is picked */
@@ -495,7 +497,7 @@ export class Game {
       this.touch = new TouchControls(this.input, {
         menu: () => this.input.unlock(),
         inventory: () => this.started && !this.player.dead && this.toggleInventory(),
-        swap: () => inPlay() && this.nextWeapon(),
+        swap: () => inPlay() && (this.breakOff() || this.nextWeapon()),
         emote: (id) => inPlay() && this.emote(id),
         chat: () => {
           if (!inPlay() || this.invUI.isOpen || this.hud.chatOpen) return;
@@ -775,6 +777,8 @@ export class Game {
     this.inv.add(makeItem('bandage'));
     this.inv.neck = this.makeTag();
     this.player.vitals = { health: 100, energy: 80, water: 80, stamina: MAX_STAMINA, bleeding: false };
+    this.player.boost = 0;
+    this.ready = null;
     this.avatar.clearWounds();
     this.weapons.validate();
     this.refreshQuick();
@@ -1893,7 +1897,7 @@ export class Game {
     this.loose = item;
     if (how === 'use') this.useItem(item);
     else this.openBox(item);
-    if (!this.use) this.settle();
+    if (!this.use && !this.ready) this.settle();
   }
 
   /** what was in the hands off the ground and is not used up: put away, or put down */
@@ -1906,22 +1910,76 @@ export class Game {
     this.inventoryChanged();
   }
 
-  private useItem(item: ItemInstance) {
+  /**
+   * An injector taken into the hand and not yet used. Its key (or Use, in the inventory) brings it out and a
+   * click uses it; the wheel, the other button, its own key again, a weapon's key or the inventory puts it away.
+   * `t` is how long it has been out: the click that chose Use in a menu is not the click that uses it.
+   */
+  private ready: { item: ItemInstance; t: number } | null = null;
+
+  private putAway() {
+    if (!this.ready) return;
+    this.ready = null;
+    this.weapons.endUse();
+    this.settle();
+  }
+
+  /**
+   * Whatever the hands are in the middle of is broken off, and nothing is lost by it: what was being eaten,
+   * drunk or put on is kept whole, an injector goes back where it was, a magazine is not counted out.
+   * (The wheel; on a phone, the weapon button.)
+   * @returns whether there was anything to break off
+   */
+  private breakOff(): boolean {
+    if (this.use) {
+      this.use = null;
+      this.weapons.endUse();
+      this.act('stop');
+      if (!this.player.dead) this.hud.note('Cancelled', 'info');
+      this.settle();
+      return true;
+    }
+    if (this.ready) {
+      this.putAway();
+      return true;
+    }
+    return this.weapons.abortReload();
+  }
+
+  /** @param now an injector already in the hand: the click that uses it */
+  private useItem(item: ItemInstance, now = false) {
     const def = ITEMS[item.id];
     if (!def.use || this.use || this.player.dead || this.weapons.working) return;
     if (def.look && performance.now() - this.glassDown < 150) return;
     const u = def.use;
+    // (an injector is in the hand already: its own key puts it away again, another thing takes its place)
+    if (this.ready && !now) {
+      const same = this.ready.item.id === item.id;
+      this.putAway();
+      if (same) return;
+    }
+    // (asked before it is taken out of anything: refused after, the radio was out of the crate and nowhere)
+    if (def.call && !this.openSky()) {
+      this.hud.note('No signal under a roof: take the radio out under open sky', 'warn');
+      return;
+    }
     const from = this.openStash?.container.has(item) ? this.openStash.container : null;
     if (from) {
       // take it out of the crate first, so the crate can be closed while we eat
       from.remove(item);
       this.syncOpenBox();
+      // (It is in the hands and nowhere else until it is used up: broken off, it goes into the pockets, as a
+      // thing used off the ground does. It was lost: out of the crate, and never put anywhere again.)
+      if (!def.look && !def.call) this.loose = item;
     }
-    // how the hands hold it while it is used: a smoke goes to the mouth, a grenade is worked with both
-    if (def.call && !this.openSky()) {
-      this.hud.note('No signal under a roof: take the radio out under open sky', 'warn');
+    if (u.hold && !now) {
+      this.toggleInventory(false);
+      this.glass = 0;
+      this.ready = { item, t: 0 };
+      this.weapons.beginUse(item.id, 'inject', u.time, true);
       return;
     }
+    // how the hands hold it while it is used: a smoke goes to the mouth, a grenade is worked with both
     const kind: UseKind = def.throw || def.call ? 'open' : def.look ? 'drink' : u.sound;
     const sound: TimedAction['sound'] = def.throw || def.look || def.call ? null : u.sound;
     this.glass = 0;
@@ -1949,6 +2007,11 @@ export class Game {
       if (u.energy) v.energy = THREE.MathUtils.clamp(v.energy + (u.energy > 0 ? Math.round(u.energy * hot) : u.energy), 0, 100);
       if (u.water) v.water = THREE.MathUtils.clamp(v.water + (u.water > 0 ? Math.round(u.water * hot) : u.water), 0, 100);
       if (u.health) v.health = Math.min(100, v.health + u.health);
+      if (u.stamina) v.stamina = Math.min(MAX_STAMINA, v.stamina + (MAX_STAMINA * u.stamina) / 100);
+      if (u.boost) {
+        this.player.boost = u.boost;
+        this.hud.note(`Adrenaline: nothing costs you breath for ${u.boost} seconds`, 'good');
+      }
       if (u.stopBleed && v.bleeding) {
         v.bleeding = false;
         this.hud.note('The bleeding has stopped', 'good');
@@ -2686,7 +2749,7 @@ export class Game {
 
   /** What to do about an open wound, in as few words as it takes: the key that holds a dressing, if there is one. */
   private bleedHint(): string {
-    if (this.use?.sound === 'bandage' || this.use?.sound === 'inject') return 'Treating the wound…';
+    if (this.use?.sound === 'bandage' || (this.use?.sound === 'inject' && !/Adrenaline/.test(this.use.label))) return 'Treating the wound…';
     const i = this.quick.findIndex((id) => !!id && !!ITEMS[id].use?.stopBleed && this.countOf(id) > 0);
     if (i >= 0) {
       const d = ITEMS[this.quick[i]!];
@@ -2857,7 +2920,27 @@ export class Game {
       });
     }
 
-    // timed item use (eat, drink, bandage, open a box): shown in the hands, RMB cancels
+    // an injector in the hand: a click uses it; the wheel, the other button, a weapon's key or the inventory puts it away
+    if (this.ready) {
+      const r = this.ready;
+      r.t += dt;
+      const kept = this.loose === r.item || this.inv.containers.some((c) => c.has(r.item));
+      if (p.dead || uiOpen || !!ride || !kept || input.wheel !== 0 || input.pressed('Mouse2') || HAND_KEYS.some((k) => input.pressed(k))) {
+        // (the wheel has done its work: it does not change the weapon as well)
+        input.wheel = 0;
+        this.putAway();
+      } else if (playing && !typing && r.t > 0.3 && input.pressed('Mouse0')) {
+        this.ready = null;
+        this.useItem(r.item, true);
+        // (it could not be begun after all: it is not left in the hand with nothing to say what it is doing there)
+        if (!this.use) {
+          this.weapons.endUse();
+          this.settle();
+        }
+      }
+    }
+
+    // timed item use (eat, drink, bandage, open a box): shown in the hands; the wheel or the other button breaks it off
     if (this.use) {
       const u = this.use;
       u.t += dt;
@@ -2872,12 +2955,9 @@ export class Game {
         u.soundT = 0;
         audio.ui(u.sound);
       }
-      if (p.dead || (input.pressed('Mouse2') && !uiOpen)) {
-        this.use = null;
-        this.weapons.endUse();
-        this.act('stop');
-        if (!p.dead) this.hud.note('Cancelled', 'info');
-        this.settle();
+      if (p.dead || ((input.pressed('Mouse2') || input.wheel !== 0) && !uiOpen)) {
+        input.wheel = 0;
+        this.breakOff();
       } else if (u.t >= u.dur) {
         this.use = null;
         this.weapons.endUse();
@@ -2889,7 +2969,7 @@ export class Game {
     // weapons + fov
     const fpLive = this.director.blend > 0.9;
     this.garage.frame(dt, now, physics.alpha, cam.position);
-    this.weapons.update(dt, input, cam, fpLive && !uiOpen && playing && !this.use && !typing && !this.glass && !this.wheelOn && !this.hold && !ride);
+    this.weapons.update(dt, input, cam, fpLive && !uiOpen && playing && !this.use && !this.ready && !typing && !this.glass && !this.wheelOn && !this.hold && !ride);
     this.grenades.update(dt);
     this.updateBarrels(dt);
     const kind = this.weapons.equippedItem ? ITEMS[this.weapons.equippedItem.id].weapon?.kind : undefined;
@@ -3080,7 +3160,8 @@ export class Game {
       bleed: v.bleeding && !p.dead ? this.bleedHint() : null,
       heading: !uiOpen ? heading : null,
       bearing: hasCompass,
-      progress: this.use ? { label: this.use.label, t: this.use.t / this.use.dur } : null,
+      progress: this.use ? { label: this.use.label, t: this.use.t / this.use.dur } : this.ready ? { label: `${ITEMS[this.ready.item.id].name}: ${this.touch ? 'fire to use it' : 'click to use it · scroll to put it away'}`, t: -1 } : null,
+      boost: p.boost,
       hotbar: this.hotbar(),
       fps: this.fps,
       ping: this.online ? this.net.ping : null,

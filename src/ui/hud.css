@@ -130,6 +130,7 @@
   margin-bottom: 5px;
 }
 .hud-progress-bar { height: 3px; background: rgba(255, 255, 255, 0.12); }
+.hud-progress.idle .hud-progress-bar { display: none; }
 .hud-progress-bar div { height: 100%; background: var(--accent); }
 
 .hud-compass {
@@ -289,6 +290,7 @@
 .hud-stamina div { height: 100%; background: rgba(233, 228, 216, 0.75); }
 /* out of breath: the bar has to fill to the mark before the next sprint */
 .hud-stamina.spent div { background: #c8553d; }
+.hud-stamina.boost div { background: #f0bd12; box-shadow: 0 0 8px rgba(240, 189, 18, 0.7); }
 .hud-stamina.spent::after { content: ''; position: absolute; left: 15%; top: -2px; width: 1px; height: 7px; background: rgba(233, 228, 216, 0.7); }
 
 .hud-hit.kill i { background: #ff5a44; }

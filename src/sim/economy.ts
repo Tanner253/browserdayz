@@ -131,6 +131,7 @@ export const TYPES: Record<string, TypeRule> = {
   // What stops bleeding is what a fight is lost for want of: twelve things on the whole map
   // was too few of it. More, sooner back, and most of it where it was kept: the clinic.
   bandage: { nominal: 20, min: 13, lifetime: 2400, restock: 240, usage: ['Village', 'Town', 'Military', 'Medic', 'Police', 'Hunting', 'Farm'], favour: { Medic: 6, Military: 2 }, gas: 4, bunker: 6, east: 12 },
+  stim: { nominal: 7, min: 4, lifetime: 3000, restock: 420, usage: ['Military', 'Medic', 'Police', 'Town'], favour: { Medic: 5, Military: 3 }, gas: 4, bunker: 5, east: 5 },
   firstaid: { nominal: 8, min: 4, lifetime: 3600, restock: 600, usage: ['Military', 'Medic', 'Town', 'Police'], favour: { Medic: 8 }, gas: 3, bunker: 5, east: 7 },
   // (what sets a broken leg and does nothing else: commoner than the kit, and where there are ladders and lofts to fall off)
   splint: { nominal: 12, min: 7, lifetime: 3600, restock: 420, usage: ['Medic', 'Village', 'Town', 'Farm', 'Hunting', 'Industrial', 'Police'], favour: { Medic: 5 }, gas: 2, bunker: 3, east: 5 },

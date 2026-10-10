@@ -26,6 +26,46 @@ const TRIGGER_GROUPS = groups(G_TRIGGER, 0xffff);
 const DOWN = { x: 0, y: -1, z: 0 };
 const UP = new THREE.Vector3(0, 1, 0);
 
+const repainted = new Map<string, THREE.Texture>();
+/**
+ * A model's colour picture with what is white on it painted another colour, and everything else as it was:
+ * one model, two things told apart by the part of it that is plain (the injector's barrel is white, its caps
+ * green, its tip red). A dye over the whole of it (`tint`) turns the caps and the tip too. Light and shade
+ * are kept: each white point is given the colour at its own brightness, so the dirt on it is still there.
+ */
+function whiteTo(src: THREE.Texture, colour: number): THREE.Texture {
+  const key = `${src.uuid}:${colour}`;
+  const had = repainted.get(key);
+  if (had) return had;
+  const img = src.image as (CanvasImageSource & { width: number; height: number }) | undefined;
+  const c = document.createElement('canvas');
+  const g = img && img.width ? c.getContext('2d', { willReadFrequently: true }) : null;
+  if (!img || !g) return src;
+  c.width = img.width;
+  c.height = img.height;
+  g.drawImage(img, 0, 0);
+  const px = g.getImageData(0, 0, c.width, c.height), d = px.data;
+  const to = new THREE.Color(colour).convertLinearToSRGB();
+  const step = (x: number, a: number, b: number) => THREE.MathUtils.smoothstep(x, a, b);
+  for (let i = 0; i < d.length; i += 4) {
+    const hi = Math.max(d[i], d[i + 1], d[i + 2]), lo = Math.min(d[i], d[i + 1], d[i + 2]);
+    // white: bright, and with next to no colour of its own
+    const w = step(hi, 118, 172) * (1 - step(hi ? (hi - lo) / hi : 0, 0.14, 0.3));
+    if (w <= 0) continue;
+    const k = (hi / 232) * 255;
+    d[i] += (Math.min(255, to.r * k) - d[i]) * w;
+    d[i + 1] += (Math.min(255, to.g * k) - d[i + 1]) * w;
+    d[i + 2] += (Math.min(255, to.b * k) - d[i + 2]) * w;
+  }
+  g.putImageData(px, 0, 0);
+  const out = src.clone();
+  // (its own picture: a clone shares the first one's)
+  out.source = new THREE.Source(c);
+  out.needsUpdate = true;
+  repainted.set(key, out);
+  return out;
+}
+
 /** stable 0..1 pseudo-random numbers from an item uid, so placement survives reloads */
 function hash01(s: string, salt: number) {
   let h = 2166136261 ^ salt;
@@ -79,6 +119,13 @@ export class ItemModels {
       parts = parts.map((p) => {
         const m = (p.material as THREE.MeshStandardMaterial).clone();
         m.color.multiply(dye);
+        return { ...p, material: m };
+      });
+    }
+    if (def.paint !== undefined) {
+      parts = parts.map((p) => {
+        const m = (p.material as THREE.MeshStandardMaterial).clone();
+        if (m.map) m.map = whiteTo(m.map, def.paint!);
         return { ...p, material: m };
       });
     }

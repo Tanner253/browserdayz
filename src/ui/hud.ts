@@ -877,6 +877,8 @@ export class HUD {
     vitals: Vitals;
     /** out of breath: no sprinting until the bar has come back a way */
     winded: boolean;
+    /** seconds of adrenaline left (0 = none) */
+    boost: number;
     prompt: string | null;
     /** where on screen the thing the prompt is about sits, as fractions of the screen (null = no marker) */
     mark: [number, number] | null;
@@ -980,8 +982,11 @@ export class HUD {
     if (s.bleed !== null) this.set('bleed', e.bleed.lastElementChild as HTMLElement, s.bleed, 'html');
     const reserve = (v.stamina / MAX_STAMINA) * 100;
     (e.stamina.firstElementChild as HTMLElement).style.width = `${reserve}%`;
-    this.toggle(e.stamina, 'show', reserve < 99.5);
+    this.toggle(e.stamina, 'show', reserve < 99.5 || s.boost > 0);
     this.toggle(e.stamina, 'spent', s.winded);
+    // (on adrenaline the bar is full and yellow, and runs down as the ten seconds do)
+    this.toggle(e.stamina, 'boost', s.boost > 0);
+    if (s.boost > 0) (e.stamina.firstElementChild as HTMLElement).style.width = `${Math.min(100, s.boost * 10)}%`;
     (e.arms.firstElementChild as HTMLElement).style.width = `${s.arms * 100}%`;
     this.toggle(e.arms, 'show', s.arms < 0.995);
     this.toggle(e.arms, 'spent', s.arms < 0.15);
@@ -1016,6 +1021,8 @@ export class HUD {
 
     if (s.progress) {
       this.toggle(e.progress, 'show', true);
+      // (nothing under way yet: words and no bar)
+      this.toggle(e.progress, 'idle', s.progress.t < 0);
       this.set('plabel', e.progress.firstElementChild as HTMLElement, s.progress.label);
       ((e.progress.lastElementChild as HTMLElement).firstElementChild as HTMLElement).style.width = `${Math.min(100, s.progress.t * 100)}%`;
     } else this.toggle(e.progress, 'show', false);
