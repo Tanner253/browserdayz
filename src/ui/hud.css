@@ -1480,10 +1480,10 @@ body.touch .hud-start, body.touch .rw, body.touch .inv-wrap, body.touch .inv-col
 .zone-warn em { font-style: normal; font-size: 12px; letter-spacing: 0.12em; text-transform: none; opacity: 0.85; }
 @keyframes zone-pulse { 50% { border-color: #ff9a8a; box-shadow: 0 0 60px rgba(255, 70, 50, 0.55); } }
 
-/* who is talking near (hold V): a name and a mark beside it, low on the left */
-.hud-voice { position: absolute; left: 22px; bottom: 150px; display: flex; flex-direction: column; gap: 4px; pointer-events: none; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink); text-shadow: 0 1px 3px #000; }
+/* who is talking near (hold V): a name and a mark beside it, half way up the left edge (the chat is below it) */
+.hud-voice { position: absolute; left: 22px; top: 48%; display: flex; flex-direction: column; gap: 4px; pointer-events: none; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink); text-shadow: 0 1px 3px #000; }
 .hud-voice div { display: flex; align-items: center; gap: 8px; padding: 3px 10px 3px 8px; background: rgba(8, 10, 9, 0.55); border-left: 2px solid #7fd4a0; }
 .hud-voice div::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: #7fd4a0; box-shadow: 0 0 6px #7fd4a0; }
 .hud-voice div.me { border-left-color: var(--accent); }
 .hud-voice div.me::before { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
-body.touch .hud-voice { bottom: 250px; }
+body.touch .hud-voice { top: 34%; }

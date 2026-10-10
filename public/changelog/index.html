@@ -15,7 +15,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
     <!--
       The changelog: one entry for each update, newest first. To add one, copy an <article class="entry"> to the
-      top of <main> and put its pictures and films in media/. A film is a <video data-src> with a poster: it is
+      top of <main> and put its pictures and films in media/. Every entry has them: a picture or a film of each thing it
+      speaks of that can be seen, and a card (marketing/*.html, scripts/card.mjs) for what cannot. A film is cut small
+      out of a finished trailer by scripts/clip.mjs. The roadmap at the top is marketing/roadmap.html: tick there what ships. A film is a <video data-src> with a poster: it is
       fetched and played when it comes into view, and stopped when it leaves. Everything said here is of what
       shipped; the films in the older entries are cut from the trailers made at the time, and show the game as it
       was then.
@@ -92,6 +94,11 @@
         <h1>Changelog</h1>
         <p>Every update to the Zone, newest first, with pictures and film of what changed. The films in the older entries were made at the time and show the game as it was then.</p>
         <div class="jump">
+          <a href="#roadmap">Roadmap</a>
+          <a href="#voices">Voices, water, lying low</a>
+          <a href="#fair-play">Tags, and fair play</a>
+          <a href="#road-over">The road over</a>
+          <a href="#kamenka">The map grows: Kamenka</a>
           <a href="#second-pass">Reloads you can see, thinner gas, more guns</a>
           <a href="#hands-arms-beds">Hands, arms and beds</a>
           <a href="#bunker-opens">The bunker opens up</a>
@@ -105,11 +112,49 @@
         </div>
       </section>
 
-      <article class="entry" id="fair-play">
+      <section class="entry" id="roadmap">
+        <div class="when"><time datetime="2026-10-10">Roadmap</time><span class="tag">Phase 3</span></div>
+        <div>
+          <h2>Where the Zone is going</h2>
+          <p class="lead">Two phases are done and the third is under way. What is ticked is in the game today. The rest is the plan, and plans change.</p>
+          <div class="media">
+            <figure class="wide"><img src="/changelog/media/roadmap.jpg" alt="The roadmap in five phases. Phase 1, The Zone opens, complete: the first valley, loot, PvP gunplay, dog tags, automatic payouts, supply drops, the call wheel, leaderboard, queue, phones. Phase 2, Survival, complete: the infected, the gas zone, day and night, Bunker 17, the jeep, campfires, broken legs, melee, new guns and sights, the soldier body. Phase 3, A living world, in progress, ten of fourteen: Kamenka and its road, the trader, body armour, helicopter crashes, the adrenaline injector, wells and bottles, lying prone, proximity voice, closets and the server's anti-cheat are in; kicks and bans, a second vehicle, attics and basements and loot by place are next. Phase 4, Settling in, planned: base building, locks, a shovel to bury a stash, tents, animals, hunting, fishing, crafting, weather. Phase 5, And more, planned: raiding, sickness, guns that wear, suppressors and night vision, cars that break down, more vehicles, more map, events." /><figcaption><b>Five phases.</b> The first two are every entry on this page from the bottom up to the bunker. The third is the three newest and what comes next. The fourth and fifth are what is meant to follow: everything DayZ does, and then what it does not.</figcaption></figure>
+          </div>
+        </div>
+      </section>
+
+      <article class="entry" id="voices">
         <div class="when"><time datetime="2026-10-10">10 Oct 2026</time><span class="tag">Latest</span></div>
+        <div>
+          <h2>Voices, water, and lying low</h2>
+          <p class="lead">Hold a key and whoever is near hears you. There is a well in each town, and a bottle holds more than one drink. And you can lie down in the grass.</p>
+          <div class="media">
+            <figure class="wide"><img loading="lazy" src="/changelog/media/voice.jpg" alt="How loud a voice is heard by distance: all of it at 2 m, 72 per cent at 10 m, 42 at 20 m, 19 at 30 m, nothing at 45 m" /><figcaption><b>Proximity voice.</b> Hold V to talk. Whoever is within 45 m hears you from where you stand, fainter with every step away. The browser asks for the microphone the first time, and nothing is sent unless the key is held.</figcaption></figure>
+            <figure><img loading="lazy" src="/changelog/media/well.jpg" alt="A brick well under a tiled roof, with a bucket on a rope and water in it" /><figcaption><b>Wells.</b> One in the village and one in Kamenka, marked on the map. Drink your fill at one and every bottle you carry is filled.</figcaption></figure>
+            <figure><img loading="lazy" src="/changelog/media/prone.jpg" alt="A player lying in the grass on a slope with a pistol, and another with a rifle" /><figcaption><b>Lying down (Z).</b> Low, slow, and steady: a gun sways under two fifths of what it does standing. Everybody sees you lying, and what of you can be hit lies with you.</figcaption></figure>
+            <figure><img loading="lazy" src="/changelog/media/sit-down.jpg" alt="Players sat on the ground with their legs out in front of them" /><figcaption><b>Sit down.</b> On the wheel (T), for a rest by a fire or a wait for somebody.</figcaption></figure>
+            <figure><img loading="lazy" src="/changelog/media/closet.jpg" alt="A closet in the corner of a bedroom with its door standing open" /><figcaption><b>Closets.</b> In the bedroom of the small house and of the brick house: a door, and room for one to stand inside with it shut.</figcaption></figure>
+            <figure class="wide"><img loading="lazy" src="/changelog/media/jeep-headlights.jpg" alt="The jeep on the road at night with both headlamps lit" /><figcaption><b>Headlights.</b> A jeep's lamps are on while it is driven, and after dark they light the road ahead of it.</figcaption></figure>
+          </div>
+          <ul>
+            <li><b>A bottle holds more than one drink</b>: the jug four, the flask three, the thermos two. A line along the foot of it in your pack shows what is left.</li>
+            <li><b>Hunger and thirst tell before they kill.</b> Under a quarter you are told, your breath comes back slower and, hungry, your aim shakes. Under a tenth it is worse, and parched you sprint slower.</li>
+            <li><b>The pack</b> has a bar over each pocket and bag: its name, how full it is, and a click folds it away.</li>
+            <li><b>A call from the wheel is said in words</b>, in the browser's own speaking voice.</li>
+            <li><b>The made-up voices are gone</b>, of the wheel and of the infected. The infected have their recordings and nothing else.</li>
+            <li><b>Lying down, you get up</b> with Z or the space bar, and to a crouch with C. There has to be room over you.</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="entry" id="fair-play">
+        <div class="when"><time datetime="2026-10-10">10 Oct 2026</time></div>
         <div>
           <h2>Tags, and fair play</h2>
           <p class="lead">Two holes in the rule about new arrivals and their tags are shut, and the server asks more questions of what each game tells it.</p>
+          <div class="media">
+            <figure class="wide"><img loading="lazy" src="/changelog/media/fair-play.jpg" alt="Six things the server checks: how fast a player moves, what is between a shot and its mark, how much damage a body takes, how near a thing is taken from, where a gun came from, and the five minutes before a tag of your own is left" /><figcaption><b>What the server checks.</b> For now it only writes down what it would refuse.</figcaption></figure>
+          </div>
           <ul>
             <li><b>Nobody alive less than five minutes leaves a tag of their own</b>: not the one round their neck, and not an older one of theirs that they took back off their last body. What they took off other people is on them as before.</li>
             <li><b>A thing lying in the world is taken from beside it.</b></li>
@@ -125,6 +170,10 @@
         <div>
           <h2>The road over, and a fall is a fall</h2>
           <p class="lead">The hill between the old valley and Kamenka is cut down along the road, so the road can be driven. There is a second injector. And nobody dies of a fall they did not take.</p>
+          <div class="media">
+            <figure class="wide"><span class="film">Film</span><video data-src="/changelog/media/teaser-kamenka.mp4" poster="/changelog/media/teaser-kamenka.jpg" muted loop playsinline preload="none"></video><figcaption><b>The new ground in fifteen seconds.</b> The road over, Kamenka, the trader, the armour, a helicopter down in a meadow.</figcaption></figure>
+            <figure class="wide"><img loading="lazy" src="/changelog/media/pass-road.jpg" alt="The road climbing through a cutting between two wooded hills" /><figcaption><b>The road over.</b> Through a cutting, with a wood on its sides: 23 in a hundred where it was 105.</figcaption></figure>
+          </div>
           <ul>
             <li><b>The road to Kamenka can be driven.</b> It climbs 23 in a hundred from the floor of the old valley to the town, through a cutting with a wood on its sides. It was a wall: 105 in a hundred at the worst of it.</li>
             <li><b>Adrenaline Injector.</b> The injector with a yellow barrel: your stamina is full, and for ten seconds nothing you do costs any.</li>

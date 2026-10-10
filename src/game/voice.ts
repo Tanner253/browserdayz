@@ -50,7 +50,7 @@ export class Voice {
    * @returns what went wrong, in words for the player, or null
    */
   async talk(tone = 0): Promise<string | null> {
-    if (!this.supported) return 'This browser cannot send voice (it has no audio coder): Chrome, Edge and Firefox can';
+    if (!this.supported) return 'This browser cannot send or hear voice (it has no audio coder): an up-to-date Chrome or Edge can';
     if (this.talking) return null;
     this.talking = true;
     try {
