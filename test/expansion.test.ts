@@ -3,7 +3,7 @@
 // `npx tsx test/expansion.test.ts`.
 
 import assert from 'node:assert/strict';
-import { BUNKER_AT, CELL, EXPANSION as E, PLAY_AREAS, PLAY_RADIUS, WORLD_RES, WORLD_SIZE, generateWorld, heightAt, inPlay, playOutline, slopeAt, BUILDING_FOOTPRINT } from '../src/world/worldgen';
+import { BUNKER_AT, CELL, TRADE_AT, EXPANSION as E, PLAY_AREAS, PLAY_RADIUS, WORLD_RES, WORLD_SIZE, generateWorld, heightAt, inPlay, playOutline, slopeAt, BUILDING_FOOTPRINT } from '../src/world/worldgen';
 import { buildWorldData } from '../server/world';
 import { GAS, gasDepth, gasZone } from '../src/sim/gas';
 import { INFECTED, openGround } from '../src/sim/infected';
@@ -23,9 +23,12 @@ const ok = (name: string, fn: () => void) => {
 // a bed a hand's width higher, on the mattress each bed was given. It was 545356472.)
 // (And on 2026-10-10 again, 1223262982 before it: the same places in the same order, those on a water
 // barrel 3 cm lower, on its lid and not at the height of its rim.)
+// (And the ground and the trees once more on 2026-10-10, with the trading post's meadow left out as well:
+// counted on the map BEFORE the post was built (234302 cells, 1986740555; 11269 trees, 3538601034 with it in),
+// and the same four figures came off the map after.)
 // (The ground and the trees were counted again on 2026-10-09, from the same map, with the
 // bunker's hollow left out of the count as the works' is: taken before the bunker was dug.)
-const WAS = { cells: 234302, heights: 1986740555, buildings: 72, buildingsHash: 2448790248, lastId: 'tower_71', spawns: 2697513077, trees: 11269, treesHash: 3538601034, lootPoints: 675, lootHash: 113905251, jeeps: 8, jeepsHash: 380833839, fires: 6 };
+const WAS = { cells: 229537, heights: 61161899, buildings: 72, buildingsHash: 2448790248, lastId: 'tower_71', spawns: 2697513077, trees: 11230, treesHash: 3386541334, lootPoints: 675, lootHash: 113905251, jeeps: 8, jeepsHash: 380833839, fires: 6 };
 const hash = (parts: number[]) => {
   let h = 2166136261 >>> 0;
   for (const v of parts) {
@@ -44,6 +47,8 @@ const ground = (x: number, z: number) => heightAt(world.heights, x, z);
 /** the only ground the expansion may have touched: the cirque itself, and a strip along the track up to it from the checkpoint */
 const touched = (x: number, z: number) => {
   if (Math.hypot(x - E.x, z - E.z) < 160) return true;
+  // (and the meadow the trading post was built in, later: 78 m round it)
+  if (Math.hypot(x - TRADE_AT.x, z - TRADE_AT.z) < 78) return true;
   // (and the bunker's hollow, on the far side of the map)
   if (Math.hypot(x - BUNKER_AT.x, z - BUNKER_AT.z) < 96) return true;
   const dx = E.x - camp.x, dz = E.z - camp.z, l2 = dx * dx + dz * dz;
@@ -53,7 +58,8 @@ const touched = (x: number, z: number) => {
 const inl = Math.hypot(camp.x - E.x, camp.z - E.z);
 const ux = (camp.x - E.x) / inl, uz = (camp.z - E.z) / inl;
 const works = world.sites.find((s) => s.kind === 'works')!;
-const added = world.buildings.slice(WAS.buildings);
+// (what was built with the works: not the trading post's two, which came later and stand in the old map's meadow)
+const added = world.buildings.slice(WAS.buildings).filter((b) => Math.hypot(b.x - TRADE_AT.x, b.z - TRADE_AT.z) > 78);
 
 ok('the map as it was is still exactly there: its ground, its buildings, its starts, its trees, its loot points, its jeeps', () => {
   const hs: number[] = [];

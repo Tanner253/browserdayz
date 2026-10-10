@@ -145,7 +145,8 @@ export interface Home {
 }
 
 // (the outlying places are where somebody new finds a first weapon: one or two there, the crowd in the village)
-const ABOUT: Record<string, number> = { hamlet: 4, depot: 4, post: 3, yard: 2, farm: 2, lodge: 1, dacha: 1, works: 0, bunker: 0 };
+// (none at the trading post: it is the one place they keep away from)
+const ABOUT: Record<string, number> = { market: 0, hamlet: 4, depot: 4, post: 3, yard: 2, farm: 2, lodge: 1, dacha: 1, works: 0, bunker: 0 };
 /** how many keep to the works (said apart from the small places: it comes high in the list, so it is never the one that goes short) */
 // (half as many again as the six there were: the gas is where the best of everything is kept, and it was thinly guarded)
 const AT_WORKS = 9;

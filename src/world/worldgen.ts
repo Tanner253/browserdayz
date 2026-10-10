@@ -107,7 +107,13 @@ export interface BuildingPlot {
 }
 
 /** what stands at an outlying place */
-export type SiteKind = 'lodge' | 'farm' | 'post' | 'yard' | 'dacha' | 'hamlet' | 'depot' | 'works' | 'bunker';
+export type SiteKind = 'lodge' | 'farm' | 'post' | 'yard' | 'dacha' | 'hamlet' | 'depot' | 'market' | 'works' | 'bunker';
+/**
+ * Where the trading post stands: a meadow east of the village, 175 m out of it, a hundred from the road and
+ * further than that from every other place. (Said, not looked for: the ground round it is counted out of the
+ * check that nothing else on the map has moved.)
+ */
+export const TRADE_AT = { x: 200, z: -40 };
 
 /** A small place away from the village: a couple of buildings in a clearing. */
 export interface Site {
@@ -281,9 +287,11 @@ export function generateWorld(seed = WORLD_SEED): World {
   // every start, and a few more lie between there and the village.
   const MID = { x: VILLAGE.x * 0.5, z: VILLAGE.z * 0.5 };
   const sites: Site[] = [];
-  const place = (name: string, kind: SiteKind, angle: number, radii: number[], offRoad = 48, later = false) => {
+  /** @param at exactly here, and nowhere looked for */
+  const place = (name: string, kind: SiteKind, angle: number, radii: number[], offRoad = 48, later = false, at?: { x: number; z: number }) => {
     // the most level spot near where it is wanted, clear of the road and of its neighbours
-    let best: { x: number; z: number; cost: number } | null = null;
+    let best: { x: number; z: number; cost: number } | null = at ? { x: at.x, z: at.z, cost: 0 } : null;
+    if (at) radii = [];
     for (const r of radii) {
       for (const da of [0, -0.05, 0.05, -0.1, 0.1]) {
         const x = MID.x + Math.cos(angle + da) * r, z = MID.z + Math.sin(angle + da) * r;
@@ -491,6 +499,8 @@ export function generateWorld(seed = WORLD_SEED): World {
     hamlet: [['store', 0, 0, 0], ['house_small', -14.5, 0.5, 0.12], ['house_brick', 16, 0, -0.1], ['barn', -4, -17, 0.2], ['shed', 13, -13.5, -0.4]],
     // the army's: a barracks, a workshop for its vehicles, a post on the way in
     depot: [['barracks', 0, -3, 0], ['garage', -16.5, -1, 0.22], ['guardpost', 13.5, 3.5, -0.3], ['shed', 12.5, -12.5, -0.5]],
+    // the trading post: the trader's shop, and his store shed behind it
+    market: [['store', 0, 0, 0], ['shed', 13.5, -12, -0.4]],
     // (laid out where it is made, at the end: see the first expansion)
     works: [],
     // (nothing stands on it that is a building of the map's: what is there is made in world/bunker.ts)
@@ -773,7 +783,7 @@ export function generateWorld(seed = WORLD_SEED): World {
     place('Sosnovka', 'hamlet', 3.93, [230, 215, 245, 200, 260], 78, true);
     place('Motor Pool', 'depot', 0.85, [205, 190, 220, 235, 175], 78, true);
     const laterSites = sites.slice(firstSite);
-    for (const st of laterSites) {
+    const lay = (st: (typeof sites)[number]) => {
       const target = before[cell(st.x, st.z)];
       const R = 60;
       for (let iz = Math.max(0, Math.floor((st.z - R + half) / CELL)); iz <= Math.min(N - 1, Math.ceil((st.z + R + half) / CELL)); iz++) {
@@ -790,9 +800,10 @@ export function generateWorld(seed = WORLD_SEED): World {
       }
       const c = Math.cos(st.rot), sn = Math.sin(st.rot);
       LAYOUT[st.kind].forEach(([type, right, fwd, turn], i) => {
-        addLater(type, st.x + right * c + fwd * sn, st.z - right * sn + fwd * c, st.rot + turn, i === 0 ? (st.kind === 'depot' ? 2 : 1) : 0, 2.5);
+        addLater(type, st.x + right * c + fwd * sn, st.z - right * sn + fwd * c, st.rot + turn, i === 0 ? (st.kind === 'depot' ? 2 : st.kind === 'market' ? 0 : 1) : 0, 2.5);
       });
-    }
+    };
+    for (const st of laterSites) lay(st);
     // Later still: houses of two floors. (Whatever is added goes here, after everything above:
     // each building is numbered by where it comes in the list, and what is kept between
     // restarts goes by those numbers.)
@@ -814,6 +825,16 @@ export function generateWorld(seed = WORLD_SEED): World {
       const c = Math.cos(st.rot), sn = Math.sin(st.rot);
       for (const [right, fwd] of [[21, 12], [-22, 11], [20, -16], [-21, -15], [0, 24]]) {
         if (addLater('tower', st.x + right * c + fwd * sn, st.z - right * sn + fwd * c, st.rot + Math.PI, 1, 2)) break;
+      }
+    }
+    // And later again, the trading post, out on its own in the east meadow (see src/sim/trade.ts). It comes
+    // after every building there was, so that none of them is renumbered.
+    {
+      const first = sites.length;
+      place('Trading Post', 'market', 0, [], 0, true, TRADE_AT);
+      for (const st of sites.slice(first)) {
+        lay(st);
+        laterSites.push(st);
       }
     }
     const added = buildings.slice(firstLater);

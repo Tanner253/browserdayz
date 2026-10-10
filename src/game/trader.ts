@@ -1,4 +1,4 @@
-// The traders as they are seen: a body behind the counter of every shop (see src/sim/trade.ts
+// The trader as he is seen: a body behind the counter of the shop at the trading post (see src/sim/trade.ts
 // for what he pays and asks). The same on everybody's screen without a word passing between
 // them: where a shop stands is the map's, and he stands in it.
 
@@ -32,8 +32,10 @@ export class Traders {
   private stands: Stand[] = [];
 
   constructor(world: World) {
+    // (not in the shops of the village and the hamlet: at the trading post, which is his own place)
+    const posts = world.sites.filter((st) => st.kind === 'market');
     for (const b of world.buildings) {
-      if (b.type !== 'store') continue;
+      if (b.type !== 'store' || !posts.some((st) => Math.hypot(st.x - b.x, st.z - b.z) < 40)) continue;
       const c = Math.cos(b.rot), s = Math.sin(b.rot);
       const yaw = b.rot + Math.PI;
       this.stands.push({ pos: new THREE.Vector3(b.x + BEHIND.x * c + BEHIND.z * s, b.floorY, b.z - BEHIND.x * s + BEHIND.z * c), yaw, now: yaw, body: null });

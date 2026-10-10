@@ -993,6 +993,8 @@
 .mm-spot.k-spawn { width: 16px; height: 16px; margin: -8px 0 0 -8px; }
 .mm-spot.k-spawn::before { width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; background: var(--ink); transform: none; }
 .mm-spot.k-spawn:hover::before, .mm-spot.k-spawn.on::before { transform: scale(1.7); }
+.mm-spot.k-trader::before { width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: #7fd4a0; box-shadow: 0 0 0 2px rgba(8, 10, 9, 0.9), inset 0 0 0 3px #7fd4a0, inset 0 0 0 5px #17402a; transform: none; }
+.mm-spot.k-trader:hover::before, .mm-spot.k-trader.on::before { transform: scale(1.4); }
 .mm-spot.k-army::before { background: #b9a26a; transform: none; }
 .mm-spot.k-army:hover::before, .mm-spot.k-army.on::before { transform: scale(1.45); }
 .mm-spot.k-police::before { width: 12px; height: 12px; margin: -6px 0 0 -6px; background: #6f9bd6; transform: none; }

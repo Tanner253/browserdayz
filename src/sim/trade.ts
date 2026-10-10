@@ -1,4 +1,4 @@
-// The trader. A man stands behind the counter of each shop on the map. He buys what is
+// The trader. A man stands behind the counter of the shop at the trading post, out east of the village. He buys what is
 // brought to him and sells what a body needs to go on with: dressings, food, rounds, a light,
 // a mask. Nothing changes hands but credit in his book: what he pays is written down, and
 // what he sells is paid for out of it.

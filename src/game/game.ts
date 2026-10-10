@@ -95,7 +95,7 @@ interface TimedAction {
 }
 
 /** bump when the map's loot points change: spawned loot from older saves is re-rolled */
-const LOOT_REV = 16;
+const LOOT_REV = 17;
 const QUICK_KEYS = ['Digit5', 'Digit6', 'Digit7', 'Digit8'];
 /** what can be held, in the order of the keys 1 to 4 */
 const HAND_SLOTS = ['primary', 'secondary', 'holster', 'melee'] as const;
@@ -550,6 +550,7 @@ export class Game {
         dacha: ['a dacha', 'A brick house and a shed. A weapon is always left here.'],
         hamlet: ['a hamlet', 'A shop between houses, a barn behind, a fire ring to rest by.'],
         depot: ['an army depot', 'A barracks, a workshop and a watchtower: rifles and kit.'],
+        market: ['the trading post', 'A trader behind the counter: he buys what you bring, sells supplies, and has paid work every day.'],
         works: ['', ''],
         bunker: ['', ''],
       };
@@ -557,7 +558,7 @@ export class Game {
         const site = world.sites.find((st) => st.name === q.name);
         if (site?.kind === 'bunker') spots.push({ x: q.x, z: q.z, name: q.name, tip: 'Under the ground, in the dark: a dozen rooms off two passages. Its door opens to a keycard, and the keycards are in the gas. The shotgun is kept here, and nowhere else.', kind: 'army', label: true });
         else if (q.name === GAS.place) spots.push({ x: q.x, z: q.z, name: q.name, tip: 'Under gas: you need a gas mask on to breathe here. The richest place on the map: rifles, ammunition, helmets, plate carriers and scopes.', kind: 'gas', label: true });
-        else if (site) spots.push({ x: q.x, z: q.z, name: q.name, tip: SITE[site.kind][1], kind: site.kind === 'depot' || site.kind === 'post' ? 'army' : 'site' });
+        else if (site) spots.push({ x: q.x, z: q.z, name: q.name, tip: SITE[site.kind][1], kind: site.kind === 'market' ? 'trader' : site.kind === 'depot' || site.kind === 'post' ? 'army' : 'site' });
         else if (/checkpoint/i.test(q.name)) spots.push({ x: q.x, z: q.z, name: q.name, tip: 'Guard posts, a barracks and a watchtower: rifles, plate carriers, grenades. The track to the works starts here.', kind: 'army', label: true });
         else spots.push({ x: q.x, z: q.z, name: q.name, tip: 'A cabin in the hills, with a fire ring to rest by. A weapon is always left here.', kind: 'site' });
       }
@@ -566,13 +567,14 @@ export class Game {
       for (const b of world.buildings.filter(inTown)) {
         if (b.type === 'police') spots.push({ x: b.x, z: b.z, name: 'Police station', tip: 'More guns than anywhere else. Gas masks are kept here, and the 9 mm suppressor.', kind: 'police' });
         else if (b.type === 'clinic') spots.push({ x: b.x, z: b.z, name: 'Clinic', tip: 'Injectors, first aid kits, and tape to splint a broken leg.', kind: 'clinic' });
-        else if (b.type === 'store') spots.push({ x: b.x, z: b.z, name: 'Shop', tip: 'A trader behind the counter: he buys what you bring and sells supplies.', kind: 'shop' });
+        else if (b.type === 'store') spots.push({ x: b.x, z: b.z, name: 'Shop', tip: 'Food and drink.', kind: 'shop' });
       }
       this.hud.setMenuMap(this.minimap.poster(), WORLD_SIZE, spots, atmo.gas);
     }
     this.menu = new MenuScenes({ world, atmo, scene: r.scene, effects: this.effects, held: (id, mods) => this.makeHeld(id, mods), wear: (body, ids) => this.wear(body, ids), filmReady: () => this.hud.filmReady() });
     void this.menu.load();
     this.traders = new Traders(world);
+    this.minimap.setTraders(this.traders.places);
     void this.traders.load(r.scene, atmo, (body, ids) => this.wear(body, ids));
     this.shop = new ShopUI({
       credit: () => this.credit,

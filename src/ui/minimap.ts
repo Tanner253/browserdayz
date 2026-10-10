@@ -27,6 +27,7 @@ export class Minimap {
   private marked = -1e9;
   /** supply drops standing in the world */
   private drops: { x: number; z: number }[] = [];
+  private traders: { x: number; z: number }[] = [];
   /** jeeps standing empty */
   private jeeps: { x: number; z: number }[] = [];
   private jeepKey = '';
@@ -169,6 +170,12 @@ export class Minimap {
     this.last.x = 1e9;
   }
 
+  /** Where a trader stands: a coin on the map, always. */
+  setTraders(at: { x: number; z: number }[]) {
+    this.traders = at;
+    this.last.x = 1e9;
+  }
+
   /** Supply drops, marked for as long as they stand. */
   setDrops(at: { x: number; z: number }[]) {
     this.drops = at;
@@ -253,6 +260,24 @@ export class Minimap {
       g.arc(qx - h * 0.85, qz + h * 0.85, h * 0.45, 0, Math.PI * 2);
       g.arc(qx + h * 0.85, qz + h * 0.85, h * 0.45, 0, Math.PI * 2);
       g.fill();
+    }
+    // the trader: a coin, where he stands
+    for (const t of this.traders) {
+      const qx = (t.x - cx + span / 2) * k, qz = (t.z - cz + span / 2) * k;
+      if (qx < 0 || qz < 0 || qx > W || qz > W) continue;
+      const r = this.big ? W / 95 : W / 22;
+      g.beginPath();
+      g.arc(qx, qz, r, 0, Math.PI * 2);
+      g.fillStyle = '#7fd4a0';
+      g.fill();
+      g.lineWidth = Math.max(1.5, r * 0.3);
+      g.strokeStyle = 'rgba(0, 0, 0, 0.9)';
+      g.stroke();
+      g.beginPath();
+      g.arc(qx, qz, r * 0.45, 0, Math.PI * 2);
+      g.lineWidth = Math.max(1, r * 0.24);
+      g.strokeStyle = '#17402a';
+      g.stroke();
     }
     // supply drops: a crate, there as long as the drop is; in the corner view one off the edge sits on the rim
     for (const d of this.drops) {

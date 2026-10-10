@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { ITEMS, makeItem } from '../src/sim/items';
 import { STOCK, asks, pays, worth } from '../src/sim/trade';
 import { generateWorld } from '../src/world/worldgen';
+import { buildWorldData } from '../server/world';
 import { bookFor, jobsFor, progress } from '../src/sim/jobs';
 
 let n = 0;
@@ -46,9 +47,15 @@ ok('a gun is paid for with what is fitted to it', () => {
   assert.equal(pays(dressed), pays(bare) + worth('red_dot') + worth('suppressor_9'));
 });
 
-ok('there is a shop on the map for him to stand in', () => {
+ok('he has a place of his own, out of the towns, and nothing lies about in it for the taking', () => {
   const world = generateWorld();
-  assert.ok(world.buildings.filter((b) => b.type === 'store').length >= 2);
+  const post = world.sites.find((st) => st.kind === 'market');
+  assert.ok(post, 'there is no trading post');
+  assert.ok(world.buildings.some((b) => b.type === 'store' && Math.hypot(b.x - post.x, b.z - post.z) < 40), 'no shop stands at it');
+  // (well away from every other place on the map)
+  for (const p of world.pois) if (p.name !== post.name) assert.ok(Math.hypot(p.x - post.x, p.z - post.z) > 120, `${p.name} is on top of it`);
+  const data = buildWorldData(process.cwd());
+  assert.equal(data.lootPoints.filter((p: { x: number; z: number }) => Math.hypot(p.x - post.x, p.z - post.z) < 40).length, 0, 'something lies about at the trading post');
 });
 
 ok('the day has three jobs, the same whoever asks, of real things, and they pay better than the counter', () => {

@@ -31,7 +31,7 @@ export interface MenuSpot {
   z: number;
   name: string;
   tip: string;
-  kind: 'town' | 'police' | 'clinic' | 'shop' | 'army' | 'site' | 'gas' | 'spawn';
+  kind: 'town' | 'police' | 'clinic' | 'shop' | 'trader' | 'army' | 'site' | 'gas' | 'spawn';
   /** its name is always shown, not only when pointed at */
   label?: boolean;
 }

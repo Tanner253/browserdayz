@@ -863,6 +863,9 @@ export class Buildings {
       yard: [['wooden_crate_01', -4, 8], ['wooden_crate_01', -5.4, 8.6], ['wooden_crate_01', 5, 9], ['Barrel_01', 7, 8], ['barrel_03', 7.9, 8.9], ['old_tyre', 2, 11], ['dry_branches_medium_01', -9, 11]],
       dacha: [['covered_car', 9, -6], ['wooden_crate_01', -7, 5], ['metal_trash_can@0', -6.2, 3.4], ['trashbag', -8, 3]],
       hamlet: [['wooden_crate_01', -6.5, 6], ['wooden_crate_01', -7.6, 6.8], ['metal_trash_can@1', 6.5, 5.2], ['trashbag', 7.6, 5.6], ['old_tyre', 3, 8.5], ['covered_car', 8.5, 9.5], ['stone_fire_pit', -3, -8], ['Barrel_01', -11, -14]],
+      // the trading post: what he has not yet got indoors, a car under its sheet, and the way in marked off
+      // (no crate that can be searched, and no barrel with something left on its lid: nothing here is for the taking)
+      market: [['cardboard_box_01', -5, 6], ['cardboard_box_01', -6.1, 6.8], ['Barrel_01', 6.5, 5.5], ['Barrel_01', 7.7, 6.3], ['covered_car', -12.5, -3], ['concrete_road_barrier', -4, 12], ['concrete_road_barrier', 4, 12.6], ['old_tyre', 9.5, 8.5], ['trashbag', 8.6, -4]],
       depot: [['concrete_road_barrier', -5, 11.5], ['concrete_road_barrier', 0, 12.5], ['concrete_road_barrier', 5, 11.5], ['weapons_case', 5.5, 3.6], ['weapons_case', 6.7, 2], ['Barrel_01', -8, 5.5], ['Barrel_01', -8.9, 6.3], ['old_tyre', -12.5, 7.5], ['covered_car', -4, 8]],
       // The works (forward is the way in, the track coming up the middle of the yard). Blocks
       // across the gate with a lorry's width left between them; drums wherever drums were
@@ -1258,7 +1261,9 @@ export class Buildings {
         });
       }
     };
-    stock(bp.furniture, bp.loot, 0);
+    // (at the trading post nothing is left lying for whoever walks in: what is there is the trader's, and is bought)
+    const his = this.world.sites.some((st) => st.kind === 'market' && Math.hypot(st.x - plot.x, st.z - plot.z) < 40);
+    stock(bp.furniture, his ? [] : bp.loot, 0);
     if (bp.upper) stock(bp.upper.furniture, bp.upper.loot, h + SLAB);
 
     // where a weapon is always to be found: on the floor first (anything fits there)
