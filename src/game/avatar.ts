@@ -10,7 +10,7 @@
 import * as THREE from 'three';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import type { Atmosphere } from '../world/atmosphere';
-import { bent, type Grips, type HandGrip } from './arms';
+import { type Curl, bent, type Grips, type HandGrip } from './arms';
 import { BEARD, HAIR_STYLES, MAX_WOUNDS, loadCharacter, lookFor, lookPatch, lookUniforms, setLookUniforms, stainPatch, suitPatch, type BodyFile, type Look, type LookUniforms } from './look';
 import type { Emote } from '../sim/emotes';
 import { INFECTED } from '../sim/infected';
@@ -157,7 +157,10 @@ export const POSE = {
     // went through the chest to get to it. In front of the middle of the body, at arm's length less a bend.)
     pistol: {
       ready: { p: [0.02, -0.13, -0.4], r: [-0.25, 0, 0] },
-      aim: { p: [0.035, 0.115, -0.44], r: [0, 0, 0] },
+      // (At the eye it was 44 cm out: 6 cm further than the gun hand can reach and 10 further than the other. The
+      // hands stopped short of it, behind its grip, wherever on it they were told to hold, and the pistol stood in
+      // front of the fists that were meant to be round it. It is within reach, with a bend left in the elbows.)
+      aim: { p: [0.035, 0.115, -0.39], r: [0, 0, 0] },
       carry: { p: [0.03, -0.26, -0.37], r: [-0.65, 0, 0] },
     } as Stances,
     /** the point the weapon hangs from, measured from midway between the shoulder joints: [up, back] */
@@ -372,7 +375,7 @@ export class Avatar {
   private heldPivot = new THREE.Group();
   private held: { obj: THREE.Object3D; grips: Grips; long: boolean; base: THREE.Quaternion } | null = null;
   /** a one-handed weapon in the right fist */
-  private inHand: { obj: THREE.Object3D; curl: [number, number, number, number]; shoulder: boolean } | null = null;
+  private inHand: { obj: THREE.Object3D; curl: Curl; shoulder: boolean } | null = null;
   /** how far what is in the fist has been laid back on the shoulder (see `shoulder` in HandGrip), 0..1 */
   private shoulderT = 0;
   /** seconds into a swing of the right arm (-1 = not swinging) */
@@ -801,7 +804,7 @@ export class Avatar {
    * Brings a hand to a point in the world: wrist at `target`, fingers along `F`, palm facing `N`.
    * @param w how much of it: below 1 the arm is only part of the way from where the clip had it
    */
-  private reach(r: ArmRig, target: THREE.Vector3, F: THREE.Vector3, N: THREE.Vector3, curl: [number, number, number, number], aimQ: THREE.Quaternion, w = 1, toward?: THREE.Vector3) {
+  private reach(r: ArmRig, target: THREE.Vector3, F: THREE.Vector3, N: THREE.Vector3, curl: Curl, aimQ: THREE.Quaternion, w = 1, toward?: THREE.Vector3) {
     const before = w < 1 ? [r.arm.quaternion.clone(), r.fore.quaternion.clone(), r.hand.quaternion.clone()] : null;
     const A = r.arm.getWorldPosition(new THREE.Vector3());
     const toT = target.clone().sub(A);
@@ -834,7 +837,7 @@ export class Avatar {
       r.arm.updateMatrixWorld(true);
       r.hand.getWorldQuaternion(handWorld);
     }
-    this.curl(r, curl.map((c) => c * w) as [number, number, number, number], handWorld);
+    this.curl(r, curl.map((c) => (typeof c === 'number' ? c * w : c.map((j) => j * w))) as Curl, handWorld);
   }
 
   /**
@@ -882,13 +885,14 @@ export class Avatar {
   }
 
   /** close the fingers toward the palm, each by its own amount */
-  private curl(r: ArmRig, curl: [number, number, number, number], handWorld: THREE.Quaternion) {
+  private curl(r: ArmRig, curl: Curl, handWorld: THREE.Quaternion) {
     const Lf = r.fingersLocal;
     const Lp = r.palmLocal.clone().sub(Lf.clone().multiplyScalar(r.palmLocal.dot(Lf))).normalize();
     const curlAxis = new THREE.Vector3().crossVectors(Lf, Lp).applyQuaternion(handWorld).normalize();
     r.fingers.forEach((chain, fi) => {
       const c = curl[fi];
-      chain.forEach((bone, j) => this.turn(bone, curlAxis, c * (j === 0 ? 0.8 : j === 1 ? 1.1 : 0.8)));
+      // (one figure closes the whole finger as a fist closes; three say each joint, for a finger laid round something with a shape of its own)
+      chain.forEach((bone, j) => this.turn(bone, curlAxis, typeof c === 'number' ? c * (j === 0 ? 0.8 : j === 1 ? 1.1 : 0.8) : c[j] ?? 0));
     });
   }
 

@@ -19,12 +19,25 @@ import { liftPack } from './rig';
 const ARMS_PACK = 'sniper_fp';
 
 /** A hand placement in weapon (model) space: wrist position, finger direction, palm normal. */
+/** how far a finger is closed: all of it by one figure, or each of its three joints by its own, knuckle first */
+export type FingerCurl = number | [number, number, number];
+export type Curl = [FingerCurl, FingerCurl, FingerCurl, FingerCurl];
+/** a finger's three joints, however it was said (one figure closes them as a fist closes) */
+export const joints = (c: FingerCurl): [number, number, number] => (typeof c === 'number' ? [c * 0.8, c * 1.1, c * 0.8] : c);
+/** part of the way from one closing of a finger to another */
+export function mixCurl(a: FingerCurl, b: FingerCurl, w: number): FingerCurl {
+  if (typeof a === 'number' && typeof b === 'number') return a + (b - a) * w;
+  const ja = joints(a), jb = joints(b);
+  return [ja[0] + (jb[0] - ja[0]) * w, ja[1] + (jb[1] - ja[1]) * w, ja[2] + (jb[2] - ja[2]) * w];
+}
+
 export interface HandGrip {
   pos: THREE.Vector3;
   fingers: THREE.Vector3;
   palm: THREE.Vector3;
   /** curl (radians) per joint for [index, middle, ring, pinky]; thumb separately */
-  curl: [number, number, number, number];
+  /** how far each finger is closed, first to little: one figure for the whole finger, or one for each of its three joints (radians) */
+  curl: Curl;
   thumb: number;
   /** 0..1: fold the thumb across the curled fingers (a closed fist) */
   tuck?: number;
@@ -398,7 +411,7 @@ export class FPArms {
     a.fingers.forEach((chain, fi) => {
       const c = grip.curl[fi];
       chain.forEach((bone, j) => {
-        const ang = c * (grip.fold?.[j] ?? (j === 0 ? 0.8 : j === 1 ? 1.1 : 0.8));
+        const ang = typeof c === 'number' ? c * (grip.fold?.[j] ?? (j === 0 ? 0.8 : j === 1 ? 1.1 : 0.8)) : c[j] ?? 0;
         bone.getWorldQuaternion(_q2);
         _q2.premultiply(_q1.setFromAxisAngle(curlAxis, ang));
         this.setWorldQuat(bone, _q2);

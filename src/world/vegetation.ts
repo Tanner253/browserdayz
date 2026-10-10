@@ -36,6 +36,8 @@ const VARIANTS: Record<string, ((node: string) => boolean)[]> = {
   old_military_crate: [(n) => /_a$/.test(n), (n) => /_b$/.test(n)],
 };
 
+/** how high a bed is to stand on: the top of its mattress (see BED in buildings.ts) */
+const BED_TOP = 0.6;
 /** props that block movement and bullets: surface type + footprint shrink factor */
 const SOLID: Record<string, [Surface, number]> = {
   tree_stump_01: ['wood', 0.8],
@@ -715,7 +717,16 @@ export class Vegetation {
               const hx = (size.x * it.scale) / 2, hy = (size.y * it.scale) / 2, hz = (size.z * it.scale) / 2;
               // a bullet that lands on a fuel drum has to know which one it was
               const drum = kind === BARREL.kind ? (this.barrels[n] = new Barrel(n, it.x, it.y, it.z, set)) : undefined;
-              const col = physics.addStatic(physics.R.ColliderDesc.cuboid(hx * shrink, hy, hz * shrink), surface, { x: it.x, y: it.y + hy, z: it.z }, it.rot, drum);
+              // (A bed is solid as high as its mattress, so that it can be got up on, and its head and its foot stand
+              // up from that as boards of their own: as one box the height of its head, it was a wall a bed long.)
+              const low = id === 'old_bed_frame' ? (BED_TOP * it.scale) / 2 : hy;
+              const col = physics.addStatic(physics.R.ColliderDesc.cuboid(hx * shrink, low, hz * shrink), surface, { x: it.x, y: it.y + low, z: it.z }, it.rot, drum);
+              if (low < hy) {
+                for (const [end, tall] of [[-1, size.y], [1, size.y * 0.68]] as const) {
+                  const dz = end * (hz - 0.03), half = (tall * it.scale) / 2;
+                  physics.addStatic(physics.R.ColliderDesc.cuboid(hx * shrink, half, 0.03), surface, { x: it.x + Math.sin(it.rot) * dz, y: it.y + half, z: it.z + Math.cos(it.rot) * dz }, it.rot);
+                }
+              }
               if (drum) drum.collider = col;
               this.solidAt.set(spotKey(it.x, it.z), col);
               if (CRATE_KINDS.has(id)) this.crates.push({ kind: id, x: it.x, y: it.y, z: it.z, rot: it.rot, collider: col });
