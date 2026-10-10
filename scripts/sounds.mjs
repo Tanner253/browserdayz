@@ -8,6 +8,11 @@
 //                       used commercially, credit not required
 //   firearm-library/    "The Free Firearm Sound Library" by Ben Jaszczak, Brian Nelson, Kevin
 //                       Heras and Matthew Nanney (CC0)
+//   kenney-impact/      "Impact Sounds" by Kenney (www.kenney.nl), CC0
+//   qubodup-punch/      "Punch" by qubodup (opengameart.org/content/punch), CC0
+//   decoded/            the two above come as Ogg, and nothing on this machine reads Ogg but a
+//                       browser: the ones used were decoded in one and written out as they are
+//                       (k-impact<Kind>-<n>.wav, q-punch-<n>.wav), and are read from here
 //
 // Each is cut to begin on the sound itself (a shot that starts a tenth of a second into its
 // file is a shot that is late), let die away at its end, made one channel, brought to the
@@ -96,6 +101,14 @@ const SOUNDS = {
   shell_in: { src: snake('Reloads, Cycling & More/WAV/Pump Shell Load WAV.wav'), rate: 32000, gain: 0.8 },
 };
 for (const [kind, takes] of Object.entries(ZED)) takes.forEach((k, n) => (SOUNDS[`z_${kind}${n ? `_${n + 1}` : ''}`] = { src: zed(k), rate: 32000, gain: 0.9 }));
+// A fist landing on somebody (the five of the Punch pack); something heavier landing on them (Kenney's heavy
+// punches); and a round or a blow on steel: a car's door, a drum, a locker (plate for the thin of it, bar for the
+// thick). Nobody who chose these could hear them: they are what their makers called them.
+const dec = (n) => path.join(SRC, 'decoded', `${n}.wav`);
+const several = (name, files, o) => files.forEach((f, n) => (SOUNDS[`${name}${n ? `_${n + 1}` : ''}`] = { src: dec(f), ...o }));
+several('punch', [1, 2, 3, 4, 5].map((k) => `q-punch-${k}`), { rate: 32000, gain: 0.9 });
+several('blow', [0, 1, 2, 3, 4].map((k) => `k-impactPunch_heavy-${k}`), { rate: 32000, gain: 0.9 });
+several('hit_metal', ['k-impactPlate_heavy-0', 'k-impactPlate_heavy-1', 'k-impactPlate_heavy-3', 'k-impactMetal_heavy-1', 'k-impactMetal_heavy-3', 'k-impactMetal_light-3'], { rate: 44100, gain: 0.9 });
 
 /** a .wav as one channel of numbers between -1 and 1: one of its channels, or all of them together */
 async function readWav(file, side) {

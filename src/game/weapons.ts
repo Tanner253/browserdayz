@@ -1780,7 +1780,7 @@ export class Weapons {
           const power = a.name === 'punch' ? 0.2 : 0.55;
           this.fx.bleed(pt, dir, power);
           this.onFlesh(hit.tag?.owner, pt, dir, power);
-          audio.impact('flesh', pt, 1);
+          audio.blow(a.name === 'punch', pt, 1);
         } else {
           const s = (hit.tag?.surface ?? 'dirt') as Surface;
           this.fx.impact(s, pt, n, false);

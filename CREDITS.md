@@ -73,6 +73,8 @@ Gunshots, the bolt, magazines and the slide are recordings (cut and converted by
 credit not asked for and given gladly) and from [The Free Firearm Sound Library](https://opengameart.org/content/the-free-firearm-sound-library)
 by Ben Jaszczak, Brian Nelson, Kevin Heras and Matthew Nanney (CC0). What the infected say is from the
 [Zombies Sound Pack](https://opengameart.org/content/zombies-sound-pack) by artisticdude (CC0, credit not asked for and given gladly).
+A fist landing is from [Punch](https://opengameart.org/content/punch) by qubodup (CC0); a heavier blow, and a round on steel, from
+[Impact Sounds](https://kenney.nl/assets/impact-sounds) by Kenney (www.kenney.nl) (CC0, credit not asked for and given gladly).
 Every other sound is made by the game as it plays.
 
 Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees are generated with

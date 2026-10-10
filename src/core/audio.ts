@@ -100,7 +100,7 @@ export interface EngineVoice {
  * One take is played, any of them. Until they have arrived, and wherever one is missing, the
  * made-up sound is what is heard.
  */
-const RECORDED: Record<string, number> = { shot_rifle: 1, shot_pistol: 3, shot_quiet: 1, bolt: 1, rifle_mag_out: 1, rifle_mag_in: 1, pistol_mag_out: 1, pistol_mag_in: 1, rack: 1, shot_shotgun: 2, shot_magnum: 2, shell_in: 1, z_groan: 4, z_growl: 4, z_alert: 4, z_attack: 4, z_hurt: 4, z_die: 4 };
+const RECORDED: Record<string, number> = { punch: 5, blow: 5, hit_metal: 6, shot_rifle: 1, shot_pistol: 3, shot_quiet: 1, bolt: 1, rifle_mag_out: 1, rifle_mag_in: 1, pistol_mag_out: 1, pistol_mag_in: 1, rack: 1, shot_shotgun: 2, shot_magnum: 2, shell_in: 1, z_groan: 4, z_growl: 4, z_alert: 4, z_attack: 4, z_hurt: 4, z_die: 4 };
 const bank = new Map<string, AudioBuffer[]>();
 let fetched: Promise<void> | null = null;
 /** Fetches the recordings, once. (They are kept apart from any one engine: the trailer renders its soundtrack on an engine of its own.) */
@@ -796,10 +796,21 @@ export class AudioEngine {
     }
   }
 
+  /**
+   * A blow landing on a body: a fist, or something heavier swung. A recording of one; until they have come, the
+   * thud a round makes in flesh.
+   */
+  blow(fist: boolean, pos: V3, distance: number) {
+    if (!this.ready) return;
+    if (!this.rec(fist ? 'punch' : 'blow', this.out(pos, 3, 1.3, distance), this.ctx.currentTime, fist ? 1.5 : 1.7)) this.impact('flesh', pos, distance);
+  }
+
   impact(surface: Surface, pos: V3, distance: number) {
     if (!this.ready) return;
     const t = this.ctx.currentTime;
     const out = this.out(pos, 3, 1.3, distance);
+    // (steel struck is a recording of steel struck: a car's door, a drum, a locker. Until they have come, the made-up ring.)
+    if (surface === 'metal' && this.rec('hit_metal', out, t, 1.5)) return;
     const n = this.noise(t, 0.2);
     let f: BiquadFilterNode;
     let peak = 0.7;

@@ -162,6 +162,8 @@ export class Game {
         return false;
       }
       const len = Math.max(0.001, Math.hypot(p.x - from.x, p.z - from.z));
+      // (their arms come down on you like fists)
+      audio.blow(true, { x: p.x, y: p.y + 1.3, z: p.z }, 1);
       this.takeHit({ t: 'dmg', from: 0, amount, zone: 'torso', w: 'infected', dir: [(p.x - from.x) / len, 0, (p.z - from.z) / len] });
       return true;
     },
