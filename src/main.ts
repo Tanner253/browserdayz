@@ -14,6 +14,8 @@ import { Game } from './game/game';
 import { initRotatePrompt } from './ui/rotate';
 import { gasZone } from './sim/gas';
 import { buildWorks } from './world/works';
+import { buildWells } from './world/wells';
+import { wellSpots } from './sim/wells';
 
 // before anything loads: a phone held upright needs a way forward straight away
 initRotatePrompt();
@@ -50,6 +52,7 @@ async function boot() {
   buildings.build(r.scene);
   buildRoad(world, atmo, r.scene);
   buildWorks(world, atmo, r.scene);
+  buildWells(wellSpots(world), atmo, r.scene);
   label.textContent = 'growing forest';
   await frame();
   const veg = new Vegetation(world, atmo);

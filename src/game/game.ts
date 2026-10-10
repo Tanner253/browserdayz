@@ -42,6 +42,7 @@ import { HUD, type HotbarEntry } from '../ui/hud';
 import { InventoryUI } from '../ui/inventory-ui';
 import { Minimap } from '../ui/minimap';
 import { CALL, CRASH, DROP, describeSpot, fillCrash, fillDrop, pickDropSite, type DropInfo } from '../sim/drops';
+import { WELL, stage, wellSpots, type Well } from '../sim/wells';
 import { renderDoll, renderIcons } from '../ui/icons';
 import { Perf } from '../core/perf';
 import { loadGraphics, type Graphics } from '../core/settings';
@@ -97,6 +98,8 @@ interface TimedAction {
 
 /** bump when the map's loot points change: spawned loot from older saves is re-rolled */
 const LOOT_REV = 17;
+/** where a jeep's headlamps are on it: so far either side of its middle, so far over its middle, so far forward (it is 2.08 m to its nose) */
+const HEADLAMP = { x: 0.5, y: 0.14, z: -2.12 };
 const QUICK_KEYS = ['Digit5', 'Digit6', 'Digit7', 'Digit8'];
 /** the keys that put something else in the hands */
 const HAND_KEYS = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'KeyX'];
@@ -221,6 +224,10 @@ export class Game {
   private awaitClick = false;
   /** the men behind the shops' counters, and the counter itself (see src/sim/trade.ts) */
   private traders: Traders | null = null;
+  /** the wells of the two towns (src/sim/wells.ts) */
+  private wells: Well[] = [];
+  /** how hungry and how thirsty the player was last said to be: each is said once as it gets worse */
+  private wanting = [0, 0];
   /** the radio a call has been made on and not yet answered */
   private radio: ItemInstance | null = null;
   /** drops called down and not yet landed: where, when they land, and the smoke that marks the place meanwhile */
@@ -579,6 +586,7 @@ export class Game {
         else if (b.type === 'clinic') spots.push({ x: b.x, z: b.z, name: 'Clinic', tip: 'Injectors, first aid kits, and tape to splint a broken leg.', kind: 'clinic' });
         else if (b.type === 'store') spots.push({ x: b.x, z: b.z, name: 'Shop', tip: 'Food and drink.', kind: 'shop' });
       }
+      for (const w of wellSpots(world)) spots.push({ x: w.x, z: w.z, name: 'Well', tip: 'Drink your fill, and fill every bottle you carry.', kind: 'well' });
       this.hud.setMenuMap(this.minimap.poster(), WORLD_SIZE, spots, atmo.gas);
     }
     this.menu = new MenuScenes({ world, atmo, scene: r.scene, effects: this.effects, held: (id, mods) => this.makeHeld(id, mods), wear: (body, ids) => this.wear(body, ids), filmReady: () => this.hud.filmReady() });
@@ -592,6 +600,8 @@ export class Game {
     }
     this.traders = new Traders(world);
     this.minimap.setTraders(this.traders.places);
+    this.wells = wellSpots(world);
+    this.minimap.setWells(this.wells);
     void this.traders.load(r.scene, atmo, (body, ids) => this.wear(body, ids));
     this.shop = new ShopUI({
       credit: () => this.credit,
@@ -1698,7 +1708,11 @@ export class Game {
     if (dark) {
       for (const j of this.garage.lit()) {
         _lampDir.set(0, -0.07, -1).applyQuaternion(j.quat);
-        this.lamps.beam(_lampPos.set(0, 0.95, -2.0).applyQuaternion(j.quat).add(j.pos), _lampDir, 2.4, 1.5);
+        // One light, thrown from between the two lamps at the front of the car and at their height, with no
+        // disc of its own: each lens is a point of light to whoever is in front and some way off. (It was thrown
+        // from a metre over the middle of the car, with a white disc there: a ball of light sitting on the bonnet.)
+        this.lamps.beam(_lampPos.set(0, HEADLAMP.y, HEADLAMP.z).applyQuaternion(j.quat).add(j.pos), _lampDir, 2.4, 1.5, 0);
+        for (const side of [-1, 1]) this.lamps.flare(_lampPos.set(side * HEADLAMP.x, HEADLAMP.y, HEADLAMP.z + 0.06).applyQuaternion(j.quat).add(j.pos), _lampDir, 1);
       }
       // the street lamps of the village, from dusk
       for (const at of this.streetLamps) if (at.distanceToSquared(cam.position) < 260 * 260) this.lamps.glow(at, STREET_LAMP, Math.min(1, (atmo.night - 0.3) / 0.3), 22);
@@ -1863,6 +1877,35 @@ export class Game {
     if (sound === 'smoke') audio.ui('smoke');
   }
 
+  /** every bottle carried (see `sips` in src/sim/items.ts): in the pockets, and in what is worn */
+  private bottles(): ItemInstance[] {
+    return this.inv.containers.flatMap((c) => c.items).map((p) => p.item).filter((it) => !!ITEMS[it.id].use?.sips);
+  }
+
+  /** A few seconds at a well: thirst gone, and every bottle carried full again. */
+  private drinkAt(w: Well) {
+    this.putAway();
+    this.toggleInventory(false);
+    const held = this.bottles()[0];
+    this.use = { label: 'Drinking at the well', t: 0, dur: WELL.drink, sound: 'drink', soundT: 0, done: () => {
+      const p = this.player;
+      if (Math.hypot(w.x - p.pos.x, w.z - p.pos.z) > WELL.reach + 0.8) return void this.hud.note('You walked off from the well', 'info');
+      let filled = 0;
+      for (const it of this.bottles()) {
+        const full = ITEMS[it.id].use!.sips!;
+        if ((it.left ?? 0) < full) filled++;
+        it.left = full;
+      }
+      p.vitals.water = 100;
+      this.inventoryChanged();
+      this.meDirty = true;
+      this.hud.note(filled ? `You drink your fill, and fill ${filled === 1 ? 'your bottle' : `${filled} bottles`}` : 'You drink your fill', 'good');
+    } };
+    // (a bottle in the hands, if one is carried: the drinking is seen by everybody as drinking is)
+    if (held) this.weapons.beginUse(held.id, 'drink', WELL.drink);
+    this.act('drink', WELL.drink);
+  }
+
   /** A few seconds of work at a fireplace, and it is alight: for everybody, once the server has been told. */
   private lightFire(i: number) {
     this.startUse('Lighting the fire', FIRE.lighting, 'cigarettes', 'open', null, () => {
@@ -1966,6 +2009,11 @@ export class Game {
     if (!def.use || this.use || this.player.dead || this.weapons.working) return;
     if (def.look && performance.now() - this.glassDown < 150) return;
     const u = def.use;
+    // (an empty bottle is kept, and says where it is filled)
+    if (u.sips && (item.left ?? u.sips) <= 0) {
+      this.hud.note(`The ${def.name.toLowerCase()} is empty: a well fills it (marked on the map)`, 'info');
+      return;
+    }
     // (an injector is in the hand already: its own key puts it away again, another thing takes its place)
     if (this.ready && !now) {
       const same = this.ready.item.id === item.id;
@@ -2043,7 +2091,9 @@ export class Game {
         const cam = this.s.r.camera;
         this.effects.muzzle(cam.position.clone().add(new THREE.Vector3(0, -0.12, -0.35).applyQuaternion(cam.quaternion)), new THREE.Vector3(0, 0.3, -1).applyQuaternion(cam.quaternion), true, true);
       }
-      this.consume(item, null);
+      // (a bottle is one drink the emptier, and is kept)
+      if (u.sips) item.left = Math.max(0, (item.left ?? u.sips) - 1);
+      else this.consume(item, null);
       this.inventoryChanged();
     });
   }
@@ -2596,6 +2646,18 @@ export class Game {
     if (!owner) {
       // nobody has a name floating over their head: you only learn it by looking right at them, up close
       const c = new THREE.Vector3();
+      // a well stood at and looked at
+      const well = this.wells.find((w) => Math.hypot(w.x - this.player.pos.x, w.z - this.player.pos.z) < WELL.reach && Math.abs(w.y - this.player.pos.y) < 1.5);
+      if (well && c.set(well.x, well.y + 0.8, well.z).sub(cam.position).normalize().dot(dir) > 0.55) {
+        const bottles = this.bottles().filter((it) => (it.left ?? 0) < ITEMS[it.id].use!.sips!).length;
+        const dry = this.player.vitals.water < 99;
+        if (!dry && !bottles) this.prompt = '<small>The well · you have drunk your fill, and your bottles are full</small>';
+        else {
+          this.prompt = `<kbd>F</kbd>${dry ? 'Drink' : 'Fill'}${dry && bottles ? ' and fill' : ''}${bottles ? (bottles === 1 ? ' your bottle' : ` your ${bottles} bottles`) : ''}`;
+          if (this.input.pressed('KeyF') && !this.use && !this.hud.chatOpen) this.drinkAt(well);
+        }
+        return;
+      }
       // a fireplace stood beside and looked at
       const fi = this.fires.at(this.player.pos);
       if (fi >= 0) {
@@ -2878,6 +2940,13 @@ export class Game {
     // (are the hands empty: asked of what is in them, and every frame. It was asked five times a second, and of
     // which slot the inventory said was out, which is not the same thing when what was out has been dropped.)
     p.emptyHanded = this.weapons.handsEmpty && !this.use;
+    // hunger and thirst, said once each as they get worse (and what they do is said with them)
+    if (playing) {
+      const now2 = [stage(p.vitals.energy), stage(p.vitals.water)];
+      if (now2[0] > this.wanting[0]) this.hud.note(now2[0] === 2 ? 'You are starving: your hands shake, and your breath is slow to come back. Eat' : 'You are hungry: your aim is less steady. Eat something', 'warn');
+      if (now2[1] > this.wanting[1]) this.hud.note(now2[1] === 2 ? 'You are parched: you cannot run flat out. Drink, or find a well' : 'You are thirsty: your breath comes back slower. Drink, or find a well (on the map)', 'warn');
+      this.wanting = now2;
+    }
     // carried weight and gear effects only change with the inventory: a few times a second is plenty
     this.slowT += dt;
     if (this.slowT > 0.2) {

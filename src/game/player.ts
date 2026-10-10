@@ -2,6 +2,7 @@
 // stamina / vitals, camera feel (bob, lean, landing dip) and footsteps.
 
 import * as THREE from 'three';
+import { NEED, stage } from '../sim/wells';
 import type RAPIER from '@dimforge/rapier3d-compat';
 import { physics, PLAYER_GROUPS, SHOT_GROUPS, type Surface } from '../core/physics';
 import type { Input, MoveInput } from '../core/input';
@@ -270,7 +271,8 @@ export class Player {
 
     const enc = Math.max(0, this.weightKg - 18) * 0.012; // encumbrance
     let speed = this.crouched ? (this.scurrying ? CROUCH_RUN : 1.9) : walk ? 1.7 : 4.0;
-    if (this.sprinting) speed = 6.2;
+    // (parched, nobody runs flat out)
+    if (this.sprinting) speed = 6.2 * (stage(v.water) === 2 ? NEED.slow : 1);
     // With nothing in the hands, whatever was carried put away, everything is a fifth faster: the one rule, and
     // no exceptions to it. (It was only so upright and at a jog or a run, and what was asked was whether the
     // hands are empty.) With a gun at the eye, a fifth slower. (That was a creep, 1.9 m/s whatever the pace
@@ -377,7 +379,8 @@ export class Player {
     } else if (this.staminaDelay > 0) {
       this.staminaDelay -= h;
     } else {
-      const regen = (v.energy < 20 || v.water < 20 ? 5 : 11) * (this.crouched ? 1.3 : 1);
+      // (breath comes back slower to whoever wants food or water, and slower still to whoever is in a bad way for either)
+      const regen = 11 * NEED.breath[Math.max(stage(v.energy), stage(v.water))] * (this.crouched ? 1.3 : 1);
       v.stamina = Math.min(MAX_STAMINA, v.stamina + regen * h);
     }
 
@@ -390,6 +393,11 @@ export class Player {
       if (physics.raycast(eyeP, side, 0.55, SHOT_GROUPS, this.collider)) lt = 0;
     }
     this.lean += (lt - this.lean) * (1 - Math.exp(-10 * h));
+  }
+
+  /** how much more a gun wanders in these hands for want of food (1: not at all) */
+  get shake() {
+    return NEED.shake[stage(this.vitals.energy)];
   }
 
   /** too spent to sprint (the stamina bar says so) */

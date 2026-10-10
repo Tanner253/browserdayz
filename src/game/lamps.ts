@@ -22,6 +22,7 @@ const BEAM = { power: 170, reach: 75, half: 0.36, soft: 0.7 };
 
 interface Beam { pos: THREE.Vector3; dir: THREE.Vector3; power: number; wide: number; glare: number; d2: number }
 interface Glow { pos: THREE.Vector3; color: THREE.Color; power: number; reach: number; d2: number }
+interface Flare { pos: THREE.Vector3; dir: THREE.Vector3; power: number }
 
 const _v = new THREE.Vector3();
 const _m = new THREE.Matrix4();
@@ -35,8 +36,10 @@ export class Lamps {
   private points: THREE.PointLight[] = [];
   private beams: Beam[] = [];
   private glows: Glow[] = [];
+  private flares: Flare[] = [];
   private nBeams = 0;
   private nGlows = 0;
+  private nFlares = 0;
   private glare: THREE.InstancedMesh;
   private glareColor: THREE.InstancedBufferAttribute;
   /** seconds the real lights are still kept in the scene after the last lamp went out (so that one flickering does not take them in and out) */
@@ -134,6 +137,19 @@ export class Lamps {
     this.nBeams++;
   }
 
+  /**
+   * This frame, the lens of a lamp as it is seen from in front and from some way off: a point of light, and no
+   * light thrown (the beam is said by itself). A headlamp: from near to there is the lit lens and nothing else
+   * (a disc of white the size of a football sat on the bonnet), from down the road there are two bright points.
+   */
+  flare(pos: THREE.Vector3, dir: THREE.Vector3, power = 1) {
+    const f = (this.flares[this.nFlares] ??= { pos: new THREE.Vector3(), dir: new THREE.Vector3(), power: 1 });
+    f.pos.copy(pos);
+    f.dir.copy(dir).normalize();
+    f.power = power;
+    this.nFlares++;
+  }
+
   /** This frame, a lamp that shines all round: a street lamp, a bulb on a wall. @param power 1 is a street lamp */
   glow(pos: THREE.Vector3, color: THREE.Color, power = 1, reach = 20) {
     const w = (this.glows[this.nGlows] ??= { pos: new THREE.Vector3(), color: new THREE.Color(), power: 1, reach: 20, d2: 0 });
@@ -147,7 +163,7 @@ export class Lamps {
   /** When every lamp lit this frame has been said: the nearest are given the real lights, and all of them their glare. */
   update(cam: THREE.Camera, dt: number) {
     const eye = cam.position;
-    const lit = this.nBeams + this.nGlows > 0;
+    const lit = this.nBeams + this.nGlows + this.nFlares > 0;
     this.keep = lit ? 1.5 : Math.max(0, this.keep - dt);
     this.pool.visible = this.keep > 0;
 
@@ -213,11 +229,16 @@ export class Lamps {
       const facing = _v.copy(eye).sub(b.pos).normalize().dot(b.dir);
       put(b.pos, b.d2, 1, 0.94, 0.8, b.glare * Math.max(0, (facing - 0.25) / 0.75) * Math.min(1.6, b.power) * 1.3);
     }
+    for (let i = 0; i < this.nFlares; i++) {
+      const f = this.flares[i], d2 = f.pos.distanceToSquared(eye), d = Math.sqrt(d2);
+      const facing = _v.copy(eye).sub(f.pos).normalize().dot(f.dir);
+      put(f.pos, d2, 1, 0.94, 0.8, f.power * Math.max(0, (facing - 0.3) / 0.7) * Math.min(1, Math.max(0, (d - 7) / 18)) * 1.5);
+    }
     for (const w of glows) put(w.pos, w.d2, w.color.r, w.color.g, w.color.b, 0.55 * w.power);
     this.glare.count = n;
     this.glare.instanceMatrix.needsUpdate = true;
     this.glareColor.needsUpdate = true;
 
-    this.nBeams = this.nGlows = 0;
+    this.nBeams = this.nGlows = this.nFlares = 0;
   }
 }

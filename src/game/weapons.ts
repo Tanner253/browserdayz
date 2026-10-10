@@ -1582,7 +1582,7 @@ export class Weapons {
     }
 
     // ----- scope sway (applied to the aim, so bullets follow it)
-    const tired = 1 + (1 - p.vitals.stamina / MAX_STAMINA) * 2.5;
+    const tired = (1 + (1 - p.vitals.stamina / MAX_STAMINA) * 2.5) * p.shake;
     const heft = THREE.MathUtils.clamp((100 - hd.ergo) / 60, 0.25, 1.2);
     const armsK = 1 + Math.pow(1 - this.armStamina, 2) * 2.6;
     const swayAmp = (this.scoped ? 0.0035 : this.aiming ? 0.0022 : 0.0012) * tired * (this.breath.held ? 0.15 : 1) * (p.crouched ? 0.6 : 1) * (hasMod(item, 'rifle_wrap') ? 0.75 : 1) * armsK * (0.75 + heft * 0.5);

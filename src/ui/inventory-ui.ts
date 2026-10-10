@@ -179,6 +179,7 @@ export class InventoryUI {
     const d = ITEMS[item.id];
     const t: string[] = [];
     if (d.stack) t.push(`<span class="qty">${item.qty}</span>`);
+    if (d.use?.sips) t.push(`<span class="qty">${item.left ?? d.use.sips}/${d.use.sips}</span>`);
     if (d.weapon) t.push(`<span class="qty">${item.loaded ?? 0}/${capacityOf(item)}</span>`);
     if (item.mods?.length) t.push(`<span class="mods">+${item.mods.length}</span>`);
     if (item.cargo?.length) t.push(`<span class="qty">${item.cargo.length} in</span>`);
@@ -296,7 +297,7 @@ export class InventoryUI {
       // (a bat is six cells tall and one wide: stood up in this little box its picture is a hair. Long things are laid on their side here.)
       ic.innerHTML = `<div class="inv-item-img fit${d.h > d.w ? ' lying' : ''}" style="background-image:url(${this.icons[w.loot.item.id] ?? ''})"></div>`;
       row.appendChild(ic);
-      const extra = d.stack ? ` <span>×${w.loot.item.qty}</span>` : d.weapon ? ` <span>${w.loot.item.loaded ?? 0}/${capacityOf(w.loot.item)}</span>` : w.loot.item.cargo?.length ? ` <span>${w.loot.item.cargo.length} inside</span>` : '';
+      const extra = d.stack ? ` <span>×${w.loot.item.qty}</span>` : d.use?.sips ? ` <span>${w.loot.item.left ?? d.use.sips}/${d.use.sips}</span>` : d.weapon ? ` <span>${w.loot.item.loaded ?? 0}/${capacityOf(w.loot.item)}</span>` : w.loot.item.cargo?.length ? ` <span>${w.loot.item.cargo.length} inside</span>` : '';
       row.insertAdjacentHTML('beforeend', `<div class="g-name">${itemName(w.loot.item)}${extra}<small>${d.category}</small></div>`);
       this.bindItem(row, { kind: 'ground', w, item: w.loot.item });
       ground.appendChild(row);
@@ -379,6 +380,7 @@ export class InventoryUI {
     const d = ITEMS[it.id];
     const stats: string[] = [`<div><span>Weight</span><b>${itemWeight(it).toFixed(2)} kg</b></div>`, `<div><span>Size</span><b>${d.w}×${d.h}</b></div>`];
     if (d.stack) stats.push(`<div><span>Quantity</span><b>${it.qty}/${d.stack}</b></div>`);
+    if (d.use?.sips) stats.push(`<div><span>Drinks left</span><b>${it.left ?? d.use.sips} of ${d.use.sips}</b></div>`);
     if (d.weapon) stats.push(`<div><span>Loaded</span><b>${it.loaded ?? 0}/${capacityOf(it)}</b></div>`, `<div><span>Ammo</span><b>${ITEMS[d.weapon.ammo].name}</b></div>`);
     if (d.melee) stats.push(`<div><span>Damage</span><b>${d.melee.damage}</b></div>`);
     if (d.wear?.cargo) stats.push(`<div><span>Adds</span><b>${d.wear.cargo[0]}×${d.wear.cargo[1]} slots</b></div>`);

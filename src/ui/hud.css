@@ -1003,6 +1003,7 @@
 .mm-spot.k-police:hover::before, .mm-spot.k-police.on::before { transform: scale(1.4); }
 .mm-spot.k-clinic::before { background: #d99a92; border-radius: 50%; transform: none; }
 .mm-spot.k-shop::before { background: #d6c9a8; border-radius: 50%; transform: none; }
+.mm-spot.k-well::before { background: #6fb6e6; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); }
 .mm-spot.k-clinic:hover::before, .mm-spot.k-clinic.on::before, .mm-spot.k-shop:hover::before, .mm-spot.k-shop.on::before { transform: scale(1.45); }
 .mm-spot.k-town::before { display: none; }
 .mm-spot.k-gas::before { width: 0; height: 0; margin: -9px 0 0 -8px; background: none; box-shadow: none; border: 8px solid transparent; border-top: 0; border-bottom: 15px solid #e4f07a; transform: none; filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.9)); }

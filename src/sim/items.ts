@@ -38,7 +38,7 @@ export interface ItemDef {
   category: Category;
   stack?: number;
   slot?: SlotKind;
-  use?: { verb: string; time: number; energy?: number; water?: number; health?: number; stopBleed?: boolean; /** sets a broken leg (see src/sim/injury.ts) */ splint?: boolean; /** breath given back, in hundredths of all there is */ stamina?: number; /** seconds afterwards in which nothing costs any breath */ boost?: number; /** taken into the hand first and held there: a click then uses it (see `ready` in src/game/game.ts) */ hold?: boolean; sound: 'eat' | 'drink' | 'bandage' | 'inject' | 'smoke' };
+  use?: { verb: string; time: number; energy?: number; water?: number; health?: number; stopBleed?: boolean; /** sets a broken leg (see src/sim/injury.ts) */ splint?: boolean; /** breath given back, in hundredths of all there is */ stamina?: number; /** a bottle: it holds this many drinks (what `water` and `energy` say is one of them), is kept when it is empty, and is filled at a well */ sips?: number; /** seconds afterwards in which nothing costs any breath */ boost?: number; /** taken into the hand first and held there: a click then uses it (see `ready` in src/game/game.ts) */ hold?: boolean; sound: 'eat' | 'drink' | 'bandage' | 'inject' | 'smoke' };
   /** thrown when used: seconds of fuse, damage at the centre, metres it reaches */
   throw?: { fuse: number; damage: number; radius: number };
   /** used, it calls a supply drop down where its user stands (see CALL in src/sim/drops.ts) */
@@ -215,9 +215,9 @@ const D: ItemDef[] = [
   { id: 'sardines', name: 'Sardines', model: 'long_life_food', node: 'long_life_food_sardines', w: 2, h: 1, weight: 0.13, category: 'food', desc: 'Flat tin of sardines.', use: { verb: 'Eat', time: 2, energy: 20, water: -1, sound: 'eat' } },
   { id: 'apple', name: 'Apple', model: 'food_apple_01', w: 1, h: 1, weight: 0.15, category: 'food', desc: 'Crisp and sour.', use: { verb: 'Eat', time: 1.5, energy: 10, water: 8, sound: 'eat' } },
   { id: 'milk', name: 'Milk Carton', model: 'long_life_food', node: 'long_life_food_milk', w: 1, h: 2, weight: 1.0, category: 'drink', desc: 'UHT milk. Still sealed.', use: { verb: 'Drink', time: 2.5, energy: 10, water: 30, sound: 'drink' } },
-  { id: 'water_jug', name: 'Water Jug', model: 'plastic_bottle_gallon', w: 2, h: 3, weight: 2.2, category: 'drink', desc: 'Two litres of clean water.', use: { verb: 'Drink', time: 3, water: 60, sound: 'drink' } },
-  { id: 'flask', name: 'Water Flask', model: 'flask', w: 2, h: 2, weight: 1.1, category: 'drink', desc: 'A soldier\'s litre of water in a hard flask.', use: { verb: 'Drink', time: 2.5, water: 48, sound: 'drink' } },
-  { id: 'thermos', name: 'Thermos', model: 'plastic_thermos', w: 1, h: 3, weight: 0.8, category: 'drink', desc: 'Lukewarm tea. Better than nothing.', use: { verb: 'Drink', time: 2.5, water: 35, energy: 5, sound: 'drink' } },
+  { id: 'water_jug', name: 'Water Jug', model: 'plastic_bottle_gallon', w: 2, h: 3, weight: 2.2, category: 'drink', desc: 'Two litres of clean water: four good drinks. A well fills it again.', use: { verb: 'Drink from the', time: 2.2, water: 20, sips: 4, sound: 'drink' } },
+  { id: 'flask', name: 'Water Flask', model: 'flask', w: 2, h: 2, weight: 1.1, category: 'drink', desc: 'A soldier\'s litre of water in a hard flask: three drinks. A well fills it again.', use: { verb: 'Drink from the', time: 2, water: 18, sips: 3, sound: 'drink' } },
+  { id: 'thermos', name: 'Thermos', model: 'plastic_thermos', w: 1, h: 3, weight: 0.8, category: 'drink', desc: 'Lukewarm tea, two cups of it. Filled at a well it is water, and still better than nothing.', use: { verb: 'Drink from the', time: 2, water: 20, energy: 3, sips: 2, sound: 'drink' } },
   // ---------------------------------------------------------------- medical
   // (The item is still `bandage`: it is what the roll of tape was, in every loot table and every
   // pocket. What it is now is an auto-injector: quicker than winding a dressing, and it gives
@@ -343,6 +343,8 @@ export interface ItemInstance {
   /** dog tag: public id of whoever carries it now, and for how many seconds they have */
   holder?: string;
   held?: number;
+  /** a bottle (see `sips`): how many drinks are left in it */
+  left?: number;
 }
 
 /** seconds somebody else's dog tag has to be carried before it is cashed in */
@@ -388,6 +390,7 @@ export function makeItem(id: string, qty?: number): ItemInstance {
   if (!def) throw new Error(`unknown item ${id}`);
   const it: ItemInstance = { uid: newUid(), id, qty: qty ?? (def.stack ? Math.max(1, Math.round(def.stack * 0.6)) : 1) };
   if (def.weapon) it.loaded = 0;
+  if (def.use?.sips) it.left = def.use.sips;
   return it;
 }
 
@@ -469,6 +472,10 @@ export function itemWeight(it: ItemInstance): number {
 /** drop anything a save refers to that no longer exists */
 export function sanitizeItem(it: ItemInstance): ItemInstance | null {
   if (!it || !ITEMS[it.id]) return null;
+  // (a bottle from before bottles were counted is a full one)
+  const sips = ITEMS[it.id].use?.sips;
+  if (sips) it.left = Math.max(0, Math.min(sips, Math.floor(Number(it.left ?? sips))));
+  else delete it.left;
   if (it.mods) it.mods = it.mods.filter((m) => ITEMS[m]?.attach?.fits.includes(it.id));
   if (it.cargo) {
     it.cargo = it.cargo.filter((p) => p && p.item && sanitizeItem(p.item));

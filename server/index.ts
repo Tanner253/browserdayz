@@ -753,6 +753,7 @@ function cleanItem(raw: unknown, depth = 0): ItemInstance | null {
     it.loaded = Math.max(0, Math.min(def.weapon.capacity + 4, Math.floor(Number(r.loaded) || 0)));
     if (Array.isArray(r.mods)) it.mods = r.mods.filter((m) => typeof m === 'string').slice(0, 4);
   }
+  if (def.use?.sips) it.left = Number.isFinite(Number(r.left)) ? Number(r.left) : def.use.sips;
   if (r.id === 'dogtag') {
     const short = (v: unknown) => (typeof v === 'string' ? v.slice(0, 24) : undefined);
     it.owner = cleanName(r.owner);
