@@ -175,6 +175,36 @@ export const LOCAL_MODELS = {
     tags: ['loot', 'gear'],
     changes: 'Scaled to metres and stood on the ground; brought down to about five thousand triangles; textures re-encoded as WebP; geometry compressed.',
   },
+  // The packs of 2026-10-10: a wreck for the helicopter that comes down, a bigger pack, and two whole buildings.
+  heli_wreck: {
+    dir: 'crashed_helicopter',
+    budget: 18000,
+    size: 14.8,
+    tex: 1024,
+    tags: ['prop'],
+    changes: 'Stood on the ground about its own middle; brought down to about eighteen thousand triangles; textures re-encoded as WebP at 1024; geometry compressed.',
+  },
+  camping_backpack: {
+    dir: 'camping_backpack',
+    size: 0.66,
+    tex: 1024,
+    tags: ['loot', 'gear'],
+    changes: 'Scaled to metres and stood on the ground; textures re-encoded as WebP; geometry compressed.',
+  },
+  house_interior: {
+    dir: 'building_interior',
+    size: 14.6,
+    tex: 2048,
+    tags: ['prop'],
+    changes: 'Stood on the ground about its own middle; its texture re-encoded as WebP at 2048; geometry compressed.',
+  },
+  shanty_mansion: {
+    dir: 'shanty_mansion',
+    size: 29.6,
+    tex: 1024,
+    tags: ['prop'],
+    changes: 'Stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.',
+  },
   military_backpack: {
     dir: 'military_backpack',
     budget: 14000,

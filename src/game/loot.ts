@@ -73,6 +73,15 @@ export class ItemModels {
         }
       }
     }
+    // (dyed: its own copy of each material, so that the other things made of the same model keep their colours)
+    if (def.tint !== undefined) {
+      const dye = new THREE.Color(def.tint);
+      parts = parts.map((p) => {
+        const m = (p.material as THREE.MeshStandardMaterial).clone();
+        m.color.multiply(dye);
+        return { ...p, material: m };
+      });
+    }
     // guns rest on their side when dropped, not balanced on the magazine
     if (def.category === 'weapon') {
       const lay = new THREE.Matrix4().makeRotationX(-Math.PI / 2);

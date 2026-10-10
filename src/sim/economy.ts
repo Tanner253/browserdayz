@@ -145,6 +145,7 @@ export const TYPES: Record<string, TypeRule> = {
   life_vest: { nominal: 2, min: 1, lifetime: 3600, restock: 900, usage: ['Military', 'Police', 'Industrial', 'Town'], favour: { Military: 5, Police: 5 }, gas: 7, bunker: 5 },
   work_gloves: { nominal: 5, min: 3, lifetime: 3600, restock: 900, usage: ['Farm', 'Industrial', 'Village', 'Military', 'Police'], favour: { Military: 2 } },
   rubber_boots: { nominal: 5, min: 3, lifetime: 3600, restock: 900, usage: ['Farm', 'Village', 'Military', 'Industrial'], favour: { Military: 2 } },
+  camping_pack: { nominal: 4, min: 2, lifetime: 3600, restock: 900, usage: ['Village', 'Town', 'Hunting', 'Farm'] },
   sack_pack: { nominal: 8, min: 4, lifetime: 3600, restock: 600, usage: ['Village', 'Town', 'Farm', 'Industrial', 'Military', 'Hunting'], gas: 1, bunker: 2 },
   suitcase: { nominal: 4, min: 2, lifetime: 3600, restock: 1200, usage: ['Village', 'Town', 'Military', 'Hunting'], favour: { Military: 3 }, gas: 1, bunker: 2 },
   // tools and odds and ends

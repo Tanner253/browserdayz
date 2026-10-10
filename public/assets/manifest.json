@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-10T02:12:42.420Z",
+ "generated": "2026-10-10T11:00:21.186Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr"
@@ -1577,6 +1577,132 @@
     }
    ]
   },
+  "gun_light": {
+   "url": "assets/models/gun_light.glb",
+   "tags": [
+    "loot",
+    "attachment"
+   ],
+   "bytes": 195768,
+   "srcTris": 13361,
+   "tris": 5256,
+   "min": [
+    -0.051,
+    0,
+    -0.0224
+   ],
+   "max": [
+    0.051,
+    0.0575,
+    0.0224
+   ],
+   "lods": []
+  },
+  "rifle_suppressor": {
+   "url": "assets/models/rifle_suppressor.glb",
+   "tags": [
+    "loot",
+    "attachment"
+   ],
+   "bytes": 193948,
+   "srcTris": 13361,
+   "tris": 5234,
+   "min": [
+    -0.0858,
+    0,
+    -0.0203
+   ],
+   "max": [
+    0.0858,
+    0.0406,
+    0.0203
+   ],
+   "lods": []
+  },
+  "holo_sight": {
+   "url": "assets/models/holo_sight.glb",
+   "tags": [
+    "loot",
+    "attachment"
+   ],
+   "bytes": 424144,
+   "srcTris": 6889,
+   "tris": 6889,
+   "min": [
+    -0.0482,
+    0,
+    -0.0295
+   ],
+   "max": [
+    0.0482,
+    0.0736,
+    0.0295
+   ],
+   "lods": []
+  },
+  "flask": {
+   "url": "assets/models/flask.glb",
+   "tags": [
+    "loot",
+    "drink"
+   ],
+   "bytes": 541200,
+   "srcTris": 52520,
+   "tris": 6000,
+   "min": [
+    -0.0677,
+    0,
+    -0.0603
+   ],
+   "max": [
+    0.0677,
+    0.22,
+    0.0603
+   ],
+   "lods": []
+  },
+  "round_50": {
+   "url": "assets/models/round_50.glb",
+   "tags": [
+    "loot",
+    "ammo"
+   ],
+   "bytes": 36288,
+   "srcTris": 13279,
+   "tris": 478,
+   "min": [
+    -0.0058,
+    0,
+    -0.0201
+   ],
+   "max": [
+    0.0058,
+    0.0116,
+    0.0201
+   ],
+   "lods": []
+  },
+  "shell_12": {
+   "url": "assets/models/shell_12.glb",
+   "tags": [
+    "loot",
+    "ammo"
+   ],
+   "bytes": 89456,
+   "srcTris": 22636,
+   "tris": 308,
+   "min": [
+    -0.0122,
+    0,
+    -0.0349
+   ],
+   "max": [
+    0.0122,
+    0.0244,
+    0.0349
+   ],
+   "lods": []
+  },
   "plate_carrier": {
    "url": "assets/models/plate_carrier.glb",
    "tags": [
@@ -1640,6 +1766,27 @@
    ],
    "lods": []
   },
+  "combat_helmet": {
+   "url": "assets/models/combat_helmet.glb",
+   "tags": [
+    "loot",
+    "gear"
+   ],
+   "bytes": 775636,
+   "srcTris": 378633,
+   "tris": 6996,
+   "min": [
+    -0.15,
+    0,
+    -0.1318
+   ],
+   "max": [
+    0.15,
+    0.2252,
+    0.1317
+   ],
+   "lods": []
+  },
   "combat_boots": {
    "url": "assets/models/combat_boots.glb",
    "tags": [
@@ -1679,6 +1826,87 @@
     0.1336,
     0.2339,
     0.0521
+   ],
+   "lods": []
+  },
+  "heli_wreck": {
+   "url": "assets/models/heli_wreck.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 2169360,
+   "srcTris": 120921,
+   "tris": 17982,
+   "min": [
+    -4.704,
+    0.0005,
+    -7.3973
+   ],
+   "max": [
+    4.7023,
+    2.8657,
+    7.398
+   ],
+   "lods": []
+  },
+  "camping_backpack": {
+   "url": "assets/models/camping_backpack.glb",
+   "tags": [
+    "loot",
+    "gear"
+   ],
+   "bytes": 1092488,
+   "srcTris": 8550,
+   "tris": 8550,
+   "min": [
+    -0.2549,
+    0,
+    -0.2225
+   ],
+   "max": [
+    0.2549,
+    0.66,
+    0.2225
+   ],
+   "lods": []
+  },
+  "house_interior": {
+   "url": "assets/models/house_interior.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 1693888,
+   "srcTris": 3460,
+   "tris": 3460,
+   "min": [
+    -5.6587,
+    0,
+    -7.3
+   ],
+   "max": [
+    5.6587,
+    7.1682,
+    7.3
+   ],
+   "lods": []
+  },
+  "shanty_mansion": {
+   "url": "assets/models/shanty_mansion.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 1479556,
+   "srcTris": 5148,
+   "tris": 5148,
+   "min": [
+    -9.1999,
+    0,
+    -14.8
+   ],
+   "max": [
+    9.1999,
+    14.2568,
+    14.8
    ],
    "lods": []
   },
@@ -1740,6 +1968,266 @@
     0.9133,
     2.1543,
     2.0546
+   ],
+   "lods": []
+  },
+  "bunker_terminal": {
+   "url": "assets/models/bunker_terminal.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 1712408,
+   "srcTris": 8436,
+   "tris": 332,
+   "min": [
+    -0.75,
+    0,
+    -0.6292
+   ],
+   "max": [
+    0.75,
+    1.1989,
+    0.6292
+   ],
+   "lods": []
+  },
+  "bunker_machine": {
+   "url": "assets/models/bunker_machine.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 1797556,
+   "srcTris": 8436,
+   "tris": 1590,
+   "min": [
+    -1.8,
+    0,
+    -0.8069
+   ],
+   "max": [
+    1.8,
+    2.2181,
+    0.8069
+   ],
+   "lods": []
+  },
+  "bunker_grate": {
+   "url": "assets/models/bunker_grate.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 180624,
+   "srcTris": 8436,
+   "tris": 828,
+   "min": [
+    -0.515,
+    0,
+    -0.515
+   ],
+   "max": [
+    0.515,
+    0.0566,
+    0.515
+   ],
+   "lods": []
+  },
+  "bunker_light": {
+   "url": "assets/models/bunker_light.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 271964,
+   "srcTris": 8436,
+   "tris": 352,
+   "min": [
+    -0.311,
+    0,
+    -0.475
+   ],
+   "max": [
+    0.311,
+    0.237,
+    0.475
+   ],
+   "lods": []
+  },
+  "bunker_rail": {
+   "url": "assets/models/bunker_rail.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 540136,
+   "srcTris": 8436,
+   "tris": 284,
+   "min": [
+    -0.925,
+    0,
+    -0.0278
+   ],
+   "max": [
+    0.925,
+    0.945,
+    0.0278
+   ],
+   "lods": []
+  },
+  "bunker_ladder": {
+   "url": "assets/models/bunker_ladder.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 555332,
+   "srcTris": 8436,
+   "tris": 1016,
+   "min": [
+    -0.319,
+    0,
+    -0.0232
+   ],
+   "max": [
+    0.319,
+    3,
+    0.0232
+   ],
+   "lods": []
+  },
+  "bunker_pipe": {
+   "url": "assets/models/bunker_pipe.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 287920,
+   "srcTris": 8436,
+   "tris": 82,
+   "min": [
+    -0.4548,
+    0,
+    -0.4548
+   ],
+   "max": [
+    0.4548,
+    3,
+    0.4548
+   ],
+   "lods": []
+  },
+  "bunker_pipes": {
+   "url": "assets/models/bunker_pipes.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 291900,
+   "srcTris": 8436,
+   "tris": 564,
+   "min": [
+    -0.8485,
+    0,
+    -0.1347
+   ],
+   "max": [
+    0.8485,
+    1.9,
+    0.1347
+   ],
+   "lods": []
+  },
+  "bunker_chain": {
+   "url": "assets/models/bunker_chain.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 558852,
+   "srcTris": 8436,
+   "tris": 1152,
+   "min": [
+    -1.025,
+    0,
+    -0.0965
+   ],
+   "max": [
+    1.025,
+    0.1927,
+    0.0965
+   ],
+   "lods": []
+  },
+  "bunker_cable": {
+   "url": "assets/models/bunker_cable.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 289732,
+   "srcTris": 8436,
+   "tris": 296,
+   "min": [
+    -3,
+    0,
+    -0.5351
+   ],
+   "max": [
+    3,
+    0.0687,
+    0.5351
+   ],
+   "lods": []
+  },
+  "bunker_house": {
+   "url": "assets/models/bunker_house.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 786524,
+   "srcTris": 286,
+   "tris": 286,
+   "min": [
+    -3.1767,
+    0,
+    -5.4064
+   ],
+   "max": [
+    3.1767,
+    3.0223,
+    5.4064
+   ],
+   "lods": []
+  },
+  "bunker_gate_frame": {
+   "url": "assets/models/bunker_gate_frame.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 1498760,
+   "srcTris": 14020,
+   "tris": 6924,
+   "min": [
+    -0.72,
+    0,
+    -0.2557
+   ],
+   "max": [
+    0.72,
+    2.34,
+    0.2557
+   ],
+   "lods": []
+  },
+  "bunker_gate_leaf": {
+   "url": "assets/models/bunker_gate_leaf.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 1500528,
+   "srcTris": 14020,
+   "tris": 7096,
+   "min": [
+    -0.5377,
+    0,
+    -0.2096
+   ],
+   "max": [
+    0.5377,
+    1.935,
+    0.2096
    ],
    "lods": []
   },
@@ -2013,153 +2501,6 @@
     ]
    }
   },
-  "combat_helmet": {
-   "url": "assets/models/combat_helmet.glb",
-   "tags": [
-    "loot",
-    "gear"
-   ],
-   "bytes": 775636,
-   "srcTris": 378633,
-   "tris": 6996,
-   "min": [
-    -0.15,
-    0,
-    -0.1318
-   ],
-   "max": [
-    0.15,
-    0.2252,
-    0.1317
-   ],
-   "lods": []
-  },
-  "gun_light": {
-   "url": "assets/models/gun_light.glb",
-   "tags": [
-    "loot",
-    "attachment"
-   ],
-   "bytes": 195768,
-   "srcTris": 13361,
-   "tris": 5256,
-   "min": [
-    -0.051,
-    0,
-    -0.0224
-   ],
-   "max": [
-    0.051,
-    0.0575,
-    0.0224
-   ],
-   "lods": []
-  },
-  "rifle_suppressor": {
-   "url": "assets/models/rifle_suppressor.glb",
-   "tags": [
-    "loot",
-    "attachment"
-   ],
-   "bytes": 193948,
-   "srcTris": 13361,
-   "tris": 5234,
-   "min": [
-    -0.0858,
-    0,
-    -0.0203
-   ],
-   "max": [
-    0.0858,
-    0.0406,
-    0.0203
-   ],
-   "lods": []
-  },
-  "holo_sight": {
-   "url": "assets/models/holo_sight.glb",
-   "tags": [
-    "loot",
-    "attachment"
-   ],
-   "bytes": 424144,
-   "srcTris": 6889,
-   "tris": 6889,
-   "min": [
-    -0.0482,
-    0,
-    -0.0295
-   ],
-   "max": [
-    0.0482,
-    0.0736,
-    0.0295
-   ],
-   "lods": []
-  },
-  "flask": {
-   "url": "assets/models/flask.glb",
-   "tags": [
-    "loot",
-    "drink"
-   ],
-   "bytes": 541200,
-   "srcTris": 52520,
-   "tris": 6000,
-   "min": [
-    -0.0677,
-    0,
-    -0.0603
-   ],
-   "max": [
-    0.0677,
-    0.22,
-    0.0603
-   ],
-   "lods": []
-  },
-  "round_50": {
-   "url": "assets/models/round_50.glb",
-   "tags": [
-    "loot",
-    "ammo"
-   ],
-   "bytes": 36288,
-   "srcTris": 13279,
-   "tris": 478,
-   "min": [
-    -0.0058,
-    0,
-    -0.0201
-   ],
-   "max": [
-    0.0058,
-    0.0116,
-    0.0201
-   ],
-   "lods": []
-  },
-  "shell_12": {
-   "url": "assets/models/shell_12.glb",
-   "tags": [
-    "loot",
-    "ammo"
-   ],
-   "bytes": 89456,
-   "srcTris": 22636,
-   "tris": 308,
-   "min": [
-    -0.0122,
-    0,
-    -0.0349
-   ],
-   "max": [
-    0.0122,
-    0.0244,
-    0.0349
-   ],
-   "lods": []
-  },
   "desert_eagle": {
    "url": "assets/models/desert_eagle.glb",
    "tags": [
@@ -2223,266 +2564,6 @@
      -0.06406
     ]
    }
-  },
-  "bunker_terminal": {
-   "url": "assets/models/bunker_terminal.glb",
-   "tags": [
-    "prop"
-   ],
-   "bytes": 1712408,
-   "srcTris": 8436,
-   "tris": 332,
-   "min": [
-    -0.75,
-    0,
-    -0.6292
-   ],
-   "max": [
-    0.75,
-    1.1989,
-    0.6292
-   ],
-   "lods": []
-  },
-  "bunker_machine": {
-   "url": "assets/models/bunker_machine.glb",
-   "tags": [
-    "prop"
-   ],
-   "bytes": 1797556,
-   "srcTris": 8436,
-   "tris": 1590,
-   "min": [
-    -1.8,
-    0,
-    -0.8069
-   ],
-   "max": [
-    1.8,
-    2.2181,
-    0.8069
-   ],
-   "lods": []
-  },
-  "bunker_grate": {
-   "url": "assets/models/bunker_grate.glb",
-   "tags": [
-    "prop"
-   ],
-   "bytes": 180624,
-   "srcTris": 8436,
-   "tris": 828,
-   "min": [
-    -0.515,
-    0,
-    -0.515
-   ],
-   "max": [
-    0.515,
-    0.0566,
-    0.515
-   ],
-   "lods": []
-  },
-  "bunker_light": {
-   "url": "assets/models/bunker_light.glb",
-   "tags": [
-    "prop"
-   ],
-   "bytes": 271964,
-   "srcTris": 8436,
-   "tris": 352,
-   "min": [
-    -0.311,
-    0,
-    -0.475
-   ],
-   "max": [
-    0.311,
-    0.237,
-    0.475
-   ],
-   "lods": []
-  },
-  "bunker_rail": {
-   "url": "assets/models/bunker_rail.glb",
-   "tags": [
-    "prop"
-   ],
-   "bytes": 540136,
-   "srcTris": 8436,
-   "tris": 284,
-   "min": [
-    -0.925,
-    0,
-    -0.0278
-   ],
-   "max": [
-    0.925,
-    0.945,
-    0.0278
-   ],
-   "lods": []
-  },
-  "bunker_ladder": {
-   "url": "assets/models/bunker_ladder.glb",
-   "tags": [
-    "prop"
-   ],
-   "bytes": 555332,
-   "srcTris": 8436,
-   "tris": 1016,
-   "min": [
-    -0.319,
-    0,
-    -0.0232
-   ],
-   "max": [
-    0.319,
-    3,
-    0.0232
-   ],
-   "lods": []
-  },
-  "bunker_pipe": {
-   "url": "assets/models/bunker_pipe.glb",
-   "tags": [
-    "prop"
-   ],
-   "bytes": 287920,
-   "srcTris": 8436,
-   "tris": 82,
-   "min": [
-    -0.4548,
-    0,
-    -0.4548
-   ],
-   "max": [
-    0.4548,
-    3,
-    0.4548
-   ],
-   "lods": []
-  },
-  "bunker_pipes": {
-   "url": "assets/models/bunker_pipes.glb",
-   "tags": [
-    "prop"
-   ],
-   "bytes": 291900,
-   "srcTris": 8436,
-   "tris": 564,
-   "min": [
-    -0.8485,
-    0,
-    -0.1347
-   ],
-   "max": [
-    0.8485,
-    1.9,
-    0.1347
-   ],
-   "lods": []
-  },
-  "bunker_chain": {
-   "url": "assets/models/bunker_chain.glb",
-   "tags": [
-    "prop"
-   ],
-   "bytes": 558852,
-   "srcTris": 8436,
-   "tris": 1152,
-   "min": [
-    -1.025,
-    0,
-    -0.0965
-   ],
-   "max": [
-    1.025,
-    0.1927,
-    0.0965
-   ],
-   "lods": []
-  },
-  "bunker_cable": {
-   "url": "assets/models/bunker_cable.glb",
-   "tags": [
-    "prop"
-   ],
-   "bytes": 289732,
-   "srcTris": 8436,
-   "tris": 296,
-   "min": [
-    -3,
-    0,
-    -0.5351
-   ],
-   "max": [
-    3,
-    0.0687,
-    0.5351
-   ],
-   "lods": []
-  },
-  "bunker_house": {
-   "url": "assets/models/bunker_house.glb",
-   "tags": [
-    "prop"
-   ],
-   "bytes": 786524,
-   "srcTris": 286,
-   "tris": 286,
-   "min": [
-    -3.1767,
-    0,
-    -5.4064
-   ],
-   "max": [
-    3.1767,
-    3.0223,
-    5.4064
-   ],
-   "lods": []
-  },
-  "bunker_gate_frame": {
-   "url": "assets/models/bunker_gate_frame.glb",
-   "tags": [
-    "prop"
-   ],
-   "bytes": 1498760,
-   "srcTris": 14020,
-   "tris": 6924,
-   "min": [
-    -0.72,
-    0,
-    -0.2557
-   ],
-   "max": [
-    0.72,
-    2.34,
-    0.2557
-   ],
-   "lods": []
-  },
-  "bunker_gate_leaf": {
-   "url": "assets/models/bunker_gate_leaf.glb",
-   "tags": [
-    "prop"
-   ],
-   "bytes": 1500528,
-   "srcTris": 14020,
-   "tris": 7096,
-   "min": [
-    -0.5377,
-    0,
-    -0.2096
-   ],
-   "max": [
-    0.5377,
-    1.935,
-    0.2096
-   ],
-   "lods": []
   }
  }
 }

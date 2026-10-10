@@ -21,7 +21,7 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { prune, weld, simplify, textureCompress, meshopt, getBounds, transformMesh } from '@gltf-transform/functions';
+import { prune, weld, simplify, textureCompress, meshopt, getBounds, transformMesh, metalRough } from '@gltf-transform/functions';
 import { MeshoptEncoder, MeshoptSimplifier } from 'meshoptimizer';
 import sharp from 'sharp';
 import { standSkin, mul, move, scaleBy } from './weapon-packs.mjs';
@@ -91,6 +91,9 @@ export async function processProp(id, cfg, { io, SRC, OUT, FORCE, exists, countT
   }
   if (!meta) {
     const doc = await io.read(gltfPath);
+    // (A download whose materials are written the old way, as diffuse and gloss, is put into the way the game
+    // reads them: left as it came, it is drawn with no texture at all, the colour of plaster.)
+    if (doc.getRoot().listExtensionsUsed().some((e) => e.extensionName === 'KHR_materials_pbrSpecularGlossiness')) await doc.transform(metalRough());
     await doc.transform(weld());
     const root = doc.getRoot(), scene = root.listScenes()[0];
     const srcTris = countTris(doc);

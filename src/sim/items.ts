@@ -78,6 +78,8 @@ export interface ItemDef {
   wear?: { cargo?: [number, number]; /** torso damage multiplier */ armor?: number; /** head damage multiplier */ head?: number; /** fall damage multiplier */ fall?: number; /** extra punch damage */ fist?: number; /** how fast thirst grows, as a multiplier */ thirst?: number; /** over the face, it keeps the gas out (see src/sim/gas.ts) */ gas?: number };
   /** weapon attachment: which weapons take it and where it mounts; what it does to the gun's handling score, and to its kick (a multiplier) */
   attach?: { fits: string[]; slot: AttachSlot; ergo?: number; recoil?: number; /** rounds more than the gun's own magazine holds */ rounds?: number; /** on the muzzle: it quiets the shot and hides the flash */ quiet?: boolean };
+  /** its model's colours are multiplied by this (0xrrggbb): one model, told apart from another thing made of it */
+  tint?: number;
   /** camera hint for the icon renderer */
   iconYaw?: number;
 }
@@ -260,14 +262,19 @@ const D: ItemDef[] = [
     desc: 'Laced leather boots with a stiff sole. Cushions a bad landing: a third less fall damage.', wear: { fall: 0.67 },
   },
   {
-    // (still `sack_pack`: the smaller of two packs, both the one military backpack at two sizes)
-    id: 'sack_pack', name: 'Patrol Pack', model: 'military_backpack', scale: 0.98, w: 3, h: 3, weight: 0.9, category: 'clothing', slot: 'back',
-    desc: 'A small camouflage day pack. 16 slots.', wear: { cargo: [4, 4] },
+    // Three packs, small to large. (Still `sack_pack`: the smallest, the military backpack's model made small and
+    // dyed dark olive, so that it is not taken for the big one at a glance.)
+    id: 'sack_pack', name: 'Recon Pack', model: 'military_backpack', scale: 0.84, tint: 0x6b7350, w: 3, h: 3, weight: 0.8, category: 'clothing', slot: 'back',
+    desc: 'A small dark day pack that sits close to the back. 16 slots.', wear: { cargo: [4, 4] },
   },
   {
-    // (still `suitcase`)
-    id: 'suitcase', name: 'Field Rucksack', model: 'military_backpack', scale: 1.22, w: 4, h: 3, weight: 1.8, category: 'clothing', slot: 'back',
-    desc: 'A full-size military backpack, with room for 30 slots.', wear: { cargo: [6, 5] },
+    id: 'camping_pack', name: 'Camping Backpack', model: 'camping_backpack', w: 4, h: 3, weight: 1.5, category: 'clothing', slot: 'back',
+    desc: 'A tall black hiking pack with red lacing. 30 slots.', wear: { cargo: [6, 5] },
+  },
+  {
+    // (still `suitcase`: the largest)
+    id: 'suitcase', name: 'Field Rucksack', model: 'military_backpack', scale: 1.22, w: 4, h: 3, weight: 2.2, category: 'clothing', slot: 'back',
+    desc: 'A full-size military backpack, the biggest there is: 42 slots.', wear: { cargo: [7, 6] },
   },
   // ---------------------------------------------------------------- tools & misc
   { id: 'keycard', name: 'Bunker Keycard', model: '@keycard', w: 1, h: 1, weight: 0.02, category: 'misc', desc: 'Opens the door of Bunker 17, once: the reader keeps it. It goes on foot: no jeep will take you while you carry one.' },

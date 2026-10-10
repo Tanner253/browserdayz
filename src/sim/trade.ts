@@ -24,7 +24,7 @@ const WORTH: Record<string, number> = {
   water_jug: 3, flask: 3, thermos: 4,
   bandage: 4, firstaid: 12, splint: 5,
   // what is worn and carried
-  boonie_hat: 18, life_vest: 22, gasmask: 30, work_gloves: 3, rubber_boots: 3, sack_pack: 8, suitcase: 6,
+  boonie_hat: 18, life_vest: 22, gasmask: 30, work_gloves: 3, rubber_boots: 3, sack_pack: 8, camping_pack: 14, suitcase: 20,
   flashlight: 5, binoculars: 10, compass: 4, watch: 6, patrol_cap: 4, fishermans_hat: 4, garden_gloves: 2,
   cigarettes: 2, grenade: 15, stash_kit: 15, jerrycan: 8, radio: 35,
 };
