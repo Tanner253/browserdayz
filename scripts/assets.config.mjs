@@ -201,6 +201,14 @@ export const LOCAL_MODELS = {
     tags: ['prop'],
     changes: 'Stood on the ground about its own middle; its texture re-encoded as WebP at 2048; geometry compressed.',
   },
+  // (inspired by a game's barrack and not taken out of it: the owner of this project says so, 2026-10-10)
+  old_barrack: {
+    dir: 'old_barrack',
+    size: 15.07,
+    tex: 2048,
+    tags: ['prop'],
+    changes: 'Stood on the ground about its own middle; its texture re-encoded as WebP at 2048; geometry compressed.',
+  },
   shanty_mansion: {
     dir: 'shanty_mansion',
     size: 29.6,

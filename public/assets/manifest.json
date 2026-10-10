@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-10T11:05:54.348Z",
+ "generated": "2026-10-10T11:10:13.778Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr"
@@ -1887,6 +1887,26 @@
     5.6587,
     7.1682,
     7.3
+   ],
+   "lods": []
+  },
+  "old_barrack": {
+   "url": "assets/models/old_barrack.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 299944,
+   "srcTris": 4598,
+   "tris": 4598,
+   "min": [
+    -7.535,
+    0,
+    -3.498
+   ],
+   "max": [
+    7.535,
+    4.7243,
+    3.498
    ],
    "lods": []
   },

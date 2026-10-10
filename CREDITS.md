@@ -31,6 +31,8 @@ What is not CC0 is listed first, with the credit its licence asks for.
   Changes made: Scaled to metres and stood on the ground; textures re-encoded as WebP; geometry compressed.
 - This work is based on "Textured Building with Interior" (https://sketchfab.com/3d-models/textured-building-with-interior-8308fcecc38b466f90076af215c52c8e) by Lodgelus (https://sketchfab.com/lodgelus) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
   Changes made: Stood on the ground about its own middle; its texture re-encoded as WebP at 2048; geometry compressed.
+- This work is based on "Old barrack from DayZ" (https://sketchfab.com/3d-models/old-barrack-from-dayz-9419706c98c94dfb83d7d3e19f7a6a37) by Shotkey (https://sketchfab.com/shotkey) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Changes made: Stood on the ground about its own middle; its texture re-encoded as WebP at 2048; geometry compressed.
 - This work is based on "Shanty | Mansion | Wooden" (https://sketchfab.com/3d-models/shanty-mansion-wooden-cf93dfd6da1640f08ebe051ba280426d) by Erroratten (https://sketchfab.com/erroratten) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
   Changes made: Stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.
 - This work is based on "Military Backpack" (https://sketchfab.com/3d-models/military-backpack-06be5c0f15aa4aa3af8ebcc4c83d02a3) by Neslihan Çakmak (https://sketchfab.com/neslihancakmak) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
