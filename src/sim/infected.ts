@@ -170,8 +170,12 @@ export function bunkerSpots(world: World): [number, number, number][] {
   for (let f = H.front - 6; f > H.back + 2; f -= 4) put(0, f);
   for (let r = -H.r + 3; r < H.r - 2; r += 4) if (Math.abs(r) > BUNKER.passage + 1.5) put(r, plan.cross);
   for (const q of plan.rooms) {
-    const [dr, df] = q.doors[0], cr = (q.r0 + q.r1) / 2, cf = (q.f0 + q.f1) / 2, d = Math.hypot(cr - dr, cf - df) || 1;
-    put(dr + ((cr - dr) / d) * 1.6, df + ((cf - df) / d) * 1.6);
+    // (a step inside each of its ways in: there are more of those than there were, and more standing in its middle)
+    const cr = (q.r0 + q.r1) / 2, cf = (q.f0 + q.f1) / 2;
+    for (const [dr, df] of q.doors) {
+      const d = Math.hypot(cr - dr, cf - df) || 1;
+      put(dr + ((cr - dr) / d) * 1.6, df + ((cf - df) / d) * 1.6);
+    }
   }
   return out;
 }
