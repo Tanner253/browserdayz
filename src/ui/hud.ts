@@ -2,6 +2,7 @@
 // only when relevant. Plain DOM; updated once per frame with cheap diffs.
 
 import type { Vitals } from '../game/player';
+import { mountUpdates } from './updates';
 import { MAX_STAMINA, type ChatChannel } from '../net/protocol';
 import { TOUCH } from '../core/device';
 import { EMOTES } from '../sim/emotes';
@@ -257,6 +258,8 @@ export class HUD {
     this.notes = this.root.querySelector('.hud-notes') as HTMLDivElement;
     for (const [k, sel] of [['wheel', '.hud-wheel'], ['wheelDot', '.wheel-dot'], ['wheelB', '.wheel-mid b'], ['wheelS', '.wheel-mid span'], ['says', '.hud-says']]) this.el[k] = this.root.querySelector(sel) as HTMLElement;
     this.buildCompass();
+    // (the game's news, in a corner of the way in: it comes when it comes, and the menu does not wait for it)
+    void mountUpdates(this.el.start);
     (this.root.querySelector('.fatal-btn') as HTMLButtonElement).onclick = () => location.reload();
     const chat = this.root.querySelector('.chat-input') as HTMLInputElement;
     chat.addEventListener('keydown', (e) => {

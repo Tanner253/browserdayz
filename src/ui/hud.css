@@ -889,6 +889,31 @@
 .start-online.full::before { background: var(--brand); box-shadow: 0 0 6px var(--brand); }
 @keyframes live-dot { 50% { opacity: 0.35; } }
 
+/* --- the game's news, in the bottom right of the way in: on a desk's screen only, and never over an open sheet */
+.sm-news { position: absolute; z-index: 1; right: 40px; bottom: 54px; display: flex; flex-direction: column; width: 332px; max-height: min(62vh, 640px); background: rgba(8, 10, 9, 0.76); border: 1px solid var(--line); backdrop-filter: blur(6px); }
+.sm-news header { display: flex; align-items: baseline; justify-content: space-between; padding: 10px 14px 9px; border-bottom: 1px solid var(--line); }
+.sm-news header b { font-family: var(--mono); font-size: 11px; font-weight: 600; letter-spacing: 0.22em; text-transform: uppercase; color: var(--ink); }
+.sm-news header a { font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; text-decoration: none; color: var(--brand); }
+.sm-news header a:hover { text-decoration: underline; }
+.sn-list { overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: rgba(233, 228, 216, 0.25) transparent; }
+.sn-post { padding: 11px 14px 12px; border-bottom: 1px solid var(--line); }
+.sn-post:last-child { border-bottom: 0; }
+.sn-meta { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); }
+.sn-text { display: -webkit-box; margin: 6px 0 0; overflow: hidden; font-size: 13px; line-height: 1.4; white-space: pre-line; overflow-wrap: anywhere; color: var(--ink-dim); -webkit-box-orient: vertical; -webkit-line-clamp: 4; }
+.sn-media { position: relative; width: 100%; max-height: 190px; margin-top: 8px; overflow: hidden; background: #050706; border: 1px solid var(--line); }
+.sn-media img, .sn-media video { display: block; width: 100%; height: 100%; object-fit: cover; }
+.sn-play { position: absolute; inset: 0; width: 46px; height: 46px; margin: auto; padding: 0; border: 1px solid rgba(233, 228, 216, 0.7); border-radius: 50%; background: rgba(5, 7, 6, 0.6); cursor: pointer; }
+.sn-play::before { content: ''; position: absolute; left: 18px; top: 13px; border-left: 14px solid var(--ink); border-top: 9px solid transparent; border-bottom: 9px solid transparent; }
+.sn-play:hover { border-color: var(--brand); background: rgba(5, 7, 6, 0.82); }
+.sn-more { position: absolute; right: 6px; bottom: 6px; padding: 2px 6px; font-family: var(--mono); font-size: 10px; color: var(--ink); background: rgba(5, 7, 6, 0.7); }
+.sn-view { display: inline-block; margin-top: 9px; padding: 5px 10px 6px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; text-decoration: none; color: var(--ink); border: 1px solid var(--line); }
+.sn-view:hover { border-color: var(--brand); color: var(--brand); }
+.hud-start.sheet .sm-news, .hud-start.paused .sm-news, body.touch .sm-news { display: none; }
+.hud-start.enter:not(.paused) .sm-news { animation: enter-fade 0.8s ease both 1.6s; }
+@media (max-width: 1180px), (max-height: 660px), (pointer: coarse) {
+  .sm-news { display: none; }
+}
+
 /* --- the way in */
 .sm-main { display: grid; grid-template-columns: minmax(0, 1fr); align-items: end; min-height: 0; padding: 0 40px; }
 .hud-start.sheet .sm-main { grid-template-columns: minmax(560px, 1fr) minmax(0, 780px); gap: 32px; }
