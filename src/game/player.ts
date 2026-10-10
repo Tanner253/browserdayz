@@ -13,11 +13,17 @@ import { LEG, breaksOnLanding } from '../sim/injury';
 
 const STAND_HALF = 0.56;
 const CROUCH_HALF = 0.26;
+/** lying down: as low as the body's own thickness lets it be */
+const PRONE_HALF = 0.03;
+/** and at a crawl, metres a second */
+const CRAWL = 1.05;
 const RADIUS = 0.3;
 const EYE_STAND = 1.64;
 const EYE_CROUCH = 1.02;
 /** sat on the ground (the wheel) */
 const EYE_SAT = 0.86;
+/** lying down, the chin just off the ground */
+const EYE_PRONE = 0.36;
 /** how long an untreated wound bleeds, seconds */
 const BLEED_TIME = 42;
 /** the gap the character controller keeps from whatever it stands on or touches */
@@ -71,6 +77,8 @@ export class Player {
   eye = EYE_STAND;
   /** sat down on the ground: the eyes are where a sitting head is (the game says when: see `hold` there) */
   sat = false;
+  /** lying down (Z): low, slow, steady, and hard to see */
+  prone = false;
   lean = 0;
   vitals: Vitals = { health: 100, energy: 85, water: 85, stamina: MAX_STAMINA, bleeding: false };
   dead = false;
@@ -203,11 +211,30 @@ export class Player {
   }
 
   private half() {
-    return this.crouched ? CROUCH_HALF : STAND_HALF;
+    return this.prone ? PRONE_HALF : this.crouched ? CROUCH_HALF : STAND_HALF;
+  }
+
+  /** Down onto the belly, or up off it (to a crouch, if that is how the body was before it lay down). @returns whether it could */
+  setProne(on: boolean): boolean {
+    if (on === this.prone) return true;
+    if (!on) {
+      // need head room for what is got up to
+      const t = this.body.translation();
+      const feet = t.y - this.half() - RADIUS, up = (this.crouched ? CROUCH_HALF : STAND_HALF) * 2 + RADIUS * 2;
+      if (physics.raycast({ x: t.x, y: feet + 0.45, z: t.z }, { x: 0, y: 1, z: 0 }, up - 0.55, SHOT_GROUPS, this.collider)) return false;
+    }
+    const feet = this.body.translation().y - this.half() - RADIUS;
+    this.prone = on;
+    this.collider.setShape(new physics.R.Capsule(this.half(), RADIUS));
+    this.body.setTranslation({ x: this.pos.x, y: feet + this.half() + RADIUS, z: this.pos.z }, true);
+    physics.world.propagateModifiedBodyPositionsToColliders();
+    return true;
   }
 
   setCrouch(c: boolean) {
     if (c === this.crouched) return;
+    // (lying down, how the body will be when it gets up is all that changes)
+    if (this.prone) return void (this.crouched = c);
     if (!c) {
       // need head room to stand
       const t = this.body.translation();
@@ -252,11 +279,21 @@ export class Player {
       return;
     }
 
-    if (input.pressedFixed('KeyC') || input.pressedFixed('ControlLeft')) this.setCrouch(!this.crouched);
+    // Z: down onto the belly, and up again. Lying down, C gets up as far as a crouch and Space all the way.
+    let rose = false;
+    if (input.pressedFixed('KeyZ') && this.grounded && !v.broken) this.setProne(!this.prone);
+    else if (this.prone && (input.pressedFixed('KeyC') || input.pressedFixed('ControlLeft'))) {
+      this.crouched = true;
+      if (!this.setProne(false)) this.crouched = false;
+    } else if (this.prone && input.pressedFixed('Space')) {
+      this.crouched = false;
+      // (Space gets up: it does not also jump)
+      rose = this.setProne(false);
+    } else if (input.pressedFixed('KeyC') || input.pressedFixed('ControlLeft')) this.setCrouch(!this.crouched);
 
     const fwd = (input.held('KeyW') ? 1 : 0) - (input.held('KeyS') ? 1 : 0);
     const str = (input.held('KeyD') ? 1 : 0) - (input.held('KeyA') ? 1 : 0);
-    const wantsSprint = input.held('ShiftLeft') && fwd > 0 && !this.aiming && !this.crouched;
+    const wantsSprint = input.held('ShiftLeft') && fwd > 0 && !this.aiming && !this.crouched && !this.prone;
     const walk = input.held('AltLeft');
     // Out of breath is a state, not a line to hover on. With only the line, a player who kept
     // Shift down after running dry sprinted for one step each second: the pace and the view
@@ -271,10 +308,10 @@ export class Player {
     this.sprinting = wantsSprint && fit;
     // Shift while crouched: a hurried crouch, well short of a sprint and well over a creep.
     // It takes breath as a sprint does (less of it), and the trigger stops it as it stops one.
-    this.scurrying = this.crouched && input.held('ShiftLeft') && fwd > 0 && !this.aiming && fit;
+    this.scurrying = this.crouched && !this.prone && input.held('ShiftLeft') && fwd > 0 && !this.aiming && fit;
 
     const enc = Math.max(0, this.weightKg - 18) * 0.012; // encumbrance
-    let speed = this.crouched ? (this.scurrying ? CROUCH_RUN : 1.9) : walk ? 1.7 : 4.0;
+    let speed = this.prone ? CRAWL : this.crouched ? (this.scurrying ? CROUCH_RUN : 1.9) : walk ? 1.7 : 4.0;
     // (parched, nobody runs flat out)
     if (this.sprinting) speed = 6.2 * (stage(v.water) === 2 ? NEED.slow : 1);
     // With nothing in the hands, whatever was carried put away, everything is a fifth faster: the one rule, and
@@ -307,9 +344,9 @@ export class Player {
     // Jumping forgives a little: pressed just before landing it still fires on touchdown,
     // and for a moment after running off an edge the ground still counts.
     this.airT = this.grounded ? 0 : this.airT + h;
-    this.jumpWish = input.pressedFixed('Space') ? 0 : this.jumpWish + h;
+    this.jumpWish = input.pressedFixed('Space') && !rose ? 0 : this.jumpWish + h;
     // (a jump costs stamina but never waits for it: feet that will not leave the ground read as a fault)
-    if (this.jumpWish < 0.13 && (this.grounded || (this.airT < 0.11 && this.vel.y <= 0)) && !this.crouched && !v.broken) {
+    if (this.jumpWish < 0.13 && (this.grounded || (this.airT < 0.11 && this.vel.y <= 0)) && !this.crouched && !this.prone && !v.broken) {
       this.vel.y = 4.4;
       v.stamina = Math.max(0, v.stamina - 14);
       this.staminaDelay = 1.2;
@@ -584,7 +621,7 @@ export class Player {
     this.alpha = alpha;
     const lean = this.prevLean + (this.lean - this.prevLean) * alpha;
     const moving = this.prevMoving + (this.moving - this.prevMoving) * alpha;
-    const targetEye = this.dead ? 0.35 : this.sat ? EYE_SAT : this.crouched ? EYE_CROUCH : EYE_STAND;
+    const targetEye = this.dead ? 0.35 : this.prone ? EYE_PRONE : this.sat ? EYE_SAT : this.crouched ? EYE_CROUCH : EYE_STAND;
     this.eye += (targetEye - this.eye) * (1 - Math.exp(-(this.dead ? 3 : 12) * dt));
 
     // landing dip spring

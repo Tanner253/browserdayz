@@ -1585,7 +1585,7 @@ export class Weapons {
     const tired = (1 + (1 - p.vitals.stamina / MAX_STAMINA) * 2.5) * p.shake;
     const heft = THREE.MathUtils.clamp((100 - hd.ergo) / 60, 0.25, 1.2);
     const armsK = 1 + Math.pow(1 - this.armStamina, 2) * 2.6;
-    const swayAmp = (this.scoped ? 0.0035 : this.aiming ? 0.0022 : 0.0012) * tired * (this.breath.held ? 0.15 : 1) * (p.crouched ? 0.6 : 1) * (hasMod(item, 'rifle_wrap') ? 0.75 : 1) * armsK * (0.75 + heft * 0.5);
+    const swayAmp = (this.scoped ? 0.0035 : this.aiming ? 0.0022 : 0.0012) * tired * (this.breath.held ? 0.15 : 1) * (p.prone ? 0.38 : p.crouched ? 0.6 : 1) * (hasMod(item, 'rifle_wrap') ? 0.75 : 1) * armsK * (0.75 + heft * 0.5);
     const t = this.time;
     const breathSway = new THREE.Vector2(Math.sin(t * 0.9) * 0.7 + Math.sin(t * 2.1) * 0.3, Math.sin(t * 1.3 + 1) * 0.6 + Math.cos(t * 0.7) * 0.4).multiplyScalar(swayAmp);
     const rec = this.aimRecoil.step(dt);

@@ -45,6 +45,18 @@ export type Gesture = 'bolt' | 'reload' | 'eat' | 'drink' | 'bandage' | 'open';
 /** from the wheel (src/sim/emotes.ts): what the arms do with a call, and what the body keeps up until told otherwise */
 export type Move = NonNullable<Emote['move']>;
 export type Hold = NonNullable<Emote['hold']>;
+/**
+ * Lying down. There is no drawing of it in the library: it is the last moment of the fall forward (face down,
+ * feet where the body stood), with the head and the chest brought up off the ground and the gun held out in
+ * front from the shoulders. Set by looking.
+ *   back    – how far the body is put back along the way it faces, so that where the player is, is its chest
+ *             (and for the player's own body, its head: the eyes are there)
+ *   up      – how far the whole of it is lifted: the drawing lies with its bones on the ground, and a chest is thicker than that
+ *   chest, head – how far each is turned up off the ground, radians
+ *   pivot   – where the gun hangs from the middle of the shoulders: up, and (negative) forward
+ *   knee    – how far a knee is drawn out to the side at each pull of a crawl, radians
+ */
+export const PRONE = { back: 1.2, backOwn: 1.62, up: 0.1, chest: 0.2, head: 0.95, pivot: [0.1, -0.3] as [number, number], knee: 0.5 };
 /** sat on the ground: how far the hips come down from the chair the sitting was drawn on, and how nearly straight the legs are laid (set by looking) */
 export const SIT = { drop: 0.4, legs: 0.92 };
 
@@ -355,6 +367,13 @@ export class Avatar {
   private hold: Hold | null = null;
   // how far into the dance, and how far up the hands are, 0..1
   private danceT = 0;
+  /** lying down (Z): asked for, how far gone, and the clock of the crawl; and the two thighs */
+  /** how high the ground is at a place: what a body lying down lies to (the game says: see game.ts) */
+  static ground: ((x: number, z: number) => number) | null = null;
+  private prone = false;
+  private proneT = 0;
+  private crawl = 0;
+  private thighs: THREE.Bone[] = [];
   /** how far sat down on the ground, 0..1; and the knees, with how each lies when the leg is straight */
   private groundT = 0;
   private knees: [THREE.Bone, THREE.Quaternion][] = [];
@@ -545,6 +564,8 @@ export class Avatar {
     }
     this.heldPivot.position.set(0, 1.43, 0);
     this.heldPivot.rotation.order = 'YXZ';
+    // (turned to where it faces first, and then tipped to the ground it lies on, if it lies)
+    this.root.rotation.order = 'YXZ';
     this.root.add(this.heldPivot);
 
     this.spine = ['spine_01', 'spine_02', 'spine_03'].map(bone).filter((b): b is THREE.Bone => !!b);
@@ -553,6 +574,7 @@ export class Avatar {
     this.joints = { head: bone('Head') ?? undefined, neck: bone('neck_01') ?? undefined, pelvis: bone('pelvis') ?? undefined };
     // (as the body rests, before anything has moved it, a leg is straight)
     this.knees = ['calf_l', 'calf_r'].map(bone).filter((b): b is THREE.Bone => !!b).map((b) => [b, b.quaternion.clone()]);
+    this.thighs = ['thigh_l', 'thigh_r'].map(bone).filter((b): b is THREE.Bone => !!b);
     // The infected's feet, as each body was MADE standing (see `plant`): which way the foot lies, how its toes lie
     // on it, and how high its ankle is over its sole. Not as its skeleton rests: these bodies wear a skeleton
     // that was brought to them, which rests as the game's own body stands and not as they do, and a foot laid
@@ -1189,6 +1211,11 @@ export class Avatar {
     return true;
   }
 
+  /** Lying down, or up again. */
+  setProne(on: boolean) {
+    this.prone = on;
+  }
+
   /** Sitting in a jeep's seat (whoever seats it puts it there and turns it with the jeep: see Garage.seatBody). */
   setSeat(on: boolean) {
     this.seated = on;
@@ -1285,6 +1312,7 @@ export class Avatar {
     const mv = this.move;
     this.danceT += ((this.hold === 'dance' && !dead ? 1 : 0) - this.danceT) * ease(7);
     this.groundT += ((this.hold === 'sit' && !dead ? 1 : 0) - this.groundT) * ease(5);
+    this.proneT += ((this.prone && !dead ? 1 : 0) - this.proneT) * ease(6);
     this.handsT += ((this.hold === 'surrender' && !dead ? 1 : 0) - this.handsT) * ease(9);
     // eating, drinking, dressing a wound, waving, dancing: whatever was in the hands is put away for it
     this.seatT += ((this.seated && !dead ? 1 : 0) - this.seatT) * ease(9);
@@ -1334,6 +1362,11 @@ export class Avatar {
     this.crouchT += ((crouched && !dead ? 1 : 0) - this.crouchT) * ease(10);
     this.airT += ((grounded || dead ? 0 : 1) - this.airT) * ease(9);
     this.moveT += (THREE.MathUtils.smoothstep(speed, 0.12, 0.8) - this.moveT) * ease(14);
+    // (killed lying down, a body is down already: it does not stand up to fall)
+    if (dead && this.downT === 0 && this.proneT > 0.5) {
+      this.deathClip = 'deathFront';
+      this.downT = this.dur.deathFront;
+    }
     if (dead) this.downT = Math.min(this.dur[this.deathClip] - 1e-3, this.downT + dt * POSE.deathRate);
     else this.downT = 0;
 
@@ -1406,6 +1439,12 @@ export class Avatar {
       w.sit = st * rest;
     }
     w[this.deathClip] = down;
+    // lying down, alive: the fall forward's last moment is how the body lies, and everything else gives way to it
+    const pr = this.proneT * (1 - down);
+    if (pr > 0.001) {
+      for (const n of CLIPS) if (n !== 'hit' && n !== 'hitHead') w[n] *= 1 - pr;
+      w.deathFront += pr;
+    }
     // --- and where in each. One stride clock for every stepping clip, so the same foot is
     // down in all of them and a blend of two is still a step.
     const rate: Record<Stride, number> = {
@@ -1447,7 +1486,8 @@ export class Avatar {
     for (const n of CLIPS) {
       const a = this.actions[n];
       a.setEffectiveWeight(w[n]);
-      if (n === 'death' || n === 'deathFront' || n === 'deathSide') a.time = Math.min(this.downT, this.dur[n] - 1e-3);
+      if (n === 'deathFront' && pr > 0.001 && !dead) a.time = this.dur[n] - 1e-3;
+      else if (n === 'death' || n === 'deathFront' || n === 'deathSide') a.time = Math.min(this.downT, this.dur[n] - 1e-3);
       else if (n === 'hit' || n === 'hitHead') a.time = Math.min(Math.max(0, this.hitT), this.dur[n] - 1e-3);
       else if (n === 'jumpStart') a.time = Math.min(this.dur[n] - 1e-3, POSE.jump[0] + Math.max(0, this.jumpT));
       else if (n === 'jumpLand') a.time = Math.min(this.dur[n] - 1e-3, POSE.landFrom + Math.max(0, this.landT));
@@ -1481,6 +1521,29 @@ export class Avatar {
     this.root.position.copy(pos);
     this.root.position.y -= SIT.drop * onGround;
     this.root.rotation.set(0, this.yaw + this.twist, 0);
+    if (pr > 0.001) {
+      // (the body lies forward of its feet: it is put back so that where the player is, is its chest)
+      this.crawl += speed * dt * 2.4;
+      const going = Math.min(1, speed / 0.5) * pr;
+      const sy = Math.sin(this.yaw), cy = Math.cos(this.yaw), back = (firstPerson ? PRONE.backOwn : PRONE.back) * pr;
+      this.root.position.x += sy * back;
+      this.root.position.z += cy * back;
+      // It lies ON the ground, and to the ground: its feet on the ground where they are, its head on the ground
+      // where that is, tipped to one side as the ground is. (Laid level at the height of the middle of it, on a
+      // hillside one end of it was under the grass and the other in the air.) Under a roof, on a floor that is
+      // not the ground's, a floor is level.
+      let tip = 0, roll = 0;
+      const G = Avatar.ground;
+      if (G && Math.abs(G(pos.x, pos.z) - pos.y) < 0.3) {
+        const x = this.root.position.x, z = this.root.position.z, feet = G(x, z);
+        tip = Math.atan2(G(x - sy * 1.6, z - cy * 1.6) - feet, 1.6);
+        const mx = x - sy * 0.9, mz = z - cy * 0.9;
+        roll = Math.atan2(G(mx + cy * 0.3, mz - sy * 0.3) - G(mx - cy * 0.3, mz + sy * 0.3), 0.6);
+        this.root.position.y += (feet - this.root.position.y) * pr;
+      }
+      this.root.position.y += PRONE.up * pr;
+      this.root.rotation.set(tip * pr, this.yaw + this.twist + Math.sin(this.crawl) * 0.05 * going, roll * pr);
+    }
     this.heldPivot.visible = !dead && hold > 0.1;
     // (and what is in the fist is put away as a gun is, while the hands are at something else)
     if (this.inHand) this.inHand.obj.visible = !using;
@@ -1498,7 +1561,7 @@ export class Avatar {
     const over = gone ? 0 : this.leanT * alive;
     // (leaning, the hips go a little the same way: the head ends up where the eyes of whoever is leaning are)
     if (over) this.root.position.addScaledVector(_right.set(Math.cos(this.yaw), 0, -Math.sin(this.yaw)), over * POSE.leanHips);
-    if (!gone && (lean || Math.abs(this.twist) > 0.003 || Math.abs(lift) > 0.003 || Math.abs(over) > 0.003)) {
+    if (!gone && (lean || Math.abs(this.twist) > 0.003 || Math.abs(lift) > 0.003 || Math.abs(over) > 0.003 || pr > 0.003)) {
       this.root.updateMatrixWorld(true);
       // the legs have turned; from the waist up the body still faces the aim
       const n = this.spine.length;
@@ -1522,6 +1585,15 @@ export class Avatar {
       // (the head stays level: it is the eyes that are being put round the corner)
       if (over) for (const b of this.neck) this.turn(b, _fwd, (-over * POSE.leanAngle * 0.55) / this.neck.length);
       if (Math.abs(bladed) > 1e-4) for (const b of this.neck) this.turn(b, UP, bladed / this.neck.length);
+      if (pr > 0.003) {
+        // lying: the chest a little up on the elbows and the head up off the ground, the eyes on what is ahead;
+        // and crawling, one knee and then the other drawn out to the side
+        if (this.chest) this.turn(this.chest, _right, PRONE.chest * pr);
+        for (const b of this.neck) this.turn(b, _right, (PRONE.head * pr) / this.neck.length);
+        const pull = Math.sin(this.crawl) * PRONE.knee * Math.min(1, speed / 0.5) * pr;
+        if (this.thighs[0] && pull > 0) this.turn(this.thighs[0], UP, pull);
+        if (this.thighs[1] && pull < 0) this.turn(this.thighs[1], UP, pull);
+      }
       if (lean) {
         if (this.chest) this.turn(this.chest, _right, pitch * 0.45 * alive);
         // and the head goes the rest of the way: you can see where somebody is looking
@@ -1531,7 +1603,8 @@ export class Avatar {
           // into a crouch, up and down with each stride.
           const mid = this.armL.arm.getWorldPosition(_a).add(this.armR.arm.getWorldPosition(_b)).multiplyScalar(0.5);
           this.root.worldToLocal(mid);
-          this.heldPivot.position.copy(_b.set(0, POSE.hold.pivot[0], POSE.hold.pivot[1]).applyAxisAngle(UP, -this.twist)).add(mid);
+          // (lying, it is held out in front of the shoulders and a little over them, not hung below them)
+          this.heldPivot.position.copy(_b.set(0, THREE.MathUtils.lerp(POSE.hold.pivot[0], PRONE.pivot[0], pr), THREE.MathUtils.lerp(POSE.hold.pivot[1], PRONE.pivot[1], pr)).applyAxisAngle(UP, -this.twist)).add(mid);
           // Aimed, the sights come up to the eye, and the stances say where that is from the
           // shoulders of somebody standing: the head a hand and a half above them. Crouched,
           // the back is bent, and the head is forward of the shoulders and hardly above them:

@@ -214,7 +214,7 @@ export class HUD {
                   <p><kbd>Q</kbd><kbd>E</kbd> lean</p>
                   <p><kbd class="wide">Shift</kbd> sprint · hold breath</p>
                   <p><kbd class="wide">Space</kbd> jump</p>
-                  <p><kbd>C</kbd> crouch <kbd class="wide">Alt</kbd> walk</p>
+                  <p><kbd>C</kbd> crouch <kbd>Z</kbd> lie down <kbd class="wide">Alt</kbd> walk</p>
                 </div>
                 <div class="kb-group">
                   <h4>Fight</h4>

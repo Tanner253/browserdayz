@@ -7,7 +7,7 @@ import type RAPIER from '@dimforge/rapier3d-compat';
 import { physics, GLASS_GROUPS, HITBOX_GROUPS, SOLID_GROUPS, type Surface } from '../core/physics';
 import { audio } from '../core/audio';
 import type { Atmosphere } from '../world/atmosphere';
-import { F_AIM, F_BLEED, F_CROUCH, F_LIGHT, F_DANCE, F_DEAD, F_GROUND, F_GUARD, F_LEAN_L, F_LEAN_R, F_LIMP, F_SIT, F_SURRENDER, type Act, type Pose } from '../net/protocol';
+import { F_AIM, F_BLEED, F_CROUCH, F_LIGHT, F_DANCE, F_DEAD, F_GROUND, F_GUARD, F_LEAN_L, F_LEAN_R, F_LIMP, F_PRONE, F_SIT, F_SURRENDER, type Act, type Pose } from '../net/protocol';
 import { SHOUT_RANGE, voiceOf, type Emote } from '../sim/emotes';
 import { ITEMS } from '../sim/items';
 import { Avatar } from './avatar';
@@ -28,6 +28,7 @@ const lerpAngle = (a: number, b: number, t: number) => a + Math.atan2(Math.sin(b
 
 export type HeldFactory = (id: string | null, mods: string[]) => { obj: THREE.Object3D; grips: Grips; kind: 'rifle' | 'pistol' | 'auto' | 'melee' } | null;
 
+const _along = new THREE.Vector3(), _legs = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0), _lie = new THREE.Quaternion();
 const _head = new THREE.Vector3(), _neck = new THREE.Vector3(), _pelvis = new THREE.Vector3();
 
 export class RemotePlayer implements Damageable {
@@ -59,6 +60,9 @@ export class RemotePlayer implements Damageable {
   /** sitting in a jeep: which one, and where in it their feet are (in the jeep's own frame) */
   seat: { jeep: Jeep; at: [number, number, number] } | null = null;
   private sat = false;
+  /** lying down (their game says so in its flags): the body lies, and so does what of it can be hit */
+  private lying = false;
+  private flat: RAPIER.Collider[] = [];
   /** the middle of the head, in the world, as of the last frame (null until the body has been seen) */
   private headAt: THREE.Vector3 | null = null;
   private ready = false;
@@ -84,7 +88,11 @@ export class RemotePlayer implements Damageable {
     zone(this.crouch, R.ColliderDesc.ball(0.125).setTranslation(-0.07, 1.03, -0.12), 'head');
     zone(this.crouch, R.ColliderDesc.cuboid(0.24, 0.24, 0.2).setTranslation(-0.07, 0.72, 0.1), 'torso');
     zone(this.crouch, R.ColliderDesc.cuboid(0.25, 0.24, 0.3).setTranslation(-0.02, 0.24, 0.07), 'legs');
-    for (const c of this.crouch) c.setEnabled(false);
+    // lying: put where the body lies each frame (see placeZones): the legs are behind the hips, not under them
+    zone(this.flat, R.ColliderDesc.ball(0.125), 'head');
+    zone(this.flat, R.ColliderDesc.cuboid(0.25, 0.31, 0.14), 'torso');
+    zone(this.flat, R.ColliderDesc.cuboid(0.2, 0.45, 0.14), 'legs');
+    for (const c of [...this.crouch, ...this.flat]) c.setEnabled(false);
     // players can't walk through each other; shots are only stopped by the hit zones
     this.blocker = physics.world.createCollider(R.ColliderDesc.capsule(0.5, 0.27).setTranslation(0, 0.8, 0).setCollisionGroups(GLASS_GROUPS), this.body);
     this.pos.set(pose[0], pose[1], pose[2]);
@@ -136,6 +144,17 @@ export class RemotePlayer implements Damageable {
       const x = v.x - this.pos.x, z = v.z - this.pos.z;
       v.set(x * c - z * s, v.y - this.pos.y, x * s + z * c);
     }
+    if (this.lying) {
+      // the chest along the line from the hips to the neck, whichever way that lies; the legs on the same line, behind the hips
+      const along = _along.copy(_neck).sub(_pelvis).normalize();
+      const q = _lie.setFromUnitVectors(_up, along);
+      this.flat[0].setTranslationWrtParent(_head);
+      this.flat[2].setTranslationWrtParent(_legs.copy(_pelvis).addScaledVector(along, -0.48));
+      this.flat[2].setRotationWrtParent(q);
+      this.flat[1].setTranslationWrtParent(_pelvis.lerp(_neck, 0.54));
+      this.flat[1].setRotationWrtParent(q);
+      return;
+    }
     const set = this.crouched ? this.crouch : this.stand;
     set[0].setTranslationWrtParent(_head);
     // the chest: between the hips and the neck, and over to one side as far as the back is
@@ -145,8 +164,9 @@ export class RemotePlayer implements Damageable {
   }
 
   private applyZones() {
-    for (const c of this.stand) c.setEnabled(this.alive && !this.crouched);
-    for (const c of this.crouch) c.setEnabled(this.alive && this.crouched);
+    for (const c of this.stand) c.setEnabled(this.alive && !this.crouched && !this.lying);
+    for (const c of this.crouch) c.setEnabled(this.alive && this.crouched && !this.lying);
+    for (const c of this.flat) c.setEnabled(this.alive && this.lying);
   }
 
   /**
@@ -254,6 +274,11 @@ export class RemotePlayer implements Damageable {
       this.avatar.limping = this.alive && !!(b.p[5] & F_LIMP);
       this.bleeding = !!(b.p[5] & F_BLEED);
       this.avatar.setHold(b.p[5] & F_DANCE ? 'dance' : b.p[5] & F_SURRENDER ? 'surrender' : b.p[5] & F_SIT ? 'sit' : null);
+      if (this.lying !== !!(b.p[5] & F_PRONE)) {
+        this.lying = !this.lying;
+        this.avatar.setProne(this.lying);
+        this.applyZones();
+      }
       // (a weapon coming up to the eye is the end of a wave)
       if (this.aiming) this.avatar.emote(null);
       const out = !this.alive ? 0 : b.p[5] & F_LEAN_R ? 1 : b.p[5] & F_LEAN_L ? -1 : 0;
