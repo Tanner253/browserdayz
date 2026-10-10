@@ -409,7 +409,10 @@ export function buildShots(S: Stage): Shot[] {
     lamp.intensity = 0;
     phone.style.display = 'none';
     document.body.classList.remove('touch', 'tr-phone6');
+    (document.querySelector('.tc') as HTMLElement | null)?.style.setProperty('display', 'none');
     g.lit = false;
+    g.player.vitals.broken = false;
+    g.player.vitals.bleeding = false;
   };
   /** the light in the hand or on the gun, on: it is the L key's, and whether it is lit already is the game's to say */
   const lightOn = () => {
@@ -540,7 +543,7 @@ export function buildShots(S: Stage): Shot[] {
       A(0).hp = A(2).hp = 400;
       A(0).nextShot = 0.5;
       A(2).nextShot = 0.9;
-      await preroll(30, { p: P(field.x, field.z + 17, 1.5), l: P(field.x, field.z, 1.2), fov: 34 });
+      await preroll(30, { p: P(field.x, field.z + 12.5, 1.5), l: P(field.x, field.z, 1.2), fov: 34 });
     },
     tick: (t) => {
       if (A(2).alive) {
@@ -550,7 +553,7 @@ export function buildShots(S: Stage): Shot[] {
     },
     cues: [{ at: 4.1, fn: () => { A(2).die(fb.clone().sub(fa).normalize()); S.feedKill('Volkov', 'Kestrel', 'm9', 21, false); } }],
     rate: (t) => (t > 3.95 && t < 4.6 ? 0.3 : 1),
-    cam: (t) => hand({ p: P(field.x + lerp(-4, 5, ease(t / b(3))), field.z + 17, 1.5), l: P(field.x + lerp(-3, 7, ease(t / b(3))), field.z + 1, 1.25), fov: lerp(36, 26, ease(t / b(3))) }, t, 1.4, 2),
+    cam: (t) => hand({ p: P(field.x + lerp(-5, 6, ease(t / b(3))), field.z + 12.5, 1.5), l: P(field.x + lerp(-5, 9, ease(t / b(3))), field.z + 1, 1.25), fov: lerp(40, 28, ease(t / b(3))) }, t, 1.4, 2),
     titles: [{ at: 0.5, until: 2.7, text: 'PLAYERS HUNT YOU', cls: 'big' }],
   });
 
@@ -559,9 +562,14 @@ export function buildShots(S: Stage): Shot[] {
     g: 'war',
     chain: true,
     plates: [[PLATE.tag, 0.3, b(2) - 0.15]],
-    tick: (_t, _s, dt) => {
+    tick: (t, _s, dt) => {
       A(0).aim = false;
-      const near1 = A(0).go(fb.x - 0.9, fb.z + 0.3, 3.4, dt);
+      // (the walk over to it is not in the picture: when the picture comes back he is a few paces off)
+      if (t < 0.03) {
+        A(0).pos.set(fb.x - 5.5, 0, fb.z + 1.2);
+        A(0).pos.y = S.ground(A(0).pos.x, A(0).pos.z);
+      }
+      const near1 = A(0).go(fb.x - 0.9, fb.z + 0.3, 2.6, dt);
       A(0).crouch = near1;
     },
     cam: (t) => hand({ p: P(fb.x + 4.5, fb.z + 5.5, 1.1), l: P(fb.x - 0.4, fb.z, 0.6), fov: 30 }, t, 1.1, 7),
@@ -585,7 +593,7 @@ export function buildShots(S: Stage): Shot[] {
     g: 'gold',
     hour: 0.62,
     flash: 0.8,
-    plates: [PLATE.p38, PLATE.m9, PLATE.deagle, PLATE.sniper, PLATE.benelli].map((p, k) => [p, 0.25 + k * b(0.78), 0.25 + (k + 1) * b(0.78) - 0.12] as [HTMLElement, number, number]),
+    plates: [PLATE.p38, PLATE.m9, PLATE.deagle, PLATE.sniper, PLATE.benelli].map((p, k) => [p, k * b(0.78) + 0.08, (k + 0.74) * b(0.78)] as [HTMLElement, number, number]),
     setup: async () => {
       reset();
       ROW.forEach((id, k) => {
@@ -597,7 +605,7 @@ export function buildShots(S: Stage): Shot[] {
     },
     cam: (t) => {
       // (along the row, one gun at a time, a pause on each)
-      const k = Math.min(4, t / b(0.78)), i = Math.floor(k), x = i + ease((k - i) * 2.2 - 1.2);
+      const k = Math.min(4, t / b(0.78)), i = Math.floor(k), x = i + ease((k - i - 0.74) / 0.26);
       const at = P(field2.x + (Math.min(4, x) - 2) * GAP, field2.z, 1.32);
       return hand({ p: at.clone().add(new THREE.Vector3(1.0, 0.02, 2.5)), l: at.clone().add(new THREE.Vector3(0.25, 0, 0)), fov: 26 }, t, 0.7, 3);
     },
@@ -757,7 +765,8 @@ export function buildShots(S: Stage): Shot[] {
     setup: () => reset(),
     cam: (t) => {
       const k = ease(t / b(3));
-      return hand({ p: W(lerp(gasR + 70, gasR - 10, k), lerp(26, 8, k), lerp(34, 7, k)), l: W(0, 0, 5), fov: 38 }, t, 0.8, 11);
+      // (low, in over the way in: from above, the gas is all there is to see)
+      return hand({ p: W(lerp(70, 36, k), lerp(7, 0, k), lerp(5.5, 2.4, k)), l: W(0, 0, 3.5), fov: 42 }, t, 0.8, 11);
     },
   });
 
@@ -803,7 +812,7 @@ export function buildShots(S: Stage): Shot[] {
       if (item) eyes(new THREE.Vector3(item.x, item.y + 0.05, item.z), 0.14);
       S.key('KeyW', t > 0.25 && t < 0.75);
     },
-    cues: [{ at: 2.3, fn: () => S.tap('KeyF') }],
+    cues: [{ at: 3.5, fn: () => S.tap('KeyF') }],
   });
 
   add(2, {
@@ -830,7 +839,7 @@ export function buildShots(S: Stage): Shot[] {
     flash: 0.3,
     setup: async () => {
       reset();
-      const q = barracks, mid = BW((q.r0 + q.r1) / 2, (q.f0 + q.f1) / 2), from = BW((q.r0 + q.r1) / 2 - 4.5, (q.f0 + q.f1) / 2);
+      const q = barracks, mid = BW((q.r0 + q.r1) / 2 - 1.2, (q.f0 + q.f1) / 2 + 1.9), from = BW((q.r0 + q.r1) / 2 - 5.2, (q.f0 + q.f1) / 2 + 1.9);
       S.kit(['gasmask', 'flashlight']);
       S.me(from.x, from.z, Math.atan2(-(mid.x - from.x), -(mid.z - from.z)), 0, from.y);
       if (g.lit) S.tap('KeyL');
@@ -867,12 +876,12 @@ export function buildShots(S: Stage): Shot[] {
     plates: [[PLATE.card, 0.4, b(2.5) - 0.15]],
     setup: async () => {
       reset();
-      const from = W(20, 6), spot = W(18.6, 6.4);
+      const from = W(20, 6), spot = W(19.0, 6.15);
       S.kit(['gasmask']);
       sweep(spot);
       item = lay('keycard', spot.clone().setY(spot.y + 0.03), 0.8);
       stand(from, spot);
-      g.player.pitch = -0.7;
+      g.player.pitch = -1.0;
       await preroll(14);
     },
     tick: (t) => {
@@ -893,7 +902,7 @@ export function buildShots(S: Stage): Shot[] {
       const j = ([...g.garage.jeeps.values()] as Any[]).filter((q) => !q.wreck).sort((p, q) => Math.hypot(p.pos.x - c.x, p.pos.z - c.z) - Math.hypot(q.pos.x - c.x, q.pos.z - c.z))[0];
       if (!j) throw new Error('no jeep on the map');
       S.kit(['keycard']);
-      const from = P(j.pos.x + 2.6, j.pos.z + 1.2);
+      const from = P(j.pos.x + 4.4, j.pos.z + 2.2);
       stand(from, j.pos);
       await preroll(14);
     },
@@ -942,6 +951,7 @@ export function buildShots(S: Stage): Shot[] {
       S.kit(['gasmask', 'flashlight', 'keycard', 'benelli', ['ammo_12', 21]], { benelli: ['gun_light', 'red_dot'] });
       S.hold(null);
       S.me(foot.x, foot.z, Math.atan2(-(doorAt.x - foot.x), -(doorAt.z - foot.z)), 0, foot.y);
+      lightOn();
       await preroll(20);
     },
     tick: (t) => {
@@ -950,7 +960,6 @@ export function buildShots(S: Stage): Shot[] {
     },
     cues: [
       { at: 0.5, fn: () => S.tap('KeyF') },
-      { at: 3.0, fn: () => lightOn() },
     ],
     titles: [{ at: 3.3, until: b(3) - 0.2, text: 'BUNKER 17', cls: 'big' }],
   });
@@ -989,7 +998,10 @@ export function buildShots(S: Stage): Shot[] {
       const from = BW(0, plan.cross + 7.5);
       S.me(from.x, from.z, Math.atan2(-(BW(0, H.back).x - from.x), -(BW(0, H.back).z - from.z)), 0, from.y);
       lightOn();
-      [0, 1, 2, 3, 4].forEach((k) => putZ(suited(k), BW((k % 2 ? 0.9 : -0.9) * (k === 4 ? 0 : 1), plan.cross - 6.5 - k * 2.6), 0, true));
+      [0, 1, 2, 3, 4].forEach((k) => putZ(suited(k), BW((k % 2 ? 0.9 : -0.9) * (k === 4 ? 0 : 1), plan.cross - 3.5 - k * 2.4), 0, true));
+      // (a film light down the passage, low: the gun's own is a narrow one, and what is beside it was not to be seen)
+      lamp.position.copy(BW(0, plan.cross - 2, 2.4));
+      lamp.intensity = 7;
       await preroll(16);
     },
     tick: (() => {
@@ -997,7 +1009,7 @@ export function buildShots(S: Stage): Shot[] {
       return (t: number) => {
         if (t < 0.1) last = -9;
         const z = zeds.filter((q) => q.i >= 3006 && !q.dead && q.pos.y < BP.y - 2).sort((p, q) => p.pos.distanceTo(g.player.pos) - q.pos.distanceTo(g.player.pos))[0];
-        S.key('KeyS', t > 2.2);
+        S.key('KeyS', t > 3.4);
         if (!z) return;
         eyes(chest(z), 0.25);
         if (t - last > 0.62 && z.pos.distanceTo(g.player.pos) < 7.5) {
@@ -1111,6 +1123,7 @@ export function buildShots(S: Stage): Shot[] {
       document.body.classList.add('touch', 'tr-phone6');
       phone.style.display = '';
       touch ??= new TouchControls(g.input, new Proxy({}, { get: () => () => {} }) as never);
+      (document.querySelector('.tc') as HTMLElement | null)?.style.removeProperty('display');
       await preroll(12);
     },
     tick: (t) => {

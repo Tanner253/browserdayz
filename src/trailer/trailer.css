@@ -350,15 +350,16 @@ body.tr-g-dim5 canvas { filter: saturate(0.5) contrast(1.1) brightness(0.6) blur
 
 /* ------------------------------------------------------------ the sixth cut: everything so far */
 .t6 .t4-logo { font-size: 30vh; letter-spacing: 0.16em; margin-right: -0.16em; }
+.t6 .t4-kick { letter-spacing: 0.46em; margin-right: -0.46em; white-space: nowrap; }
 .t6 { background: radial-gradient(ellipse at 50% 45%, rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.82)); }
 .b6 { display: flex; flex-direction: column; justify-content: center; gap: 3.4vh; padding: 0 8vw; text-transform: uppercase; background: linear-gradient(90deg, rgba(4, 6, 4, 0.82), rgba(4, 6, 4, 0.5) 60%, rgba(4, 6, 4, 0.25)); opacity: calc(min(1, var(--t, 0) * 4)); }
 .b6-head { font-size: 7.6vh; font-weight: 800; font-stretch: condensed; letter-spacing: 0.1em; line-height: 1; color: #f3ead6; }
 .b6-head b { color: #ffd35a; }
 .b6-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.6vw; max-width: 84vw; }
 .b6-foot { font-size: 2.3vh; letter-spacing: 0.3em; font-weight: 600; color: #d8cfb8; opacity: 0.8; }
-.route6 { display: grid; grid-template-columns: 62vh minmax(0, 1fr); grid-template-rows: auto 1fr; gap: 2vh 5vw; align-content: center; align-items: center; }
+.route6 { display: grid; grid-template-columns: 58vh minmax(0, 1fr); grid-template-rows: auto auto; gap: 3vh 5vw; align-content: center; align-items: center; padding-top: 6vh; padding-bottom: 6vh; }
 .route6 .b6-head { grid-column: 1 / -1; }
-.route6 svg { width: 62vh; height: 62vh; }
+.route6 svg { width: 58vh; height: 58vh; }
 .r6-rim { fill: rgba(10, 13, 10, 0.72); stroke: rgba(233, 228, 216, 0.3); stroke-width: 0.3; }
 .r6-road { fill: none; stroke: rgba(233, 228, 216, 0.34); stroke-width: 0.5; }
 .r6-gas { fill: rgba(150, 170, 40, 0.34); stroke: rgba(190, 210, 60, 0.7); stroke-width: 0.25; }
