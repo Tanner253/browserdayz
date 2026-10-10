@@ -20,6 +20,7 @@ import { WORLD_SIZE, inPlay } from '../src/world/worldgen';
 /** how far from the middle anything may say it is: the edge of the ground, and a little (the walls stand 4 m inside it) */
 const EDGE = WORLD_SIZE / 2 + 8;
 import { CALL, CRASH, DROP, fillCrash, fillDrop, type DropInfo } from '../src/sim/drops';
+import { STOCK } from '../src/sim/trade';
 import { CRATE_RESTOCK, CRATE_SPECS, fillCrate } from '../src/sim/crates';
 import { underGas } from '../src/sim/gas';
 import { BUNKER, bunkerDark, inBunker } from '../src/sim/bunker';
@@ -116,8 +117,37 @@ const isVState = (s: unknown): s is VState => Array.isArray(s) && s.length === 1
 /** the fireplaces, and which of them are alight */
 const hearths = new Hearths(world.fires);
 
+/**
+ * The things that are only ever found, never made by a player's own game: guns, blades, armour, helmets and
+ * hats, the keycard. (What the trader sells is made by the game that buys it, and so are a meal, a dressing, a
+ * round taken out of a gun, a sight taken off one: none of those can be told from an invention, and none is here.)
+ */
+const GUARDED = new Set(Object.values(ITEMS).filter((d) => !STOCK.includes(d.id) && (!!d.weapon || !!d.melee || d.wear?.armor !== undefined || d.wear?.head !== undefined || d.id === 'keycard')).map((d) => d.id));
+/** every such thing the server has put in the world, by its own number: laid out as loot, packed in a crate or a drop, left on a body */
+const issued = new Set<string>();
+function issue(it: ItemInstance | null | undefined) {
+  if (!it) return;
+  if (GUARDED.has(it.id)) issued.add(it.uid);
+  for (const p of it.cargo ?? []) issue(p.item);
+}
+/** everything in a set of pockets: what is worn and held, what is in them, and what is in what is in them */
+function* things(inv: SerializedInventory | null): Generator<ItemInstance> {
+  const walk = function* (it: ItemInstance | null | undefined): Generator<ItemInstance> {
+    if (!it) return;
+    yield it;
+    for (const p of it.cargo ?? []) yield* walk(p.item);
+  };
+  if (!inv) return;
+  for (const it of Object.values(inv.slots)) yield* walk(it);
+  for (const cont of inv.containers) for (const it of cont.items) yield* walk(it);
+}
+const invented = (it: ItemInstance) => GUARDED.has(it.id) && !issued.has(it.uid);
+
 const economy = new Economy(world.lootPoints, {
-  spawn: (l) => broadcast({ t: 'loot+', l }),
+  spawn: (l) => {
+    issue(l.item);
+    broadcast({ t: 'loot+', l });
+  },
   despawn: (l) => broadcast({ t: 'loot-', uid: l.uid }),
 });
 
@@ -128,6 +158,7 @@ function fillBox(b: Box) {
   // (a crate under the gas, or down in the bunker, is filled with the best of everything)
   fillCrate(c, b.crate!, Math.random, inBunker(world.bunker, b.x, b.y + 0.5, b.z) ? 'bunker' : underGas(world.gas, b.x, b.y, b.z));
   b.items = c.serialize().items;
+  for (const it of b.items) issue(it);
   b.emptiedAt = -1;
 }
 
@@ -166,6 +197,9 @@ function loadWorld() {
     for (const b of boxes.values()) fillBox(b);
     log(`fresh world: ${economy.loot.size} loot items`);
   }
+  // (whatever was kept from before the server stopped is the server's own too)
+  for (const l of economy.loot.values()) issue(l.item);
+  for (const b of boxes.values()) for (const it of b.items) issue(it);
 }
 
 function saveWorld() {
@@ -370,9 +404,11 @@ function takenTag(c: Client): boolean {
  *             what an honest player does until it has been seen, in the log, never to fire on one.
  *   enforce – it is refused.
  *   off     – it is not looked at.
- * What is checked: that a player has not got somewhere faster than legs or a jeep go, and that a shot does not pass
- * through a hill. (That a hit is by the weapon held, within its range, no faster than it fires, and does what that
- * weapon does, was always the server's to say: see 'hit'.)
+ * What is checked: that a player has not got somewhere faster than legs or a jeep go; that a shot does not pass
+ * through a hill; that nobody is standing after more than a body can take (`dealt`); that a thing taken off the
+ * ground was within reach; and that the guns, the blades, the armour and the keycard somebody carries, puts down,
+ * stores or hits with are ones the server itself put in the world (`issued`). (That a hit is by the weapon held,
+ * within its range, no faster than it fires, and does what that weapon does, was always the server's to say.)
  */
 const CHECKS = (['off', 'watch', 'enforce'].includes(process.env.CHECKS ?? '') ? process.env.CHECKS : 'watch') as 'off' | 'watch' | 'enforce';
 /**
@@ -384,8 +420,13 @@ const CHECKS = (['off', 'watch', 'enforce'].includes(process.env.CHECKS ?? '') ?
  *   kick  – so many refusals inside a minute, and the connection is closed (when enforcing)
  *   hill  – how far the ground may stand over the line of a shot before the shot is through a hill, metres
  *   high  – how far over the ground, and for how many seconds, before it is written down that somebody is in the air
+ *   reach – how far off a thing lying in the world can be taken from, metres (a hand reaches three)
+ *   heal  – the most health anybody gets back in a second, by any means (a first aid kit gives 45 in six)
+ *   over  – how far past none the health the server allows somebody may go before they ought to be dead, and
+ *   down  – how many ms they are given to say so themselves, as every honest game does
+ *   strikes, ban – put off the server so many times inside an hour, and they are kept off it for so many hours
  */
-const CHECK = { foot: 9.5, seat: 64, carry: 2, grace: 3, free: 2500, kick: 12, hill: 1.5, high: [30, 4] };
+const CHECK = { foot: 9.5, seat: 64, carry: 2, grace: 3, free: 2500, kick: Number(process.env.CHECK_KICK) || 12, hill: 1.5, high: [30, 4], reach: 8, heal: 10, over: 15, down: 1500, strikes: 2, ban: 6 };
 let flagged = 0;
 
 /** Something a check fires on: counted, and written down (not more than once in five seconds for one player). @returns whether it is refused */
@@ -435,10 +476,117 @@ function moveCheck(c: Client, to: Pose, now: number): boolean {
   k.refused = k.refused.filter((t) => now - t < 60000);
   k.refused.push(now);
   if (k.refused.length >= CHECK.kick * 10) {
-    log(`[check] ${c.name} is put off the server: where they said they were was refused for ${Math.round(k.refused.length / 10)} seconds of a minute`);
-    c.ws.close(4008, 'position');
+    k.refused = [];
+    putOff(c, `where they said they were was refused ${CHECK.kick * 10} times in a minute`);
   }
   return false;
+}
+
+/**
+ * The most any worn thing takes off a hit, were everything that can be worn worn at once: nobody is hurt less
+ * than that by anything. (What each player says they wear is not asked: it is their own game's word, and a
+ * moment old.)
+ */
+const SOAK = (() => {
+  const best = (field: 'armor' | 'head') => {
+    const by = new Map<string, number>();
+    for (const d of Object.values(ITEMS)) {
+      const v = d.wear?.[field];
+      if (v !== undefined) by.set(d.slot ?? d.id, Math.min(by.get(d.slot ?? d.id) ?? 1, v));
+    }
+    return [...by.values()].reduce((x, y) => x * y, 1);
+  };
+  return { torso: best('armor'), head: best('head') };
+})();
+
+/**
+ * What the server has just dealt somebody, taken off the most health they can have. That figure is never less
+ * than what they do have: it starts at what they last said (or a hundred), comes back at CHECK.heal a second
+ * whether they are mending or not, and loses only what the best armour there is would let through. So nobody
+ * honest is ever below it, and whoever is CHECK.over past none of it and still on their feet CHECK.down later
+ * has taken more than a body can (see `standing`).
+ */
+function dealt(target: Client, amount: number, zone: string, w: string) {
+  if (CHECKS === 'off' || !target.alive) return;
+  const now = Date.now(), k = target.check;
+  k.hp = Math.min(100, k.hp + (CHECK.heal * (now - k.hpAt)) / 1000) - amount * (w === 'crash' ? 1 : zone === 'torso' ? SOAK.torso : zone === 'head' ? SOAK.head : 1);
+  k.hpAt = now;
+  if (k.hp < -CHECK.over && !k.downAt) k.downAt = now;
+}
+
+/** Twice a second: whoever ought to have been dead for a while and has not said so. Enforcing, the server says it for them. */
+function standing(now: number) {
+  if (CHECKS === 'off') return;
+  for (const c of [...clients.values()]) {
+    const k = c.check;
+    if (!k.downAt || now - k.downAt < CHECK.down) continue;
+    k.downAt = 0;
+    if (!c.alive) continue;
+    if (!flag(c, `is on their feet after ${Math.round(100 - k.hp)} of damage that no armour stops`)) continue;
+    k.hp = 0;
+    kill(c, 'wounds');
+  }
+}
+setInterval(() => standing(Date.now()), 500);
+
+/** What somebody says they carry, asked of the server's own list: an invented gun is written down once, and (enforcing) is not in the copy the server keeps of their pockets. */
+function pockets(c: Client) {
+  if (CHECKS === 'off' || !c.inv) return;
+  const gone = new Set<string>();
+  for (const it of things(c.inv)) {
+    if (!invented(it)) continue;
+    if (!c.check.unknown.has(it.uid)) {
+      c.check.unknown.add(it.uid);
+      flag(c, `carries ${ITEMS[it.id].name} (${it.uid.slice(0, 12)}), which the server never put in the world`);
+    }
+    if (CHECKS === 'enforce') gone.add(it.uid);
+  }
+  if (!gone.size) return;
+  const keep = (it: ItemInstance | null): ItemInstance | null => {
+    if (!it || gone.has(it.uid)) return null;
+    if (it.cargo) it.cargo = it.cargo.filter((p) => !!keep(p.item));
+    return it;
+  };
+  for (const k of Object.keys(c.inv.slots)) c.inv.slots[k] = keep(c.inv.slots[k]);
+  for (const cont of c.inv.containers) cont.items = cont.items.filter((it) => !!keep(it));
+}
+
+// ---------------------------------------------------------------- kept off the server
+const listOf = (v: string | undefined) => (v ?? '').split(',').map((x) => x.trim()).filter(Boolean);
+/**
+ * Who is not let in. BAN_KEYS and BAN_IPS in the environment (lists, commas between) are kept off for as long as
+ * they are written there. And whoever the checks have put off the server CHECK.strikes times inside an hour is
+ * kept off for CHECK.ban hours, by the key their game gives and (where addresses can be told apart) by address.
+ * This last is forgotten when the server restarts.
+ */
+const BANS = { keys: new Set(listOf(process.env.BAN_KEYS)), ips: new Set(listOf(process.env.BAN_IPS)), temp: new Map<string, { until: number; why: string }>(), strikes: new Map<string, number[]>() };
+function bannedFor(key: string, ip: string): string | null {
+  if (BANS.keys.has(key) || (!!ip && BANS.ips.has(ip))) return 'kept off by name';
+  const now = Date.now();
+  for (const n of [key, ...(ip ? [`ip:${ip}`] : [])]) {
+    const b = BANS.temp.get(n);
+    if (b && b.until > now) return b.why;
+    if (b) BANS.temp.delete(n);
+  }
+  return null;
+}
+/** Put off the server by a check (only ever when enforcing): told so, counted, and after enough of it kept off for a while. */
+function putOff(c: Client, why: string) {
+  const now = Date.now();
+  let kept = false;
+  for (const n of namesOf(c.key, c.ip)) {
+    const times = (BANS.strikes.get(n) ?? []).filter((t) => now - t < 3600000);
+    times.push(now);
+    BANS.strikes.set(n, times);
+    if (times.length >= CHECK.strikes) {
+      BANS.temp.set(n, { until: now + CHECK.ban * 3600000, why });
+      kept = true;
+    }
+  }
+  log(`[check] ${c.name} is put off the server: ${why}${kept ? `; and kept off it for ${CHECK.ban} hours` : ''}`);
+  send(c, { t: 'kick', reason: kept ? 'The server could not make sense of what your game told it, more than once. You are kept off it for a while.' : 'The server could not make sense of what your game told it. Reconnect.' });
+  c.ws.close();
+  drop(c);
 }
 
 /** How far the ground stands over the line from one player's eye to another's chest, where it stands over it at all (0: it does not, or there is no saying). */
@@ -537,7 +685,13 @@ interface Client {
    * saved up, until when where they are is not questioned, how long they have been high over the ground, how
    * often a check has fired on them, when that was last written down, and when it last refused them.
    */
-  check: { at: number; carry: number; free: number; high: number; flags: number; said: number; refused: number[] };
+  check: {
+    at: number; carry: number; free: number; high: number; flags: number; said: number; refused: number[];
+    /** the most health they can have (see `dealt`), when that was reckoned, and since when it has been less than none (0: it is not) */
+    hp: number; hpAt: number; downAt: number;
+    /** things they have said they carry that the server never put in the world: each written down once */
+    unknown: Set<string>;
+  };
 }
 
 interface Record_ {
@@ -640,6 +794,16 @@ function cleanInventory(raw: unknown): SerializedInventory | null {
 function releaseLock(c: Client) {
   if (c.openCid && locks.get(c.openCid) === c.id) locks.delete(c.openCid);
   c.openCid = null;
+}
+
+/** The short public mark of a key, as a player's own game stamps it on their tag (publicId in src/net/client.ts: the same sum). */
+function pidOf(key: string): string {
+  let a = 2166136261, b = 5381;
+  for (let i = 0; i < key.length; i++) {
+    a = Math.imul(a ^ key.charCodeAt(i), 16777619);
+    b = (Math.imul(b, 33) ^ key.charCodeAt(i)) | 0;
+  }
+  return (a >>> 0).toString(36) + (b >>> 0).toString(36);
 }
 
 /** an item the server knows this player is carrying (pockets, slots, worn bags) */
@@ -748,6 +912,7 @@ function blowJeep(v: Veh, byId: number) {
     if (amount <= 0 || d > rule.blast! + 3) continue;
     if (by && by !== c) c.lastHitBy = { id: by.id, name: by.name, w: 'fire', zone: 'torso', dist: d, at: now };
     const len = Math.max(0.001, Math.hypot(c.pose[0] - v.s[0], c.pose[2] - v.s[2]));
+    dealt(c, amount, 'torso', 'fire');
     send(c, { t: 'dmg', from: byId, amount, zone: 'torso', w: 'fire', dir: [(c.pose[0] - v.s[0]) / len, 0, (c.pose[2] - v.s[2]) / len] });
   }
   for (const id of v.seats) {
@@ -769,12 +934,30 @@ function makeCorpse(c: Client, v: number): CorpseInfo | null {
   const uid = `corpse_${c.id}_${Date.now().toString(36)}`;
   const box = new Container(uid, 'Body', 8, 10, [], true);
   const spill: ItemInstance[] = [];
-  // their own tag (one, however many they claim to carry): on the body to be taken and cashed in, unless they had
-  // only just arrived. Somebody alive less than TAG_FRESH leaves no tag at all.
-  const own = inv ? carriedTags(inv).find((t) => !lootedTags.has(t.uid) && (t.owner ?? '') === c.name) : undefined;
+  // Their own tag (one, however many they claim to carry): on the body to be taken and cashed in, unless they had
+  // only just arrived. Somebody alive less than TAG_FRESH leaves no tag of their own at all: not the one round
+  // their neck, and not an older one of theirs that they took back off their last body. (That one was left on
+  // them: whoever killed a player a minute after they started again found a tag, and one that paid.) What they
+  // took off other people is on the body as it always was.
+  // (It is known for theirs by the mark of their key on it, or by their name: by the name alone, somebody who
+  // came back under another name carried a tag that was nobody's, and it was left on them whenever they died.)
+  const mine = pidOf(c.key);
+  const own = inv ? carriedTags(inv).find((t) => !lootedTags.has(t.uid) && (t.pid === mine || (t.owner ?? '') === c.name)) : undefined;
   const lived = Date.now() - c.lifeAt, fresh = lived < TAG_FRESH_MS;
+  /** a tag that is on a body whoever's body it is: one taken off somebody else */
+  const taken = (t: ItemInstance) => {
+    const from = lootedTags.get(t.uid);
+    return !!from && from.ownerKey !== c.key;
+  };
+  let older = 0;
+  const theirs = (it: ItemInstance) => {
+    if (it.id !== 'dogtag' || taken(it)) return false;
+    if (lootedTags.delete(it.uid)) older++;
+    return true;
+  };
   const put = (it: ItemInstance | null) => {
-    if (!it || (fresh && own && it.uid === own.uid)) return;
+    if (!it || (fresh && theirs(it))) return;
+    if (fresh && it.cargo) it.cargo = it.cargo.filter((p) => !theirs(p.item));
     stopTagClocks(it);
     const left = box.add(it);
     if (left) spill.push(left);
@@ -783,8 +966,8 @@ function makeCorpse(c: Client, v: number): CorpseInfo | null {
     for (const it of Object.values(inv.slots)) put(it);
     for (const cont of inv.containers) for (const s of cont.items) put(cleanItem(s));
     if (own && !fresh) lootedTags.set(own.uid, { owner: c.name, ownerKey: c.key, ownerIp: c.ip, livedMs: lived });
-    else if (own) {
-      log(`${c.name} left no dog tag: alive ${Math.round(lived / 1000)} s`);
+    else if (own || older) {
+      log(`${c.name} left no dog tag: alive ${Math.round(lived / 1000)} s${older ? ` (nor ${older} older of their own, taken back)` : ''}`);
       const by = c.lastHitBy && Date.now() - c.lastHitBy.at < 15000 ? clients.get(c.lastHitBy.id) : undefined;
       if (by && by !== c) send(by, { t: 'tell', kind: 'info', text: `No dog tag on ${c.name}: alive less than ${Math.round(TAG_FRESH_MS / 60000)} minutes.` });
     }
@@ -794,6 +977,8 @@ function makeCorpse(c: Client, v: number): CorpseInfo | null {
     economy.drop(it, x + Math.cos(a) * 0.9, y, z + Math.sin(a) * 0.9, Math.random() * 6.28);
   }
   if (!box.items.length) return null;
+  // (what is on a body is in the world from now on, whatever it was before: it is whoever carried it that was asked)
+  for (const p of box.items) issue(p.item);
   boxes.set(uid, { cid: uid, kind: 'corpse', w: 8, h: 10, items: box.serialize().items, x, y, z, rot: yaw, emptiedAt: -1, name: c.name, expires: economy.time + CORPSE_LIFETIME, v });
   return { uid, x, y, z, rot: yaw, name: c.name, v };
 }
@@ -954,6 +1139,8 @@ function handle(c: Client, m: C2S) {
         // you can only hit with what you are holding (fists are always there)
         if (m.w !== 'fists' && c.w !== m.w) return;
         if (now - c.lastHit < rule.interval * 700) return;
+        // (and what is held has to be in the pockets the server knows of: an invented gun is in nobody's)
+        if (m.w !== 'fists' && CHECKS !== 'off' && c.inv && !carries(c.inv, m.w) && flag(c, `hit ${target.name} with ${ITEMS[m.w]?.name ?? m.w}, which is not in their pockets`)) return;
         // (a round does not go through a hill)
         const hill = rule.melee || CHECKS === 'off' ? 0 : hillBetween(c.pose, target.pose);
         if (hill && flag(c, `shot ${target.name} through ${hill.toFixed(1)} m of hill at ${Math.round(d)} m`)) return;
@@ -963,6 +1150,7 @@ function handle(c: Client, m: C2S) {
       if (amount <= 0) return;
       const len = Math.max(0.001, Math.hypot(target.pose[0] - from[0], target.pose[2] - from[1]));
       target.lastHitBy = { id: c.id, name: c.name, w: m.w, zone: m.zone, dist: d, at: now };
+      dealt(target, amount, m.zone, m.w);
       send(target, { t: 'dmg', from: c.id, amount, zone: m.zone, w: m.w, dir: [(target.pose[0] - from[0]) / len, 0, (target.pose[2] - from[1]) / len] });
       send(c, { t: 'hitok', to: target.id, amount, zone: m.zone });
       return;
@@ -1026,7 +1214,9 @@ function handle(c: Client, m: C2S) {
         return;
       }
       const len = Math.max(0.001, Math.hypot(target.pose[0] - b.s[0], target.pose[2] - b.s[2]));
-      send(target, { t: 'dmg', from: 0, amount: INFECTED.damage + Math.round((Math.random() - 0.5) * 6), zone: 'torso', w: 'infected', dir: [(target.pose[0] - b.s[0]) / len, 0, (target.pose[2] - b.s[2]) / len] });
+      const bite = INFECTED.damage + Math.round((Math.random() - 0.5) * 6);
+      dealt(target, bite, 'torso', 'infected');
+      send(target, { t: 'dmg', from: 0, amount: bite, zone: 'torso', w: 'infected', dir: [(target.pose[0] - b.s[0]) / len, 0, (target.pose[2] - b.s[2]) / len] });
       return;
     }
     case 'radio': {
@@ -1049,6 +1239,12 @@ function handle(c: Client, m: C2S) {
       if (typeof m.uid !== 'string' || !c.alive) return;
       // first request wins; the economy's despawn event tells everyone it is gone
       // (and nobody reaches the ground from a jeep's seat)
+      const lying = economy.loot.get(m.uid);
+      const far = lying && CHECKS !== 'off' ? Math.hypot(lying.x - c.pose[0], lying.z - c.pose[2]) : 0;
+      if (lying && far > CHECK.reach && flag(c, `took ${ITEMS[lying.item.id]?.name ?? lying.item.id} from ${Math.round(far)} m away`)) {
+        send(c, { t: 'denied', uid: m.uid });
+        return;
+      }
       if (c.seatAt || !economy.take(m.uid)) send(c, { t: 'denied', uid: m.uid });
       return;
     }
@@ -1057,6 +1253,7 @@ function handle(c: Client, m: C2S) {
       const item = cleanItem(l?.item);
       if (!item || !num(l.x) || !num(l.y) || !num(l.z) || !num(l.rot) || economy.loot.has(item.uid)) return;
       if (Math.hypot(l.x - c.pose[0], l.z - c.pose[2]) > 12) return;
+      if (CHECKS !== 'off' && [...things({ slots: { it: item }, active: null, containers: [] })].some(invented) && flag(c, `put down ${ITEMS[item.id].name}, which the server never put in the world`)) return;
       economy.drop(item, l.x, l.y, l.z, l.rot);
       return;
     }
@@ -1080,6 +1277,12 @@ function handle(c: Client, m: C2S) {
       const b = boxes.get(m.cid);
       if (!b || locks.get(m.cid) !== c.id || c.seatAt) return;
       b.items = cleanStored(m.items);
+      if (CHECKS !== 'off') {
+        const made = b.items.filter((it) => [...things({ slots: { it }, active: null, containers: [] })].some(invented));
+        if (made.length && flag(c, `stored ${ITEMS[made[0].id].name}, which the server never put in the world`)) b.items = b.items.filter((it) => !made.includes(it));
+        // (let through, it is in the world from now on: it is whoever brought it that was asked)
+        for (const it of b.items) issue(it);
+      }
       if (b.kind === 'crate' || b.kind === 'drop') b.emptiedAt = b.items.length ? -1 : b.emptiedAt < 0 ? economy.time : b.emptiedAt;
       return;
     }
@@ -1116,6 +1319,7 @@ function handle(c: Client, m: C2S) {
     case 'me': {
       if (!c.alive) return;
       c.inv = cleanInventory(m.inv);
+      pockets(c);
       // the clock on a looted tag starts the first time the server sees it in somebody else's pockets
       for (const t of carriedTags(c.inv)) {
         const from = lootedTags.get(t.uid);
@@ -1127,6 +1331,8 @@ function handle(c: Client, m: C2S) {
         send(c, { t: 'tell', kind: 'warn', text: JEEP.noTag });
       }
       const v = m.vitals;
+      // (less health than the server allowed them is taken at their word; more is not)
+      if (v && num(v.health)) c.check.hp = Math.min(c.check.hp, Math.max(0, v.health) + 1);
       if (v && num(v.health) && num(v.energy) && num(v.water)) c.vitals = { health: v.health, energy: v.energy, water: v.water, stamina: num(v.stamina) ? v.stamina : MAX_STAMINA, bleeding: !!v.bleeding, broken: !!v.broken };
       return;
     }
@@ -1143,6 +1349,9 @@ function handle(c: Client, m: C2S) {
       c.vitals = null;
       c.pose = [sp.x, world.groundAt(sp.x, sp.z), sp.z, sp.yaw, 0, 0];
       c.check.free = Date.now() + CHECK.free;
+      c.check.hp = 100;
+      c.check.hpAt = Date.now();
+      c.check.downAt = 0;
       send(c, { t: 'spawn', ...sp });
       broadcast({ t: 'alive', id: c.id }, c);
       return;
@@ -1254,7 +1463,9 @@ function handle(c: Client, m: C2S) {
       if (cost.people > 0) {
         for (const id of riders) {
           const o = id === null ? undefined : clients.get(id);
-          if (o?.alive) send(o, { t: 'dmg', from: 0, amount: cost.people, zone: 'torso', w: 'crash', dir: [0, 0, 0] });
+          if (!o?.alive) continue;
+          dealt(o, cost.people, 'torso', 'crash');
+          send(o, { t: 'dmg', from: 0, amount: cost.people, zone: 'torso', w: 'crash', dir: [0, 0, 0] });
         }
       }
       return;
@@ -1302,6 +1513,13 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
     return null;
   }
   const key = keyOf(m) || `anon-${Math.random().toString(36).slice(2)}`;
+  const off = bannedFor(key, ipOf.get(ws) ?? '');
+  if (off) {
+    log(`${cleanName(m.name)} is not let in: ${off}`);
+    ws.send(JSON.stringify({ t: 'kick', reason: 'You are kept off this server for now.' } satisfies S2C));
+    ws.close();
+    return null;
+  }
   // the same character can only be in the world once
   for (const o of clients.values()) {
     if (o.key === key) {
@@ -1321,7 +1539,7 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
     pose: [sp.x, 'y' in sp && sp.y !== undefined ? sp.y : world.groundAt(sp.x, sp.z), sp.z, sp.yaw, 0, 0],
     w: null, m: [], g: [], alive: true,
     inv: resume?.inv ?? null, vitals: resume?.vitals ?? null,
-    outAt: 0, lastHit: 0, lastVHit: 0, seatAt: 0, lastNade: 0, nadeHits: 0, blasts: [], lastEmote: 0, lastChat: 0, lastHitBy: null, openCid: null, check: { at: Date.now(), carry: 0, free: Date.now() + CHECK.free, high: 0, flags: 0, said: 0, refused: [] }, activeAt: Date.now(), joinedAt: Date.now(), ip: ipOf.get(ws) ?? '', lifeAt: Date.now(), msgCount: 0, msgWindow: Date.now(),
+    outAt: 0, lastHit: 0, lastVHit: 0, seatAt: 0, lastNade: 0, nadeHits: 0, blasts: [], lastEmote: 0, lastChat: 0, lastHitBy: null, openCid: null, check: { at: Date.now(), carry: 0, free: Date.now() + CHECK.free, high: 0, flags: 0, said: 0, refused: [], hp: Math.min(100, resume?.vitals?.health ?? 100), hpAt: Date.now(), downAt: 0, unknown: new Set() }, activeAt: Date.now(), joinedAt: Date.now(), ip: ipOf.get(ws) ?? '', lifeAt: Date.now(), msgCount: 0, msgWindow: Date.now(),
   };
   records.delete(key);
   const others = [...clients.values()].map(info);
@@ -1574,6 +1792,7 @@ function spawnDrop(where?: { x: number; y: number; z: number }, heli = false) {
   else fillDrop(c);
   const b: Box = { cid: uid, kind: 'drop', w: DROP.w, h: DROP.h, items: c.serialize().items, x: at.x, y: at.y, z: at.z, rot: Math.random() * Math.PI * 2, emptiedAt: -1, expires: economy.time + (heli ? CRASH.life : DROP_LIFE), ...(heli ? { heli: true } : {}) };
   boxes.set(uid, b);
+  for (const it of b.items) issue(it);
   broadcast({ t: 'drop+', d: dropInfo(b) });
   log(`${heli ? 'helicopter down' : 'supply drop'} at ${Math.round(at.x)}, ${Math.round(at.z)} (${b.items.length} items)`);
 }
@@ -1687,7 +1906,7 @@ function serve(req: http.IncomingMessage, res: http.ServerResponse) {
     // readable from a client hosted somewhere else (e.g. Vercel) for the start-screen player count
     res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'no-store' });
     // (places: how many different addresses the players come from. One, with several players on, means the host is not passing addresses through.)
-    res.end(JSON.stringify({ ok: true, players: clients.size, max: MAX_PLAYERS, queue: queue.length, uptime: Math.round(process.uptime()), checks: CHECKS, flagged, loot: economy.loot.size, places: new Set([...clients.values()].map((c) => c.ip)).size }));
+    res.end(JSON.stringify({ ok: true, players: clients.size, max: MAX_PLAYERS, queue: queue.length, uptime: Math.round(process.uptime()), checks: CHECKS, flagged, keptOff: BANS.temp.size, loot: economy.loot.size, places: new Set([...clients.values()].map((c) => c.ip)).size }));
     return;
   }
   // the website's function asks here whether a cash-in it was told about is real

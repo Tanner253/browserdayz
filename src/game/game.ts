@@ -1045,6 +1045,13 @@ export class Game {
     net.on('death', (m) => {
       const k = m.k;
       const me = k.id === net.id;
+      // (The server says so, and this game had not: it is so. An honest game is always first, because it is the
+      // one that knows its own health; this is for the case that it was not, and for nothing else.)
+      if (me && !this.player.dead) {
+        this.player.vitals.health = 0;
+        this.player.lastCause ||= 'your wounds';
+        this.player.dead = true;
+      }
       const zone = k.zone === 'head' ? ' · headshot' : '';
       const drum = k.w === 'barrel';
       const jeep = k.w === 'jeep' || k.w === 'fire';

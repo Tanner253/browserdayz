@@ -1,7 +1,9 @@
 // The server's own checks on what a player's game tells it (CHECKS in server/index.ts): that nobody gets
-// anywhere faster than legs or a jeep go, and that a round does not pass through a hill. This starts the real
-// server twice on a port of its own, once enforcing and once only watching, and plays players against it over
-// the wire. About twenty seconds.   npx tsx test/checks.test.ts
+// anywhere faster than legs or a jeep go; that a round does not pass through a hill; that nobody stands after
+// more than a body can take; that a thing is taken from within reach; that a gun somebody carries is one the
+// server put in the world; and that whoever is put off the server twice is kept off it. This starts the real
+// server three times on a port of its own (enforcing, only watching, and enforcing with a short fuse) and plays
+// players against it over the wire. About a minute.   npx tsx test/checks.test.ts
 
 import assert from 'node:assert/strict';
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -10,6 +12,7 @@ import os from 'node:os';
 import path from 'node:path';
 import WebSocket from 'ws';
 import { PROTOCOL, type S2C } from '../src/net/protocol';
+import { ITEMS } from '../src/sim/items';
 import { generateWorld, heightAt } from '../src/world/worldgen';
 
 const PORT = 8139;
@@ -23,19 +26,39 @@ class Player {
   got: S2C[] = [];
   id = 0;
   at: [number, number] = [0, 0];
-  constructor(public name: string) {}
-  async join() {
+  shut = false;
+  /** what was lying in the world when they arrived */
+  loot: { uid: string; item: { uid: string; id: string; qty: number }; x: number; y: number; z: number }[] = [];
+  constructor(public name: string, public key = `checks-test-key-${name}-${String(++n).padStart(20, '0')}`) {}
+  /** @returns whether they were let in */
+  async join(): Promise<boolean> {
+    this.got = [];
+    this.shut = false;
     this.ws = new WebSocket(`ws://127.0.0.1:${PORT}/ws`);
     this.ws.on('message', (d) => this.got.push(JSON.parse(String(d)) as S2C));
+    this.ws.on('close', () => (this.shut = true));
     await new Promise<void>((done, fail) => {
       this.ws.once('open', () => done());
       this.ws.once('error', fail);
     });
-    this.ws.send(JSON.stringify({ t: 'hello', v: PROTOCOL, key: `checks-test-key-${this.name}-${String(++n).padStart(20, '0')}`, name: this.name }));
-    for (let k = 0; k < 160 && !this.got.some((m) => m.t === 'welcome'); k++) await sleep(50);
-    const w = this.got.find((m) => m.t === 'welcome') as { you: number } | undefined;
-    assert.ok(w, `${this.name} was never let in`);
+    this.ws.send(JSON.stringify({ t: 'hello', v: PROTOCOL, key: this.key, name: this.name }));
+    for (let k = 0; k < 160 && !this.shut && !this.got.some((m) => m.t === 'welcome'); k++) await sleep(50);
+    const w = this.got.find((m) => m.t === 'welcome') as { you: number; loot: Player['loot'] } | undefined;
+    if (!w) return false;
     this.id = w.you;
+    this.loot = w.loot;
+    return true;
+  }
+  /** what they say is in their hands and pockets, and how they are */
+  carry(slots: Record<string, object>, health = 100) {
+    this.send({ t: 'me', inv: { slots, active: null, containers: [] }, vitals: { health, energy: 80, water: 80, stamina: 300, bleeding: false } });
+  }
+  hit(whom: Player, w: string) {
+    this.send({ t: 'hit', to: whom.id, w, zone: 'torso' });
+  }
+  /** what they were told as they were put off the server */
+  get kicked(): string | undefined {
+    return (this.got.find((m) => m.t === 'kick') as { reason: string } | undefined)?.reason;
   }
   send(m: unknown) {
     this.ws.send(JSON.stringify(m));
@@ -56,11 +79,11 @@ class Player {
   }
 }
 
-async function withServer(mode: string, play: (log: () => string) => Promise<void>) {
+async function withServer(mode: string, play: (log: () => string) => Promise<void>, more: Record<string, string> = {}) {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'zona-checks-'));
   // (the site it would report a cash-in to is nowhere: nothing in this test is paid, and nothing may be)
   const server: ChildProcess = spawn(process.execPath, [path.join('node_modules', 'tsx', 'dist', 'cli.mjs'), 'server/index.ts'], {
-    env: { ...process.env, PORT: String(PORT), SITE_URL: 'http://127.0.0.1:9', DATA_DIR: dir, INFECTED: 'off', CHECKS: mode },
+    env: { ...process.env, PORT: String(PORT), SITE_URL: 'http://127.0.0.1:9', DATA_DIR: dir, INFECTED: 'off', CHECKS: mode, ...more },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let logged = '';
@@ -162,6 +185,86 @@ await withServer('enforce', async (log) => {
   for (const p of [cid, dee, eve, fay]) p.ws.close();
   checks++;
   console.log('  ok  a round through a hill hits nobody and is written down; one across open ground hits');
+
+  // ---- nobody stands after more than a body can take
+  const gil = new Player('Gil'), hal = new Player('Hal'), ivy = new Player('Ivy');
+  for (const p of [gil, hal, ivy]) await p.join();
+  gil.say(...open![0], 'mosin');
+  hal.say(...open![1]);
+  ivy.say(open![1][0] + 3, open![1][1]);
+  await sleep(300);
+  // Ivy is hit once, says how she is, and dies of the second as anybody would: nothing is said of her
+  gil.hit(ivy, 'mosin');
+  await sleep(700);
+  ivy.carry({}, 5);
+  gil.hit(ivy, 'mosin');
+  await sleep(200);
+  ivy.send({ t: 'died', cause: 'gunshot wounds' });
+  // Hal is hit six times and never says a word
+  for (let k = 0; k < 6; k++) {
+    await sleep(650);
+    gil.hit(hal, 'mosin');
+  }
+  await sleep(2800);
+  assert.ok(/\[check:enforce\] Hal is on their feet after/.test(log()), `nothing was written down of somebody who cannot be killed:\n${log().slice(-500)}`);
+  assert.ok(hal.got.some((m) => m.t === 'death' && (m as { k: { id: number } }).k.id === hal.id), 'the server did not say he was dead');
+  assert.ok(!/Ivy is on their feet/.test(log()), 'somebody who died as anybody would was written down');
+  for (const p of [gil, hal, ivy]) p.ws.close();
+  checks++;
+  console.log('  ok  whoever is hit past what a body can take and stays up is written down, and the server says they are dead');
+
+  // ---- a thing is taken from within reach
+  const jon = new Player('Jon'), kay = new Player('Kay');
+  await jon.join();
+  await kay.join();
+  const lying = jon.loot.find((l) => Math.hypot(l.x, l.z) < 300)!;
+  jon.say(lying.x + 120, lying.z);
+  kay.say(lying.x + 1, lying.z);
+  await sleep(300);
+  jon.send({ t: 'take', uid: lying.uid });
+  await sleep(400);
+  assert.ok(jon.got.some((m) => m.t === 'denied' && (m as { uid: string }).uid === lying.uid), 'a thing was taken from 120 m away');
+  assert.ok(/\[check:enforce\] Jon took .* from 120 m away/.test(log()), 'nothing was written down of it');
+  kay.send({ t: 'take', uid: lying.uid });
+  await sleep(400);
+  assert.ok(!kay.got.some((m) => m.t === 'denied'), 'a thing was refused somebody standing over it');
+  assert.ok(jon.got.some((m) => m.t === 'loot-' && (m as { uid: string }).uid === lying.uid), 'and it is still lying there');
+  jon.ws.close();
+  kay.ws.close();
+  checks++;
+  console.log('  ok  a thing lying in the world is taken from beside it, and not from across the map');
+
+  // ---- a gun somebody carries is one the server put in the world
+  const lea = new Player('Lea'), mia = new Player('Mia'), ned = new Player('Ned'), oli = new Player('Oli');
+  for (const p of [lea, mia, ned, oli]) await p.join();
+  const gun = ned.loot.find((l) => !!ITEMS[l.item.id]?.weapon && Math.hypot(l.x, l.z) < 320);
+  assert.ok(gun, 'there is no gun lying anywhere near the middle of the map');
+  lea.say(...open![0], 'deagle');
+  mia.say(open![0][0] + 8, open![0][1]);
+  ned.say(gun.x + 1, gun.z, gun.item.id);
+  oli.say(gun.x + 9, gun.z);
+  await sleep(300);
+  // Lea's is her own invention
+  lea.carry({ holster: { uid: 'made-up-desert-eagle', id: 'deagle', qty: 1, loaded: 7 } });
+  // Ned's he picks up off the ground
+  ned.send({ t: 'take', uid: gun.uid });
+  await sleep(400);
+  ned.carry({ primary: { ...gun.item, loaded: 5 } });
+  await sleep(300);
+  lea.hit(mia, 'deagle');
+  ned.hit(oli, gun.item.id);
+  await sleep(600);
+  assert.ok(/\[check:enforce\] Lea carries Desert Eagle/.test(log()), `nothing was written down of an invented gun:\n${log().slice(-500)}`);
+  assert.ok(!mia.got.some((m) => m.t === 'dmg'), 'somebody was hit with an invented gun');
+  assert.ok(!/Ned (carries|hit)/.test(log()), 'a gun picked up off the ground was taken for an invention');
+  assert.ok(oli.got.some((m) => m.t === 'dmg'), 'a gun picked up off the ground hit nobody');
+  // and she cannot put it down for somebody else to find, either
+  lea.send({ t: 'drop', l: { item: { uid: 'made-up-desert-eagle', id: 'deagle', qty: 1 }, x: open![0][0], y: ground(...open![0]), z: open![0][1], rot: 0 } });
+  await sleep(400);
+  assert.ok(!mia.got.some((m) => m.t === 'loot+' && (m as { l: { item: { uid: string } } }).l.item.uid === 'made-up-desert-eagle'), 'an invented gun was put down in the world');
+  for (const p of [lea, mia, ned, oli]) p.ws.close();
+  checks++;
+  console.log('  ok  an invented gun is written down, hits nobody and cannot be put down; one picked up off the ground is a gun');
 });
 
 await withServer('watch', async (log) => {
@@ -188,6 +291,30 @@ await withServer('watch', async (log) => {
   checks++;
   console.log('  ok  only watching, the same is written down and counted, and nothing is refused');
 });
+
+await withServer('enforce', async (log) => {
+  // ---- kept off by name, and kept off after being put off twice
+  const quin = new Player('Quin', 'checks-test-key-kept-off-by-name-0000001');
+  assert.equal(await quin.join(), false, 'somebody kept off by name was let in');
+  assert.ok(/kept off/.test(quin.kicked ?? ''), `he was told: ${quin.kicked}`);
+  const pat = new Player('Pat');
+  for (let time = 1; time <= 2; time++) {
+    assert.equal(await pat.join(), true, `Pat was not let in the ${time === 1 ? 'first' : 'second'} time`);
+    pat.say(0, 0);
+    await sleep(2700);
+    for (let k = 0; k < 14 && !pat.shut; k++) {
+      pat.say(320, 0);
+      await sleep(100);
+    }
+    await sleep(300);
+    assert.ok(pat.shut && pat.kicked, `Pat was not put off the server the ${time === 1 ? 'first' : 'second'} time`);
+  }
+  assert.ok(/kept off it for a while/.test(pat.kicked ?? ''), `the second time he was told: ${pat.kicked}`);
+  assert.equal(await pat.join(), false, 'put off twice, he was let in a third time');
+  assert.ok(/Pat is not let in/.test(log()), 'the server kept no line of it');
+  checks++;
+  console.log('  ok  whoever is kept off by name is not let in; whoever the checks put off twice is kept off');
+}, { CHECK_KICK: '1', BAN_KEYS: 'checks-test-key-kept-off-by-name-0000001' });
 
 console.log(`${checks} checks passed`);
 process.exit(0);

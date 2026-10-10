@@ -25,6 +25,15 @@ let logged = '';
 server.stdout.on('data', (d) => (logged += d));
 server.stderr.on('data', (d) => (logged += d));
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** the mark a player's game stamps on their own tag (publicId in src/net/client.ts) */
+const pidOf = (key: string) => {
+  let a = 2166136261, b = 5381;
+  for (let i = 0; i < key.length; i++) {
+    a = Math.imul(a ^ key.charCodeAt(i), 16777619);
+    b = (Math.imul(b, 33) ^ key.charCodeAt(i)) | 0;
+  }
+  return (a >>> 0).toString(36) + (b >>> 0).toString(36);
+};
 
 class Player {
   ws!: WebSocket;
@@ -84,6 +93,34 @@ try {
   cid.send({ t: 'died', cause: 'test' });
   await sleep(400);
   assert.ok(/Cid left no dog tag/.test(logged), 'a tag was left on somebody who had only just arrived');
+  // Dan has only just arrived too, under a name that is not the one on his tag: it is his by the mark of his key
+  const dan = new Player('zone-test-key-dan-000000000000000004', 'Dan');
+  await dan.join();
+  dan.carry([{ uid: 'zone-test-tag-dan', id: 'dogtag', qty: 1, owner: 'Somebody', pid: pidOf('zone-test-key-dan-000000000000000004') }]);
+  await sleep(300);
+  dan.send({ t: 'died', cause: 'test' });
+  await sleep(400);
+  assert.ok(/Dan left no dog tag/.test(logged), 'a tag was left on somebody who had only just arrived, because the name on it was not the name he came under');
+  // Eve lives long enough, dies with her tag on her, starts again, takes that tag back off her own body, and is
+  // killed at once: nothing of hers is on the second body, the new tag or the old
+  const eve = new Player('zone-test-key-eve-000000000000000005', 'Eve');
+  await eve.join();
+  await sleep(3300);
+  const old = { uid: 'zone-test-tag-eve-1', id: 'dogtag', qty: 1, owner: 'Eve' };
+  eve.carry([old]);
+  await sleep(300);
+  eve.send({ t: 'died', cause: 'test' });
+  await sleep(400);
+  eve.send({ t: 'respawn' });
+  await sleep(300);
+  eve.got.length = 0;
+  eve.carry([{ uid: 'zone-test-tag-eve-2', id: 'dogtag', qty: 1, owner: 'Eve' }, old]);
+  await sleep(300);
+  eve.send({ t: 'died', cause: 'test' });
+  await sleep(500);
+  assert.ok(/Eve left no dog tag: alive \d+ s \(nor 1 older of their own, taken back\)/.test(logged), `an older tag of her own was left on somebody who had only just started again:\n${logged.split('\n').filter((l) => l.includes('Eve')).join('\n')}`);
+  const second = eve.got.find((m) => m.t === 'death') as { corpse: unknown } | undefined;
+  assert.ok(second && second.corpse === null, 'there was something on her second body, and she carried nothing but her own tags');
   // (Bee has been alive long enough by the time she dies)
   await sleep(3200);
   // Bee dies with her own tag round her neck: the server now knows that tag as one that can be taken
