@@ -69,6 +69,14 @@ export function liftPack<T extends THREE.Material>(mat: T): T {
     // (night sights are a dull dot in daylight, not a lamp)
     if (c.emissiveMap) c.emissiveIntensity = 0.22;
   }
+  // A pack's paint that is marked as seen through (the shotgun's sight is, for its glass: and its suppressor
+  // is painted with the same) is drawn after everything solid and, as it comes, without a word of how far off
+  // it is: the suppressor was drawn through by its own barrel, and by any window behind it. It says how far
+  // off it is like anything else; what is seen through is still seen through.
+  if (c.transparent) {
+    c.depthWrite = true;
+    c.alphaTest = Math.max(c.alphaTest, 0.02);
+  }
   return mat;
 }
 
