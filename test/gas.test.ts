@@ -161,20 +161,27 @@ ok('the gas is the richest place on the map; helmets, plates and scopes are of i
     // (its own dice, thrown from a different place each time)
     (e as unknown as { rng: RNG }).rng = new RNG(seed);
     e.populate();
-    const inGas = new Map<string, number>(), out = new Map<string, number>(), deep = new Map<string, number>();
+    const inGas = new Map<string, number>(), out = new Map<string, number>(), deep = new Map<string, number>(), east = new Map<string, number>();
     let gasThings = 0;
     for (const l of e.loot.values()) {
       const under = l.point >= 0 && data.lootPoints[l.point].usage.includes('Gas');
       // (the bunker is stocked apart as well: what is in it is neither of the gas nor of the rest of the map)
-      const m = under ? inGas : l.point >= 0 && data.lootPoints[l.point].usage.includes('Bunker') ? deep : out;
+      // (and so is Kamenka, the town in the east)
+      const m = under ? inGas : l.point >= 0 && data.lootPoints[l.point].usage.includes('Bunker') ? deep : l.point >= 0 && data.lootPoints[l.point].usage.includes('East') ? east : out;
       m.set(l.item.id, (m.get(l.item.id) ?? 0) + 1);
       if (under && !data.lootPoints[l.point].arms) gasThings++;
     }
-    return { e, inGas, out, deep, gasThings };
+    return { e, inGas, out, deep, east, gasThings };
   };
   for (let k = 0; k < 6; k++) {
-    const { inGas, out, deep, gasThings } = tally(1000 + k * 7919);
-    const g = (id: string) => inGas.get(id) ?? 0, o = (id: string) => out.get(id) ?? 0, b = (id: string) => deep.get(id) ?? 0;
+    const { inGas, out, deep, east, gasThings } = tally(1000 + k * 7919);
+    const g = (id: string) => inGas.get(id) ?? 0, o = (id: string) => out.get(id) ?? 0, b = (id: string) => deep.get(id) ?? 0, t = (id: string) => east.get(id) ?? 0;
+    // Kamenka is the third step of five: the armoured vest's own home, more guns than a village has, and of what the
+    // gas and the bunker are gone into for (helmets, plates, scopes, the heavy armour, the two guns of theirs) little or none
+    assert.ok(t('armor_vest') >= 4 && t('armor_vest') > o('armor_vest') && t('armor_vest') > g('armor_vest'), `armoured vests: ${t('armor_vest')} in the town, ${o('armor_vest')} on the rest of the map, ${g('armor_vest')} under the gas`);
+    assert.ok(t('mosin') + t('m9') + t('p38') >= 9 && t('box_762') + t('box_9mm') + t('ammo_762') + t('ammo_9mm') >= 18 && t('firstaid') + t('bandage') >= 9, 'the town is thinly stocked');
+    for (const id of ['boonie_hat', 'life_vest', 'pu_scope']) assert.ok(t(id) < g(id) / 2, `${t(id)} of ${id} in the town, ${g(id)} under the gas`);
+    for (const id of ['heavy_armor', 'benelli', 'ammo_12', 'deagle', 'ammo_50', 'keycard']) assert.equal(t(id), 0, `${id} in the town`);
     // the shotgun, its shells and its can are of the bunker and nowhere else; what opens the bunker is under the gas
     assert.ok(b('benelli') >= 2 && b('ammo_12') + b('box_12') >= 10, 'no shotgun, or nothing for it, in the bunker');
     // and the heaviest armour there is: the bunker's, and nowhere else's (the bunker is the last place, and the best)

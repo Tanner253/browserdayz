@@ -11,11 +11,11 @@ import { physics, AJAR_GROUPS, BODY_QUERY, GLASS_GROUPS, WORLD_GROUPS, type Surf
 import { RNG } from '../core/noise';
 import type { Atmosphere } from './atmosphere';
 import { GAS, gasDepth, gasZone } from '../sim/gas';
-import { BUILDING_FOOTPRINT, CELL, WORLD_RES, WORLD_SIZE, bunkerPlace, heightAt, idx, type BuildingPlot, type Instance, type SiteKind, type World } from './worldgen';
+import { BUILDING_FOOTPRINT, CELL, TOWN, WORLD_RES, WORLD_SIZE, bunkerPlace, heightAt, idx, type BuildingPlot, type Instance, type SiteKind, type World } from './worldgen';
 import { bunkerAt, bunkerPlan, levelY } from '../sim/bunker';
 
 /** (`Gas` is not a kind of building: it is whatever stands under the gas, whatever else it is. See src/sim/gas.ts.) */
-export type Usage = 'Village' | 'Town' | 'Farm' | 'Industrial' | 'Military' | 'Hunting' | 'Medic' | 'Police' | 'Gas' | 'Bunker';
+export type Usage = 'Village' | 'Town' | 'Farm' | 'Industrial' | 'Military' | 'Hunting' | 'Medic' | 'Police' | 'Gas' | 'Bunker' | 'East';
 
 export interface LootPoint {
   x: number;
@@ -965,6 +965,8 @@ export class Buildings {
     // what is kept under the gas is marked so: there are things that lie nowhere else (see the economy)
     const gas = gasZone(this.world.pois, (x, z) => heightAt(this.world.heights, x, z));
     for (const p of this.lootPoints) if (gasDepth(gas, p.x, p.y, p.z) > GAS.breathe) p.usage = [...p.usage, 'Gas'];
+    // and what is kept in Kamenka, the town in the east, is marked so too: it is stocked on its own (see `east` in the economy)
+    for (const p of this.lootPoints) if (Math.hypot(p.x - TOWN.x, p.z - TOWN.z) < TOWN.stocked) p.usage = [...p.usage, 'East'];
     // The bunker: what stands in its rooms, and its places for things. After every other, so
     // that none of those is renumbered. Its places are of no kind of building: only what is
     // said to be kept in the bunker lies there.

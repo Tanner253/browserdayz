@@ -554,7 +554,7 @@ export class Game {
         market: ['the trading post', 'A trader behind the counter: he buys what you bring, sells supplies, and has paid work every day.'],
         works: ['', ''],
         bunker: ['', ''],
-        town: ['a town', 'Brick houses two floors high down both sides of the road, with a police station, a clinic and a shop. Out of the valley by the paved road, and inside the Zona.'],
+        town: ['a town', 'Brick houses two floors high down both sides of the road, plank houses, a police station, a clinic, a shop. Better stocked than the village: guns, ammunition, and armoured vests are kept here. Out of the valley by the paved road, and inside the Zona.'],
         squat: ['a squat', 'A plank house on piles, three floors of it, far out in the south country. Outside the Zona: tags are not earned here.'],
         camp: ['a camp', 'Two long huts and two containers in the north woods. Outside the Zona: tags are not earned here.'],
       };

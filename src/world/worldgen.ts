@@ -36,7 +36,12 @@ export const BUNKER_AT = { x: (-EXPANSION.x / Math.hypot(EXPANSION.x, EXPANSION.
  * on to it and through it. `street`: the way its one street runs. `r`: how much of the country round it is the
  * Zona's; `gate`: the round of the Zona that joins it to the valley, over the road between the two.
  */
-export const TOWN = { name: 'Kamenka', x: 625, z: 365, street: [0.349, 0.937] as [number, number], r: 150, gate: { x: 455, z: 203, r: 110 } };
+export const TOWN = { name: 'Kamenka', x: 625, z: 365, street: [0.349, 0.937] as [number, number], r: 150, /** how far from its middle a place for a thing is the town's own (see the economy) */ stocked: 118, gate: { x: 455, z: 203, r: 110 } };
+/** the line the road takes on from where it used to run off the old ground: round to the town's street, down it, and away through the hills */
+export function eastRoad(): [number, number][] {
+  const l = Math.hypot(...TOWN.street), on = (k: number): [number, number] => [TOWN.x + (TOWN.street[0] / l) * k, TOWN.z + (TOWN.street[1] / l) * k];
+  return [[540, 230], [566, 243], [585, 262], on(-80), on(-30), on(30), on(80), [676, 486], [716, 538], [770, 596], [800, 628]];
+}
 /** And two places far out in that country, outside the Zona: nothing is earned at them, and nobody is looking. */
 export const OUTLYING: { name: string; kind: 'squat' | 'camp'; x: number; z: number; rot: number }[] = [
   { name: "Squatters' House", kind: 'squat', x: -100, z: 640, rot: Math.PI },
@@ -295,10 +300,41 @@ export function generateWorld(seed = WORLD_SEED): World {
     h += 85 * Math.pow(smoothstep(370, 540, r), 1.6);
     return h;
   };
+  // The country the map was grown by is the top of the old valley's rim, and by the rule above it runs on level
+  // to the edge of the ground and stops. It is to be what the old map was: a bowl. Mountains stand all along the
+  // new edge, hills stand round the town, and the road has a way through both. None of it is felt inside the old
+  // square (`mask`), so the old ground is the old ground.
+  const way = eastRoad();
+  const ringParts = (x: number, z: number) => {
+    const e = Math.max(Math.abs(x), Math.abs(z)), out = e - OLD_HALF;
+    if (out <= 0) return null;
+    let road = 1e9;
+    for (let k = 0; k < way.length - 1; k++) {
+      const [ax, az] = way[k], dx = way[k + 1][0] - ax, dz = way[k + 1][1] - az;
+      const t = clamp(((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz), 0, 1);
+      road = Math.min(road, Math.hypot(x - ax - dx * t, z - az - dz * t));
+    }
+    const dT = Math.hypot(x - TOWN.x, z - TOWN.z);
+    return {
+      mask: smoothstep(0, 64, out),
+      // how much of a mountain this is: nothing 120 m in from the edge, all of one at it
+      edge: 1 - smoothstep(12, 120, half - e),
+      // and of the hills that stand round the town, a street's length off
+      hill: smoothstep(120, 195, dT) * (1 - smoothstep(300, 400, dT)),
+      pass: smoothstep(16, 75, road),
+    };
+  };
+  const ringShape = (x: number, z: number) => {
+    const q = ringParts(x, z);
+    if (!q) return 0;
+    const peak = 50 + 32 * (0.5 + 0.5 * n1.noise(x * 0.012 + 5, z * 0.012 - 9));
+    const knoll = 26 * (0.7 + 0.6 * (0.5 + 0.5 * n2.noise(x * 0.01 - 3, z * 0.01 + 7)));
+    return (Math.pow(q.edge, 1.3) * peak + q.hill * knoll * (1 - q.edge)) * q.pass * q.mask;
+  };
   const heights = new Float32Array(N * N);
   for (let iz = 0; iz < N; iz++) {
     for (let ix = 0; ix < N; ix++) {
-      heights[idx(ix, iz)] = base(-half + ix * CELL, -half + iz * CELL);
+      heights[idx(ix, iz)] = base(-half + ix * CELL, -half + iz * CELL) + ringShape(-half + ix * CELL, -half + iz * CELL);
     }
   }
 
@@ -623,14 +659,37 @@ export function generateWorld(seed = WORLD_SEED): World {
     const out = Math.max(Math.abs(x), Math.abs(z)) - OLD_HALF;
     if (out > 0) {
       let g = n2.fbm(x * 0.0042 + 40, z * 0.0042 - 23, 3) * 1.15 - 0.1 + 0.12 * n3.noise(x * 0.04, z * 0.04);
+      // (the mountains at the edge and the hills round the town are wooded, as the old rim is: the open ground is between them)
+      const q = ringParts(x, z)!;
+      g += 0.55 * q.edge + 0.3 * q.hill * q.pass;
       g -= 1.0 * (1 - smoothstep(70, 105, Math.hypot(x - TOWN.x, z - TOWN.z)));
       for (const o of OUTLYING) g -= 0.9 * (1 - smoothstep(22, 40, Math.hypot(x - o.x, z - o.z)));
       f = lerp(f, g, smoothstep(0, 60, out));
     }
     return f;
   };
+  // (Asked of every cell of the ground, twice: with the map grown and a hundred and twenty buildings on it that was
+  // most of the eight seconds the map took to make. The buildings are sorted into squares of 32 m, and only those
+  // of the square asked about are tried: the same answer. Sorted again whenever one has been added.)
+  const SQ = 32, nearby = new Map<number, BuildingPlot[]>();
+  let sorted = -1;
+  const square = (x: number, z: number) => Math.floor((x + half) / SQ) * 4096 + Math.floor((z + half) / SQ);
   const insideBuilding = (x: number, z: number, pad: number) => {
-    for (const b of buildings) {
+    if (sorted !== buildings.length) {
+      nearby.clear();
+      for (const b of buildings) {
+        // (as far as its corners reach, and the widest margin anybody asks with)
+        const r = Math.hypot(...BUILDING_FOOTPRINT[b.type]) / 2 + 8;
+        for (let qx = Math.floor((b.x - r + half) / SQ); qx <= Math.floor((b.x + r + half) / SQ); qx++)
+          for (let qz = Math.floor((b.z - r + half) / SQ); qz <= Math.floor((b.z + r + half) / SQ); qz++) {
+            const k = qx * 4096 + qz;
+            if (!nearby.has(k)) nearby.set(k, []);
+            nearby.get(k)!.push(b);
+          }
+      }
+      sorted = buildings.length;
+    }
+    for (const b of nearby.get(square(x, z)) ?? []) {
       const [w, d] = BUILDING_FOOTPRINT[b.type];
       const dx = x - b.x, dz = z - b.z;
       const c = Math.cos(b.rot), s = Math.sin(b.rot);
@@ -929,6 +988,11 @@ export function generateWorld(seed = WORLD_SEED): World {
       }
       const up = Math.hypot(EXPANSION.x - CAMP.x, EXPANSION.z - CAMP.z), ux = (EXPANSION.x - CAMP.x) / up, uz = (EXPANSION.z - CAMP.z) / up;
       for (const side of [1, -1]) if (addLater('hut', CAMP.x + ux * 46 - uz * 18 * side, CAMP.z + uz * 46 + ux * 18 * side, Math.atan2(uz, -ux), 0, 2.5)) break;
+      // And in the village, one of each of the buildings that were downloaded whole, behind its street: the brick
+      // block south of the road with its door to it, the plank house and a long hut north of it.
+      addLater('townhouse', 44, -28, Math.PI / 2, 0, 2.5);
+      addLater('shanty', 14, 50, Math.PI, 0, 2.5);
+      addLater('hut', 46, 50, 0, 0, 2.5);
     }
     const added = buildings.slice(firstLater);
     for (const b of added) seat(b);
@@ -1227,8 +1291,7 @@ export function generateWorld(seed = WORLD_SEED): World {
     // edge of the ground as the old one went off the old edge
     const ul = Math.hypot(T.street[0], T.street[1]), ux = T.street[0] / ul, uz = T.street[1] / ul;
     const rot = Math.atan2(ux, uz);
-    const on = (k: number): [number, number] => [T.x + ux * k, T.z + uz * k];
-    const line = catmullRom([path2[path2.length - 1], [566, 243], [585, 262], on(-80), on(-30), on(30), on(80), [676, 486], [716, 538], [770, 596], [800, 628]], 4);
+    const line = catmullRom(eastRoad(), 4);
     const raw = line.map(([x, z]) => heightAt(heights, x, z));
     const ys = raw.map((_, i) => {
       let sum = 0, c = 0;
