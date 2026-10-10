@@ -1885,6 +1885,12 @@ export class Buildings {
             // indoors, where there is no sun and that shade took all the light there was.)
             const src = was as THREE.MeshStandardMaterial;
             const mine = new THREE.MeshStandardMaterial({ map: src.map, normalMap: src.normalMap, color: src.color, roughness: src.roughnessMap ? 0.9 : Math.max(0.6, src.roughness), metalness: 0, side: src.side, alphaTest: src.alphaTest, transparent: src.transparent, opacity: src.opacity });
+            // (seen along a street, a wall is seen at a slant: sharp at a slant as it is face on)
+            for (const t of [mine.map, mine.normalMap]) {
+              if (!t) continue;
+              t.anisotropy = assets.maxAnisotropy;
+              t.needsUpdate = true;
+            }
             mine.name = src.name;
             this.atmo.register(mine);
             painted.set(was, mine);

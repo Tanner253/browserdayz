@@ -398,3 +398,11 @@ body.tr-phone6 #game, body.tr-phone6 #ui, body.tr-phone6 .tc { transform: scale(
 body.tr-phone6 #game { border-radius: 4.5vh; }
 .tr-phone-frame6 { position: absolute; left: 17%; top: 20.3%; width: 66%; height: 66%; z-index: 1; pointer-events: none; border: 1.3vh solid #1b1e1b; border-radius: 5.6vh; box-shadow: 0 0 0 100vmax #0b0d0b, inset 0 0 0 0.3vh #3a3f3a; transform: scale(1.02); }
 
+/* the seventh film: the five armours, each with what it takes off a hit */
+.arm7 { inset: auto 0 13% 0; display: flex; justify-content: center; align-items: stretch; gap: 1vw; }
+.arm7 .a7 { width: 16.4vw; padding: 1.3vh 1.1vw 1.4vh; background: rgba(10, 12, 10, 0.8); border-top: 0.5vh solid #ffd35a; text-align: left; opacity: 0; }
+.arm7 .a7 strong { display: block; font-size: 1.9vh; font-weight: 700; letter-spacing: 0.2em; color: #f3e6d0; white-space: nowrap; overflow: hidden; }
+.arm7 .a7 b { display: block; margin-top: 0.4vh; font-size: 8vh; font-weight: 800; font-stretch: condensed; line-height: 1; color: #ffd35a; }
+.arm7 .a7 i { display: block; height: 0.5vh; margin-top: 0.9vh; background: rgba(255, 255, 255, 0.14); }
+.arm7 .a7 i::after { content: ''; display: block; height: 100%; width: var(--w, 0%); background: #ffd35a; }
+.arm7 .a7 span { display: block; margin-top: 0.8vh; font-size: 1.35vh; letter-spacing: 0.16em; color: #c9c0aa; white-space: nowrap; }

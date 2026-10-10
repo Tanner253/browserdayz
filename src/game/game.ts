@@ -282,7 +282,7 @@ export class Game {
     this.lamps = new Lamps(r.scene);
     this.bunker = new BunkerSite(world, atmo, r.scene, this.s.terrain.lid);
     // Its door is loud: heard by everybody on the map, wherever they are, and from where it is. (It was heard
-    // within three hundred and fifty metres and by nobody else.) Far off it is as late and as dull as a far
+    // within two hundred and seventy metres and by nobody else.) Far off it is as late and as dull as a far
     // sound is, and is brought no nearer to the ear than a hundred and ten metres along the line to it: the
     // ear is told which way, and it is never too faint to tell.
     this.bunker.onMove = (opening) => {

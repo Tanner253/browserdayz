@@ -197,9 +197,13 @@ export const LOCAL_MODELS = {
   house_interior: {
     dir: 'building_interior',
     size: 14.6,
-    tex: 2048,
+    // (as big as it came: it was brought down to 2048, a quarter of its points, and its brick was soft close to)
+    tex: 4096,
+    bare: true,
+    rough: 0.9,
+    metal: 0,
     tags: ['prop'],
-    changes: 'Stood on the ground about its own middle; its texture re-encoded as WebP at 2048; geometry compressed.',
+    changes: 'Stood on the ground about its own middle; its colour and its relief re-encoded as WebP at the size they came, its other maps left out; geometry compressed.',
   },
   // (inspired by a game's barrack and not taken out of it: the owner of this project says so, 2026-10-10)
   // (It is a shell, and its windows and its door are boards with pictures of them on. Those boards are taken out:
@@ -280,9 +284,13 @@ export const LOCAL_MODELS = {
     dir: 'shanty_mansion',
     // (as it came it was twice the size of a house: a floor of it was five metres high. At this, a floor is 2.7 m.)
     size: 15.8,
-    tex: 1024,
+    // (as big as they came: they were brought down to 1024, a sixteenth of their points)
+    tex: 4096,
+    bare: true,
+    rough: 0.9,
+    metal: 0,
     tags: ['prop'],
-    changes: 'Stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.',
+    changes: 'Stood on the ground about its own middle; its colour re-encoded as WebP at the size it came, its shade maps left out; geometry compressed.',
   },
   military_backpack: {
     dir: 'military_backpack',

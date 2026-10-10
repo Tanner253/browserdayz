@@ -550,7 +550,12 @@ async function stage() {
   S.bullet.visible = S.trail.visible = false;
   g.s.r.scene.add(S.bullet, S.trail);
 
-  if (CUT === 6) {
+  if (CUT === 7) {
+    const cut = await import('./shots7');
+    shots = cut.buildShots(S);
+    arrangement = cut.ARRANGEMENT;
+    seconds = cut.SECONDS7;
+  } else if (CUT === 6) {
     const cut = await import('./shots6');
     shots = cut.buildShots(S);
     arrangement = cut.ARRANGEMENT;

@@ -18,6 +18,8 @@
 //            `{ tall, drop(a, b, c) }`: a triangle is taken out when `drop` says yes to its three corners ([x, y, z] each)
 //   plain  – its glint map is left out (a thing seen small, whose map is mostly of what was cut away): `metal`, `rough` say what it is instead
 //   both   – it is a shell, seen from inside as well as out
+//   bare   – of its pictures only its colour and its relief are kept: the game paints it with those two and nothing else
+//            (a building hung whole: see `whole:` in src/world/buildings.ts), so the others are so many megabytes nobody sees
 // A piece on a skeleton is taken as the skeleton holds it when nothing is moving.
 
 import fs from 'node:fs/promises';
@@ -175,7 +177,11 @@ export async function processProp(id, cfg, { io, SRC, OUT, FORCE, exists, countT
     for (const mesh of meshes) transformMesh(mesh, M);
     for (const m of root.listMaterials()) {
       if (cfg.both) m.setDoubleSided(true);
-      if (cfg.plain) m.setMetallicRoughnessTexture(null);
+      if (cfg.plain || cfg.bare) m.setMetallicRoughnessTexture(null);
+      if (cfg.bare) {
+        m.setOcclusionTexture(null);
+        m.setEmissiveTexture(null);
+      }
       if (m.getMetallicRoughnessTexture()) continue;
       if (cfg.metal !== undefined) m.setMetallicFactor(cfg.metal);
       if (cfg.rough !== undefined) m.setRoughnessFactor(cfg.rough);
