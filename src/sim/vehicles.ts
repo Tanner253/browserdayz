@@ -114,7 +114,10 @@ export function jeepSpots(world: World, count = JEEP.count, outlying = JEEP.outl
   for (let k = 0; k < count; k++) {
     // the middle of each stretch first, then further and further either way along it
     const mid = Math.round(((k + 0.5) / count) * (n - 1));
-    search: for (let off = 0; off < n / count / 2; off++) {
+    // (Not only within its own stretch: the last of them is the climb out of the valley to Kamenka, a fifth of a
+    // metre up in every metre and no verge on it level enough to leave a car on. Its jeep stands at the nearest
+    // place there is, which is the foot of the climb. The others are found within their own stretch as before.)
+    search: for (let off = 0; off < n; off++) {
       for (const i of off ? [mid + off, mid - off] : [mid]) {
         if (i < 1 || i > n - 2) continue;
         const tx = p[(i + 1) * 3] - p[(i - 1) * 3], tz = p[(i + 1) * 3 + 2] - p[(i - 1) * 3 + 2];

@@ -55,6 +55,18 @@ export function eastRoad(): [number, number][] {
   // (and ends at the end of its street: carried on, it ran off the edge of the ground into nothing)
   return [[540, 230], [566, 243], [585, 262], on(-80), on(-30), on(30), on(92)];
 }
+/**
+ * The way over between the two valleys. The old road ended by running straight up the side of its valley: eighty
+ * five metres up in a hundred and fifty along, a wall no car climbs, and it did not matter, for it went nowhere.
+ * It goes to Kamenka now. So the hill is cut down along it and the foot of it banked up: one even climb from the
+ * floor of the one valley to the floor of the other, a fifth of a metre in every metre, through a cutting whose
+ * sides a wood can stand on.
+ *   from  – how far east along the old road the climb begins (x, metres)
+ *   bed   – half the width that is level across, the road and its verges
+ *   side  – how steeply the sides of the cutting and of the bank stand (rise over run)
+ *   reach – how far from the road any of this goes
+ */
+export const PASS = { from: 245, bed: 5.5, side: 0.62, reach: 150 };
 /** And two places far out in that country, outside the Zona: nothing is earned at them, and nobody is looking. */
 export const OUTLYING: { name: string; kind: 'squat' | 'camp'; x: number; z: number; rot: number }[] = [
   { name: "Squatters' House", kind: 'squat', x: -100, z: 640, rot: Math.PI },
@@ -1342,22 +1354,76 @@ export function generateWorld(seed = WORLD_SEED): World {
       }
       return sum / c;
     });
-    // (it leaves the old road at the old road's own height)
-    for (let i = 0; i < 12; i++) ys[i] = lerp(smooth[smooth.length - 1], ys[i], i / 12);
-    // And it is a road: nowhere steeper than eight in a hundred. (Left to follow the ground it went up the hill
-    // at the end of the street at one in four.) Where the ground is steeper it is cut into it, or banked up.
-    for (const from of [1, line.length - 2]) {
-      const dir = from === 1 ? 1 : -1;
-      for (let i = from; i > 0 && i < line.length; i += dir) {
+    // The way over (see PASS): one even climb, from where the old road leaves the floor of its valley to where this
+    // one comes onto the floor of the town's. The old road's last stretch is the first of it: its line is as it
+    // was, point for point, and only its height is new.
+    const i0 = path2.findIndex(([x]) => x >= PASS.from), j1 = line.findIndex(([x, z]) => kamenkaQ(x, z) <= 1);
+    const way: [number, number][] = [...path2.slice(i0), ...line.slice(1, j1 + 1)];
+    const run = [0];
+    for (let k = 1; k < way.length; k++) run.push(run[k - 1] + Math.hypot(way[k][0] - way[k - 1][0], way[k][1] - way[k - 1][1]));
+    // (it eases into the climb and out of it, over a twelfth of its length at each end)
+    const ease = (t: number) => {
+      const e = 0.08, v = 1 / (1 - e);
+      return t < e ? (v * t * t) / (2 * e) : t > 1 - e ? 1 - (v * (1 - t) * (1 - t)) / (2 * e) : v * (t - e / 2);
+    };
+    const wy = run.map((r) => lerp(smooth[i0], raw[j1], ease(r / run[run.length - 1])));
+    for (let k = i0; k < path2.length; k++) {
+      smooth[k] = wy[k - i0];
+      roadPts[k * 3 + 1] = wy[k - i0];
+    }
+    for (let j = 0; j <= j1; j++) ys[j] = wy[path2.length - 1 - i0 + j];
+    // From there on it lies on the town's floor (its height taken from the floor alone: the hill behind it is no
+    // part of it), and is a road: nowhere steeper than eight in a hundred. (Left to follow the ground it went up
+    // the hill at the end of the street at one in four.) Where the ground is steeper it is cut into it, or banked up.
+    for (let j = j1 + 1; j < line.length; j++) {
+      let sum = 0, c = 0;
+      for (let k = -12; k <= 12; k++) {
+        const w = 1 - Math.abs(k) / 13;
+        sum += raw[clamp(j + k, j1, raw.length - 1)] * w;
+        c += w;
+      }
+      ys[j] = sum / c;
+    }
+    for (const from of [j1 + 1, line.length - 2]) {
+      const dir = from === j1 + 1 ? 1 : -1;
+      for (let i = from; i > j1 && i < line.length; i += dir) {
         const most = 0.08 * Math.hypot(line[i][0] - line[i - dir][0], line[i][1] - line[i - dir][1]);
         ys[i] = clamp(ys[i], ys[i - dir] - most, ys[i - dir] + most);
       }
+    }
+    // The hill is cut down to the way where it stands above it, and the ground banked up to it where it lies
+    // below: level across for the road and its verges, and from there the sides stand as a wooded hillside
+    // does, and are rounded off into the hill at the top of the cutting and the foot of the bank.
+    const wd = new Float32Array(N * N).fill(1e9), wh = new Float32Array(N * N);
+    rasterLine(way, wy, PASS.reach, wd, wh);
+    const least = (a: number, b: number, k: number) => {
+      const h = clamp(0.5 + (0.5 * (b - a)) / k, 0, 1);
+      return lerp(b, a, h) - k * h * (1 - h);
+    };
+    const back = [way[1][0] - way[0][0], way[1][1] - way[0][1]];
+    for (let i = 0; i < N * N; i++) {
+      const d = wd[i];
+      if (d >= PASS.reach) continue;
+      const x = -half + (i % N) * CELL, z = -half + Math.floor(i / N) * CELL;
+      // (nothing behind where it begins: the road there is the old road, at its own height)
+      if ((x - way[0][0]) * back[0] + (z - way[0][1]) * back[1] < 0) continue;
+      // (the sides are not ruled: a little steeper here, a little less there)
+      const off = Math.max(0, d - PASS.bed) * PASS.side * (0.86 + 0.28 * (0.5 + 0.5 * n1.noise(x * 0.021 + 11, z * 0.021 - 5)));
+      const bed = wh[i] - 0.08, round = Math.min(3, off * 0.5) + 1e-6;
+      let y = least(heights[i], bed + off, round);
+      y = -least(-y, off - bed, round);
+      // (the verges, as along every road)
+      y = lerp(y, bed, 1 - smoothstep(ROAD_W * 0.5 + 0.5, 16, d));
+      // (and at the far edge of all this the hill is the hill again, whatever it took to get there)
+      heights[i] = lerp(y, heights[i], smoothstep(PASS.reach - 20, PASS.reach, d));
+      if (d < 16 && d <= roadDist[i] + 0.01) roadH[i] = wh[i];
     }
     const nd = new Float32Array(N * N).fill(1e9), nh = new Float32Array(N * N);
     rasterLine(line, ys, 16, nd, nh);
     for (let i = 0; i < N * N; i++) {
       if (nd[i] >= 16) continue;
-      heights[i] = lerp(heights[i], nh[i] - 0.08, 1 - smoothstep(ROAD_W * 0.5 + 0.5, 16, nd[i]));
+      // (along the way over the verges are made already)
+      if (wd[i] > nd[i] + 1) heights[i] = lerp(heights[i], nh[i] - 0.08, 1 - smoothstep(ROAD_W * 0.5 + 0.5, 16, nd[i]));
       if (nd[i] < roadDist[i]) {
         roadDist[i] = nd[i];
         roadH[i] = nh[i];
@@ -1476,6 +1542,17 @@ export function generateWorld(seed = WORLD_SEED): World {
       }
     }
 
+    // and along the way over, west of that hill: whatever grew or lay where the ground was cut or banked stands on
+    // the ground as it is now
+    for (const list of [trees, rocks, props]) {
+      for (let k = list.length - 1; k >= 0; k--) {
+        const t = list[k], i = cell(t.x, t.z);
+        if (wd[i] >= PASS.reach || kamenkaQ(t.x, t.z) < KAMENKA.foot) continue;
+        if (wd[i] < ROAD_W / 2 + 2) list.splice(k, 1);
+        else t.y += heightAt(heights, t.x, t.z) - heightAt(before, t.x, t.z);
+      }
+    }
+
     // 5. rocks and what lies in the woods, over all the new country: dice of their own
     const rockKinds2 = ['rock_moss_set_01', 'rock_moss_set_02'];
     for (let k = 0; k < 1500; k++) {
@@ -1508,6 +1585,7 @@ export function generateWorld(seed = WORLD_SEED): World {
         if (kamenkaQ(-half + ix * CELL, -half + iz * CELL) < KAMENKA.foot + 0.05) again.add(iz * N + ix);
     for (const o of OUTLYING) mark(o.x, o.z, 62);
     for (const [x, z] of line) mark(x, z, 19);
+    for (const [x, z] of way) mark(x, z, PASS.reach + 3);
     for (const b of added) mark(b.x, b.z, 24);
     for (const k of again) {
       paint(k % N, Math.floor(k / N));

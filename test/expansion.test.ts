@@ -3,7 +3,7 @@
 // `npx tsx test/expansion.test.ts`.
 
 import assert from 'node:assert/strict';
-import { BUNKER_AT, CELL, KAMENKA, NO_START, OUTLYING, TOWN, TRADE_AT, kamenkaQ, EXPANSION as E, PLAY_AREAS, PLAY_RADIUS, WORLD_RES, WORLD_SIZE, generateWorld, heightAt, inPlay, playOutline, slopeAt, BUILDING_FOOTPRINT } from '../src/world/worldgen';
+import { BUNKER_AT, CELL, KAMENKA, NO_START, OUTLYING, PASS, TOWN, TRADE_AT, kamenkaQ, EXPANSION as E, PLAY_AREAS, PLAY_RADIUS, WORLD_RES, WORLD_SIZE, generateWorld, heightAt, inPlay, playOutline, slopeAt, BUILDING_FOOTPRINT } from '../src/world/worldgen';
 import { buildWorldData } from '../server/world';
 import { GAS, gasDepth, gasZone } from '../src/sim/gas';
 import { INFECTED, openGround } from '../src/sim/infected';
@@ -19,6 +19,11 @@ const ok = (name: string, fn: () => void) => {
  * The map before the expansion, as numbers taken off it the day before it was added (commit
  * f136435): the ground, the buildings, the starts, the trees, the loot points and the jeeps.
  */
+// (The jeeps: 380833839 until 2026-10-10. The one that stood at the foot of the old road's last climb, at 334, 150,
+// stands at 268, 115, the foot of the climb as it is now: where it stood is the side of a bank.)
+// (The ground and the trees once more on 2026-10-10, with the way over to Kamenka left out (see PASS): counted on
+// the map before the hill was cut down along the road, with the fence already round it. It was 217934 cells,
+// 4113734791; 10647 trees, 778129303.)
 // (The loot points were counted again on 2026-10-10: the same points in the same order, those that are on
 // a bed a hand's width higher, on the mattress each bed was given. It was 545356472.)
 // (And on 2026-10-10 again, 1223262982 before it: the same places in the same order, those on a water
@@ -28,7 +33,7 @@ const ok = (name: string, fn: () => void) => {
 // and the same four figures came off the map after.)
 // (The ground and the trees were counted again on 2026-10-09, from the same map, with the
 // bunker's hollow left out of the count as the works' is: taken before the bunker was dug.)
-const WAS = { cells: 217934, heights: 4113734791, buildings: 72, buildingsHash: 2448790248, lastId: 'tower_71', spawns: 2697513077, trees: 10647, treesHash: 778129303, lootPoints: 675, lootHash: 113905251, jeeps: 8, jeepsHash: 380833839, fires: 6 };
+const WAS = { cells: 196228, heights: 1576165764, buildings: 72, buildingsHash: 2448790248, lastId: 'tower_71', spawns: 2697513077, trees: 9671, treesHash: 312941347, lootPoints: 675, lootHash: 113905251, jeeps: 8, jeepsHash: 207674058, fires: 6 };
 const hash = (parts: number[]) => {
   let h = 2166136261 >>> 0;
   for (const v of parts) {
@@ -58,6 +63,10 @@ const data = buildWorldData(process.cwd());
 const half = WORLD_SIZE / 2;
 const camp = world.pois.find((p) => p.name === 'Military Checkpoint')!;
 const ground = (x: number, z: number) => heightAt(world.heights, x, z);
+/** the old road from where its climb out of the valley begins (see PASS), and the first of the road on from it */
+const passLine: [number, number][] = [];
+for (let i = 0; i < world.road.points.length / 3; i++) if (world.road.points[i * 3] >= PASS.from) passLine.push([world.road.points[i * 3], world.road.points[i * 3 + 2]]);
+for (let i = 0; i < 26; i++) passLine.push([world.roads[0].points[i * 3], world.roads[0].points[i * 3 + 2]]);
 /** the only ground the expansion may have touched: the cirque itself, and a strip along the track up to it from the checkpoint */
 const touched = (x: number, z: number) => {
   if (Math.hypot(x - E.x, z - E.z) < 160) return true;
@@ -71,6 +80,8 @@ const touched = (x: number, z: number) => {
   if (kamenkaQ(x, z) < KAMENKA.foot + 0.1) return true;
   // (and the bunker's hollow, on the far side of the map)
   if (Math.hypot(x - BUNKER_AT.x, z - BUNKER_AT.z) < 96) return true;
+  // (and the way over to Kamenka, 2026-10-10: the hill cut down along the road's last climb and its foot banked up)
+  if (x > PASS.from - PASS.reach - 4 && passLine.some(([px, pz]) => Math.hypot(x - px, z - pz) < PASS.reach + 3)) return true;
   const dx = E.x - camp.x, dz = E.z - camp.z, l2 = dx * dx + dz * dz;
   const t = Math.max(0, Math.min(1, ((x - camp.x) * dx + (z - camp.z) * dz) / l2));
   return Math.hypot(x - (camp.x + dx * t), z - (camp.z + dz * t)) < 34 && Math.hypot(x - camp.x, z - camp.z) > 16;
@@ -241,6 +252,34 @@ ok('the long huts stand where they were meant to: beside the trading post, behin
   }
 });
 
+ok('the way over to the town can be driven: one even climb, level across, the ground under the road and not over it', () => {
+  // (it was a wall: the old road ran straight up the side of its valley, 105 in a hundred at the worst of it)
+  const at: [number, number, number][] = [];
+  for (const pts of [world.road.points, world.roads[0].points]) for (let i = 0; i < pts.length / 3; i++) if (pts[i * 3] > PASS.from - 90) at.push([pts[i * 3], pts[i * 3 + 1], pts[i * 3 + 2]]);
+  let steep = 0, tilt = 0, off = 0, top = -1e9, low = 1e9;
+  for (let i = 1; i < at.length - 1; i++) {
+    const [x, y, z] = at[i], dx = at[i + 1][0] - at[i - 1][0], dz = at[i + 1][2] - at[i - 1][2], l = Math.hypot(dx, dz);
+    if (l < 0.5) continue;
+    const tx = dx / l, tz = dz / l;
+    // as the wheels find it: the ground itself, four metres either way along it and two and a half either side
+    steep = Math.max(steep, Math.abs(ground(x + tx * 4, z + tz * 4) - ground(x - tx * 4, z - tz * 4)) / 8);
+    tilt = Math.max(tilt, Math.abs(ground(x - tz * 2.5, z + tx * 2.5) - ground(x + tz * 2.5, z - tx * 2.5)) / 5);
+    off = Math.max(off, Math.abs(ground(x, z) - y));
+    top = Math.max(top, y);
+    low = Math.min(low, y);
+  }
+  assert.ok(steep < 0.25, `the road climbs ${(steep * 100).toFixed(0)} in a hundred somewhere between the village and the town`);
+  assert.ok(tilt < 0.12, `the road leans ${(tilt * 100).toFixed(0)} in a hundred across somewhere`);
+  assert.ok(off < 0.3, `the ground is ${off.toFixed(2)} m off the road somewhere`);
+  // (and it goes no higher than the town it goes to: it used to go ten metres over it and come down again)
+  assert.ok(top < ground(TOWN.x, TOWN.z) + 1.5, `the road goes up to ${top.toFixed(0)} m on the way to a town at ${ground(TOWN.x, TOWN.z).toFixed(0)} m`);
+  // the sides of the cutting and of the bank: a hillside a wood can stand on, not a wall
+  let wall = 0;
+  for (const [px, pz] of passLine) for (const [ox, oz] of [[0, 14], [0, -14], [0, 30], [0, -30], [30, 0], [-30, 0], [0, 60], [0, -60]]) wall = Math.max(wall, slopeAt(world.heights, px + ox, pz + oz));
+  // (the old hill beside the road stood at 56 degrees where it was steepest, and still does where it was not touched)
+  assert.ok(wall < 1.55, `the ground beside the way over stands at ${(Math.atan(wall) * 57.3).toFixed(0)} degrees somewhere`);
+});
+
 ok('the east country: a town out of the valley by the road, two places far out, and woods, all on ground the old map did not have', () => {
   const town = world.sites.find((st) => st.kind === 'town')!;
   assert.ok(town && town.name === TOWN.name && !inOld(town.x, town.z), 'no town, or it is on the old map');
@@ -291,7 +330,8 @@ ok('the east country: a town out of the valley by the road, two places far out, 
     if (i) steep = Math.max(steep, Math.abs(p[i * 3 + 1] - p[i * 3 - 2]) / Math.hypot(p[i * 3] - p[i * 3 - 3], p[i * 3 + 2] - p[i * 3 - 1]));
   }
   assert.ok(nearest < 1, `the road passes ${nearest.toFixed(1)} m from the middle of the town`);
-  assert.ok(steep < 0.2, `the road climbs ${(steep * 100).toFixed(0)} in a hundred somewhere`);
+  // (the town's own street is a street; the way up to it is the next check's)
+  assert.ok(steep < 0.25, `the road climbs ${(steep * 100).toFixed(0)} in a hundred somewhere`);
   // no building on the road, no tree on it or in a building
   const onRoad = (x: number, z: number, r: number) => {
     for (let i = 0; i < n - 1; i++) {
