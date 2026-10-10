@@ -11,6 +11,10 @@ export interface ShopHost {
   wares(): { item: ItemInstance; pays: number }[];
   /** what he sells, and what he asks */
   stock(): { id: string; asks: number }[];
+  /** the day's work: each job, how much of it is done, and whether it has been paid */
+  jobs(): { id: string; text: string; n: number; have: number; pays: number; paid: boolean }[];
+  /** null if it was paid; else why not */
+  handIn(id: string): string | null;
   /** picture of a thing, if there is one yet */
   icon(id: string): string | undefined;
   sell(item: ItemInstance): void;
@@ -22,7 +26,7 @@ export interface ShopHost {
 const CSS = `
 .shop { position: fixed; inset: 0; z-index: 40; display: none; align-items: center; justify-content: center; background: rgba(6, 8, 6, 0.72); font-family: 'Barlow Condensed', system-ui, sans-serif; color: #e9e4d8; }
 .shop.on { display: flex; }
-.shop-box { width: min(1040px, 94vw); max-height: 88vh; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; background: rgba(14, 17, 13, 0.96); border: 1px solid rgba(233, 228, 216, 0.16); box-shadow: 0 30px 90px #000; }
+.shop-box { width: min(1040px, 94vw); max-height: 90vh; display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; background: rgba(14, 17, 13, 0.96); border: 1px solid rgba(233, 228, 216, 0.16); box-shadow: 0 30px 90px #000; }
 .shop-top { display: flex; align-items: baseline; gap: 18px; padding: 16px 22px 12px; border-bottom: 1px solid rgba(233, 228, 216, 0.14); }
 .shop-top h2 { margin: 0; font-size: 34px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
 .shop-top p { margin: 0; font-size: 17px; color: rgba(233, 228, 216, 0.6); }
@@ -40,12 +44,22 @@ const CSS = `
 .shop-row span { font-size: 19px; line-height: 1.1; }
 .shop-row small { display: block; font-size: 14px; color: rgba(233, 228, 216, 0.5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .shop-row b { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 15px; font-weight: 500; color: #ffd35a; }
+.shop-jobs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 12px 16px; border-bottom: 1px solid rgba(233, 228, 216, 0.14); }
+.shop-jobs h3 { grid-column: 1 / -1; margin: 0; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px; font-weight: 500; letter-spacing: 0.2em; text-transform: uppercase; color: rgba(233, 228, 216, 0.5); }
+.shop-job { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; padding: 9px 12px 10px; background: rgba(233, 228, 216, 0.04); border-left: 3px solid rgba(233, 228, 216, 0.2); }
+.shop-job.ready { border-left-color: #ffd35a; }
+.shop-job.paid { opacity: 0.45; }
+.shop-job span { font-size: 19px; line-height: 1.15; }
+.shop-job em { grid-column: 1; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12px; font-style: normal; letter-spacing: 0.08em; color: rgba(233, 228, 216, 0.55); }
+.shop-job em b { color: #ffd35a; font-weight: 500; }
+.shop-job button { grid-column: 2; grid-row: 1 / 3; padding: 5px 12px 6px; font: inherit; font-size: 16px; letter-spacing: 0.06em; text-transform: uppercase; color: #14160f; background: #ffd35a; border: 0; cursor: pointer; }
+.shop-job button[disabled] { color: rgba(233, 228, 216, 0.5); background: rgba(233, 228, 216, 0.1); cursor: default; }
 .shop-none { padding: 18px 6px; font-size: 18px; color: rgba(233, 228, 216, 0.5); }
 .shop-foot { display: flex; gap: 18px; align-items: center; padding: 10px 22px 12px; font-size: 16px; color: rgba(233, 228, 216, 0.55); border-top: 1px solid rgba(233, 228, 216, 0.14); }
 .shop-say { color: #e9e4d8; }
 .shop-foot kbd { padding: 1px 6px 2px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px; border: 1px solid rgba(233, 228, 216, 0.3); }
 .shop-foot button { margin-left: auto; padding: 5px 16px 6px; font: inherit; font-size: 17px; letter-spacing: 0.08em; text-transform: uppercase; color: #14160f; background: #ffd35a; border: 0; cursor: pointer; }
-@media (max-width: 760px) { .shop-cols { grid-template-columns: 1fr; overflow-y: auto; } .shop-col { overflow: visible; } .shop-col + .shop-col { border-left: 0; border-top: 1px solid rgba(233, 228, 216, 0.14); } .shop-top p { display: none; } }
+@media (max-width: 760px) { .shop-jobs { grid-template-columns: 1fr; } .shop-cols { grid-template-columns: 1fr; overflow-y: auto; } .shop-col { overflow: visible; } .shop-col + .shop-col { border-left: 0; border-top: 1px solid rgba(233, 228, 216, 0.14); } .shop-top p { display: none; } }
 `;
 
 export class ShopUI {
@@ -100,8 +114,16 @@ export class ShopUI {
       ? wares.map((w, i) => row('sell', String(i), w.item.id, itemName(w.item) + (ITEMS[w.item.id].stack ? ` ×${w.item.qty ?? 1}` : ''), ITEMS[w.item.id].category, `+${w.pays}`)).join('')
       : '<div class="shop-none">Nothing on you that he deals in.</div>';
     const his = stock.map((s) => row('buy', s.id, s.id, ITEMS[s.id].name + ((ITEMS[s.id].stack ?? 1) > 1 ? ` ×${ITEMS[s.id].stack}` : ''), ITEMS[s.id].desc ?? '', String(s.asks), s.asks > credit)).join('');
+    const jobs = h.jobs();
+    const work = jobs
+      .map((j) => {
+        const ready = !j.paid && j.have >= j.n;
+        return `<div class="shop-job${j.paid ? ' paid' : ready ? ' ready' : ''}"><span>${j.text}</span><em>${j.paid ? 'Paid' : `${j.have} of ${j.n}`} · pays <b>${j.pays}</b></em><button data-job="${j.id}"${ready ? '' : ' disabled'}>${j.paid ? 'Done' : 'Hand in'}</button></div>`;
+      })
+      .join('');
     this.el.innerHTML = `<div class="shop-box">
       <div class="shop-top"><h2>The trader</h2><p>He buys what you bring and sells what keeps you alive. No tags, no keycards.</p><div class="shop-credit">Your credit<b>${credit}</b></div></div>
+      <div class="shop-jobs"><h3>Work he has today · the same for everybody, new at midnight UTC</h3>${work}</div>
       <div class="shop-cols"><div class="shop-col"><h3>You sell · click a thing to sell it</h3>${mine}</div><div class="shop-col"><h3>He sells · click to buy</h3>${his}</div></div>
       <div class="shop-foot"><span class="shop-say">“${this.said}”</span><span><kbd>F</kbd> or <kbd>Esc</kbd> to leave</span><button data-close>Done</button></div>
     </div>`;
@@ -119,6 +141,15 @@ export class ShopUI {
         const id = b.dataset.buy!;
         const no = h.buy(id);
         this.said = no ?? `One ${ITEMS[id].name.toLowerCase()}. Mind how you go.`;
+        this.render();
+      };
+    });
+    this.el.querySelectorAll<HTMLElement>('[data-job]').forEach((b) => {
+      b.onclick = () => {
+        const job = jobs.find((j) => j.id === b.dataset.job);
+        if (!job) return;
+        const no = h.handIn(job.id);
+        this.said = no ?? `That is the job done. ${job.pays} in the book.`;
         this.render();
       };
     });

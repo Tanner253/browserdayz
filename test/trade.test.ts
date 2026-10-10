@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { ITEMS, makeItem } from '../src/sim/items';
 import { STOCK, asks, pays, worth } from '../src/sim/trade';
 import { generateWorld } from '../src/world/worldgen';
+import { bookFor, jobsFor, progress } from '../src/sim/jobs';
 
 let n = 0;
 const ok = (name: string, fn: () => void) => {
@@ -48,6 +49,40 @@ ok('a gun is paid for with what is fitted to it', () => {
 ok('there is a shop on the map for him to stand in', () => {
   const world = generateWorld();
   assert.ok(world.buildings.filter((b) => b.type === 'store').length >= 2);
+});
+
+ok('the day has three jobs, the same whoever asks, of real things, and they pay better than the counter', () => {
+  for (let day = 20000; day < 20400; day++) {
+    const jobs = jobsFor(day);
+    assert.equal(jobs.length, 3);
+    assert.deepEqual(jobs, jobsFor(day));
+    assert.equal(new Set(jobs.map((j) => j.id)).size, 3);
+    for (const j of jobs) {
+      assert.ok(j.n > 0 && j.pays > 0 && j.text);
+      if (j.kind !== 'bring') continue;
+      assert.ok(ITEMS[j.item!], `${j.item} is not an item`);
+      const over = pays(makeItem(j.item!, ITEMS[j.item!].stack ? 1 : undefined)) * j.n;
+      assert.ok(j.pays > over, `${j.id}: the job pays ${j.pays}, the counter ${over}`);
+    }
+  }
+  assert.ok(new Set(Array.from({ length: 60 }, (_, k) => jobsFor(20700 + k).map((j) => j.id).join())).size > 20, 'the days are all alike');
+});
+
+ok('work is counted for its own day, is paid once, and yesterday is a clean page', () => {
+  const day = 20736, jobs = jobsFor(day);
+  const book = bookFor(day, null);
+  const kill = jobs[0];
+  book.kills = 99;
+  book.heads = 99;
+  assert.equal(progress(kill, book, () => 0), kill.n);
+  const bring = jobs[1];
+  assert.equal(progress(bring, book, () => 0), 0);
+  assert.equal(progress(bring, book, () => 50), bring.n);
+  book.done.push(bring.id);
+  assert.equal(progress(bring, book, () => 0), bring.n);
+  assert.deepEqual(bookFor(day, book), book);
+  assert.deepEqual(bookFor(day + 1, book), { day: day + 1, kills: 0, heads: 0, done: [] });
+  assert.deepEqual(bookFor(day, { day, kills: -4, done: 'x' as never }), { day, kills: 0, heads: 0, done: [] });
 });
 
 console.log(`\n${n} checks passed`);

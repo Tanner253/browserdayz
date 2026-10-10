@@ -59,6 +59,7 @@ import { MenuScenes } from './menu-scenes';
 import { Traders } from './trader';
 import { ShopUI } from '../ui/shop';
 import { STOCK, asks, pays } from '../sim/trade';
+import { bookFor, dayOf, jobsFor, progress as jobDone, type JobBook } from '../sim/jobs';
 import type { MenuSpot } from '../ui/hud';
 import { Lamps } from './lamps';
 import { BunkerSite, spotKey } from '../world/bunker';
@@ -174,7 +175,15 @@ export class Game {
     dropped: (id, qty, at) => this.dropItem(makeItem(id, qty), at.clone().setY(at.y + 0.05), 0.4),
     killed: (zone, distance) => {
       this.weapons.confirmKill();
-      this.hud.note(`Infected down${zone === 'head' ? ' · headshot' : ''}${distance > 8 ? ` · ${Math.round(distance)} m` : ''}`, 'good');
+      // (counted toward the trader's work of the day, whether or not he has been asked about it)
+      const book = this.jobBook();
+      book.kills++;
+      if (zone === 'head') book.heads++;
+      this.keepBook(book);
+      const job = jobsFor(book.day).find((j) => (j.kind === 'cull' || (j.kind === 'heads' && zone === 'head')) && !book.done.includes(j.id));
+      const done = job ? jobDone(job, book, () => 0) : 0;
+      const work = job ? (done >= job.n ? ` · the trader's job is done: ${job.pays} to collect` : ` · trader's job ${done}/${job.n}`) : '';
+      this.hud.note(`Infected down${zone === 'head' ? ' · headshot' : ''}${distance > 8 ? ` · ${Math.round(distance)} m` : ''}${work}`, 'good');
     },
   });
   remotes = new Map<number, RemotePlayer>();
@@ -570,6 +579,25 @@ export class Game {
           .map((item) => ({ item, pays: pays(item) })),
       stock: () => STOCK.map((id) => ({ id, asks: asks(id) })).filter((x) => x.asks > 0),
       icon: (id) => this.invUI.icons[id],
+      jobs: () => {
+        const book = this.jobBook();
+        return jobsFor(book.day).map((j) => ({ id: j.id, text: j.text, n: j.n, pays: j.pays, have: jobDone(j, book, (id) => this.countOf(id)), paid: book.done.includes(j.id) }));
+      },
+      handIn: (id) => {
+        const book = this.jobBook();
+        const job = jobsFor(book.day).find((j) => j.id === id);
+        if (!job || book.done.includes(id)) return 'That one is settled.';
+        if (jobDone(job, book, (x) => this.countOf(x)) < job.n) return 'Not yet it is not.';
+        if (job.kind === 'bring') {
+          if (this.inv.take(job.item!, job.n) < job.n) return 'You have not got them on you.';
+          this.inventoryChanged();
+        }
+        book.done.push(id);
+        this.keepBook(book);
+        this.setCredit(this.credit + job.pays);
+        audio.ui('open');
+        return null;
+      },
       sell: (item) => {
         const got = pays(item);
         if (!got) return;
@@ -2188,6 +2216,25 @@ export class Game {
    *   (only on a click), and sending the player to the pause menu for closing their pockets
    *   was the wrong answer: the game carries on, and the next click takes the mouse.
    */
+  /** today's page of the trader's work for this player (a new day is a clean page) */
+  private jobBook(): JobBook {
+    let kept: Partial<JobBook> | null = null;
+    try {
+      kept = JSON.parse(localStorage.getItem('zona.jobs') ?? 'null');
+    } catch {
+      // (nothing kept, or nothing that can be read: a clean page)
+    }
+    return bookFor(dayOf(Date.now()), kept);
+  }
+
+  private keepBook(book: JobBook) {
+    try {
+      localStorage.setItem('zona.jobs', JSON.stringify(book));
+    } catch {
+      // (a browser that keeps nothing)
+    }
+  }
+
   private setCredit(n: number) {
     this.credit = Math.max(0, Math.round(n));
     try {
@@ -2249,7 +2296,9 @@ export class Game {
     if (this.player.dead || this.invUI.isOpen || this.shop.isOpen || this.use) return;
     // at a shop's counter, looking at the man behind it
     if (this.started && !this.garage.ride && this.traders?.at(cam.position, _sealedLook.set(0, 0, -1).applyQuaternion(cam.quaternion))) {
-      this.prompt = '<kbd>F</kbd>Trade';
+      const book = this.jobBook();
+      const owed = jobsFor(book.day).some((j) => !book.done.includes(j.id) && jobDone(j, book, (id) => this.countOf(id)) >= j.n);
+      this.prompt = `<kbd>F</kbd>Trade${owed ? ' <small>· he owes you for a job</small>' : ''}`;
       if (this.input.pressed('KeyF') && !this.hud.chatOpen) this.openShop();
       return;
     }
