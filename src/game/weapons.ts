@@ -131,9 +131,15 @@ class Spring {
   x = new THREE.Vector3();
   constructor(public k = 160, public d = 16) {}
   step(dt: number, target = new THREE.Vector3()) {
-    const a = target.clone().sub(this.x).multiplyScalar(this.k).addScaledVector(this.v, -this.d);
-    this.v.addScaledVector(a, dt);
-    this.x.addScaledVector(this.v, dt);
+    // Taken in steps short enough to stay stable. Taken whole, a tenth of a second (which is what a frame is
+    // counted as when it hitches, or at ten frames a second on a hot laptop) is past what these springs bear:
+    // each such step threw the gun further than the last, and it left the picture until the frames came back.
+    const n = Math.max(1, Math.ceil(dt * 120)), h = dt / n;
+    for (let i = 0; i < n; i++) {
+      const a = target.clone().sub(this.x).multiplyScalar(this.k).addScaledVector(this.v, -this.d);
+      this.v.addScaledVector(a, h);
+      this.x.addScaledVector(this.v, h);
+    }
     return this.x;
   }
 }
