@@ -150,6 +150,8 @@ interface VmModel {
   /** something held to strike with: how it stands in the picture and how it is swung */
   melee?: MeleeStyle;
   grips?: Grips;
+  /** a long gun with sights of its own to aim along when it has no optic (the shotgun): no cross is drawn over them */
+  ownSights?: boolean;
   muzzle: THREE.Vector3; // in root space
   bolt?: THREE.Group;
   boltSlide?: THREE.Group;
@@ -430,6 +432,8 @@ const SEAT_ON: Record<string, THREE.Vector3> = {
 const NO_SEAT = new THREE.Vector3();
 /** how far under the ears of the shotgun's front sight the top of its post is (the eye is put level with the post) */
 const IRON_DROP = 0.004;
+/** how much nearer the eye than at the hip the shotgun is held when aimed along its own sights (nearer than this and the fist on its grip is a dark shape across the bottom of the picture) */
+const IRON_NEAR = 0.02;
 
 /**
  * How big a rifle is drawn in somebody else's hands, of its own size, kept where it is at the
@@ -555,9 +559,21 @@ async function holoParts(): Promise<MeshPart[]> {
     p.geometry.computeBoundingBox();
     box.union(p.geometry.boundingBox!);
   }
-  // (across, the gun's own middle is the middle: its box is not, with a knob on one side)
+  // (Across, its middle is the middle of its hood, the upper part of it, which is the same either side: its box is
+  // not, with a knob on one side lower down. Nor is it where the shotgun's own middle is: it sat a finger's width
+  // off the middle of a pistol's slide.)
   const mid = (box.min.x + box.max.x) / 2, tall = box.max.y - box.min.y;
-  const parts: MeshPart[] = own.map((p) => ({ ...p, geometry: p.geometry.clone().translate(-mid, -box.min.y, 0) }));
+  let z0 = Infinity, z1 = -Infinity;
+  for (const p of own) {
+    const P = p.geometry.getAttribute('position');
+    for (let i = 0; i < P.count; i++) {
+      if (P.getY(i) < box.min.y + tall * 0.62) continue;
+      z0 = Math.min(z0, P.getZ(i));
+      z1 = Math.max(z1, P.getZ(i));
+    }
+  }
+  const across = Number.isFinite(z0) ? (z0 + z1) / 2 : 0;
+  const parts: MeshPart[] = own.map((p) => ({ ...p, geometry: p.geometry.clone().translate(-mid, -box.min.y, -across) }));
   if (mark) parts.push({ name: 'reticle', owner: 'reticle', geometry: new THREE.PlaneGeometry(0.0085, 0.0085).rotateY(-Math.PI / 2).translate(0, tall * 0.7, 0), material: mark.material });
   return parts;
 }
@@ -639,7 +655,7 @@ export class Weapons {
   }
 
   get sightless() {
-    return this.aiming && this.current?.kind === 'rifle' && !!this.current.adsIron && !(this.current.optic && hasMod(this.currentItem, this.current.optic));
+    return this.aiming && this.current?.kind === 'rifle' && !!this.current.adsIron && !this.current.ownSights && !(this.current.optic && hasMod(this.currentItem, this.current.optic));
   }
   hitMarker = 0;
   /** the last hit marker was a kill (HUD draws it red) */
@@ -1120,9 +1136,10 @@ export class Weapons {
       hipRot: new THREE.Euler(0, 0, 0),
       ads,
       optic: o.kind === 'rifle' ? (hung.size ? 'red_dot' : 'pu_scope') : dotAt ? 'red_dot' : undefined,
+      ownSights: !!post,
       lamp: lamp ?? undefined,
       // without its optic the eye goes along the top of the action (a pistol's: along its own sights)
-      adsIron: o.kind === 'rifle' ? (post ? new THREE.Vector3(-(frontOf(hung.get('base')!)?.x ?? fc.x), -(post as THREE.Vector3).y + IRON_DROP, o.hip.z + 0.1) : new THREE.Vector3(-fc.x, -frame.max.y - 0.018, o.hip.z + 0.1)) : dotAt ? irons! : undefined,
+      adsIron: o.kind === 'rifle' ? (post ? new THREE.Vector3(-(frontOf(hung.get('base')!)?.x ?? fc.x), -(post as THREE.Vector3).y + IRON_DROP, o.hip.z + IRON_NEAR) : new THREE.Vector3(-fc.x, -frame.max.y - 0.018, o.hip.z + 0.1)) : dotAt ? irons! : undefined,
       // (a rifle's: the mouth of the barrel itself. Three fifths of the way up its body is under the barrel.)
       muzzle: (o.kind === 'rifle' ? (hung.has('base') ? frontOf(hung.get('base')!) : rig.front('base')) : null) ?? new THREE.Vector3(fc.x, o.kind === 'rifle' ? THREE.MathUtils.lerp(frame.min.y, frame.max.y, 0.62) : c.y, frame.min.z),
       // For whoever is seen holding it. The hands start where the pack's own hands are, and are
