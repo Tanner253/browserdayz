@@ -840,6 +840,18 @@ export function generateWorld(seed = WORLD_SEED): World {
         laterSites.push(st);
       }
     }
+    // And the long huts (see `hut` in buildings.ts), where men were quartered: one behind the depot's barracks,
+    // its door to the shed, and one beside the track from the checkpoint up to the works, its door to the
+    // checkpoint. After everything, as above. (The one by the trader's yard is in his place's own layout.)
+    {
+      const depot = sites.find((st) => st.kind === 'depot');
+      if (depot) {
+        const c = Math.cos(depot.rot), sn = Math.sin(depot.rot);
+        addLater('hut', depot.x - 6 * c - 21 * sn, depot.z + 6 * sn - 21 * c, depot.rot, 0, 2.5);
+      }
+      const up = Math.hypot(EXPANSION.x - CAMP.x, EXPANSION.z - CAMP.z), ux = (EXPANSION.x - CAMP.x) / up, uz = (EXPANSION.z - CAMP.z) / up;
+      for (const side of [1, -1]) if (addLater('hut', CAMP.x + ux * 46 - uz * 18 * side, CAMP.z + uz * 46 + ux * 18 * side, Math.atan2(uz, -ux), 0, 2.5)) break;
+    }
     const added = buildings.slice(firstLater);
     for (const b of added) seat(b);
     // (the last word on the ground a pace round a building is its own: said again for the new ones,

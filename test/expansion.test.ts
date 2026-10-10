@@ -28,7 +28,7 @@ const ok = (name: string, fn: () => void) => {
 // and the same four figures came off the map after.)
 // (The ground and the trees were counted again on 2026-10-09, from the same map, with the
 // bunker's hollow left out of the count as the works' is: taken before the bunker was dug.)
-const WAS = { cells: 229537, heights: 61161899, buildings: 72, buildingsHash: 2448790248, lastId: 'tower_71', spawns: 2697513077, trees: 11230, treesHash: 3386541334, lootPoints: 675, lootHash: 113905251, jeeps: 8, jeepsHash: 380833839, fires: 6 };
+const WAS = { cells: 229083, heights: 1589578107, buildings: 72, buildingsHash: 2448790248, lastId: 'tower_71', spawns: 2697513077, trees: 11228, treesHash: 2235155226, lootPoints: 675, lootHash: 113905251, jeeps: 8, jeepsHash: 380833839, fires: 6 };
 const hash = (parts: number[]) => {
   let h = 2166136261 >>> 0;
   for (const v of parts) {
@@ -38,6 +38,9 @@ const hash = (parts: number[]) => {
   }
   return h >>> 0;
 };
+
+/** where the long hut behind the depot was put (2026-10-10): fenced off before it was built, as the others were */
+const HUT_AT = { x: 160.1, z: 163.1 };
 
 const world = generateWorld();
 const data = buildWorldData(process.cwd());
@@ -49,6 +52,8 @@ const touched = (x: number, z: number) => {
   if (Math.hypot(x - E.x, z - E.z) < 160) return true;
   // (and the meadow the trading post was built in, later: 78 m round it)
   if (Math.hypot(x - TRADE_AT.x, z - TRADE_AT.z) < 78) return true;
+  // (and where the long hut stands behind the depot's barracks: 24 m round it)
+  if (Math.hypot(x - HUT_AT.x, z - HUT_AT.z) < 24) return true;
   // (and the bunker's hollow, on the far side of the map)
   if (Math.hypot(x - BUNKER_AT.x, z - BUNKER_AT.z) < 96) return true;
   const dx = E.x - camp.x, dz = E.z - camp.z, l2 = dx * dx + dz * dz;
@@ -59,7 +64,16 @@ const inl = Math.hypot(camp.x - E.x, camp.z - E.z);
 const ux = (camp.x - E.x) / inl, uz = (camp.z - E.z) / inl;
 const works = world.sites.find((s) => s.kind === 'works')!;
 // (what was built with the works: not the trading post's two, which came later and stand in the old map's meadow)
-const added = world.buildings.slice(WAS.buildings).filter((b) => Math.hypot(b.x - TRADE_AT.x, b.z - TRADE_AT.z) > 78);
+const added = world.buildings.slice(WAS.buildings).filter((b) => b.type !== 'hut' && Math.hypot(b.x - TRADE_AT.x, b.z - TRADE_AT.z) > 78);
+
+// To take the old map's figures again after fencing off more ground (do it BEFORE building there): FIGURES=1 npx tsx test/expansion.test.ts
+if (process.env.FIGURES) {
+  const hs: number[] = [];
+  for (let iz = 0; iz < WORLD_RES; iz++) for (let ix = 0; ix < WORLD_RES; ix++) if (!touched(-half + ix * CELL, -half + iz * CELL)) hs.push(world.heights[iz * WORLD_RES + ix]);
+  const trees = world.trees.filter((t) => !touched(t.x, t.z));
+  console.log(JSON.stringify({ cells: hs.length, heights: hash(hs), trees: trees.length, treesHash: hash(trees.flatMap((t) => [t.x, t.y, t.z])), huts: world.buildings.filter((b) => b.type === 'hut').map((b) => [b.id, +b.x.toFixed(1), +b.z.toFixed(1), +b.floorY.toFixed(2)]) }));
+  process.exit(0);
+}
 
 ok('the map as it was is still exactly there: its ground, its buildings, its starts, its trees, its loot points, its jeeps', () => {
   const hs: number[] = [];
@@ -177,6 +191,26 @@ ok('the infected keep to it too, and nowhere else has fewer for it', () => {
   const over = homes.filter((h) => !h.inside && Math.hypot(h.x - below[0].x, h.z - below[0].z) < 1);
   assert.ok(over.length === 1 && over[0].n >= 6, 'none over the bunker');
   assert.equal(INFECTED.max - here!.n - below[0].n - over[0].n, 33);
+});
+
+ok('the long huts stand where they were meant to: beside the trading post, behind the depot, and on the track up to the works', () => {
+  const huts = world.buildings.filter((b) => b.type === 'hut');
+  assert.equal(huts.length, 3, `${huts.length} huts`);
+  assert.ok(huts.some((b) => Math.hypot(b.x - TRADE_AT.x, b.z - TRADE_AT.z) < 60), 'none at the trading post');
+  assert.ok(huts.some((b) => Math.hypot(b.x - HUT_AT.x, b.z - HUT_AT.z) < 2), 'none behind the depot, where the ground was fenced off for it');
+  // (the third is on ground the works' track had already moved)
+  const third = huts.find((b) => Math.hypot(b.x - camp.x, b.z - camp.z) < 80);
+  assert.ok(third, 'none by the checkpoint');
+  for (const lx of [-13, -6.8, 0, 6.8, 13]) for (const lz of [-9, 0, 9]) {
+    const c = Math.cos(third.rot), s = Math.sin(third.rot);
+    assert.ok(touched(third.x + lx * c + lz * s, third.z - lx * s + lz * c), 'the hut by the checkpoint reaches onto the old map');
+  }
+  // each stands on its floor: the ground round it within a step of the floor
+  for (const b of huts) for (const [lx, lz] of [[8.2, -1.35], [-8.2, 0], [0, 3.6], [0, -3.6]]) {
+    const c = Math.cos(b.rot), s = Math.sin(b.rot);
+    const g = ground(b.x + lx * c + lz * s, b.z - lx * s + lz * c);
+    assert.ok(b.floorY - g > -0.05 && b.floorY - g < 0.75, `${b.id}: the ground is ${(b.floorY - g).toFixed(2)} m under its floor at ${lx}, ${lz}`);
+  }
 });
 
 console.log(`\n${n} checks passed`);
