@@ -1904,6 +1904,15 @@ export class Avatar {
       }
       this.fpRoot.position.set(pos.x + Math.sin(this.yaw) * FP_BACK, pos.y, pos.z + Math.cos(this.yaw) * FP_BACK);
       this.fpRoot.rotation.set(0, this.yaw + this.twist, 0);
+      // Lying down, the body that is seen from its own eyes lies where the body lies: behind them, on the ground
+      // and tipped to it. (It was left where a standing body is, a step behind the eyes and upright in its
+      // bones' lying pose: a back and a pair of shoulders on the ground in front of the face.)
+      const lying = dead ? 0 : this.proneT;
+      if (lying > 0.001) {
+        this.fpRoot.position.lerp(this.root.position, lying);
+        this.fpRoot.rotation.order = 'YXZ';
+        this.fpRoot.rotation.copy(this.root.rotation);
+      }
       this.fpRoot.scale.copy(this.root.scale);
     }
   }
