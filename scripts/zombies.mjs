@@ -1,4 +1,4 @@
-// Builds the infected: public/assets/characters/zombie_{cop,male,female}.glb
+// Builds the infected: public/assets/characters/zombie_{cop,male,female,hazmat}.glb
 //
 //   node scripts/build-character.mjs --infected     (once: the game's skeleton and movements, on the plain body)
 //   node scripts/zombies.mjs
@@ -8,6 +8,10 @@
 //                  with two seconds of running
 //   zombie_male    "Zombie (Male 1)" by LokitoBlu: a statue, arms out, on no skeleton at all
 //   zombie_female  "Zombie (Female 1)" by LokitoBlu: the same
+//   zombie_idle    "toxic Zombie 3 Idle (animated)" by vicente betoret ferrero: a body in an
+//                  orange suit and a mask, on a Mixamo skeleton of its own (no fingers), with
+//                  seven seconds of standing. Its standing is what all of them stand with, and
+//                  its body is the fourth of them (`hazmat`): the ones of the gas and the bunker.
 //
 // The game has one skeleton and every movement it has is drawn for that. So:
 //
@@ -53,7 +57,11 @@ const ZOMBIES = [
   { id: 'cop', dir: 'zombie_cop', pieces: { body: [[/^FuzZombie_body/, null], [/^Eyes_body/, null]], hair: [[/^Hair_glass_hair/, null]], glass: [[/^Glass_glass_hair/, null]] } },
   { id: 'male', dir: 'zombie_male', statue: true, pieces: { body: [[/^z_Body$/, null]], bottom: [[/^z_Bottom$/, null]], hair: [[/^z_Hair$/, null]], rest: [[/^z_material$/, null]] } },
   { id: 'female', dir: 'zombie_female', statue: true, pieces: { body: [[/^z_Body$/, null]], bottom: [[/^z_Bottom$/, null]], hair: [[/^z_Hair$/, null]], rest: [[/^z_material$/, null]] } },
+  // (on its own skeleton, not the cop's: `own` is how its bones are named)
+  { id: 'hazmat', dir: 'zombie_idle', own: 'mixamorig:', pieces: { body: [[/^model_default/, null]] } },
 ];
+/** only these, if any are named on the command line (`node scripts/zombies.mjs hazmat`) */
+const ONLY = process.argv.slice(2);
 
 const readCop = async () => {
   const cop = await io.read(path.join(SRC, 'zombie_cop', 'scene.gltf'));
@@ -794,16 +802,17 @@ const run = runOf(await readCop());
 // ferrero, seven seconds of it. Only its movement is used, on these bodies.
 const idle = runOf(await io.read(path.join(SRC, 'zombie_idle', 'scene.gltf')), 'mixamorig:', false);
 for (const z of ZOMBIES) {
+  if (ONLY.length && !ONLY.includes(z.id)) continue;
   const doc = await io.read(TEMPLATE);
   const root = doc.getRoot();
   const nodes = new Map(root.listNodes().map((n) => [n.getName(), n]));
   const old = ['eyes', 'eyebrows', 'hair_buzzed', 'hair_parted', 'hair_long', 'hair_beard'].map((n) => nodes.get(n)).filter(Boolean);
-  let suit = await readCop(), told = '';
+  let suit = z.own ? await io.read(path.join(SRC, z.dir, 'scene.gltf')) : await readCop(), told = '';
   let hands = '';
   if (z.statue) ({ doc: suit, told, hands } = await likeTheCop(suit, await io.read(path.join(SRC, z.dir, 'scene.gltf'))));
   // (the skeleton to the body, not the body to the skeleton: see fitSkeleton)
-  const fitted = fitSkeleton({ doc, bodyNode: nodes.get('body'), suit, prefix: '' });
-  const worn = await wearSuit({ doc, io, bodyNode: nodes.get('body'), old, suit, pieces: z.pieces, moved: {}, prefix: '' });
+  const fitted = fitSkeleton({ doc, bodyNode: nodes.get('body'), suit, prefix: z.own ?? '' });
+  const worn = await wearSuit({ doc, io, bodyNode: nodes.get('body'), old, suit, pieces: z.pieces, moved: {}, prefix: z.own ?? '' });
   // what it is painted with: all that it came with (colour, the lie of the surface, how rough
   // it is) but the map of its glints, which wants a costlier kind of material than anything
   // else in the game is made of

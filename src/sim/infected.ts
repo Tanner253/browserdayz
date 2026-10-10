@@ -14,11 +14,12 @@
 // cannot do is hurt anybody from further off than an arm, or faster than an arm swings:
 // the director believes a blow only when the two are standing together.
 
-import { BUILDING_FOOTPRINT, heightAt, type World } from '../world/worldgen';
+import { BUILDING_FOOTPRINT, bunkerPlace, heightAt, type World } from '../world/worldgen';
+import { BUNKER, bunkerAt, bunkerLocal, bunkerPlan, levelY } from './bunker';
 
 export const INFECTED = {
   /** as many as are ever alive at once, over the whole map */
-  max: 39,
+  max: 45,
   /** what each has to begin with: a rifle round anywhere, a pistol round in the head, three in the chest */
   hp: 90,
   /** how long a body lies there, and how long after that before another turns up about the same place, seconds */
@@ -139,12 +140,52 @@ export interface Home {
   z: number;
   r: number;
   n: number;
+  /** a place that is not open ground (the bunker): the spots they turn up at, and no others */
+  inside?: [number, number, number][];
 }
 
 // (the outlying places are where somebody new finds a first weapon: one or two there, the crowd in the village)
-const ABOUT: Record<string, number> = { hamlet: 4, depot: 4, post: 3, yard: 2, farm: 2, lodge: 1, dacha: 1, works: 0 };
+const ABOUT: Record<string, number> = { hamlet: 4, depot: 4, post: 3, yard: 2, farm: 2, lodge: 1, dacha: 1, works: 0, bunker: 0 };
 /** how many keep to the works (said apart from the small places: it comes high in the list, so it is never the one that goes short) */
 const AT_WORKS = 6;
+/** and how many are shut in the bunker, in the dark */
+const IN_BUNKER = 6;
+/** how far from the middle of the works one that turned up there may have done so */
+const WORKS_REACH = 62;
+
+/**
+ * Where the infected of the bunker turn up: down its two passages and just inside its rooms,
+ * clear of everything that stands there.
+ */
+export function bunkerSpots(world: World): [number, number, number][] {
+  const P = bunkerPlace(world);
+  if (!P) return [];
+  const plan = bunkerPlan(), H = BUNKER.hall, out: [number, number, number][] = [];
+  const clear = (r: number, f: number) => Math.abs(r) < H.r - 0.8 && f > H.back + 0.8 && f < H.front - 0.8
+    && !plan.stood.some((s) => Math.hypot(s.r - r, s.f - f) < 1.4)
+    && !plan.made.some((m) => m.solid !== false && Math.hypot(m.r - r, m.f - f) < 1.0 + Math.max(m.w, m.d) / 2);
+  const put = (r: number, f: number) => void (clear(r, f) && out.push(bunkerAt(P, r, f, levelY())));
+  for (let f = H.front - 6; f > H.back + 2; f -= 4) put(0, f);
+  for (let r = -H.r + 3; r < H.r - 2; r += 4) if (Math.abs(r) > BUNKER.passage + 1.5) put(r, plan.cross);
+  for (const q of plan.rooms) {
+    const [dr, df] = q.doors[0], cr = (q.r0 + q.r1) / 2, cf = (q.f0 + q.f1) / 2, d = Math.hypot(cr - dr, cf - df) || 1;
+    put(dr + ((cr - dr) / d) * 1.6, df + ((cf - df) / d) * 1.6);
+  }
+  return out;
+}
+
+/**
+ * Whether one that turned up at a spot is one of the gas or of the bunker: those wear the
+ * orange suit. (Every game says the same of each: it goes by where it turned up.)
+ */
+export function suited(world: World, x: number, z: number): boolean {
+  const works = world.sites.find((s) => s.kind === 'works');
+  if (works && Math.hypot(x - works.x, z - works.z) < WORKS_REACH + 2) return true;
+  const P = bunkerPlace(world);
+  if (!P) return false;
+  const [r, f] = bunkerLocal(P, x, 0, z);
+  return Math.abs(r) < BUNKER.pad.r && f > BUNKER.pad.back && f < BUNKER.pad.front;
+}
 
 /** Where the infected live: the village most of all, the checkpoint, and a few about every outlying place. */
 export function infectedHomes(world: World): Home[] {
@@ -154,7 +195,9 @@ export function infectedHomes(world: World): Home[] {
   const camp = world.pois.find((p) => p.name === 'Military Checkpoint');
   if (camp) homes.push({ x: camp.x, z: camp.z, r: 38, n: 5 });
   const works = world.sites.find((s) => s.kind === 'works');
-  if (works) homes.push({ x: works.x, z: works.z, r: 62, n: AT_WORKS });
+  if (works) homes.push({ x: works.x, z: works.z, r: WORKS_REACH, n: AT_WORKS });
+  const below = bunkerSpots(world), bunker = world.sites.find((s) => s.kind === 'bunker');
+  if (bunker && below.length) homes.push({ x: bunker.x, z: bunker.z, r: 30, n: IN_BUNKER, inside: below });
   for (const s of world.sites) homes.push({ x: s.x, z: s.z, r: 34, n: ABOUT[s.kind] ?? 1 });
   // (never more than the map is meant to hold: the places furthest down the list go short)
   let left = INFECTED.max;
@@ -182,6 +225,10 @@ export function openGround(world: World, x: number, z: number) {
 
 /** A place to stand one about a home, or null if a dozen tries found none. */
 export function homeSpot(world: World, home: Home, rnd: () => number): { x: number; y: number; z: number } | null {
+  if (home.inside) {
+    const at = home.inside[Math.floor(rnd() * home.inside.length)];
+    return at ? { x: at[0], y: at[1], z: at[2] } : null;
+  }
   for (let k = 0; k < 14; k++) {
     const a = rnd() * Math.PI * 2, r = home.r * (0.25 + 0.75 * Math.sqrt(rnd()));
     const x = home.x + Math.cos(a) * r, z = home.z + Math.sin(a) * r;
@@ -228,6 +275,8 @@ export class Director {
   private stand(home: number, now: number, living: Somebody[]): Body | null {
     const at = this.spot(this.homes[home]);
     if (!at || living.some((p) => Math.hypot(p.x - at.x, p.z - at.z) < INFECTED.clear)) return null;
+    // (and not where another of them is standing: two in one place can neither of them move)
+    for (const o of this.bodies.values()) if (!o.diedAt && Math.hypot(o.s[0] - at.x, o.s[2] - at.z) < 1.5 && Math.abs(o.s[1] - at.y) < 2) return null;
     const b: Body = { i: this.next++, s: [at.x, at.y, at.z, this.rnd() * Math.PI * 2, I_IDLE, 0], hp: INFECTED.hp, own: null, h: [Math.round(at.x * 10) / 10, Math.round(at.z * 10) / 10], home, diedAt: 0, heard: now, struck: 0 };
     this.bodies.set(b.i, b);
     return b;

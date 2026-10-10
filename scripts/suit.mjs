@@ -139,7 +139,8 @@ export function fitSkeleton({ doc, bodyNode, suit, prefix = 'mixamorig:' }) {
     const want = p[kc].clone().sub(p[k]);
     const has = r[c].clone().sub(r[i]);
     turn[i].premultiply(new THREE.Quaternion().setFromUnitVectors(has.clone().applyQuaternion(before).normalize(), want.clone().normalize()));
-    if (way.across) {
+    // (a suit whose skeleton has no fingers says nothing of which way round its forearms are turned: they are left as the game's lie)
+    if (way.across && way.across.every((n) => S(n) !== undefined)) {
       const [a, b] = way.across.map((n) => byName.get(n)), [sa, sb] = way.across.map(S);
       if (a === undefined || b === undefined || sa === undefined || sb === undefined) continue;
       const axis = want.clone().normalize();
@@ -275,7 +276,8 @@ export async function wearSuit({ doc, io, bodyNode, dir, old = [], suit: given, 
     const want = p[kc].clone().sub(p[k]);
     const has = r[c].clone().sub(r[i]);
     turn[i].premultiply(new THREE.Quaternion().setFromUnitVectors(has.clone().applyQuaternion(before).normalize(), want.clone().normalize()));
-    if (way.across) {
+    // (a suit whose skeleton has no fingers says nothing of which way round its forearms are turned: they are left as the game's lie)
+    if (way.across && way.across.every((n) => S(n) !== undefined)) {
       const [a, b] = way.across.map((n) => byName.get(n)), [sa, sb] = way.across.map(S);
       const axis = want.clone().normalize();
       const from = r[b].clone().sub(r[a]).applyQuaternion(turn[i]).projectOnPlane(axis).normalize();

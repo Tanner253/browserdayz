@@ -12,8 +12,8 @@ import { assets } from '../core/assets';
 
 const MASK_URL = 'assets/characters/survivor_mask.webp';
 
-/** the bodies there are: a survivor (every player), and the three the infected come in (scripts/zombies.mjs) */
-export type BodyFile = 'survivor' | 'zombie_cop' | 'zombie_male' | 'zombie_female';
+/** the bodies there are: a survivor (every player), the three the infected come in, and the one in an orange suit that is found in the gas and down the bunker (scripts/zombies.mjs) */
+export type BodyFile = 'survivor' | 'zombie_cop' | 'zombie_male' | 'zombie_female' | 'zombie_hazmat';
 export const ZOMBIES: BodyFile[] = ['zombie_male', 'zombie_female', 'zombie_cop'];
 
 const characters = new Map<BodyFile, Promise<GLTF>>();

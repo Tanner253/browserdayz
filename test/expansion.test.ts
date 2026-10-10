@@ -156,12 +156,14 @@ ok('the gas lies over the works and nowhere else, and the checkpoint is clean ai
 });
 
 ok('the infected keep to it too, and nowhere else has fewer for it', () => {
-  const homes = data.homes as { x: number; z: number; n: number }[];
+  const homes = data.homes as { x: number; z: number; n: number; inside?: unknown[] }[];
   const here = homes.find((h) => Math.hypot(h.x - E.x, h.z - E.z) < 1);
   assert.ok(here && here.n >= 4, 'none at the works');
   assert.equal(homes.reduce((s, h) => s + h.n, 0), INFECTED.max);
-  // (the valley held thirty-three before there was a works)
-  assert.equal(INFECTED.max - here!.n, 33);
+  // (the valley held thirty-three before there was a works, or a bunker with its own shut in it)
+  const below = homes.filter((h) => h.inside);
+  assert.ok(below.length === 1 && below[0].n >= 4 && below[0].inside!.length >= below[0].n * 2, 'none in the bunker, or nowhere for them to stand');
+  assert.equal(INFECTED.max - here!.n - below[0].n, 33);
 });
 
 console.log(`\n${n} checks passed`);

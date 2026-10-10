@@ -12,7 +12,7 @@ import { audio } from '../core/audio';
 import type { Atmosphere } from '../world/atmosphere';
 import { BUILDING_FOOTPRINT, heightAt, type World } from '../world/worldgen';
 import type { Buildings } from '../world/buildings';
-import { Director, INFECTED, I_ALERT, I_ATTACK, I_CHASE, I_DEAD, I_IDLE, I_WANDER, homeSpot, infectedDrop, infectedHomes, type IState, type InfectedInfo } from '../sim/infected';
+import { Director, INFECTED, I_ALERT, I_ATTACK, I_CHASE, I_DEAD, I_IDLE, I_WANDER, homeSpot, infectedDrop, infectedHomes, suited, type IState, type InfectedInfo } from '../sim/infected';
 import type { C2S } from '../net/protocol';
 import { Avatar } from './avatar';
 import { ZOMBIES, lookFor } from './look';
@@ -142,8 +142,8 @@ export class Infected implements Damageable {
     this.mode = info.s[4];
     this.after = info.s[5];
     this.fallTo = y;
-    // (which of the three bodies it is goes by its number: every game draws the same one)
-    await this.avatar.load(this.host.atmo(), 0, false, lookFor(''), ZOMBIES[this.i % ZOMBIES.length]);
+    // (which of the three bodies it is goes by its number: every game draws the same one. The ones of the gas and of the bunker wear the orange suit.)
+    await this.avatar.load(this.host.atmo(), 0, false, lookFor(''), suited(this.host.world(), this.home.x, this.home.z) ? 'zombie_hazmat' : ZOMBIES[this.i % ZOMBIES.length]);
     if (this.gone) return this.avatar.dispose();
     this.avatar.sick = { roused: 0, claw: -1, seed: (this.i * 7.31) % 20 };
     this.host.scene().add(this.avatar.root);

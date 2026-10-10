@@ -17,7 +17,8 @@ const homes: Home[] = [{ x: 0, z: 0, r: 30, n: 3 }, { x: 400, z: 0, r: 30, n: 2 
 /** a director whose bodies stand in a row at their home, so a test knows where each is */
 const make = () => {
   let k = 0;
-  return new Director(homes, (h) => ({ x: h.x + (k++ % 5) * 2, y: 0, z: h.z }), () => 0.5);
+  // (never twice in one place: two of them standing in one spot could neither of them move, and the director will not have it)
+  return new Director(homes, (h) => ({ x: h.x + (k++ % 11) * 2, y: 0, z: h.z }), () => 0.5);
 };
 const at = (id: number, x: number, z: number) => ({ id, x, z });
 
