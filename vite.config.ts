@@ -8,6 +8,11 @@ export default defineConfig({
       // the rest is the payouts, and is not for running from a desk.)
       name: 'updates-at-a-desk',
       configureServer(server) {
+        // (and the changelog is a page of its own in public/, which the dev page serves by its file's name only)
+        server.middlewares.use((req, _res, next) => {
+          if (req.url === '/changelog' || req.url === '/changelog/') req.url = '/changelog/index.html';
+          next();
+        });
         server.middlewares.use('/api/updates', (_req, res) => {
           void (async () => {
             try {

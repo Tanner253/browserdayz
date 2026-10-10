@@ -45,6 +45,10 @@
     {
       "source": "/payouts",
       "destination": "/api/cashins"
+    },
+    {
+      "source": "/changelog",
+      "destination": "/changelog/index.html"
     }
   ],
   "functions": {

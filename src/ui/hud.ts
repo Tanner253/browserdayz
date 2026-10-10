@@ -147,6 +147,7 @@ export class HUD {
             <button type="button" data-tab="keys">Controls</button>
             <button type="button" data-tab="gfx">Settings</button>
             <button type="button" data-tab="rewards" hidden>Rewards</button>
+            <a class="sm-out" href="/changelog/" target="_blank" rel="noopener">Changelog</a>
           </nav>
           <div class="sm-status">
             <span class="start-online"></span>

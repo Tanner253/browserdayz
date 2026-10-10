@@ -872,6 +872,10 @@
   transition: color 0.15s, border-color 0.15s;
 }
 .sm-nav button:hover { color: var(--ink); }
+/* (a way out of the menu to a page of its own: said as the others are, and marked as leaving) */
+.sm-nav .sm-out { align-self: center; margin-left: 8px; padding: 5px 10px 6px; font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; white-space: nowrap; text-decoration: none; color: var(--ink-dim); border: 1px solid var(--line); }
+.sm-nav .sm-out::after { content: ' \2197'; color: var(--brand); }
+.sm-nav .sm-out:hover { color: var(--ink); border-color: var(--ink-dim); }
 .sm-nav button.on { color: var(--ink); border-bottom-color: var(--brand); }
 .sm-nav button:focus-visible, .sm-close:focus-visible, .sm-wallet:focus-visible, .mm-spot:focus-visible, .hud-start .start-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 .sm-status { display: flex; align-items: center; gap: 16px; margin-left: auto; }
