@@ -60,12 +60,14 @@ const SHELF_LEVELS: Record<string, number[]> = {
   wooden_bookshelf_worn: [0.11, 0.39, 0.67, 0.96, 1.28, 1.66],
   steel_frame_shelves_01: [0.13, 0.64, 1.15, 1.65],
 };
+/** how high a bed's springs are over its feet, and how thick the mattress on them is: what is kept on a bed lies on that */
+const BED = { springs: 0.49, mattress: 0.1 };
 /** furniture whose loot sits on the very top of the model (height taken from the model, not hand-typed) */
 const TOP_SURFACE = new Set(['WoodenTable_01', 'painted_wooden_table', 'electric_stove', 'painted_wooden_cabinet', 'metal_office_desk']);
 
 type MatKey =
   | 'plaster_ext' | 'brick_ext' | 'planks_ext' | 'planks' | 'int_plaster' | 'int_painted'
-  | 'floor_wood' | 'floor_lino' | 'floor_concrete' | 'roof_iron' | 'roof_tiles' | 'concrete' | 'trim' | 'glass';
+  | 'floor_wood' | 'floor_lino' | 'floor_concrete' | 'roof_iron' | 'roof_tiles' | 'concrete' | 'trim' | 'mattress' | 'glass';
 
 const MATS: Record<Exclude<MatKey, 'glass'>, { tex: string; tile: number; color?: number; metal?: boolean; surface: Surface }> = {
   plaster_ext: { tex: 'worn_mossy_plasterwall', tile: 3, surface: 'plaster' },
@@ -81,6 +83,8 @@ const MATS: Record<Exclude<MatKey, 'glass'>, { tex: string; tile: number; color?
   roof_tiles: { tex: 'clay_roof_tiles_02', tile: 2.2, surface: 'concrete' },
   concrete: { tex: 'dirty_concrete', tile: 3, surface: 'concrete' },
   trim: { tex: 'weathered_planks', tile: 1.2, color: 0x9a8f7c, surface: 'wood' },
+  // (what lies on a bed's springs: old ticking, the colour of it and no more)
+  mattress: { tex: 'painted_plaster_wall', tile: 0.9, color: 0xaaa48d, surface: 'cloth' },
 };
 
 interface Opening {
@@ -1193,6 +1197,13 @@ export class Buildings {
     // what stands on a floor (whose own level is y0), and where things are found on it
     const stock = (furniture: Furn[], loot: [number, number, number][], y0: number) => {
       for (const f of furniture) inst(f.id, f.x, f.z, f.rot, f.scale ?? 1, (f.y ?? 0) + y0);
+      // A bed is a frame with a few wires across it and nothing on them: whatever was kept on one hung in the air
+      // over the springs (59 places on the map). Each has a mattress, and what is kept on it lies on that.
+      for (const f of furniture) {
+        if (f.id !== 'old_bed_frame') continue;
+        const M = new THREE.Matrix4().makeRotationY(f.rot).setPosition(f.x, (f.y ?? 0) + y0, f.z).premultiply(B);
+        this.push('mattress', boxGeo(-0.38, 0.38, BED.springs, BED.springs + BED.mattress, -0.9, 0.9, this.tile('mattress'), M));
+      }
 
       // loot points: on the floor, or on the furniture surface underneath
       const local = (f: Furn, lx: number, lz: number): [number, number] => {
@@ -1237,7 +1248,7 @@ export class Buildings {
           const c = Math.cos(f.rot), s = Math.sin(f.rot);
           const levels = SHELF_LEVELS[f.id];
           const sy = levels ? levels.reduce((best, l) => (Math.abs(l - ly) < Math.abs(best - ly) ? l : best)) + 0.003 : ly;
-          const p = new THREE.Vector3(f.x + ox * c + oz * s, (TOP_SURFACE.has(f.id) ? b.top + 0.003 : sy) + y0, f.z - ox * s + oz * c).applyMatrix4(B);
+          const p = new THREE.Vector3(f.x + ox * c + oz * s, (f.id === 'old_bed_frame' ? BED.springs + BED.mattress + 0.003 : TOP_SURFACE.has(f.id) ? b.top + 0.003 : sy) + y0, f.z - ox * s + oz * c).applyMatrix4(B);
           this.lootPoints.push({
             x: p.x, y: p.y, z: p.z, usage: bp.usage, building: plot.id, floor: false,
             surf: { x: p.x, z: p.z, rot: f.rot + plot.rot, hx: along ? seg : HX, hz: along ? HZ : seg, clear: SHELF_CLEARANCE[f.id] ?? 10 },

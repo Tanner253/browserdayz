@@ -19,9 +19,11 @@ const ok = (name: string, fn: () => void) => {
  * The map before the expansion, as numbers taken off it the day before it was added (commit
  * f136435): the ground, the buildings, the starts, the trees, the loot points and the jeeps.
  */
+// (The loot points were counted again on 2026-10-10: the same points in the same order, those that are on
+// a bed a hand's width higher, on the mattress each bed was given. It was 545356472.)
 // (The ground and the trees were counted again on 2026-10-09, from the same map, with the
 // bunker's hollow left out of the count as the works' is: taken before the bunker was dug.)
-const WAS = { cells: 234302, heights: 1986740555, buildings: 72, buildingsHash: 2448790248, lastId: 'tower_71', spawns: 2697513077, trees: 11269, treesHash: 3538601034, lootPoints: 675, lootHash: 545356472, jeeps: 8, jeepsHash: 380833839, fires: 6 };
+const WAS = { cells: 234302, heights: 1986740555, buildings: 72, buildingsHash: 2448790248, lastId: 'tower_71', spawns: 2697513077, trees: 11269, treesHash: 3538601034, lootPoints: 675, lootHash: 1223262982, jeeps: 8, jeepsHash: 380833839, fires: 6 };
 const hash = (parts: number[]) => {
   let h = 2166136261 >>> 0;
   for (const v of parts) {
