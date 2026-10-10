@@ -104,6 +104,8 @@ interface WallDef {
   ext: MatKey;
   int: MatKey;
   openings: Opening[];
+  /** added after the map's dice were cast: its doors are hung shut and throw none (a door's two throws moved every yard after them) */
+  still?: boolean;
 }
 
 interface Furn {
@@ -186,6 +188,9 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
           { side: 'left', ext, int: 'int_painted', openings: [win(-0.6, 0.5)] },
           { side: 'right', ext, int: 'int_painted', openings: [win(-0.3, 0.8)] },
           { side: 'inner', from: [0.4, -3.05], to: [0.4, 3.05], ext: 'int_plaster', int: 'int_painted', openings: [door(-0.25, 0.7)] },
+          // a closet in the corner of the bedroom, a door on it: room for one to stand in with the door shut
+          { side: 'inner', from: [1.4, -3.05], to: [1.4, -1.95], ext: 'int_plaster', int: 'int_painted', openings: [door(-2.9, -2.1)], still: true },
+          { side: 'inner', from: [0.5, -1.85], to: [1.5, -1.85], ext: 'int_plaster', int: 'int_painted', openings: [] },
         ],
         furniture: [
           { id: 'electric_stove', x: -3.4, z: -2.68, rot: 0 },
@@ -216,6 +221,9 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
           { side: 'right', ext: 'brick_ext', int: 'int_plaster', openings: [win(0.4, 1.6)] },
           { side: 'inner', from: [-1.6, -3.55], to: [-1.6, 3.55], ext: 'int_plaster', int: 'int_plaster', openings: [door(0.55, 1.5)] },
           { side: 'inner', from: [2.0, -3.55], to: [2.0, 3.55], ext: 'int_plaster', int: 'int_plaster', openings: [door(-1.5, -0.55)] },
+          // a closet in the corner of the bedroom, a door on it: room for one to stand in with the door shut
+          { side: 'inner', from: [-2.6, -3.55], to: [-2.6, -2.45], ext: 'int_plaster', int: 'int_plaster', openings: [door(-3.4, -2.6)], still: true },
+          { side: 'inner', from: [-2.7, -2.35], to: [-1.7, -2.35], ext: 'int_plaster', int: 'int_plaster', openings: [] },
         ],
         furniture: [
           { id: 'old_bed_frame', x: -4.5, z: -2.45, rot: 0 },
@@ -1308,7 +1316,7 @@ export class Buildings {
             this.collider((o.b - o.a) / 2, (o.top - o.bottom) / 2, 0.05, F.clone().multiply(c), 'glass', GLASS_GROUPS);
           } else if (o.kind === 'door') {
             const hinge = F.clone().multiply(new THREE.Matrix4().makeTranslation(o.a + fw, 0, 0));
-            this.doorSpecs.push({ m: hinge, w: o.b - o.a - fw * 2, h: o.top - fw, id: `${plot.id}_door${this.doorSpecs.length}`, open: rng.chance(0.35), swing: rng.chance(0.5) ? 1 : -1 });
+            this.doorSpecs.push({ m: hinge, w: o.b - o.a - fw * 2, h: o.top - fw, id: `${plot.id}_door${this.doorSpecs.length}`, open: wd.still ? false : rng.chance(0.35), swing: wd.still ? 1 : rng.chance(0.5) ? 1 : -1 });
           }
           // (a barn's open front has the same lip as a door)
           if (o.kind !== 'window' && wd.side !== 'inner' && y0 === 0) {
