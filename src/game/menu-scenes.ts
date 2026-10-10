@@ -1,7 +1,8 @@
 // What goes on behind the menu before a game is started: the Zone itself, with things
 // happening in it. A survivor run down the village street by the infected; two pairs trading
 // shots along the road; a rifleman holding a pack of them off; a masked man going in at the
-// gate of the works. They are the game's own bodies in the game's own world, moved by a few
+// gate of the works; the big pistol and the shotgun, each close enough to be looked at; and between
+// them, the squad's map on its table, a corner at a time (a film: see src/dev/poster.ts). They are the game's own bodies in the game's own world, moved by a few
 // lines each (nobody is playing them, and nothing they do counts): one scene is shown for a
 // few seconds, then the next, with the view from the air over the village between rounds.
 //
@@ -27,6 +28,8 @@ export interface MenuHost {
   held(id: string, mods: string[]): { obj: THREE.Object3D; grips: Grips; kind: 'rifle' | 'pistol' | 'auto' | 'melee' } | null;
   /** what a body has on: helmet, vest, pack, mask */
   wear(body: Avatar, ids: string[]): Promise<void>;
+  /** the film of the map is there to be shown (it comes over the wire like anything else) */
+  filmReady(): boolean;
 }
 
 interface View { p: THREE.Vector3; l: THREE.Vector3; fov: number }
@@ -37,6 +40,8 @@ interface Vignette {
   setup(): void;
   tick(t: number, dt: number): void;
   view(t: number): View;
+  /** not a scene in the world but a stretch of the film of the map: the second of it this one begins at */
+  film?: number;
 }
 
 /** somebody in a scene: where they are, which way they face, and what they are doing */
@@ -53,7 +58,10 @@ class Extra {
   nextShot = 0;
   /** a suppressor on it: no flash to speak of */
   quiet = false;
-  constructor(readonly body: Avatar, readonly weapon: 'rifle' | 'pistol' | null, readonly sick: boolean) {}
+  /** what it can be given to hold, by name ('own': what it came with), and which of them it holds now */
+  kits = new Map<string, { obj: THREE.Object3D; grips: Grips; kind: 'rifle' | 'pistol' | 'auto' | 'melee'; quiet: boolean }>();
+  kit = '';
+  constructor(readonly body: Avatar, public weapon: 'rifle' | 'pistol' | null, readonly sick: boolean) {}
 
   /** the way it faces, along the ground */
   fwd(out = new THREE.Vector3()) {
@@ -83,6 +91,8 @@ export class MenuScenes {
   caption = '';
   /** how far the picture is faded to black for a cut, 0..1 */
   fade = 0;
+  /** the second of the film of the map that is to be on the screen (-1: none of it, the world is) */
+  film = -1;
   private ready = false;
   private gone = false;
   private men: Extra[] = [];
@@ -115,13 +125,18 @@ export class MenuScenes {
       const body = new Avatar();
       await body.load(atmo, 0, false, lookFor(name));
       if (this.gone) return body.dispose();
-      const held = this.h.held(weapon, weapon === 'mosin' ? ['pu_scope'] : gear.includes('gasmask') ? ['suppressor_9'] : []);
-      if (held) body.setHeld(held.obj, held.grips, held.kind);
       await this.h.wear(body, gear);
       body.root.visible = false;
       scene.add(body.root);
       const man = new Extra(body, kind, false);
-      man.quiet = gear.includes('gasmask');
+      // (the masked man's pistol carries all three of the things a pistol takes: the suppressor, the sight and the light)
+      const own = this.h.held(weapon, weapon === 'mosin' ? ['pu_scope'] : gear.includes('gasmask') ? ['suppressor_9', 'red_dot', 'gun_light'] : []);
+      if (own) man.kits.set('own', { ...own, quiet: gear.includes('gasmask') });
+      // (two of them are also handed what is new, for the scenes that show it: the big pistol, which takes nothing
+      // on it but a longer magazine, and the shotgun with its sight and its light)
+      const also = name === 'Volkov' ? this.h.held('deagle', []) : name === 'Kestrel' ? this.h.held('benelli', ['red_dot', 'gun_light']) : null;
+      if (also) man.kits.set(name === 'Volkov' ? 'deagle' : 'benelli', { ...also, quiet: false });
+      this.arm(man);
       this.men.push(man);
     }
     for (let k = 0; k < (TOUCH ? 3 : 5); k++) {
@@ -133,7 +148,20 @@ export class MenuScenes {
       scene.add(body.root);
       this.sick.push(new Extra(body, null, true));
     }
-    this.list = [this.chase(), this.firefight(), this.stand(), this.works()].filter((v): v is Vignette => !!v);
+    // (between the scenes, the map on its table: a corner of it at a time, as the film has them)
+    const map = (caption: string, from: number, to: number): Vignette => ({ caption, seconds: to - from, film: from, setup: () => {}, tick: () => {}, view: () => ({ p: _a, l: _b, fov: 40 }) });
+    this.list = [
+      this.chase(),
+      map('The squad’s map · what they are going on', 0.2, 3.75),
+      this.firefight(),
+      map('The squad’s map · the keycard is in the gas', 3.95, 7.5),
+      this.sidearm(),
+      map('The squad’s map · Bunker 17', 7.7, 11.25),
+      this.stand(),
+      this.shotgun(),
+      map('The squad’s map · trust nobody at the door', 11.4, 13.1),
+      this.works(),
+    ].filter((v): v is Vignette => !!v);
     this.ready = this.list.length > 0;
   }
 
@@ -143,6 +171,7 @@ export class MenuScenes {
     this.ready = false;
     this.caption = '';
     this.fade = 0;
+    this.film = -1;
     for (const e of [...this.men, ...this.sick]) e.body.dispose();
     this.men = [];
     this.sick = [];
@@ -175,7 +204,17 @@ export class MenuScenes {
     at.y = this.ground(at.x, at.z);
     return { at, t, n: new THREE.Vector3(t.z, 0, -t.x) };
   }
+  /** what it holds: its own, unless a scene hands it something else */
+  private arm(e: Extra, key = 'own') {
+    const k = e.kits.get(key);
+    if (!k || e.kit === key) return;
+    e.body.setHeld(k.obj, k.grips, k.kind);
+    e.kit = key;
+    e.weapon = k.kind === 'pistol' ? 'pistol' : 'rifle';
+    e.quiet = k.quiet;
+  }
   private put(e: Extra, x: number, z: number, yaw: number) {
+    this.arm(e);
     e.pos.set(x, this.ground(x, z), z);
     e.vel.set(0, 0, 0);
     e.yaw = yaw;
@@ -352,6 +391,90 @@ export class MenuScenes {
     };
   }
 
+  /** The big pistol, close: one man on the street, and two of them coming. */
+  private sidearm(): Vignette | null {
+    const man = this.men[0];
+    if (!man.kits.has('deagle')) return null;
+    const here = this.road(-34);
+    const two = this.sick.slice(0, 2);
+    let last = -9;
+    return {
+      caption: 'New · Desert Eagle .50 · the hardest-hitting pistol in the Zone',
+      seconds: 7.5,
+      setup: () => {
+        last = -9;
+        this.put(man, here.at.x, here.at.z, Math.atan2(-here.t.x, -here.t.z));
+        this.arm(man, 'deagle');
+        man.aim = true;
+        two.forEach((z, k) => {
+          const b = this.road(-34 + 18 + k * 7);
+          const off = k ? -1.2 : 1;
+          this.put(z, b.at.x + b.n.x * off, b.at.z + b.n.z * off, Math.atan2(b.t.x, b.t.z));
+        });
+      },
+      tick: (t, dt) => {
+        const coming = two.filter((z) => !z.dead).sort((p, q) => p.pos.distanceToSquared(man.pos) - q.pos.distanceToSquared(man.pos));
+        for (const z of coming) this.go(z, man.pos.x, man.pos.z, 2.9, dt);
+        const next = coming[0];
+        if (!next) return;
+        man.face(next.pos.x, next.pos.z);
+        if (t > 1.9 && t - last > 2 && next.pos.distanceTo(man.pos) < 13) {
+          last = t;
+          this.fire(man, next);
+        }
+      },
+      view: (t) => {
+        // a pace off his right hand and a little ahead of it, looking back along the gun: the pistol has the
+        // right of the picture, and what he is shooting at is behind the menu
+        const f = man.fwd(new THREE.Vector3()), r = new THREE.Vector3(-f.z, 0, f.x);
+        const p = man.pos.clone().addScaledVector(r, 1.0 - t * 0.02).addScaledVector(f, 1.0).setY(man.pos.y + 1.56);
+        return this.lens(p, man.pos.clone().addScaledVector(f, 0.52).setY(man.pos.y + 1.47), 34, 0.34);
+      },
+    };
+  }
+
+  /** The shotgun, from the side: he stands, they come, and it goes off as fast as he can pull. */
+  private shotgun(): Vignette | null {
+    const man = this.men[3];
+    if (!man.kits.has('benelli')) return null;
+    const here = this.road(64);
+    const three = this.sick.slice(0, 3);
+    let last = -9;
+    return {
+      caption: 'New · Benelli M3 · holographic sight, and a light under the barrel',
+      seconds: 8,
+      setup: () => {
+        last = -9;
+        this.put(man, here.at.x, here.at.z, Math.atan2(-here.t.x, -here.t.z));
+        this.arm(man, 'benelli');
+        man.aim = true;
+        three.forEach((z, k) => {
+          const b = this.road(64 + 15 + k * 5.5);
+          const off = ((k % 3) - 1) * 1.3;
+          this.put(z, b.at.x + b.n.x * off, b.at.z + b.n.z * off, Math.atan2(b.t.x, b.t.z));
+        });
+      },
+      tick: (t, dt) => {
+        const coming = three.filter((z) => !z.dead).sort((p, q) => p.pos.distanceToSquared(man.pos) - q.pos.distanceToSquared(man.pos));
+        for (const z of coming) this.go(z, man.pos.x, man.pos.z, 3.2, dt);
+        const next = coming[0];
+        if (!next) return;
+        man.face(next.pos.x, next.pos.z);
+        // (it loads itself: a shot a second, and none of them thrown away at more than ten paces)
+        if (t > 1.5 && t - last > 1.15 && next.pos.distanceTo(man.pos) < 9) {
+          last = t;
+          this.fire(man, next);
+        }
+      },
+      view: (t) => {
+        // from his right, side on: the length of the gun across the right of the picture
+        const f = new THREE.Vector3(here.t.x, 0, here.t.z), r = new THREE.Vector3(-f.z, 0, f.x);
+        const p = man.pos.clone().addScaledVector(r, 2.5).addScaledVector(f, 1.3 - t * 0.04).setY(man.pos.y + 1.42);
+        return this.lens(p, man.pos.clone().addScaledVector(f, 0.75).setY(man.pos.y + 1.36), 36, 0.36);
+      },
+    };
+  }
+
   /** In at the gate of the works, under the gas, with a mask on. */
   private works(): Vignette | null {
     const z = gasZone(this.h.world.pois, (x, zz) => this.ground(x, zz));
@@ -365,7 +488,7 @@ export class MenuScenes {
     const STOOD: [number, number][] = [[0.4, 60], [-1.6, 63.5], [5.5, 64], [-4.5, 69], [7, 70]];
     let shot = false;
     return {
-      caption: 'The Chemical Works · gas: nobody goes in without a mask',
+      caption: 'The Chemical Works · gas: nobody goes in without a mask · suppressor, sight and light on his M9',
       seconds: 9,
       setup: () => {
         shot = false;
@@ -425,16 +548,28 @@ export class MenuScenes {
         e.on = false;
         e.body.root.visible = false;
       }
-      if (this.at + 1 < this.list.length) this.begin(this.at + 1);
+      // (a stretch of the film that has not come over the wire yet is passed over)
+      let k = this.at + 1;
+      while (k < this.list.length && this.list[k].film !== undefined && !this.h.filmReady()) k++;
+      if (k < this.list.length) this.begin(k);
       else {
         // the round is done: back up into the air for a while
         this.at = -1;
         this.air = 7;
         this.fade = 1;
+        this.film = -1;
         return false;
       }
     }
     const now = this.list[this.at];
+    this.caption = now.caption;
+    this.fade = Math.max(1 - this.t / CUT.in, (this.t - (now.seconds - CUT.out)) / CUT.out, 0);
+    if (now.film !== undefined) {
+      // the film has the picture: nobody is on, and the camera stays where the last scene left it
+      this.film = now.film + this.t;
+      return true;
+    }
+    this.film = -1;
     now.tick(this.t, dt);
     for (const e of [...this.men, ...this.sick]) {
       e.body.root.visible = e.on;
@@ -447,8 +582,6 @@ export class MenuScenes {
     cam.fov = view.fov;
     cam.updateProjectionMatrix();
     cam.updateMatrixWorld();
-    this.caption = now.caption;
-    this.fade = Math.max(1 - this.t / CUT.in, (this.t - (now.seconds - CUT.out)) / CUT.out, 0);
     return true;
   }
 

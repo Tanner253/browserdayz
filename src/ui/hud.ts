@@ -133,6 +133,7 @@ export class HUD {
       <div class="hud-fatal"><div class="fatal-title">Disconnected</div><div class="fatal-sub"></div><button class="dead-btn fatal-btn">Reconnect</button></div>
       <div class="hud-dead"><div class="dead-title">You are dead</div><div class="dead-sub"></div><button class="dead-btn">Respawn</button></div>
       <div class="hud-start">
+        <video class="sm-film" muted playsinline preload="auto" src="/menu/map-pan.mp4"></video>
         <div class="sm-cut"></div>
         <header class="sm-top">
           <div class="sm-brand"><img src="/brand/zona-mark-plain.svg" alt=""><b>ZONA</b></div>
@@ -480,7 +481,7 @@ export class HUD {
    * the next (see src/game/menu-scenes.ts).
    * @param fade how far the picture is faded out, 0..1
    */
-  menuScene(caption: string, fade: number) {
+  menuScene(caption: string, fade: number, film = -1) {
     const live = this.root.querySelector('.sm-live') as HTMLElement;
     this.toggle(live, 'on', !!caption);
     if (caption) this.set('scene', live.lastElementChild as HTMLElement, caption);
@@ -489,6 +490,23 @@ export class HUD {
       this.last.cut = v;
       (this.root.querySelector('.sm-cut') as HTMLElement).style.opacity = v;
     }
+    // the film of the map, when it is its turn: played from the second asked for, and kept to it
+    const reel = this.root.querySelector('.sm-film') as HTMLVideoElement | null;
+    if (!reel) return;
+    const on = film >= 0;
+    if (on !== reel.classList.contains('on')) {
+      reel.classList.toggle('on', on);
+      if (on) {
+        reel.currentTime = film;
+        void reel.play().catch(() => {});
+      } else reel.pause();
+    } else if (on && Math.abs(reel.currentTime - film) > 0.4) reel.currentTime = film;
+  }
+
+  /** the film of the map has come and can be played */
+  filmReady() {
+    const reel = this.root.querySelector('.sm-film') as HTMLVideoElement | null;
+    return !!reel && reel.readyState >= 3;
   }
 
   /** The line about being paid, under the way in: whether a wallet is given yet. Pressing it opens the rewards window. */

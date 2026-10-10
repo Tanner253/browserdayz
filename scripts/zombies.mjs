@@ -813,8 +813,9 @@ for (const z of ZOMBIES) {
   let hands = '';
   if (z.statue) ({ doc: suit, told, hands } = await likeTheCop(suit, await io.read(path.join(SRC, z.dir, 'scene.gltf'))));
   // (the skeleton to the body, not the body to the skeleton: see fitSkeleton)
-  const fitted = fitSkeleton({ doc, bodyNode: nodes.get('body'), suit, prefix: z.own ?? '' });
-  const worn = await wearSuit({ doc, io, bodyNode: nodes.get('body'), old, suit, pieces: z.pieces, moved: {}, prefix: z.own ?? '' });
+  // (toes: false, the toes lie as the foot does: see `points` in suit.mjs)
+  const fitted = fitSkeleton({ doc, bodyNode: nodes.get('body'), suit, prefix: z.own ?? '', toes: false });
+  const worn = await wearSuit({ doc, io, bodyNode: nodes.get('body'), old, suit, pieces: z.pieces, moved: {}, prefix: z.own ?? '', toes: false });
   // what it is painted with: all that it came with (colour, the lie of the surface, how rough
   // it is) but the map of its glints, which wants a costlier kind of material than anything
   // else in the game is made of

@@ -13,3 +13,7 @@ trailer/out
 trailer/emotes.glb
 # settings and keys never go in the repository
 .env*
+
+# the poster and its film at full size: kept on disk, not in the repository (the 1080p pictures are)
+marketing/*-4k.png
+marketing/*.mp4

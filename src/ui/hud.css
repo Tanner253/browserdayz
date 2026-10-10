@@ -845,6 +845,10 @@
 }
 /* the cut from one scene behind it to the next */
 .sm-cut { position: absolute; inset: 0; z-index: 0; opacity: 0; background: #050706; pointer-events: none; }
+/* the film of the squad's map, between the scenes: over the world, under the cut and the menu */
+.sm-film { position: absolute; inset: 0; z-index: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; pointer-events: none; }
+.sm-film.on { opacity: 1; }
+.hud-start.paused .sm-film { display: none; }
 .sm-top, .sm-main, .sm-foot { position: relative; z-index: 1; }
 
 /* --- the bar along the top */

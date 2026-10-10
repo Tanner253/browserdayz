@@ -45,10 +45,16 @@ export function ours(name, prefix = 'mixamorig:') {
   return f ? `${f[1].toLowerCase()}_0${f[2]}${f[2] === '4' ? '_leaf' : ''}${side}` : null;
 }
 
-/** the bone a bone points along (and, for some, two joints that say which way round it is turned) */
-function points(name) {
+/**
+ * the bone a bone points along (and, for some, two joints that say which way round it is turned)
+ * @param toes false: the toes lie as the foot lies, wherever the suit's skeleton has the end of them. (On the
+ *   infected's own skeletons that end is behind the toes and off to one side: laid along it, the toes were bound
+ *   turned most of the way round and pressed short, and every movement curled a bare foot into a claw.)
+ */
+function points(name, toes = true) {
   const side = name.match(/_[lr]$/)?.[0] ?? '';
   const b = side ? name.slice(0, -2) : name;
+  if (b === 'ball' && !toes) return null;
   const to = { upperarm: 'lowerarm', lowerarm: 'hand', hand: 'middle_01', thigh: 'calf', calf: 'foot', foot: 'ball', ball: 'ball_leaf' }[b];
   if (to) return { to: to + side, across: b === 'lowerarm' || b === 'hand' ? [`pinky_01${side}`, `index_01${side}`] : null, stretch: b !== 'hand' };
   const f = b.match(/^(thumb|index|middle|ring|pinky)_0([123])$/);
@@ -92,7 +98,7 @@ const at = (m) => new THREE.Vector3().setFromMatrixPosition(m);
  * which then finds nothing to stretch.
  * @returns what was done, for the build's last line
  */
-export function fitSkeleton({ doc, bodyNode, suit, prefix = 'mixamorig:' }) {
+export function fitSkeleton({ doc, bodyNode, suit, prefix = 'mixamorig:', toes = true }) {
   const sSkin = suit.getRoot().listSkins()[0];
   const sJoints = sSkin.listJoints();
   const ibm = sSkin.getInverseBindMatrices();
@@ -133,7 +139,7 @@ export function fitSkeleton({ doc, bodyNode, suit, prefix = 'mixamorig:' }) {
     const up = parent[i];
     const before = up < 0 ? new THREE.Quaternion() : turn[up];
     turn[i].copy(before);
-    const k = suitOf.get(i), way = points(joints[i].getName());
+    const k = suitOf.get(i), way = points(joints[i].getName(), toes);
     const c = way && byName.get(way.to), kc = c !== undefined ? suitOf.get(c) : undefined;
     if (k === undefined || kc === undefined) continue;
     const want = p[kc].clone().sub(p[k]);
@@ -195,7 +201,7 @@ export function fitSkeleton({ doc, bodyNode, suit, prefix = 'mixamorig:' }) {
  *                 which shape of the body, as PIECES), `moved` (as MOVED) and `prefix` (see ours)
  * @returns what was done, for the build's last line
  */
-export async function wearSuit({ doc, io, bodyNode, dir, old = [], suit: given, pieces = PIECES, moved: MOVED_ = MOVED, prefix = 'mixamorig:' }) {
+export async function wearSuit({ doc, io, bodyNode, dir, old = [], suit: given, pieces = PIECES, moved: MOVED_ = MOVED, prefix = 'mixamorig:', toes = true }) {
   const suit = given ?? (await io.read(path.join(dir, 'scene.gltf')));
   const sRoot = suit.getRoot();
   const sSkin = sRoot.listSkins()[0];
@@ -270,7 +276,7 @@ export async function wearSuit({ doc, io, bodyNode, dir, old = [], suit: given, 
     const before = up < 0 ? new THREE.Quaternion() : turn[up];
     q[i].copy(up < 0 ? r[i] : r[i].clone().sub(r[up]).applyQuaternion(before).add(q[up]));
     turn[i].copy(before);
-    const k = suitOf.get(i), way = points(joints[i].getName());
+    const k = suitOf.get(i), way = points(joints[i].getName(), toes);
     const c = way && byName.get(way.to), kc = c !== undefined ? suitOf.get(c) : undefined;
     if (k === undefined || kc === undefined) continue;
     const want = p[kc].clone().sub(p[k]);

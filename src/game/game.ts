@@ -122,6 +122,8 @@ export class Game {
   gas!: Gas;
   /** what goes on behind the menu before a game is started */
   private menu!: MenuScenes;
+  /** the menu is (or was last frame) what is on the screen */
+  private menuOn = true;
   /** the fireplaces: which are alight, and the look and sound of them */
   fires!: Fires;
   /** the bunker: what is built of it, its door and its lamps */
@@ -543,7 +545,7 @@ export class Game {
       }
       this.hud.setMenuMap(this.minimap.poster(), WORLD_SIZE, spots, atmo.gas);
     }
-    this.menu = new MenuScenes({ world, atmo, scene: r.scene, effects: this.effects, held: (id, mods) => this.makeHeld(id, mods), wear: (body, ids) => this.wear(body, ids) });
+    this.menu = new MenuScenes({ world, atmo, scene: r.scene, effects: this.effects, held: (id, mods) => this.makeHeld(id, mods), wear: (body, ids) => this.wear(body, ids), filmReady: () => this.hud.filmReady() });
     void this.menu.load();
     this.hud.showStart(true);
     // FPS mouse: play only while the mouse is captured. Esc releases it -> pause menu;
@@ -2590,8 +2592,17 @@ export class Game {
     // before you deploy: something going on in the Zone behind the menu, or (between those, and
     // until their people have arrived) the middle of the map from the air
     if (!this.started) {
+      this.menuOn = true;
       if (!this.menu.update(dt, cam)) this.menuCamera(now);
-      this.hud.menuScene(this.menu.caption, this.menu.fade);
+      this.hud.menuScene(this.menu.caption, this.menu.fade, this.menu.film);
+      // (a long lens brings the far wood near: its trees are drawn as trees as far as the lens makes them large)
+      this.s.veg.setReach(THREE.MathUtils.clamp(Math.tan((62 * Math.PI) / 360) / Math.tan((cam.fov * Math.PI) / 360), 1, 2.6));
+    }
+    else if (this.menuOn) {
+      // a game has begun: the film off, the trees as they are in play
+      this.menuOn = false;
+      this.hud.menuScene('', 0, -1);
+      this.s.veg.setReach(1);
     }
     const fpView = this.started && this.director.viewmodelVisible && !p.dead && !this.garage.ride;
     if (fpView) cam.layers.enable(FP_BODY_LAYER);

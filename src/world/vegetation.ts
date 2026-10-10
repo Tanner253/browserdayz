@@ -375,6 +375,11 @@ class Impostors {
 
   private sig = 0;
 
+  /** from how far off the cards are drawn (they come in between the two) */
+  reach(from: number, full: number) {
+    (this.material.uniforms.uFade.value as THREE.Vector2).set(from, full);
+  }
+
   update(cam: THREE.Vector3, frustum: THREE.Frustum, near: number) {
     let n = 0;
     let sig = 0;
@@ -717,17 +722,41 @@ export class Vegetation {
     this.impostors.build(scene, this.world.trees, bakeKinds.length);
   }
 
+  private detailK = 1;
+  private reachK = 1;
+
   /** Graphics option: how far the full-detail trees and bushes reach (1 = as built). */
   setDetail(k: number) {
+    this.detailK = k;
+    this.applyLods();
+  }
+
+  /**
+   * How many times further than built every tree is drawn as itself before its card takes over. A long lens
+   * brings far trees as near as near ones: through the menu's (30 to 45 degrees, against the game's 62) the wood
+   * on the far hill was a stand of cards, and a card of a tree at that size is bare poles. With this at the
+   * lens's own magnification they are trees, in leaf, as far as the lens makes them large.
+   */
+  setReach(k: number) {
+    if (Math.abs(k - this.reachK) < 0.03) return;
+    this.reachK = k;
+    this.applyLods();
+  }
+
+  private applyLods() {
+    const k = this.detailK * this.reachK, r = this.reachK;
     for (const d of this.detail) {
-      const fade: [number, number] = [d.base[0] * k, d.base[1] * k];
+      const fade: [number, number] = [d.base[0] * k, d.base[1] * k], mid: [number, number] = [d.mid[0] * r, d.mid[1] * r];
       for (const u of d.full) setLodFade(u, null, fade);
-      for (const u of d.simple) setLodFade(u, fade, d.mid);
+      for (const u of d.simple) setLodFade(u, fade, mid);
       const [full, simple] = d.set.levels;
       full.farFull = simple.near = fade[0];
       full.far = simple.nearFull = fade[1];
+      simple.farFull = mid[0];
+      simple.far = mid[1];
       d.set.invalidate();
     }
+    this.impostors.reach(HANDOVER[0] * r, HANDOVER[1] * r);
   }
 
   update(dt: number, camera: THREE.Camera) {
@@ -736,6 +765,6 @@ export class Vegetation {
     this.projView.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     this.frustum.setFromProjectionMatrix(this.projView);
     for (const s of this.sets) s.update(cam, this.frustum);
-    this.impostors.update(cam, this.frustum, HANDOVER[0]);
+    this.impostors.update(cam, this.frustum, HANDOVER[0] * this.reachK);
   }
 }
