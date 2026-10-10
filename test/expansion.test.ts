@@ -21,9 +21,11 @@ const ok = (name: string, fn: () => void) => {
  */
 // (The loot points were counted again on 2026-10-10: the same points in the same order, those that are on
 // a bed a hand's width higher, on the mattress each bed was given. It was 545356472.)
+// (And on 2026-10-10 again, 1223262982 before it: the same places in the same order, those on a water
+// barrel 3 cm lower, on its lid and not at the height of its rim.)
 // (The ground and the trees were counted again on 2026-10-09, from the same map, with the
 // bunker's hollow left out of the count as the works' is: taken before the bunker was dug.)
-const WAS = { cells: 234302, heights: 1986740555, buildings: 72, buildingsHash: 2448790248, lastId: 'tower_71', spawns: 2697513077, trees: 11269, treesHash: 3538601034, lootPoints: 675, lootHash: 1223262982, jeeps: 8, jeepsHash: 380833839, fires: 6 };
+const WAS = { cells: 234302, heights: 1986740555, buildings: 72, buildingsHash: 2448790248, lastId: 'tower_71', spawns: 2697513077, trees: 11269, treesHash: 3538601034, lootPoints: 675, lootHash: 113905251, jeeps: 8, jeepsHash: 380833839, fires: 6 };
 const hash = (parts: number[]) => {
   let h = 2166136261 >>> 0;
   for (const v of parts) {

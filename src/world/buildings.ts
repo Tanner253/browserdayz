@@ -62,6 +62,8 @@ const SHELF_LEVELS: Record<string, number[]> = {
 };
 /** how high a bed's springs are over its feet, and how thick the mattress on them is: what is kept on a bed lies on that */
 const BED = { springs: 0.49, mattress: 0.1 };
+/** how far under its rim the lid of a water barrel is */
+const BARREL_LID = 0.032;
 /** furniture whose loot sits on the very top of the model (height taken from the model, not hand-typed) */
 const TOP_SURFACE = new Set(['WoodenTable_01', 'painted_wooden_table', 'electric_stove', 'painted_wooden_cabinet', 'metal_office_desk']);
 
@@ -1289,7 +1291,8 @@ export class Buildings {
       if (kind === 'barrel_03') {
         // small things get left on top of a barrel (a water barrel: nothing is left on a
         // fuel drum, which may not be there in a minute)
-        const top = assets.manifest.models[kind].max[1];
+        // (on its lid, which is let 3 cm down inside its rim: at the rim's height they hung over it)
+        const top = assets.manifest.models[kind].max[1] - BARREL_LID;
         this.lootPoints.push({ x: p.x, y: gy + top + 0.003, z: p.z, usage: bp.usage, building: plot.id, floor: false, surf: { x: p.x, z: p.z, rot: 0, hx: 0.17, hz: 0.17, clear: 10 } });
       }
     }
