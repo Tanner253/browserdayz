@@ -3,6 +3,7 @@
 // Positional sounds use HRTF panners; gunshots get an outdoor slap-back echo.
 
 import type { Surface } from './physics';
+import { EMOTE } from '../sim/emotes';
 
 type V3 = { x: number; y: number; z: number };
 
@@ -1332,6 +1333,28 @@ export class AudioEngine {
    * @param pos where they stand (their head); none for the player's own voice
    * @param voice whose voice, 0..1: from a low, broad one to a higher, thinner one
    */
+  /**
+   * A call said in words by the browser's own speaking voice (the same caller has the same voice and pitch every
+   * time, by their name), quieter the further off and late by as long as sound takes to arrive.
+   * @returns whether it will be said: not where there is no such voice, nor while one call is already waiting
+   *   behind another (three people shouting at once are not said one after the other, long after)
+   */
+  private speak(words: string, distance: number, voice: number): boolean {
+    const synth = typeof speechSynthesis === 'undefined' ? null : speechSynthesis;
+    // (not while a film's soundtrack is being made from the list of what was heard: that is not this machine's to say aloud)
+    if (!words || !synth || typeof SpeechSynthesisUtterance === 'undefined' || !(this.ctx instanceof AudioContext) || this.volume <= 0 || synth.pending) return false;
+    const voices = synth.getVoices().filter((v) => /^en/i.test(v.lang));
+    if (!voices.length) return false;
+    const u = new SpeechSynthesisUtterance(words);
+    u.voice = voices[Math.min(voices.length - 1, Math.floor(voice * voices.length))];
+    u.lang = u.voice.lang;
+    u.pitch = 0.7 + voice * 0.6;
+    u.rate = 1.25;
+    u.volume = Math.max(0.04, Math.min(1, this.volume * (distance > 0 ? 1 / (1 + distance / 12) : 0.85)));
+    setTimeout(() => synth.speak(u), Math.min(400, (distance / 343) * 1000));
+    return true;
+  }
+
   shout(id: string, pos?: V3, distance = 0, voice = 0.5) {
     const call = CALLS[id];
     if (!this.ready || !call) return;
@@ -1343,8 +1366,11 @@ export class AudioEngine {
     const size = 0.95 + voice * 0.11;
     // a node of this voice's own (see gunshot): out in the world from where they stand, or
     // straight to the ears, a little quieter, when it is your own
+    // The words themselves, where the browser has a speaking voice: then the made-up throat is kept, quiet,
+    // under them (it is the throat that is heard from where the caller stands; the browser's voice has no place).
+    const spoken = this.speak(EMOTE[id]?.label ?? '', distance, voice);
     const bus = ctx.createGain();
-    bus.gain.value = pos ? 1 : 0.55;
+    bus.gain.value = (pos ? 1 : 0.55) * (spoken ? 0.3 : 1);
     bus.connect(pos ? this.out(pos, 6, 1.1, distance) : this.sfx);
     // a raised voice carries a little way into the country as well
     const far = ctx.createGain();
