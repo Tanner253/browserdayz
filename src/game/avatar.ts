@@ -57,6 +57,9 @@ export const GEAR: Record<string, { bone: 'Head' | 'spine_03'; p: [number, numbe
   // (the hood of it alone: see `facepiece`. As its model lies, the crown is toward -x and the eyepieces look along +z)
   // (the helmet: its brow is toward +x as its model stands, so it is turned a quarter round)
   boonie_hat: { bone: 'Head', p: [0, 1.593, 0.035], r: [0, Math.PI / 2, 0], s: [1, 1, 1] },
+  // (the cap and the soft hat: their bands at the brow. The cap's peak is toward +z as its model lies, so it is turned round.)
+  patrol_cap: { bone: 'Head', p: [0, 1.64, 0.01], r: [0, Math.PI, 0], s: [1, 1, 1] },
+  fishermans_hat: { bone: 'Head', p: [0, 1.66, 0.0], r: [0, 0, 0], s: [1, 1, 1] },
   // (a hood over the whole head, a little larger than life so the head and what is on it are inside it)
   gasmask: { bone: 'Head', p: [0.1155, 1.141, -0.04], r: [0, Math.PI, -Math.PI / 2], s: [1.1, 1.1, 1.1] },
 };

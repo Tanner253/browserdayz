@@ -25,12 +25,21 @@ const WORTH: Record<string, number> = {
   bandage: 4, firstaid: 12, splint: 5,
   // what is worn and carried
   boonie_hat: 18, life_vest: 22, gasmask: 30, work_gloves: 3, rubber_boots: 3, sack_pack: 8, suitcase: 6,
-  flashlight: 5, binoculars: 10, compass: 4, watch: 6,
+  flashlight: 5, binoculars: 10, compass: 4, watch: 6, patrol_cap: 4, fishermans_hat: 4, garden_gloves: 2,
   cigarettes: 2, grenade: 15, stash_kit: 15, jerrycan: 8, radio: 35,
 };
 
 /** what he has to sell, in the order it is shown */
 export const STOCK = ['bandage', 'firstaid', 'splint', 'beans', 'sardines', 'flask', 'box_9mm', 'box_762', 'box_12', 'box_50', 'flashlight', 'gun_light', 'red_dot', 'sack_pack', 'gasmask', 'grenade', 'stash_kit', 'radio'];
+
+/**
+ * How many of a thing he will sell one player in a day (three, where nothing is said). He is a place to top up
+ * at, not a place to be fitted out from: the dear things one a day, and the rest a handful.
+ */
+const A_DAY: Record<string, number> = { radio: 1, gasmask: 1, stash_kit: 1, red_dot: 1, gun_light: 1, sack_pack: 1, grenade: 2, firstaid: 2, box_9mm: 4, box_762: 4, box_12: 4, box_50: 2 };
+export const aDay = (id: string) => A_DAY[id] ?? 3;
+/** what is left of a player's credit with him when they are killed: he writes the rest off */
+export const KEPT_ON_DEATH = 0.5;
 
 /** what one of a thing is worth to him: 0 if he does not deal in it */
 export function worth(id: string): number {

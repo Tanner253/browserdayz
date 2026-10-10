@@ -29,7 +29,7 @@ export const DRIVE = {
   /** the weight sits this far below the middle of the tub (it is what brings it down on its wheels) */
   low: 0.34,
   /** how hard it is to turn over, to pitch and to spin, against a plain box of its size */
-  inertia: [1.25, 1.0, 1.9] as [number, number, number],
+  inertia: [1.5, 1.2, 2.1] as [number, number, number],
   /** wheels: half the track, half the wheelbase, radius (taken from the model when there is one: see Garage.load) */
   track: 0.702,
   base: 1.271,
@@ -37,9 +37,12 @@ export const DRIVE = {
   /** springs: length unloaded, how far they move either way, stiffness, damping going in and coming out */
   rest: 0.36,
   travel: 0.26,
-  stiff: 21,
-  comp: 1.5,
-  relax: 2.7,
+  // (It bounced like something light: its springs were damped at a sixth and a third of what stops a spring
+  // dead. They are a little softer and damped at four tenths going in and three quarters coming out, which is
+  // a heavy car on worn shocks: it settles in one movement.)
+  stiff: 18,
+  comp: 3.3,
+  relax: 6.2,
   maxForce: 90000,
   /**
    * The last of each spring's travel is that many times stiffer than the rest of it: what a

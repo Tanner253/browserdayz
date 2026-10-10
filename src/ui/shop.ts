@@ -10,7 +10,8 @@ export interface ShopHost {
   /** what you carry that he will take, and what he pays for each */
   wares(): { item: ItemInstance; pays: number }[];
   /** what he sells, and what he asks */
-  stock(): { id: string; asks: number }[];
+  /** (`left`: how many more of it he will sell this player today) */
+  stock(): { id: string; asks: number; left: number }[];
   /** the day's work: each job, how much of it is done, and whether it has been paid */
   jobs(): { id: string; text: string; n: number; have: number; pays: number; paid: boolean }[];
   /** null if it was paid; else why not */
@@ -134,7 +135,7 @@ export class ShopUI {
     const tabs = [{ key: 'all', name: 'All', n: stock.length }, ...TABS.map((t) => ({ key: t.key, name: t.name, n: stock.filter((x) => sortOf(x.id) === t.key).length }))].filter((t) => t.n);
     if (!tabs.some((t) => t.key === this.tab)) this.tab = 'all';
     const tabRow = `<div class="shop-tabs">${tabs.map((t) => `<button data-sort="${t.key}"${t.key === this.tab ? ' class="on"' : ''}>${t.name}<small>${t.n}</small></button>`).join('')}</div>`;
-    const his = tabRow + stock.filter((x) => this.tab === 'all' || sortOf(x.id) === this.tab).map((s) => row('buy', s.id, s.id, ITEMS[s.id].name + ((ITEMS[s.id].stack ?? 1) > 1 ? ` ×${ITEMS[s.id].stack}` : ''), ITEMS[s.id].desc ?? '', String(s.asks), s.asks > credit)).join('');
+    const his = tabRow + stock.filter((x) => this.tab === 'all' || sortOf(x.id) === this.tab).map((s) => row('buy', s.id, s.id, ITEMS[s.id].name + ((ITEMS[s.id].stack ?? 1) > 1 ? ` ×${ITEMS[s.id].stack}` : ''), s.left > 0 ? `${s.left} left today · ${ITEMS[s.id].desc ?? ''}` : 'None left today: he sells so many a day', String(s.asks), s.asks > credit || s.left <= 0)).join('');
     const jobs = h.jobs();
     const work = jobs
       .map((j) => {

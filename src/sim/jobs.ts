@@ -25,6 +25,8 @@ export interface JobBook {
   heads: number;
   /** ids of the jobs paid for */
   done: string[];
+  /** how many of each thing have been bought from him today (he sells so many a day: see `aDay` in trade.ts) */
+  bought?: Record<string, number>;
 }
 
 const COMMON: [string, number][] = [['beans', 3], ['sardines', 3], ['sprats', 3], ['bandage', 2], ['water_jug', 2], ['flashlight', 1], ['compass', 1], ['work_gloves', 2]];
@@ -49,8 +51,8 @@ export function jobsFor(day: number): Job[] {
 
 /** a book for a day: the one that was kept, if it is that day's, or a clean one */
 export function bookFor(day: number, kept: Partial<JobBook> | null): JobBook {
-  if (kept && kept.day === day) return { day, kills: Math.max(0, Math.floor(kept.kills ?? 0)), heads: Math.max(0, Math.floor(kept.heads ?? 0)), done: Array.isArray(kept.done) ? kept.done.filter((x) => typeof x === 'string') : [] };
-  return { day, kills: 0, heads: 0, done: [] };
+  if (kept && kept.day === day) return { day, kills: Math.max(0, Math.floor(kept.kills ?? 0)), heads: Math.max(0, Math.floor(kept.heads ?? 0)), done: Array.isArray(kept.done) ? kept.done.filter((x) => typeof x === 'string') : [], bought: kept.bought && typeof kept.bought === 'object' ? kept.bought : {} };
+  return { day, kills: 0, heads: 0, done: [], bought: {} };
 }
 
 /** how much of a job is done, of its `n`: `carried` says how many of a thing are on the player */

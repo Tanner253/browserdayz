@@ -58,7 +58,7 @@ import { breaksOnHit } from '../sim/injury';
 import { MenuScenes } from './menu-scenes';
 import { Traders } from './trader';
 import { ShopUI } from '../ui/shop';
-import { STOCK, asks, pays } from '../sim/trade';
+import { KEPT_ON_DEATH, STOCK, aDay, asks, pays } from '../sim/trade';
 import { bookFor, dayOf, jobsFor, progress as jobDone, type JobBook } from '../sim/jobs';
 import type { MenuSpot } from '../ui/hud';
 import { Lamps } from './lamps';
@@ -573,6 +573,13 @@ export class Game {
     }
     this.menu = new MenuScenes({ world, atmo, scene: r.scene, effects: this.effects, held: (id, mods) => this.makeHeld(id, mods), wear: (body, ids) => this.wear(body, ids), filmReady: () => this.hud.filmReady() });
     void this.menu.load();
+    // The ground ends at the edge of the square, and there was nothing there to stop anybody walking or
+    // driving off it. Four walls that cannot be seen, a few paces in from the edge: the wild country round
+    // the map is all there to be walked, and nobody falls out of the world.
+    {
+      const edge = WORLD_SIZE / 2 - 4;
+      for (const [x, z, hx, hz] of [[0, edge, edge, 1], [0, -edge, edge, 1], [edge, 0, 1, edge], [-edge, 0, 1, edge]]) physics.addStatic(physics.R.ColliderDesc.cuboid(hx, 400, hz), 'rock', { x, y: 0, z });
+    }
     this.traders = new Traders(world);
     this.minimap.setTraders(this.traders.places);
     void this.traders.load(r.scene, atmo, (body, ids) => this.wear(body, ids));
@@ -583,7 +590,10 @@ export class Game {
         [...this.inv.containers.flatMap((c) => c.items.map((pl) => pl.item)), ...WEAPON_SLOTS.filter((sl) => sl !== this.inv.active).map((sl) => this.inv.slots[sl])]
           .filter((it): it is ItemInstance => !!it && !it.cargo?.length && pays(it) > 0)
           .map((item) => ({ item, pays: pays(item) })),
-      stock: () => STOCK.map((id) => ({ id, asks: asks(id) })).filter((x) => x.asks > 0),
+      stock: () => {
+        const bought = this.jobBook().bought ?? {};
+        return STOCK.map((id) => ({ id, asks: asks(id), left: aDay(id) - (bought[id] ?? 0) })).filter((x) => x.asks > 0);
+      },
       icon: (id) => this.invUI.icons[id],
       jobs: () => {
         const book = this.jobBook();
@@ -615,10 +625,14 @@ export class Game {
       buy: (id) => {
         const cost = asks(id);
         if (!cost) return 'I do not sell that.';
+        const book = this.jobBook();
+        if ((book.bought?.[id] ?? 0) >= aDay(id)) return 'No more of those today. Come back tomorrow.';
         if (cost > this.credit) return `That is ${cost}. You have ${this.credit} with me.`;
         const it = makeItem(id, ITEMS[id].stack);
         if (!this.inv.hasRoom(it)) return 'You have nowhere to put it. Sell me something first.';
         this.inv.add(it);
+        book.bought = { ...book.bought, [id]: (book.bought?.[id] ?? 0) + 1 };
+        this.keepBook(book);
         this.setCredit(this.credit - cost);
         this.inventoryChanged();
         audio.ui('open');
@@ -1517,6 +1531,8 @@ export class Game {
     const p = this.player;
     // everything you carried stays where you fell
     for (const it of this.inv.topLevel()) this.dropItem(it, p.pos, 1.2);
+    // (and the trader writes off half of what he owed a dead man: credit is not a way to carry nothing and lose nothing)
+    if (this.credit > 0) this.setCredit(Math.floor(this.credit * KEPT_ON_DEATH));
     this.spawnAtEdge();
     this.freshKit();
     this.deathInfo = '';

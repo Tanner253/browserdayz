@@ -227,6 +227,19 @@ const D: ItemDef[] = [
     id: 'boonie_hat', name: 'Combat Helmet', model: 'combat_helmet', w: 2, h: 2, weight: 1.4, category: 'clothing', slot: 'head',
     desc: 'Ballistic helmet with a mount on the brow and pouches over the ears. Takes three tenths off anything that hits your head: a pistol round there is no longer the end of you.', wear: { head: 0.7 },
   },
+  // (cloth on the head: the tier under the helmet. Both were in the game's files and in nobody's hands.)
+  {
+    id: 'patrol_cap', name: 'Patrol Cap', model: 'patrol_cap', w: 2, h: 1, weight: 0.1, category: 'clothing', slot: 'head',
+    desc: 'A soldier\'s field cap. Cloth, not steel: a tenth off what hits your head, and better than nothing.', wear: { head: 0.9 },
+  },
+  {
+    id: 'fishermans_hat', name: 'Boonie Hat', model: 'fishermans_hat', w: 2, h: 1, weight: 0.1, category: 'clothing', slot: 'head',
+    desc: 'A soft brimmed hat. A tenth off what hits your head. A helmet is what you want, when you find one.', wear: { head: 0.9 },
+  },
+  {
+    id: 'garden_gloves', name: 'Work Gloves', model: 'garden_gloves_01', w: 2, h: 1, weight: 0.1, category: 'clothing', slot: 'hands',
+    desc: 'Canvas gloves from somebody\'s shed. Your punches land a little harder.', wear: { fist: 2 },
+  },
   {
     id: 'gasmask', name: 'Gas Mask', model: 'old_gas_mask', w: 2, h: 2, weight: 0.7, category: 'clothing', slot: 'face',
     desc: 'GP-5 pattern mask. Worn on the face, it lets you breathe in the gas. Thick rubber and glass, too: a fifth less damage from anything that hits your head.', wear: { head: 0.8, gas: 1 },

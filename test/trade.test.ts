@@ -3,7 +3,7 @@
 
 import assert from 'node:assert/strict';
 import { ITEMS, makeItem } from '../src/sim/items';
-import { STOCK, asks, pays, worth } from '../src/sim/trade';
+import { KEPT_ON_DEATH, STOCK, aDay, asks, pays, worth } from '../src/sim/trade';
 import { generateWorld } from '../src/world/worldgen';
 import { buildWorldData } from '../server/world';
 import { bookFor, jobsFor, progress } from '../src/sim/jobs';
@@ -90,8 +90,14 @@ ok('work is counted for its own day, is paid once, and yesterday is a clean page
   book.done.push(bring.id);
   assert.equal(progress(bring, book, () => 0), bring.n);
   assert.deepEqual(bookFor(day, book), book);
-  assert.deepEqual(bookFor(day + 1, book), { day: day + 1, kills: 0, heads: 0, done: [] });
-  assert.deepEqual(bookFor(day, { day, kills: -4, done: 'x' as never }), { day, kills: 0, heads: 0, done: [] });
+  assert.deepEqual(bookFor(day + 1, book), { day: day + 1, kills: 0, heads: 0, done: [], bought: {} });
+  assert.deepEqual(bookFor(day, { day, kills: -4, done: 'x' as never }), { day, kills: 0, heads: 0, done: [], bought: {} });
+});
+
+ok('he is a place to top up at, not to be fitted out from: so many of a thing a day, the dear things one, and a death costs half the credit', () => {
+  for (const id of STOCK) assert.ok(aDay(id) >= 1 && aDay(id) <= 4, `${id}: ${aDay(id)} a day`);
+  for (const id of ['radio', 'gasmask', 'stash_kit']) assert.equal(aDay(id), 1);
+  assert.ok(KEPT_ON_DEATH > 0 && KEPT_ON_DEATH < 1);
 });
 
 console.log(`\n${n} checks passed`);

@@ -133,6 +133,10 @@ export const TYPES: Record<string, TypeRule> = {
   // (What these are now is a soldier's kit, and their rules were written for a sun hat, a
   // life jacket and a pair of rubber boots: plates were found in a cow shed and never at an
   // army post. They are still about the farms, where people took them; most are where they were issued.)
+  // (the cloth hats and the canvas gloves: common, in houses and at the army's. The helmet stays rare.)
+  patrol_cap: { nominal: 6, min: 3, lifetime: 3600, restock: 600, usage: ['Military', 'Police', 'Village'], favour: { Military: 2 } },
+  fishermans_hat: { nominal: 6, min: 3, lifetime: 3600, restock: 600, usage: ['Village', 'Farm', 'Hunting', 'Town'] },
+  garden_gloves: { nominal: 6, min: 3, lifetime: 3600, restock: 600, usage: ['Village', 'Farm', 'Industrial'] },
   boonie_hat: { nominal: 2, min: 1, lifetime: 3600, restock: 900, usage: ['Village', 'Farm', 'Hunting', 'Military'], favour: { Military: 3 }, gas: 7, bunker: 5 },
   // (The mask is what lets anybody into the gas, so it is not kept IN the gas, where most of
   // the army's things are: it is in the police station, and the three of them there are
