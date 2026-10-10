@@ -295,7 +295,7 @@ function layOut(seed: number): Plan {
         if (clear(pr, pf, 1.6)) put(pick(ids), pr, pf, between(0, Math.PI * 2));
       }
     };
-    let lamp = pick([1, 0.5, 0.35, 0, 0]);
+    let lamp = pick([0.4, 0.3, 0, 0, 0]);
     switch (q.kind) {
       case 'barracks': {
         // bunks down the two longest walls, lockers along a third, a table in the middle if there is room
@@ -344,7 +344,7 @@ function layOut(seed: number): Plan {
           if (clear(pr, pf, 1.4)) put('weapons_case', pr, pf, (w > d ? Math.PI / 2 : 0) + between(-0.2, 0.2));
         }
         for (let k = 0; k < 6; k++) floorSpot(between(q.r0 + 1.2, q.r1 - 1.2), between(q.f0 + 1.2, q.f1 - 1.2));
-        lamp = 1;
+        lamp = 0.45;
         break;
       }
       case 'medical': {
@@ -361,7 +361,7 @@ function layOut(seed: number): Plan {
           if (k % 2 === 0) put('Television_01', r, f, rot, { y: 0.78 });
           put('SchoolChair_01', r + Math.sin(rot) * 0.9, f + Math.cos(rot) * 0.9, rot + Math.PI + between(-0.4, 0.4));
         }, 0.6, 2.2, 3);
-        lamp = 0.5;
+        lamp = 0.3;
         break;
       }
       case 'plant': {
@@ -375,7 +375,7 @@ function layOut(seed: number): Plan {
         along(longest[1], (r, f, rot, k) => (k % 2 ? put('utility_box_01', r, f, rot) : put(pick(['Barrel_01', 'barrel_03']), r, f, rot)), 0.45, 1.0, 5);
         for (const [pr, pf] of [[q.r0 + w * 0.25, q.f0 + d * 0.25], [q.r1 - w * 0.25, q.f1 - d * 0.25], [q.r0 + w * 0.25, q.f1 - d * 0.25], [q.r1 - w * 0.25, q.f0 + d * 0.25]]) if (w > 8 && d > 6 && clear(pr, pf, 1.6)) build('pillar', pr, pf, 0, 0.6, 0.6, B.tall);
         floorSpot(cr + between(-1.5, 1.5), cf + between(-1.2, 1.2));
-        lamp = 0.35;
+        lamp = 0.3;
         break;
       }
       case 'workshop': {
@@ -400,13 +400,13 @@ function layOut(seed: number): Plan {
         // barred cells down one wall, a desk for whoever kept them
         along(longest[0], (r, f, rot) => build('cell', r, f, rot, 2.2, 2.0, B.tall), 1.15, 2.2, 3);
         along(longest[1], (r, f, rot, k) => (k === 0 ? put('metal_office_desk', r, f, rot, { on: TOP }) : build('locker', r, f, rot, 0.5, 0.5, 1.85)), 0.55, 2.0, 2);
-        lamp = 0.4;
+        lamp = 0;
         break;
       }
       case 'washroom': {
         along(longest[0], (r, f, rot) => build('locker', r, f, rot, 0.5, 0.5, 1.85), 0.42, 0.5, 5);
         clutter(2, ['metal_trash_can', 'trashbag', 'cardboard_box_01']);
-        lamp = pick([0.4, 0.6]);
+        lamp = pick([0.3, 0]);
         break;
       }
     }
@@ -417,12 +417,12 @@ function layOut(seed: number): Plan {
       else if (onCross) build('sign', dr, df - Math.sign(df - cross) * (T / 2 + 0.02), df > cross ? Math.PI : 0, 1.5, 0.02, 0.3, { y: 2.3, text: q.name.toUpperCase(), solid: false });
     }
     lamps.push([cr, cf, Y + B.tall - 0.25, lamp]);
-    if (w * d > 60) lamps.push([cr + (w > d ? w * 0.28 : 0), cf + (w > d ? 0 : d * 0.28), Y + B.tall - 0.25, pick([0.5, 0])], [cr - (w > d ? w * 0.28 : 0), cf - (w > d ? 0 : d * 0.28), Y + B.tall - 0.25, pick([0.4, 0])]);
+    if (w * d > 60) lamps.push([cr + (w > d ? w * 0.28 : 0), cf + (w > d ? 0 : d * 0.28), Y + B.tall - 0.25, pick([0.3, 0, 0])], [cr - (w > d ? w * 0.28 : 0), cf - (w > d ? 0 : d * 0.28), Y + B.tall - 0.25, pick([0, 0, 0])]);
   }
 
   // ---- the passages: lamps down them, pipes and a duct along the ceiling, and what has been left standing about
-  for (let f = H.front - 3; f > H.back + 1; f -= 6.5) lamps.push([0, f, Y + B.tall - 0.25, pick([1, 0.45, 0.3, 0])]);
-  for (const r of [-14.5, -8, 8, 14.5]) lamps.push([r, cross, Y + B.tall - 0.25, pick([0.5, 0.3, 0])]);
+  for (let f = H.front - 3; f > H.back + 1; f -= 6.5) lamps.push([0, f, Y + B.tall - 0.25, pick([0.4, 0, 0, 0.3, 0, 0])]);
+  for (const r of [-14.5, -8, 8, 14.5]) lamps.push([r, cross, Y + B.tall - 0.25, pick([0.3, 0, 0, 0])]);
   // (one over the door, on an arm from the wall: the door and its reader are seen by whoever comes down the stair)
   lamps.push([0, H.front + B.door.lamp, Y + 2.62, 1]);
   builtList.push({ kind: 'pipe', r: -B.passage + 0.4, f: (H.back + H.front) / 2, rot: 0, w: 0.16, d: H.front - H.back - 0.6, h: 0.16, y: B.tall - 0.32, solid: false });
@@ -440,4 +440,98 @@ function layOut(seed: number): Plan {
   builtList.push({ kind: 'grate', r: 0, f: cross, rot: 0, w: 1.6, d: 1.6, h: 0.03, solid: false });
 
   return { rooms, walls, stood, made: builtList, spots, lamps, sealed: [0, H.back], cross };
+}
+
+// ------------------------------------------------------------------ finding the way about it
+
+/**
+ * A way through between two parts of the place: a doorway, or where one passage opens into
+ * the other. `nr, nf`: which way through it leads from part `a` to part `b`.
+ */
+export interface Way {
+  a: number;
+  b: number;
+  r: number;
+  f: number;
+  nr: number;
+  nf: number;
+  /** it is the door a keycard opens */
+  gate?: boolean;
+}
+
+export interface Ways {
+  ways: Way[];
+  /** the part that is everywhere else: the ground above it, and the whole map */
+  world: number;
+  /** which part a spot is in. @param h how high it is above the pad's own level (a chest's height, not a foot's) */
+  part(r: number, f: number, h: number): number;
+  /** the first way through on the shortest way from one part to another, and whether it is gone through from its `a` (+1) or from its `b` (-1). Null: they are the same part. */
+  next(from: number, to: number): { way: Way; dir: 1 | -1 } | null;
+}
+
+let found: Ways | null = null;
+
+/**
+ * The bunker as whatever has no map of it in its head finds its way about it: its rooms, the
+ * main passage, the two arms of the one across it, the stair (with the hut over it) and the
+ * world outside are each a part, inside any of which a straight line is a way; and from part
+ * to part is by the doorways, the shortest count of them.
+ */
+export function bunkerWays(): Ways {
+  if (found) return found;
+  const B = BUNKER, H = B.hall, plan = bunkerPlan(), n = plan.rooms.length;
+  const MAIN = n, LEFT = n + 1, RIGHT = n + 2, STAIR = n + 3, WORLD = n + 4;
+  const head = B.stair.foot + B.stair.run;
+  const part = (r: number, f: number, h: number): number => {
+    // the stair's shaft below ground, and the hut over its head
+    if (Math.abs(r) < B.hut.half && ((f > H.front - 0.15 && f < head + 0.5 && h < -0.6) || (f >= B.hut.back && f < B.hut.front))) return STAIR;
+    if (h > -2 || Math.abs(r) > H.r + 0.6 || f < H.back - 0.6 || f > H.front) return WORLD;
+    for (let k = 0; k < n; k++) {
+      const q = plan.rooms[k];
+      if (r > q.r0 && r < q.r1 && f > q.f0 && f < q.f1) return k;
+    }
+    if (Math.abs(r) <= B.passage) return MAIN;
+    if (Math.abs(f - plan.cross) <= B.across) return r < 0 ? LEFT : RIGHT;
+    return MAIN;
+  };
+  const ways: Way[] = [];
+  const seen = new Set<string>();
+  plan.rooms.forEach((q, k) => {
+    for (const [dr, df] of q.doors) {
+      const key = `${dr},${df}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      // (a door is in one of its room's four walls: out of the room is away from the room's middle, square to that wall)
+      const inR = Math.abs(dr - q.r0) < 1e-6 || Math.abs(dr - q.r1) < 1e-6;
+      const nr = inR ? Math.sign(dr - (q.r0 + q.r1) / 2) : 0, nf = inR ? 0 : Math.sign(df - (q.f0 + q.f1) / 2);
+      ways.push({ a: k, b: part(dr + nr * 0.9, df + nf * 0.9, -4), r: dr, f: df, nr, nf });
+    }
+  });
+  ways.push({ a: MAIN, b: LEFT, r: -B.passage, f: plan.cross, nr: -1, nf: 0 }, { a: MAIN, b: RIGHT, r: B.passage, f: plan.cross, nr: 1, nf: 0 });
+  ways.push({ a: MAIN, b: STAIR, r: 0, f: H.front - 0.15, nr: 0, nf: 1, gate: true });
+  ways.push({ a: STAIR, b: WORLD, r: 0, f: B.hut.front, nr: 0, nf: 1 });
+  // the first step from each part to each other, by the fewest doorways
+  const parts = WORLD + 1;
+  const first: ({ way: Way; dir: 1 | -1 } | null)[][] = [];
+  for (let from = 0; from < parts; from++) {
+    const step: ({ way: Way; dir: 1 | -1 } | null)[] = new Array(parts).fill(null);
+    const reached = new Set([from]);
+    let edge: [number, { way: Way; dir: 1 | -1 } | null][] = [[from, null]];
+    while (edge.length) {
+      const nextEdge: typeof edge = [];
+      for (const [at, by] of edge) {
+        for (const w of ways) {
+          const to = w.a === at ? w.b : w.b === at ? w.a : -1;
+          if (to < 0 || reached.has(to)) continue;
+          reached.add(to);
+          const how = by ?? { way: w, dir: (w.a === at ? 1 : -1) as 1 | -1 };
+          step[to] = how;
+          nextEdge.push([to, how]);
+        }
+      }
+      edge = nextEdge;
+    }
+    first.push(step);
+  }
+  return (found = { ways, world: WORLD, part, next: (from, to) => first[from]?.[to] ?? null });
 }

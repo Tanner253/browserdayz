@@ -93,7 +93,7 @@ const FIT: Record<string, { dot?: { at: [number, number, number]; size: number }
   m9: { dot: { at: [0.045, 0.0975, 0.0035], size: 0.5 }, light: { at: [0.165, 0, 0.0035], size: 0.62 } },
   p38: { dot: { at: [0.045, 0.0975, 0.0035], size: 0.5 }, light: { at: [0.155, 0, 0.0035], size: 0.62 } },
   mosin: { light: { at: [0.36, 0, -0.0145], size: 0.85 } },
-  benelli: { light: { at: [0.2, 0, -0.0145], size: 0.85 } },
+  benelli: { light: { at: [0.234, 0, -0.017], size: 0.95 } },
 };
 /** the pieces of a gun that come from another model, and what has to be fitted for each to be there */
 const EXTRA: Record<string, string> = { suppressor: 'suppressor_9', red_dot: 'red_dot', gun_light: 'gun_light' };
@@ -444,9 +444,9 @@ const NUDGE = {
  * How a gun sounds, where it is not how its kind does: the recording played slower (deeper)
  * and louder. Nobody has listened to these: they are set by what the guns are.
  */
-const VOICE: Record<string, { rate: number; gain: number }> = {
-  deagle: { rate: 0.8, gain: 1.3 },
-  benelli: { rate: 0.7, gain: 1.25 },
+const VOICE: Record<string, { rate: number; gain: number; rec?: string }> = {
+  deagle: { rate: 0.92, gain: 1.25, rec: 'shot_magnum' },
+  benelli: { rate: 1, gain: 1.3, rec: 'shot_shotgun' },
 };
 
 /** The lit mark of a holographic sight: its own light, whatever the hour, drawn over whatever is behind the glass. */
@@ -1552,7 +1552,7 @@ export class Weapons {
       // brought back up.
       const n = Math.min(need, have);
       this.onAct('reload', 0.55 + n * 0.48 + 0.5);
-      for (let k = 0; k < n; k++) audio.magIn(0.55 + k * 0.48, false);
+      for (let k = 0; k < n; k++) audio.shellIn(0.55 + k * 0.48);
       this.start('reload', 0.55 + n * 0.48 + 0.5, () => {
         this.boltReady = true;
         this.dry.delete(item);

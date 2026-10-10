@@ -2,7 +2,7 @@
 // the hole it stands in, what is kept in it. `npx tsx test/bunker.test.ts`.
 
 import assert from 'node:assert/strict';
-import { BUNKER, bunkerAt, bunkerDark, bunkerLocal, bunkerPlan, inBunker, lampBurns, levelY } from '../src/sim/bunker';
+import { BUNKER, bunkerAt, bunkerDark, bunkerLocal, bunkerPlan, bunkerWays, inBunker, lampBurns, levelY } from '../src/sim/bunker';
 import { BUNKER_AT, EXPANSION, PLAY_RADIUS, bunkerPlace, generateWorld, heightAt, inPlay } from '../src/world/worldgen';
 import { buildWorldData } from '../server/world';
 
@@ -109,6 +109,47 @@ ok('the server knows it as the game does: its places for things come after every
   assert.ok(Math.abs(f - BUNKER.hall.front) < 1e-6 && Math.abs(y - (levelY() + 1.2)) < 1e-6);
   assert.ok(data.crates.filter((c) => inBunker(P, c.x, c.y + 0.5, c.z)).length >= 4, 'no crates to search in the bunker');
   assert.equal(BUNKER.door.shut, 60);
+});
+
+ok('whatever has no map of it finds its way: every part reached from every other by doorways, in and out by the door a keycard opens', () => {
+  const plan = bunkerPlan(), W = bunkerWays(), H = BUNKER.hall, low = levelY() + 1;
+  const parts = plan.rooms.length + 5;
+  // every room is the part its own middle is in; the passages, the stair and the world are parts of their own
+  plan.rooms.forEach((q, k) => assert.equal(W.part((q.r0 + q.r1) / 2, (q.f0 + q.f1) / 2, low), k));
+  const main = W.part(0, -3, low), left = W.part(-10, plan.cross, low), right = W.part(10, plan.cross, low), stair = W.part(0, BUNKER.stair.foot + 2, low + 1.5);
+  assert.equal(new Set([main, left, right, stair, W.world]).size, 5);
+  assert.equal(W.part(0, -3, 1.25), W.world, 'the pad over it is not the passage under it');
+  assert.equal(W.part(0, BUNKER.hut.front + 5, 1.25), W.world);
+  assert.equal(W.part(0, BUNKER.hut.front - 1, 1.25), stair, 'the hut is the head of the stair');
+  // a doorway joins the two parts either side of it, and leads square through its wall
+  for (const w of W.ways) {
+    assert.ok(w.a !== w.b && Math.abs(Math.hypot(w.nr, w.nf) - 1) < 1e-9, 'a way through that leads nowhere');
+    if (w.a < plan.rooms.length && !w.gate) {
+      assert.equal(W.part(w.r - w.nr * 0.9, w.f - w.nf * 0.9, low), w.a);
+      assert.equal(W.part(w.r + w.nr * 0.9, w.f + w.nf * 0.9, low), w.b);
+    }
+  }
+  // from anywhere to anywhere, in no more steps than there are parts; and out of the bunker is by its door, and in again
+  for (let a = 0; a < parts; a++) {
+    for (let b = 0; b < parts; b++) {
+      if (a === b) {
+        assert.equal(W.next(a, b), null);
+        continue;
+      }
+      let at = a, steps = 0, gated = false;
+      while (at !== b) {
+        const s = W.next(at, b);
+        assert.ok(s, `no way from part ${a} to part ${b}`);
+        assert.equal(s!.dir > 0 ? s!.way.a : s!.way.b, at);
+        gated ||= !!s!.way.gate;
+        at = s!.dir > 0 ? s!.way.b : s!.way.a;
+        assert.ok(++steps <= parts, 'a way that goes round and round');
+      }
+      const under = (k: number) => k !== W.world && k !== stair;
+      assert.equal(gated, under(a) !== under(b), `the door is ${gated ? '' : 'not '}on the way from part ${a} to part ${b}`);
+    }
+  }
+  assert.ok(H.front > 0);
 });
 
 console.log(`\n${n} checks passed`);

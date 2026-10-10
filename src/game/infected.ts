@@ -10,7 +10,8 @@ import type RAPIER from '@dimforge/rapier3d-compat';
 import { physics, GLASS_GROUPS, HITBOX_GROUPS, PLAYER_GROUPS, SIGHT_GROUPS } from '../core/physics';
 import { audio } from '../core/audio';
 import type { Atmosphere } from '../world/atmosphere';
-import { BUILDING_FOOTPRINT, heightAt, type World } from '../world/worldgen';
+import { BUILDING_FOOTPRINT, bunkerPlace, heightAt, type World } from '../world/worldgen';
+import { bunkerAt, bunkerLocal, bunkerWays, type Place } from '../sim/bunker';
 import type { Buildings } from '../world/buildings';
 import { Director, INFECTED, I_ALERT, I_ATTACK, I_CHASE, I_DEAD, I_IDLE, I_WANDER, homeSpot, infectedDrop, infectedHomes, suited, type IState, type InfectedInfo } from '../sim/infected';
 import type { C2S } from '../net/protocol';
@@ -48,6 +49,8 @@ export interface HordeHost {
   killed(zone: HitZone, distance: number): void;
   /** playing alone: one went down with this on it (on a server the server puts it in the world) */
   dropped(id: string, qty: number, at: THREE.Vector3): void;
+  /** the bunker's door stands open */
+  bunkerOpen(): boolean;
 }
 
 const INTERP_DELAY = 150;
@@ -354,6 +357,21 @@ export class Infected implements Damageable {
    * on, which everything near can hear. False when it could not move.
    */
   private goTo(at: THREE.Vector3, speed: number, dt: number): boolean {
+    // In the bunker, or on the way into it or out of it: by its doorways, one after another (see bunkerWays).
+    const leg = this.horde.bunkerLeg(this.pos, at);
+    if (leg) {
+      if (!leg.shut) return this.walk(leg.x, leg.z, speed, dt);
+      // its door is shut, and it is at it: it beats on the steel, which everything near can hear
+      this.yaw = turnTo(this.yaw, Math.atan2(-(leg.dx - this.pos.x), -(leg.dz - this.pos.z)), dt * 5);
+      if ((this.poundT -= dt) <= 0) {
+        this.poundT = 1.5 + Math.random() * 0.8;
+        this.avatar.claw();
+        _v.set(leg.dx, this.pos.y + 1.2, leg.dz);
+        audio.impact('metal', _v, _v.distanceTo(this.horde.eye));
+        this.dirty = true;
+      }
+      return true;
+    }
     const there = this.horde.plotAt(at.x, at.z), here = this.horde.plotAt(this.pos.x, this.pos.z);
     // On another floor of the building it is in: by the stairs, to their near end and then along them.
     // (And upstairs with somewhere to be that is not in this building at all: down them first.)
@@ -485,7 +503,8 @@ export class Infected implements Damageable {
       case I_WANDER:
         this.waitT -= dt;
         // (the way home may be out of a house and across the village: by the doors. A drift about the place is just a few steps.)
-        if (!(this.returning ? this.goTo(this.goal, I.back, dt) : this.walk(this.goal.x, this.goal.z, I.wander, dt))) this.waitT -= dt * 4;
+        // (and one that lives down the bunker drifts from room to room by their doors: a straight line there is a wall)
+        if (!(this.returning ? this.goTo(this.goal, I.back, dt) : this.horde.below(this.pos) ? this.goTo(this.goal, I.wander, dt) : this.walk(this.goal.x, this.goal.z, I.wander, dt))) this.waitT -= dt * 4;
         if (this.waitT <= 0 || Math.hypot(this.goal.x - this.pos.x, this.goal.z - this.pos.z) < (this.returning ? 2 : 0.8)) {
           this.mode = I_IDLE;
           this.waitT = this.returning && this.waitT > 0 ? 1 + Math.random() * 3 : 2 + Math.random() * 7;
@@ -661,6 +680,46 @@ export class Infected implements Damageable {
 
 export class Horde {
   readonly all = new Map<number, Infected>();
+  /** where the bunker stands (null: this world has none; undefined: not looked for yet) */
+  private bunkerAt_: Place | null | undefined;
+  private get bunker(): Place | null {
+    return this.bunkerAt_ === undefined ? (this.bunkerAt_ = bunkerPlace(this.host.world())) : this.bunkerAt_;
+  }
+
+  /** whether a spot is down in the bunker (or on its stair) */
+  below(at: THREE.Vector3): boolean {
+    const P = this.bunker;
+    if (!P) return false;
+    const [r, f, h] = bunkerLocal(P, at.x, at.y + 1, at.z);
+    return bunkerWays().part(r, f, h) !== bunkerWays().world;
+  }
+
+  /**
+   * The next stretch of the way between two spots when either of them is in the bunker:
+   * where to walk to now (square on to the next doorway, then through it), or null when the
+   * bunker has nothing to do with it (or they are in one part of it, and the way is straight).
+   * `shut`: the way is by the bunker's door, it is shut, and whoever asks is standing at it
+   * (`dx, dz`: the middle of the door).
+   */
+  bunkerLeg(from: THREE.Vector3, to: THREE.Vector3): { x: number; z: number; shut: boolean; dx: number; dz: number } | null {
+    const P = this.bunker;
+    if (!P) return null;
+    const W = bunkerWays();
+    const [r, f, h] = bunkerLocal(P, from.x, from.y + 1, from.z), [tr, tf, th] = bunkerLocal(P, to.x, to.y + 1, to.z);
+    const a = W.part(r, f, h), b = W.part(tr, tf, th);
+    if (a === b) return null;
+    const step = W.next(a, b);
+    if (!step) return null;
+    const { way, dir } = step, nr = way.nr * dir, nf = way.nf * dir;
+    // how far short of it (or through it) it stands, and how far to one side of the line through its middle
+    const along = (r - way.r) * nr + (f - way.f) * nf, off = Math.abs((r - way.r) * nf - (f - way.f) * nr);
+    const shut = !!way.gate && !this.host.bunkerOpen();
+    const lined = off < 0.45 && along > -2.4;
+    const k = shut ? -1.0 : lined ? 1.3 : -1.1;
+    const [x, , z] = bunkerAt(P, way.r + nr * k, way.f + nf * k);
+    const [dx, , dz] = bunkerAt(P, way.r, way.f);
+    return { x, z, shut: shut && off < 0.7 && along > -1.6, dx, dz };
+  }
   /** where this game's player is listening and looking from */
   readonly eye = new THREE.Vector3();
   /** playing alone: this game is the director too */

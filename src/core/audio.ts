@@ -100,7 +100,7 @@ export interface EngineVoice {
  * One take is played, any of them. Until they have arrived, and wherever one is missing, the
  * made-up sound is what is heard.
  */
-const RECORDED: Record<string, number> = { shot_rifle: 1, shot_pistol: 3, shot_quiet: 1, rifle_mag_out: 1, rifle_mag_in: 1, pistol_mag_out: 1, pistol_mag_in: 1, rack: 1 };
+const RECORDED: Record<string, number> = { shot_rifle: 1, shot_pistol: 3, shot_quiet: 1, rifle_mag_out: 1, rifle_mag_in: 1, pistol_mag_out: 1, pistol_mag_in: 1, rack: 1, shot_shotgun: 2, shot_magnum: 2, shell_in: 1 };
 const bank = new Map<string, AudioBuffer[]>();
 let fetched: Promise<void> | null = null;
 /** Fetches the recordings, once. (They are kept apart from any one engine: the trailer renders its soundtrack on an engine of its own.) */
@@ -341,7 +341,7 @@ export class AudioEngine {
   // ------------------------------------------------------------ weapons
 
   /** @param voice a gun that is deeper and louder than its kind: its recording played that much slower and that much louder */
-  gunshot(kind: 'rifle' | 'pistol', pos?: V3, distance = 0, intermediate = false, suppressed = false, voice?: { rate: number; gain: number }) {
+  gunshot(kind: 'rifle' | 'pistol', pos?: V3, distance = 0, intermediate = false, suppressed = false, voice?: { rate: number; gain: number; rec?: string }) {
     if (!this.ready) return;
     const ctx = this.ctx;
     const t = ctx.currentTime + (distance > 0 ? distance / 343 : 0);
@@ -390,7 +390,7 @@ export class AudioEngine {
     // a recording of the real thing, where there is one: it goes the way the made-up one went (placed, dulled by distance, sent to the hills)
     // (A pistol is a few decibels under a rifle and over sooner: scripts/sounds.mjs says what
     // it is made of, and why it was a click before.)
-    if (this.rec(big ? 'shot_rifle' : 'shot_pistol', out, t, (big ? 2.5 * mid : 2.2) * (voice?.gain ?? 1), voice?.rate ?? 1)) return;
+    if (this.rec(voice?.rec ?? (big ? 'shot_rifle' : 'shot_pistol'), out, t, (big ? 2.5 * mid : 2.2) * (voice?.gain ?? 1), voice?.rate ?? 1)) return;
 
     // 1. supersonic crack / mechanical transient
     const crack = this.noise(t, 0.05);
@@ -529,6 +529,11 @@ export class AudioEngine {
 
   magIn(delay = 0, long = false) {
     if (this.ready) this.rec(long ? 'rifle_mag_in' : 'pistol_mag_in', this.sfx, this.ctx.currentTime + delay, 0.95);
+  }
+
+  /** a shell pushed into a shotgun's tube */
+  shellIn(delay = 0) {
+    if (this.ready && !this.rec('shell_in', this.sfx, this.ctx.currentTime + delay, 0.95)) this.magIn(delay, false);
   }
 
   slideRack(delay = 0) {

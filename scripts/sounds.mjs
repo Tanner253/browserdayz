@@ -60,6 +60,20 @@ const SOUNDS = {
   pistol_mag_out: { src: snake('Reloads, Cycling & More/WAV/Angel Mag Reload Part 1 WAV.wav'), rate: 32000, gain: 0.7 },
   pistol_mag_in: { src: snake('Reloads, Cycling & More/WAV/Angel Mag Reload Part 2 WAV.wav'), rate: 32000, gain: 0.7 },
   rack: { src: snake('Reloads, Cycling & More/WAV/Semi 22LR Rack WAV.wav'), rate: 32000, gain: 0.75 },
+  // The shotgun: a twelve bore recorded close (the library's Benelli Nova), and under it, as
+  // under the pistol, the air after a rifle shot.
+  shot_shotgun: {
+    src: lib('Nova/O_21P.wav'), side: 1, takes: 2, len: 1.8, rate: 44100, gain: 1, press: 1.2,
+    with: [{ src: snake('Full Sound/7.62x39/WAV/762x39 Single WAV.wav'), level: 0.55, after: 0.012, die: 0.35 }],
+  },
+  // The big pistol: a .45 (the library's 1911), which is the heaviest pistol there is a
+  // recording of, with the same air under it.
+  shot_magnum: {
+    src: lib('1911/A_42P.wav'), side: 1, takes: 2, len: 1.6, rate: 44100, gain: 1, press: 1.4, air: 0.6,
+    with: [{ src: snake('Full Sound/5.56/WAV/556 Single WAV.wav'), level: 0.8, after: 0.012, die: 0.3 }],
+  },
+  // a shell thumbed into a shotgun's tube
+  shell_in: { src: snake('Reloads, Cycling & More/WAV/Pump Shell Load WAV.wav'), rate: 32000, gain: 0.8 },
 };
 
 /** a .wav as one channel of numbers between -1 and 1: one of its channels, or all of them together */

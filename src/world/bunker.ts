@@ -187,7 +187,18 @@ export class BunkerSite {
   open = false;
   /** told when it starts to open or to shut (it is loud) */
   onMove: (opening: boolean) => void = () => {};
-  private door: { mesh: THREE.Mesh; collider: RAPIER.Collider; slide: number } | null = null;
+  private door: { mesh: THREE.Mesh; collider: RAPIER.Collider; slide: number; /** where its middle is when shut, in the bunker's own measure */ at: [number, number, number] } | null = null;
+  /** the door's leaf where it is on its track: what stops a body is where what is seen is */
+  private doorSet() {
+    const d = this.door, P = this.place;
+    if (!d || !P) return;
+    const run = d.slide * (BUNKER.door.half * 2 + 0.15);
+    d.mesh.position.x = run;
+    const [x, y, z] = bunkerAt(P, d.at[0] + run, d.at[1], d.at[2]);
+    d.collider.setTranslation({ x, y, z });
+    // (shutting, it is no wall until it is nearly home: nobody is shut in a doorway, or pushed along by it)
+    d.collider.setEnabled(this.open || d.slide < 0.25);
+  }
   private fixtures: { mat: THREE.MeshStandardMaterial; pos: THREE.Vector3; how: number; burn: number }[] = [];
   /** the light on the card reader beside the door */
   private readerLamp: THREE.MeshStandardMaterial | null = null;
@@ -435,7 +446,7 @@ export class BunkerSite {
       const face = mat(new THREE.MeshStandardMaterial({ map: doorPaint(['LEVEL 1', 'KEYCARD HOLDERS ONLY'], 31), roughness: 0.6, metalness: 0.55 }));
       const d = block(-Dr.half - 0.05, Dr.half + 0.05, L.front - 0.3, L.front - 0.08, Y, Y + Dr.tall + 0.05, [steel, steel, steel, steel, face, face], { surface: 'metal', whole: true });
       d.mesh.matrixAutoUpdate = true;
-      this.door = { mesh: d.mesh, collider: d.collider!, slide: 0 };
+      this.door = { mesh: d.mesh, collider: d.collider!, slide: 0, at: [0, L.front - 0.19, Y + (Dr.tall + 0.05) / 2] };
       // the reader: a small box on the wall of the stair, at the right hand of whoever comes down to the door, and the light on it (red: shut; green: open)
       block(S.half - 0.07, S.half, L.front + 0.28, L.front + 0.56, Y + 1.08, Y + 1.44, steel, { solid: false });
       this.readerLamp = new THREE.MeshStandardMaterial({ color: 0x111111, emissive: new THREE.Color(1, 0.1, 0.05), emissiveIntensity: 2.2 });
@@ -543,8 +554,7 @@ export class BunkerSite {
     const d = this.door;
     if (quiet && d) {
       d.slide = open ? 1 : 0;
-      d.mesh.position.x = d.slide * (BUNKER.door.half * 2 + 0.15);
-      d.collider.setEnabled(!open);
+      this.doorSet();
     } else if (this.place) this.onMove(open);
   }
 
@@ -569,9 +579,7 @@ export class BunkerSite {
       if (d.slide !== want) {
         // (a heavy door: three seconds from one end of its track to the other)
         d.slide = Math.min(1, Math.max(0, d.slide + (want ? dt : -dt) / 3));
-        d.mesh.position.x = d.slide * (BUNKER.door.half * 2 + 0.15);
-        // (nobody is shut in a doorway: it is a wall again only once it is nearly home)
-        d.collider.setEnabled(d.slide < 0.25);
+        this.doorSet();
       }
     }
     // (the lamps are not looked at from across the map)

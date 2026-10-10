@@ -148,6 +148,7 @@ export class Game {
     others: () => this.remotes.values(),
     online: () => this.online,
     send: (m) => this.net.send(m),
+    bunkerOpen: () => this.bunker.open,
     struck: (amount, from) => {
       const me = this.player, p = me.pos;
       // on guard, facing it, with the wind to hold it off: nothing lands
@@ -1462,9 +1463,9 @@ export class Game {
       if (this.bunkerEmpty > BUNKER.door.shut) this.bunker.setOpen(false);
     }
     // the bunker: its door, its lamps, and the dark of it (no daylight comes down the stair)
-    this.bunker.update(dt, cam.position, (pos, burn) => this.lamps.glow(pos, BUNKER_LAMP, burn * 0.55, 9.5));
+    this.bunker.update(dt, cam.position, (pos, burn) => this.lamps.glow(pos, BUNKER_LAMP, burn * 0.5, 8));
     const under = bunkerDark(this.bunker.place, cam.position.x, cam.position.y, cam.position.z);
-    atmo.cover.ground = { sun: 1 - under, sky: 1 - 0.985 * under };
+    atmo.cover.ground = { sun: 1 - under, sky: 1 - 0.994 * under };
     this.lamps.update(cam, dt);
     this.weapons.lampSpill.copy(this.lamps.spill);
   }

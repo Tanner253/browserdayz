@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-09T23:36:29.050Z",
+ "generated": "2026-10-10T01:20:47.183Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr"
@@ -2165,18 +2165,18 @@
    "tags": [
     "weapon"
    ],
-   "bytes": 4800476,
+   "bytes": 4800692,
    "srcTris": 12801,
    "tris": 12801,
    "min": [
-    -0.0373,
-    -0.0514,
-    -0.0197
+    -0.0419,
+    -0.0758,
+    -0.0235
    ],
    "max": [
-    0.2247,
-    0.0977,
-    0.0268
+    0.2631,
+    0.0978,
+    0.0306
    ],
    "lods": [],
    "holds": {
@@ -2197,18 +2197,18 @@
    "tags": [
     "weapon"
    ],
-   "bytes": 1037516,
+   "bytes": 2571920,
    "srcTris": 22328,
    "tris": 22328,
    "min": [
     -0.703,
-    -0.0952,
-    -0.0419
+    -0.1268,
+    -0.0466
    ],
    "max": [
-    0.6084,
-    0.1397,
-    0.03
+    0.8314,
+    0.148,
+    0.0376
    ],
    "lods": [],
    "holds": {

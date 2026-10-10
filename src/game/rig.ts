@@ -27,6 +27,9 @@ export interface RigInfo {
  * they can be read; steel keeps some of its metal and takes more of the sky. (Changes the
  * material it is given.)
  */
+/** two guns that are not painted as the rest are: how much of their paint is kept, how much metal, and how much of the sky they take */
+export const LOOK = { eagle: { tint: 0.62, metal: 0.8, sky: 0.85 }, shotgun: { tint: 1.9, metal: 0.5, sky: 1.6 } };
+
 export function liftPack<T extends THREE.Material>(mat: T): T {
   const c = mat as unknown as THREE.MeshStandardMaterial;
   if (/lens/i.test(mat.name)) {
@@ -43,6 +46,17 @@ export function liftPack<T extends THREE.Material>(mat: T): T {
     c.metalnessMap = null;
     c.color.setScalar(1.9);
     c.envMapIntensity = 0.7;
+  } else if (/^(Slide|MainBody|Magazine)$/.test(mat.name)) {
+    // the Desert Eagle is the other way about: bright brushed steel as it comes, which lifted
+    // like the dark ones is a white shape. It is left as it was painted, a shade down.
+    c.metalness = Math.min(c.metalness, LOOK.eagle.metal);
+    c.color.setScalar(LOOK.eagle.tint);
+    c.envMapIntensity = LOOK.eagle.sky;
+  } else if (/^B_M3_/.test(mat.name)) {
+    // and the shotgun is painted blacker than any of them: lifted further, or it is a cut-out
+    c.metalness = Math.min(c.metalness, LOOK.shotgun.metal);
+    c.color.setScalar(LOOK.shotgun.tint);
+    c.envMapIntensity = LOOK.shotgun.sky;
   } else {
     c.metalness = Math.min(c.metalness, 0.6);
     c.color.setScalar(1.5);
