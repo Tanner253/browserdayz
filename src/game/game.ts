@@ -3095,13 +3095,14 @@ export class Game {
         variant = along > 0.4 ? 1 : along < -0.4 ? 0 : 2;
       }
       this.avatar.setDeath(variant);
-      if (!this.deathInfo) this.deathInfo = `You died of ${p.lastCause || 'your injuries'}. Your gear lies where you fell.`;
+      if (!this.deathInfo) this.deathInfo = `You died of ${p.lastCause === 'fall' ? `a fall of ${Math.round(p.lastFall.drop)} m` : p.lastCause || 'your injuries'}. Your gear lies where you fell.`;
       if (this.invUI.isOpen) this.toggleInventory(false);
       this.input.unlock();
       if (this.online) {
         // last word on what we were carrying, then the server leaves a body with it
         this.net.send({ t: 'me', inv: this.inv.serialize(), vitals: { ...p.vitals } });
-        this.net.send({ t: 'died', cause: p.lastCause || 'injuries', v: variant });
+        // (a fall says how far and how fast: it is what the server writes down, and what everybody reads)
+        this.net.send({ t: 'died', cause: p.lastCause === 'fall' ? `fall ${Math.round(p.lastFall.drop)}m ${Math.round(p.lastFall.speed)}m/s` : p.lastCause || 'injuries', v: variant });
         this.inv.clear();
         this.weapons.validate();
       }

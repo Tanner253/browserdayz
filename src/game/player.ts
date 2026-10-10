@@ -26,6 +26,8 @@ const FOLLOW_MAX = 1.035;
 const FOLLOW_NY = 0.69;
 /** how far above its resting height the body is carried over level ground (see alongGround) */
 const HOVER = 0.004;
+/** what pulls a body down (m/s²): more than the world's, as every game's is, or a jump hangs in the air */
+const GRAVITY = 9.81 * 1.35;
 /** stamina at which a sprint gives out, and how much has to come back before the next one */
 const WINDED_AT = 4;
 const WIND_BACK = 45;
@@ -113,6 +115,10 @@ export class Player {
    */
   sprintLock = 0;
   private lastFallSpeed = 0;
+  /** the highest the feet have been since they last stood on anything: a fall is measured from there */
+  private fallTop = 0;
+  /** the last fall that hurt: how far down it was (metres) and how fast at the end of it (said when it kills) */
+  lastFall = { drop: 0, speed: 0 };
   /** seconds since the feet last touched the ground, and since jump was last pressed */
   private airT = 0;
   private jumpWish = 1;
@@ -159,6 +165,9 @@ export class Player {
     this.pos.set(x, y, z);
     this.prevPos.copy(this.pos);
     this.vel.set(0, 0, 0);
+    // (set down, not dropped: whatever fall was being counted before is not this body's any more)
+    this.lastFallSpeed = 0;
+    this.fallTop = y;
     this.stepOff = this.prevStepOff = 0;
     this.winded = false;
     this.yaw = yaw;
@@ -183,6 +192,8 @@ export class Player {
     this.pos.copy(at);
     this.prevPos.copy(at);
     this.vel.copy(vel);
+    this.lastFallSpeed = 0;
+    this.fallTop = at.y;
     this.body.setTranslation({ x: at.x, y: at.y + STAND_HALF + RADIUS, z: at.z }, false);
   }
 
@@ -301,7 +312,7 @@ export class Player {
       this.airT = 1;
       audio.jump();
     }
-    this.vel.y -= 9.81 * 1.35 * h;
+    this.vel.y -= GRAVITY * h;
     if (this.grounded && this.vel.y < 0) this.vel.y = -PRESS;
 
     const desired = { x: this.vel.x * h, y: this.vel.y * h, z: this.vel.z * h };
@@ -325,8 +336,21 @@ export class Player {
     this.grounded = this.kcc.computedGrounded();
     // velocity actually achieved (wall slides etc.)
     if (Math.abs(mv.y - desired.y) > 1e-4 && this.vel.y > 0 && mv.y < desired.y * 0.5) this.vel.y = 0;
-    if (!wasGrounded && this.grounded) this.land(this.lastFallSpeed);
-    if (!this.grounded) this.lastFallSpeed = this.vel.y;
+    // A fall is measured by how far the body really came down, and it lands no faster than a fall of that
+    // height makes it. (It was measured by the speed alone, and that is only a number kept from step to step:
+    // whatever left it too large (the body held where it could not get down, or the number carried over from
+    // before a new start) was a landing at that speed the next time the feet touched ground, and a death by
+    // a fall of no height at all.)
+    const feet = next.y - this.half() - RADIUS;
+    if (!wasGrounded && this.grounded) {
+      const drop = Math.max(0, this.fallTop - feet);
+      this.land(Math.max(this.lastFallSpeed, -(Math.sqrt(2 * GRAVITY * drop) + 1)), drop);
+    }
+    if (this.grounded) this.fallTop = feet;
+    else {
+      this.lastFallSpeed = this.vel.y;
+      this.fallTop = Math.max(this.fallTop, feet);
+    }
     // A stump, a crate or a kerb is taken in one step of the simulation: the body is simply
     // set on top of it, or down off it. The eye is not. It stays where it was and makes the
     // height up over the next fifth of a second, the way a knee gives, so a low thing run
@@ -433,7 +457,7 @@ export class Player {
     return run * k;
   }
 
-  private land(vy: number) {
+  private land(vy: number, drop = 0) {
     const s = Math.max(0, -vy);
     this.landVel = -Math.min(s * 0.035, 0.22);
     if (s > 2.5) audio.land(this.surface() as Surface, s);
@@ -442,6 +466,7 @@ export class Player {
     this.onLand(s);
     if (s > 9.5) {
       const dmg = (s - 9.5) * 14 * this.fallMult;
+      this.lastFall = { drop, speed: s };
       this.damage(dmg, 'fall');
       if (s > 13) this.bleed();
       // (boots that take a fall take it off the leg as well)
