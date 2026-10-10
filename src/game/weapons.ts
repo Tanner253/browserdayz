@@ -416,7 +416,13 @@ function stanceQuat(s: Stance, out: THREE.Quaternion) {
 
 /** What seats the body's hands on a pack's gun (see `grips` in packGun), in the gun's own space: x toward the muzzle, y up. */
 const SEAT = {
-  pistol: new THREE.Vector3(0.034, 0.03, 0),
+  // (The wrist was 3 cm further back and the two hands 2 cm nearer each other: the palm of the gun hand went
+  // through the grip from behind, its fingers came out under it, and from anywhere but square on the pistol stood
+  // out in front of the fist that was meant to be round it. The hand is on the side of the grip and its fingers
+  // go round the front of it. Looked at for each pistol from the right and the left, three quarters on.)
+  pistol: new THREE.Vector3(0.064, 0.03, 0),
+  /** how much further out from the middle of a pistol each wrist is than the pack's own hands say: the right, and the left (which is on the other side: less than nothing) */
+  apart: [0.014, -0.008] as [number, number],
   rifle: new THREE.Vector3(0.05, 0.004, 0),
   /**
    * The hand under a rifle. The pack's own left hand holds it hard up against the magazine
@@ -438,7 +444,11 @@ const SEAT = {
  */
 const SEAT_ON: Record<string, THREE.Vector3> = {
   deagle: new THREE.Vector3(0.013, -0.004, 0),
+  // (and the Pistol 43's grip stands 1.2 cm further toward its muzzle than the M9's)
+  p38: new THREE.Vector3(0.012, 0, 0),
 };
+/** the same for how far apart the hands are: the right's and the left's, on top of `SEAT.apart` */
+const APART_ON: Record<string, [number, number]> = { p38: [-0.003, 0.001] };
 const NO_SEAT = new THREE.Vector3();
 /** how far under the ears of the shotgun's front sight the top of its post is (the eye is put level with the post) */
 const IRON_DROP = 0.004;
@@ -1243,8 +1253,8 @@ export class Weapons {
             left: { pos: new THREE.Vector3(...holds.left).add(SEAT.fore).add(seen), fingers: new THREE.Vector3(0.35, 0.1, 0.93), palm: new THREE.Vector3(0, 1, 0.1), curl: [1.0, 1.05, 1.1, 1.15], thumb: 0.4 },
           }
         : {
-            right: { pos: new THREE.Vector3(...holds.right).add(SEAT.pistol).add(SEAT_ON[o.item] ?? NO_SEAT), fingers: new THREE.Vector3(0.9, -0.15, -0.3), palm: new THREE.Vector3(0.3, 0, -1), curl: [0.22, 1.25, 1.3, 1.35], thumb: 1.25 },
-            left: { pos: new THREE.Vector3(...holds.left).add(SEAT.pistol).add(SEAT_ON[o.item] ?? NO_SEAT), fingers: new THREE.Vector3(0.85, -0.2, 0.35), palm: new THREE.Vector3(0, 0.4, 1), curl: [1.05, 1.1, 1.15, 1.2], thumb: 1.2 },
+            right: { pos: new THREE.Vector3(...holds.right).add(SEAT.pistol).add(SEAT_ON[o.item] ?? NO_SEAT).add(new THREE.Vector3(0, 0, SEAT.apart[0] + (APART_ON[o.item]?.[0] ?? 0))), fingers: new THREE.Vector3(0.9, -0.15, -0.3), palm: new THREE.Vector3(0.3, 0, -1), curl: [0.22, 1.25, 1.3, 1.35], thumb: 1.25 },
+            left: { pos: new THREE.Vector3(...holds.left).add(SEAT.pistol).add(SEAT_ON[o.item] ?? NO_SEAT).add(new THREE.Vector3(0, 0, SEAT.apart[1] + (APART_ON[o.item]?.[1] ?? 0))), fingers: new THREE.Vector3(0.85, -0.2, 0.35), palm: new THREE.Vector3(0, 0.4, 1), curl: [1.05, 1.1, 1.15, 1.2], thumb: 1.2 },
           },
     };
     // (the flash rides on the gun, so it goes where the barrel goes in the kick)
