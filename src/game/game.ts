@@ -13,7 +13,7 @@ import { Barrel, type Vegetation } from '../world/vegetation';
 import type { Grass } from '../world/grass';
 import { Door, type Buildings } from '../world/buildings';
 import { WORLD_SIZE, bunkerPlace, heightAt, type SiteKind, type World } from '../world/worldgen';
-import { ITEMS, itemName, TAG_HOLD, TAG_HOLD_MIN, capacityOf, makeItem, newUid, tagClock, tagOwner, type ItemInstance, type Slot, quietOf } from '../sim/items';
+import { ITEMS, WEAPON_SLOTS, itemName, TAG_HOLD, TAG_HOLD_MIN, capacityOf, makeItem, newUid, tagClock, tagOwner, type ItemInstance, type Slot, quietOf } from '../sim/items';
 import { PlayerInventory, SLOT_ORDER, type Container } from '../sim/inventory';
 import { Economy, type WorldLoot } from '../sim/economy';
 import { CRATE_RESTOCK, CRATE_SPECS, fillCrate } from '../sim/crates';
@@ -56,6 +56,9 @@ import { FIRE, Hearths } from '../sim/fires';
 import { Fires } from './fires';
 import { breaksOnHit } from '../sim/injury';
 import { MenuScenes } from './menu-scenes';
+import { Traders } from './trader';
+import { ShopUI } from '../ui/shop';
+import { STOCK, asks, pays } from '../sim/trade';
 import type { MenuSpot } from '../ui/hud';
 import { Lamps } from './lamps';
 import { BunkerSite, spotKey } from '../world/bunker';
@@ -204,6 +207,11 @@ export class Game {
   private vicinityDue: number[] = [];
   /** the pockets were closed but the mouse is not the game's yet: one click and it is */
   private awaitClick = false;
+  /** the men behind the shops' counters, and the counter itself (see src/sim/trade.ts) */
+  private traders: Traders | null = null;
+  private shop!: ShopUI;
+  /** what is written against this player in the trader's book: kept by the browser */
+  private credit = Math.max(0, Math.floor(Number(localStorage.getItem('zona.credit')) || 0));
   /** seconds G has been held (drop what is in the hands), and whether that press has done its work */
   private dropHeld = 0;
   private dropDone = false;
@@ -545,12 +553,52 @@ export class Game {
       for (const b of world.buildings.filter(inTown)) {
         if (b.type === 'police') spots.push({ x: b.x, z: b.z, name: 'Police station', tip: 'More guns than anywhere else. Gas masks are kept here, and the 9 mm suppressor.', kind: 'police' });
         else if (b.type === 'clinic') spots.push({ x: b.x, z: b.z, name: 'Clinic', tip: 'Injectors, first aid kits, and tape to splint a broken leg.', kind: 'clinic' });
-        else if (b.type === 'store') spots.push({ x: b.x, z: b.z, name: 'Shop', tip: 'Food and drink.', kind: 'shop' });
+        else if (b.type === 'store') spots.push({ x: b.x, z: b.z, name: 'Shop', tip: 'A trader behind the counter: he buys what you bring and sells supplies.', kind: 'shop' });
       }
       this.hud.setMenuMap(this.minimap.poster(), WORLD_SIZE, spots, atmo.gas);
     }
     this.menu = new MenuScenes({ world, atmo, scene: r.scene, effects: this.effects, held: (id, mods) => this.makeHeld(id, mods), wear: (body, ids) => this.wear(body, ids), filmReady: () => this.hud.filmReady() });
     void this.menu.load();
+    this.traders = new Traders(world);
+    void this.traders.load(r.scene, atmo, (body, ids) => this.wear(body, ids));
+    this.shop = new ShopUI({
+      credit: () => this.credit,
+      // (what is carried, and the guns that are not in the hands: not what is worn, nor a bag with things in it)
+      wares: () =>
+        [...this.inv.containers.flatMap((c) => c.items.map((pl) => pl.item)), ...WEAPON_SLOTS.filter((sl) => sl !== this.inv.active).map((sl) => this.inv.slots[sl])]
+          .filter((it): it is ItemInstance => !!it && !it.cargo?.length && pays(it) > 0)
+          .map((item) => ({ item, pays: pays(item) })),
+      stock: () => STOCK.map((id) => ({ id, asks: asks(id) })).filter((x) => x.asks > 0),
+      icon: (id) => this.invUI.icons[id],
+      sell: (item) => {
+        const got = pays(item);
+        if (!got) return;
+        this.inv.remove(item);
+        this.setCredit(this.credit + got);
+        this.inventoryChanged();
+        audio.ui('close');
+      },
+      buy: (id) => {
+        const cost = asks(id);
+        if (!cost) return 'I do not sell that.';
+        if (cost > this.credit) return `That is ${cost}. You have ${this.credit} with me.`;
+        const it = makeItem(id, ITEMS[id].stack);
+        if (!this.inv.hasRoom(it)) return 'You have nowhere to put it. Sell me something first.';
+        this.inv.add(it);
+        this.setCredit(this.credit - cost);
+        this.inventoryChanged();
+        audio.ui('open');
+        return null;
+      },
+      closed: () => {
+        this.input.uiMode = false;
+        if (this.started && !this.player.dead) this.input.lock();
+        setTimeout(() => {
+          if (this.started && !this.paused && !this.invUI.isOpen && !this.shop.isOpen && !this.input.locked && !this.player.dead) this.awaitClick = true;
+        }, 400);
+        this.save();
+      },
+    });
     this.hud.showStart(true);
     // FPS mouse: play only while the mouse is captured. Esc releases it -> pause menu;
     // clicking the menu captures it again and play resumes.
@@ -562,7 +610,8 @@ export class Game {
     window.addEventListener('beforeunload', () => this.save());
     window.addEventListener('keydown', (e) => {
       if (e.code !== 'Escape') return;
-      if (this.invUI?.isOpen) this.toggleInventory(false, true);
+      if (this.shop?.isOpen) this.shop.close();
+      else if (this.invUI?.isOpen) this.toggleInventory(false, true);
       // a second Escape, with the mouse still free, is the menu
       else if (this.awaitClick) {
         this.awaitClick = false;
@@ -2139,6 +2188,24 @@ export class Game {
    *   (only on a click), and sending the player to the pause menu for closing their pockets
    *   was the wrong answer: the game carries on, and the next click takes the mouse.
    */
+  private setCredit(n: number) {
+    this.credit = Math.max(0, Math.round(n));
+    try {
+      localStorage.setItem('zona.credit', String(this.credit));
+    } catch {
+      // (a browser that keeps nothing: the book is good until the page is shut)
+    }
+  }
+
+  private openShop() {
+    if (this.shop.isOpen || this.invUI.isOpen) return;
+    this.input.releaseAll();
+    this.shop.open();
+    this.input.uiMode = true;
+    this.input.unlock();
+    audio.ui('open');
+  }
+
   toggleInventory(open?: boolean, byEscape = false) {
     const want = open ?? !this.invUI.isOpen;
     if (want === this.invUI.isOpen) return;
@@ -2179,7 +2246,13 @@ export class Game {
     this.prompt = null;
     this.mark = null;
     this.focus = null;
-    if (this.player.dead || this.invUI.isOpen || this.use) return;
+    if (this.player.dead || this.invUI.isOpen || this.shop.isOpen || this.use) return;
+    // at a shop's counter, looking at the man behind it
+    if (this.started && !this.garage.ride && this.traders?.at(cam.position, _sealedLook.set(0, 0, -1).applyQuaternion(cam.quaternion))) {
+      this.prompt = '<kbd>F</kbd>Trade';
+      if (this.input.pressed('KeyF') && !this.hud.chatOpen) this.openShop();
+      return;
+    }
     // at the way down to the second level: it is not to be opened yet, and says so
     {
       const sealed = this.bunker.sealedAt(_sealed);
@@ -2454,7 +2527,7 @@ export class Game {
     // M: the map, large; any way out of play puts it away again
     if (input.pressed('KeyM') && playing && !this.invUI.isOpen && !this.hud.chatOpen) this.minimap.toggle();
     else if (this.minimap.big && (!playing || this.invUI.isOpen)) this.minimap.toggle(false);
-    const uiOpen = this.invUI.isOpen;
+    const uiOpen = this.invUI.isOpen || this.shop.isOpen;
     // Enter opens the chat box; while typing the character stands still and the gun stays quiet
     if (input.pressed('Enter') && playing && !uiOpen && !this.hud.chatOpen) {
       input.releaseAll();
@@ -2652,6 +2725,9 @@ export class Game {
     }
 
     this.updateInteraction(cam);
+    this.traders?.update(dt, cam.position);
+    // (whoever walks off from the counter, or is killed at it, is done trading)
+    if (this.shop.isOpen && (p.dead || !this.traders?.by(p.pos))) this.shop.close();
     this.minimap.update(interp.x, interp.z, p.yaw);
     this.effects.eye.copy(cam.position);
     // the smoke over each supply drop (not from the far side of the map: nobody could see it)
