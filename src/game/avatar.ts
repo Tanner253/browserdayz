@@ -265,6 +265,8 @@ const _qa = new THREE.Quaternion();
 const _qb = new THREE.Quaternion();
 const _euler = new THREE.Euler();
 const UP = new THREE.Vector3(0, 1, 0);
+/** how far under its ankle a body's sole is (in the foot's own measure), by the file it was made from and the side */
+const SOLE_UNDER = new Map<string, number>();
 
 const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
 
@@ -351,7 +353,7 @@ export class Avatar {
   /** the joints a shot is judged by (see frame) */
   private joints: { head?: THREE.Bone; neck?: THREE.Bone; pelvis?: THREE.Bone } = {};
   /** the feet of a body that is to be kept standing on them (the infected): its ankles as it was made, and how far it is let down just now */
-  private soles: { foot: THREE.Bone; ball: THREE.Bone; high: number; lie: THREE.Vector3; /** how its toes lie on the foot, as it was made */ toe: THREE.Quaternion }[] = [];
+  private soles: { foot: THREE.Bone; ball: THREE.Bone; /** how high its ankle is over its sole, as it was made */ high: number; /** how the foot lies, as it was made (in the body's own space) */ made: THREE.Quaternion; /** how its toes lie on the foot, as it was made */ toe: THREE.Quaternion }[] = [];
   private sunk = 0;
   private backing = false;
   private layerMask = 1;
@@ -501,17 +503,49 @@ export class Avatar {
     this.chest = bone('spine_02');
     this.neck = ['neck_01', 'Head'].map(bone).filter((b): b is THREE.Bone => !!b);
     this.joints = { head: bone('Head') ?? undefined, neck: bone('neck_01') ?? undefined, pelvis: bone('pelvis') ?? undefined };
-    // The infected's feet, as each body was made standing: how high its ankle is off the ground
-    // and which way the foot lies from it (see `plant`). Taken now, before anything has moved.
+    // The infected's feet, as each body was MADE standing (see `plant`): which way the foot lies, how its toes lie
+    // on it, and how high its ankle is over its sole. Not as its skeleton rests: these bodies wear a skeleton
+    // that was brought to them, which rests as the game's own body stands and not as they do, and a foot laid
+    // as the skeleton rests stood on its toes. What a body was made as is in what its shape is bound by.
     if (file !== 'survivor') {
       model.updateMatrixWorld(true);
-      const inv = new THREE.Matrix4().copy(this.root.matrixWorld).invert();
+      const skinned: THREE.SkinnedMesh[] = [];
+      model.traverse((o) => {
+        if ((o as THREE.SkinnedMesh).isSkinnedMesh) skinned.push(o as THREE.SkinnedMesh);
+      });
+      const sk = skinned[0]?.skeleton;
       this.soles = [];
-      for (const s of ['l', 'r']) {
-        const foot = bone(`foot_${s}`), ball = bone(`ball_${s}`);
-        if (!foot || !ball) continue;
-        const a = foot.getWorldPosition(new THREE.Vector3()).applyMatrix4(inv), b = ball.getWorldPosition(new THREE.Vector3()).applyMatrix4(inv);
-        this.soles.push({ foot, ball, high: a.y, lie: b.sub(a), toe: ball.quaternion.clone() });
+      for (const side of ['l', 'r']) {
+        const foot = bone(`foot_${side}`), ball = bone(`ball_${side}`);
+        const fi = sk && foot ? sk.bones.indexOf(foot) : -1, bi = sk && ball ? sk.bones.indexOf(ball) : -1;
+        if (!foot || !ball || !sk || fi < 0 || bi < 0) continue;
+        const toFoot = sk.boneInverses[fi];
+        const made = new THREE.Quaternion(), toes = new THREE.Quaternion();
+        _m1.copy(toFoot).invert().decompose(_v1, made, _v2);
+        _m1.copy(sk.boneInverses[bi]).invert().decompose(_v1, toes, _v2);
+        // (how far under the ankle the sole is: the lowest of everything that hangs on the foot and its toes.
+        // The same for every body made from one file: measured once.)
+        const key = `${file}:${side}`;
+        let low = SOLE_UNDER.get(key);
+        if (low === undefined) {
+          const down = _v3.set(0, -1, 0).applyQuaternion(_q1.copy(made).invert());
+          low = 0;
+          for (const m of skinned) {
+            const P = m.geometry.getAttribute('position') as THREE.BufferAttribute, J = m.geometry.getAttribute('skinIndex'), W = m.geometry.getAttribute('skinWeight');
+            const mf = m.skeleton.bones.indexOf(foot), mb = m.skeleton.bones.indexOf(ball);
+            for (let i = 0; i < P.count; i++) {
+              let w = 0;
+              for (let c = 0; c < 4; c++) {
+                const j = J.getComponent(i, c);
+                if (j === mf || j === mb) w += W.getComponent(i, c);
+              }
+              if (w < 0.6) continue;
+              low = Math.max(low, _v1.fromBufferAttribute(P, i).applyMatrix4(m.bindMatrix).applyMatrix4(toFoot).dot(down));
+            }
+          }
+          SOLE_UNDER.set(key, low);
+        }
+        this.soles.push({ foot, ball, high: low * foot.getWorldScale(_v1).y, made, toe: made.clone().invert().multiply(toes) });
       }
     }
     this.collarL = bone('clavicle_l');
@@ -963,15 +997,16 @@ export class Avatar {
       if (down < 0.02) continue;
       // (and its toes lie on it as they were made: bent up by a movement drawn for a boot, a bare foot is a claw)
       s.ball.quaternion.slerp(s.toe, down);
-      // which way the foot lies now, and which way it was made to lie when it points that way over the ground
-      const now = s.ball.getWorldPosition(_v2).sub(at);
-      const flat = Math.hypot(s.lie.x, s.lie.z), over = Math.hypot(now.x, now.z);
-      if (over < 1e-4 || flat < 1e-4) continue;
-      const want = _v3.set((now.x / over) * flat, s.lie.y, (now.z / over) * flat).normalize();
-      now.normalize();
-      const axis = _v1.crossVectors(now, want), turn = Math.asin(Math.min(1, axis.length()));
-      if (turn < 0.01) continue;
-      this.lean(s.foot, axis.normalize(), turn * down);
+      // How the foot would lie if the body stood here just as it was made, turned about to point the way this
+      // foot points over the ground: that is how a foot that is down lies. (Level, and on the flat of its sole:
+      // neither tipped onto its toes nor rolled onto its edge.)
+      const made = _q2.copy(this.modelRoot.getWorldQuaternion(_q1)).multiply(s.made);
+      const here = s.foot.getWorldQuaternion(_q3);
+      const now = _v2.copy(s.ball.position).applyQuaternion(here), was = _v3.copy(s.ball.position).applyQuaternion(made);
+      if (Math.hypot(now.x, now.z) < 1e-5 || Math.hypot(was.x, was.z) < 1e-5) continue;
+      made.premultiply(_qa.setFromAxisAngle(UP, Math.atan2(now.x, now.z) - Math.atan2(was.x, was.z)));
+      here.slerp(made, down);
+      s.foot.quaternion.copy(s.foot.parent!.getWorldQuaternion(_qb).invert().multiply(here));
       s.foot.updateWorldMatrix(false, true);
     }
   }
