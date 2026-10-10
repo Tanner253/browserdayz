@@ -179,6 +179,9 @@ export const LOCAL_MODELS = {
   heli_wreck: {
     dir: 'crashed_helicopter',
     budget: 18000,
+    plain: true,
+    metal: 0.25,
+    rough: 0.8,
     size: 14.8,
     tex: 1024,
     tags: ['prop'],

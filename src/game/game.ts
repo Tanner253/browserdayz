@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import type { Renderer } from '../core/renderer';
 import { physics, USE_GROUPS, SHOT_GROUPS, SOLID_GROUPS, SIGHT_GROUPS } from '../core/physics';
+import { assets } from '../core/assets';
 import { audio } from '../core/audio';
 import { Input, NULL_INPUT } from '../core/input';
 import type { Atmosphere } from '../world/atmosphere';
@@ -40,7 +41,7 @@ import { JEEP } from '../sim/vehicles';
 import { HUD, type HotbarEntry } from '../ui/hud';
 import { InventoryUI } from '../ui/inventory-ui';
 import { Minimap } from '../ui/minimap';
-import { CALL, DROP, describeSpot, fillDrop, pickDropSite, type DropInfo } from '../sim/drops';
+import { CALL, CRASH, DROP, describeSpot, fillDrop, pickDropSite, type DropInfo } from '../sim/drops';
 import { renderDoll, renderIcons } from '../ui/icons';
 import { Perf } from '../core/perf';
 import { loadGraphics, type Graphics } from '../core/settings';
@@ -207,7 +208,7 @@ export class Game {
    * Supply drops standing in the world (see src/sim/drops.ts): the crate, when it is due to
    * be cleared away (performance clock, ms), and its column of smoke.
    */
-  private drops = new Map<string, { stash: Stash; until: number; at: THREE.Vector3; smoke: { owed: number } }>();
+  private drops = new Map<string, { stash: Stash; until: number; at: THREE.Vector3; smoke: { owed: number }; wreck?: { obj: THREE.Object3D; solid: unknown[] } }>();
   /** playing alone: game time the next one is due (-1 until the clock is first read) */
   private nextDrop = -1;
   /** the page's own title: the tab shows the place in the line, and "your turn", over it */
@@ -1263,7 +1264,7 @@ export class Game {
    */
   private async addDrop(d: DropInfo, fill = false) {
     if (this.drops.has(d.uid)) return;
-    const stash = new Stash(d.uid, d.x, d.y, d.z, d.rot, DROP.w, DROP.h, DROP.label);
+    const stash = new Stash(d.uid, d.x, d.y, d.z, d.rot, DROP.w, DROP.h, d.heli ? CRASH.label : DROP.label);
     if (fill) {
       fillDrop(stash.container);
       stash.known = true;
@@ -1272,6 +1273,12 @@ export class Game {
     this.markDrops();
     const where = describeSpot(this.s.world, d.x, d.z);
     const mins = Math.max(1, Math.round(d.left / 60));
+    if (d.heli) {
+      void this.layWreck(d);
+      this.hud.note(`A helicopter has come down ${where}: its cargo is there for ${mins} min, marked on the map (M)`, 'good');
+      this.hud.feed(`Helicopter down ${where}`);
+      return;
+    }
     this.hud.note(`Supply drop ${where}: there for ${mins} min, marked on the map (M)`, 'good');
     this.hud.feed(`Supply drop ${where}`);
     this.hud.chatLine('system', '', `A supply drop has come down ${where}.`);
@@ -1280,14 +1287,52 @@ export class Game {
     if (this.drops.get(d.uid)?.stash !== stash) this.loot.removeStash(stash);
   }
 
+  /** The wreck of the helicopter whose cargo a drop is: beside the cargo, lying to the ground, solid. */
+  private async layWreck(d: DropInfo) {
+    const model = (await assets.model('heli_wreck')).clone();
+    const entry = this.drops.get(d.uid);
+    if (!entry) return;
+    const H = this.s.world.heights;
+    const x = d.x + Math.cos(d.rot) * CRASH.beside, z = d.z - Math.sin(d.rot) * CRASH.beside;
+    // (laid to the ground along its length, and let a hand's depth into it: it came down hard)
+    const ax = Math.sin(d.rot), az = Math.cos(d.rot);
+    const nose = heightAt(H, x + ax * 5, z + az * 5), tail = heightAt(H, x - ax * 5, z - az * 5);
+    const y = (heightAt(H, x, z) + nose + tail) / 3 - 0.12;
+    model.position.set(x, y, z);
+    model.rotation.set(-Math.atan2(nose - tail, 10), d.rot, 0, 'YXZ');
+    model.traverse((o: THREE.Object3D) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) return;
+      m.castShadow = m.receiveShadow = true;
+      // (it is painted burnt black all over: lifted, so that it is a wreck and not a hole in the picture)
+      const paint = (m.material as THREE.MeshStandardMaterial).clone();
+      paint.color.multiplyScalar(2.6);
+      m.material = paint;
+    });
+    this.s.r.scene.add(model);
+    // its body, as two boxes: the cabin and the tail boom
+    const solid = [
+      physics.addStatic(physics.R.ColliderDesc.cuboid(1.35, 1.2, 3.2), 'metal', { x: x + ax * 1.6, y: y + 1.1, z: z + az * 1.6 }, d.rot),
+      physics.addStatic(physics.R.ColliderDesc.cuboid(0.5, 0.6, 3.4), 'metal', { x: x - ax * 4, y: y + 1.0, z: z - az * 4 }, d.rot),
+    ];
+    entry.wreck = { obj: model, solid };
+    // (its smoke stands over the wreck, not over the cargo beside it)
+    entry.at.set(x, y + 1.2, z);
+    this.markDrops();
+  }
+
   private removeDrop(uid: string) {
     const d = this.drops.get(uid);
     if (!d) return;
     this.drops.delete(uid);
+    if (d.wreck) {
+      d.wreck.obj.removeFromParent();
+      for (const c of d.wreck.solid) physics.world.removeCollider(c as never, false);
+    }
     if (this.openStash === d.stash) this.toggleInventory(false);
     if (d.stash.obj) this.loot.removeStash(d.stash);
     this.markDrops();
-    this.hud.feed('The supply drop is gone');
+    this.hud.feed(d.wreck ? 'The wreck has been cleared away' : 'The supply drop is gone');
   }
 
   /** Playing alone: the same clock the server keeps (see tickDrops in server/index.ts). */

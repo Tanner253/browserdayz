@@ -15,6 +15,27 @@ import { gasEdge, gasZone } from './gas';
  */
 export const CALL = { eta: 45, every: 300, /** metres in front of the caller it comes down */ ahead: 3 };
 
+/**
+ * A helicopter comes down. Now and then, somewhere open on the map: its wreck, smoke that is seen from a long
+ * way off, and its cargo beside it, which is the army's and better than a supply drop's. Everybody is told
+ * where. One at a time; the wreck and whatever is left in it are cleared away after `life` seconds.
+ */
+export const CRASH = { every: 900, first: 300, life: 600, label: 'Helicopter Cargo', /** metres from the cargo to the middle of the wreck */ beside: 4.6 };
+
+/** what a wreck's cargo holds: a supply drop's worth, and the army's own on top of it */
+export function fillCrash(c: Container, rnd: () => number = Math.random) {
+  fillDrop(c, rnd);
+  for (const [id, qty] of [['m9', undefined], ['box_9mm', undefined], ['box_762', undefined], ['grenade', undefined], ['boonie_hat', undefined], ['life_vest', undefined], ['firstaid', undefined], ['red_dot', undefined]] as [string, number | undefined][]) {
+    const def = ITEMS[id];
+    const item = makeItem(id, qty ?? (def.stack ? def.stack : 1));
+    if (def.weapon) {
+      item.loaded = def.weapon.capacity;
+      fitAtRandom(item, rnd);
+    }
+    c.add(item);
+  }
+}
+
 export const DROP = {
   /** seconds from one drop to the next */
   every: 420,
@@ -38,6 +59,8 @@ export interface DropInfo {
   rot: number;
   /** seconds until it is cleared away */
   left: number;
+  /** it is the cargo of a helicopter that came down: the wreck lies beside it (see CRASH) */
+  heli?: boolean;
 }
 
 /** one of a weighted list */

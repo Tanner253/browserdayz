@@ -15,7 +15,7 @@ import { buildWorldData } from './world';
 import { Economy, type WorldLoot } from '../src/sim/economy';
 import { Container, type SerializedInventory } from '../src/sim/inventory';
 import { ITEMS, TAG_HOLD, makeItem, sanitizeItem, type ItemInstance } from '../src/sim/items';
-import { CALL, DROP, fillDrop, type DropInfo } from '../src/sim/drops';
+import { CALL, CRASH, DROP, fillCrash, fillDrop, type DropInfo } from '../src/sim/drops';
 import { CRATE_RESTOCK, CRATE_SPECS, fillCrate } from '../src/sim/crates';
 import { underGas } from '../src/sim/gas';
 import { BUNKER, bunkerDark, inBunker } from '../src/sim/bunker';
@@ -52,6 +52,8 @@ log(`world ready in ${Date.now() - t0} ms: ${world.lootPoints.length} loot point
 interface Box {
   cid: string;
   kind: 'crate' | 'stash' | 'corpse' | 'drop';
+  /** a drop that is the cargo of a helicopter that came down */
+  heli?: boolean;
   w: number;
   h: number;
   items: StoredItem[];
@@ -1388,28 +1390,32 @@ const DROP_LINGER = Number(process.env.DROP_LINGER_S) || DROP.linger;
 let nextDrop = -1;
 
 function dropInfo(b: Box): DropInfo {
-  return { uid: b.cid, x: b.x, y: b.y, z: b.z, rot: b.rot, left: Math.max(0, Math.round((b.expires ?? 0) - economy.time)) };
+  return { uid: b.cid, x: b.x, y: b.y, z: b.z, rot: b.rot, left: Math.max(0, Math.round((b.expires ?? 0) - economy.time)), ...(b.heli ? { heli: true } : {}) };
 }
 
 /** economy time of the last call answered on a field radio */
 let lastCall = -1e9;
 
 /** @param where set down here (called for on a radio) and not at a place of the map's choosing */
-function spawnDrop(where?: { x: number; y: number; z: number }) {
+function spawnDrop(where?: { x: number; y: number; z: number }, heli = false) {
   const at = where ?? world.dropSite();
   if (!at) return;
   const uid = `drop-${Math.round(economy.time)}-${Math.random().toString(36).slice(2, 7)}`;
-  const c = new Container(uid, DROP.label, DROP.w, DROP.h, [], true);
-  fillDrop(c);
-  const b: Box = { cid: uid, kind: 'drop', w: DROP.w, h: DROP.h, items: c.serialize().items, x: at.x, y: at.y, z: at.z, rot: Math.random() * Math.PI * 2, emptiedAt: -1, expires: economy.time + DROP_LIFE };
+  const c = new Container(uid, heli ? CRASH.label : DROP.label, DROP.w, DROP.h, [], true);
+  if (heli) fillCrash(c);
+  else fillDrop(c);
+  const b: Box = { cid: uid, kind: 'drop', w: DROP.w, h: DROP.h, items: c.serialize().items, x: at.x, y: at.y, z: at.z, rot: Math.random() * Math.PI * 2, emptiedAt: -1, expires: economy.time + (heli ? CRASH.life : DROP_LIFE), ...(heli ? { heli: true } : {}) };
   boxes.set(uid, b);
   broadcast({ t: 'drop+', d: dropInfo(b) });
-  log(`supply drop at ${Math.round(at.x)}, ${Math.round(at.z)} (${b.items.length} items)`);
+  log(`${heli ? 'helicopter down' : 'supply drop'} at ${Math.round(at.x)}, ${Math.round(at.z)} (${b.items.length} items)`);
 }
 
 /** every five seconds: clear away the one that is done with, set the next one down when it is due */
+/** economy time the next helicopter is due to come down (-1 until the clock is first read) */
+let nextCrash = -1;
+
 function tickDrops(anyoneAlive: boolean) {
-  let standing = false;
+  let standing = false, wreck = false;
   for (const b of [...boxes.values()]) {
     if (b.kind !== 'drop') continue;
     // (never from under somebody who has it open)
@@ -1417,7 +1423,14 @@ function tickDrops(anyoneAlive: boolean) {
     if (done && !locks.has(b.cid)) {
       boxes.delete(b.cid);
       broadcast({ t: 'drop-', uid: b.cid });
-    } else standing = true;
+    } else if (b.heli) wreck = true;
+    else standing = true;
+  }
+  // (helicopters keep a clock of their own: one down at a time, the first a few minutes after somebody turns up)
+  if (nextCrash < 0 || !anyoneAlive) nextCrash = Math.max(nextCrash, economy.time + (Number(process.env.CRASH_FIRST_S) || CRASH.first));
+  else if (economy.time >= nextCrash && !wreck) {
+    nextCrash = economy.time + (Number(process.env.CRASH_EVERY_S) || CRASH.every);
+    spawnDrop(undefined, true);
   }
   // with nobody about the clock waits: the first one comes a minute and a half after somebody turns up
   if (nextDrop < 0 || !anyoneAlive) nextDrop = Math.max(nextDrop, economy.time + DROP_FIRST);

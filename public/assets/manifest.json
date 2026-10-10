@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-10T11:00:21.186Z",
+ "generated": "2026-10-10T11:05:54.348Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr"
@@ -1834,7 +1834,7 @@
    "tags": [
     "prop"
    ],
-   "bytes": 2169360,
+   "bytes": 1357760,
    "srcTris": 120921,
    "tris": 17982,
    "min": [
