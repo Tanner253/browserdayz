@@ -73,6 +73,8 @@ export class InventoryUI {
   private stash: Stash | null = null;
   private stashState = '';
   private selected: ItemInstance | null = null;
+  /** the pockets and bags folded away (by their names): a click on the bar over one folds it, and opens it again */
+  private folded = new Set<string>();
   private drag: Drag | null = null;
   private hoverOutline: HTMLDivElement;
   private vitals: Vitals | null = null;
@@ -183,6 +185,9 @@ export class InventoryUI {
     if (d.weapon) t.push(`<span class="qty">${item.loaded ?? 0}/${capacityOf(item)}</span>`);
     if (item.mods?.length) t.push(`<span class="mods">+${item.mods.length}</span>`);
     if (item.cargo?.length) t.push(`<span class="qty">${item.cargo.length} in</span>`);
+    // how full it is, as a line along its foot: a stack, a bottle, what is loaded in a gun
+    const fill = d.stack ? item.qty / d.stack : d.use?.sips ? (item.left ?? d.use.sips) / d.use.sips : d.weapon ? (item.loaded ?? 0) / capacityOf(item) : -1;
+    if (fill >= 0) t.push(`<span class="qbar${fill <= 0 ? ' none' : ''}"><i style="width:${Math.round(Math.min(1, fill) * 100)}%"></i></span>`);
     // somebody else's dog tag, carried: time left until it is cashed in
     if (this.counting(item)) {
       this.clocks.set(item.uid, item);
@@ -343,9 +348,16 @@ export class InventoryUI {
     grids.className = 'inv-grids';
     for (const c of inv.containers) {
       const box = document.createElement('div');
-      box.className = 'inv-gridbox';
-      box.innerHTML = c === inv.tags ? `<h4>${c.name} <span>${c.items.length} / ${c.w * c.h} · taken off others</span></h4>` : `<h4>${c.name} <span>${c.w}×${c.h}</span></h4>`;
-      box.appendChild(this.gridEl(c));
+      // A bar over each, as DayZ has it: its name, how much of it is taken up, and a click folds it away.
+      const used = c.items.reduce((n, p) => n + ITEMS[p.item.id].w * ITEMS[p.item.id].h, 0);
+      const shut = this.folded.has(c.id);
+      box.className = 'inv-gridbox' + (shut ? ' shut' : '');
+      box.innerHTML = `<h4 title="${shut ? 'Open it' : 'Fold it away'}"><i>${shut ? '▸' : '▾'}</i>${c.name} <span>${c === inv.tags ? `${c.items.length} / ${c.w * c.h} · taken off others` : `${used} / ${c.w * c.h}`}</span></h4>`;
+      box.querySelector('h4')!.addEventListener('click', () => {
+        if (!this.folded.delete(c.id)) this.folded.add(c.id);
+        this.render();
+      });
+      if (!shut) box.appendChild(this.gridEl(c));
       grids.appendChild(box);
     }
     cargo.appendChild(grids);

@@ -599,7 +599,13 @@
   background-size: 46px 46px;
   border: 1px solid var(--line);
 }
-.inv-grids { display: flex; flex-wrap: wrap; gap: 12px 16px; }
+.inv-grids { display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: flex-start; }
+.inv-gridbox { min-width: 138px; }
+.inv-gridbox h4 { display: flex; align-items: center; margin: 0; padding: 5px 8px 5px 6px; background: rgba(233, 228, 216, 0.07); border: 1px solid var(--line); border-bottom: 0; cursor: pointer; white-space: nowrap; }
+.inv-gridbox h4:hover { background: rgba(233, 228, 216, 0.12); color: var(--ink); }
+.inv-gridbox h4 i { width: 12px; font-style: normal; color: var(--accent); }
+.inv-gridbox h4 span { margin-left: auto; padding-left: 10px; }
+.inv-gridbox.shut h4 { border-bottom: 1px solid var(--line); opacity: 0.75; }
 .inv-item {
   position: absolute;
   background: rgba(233, 228, 216, 0.07);
@@ -623,7 +629,13 @@
 .inv-item.mini .inv-item-img.fit.lying { inset: auto; left: 50%; top: 50%; width: 40px; height: 52px; transform: translate(-50%, -50%) rotate(90deg) scale(1.2); filter: brightness(1.5) drop-shadow(0 0 1px rgba(233, 228, 216, 0.4)); }
 /* (and every picture in that list stands on a paler chip: a dark thing on the dark panel was not there at all) */
 .inv-ground-row .inv-item.mini { background: rgba(233, 228, 216, 0.075); border-radius: 3px; }
-.inv-item .qty { position: absolute; right: 3px; bottom: 1px; font-family: var(--mono); font-size: 10px; color: var(--ink); text-shadow: 0 1px 2px #000, 0 0 3px #000; }
+.inv-item .qbar { position: absolute; left: 3px; right: 3px; bottom: 2px; height: 2px; background: rgba(0, 0, 0, 0.6); pointer-events: none; }
+.inv-item .qbar i { display: block; height: 100%; background: #c9b27c; }
+.inv-item.cat-drink .qbar i { background: #6fb6e6; }
+.inv-item.cat-ammo .qbar i { background: #b98c55; }
+.inv-item.cat-medical .qbar i { background: #c4523d; }
+.inv-item .qbar.none { background: rgba(196, 82, 61, 0.75); }
+.inv-item .qty { position: absolute; right: 3px; bottom: 4px; font-family: var(--mono); font-size: 10px; color: var(--ink); text-shadow: 0 1px 2px #000, 0 0 3px #000; }
 .inv-item .mods { position: absolute; right: 3px; top: 1px; font-family: var(--mono); font-size: 9px; color: #b9a6e6; text-shadow: 0 1px 2px #000; }
 .inv-item .qkey { position: absolute; left: 4px; top: 1px; font-family: var(--mono); font-size: 9px; color: var(--accent); text-shadow: 0 1px 2px #000; }
 
