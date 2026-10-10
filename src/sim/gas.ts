@@ -16,7 +16,8 @@ export const GAS = {
   radius: 96,
   height: 36,
   /** how much of what is seen through it is lost to each metre of it, at its thickest */
-  thick: 0.04,
+  // (a quarter thinner than it was: at 0.04 the works could not be seen across from inside it)
+  thick: 0.03,
   /** how deep in (0 at the rim, 1 at the middle) it is thick enough to be breathed */
   breathe: 0.08,
   /** seconds of it in the lungs before it starts to hurt (and it is out of them again as fast, in clean air) */

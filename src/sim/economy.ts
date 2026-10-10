@@ -66,14 +66,16 @@ export const TYPES: Record<string, TypeRule> = {
   // of it restocked until a third of the map's supply was gone, a busy server ran dry: people
   // who played fast were out of ammunition for good.) `min` one under `nominal` means every
   // one taken is put back at the next restock, not only once the world is well short.
-  mosin: { nominal: 16, min: 15, lifetime: 7200, restock: 180, usage: ANYWHERE, favour: ARMOURY, loaded: [1, 4], gas: 5, bunker: 3 },
-  p38: { nominal: 16, min: 15, lifetime: 7200, restock: 180, usage: ANYWHERE, favour: ARMOURY, loaded: [2, 6], gas: 3 },
+  // (Sixteen of each on the map, most of them at the police station and the army's posts, came to one gun in
+  // every fifty places a newcomer looks: half as many again of the rifle, and more than that of the pistols.)
+  mosin: { nominal: 24, min: 23, lifetime: 7200, restock: 180, usage: ANYWHERE, favour: ARMOURY, loaded: [1, 4], gas: 5, bunker: 3 },
+  p38: { nominal: 26, min: 25, lifetime: 7200, restock: 180, usage: ANYWHERE, favour: ARMOURY, loaded: [2, 6], gas: 3 },
   // the service pistol, with nearly twice the magazine: as easy to come by as the other one
   // (at half as many, and in half the kinds of building, nobody could find one)
-  m9: { nominal: 16, min: 15, lifetime: 7200, restock: 180, usage: ANYWHERE, favour: ARMOURY, loaded: [3, 10], gas: 4, bunker: 3 },
+  m9: { nominal: 26, min: 25, lifetime: 7200, restock: 180, usage: ANYWHERE, favour: ARMOURY, loaded: [3, 10], gas: 4, bunker: 3 },
   // loose rounds turn up in handfuls; sealed boxes are the real find
-  ammo_762: { nominal: 36, min: 35, lifetime: 3600, restock: 120, usage: ANYWHERE, favour: ARMOURY, qty: [0.25, 0.6], gas: 4, bunker: 6 },
-  ammo_9mm: { nominal: 46, min: 45, lifetime: 3600, restock: 120, usage: ANYWHERE, favour: ARMOURY, qty: [0.25, 0.6], gas: 4, bunker: 6 },
+  ammo_762: { nominal: 44, min: 43, lifetime: 3600, restock: 120, usage: ANYWHERE, favour: ARMOURY, qty: [0.25, 0.6], gas: 4, bunker: 6 },
+  ammo_9mm: { nominal: 58, min: 57, lifetime: 3600, restock: 120, usage: ANYWHERE, favour: ARMOURY, qty: [0.25, 0.6], gas: 4, bunker: 6 },
   box_762: { nominal: 14, min: 13, lifetime: 3600, restock: 180, usage: ['Military', 'Police', 'Hunting', 'Farm', 'Industrial'], favour: ARMOURY, gas: 6, bunker: 6 },
   box_9mm: { nominal: 18, min: 17, lifetime: 3600, restock: 180, usage: ['Police', 'Military', 'Town', 'Village'], favour: ARMOURY, gas: 6, bunker: 6 },
   // The Desert Eagle, and what it fires, are of the gas and nowhere else: `nominal` 0 and no

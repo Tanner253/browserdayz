@@ -19,7 +19,7 @@ import { BUNKER, bunkerAt, bunkerPlan, levelY } from './bunker';
 
 export const INFECTED = {
   /** as many as are ever alive at once, over the whole map */
-  max: 60,
+  max: 63,
   /** what each has to begin with: a rifle round anywhere, a pistol round in the head, three in the chest */
   hp: 90,
   /** how long a body lies there, and how long after that before another turns up about the same place, seconds */
@@ -147,7 +147,8 @@ export interface Home {
 // (the outlying places are where somebody new finds a first weapon: one or two there, the crowd in the village)
 const ABOUT: Record<string, number> = { hamlet: 4, depot: 4, post: 3, yard: 2, farm: 2, lodge: 1, dacha: 1, works: 0, bunker: 0 };
 /** how many keep to the works (said apart from the small places: it comes high in the list, so it is never the one that goes short) */
-const AT_WORKS = 6;
+// (half as many again as the six there were: the gas is where the best of everything is kept, and it was thinly guarded)
+const AT_WORKS = 9;
 /** and how many are shut in the bunker, in the dark */
 const IN_BUNKER = 12;
 /** and how many walk the ground over it, in its gas */

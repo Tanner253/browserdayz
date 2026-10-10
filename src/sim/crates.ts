@@ -20,7 +20,7 @@ const CIVILIAN: Table = [
   ['beans', 2], ['sardines', 2], ['sprats', 2], ['tomatoes', 1.5], ['apple', 1.5], ['milk', 1], ['thermos', 0.6],
   ['bandage', 1.5], ['cigarettes', 1.2], ['box_9mm', 0.4], ['ammo_9mm', 0.5],
   ['knife', 0.8], ['work_gloves', 0.8], ['boonie_hat', 0.12], ['sack_pack', 0.8], ['rubber_boots', 0.5],
-  ['hatchet', 0.8], ['bat', 0.7], ['crowbar', 0.7], ['machete', 0.5], ['p38', 0.45], ['m9', 0.3], ['mosin', 0.25], ['ammo_762', 0.5],
+  ['hatchet', 0.8], ['bat', 0.7], ['crowbar', 0.7], ['machete', 0.5], ['p38', 0.8], ['m9', 0.6], ['mosin', 0.45], ['ammo_762', 0.5],
   ['water_jug', 0.8], ['flask', 0.5], ['flashlight', 0.7],
 ];
 
