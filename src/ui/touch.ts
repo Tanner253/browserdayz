@@ -12,6 +12,7 @@
 //   G                                                      a second button beside Use, when G would do something
 //   Q and E                                                the two lean buttons, while aiming
 //   T                                                      the speech button: a list to tap from
+//   L                                                      the light button, once there is a light to switch on
 //   Enter, Tab, Esc, M                                     chat, the pack, the menu, a tap on the map
 
 import type { Input } from '../core/input';
@@ -66,6 +67,7 @@ export class TouchControls {
         <button class="tc-b" data-act="inv" aria-label="Inventory">${icon('<path d="M6 8h12l1 12H5zM9 8V6a3 3 0 0 1 6 0v2"/>')}</button>
         <button class="tc-b" data-act="chat" aria-label="Chat">${icon('<path d="M4 5h16v11H9l-5 4z"/>')}</button>
         <button class="tc-b" data-act="emotes" aria-label="Call out">${icon('<path d="M4 10v4h3l5 4V6L7 10zM16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/>')}</button>
+        <button class="tc-b tc-light" data-key="KeyL" aria-label="Light">${icon('<path d="M8 3h8l-1.5 6h-5zM9.5 9h5v10a2.5 2.5 0 0 1-5 0zM12 12.5v2.5"/>')}</button>
       </div>
       <button class="tc-b tc-use" data-key="KeyF" aria-label="Use">${icon('<path d="M8 12V6.5a1.5 1.5 0 0 1 3 0V11m0-5.5v-1a1.5 1.5 0 0 1 3 0V11m0-4.5a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6h-1a6 6 0 0 1-5-3l-2.4-4.3a1.5 1.5 0 0 1 2.6-1.5L8 14"/>')}</button>
       <button class="tc-b tc-act2" data-key="KeyG"></button>
@@ -102,9 +104,9 @@ export class TouchControls {
    * @param playing the player has control (not in a menu, not dead)
    * @param inventory the inventory screen is open (it gets a Close button)
    * @param canUse there is something in reach to take, open or search
-   * @param also what G would do here, in a word ("Fuel", "Pack up"): it gets a button of its own; and whether the gun is at the eye
+   * @param also what G would do here, in a word ("Fuel", "Pack up"): it gets a button of its own; whether the gun is at the eye; whether a light is carried (it gets a button), and whether it is on
    */
-  update(playing: boolean, inventory: boolean, canUse: boolean, also: { g: string | null; aiming: boolean } = { g: null, aiming: false }) {
+  update(playing: boolean, inventory: boolean, canUse: boolean, also: { g: string | null; aiming: boolean; lamp?: boolean; lit?: boolean } = { g: null, aiming: false }) {
     if (playing !== this.visible) {
       this.visible = playing;
       this.root.classList.toggle('on', playing);
@@ -115,6 +117,8 @@ export class TouchControls {
     this.root.classList.toggle('g', playing && !!also.g);
     if (also.g && this.act2.textContent !== also.g) this.act2.textContent = also.g;
     this.root.classList.toggle('ads', playing && also.aiming);
+    this.root.classList.toggle('lamp', !!also.lamp);
+    this.root.classList.toggle('lit', !!also.lit);
   }
 
   /** nothing stays held when the controls leave the screen */

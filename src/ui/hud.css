@@ -1235,6 +1235,10 @@ kbd.hot { color: #121413; background: linear-gradient(#d8c594, #b89f66); border-
 .tc-lean-r { left: calc(92px + env(safe-area-inset-left)); }
 .tc-top { position: absolute; left: calc(12px + env(safe-area-inset-left)); top: 10px; display: flex; gap: 8px; }
 .tc-top .tc-b { position: static; width: 46px; height: 46px; }
+/* the light: there once a light is carried (a flashlight, or one on the gun), and bright while it is on */
+.tc-top .tc-light { display: none; }
+.tc.lamp .tc-top .tc-light { display: grid; }
+.tc.lit .tc-top .tc-light { color: #121413; background: var(--accent); border-color: var(--accent); }
 /* what can be called out: a list under the button that opens it */
 .tc-emotes { position: absolute; left: calc(12px + env(safe-area-inset-left)); top: 64px; display: none; grid-template-columns: repeat(2, 136px); gap: 6px; pointer-events: auto; touch-action: none; }
 .tc.emo .tc-emotes { display: grid; }

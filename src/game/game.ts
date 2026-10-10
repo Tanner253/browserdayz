@@ -2758,6 +2758,8 @@ export class Game {
     this.touch?.update(playing && !uiOpen && !typing, uiOpen, !!this.prompt?.includes('<kbd>F'), {
       g: this.prompt?.includes('G to pour') ? 'Fuel' : this.prompt?.includes('G to pack up') ? 'Pack' : null,
       aiming: this.weapons.aiming,
+      lamp: this.weapons.hasLamp || this.inv.count('flashlight') > 0,
+      lit: this.lit,
     });
     this.perf.beforeRender();
     r.render(dt);
