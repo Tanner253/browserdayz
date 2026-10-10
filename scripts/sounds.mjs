@@ -23,6 +23,16 @@ const SRC = path.join(ROOT, 'assets-src', 'sounds');
 const OUT = path.join(ROOT, 'public', 'assets', 'sounds');
 const snake = (p) => path.join(SRC, 'snake', "Snake's Authentic Gun Sounds", p);
 const lib = (p) => path.join(SRC, 'firearm-library', 'Prepared SFX Library', p);
+const zed = (k) => path.join(SRC, 'zombies', 'zombies', `zombie-${k}.wav`);
+/**
+ * The infected: twenty-four recordings ("Zombies Sound Pack" by artisticdude, CC0, unpacked into
+ * assets-src/sounds/zombies/), numbered and nothing more. Which is used for what was settled by
+ * measuring them (whoever settled it cannot hear): the long low ones are what they do when they
+ * are let alone, the long loud ones what they do when they are roused, the bright middling ones
+ * the cry when they see somebody, the short ones a blow given or taken. Change the numbers here
+ * if a growl turns out to be a scream, and run `npm run sounds`.
+ */
+const ZED = { groan: [16, 20, 1, 23], growl: [17, 18, 21, 15], alert: [8, 10, 12, 14], attack: [4, 3, 7, 2], hurt: [24, 5, 11, 13], die: [19, 9, 22, 6] };
 
 /**
  *   src   – the recording
@@ -69,12 +79,17 @@ const SOUNDS = {
   // The big pistol: a .45 (the library's 1911), which is the heaviest pistol there is a
   // recording of, with the same air under it.
   shot_magnum: {
-    src: lib('1911/A_42P.wav'), side: 1, takes: 2, len: 1.6, rate: 44100, gain: 1, press: 1.4, air: 0.6,
-    with: [{ src: snake('Full Sound/5.56/WAV/556 Single WAV.wav'), level: 0.8, after: 0.012, die: 0.3 }],
+    src: lib('1911/A_42P.wav'), side: 1, takes: 2, len: 1.9, rate: 44100, gain: 1, press: 1.3, air: 0.5,
+    // (and the bottom of the big rifle's shot under it, which is the weight a .50 has and a .45 has not)
+    with: [
+      { src: snake('Full Sound/7.62x54R/WAV/762x54r Single WAV.wav'), level: 0.95, low: 700 },
+      { src: snake('Full Sound/7.62x39/WAV/762x39 Single WAV.wav'), level: 0.7, after: 0.012, die: 0.45 },
+    ],
   },
   // a shell thumbed into a shotgun's tube
   shell_in: { src: snake('Reloads, Cycling & More/WAV/Pump Shell Load WAV.wav'), rate: 32000, gain: 0.8 },
 };
+for (const [kind, takes] of Object.entries(ZED)) takes.forEach((k, n) => (SOUNDS[`z_${kind}${n ? `_${n + 1}` : ''}`] = { src: zed(k), rate: 32000, gain: 0.9 }));
 
 /** a .wav as one channel of numbers between -1 and 1: one of its channels, or all of them together */
 async function readWav(file, side) {

@@ -208,6 +208,18 @@ export const LOCAL_MODELS = {
       changes: 'Scaled to metres and turned to face the way the game drives; each wheel re-centred on its own middle; textures re-encoded as WebP; geometry compressed.',
     },
   },
+  // The bunker's own fittings, all out of one download ("Bunker PBR Showcase Props JFG"): each is
+  // a few of its shapes, picked out by name and brought to the size of a room three metres high.
+  bunker_terminal: { dir: 'bunker_props', only: /^SM_TerminalBaseOnly/, size: 1.5, tex: 2048, tags: ['prop'], changes: 'Only these of its shapes are used here, scaled to the rooms of the bunker and stood on the ground; textures re-encoded as WebP; geometry compressed.' },
+  bunker_machine: { dir: 'bunker_props', only: /^SM_Machine_1_(Main|Buttons|Deco|Windows)/, size: 3.6, tex: 2048, tags: ['prop'], changes: 'Only these of its shapes are used here, scaled to the rooms of the bunker and stood on the ground; textures re-encoded as WebP; geometry compressed.' },
+  bunker_grate: { dir: 'bunker_props', only: /^SM_GrateRoblox/, size: 1.03, tex: 1024, tags: ['prop'], changes: 'Only these of its shapes are used here, scaled to the rooms of the bunker and stood on the ground; textures re-encoded as WebP; geometry compressed.' },
+  bunker_light: { dir: 'bunker_props', only: /^SM_Light_/, size: 0.95, tex: 1024, tags: ['prop'], changes: 'Only these of its shapes are used here, scaled to the rooms of the bunker and stood on the ground; textures re-encoded as WebP; geometry compressed.' },
+  bunker_rail: { dir: 'bunker_props', only: /^SM_Rail_1/, size: 1.85, tex: 1024, tags: ['prop'], changes: 'Only these of its shapes are used here, scaled to the rooms of the bunker and stood on the ground; textures re-encoded as WebP; geometry compressed.' },
+  bunker_ladder: { dir: 'bunker_props', only: /^SM_MetalLadder/, size: 3.0, tex: 1024, tags: ['prop'], changes: 'Only these of its shapes are used here, scaled to the rooms of the bunker and stood on the ground; textures re-encoded as WebP; geometry compressed.' },
+  bunker_pipe: { dir: 'bunker_props', only: /^SM_Tubes_JFG_1_M_/, size: 3.0, tex: 1024, tags: ['prop'], changes: 'Only these of its shapes are used here, scaled to the rooms of the bunker and stood on the ground; textures re-encoded as WebP; geometry compressed.' },
+  bunker_pipes: { dir: 'bunker_props', only: /^SM_Tubes_JFG_5/, size: 1.9, tex: 1024, tags: ['prop'], changes: 'Only these of its shapes are used here, scaled to the rooms of the bunker and stood on the ground; textures re-encoded as WebP; geometry compressed.' },
+  bunker_chain: { dir: 'bunker_props', only: /^SM_Chain_1/, size: 2.05, tex: 1024, tags: ['prop'], changes: 'Only these of its shapes are used here, scaled to the rooms of the bunker and stood on the ground; textures re-encoded as WebP; geometry compressed.' },
+  bunker_cable: { dir: 'bunker_props', only: /^SM_Cable_JFG_3/, size: 6, tex: 1024, tags: ['prop'], changes: 'Only these of its shapes are used here, scaled to the rooms of the bunker and stood on the ground; textures re-encoded as WebP; geometry compressed.' },
 };
 
 /**

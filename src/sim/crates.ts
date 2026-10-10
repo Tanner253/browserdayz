@@ -32,6 +32,21 @@ const UNDER_GAS: Table = [
   ['deagle', 0.8], ['ammo_50', 1.2], ['red_dot', 0.6], ['gun_light', 0.6], ['suppressor_762', 0.4], ['mag_m9_ext', 0.4], ['mag_deagle_ext', 0.3], ['flask', 0.5], ['keycard', 0.5],
 ];
 
+/**
+ * What is in whatever is searched down the bunker: the fourth and (for now) the best of the
+ * places things are kept. The shotgun and all that goes with it is here and nowhere else; the
+ * Desert Eagle is the gas's own and is not.
+ */
+const IN_BUNKER: Table = [
+  ['benelli', 1.5], ['ammo_12', 3.2], ['box_12', 2.2], ['suppressor_12', 0.9], ['red_dot', 1.1], ['gun_light', 1.1],
+  ['mosin', 1.1], ['pu_scope', 1.5], ['suppressor_762', 0.9], ['box_762', 2.2], ['ammo_762', 1.2],
+  ['m9', 0.9], ['mag_m9_ext', 0.7], ['suppressor_9', 0.7], ['box_9mm', 1.8], ['ammo_50', 1.2], ['box_50', 0.6],
+  ['grenade', 1.8], ['boonie_hat', 1.8], ['life_vest', 1.8], ['firstaid', 1.7], ['bandage', 1.5], ['splint', 0.6],
+  ['flashlight', 0.9], ['flask', 0.5], ['condensed', 0.6], ['thermos', 0.4],
+];
+/** and on its racks, the long things */
+const ON_RACKS: Table = [['benelli', 3], ['mosin', 2], ['ammo_12', 2], ['box_12', 1.5], ['box_762', 1.5], ['suppressor_12', 0.8], ['suppressor_762', 0.8], ['pu_scope', 1.2], ['red_dot', 0.8], ['gun_light', 0.8]];
+
 export interface CrateSpec {
   label: string;
   w: number;
@@ -46,18 +61,29 @@ export const CRATE_SPECS: Record<string, CrateSpec> = {
   // (the hard case that stands wherever a military crate or an ammunition crate stood, and a little better filled)
   weapons_case: { label: 'Weapons Case', w: 8, h: 4, table: MILITARY, count: [2, 5] },
   wooden_crate_01: { label: 'Wooden Crate', w: 6, h: 3, table: CIVILIAN, count: [1, 3] },
+  // what is searched in the bunker and is no crate (see bunkerCrates): some of them are empty
+  locker: { label: 'Locker', w: 4, h: 6, table: IN_BUNKER, count: [0, 2] },
+  gun_rack: { label: 'Weapon Rack', w: 8, h: 4, table: ON_RACKS, count: [1, 3] },
+  bunker_cabinet: { label: 'Cabinet', w: 6, h: 4, table: IN_BUNKER, count: [1, 2] },
+  bunker_desk: { label: 'Desk', w: 6, h: 3, table: IN_BUNKER, count: [0, 2] },
 };
+/** the kinds that are the bunker's own furniture: what they hold is theirs whatever is said of where they stand */
+const OF_BUNKER = new Set(['locker', 'gun_rack', 'bunker_cabinet', 'bunker_desk']);
 
 /** seconds an emptied crate stays empty before it refills (only while nobody is near): five minutes, it was twenty */
 export const CRATE_RESTOCK = 300;
 
-/** @param rich the crate stands under the gas: it holds the best of everything, and one thing more */
-export function fillCrate(c: Container, kind: string, rnd: () => number = Math.random, rich = false) {
+/**
+ * @param rich the crate stands under the gas (true) or down the bunker ('bunker'): it holds the
+ *   best of what is kept there, and one thing more
+ */
+export function fillCrate(c: Container, kind: string, rnd: () => number = Math.random, rich: boolean | 'bunker' = false) {
   const spec = CRATE_SPECS[kind];
   if (!spec) return;
-  const table = rich ? UNDER_GAS : spec.table;
+  const own = OF_BUNKER.has(kind);
+  const table = own ? spec.table : rich === 'bunker' ? IN_BUNKER : rich ? UNDER_GAS : spec.table;
   const total = table.reduce((s, [, w]) => s + w, 0);
-  const n = spec.count[0] + Math.floor(rnd() * (spec.count[1] - spec.count[0] + 1)) + (rich ? 1 : 0);
+  const n = spec.count[0] + Math.floor(rnd() * (spec.count[1] - spec.count[0] + 1)) + (rich && !own ? 1 : 0);
   for (let i = 0; i < n; i++) {
     let r = rnd() * total;
     let id = table[0][0];

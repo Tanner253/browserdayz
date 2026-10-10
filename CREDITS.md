@@ -40,6 +40,8 @@ What is not CC0 is listed first, with the credit its licence asks for.
 - This work is based on "Benelli M3 Tactical" (https://sketchfab.com/3d-models/benelli-m3-tactical-1eaea0239fdf43ad92eb276fbf9c60dd) by Amapsis (https://sketchfab.com/Amapsis) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
   Changes made: Only its shell is used here: stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.
   Also: Set in rigid pieces (the gun, its fore-end, its sight, the can on its muzzle) and laid along the barrel; its shell is a model of its own. Textures re-encoded as WebP; geometry compressed.
+- This work is based on "Bunker PBR Showcase Props JFG - Roblox Showcase" (https://sketchfab.com/3d-models/bunker-pbr-showcase-props-jfg-roblox-showcase-d2a3844ea1684caba53dcc6492a74176) by Jesus Fernandez Garcia (https://sketchfab.com/jamyzgenius) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Changes made: Only these of its shapes are used here, scaled to the rooms of the bunker and stood on the ground; textures re-encoded as WebP; geometry compressed.
 - "Uaz-469" (https://skfb.ly/6x8RE) by Yo.Ri is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
   Changes made: Scaled to metres and turned to face the way the game drives; each wheel re-centred on its own middle; textures re-encoded as WebP; geometry compressed.
 - "sniper animated" (https://sketchfab.com/3d-models/sniper-animated-b48999a250b2433da59f705c371a49b2) by DJMaesen is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
@@ -63,7 +65,9 @@ The flash at a muzzle, seen from the side, is out of the Particle Pack by [Kenne
 Gunshots, magazines and the slide are recordings (cut and converted by `npm run sounds`): from
 [Snake's Authentic Gun Sounds](https://f8studios.itch.io/snakes-authentic-gun-sounds) by Snake (free to use,
 credit not asked for and given gladly) and from [The Free Firearm Sound Library](https://opengameart.org/content/the-free-firearm-sound-library)
-by Ben Jaszczak, Brian Nelson, Kevin Heras and Matthew Nanney (CC0). Every other sound is made by the game as it plays.
+by Ben Jaszczak, Brian Nelson, Kevin Heras and Matthew Nanney (CC0). What the infected say is from the
+[Zombies Sound Pack](https://opengameart.org/content/zombies-sound-pack) by artisticdude (CC0, credit not asked for and given gladly).
+Every other sound is made by the game as it plays.
 
 Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees are generated with
 [EZ-Tree](https://github.com/dgreenheck/ez-tree) (MIT, Daniel Greenheck).

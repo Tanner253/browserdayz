@@ -28,7 +28,7 @@ export interface RigInfo {
  * material it is given.)
  */
 /** two guns that are not painted as the rest are: how much of their paint is kept, how much metal, and how much of the sky they take */
-export const LOOK = { eagle: { tint: 0.62, metal: 0.8, sky: 0.85 }, shotgun: { tint: 1.9, metal: 0.5, sky: 1.6 } };
+export const LOOK = { eagle: { tint: 0.62, metal: 0.8, sky: 0.85 }, shotgun: { tint: 1.9, metal: 0.5, sky: 1.6 }, sight: { tint: 2.6, metal: 0.4, sky: 1.6 } };
 
 export function liftPack<T extends THREE.Material>(mat: T): T {
   const c = mat as unknown as THREE.MeshStandardMaterial;
@@ -52,6 +52,11 @@ export function liftPack<T extends THREE.Material>(mat: T): T {
     c.metalness = Math.min(c.metalness, LOOK.eagle.metal);
     c.color.setScalar(LOOK.eagle.tint);
     c.envMapIntensity = LOOK.eagle.sky;
+  } else if (/^EOTECH/i.test(mat.name)) {
+    // the holographic sight is painted as black as the shotgun: on a pistol it was a black box
+    c.metalness = Math.min(c.metalness, LOOK.sight.metal);
+    c.color.setScalar(LOOK.sight.tint);
+    c.envMapIntensity = LOOK.sight.sky;
   } else if (/^B_M3_/.test(mat.name)) {
     // and the shotgun is painted blacker than any of them: lifted further, or it is a cut-out
     c.metalness = Math.min(c.metalness, LOOK.shotgun.metal);

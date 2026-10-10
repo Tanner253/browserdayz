@@ -42,6 +42,8 @@ export interface Vitals {
 
 /** metres a second hurrying in a crouch: creeping is 1.9, a jog upright 4, a sprint 6.2 */
 const CROUCH_RUN = 3.3;
+/** how much faster somebody runs with their hands empty */
+const HANDS_FREE = 1.2;
 
 export class Player {
   body!: RAPIER.RigidBody;
@@ -68,6 +70,8 @@ export class Player {
   /** externally supplied (weapons): ADS + weapon weight slow the player */
   aiming = false;
   weightKg = 0;
+  /** nothing is held: whatever is carried is holstered or slung */
+  emptyHanded = false;
   /** how fast thirst grows, from headwear */
   thirstMult = 1;
   /** fall damage multiplier from footwear */
@@ -244,6 +248,8 @@ export class Player {
     const enc = Math.max(0, this.weightKg - 18) * 0.012; // encumbrance
     let speed = this.crouched ? (this.scurrying ? CROUCH_RUN : 1.9) : walk ? 1.7 : 4.0;
     if (this.sprinting) speed = 6.2;
+    // (with nothing in the hands, whatever was carried put away, running is a fifth faster)
+    if (this.emptyHanded && !this.crouched && !walk) speed *= HANDS_FREE;
     if (this.aiming) speed = Math.min(speed, this.crouched ? 1.2 : 1.9);
     if (fwd < 0) speed *= 0.75;
     speed *= Math.max(0.55, 1 - enc) * (v.health < 30 ? 0.8 : 1);

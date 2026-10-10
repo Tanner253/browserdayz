@@ -6,6 +6,7 @@
 
 import * as THREE from 'three';
 import { physics } from '../core/physics';
+import { assets } from '../core/assets';
 import type RAPIER from '@dimforge/rapier3d-compat';
 import type { Atmosphere } from './atmosphere';
 import { bunkerPlace, type World } from './worldgen';
@@ -180,6 +181,9 @@ function boxGeo(w: number, h: number, d: number, per = 2.6): THREE.BoxGeometry {
 const LAMP_POOL = 7.5;
 const LAMP_GLOW = 1.6;
 
+/** a place on the ground, to the nearest hand's breadth: what a thing standing there is known by */
+export const spotKey = (x: number, z: number) => `${Math.round(x * 10)}_${Math.round(z * 10)}`;
+
 export class BunkerSite {
   /** where it stands: null in a world that has none (and then this does nothing) */
   readonly place: Place | null;
@@ -203,6 +207,8 @@ export class BunkerSite {
   /** the light on the card reader beside the door */
   private readerLamp: THREE.MeshStandardMaterial | null = null;
   private clock = 0;
+  /** what stops a body, for each thing made here that does: by where it stands (see spotKey) */
+  readonly solidAt = new Map<string, RAPIER.Collider>();
 
   constructor(world: World, atmo: Atmosphere, scene: THREE.Scene) {
     this.place = bunkerPlace(world);
@@ -310,7 +316,10 @@ export class BunkerSite {
       /** it stops a body and a bullet: a box of its own size (or the size given), where it stands */
       const solid = (surface: 'concrete' | 'metal', w = m.w, h = m.h, d = m.d, lift = 0) => {
         const [x, y, z] = bunkerAt(P, m.r, m.f, Y + (m.y ?? 0) + lift + h / 2);
-        physics.addStatic(physics.R.ColliderDesc.cuboid(w / 2, h / 2, d / 2), surface, { x, y, z }, P.rot + m.rot);
+        const c = physics.addStatic(physics.R.ColliderDesc.cuboid(w / 2, h / 2, d / 2), surface, { x, y, z }, P.rot + m.rot);
+        // (the first of its boxes is the thing itself, for whoever looks at it and means to open it)
+        const key = spotKey(x, z);
+        if (!this.solidAt.has(key)) this.solidAt.set(key, c);
       };
       const { w, d, h } = m;
       switch (m.kind) {
@@ -463,15 +472,44 @@ export class BunkerSite {
     }
 
     // ---- the lamps: a caged fitting on the ceiling for each, lit as it burns (the ones that burn steadily share one glow)
+    const fittings: { at: [number, number, number]; glow: THREE.Material; made: THREE.Mesh[] }[] = [];
     const steady = new THREE.MeshStandardMaterial({ color: 0x2a2a26, emissive: new THREE.Color(1, 0.86, 0.6), emissiveIntensity: 3.2, roughness: 0.5 });
     atmo.register(steady);
     plan.lamps.forEach(([r, f, y, how]) => {
       const m = how >= 1 ? steady : (atmo.register(new THREE.MeshStandardMaterial({ color: 0x2a2a26, emissive: new THREE.Color(1, 0.86, 0.6), emissiveIntensity: 0, roughness: 0.5 })) as THREE.MeshStandardMaterial);
-      block(r - 0.3, r + 0.3, f - 0.08, f + 0.08, y + 0.13, y + 0.2, m, { solid: false });
-      block(r - 0.36, r + 0.36, f - 0.12, f + 0.12, y + 0.2, y + 0.25, dark, { solid: false });
+      const made = [block(r - 0.3, r + 0.3, f - 0.08, f + 0.08, y + 0.13, y + 0.2, m, { solid: false }).mesh, block(r - 0.36, r + 0.36, f - 0.12, f + 0.12, y + 0.2, y + 0.25, dark, { solid: false }).mesh];
       const [x, wy, z] = bunkerAt(P, r, f, y);
       this.fixtures.push({ mat: m, pos: new THREE.Vector3(x, wy, z), how, burn: 0 });
+      fittings.push({ at: [r, y + 0.25, f], glow: m, made });
     });
+    // The fittings themselves are a model (a caged lamp out of the bunker pack), hung from the
+    // ceiling upside down as it was made to stand; the boxes above are what is there until it has
+    // come, and if it never does. Its glass is each lamp's own glow; the rest of it is one stuff.
+    void assets.model('bunker_light').then((scene) => {
+      const parts: { geo: THREE.BufferGeometry; glass: boolean; stuff: THREE.Material }[] = [];
+      const kept = new Map<THREE.Material, THREE.Material>();
+      scene.updateMatrixWorld(true);
+      scene.traverse((o) => {
+        const mesh = o as THREE.Mesh;
+        if (!mesh.isMesh) return;
+        const src = mesh.material as THREE.MeshStandardMaterial, glass = /glow/i.test(src.name);
+        if (!glass && !kept.has(src)) kept.set(src, mat(src.clone() as THREE.MeshStandardMaterial));
+        parts.push({ geo: mesh.geometry.clone().applyMatrix4(mesh.matrixWorld), glass, stuff: kept.get(src) ?? src });
+      });
+      if (!parts.length) return;
+      for (const ft of fittings) {
+        for (const old of ft.made) group.remove(old);
+        for (const p of parts) {
+          const mesh = new THREE.Mesh(p.geo, p.glass ? ft.glow : p.stuff);
+          mesh.position.set(ft.at[0], ft.at[1], ft.at[2]);
+          mesh.rotation.x = Math.PI;
+          mesh.receiveShadow = true;
+          mesh.matrixAutoUpdate = false;
+          mesh.updateMatrix();
+          group.add(mesh);
+        }
+      }
+    }).catch(() => {});
 
     // the name over the hut's doorway
     {

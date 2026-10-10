@@ -12,7 +12,7 @@ import type { Terrain } from '../world/terrain';
 import { Barrel, type Vegetation } from '../world/vegetation';
 import type { Grass } from '../world/grass';
 import { Door, type Buildings } from '../world/buildings';
-import { WORLD_SIZE, heightAt, type SiteKind, type World } from '../world/worldgen';
+import { WORLD_SIZE, bunkerPlace, heightAt, type SiteKind, type World } from '../world/worldgen';
 import { ITEMS, itemName, TAG_HOLD, TAG_HOLD_MIN, capacityOf, makeItem, newUid, tagClock, tagOwner, type ItemInstance, type Slot, quietOf } from '../sim/items';
 import { PlayerInventory, SLOT_ORDER, type Container } from '../sim/inventory';
 import { Economy, type WorldLoot } from '../sim/economy';
@@ -58,8 +58,8 @@ import { breaksOnHit } from '../sim/injury';
 import { MenuScenes } from './menu-scenes';
 import type { MenuSpot } from '../ui/hud';
 import { Lamps } from './lamps';
-import { BunkerSite } from '../world/bunker';
-import { BUNKER, bunkerDark, inBunker } from '../sim/bunker';
+import { BunkerSite, spotKey } from '../world/bunker';
+import { BUNKER, bunkerCrates, bunkerDark, inBunker } from '../sim/bunker';
 
 const _gasHead = new THREE.Vector3();
 const _lampPos = new THREE.Vector3(), _lampDir = new THREE.Vector3();
@@ -307,6 +307,22 @@ export class Game {
       st.kind = c.kind;
       st.adopt(c.collider);
       this.loot.crates.push(st);
+    }
+    // and what is searched in the bunker that is no crate: its lockers, racks, cabinets and desks
+    // (each is solid already: what stands for it here is a grain of steel in the middle of it)
+    const under = bunkerPlace(world);
+    if (under) {
+      for (const c of bunkerCrates(under)) {
+        const spec = CRATE_SPECS[c.kind];
+        if (!spec) continue;
+        const st = new Stash(crateId(c.x, c.z), c.x, c.y, c.z, c.rot, spec.w, spec.h, spec.label);
+        st.kind = c.kind;
+        // (what is looked at and opened is the thing itself: the box that already stops a body there)
+        const key = spotKey(c.x, c.z);
+        st.adopt(this.bunker.solidAt.get(key) ?? veg.solidAt.get(key) ?? physics.addStatic(physics.R.ColliderDesc.cuboid(0.02, 0.02, 0.02), 'metal', { x: c.x, y: c.y + 0.5, z: c.z }));
+        physics.tag(st.collider, { surface: 'metal', owner: st });
+        this.loot.crates.push(st);
+      }
     }
 
     progress('loading weapons');
@@ -620,7 +636,7 @@ export class Game {
 
   /** a crate of the map filled (one under the gas with the best of everything) */
   private fillCrate(c: Stash) {
-    fillCrate(c.container, c.kind, Math.random, underGas(this.s.atmo.gas, c.x, c.y, c.z) || inBunker(this.bunker.place, c.x, c.y + 0.5, c.z));
+    fillCrate(c.container, c.kind, Math.random, inBunker(this.bunker.place, c.x, c.y + 0.5, c.z) ? 'bunker' : underGas(this.s.atmo.gas, c.x, c.y, c.z));
   }
 
   private fresh() {
@@ -2467,6 +2483,7 @@ export class Game {
     if (this.slowT > 0.2) {
       this.slowT = 0;
       p.weightKg = this.inv.weight();
+      p.emptyHanded = this.inv.active === null && !this.use;
       p.fallMult = this.inv.wear('fall').reduce((a, b) => a * b, 1);
       p.thirstMult = this.inv.wear('thirst').reduce((a, b) => a * b, 1);
       this.hasCompass = !!this.inv.find((i) => i.id === 'compass');
@@ -2682,7 +2699,7 @@ export class Game {
       // forest floor underfoot means trees overhead: leaves instead of open-field insects
       this.inForest = this.s.terrain.surfaceAt(p.pos.x, p.pos.z) === 'dirt';
     }
-    audio.updateAmbience(dt, cam.position, this.indoors, this.inForest);
+    audio.updateAmbience(dt, cam.position, this.indoors, this.inForest, bunkerDark(this.bunker.place, cam.position.x, cam.position.y, cam.position.z));
     // breathing follows how much of the reserve is left, as a percentage
     if (this.started) audio.body(dt, (v.stamina / MAX_STAMINA) * 100, v.health, !p.dead, v.bleeding);
 

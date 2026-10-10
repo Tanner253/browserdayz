@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import type RAPIER from '@dimforge/rapier3d-compat';
 import { CRATE_KINDS } from './buildings';
+import { spotKey } from './bunker';
 import { assets, type TreeEntry } from '../core/assets';
 import { physics, type Surface } from '../core/physics';
 import { extractParts, groundParts, type MeshPart } from '../core/gltf-utils';
@@ -63,6 +64,10 @@ const SOLID: Record<string, [Surface, number]> = {
   metal_office_desk: ['metal', 0.95],
   electric_stove: ['metal', 0.95],
   Television_01: ['metal', 0.9],
+  bunker_terminal: ['metal', 0.92],
+  bunker_machine: ['metal', 0.95],
+  bunker_pipe: ['metal', 0.7],
+  bunker_pipes: ['metal', 0.95],
 };
 
 /**
@@ -491,6 +496,8 @@ export class Vegetation {
   barkMats = new Map<string, THREE.MeshStandardMaterial>();
   /** crate props (with their colliders) that the game turns into searchable containers */
   crates: { kind: string; x: number; y: number; z: number; rot: number; collider: RAPIER.Collider }[] = [];
+  /** what stops a body, for each solid thing stood in the world: by where it stands (see spotKey) */
+  readonly solidAt = new Map<string, RAPIER.Collider>();
   /** the fuel drums, by number */
   barrels: Barrel[] = [];
 
@@ -697,6 +704,7 @@ export class Vegetation {
               const drum = kind === BARREL.kind ? (this.barrels[n] = new Barrel(n, it.x, it.y, it.z, set)) : undefined;
               const col = physics.addStatic(physics.R.ColliderDesc.cuboid(hx * shrink, hy, hz * shrink), surface, { x: it.x, y: it.y + hy, z: it.z }, it.rot, drum);
               if (drum) drum.collider = col;
+              this.solidAt.set(spotKey(it.x, it.z), col);
               if (CRATE_KINDS.has(id)) this.crates.push({ kind: id, x: it.x, y: it.y, z: it.z, rot: it.rot, collider: col });
             });
           }

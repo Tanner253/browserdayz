@@ -87,10 +87,14 @@ export function inBunker(p: Place | null, x: number, y: number, z: number, slack
 export function lampBurns(how: number, k: number, t: number): number {
   if (how >= 1) return 1;
   if (how <= 0) return 0;
-  // (two slow waves out of step, cut off sharply: on, on, a stutter, off for a while)
-  const a = Math.sin(t * (1.3 + (k % 7) * 0.37) + k * 2.1), b = Math.sin(t * (7.1 + (k % 5) * 1.3) + k);
-  const on = a * 0.6 + b * 0.4 > 1 - how * 1.9 ? 1 : 0.06;
-  return on * (0.85 + 0.15 * Math.sin(t * 31 + k));
+  // One slow wave, a quarter of a minute round: above a line it burns, below it it is out (the
+  // line is lower the better the lamp). Only as it crosses the line does it stutter, for half a
+  // second or so. (It used to be cut in and out by a second, quick wave: every such lamp in
+  // sight blinked a couple of times a second, which is a disco and no bunker.)
+  const d = Math.sin(t * (0.36 + (k % 7) * 0.035) + k * 2.1) - (1 - how * 1.9);
+  if (d > 0.09) return 0.93 + 0.07 * Math.sin(t * 5.3 + k);
+  if (d < -0.09) return 0.03;
+  return Math.sin(t * 21 + k * 5) > 0.15 ? 0.95 : 0.05;
 }
 
 // ------------------------------------------------------------------ the level, laid out by rule
@@ -287,6 +291,8 @@ function layOut(seed: number): Plan {
     const put = (id: string, r: number, f: number, rot: number, o: Partial<Stood> = {}) => stood.push({ id, r, f, rot, ...o });
     const build = (kind: Made['kind'], r: number, f: number, rot: number, bw: number, bd: number, bh: number, o: Partial<Made> = {}) => builtList.push({ kind, r, f, rot, w: bw, d: bd, h: bh, ...o });
     const floorSpot = (r: number, f: number) => spots.push({ r, f, y: Y, floor: true });
+    /** nothing already stands within `by` of a spot */
+    const room = (r: number, f: number, by: number) => !stood.some((s) => Math.hypot(s.r - r, s.f - f) < by) && !builtList.some((m) => m.solid !== false && m.kind !== 'sign' && Math.hypot(m.r - r, m.f - f) < by + Math.min(m.w, m.d) / 2);
     const corner = (k: number): [number, number] => [k & 1 ? q.r1 - 1.1 : q.r0 + 1.1, k & 2 ? q.f1 - 1.1 : q.f0 + 1.1];
     const clutter = (n: number, ids: string[]) => {
       for (let i = 0; i < n; i++) {
@@ -355,12 +361,13 @@ function layOut(seed: number): Plan {
       }
       case 'control': {
         // a row of consoles facing the longest wall, desks behind them, and what is watched on the wall
-        along(longest[0], (r, f, rot) => build('console', r, f, rot, 1.5, 0.8, 1.15), 0.55, 1.5, 5);
+        along(longest[0], (r, f, rot, k) => (k % 2 === 0 ? put('bunker_terminal', r, f, rot) : build('console', r, f, rot, 1.5, 0.8, 1.15)), 0.78, 1.6, 5);
         along(longest[1], (r, f, rot, k) => {
           put('metal_office_desk', r, f, rot, { on: TOP });
           if (k % 2 === 0) put('Television_01', r, f, rot, { y: 0.78 });
           put('SchoolChair_01', r + Math.sin(rot) * 0.9, f + Math.cos(rot) * 0.9, rot + Math.PI + between(-0.4, 0.4));
         }, 0.6, 2.2, 3);
+        along(longest[2], (r, f, rot) => void (room(r, f, 1.7) && put('bunker_machine', r, f, rot)), 0.95, 3.7, 1);
         lamp = 0.3;
         break;
       }
@@ -369,12 +376,17 @@ function layOut(seed: number): Plan {
         const n = Math.max(1, Math.min(3, Math.floor((Math.max(w, d) - 3) / 3.6)));
         for (let k = 0; k < n; k++) {
           const t = (k + 0.5) / n;
-          build('generator', w > d ? q.r0 + 1.5 + t * (w - 3) : cr, w > d ? cf : q.f0 + 1.5 + t * (d - 3), w > d ? 0 : Math.PI / 2, 2.6, 1.3, 1.55);
+          const gr = w > d ? q.r0 + 1.5 + t * (w - 3) : cr, gf = w > d ? cf : q.f0 + 1.5 + t * (d - 3), turn = w > d ? 0 : Math.PI / 2;
+          if (k % 2 === 0) put('bunker_machine', gr, gf, turn);
+          else build('generator', gr, gf, turn, 2.6, 1.3, 1.55);
+          put('bunker_grate', gr + (w > d ? 0 : 1.6), gf + (w > d ? 1.5 : 0), 0);
         }
         along(longest[0], (r, f, rot) => build('tank', r, f, rot, 1.1, 1.1, 2.2), 0.75, 1.3, 4);
         along(longest[1], (r, f, rot, k) => (k % 2 ? put('utility_box_01', r, f, rot) : put(pick(['Barrel_01', 'barrel_03']), r, f, rot)), 0.45, 1.0, 5);
         for (const [pr, pf] of [[q.r0 + w * 0.25, q.f0 + d * 0.25], [q.r1 - w * 0.25, q.f1 - d * 0.25], [q.r0 + w * 0.25, q.f1 - d * 0.25], [q.r1 - w * 0.25, q.f0 + d * 0.25]]) if (w > 8 && d > 6 && clear(pr, pf, 1.6)) build('pillar', pr, pf, 0, 0.6, 0.6, B.tall);
         floorSpot(cr + between(-1.5, 1.5), cf + between(-1.2, 1.2));
+        along(longest[2], (r, f, rot) => void (room(r, f, 1.1) && put('bunker_pipe', r, f, rot)), 0.55, 1.4, 3);
+        along(longest[3], (r, f, rot, k) => void (room(r, f, 0.9) && put(k === 0 ? 'bunker_ladder' : 'bunker_pipes', r, f, rot)), 0.17, 1.9, 2);
         lamp = 0.3;
         break;
       }
@@ -387,6 +399,7 @@ function layOut(seed: number): Plan {
         along(longest[1], (r, f, rot) => put('Shelf_01', r, f, rot, { on: SHELF }), 0.3, 1.1, 3);
         clutter(4, ['old_tyre', 'utility_box_01', 'Barrel_01', 'wooden_crate_01', 'cardboard_box_01']);
         floorSpot(cr, cf);
+        along(longest[2], (r, f, rot) => void (room(r, f, 1.0) && put('bunker_pipes', r, f, rot)), 0.17, 1.9, 1);
         break;
       }
       case 'archive': {
@@ -438,8 +451,39 @@ function layOut(seed: number): Plan {
   for (const f of [H.front - 2.5, cross + 4, cross - 5, H.back + 2.5]) spots.push({ r: pick([-0.9, 0.9]), f, y: Y, floor: true });
   builtList.push({ kind: 'sign', r: 0, f: H.back + 0.02, rot: 0, w: 2.2, d: 0.02, h: 0.4, y: 2.42, text: 'LEVEL 2 · LEVEL 3', solid: false });
   builtList.push({ kind: 'grate', r: 0, f: cross, rot: 0, w: 1.6, d: 1.6, h: 0.03, solid: false });
+  // (the works of the place run down its walls: clusters of pipes, wherever there is neither a way through nor something standing)
+  let side = 1;
+  for (let f = H.front - 2.2; f > H.back + 2; f -= 3.1) {
+    const r = side * (B.passage - T / 2 - 0.15);
+    const blocked = rooms.some((q) => q.doors.some(([dr, df]) => Math.abs(dr - side * B.passage) < 0.1 && Math.abs(df - f) < 2.1)) || Math.abs(f - cross) < B.across + 1.3 || stood.some((s) => Math.hypot(s.r - r, s.f - f) < 1.5);
+    if (blocked) continue;
+    stood.push({ id: 'bunker_pipes', r, f, rot: side > 0 ? -Math.PI / 2 : Math.PI / 2 });
+    side = -side;
+  }
 
   return { rooms, walls, stood, made: builtList, spots, lamps, sealed: [0, H.back], cross };
+}
+
+// ------------------------------------------------------------------ what is searched in it
+
+/** which things of the bunker are opened and looked into, and as what kind of crate (see CRATE_SPECS) */
+const SEARCHED: Record<string, string> = { locker: 'locker', rack: 'gun_rack', painted_wooden_cabinet: 'bunker_cabinet', metal_office_desk: 'bunker_desk', bunker_terminal: 'bunker_desk' };
+
+/**
+ * The lockers, racks, cabinets and desks of the bunker, each a thing to be searched: where it
+ * stands in the world. (Its crates and cases are crates like any on the map, and are not said
+ * here.) The same on the server and in every game: it is all in the plan.
+ */
+export function bunkerCrates(p: Place): { kind: string; x: number; y: number; z: number; rot: number }[] {
+  const plan = bunkerPlan(), out: { kind: string; x: number; y: number; z: number; rot: number }[] = [];
+  const add = (kind: string | undefined, r: number, f: number, rot: number) => {
+    if (!kind) return;
+    const [x, y, z] = bunkerAt(p, r, f, levelY());
+    out.push({ kind, x, y, z, rot: p.rot + rot });
+  };
+  for (const m of plan.made) add(SEARCHED[m.kind], m.r, m.f, m.rot);
+  for (const s of plan.stood) add(SEARCHED[s.id], s.r, s.f, s.rot);
+  return out;
 }
 
 // ------------------------------------------------------------------ finding the way about it

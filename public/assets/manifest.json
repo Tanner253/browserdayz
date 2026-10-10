@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-10T01:20:47.183Z",
+ "generated": "2026-10-10T01:39:28.482Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr"
@@ -2223,6 +2223,206 @@
      -0.06406
     ]
    }
+  },
+  "bunker_terminal": {
+   "url": "assets/models/bunker_terminal.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 1712408,
+   "srcTris": 8436,
+   "tris": 332,
+   "min": [
+    -0.75,
+    0,
+    -0.6292
+   ],
+   "max": [
+    0.75,
+    1.1989,
+    0.6292
+   ],
+   "lods": []
+  },
+  "bunker_machine": {
+   "url": "assets/models/bunker_machine.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 1797556,
+   "srcTris": 8436,
+   "tris": 1590,
+   "min": [
+    -1.8,
+    0,
+    -0.8069
+   ],
+   "max": [
+    1.8,
+    2.2181,
+    0.8069
+   ],
+   "lods": []
+  },
+  "bunker_grate": {
+   "url": "assets/models/bunker_grate.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 180624,
+   "srcTris": 8436,
+   "tris": 828,
+   "min": [
+    -0.515,
+    0,
+    -0.515
+   ],
+   "max": [
+    0.515,
+    0.0566,
+    0.515
+   ],
+   "lods": []
+  },
+  "bunker_light": {
+   "url": "assets/models/bunker_light.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 271964,
+   "srcTris": 8436,
+   "tris": 352,
+   "min": [
+    -0.311,
+    0,
+    -0.475
+   ],
+   "max": [
+    0.311,
+    0.237,
+    0.475
+   ],
+   "lods": []
+  },
+  "bunker_rail": {
+   "url": "assets/models/bunker_rail.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 540136,
+   "srcTris": 8436,
+   "tris": 284,
+   "min": [
+    -0.925,
+    0,
+    -0.0278
+   ],
+   "max": [
+    0.925,
+    0.945,
+    0.0278
+   ],
+   "lods": []
+  },
+  "bunker_ladder": {
+   "url": "assets/models/bunker_ladder.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 555332,
+   "srcTris": 8436,
+   "tris": 1016,
+   "min": [
+    -0.319,
+    0,
+    -0.0232
+   ],
+   "max": [
+    0.319,
+    3,
+    0.0232
+   ],
+   "lods": []
+  },
+  "bunker_pipe": {
+   "url": "assets/models/bunker_pipe.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 287920,
+   "srcTris": 8436,
+   "tris": 82,
+   "min": [
+    -0.4548,
+    0,
+    -0.4548
+   ],
+   "max": [
+    0.4548,
+    3,
+    0.4548
+   ],
+   "lods": []
+  },
+  "bunker_pipes": {
+   "url": "assets/models/bunker_pipes.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 291900,
+   "srcTris": 8436,
+   "tris": 564,
+   "min": [
+    -0.8485,
+    0,
+    -0.1347
+   ],
+   "max": [
+    0.8485,
+    1.9,
+    0.1347
+   ],
+   "lods": []
+  },
+  "bunker_chain": {
+   "url": "assets/models/bunker_chain.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 558852,
+   "srcTris": 8436,
+   "tris": 1152,
+   "min": [
+    -1.025,
+    0,
+    -0.0965
+   ],
+   "max": [
+    1.025,
+    0.1927,
+    0.0965
+   ],
+   "lods": []
+  },
+  "bunker_cable": {
+   "url": "assets/models/bunker_cable.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 289732,
+   "srcTris": 8436,
+   "tris": 296,
+   "min": [
+    -3,
+    0,
+    -0.5351
+   ],
+   "max": [
+    3,
+    0.0687,
+    0.5351
+   ],
+   "lods": []
   }
  }
 }

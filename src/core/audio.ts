@@ -100,7 +100,7 @@ export interface EngineVoice {
  * One take is played, any of them. Until they have arrived, and wherever one is missing, the
  * made-up sound is what is heard.
  */
-const RECORDED: Record<string, number> = { shot_rifle: 1, shot_pistol: 3, shot_quiet: 1, rifle_mag_out: 1, rifle_mag_in: 1, pistol_mag_out: 1, pistol_mag_in: 1, rack: 1, shot_shotgun: 2, shot_magnum: 2, shell_in: 1 };
+const RECORDED: Record<string, number> = { shot_rifle: 1, shot_pistol: 3, shot_quiet: 1, rifle_mag_out: 1, rifle_mag_in: 1, pistol_mag_out: 1, pistol_mag_in: 1, rack: 1, shot_shotgun: 2, shot_magnum: 2, shell_in: 1, z_groan: 4, z_growl: 4, z_alert: 4, z_attack: 4, z_hurt: 4, z_die: 4 };
 const bank = new Map<string, AudioBuffer[]>();
 let fetched: Promise<void> | null = null;
 /** Fetches the recordings, once. (They are kept apart from any one engine: the trailer renders its soundtrack on an engine of its own.) */
@@ -1241,6 +1241,8 @@ export class AudioEngine {
     const pitch = 82 + ((seed * 37) % 34);
     const t = ctx.currentTime + 0.01 + distance / 343;
     const out = this.out(pos, kind === 'alert' ? 9 : 4, 1.15, distance);
+    // a recording of one, where there is one (scripts/sounds.mjs says which is which): each of them a little higher or lower than the next
+    if (this.rec(`z_${kind}`, out, t, { groan: 0.75, growl: 1.0, alert: 1.6, attack: 1.3, hurt: 1.1, die: 1.2 }[kind], 0.88 + ((seed * 37) % 24) / 100)) return;
     const bus = ctx.createGain();
     bus.gain.setValueAtTime(0.0001, t);
     bus.gain.exponentialRampToValueAtTime(loud, t + Math.min(0.08, dur * 0.2));
@@ -1607,9 +1609,138 @@ export class AudioEngine {
     for (let i = 0; i < 3; i++) this.click(600 + Math.random() * 900, 0.12 + k * 0.2, 0.03, 0.05 + i * 0.07 + Math.random() * 0.04, pos);
   }
 
-  updateAmbience(dt: number, listener: V3, indoors: boolean, forest = false) {
+  /** the hum of the bunker (made when somebody first goes down), whether it is sounding, and how long until the place next makes a noise of its own */
+  private bunkerAir: { bed: GainNode; on: boolean; nextT: number; wind: number } | null = null;
+
+  /**
+   * Down the bunker there are no birds: a low hum under everything, and now and then the place
+   * itself, off in the dark: steel taking the strain, something knocked over far away, the
+   * weight of the hill, water. @param under how far underground the ear is, 0..1
+   */
+  private bunkerAmbience(dt: number, listener: V3, under: number) {
+    const ctx = this.ctx, t = ctx.currentTime, on = under > 0.5;
+    if (!this.bunkerAir) {
+      if (!on) return;
+      const bed = ctx.createGain();
+      bed.gain.value = 0;
+      // two low notes a little apart, which beat against each other slowly, one an octave over them, and the air in the ducts
+      for (const [f, g] of [[46, 0.5], [49.4, 0.45], [92.7, 0.1]]) {
+        const o = ctx.createOscillator();
+        o.frequency.value = f;
+        const lvl = ctx.createGain();
+        lvl.gain.value = g;
+        o.connect(lvl).connect(bed);
+        o.start();
+      }
+      const air = ctx.createBufferSource();
+      air.buffer = this.noiseBuf;
+      air.loop = true;
+      const lvl = ctx.createGain();
+      lvl.gain.value = 0.5;
+      air.connect(this.filter('lowpass', 150, 0.6)).connect(lvl).connect(bed);
+      air.start();
+      bed.connect(this.sfx);
+      this.bunkerAir = { bed, on: false, nextT: 5, wind: this.ambience.wind?.gain.value ?? 0 };
+    }
+    const B = this.bunkerAir;
+    if (on !== B.on) {
+      B.on = on;
+      B.bed.gain.setTargetAtTime(on ? 0.1 : 0, t, 1.4);
+      // (the wind, the leaves and whatever sings in the grass are left at the top of the stair)
+      if (on) B.wind = this.ambience.wind?.gain.value ?? B.wind;
+      this.ambience.wind?.gain.setTargetAtTime(on ? 0 : B.wind, t, 1.2);
+      if (on) {
+        this.ambience.leaves?.gain.setTargetAtTime(0, t, 1.2);
+        this.ambience.insects?.gain.setTargetAtTime(0, t, 1.2);
+      } else this.ambience.forest = undefined;
+    }
+    if (!on || (B.nextT -= dt) > 0) return;
+    B.nextT = 6 + Math.random() * 13;
+    const a = Math.random() * Math.PI * 2, r = 7 + Math.random() * 16;
+    const pos = { x: listener.x + Math.cos(a) * r, y: listener.y + Math.random() * 1.5, z: listener.z + Math.sin(a) * r };
+    const bus = ctx.createGain();
+    bus.connect(this.out(pos, 6, 0.9, r));
+    const tail = ctx.createGain();
+    tail.gain.value = 0.7;
+    bus.connect(tail).connect(this.reverbSend);
+    const t0 = t + 0.05, k = Math.random();
+    if (k < 0.42) {
+      // steel taking the strain: a low rasp that climbs and falls back, rung through what it is fixed to
+      const dur = 1.3 + Math.random() * 1.6, f0 = 48 + Math.random() * 30;
+      const o = ctx.createOscillator();
+      o.type = 'sawtooth';
+      o.frequency.setValueAtTime(f0, t0);
+      for (let s = 1; s <= 6; s++) o.frequency.linearRampToValueAtTime(f0 * (1 + 0.5 * Math.sin((s / 6) * Math.PI) + (Math.random() - 0.5) * 0.25), t0 + (dur * s) / 6);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(0.5, t0 + dur * 0.25);
+      g.gain.setValueAtTime(0.5, t0 + dur * 0.6);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      for (const [f, q, lv] of [[380 + Math.random() * 120, 22, 1], [1050 + Math.random() * 300, 28, 0.55], [2300 + Math.random() * 500, 30, 0.25]]) {
+        const lvl = ctx.createGain();
+        lvl.gain.value = lv;
+        o.connect(this.filter('bandpass', f, q)).connect(lvl).connect(g);
+      }
+      g.connect(bus);
+      o.start(t0);
+      o.stop(t0 + dur + 0.1);
+    } else if (k < 0.7) {
+      // something knocked or dropped, a long way off: a blow, and the note of whatever was struck (once, or twice)
+      const n = Math.random() < 0.4 ? 2 : 1;
+      for (let i = 0; i < n; i++) {
+        const at = t0 + i * (0.22 + Math.random() * 0.2), ring = 0.5 + Math.random() * 0.9;
+        const hit = ctx.createGain();
+        this.env(hit, at, 0.5, 0.004, 0.09);
+        this.noise(at, 0.1).connect(this.filter('bandpass', 600 + Math.random() * 900, 3)).connect(hit).connect(bus);
+        for (const f of [310 + Math.random() * 260, 870 + Math.random() * 700]) {
+          const o = ctx.createOscillator();
+          o.frequency.value = f;
+          const g = ctx.createGain();
+          this.env(g, at, 0.22, 0.004, ring);
+          o.connect(g).connect(bus);
+          o.start(at);
+          o.stop(at + ring + 0.1);
+        }
+      }
+    } else if (k < 0.88) {
+      // the weight of the hill on the roof: a note at the bottom of hearing that sinks
+      const dur = 2.6 + Math.random() * 2, f0 = 58 + Math.random() * 14;
+      for (const [m, lv] of [[1, 0.9], [2.02, 0.25]]) {
+        const o = ctx.createOscillator();
+        o.frequency.setValueAtTime(f0 * m, t0);
+        o.frequency.exponentialRampToValueAtTime(f0 * m * 0.72, t0 + dur);
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t0);
+        g.gain.exponentialRampToValueAtTime(lv, t0 + dur * 0.3);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+        o.connect(g).connect(bus);
+        o.start(t0);
+        o.stop(t0 + dur + 0.1);
+      }
+    } else {
+      // water, somewhere: a few drops
+      const n = 2 + Math.floor(Math.random() * 4);
+      let at = t0;
+      for (let i = 0; i < n; i++) {
+        const o = ctx.createOscillator();
+        const f = 900 + Math.random() * 900;
+        o.frequency.setValueAtTime(f * 1.6, at);
+        o.frequency.exponentialRampToValueAtTime(f, at + 0.04);
+        const g = ctx.createGain();
+        this.env(g, at, 0.12, 0.003, 0.09);
+        o.connect(g).connect(bus);
+        o.start(at);
+        o.stop(at + 0.2);
+        at += 0.35 + Math.random() * 0.8;
+      }
+    }
+  }
+
+  updateAmbience(dt: number, listener: V3, indoors: boolean, forest = false, under = 0) {
     if (!this.ready) return;
     this.setEnvironment(indoors);
+    this.bunkerAmbience(dt, listener, under);
+    if (under > 0.5) return;
     // only schedule a fade when the surroundings change, not every frame
     if (forest !== this.ambience.forest) {
       this.ambience.forest = forest;

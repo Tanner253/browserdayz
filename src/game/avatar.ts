@@ -251,6 +251,7 @@ const _b = new THREE.Vector3();
 const _q1 = new THREE.Quaternion();
 const _q2 = new THREE.Quaternion();
 const _q3 = new THREE.Quaternion();
+const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3();
 const _m1 = new THREE.Matrix4();
 const _m2 = new THREE.Matrix4();
 const _aimQ = new THREE.Quaternion();
@@ -349,6 +350,9 @@ export class Avatar {
   private leanT = 0;
   /** the joints a shot is judged by (see frame) */
   private joints: { head?: THREE.Bone; neck?: THREE.Bone; pelvis?: THREE.Bone } = {};
+  /** the feet of a body that is to be kept standing on them (the infected): its ankles as it was made, and how far it is let down just now */
+  private soles: { foot: THREE.Bone; ball: THREE.Bone; high: number; lie: THREE.Vector3; /** how its toes lie on the foot, as it was made */ toe: THREE.Quaternion }[] = [];
+  private sunk = 0;
   private backing = false;
   private layerMask = 1;
   /** weapon in the hands: pivot (at the shoulders, pitches with the aim) > the model */
@@ -497,6 +501,19 @@ export class Avatar {
     this.chest = bone('spine_02');
     this.neck = ['neck_01', 'Head'].map(bone).filter((b): b is THREE.Bone => !!b);
     this.joints = { head: bone('Head') ?? undefined, neck: bone('neck_01') ?? undefined, pelvis: bone('pelvis') ?? undefined };
+    // The infected's feet, as each body was made standing: how high its ankle is off the ground
+    // and which way the foot lies from it (see `plant`). Taken now, before anything has moved.
+    if (file !== 'survivor') {
+      model.updateMatrixWorld(true);
+      const inv = new THREE.Matrix4().copy(this.root.matrixWorld).invert();
+      this.soles = [];
+      for (const s of ['l', 'r']) {
+        const foot = bone(`foot_${s}`), ball = bone(`ball_${s}`);
+        if (!foot || !ball) continue;
+        const a = foot.getWorldPosition(new THREE.Vector3()).applyMatrix4(inv), b = ball.getWorldPosition(new THREE.Vector3()).applyMatrix4(inv);
+        this.soles.push({ foot, ball, high: a.y, lie: b.sub(a), toe: ball.quaternion.clone() });
+      }
+    }
     this.collarL = bone('clavicle_l');
     // a shouldered weapon rides on the upper back: placed where it should be on the standing
     // body, then handed to the spine so it follows every lean and step
@@ -917,6 +934,46 @@ export class Avatar {
   private lean(bone: THREE.Object3D, axis: THREE.Vector3, angle: number) {
     bone.getWorldQuaternion(_q2).premultiply(_q1.setFromAxisAngle(axis, angle));
     bone.quaternion.copy(bone.parent!.getWorldQuaternion(_q3).invert().multiply(_q2));
+  }
+
+  /**
+   * The infected stand on their feet. Their movements were drawn for other legs than each of
+   * these bodies has, and the lean laid over them tips the hips: left alone, the feet hang a
+   * hand's breadth off the ground with their toes down. So the whole body is let down (or
+   * lifted) until the nearer ankle is as high as it was made to be; and a foot that is down is
+   * laid the way it was made to lie, heel and toe on the ground. A foot in the air mid-stride
+   * is left to the movement.
+   */
+  private plant(dt: number) {
+    const pelvis = this.joints.pelvis;
+    if (!pelvis || this.soles.length < 2) return;
+    this.root.updateMatrixWorld(true);
+    const ground = this.root.position.y;
+    let gap = Infinity;
+    for (const s of this.soles) gap = Math.min(gap, s.foot.getWorldPosition(_v1).y - ground - s.high);
+    // (it comes to its feet over a few frames, not at once: the nearer foot changes as it walks)
+    this.sunk += (THREE.MathUtils.clamp(gap, -0.15, 0.3) - this.sunk) * (1 - Math.exp(-14 * dt));
+    const up = pelvis.parent!.getWorldScale(_v2).y || 1;
+    _v1.set(0, -this.sunk / up, 0).applyQuaternion(pelvis.parent!.getWorldQuaternion(_q3).invert());
+    pelvis.position.add(_v1);
+    pelvis.updateWorldMatrix(false, true);
+    for (const s of this.soles) {
+      const at = s.foot.getWorldPosition(_v1), off = at.y - ground - s.high;
+      const down = 1 - THREE.MathUtils.smoothstep(off, 0.03, 0.14);
+      if (down < 0.02) continue;
+      // (and its toes lie on it as they were made: bent up by a movement drawn for a boot, a bare foot is a claw)
+      s.ball.quaternion.slerp(s.toe, down);
+      // which way the foot lies now, and which way it was made to lie when it points that way over the ground
+      const now = s.ball.getWorldPosition(_v2).sub(at);
+      const flat = Math.hypot(s.lie.x, s.lie.z), over = Math.hypot(now.x, now.z);
+      if (over < 1e-4 || flat < 1e-4) continue;
+      const want = _v3.set((now.x / over) * flat, s.lie.y, (now.z / over) * flat).normalize();
+      now.normalize();
+      const axis = _v1.crossVectors(now, want), turn = Math.asin(Math.min(1, axis.length()));
+      if (turn < 0.01) continue;
+      this.lean(s.foot, axis.normalize(), turn * down);
+      s.foot.updateWorldMatrix(false, true);
+    }
   }
 
   /**
@@ -1548,7 +1605,10 @@ export class Avatar {
       }
     }
 
-    if (this.sick && !dead && this.downT <= 0) this.sicken(dt);
+    if (this.sick && !dead && this.downT <= 0) {
+      this.sicken(dt);
+      this.plant(dt);
+    }
     // on a broken leg: once a stride the hips drop over it and the back goes after them
     this.limpT += ((this.limping && !dead ? 1 : 0) - this.limpT) * ease(5);
     if (this.limpT > 0.02 && !this.sick && this.downT <= 0) {

@@ -90,8 +90,8 @@ function boltAction(id: string): boolean {
  *           here is added to that).
  */
 const FIT: Record<string, { dot?: { at: [number, number, number]; size: number }; light?: { at: [number, number, number]; size: number } }> = {
-  m9: { dot: { at: [0.045, 0.0975, 0.0035], size: 0.5 }, light: { at: [0.165, 0, 0.0035], size: 0.62 } },
-  p38: { dot: { at: [0.045, 0.0975, 0.0035], size: 0.5 }, light: { at: [0.155, 0, 0.0035], size: 0.62 } },
+  m9: { dot: { at: [0.045, 0.0835, 0.0035], size: 0.5 }, light: { at: [0.165, 0, 0.0035], size: 0.62 } },
+  p38: { dot: { at: [0.045, 0.0835, 0.0035], size: 0.5 }, light: { at: [0.155, 0, 0.0035], size: 0.62 } },
   mosin: { light: { at: [0.36, 0, -0.0145], size: 0.85 } },
   benelli: { light: { at: [0.234, 0, -0.017], size: 0.95 } },
 };
@@ -445,7 +445,7 @@ const NUDGE = {
  * and louder. Nobody has listened to these: they are set by what the guns are.
  */
 const VOICE: Record<string, { rate: number; gain: number; rec?: string }> = {
-  deagle: { rate: 0.92, gain: 1.25, rec: 'shot_magnum' },
+  deagle: { rate: 0.86, gain: 1.5, rec: 'shot_magnum' },
   benelli: { rate: 1, gain: 1.3, rec: 'shot_shotgun' },
 };
 
