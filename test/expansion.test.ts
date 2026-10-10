@@ -72,7 +72,7 @@ const touched = (x: number, z: number) => {
   if (Math.hypot(x - E.x, z - E.z) < 160) return true;
   // (and the meadow the trading post was built in, later: 78 m round it)
   if (Math.hypot(x - TRADE_AT.x, z - TRADE_AT.z) < 78) return true;
-  // (and the clearing the army's camp was pitched in, 2026-10-11: 78 m round it, as round the trading post)
+  // (and the clearing the army's camp was pitched in, 2026-10-10: 78 m round it, as round the trading post)
   if (Math.hypot(x - ARMY_CAMP.x, z - ARMY_CAMP.z) < 78) return true;
   // (and where the long hut stands behind the depot's barracks: 24 m round it)
   if (Math.hypot(x - HUT_AT.x, z - HUT_AT.z) < 24) return true;

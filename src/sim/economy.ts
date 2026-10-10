@@ -62,7 +62,7 @@ const ARMS: [string, number][] = [['p38', 2.4], ['m9', 1.8], ['hatchet', 1.6], [
 export const ARMS_RESTOCK = 180;
 
 // How many of each, and where: `npx tsx scripts/loot-audit.ts` says what the rules come to on the map as it is,
-// and test/loot.test.ts holds them to what was asked (2026-10-11):
+// and test/loot.test.ts holds them to what was asked (2026-10-10):
 //   - what you hit with is found on the outskirts and nowhere else; lights and tools mostly there too
 //   - pistols from the village on: the police station, the army's places, and now and then a house
 //   - the sniper rifle is rare in Kamenka and common under the gas (and in a helicopter's cargo and a supply drop)
@@ -86,7 +86,7 @@ export const TYPES: Record<string, TypeRule> = {
   box_762: { at: [0, 3, 7, 8, 4], lifetime: 3600, restock: 180, usage: ARMY, keep: SOON },
   box_9mm: { at: [0, 14, 9, 5, 4], lifetime: 3600, restock: 180, usage: ['Police', 'Military', 'Town'], favour: ARMOURY, keep: SOON },
   // The Desert Eagle and what it fires, the shotgun, its shells and the can for its muzzle: the bunker's, and
-  // nobody else's. (The Desert Eagle was the gas's own until 2026-10-11.)
+  // nobody else's. (The Desert Eagle was the gas's own until 2026-10-10.)
   deagle: { at: [0, 0, 0, 0, 4], lifetime: 7200, restock: 600, usage: [], loaded: [2, 7] },
   ammo_50: { at: [0, 0, 0, 0, 6], lifetime: 3600, restock: 300, usage: [], qty: [0.4, 0.9] },
   box_50: { at: [0, 0, 0, 0, 3], lifetime: 3600, restock: 420, usage: [] },

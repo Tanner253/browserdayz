@@ -8,7 +8,7 @@ import type { Container } from './inventory';
 
 type Table = [id: string, weight: number][];
 
-// (By the steps of the map, 2026-10-11. One of the army's cases is of the second step wherever it stands: pistols
+// (By the steps of the map, 2026-10-10. One of the army's cases is of the second step wherever it stands: pistols
 // and what they fire, the army's kit; now and then something of the third, an armoured vest or a helmet; and a
 // gas mask, if you are lucky. No rifle, no scope, no plates: those are under the gas. A wooden crate is of the
 // first: food, tools, something to hit with, and no gun.)

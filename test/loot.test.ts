@@ -1,4 +1,4 @@
-// What lies where (src/sim/economy.ts, src/sim/tiers.ts, src/sim/crates.ts): the rules of 2026-10-11, held to on
+// What lies where (src/sim/economy.ts, src/sim/tiers.ts, src/sim/crates.ts): the rules of 2026-10-10, held to on
 // the map as it is, over several stockings of it. Every place for a thing is on one of five steps, and every sort
 // of thing is kept on the steps it belongs to.   npx tsx test/loot.test.ts
 //

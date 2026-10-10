@@ -237,7 +237,7 @@ const D: ItemDef[] = [
     desc: 'Ballistic helmet with a mount on the brow and pouches over the ears. Takes three tenths off anything that hits your head: a pistol round there is no longer the end of you.', wear: { head: 0.7 },
   },
   {
-    // (2026-10-11: the fifth step's helmet. A sniper's round to the head does 304 at the muzzle; under this it does 97.)
+    // (2026-10-10: the fifth step's helmet. A sniper's round to the head does 304 at the muzzle; under this it does 97.)
     id: 'helmet_k63', name: 'K6-3 Helmet', model: 'helmet_k63', w: 3, h: 3, weight: 3.6, category: 'clothing', slot: 'head',
     desc: 'A titanium assault helmet with a steel visor: the heaviest there is, and kept in the bunker and nowhere else. Takes two thirds off anything that hits your head. A sniper round there leaves you standing, barely.', wear: { head: 0.32 },
   },
@@ -294,9 +294,9 @@ const D: ItemDef[] = [
   {
     // Three packs, small to large. (Still `sack_pack`: the smallest. It was the military backpack's model made
     // small, and was taken for the big one, which is not found below the fourth step of the map: it is the
-    // camping pack's now, made small and faded.)
-    id: 'sack_pack', name: 'Day Pack', model: 'camping_backpack', scale: 0.72, tint: 0x8a927c, w: 3, h: 3, weight: 0.8, category: 'clothing', slot: 'back',
-    desc: 'A small grey-green day pack that sits close to the back. 16 slots.', wear: { cargo: [4, 4] },
+    // camping pack's now, made small.)
+    id: 'sack_pack', name: 'Day Pack', model: 'camping_backpack', scale: 0.72, w: 3, h: 3, weight: 0.8, category: 'clothing', slot: 'back',
+    desc: 'A small black day pack that sits close to the back. 16 slots.', wear: { cargo: [4, 4] },
   },
   {
     id: 'camping_pack', name: 'Camping Backpack', model: 'camping_backpack', w: 4, h: 3, weight: 1.5, category: 'clothing', slot: 'back',

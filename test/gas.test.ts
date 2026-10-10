@@ -201,7 +201,7 @@ ok('the gas is the richest place on the map; helmets, plates and scopes are of i
     assert.ok(g('mosin') + g('p38') + g('m9') >= 14 && g('mosin') >= 8, 'few guns under the gas');
     assert.ok(g('box_762') + g('box_9mm') + g('ammo_762') + g('ammo_9mm') + g('box_50') + g('ammo_50') >= 24, 'little ammunition under the gas');
     assert.ok(g('firstaid') + g('bandage') >= 6 && g('grenade') >= 4);
-    // the Desert Eagle and what it fires are of the bunker and nowhere else (they were the gas's own until 2026-10-11)
+    // the Desert Eagle and what it fires are of the bunker and nowhere else (they were the gas's own until 2026-10-10)
     assert.ok(b('deagle') >= 2 && b('ammo_50') + b('box_50') >= 6, 'no Desert Eagle, or nothing for it, in the bunker');
     for (const id of ['deagle', 'ammo_50', 'box_50', 'mag_deagle_ext']) assert.equal(g(id) + o(id) + t(id), 0, `${id} outside the bunker`);
     assert.equal(o('suppressor_762'), 0);

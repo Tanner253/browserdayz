@@ -174,7 +174,7 @@ export type SiteKind = 'lodge' | 'farm' | 'post' | 'yard' | 'dacha' | 'hamlet' |
  * check that nothing else on the map has moved.)
  */
 export const TRADE_AT = { x: 200, z: -40 };
-/** The army's camp (2026-10-11): four tents and a watchtower in a clearing of the wood south of the west road, between the trapper's camp and the old sawmill. */
+/** The army's camp (2026-10-10): four tents and a watchtower in a clearing of the wood south of the west road, between the trapper's camp and the old sawmill. */
 export const ARMY_CAMP = { name: 'Army Camp', x: -240, z: 5 };
 
 /** A small place away from the village: a couple of buildings in a clearing. */
@@ -1024,7 +1024,7 @@ export function generateWorld(seed = WORLD_SEED): World {
       addLater('shanty', 14, 50, Math.PI, 0, 2.5);
       addLater('hut', 46, 50, 0, 0, 2.5);
     }
-    // And the army's camp (2026-10-11), in a clearing of the wood south of the west road. After everything, as
+    // And the army's camp (2026-10-10), in a clearing of the wood south of the west road. After everything, as
     // above: none of what was there is renumbered.
     {
       const first = sites.length;
