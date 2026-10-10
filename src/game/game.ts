@@ -2915,7 +2915,7 @@ export class Game {
       }
       for (const c of this.calls) if (c.at.distanceToSquared(cam.position) < 420 * 420) this.effects.signal(c.at, c.smoke, dt);
     }
-    for (const d of this.drops.values()) if (d.at.distanceToSquared(cam.position) < 420 * 420) this.effects.signal(d.at, d.smoke, dt);
+    for (const d of this.drops.values()) if (d.at.distanceToSquared(cam.position) < 420 * 420) this.effects.signal(d.at, d.smoke, dt, !!d.wreck);
     this.effects.update(dt);
     this.loot.update(cam.position, dt);
 
