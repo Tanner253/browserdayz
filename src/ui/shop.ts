@@ -52,6 +52,7 @@ export class ShopUI {
   isOpen = false;
   private el: HTMLElement;
   private said = '';
+  private openedAt = 0;
 
   constructor(private host: ShopHost) {
     const style = document.createElement('style');
@@ -64,11 +65,19 @@ export class ShopUI {
     this.el.addEventListener('pointerdown', (e) => {
       if (e.target === this.el) this.close();
     });
+    // F and Tab put it away as they put the inventory away (not the press that opened it, held down)
+    window.addEventListener('keydown', (e) => {
+      if (!this.isOpen || e.repeat || performance.now() - this.openedAt < 250) return;
+      if (e.code !== 'KeyF' && e.code !== 'Tab') return;
+      e.preventDefault();
+      this.close();
+    });
   }
 
   open() {
     if (this.isOpen) return;
     this.isOpen = true;
+    this.openedAt = performance.now();
     this.said = 'Put it on the counter. I pay what it is worth here, not what it cost you to get.';
     this.el.classList.add('on');
     this.render();
@@ -83,7 +92,8 @@ export class ShopUI {
 
   private render() {
     const h = this.host, credit = h.credit();
-    const wares = h.wares(), stock = h.stock();
+    // (what is worth most to him first: it is what somebody came to sell)
+    const wares = h.wares().sort((a, b) => b.pays - a.pays), stock = h.stock();
     const row = (kind: string, key: string, id: string, title: string, sub: string, price: string, off = false) =>
       `<button class="shop-row" data-${kind}="${key}"${off ? ' disabled' : ''}><i style="${h.icon(id) ? `background-image:url(${h.icon(id)})` : ''}"></i><span>${title}<small>${sub}</small></span><b>${price}</b></button>`;
     const mine = wares.length
@@ -93,7 +103,7 @@ export class ShopUI {
     this.el.innerHTML = `<div class="shop-box">
       <div class="shop-top"><h2>The trader</h2><p>He buys what you bring and sells what keeps you alive. No tags, no keycards.</p><div class="shop-credit">Your credit<b>${credit}</b></div></div>
       <div class="shop-cols"><div class="shop-col"><h3>You sell · click a thing to sell it</h3>${mine}</div><div class="shop-col"><h3>He sells · click to buy</h3>${his}</div></div>
-      <div class="shop-foot"><span class="shop-say">“${this.said}”</span><button data-close>Done</button></div>
+      <div class="shop-foot"><span class="shop-say">“${this.said}”</span><span><kbd>F</kbd> or <kbd>Esc</kbd> to leave</span><button data-close>Done</button></div>
     </div>`;
     this.el.querySelectorAll<HTMLElement>('[data-sell]').forEach((b) => {
       b.onclick = () => {

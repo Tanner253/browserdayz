@@ -7,6 +7,7 @@ import { Avatar } from './avatar';
 import { lookFor } from './look';
 import type { Atmosphere } from '../world/atmosphere';
 import type { World } from '../world/worldgen';
+import { physics } from '../core/physics';
 
 /** where he stands in a shop, in the shop's own measure: behind the counter, between it and the shelves, facing the door */
 const BEHIND = { x: -0.9, z: -0.45 };
@@ -52,6 +53,8 @@ export class Traders {
         await wear(body, ['boonie_hat', 'life_vest', 'work_gloves']);
         body.update(0, s.pos, _still, s.yaw, false, false);
         scene.add(body.root);
+        // (he is solid: not walked through, and a shot at him stops at him. He is not hurt by it.)
+        physics.addStatic(physics.R.ColliderDesc.capsule(0.55, 0.26), 'cloth', { x: s.pos.x, y: s.pos.y + 0.85, z: s.pos.z });
         s.body = body;
       }),
     );

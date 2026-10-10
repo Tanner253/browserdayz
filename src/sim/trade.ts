@@ -14,9 +14,8 @@ const WORTH: Record<string, number> = {
   // guns: he takes them, and does not sell them
   p38: 12, m9: 16, mosin: 28, deagle: 40, benelli: 45,
   hatchet: 5, machete: 5, crowbar: 4, bat: 3, knife: 3,
-  // rounds by the one, and boxes of them
+  // rounds by the one (a sealed box is worth the rounds in it: see `worth`)
   ammo_9mm: 0.4, ammo_762: 0.6, ammo_50: 1.5, ammo_12: 1.2,
-  box_9mm: 8, box_762: 10, box_50: 14, box_12: 12,
   // fittings
   red_dot: 20, gun_light: 10, pu_scope: 30, rifle_wrap: 8, suppressor_9: 22, suppressor_762: 28, suppressor_12: 28,
   mag_m9_ext: 12, mag_p38_ext: 12, mag_deagle_ext: 14,
@@ -33,22 +32,31 @@ const WORTH: Record<string, number> = {
 /** what he has to sell, in the order it is shown */
 export const STOCK = ['bandage', 'firstaid', 'splint', 'beans', 'sardines', 'flask', 'box_9mm', 'box_762', 'box_12', 'box_50', 'flashlight', 'gun_light', 'red_dot', 'sack_pack', 'gasmask', 'grenade', 'stash_kit', 'radio'];
 
+/** what one of a thing is worth to him: 0 if he does not deal in it */
+export function worth(id: string): number {
+  const def = ITEMS[id];
+  if (!def) return 0;
+  // (a box of rounds: what is in it, so that nothing is gained or lost by opening it before it is sold)
+  if (def.open) return (WORTH[def.open.gives] ?? 0) * def.open.qty;
+  return WORTH[id] ?? 0;
+}
+
 /** how many times what he pays for a thing he asks for it */
 const MARKUP = 2.5;
 
 /** what he pays for a thing as it is (a stack: for all of it). 0: he will not take it. */
 export function pays(item: ItemInstance): number {
-  const each = WORTH[item.id];
-  if (!each || !ITEMS[item.id]) return 0;
+  const each = worth(item.id);
+  if (!each) return 0;
   const n = ITEMS[item.id].stack ? Math.max(1, item.qty ?? 1) : 1;
   // (a gun is paid for with what is fitted to it: nothing is lost by not stripping it first)
-  const fitted = (item.mods ?? []).reduce((sum, mod) => sum + (WORTH[mod] ?? 0), 0);
+  const fitted = (item.mods ?? []).reduce((sum, mod) => sum + worth(mod), 0);
   return Math.max(1, Math.round(each * n + fitted));
 }
 
 /** what he asks for one of a thing he sells (a thing that stacks is sold as a full stack) */
 export function asks(id: string): number {
   const def = ITEMS[id];
-  if (!def || !WORTH[id] || !STOCK.includes(id)) return 0;
-  return Math.round(WORTH[id] * (def.stack ?? 1) * MARKUP);
+  if (!def || !worth(id) || !STOCK.includes(id)) return 0;
+  return Math.round(worth(id) * (def.stack ?? 1) * MARKUP);
 }
