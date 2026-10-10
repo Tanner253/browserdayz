@@ -432,10 +432,12 @@ const SEAT = {
  * trigger guard with the whole grip hanging under its fist. Where the body's hands go on such a gun, from where
  * they go on the pack's own (the gun's own space: x toward the muzzle, y up; metres). (It was then put too far
  * the other way, 3.6 cm down: the fists were under the foot of the grip and the gun rode up and forward of them.
- * Set beside the M9 in a row and from both sides: the web of the hand under the tail of the frame, as there.)
+ * It is now what the two guns' own shapes say: the Desert Eagle's grip stands 1.3 cm further toward its muzzle
+ * than the M9's and its top is level with it. Looked at beside the M9 from each side and from three quarters on,
+ * which is how the menu shows it: square from the side a hand behind the grip looks like a hand on it.)
  */
 const SEAT_ON: Record<string, THREE.Vector3> = {
-  deagle: new THREE.Vector3(-0.002, -0.012, 0),
+  deagle: new THREE.Vector3(0.013, -0.004, 0),
 };
 const NO_SEAT = new THREE.Vector3();
 /** how far under the ears of the shotgun's front sight the top of its post is (the eye is put level with the post) */
