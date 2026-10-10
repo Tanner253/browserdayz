@@ -432,6 +432,8 @@ const SEAT_ON: Record<string, THREE.Vector3> = {
 const NO_SEAT = new THREE.Vector3();
 /** how far under the ears of the shotgun's front sight the top of its post is (the eye is put level with the post) */
 const IRON_DROP = 0.004;
+/** rifles that came with no sights of their own and are given plain ones: a post at the muzzle, a notch over the breech (see `Weapons.fitIrons`) */
+const PLAIN_SIGHTS = new Set(['mosin']);
 /** how much nearer the eye than at the hip the shotgun is held when aimed along its own sights (nearer than this and the fist on its grip is a dark shape across the bottom of the picture) */
 const IRON_NEAR = 0.02;
 
@@ -958,6 +960,55 @@ export class Weapons {
       }
       if (!ring.isEmpty()) ring.getCenter(mouth).setX(span.max.x);
     }
+    // Sights of its own for a rifle that came with none (the sniper: whoever made it meant it for a scope, and
+    // with the scope off there was nothing to aim along but a cross drawn on the screen). A post at the muzzle
+    // and a notch ahead of the breech, as the old rifle had. They are not out of a model: a blade and two small
+    // blocks of steel made here, a few millimetres each, set on the barrel where its own shape is highest.
+    let ironPost: THREE.Object3D | null = null;
+    if (PLAIN_SIGHTS.has(o.item)) {
+      const v = new THREE.Vector3();
+      const xr = THREE.MathUtils.lerp(span.min.x, span.max.x, 0.56);
+      let muzzleTop = -Infinity, rearTop = -Infinity;
+      for (const p of alone) {
+        if (p.name.replace(/_\d+$/, '') !== 'base') continue;
+        const Pn = p.geometry.getAttribute('position');
+        for (let i = 0; i < Pn.count; i++) {
+          v.fromBufferAttribute(Pn, i);
+          // (a barrel is a few rings of points a long way apart: a hand's width of it is looked along, not a finger's)
+          if (Math.abs(v.z - mouth.z) > 0.014) continue;
+          if (v.x > span.max.x - 0.05) muzzleTop = Math.max(muzzleTop, v.y);
+          if (Math.abs(v.x - xr) < 0.06) rearTop = Math.max(rearTop, v.y);
+        }
+      }
+      if (Number.isFinite(muzzleTop) && Number.isFinite(rearTop)) {
+        // (the line of them: level, and over the higher of the two places they stand)
+        const line = Math.max(rearTop + 0.009, muzzleTop + 0.011);
+        const steel = new THREE.MeshStandardMaterial({ color: 0x17181a, metalness: 0.8, roughness: 0.5 });
+        const block = (w: number, h: number, d: number, x: number, y0: number, z: number) => {
+          const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), steel);
+          mesh.position.set(x, y0 + h / 2, z);
+          mesh.castShadow = false;
+          return mesh;
+        };
+        const make = () => {
+          const g = new THREE.Group();
+          g.name = 'irons';
+          const xf = span.max.x - 0.016;
+          g.add(block(0.014, 0.004, 0.012, xf, muzzleTop - 0.001, mouth.z));
+          const blade = block(0.009, line - muzzleTop - 0.002, 0.0022, xf, muzzleTop + 0.002, mouth.z);
+          blade.name = 'post';
+          g.add(blade);
+          g.add(block(0.02, Math.max(0.003, line - 0.0045 - rearTop + 0.001), 0.017, xr, rearTop - 0.001, mouth.z));
+          for (const side of [-1, 1]) g.add(block(0.004, 0.006, 0.0052, xr, line - 0.0045, mouth.z + side * 0.0052));
+          return g;
+        };
+        world.add(make());
+        const mine = make();
+        mine.position.copy(nudge);
+        rig.hang(mine, 'base');
+        ironPost = mine.getObjectByName('post') ?? null;
+      }
+    }
     let suppressor: THREE.Object3D | undefined;
     if (o.kind === 'pistol') {
       const steel = new THREE.MeshStandardMaterial({ color: 0x1c1d1f, metalness: 0.85, roughness: 0.55 });
@@ -1118,6 +1169,11 @@ export class Weapons {
         }
       });
     }
+    if (ironPost) {
+      // (the plain sights it was given: their post is the post)
+      const bx = new THREE.Box3().setFromObject(ironPost);
+      post = new THREE.Vector3((bx.min.x + bx.max.x) / 2, bx.max.y, (bx.min.z + bx.max.z) / 2);
+    }
     // (through a holographic sight: the eye on the lit mark, a hand and a half behind the glass)
     // (a gun in the rifle's hands with a holographic sight of its own: the mark is put in its glass, which is the upper part of it)
     const glassY = THREE.MathUtils.lerp(sight.min.y, sight.max.y, 0.7);
@@ -1146,7 +1202,7 @@ export class Weapons {
       ownSights: !!post,
       lamp: lamp ?? undefined,
       // without its optic the eye goes along the top of the action (a pistol's: along its own sights)
-      adsIron: o.kind === 'rifle' ? (post ? new THREE.Vector3(-(frontOf(hung.get('base')!)?.x ?? fc.x), -(post as THREE.Vector3).y + IRON_DROP, o.hip.z + IRON_NEAR) : new THREE.Vector3(-fc.x, -frame.max.y - 0.018, o.hip.z + 0.1)) : dotAt ? irons! : undefined,
+      adsIron: o.kind === 'rifle' ? (post ? new THREE.Vector3(-(ironPost ? (post as THREE.Vector3).x : frontOf(hung.get('base')!)?.x ?? fc.x), -(post as THREE.Vector3).y + IRON_DROP, o.hip.z + IRON_NEAR) : new THREE.Vector3(-fc.x, -frame.max.y - 0.018, o.hip.z + 0.1)) : dotAt ? irons! : undefined,
       // (a rifle's: the mouth of the barrel itself. Three fifths of the way up its body is under the barrel.)
       muzzle: (o.kind === 'rifle' ? (hung.has('base') ? frontOf(hung.get('base')!) : rig.front('base')) : null) ?? new THREE.Vector3(fc.x, o.kind === 'rifle' ? THREE.MathUtils.lerp(frame.min.y, frame.max.y, 0.62) : c.y, frame.min.z),
       // For whoever is seen holding it. The hands start where the pack's own hands are, and are

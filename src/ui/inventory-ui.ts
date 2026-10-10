@@ -682,7 +682,8 @@ export class InventoryUI {
     const def = ITEMS[item.id];
     if (onto === item) return null;
     if (def.stack && onto.id === item.id && onto.qty < def.stack) return 'stack';
-    if (def.attach && d.src.kind !== 'ground' && this.actions.attachTargets(item).includes(onto)) return 'attach';
+    // (a part is fitted from wherever it lies: off the ground as well as out of a pocket)
+    if (def.attach && this.actions.attachTargets(item).includes(onto)) return 'attach';
     return null;
   }
 
@@ -696,9 +697,9 @@ export class InventoryUI {
     const d = ITEMS[it.id];
     const mine = src.kind === 'slot' || (src.kind === 'container' && this.inv.containers.includes(src.c));
     if (d.slot) return src.kind === 'slot' ? null : { label: d.category === 'clothing' ? 'Wear' : 'Equip', run: () => this.equip(src) };
-    if (d.attach && mine) {
+    if (d.attach && (mine || src.kind === 'ground')) {
       const w = this.actions.attachTargets(it)[0];
-      if (w) return { label: `Fit to ${ITEMS[w.id].name}`, run: () => this.actions.attach(it, w) };
+      if (w) return { label: `Fit to ${ITEMS[w.id].name}`, run: () => this.fit(src, w) };
     }
     if (mine) {
       if (d.use) return { label: d.use.verb, run: () => this.actions.use(it) };
@@ -839,7 +840,7 @@ export class InventoryUI {
       }
       // a part, let go on a weapon it fits
       if (onto && how === 'attach') {
-        this.actions.attach(item, onto.item);
+        this.fit(d.src, onto.item);
         return this.render();
       }
       const at = this.landing(c, item, cx, cy, d.rot);
@@ -852,7 +853,7 @@ export class InventoryUI {
       const occupant = this.inv.slots[t.slot];
       // an attachment dropped onto the weapon in a slot
       if (occupant && this.joins(d, occupant) === 'attach') {
-        this.actions.attach(item, occupant);
+        this.fit(d.src, occupant);
         return this.render();
       }
       // not what that slot takes: do what letting go anywhere on the survivor would
@@ -884,6 +885,23 @@ export class InventoryUI {
   }
 
   /** ground items must be taken out of the world before being placed */
+  /**
+   * A part put on a weapon, from wherever it was. Off the ground it is picked up as it is fitted, and never has
+   * to find room in a pocket first. (Should the weapon not take it after all, the hands being busy with it, it
+   * goes into the pockets, or back on the ground.)
+   */
+  private fit(src: Source, weapon: ItemInstance) {
+    const item = src.item;
+    if (src.kind !== 'ground') return this.actions.attach(item, weapon);
+    if (!this.materialize(src)) return;
+    this.removeFrom(src);
+    this.actions.attach(item, weapon);
+    if (!(weapon.mods ?? []).includes(item.id)) {
+      const left = this.inv.add(item);
+      if (left) this.actions.drop(left);
+    }
+  }
+
   private materialize(src: Source): boolean {
     if (src.kind !== 'ground') return true;
     const it = this.actions.take(src.w);
