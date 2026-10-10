@@ -579,7 +579,11 @@ function boxGeo(x0: number, x1: number, y0: number, y1: number, z0: number, z1: 
   return g;
 }
 
-function prismGeo(halfBase: number, rise: number, thick: number, tile: number, frame: THREE.Matrix4) {
+/**
+ * @param paint where the wall's pattern is at the foot of it: `[along, at, up]`, the pattern running `along` (1 or -1)
+ * times z from `at`, and starting `up` high. The gable carries on the courses of the wall it stands on.
+ */
+function prismGeo(halfBase: number, rise: number, thick: number, tile: number, frame: THREE.Matrix4, paint: [number, number, number] = [1, 0, 0]) {
   // triangle in the z/y plane, extruded along x
   const pts: [number, number][] = [[-halfBase, 0], [halfBase, 0], [0, rise]];
   const pos: number[] = [];
@@ -587,15 +591,17 @@ function prismGeo(halfBase: number, rise: number, thick: number, tile: number, f
   const x0 = -thick / 2, x1 = thick / 2;
   const tri = (a: number[], b: number[], c: number[]) => {
     pos.push(...a, ...b, ...c);
-    for (const p of [a, b, c]) uvs.push(p[2] / tile, p[1] / tile);
+    for (const p of [a, b, c]) uvs.push((paint[0] * p[2] + paint[1]) / tile, (p[1] + paint[2]) / tile);
   };
   const P = (x: number, i: number) => [x, pts[i][1], pts[i][0]];
-  tri(P(x1, 0), P(x1, 1), P(x1, 2));
-  tri(P(x0, 0), P(x0, 2), P(x0, 1));
+  // (each wound so that it faces out of the shape. They were wound the other way: the face seen from outside was the
+  // far one, a wall's thickness back from the wall under it, and the edge of the ceiling lay in that face and flickered.)
+  tri(P(x1, 0), P(x1, 2), P(x1, 1));
+  tri(P(x0, 0), P(x0, 1), P(x0, 2));
   // sloped sides
   for (const [i, j] of [[1, 2], [2, 0]]) {
-    tri(P(x0, i), P(x1, j), P(x1, i));
-    tri(P(x0, i), P(x0, j), P(x1, j));
+    tri(P(x0, i), P(x1, i), P(x1, j));
+    tri(P(x0, i), P(x1, j), P(x0, j));
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
@@ -781,7 +787,15 @@ export class Buildings {
 
   /** Generates layouts; pushes furniture / yard props into world.props so they get instanced. */
   plan() {
-    for (const plot of this.world.buildings) this.planBuilding(plot);
+    for (const plot of this.world.buildings) {
+      // (for scripts/overlap-audit.ts: every piece of the first building of each kind, as it is laid)
+      if (this.pieces && !this.piecesOf.has(plot.type)) {
+        this.piecesOf.add(plot.type);
+        this.noting = { type: plot.type, x: plot.x, y: plot.floorY, z: plot.z, rot: plot.rot };
+      }
+      this.planBuilding(plot);
+      this.noting = null;
+    }
     this.planVillageProps();
     this.planSiteProps();
     // what is kept under the gas is marked so: there are things that lie nowhere else (see the economy)
@@ -872,7 +886,13 @@ export class Buildings {
     }
   }
 
+  /** set to an empty list before `plan()` to have every piece of one building of each kind noted in it (see scripts/overlap-audit.ts) */
+  pieces: { type: string; x: number; y: number; z: number; rot: number; key: string; geo: THREE.BufferGeometry }[] | null = null;
+  private piecesOf = new Set<string>();
+  private noting: { type: string; x: number; y: number; z: number; rot: number } | null = null;
+
   private push(key: MatKey, g: THREE.BufferGeometry) {
+    if (this.noting) this.pieces!.push({ ...this.noting, key, geo: g });
     if (!this.geoms.has(key)) this.geoms.set(key, []);
     this.geoms.get(key)!.push(g);
   }
@@ -1073,8 +1093,8 @@ export class Buildings {
       // backs of the steps were seen, and the hollow under them
       this.push('planks', boxGeo(st.x0, st.x1, 0, h, Math.min(st.top, st.top + dz * 0.04), Math.max(st.top, st.top + dz * 0.04), this.tile('planks'), B));
       // rails: up the open side of the flight, and round the well on the floor above
-      this.rail(B, open + away * 0.03, st.foot, open + away * 0.03, st.top, rise, y1);
-      this.rail(B, open + away * 0.03, st.foot + dz * run, open + away * 0.03, st.top - dz * 0.02, y1, y1);
+      this.rail(B, open + away * 0.035, st.foot, open + away * 0.035, st.top, rise, y1);
+      this.rail(B, open + away * 0.035, st.foot + dz * run, open + away * 0.035, st.top - dz * 0.02, y1, y1);
       this.rail(B, st.x0, st.foot + dz * run, st.x1, st.foot + dz * run, y1, y1);
       raise(up.walls, y1, up.h);
     }
@@ -1136,7 +1156,7 @@ export class Buildings {
       // gable ends
       for (const sx of [1, -1]) {
         const G = B.clone().multiply(new THREE.Matrix4().makeTranslation(sx * (hw - T / 2), H, 0));
-        this.push(bp.ext, prismGeo(hd, rise, T, this.tile(bp.ext), G));
+        this.push(bp.ext, prismGeo(hd, rise, T, this.tile(bp.ext), G, [-sx, hd - T, bp.upper ? bp.upper.h : h]));
       }
       // ridge cap
       addBox('trim', -hw - oh, hw + oh, H + rise + 0.02, H + rise + 0.14, -0.12, 0.12, B, false);
@@ -1152,9 +1172,10 @@ export class Buildings {
       // the front wall carries on up to the high edge of the roof
       addBox(bp.ext, -hw, hw, h, h + rise, hd - T, hd, B, false);
       // and each side wall is closed by a wedge under the slope
+      // (as far as the front wall and no further: run on to the front, its side lay in the end of that wall and the corner flickered)
       for (const sx of [1, -1]) {
         const G = B.clone().multiply(new THREE.Matrix4().makeTranslation(sx * (hw - T / 2), h, -hd));
-        this.push(bp.ext, wedgeGeo(d, rise, T, this.tile(bp.ext), G));
+        this.push(bp.ext, wedgeGeo(d - T, (rise * (d - T)) / d, T, this.tile(bp.ext), G));
       }
     } else {
       addBox(bp.roof, -hw - 0.25, hw + 0.25, H, H + 0.22, -hd - 0.25, hd + 0.25, B);
@@ -1289,7 +1310,9 @@ export class Buildings {
     const tile = this.tile('planks');
     for (let i = 0; i < N; i++) {
       const za = st.foot + dz * i * run, zb = st.foot + dz * (i + 1) * run;
-      this.push('planks', boxGeo(st.x0, st.x1, y0 + (i + 1) * rise - 0.045, y0 + (i + 1) * rise, Math.min(za, zb) - 0.015, Math.max(za, zb) + 0.015, tile, B));
+      // (each tread overhangs the one under it; the last does not overhang the floor it comes up to, whose top is its own)
+      const last = i === N - 1;
+      this.push('planks', boxGeo(st.x0, st.x1, y0 + (i + 1) * rise - 0.045, y0 + (i + 1) * rise, Math.min(za, zb) - (last && dz < 0 ? 0 : 0.015), Math.max(za, zb) + (last && dz > 0 ? 0 : 0.015), tile, B));
       this.push('planks', boxGeo(st.x0 + 0.02, st.x1 - 0.02, y0 + i * rise, y0 + (i + 1) * rise - 0.045, Math.min(za, za + dz * 0.025), Math.max(za, za + dz * 0.025), tile, B));
     }
     const tilt = Math.atan2(up, L), HALF = 0.04, xc = (st.x0 + st.x1) / 2;
@@ -1324,7 +1347,9 @@ export class Buildings {
     const posts = Math.max(1, Math.round(flat / 0.95));
     for (let k = 0; k <= posts; k++) {
       const u = k / posts;
-      this.push(key, boxGeo(-0.025, 0.025, 0, 0.93, -0.025, 0.025, tile, B.clone().multiply(new THREE.Matrix4().makeTranslation(xa + (xb - xa) * u, ya + (yb - ya) * u, za + (zb - za) * u))));
+      // (painted by where it stands in the building: where two rails meet, the post of each is there, and the two show as one)
+      const px = xa + (xb - xa) * u, py = ya + (yb - ya) * u, pz = za + (zb - za) * u;
+      this.push(key, boxGeo(px - 0.025, px + 0.025, py, py + 0.93, pz - 0.025, pz + 0.025, tile, B));
     }
     const tall = Math.abs(yb - ya) + 1;
     this.collider(0.03, tall / 2, flat / 2, B.clone().multiply(new THREE.Matrix4().makeTranslation((xa + xb) / 2, Math.min(ya, yb) + tall / 2, (za + zb) / 2)).multiply(turn), 'wood', GLASS_GROUPS);
@@ -1360,7 +1385,8 @@ export class Buildings {
         .multiply(new THREE.Matrix4().makeTranslation(xa, ya, za))
         .multiply(new THREE.Matrix4().makeRotationY(Math.atan2(xb - xa, zb - za)))
         .multiply(new THREE.Matrix4().makeRotationX(-Math.atan2(yb - ya, flat)));
-      this.push('planks', boxGeo(-0.02, 0.02, -0.06, 0.06, 0, len, this.tile('planks'), R));
+      // (to one side of the line between the legs: the board that crosses it runs the other way and so lies to the other side, against it)
+      this.push('planks', boxGeo(0, 0.04, -0.06, 0.06, 0, len, this.tile('planks'), R));
     };
     for (const [y0, y1, front] of [[0.15, MID - 0.3, false], [MID + 0.1, TOP - 0.45, true]] as [number, number, boolean][]) {
       for (const s of [-1, 1]) {
@@ -1384,16 +1410,16 @@ export class Buildings {
     this.rail(B, RIM, -RIM, RIM, -F, MID, MID);
     // each flight between two rails
     this.rail(B, -RIM, F, -RIM, -F, 0.17, MID);
-    this.rail(B, -IN + 0.03, F, -IN + 0.03, -F, 0.17, MID);
+    this.rail(B, -IN + 0.035, F, -IN + 0.035, -F, 0.17, MID);
     this.rail(B, RIM, -F, RIM, F, MID + 0.17, TOP);
-    this.rail(B, IN - 0.03, -F, IN - 0.03, F, MID + 0.17, TOP);
+    this.rail(B, IN - 0.035, -F, IN - 0.035, F, MID + 0.17, TOP);
     // the platform: all of it but the well the second flight comes up through (which has a rail across its foot)
     box('planks', -E, b.x0, TOP - 0.14, TOP, -E, E);
     box('planks', b.x1, E, TOP - 0.14, TOP, -E, E);
     box('planks', b.x0, b.x1, TOP - 0.14, TOP, -E, b.foot);
     box('planks', b.x0, b.x1, TOP - 0.14, TOP, b.top - 0.02, E);
     this.rail(B, b.x0, b.foot, b.x1, b.foot, TOP, TOP);
-    this.rail(B, IN - 0.03, -F, IN - 0.03, F - 0.35, TOP, TOP);
+    this.rail(B, IN - 0.035, -F, IN - 0.035, F - 0.35, TOP, TOP);
     // a parapet of boards, chest high, and a roof of iron on the legs
     for (const s of [-1, 1]) {
       box('planks_ext', -E, E, TOP, TOP + 1.05, s * E - 0.04, s * E + 0.04);
@@ -1420,11 +1446,14 @@ export class Buildings {
     const tile = this.tile('trim');
     for (const s of [1, -1]) {
       const R = B.clone().multiply(new THREE.Matrix4().makeTranslation(0, ridge, 0)).multiply(new THREE.Matrix4().makeRotationX(s * ang));
-      const z0 = s > 0 ? slopeLen - 0.02 : -slopeLen - 0.04;
+      // (against the end of the roof: through the last of it, its top lay in the roof's own and the two flickered along every eave)
+      const z0 = s > 0 ? slopeLen : -slopeLen - 0.06;
       this.push('trim', boxGeo(-hw - oh, hw + oh, -0.17, 0.1, z0, z0 + 0.06, tile, R));
+      // (the two boards down a gable cross at its peak: one of them is the thinner, so that no face of one lies in a face of the other)
+      const half = s > 0 ? 0.03 : 0.022;
       for (const sx of [1, -1]) {
         const x = sx * (hw + oh);
-        this.push('trim', boxGeo(x - 0.03, x + 0.03, -0.17, 0.12, s > 0 ? 0 : -slopeLen, s > 0 ? slopeLen : 0, tile, R));
+        this.push('trim', boxGeo(x - half, x + half, -0.17, 0.12, s > 0 ? 0 : -slopeLen, s > 0 ? slopeLen : 0, tile, R));
       }
     }
   }
