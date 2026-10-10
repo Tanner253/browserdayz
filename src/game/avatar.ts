@@ -153,10 +153,12 @@ export const POSE = {
       aim: { p: [0.05, 0.1, -0.6], r: [0, 0, 0] },
       carry: { p: [-0.07, -0.07, -0.34], r: [0.656, 0.88, 0] },
     } as Stances,
+    // (A pistol at the ready and carried was a hand's width nearer the chest and off to the right: the left arm
+    // went through the chest to get to it. In front of the middle of the body, at arm's length less a bend.)
     pistol: {
-      ready: { p: [0.05, -0.1, -0.32], r: [-0.25, 0, 0] },
+      ready: { p: [0.02, -0.13, -0.4], r: [-0.25, 0, 0] },
       aim: { p: [0.035, 0.115, -0.44], r: [0, 0, 0] },
-      carry: { p: [0.08, -0.24, -0.24], r: [-0.75, 0, 0] },
+      carry: { p: [0.03, -0.26, -0.37], r: [-0.65, 0, 0] },
     } as Stances,
     /** the point the weapon hangs from, measured from midway between the shoulder joints: [up, back] */
     pivot: [0.04, -0.04] as [number, number],
@@ -265,6 +267,15 @@ const _qa = new THREE.Quaternion();
 const _qb = new THREE.Quaternion();
 const _euler = new THREE.Euler();
 const UP = new THREE.Vector3(0, 1, 0);
+/**
+ * Which way each elbow points with both hands on a gun: out from the body and down, the right a little forward.
+ * (They pointed where they do for everything else an arm reaches to, nearly straight down and the right one
+ * back: with a gun held in front of the chest that drew the upper arms in through the ribs, 7 to 9 cm of the left
+ * one inside the chest with a pistol at the ready or carried at a jog, 6 of the right with a rifle. No more of an
+ * arm is inside the body now than of one hanging at its side: measured over the stand, the walk, the jog, the
+ * sprint, the crouch and the aim, level, up and down, with each kind of gun. See T.arms in the dev harness.)
+ */
+const GUN_ELBOW = { r: new THREE.Vector3(1.2, -0.75, -0.1), l: new THREE.Vector3(-1.3, -0.85, 0.05) };
 /** how far under its ankle a body's sole is (in the foot's own measure), by the file it was made from and the side */
 const SOLE_UNDER = new Map<string, number>();
 
@@ -783,14 +794,14 @@ export class Avatar {
       const reach = (r.la + r.lb) * 0.96;
       for (let moved = 0; moved < POSE.hold.slide && target.distanceTo(A) > reach; moved += 0.02) target.addScaledVector(slide, 0.02);
     }
-    this.reach(r, target, grip.fingers.clone().applyQuaternion(wq), grip.palm.clone().applyQuaternion(wq), grip.curl, aimQ);
+    this.reach(r, target, grip.fingers.clone().applyQuaternion(wq), grip.palm.clone().applyQuaternion(wq), grip.curl, aimQ, 1, r === this.armR ? GUN_ELBOW.r : GUN_ELBOW.l);
   }
 
   /**
    * Brings a hand to a point in the world: wrist at `target`, fingers along `F`, palm facing `N`.
    * @param w how much of it: below 1 the arm is only part of the way from where the clip had it
    */
-  private reach(r: ArmRig, target: THREE.Vector3, F: THREE.Vector3, N: THREE.Vector3, curl: [number, number, number, number], aimQ: THREE.Quaternion, w = 1) {
+  private reach(r: ArmRig, target: THREE.Vector3, F: THREE.Vector3, N: THREE.Vector3, curl: [number, number, number, number], aimQ: THREE.Quaternion, w = 1, toward?: THREE.Vector3) {
     const before = w < 1 ? [r.arm.quaternion.clone(), r.fore.quaternion.clone(), r.hand.quaternion.clone()] : null;
     const A = r.arm.getWorldPosition(new THREE.Vector3());
     const toT = target.clone().sub(A);
@@ -799,7 +810,7 @@ export class Avatar {
     const dir = toT.normalize();
     const cosA = (la * la + d * d - lb * lb) / (2 * la * d);
     const sinA = Math.sqrt(Math.max(0, 1 - cosA * cosA));
-    const pole = r.pole.clone().applyQuaternion(aimQ);
+    const pole = (toward ?? r.pole).clone().applyQuaternion(aimQ);
     const perp = pole.sub(dir.clone().multiplyScalar(pole.dot(dir))).normalize();
     const elbow = A.clone().addScaledVector(dir, la * cosA).addScaledVector(perp, la * sinA);
     const handPos = A.clone().addScaledVector(dir, d);

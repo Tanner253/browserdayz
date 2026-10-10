@@ -420,7 +420,9 @@ const SEAT = {
   // through the grip from behind, its fingers came out under it, and from anywhere but square on the pistol stood
   // out in front of the fist that was meant to be round it. The hand is on the side of the grip and its fingers
   // go round the front of it. Looked at for each pistol from the right and the left, three quarters on.)
-  pistol: new THREE.Vector3(0.064, 0.03, 0),
+  // (and then a centimetre higher on it and most of one further up it again: the gun still stood a little proud
+  // of the fist and ahead of it. The web of the hand is up under the tail of the frame.)
+  pistol: new THREE.Vector3(0.071, 0.039, 0),
   /** how much further out from the middle of a pistol each wrist is than the pack's own hands say: the right, and the left (which is on the other side: less than nothing) */
   apart: [0.014, -0.008] as [number, number],
   rifle: new THREE.Vector3(0.05, 0.004, 0),
@@ -443,7 +445,7 @@ const SEAT = {
  * which is how the menu shows it: square from the side a hand behind the grip looks like a hand on it.)
  */
 const SEAT_ON: Record<string, THREE.Vector3> = {
-  deagle: new THREE.Vector3(0.013, -0.004, 0),
+  deagle: new THREE.Vector3(0.017, -0.002, 0),
   // (and the Pistol 43's grip stands 1.2 cm further toward its muzzle than the M9's)
   p38: new THREE.Vector3(0.012, 0, 0),
 };

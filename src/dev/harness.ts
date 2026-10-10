@@ -218,6 +218,71 @@ export function installHarness(g: Game) {
       sheet = { from: new THREE.Vector3(mid.x, Math.max(mid.y + 0.25, heightAt(g.s.world.heights, mid.x, mid.z + d) + 1.2), mid.z + d), to: mid };
       void cam;
     },
+    /**
+     * How far the arms of the row just laid out are inside its bodies, at worst: metres, and which part of which
+     * arm. The torso's own shape is measured off the first body (how wide, and how far front and back, every
+     * 4 cm up it, from what is drawn of it: jacket, vest and pack), and points along each forearm, each hand and
+     * the lower end of each upper arm are tried against it. An arm hanging at a side reads about 0.04 (cloth on
+     * cloth): much over that is an arm through the body.
+     */
+    arms() {
+      const bone = (a: Avatar, n: string) => {
+        let b: THREE.Bone | null = null;
+        a.root.traverse((o) => { if ((o as THREE.Bone).isBone && o.name === n) b = o as THREE.Bone; });
+        return b!;
+      };
+      const at = (b: THREE.Object3D) => b.getWorldPosition(new THREE.Vector3());
+      const frame = (a: Avatar) => {
+        const C = at(bone(a, 'spine_03')), U = at(bone(a, 'neck_01')).sub(at(bone(a, 'spine_01'))).normalize();
+        const R = at(bone(a, 'upperarm_r')).sub(at(bone(a, 'upperarm_l')));
+        R.addScaledVector(U, -R.dot(U)).normalize();
+        return { C, U, R, F: new THREE.Vector3().crossVectors(U, R) };
+      };
+      if (!row.length) return null;
+      for (const a of row) a.root.updateMatrixWorld(true);
+      const first = frame(row[0]), bands = new Map<number, { a: number; front: number; back: number; n: number }>(), v = new THREE.Vector3();
+      const TORSO = new Set(['pelvis', 'spine_01', 'spine_02', 'spine_03']);
+      row[0].root.traverse((o) => {
+        const m = o as THREE.SkinnedMesh;
+        if (!m.isSkinnedMesh || !m.visible) return;
+        const P = m.geometry.getAttribute('position'), J = m.geometry.getAttribute('skinIndex'), W = m.geometry.getAttribute('skinWeight');
+        for (let i = 0; i < P.count; i++) {
+          let w = 0;
+          for (let c = 0; c < 4; c++) if (TORSO.has(m.skeleton.bones[J.getComponent(i, c)].name)) w += W.getComponent(i, c);
+          if (w < 0.8) continue;
+          m.getVertexPosition(i, v).applyMatrix4(m.matrixWorld).sub(first.C);
+          const h = Math.round(v.dot(first.U) / 0.04), x = v.dot(first.R), f = v.dot(first.F);
+          const b = bands.get(h) ?? bands.set(h, { a: 0, front: -9, back: 9, n: 0 }).get(h)!;
+          b.a = Math.max(b.a, Math.abs(x));
+          if (Math.abs(x) < 0.08) {
+            b.front = Math.max(b.front, f);
+            b.back = Math.min(b.back, f);
+          }
+          b.n++;
+        }
+      });
+      let worst = { sink: -9, side: '', what: '', i: -1 };
+      /** the worst of each part of each arm, by its side and the first letter of its name: `lf` the left forearm, `ru` the right upper arm */
+      const parts: Record<string, number> = {};
+      row.forEach((a, i) => {
+        const f = frame(a);
+        for (const side of ['l', 'r']) {
+          const E = at(bone(a, `lowerarm_${side}`)), Wr = at(bone(a, `hand_${side}`)), S = at(bone(a, `upperarm_${side}`));
+          const pts: [THREE.Vector3, number, string][] = [];
+          for (let k = 0; k <= 6; k++) pts.push([E.clone().lerp(Wr, k / 6), 0.036, 'forearm']);
+          pts.push([Wr.clone().add(Wr.clone().sub(E).normalize().multiplyScalar(0.07)), 0.03, 'hand']);
+          for (let k = 0; k <= 2; k++) pts.push([S.clone().lerp(E, 0.65 + k * 0.175), 0.045, 'upper arm']);
+          for (const [p, r, what] of pts) {
+            const q = p.clone().sub(f.C), b = bands.get(Math.round(q.dot(f.U) / 0.04));
+            if (!b || b.n < 6) continue;
+            const sink = Math.min(b.a - Math.abs(q.dot(f.R)), b.front - q.dot(f.F), q.dot(f.F) - b.back) + r;
+            if (sink > worst.sink) worst = { sink: Math.round(sink * 1000) / 1000, side, what, i };
+            parts[side + what[0]] = Math.max(parts[side + what[0]] ?? -9, Math.round(sink * 1000) / 1000);
+          }
+        }
+      });
+      return { ...worst, parts };
+    },
     /** render the contact sheet's view over whatever the game just drew */
     sheet() {
       if (!sheet) return;
