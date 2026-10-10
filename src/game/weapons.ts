@@ -527,13 +527,12 @@ function plainMaterial(m: THREE.Material): THREE.Material {
 /** a weapon pack's material for the hands' own scene: plain, and lifted out of the dark (see liftPack) */
 const packMaterial = (m: THREE.Material) => liftPack(plainMaterial(m));
 
-/** the glass of a holographic sight: nearly nothing, a little green, and the sky in it */
-const SIGHT_GLASS = new THREE.MeshStandardMaterial({ name: 'sight-glass', color: 0x9fd8c6, roughness: 0.05, metalness: 0, transparent: true, opacity: 0.12, depthWrite: false, side: THREE.DoubleSide, envMapIntensity: 1.4 });
 const _texels = new WeakMap<THREE.Texture, ImageData | null>();
 /**
  * Whether a piece of the sight is its pane of glass. The model has no glass in it: the pane is a slab like any
  * other piece, and is told from the rest only by being painted black (it was drawn so, a black window that nothing
  * was seen through). So: a piece of a few flat faces, every corner of which is black in the sight's own picture.
+ * (It is not drawn at all: the window of the sight is open.)
  */
 function isPane(geometry: THREE.BufferGeometry, material: THREE.Material): boolean {
   const map = (material as THREE.MeshStandardMaterial).map, uv = geometry.getAttribute('uv');
@@ -991,11 +990,11 @@ export class Weapons {
         obj.name = name;
         for (const p of extractParts(await assets.model(modelId))) {
           const reticle = /crosshair/i.test((p.material as THREE.Material).name);
-          // (its pane is glass: see isPane)
-          const pane = !reticle && isPane(p.geometry, p.material);
-          const mesh = new THREE.Mesh(p.geometry, reticle ? reticleMaterial(p.material) : pane ? SIGHT_GLASS : packMaterial(p.material));
+          // (Its pane is left out: see isPane. Drawn as glass, however faint, it was a veil over what was aimed at:
+          // the window is clear, with the lit mark in it.)
+          if (!reticle && isPane(p.geometry, p.material)) continue;
+          const mesh = new THREE.Mesh(p.geometry, reticle ? reticleMaterial(p.material) : packMaterial(p.material));
           mesh.name = reticle ? 'reticle' : name;
-          if (pane) mesh.renderOrder = 19;
           mesh.castShadow = false;
           if (reticle) {
             // (twice the size it was modelled, about its own middle: at arm's length it was a speck. And drawn last, over the glass.)

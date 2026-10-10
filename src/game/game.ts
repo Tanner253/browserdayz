@@ -62,6 +62,8 @@ import { BunkerSite, spotKey } from '../world/bunker';
 import { BUNKER, bunkerCrates, bunkerDark, inBunker } from '../sim/bunker';
 
 const _gasHead = new THREE.Vector3();
+/** how much of the view is left when aiming through a holographic sight (the plain sights leave 0.8 of it): nearer by a third again */
+const HOLO_ZOOM = 0.6;
 const _lampPos = new THREE.Vector3(), _lampDir = new THREE.Vector3();
 /** the colour of a street lamp's light (sodium: warm) */
 const STREET_LAMP = new THREE.Color(1, 0.72, 0.38);
@@ -2582,7 +2584,7 @@ export class Game {
     this.updateBarrels(dt);
     const kind = this.weapons.equippedItem ? ITEMS[this.weapons.equippedItem.id].weapon?.kind : undefined;
     // a sprint opens the view a touch: speed you can feel
-    this.director.fovMul = ride ? this.garage.fov : this.glass ? this.glass : this.weapons.scoped ? 0.3 : this.weapons.aiming ? (kind === 'rifle' ? 0.78 : 0.8) : p.sprinting && p.moving > 0.6 ? 1.055 : 1;
+    this.director.fovMul = ride ? this.garage.fov : this.glass ? this.glass : this.weapons.scoped ? 0.3 : this.weapons.aiming ? (this.weapons.equippedItem?.mods?.includes('red_dot') ? HOLO_ZOOM : kind === 'rifle' ? 0.78 : 0.8) : p.sprinting && p.moving > 0.6 ? 1.055 : 1;
     this.syncHeld();
 
     this.director.update(dt);
