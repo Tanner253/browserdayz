@@ -109,7 +109,13 @@ function leanOn(world: World, it: Instance, hx: number, hz: number): [number, nu
   const at = (lx: number, lz: number) => heightAt(world.heights, it.x + lx * c + lz * s, it.z - lx * s + lz * c);
   const wx = hx * it.scale * 0.8, wz = hz * it.scale * 0.8;
   const f = at(0, wz), b = at(0, -wz), l = at(-wx, 0), r = at(wx, 0);
-  return [-Math.atan2(f - b, 2 * wz), Math.atan2(r - l, 2 * wx), (f + b + l + r) / 4];
+  const nose = -Math.atan2(f - b, 2 * wz), roll = Math.atan2(r - l, 2 * wx);
+  // Ground is not a plane: laid to its four sides, one wheel may still be a hand's breadth clear of a hollow. It
+  // is let down until the highest of the four is on the ground (the others are then a little in it, as a weight is).
+  let y = (f + b + l + r) / 4, clear = 0;
+  for (const [cx, cz] of [[wx, wz * 0.78], [wx, -wz * 0.78], [-wx, wz * 0.78], [-wx, -wz * 0.78]]) clear = Math.max(clear, y + cx * Math.sin(roll) - cz * Math.sin(nose) - at(cx, cz));
+  y -= clear;
+  return [nose, roll, y];
 }
 
 class LodSet {
