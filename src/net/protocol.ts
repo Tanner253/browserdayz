@@ -14,7 +14,7 @@ import type { DropInfo } from '../sim/drops';
 import type { VehicleInfo, VState } from '../sim/vehicles';
 import type { IState, InfectedInfo } from '../sim/infected';
 
-export const PROTOCOL = 19;
+export const PROTOCOL = 20;
 
 /** chat channels: everyone on the server, or only players standing near the speaker */
 export type ChatChannel = 'global' | 'near';
@@ -122,6 +122,8 @@ export type C2S =
   | { t: 'gear'; g: string[] }
   | { t: 'hit'; to: number; zone: HitZone; w: string; dist: number; sup: boolean; bonus: number; /** a shotgun: how many of the shot's pellets landed */ n?: number }
   | { t: 'take'; uid: string }
+  /** a field radio keyed: a supply drop is asked for where the sender stands */
+  | { t: 'radio' }
   | { t: 'drop'; l: WorldLoot }
   | { t: 'copen'; cid: string }
   | { t: 'cset'; cid: string; items: StoredItem[] }
@@ -234,6 +236,9 @@ export type S2C =
   /** a supply drop has been set down (see src/sim/drops.ts), and one has been cleared away */
   | { t: 'drop+'; d: DropInfo }
   | { t: 'drop-'; uid: string }
+  /** a drop has been called down (by whom, where, and in how many seconds), or the call was not answered */
+  | { t: 'radio+'; by: number; x: number; z: number; eta: number }
+  | { t: 'radio-'; why: string }
   /** where everyone carrying a tag they took is standing right now: [player id, x, z]. Sent to all, every half minute. */
   | { t: 'tags'; p: [number, number, number][] }
   /**

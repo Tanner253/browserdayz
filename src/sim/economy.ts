@@ -152,6 +152,8 @@ export const TYPES: Record<string, TypeRule> = {
   grenade: { nominal: 4, min: 2, lifetime: 3600, restock: 1200, usage: ['Military', 'Police'], gas: 5, bunker: 5 },
   stash_kit: { nominal: 3, min: 1, lifetime: 7200, restock: 1800, usage: ['Farm', 'Industrial', 'Hunting'] },
   // fuel for the jeeps (src/sim/vehicles.ts): where there are sheds, yards and soldiers
+  // (a field radio: good for one supply drop called down where it is used. One at the army's; the trader sells them dear.)
+  radio: { nominal: 1, min: 0, lifetime: 7200, restock: 2400, usage: ['Military'], bunker: 1 },
   jerrycan: { nominal: 8, min: 5, lifetime: 3600, restock: 600, usage: ['Farm', 'Industrial', 'Military', 'Village'], gas: 1, bunker: 2 },
 };
 

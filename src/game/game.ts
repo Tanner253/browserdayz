@@ -40,7 +40,7 @@ import { JEEP } from '../sim/vehicles';
 import { HUD, type HotbarEntry } from '../ui/hud';
 import { InventoryUI } from '../ui/inventory-ui';
 import { Minimap } from '../ui/minimap';
-import { DROP, describeSpot, fillDrop, pickDropSite, type DropInfo } from '../sim/drops';
+import { CALL, DROP, describeSpot, fillDrop, pickDropSite, type DropInfo } from '../sim/drops';
 import { renderDoll, renderIcons } from '../ui/icons';
 import { Perf } from '../core/perf';
 import { loadGraphics, type Graphics } from '../core/settings';
@@ -218,6 +218,8 @@ export class Game {
   private awaitClick = false;
   /** the men behind the shops' counters, and the counter itself (see src/sim/trade.ts) */
   private traders: Traders | null = null;
+  /** the radio a call has been made on and not yet answered */
+  private radio: ItemInstance | null = null;
   private shop!: ShopUI;
   /** what is written against this player in the trader's book: kept by the browser */
   private credit = Math.max(0, Math.floor(Number(localStorage.getItem('zona.credit')) || 0));
@@ -1022,6 +1024,11 @@ export class Game {
     net.on('corpse-', (m) => this.removeCorpse(m.uid));
     net.on('board', (m) => this.hud.setBoard(m.rows, m.me, m.mine, playerName()));
     net.on('drop+', (m) => void this.addDrop(m.d));
+    net.on('radio+', (m) => this.dropCalled(m.by === net.id, m.x, m.z, m.eta));
+    net.on('radio-', (m) => {
+      this.radio = null;
+      this.hud.note(m.why, 'warn');
+    });
     net.on('drop-', (m) => this.removeDrop(m.uid));
     net.on('door', (m) => {
       const d = buildings.doors[m.i];
@@ -1798,10 +1805,19 @@ export class Game {
       this.syncOpenBox();
     }
     // how the hands hold it while it is used: a smoke goes to the mouth, a grenade is worked with both
-    const kind: UseKind = def.throw ? 'open' : def.look ? 'drink' : u.sound;
-    const sound: TimedAction['sound'] = def.throw || def.look ? null : u.sound;
+    if (def.call && !this.openSky()) {
+      this.hud.note('No signal under a roof: take the radio out under open sky', 'warn');
+      return;
+    }
+    const kind: UseKind = def.throw || def.call ? 'open' : def.look ? 'drink' : u.sound;
+    const sound: TimedAction['sound'] = def.throw || def.look || def.call ? null : u.sound;
     this.glass = 0;
-    this.startUse(def.throw ? 'Pulling the cord' : def.look ? 'Binoculars' : `${u.verb} ${def.name}`, u.time, item.id, kind, sound, () => {
+    this.startUse(def.throw ? 'Pulling the cord' : def.look ? 'Binoculars' : def.call ? 'Calling a drop in' : `${u.verb} ${def.name}`, u.time, item.id, kind, sound, () => {
+      if (def.call) {
+        if (from) this.inv.add(item);
+        this.callDrop(item);
+        return;
+      }
       if (def.throw) {
         this.consume(item, null);
         this.inventoryChanged();
@@ -2216,6 +2232,41 @@ export class Game {
    *   (only on a click), and sending the player to the pause menu for closing their pockets
    *   was the wrong answer: the game carries on, and the next click takes the mouse.
    */
+  /** nothing between the player and the sky: a radio is heard from there, and a crate can come down there */
+  private openSky() {
+    const p = this.player.pos;
+    return physics.raycast({ x: p.x, y: p.y + 1.7, z: p.z }, { x: 0, y: 1, z: 0 }, 60, SIGHT_GROUPS) === null;
+  }
+
+  /** the radio keyed: the call goes out, and the set is good for the one call if it is answered */
+  private callDrop(item: ItemInstance) {
+    if (!this.openSky()) {
+      this.hud.note('No signal under a roof: take the radio out under open sky', 'warn');
+      return;
+    }
+    this.radio = item;
+    if (this.online) {
+      this.net.send({ t: 'radio' });
+      return;
+    }
+    // (playing alone: there is nobody to refuse it, and the game sets the crate down itself)
+    const p = this.player.pos.clone();
+    this.dropCalled(true, p.x, p.z, CALL.eta);
+    setTimeout(() => void this.addDrop({ uid: `drop-call-${Math.round(performance.now())}`, x: p.x, y: p.y, z: p.z, rot: Math.random() * Math.PI * 2, left: DROP.life }, true), CALL.eta * 1000);
+  }
+
+  /** a drop has been called down: by this player (whose set is spent) or by somebody else (who has just told the map where they are) */
+  private dropCalled(mine: boolean, x: number, z: number, eta: number) {
+    const where = describeSpot(this.s.world, x, z);
+    if (mine && this.radio) {
+      this.inv.remove(this.radio);
+      this.radio = null;
+      this.inventoryChanged();
+    }
+    this.hud.note(mine ? `Drop called in: down in ${eta} s, right here. Everybody heard it` : `Somebody has called a supply drop in ${where}: down in ${eta} s`, mine ? 'good' : 'warn');
+    this.hud.feed(`Supply drop called in ${where}`);
+  }
+
   /** today's page of the trader's work for this player (a new day is a clean page) */
   private jobBook(): JobBook {
     let kept: Partial<JobBook> | null = null;

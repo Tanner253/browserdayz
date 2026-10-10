@@ -15,7 +15,7 @@ import { buildWorldData } from './world';
 import { Economy, type WorldLoot } from '../src/sim/economy';
 import { Container, type SerializedInventory } from '../src/sim/inventory';
 import { ITEMS, TAG_HOLD, makeItem, sanitizeItem, type ItemInstance } from '../src/sim/items';
-import { DROP, fillDrop, type DropInfo } from '../src/sim/drops';
+import { CALL, DROP, fillDrop, type DropInfo } from '../src/sim/drops';
 import { CRATE_RESTOCK, CRATE_SPECS, fillCrate } from '../src/sim/crates';
 import { underGas } from '../src/sim/gas';
 import { BUNKER, bunkerDark, inBunker } from '../src/sim/bunker';
@@ -861,6 +861,21 @@ function handle(c: Client, m: C2S) {
       send(target, { t: 'dmg', from: 0, amount: INFECTED.damage + Math.round((Math.random() - 0.5) * 6), zone: 'torso', w: 'infected', dir: [(target.pose[0] - b.s[0]) / len, 0, (target.pose[2] - b.s[2]) / len] });
       return;
     }
+    case 'radio': {
+      // a field radio keyed: one aircraft, so one call in five minutes, whoever makes it
+      if (!c.alive) return;
+      const wait = Math.ceil(lastCall + CALL.every - economy.time);
+      if (wait > 0) {
+        send(c, { t: 'radio-', why: `No aircraft to send: one went out a moment ago. Try again in ${wait} s.` });
+        return;
+      }
+      lastCall = economy.time;
+      const at = { x: c.pose[0], y: c.pose[1], z: c.pose[2] };
+      broadcast({ t: 'radio+', by: c.id, x: at.x, z: at.z, eta: CALL.eta });
+      setTimeout(() => spawnDrop(at), CALL.eta * 1000);
+      log(`${c.name} called a supply drop to ${Math.round(at.x)}, ${Math.round(at.z)}`);
+      return;
+    }
     case 'take': {
       if (typeof m.uid !== 'string' || !c.alive) return;
       // first request wins; the economy's despawn event tells everyone it is gone
@@ -1375,8 +1390,12 @@ function dropInfo(b: Box): DropInfo {
   return { uid: b.cid, x: b.x, y: b.y, z: b.z, rot: b.rot, left: Math.max(0, Math.round((b.expires ?? 0) - economy.time)) };
 }
 
-function spawnDrop() {
-  const at = world.dropSite();
+/** economy time of the last call answered on a field radio */
+let lastCall = -1e9;
+
+/** @param where set down here (called for on a radio) and not at a place of the map's choosing */
+function spawnDrop(where?: { x: number; y: number; z: number }) {
+  const at = where ?? world.dropSite();
   if (!at) return;
   const uid = `drop-${Math.round(economy.time)}-${Math.random().toString(36).slice(2, 7)}`;
   const c = new Container(uid, DROP.label, DROP.w, DROP.h, [], true);

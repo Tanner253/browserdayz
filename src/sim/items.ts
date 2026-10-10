@@ -41,6 +41,8 @@ export interface ItemDef {
   use?: { verb: string; time: number; energy?: number; water?: number; health?: number; stopBleed?: boolean; /** sets a broken leg (see src/sim/injury.ts) */ splint?: boolean; sound: 'eat' | 'drink' | 'bandage' | 'inject' | 'smoke' };
   /** thrown when used: seconds of fuse, damage at the centre, metres it reaches */
   throw?: { fuse: number; damage: number; radius: number };
+  /** used, it calls a supply drop down where its user stands (see CALL in src/sim/drops.ts) */
+  call?: boolean;
   /** looked through when used: how much of the normal field of view is left (0.2 = five times closer) */
   look?: number;
   /** ergo: how handy it is, 0..100. A handy gun comes up to the eye fast and follows a turn closely; a long heavy one does neither. */
@@ -260,7 +262,7 @@ const D: ItemDef[] = [
   { id: 'binoculars', name: 'Binoculars', model: 'binoculars', w: 2, h: 2, weight: 0.6, category: 'tool', desc: 'Field binoculars. Use them to look five times closer; any other action puts them away.', use: { verb: 'Look through', time: 0.35, sound: 'bandage' }, look: 0.2 },
   { id: 'compass', name: 'Compass', model: 'seadogs_compass', w: 1, h: 1, weight: 0.1, category: 'tool', desc: 'Brass pocket compass. While you carry it, your exact bearing in degrees is shown under the compass strip.' },
   { id: 'watch', name: 'Wrist Watch', model: 'digital_wrist_watch', w: 1, h: 1, weight: 0.05, category: 'tool', desc: 'Still ticking.' },
-  { id: 'radio', name: 'Field Radio', model: 'vintage_radio_transceiver', w: 4, h: 3, weight: 6.5, category: 'misc', desc: 'Military transceiver. Heavy, valuable to the right people.' },
+  { id: 'radio', name: 'Field Radio', model: 'vintage_radio_transceiver', w: 4, h: 3, weight: 6.5, category: 'misc', desc: 'Military transceiver, good for one call: use it under open sky and a supply drop comes down where you stand. Everybody hears it called.', use: { verb: 'Call a drop on the', time: 5, sound: 'bandage' }, call: true },
   { id: 'cigarettes', name: 'Cigarettes', model: 'cigarette_pack', w: 1, h: 1, weight: 0.03, category: 'misc', stack: 5, desc: 'Kentucky Ace. A smoke steadies you: each one gives back 12 health.', use: { verb: 'Smoke', time: 4, health: 12, sound: 'smoke' } },
   { id: 'jerrycan', name: 'Jerrycan', model: 'metal_jerrycan_green', w: 2, h: 3, weight: 8.5, category: 'misc', desc: 'Ten litres of fuel, a quarter of what a jeep holds. Look at a jeep and press G to pour it in.' },
   { id: 'grenade', name: 'Stick Grenade', model: 'stick_grenade', w: 1, h: 3, weight: 0.6, category: 'misc', desc: 'Pull the cord and throw. Four seconds, then everything within nine metres is hurt, you included.', use: { verb: 'Throw', time: 0.75, sound: 'bandage' }, throw: { fuse: 4, damage: 150, radius: 9 } },
