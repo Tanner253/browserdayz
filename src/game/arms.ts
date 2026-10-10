@@ -59,6 +59,12 @@ export interface HandGrip {
 export interface Grips {
   right: HandGrip | null;
   left: HandGrip | null;
+  /**
+   * Where on a long gun the hands go to work it, for whoever is seen doing so (wrists, in the gun's own space):
+   * the right one at its bolt handle; the left one under where it is fed, a magazine or, into a `tube`, a shell
+   * at a time.
+   */
+  work?: { bolt?: THREE.Vector3; feed?: THREE.Vector3; tube?: boolean };
 }
 
 interface Arm {

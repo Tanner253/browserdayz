@@ -1475,13 +1475,32 @@ export class Avatar {
           if (ges) {
             const k = ges.t / ges.dur;
             const sm = (a: number, b: number) => THREE.MathUtils.smoothstep(k, a, b);
-            if (long && gripR) {
-              // the right hand leaves the grip for the bolt handle; the rifle rolls over to meet it
-              const bolt = ges.kind === 'bolt';
-              const off = bolt ? sm(0, 0.14) * (1 - sm(0.86, 1)) : sm(0, 0.08) * (1 - sm(0.94, 1));
-              const back = bolt ? sm(0.22, 0.45) - sm(0.48, 0.7) : 0.5 + 0.5 * Math.sin(ges.t * 13);
-              gripR = { ...gripR, pos: gripR.pos.clone().lerp(_w.set(-0.235 - back * 0.07, 0.065, 0.06), off) };
-              obj.quaternion.multiply(_q1.setFromAxisAngle(_X, 0.32 * off));
+            const work = grips.work;
+            if (long && ges.kind === 'bolt' && gripR && work?.bolt) {
+              // The right hand leaves the grip for the bolt handle: up with it, back, home, and down. The rifle
+              // rolls a little to meet the hand. (It was sent to where the old rifle's bolt was, which on these
+              // is further up the gun than the arm is long: the arm went out straight and stopped there.)
+              const off = sm(0, 0.16) * (1 - sm(0.84, 1));
+              const lift = sm(0.16, 0.3) - sm(0.7, 0.84), back = sm(0.3, 0.48) - sm(0.52, 0.7);
+              gripR = { ...gripR, pos: gripR.pos.clone().lerp(_w.copy(work.bolt).add(_v1.set(-0.085 * back, 0.03 * lift, -0.012 * lift)), off) };
+              obj.quaternion.multiply(_q1.setFromAxisAngle(_X, 0.2 * off));
+            } else if (long && ges.kind === 'reload' && gripL && work?.feed) {
+              // The forward hand leaves the fore-end to feed the gun, and the gun is rolled over to it.
+              const t = ges.t, end = ges.dur;
+              let at: number;
+              if (work.tube) {
+                // a shell at a time into the tube: the hand in under the port as each goes home, and away for the next
+                at = THREE.MathUtils.smoothstep(t, 0.08, 0.5) * (1 - THREE.MathUtils.smoothstep(t, end - 0.5, end - 0.08));
+                const push = t > 0.3 && t < end - 0.42 ? 0.5 + 0.5 * Math.cos(((t - 0.55) / 0.48) * Math.PI * 2) : 1;
+                _w.copy(work.feed).add(_v1.set(0.035 * push - 0.03 * (1 - push), 0.02 * push - 0.075 * (1 - push), -0.035 * (1 - push)));
+              } else {
+                // a magazine: the hand to it, down and away with the old one to the belt, back up with the new, and home
+                at = sm(0.06, 0.24) * (1 - sm(0.8, 0.97));
+                const away = sm(0.28, 0.42) * (1 - sm(0.48, 0.62));
+                _w.copy(work.feed).add(_v1.set(-0.06 * away, -0.26 * away, -0.07 * away));
+              }
+              gripL = { ...gripL, pos: gripL.pos.clone().lerp(_w, at) };
+              obj.quaternion.multiply(_q1.setFromAxisAngle(_X, (work.tube ? 0.34 : 0.18) * at));
             } else if (!long && gripL) {
               // a fresh magazine: the left hand goes down to the belt for it and comes back up under the grip
               const away = sm(0.1, 0.32) * (1 - sm(0.5, 0.78));

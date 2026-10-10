@@ -456,6 +456,15 @@ const SEAT_ON: Record<string, THREE.Vector3> = {
 };
 const APART_ON: Record<string, [number, number]> = { deagle: [0.002, -0.0035], p38: [-0.003, 0.001] };
 const NO_SEAT = new THREE.Vector3();
+/**
+ * Where the hands go to work a long gun, seen from outside (see `Grips.work`): from the guns' own shapes. The
+ * sniper's bolt handle stands out of its right side a hand ahead of the grip, and its magazine hangs under it
+ * ahead of the trigger; the shotgun is fed through the port under it, ahead of the guard.
+ */
+const WORK_ON: Record<string, Grips['work']> = {
+  mosin: { bolt: new THREE.Vector3(-0.408, 0.036, 0.074), feed: new THREE.Vector3(-0.288, -0.091, -0.045) },
+  benelli: { feed: new THREE.Vector3(-0.262, -0.088, -0.04), tube: true },
+};
 /** how far under the ears of the shotgun's front sight the top of its post is (the eye is put level with the post) */
 const IRON_DROP = 0.004;
 /** rifles that came with no sights of their own and are given plain ones: a post at the muzzle, a notch over the breech (see `Weapons.fitIrons`) */
@@ -1257,6 +1266,7 @@ export class Weapons {
         ? {
             right: { pos: new THREE.Vector3(...holds.right).add(SEAT.rifle).add(seen), fingers: new THREE.Vector3(0.75, -0.55, -0.3), palm: new THREE.Vector3(0.15, -0.1, -1), curl: [0.25, 1.2, 1.25, 1.3], thumb: 0.5 },
             left: { pos: new THREE.Vector3(...holds.left).add(SEAT.fore).add(seen), fingers: new THREE.Vector3(0.35, 0.1, 0.93), palm: new THREE.Vector3(0, 1, 0.1), curl: [1.0, 1.05, 1.1, 1.15], thumb: 0.4 },
+            work: WORK_ON[o.item],
           }
         : {
             right: { pos: PISTOL_HOLD.right.clone().add(SEAT_ON[o.item] ?? NO_SEAT).add(new THREE.Vector3(0, 0, APART_ON[o.item]?.[0] ?? 0)), fingers: new THREE.Vector3(0.9, -0.15, -0.3), palm: new THREE.Vector3(0.3, 0, -1), curl: PISTOL_HOLD.curl.right, thumb: 1.25 },
