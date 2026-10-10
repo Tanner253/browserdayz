@@ -7,8 +7,16 @@ import { RNG, Simplex, hash2, clamp, lerp, smoothstep } from '../core/noise';
 import { BUNKER, bunkerAt, type Place } from '../sim/bunker';
 
 export const WORLD_SEED = 1337;
-export const WORLD_SIZE = 1024; // metres, square, centred on the origin
-export const WORLD_RES = 513; // height samples per side
+/**
+ * The map was first made 1024 m square (513 height samples a side) and has been grown since, the same middle
+ * in a bigger square, with nothing of it moved: every sample of the old ground is still a sample (the grid
+ * grew by a whole number of cells each side), the ground's shape is written in metres from the middle, and
+ * whatever read the EDGE of the map (where trees are planted from, where rocks are thrown, how far out a
+ * place may be put) reads OLD_HALF, where the edge was. test/expansion.test.ts holds it to that.
+ */
+export const OLD_HALF = 512;
+export const WORLD_SIZE = 1536; // metres, square, centred on the origin
+export const WORLD_RES = 769; // height samples per side
 export const CELL = WORLD_SIZE / (WORLD_RES - 1); // 2 m
 export const PLAY_RADIUS = 400;
 /**
@@ -297,7 +305,7 @@ export function generateWorld(seed = WORLD_SEED): World {
     for (const r of radii) {
       for (const da of [0, -0.05, 0.05, -0.1, 0.1]) {
         const x = MID.x + Math.cos(angle + da) * r, z = MID.z + Math.sin(angle + da) * r;
-        if (Math.abs(x) > half - 90 || Math.abs(z) > half - 90) continue;
+        if (Math.abs(x) > OLD_HALF - 90 || Math.abs(z) > OLD_HALF - 90) continue;
         if (roadGap(x, z) < offRoad) continue;
         if (pois.some((p) => Math.hypot(p.x - x, p.z - z) < p.radius + 60)) continue;
         // level where the buildings stand, and no bank to climb on the way in
@@ -332,8 +340,9 @@ export function generateWorld(seed = WORLD_SEED): World {
   // --- soften settlements (village plateau, camp clearing)
   const flattenArea = (cx: number, cz: number, inner: number, outer: number, bumpy: number) => {
     const target = base(cx, cz);
-    for (let iz = 0; iz < N; iz++) {
-      for (let ix = 0; ix < N; ix++) {
+    // (only the cells the disc can reach: the same result, and no walk of the whole grid for each place)
+    for (let iz = Math.max(0, Math.floor((cz - outer + half) / CELL)); iz <= Math.min(N - 1, Math.ceil((cz + outer + half) / CELL)); iz++) {
+      for (let ix = Math.max(0, Math.floor((cx - outer + half) / CELL)); ix <= Math.min(N - 1, Math.ceil((cx + outer + half) / CELL)); ix++) {
         const x = -half + ix * CELL;
         const z = -half + iz * CELL;
         const d = Math.hypot(x - cx, z - cz);
@@ -351,7 +360,10 @@ export function generateWorld(seed = WORLD_SEED): World {
   for (const st of sites) flattenArea(st.x, st.z, 20, 60, 0.35);
 
   // --- road: spline through the village, height profile smoothed along its length
-  const sampled = path2.map(([x, z]) => heightAt(heights, x, z));
+  // (The road runs 28 m past where the map once ended. Its height out there was read at that edge, the nearest
+  // ground there was: it still is, to the same fraction of a cell, or the road's last 60 m would stand a metre off.)
+  const atOldEdge = (v: number) => clamp(v, -OLD_HALF, OLD_HALF - 0.0001 * CELL);
+  const sampled = path2.map(([x, z]) => heightAt(heights, atOldEdge(x), atOldEdge(z)));
   const smooth = sampled.map((_, i) => {
     let s = 0;
     let c = 0;
@@ -648,8 +660,8 @@ export function generateWorld(seed = WORLD_SEED): World {
   const props: Instance[] = [];
   const TREE_STEP = 6.2;
   const pines = ['pine_a', 'pine_b', 'pine_c', 'pine_d'];
-  for (let gz = -half + 4; gz < half - 4; gz += TREE_STEP) {
-    for (let gx = -half + 4; gx < half - 4; gx += TREE_STEP) {
+  for (let gz = -OLD_HALF + 4; gz < OLD_HALF - 4; gz += TREE_STEP) {
+    for (let gx = -OLD_HALF + 4; gx < OLD_HALF - 4; gx += TREE_STEP) {
       const hx = hash2(Math.round(gx * 10), Math.round(gz * 10), seed);
       const hz = hash2(Math.round(gz * 10), Math.round(gx * 10), seed + 7);
       const x = gx + (hx - 0.5) * TREE_STEP * 0.9;
@@ -683,8 +695,8 @@ export function generateWorld(seed = WORLD_SEED): World {
   // forest debris, rocks, ferns
   const rockKinds = ['rock_moss_set_01', 'rock_moss_set_02'];
   for (let k = 0; k < 2600; k++) {
-    const x = rng.range(-half + 20, half - 20);
-    const z = rng.range(-half + 20, half - 20);
+    const x = rng.range(-OLD_HALF + 20, OLD_HALF - 20);
+    const z = rng.range(-OLD_HALF + 20, OLD_HALF - 20);
     const f = forestMask(x, z);
     const i = idx(Math.round((x + half) / CELL), Math.round((z + half) / CELL));
     if (roadDist[i] < ROAD_W / 2 + 2 || trackDist[i] < 2 || insideBuilding(x, z, 2)) continue;
@@ -711,7 +723,7 @@ export function generateWorld(seed = WORLD_SEED): World {
     const a = (k / 24) * Math.PI * 2 + 0.13;
     for (const r of [365, 360, 370, 355, 375, 350, 380, 345, 385, 395]) {
       const x = VILLAGE.x * 0.5 + Math.cos(a) * r, z = VILLAGE.z * 0.5 + Math.sin(a) * r;
-      if (Math.abs(x) > half - 60 || Math.abs(z) > half - 60) continue;
+      if (Math.abs(x) > OLD_HALF - 60 || Math.abs(z) > OLD_HALF - 60) continue;
       // reasonably level ground
       const h0 = heightAt(heights, x, z);
       const steep = Math.max(Math.abs(heightAt(heights, x + 3, z) - h0), Math.abs(heightAt(heights, x, z + 3) - h0), Math.abs(heightAt(heights, x - 3, z) - h0), Math.abs(heightAt(heights, x, z - 3) - h0));

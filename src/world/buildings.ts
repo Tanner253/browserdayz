@@ -151,6 +151,14 @@ interface Blueprint {
    * its roof is, in the middle and at its edge, and `out`: how far from the middle that edge is.
    */
   shell?: { model: string; lift: number; ridge: number; eave: number; out: number };
+  /**
+   * It is ALL a model's, inside and out: rooms, floors, stairs. Nothing of it is made here but the ground under
+   * it, doors hung in its doorways, and its places for things; what stops a body and a shot is the model's own
+   * triangles (made when it is built). `lift`: how far the model's own ground is under its ground floor.
+   * `floors`: how high each floor is over the ground one (a place for a thing at one of those heights lies on that
+   * floor). `doors`: a leaf hung at [x, y, z] (its hinge, on the sill), turned `rot`, `w` wide and `h` high.
+   */
+  whole?: { model: string; lift: number; surface: Surface; floors: number[]; doors: { x: number; y: number; z: number; rot: number; w: number; h: number }[] };
   walls: WallDef[];
   furniture: Furn[];
   loot: [number, number, number][];
@@ -949,7 +957,7 @@ export class Buildings {
   }
 
   /** buildings whose outsides are models: which, and where each stands */
-  private shells: { model: string; m: THREE.Matrix4 }[] = [];
+  private shells: { model: string; m: THREE.Matrix4; /** it is solid as it is drawn: every triangle of it stops a body, and sounds like this */ solid?: Surface }[] = [];
 
   /** the containers that stand about, in the order they were stood (their leaves are doors: see the end of `plan`) */
   containers: Instance[] = [];
@@ -1105,11 +1113,21 @@ export class Buildings {
     };
     // (under a model, a finger inside its plinth: in the plane of that, the two flickered)
     const proud = bp.shell ? 0.06 : 0.08;
-    addBox('concrete', -hw - proud, hw + proud, -1.4, -0.1, -hd - proud, hd + proud, B);
-    addBox(bp.floor, -hw + T * 0.5, hw - T * 0.5, -0.12, 0, -hd + T * 0.5, hd - T * 0.5, B);
+    if (bp.whole) {
+      // (all of it is the model's: under it only a pad, for ground that falls away from its foot, as low as the model's own ground)
+      addBox('concrete', -hw - 0.04, hw + 0.04, -1.4, -bp.whole.lift - 0.03, -hd - 0.04, hd + 0.04, B);
+      this.shells.push({ model: bp.whole.model, m: B.clone().multiply(new THREE.Matrix4().makeTranslation(0, -bp.whole.lift, 0)), solid: bp.whole.surface });
+      bp.whole.doors.forEach((dr, k) => {
+        const hinge = B.clone().multiply(new THREE.Matrix4().makeTranslation(dr.x, dr.y, dr.z)).multiply(new THREE.Matrix4().makeRotationY(dr.rot));
+        this.doorSpecs.push({ m: hinge, w: dr.w, h: dr.h, id: `${plot.id}_door${k}`, open: rng.chance(0.4), swing: rng.chance(0.5) ? 1 : -1 });
+      });
+    } else {
+      addBox('concrete', -hw - proud, hw + proud, -1.4, -0.1, -hd - proud, hd + proud, B);
+      addBox(bp.floor, -hw + T * 0.5, hw - T * 0.5, -0.12, 0, -hd + T * 0.5, hd - T * 0.5, B);
+    }
     // (how high the walls stand in all: one floor, or two with the floor between them)
     const H = bp.upper ? h + SLAB + bp.upper.h : h;
-    if (bp.roofType !== 'flat') addBox(bp.upper?.int ?? bp.int, -hw + T, hw - T, H, H + 0.08, -hd + T, hd - T, B, false);
+    if (bp.roofType !== 'flat' && !bp.whole) addBox(bp.upper?.int ?? bp.int, -hw + T, hw - T, H, H + 0.08, -hd + T, hd - T, B, false);
 
     // walls: of one floor, whose foot is at y0 and which is h high
     const outside: { F: THREE.Matrix4; a: number; b: number; front: boolean }[] = [];
@@ -1308,7 +1326,9 @@ export class Buildings {
     if (plot.type === 'store') this.signs.push({ m: B.clone().multiply(new THREE.Matrix4().makeTranslation(0, 2.64, hd + 0.03)), text: 'МАГАЗИН', sub: 'SHOP', board: '#2f4a33', ink: '#e8ebf0' });
 
     // roofs
-    if (bp.shell) {
+    if (bp.whole) {
+      // (the model's)
+    } else if (bp.shell) {
       // The model's. Only what stops a body and a shot: a slab under each slope, and the two ends under them.
       const { ridge, eave, out } = bp.shell;
       const ang = Math.atan2(ridge - eave, out), len = Math.hypot(out, ridge - eave);
@@ -1389,7 +1409,8 @@ export class Buildings {
       };
       const onFurniture = new Map<string, { f: Furn; ly: number; pts: [number, number][] }>();
       for (const [lx, ly, lz] of loot) {
-        if (ly < 0.1) {
+        // (on the ground floor, or on one of the floors of a building that is a model's)
+        if (ly < 0.1 || bp.whole?.floors.some((f) => Math.abs(ly - f) < 0.1)) {
           const p = new THREE.Vector3(lx, ly + y0, lz).applyMatrix4(B);
           this.lootPoints.push({ x: p.x, y: p.y, z: p.z, usage: bp.usage, building: plot.id, floor: true });
           continue;
@@ -1791,6 +1812,24 @@ export class Buildings {
           m.material = painted.get(was)!;
         });
         scene.add(obj);
+        if (sh.solid) {
+          // what stops a body and a shot is the model itself: every triangle of it, where it stands
+          obj.updateMatrixWorld(true);
+          const verts: number[] = [], index: number[] = [], v = new THREE.Vector3();
+          obj.traverse((o) => {
+            const m = o as THREE.Mesh;
+            if (!m.isMesh) return;
+            const at = m.geometry.getAttribute('position'), first = verts.length / 3;
+            for (let i = 0; i < at.count; i++) {
+              v.fromBufferAttribute(at, i).applyMatrix4(m.matrixWorld);
+              verts.push(v.x, v.y, v.z);
+            }
+            const ix = m.geometry.getIndex();
+            if (ix) for (let i = 0; i < ix.count; i++) index.push(first + ix.getX(i));
+            else for (let i = 0; i < at.count; i++) index.push(first + i);
+          });
+          physics.addStatic(physics.R.ColliderDesc.trimesh(new Float32Array(verts), new Uint32Array(index)), sh.solid, { x: 0, y: 0, z: 0 });
+        }
       });
     }
     // what of a container stops a body and a shot: its floor, its roof, its two sides, and the plated half of each end

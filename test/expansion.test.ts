@@ -43,6 +43,14 @@ const hash = (parts: number[]) => {
 const HUT_AT = { x: 160.1, z: 163.1 };
 
 const world = generateWorld();
+/** the map as it was first made: 513 samples a side, 1024 m, in the middle of whatever the grid is now */
+const OLD_RES = 513, OLD_HALF = 512, OFF = (WORLD_RES - OLD_RES) / 2;
+const oldGround = (keep: (x: number, z: number) => boolean) => {
+  const hs: number[] = [];
+  for (let iz = 0; iz < OLD_RES; iz++) for (let ix = 0; ix < OLD_RES; ix++) if (keep(-OLD_HALF + ix * CELL, -OLD_HALF + iz * CELL)) hs.push(world.heights[(iz + OFF) * WORLD_RES + ix + OFF]);
+  return hs;
+};
+const inOld = (x: number, z: number) => Math.abs(x) <= OLD_HALF && Math.abs(z) <= OLD_HALF;
 const data = buildWorldData(process.cwd());
 const half = WORLD_SIZE / 2;
 const camp = world.pois.find((p) => p.name === 'Military Checkpoint')!;
@@ -68,23 +76,21 @@ const added = world.buildings.slice(WAS.buildings).filter((b) => b.type !== 'hut
 
 // To take the old map's figures again after fencing off more ground (do it BEFORE building there): FIGURES=1 npx tsx test/expansion.test.ts
 if (process.env.FIGURES) {
-  const hs: number[] = [];
-  for (let iz = 0; iz < WORLD_RES; iz++) for (let ix = 0; ix < WORLD_RES; ix++) if (!touched(-half + ix * CELL, -half + iz * CELL)) hs.push(world.heights[iz * WORLD_RES + ix]);
-  const trees = world.trees.filter((t) => !touched(t.x, t.z));
+  const hs = oldGround((x, z) => !touched(x, z));
+  const trees = world.trees.filter((t) => inOld(t.x, t.z) && !touched(t.x, t.z));
   console.log(JSON.stringify({ cells: hs.length, heights: hash(hs), trees: trees.length, treesHash: hash(trees.flatMap((t) => [t.x, t.y, t.z])), huts: world.buildings.filter((b) => b.type === 'hut').map((b) => [b.id, +b.x.toFixed(1), +b.z.toFixed(1), +b.floorY.toFixed(2)]) }));
   process.exit(0);
 }
 
 ok('the map as it was is still exactly there: its ground, its buildings, its starts, its trees, its loot points, its jeeps', () => {
-  const hs: number[] = [];
-  for (let iz = 0; iz < WORLD_RES; iz++) for (let ix = 0; ix < WORLD_RES; ix++) if (!touched(-half + ix * CELL, -half + iz * CELL)) hs.push(world.heights[iz * WORLD_RES + ix]);
+  const hs = oldGround((x, z) => !touched(x, z));
   assert.equal(hs.length, WAS.cells);
   assert.equal(hash(hs), WAS.heights, 'the old ground has moved');
   const old = world.buildings.slice(0, WAS.buildings);
   assert.equal(old[old.length - 1].id, WAS.lastId);
   assert.equal(hash(old.flatMap((b) => [b.x, b.z, b.rot, b.floorY])), WAS.buildingsHash, 'an old building has moved');
   assert.equal(hash(world.spawns.flatMap((s) => [s.x, s.z, s.yaw])), WAS.spawns, 'a starting point has moved');
-  const trees = world.trees.filter((t) => !touched(t.x, t.z));
+  const trees = world.trees.filter((t) => inOld(t.x, t.z) && !touched(t.x, t.z));
   assert.equal(trees.length, WAS.trees);
   assert.equal(hash(trees.flatMap((t) => [t.x, t.y, t.z])), WAS.treesHash, 'a tree away from the works has moved');
   // (what is kept between restarts goes by a loot point's number: the old ones are the first, in their old order)

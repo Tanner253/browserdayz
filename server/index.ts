@@ -15,7 +15,10 @@ import { buildWorldData } from './world';
 import { Economy, type WorldLoot } from '../src/sim/economy';
 import { Container, type SerializedInventory } from '../src/sim/inventory';
 import { ITEMS, TAG_HOLD, TAG_OUT, makeItem, sanitizeItem, type ItemInstance } from '../src/sim/items';
-import { inPlay } from '../src/world/worldgen';
+import { WORLD_SIZE, inPlay } from '../src/world/worldgen';
+
+/** how far from the middle anything may say it is: the edge of the ground, and a little (the walls stand 4 m inside it) */
+const EDGE = WORLD_SIZE / 2 + 8;
 import { CALL, CRASH, DROP, fillCrash, fillDrop, type DropInfo } from '../src/sim/drops';
 import { CRATE_RESTOCK, CRATE_SPECS, fillCrate } from '../src/sim/crates';
 import { underGas } from '../src/sim/gas';
@@ -108,7 +111,7 @@ function standJeep(home: number): Veh {
 world.jeeps.forEach((_, k) => standJeep(k));
 const vehInfo = (v: Veh): VehicleInfo => ({ i: v.i, s: v.s, hp: v.goneAt ? 0 : v.hp, fuel: v.fuel, seats: v.seats, sim: v.sim });
 const tellSeats = (v: Veh, rest = false) => broadcast({ t: 'vseat', i: v.i, seats: v.seats, sim: v.sim, ...(rest ? { s: v.s } : {}) });
-const isVState = (s: unknown): s is VState => Array.isArray(s) && s.length === 12 && s.every(num) && Math.abs(s[0]) < 600 && Math.abs(s[2]) < 600 && Math.abs(s[1]) < 500 && Math.abs(Math.hypot(s[3], s[4], s[5], s[6]) - 1) < 0.02 && Math.hypot(s[7], s[8], s[9]) < 60;
+const isVState = (s: unknown): s is VState => Array.isArray(s) && s.length === 12 && s.every(num) && Math.abs(s[0]) < EDGE && Math.abs(s[2]) < EDGE && Math.abs(s[1]) < 500 && Math.abs(Math.hypot(s[3], s[4], s[5], s[6]) - 1) < 0.02 && Math.hypot(s[7], s[8], s[9]) < 60;
 
 /** the fireplaces, and which of them are alight */
 const hearths = new Hearths(world.fires);
@@ -480,7 +483,7 @@ function pickSpawn() {
 
 const num = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 const isVec3 = (v: unknown): v is [number, number, number] => Array.isArray(v) && v.length === 3 && v.every(num);
-const isPose = (v: unknown): v is Pose => Array.isArray(v) && v.length === 6 && v.every(num) && Math.abs(v[0]) < 600 && Math.abs(v[2]) < 600 && Math.abs(v[1]) < 500;
+const isPose = (v: unknown): v is Pose => Array.isArray(v) && v.length === 6 && v.every(num) && Math.abs(v[0]) < EDGE && Math.abs(v[2]) < EDGE && Math.abs(v[1]) < 500;
 const cleanName = (s: unknown) => (typeof s === 'string' ? s : '').replace(/[^\p{L}\p{N} _\-.]/gu, '').trim().slice(0, 16) || 'Survivor';
 const round2 = (v: number) => Math.round(v * 100) / 100;
 
@@ -1264,7 +1267,7 @@ setInterval(() => {
     else if (v.goneAt && now >= v.goneAt) {
       vehicles.delete(v.i);
       broadcast({ t: 'v-', i: v.i });
-    } else if (!v.goneAt && (v.s[1] < JEEP.floor || Math.abs(v.s[0]) > 540 || Math.abs(v.s[2]) > 540) && v.seats.every((s) => s === null)) {
+    } else if (!v.goneAt && (v.s[1] < JEEP.floor || Math.abs(v.s[0]) > EDGE || Math.abs(v.s[2]) > EDGE) && v.seats.every((s) => s === null)) {
       // off the edge of the world, or through the bottom of it: stood back where it started
       const p = world.jeeps[v.home];
       v.s = restState(p.x, p.y, p.z, p.yaw);

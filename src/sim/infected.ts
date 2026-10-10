@@ -14,7 +14,10 @@
 // cannot do is hurt anybody from further off than an arm, or faster than an arm swings:
 // the director believes a blow only when the two are standing together.
 
-import { BUILDING_FOOTPRINT, bunkerPlace, heightAt, type World } from '../world/worldgen';
+import { BUILDING_FOOTPRINT, WORLD_SIZE, bunkerPlace, heightAt, type World } from '../world/worldgen';
+
+/** how far from the middle one may be said to be: the edge of the ground, and a little */
+const EDGE = WORLD_SIZE / 2 + 8;
 import { BUNKER, bunkerAt, bunkerPlan, levelY } from './bunker';
 
 export const INFECTED = {
@@ -350,7 +353,7 @@ export class Director {
       const b = this.bodies.get(r[0]);
       if (!b || b.diedAt || b.own !== by) continue;
       const [x, y, z, yaw, mode, after] = r.slice(1) as IState;
-      if (Math.abs(x) > 600 || Math.abs(z) > 600 || Math.abs(y) > 500 || mode < I_IDLE || mode > I_ATTACK) continue;
+      if (Math.abs(x) > EDGE || Math.abs(z) > EDGE || Math.abs(y) > 500 || mode < I_IDLE || mode > I_ATTACK) continue;
       // no further than it could have run since it was last heard of (with room for a late message)
       const dt = Math.min(3, (now - b.heard) / 1000);
       if (Math.hypot(x - b.s[0], z - b.s[2]) > INFECTED.chase * 1.5 * dt + 2.5) continue;
