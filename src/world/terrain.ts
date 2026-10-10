@@ -76,6 +76,8 @@ export class Terrain {
   /** the ground, as a group of tiles */
   mesh!: THREE.Group;
   heightTex!: THREE.DataTexture;
+  /** the ground's own paint, for a lid laid over a hole in the ground (see where it is made) */
+  lid: THREE.MeshStandardMaterial | null = null;
   splatTex!: THREE.DataTexture;
   grassTex!: THREE.DataTexture;
   macroTex!: THREE.DataTexture;
@@ -174,7 +176,7 @@ export class Terrain {
       uWorld: { value: new THREE.Vector2(WORLD_SIZE, WORLD_RES) },
       uTint: { value: [new THREE.Vector3(0.78, 0.96, 0.62), new THREE.Vector3(0.9, 0.92, 0.85), new THREE.Vector3(0.95, 0.97, 0.93), new THREE.Vector3(0.86, 0.84, 0.8)] },
     };
-    this.atmo.register(mat, (shader) => {
+    const paint = (shader: Parameters<Parameters<Atmosphere['register']>[1] & {}>[0]) => {
       Object.assign(shader.uniforms, uniforms);
       shader.vertexShader = shader.vertexShader
         .replace('#include <common>', '#include <common>\nvarying vec3 vTerrainPos;\nvarying vec3 vTerrainNormal;')
@@ -185,7 +187,12 @@ export class Terrain {
         .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = tRough;')
         .replace('#include <normal_fragment_maps>', TERRAIN_NORMAL)
         .replace('#include <aomap_fragment>', TERRAIN_AO);
-    }, 'terrain');
+    };
+    this.atmo.register(mat, paint, 'terrain');
+    // The same paint for something laid level with the ground over a hole in it (the bunker's roof): drawn a hair
+    // nearer the eye than it is, so that where the ground itself lies a finger under it the two do not flicker.
+    this.lid = new THREE.MeshStandardMaterial({ roughness: 1, metalness: 0, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -6 });
+    this.atmo.register(this.lid, paint, 'terrain-lid');
 
     this.mesh = new THREE.Group();
     this.mesh.name = 'terrain';

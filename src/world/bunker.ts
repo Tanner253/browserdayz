@@ -527,8 +527,10 @@ export class BunkerSite {
       // (scripts/split-door.mjs): the frame is set in the wall, which is filled in round it, and the leaf hangs on
       // its hinge and swings out over the landing. Until they have come there is the plain slab; once they have,
       // the slab is not drawn (it is still what stops a body while the door is shut).
-      block(-Dr.half - 0.05, -GATE.half, L.front - 0.3, L.front, Y, Y + Dr.tall + 0.05, inside);
-      block(GATE.half, Dr.half + 0.05, L.front - 0.3, L.front, Y, Y + Dr.tall + 0.05, inside);
+      // (exactly the gap the wall leaves, side to side and up to its lintel: laid over the wall's own ends by a finger's
+      // width, the two were drawn turn and turn about and the wall flickered beside the door)
+      block(-Dr.half, -GATE.half, L.front - 0.3, L.front, Y, Y + Dr.tall, inside);
+      block(GATE.half, Dr.half, L.front - 0.3, L.front, Y, Y + Dr.tall, inside);
       void Promise.all([assets.model('bunker_gate_frame'), assets.model('bunker_gate_leaf')]).then(([frame, leaf]) => {
         const stuff = new Map<THREE.Material, THREE.MeshStandardMaterial>();
         const take = (scene: THREE.Object3D, into: THREE.Object3D, x: number, y: number, z: number) => {
@@ -561,7 +563,8 @@ export class BunkerSite {
       block(S.half - 0.078, S.half - 0.07, L.front + 0.35, L.front + 0.49, Y + 1.2, Y + 1.216, dark, { solid: false });
       // The wall the door is in goes on up to the ceiling of the stair's shaft: the level's own wall stops at the
       // level's ceiling, and over it there was a window on to the sky and the top of the bunker's roof.
-      block(-S.half - 0.3, S.half + 0.3, L.front - 0.4, L.front, T, under, inside);
+      // (from the top of the level's ceiling slab, not through it: the same flicker)
+      block(-S.half - 0.3, S.half + 0.3, L.front - 0.4, L.front, T + 0.3, under, inside);
     }
     // ---- and the way down to the levels below, at the far end of the passage: shut, for now
     {
