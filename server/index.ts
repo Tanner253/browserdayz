@@ -14,7 +14,8 @@ import { WebSocketServer, type WebSocket } from 'ws';
 import { buildWorldData } from './world';
 import { Economy, type WorldLoot } from '../src/sim/economy';
 import { Container, type SerializedInventory } from '../src/sim/inventory';
-import { ITEMS, TAG_HOLD, makeItem, sanitizeItem, type ItemInstance } from '../src/sim/items';
+import { ITEMS, TAG_HOLD, TAG_OUT, makeItem, sanitizeItem, type ItemInstance } from '../src/sim/items';
+import { inPlay } from '../src/world/worldgen';
 import { CALL, CRASH, DROP, fillCrash, fillDrop, type DropInfo } from '../src/sim/drops';
 import { CRATE_RESTOCK, CRATE_SPECS, fillCrate } from '../src/sim/crates';
 import { underGas } from '../src/sim/gas';
@@ -208,6 +209,8 @@ interface Looted {
 }
 /** tag uid -> that */
 const lootedTags = new Map<string, Looted>();
+/** tags carried out of the Zona and held there past TAG_OUT: no reward is ever paid on one */
+const voided = new Set<string>();
 /** `${player key}|${tag uid}` -> when the server first saw that player carrying it */
 const tagSeen = new Map<string, number>();
 const isWallet = (s: unknown): s is string => typeof s === 'string' && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(s);
@@ -353,6 +356,48 @@ function takenTag(c: Client): boolean {
   });
 }
 
+/**
+ * Whoever carries a tag they took off somebody over the line round the Zona has TAG_OUT seconds to turn back.
+ * After that every such tag they carry is void: it is forgotten here (so nothing is ever paid on it), taken
+ * out of this server's copy of their pockets, and they are told to take it out of their own.
+ */
+function zoneCheck(c: Client, now = Date.now()) {
+  if (!c.alive || inPlay(c.pose[0], c.pose[2]) || !takenTag(c)) {
+    c.outAt = 0;
+    return;
+  }
+  if (!c.outAt) c.outAt = now;
+  if (now - c.outAt < TAG_OUT * 1000) return;
+  c.outAt = 0;
+  const uids: string[] = [];
+  for (const t of carriedTags(c.inv)) {
+    const from = lootedTags.get(t.uid);
+    if (!from || from.ownerKey === c.key) continue;
+    lootedTags.delete(t.uid);
+    tagSeen.delete(`${c.key}|${t.uid}`);
+    voided.add(t.uid);
+    uids.push(t.uid);
+  }
+  if (!uids.length) return;
+  const gone = new Set(uids);
+  const strip = (it: ItemInstance | null | undefined) => {
+    if (it?.cargo) {
+      it.cargo = it.cargo.filter((p) => !gone.has(p.item.uid));
+      for (const p of it.cargo) strip(p.item);
+    }
+  };
+  if (c.inv) {
+    for (const [slot, it] of Object.entries(c.inv.slots)) {
+      if (it && gone.has(it.uid)) (c.inv.slots as Record<string, ItemInstance | null>)[slot] = null;
+      else strip(it);
+    }
+    // (and out of whatever else of theirs things are kept in)
+    for (const cont of c.inv.containers) cont.items = cont.items.filter((it) => !gone.has((it as { uid?: string }).uid ?? ''));
+  }
+  send(c, { t: 'void', uids });
+  log(`${c.name} carried ${uids.length} dog tag${uids.length === 1 ? '' : 's'} out of the Zona: void`);
+}
+
 interface Client {
   ws: WebSocket;
   id: number;
@@ -369,6 +414,8 @@ interface Client {
   /** when a round of theirs last hit a jeep, and when they got into the seat they are in (0: on foot) */
   lastVHit: number;
   seatAt: number;
+  /** when they were first seen outside the Zona with a tag they took (0: they are not) */
+  outAt: number;
   /** when this player last threw a grenade, and how many hits have been claimed for it */
   lastNade: number;
   nadeHits: number;
@@ -671,6 +718,7 @@ function handle(c: Client, m: C2S) {
       const was = c.pose;
       if (Math.abs(m.p[0] - was[0]) + Math.abs(m.p[2] - was[2]) > 0.02 || Math.abs(m.p[3] - was[3]) + Math.abs(m.p[4] - was[4]) > 0.004) c.activeAt = Date.now();
       c.pose = m.p;
+      zoneCheck(c);
       const w = typeof m.w === 'string' && ITEMS[m.w] ? m.w : null;
       c.w = w;
       c.m = Array.isArray(m.m) ? m.m.filter((x) => typeof x === 'string').slice(0, 4) : [];
@@ -1109,7 +1157,7 @@ function handle(c: Client, m: C2S) {
       const from = lootedTags.get(tag.uid);
       const now = Date.now();
       // (a tag this server did not see taken: it has restarted since, and no longer knows whose pockets it came out of)
-      const why = from ? notEarned(c, from, tagSeen.get(`${c.key}|${tag.uid}`), now) : 'the server restarted while you were carrying it';
+      const why = voided.has(tag.uid) ? 'it was carried out of the Zona' : from ? notEarned(c, from, tagSeen.get(`${c.key}|${tag.uid}`), now) : 'the server restarted while you were carrying it';
       log(`${c.name} cashed in ${owner}'s dog tag${why ? ` (not listed for a reward: ${why})` : ''}`);
       lootedTags.delete(tag.uid);
       tagSeen.delete(`${c.key}|${tag.uid}`);
@@ -1153,7 +1201,7 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
     pose: [sp.x, 'y' in sp && sp.y !== undefined ? sp.y : world.groundAt(sp.x, sp.z), sp.z, sp.yaw, 0, 0],
     w: null, m: [], g: [], alive: true,
     inv: resume?.inv ?? null, vitals: resume?.vitals ?? null,
-    lastHit: 0, lastVHit: 0, seatAt: 0, lastNade: 0, nadeHits: 0, blasts: [], lastEmote: 0, lastChat: 0, lastHitBy: null, openCid: null, activeAt: Date.now(), joinedAt: Date.now(), ip: ipOf.get(ws) ?? '', lifeAt: Date.now(), msgCount: 0, msgWindow: Date.now(),
+    outAt: 0, lastHit: 0, lastVHit: 0, seatAt: 0, lastNade: 0, nadeHits: 0, blasts: [], lastEmote: 0, lastChat: 0, lastHitBy: null, openCid: null, activeAt: Date.now(), joinedAt: Date.now(), ip: ipOf.get(ws) ?? '', lifeAt: Date.now(), msgCount: 0, msgWindow: Date.now(),
   };
   records.delete(key);
   const others = [...clients.values()].map(info);

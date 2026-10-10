@@ -343,6 +343,12 @@ export interface ItemInstance {
 
 /** seconds somebody else's dog tag has to be carried before it is cashed in */
 export const TAG_HOLD = 10 * 60;
+/**
+ * The Zona is the played part of the map, the dotted line on it (PLAY_AREAS in the world's generator): tags are
+ * earned inside it. The country outside is for stashes and for building. A tag taken off somebody and carried
+ * over that line is void after this many seconds out there: no sitting out its ten minutes in the hills.
+ */
+export const TAG_OUT = 15;
 /** the same in minutes, for everything that says so in words */
 export const TAG_HOLD_MIN = TAG_HOLD / 60;
 

@@ -251,10 +251,11 @@ export const LOCAL_MODELS = {
     // shipped as its pads, bolts and straps with no body to it)
     only: /main_002\.004|pad_002_0|bolt_005|cover_002\.004|strap_021|pouch_002\.002|buckle\.002/,
     size: 0.6,
-    budget: 9000,
-    tex: 1024,
+    // (as it was made, within reason: it was brought down to a tenth of its triangles and half its texture size, and looked it)
+    budget: 36000,
+    tex: 2048,
     tags: ['loot', 'gear'],
-    changes: 'The collared vest of the pack alone: scaled to a body and stood on the ground; brought down to about nine thousand triangles; textures re-encoded as WebP; geometry compressed.',
+    changes: 'The collared vest of the pack alone: scaled to a body and stood on the ground; brought down from eighty-seven thousand triangles to about thirty-six thousand; textures re-encoded as WebP; geometry compressed.',
   },
   // The container that can be gone into: the pack's open one, with the leaves it was drawn with cut away (they are
   // hung on it in the game, where they open and shut: see CONTAINER in src/world/buildings.ts).

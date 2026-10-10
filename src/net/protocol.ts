@@ -222,6 +222,8 @@ export type S2C =
   | { t: 'chat'; ch?: ChatChannel; from: string; text: string }
   /** somebody cashed in a dog tag: announced to everyone */
   | { t: 'cashed'; id: number; name: string; owner: string }
+  /** these tags of yours are void: you carried them out of the Zona (see TAG_OUT) */
+  | { t: 'void'; uids: string[] }
   /**
    * The leaderboard: the top five since the server started, as [name, kills, tags cashed in],
    * where this player stands in the whole list (-1 = not on it yet) and their own two counts.

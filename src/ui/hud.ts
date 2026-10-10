@@ -435,6 +435,28 @@ export class HUD {
     el.style.setProperty('--k', (k < 1 ? 0.4 + k * 0.75 : 1.15 - Math.min(0.15, (age - 0.12) * 1.2)).toFixed(3));
   }
 
+  private zoneEl: HTMLDivElement | null = null;
+  /**
+   * The warning that tags taken off others are being carried out of the Zona: how many, and the seconds left
+   * before they are void (null: no warning).
+   */
+  zone(left: number | null, tags: number) {
+    if (left === null) {
+      this.zoneEl?.classList.remove('show');
+      return;
+    }
+    if (!this.zoneEl) {
+      this.zoneEl = document.createElement('div');
+      this.zoneEl.className = 'zone-warn';
+      this.zoneEl.innerHTML = '<b>You are leaving the Zona</b><span></span><i></i><em>Turn back: tags are earned inside the dotted line on the map (M)</em>';
+      this.root.appendChild(this.zoneEl);
+    }
+    const s = Math.ceil(left);
+    (this.zoneEl.children[1] as HTMLElement).textContent = s > 0 ? `${tags === 1 ? 'Your dog tag is' : `Your ${tags} dog tags are`} void in` : `${tags === 1 ? 'Your dog tag is' : 'Your dog tags are'} void`;
+    (this.zoneEl.children[2] as HTMLElement).textContent = s > 0 ? String(s) : '';
+    this.zoneEl.classList.add('show');
+  }
+
   note(text: string, kind: 'info' | 'warn' | 'good' = 'info') {
     const n = document.createElement('div');
     n.className = `note note-${kind}`;

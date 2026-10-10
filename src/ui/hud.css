@@ -1447,3 +1447,20 @@ body.touch .hud-start, body.touch .rw, body.touch .inv-wrap, body.touch .inv-col
 /* a broken leg, for as long as it is one (under the word about the gas or the fire, which may be up at the same time) */
 .hud-leg-tag { position: absolute; top: 126px; left: 50%; transform: translateX(-50%); padding: 6px 14px 6px 12px; font: 700 13px/1 'Barlow Condensed', 'Bahnschrift', sans-serif; letter-spacing: 0.2em; color: #ffe2d6; background: rgba(60, 16, 10, 0.78); border-left: 3px solid #ff6a4a; opacity: 0; transition: opacity 0.35s; white-space: nowrap; pointer-events: none; }
 .hud-leg-tag.on { opacity: 1; }
+
+/* carrying tags out of the Zona: said in the middle of the screen, with the seconds left */
+.zone-warn {
+  position: absolute; left: 50%; top: 21%; transform: translateX(-50%);
+  display: none; flex-direction: column; align-items: center; gap: 4px;
+  padding: 14px 30px 16px; text-align: center; pointer-events: none;
+  background: rgba(40, 8, 6, 0.86); border: 2px solid var(--danger);
+  box-shadow: 0 0 40px rgba(200, 40, 30, 0.35);
+  text-transform: uppercase; color: #fff;
+}
+.zone-warn.show { display: flex; animation: zone-pulse 1s ease-in-out infinite; }
+.zone-warn b { font-size: 26px; letter-spacing: 0.14em; }
+.zone-warn span { font-size: 15px; letter-spacing: 0.18em; opacity: 0.9; }
+.zone-warn i { font-style: normal; font-size: 64px; font-weight: 700; line-height: 1; color: #ffd35a; min-height: 0; }
+.zone-warn i:empty { display: none; }
+.zone-warn em { font-style: normal; font-size: 12px; letter-spacing: 0.12em; text-transform: none; opacity: 0.85; }
+@keyframes zone-pulse { 50% { border-color: #ff9a8a; box-shadow: 0 0 60px rgba(255, 70, 50, 0.55); } }

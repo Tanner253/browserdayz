@@ -13,8 +13,8 @@ import type { Terrain } from '../world/terrain';
 import { Barrel, type Vegetation } from '../world/vegetation';
 import type { Grass } from '../world/grass';
 import { Door, type Buildings } from '../world/buildings';
-import { WORLD_SIZE, bunkerPlace, heightAt, type SiteKind, type World } from '../world/worldgen';
-import { ITEMS, WEAPON_SLOTS, itemName, TAG_HOLD, TAG_HOLD_MIN, capacityOf, makeItem, newUid, tagClock, tagOwner, type ItemInstance, type Slot, quietOf } from '../sim/items';
+import { WORLD_SIZE, bunkerPlace, heightAt, inPlay, type SiteKind, type World } from '../world/worldgen';
+import { ITEMS, WEAPON_SLOTS, itemName, TAG_HOLD, TAG_HOLD_MIN, TAG_OUT, capacityOf, makeItem, newUid, tagClock, tagOwner, type ItemInstance, type Slot, quietOf } from '../sim/items';
 import { PlayerInventory, SLOT_ORDER, type Container } from '../sim/inventory';
 import { Economy, type WorldLoot } from '../sim/economy';
 import { CRATE_RESTOCK, CRATE_SPECS, fillCrate } from '../sim/crates';
@@ -797,12 +797,54 @@ export class Game {
    * seconds it is cashed in and leaves the inventory. The clock belongs to whoever is
    * carrying the tag: when it changes hands it starts again.
    */
+  /** seconds this player has been outside the Zona carrying a tag they took (see TAG_OUT) */
+  private outFor = 0;
+  /** the tags they carry that they took off somebody (as of the last look, a second ago at most) */
+  private takenTags: string[] = [];
+
+  /**
+   * Over the line round the Zona with a tag taken off somebody: it is said on the screen, with the seconds left
+   * to turn back in. Every frame, so that a step back over the line is answered at once. (Online it is the
+   * server that calls them void, a moment after this clock runs out.)
+   */
+  private tickZone(dt: number) {
+    const p = this.player;
+    if (this.started && !p.dead && this.takenTags.length && !inPlay(p.pos.x, p.pos.z)) {
+      this.outFor += dt;
+      this.hud.zone(Math.max(0, TAG_OUT - this.outFor), this.takenTags.length);
+      // (and two seconds after it, whatever the server says: a tag it does not know of was worth nothing already)
+      if (this.outFor >= TAG_OUT + (this.online ? 2 : 0)) this.voidTags(this.takenTags);
+    } else if (this.outFor) {
+      this.outFor = 0;
+      this.hud.zone(null, 0);
+    }
+  }
+
+  /** These tags were carried out of the Zona and are void: out of the pockets they go, and it is said why. */
+  private voidTags(uids: string[]) {
+    let n = 0;
+    for (let it = this.inv.find((i) => uids.includes(i.uid)); it; it = this.inv.find((i) => uids.includes(i.uid))) {
+      this.inv.remove(it);
+      n++;
+    }
+    this.outFor = 0;
+    this.takenTags = [];
+    this.hud.zone(null, 0);
+    if (!n) return;
+    this.inventoryChanged();
+    const text = `${n === 1 ? 'Your dog tag is' : `Your ${n} dog tags are`} void: carried out of the Zona. Tags are earned inside the dotted line on the map.`;
+    this.hud.note(text, 'warn');
+    this.hud.chatLine('system', '', text);
+  }
+
   private tickTags(dt: number) {
     const me = publicId();
     const done: ItemInstance[] = [];
     const carried: { name: string; clock: string }[] = [];
+    const taken: string[] = [];
     this.inv.find((it) => {
       if (it.id !== 'dogtag' || it.pid === me) return false;
+      taken.push(it.uid);
       if (it.holder !== me) {
         it.holder = me;
         it.held = 0;
@@ -814,6 +856,7 @@ export class Game {
       else carried.push({ name: tagOwner(it), clock: tagClock(it) });
       return false;
     });
+    this.takenTags = taken;
     // the countdown is on screen the whole time, and on the tag itself in the inventory
     this.hud.setTags(carried);
     if (this.invUI.isOpen) this.invUI.tickTags();
@@ -1085,6 +1128,7 @@ export class Game {
       this.hud.note(m.text, m.kind);
       this.hud.chatLine('system', '', m.text);
     });
+    net.on('void', (m) => this.voidTags(m.uids));
     net.on('cashed', (m) => {
       const text = `${m.name} cashed in ${m.owner}'s dog tag.`;
       this.hud.chatLine('system', '', text);
@@ -2766,9 +2810,13 @@ export class Game {
     if (this.tagT >= 1) {
       this.minimap.setJeeps([...this.garage.jeeps.values()].filter((j) => !j.wreck && j.mode === 'parked' && j.seats.every((s) => s === null)).map((j) => ({ x: j.pos.x, z: j.pos.z })));
       if (this.started && !p.dead) this.tickTags(this.tagT);
-      else this.hud.setTags([]);
+      else {
+        this.hud.setTags([]);
+        this.takenTags = [];
+      }
       this.tagT = 0;
     }
+    this.tickZone(dt);
     physics.step(dt, (h) => {
       this.garage.step(h, moveInput);
       p.step(h, moveInput);
