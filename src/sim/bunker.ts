@@ -33,13 +33,17 @@ export const BUNKER = {
   passage: 1.7,
   across: 1.4,
   /** the stair: half its width, where its foot is, and how far along the ground its head is from that */
-  stair: { half: 1.2, foot: 6.5, run: 9 },
+  stair: { half: 1.2, foot: 7.25, run: 8.25 },
   /** the hut over the head of the stair */
-  hut: { half: 2, back: 10.5, front: 18, tall: 2.6 },
+  hut: { half: 2.1, back: 10.8, front: 16.45, tall: 2.45 },
+  /** the walled yard before its door (the house is a model, "WW2 Field Bunker": see BunkerSite): how far out it reaches either side and to the front, and which side it is open to (-1: toward -r) */
+  court: { r: 2.9, front: 18.9, open: -1 },
+  /** where that model's own middle stands: forward of the bunker's own, and how far it is let into the ground */
+  house: { f: 13.7, sunk: 0.28 },
   /** the ground that is dug out for all of it */
   pit: { r: 22.5, back: -30.5, front: 14 },
   /** the pad over the pit */
-  pad: { r: 24.5, back: -32.5, front: 16.6, top: 0.25 },
+  pad: { r: 24.5, back: -32.5, front: 16.6, top: 0.04 },
   /** the door at the foot of the stair: half its width, its height; how long it stays open once nobody is left inside, seconds; and how far out from it the lamp over it hangs */
   door: { half: 1.1, tall: 2.3, shut: 60, lamp: 0.9 },
   /** how far off its opening and shutting are heard, metres */
@@ -524,11 +528,13 @@ let found: Ways | null = null;
 export function bunkerWays(): Ways {
   if (found) return found;
   const B = BUNKER, H = B.hall, plan = bunkerPlan(), n = plan.rooms.length;
-  const MAIN = n, LEFT = n + 1, RIGHT = n + 2, STAIR = n + 3, WORLD = n + 4;
+  const MAIN = n, LEFT = n + 1, RIGHT = n + 2, STAIR = n + 3, WORLD = n + 4, COURT = n + 5;
   const head = B.stair.foot + B.stair.run;
   const part = (r: number, f: number, h: number): number => {
     // the stair's shaft below ground, and the hut over its head
     if (Math.abs(r) < B.hut.half && ((f > H.front - 0.15 && f < head + 0.5 && h < -0.6) || (f >= B.hut.back && f < B.hut.front))) return STAIR;
+    // (the walled yard before the house's door: out of it is by its open side, not through its walls)
+    if (h > -2 && Math.abs(r) < B.court.r && f >= B.hut.front && f < B.court.front) return COURT;
     if (h > -2 || Math.abs(r) > H.r + 0.6 || f < H.back - 0.6 || f > H.front) return WORLD;
     for (let k = 0; k < n; k++) {
       const q = plan.rooms[k];
@@ -553,9 +559,10 @@ export function bunkerWays(): Ways {
   });
   ways.push({ a: MAIN, b: LEFT, r: -B.passage, f: plan.cross, nr: -1, nf: 0 }, { a: MAIN, b: RIGHT, r: B.passage, f: plan.cross, nr: 1, nf: 0 });
   ways.push({ a: MAIN, b: STAIR, r: 0, f: H.front - 0.15, nr: 0, nf: 1, gate: true });
-  ways.push({ a: STAIR, b: WORLD, r: 0, f: B.hut.front, nr: 0, nf: 1 });
+  ways.push({ a: STAIR, b: COURT, r: -0.24, f: B.hut.front, nr: 0, nf: 1 });
+  ways.push({ a: COURT, b: WORLD, r: B.court.open * B.court.r, f: (B.hut.front + B.court.front) / 2 + 0.2, nr: B.court.open, nf: 0 });
   // the first step from each part to each other, by the fewest doorways
-  const parts = WORLD + 1;
+  const parts = COURT + 1;
   const first: ({ way: Way; dir: 1 | -1 } | null)[][] = [];
   for (let from = 0; from < parts; from++) {
     const step: ({ way: Way; dir: 1 | -1 } | null)[] = new Array(parts).fill(null);

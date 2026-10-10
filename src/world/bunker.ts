@@ -181,6 +181,31 @@ function boxGeo(w: number, h: number, d: number, per = 2.6): THREE.BoxGeometry {
 const LAMP_POOL = 7.5;
 const LAMP_GLOW = 1.6;
 
+/**
+ * The door model in its doorway, metres (it is drawn at nine tenths of the size it came, to stand under the lintel):
+ * half its frame's width; how far forward of the middle of the wall the frame's own middle is; where the hinge is
+ * (to the right of the doorway's middle, and forward of the wall's); where the leaf's own middle is from the hinge
+ * (right, up from the floor, forward); and how far round it swings (toward the stair).
+ */
+const GATE = { half: 0.72, frame: 0.1125, hinge: [0.512, 0.2097], leaf: [-0.4698, 0.207, 0.1179], swing: 1.66 };
+
+/**
+ * A model's shape as it stands in its own file, in metres. (The models are packed small: their
+ * points are whole numbers in a box, and the shape's own place in the file says how big the box
+ * is. Moved about as they are, the points stay whole numbers in that box, and the thing comes
+ * out the size of a shoebox: so they are written out as plain numbers first.)
+ */
+function inMetres(mesh: THREE.Mesh): THREE.BufferGeometry {
+  const from = mesh.geometry, geo = new THREE.BufferGeometry();
+  for (const name of Object.keys(from.attributes)) {
+    const a = from.getAttribute(name), out = new Float32Array(a.count * a.itemSize);
+    for (let i = 0; i < a.count; i++) for (let c = 0; c < a.itemSize; c++) out[i * a.itemSize + c] = a.getComponent(i, c);
+    geo.setAttribute(name, new THREE.BufferAttribute(out, a.itemSize));
+  }
+  if (from.index) geo.setIndex(Array.from(from.index.array));
+  return geo.applyMatrix4(mesh.matrixWorld);
+}
+
 /** a place on the ground, to the nearest hand's breadth: what a thing standing there is known by */
 export const spotKey = (x: number, z: number) => `${Math.round(x * 10)}_${Math.round(z * 10)}`;
 
@@ -191,17 +216,16 @@ export class BunkerSite {
   open = false;
   /** told when it starts to open or to shut (it is loud) */
   onMove: (opening: boolean) => void = () => {};
-  private door: { mesh: THREE.Mesh; collider: RAPIER.Collider; slide: number; /** where its middle is when shut, in the bunker's own measure */ at: [number, number, number] } | null = null;
+  private door: { mesh: THREE.Mesh; collider: RAPIER.Collider; slide: number; /** where its middle is when shut, in the bunker's own measure */ at: [number, number, number]; /** the model's leaf, on its hinge (null until it has loaded) */ leaf: THREE.Object3D | null } | null = null;
   /** the door's leaf where it is on its track: what stops a body is where what is seen is */
   private doorSet() {
     const d = this.door, P = this.place;
     if (!d || !P) return;
-    const run = d.slide * (BUNKER.door.half * 2 + 0.15);
-    d.mesh.position.x = run;
-    const [x, y, z] = bunkerAt(P, d.at[0] + run, d.at[1], d.at[2]);
-    d.collider.setTranslation({ x, y, z });
-    // (shutting, it is no wall until it is nearly home: nobody is shut in a doorway, or pushed along by it)
-    d.collider.setEnabled(this.open || d.slide < 0.25);
+    // (the leaf swings out on its hinge; the plain slab that stands for it until it has loaded slides, as it did)
+    if (d.leaf) d.leaf.rotation.y = d.slide * GATE.swing;
+    else d.mesh.position.x = d.slide * (BUNKER.door.half * 2 + 0.15);
+    // (what stops a body is the doorway shut: it is there while the door is shut or all but, and not while it moves)
+    d.collider.setEnabled(d.slide < 0.12);
   }
   private fixtures: { mat: THREE.MeshStandardMaterial; pos: THREE.Vector3; how: number; burn: number }[] = [];
   /** the light on the card reader beside the door */
@@ -245,26 +269,68 @@ export class BunkerSite {
     // ---- the pad over the hole, open only where the stair comes up inside the hut
     const top = B.pad.top, under = top - 0.45, hole = B.hut.back + 0.5, head = B.stair.foot + B.stair.run + 0.5;
     const up = { shadow: true };
-    block(-B.pad.r, B.pad.r, B.pad.back, hole, under, top, outside, up);
-    block(-B.pad.r, -B.stair.half, hole, B.pad.front, under, top, outside, up);
-    block(B.stair.half, B.pad.r, hole, B.pad.front, under, top, outside, up);
-    block(-B.stair.half, B.stair.half, head, B.pad.front, under, top, outside, up);
-    // a kerb round it, and two air shafts standing on it
-    for (const [r, f] of [[-9, -12], [8.5, -4]]) {
-      block(r - 0.7, r + 0.7, f - 0.7, f + 0.7, top, top + 1.5, outside, up);
-      block(r - 0.85, r + 0.85, f - 0.85, f + 0.85, top + 1.5, top + 1.65, steel, { ...up, surface: 'metal' });
-    }
+    // (Nothing of it is seen from above but the house: the roof of the place lies level with the ground and is the
+    // ground to look at, the same earth and stones as lie about it. Under the house it is the house's floor.)
+    const earthOf = assets.pbr('rocks_ground_02');
+    const earth = mat(new THREE.MeshStandardMaterial({ map: earthOf.map, normalMap: earthOf.normalMap, roughness: 1, metalness: 0 }));
+    const roof = [outside, outside, earth, outside, outside, outside];
+    block(-B.pad.r, B.pad.r, B.pad.back, hole, under, top, roof, up);
+    block(-B.pad.r, -B.stair.half, hole, B.pad.front, under, top, roof, up);
+    block(B.stair.half, B.pad.r, hole, B.pad.front, under, top, roof, up);
+    block(-B.stair.half, B.stair.half, head, B.pad.front, under, top, roof, up);
+    // the floor of the house's one room, round the well the stair comes up in
+    for (const [r0, r1, f0, f1] of [[-2.2, -B.stair.half, hole - 0.5, B.hut.front - 0.1], [B.stair.half, 2.9, hole - 0.5, B.hut.front - 0.1], [-B.stair.half, B.stair.half, head, B.hut.front - 0.1]]) block(r0, r1, f0, f1, top, top + 0.02, floor, { solid: false });
 
-    // ---- the hut over the head of the stair: three walls and a roof, open to the front
-    const H = B.hut, ht = top + H.tall;
-    block(-H.half - 0.3, -H.half, H.back, H.front, top, ht, outside, up);
-    block(H.half, H.half + 0.3, H.back, H.front, top, ht, outside, up);
-    block(-H.half - 0.3, H.half + 0.3, H.back - 0.3, H.back, top, ht, outside, up);
-    block(-H.half - 0.5, H.half + 0.5, H.back - 0.5, H.front + 0.4, ht, ht + 0.3, outside, up);
-    // (the front: a doorway between two piers)
-    block(-H.half, -0.95, H.front - 0.3, H.front, top, ht, outside, up);
-    block(0.95, H.half, H.front - 0.3, H.front, top, ht, outside, up);
-    block(-0.95, 0.95, H.front - 0.3, H.front, top + 2.15, ht, outside, up);
+    // ---- the house over the head of the stair: a model ("WW2 Field Bunker" by Golden), stood so that the stair comes up
+    // inside its one room and its door is ahead of whoever climbs it. It is turned about (its door was at its back),
+    // its room's floor is taken out (the pad is the floor, with the stair's well in it), and what stops a body is the
+    // model's own walls, triangle for triangle.
+    void assets.model('bunker_house').then((scene) => {
+      scene.updateMatrixWorld(true);
+      const kept = new Map<THREE.Material, THREE.MeshStandardMaterial>();
+      const about = new THREE.Matrix4().makeRotationY(Math.PI).setPosition(0, -B.house.sunk, B.house.f);
+      const v = new THREE.Vector3();
+      scene.traverse((o) => {
+        const src = o as THREE.Mesh;
+        if (!src.isMesh) return;
+        const from = src.material as THREE.MeshStandardMaterial;
+        let geo = inMetres(src);
+        geo = geo.index ? geo.toNonIndexed() : geo;
+        {
+          // (its own floor, the room's and the slab the whole of it stands on: every triangle that lies flat and low.
+          // The stair comes up through there.)
+          const P = geo.getAttribute('position'), keep: number[] = [];
+          for (let t = 0; t < P.count; t += 3) if (!(P.getY(t) < 0.45 && P.getY(t + 1) < 0.45 && P.getY(t + 2) < 0.45)) keep.push(t, t + 1, t + 2);
+          const cutGeo = new THREE.BufferGeometry();
+          for (const name of Object.keys(geo.attributes)) {
+            const a = geo.getAttribute(name), out = new Float32Array(keep.length * a.itemSize);
+            keep.forEach((k, n) => { for (let c = 0; c < a.itemSize; c++) out[n * a.itemSize + c] = a.getComponent(k, c); });
+            cutGeo.setAttribute(name, new THREE.BufferAttribute(out, a.itemSize));
+          }
+          geo = cutGeo;
+        }
+        geo.applyMatrix4(about);
+        if (!kept.has(from)) {
+          const m = mat(from.clone() as THREE.MeshStandardMaterial);
+          m.side = THREE.DoubleSide;
+          kept.set(from, m);
+        }
+        const mesh = new THREE.Mesh(geo, kept.get(from)!);
+        mesh.castShadow = !/interior/i.test(from.name);
+        mesh.receiveShadow = true;
+        mesh.matrixAutoUpdate = false;
+        group.add(mesh);
+        // what stops a body and a bullet: the same triangles, where they stand in the world
+        const P = geo.getAttribute('position'), verts = new Float32Array(P.count * 3), tris = new Uint32Array(P.count);
+        for (let i = 0; i < P.count; i++) {
+          v.fromBufferAttribute(P, i);
+          const [x, y, z] = bunkerAt(this.place!, v.x, v.z, v.y);
+          verts.set([x, y, z], i * 3);
+          tris[i] = i;
+        }
+        physics.addStatic(physics.R.ColliderDesc.trimesh(verts, tris), 'concrete', { x: 0, y: 0, z: 0 });
+      });
+    }).catch(() => {});
 
     // ---- the stair: a solid flight from the level's floor up to the pad, between two walls
     const S = B.stair, rise = D + top, steps = 28;
@@ -455,7 +521,37 @@ export class BunkerSite {
       const face = mat(new THREE.MeshStandardMaterial({ map: doorPaint(['LEVEL 1', 'KEYCARD HOLDERS ONLY'], 31), roughness: 0.6, metalness: 0.55 }));
       const d = block(-Dr.half - 0.05, Dr.half + 0.05, L.front - 0.3, L.front - 0.08, Y, Y + Dr.tall + 0.05, [steel, steel, steel, steel, face, face], { surface: 'metal', whole: true });
       d.mesh.matrixAutoUpdate = true;
-      this.door = { mesh: d.mesh, collider: d.collider!, slide: 0, at: [0, L.front - 0.19, Y + (Dr.tall + 0.05) / 2] };
+      this.door = { mesh: d.mesh, collider: d.collider!, slide: 0, at: [0, L.front - 0.19, Y + (Dr.tall + 0.05) / 2], leaf: null };
+      // The door itself is a model ("Old metal bunker door" by rakutin), taken apart into its frame and its leaf
+      // (scripts/split-door.mjs): the frame is set in the wall, which is filled in round it, and the leaf hangs on
+      // its hinge and swings out over the landing. Until they have come there is the plain slab; once they have,
+      // the slab is not drawn (it is still what stops a body while the door is shut).
+      block(-Dr.half - 0.05, -GATE.half, L.front - 0.3, L.front, Y, Y + Dr.tall + 0.05, inside);
+      block(GATE.half, Dr.half + 0.05, L.front - 0.3, L.front, Y, Y + Dr.tall + 0.05, inside);
+      void Promise.all([assets.model('bunker_gate_frame'), assets.model('bunker_gate_leaf')]).then(([frame, leaf]) => {
+        const stuff = new Map<THREE.Material, THREE.MeshStandardMaterial>();
+        const take = (scene: THREE.Object3D, into: THREE.Object3D, x: number, y: number, z: number) => {
+          scene.updateMatrixWorld(true);
+          scene.traverse((o) => {
+            const src = o as THREE.Mesh;
+            if (!src.isMesh) return;
+            const from = src.material as THREE.MeshStandardMaterial;
+            if (!stuff.has(from)) stuff.set(from, mat(from.clone() as THREE.MeshStandardMaterial));
+            const mesh = new THREE.Mesh(inMetres(src), stuff.get(from)!);
+            mesh.position.set(x, y, z);
+            mesh.receiveShadow = true;
+            into.add(mesh);
+          });
+        };
+        take(frame, group, 0, Y, L.front - 0.15 + GATE.frame);
+        const pivot = new THREE.Group();
+        pivot.position.set(GATE.hinge[0], Y, L.front - 0.15 + GATE.hinge[1]);
+        take(leaf, pivot, GATE.leaf[0], GATE.leaf[1], GATE.leaf[2]);
+        group.add(pivot);
+        d.mesh.visible = false;
+        if (this.door) this.door.leaf = pivot;
+        this.doorSet();
+      }).catch(() => {});
       // the reader: a small box on the wall of the stair, at the right hand of whoever comes down to the door, and the light on it (red: shut; green: open)
       block(S.half - 0.07, S.half, L.front + 0.28, L.front + 0.56, Y + 1.08, Y + 1.44, steel, { solid: false });
       this.readerLamp = new THREE.MeshStandardMaterial({ color: 0x111111, emissive: new THREE.Color(1, 0.1, 0.05), emissiveIntensity: 2.2 });
@@ -494,7 +590,7 @@ export class BunkerSite {
         if (!mesh.isMesh) return;
         const src = mesh.material as THREE.MeshStandardMaterial, glass = /glow/i.test(src.name);
         if (!glass && !kept.has(src)) kept.set(src, mat(src.clone() as THREE.MeshStandardMaterial));
-        parts.push({ geo: mesh.geometry.clone().applyMatrix4(mesh.matrixWorld), glass, stuff: kept.get(src) ?? src });
+        parts.push({ geo: inMetres(mesh), glass, stuff: kept.get(src) ?? src });
       });
       if (!parts.length) return;
       for (const ft of fittings) {
@@ -510,21 +606,6 @@ export class BunkerSite {
         }
       }
     }).catch(() => {});
-
-    // the name over the hut's doorway
-    {
-      const sign = painted(512, 128, (g) => {
-        g.fillStyle = '#2f352f';
-        g.fillRect(0, 0, 512, 128);
-        g.fillStyle = 'rgba(226, 220, 200, 0.92)';
-        g.font = '700 84px "Arial Narrow", Arial, sans-serif';
-        g.textAlign = 'center';
-        g.fillText(B.name.toUpperCase(), 256, 94);
-      }, 5, false);
-      const plate = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 0.42), mat(new THREE.MeshStandardMaterial({ map: sign, roughness: 0.7, metalness: 0.3 })));
-      plate.position.set(0, top + 2.38, H.front + 0.01);
-      group.add(plate);
-    }
 
     // ---- the light the steady lamps throw, painted once on a plan of the level and laid over all that is built down here.
     // Only the few lamps nearest the eye are real lights (see Lamps): without this a lamp at the far end of a passage would

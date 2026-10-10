@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-10T01:39:28.482Z",
+ "generated": "2026-10-10T02:12:42.420Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr"
@@ -2421,6 +2421,66 @@
     3,
     0.0687,
     0.5351
+   ],
+   "lods": []
+  },
+  "bunker_house": {
+   "url": "assets/models/bunker_house.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 786524,
+   "srcTris": 286,
+   "tris": 286,
+   "min": [
+    -3.1767,
+    0,
+    -5.4064
+   ],
+   "max": [
+    3.1767,
+    3.0223,
+    5.4064
+   ],
+   "lods": []
+  },
+  "bunker_gate_frame": {
+   "url": "assets/models/bunker_gate_frame.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 1498760,
+   "srcTris": 14020,
+   "tris": 6924,
+   "min": [
+    -0.72,
+    0,
+    -0.2557
+   ],
+   "max": [
+    0.72,
+    2.34,
+    0.2557
+   ],
+   "lods": []
+  },
+  "bunker_gate_leaf": {
+   "url": "assets/models/bunker_gate_leaf.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 1500528,
+   "srcTris": 14020,
+   "tris": 7096,
+   "min": [
+    -0.5377,
+    0,
+    -0.2096
+   ],
+   "max": [
+    0.5377,
+    1.935,
+    0.2096
    ],
    "lods": []
   }

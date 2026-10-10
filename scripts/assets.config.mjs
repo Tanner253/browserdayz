@@ -220,6 +220,11 @@ export const LOCAL_MODELS = {
   bunker_pipes: { dir: 'bunker_props', only: /^SM_Tubes_JFG_5/, size: 1.9, tex: 1024, tags: ['prop'], changes: 'Only these of its shapes are used here, scaled to the rooms of the bunker and stood on the ground; textures re-encoded as WebP; geometry compressed.' },
   bunker_chain: { dir: 'bunker_props', only: /^SM_Chain_1/, size: 2.05, tex: 1024, tags: ['prop'], changes: 'Only these of its shapes are used here, scaled to the rooms of the bunker and stood on the ground; textures re-encoded as WebP; geometry compressed.' },
   bunker_cable: { dir: 'bunker_props', only: /^SM_Cable_JFG_3/, size: 6, tex: 1024, tags: ['prop'], changes: 'Only these of its shapes are used here, scaled to the rooms of the bunker and stood on the ground; textures re-encoded as WebP; geometry compressed.' },
+  // What stands over the bunker's stair, and the door at its foot: two more downloads.
+  bunker_house: { dir: 'field_bunker', scale: 1, tex: 2048, tags: ['prop'], changes: 'Stood on the ground as it came; textures re-encoded as WebP; geometry compressed.' },
+  // (the door came as one shape standing half open: scripts/split-door.mjs makes its frame and its leaf two, the leaf shut)
+  bunker_gate_frame: { dir: 'bunker_door_split', only: /Frame/, scale: 0.009, tex: 2048, tags: ['prop'], changes: 'Its frame, taken apart from its leaf; scaled to the doorway and stood on the ground; textures re-encoded as WebP; geometry compressed.' },
+  bunker_gate_leaf: { dir: 'bunker_door_split', only: /Leaf/, scale: 0.009, tex: 2048, tags: ['prop'], changes: 'Its leaf, taken apart from its frame and turned shut; scaled to the doorway and stood on the ground; textures re-encoded as WebP; geometry compressed.' },
 };
 
 /**

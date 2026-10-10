@@ -1071,7 +1071,7 @@ export function generateWorld(seed = WORLD_SEED): World {
         // (no grass under the pad, nor in the hole: it would stand up through the concrete)
         const dx = -half + ix * CELL - bx, dz = -half + iz * CELL - bz;
         const r = dx * Math.cos(rot) - dz * Math.sin(rot), f = dx * Math.sin(rot) + dz * Math.cos(rot);
-        if (Math.abs(r) <= B.pad.r + 2.5 && f >= B.pad.back - 2.5 && f <= B.hut.front + 3) grass[idx(ix, iz)] = 0;
+        if (Math.abs(r) <= B.pad.r + 2.5 && f >= B.pad.back - 2.5 && f <= B.court.front + 2.1) grass[idx(ix, iz)] = 0;
       }
   }
 

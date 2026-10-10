@@ -42,6 +42,12 @@ What is not CC0 is listed first, with the credit its licence asks for.
   Also: Set in rigid pieces (the gun, its fore-end, its sight, the can on its muzzle) and laid along the barrel; its shell is a model of its own. Textures re-encoded as WebP; geometry compressed.
 - This work is based on "Bunker PBR Showcase Props JFG - Roblox Showcase" (https://sketchfab.com/3d-models/bunker-pbr-showcase-props-jfg-roblox-showcase-d2a3844ea1684caba53dcc6492a74176) by Jesus Fernandez Garcia (https://sketchfab.com/jamyzgenius) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
   Changes made: Only these of its shapes are used here, scaled to the rooms of the bunker and stood on the ground; textures re-encoded as WebP; geometry compressed.
+- This work is based on "WW2 Field Bunker" (https://sketchfab.com/3d-models/ww2-field-bunker-6ea5cebdaa82455aa3aad26baa6e0375) by Golden (https://sketchfab.com/goldenblack4) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Changes made: Stood on the ground as it came; textures re-encoded as WebP; geometry compressed.
+- This work is based on "Old metal bunker door" (https://sketchfab.com/3d-models/old-metal-bunker-door-a602f52789fb4bc1a46cc1d0633def60) by rakutin (https://sketchfab.com/rakutin) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Changes made: Scaled to metres and stood on the ground; textures re-encoded as WebP; geometry compressed.
+  Also: Its leaf, taken apart from its frame and turned shut; scaled to the doorway and stood on the ground; textures re-encoded as WebP; geometry compressed.
+  Also: Its frame, taken apart from its leaf; scaled to the doorway and stood on the ground; textures re-encoded as WebP; geometry compressed.
 - "Uaz-469" (https://skfb.ly/6x8RE) by Yo.Ri is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
   Changes made: Scaled to metres and turned to face the way the game drives; each wheel re-centred on its own middle; textures re-encoded as WebP; geometry compressed.
 - "sniper animated" (https://sketchfab.com/3d-models/sniper-animated-b48999a250b2433da59f705c371a49b2) by DJMaesen is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).

@@ -89,11 +89,14 @@ function boltAction(id: string): boolean {
  *           found: the underside of the gun at that place is what its top is set against (y
  *           here is added to that).
  */
-const FIT: Record<string, { dot?: { at: [number, number, number]; size: number }; light?: { at: [number, number, number]; size: number } }> = {
-  m9: { dot: { at: [0.045, 0.0835, 0.0035], size: 0.5 }, light: { at: [0.165, 0, 0.0035], size: 0.62 } },
-  p38: { dot: { at: [0.045, 0.0835, 0.0035], size: 0.5 }, light: { at: [0.155, 0, 0.0035], size: 0.62 } },
-  mosin: { light: { at: [0.36, 0, -0.0145], size: 0.85 } },
-  benelli: { light: { at: [0.234, 0, -0.017], size: 0.95 } },
+const FIT: Record<string, { dot?: { at: [number, number, number]; size: number }; light?: { at: [number, number, number]; size: number; /** how high the gun's underside is where the light hangs (measured off the model: looked for there, where it is not said) */ under?: number }; /** how far down its slide a pistol's barrel lies, as a share of the slide's height (0.42 where not said) */ bore?: number }> = {
+  // (The undersides are measured off each model. Looked for by rule, the M9's was not found at
+  // all and the other pistol's was its trigger guard: both lights hung in the air under the gun.)
+  m9: { dot: { at: [0.045, 0.0835, 0.0035], size: 0.5 }, light: { at: [0.167, 0, 0.0035], size: 0.62, under: 0.046 } },
+  p38: { dot: { at: [0.045, 0.0835, 0.0035], size: 0.5 }, light: { at: [0.19, 0, 0.0035], size: 0.62, under: 0.037 }, bore: 0.6 },
+  // (under the end of the fore-stock: under the bare barrel ahead of it there is nothing to hang it on, and it hung in the air)
+  mosin: { light: { at: [0.27, 0, -0.0145], size: 0.85, under: 0.02 } },
+  benelli: { light: { at: [0.234, 0, -0.017], size: 0.95, under: -0.018 } },
 };
 /** the pieces of a gun that come from another model, and what has to be fitted for each to be there */
 const EXTRA: Record<string, string> = { suppressor: 'suppressor_9', red_dot: 'red_dot', gun_light: 'gun_light' };
@@ -890,7 +893,7 @@ export class Weapons {
       if (piece === 'slide' || (piece === 'base' && o.kind === 'rifle')) top.union(p.geometry.boundingBox!);
     }
     // the muzzle, in the gun's own space: the front of the barrel, at the height of the bore
-    const bore = o.kind === 'pistol' ? top.max.y - (top.max.y - top.min.y) * 0.42 : THREE.MathUtils.lerp(span.min.y, span.max.y, 0.62);
+    const bore = o.kind === 'pistol' ? top.max.y - (top.max.y - top.min.y) * (FIT[o.item]?.bore ?? 0.42) : THREE.MathUtils.lerp(span.min.y, span.max.y, 0.62);
     const mouth = new THREE.Vector3(span.max.x, bore, (span.min.z + span.max.z) / 2);
     if (o.kind === 'rifle') {
       // (a rifle's body goes down to the bottom of its grip and its barrel lies along the top of
@@ -1006,7 +1009,7 @@ export class Weapons {
           if (Math.abs(v.x - fit.light.at[0]) < 0.015 && Math.abs(v.z - fit.light.at[2]) < 0.02) under = Math.min(under, v.y);
         }
       }
-      const at: [number, number, number] = [fit.light.at[0], (Number.isFinite(under) ? under : 0) + fit.light.at[1] + 0.003, fit.light.at[2]];
+      const at: [number, number, number] = [fit.light.at[0], (fit.light.under ?? (Number.isFinite(under) ? under : 0)) + fit.light.at[1] + 0.003, fit.light.at[2]];
       // (hung by its top: the model stands on its own ground, so it is let down by its height)
       const light = await fitted('gun_light', 'gun_light', at, fit.light.size, 'base', (obj, box) => (obj.position.y -= box.max.y - box.min.y));
       rig.root.updateMatrixWorld(true);
