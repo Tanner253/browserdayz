@@ -20,7 +20,7 @@ const GLARES = 96;
 /** how strong a beam of power 1 is (candela, as three counts it), how far it carries, and how wide it is (radians, half) */
 const BEAM = { power: 170, reach: 75, half: 0.36, soft: 0.7 };
 
-interface Beam { pos: THREE.Vector3; dir: THREE.Vector3; power: number; wide: number; d2: number }
+interface Beam { pos: THREE.Vector3; dir: THREE.Vector3; power: number; wide: number; glare: number; d2: number }
 interface Glow { pos: THREE.Vector3; color: THREE.Color; power: number; reach: number; d2: number }
 
 const _v = new THREE.Vector3();
@@ -118,9 +118,15 @@ export class Lamps {
     this.pool.visible = false;
   }
 
-  /** This frame, a lamp that throws a beam: a flashlight, a headlight. @param power 1 is a flashlight @param wide 1 is a flashlight's cone */
-  beam(pos: THREE.Vector3, dir: THREE.Vector3, power = 1, wide = 1) {
-    const b = (this.beams[this.nBeams] ??= { pos: new THREE.Vector3(), dir: new THREE.Vector3(), power: 1, wide: 1, d2: 0 });
+  /**
+   * This frame, a lamp that throws a beam: a flashlight, a headlight.
+   * @param power 1 is a flashlight @param wide 1 is a flashlight's cone
+   * @param glare how much of a bright disc it is to whoever looks into it (1: a headlight; 0: none, which is a lamp in
+   *   somebody's hand: the disc sat on their chest like a ball of white light, and they are lit by the beam they throw)
+   */
+  beam(pos: THREE.Vector3, dir: THREE.Vector3, power = 1, wide = 1, glare = 1) {
+    const b = (this.beams[this.nBeams] ??= { pos: new THREE.Vector3(), dir: new THREE.Vector3(), power: 1, wide: 1, glare: 1, d2: 0 });
+    b.glare = glare;
     b.pos.copy(pos);
     b.dir.copy(dir).normalize();
     b.power = power;
@@ -205,7 +211,7 @@ export class Lamps {
     };
     for (const b of beams) {
       const facing = _v.copy(eye).sub(b.pos).normalize().dot(b.dir);
-      put(b.pos, b.d2, 1, 0.94, 0.8, Math.max(0, (facing - 0.25) / 0.75) * Math.min(1.6, b.power) * 1.3);
+      put(b.pos, b.d2, 1, 0.94, 0.8, b.glare * Math.max(0, (facing - 0.25) / 0.75) * Math.min(1.6, b.power) * 1.3);
     }
     for (const w of glows) put(w.pos, w.d2, w.color.r, w.color.g, w.color.b, 0.55 * w.power);
     this.glare.count = n;

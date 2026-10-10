@@ -527,6 +527,41 @@ function plainMaterial(m: THREE.Material): THREE.Material {
 /** a weapon pack's material for the hands' own scene: plain, and lifted out of the dark (see liftPack) */
 const packMaterial = (m: THREE.Material) => liftPack(plainMaterial(m));
 
+/** the glass of a holographic sight: nearly nothing, a little green, and the sky in it */
+const SIGHT_GLASS = new THREE.MeshStandardMaterial({ name: 'sight-glass', color: 0x9fd8c6, roughness: 0.05, metalness: 0, transparent: true, opacity: 0.12, depthWrite: false, side: THREE.DoubleSide, envMapIntensity: 1.4 });
+const _texels = new WeakMap<THREE.Texture, ImageData | null>();
+/**
+ * Whether a piece of the sight is its pane of glass. The model has no glass in it: the pane is a slab like any
+ * other piece, and is told from the rest only by being painted black (it was drawn so, a black window that nothing
+ * was seen through). So: a piece of a few flat faces, every corner of which is black in the sight's own picture.
+ */
+function isPane(geometry: THREE.BufferGeometry, material: THREE.Material): boolean {
+  const map = (material as THREE.MeshStandardMaterial).map, uv = geometry.getAttribute('uv');
+  const tris = (geometry.getIndex()?.count ?? geometry.getAttribute('position').count) / 3;
+  if (!map || !uv || tris > 16) return false;
+  if (!_texels.has(map)) {
+    let data: ImageData | null = null;
+    try {
+      const c = document.createElement('canvas');
+      c.width = c.height = 256;
+      const g = c.getContext('2d', { willReadFrequently: true })!;
+      g.drawImage(map.image as CanvasImageSource, 0, 0, 256, 256);
+      data = g.getImageData(0, 0, 256, 256);
+    } catch {
+      /* a picture that cannot be read: nothing is taken for glass */
+    }
+    _texels.set(map, data);
+  }
+  const px = _texels.get(map);
+  if (!px) return false;
+  for (let i = 0; i < uv.count; i++) {
+    const u = uv.getX(i) - Math.floor(uv.getX(i)), v0 = uv.getY(i) - Math.floor(uv.getY(i)), v = map.flipY ? 1 - v0 : v0;
+    const k = (Math.min(255, Math.floor(v * 256)) * 256 + Math.min(255, Math.floor(u * 256))) * 4;
+    if (px.data[k] + px.data[k + 1] + px.data[k + 2] > 60) return false;
+  }
+  return true;
+}
+
 export class Weapons {
   private vmRoot = new THREE.Group();
   private models = new Map<string, VmModel>();
@@ -956,8 +991,11 @@ export class Weapons {
         obj.name = name;
         for (const p of extractParts(await assets.model(modelId))) {
           const reticle = /crosshair/i.test((p.material as THREE.Material).name);
-          const mesh = new THREE.Mesh(p.geometry, reticle ? reticleMaterial(p.material) : packMaterial(p.material));
+          // (its pane is glass: see isPane)
+          const pane = !reticle && isPane(p.geometry, p.material);
+          const mesh = new THREE.Mesh(p.geometry, reticle ? reticleMaterial(p.material) : pane ? SIGHT_GLASS : packMaterial(p.material));
           mesh.name = reticle ? 'reticle' : name;
+          if (pane) mesh.renderOrder = 19;
           mesh.castShadow = false;
           if (reticle) {
             // (twice the size it was modelled, about its own middle: at arm's length it was a speck. And drawn last, over the glass.)

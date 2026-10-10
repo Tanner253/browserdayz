@@ -1460,13 +1460,13 @@ export class Game {
     }
     if (!carried || p.dead || !this.started) this.lit = false;
     if (this.lit && !this.garage.ride) {
-      if (this.weapons.hasLamp) this.lamps.beam(this.weapons.lampWorld(cam, _lampPos), _lampDir.set(0, 0, -1).applyQuaternion(cam.quaternion), 1.5, 0.85);
+      if (this.weapons.hasLamp) this.lamps.beam(this.weapons.lampWorld(cam, _lampPos), _lampDir.set(0, 0, -1).applyQuaternion(cam.quaternion), 1.5, 0.85, 0);
       // (the lantern: from the chest and tipped a little down, so that it lights the ground walked on; wide, and not far)
-      else this.lamps.beam(_lampPos.set(0.16, -0.3, -0.15).applyQuaternion(cam.quaternion).add(cam.position), _lampDir.set(0, -0.09, -1).applyQuaternion(cam.quaternion), 1, 1.3);
+      else this.lamps.beam(_lampPos.set(0.16, -0.3, -0.15).applyQuaternion(cam.quaternion).add(cam.position), _lampDir.set(0, -0.09, -1).applyQuaternion(cam.quaternion), 1, 1.3, 0);
     }
     for (const r of this.remotes.values()) {
       const l = r.lamp(_lampPos, _lampDir);
-      if (l) this.lamps.beam(_lampPos, _lampDir, l.power, l.wide);
+      if (l) this.lamps.beam(_lampPos, _lampDir, l.power, l.wide, 0);
     }
     const dark = atmo.night > 0.3;
     // headlights: a jeep's lamps are on while it is driven, and after dark they light the road
