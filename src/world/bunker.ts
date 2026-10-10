@@ -167,6 +167,135 @@ function signPaint(text: string) {
   return signs.get(text)!;
 }
 
+/** blood, long dry: a pool with what was thrown off it (even `v`), or what was dragged through one (odd) */
+const stains = new Map<number, THREE.CanvasTexture>();
+function stainPaint(v: number) {
+  if (!stains.has(v)) {
+    stains.set(v, painted(256, 256, (g, rnd) => {
+      const blot = (x: number, y: number, r: number, a: number) => {
+        const gr = g.createRadialGradient(x, y, r * 0.15, x, y, r);
+        gr.addColorStop(0, `rgba(40, 7, 5, ${a})`);
+        gr.addColorStop(0.72, `rgba(54, 11, 7, ${a * 0.9})`);
+        gr.addColorStop(1, 'rgba(54, 11, 7, 0)');
+        g.fillStyle = gr;
+        g.beginPath();
+        g.arc(x, y, r, 0, Math.PI * 2);
+        g.fill();
+      };
+      if (v % 2 === 0) {
+        for (let i = 0; i < 9; i++) blot(128 + (rnd() - 0.5) * 84, 128 + (rnd() - 0.5) * 84, 26 + rnd() * 40, 0.78);
+        for (let i = 0; i < 30; i++) {
+          const a = rnd() * Math.PI * 2, far = 62 + rnd() * 52;
+          blot(128 + Math.cos(a) * far, 128 + Math.sin(a) * far, 1.5 + rnd() * 6.5, 0.72);
+        }
+      } else {
+        g.lineCap = 'round';
+        for (let i = 0; i < 18; i++) {
+          const x = 78 + rnd() * 100;
+          g.strokeStyle = `rgba(50, 10, 7, ${(0.2 + rnd() * 0.45).toFixed(2)})`;
+          g.lineWidth = 3 + rnd() * 15;
+          g.beginPath();
+          g.moveTo(x, 22 + rnd() * 34);
+          g.bezierCurveTo(x + (rnd() - 0.5) * 34, 90, x + (rnd() - 0.5) * 34, 168, x + (rnd() - 0.5) * 26, 232 - rnd() * 34);
+          g.stroke();
+        }
+        for (let i = 0; i < 5; i++) blot(90 + rnd() * 76, 40 + rnd() * 176, 8 + rnd() * 14, 0.5);
+      }
+    }, 900 + v * 17, false));
+  }
+  return stains.get(v)!;
+}
+
+/** words put on a wall with a brush by somebody in a hurry: `|` breaks the line; v 0 is whitewash, 1 red */
+const scrawls = new Map<string, THREE.CanvasTexture>();
+function scrawlPaint(text: string, v: number) {
+  const key = `${v}:${text}`;
+  if (!scrawls.has(key)) {
+    scrawls.set(key, painted(1024, 256, (g, rnd) => {
+      const rows = text.split('|');
+      const size = rows.length > 1 ? 104 : 136;
+      g.font = `900 ${size}px Impact, "Arial Black", "Arial Narrow", Arial, sans-serif`;
+      g.textBaseline = 'middle';
+      g.textAlign = 'center';
+      const ink = v === 1 ? '148, 24, 16' : '212, 206, 188';
+      rows.forEach((row, li) => {
+        const all = g.measureText(row).width, k = Math.min(1, 950 / all);
+        let x = 512 - (all * k) / 2;
+        const y = 132 + (li - (rows.length - 1) / 2) * size * 1.04;
+        for (const ch of row) {
+          const cw = g.measureText(ch).width * k;
+          g.save();
+          g.translate(x + cw / 2, y + (rnd() - 0.5) * size * 0.1);
+          g.rotate((rnd() - 0.5) * 0.13);
+          g.scale(k, 1 + (rnd() - 0.5) * 0.14);
+          g.fillStyle = `rgba(${ink}, ${(0.7 + rnd() * 0.22).toFixed(2)})`;
+          g.fillText(ch, 0, 0);
+          g.restore();
+          // (paint that ran)
+          if (ch !== ' ' && rnd() < 0.3) {
+            g.fillStyle = `rgba(${ink}, 0.55)`;
+            g.fillRect(x + cw * (0.25 + rnd() * 0.5), y + size * 0.28, 3 + rnd() * 3, 12 + rnd() * 46);
+          }
+          x += cw;
+        }
+      });
+      // (and what the years have taken off it)
+      g.globalCompositeOperation = 'destination-out';
+      for (let i = 0; i < 1100; i++) {
+        g.fillStyle = `rgba(0, 0, 0, ${(0.25 + rnd() * 0.6).toFixed(2)})`;
+        g.fillRect(rnd() * 1024, rnd() * 256, 2 + rnd() * 11, 1 + rnd() * 3);
+      }
+      g.globalCompositeOperation = 'source-over';
+    }, 77 + text.length * 13 + v, false));
+  }
+  return scrawls.get(key)!;
+}
+
+/** warning paint on a floor: yellow and black on the slant, scuffed by years of boots */
+let hazardTex: THREE.CanvasTexture | null = null;
+function hazardPaint() {
+  return (hazardTex ??= painted(128, 128, (g, rnd) => {
+    g.fillStyle = '#16170f';
+    g.fillRect(0, 0, 128, 128);
+    g.fillStyle = '#a8842a';
+    for (let x = -128; x < 256; x += 64) {
+      g.beginPath();
+      g.moveTo(x, 128);
+      g.lineTo(x + 32, 128);
+      g.lineTo(x + 160, 0);
+      g.lineTo(x + 128, 0);
+      g.fill();
+    }
+    for (let i = 0; i < 260; i++) {
+      g.fillStyle = `rgba(70, 72, 68, ${(0.2 + rnd() * 0.5).toFixed(2)})`;
+      g.fillRect(rnd() * 128, rnd() * 128, 1 + rnd() * 9, 1 + rnd() * 3);
+    }
+  }, 4242));
+}
+
+/** the cover of a mattress: pale ticking with a blue stripe in it, and what years of use have left on that */
+let tickTex: THREE.CanvasTexture | null = null;
+function tickPaint() {
+  return (tickTex ??= painted(256, 256, (g, rnd) => {
+    g.fillStyle = '#8f8a78';
+    g.fillRect(0, 0, 256, 256);
+    for (let x = 6; x < 256; x += 32) {
+      g.fillStyle = 'rgba(52, 62, 84, 0.75)';
+      g.fillRect(x, 0, 5, 256);
+      g.fillStyle = 'rgba(52, 62, 84, 0.4)';
+      g.fillRect(x + 9, 0, 1.5, 256);
+    }
+    for (let i = 0; i < 14; i++) {
+      const x = rnd() * 256, y = rnd() * 256, r = 18 + rnd() * 46;
+      const gr = g.createRadialGradient(x, y, r * 0.2, x, y, r);
+      gr.addColorStop(0, `rgba(58, 44, 26, ${(0.2 + rnd() * 0.3).toFixed(2)})`);
+      gr.addColorStop(1, 'rgba(58, 44, 26, 0)');
+      g.fillStyle = gr;
+      g.fillRect(x - r, y - r, r * 2, r * 2);
+    }
+  }, 5151));
+}
+
 /** a box whose faces carry the picture at one size whatever the box's own: so many metres to one turn of it */
 function boxGeo(w: number, h: number, d: number, per = 2.6): THREE.BoxGeometry {
   const g = new THREE.BoxGeometry(w, h, d);
@@ -366,6 +495,15 @@ export class BunkerSite {
     const dark = mat(new THREE.MeshStandardMaterial({ color: 0x191a18, roughness: 0.7, metalness: 0.4 }));
     const cloth = mat(new THREE.MeshStandardMaterial({ color: 0x4d4a3a, roughness: 0.97 }));
     const hazard = mat(new THREE.MeshStandardMaterial({ color: 0xb8922a, roughness: 0.6, metalness: 0.3 }));
+    const ticking = mat(new THREE.MeshStandardMaterial({ map: tickPaint(), roughness: 0.96, metalness: 0 }));
+    const linePaint = mat(new THREE.MeshStandardMaterial({ color: 0x9c7c24, roughness: 0.8, metalness: 0 }));
+    const warnPaint = mat(new THREE.MeshStandardMaterial({ map: hazardPaint(), roughness: 0.8, metalness: 0 }));
+    // (paint and blood lie ON the floor and the walls: seen through where there is none, and never in front of what stands on them)
+    const laid = new Map<string, THREE.MeshStandardMaterial>();
+    const onIt = (key: string, map: THREE.Texture, rough: number) => {
+      if (!laid.has(key)) laid.set(key, mat(new THREE.MeshStandardMaterial({ map, transparent: true, depthWrite: false, roughness: rough, metalness: 0, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })));
+      return laid.get(key)!;
+    };
     const screen = new THREE.MeshStandardMaterial({ color: 0x0b120c, emissive: new THREE.Color(0.25, 1, 0.45), emissiveMap: screenPaint(), emissiveIntensity: 1.6, roughness: 0.3 });
     atmo.register(screen);
     /** shapes waiting to be drawn, by what they are made of: all of one stuff is one thing to draw */
@@ -474,6 +612,28 @@ export class BunkerSite {
         case 'duct': {
           slab(grey, w, h, d, 0, 0, 0);
           for (let z = -d / 2 + 1; z < d / 2; z += 2.4) slab(dark, w + 0.02, h + 0.02, 0.04, 0, -0.01, z);
+          break;
+        }
+        case 'mattress': {
+          slab(ticking, w, h, d, 0, 0, 0);
+          break;
+        }
+        case 'stripe': {
+          // a line of paint, or (text: 'hazard') a patch of warning paint, a carpet's thickness over the floor
+          if (m.text === 'hazard') {
+            const geo = new THREE.PlaneGeometry(w, d).rotateX(-Math.PI / 2);
+            const uv = geo.getAttribute('uv') as THREE.BufferAttribute;
+            for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * (w / 0.9), uv.getY(i) * (d / 0.9));
+            part(geo, warnPaint, 0, 0.004, 0);
+          } else slab(linePaint, w, h, d, 0, 0.001, 0);
+          break;
+        }
+        case 'stain': {
+          part(new THREE.PlaneGeometry(w, d).rotateX(-Math.PI / 2), onIt(`stain${m.v ?? 0}`, stainPaint(m.v ?? 0), 0.45), 0, 0.009, 0);
+          break;
+        }
+        case 'scrawl': {
+          part(new THREE.PlaneGeometry(w, h), onIt(`scrawl${m.v ?? 0}:${m.text ?? ''}`, scrawlPaint(m.text ?? '', m.v ?? 0), 0.9), 0, h / 2, 0.006);
           break;
         }
         case 'grate': {

@@ -1235,6 +1235,14 @@ export class Weapons {
     return this.currentItem;
   }
 
+  /**
+   * Are the hands empty? Nothing is held; or what was held is being put away with nothing to come out after
+   * it (the pace picks up as the gun goes down, not a third of a second after: it is the key that is felt).
+   */
+  get handsEmpty() {
+    return !this.currentItem || (this.action?.name === 'unequip' && this.action.data?.away === 1);
+  }
+
   /** current weapon status for the HUD */
   status() {
     const it = this.currentItem;
@@ -1276,7 +1284,7 @@ export class Weapons {
       }
       this.onSlungChange(this.slungModel());
     };
-    if (this.current) this.start('unequip', 0.28, swap);
+    if (this.current) this.start('unequip', 0.28, swap, { away: next ? 0 : 1 });
     else swap();
   }
 

@@ -91,7 +91,7 @@ interface TimedAction {
 }
 
 /** bump when the map's loot points change: spawned loot from older saves is re-rolled */
-const LOOT_REV = 13;
+const LOOT_REV = 14;
 const QUICK_KEYS = ['Digit5', 'Digit6', 'Digit7', 'Digit8'];
 /** what can be held, in the order of the keys 1 to 4 */
 const HAND_SLOTS = ['primary', 'secondary', 'holster', 'melee'] as const;
@@ -2496,12 +2496,14 @@ export class Game {
 
     const canMove = !uiOpen && playing && !typing;
     const moveInput = canMove ? input : NULL_INPUT;
+    // (are the hands empty: asked of what is in them, and every frame. It was asked five times a second, and of
+    // which slot the inventory said was out, which is not the same thing when what was out has been dropped.)
+    p.emptyHanded = this.weapons.handsEmpty && !this.use;
     // carried weight and gear effects only change with the inventory: a few times a second is plenty
     this.slowT += dt;
     if (this.slowT > 0.2) {
       this.slowT = 0;
       p.weightKg = this.inv.weight();
-      p.emptyHanded = this.inv.active === null && !this.use;
       p.fallMult = this.inv.wear('fall').reduce((a, b) => a * b, 1);
       p.thirstMult = this.inv.wear('thirst').reduce((a, b) => a * b, 1);
       this.hasCompass = !!this.inv.find((i) => i.id === 'compass');

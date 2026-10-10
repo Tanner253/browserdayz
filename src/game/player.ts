@@ -42,8 +42,10 @@ export interface Vitals {
 
 /** metres a second hurrying in a crouch: creeping is 1.9, a jog upright 4, a sprint 6.2 */
 const CROUCH_RUN = 3.3;
-/** how much faster somebody runs with their hands empty */
+/** how much faster somebody moves with their hands empty: at a walk, in a crouch and at a run alike */
 const HANDS_FREE = 1.2;
+/** and how much slower with a gun held at the eye */
+const AIM_SLOW = 0.8;
 
 export class Player {
   body!: RAPIER.RigidBody;
@@ -70,7 +72,7 @@ export class Player {
   /** externally supplied (weapons): ADS + weapon weight slow the player */
   aiming = false;
   weightKg = 0;
-  /** nothing is held: whatever is carried is holstered or slung */
+  /** nothing is held: whatever is carried is holstered or slung, or is on its way there (said every frame: see Weapons.handsEmpty) */
   emptyHanded = false;
   /** how fast thirst grows, from headwear */
   thirstMult = 1;
@@ -248,9 +250,12 @@ export class Player {
     const enc = Math.max(0, this.weightKg - 18) * 0.012; // encumbrance
     let speed = this.crouched ? (this.scurrying ? CROUCH_RUN : 1.9) : walk ? 1.7 : 4.0;
     if (this.sprinting) speed = 6.2;
-    // (with nothing in the hands, whatever was carried put away, running is a fifth faster)
-    if (this.emptyHanded && !this.crouched && !walk) speed *= HANDS_FREE;
-    if (this.aiming) speed = Math.min(speed, this.crouched ? 1.2 : 1.9);
+    // With nothing in the hands, whatever was carried put away, everything is a fifth faster: the one rule, and
+    // no exceptions to it. (It was only so upright and at a jog or a run, and what was asked was whether the
+    // hands are empty.) With a gun at the eye, a fifth slower. (That was a creep, 1.9 m/s whatever the pace
+    // had been. Aiming still ends a sprint: see wantsSprint.)
+    if (this.emptyHanded) speed *= HANDS_FREE;
+    if (this.aiming) speed *= AIM_SLOW;
     if (fwd < 0) speed *= 0.75;
     speed *= Math.max(0.55, 1 - enc) * (v.health < 30 ? 0.8 : 1);
     if (this.stumble > 0) {

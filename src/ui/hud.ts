@@ -45,6 +45,8 @@ export interface HotbarEntry {
 
 /** where the game is talked about, and its token's address on Solana: both shown on the main menu */
 export const X_HANDLE = 'zonaSOL_';
+/** where its players talk to each other: the way in to the Discord, on the main menu */
+export const DISCORD = 'https://discord.com/invite/8ECdSH2vWE';
 export const CONTRACT = 'GvfAzdPF466PJsPJMzXQeX3TSqmJm9YxAG8xBJ6ypump';
 
 /** the wheel: eight wedges round a hub, the first at the top and the rest clockwise (the order of EMOTES) */
@@ -147,6 +149,7 @@ export class HUD {
           </nav>
           <div class="sm-status">
             <span class="start-online"></span>
+            <a class="sm-discord" href="${DISCORD}" target="_blank" rel="noopener noreferrer"><b>Discord</b><em>Join</em></a>
           </div>
         </header>
         <div class="sm-main">

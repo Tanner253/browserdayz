@@ -879,6 +879,13 @@
 .start-online.show { display: block; }
 .start-online.show::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 6px var(--ok); vertical-align: 1px; animation: live-dot 2.4s ease-in-out infinite; }
 .start-online.full { color: var(--brand); }
+/* the way in to the Discord: a button, the one thing up here that is one */
+.sm-discord { display: inline-flex; align-items: center; gap: 10px; padding: 7px 12px 8px; font-family: var(--mono); white-space: nowrap; text-decoration: none; color: var(--ink); background: rgba(10, 12, 11, 0.6); border: 1px solid var(--line); transition: border-color 0.15s, background 0.15s; }
+.sm-discord b { font-size: 11px; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; }
+.sm-discord em { font-size: 10px; font-style: normal; letter-spacing: 0.16em; text-transform: uppercase; color: var(--brand); }
+.sm-discord:hover { border-color: var(--brand); background: rgba(255, 211, 90, 0.08); }
+.sm-discord:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.hud-start.paused .sm-discord { cursor: pointer; }
 .start-online.full::before { background: var(--brand); box-shadow: 0 0 6px var(--brand); }
 @keyframes live-dot { 50% { opacity: 0.35; } }
 

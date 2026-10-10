@@ -61,7 +61,7 @@ const SHELF_LEVELS: Record<string, number[]> = {
   steel_frame_shelves_01: [0.13, 0.64, 1.15, 1.65],
 };
 /** furniture whose loot sits on the very top of the model (height taken from the model, not hand-typed) */
-const TOP_SURFACE = new Set(['WoodenTable_01', 'electric_stove', 'painted_wooden_cabinet', 'metal_office_desk']);
+const TOP_SURFACE = new Set(['WoodenTable_01', 'painted_wooden_table', 'electric_stove', 'painted_wooden_cabinet', 'metal_office_desk']);
 
 type MatKey =
   | 'plaster_ext' | 'brick_ext' | 'planks_ext' | 'planks' | 'int_plaster' | 'int_painted'
@@ -809,7 +809,9 @@ export class Buildings {
       const plan = bunkerPlan(), Y = levelY();
       const point = (r: number, f: number, y: number, floor: boolean, surf?: LootPoint['surf']) => {
         const [x, wy, z] = bunkerAt(at, r, f, y);
-        this.lootPoints.push({ x, y: wy + 0.02, z, usage: ['Bunker'], building: 'bunker', floor, ...(surf ? { surf } : {}) });
+        // (on the floor a thing lies a finger over it, as everywhere; on a table or a shelf it lies ON it: that
+        // finger, and a mess table whose top was taken to be a metre up, had things hanging in the air over them)
+        this.lootPoints.push({ x, y: wy + (floor ? 0.02 : 0.003), z, usage: ['Bunker'], building: 'bunker', floor, ...(surf ? { surf } : {}) });
       };
       for (const st of plan.stood) {
         const [x, y, z] = bunkerAt(at, st.r, st.f, Y + (st.y ?? 0));
@@ -830,7 +832,7 @@ export class Buildings {
             const ox = along ? centre : 0, oz = along ? 0 : centre;
             const r = st.r + ox * c + oz * sn, f = st.f - ox * sn + oz * c;
             const [sx, , sz] = bunkerAt(at, r, f);
-            point(r, f, Y + (st.y ?? 0) + ly + 0.003, false, { x: sx, z: sz, rot: st.rot + at.rot, hx: along ? L / n : hx, hz: along ? hz : L / n, clear: SHELF_CLEARANCE[st.id] ?? 10 });
+            point(r, f, Y + (st.y ?? 0) + ly, false, { x: sx, z: sz, rot: st.rot + at.rot, hx: along ? L / n : hx, hz: along ? hz : L / n, clear: SHELF_CLEARANCE[st.id] ?? 10 });
           }
         }
       }
