@@ -153,6 +153,8 @@ export interface POI {
 
 export interface World {
   heights: Float32Array;
+  /** the ground as it is seen from above: `heights`, but for the roof of the bunker, which lies level with the ground about it over the hole the bunker stands in. What grows is drawn at this height. */
+  surface: Float32Array;
   /** RGBA weights: grass, forest floor, rock, gravel */
   splat: Uint8Array;
   /** grass blade density 0..255 */
@@ -1023,6 +1025,8 @@ export function generateWorld(seed = WORLD_SEED): World {
   // foot of the hills straight across the map from the works. By the same rule: nothing that
   // was there before is moved or renumbered, and the ground is touched only where it stands.
   // Its mouth opens straight onto the valley floor: there is no track to it.
+  /** the ground as it is seen from above, where that is not the ground there is (over the bunker) */
+  let surface: Float32Array | null = null;
   {
     const B = BUNKER;
     const before = heights.slice();
@@ -1043,40 +1047,50 @@ export function generateWorld(seed = WORLD_SEED): World {
         const w = 1 - (0.3 * smoothstep(0, 1, t) + 0.7 * t);
         const i = idx(ix, iz);
         // (dead level under and about the pad: a slab is laid on it)
-        const level = floorY + 0.3 * n3.fbm(x * 0.02 + 5, z * 0.02, 3) * smoothstep(21, 28, d);
+        const level = floorY + 0.3 * n3.fbm(x * 0.02 + 5, z * 0.02, 3) * smoothstep(36, 44, d);
         heights[i] = lerp(heights[i], level + (heights[i] - level) * 0.12 * t, w);
-        // the hole the first level stands in
-        const dx = x - bx, dz = z - bz;
-        const r = dx * Math.cos(rot) - dz * Math.sin(rot), f = dx * Math.sin(rot) + dz * Math.cos(rot);
-        if (Math.abs(r) <= B.pit.r && f >= B.pit.back && f <= B.pit.front) heights[i] = floorY - B.depth - 0.3;
       }
     }
     sites.push({ name: B.name, kind: 'bunker', x: bx, z: bz, rot, later: true });
     pois.push({ name: B.name, x: bx, z: bz, radius: 40 });
-    // what grew or lay there: nothing on its floor, nothing left hanging on the cut hillside
+    const local = (x: number, z: number): [number, number] => {
+      const dx = x - bx, dz = z - bz;
+      return [dx * Math.cos(rot) - dz * Math.sin(rot), dx * Math.sin(rot) + dz * Math.cos(rot)];
+    };
+    // What grew or lay there stays: it is the foot of a wooded hill, and is to look like nothing else. (It was cleared
+    // to bare gravel, forty metres across, with a slab in the middle of it: a place nobody could miss.) Only what would
+    // stand in the house, in its yard or in the way out of it goes, and what was left hanging on the cut hillside.
     for (const list of [trees, rocks, props]) {
       for (let k = list.length - 1; k >= 0; k--) {
         const t = list[k];
         const d = Math.hypot(t.x - bx, t.z - bz);
         if (d > R + 2) continue;
-        if (d < B.floor + 4 || slopeAt(heights, t.x, t.z) > 1.05) list.splice(k, 1);
+        const [r, f] = local(t.x, t.z);
+        if ((Math.abs(r) < 6.5 && f > 7.5 && f < 23) || slopeAt(heights, t.x, t.z) > 1.05) list.splice(k, 1);
         else t.y += heightAt(heights, t.x, t.z) - heightAt(before, t.x, t.z);
       }
     }
-    // and the ground is painted again where any of this reaches (its floor is gravel, as the works' is)
-    cleared = { x: bx, z: bz, r: B.floor };
+    // The ground is painted again where any of this reaches, as the hillside about it is painted: grass, and the
+    // floor of a wood. Grass grows on all of it but the house's own floor and its yard.
     for (let iz = Math.max(0, Math.floor((bz - R - 6 + half) / CELL)); iz <= Math.min(N - 1, Math.ceil((bz + R + 6 + half) / CELL)); iz++)
       for (let ix = Math.max(0, Math.floor((bx - R - 6 + half) / CELL)); ix <= Math.min(N - 1, Math.ceil((bx + R + 6 + half) / CELL)); ix++) {
         paint(ix, iz);
-        // (no grass under the pad, nor in the hole: it would stand up through the concrete)
-        const dx = -half + ix * CELL - bx, dz = -half + iz * CELL - bz;
-        const r = dx * Math.cos(rot) - dz * Math.sin(rot), f = dx * Math.sin(rot) + dz * Math.cos(rot);
-        if (Math.abs(r) <= B.pad.r + 2.5 && f >= B.pad.back - 2.5 && f <= B.court.front + 2.1) grass[idx(ix, iz)] = 0;
+        const [r, f] = local(-half + ix * CELL, -half + iz * CELL);
+        if (Math.abs(r) <= 3.8 && f >= B.hut.back - 1 && f <= B.court.front + 0.8) grass[idx(ix, iz)] = 0;
+      }
+    // That is the ground as it is seen (`surface`): the roof of the place lies level with it and is drawn as it is
+    // (see BunkerSite), grass and all. Under that roof the ground itself is dug out, for the first level to stand in.
+    surface = heights.slice();
+    for (let iz = Math.max(0, Math.floor((bz - R + half) / CELL)); iz <= Math.min(N - 1, Math.ceil((bz + R + half) / CELL)); iz++)
+      for (let ix = Math.max(0, Math.floor((bx - R + half) / CELL)); ix <= Math.min(N - 1, Math.ceil((bx + R + half) / CELL)); ix++) {
+        const [r, f] = local(-half + ix * CELL, -half + iz * CELL);
+        if (Math.abs(r) <= B.pit.r && f >= B.pit.back && f <= B.pit.front) heights[idx(ix, iz)] = floorY - B.depth - 0.3;
       }
   }
 
   return {
     heights,
+    surface: surface ?? heights,
     splat,
     grass,
     road: { points: roadPts, width: ROAD_W },

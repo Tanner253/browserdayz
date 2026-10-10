@@ -234,7 +234,8 @@ export class BunkerSite {
   /** what stops a body, for each thing made here that does: by where it stands (see spotKey) */
   readonly solidAt = new Map<string, RAPIER.Collider>();
 
-  constructor(world: World, atmo: Atmosphere, scene: THREE.Scene) {
+  /** @param ground what the ground is drawn with: the bunker's roof is drawn with the same, where it lies under the open sky */
+  constructor(world: World, atmo: Atmosphere, scene: THREE.Scene, ground: THREE.Material | null = null) {
     this.place = bunkerPlace(world);
     const P = this.place;
     if (!P) return;
@@ -269,10 +270,10 @@ export class BunkerSite {
     // ---- the pad over the hole, open only where the stair comes up inside the hut
     const top = B.pad.top, under = top - 0.45, hole = B.hut.back + 0.5, head = B.stair.foot + B.stair.run + 0.5;
     const up = { shadow: true };
-    // (Nothing of it is seen from above but the house: the roof of the place lies level with the ground and is the
-    // ground to look at, the same earth and stones as lie about it. Under the house it is the house's floor.)
-    const earthOf = assets.pbr('rocks_ground_02');
-    const earth = mat(new THREE.MeshStandardMaterial({ map: earthOf.map, normalMap: earthOf.normalMap, roughness: 1, metalness: 0 }));
+    // (Nothing of it is seen from above but the house: the roof of the place lies level with the ground and is drawn
+    // with the ground's own paint, which goes by where a thing is in the world: grass where the hillside is grass,
+    // the floor of a wood where it is that. Grass grows on it and trees stand on it: see `surface` in worldgen.)
+    const earth = ground ?? outside;
     const roof = [outside, outside, earth, outside, outside, outside];
     block(-B.pad.r, B.pad.r, B.pad.back, hole, under, top, roof, up);
     block(-B.pad.r, -B.stair.half, hole, B.pad.front, under, top, roof, up);
@@ -558,8 +559,9 @@ export class BunkerSite {
       block(S.half - 0.08, S.half - 0.07, L.front + 0.38, L.front + 0.46, Y + 1.34, Y + 1.39, atmo.register(this.readerLamp), { solid: false });
       // the slot the card goes into
       block(S.half - 0.078, S.half - 0.07, L.front + 0.35, L.front + 0.49, Y + 1.2, Y + 1.216, dark, { solid: false });
-      // and the arm the lamp over the door hangs from (the lamp itself is one of the plan's)
-      block(-0.04, 0.04, L.front, L.front + B.door.lamp + 0.1, Y + 2.87, Y + 2.93, dark, { solid: false });
+      // The wall the door is in goes on up to the ceiling of the stair's shaft: the level's own wall stops at the
+      // level's ceiling, and over it there was a window on to the sky and the top of the bunker's roof.
+      block(-S.half - 0.3, S.half + 0.3, L.front - 0.4, L.front, T, under, inside);
     }
     // ---- and the way down to the levels below, at the far end of the passage: shut, for now
     {
@@ -657,7 +659,8 @@ export class BunkerSite {
       });
       for (const m of stuffs) {
         const s = m as THREE.MeshStandardMaterial;
-        if (!s.isMeshStandardMaterial) continue;
+        // (not the ground's own paint: that is every hill's, and no lamp of the bunker's shines on those)
+        if (!s.isMeshStandardMaterial || m === ground) continue;
         s.lightMap = glow;
         s.lightMapIntensity = LAMP_GLOW;
       }

@@ -249,7 +249,7 @@ export class Game {
     this.effects = new Effects(r.scene, atmo);
     this.fires = new Fires(world, r.scene, this.effects, atmo);
     this.lamps = new Lamps(r.scene);
-    this.bunker = new BunkerSite(world, atmo, r.scene);
+    this.bunker = new BunkerSite(world, atmo, r.scene, ((this.s.terrain.mesh?.children[0] as THREE.Mesh | undefined)?.material as THREE.Material | undefined) ?? null);
     // its door is loud: heard across the valley, by whoever is playing and by the infected
     this.bunker.onMove = (opening) => {
       const at = this.bunker.doorAt(new THREE.Vector3());

@@ -144,7 +144,7 @@ export class Terrain {
 
     // --- data textures shared with grass / vegetation shaders
     const hf = new Float32Array(N * N);
-    hf.set(heights);
+    hf.set(this.world.surface);
     this.heightTex = new THREE.DataTexture(hf, N, N, THREE.RedFormat, THREE.FloatType);
     this.heightTex.magFilter = this.heightTex.minFilter = THREE.LinearFilter;
     this.heightTex.needsUpdate = true;

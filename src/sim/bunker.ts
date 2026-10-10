@@ -39,11 +39,11 @@ export const BUNKER = {
   /** the walled yard before its door (the house is a model, "WW2 Field Bunker": see BunkerSite): how far out it reaches either side and to the front, and which side it is open to (-1: toward -r) */
   court: { r: 2.9, front: 18.9, open: -1 },
   /** where that model's own middle stands: forward of the bunker's own, and how far it is let into the ground */
-  house: { f: 13.7, sunk: 0.28 },
+  house: { f: 13.7, sunk: 0.305 },
   /** the ground that is dug out for all of it */
   pit: { r: 22.5, back: -30.5, front: 14 },
   /** the pad over the pit */
-  pad: { r: 24.5, back: -32.5, front: 16.6, top: 0.04 },
+  pad: { r: 24.5, back: -32.5, front: 16.6, top: 0.015 },
   /** the door at the foot of the stair: half its width, its height; how long it stays open once nobody is left inside, seconds; and how far out from it the lamp over it hangs */
   door: { half: 1.1, tall: 2.3, shut: 60, lamp: 0.9 },
   /** how far off its opening and shutting are heard, metres */
@@ -440,8 +440,8 @@ function layOut(seed: number): Plan {
   // ---- the passages: lamps down them, pipes and a duct along the ceiling, and what has been left standing about
   for (let f = H.front - 3; f > H.back + 1; f -= 6.5) lamps.push([0, f, Y + B.tall - 0.25, pick([0.4, 0, 0, 0.3, 0, 0])]);
   for (const r of [-14.5, -8, 8, 14.5]) lamps.push([r, cross, Y + B.tall - 0.25, pick([0.3, 0, 0, 0])]);
-  // (one over the door, on an arm from the wall: the door and its reader are seen by whoever comes down the stair)
-  lamps.push([0, H.front + B.door.lamp, Y + 2.62, 1]);
+  // (one over the door, on the ceiling of the stair's shaft: the door and its reader are seen by whoever comes down the stair)
+  lamps.push([0, H.front + B.door.lamp, Y + B.depth + B.pad.top - 0.45 - 0.25, 1]);
   builtList.push({ kind: 'pipe', r: -B.passage + 0.4, f: (H.back + H.front) / 2, rot: 0, w: 0.16, d: H.front - H.back - 0.6, h: 0.16, y: B.tall - 0.32, solid: false });
   builtList.push({ kind: 'pipe', r: -B.passage + 0.68, f: (H.back + H.front) / 2, rot: 0, w: 0.1, d: H.front - H.back - 0.6, h: 0.1, y: B.tall - 0.26, solid: false });
   builtList.push({ kind: 'duct', r: B.passage - 0.5, f: (H.back + H.front) / 2, rot: 0, w: 0.55, d: H.front - H.back - 0.6, h: 0.35, y: B.tall - 0.4, solid: false });
