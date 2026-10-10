@@ -438,8 +438,10 @@ const SEAT = {
  * different hand: 2 to 6 cm out, and through the grip.)
  */
 const PISTOL_HOLD = {
-  right: new THREE.Vector3(-0.056, -0.004, 0.066),
-  left: new THREE.Vector3(-0.054, -0.022, -0.064),
+  // (the gun 2.2 cm nearer the body and 2 cm nearer the ground in the hands than these were first worked out:
+  // it stood high and forward of the fists, and the first finger was short of the trigger)
+  right: new THREE.Vector3(-0.034, 0.016, 0.066),
+  left: new THREE.Vector3(-0.032, -0.002, -0.064),
   curl: {
     right: [[1.0, 0.45, 0.25], [1.45, 0.6, 1.0], [1.45, 0.6, 1.0], [1.45, 0.65, 1.0]] as Curl,
     left: [[1.3, 0.55, 0.9], [1.35, 0.55, 0.95], [1.4, 0.6, 1.0], [1.4, 0.65, 1.0]] as Curl,
