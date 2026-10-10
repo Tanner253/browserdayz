@@ -719,6 +719,8 @@ export class Weapons {
   private readyT = 0;
   private cockT = 1;
   private guardHold = 0;
+  /** what was asked for while something else was being drawn (undefined: nothing) */
+  private wanted: Slot | null | undefined = undefined;
   /** the guard button is down, with the fists or something to strike with in the hands */
   private guardHeld = false;
   /** which blow of the run this is, and when the last was struck (one soon after another comes back the other way) */
@@ -1379,7 +1381,14 @@ export class Weapons {
 
   /** switch the item in hands (null = holster) */
   equip(slot: Slot | null) {
-    if (this.action && this.action.name !== 'equip') return;
+    // (Asked for while another is still coming up, it waits for that: changed at once, the one half drawn was
+    // gone and the next was there in a single frame.)
+    if (this.action?.name === 'equip') {
+      this.wanted = slot;
+      return;
+    }
+    this.wanted = undefined;
+    if (this.action) return;
     const next = slot ? this.inv.slots[slot] : null;
     if (next === this.currentItem) return;
     const swap = () => {
@@ -1445,6 +1454,11 @@ export class Weapons {
   private selectorT = 0;
 
   update(dt: number, input: Input, camera: THREE.PerspectiveCamera, enabled: boolean) {
+    if (this.wanted !== undefined && !this.action) {
+      const slot = this.wanted;
+      this.wanted = undefined;
+      this.equip(slot);
+    }
     this.time += dt;
     this.selectorT = Math.max(0, this.selectorT - dt);
     this.fireCooldown = Math.max(0, this.fireCooldown - dt);
@@ -1469,7 +1483,7 @@ export class Weapons {
     const p = this.player;
 
     // ----- aiming
-    const canAim = enabled && !!m && !p.sprinting && (!this.action || this.action.name === 'bolt') && !p.dead;
+    const canAim = enabled && !this.held && !!m && !p.sprinting && (!this.action || this.action.name === 'bolt') && !p.dead;
     this.aiming = canAim && input.held('Mouse2');
     this.spread = def?.weapon ? this.spreadNow(def.weapon.kind) : 0;
     p.aiming = this.aiming;
@@ -1496,7 +1510,7 @@ export class Weapons {
 
     // ----- trigger / actions
     this.wantShot = Math.max(0, this.wantShot - dt);
-    if (enabled && m && item && def && !p.dead) {
+    if (enabled && !this.held && m && item && def && !p.dead) {
       if (def.weapon) {
         const auto = this.fireMode(item) === 'auto';
         // Nobody shoots on the run. Sprinting, the gun is down across the body: the trigger
@@ -1816,6 +1830,8 @@ export class Weapons {
 
   /** Show an item in the hands while it is being used; the weapon drops out of the way. */
   beginUse(id: string, kind: UseKind, dur: number) {
+    this.guardHold = 0;
+    this.guardT = 0;
     if (kind === 'smoke') {
       // (not the packet: one out of it)
       const c = (this.smoke ??= cigarette());
@@ -2162,7 +2178,9 @@ export class Weapons {
     this.handLamp.position.y += 1;
 
     // an item in use takes over the hands; whatever was held drops out of view
-    this.lowerT += ((this.stowed || (this.held && !this.held.ending) ? 1 : 0) - this.lowerT) * (1 - Math.exp(-10 * dt));
+    // (down for as long as anything is in the hands: let up while the thing was still leaving, the gun was back
+    // where it is held before it was shown again, and came into the picture in one frame)
+    this.lowerT += ((this.stowed || this.held ? 1 : 0) - this.lowerT) * (1 - Math.exp(-10 * dt));
     if (this.held) {
       if (m) m.root.visible = false;
       this.lag.set(0, 0);
@@ -2653,7 +2671,7 @@ export class Weapons {
       const I = INJECT;
       const down = I.down.clone().normalize();
       const leave = seg(h.dur - 0.3, h.dur - 0.02);
-      const shown = seg(0.04, 0.4) * (1 - leave);
+      const shown = seg(0.04, 0.4) * (1 - leave) * (1 - exit);
       // the blow landing: the arm goes with it and comes back
       const since = t - I.hit;
       const give = since > 0 ? Math.exp(-since * 11) * Math.cos(since * 17) * 0.012 : 0;

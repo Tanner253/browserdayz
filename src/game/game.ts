@@ -1264,7 +1264,9 @@ export class Game {
     const p = this.player;
     this.sendT += dt;
     if (this.sendT >= 1 / SEND_HZ) {
-      this.sendT = 0;
+      // (what is over is kept: thrown away, sixty frames a second made thirteen reports of fifteen, and whoever
+      // was watching saw a runner stop for a tick now and then)
+      this.sendT = this.sendT > 2 / SEND_HZ ? 0 : this.sendT - 1 / SEND_HZ;
       const it = this.weapons.equippedItem;
       const flags = (p.crouched ? F_CROUCH : 0) | (p.sprinting ? F_SPRINT : 0) | (this.weapons.aiming ? F_AIM : 0) | (p.grounded ? F_GROUND : 0) | (p.dead ? F_DEAD : 0) | (p.vitals.bleeding ? F_BLEED : 0) | (p.lean > 0.3 ? F_LEAN_R : p.lean < -0.3 ? F_LEAN_L : 0) | (this.hold === 'dance' ? F_DANCE : 0) | (this.hold === 'surrender' ? F_SURRENDER : 0) | (this.garage.ride ? F_SEAT : 0) | (this.weapons.guarding ? F_GUARD : 0) | (p.vitals.broken ? F_LIMP : 0) | (this.lit && !this.garage.ride ? F_LIGHT : 0);
       const pose: Pose = [p.pos.x, p.pos.y, p.pos.z, p.yaw, p.pitch, flags];
@@ -2281,7 +2283,7 @@ export class Game {
       if (key) this.garage.use(owner, tagged);
       else if (can && !owner.wreck && owner.fuel < JEEP.tank - 0.5 && this.input.pressed('KeyG')) {
         const jeep = owner;
-        this.startUse('Filling the tank', 4, 'jerrycan', 'drink', null, () => {
+        this.startUse('Filling the tank', 4, 'jerrycan', 'open', null, () => {
           if (jeep.wreck || jeep.pos.distanceTo(this.player.pos) > JEEP.reach + 1 || !this.inv.find((i) => i === can)) return;
           this.inv.remove(can);
           this.garage.refuel(jeep);
@@ -2494,7 +2496,7 @@ export class Game {
         if (this.minimap.big) this.minimap.toggle(false);
       }
     }
-    this.weapons.stowed = !!this.hold || this.armsUntil > now || !!ride;
+    this.weapons.stowed = !!this.hold || this.armsUntil > now || !!ride || !!this.glass;
     const sens = this.glass ? 0.22 : this.weapons.scoped ? 0.28 : this.weapons.aiming ? 0.7 : 1;
     if (!uiOpen && playing && !this.wheelOn) p.look(input, sens);
 

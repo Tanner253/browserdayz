@@ -634,6 +634,10 @@ export class Infected implements Damageable {
     const half = this.yaw / 2;
     this.body.setNextKinematicRotation({ x: 0, y: Math.sin(half), z: 0, w: Math.cos(half) });
     if (far) return;
+    // (where it is, is said every frame: only its pose is done less often. Moved with the pose, one across the
+    // street went in steps of two or three frames.)
+    this.avatar.root.position.x = this.pos.x;
+    this.avatar.root.position.z = this.pos.z;
     // posing a body is most of what one of them costs: across the street it is done every other frame, further off every third
     this.poseDt += dt;
     if ((this.frameNo++ + this.i) % (off > 70 * 70 ? 3 : off > 30 * 30 ? 2 : 1) !== 0) return;

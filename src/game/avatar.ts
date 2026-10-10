@@ -173,6 +173,8 @@ export const POSE = {
     reach: 0.3,
     /** the most the left hand moves back along the stock toward the right when the grip is beyond its reach, metres */
     slide: 0.3,
+    /** how much of an arm's length a hand on a gun may be from its shoulder: past that the gun is brought in to the hands */
+    within: 0.95,
   },
 };
 
@@ -266,6 +268,10 @@ const _w = new THREE.Vector3();
 const _fwd = new THREE.Vector3();
 const _head = new THREE.Vector3();
 const _X = new THREE.Vector3(1, 0, 0);
+/** below this much of a hold the gun is as good as out of the hands (see `holdT`) */
+const HOLD_GONE = 0.06;
+/** seconds the hands are given to come away from something broken off */
+const CUT = 0.2;
 const _qa = new THREE.Quaternion();
 const _qb = new THREE.Quaternion();
 const _euler = new THREE.Euler();
@@ -329,8 +335,9 @@ export class Avatar {
   private deathClip: (typeof DEATHS)[number] = 'death';
   /** seconds since the feet left the ground in a jump (-1 = not jumping: a drop has no take-off) */
   private jumpT = -1;
-  private gesture: { kind: Gesture; t: number; dur: number } | null = null;
-  private move: { kind: Move; t: number; dur: number } | null = null;
+  /** (`stop`: when it is to be over, if it was broken off: the hands are given a moment to come away) */
+  private gesture: { kind: Gesture; t: number; dur: number; stop?: number } | null = null;
+  private move: { kind: Move; t: number; dur: number; stop?: number } | null = null;
   private hold: Hold | null = null;
   // how far into the dance, and how far up the hands are, 0..1
   private danceT = 0;
@@ -374,6 +381,14 @@ export class Avatar {
   /** weapon in the hands: pivot (at the shoulders, pitches with the aim) > the model */
   private heldPivot = new THREE.Group();
   private held: { obj: THREE.Object3D; grips: Grips; long: boolean; base: THREE.Quaternion } | null = null;
+  /**
+   * How much the hands are on the gun they hold, 0..1. They come off it to use something, to wave, to sit, and
+   * when it is changed for another, and go back onto it, over a fifth of a second, the gun going down toward
+   * the belt and coming up from it. (They left it and found it in a single frame: half a metre in one step.)
+   */
+  private holdT = 0;
+  /** what is to be in the hands once what is in them now has been lowered */
+  private nextHeld: { obj: THREE.Object3D | null; grips: Grips | null; kind: 'rifle' | 'pistol' | 'auto' | 'melee' } | null = null;
   /** a one-handed weapon in the right fist */
   private inHand: { obj: THREE.Object3D; curl: Curl; shoulder: boolean } | null = null;
   /** how far what is in the fist has been laid back on the shoulder (see `shoulder` in HandGrip), 0..1 */
@@ -723,6 +738,17 @@ export class Avatar {
   }
 
   setHeld(obj: THREE.Object3D | null, grips: Grips | null, kind: 'rifle' | 'pistol' | 'auto' | 'melee' = 'rifle') {
+    // A gun in two hands is not changed for another thing in one frame: it is lowered first (update() does
+    // that, and then takes this up). Only where it could be seen: a body not yet placed, or not drawn, has it at once.
+    if (this.held && this.placed && this.root.visible && this.holdT > HOLD_GONE) {
+      this.nextHeld = { obj, grips, kind };
+      return;
+    }
+    this.nextHeld = null;
+    this.takeUp(obj, grips, kind);
+  }
+
+  private takeUp(obj: THREE.Object3D | null, grips: Grips | null, kind: 'rifle' | 'pistol' | 'auto' | 'melee') {
     this.heldPivot.clear();
     this.held = null;
     this.inHand?.obj.removeFromParent();
@@ -789,7 +815,7 @@ export class Avatar {
   }
 
   /** @param slide the way a hand may move along the weapon to come within reach (unit vector), if it may */
-  private solveArm(r: ArmRig, grip: HandGrip, weapon: THREE.Object3D, aimQ: THREE.Quaternion, slide?: THREE.Vector3) {
+  private solveArm(r: ArmRig, grip: HandGrip, weapon: THREE.Object3D, aimQ: THREE.Quaternion, slide?: THREE.Vector3, w = 1) {
     const target = grip.pos.clone().applyMatrix4(weapon.matrixWorld);
     const wq = weapon.getWorldQuaternion(new THREE.Quaternion());
     if (slide) {
@@ -797,7 +823,7 @@ export class Avatar {
       const reach = (r.la + r.lb) * 0.96;
       for (let moved = 0; moved < POSE.hold.slide && target.distanceTo(A) > reach; moved += 0.02) target.addScaledVector(slide, 0.02);
     }
-    this.reach(r, target, grip.fingers.clone().applyQuaternion(wq), grip.palm.clone().applyQuaternion(wq), grip.curl, aimQ, 1, r === this.armR ? GUN_ELBOW.r : GUN_ELBOW.l);
+    this.reach(r, target, grip.fingers.clone().applyQuaternion(wq), grip.palm.clone().applyQuaternion(wq), grip.curl, aimQ, w, r === this.armR ? GUN_ELBOW.r : GUN_ELBOW.l);
   }
 
   /**
@@ -1107,12 +1133,15 @@ export class Avatar {
 
   /** The hands start on something: working the bolt, a reload, eating, dressing a wound. null stops it. */
   act(kind: Gesture | null, dur = 1) {
-    this.gesture = kind ? { kind, t: 0, dur } : null;
+    // (broken off, the hands are not put back where they were in one frame: see `stop`)
+    if (kind) this.gesture = { kind, t: 0, dur };
+    else if (this.gesture && this.gesture.stop === undefined) this.gesture.stop = this.gesture.t + CUT;
   }
 
   /** A call from the wheel: what the arms do with it (a wave, a point). null drops them. */
   emote(kind: Move | null, dur = 1.5) {
-    this.move = kind ? { kind, t: 0, dur } : null;
+    if (kind) this.move = { kind, t: 0, dur };
+    else if (this.move && this.move.stop === undefined) this.move.stop = this.move.t + CUT;
   }
 
   /** Dancing, standing with the hands up, or neither. */
@@ -1223,12 +1252,12 @@ export class Avatar {
     const armed = !!this.held;
     if (this.gesture) {
       this.gesture.t += dt;
-      if (this.gesture.t >= this.gesture.dur || dead) this.gesture = null;
+      if (this.gesture.t >= Math.min(this.gesture.dur, this.gesture.stop ?? Infinity) || dead) this.gesture = null;
     }
     const ges = this.gesture;
     if (this.move) {
       this.move.t += dt;
-      if (this.move.t >= this.move.dur || dead) this.move = null;
+      if (this.move.t >= Math.min(this.move.dur, this.move.stop ?? Infinity) || dead) this.move = null;
     }
     const mv = this.move;
     this.danceT += ((this.hold === 'dance' && !dead ? 1 : 0) - this.danceT) * ease(7);
@@ -1237,7 +1266,20 @@ export class Avatar {
     this.seatT += ((this.seated && !dead ? 1 : 0) - this.seatT) * ease(9);
     // (and sat in a jeep it is slung)
     const using = (!!ges && ges.kind !== 'bolt' && ges.kind !== 'reload') || !!mv || this.danceT > 0.25 || this.handsT > 0.25 || this.seatT > 0.25;
-    const held = using ? null : this.held;
+    // (the hands come off a gun and go back onto it over a fifth of a second, and one gun is lowered before the next is taken up)
+    const busy = (!!ges && ges.kind !== 'bolt' && ges.kind !== 'reload') || !!mv || this.hold !== null || this.seated;
+    const wantHold = !!this.held && !busy && !dead && !this.nextHeld;
+    if (!this.placed) this.holdT = wantHold ? 1 : 0;
+    else this.holdT += ((wantHold ? 1 : 0) - this.holdT) * ease(wantHold ? 11 : dead ? 26 : 16);
+    if (this.nextHeld && this.holdT <= HOLD_GONE) {
+      const n = this.nextHeld;
+      this.nextHeld = null;
+      this.takeUp(n.obj, n.grips, n.kind);
+    }
+    const hold = this.held && this.holdT > 0.004 ? this.holdT : 0;
+    const held = hold ? this.held : null;
+    /** how much of a movement of the hands is left, if it was broken off: 1 until then */
+    const left = (m: { t: number; stop?: number } | null) => (m?.stop === undefined ? 1 : 1 - THREE.MathUtils.smoothstep(m.t, m.stop - CUT, m.stop));
     // fists come up for a punch and stay up a while after it; and on guard they are up, with whatever is in them
     this.fistsHold = Math.max(0, this.fistsHold - dt);
     const fists = ((this.fistsHold > 0 && !this.inHand) || (this.guarding && this.strikeT < 0)) && !dead && !armed && !using;
@@ -1342,7 +1384,8 @@ export class Avatar {
     const rate: Record<Stride, number> = {
       walk: THREE.MathUtils.clamp(Math.min(speed, POSE.walkTop) / POSE.pace.walk, 0.6, 2.1),
       run: THREE.MathUtils.clamp(speed / POSE.pace.run, 1, 1.2),
-      crouchWalk: THREE.MathUtils.clamp(speed / POSE.pace.crouchWalk, 0.6, 2.8),
+      // (to 4.8: the hurried crouch is 3.3 m/s, and at 2.8 the legs crept at 1.9 under a body going nearly twice that)
+      crouchWalk: THREE.MathUtils.clamp(speed / POSE.pace.crouchWalk, 0.6, 4.8),
     };
     let cadence = 0, stepping = 0;
     for (const n of STRIDES) {
@@ -1406,18 +1449,24 @@ export class Avatar {
 
     this.root.position.copy(pos);
     this.root.rotation.set(0, this.yaw + this.twist, 0);
-    this.heldPivot.visible = !dead && !using;
+    this.heldPivot.visible = !dead && hold > 0.1;
+    // (and what is in the fist is put away as a gun is, while the hands are at something else)
+    if (this.inHand) this.inHand.obj.visible = !using;
     this.heldPivot.rotation.set(pitch, -this.twist, 0);
     this.aimT += ((aiming && !dead ? 1 : 0) - this.aimT) * ease(12);
     this.carryT += (THREE.MathUtils.smoothstep(speed, 2.6, 3.6) * (1 - this.aimT) - this.carryT) * ease(7);
     const carry = this.carryT * (1 - this.aimT);
 
-    const lean = !dead && (held || Math.abs(pitch) > 0.02);
-    const lift = POSE.crouchLift * this.crouchT;
-    const over = dead ? 0 : this.leanT;
+    // Dying, what is laid over the clips goes as the clips go: the turn of the waist, the lean, the look up or
+    // down and the arms on a gun are let go over the tenth of a second the fall takes to come in. (They were all
+    // dropped on the first frame of it, while the body was still nine tenths standing.)
+    const alive = 1 - down, gone = dead && alive < 0.001;
+    const lean = !gone && (held || Math.abs(pitch) > 0.02);
+    const lift = POSE.crouchLift * this.crouchT * alive;
+    const over = gone ? 0 : this.leanT * alive;
     // (leaning, the hips go a little the same way: the head ends up where the eyes of whoever is leaning are)
     if (over) this.root.position.addScaledVector(_right.set(Math.cos(this.yaw), 0, -Math.sin(this.yaw)), over * POSE.leanHips);
-    if (!dead && (lean || Math.abs(this.twist) > 0.003 || Math.abs(lift) > 0.003 || Math.abs(over) > 0.003)) {
+    if (!gone && (lean || Math.abs(this.twist) > 0.003 || Math.abs(lift) > 0.003 || Math.abs(over) > 0.003)) {
       this.root.updateMatrixWorld(true);
       // the legs have turned; from the waist up the body still faces the aim
       const n = this.spine.length;
@@ -1426,21 +1475,25 @@ export class Avatar {
       // a long gun is held across the body: chest turned off the aim, left shoulder leading,
       // the head still looking down the barrel
       // (and square again for a run, the gun carried across the chest)
-      const blade = held?.long ? POSE.hold.blade * (1 - carry) : 0;
+      const blade = held?.long ? POSE.hold.blade * (1 - carry) * hold : 0;
+      // (the legs' turn and the blade are two turns of the one waist: together they are no more than it can turn.
+      // Stepping one way with a long gun they came to 120 degrees.)
+      const waist = THREE.MathUtils.clamp(-this.twist - blade, -POSE.maxTwist, POSE.maxTwist) * alive;
+      const bladed = (-waist - this.twist) * alive;
       _fwd.set(0, 0, -1).applyQuaternion(aimQ);
       for (const b of this.spine) {
-        this.turn(b, UP, (-this.twist - blade) / n);
+        this.turn(b, UP, waist / n);
         if (lift) this.turn(b, _right, lift / n);
         // leaning out: over from the waist, about the line the body is facing along
         if (over) this.turn(b, _fwd, (over * POSE.leanAngle) / n);
       }
       // (the head stays level: it is the eyes that are being put round the corner)
       if (over) for (const b of this.neck) this.turn(b, _fwd, (-over * POSE.leanAngle * 0.55) / this.neck.length);
-      if (blade) for (const b of this.neck) this.turn(b, UP, blade / this.neck.length);
+      if (Math.abs(bladed) > 1e-4) for (const b of this.neck) this.turn(b, UP, bladed / this.neck.length);
       if (lean) {
-        if (this.chest) this.turn(this.chest, _right, pitch * 0.45);
+        if (this.chest) this.turn(this.chest, _right, pitch * 0.45 * alive);
         // and the head goes the rest of the way: you can see where somebody is looking
-        for (const b of this.neck) this.turn(b, _right, (pitch * POSE.headPitch) / this.neck.length);
+        for (const b of this.neck) this.turn(b, _right, (pitch * POSE.headPitch * alive) / this.neck.length);
         if (held && this.armR && this.armL) {
           // The weapon hangs from the shoulders, wherever the clips have taken them: down
           // into a crouch, up and down with each stride.
@@ -1469,18 +1522,26 @@ export class Avatar {
           turned(set.ready, _qa);
           if (carry > 0.001) _qa.slerp(turned(set.carry, _qb), carry / Math.max(1e-4, 1 - wAim));
           if (wAim > 0.001) _qa.slerp(turned(set.aim, _qb), wAim);
+          if (hold < 1) {
+            // being put away, or taken up: down toward the belt, its muzzle tipped to the ground
+            const away = 1 - THREE.MathUtils.smoothstep(hold, 0, 1);
+            obj.position.y -= 0.24 * away;
+            obj.position.z += 0.1 * away;
+            _qa.multiply(_qb.setFromAxisAngle(_X, -0.7 * away));
+          }
           obj.quaternion.copy(_qa).multiply(base);
           // the hands at work on the weapon (grip points are in its own space: x toward the muzzle, y up)
           let gripR = grips.right, gripL = grips.left;
           if (ges) {
             const k = ges.t / ges.dur;
             const sm = (a: number, b: number) => THREE.MathUtils.smoothstep(k, a, b);
+            const live = left(ges);
             const work = grips.work;
             if (long && ges.kind === 'bolt' && gripR && work?.bolt) {
               // The right hand leaves the grip for the bolt handle: up with it, back, home, and down. The rifle
               // rolls a little to meet the hand. (It was sent to where the old rifle's bolt was, which on these
               // is further up the gun than the arm is long: the arm went out straight and stopped there.)
-              const off = sm(0, 0.16) * (1 - sm(0.84, 1));
+              const off = sm(0, 0.16) * (1 - sm(0.84, 1)) * live;
               const lift = sm(0.16, 0.3) - sm(0.7, 0.84), back = sm(0.3, 0.48) - sm(0.52, 0.7);
               gripR = { ...gripR, pos: gripR.pos.clone().lerp(_w.copy(work.bolt).add(_v1.set(-0.085 * back, 0.03 * lift, -0.012 * lift)), off) };
               obj.quaternion.multiply(_q1.setFromAxisAngle(_X, 0.2 * off));
@@ -1491,7 +1552,9 @@ export class Avatar {
               if (work.tube) {
                 // a shell at a time into the tube: the hand in under the port as each goes home, and away for the next
                 at = THREE.MathUtils.smoothstep(t, 0.08, 0.5) * (1 - THREE.MathUtils.smoothstep(t, end - 0.5, end - 0.08));
-                const push = t > 0.3 && t < end - 0.42 ? 0.5 + 0.5 * Math.cos(((t - 0.55) / 0.48) * Math.PI * 2) : 1;
+                // (in, and away between shells only while there are shells going in: eased, at both ends of the loading)
+                const fed = THREE.MathUtils.smoothstep(t, 0.3, 0.55) * (1 - THREE.MathUtils.smoothstep(t, end - 0.67, end - 0.42));
+                const push = 1 - fed * (0.5 - 0.5 * Math.cos(((t - 0.55) / 0.48) * Math.PI * 2));
                 _w.copy(work.feed).add(_v1.set(0.035 * push - 0.03 * (1 - push), 0.02 * push - 0.075 * (1 - push), -0.035 * (1 - push)));
               } else {
                 // a magazine: the hand to it, down and away with the old one to the belt, back up with the new, and home
@@ -1499,22 +1562,40 @@ export class Avatar {
                 const away = sm(0.28, 0.42) * (1 - sm(0.48, 0.62));
                 _w.copy(work.feed).add(_v1.set(-0.06 * away, -0.26 * away, -0.07 * away));
               }
+              at *= live;
               gripL = { ...gripL, pos: gripL.pos.clone().lerp(_w, at) };
               obj.quaternion.multiply(_q1.setFromAxisAngle(_X, (work.tube ? 0.34 : 0.18) * at));
             } else if (!long && gripL) {
               // a fresh magazine: the left hand goes down to the belt for it and comes back up under the grip
-              const away = sm(0.1, 0.32) * (1 - sm(0.5, 0.78));
-              gripL = { ...gripL, pos: gripL.pos.clone().add(_w.set(-0.02 * away, -0.3 * away, -0.06 * away)) };
-              obj.quaternion.multiply(_q1.setFromAxisAngle(_X, -0.3 * sm(0, 0.15) * (1 - sm(0.8, 1))));
+              // (to the belt at its own side: 30 cm straight down from the gun is further than the arm is long, and
+              // the way there is through the ribs)
+              const away = sm(0.1, 0.32) * (1 - sm(0.5, 0.78)) * live;
+              gripL = { ...gripL, pos: gripL.pos.clone().add(_w.set(-0.05 * away, -0.19 * away, -0.13 * away)) };
+              obj.quaternion.multiply(_q1.setFromAxisAngle(_X, -0.3 * sm(0, 0.15) * (1 - sm(0.8, 1)) * live));
             }
           }
           this.heldPivot.updateMatrixWorld(true);
           // the leading shoulder comes forward to the gun
-          if (blade && this.collarL) this.turn(this.collarL, UP, -POSE.hold.reach * (1 - carry));
-          if (gripR) this.solveArm(this.armR, gripR, obj, aimQ);
+          if (blade && this.collarL) this.turn(this.collarL, UP, -POSE.hold.reach * (1 - carry) * hold);
+          // A gun is held no further out than the hands that hold it can reach. The stances are said from the
+          // shoulders of a body standing still; crouched, in the air, looking down and at a run the shoulders are
+          // somewhere else, and a hand sent past the end of its arm stops short of the gun: a pistol was left 2 to
+          // 12 cm out in front of the fists. It is brought in toward the shoulders until both hands of a pistol, and
+          // the gun hand of a long gun (whose other hand slides), are on it with a bend left in the elbow.
+          for (let pass = 0; pass < 3; pass++) {
+            const far = (grip: HandGrip | null, r: ArmRig) => (grip ? _a.copy(grip.pos).applyMatrix4(obj.matrixWorld).distanceTo(r.arm.getWorldPosition(_b)) - (r.la + r.lb) * POSE.hold.within : 0);
+            const over = Math.max(far(grips.right, this.armR), long ? 0 : far(grips.left, this.armL));
+            if (over <= 0.001) break;
+            const back = this.armL.arm.getWorldPosition(_a).add(this.armR.arm.getWorldPosition(_b)).multiplyScalar(0.5).sub(obj.getWorldPosition(_w));
+            // (aimed, hardly downward at all: the sights stay at the eye)
+            back.y *= 1 - 0.8 * this.aimT;
+            this.heldPivot.position.add(back.normalize().multiplyScalar(Math.min(0.1, over * 1.2)).applyQuaternion(_q1.copy(this.root.quaternion).invert()));
+            this.heldPivot.updateMatrixWorld(true);
+          }
+          if (gripR) this.solveArm(this.armR, gripR, obj, aimQ, undefined, hold);
           // the forward hand may sit further back along the stock than the first-person arms
           // have it: these arms are only so long
-          if (gripL) this.solveArm(this.armL, gripL, obj, aimQ, gripR && !(ges && !long) ? _slide.set(0, 0, 1).applyQuaternion(_qa).applyQuaternion(this.heldPivot.getWorldQuaternion(_q1)) : undefined);
+          if (gripL) this.solveArm(this.armL, gripL, obj, aimQ, gripR && !(ges && !long) ? _slide.set(0, 0, 1).applyQuaternion(_qa).applyQuaternion(this.heldPivot.getWorldQuaternion(_q1)) : undefined, hold);
         }
       }
     }
@@ -1537,7 +1618,7 @@ export class Avatar {
           if (this.chest) this.turn(this.chest, UP, 0.25 * strike - 0.15 * wind);
         }
       }
-      if (this.inHand) {
+      if (this.inHand && !using) {
         r.hand.updateWorldMatrix(true, false);
         this.curl(r, this.inHand.curl, r.hand.getWorldQuaternion(_qa));
       }
@@ -1609,20 +1690,26 @@ export class Avatar {
       // a point measured from the head: ahead of it, above it, to its right
       const at = (f: number, u: number, r: number) => new THREE.Vector3().copy(head).addScaledVector(fwd, f).addScaledVector(UP, u).addScaledVector(_right, r);
       const dirOf = (f: number, u: number, r: number) => new THREE.Vector3().addScaledVector(fwd, f).addScaledVector(UP, u).addScaledVector(_right, r);
-      const wgt = THREE.MathUtils.smoothstep(ges.t, 0, 0.3) * (1 - THREE.MathUtils.smoothstep(ges.t, ges.dur - 0.25, ges.dur));
+      const wgt = THREE.MathUtils.smoothstep(ges.t, 0, 0.3) * (1 - THREE.MathUtils.smoothstep(ges.t, ges.dur - 0.25, ges.dur)) * left(ges);
+      // (No hand is sent further than its arm goes with a bend left in it. These places are measured from the head,
+      // and crouched the head is further from the shoulders: the arms went out dead straight and stopped short.)
+      const near = (to: THREE.Vector3, r: ArmRig) => {
+        const from = r.arm.getWorldPosition(_v2), d = to.distanceTo(from), most = (r.la + r.lb) * 0.93;
+        return d > most ? to.sub(from).multiplyScalar(most / d).add(from) : to;
+      };
       if (ges.kind === 'eat' || ges.kind === 'drink') {
         // up to the mouth and back down, once a bite or a gulp
         const period = ges.kind === 'eat' ? 0.95 : 1.25;
         const cyc = 0.5 - 0.5 * Math.cos((Math.max(0, ges.t - 0.3) / period) * Math.PI * 2);
         const m = ges.kind === 'drink' ? Math.pow(cyc, 0.6) : cyc;
-        this.reach(this.armR, at(0.3, -0.36, 0.12).lerp(at(0.17, -0.06, 0.05), m), dirOf(-0.2 * m, 0.8, -0.5), dirOf(-1, 0, -0.4), [1.0, 1.05, 1.1, 1.15], aimQ, wgt);
+        this.reach(this.armR, near(at(0.3, -0.36, 0.12).lerp(at(0.17, -0.06, 0.05), m), this.armR), dirOf(-0.2 * m, 0.8, -0.5), dirOf(-1, 0, -0.4), [1.0, 1.05, 1.1, 1.15], aimQ, wgt);
       } else {
         // both hands in front of the belly: the left held still, the right working round it
-        const l = at(0.28, -0.4, -0.07);
+        const l = near(at(0.28, -0.4, -0.07), this.armL);
         this.reach(this.armL, l, dirOf(1, 0, 0.6), dirOf(0, 1, 0), [0.5, 0.55, 0.6, 0.65], aimQ, wgt);
         const a = ges.t * (ges.kind === 'bandage' ? 5.5 : 9);
         const r = l.clone().addScaledVector(_right, 0.08).addScaledVector(UP, 0.05 + Math.cos(a) * 0.045).addScaledVector(fwd, 0.02 + Math.sin(a) * 0.045);
-        this.reach(this.armR, r, dirOf(0.4, 0, -1), dirOf(0, -1, 0), [0.9, 0.95, 1, 1.05], aimQ, wgt);
+        this.reach(this.armR, near(r, this.armR), dirOf(0.4, 0, -1), dirOf(0, -1, 0), [0.9, 0.95, 1, 1.05], aimQ, wgt);
       }
     }
 
@@ -1645,7 +1732,7 @@ export class Avatar {
       }
       if (mv) {
         const k = mv.t;
-        const wgt = THREE.MathUtils.smoothstep(k, 0, 0.22) * (1 - THREE.MathUtils.smoothstep(k, mv.dur - 0.3, mv.dur)) * (1 - this.handsT);
+        const wgt = THREE.MathUtils.smoothstep(k, 0, 0.22) * (1 - THREE.MathUtils.smoothstep(k, mv.dur - 0.3, mv.dur)) * (1 - this.handsT) * left(mv);
         if (mv.kind === 'wave') {
           // a hand up beside the head, waved from the elbow
           const s = Math.sin(k * 16);
