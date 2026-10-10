@@ -352,6 +352,8 @@ export class Avatar {
   /** seconds since the feet came back down after being in the air (-1 = long ago) */
   private landT = -1;
   private wasAir = false;
+  /** seconds off the ground */
+  private airFor = 0;
   /** fastest it has fallen since leaving the ground (negative), and how hard the last landing was, 0..1 */
   private fallV = 0;
   private landK = 1;
@@ -737,10 +739,12 @@ export class Avatar {
     return { pos, dir };
   }
 
-  setHeld(obj: THREE.Object3D | null, grips: Grips | null, kind: 'rifle' | 'pistol' | 'auto' | 'melee' = 'rifle') {
+  /** @param now at once, already in the hands: for a scene that is cut to, where nobody sees it taken up */
+  setHeld(obj: THREE.Object3D | null, grips: Grips | null, kind: 'rifle' | 'pistol' | 'auto' | 'melee' = 'rifle', now = false) {
     // A gun in two hands is not changed for another thing in one frame: it is lowered first (update() does
     // that, and then takes this up). Only where it could be seen: a body not yet placed, or not drawn, has it at once.
-    if (this.held && this.placed && this.root.visible && this.holdT > HOLD_GONE) {
+    if (now) this.holdT = obj && grips && kind !== 'melee' ? 1 : 0;
+    else if (this.held && this.placed && this.root.visible && this.holdT > HOLD_GONE) {
       this.nextHeld = { obj, grips, kind };
       return;
     }
@@ -1324,7 +1328,10 @@ export class Avatar {
     }
     this.fallV = inAir ? Math.min(this.fallV, velocity.y) : 0;
     // leaving the ground upward is a jump: it gets the push-off. Walking off an edge does not.
-    if (!this.wasAir && inAir) this.jumpT = velocity.y > 1.5 ? 0 : -1;
+    // (Known by going up in the first moments off the ground, not on the first frame of it: another player's
+    // rise comes smoothed and is not yet there on that frame, so their jumps never had the push-off.)
+    this.airFor = inAir ? this.airFor + dt : 0;
+    if (inAir && this.jumpT < 0 && this.airFor < 0.15 && velocity.y > 1.5) this.jumpT = 0;
     else if (!inAir) this.jumpT = -1;
     else if (this.jumpT >= 0) this.jumpT += dt;
     this.wasAir = inAir;

@@ -1711,7 +1711,7 @@ export class Game {
 
   private useItem(item: ItemInstance) {
     const def = ITEMS[item.id];
-    if (!def.use || this.use || this.player.dead) return;
+    if (!def.use || this.use || this.player.dead || this.weapons.working) return;
     if (def.look && performance.now() - this.glassDown < 150) return;
     const u = def.use;
     const from = this.openStash?.container.has(item) ? this.openStash.container : null;
@@ -2016,7 +2016,7 @@ export class Game {
   /** Sealed ammo box -> a stack of loose rounds. */
   private openBox(item: ItemInstance) {
     const def = ITEMS[item.id];
-    if (!def.open || this.use || this.player.dead) return;
+    if (!def.open || this.use || this.player.dead || this.weapons.working) return;
     const o = def.open;
     const from = this.openStash?.container.has(item) ? this.openStash.container : null;
     if (from) {

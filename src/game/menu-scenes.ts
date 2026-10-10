@@ -208,7 +208,8 @@ export class MenuScenes {
   private arm(e: Extra, key = 'own') {
     const k = e.kits.get(key);
     if (!k || e.kit === key) return;
-    e.body.setHeld(k.obj, k.grips, k.kind);
+    // (at once: each of these scenes is cut to)
+    e.body.setHeld(k.obj, k.grips, k.kind, true);
     e.kit = key;
     e.weapon = k.kind === 'pistol' ? 'pistol' : 'rifle';
     e.quiet = k.quiet;
@@ -379,6 +380,7 @@ export class MenuScenes {
         if (t > 0.9 && t - last > 1.35 && next.pos.distanceTo(man.pos) < 16) {
           last = t;
           this.fire(man, next);
+          man.body.act('bolt', 0.95);
         }
       },
       view: (t) => {

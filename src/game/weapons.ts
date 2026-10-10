@@ -440,8 +440,9 @@ const SEAT = {
 const PISTOL_HOLD = {
   // (the gun 2.2 cm nearer the body and 2 cm nearer the ground in the hands than these were first worked out:
   // it stood high and forward of the fists, and the first finger was short of the trigger)
-  right: new THREE.Vector3(-0.034, 0.016, 0.066),
-  left: new THREE.Vector3(-0.032, -0.002, -0.064),
+  // (and then half of that way back: at the full 2.2 and 2 cm the gun was too far into the hand)
+  right: new THREE.Vector3(-0.045, 0.006, 0.066),
+  left: new THREE.Vector3(-0.043, -0.012, -0.064),
   curl: {
     right: [[1.0, 0.45, 0.25], [1.45, 0.6, 1.0], [1.45, 0.6, 1.0], [1.45, 0.65, 1.0]] as Curl,
     left: [[1.3, 0.55, 0.9], [1.35, 0.55, 0.95], [1.4, 0.6, 1.0], [1.4, 0.65, 1.0]] as Curl,
@@ -1351,6 +1352,12 @@ export class Weapons {
     return this.action !== null;
   }
 
+  /** the hands are in the middle of something that has to be seen through: a reload, a blow */
+  get working() {
+    const n = this.action?.name;
+    return n === 'reload' || n === 'magswap' || n === 'swing' || n === 'punch';
+  }
+
   get equippedItem() {
     return this.currentItem;
   }
@@ -2182,12 +2189,18 @@ export class Weapons {
     // an item in use takes over the hands; whatever was held drops out of view
     // (down for as long as anything is in the hands: let up while the thing was still leaving, the gun was back
     // where it is held before it was shown again, and came into the picture in one frame)
-    this.lowerT += ((this.stowed || this.held ? 1 : 0) - this.lowerT) * (1 - Math.exp(-10 * dt));
+    this.lowerT += ((this.stowed || this.held ? 1 : 0) - this.lowerT) * (1 - Math.exp(-(this.held ? 24 : 10) * dt));
     if (this.held) {
-      if (m) m.root.visible = false;
       this.lag.set(0, 0);
       this.animateHeld(dt);
-      return;
+      // A gun with hands of its own is seen to go down first, a tenth of a second of it, and what is taken out
+      // is not shown until it has: gun and hands were gone on the very frame the thing was reached for.
+      const sinking = !!m?.rig && this.lowerT < 0.88 && !!this.held && !this.held.ending;
+      if (!sinking) {
+        if (m) m.root.visible = false;
+        return;
+      }
+      this.held!.root.visible = false;
     }
     if (!m) {
       this.lag.set(0, 0);

@@ -53,7 +53,9 @@ export interface HordeHost {
   bunkerOpen(): boolean;
 }
 
-const INTERP_DELAY = 150;
+// (210: their owner reports every 125 to 150 ms. At 150 there was 17 ms to spare, and any report later than
+// that left them standing for a frame and then hopping on.)
+const INTERP_DELAY = 210;
 /** drawn and moved in full within this of the eye; past it they are not there to be seen */
 const DRAWN = 150;
 const _head = new THREE.Vector3(), _neck = new THREE.Vector3(), _pelvis = new THREE.Vector3();
