@@ -45,6 +45,8 @@ export type Gesture = 'bolt' | 'reload' | 'eat' | 'drink' | 'bandage' | 'open';
 /** from the wheel (src/sim/emotes.ts): what the arms do with a call, and what the body keeps up until told otherwise */
 export type Move = NonNullable<Emote['move']>;
 export type Hold = NonNullable<Emote['hold']>;
+/** sat on the ground: how far the hips come down from the chair the sitting was drawn on, and how nearly straight the legs are laid (set by looking) */
+export const SIT = { drop: 0.4, legs: 0.92 };
 
 /**
  * Worn things that are drawn on the body. `p`, `r`, `s` place the item's model on the body
@@ -353,6 +355,9 @@ export class Avatar {
   private hold: Hold | null = null;
   // how far into the dance, and how far up the hands are, 0..1
   private danceT = 0;
+  /** how far sat down on the ground, 0..1; and the knees, with how each lies when the leg is straight */
+  private groundT = 0;
+  private knees: [THREE.Bone, THREE.Quaternion][] = [];
   /** in a seat, and how far into sitting the body has got */
   private seated = false;
   private seatT = 0;
@@ -546,6 +551,8 @@ export class Avatar {
     this.chest = bone('spine_02');
     this.neck = ['neck_01', 'Head'].map(bone).filter((b): b is THREE.Bone => !!b);
     this.joints = { head: bone('Head') ?? undefined, neck: bone('neck_01') ?? undefined, pelvis: bone('pelvis') ?? undefined };
+    // (as the body rests, before anything has moved it, a leg is straight)
+    this.knees = ['calf_l', 'calf_r'].map(bone).filter((b): b is THREE.Bone => !!b).map((b) => [b, b.quaternion.clone()]);
     // The infected's feet, as each body was MADE standing (see `plant`): which way the foot lies, how its toes lie
     // on it, and how high its ankle is over its sole. Not as its skeleton rests: these bodies wear a skeleton
     // that was brought to them, which rests as the game's own body stands and not as they do, and a foot laid
@@ -1277,11 +1284,12 @@ export class Avatar {
     }
     const mv = this.move;
     this.danceT += ((this.hold === 'dance' && !dead ? 1 : 0) - this.danceT) * ease(7);
+    this.groundT += ((this.hold === 'sit' && !dead ? 1 : 0) - this.groundT) * ease(5);
     this.handsT += ((this.hold === 'surrender' && !dead ? 1 : 0) - this.handsT) * ease(9);
     // eating, drinking, dressing a wound, waving, dancing: whatever was in the hands is put away for it
     this.seatT += ((this.seated && !dead ? 1 : 0) - this.seatT) * ease(9);
     // (and sat in a jeep it is slung)
-    const using = (!!ges && ges.kind !== 'bolt' && ges.kind !== 'reload') || !!mv || this.danceT > 0.25 || this.handsT > 0.25 || this.seatT > 0.25;
+    const using = (!!ges && ges.kind !== 'bolt' && ges.kind !== 'reload') || !!mv || this.danceT > 0.25 || this.handsT > 0.25 || this.seatT > 0.25 || this.groundT > 0.25;
     // (the hands come off a gun and go back onto it over a fifth of a second, and one gun is lowered before the next is taken up)
     const busy = (!!ges && ges.kind !== 'bolt' && ges.kind !== 'reload') || !!mv || this.hold !== null || this.seated;
     const wantHold = !!this.held && !busy && !dead && !this.nextHeld;
@@ -1391,8 +1399,8 @@ export class Avatar {
       armed: 0,
       strike: 0,
     };
-    // sat down, sitting is all of it but the flinch
-    const st = this.seatT * (1 - down);
+    // sat down (in a seat, or on the ground), sitting is all of it but the flinch
+    const st = Math.max(this.seatT, this.groundT) * (1 - down);
     if (st > 0) {
       for (const n of CLIPS) if (n !== 'hit' && n !== 'hitHead') w[n] *= 1 - st;
       w.sit = st * rest;
@@ -1452,6 +1460,10 @@ export class Avatar {
       to.position.copy(from.position);
       to.quaternion.copy(from.quaternion);
     }
+    // Sat on the ground. The library's sitting is on a chair: the legs are laid out straight in front instead of
+    // going down to a floor that is not there, and the hips are let down to the ground (below, with the body's place).
+    const onGround = this.groundT * (1 - down);
+    if (onGround > 0.001) for (const [knee, straight] of this.knees) knee.quaternion.slerp(straight, onGround * SIT.legs);
 
     // --- a blow with something in the fist, or one of the infected's: the library's drawing of one, laid over all that
     if (this.strikeT >= 0) {
@@ -1467,6 +1479,7 @@ export class Avatar {
     }
 
     this.root.position.copy(pos);
+    this.root.position.y -= SIT.drop * onGround;
     this.root.rotation.set(0, this.yaw + this.twist, 0);
     this.heldPivot.visible = !dead && hold > 0.1;
     // (and what is in the fist is put away as a gun is, while the hands are at something else)

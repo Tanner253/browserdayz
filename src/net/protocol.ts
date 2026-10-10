@@ -25,6 +25,8 @@ export const CHAT_RANGE = 50;
 export const F_CROUCH = 1, F_SPRINT = 2, F_AIM = 4, F_GROUND = 8, F_DEAD = 16, F_BLEED = 32;
 /** what the body is doing for as long as it is left to (see src/sim/emotes.ts): dancing, hands up */
 export const F_DANCE = 64, F_SURRENDER = 128;
+/** sat down on the ground (the wheel) */
+export const F_SIT = 16384;
 /**
  * Leaning out to one side (Q, E). The eyes of whoever leans go half a pace sideways: so do
  * their head and shoulders as everybody else sees them, and as everybody else's bullets

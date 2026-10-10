@@ -15,7 +15,7 @@ export interface Emote {
   move?: 'wave' | 'beckon' | 'distress' | 'palms' | 'point' | 'salute';
   dur?: number;
   /** a thing the body keeps doing until the player moves or does something else: told in the pose flags */
-  hold?: 'dance' | 'surrender';
+  hold?: 'dance' | 'surrender' | 'sit';
 }
 
 /** in the order they sit round the wheel, clockwise from the top */
@@ -26,6 +26,8 @@ export const EMOTES: Emote[] = [
   { id: 'thanks', label: 'Thanks!', say: 'THANKS!', move: 'salute', dur: 1.3 },
   { id: 'dance', label: 'Dance', hold: 'dance' },
   { id: 'surrender', label: 'Hands up', hold: 'surrender' },
+  // (sat on the ground, for as long as nothing else is done: a rest by a fire, a wait for somebody)
+  { id: 'sit', label: 'Sit down', hold: 'sit' },
   { id: 'help', label: 'Help!', say: 'HELP!', move: 'distress', dur: 1.8 },
   { id: 'friendly', label: 'Friendly!', say: 'FRIENDLY!', move: 'palms', dur: 1.7 },
 ];

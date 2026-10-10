@@ -16,6 +16,8 @@ const CROUCH_HALF = 0.26;
 const RADIUS = 0.3;
 const EYE_STAND = 1.64;
 const EYE_CROUCH = 1.02;
+/** sat on the ground (the wheel) */
+const EYE_SAT = 0.86;
 /** how long an untreated wound bleeds, seconds */
 const BLEED_TIME = 42;
 /** the gap the character controller keeps from whatever it stands on or touches */
@@ -67,6 +69,8 @@ export class Player {
   scurrying = false;
   moving = 0; // 0..1 horizontal speed fraction
   eye = EYE_STAND;
+  /** sat down on the ground: the eyes are where a sitting head is (the game says when: see `hold` there) */
+  sat = false;
   lean = 0;
   vitals: Vitals = { health: 100, energy: 85, water: 85, stamina: MAX_STAMINA, bleeding: false };
   dead = false;
@@ -202,7 +206,7 @@ export class Player {
     return this.crouched ? CROUCH_HALF : STAND_HALF;
   }
 
-  private setCrouch(c: boolean) {
+  setCrouch(c: boolean) {
     if (c === this.crouched) return;
     if (!c) {
       // need head room to stand
@@ -580,7 +584,7 @@ export class Player {
     this.alpha = alpha;
     const lean = this.prevLean + (this.lean - this.prevLean) * alpha;
     const moving = this.prevMoving + (this.moving - this.prevMoving) * alpha;
-    const targetEye = this.dead ? 0.35 : this.crouched ? EYE_CROUCH : EYE_STAND;
+    const targetEye = this.dead ? 0.35 : this.sat ? EYE_SAT : this.crouched ? EYE_CROUCH : EYE_STAND;
     this.eye += (targetEye - this.eye) * (1 - Math.exp(-(this.dead ? 3 : 12) * dt));
 
     // landing dip spring
