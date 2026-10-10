@@ -247,7 +247,9 @@ export const LOCAL_MODELS = {
   },
   heavy_armor: {
     dir: 'body_armor_pack',
-    only: /main_002\\.004|pad_002_0|bolt_005|cover_002\\.004|strap_021|pouch_002\\.002|buckle\\.002/,
+    // (a dot in a name is written with ONE backslash: with two, four of these seven never matched, and the vest was
+    // shipped as its pads, bolts and straps with no body to it)
+    only: /main_002\.004|pad_002_0|bolt_005|cover_002\.004|strap_021|pouch_002\.002|buckle\.002/,
     size: 0.6,
     budget: 9000,
     tex: 1024,
