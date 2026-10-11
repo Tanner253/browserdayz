@@ -407,21 +407,22 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 .chat-hint-orders { display: none; }
 .hud-chat.staff .chat-hint-orders { display: inline; }
 /* who said it has a role: written before the channel. A mod's is one steady colour; an admin's, and an admin's
-   name, are a band of soft colours going slowly by (the words they say are left as anybody's, to be read) */
+   name, are the whole rainbow going by (the words they say are left as anybody's, to be read) */
 .chat-line em { font-style: normal; font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: 0.08em; margin-right: 6px; }
 .chat-line[data-role='mod'] em { color: #6fd6a8; }
 .chat-line[data-role='admin'] em,
 .chat-line[data-role='admin'] b {
   color: transparent;
-  background: linear-gradient(90deg, #ff9d9d, #ffd58a, #a5e8a8, #8fd3ff, #c8a8ff, #ff9d9d) 0 0 / 300% 100%;
+  background: linear-gradient(90deg, #ff3b3b, #ff9f2e, #ffe82e, #46f25a, #2ed8ff, #5b78ff, #d24dff, #ff3b3b) 0 0 / 200% 100%;
   -webkit-background-clip: text;
   background-clip: text;
-  animation: adminband 9s linear infinite;
+  animation: adminband 3.5s linear infinite;
   /* (the line's own shadow is drawn over a background, and this colour is one: a shadow of the finished letters instead) */
   text-shadow: none;
-  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.9)) drop-shadow(0 0 5px rgba(200, 168, 255, 0.3));
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.9));
 }
-@keyframes adminband { to { background-position: 300% 0; } }
+.chat-line[data-role='admin'] em { font-size: 11px; }
+@keyframes adminband { to { background-position: 200% 0; } }
 @media (prefers-reduced-motion: reduce) { .chat-line[data-role='admin'] em, .chat-line[data-role='admin'] b { animation: none; } }
 /* an order being typed (a role is needed): what could be meant, above the box */
 .chat-orders { display: none; flex-direction: column; padding: 4px 0; background: rgba(8, 10, 9, 0.88); border-left: 2px solid #c8a8ff; pointer-events: auto; }
