@@ -307,8 +307,8 @@ const D: ItemDef[] = [
   },
   {
     id: 'gun_light', name: 'Weapon Light', model: 'gun_light', w: 1, h: 1, weight: 0.15, category: 'attachment',
-    desc: 'A light clamped to the gun, switched with L. It shows you the dark, and shows the dark where you are. Fits every gun.',
-    attach: { fits: ['mosin', 'colt', 'm9', 'deagle', 'mpa', 'benelli', 'ak', 'ar15'], slot: 'light', ergo: -2 },
+    desc: 'A light clamped to the gun, switched with L. It shows you the dark, and shows the dark where you are. Fits everything but the Desert Eagle and the AK.',
+    attach: { fits: ['mosin', 'colt', 'm9', 'benelli', 'ar15'], slot: 'light', ergo: -2 },
   },
   {
     id: 'suppressor_556', name: '5.56 Suppressor', model: 'ar15', nodeRe: '^silencer', w: 3, h: 1, weight: 0.45, category: 'attachment',

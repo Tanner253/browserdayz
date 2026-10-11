@@ -85,15 +85,11 @@ const FIT: Record<string, { dot?: { at: [number, number, number]; size: number }
   // a rifle's size. Its drum where its magazine goes, by the top of its tower. A drum's rounds lie along its
   // axle, so its flat faces look along the barrel, the one with the winding key to the front, and it stands out
   // either side of the rifle; it comes leaning, its foot forward, as the rifle's own magazine hangs.)
-  // (And its light under the barrel, a hand's width ahead of the fore-end, clamped to the rod that lies there: the
-  // hand that holds the rifle up has the fore-end itself.)
-  ak: { dot: { at: [-0.095, 0.1062, 0.0012], size: 0.85 }, light: { at: [0.27, 0, 0.001], size: 0.85 }, mags: { drum_ak: { model: 'ak_drum', at: [-0.035, 0.0678, 0.0015], size: 1, turn: Math.PI / 2 } }, can: { model: 'rifle_suppressor', size: 1 } },
+  ak: { dot: { at: [-0.095, 0.1062, 0.0012], size: 0.85 }, mags: { drum_ak: { model: 'ak_drum', at: [-0.035, 0.0678, 0.0015], size: 1, turn: Math.PI / 2 } }, can: { model: 'rifle_suppressor', size: 1 } },
   // (the long magazine lies across its file, its foot to the back: turned a quarter, to hang along the gun with its foot forward)
   ar15: { mags: { mag_ar_60: { model: 'ar_mag_60', at: [-0.042, 0.0678, 0.0015], size: 1, turn: -Math.PI / 2 } } },
-  // (the submachine gun: the sight on the rail along its top, the light on the rail under the front of its fore-end)
-  mpa: { dot: { at: [0.035, 0.082, -0.003], size: 0.8 }, light: { at: [0.19, 0, -0.003], size: 0.7 } },
-  // (the big pistol: under its barrel, ahead of the guard, as on the other two)
-  deagle: { light: { at: [0.185, 0, 0.0035], size: 0.62 } },
+  // (the submachine gun: the sight on the rail along its top)
+  mpa: { dot: { at: [0.035, 0.082, -0.003], size: 0.8 } },
 };
 /** the pieces of a gun that come from another model, and what has to be fitted for each to be there */
 const EXTRA: Record<string, string> = { suppressor: 'suppressor_9', red_dot: 'red_dot', gun_light: 'gun_light' };
