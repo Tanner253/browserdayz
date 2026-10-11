@@ -25,7 +25,7 @@ import type { ItemModels } from './loot';
 export type HitZone = 'head' | 'torso' | 'legs';
 /** damage multiplier per hit zone: bullets / melee */
 const ZONE_MULT: Record<HitZone, [number, number]> = { head: [3.2, 1.6], torso: [1, 1], legs: [0.6, 0.7] };
-export type UseKind = 'eat' | 'drink' | 'bandage' | 'inject' | 'smoke' | 'open' | 'swipe' | 'load' | 'unbox';
+export type UseKind = 'eat' | 'drink' | 'bandage' | 'inject' | 'smoke' | 'open' | 'swipe' | 'load' | 'unload' | 'unbox';
 const FIST = { damage: 14, range: 1.35, rate: 0.4, stamina: 5 };
 
 export type FireMode = 'semi' | 'auto';
@@ -2355,12 +2355,13 @@ export class Weapons {
     audio.gunshot(kind === 'auto' ? 'rifle' : kind, origin, d, false, suppressed, VOICE[weaponId]);
   }
 
-  /** the server confirmed our hit killed someone */
-  confirmKill() {
-    this.hitMarker = 0.6;
-    this.killMarker = true;
-    audio.hitTick(true);
-  }
+  /**
+   * The server confirmed our hit killed someone. Nothing is shown or sounded for it (2026-10-11, asked for: "there
+   * is no feedback other than blood splatter on the target for if you hit them or not"): no mark on the sights and
+   * no tick, for a hit or for a kill, on a player or one of the infected. What says a shot landed is what is seen
+   * of it landing.
+   */
+  confirmKill() {}
 
   /** the ground came up: the weapon dips with the knees */
   landed(speed: number) {
@@ -2395,11 +2396,10 @@ export class Weapons {
     this.kick.v.y -= 0.5 * k;
   }
 
+  /** (a hit, by a round or a blow: nothing marks it, see confirmKill) */
   private markHit(killed: boolean, head = false) {
-    this.hitMarker = killed ? 0.5 : 0.25;
-    this.killMarker = killed;
-    this.headMarker = head;
-    audio.hitTick(killed, head);
+    void killed;
+    void head;
   }
 
   /**

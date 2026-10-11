@@ -40,6 +40,23 @@ export interface MenuSpot {
   finds?: string;
 }
 
+/**
+ * One thing the hands can do with what is in them, and what does it: the left button, the right, or the wheel.
+ * Drawn in the corner as a small mouse with that part of it lit and the word beside it, as DayZ draws it (asked for
+ * 2026-10-11: "there should be a icon on the bottom right or left of the screen showing what to press").
+ */
+export interface HandAct {
+  on: 'l' | 'r' | 'w';
+  /** done for as long as it is held */
+  hold?: boolean;
+  text: string;
+  /** a figure or two under the word */
+  sub?: string;
+}
+
+/** a mouse, small, with one part of it lit */
+const mouseSvg = (on: HandAct['on']) => `<svg viewBox="26 4 68 108" aria-hidden="true"><rect class="m-body" x="30" y="8" width="60" height="100" rx="30"/><path class="m-part${on === 'l' ? ' on' : ''}" d="M57 11C43 12.5 33 23 33 38v6h24z"/><path class="m-part${on === 'r' ? ' on' : ''}" d="M63 11c14 1.5 24 12 24 27v6H63z"/><path class="m-line" d="M60 8v38M30 46h60"/><rect class="m-wheel${on === 'w' ? ' on' : ''}" x="54" y="18" width="12" height="22" rx="6"/></svg>`;
+
 export interface HotbarEntry {
   key: string;
   id: string | null;
@@ -84,6 +101,7 @@ export class HUD {
       <div class="hud-cross"><i></i><i></i><i></i><i></i></div>
       <div class="hud-hit"><i></i><i></i><i></i><i></i></div>
       <div class="hud-prompt"></div>
+      <div class="hud-acts"></div>
       <div class="hud-mark"></div>
       <div class="hud-says"></div>
       <div class="hud-wheel">${wheelSvg()}<i class="wheel-dot"></i><div class="wheel-mid"><b></b><span></span></div></div>
@@ -262,7 +280,7 @@ export class HUD {
       </div>
     `;
     document.getElementById('ui')!.appendChild(this.root);
-    for (const k of ['cross', 'hit', 'prompt', 'mark', 'progress', 'compass', 'bearing', 'area', 'weapon', 'vitals', 'stamina', 'arms', 'ride', 'hotbar', 'chat', 'scope', 'damage', 'bleedfx', 'bleed', 'hitdir', 'fps', 'online', 'net', 'feed', 'board', 'tags', 'fatal', 'dead', 'start']) {
+    for (const k of ['cross', 'hit', 'prompt', 'acts', 'mark', 'progress', 'compass', 'bearing', 'area', 'weapon', 'vitals', 'stamina', 'arms', 'ride', 'hotbar', 'chat', 'scope', 'damage', 'bleedfx', 'bleed', 'hitdir', 'fps', 'online', 'net', 'feed', 'board', 'tags', 'fatal', 'dead', 'start']) {
       this.el[k] = this.root.querySelector(`.hud-${k}`) as HTMLElement;
     }
     this.notes = this.root.querySelector('.hud-notes') as HTMLDivElement;
@@ -920,6 +938,10 @@ export class HUD {
     /** seconds of adrenaline left (0 = none) */
     boost: number;
     prompt: string | null;
+    /** what the hands can do with what is in them (null: nothing to say) */
+    acts?: HandAct[] | null;
+    /** a phone: the buttons are named, where a mouse is drawn */
+    touch?: boolean;
     /** where on screen the thing the prompt is about sits, as fractions of the screen (null = no marker) */
     mark: [number, number] | null;
     weapon: { name: string; ammo: { loaded: number; reserve: number; cap: number; mags?: number; bare?: boolean } | null; action: string | null; mode: string | null; /** the range its sights are set for, metres, where that can be changed */ zero?: number | null } | null;
@@ -991,6 +1013,12 @@ export class HUD {
 
     this.set('prompt', e.prompt, s.prompt ? s.prompt : '', 'html');
     this.toggle(e.prompt, 'show', !!s.prompt);
+    const acts = s.acts?.length ? s.acts : null;
+    if (acts) {
+      const key = (a: HandAct) => (s.touch ? `<span class="act-key">${a.on === 'l' ? 'Fire' : a.on === 'w' ? 'Swap' : 'Aim'}</span>` : mouseSvg(a.on));
+      this.set('acts', e.acts, acts.map((a) => `<div class="hud-act${a.hold ? ' hold' : ''}"><div class="hud-act-text"><b>${a.text}</b>${a.sub ? `<small>${a.sub}</small>` : ''}</div>${key(a)}</div>`).join(''), 'html');
+    }
+    this.toggle(e.acts, 'show', !!acts);
     this.toggle(e.mark, 'show', !!s.mark);
     if (s.mark) {
       const at = `${(s.mark[0] * 100).toFixed(1)}%|${(s.mark[1] * 100).toFixed(1)}%`;

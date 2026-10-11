@@ -79,6 +79,40 @@
   white-space: nowrap;
 }
 .hud-prompt.show { opacity: 1; }
+/* what the hands can do with what is in them: in the corner, a small mouse with the button lit and the word for it */
+.hud-acts {
+  position: absolute;
+  right: 26px;
+  bottom: 212px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 9px;
+  opacity: 0;
+  transition: opacity 0.12s;
+  pointer-events: none;
+}
+.hud-acts.show { opacity: 1; }
+.hud-act { display: flex; align-items: center; gap: 11px; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); }
+.hud-act-text { text-align: right; line-height: 1.2; }
+.hud-act-text b { display: block; font-size: 13px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink); }
+.hud-act-text small { display: block; font-family: var(--mono); font-size: 11px; letter-spacing: 0.03em; color: var(--ink-dim); }
+.hud-act svg { flex: none; width: 21px; height: 33px; overflow: visible; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7)); }
+.hud-act svg .m-body { fill: rgba(10, 12, 11, 0.5); stroke: rgba(233, 228, 216, 0.82); stroke-width: 5; }
+.hud-act svg .m-line { fill: none; stroke: rgba(233, 228, 216, 0.6); stroke-width: 4; }
+.hud-act svg .m-part { fill: transparent; }
+.hud-act svg .m-wheel { fill: rgba(10, 12, 11, 0.85); stroke: rgba(233, 228, 216, 0.6); stroke-width: 4; }
+/* (lit brighter than the accent is anywhere else: it is a few pixels, and has to be found at a glance) */
+.hud-act svg .on { fill: #ffd35a; }
+.hud-act svg .m-wheel.on { stroke: #ffd35a; }
+/* (the first of them is the one the button does: the others are smaller under it) */
+.hud-act + .hud-act { opacity: 0.78; }
+.hud-act + .hud-act .hud-act-text b { font-size: 11px; font-weight: 500; }
+.hud-act + .hud-act svg { width: 16px; height: 25px; margin-right: 2.5px; }
+.hud-act.hold svg .on { animation: act-held 1.2s ease-in-out infinite; }
+@keyframes act-held { 50% { fill-opacity: 0.45; } }
+.hud-act .act-key { flex: none; min-width: 34px; padding: 3px 6px; border: 1px solid rgba(233, 228, 216, 0.6); background: rgba(10, 12, 11, 0.5); font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; text-align: center; color: var(--accent); }
+body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: translateX(-50%); align-items: center; }
 /* four corners round the thing F would take: it need not be dead under the cross-hair */
 .hud-mark {
   position: absolute;

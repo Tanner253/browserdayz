@@ -39,7 +39,7 @@ import { Grenades } from './grenades';
 import { Garage } from './garage';
 import { Jeep } from './vehicle';
 import { JEEP } from '../sim/vehicles';
-import { HUD, type HotbarEntry } from '../ui/hud';
+import { HUD, type HandAct, type HotbarEntry } from '../ui/hud';
 import { BACK_SHORT } from '../ui/updates';
 import { InventoryUI } from '../ui/inventory-ui';
 import { Minimap } from '../ui/minimap';
@@ -544,7 +544,7 @@ export class Game {
       this.touch = new TouchControls(this.input, {
         menu: () => this.input.unlock(),
         inventory: () => this.started && !this.player.dead && this.toggleInventory(),
-        swap: () => inPlay() && (this.breakOff() || this.nextWeapon()),
+        swap: () => inPlay() && (this.breakOff() || this.turnMagWork() || this.nextWeapon()),
         emote: (id) => inPlay() && this.emote(id),
         chat: () => {
           if (!inPlay() || this.invUI.isOpen || this.hud.chatOpen) return;
@@ -1958,6 +1958,7 @@ export class Game {
     this.weapons.take(item);
     if (def.weapon || def.melee) return;
     this.inHand = item;
+    this.magMode = null;
     this.ready = { item, t: 0 };
     this.weapons.beginUse(item.id, this.poseOf(item), def.use?.time ?? def.open?.time ?? 2, true);
   }
@@ -1991,7 +1992,7 @@ export class Game {
     const def = ITEMS[item.id];
     if (this.use || this.player.dead || this.weapons.working) return;
     const well = def.use?.sips ? this.wellHere() : null;
-    if (def.mag) this.fillMagazine(item);
+    if (def.mag) this.magWork(item) === 'empty' ? this.unloadMagazine(item) : this.fillMagazine(item);
     else if (def.open) this.openBox(item);
     else if (item.id === 'jerrycan') this.pourFuel(item);
     else if (item.id === 'keycard') this.swipeCard();
@@ -2094,7 +2095,7 @@ export class Game {
     this.use = { label, t: 0, dur, sound, soundT: 0, done };
     this.weapons.beginUse(itemId, kind, dur);
     // (what everybody else sees of an injection is the hands at work on a wound, as with a dressing)
-    this.act(seen ?? (kind === 'inject' ? 'bandage' : kind === 'smoke' ? 'eat' : kind === 'swipe' ? 'open' : kind), dur);
+    this.act(seen ?? (kind === 'inject' ? 'bandage' : kind === 'smoke' ? 'eat' : kind === 'swipe' ? 'open' : kind === 'unload' ? 'load' : kind), dur);
     // (a smoke is one sound from the lighter to the last breath of it, made once)
     if (sound === 'smoke') audio.ui('smoke');
   }
@@ -2707,6 +2708,79 @@ export class Game {
 
   /** seconds a round takes to push into a magazine */
   private static readonly ROUND_IN = 0.42;
+  /** seconds to thumb one round out of a magazine (quicker than pushing one in) */
+  private static readonly ROUND_OUT = 0.3;
+  /**
+   * What holding the button does with a magazine in the hands: rounds into it, or rounds out of it. The wheel
+   * turns it over (as it turns over what a thing does in DayZ); on a phone, the button that changes weapons does.
+   * Null: as it comes, which is whichever of the two can be done (filling, if both can).
+   */
+  private magMode: 'fill' | 'empty' | null = null;
+
+  /**
+   * What the hands can do with what is in them, for the corner of the picture: the button and the word. One place,
+   * beside `handFire` (which does it): a thing given a use there is given its word here.
+   */
+  private handActs(): HandAct[] | null {
+    if (this.player.dead || !this.started || this.invUI.isOpen || this.shop.isOpen || this.garage.ride) return null;
+    // (at it already: what stops it)
+    if (this.use) return this.holding ? [{ on: 'l', hold: true, text: 'Let go to stop' }] : [{ on: 'r', text: 'Stop' }];
+    const item = this.inHand;
+    if (!item) return null;
+    const def = ITEMS[item.id];
+    const hold = !this.touch;
+    let act: HandAct | null = null, wheel = 'Put away';
+    if (def.mag) {
+      const work = this.magWork(item);
+      act = { on: 'l', hold, text: work === 'fill' ? 'Fill magazine' : 'Empty magazine', sub: work === 'fill' ? `${item.rounds ?? 0}/${def.mag.capacity} · ${this.inv.count(def.mag.ammo)} loose` : `${item.rounds ?? 0} in it` };
+      wheel = work === 'fill' ? 'Empty it instead' : 'Fill it instead';
+    } else if (def.open) act = { on: 'l', hold, text: 'Open the box', sub: `${def.open.qty} rounds` };
+    else if (item.id === 'jerrycan') act = { on: 'l', hold, text: 'Pour it in', sub: this.lookedAt instanceof Jeep ? undefined : 'at a car' };
+    else if (item.id === 'keycard') act = { on: 'l', hold, text: 'Put the card in', sub: 'at the reader' };
+    else if (def.use?.sips && this.wellHere() && (item.left ?? 0) < def.use.sips) act = { on: 'l', hold, text: 'Fill it at the well' };
+    else if (def.use) {
+      const word = def.use.sound === 'eat' ? 'Eat' : def.use.sound === 'drink' ? 'Drink' : def.use.sound === 'bandage' ? 'Dress the wound' : def.use.sound === 'inject' ? 'Inject' : def.use.sound === 'smoke' ? 'Smoke' : 'Use';
+      act = { on: 'l', hold, text: word, sub: def.use.sips ? `${item.left ?? def.use.sips}/${def.use.sips} left` : undefined };
+    } else if (def.category === 'stash') act = { on: 'l', hold, text: 'Set it down' };
+    return act ? [act, { on: 'w', text: wheel }] : [{ on: 'w', text: wheel }];
+  }
+
+  /** which of the two it is for this magazine, as things stand */
+  private magWork(mag: ItemInstance): 'fill' | 'empty' {
+    const d = ITEMS[mag.id].mag!;
+    const canFill = (mag.rounds ?? 0) < d.capacity && this.inv.count(d.ammo) > 0, canEmpty = (mag.rounds ?? 0) > 0;
+    return this.magMode ?? (canFill || !canEmpty ? 'fill' : 'empty');
+  }
+
+  /** The wheel (or its button) with a magazine held: the other of the two. @returns whether there was a magazine to turn it over for */
+  private turnMagWork(): boolean {
+    const mag = this.inHand && ITEMS[this.inHand.id].mag ? this.inHand : null;
+    if (!mag || this.use) return false;
+    this.magMode = this.magWork(mag) === 'fill' ? 'empty' : 'fill';
+    audio.ui('move');
+    return true;
+  }
+
+  /**
+   * Rounds thumbed out of a magazine into the pockets, one at a time, until it is empty, there is no more room
+   * for them, or the hands are taken off it.
+   */
+  private unloadMagazine(mag: ItemInstance) {
+    const d = ITEMS[mag.id].mag;
+    if (!d || this.use || this.player.dead || this.weapons.working) return;
+    if ((mag.rounds ?? 0) <= 0) return void this.hud.note('It is empty', 'info');
+    if (!this.inv.hasRoom(makeItem(d.ammo, 1))) return void this.hud.note('No room in your pockets for loose rounds', 'warn');
+    this.startUse(`Emptying the magazine · ${mag.rounds ?? 0} in it`, Game.ROUND_OUT, mag.id, 'unload', null, () => {
+      if (!this.inv.containerOf(mag) || (mag.rounds ?? 0) <= 0) return;
+      const round = makeItem(d.ammo, 1);
+      if (this.inv.add(round)) return void this.hud.note('No room in your pockets for loose rounds', 'warn');
+      mag.rounds = (mag.rounds ?? 0) - 1;
+      audio.ui('round');
+      this.inventoryChanged();
+      if ((mag.rounds ?? 0) > 0 && this.inv.hasRoom(makeItem(d.ammo, 1))) this.unloadMagazine(mag);
+      else this.hud.note((mag.rounds ?? 0) > 0 ? `${mag.rounds} left in it: no room for more loose rounds` : `The ${ITEMS[mag.id].name.toLowerCase()} is empty`, 'good');
+    }, 'load');
+  }
 
   /**
    * Rounds pushed into a magazine out of the loose ones carried, one at a time, until it is full, there are no
@@ -2932,7 +3006,7 @@ export class Game {
       // (the card is used from the hands, like everything: F takes it into them, and the button puts it in)
       const card = this.inv.find((i) => i.id === 'keycard');
       const inHand = this.inHand?.id === 'keycard';
-      this.prompt = inHand ? (this.touch ? '<small>Tap fire to put the card in</small>' : '<small>Hold the left button to put the card in</small>') : card ? '<kbd>F</kbd>Take out the keycard' : '<small>Locked. A keycard opens it: they are kept under the gas</small>';
+      this.prompt = inHand ? null : card ? '<kbd>F</kbd>Take out the keycard' : '<small>Locked. A keycard opens it: they are kept under the gas</small>';
       if (card && !inHand && this.input.pressed('KeyF') && !this.hud.chatOpen && !this.use) this.takeUp(card);
       return;
     }
@@ -3329,6 +3403,8 @@ export class Game {
       const r = this.ready;
       r.t += dt;
       const kept = this.loose === r.item || this.inv.containers.some((c) => c.has(r.item));
+      // (a magazine: the wheel turns over what the button does with it, filling or emptying, and it stays in the hand)
+      if (kept && !p.dead && input.wheel !== 0 && !uiOpen && this.turnMagWork()) input.wheel = 0;
       if (p.dead || !kept || (input.wheel !== 0 && !uiOpen)) this.putAway();
       else if (playing && !uiOpen && !typing && r.t > 0.3 && (input.pressed('Mouse0') || (input.held('Mouse0') && r.t > 0.55))) this.handFire(r.item);
     }
@@ -3548,6 +3624,8 @@ export class Game {
       // no keyboard on a phone: the Use button lights up instead of naming a key
       prompt: this.awaitClick ? '<kbd>Click</kbd>to look around' : this.touch ? (this.prompt?.replace(/<kbd>F<\/kbd>/, '').replace(/ <small>G to [^<]*<\/small>/, '').replace('W A S D to drive · Space is the handbrake', 'the stick drives · the jump button is the handbrake') ?? null) : this.prompt,
       mark: this.awaitClick ? null : this.mark,
+      acts: this.awaitClick ? null : this.handActs(),
+      touch: !!this.touch,
       weapon: this.garage.ride ? null : this.weapons.status(),
       aiming: this.weapons.aiming,
       spread: this.weapons.spread,
