@@ -128,11 +128,19 @@ try {
   ann.speak(0, VOICE.bytes + 10);
   await sleep(300);
   assert.equal(ben.heard.length, 0, 'a piece bigger than speech was passed on');
-  await sleep(1100);
-  for (let k = 0; k < 400; k++) ann.speak(k);
-  await sleep(700);
-  assert.ok(ben.heard.length > 0 && ben.heard.length <= VOICE.rate, `of 400 pieces sent at once, ${ben.heard.length} were passed on (no more than ${VOICE.rate} a second should be)`);
-  ok(`nobody can flood the others: a piece over ${VOICE.bytes} bytes is dropped, and of 400 sent at once ${ben.heard.length} were passed on`);
+  // what a game owes after it has stopped for a second comes all at once, and is passed on whole
+  await sleep(4500);
+  ben.heard = [];
+  for (let k = 0; k < 60; k++) ann.speak(k);
+  await sleep(500);
+  assert.equal(ben.heard.length, 60, `of 60 pieces sent together after a stop, ${ben.heard.length} were passed on`);
+  // and a flood is not: no more than the allowance, then no more than the rate
+  await sleep(4500);
+  ben.heard = [];
+  for (let k = 0; k < 1500; k++) ann.speak(k);
+  await sleep(900);
+  assert.ok(ben.heard.length >= VOICE.burst - 10 && ben.heard.length <= VOICE.burst + VOICE.rate * 2, `of 1500 pieces sent at once, ${ben.heard.length} were passed on (the allowance is ${VOICE.burst})`);
+  ok(`what is owed after a stop is passed on whole, and a flood is not: a piece over ${VOICE.bytes} bytes is dropped, and of 1500 sent at once ${ben.heard.length} were passed on`);
 
   for (const p of [ann, ben, far]) p.ws.close();
 } catch (e) {

@@ -1,14 +1,21 @@
-// How the voice sounds, measured (nobody who wrote it can hear it): a steady note is put through the whole of
-// src/game/voice.ts but the wire and the microphone, in a headless Chrome, while the page's own thread is kept as
-// busy as a game keeps it; and what comes out to be heard is looked at a sample at a time. A note that comes
+// How the voice sounds, measured (nobody who wrote it can hear it). In a headless Chrome a steady note is spoken
+// by one player's voice (src/game/voice.ts, all of it but the microphone) and heard by another's, over a line
+// made up between the two, and what comes out to be heard is looked at a sample at a time. A note that comes
 // through whole is smooth: every sample is a small step from the last. A piece lost, or two pieces badly joined,
-// is a step no note makes.
+// is a step no note makes; a piece late with nothing in hand is a silence.
 //
 //   node scripts/voice-check.mjs                    the voice as it is now
 //   node scripts/voice-check.mjs --of <commit>      as it was at that commit (to see what a change did)
 //
-// For each engine rate (48000, and 44100: most laptops), prints: pieces sent and played of those owed; how much of
-// what was listened to was silence; and how many steps were bigger than the note can make.
+// Three times over, each harder than the last:
+//   quiet     - the page idle, the line perfect
+//   stopping  - the page as busy as a game keeps it, and stopping dead for a third of a second every two and a half
+//               (a place loading, a shader made): what is owed then comes all at once
+//   bad line  - that, and a line that holds each piece back by 40 to 130 ms and every few seconds stops for up to
+//               three quarters of a second and then gives all it holds together (as a line that resends does)
+// For each: pieces sent and heard; how often the listener ran dry while it was finding how much to keep in hand
+// (the first four seconds) and after; and, of what was listened to after those four seconds, how much was silence
+// and how many steps no note makes.
 
 import { execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -30,49 +37,70 @@ if (of) {
 }
 execFileSync(process.execPath, [path.resolve('node_modules/esbuild/bin/esbuild'), entry, '--bundle', '--format=iife', '--global-name=VoiceMod', `--outfile=${path.join(dir, 'voice.js')}`, '--log-level=error']);
 fs.writeFileSync(path.join(dir, 'check.html'), `<!doctype html><meta charset="utf-8"><script src="voice.js"></script><script>
-window.check = async (rate, busy) => {
+window.check = async (rate, mode) => {
   const ctx = new AudioContext({ sampleRate: rate });
   await ctx.resume();
   const bus = ctx.createGain();
   bus.gain.value = 0;
   bus.connect(ctx.destination);
-  const v = new VoiceMod.Voice(() => ctx, () => bus, () => {});
-  // the page's thread as a game keeps it: busy for most of every frame, and now and then for three frames together
+  const hard = mode !== 'quiet', bad = mode === 'bad line';
+  // the line: pieces come out in the order they went in, each late by its own amount; now and then it stops, and then gives all it holds at once
+  let free = 0, stopped = 0, heard = 0;
+  const listener = new VoiceMod.Voice(() => ctx, () => bus, () => {});
+  const speaker = new VoiceMod.Voice(() => ctx, () => bus, (b) => {
+    const o = new Uint8Array(b.length + 2);
+    o[0] = 7;
+    o.set(b, 2);
+    const now = performance.now();
+    if (bad && now > stopped && Math.random() < 0.007) stopped = now + 300 + Math.random() * 450;
+    const at = Math.max(now + (bad ? 40 + Math.random() * 90 : 0), stopped, free);
+    free = at;
+    line.push([at, o.buffer]);
+  });
+  // (given out by one hand, in the order it went in: a timer for each piece let a later one overtake an earlier, which no line does)
+  const line = [];
+  const pump = setInterval(() => { const now = performance.now(); while (line.length && line[0][0] <= now) { heard++; listener.hear(line.shift()[1]); } }, 4);
+  // the page's thread as a game keeps it: busy for most of every frame, and every two and a half seconds stopped dead for a third of one
   let n = 0;
-  const work = busy ? setInterval(() => { const until = performance.now() + (++n % 20 === 0 ? 70 : 22); while (performance.now() < until); }, 33) : 0;
+  const work = hard ? setInterval(() => { const until = performance.now() + (++n % 75 === 0 ? 330 : 22); while (performance.now() < until); }, 33) : 0;
+  speaker.testing = true;
+  const error = await speaker.talk(440);
   const tap = ctx.createAnalyser();
   tap.fftSize = 32768;
-  const first = v.loop(400);          // (the first that is heard brings the worklets in, and is not itself heard)
-  await first;
-  const run = v.loop(7000);  // (longer than the four listenings take: none of them is of the quiet after it)
-  // what each speaker is heard through, before it is made loud or quiet: listened to four times while it plays
-  const takes = [];
-  for (let k = 0; k < 4; k++) {
-    await new Promise((r) => setTimeout(r, 800));
-    const p = [...v.peers.values()][0];
-    if (!p) continue;
+  await new Promise((r) => setTimeout(r, 4000));
+  const peer = () => [...listener.peers.values()][0];
+  const settling = peer()?.state?.dry ?? -1;
+  const p = peer();
+  if (p) {
     (p.ear ?? p.gain).connect(tap);
     if (!p.ear) p.gain.gain.value = 1;
-    await new Promise((r) => setTimeout(r, 720));
+  }
+  // listened to eight times over the next twelve seconds, seven tenths of a second each
+  const takes = [];
+  for (let k = 0; k < 8; k++) {
+    await new Promise((r) => setTimeout(r, 1500));
     const buf = new Float32Array(tap.fftSize);
     tap.getFloatTimeDomainData(buf);
     takes.push(buf);
   }
-  const r = await run;
+  speaker.testing = false;
+  speaker.hush();
   clearInterval(work);
+  clearInterval(pump);
   let silent = 0, jumps = 0, total = 0, peak = 0;
-  for (const b of takes) {
-    for (let i = 0; i < b.length; i++) peak = Math.max(peak, Math.abs(b[i]));
-    // the biggest step a note of 440 can make from one sample to the next, and half as much again
-    const most = peak * 2 * Math.PI * 440 / rate * 1.5 + 0.004;
-    for (let i = 1; i < b.length; i++) {
-      total++;
-      if (Math.abs(b[i]) < 1e-4 && Math.abs(b[i - 1]) < 1e-4) silent++;
-      if (Math.abs(b[i] - b[i - 1]) > most) jumps++;
-    }
+  for (const b of takes) for (let i = 0; i < b.length; i++) peak = Math.max(peak, Math.abs(b[i]));
+  // the biggest step a note of 440 can make from one sample to the next, and half as much again
+  const most = peak * 2 * Math.PI * 440 / rate * 1.6 + 0.004;
+  for (const b of takes) for (let i = 1; i < b.length; i++) {
+    total++;
+    if (Math.abs(b[i]) < 1e-4 && Math.abs(b[i - 1]) < 1e-4) silent++;
+    if (Math.abs(b[i] - b[i - 1]) > most) jumps++;
   }
+  const st = peer()?.state ?? null;
+  const out = { rate, mode, sent: speaker.stats.sent, heard, played: listener.stats.played, error, settling, dry: st ? st.dry - settling : -1, want: st?.want ?? -1, silentPct: +(100 * silent / Math.max(1, total)).toFixed(1), jumps, peak: +peak.toFixed(2) };
+  await new Promise((r) => setTimeout(r, 1200));
   await ctx.close();
-  return { rate, busy, sent: r.sent, played: r.played, owed: 350, error: r.error, takes: takes.length, silentPct: +(100 * silent / Math.max(1, total)).toFixed(1), jumps, peak: +peak.toFixed(2) };
+  return out;
 };
 </script>`);
 const CHROME = ['C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'].find((p) => fs.existsSync(p));
@@ -105,9 +133,9 @@ try {
     ws.send(JSON.stringify({ id, method: 'Runtime.evaluate', params: { expression, awaitPromise: true, returnByValue: true } }));
   });
   console.log(of ? `the voice as it was at ${of}:` : 'the voice as it is:');
-  for (const [rate, busy] of [[48000, false], [48000, true], [44100, true]]) {
-    const r = await run(`check(${rate}, ${busy})`);
-    console.log(`  engine at ${r.rate}${r.busy ? ', the page busy' : ''}: sent ${r.sent} and played ${r.played} of about ${r.owed} pieces; ${r.silentPct}% of what was listened to was silence; ${r.jumps} steps no note makes; peak ${r.peak}${r.error ? '; ' + r.error : ''}`);
+  for (const [rate, mode] of [[48000, 'quiet'], [44100, 'stopping'], [48000, 'bad line'], [44100, 'bad line']]) {
+    const r = await run(`check(${rate}, '${mode}')`);
+    console.log(`  ${mode.padEnd(8)} at ${r.rate}: ${r.sent} pieces sent, ${r.heard} passed on, ${r.played} played; ran dry ${r.settling} times settling and ${r.dry} after (keeping ${r.want} ms in hand); after settling ${r.silentPct}% silence and ${r.jumps} steps no note makes; peak ${r.peak}${r.error ? '; ' + r.error : ''}`);
   }
   ws.close();
 } finally {

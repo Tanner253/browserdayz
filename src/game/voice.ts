@@ -12,12 +12,23 @@
 // each speaker is heard through a worklet that keeps a little in hand (more, when what comes is uneven) and plays
 // it as one unbroken sound.
 //
+// And nothing that was said is thrown away for coming late or all at once. A game stops for a third of a second
+// now and then (a place loading, a new shader), on the speaker's machine and on the listener's, and the line
+// between them is no steadier: after every such stop a dozen and more pieces arrive together. The first mending
+// (2026-10-10) was smooth on a quiet machine and still dropped whatever came in such a heap: the coders were let
+// fall behind by no more than a quarter of a second, and the server passed on no more than seventy pieces in a
+// second. It still came across broken. Now the heap is taken whole and played out; what is in hand is let grow as
+// far as six tenths of a second where the line is bad, and is brought back down by playing a twentieth faster,
+// never by a jump (scripts/voice-check.mjs plays it over a bad line and a stopping page, and counts the breaks).
+//
 // A browser without the coder (WebCodecs) neither sends nor hears, and the game says so once.
 
 import { VOICE, loud } from '../sim/voice';
 
-/** a voice beside the player, against everything else that is heard (speech is quiet beside gunfire) */
-const LOUDEST = 1.8;
+/** a voice beside the player, against everything else that is heard (speech is quiet beside gunfire; at 1.8 a loud voice was driven into the stops, and came out as crackle) */
+const LOUDEST = 1.4;
+/** how far behind the coders may fall before a piece is let go, pieces (two seconds: only a machine that cannot keep up at all gets there) */
+const BEHIND = 100;
 /** speech is coded at this many samples a second, in pieces this long */
 const RATE = 48000, PIECE = 960;
 
@@ -45,31 +56,45 @@ registerProcessor('zona-mic', ZonaMic);
 class ZonaEar extends AudioWorkletProcessor {
   constructor() {
     super();
-    this.ring = new Float32Array(${RATE * 2});
+    this.ring = new Float32Array(${RATE * 4});
     this.w = 0; this.r = 0; this.step = ${RATE} / sampleRate;
-    this.want = ${RATE} * 0.1; this.going = false; this.level = 0; this.dry = 0;
+    // how much is kept in hand before it plays (it starts at 0.16 s and grows by a twentieth of a second each time it
+    // runs dry, as far as 0.6 s), whether it is playing, how loud (it comes in and goes out, never at a step), and how
+    // often it has run dry
+    this.want = ${RATE} * 0.16; this.going = false; this.level = 0; this.dry = 0; this.told = 0;
     this.port.onmessage = (e) => {
       const pcm = e.data, N = this.ring.length;
       for (let i = 0; i < pcm.length; i++) this.ring[(this.w + i) % N] = pcm[i];
       this.w += pcm.length;
-      if (this.w - this.r > this.want + ${RATE} * 0.45) this.r = this.w - this.want;
+      // (more than three seconds behind is a line that has been down: only then is anything skipped)
+      if (this.w - this.r > ${RATE} * 3) this.r = this.w - this.want;
     };
   }
   process(_in, outputs) {
     const out = outputs[0][0], N = this.ring.length;
     if (!this.going && this.w - this.r >= this.want) this.going = true;
+    // with much more in hand than is wanted, it is played a twentieth faster until it is not (nobody hears that; a jump they would)
+    const fast = this.w - this.r > this.want + ${RATE} * 0.25 ? 1.05 : 1;
     for (let i = 0; i < out.length; i++) {
-      if (this.going && this.w - this.r < 2) {
+      const left = this.w - this.r;
+      if (this.going && left < 2) {
         this.going = false;
         this.dry++;
-        this.want = Math.min(${RATE} * 0.36, this.want + ${RATE} * 0.04);
+        this.want = Math.min(${RATE} * 0.6, this.want + ${RATE} * 0.05);
       }
-      this.level += ((this.going ? 1 : 0) - this.level) * 0.004;
+      // (the last hundredth of a second of what there is goes out quietly: running dry is not a click)
+      const target = this.going ? Math.min(1, (left - 2) / 480) : 0;
+      this.level += (target - this.level) * (target < this.level ? 0.05 : 0.006);
       if (this.going) {
         const k = Math.floor(this.r), f = this.r - k, a = this.ring[k % N], b = this.ring[(k + 1) % N];
         out[i] = (a + (b - a) * f) * this.level;
-        this.r += this.step;
+        this.r += this.step * fast;
       } else out[i] = 0;
+    }
+    // (once a second, how it is going: the game writes it down where whoever is looking for a fault can read it)
+    if (currentTime - this.told > 1) {
+      this.told = currentTime;
+      this.port.postMessage({ dry: this.dry, inHand: Math.round(((this.w - this.r) / ${RATE}) * 1000), want: Math.round((this.want / ${RATE}) * 1000) });
     }
     return true;
   }
@@ -90,6 +115,8 @@ function worklets(ctx: BaseAudioContext): Promise<boolean> {
 }
 
 interface Peer {
+  /** how its worklet says it is going: times it has run dry, thousandths of a second in hand, and how many it wants */
+  state: { dry: number; inHand: number; want: number };
   dec: AudioDecoder;
   ear: AudioWorkletNode;
   gain: GainNode;
@@ -158,9 +185,9 @@ export class Voice {
       }
       if (!this.enc || this.enc.state === 'closed') {
         this.enc = new AudioEncoder({ output: (chunk) => this.packet(chunk), error: () => (this.enc = null) });
-        // (speech, a fiftieth of a second to a piece; and each piece carries a thin copy of the one before it, so
-        // that one lost on the way is not a hole)
-        this.enc.configure({ codec: 'opus', sampleRate: RATE, numberOfChannels: 1, bitrate: 32000, opus: { frameDuration: 20000, application: 'voip', signal: 'voice', useinbandfec: true, packetlossperc: 5 } } as AudioEncoderConfig);
+        // (speech, a fiftieth of a second to a piece. Nothing is lost on the way, the line being what it is, so none
+        // of a piece is spent on a copy of the one before it)
+        this.enc.configure({ codec: 'opus', sampleRate: RATE, numberOfChannels: 1, bitrate: 32000, opus: { frameDuration: 20000, application: 'voip', signal: 'voice' } } as AudioEncoderConfig);
       }
     } catch (e) {
       this.talking = false;
@@ -176,8 +203,9 @@ export class Voice {
 
   /** A piece from the microphone's worklet: exactly PIECE samples. */
   private capture(pcm: Float32Array) {
-    // (behind with its coding, it drops what it cannot keep up with: late speech is worse than a gap)
-    if (!this.talking || !this.enc || this.enc.state !== 'configured' || this.enc.encodeQueueSize > 12) return;
+    // (after the game has stopped a moment these come a dozen at once, and all of them are coded: only a coder two
+    // seconds behind lets one go)
+    if (!this.talking || !this.enc || this.enc.state !== 'configured' || this.enc.encodeQueueSize > BEHIND) return;
     const data = new AudioData({ format: 'f32', sampleRate: RATE, numberOfFrames: pcm.length, numberOfChannels: 1, timestamp: this.ts, data: pcm as Float32Array<ArrayBuffer> });
     this.ts += Math.round((pcm.length / RATE) * 1e6);
     this.enc.encode(data);
@@ -212,18 +240,25 @@ export class Voice {
       // From where they stand. How loud is not left to the panner: it is `loud` of how far off they are, set
       // every frame (see `update`), so it is the same curve the test checks; until it is known where they
       // are, they are not heard at all.
-      pan.panningModel = 'HRTF';
+      // (plainly to the left or the right: the finer model works every voice through a pair of long filters, which
+      // costs a great deal for somebody talking without a stop and gains speech nothing)
+      pan.panningModel = 'equalpower';
       pan.distanceModel = 'linear';
       pan.rolloffFactor = 0;
       gain.gain.value = 0;
       ear.connect(gain).connect(pan).connect(bus);
-      const peer: Peer = { dec: null as unknown as AudioDecoder, ear, gain, pan, heard: 0, frames: 0 };
+      const peer: Peer = { state: { dry: 0, inHand: 0, want: 0 }, dec: null as unknown as AudioDecoder, ear, gain, pan, heard: 0, frames: 0 };
+      ear.port.onmessage = (e) => {
+        const now = e.data as Peer['state'];
+        if (now.dry > peer.state.dry) console.info(`[voice] ${id}: ran dry (${now.dry} times); keeping ${now.want} ms in hand`);
+        peer.state = now;
+      };
       peer.dec = new AudioDecoder({ output: (d) => this.play(peer, d), error: () => void this.drop(id) });
       peer.dec.configure({ codec: 'opus', sampleRate: RATE, numberOfChannels: 1 });
       this.peers.set(id, (p = peer));
     }
     p.heard = performance.now();
-    if (p.dec.state !== 'configured' || p.dec.decodeQueueSize > 16) return;
+    if (p.dec.state !== 'configured' || p.dec.decodeQueueSize > BEHIND) return;
     p.dec.decode(new EncodedAudioChunk({ type: 'key', timestamp: p.frames++ * 20000, data: new Uint8Array(buf, 4) }));
   }
 
@@ -235,6 +270,11 @@ export class Voice {
     for (let i = 0; i < pcm.length; i += 16) this.stats.peak = Math.max(this.stats.peak, Math.abs(pcm[i]));
     this.stats.played++;
     p.ear.port.postMessage(pcm, [pcm.buffer]);
+  }
+
+  /** How each speaker's sound is going (for whoever is looking for a fault: `__game.voice.report()` in the console). */
+  report() {
+    return [...this.peers].map(([id, p]) => ({ id, ...p.state, pieces: p.frames }));
   }
 
   private drop(id: number) {
@@ -261,9 +301,10 @@ export class Voice {
       }
       const at = where(id);
       if (at) {
-        p.pan.positionX.value = at.x;
-        p.pan.positionY.value = at.y + 1.6;
-        p.pan.positionZ.value = at.z;
+        // (eased as well: set outright every frame, a voice came from a place that moved in steps)
+        p.pan.positionX.setTargetAtTime(at.x, clock, 0.05);
+        p.pan.positionY.setTargetAtTime(at.y + 1.6, clock, 0.05);
+        p.pan.positionZ.setTargetAtTime(at.z, clock, 0.05);
         // (eased over a tenth of a second: walking away, a voice sinks and does not step down)
         p.gain.gain.setTargetAtTime(LOUDEST * loud(Math.hypot(at.x - ear.x, at.y - ear.y, at.z - ear.z)), clock, 0.1);
       }

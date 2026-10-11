@@ -810,16 +810,20 @@ function pidOf(key: string): string {
 
 /**
  * A piece of somebody's speech: passed on, with whose it is in front of it, to whoever is alive within earshot of
- * them and to nobody else. Nothing is kept of it. One player sends no more than VOICE.rate pieces a second, none
- * bigger than VOICE.bytes; the dead say nothing.
+ * them and to nobody else. Nothing is kept of it. One player sends no more than VOICE.rate pieces a second over
+ * time and no more than VOICE.burst at once, none bigger than VOICE.bytes; the dead say nothing.
  */
-const said = new Map<number, { at: number; n: number }>();
+const said = new Map<number, { at: number; left: number }>();
 function voice(c: Client, piece: Buffer) {
   if (!c.alive || piece.length < 3 || piece.length > VOICE.bytes) return;
   const now = Date.now();
+  // (an allowance that fills at VOICE.rate a second and holds VOICE.burst: what comes all at once after a stop is passed on whole)
   let k = said.get(c.id);
-  if (!k || now - k.at > 1000) said.set(c.id, (k = { at: now, n: 0 }));
-  if (++k.n > VOICE.rate) return;
+  if (!k) said.set(c.id, (k = { at: now, left: VOICE.burst }));
+  k.left = Math.min(VOICE.burst, k.left + ((now - k.at) / 1000) * VOICE.rate);
+  k.at = now;
+  if (k.left < 1) return;
+  k.left--;
   const out = Buffer.allocUnsafe(piece.length + 2);
   out.writeUInt16LE(c.id & 0xffff, 0);
   piece.copy(out, 2);

@@ -9,8 +9,13 @@ export const VOICE = {
   fall: 1.6,
   /** the most one piece of speech may be, bytes (a fiftieth of a second of Opus is about fifty) */
   bytes: 400,
-  /** and the most pieces one player may send in a second */
-  rate: 70,
+  /**
+   * And the most pieces one player may send: `rate` a second over any length of time (speech is fifty), and as
+   * many as `burst` at once (a game that stopped for a moment sends what it owes all together, and none of it is
+   * to be lost: at seventy in any one second and no more, it was).
+   */
+  rate: 60,
+  burst: 250,
 };
 
 /**
