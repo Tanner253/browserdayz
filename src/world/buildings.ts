@@ -296,18 +296,25 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
           { id: 'WoodenTable_01', x: 0.6, z: -5.6, rot: 0 },
           { id: 'painted_wooden_chair_01', x: 0.2, z: -4.95, rot: Math.PI },
           { id: 'painted_wooden_chair_01', x: 1.0, z: -6.25, rot: 0 },
-          { id: 'painted_wooden_cabinet', x: -1.4, z: -6.72, rot: 0 },
-          { id: 'Shelf_01', x: -1.6, z: 7.02, rot: Math.PI },
+          // ("the white shelves clip through the walls on the 2 store red birck buildings of kamenka", 2026-10-12.
+          // Two things were wrong, both found by rays through the model's own file (assets-src/_wf/me/ray-at.mjs).
+          // A thing is stood by its middle, so a shelf a quarter of a metre deep with its middle at 7.02 had its
+          // back half in a wall whose inner face is at 7.038. And the walls at the two ends are mostly window: the
+          // cabinet stood across one, and the shelf upstairs filled the metre between two, frame to frame. Each is
+          // now against a stretch of wall with nothing in it: the shelf beside the front window, the cabinet on
+          // the side wall of the back room, the shelf upstairs on the other side wall of the room over it.)
+          { id: 'painted_wooden_cabinet', x: -1.9, z: -6.1, rot: Math.PI / 2 },
+          { id: 'Shelf_01', x: -1.68, z: 6.9, rot: Math.PI },
           // upstairs
           { id: 'old_bed_frame', x: -1.6, z: -5.95, rot: 0, y: 3.294 },
           { id: 'old_bed_frame', x: 4.65, z: -4.3, rot: 0, y: 3.294 },
           { id: 'painted_wooden_cabinet', x: 0.78, z: 6.72, rot: Math.PI, y: 3.294 },
-          { id: 'Shelf_01', x: -0.26, z: -7.02, rot: 0, y: 3.294 },
+          { id: 'Shelf_01', x: 3.68, z: -6.2, rot: -Math.PI / 2, y: 3.294 },
         ],
         loot: [
-          [0.3, 0.57, -5.6], [0.9, 0.57, -5.6], [-1.4, 1.2, -6.72], [-1.6, 0.44, 6.97], [-1.6, 1.24, 6.97],
+          [0.3, 0.57, -5.6], [0.9, 0.57, -5.6], [-1.9, 1.2, -6.1], [-1.68, 0.44, 6.9], [-1.68, 1.24, 6.9],
           [2.6, 0.02, -6.3], [-1.4, 0.02, 1.7], [3.1, 0.02, 6.4],
-          [-1.6, 3.774, -5.55], [4.65, 3.774, -3.9], [0.78, 4.494, 6.72], [-0.26, 3.734, -6.97], [-0.26, 4.534, -6.97],
+          [-1.6, 3.774, -5.55], [4.65, 3.774, -3.9], [0.78, 4.494, 6.72], [3.68, 3.734, -6.2], [3.68, 4.534, -6.2],
           [-3.0, 3.314, -4.8], [0.3, 3.314, 3.1], [3.0, 3.314, 6.3],
         ],
         usage: ['Town', 'Village'],

@@ -415,7 +415,8 @@ export class InventoryUI {
     if (item) {
       const el = document.createElement('div');
       el.className = 'inv-item in-slot' + (item === this.selected ? ' sel' : '') + (this.actions.inHands() === item ? ' active' : '');
-      const url = this.icons[item.id];
+      // (what is worn has a picture of its own for where it is worn: see `slot:` in icons.ts)
+      const url = this.icons[`slot:${item.id}`] ?? this.icons[item.id];
       el.innerHTML = `<div class="inv-item-img fit" style="${url ? `background-image:url(${url})` : ''}"></div>${this.tags(item)}`;
       el.title = itemName(item);
       this.bindItem(el, { kind: 'slot', slot, item });

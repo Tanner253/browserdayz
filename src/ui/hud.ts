@@ -164,7 +164,7 @@ export class HUD {
       <div class="hud-feed"></div>
       <div class="hud-under"><div class="hud-board"></div><div class="hud-tags"></div></div>
       <div class="hud-fatal"><div class="fatal-title">Disconnected</div><div class="fatal-sub"></div><button class="dead-btn fatal-btn">Reconnect</button></div>
-      <div class="hud-dead"><div class="dead-title">You are dead</div><div class="dead-sub"></div><button class="dead-btn">Respawn</button><a class="dead-back" data-back><b>Back ZONA on X</b><span>Like, reply, repost. ${BACK_SHORT}</span></a></div>
+      <div class="hud-dead"><div class="dead-title">You are dead</div><div class="dead-sub"></div><button class="dead-btn">Respawn <small>Space</small></button><a class="dead-back" data-back><b>Back ZONA on X</b><span>Like, reply, repost. ${BACK_SHORT}</span></a></div>
       <div class="hud-start">
         <video class="sm-film" muted playsinline preload="auto" src="/menu/map-pan.mp4"></video>
         <video class="sm-film" muted playsinline preload="auto" src="/menu/armoury.mp4"></video>

@@ -426,7 +426,7 @@ const D: ItemDef[] = [
   },
   {
     // (still `rubber_boots`)
-    id: 'rubber_boots', name: 'Combat Boots', model: 'combat_boots', w: 2, h: 3, weight: 1.4, category: 'clothing', slot: 'feet',
+    id: 'rubber_boots', name: 'Combat Boots', model: 'combat_boots', w: 2, h: 2, weight: 1.4, category: 'clothing', slot: 'feet',
     desc: 'Laced leather boots with a stiff sole. Cushions a bad landing: a third less fall damage.', wear: { fall: 0.67 },
   },
   {

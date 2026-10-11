@@ -788,6 +788,15 @@ export class Game {
       } else if (!this.invUI.isOpen && !this.map?.open && !this.adminUI?.isOpen && !this.player.dead && this.started) this.pause();
     };
     window.addEventListener('beforeunload', () => this.save());
+    // Dead, Space is the Respawn button. (Not in the first second: whoever died with a thumb on it, jumping, is
+    // shown what killed them before they are somewhere else.)
+    window.addEventListener('keydown', (e) => {
+      if (e.code !== 'Space' || e.repeat || !this.started || !this.player.dead || !this.deathSent) return;
+      if ((e.target as HTMLElement | null)?.tagName === 'INPUT' || this.hud.chatOpen || this.adminUI?.isOpen) return;
+      if (performance.now() - this.diedAt < 1000) return;
+      e.preventDefault();
+      this.respawn();
+    });
     window.addEventListener('keydown', (e) => {
       if (e.code !== 'Escape') return;
       if (this.adminUI?.isOpen) this.toggleAdmin(false, true);
@@ -1565,6 +1574,12 @@ export class Game {
 
   private async addCorpse(c: CorpseInfo) {
     if (this.corpses.has(c.uid)) return;
+    // Where somebody died is where their feet were, and that can be in the air (a jump, a fall, a roof's edge): the
+    // body lies on whatever is under that place, and along it if it slopes. ("dead bodies somtimes hover above the
+    // ground", 2026-10-12. Every game works this out the same, from the same ground.)
+    const under = physics.raycast({ x: c.x, y: c.y + 0.5, z: c.z }, { x: 0, y: -1, z: 0 }, 150, SOLID_GROUPS);
+    const slope = under && under.toi > 0.02 ? new THREE.Vector3(under.normal.x, under.normal.y, under.normal.z) : undefined;
+    if (under && under.toi > 0.02) c = { ...c, y: under.point.y };
     const stash = new Stash(c.uid, c.x, c.y, c.z, c.rot, 8, 10, `${c.name}'s body`);
     stash.corpse = true;
     // the box to search is where the body lies: behind where they stood if they went over
@@ -1578,7 +1593,7 @@ export class Game {
     // let the fall animation of the player finish before the body appears
     await new Promise((r) => setTimeout(r, 1800));
     if (!this.corpses.has(c.uid)) return;
-    await body.load(this.s.atmo, this.s.r.scene, c.x, c.y, c.z, c.rot, c.name, v);
+    await body.load(this.s.atmo, this.s.r.scene, c.x, c.y, c.z, c.rot, c.name, v, slope);
     // and what has run out of it by then
     this.effects.pool(c.x - Math.sin(c.rot) * ahead * 0.75 - Math.cos(c.rot) * left, c.y, c.z - Math.cos(c.rot) * ahead * 0.75 + Math.sin(c.rot) * left);
   }
@@ -2136,6 +2151,8 @@ export class Game {
     this.hud.note('You were under the ground: back on your feet', 'warn');
   }
   private buriedT = 0;
+  /** when this player last died, by this game's clock (Space respawns, but not in the same breath) */
+  private diedAt = 0;
 
   // ---- what an admin can do that nobody else can (the server holds every one of them to having the role)
 
@@ -4157,6 +4174,7 @@ export class Game {
     } else if (v.water > 35) this.warned.thirst = false;
     if (p.dead && !this.deathSent) {
       this.deathSent = true;
+      this.diedAt = performance.now();
       audio.death();
       // Which way the body goes: away from what killed it. With nothing to throw it (blood
       // loss, a fall, hunger) it folds up where it stands.

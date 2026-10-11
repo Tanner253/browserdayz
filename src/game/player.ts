@@ -312,7 +312,20 @@ export class Player {
     this.prevLean = this.lean;
     this.prevMoving = this.moving;
     this.prevStepOff = this.stepOff;
-    if (this.dead) return;
+    if (this.dead) {
+      // (Whoever dies in the air comes down: jumping, falling, or shot off a roof, the body was left hanging where
+      // it died, and the body everybody else was shown lay in the air with it.)
+      if (this.body && !this.seated && !this.fly) {
+        const under = physics.raycast({ x: this.pos.x, y: this.pos.y + 0.4, z: this.pos.z }, { x: 0, y: -1, z: 0 }, 150, SHOT_GROUPS, this.collider);
+        const floor = under && under.toi > 0.02 ? under.point.y : this.pos.y;
+        if (this.pos.y > floor + 0.01) {
+          this.vel.set(0, Math.min(this.vel.y, 0) - GRAVITY * h, 0);
+          this.pos.y = Math.max(floor, this.pos.y + this.vel.y * h);
+          this.body.setTranslation({ x: this.pos.x, y: this.pos.y + this.half() + RADIUS, z: this.pos.z }, true);
+        } else this.vel.set(0, 0, 0);
+      }
+      return;
+    }
     const v = this.vitals;
     // (adrenaline: whatever was spent since the last step is given back, and nobody on it is out of breath)
     if (this.boost > 0) {

@@ -91,7 +91,9 @@ export async function renderIcons(renderer: THREE.WebGLRenderer, models: ItemMod
       pivot.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(side, up, out).invert());
     } else {
       if (upright && iconLandscape && def.w > def.h && !worn) pivot.rotation.z = Math.PI / 2;
-      if (!upright && !iconLandscape) pivot.rotation.x = Math.PI / 2;
+      // (What is worn is not tipped over to fill a tall place either: a pair of boots was drawn from over the top of
+      // them, toes down. "the boots icon is backwards or upside down", 2026-10-12.)
+      if (!upright && !iconLandscape && !worn) pivot.rotation.x = Math.PI / 2;
       if (modelLong === 'z' && !upright) pivot.rotation.y = Math.PI / 2;
       pivot.rotation.y += 0.35;
       // something as flat as a dog tag is looked at from above, or it is only a sliver
@@ -111,36 +113,53 @@ export async function renderIcons(renderer: THREE.WebGLRenderer, models: ItemMod
     // bat comes lying along x and is six cells tall: it was drawn across the middle of its
     // picture, a hair's width of it, and looked like no picture at all.)
     const across = s2.x > s2.y * 1.3, along = s2.y > s2.x * 1.3;
-    if (!def.mag && ((across && h > w) || (along && w > h && !worn))) {
+    if (!def.mag && !worn && ((across && h > w) || (along && w > h))) {
       frame.rotation.z = across ? Math.PI / 2 : -Math.PI / 2;
       frame.updateMatrixWorld(true);
       b2 = new THREE.Box3().setFromObject(frame);
       s2 = b2.getSize(new THREE.Vector3());
     }
-    const c2 = b2.getCenter(new THREE.Vector3());
-    const aspect = w / h;
-    const half = Math.max(s2.x / 2, s2.y / 2 * aspect) * 1.08;
-    cam.left = -half;
-    cam.right = half;
-    cam.top = half / aspect;
-    cam.bottom = -half / aspect;
-    cam.position.set(c2.x, c2.y, c2.z + 10);
-    cam.lookAt(c2);
-    cam.updateProjectionMatrix();
-
-    renderer.setRenderTarget(rt);
-    renderer.setClearColor(0x000000, 0);
-    renderer.clear();
-    renderer.render(scene, cam);
-    const buf = new Uint8Array(w * 2 * h * 2 * 4);
-    renderer.readRenderTargetPixels(rt, 0, 0, w * 2, h * 2, buf);
-    canvas.width = w * 2;
-    canvas.height = h * 2;
-    const img = ctx.createImageData(w * 2, h * 2);
-    // flip rows (GL origin is bottom-left)
-    for (let y = 0; y < h * 2; y++) img.data.set(buf.subarray((h * 2 - 1 - y) * w * 2 * 4, (h * 2 - y) * w * 2 * 4), y * w * 2 * 4);
-    ctx.putImageData(img, 0, 0);
-    out[id] = canvas.toDataURL('image/png');
+    /** the thing as it stands in the scene, drawn to fill a picture of this many pixels each way */
+    const shoot = (pw: number, ph: number, target: THREE.WebGLRenderTarget): string => {
+      frame.updateMatrixWorld(true);
+      const bb = new THREE.Box3().setFromObject(frame), ss = bb.getSize(new THREE.Vector3()), c2 = bb.getCenter(new THREE.Vector3());
+      const aspect = pw / ph;
+      const half = Math.max(ss.x / 2, ss.y / 2 * aspect) * 1.08;
+      cam.left = -half;
+      cam.right = half;
+      cam.top = half / aspect;
+      cam.bottom = -half / aspect;
+      cam.position.set(c2.x, c2.y, c2.z + 10);
+      cam.lookAt(c2);
+      cam.updateProjectionMatrix();
+      renderer.setRenderTarget(target);
+      renderer.setClearColor(0x000000, 0);
+      renderer.clear();
+      renderer.render(scene, cam);
+      const buf = new Uint8Array(pw * ph * 4);
+      renderer.readRenderTargetPixels(target, 0, 0, pw, ph, buf);
+      canvas.width = pw;
+      canvas.height = ph;
+      const img = ctx.createImageData(pw, ph);
+      // flip rows (GL origin is bottom-left)
+      for (let y = 0; y < ph; y++) img.data.set(buf.subarray((ph - 1 - y) * pw * 4, (ph - y) * pw * 4), y * pw * 4);
+      ctx.putImageData(img, 0, 0);
+      return canvas.toDataURL('image/png');
+    };
+    out[id] = shoot(w * 2, h * 2, rt);
+    // What is worn has a second picture, for the place on the body it is worn in: the thing by itself, as big as a
+    // square will hold. (Its picture for a pocket is the shape of its place in a pocket: a pair of gloves two cells
+    // wide and one tall was a small pair of gloves in the middle of a wide picture, and smaller again in a slot.
+    // "when equipped the gloves and boots icons are to small", 2026-10-12.)
+    if (worn && def.slot) {
+      // (a thing that lies low, a pair of gloves or of boots, is looked at from further over it: from near level it
+      // is a thin strip across the square)
+      if (size.y < Math.max(size.x, size.z) * 0.62) pivot.rotation.x = def.slot === 'hands' ? 1.02 : 0.72;
+      const side = 3 * PX;
+      const sq = new THREE.WebGLRenderTarget(side, side, { samples: 4, colorSpace: THREE.SRGBColorSpace });
+      out[`slot:${id}`] = shoot(side, side, sq);
+      sq.dispose();
+    }
     scene.remove(frame);
     rt.dispose();
   }

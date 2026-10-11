@@ -394,11 +394,13 @@ export class RemotePlayer implements Damageable {
 export class CorpseBody {
   private avatar = new Avatar();
   /** @param name whose body it is: it is dressed the way they were */
-  async load(atmo: Atmosphere, scene: THREE.Scene, x: number, y: number, z: number, yaw: number, name: string, variant = 0) {
+  /** @param slope which way is up out of what it lies on (on a hillside it lies along the hill, not level in the air over it) */
+  async load(atmo: Atmosphere, scene: THREE.Scene, x: number, y: number, z: number, yaw: number, name: string, variant = 0, slope?: THREE.Vector3) {
     await this.avatar.load(atmo, 0, false, lookFor(name));
     scene.add(this.avatar.root);
     this.avatar.layDown(variant);
     this.avatar.update(0, new THREE.Vector3(x, y, z), new THREE.Vector3(), yaw, false, true);
+    if (slope && slope.y > 0.6 && slope.y < 0.9995) this.avatar.root.quaternion.premultiply(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), slope));
   }
   dispose() {
     this.avatar.dispose();

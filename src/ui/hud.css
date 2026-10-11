@@ -80,21 +80,23 @@
 }
 .hud-prompt.show { opacity: 1; }
 /* what the hands can do with what is in them: in the corner, a small mouse with the button lit and the word for it */
+/* (bottom left, over the chat: "would look better in the bottom left corner than the right corner above the
+   player status bars", 2026-10-12. Each is the mouse, then what it does.) */
 .hud-acts {
   position: absolute;
-  right: 26px;
-  bottom: 212px;
+  left: 22px;
+  bottom: 272px;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: 9px;
   opacity: 0;
   transition: opacity 0.12s;
   pointer-events: none;
 }
 .hud-acts.show { opacity: 1; }
-.hud-act { display: flex; align-items: center; gap: 11px; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); }
-.hud-act-text { text-align: right; line-height: 1.2; }
+.hud-act { display: flex; flex-direction: row-reverse; align-items: center; gap: 11px; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); }
+.hud-act-text { text-align: left; line-height: 1.2; }
 .hud-act-text b { display: block; font-size: 13px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink); }
 .hud-act-text small { display: block; font-family: var(--mono); font-size: 11px; letter-spacing: 0.03em; color: var(--ink-dim); }
 .hud-act svg { flex: none; width: 21px; height: 33px; overflow: visible; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7)); }
@@ -580,6 +582,7 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
   pointer-events: auto;
 }
 .hud-dead.show, .hud-start.show { display: grid; }
+.dead-btn small { margin-left: 10px; padding: 1px 6px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; border: 1px solid currentColor; border-radius: 3px; opacity: 0.65; vertical-align: 2px; }
 .hud-dead { background: radial-gradient(ellipse at center, rgba(40, 0, 0, 0.45), rgba(0, 0, 0, 0.85)); text-align: center; }
 .dead-title { font-size: 58px; font-weight: 600; letter-spacing: 0.25em; text-transform: uppercase; color: #d9cfc0; }
 .dead-sub { margin: 10px 0 26px; font-family: var(--mono); font-size: 12px; color: var(--ink-dim); }
@@ -740,7 +743,7 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 .slot-label { position: absolute; top: 4px; left: 6px; z-index: 1; font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-faint); pointer-events: none; }
 .slot-label b { margin-left: 4px; font-family: var(--mono); font-weight: 400; color: var(--accent); }
 .inv-item.in-slot { position: absolute; inset: 0; border: 0; background: transparent; box-shadow: none; }
-.inv-item.in-slot .inv-item-img.fit { inset: 16px 6px 6px; }
+.inv-item.in-slot .inv-item-img.fit { inset: 13px 4px 3px; }
 .inv-item.in-slot:hover { background: rgba(233, 228, 216, 0.07); }
 .inv-item.in-slot.sel { box-shadow: inset 0 0 0 1px var(--accent); }
 .inv-item.in-slot.active::after { content: 'in hands'; position: absolute; left: 6px; bottom: 3px; font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); }
