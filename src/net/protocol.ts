@@ -14,7 +14,7 @@ import type { DropInfo } from '../sim/drops';
 import type { VehicleInfo, VState } from '../sim/vehicles';
 import type { IState, InfectedInfo } from '../sim/infected';
 
-export const PROTOCOL = 28;
+export const PROTOCOL = 29;
 
 /** chat channels: everyone on the server, or only players standing near the speaker */
 export type ChatChannel = 'global' | 'near';
@@ -94,6 +94,10 @@ export interface StashInfo {
   y: number;
   z: number;
   rot: number;
+  /** what was put down: the stash case (when it is not said), or another thing of the kind, by its item (see `stash` in src/sim/items.ts) */
+  item?: string;
+  /** it is under the ground: nothing is seen of it but turned earth, and a shovel brings it up */
+  buried?: boolean;
 }
 
 export interface CorpseInfo extends StashInfo {
@@ -140,8 +144,11 @@ export type C2S =
   | { t: 'copen'; cid: string }
   | { t: 'cset'; cid: string; items: StoredItem[] }
   | { t: 'cclose'; cid: string }
+  /** a stash put down (empty) */
   | { t: 'stash+'; s: StashInfo }
   | { t: 'stash-'; uid: string }
+  /** a shovel put to a stash: it is buried, or dug up */
+  | { t: 'bury'; uid: string; on: boolean }
   | { t: 'door'; i: number; open: boolean; swing: number }
   | { t: 'me'; inv: SerializedInventory; vitals: Vitals }
   | { t: 'died'; cause: string; v?: number }
@@ -235,6 +242,10 @@ export type S2C =
   | { t: 'cbusy'; cid: string }
   | { t: 'stash+'; s: StashInfo }
   | { t: 'stash-'; uid: string }
+  /** a stash has been buried, or dug up */
+  | { t: 'stash~'; uid: string; buried: boolean }
+  /** the (empty) stash this player asked to pick up is theirs to carry: what it was */
+  | { t: 'stashgot'; uid: string; item: string }
   | { t: 'corpse-'; uid: string }
   | { t: 'door'; i: number; open: boolean; swing: number }
   | { t: 'spawn'; x: number; z: number; yaw: number }

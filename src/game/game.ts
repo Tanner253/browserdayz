@@ -44,6 +44,7 @@ import { BACK_SHORT } from '../ui/updates';
 import { InventoryUI } from '../ui/inventory-ui';
 import { Minimap } from '../ui/minimap';
 import { BigMap } from '../ui/bigmap';
+import { BURY, noBurying } from '../sim/stash';
 import { AdminUI, type AdminSelf } from '../ui/admin-ui';
 import { CALL, CRASH, DROP, describeSpot, fillCrash, fillDrop, pickDropSite, type DropInfo } from '../sim/drops';
 import { WELL, stage, wellSpots, type Well } from '../sim/wells';
@@ -93,6 +94,9 @@ export interface WorldSystems {
   grass: Grass;
   buildings: Buildings;
 }
+
+/** seconds with a shovel to put a stash under the ground, or to bring one up */
+const DIG_SECONDS = BURY.seconds;
 
 interface TimedAction {
   label: string;
@@ -1040,8 +1044,8 @@ export class Game {
     this.economy.lastRestock = sameMap ? e.lastRestock : {};
     this.economy.restore(e.loot, sameMap);
     if (!sameMap) this.economy.populate();
-    for (const sd of save.stashes) {
-      const st = new Stash(sd.uid, sd.x, sd.y, sd.z, sd.rot);
+    for (const sd of save.stashes as (SaveData['stashes'][number] & { item?: string; buried?: boolean })[]) {
+      const st = this.newStash(sd);
       st.container.load(sd.container as never);
       await this.loot.addStash(st);
     }
@@ -1248,6 +1252,21 @@ export class Game {
     net.on('stash-', (m) => {
       const st = this.loot.stashes.find((s) => s.uid === m.uid);
       if (st) this.loot.removeStash(st);
+    });
+    // (the one this player asked to pick up: it is theirs to carry, with what the server says was in it)
+    net.on('stashgot', (m) => {
+      const st = this.loot.stashes.find((s) => s.uid === m.uid);
+      if (st) {
+        if (this.openStash === st) this.toggleInventory(false);
+        this.loot.removeStash(st);
+      }
+      this.carryOff(m.item);
+    });
+    net.on('stash~', (m) => {
+      const st = this.loot.stashes.find((s) => s.uid === m.uid);
+      if (!st) return;
+      if (this.openStash === st) this.toggleInventory(false);
+      st.setBuried(m.buried);
     });
     net.on('corpse-', (m) => this.removeCorpse(m.uid));
     net.on('board', (m) => this.hud.setBoard(m.rows, m.me, m.mine, playerName()));
@@ -1507,7 +1526,7 @@ export class Game {
 
   private async addRemoteStash(s: StashInfo) {
     if (this.loot.stashes.some((x) => x.uid === s.uid)) return;
-    await this.loot.addStash(new Stash(s.uid, s.x, s.y, s.z, s.rot));
+    await this.loot.addStash(this.newStash(s));
   }
 
   private async addCorpse(c: CorpseInfo) {
@@ -3146,24 +3165,64 @@ export class Game {
     }
     this.inv.remove(item);
     this.openStash?.container.remove(item);
-    const st = new Stash(newUid(), x, hit.point.y, z, p.yaw);
+    const st = this.newStash({ uid: newUid(), x, y: hit.point.y, z, rot: p.yaw, item: item.id });
     st.known = true;
     void this.loot.addStash(st).then(() => this.save());
-    this.net.send({ t: 'stash+', s: { uid: st.uid, x: st.x, y: st.y, z: st.z, rot: st.rot } });
+    this.net.send({ t: 'stash+', s: { uid: st.uid, x: st.x, y: st.y, z: st.z, rot: st.rot, ...(st.item === 'stash_kit' ? {} : { item: st.item }) } });
     this.toggleInventory(false);
     this.inventoryChanged();
     audio.ui('drop');
-    this.hud.note('Stash crate placed. Look at it and press F to open it.', 'good');
+  }
+
+  /** A stash as the game holds one: the case, the suitcase or the bag, as big inside as that thing is (see `stash` in src/sim/items.ts). */
+  private newStash(s: StashInfo): Stash {
+    const def = s.item && ITEMS[s.item]?.category === 'stash' ? ITEMS[s.item] : ITEMS.stash_kit;
+    const [w, h] = def.stash ?? [8, 6];
+    const st = new Stash(s.uid, s.x, s.y, s.z, s.rot, w, h, def.id === 'stash_kit' ? 'Stash Crate' : def.name);
+    st.item = def.id;
+    st.buried = !!s.buried;
+    return st;
+  }
+
+  /** A stash picked up (empty): into the pockets, or at the feet with no room. */
+  private carryOff(id: string) {
+    const it = makeItem(ITEMS[id]?.category === 'stash' ? id : 'stash_kit', 1);
+    if (this.inv.add(it)) this.dropItem(it);
+    audio.ui('pickup');
+    this.inventoryChanged();
+    this.meDirty = true;
+    this.save();
+  }
+
+  /**
+   * A shovel put to a stash, the left button held: so many seconds of digging, and it is under the ground (or up
+   * out of it). Let go of the button, put the shovel away or walk off, and the digging stops there.
+   */
+  private dig(st: Stash, bury: boolean) {
+    const p = this.player;
+    const { world } = this.s;
+    const no = bury ? noBurying(st.x, st.y, st.z, heightAt(world.heights, st.x, st.z), world.pois, world.buildings) : null;
+    if (no) return void this.hud.note(no, 'warn');
+    const still = () => this.input.held('Mouse0') && this.weapons.equippedItem?.id === 'shovel' && st.buried !== bury && this.loot.stashes.includes(st) && Math.hypot(st.x - p.pos.x, st.z - p.pos.z) <= BURY.reach - 0.5;
+    this.use = { label: bury ? 'Burying it' : 'Digging', t: 0, dur: DIG_SECONDS, sound: null, soundT: 0, valid: still, lost: 'You stopped digging', done: () => {
+      if (st.buried === bury || !this.loot.stashes.includes(st)) return;
+      if (this.online) this.net.send({ t: 'bury', uid: st.uid, on: bury });
+      else {
+        st.setBuried(bury);
+        this.save();
+      }
+    } };
   }
 
   private nearbyStash(): Stash | null {
     // (nothing is searched from a jeep's seat)
     if (this.garage.ride) return null;
-    if (this.focus instanceof Stash) return this.focus;
+    // (what is under the ground is not opened: it is dug up first)
+    if (this.focus instanceof Stash) return this.focus.buried ? null : this.focus;
     const p = this.player.pos;
     let best: Stash | null = null;
     let bd = 2.2;
-    for (const s of [...this.loot.stashes, ...this.loot.crates, ...[...this.corpses.values()].map((c) => c.stash), ...[...this.drops.values()].map((d) => d.stash)]) {
+    for (const s of [...this.loot.stashes.filter((q) => !q.buried), ...this.loot.crates, ...[...this.corpses.values()].map((c) => c.stash), ...[...this.drops.values()].map((d) => d.stash)]) {
       const d = Math.hypot(s.x - p.x, s.z - p.z);
       if (d < bd && Math.abs(s.y - p.y) < 1.5) {
         bd = d;
@@ -3453,22 +3512,28 @@ export class Game {
       this.prompt = this.garage.prompt(owner, !!can, tagged);
       if (key) this.garage.use(owner, tagged);
     } else if (owner instanceof Stash) {
-      const canPack = !owner.fixed && owner.container.items.length === 0 && (!this.online || owner.known);
+      // A stash somebody put down: opened, picked up when it is empty, and with a shovel in the hands buried, or
+      // dug up again, by holding the left button.
+      const shovel = !owner.fixed && this.weapons.equippedItem?.id === 'shovel';
+      const canPack = !owner.fixed && !owner.buried && owner.container.items.length === 0 && (!this.online || owner.known);
       this.prompt = owner.fixed
         ? `<kbd>F</kbd>Search ${owner.label}`
-        : `<kbd>F</kbd>Open ${owner.label}${canPack ? ' <small>G to pack up</small>' : ''}`;
-      if (key) this.toggleInventory(true);
+        : owner.buried
+          ? shovel ? '<kbd>LMB</kbd>Hold to dig here' : 'Something is buried here <small>a shovel would dig it up</small>'
+          : `<kbd>F</kbd>Open ${owner.label}${canPack ? ' <small>G to pack up</small>' : ''}${shovel ? ' <small>hold the left button to bury it</small>' : ''}`;
+      if (key && !owner.buried) this.toggleInventory(true);
+      if (shovel && !this.use && !this.invUI.isOpen && this.input.pressed('Mouse0')) this.dig(owner, !owner.buried);
       if (canPack && this.input.pressed('KeyG')) {
-        const kit = makeItem('stash_kit', 1);
-        if (!this.inv.hasRoom(kit)) {
-          this.hud.note('No room to carry the crate', 'warn');
+        if (!this.inv.hasRoom(makeItem(owner.item, 1))) {
+          this.hud.note('No room to carry it', 'warn');
           return;
         }
-        this.inv.add(kit);
-        this.loot.removeStash(owner);
-        this.net.send({ t: 'stash-', uid: owner.uid });
-        audio.ui('pickup');
-        this.inventoryChanged();
+        // (online it is theirs when the server says so: see 'stashgot')
+        if (this.online) this.net.send({ t: 'stash-', uid: owner.uid });
+        else {
+          this.loot.removeStash(owner);
+          this.carryOff(owner.item);
+        }
       }
     }
   }

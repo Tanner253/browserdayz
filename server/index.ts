@@ -6,7 +6,7 @@
 // hurts. Clients own their movement, aim and inventory.
 
 import http from 'node:http';
-import { createHash, randomBytes } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes } from 'node:crypto';
 import { createReadStream, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
@@ -16,6 +16,7 @@ import { Economy, type WorldLoot } from '../src/sim/economy';
 import { Container, type SerializedInventory } from '../src/sim/inventory';
 import { ITEMS, TAG_FRESH, TAG_HOLD, TAG_OUT, magFits, makeItem, sanitizeItem, type ItemInstance } from '../src/sim/items';
 import { WORLD_SIZE, inPlay } from '../src/world/worldgen';
+import { BURY, noBurying } from '../src/sim/stash';
 
 /** how far from the middle anything may say it is: the edge of the ground, and a little (the walls stand 4 m inside it) */
 const EDGE = WORLD_SIZE / 2 + 8;
@@ -44,7 +45,9 @@ const SAVE_FILE = path.join(DATA_DIR, 'world.json');
 const MAX_PLAYERS = Number(process.env.MAX_PLAYERS ?? 24);
 const TICK_HZ = 15;
 const CORPSE_LIFETIME = 600; // seconds
-const RECORD_LIFETIME = 30 * 60 * 1000; // a logged-out character is remembered this long
+// (A character is its player's until it dies: whoever comes back in a year has what they left with. It was
+    // half an hour.)
+const RECORD_LIFETIME = 400 * 24 * 3600 * 1000; // a logged-out character is remembered this long
 /** bump when loot points change: world loot from an older save is re-rolled */
 const WORLD_REV = 21;
 
@@ -71,6 +74,9 @@ interface Box {
   rot: number;
   /** crate prop kind (loot table) */
   crate?: string;
+  /** a stash: what was put down (a pack's item; not said, the stash case), and whether it is under the ground */
+  item?: string;
+  buried?: boolean;
   emptiedAt: number;
   /** corpse and supply drop: expiry (economy time). Corpse: owner name, how it fell */
   name?: string;
@@ -770,11 +776,179 @@ async function siteAdmin(op: Record<string, unknown>): Promise<{ ok?: boolean; w
     ADMIN.ops.delete(n);
   }
 }
+// ------------------------------------------------------------------ kept between restarts
+//
+// Everybody's character (where they stood, what they carried, how they were) and every stash, with what is in it:
+// handed to the site, which keeps it in one file (api/keep.ts), and read back when the server starts. This server
+// has no disk that outlasts it. What lies loose in the world is not kept: only what is in somebody's pockets or in
+// a container somebody put down.
+//
+// It is sealed here before it leaves (with a key drawn from the secret this server shares with the site), so the
+// file says nothing to anybody else: not who anybody is, and not where a stash is buried. A player is in it by a
+// hash of their key and never the key.
+//
+// When it is written: once a server with somebody on it begins (`claim`: from then on the file says a server is
+// alive that has more to say), every KEEP_EVERY while anybody has been on, and as it stops (its last word). At a
+// deploy the new server is started before the old one is stopped: so a server that finds the file is not a last
+// word waits a little for one before it reads, and whoever arrives meanwhile waits in the line.
+//
+// WIPE on the host is the name of the world: what was kept under another name is not read, and is written over.
+// (Changing it is how everything is wiped, when that is wanted.)
+
+/** this run of the server, by a name of its own */
+const BOOT = randomBytes(8).toString('hex');
+/** on the host it is kept; on somebody's own machine it is not, unless asked for (KEEP=on) */
+const KEEP_ON = process.env.KEEP ? process.env.KEEP !== 'off' : !!process.env.RENDER;
+const KEEP_EVERY_MS = (process.env.KEEP_EVERY_MIN === undefined ? 180 : Math.max(0, Number(process.env.KEEP_EVERY_MIN) || 0)) * 60_000;
+const KEEP_WAIT_MS = (process.env.KEEP_WAIT_S === undefined ? 25 : Math.max(0, Number(process.env.KEEP_WAIT_S) || 0)) * 1000;
+const WIPE = (process.env.WIPE ?? '').slice(0, 40);
+const KEPT = {
+  /** what was kept has been read (or there was nothing, or it is not kept here): players are let in */
+  ready: !KEEP_ON,
+  /** characters from before this server started, by the hash of their key, until their players come for them */
+  chars: new Map<string, Record_>(),
+  /** the file says this server is alive; something has happened since it was last written; when that was; a writing is under way */
+  claimed: false,
+  dirty: false,
+  savedAt: 0,
+  busy: false,
+};
+const pause = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));
+
+interface Snapshot {
+  rev: number;
+  wipe: string;
+  chars: [string, Record_][];
+  stashes: Box[];
+}
+interface KeptFile { at: string; boot: string; final: boolean; z: string }
+
+const sealKey = () => createHash('sha256').update(`zona world save ${ADMIN.pepper}`).digest();
+function seal(data: unknown): string {
+  const iv = randomBytes(12), c = createCipheriv('aes-256-gcm', sealKey(), iv);
+  const body = Buffer.concat([c.update(zlib.gzipSync(JSON.stringify(data))), c.final()]);
+  return Buffer.concat([iv, c.getAuthTag(), body]).toString('base64');
+}
+function unseal(z: string): unknown {
+  const b = Buffer.from(z, 'base64'), d = createDecipheriv('aes-256-gcm', sealKey(), b.subarray(0, 12));
+  d.setAuthTag(b.subarray(12, 28));
+  return JSON.parse(zlib.gunzipSync(Buffer.concat([d.update(b.subarray(28)), d.final()])).toString('utf8'));
+}
+
+/** Something asked of the site about what is kept: signed with the secret the two share (see api/keep.ts). */
+async function siteKeep(op: Record<string, unknown>): Promise<{ ok?: boolean; why?: string; save?: KeptFile | null } | null> {
+  if (!ADMIN.pepper) return null;
+  const body = JSON.stringify(op), at = String(Date.now());
+  const sig = createHmac('sha256', `zona keep ${ADMIN.pepper}`).update(`${at}.${createHash('sha256').update(body).digest('hex')}`).digest('hex');
+  try {
+    const r = await fetch(`${SITE_URL}/api/keep`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-zona-at': at, 'x-zona-auth': sig }, body, signal: AbortSignal.timeout(20_000) });
+    return r.ok ? ((await r.json()) as { ok?: boolean; why?: string; save?: KeptFile | null }) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** everything that is kept, as it is this moment */
+function snapshot(): Snapshot {
+  const now = Date.now(), chars = new Map<string, Record_>(KEPT.chars);
+  for (const [k, r] of records) if (r.alive && r.inv) chars.set(keyHash(k), r);
+  for (const c of clients.values()) if (c.alive && c.inv) chars.set(keyHash(c.key), { pose: c.pose, inv: c.inv, vitals: c.vitals, alive: true, leftAt: now });
+  // (no more of them than can be carried: the newest, if it ever came to that)
+  const newest = [...chars].sort((a, b) => b[1].leftAt - a[1].leftAt).slice(0, 6000);
+  return { rev: WORLD_REV, wipe: WIPE, chars: newest, stashes: [...boxes.values()].filter((b) => b.kind === 'stash') };
+}
+
+/** What is kept is written to the site. @param final this server's last word @returns whether it was */
+async function keepNow(final: boolean, why: string): Promise<boolean> {
+  if (!KEEP_ON || !KEPT.ready || !ADMIN.pepper || KEPT.busy) return false;
+  // (a server nobody came to has nothing to say that the file does not say already)
+  if (!KEPT.claimed && !KEPT.dirty) return false;
+  KEPT.busy = true;
+  try {
+    const snap = snapshot();
+    for (let tries = 0; tries < 3; tries++) {
+      const r = await siteKeep({ op: 'save', at: new Date().toISOString(), boot: BOOT, final, z: seal(snap) });
+      if (r?.ok) {
+        KEPT.claimed = true;
+        KEPT.dirty = clients.size > 0;
+        KEPT.savedAt = Date.now();
+        log(`[keep] ${why}: ${snap.chars.length} characters and ${snap.stashes.length} stashes written to the site${final ? ' (the last word)' : ''}`);
+        return true;
+      }
+      await pause(700);
+    }
+    log(`[keep] ${why}: it could NOT be written to the site`);
+    return false;
+  } finally {
+    KEPT.busy = false;
+  }
+}
+
+/** The first player of this run has come in: the file is made to say a server is alive, with more to say. */
+function claim() {
+  KEPT.dirty = true;
+  if (KEEP_ON && KEPT.ready && !KEPT.claimed && !KEPT.busy) void keepNow(false, 'somebody is on');
+}
+setInterval(() => {
+  if (KEEP_EVERY_MS && KEPT.dirty && Date.now() - KEPT.savedAt >= KEEP_EVERY_MS) void keepNow(false, 'time has gone by');
+}, Math.max(1000, Math.min(60_000, KEEP_EVERY_MS || 60_000))).unref();
+
+/** What was kept is read, and the world is as it was left: then players are let in. */
+async function loadKept() {
+  const open = (what: string) => {
+    if (KEPT.ready) return;
+    KEPT.ready = true;
+    log(`[keep] ${what}`);
+    fillFromQueue();
+  };
+  if (!KEEP_ON) return;
+  try {
+    // (the secret it is read with comes with the admin lists: see `loadAdmin`)
+    for (let k = 0; k < 35 && !ADMIN.pepper; k++) await pause(1000);
+    if (!ADMIN.pepper) return open('nothing is kept between restarts: the site did not answer, or no admin password is set on it');
+    let save: KeptFile | null = null;
+    const until = Date.now() + KEEP_WAIT_MS;
+    for (;;) {
+      const r = await siteKeep({ op: 'load' });
+      if (r?.ok) save = r.save ?? null;
+      // (written by a server that has not said its last word: it may be about to, if this is a deploy and it is still alive)
+      if ((r?.ok && (!save || save.final || save.boot === BOOT)) || Date.now() >= until) break;
+      await pause(2500);
+    }
+    if (!save) return open('nothing has been kept yet: everybody begins afresh');
+    const snap = unseal(save.z) as Snapshot;
+    if ((snap.wipe ?? '') !== WIPE) return open(`what was kept is of the world "${snap.wipe ?? ''}", and this is "${WIPE}": everybody begins afresh`);
+    const moved = snap.rev !== WORLD_REV, now = Date.now();
+    for (const [k, r] of snap.chars ?? []) {
+      if (!r?.inv || !r.alive || now - r.leftAt > RECORD_LIFETIME || !isPose(r.pose)) continue;
+      const inv = cleanInventory(r.inv);
+      for (const it of things(inv)) issue(it);
+      // (the map has been made again since: what they carried is theirs, where they stood may be inside a wall)
+      KEPT.chars.set(k, { pose: r.pose, inv, vitals: r.vitals, alive: true, leftAt: r.leftAt, ...(moved ? { afresh: true } : {}) });
+    }
+    let stashes = 0;
+    for (const b of snap.stashes ?? []) {
+      if (b?.kind !== 'stash' || typeof b.cid !== 'string' || boxes.has(b.cid) || ![b.x, b.y, b.z, b.rot].every(num)) continue;
+      const items = (Array.isArray(b.items) ? b.items : []).flatMap((s) => {
+        const it = cleanItem(s);
+        return it ? [{ ...it, x: s.x, y: s.y, rot: !!s.rot }] : [];
+      });
+      for (const it of items) issue(it);
+      boxes.set(b.cid, { ...b, items, y: moved ? world.groundAt(b.x, b.z) : b.y, emptiedAt: -1 });
+      stashes++;
+    }
+    open(`${KEPT.chars.size} characters and ${stashes} stashes as they were kept at ${save.at}${save.final ? '' : ' (not a last word: the server before this one stopped without one)'}${moved ? '; the map has been made again since, so everybody starts from the edge with what they had' : ''}`);
+  } catch (e) {
+    open(`what was kept could not be read (${e instanceof Error ? e.message : e}): everybody begins afresh`);
+  }
+}
+
 /** The lists are read when the server starts, and again every little while until they have been (the site may be asleep). */
 function loadAdmin(tries = 0) {
   void siteAdmin({ op: 'load' }).then((r) => {
     if (r?.ok) return void log(`[admin] lists read from the site: ${Object.keys(ADMIN.state.roles).length} with a role, ${ADMIN.state.bans.length} banned${r.set ? '' : ' (no ADMIN_PASSWORD is set there: nobody can become an admin)'}`);
-    if (tries < 20) setTimeout(() => loadAdmin(tries + 1), 30_000).unref();
+    // (often at first: at a deploy the site's call back reaches the server before this one until this one is the one being served)
+    if (tries < 44) setTimeout(() => loadAdmin(tries + 1), tries < 24 ? 5_000 : 30_000).unref();
   });
 }
 /** What an admin changed is written to the site. @returns whether it was */
@@ -1289,6 +1463,8 @@ interface Record_ {
   vitals: Vitals | null;
   alive: boolean;
   leftAt: number;
+  /** kept from a world of another making: what they carried is theirs, where they stood is not */
+  afresh?: boolean;
 }
 
 const clients = new Map<number, Client>();
@@ -1919,7 +2095,7 @@ function handle(c: Client, m: C2S) {
     case 'copen': {
       const b = boxes.get(m.cid);
       // (a body, a crate, a stash, a drop: none of them is searched from a jeep's seat)
-      if (!b || !c.alive || c.seatAt || buried(c)) return;
+      if (!b || !c.alive || c.seatAt || buried(c) || b.buried) return;
       if (Math.hypot(b.x - c.pose[0], b.z - c.pose[2]) > 6) return;
       const holder = locks.get(m.cid);
       if (holder !== undefined && holder !== c.id && clients.has(holder)) {
@@ -1952,20 +2128,49 @@ function handle(c: Client, m: C2S) {
     case 'stash+': {
       const s = m.s;
       if (!s || typeof s.uid !== 'string' || s.uid.length > 64 || boxes.has(s.uid) || ![s.x, s.y, s.z, s.rot].every(num)) return;
-      if (Math.hypot(s.x - c.pose[0], s.z - c.pose[2]) > 8) return;
-      const st: StashInfo = { uid: s.uid, x: s.x, y: s.y, z: s.z, rot: s.rot };
-      boxes.set(s.uid, { cid: s.uid, kind: 'stash', w: 8, h: 6, items: [], ...st, emptiedAt: -1 });
+      if (!c.alive || Math.hypot(s.x - c.pose[0], s.z - c.pose[2]) > 8) return;
+      // (the stash case, the suitcase or the black bag: each as big inside as it is, and put down empty)
+      const def = ITEMS[String(s.item ?? 'stash_kit')];
+      if (def?.category !== 'stash') return;
+      const [w, h] = def.stash ?? [8, 6];
+      const st: StashInfo = { uid: s.uid, x: s.x, y: s.y, z: s.z, rot: s.rot, ...(def.id === 'stash_kit' ? {} : { item: def.id }) };
+      boxes.set(s.uid, { cid: s.uid, kind: 'stash', w, h, items: [], ...st, emptiedAt: -1 });
+      KEPT.dirty = true;
       broadcast({ t: 'stash+', s: st }, c);
       return;
     }
     case 'stash-': {
+      // picked up, when it is empty. Not from under the ground, and not from across a field.
       const b = boxes.get(m.uid);
-      if (!b || b.kind !== 'stash' || b.items.length) return;
+      if (!b || b.kind !== 'stash' || b.buried || !c.alive || b.items.length) return;
+      if (Math.hypot(b.x - c.pose[0], b.z - c.pose[2]) > 6) return;
       const holder = locks.get(m.uid);
       if (holder !== undefined && holder !== c.id && clients.has(holder)) return;
       locks.delete(m.uid);
       boxes.delete(m.uid);
+      KEPT.dirty = true;
+      // (it is theirs when the server says so, and nobody else's: two who reached for it at once do not both carry it off)
+      send(c, { t: 'stashgot', uid: m.uid, item: b.item ?? 'stash_kit' });
       broadcast({ t: 'stash-', uid: m.uid }, c);
+      return;
+    }
+    case 'bury': {
+      // A shovel in the hands, beside a stash: it goes under the ground, or comes up out of it. Anybody's shovel
+      // brings up anybody's stash; it is the finding of the place that keeps it.
+      const b = boxes.get(m.uid);
+      if (!b || b.kind !== 'stash' || !c.alive || c.seatAt || !!b.buried === !!m.on) return;
+      if (c.w !== 'shovel' || Math.hypot(b.x - c.pose[0], b.z - c.pose[2]) > BURY.reach) return;
+      const holder = locks.get(m.uid);
+      if (holder !== undefined && holder !== c.id && clients.has(holder)) return void send(c, { t: 'tell', kind: 'warn', text: 'Somebody has it open.' });
+      // (out in the country and nowhere else: not in a town or a camp, not in a building, not beside one)
+      const no = m.on ? noBurying(b.x, b.y, b.z, world.groundAt(b.x, b.z), world.places, world.buildings) : null;
+      if (no) return void send(c, { t: 'tell', kind: 'warn', text: `${no}.` });
+      locks.delete(m.uid);
+      if (c.openCid === m.uid) c.openCid = null;
+      b.buried = !!m.on;
+      KEPT.dirty = true;
+      log(`${c.name} ${b.buried ? 'buried' : 'dug up'} a stash at ${b.x.toFixed(0)}, ${b.z.toFixed(0)}`);
+      broadcast({ t: 'stash~', uid: m.uid, buried: b.buried });
       return;
     }
     case 'door': {
@@ -2230,14 +2435,14 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
       drop(o);
     }
   }
-  const rec = records.get(key);
+  const rec = records.get(key) ?? KEPT.chars.get(keyHash(key));
   const resume = rec && rec.alive && rec.inv && Date.now() - rec.leftAt < RECORD_LIFETIME ? rec : null;
   // (a tag is carried for its time in the world: the time its carrier was out of it is not counted)
   if (resume) for (const [k, since] of tagSeen) if (k.startsWith(`${key}|`)) tagSeen.set(k, since + (Date.now() - resume.leftAt));
   // (Somebody who left the game down in the bunker comes back with what they carried, at one
   // of the map's own starting places: nobody waits behind its door for it to be opened for them.)
   const under = !!resume && bunkerDark(world.bunker, resume.pose[0], resume.pose[1] + 1, resume.pose[2]) > 0;
-  const sp = resume && !under ? { x: resume.pose[0], y: resume.pose[1], z: resume.pose[2], yaw: resume.pose[3] } : pickSpawn();
+  const sp = resume && !under && !resume.afresh ? { x: resume.pose[0], y: resume.pose[1], z: resume.pose[2], yaw: resume.pose[3] } : pickSpawn();
   const c: Client = {
     ws, id: nextId++, key, name: cleanName(m.name),
     pose: [sp.x, 'y' in sp && sp.y !== undefined ? sp.y : world.groundAt(sp.x, sp.z), sp.z, sp.yaw, 0, 0],
@@ -2247,13 +2452,15 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
     outAt: 0, underAt: 0, lastHit: 0, lastVHit: 0, seatAt: 0, lastNade: 0, nadeHits: 0, blasts: [], lastEmote: 0, lastChat: 0, lastHitBy: null, openCid: null, check: { at: Date.now(), carry: 0, free: Date.now() + CHECK.free, high: 0, flags: 0, said: 0, refused: [], hp: Math.min(100, resume?.vitals?.health ?? 100), hpAt: Date.now(), downAt: 0, unknown: new Set() }, activeAt: Date.now(), joinedAt: Date.now(), ip: ipOf.get(ws) ?? '', lifeAt: Date.now(), msgCount: 0, msgWindow: Date.now(),
   };
   records.delete(key);
+  KEPT.chars.delete(keyHash(key));
   const others = [...clients.values()].filter((o) => !o.power.hidden).map(info);
   clients.set(c.id, c);
+  claim();
   send(c, {
     t: 'welcome', v: PROTOCOL, you: c.id, players: others,
     loot: [...economy.loot.values()],
     doors: [...doors].map(([i, [open, swing]]) => [i, open, swing]),
-    stashes: [...boxes.values()].filter((b) => b.kind === 'stash').map((b) => ({ uid: b.cid, x: b.x, y: b.y, z: b.z, rot: b.rot })),
+    stashes: [...boxes.values()].filter((b) => b.kind === 'stash').map((b) => ({ uid: b.cid, x: b.x, y: b.y, z: b.z, rot: b.rot, ...(b.item ? { item: b.item } : {}), ...(b.buried ? { buried: true } : {}) })),
     corpses: [...boxes.values()].filter((b) => b.kind === 'corpse').map((b) => ({ uid: b.cid, x: b.x, y: b.y, z: b.z, rot: b.rot, name: b.name ?? 'Survivor', v: b.v ?? 0 })),
     drops: [...boxes.values()].filter((b) => b.kind === 'drop').map(dropInfo),
     barrels: [...barrelsGone.keys()],
@@ -2399,7 +2606,7 @@ function mustWait(m: Extract<C2S, { t: 'hello' }>) {
   if (m.v !== PROTOCOL) return false; // join() turns them away itself
   const key = keyOf(m);
   if (key && [...clients.values()].some((o) => o.key === key)) return false;
-  return clients.size >= MAX_PLAYERS || queue.length > 0;
+  return clients.size >= MAX_PLAYERS || queue.length > 0 || !KEPT.ready;
 }
 
 /** when the line was last told where it stands */
@@ -2448,7 +2655,7 @@ function leaveQueue(ws: WebSocket) {
 /** somebody has left: the next in line comes in */
 function fillFromQueue() {
   let moved = false;
-  while (clients.size < MAX_PLAYERS && queue.length) {
+  while (KEPT.ready && clients.size < MAX_PLAYERS && queue.length) {
     const w = queue.shift()!;
     moved = true;
     if (w.ws.readyState !== 1) continue;
@@ -2770,10 +2977,16 @@ server.listen(PORT, () => log(`listening on :${PORT}${existsSync(DIST) ? '' : ' 
 // (who may give orders here and who is kept off: read from the site, which keeps them between this server's restarts)
 loadAdmin();
 
+void loadKept();
+
+let stopping = false;
 for (const sig of ['SIGINT', 'SIGTERM'] as const) {
   process.on(sig, () => {
+    if (stopping) return;
+    stopping = true;
     log('shutting down, saving world');
     saveWorld();
-    process.exit(0);
+    // (and its last word to the site, where it outlasts this server: a few seconds are allowed for it)
+    void Promise.race([keepNow(true, 'this server is stopping'), pause(12_000)]).finally(() => process.exit(0));
   });
 }

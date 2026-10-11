@@ -55,6 +55,9 @@ const same = (a: string, b: string) => {
   return x.length === y.length && timingSafeEqual(x, y);
 };
 
+/** the secret drawn from the password and never the password: what the game server hashes addresses with, and signs what it has kept with (api/keep.ts) */
+export const pepperOf = (secret: string) => createHmac('sha256', secret).update('zona address pepper').digest('hex');
+
 export async function admin(request: Request, store: Store = blobStore, game = GAME, env: Record<string, string | undefined> = process.env): Promise<Response> {
   const n = new URL(request.url).searchParams.get('n') ?? '';
   if (!/^[a-f0-9]{32}$/.test(n)) return Response.json({ error: 'bad number' }, { status: 400 });
@@ -63,7 +66,7 @@ export async function admin(request: Request, store: Store = blobStore, game = G
   const op = (await r.json()) as { op?: string; pw?: string; key?: string; name?: string; state?: unknown };
   const secret = env.ADMIN_PASSWORD ?? '';
   // (drawn from the password and never the password: what the game server hashes addresses with)
-  const pepper = secret ? createHmac('sha256', secret).update('zona address pepper').digest('hex') : '';
+  const pepper = secret ? pepperOf(secret) : '';
   const none = { headers: { 'cache-control': 'no-store' } };
   const held = await store.read<AdminState>(FILE);
   const state = clean(held?.data ?? EMPTY);

@@ -214,6 +214,10 @@ export const TYPES: Record<string, TypeRule> = {
   // What the Colt fires (2026-10-11): loose, a little of it wherever the 9 mm is, from the outskirts on; its sealed
   // boxes where the army kept things (above, in the places the Pistol 43's long magazine had) and in the police station.
   ammo_45: { at: [5, 12, 7, 0, 0], lifetime: 3600, restock: 120, usage: ANYWHERE, favour: ARMOURY, qty: [0.25, 0.6], keep: SOON },
+  // Two more things to keep things in (2026-10-12), beside the stash case: a black sack, which is in every shed and
+  // kitchen, and a suitcase, which is in houses. (Said last, like the others above, for the sake of the dice.)
+  black_bag: { at: [8, 5, 2, 0, 0], lifetime: 7200, restock: 1200, usage: [...SHEDS, 'Town'] },
+  old_suitcase: { at: [3, 4, 3, 0, 0], lifetime: 7200, restock: 1800, usage: HOMES },
 };
 
 const STEPS: Tier[] = [1, 2, 3, 4, 5];

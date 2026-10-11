@@ -90,3 +90,16 @@ Admins only:
 - A player who closes the window without logging out leaves their body for five minutes. In the Players tab it is marked "gone: body left behind". Kick, ban and the rest still work on it.
 - Log out is on the pause screen: sixty seconds, cancelled by moving, firing or being hit.
 - Both times can be changed on Render: `LINGER_S` (seconds a body stays; `0` turns it off) and `LOGOUT_S` (seconds of the wait).
+
+## What the server keeps between restarts
+
+- Every character (where they stood, what they carried, how they were) and every stash (the case, the suitcase, the black bag: buried or not, with what is in it) is written to the site's store when a server with players on it starts, every three hours, and as it stops. It is read back when the server starts. What lies loose on the ground is not kept.
+- A character is kept for 400 days from when its player last left.
+- To wipe everything: set `WIPE` on Render to a new word (any word, for example `season2`). What was kept under the old word is ignored and written over.
+- `KEEP=off` on Render turns the keeping off. `KEEP_EVERY_MIN` changes the three hours.
+- It needs `ADMIN_PASSWORD` to be set on the site (it is): what is kept is sealed with a key drawn from it. If the password is changed, what was kept before can no longer be read, and everybody starts afresh.
+- Tags carried over a restart still earn nothing, as before: the server that saw them taken is gone.
+
+## Player slots
+
+`MAX_PLAYERS` on Render (24 now). Above it, players wait in the line.
