@@ -9,7 +9,7 @@
 
 import type { Usage, LootPoint } from '../world/buildings';
 import type { Tier } from './tiers';
-import { ITEMS, fitAtRandom, makeItem, type ItemInstance } from './items';
+import { ITEMS, fitAtRandom, foundMag, makeItem, stockGun, type ItemInstance } from './items';
 import { fitsPoint } from './placement';
 import { RNG } from '../core/noise';
 
@@ -81,15 +81,23 @@ export const TYPES: Record<string, TypeRule> = {
   // the service pistol, with nearly twice the magazine
   m9: { at: [0, 12, 9, 4, 2], lifetime: 7200, restock: 180, usage: ['Police', 'Military', 'Town'], favour: ARMOURY, loaded: [3, 10], keep: SOON },
   // loose rounds turn up in handfuls, everywhere; sealed boxes are the real find, and are where guns were kept
-  ammo_762: { at: [6, 12, 12, 8, 4], lifetime: 3600, restock: 120, usage: ANYWHERE, favour: ARMOURY, qty: [0.25, 0.6], keep: SOON },
-  ammo_9mm: { at: [12, 30, 16, 3, 3], lifetime: 3600, restock: 120, usage: ANYWHERE, favour: ARMOURY, qty: [0.25, 0.6], keep: SOON },
+  ammo_762: { at: [6, 12, 12, 5, 4], lifetime: 3600, restock: 120, usage: ANYWHERE, favour: ARMOURY, qty: [0.25, 0.6], keep: SOON },
+  ammo_9mm: { at: [12, 30, 16, 2, 3], lifetime: 3600, restock: 120, usage: ANYWHERE, favour: ARMOURY, qty: [0.25, 0.6], keep: SOON },
   box_762: { at: [0, 3, 7, 8, 4], lifetime: 3600, restock: 180, usage: ARMY, keep: SOON },
   box_9mm: { at: [0, 14, 9, 5, 4], lifetime: 3600, restock: 180, usage: ['Police', 'Military', 'Town'], favour: ARMOURY, keep: SOON },
+  // Magazines (2026-10-10): a gun is found with its own in it six times in ten, and they lie by themselves where
+  // the guns they fit are kept, about as many again as there are guns, a few rounds in some. A second one is
+  // what makes a gun worth keeping. (Under the gas every place is spoken for: the rifle's magazines there are in
+  // place of a few handfuls of loose rounds.)
+  mag_p38: { at: [0, 12, 5, 2, 0], lifetime: 7200, restock: 240, usage: ['Police', 'Military', 'Town'], favour: ARMOURY, keep: SOON },
+  mag_m9: { at: [0, 9, 7, 3, 2], lifetime: 7200, restock: 240, usage: ['Police', 'Military', 'Town'], favour: ARMOURY, keep: SOON },
+  mag_sniper: { at: [0, 0, 2, 4, 3], lifetime: 7200, restock: 300, usage: ARMY, keep: SOON },
   // The Desert Eagle and what it fires, the shotgun, its shells and the can for its muzzle: the bunker's, and
   // nobody else's. (The Desert Eagle was the gas's own until 2026-10-10.)
   deagle: { at: [0, 0, 0, 0, 4], lifetime: 7200, restock: 600, usage: [], loaded: [2, 7] },
   ammo_50: { at: [0, 0, 0, 0, 6], lifetime: 3600, restock: 300, usage: [], qty: [0.4, 0.9] },
   box_50: { at: [0, 0, 0, 0, 3], lifetime: 3600, restock: 420, usage: [] },
+  mag_deagle: { at: [0, 0, 0, 0, 4], lifetime: 7200, restock: 600, usage: [] },
   mag_deagle_ext: { at: [0, 0, 0, 0, 2], lifetime: 7200, restock: 1200, usage: [] },
   benelli: { at: [0, 0, 0, 0, 4], lifetime: 7200, restock: 600, usage: [], loaded: [3, 7] },
   ammo_12: { at: [0, 0, 0, 0, 10], lifetime: 3600, restock: 300, usage: [], qty: [0.4, 0.9] },
@@ -182,9 +190,10 @@ const UNSORTED = 4;
 /**
  * What is put down before anything else when a world is stocked: the masks, which are what lets anybody into the
  * gas; and then the long things and the big ones, which lie only on a floor, while there are floors free (down the
- * bunker there are thirteen, and with everything put down turn about half the shotguns had nowhere to lie).
+ * bunker there are thirteen, and with everything put down turn about half the shotguns had nowhere to lie; on the
+ * outskirts the bats and the crowbars came up a few short, which of them depending on the dice).
  */
-const FIRST = ['gasmask', 'benelli', 'mosin', 'suppressor_12', 'suitcase', 'heavy_armor', 'life_vest'];
+const FIRST = ['gasmask', 'benelli', 'mosin', 'suppressor_12', 'suitcase', 'heavy_armor', 'life_vest', 'bat', 'crowbar', 'shovel', 'machete'];
 
 export interface WorldLoot {
   uid: string;
@@ -274,8 +283,13 @@ export class Economy {
     const p = this.points[pi];
     const item = makeItem(id);
     if (def.stack && rule.qty) item.qty = Math.max(1, Math.round(def.stack * this.rng.range(rule.qty[0], rule.qty[1])));
-    if (def.weapon && rule.loaded) item.loaded = this.rng.int(rule.loaded[0], Math.min(rule.loaded[1], def.weapon.capacity));
-    if (def.weapon) fitAtRandom(item, () => this.rng.next());
+    if (def.weapon) {
+      fitAtRandom(item, () => this.rng.next());
+      // (what is left at an armed place is a gun that fires: it has its magazine, whatever the dice said)
+      if (at >= 0 && def.weapon.mag && !item.mag) item.mag = def.weapon.mag;
+      if (rule.loaded) stockGun(item, this.rng.int(rule.loaded[0], Math.min(rule.loaded[1], def.weapon.capacity)));
+    }
+    if (def.mag) foundMag(item, () => this.rng.next());
     const l: WorldLoot = {
       uid: item.uid,
       item,

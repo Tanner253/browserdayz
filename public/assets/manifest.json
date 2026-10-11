@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-11T00:24:51.945Z",
+ "generated": "2026-10-11T02:02:04.066Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr"
@@ -1700,6 +1700,132 @@
     0.0122,
     0.0244,
     0.0349
+   ],
+   "lods": []
+  },
+  "ammo_box_9mm": {
+   "url": "assets/models/ammo_box_9mm.glb",
+   "tags": [
+    "loot",
+    "ammo"
+   ],
+   "bytes": 2432072,
+   "srcTris": 81986,
+   "tris": 68546,
+   "min": [
+    -0.0372,
+    0,
+    -0.065
+   ],
+   "max": [
+    0.0372,
+    0.0359,
+    0.065
+   ],
+   "lods": []
+  },
+  "ammo_box_739": {
+   "url": "assets/models/ammo_box_739.glb",
+   "tags": [
+    "loot",
+    "ammo"
+   ],
+   "bytes": 5697164,
+   "srcTris": 42386,
+   "tris": 42386,
+   "min": [
+    -0.0449,
+    0,
+    -0.065
+   ],
+   "max": [
+    0.0449,
+    0.0525,
+    0.065
+   ],
+   "lods": []
+  },
+  "ammo_box_50": {
+   "url": "assets/models/ammo_box_50.glb",
+   "tags": [
+    "loot",
+    "ammo"
+   ],
+   "bytes": 420500,
+   "srcTris": 12,
+   "tris": 12,
+   "min": [
+    -0.0401,
+    0,
+    -0.065
+   ],
+   "max": [
+    0.0401,
+    0.0332,
+    0.065
+   ],
+   "lods": []
+  },
+  "ammo_box_12": {
+   "url": "assets/models/ammo_box_12.glb",
+   "tags": [
+    "loot",
+    "ammo"
+   ],
+   "bytes": 23580,
+   "srcTris": 124,
+   "tris": 12,
+   "min": [
+    -0.055,
+    0,
+    -0.0547
+   ],
+   "max": [
+    0.055,
+    0.0806,
+    0.0547
+   ],
+   "lods": []
+  },
+  "ammo_box_762": {
+   "url": "assets/models/ammo_box_762.glb",
+   "tags": [
+    "loot",
+    "ammo"
+   ],
+   "bytes": 30432,
+   "srcTris": 124,
+   "tris": 12,
+   "min": [
+    -0.065,
+    0,
+    -0.0245
+   ],
+   "max": [
+    0.065,
+    0.0618,
+    0.0245
+   ],
+   "lods": []
+  },
+  "ammo_box_556": {
+   "url": "assets/models/ammo_box_556.glb",
+   "tags": [
+    "loot",
+    "ammo"
+   ],
+   "bytes": 33464,
+   "srcTris": 124,
+   "tris": 12,
+   "min": [
+    -0.065,
+    0,
+    -0.0245
+   ],
+   "max": [
+    0.065,
+    0.0618,
+    0.0245
    ],
    "lods": []
   },

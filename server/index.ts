@@ -14,7 +14,7 @@ import { WebSocketServer, type WebSocket } from 'ws';
 import { buildWorldData } from './world';
 import { Economy, type WorldLoot } from '../src/sim/economy';
 import { Container, type SerializedInventory } from '../src/sim/inventory';
-import { ITEMS, TAG_FRESH, TAG_HOLD, TAG_OUT, makeItem, sanitizeItem, type ItemInstance } from '../src/sim/items';
+import { ITEMS, TAG_FRESH, TAG_HOLD, TAG_OUT, magFits, makeItem, sanitizeItem, type ItemInstance } from '../src/sim/items';
 import { WORLD_SIZE, inPlay } from '../src/world/worldgen';
 
 /** how far from the middle anything may say it is: the edge of the ground, and a little (the walls stand 4 m inside it) */
@@ -44,7 +44,7 @@ const TICK_HZ = 15;
 const CORPSE_LIFETIME = 600; // seconds
 const RECORD_LIFETIME = 30 * 60 * 1000; // a logged-out character is remembered this long
 /** bump when loot points change: world loot from an older save is re-rolled */
-const WORLD_REV = 20;
+const WORLD_REV = 21;
 
 const log = (...a: unknown[]) => console.log(new Date().toISOString().slice(11, 19), ...a);
 
@@ -753,9 +753,13 @@ function cleanItem(raw: unknown, depth = 0): ItemInstance | null {
   if (!def || typeof r.uid !== 'string' || r.uid.length > 64) return null;
   const it: ItemInstance = { uid: r.uid, id: r.id, qty: def.stack ? Math.max(1, Math.min(def.stack, Math.floor(Number(r.qty) || 1))) : 1 };
   if (def.weapon) {
-    it.loaded = Math.max(0, Math.min(def.weapon.capacity + 4, Math.floor(Number(r.loaded) || 0)));
-    if (Array.isArray(r.mods)) it.mods = r.mods.filter((m) => typeof m === 'string').slice(0, 4);
+    // (how many it may really have in it is said by what feeds it: sanitizeItem holds it to that)
+    it.loaded = Math.max(0, Math.min(200, Math.floor(Number(r.loaded) || 0)));
+    if (Array.isArray(r.mods)) it.mods = r.mods.filter((m) => typeof m === 'string').slice(0, 6);
+    // (its magazine: one it takes, or none; said by nobody, it is a gun from before magazines, and is given its own)
+    if (def.weapon.mag && r.mag !== undefined) it.mag = typeof r.mag === 'string' && magFits(r.mag, r.id) ? r.mag : null;
   }
+  if (def.mag) it.rounds = Math.max(0, Math.min(def.mag.capacity, Math.floor(Number(r.rounds) || 0)));
   if (def.use?.sips) it.left = Number.isFinite(Number(r.left)) ? Number(r.left) : def.use.sips;
   if (r.id === 'dogtag') {
     const short = (v: unknown) => (typeof v === 'string' ? v.slice(0, 24) : undefined);

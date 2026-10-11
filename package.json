@@ -25,6 +25,7 @@
     "test:checks": "tsx test/checks.test.ts",
     "test:thirst": "tsx test/thirst.test.ts",
     "test:loot": "tsx test/loot.test.ts",
+    "test:mags": "tsx test/mags.test.ts",
     "test:cars": "tsx test/cars.test.ts",
     "test:voice": "tsx test/voice.test.ts",
     "test:overlap": "tsx scripts/overlap-audit.ts",

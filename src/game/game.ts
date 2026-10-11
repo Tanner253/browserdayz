@@ -14,7 +14,7 @@ import { Barrel, type Vegetation } from '../world/vegetation';
 import type { Grass } from '../world/grass';
 import { Door, type Buildings } from '../world/buildings';
 import { WORLD_SIZE, bunkerPlace, heightAt, inPlay, type SiteKind, type World } from '../world/worldgen';
-import { ITEMS, WEAPON_SLOTS, itemName, TAG_HOLD, TAG_HOLD_MIN, TAG_OUT, capacityOf, makeItem, newUid, tagClock, tagOwner, type ItemInstance, type Slot, quietOf } from '../sim/items';
+import { ITEMS, WEAPON_SLOTS, itemName, TAG_HOLD, TAG_HOLD_MIN, TAG_OUT, capacityOf, chambered, fillMag, fittedOf, magRoom, makeItem, newUid, swapMag, tagClock, tagOwner, type ItemInstance, type Slot, quietOf } from '../sim/items';
 import { PlayerInventory, SLOT_ORDER, type Container } from '../sim/inventory';
 import { Economy, type WorldLoot } from '../sim/economy';
 import { CRATE_RESTOCK, CRATE_SPECS, fillCrate } from '../sim/crates';
@@ -401,6 +401,12 @@ export class Game {
     };
     // the bolt, a reload: the same
     this.weapons.onAct = (a, d) => this.act(a, d);
+    this.weapons.onSay = (text, kind) => this.hud.note(text, kind);
+    this.weapons.onCarried = () => this.inventoryChanged();
+    this.weapons.onSpill = (item) => {
+      this.dropItem(item);
+      this.hud.note(`No room for the ${ITEMS[item.id].name.toLowerCase()}: it is at your feet`, 'warn');
+    };
     // a punch or a swing: your own body throws it, and everyone near you sees it
     this.weapons.onSwing = (seconds) => {
       this.avatar.swing(false, seconds);
@@ -460,6 +466,9 @@ export class Game {
       attachTargets: (att) => this.attachTargets(att),
       attach: (att, weapon) => this.attachMod(att, weapon),
       detach: (weapon, mod) => this.detachMod(weapon, mod),
+      fillMag: (mag) => this.fillMagazine(mag),
+      emptyMag: (mag) => this.emptyMagazine(mag),
+      looseFor: (mag) => this.inv.count(ITEMS[mag.id].mag?.ammo ?? ''),
       assignQuick: (item, i) => this.assignQuick(i, item.id),
       quickIndex: (id) => this.quick.indexOf(id),
       changed: () => this.inventoryChanged(),
@@ -1264,7 +1273,7 @@ export class Game {
   /** something the hands do that shows on the body: your own, and (through the server) the copy of you everyone else sees */
   private act(a: Act, d = 1) {
     if (a === 'stop') this.avatar.act(null);
-    else this.avatar.act(a, d);
+    else this.avatar.act(a === 'load' || a === 'unbox' ? 'open' : a, d);
     this.net.send({ t: 'act', a, d });
   }
 
@@ -1511,7 +1520,7 @@ export class Game {
       const it = this.weapons.equippedItem;
       const flags = (p.crouched ? F_CROUCH : 0) | (p.sprinting ? F_SPRINT : 0) | (this.weapons.aiming ? F_AIM : 0) | (p.grounded ? F_GROUND : 0) | (p.dead ? F_DEAD : 0) | (p.vitals.bleeding ? F_BLEED : 0) | (p.lean > 0.3 ? F_LEAN_R : p.lean < -0.3 ? F_LEAN_L : 0) | (this.hold === 'dance' ? F_DANCE : 0) | (this.hold === 'sit' ? F_SIT : 0) | (p.prone ? F_PRONE : 0) | (this.hold === 'surrender' ? F_SURRENDER : 0) | (this.garage.ride ? F_SEAT : 0) | (this.weapons.guarding ? F_GUARD : 0) | (p.vitals.broken ? F_LIMP : 0) | (this.lit && !this.garage.ride ? F_LIGHT : 0);
       const pose: Pose = [p.pos.x, p.pos.y, p.pos.z, p.yaw, p.pitch, flags];
-      this.net.send({ t: 's', p: pose, w: it?.id ?? null, m: it?.mods ?? [] });
+      this.net.send({ t: 's', p: pose, w: it?.id ?? null, m: fittedOf(it) });
     }
     // the server keeps a copy of what we carry so it can leave a body with our gear on it
     this.meT += dt;
@@ -1886,12 +1895,13 @@ export class Game {
 
   // ------------------------------------------------------------ item actions
 
-  private startUse(label: string, dur: number, itemId: string, kind: UseKind, sound: TimedAction['sound'], done: () => void) {
+  /** @param seen what the people around are told the hands are doing, where that is not what `kind` says (see ACTS) */
+  private startUse(label: string, dur: number, itemId: string, kind: UseKind, sound: TimedAction['sound'], done: () => void, seen?: Act) {
     this.toggleInventory(false);
     this.use = { label, t: 0, dur, sound, soundT: 0, done };
     this.weapons.beginUse(itemId, kind, dur);
     // (what everybody else sees of an injection is the hands at work on a wound, as with a dressing)
-    this.act(kind === 'inject' ? 'bandage' : kind === 'smoke' ? 'eat' : kind === 'swipe' ? 'open' : kind, dur);
+    this.act(seen ?? (kind === 'inject' ? 'bandage' : kind === 'smoke' ? 'eat' : kind === 'swipe' ? 'open' : kind), dur);
     // (a smoke is one sound from the lighter to the last breath of it, made once)
     if (sound === 'smoke') audio.ui('smoke');
   }
@@ -2378,8 +2388,8 @@ export class Game {
       from.remove(item);
       this.syncOpenBox();
     }
-    audio.ui('open');
-    this.startUse(`Open ${def.name}`, o.time, item.id, 'open', null, () => {
+    audio.ui('unbox');
+    this.startUse(`Unwrapping the ${def.name.toLowerCase()}`, o.time, item.id, 'open', null, () => {
       if (this.loose === item) this.loose = null;
       this.inv.remove(item);
       const left = this.inv.add(makeItem(o.gives, o.qty));
@@ -2387,14 +2397,35 @@ export class Game {
       audio.ui('pickup');
       this.hud.note(`${o.qty} × ${ITEMS[o.gives].name}`, 'good');
       this.inventoryChanged();
-    });
+    }, 'unbox');
   }
 
-  /** Take the rounds out of a weapon and put them back in the pockets. */
+  /**
+   * Take the rounds out of a weapon and put them back in the pockets. Out of a gun fed by a magazine that is its
+   * magazine, with what is in it, and the round out of its chamber.
+   */
   private unloadWeapon(item: ItemInstance) {
     const def = ITEMS[item.id];
+    if (!def.weapon || this.weapons.busy) return;
+    if (def.weapon.mag) {
+      if (!item.mag && !chambered(item)) return;
+      const back: ItemInstance[] = [];
+      const mag = swapMag(item, null);
+      if (mag) back.push(mag);
+      if (chambered(item)) back.push(makeItem(def.weapon.ammo, 1));
+      item.loaded = 0;
+      for (const it of back) {
+        const left = this.inv.add(it);
+        if (left) this.dropItem(left);
+      }
+      audio.click(2200, 0.4, 0.03);
+      audio.click(1500, 0.4, 0.04, 0.12);
+      this.hud.note(mag ? `The magazine is out of the ${def.name}${back.length > 1 ? ', and its chamber is clear' : ''}` : 'The chamber is clear', 'good');
+      this.inventoryChanged();
+      return;
+    }
     const n = item.loaded ?? 0;
-    if (!def.weapon || n <= 0 || this.weapons.busy) return;
+    if (n <= 0) return;
     item.loaded = 0;
     const left = this.inv.add(makeItem(def.weapon.ammo, n));
     if (left) this.dropItem(left);
@@ -2413,6 +2444,8 @@ export class Game {
     const out: ItemInstance[] = [];
     const consider = (w: ItemInstance) => {
       if (!a.fits.includes(w.id)) return;
+      // (a magazine goes into a gun that has one in it already: the two are changed over)
+      if (ITEMS[att.id].mag) return void out.push(w);
       // one attachment per mount point
       if ((w.mods ?? []).some((m) => ITEMS[m]?.attach?.slot === a.slot)) return;
       out.push(w);
@@ -2426,6 +2459,18 @@ export class Game {
     if (!this.attachTargets(att).includes(weapon) || this.weapons.busy) return;
     this.inv.remove(att);
     this.openStash?.container.remove(att);
+    if (ITEMS[att.id].mag) {
+      // the one that was in it comes out, with what is left in it, and goes where there is room
+      const out = swapMag(weapon, att);
+      const left = out ? this.inv.add(out) : null;
+      if (left) this.dropItem(left);
+      // (heard by whoever is near as a magazine going in is, and seen as one)
+      audio.ui('mag');
+      this.act('reload', 0.9);
+      this.hud.note(`${ITEMS[att.id].name} in the ${ITEMS[weapon.id].name}: ${weapon.loaded ?? 0} round${weapon.loaded === 1 ? '' : 's'} in it`, 'good');
+      this.inventoryChanged();
+      return;
+    }
     (weapon.mods ??= []).push(att.id);
     audio.click(2600, 0.4, 0.03);
     audio.click(1900, 0.45, 0.05, 0.14);
@@ -2434,7 +2479,17 @@ export class Game {
   }
 
   private detachMod(weapon: ItemInstance, mod: string) {
-    if (!weapon.mods?.includes(mod) || this.weapons.busy) return;
+    if (this.weapons.busy) return;
+    if (weapon.mag === mod) {
+      // (its magazine: out with what is in it; the round in the chamber stays)
+      const out = swapMag(weapon, null);
+      const left = out ? this.inv.add(out) : null;
+      if (left) this.dropItem(left);
+      audio.click(1900, 0.45, 0.05);
+      this.inventoryChanged();
+      return;
+    }
+    if (!weapon.mods?.includes(mod)) return;
     weapon.mods = weapon.mods.filter((m) => m !== mod);
     // rounds that no longer fit come back out
     const extra = (weapon.loaded ?? 0) - capacityOf(weapon);
@@ -2448,6 +2503,47 @@ export class Game {
       if (left) this.dropItem(left);
     }
     audio.click(1900, 0.45, 0.05);
+    this.inventoryChanged();
+  }
+
+  // ------------------------------------------------------------ magazines
+
+  /** seconds a round takes to push into a magazine */
+  private static readonly ROUND_IN = 0.42;
+
+  /**
+   * Rounds pushed into a magazine out of the loose ones carried, one at a time, until it is full, there are no
+   * more, or the hands are taken off it (anything that breaks an action off: what is in it by then stays in it).
+   */
+  private fillMagazine(mag: ItemInstance) {
+    const d = ITEMS[mag.id].mag;
+    if (!d || this.use || this.player.dead || this.weapons.working) return;
+    const room = d.capacity - (mag.rounds ?? 0);
+    if (room <= 0) return void this.hud.note('It is full', 'info');
+    if (this.inv.count(d.ammo) <= 0) return void this.hud.note(`No ${ITEMS[d.ammo].name.toLowerCase()} to put in it`, 'warn');
+    this.startUse(`Filling the magazine · ${mag.rounds ?? 0}/${d.capacity}`, Game.ROUND_IN, mag.id, 'open', null, () => {
+      // (put down, sold or fitted meanwhile)
+      if (!this.inv.containerOf(mag)) return;
+      if (this.inv.take(d.ammo, 1) !== 1) return;
+      fillMag(mag, 1);
+      audio.ui('round');
+      this.inventoryChanged();
+      // (and the next, for as long as there is one and room for it)
+      if ((mag.rounds ?? 0) < d.capacity && this.inv.count(d.ammo) > 0) this.fillMagazine(mag);
+      else this.hud.note(`${mag.rounds} in the ${ITEMS[mag.id].name.toLowerCase()}`, 'good');
+    }, 'load');
+  }
+
+  /** The rounds out of a magazine and loose into the pockets (what there is no room for is put down). */
+  private emptyMagazine(mag: ItemInstance) {
+    const d = ITEMS[mag.id].mag, n = mag.rounds ?? 0;
+    if (!d || n <= 0 || this.weapons.busy) return;
+    mag.rounds = 0;
+    const left = this.inv.add(makeItem(d.ammo, n));
+    if (left) this.dropItem(left);
+    audio.click(2200, 0.4, 0.03);
+    audio.click(1500, 0.4, 0.04, 0.12);
+    this.hud.note(`${n} × ${ITEMS[d.ammo].name} out of it`, 'good');
     this.inventoryChanged();
   }
 
@@ -2708,7 +2804,7 @@ export class Game {
     if (owner instanceof WorldItem) {
       const item = owner.loot.item;
       const d = ITEMS[item.id];
-      const qty = d.stack ? ` <small>×${item.qty}</small>` : d.weapon ? ` <small>${item.loaded ?? 0}/${capacityOf(item)}</small>` : item.cargo?.length ? ` <small>${item.cargo.length} inside</small>` : '';
+      const qty = d.stack ? ` <small>×${item.qty}</small>` : d.weapon ? ` <small>${item.loaded ?? 0}/${d.weapon.mag ? (item.mag ? magRoom(item) : 'no mag') : capacityOf(item)}</small>` : d.mag ? ` <small>${item.rounds ?? 0}/${d.mag.capacity}</small>` : item.cargo?.length ? ` <small>${item.cargo.length} inside</small>` : '';
       this.prompt = `<kbd>F</kbd>Take ${d.name}${qty}`;
       // four corners round it, so there is no doubt which thing that is
       const at = new THREE.Vector3(owner.loot.x, owner.loot.y + 0.05, owner.loot.z).project(cam);

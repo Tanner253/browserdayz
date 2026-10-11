@@ -1,7 +1,7 @@
 // Item database. Pure data; shared by the client UI, world spawning and the server.
 // Grid sizes follow DayZ conventions (1 cell ~ 10 cm).
 
-export type Category = 'weapon' | 'ammo' | 'food' | 'drink' | 'medical' | 'melee' | 'tool' | 'misc' | 'stash' | 'attachment' | 'clothing';
+export type Category = 'weapon' | 'ammo' | 'magazine' | 'food' | 'drink' | 'medical' | 'melee' | 'tool' | 'misc' | 'stash' | 'attachment' | 'clothing';
 /** physical equipment slots on the character: weapons and worn gear */
 export type Slot = 'primary' | 'secondary' | 'holster' | 'melee' | 'head' | 'face' | 'vest' | 'back' | 'hands' | 'feet';
 /** what kind of slot an item fits: long guns fit primary or secondary, gear fits its own slot */
@@ -49,7 +49,14 @@ export interface ItemDef {
   weapon?: {
     kind: 'rifle' | 'pistol' | 'auto';
     ammo: string;
+    /** rounds in what feeds it: its own tube, or the magazine it is made with (a gun with a bigger one in it holds that one's) */
     capacity: number;
+    /**
+     * The magazine it is made with, if it is fed by one: a thing of its own (see `mag` on an item), found, carried,
+     * filled by hand and put in. A gun with none in it fires what is in its chamber and no more. Without this the
+     * gun is fed from its own tube, a round at a time.
+     */
+    mag?: string;
     ergo: number;
     modes?: ('semi' | 'auto')[];
     /** pieces of its model that are only there with an attachment on it (attachment -> pieces), and pieces that never are */
@@ -70,6 +77,8 @@ export interface ItemDef {
     tube?: boolean;
   };
   melee?: { damage: number; range: number; rate: number };
+  /** a magazine: what it is filled with, and how many of them it holds (which guns take it is its `attach.fits`) */
+  mag?: { ammo: string; capacity: number };
   /** sealed container (ammo box): opening it replaces the item with loose contents */
   open?: { gives: string; qty: number; time: number };
   /** world model shows this many copies of the mesh in a small pile (loose rounds) */
@@ -77,7 +86,7 @@ export interface ItemDef {
   /** worn gear: cargo grid it adds, damage it soaks */
   wear?: { cargo?: [number, number]; /** torso damage multiplier */ armor?: number; /** head damage multiplier */ head?: number; /** fall damage multiplier */ fall?: number; /** extra punch damage */ fist?: number; /** how fast thirst grows, as a multiplier */ thirst?: number; /** over the face, it keeps the gas out (see src/sim/gas.ts) */ gas?: number };
   /** weapon attachment: which weapons take it and where it mounts; what it does to the gun's handling score, and to its kick (a multiplier) */
-  attach?: { fits: string[]; slot: AttachSlot; ergo?: number; recoil?: number; /** rounds more than the gun's own magazine holds */ rounds?: number; /** on the muzzle: it quiets the shot and hides the flash */ quiet?: boolean };
+  attach?: { fits: string[]; slot: AttachSlot; ergo?: number; recoil?: number; /** on the muzzle: it quiets the shot and hides the flash */ quiet?: boolean };
   /** its model's colours are multiplied by this (0xrrggbb): one model, told apart from another thing made of it */
   tint?: number;
   /** what is white on its model is painted this colour (0xrrggbb) and the rest keeps its own: see whiteTo in src/game/loot.ts */
@@ -91,67 +100,110 @@ const D: ItemDef[] = [
   {
     id: 'mosin', name: 'Sniper Rifle', model: 'sniper', w: 9, h: 2, weight: 4.1, category: 'weapon', slot: 'long',
     desc: 'Bolt-action rifle in 7.62. Five rounds in a box magazine, and the bolt worked by hand after every one. Slow, loud and devastating. Takes a scope, a cheek rest, a suppressor and a light.',
-    weapon: { kind: 'rifle', ammo: 'ammo_762', capacity: 5, ergo: 40, shows: { pu_scope: ['scope', 'glass'], rifle_wrap: ['cheekrest'], suppressor_762: ['silencer'] } }, iconYaw: 0,
+    weapon: { kind: 'rifle', ammo: 'ammo_762', capacity: 5, mag: 'mag_sniper', ergo: 40, shows: { pu_scope: ['scope', 'glass'], rifle_wrap: ['cheekrest'], suppressor_762: ['silencer'] } }, iconYaw: 0,
   },
   {
     id: 'p38', name: 'Pistol 43', model: 'pistol_43', w: 3, h: 2, weight: 0.75, category: 'weapon', slot: 'holster',
-    desc: 'Slim 9x19mm pistol. Eight-round magazine. Takes a suppressor, an extended magazine, a holographic sight and a light.',
-    weapon: { kind: 'pistol', ammo: 'ammo_9mm', capacity: 8, ergo: 86 }, iconYaw: 0,
+    desc: 'Slim 9x19mm pistol. Eight rounds in its magazine, twelve in the long one. Takes a suppressor, a holographic sight and a light.',
+    weapon: { kind: 'pistol', ammo: 'ammo_9mm', capacity: 8, mag: 'mag_p38', ergo: 86 }, iconYaw: 0,
   },
   {
     id: 'm9', name: 'M9 Pistol', model: 'm9', w: 3, h: 2, weight: 1.0, category: 'weapon', slot: 'holster',
-    desc: 'Full-size 9x19mm service pistol. Fifteen rounds in the magazine, and heavier in the hand for it. Takes a suppressor, an extended magazine, a holographic sight and a light.',
-    weapon: { kind: 'pistol', ammo: 'ammo_9mm', capacity: 15, ergo: 74 }, iconYaw: 0,
+    desc: 'Full-size 9x19mm service pistol. Fifteen rounds in its magazine, twenty in the long one, and heavier in the hand for it. Takes a suppressor, a holographic sight and a light.',
+    weapon: { kind: 'pistol', ammo: 'ammo_9mm', capacity: 15, mag: 'mag_m9', ergo: 74 }, iconYaw: 0,
   },
   {
     id: 'deagle', name: 'Desert Eagle', model: 'desert_eagle', w: 3, h: 2, weight: 2.0, category: 'weapon', slot: 'holster',
-    desc: 'A .50 pistol the size of a brick. Seven rounds, a kick to match, and two of them end most arguments. Takes an extended magazine and nothing else.',
+    desc: 'A .50 pistol the size of a brick. Seven rounds in its magazine, ten in the long one, a kick to match, and two of them end most arguments. Nothing else fits it.',
     // (A .50 AE leaves at about 440 m/s. What a round does is its `damage` times how fast it is still going, and
     // nothing as slow as a pistol's does all of it (see where a round lands in src/game/weapons.ts): at 58 this
     // did 50 at the muzzle, and two to the body left a man standing with a sliver. At 82 it does 70: two to the
     // body are the end of anybody not in plates, and of whoever wears the armoured vest, barely.)
-    weapon: { kind: 'pistol', ammo: 'ammo_50', capacity: 7, ergo: 56, round: { muzzleVel: 440, drag: 0.0017, damage: 82, zero: 30 }, kick: 2.1, pace: 2.1 }, iconYaw: 0,
+    weapon: { kind: 'pistol', ammo: 'ammo_50', capacity: 7, mag: 'mag_deagle', ergo: 56, round: { muzzleVel: 440, drag: 0.0017, damage: 82, zero: 30 }, kick: 2.1, pace: 2.1 }, iconYaw: 0,
   },
   {
     id: 'benelli', name: 'Benelli M3', model: 'benelli_m3', w: 8, h: 2, weight: 3.5, category: 'weapon', slot: 'long',
-    desc: 'Twelve-gauge shotgun, self-loading. Seven shells in the tube, nine pellets a shell: nothing is worse to meet in a corridor, and little is less use across a field. Takes a holographic sight, a suppressor and a light.',
+    desc: 'Twelve-gauge shotgun, self-loading. Seven shells in the tube, pushed in one at a time: it takes no magazine. Nine pellets a shell: nothing is worse to meet in a corridor, and little is less use across a field. Takes a holographic sight, a suppressor and a light.',
     weapon: { kind: 'rifle', ammo: 'ammo_12', capacity: 7, ergo: 52, action: 'self', tube: true, round: { muzzleVel: 400, drag: 0.011, damage: 14, zero: 25, pellets: 9, cone: 0.075 }, kick: 1.3, pace: 1.7, shows: { red_dot: ['sight'], suppressor_12: ['silencer'] } }, iconYaw: 0,
   },
+  // Ammunition (2026-10-10). Loose rounds lie thirty to a place in a pocket, whatever they are. A box is one place,
+  // and holds twenty-five: it is unwrapped in the hands, and what was in it is loose rounds. Rounds go into a
+  // magazine by hand, and a magazine into a gun: nothing goes from a pocket into a gun but through one of those,
+  // except a shell into the shotgun's tube, and a single round into an empty chamber.
   {
-    id: 'ammo_762', name: '7.62x54R Rounds', model: 'bolt_action_rifle_7_62', node: 'bolt_action_rifle_7_62_bullet_54mm', w: 1, h: 1, weight: 0.022, category: 'ammo', stack: 20, scale: 1.25, pile: 5,
-    desc: 'Loose full-power rifle cartridges. Load them into a Mosin with R.',
+    id: 'ammo_762', name: '7.62x54R Rounds', model: 'bolt_action_rifle_7_62', node: 'bolt_action_rifle_7_62_bullet_54mm', w: 1, h: 1, weight: 0.022, category: 'ammo', stack: 30, scale: 1.25, pile: 5,
+    desc: 'Loose full-power rifle cartridges, for the sniper rifle. They go into its magazine by hand.',
   },
   {
-    id: 'ammo_9mm', name: '9x19mm Rounds', model: 'service_pistol', node: 'service_pistol_bullet', w: 1, h: 1, weight: 0.012, category: 'ammo', stack: 25, scale: 1.6, pile: 6,
-    desc: 'Loose pistol cartridges. Common among police and military.',
+    id: 'ammo_9mm', name: '9x19mm Rounds', model: 'service_pistol', node: 'service_pistol_bullet', w: 1, h: 1, weight: 0.012, category: 'ammo', stack: 30, scale: 1.6, pile: 6,
+    desc: 'Loose pistol cartridges. Common among police and military. They go into a pistol\'s magazine by hand.',
   },
   {
-    id: 'ammo_50', name: '.50 AE Rounds', model: 'round_50', w: 1, h: 1, weight: 0.03, category: 'ammo', stack: 14, scale: 1.5, pile: 4,
+    id: 'ammo_50', name: '.50 AE Rounds', model: 'round_50', w: 1, h: 1, weight: 0.03, category: 'ammo', stack: 30, scale: 1.5, pile: 4,
     desc: 'Loose .50 cartridges. Only the Desert Eagle fires them.',
   },
   {
-    id: 'ammo_12', name: '12 Gauge Shells', model: 'shell_12', w: 1, h: 1, weight: 0.045, category: 'ammo', stack: 16, scale: 1.3, pile: 5,
-    desc: 'Buckshot: nine pellets a shell. For the shotgun.',
+    id: 'ammo_12', name: '12 Gauge Shells', model: 'shell_12', w: 1, h: 1, weight: 0.045, category: 'ammo', stack: 30, scale: 1.3, pile: 5,
+    desc: 'Buckshot: nine pellets a shell. Pushed into the shotgun\'s tube one at a time.',
   },
   {
-    id: 'box_50', name: '.50 AE Ammo Box', model: 'ammo_box', w: 2, h: 1, weight: 0.5, category: 'ammo', scale: 0.6,
-    desc: 'Sealed box of 14 .50 cartridges. Open it to get the rounds out.',
-    open: { gives: 'ammo_50', qty: 14, time: 1.5 },
+    id: 'box_50', name: '.50 AE Ammo Box', model: 'ammo_box_50', w: 1, h: 1, weight: 0.8, category: 'ammo',
+    desc: 'A sealed box of 25 .50 cartridges. Hold it and unwrap it to get the rounds out.',
+    open: { gives: 'ammo_50', qty: 25, time: 2.2 },
   },
   {
-    id: 'box_12', name: '12 Gauge Shell Box', model: 'ammo_box', w: 2, h: 2, weight: 0.8, category: 'ammo', scale: 0.8,
-    desc: 'Sealed box of 16 buckshot shells. Open it to get them out.',
-    open: { gives: 'ammo_12', qty: 16, time: 1.8 },
+    id: 'box_12', name: '12 Gauge Shell Box', model: 'ammo_box_12', w: 1, h: 1, weight: 1.15, category: 'ammo',
+    desc: 'A sealed box of 25 buckshot shells. Hold it and unwrap it to get them out.',
+    open: { gives: 'ammo_12', qty: 25, time: 2.2 },
   },
   {
-    id: 'box_762', name: '7.62x54R Ammo Box', model: 'ammo_box', w: 2, h: 2, weight: 0.6, category: 'ammo', scale: 0.8,
-    desc: 'Sealed steel can of 20 rifle cartridges. Open it to get the rounds out.',
-    open: { gives: 'ammo_762', qty: 20, time: 1.8 },
+    id: 'box_762', name: '7.62x54R Ammo Box', model: 'ammo_box_762', w: 1, h: 1, weight: 0.6, category: 'ammo',
+    desc: 'A sealed box of 25 rifle cartridges. Hold it and unwrap it to get the rounds out.',
+    open: { gives: 'ammo_762', qty: 25, time: 2.2 },
   },
   {
-    id: 'box_9mm', name: '9x19mm Ammo Box', model: 'ammo_box', w: 2, h: 1, weight: 0.4, category: 'ammo', scale: 0.6,
-    desc: 'Sealed box of 25 pistol cartridges. Open it to get the rounds out.',
-    open: { gives: 'ammo_9mm', qty: 25, time: 1.5 },
+    id: 'box_9mm', name: '9x19mm Ammo Box', model: 'ammo_box_9mm', w: 1, h: 1, weight: 0.33, category: 'ammo',
+    desc: 'A sealed box of 25 pistol cartridges. Hold it and unwrap it to get the rounds out.',
+    open: { gives: 'ammo_9mm', qty: 25, time: 2.2 },
+  },
+  // ---------------------------------------------------------------- magazines
+  // A thing of its own: found with a gun in it or lying by itself, carried, filled a round at a time and put into
+  // the gun it fits. Each is its gun's own magazine, as its gun's model draws it; the long ones are the same drawn
+  // a little longer. What it weighs is itself: the rounds in it are weighed with it (see itemWeight).
+  {
+    id: 'mag_sniper', name: 'Sniper Rifle Magazine', model: 'sniper', nodeRe: '^mag', w: 1, h: 1, weight: 0.12, category: 'magazine',
+    desc: 'The five-round box magazine of the sniper rifle.',
+    mag: { ammo: 'ammo_762', capacity: 5 }, attach: { fits: ['mosin'], slot: 'magazine' },
+  },
+  {
+    id: 'mag_p38', name: 'Pistol 43 Magazine', model: 'pistol_43', nodeRe: '^mag', w: 1, h: 1, weight: 0.08, category: 'magazine',
+    desc: 'Eight rounds of 9 mm for the Pistol 43.',
+    mag: { ammo: 'ammo_9mm', capacity: 8 }, attach: { fits: ['p38'], slot: 'magazine' },
+  },
+  {
+    id: 'mag_p38_ext', name: 'Pistol 43 Extended Magazine', model: 'pistol_43', nodeRe: '^mag', w: 1, h: 2, weight: 0.12, category: 'magazine', scale: 1.15,
+    desc: 'Twelve rounds for the Pistol 43: four more shots before you change it, and a longer grip to draw.',
+    mag: { ammo: 'ammo_9mm', capacity: 12 }, attach: { fits: ['p38'], slot: 'magazine', ergo: -4 },
+  },
+  {
+    id: 'mag_m9', name: 'M9 Magazine', model: 'm9', nodeRe: '^mag', w: 1, h: 1, weight: 0.11, category: 'magazine',
+    desc: 'Fifteen rounds of 9 mm for the M9.',
+    mag: { ammo: 'ammo_9mm', capacity: 15 }, attach: { fits: ['m9'], slot: 'magazine' },
+  },
+  {
+    id: 'mag_m9_ext', name: 'M9 Extended Magazine', model: 'm9', nodeRe: '^mag', w: 1, h: 2, weight: 0.16, category: 'magazine', scale: 1.15,
+    desc: 'Twenty rounds for the M9: five more shots before you change it.',
+    mag: { ammo: 'ammo_9mm', capacity: 20 }, attach: { fits: ['m9'], slot: 'magazine', ergo: -4 },
+  },
+  {
+    id: 'mag_deagle', name: 'Desert Eagle Magazine', model: 'desert_eagle', nodeRe: '^mag', w: 1, h: 1, weight: 0.15, category: 'magazine',
+    desc: 'Seven rounds of .50 for the Desert Eagle.',
+    mag: { ammo: 'ammo_50', capacity: 7 }, attach: { fits: ['deagle'], slot: 'magazine' },
+  },
+  {
+    id: 'mag_deagle_ext', name: 'Desert Eagle Extended Magazine', model: 'desert_eagle', nodeRe: '^mag', w: 1, h: 2, weight: 0.2, category: 'magazine', scale: 1.15,
+    desc: 'Ten rounds for the Desert Eagle: three more shots before you change it.',
+    mag: { ammo: 'ammo_50', capacity: 10 }, attach: { fits: ['deagle'], slot: 'magazine', ergo: -4 },
   },
   // ---------------------------------------------------------------- attachments
   {
@@ -188,21 +240,6 @@ const D: ItemDef[] = [
     id: 'gun_light', name: 'Weapon Light', model: 'gun_light', w: 1, h: 1, weight: 0.15, category: 'attachment',
     desc: 'A light clamped under the barrel, switched with L. It shows you the dark, and shows the dark where you are. Fits everything but the Desert Eagle.',
     attach: { fits: ['mosin', 'p38', 'm9', 'benelli'], slot: 'light', ergo: -2 },
-  },
-  {
-    id: 'mag_m9_ext', name: 'M9 Extended Magazine', model: 'm9', nodeRe: '^mag', w: 1, h: 2, weight: 0.16, category: 'attachment', scale: 1.15,
-    desc: 'Twenty-round magazine for the M9: five more shots before you reload.',
-    attach: { fits: ['m9'], slot: 'magazine', ergo: -4, rounds: 5 },
-  },
-  {
-    id: 'mag_deagle_ext', name: 'Desert Eagle Extended Magazine', model: 'desert_eagle', nodeRe: '^mag', w: 1, h: 2, weight: 0.2, category: 'attachment', scale: 1.15,
-    desc: 'Ten-round magazine for the Desert Eagle: three more shots before you reload.',
-    attach: { fits: ['deagle'], slot: 'magazine', ergo: -4, rounds: 3 },
-  },
-  {
-    id: 'mag_p38_ext', name: 'Pistol 43 Extended Magazine', model: 'pistol_43', nodeRe: '^mag', w: 1, h: 2, weight: 0.12, category: 'attachment', scale: 1.15,
-    desc: 'Twelve-round magazine for the Pistol 43: four more shots before you reload.',
-    attach: { fits: ['p38'], slot: 'magazine', ergo: -4, rounds: 4 },
   },
   // ---------------------------------------------------------------- melee
   { id: 'hatchet', name: 'Hatchet', model: 'hatchet', w: 1, h: 3, weight: 0.8, category: 'melee', slot: 'melee', desc: 'Chops wood and anything else.', melee: { damage: 45, range: 1.7, rate: 0.75 } },
@@ -342,9 +379,13 @@ export interface ItemInstance {
   uid: string;
   id: string;
   qty: number;
-  /** rounds loaded (weapons) */
+  /** a gun: the rounds in it, in its magazine or its tube and the one in its chamber */
   loaded?: number;
-  /** attachment item ids fitted to this weapon */
+  /** a gun fed by a magazine: the one in it (an item's id), or null with none in it. (Not said at all: a gun from before magazines were things, which is given the one it was made with: see sanitizeItem.) */
+  mag?: string | null;
+  /** a magazine: the rounds in it */
+  rounds?: number;
+  /** attachment item ids fitted to this weapon (not its magazine: see `mag`) */
   mods?: string[];
   /** contents of a bag or vest: they stay inside it when it is dropped or handed over */
   cargo?: Placed[];
@@ -400,9 +441,103 @@ export function makeItem(id: string, qty?: number): ItemInstance {
   const def = ITEMS[id];
   if (!def) throw new Error(`unknown item ${id}`);
   const it: ItemInstance = { uid: newUid(), id, qty: qty ?? (def.stack ? Math.max(1, Math.round(def.stack * 0.6)) : 1) };
-  if (def.weapon) it.loaded = 0;
+  if (def.weapon) {
+    it.loaded = 0;
+    if (def.weapon.mag) it.mag = null;
+  }
+  if (def.mag) it.rounds = 0;
   if (def.use?.sips) it.left = def.use.sips;
   return it;
+}
+
+// ------------------------------------------------------------------ magazines, and what feeds a gun
+//
+// A gun fed by a magazine holds what its magazine holds and one more, in its chamber. Pull the magazine out of a
+// gun that has been firing and one round stays behind: put a full one in and the gun is one over. A gun with no
+// magazine in it has its chamber and nothing else. Every count below keeps to that, and nothing here makes a
+// round or loses one: what goes into a gun came out of a magazine, and what goes into a magazine came out of a
+// pocket.
+
+/** How often a gun put into the world has its magazine in it, and how full that is at most (a share of what it holds). */
+export const FOUND_WITH_MAG = { chance: 0.6, full: 0.6 };
+
+/** Is this gun fed by a magazine that comes out? (the others by their own tube, a round at a time) */
+export function magFed(id: string): boolean {
+  return !!ITEMS[id]?.weapon?.mag;
+}
+
+/** what the magazine in a gun holds (0 with none in it, or for a gun that takes none) */
+export function magRoom(gun: ItemInstance): number {
+  return (gun.mag ? ITEMS[gun.mag]?.mag?.capacity : 0) ?? 0;
+}
+
+/** Is there a round in its chamber? (any gun with a round in it has one there: it is the first to go) */
+export function chambered(gun: ItemInstance): boolean {
+  return (gun.loaded ?? 0) > 0;
+}
+
+/** Does this magazine go into this gun? */
+export function magFits(mag: ItemInstance | string, gun: ItemInstance | string): boolean {
+  const m = ITEMS[typeof mag === 'string' ? mag : mag.id], g = typeof gun === 'string' ? gun : gun.id;
+  return !!m?.mag && m.attach?.slot === 'magazine' && m.attach.fits.includes(g);
+}
+
+/** A magazine, made with this many rounds in it (no more than it holds). */
+export function makeMag(id: string, rounds = 0): ItemInstance {
+  const it = makeItem(id);
+  it.rounds = Math.max(0, Math.min(ITEMS[id].mag?.capacity ?? 0, Math.floor(rounds)));
+  return it;
+}
+
+/**
+ * One magazine out of a gun and another in (or none in, with `next` null: it is taken out and that is all).
+ * The round in the chamber stays where it is.
+ * @returns the magazine that came out, with what was in it, or null if there was none in the gun
+ */
+export function swapMag(gun: ItemInstance, next: ItemInstance | null): ItemInstance | null {
+  if (!magFed(gun.id) || (next && !magFits(next, gun))) return null;
+  const inChamber = chambered(gun) ? 1 : 0;
+  const out = gun.mag ? makeMag(gun.mag, (gun.loaded ?? 0) - inChamber) : null;
+  gun.mag = next ? next.id : null;
+  gun.loaded = inChamber + (next ? Math.min(next.rounds ?? 0, ITEMS[next.id].mag!.capacity) : 0);
+  return out;
+}
+
+/**
+ * Rounds in a gun as it is put into the world: as many of these as it has room for as it is, which with no
+ * magazine in a gun that needs one is none. (No extra one for the chamber: that comes of changing magazines.)
+ */
+export function stockGun(gun: ItemInstance, rounds: number): ItemInstance {
+  const w = ITEMS[gun.id].weapon;
+  if (w) gun.loaded = Math.max(0, Math.min(Math.floor(rounds), w.mag ? magRoom(gun) : w.capacity));
+  return gun;
+}
+
+/** The same for a gun that is to be a gun that fires, whatever the dice said: its magazine is put in it first, if it has none. */
+export function loadGun(gun: ItemInstance, rounds: number): ItemInstance {
+  const w = ITEMS[gun.id].weapon;
+  if (w?.mag && !gun.mag) gun.mag = w.mag;
+  return stockGun(gun, rounds);
+}
+
+/** How full a magazine found lying by itself is: nothing in it up to FOUND_WITH_MAG.full of what it holds. @param rnd 0..1 */
+export function foundMag(mag: ItemInstance, rnd: () => number): ItemInstance {
+  const cap = ITEMS[mag.id].mag?.capacity ?? 0;
+  mag.rounds = Math.floor(rnd() * (cap * FOUND_WITH_MAG.full + 1));
+  return mag;
+}
+
+/** Rounds pushed into a magazine. @returns how many went in (what it had room for) */
+export function fillMag(mag: ItemInstance, rounds: number): number {
+  const room = (ITEMS[mag.id].mag?.capacity ?? 0) - (mag.rounds ?? 0);
+  const n = Math.max(0, Math.min(room, Math.floor(rounds)));
+  mag.rounds = (mag.rounds ?? 0) + n;
+  return n;
+}
+
+/** Everything fitted to a gun that its model shows: its attachments, and its magazine. */
+export function fittedOf(it: ItemInstance | null | undefined): string[] {
+  return it ? [...(it.mods ?? []), ...(it.mag ? [it.mag] : [])] : [];
 }
 
 /**
@@ -421,8 +556,14 @@ export const FITTED: Record<string, [string, number][]> = {
 /** Rolls for what a gun put into the world comes with. @param rnd 0..1, the caller's own dice */
 export function fitAtRandom(item: ItemInstance, rnd: () => number): ItemInstance {
   for (const [mod, chance] of FITTED[item.id] ?? []) {
-    if (rnd() < chance && !item.mods?.includes(mod)) (item.mods ??= []).push(mod);
+    // (a long magazine is a magazine: it goes where the magazine goes, with nothing in it yet)
+    if (rnd() >= chance) continue;
+    if (ITEMS[mod]?.mag) item.mag = mod;
+    else if (!item.mods?.includes(mod)) (item.mods ??= []).push(mod);
   }
+  // (and more often than not, the one it was made with: a gun found is not always a gun that can be fired twice)
+  const w = ITEMS[item.id].weapon;
+  if (w?.mag && !item.mag && rnd() < FOUND_WITH_MAG.chance) item.mag = w.mag;
   return item;
 }
 
@@ -439,13 +580,11 @@ export function pieceShown(id: string, piece: string, mods: string[] = []): bool
   return true;
 }
 
-/** magazine capacity including an extended magazine */
+/** The most rounds this gun can have in it as it is: its tube's worth, or its magazine's and the one in its chamber. */
 export function capacityOf(it: ItemInstance): number {
   const w = ITEMS[it.id].weapon;
   if (!w) return 0;
-  let n = w.capacity;
-  for (const m of it.mods ?? []) n += ITEMS[m]?.attach?.rounds ?? 0;
-  return n;
+  return w.mag ? magRoom(it) + 1 : w.capacity;
 }
 
 /** Is something on its muzzle that quiets it? (a quieted shot shows no flash, carries a fraction as far, and hits a little softer) */
@@ -462,7 +601,7 @@ export function handlingOf(it: ItemInstance | null | undefined): { ergo: number;
   const w = it ? ITEMS[it.id]?.weapon : undefined;
   if (!it || !w) return null;
   let ergo = w.ergo, recoil = 1, weight = ITEMS[it.id].weight;
-  for (const m of it.mods ?? []) {
+  for (const m of fittedOf(it)) {
     const d = ITEMS[m];
     if (!d) continue;
     ergo += d.attach?.ergo ?? 0;
@@ -475,7 +614,10 @@ export function handlingOf(it: ItemInstance | null | undefined): { ergo: number;
 export function itemWeight(it: ItemInstance): number {
   const d = ITEMS[it.id];
   let w = d.weight * (d.stack ? it.qty : 1);
-  for (const m of it.mods ?? []) w += ITEMS[m]?.weight ?? 0;
+  for (const m of fittedOf(it)) w += ITEMS[m]?.weight ?? 0;
+  // (the rounds in a magazine and in a gun weigh what they weigh loose)
+  if (d.mag) w += (it.rounds ?? 0) * (ITEMS[d.mag.ammo]?.weight ?? 0);
+  if (d.weapon) w += (it.loaded ?? 0) * (ITEMS[d.weapon.ammo]?.weight ?? 0);
   for (const p of it.cargo ?? []) w += itemWeight(p.item);
   return w;
 }
@@ -487,7 +629,18 @@ export function sanitizeItem(it: ItemInstance): ItemInstance | null {
   const sips = ITEMS[it.id].use?.sips;
   if (sips) it.left = Math.max(0, Math.min(sips, Math.floor(Number(it.left ?? sips))));
   else delete it.left;
-  if (it.mods) it.mods = it.mods.filter((m) => ITEMS[m]?.attach?.fits.includes(it.id));
+  const d = ITEMS[it.id];
+  if (d.weapon?.mag) {
+    // A gun from before magazines were things had its rounds in itself, and a long magazine among what was fitted
+    // to it: it is given that one, or the one it was made with, and keeps what was in it.
+    const was = it.mods?.find((m) => magFits(m, it.id));
+    if (it.mag === undefined) it.mag = was ?? d.weapon.mag;
+    else if (it.mag !== null && !magFits(it.mag, it.id)) it.mag = null;
+    it.loaded = Math.max(0, Math.min(capacityOf(it), Math.floor(Number(it.loaded) || 0)));
+  } else delete it.mag;
+  if (d.mag) it.rounds = Math.max(0, Math.min(d.mag.capacity, Math.floor(Number(it.rounds) || 0)));
+  else delete it.rounds;
+  if (it.mods) it.mods = it.mods.filter((m) => !ITEMS[m]?.mag && ITEMS[m]?.attach?.fits.includes(it.id));
   if (it.cargo) {
     it.cargo = it.cargo.filter((p) => p && p.item && sanitizeItem(p.item));
     if (!ITEMS[it.id].wear?.cargo) delete it.cargo;

@@ -4,7 +4,7 @@
 // where people meet. Rules and data only: the server runs them in multiplayer, the game
 // itself when playing alone.
 
-import { ITEMS, fitAtRandom, makeItem } from './items';
+import { ITEMS, fitAtRandom, loadGun, makeItem, makeMag } from './items';
 import type { Container } from './inventory';
 import { BUILDING_FOOTPRINT, heightAt, type World } from '../world/worldgen';
 import { gasEdge, gasZone } from './gas';
@@ -43,8 +43,8 @@ export function fillCrash(c: Container, rnd: () => number = Math.random) {
     const def = ITEMS[id];
     const item = makeItem(id, def.stack ? def.stack : 1);
     if (def.weapon) {
-      item.loaded = def.weapon.capacity;
       fitAtRandom(item, rnd);
+      loadGun(item, 999);
     }
     c.add(item);
   }
@@ -88,7 +88,7 @@ function pick<T>(table: [T, number][], rnd: () => number): T {
 }
 
 /**
- * What is in one: both guns, loaded, with a box of rounds each; something for a wound; a
+ * What is in one: both guns, loaded, each with a second magazine full and a box of rounds; something for a wound; a
  * scope, always; another part for one of the guns; and two or three of the things that are
  * hard to come by.
  */
@@ -97,12 +97,13 @@ export function fillDrop(c: Container, rnd: () => number = Math.random) {
     const def = ITEMS[id];
     const item = makeItem(id, qty ?? (def.stack ? def.stack : 1));
     if (def.weapon) {
-      item.loaded = def.weapon.capacity;
       fitAtRandom(item, rnd);
+      loadGun(item, 999);
     }
     c.add(item);
   };
   for (const id of ['mosin', 'p38', 'box_762', 'box_9mm', 'firstaid', 'bandage', 'bandage', 'pu_scope']) put(id);
+  for (const id of ['mag_sniper', 'mag_p38']) c.add(makeMag(id, 999));
   put(pick([['suppressor_9', 3], ['mag_p38_ext', 3], ['rifle_wrap', 2]], rnd));
   const extras: [string, number][] = [['grenade', 3], ['grenade', 2], ['gasmask', 2], ['life_vest', 2], ['binoculars', 1.5], ['condensed', 1.5], ['thermos', 1.5], ['ammo_762', 2], ['ammo_9mm', 2]];
   const n = 2 + Math.floor(rnd() * 2);

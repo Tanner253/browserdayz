@@ -104,6 +104,56 @@ export const LOCAL_MODELS = {
     tags: ['loot', 'ammo'],
     changes: 'Only its shell is used here: stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.',
   },
+  // The boxes ammunition is found in (2026-10-10): one to a calibre, each a hand's length, every triangle and every
+  // picture as it came. The 9 mm box came with two loose rounds lying beside it: a box is a box, and they are left
+  // out. Three are out of one download of nine small boxes drawn for an old console, which is their look: 256
+  // pixels is the size they were made.
+  ammo_box_9mm: {
+    dir: 'ammo_box_9mm',
+    only: /^(box|tray|bullet9mm\.001)/,
+    size: 0.13,
+    tex: 2048,
+    tags: ['loot', 'ammo'],
+    changes: 'The box, its tray and the rounds in it, without the two loose rounds beside it: scaled to metres and stood on the ground about its own middle; textures re-encoded as WebP at the size they came; geometry compressed.',
+  },
+  ammo_box_739: {
+    dir: 'ammo_box_rifle',
+    size: 0.13,
+    tex: 4096,
+    tags: ['loot', 'ammo'],
+    changes: 'Scaled to metres and stood on the ground about its own middle; textures re-encoded as WebP at the size they came; geometry compressed.',
+  },
+  ammo_box_50: {
+    dir: 'ammo_box_b',
+    size: 0.13,
+    tex: 1024,
+    tags: ['loot', 'ammo'],
+    changes: 'Scaled to a hand\'s length and stood on the ground about its own middle; textures re-encoded as WebP at the size they came; geometry compressed.',
+  },
+  ammo_box_12: {
+    dir: 'ammo_boxes_psx',
+    only: /^12Cal/,
+    size: 0.11,
+    tex: 256,
+    tags: ['loot', 'ammo'],
+    changes: 'Only its 12 gauge box is used here: scaled to metres and stood on the ground about its own middle; its texture re-encoded as WebP at the size it came; geometry compressed.',
+  },
+  ammo_box_762: {
+    dir: 'ammo_boxes_psx',
+    only: /^7\.62Cal/,
+    size: 0.13,
+    tex: 256,
+    tags: ['loot', 'ammo'],
+    changes: 'Only its 7.62 mm box is used here: scaled to metres and stood on the ground about its own middle; its texture re-encoded as WebP at the size it came; geometry compressed.',
+  },
+  ammo_box_556: {
+    dir: 'ammo_boxes_psx',
+    only: /^5\.56Cal/,
+    size: 0.13,
+    tex: 256,
+    tags: ['loot', 'ammo'],
+    changes: 'Only its 5.56 mm box is used here: scaled to metres and stood on the ground about its own middle; its texture re-encoded as WebP at the size it came; geometry compressed.',
+  },
   plate_carrier: {
     dir: 'plate_carrier',
     size: 0.56,

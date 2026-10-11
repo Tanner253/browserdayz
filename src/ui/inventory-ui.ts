@@ -10,7 +10,7 @@
 // equip, use or take it) and the ground (the whole left column). Over a grid the outline is where it will land,
 // which is the nearest free spot to the pointer, not only the cell under it.
 
-import { GEAR_SLOTS, ITEMS, SLOT_KIND, SLOT_LABEL, TAG_HOLD_MIN, capacityOf, handlingOf, itemName, itemWeight, tagClock, tagOwner, type ItemInstance, type Slot } from '../sim/items';
+import { GEAR_SLOTS, ITEMS, SLOT_KIND, SLOT_LABEL, TAG_HOLD_MIN, capacityOf, handlingOf, itemName, itemWeight, magRoom, tagClock, tagOwner, type ItemInstance, type Slot } from '../sim/items';
 import { Container, type PlayerInventory } from '../sim/inventory';
 import type { WorldItem, Stash } from '../game/loot';
 import type { Vitals } from '../game/player';
@@ -33,6 +33,12 @@ export interface InvActions {
   attachTargets(att: ItemInstance): ItemInstance[];
   attach(att: ItemInstance, weapon: ItemInstance): void;
   detach(weapon: ItemInstance, mod: string): void;
+  /** push loose rounds into a magazine, one at a time, for as long as the hands are left to it */
+  fillMag(mag: ItemInstance): void;
+  /** the rounds out of a magazine, loose into the pockets */
+  emptyMag(mag: ItemInstance): void;
+  /** how many loose rounds are carried of the kind this magazine holds */
+  looseFor(mag: ItemInstance): number;
   /** put this item type on quick key 5 + i */
   assignQuick(item: ItemInstance, i: number): void;
   /** quick key index (0-3) this item type is on, or -1 */
@@ -182,11 +188,13 @@ export class InventoryUI {
     const t: string[] = [];
     if (d.stack) t.push(`<span class="qty">${item.qty}</span>`);
     if (d.use?.sips) t.push(`<span class="qty">${item.left ?? d.use.sips}/${d.use.sips}</span>`);
-    if (d.weapon) t.push(`<span class="qty">${item.loaded ?? 0}/${capacityOf(item)}</span>`);
+    // (a gun fed by a magazine: what is in it over what its magazine holds, or that it has none)
+    if (d.weapon) t.push(`<span class="qty">${item.loaded ?? 0}/${d.weapon.mag ? (item.mag ? magRoom(item) : '–') : capacityOf(item)}</span>`);
+    if (d.mag) t.push(`<span class="qty">${item.rounds ?? 0}/${d.mag.capacity}</span>`);
     if (item.mods?.length) t.push(`<span class="mods">+${item.mods.length}</span>`);
     if (item.cargo?.length) t.push(`<span class="qty">${item.cargo.length} in</span>`);
     // how full it is, as a line along its foot: a stack, a bottle, what is loaded in a gun
-    const fill = d.stack ? item.qty / d.stack : d.use?.sips ? (item.left ?? d.use.sips) / d.use.sips : d.weapon ? (item.loaded ?? 0) / capacityOf(item) : -1;
+    const fill = d.stack ? item.qty / d.stack : d.use?.sips ? (item.left ?? d.use.sips) / d.use.sips : d.weapon ? (item.loaded ?? 0) / Math.max(1, d.weapon.mag ? magRoom(item) : capacityOf(item)) : d.mag ? (item.rounds ?? 0) / d.mag.capacity : -1;
     if (fill >= 0) t.push(`<span class="qbar${fill <= 0 ? ' none' : ''}"><i style="width:${Math.round(Math.min(1, fill) * 100)}%"></i></span>`);
     // somebody else's dog tag, carried: time left until it is cashed in
     if (this.counting(item)) {
@@ -393,7 +401,9 @@ export class InventoryUI {
     const stats: string[] = [`<div><span>Weight</span><b>${itemWeight(it).toFixed(2)} kg</b></div>`, `<div><span>Size</span><b>${d.w}×${d.h}</b></div>`];
     if (d.stack) stats.push(`<div><span>Quantity</span><b>${it.qty}/${d.stack}</b></div>`);
     if (d.use?.sips) stats.push(`<div><span>Drinks left</span><b>${it.left ?? d.use.sips} of ${d.use.sips}</b></div>`);
-    if (d.weapon) stats.push(`<div><span>Loaded</span><b>${it.loaded ?? 0}/${capacityOf(it)}</b></div>`, `<div><span>Ammo</span><b>${ITEMS[d.weapon.ammo].name}</b></div>`);
+    if (d.weapon) stats.push(`<div><span>Loaded</span><b>${it.loaded ?? 0}${d.weapon.mag ? '' : `/${capacityOf(it)}`}</b></div>`, `<div><span>Ammo</span><b>${ITEMS[d.weapon.ammo].name}</b></div>`);
+    if (d.weapon?.mag) stats.push(`<div><span>Magazine</span><b>${it.mag ? `${ITEMS[it.mag].name} (${magRoom(it)})` : 'None in it'}</b></div>`);
+    if (d.mag) stats.push(`<div><span>Rounds</span><b>${it.rounds ?? 0}/${d.mag.capacity}</b></div>`, `<div><span>Holds</span><b>${ITEMS[d.mag.ammo].name}</b></div>`);
     if (d.melee) stats.push(`<div><span>Damage</span><b>${d.melee.damage}</b></div>`);
     if (d.wear?.cargo) stats.push(`<div><span>Adds</span><b>${d.wear.cargo[0]}×${d.wear.cargo[1]} slots</b></div>`);
     if (d.wear?.armor) stats.push(`<div><span>Chest hits</span><b>−${Math.round((1 - d.wear.armor) * 100)}%</b></div>`);
@@ -498,7 +508,15 @@ export class InventoryUI {
         },
       });
     }
-    if (d.weapon && (it.loaded ?? 0) > 0) out.push({ label: `Unload (${it.loaded})`, run: () => this.actions.unload(it) });
+    if (d.mag) {
+      const loose = this.actions.looseFor(it), room = d.mag.capacity - (it.rounds ?? 0);
+      if (room > 0 && loose > 0) out.push({ label: `Fill (${Math.min(room, loose)} rounds)`, run: () => this.actions.fillMag(it), primary: true });
+      if ((it.rounds ?? 0) > 0) out.push({ label: `Empty (${it.rounds})`, run: () => this.actions.emptyMag(it) });
+    }
+    if (d.weapon?.mag) {
+      if (it.mag) out.push({ label: `Take out the ${ITEMS[it.mag].name.toLowerCase()}`, run: () => this.actions.detach(it, it.mag!) });
+      if (it.mag || (it.loaded ?? 0) > 0) out.push({ label: 'Unload', run: () => this.actions.unload(it) });
+    } else if (d.weapon && (it.loaded ?? 0) > 0) out.push({ label: `Unload (${it.loaded})`, run: () => this.actions.unload(it) });
     for (const m of it.mods ?? []) out.push({ label: `Detach ${ITEMS[m].name}`, run: () => this.actions.detach(it, m) });
     if (this.stash && !this.stashState) out.push({ label: inStash ? 'Take' : `Move to ${this.stash.label}`, run: () => this.transfer(loc), primary: inStash });
     if (this.usable(it)) {
@@ -691,11 +709,14 @@ export class InventoryUI {
   }
 
   /** dropped on that item, the dragged one goes into it: more of the same stack, or a part the weapon takes */
-  private joins(d: Drag, onto: ItemInstance): 'stack' | 'attach' | null {
+  private joins(d: Drag, onto: ItemInstance): 'stack' | 'attach' | 'fill' | null {
     const item = d.src.item;
     const def = ITEMS[item.id];
     if (onto === item) return null;
     if (def.stack && onto.id === item.id && onto.qty < def.stack) return 'stack';
+    // (rounds let go on a magazine that holds them and has room: they are pushed into it)
+    const into = ITEMS[onto.id].mag;
+    if (into && into.ammo === item.id && (onto.rounds ?? 0) < into.capacity) return 'fill';
     // (a part is fitted from wherever it lies: off the ground as well as out of a pocket)
     if (def.attach && this.actions.attachTargets(item).includes(onto)) return 'attach';
     return null;
@@ -794,7 +815,7 @@ export class InventoryUI {
       const how = onto ? this.joins(d, onto.item) : null;
       if (onto && how) {
         const [w, h] = Container.size(onto.item, onto.rot);
-        box(rect, onto.x, onto.y, w, h, 'join', how === 'stack' ? 'Add' : 'Fit');
+        box(rect, onto.x, onto.y, w, h, 'join', how === 'stack' ? 'Add' : how === 'fill' ? 'Fill' : 'Fit');
         return;
       }
       const at = this.landing(c, d.src.item, cx, cy, d.rot);
@@ -857,6 +878,17 @@ export class InventoryUI {
         this.fit(d.src, onto.item);
         return this.render();
       }
+      // rounds, let go on a magazine: off the ground they are picked up first, and then the hands fill it
+      if (onto && how === 'fill') {
+        if (d.src.kind === 'ground') {
+          if (!this.materialize(d.src)) return this.render();
+          this.removeFrom(d.src);
+          const left = this.inv.add(item);
+          if (left) this.actions.drop(left);
+        }
+        this.actions.fillMag(onto.item);
+        return this.render();
+      }
       const at = this.landing(c, item, cx, cy, d.rot);
       if (!at) return this.render();
       if (!this.materialize(d.src)) return this.render();
@@ -910,7 +942,7 @@ export class InventoryUI {
     if (!this.materialize(src)) return;
     this.removeFrom(src);
     this.actions.attach(item, weapon);
-    if (!(weapon.mods ?? []).includes(item.id)) {
+    if (!(ITEMS[item.id].mag ? weapon.mag === item.id : (weapon.mods ?? []).includes(item.id))) {
       const left = this.inv.add(item);
       if (left) this.actions.drop(left);
     }

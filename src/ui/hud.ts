@@ -919,7 +919,7 @@ export class HUD {
     prompt: string | null;
     /** where on screen the thing the prompt is about sits, as fractions of the screen (null = no marker) */
     mark: [number, number] | null;
-    weapon: { name: string; ammo: { loaded: number; reserve: number; cap: number } | null; action: string | null; mode: string | null } | null;
+    weapon: { name: string; ammo: { loaded: number; reserve: number; cap: number; mags?: number; bare?: boolean } | null; action: string | null; mode: string | null } | null;
     /** looking through binoculars */
     glass: boolean;
     aiming: boolean;
@@ -1041,7 +1041,8 @@ export class HUD {
       this.toggle(e.weapon, 'show', true);
       this.set('wname', e.weapon.firstElementChild as HTMLElement, s.weapon.name + (s.weapon.mode ? ` · ${s.weapon.mode === 'auto' ? 'AUTO' : 'SEMI'}` : ''));
       const a = s.weapon.ammo;
-      const txt = a ? `<b>${a.loaded}</b><span>/${a.cap}</span> <em>${a.reserve}</em>` : '';
+      // (a gun fed by a magazine: what is in it over what its magazine holds, then the magazines carried for it and the rounds in them)
+      const txt = a ? (a.mags !== undefined ? `<b>${a.loaded}</b><span>/${a.bare ? 'no mag' : a.cap}</span> <em>${a.mags ? `${a.mags} mag${a.mags === 1 ? '' : 's'} · ${a.reserve}` : 'no spare'}</em>` : `<b>${a.loaded}</b><span>/${a.cap}</span> <em>${a.reserve}</em>`) : '';
       this.set('wammo', e.weapon.lastElementChild as HTMLElement, txt + (s.weapon.action === 'reload' || s.weapon.action === 'magswap' ? ' <i>reloading</i>' : ''), 'html');
     } else this.toggle(e.weapon, 'show', false);
 

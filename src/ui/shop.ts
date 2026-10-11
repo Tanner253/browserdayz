@@ -70,7 +70,7 @@ const CSS = `
 
 /** the sorts his stock is shown under, and the kinds of thing each takes in */
 const TABS: { key: string; name: string; has: string[] }[] = [
-  { key: 'ammo', name: 'Ammo', has: ['ammo'] },
+  { key: 'ammo', name: 'Ammo', has: ['ammo', 'magazine'] },
   { key: 'medical', name: 'Medical', has: ['medical'] },
   { key: 'food', name: 'Food & drink', has: ['food', 'drink'] },
   { key: 'gear', name: 'Gear', has: ['clothing', 'tool', 'attachment'] },

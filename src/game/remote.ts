@@ -31,6 +31,9 @@ export type HeldFactory = (id: string | null, mods: string[]) => { obj: THREE.Ob
 const _along = new THREE.Vector3(), _legs = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0), _lie = new THREE.Quaternion();
 const _head = new THREE.Vector3(), _neck = new THREE.Vector3(), _pelvis = new THREE.Vector3();
 
+/** metres within which what somebody's hands are doing is heard: rounds into a magazine, a box torn open (eating and the like, three less) */
+export const HANDS_HEARD = 11;
+
 export class RemotePlayer implements Damageable {
   alive = true;
   pos = new THREE.Vector3();
@@ -201,11 +204,18 @@ export class RemotePlayer implements Damageable {
   act(a: Act, dur: number, listener: THREE.Vector3) {
     if (!this.ready || !this.alive) return;
     if (a === 'stop') return this.avatar.act(null);
-    this.avatar.act(a, dur);
-    // (a magazine going in is heard only by whoever is close, and a bolt worked by whoever is closer still)
+    // (rounds going into a magazine and a box being torn open are hands at work in front of the body, as opening anything is)
+    this.avatar.act(a === 'load' || a === 'unbox' ? 'open' : a, dur);
+    // A magazine going in is heard only by whoever is close, and a bolt worked by whoever is closer still. And the
+    // small things hands do are heard by whoever is within a room's length: rounds clicked into a magazine one by
+    // one, a box torn open, somebody eating or drinking or seeing to a wound. It is how the one who is not seen is
+    // found.
     const d2 = this.pos.distanceToSquared(listener);
     if (a === 'bolt' && d2 < 12 * 12) audio.boltCycle(0, this.pos);
     else if (a === 'reload' && d2 < 22 * 22) audio.reloadNear(this.pos, dur, ITEMS[this.weapon ?? '']?.weapon?.kind === 'pistol');
+    else if (a === 'load' && d2 < HANDS_HEARD * HANDS_HEARD) audio.ui('round', this.pos);
+    else if (a === 'unbox' && d2 < HANDS_HEARD * HANDS_HEARD) audio.ui('unbox', this.pos);
+    else if ((a === 'eat' || a === 'drink' || a === 'bandage' || a === 'open') && d2 < (HANDS_HEARD - 3) * (HANDS_HEARD - 3)) audio.ui(a, this.pos);
   }
 
   /** they called something out (see src/sim/emotes.ts): heard from where their head is, and the arms go with it */

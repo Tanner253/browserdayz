@@ -8,7 +8,7 @@ import { physics, SHOT_GROUPS, type Surface } from '../core/physics';
 import { audio } from '../core/audio';
 import type { Input } from '../core/input';
 import { extractParts, type MeshPart } from '../core/gltf-utils';
-import { ITEMS, capacityOf, handlingOf, hasMod, pieceShown, type ItemInstance, type Slot, quietOf } from '../sim/items';
+import { ITEMS, capacityOf, chambered, handlingOf, hasMod, magFits, magRoom, pieceShown, swapMag, type ItemInstance, type Slot, quietOf } from '../sim/items';
 import { suppressorGeometry } from './procedural';
 import { SLOT_ORDER, type PlayerInventory } from '../sim/inventory';
 import type { Atmosphere } from '../world/atmosphere';
@@ -715,6 +715,12 @@ export class Weapons {
   onShot: (info: ShotInfo) => void = () => {};
   /** the hands started on something others can see: working the bolt, reloading (seconds it takes) */
   onAct: (act: 'bolt' | 'reload' | 'stop', dur: number) => void = () => {};
+  /** something the player is told: why R did nothing */
+  onSay: (text: string, kind: 'info' | 'warn') => void = () => {};
+  /** what is carried has changed (a magazine out of a pocket and into the gun, the old one back into a pocket) */
+  onCarried: () => void = () => {};
+  /** a magazine came out of the gun and there is no pocket for it: it is put down */
+  onSpill: (item: ItemInstance) => void = () => {};
   /** something hit a body (anyone's): where, which way it was travelling, and how hard (1 = a rifle round) */
   onFlesh: (owner: unknown, point: THREE.Vector3, dir: THREE.Vector3, power: number) => void = () => {};
   /** one of our own bullets landed on something that is not a body: what it belongs to, if anything */
@@ -1386,15 +1392,40 @@ export class Weapons {
   /** current weapon status for the HUD */
   status() {
     const it = this.currentItem;
-    if (!it) return { name: 'Fists', ammo: null as null | { loaded: number; reserve: number; cap: number }, action: this.action?.name ?? null, mode: null as FireMode | null };
+    if (!it) return { name: 'Fists', ammo: null as null | { loaded: number; reserve: number; cap: number; mags?: number; bare?: boolean }, action: this.action?.name ?? null, mode: null as FireMode | null };
     const def = ITEMS[it.id];
-    if (!def.weapon) return { name: def.name, ammo: null as null | { loaded: number; reserve: number; cap: number }, action: this.action?.name ?? null, mode: null as FireMode | null };
+    if (!def.weapon) return { name: def.name, ammo: null as null | { loaded: number; reserve: number; cap: number; mags?: number; bare?: boolean }, action: this.action?.name ?? null, mode: null as FireMode | null };
+    // (a gun fed by a magazine: what its magazine holds, and what is in the others carried for it; the rounds loose in the pockets are not its to fire)
+    const spare = def.weapon.mag ? this.magsFor(it) : null;
     return {
       name: def.name,
-      ammo: { loaded: it.loaded ?? 0, reserve: this.inv.count(def.weapon.ammo), cap: capacityOf(it) },
+      ammo: spare
+        ? { loaded: it.loaded ?? 0, reserve: spare.reduce((n, m) => n + (m.rounds ?? 0), 0), cap: magRoom(it), mags: spare.length, bare: !it.mag }
+        : { loaded: it.loaded ?? 0, reserve: this.inv.count(def.weapon.ammo), cap: capacityOf(it) },
       action: this.action?.name ?? null,
       mode: def.weapon.modes ? this.fireMode(it) : null,
     };
+  }
+
+  /** every magazine carried that goes into this gun */
+  private magsFor(gun: ItemInstance): ItemInstance[] {
+    const out: ItemInstance[] = [];
+    for (const c of this.inv.containers) for (const p of c.items) if (magFits(p.item, gun)) out.push(p.item);
+    return out;
+  }
+
+  /**
+   * One magazine out and another in, when the hands have done it (see `swapMag` for what becomes of the rounds):
+   * the new one out of its pocket, the old one into a pocket, or onto the ground if there is no room for it.
+   */
+  private changeMag(gun: ItemInstance, next: ItemInstance) {
+    // (put down, handed over or emptied while the hands were at it)
+    if (!this.inv.containerOf(next)) return;
+    this.inv.remove(next);
+    const out = swapMag(gun, next);
+    const left = out ? this.inv.add(out) : null;
+    if (left) this.onSpill(left);
+    this.onCarried();
   }
 
   private start(name: Action['name'], dur: number, done?: () => void, data?: Record<string, number>) {
@@ -1784,9 +1815,34 @@ export class Weapons {
   private reload(m: VmModel, item: ItemInstance) {
     const def = ITEMS[item.id];
     if (!def.weapon) return;
+    // A gun fed by a magazine is given the fullest one carried for it, if that is fuller than the one in it: the
+    // old one goes back in a pocket with what is left in it, and the round in the chamber stays. Loose rounds do
+    // not go into a gun: they go into a magazine, by hand. With no magazine to give it and nothing in its chamber,
+    // one loose round is put there, which is one shot.
+    let next: ItemInstance | null = null, single = false;
+    if (def.weapon.mag) {
+      const mags = this.magsFor(item);
+      for (const mg of mags) if ((mg.rounds ?? 0) > 0 && (!next || (mg.rounds ?? 0) > (next.rounds ?? 0))) next = mg;
+      const inGun = Math.max(0, (item.loaded ?? 0) - (chambered(item) ? 1 : 0));
+      if (next && item.mag && (next.rounds ?? 0) <= inGun) return void this.onSay('The magazine in it is the fullest you have', 'info');
+      if (!next) {
+        single = !chambered(item) && this.inv.count(def.weapon.ammo) > 0;
+        if (!single) return void this.onSay(mags.length || item.mag ? 'No rounds in a magazine: hold one, and fill it from your loose rounds' : `No magazine for the ${def.name}: it fires what is in its chamber`, 'warn');
+        this.onSay(mags.length || item.mag ? 'One round into the chamber: your magazines are empty' : 'One round into the chamber: it has no magazine', 'info');
+      }
+    }
+    const fed = !!def.weapon.mag;
+    /** what the hands have done when a magazine-fed gun's reload is over */
+    const feed = () => {
+      if (next) this.changeMag(item, next);
+      else if (single && !chambered(item) && this.inv.take(def.weapon!.ammo, 1) === 1) {
+        item.loaded = 1;
+        this.onCarried();
+      }
+    };
     const need = capacityOf(item) - (item.loaded ?? 0);
     const have = this.inv.count(def.weapon.ammo);
-    if (need <= 0 || have <= 0) return;
+    if (!fed && (need <= 0 || have <= 0)) return;
     if (m.rig && def.weapon.tube) {
       // A tube under the barrel is fed a shell at a time: the gun is turned over, each shell
       // pushed in (and any of them may be the last: the trigger stops it there), and it is
@@ -1812,14 +1868,14 @@ export class Weapons {
       if (empty) audio.slideRack(dur * 0.7);
       this.onAct('reload', dur);
       this.start('magswap', dur, () => {
-        const got = this.inv.take(def.weapon!.ammo, capacityOf(item) - (item.loaded ?? 0));
-        item.loaded = (item.loaded ?? 0) + got;
+        if (fed) feed();
+        else item.loaded = (item.loaded ?? 0) + this.inv.take(def.weapon!.ammo, capacityOf(item) - (item.loaded ?? 0));
         this.dry.delete(item);
         this.boltReady = true;
       }, { empty: empty ? 1 : 0 });
       return;
     }
-    if (m.kind === 'rifle') {
+    if (m.kind === 'rifle' && !fed) {
       // open bolt, push rounds in one by one, close bolt
       const n = Math.min(need, have);
       // (a rifle with no pack of its own: it is heard as the others are, a magazine out and one in)
@@ -1838,9 +1894,10 @@ export class Weapons {
       const dur = long ? (locked ? 2.35 : 1.9) : locked ? 1.95 : 1.55;
       this.onAct('reload', dur);
       this.start('magswap', dur, () => {
-        const got = this.inv.take(def.weapon!.ammo, capacityOf(item) - (item.loaded ?? 0));
-        item.loaded = (item.loaded ?? 0) + got;
+        if (fed) feed();
+        else item.loaded = (item.loaded ?? 0) + this.inv.take(def.weapon!.ammo, capacityOf(item) - (item.loaded ?? 0));
         this.dry.delete(item);
+        this.boltReady = true;
       });
     }
   }

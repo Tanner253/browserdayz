@@ -35,7 +35,7 @@ export interface EngineVoice {
  * made-up sound is what is heard: but for the infected (z_), who have no made-up voice any more
  * and are silent until theirs is there.
  */
-const RECORDED: Record<string, number> = { punch: 5, blow: 5, hit_metal: 6, shot_rifle: 1, shot_pistol: 3, shot_quiet: 1, bolt: 1, rifle_mag_out: 1, rifle_mag_in: 1, pistol_mag_out: 1, pistol_mag_in: 1, rack: 1, shot_shotgun: 2, shot_magnum: 2, shell_in: 1, z_groan: 4, z_growl: 4, z_alert: 4, z_attack: 4, z_hurt: 4, z_die: 4, door_open: 1, door_creak: 2, door_close: 2, gate_open: 1, gate_close: 1, gate_slam: 1 };
+const RECORDED: Record<string, number> = { punch: 5, blow: 5, hit_metal: 6, shot_rifle: 1, shot_pistol: 3, shot_quiet: 1, bolt: 1, rifle_mag_out: 1, rifle_mag_in: 1, pistol_mag_out: 1, pistol_mag_in: 1, mag_round: 1, rack: 1, shot_shotgun: 2, shot_magnum: 2, shell_in: 1, z_groan: 4, z_growl: 4, z_alert: 4, z_attack: 4, z_hurt: 4, z_die: 4, door_open: 1, door_creak: 2, door_close: 2, gate_open: 1, gate_close: 1, gate_slam: 1 };
 const bank = new Map<string, AudioBuffer[]>();
 let fetched: Promise<void> | null = null;
 /** Fetches the recordings, once. (They are kept apart from any one engine: the trailer renders its soundtrack on an engine of its own.) */
@@ -971,9 +971,16 @@ export class AudioEngine {
     rush.connect(wf).connect(wg).connect(out);
   }
 
-  ui(kind: 'pickup' | 'drop' | 'open' | 'close' | 'eat' | 'drink' | 'bandage' | 'inject' | 'move' | 'smoke') {
+  /**
+   * What the hands are heard doing. One's own, in the ears; somebody else's from where they are, and only close
+   * to: these are small sounds, lost within a room's length (who is near enough to be told at all is the game's
+   * to say: see RemotePlayer.act).
+   * @param pos somebody else's hands: where they are
+   */
+  ui(kind: 'pickup' | 'drop' | 'open' | 'close' | 'eat' | 'drink' | 'bandage' | 'inject' | 'move' | 'smoke' | 'unbox' | 'round' | 'mag', pos?: V3) {
     if (!this.ready) return;
     const t = this.ctx.currentTime;
+    const to = pos ? this.out(pos, 1.2, 2.2) : (this.sfx as AudioNode);
     const rustle = (dur: number, freq: number, vol: number, at = 0) => {
       const n = this.noise(t + at, dur);
       const f = this.filter('bandpass', freq, 0.8);
@@ -981,9 +988,27 @@ export class AudioEngine {
       g.gain.setValueAtTime(0.0001, t + at);
       g.gain.linearRampToValueAtTime(vol, t + at + dur * 0.3);
       g.gain.exponentialRampToValueAtTime(0.0001, t + at + dur);
-      n.connect(f).connect(g).connect(this.sfx);
+      n.connect(f).connect(g).connect(to);
     };
     switch (kind) {
+      case 'unbox':
+        // a card box of rounds torn open: the flap, the tray drawn out, and the brass shifting in it
+        rustle(0.22, 1300, 0.22);
+        rustle(0.3, 2600, 0.16, 0.2);
+        for (let i = 0; i < 5; i++) this.click(4200 + i * 300, 0.1, 0.012, 0.5 + i * 0.07, pos);
+        rustle(0.18, 900, 0.18, 0.95);
+        break;
+      case 'round':
+        // a round pushed into a magazine against its spring: a recording, or until it has come a click of brass on steel
+        if (!this.rec('mag_round', to, t, pos ? 1.3 : 0.9, 1.12)) {
+          this.click(3100, 0.3, 0.014, 0, pos);
+          this.click(1700, 0.22, 0.03, 0.035, pos);
+        }
+        break;
+      case 'mag':
+        // a magazine seated in a gun by hand, with no reload about it
+        if (!this.rec('pistol_mag_in', to, t, pos ? 1.1 : 0.8)) this.click(1900, 0.45, 0.05, 0, pos);
+        break;
       case 'pickup':
         rustle(0.18, 2200, 0.25);
         rustle(0.1, 900, 0.2, 0.08);
@@ -1007,7 +1032,7 @@ export class AudioEngine {
           o.frequency.exponentialRampToValueAtTime(180, t + i * 0.25 + 0.12);
           const g = this.ctx.createGain();
           this.env(g, t + i * 0.25, 0.12, 0.01, 0.12);
-          o.connect(g).connect(this.sfx);
+          o.connect(g).connect(to);
           o.start(t + i * 0.25);
           o.stop(t + i * 0.25 + 0.2);
         }

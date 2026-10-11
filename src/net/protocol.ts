@@ -14,7 +14,7 @@ import type { DropInfo } from '../sim/drops';
 import type { VehicleInfo, VState } from '../sim/vehicles';
 import type { IState, InfectedInfo } from '../sim/infected';
 
-export const PROTOCOL = 23;
+export const PROTOCOL = 24;
 
 /** chat channels: everyone on the server, or only players standing near the speaker */
 export type ChatChannel = 'global' | 'near';
@@ -47,7 +47,8 @@ export const F_LIGHT = 8192;
 export const LEAN_REACH = 0.34;
 
 /** things a player does with their hands that the people around them can see (and hear) */
-export const ACTS = ['bolt', 'reload', 'eat', 'drink', 'bandage', 'open', 'stop'] as const;
+// ('load': one round pushed into a magazine; 'unbox': a box of rounds torn open. Both are small sounds, heard close to.)
+export const ACTS = ['bolt', 'reload', 'eat', 'drink', 'bandage', 'open', 'load', 'unbox', 'stop'] as const;
 export type Act = (typeof ACTS)[number];
 
 /** [x, y, z, yaw, pitch, flags] */

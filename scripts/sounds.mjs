@@ -100,6 +100,9 @@ const SOUNDS = {
   },
   // a shell thumbed into a shotgun's tube
   shell_in: { src: snake('Reloads, Cycling & More/WAV/Pump Shell Load WAV.wav'), rate: 32000, gain: 0.8 },
+  // a round pushed into a magazine against its spring (a cartridge going in at a rifle's loading gate: the same
+  // click of brass past steel, and the nearest thing there is a recording of)
+  mag_round: { src: snake('Reloads, Cycling & More/WAV/Lever Reload WAV.wav'), rate: 32000, gain: 0.9 },
 };
 for (const [kind, takes] of Object.entries(ZED)) takes.forEach((k, n) => (SOUNDS[`z_${kind}${n ? `_${n + 1}` : ''}`] = { src: zed(k), rate: 32000, gain: 0.9 }));
 // A fist landing on somebody (the five of the Punch pack); something heavier landing on them (Kenney's heavy
