@@ -76,8 +76,13 @@ export interface PlayerInfo {
   m: string[];
   /** what they wear that shows: hat, vest, pack */
   g: string[];
+  /** what is slung on their back and not in their hands: up to two things, each with what is fitted to it */
+  b?: Slung[];
   alive: boolean;
 }
+
+/** a thing slung on a back: its item, and what is fitted to it (its magazine among them) */
+export type Slung = [id: string, fitted: string[]];
 
 /** an item with its grid position, as containers are stored and sent */
 export type StoredItem = ItemInstance & { x: number; y: number; rot: boolean };
@@ -125,6 +130,7 @@ export type C2S =
   /** a keycard was put to the bunker's door */
   | { t: 'bunker' }
   | { t: 'gear'; g: string[] }
+  | { t: 'back'; b: Slung[] }
   | { t: 'hit'; to: number; zone: HitZone; w: string; dist: number; sup: boolean; bonus: number; /** a shotgun: how many of the shot's pellets landed */ n?: number }
   | { t: 'take'; uid: string }
   /** a field radio keyed: a supply drop is asked for where the sender stands */
@@ -210,6 +216,7 @@ export type S2C =
   /** the bunker's door: open, or shut (it stays open while anybody is inside, and shuts a minute after the last of them has gone) */
   | { t: 'bunker'; open: boolean }
   | { t: 'gear'; id: number; g: string[] }
+  | { t: 'back'; id: number; b: Slung[] }
   | { t: 'dmg'; from: number; amount: number; zone: HitZone; w: string; dir: [number, number, number] }
   | { t: 'hitok'; to: number; amount: number; zone: HitZone }
   | { t: 'death'; k: KillInfo; corpse: CorpseInfo | null }

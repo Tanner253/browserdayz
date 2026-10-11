@@ -394,7 +394,10 @@ export class Game {
     await this.weapons.load();
     this.weapons.mainCam = r.camera;
     this.weapons.itemModels = this.loot.models;
-    this.weapons.onSlungChange = (obj) => this.avatar.setSlung(obj);
+    this.weapons.onSlungChange = (obj) => {
+      this.avatar.setSlung(obj);
+      this.syncBack();
+    };
     this.weapons.setLook(lookFor(playerName()));
     this.weapons.resolveTarget = (owner) => (owner instanceof Dummy || owner instanceof RemotePlayer || owner instanceof Infected ? owner : null);
     this.weapons.onHit = (h) => this.onHit(h);
@@ -1035,6 +1038,8 @@ export class Game {
     // the server has not heard what we are wearing yet
     this.gearKey = '\u0000';
     this.syncGear();
+    this.backKey = '\u0000';
+    this.syncBack();
 
     const net = this.net;
     const cam = () => this.s.r.camera;
@@ -1094,6 +1099,7 @@ export class Game {
     net.on('fire', (m) => this.fires.set(m.i, m.left));
     net.on('bunker', (m) => this.bunker.setOpen(m.open));
     net.on('gear', (m) => this.remotes.get(m.id) && void this.wear(this.remotes.get(m.id)!.avatar, m.g));
+    net.on('back', (m) => this.remotes.get(m.id)?.avatar.setSlung(this.weapons.slungOf(m.b)));
     net.onVoice = (packet) => this.voice.hear(packet);
     net.on('dmg', (m) => this.takeHit(m));
     net.on('death', (m) => {
@@ -1287,6 +1293,7 @@ export class Game {
     await r.load(this.s.atmo, this.s.r.scene, p.pose);
     r.setWeapon(p.w, p.m);
     void this.wear(r.avatar, p.g ?? []);
+    r.avatar.setSlung(this.weapons.slungOf(p.b ?? []));
     r.setAlive(p.alive);
     // (they may have been sitting in a jeep since before this game knew of them)
     this.garage.reseat();
@@ -1308,6 +1315,17 @@ export class Game {
       out.push({ id, obj: id === 'gasmask' ? facepiece(model) : model });
     }
     body.setGear(out);
+  }
+
+  private backKey = '';
+  /** What is slung on this player's back, told to the server when it changes: everybody else draws it on the copy of them they see. */
+  private syncBack() {
+    if (!this.weapons) return;
+    const b = this.weapons.slung();
+    const key = JSON.stringify(b);
+    if (key === this.backKey) return;
+    this.backKey = key;
+    this.net.send({ t: 'back', b });
   }
 
   /** what this player wears that shows, kept in step with the inventory (and told to the server when it changes) */
@@ -3116,10 +3134,11 @@ export class Game {
   /** keep the body's hands in step with what is equipped */
   private syncHeld() {
     const it = this.weapons.equippedItem;
-    const key = it ? `${it.id}|${(it.mods ?? []).join(',')}` : '';
+    const key = it ? `${it.id}|${fittedOf(it).join(',')}` : '';
     if (key === this.heldKey) return;
     this.heldKey = key;
-    const h = it ? this.makeHeld(it.id, it.mods ?? []) : null;
+    // (with what is fitted to it and the magazine in it, as everybody else is shown it)
+    const h = it ? this.makeHeld(it.id, fittedOf(it)) : null;
     this.avatar.setHeld(h?.obj ?? null, h?.grips ?? null, h?.kind);
   }
 

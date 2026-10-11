@@ -1419,17 +1419,26 @@ export class Weapons {
     added.forEach((o) => this.vmRoot.remove(o));
   }
 
-  /** world-space models of what is slung on the back and not in the hands (two places: either, both or neither), for the avatar */
+  /** What is slung on the back and not in the hands (two places: either, both or neither): each thing, and what is fitted to it. */
+  slung(): [string, string[]][] {
+    return [this.inv.slots.primary, this.inv.slots.secondary].filter((it): it is ItemInstance => !!it && it !== this.currentItem).map((it) => [it.id, fittedOf(it)]);
+  }
+
+  /** world-space models of what is slung on the back, for the avatar */
   slungModel(): THREE.Object3D[] {
+    return this.slungOf(this.slung());
+  }
+
+  /** The same for anybody's back: by what their game says is on it. */
+  slungOf(list: [string, string[]][]): THREE.Object3D[] {
     const out: THREE.Object3D[] = [];
-    for (const it of [this.inv.slots.primary, this.inv.slots.secondary]) {
-      if (!it || it === this.currentItem) continue;
-      const m = this.models.get(it.id);
+    for (const [id, fitted] of list) {
+      const m = this.models.get(id);
       if (m?.kind === 'melee') {
         // A thing to hit with is drawn standing on its handle, and a gun lying along its barrel: laid along the
         // same line as a gun, about its own middle, it is slung as a gun is (left as it stands, it stuck straight
         // out of the back).
-        const body = this.worldModel(it.id);
+        const body = this.worldModel(id);
         if (!body) continue;
         body.position.set(0, 0, 0);
         body.rotation.set(0, 0, 0);
@@ -1444,7 +1453,7 @@ export class Weapons {
         out.push(held);
         continue;
       }
-      const obj = m?.world ? this.dressed(m, it.id, fittedOf(it)) : m ? m.root.children[0] : null;
+      const obj = m?.world ? this.dressed(m, id, fitted) : m ? m.root.children[0] : null;
       if (obj) out.push(obj);
     }
     return out;
@@ -1453,7 +1462,12 @@ export class Weapons {
   /** a pack's gun alone, with the pieces that go with what is fitted to it */
   private dressed(m: VmModel, id: string, mods: string[]): THREE.Object3D {
     const c = m.world!.clone();
-    for (const piece of c.children) piece.visible = piece.name === 'irons' ? !mods.includes('pu_scope') : EXTRA[piece.name] ? mods.includes(EXTRA[piece.name]) : pieceShown(id, piece.name, mods);
+    // (Plain sights are put away under the sight that stands where they do. A piece that is a thing of its own out
+    // of another model, a drum or a suppressor or a long magazine, is named for that thing and is there when it is
+    // fitted: it was asked of the gun's own pieces, which know nothing of it, and every AK anybody was seen
+    // holding had its drum and its suppressor on.)
+    const optic = PLAIN_SIGHTS.has(id) && id !== 'mosin' ? 'red_dot' : 'pu_scope';
+    for (const piece of c.children) piece.visible = piece.name === 'irons' ? !mods.includes(optic) : EXTRA[piece.name] ? mods.includes(EXTRA[piece.name]) : ITEMS[piece.name]?.attach || ITEMS[piece.name]?.mag ? mods.includes(piece.name) : pieceShown(id, piece.name, mods);
     return c;
   }
 

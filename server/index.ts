@@ -31,7 +31,7 @@ import { BARREL } from '../src/sim/barrels';
 import { JEEP, POLICE_CAR, SEATS, crashDamage, restState, type VehicleInfo, type VState } from '../src/sim/vehicles';
 import { Director, INFECTED, guarded, infectedDrop } from '../src/sim/infected';
 import { EMOTE, EMOTE_GAP, SHOUT_RANGE } from '../src/sim/emotes';
-import { ACTS, CHAT_RANGE, F_DEAD, F_GUARD, MAX_STAMINA, PROTOCOL, type C2S, type CorpseInfo, type KillInfo, type PlayerInfo, type Pose, type S2C, type StashInfo, type StoredItem, type Vitals } from '../src/net/protocol';
+import { ACTS, CHAT_RANGE, F_DEAD, F_GUARD, MAX_STAMINA, PROTOCOL, type C2S, type CorpseInfo, type KillInfo, type PlayerInfo, type Pose, type S2C, type Slung, type StashInfo, type StoredItem, type Vitals } from '../src/net/protocol';
 import { FIRE, Hearths } from '../src/sim/fires';
 
 const PORT = Number(process.env.PORT ?? 8080);
@@ -657,6 +657,7 @@ interface Client {
   w: string | null;
   m: string[];
   g: string[];
+  b: Slung[];
   alive: boolean;
   inv: SerializedInventory | null;
   vitals: Vitals | null;
@@ -718,7 +719,7 @@ function broadcast(m: S2C, except?: Client) {
   for (const c of clients.values()) if (c !== except && c.ws.readyState === 1) c.ws.send(s);
 }
 
-const info = (c: Client): PlayerInfo => ({ id: c.id, name: c.name, pose: c.pose, w: c.w, m: c.m, g: c.g, alive: c.alive });
+const info = (c: Client): PlayerInfo => ({ id: c.id, name: c.name, pose: c.pose, w: c.w, m: c.m, g: c.g, b: c.b, alive: c.alive });
 
 /** a spawn point on the edge of the map, as far from everyone else as possible */
 function pickSpawn() {
@@ -1045,7 +1046,7 @@ function kill(c: Client, cause: string, v = 0) {
 
 function handle(c: Client, m: C2S) {
   // anything a person does counts as being there; what the game reports on its own does not
-  if (m.t !== 's' && m.t !== 'me' && m.t !== 'ping' && m.t !== 'gear') c.activeAt = Date.now();
+  if (m.t !== 's' && m.t !== 'me' && m.t !== 'ping' && m.t !== 'gear' && m.t !== 'back') c.activeAt = Date.now();
   switch (m.t) {
     case 's': {
       if (!isPose(m.p)) return;
@@ -1129,6 +1130,15 @@ function handle(c: Client, m: C2S) {
       // only things that are worn, and only as many as there are places to wear them
       c.g = (Array.isArray(m.g) ? m.g : []).filter((x) => typeof x === 'string' && !!ITEMS[x]?.wear).slice(0, 6);
       broadcast({ t: 'gear', id: c.id, g: c.g }, c);
+      return;
+    }
+    case 'back': {
+      // what is slung on a back: two places, a gun or a thing to hit with in each, and only things fitted to it
+      c.b = (Array.isArray(m.b) ? m.b : [])
+        .filter((e) => Array.isArray(e) && typeof e[0] === 'string' && !!(ITEMS[e[0]]?.weapon || ITEMS[e[0]]?.melee))
+        .slice(0, 2)
+        .map((e): Slung => [e[0], (Array.isArray(e[1]) ? e[1] : []).filter((x) => typeof x === 'string' && !!(ITEMS[x]?.attach || ITEMS[x]?.mag)).slice(0, 8)]);
+      broadcast({ t: 'back', id: c.id, b: c.b }, c);
       return;
     }
     case 'hit': {
@@ -1573,7 +1583,7 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
   const c: Client = {
     ws, id: nextId++, key, name: cleanName(m.name),
     pose: [sp.x, 'y' in sp && sp.y !== undefined ? sp.y : world.groundAt(sp.x, sp.z), sp.z, sp.yaw, 0, 0],
-    w: null, m: [], g: [], alive: true,
+    w: null, m: [], g: [], b: [], alive: true,
     inv: resume?.inv ?? null, vitals: resume?.vitals ?? null,
     outAt: 0, lastHit: 0, lastVHit: 0, seatAt: 0, lastNade: 0, nadeHits: 0, blasts: [], lastEmote: 0, lastChat: 0, lastHitBy: null, openCid: null, check: { at: Date.now(), carry: 0, free: Date.now() + CHECK.free, high: 0, flags: 0, said: 0, refused: [], hp: Math.min(100, resume?.vitals?.health ?? 100), hpAt: Date.now(), downAt: 0, unknown: new Set() }, activeAt: Date.now(), joinedAt: Date.now(), ip: ipOf.get(ws) ?? '', lifeAt: Date.now(), msgCount: 0, msgWindow: Date.now(),
   };
