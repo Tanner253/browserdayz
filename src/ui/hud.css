@@ -721,6 +721,8 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 /* under a gun, the places on it that take a part: each a slot of its own, dragged onto and dragged off */
 .inv-armed { min-width: 0; }
 .inv-parts { display: flex; gap: 4px; height: 38px; margin-top: 4px; }
+/* the parts of a gun that is in a pocket, shown where the gun is looked at */
+.inv-parts.in-inspect { margin: 8px 0 6px; }
 .inv-part { position: relative; flex: 1 1 0; min-width: 0; max-width: 62px; border: 1px solid var(--line); background: rgba(0, 0, 0, 0.3); cursor: grab; }
 .inv-part.empty { cursor: default; background: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0 5px, transparent 5px 10px), rgba(0, 0, 0, 0.22); }
 .inv-part span { position: absolute; left: 3px; top: 1px; z-index: 1; font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); pointer-events: none; }
@@ -1407,6 +1409,12 @@ kbd.hot { color: #121413; background: linear-gradient(#d8c594, #b89f66); border-
 .tc-top .tc-b { position: static; width: 46px; height: 46px; }
 /* the light: there once a light is carried (a flashlight, or one on the gun), and bright while it is on */
 .tc-top .tc-light { display: none; }
+/* the microphone: held to talk, there only where there is somebody to hear it */
+.tc-top .tc-talk { display: none; }
+.tc.talk .tc-top .tc-talk { display: grid; }
+.tc.talking .tc-top .tc-talk { color: #121413; background: var(--accent); border-color: var(--accent); }
+/* a gun at the eye: the buttons are drawn over the scope's black surround, which was drawn over them (and hid the one that takes the eye off it) */
+body.touch .tc.ads { z-index: 8; }
 .tc.lamp .tc-top .tc-light { display: grid; }
 .tc.lit .tc-top .tc-light { color: #121413; background: var(--accent); border-color: var(--accent); }
 /* what can be called out: a list under the button that opens it */

@@ -573,6 +573,13 @@ export class InventoryUI {
       <div class="ins-stats">${stats.join('')}</div>
       <div class="ins-actions"></div>`;
     const acts = box.querySelector('.ins-actions') as HTMLElement;
+    // (A gun carried in a pocket or a pack: its parts, each in its place, as they are under a gun on the back or in
+    // the hands. A part put on or taken off here has the gun drawn first, like any other.)
+    if (d.weapon && loc.kind === 'container' && this.carried(loc) && this.actions.inHands() !== it) {
+      const parts = this.partsEl(it);
+      parts.classList.add('in-inspect');
+      box.insertBefore(parts, acts);
+    }
     for (const act of this.actionsFor(loc).filter((a) => !a.label.startsWith('Quick key'))) {
       const b = document.createElement('button');
       b.textContent = act.label;

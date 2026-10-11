@@ -3742,11 +3742,14 @@ export class Game {
     });
 
     // (what G would do here gets a button of its own beside Use)
-    this.touch?.update(playing && !uiOpen && !typing, uiOpen, !!this.prompt?.includes('<kbd>F'), {
+    // (the Close button it shows is the inventory's and the trader's: the map has its own way out)
+    this.touch?.update(playing && !uiOpen && !typing, this.invUI.isOpen || this.shop.isOpen, !!this.prompt?.includes('<kbd>F'), {
       g: this.prompt?.includes('G to pour') ? 'Fuel' : this.prompt?.includes('G to pack up') ? 'Pack' : null,
       aiming: this.weapons.aiming,
       lamp: this.weapons.hasLamp || this.inv.count('flashlight') > 0,
       lit: this.lit,
+      talk: this.online && this.voice.supported,
+      talking: this.voice.talking,
     });
     this.perf.beforeRender();
     r.render(dt);
