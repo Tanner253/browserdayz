@@ -12,6 +12,7 @@
 
 import * as THREE from 'three';
 import { assets } from '../core/assets';
+import { TOUCH } from '../core/device';
 
 /** carried things: not this file's (see above) */
 const SMALL = ['weapon', 'loot', 'ammo', 'attachment', 'drink', 'magazine', 'gear', 'viewmodel'];
@@ -37,8 +38,11 @@ interface Seen {
  * a thousand pixels across it, so a piece R metres in radius has about 500 / R of them to the metre. A screen
  * 2160 pixels tall shows 1800 / d to the metre at d metres. The two are equal at d = 3.6 R; and half as far
  * again, for a picture that is not laid across its piece edge to edge.
+ *
+ * (On a phone what is far is drawn with pictures a quarter of that across, on a screen of about half as many
+ * pixels: the two are equal at 6.5 R, and it is left at that.)
  */
-const REACH = 5.4;
+const REACH = TOUCH ? 6.5 : 5.4;
 
 const _v = new THREE.Vector3(), _m = new THREE.Matrix4();
 

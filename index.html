@@ -43,8 +43,31 @@
         <div class="load-sub">pvp survival · the infected · play to earn</div>
         <div class="load-bar"><div class="load-fill"></div></div>
         <div class="load-label">initialising</div>
+        <div class="load-help" hidden><span></span><button type="button" onclick="location.reload()">Reload</button></div>
       </div>
     </div>
+    <script>
+      // The page's own watch on its start: written the old way on purpose, to run in a browser the game itself
+      // cannot start in, and say so. (A browser too old for the game shows nothing wrong: it shows this screen,
+      // for ever.) What goes wrong while it loads is kept here for the game to report (see src/main.ts).
+      (function () {
+        var B = (window.__boot = { t0: Date.now(), stage: 'page', errs: [], done: false });
+        var box = document.querySelector('.load-help');
+        B.say = function (text) {
+          if (!box) return;
+          box.querySelector('span').textContent = text;
+          box.hidden = false;
+        };
+        var keep = function (what) {
+          if (!B.done && B.errs.length < 6) B.errs.push(String(what).slice(0, 160));
+        };
+        window.addEventListener('error', function (e) { keep(e.message || 'error'); });
+        window.addEventListener('unhandledrejection', function (e) { keep((e.reason && e.reason.message) || e.reason || 'rejected'); });
+        setTimeout(function () {
+          if (B.stage === 'page') B.say('This browser could not start the game. Update your phone or browser and reload (an iPhone needs iOS 15 or later), or open zonapvp.fun in Safari or Chrome.');
+        }, 20000);
+      })();
+    </script>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

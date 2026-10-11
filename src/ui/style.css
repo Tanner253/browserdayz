@@ -143,4 +143,27 @@ body {
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+/* what is said when the start goes wrong or goes slowly, and the way out of it */
+.load-help {
+  margin-top: 16px;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-dim);
+}
+.load-help[hidden] { display: none; }
+.load-help span { display: block; }
+.load-help button {
+  margin-top: 14px;
+  padding: 10px 26px;
+  font-family: var(--font);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #121413;
+  background: var(--accent);
+  border: 0;
+  cursor: pointer;
+}
 

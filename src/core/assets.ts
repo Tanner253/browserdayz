@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
-import { TOUCH } from './device';
+import { LEAN, TOUCH } from './device';
 
 export interface ModelEntry {
   url: string;
@@ -56,6 +56,17 @@ type Progress = (loaded: number, total: number, label: string) => void;
  * as sharp as it was. (A computer keeps every picture whole.)
  */
 const PHONE_CAP = { colour: 1024, other: 512 };
+/**
+ * And that was still more than an iPhone allows a page, by a long way: every picture in the game at that size is
+ * 1.7 GB on the card, and as much again held in the page, and a page there is closed at about one. So on a phone a
+ * thing is drawn with pictures this small until the eye is near it, or it is in the hands, and then with the ones
+ * above (see `sharpen`: it is what a computer does with the pictures at the size they came, a size down). From as
+ * far as this is seen from, on a screen that size, it is what the screen has pixels for.
+ */
+const PHONE_FAR = { colour: 256, other: 128 };
+/** somebody's body, on a phone: it is not one of the things made sharper when near, and is never far when it matters */
+const PHONE_BODY = { colour: 512, other: 256 };
+type Cap = typeof PHONE_CAP;
 const SLOTS: [string, keyof typeof PHONE_CAP][] = [['map', 'colour'], ['emissiveMap', 'colour'], ['normalMap', 'other'], ['roughnessMap', 'other'], ['metalnessMap', 'other'], ['aoMap', 'other'], ['alphaMap', 'other']];
 
 type Picture = ImageBitmap | HTMLImageElement | HTMLCanvasElement;
@@ -77,14 +88,14 @@ const paints = (o: THREE.Object3D): Painted[] => {
  * put back (the inventory's pictures are drawn that way: see src/ui/icons.ts).
  */
 const THIN_OVER = 1024;
-function thin(t: THREE.Texture) {
+function thin(t: THREE.Texture, over = THIN_OVER) {
   const was = t.onUpdate as ((tex: THREE.Texture) => void) | null;
   t.onUpdate = (tex: THREE.Texture) => {
     was?.(tex);
     tex.onUpdate = was as never;
     const img = tex.image as ImageBitmap | undefined;
     // (once the frame that put it there is over; how big it was is kept, for whoever counts what is on the card)
-    if (img && typeof img.close === 'function' && Math.max(img.width, img.height) > THIN_OVER) {
+    if (img && typeof img.close === 'function' && Math.max(img.width, img.height) > over) {
       tex.userData.was = [img.width, img.height];
       setTimeout(() => img.close(), 0);
     }
@@ -127,24 +138,34 @@ async function shrink(t: THREE.Texture, cap: number) {
   t.needsUpdate = true;
 }
 
-/** every picture a model came with, capped (see PHONE_CAP) */
-async function shrinkModel<T extends { scene: THREE.Object3D }>(g: T): Promise<T> {
+/** every picture these materials are painted with, capped */
+async function shrinkPaints(mats: Iterable<unknown>, cap: Cap) {
   const seen = new Set<unknown>();
   const jobs: Promise<void>[] = [];
-  g.scene.traverse((o) => {
-    const m = (o as THREE.Mesh).material;
-    for (const mat of m ? (Array.isArray(m) ? m : [m]) : []) {
-      for (const [slot, kind] of SLOTS) {
-        const t = (mat as unknown as Record<string, THREE.Texture | null>)[slot];
-        if (!t || seen.has(t.source)) continue;
-        seen.add(t.source);
-        jobs.push(shrink(t, PHONE_CAP[kind]));
-      }
+  for (const mat of mats) {
+    for (const [slot, kind] of SLOTS) {
+      const t = (mat as Record<string, THREE.Texture | null>)[slot];
+      if (!t || seen.has(t.source)) continue;
+      seen.add(t.source);
+      jobs.push(shrink(t, cap[kind]));
     }
-  });
+  }
   await Promise.all(jobs);
+}
+
+/** every picture a model came with, capped (see PHONE_CAP) */
+async function shrinkModel<T extends { scene: THREE.Object3D }>(g: T, cap: Cap): Promise<T> {
+  const mats: unknown[] = [];
+  g.scene.traverse((o) => mats.push(...paints(o)));
+  await shrinkPaints(mats, cap);
   return g;
 }
+
+/** how many times a file is asked for before it is given up */
+const TRIES = 4;
+/** a file that has sent nothing for this long is asked for afresh, milliseconds: a phone's line goes quiet without ever saying it has dropped */
+const QUIET = 25000;
+const pause = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 // (the server imports this module too, where there is no Vite environment)
 const BASE = (import.meta as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? '/';
@@ -154,7 +175,9 @@ export class Assets {
   manifest!: Manifest;
   trees!: Record<string, TreeEntry>;
   readonly gltf = new GLTFLoader();
-  readonly tex = new THREE.TextureLoader();
+  /** reads a model's file for what it is painted with and nothing else: its shapes and its movements are left packed (see `holdSharp`) */
+  private paint = new GLTFLoader();
+  private img = new THREE.ImageLoader();
   readonly hdr = new HDRLoader();
   private models = new Map<string, Promise<GLTF>>();
   private textures = new Map<string, THREE.Texture>();
@@ -165,19 +188,31 @@ export class Assets {
 
   constructor() {
     this.gltf.setMeshoptDecoder(MeshoptDecoder);
+    this.paint.setMeshoptDecoder(MeshoptDecoder);
+    this.paint.register(() => ({ name: 'ZONA_paint_only', loadMesh: () => Promise.resolve(new THREE.Group()), loadAnimation: () => Promise.resolve(new THREE.AnimationClip('', 0, [])) }) as never);
   }
 
   async init() {
     // Always ask the server for the current asset list: a browser holding last week's copy
     // would not know about models added since, and the game would fail to start.
-    const [m, t] = await Promise.all([
-      fetch(`${BASE}assets/manifest.json`, { cache: 'no-cache' }).then((r) => r.json()),
-      fetch(`${BASE}assets/trees/trees.json`, { cache: 'no-cache' }).then((r) => r.json()),
+    const list = (name: string) => this.again(() => fetch(`${BASE}assets/${name}`, { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : Promise.reject(new Error(`${r.status} for ${name}`)))));
+    const [m, t, v] = await Promise.all([
+      list('manifest.json'),
+      list('trees/trees.json'),
+      // (which version of each file this is: a build that has none is as it was, every file marked with the day the lot was made)
+      list('versions.json').catch(() => ({})),
     ]);
     this.manifest = m;
     this.trees = t;
+    this.versions = v;
     this.version = String(m.generated ?? '').replace(/\D/g, '').slice(0, 14);
+    for (const e of Object.values(this.manifest.models)) {
+      this.far.add(e.url);
+      for (const l of e.lods) this.far.add(l.url);
+    }
   }
+  /** the files of the things that are made sharper when they are near (see PHONE_FAR) */
+  private far = new Set<string>();
 
   private idleWaiters: (() => void)[] = [];
 
@@ -201,22 +236,112 @@ export class Assets {
     return new Promise((r) => this.idleWaiters.push(r));
   }
 
-  /** changes whenever the assets are rebuilt, so cached models and textures are never stale */
+  /** changes whenever the assets are rebuilt: what a file is marked with if nothing says which version of it this is */
   private version = '';
+  /**
+   * Which version of each file this is, by what is in it (the build works it out: see vite.config.ts). A file is
+   * kept by the browser for a year under its address, and its address has its version in it: so a file that has
+   * not changed since the last time somebody played is not fetched again, and one that has is. (Every file used to
+   * be marked with the day the lot was last made, and every update that touched one model had everybody fetch all
+   * of them again.)
+   */
+  private versions: Record<string, string> = {};
 
   url(rel: string) {
-    return `${BASE}${rel}${this.version ? `?v=${this.version}` : ''}`;
+    const v = this.versions[rel] ?? this.version;
+    return `${BASE}${rel}${v ? `?v=${v}` : ''}`;
+  }
+
+  /** bytes that have come over the wire so far (whoever watches the loading asks: it is how a slow line is told from a dead one) */
+  received = 0;
+
+  /** something asked for again if it fails: a phone's line drops a request now and then, and one file not had was the whole game not started */
+  private async again<T>(ask: () => Promise<T>): Promise<T> {
+    for (let go = 0; ; go++) {
+      try {
+        return await ask();
+      } catch (e) {
+        if (go >= TRIES - 1) throw e;
+        await pause(700 * (go + 1));
+      }
+    }
+  }
+
+  /** A file's bytes. Asked for again if the line drops, or if it goes quiet for a long while without saying so. */
+  private bytes(rel: string): Promise<ArrayBuffer> {
+    return this.again(async () => {
+      const stop = new AbortController();
+      let quiet: ReturnType<typeof setTimeout> | undefined;
+      const alive = () => {
+        clearTimeout(quiet);
+        quiet = setTimeout(() => stop.abort(), QUIET);
+      };
+      try {
+        alive();
+        const res = await fetch(this.url(rel), { signal: stop.signal });
+        if (!res.ok) throw new Error(`${res.status} for ${rel}`);
+        if (!res.body) {
+          const all = await res.arrayBuffer();
+          this.received += all.byteLength;
+          return all;
+        }
+        const from = res.body.getReader();
+        const parts: Uint8Array[] = [];
+        let n = 0;
+        for (;;) {
+          const { done, value } = await from.read();
+          if (done) break;
+          alive();
+          parts.push(value);
+          n += value.byteLength;
+          this.received += value.byteLength;
+        }
+        const all = new Uint8Array(n);
+        let at = 0;
+        for (const p of parts) {
+          all.set(p, at);
+          at += p.byteLength;
+        }
+        return all.buffer;
+      } finally {
+        clearTimeout(quiet);
+      }
+    });
+  }
+
+  /**
+   * On a phone, so many model files are unpacked at a time and no more. Unpacked, a file's pictures are many times
+   * the size of the file, and they are all there at once until they have been made smaller: every file in the game
+   * unpacked together was more than the page was allowed, before a single thing had been drawn.
+   */
+  private free = TOUCH ? (LEAN ? 1 : 2) : 1e9;
+  private line: (() => void)[] = [];
+  private async turn<T>(work: () => Promise<T>): Promise<T> {
+    if (this.free > 0) this.free--;
+    else await new Promise<void>((go) => this.line.push(go));
+    try {
+      return await work();
+    } finally {
+      const next = this.line.shift();
+      if (next) next();
+      else this.free++;
+    }
   }
 
   loadGLTF(url: string): Promise<GLTF> {
     let p = this.models.get(url);
     if (!p) {
-      const file = this.gltf.loadAsync(this.url(url)).then((g) => {
-        // (its pictures are let go of here once they are on the card: see `thin`)
-        if (!TOUCH && !this.kept.has(url)) g.scene.traverse((o) => paints(o).forEach((mat) => MAPS.forEach((slot) => mat[slot] && thin(mat[slot]!))));
-        return g;
-      });
-      p = this.track(TOUCH ? file.then(shrinkModel) : file, url.split('/').pop()!);
+      const file = this.bytes(url).then((data) =>
+        this.turn(async () => {
+          const g = await this.gltf.parseAsync(data, '');
+          // (on a phone its pictures are made small before anything is drawn with them: see PHONE_FAR)
+          if (TOUCH) return shrinkModel(g, this.far.has(url) ? PHONE_FAR : PHONE_BODY);
+          // (its pictures are let go of here once they are on the card: see `thin`)
+          if (!this.kept.has(url)) g.scene.traverse((o) => paints(o).forEach((mat) => MAPS.forEach((slot) => mat[slot] && thin(mat[slot]!))));
+          return g;
+        }),
+      );
+      p = this.track(file, url.split('/').pop()!);
       this.models.set(url, p);
     }
     return p;
@@ -241,7 +366,8 @@ export class Assets {
 
   /** every material of a model that has a copy as it came says which model that is, and which of its materials it is */
   private mark(id: string, g: GLTF): GLTF {
-    if (this.marked.has(g) || !this.manifest.models[id]?.hi || this.allSharp) return g;
+    // (on a phone every model has a sharper copy of itself: its own file, whose pictures were made small as it was read)
+    if (this.marked.has(g) || !(TOUCH || this.manifest.models[id]?.hi) || this.allSharp) return g;
     this.marked.add(g);
     g.scene.traverse((o) => {
       for (const mat of paints(o)) {
@@ -258,10 +384,14 @@ export class Assets {
    * copy is what is seen until they are, a moment the first time), put on one at a time, and taken off and let go
    * of a little while after the last thing that wanted them has let go. A material keeps what it was painted with:
    * every copy of it in the world is sharp while this one is, at no cost.
+   *
+   * On a phone the same is done a size down: what is far is drawn with very small pictures (PHONE_FAR), and what
+   * is close with the world's own (PHONE_CAP), read again out of the file the browser already has.
    * @returns the letting go
    */
   sharpen(root: THREE.Object3D | THREE.Material[]): () => void {
-    if (TOUCH || this.allSharp) return () => {};
+    // (a phone the game has already failed to start on is asked for nothing more than the small pictures: see LEAN)
+    if (this.allSharp || LEAN) return () => {};
     const want = new Map<string, Painted[]>();
     // (or the materials themselves, where whoever asks knows them: see src/game/near.ts)
     if (Array.isArray(root)) {
@@ -351,14 +481,21 @@ export class Assets {
     let s = this.sharp.get(id);
     if (!s) {
       const pictures = new Set<THREE.Texture>();
-      const mats = this.gltf.loadAsync(this.url(this.manifest.models[id].hi!)).then(async (g) => {
-        const list = (await g.parser.getDependencies('material')) as unknown as Painted[];
-        for (const m of list) for (const slot of MAPS) if (m[slot]) {
-          pictures.add(m[slot]!);
-          thin(m[slot]!);
-        }
-        return list;
-      });
+      const entry = this.manifest.models[id];
+      const mats = this.bytes(TOUCH ? entry.url : entry.hi!).then((data) =>
+        this.turn(async () => {
+          // (only what it is painted with is unpacked: its shapes are in the world already)
+          const g = await this.paint.parseAsync(data, '');
+          const list = (await g.parser.getDependencies('material')) as unknown as Painted[];
+          if (TOUCH) await shrinkPaints(list, PHONE_CAP);
+          for (const m of list) for (const slot of MAPS) if (m[slot]) {
+            pictures.add(m[slot]!);
+            // (these are never taken off the card and put back, only thrown away: the page's copy of each goes as soon as the card has it, whatever its size)
+            thin(m[slot]!, 0);
+          }
+          return list;
+        }),
+      );
       this.sharp.set(id, (s = { users: 0, mats, pictures, drop: null }));
       // (one that could not be fetched is asked for again the next time it is wanted)
       mats.catch(() => this.sharp.get(id) === s && this.sharp.delete(id));
@@ -426,13 +563,21 @@ export class Assets {
     if (t) return t;
     let resolve!: () => void;
     const loaded = new Promise<void>((r) => (resolve = r));
-    const made = (t = this.tex.load(
-      this.url(rel),
-      // (on a phone it is made smaller before it is ever drawn with: see PHONE_CAP)
-      () => void (TOUCH ? shrink(made, PHONE_CAP[opts.srgb ? 'colour' : 'other']).then(resolve, resolve) : resolve()),
-      undefined,
-      () => resolve(),
-    ));
+    const made = (t = new THREE.Texture());
+    const ask = (go: number) =>
+      this.img.load(
+        this.url(rel),
+        (image) => {
+          made.image = image;
+          made.needsUpdate = true;
+          // (on a phone it is made smaller before it is ever drawn with: see PHONE_CAP)
+          void (TOUCH ? shrink(made, PHONE_CAP[opts.srgb ? 'colour' : 'other']).then(resolve, resolve) : resolve());
+        },
+        undefined,
+        // (asked for again before the ground is left without its picture)
+        () => void (go < TRIES - 1 ? setTimeout(() => ask(go + 1), 700 * (go + 1)) : resolve()),
+      );
+    ask(0);
     this.track(loaded, rel.split('/').pop()!);
     if (opts.srgb) t.colorSpace = THREE.SRGBColorSpace;
     if (opts.repeat) t.wrapS = t.wrapT = THREE.RepeatWrapping;
@@ -454,15 +599,15 @@ export class Assets {
 
   async image(rel: string): Promise<ImageBitmap> {
     return this.track(
-      fetch(this.url(rel))
-        .then((r) => r.blob())
-        .then((b) => createImageBitmap(b, { colorSpaceConversion: 'none', premultiplyAlpha: 'none' })),
+      this.bytes(rel).then((b) => createImageBitmap(new Blob([b]), { colorSpaceConversion: 'none', premultiplyAlpha: 'none' })),
       rel.split('/').pop()!,
     );
   }
 
-  async hdri(rel: string): Promise<THREE.DataTexture> {
-    return this.track(this.hdr.loadAsync(this.url(rel)), rel.split('/').pop()!);
+  /** @param wait whether the loading screen waits for it (the sky itself is not waited for: see Atmosphere.init) */
+  async hdri(rel: string, wait = true): Promise<THREE.DataTexture> {
+    const got = this.again(() => this.hdr.loadAsync(this.url(rel)));
+    return wait ? this.track(got, rel.split('/').pop()!) : got;
   }
 }
 

@@ -8,7 +8,29 @@
 import * as THREE from 'three';
 import { CSM } from 'three/addons/csm/CSM.js';
 import { assets } from '../core/assets';
+import { LEAN, TOUCH } from '../core/device';
 import { GAS, type GasZone } from '../sim/gas';
+
+/**
+ * A sky picture made half the size each way: every four of its points made one, their light averaged. A few rows
+ * at a time, so that the menu it is done under does not stop while it is.
+ */
+async function halve(sky: THREE.DataTexture) {
+  const { data, width, height } = sky.image as { data: Uint16Array; width: number; height: number };
+  if (!(data instanceof Uint16Array) || width < 2048) return;
+  const w = width >> 1, h = height >> 1, out = new Uint16Array(w * h * 4);
+  const light = THREE.DataUtils.fromHalfFloat, half = THREE.DataUtils.toHalfFloat;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const a = (y * 2 * width + x * 2) * 4, b = a + 4, c = a + width * 4, d = c + 4, o = (y * w + x) * 4;
+      for (let k = 0; k < 3; k++) out[o + k] = half((light(data[a + k]) + light(data[b + k]) + light(data[c + k]) + light(data[d + k])) / 4);
+      out[o + 3] = data[a + 3];
+    }
+    if (y % 64 === 63) await new Promise((r) => setTimeout(r, 0));
+  }
+  sky.image = { data: out, width: w, height: h } as never;
+  sky.needsUpdate = true;
+}
 
 /** the colour of the gas where the light is in it (linear, before the picture is finished) */
 const GAS_COLOR = new THREE.Color(0.3, 0.36, 0.1);
@@ -104,7 +126,7 @@ export class Atmosphere {
 
   async init() {
     const m = assets.manifest.hdri;
-    const [env, bg] = await Promise.all([assets.hdri(m.env), assets.hdri(m.background)]);
+    const env = await assets.hdri(m.env);
 
     this.analyseSky(env);
     this.clampSun(env);
@@ -115,17 +137,34 @@ export class Atmosphere {
     pmrem.dispose();
     env.dispose();
 
-    bg.mapping = THREE.EquirectangularReflectionMapping;
-    bg.colorSpace = THREE.LinearSRGBColorSpace;
-    // 4k half-float sky is ~67 MB on the JS heap; release it after upload
-    bg.onUpdate = () => {
-      (bg.image as { data: Uint16Array | Float32Array | null }).data = null;
-    };
-    this.background = bg;
+    // The sky that is looked at is a file of twenty megabytes, a seventh of everything the game fetches before it
+    // can be played, and nothing waits on it but the sky: the game starts under the small sky its light is taken
+    // from (soft, and the right colours), and the sharp one takes its place when it has come. On a quick line that
+    // is before the loading is over.
+    this.background = this.envMap;
+    // (a phone the game has already failed to start on keeps the small sky: see LEAN)
+    if (!LEAN) void assets.hdri(m.background, false).then(
+      async (bg) => {
+        // (A phone has it at half the size each way. Drawn, the sky is laid out as the six sides of a box, each as
+        // tall as the picture: 270 MB on the card for the whole one, a quarter of everything a phone can be asked
+        // to hold, for the one thing in the game that is never looked at closely.)
+        if (TOUCH) await halve(bg);
+        bg.mapping = THREE.EquirectangularReflectionMapping;
+        bg.colorSpace = THREE.LinearSRGBColorSpace;
+        // 4k half-float sky is ~67 MB on the JS heap; release it after upload
+        bg.onUpdate = () => {
+          (bg.image as { data: Uint16Array | Float32Array | null }).data = null;
+        };
+        // (whatever has put another sky up meanwhile keeps its own: only the stand-in is changed for this)
+        if (this.scene.background === this.background) this.scene.background = bg;
+        this.background = bg;
+      },
+      () => {},
+    );
 
     this.scene.environment = this.envMap;
     this.scene.environmentIntensity = 0.9;
-    this.scene.background = bg;
+    this.scene.background = this.background;
     this.scene.backgroundIntensity = 1.0;
     this.scene.fog = new THREE.FogExp2(this.fogColor.getHex(), 0.0011);
     (this.scene.fog as THREE.FogExp2).color.copy(this.fogColor);

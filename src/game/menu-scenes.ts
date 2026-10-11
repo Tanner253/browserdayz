@@ -10,6 +10,7 @@
 // fired rifles would not be thanked for it), and all of it is taken away when a game starts.
 
 import * as THREE from 'three';
+import { assets } from '../core/assets';
 import { TOUCH } from '../core/device';
 import { GAS, gasZone } from '../sim/gas';
 import type { Atmosphere } from '../world/atmosphere';
@@ -136,6 +137,9 @@ export class MenuScenes {
       // on it but a longer magazine, and the shotgun with its sight and its light)
       const also = name === 'Volkov' ? this.h.held('deagle', []) : name === 'Kestrel' ? this.h.held('benelli', ['red_dot', 'gun_light']) : null;
       if (also) man.kits.set(name === 'Volkov' ? 'deagle' : 'benelli', { ...also, quiet: false });
+      // (On a phone a thing is drawn with very small pictures until it is near or in the hands: these are neither,
+      // and two of the scenes are of nothing but a gun. They are asked for by name.)
+      if (TOUCH) for (const k of man.kits.values()) this.sharp.push(assets.sharpen(k.obj));
       this.arm(man);
       this.men.push(man);
     }
@@ -175,7 +179,10 @@ export class MenuScenes {
     for (const e of [...this.men, ...this.sick]) e.body.dispose();
     this.men = [];
     this.sick = [];
+    for (const drop of this.sharp) drop();
+    this.sharp = [];
   }
+  private sharp: (() => void)[] = [];
 
   // ------------------------------------------------------------ places
 

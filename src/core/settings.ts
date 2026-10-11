@@ -1,7 +1,7 @@
 // Graphics and sound options (Esc menu, Settings tab). The player picks them and they are kept in this browser;
 // nothing here changes by itself while playing.
 
-import { TOUCH } from './device';
+import { LEAN, TOUCH } from './device';
 
 export type AoMode = 'off' | 'half' | 'full';
 export type Level = 'low' | 'medium' | 'high';
@@ -45,8 +45,8 @@ export const VOLUMES = [0, 0.25, 0.5, 0.75, 1];
  */
 export const PHONE: Omit<Graphics, 'fpsLimit' | 'volume'> = { scale: 0.85, msaa: 2, ao: 'off', shadows: 'low', foliage: 'medium' };
 
-/** Everything at full on a computer; a phone starts on its own setting, and the menu has the rest either way. */
-export const DEFAULT_GRAPHICS: Graphics = { ...(TOUCH ? PHONE : PRESETS.ultra), fpsLimit: 0, volume: 1 };
+/** Everything at full on a computer; a phone starts on its own setting, and the menu has the rest either way. (One the game has already failed to start on starts on the lowest: see LEAN.) */
+export const DEFAULT_GRAPHICS: Graphics = { ...(LEAN ? PRESETS.low : TOUCH ? PHONE : PRESETS.ultra), fpsLimit: 0, volume: 1 };
 
 const STORE = 'zona.gfx';
 
