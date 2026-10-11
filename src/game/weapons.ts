@@ -314,6 +314,26 @@ export const HOLD = {
 };
 
 /**
+ * A roll of dressing (the bandage, the splint tape), in the eye's space. It lies in the hollow of the left palm,
+ * held up left of the middle and tipped to the eye; the right hand takes the end of it, draws a length off, goes
+ * down out of the picture to where the wound is, and comes back for more.
+ *
+ * (It was held as the first aid kit is, which is a foot wide and whose movement this was made for: a hand under
+ * the far edge of a box that was not there, with its fingers closed through a roll two inches across. Asked for:
+ * "the bandage model and animation could be repositioned to sit in the hand better and not clip through it".)
+ *   at, turn    – where the roll is, and how it is turned
+ *   back, under – how far behind the roll's middle the left wrist is, and how far under its underside
+ *   reach       – how far behind its fingertips the right wrist is, as they come down on the roll
+ */
+export const ROLL = {
+  at: [-0.05, -0.088, -0.4] as [number, number, number],
+  turn: [0.5, 0.3, -0.06] as [number, number, number],
+  back: 0.085,
+  under: 0.03,
+  reach: 0.118,
+};
+
+/**
  * A magazine being filled, in the eye's space. It stands in the left hand, left of the middle, its mouth up and
  * tipped to the right hand; the right brings a round up from low on the right, sets it on the mouth, presses it
  * down and slides it back under the lips, and goes for the next. One round to each turn of it: the press lands as
@@ -3185,6 +3205,8 @@ export class Weapons {
     const H = HOLD;
     const pos = new THREE.Vector3(H.rest[0] + wide * H.restBy[0], H.rest[1] + sy * H.restBy[1], H.rest[2] + sy * H.restBy[2]);
     const rot = new THREE.Euler(0, 0, 0);
+    /** a roll of dressing, not the kit (which is held and gone into another way: see HOLD.kit and ROLL) */
+    const rolled = h.kind === 'bandage' && Math.max(h.size.x, h.size.z) < 0.1;
     const two = !h.wait && (h.kind === 'bandage' || h.kind === 'inject' || h.kind === 'open' || h.kind === 'load' || h.kind === 'unbox' || (h.kind !== 'smoke' && Math.min(h.size.x, h.size.z) > 0.16));
     /** a magazine being filled: how far the right hand is from where it takes a round (0) to the magazine's mouth (1), how far the round is pressed in, and slid back */
     let fill: { reach: number; press: number; slide: number; has: boolean } | null = null;
@@ -3220,6 +3242,12 @@ export class Weapons {
       };
       rot.setFromQuaternion(turned(C.showAlong, C.showFace, new THREE.Quaternion()).slerp(turned(C.putAlong, C.putFace, new THREE.Quaternion()), reach));
       h.root.scale.setScalar(C.scale);
+    } else if (h.kind === 'bandage' && rolled && h.wait) {
+      // A roll taken out and not yet used: in the right hand at rest, as anything small is.
+    } else if (h.kind === 'bandage' && rolled) {
+      // A roll in the left palm (see ROLL).
+      pos.set(ROLL.at[0], ROLL.at[1] + Math.sin(t * 2.3) * 0.003, ROLL.at[2]);
+      rot.set(ROLL.turn[0], ROLL.turn[1], ROLL.turn[2] + Math.sin(t * 1.7) * 0.02);
     } else if (h.kind === 'bandage') {
       // A kit, open in the left hand, low and to the left. The right goes into it, comes out
       // and goes down out of the picture to where the wound is, and comes back for more.
@@ -3394,7 +3422,21 @@ export class Weapons {
         tuck: 0.55 * offered.clench,
       };
     }
-    if (h.kind === 'bandage') {
+    if (rolled && !h.wait) {
+      // on to the roll and away, once every second and a half: the fingertips come down on its near edge and draw
+      // a length off it, then away low on the right to where it is wound on
+      const k = (t % 1.5) / 1.5;
+      const on = THREE.MathUtils.smoothstep(k, 0.02, 0.24) * (1 - THREE.MathUtils.smoothstep(k, 0.5, 0.74));
+      const inv = h.root.quaternion.clone().invert();
+      const away = new THREE.Vector3(0.2, -0.4, -0.3).sub(h.root.position).applyQuaternion(inv);
+      // (The fingers come to it from the right, level, and the hand is that far behind their tips: beside the roll
+      // and not over it. Brought down on it from above, the sleeve lay across the roll and hid it.)
+      const fingers = new THREE.Vector3(-0.93, -0.24, -0.28).applyQuaternion(inv).normalize();
+      const tips = new THREE.Vector3(h.size.x / 2 - 0.004 + Math.sin(t * 9) * 0.003 * on, h.size.y / 2 + 0.004, 0.006);
+      right = { pos: away.lerp(tips.addScaledVector(fingers, -ROLL.reach), on), fingers, palm: new THREE.Vector3(-0.1, -0.8, 0.6).applyQuaternion(inv).normalize(), curl: [0.4 + on * 0.25, 0.55 + on * 0.25, 0.95, 1.05], thumb: 0.9, tuck: 0.25 };
+      // (the left is under it, its palm up: the roll lies in the hollow of it, the fingers a little closed beyond)
+      left = { pos: new THREE.Vector3(-0.012, -(h.size.y / 2 + ROLL.under), ROLL.back), fingers: new THREE.Vector3(0.14, 0.1, -0.98).normalize(), palm: new THREE.Vector3(0.05, 1, 0.05).normalize(), curl: [0.42, 0.46, 0.5, 0.55], thumb: 0.45, spread: 0.2 };
+    } else if (h.kind === 'bandage' && !rolled) {
       // in and out of the kit, once every second and a half: over it with the fingers down, then away low on the right
       const k = (t % 1.5) / 1.5;
       const inKit = THREE.MathUtils.smoothstep(k, 0.02, 0.24) * (1 - THREE.MathUtils.smoothstep(k, 0.5, 0.74));
