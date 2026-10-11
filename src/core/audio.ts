@@ -743,7 +743,9 @@ export class AudioEngine {
     const out = this.out(pos, 1.6, 2.4, distance * 6);
     // Recordings of a wooden door, where they have come: opened (the handle, and its hinge a moment after, quietly),
     // or swung to and shut. Until then, the made-up click, creak and thud.
-    if (opening ? this.rec('door_open', out, t, 0.7) : this.rec('door_close', out, t + 0.28, 0.75)) {
+    // (Shut, it is the same recording as opened, a little lower: asked for 2026-10-10, the recording of one
+    // being shut not being liked.)
+    if (opening ? this.rec('door_open', out, t, 0.7) : this.rec('door_open', out, t + 0.12, 0.7, 0.92)) {
       if (opening) this.rec('door_creak', out, t + 0.14, 0.22);
       return;
     }
