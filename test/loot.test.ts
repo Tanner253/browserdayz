@@ -107,7 +107,9 @@ ok('the gas masks are in the village\'s police station and the keycards under th
     const masks = all.filter(({ id }) => id === 'gasmask');
     assert.ok(masks.length === 3 && masks.every(({ p }) => p.tier === 2 && p.usage.includes('Police')), 'the masks are not all in the village\'s police station');
     assert.ok(on('keycard', 4) >= 1 && on('keycard', 1) + on('keycard', 2) + on('keycard', 3) + on('keycard', 5) === 0);
-    for (const t of STEPS) assert.ok(on('ammo_9mm', t) + on('box_9mm', t) + on('ammo_762', t) + on('box_762', t) >= 12, `little to fire on step ${t}`);
+    // (of whatever kind: down the bunker it is mostly what the guns kept there fire)
+    const rounds = Object.values(ITEMS).filter((d) => d.category === 'ammo').map((d) => d.id);
+    for (const t of STEPS) assert.ok(rounds.reduce((n, id) => n + on(id, t), 0) >= 12, `little to fire on step ${t}`);
   }
 });
 

@@ -24,7 +24,7 @@ export const SLOT_LABEL: Record<Slot, string> = {
   head: 'Head', face: 'Face', vest: 'Vest', back: 'Back', hands: 'Hands', feet: 'Feet',
 };
 
-export type AttachSlot = 'optic' | 'muzzle' | 'magazine' | 'wrap' | 'light';
+export type AttachSlot = 'optic' | 'muzzle' | 'magazine' | 'wrap' | 'light' | 'grip';
 
 export interface ItemDef {
   id: string;
@@ -68,6 +68,8 @@ export interface ItemDef {
     /** pieces of its model that are only there with an attachment on it (attachment -> pieces), and pieces that never are */
     shows?: Record<string, string[]>;
     never?: string[];
+    /** and pieces that are taken off when an attachment goes on in their place (attachment -> pieces): a brake, for a suppressor */
+    hides?: Record<string, string[]>;
     /** how it is made ready after a shot, where its kind does not say: by hand (a bolt), or by itself */
     action?: 'bolt' | 'self';
     /**
@@ -136,6 +138,37 @@ const D: ItemDef[] = [
   // and holds twenty-five: it is unwrapped in the hands, and what was in it is loose rounds. Rounds go into a
   // magazine by hand, and a magazine into a gun: nothing goes from a pocket into a gun but through one of those,
   // except a shell into the shotgun's tube, and a single round into an empty chamber.
+  // The two rifles that fire as long as the trigger is held (2026-10-10). Each is fed by a thirty-round magazine
+  // of its own, three cells tall, or by a big one that is two wide; neither goes in a pocket: they are slung on
+  // the back. (The AK is drawn from an AK-74M and fires what the box found with it says, 7.62x39.)
+  {
+    id: 'ak', name: 'AK', model: 'ak', w: 8, h: 3, weight: 3.6, category: 'weapon', slot: 'long',
+    desc: 'Assault rifle in 7.62x39. Thirty rounds in its magazine, seventy-five in the drum. It fires for as long as the trigger is held, kicks up and to the right, and hits hard at any range a man is seen at. B changes it to single shots. Takes a holographic sight, a suppressor and the drum.',
+    weapon: { kind: 'auto', ammo: 'ammo_739', capacity: 30, mag: 'mag_ak', ergo: 46, modes: ['auto', 'semi'], round: { muzzleVel: 715, drag: 0.0012, damage: 52, zero: 100 }, kick: 1.2, shows: { mag_ak: ['mag'] } }, iconYaw: 0,
+  },
+  {
+    id: 'ar15', name: 'AR-15', model: 'ar15', w: 7, h: 3, weight: 3.0, category: 'weapon', slot: 'long',
+    desc: 'Carbine in 5.56. Thirty rounds in its magazine, sixty in the long one. Faster and flatter than the AK and easier to hold on a target, and each round does less. B changes it to single shots. Takes a holographic sight, a suppressor, a foregrip, a light and the long magazine.',
+    weapon: { kind: 'auto', ammo: 'ammo_556', capacity: 30, mag: 'mag_ar', ergo: 62, modes: ['auto', 'semi'], round: { muzzleVel: 880, drag: 0.001, damage: 42, zero: 100 }, kick: 0.85, pace: 0.86, shows: { mag_ar: ['mag'], suppressor_556: ['silencer'], red_dot: ['sight'], foregrip: ['foregrip'], gun_light: ['light'] }, hides: { suppressor_556: ['brake'] } }, iconYaw: 0,
+  },
+  {
+    id: 'ammo_739', name: '7.62x39 Rounds', model: 'bolt_action_rifle_7_62', node: 'bolt_action_rifle_7_62_bullet_54mm', w: 1, h: 1, weight: 0.016, category: 'ammo', stack: 30, scale: 0.95, pile: 5,
+    desc: 'Loose rifle cartridges, for the AK. They go into its magazine by hand.',
+  },
+  {
+    id: 'ammo_556', name: '5.56x45 Rounds', model: 'bolt_action_rifle_7_62', node: 'bolt_action_rifle_7_62_bullet_54mm', w: 1, h: 1, weight: 0.012, category: 'ammo', stack: 30, scale: 0.82, pile: 5,
+    desc: 'Loose rifle cartridges, small and fast, for the AR-15. They go into its magazine by hand.',
+  },
+  {
+    id: 'box_739', name: '7.62x39 Ammo Box', model: 'ammo_box_739', w: 1, h: 1, weight: 0.45, category: 'ammo',
+    desc: 'A sealed box of 25 cartridges for the AK. Hold it and unwrap it to get the rounds out.',
+    open: { gives: 'ammo_739', qty: 25, time: 2.2 },
+  },
+  {
+    id: 'box_556', name: '5.56x45 Ammo Box', model: 'ammo_box_556', w: 1, h: 1, weight: 0.35, category: 'ammo',
+    desc: 'A sealed box of 25 cartridges for the AR-15. Hold it and unwrap it to get the rounds out.',
+    open: { gives: 'ammo_556', qty: 25, time: 2.2 },
+  },
   {
     id: 'ammo_762', name: '7.62x54R Rounds', model: 'bolt_action_rifle_7_62', node: 'bolt_action_rifle_7_62_bullet_54mm', w: 1, h: 1, weight: 0.022, category: 'ammo', stack: 30, scale: 1.25, pile: 5,
     desc: 'Loose full-power rifle cartridges, for the sniper rifle. They go into its magazine by hand.',
@@ -180,6 +213,26 @@ const D: ItemDef[] = [
     id: 'mag_sniper', name: 'Sniper Rifle Magazine', model: 'sniper', nodeRe: '^mag', w: 1, h: 1, weight: 0.12, category: 'magazine',
     desc: 'The five-round box magazine of the sniper rifle.',
     mag: { ammo: 'ammo_762', capacity: 5 }, attach: { fits: ['mosin'], slot: 'magazine' },
+  },
+  {
+    id: 'mag_ak', name: 'AK Magazine', model: 'ak', nodeRe: '^mag', w: 1, h: 3, weight: 0.33, category: 'magazine',
+    desc: 'Thirty rounds of 7.62x39 for the AK.',
+    mag: { ammo: 'ammo_739', capacity: 30 }, attach: { fits: ['ak'], slot: 'magazine' },
+  },
+  {
+    id: 'drum_ak', name: 'AK Drum Magazine', model: 'ak_drum', w: 2, h: 3, weight: 0.9, category: 'magazine',
+    desc: 'A drum of seventy-five rounds for the AK, off a light machine gun. Two and a half magazines without a change, and a rifle that is heavier and slower to bring up for it.',
+    mag: { ammo: 'ammo_739', capacity: 75 }, attach: { fits: ['ak'], slot: 'magazine', ergo: -12 },
+  },
+  {
+    id: 'mag_ar', name: 'AR-15 Magazine', model: 'ar15', nodeRe: '^mag', w: 1, h: 3, weight: 0.13, category: 'magazine',
+    desc: 'Thirty rounds of 5.56 for the AR-15.',
+    mag: { ammo: 'ammo_556', capacity: 30 }, attach: { fits: ['ar15'], slot: 'magazine' },
+  },
+  {
+    id: 'mag_ar_60', name: 'AR-15 60-Round Magazine', model: 'ar_mag_60', w: 2, h: 3, weight: 0.3, category: 'magazine',
+    desc: 'Sixty rounds of 5.56 in a magazine four rows thick: two magazines without a change, and a longer one to swing.',
+    mag: { ammo: 'ammo_556', capacity: 60 }, attach: { fits: ['ar15'], slot: 'magazine', ergo: -7 },
   },
   {
     id: 'mag_p38', name: 'Pistol 43 Magazine', model: 'pistol_43', nodeRe: '^mag', w: 1, h: 1, weight: 0.08, category: 'magazine',
@@ -239,13 +292,28 @@ const D: ItemDef[] = [
   },
   {
     id: 'red_dot', name: 'Holographic Sight', model: 'holo_sight', w: 2, h: 1, weight: 0.3, category: 'attachment',
-    desc: 'A holographic sight: a lit ring and dot that lie on whatever the gun points at. Fits either 9 mm pistol and the shotgun. Faster to aim with than irons.',
-    attach: { fits: ['p38', 'm9', 'benelli'], slot: 'optic', ergo: 3 },
+    desc: 'A holographic sight: a lit ring and dot that lie on whatever the gun points at. Fits either 9 mm pistol, the shotgun and both assault rifles. Faster to aim with than irons.',
+    attach: { fits: ['p38', 'm9', 'benelli', 'ak', 'ar15'], slot: 'optic', ergo: 3 },
   },
   {
     id: 'gun_light', name: 'Weapon Light', model: 'gun_light', w: 1, h: 1, weight: 0.15, category: 'attachment',
-    desc: 'A light clamped under the barrel, switched with L. It shows you the dark, and shows the dark where you are. Fits everything but the Desert Eagle.',
-    attach: { fits: ['mosin', 'p38', 'm9', 'benelli'], slot: 'light', ergo: -2 },
+    desc: 'A light clamped to the gun, switched with L. It shows you the dark, and shows the dark where you are. Fits everything but the Desert Eagle and the AK.',
+    attach: { fits: ['mosin', 'p38', 'm9', 'benelli', 'ar15'], slot: 'light', ergo: -2 },
+  },
+  {
+    id: 'suppressor_556', name: '5.56 Suppressor', model: 'ar15', nodeRe: '^silencer', w: 3, h: 1, weight: 0.45, category: 'attachment',
+    desc: 'A suppressor for the AR-15, in place of its brake. Much quieter and no flash: a little less punch, a softer kick, and a longer rifle to swing.',
+    attach: { fits: ['ar15'], slot: 'muzzle', ergo: -7, recoil: 0.88, quiet: true },
+  },
+  {
+    id: 'suppressor_739', name: 'AK Suppressor', model: 'rifle_suppressor', w: 3, h: 1, weight: 0.55, category: 'attachment',
+    desc: 'A suppressor for the AK. A burst with it on is not heard across the valley, and shows no flash: a little less punch, a softer kick, and a longer rifle to swing.',
+    attach: { fits: ['ak'], slot: 'muzzle', ergo: -9, recoil: 0.88, quiet: true },
+  },
+  {
+    id: 'foregrip', name: 'Foregrip', model: 'ar15', nodeRe: '^foregrip', w: 1, h: 2, weight: 0.12, category: 'attachment',
+    desc: 'A grip for the forward hand, clamped under the AR-15. It holds the rifle down when it fires: a fifth less kick, and it comes up a little faster.',
+    attach: { fits: ['ar15'], slot: 'grip', ergo: 4, recoil: 0.8 },
   },
   // ---------------------------------------------------------------- melee
   // (The long ones are carried slung on the back, in either of its two places, or in a pack that is tall enough;
@@ -560,6 +628,8 @@ export const FITTED: Record<string, [string, number][]> = {
   m9: [['suppressor_9', 0.06], ['mag_m9_ext', 0.08], ['red_dot', 0.03]],
   deagle: [['mag_deagle_ext', 0.1]],
   benelli: [['red_dot', 0.25], ['gun_light', 0.2]],
+  ak: [['red_dot', 0.1], ['suppressor_739', 0.05], ['drum_ak', 0.04]],
+  ar15: [['red_dot', 0.2], ['foregrip', 0.2], ['gun_light', 0.15], ['suppressor_556', 0.06], ['mag_ar_60', 0.05]],
 };
 
 /** Rolls for what a gun put into the world comes with. @param rnd 0..1, the caller's own dice */
@@ -576,8 +646,9 @@ export function fitAtRandom(item: ItemInstance, rnd: () => number): ItemInstance
   return item;
 }
 
+/** Is this fitted to it? (an attachment, or the magazine that is in it) */
 export function hasMod(it: ItemInstance | null | undefined, id: string) {
-  return !!it?.mods?.includes(id);
+  return !!it?.mods?.includes(id) || (!!it?.mag && it.mag === id);
 }
 
 /** Is this piece of a gun's model there, with these attachments on the gun? (see `shows` and `never` on the weapon) */
@@ -585,6 +656,7 @@ export function pieceShown(id: string, piece: string, mods: string[] = []): bool
   const w = ITEMS[id]?.weapon;
   if (!w) return true;
   if (w.never?.includes(piece)) return false;
+  for (const [mod, pieces] of Object.entries(w.hides ?? {})) if (pieces.includes(piece) && mods.includes(mod)) return false;
   for (const [mod, pieces] of Object.entries(w.shows ?? {})) if (pieces.includes(piece)) return mods.includes(mod);
   return true;
 }

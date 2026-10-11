@@ -18,6 +18,14 @@ export interface RigInfo {
   view: number[];
   /** the pack's own space -> the space of the gun-alone file (x along the barrel, y up, z to its right) */
   frame: number[];
+  /**
+   * Its gun is drawn on the skeleton with the arms. The gun alone was then made from the skeleton as the file
+   * has it standing (not as its first movement begins), so what is hung on one of its joints is hung by where
+   * that joint stands in the file.
+   */
+  skinned?: boolean;
+  /** where the pack's own camera stands, if it came with one: the eye it was drawn for (the eye's space) */
+  eye?: [number, number, number];
 }
 
 /**
@@ -64,7 +72,10 @@ export function liftPack<T extends THREE.Material>(mat: T): T {
     c.envMapIntensity = LOOK.shotgun.sky;
   } else {
     c.metalness = Math.min(c.metalness, 0.6);
-    c.color.setScalar(1.5);
+    // (A paint that is a picture is lifted by so much. One that is a bare colour and no picture keeps its colour,
+    // lifted as much: set to the same number it was white, and a dark magazine hung on a black rifle like a sheet of paper.)
+    if (c.map) c.color.setScalar(1.5);
+    else c.color.multiplyScalar(1.5);
     c.envMapIntensity = 1.5;
     // (night sights are a dull dot in daylight, not a lamp)
     if (c.emissiveMap) c.emissiveIntensity = 0.22;
@@ -90,6 +101,8 @@ export class WeaponRig {
   private length: number;
   /** where each piece is when the gun is simply held */
   private atRest = new Map<THREE.Object3D, { p: THREE.Vector3; q: THREE.Quaternion }>();
+  /** where each piece stands as the file has it, before any movement is played, in the pack's own space (see `skinned`) */
+  private asFiled = new Map<THREE.Object3D, THREE.Matrix4>();
 
   /** @param paint the material each of the pack's own is drawn with here */
   constructor(gltf: GLTF, private info: RigInfo, paint: (m: THREE.Material) => THREE.Material) {
@@ -110,6 +123,9 @@ export class WeaponRig {
       if (!own.has(src)) own.set(src, paint(src));
       mesh.material = own.get(src)!;
     });
+    this.root.updateMatrixWorld(true);
+    const out = new THREE.Matrix4().copy(this.scene.matrixWorld).invert();
+    this.scene.traverse((o) => this.asFiled.set(o, new THREE.Matrix4().copy(out).multiply(o.matrixWorld)));
     this.mixer = new THREE.AnimationMixer(this.scene);
     const clip = gltf.animations[0];
     this.length = clip.duration;
@@ -236,13 +252,14 @@ export class WeaponRig {
    * Hang something on one of the pack's pieces, so that it moves as that piece does.
    * @param obj drawn in the space of the gun-alone file (x along the barrel, y up): another gun's slide, a suppressor
    */
-  hang(obj: THREE.Object3D, name: string) {
-    const n = this.node(name);
-    if (!n) return;
+  /** @param as the piece whose place it is hung by, where that is not the one it is hung on (a second magazine, drawn as the first is about its own joint) */
+  hang(obj: THREE.Object3D, name: string, as = name) {
+    const n = this.node(name), by = this.node(as);
+    if (!n || !by) return;
     this.rest();
     this.root.updateMatrixWorld(true);
     // the piece in the pack's space, and the gun-alone file's space in the pack's
-    const piece = new THREE.Matrix4().copy(this.scene.matrixWorld).invert().multiply(n.matrixWorld);
+    const piece = this.info.skinned ? this.asFiled.get(by)!.clone() : new THREE.Matrix4().copy(this.scene.matrixWorld).invert().multiply(by.matrixWorld);
     const gun = new THREE.Matrix4().fromArray(this.info.frame).invert();
     const holder = new THREE.Group();
     holder.matrixAutoUpdate = false;

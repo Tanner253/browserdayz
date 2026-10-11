@@ -100,6 +100,15 @@ const SOUNDS = {
   },
   // a shell thumbed into a shotgun's tube
   shell_in: { src: snake('Reloads, Cycling & More/WAV/Pump Shell Load WAV.wav'), rate: 32000, gain: 0.8 },
+  // The two assault rifles, each as it was recorded: a single shot, its magazine out and in, and its bolt worked.
+  shot_ak: { src: snake('Full Sound/7.62x39/WAV/762x39 Single WAV.wav'), len: 1.7, rate: 44100, gain: 1 },
+  shot_ar: { src: snake('Full Sound/5.56/WAV/556 Single WAV.wav'), len: 1.6, rate: 44100, gain: 1 },
+  ak_mag_out: { src: snake('Reloads, Cycling & More/WAV/AK Reload Part 1 WAV.wav'), rate: 32000, gain: 0.75 },
+  ak_mag_in: { src: snake('Reloads, Cycling & More/WAV/AK Reload Part 2 WAV.wav'), rate: 32000, gain: 0.75 },
+  ak_rack: { src: snake('Reloads, Cycling & More/WAV/AK Rack WAV.wav'), rate: 32000, gain: 0.8 },
+  ar_mag_out: { src: snake('Reloads, Cycling & More/WAV/AR Reload Part 1 WAV.wav'), rate: 32000, gain: 0.75 },
+  ar_mag_in: { src: snake('Reloads, Cycling & More/WAV/AR Reload Part 2 WAV.wav'), rate: 32000, gain: 0.75 },
+  ar_rack: { src: snake('Reloads, Cycling & More/WAV/AR Charging Handle WAV.wav'), rate: 32000, gain: 0.8 },
   // a round pushed into a magazine against its spring (a cartridge going in at a rifle's loading gate: the same
   // click of brass past steel, and the nearest thing there is a recording of)
   mag_round: { src: snake('Reloads, Cycling & More/WAV/Lever Reload WAV.wav'), rate: 32000, gain: 0.9 },

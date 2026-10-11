@@ -154,6 +154,30 @@ export const LOCAL_MODELS = {
     tags: ['loot', 'ammo'],
     changes: 'Only its 5.56 mm box is used here: scaled to metres and stood on the ground about its own middle; its texture re-encoded as WebP at the size it came; geometry compressed.',
   },
+  // Two magazines that are not their rifle's own (2026-10-10). The AK's drum is the drum of a light machine gun,
+  // and all that is used of that gun: 0.0186 brings it to metres (the gun is 57.8 of its units long, and 1.08 m).
+  // The AR-15's sixty-round magazine is one of a sheet of magazines drawn plain, in metres already.
+  ak_drum: {
+    dir: 'rpk_drum',
+    only: /RPK_Mag/,
+    scale: 0.0186,
+    tex: 1024,
+    tags: ['loot', 'magazine'],
+    changes: 'Only its drum magazine is used here: scaled to metres and stood on the ground about its own middle; its texture re-encoded as WebP at the size it came; geometry compressed.',
+  },
+  ar_mag_60: {
+    dir: 'ar15_magazines',
+    only: /^Object_3[12] /,
+    scale: 1,
+    // (It came as bare colour, a pale grey-green, said to be all metal and with no picture to say how it shines:
+    // drawn so, it was a mirror of the sky, nearly white on a black rifle. Painted metal: a little sheen, and its
+    // own colour a good deal darker, the dark grey such a magazine is.)
+    metal: 0.3,
+    rough: 0.6,
+    shade: 0.22,
+    tags: ['loot', 'magazine'],
+    changes: 'Only its sixty-round magazine is used here: stood on the ground about its own middle; its surface made painted metal rather than bare, and its colour darkened (it has no textures); geometry compressed.',
+  },
   plate_carrier: {
     dir: 'plate_carrier',
     size: 0.56,
@@ -516,6 +540,70 @@ export const WEAPON_PACKS = {
       author: 'DJMaesen',
       line: '"animated pistol" (https://skfb.ly/ooPqJ) by DJMaesen is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).',
       changes: 'Its one long animation cut into the movements the game plays; a copy of the pistol alone, standing still, made for the ground and for other players; textures re-encoded as WebP; geometry compressed.',
+    },
+  },
+  // The AK (2026-10-10): a rifle on a skeleton with the arms that hold it, and a movement to an animation: an
+  // idle, a draw, a shot, three reloads (a magazine changed; the same done another way; and one with the bolt
+  // worked after it, for a gun that had run dry), a walk and a run. Every triangle and every picture as it came,
+  // at the size it came: four thousand pixels a side, the arms as well. Its body is one shape that follows five
+  // joints (nearly all of it one of them; the top cover, the safety and the trigger each their own; and its
+  // magazine), and a second magazine is a shape by itself, which is the fresh one of the reloads: the gun alone
+  // is made of the first, in two pieces, the rifle and its magazine. It lies along z as it comes, its muzzle to
+  // +z (its trigger is nearer the low end than its magazine is), 2.76 of its own units long: an AK-74M is 0.943 m.
+  ak: {
+    dir: 'ak74m',
+    file: 'scene.gltf',
+    tex: 4096,
+    length: 0.943,
+    forward: [0, 0, 1],
+    up: [0, 1, 0],
+    // (It was modelled as it is held: turned in to the middle of the picture, its front sight 9 mm to the left of
+    // its rear one, 36 cm ahead of it; and leaning over to the left, six degrees, by its magazine, its stock and
+    // the ears of its front sight alike. The gun alone is made straight and upright; in the hands it stays as it came.)
+    trim: { yaw: -1.4, roll: 6.2 },
+    // (each joint's share of it a piece of its own, so that in the hands each is hung on its joint and moves as it did)
+    skinned: { mesh: ['Ak_ak74m', 'Mag_2_ak74m'], joints: { PBody_058: 'base', Rif_059: 'bolt', Safety_061: 'safety', Trigger_060: 'trigger', Pmag_062: 'mag', Pmag2_063: null }, rest: 'base' },
+    eye: 'Head_Cam_014',
+    wrists: { right: 'Hand_R_037', left: 'Hand_L_016' },
+    origin: [0.3, 0.02, -0.03],
+    fps: 30,
+    clips: { idle: 'Rig|AK_Idle', draw: 'Rig|AK_Draw', fire: 'Rig|AK_Shot', reload: 'Rig|AK_Reload', reloadEmpty: 'Rig|AK_Reload_full', reloadOther: 'Rig|AK_Reload_var2', walk: 'Rig|AK_Walk', run: 'Rig|AK_Run' },
+    credit: {
+      name: 'FPS AK-74m animations',
+      url: 'https://sketchfab.com/3d-models/fps-ak-74m-animations-94be8385c402474cacd39bc096c6ca14',
+      author: 'Cransh',
+      line: 'This work is based on "FPS AK-74m animations" (https://sketchfab.com/3d-models/fps-ak-74m-animations-94be8385c402474cacd39bc096c6ca14) by Cransh (https://sketchfab.com/ccransh) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)',
+      changes: 'Scaled to metres; its eight animations laid end to end as the one the game plays; a copy of the rifle alone, taken off its skeleton and standing still, in two pieces (the rifle and its magazine), made for the ground and for other players; textures re-encoded as WebP at the size they came; geometry compressed.',
+    },
+  },
+  // The AR-15 (2026-10-10): a rifle and nothing else, in twenty-nine pieces, with what was fitted to it as it
+  // came: a suppressor and the brake it goes on in place of, a holographic sight, a foregrip, a light on its
+  // mount, a magazine. Each of those is a piece by itself here, there when the thing is fitted and not otherwise
+  // (see `shows` on the weapon). It came with no hands and no movements: it is held in the AK's, set where the
+  // AK is, magazine to magazine, since it is the magazine the hands go to. Every triangle and every picture as
+  // it came. Ten of its units are a metre: its lower receiver is 2.1 of them long, and an AR's is 0.2 m.
+  ar15: {
+    dir: 'ar15',
+    file: 'scene.gltf',
+    tex: 2048,
+    fp: false,
+    scale: 0.1,
+    forward: [1, 0, 0],
+    up: [0, 1, 0],
+    fit: { to: 'ak', piece: 'mag' },
+    // (its brake is drawn lying under the muzzle, for show: it is put on the barrel, where the suppressor that takes its place is)
+    put: { brake: 'silencer' },
+    parts: {
+      'CQB STOCK': 'base', Barrel: 'base', Bolt_catch: 'base', Disconnector: 'base', Hammer: 'base', 'Lower receiver': 'base', 'Magazine catch button': 'base', Springs: 'base', SSL: 'base', Trigger: 'base', lower_pin: 'base',
+      'Firing pin': 'base', 'Bolt carrier key': 'base', Bolt: 'base', 'Ejection port cover': 'base', 'Bolt carrier': 'base', 'Upper receiver': 'base', Grip: 'base', Handguard: 'base', 'Swivel QD': 'base', 'Charging handle': 'base',
+      'Magpul PMAG 30': 'mag', Bullets: 'mag', 'Muzzle brake': 'brake', 'GEMTECH ABYSS 5.56': 'silencer', 'EOtech EXPS-2': 'sight', 'BCM VFG': 'foregrip', 'mount flashlight': 'light', 'Surefire EDC1': 'light',
+    },
+    credit: {
+      name: 'AR-15',
+      url: 'https://sketchfab.com/3d-models/ar-15-33e225811b404192b89dcd4096603fbe',
+      author: 'wafla',
+      line: 'This work is based on "AR-15" (https://sketchfab.com/3d-models/ar-15-33e225811b404192b89dcd4096603fbe) by wafla (https://sketchfab.com/wafla) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)',
+      changes: 'Scaled to metres and set in the pieces the game shows and hides (the rifle, its magazine, its brake, its suppressor, its sight, its foregrip, its light); its muzzle brake, which lay beside the rifle, put on the barrel; textures re-encoded as WebP at the size they came; geometry compressed.',
     },
   },
   pistol_43: {

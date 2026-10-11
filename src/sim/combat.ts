@@ -23,6 +23,9 @@ export const WEAPON_RULES: Record<string, WeaponRule> = {
   p38: { damage: 34, melee: false, range: 220, interval: 0.1, falloff: 0.45 },
   m9: { damage: 34, melee: false, range: 220, interval: 0.1, falloff: 0.45 },
   deagle: { damage: 58, melee: false, range: 260, interval: 0.2, falloff: 0.5 },
+  // (the two assault rifles: what each round does is what the item says it does, and no faster than each can cycle)
+  ak: { damage: 52, melee: false, range: 500, interval: 0.1, falloff: 0.5 },
+  ar15: { damage: 42, melee: false, range: 550, interval: 0.086, falloff: 0.5 },
   // (buckshot: nine pellets, each little by itself and spent within a field's width)
   benelli: { damage: 14, melee: false, range: 70, interval: 0.25, falloff: 0.3, pellets: 9 },
   fists: { damage: 14, melee: true, range: 3.2, interval: 0.3, falloff: 1 },

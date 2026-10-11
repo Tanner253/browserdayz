@@ -60,7 +60,7 @@ type Source =
   | { kind: 'fitted'; weapon: ItemInstance; mod: string; item: ItemInstance };
 
 /** the places on a gun that take a part, in the order they are shown under it */
-const PARTS: [AttachSlot, string][] = [['magazine', 'Magazine'], ['optic', 'Optic'], ['muzzle', 'Muzzle'], ['light', 'Light'], ['wrap', 'Stock']];
+const PARTS: [AttachSlot, string][] = [['magazine', 'Magazine'], ['optic', 'Optic'], ['muzzle', 'Muzzle'], ['grip', 'Grip'], ['light', 'Light'], ['wrap', 'Stock']];
 
 interface Drag {
   src: Source;

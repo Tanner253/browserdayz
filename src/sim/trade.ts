@@ -12,14 +12,14 @@ import { ITEMS, fittedOf, type ItemInstance } from './items';
 /** what one of a thing is worth to him, in credit (for a thing that stacks: each of the stack) */
 const WORTH: Record<string, number> = {
   // guns: he takes them, and does not sell them
-  p38: 12, m9: 16, mosin: 28, deagle: 40, benelli: 45,
+  p38: 12, m9: 16, mosin: 28, deagle: 40, benelli: 45, ak: 55, ar15: 60,
   hatchet: 5, machete: 5, crowbar: 4, bat: 3, shovel: 4, knife: 3,
   // rounds by the one (a sealed box is worth the rounds in it: see `worth`)
-  ammo_9mm: 0.4, ammo_762: 0.6, ammo_50: 1.5, ammo_12: 1.2,
+  ammo_9mm: 0.4, ammo_762: 0.6, ammo_50: 1.5, ammo_12: 1.2, ammo_739: 0.7, ammo_556: 0.7,
   // fittings
-  red_dot: 20, gun_light: 10, pu_scope: 30, rifle_wrap: 8, suppressor_9: 22, suppressor_762: 28, suppressor_12: 28,
+  red_dot: 20, gun_light: 10, pu_scope: 30, rifle_wrap: 8, suppressor_9: 22, suppressor_762: 28, suppressor_12: 28, suppressor_739: 30, suppressor_556: 30, foregrip: 12,
   // magazines: the plain ones he sells as well (a gun with none is no gun)
-  mag_p38: 4, mag_m9: 5, mag_sniper: 8, mag_deagle: 9, mag_m9_ext: 12, mag_p38_ext: 12, mag_deagle_ext: 14,
+  mag_p38: 4, mag_m9: 5, mag_sniper: 8, mag_deagle: 9, mag_m9_ext: 12, mag_p38_ext: 12, mag_deagle_ext: 14, mag_ak: 10, mag_ar: 10, drum_ak: 30, mag_ar_60: 24,
   // food, drink, medicine
   sprats: 2, condensed: 3, beans: 3, tomatoes: 2, sardines: 2, apple: 1, milk: 2,
   water_jug: 3, flask: 3, thermos: 4,
@@ -31,13 +31,13 @@ const WORTH: Record<string, number> = {
 };
 
 /** what he has to sell, in the order it is shown */
-export const STOCK = ['bandage', 'firstaid', 'splint', 'beans', 'sardines', 'flask', 'box_9mm', 'box_762', 'box_12', 'box_50', 'mag_p38', 'mag_m9', 'mag_sniper', 'flashlight', 'gun_light', 'red_dot', 'sack_pack', 'gasmask', 'grenade', 'stash_kit', 'radio'];
+export const STOCK = ['bandage', 'firstaid', 'splint', 'beans', 'sardines', 'flask', 'box_9mm', 'box_762', 'box_739', 'box_556', 'box_12', 'box_50', 'mag_p38', 'mag_m9', 'mag_sniper', 'flashlight', 'gun_light', 'red_dot', 'sack_pack', 'gasmask', 'grenade', 'stash_kit', 'radio'];
 
 /**
  * How many of a thing he will sell one player in a day (three, where nothing is said). He is a place to top up
  * at, not a place to be fitted out from: the dear things one a day, and the rest a handful.
  */
-const A_DAY: Record<string, number> = { radio: 1, gasmask: 1, stash_kit: 1, red_dot: 1, gun_light: 1, sack_pack: 1, grenade: 2, firstaid: 2, box_9mm: 4, box_762: 4, box_12: 4, box_50: 2 };
+const A_DAY: Record<string, number> = { radio: 1, gasmask: 1, stash_kit: 1, red_dot: 1, gun_light: 1, sack_pack: 1, grenade: 2, firstaid: 2, box_9mm: 4, box_762: 4, box_739: 3, box_556: 3, box_12: 4, box_50: 2 };
 export const aDay = (id: string) => A_DAY[id] ?? 3;
 /** what is left of a player's credit with him when they are killed: he writes the rest off */
 export const KEPT_ON_DEATH = 0.5;

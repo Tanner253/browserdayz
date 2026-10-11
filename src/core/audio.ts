@@ -35,7 +35,7 @@ export interface EngineVoice {
  * made-up sound is what is heard: but for the infected (z_), who have no made-up voice any more
  * and are silent until theirs is there.
  */
-const RECORDED: Record<string, number> = { punch: 5, blow: 5, hit_metal: 6, shot_rifle: 1, shot_pistol: 3, shot_quiet: 1, bolt: 1, rifle_mag_out: 1, rifle_mag_in: 1, pistol_mag_out: 1, pistol_mag_in: 1, mag_round: 1, rack: 1, shot_shotgun: 2, shot_magnum: 2, shell_in: 1, z_groan: 4, z_growl: 4, z_alert: 4, z_attack: 4, z_hurt: 4, z_die: 4, door_open: 1, door_creak: 2, door_close: 2, gate_open: 1, gate_close: 1, gate_slam: 1 };
+const RECORDED: Record<string, number> = { punch: 5, blow: 5, hit_metal: 6, shot_rifle: 1, shot_pistol: 3, shot_quiet: 1, bolt: 1, rifle_mag_out: 1, rifle_mag_in: 1, pistol_mag_out: 1, pistol_mag_in: 1, mag_round: 1, rack: 1, shot_ak: 1, shot_ar: 1, ak_mag_out: 1, ak_mag_in: 1, ak_rack: 1, ar_mag_out: 1, ar_mag_in: 1, ar_rack: 1, shot_shotgun: 2, shot_magnum: 2, shell_in: 1, z_groan: 4, z_growl: 4, z_alert: 4, z_attack: 4, z_hurt: 4, z_die: 4, door_open: 1, door_creak: 2, door_close: 2, gate_open: 1, gate_close: 1, gate_slam: 1 };
 const bank = new Map<string, AudioBuffer[]>();
 let fetched: Promise<void> | null = null;
 /** Fetches the recordings, once. (They are kept apart from any one engine: the trailer renders its soundtrack on an engine of its own.) */
@@ -507,13 +507,20 @@ export class AudioEngine {
     this.rec(`${kind}_mag_in`, this.out(pos, 2, 1.7), now + dur * (pistol ? 0.48 : 0.62), 1.1);
   }
 
-  /** @param long a rifle's magazine (a pistol's, if not) */
-  magOut(delay = 0, long = false) {
-    if (this.ready) this.rec(long ? 'rifle_mag_out' : 'pistol_mag_out', this.sfx, this.ctx.currentTime + delay, 0.95, 1, true);
+  /**
+   * @param long a rifle's magazine (a pistol's, if not)
+   * @param set a gun with recordings of its own being handled ('ak', 'ar'): they are what is heard, if they have come
+   */
+  magOut(delay = 0, long = false, set?: string) {
+    if (!this.ready) return;
+    if (set && this.rec(`${set}_mag_out`, this.sfx, this.ctx.currentTime + delay, 0.95, 1, true)) return;
+    this.rec(long ? 'rifle_mag_out' : 'pistol_mag_out', this.sfx, this.ctx.currentTime + delay, 0.95, 1, true);
   }
 
-  magIn(delay = 0, long = false) {
-    if (this.ready) this.rec(long ? 'rifle_mag_in' : 'pistol_mag_in', this.sfx, this.ctx.currentTime + delay, 0.95, 1, true);
+  magIn(delay = 0, long = false, set?: string) {
+    if (!this.ready) return;
+    if (set && this.rec(`${set}_mag_in`, this.sfx, this.ctx.currentTime + delay, 0.95, 1, true)) return;
+    this.rec(long ? 'rifle_mag_in' : 'pistol_mag_in', this.sfx, this.ctx.currentTime + delay, 0.95, 1, true);
   }
 
   /** a shell pushed into a shotgun's tube */
@@ -521,8 +528,10 @@ export class AudioEngine {
     if (this.ready && !this.rec('shell_in', this.sfx, this.ctx.currentTime + delay, 0.95, 1, true)) this.magIn(delay, false);
   }
 
-  slideRack(delay = 0) {
-    if (this.ready) this.rec('rack', this.sfx, this.ctx.currentTime + delay, 0.95, 1, true);
+  slideRack(delay = 0, set?: string) {
+    if (!this.ready) return;
+    if (set && this.rec(`${set}_rack`, this.sfx, this.ctx.currentTime + delay, 0.95, 1, true)) return;
+    this.rec('rack', this.sfx, this.ctx.currentTime + delay, 0.95, 1, true);
   }
 
   shellDrop(delay = 0.35) {

@@ -182,6 +182,8 @@ export async function processProp(id, cfg, { io, SRC, OUT, FORCE, exists, countT
         m.setOcclusionTexture(null);
         m.setEmissiveTexture(null);
       }
+      // (a model that came as bare colour, lighter than the thing is: its colour darkened by this much)
+      if (cfg.shade !== undefined) m.setBaseColorFactor(m.getBaseColorFactor().map((v, k) => (k < 3 ? v * cfg.shade : v)));
       if (m.getMetallicRoughnessTexture()) continue;
       if (cfg.metal !== undefined) m.setMetallicFactor(cfg.metal);
       if (cfg.rough !== undefined) m.setRoughnessFactor(cfg.rough);

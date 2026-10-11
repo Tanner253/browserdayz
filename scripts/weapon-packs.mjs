@@ -37,6 +37,77 @@ function restPose(doc) {
 
 const named = (doc, name) => doc.getRoot().listNodes().find((n) => n.getName() === name);
 
+/**
+ * A pack that came with a movement to an animation (an idle, a shot, a reload, each its own) is made into what
+ * the game plays: one long animation with every movement in it one after another, and where each begins and
+ * ends. (See src/game/rig.ts.) A joint that one movement moves and another does not is held, through the other,
+ * where the file has it standing. Keys are taken as they are (straight lines between them: what these were made
+ * with), and a breath of nothing is left between one movement and the next so that neither is seen in the other.
+ * @param order [what the game calls a movement, the animation's name in the file] in the order they are laid
+ * @returns movement -> [first frame, last frame] at `fps`
+ */
+function joinAnimations(doc, order, fps) {
+  const root = doc.getRoot();
+  const byName = new Map(root.listAnimations().map((a) => [a.getName(), a]));
+  const width = { translation: 3, rotation: 4, scale: 3 };
+  const tracks = new Map();
+  const clips = [];
+  let t0 = 0;
+  for (const [as, name] of order) {
+    const a = byName.get(name);
+    if (!a) throw new Error(`no animation called ${name} in the pack (it has: ${[...byName.keys()].join(', ')})`);
+    let dur = 0;
+    for (const ch of a.listChannels()) dur = Math.max(dur, ch.getSampler().getInput().getMax([])[0]);
+    const here = new Map();
+    for (const ch of a.listChannels()) {
+      const node = ch.getTargetNode(), path = ch.getTargetPath(), sm = ch.getSampler();
+      if (!node || !(path in width)) continue;
+      if (sm.getInterpolation() === 'CUBICSPLINE') throw new Error(`${name}: its keys are curves, which this does not join`);
+      const key = `${root.listNodes().indexOf(node)}|${path}`;
+      if (!tracks.has(key)) tracks.set(key, { node, path, times: [], values: [] });
+      here.set(key, { t: sm.getInput().getArray(), v: sm.getOutput().getArray() });
+    }
+    clips.push({ as, t0, dur, here });
+    t0 += dur + 2 / fps;
+  }
+  const ranges = {};
+  for (const c of clips) ranges[c.as] = [round(c.t0 * fps, 1e4), round((c.t0 + c.dur) * fps, 1e4)];
+  for (const [key, tr] of tracks) {
+    const n = width[tr.path];
+    const still = tr.path === 'translation' ? tr.node.getTranslation() : tr.path === 'rotation' ? tr.node.getRotation() : tr.node.getScale();
+    const push = (t, v, at) => {
+      tr.times.push(t);
+      for (let k = 0; k < n; k++) tr.values.push(v[at + k]);
+    };
+    for (const c of clips) {
+      const h = c.here.get(key);
+      if (!h) {
+        push(c.t0, still, 0);
+        push(c.t0 + c.dur, still, 0);
+        continue;
+      }
+      const last = h.t.length - 1;
+      if (h.t[0] > 1e-5) push(c.t0, h.v, 0);
+      for (let i = 0; i <= last; i++) push(c.t0 + h.t[i], h.v, i * n);
+      if (h.t[last] < c.dur - 1e-5) push(c.t0 + c.dur, h.v, last * n);
+    }
+  }
+  for (const a of root.listAnimations()) {
+    for (const ch of a.listChannels()) ch.dispose();
+    for (const sm of a.listSamplers()) sm.dispose();
+    a.dispose();
+  }
+  const buffer = root.listBuffers()[0];
+  const all = doc.createAnimation('all');
+  for (const tr of tracks.values()) {
+    const input = doc.createAccessor().setType('SCALAR').setArray(new Float32Array(tr.times)).setBuffer(buffer);
+    const output = doc.createAccessor().setType(width[tr.path] === 4 ? 'VEC4' : 'VEC3').setArray(new Float32Array(tr.values)).setBuffer(buffer);
+    const sm = doc.createAnimationSampler().setInput(input).setOutput(output).setInterpolation('LINEAR');
+    all.addSampler(sm).addChannel(doc.createAnimationChannel().setTargetNode(tr.node).setTargetPath(tr.path).setSampler(sm));
+  }
+  return ranges;
+}
+
 /** A skinned shape as it stands on its skeleton now: [positions, normals, tangents, the joint each point mostly follows], per primitive. */
 function standSkin(node) {
   const skin = node.getSkin();
@@ -89,7 +160,7 @@ export async function processWeaponPack(id, cfg, { io, SRC, OUT, FORCE, exists, 
   const fp = cfg.fp !== false;
   const dest = path.join(OUT, 'models', `${id}.glb`), destFp = path.join(OUT, 'models', `${id}_fp.glb`);
   const { credit, ...settings } = cfg;
-  const stamp = JSON.stringify({ ...settings, v: 7 });
+  const stamp = JSON.stringify({ ...settings, v: 9 });
   const metaPath = path.join(dir, '_meta.json');
   let meta;
   if (!FORCE && (await exists(dest)) && (!fp || (await exists(destFp))) && (await exists(metaPath))) {
@@ -110,7 +181,9 @@ export async function processWeaponPack(id, cfg, { io, SRC, OUT, FORCE, exists, 
     // what the gun is made of, as points in the pack's own space: [piece, positions (flat xyz)]
     const pieces = [];
     // (the skinned shape hangs on a node of its own: found by what it draws)
-    const stood = cfg.skinned ? standSkin(root.listNodes().find((n) => n.getSkin() && n.getMesh()?.getName().includes(cfg.skinned.mesh))) : null;
+    // (a gun may be drawn as more than one shape on the one skeleton: its body, and a magazine by itself)
+    const shapes = cfg.skinned ? [].concat(cfg.skinned.mesh) : [];
+    const stood = cfg.skinned ? root.listNodes().filter((n) => n.getSkin() && shapes.some((m) => n.getMesh()?.getName().includes(m))).flatMap((n) => standSkin(n)) : null;
     if (stood) {
       for (const s of stood) {
         const of = s.lead.map((j) => (j in cfg.skinned.joints ? cfg.skinned.joints[j] : cfg.skinned.rest));
@@ -217,6 +290,19 @@ export async function processWeaponPack(id, cfg, { io, SRC, OUT, FORCE, exists, 
         }
       }
     }
+    // A piece drawn lying beside the gun, for show (a brake under the muzzle its suppressor is on): put where the
+    // piece that takes its place is, its back end on that one's and its middle on that one's.
+    const shift = new Map();
+    for (const [piece, onto] of Object.entries(cfg.put ?? {})) {
+      const a = pieceBox.get(piece), b = pieceBox.get(onto);
+      if (!a || !b) throw new Error(`${id}: ${piece} is to be put on ${onto}, and one of them is not there`);
+      const d = [b.min[0] - a.min[0], (b.min[1] + b.max[1] - a.min[1] - a.max[1]) / 2, (b.min[2] + b.max[2] - a.min[2] - a.max[2]) / 2];
+      shift.set(piece, d);
+      for (let k = 0; k < 3; k++) {
+        a.min[k] += d[k];
+        a.max[k] += d[k];
+      }
+    }
     // the back of a piece, the top of it, the middle of its width
     const mark = (b) => [b.min[0], b.max[1], (b.min[2] + b.max[2]) / 2];
     let at, holds;
@@ -243,7 +329,8 @@ export async function processWeaponPack(id, cfg, { io, SRC, OUT, FORCE, exists, 
       if (pc.node) {
         const mesh = pc.node.getMesh();
         if (mesh.listParents().filter((p) => p.propertyType === 'Node').length > 1) pc.node.setMesh(mesh.clone());
-        transformMesh(pc.node.getMesh(), mul(A, pc.world));
+        const to = mul(A, pc.world);
+        transformMesh(pc.node.getMesh(), shift.has(pc.piece) ? mul(move(...shift.get(pc.piece)), to) : to);
         nodes.push(put(pc.piece, pc.node.getMesh()));
         continue;
       }
@@ -310,6 +397,9 @@ export async function processWeaponPack(id, cfg, { io, SRC, OUT, FORCE, exists, 
     if (fp) {
       const whole = await io.read(gltfPath);
       const all = countTris(whole);
+      // (movements said by the names of the pack's own animations: joined into the one the game plays, and said as frames of it)
+      const byName = Object.values(cfg.clips).some((c) => typeof c === 'string');
+      const clips = byName ? joinAnimations(whole, Object.entries(cfg.clips), cfg.fps) : cfg.clips;
       await whole.transform(
         dedup(),
         resample(),
@@ -324,7 +414,11 @@ export async function processWeaponPack(id, cfg, { io, SRC, OUT, FORCE, exists, 
       meta.rig = {
         tris: all,
         fps: cfg.fps,
-        clips: cfg.clips,
+        clips,
+        // (a gun on a skeleton: what is hung on its joints is hung by where they stand as the file has them, which is how the gun alone was made)
+        ...(cfg.skinned ? { skinned: true } : {}),
+        // (where the pack's own camera stands, if it has one: the eye it was drawn for, in the eye's space)
+        ...(cfg.eye ? { eye: point(view, named(whole, cfg.eye).getWorldTranslation()).map((v) => round(v)) } : {}),
         view: view.map((v) => round(v, 1e7)),
         /** the pack's space -> the space of the gun-alone file */
         frame: A.map((v) => round(v, 1e7)),
