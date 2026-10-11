@@ -159,7 +159,10 @@ export const TYPES: Record<string, TypeRule> = {
   // (What stops bleeding is what a fight is lost for want of.)
   // (2026-10-10: bandages common on the outskirts and in the village; stims found in the village, common from Kamenka on)
   bandage: { at: [16, 30, 10, 3, 3], lifetime: 2400, restock: 240, usage: ['Medic', 'Shop', ...HOMES, 'Military', 'Police', 'Hunting', 'Farm'], favour: { Medic: 10, Shop: 6, Military: 2 } },
-  stim: { at: [0, 5, 14, 5, 6], lifetime: 3000, restock: 420, usage: ['Medic', 'Military', 'Police', 'Shop'], favour: { Medic: 5, Military: 3 } },
+  // (2026-10-11, asked: "stims should be common in mid tier loot and in hospitals". Three times as many in the
+  // village and the army's places, half as many again in Kamenka and under the gas, in the houses there as well
+  // as where they were, and a clinic's shelf twice as likely to have one as it was. Still none on the outskirts.)
+  stim: { at: [0, 15, 21, 8, 6], lifetime: 3000, restock: 360, usage: ['Medic', 'Military', 'Police', 'Shop', ...HOMES], favour: { Medic: 10, Military: 3, Police: 2 } },
   firstaid: { at: [0, 9, 8, 3, 3], lifetime: 3600, restock: 600, usage: ['Medic', 'Military', 'Police'], favour: { Medic: 12 } },
   // (what sets a broken leg and does nothing else: commoner than the kit, and where there are ladders and lofts to fall off)
   splint: { at: [5, 10, 6, 1, 2], lifetime: 3600, restock: 420, usage: ['Medic', 'Shop', ...HOMES, 'Farm', 'Hunting', 'Industrial', 'Police'], favour: { Medic: 5, Shop: 2 } },

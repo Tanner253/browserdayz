@@ -41,7 +41,7 @@ export function fillCrash(c: Container, rnd: () => number = Math.random) {
   }
   for (const id of ids) {
     const def = ITEMS[id];
-    const item = makeItem(id, def.stack ? def.stack : 1);
+    const item = makeItem(id, def.fresh ?? def.stack ?? 1);
     if (def.weapon) {
       fitAtRandom(item, rnd);
       loadGun(item, 999);
@@ -118,7 +118,7 @@ function pick<T>(table: [T, number][], rnd: () => number): T {
 export function fillDrop(c: Container, rnd: () => number = Math.random) {
   const put = (id: string, qty?: number) => {
     const def = ITEMS[id];
-    const item = makeItem(id, qty ?? (def.stack ? def.stack : 1));
+    const item = makeItem(id, qty ?? def.fresh ?? def.stack ?? 1);
     if (def.weapon) {
       fitAtRandom(item, rnd);
       loadGun(item, 999);

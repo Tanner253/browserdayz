@@ -44,8 +44,13 @@ export interface InvActions {
   assignHot(item: ItemInstance | null, i: number): void;
   /** the hot key this thing is on (0-9), or -1 */
   hotIndex(item: ItemInstance): number;
-  /** take a carried thing into the hands: what is then done with it is done with the left button, out of this screen */
-  hold(item: ItemInstance): void;
+  /**
+   * take a thing into the hands: what is then done with it is done with the left button, out of this screen
+   * @param loose it is carried nowhere (just taken off the ground or out of a crate, with no room for it): held, and nothing else
+   */
+  hold(item: ItemInstance, loose?: boolean): void;
+  /** a thing held loose is let go of by the hands, to be put where it was dragged to */
+  release(item: ItemInstance): void;
   /** what is in the hands */
   inHands(): ItemInstance | null;
   changed(): void;
@@ -56,6 +61,8 @@ type Source =
   | { kind: 'container'; c: Container; item: ItemInstance }
   | { kind: 'slot'; slot: Slot; item: ItemInstance }
   | { kind: 'ground'; w: WorldItem; item: ItemInstance }
+  // (in the hands and carried nowhere: see `hold`)
+  | { kind: 'loose'; item: ItemInstance }
   // (a part fitted to a gun, dragged off it: `item` is only its picture until it is let go, when the game hands the part itself back)
   | { kind: 'fitted'; weapon: ItemInstance; mod: string; item: ItemInstance };
 
@@ -301,7 +308,9 @@ export class InventoryUI {
       el.className = 'inv-item in-slot' + (item === this.selected ? ' sel' : '');
       const url = this.icons[item.id];
       el.innerHTML = `<div class="inv-item-img fit" style="${url ? `background-image:url(${url})` : ''}"></div>${this.tags(item)}`;
-      el.title = `${itemName(item)}: used with the left button, held, once this is shut`;
+      const src0 = this.locate(item);
+      el.title = `${itemName(item)}: used with the left button, held, once this is shut${src0?.kind === 'loose' ? '. It is in your hands and nowhere else: put away, it goes on the ground unless there is room for it' : ''}`;
+      if (src0?.kind === 'loose') s.classList.add('loose');
       const src = this.locate(item);
       if (src) this.bindItem(el, src);
       s.appendChild(el);
@@ -629,6 +638,7 @@ export class InventoryUI {
     if (loc.kind === 'ground') {
       out.push({ label: 'Take', run: () => this.quickMove(loc), primary: true });
       if (d.slot) out.push({ label: gearWord, run: () => this.equip(loc) });
+      if (d.category !== 'clothing' && !d.weapon && !d.melee) out.push({ label: 'Take in hands', run: () => this.intoHands(loc) });
       return out;
     }
     const inStash = loc.kind === 'container' && !!this.stash && loc.c === this.stash.container;
@@ -743,11 +753,13 @@ export class InventoryUI {
     if (this.stash && this.stash.container.has(item)) return { kind: 'container', c: this.stash.container, item };
     const w = this.vicinity.find((v) => v.loot.item === item);
     if (w) return { kind: 'ground', w, item };
+    if (this.actions.inHands() === item) return { kind: 'loose', item };
     return null;
   }
 
   private detach(src: Source) {
     if (src.kind === 'fitted') return;
+    if (src.kind === 'loose') return this.actions.release(src.item);
     if (src.kind === 'container') src.c.remove(src.item);
     else if (src.kind === 'slot') {
       this.inv.slots[src.slot] = null;
@@ -1082,15 +1094,8 @@ export class InventoryUI {
     // let go on the hands: a thing carried comes into them; a thing lying about is picked up, and then does
     if (t.kind === 'hands') {
       if (def.category === 'clothing') return this.render();
-      if (d.src.kind === 'ground' || (d.src.kind === 'container' && !this.inv.containers.includes(d.src.c))) {
-        if (!this.inv.hasRoom(item) || !this.materialize(d.src)) return this.render();
-        this.removeFrom(d.src);
-        const left = this.inv.add(item);
-        if (left) {
-          this.actions.drop(left);
-          return this.finish('pickup');
-        }
-      }
+      if (d.src.kind === 'ground' || (d.src.kind === 'container' && !this.inv.containers.includes(d.src.c))) return this.intoHands(d.src);
+      if (d.src.kind === 'loose') return this.render();
       this.actions.hold(item);
       return this.finish('move');
     }
@@ -1199,6 +1204,29 @@ export class InventoryUI {
     }
   }
 
+  /**
+   * A thing lying about, or in a crate, is taken into the hands. With room for it, it is put away first and held
+   * from where it is carried, as ever. With none it is held and carried nowhere (see `hold`): eaten, drunk or put
+   * on from there, and put down when the hands are wanted for something else. A gun or a thing to hit with is
+   * slung or holstered, and needs a place.
+   */
+  private intoHands(src: Source) {
+    const item = src.item, def = ITEMS[item.id];
+    const armed = !!(def.weapon || def.melee);
+    if (def.category === 'clothing' || (armed && !this.inv.hasRoom(item)) || !this.materialize(src)) return this.render();
+    this.removeFrom(src);
+    const left = this.inv.hasRoom(item) ? this.inv.add(item) : item;
+    if (left) {
+      if (armed) this.actions.drop(left);
+      else this.actions.hold(left, true);
+    } else {
+      // (all of it may have gone onto a pile already carried: that pile is then what is held)
+      const into = this.locate(item) ? item : [...this.inv.carried()].find((x) => x.id === item.id);
+      if (into) this.actions.hold(into);
+    }
+    this.finish('pickup');
+  }
+
   private materialize(src: Source): boolean {
     if (src.kind !== 'ground') return true;
     const it = this.actions.take(src.w);
@@ -1218,7 +1246,8 @@ export class InventoryUI {
     const item = src.item;
     if (src.kind === 'ground') {
       // pick up: wear it / sling it if the slot is free, else into the pockets
-      if (!this.inv.hasRoom(item)) return;
+      // (with no room for it, into the hands if they are empty: as a double click does in DayZ)
+      if (!this.inv.hasRoom(item)) return void (!this.actions.inHands() && this.intoHands(src));
       if (!this.actions.take(src.w)) return;
       this.vicinity = this.vicinity.filter((v) => v !== src.w);
       const left = this.inv.add(item);

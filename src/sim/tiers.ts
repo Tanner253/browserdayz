@@ -7,7 +7,7 @@ export type Tier = 1 | 2 | 3 | 4 | 5;
 
 export const TIERS: Record<Tier, { name: string; colour: string; where: string; finds: string }> = {
   1: { name: 'Tier 1', colour: '#cfc9ba', where: 'The outskirts: cabins, farms, yards, ranger posts', finds: 'Melee weapons, flashlights and tools, food and water, bandages, cloth hats, a day pack.' },
-  2: { name: 'Tier 2', colour: '#7fd4a0', where: 'The village, the checkpoint, the army camp, the depot', finds: 'Pistols, their magazines and 9 mm, soft vests, bandages and now and then a stim, and the gas masks: at the police station.' },
+  2: { name: 'Tier 2', colour: '#7fd4a0', where: 'The village, the checkpoint, the army camp, the depot', finds: 'Pistols, their magazines and 9 mm, soft vests, bandages and stims (the clinic before anywhere), and the gas masks: at the police station.' },
   // TEMPORARY, THE SHOWCASE (2026-10-11; see SHOWCASE in src/sim/economy.ts). It was: 'Armoured vests, combat helmets,
   // stims, long magazines and suppressors for pistols, and a sniper rifle or an AK if you are lucky.'
   3: { name: 'Tier 3', colour: '#6db3ff', where: 'Kamenka', finds: 'For now, the new guns: the AK, the AR-15, the MPA30 and the shotgun, with their magazines, rounds, suppressors, sights, grips and lights. Armoured vests, combat helmets, stims, gas masks and bunker keycards.' },

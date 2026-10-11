@@ -44,6 +44,8 @@ export interface ItemDef {
   weight: number;
   category: Category;
   stack?: number;
+  /** how many of it a new one is, where that is not six tenths of a full pile: a bandage is found one at a time, and carried five together */
+  fresh?: number;
   slot?: SlotKind;
   use?: { verb: string; time: number; energy?: number; water?: number; health?: number; stopBleed?: boolean; /** sets a broken leg (see src/sim/injury.ts) */ splint?: boolean; /** breath given back, in hundredths of all there is */ stamina?: number; /** a bottle: it holds this many drinks (what `water` and `energy` say is one of them), is kept when it is empty, and is filled at a well */ sips?: number; /** seconds afterwards in which nothing costs any breath */ boost?: number; /** taken into the hand first and held there: a click then uses it (see `ready` in src/game/game.ts) */ hold?: boolean; sound: 'eat' | 'drink' | 'bandage' | 'inject' | 'smoke' };
   /** thrown when used: seconds of fuse, damage at the centre, metres it reaches */
@@ -351,9 +353,12 @@ const D: ItemDef[] = [
   // bleeding and gives back 10; a stim, found in the village and common from Kamenka on, stops bleeding and gives
   // back 35, and is the adrenaline it always was. (`bandage` was an injector for two days, and a roll of tape
   // before that: it is a bandage again, in every loot table and every pocket.)
-  { id: 'bandage', name: 'Bandage', model: 'medical_tape', w: 1, h: 1, weight: 0.06, category: 'medical', desc: 'A rolled field dressing. Bound on, it stops bleeding and gives back 10 health.', use: { verb: 'Apply', time: 3.2, stopBleed: true, health: 10, sound: 'bandage' } },
+  // (2026-10-11, asked: "stims should be common in mid tier loot and in hospitals and should stack, bandages stack
+  // to 5, stims stack to 3". Each is still found, given and sold one at a time: `fresh`. Five in one place of a
+  // pocket, and one is used off the pile.)
+  { id: 'bandage', name: 'Bandage', model: 'medical_tape', w: 1, h: 1, weight: 0.06, category: 'medical', stack: 5, fresh: 1, desc: 'A rolled field dressing. Bound on, it stops bleeding and gives back 10 health.', use: { verb: 'Apply', time: 3.2, stopBleed: true, health: 10, sound: 'bandage' } },
   // (an injector with a yellow barrel)
-  { id: 'stim', name: 'Stim', model: 'syringe', paint: 0xf0bd12, w: 1, h: 1, weight: 0.06, category: 'medical', desc: 'Clotting agent, a painkiller and adrenaline in one spring-loaded shot, its barrel yellow. Stops bleeding and gives back 35 health; fills your stamina, and for ten seconds after it nothing you do costs any.', use: { verb: 'Use', time: 2.4, stopBleed: true, health: 35, stamina: 100, boost: 10, hold: true, sound: 'inject' } },
+  { id: 'stim', name: 'Stim', model: 'syringe', paint: 0xf0bd12, w: 1, h: 1, weight: 0.06, category: 'medical', stack: 3, fresh: 1, desc: 'Clotting agent, a painkiller and adrenaline in one spring-loaded shot, its barrel yellow. Stops bleeding and gives back 35 health; fills your stamina, and for ten seconds after it nothing you do costs any.', use: { verb: 'Use', time: 2.4, stopBleed: true, health: 35, stamina: 100, boost: 10, hold: true, sound: 'inject' } },
   { id: 'firstaid', name: 'First Aid Kit', model: 'medical_box', w: 3, h: 2, weight: 0.9, category: 'medical', desc: 'Dressings, antiseptic and a splint. Treats wounds properly, and sets a broken leg.', use: { verb: 'Treat wounds', time: 6, stopBleed: true, health: 45, splint: true, sound: 'bandage' } },
   { id: 'splint', name: 'Splint Tape', model: 'medical_tape', tint: 0xd9a55c, w: 1, h: 1, weight: 0.12, category: 'medical', desc: 'A roll of tan strapping tape. Bound round a broken leg with whatever is to hand, it lets you run on it again.', use: { verb: 'Splint your leg with', time: 5, splint: true, sound: 'bandage' } },
   // ---------------------------------------------------------------- clothing & bags
@@ -529,7 +534,7 @@ export function newUid() {
 export function makeItem(id: string, qty?: number): ItemInstance {
   const def = ITEMS[id];
   if (!def) throw new Error(`unknown item ${id}`);
-  const it: ItemInstance = { uid: newUid(), id, qty: qty ?? (def.stack ? Math.max(1, Math.round(def.stack * 0.6)) : 1) };
+  const it: ItemInstance = { uid: newUid(), id, qty: qty ?? def.fresh ?? (def.stack ? Math.max(1, Math.round(def.stack * 0.6)) : 1) };
   if (def.weapon) {
     it.loaded = 0;
     if (def.weapon.mag) it.mag = null;

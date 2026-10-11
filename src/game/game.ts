@@ -66,7 +66,7 @@ import { breaksOnHit } from '../sim/injury';
 import { MenuScenes } from './menu-scenes';
 import { Traders } from './trader';
 import { ShopUI } from '../ui/shop';
-import { KEPT_ON_DEATH, STOCK, aDay, asks, pays } from '../sim/trade';
+import { KEPT_ON_DEATH, STOCK, aDay, asks, pays, sold } from '../sim/trade';
 import { bookFor, dayOf, jobsFor, progress as jobDone, type JobBook } from '../sim/jobs';
 import type { MenuSpot } from '../ui/hud';
 import { Lamps } from './lamps';
@@ -497,8 +497,9 @@ export class Game {
       looseFor: (mag) => this.inv.count(ITEMS[mag.id].mag?.ammo ?? ''),
       assignHot: (item, i) => this.assignHot(i, item),
       hotIndex: (item) => this.inv.hotOf(item),
-      hold: (item) => this.takeUp(item),
-      inHands: () => this.inv.held(),
+      hold: (item, loose) => this.takeUp(item, loose),
+      inHands: () => this.inv.held() ?? this.inHand,
+      release: (item) => this.release(item),
       changed: () => this.inventoryChanged(),
       sound: (k) => audio.ui(k),
     });
@@ -701,7 +702,7 @@ export class Game {
         const book = this.jobBook();
         if ((book.bought?.[id] ?? 0) >= aDay(id)) return 'No more of those today. Come back tomorrow.';
         if (cost > this.credit) return `That is ${cost}. You have ${this.credit} with me.`;
-        const it = makeItem(id, ITEMS[id].stack);
+        const it = makeItem(id, sold(id));
         if (!this.inv.hasRoom(it)) return 'You have nowhere to put it. Sell me something first.';
         this.inv.add(it);
         book.bought = { ...book.bought, [id]: (book.bought?.[id] ?? 0) + 1 };
@@ -1961,11 +1962,17 @@ export class Game {
    * else is held out in the right hand, waiting (see `ready`), and the left button then does with it what is done
    * with such a thing (see `handFire`). Whatever was in the hands before goes back where it is carried.
    */
-  private takeUp(item: ItemInstance) {
+  private takeUp(item: ItemInstance, loose = false) {
     const def = ITEMS[item.id];
     if (this.player.dead || !def) return;
     if (this.use) this.breakOff();
     this.stow();
+    // (Taken straight off the ground or out of a crate with no room for it anywhere: it is in the hands and nowhere
+    // else, as in DayZ, and is eaten, drunk or put on from there. Put away, it goes into the pockets if there is
+    // room by then and onto the ground if there is not: see `settle`. Asked for 2026-10-11: "drag things in the
+    // vicinity to their hands even if no room in inventory, so i can use a medkit or drink or eat something
+    // without it needing to go in my inventory". A gun or a thing to hit with needs a place on the body: not this.)
+    if (loose && !def.weapon && !def.melee) this.loose = item;
     this.handsFree = false;
     this.glass = 0;
     this.weapons.take(item);
@@ -2038,8 +2045,10 @@ export class Game {
       return !!d && d.distanceTo(this.s.r.camera.position) <= 3.1;
     };
     this.startUse('Putting the keycard in', 2.1, 'keycard', 'swipe', null, () => {
-      if (!near() || this.inv.count('keycard') < 1) return;
-      this.inv.take('keycard', 1);
+      const held = this.loose?.id === 'keycard';
+      if (!near() || (!held && this.inv.count('keycard') < 1)) return;
+      if (held) this.loose = null;
+      else this.inv.take('keycard', 1);
       this.inventoryChanged();
       this.hud.note('The reader keeps the card. The door stays open while anybody is inside, and shuts a minute after', 'good');
       if (this.online) this.net.send({ t: 'bunker' });
@@ -2058,11 +2067,12 @@ export class Game {
     const item = this.inHand;
     this.holding = false;
     if (!item) return;
-    if (this.player.dead || !this.inv.containerOf(item)) {
+    if (this.player.dead || !this.mine(item)) {
       this.inHand = null;
       this.ready = null;
       this.inv.hold(null);
       this.weapons.endUse();
+      this.settle();
       return;
     }
     this.ready = { item, t: 0.3 };
@@ -2076,7 +2086,8 @@ export class Game {
     if (jeep.fuel >= JEEP.tank - 0.5) return void this.hud.note('Its tank is full', 'info');
     const near = () => !jeep.wreck && jeep.pos.distanceTo(this.player.pos) <= JEEP.reach + 1;
     this.startUse('Filling the tank', 4, 'jerrycan', 'open', null, () => {
-      if (!near() || !this.inv.find((i) => i === can)) return;
+      if (!near() || !this.mine(can)) return;
+      if (this.loose === can) this.loose = null;
       this.inv.remove(can);
       this.garage.refuel(jeep);
       audio.ui('drink');
@@ -2187,14 +2198,38 @@ export class Game {
     if (!this.use && !this.ready) this.settle();
   }
 
-  /** what was in the hands off the ground and is not used up: put away, or put down */
+  /** what was in the hands off the ground and is not used up: put away, or put down (a dead hand lets it fall) */
   private settle() {
     const item = this.loose;
     this.loose = null;
     if (!item) return;
-    const left = this.inv.add(item);
+    const left = this.player.dead ? item : this.inv.add(item);
     if (left) this.dropItem(left);
     this.inventoryChanged();
+  }
+
+  /** Is this thing the survivor's: carried somewhere on them, or held in the hands and carried nowhere? */
+  private mine(item: ItemInstance) {
+    return this.loose === item || !!this.inv.find((i) => i === item);
+  }
+
+  /**
+   * The inventory screen takes a thing held loose out of the hands, to put it where it was let go (a pocket that
+   * has room now, a crate, the ground): the hands are emptied and the thing is the screen's to place.
+   */
+  private release(item: ItemInstance) {
+    if (this.loose !== item) return;
+    if (this.use) {
+      this.use = null;
+      this.act('stop');
+    }
+    this.loose = null;
+    this.ready = null;
+    this.inHand = null;
+    this.holding = false;
+    this.weapons.endUse();
+    this.inv.hold(null);
+    this.weapons.validate();
   }
 
   /**
@@ -2810,7 +2845,7 @@ export class Game {
     if ((mag.rounds ?? 0) <= 0) return void this.hud.note('It is empty', 'info');
     if (!this.inv.hasRoom(makeItem(d.ammo, 1))) return void this.hud.note('No room in your pockets for loose rounds', 'warn');
     this.startUse(`Emptying the magazine · ${mag.rounds ?? 0} in it`, Game.ROUND_OUT, mag.id, 'unload', null, () => {
-      if (!this.inv.containerOf(mag) || (mag.rounds ?? 0) <= 0) return;
+      if (!this.mine(mag) || (mag.rounds ?? 0) <= 0) return;
       const round = makeItem(d.ammo, 1);
       if (this.inv.add(round)) return void this.hud.note('No room in your pockets for loose rounds', 'warn');
       mag.rounds = (mag.rounds ?? 0) - 1;
@@ -2833,7 +2868,7 @@ export class Game {
     if (this.inv.count(d.ammo) <= 0) return void this.hud.note(`No ${ITEMS[d.ammo].name.toLowerCase()} to put in it`, 'warn');
     this.startUse(`Filling the magazine · ${mag.rounds ?? 0}/${d.capacity}`, Game.ROUND_IN, mag.id, 'load', null, () => {
       // (put down, sold or fitted meanwhile)
-      if (!this.inv.containerOf(mag)) return;
+      if (!this.mine(mag)) return;
       if (this.inv.take(d.ammo, 1) !== 1) return;
       fillMag(mag, 1);
       audio.ui('round');
@@ -3140,7 +3175,18 @@ export class Game {
       if (at.z < 1) this.mark = [at.x * 0.5 + 0.5, 0.5 - at.y * 0.5];
       if (key) {
         if (!this.inv.hasRoom(item)) {
-          this.hud.note(d.slot ? `No free ${d.slot === 'long' ? 'weapon' : d.slot} slot and no room in your pockets` : 'No room: find a vest or a bag', 'warn');
+          // (No room for it. With the hands empty it is taken into them and carried nowhere, as in DayZ: eaten,
+          // drunk or put on from there. A gun, a blade or a thing to wear needs a place of its own.)
+          const free = !this.weapons.equippedItem && !this.inHand && !this.use;
+          if (d.slot || d.weapon || d.melee || !free) {
+            this.hud.note(d.slot ? `No free ${d.slot === 'long' ? 'weapon' : d.slot} slot and no room in your pockets` : 'No room: empty your hands (X) to pick it up in them, or find a vest or a bag', 'warn');
+            return;
+          }
+          if (!this.takeWorldItem(owner)) return;
+          this.takeUp(item, true);
+          audio.ui('pickup');
+          this.hud.note(`${d.name}: in your hands, there is no room to put it away`, 'info');
+          this.inventoryChanged();
           return;
         }
         if (!this.takeWorldItem(owner)) return;
@@ -3218,6 +3264,7 @@ export class Game {
       return;
     }
     if (this.use) this.breakOff();
+    if (this.loose === item) this.loose = null;
     this.stow();
     this.inv.remove(item);
     this.dropItem(item);

@@ -66,9 +66,15 @@ export function pays(item: ItemInstance): number {
   return Math.max(1, Math.round(each * n + fitted + rounds));
 }
 
-/** what he asks for one of a thing he sells (a thing that stacks is sold as a full stack) */
+/** how many of a thing he hands over at a time: a full pile of what is piled (rounds), one of what is found one at a time (a bandage) */
+export function sold(id: string): number {
+  const def = ITEMS[id];
+  return def?.fresh ?? def?.stack ?? 1;
+}
+
+/** what he asks for a thing he sells (a thing that stacks is sold as a full stack: see `sold`) */
 export function asks(id: string): number {
   const def = ITEMS[id];
   if (!def || !worth(id) || !STOCK.includes(id)) return 0;
-  return Math.round(worth(id) * (def.stack ?? 1) * MARKUP);
+  return Math.round(worth(id) * sold(id) * MARKUP);
 }

@@ -72,7 +72,7 @@ function boltAction(id: string): boolean {
  *           found: the underside of the gun at that place is what its top is set against (y
  *           here is added to that).
  */
-const FIT: Record<string, { dot?: { at: [number, number, number]; size: number }; light?: { at: [number, number, number]; size: number; /** how high the gun's underside is where the light hangs (measured off the model: looked for there, where it is not said) */ under?: number }; /** magazines that are models of their own, not a piece of the gun's: which, where its top goes (hung by it), how big, and turned how far about the upright */ mags?: Record<string, { model: string; at: [number, number, number]; size: number; turn?: number }>; /** a suppressor out of a model of its own, screwed onto the mouth of the barrel */ can?: { model: string; size: number }; /** how far down its slide a pistol's barrel lies, as a share of the slide's height (0.42 where not said) */ bore?: number }> = {
+const FIT: Record<string, { dot?: { at: [number, number, number]; size: number }; light?: { at: [number, number, number]; size: number; /** how high the gun's underside is where the light hangs (measured off the model: looked for there, where it is not said) */ under?: number; /** clamped to the gun's right side and not hung under it: `at` is then where its foot meets that side, at the height of its middle */ side?: boolean }; /** magazines that are models of their own, not a piece of the gun's: which, where its top goes (hung by it), how big, and turned how far about the upright */ mags?: Record<string, { model: string; at: [number, number, number]; size: number; turn?: number }>; /** a suppressor out of a model of its own, screwed onto the mouth of the barrel */ can?: { model: string; size: number }; /** how far down its slide a pistol's barrel lies, as a share of the slide's height (0.42 where not said) */ bore?: number }> = {
   // (The undersides are measured off each model. Looked for by rule, the M9's was not found at
   // all and the other pistol's was its trigger guard: both lights hung in the air under the gun.)
   m9: { dot: { at: [0.045, 0.0835, 0.0035], size: 0.5 }, light: { at: [0.167, 0, 0.0035], size: 0.62, under: 0.046 } },
@@ -90,8 +90,10 @@ const FIT: Record<string, { dot?: { at: [number, number, number]; size: number }
   ak: { dot: { at: [-0.095, 0.1062, 0.0012], size: 0.85 }, light: { at: [0.27, 0, 0.001], size: 0.85 }, mags: { drum_ak: { model: 'ak_drum', at: [-0.035, 0.0678, 0.0015], size: 1, turn: Math.PI / 2 } }, can: { model: 'rifle_suppressor', size: 1 } },
   // (the long magazine lies across its file, its foot to the back: turned a quarter, to hang along the gun with its foot forward)
   ar15: { mags: { mag_ar_60: { model: 'ar_mag_60', at: [-0.042, 0.0678, 0.0015], size: 1, turn: -Math.PI / 2 } } },
-  // (the submachine gun: the sight on the rail along its top, the light on the rail under the front of its fore-end)
-  mpa: { dot: { at: [0.035, 0.082, -0.003], size: 0.8 }, light: { at: [0.19, 0, -0.003], size: 0.7 } },
+  // (The submachine gun: the sight on the rail along its top. Its light is on the rail down the right side of its
+  // fore-end, high and well forward: hung under the fore-end, where it was first put by the figures alone, it was
+  // inside the left hand, which holds the gun there. Looked at 2026-10-11.)
+  mpa: { dot: { at: [0.035, 0.082, -0.003], size: 0.8 }, light: { at: [0.197, 0.066, 0.025], size: 0.62, side: true } },
   // (the big pistol: under its barrel, ahead of the guard, as on the other two)
   deagle: { light: { at: [0.185, 0, 0.0035], size: 0.62 } },
 };
@@ -1451,9 +1453,15 @@ export class Weapons {
           if (Math.abs(v.x - fit.light.at[0]) < 0.015 && Math.abs(v.z - fit.light.at[2]) < 0.02) under = Math.min(under, v.y);
         }
       }
-      const at: [number, number, number] = [fit.light.at[0], (fit.light.under ?? (Number.isFinite(under) ? under : 0)) + fit.light.at[1] + 0.003, fit.light.at[2]];
-      // (hung by its top: the model stands on its own ground, so it is let down by its height)
-      const light = await fitted('gun_light', 'gun_light', at, fit.light.size, onBody, (obj, box) => (obj.position.y -= box.max.y - box.min.y));
+      const side = !!fit.light.side;
+      const at: [number, number, number] = side ? fit.light.at : [fit.light.at[0], (fit.light.under ?? (Number.isFinite(under) ? under : 0)) + fit.light.at[1] + 0.003, fit.light.at[2]];
+      // (Hung by its top: the model stands on its own ground, so it is let down by its height. On a gun's side it
+      // is turned a quarter about the gun's length, its top to the gun, and stood off by that same height.)
+      const light = await fitted('gun_light', 'gun_light', at, fit.light.size, onBody, (obj, box) => {
+        if (!side) return void (obj.position.y -= box.max.y - box.min.y);
+        obj.rotation.x = -Math.PI / 2;
+        obj.position.z += box.max.y - box.min.y;
+      });
       rig.root.updateMatrixWorld(true);
       const lb = new THREE.Box3().setFromObject(light);
       lamp = new THREE.Vector3((lb.min.x + lb.max.x) / 2, (lb.min.y + lb.max.y) / 2, lb.min.z);
