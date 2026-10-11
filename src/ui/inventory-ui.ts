@@ -10,7 +10,7 @@
 // equip, use or take it) and the ground (the whole left column). Over a grid the outline is where it will land,
 // which is the nearest free spot to the pointer, not only the cell under it.
 
-import { GEAR_SLOTS, ITEMS, SLOT_KIND, SLOT_LABEL, TAG_HOLD_MIN, WEAPON_SLOTS, capacityOf, handlingOf, itemName, itemWeight, magRoom, tagClock, tagOwner, type ItemInstance, type Slot } from '../sim/items';
+import { GEAR_SLOTS, ITEMS, SLOT_KIND, SLOT_LABEL, TAG_HOLD_MIN, WEAPON_SLOTS, makeItem, type AttachSlot, capacityOf, handlingOf, itemName, itemWeight, magRoom, tagClock, tagOwner, type ItemInstance, type Slot } from '../sim/items';
 import { Container, type PlayerInventory } from '../sim/inventory';
 import type { WorldItem, Stash } from '../game/loot';
 import type { Vitals } from '../game/player';
@@ -32,15 +32,16 @@ export interface InvActions {
   /** carried weapons this attachment can be fitted to right now */
   attachTargets(att: ItemInstance): ItemInstance[];
   attach(att: ItemInstance, weapon: ItemInstance): void;
-  detach(weapon: ItemInstance, mod: string): void;
+  /** @param loose the part is handed back, to be put where it was let go, and not put away in a pocket */
+  detach(weapon: ItemInstance, mod: string, loose?: boolean): ItemInstance | null;
   /** push loose rounds into a magazine, one at a time, for as long as the hands are left to it */
   fillMag(mag: ItemInstance): void;
   /** the rounds out of a magazine, loose into the pockets */
   emptyMag(mag: ItemInstance): void;
   /** how many loose rounds are carried of the kind this magazine holds */
   looseFor(mag: ItemInstance): number;
-  /** put this thing on hot key i (0: the key 1 ... 9: the key 0) */
-  assignHot(item: ItemInstance, i: number): void;
+  /** put this thing on hot key i (0: the key 1 ... 9: the key 0), or with null clear that key */
+  assignHot(item: ItemInstance | null, i: number): void;
   /** the hot key this thing is on (0-9), or -1 */
   hotIndex(item: ItemInstance): number;
   /** take a carried thing into the hands: what is then done with it is done with the left button, out of this screen */
@@ -54,7 +55,12 @@ export interface InvActions {
 type Source =
   | { kind: 'container'; c: Container; item: ItemInstance }
   | { kind: 'slot'; slot: Slot; item: ItemInstance }
-  | { kind: 'ground'; w: WorldItem; item: ItemInstance };
+  | { kind: 'ground'; w: WorldItem; item: ItemInstance }
+  // (a part fitted to a gun, dragged off it: `item` is only its picture until it is let go, when the game hands the part itself back)
+  | { kind: 'fitted'; weapon: ItemInstance; mod: string; item: ItemInstance };
+
+/** the places on a gun that take a part, in the order they are shown under it */
+const PARTS: [AttachSlot, string][] = [['magazine', 'Magazine'], ['optic', 'Optic'], ['muzzle', 'Muzzle'], ['light', 'Light'], ['wrap', 'Stock']];
 
 interface Drag {
   src: Source;
@@ -268,12 +274,133 @@ export class InventoryUI {
     return `<div class="inv-neck" title="Your own dog tag. It hangs round your neck: it cannot be moved or dropped, and whoever kills you takes it off your body."><div class="inv-item-img fit" style="${url ? `background-image:url(${url})` : ''}"></div><div><b>${itemName(tag)}</b><span>Round your neck · cannot be dropped</span></div></div>`;
   }
 
+  /** a grid with its bar over it, as DayZ has it: its name, how much of it is taken up, and a click folds it away */
+  private gridBox(c: Container) {
+    const box = document.createElement('div');
+    const used = c.items.reduce((n, p) => n + ITEMS[p.item.id].w * ITEMS[p.item.id].h, 0);
+    const shut = this.folded.has(c.id);
+    box.className = 'inv-gridbox' + (shut ? ' shut' : '');
+    box.innerHTML = `<h4 title="${shut ? 'Open it' : 'Fold it away'}"><i>${shut ? '▸' : '▾'}</i>${c.name} <span>${c === this.inv.tags ? `${c.items.length} / ${c.w * c.h} · taken off others` : `${used} / ${c.w * c.h}`}</span></h4>`;
+    box.querySelector('h4')!.addEventListener('click', () => {
+      if (!this.folded.delete(c.id)) this.folded.add(c.id);
+      this.render();
+    });
+    if (!shut) box.appendChild(this.gridEl(c));
+    return box;
+  }
+
+  /** The hands: what is in them, and a place to let a thing go to take it into them. */
+  private handsEl() {
+    const s = document.createElement('div');
+    const item = this.actions.inHands();
+    s.className = 'inv-slot slot-inhands' + (item ? '' : ' empty');
+    s.dataset.hands = '1';
+    s.innerHTML = `<div class="slot-label">In your hands</div>`;
+    if (item) {
+      const el = document.createElement('div');
+      el.className = 'inv-item in-slot' + (item === this.selected ? ' sel' : '');
+      const url = this.icons[item.id];
+      el.innerHTML = `<div class="inv-item-img fit" style="${url ? `background-image:url(${url})` : ''}"></div>${this.tags(item)}`;
+      el.title = `${itemName(item)}: used with the left button, held, once this is shut`;
+      const src = this.locate(item);
+      if (src) this.bindItem(el, src);
+      s.appendChild(el);
+    }
+    return s;
+  }
+
+  /**
+   * The places on a gun that take a part, in a row under it: its magazine, its sight, its muzzle, its light, its
+   * stock, whichever of them this gun has. What is fitted is shown in its place and is dragged off it; a part let
+   * go on its place (or anywhere on the gun) is fitted. For anything that is not a gun the row is there and empty,
+   * so that nothing under it moves when a gun is slung.
+   */
+  private partsEl(gun: ItemInstance | null) {
+    const row = document.createElement('div');
+    row.className = 'inv-parts';
+    if (!gun || !ITEMS[gun.id].weapon) return row;
+    const takes = new Set(Object.values(ITEMS).filter((d) => d.attach?.fits.includes(gun.id)).map((d) => d.attach!.slot));
+    for (const [slot, label] of PARTS) {
+      if (!takes.has(slot)) continue;
+      const mod = slot === 'magazine' ? gun.mag ?? null : gun.mods?.find((m) => ITEMS[m]?.attach?.slot === slot) ?? null;
+      const cell = document.createElement('div');
+      cell.className = 'inv-part' + (mod ? '' : ' empty');
+      cell.dataset.part = slot;
+      cell.dataset.gun = gun.uid;
+      const inMag = slot === 'magazine' && mod ? Math.max(0, (gun.loaded ?? 0) - ((gun.loaded ?? 0) > 0 ? 1 : 0)) : 0;
+      cell.innerHTML = `<span>${label}</span>` + (mod ? `<div class="inv-item-img fit" style="background-image:url(${this.icons[mod] ?? ''})"></div>${slot === 'magazine' ? `<em>${inMag}/${ITEMS[mod].mag?.capacity ?? 0}</em>` : ''}` : '');
+      cell.title = mod ? `${ITEMS[mod].name}: drag it off to take it off` : `${label}: drag one here`;
+      if (mod) {
+        cell.addEventListener('pointerdown', (e) => {
+          if (e.button !== 0) return;
+          e.preventDefault();
+          // (what is dragged is the part's picture: the part itself comes off when it is let go)
+          const pic = makeItem(mod);
+          if (ITEMS[mod].mag) pic.rounds = inMag;
+          const ghost = document.createElement('div');
+          ghost.className = 'inv-ghost';
+          this.drag = { src: { kind: 'fitted', weapon: gun, mod, item: pic }, ghost, rot: false, offX: CELL / 2, offY: CELL / 2 };
+          this.styleGhost();
+          this.root.appendChild(ghost);
+          this.dragStart = { x: e.clientX, y: e.clientY, moved: false };
+          this.onMove(e);
+        });
+        cell.addEventListener('dblclick', () => {
+          this.actions.detach(gun, mod);
+          this.finish('move');
+        });
+        cell.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          this.cancelDrag();
+          this.actions.detach(gun, mod);
+          this.finish('move');
+        });
+      }
+      row.appendChild(cell);
+    }
+    return row;
+  }
+
+  /**
+   * The hot keys along the foot of the screen: what is on each, and a place to let a thing go to put it on one.
+   * (Pointing at a thing and pressing the number does the same. A right-click on a key clears it.)
+   */
+  private hotEl() {
+    const bar = document.createElement('div');
+    bar.className = 'inv-hot';
+    this.inv.hot.forEach((b, i) => {
+      const it = b ? this.inv.hotItem(i) : null;
+      const cell = document.createElement('div');
+      cell.className = 'inv-hotkey' + (b ? (it ? '' : ' gone') : ' empty') + (it && it === this.actions.inHands() ? ' on' : '');
+      cell.dataset.hot = String(i);
+      const id = it?.id ?? b?.id;
+      cell.innerHTML = `<b>${(i + 1) % 10}</b>${id ? `<div class="inv-item-img fit" style="background-image:url(${this.icons[id] ?? ''})"></div>` : ''}`;
+      cell.title = id ? `${ITEMS[id].name}${it ? '' : ' (none carried)'} · right-click to clear` : `Key ${(i + 1) % 10}: drag a thing here, or point at it and press ${(i + 1) % 10}`;
+      cell.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        if (!b) return;
+        this.actions.assignHot(null, i);
+        this.actions.sound('move');
+        this.render();
+      });
+      bar.appendChild(cell);
+    });
+    return bar;
+  }
+
+  /** the gun carried that has this number (the one a part's place belongs to) */
+  private gunByUid(uid: string): ItemInstance | null {
+    return this.inv.find((it) => it.uid === uid);
+  }
+
   private slotEl(slot: Slot, hint = '') {
     const s = document.createElement('div');
     s.className = `inv-slot slot-${slot}`;
     s.dataset.slot = slot;
     const item = this.inv.slots[slot];
-    s.innerHTML = `<div class="slot-label">${SLOT_LABEL[slot]}${hint ? ` <b>${hint}</b>` : ''}</div>`;
+    // (the key it is on, if it is on one: the keys are bound to things and can be given to anything)
+    const key = item ? this.actions.hotIndex(item) : -1;
+    s.innerHTML = `<div class="slot-label">${SLOT_LABEL[slot]}${hint ? ` <b>${hint}</b>` : key >= 0 ? ` <b>${(key + 1) % 10}</b>` : ''}</div>`;
     if (item) {
       const el = document.createElement('div');
       el.className = 'inv-item in-slot' + (item === this.selected ? ' sel' : '') + (this.actions.inHands() === item ? ' active' : '');
@@ -344,13 +471,27 @@ export class InventoryUI {
     doll.appendChild(right);
     gear.appendChild(doll);
     gear.insertAdjacentHTML('beforeend', this.neckEl());
+    // The hands, and beside them the holster; under those the two places on the back. Under each gun are the
+    // places on it that take a part, each a slot of its own: a part is dragged onto one and dragged off it.
+    const withParts = (slot: Slot) => {
+      const box = document.createElement('div');
+      box.className = 'inv-armed';
+      box.append(this.slotEl(slot), this.partsEl(inv.slots[slot]));
+      return box;
+    };
+    const top = document.createElement('div');
+    top.className = 'inv-slots';
+    const handBox = document.createElement('div');
+    handBox.className = 'inv-armed';
+    const held = this.actions.inHands();
+    handBox.append(this.handsEl(), this.partsEl(held && !WEAPON_SLOTS.some((x) => inv.slots[x] === held) ? held : null));
+    top.append(handBox, withParts('holster'));
     const long = document.createElement('div');
     long.className = 'inv-slots';
-    long.append(this.slotEl('primary', '1'), this.slotEl('secondary', '2'));
-    const small = document.createElement('div');
-    small.className = 'inv-slots';
-    small.append(this.slotEl('holster', '3'));
-    gear.append(long, small);
+    long.append(withParts('primary'), withParts('secondary'));
+    gear.append(top, long);
+    // (the tags taken off others: here under the survivor, out of the way of what is carried)
+    gear.appendChild(this.gridBox(inv.tags));
 
     // ---- carried: every cargo grid, then the inspector
     const cargo = document.createElement('div');
@@ -358,34 +499,22 @@ export class InventoryUI {
     cargo.innerHTML = `<h3>Carried <span>${inv.weight().toFixed(1)} kg</span></h3>`;
     const grids = document.createElement('div');
     grids.className = 'inv-grids';
-    for (const c of inv.containers) {
-      const box = document.createElement('div');
-      // A bar over each, as DayZ has it: its name, how much of it is taken up, and a click folds it away.
-      const used = c.items.reduce((n, p) => n + ITEMS[p.item.id].w * ITEMS[p.item.id].h, 0);
-      const shut = this.folded.has(c.id);
-      box.className = 'inv-gridbox' + (shut ? ' shut' : '');
-      box.innerHTML = `<h4 title="${shut ? 'Open it' : 'Fold it away'}"><i>${shut ? '▸' : '▾'}</i>${c.name} <span>${c === inv.tags ? `${c.items.length} / ${c.w * c.h} · taken off others` : `${used} / ${c.w * c.h}`}</span></h4>`;
-      box.querySelector('h4')!.addEventListener('click', () => {
-        if (!this.folded.delete(c.id)) this.folded.add(c.id);
-        this.render();
-      });
-      if (!shut) box.appendChild(this.gridEl(c));
-      grids.appendChild(box);
-    }
+    for (const c of inv.containers) if (c !== inv.tags) grids.appendChild(this.gridBox(c));
     cargo.appendChild(grids);
     if (!GEAR_SLOTS.some((s) => inv.slots[s] && ITEMS[inv.slots[s]!.id].wear?.cargo)) {
       cargo.insertAdjacentHTML('beforeend', `<div class="inv-tip">Only your pockets. A vest or a bag on your back adds more space.</div>`);
     }
     cargo.appendChild(this.inspector());
+    cargo.insertAdjacentHTML('beforeend', `<div class="inv-help"><b>Drag</b> to move: onto your character to wear it, sling it or take it in your hands, onto the left side to drop · <b>R</b> rotate · <b>Double-click</b> or <b>Shift-click</b>: take in hands, wear or pick up · point + <b>1</b>–<b>0</b>: put it on that key · point + <b>G</b> drop · <b>Right-click</b> for the rest. What is in your hands is used with the <b>left button</b>, held, once this is shut.</div>`);
     if (this.vitals) {
       const v = this.vitals;
       const bar = (label: string, val: number, cls: string) => `<div class="vbar ${cls}"><span>${label}</span><div><i style="width:${Math.max(0, Math.min(100, val))}%"></i></div><b>${Math.round(val)}</b></div>`;
       cargo.insertAdjacentHTML('beforeend', `<div class="inv-status"><h3>Status</h3>${bar('Health', v.health, v.health < 30 ? 'bad' : '')}${bar('Energy', v.energy, v.energy < 25 ? 'bad' : '')}${bar('Water', v.water, v.water < 25 ? 'bad' : '')}${v.bleeding ? '<div class="bleeding">Bleeding: use a bandage</div>' : ''}</div>`);
     }
-    cargo.insertAdjacentHTML('beforeend', `<div class="inv-help"><b>Drag</b> to move: onto your character to wear it, sling it or take it in your hands, onto the left side to drop · <b>R</b> rotate · <b>Double-click</b> or <b>Shift-click</b>: take in hands, wear or pick up · point + <b>1</b>–<b>0</b>: put it on that key · point + <b>G</b> drop · <b>Right-click</b> for the rest. What is in your hands is used with the <b>left button</b>, held, once this is shut.</div>`);
 
     wrap.append(vic, gear, cargo);
     r.appendChild(wrap);
+    r.appendChild(this.hotEl());
     r.appendChild(this.hoverOutline);
     if (this.menu) r.appendChild(this.menu);
   }
@@ -593,6 +722,7 @@ export class InventoryUI {
   }
 
   private detach(src: Source) {
+    if (src.kind === 'fitted') return;
     if (src.kind === 'container') src.c.remove(src.item);
     else if (src.kind === 'slot') {
       this.inv.slots[src.slot] = null;
@@ -649,6 +779,9 @@ export class InventoryUI {
     for (const el of els) {
       const h = el as HTMLElement;
       if (h.dataset?.container) return { kind: 'grid' as const, el: h, id: h.dataset.container };
+      if (h.dataset?.part) return { kind: 'part' as const, el: h, gun: h.dataset.gun! };
+      if (h.dataset?.hot) return { kind: 'hot' as const, el: h, i: Number(h.dataset.hot) };
+      if (h.dataset?.hands) return { kind: 'hands' as const, el: h };
       if (h.dataset?.slot) return { kind: 'slot' as const, el: h, slot: h.dataset.slot as Slot };
       if (h.dataset?.ground) return { kind: 'ground' as const, el: h };
       if (h.dataset?.char) return { kind: 'char' as const, el: h };
@@ -824,6 +957,13 @@ export class InventoryUI {
       const occupant = this.inv.slots[t.slot];
       const part = !!occupant && this.joins(d, occupant) === 'attach';
       t.el.classList.add(part || ITEMS[d.src.item.id].slot === SLOT_KIND[t.slot] ? 'drop-ok' : 'drop-bad');
+    } else if (t?.kind === 'part') {
+      const gun = this.gunByUid(t.gun);
+      t.el.classList.add(gun && d.src.kind !== 'fitted' && this.joins(d, gun) === 'attach' && ITEMS[d.src.item.id].attach?.slot === t.el.dataset.part ? 'drop-ok' : 'drop-bad');
+    } else if (t?.kind === 'hot') {
+      t.el.classList.add(d.src.kind === 'slot' || (d.src.kind === 'container' && this.inv.containers.includes(d.src.c)) ? 'drop-ok' : 'drop-bad');
+    } else if (t?.kind === 'hands') {
+      t.el.classList.add(d.src.kind === 'fitted' || ITEMS[d.src.item.id].category === 'clothing' ? 'drop-bad' : 'drop-ok');
     } else if (t?.kind === 'char') {
       if (this.onCharacter(d.src)) t.el.classList.add('char-over');
     } else if ((t?.kind === 'ground' || t?.kind === 'out') && d.src.kind !== 'ground') {
@@ -840,9 +980,57 @@ export class InventoryUI {
       return;
     }
     const t = this.target(e.clientX, e.clientY);
+    if (!t) return this.render();
+    // A part dragged off its gun: it comes off where it is let go. Onto the ground, it is put down; into a grid, it
+    // goes where it was put if it fits there; anywhere else, into a pocket (or onto the ground, with no room).
+    if (d.src.kind === 'fitted') {
+      if (t.kind === 'part' && t.gun === d.src.weapon.uid) return this.render();
+      const part = this.actions.detach(d.src.weapon, d.src.mod, true);
+      if (!part) return this.render();
+      if (t.kind === 'ground' || t.kind === 'out') {
+        this.actions.drop(part);
+        return this.finish('drop');
+      }
+      const c = t.kind === 'grid' ? this.containerById(t.id!) : null;
+      const at = c ? this.landing(c, part, ...this.cellAt(e, t.el, d), d.rot) : null;
+      if (c && at) c.place(part, at.x, at.y, at.rot);
+      else {
+        const left = this.inv.add(part);
+        if (left) this.actions.drop(left);
+      }
+      return this.finish('move');
+    }
     const item = d.src.item;
     const def = ITEMS[item.id];
-    if (!t) return this.render();
+    // let go on a hot key: a thing carried goes on that key
+    if (t.kind === 'hot') {
+      if (d.src.kind === 'slot' || (d.src.kind === 'container' && this.inv.containers.includes(d.src.c))) {
+        this.actions.assignHot(item, t.i);
+        this.actions.sound('move');
+      }
+      return this.render();
+    }
+    // let go on the hands: a thing carried comes into them; a thing lying about is picked up, and then does
+    if (t.kind === 'hands') {
+      if (def.category === 'clothing') return this.render();
+      if (d.src.kind === 'ground' || (d.src.kind === 'container' && !this.inv.containers.includes(d.src.c))) {
+        if (!this.inv.hasRoom(item) || !this.materialize(d.src)) return this.render();
+        this.removeFrom(d.src);
+        const left = this.inv.add(item);
+        if (left) {
+          this.actions.drop(left);
+          return this.finish('pickup');
+        }
+      }
+      this.actions.hold(item);
+      return this.finish('move');
+    }
+    // let go on a place on a gun that takes a part: the part is fitted, if it is that gun's and that place's
+    if (t.kind === 'part') {
+      const gun = this.gunByUid(t.gun);
+      if (gun && this.joins(d, gun) === 'attach') this.fit(d.src, gun);
+      return this.render();
+    }
     if (t.kind === 'grid') {
       const c = this.containerById(t.id!);
       if (!c) return this.render();

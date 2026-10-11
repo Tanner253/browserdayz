@@ -237,6 +237,8 @@ export class Game {
   private title = document.title;
   /** times at which the open inventory should look again at what lies on the ground (see drop) */
   private vicinityDue: number[] = [];
+  private vicinityT = 0;
+  private vicinitySig = '';
   /** the pockets were closed but the mouse is not the game's yet: one click and it is */
   private awaitClick = false;
   /** the men behind the shops' counters, and the counter itself (see src/sim/trade.ts) */
@@ -477,7 +479,7 @@ export class Game {
       place: (item) => this.placeStash(item),
       attachTargets: (att) => this.attachTargets(att),
       attach: (att, weapon) => this.attachMod(att, weapon),
-      detach: (weapon, mod) => this.detachMod(weapon, mod),
+      detach: (weapon, mod, loose) => this.detachMod(weapon, mod, loose),
       fillMag: (mag) => this.fillMagazine(mag),
       emptyMag: (mag) => this.emptyMagazine(mag),
       looseFor: (mag) => this.inv.count(ITEMS[mag.id].mag?.ammo ?? ''),
@@ -2640,22 +2642,32 @@ export class Game {
     this.inventoryChanged();
   }
 
-  private detachMod(weapon: ItemInstance, mod: string) {
-    if (this.weapons.busy) return;
+  /**
+   * A part comes off a gun.
+   * @param loose it is handed back to whoever asked (the inventory, which puts it where it was let go) and not put in a pocket
+   * @returns the part, when it was asked for loose
+   */
+  private detachMod(weapon: ItemInstance, mod: string, loose = false): ItemInstance | null {
+    if (this.weapons.busy) return null;
     if (weapon.mag === mod) {
       // (its magazine: out with what is in it; the round in the chamber stays)
       const out = swapMag(weapon, null);
+      audio.ui('mag');
+      if (loose) {
+        this.inventoryChanged();
+        return out;
+      }
       const left = out ? this.inv.add(out) : null;
       if (left) this.dropItem(left);
-      audio.click(1900, 0.45, 0.05);
       this.inventoryChanged();
-      return;
+      return null;
     }
-    if (!weapon.mods?.includes(mod)) return;
+    if (!weapon.mods?.includes(mod)) return null;
     weapon.mods = weapon.mods.filter((m) => m !== mod);
     // rounds that no longer fit come back out
     const extra = (weapon.loaded ?? 0) - capacityOf(weapon);
-    const back: ItemInstance[] = [makeItem(mod)];
+    const part = makeItem(mod);
+    const back: ItemInstance[] = loose ? [] : [part];
     if (extra > 0) {
       weapon.loaded = capacityOf(weapon);
       back.push(makeItem(ITEMS[weapon.id].weapon!.ammo, extra));
@@ -2666,6 +2678,7 @@ export class Game {
     }
     audio.click(1900, 0.45, 0.05);
     this.inventoryChanged();
+    return loose ? part : null;
   }
 
   // ------------------------------------------------------------ magazines
@@ -3133,6 +3146,16 @@ export class Game {
       this.vicinityDue.shift();
       if (this.invUI.isOpen) this.invUI.refresh(this.around(), this.openStash);
     }
+    // the inventory open and the survivor on the move: what lies near comes into the list and goes out of it as they walk
+    if (this.invUI.isOpen && (this.vicinityT += dt) > 0.25) {
+      this.vicinityT = 0;
+      const near = this.around();
+      const sig = near.map((w) => w.loot.uid).join(',');
+      if (sig !== this.vicinitySig) {
+        this.vicinitySig = sig;
+        this.invUI.refresh(near, this.openStash);
+      }
+    }
     // G held for a third of a second drops what is in the hands (a tap next to F does nothing;
     // looking at an empty crate of your own, G packs it up instead: see updateInteraction)
     if (playing && !this.invUI.isOpen && !this.hud.chatOpen && !this.use && input.held('KeyG') && !(this.focus instanceof Stash) && !(this.focus instanceof Jeep)) {
@@ -3194,7 +3217,9 @@ export class Game {
     const sens = this.glass ? 0.22 : this.weapons.scoped ? 0.28 : this.weapons.aiming ? 0.7 : 1;
     if (!uiOpen && playing && !this.wheelOn) p.look(input, sens);
 
-    const canMove = !uiOpen && playing && !typing;
+    // (The legs are free while the inventory is open: it is walked about with, to see what lies near, as in DayZ.
+    // What is nearby is read again as it changes: see `vicinityT`. The trader's counter is stood at.)
+    const canMove = (!uiOpen || (this.invUI.isOpen && !this.shop.isOpen)) && playing && !typing;
     const moveInput = canMove ? input : NULL_INPUT;
     // (are the hands empty: asked of what is in them, and every frame. It was asked five times a second, and of
     // which slot the inventory said was out, which is not the same thing when what was out has been dropped.)
