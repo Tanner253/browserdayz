@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { physics } from '../core/physics';
 import { heightAt } from '../world/worldgen';
-import { makeItem } from '../sim/items';
+import { makeItem, type ItemInstance } from '../sim/items';
 import { Avatar, POSE } from '../game/avatar';
 import { lookFor } from '../game/look';
 import { MAX_STAMINA } from '../net/protocol';
@@ -105,6 +105,46 @@ export function installHarness(g: Game) {
       const left = g.inv.add(it);
       anyG.inventoryChanged();
       return left ? null : it;
+    },
+    /**
+     * A kit to try the guns with (also `?kit=guns` on the address, which gives it once you are in the world): both
+     * rifles and a pistol loaded, their magazines and the big ones, loose rounds and boxes of them, every part that
+     * fits, a pack, a plate carrier and a helmet, and something to mend with. Whatever was carried goes first.
+     */
+    kit() {
+      const inv = g.inv as unknown as { neck: unknown; clear(): void; bind(i: number, it: ItemInstance | null): void; hot: unknown[] };
+      const neck = inv.neck;
+      g.weapons.take(null);
+      inv.clear();
+      inv.neck = neck;
+      const got: ItemInstance[] = [];
+      const one = (id: string, set?: (it: ItemInstance) => void, qty?: number) => {
+        const it = T.give(id, qty);
+        if (it) {
+          set?.(it);
+          got.push(it);
+        }
+      };
+      for (const id of ['suitcase', 'life_vest', 'boonie_hat']) one(id);
+      one('ak', (it) => Object.assign(it, { mag: 'mag_ak', loaded: 31 }));
+      one('ar15', (it) => Object.assign(it, { mag: 'mag_ar', loaded: 31 }));
+      one('m9', (it) => Object.assign(it, { mag: 'mag_m9', loaded: 16 }));
+      // (one of the AK's magazines is nearly empty: it is on key 4, to be filled by hand)
+      for (const [id, rounds] of [['mag_ak', 8], ['mag_ak', 30], ['mag_ak', 30], ['drum_ak', 75], ['mag_ar', 30], ['mag_ar', 30], ['mag_ar', 30], ['mag_ar_60', 60], ['mag_m9', 15], ['mag_m9', 15]] as [string, number][]) one(id, (it) => (it.rounds = rounds));
+      one('ammo_739', undefined, 30);
+      one('ammo_556', undefined, 30);
+      for (const id of ['box_739', 'box_739', 'box_556', 'box_556', 'red_dot', 'red_dot', 'suppressor_739', 'suppressor_556', 'foregrip', 'gun_light', 'bandage', 'bandage', 'stim', 'beans', 'flask']) one(id);
+      inv.hot = [];
+      anyG.autoHot?.();
+      const first = (id: string) => got.find((it) => it.id === id) ?? null;
+      inv.bind(3, first('mag_ak'));
+      inv.bind(4, first('box_739'));
+      inv.bind(5, first('bandage'));
+      inv.bind(6, first('stim'));
+      g.player.vitals = { health: 100, energy: 100, water: 100, stamina: MAX_STAMINA, bleeding: false };
+      g.weapons.validate();
+      anyG.inventoryChanged();
+      return got.length;
     },
     tp(x: number, z: number, yaw = 0, y?: number) {
       g.player.spawn(x, (y ?? heightAt(g.s.world.heights, x, z)) + 0.05, z, yaw);
@@ -465,4 +505,12 @@ export function installHarness(g: Game) {
   window.addEventListener('unhandledrejection', (e) => T.errors.push(String((e.reason && e.reason.message) || e.reason)));
   (window as unknown as { T: typeof T }).T = T;
   installLook(g, T);
+  // (`?kit=guns`: in whichever browser the local game is opened, once in the world)
+  if (new URLSearchParams(location.search).get('kit') === 'guns') {
+    const wait = setInterval(() => {
+      if (!anyG.started || anyG.joining || g.player.dead) return;
+      clearInterval(wait);
+      T.kit();
+    }, 300);
+  }
 }
