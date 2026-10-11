@@ -5,14 +5,17 @@
 // the third beat (so it walks at half its speed), a low sine that slides into its notes, bells made by one sine
 // bending another, a soft pad under them, and dry ticking hats. D minor. Twelve bars of 2.5 s: thirty seconds.
 //
-// It is written to the film (shots8.ts), a bar to each thing shown:
-//   1      the card: a swell, a clock ticking, a rise
-//   2-5    the four guns: the beat, the bells
-//   6      a gun looked over: the drums stop, the bells go on alone
-//   7-8    rounds by hand: only the hats and one low note to a bar, so that every click of brass is heard
-//   9      mending: the beat comes back under a roll
-//   10-11  the car, then the guns fired: everything, and a growling bass under it
-//   12     where it is played: one blow, and the chord left ringing
+// It is written to the film (shots8.ts), which was cut again at the pace things are done at in the game (the first
+// cut was thirty seconds and everything in it was hurried: "the entire video is too fast"): eighteen bars of 2.5 s,
+// forty-five seconds.
+//   1       the card: a swell, a clock ticking, a rise
+//   2-7     the four guns: the beat, the bells
+//   8-9     a gun looked over: the drums stop, the bells go on alone
+//   10-12   rounds by hand: only the hats and one low note to a bar, so that every click of brass is heard
+//   13-14   mending: the same, fuller; then the beat comes back under a roll
+//   15      the car: everything, and a growling bass under it
+//   16-17   the guns fired
+//   18      where it is played: one blow, and the chord left ringing
 //
 // Everything is scheduled up front into the film's offline render, as the others are. Nobody has heard it:
 // its levels are set by the numbers the render prints (peak and loudness), not by ear.
@@ -20,24 +23,40 @@
 export const BPM8 = 96;
 export const BEAT8 = 60 / BPM8;
 export const BAR8 = BEAT8 * 4;
-export const BARS8 = 12;
+export const BARS8 = 18;
 export const SECONDS8 = BARS8 * BAR8;
 
 const hz = (midi: number) => 440 * Math.pow(2, (midi - 69) / 12);
 const STEP = BEAT8 / 4;
 
 type Kind = 'card' | 'beat' | 'alone' | 'hands' | 'roll' | 'full' | 'end';
-// D minor: D2 38, G1 31 (played as G2 43 where it is a bass note that has to be heard), A1 33, Bb1 34, C2 36
+interface Row {
+  root: number;
+  minor: boolean;
+  kind: Kind;
+  /** a blow as the bar begins (where the picture changes to another part of the sheet), and how hard */
+  hit?: number;
+  /** the air rising through its second half toward the next bar */
+  lift?: number;
+  /** every other bar of the beat: one kick fewer, and an open hat for the stutter */
+  odd?: boolean;
+  /** the quiet bars, a little fuller (mending) */
+  up?: boolean;
+}
+// D minor: D2 38, G2 43, A1 33, Bb1 34, C2 36
 const D = 38, G = 43, A = 33, Bb = 34, C = 36;
-const ROWS: [number, boolean, Kind][] = [
-  [D, true, 'card'],
-  [D, true, 'beat'], [D, true, 'beat'], [Bb, false, 'beat'], [C, false, 'beat'],
-  [D, true, 'alone'],
-  [G, true, 'hands'], [A, false, 'hands'],
-  [Bb, false, 'roll'],
-  [D, true, 'full'], [Bb, false, 'full'],
-  [D, true, 'end'],
+const row = (root: number, kind: Kind, o: Partial<Row> = {}): Row => ({ root, minor: root === D || root === G, kind, ...o });
+const ROWS: Row[] = [
+  row(D, 'card'),
+  row(D, 'beat', { hit: 1 }), row(D, 'beat', { odd: true }), row(Bb, 'beat', { hit: 0.6 }), row(C, 'beat', { odd: true }), row(D, 'beat', { hit: 0.6 }), row(A, 'beat', { odd: true, lift: 0.8 }),
+  row(D, 'alone', { hit: 0.55 }), row(Bb, 'alone', { lift: 0.6 }),
+  row(G, 'hands'), row(D, 'hands'), row(A, 'hands', { lift: 0.8 }),
+  row(Bb, 'hands', { hit: 0.5, up: true }), row(C, 'roll'),
+  row(D, 'full', { hit: 1.1 }),
+  row(Bb, 'full', { hit: 0.7 }), row(C, 'full', { lift: 1 }),
+  row(D, 'end'),
 ];
+if (ROWS.length !== BARS8) throw new Error('the score is not as long as the film');
 
 export function scoreMusic8(ctx: BaseAudioContext, out: AudioNode) {
   // ------------------------------------------------------------ the desk
@@ -266,7 +285,7 @@ export function scoreMusic8(ctx: BaseAudioContext, out: AudioNode) {
   // ------------------------------------------------------------ the twelve bars
   /** what the bells play over a bar's low note, in eighths: semitones above it (an octave up) */
   const TUNE = (minor: boolean) => (minor ? [12, 19, 24, 27, 24, 19, 26, 19] : [12, 19, 24, 28, 24, 19, 26, 19]);
-  ROWS.forEach(([root, minor, kind], i) => {
+  ROWS.forEach(({ root, minor, kind, hit, lift, odd, up }, i) => {
     const t0 = i * BAR8, at = (step: number) => t0 + step * STEP, third = minor ? 3 : 4;
     const tune = TUNE(minor);
     const bells = (vel: number, up = 0, every = 1) => tune.forEach((n, k) => k % every === 0 && bell(at(k * 2), root + n + up, vel * (k % 2 ? 0.75 : 1), 0.8, k % 2 ? 0.35 : -0.35));
@@ -276,8 +295,8 @@ export function scoreMusic8(ctx: BaseAudioContext, out: AudioNode) {
       low(t0, root, BAR8 * 0.9, 0.7);
       rise(t0 + BEAT8 * 1.5, t0 + BAR8, 1);
     } else if (kind === 'beat') {
-      if (i === 1) blow(t0, 1);
-      for (const s of i % 2 ? [0, 6, 10] : [0, 6, 10, 14]) kick(at(s), s ? 0.85 : 1);
+      if (hit) blow(t0, hit);
+      for (const s of odd ? [0, 6, 10] : [0, 6, 10, 14]) kick(at(s), s ? 0.85 : 1);
       low(at(0), root, STEP * 5, 1);
       low(at(6), root, STEP * 3, 0.85);
       low(at(10), root, STEP * 5, 0.95, 12);
@@ -286,28 +305,30 @@ export function scoreMusic8(ctx: BaseAudioContext, out: AudioNode) {
       hat(at(3), 0.4);
       hat(at(11), 0.4);
       // (a stutter into the next bar, every other one)
-      if (i % 2 === 0) for (let k = 0; k < 6; k++) hat(at(13) + (k * STEP) / 2, 0.45 + k * 0.08);
+      if (!odd) for (let k = 0; k < 6; k++) hat(at(13) + (k * STEP) / 2, 0.45 + k * 0.08);
       else hat(at(14), 0.9, true);
       bells(0.9);
       pad(t0, [root + 12, root + 19], BAR8 - 0.15, 0.7, 1100);
+      if (lift) rise(t0 + BEAT8 * 2, t0 + BAR8, lift);
     } else if (kind === 'alone') {
-      blow(t0, 0.55);
+      if (hit) blow(t0, hit);
       pad(t0, [root + 12, root + 12 + third, root + 19, root + 22], BAR8 - 0.1, 1.3, 1900);
       low(t0, root, BAR8 * 0.85, 0.8);
       bells(1.1, 12, 1);
-      rise(t0 + BEAT8 * 2.5, t0 + BAR8, 0.6);
+      if (lift) rise(t0 + BEAT8 * 2.5, t0 + BAR8, lift);
     } else if (kind === 'hands') {
+      if (hit) blow(t0, hit);
       kick(at(0), 0.9);
-      low(at(0), root, STEP * 6, 0.9, i === 7 ? 0 : 5);
+      low(at(0), root, STEP * 6, 0.9, 5);
       for (let s = 0; s < 16; s += 2) hat(at(s), s % 4 ? 0.45 : 0.6);
       knock(at(4), 0.9);
       knock(at(12), 0.9);
       knock(at(14), 0.5);
-      pad(t0, [root + 12, root + 19], BAR8 - 0.15, 0.6, 900);
-      bells(0.5, 0, 4);
-      if (i === 7) {
+      pad(t0, up ? [root + 12, root + 12 + third, root + 19] : [root + 12, root + 19], BAR8 - 0.15, up ? 0.9 : 0.6, up ? 1500 : 900);
+      bells(up ? 0.7 : 0.5, 0, up ? 2 : 4);
+      if (lift) {
         snare(at(8), 0.5, 0.6);
-        rise(t0 + BEAT8 * 2, t0 + BAR8 - STEP, 0.8);
+        rise(t0 + BEAT8 * 2, t0 + BAR8 - STEP, lift);
       }
     } else if (kind === 'roll') {
       blow(t0, 0.8);
@@ -324,7 +345,7 @@ export function scoreMusic8(ctx: BaseAudioContext, out: AudioNode) {
       rise(t0 + BEAT8 * 2, t0 + BAR8, 1.1);
       pad(t0, [root + 12, root + 16, root + 19], BAR8 - 0.1, 1, 2400);
     } else if (kind === 'full') {
-      blow(t0, i === 9 ? 1.1 : 0.7);
+      if (hit) blow(t0, hit);
       for (const s of [0, 3, 6, 10, 12]) kick(at(s), s === 3 ? 0.7 : 1);
       snare(at(8), 1.1);
       snare(at(15), 0.45, 0.2);
@@ -334,13 +355,13 @@ export function scoreMusic8(ctx: BaseAudioContext, out: AudioNode) {
       low(at(3), root, STEP * 3, 0.85);
       low(at(6), root, STEP * 4, 0.9);
       low(at(10), root, STEP * 2, 0.9, 12);
-      low(at(12), root + (i === 10 ? 2 : 0), STEP * 4, 1);
+      low(at(12), root + (lift ? 2 : 0), STEP * 4, 1);
       growl(at(0), root, STEP * 6, 1);
       growl(at(6), root, STEP * 4, 0.9);
-      growl(at(10), root + (i === 10 ? 2 : 0), STEP * 6, 1);
+      growl(at(10), root + (lift ? 2 : 0), STEP * 6, 1);
       bells(1, 12);
       pad(t0, [root + 12, root + 12 + third, root + 19], BAR8 - 0.12, 1, 2600);
-      if (i === 10) rise(t0 + BEAT8 * 2, t0 + BAR8, 1);
+      if (lift) rise(t0 + BEAT8 * 2, t0 + BAR8, lift);
     } else {
       blow(t0, 1.2);
       kick(t0, 1);

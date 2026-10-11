@@ -6,6 +6,7 @@
 //   node scripts/film.mjs --from 18 --to 30   only that stretch (seconds)
 //   node scripts/film.mjs --stills 30         also keep every 30th frame, and lay them out as contact sheets
 //   node scripts/film.mjs --no-video          stills and contact sheets only (fastest way to look at a cut)
+//   node scripts/film.mjs --stills 6 --big    and each still kept as a file of its own, at the size it was filmed (to look closely at one)
 //   node scripts/film.mjs --twice             film the stretch twice and report how many frames differ
 //   node scripts/film.mjs --cut 2             the second trailer (src/trailer/shots2.ts) -> zona-trailer-2.mp4
 //
@@ -31,6 +32,7 @@ const from = Number(arg('from', 0));
 const to = arg('to', null) === null ? null : Number(arg('to'));
 const stills = Number(arg('stills', 0));
 const noVideo = !!arg('no-video', false);
+const big = !!arg('big', false);
 const twice = !!arg('twice', false);
 const cut = String(arg('cut', '1'));
 const name = String(arg('out', (draft ? 'draft' : 'zona-trailer') + (cut === '1' ? '' : `-${cut}`)));
@@ -113,7 +115,10 @@ async function take(pass) {
     if (twice) hashes.push(await sharp(Buffer.from(shot.data, 'base64')).resize(96, 54).greyscale().raw().toBuffer());
     if (pass === 0) {
       if (i === first) fs.writeFileSync(path.join(OUT, `${name}-first-frame.jpg`), Buffer.from(shot.data, 'base64'));
-      if (stills && (i - first) % stills === 0) kept.push({ t: i / fps, data: Buffer.from(shot.data, 'base64') });
+      if (stills && (i - first) % stills === 0) {
+        kept.push({ t: i / fps, data: Buffer.from(shot.data, 'base64') });
+        if (big) fs.writeFileSync(path.join(OUT, `${name}-still-${(i / fps).toFixed(2).padStart(5, '0')}.jpg`), Buffer.from(shot.data, 'base64'));
+      }
       if (!noVideo) await run(`window.tr.encodeFrame(${JSON.stringify(shot.data)}, ${i - first})`);
     }
     if ((i - first) % 60 === 59) {

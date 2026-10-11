@@ -1,13 +1,20 @@
-// The eighth film: thirty seconds (12 bars at 96 BPM) on what the guns have become, and what the hands now do.
+// The eighth film: forty-five seconds (18 bars at 96 BPM) on what the guns have become, and what the hands now do.
 // Made the way the others were (the real game on a clock that only moves when the film says), and filmed
 // another way altogether, as it was asked: "new musics and a new shooting format, we need to feel fresh".
 //
 // The seven before it are told out of doors, from over a shoulder or through the player's eyes, with cards. This
-// one is a spec sheet. Each new gun hangs alone in a black room, turned in the light, and takes its parts one at a
+// one is a spec sheet. Each new gun hangs alone in a lit room, turned in the light, and takes its parts one at a
 // time on the beat: its magazine, its sight, its suppressor, each named on a fine line as it goes on. Then the
 // hands: a gun looked over, a box of rounds torn open, a magazine filled a round at a time and put in the rifle,
-// a bandage, an injector, each with the one number it changes counted beside it. Then the police car after dark,
+// a bandage, an injector, each with the one number it changes counted beside it. Then the police car at dusk,
 // the four guns fired, and where it is played.
+//
+// It was cut first at thirty seconds, as asked, and to fit them everything the hands do was run faster than it
+// is done: "the animations and video play too fast, the entire video is too fast". So it is cut again at the
+// pace of the game: nothing in it runs at any speed but its own (no shot has a `rate`), the parts go on a beat
+// apart and not half of one, and it is as long as that takes. And the room was black, and what is black on a
+// gun was not to be seen in it ("supressor is not loading in the render, the background being black makes it
+// too hard to see"): it is a grey wall now, lit behind the gun.
 //
 // What is on the sheet is read off the rules as the film is made (a gun's round and rate, what a magazine holds,
 // what a bandage gives back), and a part is hung on a gun only if the game lets it be: a film made after the
@@ -35,12 +42,12 @@ const beats = (n: number) => n * BEAT8;
 type Any = any;
 type Extra = { g?: string | null; fadeIn?: number; fadeOut?: number; flash?: number; hour?: number; word?: [string, string]; chip?: [string, string]; grid?: number };
 
-/** The sheet: each new gun, and what is put on it, a step at a time (each step is everything on it by then). `at`: when each step is taken, in half beats. */
-const SHEET: { id: string; steps: string[][]; at: number[] }[] = [
-  { id: 'ak', steps: [[], ['mag_ak'], ['mag_ak', 'red_dot'], ['mag_ak', 'red_dot', 'suppressor_739'], ['drum_ak', 'red_dot', 'suppressor_739']], at: [0, 1, 2, 3, 5] },
-  { id: 'ar15', steps: [[], ['mag_ar'], ['mag_ar', 'red_dot'], ['mag_ar', 'red_dot', 'suppressor_556'], ['mag_ar', 'red_dot', 'suppressor_556', 'foregrip'], ['mag_ar', 'red_dot', 'suppressor_556', 'foregrip', 'gun_light'], ['mag_ar_60', 'red_dot', 'suppressor_556', 'foregrip', 'gun_light']], at: [0, 1, 2, 3, 4, 5, 6] },
-  { id: 'mpa', steps: [[], ['mag_mpa'], ['mag_mpa', 'red_dot'], ['mag_mpa', 'red_dot', 'suppressor_9']], at: [0, 1, 2, 4] },
-  { id: 'colt', steps: [[], ['mag_colt'], ['mag_colt', 'suppressor_9'], ['mag_colt', 'suppressor_9', 'red_dot'], ['mag_colt', 'suppressor_9', 'red_dot', 'gun_light']], at: [0, 1, 2, 3, 5] },
+/** The sheet: each new gun, how many beats it has, and what is put on it, a step at a time (each step is everything on it by then). `at`: the beat each step is taken on. */
+const SHEET: { id: string; len: number; steps: string[][]; at: number[] }[] = [
+  { id: 'ak', len: 8, steps: [[], ['mag_ak'], ['mag_ak', 'red_dot'], ['mag_ak', 'red_dot', 'suppressor_739'], ['drum_ak', 'red_dot', 'suppressor_739']], at: [0, 1, 2, 3, 5] },
+  { id: 'ar15', len: 8, steps: [[], ['mag_ar'], ['mag_ar', 'red_dot'], ['mag_ar', 'red_dot', 'suppressor_556'], ['mag_ar', 'red_dot', 'suppressor_556', 'foregrip'], ['mag_ar', 'red_dot', 'suppressor_556', 'foregrip', 'gun_light'], ['mag_ar_60', 'red_dot', 'suppressor_556', 'foregrip', 'gun_light']], at: [0, 1, 2, 3, 4, 5, 6] },
+  { id: 'mpa', len: 4, steps: [[], ['mag_mpa'], ['mag_mpa', 'red_dot'], ['mag_mpa', 'red_dot', 'suppressor_9']], at: [0, 1, 2, 3] },
+  { id: 'colt', len: 4, steps: [[], ['mag_colt'], ['mag_colt', 'suppressor_9'], ['mag_colt', 'suppressor_9', 'red_dot'], ['mag_colt', 'suppressor_9', 'red_dot', 'gun_light']], at: [0, 0.75, 1.5, 2.25, 3] },
 ];
 
 interface Rack {
@@ -152,9 +159,28 @@ export function buildShots(S: Stage): Shot[] {
   room.position.copy(O);
   room.visible = false;
   scene.add(room);
-  const shell = new THREE.Mesh(new THREE.SphereGeometry(46, 40, 20), new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.BackSide, fog: false }));
+  // Its wall: grey where the lens looks, as a wall is that has a lamp turned on it, and falling away to near black
+  // round that. (It was black all over, and whatever is black on a gun was not to be seen against it: the pistols'
+  // suppressor was a label on a line to nothing.)
+  const WALL = { lit: [0.34, 0.35, 0.33], dark: [0.035, 0.037, 0.034], wide: 0.62 };
+  const shellGeo = new THREE.SphereGeometry(46, 72, 36);
+  const shell = new THREE.Mesh(shellGeo, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false }));
   shell.frustumCulled = false;
   room.add(shell);
+  /** the wall painted for a lens that stands at this bearing: lit behind what it looks at */
+  const paintWall = (az: number) => {
+    const P = shellGeo.getAttribute('position'), n = P.count, col = new Float32Array(n * 3);
+    // (the middle of the lit part: straight through the room from the lens, and a little below its line)
+    const mid = new THREE.Vector3(-Math.sin(az), -0.1, -Math.cos(az)).normalize(), v = new THREE.Vector3(), c = new THREE.Color();
+    for (let i = 0; i < n; i++) {
+      const k = Math.pow(THREE.MathUtils.smoothstep(v.fromBufferAttribute(P, i).normalize().dot(mid), 1 - WALL.wide, 1), 1.6);
+      c.setRGB(WALL.dark[0] + (WALL.lit[0] - WALL.dark[0]) * k, WALL.dark[1] + (WALL.lit[1] - WALL.dark[1]) * k, WALL.dark[2] + (WALL.lit[2] - WALL.dark[2]) * k, THREE.SRGBColorSpace);
+      col[i * 3] = c.r;
+      col[i * 3 + 1] = c.g;
+      col[i * 3 + 2] = c.b;
+    }
+    shellGeo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  };
   // two lamps of the film's own behind what is shown, one warm and one cold (they are in the scene from the first
   // frame, dark, so that nothing has to be made ready again when they come on)
   // (A gun is dark steel, and under the sky alone in a black room it was a flat grey shape, and anything black on
@@ -168,6 +194,7 @@ export function buildShots(S: Stage): Shot[] {
   const sun = (g.s.atmo.sunDir as THREE.Vector3).clone(), sunAz = Math.atan2(sun.x, sun.z);
   /** where the lens stands, round the room: the sun over its left shoulder */
   const AZ = sunAz - 0.85;
+  paintWall(AZ);
 
   /** the box round what is seen of a thing (its own hiding is not asked: the gun at a step is put out of sight until its step comes) */
   const boxOf = (o: THREE.Object3D) => {
@@ -362,7 +389,7 @@ export function buildShots(S: Stage): Shot[] {
       const a = r.anchors[k], on = k <= step && r.steps[step].includes(el.dataset.mod!);
       if (!on || !a) return void (el.style.display = 'none');
       _v.copy(a).applyMatrix4(r.pivot.matrixWorld).project(camera);
-      live.push({ el, x: (_v.x * 0.5 + 0.5) * 100, y: (0.5 - _v.y * 0.5) * 100, row: r.rows[k], age: t - beats(r.at[k] / 2) });
+      live.push({ el, x: (_v.x * 0.5 + 0.5) * 100, y: (0.5 - _v.y * 0.5) * 100, row: r.rows[k], age: t - beats(r.at[k]) });
     });
     for (const row of [-1, 1]) {
       // (side by side in their row, in the order their parts are in, and never one on another)
@@ -447,6 +474,8 @@ export function buildShots(S: Stage): Shot[] {
 
   // ------------------------------------------------------------ the set
   const shots: Shot[] = [];
+  /** how long the word that opens a part of the sheet has the screen, seconds (it had five frames, and was a flicker) */
+  const WORD = 0.34;
   let cur = 0;
   const add = (len: number, s: Omit<Shot, 'start' | 'end'> & Extra) => {
     const L = beats(len), setup = s.setup, after = s.after, start = cur;
@@ -477,12 +506,12 @@ export function buildShots(S: Stage): Shot[] {
           show(mark, t);
         }
         // (the word that opens a part of the sheet: the whole screen for a few frames, then the thing itself)
-        const w = s.word && t < 5 / 60 ? s.word : null;
+        const w = s.word && t < WORD ? s.word : null;
         word.style.display = w ? '' : 'none';
         if (w) {
           word.querySelector('b')!.textContent = w[0];
           word.querySelector('span')!.textContent = w[1];
-          word.style.setProperty('--k', (1.12 - t * 1.6).toFixed(3));
+          word.style.setProperty('--k', (1.06 - (t / WORD) * 0.06).toFixed(3));
         }
       },
     });
@@ -529,11 +558,11 @@ export function buildShots(S: Stage): Shot[] {
     grid: 0.6,
   });
 
-  // ------------------------------------------------------------ 2. the four guns, a bar each, their parts on the beat
-  SHEET.forEach(({ id }, nth) => {
-    const r = rackOf(id), len = beats(4);
+  // ------------------------------------------------------------ 2. the four guns, their parts a beat apart
+  SHEET.forEach(({ id, len: n }, nth) => {
+    const r = rackOf(id), len = beats(n);
     let done = -1;
-    add(4, {
+    add(n, {
       name: `gun-${id}`,
       flash: 0.45,
       chip: ['01', 'THE GUNS'],
@@ -551,7 +580,7 @@ export function buildShots(S: Stage): Shot[] {
       },
       after: (t) => {
         let step = 0;
-        r.at.forEach((h, k) => { if (t >= beats(h / 2)) step = k; });
+        r.at.forEach((h, k) => { if (t >= beats(h)) step = k; });
         r.looks.forEach((o, k) => (o.visible = k === step));
         if (step > done) {
           done = step;
@@ -569,57 +598,59 @@ export function buildShots(S: Stage): Shot[] {
     });
   });
 
-  // ------------------------------------------------------------ 3. a gun looked over
+  // ------------------------------------------------------------ 3. a gun looked over, at the pace it is turned at
   const VIEW = { at: K(-46, 0.9), yaw: DOWN };
   const heldRoot = () => (g.weapons.current?.root ?? null) as THREE.Object3D | null;
   const looked = counter('PRESS &nbsp;I', 'ANY TIME YOUR HANDS ARE FREE OF A FIGHT', 'LOOK IT OVER');
-  /** a gun taken up and looked over: the film opens `from` of the way through its turning-over and closes at `to` */
-  const inspect = (name: string, id: string, set: Partial<ItemInstance>, from: number, to: number, first: boolean) => {
-    let rate = 1;
-    add(2, {
-      name,
-      flash: 0.5,
-      hour: 0.3,
-      g: 'warm',
-      chip: ['02', 'LOOK IT OVER'],
-      word: first ? ['INSPECT', 'PRESS I'] : undefined,
-      grid: 0.35,
-      setup: async () => {
-        reset(VIEW.at);
-        me(VIEW.at, VIEW.yaw + (first ? 0.25 : -0.4), -0.03);
-        const gun = give(id, set);
-        g.takeUp(gun);
-        note(heldRoot());
-        await run(50);
-        await sharpen(heldRoot, `the ${id} in the hands`);
-        S.key('KeyI', true);
-        await run(2);
-        S.key('KeyI', false);
-        const act = g.weapons.action;
-        if (act?.name !== 'check') return void console.log(`[tr] cut 8: the ${id} was not looked over (${act?.name ?? 'nothing begun'})`);
-        // (the frames the director runs unseen before the first one filmed are a part of the way there)
-        await run(600, () => g.weapons.action?.name === 'check' && g.weapons.action.t < act.dur * from - 0.4);
-        rate = Math.min(1.7, Math.max(0.5, (act.dur * (to - from)) / beats(2)));
-        console.log(`[tr] cut 8: the ${id} is looked over in ${act.dur.toFixed(2)} s; filmed from ${from} to ${to} of it at ${rate.toFixed(2)}`);
-      },
-      rate: () => rate,
-      after: (t) => {
-        show(looked, t, ease(t / 0.15));
-        looked.querySelector('b')!.textContent = ITEMS[id].name.toUpperCase();
-      },
-    });
-  };
-  inspect('look-mpa', 'mpa', { mag: 'mag_mpa', loaded: 31, mods: ['red_dot', 'suppressor_9'] }, 0.14, 0.42, true);
-  inspect('look-colt', 'colt', { mag: 'mag_colt', loaded: 8 }, 0.42, 0.7, false);
   // (a name is not a number: the big figure's place holds the gun's name, smaller)
   (looked.querySelector('.c8-n b') as HTMLElement).style.fontSize = '9vh';
   (looked.querySelector('.c8-bar') as HTMLElement).style.display = 'none';
+  add(8, {
+    name: 'look',
+    flash: 0.5,
+    hour: 0.3,
+    g: 'warm',
+    chip: ['02', 'LOOK IT OVER'],
+    word: ['INSPECT', 'PRESS I'],
+    grid: 0.35,
+    setup: async () => {
+      reset(VIEW.at);
+      me(VIEW.at, VIEW.yaw + 0.25, -0.03);
+      const gun = give('mpa', { mag: 'mag_mpa', loaded: 31, mods: ['red_dot', 'suppressor_9'] });
+      g.takeUp(gun);
+      note(heldRoot());
+      await run(50);
+      await sharpen(heldRoot, 'the mpa in the hands');
+      S.key('KeyI', true);
+      await run(2);
+      S.key('KeyI', false);
+      const act = g.weapons.action;
+      if (act?.name !== 'check') return void console.log(`[tr] cut 8: the gun was not looked over (${act?.name ?? 'nothing begun'})`);
+      // (It is seven seconds of turning over, and five of them are shown, as they are: from where the gun has begun
+      // to come round. The frames the director runs unseen before the first one filmed are part of the way there.)
+      await run(600, () => g.weapons.action?.name === 'check' && g.weapons.action.t < act.dur * 0.1 - 0.4);
+      console.log(`[tr] cut 8: the gun is looked over in ${act.dur.toFixed(2)} s; ${beats(8).toFixed(2)} s of it are filmed, from ${(g.weapons.action.t + 0.4).toFixed(2)} s`);
+    },
+    after: (t) => {
+      show(looked, t, ease(t / 0.15));
+      looked.querySelector('b')!.textContent = ITEMS.mpa.name.toUpperCase();
+    },
+  });
 
   // ------------------------------------------------------------ 4. rounds, by hand
   const BENCH = { at: K(-18, -1.4), yaw: DOWN + 2.3 };
   const box = ITEMS.box_739, loose = ITEMS[box.open!.gives], akMag = ITEMS.mag_ak;
+  let was = 0, wasAt = -1;
+  /** a number watched for its changing: when it last did, for the jump its figure makes */
+  const since = (n: number, t: number) => {
+    if (n !== was) {
+      was = n;
+      wasAt = t;
+    }
+    return wasAt < 0 ? 1 : t - wasAt;
+  };
   const unboxed = counter(`${box.name.toUpperCase()}`, 'TORN OPEN IN YOUR HANDS', `LOOSE ${CARTRIDGES[GUNS.ak.ammo].name} ROUNDS`);
-  add(2, {
+  add(4, {
     name: 'unbox',
     flash: 0.5,
     hour: 0.42,
@@ -629,24 +660,21 @@ export function buildShots(S: Stage): Shot[] {
     setup: async () => {
       reset(BENCH.at);
       me(BENCH.at, BENCH.yaw, -0.06);
-      const it = give('box_739');
-      g.takeUp(it);
+      was = 0;
+      wasAt = -1;
+      g.takeUp(give('box_739'));
       await run(45);
-      key('Mouse0', true);
-      await run(8);
-      if (!g.use) console.log('[tr] cut 8: the box was never begun on');
-      // (it comes open half a second into the picture)
-      await run(600, () => !!g.use && g.use.t < g.use.dur - 0.55 - 0.4);
     },
+    // (begun as the picture opens, and seen through: it is two seconds' work)
+    tick: (t) => { if (t > 0.05) key('Mouse0', true); },
     after: (t) => {
-      cue(t, 0.03, () => audio.ui('unbox'));
       const n = g.inv.count(loose.id) as number;
-      count(unboxed, t, n, n / box.open!.qty, n ? t - 0.55 : 1);
+      count(unboxed, t, n, n / box.open!.qty, since(n, t));
     },
   });
-  let mag: ItemInstance | null = null, was = 0, wasAt = 0;
+  let mag: ItemInstance | null = null;
   const filled = counter(`${akMag.name.toUpperCase()}`, 'ONE ROUND AT A TIME · HOLD THE BUTTON', '', String(akMag.mag!.capacity));
-  add(3, {
+  add(4, {
     name: 'fill',
     hour: 0.42,
     chip: ['03', 'BY HAND'],
@@ -661,22 +689,18 @@ export function buildShots(S: Stage): Shot[] {
       wasAt = -1;
       g.takeUp(mag);
       await run(48);
+      // (the first round is on its way as the picture opens: three go in while it is watched, each in its own time)
+      key('Mouse0', true);
+      await run(8);
     },
-    // (a round goes home on every beat: the game takes its own time over each, and the clock is run to suit)
-    rate: () => g.constructor.ROUND_IN / BEAT8,
-    tick: (t) => { if (t > 0.02) key('Mouse0', true); },
     after: (t) => {
       const n = (mag?.rounds ?? 0) as number;
-      if (n !== was) {
-        was = n;
-        wasAt = t;
-      }
-      count(filled, t, n, n / akMag.mag!.capacity, t - wasAt);
+      count(filled, t, n, n / akMag.mag!.capacity, since(n, t));
     },
   });
-  let rifle: ItemInstance | null = null, swap = 1, magOutAt = 0.2, magInAt = 0.9;
+  let rifle: ItemInstance | null = null, magOutAt = 0.3, magInAt = 1.3;
   const loaded = counter('THE FULL ONE IN · THE OTHER KEPT', 'A MAGAZINE IS A THING YOU CARRY, AND CAN RUN OUT OF', 'IN THE RIFLE');
-  add(3, {
+  add(4, {
     name: 'reload',
     flash: 0.4,
     hour: 0.42,
@@ -697,36 +721,30 @@ export function buildShots(S: Stage): Shot[] {
       await run(4);
       const act = g.weapons.action;
       if (!act) return void console.log('[tr] cut 8: the rifle was not reloaded');
-      await run(600, () => !!g.weapons.action && g.weapons.action.t < act.dur * 0.16 - 0.4);
-      // (done with a beat of the picture to spare, to see what is in the rifle then)
-      swap = Math.min(2, Math.max(0.6, (act.dur * 0.84) / beats(2.2)));
-      // (where in the picture the old magazine comes out and the full one goes home: the game's own shares of the movement)
-      const opens = act.dur * 0.16;
-      magOutAt = Math.max(0.02, (act.dur * 0.28 - opens) / swap);
-      magInAt = (act.dur * 0.66 - opens) / swap;
-      console.log(`[tr] cut 8: the reload (${act.name}) takes ${act.dur.toFixed(2)} s; filmed at ${swap.toFixed(2)}`);
+      // (Begun a moment before the picture opens, so that it is done with a moment of the picture to spare. What
+      // the game plays as it begins is played then, where nobody is listening: where in the picture the old
+      // magazine comes out and the full one goes home is worked out from the game's own shares of the movement.)
+      const opens = act.t + 0.4;
+      magOutAt = Math.max(0.02, act.dur * 0.28 - opens);
+      magInAt = act.dur * 0.66 - opens;
+      console.log(`[tr] cut 8: the reload (${act.name}) takes ${act.dur.toFixed(2)} s; the picture opens ${opens.toFixed(2)} s into it`);
     },
-    rate: () => swap,
     after: (t) => {
       cue(t, magOutAt, () => audio.magOut(0, true, 'ak'));
       cue(t, magInAt, () => audio.magIn(0, true, 'ak'));
       const n = (rifle?.loaded ?? 0) as number;
-      if (n !== was) {
-        was = n;
-        wasAt = t;
-      }
-      count(loaded, t, n, n / (akMag.mag!.capacity + 1), wasAt < 0 ? 1 : t - wasAt);
+      count(loaded, t, n, n / (akMag.mag!.capacity + 1), since(n, t));
     },
   });
 
   // ------------------------------------------------------------ 5. mending
   const WARD = { at: K(8, 1.6), yaw: DOWN - 0.6 };
   const hp = () => Math.round(g.player.vitals.health as number);
-  const heal = (name: string, id: string, from: number, lands: number, first: boolean) => {
+  /** something mended with: the picture opens `into` seconds into the using of it (0: as it is begun) */
+  const heal = (name: string, id: string, from: number, into: number, first: boolean) => {
     const use = ITEMS[id].use!;
     const el = counter(`${ITEMS[id].name.toUpperCase()} &nbsp;·&nbsp; +${use.health}`, id === 'stim' ? `BREATH FILLED · ${use.boost} SECONDS OF RUNNING FOR NOTHING` : 'BOUND ON BY HAND · THE BLEEDING STOPPED', 'HEALTH', '100');
-    let last = from, lastAt = -1;
-    add(2, {
+    add(4, {
       name,
       flash: 0.5,
       hour: 0.6,
@@ -738,29 +756,25 @@ export function buildShots(S: Stage): Shot[] {
         reset(WARD.at);
         me(WARD.at, WARD.yaw + (first ? 0 : 0.5), -0.05);
         g.player.vitals.health = from;
-        last = from;
-        lastAt = -1;
-        const it = give(id);
-        g.takeUp(it);
+        was = from;
+        wasAt = -1;
+        g.takeUp(give(id));
         await run(45);
         key('Mouse0', true);
         await run(8);
         if (!g.use) console.log(`[tr] cut 8: the ${id} was never begun on`);
-        await run(600, () => !!g.use && g.use.t < g.use.dur - lands - 0.4);
+        await run(600, () => !!g.use && g.use.t < into - 0.4);
       },
       after: (t) => {
-        cue(t, id === 'stim' ? 0.14 : 0.03, () => audio.ui(id === 'stim' ? 'inject' : 'bandage'));
+        // (what the dressing gave, and no more: the body mends a point by itself while it is watched)
         const n = Math.min(hp(), from + use.health!);
-        if (n !== last) {
-          last = n;
-          lastAt = t;
-        }
-        count(el, t, n, n / 100, lastAt < 0 ? 1 : t - lastAt);
+        count(el, t, n, n / 100, since(n, t));
       },
     });
   };
-  heal('bandage', 'bandage', 55, 0.62, true);
-  heal('stim', 'stim', 55 + ITEMS.bandage.use!.health!, 0.62, false);
+  // (a bandage is three seconds' work: the last two and a bit of them; an injector is two and a half: all of it)
+  heal('bandage', 'bandage', 55, ITEMS.bandage.use!.time - beats(4) + 0.25, true);
+  heal('stim', 'stim', 55 + ITEMS.bandage.use!.health!, 0, false);
 
   // ------------------------------------------------------------ 6. the police car, after dark
   // down the town's own street, from its top end toward its middle (the road in from the old valley stops short of
@@ -836,7 +850,7 @@ export function buildShots(S: Stage): Shot[] {
   FIRED.forEach(([id, set, yaw], nth) => {
     const gun = GUNS[id];
     const el = g8('x8-spec', `<div class="s8-idx">${CARTRIDGES[gun.ammo].name}</div><div class="s8-name">${ITEMS[id].name}</div>`);
-    add(1, {
+    add(2, {
       name: `fire-${id}`,
       flash: 0.7,
       hour: 0.64,
@@ -850,8 +864,8 @@ export function buildShots(S: Stage): Shot[] {
         g.takeUp(give(id, set));
         await run(52);
       },
-      // (the trigger pulled and let go ten times a second: a gun that fires one to a pull fires as fast as it can, one that does not fires on)
-      tick: (t) => key('Mouse0', t > 0.06 && Math.floor(t * 60) % 6 < 4),
+      // (the trigger pulled and let go: ten times a second for a gun that fires on, which fires on; four for a pistol, a shot to each)
+      tick: (t) => key('Mouse0', t > 0.12 && Math.floor(t * 60) % (gun.auto ? 6 : 16) < 4),
       after: (t) => show(el, t, ease(t / 0.1)),
     });
   });
