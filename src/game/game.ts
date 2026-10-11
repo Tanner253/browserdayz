@@ -39,6 +39,7 @@ import { Garage } from './garage';
 import { Jeep } from './vehicle';
 import { JEEP } from '../sim/vehicles';
 import { HUD, type HotbarEntry } from '../ui/hud';
+import { BACK_SHORT } from '../ui/updates';
 import { InventoryUI } from '../ui/inventory-ui';
 import { Minimap } from '../ui/minimap';
 import { CALL, CRASH, DROP, describeSpot, fillCrash, fillDrop, pickDropSite, type DropInfo } from '../sim/drops';
@@ -1173,7 +1174,11 @@ export class Game {
       const text = `${m.name} cashed in ${m.owner}'s dog tag.`;
       this.hud.chatLine('system', '', text);
       this.hud.feed(text, m.id === net.id);
-      if (m.id === net.id) this.hud.chatLine('system', '', `That is ${cashedTags()} cashed in so far.`);
+      if (m.id === net.id) {
+        this.hud.chatLine('system', '', `That is ${cashedTags()} cashed in so far.`);
+        // (and the one moment the treasury is on a player's mind: what fills it, and what they can do for it)
+        this.hud.chatLine('system', '', `${BACK_SHORT} Like and repost ZONA on X: the link is on the menu.`);
+      }
     });
     net.onClose = (reason) => {
       this.paused = true;

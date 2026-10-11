@@ -7,6 +7,11 @@
 // says and shows is read from X every time, and is never kept here.
 export const X_ACCOUNT = 'ZonaSOL_';
 export const POSTS = [
+  '2109086272841281908',
+  '2109079695132364877',
+  '2109070429939982401',
+  '2109068923572453536',
+  '2108816514388459905',
   '2108771898155053358',
   '2108765938724331762',
   '2108763467280965747',

@@ -2,7 +2,7 @@
 // only when relevant. Plain DOM; updated once per frame with cheap diffs.
 
 import type { Vitals } from '../game/player';
-import { mountUpdates } from './updates';
+import { BACK_SHORT, BACK_WHY, mountUpdates } from './updates';
 import { MAX_STAMINA, type ChatChannel } from '../net/protocol';
 import { TOUCH } from '../core/device';
 import { EMOTES } from '../sim/emotes';
@@ -138,7 +138,7 @@ export class HUD {
       <div class="hud-feed"></div>
       <div class="hud-under"><div class="hud-board"></div><div class="hud-tags"></div></div>
       <div class="hud-fatal"><div class="fatal-title">Disconnected</div><div class="fatal-sub"></div><button class="dead-btn fatal-btn">Reconnect</button></div>
-      <div class="hud-dead"><div class="dead-title">You are dead</div><div class="dead-sub"></div><button class="dead-btn">Respawn</button></div>
+      <div class="hud-dead"><div class="dead-title">You are dead</div><div class="dead-sub"></div><button class="dead-btn">Respawn</button><a class="dead-back" data-back><b>Back ZONA on X</b><span>Like, reply, repost. ${BACK_SHORT}</span></a></div>
       <div class="hud-start">
         <video class="sm-film" muted playsinline preload="auto" src="/menu/map-pan.mp4"></video>
         <div class="sm-cut"></div>
@@ -178,6 +178,7 @@ export class HUD {
               <li><i>1</i>Drop in</li><li><i>2</i>Loot</li><li><i>3</i>Take a tag</li><li><i>4</i>Hold ${TAG_HOLD_MIN}:00</li><li><i>5</i>Cash in</li>
             </ol>
             <button class="sm-wallet" type="button" hidden><b></b><span></span></button>
+            <a class="sm-back" data-back><b>Back ZONA on X</b><span>${BACK_WHY}</span><em>Like · Reply · Repost</em></a>
           </section>
           <aside class="sm-sheet start-brief" data-tab="play">
             <div class="sm-sheet-head"><h2></h2><button class="sm-close" type="button" aria-label="Close">&times;</button></div>
@@ -265,7 +266,16 @@ export class HUD {
     for (const [k, sel] of [['wheel', '.hud-wheel'], ['wheelDot', '.wheel-dot'], ['wheelB', '.wheel-mid b'], ['wheelS', '.wheel-mid span'], ['says', '.hud-says']]) this.el[k] = this.root.querySelector(sel) as HTMLElement;
     this.buildCompass();
     // (the game's news, in a corner of the way in: it comes when it comes, and the menu does not wait for it)
-    void mountUpdates(this.el.start);
+    void mountUpdates(this.el.start, X_HANDLE);
+    // And said again in the chat, to whoever is in the game and not at a menu: ten minutes in, and every twenty after.
+    // (A line among the others, not a thing over the view: nobody is shot for reading it.)
+    const remind = () => {
+      if (!this.el.start.classList.contains('show')) this.chatLine('system', '', `Enjoying ZONA? Like, reply and repost our newest post on X (@${X_HANDLE}). ${BACK_SHORT} The link is on the menu.`);
+    };
+    setTimeout(() => {
+      remind();
+      setInterval(remind, 20 * 60_000);
+    }, 10 * 60_000);
     (this.root.querySelector('.fatal-btn') as HTMLButtonElement).onclick = () => location.reload();
     const chat = this.root.querySelector('.chat-input') as HTMLInputElement;
     chat.addEventListener('keydown', (e) => {
