@@ -225,7 +225,7 @@ export class AdminUI {
     list.append(this.row('#', 'Name', 'Role', 'At', 'On', 'Flags', ''));
     list.firstElementChild!.classList.add('headrow');
     for (const p of shown) {
-      const marks = [p.alive ? '' : 'dead', p.seat ? 'in a car' : '', p.muted ? 'muted' : '', p.god ? 'god' : '', p.hidden ? 'vanished' : '', p.clip ? 'noclip' : ''].filter(Boolean).join(' · ');
+      const marks = [p.alive ? '' : 'dead', p.asleep ? 'gone: body left behind' : p.away ? 'not answering (tabbed out)' : '', p.seat ? 'in a car' : '', p.muted ? 'muted' : '', p.god ? 'god' : '', p.hidden ? 'vanished' : '', p.clip ? 'noclip' : ''].filter(Boolean).join(' · ');
       const r = this.row(`#${p.id}`, p.name + (p.id === this.self.id ? '  (you)' : ''), p.role ?? '', `${p.x}, ${p.z}`, `${p.mins} min`, p.flags ? String(p.flags) : '', marks);
       r.classList.add('pickable');
       if (p.id === this.picked) r.classList.add('on');

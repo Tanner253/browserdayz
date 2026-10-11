@@ -199,6 +199,7 @@ export class HUD {
                 <i class="tagplate-meta"><b>ZONA</b><b>Survivor</b></i>
               </label>
               <button class="start-btn" type="button"><span>Deploy</span></button>
+              <button class="start-out" type="button">Log out</button>
             </div>
             <div class="start-queue"><div class="sq-pos"></div><div class="sq-sub"></div><button class="sq-leave" type="button">Play on your own instead</button></div>
             <ol class="sm-loop" aria-label="How a life goes">
@@ -563,7 +564,7 @@ export class HUD {
     this.toggle(this.el.start, 'busy', on && !paused && !!text);
     this.set('startBtn', this.root.querySelector('.start-btn span') as HTMLElement, text || (paused ? 'Resume' : 'Deploy'));
     this.set('startKick', this.root.querySelector('.start-kicker span') as HTMLElement, paused ? 'Paused' : 'PvP survival shooter');
-    this.set('startSub', this.root.querySelector('.start-sub') as HTMLElement, paused ? 'The Zone does not stop for you: you can still be killed.' : 'Players hunt you. So do the infected.');
+    this.set('startSub', this.root.querySelector('.start-sub') as HTMLElement, paused ? (this.live ? 'The Zone does not stop for you: you can still be killed. Log out to leave safely: close the game without it and your body stays here for five minutes, to be killed and searched.' : 'The Zone does not stop for you: you can still be killed.') : 'Players hunt you. So do the infected.');
     if (!on) {
       this.el.start.classList.remove('enter');
       this.sheet('play');
@@ -896,6 +897,47 @@ export class HUD {
   private offered: Offer | null = null;
   /** which of what is offered Tab would take */
   private lit = 0;
+
+  // ---- leaving the proper way (see "a life kept by the server" in server/index.ts)
+
+  /** the button on the pause screen was pressed: the wait is asked for, or (true) called off */
+  onLogout: (cancel: boolean) => void = () => {};
+  /** playing on a server (there is somebody to leave) */
+  private live = false;
+  private outLeft = 0;
+  private outTimer = 0;
+
+  setLive(on: boolean) {
+    this.live = on;
+    this.toggle(this.el.start, 'live', on);
+    const b = this.root.querySelector('.start-out') as HTMLButtonElement;
+    b.onclick = (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      this.onLogout(this.outLeft > 0);
+    };
+  }
+
+  /** The wait to leave: so many seconds of it are left (0: there is none). Counted down here, and said wherever the player is looking. */
+  setLogout(left: number) {
+    window.clearInterval(this.outTimer);
+    this.outLeft = Math.max(0, Math.round(left));
+    let bar = this.root.querySelector('.hud-logout') as HTMLElement | null;
+    if (!bar) this.root.appendChild((bar = Object.assign(document.createElement('div'), { className: 'hud-logout' })));
+    const show = () => {
+      (this.root.querySelector('.start-out') as HTMLElement).textContent = this.outLeft > 0 ? `Stay in the game  (out in ${this.outLeft} s)` : 'Log out';
+      bar!.textContent = this.outLeft > 0 ? `Logging out in ${this.outLeft} s. Stay where you are: moving, firing or being hit stops it.` : '';
+      this.toggle(bar!, 'show', this.outLeft > 0);
+    };
+    show();
+    if (this.outLeft > 0) {
+      this.outTimer = window.setInterval(() => {
+        this.outLeft = Math.max(0, this.outLeft - 1);
+        show();
+        if (!this.outLeft) window.clearInterval(this.outTimer);
+      }, 1000);
+    }
+  }
 
   /** which of an admin's powers are on, said at the top of the screen for as long as any is ('' for none) */
   setPowers(text: string) {

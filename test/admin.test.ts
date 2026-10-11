@@ -100,7 +100,7 @@ class Player {
 async function withServer(play: (log: () => string) => Promise<void>) {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'zona-admin-'));
   const server: ChildProcess = spawn(process.execPath, [path.join('node_modules', 'tsx', 'dist', 'cli.mjs'), 'server/index.ts'], {
-    env: { ...process.env, PORT: String(PORT), SITE_URL: `http://127.0.0.1:${SITE}`, DATA_DIR: dir, INFECTED: 'off', CHECKS: 'watch' },
+    env: { ...process.env, PORT: String(PORT), SITE_URL: `http://127.0.0.1:${SITE}`, DATA_DIR: dir, INFECTED: 'off', LINGER_S: '0', CHECKS: 'watch' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let logged = '';

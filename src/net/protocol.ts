@@ -14,7 +14,7 @@ import type { DropInfo } from '../sim/drops';
 import type { VehicleInfo, VState } from '../sim/vehicles';
 import type { IState, InfectedInfo } from '../sim/infected';
 
-export const PROTOCOL = 27;
+export const PROTOCOL = 28;
 
 /** chat channels: everyone on the server, or only players standing near the speaker */
 export type ChatChannel = 'global' | 'near';
@@ -151,6 +151,8 @@ export type C2S =
   | { t: 'admin'; pw: string }
   /** somebody with a role has their panel open: the lists it shows are asked for */
   | { t: 'adm' }
+  /** leaving the proper way: the wait is begun (see LOGOUT in server/index.ts), or called off */
+  | { t: 'logout'; cancel?: true }
   /** a dog tag taken from another player has been carried for the full time */
   | { t: 'cash'; uid: string; /** where a reward for it should go, if the player has given an address */ wallet?: string }
   /** getting into jeep number i (see src/sim/vehicles.ts), in this seat; and getting out of whatever we are in */
@@ -296,6 +298,13 @@ export type S2C =
   | { t: 'put'; x: number; y?: number; z: number; by?: string }
   /** made whole by an admin: health, food, water, the wound and the leg */
   | { t: 'mend' }
+  /**
+   * What this player's health is, and whether a wound is open: said when their game is heard from again after the
+   * server has been keeping their life for them (a hidden tab, a frozen game). The server's figure is the figure.
+   */
+  | { t: 'hp'; health: number; bleeding: boolean }
+  /** leaving the proper way: so many seconds of the wait are left; or (0, with why) it has been called off */
+  | { t: 'logout'; left: number; why?: string }
   /** a whole set handed over by an admin (see src/sim/kits.ts): put on and away in place of what is carried, or (adds) beside it */
   | { t: 'kit'; name: string; items: ItemInstance[]; adds?: true; by?: string }
   /**
@@ -310,7 +319,7 @@ export type S2C =
 /** What the panel of somebody with a role is shown. The last two are an admin's alone. */
 export interface AdminLists {
   /** everybody online: where they are, how long they have been on (minutes), how often the checks have fired on them */
-  players: { id: number; name: string; role: 'admin' | 'mod' | null; x: number; z: number; alive: boolean; flags: number; mins: number; hidden?: true; god?: true; clip?: true; muted?: true; seat?: true }[];
+  players: { id: number; name: string; role: 'admin' | 'mod' | null; x: number; z: number; alive: boolean; flags: number; mins: number; hidden?: true; god?: true; clip?: true; muted?: true; seat?: true; /** gone without logging out: the body is still here */ asleep?: true; /** their game is not answering (a hidden tab): the server keeps their life */ away?: true }[];
   /** who left lately, newest first */
   gone: { id: number; name: string; mins: number }[];
   bans: { n: number; name: string; why: string; by: string; at: string }[];

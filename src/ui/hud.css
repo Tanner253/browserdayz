@@ -1244,6 +1244,13 @@ kbd.hot { color: #121413; background: linear-gradient(#d8c594, #b89f66); border-
 .hud-start.paused .sm-hero { align-self: center; padding-bottom: 60px; }
 .hud-start.paused .start-title { font-size: 92px; }
 .hud-start.paused .start-sub { font-size: 20px; color: var(--ink-dim); }
+.hud-start.paused.live .start-sub { max-width: 620px; font-size: 17px; line-height: 1.35; }
+/* leaving the proper way: under Resume on the pause screen, when playing on a server */
+.start-out { display: none; margin-top: 10px; padding: 8px 18px; font-family: var(--mono); font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-dim); background: rgba(10, 12, 11, 0.7); border: 1px solid rgba(233, 228, 216, 0.3); cursor: pointer; }
+.start-out:hover { color: var(--ink); border-color: rgba(233, 228, 216, 0.6); }
+.hud-start.paused.live .start-out { display: block; }
+.hud-logout { position: absolute; top: 96px; left: 50%; transform: translateX(-50%); display: none; padding: 6px 14px; font-family: var(--mono); font-size: 12px; letter-spacing: 0.06em; color: #ffd58a; background: rgba(10, 12, 11, 0.78); border: 1px solid rgba(255, 213, 138, 0.5); pointer-events: none; z-index: 40; white-space: nowrap; }
+.hud-logout.show { display: block; }
 .hud-start.paused .start-btn { min-height: 58px; }
 
 /* --- the entrance: once, as the loading screen lifts */

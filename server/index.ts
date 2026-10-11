@@ -31,7 +31,7 @@ import { BARREL } from '../src/sim/barrels';
 import { JEEP, POLICE_CAR, SEATS, crashDamage, restState, type VehicleInfo, type VState } from '../src/sim/vehicles';
 import { Director, INFECTED, guarded, infectedDrop } from '../src/sim/infected';
 import { EMOTE, EMOTE_GAP, SHOUT_RANGE } from '../src/sim/emotes';
-import { ACTS, CHAT_RANGE, F_DEAD, F_GUARD, MAX_STAMINA, PROTOCOL, type C2S, type CorpseInfo, type KillInfo, type PlayerInfo, type Pose, type S2C, type Slung, type StashInfo, type StoredItem, type Vitals } from '../src/net/protocol';
+import { ACTS, CHAT_RANGE, F_BLEED, F_DEAD, F_GROUND, F_GUARD, F_SIT, MAX_STAMINA, PROTOCOL, type C2S, type CorpseInfo, type KillInfo, type PlayerInfo, type Pose, type S2C, type Slung, type StashInfo, type StoredItem, type Vitals } from '../src/net/protocol';
 import { ORDERS, written } from '../src/net/orders';
 import { KITS } from '../src/sim/kits';
 import { FIRE, Hearths } from '../src/sim/fires';
@@ -531,11 +531,105 @@ const SOAK = (() => {
  * has taken more than a body can (see `standing`).
  */
 function dealt(target: Client, amount: number, zone: string, w: string) {
+  keep(target, amount, zone, w);
+  stayOn(target, 'you were hit');
   if (CHECKS === 'off' || !target.alive) return;
   const now = Date.now(), k = target.check;
   k.hp = Math.min(100, k.hp + (CHECK.heal * (now - k.hpAt)) / 1000) - amount * (w === 'crash' ? 1 : zone === 'torso' ? SOAK.torso : zone === 'head' ? SOAK.head : 1);
   k.hpAt = now;
   if (k.hp < -CHECK.over && !k.downAt) k.downAt = now;
+}
+
+// ------------------------------------------------------------------ a life kept by the server
+//
+// A player's health is their own game's to keep for as long as that game is answering: it is the one that knows
+// what they ate, what they fell off and what they bound up. But a game that is not answering is a body standing in
+// the world all the same: a tab put behind another (a browser stops the game in it), a game that has frozen, a
+// window shut. Nothing could kill such a body, because nothing was there to say it had died.
+//
+// So: from SILENT after a game last said where its player was, the server keeps that player's life. What hits
+// them comes off the health they last reported, through the armour they were last seen wearing; an open wound
+// runs; and at nothing the server says they are dead, as their own game would have. When the game is heard from
+// again it is told what the figure is now.
+//
+// And a connection that goes without a proper leave leaves its body where it stood, sat on the ground, for
+// LINGER: seen, hit and killed like anybody, and what it carried is on it. Whoever comes back within that time is
+// back in that body. The proper leave is asked for and waited out, LOGOUT seconds, standing still and unhurt:
+// then the body goes with the player, at once.
+
+/** seconds of nothing heard before a life is the server's to keep; a body left behind stays so long; the wait to leave properly */
+const SILENT_MS = 1500;
+const LINGER_MS = (process.env.LINGER_S === undefined ? 300 : Math.max(0, Number(process.env.LINGER_S) || 0)) * 1000;
+const LOGOUT_MS = (process.env.LOGOUT_S === undefined ? 60 : Math.max(0, Number(process.env.LOGOUT_S) || 0)) * 1000;
+/** how far somebody waiting to leave may shift before the wait is off, metres; and how long an open wound runs by itself, seconds */
+const LOGOUT_STIR = 1.5, BLEED_S = 42;
+
+const away = (c: Client, now = Date.now()) => c.asleep > 0 || now - c.heardAt > SILENT_MS;
+/** what worn things do to a hit: every plate and helmet they were last seen in (as their own game reckons it: Game.takeHit) */
+const worn = (c: Client, k: 'armor' | 'head') => Object.values(c.inv?.slots ?? {}).flatMap((it) => (it && ITEMS[it.id]?.wear?.[k] !== undefined ? [ITEMS[it.id].wear![k] as number] : []));
+
+/** Something has hit somebody whose game is not answering: it comes off the health the server holds for them. */
+function keep(c: Client, amount: number, zone: string, w: string) {
+  if (!c.alive || !away(c)) return;
+  const v = (c.vitals ??= { health: 100, energy: 80, water: 80, stamina: MAX_STAMINA, bleeding: false });
+  let a = amount;
+  if (w !== 'crash') for (const m of zone === 'torso' ? worn(c, 'armor') : zone === 'head' ? worn(c, 'head') : []) a *= m;
+  v.health = Math.max(0, v.health - a);
+  c.kept = true;
+  // (a round nearly always opens a wound, the infected and a blade often, a blast or a blow seldom)
+  if (w !== 'crash' && Math.random() < (ITEMS[w]?.weapon ? (a > 12 ? 0.85 : 0.4) : w === 'infected' ? INFECTED.bleed : 0.25)) v.bleeding = true;
+  // (after whoever dealt it has been told it landed)
+  if (v.health <= 0) setImmediate(() => kill(c, w === 'infected' ? 'the infected' : ITEMS[w]?.name ? 'wounds' : w));
+}
+
+/** Once a second: the wounds of those whose lives the server is keeping, the bodies left behind whose time is up, and the waits to leave that are over. */
+function keeping(now: number) {
+  for (const c of [...clients.values()]) {
+    if (c.asleep && now - c.asleep >= LINGER_MS) {
+      log(`${c.name}'s body has been left ${Math.round(LINGER_MS / 1000)} s: it goes, with what it carried`);
+      drop(c);
+      continue;
+    }
+    if (c.logoutAt && now >= c.logoutAt && !c.asleep) {
+      log(`${c.name} left the proper way`);
+      send(c, { t: 'kick', reason: 'You have logged out. Your character is saved where you stood, with everything you carried.' });
+      drop(c);
+      c.ws.close();
+      continue;
+    }
+    if (!c.alive || !away(c, now)) continue;
+    const v = c.vitals;
+    if (!v?.bleeding) continue;
+    c.kept = true;
+    v.health = Math.max(0, v.health - 1);
+    if (++c.bled > BLEED_S) {
+      v.bleeding = false;
+      c.bled = 0;
+    }
+    if (v.health <= 0) kill(c, 'blood loss');
+  }
+}
+setInterval(() => keeping(Date.now()), 1000);
+
+/** The wait to leave properly is off: they are told why. */
+function stayOn(c: Client, why: string) {
+  if (!c.logoutAt) return;
+  c.logoutAt = 0;
+  send(c, { t: 'logout', left: 0, why });
+}
+
+/** A connection has gone. Dead, or with nothing kept of bodies: out of the world. Alive: the body stays, sat where it stood. */
+function gone(c: Client) {
+  if (!clients.has(c.id)) return;
+  if (!c.alive || !LINGER_MS) return void drop(c);
+  c.asleep = Date.now();
+  c.logoutAt = 0;
+  releaseLock(c);
+  leaveSeat(c, true);
+  c.w = null;
+  c.m = [];
+  c.pose[5] = F_SIT | F_GROUND | (c.vitals?.bleeding ? F_BLEED : 0);
+  log(`~ ${c.name} (#${c.id}) went without logging out: their body stays ${Math.round(LINGER_MS / 1000)} s`);
 }
 
 /** Twice a second: whoever ought to have been dead for a while and has not said so. Enforcing, the server says it for them. */
@@ -1141,6 +1235,18 @@ interface Client {
   /** when they were first seen under the ground this time (0: they are not): see `underCheck` */
   underAt: number;
   /**
+   * The body in the world when its game is not (see "a life kept by the server", below): when their game last said
+   * where they were; whether the server has had to keep their health for them since; when the connection went
+   * without a proper leave (0: it has not), the body staying where it was; for how many seconds a wound has run
+   * while the server kept it; and when the wait to leave properly ends (0: nobody is waiting), begun where.
+   */
+  heardAt: number;
+  kept: boolean;
+  asleep: number;
+  bled: number;
+  logoutAt: number;
+  logoutFrom: [number, number];
+  /**
    * An admin's powers that are on: nothing hurts them, nobody is shown them, and where they go is not questioned.
    * And two things chosen for their own death: nothing they carried is left on the body (what an admin makes for
    * themselves is not found on them by whoever kills them), and no dog tag of their own is.
@@ -1506,6 +1612,9 @@ function makeCorpse(c: Client, v: number): CorpseInfo | null {
 function kill(c: Client, cause: string, v = 0) {
   if (!c.alive) return;
   c.alive = false;
+  c.logoutAt = 0;
+  // (a body left behind has nobody to come back to it: it is out of the world once it has fallen)
+  if (c.asleep) setTimeout(() => drop(c), 3000);
   releaseLock(c);
   leaveSeat(c);
   const now = Date.now();
@@ -1537,6 +1646,14 @@ function handle(c: Client, m: C2S) {
       const was = c.pose;
       if (Math.abs(m.p[0] - was[0]) + Math.abs(m.p[2] - was[2]) > 0.02 || Math.abs(m.p[3] - was[3]) + Math.abs(m.p[4] - was[4]) > 0.004) c.activeAt = Date.now();
       // (somewhere they cannot have got to: they are kept where they were, and only the way they look is taken)
+      // (heard from again after the server kept their life for them: its figure is the figure)
+      if (c.kept) {
+        c.kept = false;
+        c.bled = 0;
+        if (c.alive && c.vitals) send(c, { t: 'hp', health: c.vitals.health, bleeding: !!c.vitals.bleeding });
+      }
+      c.heardAt = Date.now();
+      if (c.logoutAt && Math.hypot(m.p[0] - c.logoutFrom[0], m.p[2] - c.logoutFrom[1]) > LOGOUT_STIR) stayOn(c, 'you moved');
       c.pose = moveCheck(c, m.p, Date.now()) ? m.p : [was[0], was[1], was[2], m.p[3], m.p[4], m.p[5]];
       // (dead here is dead in what is passed on, whatever their own game had heard when it sent this)
       if (!c.alive) c.pose[5] |= F_DEAD;
@@ -1549,6 +1666,7 @@ function handle(c: Client, m: C2S) {
     }
     case 'shot': {
       if (!c.alive || !isVec3(m.o) || !isVec3(m.d) || !WEAPON_RULES[m.w] || WEAPON_RULES[m.w].melee) return;
+      stayOn(c, 'you fired');
       broadcast({ t: 'shot', id: c.id, o: m.o, d: m.d, w: m.w, sup: !!m.sup }, c);
       return;
     }
@@ -1874,7 +1992,9 @@ function handle(c: Client, m: C2S) {
       const v = m.vitals;
       // (less health than the server allowed them is taken at their word; more is not)
       if (v && num(v.health)) c.check.hp = Math.min(c.check.hp, Math.max(0, v.health) + 1);
-      if (v && num(v.health) && num(v.energy) && num(v.water)) c.vitals = { health: v.health, energy: v.energy, water: v.water, stamina: num(v.stamina) ? v.stamina : MAX_STAMINA, bleeding: !!v.bleeding, broken: !!v.broken };
+      // (and while the server is keeping their life for them, what their game says puts no health back)
+      const held = c.kept && c.vitals ? c.vitals : null;
+      if (v && num(v.health) && num(v.energy) && num(v.water)) c.vitals = { health: held ? Math.min(held.health, v.health) : v.health, energy: v.energy, water: v.water, stamina: num(v.stamina) ? v.stamina : MAX_STAMINA, bleeding: held ? held.bleeding || !!v.bleeding : !!v.bleeding, broken: !!v.broken };
       return;
     }
     case 'died': {
@@ -1917,6 +2037,13 @@ function handle(c: Client, m: C2S) {
     }
     case 'admin':
       return void login(c, m.pw).catch(() => sys(c, 'The site did not answer: try again in a minute.'));
+    case 'logout': {
+      if (m.cancel) return void stayOn(c, 'you called it off');
+      if (!c.alive || c.logoutAt) return;
+      c.logoutAt = Date.now() + LOGOUT_MS;
+      c.logoutFrom = [c.pose[0], c.pose[2]];
+      return void send(c, { t: 'logout', left: Math.round(LOGOUT_MS / 1000) });
+    }
     case 'adm': {
       const role = roleOf(c), now = Date.now();
       if (!role || now - (ADMIN.asked.get(c.id) ?? 0) < 600) return;
@@ -1928,6 +2055,7 @@ function handle(c: Client, m: C2S) {
           id: o.id, name: o.name, role: roleOf(o), x: Math.round(o.pose[0]), z: Math.round(o.pose[2]), alive: o.alive, flags: o.check.flags, mins: Math.round((now - o.joinedAt) / 60000),
           ...(o.power.hidden ? { hidden: true as const } : {}), ...(o.power.god ? { god: true as const } : {}), ...(o.power.clip ? { clip: true as const } : {}),
           ...((ADMIN.muted.get(o.key) ?? 0) > now ? { muted: true as const } : {}), ...(o.seatAt ? { seat: true as const } : {}),
+          ...(o.asleep ? { asleep: true as const } : away(o, now) && o.alive ? { away: true as const } : {}),
         })),
         gone: ADMIN.gone.slice(-20).reverse().map((g) => ({ id: g.id, name: g.name, mins: Math.round((now - g.at) / 60000) })),
         bans: admin ? ADMIN.state.bans.map((b, i) => ({ n: i + 1, name: b.name, why: b.why, by: b.by, at: b.at.slice(0, 10) })) : [],
@@ -2047,7 +2175,8 @@ function handle(c: Client, m: C2S) {
       // the tag has to be one this player really carries, with its time (nearly) served:
       // our copy of their inventory is a few seconds behind theirs
       const tag = findCarried(c, m.uid);
-      if (!tag || tag.id !== 'dogtag' || (tag.held ?? 0) < TAG_HOLD - 30) return;
+      const seenAt = tag ? tagSeen.get(`${c.key}|${tag.uid}`) : undefined;
+      if (!tag || tag.id !== 'dogtag' || ((tag.held ?? 0) < TAG_HOLD - 30 && !(seenAt !== undefined && Date.now() - seenAt >= CASH_HOLD_MS))) return;
       // (nothing is earned by somebody nothing can hurt, nobody can see, or no wall stops)
       if (c.power.god || c.power.hidden || c.power.clip) return void sys(c, 'No tag is cashed in with god mode, vanish or noclip on: put them off first.');
       tag.held = 0;
@@ -2103,6 +2232,8 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
   }
   const rec = records.get(key);
   const resume = rec && rec.alive && rec.inv && Date.now() - rec.leftAt < RECORD_LIFETIME ? rec : null;
+  // (a tag is carried for its time in the world: the time its carrier was out of it is not counted)
+  if (resume) for (const [k, since] of tagSeen) if (k.startsWith(`${key}|`)) tagSeen.set(k, since + (Date.now() - resume.leftAt));
   // (Somebody who left the game down in the bunker comes back with what they carried, at one
   // of the map's own starting places: nobody waits behind its door for it to be opened for them.)
   const under = !!resume && bunkerDark(world.bunker, resume.pose[0], resume.pose[1] + 1, resume.pose[2]) > 0;
@@ -2111,6 +2242,7 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
     ws, id: nextId++, key, name: cleanName(m.name),
     pose: [sp.x, 'y' in sp && sp.y !== undefined ? sp.y : world.groundAt(sp.x, sp.z), sp.z, sp.yaw, 0, 0],
     w: null, m: [], g: [], b: [], alive: true, power: { god: false, hidden: false, clip: false, voidInv: false, voidTag: false },
+    heardAt: Date.now(), kept: false, asleep: 0, bled: 0, logoutAt: 0, logoutFrom: [0, 0],
     inv: resume?.inv ?? null, vitals: resume?.vitals ?? null,
     outAt: 0, underAt: 0, lastHit: 0, lastVHit: 0, seatAt: 0, lastNade: 0, nadeHits: 0, blasts: [], lastEmote: 0, lastChat: 0, lastHitBy: null, openCid: null, check: { at: Date.now(), carry: 0, free: Date.now() + CHECK.free, high: 0, flags: 0, said: 0, refused: [], hp: Math.min(100, resume?.vitals?.health ?? 100), hpAt: Date.now(), downAt: 0, unknown: new Set() }, activeAt: Date.now(), joinedAt: Date.now(), ip: ipOf.get(ws) ?? '', lifeAt: Date.now(), msgCount: 0, msgWindow: Date.now(),
   };
@@ -2215,7 +2347,7 @@ setInterval(() => {
     }
   }
   // the infected: new ones where nobody is looking, the dead cleared away, and whose game moves each
-  const turn = horde.tick(now, [...clients.values()].filter((c) => c.alive).map((c) => ({ id: c.id, x: c.pose[0], z: c.pose[2] })));
+  const turn = horde.tick(now, [...clients.values()].filter((c) => c.alive && !away(c)).map((c) => ({ id: c.id, x: c.pose[0], z: c.pose[2] })));
   for (const i of turn.gone) broadcast({ t: 'i-', i });
   for (const b of turn.added) broadcast({ t: 'i+', b: { i: b.i, s: b.s, hp: b.hp, own: b.own, h: b.h } });
   for (const [i, to] of turn.owned) broadcast({ t: 'iown', i, to });
@@ -2330,7 +2462,7 @@ function fillFromQueue() {
 function kickIdle(now: number) {
   if (!queue.length) return;
   for (const c of [...clients.values()]) {
-    if (now - c.activeAt < IDLE_KICK_MS) continue;
+    if (now - c.activeAt < IDLE_KICK_MS || c.asleep) continue;
     send(c, { t: 'kick', reason: 'You were away while others were waiting to play. Reconnect to join the line.' });
     log(`${c.name} was idle with ${queue.length} waiting: their place goes to the next in line`);
     c.ws.close();
@@ -2507,7 +2639,7 @@ function serve(req: http.IncomingMessage, res: http.ServerResponse) {
     // readable from a client hosted somewhere else (e.g. Vercel) for the start-screen player count
     res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'no-store' });
     // (places: how many different addresses the players come from. One, with several players on, means the host is not passing addresses through.)
-    res.end(JSON.stringify({ ok: true, players: clients.size, max: MAX_PLAYERS, queue: queue.length, uptime: Math.round(process.uptime()), checks: CHECKS, flagged, keptOff: BANS.temp.size, loot: economy.loot.size, places: new Set([...clients.values()].map((c) => c.ip)).size }));
+    res.end(JSON.stringify({ ok: true, players: [...clients.values()].filter((c) => !c.asleep).length, asleep: [...clients.values()].filter((c) => c.asleep).length, max: MAX_PLAYERS, queue: queue.length, uptime: Math.round(process.uptime()), checks: CHECKS, flagged, keptOff: BANS.temp.size, loot: economy.loot.size, places: new Set([...clients.values()].map((c) => c.ip)).size }));
     return;
   }
   // the website's function asks here what it has just been asked to do with the lists of admins and bans (see siteAdmin)
@@ -2628,7 +2760,7 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
   ws.on('close', () => {
     clearTimeout(hello);
     if (waiting) leaveQueue(ws);
-    if (c) drop(c);
+    if (c) gone(c);
   });
   ws.on('error', () => ws.close());
 });

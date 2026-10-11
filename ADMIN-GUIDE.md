@@ -83,3 +83,10 @@ Admins only:
 - Bans and roles are kept on the site and outlast server restarts. Mutes, timeouts and the two death settings last until the server restarts.
 - One player per internet address. To allow more, set `PER_ADDRESS` on Render (for example `2`).
 - The cheat checks only watch at the moment. To have the server refuse impossible movement and health, set `CHECKS=enforce` on Render.
+
+## Leaving, and bodies left behind
+
+- A player whose game stops answering (a hidden tab, a frozen game) can be killed: the server keeps their health. In the Players tab they are marked "not answering (tabbed out)".
+- A player who closes the window without logging out leaves their body for five minutes. In the Players tab it is marked "gone: body left behind". Kick, ban and the rest still work on it.
+- Log out is on the pause screen: sixty seconds, cancelled by moving, firing or being hit.
+- Both times can be changed on Render: `LINGER_S` (seconds a body stays; `0` turns it off) and `LOGOUT_S` (seconds of the wait).

@@ -288,6 +288,18 @@ export class Game {
   /** graphics options the player picked in the Esc menu */
   gfx: Graphics = loadGraphics();
   private tagT = 0;
+  /** when a taken tag's time was last counted, by the clock on the wall (a hidden tab draws no frames: see `tagReal`) */
+  private tagWall = Date.now();
+  /**
+   * Seconds since tags were last counted. By the clock, not by frames drawn: put behind another tab, the game
+   * draws nothing, and a tag's ten minutes stopped for as long as it was there. (The server keeps its own clock
+   * on every tag and pays by that one: this is the one the player is shown, and the one that cashes it in.)
+   */
+  private tagReal() {
+    const now = Date.now(), s = Math.min(90, Math.max(0, (now - this.tagWall) / 1000));
+    this.tagWall = now;
+    return s;
+  }
   /** when the player last got into a jeep (the keys are shown for a few seconds) */
   private rideAt = -1e9;
   /** phones and tablets: on-screen stick and buttons */
@@ -536,6 +548,14 @@ export class Game {
       this.meDirty = true;
     };
     this.hud.people = () => [...this.remotes.values()].map((r) => ({ id: r.id, name: r.name }));
+    this.hud.onLogout = (cancel) => {
+      if (this.online && !this.player.dead) this.net.send(cancel ? { t: 'logout', cancel: true } : { t: 'logout' });
+    };
+    // Behind another tab no frame is drawn, and nothing that is done once a frame is done: a taken tag's time
+    // is counted here meanwhile, once a second (or as often as the browser lets a hidden tab do anything).
+    window.setInterval(() => {
+      if (document.hidden && this.started && this.online && !this.player.dead) this.tickTags(this.tagReal());
+    }, 1000);
     this.hud.onPass = (pw) => {
       if (this.online) this.net.send({ t: 'admin', pw });
       else this.hud.chatLine('system', '', 'You are playing offline: there is no server to be an admin of.');
@@ -989,6 +1009,8 @@ export class Game {
     this.hud.setTags(carried);
     if (this.invUI.isOpen) this.invUI.tickTags();
     if (!done.length) return;
+    // (the server is shown the tag with its time served before it is asked to cash it: asked from a hidden tab, its last sight of it may be minutes old)
+    if (this.online) this.net.send({ t: 'me', inv: this.inv.serialize(), vitals: { ...this.player.vitals } });
     for (const it of done) {
       this.inv.remove(it);
       const n = addCashedTag();
@@ -1301,6 +1323,19 @@ export class Game {
       this.meDirty = true;
     });
     net.on('kit', (m) => this.kitUp(m));
+    // (this game was not answering, and the server kept this life meanwhile: what it makes of it is what it is)
+    net.on('hp', (m) => {
+      const p = this.player;
+      if (p.dead) return;
+      p.vitals.health = Math.max(1, Math.min(100, m.health));
+      if (m.bleeding && !p.vitals.bleeding) p.bleed();
+      this.meDirty = true;
+    });
+    net.on('logout', (m) => {
+      this.hud.setLogout(m.left);
+      if (m.left) this.hud.note(`Logging out in ${m.left} seconds: stay where you are`, 'info');
+      else if (m.why) this.hud.note(`You are staying in the game: ${m.why}`, 'warn');
+    });
     // set down somewhere by an admin (by themselves, or by another): with no height given, on top of whatever is there
     net.on('put', (m) => {
       const p = this.player;
@@ -1339,6 +1374,7 @@ export class Game {
       this.hud.fatal(reason);
     };
     this.maxPlayers = w.max;
+    this.hud.setLive(true);
     this.hud.setNet('Online');
     this.updateOnline();
   }
@@ -3686,10 +3722,11 @@ export class Game {
     this.tagT += dt;
     if (this.tagT >= 1) {
       this.minimap.setJeeps([...this.garage.jeeps.values()].filter((j) => !j.wreck && j.mode === 'parked' && j.seats.every((s) => s === null)).map((j) => ({ x: j.pos.x, z: j.pos.z })));
-      if (this.started && !p.dead) this.tickTags(this.tagT);
+      if (this.started && !p.dead) this.tickTags(this.tagReal());
       else {
         this.hud.setTags([]);
         this.takenTags = [];
+        this.tagWall = Date.now();
       }
       this.tagT = 0;
     }
