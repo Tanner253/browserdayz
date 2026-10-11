@@ -733,16 +733,18 @@ export class AudioEngine {
   // ------------------------------------------------------------ world
 
   /** latch click + hinge creak (opening) or a soft thud (closing) */
-  door(opening: boolean, pos: V3) {
+  door(opening: boolean, pos: V3, distance = 0) {
     if (!this.ready) return;
     const t = this.ctx.currentTime;
-    const out = this.out(pos, 3, 1.2);
-    // (from where the door is, like the rest of it: with no place given, the click of every
-    // door on the map was heard by everybody, at full strength, wherever they stood)
+    // From where the door is, and a thing of the room it is in: all of it at an arm's length, a fifth of it across
+    // the room, a twentieth across a yard, and duller the further off. (It was given to fall away as a gunshot
+    // does, and the recordings are as loud as recordings are: a door thirty metres off was a door at your elbow.
+    // Reported 2026-10-10: "too loud, and not in proximity to its source".)
+    const out = this.out(pos, 1.6, 2.4, distance * 6);
     // Recordings of a wooden door, where they have come: opened (the handle, and its hinge a moment after, quietly),
     // or swung to and shut. Until then, the made-up click, creak and thud.
-    if (opening ? this.rec('door_open', out, t, 1.5) : this.rec('door_close', out, t + 0.28, 1.6)) {
-      if (opening) this.rec('door_creak', out, t + 0.14, 0.45);
+    if (opening ? this.rec('door_open', out, t, 0.7) : this.rec('door_close', out, t + 0.28, 0.75)) {
+      if (opening) this.rec('door_creak', out, t + 0.14, 0.22);
       return;
     }
     this.click(opening ? 1400 : 900, 0.4, 0.04, 0, pos);

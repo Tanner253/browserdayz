@@ -1138,7 +1138,8 @@ export class Game {
       if (!d || d.open === m.open) return;
       d.set(m.open, m.swing);
       // (somebody else's door is heard across a yard, not across the map)
-      if (d.pivot.position.distanceToSquared(cam().position) < 45 * 45) audio.door(m.open, d.pivot.position);
+      const far = d.pivot.position.distanceTo(cam().position);
+      if (far < 28) audio.door(m.open, d.pivot.position, far);
     });
     net.on('spawn', (m) => {
       const p = this.player;
@@ -2729,7 +2730,7 @@ export class Game {
       this.prompt = `<kbd>F</kbd>${door.open ? 'Close' : 'Open'} door`;
       if (key) {
         door.toggle(this.player.pos);
-        audio.door(door.open, door.pivot.position);
+        audio.door(door.open, door.pivot.position, door.pivot.position.distanceTo(this.s.r.camera.position));
         this.net.send({ t: 'door', i: this.s.buildings.doors.indexOf(door), open: door.open, swing: door.swingDir });
       }
     } else if (owner instanceof Jeep) {
