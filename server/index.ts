@@ -32,6 +32,7 @@ import { JEEP, POLICE_CAR, SEATS, crashDamage, restState, type VehicleInfo, type
 import { Director, INFECTED, guarded, infectedDrop } from '../src/sim/infected';
 import { EMOTE, EMOTE_GAP, SHOUT_RANGE } from '../src/sim/emotes';
 import { ACTS, CHAT_RANGE, F_DEAD, F_GUARD, MAX_STAMINA, PROTOCOL, type C2S, type CorpseInfo, type KillInfo, type PlayerInfo, type Pose, type S2C, type Slung, type StashInfo, type StoredItem, type Vitals } from '../src/net/protocol';
+import { ORDERS, written } from '../src/net/orders';
 import { FIRE, Hearths } from '../src/sim/fires';
 
 const PORT = Number(process.env.PORT ?? 8080);
@@ -717,7 +718,7 @@ async function command(c: Client, line: string) {
   const label = (o: Client) => `#${o.id} ${o.name}${roleOf(o) ? ` [${roleOf(o)}]` : ''}`;
   switch (cmd) {
     case 'help':
-      return void sys(c, 'Orders: /players · /recent · /flagged · /kick who [why] · /timeout who minutes [why] · /say words', ...(admin ? ['Admins: /ban who [why] · /bans · /unban number-or-name · /admin who · /mod who · /demote who · /roles', '"who" is a name, part of one, or #number from /players. /ban also finds somebody who has just left (/recent).'] : []));
+      return void sys(c, `Orders: ${ORDERS.filter((o) => !o.admin).map(written).join(' · ')}`, ...(admin ? [`Admins: ${ORDERS.filter((o) => o.admin).map(written).join(' · ')}`] : []), '"who" is a name, part of one, or #number from /players.', ...(admin ? ['/ban also finds somebody who has just left (/recent).'] : []));
     case 'players':
     case 'who':
     case 'list':
@@ -1345,6 +1346,8 @@ function handle(c: Client, m: C2S) {
       if (Math.abs(m.p[0] - was[0]) + Math.abs(m.p[2] - was[2]) > 0.02 || Math.abs(m.p[3] - was[3]) + Math.abs(m.p[4] - was[4]) > 0.004) c.activeAt = Date.now();
       // (somewhere they cannot have got to: they are kept where they were, and only the way they look is taken)
       c.pose = moveCheck(c, m.p, Date.now()) ? m.p : [was[0], was[1], was[2], m.p[3], m.p[4], m.p[5]];
+      // (dead here is dead in what is passed on, whatever their own game had heard when it sent this)
+      if (!c.alive) c.pose[5] |= F_DEAD;
       zoneCheck(c);
       underCheck(c);
       const w = typeof m.w === 'string' && ITEMS[m.w] ? m.w : null;
@@ -1709,11 +1712,11 @@ function handle(c: Client, m: C2S) {
       if (text.startsWith('/')) return void command(c, text).catch((e) => log('[admin] an order failed:', e instanceof Error ? e.message : e));
       if (m.ch === 'near') {
         // proximity: only players standing within earshot get it (the speaker included)
-        const out: S2C = { t: 'chat', ch: 'near', from: c.name, text };
+        const out: S2C = { t: 'chat', ch: 'near', from: c.name, text, role: roleOf(c) ?? undefined };
         for (const o of clients.values()) {
           if (Math.hypot(o.pose[0] - c.pose[0], o.pose[1] - c.pose[1], o.pose[2] - c.pose[2]) <= CHAT_RANGE) send(o, out);
         }
-      } else broadcast({ t: 'chat', ch: 'global', from: c.name, text });
+      } else broadcast({ t: 'chat', ch: 'global', from: c.name, text, role: roleOf(c) ?? undefined });
       return;
     }
     case 'admin':

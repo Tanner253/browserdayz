@@ -24,7 +24,7 @@ export class Input {
     window.addEventListener('keydown', (e) => {
       // typing in a text field (player name) is not game input
       if ((e.target as HTMLElement | null)?.tagName === 'INPUT') return;
-      if (e.code === 'Tab' || e.code === 'Space' || e.code.startsWith('Arrow') || (e.ctrlKey && e.code === 'KeyW')) e.preventDefault();
+      if (e.code === 'Tab' || e.code === 'Space' || e.code === 'Slash' || e.code.startsWith('Arrow') || (e.ctrlKey && e.code === 'KeyW')) e.preventDefault();
       if (e.repeat) return;
       this.down.add(e.code);
       this.pressedSet.add(e.code);

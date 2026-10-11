@@ -121,9 +121,22 @@ export class RemotePlayer implements Damageable {
     this.avatar.setHeld(h?.obj ?? null, h?.grips ?? null, h?.kind);
   }
 
+  /** when they were last told dead */
+  private diedAt = 0;
+
+  /**
+   * A position of theirs that does not say they are dead. Just after a death that is no news: it was sent before
+   * their own game knew, and reached the server after the server did. (Taken for a return to life, it stood them
+   * up again on their own body, for as long as they stayed dead.)
+   */
+  seenAlive(now: number) {
+    if (!this.alive && now - this.diedAt > 3000) this.setAlive(true);
+  }
+
   setAlive(alive: boolean) {
     if (alive === this.alive) return;
     this.alive = alive;
+    if (!alive) this.diedAt = performance.now();
     // back from the dead is a new life in clean clothes
     if (alive) this.avatar.clearWounds();
     this.fall = 0;

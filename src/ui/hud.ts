@@ -1,6 +1,7 @@
 // A lean HUD: small vitals, a compass strip, a corner map (src/ui/minimap.ts), prompts
 // only when relevant. Plain DOM; updated once per frame with cheap diffs.
 
+import { offer, type Offer, type Pick, type Role } from '../net/orders';
 import type { Vitals } from '../game/player';
 import { BACK_SHORT, BACK_WHY, mountUpdates } from './updates';
 import { MAX_STAMINA, type ChatChannel } from '../net/protocol';
@@ -126,8 +127,9 @@ export class HUD {
       <div class="hud-hotbar"></div>
       <div class="hud-chat">
         <div class="chat-log"></div>
+        <div class="chat-orders"></div>
         <div class="chat-entry"><span class="chat-ch"></span><input class="chat-input" maxlength="160" spellcheck="false" autocomplete="off"></div>
-        <div class="chat-hint"><b>Tab</b> switch channel · <b>Enter</b> send · empty <b>Enter</b> closes</div>
+        <div class="chat-hint"><b>Tab</b> switch channel · <b>Enter</b> send · empty <b>Enter</b> closes<span class="chat-hint-orders"> · <b>/</b> orders</span></div>
       </div>
       <div class="hud-scope">
         <svg viewBox="-100 -100 200 200" preserveAspectRatio="xMidYMid meet">
@@ -306,15 +308,30 @@ export class HUD {
     const chat = this.root.querySelector('.chat-input') as HTMLInputElement;
     chat.addEventListener('keydown', (e) => {
       e.stopPropagation();
+      const picks = this.offered?.picks ?? [];
       if (e.key === 'Tab') {
-        // same box, different audience
         e.preventDefault();
-        this.setChannel(CHANNELS[(CHANNELS.indexOf(this.channel) + (e.shiftKey ? CHANNELS.length - 1 : 1)) % CHANNELS.length]);
+        // an order being typed: the one that is lit is written out. Talk: same box, different audience
+        if (picks.length) this.take(picks[this.lit]);
+        else if (!this.offered) this.setChannel(CHANNELS[(CHANNELS.indexOf(this.channel) + (e.shiftKey ? CHANNELS.length - 1 : 1)) % CHANNELS.length]);
+      } else if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && picks.length) {
+        e.preventDefault();
+        this.lit = (this.lit + (e.key === 'ArrowDown' ? 1 : picks.length - 1)) % picks.length;
+        this.showOffer();
+      } else if (e.key === '/' && e.repeat && chat.value === '/') {
+        // the key that opened the box is still held down
+        e.preventDefault();
       } else if (e.key === 'Enter') {
         e.preventDefault();
         // the key that opened the box is still held down
         if (e.repeat) return;
-        const text = chat.value.trim();
+        let text = chat.value.trim();
+        // An order's name, typed or half typed: Enter writes out the one that is lit, and gives it at once if
+        // there is no more to it than its name.
+        if (this.offered && !this.offered.order && picks.length) {
+          if (!picks[this.lit].whole) return void this.take(picks[this.lit]);
+          text = picks[this.lit].fill.trim();
+        }
         // The admin password. `/admin` by itself turns this same box into one that does not show what is typed
         // in it; what is typed then goes to the server as a thing of its own, never as talk, and is kept nowhere.
         if (this.passMode) {
@@ -334,6 +351,7 @@ export class HUD {
         if (text) this.chatSend(this.channel, text);
       } else if (e.key === 'Escape') this.closeChat();
     });
+    chat.addEventListener('input', () => this.suggest());
     chat.addEventListener('blur', () => this.chatOpen && this.closeChat());
     this.setChannel('global');
     // the contract address, copied
@@ -831,13 +849,17 @@ export class HUD {
     tag.dataset.ch = ch;
   }
 
-  openChat() {
+  /** @param begun what is in the box to begin with (`/`, for an order) */
+  openChat(begun = '') {
     if (this.chatOpen) return;
     this.chatOpen = true;
     this.toggle(this.el.chat, 'open', true);
+    this.toggle(this.el.chat, 'staff', !!this.role);
     const input = this.root.querySelector('.chat-input') as HTMLInputElement;
-    input.value = '';
+    input.value = begun;
     input.focus();
+    input.setSelectionRange(begun.length, begun.length);
+    this.suggest();
     const log = this.root.querySelector('.chat-log') as HTMLElement;
     log.scrollTop = log.scrollHeight;
   }
@@ -855,7 +877,68 @@ export class HUD {
       box.placeholder = '';
     }
     box.blur();
+    this.offered = null;
+    this.showOffer();
     this.chatClosed();
+  }
+
+  // ---- orders (src/net/orders.ts): offered under the box as one is typed, to whoever has a role
+
+  /** what this player may order on the server (the server says, and is the one that holds them to it) */
+  role: Role | null = null;
+  /** who else is online, to be named in an order */
+  people: () => { id: number; name: string }[] = () => [];
+  /** the names of who left lately, newest last: they can still be banned */
+  gone: string[] = [];
+  private offered: Offer | null = null;
+  /** which of what is offered Tab would take */
+  private lit = 0;
+
+  private suggest() {
+    const box = this.root.querySelector('.chat-input') as HTMLInputElement;
+    this.offered = this.passMode || !this.chatOpen ? null : offer(box.value, this.role, this.people(), this.gone);
+    this.lit = 0;
+    this.showOffer();
+  }
+
+  /** one of what is offered, written into the box */
+  private take(p: Pick) {
+    const box = this.root.querySelector('.chat-input') as HTMLInputElement;
+    box.value = p.fill;
+    box.setSelectionRange(p.fill.length, p.fill.length);
+    this.suggest();
+  }
+
+  private showOffer() {
+    const panel = this.root.querySelector('.chat-orders') as HTMLElement, o = this.offered;
+    panel.replaceChildren();
+    this.toggle(panel, 'show', !!o);
+    if (!o) return;
+    // (every word of this is set as text and never as markup: a player's name is whatever they typed)
+    const el = (tag: string, cls: string, text: string) => {
+      const n = document.createElement(tag);
+      if (cls) n.className = cls;
+      n.textContent = text;
+      return n;
+    };
+    if (o.order) {
+      const head = el('div', 'co-head', `/${o.order.name}`);
+      o.order.args.forEach((a, i) => head.append(' ', el(i === o.at ? 'u' : 'span', '', a)));
+      panel.append(head);
+    }
+    // eight of them at a time, about the one that is lit
+    const from = Math.max(0, Math.min(this.lit - 3, o.picks.length - 8));
+    o.picks.slice(from, from + 8).forEach((p, i) => {
+      const row = el('div', `co-row${from + i === this.lit ? ' on' : ''}`, '');
+      row.append(el('b', '', p.label), el('span', '', p.note));
+      // (pressed, not clicked: the box keeps the keyboard)
+      row.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        this.take(p);
+      });
+      panel.append(row);
+    });
+    if (o.picks.length) panel.append(el('div', 'co-keys', `Tab takes it · ↑ ↓ choose${o.picks.length > 8 ? ` · ${o.picks.length} in all` : ''}${o.order ? '' : ' · Enter gives it'}`));
   }
 
   /** the box is asking for the admin password (see the Enter key, above) */
@@ -864,12 +947,19 @@ export class HUD {
   onPass: (pw: string) => void = () => {};
 
   /** every channel lands in the one log, tagged and coloured by channel */
-  chatLine(ch: ChatChannel | 'system', from: string, text: string) {
+  /** @param role whoever said it is an admin or a mod: it is written before their name */
+  chatLine(ch: ChatChannel | 'system', from: string, text: string, role?: Role | null) {
     const log = this.root.querySelector('.chat-log') as HTMLElement;
     const n = document.createElement('div');
     n.className = 'chat-line';
     n.dataset.ch = ch;
     if (ch !== 'system') {
+      if (role === 'admin' || role === 'mod') {
+        n.dataset.role = role;
+        const rank = document.createElement('em');
+        rank.textContent = `[${role.toUpperCase()}]`;
+        n.append(rank);
+      }
       const tag = document.createElement('i');
       tag.textContent = CHANNEL_LABEL[ch];
       const who = document.createElement('b');

@@ -234,7 +234,7 @@ export type S2C =
   | { t: 'corpse-'; uid: string }
   | { t: 'door'; i: number; open: boolean; swing: number }
   | { t: 'spawn'; x: number; z: number; yaw: number }
-  | { t: 'chat'; ch?: ChatChannel; from: string; text: string }
+  | { t: 'chat'; ch?: ChatChannel; from: string; text: string; role?: 'admin' | 'mod' }
   /** somebody cashed in a dog tag: announced to everyone */
   | { t: 'cashed'; id: number; name: string; owner: string }
   /** these tags of yours are void: you carried them out of the Zona (see TAG_OUT) */

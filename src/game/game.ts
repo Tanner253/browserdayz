@@ -534,6 +534,7 @@ export class Game {
       this.hud.note('The bleeding has stopped on its own', 'good');
       this.meDirty = true;
     };
+    this.hud.people = () => [...this.remotes.values()].map((r) => ({ id: r.id, name: r.name }));
     this.hud.onPass = (pw) => {
       if (this.online) this.net.send({ t: 'admin', pw });
       else this.hud.chatLine('system', '', 'You are playing offline: there is no server to be an admin of.');
@@ -1073,6 +1074,7 @@ export class Game {
       r.seat = null;
       this.hud.feed(`${r.name} left`);
       this.hud.chatLine('system', '', `${r.name} left`);
+      this.hud.gone = [...this.hud.gone.filter((n) => n !== r.name), r.name].slice(-15);
       r.dispose();
       this.remotes.delete(m.id);
       this.updateOnline();
@@ -1084,7 +1086,7 @@ export class Game {
         if (!r) continue;
         r.push([s[1], s[2], s[3], s[4], s[5], s[6]], now);
         r.setWeapon(s[7], s[8]);
-        if (!(s[6] & F_DEAD)) r.setAlive(true);
+        if (!(s[6] & F_DEAD)) r.seenAlive(now);
       }
     });
     net.on('i+', (m) => this.horde.add(m.b));
@@ -1205,7 +1207,7 @@ export class Game {
       this.meDirty = true;
       this.resume();
     });
-    net.on('chat', (m) => this.hud.chatLine(m.ch ?? 'global', m.from, m.text));
+    net.on('chat', (m) => this.hud.chatLine(m.ch ?? 'global', m.from, m.text, m.role));
     // everyone carrying a tag they took, shown on the map for a few seconds
     net.on('tags', (m) => {
       const me = m.p.some(([id]) => id === net.id);
@@ -1224,6 +1226,8 @@ export class Game {
     // what the server says to this player alone: a role given or taken, and what came of an order (see `command` in server/index.ts)
     net.on('role', (m) => {
       this.role = m.role;
+      this.hud.role = m.role;
+      if (m.role) this.hud.chatLine('system', '', `You are ${m.role === 'admin' ? 'an admin' : 'a mod'} here. Press / for your orders: they are listed as you type.`);
     });
     net.on('sys', (m) => this.hud.chatLine('system', '', m.text));
     net.on('tell', (m) => {
@@ -3413,10 +3417,11 @@ export class Game {
     if (input.pressed('KeyM') && playing && !this.invUI.isOpen && !this.shop.isOpen && !this.hud.chatOpen) this.toggleMap();
     else if (this.map.open && (!playing || this.invUI.isOpen || this.shop.isOpen)) this.toggleMap(false);
     const uiOpen = this.invUI.isOpen || this.shop.isOpen || this.map.open;
-    // Enter opens the chat box; while typing the character stands still and the gun stays quiet
-    if (input.pressed('Enter') && playing && !uiOpen && !this.hud.chatOpen) {
+    // Enter opens the chat box, and / opens it with an order begun; while typing the character stands still and the gun stays quiet
+    const order = input.pressed('Slash') || input.pressed('NumpadDivide');
+    if ((order || input.pressed('Enter')) && playing && !uiOpen && !this.hud.chatOpen) {
       input.releaseAll();
-      this.hud.openChat();
+      this.hud.openChat(order ? '/' : '');
     }
     if (this.hud.chatOpen && (!playing || uiOpen)) this.hud.closeChat();
     const typing = this.hud.chatOpen;
