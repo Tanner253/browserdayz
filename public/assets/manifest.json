@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-11T19:07:53.569Z",
+ "generated": "2026-10-11T19:31:29.770Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr"
@@ -3703,7 +3703,7 @@
    "tags": [
     "furniture"
    ],
-   "bytes": 159592,
+   "bytes": 144152,
    "srcTris": 14080,
    "tris": 1660,
    "min": [
@@ -3718,14 +3718,14 @@
    ],
    "lods": [],
    "hi": "assets/models/hi/body_lockers.glb",
-   "hiBytes": 1095132
+   "hiBytes": 739408
   },
   "autopsy_table": {
    "url": "assets/models/autopsy_table.glb",
    "tags": [
     "furniture"
    ],
-   "bytes": 210964,
+   "bytes": 185504,
    "srcTris": 14080,
    "tris": 1734,
    "min": [
@@ -3740,14 +3740,14 @@
    ],
    "lods": [],
    "hi": "assets/models/hi/autopsy_table.glb",
-   "hiBytes": 1208212
+   "hiBytes": 962348
   },
   "surgical_trolley": {
    "url": "assets/models/surgical_trolley.glb",
    "tags": [
     "furniture"
    ],
-   "bytes": 152452,
+   "bytes": 127512,
    "srcTris": 14080,
    "tris": 888,
    "min": [
@@ -3762,14 +3762,14 @@
    ],
    "lods": [],
    "hi": "assets/models/hi/surgical_trolley.glb",
-   "hiBytes": 664416
+   "hiBytes": 445804
   },
   "med_cabinet": {
    "url": "assets/models/med_cabinet.glb",
    "tags": [
     "furniture"
    ],
-   "bytes": 133552,
+   "bytes": 108612,
    "srcTris": 14080,
    "tris": 138,
    "min": [
@@ -3784,14 +3784,14 @@
    ],
    "lods": [],
    "hi": "assets/models/hi/med_cabinet.glb",
-   "hiBytes": 645516
+   "hiBytes": 426904
   },
   "lab_counter": {
    "url": "assets/models/lab_counter.glb",
    "tags": [
     "furniture"
    ],
-   "bytes": 132736,
+   "bytes": 107796,
    "srcTris": 14080,
    "tris": 68,
    "min": [
@@ -3806,14 +3806,14 @@
    ],
    "lods": [],
    "hi": "assets/models/hi/lab_counter.glb",
-   "hiBytes": 644700
+   "hiBytes": 426088
   },
   "med_sink": {
    "url": "assets/models/med_sink.glb",
    "tags": [
     "furniture"
    ],
-   "bytes": 140268,
+   "bytes": 115328,
    "srcTris": 14080,
    "tris": 618,
    "min": [
@@ -3828,14 +3828,14 @@
    ],
    "lods": [],
    "hi": "assets/models/hi/med_sink.glb",
-   "hiBytes": 652232
+   "hiBytes": 433620
   },
   "surgical_lamp": {
    "url": "assets/models/surgical_lamp.glb",
    "tags": [
     "furniture"
    ],
-   "bytes": 240788,
+   "bytes": 199704,
    "srcTris": 14080,
    "tris": 1520,
    "min": [
@@ -3850,14 +3850,14 @@
    ],
    "lods": [],
    "hi": "assets/models/hi/surgical_lamp.glb",
-   "hiBytes": 1755348
+   "hiBytes": 1417160
   },
   "autopsy_scales": {
    "url": "assets/models/autopsy_scales.glb",
    "tags": [
     "furniture"
    ],
-   "bytes": 243688,
+   "bytes": 202604,
    "srcTris": 14080,
    "tris": 1752,
    "min": [
@@ -3872,14 +3872,14 @@
    ],
    "lods": [],
    "hi": "assets/models/hi/autopsy_scales.glb",
-   "hiBytes": 1758252
+   "hiBytes": 1420064
   },
   "covered_body": {
    "url": "assets/models/covered_body.glb",
    "tags": [
     "furniture"
    ],
-   "bytes": 233392,
+   "bytes": 192308,
    "srcTris": 14080,
    "tris": 1368,
    "min": [
@@ -3894,14 +3894,14 @@
    ],
    "lods": [],
    "hi": "assets/models/hi/covered_body.glb",
-   "hiBytes": 1747956
+   "hiBytes": 1409768
   },
   "instrument_tray": {
    "url": "assets/models/instrument_tray.glb",
    "tags": [
     "furniture"
    ],
-   "bytes": 228940,
+   "bytes": 187852,
    "srcTris": 14080,
    "tris": 402,
    "min": [
@@ -3916,7 +3916,7 @@
    ],
    "lods": [],
    "hi": "assets/models/hi/instrument_tray.glb",
-   "hiBytes": 1743508
+   "hiBytes": 1405320
   },
   "xray_viewer": {
    "url": "assets/models/xray_viewer.glb",
@@ -3967,7 +3967,7 @@
    "tags": [
     "furniture"
    ],
-   "bytes": 469464,
+   "bytes": 430364,
    "srcTris": 46706,
    "tris": 11452,
    "min": [
@@ -3982,14 +3982,14 @@
    ],
    "lods": [],
    "hi": "assets/models/hi/medical_light.glb",
-   "hiBytes": 2077620
+   "hiBytes": 1548052
   },
   "steel_table": {
    "url": "assets/models/steel_table.glb",
    "tags": [
     "furniture"
    ],
-   "bytes": 245468,
+   "bytes": 234924,
    "srcTris": 46706,
    "tris": 6252,
    "min": [
@@ -4004,14 +4004,14 @@
    ],
    "lods": [],
    "hi": "assets/models/hi/steel_table.glb",
-   "hiBytes": 4258912
+   "hiBytes": 3743760
   },
   "lab_table": {
    "url": "assets/models/lab_table.glb",
    "tags": [
     "furniture"
    ],
-   "bytes": 727712,
+   "bytes": 691880,
    "srcTris": 46706,
    "tris": 18119,
    "min": [
@@ -4026,7 +4026,7 @@
    ],
    "lods": [],
    "hi": "assets/models/hi/lab_table.glb",
-   "hiBytes": 5970884
+   "hiBytes": 5170604
   }
  }
 }

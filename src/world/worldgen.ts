@@ -128,10 +128,12 @@ export function playOutline(): { x: number; z: number; r: number; from: number; 
   return out;
 }
 
+/** where the hospital stands in Kamenka: metres to the right of its street (looking down it), and along it from the town's middle */
+export const HOSPITAL_AT = { right: 46, along: -4 };
 /** the village's second clinic and second shop: how far out along its street from its middle they are looked for a place (metres: no nearer, no farther, and where first) */
 export const SERVICES = { from: 68, to: 116, out: 90 };
 
-export type BuildingType = 'house_small' | 'house_brick' | 'barn' | 'shed' | 'cabin' | 'guardpost' | 'police' | 'clinic' | 'store' | 'barracks' | 'garage' | 'house_two' | 'tower' | 'hut' | 'townhouse' | 'shanty' | 'tent';
+export type BuildingType = 'house_small' | 'house_brick' | 'barn' | 'shed' | 'cabin' | 'guardpost' | 'police' | 'clinic' | 'store' | 'barracks' | 'garage' | 'house_two' | 'tower' | 'hut' | 'townhouse' | 'shanty' | 'tent' | 'hospital' | 'police_hq';
 
 /** footprint (x = width, z = depth) in metres, used for terrain pads + spacing */
 export const BUILDING_FOOTPRINT: Record<BuildingType, [number, number]> = {
@@ -155,6 +157,9 @@ export const BUILDING_FOOTPRINT: Record<BuildingType, [number, number]> = {
   shanty: [9.9, 15.9],
   // (the army's tent, another download gone into whole: its cloth, without the ropes)
   tent: [6.3, 8.5],
+  // (2026-10-11: the district hospital, three floors and the roof; and the police headquarters, two: see src/world/big-buildings.ts)
+  hospital: [46, 16],
+  police_hq: [22, 13],
 };
 
 export interface BuildingPlot {
@@ -1681,6 +1686,51 @@ export function generateWorld(seed = WORLD_SEED): World {
       paint(k % N, Math.floor(k / N));
       if (surface) surface[k] = heights[k];
     }
+  }
+
+  // --- the district hospital, in Kamenka (2026-10-11): three floors and a roof, the biggest building there is
+  // (src/world/big-buildings.ts). It stands on the east edge of the town's floor, behind the right-hand row of the
+  // street, its long front to the street and its door opposite the way through between the plank house and the
+  // brick block. After every building there was: none is renumbered. The ground under it is the floor's, level
+  // already; what grew or lay there goes.
+  {
+    const first = buildings.length;
+    const before = heights.slice();
+    const rng6 = new RNG(seed + 7373);
+    const cell = (x: number, z: number) => idx(clamp(Math.round((x + half) / CELL), 0, N - 1), clamp(Math.round((z + half) / CELL), 0, N - 1));
+    const [sx, sz] = TOWN.street, street = Math.atan2(sx, sz);
+    const inTown = (right: number, along: number): [number, number] => [TOWN.x + right * sz + along * sx, TOWN.z - right * sx + along * sz];
+    const [hx, hz] = inTown(HOSPITAL_AT.right, HOSPITAL_AT.along);
+    buildings.push({ id: `hospital_${buildings.length}`, type: 'hospital', x: hx, z: hz, rot: street - Math.PI / 2, floorY: 0, seed: Math.floor(rng6.next() * 1e9) });
+    const added = buildings.slice(first);
+    const reach = (type: BuildingType) => Math.hypot(...BUILDING_FOOTPRINT[type]) / 2;
+    for (const b of added) seat(b);
+    for (const b of buildings) if (added.some((n) => n === b || Math.hypot(n.x - b.x, n.z - b.z) < reach(n.type) + reach(b.type) + 9.5)) pad(b, 3.2, 2.2);
+    const inAdded = (x: number, z: number, margin: number) =>
+      added.some((b) => {
+        const [w, d] = BUILDING_FOOTPRINT[b.type];
+        const dx = x - b.x, dz = z - b.z, c = Math.cos(b.rot), sn = Math.sin(b.rot);
+        return Math.abs(dx * c - dz * sn) < w / 2 + margin && Math.abs(dx * sn + dz * c) < d / 2 + margin;
+      });
+    for (const list of [trees, rocks, props]) {
+      for (let k = list.length - 1; k >= 0; k--) {
+        const t = list[k];
+        if (!added.some((b) => Math.hypot(b.x - t.x, b.z - t.z) < reach(b.type) + 14)) continue;
+        if (inAdded(t.x, t.z, list === trees ? 4 : 2.5)) list.splice(k, 1);
+        else t.y += heightAt(heights, t.x, t.z) - heightAt(before, t.x, t.z);
+      }
+    }
+    const again = new Set<number>();
+    for (const b of added) {
+      const R = reach(b.type) + 8;
+      for (let iz = Math.max(0, Math.floor((b.z - R + half) / CELL)); iz <= Math.min(N - 1, Math.ceil((b.z + R + half) / CELL)); iz++)
+        for (let ix = Math.max(0, Math.floor((b.x - R + half) / CELL)); ix <= Math.min(N - 1, Math.ceil((b.x + R + half) / CELL)); ix++) again.add(iz * N + ix);
+    }
+    for (const k of again) {
+      paint(k % N, Math.floor(k / N));
+      if (surface) surface[k] = heights[k];
+    }
+    void cell;
   }
 
   // Where anybody starts. The ring of starts was laid before there was a bunker, or a town in the east: nobody

@@ -249,7 +249,10 @@ ok('the long huts stand where they were meant to: beside the trading post, behin
   // and the village's second clinic and second shop: the last two buildings of all, each where its ground was fenced
   // off, well away from the police station, from the first of its kind and from one another, and still in the village
   const police = world.buildings.find((b) => b.type === 'police')!, village = world.pois[0];
-  const last = world.buildings.slice(-SECOND.length);
+  // (the last two there were when they were built: what has been built since comes after them)
+  const last = SECOND.map((q) => world.buildings.find((b) => b.type === q.type && Math.hypot(b.x - q.x, b.z - q.z) < 0.5)!);
+  assert.ok(last.every(Boolean), 'the second clinic or the second shop is gone');
+  assert.ok(world.buildings.indexOf(last[1]) === world.buildings.indexOf(last[0]) + 1, 'the second clinic and the second shop are not side by side in the list');
   SECOND.forEach((q, i) => {
     const b = last[i];
     assert.ok(b.type === q.type && Math.hypot(b.x - q.x, b.z - q.z) < 0.5, `no second ${q.type} at ${q.x}, ${q.z}: ${b.id} is at ${b.x.toFixed(1)}, ${b.z.toFixed(1)}`);

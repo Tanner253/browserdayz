@@ -14,6 +14,7 @@ import { GAS, gasDepth, gasZone } from '../sim/gas';
 import type { Tier } from '../sim/tiers';
 import { BUILDING_FOOTPRINT, CELL, TOWN, WORLD_RES, WORLD_SIZE, bunkerPlace, heightAt, idx, type BuildingPlot, type Instance, type SiteKind, type World } from './worldgen';
 import { bunkerAt, bunkerPlan, levelY } from '../sim/bunker';
+import { hospitalPlan } from './big-buildings';
 
 /** (`Gas` is not a kind of building: it is whatever stands under the gas, whatever else it is. See src/sim/gas.ts.) */
 export type Usage = 'Village' | 'Town' | 'Farm' | 'Industrial' | 'Military' | 'Hunting' | 'Medic' | 'Police' | 'Shop' | 'Gas' | 'Bunker' | 'East';
@@ -70,7 +71,7 @@ const BED = { springs: 0.49, mattress: 0.1 };
 /** how far under its rim the lid of a water barrel is */
 const BARREL_LID = 0.032;
 /** furniture whose loot sits on the very top of the model (height taken from the model, not hand-typed) */
-const TOP_SURFACE = new Set(['WoodenTable_01', 'painted_wooden_table', 'electric_stove', 'painted_wooden_cabinet', 'metal_office_desk']);
+const TOP_SURFACE = new Set(['WoodenTable_01', 'painted_wooden_table', 'electric_stove', 'painted_wooden_cabinet', 'metal_office_desk', 'lab_counter', 'steel_table', 'surgical_trolley']);
 
 export type MatKey =
   | 'plaster_ext' | 'brick_ext' | 'planks_ext' | 'planks' | 'int_plaster' | 'int_painted'
@@ -105,7 +106,8 @@ const MATS: Record<Exclude<MatKey, 'glass'>, { tex: string; tile: number; color?
   // a cell's: grey-blue to the height of a man
   cell_wall: { tex: 'damaged_plaster', tile: 2.2, color: 0x8f9aa3, surface: 'plaster' },
   // bars, vents, a tank, a mast
-  steel: { tex: 'metal_plate', tile: 1.4, color: 0x8b9094, metal: true, surface: 'metal' },
+  // (painted steel: there is no picture of bare plate among the ones the game has)
+  steel: { tex: 'painted_plaster_wall', tile: 1.2, color: 0x565d63, surface: 'metal' },
   // a flat roof's felt
   bitumen: { tex: 'asphalt_02', tile: 3.4, color: 0x8d8a84, surface: 'concrete' },
 };
@@ -505,6 +507,8 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
         loot: [[2.3, 0.48, -0.9], [-1.5, 0.57, 0.7], [-1.5, 0.57, 1.3], [0.6, 0.56, -2.0], [0.6, 1.02, -2.0], [-2.4, 0.02, -1.75]],
         usage: ['Hunting'],
       };
+    case 'hospital':
+      return hospitalPlan();
     case 'police':
       // lobby with the duty desk, a holding cell on the left, the armoury behind a door on the right
       return {
@@ -1339,7 +1343,10 @@ export class Buildings {
       addBox('concrete', -hw - proud, hw + proud, -1.4, -0.1, -hd - proud, hd + proud, B);
       addBox(bp.floor, -hw + T * 0.5, hw - T * 0.5, -0.12, 0, -hd + T * 0.5, hd - T * 0.5, B);
     }
-    if (bp.roofType !== 'flat' && !bp.whole) addBox(bp.upper?.int ?? bp.int, -hw + T, hw - T, H, H + 0.08, -hd + T, hd - T, B, false);
+    // (The ceiling under a pitched roof: it stops a body. It was a picture of a ceiling and nothing else, and a jump in
+    // a room went up through it into the roof: "ceilings in our buildings need collision so when you jump your camera
+    // doesnt clip through the ceiling ... on all buildings and the ceilings of all floors", 2026-10-11.)
+    if (bp.roofType !== 'flat' && !bp.whole) addBox(bp.upper?.int ?? bp.int, -hw + T, hw - T, H, H + 0.08, -hd + T, hd - T, B);
 
     // walls: of one floor, whose foot is at y0 and which is h high
     const outside: { F: THREE.Matrix4; a: number; b: number; front: boolean }[] = [];
@@ -1464,13 +1471,13 @@ export class Buildings {
 
     // --- a building of several floors, with a flat roof that is walked on (the hospital, the police headquarters)
     /** how high each floor is over the ground one: [0, the first above it, ...]; and the roof */
-    const levelY: number[] = [0];
+    const storeyY: number[] = [0];
     let roofY = 0;
     if (bp.levels) {
       const ups = bp.levels, wells = bp.wells ?? [], deck = bp.deck;
       let top = h;
       for (const l of ups) {
-        levelY.push(top + SLAB);
+        storeyY.push(top + SLAB);
         top += SLAB + l.h;
       }
       roofY = top + SLAB;
@@ -1502,9 +1509,9 @@ export class Buildings {
         }
       };
       ups.forEach((l, k) => {
-        slab(l.floor, levelY[k + 1] - SLAB, levelY[k + 1], wells.filter((wl) => climbs(wl) > k));
+        slab(l.floor, storeyY[k + 1] - SLAB, storeyY[k + 1], wells.filter((wl) => climbs(wl) > k));
         // (its outside walls go on up past the edge of the floor or the roof over it)
-        raise(l.walls, levelY[k + 1], l.h + SLAB, l.h);
+        raise(l.walls, storeyY[k + 1], l.h + SLAB, l.h);
       });
       slab(deck ? 'bitumen' : bp.roof, roofY - SLAB, roofY, wells.filter((wl) => climbs(wl) > ups.length));
 
@@ -1514,7 +1521,7 @@ export class Buildings {
         const dz = Math.sign(wl.far - wl.land), turn = wl.far - dz * LANDING, xm = (wl.x0 + wl.x1) / 2;
         const n = climbs(wl);
         for (let st = 0; st < n; st++) {
-          const ya = levelY[st], yb = st < ups.length ? levelY[st + 1] : roofY, ym = (ya + yb) / 2;
+          const ya = storeyY[st], yb = st < ups.length ? storeyY[st + 1] : roofY, ym = (ya + yb) / 2;
           const out: Stairs = { x0: wl.x0, x1: xm - GAP, foot: wl.land, top: turn };
           const back: Stairs = { x0: xm + GAP, x1: wl.x1, foot: turn, top: wl.land };
           this.flight(B, plot.id, out, ya, ym, undefined, 'concrete');
@@ -1545,14 +1552,14 @@ export class Buildings {
         }
         // At the head of the well nothing goes on up: the side the next flight would have left by is open over
         // the one below, and is railed off.
-        const headY = n <= ups.length ? levelY[n] : roofY;
+        const headY = n <= ups.length ? storeyY[n] : roofY;
         this.rail(B, wl.x0, wl.land, xm, wl.land, headY, headY, 'steel');
       }
 
       // bars, counters, plinths: plain shapes on a floor
       for (const fl of bp.fittings ?? []) {
         for (const f of fl.list) {
-          const y = levelY[fl.level] ?? 0;
+          const y = storeyY[fl.level] ?? 0;
           if (f.glass) this.push('glass', boxGeo(f.x0, f.x1, y + f.y0, y + f.y1, f.z0, f.z1, 1, B));
           else addBox(f.key, f.x0, f.x1, y + f.y0, y + f.y1, f.z0, f.z1, B, !f.soft);
           if (f.glass) this.collider((f.x1 - f.x0) / 2, (f.y1 - f.y0) / 2, Math.max(0.04, (f.z1 - f.z0) / 2), B.clone().multiply(new THREE.Matrix4().makeTranslation((f.x0 + f.x1) / 2, y + (f.y0 + f.y1) / 2, (f.z0 + f.z1) / 2)), 'glass', GLASS_GROUPS);
@@ -1784,7 +1791,7 @@ export class Buildings {
     const his = plot.type !== 'hut' && this.world.sites.some((st) => st.kind === 'market' && Math.hypot(st.x - plot.x, st.z - plot.z) < 40);
     stock(bp.furniture, his ? [] : bp.loot, 0);
     if (bp.upper) stock(bp.upper.furniture, bp.upper.loot, h + SLAB);
-    (bp.levels ?? []).forEach((l, k) => stock(l.furniture, l.loot, levelY[k + 1], l.usage));
+    (bp.levels ?? []).forEach((l, k) => stock(l.furniture, l.loot, storeyY[k + 1], l.usage));
     if (bp.deck) {
       const firstUp = this.lootPoints.length;
       stock(bp.deck.furniture, bp.deck.loot, roofY, bp.deck.usage);

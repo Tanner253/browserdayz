@@ -19,6 +19,8 @@ const PRONE_HALF = 0.03;
 const CRAWL = 1.05;
 const RADIUS = 0.3;
 const EYE_STAND = 1.64;
+/** how far under a ceiling the eye is kept (the picture is drawn from eight centimetres in front of it, in every direction it may be turned) */
+const HEADROOM = 0.15;
 const EYE_CROUCH = 1.02;
 /** sat on the ground (the wheel) */
 const EYE_SAT = 0.86;
@@ -638,7 +640,13 @@ export class Player {
 
     const side = new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
     const step = this.prevStepOff + (this.stepOff - this.prevStepOff) * alpha;
-    cam.position.set(p.x, p.y + this.eye + this.landDip + this.bob.y + step, p.z);
+    // The eye is kept clear of whatever is over the head. The top of the body stops at a ceiling and the eye is
+    // eight centimetres under that, which is as near a thing as the picture is drawn from: looked up at from a
+    // jump, or from under a stair, the ceiling was looked through. One look upward a frame.
+    let eyeY = p.y + this.eye + this.landDip + this.bob.y + step;
+    const over = this.dead ? null : physics.raycast({ x: p.x, y: p.y + 0.5, z: p.z }, { x: 0, y: 1, z: 0 }, 1.5, SHOT_GROUPS, this.collider);
+    if (over) eyeY = Math.min(eyeY, Math.max(p.y + 0.3, p.y + 0.5 + over.toi - HEADROOM));
+    cam.position.set(p.x, eyeY, p.z);
     const reach = LEAN_REACH * THREE.MathUtils.lerp(1, 0.74, THREE.MathUtils.clamp((EYE_STAND - this.eye) / (EYE_STAND - EYE_CROUCH), 0, 1));
     cam.position.addScaledVector(side, this.bob.x + lean * reach);
     if (lean !== 0) cam.position.y -= Math.abs(lean) * 0.08;

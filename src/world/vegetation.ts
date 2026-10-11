@@ -71,6 +71,23 @@ const SOLID: Record<string, [Surface, number]> = {
   bunker_machine: ['metal', 0.95],
   bunker_pipe: ['metal', 0.7],
   bunker_pipes: ['metal', 0.95],
+  // (the hospital's, 2026-10-11: what stands on a floor and is big enough to be walked into)
+  hospital_desk: ['wood', 0.96],
+  hospital_bench: ['metal', 0.92],
+  water_cooler: ['metal', 0.9],
+  ward_curtain: ['cloth', 0.9],
+  screen_curtain: ['cloth', 0.9],
+  ventilator: ['metal', 0.7],
+  computer_cart: ['metal', 0.8],
+  body_lockers: ['metal', 0.98],
+  autopsy_table: ['metal', 0.92],
+  steel_table: ['metal', 0.92],
+  lab_table: ['metal', 0.92],
+  surgical_trolley: ['metal', 0.85],
+  med_cabinet: ['metal', 0.95],
+  lab_counter: ['concrete', 0.95],
+  med_sink: ['metal', 0.9],
+  mop_bucket: ['metal', 0.6],
 };
 
 /**
