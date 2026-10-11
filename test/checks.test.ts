@@ -234,6 +234,42 @@ await withServer('enforce', async (log) => {
   checks++;
   console.log('  ok  a thing lying in the world is taken from beside it, and not from across the map');
 
+  // ---- under the ground nobody hits anybody or takes a thing (a rule of the game: it holds whatever CHECKS says)
+  const ula = new Player('Ula'), vic = new Player('Vic');
+  await ula.join();
+  await vic.join();
+  const thing = ula.loot.find((l) => Math.hypot(l.x, l.z) < 300 && l.uid !== lying.uid)!;
+  ula.say(thing.x + 1, thing.z);
+  vic.say(thing.x + 2.2, thing.z);
+  await sleep(2700);
+  // (on the ground a fist lands)
+  ula.hit(vic, 'fists');
+  await sleep(500);
+  assert.ok(vic.got.some((m) => m.t === 'dmg'), 'a fist from beside somebody did not land');
+  vic.got = [];
+  // (then she says she is two and a half metres down in the earth, and goes on saying so)
+  for (let k = 0; k < 9; k++) {
+    ula.send({ t: 's', p: [thing.x + 1, ground(thing.x + 1, thing.z) - 2.5, thing.z, 0, 0, 0], w: null, m: [] });
+    await sleep(500);
+  }
+  ula.hit(vic, 'fists');
+  ula.send({ t: 'take', uid: thing.uid });
+  await sleep(500);
+  assert.ok(!vic.got.some((m) => m.t === 'dmg'), 'somebody was hit from under the ground');
+  assert.ok(ula.got.some((m) => m.t === 'denied' && (m as { uid: string }).uid === thing.uid), 'a thing was taken from under the ground');
+  assert.ok(/Ula is 2\.5 m under the ground/.test(log()), `nothing was written down of it:
+${log().slice(-400)}`);
+  // (and back on the ground she is in the game again)
+  ula.say(thing.x + 1, thing.z);
+  await sleep(300);
+  ula.send({ t: 'take', uid: thing.uid });
+  await sleep(400);
+  assert.ok(ula.got.some((m) => m.t === 'loot-' && (m as { uid: string }).uid === thing.uid), 'back on the ground, a thing at her feet was refused her');
+  ula.ws.close();
+  vic.ws.close();
+  checks++;
+  console.log('  ok  under the ground nobody hits anybody or takes a thing; back on it they do');
+
   // ---- a gun somebody carries is one the server put in the world
   const lea = new Player('Lea'), mia = new Player('Mia'), ned = new Player('Ned'), oli = new Player('Oli');
   for (const p of [lea, mia, ned, oli]) await p.join();

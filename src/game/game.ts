@@ -1954,6 +1954,25 @@ export class Game {
     }
   }
 
+  /**
+   * Under the ground. A body that has got down into the earth (through a seam of it, off the edge of something,
+   * by whatever let it) is put back on its feet on the ground over it, two seconds after it is found there:
+   * nobody under the ground can be shot, and one such was found waiting out his tags' ten minutes there. The
+   * server holds the rule whatever a game does (see UNDER in server/index.ts); this is what keeps an honest player
+   * out of its way. The bunker is under the ground and is a place: round it the ground is not asked about.
+   */
+  private unbury(dt: number, riding: boolean) {
+    const p = this.player, at = p.pos;
+    const b = this.bunker.place;
+    const down = this.started && !p.dead && !riding && at.y < heightAt(this.s.world.heights, at.x, at.z) - 1.1 && !(b && Math.hypot(at.x - b.x, at.z - b.z) < 48);
+    this.buriedT = down ? this.buriedT + dt : 0;
+    if (this.buriedT < 2) return;
+    this.buriedT = 0;
+    p.spawn(at.x, heightAt(this.s.world.heights, at.x, at.z) + 0.15, at.z, p.yaw);
+    this.hud.note('You were under the ground: back on your feet', 'warn');
+  }
+  private buriedT = 0;
+
   /** A hot key is pressed: what is on it comes into the hands, or goes out of them if it is there already. */
   private hot(i: number) {
     const key = (i + 1) % 10, bound = this.inv.hot[i], item = this.inv.hotItem(i);
@@ -3539,6 +3558,8 @@ export class Game {
         f.run();
       }
     }
+
+    this.unbury(dt, !!ride);
 
     // the hot keys: each brings up what is on it (and puts it away again); X empties the hands
     if (playing && !uiOpen && !typing && !p.dead) {
