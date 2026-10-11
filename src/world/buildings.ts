@@ -420,6 +420,9 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
           { side: 'back', ext: 'planks_ext', int: 'planks', openings: [win(-1.6, -0.6)] },
           { side: 'left', ext: 'planks_ext', int: 'planks', openings: [win(-0.5, 0.5)] },
           { side: 'right', ext: 'planks_ext', int: 'planks', openings: [win(0.2, 1.0)] },
+          // a closet in the back corner, boarded off, a door on it: room for one to stand in with the door shut
+          { side: 'inner', from: [-1.9, -2.3], to: [-1.9, -1.2], ext: 'planks', int: 'planks', openings: [door(-2.15, -1.35)], still: true },
+          { side: 'inner', from: [-2.8, -1.1], to: [-1.8, -1.1], ext: 'planks', int: 'planks', openings: [] },
         ],
         furniture: [
           { id: 'old_bed_frame', x: 2.3, z: -1.3, rot: 0 },
@@ -427,7 +430,8 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
           { id: 'painted_wooden_chair_01', x: -0.8, z: 1.0, rot: -Math.PI / 2 },
           { id: 'wooden_bookshelf_worn', x: 0.6, z: -2.0, rot: 0 },
         ],
-        loot: [[2.3, 0.48, -0.9], [-1.5, 0.57, 0.7], [-1.5, 0.57, 1.3], [0.6, 0.56, -2.0], [0.6, 1.02, -2.0], [-2.0, 0.02, -1.2]],
+        // (the last of them is on the closet's floor)
+        loot: [[2.3, 0.48, -0.9], [-1.5, 0.57, 0.7], [-1.5, 0.57, 1.3], [0.6, 0.56, -2.0], [0.6, 1.02, -2.0], [-2.4, 0.02, -1.75]],
         usage: ['Hunting'],
       };
     case 'police':
@@ -645,6 +649,9 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
           { side: 'left', ext, int: 'int_painted', openings: [win(-0.6, 0.6)] },
           { side: 'right', ext, int: 'int_painted', openings: [] },
           { side: 'inner', from: [-0.9, -3.3], to: [-0.9, 3.3], ext: 'int_plaster', int: 'int_painted', openings: [door(0.9, 1.8)] },
+          // The cupboard under the stairs: the corner under the landing, behind the boards the flight ends in, was a
+          // nook open to the hall. A wall across the way into it, with a door: room for one to stand in with it shut.
+          { side: 'inner', from: [3.2, -3.3], to: [3.2, -2.0], ext: 'int_plaster', int: 'int_painted', openings: [door(-3.15, -2.35)], still: true },
         ],
         stairs: { x0: 3.3, x1: 4.3, foot: 1.9, top: -2.1 },
         furniture: [
@@ -660,16 +667,21 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
         ],
         loot: [
           [-3.9, 0.88, -2.95], [-3.95, 1.2, -1.9], [-2.9, 0.57, 0.6], [-2.5, 0.57, 0.6], [-4.05, 0.94, 2.4], [-4.05, 1.51, 2.4],
-          [1.4, 0.67, -3.0], [1.4, 1.28, -3.0], [-0.42, 1.2, -1.4], [1.6, 0.02, 0.8], [-2.0, 0.02, 2.6],
+          // (The one that lay on the hall floor is in the cupboard now. No place is added: what the server keeps
+          // between restarts goes by a place's number, and one more here would renumber every place after it.)
+          [1.4, 0.67, -3.0], [1.4, 1.28, -3.0], [-0.42, 1.2, -1.4], [3.8, 0.02, -2.7], [-2.0, 0.02, 2.6],
         ],
         upper: {
           h: 2.6, int: 'int_painted', floor: 'floor_wood',
           walls: [
             { side: 'front', ext, int: 'int_painted', openings: [win(-3.7, -2.6), win(-0.6, 0.5), win(1.5, 2.6)] },
-            { side: 'back', ext, int: 'int_painted', openings: [win(-3.5, -2.4), win(0.5, 1.6)] },
+            { side: 'back', ext, int: 'int_painted', openings: [win(-3.5, -2.4), win(1.3, 2.4)] },
             { side: 'left', ext, int: 'int_painted', openings: [win(-0.6, 0.6)] },
             { side: 'right', ext, int: 'int_painted', openings: [win(-0.5, 0.6)] },
-            { side: 'inner', from: [0.2, -3.3], to: [0.2, 3.3], ext: 'int_plaster', int: 'int_painted', openings: [door(-3.05, -2.15)] },
+            // (The wall between the two rooms stood at 0.2: in the middle of the window over the front door, which is
+            // from -0.6 to 0.5, and in the back one's frame. It stands clear of both now, a hand's breadth past the
+            // front window's jamb; the back window has moved along its wall, and the near room's things with the wall.)
+            { side: 'inner', from: [0.8, -3.3], to: [0.8, 3.3], ext: 'int_plaster', int: 'int_painted', openings: [door(-3.05, -2.15)] },
           ],
           furniture: [
             // (the far room: a bed in the corner, books, a table to sit at; nothing across the way in from the door)
@@ -679,14 +691,14 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
             { id: 'WoodenTable_01', x: -1.3, z: -0.3, rot: Math.PI / 2 },
             { id: 'painted_wooden_chair_01', x: -1.95, z: -0.3, rot: Math.PI / 2 },
             // (the near one, beside the stair well: the bed along the wall, a desk under the window, and room to walk between the bed and the rail)
-            { id: 'old_bed_frame', x: 0.8, z: 0.2, rot: 0 },
-            { id: 'Shelf_01', x: 0.44, z: 1.9, rot: Math.PI / 2 },
-            { id: 'metal_office_desk', x: 1.7, z: 2.8, rot: Math.PI },
-            { id: 'SchoolChair_01', x: 1.7, z: 1.95, rot: 0 },
+            { id: 'old_bed_frame', x: 1.4, z: 0.2, rot: 0 },
+            { id: 'Shelf_01', x: 1.04, z: 1.9, rot: Math.PI / 2 },
+            { id: 'metal_office_desk', x: 2.25, z: 2.8, rot: Math.PI },
+            { id: 'SchoolChair_01', x: 2.25, z: 1.95, rot: 0 },
           ],
           loot: [
             [-3.8, 0.48, -1.7], [-4.02, 0.67, 1.5], [-4.02, 1.28, 1.5], [-1.5, 1.2, 3.0], [-1.3, 0.57, -0.3],
-            [0.8, 0.48, 0.5], [0.44, 0.94, 1.9], [0.44, 1.51, 1.9], [1.3, 0.81, 2.8], [2.1, 0.81, 2.8], [-2.4, 0.02, 1.0], [2.3, 0.02, -0.4], [3.8, 0.02, 2.7],
+            [1.4, 0.48, 0.5], [1.04, 0.94, 1.9], [1.04, 1.51, 1.9], [1.85, 0.81, 2.8], [2.65, 0.81, 2.8], [-2.4, 0.02, 1.0], [2.3, 0.02, -0.4], [3.8, 0.02, 2.7],
           ],
         },
         usage: ['Village', 'Town'],

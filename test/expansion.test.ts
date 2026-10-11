@@ -33,7 +33,10 @@ const ok = (name: string, fn: () => void) => {
 // and the same four figures came off the map after.)
 // (The ground and the trees were counted again on 2026-10-09, from the same map, with the
 // bunker's hollow left out of the count as the works' is: taken before the bunker was dug.)
-const WAS = { cells: 191458, heights: 1415315074, buildings: 72, buildingsHash: 2448790248, lastId: 'tower_71', spawns: 2697513077, trees: 9494, treesHash: 1630127803, lootPoints: 675, lootHash: 113905251, jeeps: 8, jeepsHash: 207674058, fires: 6 };
+// (2026-10-11: thirty-three of the old places for things moved, each inside its own house and none by more than
+// 4.2 m, when the upstairs wall of the two-floor house was moved clear of its window and closets were built:
+// compared place by place, before and after, with assets-src/_wf/me/loot-points.ts. None was added or renumbered.)
+const WAS = { cells: 191458, heights: 1415315074, buildings: 72, buildingsHash: 2448790248, lastId: 'tower_71', spawns: 2697513077, trees: 9494, treesHash: 1630127803, lootPoints: 675, lootHash: 2826555666, jeeps: 8, jeepsHash: 207674058, fires: 6 };
 const hash = (parts: number[]) => {
   let h = 2166136261 >>> 0;
   for (const v of parts) {
