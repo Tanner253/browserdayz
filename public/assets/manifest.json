@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-11T00:05:22.397Z",
+ "generated": "2026-10-11T00:14:33.949Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr"
@@ -1936,7 +1936,7 @@
     "loot",
     "gear"
    ],
-   "bytes": 437520,
+   "bytes": 1433136,
    "srcTris": 4242,
    "tris": 4242,
    "min": [
@@ -2161,9 +2161,9 @@
    "tags": [
     "vehicle"
    ],
-   "bytes": 888112,
+   "bytes": 2271112,
    "srcTris": 256420,
-   "tris": 60131,
+   "tris": 256316,
    "min": [
     -0.9915,
     0,
@@ -2172,7 +2172,7 @@
    "max": [
     1.0049,
     1.5984,
-    2.8265
+    2.8268
    ],
    "lods": []
   },

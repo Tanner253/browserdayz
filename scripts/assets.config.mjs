@@ -242,9 +242,10 @@ export const LOCAL_MODELS = {
   helmet_k63: {
     dir: 'helmet_k63',
     scale: 0.00279,
-    tex: 1024,
+    // (as big as its pictures came)
+    tex: 2048,
     tags: ['loot', 'gear'],
-    changes: 'Scaled to a head and stood on the ground about its own middle; textures re-encoded as WebP at 1024; geometry compressed.',
+    changes: 'Scaled to a head and stood on the ground about its own middle; textures re-encoded as WebP at the size they came; geometry compressed.',
   },
   // Armour for the body, lightest to heaviest (the tiers are in src/sim/items.ts): three vests out of one pack, and
   // the collared vest out of another. And containers and a crate, a piece at a time.
@@ -350,23 +351,24 @@ export const LOCAL_MODELS = {
   },
   // The police car (2026-10-10): the second car, a road car. It came 6.7 long, nose toward +z, a quarter of a
   // million triangles, and with its brakes as pieces of their own (four more things called a wheel): those are
-  // left out, it is made the length of the car it is drawn from, and brought down to what a game can draw.
+  // left out, and it is made the length of the car it is drawn from. Nothing else of it is lessened: every
+  // triangle it came with, and its pictures at the size they came ("i dont want the quality of the models to be
+  // lowered"). It was first brought down to sixty thousand triangles and 2048: that was put back.
   police_car: {
     kind: 'vehicle',
     file: 'scene.gltf',
-    tex: 2048,
+    tex: 4096,
     scale: 0.806,
     turn: Math.PI,
     wheel: /Wheel\.(Ft|Bk)\./,
     skip: /WheelBrake/,
-    budget: 60000,
     tags: ['vehicle'],
     credit: {
       name: 'Police car',
       url: 'https://sketchfab.com/3d-models/police-car-9166b13b6ae341f4bfc093edb71d74f4',
       author: 'Mateusz Woliński',
       line: 'This work is based on "Police car" (https://sketchfab.com/3d-models/police-car-9166b13b6ae341f4bfc093edb71d74f4) by Mateusz Woliński (https://sketchfab.com/jeandiz) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)',
-      changes: 'Scaled to metres and turned to face the way the game drives; each wheel re-centred on its own middle; its brake discs left out; brought down to about sixty thousand triangles; textures re-encoded as WebP; geometry compressed.',
+      changes: 'Scaled to metres and turned to face the way the game drives; each wheel re-centred on its own middle; its brake discs left out; textures re-encoded as WebP at the size they came; geometry compressed.',
     },
   },
   // The bunker's own fittings, all out of one download ("Bunker PBR Showcase Props JFG"): each is
