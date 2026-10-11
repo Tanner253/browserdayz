@@ -65,6 +65,11 @@ export function liftPack<T extends THREE.Material>(mat: T): T {
     c.metalness = Math.min(c.metalness, LOOK.sight.metal);
     c.color.setScalar(LOOK.sight.tint);
     c.envMapIntensity = LOOK.sight.sky;
+  } else if (/^Scene_-_Root$/.test(mat.name)) {
+    // the Colt is painted as blued steel with its wear in the paint, and walnut on its grip: lifted like the dark
+    // ones it was a pale grey pistol. As it came, with a little more of the sky on its steel.
+    c.metalness = Math.min(c.metalness, 0.8);
+    c.envMapIntensity = 1.25;
   } else if (/^Material_45[79]$/.test(mat.name)) {
     // the submachine gun is painted a mid olive, with its wear and its markings in the paint: lifted like the dark
     // ones it was a flat pale shape with nothing on it. As it came.

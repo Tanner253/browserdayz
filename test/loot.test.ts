@@ -17,7 +17,7 @@ import assert from 'node:assert/strict';
 import { buildWorldData } from '../server/world';
 import { RNG } from '../src/core/noise';
 import { CRATE_SPECS, fillCrate } from '../src/sim/crates';
-import { Economy, TYPES } from '../src/sim/economy';
+import { Economy, SHOWCASE, TYPES } from '../src/sim/economy';
 import { ITEMS } from '../src/sim/items';
 import { TIERS, type Tier } from '../src/sim/tiers';
 import { ARMY_CAMP } from '../src/world/worldgen';
@@ -78,8 +78,8 @@ ok('what you hit with is on the outskirts and nowhere else; no gun is; and most 
 
 ok('pistols from the village on, most of them where guns were kept; the sniper rare in Kamenka and common under the gas', () => {
   for (const { on, all } of worlds) {
-    assert.ok(on('p38', 2) + on('m9', 2) >= 26, 'few pistols in the village and the army\'s places');
-    const pistols = all.filter(({ id, p }) => (id === 'p38' || id === 'm9') && p.tier === 2);
+    assert.ok(on('colt', 2) + on('m9', 2) >= 26, 'few pistols in the village and the army\'s places');
+    const pistols = all.filter(({ id, p }) => (id === 'colt' || id === 'm9') && p.tier === 2);
     const kept = pistols.filter(({ p }) => p.usage.includes('Police') || p.usage.includes('Military')).length;
     assert.ok(kept > pistols.length * 0.6, `${kept} of ${pistols.length} pistols on the second step are where guns were kept`);
     assert.equal(on('mosin', 1) + on('mosin', 2), 0, 'a sniper rifle below Kamenka');
@@ -91,10 +91,13 @@ ok('pistols from the village on, most of them where guns were kept; the sniper r
 
 ok('the shotgun, the Desert Eagle, the heavy armour and the K6-3 are the bunker\'s and nobody else\'s; the rucksack is not below the fourth step', () => {
   for (const { on } of worlds) {
+    // TEMPORARY, THE SHOWCASE (2026-10-11; see SHOWCASE in src/sim/economy.ts): the shotgun, its shells and its
+    // can are in Kamenka as well for now. It was: all ten of these in the bunker and on no other step.
     for (const id of ['benelli', 'ammo_12', 'box_12', 'suppressor_12', 'deagle', 'ammo_50', 'box_50', 'mag_deagle_ext', 'heavy_armor', 'helmet_k63']) {
       assert.ok(on(id, 5) >= 1, `no ${id} in the bunker`);
-      for (const t of [1, 2, 3, 4] as Tier[]) assert.equal(on(id, t), 0, `a ${id} on step ${t}`);
+      for (const t of [1, 2, 3, 4] as Tier[]) if (!(t === 3 && id in SHOWCASE.kamenka)) assert.equal(on(id, t), 0, `a ${id} on step ${t}`);
     }
+    for (const [id, n] of Object.entries(SHOWCASE.kamenka)) assert.ok(on(id, 3) >= n - 1, `the showcase: ${on(id, 3)} of ${id} in Kamenka, and ${n} are wanted`);
     for (const t of [1, 2, 3] as Tier[]) assert.equal(on('suitcase', t) + on('life_vest', t), 0, `the army's rucksack or a plate carrier on step ${t}`);
     assert.ok(on('suitcase', 4) + on('suitcase', 5) >= 4);
   }
@@ -104,9 +107,12 @@ ok('the shotgun, the Desert Eagle, the heavy armour and the K6-3 are the bunker\
 
 ok('the gas masks are in the village\'s police station and the keycards under the gas; what a gun fires is on every step', () => {
   for (const { on, all } of worlds) {
-    const masks = all.filter(({ id }) => id === 'gasmask');
+    // TEMPORARY, THE SHOWCASE: masks and keycards are in Kamenka as well for now. It was: three masks, all on the
+    // second step in the police station; and no keycard on any step but the fourth.
+    assert.ok(all.filter(({ id, p }) => id === 'gasmask' && p.tier === 3).every(({ p }) => p.usage.includes('Police')), 'a mask in Kamenka that is not in its police station');
+    const masks = all.filter(({ id, p }) => id === 'gasmask' && p.tier !== 3);
     assert.ok(masks.length === 3 && masks.every(({ p }) => p.tier === 2 && p.usage.includes('Police')), 'the masks are not all in the village\'s police station');
-    assert.ok(on('keycard', 4) >= 1 && on('keycard', 1) + on('keycard', 2) + on('keycard', 3) + on('keycard', 5) === 0);
+    assert.ok(on('keycard', 4) >= 1 && on('keycard', 1) + on('keycard', 2) + on('keycard', 5) === 0);
     // (of whatever kind: down the bunker it is mostly what the guns kept there fire)
     const rounds = Object.values(ITEMS).filter((d) => d.category === 'ammo').map((d) => d.id);
     for (const t of STEPS) assert.ok(rounds.reduce((n, id) => n + on(id, t), 0) >= 12, `little to fire on step ${t}`);
@@ -146,7 +152,7 @@ ok('one of the army\'s cases holds pistols and kit, now and then a mask or somet
   for (const kind of ['weapons_case', 'old_military_crate', 'wooden_military_crate']) {
     const seen = open(kind, 600);
     for (const id of ['mosin', 'pu_scope', 'life_vest', 'suitcase', 'deagle', 'benelli', 'heavy_armor', 'helmet_k63', 'keycard', ...melee]) assert.ok(!seen.has(id), `a ${id} in a ${CRATE_SPECS[kind].label}`);
-    assert.ok((seen.get('p38') ?? 0) + (seen.get('m9') ?? 0) > 60, 'hardly a pistol in the army\'s cases');
+    assert.ok((seen.get('colt') ?? 0) + (seen.get('m9') ?? 0) > 60, 'hardly a pistol in the army\'s cases');
     const mask = (seen.get('gasmask') ?? 0) / 600;
     assert.ok(mask > 0.01 && mask < 0.12, `a gas mask in ${(mask * 100).toFixed(0)} cases of a hundred`);
     assert.ok((seen.get('armor_vest') ?? 0) + (seen.get('boonie_hat') ?? 0) > 0 && ((seen.get('armor_vest') ?? 0) + (seen.get('boonie_hat') ?? 0)) / 600 < 0.15, 'the third step\'s things are not rare in them');

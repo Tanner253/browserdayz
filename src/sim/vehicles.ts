@@ -8,7 +8,7 @@
 // what state it is in; whoever is driving works out how it moves (as each player does for
 // their own two feet) and the server passes that on.
 
-import { BUILDING_FOOTPRINT, PLAY_RADIUS, heightAt, type World } from '../world/worldgen';
+import { BUILDING_FOOTPRINT, PLAY_RADIUS, WORLD_SIZE, heightAt, type World } from '../world/worldgen';
 
 export const JEEP = {
   /** the model it is drawn with (see scripts/assets.config.mjs): without it there are no jeeps */
@@ -17,8 +17,24 @@ export const JEEP = {
   count: 5,
   /** and how many more out at the edge of the map, away from the road, each behind one of the outlying places */
   outlying: 3,
-  /** what it takes before it burns: a rifle round takes 95 of it, a pistol round 34 */
-  hp: 600,
+  /**
+   * And how many more again, wherever on the whole map a place is furthest from any car: the east country and the
+   * corners of the valley, which had none (2026-10-11: "make sure car spawns around the map good distrobution").
+   * They are found after all the others, so every car that stood before stands where it stood.
+   */
+  far: 5,
+  /**
+   * What it takes before it burns: a rifle round takes 95 of it, a pistol round 34. (Three times what it was,
+   * 2026-10-11: "we need to triple the HP of cars they blow up too easily". It was 600.)
+   */
+  hp: 1800,
+  /**
+   * Left under the gas: one that has stood empty there this many seconds, with nobody within this many metres of
+   * it, is stood back where it first stood, whole and fuelled as a new one is (2026-10-11: "cars left in the gas
+   * zone with no players around should respawn"). A car driven in to the works and walked away from was gone
+   * from the map for good: nobody goes back in for it.
+   */
+  gas: { after: 120, clear: 70 },
   /** under this it smokes, under this it is on fire and goes up a few seconds later */
   smokeAt: 0.4,
   fireAt: 0.12,
@@ -104,7 +120,7 @@ export function restState(x: number, ground: number, z: number, yaw: number): VS
  * whole length of the road, on ground that is level and clear; and then a few out where
  * people start, far from the road. The same on every game and on the server.
  */
-export function jeepSpots(world: World, count = JEEP.count, outlying = JEEP.outlying): { x: number; y: number; z: number; yaw: number }[] {
+export function jeepSpots(world: World, count = JEEP.count, outlying = JEEP.outlying, more = JEEP.far): { x: number; y: number; z: number; yaw: number }[] {
   const p = world.road.points, n = p.length / 3;
   const H = world.heights;
   const out: { x: number; y: number; z: number; yaw: number }[] = [];
@@ -162,6 +178,37 @@ export function jeepSpots(world: World, count = JEEP.count, outlying = JEEP.outl
       for (const [right, fwd] of BEHIND) {
         const x = st.x + right * c + fwd * sn, z = st.z - right * sn + fwd * c;
         if (!clear(x, z, 4.5)) continue;
+        out.push({ x, y: heightAt(H, x, z), z, yaw: st.rot });
+        break place;
+      }
+    }
+  }
+  // And wherever on the whole map a place is furthest from any car, the police cars counted (they are stood after
+  // these, beside their stations): any place there is, built first or later, in the valley or out of it. Behind
+  // its buildings as the others are, or wherever round it the ground is level and clear.
+  const stations = world.buildings.filter((b) => b.type === 'police');
+  const open = (x: number, z: number) => {
+    const y = heightAt(H, x, z);
+    for (const [dx, dz] of [[2.2, 0], [-2.2, 0], [0, 2.2], [0, -2.2]]) if (Math.abs(heightAt(H, x + dx, z + dz) - y) > 0.45) return false;
+    if (world.buildings.some((b) => {
+      const [w, d] = BUILDING_FOOTPRINT[b.type];
+      return Math.hypot(b.x - x, b.z - z) < Math.hypot(w, d) / 2 + 4;
+    })) return false;
+    if (world.trees.some((t) => Math.hypot(t.x - x, t.z - z) < 4.5)) return false;
+    if (world.rocks.some((t) => Math.hypot(t.x - x, t.z - z) < 3.4) || world.props.some((t) => Math.hypot(t.x - x, t.z - z) < 3)) return false;
+    return Math.max(Math.abs(x), Math.abs(z)) < WORLD_SIZE / 2 - 30;
+  };
+  // (Not at the works, where it would stand under the gas, nor over the bunker. The two places out in the wild
+  // country, outside the line, are places like any other: a car out there is the way back.)
+  const NOT_AT = ['Chemical Works', 'Bunker 17'];
+  const places = [...world.sites.map((st) => ({ x: st.x, z: st.z, rot: st.rot })), ...world.pois.filter((q) => !NOT_AT.includes(q.name) && !world.sites.some((st) => Math.hypot(st.x - q.x, st.z - q.z) < 30)).map((q) => ({ x: q.x, z: q.z, rot: Math.atan2(q.x, q.z) }))].filter((st) => !world.pois.some((q) => NOT_AT.includes(q.name) && Math.hypot(q.x - st.x, q.z - st.z) < 150));
+  for (let k = 0; k < more; k++) {
+    const alone = (st: { x: number; z: number }) => Math.min(...[...out, ...stations].map((o) => Math.hypot(o.x - st.x, o.z - st.z)));
+    place: for (const st of places.filter((s) => alone(s) > 110).sort((a, b) => alone(b) - alone(a))) {
+      const c = Math.cos(st.rot), sn = Math.sin(st.rot);
+      for (const [right, fwd] of [...BEHIND, [17, -8], [-17, -8], [20, 4], [-20, 4], [0, 20], [12, 22], [-12, 22], [26, -14], [-26, -14], [0, -34], [0, 30]] as [number, number][]) {
+        const x = st.x + right * c + fwd * sn, z = st.z - right * sn + fwd * c;
+        if (!open(x, z) || out.some((o) => Math.hypot(o.x - x, o.z - z) < 40)) continue;
         out.push({ x, y: heightAt(H, x, z), z, yaw: st.rot });
         break place;
       }

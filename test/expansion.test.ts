@@ -36,6 +36,7 @@ const ok = (name: string, fn: () => void) => {
 // (2026-10-11: thirty-three of the old places for things moved, each inside its own house and none by more than
 // 4.2 m, when the upstairs wall of the two-floor house was moved clear of its window and closets were built:
 // compared place by place, before and after, with assets-src/_wf/me/loot-points.ts. None was added or renumbered.)
+import { JEEP } from '../src/sim/vehicles';
 const WAS = { cells: 191458, heights: 1415315074, buildings: 72, buildingsHash: 2448790248, lastId: 'tower_71', spawns: 2697513077, trees: 9494, treesHash: 1630127803, lootPoints: 675, lootHash: 2826555666, jeeps: 8, jeepsHash: 207674058, fires: 6 };
 const hash = (parts: number[]) => {
   let h = 2166136261 >>> 0;
@@ -126,8 +127,9 @@ ok('the map as it was is still exactly there: its ground, its buildings, its sta
   // (what is kept between restarts goes by a loot point's number: the old ones are the first, in their old order)
   const points = data.lootPoints.slice(0, WAS.lootPoints);
   assert.equal(hash(points.flatMap((p) => [p.x, p.y, p.z])), WAS.lootHash, 'an old loot point has moved or been renumbered');
-  assert.equal(data.jeeps.length, WAS.jeeps);
-  assert.equal(hash(data.jeeps.flatMap((j: { x: number; z: number }) => [j.x, j.z])), WAS.jeepsHash);
+  // (2026-10-11: five more cars stand where the map had none, found after all the others: the eight that stood stand where they stood)
+  assert.equal(data.jeeps.length, WAS.jeeps + JEEP.far);
+  assert.equal(hash(data.jeeps.slice(0, WAS.jeeps).flatMap((j: { x: number; z: number }) => [j.x, j.z])), WAS.jeepsHash);
   // (the old six, and one each at the three places built in the east country)
   // (and one where the lane crosses in the army's camp)
   assert.equal(data.fires.length, WAS.fires + 4);

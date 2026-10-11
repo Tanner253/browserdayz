@@ -11,9 +11,10 @@ import { physics, SOLID_GROUPS } from '../core/physics';
 import type { Atmosphere, ShaderPatch } from '../world/atmosphere';
 import { WEAPON_RULES } from '../sim/combat';
 import { JEEP, POLICE_CAR, RIDE_HEIGHT, SEATS, crashDamage, jeepSpots, policeSpots, restState, type VehicleInfo, type VState } from '../sim/vehicles';
+import { gasEdge, gasZone, type GasZone } from '../sim/gas';
 import type { Net } from '../net/client';
 import { roadLift } from '../world/road';
-import type { World } from '../world/worldgen';
+import { heightAt, type World } from '../world/worldgen';
 import type { Terrain } from '../world/terrain';
 import { CAR_SIT, type Avatar, type SeatPose } from './avatar';
 import type { Effects } from './effects';
@@ -622,6 +623,10 @@ export class Garage {
     });
   }
 
+  private gas: GasZone | null | undefined;
+  /** playing alone: how long each car has stood empty under the gas with nobody near, seconds */
+  private leftFor = new Map<number, number>();
+
   private aloneTick(dt: number) {
     for (let k = this.due.length - 1; k >= 0; k--) {
       const d = this.due[k];
@@ -629,6 +634,20 @@ export class Garage {
       if ((d.t -= dt) > 0 || !p || Math.hypot(p.x - this.h.player.pos.x, p.z - this.h.player.pos.z) < 25) continue;
       this.due.splice(k, 1);
       this.standAlone(p, d.home);
+    }
+    // a car left under the gas with nobody near is stood back where it first stood (see JEEP.gas)
+    this.gas ??= gasZone(this.h.world.pois, (x, z) => heightAt(this.h.world.heights, x, z));
+    for (const j of [...this.jeeps.values()]) {
+      const home = this.homes.get(j.i), p = home === undefined ? null : this.parks()[home];
+      const me = this.h.player.pos;
+      const left = !!this.gas && !!p && !j.wreck && this.ride?.jeep !== j && gasEdge(this.gas, j.pos.x, j.pos.z) < 0 && Math.hypot(me.x - j.pos.x, me.z - j.pos.z) > JEEP.gas.clear;
+      const t = left ? (this.leftFor.get(j.i) ?? 0) + dt : 0;
+      this.leftFor.set(j.i, t);
+      if (t > JEEP.gas.after && p && Math.hypot(p.x - me.x, p.z - me.z) > JEEP.respawnClear) {
+        this.leftFor.delete(j.i);
+        this.remove(j.i);
+        this.standAlone(p, home!);
+      }
     }
     for (const j of this.jeeps.values()) {
       if (j.wreck || j.hp > JEEP.hp * JEEP.fireAt) continue;

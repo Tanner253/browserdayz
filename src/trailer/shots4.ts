@@ -814,7 +814,7 @@ export function buildShots(S: Stage): Shot[] {
         S.me(nest.x, nest.z, ang + 0.05, 0);
         // the one in the glass: walking, unaware
         const d = new THREE.Vector3(mark.x - nest.x, 0, mark.z - nest.z).normalize(), r = new THREE.Vector3(-d.z, 0, d.x);
-        A(2).place(mark.x - r.x * 3.2, mark.z - r.z * 3.2, yawTo(0, 0, r.x, r.z), 'p38', ['boonie_hat', 'sack_pack']);
+        A(2).place(mark.x - r.x * 3.2, mark.z - r.z * 3.2, yawTo(0, 0, r.x, r.z), 'colt', ['boonie_hat', 'sack_pack']);
         (A(2) as any).told = false;
         (A(2) as any).side = r;
         // (a rifle round to the body leaves a man standing, in the game: for the film one is enough)
@@ -1053,7 +1053,7 @@ export function buildShots(S: Stage): Shot[] {
     const us: [number, THREE.Vector3][] = [[0, dAt.clone().addScaledVector(away, 19).add(new THREE.Vector3(2.5, 0, 0))], [1, dAt.clone().addScaledVector(away, 21).add(new THREE.Vector3(-2.2, 0, 1))], [2, dAt.clone().addScaledVector(away, 23)]];
     const fight = () => {
       for (const [i, p] of they) {
-        const a = dress(A(i), p.x, p.z, yawTo(p.x, p.z, us[0][1].x, us[0][1].z), i === 4 ? 'mosin' : 'p38', ['boonie_hat']);
+        const a = dress(A(i), p.x, p.z, yawTo(p.x, p.z, us[0][1].x, us[0][1].z), i === 4 ? 'mosin' : 'colt', ['boonie_hat']);
         a.foe = A(us[(i - 3) % 3][0]);
         a.skill = 0.12;
         a.crouch = i === 5;
@@ -1133,7 +1133,7 @@ export function buildShots(S: Stage): Shot[] {
         go = stroll([outside(barracks, 0, BAR_HD + 1.2), inside(barracks, 0, BAR_HD - 1.6), inside(barracks, -0.6, 0.9)], (i) => i === 0);
         // one of them left inside, at the far end among the beds
         const in1 = inside(barracks, -4.6, 0.4);
-        A(4).place(in1.x, in1.z, yawTo(in1.x, in1.z, barracks.x, barracks.z), 'p38', ['boonie_hat']);
+        A(4).place(in1.x, in1.z, yawTo(in1.x, in1.z, barracks.x, barracks.z), 'colt', ['boonie_hat']);
         A(4).pos.y = barracks.floorY;
         (A(4) as any).told = false;
         tough(A(4), 2);

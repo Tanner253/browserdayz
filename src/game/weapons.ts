@@ -76,7 +76,8 @@ const FIT: Record<string, { dot?: { at: [number, number, number]; size: number }
   // (The undersides are measured off each model. Looked for by rule, the M9's was not found at
   // all and the other pistol's was its trigger guard: both lights hung in the air under the gun.)
   m9: { dot: { at: [0.045, 0.0835, 0.0035], size: 0.5 }, light: { at: [0.167, 0, 0.0035], size: 0.62, under: 0.046 } },
-  p38: { dot: { at: [0.045, 0.0835, 0.0035], size: 0.5 }, light: { at: [0.19, 0, 0.0035], size: 0.62, under: 0.037 }, bore: 0.6 },
+  // (the Colt: the sight on the flat of its slide ahead of its rear sight, the light under its dust cover ahead of the guard)
+  colt: { dot: { at: [0.05, 0.094, 0], size: 0.5 }, light: { at: [0.135, 0, 0], size: 0.62 }, bore: 0.45 },
   // (under the end of the fore-stock: under the bare barrel ahead of it there is nothing to hang it on, and it hung in the air)
   mosin: { light: { at: [0.27, 0, -0.0145], size: 0.85, under: 0.02 } },
   benelli: { light: { at: [0.234, 0, -0.017], size: 0.95, under: -0.018 } },
@@ -223,7 +224,7 @@ const HELD = {
  */
 const IN_SMG: Record<string, { /** how big it is drawn in these hands, of its own size: they are smaller than life, and the pistols were sized for another pair */ size: number; move: [number, number, number]; turn?: [number, number, number]; left: { move: [number, number, number]; turn?: [number, number, number] } }> = {
   m9: { size: 0.88, move: [0, 0, 0], left: { move: [-0.125, -0.065, 0.012] } },
-  p38: { size: 0.85, move: [0, 0, 0], left: { move: [-0.125, -0.065, 0.012] } },
+  colt: { size: 1, move: [0, 0, 0], left: { move: [-0.125, -0.065, 0.012] } },
   deagle: { size: 0.85, move: [0, 0, 0], left: { move: [-0.125, -0.065, 0.012] } },
 };
 /**
@@ -565,9 +566,9 @@ const PISTOL_HOLD = {
  */
 const SEAT_ON: Record<string, THREE.Vector3> = {
   deagle: new THREE.Vector3(0.019, -0.002, 0),
-  p38: new THREE.Vector3(0.013, 0, 0),
+  colt: new THREE.Vector3(0.006, 0, 0),
 };
-const APART_ON: Record<string, [number, number]> = { deagle: [0.002, -0.0035], p38: [-0.003, 0.001] };
+const APART_ON: Record<string, [number, number]> = { deagle: [0.002, -0.0035], colt: [-0.003, 0.003] };
 const NO_SEAT = new THREE.Vector3();
 /**
  * Where the hands go to work a long gun, seen from outside (see `Grips.work`): from the guns' own shapes. The
@@ -636,6 +637,8 @@ const VOICE: Record<string, { rate: number; gain: number; rec?: string }> = {
   ar15: { rate: 1, gain: 1, rec: 'shot_ar' },
   // (a 9 mm out of a longer barrel: the pistol's recording, a little sharper)
   mpa: { rate: 1.06, gain: 1.05, rec: 'shot_pistol' },
+  // (a .45: the pistol's recording, lower and a little louder)
+  colt: { rate: 0.9, gain: 1.2 },
 };
 /** whose recordings a gun's magazine and bolt are heard with, where it has its own (see audio.magOut) */
 const HANDLED: Record<string, 'ak' | 'ar'> = { ak: 'ak', ar15: 'ar' };
@@ -974,7 +977,7 @@ export class Weapons {
       this.models.set(item, m);
     };
     await inSmg('m9', 'm9', 0.2, { hammer: smgRide.base, trigger: smgRide.base, stopper: smgRide.base });
-    await inSmg('p38', 'pistol_43', 0.2);
+    await inSmg('colt', 'colt_1911', 0.22, { hammer: smgRide.base });
     await inSmg('deagle', 'desert_eagle', 0.3);
     // And the shotgun, in the rifle's hands: every piece of it rides on the rifle's body (nothing
     // on it moves by itself), in place of the rifle and everything on the rifle.
@@ -1905,7 +1908,8 @@ export class Weapons {
         }
         if (input.pressed('KeyR') && !this.action) this.reload(m, item);
         // looked over, where its pack has that drawn: the trigger, the sights or a reload ends it
-        if (input.pressed('KeyI') && !this.action && m.rig?.has('check') && !this.aiming && this.sprintT < 0.2) {
+        // (the pistols and the submachine gun for now: the sniper's pack has such a movement too, which nobody has yet looked at with the shotgun in its hands)
+        if (input.pressed('KeyI') && !this.action && m.gait && m.rig?.has('check') && !this.aiming && this.sprintT < 0.2) {
           this.start('check', m.rig.seconds('check'));
           this.onAct('check', m.rig.seconds('check'));
         }

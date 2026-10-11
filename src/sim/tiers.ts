@@ -8,7 +8,9 @@ export type Tier = 1 | 2 | 3 | 4 | 5;
 export const TIERS: Record<Tier, { name: string; colour: string; where: string; finds: string }> = {
   1: { name: 'Tier 1', colour: '#cfc9ba', where: 'The outskirts: cabins, farms, yards, ranger posts', finds: 'Melee weapons, flashlights and tools, food and water, bandages, cloth hats, a day pack.' },
   2: { name: 'Tier 2', colour: '#7fd4a0', where: 'The village, the checkpoint, the army camp, the depot', finds: 'Pistols, their magazines and 9 mm, soft vests, bandages and now and then a stim, and the gas masks: at the police station.' },
-  3: { name: 'Tier 3', colour: '#6db3ff', where: 'Kamenka', finds: 'Armoured vests, combat helmets, stims, long magazines and suppressors for pistols, and a sniper rifle or an AK if you are lucky.' },
+  // TEMPORARY, THE SHOWCASE (2026-10-11; see SHOWCASE in src/sim/economy.ts). It was: 'Armoured vests, combat helmets,
+  // stims, long magazines and suppressors for pistols, and a sniper rifle or an AK if you are lucky.'
+  3: { name: 'Tier 3', colour: '#6db3ff', where: 'Kamenka', finds: 'For now, the new guns: the AK, the AR-15, the MPA30 and the shotgun, with their magazines, rounds, suppressors, sights, grips and lights. Armoured vests, combat helmets, stims, gas masks and bunker keycards.' },
   4: { name: 'Tier 4', colour: '#c58cff', where: 'The Chemical Works, under the gas; a helicopter down; a supply drop', finds: 'Sniper rifles and scopes, the AK, now and then an AR-15, plate carriers, field rucksacks, and the keycards that open the bunker.' },
   5: { name: 'Tier 5', colour: '#ffd35a', where: 'Bunker 17', finds: 'The shotgun, the Desert Eagle, heavy armour and the K6-3 helmet, here and nowhere else; the AR-15, the AK\'s drum and the long magazines.' },
 };

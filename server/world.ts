@@ -66,6 +66,6 @@ export function buildWorldData(root: string) {
     doorCount: buildings.doorSpecs.length,
     groundAt: (x: number, z: number) => heightAt(world.heights, x, z),
     /** somewhere open and level to set a supply drop down */
-    dropSite: (rnd?: () => number) => pickDropSite(world, rnd),
+    dropSite: (rnd?: () => number, inside = false) => pickDropSite(world, rnd, inside),
   };
 }

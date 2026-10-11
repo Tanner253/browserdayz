@@ -239,14 +239,14 @@ export function buildShots(S: Stage): Shot[] {
       titles: [title('LOOT', 0.15, 1.7)],
     });
   }
-  add(5, 1, takeShot('loot-pistol', 'p38', 0.85, null, []));
+  add(5, 1, takeShot('loot-pistol', 'colt', 0.85, null, []));
   add(6, 1, {
     name: 'loot-pockets',
     chain: true,
     hud: true,
     // straight on from the last cut: the pistol is in the pockets now, and Tab opens them
     setup: () => {
-      if (!g.inv.find((i: any) => i.id === 'p38')) g.inv.add(makeItem('p38'));
+      if (!g.inv.find((i: any) => i.id === 'colt')) g.inv.add(makeItem('colt'));
       if (!g.inv.find((i: any) => i.id === 'ammo_9mm')) g.inv.add(makeItem('ammo_9mm', 16));
       g.inventoryChanged();
     },
@@ -258,7 +258,7 @@ export function buildShots(S: Stage): Shot[] {
 
   // ============================================================ 4. the weapons (bars 8-10)
   {
-    const guns: [string, string][] = [['mosin', 'MOSIN 91/30'], ['p38', 'P38'], ['hatchet', 'HATCHET'], ['machete', 'MACHETE'], ['crowbar', 'CROWBAR'], ['bat', 'BASEBALL BAT'], ['knife', 'FISH KNIFE']];
+    const guns: [string, string][] = [['mosin', 'MOSIN 91/30'], ['colt', 'COLT 1911'], ['hatchet', 'HATCHET'], ['machete', 'MACHETE'], ['crowbar', 'CROWBAR'], ['bat', 'BASEBALL BAT'], ['knife', 'FISH KNIFE']];
     const each = b(2) / guns.length;
     const here = roadAt(0.45), ahead = roadAt(0.6);
     add(8, 2, {
@@ -267,7 +267,7 @@ export function buildShots(S: Stage): Shot[] {
         hideAll();
         S.clean();
         S.me(here.x, here.z, yawTo(here.x, here.z, ahead.x, ahead.z), -0.02);
-        S.kit(['mosin', 'p38', ['ammo_762', 20], ['ammo_9mm', 30]]);
+        S.kit(['mosin', 'colt', ['ammo_762', 20], ['ammo_9mm', 30]]);
       },
       cues: guns.flatMap(([id], i) => [
         {
@@ -314,8 +314,8 @@ export function buildShots(S: Stage): Shot[] {
     S.clean();
     S.parkMe();
     fightT = 0;
-    A().place(duel.x - side.x * 6.5, duel.z - side.z * 6.5, 0, 'p38', ['boonie_hat']);
-    B().place(duel.x + side.x * 6.5, duel.z + side.z * 6.5, 0, 'p38', ['life_vest']);
+    A().place(duel.x - side.x * 6.5, duel.z - side.z * 6.5, 0, 'colt', ['boonie_hat']);
+    B().place(duel.x + side.x * 6.5, duel.z + side.z * 6.5, 0, 'colt', ['life_vest']);
     for (const a of [A(), B()]) {
       a.hp = 1e4; // nobody wins this one before the third player has a say
       a.skill = 0.42;
@@ -483,7 +483,7 @@ export function buildShots(S: Stage): Shot[] {
         S.parkMe();
         const yaw = Math.atan2(-dir.x, -dir.z);
         squad()[0].place(from.x, from.z, yaw, 'mosin', ['boonie_hat', 'sack_pack']);
-        squad()[1].place(from.x - dir.x * 2 + right.x * 2.2, from.z - dir.z * 2 + right.z * 2.2, yaw, 'p38', ['life_vest']);
+        squad()[1].place(from.x - dir.x * 2 + right.x * 2.2, from.z - dir.z * 2 + right.z * 2.2, yaw, 'colt', ['life_vest']);
         squad()[2].place(from.x - dir.x * 3.6 - right.x * 2, from.z - dir.z * 3.6 - right.z * 2, yaw, 'mosin', ['suitcase']);
       },
       tick: (t, _S, dt) => {
@@ -563,7 +563,7 @@ export function buildShots(S: Stage): Shot[] {
         S.clean();
         dead().place(spot.x, spot.z, 1.2, null, []);
         dead().die(new THREE.Vector3(-Math.sin(1.2), 0, -Math.cos(1.2)).negate());
-        S.kit(['p38', ['ammo_9mm', 16], 'bandage']);
+        S.kit(['colt', ['ammo_9mm', 16], 'bandage']);
         S.hold('holster');
         // he went over backwards: the body lies a pace behind where he stood
         const bx = spot.x + Math.sin(1.2) * 0.85, bz = spot.z + Math.cos(1.2) * 0.85;
@@ -671,7 +671,7 @@ export function buildShots(S: Stage): Shot[] {
       const gear = [['boonie_hat'], ['life_vest'], ['sack_pack'], ['suitcase', 'boonie_hat'], [], ['life_vest', 'boonie_hat']];
       cast().forEach((a, i) => {
         const ang = (i / cast().length) * Math.PI * 2;
-        a.place(crowd.x + Math.cos(ang) * 2.6, crowd.z + Math.sin(ang) * 2.6, yawTo(Math.cos(ang), Math.sin(ang), 0, 0) + 0.3, ['mosin', 'p38', 'hatchet', 'mosin', 'bat', 'p38'][i], gear[i]);
+        a.place(crowd.x + Math.cos(ang) * 2.6, crowd.z + Math.sin(ang) * 2.6, yawTo(Math.cos(ang), Math.sin(ang), 0, 0) + 0.3, ['mosin', 'colt', 'hatchet', 'mosin', 'bat', 'colt'][i], gear[i]);
         a.aim = i % 2 === 0;
       });
     });
@@ -693,7 +693,7 @@ export function buildShots(S: Stage): Shot[] {
       hideAll();
       S.parkMe();
       S.clean();
-      cast()[0].place(s1.x, s1.z, 2.0, 'p38', ['boonie_hat', 'sack_pack']);
+      cast()[0].place(s1.x, s1.z, 2.0, 'colt', ['boonie_hat', 'sack_pack']);
       cast()[0].aim = false;
     });
     soon(1, 'AN AUTOMATIC RIFLE · MORE WEAPONS', orbit(P(s2.x, s2.z, 1.3), 4.2, 3.4, 0.2, 0.9, 0.1, 34, b(1)), () => {
@@ -721,7 +721,7 @@ export function buildShots(S: Stage): Shot[] {
         S.parkMe();
         S.clean();
         const yaw = Math.atan2(-dir.x, -dir.z);
-        [cast()[2], cast()[3], cast()[4], cast()[5]].forEach((a, i) => a.place(from.x - dir.x * (i > 1 ? 2.5 : 0) + right.x * (i % 2 ? 1.6 : -1.6), from.z - dir.z * (i > 1 ? 2.5 : 0) + right.z * (i % 2 ? 1.6 : -1.6), yaw, i % 2 ? 'p38' : 'mosin', [['boonie_hat'], ['life_vest'], ['sack_pack'], ['suitcase']][i]));
+        [cast()[2], cast()[3], cast()[4], cast()[5]].forEach((a, i) => a.place(from.x - dir.x * (i > 1 ? 2.5 : 0) + right.x * (i % 2 ? 1.6 : -1.6), from.z - dir.z * (i > 1 ? 2.5 : 0) + right.z * (i % 2 ? 1.6 : -1.6), yaw, i % 2 ? 'colt' : 'mosin', [['boonie_hat'], ['life_vest'], ['sack_pack'], ['suitcase']][i]));
       }, (_t, _S, dt) => [cast()[2], cast()[3], cast()[4], cast()[5]].forEach((a) => a.go(a.pos.x + dir.x * 5, a.pos.z + dir.z * 5, 3.3, dt)));
     }
     soon(3, 'NEW PLACES ON THE MAP', (t) => {
@@ -750,7 +750,7 @@ export function buildShots(S: Stage): Shot[] {
           S.parkMe();
           S.clean();
           const face = yawTo(at.x, at.z, sx, sz);
-          victim().place(at.x, at.z, face + vyaw, k % 3 === 0 ? 'p38' : 'mosin', [['boonie_hat'], ['life_vest'], ['sack_pack'], []][k % 4]);
+          victim().place(at.x, at.z, face + vyaw, k % 3 === 0 ? 'colt' : 'mosin', [['boonie_hat'], ['life_vest'], ['sack_pack'], []][k % 4]);
           victim().hp = 40;
           victim().aim = vyaw === 0;
           shooter().place(sx, sz, yawTo(sx, sz, at.x, at.z), 'mosin', [['life_vest'], ['boonie_hat', 'suitcase']][k % 2]);

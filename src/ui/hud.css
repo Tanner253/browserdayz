@@ -1600,3 +1600,5 @@ body.touch .hud-start, body.touch .rw, body.touch .inv-wrap, body.touch .inv-col
 .hud-voice div.me { border-left-color: var(--accent); }
 .hud-voice div.me::before { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
 body.touch .hud-voice { top: 34%; }
+/* (a thing in a place on the body or in the hands: the number of its key is not written over it, the keys are along the foot of the page) */
+.inv-item.in-slot .qkey { display: none; }

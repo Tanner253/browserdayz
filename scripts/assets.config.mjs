@@ -120,6 +120,14 @@ export const LOCAL_MODELS = {
     tags: ['loot', 'ammo'],
     changes: 'Only its 9 mm cartridge is used here: scaled to metres and stood on the ground about its own middle; textures re-encoded as WebP at the size they came; geometry compressed.',
   },
+  round_45: {
+    dir: 'cartridges',
+    only: /^_45ACP_low/,
+    scale: 0.001,
+    tex: 512,
+    tags: ['loot', 'ammo'],
+    changes: 'Only its .45 ACP cartridge is used here: scaled to metres and stood on the ground about its own middle; textures re-encoded as WebP at the size they came; geometry compressed.',
+  },
   round_556: {
     dir: 'cartridges',
     only: /^_556NATO_low/,
@@ -162,6 +170,15 @@ export const LOCAL_MODELS = {
     tex: 4096,
     tags: ['loot', 'ammo'],
     changes: 'Scaled to metres and stood on the ground about its own middle; textures re-encoded as WebP at the size they came; geometry compressed.',
+  },
+  // (The .45's box, for the Colt: a Remington box of fifty with its end open and the rounds showing, every round
+  // of them a shape of its own. As it came, at the size it came: 17.7 cm long.)
+  ammo_box_45: {
+    dir: 'ammo_box_45acp',
+    scale: 1,
+    tex: 4096,
+    tags: ['loot', 'ammo'],
+    changes: 'Stood on the ground about its own middle; textures re-encoded as WebP at the size they came; geometry compressed.',
   },
   ammo_box_50: {
     dir: 'ammo_box_b',
@@ -672,31 +689,28 @@ export const WEAPON_PACKS = {
       changes: 'Scaled to metres and set in the pieces the game shows and hides (the rifle, its magazine, its brake, its suppressor, its sight, its foregrip, its light); its muzzle brake, which lay beside the rifle, put on the barrel; textures re-encoded as WebP at the size they came; geometry compressed.',
     },
   },
-  pistol_43: {
-    dir: 'pistol_43',
+  // The Colt 1911 (2026-10-11, in place of the Pistol 43, which is gone: "replace pistol 43 with colt 1911 i
+  // dropped in"). A pistol and nothing else, on a skeleton of its own with a joint to each part: taken off it and
+  // set in rigid pieces (its frame with its barrel, trigger and catch; its slide; its hammer; its magazine with the
+  // round that shows at the top of it). It lies along z with its muzzle to -z, 792 of its units from the front of
+  // its slide to the back of its grip safety: a Government Model is 216 mm. Every triangle and every picture as it
+  // came. Like the other pistols it is set where the M9 is, slide to slide, and held in the same hands.
+  colt_1911: {
+    dir: 'colt_1911',
     file: 'scene.gltf',
     tex: 4096,
     fp: false,
-    // (over life size: it is held in hands that were drawn round a bigger pistol, and this is the size at which its grip fills them)
-    length: 0.213,
-    forward: [0, 0, 1],
+    length: 0.216,
+    forward: [0, 0, -1],
     up: [0, 1, 0],
-    // set where the other pistol is, slide to slide (the back of it, the top of it): it is held in that pistol's hands
     fit: { to: 'm9', piece: 'slide' },
-    // (it is bound to its skeleton held over on its side: stood up by its magazine, which hangs straight down a pistol)
-    level: 'mag',
-    // (and it is bound a little askew besides, which shows along the sights: under a degree each
-    // way, measured in the game along the sides and the underside of its slide once it stood up)
-    trim: { yaw: 0.83, pitch: 0.6, roll: 0.4 },
-    skinned: { mesh: 'Glock', joints: { Slide_051: 'slide', Magazine_054: 'mag', Bullet_055: 'mag', Magazine2_056: null }, rest: 'base' },
-    wrists: { right: 'r_wrist_027', left: 'l_wrist_03' },
-    origin: [0.072, 0.018, -0.032],
+    skinned: { mesh: 'Default_1', joints: { Main_00: 'base', Dyl_03: 'base', Trig_015: 'base', Mag_button_021: 'base', Slide_012: 'slide', Hammer_018: 'hammer', Magaz_024: 'mag', Bullet_2_027: 'mag', Gils_09: null, Bullet_06: null }, rest: 'base' },
     credit: {
-      name: 'Pistol 43 Tactical | FPS Animations',
-      url: 'https://skfb.ly/oMt7u',
-      author: 'Vlasov Daniil',
-      line: '"Pistol 43 Tactical | FPS Animations" (https://skfb.ly/oMt7u) by Vlasov Daniil is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).',
-      changes: 'Only the pistol is used: the arms that came with it, its lights and its animation are left out. The pistol is taken off its skeleton and set in rigid pieces (frame, slide, magazine), scaled to metres; textures re-encoded as WebP; geometry compressed.',
+      name: 'Colt 1911',
+      url: 'https://sketchfab.com/3d-models/colt-1911-561fccb5b3314feda06da315b8d36553',
+      author: 'AlexChuchvaga',
+      line: 'This work is based on "Colt 1911" (https://sketchfab.com/3d-models/colt-1911-561fccb5b3314feda06da315b8d36553) by AlexChuchvaga (https://sketchfab.com/AlexChuchvaga) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)',
+      changes: 'Taken off its skeleton and set in rigid pieces (frame, slide, hammer, magazine), scaled to metres and laid along the barrel; the cartridge in its chamber and the spent case are left out, and its animation is not used. Textures re-encoded as WebP at the size they came; geometry compressed.',
     },
   },
   // The Desert Eagle came as a pistol and nothing else: it is held in the other pistol's

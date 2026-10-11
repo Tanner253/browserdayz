@@ -103,14 +103,15 @@ const D: ItemDef[] = [
     desc: 'Bolt-action rifle in 7.62. Five rounds in a box magazine, and the bolt worked by hand after every one. Slow, loud and devastating. Takes a scope, a cheek rest, a suppressor and a light.',
     weapon: { kind: 'rifle', ammo: 'ammo_762', capacity: 5, mag: 'mag_sniper', ergo: 40, shows: { pu_scope: ['scope', 'glass'], rifle_wrap: ['cheekrest'], suppressor_762: ['silencer'] } }, iconYaw: 0,
   },
+  // (The Colt 1911, 2026-10-11, in place of the Pistol 43, which is gone. It fires the .45, seven to a magazine.)
   {
-    id: 'p38', name: 'Pistol 43', model: 'pistol_43', w: 3, h: 2, weight: 0.75, category: 'weapon', slot: 'holster',
-    desc: 'Slim 9x19mm pistol. Eight rounds in its magazine, twelve in the long one. Takes a suppressor, a holographic sight and a light.',
-    weapon: { kind: 'pistol', ammo: 'ammo_9mm', capacity: 8, mag: 'mag_p38', ergo: 86 }, iconYaw: 0,
+    id: 'colt', name: 'Colt 1911', model: 'colt_1911', w: 3, h: 2, weight: 1.1, category: 'weapon', slot: 'holster',
+    desc: 'The old .45 service pistol. Seven rounds in its magazine, each a good deal heavier than a 9 mm: slower to fire again, and it needs fewer. Takes a suppressor, a holographic sight and a light.',
+    weapon: { kind: 'pistol', ammo: 'ammo_45', capacity: 7, mag: 'mag_colt', ergo: 80 }, iconYaw: 0,
   },
   {
     id: 'm9', name: 'M9 Pistol', model: 'm9', w: 3, h: 2, weight: 1.0, category: 'weapon', slot: 'holster',
-    desc: 'Full-size 9x19mm service pistol. Fifteen rounds in its magazine, twenty in the long one, and heavier in the hand for it. Takes a suppressor, a holographic sight and a light.',
+    desc: 'Full-size 9x19mm service pistol. Fifteen rounds in its magazine, twenty in the long one. Takes a suppressor, a holographic sight and a light.',
     weapon: { kind: 'pistol', ammo: 'ammo_9mm', capacity: 15, mag: 'mag_m9', ergo: 74 }, iconYaw: 0,
   },
   {
@@ -175,7 +176,11 @@ const D: ItemDef[] = [
   },
   {
     id: 'ammo_9mm', name: '9x19mm Rounds', model: 'round_9mm', w: 1, h: 1, weight: 0.012, category: 'ammo', stack: 30, scale: 1.6, pile: 6,
-    desc: 'Loose pistol cartridges, for either 9 mm pistol and the MPA30. Common among police and military. They go into a magazine by hand.',
+    desc: 'Loose pistol cartridges, for the M9 and the MPA30. Common among police and military. They go into a magazine by hand.',
+  },
+  {
+    id: 'ammo_45', name: '.45 ACP Rounds', model: 'round_45', w: 1, h: 1, weight: 0.021, category: 'ammo', stack: 30, scale: 1.6, pile: 6,
+    desc: 'Loose .45 cartridges, short and fat, for the Colt 1911. They go into its magazine by hand.',
   },
   {
     id: 'ammo_50', name: '.50 AE Rounds', model: 'round_50', w: 1, h: 1, weight: 0.03, category: 'ammo', stack: 30, scale: 1.5, pile: 4,
@@ -184,6 +189,11 @@ const D: ItemDef[] = [
   {
     id: 'ammo_12', name: '12 Gauge Shells', model: 'shell_12', w: 1, h: 1, weight: 0.045, category: 'ammo', stack: 30, scale: 1.3, pile: 5,
     desc: 'Buckshot: nine pellets a shell. Pushed into the shotgun\'s tube one at a time.',
+  },
+  {
+    id: 'box_45', name: '.45 ACP Ammo Box', model: 'ammo_box_45', w: 1, h: 1, weight: 0.55, category: 'ammo', scale: 0.75,
+    desc: 'An old box of 25 .45 cartridges for the Colt 1911. Hold it and unwrap it to get the rounds out.',
+    open: { gives: 'ammo_45', qty: 25, time: 2.2 },
   },
   {
     id: 'box_50', name: '.50 AE Ammo Box', model: 'ammo_box_50', w: 1, h: 1, weight: 0.8, category: 'ammo',
@@ -240,14 +250,9 @@ const D: ItemDef[] = [
     mag: { ammo: 'ammo_9mm', capacity: 30 }, attach: { fits: ['mpa'], slot: 'magazine' },
   },
   {
-    id: 'mag_p38', name: 'Pistol 43 Magazine', model: 'pistol_43', nodeRe: '^mag', w: 1, h: 1, weight: 0.08, category: 'magazine',
-    desc: 'Eight rounds of 9 mm for the Pistol 43.',
-    mag: { ammo: 'ammo_9mm', capacity: 8 }, attach: { fits: ['p38'], slot: 'magazine' },
-  },
-  {
-    id: 'mag_p38_ext', name: 'Pistol 43 Extended Magazine', model: 'pistol_43', nodeRe: '^mag', w: 1, h: 2, weight: 0.12, category: 'magazine', scale: 1.15,
-    desc: 'Twelve rounds for the Pistol 43: four more shots before you change it, and a longer grip to draw.',
-    mag: { ammo: 'ammo_9mm', capacity: 12 }, attach: { fits: ['p38'], slot: 'magazine', ergo: -4 },
+    id: 'mag_colt', name: 'Colt 1911 Magazine', model: 'colt_1911', nodeRe: '^mag', w: 1, h: 1, weight: 0.1, category: 'magazine',
+    desc: 'Seven rounds of .45 for the Colt 1911.',
+    mag: { ammo: 'ammo_45', capacity: 7 }, attach: { fits: ['colt'], slot: 'magazine' },
   },
   {
     id: 'mag_m9', name: 'M9 Magazine', model: 'm9', nodeRe: '^mag', w: 1, h: 1, weight: 0.11, category: 'magazine',
@@ -281,9 +286,9 @@ const D: ItemDef[] = [
     attach: { fits: ['mosin'], slot: 'wrap', ergo: 6 },
   },
   {
-    id: 'suppressor_9', name: '9mm Suppressor', model: '@suppressor', w: 2, h: 1, weight: 0.3, category: 'attachment',
-    desc: 'Screw-on sound suppressor for either 9 mm pistol and the MPA30. Much quieter, no muzzle flash, slightly less punch. Softer kick, but the gun is longer and slower in the hand.',
-    attach: { fits: ['p38', 'm9', 'mpa'], slot: 'muzzle', ergo: -8, recoil: 0.85, quiet: true },
+    id: 'suppressor_9', name: 'Pistol Suppressor', model: '@suppressor', w: 2, h: 1, weight: 0.3, category: 'attachment',
+    desc: 'Screw-on sound suppressor for the M9, the Colt 1911 and the MPA30. Much quieter, no muzzle flash, slightly less punch. Softer kick, but the gun is longer and slower in the hand.',
+    attach: { fits: ['colt', 'm9', 'mpa'], slot: 'muzzle', ergo: -8, recoil: 0.85, quiet: true },
   },
   {
     id: 'suppressor_762', name: 'Sniper Suppressor', model: 'sniper', nodeRe: '^silencer', w: 3, h: 1, weight: 0.55, category: 'attachment',
@@ -297,13 +302,13 @@ const D: ItemDef[] = [
   },
   {
     id: 'red_dot', name: 'Holographic Sight', model: 'holo_sight', w: 2, h: 1, weight: 0.3, category: 'attachment',
-    desc: 'A holographic sight: a lit ring and dot that lie on whatever the gun points at. Fits either 9 mm pistol, the MPA30, the shotgun and both assault rifles. Faster to aim with than irons.',
-    attach: { fits: ['p38', 'm9', 'mpa', 'benelli', 'ak', 'ar15'], slot: 'optic', ergo: 3 },
+    desc: 'A holographic sight: a lit ring and dot that lie on whatever the gun points at. Fits the M9, the Colt 1911, the MPA30, the shotgun and both assault rifles. Faster to aim with than irons.',
+    attach: { fits: ['colt', 'm9', 'mpa', 'benelli', 'ak', 'ar15'], slot: 'optic', ergo: 3 },
   },
   {
     id: 'gun_light', name: 'Weapon Light', model: 'gun_light', w: 1, h: 1, weight: 0.15, category: 'attachment',
     desc: 'A light clamped to the gun, switched with L. It shows you the dark, and shows the dark where you are. Fits everything but the Desert Eagle and the AK.',
-    attach: { fits: ['mosin', 'p38', 'm9', 'benelli', 'ar15'], slot: 'light', ergo: -2 },
+    attach: { fits: ['mosin', 'colt', 'm9', 'benelli', 'ar15'], slot: 'light', ergo: -2 },
   },
   {
     id: 'suppressor_556', name: '5.56 Suppressor', model: 'ar15', nodeRe: '^silencer', w: 3, h: 1, weight: 0.45, category: 'attachment',
@@ -648,7 +653,7 @@ export function fittedOf(it: ItemInstance | null | undefined): string[] {
  */
 export const FITTED: Record<string, [string, number][]> = {
   mosin: [['pu_scope', 0.025], ['rifle_wrap', 0.12], ['suppressor_762', 0.02]],
-  p38: [['suppressor_9', 0.08], ['mag_p38_ext', 0.12], ['red_dot', 0.03]],
+  colt: [['suppressor_9', 0.08], ['gun_light', 0.06], ['red_dot', 0.03]],
   m9: [['suppressor_9', 0.06], ['mag_m9_ext', 0.08], ['red_dot', 0.03]],
   deagle: [['mag_deagle_ext', 0.1]],
   benelli: [['red_dot', 0.25], ['gun_light', 0.2]],
@@ -728,7 +733,13 @@ export function itemWeight(it: ItemInstance): number {
 }
 
 /** drop anything a save refers to that no longer exists */
+/** things that are gone, and what one of them carried from before is now: the Pistol 43 and its magazines (2026-10-11) */
+const NOW: Record<string, string> = { p38: 'colt', mag_p38: 'mag_colt', mag_p38_ext: 'mag_colt' };
+
 export function sanitizeItem(it: ItemInstance): ItemInstance | null {
+  if (it && NOW[it.id]) it.id = NOW[it.id];
+  if (it?.mag && NOW[it.mag]) it.mag = NOW[it.mag];
+  if (it?.mods) it.mods = it.mods.filter((m) => !NOW[m]);
   if (!it || !ITEMS[it.id]) return null;
   // (a bottle from before bottles were counted is a full one)
   const sips = ITEMS[it.id].use?.sips;

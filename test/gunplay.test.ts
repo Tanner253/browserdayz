@@ -181,7 +181,7 @@ ok('what a hit does at a distance is the same on the server as in the game', () 
 
 ok('the guns that were there shoot as they did, near enough', () => {
   // (what each did at the muzzle before this table, by the rules the server had: nothing that was live is changed there)
-  for (const [id, was] of [['mosin', 95], ['p38', 34], ['m9', 34], ['deagle', 58], ['benelli', 14]] as [string, number][]) assert.equal(shotOf(id).damage, was, id);
+  for (const [id, was] of [['mosin', 95], ['m9', 34], ['deagle', 58], ['benelli', 14]] as [string, number][]) assert.equal(shotOf(id).damage, was, id);
   // (and their pace: a pistol as fast as it was, the shotgun and the big pistol as slow)
   assert.ok(Math.abs(intervalOf('m9') - 0.13) < 0.005 && Math.abs(intervalOf('deagle') - 0.273) < 0.005 && Math.abs(intervalOf('benelli') - 0.34) < 0.005 && Math.abs(intervalOf('ak') - 0.1) < 1e-9);
 });

@@ -83,7 +83,7 @@ ok('a gun holds what its magazine holds and one in its chamber; with no magazine
 });
 
 ok('changing magazines neither makes a round nor loses one, and the round in the chamber stays', () => {
-  for (const [gunId, inGun, inNext] of [['m9', 6, 15], ['m9', 0, 15], ['m9', 15, 0], ['p38', 1, 8], ['mosin', 3, 5], ['deagle', 7, 7]] as const) {
+  for (const [gunId, inGun, inNext] of [['m9', 6, 15], ['m9', 0, 15], ['m9', 15, 0], ['colt', 1, 7], ['mosin', 3, 5], ['deagle', 7, 7]] as const) {
     const g = loadGun(makeItem(gunId), inGun);
     const next = makeMag(ITEMS[gunId].weapon!.mag!, inNext);
     const before = rounds(g) + rounds(next);
@@ -103,10 +103,10 @@ ok('changing magazines neither makes a round nor loses one, and the round in the
   assert.equal(g.mag, null);
   assert.equal(swapMag(g, null), null);
   // a magazine that is not this gun's does not go into it
-  const wrong = makeMag('mag_p38', 8);
+  const wrong = makeMag('mag_colt', 7);
   assert.equal(swapMag(g, wrong), null);
   assert.equal(g.mag, null);
-  assert.equal(wrong.rounds, 8);
+  assert.equal(wrong.rounds, 7);
   // the long one holds more, in the same gun
   const long = makeMag('mag_m9_ext', 20);
   swapMag(g, long);
@@ -115,13 +115,13 @@ ok('changing magazines neither makes a round nor loses one, and the round in the
 });
 
 ok('a magazine takes what it has room for and no more', () => {
-  const m = makeMag('mag_p38', 5);
+  const m = makeMag('mag_colt', 4);
   assert.equal(fillMag(m, 2), 2);
   assert.equal(fillMag(m, 30), 1);
-  assert.equal(m.rounds, 8);
+  assert.equal(m.rounds, 7);
   assert.equal(fillMag(m, 1), 0);
-  assert.equal(makeMag('mag_p38', 99).rounds, 8);
-  assert.equal(makeItem('mag_p38').rounds, 0);
+  assert.equal(makeMag('mag_colt', 99).rounds, 7);
+  assert.equal(makeItem('mag_colt').rounds, 0);
 });
 
 ok('a gun from before magazines were things is given its own, or the long one it had, and keeps its rounds', () => {
@@ -129,11 +129,18 @@ ok('a gun from before magazines were things is given its own, or the long one it
   sanitizeItem(old);
   assert.equal(old.mag, 'mag_m9');
   assert.equal(old.loaded, 12);
-  const long = { uid: 'b', id: 'p38', qty: 1, loaded: 12, mods: ['mag_p38_ext', 'suppressor_9'] } as ItemInstance;
+  const long = { uid: 'b', id: 'm9', qty: 1, loaded: 18, mods: ['mag_m9_ext', 'suppressor_9'] } as ItemInstance;
   sanitizeItem(long);
-  assert.equal(long.mag, 'mag_p38_ext');
+  assert.equal(long.mag, 'mag_m9_ext');
   assert.deepEqual(long.mods, ['suppressor_9']);
-  assert.equal(long.loaded, 12);
+  assert.equal(long.loaded, 18);
+  // (and a Pistol 43, which is gone, is a Colt: with the Colt's magazine in it, and no more rounds than that holds)
+  const gone = { uid: 'f', id: 'p38', qty: 1, loaded: 12, mag: 'mag_p38_ext', mods: ['suppressor_9'] } as ItemInstance;
+  sanitizeItem(gone);
+  assert.equal(gone.id, 'colt');
+  assert.equal(gone.mag, 'mag_colt');
+  assert.equal(gone.loaded, 8);
+  assert.equal(sanitizeItem({ uid: 'g', id: 'mag_p38', qty: 1, rounds: 8 } as ItemInstance)!.rounds, 7);
   // and one that says it has none has none, however many rounds it says it has
   const bare = { uid: 'c', id: 'm9', qty: 1, loaded: 12, mag: null } as ItemInstance;
   sanitizeItem(bare);
@@ -142,7 +149,7 @@ ok('a gun from before magazines were things is given its own, or the long one it
   // a magazine cannot say it holds more than it does, nor a gun that it has somebody else's in it
   assert.equal(sanitizeItem({ uid: 'd', id: 'mag_m9', qty: 1, rounds: 400 } as ItemInstance)!.rounds, 15);
   assert.equal(sanitizeItem({ uid: 'e', id: 'm9', qty: 1, loaded: 5, mag: 'mag_deagle' } as ItemInstance)!.mag, null);
-  assert.deepEqual(fittedOf(long), ['suppressor_9', 'mag_p38_ext']);
+  assert.deepEqual(fittedOf(long), ['suppressor_9', 'mag_m9_ext']);
 });
 
 ok('guns are found with their magazine about six times in ten, never with rounds and no magazine, and what is dropped from the sky fires', () => {
@@ -150,7 +157,7 @@ ok('guns are found with their magazine about six times in ten, never with rounds
   let withMag = 0;
   const N = 2000;
   for (let i = 0; i < N; i++) {
-    const g = fitAtRandom(makeItem(i % 2 ? 'm9' : 'p38'), () => rng.next());
+    const g = fitAtRandom(makeItem(i % 2 ? 'm9' : 'colt'), () => rng.next());
     stockGun(g, 6);
     if (g.mag) withMag++;
     else assert.equal(g.loaded, 0);
@@ -164,7 +171,7 @@ ok('guns are found with their magazine about six times in ten, never with rounds
   // a supply drop: both guns with a magazine in them and full, and a second magazine for each, full
   const c = new Container('t', 't', 10, 12, [], true);
   fillDrop(c, () => rng.next());
-  for (const id of ['mosin', 'p38']) {
+  for (const id of ['mosin', 'colt']) {
     const g = c.items.find((p) => p.item.id === id)?.item;
     assert.ok(g?.mag && g.loaded === magRoom(g), `the drop's ${id}: ${g?.loaded} in ${g?.mag}`);
     const spare = c.items.find((p) => p.item.id === ITEMS[id].weapon!.mag)?.item;

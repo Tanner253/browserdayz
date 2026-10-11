@@ -400,7 +400,9 @@ export class InventoryUI {
     const item = this.inv.slots[slot];
     // (the key it is on, if it is on one: the keys are bound to things and can be given to anything)
     const key = item ? this.actions.hotIndex(item) : -1;
-    s.innerHTML = `<div class="slot-label">${SLOT_LABEL[slot]}${hint ? ` <b>${hint}</b>` : key >= 0 ? ` <b>${(key + 1) % 10}</b>` : ''}</div>`;
+    // (the number of its key is not written over a place on the body any more: the keys are along the foot of the page. 2026-10-11: "the floating numbers above the weapon and hand and back slots are not intuitive we can just remove them")
+    void key;
+    s.innerHTML = `<div class="slot-label">${SLOT_LABEL[slot]}${hint ? ` <b>${hint}</b>` : ''}</div>`;
     if (item) {
       const el = document.createElement('div');
       el.className = 'inv-item in-slot' + (item === this.selected ? ' sel' : '') + (this.actions.inHands() === item ? ' active' : '');

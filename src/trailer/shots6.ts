@@ -186,7 +186,7 @@ export function buildShots(S: Stage): Shot[] {
     loot: plate('LOOT', [`${g.s.buildings.lootPoints.length} places things are left`, 'every one of them worth a look', 'everything has a use']),
     them: plate('THE INFECTED', [`${I.max} of them on the map`, `a gunshot carries ${m(I.hearShot)}`, 'crouch, and keep behind them']),
     tag: plate('TAKE THE TAG', ['off whoever you put down', 'stay alive 10:00 holding it', 'the map gives you away', 'cash it in: paid in SOL']),
-    p38: plate('PISTOL 43', ['9 mm', `${gun('p38').capacity} rounds`, `${NINE} a round`]),
+    colt: plate('COLT 1911', ['.45', `${gun('colt').capacity} rounds`, `${NINE} a round`]),
     m9: plate('M9', ['9 mm', `${gun('m9').capacity} rounds`, 'suppressor · sight · light']),
     deagle: plate('DESERT EAGLE', ['.50', `${gun('deagle').capacity} rounds`, `${shotOf('deagle').damage} a round`]),
     sniper: plate('SNIPER RIFLE', ['7.62, bolt action', `${gun('mosin').capacity} rounds`, `${RIFLE} a round`]),
@@ -587,14 +587,14 @@ export function buildShots(S: Stage): Shot[] {
   });
 
   // ============================================================ 2. what there is to carry
-  const ROW = ['p38', 'm9', 'deagle', 'mosin', 'benelli'], GAP = 2.3;
+  const ROW = ['colt', 'm9', 'deagle', 'mosin', 'benelli'], GAP = 2.3;
   const rowAt = (k: number, up = 0) => P(field2.x + (k - 2) * GAP, field2.z, up);
   add(4, {
     name: 'guns',
     g: 'gold',
     hour: 0.62,
     flash: 0.8,
-    plates: [PLATE.p38, PLATE.m9, PLATE.deagle, PLATE.sniper, PLATE.benelli].map((p, k) => [p, k * b(0.78) + 0.08, (k + 0.74) * b(0.78)] as [HTMLElement, number, number]),
+    plates: [PLATE.colt, PLATE.m9, PLATE.deagle, PLATE.sniper, PLATE.benelli].map((p, k) => [p, k * b(0.78) + 0.08, (k + 0.74) * b(0.78)] as [HTMLElement, number, number]),
     setup: async () => {
       reset();
       ROW.forEach((id, k) => {

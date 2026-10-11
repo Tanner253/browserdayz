@@ -342,7 +342,7 @@ export class Stage {
       const [id, qty] = Array.isArray(e) ? e : [e, undefined];
       const it = makeItem(id, qty) as ItemInstance;
       if (mods[id]) it.mods = mods[id];
-      if (it.loaded !== undefined || id === 'mosin' || id === 'p38') it.loaded = id === 'mosin' ? 5 : 8;
+      if (it.loaded !== undefined || id === 'mosin' || id === 'colt') it.loaded = id === 'mosin' ? 5 : 8;
       g.inv.add(it);
     }
     g.inventoryChanged();

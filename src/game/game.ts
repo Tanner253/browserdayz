@@ -109,7 +109,7 @@ interface TimedAction {
 }
 
 /** bump when the map's loot points change: spawned loot from older saves is re-rolled */
-const LOOT_REV = 17;
+const LOOT_REV = 18;
 /** where a jeep's headlamps are on it: so far either side of its middle, so far over its middle, so far forward (it is 2.08 m to its nose) */
 const HEADLAMP = { x: 0.5, y: 0.14, z: -2.12 };
 /** and the police car's: wider apart, lower, and further forward (it is 2.58 m to its nose) */
@@ -1403,7 +1403,7 @@ export class Game {
    */
   private async addDrop(d: DropInfo, fill = false) {
     if (this.drops.has(d.uid)) return;
-    const stash = new Stash(d.uid, d.x, d.y, d.z, d.rot, DROP.w, DROP.h, d.heli ? CRASH.label : DROP.label);
+    const stash = new Stash(d.uid, d.x, d.y, d.z, d.rot, d.heli ? CRASH.w : DROP.w, d.heli ? CRASH.h : DROP.h, d.heli ? CRASH.label : DROP.label);
     if (fill) {
       if (d.heli) fillCrash(stash.container);
       else fillDrop(stash.container);

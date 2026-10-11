@@ -15,7 +15,7 @@ type Table = [id: string, weight: number][];
 const MILITARY: Table = [
   ['box_9mm', 3], ['ammo_9mm', 2.5], ['ammo_762', 1.2], ['bandage', 2], ['firstaid', 1], ['stim', 0.9],
   ['condensed', 1.5], ['thermos', 1], ['flask', 0.9], ['binoculars', 0.5], ['compass', 0.5], ['grenade', 0.6],
-  ['p38', 1], ['m9', 1], ['mag_p38_ext', 0.5], ['mag_m9_ext', 0.3], ['suppressor_9', 0.25], ['gun_light', 0.3],
+  ['colt', 1], ['m9', 1], ['box_45', 0.5], ['mag_m9_ext', 0.3], ['suppressor_9', 0.25], ['gun_light', 0.3],
   ['soft_vest', 0.6], ['patrol_cap', 0.6], ['rubber_boots', 0.4], ['work_gloves', 0.4], ['flashlight', 0.5], ['jerrycan', 0.4],
   ['armor_vest', 0.22], ['boonie_hat', 0.2], ['gasmask', 0.3],
 ];
@@ -29,9 +29,9 @@ const CIVILIAN: Table = [
 /** what is in any crate that stands under the gas, whatever sort of crate it is: the best of everything */
 export const UNDER_GAS: Table = [
   // (the pistols and their rounds a good deal less than they were: the rifles below have their share)
-  ['box_762', 3], ['box_9mm', 1.8], ['ammo_762', 1.5], ['ammo_9mm', 0.8], ['mosin', 1.4], ['m9', 0.7], ['p38', 0.4],
+  ['box_762', 3], ['box_9mm', 1.8], ['ammo_762', 1.5], ['ammo_9mm', 0.8], ['mosin', 1.4], ['m9', 0.7], ['colt', 0.4],
   ['boonie_hat', 2], ['life_vest', 2], ['pu_scope', 1.6], ['grenade', 1.5], ['firstaid', 1.5], ['bandage', 1.5], ['stim', 1.2],
-  ['suppressor_9', 0.8], ['mag_p38_ext', 0.8], ['rifle_wrap', 0.6], ['binoculars', 0.4], ['condensed', 0.8], ['thermos', 0.8], ['suitcase', 0.4],
+  ['suppressor_9', 0.8], ['box_45', 0.8], ['rifle_wrap', 0.6], ['binoculars', 0.4], ['condensed', 0.8], ['thermos', 0.8], ['suitcase', 0.4],
   ['red_dot', 0.6], ['gun_light', 0.6], ['suppressor_762', 0.5], ['mag_m9_ext', 0.4], ['flask', 0.5], ['keycard', 0.5],
   // (2026-10-10: the two assault rifles and what feeds them)
   ['ak', 0.6], ['mag_ak', 0.6], ['box_739', 0.8], ['ammo_739', 0.4], ['ar15', 0.25], ['mag_ar', 0.3], ['box_556', 0.4], ['mag_sniper', 0.4],
@@ -54,8 +54,12 @@ const IN_BUNKER: Table = [
   ['ar15', 1.1], ['mag_ar', 1.4], ['mag_ar_60', 0.6], ['box_556', 1.8], ['ammo_556', 1.2], ['suppressor_556', 0.6], ['foregrip', 0.7],
   ['ak', 0.8], ['mag_ak', 1], ['drum_ak', 0.6], ['box_739', 1.4], ['ammo_739', 1], ['suppressor_739', 0.5], ['mag_deagle', 0.8], ['mag_sniper', 0.7],
 ];
+// TEMPORARY, THE SHOWCASE (2026-10-11; see SHOWCASE in economy.ts): the submachine gun, the Colt and what feeds
+// them down the bunker with the rest of the firepower. (The bunker is where they are to stay once Kamenka is no
+// longer given them: this part is kept when the showcase is taken away.)
+IN_BUNKER.push(['mpa', 0.9], ['mag_mpa', 1.1], ['colt', 0.5], ['mag_colt', 0.6], ['box_45', 0.8], ['ammo_45', 0.6]);
 /** and on its racks, the long things */
-const ON_RACKS: Table = [['benelli', 3], ['mosin', 2], ['ar15', 2], ['ak', 1.5], ['box_556', 1.2], ['box_739', 1], ['ammo_12', 2], ['box_12', 1.5], ['box_762', 1.5], ['suppressor_12', 0.8], ['suppressor_762', 0.8], ['pu_scope', 1.2], ['red_dot', 0.8], ['gun_light', 0.8]];
+const ON_RACKS: Table = [['mpa', 1.5], ['benelli', 3], ['mosin', 2], ['ar15', 2], ['ak', 1.5], ['box_556', 1.2], ['box_739', 1], ['ammo_12', 2], ['box_12', 1.5], ['box_762', 1.5], ['suppressor_12', 0.8], ['suppressor_762', 0.8], ['pu_scope', 1.2], ['red_dot', 0.8], ['gun_light', 0.8]];
 
 export interface CrateSpec {
   label: string;

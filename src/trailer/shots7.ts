@@ -85,7 +85,7 @@ export function buildShots(S: Stage): Shot[] {
     }
   }
   if (!crashAt) console.log('[tr] cut 7: no meadow found for the helicopter: it comes down where a supply drop would');
-  crashAt ??= pickDropSite(world, () => S.rnd());
+  crashAt ??= pickDropSite(world, () => S.rnd(), true);
   if (!crashAt) throw new Error('nowhere for a helicopter to come down');
   console.log(`[tr] cut 7: Kamenka has ${inTown.length} buildings; the climb is ${climb} m at ${steep} in a hundred from road point ${foot} of ${RN}; the trader is at ${trader.x.toFixed(0)}, ${trader.z.toFixed(0)}; the helicopter comes down at ${crashAt.x.toFixed(0)}, ${crashAt.z.toFixed(0)}`);
 
@@ -354,7 +354,7 @@ export function buildShots(S: Stage): Shot[] {
   });
 
   // ------------------------------------------------------------ 5. the five armours
-  const ROW = { along: 18, gap: 2.1, guns: [null, 'p38', 'm9', 'mosin', 'benelli'] as (string | null)[] };
+  const ROW = { along: 18, gap: 2.1, guns: [null, 'colt', 'm9', 'mosin', 'benelli'] as (string | null)[] };
   const man = (k: number) => K(ROW.along + (k - 2) * ROW.gap, 0);
   const lineUp = (t: number): CamPose => {
     const k = ease(t / b(1.5)), at = K(ROW.along + (-2.6 + k * 5.2) * ROW.gap, 0, 1.25);

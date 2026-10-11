@@ -6,7 +6,7 @@
 
 import { ITEMS, fitAtRandom, loadGun, makeItem, makeMag } from './items';
 import type { Container } from './inventory';
-import { BUILDING_FOOTPRINT, heightAt, type World } from '../world/worldgen';
+import { BUILDING_FOOTPRINT, WORLD_SIZE, heightAt, inPlay, type World } from '../world/worldgen';
 import { gasEdge, gasZone } from './gas';
 import { UNDER_GAS } from './crates';
 
@@ -21,7 +21,7 @@ export const CALL = { eta: 45, every: 300, /** metres in front of the caller it 
  * way off, and its cargo beside it: a few things, of the kind kept under the gas. Everybody is told
  * where. One at a time; the wreck and whatever is left in it are cleared away after `life` seconds.
  */
-export const CRASH = { every: 900, first: 300, life: 600, label: 'Helicopter Cargo', /** metres from the cargo to the middle of the wreck */ beside: 4.6 };
+export const CRASH = { every: 900, first: 300, life: 600, label: 'Helicopter Cargo', /** its crate's grid (a supply drop's is twice as deep) */ w: 8, h: 9, /** metres from the cargo to the middle of the wreck */ beside: 4.6 };
 
 /** one of these is in every wreck's cargo: the things the gas is gone into for */
 const CRASH_SURE = ['boonie_hat', 'life_vest', 'pu_scope', 'mosin'];
@@ -59,11 +59,34 @@ export const DROP = {
   life: 360,
   /** seconds an emptied one stays before it is cleared away */
   linger: 20,
-  /** the crate's grid: nine deep, because that is what a rifle laid in it takes (it is nine long, and the inventory is eight across) */
+  /**
+   * The crate's grid: eight across (the inventory is), and eighteen deep, twice what it was: it holds twice as
+   * much (2026-10-11: "they should drop 2x the loot (bigger inventory of the container)"). A rifle laid in it is
+   * nine long.
+   */
   w: 8,
-  h: 9,
+  h: 18,
   label: 'Supply Drop',
+  /**
+   * How far outside the Zona's line a drop comes down, at least and at most, metres (2026-10-11: "we have
+   * helicopter crashes now so i think supply drops should spawn outside the zona, in the wilderness ... gives a
+   * reason for people to explore"). A helicopter's cargo is what comes down inside it now.
+   */
+  out: [30, 260] as [number, number],
 };
+
+/**
+ * TEMPORARY, THE SHOWCASE (2026-10-11; see SHOWCASE in src/sim/economy.ts): a drop also brings one of the new guns
+ * with two magazines for it, a box of what it fires and something to fit to it ("and include all the T3 loot we
+ * discussed here"). When the showcase is taken away this goes with it, or is cut down to what the drops are then
+ * meant to bring.
+ */
+const SHOWCASE: { gun: string; mags: string[]; box: string; fits: string[] }[] = [
+  { gun: 'ak', mags: ['mag_ak', 'mag_ak'], box: 'box_739', fits: ['suppressor_739', 'red_dot', 'drum_ak'] },
+  { gun: 'ar15', mags: ['mag_ar', 'mag_ar'], box: 'box_556', fits: ['suppressor_556', 'red_dot', 'foregrip', 'gun_light', 'mag_ar_60'] },
+  { gun: 'mpa', mags: ['mag_mpa', 'mag_mpa'], box: 'box_9mm', fits: ['suppressor_9', 'red_dot'] },
+  { gun: 'benelli', mags: [], box: 'box_12', fits: ['suppressor_12', 'red_dot', 'gun_light'] },
+];
 
 export interface DropInfo {
   uid: string;
@@ -102,27 +125,48 @@ export function fillDrop(c: Container, rnd: () => number = Math.random) {
     }
     c.add(item);
   };
-  for (const id of ['mosin', 'p38', 'box_762', 'box_9mm', 'firstaid', 'bandage', 'bandage', 'pu_scope']) put(id);
-  for (const id of ['mag_sniper', 'mag_p38']) c.add(makeMag(id, 999));
-  put(pick([['suppressor_9', 3], ['mag_p38_ext', 3], ['rifle_wrap', 2]], rnd));
-  const extras: [string, number][] = [['grenade', 3], ['grenade', 2], ['gasmask', 2], ['life_vest', 2], ['binoculars', 1.5], ['condensed', 1.5], ['thermos', 1.5], ['ammo_762', 2], ['ammo_9mm', 2]];
-  const n = 2 + Math.floor(rnd() * 2);
+  for (const id of ['mosin', 'colt', 'box_762', 'box_45', 'firstaid', 'bandage', 'bandage', 'pu_scope']) put(id);
+  for (const id of ['mag_sniper', 'mag_colt']) c.add(makeMag(id, 999));
+  put(pick([['suppressor_9', 3], ['mag_colt', 3], ['rifle_wrap', 2]], rnd));
+  const extras: [string, number][] = [['grenade', 3], ['grenade', 2], ['gasmask', 2], ['life_vest', 2], ['binoculars', 1.5], ['condensed', 1.5], ['thermos', 1.5], ['ammo_762', 2], ['ammo_45', 2]];
+  // (twice what it brought, 2026-10-11: it is a long way out now, and worth the walk)
+  const n = 2 * (2 + Math.floor(rnd() * 2));
   for (let i = 0; i < n; i++) put(pick(extras, rnd));
+  for (const id of ['firstaid', 'stim', 'box_762', 'keycard']) put(id);
+  // TEMPORARY, THE SHOWCASE: one of the new guns, loaded, with its magazines, its rounds and two things to fit to it
+  const show = SHOWCASE[Math.floor(rnd() * SHOWCASE.length)];
+  put(show.gun);
+  for (const id of show.mags) c.add(makeMag(id, 999));
+  put(show.box);
+  put(show.box);
+  const fits = [...show.fits];
+  for (let k = 0; k < 2 && fits.length; k++) put(fits.splice(Math.floor(rnd() * fits.length), 1)[0]);
 }
 
 /**
- * Somewhere to set one down: open, level ground inside the part of the map people play
- * in, clear of buildings and trees, and not on the road.
+ * Somewhere to set one down: open, level ground OUTSIDE the part of the map people play in (the Zona, the dotted
+ * line on the map): the wild country round it, clear of buildings and trees, and not on the road. (It was inside,
+ * anywhere from the village out to the ring of outlying places: `inside` is that, and is where a helicopter comes down.)
  */
-export function pickDropSite(world: World, rnd: () => number = Math.random): { x: number; y: number; z: number } | null {
+export function pickDropSite(world: World, rnd: () => number = Math.random, inside = false): { x: number; y: number; z: number } | null {
   const H = world.heights;
   const road = world.road.points;
   const gas = gasZone(world.pois, (x, z) => heightAt(H, x, z));
   for (let tries = 0; tries < 200; tries++) {
-    // anywhere from the village out to the ring of outlying places
-    const a = rnd() * Math.PI * 2;
-    const r = 40 + Math.sqrt(rnd()) * 250;
-    const x = 15 + Math.cos(a) * r, z = 5 + Math.sin(a) * r;
+    let x: number, z: number;
+    if (inside) {
+      // (a helicopter's cargo: inside the line, anywhere from the village out to the ring of outlying places, as a drop was)
+      const a = rnd() * Math.PI * 2;
+      const r = 40 + Math.sqrt(rnd()) * 250;
+      x = 15 + Math.cos(a) * r;
+      z = 5 + Math.sin(a) * r;
+    } else {
+      // anywhere on the map that is outside the line, by not too little and not too much, and not at the very edge of the world
+      const edge = WORLD_SIZE / 2 - 45;
+      x = (rnd() * 2 - 1) * edge;
+      z = (rnd() * 2 - 1) * edge;
+      if (inPlay(x, z, -DROP.out[0]) || !inPlay(x, z, -DROP.out[1])) continue;
+    }
     const y = heightAt(H, x, z);
     // not into the gas: a drop is for whoever gets to it, not for whoever has a mask
     if (gas && gasEdge(gas, x, z) < 12) continue;

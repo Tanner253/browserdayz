@@ -23,7 +23,7 @@ import { CALL, CRASH, DROP, fillCrash, fillDrop, type DropInfo } from '../src/si
 import { STOCK } from '../src/sim/trade';
 import { VOICE } from '../src/sim/voice';
 import { CRATE_RESTOCK, CRATE_SPECS, fillCrate } from '../src/sim/crates';
-import { underGas } from '../src/sim/gas';
+import { gasEdge, underGas } from '../src/sim/gas';
 import { BUNKER, bunkerDark, inBunker } from '../src/sim/bunker';
 import { phaseOf } from '../src/sim/daynight';
 import { WEAPON_RULES, hitDamage, type HitZone } from '../src/sim/combat';
@@ -99,6 +99,8 @@ interface Veh extends VehicleInfo {
   by: number;
   /** burned out: when the wreck is cleared away (0: it is whole) */
   goneAt: number;
+  /** standing empty under the gas with nobody near: since when (0: it is not) */
+  leftAt?: number;
 }
 const vehicles = new Map<number, Veh>();
 /** spots whose jeep burned: which -> when a new one may be stood there */
@@ -113,6 +115,8 @@ function standJeep(home: number): Veh {
   return v;
 }
 PARKS.forEach((_, k) => standJeep(k));
+/** the gas over the works: a car left under it is stood back home (see JEEP.gas) */
+const carsGas = world.gas;
 const vehInfo = (v: Veh): VehicleInfo => ({ i: v.i, s: v.s, hp: v.goneAt ? 0 : v.hp, fuel: v.fuel, seats: v.seats, sim: v.sim, ...(v.k ? { k: v.k } : {}) });
 const tellSeats = (v: Veh, rest = false) => broadcast({ t: 'vseat', i: v.i, seats: v.seats, sim: v.sim, ...(rest ? { s: v.s } : {}) });
 const isVState = (s: unknown): s is VState => Array.isArray(s) && s.length === 12 && s.every(num) && Math.abs(s[0]) < EDGE && Math.abs(s[2]) < EDGE && Math.abs(s[1]) < 500 && Math.abs(Math.hypot(s[3], s[4], s[5], s[6]) - 1) < 0.02 && Math.hypot(s[7], s[8], s[9]) < 60;
@@ -1654,6 +1658,21 @@ setInterval(() => {
       v.s = restState(p.x, p.y, p.z, p.yaw);
       v.sim = null;
       tellSeats(v, true);
+    } else if (!v.goneAt && !v.burnAt && carsGas && gasEdge(carsGas, v.s[0], v.s[2]) < 0 && v.seats.every((s) => s === null)) {
+      // Left under the gas (see JEEP.gas): once it has stood there empty long enough with nobody near, it is stood
+      // back where it first stood, as a new one is. (Anybody near, or in it, and the count starts again.)
+      const near = [...clients.values()].some((c) => c.alive && Math.hypot(c.pose[0] - v.s[0], c.pose[2] - v.s[2]) < JEEP.gas.clear);
+      if (near) v.leftAt = 0;
+      else if (!v.leftAt) v.leftAt = now;
+      else if (now - v.leftAt > JEEP.gas.after * 1000) {
+        const p = PARKS[v.home];
+        // (not onto anybody, nor onto another car: it waits until its place is free)
+        if (![...clients.values()].some((c) => c.alive && Math.hypot(c.pose[0] - p.x, c.pose[2] - p.z) < JEEP.respawnClear) && ![...vehicles.values()].some((o) => o !== v && Math.hypot(o.s[0] - p.x, o.s[2] - p.z) < 8)) {
+          vehicles.delete(v.i);
+          broadcast({ t: 'v-', i: v.i });
+          broadcast({ t: 'v+', v: vehInfo(standJeep(v.home)) });
+        }
+      }
     } else if (v.sim !== null && v.seats[0] !== v.sim && now - v.heard > 6000) {
       // the game that was letting it roll to a stop has gone quiet
       v.sim = null;
@@ -1830,13 +1849,15 @@ let lastCall = -1e9;
 
 /** @param where set down here (called for on a radio) and not at a place of the map's choosing */
 function spawnDrop(where?: { x: number; y: number; z: number }, heli = false) {
-  const at = where ?? world.dropSite();
+  // (a supply drop out in the wild country, past the line; a helicopter's cargo inside it)
+  const at = where ?? world.dropSite(undefined, heli);
   if (!at) return;
   const uid = `drop-${Math.round(economy.time)}-${Math.random().toString(36).slice(2, 7)}`;
-  const c = new Container(uid, heli ? CRASH.label : DROP.label, DROP.w, DROP.h, [], true);
+  const [w, h] = heli ? [CRASH.w, CRASH.h] : [DROP.w, DROP.h];
+  const c = new Container(uid, heli ? CRASH.label : DROP.label, w, h, [], true);
   if (heli) fillCrash(c);
   else fillDrop(c);
-  const b: Box = { cid: uid, kind: 'drop', w: DROP.w, h: DROP.h, items: c.serialize().items, x: at.x, y: at.y, z: at.z, rot: Math.random() * Math.PI * 2, emptiedAt: -1, expires: economy.time + (heli ? CRASH.life : DROP_LIFE), ...(heli ? { heli: true } : {}) };
+  const b: Box = { cid: uid, kind: 'drop', w, h, items: c.serialize().items, x: at.x, y: at.y, z: at.z, rot: Math.random() * Math.PI * 2, emptiedAt: -1, expires: economy.time + (heli ? CRASH.life : DROP_LIFE), ...(heli ? { heli: true } : {}) };
   boxes.set(uid, b);
   for (const it of b.items) issue(it);
   broadcast({ t: 'drop+', d: dropInfo(b) });

@@ -29,6 +29,8 @@ export interface Cartridge {
 export const CARTRIDGES: Record<string, Cartridge> = {
   // 9x19, 115 grain ball: 360 m/s at the muzzle, 312 at a hundred yards
   ammo_9mm: { name: '9x19', vel: 360, drag: 0.00156, damage: 34 },
+  // .45 ACP, 230 grain ball: 255 m/s, 237 at a hundred yards. Slow, and nearly half as heavy again as it looks.
+  ammo_45: { name: '.45 ACP', vel: 255, drag: 0.0008, damage: 46 },
   // .50 Action Express, 300 grain: 450 m/s, 378 at a hundred yards
   ammo_50: { name: '.50 AE', vel: 450, drag: 0.0019, damage: 58 },
   // 7.62x54R, 148 grain ball from a long barrel: 830 m/s, 622 at three hundred yards
@@ -82,7 +84,8 @@ export interface Gun {
 export const GUNS: Record<string, Gun> = {
   // (the bolt rifle: one hard shove, and a long way back to the target)
   mosin: { ammo: 'ammo_762', rpm: 300, cycle: 0.8, barrel: 1, moa: 1.6, hip: 1.3, up: 3.1, side: 0.5, lean: 0.15, first: 1, held: 1, stays: 0.24, back: 8.5, jump: 3.2, heavy: true, zero: [100, 200, 300, 400, 500, 600], reach: 900 },
-  p38: { ammo: 'ammo_9mm', rpm: 460, barrel: 1, moa: 7, hip: 1.7, up: 1.5, side: 0.45, lean: 0, first: 1, held: 1, stays: 0.23, back: 10, jump: 1.6, zero: [25], reach: 220 },
+  // (the Colt: a heavier round than the 9 mm's and a harder shove with each, a little slower to come back)
+  colt: { ammo: 'ammo_45', rpm: 380, barrel: 1, moa: 6, hip: 1.8, up: 2.1, side: 0.5, lean: 0, first: 1, held: 1, stays: 0.26, back: 9, jump: 1.9, zero: [25], reach: 200 },
   m9: { ammo: 'ammo_9mm', rpm: 460, barrel: 1, moa: 6, hip: 1.7, up: 1.4, side: 0.4, lean: 0, first: 1, held: 1, stays: 0.23, back: 10, jump: 1.6, zero: [25], reach: 220 },
   deagle: { ammo: 'ammo_50', rpm: 220, barrel: 1, moa: 5, hip: 1.9, up: 3.3, side: 0.8, lean: 0, first: 1, held: 1, stays: 0.3, back: 8, jump: 2.7, heavy: true, zero: [25, 50], reach: 260 },
   benelli: { ammo: 'ammo_12', rpm: 176, barrel: 1, moa: 7, hip: 1.3, up: 3.9, side: 0.9, lean: 0, first: 1, held: 1, stays: 0.24, back: 8.5, jump: 4.2, heavy: true, zero: [25], reach: 70 },

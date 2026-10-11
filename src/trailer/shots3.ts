@@ -415,7 +415,7 @@ export function buildShots(S: Stage): Shot[] {
         grade('cold');
         const m0 = runAt(31), v0 = runAt(40);
         put(MIRA, m0.x, m0.z, yawTo(m0.x, m0.z, K.x, K.z), null).bleeding = true;
-        put(VOLKOV, v0.x, v0.z, yawTo(v0.x, v0.z, K.x, K.z), 'p38');
+        put(VOLKOV, v0.x, v0.z, yawTo(v0.x, v0.z, K.x, K.z), 'colt');
         M().rp.avatar.clearWounds();
       },
       tick: (t, _S, dt) => {
@@ -620,7 +620,7 @@ export function buildShots(S: Stage): Shot[] {
         if (t > 1.5) m.yaw = yawTo(m.pos.x, m.pos.z, g.player.pos.x, g.player.pos.z);
       },
       cues: [
-        { at: 0.55, fn: () => { const m = M(); m.weapon = 'p38'; m.rp.setWeapon('p38', []); audio.ui('pickup'); } },
+        { at: 0.55, fn: () => { const m = M(); m.weapon = 'colt'; m.rp.setWeapon('colt', []); audio.ui('pickup'); } },
         { at: 1.05, fn: () => (M().crouch = false) },
         { at: 1.2, fn: () => { pocket(tagOf(V().name)); audio.ui('pickup'); } },
       ],
@@ -640,7 +640,7 @@ export function buildShots(S: Stage): Shot[] {
         grade('warm');
         const s0 = local(station, lane + 0.9, SHD + 31), m0 = local(station, lane - 0.9, SHD + 32.4), d0 = local(station, 0, SHD);
         put(SABLE, s0.x, s0.z, yawTo(s0.x, s0.z, d0.x, d0.z), 'mosin');
-        put(MIRA, m0.x, m0.z, yawTo(m0.x, m0.z, d0.x, d0.z), 'p38');
+        put(MIRA, m0.x, m0.z, yawTo(m0.x, m0.z, d0.x, d0.z), 'colt');
       },
       tick: (_t, _S, dt) => {
         walkTo(SABLE, lane * 0.4 + 0.7, SHD + 4, 4.3, dt);
@@ -673,7 +673,7 @@ export function buildShots(S: Stage): Shot[] {
         grade('war');
         const s0 = local(station, 0.25, SHD + 3.4), m0 = local(station, -0.6, SHD + 5.2), d0 = local(station, 0, SHD);
         put(SABLE, s0.x, s0.z, yawTo(s0.x, s0.z, d0.x, d0.z), 'mosin').aim = true;
-        put(MIRA, m0.x, m0.z, yawTo(m0.x, m0.z, d0.x, d0.z), 'p38').aim = true;
+        put(MIRA, m0.x, m0.z, yawTo(m0.x, m0.z, d0.x, d0.z), 'colt').aim = true;
         if (fromInside) lampOn(inside(station, 0.6, SHD - 3.2, 2.2), 7);
       },
       tick: (t, _S, dt) => {
@@ -717,7 +717,7 @@ export function buildShots(S: Stage): Shot[] {
         eyes(at.x, at.z, yawTo(at.x, at.z, out.x, out.z), 0.01, ['mosin', ['ammo_762', 10], 'bandage'], 'primary', station.floorY + 0.02);
         pocket(tagOf('Volkov', 46));
         const m = inside(station, mx, mz);
-        put(MIRA, m.x, m.z, yawTo(m.x, m.z, out.x, out.z), 'p38').pos.y = station.floorY;
+        put(MIRA, m.x, m.z, yawTo(m.x, m.z, out.x, out.z), 'colt').pos.y = station.floorY;
         lampOn(inside(station, 0.4, SHD - 3.4, 2.2), 8);
         document.body.classList.add('tr-map-big');
         hush();
@@ -747,7 +747,7 @@ export function buildShots(S: Stage): Shot[] {
   // ============================================================ 10. they come (bars 19-24)
   {
     const four = [KESTREL, DMITRI, OKSANA, BEAR];
-    const guns = ['mosin', 'p38', 'p38', 'mosin'];
+    const guns = ['mosin', 'colt', 'colt', 'mosin'];
     /** where each of them makes for: nearer on the wings than in the middle */
     const goal = (k: number) => front(lanes[k], [16, 20, 15, 21][k]);
     const advance = (dt: number, speed: number) => four.forEach((id, k) => {
@@ -787,7 +787,7 @@ export function buildShots(S: Stage): Shot[] {
         const me = local(station, 0.9, SHD + 3.0), her = local(station, -1.9, SHD + 6.4), tgt = goal(2);
         eyes(me.x, me.z, yawTo(me.x, me.z, tgt.x, tgt.z), 0, ['mosin', ['ammo_762', 15], 'bandage'], 'primary');
         pocket(tagOf('Volkov', 96));
-        const m = put(MIRA, her.x, her.z, yawTo(her.x, her.z, tgt.x, tgt.z), 'p38');
+        const m = put(MIRA, her.x, her.z, yawTo(her.x, her.z, tgt.x, tgt.z), 'colt');
         m.crouch = true;
         m.hp = 1e5;
         m.skill = 0.2;
@@ -844,7 +844,7 @@ export function buildShots(S: Stage): Shot[] {
         grade('war');
         two.forEach((id, k) => {
           const from = byDrum(-9 - k * 1.5, (k ? -1 : 1) * 2.4);
-          put(id, from.x, from.z, yawTo(from.x, from.z, drum.x, drum.z), k ? 'p38' : 'mosin');
+          put(id, from.x, from.z, yawTo(from.x, from.z, drum.x, drum.z), k ? 'colt' : 'mosin');
         });
       },
       tick: (_t, _S, dt) => two.forEach((id, k) => {
@@ -945,12 +945,12 @@ export function buildShots(S: Stage): Shot[] {
         const rifle = g.inv.find((i: any) => i.id === 'mosin');
         if (rifle) rifle.loaded = 1;
         const m = inside(station, her[0], her[1]), out = local(station, 0.3, SHD + 10);
-        put(MIRA, m.x, m.z, yawTo(m.x, m.z, out.x, out.z), 'p38').pos.y = station.floorY;
+        put(MIRA, m.x, m.z, yawTo(m.x, m.z, out.x, out.z), 'colt').pos.y = station.floorY;
         M().crouch = true;
         const b0 = local(station, 0.4, SHD + 6.5);
-        put(BEAR, b0.x, b0.z, yawTo(b0.x, b0.z, station.x, station.z), 'p38');
+        put(BEAR, b0.x, b0.z, yawTo(b0.x, b0.z, station.x, station.z), 'colt');
         tough(B0(), 3);
-        B0().onDeath = () => S.feedKill(FRIEND, B0().name, ITEMS.p38.name, 0, false);
+        B0().onDeath = () => S.feedKill(FRIEND, B0().name, ITEMS.colt.name, 0, false);
         lampOn(inside(station, 0.2, SHD - 2.6, 2.3), 9);
         hush();
       },
@@ -1007,7 +1007,7 @@ export function buildShots(S: Stage): Shot[] {
       eyes(me.x, me.z, yawTo(me.x, me.z, outw.x, outw.z), -0.12, ['mosin', ['ammo_762', 15], 'bandage'], 'primary');
       pocket(tagOf('Volkov', 392), tagOf('Oksana', 208), tagOf('Kestrel', 163), tagOf('Dmitri', 163), tagOf('Bear', 131));
       const her = local(station, -1.2, SHD + 7.6);
-      put(MIRA, her.x, her.z, yawTo(her.x, her.z, local(station, -0.6, SHD + 6.5).x, local(station, -0.6, SHD + 6.5).z), 'p38').crouch = true;
+      put(MIRA, her.x, her.z, yawTo(her.x, her.z, local(station, -0.6, SHD + 6.5).x, local(station, -0.6, SHD + 6.5).z), 'colt').crouch = true;
       hush();
     },
     tick: (t) => {
@@ -1143,7 +1143,7 @@ export function buildShots(S: Stage): Shot[] {
         grade('dust');
         const s0 = local(station, 0.2, SHD + 6.5), m0 = local(station, -0.5, SHD + 3.4);
         put(SABLE, s0.x, s0.z, outYaw(), 'mosin');
-        put(MIRA, m0.x, m0.z, yawTo(m0.x, m0.z, s0.x, s0.z), 'p38');
+        put(MIRA, m0.x, m0.z, yawTo(m0.x, m0.z, s0.x, s0.z), 'colt');
       },
       tick: (t, _S, dt) => {
         const s = S0(), m = M(), to = local(station, 0.2, SHD + 30);
@@ -1173,7 +1173,7 @@ export function buildShots(S: Stage): Shot[] {
         const me = local(station, 0.2, SHD + 9.5), her = local(station, -0.5, SHD + 3.4);
         eyes(me.x, me.z, outYaw(), 0.02, ['mosin', ['ammo_762', 15], 'bandage'], 'primary');
         pocket(tagOf('Oksana', TAG_HOLD - 171), tagOf('Kestrel', TAG_HOLD - 216), tagOf('Dmitri', TAG_HOLD - 216), tagOf('Bear', TAG_HOLD - 248));
-        put(MIRA, her.x, her.z, yawTo(her.x, her.z, me.x, me.z), 'p38').aim = true;
+        put(MIRA, her.x, her.z, yawTo(her.x, her.z, me.x, me.z), 'colt').aim = true;
         hush();
       },
       tick: (t) => {
@@ -1188,7 +1188,7 @@ export function buildShots(S: Stage): Shot[] {
           fn: () => {
             M().fireAt(g.s.r.camera.position.clone().setY(g.s.r.camera.position.y - 0.35), 0);
             // (what the game tells you when another player does this to you)
-            g.deathInfo = `Killed by ${FRIEND} with ${ITEMS.p38.name}. Your body and gear are where you fell.`;
+            g.deathInfo = `Killed by ${FRIEND} with ${ITEMS.colt.name}. Your body and gear are where you fell.`;
             g.lastHit = { x: -Math.sin(outYaw()), z: -Math.cos(outYaw()), at: performance.now() };
             hitMe(200, Math.PI);
           },
@@ -1207,7 +1207,7 @@ export function buildShots(S: Stage): Shot[] {
         grade('dust');
         const at = fall(), her = local(station, -0.2, SHD + 7.4);
         put(SABLE, at.x, at.z, outYaw(), 'mosin').die(new THREE.Vector3(-Math.sin(outYaw()), 0, -Math.cos(outYaw())));
-        put(MIRA, her.x, her.z, yawTo(her.x, her.z, at.x, at.z), 'p38').aim = true;
+        put(MIRA, her.x, her.z, yawTo(her.x, her.z, at.x, at.z), 'colt').aim = true;
         await preroll(80);
       },
       tick: (t) => {
@@ -1234,12 +1234,12 @@ export function buildShots(S: Stage): Shot[] {
         M().hide();
         grade('dust');
         // she is the one we are now: his own tag and the four he was carrying, every clock back at the top
-        eyes(me.x, me.z, yawTo(me.x, me.z, at.x, at.z), -0.62, ['p38', ['ammo_9mm', 16], 'bandage'], 'holster');
+        eyes(me.x, me.z, yawTo(me.x, me.z, at.x, at.z), -0.62, ['colt', ['ammo_9mm', 16], 'bandage'], 'holster');
         hush();
         document.body.classList.add('tr-map-big');
         next.forEach((id, k) => {
           const w = front(lanes[(k + 1) % lanes.length], 58 + k * 5), d0 = local(station, 0, SHD + 9);
-          put(id, w.x, w.z, yawTo(w.x, w.z, d0.x, d0.z), k === 1 ? 'p38' : 'mosin');
+          put(id, w.x, w.z, yawTo(w.x, w.z, d0.x, d0.z), k === 1 ? 'colt' : 'mosin');
         });
       },
       tick: (t, _S, dt) => {
@@ -1440,7 +1440,7 @@ export function buildShots(S: Stage): Shot[] {
         grade('gold');
         const s0 = local(station, 1.0, SHD + 3.0), m0 = local(station, -1.2, SHD + 3.6), outw = local(station, 0, SHD + 30);
         put(SABLE, s0.x, s0.z, yawTo(s0.x, s0.z, outw.x, outw.z), 'mosin');
-        put(MIRA, m0.x, m0.z, yawTo(m0.x, m0.z, outw.x, outw.z), 'p38');
+        put(MIRA, m0.x, m0.z, yawTo(m0.x, m0.z, outw.x, outw.z), 'colt');
       },
       // up at the two of them in the station's door, from the yard
       cam: (t) => {
@@ -1474,7 +1474,7 @@ export function buildShots(S: Stage): Shot[] {
       setup: () => {
         strike();
         shutAll();
-        eyes(at.x, at.z, yawTo(at.x, at.z, to.x, to.z), 0, ['mosin', 'p38', ['ammo_762', 10]], null, undefined, { mosin: ['pu_scope', 'rifle_wrap'], p38: ['suppressor_9', 'mag_p38_ext'] });
+        eyes(at.x, at.z, yawTo(at.x, at.z, to.x, to.z), 0, ['mosin', 'colt', ['ammo_762', 10]], null, undefined, { mosin: ['pu_scope', 'rifle_wrap'], colt: ['suppressor_9', 'mag_colt'] });
       },
       tick: (t) => {
         g.player.yaw = yawTo(at.x, at.z, to.x, to.z) + 0.05 * Math.sin(t * 1.3);
@@ -1497,7 +1497,7 @@ export function buildShots(S: Stage): Shot[] {
         cast().forEach((_a, i) => {
           const off = (i - 3) * 1.25, back = Math.abs(i - 3) * 0.55;
           const x = mid.x + right.x * off - d.x * back, z = mid.z + right.z * off - d.z * back;
-          put(i, x, z, yawTo(x, z, x + d.x, z + d.z), [null, 'p38', 'mosin', 'mosin', 'p38', null, 'mosin'][i]);
+          put(i, x, z, yawTo(x, z, x + d.x, z + d.z), [null, 'colt', 'mosin', 'mosin', 'colt', null, 'mosin'][i]);
         });
       },
       tick: (_t, _S, dt) => cast().forEach((a) => { a.go(a.pos.x + d.x * 5, a.pos.z + d.z * 5, 1.7, dt); a.sprint = false; }),
@@ -1538,7 +1538,7 @@ export function buildShots(S: Stage): Shot[] {
           if (kind === 'drum') {
             // the drum of the story again, with two standing by it who should have known better
             const p1 = byDrum(-1.5, 1.0), p2 = byDrum(-0.5, -1.7);
-            two().place(p1.x, p1.z, yawTo(p1.x, p1.z, shooter.x, shooter.z), 'p38', GEAR[4]).hp = 60;
+            two().place(p1.x, p1.z, yawTo(p1.x, p1.z, shooter.x, shooter.z), 'colt', GEAR[4]).hp = 60;
             three().place(p2.x, p2.z, yawTo(p2.x, p2.z, shooter.x, shooter.z) + 0.5, 'mosin', GEAR[5]).hp = 60;
           } else if (kind === 'dance') {
             dancers().forEach((a, i, all) => {
@@ -1551,7 +1551,7 @@ export function buildShots(S: Stage): Shot[] {
             two().place(at.x, at.z, face, null, GEAR[2]).hp = 20;
             one().place(sx, sz, yawTo(sx, sz, at.x, at.z), null, GEAR[0]);
           } else if (kind === 'nade') {
-            two().place(at.x - 0.9, at.z + 0.3, face + 2.6, 'p38', GEAR[2]).hp = 55;
+            two().place(at.x - 0.9, at.z + 0.3, face + 2.6, 'colt', GEAR[2]).hp = 55;
             three().place(at.x + 0.8, at.z - 0.6, face + 3.4, 'mosin', GEAR[6]).hp = 55;
           } else if (kind === 'loot') {
             // somebody going through the pockets of somebody who no longer needs them
@@ -1567,7 +1567,7 @@ export function buildShots(S: Stage): Shot[] {
           } else if (kind === 'back') {
             // one walking away, and the one behind him with a pistol
             two().place(at.x, at.z, yawTo(sx, sz, at.x, at.z), 'mosin', GEAR[0]).hp = 30;
-            one().place(sx, sz, yawTo(sx, sz, at.x, at.z), 'p38', GEAR[1]).aim = true;
+            one().place(sx, sz, yawTo(sx, sz, at.x, at.z), 'colt', GEAR[1]).aim = true;
           } else {
             two().place(at.x, at.z, face + Math.PI / 2, 'mosin', GEAR[4]).hp = 40;
             one().place(sx, sz, yawTo(sx, sz, at.x, at.z), 'mosin', GEAR[3]).aim = true;

@@ -57,7 +57,7 @@ const SOON = 0.95;
  * On the outskirts that is something to hit with and never a gun; from the village on, a pistol where guns were
  * kept, and either elsewhere. [item, weight]
  */
-const ARMS: [string, number][] = [['p38', 2.4], ['m9', 1.8], ['hatchet', 1.6], ['bat', 1.6], ['crowbar', 1.4], ['machete', 1.4], ['shovel', 1.4], ['knife', 1]];
+const ARMS: [string, number][] = [['colt', 2.4], ['m9', 1.8], ['hatchet', 1.6], ['bat', 1.6], ['crowbar', 1.4], ['machete', 1.4], ['shovel', 1.4], ['knife', 1]];
 /** seconds an armed point stays bare once its weapon has been taken */
 export const ARMS_RESTOCK = 180;
 
@@ -77,7 +77,7 @@ export const TYPES: Record<string, TypeRule> = {
   // (Weapons and what they fire come back fast: a gun taken off a shelf is back somewhere on its step within
   // three minutes, rounds within two. At seven minutes for a rifle a busy server ran dry.)
   mosin: { at: [0, 0, 2, 9, 2], lifetime: 7200, restock: 180, usage: ARMY, loaded: [1, 4], keep: SOON },
-  p38: { at: [0, 16, 6, 0, 0], lifetime: 7200, restock: 180, usage: ['Police', 'Military', 'Town'], favour: ARMOURY, loaded: [2, 6], keep: SOON },
+  colt: { at: [0, 16, 6, 0, 0], lifetime: 7200, restock: 180, usage: ['Police', 'Military', 'Town'], favour: ARMOURY, loaded: [2, 6], keep: SOON },
   // the service pistol, with nearly twice the magazine
   m9: { at: [0, 12, 9, 1, 0], lifetime: 7200, restock: 180, usage: ['Police', 'Military', 'Town'], favour: ARMOURY, loaded: [3, 10], keep: SOON },
   // loose rounds turn up in handfuls, everywhere; sealed boxes are the real find, and are where guns were kept
@@ -89,7 +89,7 @@ export const TYPES: Record<string, TypeRule> = {
   // the guns they fit are kept, about as many again as there are guns, a few rounds in some. A second one is
   // what makes a gun worth keeping. (Under the gas every place is spoken for: the rifle's magazines there are in
   // place of a few handfuls of loose rounds.)
-  mag_p38: { at: [0, 12, 5, 0, 0], lifetime: 7200, restock: 240, usage: ['Police', 'Military', 'Town'], favour: ARMOURY, keep: SOON },
+  mag_colt: { at: [0, 12, 5, 0, 0], lifetime: 7200, restock: 240, usage: ['Police', 'Military', 'Town'], favour: ARMOURY, keep: SOON },
   mag_m9: { at: [0, 9, 7, 1, 0], lifetime: 7200, restock: 240, usage: ['Police', 'Military', 'Town'], favour: ARMOURY, keep: SOON },
   mag_sniper: { at: [0, 0, 2, 4, 2], lifetime: 7200, restock: 300, usage: ARMY, keep: SOON },
   // The two assault rifles (2026-10-10), and what goes with them. Nobody said where they are kept: they are put a
@@ -134,7 +134,7 @@ export const TYPES: Record<string, TypeRule> = {
   pu_scope: { at: [0, 0, 1, 6, 3], lifetime: 7200, restock: 1800, usage: ARMY },
   rifle_wrap: { at: [0, 0, 2, 3, 1], lifetime: 7200, restock: 1500, usage: ARMY },
   suppressor_9: { at: [0, 2, 2, 0, 0], lifetime: 7200, restock: 1800, usage: ['Police'] },
-  mag_p38_ext: { at: [0, 3, 2, 0, 0], lifetime: 7200, restock: 1200, usage: ARMY },
+  box_45: { at: [0, 3, 2, 0, 0], lifetime: 3600, restock: 240, usage: ARMY },
   // ------------------------------------------------------------ what you hit with: the outskirts, and nowhere else
   hatchet: { at: [14, 0, 0, 0, 0], lifetime: 3600, restock: 180, usage: SHEDS, favour: { Farm: 2, Hunting: 2 } },
   machete: { at: [12, 0, 0, 0, 0], lifetime: 3600, restock: 180, usage: SHEDS, favour: { Farm: 2 } },
@@ -208,6 +208,9 @@ export const TYPES: Record<string, TypeRule> = {
   // every place is spoken for: there it is in the crates.)
   mpa: { at: [0, 3, 3, 0, 0], lifetime: 7200, restock: 300, usage: ['Police', 'Military'], favour: ARMOURY, loaded: [5, 20], keep: SOON },
   mag_mpa: { at: [0, 3, 3, 0, 0], lifetime: 7200, restock: 300, usage: ['Police', 'Military'], favour: ARMOURY, keep: SOON },
+  // What the Colt fires (2026-10-11): loose, a little of it wherever the 9 mm is, from the outskirts on; its sealed
+  // boxes where the army kept things (above, in the places the Pistol 43's long magazine had) and in the police station.
+  ammo_45: { at: [5, 12, 7, 0, 0], lifetime: 3600, restock: 120, usage: ANYWHERE, favour: ARMOURY, qty: [0.25, 0.6], keep: SOON },
 };
 
 const STEPS: Tier[] = [1, 2, 3, 4, 5];
@@ -221,6 +224,58 @@ const UNSORTED = 4;
  * outskirts the bats and the crowbars came up a few short, which of them depending on the dice).
  */
 const FIRST = ['gasmask', 'benelli', 'mosin', 'ak', 'ar15', 'suppressor_12', 'suitcase', 'heavy_armor', 'life_vest', 'armor_vest', 'bat', 'crowbar', 'shovel', 'machete'];
+
+/**
+ * ======================================================================================================
+ * TEMPORARY: THE SHOWCASE (2026-10-11). To be taken away again: delete this block and SHOWCASE in crates.ts
+ * and drops.ts, put the words of TIERS back (src/sim/tiers.ts), and the marked checks in test/gas.test.ts and
+ * test/loot.test.ts back as they were (each says what it was).
+ *
+ * The user's, 2026-10-11: "we will make all these new guns and attachments common in T3 ... all the machine guns
+ * are bunker weapons, maybe submachine gun T4 weapon, but all this should be in the bunker. FOR NOW we will make
+ * it available in T3 so people have a reason to visit the new town, and try the new guns. we will give the
+ * players a taste of the firepower then take it away hiding it in the bunker soon. in fact lets bring the
+ * shotgun to the T3 as well, and the bunker keycard, and the gasmask." And: "make sure all this new firepower is
+ * in the bunker of course."
+ *
+ * What it is NOT: the loot the game is meant to have. That is to be worked out as DayZ has it, where a gun that
+ * fires is put together from a gun, a magazine and rounds found in three places ("think about dayz, how
+ * difficult it can be to make a full weapon that actually shoots, we need to make the game feel gritty"), with
+ * the automatic guns the bunker's and the submachine gun the gas's or the bunker's.
+ *
+ * What it does: how many of each of these are kept in Kamenka (the third step) while it lasts, and in the
+ * bunker (the fifth) where there were none. Nothing else is changed: what was kept on a step is kept there still.
+ * ======================================================================================================
+ */
+export const SHOWCASE: { kamenka: Record<string, number>; bunker: Record<string, number> } = {
+  kamenka: {
+    // the guns
+    ak: 6, ar15: 5, mpa: 7, benelli: 4,
+    // what feeds them
+    mag_ak: 7, mag_ar: 6, mag_mpa: 7, drum_ak: 2, mag_ar_60: 2,
+    ammo_739: 6, ammo_556: 6, ammo_12: 6, box_739: 4, box_556: 4, box_12: 3,
+    // what goes on them
+    suppressor_739: 2, suppressor_556: 2, suppressor_12: 2, suppressor_9: 3, foregrip: 3, red_dot: 4, gun_light: 4,
+    // and the way into the two places past it
+    keycard: 3, gasmask: 3,
+  },
+  // (Down the bunker a long gun lies on its floor or its racks and nowhere else, and the floor is spoken for: the
+  // submachine gun is on the racks and in the crates there, with the Colt and what both fire: see crates.ts. Its
+  // magazines have a shelf.)
+  bunker: { mag_mpa: 2 },
+};
+/**
+ * Where the showcase's things lie in Kamenka: in its houses and its shops, a great many places, and not where the
+ * army and the police kept theirs, which are few and are for what the town always had. (On the steps below it,
+ * each lies where it always did.)
+ */
+const SHOWN_IN: Usage[] = ['Town'];
+for (const [id, n] of Object.entries(SHOWCASE.kamenka)) TYPES[id].at[2] = Math.max(TYPES[id].at[2], n);
+for (const [id, n] of Object.entries(SHOWCASE.bunker)) TYPES[id].at[4] = Math.max(TYPES[id].at[4], n);
+// (Kamenka's own things are put down ahead of the showcase's, so that what the town was for is still there to be
+// found: its dressings and its stims lie in the same houses the new guns are now strewn through.)
+FIRST.push('firstaid', 'stim', 'soft_vest');
+
 
 export interface WorldLoot {
   uid: string;
@@ -284,7 +339,9 @@ export class Economy {
     this.points.forEach((p, i) => {
       // armed points are stocked on their own (see arm)
       if (p.arms || this.pointBusy.has(i) || this.tier[i] !== where) return;
-      if (sorted && !p.usage.some((u) => rule.usage.includes(u))) return;
+      // (TEMPORARY, THE SHOWCASE: in Kamenka its things lie in the town's houses as well as where each was kept)
+      const kinds = where === 3 && id in SHOWCASE.kamenka && id !== 'gasmask' ? SHOWN_IN : rule.usage;
+      if (sorted && !p.usage.some((u) => kinds.includes(u))) return;
       // a rifle never spawns on a narrow shelf, a jerrycan never on a barrel
       if (!this.fits(id, p)) return;
       let w = 1;

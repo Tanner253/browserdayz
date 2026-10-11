@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-11T06:44:11.091Z",
+ "generated": "2026-10-11T07:09:19.876Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr"
@@ -1724,6 +1724,27 @@
    ],
    "lods": []
   },
+  "round_45": {
+   "url": "assets/models/round_45.glb",
+   "tags": [
+    "loot",
+    "ammo"
+   ],
+   "bytes": 61236,
+   "srcTris": 6240,
+   "tris": 512,
+   "min": [
+    -0.0061,
+    0,
+    -0.0061
+   ],
+   "max": [
+    0.0061,
+    0.0324,
+    0.0061
+   ],
+   "lods": []
+  },
   "round_556": {
    "url": "assets/models/round_556.glb",
    "tags": [
@@ -1826,6 +1847,27 @@
     0.0449,
     0.0525,
     0.065
+   ],
+   "lods": []
+  },
+  "ammo_box_45": {
+   "url": "assets/models/ammo_box_45.glb",
+   "tags": [
+    "loot",
+    "ammo"
+   ],
+   "bytes": 15562048,
+   "srcTris": 151392,
+   "tris": 151392,
+   "min": [
+    -0.0886,
+    0,
+    -0.0351
+   ],
+   "max": [
+    0.0886,
+    0.0381,
+    0.0351
    ],
    "lods": []
   },
@@ -3240,23 +3282,23 @@
     ]
    }
   },
-  "pistol_43": {
-   "url": "assets/models/pistol_43.glb",
+  "colt_1911": {
+   "url": "assets/models/colt_1911.glb",
    "tags": [
     "weapon"
    ],
-   "bytes": 3752672,
-   "srcTris": 3342,
-   "tris": 3342,
+   "bytes": 4533088,
+   "srcTris": 14915,
+   "tris": 14915,
    "min": [
-    -0.0139,
-    -0.0573,
-    -0.0175
+    -0.0347,
+    -0.0401,
+    -0.0135
    ],
    "max": [
-    0.2,
+    0.1813,
     0.0976,
-    0.0219
+    0.0189
    ],
    "lods": [],
    "holds": {

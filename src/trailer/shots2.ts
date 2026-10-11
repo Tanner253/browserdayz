@@ -449,10 +449,10 @@ export function buildShots(S: Stage): Shot[] {
         noDrop();
         showBoard(1, 0);
         const inStation = (l: { x: number; z: number }) => Math.hypot(l.x - station.x, l.z - station.z) < 9;
-        const rifle = lootOf('mosin'), pistol = lootOf('p38');
+        const rifle = lootOf('mosin'), pistol = lootOf('colt');
         const pick = rifle && (inStation(rifle.l) || !pistol || !inStation(pistol.l)) ? rifle : pistol ?? rifle;
         if (!pick) throw new Error('no gun lying in the world where it can be filmed');
-        gun = pick === rifle ? 'mosin' : 'p38';
+        gun = pick === rifle ? 'mosin' : 'colt';
         S.kit(['sprats', 'thermos', 'bandage']);
         S.hold(null);
         S.me(pick.px, pick.pz, yawTo(pick.px, pick.pz, pick.l.x, pick.l.z) + 0.5, -0.1, pick.fy);
@@ -475,7 +475,7 @@ export function buildShots(S: Stage): Shot[] {
       chain: true,
       hud: true,
       setup: () => {
-        if (!g.inv.find((i: any) => i.id === 'mosin' || i.id === 'p38')) g.inv.add(makeItem(gun));
+        if (!g.inv.find((i: any) => i.id === 'mosin' || i.id === 'colt')) g.inv.add(makeItem(gun));
         // a hat in a pocket (asked simply to carry it, the inventory would put it straight on)
         if (g.inv.slots.head) g.inv.remove(g.inv.slots.head);
         if (!g.inv.find((i: any) => i.id === 'boonie_hat')) {
@@ -569,7 +569,7 @@ export function buildShots(S: Stage): Shot[] {
         S.parkMe();
         scrub();
         await ensureDrop();
-        runners().forEach((a, i) => a.place(from[i].x, from[i].z, yawTo(from[i].x, from[i].z, dropAt.x, dropAt.z), ['mosin', 'p38', 'mosin'][i], [['sack_pack'], ['life_vest'], ['boonie_hat', 'suitcase']][i]));
+        runners().forEach((a, i) => a.place(from[i].x, from[i].z, yawTo(from[i].x, from[i].z, dropAt.x, dropAt.z), ['mosin', 'colt', 'mosin'][i], [['sack_pack'], ['life_vest'], ['boonie_hat', 'suitcase']][i]));
       },
       tick: (_t, _S, dt) => runners().forEach((a) => a.go(dropAt.x, dropAt.z, 6.2, dt)),
       // over the first one's shoulder, the smoke ahead, the others closing from the sides
@@ -586,10 +586,10 @@ export function buildShots(S: Stage): Shot[] {
   }
   // five at the crate. Places are in the frame of the throw: u toward the thrower, v across.
   const ring: [number, number, string, string[]][] = [
-    [-0.7, 1.35, 'p38', ['boonie_hat']],
-    [-0.7, -1.35, 'p38', ['life_vest']],
-    [1.5, 1.05, 'p38', ['sack_pack']],
-    [1.3, -1.45, 'p38', []],
+    [-0.7, 1.35, 'colt', ['boonie_hat']],
+    [-0.7, -1.35, 'colt', ['life_vest']],
+    [1.5, 1.05, 'colt', ['sack_pack']],
+    [1.3, -1.45, 'colt', []],
     [2.2, -0.1, 'mosin', ['boonie_hat', 'suitcase']],
   ];
   const five = () => cast().slice(0, 5);
@@ -897,7 +897,7 @@ export function buildShots(S: Stage): Shot[] {
         shutAll();
         hunters().forEach((a, i) => {
           const at = local(cabin, lanes[i], CHD + 21 + i * 2.2);
-          a.place(at.x, at.z, yawTo(at.x, at.z, cabin.x, cabin.z), i === 1 ? 'p38' : 'mosin', [['boonie_hat'], ['life_vest'], ['sack_pack']][i]);
+          a.place(at.x, at.z, yawTo(at.x, at.z, cabin.x, cabin.z), i === 1 ? 'colt' : 'mosin', [['boonie_hat'], ['life_vest'], ['sack_pack']][i]);
         });
       },
       tick: (_t, _S, dt) => hunters().forEach((a, i) => {
@@ -945,7 +945,7 @@ export function buildShots(S: Stage): Shot[] {
         lampOn(inside(cabin, -0.6, -1.9, 2.1));
         H().forEach((a, i) => {
           const o = local(cabin, [0.1, 0.5][i], CHD + [1.6, 3.4][i]);
-          a.place(o.x, o.z, yawTo(o.x, o.z, cabin.x, cabin.z), i ? 'mosin' : 'p38', [['boonie_hat'], ['sack_pack']][i]);
+          a.place(o.x, o.z, yawTo(o.x, o.z, cabin.x, cabin.z), i ? 'mosin' : 'colt', [['boonie_hat'], ['sack_pack']][i]);
           a.pos.y = cabin.floorY - 0.08;
           // one rifle round each, wherever it lands
           delete (a as any).hurt;
@@ -1062,7 +1062,7 @@ export function buildShots(S: Stage): Shot[] {
       shutAll();
       cast().forEach((a, i) => {
         const at = local(station, 0.15 + 0.12 * Math.sin(i * 2.1), SHD + 1.5 + i * 1.05);
-        a.place(at.x, at.z, yawTo(at.x, at.z, local(station, 0, SHD).x, local(station, 0, SHD).z) + 0.12 * Math.sin(i * 1.7), [null, 'mosin', null, 'p38', null, 'mosin'][i], [['boonie_hat'], ['sack_pack'], ['life_vest'], [], ['suitcase'], ['boonie_hat', 'life_vest']][i]);
+        a.place(at.x, at.z, yawTo(at.x, at.z, local(station, 0, SHD).x, local(station, 0, SHD).z) + 0.12 * Math.sin(i * 1.7), [null, 'mosin', null, 'colt', null, 'mosin'][i], [['boonie_hat'], ['sack_pack'], ['life_vest'], [], ['suitcase'], ['boonie_hat', 'life_vest']][i]);
       });
     },
     cam: (t) => {
@@ -1195,12 +1195,12 @@ export function buildShots(S: Stage): Shot[] {
             one().place(sx, sz, yawTo(sx, sz, at.x, at.z), null, gear[(k + 2) % 5]);
           } else if (kind === 'nade') {
             // two with their backs to it, a third coming over
-            two().place(at.x - 0.9, at.z + 0.3, face + 2.6, 'p38', gear[k % 5]);
+            two().place(at.x - 0.9, at.z + 0.3, face + 2.6, 'colt', gear[k % 5]);
             three().place(at.x + 0.8, at.z - 0.6, face + 3.4, 'mosin', gear[(k + 1) % 5]);
             one().place(at.x + 0.2, at.z + 1.5, face + 1.2, null, gear[(k + 3) % 5]);
             for (const a of [one(), two(), three()]) a.hp = 55;
           } else {
-            two().place(at.x, at.z, face + [0, Math.PI, 0.5, 0, 0, Math.PI / 2, 0, Math.PI][k], k % 3 === 0 ? 'p38' : 'mosin', gear[k % 5]);
+            two().place(at.x, at.z, face + [0, Math.PI, 0.5, 0, 0, Math.PI / 2, 0, Math.PI][k], k % 3 === 0 ? 'colt' : 'mosin', gear[k % 5]);
             two().hp = 40;
             two().aim = k % 2 === 0;
             one().place(sx, sz, yawTo(sx, sz, at.x, at.z), 'mosin', gear[(k + 2) % 5]);

@@ -31,7 +31,8 @@ export async function renderIcons(renderer: THREE.WebGLRenderer, models: ItemMod
   const used = new Set<THREE.Texture>(), copies: THREE.Material[] = [];
 
   for (const [id, def] of Object.entries(ITEMS)) {
-    const tpl = await models.get(id);
+    // (a gun fed by a magazine is drawn with its own in it: without, it is a gun with a hole in it)
+    const tpl = await models.get(id, def.weapon?.mag ? [def.weapon.mag] : []);
     const w = def.w * PX, h = def.h * PX;
     const rt = new THREE.WebGLRenderTarget(w * 2, h * 2, { samples: 4, colorSpace: THREE.SRGBColorSpace });
     const obj = tpl.group.clone();
