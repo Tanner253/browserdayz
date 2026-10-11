@@ -2593,7 +2593,8 @@ export class Game {
    */
   private unloadWeapon(item: ItemInstance) {
     const def = ITEMS[item.id];
-    if (!def.weapon || this.weapons.busy) return;
+    if (!def.weapon) return;
+    if (!this.gunInHands(item, () => this.unloadWeapon(item)) || this.weapons.busy) return;
     if (def.weapon.mag) {
       if (!item.mag && !chambered(item)) return;
       const back: ItemInstance[] = [];
@@ -2642,8 +2643,31 @@ export class Game {
     return out;
   }
 
+  /** a change to a gun's parts that is waiting on the gun coming up into the hands */
+  private fitting: { gun: ItemInstance; run: () => void; t: number } | null = null;
+
+  /**
+   * A gun's parts and its magazine are changed with the gun in the hands, as in DayZ (asked for 2026-10-11: "a
+   * player cannot swap out attachments for a gun they are not holding in their hand"). Asked of one on the back
+   * or in a pocket, the gun is brought up first, and the change is made when it is there.
+   * @param run the change, to be made once the gun is up
+   * @returns whether it is in the hands now, and the change can be made at once
+   */
+  private gunInHands(gun: ItemInstance, run: () => void): boolean {
+    if (this.inv.held() === gun) return true;
+    if (!this.inv.find((i) => i === gun)) {
+      this.hud.note(`Take the ${ITEMS[gun.id].name} first: a gun's parts are changed with it in your hands`, 'warn');
+      return false;
+    }
+    if (this.player.dead || this.garage.ride) return false;
+    this.takeUp(gun);
+    this.fitting = { gun, run, t: 0 };
+    return false;
+  }
+
   private attachMod(att: ItemInstance, weapon: ItemInstance) {
-    if (!this.attachTargets(att).includes(weapon) || this.weapons.busy) return;
+    if (!this.attachTargets(att).includes(weapon)) return;
+    if (!this.gunInHands(weapon, () => this.attachMod(att, weapon)) || this.weapons.busy) return;
     this.inv.remove(att);
     this.openStash?.container.remove(att);
     if (ITEMS[att.id].mag) {
@@ -2671,7 +2695,8 @@ export class Game {
    * @returns the part, when it was asked for loose
    */
   private detachMod(weapon: ItemInstance, mod: string, loose = false): ItemInstance | null {
-    if (this.weapons.busy) return null;
+    // (off a gun that is not in the hands: it is brought up, and the part then goes to a pocket)
+    if (!this.gunInHands(weapon, () => void this.detachMod(weapon, mod)) || this.weapons.busy) return null;
     if (weapon.mag === mod) {
       // (its magazine: out with what is in it; the round in the chamber stays)
       const out = swapMag(weapon, null);
@@ -2707,9 +2732,10 @@ export class Game {
   // ------------------------------------------------------------ magazines
 
   /** seconds a round takes to push into a magazine */
-  private static readonly ROUND_IN = 0.42;
+  // (0.42 s to 2026-10-11, when it was asked for slower: "the loading animation and time should be slower")
+  private static readonly ROUND_IN = 0.85;
   /** seconds to thumb one round out of a magazine (quicker than pushing one in) */
-  private static readonly ROUND_OUT = 0.3;
+  private static readonly ROUND_OUT = 0.55;
   /**
    * What holding the button does with a magazine in the hands: rounds into it, or rounds out of it. The wheel
    * turns it over (as it turns over what a thing does in DayZ); on a phone, the button that changes weapons does.
@@ -3387,6 +3413,17 @@ export class Game {
       const v = p.vitals;
       const say = mending ? 'BY THE FIRE · MENDING' : v.bleeding ? 'BY THE FIRE · STOP THE BLEEDING FIRST' : v.energy <= 10 || v.water <= 10 ? 'BY THE FIRE · EAT AND DRINK FIRST' : 'BY THE FIRE';
       if (this.fireTag.textContent !== say) this.fireTag.textContent = say;
+    }
+
+    // a part waiting on its gun: fitted, or taken off, the moment the gun is up (and forgotten if something else was taken up instead)
+    if (this.fitting) {
+      const f = this.fitting;
+      f.t += dt;
+      if (this.inv.held() !== f.gun || f.t > 4 || p.dead) this.fitting = null;
+      else if (!this.weapons.busy) {
+        this.fitting = null;
+        f.run();
+      }
     }
 
     // the hot keys: each brings up what is on it (and puts it away again); X empties the hands

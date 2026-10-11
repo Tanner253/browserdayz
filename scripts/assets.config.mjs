@@ -96,6 +96,28 @@ export const LOCAL_MODELS = {
     tags: ['loot', 'ammo'],
     changes: 'Only its cartridge is used here: scaled to metres and stood on the ground; textures re-encoded as WebP; geometry compressed.',
   },
+  // A round of 7.62x39 and one of 9 mm (2026-10-11, asked for: "they should be brass, with tips visible"): brass
+  // cases with their bullets showing, out of the boxes the rounds are sold in. The rifle's are thirty standing in
+  // a tray, all one shape: one of them is taken, the one in the corner. (Said in metres of the tray stood 5.6 cm
+  // tall about its own middle: its columns are 1.2 cm apart and its rows 1.4.) The 9 mm is one of the two that
+  // came lying loose beside its box.
+  round_739: {
+    dir: 'ammo_box_rifle',
+    only: /^bullets_bullet/,
+    cut: { tall: 0.056, keep: (x, _y, z) => x < -0.018 && z > 0.027 },
+    size: 0.056,
+    tex: 1024,
+    tags: ['loot', 'ammo'],
+    changes: 'One cartridge out of the thirty in its tray: scaled to metres and stood on the ground about its own middle; textures re-encoded as WebP at the size they came; geometry compressed.',
+  },
+  round_9mm: {
+    dir: 'ammo_box_9mm',
+    only: /^bullet9mm_bulletA/,
+    size: 0.0297,
+    tex: 2048,
+    tags: ['loot', 'ammo'],
+    changes: 'One of the cartridges that came loose beside the box: scaled to metres and stood on the ground about its own middle; textures re-encoded as WebP at the size they came; geometry compressed.',
+  },
   shell_12: {
     dir: 'benelli_m3',
     only: /^Shell_Low/,

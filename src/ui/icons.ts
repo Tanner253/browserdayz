@@ -44,6 +44,17 @@ export async function renderIcons(renderer: THREE.WebGLRenderer, models: ItemMod
       }
       c.onBeforeCompile = () => {};
       c.customProgramCacheKey = () => 'icon';
+      // Loose rounds are brass, and brass is all shine: under this light it is a mirror of a dim sky, and the
+      // pictures of every round were dark brown. In its picture a round is given less of the mirror and more of its
+      // own colour, lit up: brass that reads as brass, and the bullet's tip to be told from its case.
+      if (def.category === 'ammo' && def.stack) {
+        c.metalness = Math.min(c.metalness, 0.45);
+        c.metalnessMap = null;
+        c.roughness = Math.max(c.roughness, 0.42);
+        c.roughnessMap = null;
+        c.color.multiplyScalar(1.9);
+        c.envMapIntensity = 1.5;
+      }
       m.material = c;
     });
     const pivot = new THREE.Group();

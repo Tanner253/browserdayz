@@ -145,11 +145,11 @@ const D: ItemDef[] = [
     weapon: { kind: 'auto', ammo: 'ammo_556', capacity: 30, mag: 'mag_ar', ergo: 62, modes: ['auto', 'semi'], shows: { mag_ar: ['mag'], suppressor_556: ['silencer'], red_dot: ['sight'], foregrip: ['foregrip'], gun_light: ['light'] }, hides: { suppressor_556: ['brake'] } }, iconYaw: 0,
   },
   {
-    id: 'ammo_739', name: '7.62x39 Rounds', model: 'bolt_action_rifle_7_62', node: 'bolt_action_rifle_7_62_bullet_54mm', w: 1, h: 1, weight: 0.016, category: 'ammo', stack: 30, scale: 0.95, pile: 5,
+    id: 'ammo_739', name: '7.62x39 Rounds', model: 'round_739', w: 1, h: 1, weight: 0.016, category: 'ammo', stack: 30, scale: 1.3, pile: 5,
     desc: 'Loose rifle cartridges, for the AK. They go into its magazine by hand.',
   },
   {
-    id: 'ammo_556', name: '5.56x45 Rounds', model: 'bolt_action_rifle_7_62', node: 'bolt_action_rifle_7_62_bullet_54mm', w: 1, h: 1, weight: 0.012, category: 'ammo', stack: 30, scale: 0.82, pile: 5,
+    id: 'ammo_556', name: '5.56x45 Rounds', model: 'round_739', w: 1, h: 1, weight: 0.012, category: 'ammo', stack: 30, scale: 1.12, pile: 5,
     desc: 'Loose rifle cartridges, small and fast, for the AR-15. They go into its magazine by hand.',
   },
   {
@@ -167,7 +167,7 @@ const D: ItemDef[] = [
     desc: 'Loose full-power rifle cartridges, for the sniper rifle. They go into its magazine by hand.',
   },
   {
-    id: 'ammo_9mm', name: '9x19mm Rounds', model: 'service_pistol', node: 'service_pistol_bullet', w: 1, h: 1, weight: 0.012, category: 'ammo', stack: 30, scale: 1.6, pile: 6,
+    id: 'ammo_9mm', name: '9x19mm Rounds', model: 'round_9mm', w: 1, h: 1, weight: 0.012, category: 'ammo', stack: 30, scale: 1.6, pile: 6,
     desc: 'Loose pistol cartridges. Common among police and military. They go into a pistol\'s magazine by hand.',
   },
   {
