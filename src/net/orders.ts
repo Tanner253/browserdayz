@@ -3,11 +3,13 @@
 // One list for both ends: the server's /help reads it out, and the game's chat box offers from it as an order is
 // typed. What each one does is `command` in server/index.ts: a line added here does nothing until it is added there.
 
+import { KITS } from '../sim/kits';
+
 export type Role = 'admin' | 'mod';
 
 export interface Order {
   name: string;
-  /** what follows it, word by word, as it is shown (the last may be many words). `who` is a player; `minutes` a number */
+  /** what follows it, word by word, as it is shown (the last may be many words). `who` is a player, `item` a thing, `minutes` a number; in [brackets], it can be left out */
   args: string[];
   does: string;
   /** an admin's alone: a mod is not offered it and may not give it */
@@ -21,6 +23,21 @@ export const ORDERS: Order[] = [
   { name: 'kick', args: ['who', '[why]'], does: 'Put somebody off the server (they can come straight back)' },
   { name: 'timeout', args: ['who', 'minutes', '[why]'], does: 'Keep somebody off for up to 60 minutes' },
   { name: 'say', args: ['words'], does: 'Say something across everybody’s screen' },
+  { name: 'warn', args: ['who', 'words'], does: 'Put a warning on somebody’s screen' },
+  { name: 'mute', args: ['who', 'minutes'], does: 'What they type and say reaches nobody, for up to 60 minutes' },
+  { name: 'unmute', args: ['who'], does: 'Let them be heard again' },
+  { name: 'goto', args: ['who'], does: 'Go to where somebody is', admin: true },
+  { name: 'bring', args: ['who'], does: 'Bring somebody to where you are', admin: true },
+  { name: 'tp', args: ['x', 'z'], does: 'Go to a place by its numbers (or right-click the map)', admin: true },
+  { name: 'give', args: ['item', '[count]', '[who]'], does: 'Put a thing at your feet, or at somebody’s', admin: true },
+  { name: 'kit', args: ['kit', '[who]'], does: 'A whole set of the best there is, in place of what is carried', admin: true },
+  { name: 'heal', args: ['[who]'], does: 'Whole, fed and watered: you, or somebody', admin: true },
+  { name: 'slay', args: ['who'], does: 'Kill somebody where they stand', admin: true },
+  { name: 'god', args: [], does: 'Nothing hurts you (again, to put it off)', admin: true },
+  { name: 'vanish', args: [], does: 'Nobody sees you (again, to be seen)', admin: true },
+  { name: 'noclip', args: [], does: 'Fly, and through anything (again, to walk)', admin: true },
+  { name: 'voidinv', args: [], does: 'Dying, you leave nothing you carried on your body (again, to leave it)', admin: true },
+  { name: 'voidtag', args: [], does: 'Dying, you leave no dog tag of your own (again, to leave one)', admin: true },
   { name: 'ban', args: ['who', '[why]'], does: 'Ban for good: their game and their address', admin: true },
   { name: 'bans', args: [], does: 'Who is banned, numbered for /unban', admin: true },
   { name: 'unban', args: ['number-or-name'], does: 'Lift a ban (the number is from /bans)', admin: true },
@@ -57,8 +74,9 @@ const MINUTES = ['5', '10', '30', '60'];
 /**
  * What to offer under a line being typed. @returns null when the line is talk, or whoever types has no role.
  * @param here who is online (not counting whoever types)  @param gone the names of who left lately, newest last
+ * @param things everything there is to be given
  */
-export function offer(text: string, role: Role | null, here: { id: number; name: string }[], gone: string[] = []): Offer | null {
+export function offer(text: string, role: Role | null, here: { id: number; name: string }[], gone: string[] = [], things: { id: string; name: string }[] = []): Offer | null {
   if (!role || !text.startsWith('/')) return null;
   const mine = ordersOf(role), words = text.slice(1).split(/\s+/);
   if (words.length === 1) {
@@ -71,7 +89,7 @@ export function offer(text: string, role: Role | null, here: { id: number; name:
   const typed = words.length - 2, at = Math.min(typed, order.args.length - 1);
   // (past the last word that is named, what is typed is more of that last one: a reason, or what to say)
   const part = typed === at ? words[words.length - 1] : '', p = part.toLowerCase();
-  const stem = text.slice(0, text.length - part.length), kind = order.args[at];
+  const stem = text.slice(0, text.length - part.length), kind = order.args[at].replace(/[[\]]/g, '');
   let picks: Pick[] = [];
   if (kind === 'who') {
     // (taken by number: a name can have a space in it, or be somebody else's too)
@@ -87,6 +105,13 @@ export function offer(text: string, role: Role | null, here: { id: number; name:
         picks.push({ label: name, note: 'left lately', fill: `${stem}${word} `, whole: false });
       }
     }
+  } else if (kind === 'item') {
+    picks = things
+      .filter((o) => !p || o.id.includes(p) || o.name.toLowerCase().includes(p))
+      .sort((x, y) => Number(y.id.startsWith(p)) - Number(x.id.startsWith(p)))
+      .map((o) => ({ label: o.id, note: o.name, fill: `${stem}${o.id} `, whole: false }));
+  } else if (kind === 'kit') {
+    picks = KITS.filter((o) => o.id.startsWith(p)).map((o) => ({ label: o.id, note: o.does, fill: `${stem}${o.id} `, whole: false }));
   } else if (kind === 'minutes') {
     picks = MINUTES.filter((m) => m.startsWith(p) && m !== p).map((m) => ({ label: m, note: 'minutes', fill: `${stem}${m} `, whole: false }));
   }

@@ -155,6 +155,56 @@ export class Player {
 
   constructor(private terrain: Terrain) {}
 
+  // ---- an admin's powers (the server says who has them: see `setPower` in server/index.ts)
+
+  /** nothing hurts this body, and it neither hungers nor thirsts */
+  god = false;
+  /** it flies, and through anything: see `flyStep` */
+  fly = false;
+  /** the next landing costs nothing (flying was stopped in the air) */
+  private softLanding = false;
+
+  setFly(on: boolean) {
+    if (on === this.fly || !this.body) return;
+    if (on) {
+      if (this.prone) this.setProne(false);
+      if (this.crouched) this.setCrouch(false);
+    }
+    this.fly = on;
+    this.collider.setEnabled(!on && !this.seated);
+    this.vel.set(0, 0, 0);
+    this.lastFallSpeed = 0;
+    this.fallTop = this.pos.y;
+    this.softLanding = !on;
+    this.sprinting = this.scurrying = false;
+  }
+
+  /** Set down in the air by an admin: the landing that follows costs nothing. */
+  landSoft() {
+    this.softLanding = true;
+  }
+
+  /** Flying: where the eyes point is forward, Space is up and Ctrl down, Shift is fast and Alt slow. Nothing is run into. */
+  private flyStep(h: number, input: MoveInput) {
+    const fwd = (input.held('KeyW') ? 1 : 0) - (input.held('KeyS') ? 1 : 0);
+    const str = (input.held('KeyD') ? 1 : 0) - (input.held('KeyA') ? 1 : 0);
+    const up = (input.held('Space') ? 1 : 0) - (input.held('ControlLeft') || input.held('KeyC') ? 1 : 0);
+    const speed = input.held('ShiftLeft') ? 48 : input.held('AltLeft') ? 3 : 12;
+    const cp = Math.cos(this.pitch), sy = Math.sin(this.yaw), cy = Math.cos(this.yaw);
+    const d = new THREE.Vector3(-sy * cp * fwd + cy * str, Math.sin(this.pitch) * fwd + up, -cy * cp * fwd - sy * str);
+    if (d.lengthSq() > 1) d.normalize();
+    this.vel.copy(d).multiplyScalar(speed);
+    this.pos.addScaledVector(this.vel, h);
+    this.body.setTranslation({ x: this.pos.x, y: this.pos.y + this.half() + RADIUS, z: this.pos.z }, true);
+    this.grounded = false;
+    this.moving = 0;
+    this.lean += (0 - this.lean) * (1 - Math.exp(-10 * h));
+    this.lastFallSpeed = 0;
+    this.fallTop = this.pos.y;
+    this.stepOff = 0;
+    this.vitals.stamina = Math.min(MAX_STAMINA, this.vitals.stamina + 14 * h);
+  }
+
   spawn(x: number, y: number, z: number, yaw: number) {
     const R = physics.R;
     if (!this.body) {
@@ -270,6 +320,7 @@ export class Player {
       v.stamina = MAX_STAMINA;
       this.winded = false;
     }
+    if (this.fly) return void this.flyStep(h, input);
     if (this.seated) {
       // carried: the legs get their breath back, and that is all they do
       this.sprinting = this.scurrying = false;
@@ -507,6 +558,10 @@ export class Player {
   }
 
   private land(vy: number, drop = 0) {
+    if (this.softLanding) {
+      this.softLanding = false;
+      vy = Math.max(vy, -2);
+    }
     const s = Math.max(0, -vy);
     this.landVel = -Math.min(s * 0.035, 0.22);
     if (s > 2.5) audio.land(this.surface() as Surface, s);
@@ -531,7 +586,7 @@ export class Player {
   }
 
   damage(amount: number, cause: string) {
-    if (this.dead) return;
+    if (this.dead || this.god) return;
     this.vitals.health = Math.max(0, this.vitals.health - amount);
     this.hurtTimer = 0.4;
     this.lastCause = cause;
@@ -544,7 +599,7 @@ export class Player {
   tickVitals(dt: number) {
     const v = this.vitals;
     if (this.dead) return;
-    const exertion = this.sprinting ? 2.4 : this.scurrying ? 1.8 : this.moving > 0.1 ? 1.3 : 1;
+    const exertion = this.god ? 0 : this.sprinting ? 2.4 : this.scurrying ? 1.8 : this.moving > 0.1 ? 1.3 : 1;
     v.energy = Math.max(0, v.energy - 0.045 * exertion * dt);
     v.water = Math.max(0, v.water - 0.07 * exertion * this.thirstMult * dt);
     // An open wound costs about one health a second. Left alone it closes in the end, at a
@@ -584,6 +639,19 @@ export class Player {
     this.onSet(by);
   }
 
+  /** Made whole (by an admin): health, food, water, the wound and the leg. */
+  mend() {
+    if (this.dead) return;
+    const v = this.vitals;
+    v.health = 100;
+    v.energy = 100;
+    v.water = 100;
+    v.stamina = MAX_STAMINA;
+    v.bleeding = false;
+    this.bleedT = 0;
+    this.setLeg(true);
+  }
+
   /** health put back by rest (beside a fire): not while a wound is open, and not on an empty stomach or a dry mouth */
   rest(amount: number): boolean {
     const v = this.vitals;
@@ -598,6 +666,7 @@ export class Player {
   }
 
   private damageQuiet(a: number, cause: string) {
+    if (this.god) return;
     this.vitals.health = Math.max(0, this.vitals.health - a);
     if (this.vitals.health <= 0 && !this.dead) {
       this.lastCause = cause;

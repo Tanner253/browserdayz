@@ -14,7 +14,7 @@ import type { DropInfo } from '../sim/drops';
 import type { VehicleInfo, VState } from '../sim/vehicles';
 import type { IState, InfectedInfo } from '../sim/infected';
 
-export const PROTOCOL = 26;
+export const PROTOCOL = 27;
 
 /** chat channels: everyone on the server, or only players standing near the speaker */
 export type ChatChannel = 'global' | 'near';
@@ -149,6 +149,8 @@ export type C2S =
   | { t: 'chat'; ch?: ChatChannel; text: string }
   /** the admin password, as typed (the server passes it to the site, which alone knows it; it is kept nowhere) */
   | { t: 'admin'; pw: string }
+  /** somebody with a role has their panel open: the lists it shows are asked for */
+  | { t: 'adm' }
   /** a dog tag taken from another player has been carried for the full time */
   | { t: 'cash'; uid: string; /** where a reward for it should go, if the player has given an address */ wallet?: string }
   /** getting into jeep number i (see src/sim/vehicles.ts), in this seat; and getting out of whatever we are in */
@@ -290,7 +292,32 @@ export type S2C =
   | { t: 'role'; role: 'admin' | 'mod' | null }
   /** a line from the server to this player alone, shown where talk is shown (what an order did, a list asked for) */
   | { t: 'sys'; text: string }
+  /** put somewhere by an admin (by themselves, or by `by`). With no height, it is on top of whatever is there */
+  | { t: 'put'; x: number; y?: number; z: number; by?: string }
+  /** made whole by an admin: health, food, water, the wound and the leg */
+  | { t: 'mend' }
+  /** a whole set handed over by an admin (see src/sim/kits.ts): put on and away in place of what is carried, or (adds) beside it */
+  | { t: 'kit'; name: string; items: ItemInstance[]; adds?: true; by?: string }
+  /**
+   * Which of an admin's powers this player has on: nothing hurts them, nobody sees them, they fly through things.
+   * And what they have chosen for their own death: nothing they carried is left on the body, no tag of theirs is.
+   */
+  | { t: 'powers'; god: boolean; hidden: boolean; clip: boolean; voidInv: boolean; voidTag: boolean }
+  /** the lists the panel shows (see AdminLists) */
+  | ({ t: 'adm' } & AdminLists)
   | { t: 'kick'; reason: string };
+
+/** What the panel of somebody with a role is shown. The last two are an admin's alone. */
+export interface AdminLists {
+  /** everybody online: where they are, how long they have been on (minutes), how often the checks have fired on them */
+  players: { id: number; name: string; role: 'admin' | 'mod' | null; x: number; z: number; alive: boolean; flags: number; mins: number; hidden?: true; god?: true; clip?: true; muted?: true; seat?: true }[];
+  /** who left lately, newest first */
+  gone: { id: number; name: string; mins: number }[];
+  bans: { n: number; name: string; why: string; by: string; at: string }[];
+  roles: { name: string; role: 'admin' | 'mod'; by: string; at: string }[];
+  /** what the server's own checks are set to */
+  checks: string;
+}
 
 /** deterministic id of a crate that is part of the map (same on every client and the server) */
 export function crateId(x: number, z: number) {

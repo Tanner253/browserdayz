@@ -44,6 +44,7 @@ import { BACK_SHORT } from '../ui/updates';
 import { InventoryUI } from '../ui/inventory-ui';
 import { Minimap } from '../ui/minimap';
 import { BigMap } from '../ui/bigmap';
+import { AdminUI, type AdminSelf } from '../ui/admin-ui';
 import { CALL, CRASH, DROP, describeSpot, fillCrash, fillDrop, pickDropSite, type DropInfo } from '../sim/drops';
 import { WELL, stage, wellSpots, type Well } from '../sim/wells';
 import { Voice } from './voice';
@@ -647,6 +648,22 @@ export class Game {
       this.map = new BigMap(world, buildings.lootPoints, spots, atmo.gas, () => this.minimap.live);
       this.map.onClose = () => this.toggleMap(false);
       document.getElementById('ui')!.appendChild(this.map.root);
+      // the panel of whoever has a role (shut and empty for everybody else)
+      this.adminUI = new AdminUI(spots.filter((s) => s.kind !== 'well').map((s) => ({ name: s.name, x: s.x, z: s.z })), {
+        order: (line) => this.order(line),
+        ask: () => {
+          if (this.online && this.role) this.net.send({ t: 'adm' });
+          this.adminUI.setSelf(this.adminSelf());
+        },
+        freecam: (on) => this.toggleFreecam(on),
+        // (the map first: the mouse stays free from the one to the other)
+        map: () => {
+          this.adminUI.close();
+          this.toggleMap(true);
+        },
+        close: () => this.toggleAdmin(false),
+      });
+      document.getElementById('ui')!.appendChild(this.adminUI.root);
     }
     this.menu = new MenuScenes({ world, atmo, scene: r.scene, effects: this.effects, held: (id, mods) => this.makeHeld(id, mods), wear: (body, ids) => this.wear(body, ids), filmReady: (film) => this.hud.filmReady(film) });
     void this.menu.load();
@@ -732,12 +749,13 @@ export class Game {
     this.input.onLockChange = (locked) => {
       if (locked) {
         if (this.started) this.unpause();
-      } else if (!this.invUI.isOpen && !this.map?.open && !this.player.dead && this.started) this.pause();
+      } else if (!this.invUI.isOpen && !this.map?.open && !this.adminUI?.isOpen && !this.player.dead && this.started) this.pause();
     };
     window.addEventListener('beforeunload', () => this.save());
     window.addEventListener('keydown', (e) => {
       if (e.code !== 'Escape') return;
-      if (this.shop?.isOpen) this.shop.close();
+      if (this.adminUI?.isOpen) this.toggleAdmin(false, true);
+      else if (this.shop?.isOpen) this.shop.close();
       else if (this.map?.open) this.toggleMap(false, true);
       else if (this.invUI?.isOpen) this.toggleInventory(false, true);
       // a second Escape, with the mouse still free, is the menu
@@ -856,6 +874,34 @@ export class Game {
     this.avatar.clearWounds();
     this.weapons.validate();
     this.autoHot();
+  }
+
+  /**
+   * A whole set handed over by an admin (src/sim/kits.ts): what was carried goes, but for the dog tags, and the
+   * set is put on and away as things picked up are. What finds no room is put at the feet.
+   */
+  private kitUp(m: Extract<S2C, { t: 'kit' }>) {
+    const inv = this.inv;
+    if (this.player.dead) return;
+    if (!m.adds) {
+      this.weapons.take(null);
+      const me = publicId();
+      inv.sortTags((tag) => tag.pid === me);
+      const neck = inv.neck, pouch = inv.tags.items.map((q) => q.item);
+      inv.clear();
+      inv.neck = neck ?? this.makeTag();
+      for (const tag of pouch) inv.tags.add(tag);
+      this.ready = null;
+      this.inHand = null;
+      this.holding = false;
+    }
+    const over = m.items.filter((it) => inv.add(it));
+    for (const it of over) this.dropItem(it);
+    this.weapons.validate();
+    this.autoHot();
+    this.inventoryChanged();
+    this.meDirty = true;
+    this.hud.note(`${m.by ? `${m.by}, an admin, has given you` : 'You have'} the ${m.name} kit${over.length ? `: ${over.length} of its things found no room and lie at your feet` : ''}`, 'good');
   }
 
   /** Every survivor wears a dog tag stamped with their own name, round their neck (see PlayerInventory.neck). */
@@ -1227,9 +1273,51 @@ export class Game {
     net.on('role', (m) => {
       this.role = m.role;
       this.hud.role = m.role;
-      if (m.role) this.hud.chatLine('system', '', `You are ${m.role === 'admin' ? 'an admin' : 'a mod'} here. Press / for your orders: they are listed as you type.`);
+      if (m.role) this.hud.chatLine('system', '', `You are ${m.role === 'admin' ? 'an admin' : 'a mod'} here. Press \` for your panel, or / for your orders: they are listed as you type.`);
+      // (a place right-clicked on the map is gone to: an admin's alone)
+      this.map.onPick = m.role === 'admin' ? (x, z) => {
+        this.order(`/tp ${x.toFixed(0)} ${z.toFixed(0)}`);
+        this.toggleMap(false);
+      } : null;
+      if (m.role !== 'admin') {
+        this.toggleFreecam(false);
+        if (!m.role) this.toggleAdmin(false);
+      }
+      this.adminUI.setSelf(this.adminSelf());
     });
-    net.on('sys', (m) => this.hud.chatLine('system', '', m.text));
+    net.on('sys', (m) => {
+      this.hud.chatLine('system', '', m.text);
+      this.adminUI.say(m.text);
+    });
+    net.on('adm', (m) => this.adminUI.setLists(m));
+    net.on('powers', (m) => {
+      this.powers = { god: m.god, hidden: m.hidden, clip: m.clip, voidInv: m.voidInv, voidTag: m.voidTag };
+      this.player.god = m.god;
+      this.player.setFly(m.clip);
+      this.showPowers();
+    });
+    net.on('mend', () => {
+      this.player.mend();
+      this.meDirty = true;
+    });
+    net.on('kit', (m) => this.kitUp(m));
+    // set down somewhere by an admin (by themselves, or by another): with no height given, on top of whatever is there
+    net.on('put', (m) => {
+      const p = this.player;
+      if (p.dead || this.garage.ride) return;
+      let y = m.y;
+      if (y === undefined) {
+        const ground = heightAt(world.heights, m.x, m.z);
+        const roof = physics.raycast({ x: m.x, y: ground + 90, z: m.z }, { x: 0, y: -1, z: 0 }, 90, SOLID_GROUPS);
+        y = Math.max(ground, roof ? roof.point.y : ground);
+      }
+      const pitch = p.pitch;
+      p.spawn(m.x, y + 0.1, m.z, p.yaw);
+      p.pitch = pitch;
+      p.landSoft();
+      this.buriedT = 0;
+      if (m.by) this.hud.note(`${m.by}, an admin, has moved you`, 'warn');
+    });
     net.on('tell', (m) => {
       this.hud.note(m.text, m.kind);
       this.hud.chatLine('system', '', m.text);
@@ -1951,7 +2039,7 @@ export class Game {
   private unbury(dt: number, riding: boolean) {
     const p = this.player, at = p.pos;
     const b = this.bunker.place;
-    const down = this.started && !p.dead && !riding && at.y < heightAt(this.s.world.heights, at.x, at.z) - 1.1 && !(b && Math.hypot(at.x - b.x, at.z - b.z) < 48);
+    const down = this.started && !p.dead && !riding && !p.fly && at.y < heightAt(this.s.world.heights, at.x, at.z) - 1.1 && !(b && Math.hypot(at.x - b.x, at.z - b.z) < 48);
     this.buriedT = down ? this.buriedT + dt : 0;
     if (this.buriedT < 2) return;
     this.buriedT = 0;
@@ -1959,6 +2047,91 @@ export class Game {
     this.hud.note('You were under the ground: back on your feet', 'warn');
   }
   private buriedT = 0;
+
+  // ---- what an admin can do that nobody else can (the server holds every one of them to having the role)
+
+  private adminUI!: AdminUI;
+  private powers = { god: false, hidden: false, clip: false, voidInv: false, voidTag: false };
+  /** the view has left the body: where it is, and which way it looks */
+  private freecam: { pos: THREE.Vector3; yaw: number; pitch: number } | null = null;
+
+  /** an order, sent as if it had been typed */
+  private order(line: string) {
+    if (this.online) this.net.send({ t: 'chat', ch: 'global', text: line });
+    else this.hud.chatLine('system', '', 'You are playing offline: there is no server to give orders on.');
+  }
+
+  private adminSelf(): AdminSelf {
+    return { role: this.role, id: this.net?.id ?? 0, ...this.powers, freecam: !!this.freecam, x: Math.round(this.player.pos.x), z: Math.round(this.player.pos.z) };
+  }
+
+  private showPowers() {
+    const on = [this.powers.god && 'GOD MODE', this.powers.hidden && 'VANISHED', this.powers.clip && 'NOCLIP', this.freecam && 'FREE CAMERA  ·  H: BODY HERE  ·  K: BACK'].filter(Boolean);
+    this.hud.setPowers(on.join('  ·  '));
+    this.adminUI?.setSelf(this.adminSelf());
+  }
+
+  /** The panel (the ` key): opened over the game with the mouse free, as the map is. */
+  toggleAdmin(open?: boolean, byEscape = false) {
+    if (!this.adminUI) return;
+    const want = open ?? !this.adminUI.isOpen;
+    if (want === this.adminUI.isOpen) return;
+    if (want) {
+      if (!this.role || !this.online || !this.started || this.invUI.isOpen || this.shop.isOpen || this.map.open) return;
+      this.adminUI.open(this.adminSelf());
+      this.input.uiMode = true;
+      this.input.unlock();
+      return;
+    }
+    this.adminUI.close();
+    if (this.invUI.isOpen || this.shop.isOpen || this.map.open) return;
+    this.input.uiMode = false;
+    if (byEscape && !this.input.touch) this.awaitClick = true;
+    else if (this.started && !this.paused) this.input.lock();
+    // if the browser refuses the re-capture, the next click on the game takes it (see awaitClick)
+    setTimeout(() => {
+      if (this.started && !this.paused && !this.invUI.isOpen && !this.shop.isOpen && !this.map.open && !this.adminUI.isOpen && !this.input.locked && !this.player.dead) this.awaitClick = true;
+    }, 400);
+  }
+
+  /** The free camera (K): the view leaves the body where it stands and goes where it is flown. */
+  toggleFreecam(on = !this.freecam) {
+    if (on === !!this.freecam || (on && this.role !== 'admin')) return;
+    const cam = this.s.r.camera;
+    if (on) {
+      const e = new THREE.Euler().setFromQuaternion(cam.quaternion, 'YXZ');
+      this.freecam = { pos: cam.position.clone(), yaw: e.y, pitch: e.x };
+      this.director.third = this.freeView;
+    } else {
+      this.freecam = null;
+      this.director.third = this.garage.ride ? this.garage.view : null;
+    }
+    this.director.shift(0.25);
+    this.showPowers();
+  }
+  private freeView = (cam: THREE.PerspectiveCamera) => {
+    const f = this.freecam;
+    if (!f) return;
+    cam.position.copy(f.pos);
+    cam.quaternion.setFromEuler(new THREE.Euler(f.pitch, f.yaw, 0, 'YXZ'));
+  };
+
+  /** the free camera flown: as noclip is, but it is the view that goes and the body that stays */
+  private flyCamera(dt: number, input: Input) {
+    const f = this.freecam!, sens = this.player.sensitivity;
+    f.yaw -= input.mouseDX * sens;
+    f.pitch = THREE.MathUtils.clamp(f.pitch - input.mouseDY * sens, -1.55, 1.55);
+    const fwd = (input.held('KeyW') ? 1 : 0) - (input.held('KeyS') ? 1 : 0);
+    const str = (input.held('KeyD') ? 1 : 0) - (input.held('KeyA') ? 1 : 0);
+    const up = (input.held('Space') ? 1 : 0) - (input.held('ControlLeft') || input.held('KeyC') ? 1 : 0);
+    const speed = input.held('ShiftLeft') ? 60 : input.held('AltLeft') ? 3 : 14;
+    const cp = Math.cos(f.pitch), sy = Math.sin(f.yaw), cy = Math.cos(f.yaw);
+    const d = new THREE.Vector3(-sy * cp * fwd + cy * str, Math.sin(f.pitch) * fwd + up, -cy * cp * fwd - sy * str);
+    if (d.lengthSq() > 1) d.normalize();
+    f.pos.addScaledVector(d, speed * dt);
+    // H: the body is brought to where the view is
+    if (input.pressed('KeyH')) this.order(`/tp ${f.pos.x.toFixed(1)} ${(f.pos.y - 1.64).toFixed(1)} ${f.pos.z.toFixed(1)}`);
+  }
   /** what the server lets this player do out of the way: nothing (null), keep order, or everything */
   role: 'admin' | 'mod' | null = null;
 
@@ -3416,14 +3589,25 @@ export class Game {
     // M: the map, large; any way out of play puts it away again
     if (input.pressed('KeyM') && playing && !this.invUI.isOpen && !this.shop.isOpen && !this.hud.chatOpen) this.toggleMap();
     else if (this.map.open && (!playing || this.invUI.isOpen || this.shop.isOpen)) this.toggleMap(false);
-    const uiOpen = this.invUI.isOpen || this.shop.isOpen || this.map.open;
+    // ` : the panel of whoever has a role. And an admin's two keys: N flies (noclip), K sends the view off by itself.
+    if (this.role && this.online && this.started && !this.hud.chatOpen) {
+      if (input.pressed('Backquote')) this.toggleAdmin();
+      if (this.role === 'admin' && playing && !this.invUI.isOpen && !this.shop.isOpen && !this.map.open && !this.adminUI.isOpen) {
+        if (input.pressed('KeyN')) this.order('/noclip');
+        if (input.pressed('KeyK')) this.toggleFreecam();
+      }
+    }
+    if (this.adminUI.isOpen && (!this.started || this.paused)) this.toggleAdmin(false);
+    const panels = this.invUI.isOpen || this.shop.isOpen || this.map.open || this.adminUI.isOpen;
+    // (with the view off by itself, the body does nothing: as with a panel open, but that talk can still be typed)
+    const uiOpen = panels || !!this.freecam;
     // Enter opens the chat box, and / opens it with an order begun; while typing the character stands still and the gun stays quiet
     const order = input.pressed('Slash') || input.pressed('NumpadDivide');
-    if ((order || input.pressed('Enter')) && playing && !uiOpen && !this.hud.chatOpen) {
+    if ((order || input.pressed('Enter')) && playing && !panels && !this.hud.chatOpen) {
       input.releaseAll();
       this.hud.openChat(order ? '/' : '');
     }
-    if (this.hud.chatOpen && (!playing || uiOpen)) this.hud.closeChat();
+    if (this.hud.chatOpen && (!playing || panels)) this.hud.closeChat();
     const typing = this.hud.chatOpen;
     // A phone has no row of number keys under the fingers: whatever is picked up to fight with
     // comes into the hands by itself when they are empty, unless they were emptied on purpose.
@@ -3462,6 +3646,7 @@ export class Game {
     this.weapons.stowed = !!this.hold || this.armsUntil > now || !!ride || !!this.glass;
     const sens = this.glass ? 0.22 : this.weapons.scoped ? 0.28 : this.weapons.aiming ? 0.7 : 1;
     if (!uiOpen && playing && !this.wheelOn) p.look(input, sens);
+    if (this.freecam && !panels && playing && !typing) this.flyCamera(dt, input);
 
     // (The legs are free while the inventory is open: it is walked about with, to see what lies near, as in DayZ.
     // What is nearby is read again as it changes: see `vicinityT`. The trader's counter is stood at.)

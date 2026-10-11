@@ -8,7 +8,7 @@ import { MAX_STAMINA, type ChatChannel } from '../net/protocol';
 import { TOUCH } from '../core/device';
 import { EMOTES } from '../sim/emotes';
 import { TIERS, type Tier } from '../sim/tiers';
-import { TAG_FRESH, TAG_HOLD_MIN } from '../sim/items';
+import { ITEMS, TAG_FRESH, TAG_HOLD_MIN } from '../sim/items';
 import { INFECTED } from '../sim/infected';
 import { GAS } from '../sim/gas';
 import { AO_MODES, DEFAULT_GRAPHICS, FPS_LIMITS, LEVELS, MSAA, PRESETS, SCALES, VOLUMES, presetOf, saveGraphics, type Graphics, type PresetName } from '../core/settings';
@@ -91,6 +91,9 @@ function wheelSvg() {
 
 /** the menu's films are told apart by the second asked for: each has this many seconds of the count to itself */
 export const REEL = 100;
+
+/** everything there is to be given (never a tag: one is only ever taken from somebody) */
+const THINGS = Object.values(ITEMS).filter((d) => d.id !== 'dogtag').map((d) => ({ id: d.id, name: d.name }));
 
 export class HUD {
   root: HTMLDivElement;
@@ -894,9 +897,17 @@ export class HUD {
   /** which of what is offered Tab would take */
   private lit = 0;
 
+  /** which of an admin's powers are on, said at the top of the screen for as long as any is ('' for none) */
+  setPowers(text: string) {
+    let n = this.root.querySelector('.hud-powers') as HTMLElement | null;
+    if (!n) this.root.appendChild((n = Object.assign(document.createElement('div'), { className: 'hud-powers' })));
+    n.textContent = text;
+    this.toggle(n, 'show', !!text);
+  }
+
   private suggest() {
     const box = this.root.querySelector('.chat-input') as HTMLInputElement;
-    this.offered = this.passMode || !this.chatOpen ? null : offer(box.value, this.role, this.people(), this.gone);
+    this.offered = this.passMode || !this.chatOpen ? null : offer(box.value, this.role, this.people(), this.gone, THINGS);
     this.lit = 0;
     this.showOffer();
   }

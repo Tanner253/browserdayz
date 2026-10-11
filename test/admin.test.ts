@@ -225,5 +225,98 @@ await withServer(async () => {
   console.log('  ok  after a restart the admin is an admin and the banned are banned; a ban is of a key, not a name; one who has left can be banned; an unban lets them in');
 });
 
+// ---- what an admin can do that nobody else can: the lists, going and bringing, things, the powers
+await withServer(async () => {
+  const eve = new Player('Eve'), fay = new Player('Fay');
+  for (const p of [ann, eve, fay]) assert.ok(await p.join(), `${p.name} was not let in`);
+  await sleep(300);
+  const last = <T extends S2C['t']>(p: Player, t: T) => p.got.filter((m) => m.t === t).pop() as Extract<S2C, { t: T }> | undefined;
+
+  ann.send({ t: 'adm' });
+  eve.send({ t: 'adm' });
+  await sleep(400);
+  const lists = last(ann, 'adm');
+  assert.ok(lists, 'an admin was not sent the lists');
+  assert.deepEqual(lists.players.map((p) => p.name).sort(), ['Ann', 'Eve', 'Fay']);
+  assert.equal(lists.players.find((p) => p.name === 'Ann')?.role, 'admin');
+  assert.ok(lists.roles.some((r) => r.role === 'admin'), 'the roles are not in the lists of an admin');
+  assert.ok(!last(eve, 'adm'), 'somebody with no role was sent the lists');
+  for (const o of ['/god', '/noclip', '/vanish', '/tp 5 5', '/give bandage', `/slay #${ann.id}`]) assert.match(await eve.order(o), /not a thing you can do/);
+  checks++;
+  console.log('  ok  the lists go to whoever has a role and to nobody else; with no role no power is to be had');
+
+  assert.match(await ann.order('/tp 100 -50'), /You are at 100, -50/);
+  const put = last(ann, 'put');
+  assert.ok(put && put.x === 100 && put.z === -50 && put.y === undefined && put.by === undefined, 'an admin was not put where they asked');
+  assert.match(await ann.order(`/bring #${eve.id}`), /Eve is with you/);
+  const brought = last(eve, 'put');
+  assert.ok(brought && Math.hypot(brought.x - 100, brought.z + 50) < 3 && brought.by === 'Ann', 'somebody brought was not put beside the admin, or not told by whom');
+  assert.match(await ann.order(`/goto #${fay.id}`), /You are with Fay/);
+  ann.send({ t: 'adm' });
+  await sleep(700);
+  const fayAt = last(ann, 'adm')!.players.find((p) => p.name === 'Fay')!, annAt = last(ann, 'adm')!.players.find((p) => p.name === 'Ann')!;
+  assert.ok(Math.hypot(fayAt.x - annAt.x, fayAt.z - annAt.z) < 3, 'an admin who went to somebody is not beside them');
+  assert.match(await ann.order('/tp 99999 0'), /off the map/);
+  checks++;
+  console.log('  ok  an admin goes to a place, goes to a player and brings one, and whoever is brought is told by whom');
+
+  assert.match(await ann.order('/give bandage 3'), /3 × .* at your feet/);
+  const made = last(eve, 'loot+');
+  assert.ok(made && made.l.item.id === 'bandage' && made.l.item.qty === 3, 'what was given did not appear in the world');
+  assert.match(await ann.order(`/give ak #${eve.id}`), /at Eve's feet/);
+  assert.match(await ann.order('/give dogtag'), /Not a dog tag/);
+  assert.match(await ann.order('/give zzzz'), /No thing is/);
+  assert.match(await ann.order(`/kit assault #${eve.id}`), /Eve has the Assault kit/);
+  const kit = last(eve, 'kit');
+  assert.ok(kit && kit.by === 'Ann' && kit.items.some((it) => it.id === 'ar15' && it.mag === 'mag_ar_60' && it.loaded === 61 && it.mods?.includes('suppressor_556')), 'a kit did not reach who it was for with its rifle fitted out');
+  assert.ok(new Set(kit.items.map((it) => it.uid)).size === kit.items.length && !kit.items.some((it) => it.id === 'dogtag'), 'a kit has a thing twice over, or a dog tag');
+  assert.match(await ann.order('/kit nothing'), /The kits are: assault/);
+  checks++;
+  console.log('  ok  a thing given lies in the world for everybody; a dog tag is never made');
+
+  assert.match(await ann.order('/god'), /Nothing hurts you/);
+  assert.deepEqual({ ...last(ann, 'powers'), t: 0 }, { t: 0, god: true, hidden: false, clip: false, voidInv: false, voidTag: false });
+  assert.match(await ann.order('/voidinv on'), /nothing you carried is left/);
+  assert.match(await ann.order('/voidtag'), /no dog tag of your own/);
+  assert.ok(last(ann, 'powers')?.voidInv && last(ann, 'powers')?.voidTag, 'what an admin chose for their death was not said back');
+  assert.match(await eve.order('/voidinv'), /not a thing you can do/);
+  const seen = fay.got.length;
+  assert.match(await ann.order('/vanish'), /Nobody sees you/);
+  assert.ok(fay.got.slice(seen).some((m) => m.t === 'leave' && m.id === ann.id), 'a vanished admin was not taken out of the game of everybody else');
+  const late = new Player('Gus');
+  assert.ok(await late.join());
+  const welcome = last(late, 'welcome')!;
+  assert.ok(!welcome.players.some((p) => p.id === ann.id), 'somebody who came in was shown a vanished admin');
+  assert.match(await ann.order('/vanish'), /seen again/);
+  await sleep(200);
+  assert.ok(fay.got.some((m) => m.t === 'join' && m.p.id === ann.id), 'an admin seen again was not put back in the game of everybody else');
+  assert.match(await ann.order('/noclip on'), /You fly/);
+  assert.equal(last(ann, 'powers')?.clip, true);
+  checks++;
+  console.log('  ok  god mode, vanish and noclip are put on and off, and said to whoever has them; vanished is gone from the game of everybody else');
+
+  assert.match(await ann.order(`/mute #${eve.id} 5`), /Eve is muted for 5 minutes/);
+  eve.send({ t: 'chat', ch: 'global', text: 'can anybody hear this' });
+  await sleep(700);
+  assert.ok(!fay.heard('can anybody hear this'), 'somebody muted was heard');
+  assert.match(await ann.order(`/unmute #${eve.id}`), /heard again/);
+  await sleep(600);
+  eve.send({ t: 'chat', ch: 'global', text: 'and now' });
+  await sleep(500);
+  assert.ok(fay.heard('and now'), 'somebody unmuted was not heard');
+  ann.send({ t: 'chat', ch: 'global', text: 'said by an admin' });
+  await sleep(500);
+  assert.equal((fay.got.find((m) => m.t === 'chat' && m.text === 'said by an admin') as { role?: string } | undefined)?.role, 'admin', 'a line of chat from an admin does not say so');
+  assert.match(await ann.order(`/warn #${eve.id} stop that`), /has been warned/);
+  assert.ok(eve.got.some((m) => m.t === 'tell' && /warns you: stop that/.test(m.text)), 'a warning did not reach who it was for');
+  assert.match(await ann.order(`/heal #${eve.id}`), /Eve is whole/);
+  assert.ok(last(eve, 'mend'), 'somebody healed was not told');
+  assert.match(await ann.order(`/slay #${eve.id}`), /Eve is dead/);
+  await sleep(200);
+  assert.ok(fay.got.some((m) => m.t === 'death' && m.k.id === eve.id), 'somebody slain did not die for everybody');
+  checks++;
+  console.log('  ok  a mute silences and is lifted; the chat of an admin says so; a warning, a healing and a killing reach who they are for');
+});
+
 site.close();
 console.log(`\n${checks} checks passed`);

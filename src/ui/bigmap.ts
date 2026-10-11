@@ -61,6 +61,8 @@ export class BigMap {
   open = false;
   /** asked to be shut (its X, or a tap outside it) */
   onClose: () => void = () => {};
+  /** a place on the sheet right-clicked (an admin goes there): null, and a right-click is nothing */
+  onPick: ((x: number, z: number) => void) | null = null;
   private sheet: HTMLCanvasElement | null = null;
   /** pixels of the sheet to a metre: finer on a computer, which has the memory for it and looks closer */
   private S = TOUCH ? 1 : 2;
@@ -228,6 +230,12 @@ export class BigMap {
     v.addEventListener('pointerup', up);
     v.addEventListener('pointercancel', up);
     v.addEventListener('pointerleave', () => (this.tip.hidden = true));
+    v.addEventListener('contextmenu', (e) => {
+      if (!this.onPick) return;
+      e.preventDefault();
+      const r = v.getBoundingClientRect(), k = this.perMetre();
+      this.onPick(this.at.x + (((e.clientX - r.left) / r.width - 0.5) * v.width) / k, this.at.z + (((e.clientY - r.top) / r.height - 0.5) * v.height) / k);
+    });
     window.addEventListener('resize', () => (this.dirty = true));
   }
 

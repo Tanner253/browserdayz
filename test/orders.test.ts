@@ -23,7 +23,7 @@ assert.equal(offer('/ban', 'mod', here), null);
 checks++;
 
 // ---- a name half typed narrows it; one with nothing after it is given whole, one with more to it is not
-const k = offer('/ki', 'admin', here)!;
+const k = offer('/kic', 'admin', here)!;
 assert.deepEqual(k.picks.map((p) => [p.fill, p.whole]), [['/kick ', false]]);
 const b = offer('/ban', 'admin', here)!;
 assert.deepEqual(b.picks.map((p) => [p.fill, p.whole]), [['/ban ', false], ['/bans', true]]);
