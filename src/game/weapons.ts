@@ -8,7 +8,7 @@ import { physics, SHOT_GROUPS, type Surface } from '../core/physics';
 import { audio } from '../core/audio';
 import type { Input } from '../core/input';
 import { extractParts, type MeshPart } from '../core/gltf-utils';
-import { ITEMS, capacityOf, chambered, fittedOf, handlingOf, hasMod, magFits, magRoom, pieceShown, swapMag, type ItemInstance, type Slot, quietOf } from '../sim/items';
+import { ITEMS, capacityOf, chambered, fittedOf, handlingOf, hasMod, magFits, magRoom, nextMag, pieceShown, swapMag, type ItemInstance, type Slot, quietOf } from '../sim/items';
 import { suppressorGeometry } from './procedural';
 import { SLOT_ORDER, type PlayerInventory } from '../sim/inventory';
 import type { Atmosphere } from '../world/atmosphere';
@@ -1902,7 +1902,14 @@ export class Weapons {
     if (!suppressed) {
       m.flash.fire(FLAME[kind]);
     }
-    this.fx.muzzle(muzzleWorld, new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion), big || kind === 'auto', suppressed);
+    // The smoke of one's own shot: a breath of it, thrown well ahead and gone in under a second. (It was what a
+    // shot seen from across a field gives, five puffs that hang two seconds: held open, a rifle stood a bank of
+    // fog on its own sights, and with a suppressor on, where no flash hides it and it comes from a hand nearer the
+    // eye, nothing was to be seen through irons or glass.) Less of it down the sights, less again quieted, and a
+    // string held open gives a puff to every other shot after its first two. It comes from the end of the can.
+    const ahead = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+    const thin = gun?.auto && this.burst > 2 && this.burst % 2 === 0 ? 0 : (suppressed ? 0.3 : 0.8) * (gun?.auto ? 0.4 : 1) * THREE.MathUtils.lerp(1, 0.5, this.adsT);
+    this.fx.muzzle(suppressed ? muzzleWorld.addScaledVector(ahead, kind === 'pistol' ? 0.13 : 0.19) : muzzleWorld, ahead, big || kind === 'auto', suppressed, 0, thin);
     audio.gunshot(kind === 'auto' ? 'rifle' : kind, undefined, 0, kind === 'auto', suppressed, VOICE[item.id]);
 
     m.shotT = 0;
@@ -2000,16 +2007,16 @@ export class Weapons {
   private reload(m: VmModel, item: ItemInstance) {
     const def = ITEMS[item.id];
     if (!def.weapon) return;
-    // A gun fed by a magazine is given the fullest one carried for it, if that is fuller than the one in it: the
+    // A gun fed by a magazine is given the fullest one carried of the kind that is in it (see nextMag), if that is
+    // fuller than the one in it: the
     // old one goes back in a pocket with what is left in it, and the round in the chamber stays. Loose rounds do
     // not go into a gun: they go into a magazine, by hand. With no magazine to give it and nothing in its chamber,
     // one loose round is put there, which is one shot.
     let next: ItemInstance | null = null, single = false;
     if (def.weapon.mag) {
       const mags = this.magsFor(item);
-      for (const mg of mags) if ((mg.rounds ?? 0) > 0 && (!next || (mg.rounds ?? 0) > (next.rounds ?? 0))) next = mg;
-      const inGun = Math.max(0, (item.loaded ?? 0) - (chambered(item) ? 1 : 0));
-      if (next && item.mag && (next.rounds ?? 0) <= inGun) return void this.onSay('The magazine in it is the fullest you have', 'info');
+      next = nextMag(item, mags);
+      if (!next && item.mag && mags.some((mg) => (mg.rounds ?? 0) > 0)) return void this.onSay('The magazine in it is the fullest you have', 'info');
       if (!next) {
         single = !chambered(item) && this.inv.count(def.weapon.ammo) > 0;
         if (!single) return void this.onSay(mags.length || item.mag ? 'No rounds in a magazine: hold one, and fill it from your loose rounds' : `No magazine for the ${def.name}: it fires what is in its chamber`, 'warn');

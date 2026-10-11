@@ -6,7 +6,7 @@
 // has one. What is held to here besides: no round is made or lost by anything that is done with a magazine.
 
 import assert from 'node:assert/strict';
-import { FOUND_WITH_MAG, ITEMS, capacityOf, chambered, fillMag, fitAtRandom, fittedOf, foundMag, itemWeight, loadGun, magFed, magFits, magRoom, makeItem, makeMag, sanitizeItem, stockGun, swapMag, type ItemInstance } from '../src/sim/items';
+import { FOUND_WITH_MAG, ITEMS, capacityOf, chambered, fillMag, fitAtRandom, fittedOf, foundMag, itemWeight, loadGun, magFed, magFits, magRoom, makeItem, makeMag, nextMag, sanitizeItem, stockGun, swapMag, type ItemInstance } from '../src/sim/items';
 import { Container } from '../src/sim/inventory';
 import { CRATE_SPECS, fillCrate } from '../src/sim/crates';
 import { fillDrop } from '../src/sim/drops';
@@ -191,6 +191,30 @@ ok('what is in a magazine and in a gun is weighed with it', () => {
   assert.ok(Math.abs(full - empty - 15 * ITEMS.ammo_9mm.weight) < 1e-9);
   const g = loadGun(makeItem('m9'), 15);
   assert.ok(Math.abs(itemWeight(g) - (ITEMS.m9.weight + ITEMS.mag_m9.weight + 15 * ITEMS.ammo_9mm.weight)) < 1e-9);
+});
+
+ok('a reload changes a magazine for one of its own kind; the big one goes in by hand, or when nothing else has a round', () => {
+  for (const [gun, small, big] of [['ak', 'mag_ak', 'drum_ak'], ['ar15', 'mag_ar', 'mag_ar_60']] as [string, string, string][]) {
+    const g = loadGun(makeItem(gun), 5);
+    assert.equal(g.mag, small);
+    const full = makeMag(small, 30), half = makeMag(small, 12), huge = makeMag(big, ITEMS[big].mag!.capacity);
+    assert.equal(nextMag(g, [half, huge, full]), full, `${gun}: with a thirty in it and a full thirty carried, the reload reached for the ${big}`);
+    // (nothing of its own kind is fuller than what is in it: then the big one)
+    assert.equal(nextMag(loadGun(makeItem(gun), 20), [half, huge]), huge);
+    assert.equal(nextMag(g, [makeMag(small, 0), huge]), huge);
+    // (with the big one in it, it is changed for another big one first, and for a small one that is fuller if there is none)
+    const fat = loadGun(Object.assign(makeItem(gun), { mag: big }), 9);
+    assert.equal(nextMag(fat, [full, huge]), huge);
+    assert.equal(nextMag(fat, [full, half]), full);
+    // (nothing carried is fuller than what is in it: nothing is changed; and one for another gun is never taken)
+    assert.equal(nextMag(loadGun(makeItem(gun), 30), [half, makeMag(small, 29)]), null);
+    assert.equal(nextMag(g, [makeMag('mag_m9', 15)]), null);
+    // (a gun with no magazine in it takes its own kind first)
+    const bare = makeItem(gun);
+    assert.equal(bare.mag, null);
+    assert.equal(nextMag(bare, [huge, half]), half);
+    assert.equal(nextMag(bare, [huge]), huge);
+  }
 });
 
 console.log(`\n${n} checks passed`);

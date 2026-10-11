@@ -776,7 +776,8 @@ export class Effects {
   }
 
   /** @param flame the flame is drawn here too, this long (somebody else's shot: the player's own gun carries its own) */
-  muzzle(worldPos: THREE.Vector3, dir: THREE.Vector3, big: boolean, suppressed = false, flame = 0) {
+  /** @param smoke how much smoke, of what a shot seen from outside gives (1): the one firing is given a good deal less (see tryFire) */
+  muzzle(worldPos: THREE.Vector3, dir: THREE.Vector3, big: boolean, suppressed = false, flame = 0, smoke = 1) {
     if (!suppressed && flame > 0) {
       const f = this.flames[this.flame++ % this.flames.length];
       if (!f) return;
@@ -794,8 +795,14 @@ export class Effects {
       this.flashT = 0.055;
     }
     // a little smoke drifting from the muzzle
-    for (let i = 0; i < (big ? 5 : 3); i++) {
-      this.spawn({ p: worldPos.clone().addScaledVector(dir, 0.1), v: dir.clone().multiplyScalar(0.6 + Math.random()).add(new THREE.Vector3(0, 0.25, 0)), max: 1.2 + Math.random(), size: 0.06, grow: 0.35, color: new THREE.Color(0.75, 0.74, 0.72), alpha: 0.22, gravity: -0.3, drag: 1.8 });
+    // (thinner: fewer puffs, fainter, shorter lived, and thrown further and faster from the barrel, up out of its line)
+    const n = smoke <= 0 ? 0 : Math.max(1, Math.round((big ? 5 : 3) * smoke)), k = Math.min(1, Math.max(0, smoke));
+    for (let i = 0; i < n; i++) {
+      this.spawn({
+        p: worldPos.clone().addScaledVector(dir, 0.1 + (1 - k) * 0.3),
+        v: dir.clone().multiplyScalar((0.6 + Math.random()) * (1 + (1 - k) * 1.6)).add(new THREE.Vector3(0, 0.25 + (1 - k) * 0.35, 0)),
+        max: (1.2 + Math.random()) * (0.4 + 0.6 * k), size: 0.06, grow: 0.35 * (0.55 + 0.45 * k), color: new THREE.Color(0.75, 0.74, 0.72), alpha: 0.22 * (0.4 + 0.6 * k), gravity: -0.3, drag: 1.8,
+      });
     }
   }
 

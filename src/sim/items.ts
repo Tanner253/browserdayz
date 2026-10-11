@@ -585,6 +585,23 @@ export function stockGun(gun: ItemInstance, rounds: number): ItemInstance {
   return gun;
 }
 
+/**
+ * The magazine a reload puts into a gun, of those carried for it: the fullest of the kind that is in it (with none
+ * in it, the kind it is made with), if that is fuller than what the gun has; and only failing that, the fullest of
+ * any other kind it takes. (It was the fullest of any kind: a rifle with a thirty in it and a drum in the pack was
+ * given the drum by every reload, which is nobody's idea of changing a magazine. The big one is put in by hand, or
+ * when there is nothing else with a round in it.) Null: nothing carried is fuller than what is in it.
+ */
+export function nextMag(gun: ItemInstance, carried: ItemInstance[]): ItemInstance | null {
+  const w = ITEMS[gun.id]?.weapon;
+  if (!w?.mag) return null;
+  const inGun = gun.mag ? Math.max(0, (gun.loaded ?? 0) - (chambered(gun) ? 1 : 0)) : 0;
+  const fuller = carried.filter((mg) => magFits(mg.id, gun.id) && (mg.rounds ?? 0) > inGun);
+  const best = (list: ItemInstance[]) => list.reduce<ItemInstance | null>((a, b) => (!a || (b.rounds ?? 0) > (a.rounds ?? 0) ? b : a), null);
+  const kind = gun.mag ?? w.mag;
+  return best(fuller.filter((mg) => mg.id === kind)) ?? best(fuller);
+}
+
 /** The same for a gun that is to be a gun that fires, whatever the dice said: its magazine is put in it first, if it has none. */
 export function loadGun(gun: ItemInstance, rounds: number): ItemInstance {
   const w = ITEMS[gun.id].weapon;
