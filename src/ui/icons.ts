@@ -24,6 +24,11 @@ export async function renderIcons(renderer: THREE.WebGLRenderer, models: ItemMod
   const prevTarget = renderer.getRenderTarget();
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d')!;
+  // Drawing a thing puts every picture it is painted with on the graphics card, and there they stay: the pictures
+  // of every item in the game, most of which are never seen in a given hour, sat there from the first second (with
+  // every model at the size it came, some gigabytes of them: more than many cards have). What was put there for
+  // these pictures is taken off again when they are made, and goes back the first time the thing itself is drawn.
+  const used = new Set<THREE.Texture>(), copies: THREE.Material[] = [];
 
   for (const [id, def] of Object.entries(ITEMS)) {
     const tpl = await models.get(id);
@@ -48,13 +53,14 @@ export async function renderIcons(renderer: THREE.WebGLRenderer, models: ItemMod
       // pictures of every round were dark brown. In its picture a round is given less of the mirror and more of its
       // own colour, lit up: brass that reads as brass, and the bullet's tip to be told from its case.
       if (def.category === 'ammo' && def.stack) {
-        c.metalness = Math.min(c.metalness, 0.45);
+        c.metalness = Math.min(c.metalness, 0.5);
         c.metalnessMap = null;
-        c.roughness = Math.max(c.roughness, 0.42);
+        c.roughness = Math.max(c.roughness, 0.4);
         c.roughnessMap = null;
-        c.color.multiplyScalar(1.9);
-        c.envMapIntensity = 1.5;
+        c.envMapIntensity = 1.6;
       }
+      for (const t of [src.map, src.normalMap, src.roughnessMap, src.metalnessMap, src.aoMap, src.emissiveMap, src.alphaMap]) if (t) used.add(t);
+      copies.push(c);
       m.material = c;
     });
     const pivot = new THREE.Group();
@@ -138,6 +144,8 @@ export async function renderIcons(renderer: THREE.WebGLRenderer, models: ItemMod
     rt.dispose();
   }
   renderer.setRenderTarget(prevTarget);
+  for (const t of used) t.dispose();
+  for (const c of copies) c.dispose();
   return out;
 }
 

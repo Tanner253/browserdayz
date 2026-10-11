@@ -130,6 +130,12 @@ export function installHarness(g: Game) {
       // (the AR-15 with everything that came on it fitted: its sight, its suppressor, its foregrip and its light. Each comes off in the inventory.)
       one('ar15', (it) => Object.assign(it, { mag: 'mag_ar', loaded: 31, mods: ['red_dot', 'suppressor_556', 'foregrip', 'gun_light'] }));
       one('m9', (it) => Object.assign(it, { mag: 'mag_m9', loaded: 16 }));
+      // (the submachine gun, and the other two pistols in a pocket: all four are held in the same hands)
+      one('mpa', (it) => Object.assign(it, { mag: 'mag_mpa', loaded: 31 }));
+      one('p38', (it) => Object.assign(it, { mag: 'mag_p38', loaded: 9 }));
+      one('deagle', (it) => Object.assign(it, { mag: 'mag_deagle', loaded: 8 }));
+      for (const [id, rounds] of [['mag_mpa', 30], ['mag_mpa', 30], ['mag_p38', 8], ['mag_deagle', 7]] as [string, number][]) one(id, (it) => (it.rounds = rounds));
+      one('ammo_9mm', undefined, 30);
       // (one of the AK's magazines is nearly empty: it is on key 4, to be filled by hand)
       for (const [id, rounds] of [['mag_ak', 8], ['mag_ak', 30], ['mag_ak', 30], ['drum_ak', 75], ['mag_ar', 30], ['mag_ar', 30], ['mag_ar', 30], ['mag_ar_60', 60], ['mag_m9', 15], ['mag_m9', 15]] as [string, number][]) one(id, (it) => (it.rounds = rounds));
       one('ammo_739', undefined, 30);

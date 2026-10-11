@@ -41,7 +41,7 @@ export const DEATHS = ['death', 'deathFront', 'deathSide'] as const;
 export const DEATH_REST: [number, number][] = [[-0.85, 0], [0.9, 0], [0.05, 0.36]];
 
 /** what the hands can be seen doing */
-export type Gesture = 'bolt' | 'reload' | 'eat' | 'drink' | 'bandage' | 'open';
+export type Gesture = 'bolt' | 'reload' | 'eat' | 'drink' | 'bandage' | 'open' | 'check';
 /** from the wheel (src/sim/emotes.ts): what the arms do with a call, and what the body keeps up until told otherwise */
 export type Move = NonNullable<Emote['move']>;
 export type Hold = NonNullable<Emote['hold']>;
@@ -314,6 +314,7 @@ const _w = new THREE.Vector3();
 const _fwd = new THREE.Vector3();
 const _head = new THREE.Vector3();
 const _X = new THREE.Vector3(1, 0, 0);
+const _Z = new THREE.Vector3(0, 0, 1);
 /** below this much of a hold the gun is as good as out of the hands (see `holdT`) */
 const HOLD_GONE = 0.06;
 /** seconds the hands are given to come away from something broken off */
@@ -1345,9 +1346,9 @@ export class Avatar {
     // eating, drinking, dressing a wound, waving, dancing: whatever was in the hands is put away for it
     this.seatT += ((this.seated && !dead ? 1 : 0) - this.seatT) * ease(9);
     // (and sat in a jeep it is slung)
-    const using = (!!ges && ges.kind !== 'bolt' && ges.kind !== 'reload') || !!mv || this.danceT > 0.25 || this.handsT > 0.25 || this.seatT > 0.25 || this.groundT > 0.25;
+    const using = (!!ges && ges.kind !== 'bolt' && ges.kind !== 'reload' && ges.kind !== 'check') || !!mv || this.danceT > 0.25 || this.handsT > 0.25 || this.seatT > 0.25 || this.groundT > 0.25;
     // (the hands come off a gun and go back onto it over a fifth of a second, and one gun is lowered before the next is taken up)
-    const busy = (!!ges && ges.kind !== 'bolt' && ges.kind !== 'reload') || !!mv || this.hold !== null || this.seated;
+    const busy = (!!ges && ges.kind !== 'bolt' && ges.kind !== 'reload' && ges.kind !== 'check') || !!mv || this.hold !== null || this.seated;
     const wantHold = !!this.held && !busy && !dead && !this.nextHeld;
     if (!this.placed) this.holdT = wantHold ? 1 : 0;
     else this.holdT += ((wantHold ? 1 : 0) - this.holdT) * ease(wantHold ? 11 : dead ? 26 : 16);
@@ -1657,17 +1658,20 @@ export class Avatar {
             this.heldPivot.position.z += (head.z - mid.z - POSE.hold.eye[1]) * this.aimT;
           }
           const { obj, grips, long, base } = held;
-          const set = long ? POSE.hold.long : POSE.hold.pistol;
+          const kind = long ? POSE.hold.long : POSE.hold.pistol;
+          // (a gun with a way of its own of being stood with, or carried at a run: a submachine gun out in front of the chest; that or a pistol muzzle up in the gun hand)
+          const set = grips.stand ? { ...kind, ...grips.stand } : kind;
+          const carried: Stance = grips.carry ?? set.carry;
           const wAim = this.aimT, wReady = 1 - wAim - carry;
           obj.position.set(0, 0, 0);
-          for (const [s, w] of [[set.ready, wReady], [set.carry, carry], [set.aim, wAim]] as [Stance, number][]) {
+          for (const [s, w] of [[set.ready, wReady], [carried, carry], [set.aim, wAim]] as [Stance, number][]) {
             obj.position.x += s.p[0] * w;
             obj.position.y += s.p[1] * w;
             obj.position.z += s.p[2] * w;
           }
           const turned = (s: Stance, q: THREE.Quaternion) => q.setFromEuler(_euler.set(s.r[0], s.r[1], s.r[2], 'YXZ'));
           turned(set.ready, _qa);
-          if (carry > 0.001) _qa.slerp(turned(set.carry, _qb), carry / Math.max(1e-4, 1 - wAim));
+          if (carry > 0.001) _qa.slerp(turned(carried, _qb), carry / Math.max(1e-4, 1 - wAim));
           if (wAim > 0.001) _qa.slerp(turned(set.aim, _qb), wAim);
           if (hold < 1) {
             // being put away, or taken up: down toward the belt, its muzzle tipped to the ground
@@ -1684,7 +1688,15 @@ export class Avatar {
             const sm = (a: number, b: number) => THREE.MathUtils.smoothstep(k, a, b);
             const live = left(ges);
             const work = grips.work;
-            if (long && ges.kind === 'bolt' && gripR && work?.bolt) {
+            if (ges.kind === 'check') {
+              // Looked over: brought up in front of the chest with its muzzle lifted, turned over to show one side
+              // and then the other, and let back down. Both hands stay on it and turn with it.
+              const up = sm(0, 0.14) * (1 - sm(0.86, 1)) * live;
+              const over = (sm(0.14, 0.32) - sm(0.42, 0.66) * 2 + sm(0.74, 0.88)) * live;
+              obj.position.y += 0.07 * up;
+              obj.position.z += 0.04 * up;
+              obj.quaternion.multiply(_q1.setFromAxisAngle(_Z, 0.45 * up)).multiply(_q2.setFromAxisAngle(_X, 0.85 * over));
+            } else if (long && ges.kind === 'bolt' && gripR && work?.bolt) {
               // The right hand leaves the grip for the bolt handle: up with it, back, home, and down. The rifle
               // rolls a little to meet the hand. (It was sent to where the old rifle's bolt was, which on these
               // is further up the gun than the arm is long: the arm went out straight and stopped there.)
@@ -1742,7 +1754,8 @@ export class Avatar {
           if (gripR) this.solveArm(this.armR, gripR, obj, aimQ, undefined, hold);
           // the forward hand may sit further back along the stock than the first-person arms
           // have it: these arms are only so long
-          if (gripL) this.solveArm(this.armL, gripL, obj, aimQ, gripR && !(ges && !long) ? _slide.set(0, 0, 1).applyQuaternion(_qa).applyQuaternion(this.heldPivot.getWorldQuaternion(_q1)) : undefined, hold);
+          // (a gun carried in the one hand at a run: the other is let go of it by as much as it is carried so, and swings as the body runs)
+          if (gripL) this.solveArm(this.armL, gripL, obj, aimQ, gripR && !(ges && !long) ? _slide.set(0, 0, 1).applyQuaternion(_qa).applyQuaternion(this.heldPivot.getWorldQuaternion(_q1)) : undefined, hold * (grips.carry?.free ? 1 - carry : 1));
         }
       }
     }

@@ -48,7 +48,8 @@ export const LEAN_REACH = 0.34;
 
 /** things a player does with their hands that the people around them can see (and hear) */
 // ('load': one round pushed into a magazine; 'unbox': a box of rounds torn open. Both are small sounds, heard close to.)
-export const ACTS = ['bolt', 'reload', 'eat', 'drink', 'bandage', 'open', 'load', 'unbox', 'stop'] as const;
+// ('check': a gun turned over in the hands and looked at.)
+export const ACTS = ['bolt', 'reload', 'eat', 'drink', 'bandage', 'open', 'load', 'unbox', 'check', 'stop'] as const;
 export type Act = (typeof ACTS)[number];
 
 /** [x, y, z, yaw, pitch, flags] */

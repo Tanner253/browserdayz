@@ -127,6 +127,13 @@ const D: ItemDef[] = [
     desc: 'Twelve-gauge shotgun, self-loading. Seven shells in the tube, pushed in one at a time: it takes no magazine. Nine pellets a shell: nothing is worse to meet in a corridor, and little is less use across a field. Takes a holographic sight, a suppressor and a light.',
     weapon: { kind: 'rifle', ammo: 'ammo_12', capacity: 7, ergo: 52, action: 'self', tube: true, shows: { red_dot: ['sight'], suppressor_12: ['silencer'] } }, iconYaw: 0,
   },
+  // The submachine gun (2026-10-11): a MAC-pattern 9 mm with a railed fore-end, its magazine up its grip. It fires
+  // what the pistols fire, thirty to a magazine, for as long as the trigger is held; it is slung on the back.
+  {
+    id: 'mpa', name: 'MPA30 SMG', model: 'smg', w: 5, h: 3, weight: 2.6, category: 'weapon', slot: 'long',
+    desc: 'Submachine gun in 9x19mm. Thirty rounds in the magazine up its grip, and it empties it in under three seconds: a great deal of fire across a room, and a pistol\'s round past the end of the street. B changes it to single shots. Takes a holographic sight and the 9 mm suppressor.',
+    weapon: { kind: 'auto', ammo: 'ammo_9mm', capacity: 30, mag: 'mag_mpa', ergo: 68, modes: ['auto', 'semi'], shows: { mag_mpa: ['mag'] } }, iconYaw: 0,
+  },
   // Ammunition (2026-10-10). Loose rounds lie thirty to a place in a pocket, whatever they are. A box is one place,
   // and holds twenty-five: it is unwrapped in the hands, and what was in it is loose rounds. Rounds go into a
   // magazine by hand, and a magazine into a gun: nothing goes from a pocket into a gun but through one of those,
@@ -149,7 +156,7 @@ const D: ItemDef[] = [
     desc: 'Loose rifle cartridges, for the AK. They go into its magazine by hand.',
   },
   {
-    id: 'ammo_556', name: '5.56x45 Rounds', model: 'round_739', w: 1, h: 1, weight: 0.012, category: 'ammo', stack: 30, scale: 1.12, pile: 5,
+    id: 'ammo_556', name: '5.56x45 Rounds', model: 'round_556', w: 1, h: 1, weight: 0.012, category: 'ammo', stack: 30, scale: 1.15, pile: 5,
     desc: 'Loose rifle cartridges, small and fast, for the AR-15. They go into its magazine by hand.',
   },
   {
@@ -163,12 +170,12 @@ const D: ItemDef[] = [
     open: { gives: 'ammo_556', qty: 25, time: 2.2 },
   },
   {
-    id: 'ammo_762', name: '7.62x54R Rounds', model: 'bolt_action_rifle_7_62', node: 'bolt_action_rifle_7_62_bullet_54mm', w: 1, h: 1, weight: 0.022, category: 'ammo', stack: 30, scale: 1.25, pile: 5,
+    id: 'ammo_762', name: '7.62x54R Rounds', model: 'round_762', w: 1, h: 1, weight: 0.022, category: 'ammo', stack: 30, scale: 1.3, pile: 5,
     desc: 'Loose full-power rifle cartridges, for the sniper rifle. They go into its magazine by hand.',
   },
   {
     id: 'ammo_9mm', name: '9x19mm Rounds', model: 'round_9mm', w: 1, h: 1, weight: 0.012, category: 'ammo', stack: 30, scale: 1.6, pile: 6,
-    desc: 'Loose pistol cartridges. Common among police and military. They go into a pistol\'s magazine by hand.',
+    desc: 'Loose pistol cartridges, for either 9 mm pistol and the MPA30. Common among police and military. They go into a magazine by hand.',
   },
   {
     id: 'ammo_50', name: '.50 AE Rounds', model: 'round_50', w: 1, h: 1, weight: 0.03, category: 'ammo', stack: 30, scale: 1.5, pile: 4,
@@ -228,6 +235,11 @@ const D: ItemDef[] = [
     mag: { ammo: 'ammo_556', capacity: 60 }, attach: { fits: ['ar15'], slot: 'magazine', ergo: -7 },
   },
   {
+    id: 'mag_mpa', name: 'MPA30 Magazine', model: 'smg', nodeRe: '^mag', w: 1, h: 2, weight: 0.22, category: 'magazine',
+    desc: 'Thirty rounds of 9 mm for the MPA30.',
+    mag: { ammo: 'ammo_9mm', capacity: 30 }, attach: { fits: ['mpa'], slot: 'magazine' },
+  },
+  {
     id: 'mag_p38', name: 'Pistol 43 Magazine', model: 'pistol_43', nodeRe: '^mag', w: 1, h: 1, weight: 0.08, category: 'magazine',
     desc: 'Eight rounds of 9 mm for the Pistol 43.',
     mag: { ammo: 'ammo_9mm', capacity: 8 }, attach: { fits: ['p38'], slot: 'magazine' },
@@ -270,8 +282,8 @@ const D: ItemDef[] = [
   },
   {
     id: 'suppressor_9', name: '9mm Suppressor', model: '@suppressor', w: 2, h: 1, weight: 0.3, category: 'attachment',
-    desc: 'Screw-on sound suppressor for either 9 mm pistol. Much quieter, no muzzle flash, slightly less punch. Softer kick, but the pistol is longer and slower in the hand.',
-    attach: { fits: ['p38', 'm9'], slot: 'muzzle', ergo: -8, recoil: 0.85, quiet: true },
+    desc: 'Screw-on sound suppressor for either 9 mm pistol and the MPA30. Much quieter, no muzzle flash, slightly less punch. Softer kick, but the gun is longer and slower in the hand.',
+    attach: { fits: ['p38', 'm9', 'mpa'], slot: 'muzzle', ergo: -8, recoil: 0.85, quiet: true },
   },
   {
     id: 'suppressor_762', name: 'Sniper Suppressor', model: 'sniper', nodeRe: '^silencer', w: 3, h: 1, weight: 0.55, category: 'attachment',
@@ -285,8 +297,8 @@ const D: ItemDef[] = [
   },
   {
     id: 'red_dot', name: 'Holographic Sight', model: 'holo_sight', w: 2, h: 1, weight: 0.3, category: 'attachment',
-    desc: 'A holographic sight: a lit ring and dot that lie on whatever the gun points at. Fits either 9 mm pistol, the shotgun and both assault rifles. Faster to aim with than irons.',
-    attach: { fits: ['p38', 'm9', 'benelli', 'ak', 'ar15'], slot: 'optic', ergo: 3 },
+    desc: 'A holographic sight: a lit ring and dot that lie on whatever the gun points at. Fits either 9 mm pistol, the MPA30, the shotgun and both assault rifles. Faster to aim with than irons.',
+    attach: { fits: ['p38', 'm9', 'mpa', 'benelli', 'ak', 'ar15'], slot: 'optic', ergo: 3 },
   },
   {
     id: 'gun_light', name: 'Weapon Light', model: 'gun_light', w: 1, h: 1, weight: 0.15, category: 'attachment',

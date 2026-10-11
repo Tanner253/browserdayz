@@ -35,6 +35,8 @@ export const UNDER_GAS: Table = [
   ['red_dot', 0.6], ['gun_light', 0.6], ['suppressor_762', 0.5], ['mag_m9_ext', 0.4], ['flask', 0.5], ['keycard', 0.5],
   // (2026-10-10: the two assault rifles and what feeds them)
   ['ak', 0.6], ['mag_ak', 0.6], ['box_739', 0.8], ['ammo_739', 0.4], ['ar15', 0.25], ['mag_ar', 0.3], ['box_556', 0.4], ['mag_sniper', 0.4],
+  // (2026-10-11: the submachine gun)
+  ['mpa', 0.5], ['mag_mpa', 0.5],
 ];
 
 /**

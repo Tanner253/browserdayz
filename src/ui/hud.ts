@@ -251,6 +251,7 @@ export class HUD {
                     <path d="M40 46v62H28M80 46v62h12" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="2 3"/>
                   </svg>
                   <p><kbd>R</kbd> reload <kbd>X</kbd> empty hands</p>
+                  <p><kbd>I</kbd> look the gun over</p>
                   <p><kbd>B</kbd> automatic · single shots</p>
                   <p><kbd class="wide">PgUp</kbd><kbd class="wide">PgDn</kbd> set the range of the sights</p>
                 </div>

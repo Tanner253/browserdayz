@@ -65,6 +65,10 @@ export function liftPack<T extends THREE.Material>(mat: T): T {
     c.metalness = Math.min(c.metalness, LOOK.sight.metal);
     c.color.setScalar(LOOK.sight.tint);
     c.envMapIntensity = LOOK.sight.sky;
+  } else if (/^Material_45[79]$/.test(mat.name)) {
+    // the submachine gun is painted a mid olive, with its wear and its markings in the paint: lifted like the dark
+    // ones it was a flat pale shape with nothing on it. As it came.
+    c.envMapIntensity = 1.1;
   } else if (/^B_M3_/.test(mat.name)) {
     // and the shotgun is painted blacker than any of them: lifted further, or it is a cut-out
     c.metalness = Math.min(c.metalness, LOOK.shotgun.metal);
@@ -129,6 +133,11 @@ export class WeaponRig {
     this.mixer = new THREE.AnimationMixer(this.scene);
     const clip = gltf.animations[0];
     this.length = clip.duration;
+    // (what the movements move: by the name of each track, and each thing once)
+    for (const t of clip.tracks) this.tracked.add(t.name);
+    this.scene.traverse((o) => {
+      if (this.tracked.has(`${o.name}.position`) || this.tracked.has(`${o.name}.quaternion`)) this.moved.push({ n: o, p: new THREE.Vector3(), q: new THREE.Quaternion() });
+    });
     this.mixer.clipAction(clip).play();
     this.rest();
     this.scene.traverse((o) => this.atRest.set(o, { p: o.position.clone(), q: o.quaternion.clone() }));
@@ -153,6 +162,47 @@ export class WeaponRig {
   /** the pose the gun is simply held in */
   rest() {
     this.mixer.setTime(0);
+  }
+
+  private tracked = new Set<string>();
+  private moved: { n: THREE.Object3D; p: THREE.Vector3; q: THREE.Quaternion }[] = [];
+
+  /**
+   * The movement it stands in now, mixed with another: `w` of the way to `clip`, `k` of the way through that one
+   * (a walk or a run over the standing still: the packs draw each by itself). Call after `pose`.
+   */
+  mix(clip: string, k: number, w: number, fast?: { body: string; to: string[] }) {
+    if (w <= 0.001 || !(clip in this.info.clips)) return;
+    for (const m of this.moved) {
+      m.p.copy(m.n.position);
+      m.q.copy(m.n.quaternion);
+    }
+    this.pose(clip, k);
+    if (w >= 0.999) return;
+    // What is fast to the gun in both movements (its magazine, the hand on its grip) is mixed as it stands ON the
+    // gun, not by itself: each has a joint of its own beside the gun's, and two things mixed apart from one
+    // another part company on the way (a pistol's magazine came out through its grip as the gun went up for a run).
+    const body = fast ? this.moved.find((m) => m.n.name === fast.body) : undefined;
+    const held: { m: { n: THREE.Object3D; p: THREE.Vector3; q: THREE.Quaternion }; rel: THREE.Matrix4 }[] = [];
+    if (body && fast) {
+      const A = _m1.compose(body.p, body.q, body.n.scale).invert(), B = _m2.compose(body.n.position, body.n.quaternion, body.n.scale).invert();
+      for (const name of fast.to) {
+        const m = this.moved.find((x) => x.n.name === name);
+        if (!m || m.n.parent !== body.n.parent) continue;
+        // (where it stands on the gun in the one movement and in the other, and between the two)
+        _h.compose(m.p, m.q, m.n.scale).premultiply(A).decompose(_p, _q, _s);
+        _g.compose(m.n.position, m.n.quaternion, m.n.scale).premultiply(B).decompose(_v1, _q2, _v2);
+        held.push({ m, rel: new THREE.Matrix4().compose(_p.lerp(_v1, w), _q.slerp(_q2, w), _s) });
+      }
+    }
+    for (const m of this.moved) {
+      m.n.position.lerpVectors(m.p, m.n.position, w);
+      m.n.quaternion.copy(m.q.slerp(m.n.quaternion, w));
+    }
+    if (body) {
+      _m1.compose(body.n.position, body.n.quaternion, body.n.scale);
+      for (const h of held) h.rel.premultiply(_m1).decompose(h.m.n.position, h.m.n.quaternion, _s);
+    }
   }
 
   /** These pieces put back where they are at rest, whatever the movement being played does with them. Call after `pose`. */
@@ -263,8 +313,150 @@ export class WeaponRig {
     const gun = new THREE.Matrix4().fromArray(this.info.frame).invert();
     const holder = new THREE.Group();
     holder.matrixAutoUpdate = false;
-    holder.matrix.copy(piece).invert().multiply(gun);
+    const base = new THREE.Matrix4().copy(piece).invert().multiply(gun);
+    holder.matrix.copy(base).multiply(this.seat);
     holder.add(obj);
     n.add(holder);
+    this.hung.push({ holder, base });
+  }
+  private hung: { holder: THREE.Group; base: THREE.Matrix4 }[] = [];
+
+  /**
+   * Where a gun that is not the pack's own sits in the pack's hands: moved (and turned) from where the pack's gun
+   * is, in the space of the gun-alone file. Everything hung after this is hung so. (A pistol in hands that were
+   * drawn round a bigger gun: its grip is put where that gun's grip is.)
+   */
+  private seat = new THREE.Matrix4();
+  /** @param size how big it is drawn in these hands, of its own size (hands drawn smaller than life hold a gun made the size that fits them) */
+  seatAt(move: THREE.Vector3, turn?: THREE.Euler, size = 1) {
+    this.seat.compose(move, new THREE.Quaternion().setFromEuler(turn ?? new THREE.Euler()), new THREE.Vector3(size, size, size));
+    // (and whatever is hung already is moved with it: a seat is set by eye, with the gun in the hands)
+    for (const h of this.hung) h.holder.matrix.copy(h.base).multiply(this.seat);
+  }
+
+  /** A piece pushed along the barrel from where the movement being played has it, metres (toward the muzzle: more). Call after `pose`. */
+  slide(name: string, by: number) {
+    const n = this.node(name);
+    if (!n?.parent) return;
+    // (along the barrel in the gun-alone file is x: which way that is for this piece's parent, as the file has it standing)
+    const along = _v1.set(1, 0, 0).transformDirection(_m1.fromArray(this.info.frame).invert()).transformDirection(_m2.copy(this.asFiled.get(n.parent) ?? _m2.identity()).invert());
+    const size = _v2.setFromMatrixScale(_m1.fromArray(this.info.frame)).x * _v3.setFromMatrixScale(this.asFiled.get(n.parent) ?? _m2.identity()).x;
+    n.position.addScaledVector(along, by / size);
+  }
+
+  /** a pack's arm, as its maker's skeleton has it: the upper arm, the forearm, and what the hand hangs on */
+  private arm(side: 'L' | 'R') {
+    const upper = this.node(side === 'L' ? 'UpArm_L_03' : 'UpArm_R_09'), fore = this.node(side === 'L' ? 'Forearm_L_04' : 'Forearm_R_010');
+    let hand: THREE.Object3D | null = null;
+    this.scene.traverse((o) => {
+      if (!hand && new RegExp(`^IK_Hand_Cntrl_${side}`).test(o.name)) hand = o;
+    });
+    // (a joint well down the forearm: which way the forearm lies is said by it)
+    const tip = this.node(side === 'L' ? 'BoneTwist_01.L_07' : 'BoneTwist_01.R_013') ?? this.node(side === 'L' ? 'BoneTwist_01L_07' : 'BoneTwist_01R_013');
+    return upper && fore && hand ? { upper, fore, hand: hand as THREE.Object3D, tip } : null;
+  }
+  private armLen: Partial<Record<'L' | 'R', [number, number]>> = {};
+  private arms: Partial<Record<'L' | 'R', ReturnType<WeaponRig['arm']>>> = {};
+  private handAt = new Map<string, THREE.Vector3>();
+
+  /** the gun-alone file's space as it stands in the world this frame, by the joint the gun's body follows */
+  private gunSpace(body: THREE.Object3D, out: THREE.Matrix4) {
+    return out.copy(body.matrixWorld).multiply(_m1.copy(this.asFiled.get(body) ?? _m1.identity()).invert()).multiply(_m2.fromArray(this.info.frame).invert());
+  }
+
+  /**
+   * An arm of the pack's brought to where its hand, or its shoulder, is put, when that is not where its maker drew it.
+   *
+   * The hand: for a gun that is not the one these hands were drawn round (a pistol has nothing out in front for the
+   * other hand to hold: it is brought back under the grip). `move` and `turn` are said in the gun's own space (x
+   * toward the muzzle, y up, z to its right; metres), from where the hand is when the gun is simply held. The hand
+   * is moved by all of that while it is where it rests on the gun, and by less of it the further the movement being
+   * played takes it from there (a reload takes it to the magazine and back: it does that as it was drawn).
+   *
+   * The shoulder: `shoulder` is how far the top of the arm is moved, in the eye's space (x right, y up, -z away;
+   * metres). The packs were drawn for a camera of their own; from where the game's eye is, the top of an arm may
+   * stand in the corner of the picture. Let down and back, the arm comes up into the picture from under it.
+   *
+   * Call after `pose`, with the pack where it is drawn this frame.
+   * @param body the joint the gun's body follows
+   */
+  reseat(side: 'L' | 'R', body: string, o: { move?: THREE.Vector3; turn?: THREE.Quaternion; shoulder?: THREE.Vector3; letGo?: [number, number] }) {
+    const arm = (this.arms[side] ??= this.arm(side));
+    const b = this.node(body);
+    if (!arm || !b) return;
+    const key = `${side}|${body}`;
+    if (!this.handAt.has(key)) {
+      // where the hand rests on the gun, in the gun's space (found with the gun simply held: the frame it is found on is drawn as it was)
+      this.rest();
+      this.root.updateWorldMatrix(true, true);
+      this.handAt.set(key, new THREE.Vector3().setFromMatrixPosition(arm.hand.matrixWorld).applyMatrix4(this.gunSpace(b, new THREE.Matrix4()).invert()));
+      // (and how long its two bones are: the hand is on the end of the forearm there)
+      const s0 = _a.setFromMatrixPosition(arm.upper.matrixWorld), e0 = _b.setFromMatrixPosition(arm.fore.matrixWorld);
+      this.armLen[side] = [e0.distanceTo(s0), _v1.setFromMatrixPosition(arm.hand.matrixWorld).distanceTo(e0)];
+      return;
+    }
+    this.root.updateWorldMatrix(true, true);
+    const was = _v1.setFromMatrixPosition(arm.hand.matrixWorld);
+    const to = _v3.copy(was);
+    if (o.move || o.turn) {
+      const G = this.gunSpace(b, _g), Gi = _gi.copy(G).invert();
+      const letGo = o.letGo ?? [0.03, 0.12];
+      const w = 1 - THREE.MathUtils.smoothstep(_v2.copy(was).applyMatrix4(Gi).distanceTo(this.handAt.get(key)!), letGo[0], letGo[1]);
+      if (w > 0.001) {
+        // the hand, in the gun's space, moved and turned about itself
+        const H = _h.copy(Gi).multiply(arm.hand.matrixWorld);
+        H.decompose(_p, _q, _s);
+        if (o.move) _p.addScaledVector(o.move, w);
+        if (o.turn) _q.premultiply(_q2.identity().slerp(o.turn, w));
+        H.compose(_p, _q, _s).premultiply(G);
+        to.setFromMatrixPosition(H);
+        // (set on what it hangs on, in that one's own space)
+        _m1.copy(arm.hand.parent!.matrixWorld).invert().multiply(H).decompose(arm.hand.position, arm.hand.quaternion, arm.hand.scale);
+      }
+    }
+    // the arm after it: the elbow kept to the side it was on, the two bones as long as they were
+    const S = _a.setFromMatrixPosition(arm.upper.matrixWorld), E = _b.setFromMatrixPosition(arm.fore.matrixWorld);
+    const [up, low] = this.armLen[side] ?? [E.distanceTo(S), was.distanceTo(E)];
+    // (which way the forearm lies now: by a joint further down it, not by the hand, which is not on its end once the shoulder has been moved)
+    const lies = arm.tip ? _l.setFromMatrixPosition(arm.tip.matrixWorld).sub(E).normalize() : _l.copy(was).sub(E).normalize();
+    const S2 = _s2.copy(S);
+    if (o.shoulder) {
+      // (said in the eye's space, which is the space of `root`: how far that is in the world, and in the space of what the arm hangs on)
+      const by = _d.copy(o.shoulder).transformDirection(this.root.matrixWorld).multiplyScalar(o.shoulder.length() * _s.setFromMatrixScale(this.root.matrixWorld).x);
+      S2.add(by);
+      const rest = this.atRest.get(arm.upper);
+      const local = _e.copy(S2).applyMatrix4(_m1.copy(arm.upper.parent!.matrixWorld).invert());
+      // (a joint no movement moves stays where it is put: it is put from where it stands at rest, not from where it was put last frame)
+      if (rest && !this.tracked.has(`${arm.upper.name}.position`)) {
+        const at = _f.copy(rest.p).applyMatrix4(arm.upper.parent!.matrixWorld);
+        local.copy(at.add(by)).applyMatrix4(_m1);
+        S2.copy(at);
+      }
+      arm.upper.position.copy(local);
+      arm.upper.updateWorldMatrix(false, true);
+    }
+    const reach = _c.copy(to).sub(S2);
+    const d = THREE.MathUtils.clamp(reach.length(), Math.abs(up - low) + 1e-4, up + low - 1e-4);
+    reach.normalize();
+    const along = (up * up - low * low + d * d) / (2 * d), out = Math.sqrt(Math.max(0, up * up - along * along));
+    const pole = _d.copy(E).sub(S);
+    pole.addScaledVector(reach, -pole.dot(reach)).normalize();
+    const E2 = _e.copy(S2).addScaledVector(reach, along).addScaledVector(pole, out);
+    const turnBone = (bone: THREE.Object3D, by: THREE.Quaternion) => {
+      const world = bone.getWorldQuaternion(_q3), parent = bone.parent!.getWorldQuaternion(_q4);
+      bone.quaternion.copy(parent.invert()).multiply(by).multiply(world);
+      bone.updateWorldMatrix(false, true);
+    };
+    const q1 = _q5.setFromUnitVectors(_f.copy(E).sub(S).normalize(), _g2.copy(E2).sub(S2).normalize());
+    // (which way the forearm lies with only the upper arm turned)
+    const fore = lies.applyQuaternion(q1).normalize();
+    turnBone(arm.upper, q1);
+    const E3 = _b.setFromMatrixPosition(arm.fore.matrixWorld);
+    turnBone(arm.fore, _q5.setFromUnitVectors(fore, _g2.copy(S2).addScaledVector(reach, d).sub(E3).normalize()));
   }
 }
+
+const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3(), _p = new THREE.Vector3(), _s = new THREE.Vector3();
+const _s2 = new THREE.Vector3(), _l = new THREE.Vector3(), _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _d = new THREE.Vector3(), _e = new THREE.Vector3(), _f = new THREE.Vector3(), _g2 = new THREE.Vector3();
+const _m1 = new THREE.Matrix4(), _m2 = new THREE.Matrix4(), _g = new THREE.Matrix4(), _gi = new THREE.Matrix4(), _h = new THREE.Matrix4();
+const _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _q3 = new THREE.Quaternion(), _q4 = new THREE.Quaternion(), _q5 = new THREE.Quaternion();

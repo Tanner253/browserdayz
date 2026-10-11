@@ -202,6 +202,12 @@ export const TYPES: Record<string, TypeRule> = {
   radio: { at: [0, 1, 1, 0, 0], lifetime: 7200, restock: 2400, usage: ['Military'] },
   // fuel for the jeeps (src/sim/vehicles.ts): where there are sheds, yards and soldiers
   jerrycan: { at: [6, 5, 4, 1, 1], lifetime: 3600, restock: 600, usage: ['Farm', 'Industrial', 'Military', 'Village'] },
+  // (Said last, so that the dice fall for everything before it as they fell before it was there.)
+  // The submachine gun (2026-10-11): a 9 mm, and kept where the pistols are kept, a good deal seldomer: the police
+  // station and the army's places, and now and then in Kamenka. Its magazines with it. (Not under the gas, where
+  // every place is spoken for: there it is in the crates.)
+  mpa: { at: [0, 3, 3, 0, 0], lifetime: 7200, restock: 300, usage: ['Police', 'Military'], favour: ARMOURY, loaded: [5, 20], keep: SOON },
+  mag_mpa: { at: [0, 3, 3, 0, 0], lifetime: 7200, restock: 300, usage: ['Police', 'Military'], favour: ARMOURY, keep: SOON },
 };
 
 const STEPS: Tier[] = [1, 2, 3, 4, 5];

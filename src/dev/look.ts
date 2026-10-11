@@ -120,6 +120,28 @@ export function installLook(g: Game, T: { freeze(on?: boolean): void }) {
       return snap(name);
     },
     /**
+     * The hands' own scene from several sides at once, round a point said in the eye's space (metres: x right, y up,
+     * -z away): views are [round, up] in radians from the eye's own line. A fly on the wall of what the eye sees.
+     */
+    async vm(name: string, at: [number, number, number], views = VIEWS, dist = 0.5, fov = 30) {
+      vm.updateMatrixWorld(true);
+      const eye = g.s.r.vmCamera;
+      const q = eye.getWorldQuaternion(new THREE.Quaternion());
+      const p = new THREE.Vector3(...at).applyMatrix4(eye.matrixWorld);
+      sheet(views.length, (i, aspect) => {
+        const [az, el] = views[i];
+        cam.position.copy(p).add(new THREE.Vector3(Math.sin(az) * Math.cos(el) * dist, Math.sin(el) * dist, Math.cos(az) * Math.cos(el) * dist).applyQuaternion(q));
+        cam.up.set(0, 1, 0).applyQuaternion(q);
+        cam.lookAt(p);
+        cam.fov = fov;
+        cam.aspect = aspect;
+        cam.updateProjectionMatrix();
+        cam.updateMatrixWorld();
+        return vm;
+      });
+      return snap(name);
+    },
+    /**
      * Places in the world, several to a picture: each is [x, y, z of what is looked at, round, up, how far, field of view].
      * (Drawn straight, without the game's finishing: colours are flatter than in play.)
      */

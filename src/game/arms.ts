@@ -65,6 +65,14 @@ export interface Grips {
    * at a time.
    */
   work?: { bolt?: THREE.Vector3; feed?: THREE.Vector3; tube?: boolean };
+  /**
+   * How it is carried at a run by whoever is seen with it, where that is not how its kind is: where the gun's own
+   * origin sits from the point between the shoulders (x right, y up, z back) and how it is turned ([nose up, nose
+   * left, roll], radians). `free`: the other hand lets go of it then, and swings as the body runs.
+   */
+  carry?: { p: [number, number, number]; r: [number, number, number]; free?: boolean };
+  /** and how it is stood with and aimed, likewise (a long gun with no stock is not held with its butt in the shoulder) */
+  stand?: { ready: { p: [number, number, number]; r: [number, number, number] }; aim: { p: [number, number, number]; r: [number, number, number] } };
 }
 
 interface Arm {
