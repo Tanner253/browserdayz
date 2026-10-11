@@ -75,3 +75,22 @@ export function groundParts(parts: MeshPart[]): THREE.Box3 {
   for (const p of parts) p.geometry.applyMatrix4(t);
   return boundsOf(parts);
 }
+
+/**
+ * A thing that is put out of sight costs nothing while it is: three works out where every thing in a scene is on
+ * every frame, shown or not, piece by piece (a body is sixty-five joints; sixty-eight of the infected stood
+ * hidden about the map, and every thing lying in every house). This one, and everything under it, is left as it
+ * was for as long as it is hidden, and worked out again on the frame it is shown.
+ */
+export function restWhileHidden<T extends THREE.Object3D>(o: T): T {
+  const work = THREE.Object3D.prototype.updateMatrixWorld;
+  o.updateMatrixWorld = function (this: THREE.Object3D, force?: boolean) {
+    if (!this.visible) {
+      // (it is to be worked out whole when it is next shown, whatever has moved meanwhile)
+      this.matrixWorldNeedsUpdate = true;
+      return;
+    }
+    work.call(this, force);
+  };
+  return o;
+}

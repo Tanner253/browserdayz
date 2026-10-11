@@ -396,6 +396,10 @@ export async function processWeaponPack(id, cfg, { io, SRC, OUT, FORCE, exists, 
     // ---- the pack as it came: arms, gun and every movement, for the one holding it
     if (fp) {
       const whole = await io.read(gltfPath);
+      // (The pack's own drawing of its gun is left out where the game hangs the gun alone on the pack's joints
+      // instead, piece by piece: it was never drawn, and its pictures were fetched and unpacked all the same,
+      // some hundreds of megabytes of them.)
+      for (const name of cfg.fpDrop ?? []) named(whole, name)?.setMesh(null).setSkin(null);
       const all = countTris(whole);
       // (movements said by the names of the pack's own animations: joined into the one the game plays, and said as frames of it)
       const byName = Object.values(cfg.clips).some((c) => typeof c === 'string');

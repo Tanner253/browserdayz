@@ -1136,6 +1136,42 @@ export class Weapons {
    * @param o.gun the gun-alone model shown in them, if it is not the pack's own (its `base`, `slide` and `mag` ride on the pack's)
    */
   private sleeves: THREE.Material | null = null;
+  /** the same for the packs that came with arms of their own (the AK's and the submachine gun's: one pair) */
+  private sleevesOwn: THREE.Material | null = null;
+  /**
+   * What is in the hands is drawn with its pictures at the size they came (see Assets.sharpen): the gun with the
+   * arms that hold it, or the thing held. Everything else in the world is drawn with the world's own copies.
+   */
+  private sharpGun: { of: VmModel; as: string; drop: () => void } | null = null;
+  private warmed = '';
+  private sharpHeld: { of: THREE.Object3D; drop: () => void } | null = null;
+  private sharpenHands() {
+    // (What is carried to fight with, and the arms it is held in, are fetched ahead: so that the pictures are in
+    // the browser's keeping when the gun comes up, and only have to be unpacked.)
+    const carried = [this.inv.slots.primary, this.inv.slots.secondary, this.inv.slots.holster].map((it) => it?.id ?? '').join();
+    if (carried !== this.warmed) {
+      this.warmed = carried;
+      for (const id of carried.split(',')) {
+        if (!id) continue;
+        assets.warm(ITEMS[id].model);
+        assets.warm(this.models.get(id)?.rig ? (['mosin', 'benelli'].includes(id) ? 'sniper_fp' : 'ak_fp') : '');
+      }
+    }
+    const m = this.current;
+    // (and again when what is fitted to it changes: a part put on is fetched then, one taken off is let go of)
+    const as = this.currentItem ? `${this.currentItem.uid}|${fittedOf(this.currentItem).join()}` : '';
+    if ((this.sharpGun?.of ?? null) !== m || (m && this.sharpGun!.as !== as)) {
+      const was = this.sharpGun;
+      this.sharpGun = m ? { of: m, as, drop: assets.sharpen(m.root) } : null;
+      // (the new hold taken before the old is let go: what both want is never dropped between them)
+      was?.drop();
+    }
+    const h = this.held?.root ?? null;
+    if ((this.sharpHeld?.of ?? null) !== h) {
+      this.sharpHeld?.drop();
+      this.sharpHeld = h ? { of: h, drop: assets.sharpen(h) } : null;
+    }
+  }
   /** the lit mark of a holographic sight: one material, whichever gun it is on */
   private reticle: THREE.Material | null = null;
 
@@ -1155,8 +1191,13 @@ export class Weapons {
     // one pair of sleeves and gloves whatever is held: the first pack's (the packs are one maker's, on one pair of arms)
     const sleeves = rig.material(/arm/i);
     // (a pack by another maker has arms laid out its own way: another's sleeves are not painted on them)
-    if (o.ownArms) void sleeves;
-    else if (this.sleeves) rig.repaint(/arm/i, this.sleeves);
+    // (The AK's pack and the submachine gun's are one maker's on one pair of arms, painted with the very same
+    // pictures: every gun held in either is held in the one pair's paint, not each in a copy of it. Three pictures
+    // of four thousand pixels a side were on the card once for each pack.)
+    if (o.ownArms) {
+      if (this.sleevesOwn) rig.repaint(/arm/i, this.sleevesOwn);
+      else if (sleeves) this.sleevesOwn = sleeves;
+    } else if (this.sleeves) rig.repaint(/arm/i, this.sleeves);
     else if (sleeves) this.sleeves = sleeves;
     const aloneId = o.gun ?? o.pack;
     const holds = assets.manifest.models[aloneId].holds!;
@@ -2683,6 +2724,7 @@ export class Weapons {
     this.handLamp.position.set(0, 0, 0.45).applyQuaternion(camera.quaternion);
     this.handLamp.position.y += 1;
 
+    this.sharpenHands();
     // an item in use takes over the hands; whatever was held drops out of view
     // (down for as long as anything is in the hands: let up while the thing was still leaving, the gun was back
     // where it is held before it was shown again, and came into the picture in one frame)

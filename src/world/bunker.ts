@@ -338,6 +338,9 @@ function inMetres(mesh: THREE.Mesh): THREE.BufferGeometry {
 /** a place on the ground, to the nearest hand's breadth: what a thing standing there is known by */
 export const spotKey = (x: number, z: number) => `${Math.round(x * 10)}_${Math.round(z * 10)}`;
 
+/** how far from the bunker the eye may be, over the ground, for anything of it to be drawn: its house on the hill is seen from further than its rooms are long */
+const SEEN_FROM = 320;
+
 export class BunkerSite {
   /** where it stands: null in a world that has none (and then this does nothing) */
   readonly place: Place | null;
@@ -832,7 +835,14 @@ export class BunkerSite {
       }
     }
     scene.add(group);
+    this.all = group;
   }
+  /**
+   * Everything of it that is drawn. It is three hundred pieces under a hill, and from anywhere on the map that
+   * looked its way every one of them was made ready and sent to be drawn, to be hidden by the hill: it is drawn
+   * when the eye is near enough to its way in to see any of it.
+   */
+  private all: THREE.Group | null = null;
 
   /** The door: open, or shut. @param quiet it is found so (on joining), not seen and heard to move */
   setOpen(open: boolean, quiet = false) {
@@ -867,6 +877,7 @@ export class BunkerSite {
   update(dt: number, eye: THREE.Vector3, lit: (pos: THREE.Vector3, burn: number) => void) {
     const P = this.place;
     if (!P) return;
+    if (this.all) this.all.visible = Math.hypot(eye.x - P.x, eye.z - P.z) < SEEN_FROM;
     this.clock += dt;
     const d = this.door;
     if (d) {

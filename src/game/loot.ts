@@ -7,7 +7,7 @@ import type RAPIER from '@dimforge/rapier3d-compat';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { assets } from '../core/assets';
 import { physics, G_TRIGGER, groups, WORLD_GROUPS, SOLID_GROUPS } from '../core/physics';
-import { extractParts, groundParts, type MeshPart } from '../core/gltf-utils';
+import { extractParts, groundParts, restWhileHidden, type MeshPart } from '../core/gltf-utils';
 import { ITEMS, type ItemInstance, pieceShown } from '../sim/items';
 import { liftPack } from './rig';
 import { fitsPoint } from '../sim/placement';
@@ -20,7 +20,14 @@ import type { LootPoint } from '../world/buildings';
 export interface ItemTemplate {
   group: THREE.Group;
   size: THREE.Vector3;
+  /** when one of it was last near enough to be drawn, seconds of this game (see LootManager.update) */
+  seen?: number;
+  /** its pictures have been taken off the graphics card since: they go back on the next time one of it is drawn */
+  cold?: boolean;
 }
+
+/** seconds a sort of thing has to have been out of sight before its pictures are taken off the card */
+const COLD_AFTER = 15;
 
 const TRIGGER_GROUPS = groups(G_TRIGGER, 0xffff);
 const DOWN = { x: 0, y: -1, z: 0 };
@@ -87,9 +94,16 @@ export class ItemModels {
     if (!p) {
       p = this.build(id, mods);
       this.cache.set(key, p);
+      void p.then((tpl) => this.done.push(tpl), () => {});
     }
     return p;
   }
+
+  /** every model made so far */
+  made(): ItemTemplate[] {
+    return this.done;
+  }
+  private done: ItemTemplate[] = [];
 
   /** the model for a specific item: a scoped, wrapped rifle looks the part on the ground too */
   getFor(item: ItemInstance): Promise<ItemTemplate> {
@@ -125,6 +139,8 @@ export class ItemModels {
     if (def.paint !== undefined) {
       parts = parts.map((p) => {
         const m = (p.material as THREE.MeshStandardMaterial).clone();
+        // (its own picture, made here: not changed for the model's as it came when the thing is close)
+        delete m.userData.hi;
         if (m.map) m.map = whiteTo(m.map, def.paint!);
         return { ...p, material: m };
       });
@@ -170,6 +186,24 @@ export class ItemModels {
       }
       box = groundParts(parts);
     }
+    // The pieces of it that are painted with the one paint are made one piece: a box of rounds came as fifty-three
+    // (every round of it its own), a rifle as twenty-nine, and each piece is a thing for the card to be told of
+    // on every frame it is in sight, and again for every shadow it casts. (Pieces that cannot be made one, having
+    // different things said of their points, are left as they were.)
+    {
+      const by = new Map<THREE.Material, MeshPart[]>();
+      for (const p of parts) by.set(p.material, [...(by.get(p.material) ?? []), p]);
+      const made: MeshPart[] = [];
+      for (const [material, list] of by) {
+        // (they can be made one if the same things are said of every point of each, and each says its triangles the same way)
+        const said = (g: THREE.BufferGeometry) => `${!!g.index}|${Object.keys(g.attributes).sort().map((k) => `${k}${g.attributes[k].itemSize}${g.attributes[k].array.constructor.name}${g.attributes[k].normalized}`).join()}|${Object.keys(g.morphAttributes).length}`;
+        const alike = list.every((p) => said(p.geometry) === said(list[0].geometry));
+        const one = list.length > 1 && alike ? mergeGeometries(list.map((p) => p.geometry), false) : null;
+        if (one) made.push({ ...list[0], geometry: one, material });
+        else made.push(...list);
+      }
+      parts = made;
+    }
     const group = new THREE.Group();
     for (const p of parts) {
       const mesh = new THREE.Mesh(p.geometry, p.material);
@@ -191,7 +225,7 @@ export class WorldItem {
   collider: RAPIER.Collider;
   private meshes: THREE.Mesh[] = [];
   private shadows = true;
-  constructor(public loot: WorldLoot, tpl: ItemTemplate, scene: THREE.Scene, normal: THREE.Vector3 | null) {
+  constructor(public loot: WorldLoot, public tpl: ItemTemplate, scene: THREE.Scene, normal: THREE.Vector3 | null) {
     this.obj = tpl.group.clone();
     this.obj.position.set(loot.x, loot.y, loot.z);
     const q = new THREE.Quaternion().setFromAxisAngle(UP, loot.rot);
@@ -200,7 +234,11 @@ export class WorldItem {
     this.obj.quaternion.copy(q);
     this.obj.traverse((o) => {
       if ((o as THREE.Mesh).isMesh) this.meshes.push(o as THREE.Mesh);
+      // (it lies where it lies: where it is, is worked out when it is put there, and not again on every frame)
+      o.matrixAutoUpdate = false;
+      o.updateMatrix();
     });
+    restWhileHidden(this.obj);
     scene.add(this.obj);
     const hx = Math.max(0.08, tpl.size.x / 2 + 0.03);
     const hy = Math.max(0.06, tpl.size.y / 2 + 0.02);
@@ -223,6 +261,7 @@ export class WorldItem {
     this.toss = { from: from.clone(), to: this.obj.position.clone(), rest: this.obj.quaternion.clone(), spin: spin.multiply(this.obj.quaternion), t: 0 };
     this.obj.position.copy(from);
     this.obj.quaternion.copy(this.toss.spin);
+    this.obj.updateMatrix();
   }
 
   /** advance the fall; true once it has landed */
@@ -240,6 +279,7 @@ export class WorldItem {
       this.obj.quaternion.copy(a.rest);
       this.toss = null;
     }
+    this.obj.updateMatrix();
   }
 
   get flying() {
@@ -347,6 +387,8 @@ export class LootManager {
 
   constructor(private scene: THREE.Scene, atmo: Atmosphere, private points: LootPoint[]) {
     this.models = new ItemModels(atmo);
+    // (a thing repainted from its model's picture reads that picture when it is first made, whenever that is)
+    for (const d of Object.values(ITEMS)) if (d.paint !== undefined && !d.model.startsWith('@')) assets.keepPictures(d.model);
   }
 
   async preload() {
@@ -540,11 +582,38 @@ export class LootManager {
       w.update(dt);
       if (!w.flying) this.falling.delete(w);
     }
+    this.clock += dt;
     const s2 = this.shadowDist * this.shadowDist;
     for (const w of this.items.values()) {
       const d2 = (w.loot.x - cam.x) ** 2 + (w.loot.z - cam.z) ** 2;
-      w.obj.visible = d2 < 55 * 55;
+      const near = d2 < 55 * 55;
+      w.obj.visible = near;
       w.setShadows(d2 < s2);
+      if (near) {
+        w.tpl.seen = this.clock;
+        w.tpl.cold = false;
+      }
+    }
+    // What has not been near for a while has its pictures taken off the graphics card: every sort of thing a walk
+    // through a town had passed stayed there for good, a gigabyte of it by the far end of the street. They are
+    // kept by the page (they are small: see scripts/tiers.mjs), and go back on the next time one of it is drawn.
+    if (this.clock - this.swept > 3) {
+      this.swept = this.clock;
+      for (const p of this.models.made()) {
+        if (p.cold || this.clock - (p.seen ?? -COLD_AFTER) < COLD_AFTER) continue;
+        p.cold = true;
+        p.group.traverse((o) => {
+          const m = (o as THREE.Mesh).material as (THREE.MeshStandardMaterial & { userData: { hi?: unknown } }) | undefined;
+          if (!m || Array.isArray(m)) return;
+          for (const t of [m.map, m.normalMap, m.roughnessMap, m.metalnessMap, m.aoMap, m.emissiveMap]) {
+            // (only a picture the page still has, to put back: a big one is let go of once it is on the card, and is left there)
+            const img = t?.image as { width: number; height: number } | undefined;
+            if (t && img && img.width > 0 && Math.max(img.width, img.height) <= 1024) t.dispose();
+          }
+        });
+      }
     }
   }
+  private clock = 0;
+  private swept = 0;
 }

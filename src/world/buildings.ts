@@ -839,8 +839,15 @@ function containerLeaf(blue: boolean) {
 
 // ------------------------------------------------------------------ doors
 
+/** a door's two handles as one shape: one on each face of the leaf */
+const HANDLES = mergeGeometries([new THREE.BoxGeometry(0.12, 0.03, 0.05).translate(0, 0, 0.05), new THREE.BoxGeometry(0.12, 0.03, 0.05).translate(0, 0, -0.05)], false)!;
+/** how far off a door's handle is still drawn, metres: it is a finger's length of steel */
+const HANDLE_SEEN = 45;
+
 export class Door {
   pivot = new THREE.Group();
+  /** its handles (a door of the game's own making has them; a leaf out of a model is whatever it is) */
+  handle: THREE.Mesh | null = null;
   body: RAPIER.RigidBody;
   open = false;
   angle = 0;
@@ -871,11 +878,16 @@ export class Door {
       const panel = new THREE.Mesh(boxGeo(0, width - 0.02, 0, height - 0.02, -0.025, 0.025, 1.2, new THREE.Matrix4()), mat);
       panel.castShadow = panel.receiveShadow = true;
       panel.renderOrder = WALLS_FIRST;
-      const handle = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.03, 0.05), handleMat);
-      handle.position.set(width - 0.12, 1.0, 0.05);
-      const handle2 = handle.clone();
-      handle2.position.z = -0.05;
-      this.pivot.add(panel, handle, handle2);
+      // (its two handles, one each side, are one piece: each door was three things to draw, and there are 245 doors)
+      const handle = new THREE.Mesh(HANDLES, handleMat);
+      handle.position.set(width - 0.12, 1.0, 0);
+      this.handle = handle;
+      this.pivot.add(panel, handle);
+      // (the leaf and the handle do not move on the door: only the door does)
+      for (const m of [panel, handle]) {
+        m.matrixAutoUpdate = false;
+        m.updateMatrix();
+      }
     }
     const R = physics.R;
     this.body = physics.world.createRigidBody(
@@ -1949,6 +1961,8 @@ export class Buildings {
               t.needsUpdate = true;
             }
             mine.name = src.name;
+            // (which model's pictures these are, for when they are wanted at the size they came: see Assets.sharpen)
+            mine.userData.hi = src.userData.hi;
             this.atmo.register(mine);
             painted.set(was, mine);
           }
@@ -2010,8 +2024,14 @@ export class Buildings {
     return m;
   }
 
-  update(dt: number) {
+  private handlesT = 0;
+  update(dt: number, eye?: { x: number; z: number }) {
     for (const d of this.doors) d.update(dt);
+    // (a door's handle is drawn where it can be seen: from across the street it is less than a pixel, and it was one more thing to draw for every door in sight)
+    if (eye && (this.handlesT += dt) > 0.4) {
+      this.handlesT = 0;
+      for (const d of this.doors) if (d.handle) d.handle.visible = (d.pivot.position.x - eye.x) ** 2 + (d.pivot.position.z - eye.z) ** 2 < HANDLE_SEEN * HANDLE_SEEN;
+    }
   }
 }
 

@@ -8,6 +8,7 @@
 // leans with the aim pitch.
 
 import * as THREE from 'three';
+import { restWhileHidden } from '../core/gltf-utils';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import type { Atmosphere } from '../world/atmosphere';
 import { type Curl, bent, type Grips, type HandGrip } from './arms';
@@ -338,7 +339,7 @@ const SOLE_UNDER = new Map<string, number>();
 const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
 
 export class Avatar {
-  root = new THREE.Group();
+  root = restWhileHidden(new THREE.Group());
   /** first-person body (only built for the local player) */
   fpRoot = new THREE.Group();
   private mixer!: THREE.AnimationMixer;

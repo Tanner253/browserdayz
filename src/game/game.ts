@@ -48,6 +48,7 @@ import { WELL, stage, wellSpots, type Well } from '../sim/wells';
 import { Voice } from './voice';
 import { TIERS, type Tier } from '../sim/tiers';
 import { renderDoll, renderIcons } from '../ui/icons';
+import { Near } from './near';
 import { Perf } from '../core/perf';
 import { loadGraphics, type Graphics } from '../core/settings';
 import { Horde, Infected } from './infected';
@@ -262,6 +263,9 @@ export class Game {
   private dropHeld = 0;
   private dropDone = false;
   private focus: unknown = null;
+  private sharpFocus: { of: WorldItem; drop: () => void } | null = null;
+  /** houses, cars and the like painted with their own pictures when the eye is near them (see near.ts) */
+  private near!: Near;
   private openStash: Stash | null = null;
   private indoors = false;
   private inForest = false;
@@ -331,6 +335,7 @@ export class Game {
     this.hearths = new Hearths(this.fires.spots);
     progress('loading loot');
     this.loot = new LootManager(r.scene, atmo, buildings.lootPoints);
+    this.near = new Near(r.scene);
     await this.loot.preload();
     this.loot.onPlaced = (l) => this.lootPlaced(l);
     this.grenades = new Grenades(r.scene, this.loot.models);
@@ -3392,7 +3397,7 @@ export class Game {
       // A key press belongs to one simulation step, however many of them this frame needs:
       // seen by two, a single tap of C crouches and stands straight back up.
       input.consumeFixed();
-      buildings.update(h);
+      buildings.update(h, this.player.pos);
     });
     if (this.started) p.tickVitals(dt);
     this.gas.update(dt, this.s.r.camera.position, _gasHead.set(p.pos.x, p.pos.y + (p.crouched ? 1.0 : 1.6), p.pos.z), this.started && !p.dead);
@@ -3566,6 +3571,16 @@ export class Game {
     for (const d of this.drops.values()) if (d.at.distanceToSquared(cam.position) < 420 * 420) this.effects.signal(d.at, d.smoke, dt, !!d.wreck);
     this.effects.update(dt);
     this.loot.update(cam.position, dt);
+    this.near.update(cam.position, dt);
+    // (The thing looked at, close enough to pick up: its pictures at the size they came, as if it were in the
+    // hands already. Everything further off is drawn with the world's copies, which at that distance are more
+    // than the screen has pixels for.)
+    const close = this.focus instanceof WorldItem ? this.focus : null;
+    if ((this.sharpFocus?.of ?? null) !== close) {
+      const was = this.sharpFocus;
+      this.sharpFocus = close ? { of: close, drop: assets.sharpen(close.obj) } : null;
+      was?.drop();
+    }
 
     // world simulation ticks (the server does this when online)
     this.econT += dt;

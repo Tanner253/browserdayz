@@ -4,6 +4,7 @@
 // that everything that asks whether ground is open knows of them.
 
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { physics } from '../core/physics';
 import type { Atmosphere } from './atmosphere';
 import type { Solid, World } from './worldgen';
@@ -160,5 +161,31 @@ export function buildWorks(world: World, atmo: Atmosphere, scene: THREE.Scene) {
       physics.addStatic(physics.R.ColliderDesc.cylinder((s.h + 1) / 2, s.r), 'metal', { x: s.x, y: s.y + (s.h - 1) / 2, z: s.z });
     }
   });
+  // Its pieces of one paint are made one piece: there are sixty of them, none of them moves, and each was a thing
+  // to draw by itself from wherever on the map the works were looked toward.
+  {
+    const by = new Map<string, { m: THREE.Material; shadow: boolean; list: THREE.Mesh[] }>();
+    for (const c of [...group.children]) {
+      const mesh = c as THREE.Mesh;
+      if (!mesh.isMesh || Array.isArray(mesh.material) || mesh.children.length) continue;
+      const key = `${mesh.material.uuid}|${mesh.castShadow}|${!!mesh.geometry.index}|${Object.keys(mesh.geometry.attributes).sort().join()}`;
+      if (!by.has(key)) by.set(key, { m: mesh.material, shadow: mesh.castShadow, list: [] });
+      by.get(key)!.list.push(mesh);
+    }
+    for (const { m, shadow, list } of by.values()) {
+      if (list.length < 2) continue;
+      const one = mergeGeometries(list.map((mesh) => {
+        mesh.updateMatrix();
+        return mesh.geometry.clone().applyMatrix4(mesh.matrix);
+      }), false);
+      if (!one) continue;
+      for (const mesh of list) group.remove(mesh);
+      const all = new THREE.Mesh(one, m);
+      all.castShadow = shadow;
+      all.receiveShadow = true;
+      all.matrixAutoUpdate = false;
+      group.add(all);
+    }
+  }
   scene.add(group);
 }

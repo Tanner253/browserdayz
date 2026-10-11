@@ -224,10 +224,15 @@ export class Garage {
     this.parks().forEach((p, home) => this.standAlone(p, home));
   }
 
+  private parked: { x: number; y: number; z: number; yaw: number; k: number }[] | null = null;
   /** where every car stands when the world is new: the jeeps, and after them the police cars (as the server numbers them) */
   private parks() {
+    // (Worked out once. It is a search of the whole map, every tree and wall of it, and it was asked for by every
+    // car on every frame of a game played alone, once cars left under the gas were looked for: a hundred
+    // milliseconds a frame, 2026-10-11.)
+    if (this.parked) return this.parked;
     const jeeps = jeepSpots(this.h.world);
-    return [...jeeps.map((p) => ({ ...p, k: 0 })), ...policeSpots(this.h.world, jeeps).map((p) => ({ ...p, k: POLICE_CAR.kind }))];
+    return (this.parked = [...jeeps.map((p) => ({ ...p, k: 0 })), ...policeSpots(this.h.world, jeeps).map((p) => ({ ...p, k: POLICE_CAR.kind }))]);
   }
 
   private standAlone(p: { x: number; y: number; z: number; yaw: number; k: number }, home: number) {

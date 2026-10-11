@@ -244,6 +244,8 @@ class LodSet {
     for (const l of this.levels) {
       for (const m of l.meshes) {
         m.count = l.count;
+        // (a set with nothing in it draws nothing, and was still made ready to be drawn on every frame and for every shadow: a few hundred of them)
+        m.visible = l.count > 0;
         if (l.count) {
           m.instanceMatrix.clearUpdateRanges();
           m.instanceMatrix.addUpdateRange(0, l.count * 16);

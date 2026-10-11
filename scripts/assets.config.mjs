@@ -617,6 +617,8 @@ export const WEAPON_PACKS = {
     skinned: { mesh: ['Ak_ak74m', 'Mag_2_ak74m'], joints: { PBody_058: 'base', Rif_059: 'bolt', Safety_061: 'safety', Trigger_060: 'trigger', Pmag_062: 'mag', Pmag2_063: null }, rest: 'base' },
     eye: 'Head_Cam_014',
     wrists: { right: 'Hand_R_037', left: 'Hand_L_016' },
+    // (in the hands the gun alone is hung on these joints: the pack's own drawing of it, and of its second magazine, is not kept)
+    fpDrop: ['Object_97', 'Object_99'],
     origin: [0.3, 0.02, -0.03],
     fps: 30,
     clips: { idle: 'Rig|AK_Idle', draw: 'Rig|AK_Draw', fire: 'Rig|AK_Shot', reload: 'Rig|AK_Reload', reloadEmpty: 'Rig|AK_Reload_full', reloadOther: 'Rig|AK_Reload_var2', walk: 'Rig|AK_Walk', run: 'Rig|AK_Run' },
@@ -648,6 +650,8 @@ export const WEAPON_PACKS = {
     skinned: { mesh: ['LP SST30 Bottom Frame001'], joints: { PBody_058: 'base', Rif_059: 'bolt', Trigger_060: 'trigger', Pmag_061: 'mag', Pmag_2_062: null }, rest: 'base' },
     eye: 'Head_Cam_014',
     wrists: { right: 'Hand_R_00', left: 'Hand_L_016' },
+    // (as the AK's: the gun alone is hung on the joints, and the pack's own drawing of it is not kept)
+    fpDrop: ['Object_93', 'Object_94', 'Object_96'],
     origin: [0.08, 0.02, -0.03],
     fps: 30,
     clips: { idle: 'Rig|KDW_DPose_Idle', draw: 'Rig|KDW_Draw', fire: 'Rig|KDW_Shot', reload: 'Rig|KDW_Reload_fast', reloadEmpty: 'Rig|KDW_Reload_full', check: 'Rig|KDW_Ispect', walk: 'Rig|KDW_Walk', run: 'Rig|KDW_Run' },

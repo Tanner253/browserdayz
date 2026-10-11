@@ -12,6 +12,7 @@ import { NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { dedup, prune, weld, simplify, textureCompress, meshopt, getBounds, transformMesh } from '@gltf-transform/functions';
 import { MeshoptEncoder, MeshoptSimplifier } from 'meshoptimizer';
+import { tierModels } from './tiers.mjs';
 import sharp from 'sharp';
 import { HDRI, TEXTURES, MODELS, LOCAL_MODELS, WEAPON_PACKS } from './assets.config.mjs';
 import { processWeaponPack } from './weapon-packs.mjs';
@@ -400,6 +401,8 @@ const manifest = {
   textures: Object.fromEntries(texIds.map((id, i) => [id, texOut[i]])),
   models: { ...Object.fromEntries([...modelIds.map((id, i) => [id, modelOut[i]]), ...localIds.map((id, i) => [id, localOut[i]])]), ...packEntries },
 };
+// every small thing in two copies: one for the world, one as it came for the hands (see scripts/tiers.mjs)
+const tiers = await tierModels(manifest.models, { SRC, OUT });
 await fs.writeFile(path.join(OUT, 'manifest.json'), JSON.stringify(manifest, null, 1));
 
 credits.sort((a, b) => a.type.localeCompare(b.type) || a.id.localeCompare(b.id));
@@ -435,4 +438,4 @@ const md = [
 await fs.writeFile(path.join(ROOT, 'CREDITS.md'), md.join('\n'));
 
 const totalBytes = modelOut.reduce((s, m) => s + m.bytes, 0);
-console.log(`\ndone in ${((Date.now() - t0) / 1000).toFixed(0)}s — models ${(totalBytes / 1048576).toFixed(1)} MB`);
+console.log(`\ndone in ${((Date.now() - t0) / 1000).toFixed(0)}s — models ${(totalBytes / 1048576).toFixed(1)} MB; small things: ${(tiers.world / 1048576).toFixed(1)} MB as the world is drawn with them, ${(tiers.full / 1048576).toFixed(1)} MB as they came (${tiers.made} parted this time)`);
