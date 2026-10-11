@@ -43,6 +43,7 @@ import { HUD, type HandAct, type HotbarEntry } from '../ui/hud';
 import { BACK_SHORT } from '../ui/updates';
 import { InventoryUI } from '../ui/inventory-ui';
 import { Minimap } from '../ui/minimap';
+import { BigMap } from '../ui/bigmap';
 import { CALL, CRASH, DROP, describeSpot, fillCrash, fillDrop, pickDropSite, type DropInfo } from '../sim/drops';
 import { WELL, stage, wellSpots, type Well } from '../sim/wells';
 import { Voice } from './voice';
@@ -146,6 +147,8 @@ export class Game {
   economy!: Economy;
   hud!: HUD;
   minimap!: Minimap;
+  /** the map opened large (M): see src/ui/bigmap.ts */
+  map!: BigMap;
   invUI!: InventoryUI;
   dummies: Dummy[] = [];
   /** the infected (src/game/infected.ts) */
@@ -557,10 +560,10 @@ export class Game {
           this.hud.openChat();
         },
       });
-      // a tap on the map makes it big, another puts it back (M on a keyboard)
+      // a tap on the corner map opens the sheet (M on a keyboard); the sheet has its own way out
       this.minimap.root.addEventListener('pointerdown', (e) => {
         e.preventDefault();
-        if (inPlay() && !this.invUI.isOpen) this.minimap.toggle();
+        if (inPlay() && !this.invUI.isOpen) this.toggleMap(true);
       });
     }
     // Tapping (or clicking) a hotbar slot is the same as pressing its number. On a phone a tap
@@ -634,6 +637,10 @@ export class Game {
       }
       for (const w of wellSpots(world)) spots.push({ x: w.x, z: w.z, name: 'Well', tip: 'Drink your fill, and fill every bottle you carry.', kind: 'well' });
       this.hud.setMenuMap(this.minimap.poster(), WORLD_SIZE, spots, atmo.gas);
+      // (and the map opened in the game says the same of the same places)
+      this.map = new BigMap(world, buildings.lootPoints, spots, atmo.gas, () => this.minimap.live);
+      this.map.onClose = () => this.toggleMap(false);
+      document.getElementById('ui')!.appendChild(this.map.root);
     }
     this.menu = new MenuScenes({ world, atmo, scene: r.scene, effects: this.effects, held: (id, mods) => this.makeHeld(id, mods), wear: (body, ids) => this.wear(body, ids), filmReady: (film) => this.hud.filmReady(film) });
     void this.menu.load();
@@ -719,12 +726,13 @@ export class Game {
     this.input.onLockChange = (locked) => {
       if (locked) {
         if (this.started) this.unpause();
-      } else if (!this.invUI.isOpen && !this.player.dead && this.started) this.pause();
+      } else if (!this.invUI.isOpen && !this.map?.open && !this.player.dead && this.started) this.pause();
     };
     window.addEventListener('beforeunload', () => this.save());
     window.addEventListener('keydown', (e) => {
       if (e.code !== 'Escape') return;
       if (this.shop?.isOpen) this.shop.close();
+      else if (this.map?.open) this.toggleMap(false, true);
       else if (this.invUI?.isOpen) this.toggleInventory(false, true);
       // a second Escape, with the mouse still free, is the menu
       else if (this.awaitClick) {
@@ -2974,6 +2982,34 @@ export class Game {
     audio.ui('open');
   }
 
+  /**
+   * The map, opened large or put away. Open, the mouse is let go (the sheet is pointed at, brought nearer, dragged
+   * about) and nothing is fired or looked round at; the feet still go where the keys send them, as with the
+   * inventory open.
+   */
+  toggleMap(open?: boolean, byEscape = false) {
+    const want = open ?? !this.map.open;
+    if (want === this.map.open) return;
+    if (want) {
+      this.map.show(this.player.pos.x, this.player.pos.z);
+      this.input.uiMode = true;
+      this.input.unlock();
+      audio.ui('open');
+      return;
+    }
+    this.map.hide();
+    // (shut because the inventory was opened over it: the mouse stays free, for that)
+    if (this.invUI.isOpen || this.shop.isOpen) return;
+    this.input.uiMode = false;
+    if (byEscape && !this.input.touch) this.awaitClick = true;
+    else if (this.started && !this.paused) this.input.lock();
+    // if the browser refuses the re-capture, the next click on the game takes it (see awaitClick)
+    setTimeout(() => {
+      if (this.started && !this.paused && !this.invUI.isOpen && !this.shop.isOpen && !this.map.open && !this.input.locked && !this.player.dead) this.awaitClick = true;
+    }, 400);
+    audio.ui('close');
+  }
+
   toggleInventory(open?: boolean, byEscape = false) {
     const want = open ?? !this.invUI.isOpen;
     if (want === this.invUI.isOpen) return;
@@ -3297,9 +3333,9 @@ export class Game {
       this.dropDone = false;
     }
     // M: the map, large; any way out of play puts it away again
-    if (input.pressed('KeyM') && playing && !this.invUI.isOpen && !this.hud.chatOpen) this.minimap.toggle();
-    else if (this.minimap.big && (!playing || this.invUI.isOpen)) this.minimap.toggle(false);
-    const uiOpen = this.invUI.isOpen || this.shop.isOpen;
+    if (input.pressed('KeyM') && playing && !this.invUI.isOpen && !this.shop.isOpen && !this.hud.chatOpen) this.toggleMap();
+    else if (this.map.open && (!playing || this.invUI.isOpen || this.shop.isOpen)) this.toggleMap(false);
+    const uiOpen = this.invUI.isOpen || this.shop.isOpen || this.map.open;
     // Enter opens the chat box; while typing the character stands still and the gun stays quiet
     if (input.pressed('Enter') && playing && !uiOpen && !this.hud.chatOpen) {
       input.releaseAll();
@@ -3338,7 +3374,7 @@ export class Game {
         this.rideAt = now;
         this.setHold(null);
         this.glass = 0;
-        if (this.minimap.big) this.minimap.toggle(false);
+        if (this.map.open) this.toggleMap(false);
       }
     }
     this.weapons.stowed = !!this.hold || this.armsUntil > now || !!ride || !!this.glass;
@@ -3347,7 +3383,7 @@ export class Game {
 
     // (The legs are free while the inventory is open: it is walked about with, to see what lies near, as in DayZ.
     // What is nearby is read again as it changes: see `vicinityT`. The trader's counter is stood at.)
-    const canMove = (!uiOpen || (this.invUI.isOpen && !this.shop.isOpen)) && playing && !typing;
+    const canMove = (!uiOpen || ((this.invUI.isOpen || this.map.open) && !this.shop.isOpen)) && playing && !typing;
     const moveInput = canMove ? input : NULL_INPUT;
     // (are the hands empty: asked of what is in them, and every frame. It was asked five times a second, and of
     // which slot the inventory said was out, which is not the same thing when what was out has been dropped.)
@@ -3557,6 +3593,7 @@ export class Game {
     // (whoever walks off from the counter, or is killed at it, is done trading)
     if (this.shop.isOpen && (p.dead || !this.traders?.by(p.pos))) this.shop.close();
     this.minimap.update(interp.x, interp.z, p.yaw);
+    this.map.update(interp.x, interp.z, p.yaw);
     this.effects.eye.copy(cam.position);
     // the smoke over each supply drop (not from the far side of the map: nobody could see it)
     // (and over each place one has been called to, until it lands)

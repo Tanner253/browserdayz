@@ -1,7 +1,7 @@
 // A small map in the corner of the screen: the ground, the forest, the road, the buildings,
 // and an arrow for where you are and which way you face. North is up. Nobody else is on
 // it, with one exception: whoever carries a tag they took is shown to everyone for a few
-// seconds, every half minute (see ping). M opens it large, with the places named.
+// seconds, every half minute (see ping). M opens the sheet itself, large: that is another thing (bigmap.ts).
 
 import { BUILDING_FOOTPRINT, WORLD_RES, WORLD_SIZE, heightAt, playOutline, type World } from '../world/worldgen';
 import { gasZone, type GasZone } from '../sim/gas';
@@ -46,6 +46,11 @@ export class Minimap {
     this.root.insertAdjacentHTML('beforeend', '<b>N</b><span><kbd>M</kbd> map</span>');
     this.ctx = this.view.getContext('2d')!;
     this.resize();
+  }
+
+  /** what stands about the world now, as this map has been told it: the sheet opened large (bigmap.ts) shows the same */
+  get live() {
+    return { jeeps: this.jeeps, wells: this.wells, traders: this.traders, drops: this.drops, pings: this.pings };
   }
 
   /** the whole map as it was drawn once: for the menu's map sheet, which shows the same picture */

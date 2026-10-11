@@ -1602,3 +1602,50 @@ body.touch .hud-start, body.touch .rw, body.touch .inv-wrap, body.touch .inv-col
 body.touch .hud-voice { top: 34%; }
 /* (a thing in a place on the body or in the hands: the number of its key is not written over it, the keys are along the foot of the page) */
 .inv-item.in-slot .qkey { display: none; }
+
+/* ------------------------------------------------------------------------------------------------
+   The map, opened large (M): a printed sheet in a dark frame, with a bar along its top for what is
+   shown on it and how near it is, and a line along its foot that says what a tier is. */
+.hud-map { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; background: rgba(8, 10, 7, 0.78); pointer-events: auto; font-family: var(--font); }
+.hud-map[hidden] { display: none; }
+.hm-sheet { width: min(96vw, 1500px); height: min(92vh, 1000px); display: grid; grid-template-rows: auto 1fr auto; background: #15170f; border: 1px solid rgba(233, 228, 216, 0.28); box-shadow: 0 18px 60px rgba(0, 0, 0, 0.7); }
+.hm-bar { display: flex; align-items: center; gap: 14px; padding: 8px 10px 8px 14px; border-bottom: 1px solid rgba(233, 228, 216, 0.16); flex-wrap: wrap; }
+.hm-title { display: flex; align-items: baseline; gap: 12px; margin-right: auto; white-space: nowrap; }
+.hm-title b { font-size: 26px; font-weight: 700; letter-spacing: 0.28em; color: var(--ink); }
+.hm-title span { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.22em; color: var(--ink-faint); }
+.hm-tiers, .hm-show, .hm-zoom { display: flex; gap: 5px; }
+.hud-map button { font-family: var(--font); font-size: 15px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-dim); background: rgba(233, 228, 216, 0.05); border: 1px solid rgba(233, 228, 216, 0.2); padding: 5px 10px; cursor: pointer; white-space: nowrap; line-height: 1.2; }
+.hud-map button:hover { color: var(--ink); border-color: rgba(233, 228, 216, 0.5); }
+.hud-map button.on { color: var(--ink); background: rgba(233, 228, 216, 0.13); border-color: rgba(233, 228, 216, 0.55); }
+.hm-tiers button { display: flex; align-items: center; gap: 6px; }
+.hm-tiers button i { width: 10px; height: 10px; border-radius: 50%; background: var(--c); opacity: 0.3; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6); }
+.hm-tiers button.on { border-color: var(--c); }
+.hm-tiers button.on i { opacity: 1; }
+.hm-zoom button { min-width: 34px; padding: 5px 8px; font-size: 17px; }
+.hm-zoom button:last-child { font-size: 15px; }
+.hud-map .hm-x { font-size: 17px; padding: 5px 12px; color: #14110b; background: var(--accent); border-color: var(--accent); }
+.hud-map .hm-x:hover { color: #14110b; filter: brightness(1.12); }
+.hm-view { position: relative; min-height: 0; overflow: hidden; background: #15170f; }
+.hm-view canvas { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
+.hm-view canvas:active { cursor: grabbing; }
+.hm-tip { position: absolute; width: 280px; padding: 9px 12px 10px; background: rgba(14, 16, 12, 0.94); border: 1px solid rgba(233, 228, 216, 0.3); pointer-events: none; }
+.hm-tip b { display: block; font-size: 19px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink); }
+.hm-tip i { display: block; margin-top: 1px; font-style: normal; font-size: 13px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; }
+.hm-tip p { margin: 6px 0 0; font-size: 14.5px; line-height: 1.28; color: var(--ink-dim); }
+.hm-tip p.finds { color: var(--ink); }
+.hm-key { display: flex; align-items: baseline; gap: 12px; min-height: 34px; padding: 7px 14px 8px; border-top: 1px solid rgba(233, 228, 216, 0.16); font-size: 15px; line-height: 1.25; color: var(--ink-dim); }
+.hm-key b { font-size: 16px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; white-space: nowrap; }
+.hm-key em { font-style: normal; color: var(--ink); }
+body.touch .hm-sheet { width: 100vw; height: 100vh; border: 0; }
+body.touch .hm-bar { gap: 8px; padding: 6px calc(8px + env(safe-area-inset-right)) 6px calc(10px + env(safe-area-inset-left)); }
+body.touch .hm-title span { display: none; }
+body.touch .hm-title b { font-size: 19px; }
+body.touch .hud-map button { font-size: 13px; padding: 7px 9px; }
+body.touch .hm-key { font-size: 12.5px; min-height: 0; padding: 5px 12px 6px; max-height: 3.1em; overflow: hidden; }
+body.touch .hm-tip { width: 240px; }
+.hm-short { display: none; }
+body.touch .hm-long { display: none; }
+body.touch .hm-short { display: inline; }
+body.touch .hm-show [data-show="grid"] { display: none; }
+body.touch .hm-bar { flex-wrap: nowrap; }
+body.touch .hm-tiers, body.touch .hm-show, body.touch .hm-zoom { gap: 3px; }
