@@ -10,7 +10,7 @@ import type { Atmosphere } from '../world/atmosphere';
 import { F_AIM, F_BLEED, F_CROUCH, F_LIGHT, F_DANCE, F_DEAD, F_GROUND, F_GUARD, F_LEAN_L, F_LEAN_R, F_LIMP, F_PRONE, F_SIT, F_SURRENDER, type Act, type Pose } from '../net/protocol';
 import { SHOUT_RANGE, voiceOf, type Emote } from '../sim/emotes';
 import { ITEMS } from '../sim/items';
-import { Avatar } from './avatar';
+import { Avatar, type SeatPose } from './avatar';
 import { lookFor } from './look';
 import type { Damageable, HitZone } from './weapons';
 import type { Grips } from './arms';
@@ -58,7 +58,7 @@ export class RemotePlayer implements Damageable {
   /** leaning out, -1 (left) .. 1 (right) */
   lean = 0;
   /** sitting in a jeep: which one, and where in it their feet are (in the jeep's own frame) */
-  seat: { jeep: Jeep; at: [number, number, number] } | null = null;
+  seat: { jeep: Jeep; at: [number, number, number]; how: SeatPose | null } | null = null;
   private sat = false;
   /** lying down (their game says so in its flags): the body lies, and so does what of it can be hit */
   private lying = false;
@@ -312,7 +312,7 @@ export class RemotePlayer implements Damageable {
     }
     if (!!seat !== this.sat) {
       this.sat = !!seat;
-      this.avatar.setSeat(this.sat);
+      this.avatar.setSeat(this.sat, seat?.how);
       this.blocker.setEnabled(this.alive && !this.sat);
     }
 

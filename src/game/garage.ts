@@ -8,14 +8,14 @@ import { assets } from '../core/assets';
 import { audio, type EngineVoice } from '../core/audio';
 import type { Input, MoveInput } from '../core/input';
 import { physics, SOLID_GROUPS } from '../core/physics';
-import type { Atmosphere } from '../world/atmosphere';
+import type { Atmosphere, ShaderPatch } from '../world/atmosphere';
 import { WEAPON_RULES } from '../sim/combat';
 import { JEEP, POLICE_CAR, RIDE_HEIGHT, SEATS, crashDamage, jeepSpots, policeSpots, restState, type VehicleInfo, type VState } from '../sim/vehicles';
 import type { Net } from '../net/client';
 import { roadLift } from '../world/road';
 import type { World } from '../world/worldgen';
 import type { Terrain } from '../world/terrain';
-import type { Avatar } from './avatar';
+import { CAR_SIT, type Avatar, type SeatPose } from './avatar';
 import type { Effects } from './effects';
 import type { Player } from './player';
 import type { RemotePlayer } from './remote';
@@ -31,13 +31,25 @@ export const SEAT_AT: [number, number, number][] = [
   [-0.41, -0.34, 1.0],
   [0.41, -0.34, 1.0],
 ];
-/** and in the police car: lower, the floor a hand over the road, the back seat a little further back */
+/**
+ * And in the police car, by its own seats, which were measured in the game by lines cast at the model (2026-10-10,
+ * heights over the car's own middle, the road being 0.81 under it): the front cushion is at -0.35 from 0.35 ahead of
+ * the middle to 0.05 behind it, its back rising from there; the back cushion is at -0.22 from 0.6 to 1.05 behind,
+ * with a third of a metre of floor between it and the seat in front; the floor is at -0.56 and the roof's underside
+ * at 0.6. The library's sitting has its hips 0.54 over the body's own origin and 0.32 BEHIND it, and the top of its
+ * head 0.83 over its hips. So: in front the hips at -0.3 and at the middle of the car; behind, the hips at -0.2
+ * and 0.88 back, and the body slouched under the roof (CAR_SIT in avatar.ts, where each seat's way of sitting is).
+ * (Before this the origin was put where the hips should be: the driver sat a third of a metre behind the seat,
+ * through its back, and whoever sat behind had their head through the roof.)
+ */
 const SEAT_CAR: [number, number, number][] = [
-  [-0.4, -0.5, 0.12],
-  [0.4, -0.5, 0.12],
-  [-0.4, -0.5, 1.02],
-  [0.4, -0.5, 1.02],
+  [-0.4, -0.84, -0.32],
+  [0.4, -0.84, -0.32],
+  [-0.4, -0.74, 0.56],
+  [0.4, -0.74, 0.56],
 ];
+/** how whoever sits in each seat sits: as the library drew it on a jeep's bench (see CAR_SIT) */
+const SIT_OF: (SeatPose | null)[][] = [[null, null, null, null], [CAR_SIT.front, CAR_SIT.front, CAR_SIT.back, CAR_SIT.back]];
 /** the seats of each kind of car (the `k` of a VehicleInfo), and where its engine is, for the smoke */
 const SEATS_OF = [SEAT_AT, SEAT_CAR];
 const ENGINE_AT: [number, number, number][] = [[0, 0.5, -1.45], [0, 0.22, -1.9]];
@@ -125,7 +137,7 @@ export class Garage {
     } else if ((import.meta as { env?: { DEV?: boolean } }).env?.DEV) this.proto = standIn();
     this.ready = !!this.proto;
     if (this.ready && assets.manifest.models[POLICE_CAR.model]) {
-      const m = fromModel(await assets.model(POLICE_CAR.model));
+      const m = fromModel(await assets.model(POLICE_CAR.model), POLICE_CAR.kind);
       this.protoCar = m;
       DRIVE_CAR.radius = m.radius;
       DRIVE_CAR.track = m.track;
@@ -143,7 +155,9 @@ export class Garage {
       let mat = own.get(src);
       if (!mat) {
         mat = src.clone();
-        this.h.atmo.register(mat);
+        // (polished paint is given the sky to show: see skySheen)
+        if (src.userData.sheen) this.h.atmo.register(mat, skySheen, 'car-paint');
+        else this.h.atmo.register(mat);
         own.set(src, mat);
         const std = mat as THREE.MeshStandardMaterial;
         if (std.emissiveMap) {
@@ -249,7 +263,7 @@ export class Garage {
     for (const j of this.jeeps.values()) {
       for (const r of this.h.remotes.values()) {
         const k = j.seats.indexOf(r.id);
-        if (k >= 0) r.seat = { jeep: j, at: SEATS_OF[j.kind][k] };
+        if (k >= 0) r.seat = { jeep: j, at: SEATS_OF[j.kind][k], how: SIT_OF[j.kind][k] };
       }
     }
   }
@@ -264,13 +278,16 @@ export class Garage {
     // everybody else, into and out of their seats
     for (const r of this.h.remotes.values()) {
       const k = seats.indexOf(r.id);
-      if (k >= 0) r.seat = { jeep: j, at: SEATS_OF[j.kind][k] };
+      if (k >= 0) r.seat = { jeep: j, at: SEATS_OF[j.kind][k], how: SIT_OF[j.kind][k] };
       else if (r.seat?.jeep === j) r.seat = null;
     }
     const mine = online ? seats.indexOf(me) : this.ride?.jeep === j ? this.ride.seat : -1;
     if (mine >= 0 && this.ride?.jeep !== j) this.sit(j, mine);
     else if (mine < 0 && this.ride?.jeep === j) this.out(false);
-    else if (mine >= 0 && this.ride) this.ride.seat = mine;
+    else if (mine >= 0 && this.ride) {
+      this.ride.seat = mine;
+      this.h.avatar.setSeat(true, SIT_OF[j.kind][mine]);
+    }
     if (j.sim !== sim) {
       j.sim = sim;
       j.forget();
@@ -351,7 +368,7 @@ export class Garage {
     const p = this.h.player;
     this.ride = { jeep: j, seat };
     p.seat(true);
-    this.h.avatar.setSeat(true);
+    this.h.avatar.setSeat(true, SIT_OF[j.kind][seat]);
     // the view goes round behind it, looking the way it points
     this.lastYaw = j.yaw;
     p.yaw = j.yaw;
@@ -705,7 +722,76 @@ function standIn() {
  * about its own middle. Here the wheels are lifted out to be moved by the springs, the rest
  * is set down where the simulation's body is, and the wheels are measured.
  */
-function fromModel(scene: THREE.Group) {
+/**
+ * Polished paint shows the sky. What the engine itself gives a painted thing of the sky is four parts in a hundred
+ * of it, which on black paint is nothing to see: the car was a black hole in the shape of a car. So what a clear
+ * coat shows is said here: the sky by the way the surface throws the eye's line back (the ground's grey-green
+ * under the horizon, haze at it, blue overhead), a little of it seen square on and most of it at a glance along
+ * the surface, and as bright as the hour (uDaylight is the atmosphere's: see `register` there).
+ */
+const skySheen: ShaderPatch = (shader) => {
+  shader.fragmentShader = shader.fragmentShader.replace(
+    '#include <opaque_fragment>',
+    `{
+      vec3 zEye = normalize(vViewPosition);
+      vec3 zBack = inverseTransformDirection(reflect(-zEye, normal), viewMatrix);
+      float zGlance = 0.035 + 0.965 * pow(1.0 - saturate(dot(normal, zEye)), 5.0);
+      vec3 zSky = mix(vec3(0.34, 0.37, 0.31), vec3(0.74, 0.82, 0.92), smoothstep(-0.08, 0.22, zBack.y));
+      zSky = mix(zSky, vec3(0.28, 0.48, 0.86), smoothstep(0.22, 1.0, zBack.y));
+      outgoingLight += zSky * zGlance * 0.62 * uDaylight;
+    }
+    #include <opaque_fragment>`,
+  );
+};
+
+/**
+ * What the police car is made of, by the names its maker gave its surfaces. As it came it was drawn for a studio:
+ * its paint is bare metal polished to a mirror, which with black under it shows almost nothing; its tyres were metal as well; and its seats, its dashboard and its
+ * light bar were see-through, which the game took for glass and drew as a ghost of an inside. Here the paint is
+ * paint under a clear coat (it shows the sky: see skySheen), the tyres are rubber, the inside is solid, and the light bar is
+ * coloured plastic that is lit while somebody drives (its picture is its own lamp: see `lamps` in Garage.make).
+ */
+function dressPoliceCar(m: THREE.Mesh, mat: THREE.MeshStandardMaterial) {
+  const phys = mat as THREE.MeshPhysicalMaterial;
+  if (phys.isMeshPhysicalMaterial) phys.transmission = 0;
+  const solid = () => {
+    mat.transparent = false;
+    mat.opacity = 1;
+    mat.alphaTest = 0.5;
+    mat.depthWrite = true;
+    mat.metalness = 0;
+    mat.metalnessMap = null;
+    m.castShadow = true;
+    m.renderOrder = 0;
+  };
+  if (mat.name === 'body') {
+    // Its white is all of white in its picture (255 of 255), and all of white is the one colour the engine cannot
+    // light: its sum for what a surface throws back divides by nothing at exactly that, the answer is not a number,
+    // and the game's own guard against such answers paints the place black. That is what its doors and its roof
+    // were: black, with the letters on them showing lighter. A tenth off the white, and it is white paint.
+    mat.color.setScalar(0.9);
+    mat.metalness = 0;
+    mat.metalnessMap = null;
+    mat.roughness = 0.22;
+    mat.roughnessMap = null;
+    // (and it shows the sky: see `skySheen`, which Garage.make gives whatever is marked so)
+    mat.userData.sheen = 1;
+  } else if (mat.name === 'wheel') {
+    mat.metalness = 0.1;
+    mat.roughness = 0.82;
+  } else if (mat.name === 'interior') {
+    solid();
+    mat.roughness = 0.9;
+  } else if (mat.name === 'roof_light_bar') {
+    solid();
+    mat.roughness = 0.3;
+    mat.roughnessMap = null;
+    mat.emissiveMap = mat.map;
+    mat.emissive.set(0xffffff);
+  }
+}
+
+function fromModel(scene: THREE.Group, kind = 0) {
   const root = scene.clone(true);
   root.updateMatrixWorld(true);
   const box = new THREE.Box3(), at = new THREE.Vector3(), size = new THREE.Vector3();
@@ -743,10 +829,15 @@ function fromModel(scene: THREE.Group) {
       // sky is black (metal shows only what it reflects). Mostly paint, with a little of the sheen.
       mat.metalness = PAINT_METAL;
     }
+    if (kind === POLICE_CAR.kind) dressPoliceCar(m, mat);
   });
   for (const w of wheels) {
     w.traverse((o) => {
-      if ((o as THREE.Mesh).isMesh) o.castShadow = o.receiveShadow = true;
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) return;
+      m.castShadow = m.receiveShadow = true;
+      // (the wheels are taken off the body before its surfaces are gone through: theirs are seen to here)
+      if (kind === POLICE_CAR.kind) dressPoliceCar(m, m.material as THREE.MeshStandardMaterial);
     });
   }
   // (the simulation's body has its middle RIDE_HEIGHT above the ground it stands on)

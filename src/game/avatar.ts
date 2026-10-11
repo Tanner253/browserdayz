@@ -59,6 +59,23 @@ export type Hold = NonNullable<Emote['hold']>;
 export const PRONE = { back: 1.2, backOwn: 1.62, up: 0.1, chest: 0.2, head: 0.95, pivot: [0.1, -0.3] as [number, number], knee: 0.5 };
 /** sat on the ground: how far the hips come down from the chair the sitting was drawn on, and how nearly straight the legs are laid (set by looking) */
 export const SIT = { drop: 0.4, legs: 0.92 };
+/**
+ * Sat in a low car (the police car). The library's sitting is on a chair, which is a jeep's bench: upright, the
+ * shins straight down, the body a little forward. A car's seat is a hand over its floor and its roof is a head
+ * over the seat, so each seat says how it is sat in: `legs`, how nearly straight the knees (as for sitting on the
+ * ground, and for the same reason); `knees`, how far the thighs are lifted (radians); `back`, how far the body
+ * lies back from the waist, against the seat (radians). In front the legs go out under the dashboard to the
+ * pedals. Behind there is a third of a metre of floor and a roof lower than a sat body is tall: the knees are up,
+ * the feet under them, and the body lies back along the seat, which is laid back as far itself. Set, with the
+ * seats (SEAT_CAR in garage.ts), by measuring every point of the body's skin against the car: none under its
+ * floor, none through its roof.
+ */
+export interface SeatPose {
+  legs: number;
+  knees: number;
+  back: number;
+}
+export const CAR_SIT: { front: SeatPose; back: SeatPose } = { front: { legs: 0.85, knees: 0, back: 0.2 }, back: { legs: 0, knees: 0.43, back: 0.87 } };
 
 /**
  * Worn things that are drawn on the body. `p`, `r`, `s` place the item's model on the body
@@ -383,6 +400,8 @@ export class Avatar {
   /** in a seat, and how far into sitting the body has got */
   private seated = false;
   private seatT = 0;
+  /** how the seat sat in is sat in: as the library drew it on a bench at knee height (the jeep), or a low car's way (see CAR_SIT) */
+  private seatHow: SeatPose | null = null;
   private handsT = 0;
   private gearRest = new Map<string, { bone: THREE.Object3D; inv: THREE.Matrix4 }>();
   private gearObjs: THREE.Object3D[] = [];
@@ -1220,8 +1239,9 @@ export class Avatar {
   }
 
   /** Sitting in a jeep's seat (whoever seats it puts it there and turns it with the jeep: see Garage.seatBody). */
-  setSeat(on: boolean) {
+  setSeat(on: boolean, how: SeatPose | null = null) {
     this.seated = on;
+    if (on) this.seatHow = how;
   }
 
   /** Leaning out to one side: -1 all the way left, 1 all the way right, 0 upright. */
@@ -1506,7 +1526,21 @@ export class Avatar {
     // Sat on the ground. The library's sitting is on a chair: the legs are laid out straight in front instead of
     // going down to a floor that is not there, and the hips are let down to the ground (below, with the body's place).
     const onGround = this.groundT * (1 - down);
-    if (onGround > 0.001) for (const [knee, straight] of this.knees) knee.quaternion.slerp(straight, onGround * SIT.legs);
+    // (and in a low car, the same: see CAR_SIT)
+    const how = this.seatHow, inCar = how ? this.seatT * (1 - down) : 0;
+    const legs = Math.max(onGround * SIT.legs, inCar * (how?.legs ?? 0));
+    if (legs > 0.001) for (const [knee, straight] of this.knees) knee.quaternion.slerp(straight, legs);
+    if (how && inCar > 0.001) {
+      // (about the body's own line from side to side, wherever it has been turned: forward of it goes up, up goes back)
+      this.root.updateMatrixWorld(true);
+      _right.setFromMatrixColumn(this.root.matrixWorld, 0).normalize();
+      if (how.knees) for (const t of this.thighs) if (t) this.turn(t, _right, how.knees * inCar);
+      if (how.back) {
+        for (const b of this.spine) this.turn(b, _right, (how.back * inCar) / this.spine.length);
+        // (and the head comes up again most of the way: the eyes are on the road, not the roof)
+        for (const b of this.neck) this.turn(b, _right, (-how.back * 0.6 * inCar) / this.neck.length);
+      }
+    }
 
     // --- a blow with something in the fist, or one of the infected's: the library's drawing of one, laid over all that
     if (this.strikeT >= 0) {
