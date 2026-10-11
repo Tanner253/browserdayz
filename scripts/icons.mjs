@@ -1,0 +1,85 @@
+// Makes the inventory's pictures ahead of time. Every item is drawn from its own model by the game's own code
+// (src/ui/icons.ts), in a headless Chrome looking at the local game, and kept as one small file each:
+// public/assets/icons/<id>.webp, with a note of what each was made from (index.json).
+//
+// The game used to make them all when it started, which meant fetching the model of every item there is before
+// anybody could play. Now it reads these, and fetches a model when a thing of its kind is first near. A picture
+// whose item has changed since (another model, another dye, another shape in a pocket) is known by its note, and
+// the game makes that one itself until this is run again.
+//
+//   npm run icons        (the local game must be running: npm run dev)
+//   npm run icons -- http://localhost:5173/
+
+import { spawn } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import sharp from 'sharp';
+import WebSocket from 'ws';
+
+const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
+const OUT = path.join(ROOT, 'public', 'assets', 'icons');
+const address = process.argv[2] ?? 'http://localhost:5173/';
+const PORT = 9341;
+const CHROME = ['C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', '/usr/bin/google-chrome', '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'].find((p) => fs.existsSync(p));
+if (!CHROME) throw new Error('no Chrome or Edge found');
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'zona-icons-'));
+const chrome = spawn(CHROME, ['--headless=new', `--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`, '--enable-gpu', '--ignore-gpu-blocklist', '--use-angle=d3d11', '--mute-audio', '--window-size=480,270', 'about:blank'], { stdio: 'ignore' });
+const quit = () => { try { chrome.kill(); } catch { /* gone */ } };
+process.on('exit', quit);
+
+let target = null;
+for (let i = 0; i < 60 && !target; i++) {
+  await sleep(250);
+  try { target = (await (await fetch(`http://127.0.0.1:${PORT}/json/list`)).json()).find((t) => t.type === 'page'); } catch { /* not up yet */ }
+}
+if (!target) throw new Error('Chrome did not start');
+const ws = new WebSocket(target.webSocketDebuggerUrl, { maxPayload: 512 * 1024 * 1024 });
+await new Promise((res, rej) => { ws.once('open', res); ws.once('error', rej); });
+let seq = 0;
+const waiting = new Map();
+ws.on('message', (data) => {
+  const m = JSON.parse(String(data));
+  if (!m.id || !waiting.has(m.id)) return;
+  const [res, rej] = waiting.get(m.id);
+  waiting.delete(m.id);
+  if (m.error) rej(new Error(m.error.message)); else res(m.result);
+});
+const cdp = (method, params = {}) => new Promise((res, rej) => { const id = ++seq; waiting.set(id, [res, rej]); ws.send(JSON.stringify({ id, method, params })); });
+const run = async (expression) => {
+  const r = await cdp('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
+  if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description ?? r.exceptionDetails.text);
+  return r.result.value;
+};
+
+await cdp('Page.enable');
+await cdp('Runtime.enable');
+await cdp('Page.navigate', { url: address });
+let up = false;
+for (let i = 0; i < 480 && !up; i++) {
+  await sleep(500);
+  up = await run(`!!window.T && !!window.__game && !document.querySelector('#loading:not(.done)')`).catch(() => false);
+}
+if (!up) throw new Error(`the local game did not come up at ${address}: is it running? (npm run dev)`);
+const made = JSON.parse(await run(`(async () => JSON.stringify(await window.T.icons()))()`));
+ws.close();
+quit();
+
+fs.mkdirSync(OUT, { recursive: true });
+const index = {};
+let bytes = 0;
+for (const id of Object.keys(made).sort()) {
+  const { url, sig } = made[id];
+  const png = Buffer.from(url.split(',')[1], 'base64');
+  const webp = await sharp(png).webp({ quality: 90, alphaQuality: 100, effort: 6 }).toBuffer();
+  fs.writeFileSync(path.join(OUT, `${id}.webp`), webp);
+  index[id] = sig;
+  bytes += webp.length;
+}
+// (a picture of what is no longer an item goes)
+for (const f of fs.readdirSync(OUT)) if (f.endsWith('.webp') && !(f.slice(0, -5) in index)) fs.rmSync(path.join(OUT, f));
+fs.writeFileSync(path.join(OUT, 'index.json'), JSON.stringify(index, null, 1) + '\n');
+console.log(`${Object.keys(index).length} pictures, ${(bytes / 1024).toFixed(0)} KB in all, in public/assets/icons`);
+try { fs.rmSync(profile, { recursive: true, force: true }); } catch { /* Chrome still letting go */ }

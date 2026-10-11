@@ -158,6 +158,19 @@ export class Renderer {
     this.renderer.setRenderTarget(prev);
   }
 
+  /**
+   * A thing that has just come is got ready to be drawn in the world as it is lit now: its shaders are made, by
+   * the graphics card's own workers where it has them, and this is over when they are. The thing is put into the
+   * world after: its first frame then costs what any other does.
+   */
+  async ready(obj: THREE.Object3D) {
+    const prev = this.renderer.getRenderTarget();
+    this.renderer.setRenderTarget(this.composer.inputBuffer);
+    const made = this.renderer.compileAsync(obj, this.camera, this.scene);
+    this.renderer.setRenderTarget(prev);
+    await made;
+  }
+
   render(dt: number) {
     this.renderer.info.reset();
     this.composer.render(dt);

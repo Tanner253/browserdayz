@@ -252,6 +252,11 @@ export class Assets {
     return `${BASE}${rel}${v ? `?v=${v}` : ''}`;
   }
 
+  /** which version of a file this is, by what is in it ('' where the build did not say: then nothing made from it can be told to be current) */
+  stamp(rel: string) {
+    return this.versions[rel] ?? '';
+  }
+
   /** bytes that have come over the wire so far (whoever watches the loading asks: it is how a slow line is told from a dead one) */
   received = 0;
 

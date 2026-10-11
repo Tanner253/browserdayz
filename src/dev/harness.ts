@@ -99,6 +99,12 @@ export function installHarness(g: Game) {
     itemSizes() {
       return Object.fromEntries([...g.loot.models.sizes].map(([k, v]) => [k, [+v.x.toFixed(3), +v.y.toFixed(3), +v.z.toFixed(3)]]));
     },
+    /** every item's inventory picture, made here from its model, with what it was made from (scripts/icons.mjs keeps them as files) */
+    async icons() {
+      const { renderIcons, iconSig } = await import('../ui/icons');
+      const made = await renderIcons(g.s.r.renderer, g.loot.models, g.s.atmo.envMap);
+      return Object.fromEntries(Object.entries(made).map(([id, url]) => [id, { url, sig: iconSig(id) }]));
+    },
     /** give the player an item (testing) */
     give(id: string, qty?: number) {
       const it = makeItem(id, qty);
@@ -171,7 +177,13 @@ export function installHarness(g: Game) {
     },
     /** stand in front of a world item and look at it */
     async lookAtItem(id: string, dist = 1.4, nth = 0) {
-      const w = [...g.loot.items.values()].filter((i) => i.loot.item.id === id)[nth];
+      // (a thing far off is not made until the eye is near it: gone to first, where it lies)
+      const far = g.loot.lying().filter((l) => l.item.id === id)[nth];
+      if (far && !g.loot.items.has(far.uid)) {
+        T.tp(far.x + 2, far.z + 2);
+        await T.wait(1500);
+      }
+      const w = [...g.loot.items.values()].filter((i) => i.loot.item.id === id)[nth] ?? (far ? g.loot.items.get(far.uid) : undefined);
       if (!w) return null;
       const l = w.loot;
       const pt = l.point >= 0 ? g.s.buildings.lootPoints[l.point] : undefined;

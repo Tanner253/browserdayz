@@ -4,13 +4,38 @@
 import * as THREE from 'three';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { ITEMS } from '../sim/items';
+import { assets } from '../core/assets';
 import type { ItemModels } from '../game/loot';
 import { BEARD, HAIR_STYLES, loadCharacter, lookPatch, lookUniforms, setLookUniforms, suitPatch, type Look } from '../game/look';
 import { BODY_SCALE, GEAR, WORN } from '../game/avatar';
 
 const PX = 64; // pixels per grid cell
 
-export async function renderIcons(renderer: THREE.WebGLRenderer, models: ItemModels, env: THREE.Texture): Promise<Record<string, string>> {
+/** changed whenever the way a picture is made here changes: every picture kept from before is then made again (see `iconSig`) */
+const ICONS_REV = 1;
+
+/**
+ * What an item's picture is made from, in one word: how the game's list says it looks, and which version of its
+ * model's file that is. The picture kept on disk for it (public/assets/icons, made by `npm run icons`) is good for
+ * exactly as long as this is what it was made from: change the model, the dye or the shape of its place in a
+ * pocket and the game makes the picture itself, as it used to make all of them, until they are made again.
+ */
+export function iconSig(id: string): string {
+  const of = (d: (typeof ITEMS)[string] | undefined) => {
+    if (!d) return [];
+    const file = d.model.startsWith('@') ? '@' : assets.stamp(assets.manifest.models[d.model]?.url ?? '');
+    // (a file the build has no version for: nothing made from it can be told to be current)
+    return [d.model, file || Math.random(), d.node ?? '', d.nodeRe ?? '', d.tint ?? '', d.paint ?? '', d.scale ?? '', d.w, d.h, d.category, d.pile ?? '', !!d.mag, d.stack ? 1 : 0, d.weapon ? [d.weapon.mag ?? '', d.weapon.shows ?? '', (d.weapon as { hides?: unknown }).hides ?? '', d.weapon.never ?? ''] : ''];
+  };
+  const d = ITEMS[id];
+  const text = JSON.stringify([ICONS_REV, of(d), of(d.weapon?.mag ? ITEMS[d.weapon.mag] : undefined)]);
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619) >>> 0;
+  return h.toString(36);
+}
+
+/** @param only the items to make pictures of (all of them, where not said) */
+export async function renderIcons(renderer: THREE.WebGLRenderer, models: ItemModels, env: THREE.Texture, only?: string[]): Promise<Record<string, string>> {
   const out: Record<string, string> = {};
   const scene = new THREE.Scene();
   scene.environment = env;
@@ -31,6 +56,7 @@ export async function renderIcons(renderer: THREE.WebGLRenderer, models: ItemMod
   const used = new Set<THREE.Texture>(), copies: THREE.Material[] = [];
 
   for (const [id, def] of Object.entries(ITEMS)) {
+    if (only && !only.includes(id)) continue;
     // (a gun fed by a magazine is drawn with its own in it: without, it is a gun with a hole in it)
     const tpl = await models.get(id, def.weapon?.mag ? [def.weapon.mag] : []);
     const w = def.w * PX, h = def.h * PX;

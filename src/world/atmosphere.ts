@@ -124,6 +124,14 @@ export class Atmosphere {
     private camera: THREE.PerspectiveCamera,
   ) {}
 
+  /** what of the sky is sent for only once the game is up: the sharp picture of it (null: nothing, or it has been) */
+  private later: (() => void) | null = null;
+  /** The game is up: what was not worth making anybody wait for is sent for now. */
+  afterBoot() {
+    this.later?.();
+    this.later = null;
+  }
+
   async init() {
     const m = assets.manifest.hdri;
     const env = await assets.hdri(m.env);
@@ -139,11 +147,12 @@ export class Atmosphere {
 
     // The sky that is looked at is a file of twenty megabytes, a seventh of everything the game fetches before it
     // can be played, and nothing waits on it but the sky: the game starts under the small sky its light is taken
-    // from (soft, and the right colours), and the sharp one takes its place when it has come. On a quick line that
-    // is before the loading is over.
+    // from (soft, and the right colours), and the sharp one takes its place when it has come. It is not even
+    // sent for until the game is up (see `later`, and main.ts): asked for here, it came down beside everything
+    // the game does wait on, and took a sixth of the line from it.
     this.background = this.envMap;
     // (a phone the game has already failed to start on keeps the small sky: see LEAN)
-    if (!LEAN) void assets.hdri(m.background, false).then(
+    this.later = () => void assets.hdri(m.background, false).then(
       async (bg) => {
         // (A phone has it at half the size each way. Drawn, the sky is laid out as the six sides of a box, each as
         // tall as the picture: 270 MB on the card for the whole one, a quarter of everything a phone can be asked
@@ -161,6 +170,7 @@ export class Atmosphere {
       },
       () => {},
     );
+    if (LEAN) this.later = null;
 
     this.scene.environment = this.envMap;
     this.scene.environmentIntensity = 0.9;

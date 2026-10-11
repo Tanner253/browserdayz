@@ -161,8 +161,8 @@ export class HUD {
       <div class="hud-fatal"><div class="fatal-title">Disconnected</div><div class="fatal-sub"></div><button class="dead-btn fatal-btn">Reconnect</button></div>
       <div class="hud-dead"><div class="dead-title">You are dead</div><div class="dead-sub"></div><button class="dead-btn">Respawn</button><a class="dead-back" data-back><b>Back ZONA on X</b><span>Like, reply, repost. ${BACK_SHORT}</span></a></div>
       <div class="hud-start">
-        <video class="sm-film" muted playsinline preload="auto" src="/menu/map-pan.mp4"></video>
-        <video class="sm-film" muted playsinline preload="auto" src="/menu/armoury.mp4"></video>
+        <video class="sm-film" muted playsinline preload="none" data-src="/menu/map-pan.mp4"></video>
+        <video class="sm-film" muted playsinline preload="none" data-src="/menu/armoury.mp4"></video>
         <div class="sm-cut"></div>
         <header class="sm-top">
           <div class="sm-brand"><img src="/brand/zona-mark-plain.svg" alt=""><b>ZONA</b></div>
@@ -572,6 +572,21 @@ export class HUD {
           void reel.play().catch(() => {});
         } else reel.pause();
       } else if (on && Math.abs(reel.currentTime - at) > 0.4) reel.currentTime = at;
+    });
+  }
+
+  /**
+   * The menu's films are sent for: once the game is up, and not before. (Thirteen megabytes that nothing waits
+   * on: named in the page, they came down beside what the game does wait on. Until one has come the menu shows
+   * the scenes that are played live: see `filmReady`.)
+   */
+  fetchFilms() {
+    this.root.querySelectorAll<HTMLVideoElement>('.sm-film').forEach((reel) => {
+      const src = reel.dataset.src;
+      if (!src || reel.getAttribute('src')) return;
+      reel.preload = 'auto';
+      reel.src = src;
+      reel.load();
     });
   }
 

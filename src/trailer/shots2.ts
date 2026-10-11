@@ -380,7 +380,7 @@ export function buildShots(S: Stage): Shot[] {
   };
   /** one of these lying where the player's reach really lands on it, nearest the station's armoury first */
   const lootOf = (id: string) => {
-    const all = [...g.loot.items.values()].map((w: any) => w.loot).filter((l: any) => l.item.id === id) as { x: number; y: number; z: number; point: number }[];
+    const all = g.loot.lying().filter((l: any) => l.item.id === id) as { x: number; y: number; z: number; point: number }[];
     const tries: { l: (typeof all)[number]; px: number; pz: number; fy: number; kneel: boolean; score: number }[] = [];
     for (const l of all) {
       const pt = l.point >= 0 ? g.s.buildings.lootPoints[l.point] : null;

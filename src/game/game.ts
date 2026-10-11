@@ -48,7 +48,7 @@ import { CALL, CRASH, DROP, describeSpot, fillCrash, fillDrop, pickDropSite, typ
 import { WELL, stage, wellSpots, type Well } from '../sim/wells';
 import { Voice } from './voice';
 import { TIERS, type Tier } from '../sim/tiers';
-import { renderDoll, renderIcons } from '../ui/icons';
+import { iconSig, renderDoll, renderIcons } from '../ui/icons';
 import { Near } from './near';
 import { Perf } from '../core/perf';
 import { loadGraphics, type Graphics } from '../core/settings';
@@ -339,7 +339,9 @@ export class Game {
     progress('loading loot');
     this.loot = new LootManager(r.scene, atmo, buildings.lootPoints);
     this.near = new Near(r.scene);
-    await this.loot.preload();
+    // (no model of a thing is fetched here any more: each is, when a thing of its kind is first near. See LootManager.spawn.)
+    // (never waited on for long: a card that will not say its shaders are made is not what keeps a thing out of the world)
+    this.loot.models.onMade = (tpl) => Promise.race([r.ready(tpl.group), new Promise<void>((done) => setTimeout(done, 1500))]);
     this.loot.onPlaced = (l) => this.lootPlaced(l);
     this.grenades = new Grenades(r.scene, this.loot.models);
     await this.grenades.preload();
@@ -440,11 +442,11 @@ export class Game {
     };
     progress('compiling shaders');
     this.weapons.precompile((scene, camera) => r.precompile(scene, camera));
-    // every loot model's material, so entering a house never compiles mid-game
+    // (A loot model's materials are made ready when the model comes, off the frame: see ItemModels.onMade. They
+    // were all fetched and warmed here, before anybody could play.)
     const warm = new THREE.Group();
     for (const id of Object.keys(ITEMS)) {
-      warm.add((await this.loot.models.get(id)).group.clone());
-      // and every weapon as it looks in somebody's hands: the first armed player to walk
+      // every weapon as it looks in somebody's hands: the first armed player to walk
       // into view must not cost a frame
       const held = this.weapons.worldModel(id);
       if (held) warm.add(held);
@@ -456,7 +458,19 @@ export class Game {
     this.lamps.warm(() => r.precompile(r.scene, r.camera));
     r.scene.remove(warm);
     progress('rendering icons');
-    const icons = await renderIcons(r.renderer, this.loot.models, atmo.envMap);
+    // The pictures of things are kept from the build (public/assets/icons: `npm run icons`), one small file each,
+    // fetched when it is first shown. Any whose thing has changed since it was made is made here, as all were.
+    const keptIcons = (await fetch(assets.url('assets/icons/index.json')).then((res) => (res.ok ? res.json() : {})).catch(() => ({}))) as Record<string, string>;
+    const icons: Record<string, string> = {};
+    const stale: string[] = [];
+    for (const id of Object.keys(ITEMS)) {
+      if (keptIcons[id] && keptIcons[id] === iconSig(id)) icons[id] = assets.url(`assets/icons/${id}.webp`);
+      else stale.push(id);
+    }
+    if (stale.length) {
+      if (import.meta.env.DEV) console.info(`${stale.length} item pictures are not kept, or are of what has changed: made here (npm run icons makes them again): ${stale.slice(0, 12).join(', ')}${stale.length > 12 ? '…' : ''}`);
+      Object.assign(icons, await renderIcons(r.renderer, this.loot.models, atmo.envMap, stale));
+    }
     const doll = await renderDoll(r.renderer, atmo.envMap, lookFor(playerName()));
 
     this.hud = new HUD(icons);
@@ -645,7 +659,7 @@ export class Game {
       document.getElementById('ui')!.appendChild(this.map.root);
     }
     this.menu = new MenuScenes({ world, atmo, scene: r.scene, effects: this.effects, held: (id, mods) => this.makeHeld(id, mods), wear: (body, ids) => this.wear(body, ids), filmReady: (film) => this.hud.filmReady(film) });
-    void this.menu.load();
+    // (its cast is sent for when the game is up: see `afterBoot`)
     // The ground ends at the edge of the square, and there was nothing there to stop anybody walking or
     // driving off it. Four walls that cannot be seen, a few paces in from the edge: the wild country round
     // the map is all there to be walked, and nobody falls out of the world.
@@ -1844,6 +1858,17 @@ export class Game {
     cam.fov = 50;
     cam.updateProjectionMatrix();
     cam.updateMatrixWorld();
+  }
+
+  /**
+   * The game is up, and what nobody was made to wait for is sent for now: the sharp sky, the menu's two films and
+   * the cast of its scenes (three of the infected among them). Forty megabytes, a third of what used to come down
+   * before the menu was seen. Until each has come the menu has what it has: the soft sky, and the view from the air.
+   */
+  afterBoot() {
+    this.s.atmo.afterBoot();
+    this.hud.fetchFilms();
+    void this.menu.load();
   }
 
   start() {

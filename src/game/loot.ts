@@ -92,12 +92,24 @@ export class ItemModels {
     const key = mods.length ? `${id}+${[...mods].sort().join('+')}` : id;
     let p = this.cache.get(key);
     if (!p) {
-      p = this.build(id, mods);
+      // (made, and then got ready to be drawn before anybody is handed it: see `onMade`)
+      p = this.build(id, mods).then(async (tpl) => {
+        await this.onMade(tpl).catch(() => {});
+        return tpl;
+      });
       this.cache.set(key, p);
       void p.then((tpl) => this.done.push(tpl), () => {});
     }
     return p;
   }
+
+  /**
+   * A model has just been made, and is not yet anybody's: what has to be done before it is first drawn is done
+   * here (the game has its shaders made, off the frame). Every item's model used to be fetched and warmed before
+   * the game could be played; now each is fetched when a thing of its kind is first near, and this is what keeps
+   * the first sight of it from costing a frame.
+   */
+  onMade: (tpl: ItemTemplate) => Promise<void> = async () => {};
 
   /** every model made so far */
   made(): ItemTemplate[] {
@@ -375,6 +387,9 @@ export class Stash {
   }
 }
 
+/** how near the eye a thing lying in the world is made, metres: well beyond the 55 at which it is first drawn, so that it is there by then */
+const MAKE_WITHIN = 90;
+
 export class LootManager {
   items = new Map<string, WorldItem>();
   stashes: Stash[] = [];
@@ -391,8 +406,19 @@ export class LootManager {
     for (const d of Object.values(ITEMS)) if (d.paint !== undefined && !d.model.startsWith('@')) assets.keepPictures(d.model);
   }
 
-  async preload() {
-    await Promise.all(Object.keys(ITEMS).map((id) => this.models.get(id)));
+  /**
+   * Things that lie too far off to be seen, waiting to be made. A thing is drawn within 55 m of the eye. Its
+   * model is sent for, and it is laid on its place, when the eye first comes within MAKE_WITHIN of it: the models
+   * of everything lying anywhere on the map (twenty-four megabytes of them) used to be fetched before the game
+   * could be played, most of them for things at the far end of it.
+   */
+  private waiting = new Map<string, WorldLoot>();
+  private eye: THREE.Vector3 | null = null;
+  private looked = 0;
+
+  /** every thing lying in the world, made or not (what looks for one of a kind anywhere on the map asks this) */
+  lying(): WorldLoot[] {
+    return [...[...this.items.values()].map((w) => w.loot), ...this.waiting.values()];
   }
 
   /** where each item about to appear was let go of (uid -> hand position): it falls from there */
@@ -405,6 +431,13 @@ export class LootManager {
   lift: (x: number, z: number) => number = () => 0;
 
   spawn(l: WorldLoot) {
+    // (what a hand has just let go of is made at once, and so is anything near; the rest waits for the eye)
+    const e = this.eye;
+    if (this.hands.has(l.uid) || (e && (l.x - e.x) ** 2 + (l.z - e.z) ** 2 < MAKE_WITHIN * MAKE_WITHIN)) this.make(l);
+    else this.waiting.set(l.uid, l);
+  }
+
+  private make(l: WorldLoot) {
     this.pending.add(l.uid);
     void this.models.getFor(l.item).then((tpl) => {
       if (!this.pending.has(l.uid)) return; // despawned before the model loaded
@@ -532,6 +565,7 @@ export class LootManager {
   }
 
   despawn(l: WorldLoot) {
+    this.waiting.delete(l.uid);
     this.pending.delete(l.uid);
     const w = this.items.get(l.uid);
     if (w) {
@@ -583,6 +617,17 @@ export class LootManager {
       if (!w.flying) this.falling.delete(w);
     }
     this.clock += dt;
+    // what the eye has come near enough to is made (looked for four times a second: there are a thousand and more)
+    const first = !this.eye;
+    (this.eye ??= new THREE.Vector3()).copy(cam);
+    if (first || this.clock - this.looked > 0.25) {
+      this.looked = this.clock;
+      for (const l of this.waiting.values()) {
+        if ((l.x - cam.x) ** 2 + (l.z - cam.z) ** 2 >= MAKE_WITHIN * MAKE_WITHIN) continue;
+        this.waiting.delete(l.uid);
+        this.make(l);
+      }
+    }
     const s2 = this.shadowDist * this.shadowDist;
     for (const w of this.items.values()) {
       const d2 = (w.loot.x - cam.x) ** 2 + (w.loot.z - cam.z) ** 2;

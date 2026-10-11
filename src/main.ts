@@ -158,6 +158,7 @@ async function boot() {
   (window as unknown as Record<string, unknown>).__game = game;
   if (import.meta.env.DEV) (await import('./dev/harness')).installHarness(game);
   game.start();
+  game.afterBoot();
   B.done = true;
   B.stage = 'up';
   bootDone();
