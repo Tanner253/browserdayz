@@ -100,6 +100,20 @@ const FIT: Record<string, { dot?: { at: [number, number, number]; size: number }
   // (the big pistol: under its barrel, ahead of the guard, as on the other two)
   deagle: { light: { at: [0.185, 0, 0.0035], size: 0.62 } },
 };
+/**
+ * A gun looked over (I) that has no such movement drawn in its pack: how long it takes, when in that it is turned
+ * from its one side to the other (a share of the whole), how long each turn takes, how far it is brought before the
+ * eye (metres: right, up, toward), and how it is turned for each side (radians: muzzle up, muzzle to the left, top
+ * to the left).
+ */
+const LOOK_OVER = {
+  dur: 2.6, turn: 0.46, ease: 0.42,
+  long: { at: [-0.035, 0.03, 0.02], first: [0.16, 0.36, -0.3], second: [0.2, -0.1, 0.42] },
+  // (The AK's pack, which the AR-15 is held in too. Its sleeves end not far below the picture: turned top to the
+  // right at all, the end of the left one came up into it. So it is only ever turned top to the left: a little, with
+  // the muzzle up and across, and then well over.)
+  auto: { at: [-0.02, 0, -0.03], first: [0.1, 0.17, 0.16], second: [0.08, -0.05, 0.36] },
+};
 /** the pieces of a gun that come from another model, and what has to be fitted for each to be there */
 const EXTRA: Record<string, string> = { suppressor: 'suppressor_9', red_dot: 'red_dot', gun_light: 'gun_light' };
 
@@ -848,6 +862,10 @@ export class Weapons {
    * its own, and the eye is laid along the top of it. The mark on the screen stays, to say
    * where that is.
    */
+  /** Has this gun's pack a drawing of it being looked over? (Those that carry a walk of their own: the submachine gun's pack and the pistols held in its hands.) */
+  private checkDrawn(m: VmModel) {
+    return !!m.gait && !!m.rig?.has('check');
+  }
   /** Is there a light on the gun in the hands? */
   get hasLamp(): boolean {
     return !!this.current?.lamp && hasMod(this.currentItem, 'gun_light');
@@ -2004,10 +2022,13 @@ export class Weapons {
         }
         if (input.pressed('KeyR') && !this.action) this.reload(m, item);
         // looked over, where its pack has that drawn: the trigger, the sights or a reload ends it
-        // (the pistols and the submachine gun for now: the sniper's pack has such a movement too, which nobody has yet looked at with the shotgun in its hands)
-        if (input.pressed('KeyI') && !this.action && m.gait && m.rig?.has('check') && !this.aiming && this.sprintT < 0.2) {
-          this.start('check', m.rig.seconds('check'));
-          this.onAct('check', m.rig.seconds('check'));
+        // (The pistols and the submachine gun have it drawn. The rifles and the shotgun have not: what the sniper's
+        // pack calls by that name is the rifle put away and brought up again. Those are turned over in the hands
+        // instead, one side and then the other: see LOOK_OVER. 2026-10-11, asked for the sniper and the shotgun.)
+        if (input.pressed('KeyI') && !this.action && !this.aiming && this.sprintT < 0.2) {
+          const dur = this.checkDrawn(m) ? m.rig!.seconds('check') : LOOK_OVER.dur;
+          this.start('check', dur);
+          this.onAct('check', dur);
         }
         if (this.action?.name === 'check' && (input.pressed('Mouse0') || input.held('Mouse2') || input.pressed('KeyR') || this.sprintT > 0.5)) {
           this.action = null;
@@ -2858,6 +2879,18 @@ export class Weapons {
     // actions
     const a = this.action;
     if (m.rig) this.poseRig(m, dt);
+    // looked over, with no drawing of it: the gun is brought up before the eye and turned, its near side and then its top
+    if (a?.name === 'check' && !this.checkDrawn(m)) {
+      const L = LOOK_OVER, s = THREE.MathUtils.smoothstep, half = a.dur * L.turn, how = m.kind === 'auto' ? L.auto : L.long;
+      const first = s(a.t, 0, L.ease) * (1 - s(a.t, half, half + L.ease));
+      const second = s(a.t, half, half + L.ease) * (1 - s(a.t, a.dur - L.ease, a.dur));
+      pos.x += how.at[0] * (first + second);
+      pos.y += how.at[1] * (first + second);
+      pos.z += how.at[2] * (first + second);
+      rot.x += how.first[0] * first + how.second[0] * second;
+      rot.y += how.first[1] * first + how.second[1] * second;
+      rot.z += how.first[2] * first + how.second[2] * second;
+    }
     // (a pack with no drawing of its coming up is lifted into the picture the way a still model is)
     if (a && (!m.rig || ((a.name === 'equip' || a.name === 'unequip') && !m.rig.has('holster') && !m.rig.has('draw')))) {
       const k = Math.min(1, a.t / a.dur);
@@ -3016,7 +3049,7 @@ export class Weapons {
         // (run dry, its slide is back until the hand has worked it, late in the movement)
         if (a.data?.empty && m.slideOn) rig.slide(m.slideOn, -SLIDE_LOCK * (1 - THREE.MathUtils.smoothstep(k, 0.7, 0.76)));
       }
-      else if (a.name === 'check' && rig.has('check')) rig.pose('check', k);
+      else if (a.name === 'check' && this.checkDrawn(m)) rig.pose('check', k);
       else rig.rest();
       if (m.slideOn && this.chamberEmpty && a.name !== 'magswap') rig.slide(m.slideOn, -SLIDE_LOCK);
       this.reseat(m);
