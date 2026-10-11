@@ -54,16 +54,37 @@ export async function renderIcons(renderer: THREE.WebGLRenderer, models: ItemMod
     const iconLandscape = def.w >= def.h;
     const modelLong = size.x >= size.z ? 'x' : 'z';
     const upright = size.y > Math.max(size.x, size.z) * 1.2;
-    if (upright && iconLandscape && def.w > def.h) pivot.rotation.z = Math.PI / 2;
-    if (!upright && !iconLandscape) pivot.rotation.x = Math.PI / 2;
-    if (modelLong === 'z' && !upright) pivot.rotation.y = Math.PI / 2;
-    pivot.rotation.y += 0.35;
-    // something as flat as a dog tag is looked at from above, or it is only a sliver
-    const flat = size.y < Math.min(size.x, size.z) * 0.1;
-    pivot.rotation.x += upright ? 0.15 : flat ? 1.15 : 0.55;
+    // What is worn stands as it is worn, whatever the shape of its place in a pocket: a vest three cells wide and
+    // two tall was laid on its side to fill them, and was a vest on its side in the vest's own slot.
+    const worn = def.category === 'clothing';
+    if (def.mag) {
+      // A magazine stands on its end, the end that goes into the gun uppermost, its broad side to the eye, whatever
+      // the shape of its place in a pocket. It lies on its side in the world, and by the rules below was drawn on
+      // its side, on its head, or across a tall picture, one magazine one way and the next another. Its longest
+      // side is stood up, its thinnest turned to the eye. (As they are laid in the world the top of every one of
+      // them is toward the low end of the axis it lies along: that end is put uppermost. Looked at, 2026-10-10: the
+      // round in each is at the top.)
+      const dims: [number, 'x' | 'y' | 'z'][] = [[size.x, 'x'], [size.y, 'y'], [size.z, 'z']];
+      dims.sort((p, q) => q[0] - p[0]);
+      const unit = { x: new THREE.Vector3(1, 0, 0), y: new THREE.Vector3(0, 1, 0), z: new THREE.Vector3(0, 0, 1) };
+      const up = unit[dims[0][1]].clone().multiplyScalar(dims[0][1] === 'y' ? 1 : -1), side = unit[dims[1][1]].clone();
+      const out = new THREE.Vector3().crossVectors(side, up);
+      // (what takes the model's own axes to the picture's: the inverse of the frame made of where each is to go)
+      pivot.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(side, up, out).invert());
+    } else {
+      if (upright && iconLandscape && def.w > def.h && !worn) pivot.rotation.z = Math.PI / 2;
+      if (!upright && !iconLandscape) pivot.rotation.x = Math.PI / 2;
+      if (modelLong === 'z' && !upright) pivot.rotation.y = Math.PI / 2;
+      pivot.rotation.y += 0.35;
+      // something as flat as a dog tag is looked at from above, or it is only a sliver
+      const flat = size.y < Math.min(size.x, size.z) * 0.1;
+      pivot.rotation.x += upright ? 0.15 : flat ? 1.15 : 0.55;
+    }
     // (in a frame of its own, which is what is turned if the turns above left it across the picture)
     const frame = new THREE.Group();
     frame.add(pivot);
+    // (a magazine is looked at a little from one side and a little from above, as a thing stood on a table is)
+    if (def.mag) frame.rotation.set(0.12, 0.45, 0);
     scene.add(frame);
     frame.updateMatrixWorld(true);
     let b2 = new THREE.Box3().setFromObject(frame);
@@ -72,7 +93,7 @@ export async function renderIcons(renderer: THREE.WebGLRenderer, models: ItemMod
     // bat comes lying along x and is six cells tall: it was drawn across the middle of its
     // picture, a hair's width of it, and looked like no picture at all.)
     const across = s2.x > s2.y * 1.3, along = s2.y > s2.x * 1.3;
-    if ((across && h > w) || (along && w > h)) {
+    if (!def.mag && ((across && h > w) || (along && w > h && !worn))) {
       frame.rotation.z = across ? Math.PI / 2 : -Math.PI / 2;
       frame.updateMatrixWorld(true);
       b2 = new THREE.Box3().setFromObject(frame);
