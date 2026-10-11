@@ -330,3 +330,136 @@ export function hospitalPlan(): Blueprint {
     usage: ['Medic'],
   };
 }
+
+// ------------------------------------------------------------------------------------------------ the police headquarters
+
+const grille = (a: number, b: number, bottom = 0.2, top = 2.2): Opening => ({ a, b, bottom, top, kind: 'grille' });
+
+/**
+ * Two floors and a roof, at the edge of the village. Below: the hall the public comes into, with the duty desk;
+ * the charge room to the west of it and the duty room to the east; behind them, down a passage, three cells with
+ * barred fronts, the stair, the lockers and the evidence store. Above: the detectives' room and the chief's across
+ * the front; the armoury behind its barred hatch, the radio room, a kitchen and the files across the back. On the
+ * roof, the mast, and a place somebody kept watch from.
+ */
+export function policeHqPlan(): Blueprint {
+  const PW = 11, PD = 6.5;
+  const x0 = -PW + 0.2, x1 = PW - 0.2, z0 = -PD + 0.2, z1 = PD - 0.2;
+  // the passage's two walls (their middles), and the faces of them the rooms see
+  const pf = 0.7, pb = -1.2, rf = 0.8, rb = -1.3;
+  const well = { x0: -1.5, x1: 1.5, land: -2.7, far: z0 };
+
+  // ---------------------------------------------------------------- below
+  const g = new Floor();
+  // the hall: the desk, and where people waited
+  g.top('hospital_desk', 0.8, 2.3, PI, 0.78, 2).put('hospital_pc', 1.4, 2.2, PI, 0.76).put('SchoolChair_01', 0.8, 1.5, 0).top('hospital_bench', -3.14, 4.4, Q, 0.46).put('hospital_bench', 2.3, 5.96, PI).put('extinguisher_box', -3.34, 1.6, Q, 1.05).put('water_cooler', -3.1, 5.9, Q);
+  g.floor([-1.4, 4.6], [2.6, 3.6]);
+  // the charge room
+  g.top('metal_office_desk', -7.0, 4.7, PI, 0.81, 2).put('SchoolChair_01', -7.0, 3.85, 0).top('hospital_bench', -10.46, 2.6, Q, 0.46).shelves(-4.06, 2.3, -Q).top('painted_wooden_cabinet', -9.9, 5.97, PI, 1.2).case('Shelf_01', -4.86, 5.96, PI, [0.66, 1.22]);
+  g.floor([-8.6, 2.0], [-5.6, 3.0]);
+  // the duty room
+  g.top('metal_office_desk', 6.0, 3.1, PI, 0.81, 2).put('SchoolChair_01', 6.0, 2.25, 0).top('metal_office_desk', 9.2, 4.6, -Q, 0.81, 2).put('SchoolChair_01', 8.35, 4.6, Q).case('wooden_bookshelf_worn', 10.48, 1.8, -Q, [0.67, 1.28]);
+  g.top('painted_wooden_cabinet', 7.6, 5.97, PI, 1.2).put('Television_01', 7.2, 5.95, PI + 0.2, 1.18).put('weapons_case', 4.5, 5.6, 0.1).floor([5.0, 4.6], [9.6, 2.2]);
+  // the cells
+  g.bed(-10.3, -4.7, 0).bed(-7.2, -4.7, 0, false).bed(-4.1, -4.7, 0).put('painted_wooden_chair_01', -2.4, -5.4, 2.4).floor([-9.2, -2.6], [-6.0, -3.4], [-2.6, -3.0]);
+  // the lockers
+  g.put('med_cabinet', 5.92, -2.3, -Q).put('med_cabinet', 5.92, -3.6, -Q).top('hospital_bench', 3.5, -3.7, 0, 0.46).case('Shelf_01', 1.86, -4.4, Q, [0.38, 0.94, 1.51]).floor([3.0, -2.2], [4.2, -5.4]);
+  // the evidence store
+  g.shelves(7.2, -6.02, 0).shelves(8.4, -6.02, 0, [0, 1, 2, 3]).shelves(9.6, -6.02, 0).shelves(10.52, -2.7, -Q, [1, 2]).put('weapons_case', 7.4, -2.0, 0.2).put('cardboard_box_01', 10.2, -4.6, 0.4).put('cardboard_box_01', 9.7, -4.9, 1.2).floor([8.6, -3.6]);
+  // the passage
+  g.put('extinguisher_box', 5.2, -1.04, 0, 1.05).floor([-6.4, -0.2], [7.0, -0.3]);
+
+  const below: WallDef[] = [
+    { side: 'front', ext: 'brick_ext', int: 'int_painted', openings: [win(-9.4, -8.0), win(-6.6, -5.2), win(-2.9, -1.7, 0.9, 2.2), door(-0.6, 0.6, 2.2), win(1.7, 2.9, 0.9, 2.2), win(5.2, 6.6), win(8.0, 9.4)] },
+    { side: 'back', ext: 'brick_ext', int: 'cell_wall', openings: [win(-9.7, -9.1, 1.9, 2.3), win(-6.6, -6.0, 1.9, 2.3), win(-3.5, -2.9, 1.9, 2.3), win(-0.6, 0.6, 2.1, 2.8), win(3.6, 4.6, 1.5, 2.1), door(5.0, 5.9)] },
+    { side: 'left', ext: 'brick_ext', int: 'int_painted', openings: [win(2.6, 4.0)] },
+    { side: 'right', ext: 'brick_ext', int: 'int_painted', openings: [win(2.6, 4.0)] },
+    // the passage: its front wall, and its back wall with the bars of the cells in it
+    inner([x0, pf], [x1, pf], [door(-7.6, -6.6), door(-2.9, -1.9), door(6.6, 7.6)], 'office_wall'),
+    inner([x0, pb], [x1, pb], [door(-10.5, -9.6), grille(-9.4, -8.1), door(-7.4, -6.5), grille(-6.3, -5.0), door(-4.3, -3.4), grille(-3.2, -1.9), gap(-1.3, 1.3, 2.3), door(3.4, 4.4), door(7.6, 8.6)], 'int_painted', 'cell_wall'),
+    // the two sides of the hall: a hatch in the one the duty room is behind
+    inner([-3.6, rf], [-3.6, z1], [], 'int_painted', 'office_wall'),
+    inner([3.6, rf], [3.6, z1], [win(2.4, 4.4, 1.05, 2.0)], 'office_wall', 'int_painted'),
+    // between the cells, round the stair, between the lockers and the store
+    inner([-7.8, z0], [-7.8, rb], [], 'cell_wall', 'cell_wall'),
+    inner([-4.7, z0], [-4.7, rb], [], 'cell_wall', 'cell_wall'),
+    inner([-1.6, z0], [-1.6, rb], [], 'int_painted', 'cell_wall'),
+    inner([1.6, z0], [1.6, rb], [], 'office_wall'),
+    inner([6.3, z0], [6.3, rb], [], 'int_plaster', 'office_wall'),
+  ];
+
+  // ---------------------------------------------------------------- above
+  const u = new Floor();
+  // the detectives: five desks
+  for (const x of [-8.6, -5.4, -2.2]) u.top('metal_office_desk', x, 4.9, PI, 0.81, x === -5.4 ? 2 : 1).put('SchoolChair_01', x, 4.05, 0);
+  for (const x of [-7.0, -3.8]) u.top('metal_office_desk', x, 1.9, 0, 0.81, x === -7.0 ? 2 : 1).put('SchoolChair_01', x, 2.75, PI);
+  u.put('hospital_pc', -5.0, 4.9, PI, 0.8).case('wooden_bookshelf_worn', -10.48, 2.0, Q, [0.67, 1.28]).case('Shelf_01', 1.86, 4.6, -Q, [0.66, 1.22]).floor([-0.4, 3.0], [-9.6, 3.4]);
+  // the chief
+  u.top('metal_office_desk', 6.6, 3.7, 0, 0.81, 2).put('SchoolChair_01', 6.6, 4.6, PI).put('painted_wooden_chair_01', 6.1, 2.5, 0.2).put('painted_wooden_chair_01', 7.3, 2.4, -0.3);
+  u.case('wooden_bookshelf_worn', 10.48, 2.0, -Q, [0.67, 1.28]).case('wooden_bookshelf_worn', 10.48, 3.5, -Q, [0.39, 0.96]).top('painted_wooden_cabinet', 9.4, 5.97, PI, 1.2).put('weapons_case', 2.9, 5.7, Q).put('water_cooler', 2.5, 1.2, Q).floor([4.4, 5.0], [9.0, 4.6]);
+  // the armoury: what the hatch was for
+  u.shelves(-10.2, -6.02, 0, [0, 1, 2, 3]).shelves(-9.0, -6.02, 0).shelves(-7.8, -6.02, 0, [0, 1, 2, 3]).shelves(-6.6, -6.02, 0).put('weapons_case', -9.9, -3.5, 0.1).put('weapons_case', -8.3, -3.3, -0.2).put('weapons_case', -6.3, -3.8, Q);
+  u.top('lab_counter', -7.5, -1.72, 0, 0.9, 2).floor([-9.4, -4.8], [-7.2, -4.6], [-6.0, -2.6]);
+  // the radio room
+  u.put('bunker_terminal', -3.5, -5.62, 0).top('metal_office_desk', -3.3, -2.5, PI, 0.81, 2).put('SchoolChair_01', -3.3, -3.35, 0).case('Shelf_01', -5.0, -4.2, Q, [0.66, 1.22]).floor([-2.4, -4.4]);
+  // where they ate
+  u.top('electric_stove', 2.1, -5.95, 0, 0.88).top('painted_wooden_cabinet', 3.1, -5.97, 0, 1.2).top('WoodenTable_01', 4.4, -3.4, 0, 0.57, 2).put('painted_wooden_chair_01', 4.0, -2.7, PI).put('painted_wooden_chair_01', 4.9, -4.1, 0).floor([2.6, -3.0]);
+  // the files
+  u.case('wooden_bookshelf_worn', 6.52, -3.0, Q, [0.67, 1.28]).case('wooden_bookshelf_worn', 6.52, -4.5, Q, [0.39]).shelves(8.6, -6.02, 0, [0, 2]).shelves(9.8, -6.02, 0, [1, 3]).put('cardboard_box_01', 10.2, -2.2, 0.5).put('cardboard_box_01', 9.6, -2.0, 1.3).floor([8.6, -3.6]);
+  u.put('extinguisher_box', -5.6, 0.54, PI, 1.05).floor([-8.0, -0.2], [5.6, -0.3]);
+
+  const above: WallDef[] = [
+    { side: 'front', ext: 'brick_ext', int: 'office_wall', openings: [win(-9.4, -8.0), win(-6.6, -5.2), win(-3.6, -2.2), win(-0.7, 0.7), win(3.8, 5.2), win(6.6, 8.0), win(8.8, 10.2)] },
+    { side: 'back', ext: 'brick_ext', int: 'int_painted', openings: [win(-9.0, -8.4, 1.9, 2.3), win(-4.0, -3.0, 1.5, 2.1), win(-0.6, 0.6, 2.1, 2.8), win(3.4, 4.6), win(8.2, 9.2, 1.5, 2.1)] },
+    { side: 'left', ext: 'brick_ext', int: 'office_wall', openings: [win(2.6, 4.0)] },
+    { side: 'right', ext: 'brick_ext', int: 'office_wall', openings: [win(2.6, 4.0)] },
+    inner([x0, pf], [x1, pf], [door(-6.0, -5.0), door(5.4, 6.4)], 'office_wall'),
+    inner([x0, pb], [x1, pb], [door(-9.9, -9.0), grille(-8.7, -6.3, 1.0, 2.0), door(-4.2, -3.2), gap(-1.3, 1.3, 2.3), door(3.0, 4.0), door(7.8, 8.8)], 'int_painted', 'int_painted'),
+    inner([2.1, rf], [2.1, z1], [], 'office_wall', 'office_wall'),
+    inner([-5.3, z0], [-5.3, rb], [], 'int_plaster', 'int_painted'),
+    inner([-1.6, z0], [-1.6, rb], [], 'int_painted'),
+    inner([1.6, z0], [1.6, rb], [], 'office_wall'),
+    inner([6.1, z0], [6.1, rb], [], 'office_wall', 'office_wall'),
+  ];
+
+  // ---------------------------------------------------------------- the roof
+  const r = new Floor();
+  r.put('concrete_road_barrier', -9.4, 5.75, 0).put('concrete_road_barrier', -10.05, 4.4, Q).put('wooden_military_crate', -8.0, 4.6, 0.3).put('painted_wooden_chair_01', -9.0, 4.3, 2.2).floor([-8.8, 5.0], [-7.4, 3.6], [6.0, 2.0], [3.0, -4.0]);
+  const roof: Deck = {
+    parapet: 1.1, h: 2.5,
+    walls: [
+      { side: 'inner', from: [-1.7, pb], to: [1.7, pb], ext: 'brick_ext', int: 'int_painted', openings: [door(-0.5, 0.5)] },
+      { side: 'inner', from: [-1.6, z0], to: [-1.6, rb], ext: 'brick_ext', int: 'int_painted', openings: [] },
+      { side: 'inner', from: [1.6, rb], to: [1.6, z0], ext: 'brick_ext', int: 'int_painted', openings: [] },
+    ],
+    roofs: [{ x0: -1.7, x1: 1.7, z0: -PD, z1: -1.1 }],
+    boxes: [
+      { key: 'brick_ext', x0: -1.7, x1: 1.7, y0: 1.17, y1: 2.5, z0: -PD, z1: z0 },
+      // the mast, on a block, and its two arms
+      { key: 'concrete', x0: 6.6, x1: 7.4, y0: 0, y1: 0.25, z0: -4.9, z1: -4.1 },
+      { key: 'steel', x0: 6.95, x1: 7.05, y0: 0.25, y1: 8.5, z0: -4.55, z1: -4.45 },
+      { key: 'steel', x0: 6.3, x1: 7.7, y0: 6.6, y1: 6.64, z0: -4.52, z1: -4.48, soft: true },
+      { key: 'steel', x0: 6.5, x1: 7.5, y0: 7.6, y1: 7.64, z0: -4.52, z1: -4.48, soft: true },
+      // the coolers, and two shafts
+      { key: 'concrete', x0: 3.4, x1: 6.0, y0: 0, y1: 0.12, z0: 3.4, z1: 4.6 },
+      { key: 'steel', x0: 3.6, x1: 4.6, y0: 0.12, y1: 0.95, z0: 3.6, z1: 4.4 },
+      { key: 'steel', x0: 4.9, x1: 5.9, y0: 0.12, y1: 0.95, z0: 3.6, z1: 4.4 },
+      ...[[-5.0, -4.6], [8.6, 1.0]].flatMap(([x, z]) => [
+        { key: 'concrete' as const, x0: x - 0.5, x1: x + 0.5, y0: 0, y1: 0.9, z0: z - 0.4, z1: z + 0.4 },
+        { key: 'roof_iron' as const, x0: x - 0.65, x1: x + 0.65, y0: 0.9, y1: 0.97, z0: z - 0.55, z1: z + 0.55, soft: true },
+      ]),
+    ],
+    furniture: r.furniture,
+    loot: r.loot,
+    usage: ['Police', 'Military'],
+  };
+
+  return {
+    w: PW * 2, d: PD * 2, h: 3.0, ext: 'brick_ext', int: 'int_painted', floor: 'floor_lino', roof: 'concrete', roofType: 'flat',
+    walls: below, furniture: g.furniture, loot: g.loot,
+    levels: [{ h: 3.0, int: 'office_wall', floor: 'floor_wood', walls: above, furniture: u.furniture, loot: u.loot }],
+    wells: [well], deck: roof,
+    sign: { x: 0, y: 2.62, text: 'ПОЛИЦИЯ', sub: 'POLICE' },
+    usage: ['Police'],
+  };
+}

@@ -238,8 +238,9 @@ export function policeSpots(world: World, taken: { x: number; z: number }[] = []
     return !world.trees.some((t) => Math.hypot(t.x - x, t.z - z) < 3.2) && !world.rocks.some((t) => Math.hypot(t.x - x, t.z - z) < 3.2) && !world.props.some((t) => Math.hypot(t.x - x, t.z - z) < 3.4);
   };
   for (const b of world.buildings) {
-    if (b.type !== 'police') continue;
-    const [w, d] = BUILDING_FOOTPRINT.police, c = Math.cos(b.rot), s = Math.sin(b.rot);
+    // (the stations, in the order they were built; and the headquarters, built after them all)
+    if (b.type !== 'police' && b.type !== 'police_hq') continue;
+    const [w, d] = BUILDING_FOOTPRINT[b.type], c = Math.cos(b.rot), s = Math.sin(b.rot);
     // (beside it first, then before its door, then behind: [to its right, toward its front])
     for (const [right, fwd] of [[w / 2 + 3.6, 1], [-(w / 2 + 3.6), 1], [w / 2 + 3.6, d / 2 + 2.5], [-(w / 2 + 3.6), d / 2 + 2.5], [3, d / 2 + 6], [-3, d / 2 + 6], [w / 2 + 6.5, -2], [-(w / 2 + 6.5), -2], [0, -(d / 2 + 5.5)], [w / 2 + 9, 3], [-(w / 2 + 9), 3]]) {
       const x = b.x + right * c + fwd * s, z = b.z - right * s + fwd * c;

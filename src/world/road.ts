@@ -34,6 +34,13 @@ export function buildRoad(world: World, atmo: Atmosphere, scene: THREE.Scene) {
   const pts = road.points;
   const n = pts.length / 3;
   const W = road.width - 0.6;
+  // A side street's asphalt begins under the edge of the road's (see the village's streets in worldgen): it lies a
+  // finger's breadth lower, so that where the two overlap they are not two faces in one plane. And it does not stop
+  // dead at its far end: its last metres break up into the gravel, as its edges do.
+  const side = !!(road as { side?: boolean }).side;
+  const lift = side ? ROAD_LIFT - 0.014 : ROAD_LIFT;
+  let whole = 0;
+  for (let i = 1; i < n; i++) whole += Math.hypot(pts[i * 3] - pts[i * 3 - 3], pts[i * 3 + 2] - pts[i * 3 - 1]);
   const ACROSS = 6;
   const TILE = 5;
   const pos: number[] = [];
@@ -51,9 +58,9 @@ export function buildRoad(world: World, atmo: Atmosphere, scene: THREE.Scene) {
     for (let k = 0; k <= ACROSS; k++) {
       const s = k / ACROSS - 0.5;
       const px = x + nx * s * W, pz = z + nz * s * W;
-      pos.push(px, heightAt(world.heights, px, pz) + ROAD_LIFT, pz);
+      pos.push(px, heightAt(world.heights, px, pz) + lift, pz);
       uv.push((s + 0.5) * (W / TILE), along / TILE);
-      edge.push(Math.abs(s) * 2);
+      edge.push(side ? Math.max(Math.abs(s) * 2, 1 - (whole - along) / 4.5) : Math.abs(s) * 2);
     }
     if (i < n - 1) {
       for (let k = 0; k < ACROSS; k++) {

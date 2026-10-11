@@ -102,7 +102,7 @@ export class Minimap {
     g.lineJoin = g.lineCap = 'round';
     for (const road of [world.road, ...world.roads]) {
     const pts = road.points;
-    for (const [w, col] of [[world.road.width + 3, 'rgba(20, 20, 18, 0.55)'], [world.road.width, '#9a9486']] as [number, string][]) {
+    for (const [w, col] of [[road.width + 3, 'rgba(20, 20, 18, 0.55)'], [road.width, '#9a9486']] as [number, string][]) {
       g.strokeStyle = col;
       g.lineWidth = w * SCALE;
       g.beginPath();
@@ -121,7 +121,7 @@ export class Minimap {
       g.rotate(-b.rot);
       g.fillStyle = 'rgba(0, 0, 0, 0.5)';
       g.fillRect((-w / 2 - 1) * SCALE, (-d / 2 - 1) * SCALE, (w + 2) * SCALE, (d + 2) * SCALE);
-      g.fillStyle = b.type === 'police' ? '#6f9bd6' : b.type === 'guardpost' || b.type === 'barracks' || b.type === 'tower' ? '#b9a26a' : b.type === 'clinic' ? '#d99a92' : '#d6c9a8';
+      g.fillStyle = b.type === 'police' || b.type === 'police_hq' ? '#6f9bd6' : b.type === 'guardpost' || b.type === 'barracks' || b.type === 'tower' ? '#b9a26a' : b.type === 'clinic' || b.type === 'hospital' ? '#d99a92' : '#d6c9a8';
       g.fillRect((-w / 2) * SCALE, (-d / 2) * SCALE, w * SCALE, d * SCALE);
       g.restore();
     }

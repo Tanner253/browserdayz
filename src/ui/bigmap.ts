@@ -46,7 +46,7 @@ const onPaper = (t: Tier) => (t === 1 ? '#8d846c' : TIERS[t].colour);
 /** what a kind of building is called */
 const CALLED: Record<string, string> = {
   house_small: 'House', house_brick: 'Brick house', house_two: 'Two-floor house', townhouse: 'Brick townhouse', shanty: 'Plank house', cabin: 'Cabin', hut: 'Long hut',
-  barn: 'Barn', shed: 'Shed', garage: 'Workshop', store: 'Shop', clinic: 'Clinic', police: 'Police station', barracks: 'Barracks', guardpost: 'Guard post', tower: 'Watchtower', tent: 'Army tent',
+  barn: 'Barn', shed: 'Shed', garage: 'Workshop', store: 'Shop', clinic: 'Clinic', police: 'Police station', police_hq: 'Police headquarters', hospital: 'Hospital', barracks: 'Barracks', guardpost: 'Guard post', tower: 'Watchtower', tent: 'Army tent',
 };
 /** the kinds of thing kept in a place, by what the place is said to be used for (what is not here says where a place is, not what is in it) */
 const KIND: Record<string, string> = { Village: 'Residential', Town: 'Residential', Farm: 'Farm', Industrial: 'Industrial', Military: 'Military', Hunting: 'Hunting', Medic: 'Medical', Police: 'Police', Shop: 'Food and supplies', Bunker: 'Military' };
@@ -435,7 +435,7 @@ export class BigMap {
       for (const road of [world.road, ...world.roads]) {
         const pts = road.points;
         g.strokeStyle = colour;
-        g.lineWidth = (world.road.width + extra) * S;
+        g.lineWidth = (road.width + extra) * S;
         g.beginPath();
         for (let i = 0; i < pts.length; i += 3) {
           if (i === 0) g.moveTo(X(pts[i]), Y(pts[i + 2]));

@@ -130,6 +130,53 @@ export function playOutline(): { x: number; z: number; r: number; from: number; 
 
 /** where the hospital stands in Kamenka: metres to the right of its street (looking down it), and along it from the town's middle */
 export const HOSPITAL_AT = { right: 46, along: -4 };
+/**
+ * The village's streets and what stands on them (2026-10-12: see "the village laid out as a place is", at the end
+ * of the map's making). `streets`: where each side street leaves the road (metres along it from the village's
+ * middle, east is on) and how far it runs north and south of it. `plots`: [building, on what, how far along, how
+ * far its front is from the edge of that street]. N and S are the road's two sides; <street>E and <street>W the two
+ * sides of a side street, measured from the road (south is on, north is back).
+ */
+export const VILLAGE_STREETS = {
+  width: 5,
+  /** metres of open ground between the foot of the middle street and the headquarters' front */
+  forecourt: 5,
+  /** how far from the village's middle any of this reaches */
+  reach: 190,
+  streets: { west: { s: -68, north: 0, south: 64 }, middle: { s: 20.5, north: 62, south: 80 } } as Record<string, { s: number; north: number; south: number }>,
+  plots: [
+    // the road's north side, west to east
+    ['house_small_3', 'N', -82, 7],
+    ['barn_13', 'N', -47, 11],
+    ['shed_4', 'N', -34, 9],
+    ['garage_54', 'N', -23, 7.5],
+    ['clinic_52', 'N', 7, 7.5],
+    ['house_brick_7', 'N', 31.5, 7],
+    ['house_brick_9', 'N', 47, 7],
+    // its south side
+    ['house_small_1', 'S', -104, 7],
+    ['house_brick_2', 'S', -86, 7],
+    ['house_two_68', 'S', -58, 7],
+    ['house_two_67', 'S', -42, 7],
+    ['house_small_5', 'S', -23, 7],
+    ['store_53', 'S', 31.5, 7.5],
+    ['house_small_8', 'S', 46, 7],
+    ['shed_19', 'S', 66, 9],
+    ['house_small_11', 'S', 89, 7],
+    // the west street
+    ['shed_14', 'westE', 31, 4],
+    ['barn_15', 'westE', 47, 6],
+    // the middle street, north of the road
+    ['townhouse_77', 'middleW', -34, 5],
+    ['shed_17', 'middleE', -27, 4],
+    ['shed_18', 'middleE', -44, 4],
+    ['barn_16', 'middleW', -54, 6],
+    // and south of it
+    ['hut_79', 'middleW', 35, 4],
+    ['shanty_78', 'middleW', 54, 4],
+    ['barn_20', 'middleE', 42, 6],
+  ] as [string, string, number, number][],
+};
 /** the village's second clinic and second shop: how far out along its street from its middle they are looked for a place (metres: no nearer, no farther, and where first) */
 export const SERVICES = { from: 68, to: 116, out: 90 };
 
@@ -239,7 +286,7 @@ export interface World {
   grass: Uint8Array;
   road: { points: Float32Array; width: number };
   /** roads laid since: each a line of its own. (Never added to the first one's points: jeeps and street lamps are told off along those by number.) */
-  roads: { points: Float32Array; width: number }[];
+  roads: { points: Float32Array; width: number; /** a side street: its asphalt lies just under the road's where it leaves it, and breaks up at its far end */ side?: boolean }[];
   buildings: BuildingPlot[];
   trees: Instance[];
   rocks: Instance[];
@@ -1321,7 +1368,7 @@ export function generateWorld(seed = WORLD_SEED): World {
   // Kamenka, of the buildings that were downloaded whole; and two places stand far out in the ring. By the
   // rule of the others: own dice, everything after what there was, and nothing inside the old square touched
   // (the road is picked up where it used to run off the ground, 28 m outside it).
-  const roads: { points: Float32Array; width: number }[] = [];
+  const roads: World['roads'] = [];
   {
     const T = TOWN;
     const rng4 = new RNG(seed + 9001);
@@ -1731,6 +1778,225 @@ export function generateWorld(seed = WORLD_SEED): World {
       if (surface) surface[k] = heights[k];
     }
     void cell;
+  }
+
+  // --- the village laid out as a place is (2026-10-12). Asked: "we will need to make the building layout in the
+  // village more tightly packed i presume, or add some cross streets like a real city would have. we should really
+  // take some time here with the map layout and ensure high quality, the buildings are all facing the proper way
+  // etc... think about natural city look, realistic."
+  //
+  // What there was: the road, a row of houses either side of it fifteen and twenty metres back, and behind them
+  // barns, sheds and three downloaded buildings dropped by the dice and turned any way at all. What there is:
+  //   - the houses of the two rows stand seven metres from the road's edge, each with its door to it;
+  //   - two side streets leave the road at a right angle. The one in the middle of the village crosses it, between
+  //     the clinic and the brick house to the north and between the police station's yard and the shop to the
+  //     south; the one at its west end goes south only. A lane of bare earth joins their far ends behind the
+  //     houses, so that the south of the village is a block with a way all round it;
+  //   - everything that stood behind the rows stands on one of those streets, its door to it;
+  //   - the police headquarters (src/world/big-buildings.ts) stands across the far end of the middle street,
+  //     looking back up it to the road: the last building of the village, and the last of all.
+  // Nothing is renumbered: every building is the one it was, in the place of the list it had, with its own dice.
+  // It is only stood somewhere else, and so what is kept in it is kept there. (The ground where one stood is
+  // left level, as a yard is.) This block comes after everything, and takes nothing from anybody's dice.
+  {
+    const before = heights.slice();
+    const rng7 = new RNG(seed + 8282);
+    const LANE = VILLAGE_STREETS.width;
+    // the road, by how far along it a spot is from the village's middle (east is on)
+    let mid = 0;
+    path2.forEach(([x, z], i) => {
+      if (Math.hypot(x - VILLAGE.x, z - VILLAGE.z) < Math.hypot(path2[mid][0] - VILLAGE.x, path2[mid][1] - VILLAGE.z)) mid = i;
+    });
+    const run = path2.map(() => 0);
+    for (let i = mid + 1; i < path2.length; i++) run[i] = run[i - 1] + Math.hypot(path2[i][0] - path2[i - 1][0], path2[i][1] - path2[i - 1][1]);
+    for (let i = mid - 1; i >= 0; i--) run[i] = run[i + 1] - Math.hypot(path2[i][0] - path2[i + 1][0], path2[i][1] - path2[i + 1][1]);
+    /** the road at `s` metres along: where, how high, and which way it runs (a unit) */
+    const at = (s: number) => {
+      let i = mid;
+      while (i < path2.length - 2 && run[i + 1] < s) i++;
+      while (i > 0 && run[i] > s) i--;
+      const t = clamp((s - run[i]) / (run[i + 1] - run[i] || 1), 0, 1);
+      const tx = path2[i + 1][0] - path2[i][0], tz = path2[i + 1][1] - path2[i][1], tl = Math.hypot(tx, tz) || 1;
+      return { x: lerp(path2[i][0], path2[i + 1][0], t), z: lerp(path2[i][1], path2[i + 1][1], t), y: lerp(smooth[i], smooth[i + 1], t), tx: tx / tl, tz: tz / tl };
+    };
+
+    // 1. the side streets. Each arm is a road of its own that begins under the edge of the road's asphalt (the two
+    // ribbons never cross: two faces in one plane flicker) and ends where its last plot does.
+    const laneDist = new Float32Array(N * N).fill(1e9), laneH = new Float32Array(N * N);
+    const frames = new Map<string, { x: number; z: number; ex: number; ez: number; dx: number; dz: number }>();
+    for (const [name, st] of Object.entries(VILLAGE_STREETS.streets)) {
+      const j = at(st.s);
+      // (south of the road is to the left of the way it runs)
+      const dx = -j.tz, dz = j.tx;
+      frames.set(name, { x: j.x, z: j.z, ex: j.tx, ez: j.tz, dx, dz });
+      for (const [len, sign] of [[st.north, -1], [st.south, 1]] as [number, number][]) {
+        if (len <= 0) continue;
+        const from = ROAD_W / 2 - 1.1, n = Math.ceil((len - from) / 4);
+        const line: [number, number][] = [];
+        for (let k = 0; k <= n; k++) {
+          const t = sign * (from + ((len - from) * k) / n);
+          line.push([j.x + dx * t, j.z + dz * t]);
+        }
+        // its height: the ground's along it, evened out, from the road's own where it leaves it; nowhere steeper
+        // than one in ten
+        const raw = line.map(([x, z]) => heightAt(heights, x, z));
+        const ys = raw.map((_, i) => {
+          let sum = 0, c = 0;
+          for (let k = -4; k <= 4; k++) {
+            const w = 1 - Math.abs(k) / 5;
+            sum += raw[clamp(i + k, 0, raw.length - 1)] * w;
+            c += w;
+          }
+          return sum / c;
+        });
+        ys[0] = j.y;
+        ys[1] = lerp(j.y, ys[1], 0.5);
+        for (let i = 1; i < ys.length; i++) {
+          const most = 0.1 * Math.hypot(line[i][0] - line[i - 1][0], line[i][1] - line[i - 1][1]);
+          ys[i] = clamp(ys[i], ys[i - 1] - most, ys[i - 1] + most);
+        }
+        rasterLine(line, ys, 12, laneDist, laneH);
+        const pts = new Float32Array(line.length * 3);
+        line.forEach(([x, z], i) => pts.set([x, ys[i], z], i * 3));
+        roads.push({ points: pts, width: LANE, side: true });
+      }
+    }
+    /** the bed of the side streets, cut or banked: level across, and the verge eased into the ground over `to` metres */
+    const bed = (to: number) => {
+      for (let i = 0; i < N * N; i++) {
+        if (laneDist[i] >= to) continue;
+        // (not the road's own bed, where a street leaves it)
+        const w = (1 - smoothstep(LANE / 2 + 0.4, to, laneDist[i])) * smoothstep(ROAD_W / 2 - 0.4, ROAD_W / 2 + 1.2, roadDist[i]);
+        heights[i] = lerp(heights[i], laneH[i] - 0.08, w);
+      }
+    };
+    bed(9);
+
+    // 2. the lane behind the houses: bare earth, from the foot of the one street to the other
+    const backLane: [number, number][] = [];
+    {
+      const a = frames.get('west')!, b = frames.get('middle')!, t = VILLAGE_STREETS.streets.west.south;
+      const from: [number, number] = [a.x + a.dx * t, a.z + a.dz * t], to: [number, number] = [b.x + b.dx * t - b.ex * (LANE / 2 - 0.5), b.z + b.dz * t - b.ez * (LANE / 2 - 0.5)];
+      const len = Math.hypot(to[0] - from[0], to[1] - from[1]), n = Math.ceil(len / 4);
+      for (let k = 0; k <= n; k++) backLane.push([lerp(from[0], to[0], k / n), lerp(from[1], to[1], k / n)]);
+    }
+    const backDist = new Float32Array(N * N).fill(1e9), backH = new Float32Array(N * N);
+    {
+      const raw = backLane.map(([x, z]) => heightAt(heights, x, z));
+      const ys = raw.map((_, i) => {
+        let sum = 0, c = 0;
+        for (let k = -3; k <= 3; k++) {
+          const w = 1 - Math.abs(k) / 4;
+          sum += raw[clamp(i + k, 0, raw.length - 1)] * w;
+          c += w;
+        }
+        return sum / c;
+      });
+      rasterLine(backLane, ys, 8, backDist, backH);
+      for (let i = 0; i < N * N; i++) {
+        if (backDist[i] >= 8) continue;
+        heights[i] = lerp(heights[i], backH[i], (1 - smoothstep(1.5, 8, backDist[i])) * 0.7 * smoothstep(LANE / 2, LANE / 2 + 2, laneDist[i]));
+        if (backDist[i] < trackDist[i]) trackDist[i] = backDist[i];
+      }
+    }
+
+    // 3. where everything stands. [which building, on what, how far along it, how far its front is from the edge]
+    //   N, S        the road: its north side, its south side; along = metres along the road from the village's middle
+    //   <street>E/W a side street: its east side, its west; along = metres from the road (south is on, north is back)
+    const moved: BuildingPlot[] = [];
+    /** how high the street is where each stands on it */
+    const level = new Map<BuildingPlot, number>();
+    const cellOf = (x: number, z: number) => idx(clamp(Math.round((x + half) / CELL), 0, N - 1), clamp(Math.round((z + half) / CELL), 0, N - 1));
+    const stand = (b: BuildingPlot, cx: number, cz: number, fx: number, fz: number, off: number, lvl: number) => {
+      level.set(b, lvl);
+      // (the brick block's door is in its west wall: it is its west wall that looks at the street)
+      const side = b.type === 'townhouse';
+      const depth = BUILDING_FOOTPRINT[b.type][side ? 0 : 1];
+      b.x = cx - fx * (off + depth / 2);
+      b.z = cz - fz * (off + depth / 2);
+      b.rot = side ? Math.atan2(fz, -fx) : Math.atan2(fx, fz);
+      moved.push(b);
+    };
+    for (const [id, on, along, back] of VILLAGE_STREETS.plots) {
+      const b = buildings.find((q) => q.id === id);
+      if (!b) throw new Error(`the village's plan names ${id}, and there is no such building`);
+      if (on === 'N' || on === 'S') {
+        const p = at(along), k = on === 'S' ? 1 : -1;
+        // (its front looks back at the road)
+        stand(b, p.x - p.tz * k * (ROAD_W / 2), p.z + p.tx * k * (ROAD_W / 2), p.tz * k, -p.tx * k, back, p.y);
+      } else {
+        const f = frames.get(on.slice(0, -1))!, k = on.endsWith('E') ? 1 : -1;
+        stand(b, f.x + f.dx * along + f.ex * k * (LANE / 2), f.z + f.dz * along + f.ez * k * (LANE / 2), -f.ex * k, -f.ez * k, back, laneH[cellOf(f.x + f.dx * along, f.z + f.dz * along)]);
+      }
+    }
+    // and the headquarters, across the foot of the middle street
+    {
+      const f = frames.get('middle')!, t = VILLAGE_STREETS.streets.middle.south + VILLAGE_STREETS.forecourt;
+      const b: BuildingPlot = { id: `police_hq_${buildings.length}`, type: 'police_hq', x: 0, z: 0, rot: 0, floorY: 0, seed: Math.floor(rng7.next() * 1e9), arms: 6 };
+      buildings.push(b);
+      const foot = VILLAGE_STREETS.streets.middle.south;
+      stand(b, f.x + f.dx * t, f.z + f.dz * t, -f.dx, -f.dz, 0, laneH[cellOf(f.x + f.dx * foot, f.z + f.dz * foot)]);
+    }
+    sorted = -1;
+    // Each stands a step above its street, whatever the ground did there: where the ground climbs away from the
+    // street it is cut back behind the house, as a builder does, and the way from the street to the door is level.
+    // (Stood on the ground as it lay, a house seven metres from the road was two metres above it, up a bank.)
+    for (const b of moved) {
+      const [w, d] = BUILDING_FOOTPRINT[b.type], c = Math.cos(b.rot), sn = Math.sin(b.rot);
+      let sum = 0, cnt = 0;
+      for (let lz = -d / 2; lz <= d / 2; lz += 1) for (let lx = -w / 2; lx <= w / 2; lx += 1) {
+        sum += heightAt(heights, b.x + lx * c + lz * sn, b.z - lx * sn + lz * c);
+        cnt++;
+      }
+      const lvl = level.get(b)!;
+      b.floorY = clamp(sum / cnt + 0.35, lvl + 0.3, lvl + 0.6);
+      // (the headquarters in a yard of its own: level for a few paces all round it, and the bank beyond an easy one)
+      if (b.type === 'police_hq') pad(b, 16, 5);
+      else pad(b, 6, 0.3);
+    }
+    const reach = (type: BuildingType) => Math.hypot(...BUILDING_FOOTPRINT[type]) / 2;
+    for (const b of buildings) if (b.type !== 'police_hq' && moved.some((n) => n === b || Math.hypot(n.x - b.x, n.z - b.z) < reach(n.type) + reach(b.type) + 9.5)) pad(b, 3.2, 2.2);
+    // (a house's skirt reaches the street beside it: the street is level across, whatever stands by it)
+    bed(LANE / 2 + 1.6);
+    for (const b of moved) if (b.type !== 'police_hq') pad(b, 2.0, 1.6);
+    for (let i = 0; i < N * N; i++) {
+      if (laneDist[i] >= 12) continue;
+      // (a street narrower than the road: the ground is painted by how far a spot is from a road as wide as that one)
+      const d = laneDist[i] + (ROAD_W - LANE) / 2;
+      if (d < roadDist[i]) {
+        roadDist[i] = d;
+        roadH[i] = laneH[i];
+      }
+    }
+    for (const r of roads) {
+      if (!r.side) continue;
+      for (let i = 0; i < r.points.length / 3; i++) r.points[i * 3 + 1] = heightAt(heights, r.points[i * 3], r.points[i * 3 + 2]) + 0.08;
+    }
+
+    // 4. what grew or lay where a building or a street now is goes; the rest stands on the ground as it is now
+    const inMoved = (x: number, z: number, margin: number) =>
+      moved.some((b) => {
+        const [w, d] = BUILDING_FOOTPRINT[b.type];
+        const dx = x - b.x, dz = z - b.z, c = Math.cos(b.rot), sn = Math.sin(b.rot);
+        return Math.abs(dx * c - dz * sn) < w / 2 + margin && Math.abs(dx * sn + dz * c) < d / 2 + margin;
+      });
+    const R = VILLAGE_STREETS.reach;
+    for (const list of [trees, rocks, props]) {
+      for (let k = list.length - 1; k >= 0; k--) {
+        const t = list[k];
+        if (Math.abs(t.x - VILLAGE.x) > R || Math.abs(t.z - VILLAGE.z) > R) continue;
+        const i = idx(clamp(Math.round((t.x + half) / CELL), 0, N - 1), clamp(Math.round((t.z + half) / CELL), 0, N - 1));
+        // (a fire ring or a fuel drum is told by its place in the list: none is taken up, and the plan keeps clear of them)
+        if (/^(stone_fire_pit|Barrel_01)/.test(t.kind)) t.y += heightAt(heights, t.x, t.z) - heightAt(before, t.x, t.z);
+        else if (inMoved(t.x, t.z, list === trees ? 4 : 2.5) || laneDist[i] < LANE / 2 + (list === trees ? 3.5 : 1.8) || backDist[i] < (list === trees ? 3 : 2)) list.splice(k, 1);
+        else t.y += heightAt(heights, t.x, t.z) - heightAt(before, t.x, t.z);
+      }
+    }
+    for (let iz = Math.max(0, Math.floor((VILLAGE.z - R + half) / CELL)); iz <= Math.min(N - 1, Math.ceil((VILLAGE.z + R + half) / CELL)); iz++)
+      for (let ix = Math.max(0, Math.floor((VILLAGE.x - R + half) / CELL)); ix <= Math.min(N - 1, Math.ceil((VILLAGE.x + R + half) / CELL)); ix++) {
+        paint(ix, iz);
+        if (surface) surface[iz * N + ix] = heights[iz * N + ix];
+      }
   }
 
   // Where anybody starts. The ring of starts was laid before there was a bunker, or a town in the east: nobody

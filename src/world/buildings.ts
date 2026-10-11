@@ -14,7 +14,7 @@ import { GAS, gasDepth, gasZone } from '../sim/gas';
 import type { Tier } from '../sim/tiers';
 import { BUILDING_FOOTPRINT, CELL, TOWN, WORLD_RES, WORLD_SIZE, bunkerPlace, heightAt, idx, type BuildingPlot, type Instance, type SiteKind, type World } from './worldgen';
 import { bunkerAt, bunkerPlan, levelY } from '../sim/bunker';
-import { hospitalPlan } from './big-buildings';
+import { hospitalPlan, policeHqPlan } from './big-buildings';
 
 /** (`Gas` is not a kind of building: it is whatever stands under the gas, whatever else it is. See src/sim/gas.ts.) */
 export type Usage = 'Village' | 'Town' | 'Farm' | 'Industrial' | 'Military' | 'Hunting' | 'Medic' | 'Police' | 'Shop' | 'Gas' | 'Bunker' | 'East';
@@ -117,7 +117,8 @@ export interface Opening {
   b: number;
   bottom: number;
   top: number;
-  kind: 'door' | 'window' | 'gap';
+  /** (`grille`: bars from `bottom` to `top`, as a cell has: a body does not pass, the eye and a shot do) */
+  kind: 'door' | 'window' | 'gap' | 'grille';
 }
 
 export interface WallDef {
@@ -520,6 +521,8 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
       };
     case 'hospital':
       return hospitalPlan();
+    case 'police_hq':
+      return policeHqPlan();
     case 'police':
       // lobby with the duty desk, a holding cell on the left, the armoury behind a door on the right
       return {
@@ -1402,7 +1405,7 @@ export class Buildings {
           let from = 0;
           const skirt = (to: number) => to - from > 0.05 && addBox('concrete', from, to, -0.1, 0.26, T / 2, T / 2 + 0.04, F, false);
           for (const o of ops) {
-            if (o.kind === 'window') continue;
+            if (o.kind === 'window' || o.kind === 'grille') continue;
             skirt(o.a);
             from = o.b;
           }
@@ -1417,7 +1420,7 @@ export class Buildings {
             if (wd.side === 'inner') addBox('trim', from, to, 0, 0.085, T / 2, T / 2 + 0.014, F, false);
           };
           for (const o of ops) {
-            if (o.kind === 'window') continue;
+            if (o.kind === 'window' || o.kind === 'grille') continue;
             board(o.a);
             from = o.b;
           }
@@ -1464,12 +1467,22 @@ export class Buildings {
             // windows block movement but not bullets
             const c = new THREE.Matrix4().makeTranslation((o.a + o.b) / 2, (o.bottom + o.top) / 2, 0);
             this.collider((o.b - o.a) / 2, (o.top - o.bottom) / 2, 0.05, F.clone().multiply(c), 'glass', GLASS_GROUPS);
+          } else if (o.kind === 'grille') {
+            // bars: an upright every hand's breadth and two rails across them
+            const bars = Math.max(2, Math.round((o.b - o.a) / 0.115)), tile = this.tile('steel');
+            for (let k = 1; k < bars; k++) {
+              const x = o.a + ((o.b - o.a) * k) / bars;
+              this.push('steel', boxGeo(x - 0.012, x + 0.012, o.bottom, o.top - fw, -0.012, 0.012, tile, F));
+            }
+            for (const at of [o.bottom + 0.4, o.top - 0.5]) this.push('steel', boxGeo(o.a + fw, o.b - fw, at - 0.016, at + 0.016, -0.02, 0.02, tile, F));
+            const c = new THREE.Matrix4().makeTranslation((o.a + o.b) / 2, (o.bottom + o.top) / 2, 0);
+            this.collider((o.b - o.a) / 2, (o.top - o.bottom) / 2, 0.04, F.clone().multiply(c), 'metal', GLASS_GROUPS);
           } else if (o.kind === 'door') {
             const hinge = F.clone().multiply(new THREE.Matrix4().makeTranslation(o.a + fw, 0, 0));
             this.doorSpecs.push({ m: hinge, w: o.b - o.a - fw * 2, h: o.top - fw, id: `${plot.id}_door${this.doorSpecs.length}`, open: wd.still ? false : rng.chance(0.35), swing: wd.still ? 1 : rng.chance(0.5) ? 1 : -1 });
           }
           // (a barn's open front has the same lip as a door)
-          if (o.kind !== 'window' && wd.side !== 'inner' && y0 === 0) {
+          if (o.kind !== 'window' && o.kind !== 'grille' && wd.side !== 'inner' && y0 === 0) {
             this.doorstep(F, o.a, o.b);
             outside.push({ F, a: o.a, b: o.b, front: wd.side === 'front' });
           }
@@ -1819,7 +1832,7 @@ export class Buildings {
     if (plot.arms) {
       const mine = this.lootPoints.slice(firstPoint);
       const pick = [...mine.filter((p) => p.floor), ...mine.filter((p) => !p.floor)].slice(0, plot.arms);
-      for (const p of pick) p.arms = plot.type === 'police' || plot.type === 'guardpost' || plot.type === 'barracks' || plot.type === 'tent' ? 'guns' : 'any';
+      for (const p of pick) p.arms = plot.type === 'police' || plot.type === 'police_hq' || plot.type === 'guardpost' || plot.type === 'barracks' || plot.type === 'tent' ? 'guns' : 'any';
     }
 
     // yard clutter
