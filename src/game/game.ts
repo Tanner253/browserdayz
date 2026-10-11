@@ -583,7 +583,7 @@ export class Game {
         hamlet: ['A shop between houses, a barn behind, a fire ring to rest by.', 1, 'Food and drink at the shop, melee weapons and tools in the barn and the shed.'],
         depot: ['A barracks, a workshop and a watchtower.', 2, 'Pistols and 9 mm, soft vests, boots and gloves, fuel. Now and then an armoured vest.'],
         market: ['A trader behind the counter: he buys what you bring, sells supplies, and has paid work every day.', 2, 'Whatever you can pay for.'],
-        tents: ['Four army tents and a watchtower in the wood south of the west road. A pistol is always left here.', 2, 'Pistols and 9 mm, soft vests, injectors, the army\'s cases. Now and then an armoured vest or a helmet, and a gas mask if you are lucky.'],
+        tents: ['Four army tents and a watchtower in the wood south of the west road. A pistol is always left here.', 2, 'Pistols and 9 mm, soft vests, bandages, the army\'s cases. Now and then an armoured vest or a helmet, and a gas mask if you are lucky.'],
         works: ['', 4],
         bunker: ['', 5],
         town: ['Brick houses two floors high down both sides of the road, plank houses, a police station, a clinic, a shop. Out of the valley by the paved road, and inside the Zona.', 3],
@@ -604,7 +604,7 @@ export class Game {
       const inTown = (b: { x: number; z: number }) => Math.hypot(b.x - town.x, b.z - town.z) < town.radius;
       for (const b of world.buildings.filter(inTown)) {
         if (b.type === 'police') spots.push(at({ x: b.x, z: b.z, name: 'Police station' }, 'The armoury of the village. The gas masks are kept here: without one, nobody goes into the Chemical Works.', 'police', 2, 'Pistols, 9 mm, soft vests, gas masks, and what goes on a pistol.'));
-        else if (b.type === 'clinic') spots.push(at({ x: b.x, z: b.z, name: 'Clinic' }, 'Where the wounded were brought.', 'clinic', 2, 'Injectors, first aid kits, and tape to splint a broken leg.'));
+        else if (b.type === 'clinic') spots.push(at({ x: b.x, z: b.z, name: 'Clinic' }, 'Where the wounded were brought.', 'clinic', 2, 'Bandages, stims, first aid kits, and tape to splint a broken leg.'));
         else if (b.type === 'store') spots.push(at({ x: b.x, z: b.z, name: 'Shop' }, 'The village shop.', 'shop', 2, 'Food and drink, and dressings.'));
       }
       for (const w of wellSpots(world)) spots.push({ x: w.x, z: w.z, name: 'Well', tip: 'Drink your fill, and fill every bottle you carry.', kind: 'well' });
@@ -2951,7 +2951,7 @@ export class Game {
     }
     const carried = this.inv.find((it) => !!ITEMS[it.id].use?.stopBleed);
     if (carried) return `${this.touch ? 'Open your pack' : '<kbd>Tab</kbd>'} and use the ${ITEMS[carried.id].name}`;
-    return 'Find an injector or a first aid kit';
+    return 'Find a bandage, a stim or a first aid kit';
   }
 
   private dripT = 0;

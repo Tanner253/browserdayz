@@ -261,14 +261,15 @@ const D: ItemDef[] = [
   { id: 'flask', name: 'Water Flask', model: 'flask', w: 2, h: 2, weight: 1.1, category: 'drink', desc: 'A soldier\'s litre of water in a hard flask: three drinks. A well fills it again.', use: { verb: 'Drink from the', time: 2, water: 18, sips: 3, sound: 'drink' } },
   { id: 'thermos', name: 'Thermos', model: 'plastic_thermos', w: 1, h: 3, weight: 0.8, category: 'drink', desc: 'Lukewarm tea, two cups of it. Filled at a well it is water, and still better than nothing.', use: { verb: 'Drink from the', time: 2, water: 20, energy: 3, sips: 2, sound: 'drink' } },
   // ---------------------------------------------------------------- medical
-  // (The item is still `bandage`: it is what the roll of tape was, in every loot table and every
-  // pocket. What it is now is an auto-injector: quicker than winding a dressing, and it gives
-  // something back.)
-  { id: 'bandage', name: 'Combat Injector', model: 'syringe', w: 1, h: 1, weight: 0.06, category: 'medical', desc: 'Clotting agent and a painkiller in one spring-loaded shot. Stops bleeding and gives back 15 health.', use: { verb: 'Use', time: 2.4, stopBleed: true, health: 15, hold: true, sound: 'inject' } },
-  // (the same injector with a yellow barrel: told from the other at a glance, on the ground and in the hand)
-  { id: 'stim', name: 'Adrenaline Injector', model: 'syringe', paint: 0xf0bd12, w: 1, h: 1, weight: 0.06, category: 'medical', desc: 'Adrenaline in a spring-loaded shot, its barrel yellow. Fills your stamina, and for ten seconds after it nothing you do costs any.', use: { verb: 'Use', time: 2.4, stamina: 100, boost: 10, hold: true, sound: 'inject' } },
+  // Two things for a wound, and the kit (2026-10-10, as asked): a bandage, common from the outskirts on, stops
+  // bleeding and gives back 10; a stim, found in the village and common from Kamenka on, stops bleeding and gives
+  // back 35, and is the adrenaline it always was. (`bandage` was an injector for two days, and a roll of tape
+  // before that: it is a bandage again, in every loot table and every pocket.)
+  { id: 'bandage', name: 'Bandage', model: 'medical_tape', w: 1, h: 1, weight: 0.06, category: 'medical', desc: 'A rolled field dressing. Bound on, it stops bleeding and gives back 10 health.', use: { verb: 'Apply', time: 3.2, stopBleed: true, health: 10, sound: 'bandage' } },
+  // (an injector with a yellow barrel)
+  { id: 'stim', name: 'Stim', model: 'syringe', paint: 0xf0bd12, w: 1, h: 1, weight: 0.06, category: 'medical', desc: 'Clotting agent, a painkiller and adrenaline in one spring-loaded shot, its barrel yellow. Stops bleeding and gives back 35 health; fills your stamina, and for ten seconds after it nothing you do costs any.', use: { verb: 'Use', time: 2.4, stopBleed: true, health: 35, stamina: 100, boost: 10, hold: true, sound: 'inject' } },
   { id: 'firstaid', name: 'First Aid Kit', model: 'medical_box', w: 3, h: 2, weight: 0.9, category: 'medical', desc: 'Dressings, antiseptic and a splint. Treats wounds properly, and sets a broken leg.', use: { verb: 'Treat wounds', time: 6, stopBleed: true, health: 45, splint: true, sound: 'bandage' } },
-  { id: 'splint', name: 'Splint Tape', model: 'medical_tape', w: 1, h: 1, weight: 0.12, category: 'medical', desc: 'A roll of strapping tape. Bound round a broken leg with whatever is to hand, it lets you run on it again.', use: { verb: 'Splint your leg with', time: 5, splint: true, sound: 'bandage' } },
+  { id: 'splint', name: 'Splint Tape', model: 'medical_tape', tint: 0xd9a55c, w: 1, h: 1, weight: 0.12, category: 'medical', desc: 'A roll of tan strapping tape. Bound round a broken leg with whatever is to hand, it lets you run on it again.', use: { verb: 'Splint your leg with', time: 5, splint: true, sound: 'bandage' } },
   // ---------------------------------------------------------------- clothing & bags
   {
     // (still `boonie_hat`, so that what is carried and what is kept in the world still means it: a helmet now)

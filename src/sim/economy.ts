@@ -137,8 +137,9 @@ export const TYPES: Record<string, TypeRule> = {
   thermos: { at: [4, 7, 5, 1, 2], lifetime: 2400, restock: 300, usage: ['Military', 'Hunting', 'Village', 'Police', 'Industrial', 'Shop'] },
   // ------------------------------------------------------------ medical: the clinic, and the shop until there is a hospital
   // (What stops bleeding is what a fight is lost for want of.)
-  bandage: { at: [5, 22, 14, 4, 5], lifetime: 2400, restock: 240, usage: ['Medic', 'Shop', ...HOMES, 'Military', 'Police', 'Hunting', 'Farm'], favour: { Medic: 10, Shop: 6, Military: 2 } },
-  stim: { at: [0, 9, 6, 4, 4], lifetime: 3000, restock: 420, usage: ['Medic', 'Military', 'Police', 'Shop'], favour: { Medic: 5, Military: 3 } },
+  // (2026-10-10: bandages common on the outskirts and in the village; stims found in the village, common from Kamenka on)
+  bandage: { at: [16, 30, 10, 3, 4], lifetime: 2400, restock: 240, usage: ['Medic', 'Shop', ...HOMES, 'Military', 'Police', 'Hunting', 'Farm'], favour: { Medic: 10, Shop: 6, Military: 2 } },
+  stim: { at: [0, 5, 14, 5, 8], lifetime: 3000, restock: 420, usage: ['Medic', 'Military', 'Police', 'Shop'], favour: { Medic: 5, Military: 3 } },
   firstaid: { at: [0, 9, 8, 3, 4], lifetime: 3600, restock: 600, usage: ['Medic', 'Military', 'Police'], favour: { Medic: 12 } },
   // (what sets a broken leg and does nothing else: commoner than the kit, and where there are ladders and lofts to fall off)
   splint: { at: [5, 10, 6, 2, 2], lifetime: 3600, restock: 420, usage: ['Medic', 'Shop', ...HOMES, 'Farm', 'Hunting', 'Industrial', 'Police'], favour: { Medic: 5, Shop: 2 } },
