@@ -1966,7 +1966,10 @@ export class Game {
   private poseOf(item: ItemInstance): UseKind {
     const def = ITEMS[item.id];
     if (item.id === 'keycard') return 'swipe';
-    if (def.throw || def.call || def.open || def.mag || !def.use) return 'open';
+    // (a magazine is held to be filled, a box of rounds to be torn open: each has its own way of being held and worked)
+    if (def.mag) return 'load';
+    if (def.open) return 'unbox';
+    if (def.throw || def.call || !def.use) return 'open';
     return def.look ? 'drink' : def.use.sound;
   }
 
@@ -2572,7 +2575,7 @@ export class Game {
       this.syncOpenBox();
     }
     audio.ui('unbox');
-    this.startUse(`Unwrapping the ${def.name.toLowerCase()}`, o.time, item.id, 'open', null, () => {
+    this.startUse(`Unwrapping the ${def.name.toLowerCase()}`, o.time, item.id, 'unbox', null, () => {
       if (this.loose === item) this.loose = null;
       this.inv.remove(item);
       const left = this.inv.add(makeItem(o.gives, o.qty));
@@ -2715,7 +2718,7 @@ export class Game {
     const room = d.capacity - (mag.rounds ?? 0);
     if (room <= 0) return void this.hud.note('It is full', 'info');
     if (this.inv.count(d.ammo) <= 0) return void this.hud.note(`No ${ITEMS[d.ammo].name.toLowerCase()} to put in it`, 'warn');
-    this.startUse(`Filling the magazine · ${mag.rounds ?? 0}/${d.capacity}`, Game.ROUND_IN, mag.id, 'open', null, () => {
+    this.startUse(`Filling the magazine · ${mag.rounds ?? 0}/${d.capacity}`, Game.ROUND_IN, mag.id, 'load', null, () => {
       // (put down, sold or fitted meanwhile)
       if (!this.inv.containerOf(mag)) return;
       if (this.inv.take(d.ammo, 1) !== 1) return;

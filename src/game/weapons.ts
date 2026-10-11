@@ -25,7 +25,7 @@ import type { ItemModels } from './loot';
 export type HitZone = 'head' | 'torso' | 'legs';
 /** damage multiplier per hit zone: bullets / melee */
 const ZONE_MULT: Record<HitZone, [number, number]> = { head: [3.2, 1.6], torso: [1, 1], legs: [0.6, 0.7] };
-export type UseKind = 'eat' | 'drink' | 'bandage' | 'inject' | 'smoke' | 'open' | 'swipe';
+export type UseKind = 'eat' | 'drink' | 'bandage' | 'inject' | 'smoke' | 'open' | 'swipe' | 'load' | 'unbox';
 const FIST = { damage: 14, range: 1.35, rate: 0.4, stamina: 5 };
 
 export type FireMode = 'semi' | 'auto';
@@ -226,6 +226,37 @@ export const HOLD = {
   kit: [-0.06, -0.14, -0.52],
   kitBy: [-0.15, -0.5],
   kitTurn: [0.2, 0.5, 0.05],
+};
+
+/**
+ * A magazine being filled, in the eye's space. It stands in the left hand, left of the middle, its mouth up and
+ * tipped to the right hand; the right brings a round up from low on the right, sets it on the mouth, presses it
+ * down and slides it back under the lips, and goes for the next. One round to each turn of it: the press lands as
+ * the turn ends, which is when the game counts the round in and the click is heard.
+ *   rest, restTurn – held and not being filled: upright in the right fist, low on the right
+ *   at, turn       – being filled: where it stands, and how it is turned
+ *   away           – where the right hand takes the next round from
+ *   down, back     – how far a round is pressed into the mouth, and slid back, metres
+ */
+export const LOAD = {
+  rest: [0.105, -0.135, -0.42],
+  restTurn: [0.22, -0.55, 0.1],
+  at: [-0.045, -0.095, -0.36],
+  turn: [0.3, 0.42, -0.1],
+  away: [0.19, -0.2, -0.37],
+  down: 0.014,
+  back: 0.02,
+};
+
+/**
+ * A box of rounds being torn open, in the eye's space: held in the left hand before the chest, its flap pulled
+ * back by the right in two tugs, and then tipped over into the right palm, cupped under it.
+ *   at    – where the box is held
+ *   palm  – where the right hand is cupped to take what comes out
+ */
+export const UNBOX = {
+  at: [-0.035, -0.095, -0.4],
+  palm: [0.08, -0.19, -0.38],
 };
 
 /**
@@ -781,8 +812,8 @@ export class Weapons {
    * `wait`: taken into the hand and not yet used (an injector: see `ready` in game.ts). `age` is how long it has
    * been in the hand, `t` how far into its use it is; `from` is where it was held when the use began.
    */
-  private held: { root: THREE.Group; id: string; kind: UseKind; t: number; age: number; dur: number; size: THREE.Vector3; ending: number; wait?: boolean; from?: { pos: THREE.Vector3; quat: THREE.Quaternion }; coal?: THREE.Mesh; puffs?: number; wispT?: number } | null = null;
-  private heldCache = new Map<string, { root: THREE.Group; size: THREE.Vector3 }>();
+  private held: { root: THREE.Group; id: string; kind: UseKind; t: number; age: number; dur: number; size: THREE.Vector3; ending: number; wait?: boolean; from?: { pos: THREE.Vector3; quat: THREE.Quaternion }; /** seconds since it changed between being held and being worked on (it is carried over from where it was) */ fromT?: number; /** how many times over it has been worked on without being put down (a magazine: rounds) */ turns?: number; /** a round for the fingers, while a magazine is filled */ round?: THREE.Object3D; coal?: THREE.Mesh; puffs?: number; wispT?: number } | null = null;
+  private heldCache = new Map<string, { root: THREE.Group; size: THREE.Vector3; round?: THREE.Object3D }>();
   private smoke: ReturnType<typeof cigarette> | null = null;
   private lowerT = 0;
   /** the hands are busy with something that is not a weapon (a wave, a dance): it is let down out of the way */
@@ -2095,11 +2126,22 @@ export class Weapons {
     this.guardHold = 0;
     this.guardT = 0;
     const h0 = this.held;
-    if (h0 && h0.wait && h0.id === id && !h0.ending && !wait) {
-      h0.wait = false;
-      h0.t = 0;
-      h0.dur = dur;
-      h0.from = { pos: h0.root.position.clone(), quat: h0.root.quaternion.clone() };
+    // What is already in the hands stays in them: taken up to be used, worked on again (the next round into a
+    // magazine), or let down to be held when the work is done. (Each of those brought it up from under the picture
+    // afresh: a magazine being filled bobbed up from below for every round.)
+    if (h0 && h0.id === id && !h0.ending && (wait || h0.wait || h0.kind === kind)) {
+      if (!!h0.wait !== wait) {
+        // (carried over from where it is, if it has been anywhere yet: it is made at the eye itself)
+        h0.from = h0.age > 0.05 ? { pos: h0.root.position.clone(), quat: h0.root.quaternion.clone() } : undefined;
+        h0.fromT = 0;
+        h0.turns = 0;
+      } else if (!wait) h0.turns = (h0.turns ?? 0) + 1;
+      h0.wait = wait;
+      h0.kind = kind;
+      if (!wait) {
+        h0.t = 0;
+        h0.dur = dur;
+      }
       return;
     }
     if (kind === 'smoke') {
@@ -2111,7 +2153,7 @@ export class Weapons {
       return;
     }
     if (!this.itemModels) return;
-    void this.itemModels.get(id).then((tpl) => {
+    void this.itemModels.get(id).then(async (tpl) => {
       let h = this.heldCache.get(id);
       if (!h) {
         const root = new THREE.Group();
@@ -2124,18 +2166,65 @@ export class Weapons {
           }
         });
         const size = tpl.size.clone();
-        // long side points away from the camera so the hand wraps the narrow side
-        if (size.x > size.z * 1.15) {
-          obj.rotation.y = Math.PI / 2;
-          size.set(size.z, size.y, size.x);
+        const mag = ITEMS[id].mag;
+        let round: THREE.Object3D | undefined;
+        if (mag) {
+          // A magazine is stood on its end, its mouth uppermost and its broad side to the eye, as its picture in the
+          // inventory is (whichever way its model lies: its longest side is its height, and the low end of that is
+          // the end that goes into the gun).
+          obj.position.y = -size.y / 2;
+          const stood = new THREE.Group();
+          stood.add(obj);
+          const long = size.x > size.y && size.x >= size.z ? 'x' : size.z > size.y ? 'z' : 'y';
+          if (long === 'z') {
+            stood.rotation.x = Math.PI / 2;
+            size.set(size.x, size.z, size.y);
+          } else if (long === 'x') {
+            stood.rotation.z = -Math.PI / 2;
+            size.set(size.y, size.x, size.z);
+          }
+          const faced = new THREE.Group();
+          faced.add(stood);
+          if (size.z > size.x * 1.15) {
+            faced.rotation.y = Math.PI / 2;
+            size.set(size.z, size.y, size.x);
+          }
+          root.add(faced);
+          // (and one of what goes in it, for the fingers that fill it: lying along the magazine, as it goes in)
+          const one = (await this.itemModels!.get(mag.ammo)).group;
+          let src: THREE.Mesh | null = null;
+          one.traverse((o) => {
+            if (!src && (o as THREE.Mesh).isMesh) src = o as THREE.Mesh;
+          });
+          if (src) {
+            const mesh = new THREE.Mesh((src as THREE.Mesh).geometry, plainMaterial((src as THREE.Mesh).material as THREE.Material));
+            mesh.castShadow = false;
+            mesh.geometry.computeBoundingBox();
+            const bb = mesh.geometry.boundingBox!, sz = bb.getSize(new THREE.Vector3());
+            mesh.position.copy(bb.getCenter(new THREE.Vector3())).multiplyScalar(-1);
+            const lie = new THREE.Group();
+            lie.add(mesh);
+            if (sz.y > sz.x && sz.y >= sz.z) lie.rotation.z = -Math.PI / 2;
+            else if (sz.z > sz.x) lie.rotation.y = Math.PI / 2;
+            round = new THREE.Group();
+            round.add(lie);
+            round.visible = false;
+            root.add(round);
+          }
+        } else {
+          // long side points away from the camera so the hand wraps the narrow side
+          if (size.x > size.z * 1.15) {
+            obj.rotation.y = Math.PI / 2;
+            size.set(size.z, size.y, size.x);
+          }
+          obj.position.y = -size.y / 2;
+          root.add(obj);
         }
-        obj.position.y = -size.y / 2;
-        root.add(obj);
-        h = { root, size };
+        h = { root, size, round };
         this.heldCache.set(id, h);
       }
       if (this.held) this.vmRoot.remove(this.held.root);
-      this.held = { root: h.root, id, kind, t: 0, age: 0, dur, size: h.size, ending: 0, wait };
+      this.held = { root: h.root, id, kind, t: 0, age: 0, dur, size: h.size, ending: 0, wait, round: h.round };
       // (not seen until it has been put where it goes: it is made at the eye itself)
       h.root.visible = false;
       this.vmRoot.add(h.root);
@@ -2880,7 +2969,11 @@ export class Weapons {
     const H = HOLD;
     const pos = new THREE.Vector3(H.rest[0] + wide * H.restBy[0], H.rest[1] + sy * H.restBy[1], H.rest[2] + sy * H.restBy[2]);
     const rot = new THREE.Euler(0, 0, 0);
-    const two = !h.wait && (h.kind === 'bandage' || h.kind === 'inject' || h.kind === 'open' || (h.kind !== 'smoke' && Math.min(h.size.x, h.size.z) > 0.16));
+    const two = !h.wait && (h.kind === 'bandage' || h.kind === 'inject' || h.kind === 'open' || h.kind === 'load' || h.kind === 'unbox' || (h.kind !== 'smoke' && Math.min(h.size.x, h.size.z) > 0.16));
+    /** a magazine being filled: how far the right hand is from where it takes a round (0) to the magazine's mouth (1), how far the round is pressed in, and slid back */
+    let fill: { reach: number; press: number; slide: number; has: boolean } | null = null;
+    /** a box being torn open: how far its flap is being pulled, and how far it is tipped over to pour */
+    let torn: { tug: number; pour: number } | null = null;
     // a smoke: how near the mouth it is (0 held low, 1 at the lips)
     let drawn = -1;
     // an injection: where the left hand is held out to take it (in the eye's space), and how far the shot has gone in
@@ -2947,6 +3040,32 @@ export class Weapons {
           this.fx.muzzle(out(new THREE.Vector3(0, -0.075, -0.16)), new THREE.Vector3(0, -0.12, -1).applyQuaternion(cam.quaternion), true, true);
         }
       }
+    } else if (h.kind === 'load' && h.wait) {
+      // A magazine taken out and not being filled: upright in the right fist, low on the right, its mouth up.
+      pos.set(LOAD.rest[0] + Math.sin(h.age * 1.3) * 0.002, LOAD.rest[1] + Math.sin(h.age * 1.9) * 0.003, LOAD.rest[2]);
+      rot.set(LOAD.restTurn[0], LOAD.restTurn[1], LOAD.restTurn[2]);
+    } else if (h.kind === 'load') {
+      // Being filled. One turn to a round: the right hand comes away from the last one and takes the next (the
+      // first third), brings it to the mouth, presses it down and slides it back, and the turn ends with it home.
+      const k = THREE.MathUtils.clamp(t / Math.max(0.05, h.dur), 0, 1);
+      const first = !h.turns;
+      const off = first ? 0 : 1 - THREE.MathUtils.smoothstep(k, 0, 0.3);
+      const reach = Math.max(off, THREE.MathUtils.smoothstep(k, 0.3, 0.72));
+      const press = THREE.MathUtils.smoothstep(k, 0.7, 0.9), slide = THREE.MathUtils.smoothstep(k, 0.86, 1);
+      fill = { reach, press: k < 0.3 ? 0 : press, slide: k < 0.3 ? 0 : slide, has: k >= 0.3 || first };
+      // (it gives a little under the thumb)
+      pos.set(LOAD.at[0], LOAD.at[1] - Math.sin(press * Math.PI) * 0.005, LOAD.at[2]);
+      rot.set(LOAD.turn[0] + Math.sin(press * Math.PI) * 0.03, LOAD.turn[1], LOAD.turn[2]);
+    } else if (h.kind === 'unbox' && !h.wait) {
+      // A box of rounds: in the left hand before the chest; the right takes hold of its flap and pulls it back,
+      // twice; then the box is tipped over into the right palm.
+      const k = THREE.MathUtils.clamp(t / Math.max(0.05, h.dur), 0, 1);
+      const pull = (a: number, b: number) => THREE.MathUtils.smoothstep(k, a, (a + b) / 2) * (1 - THREE.MathUtils.smoothstep(k, (a + b) / 2, b));
+      const tug = pull(0.1, 0.34) + pull(0.36, 0.62);
+      const pour = THREE.MathUtils.smoothstep(k, 0.66, 0.84);
+      torn = { tug, pour };
+      pos.set(UNBOX.at[0] + pour * 0.012, UNBOX.at[1] + sy * H.workBy[0] + pour * 0.04 - tug * 0.006, UNBOX.at[2] + sy * H.workBy[1]);
+      rot.set(0.45 - tug * 0.14, 0.25, -pour * 1.25 + Math.sin(k * 40) * 0.012 * pour);
     } else if (h.kind === 'inject' && h.wait) {
       // Taken out and not yet used: upright in the right fist, low on the right, where a thing is held that is
       // about to be used. Nothing of the left hand: it has no part in this until the click.
@@ -3003,6 +3122,14 @@ export class Weapons {
     pos.y -= (1 - up) * 0.4;
     h.root.position.copy(pos);
     h.root.rotation.copy(rot);
+    // (taken up to be worked on, or let down again: carried over from where it was, not put there)
+    if (h.from && h.fromT !== undefined && h.kind !== 'inject') {
+      h.fromT += dt;
+      const k = THREE.MathUtils.smoothstep(h.fromT, 0, 0.26);
+      h.root.position.lerpVectors(h.from.pos, pos, k);
+      h.root.quaternion.copy(h.from.quat).slerp(new THREE.Quaternion().setFromEuler(rot), k);
+      if (k >= 1) h.from = undefined;
+    }
     h.root.visible = true;
     const half = Math.min(h.size.x, h.size.z) / 2;
     const reach = Math.min(1, half / 0.06);
@@ -3061,6 +3188,44 @@ export class Weapons {
       right = { pos: away.lerp(over, inKit), fingers: new THREE.Vector3(-0.45, -0.55, -0.7), palm: new THREE.Vector3(-0.1, -1, 0.1), curl: [0.5 + inKit * 0.3, 0.6 + inKit * 0.3, 0.75, 0.85], thumb: 0.7, spread: 0.55 };
       // (the left has the far edge of it, from underneath)
       left = { pos: new THREE.Vector3(-(h.size.x / 2 + 0.03), -h.size.y * 0.5 - 0.02, 0.07), fingers: new THREE.Vector3(0.55, 0.25, -0.8), palm: new THREE.Vector3(0.3, 0.95, 0), curl: [0.5, 0.55, 0.6, 0.65], thumb: 0.3 };
+    }
+    if (fill) {
+      // The magazine in the left hand, by its lower half and from behind. The right is said in the eye's space
+      // (where it takes a round) and in the magazine's own (its mouth), and goes between the two.
+      const inv = h.root.quaternion.clone().invert();
+      const away = new THREE.Vector3(LOAD.away[0], LOAD.away[1], LOAD.away[2]).sub(h.root.position).applyQuaternion(inv);
+      const mouth = new THREE.Vector3(0.012 - fill.slide * LOAD.back, sy / 2 + 0.012 - fill.press * LOAD.down, 0.004);
+      // (The fingers come to it from the right, level, and the hand is that far behind their tips: beside the
+      // magazine and not over it, where it hid the whole of it from the eye.)
+      const fingers = new THREE.Vector3(-0.93, -0.22, -0.28).applyQuaternion(inv).normalize();
+      const tip = away.clone().lerp(mouth, fill.reach);
+      right = { pos: tip.clone().addScaledVector(fingers, -0.085), fingers, palm: new THREE.Vector3(-0.1, -0.8, 0.6).applyQuaternion(inv).normalize(), curl: [0.45, 0.6, 0.95, 1.05], thumb: 0.95, tuck: 0.3 };
+      left = { pos: new THREE.Vector3(-(h.size.x / 2 + 0.012), -sy * 0.2, 0.05), fingers: new THREE.Vector3(0.5, 0.15, -0.85).normalize(), palm: new THREE.Vector3(0.75, 0.1, -0.65).normalize(), curl: [0.95, 1.0, 1.05, 1.1], thumb: 0.5 };
+      if (h.round) {
+        // (the round rides under the fingertips, and is gone from sight when it is home)
+        h.round.visible = fill.has && fill.slide < 0.85;
+        h.round.position.copy(tip).add(new THREE.Vector3(0, -0.004, 0));
+        h.round.rotation.set(0, 0, THREE.MathUtils.lerp(-0.35, 0, fill.reach));
+      }
+    } else if (h.round) h.round.visible = false;
+    if (torn) {
+      const inv = h.root.quaternion.clone().invert();
+      const half = Math.min(h.size.x, h.size.z) / 2;
+      // on the flap, at the near top edge, and lifting it; then away under the box, cupped, as it is tipped
+      const flap = new THREE.Vector3(half * 0.2, sy / 2 + 0.02 + torn.tug * 0.03, h.size.z / 2 + 0.015 + torn.tug * 0.028);
+      const cup = new THREE.Vector3(UNBOX.palm[0], UNBOX.palm[1], UNBOX.palm[2]).sub(h.root.position).applyQuaternion(inv);
+      const p = torn.pour;
+      right = {
+        pos: flap.lerp(cup, p),
+        fingers: new THREE.Vector3(-0.55, -0.6, -0.55).lerp(new THREE.Vector3(-0.55, 0.12, -0.82).applyQuaternion(inv), p).normalize(),
+        palm: new THREE.Vector3(-0.2, -0.95, 0.2).lerp(new THREE.Vector3(-0.15, 0.97, 0.15).applyQuaternion(inv), p).normalize(),
+        curl: [THREE.MathUtils.lerp(0.75, 0.4, p), THREE.MathUtils.lerp(0.8, 0.45, p), THREE.MathUtils.lerp(0.95, 0.5, p), THREE.MathUtils.lerp(1.0, 0.55, p)],
+        thumb: THREE.MathUtils.lerp(0.9, 0.35, p),
+        spread: 0.3 * p,
+      };
+      // (The left has it from underneath, on the flat of the hand, the fingers along its far side. Held by its
+      // side as other things are, a box this size was behind the back of the glove and nothing of it was seen.)
+      left = { pos: new THREE.Vector3(-half * 0.6, -sy / 2 - 0.028, 0.045), fingers: new THREE.Vector3(0.45, 0.12, -0.88).normalize(), palm: new THREE.Vector3(0.1, 0.99, 0.05).normalize(), curl: [0.45, 0.5, 0.55, 0.6], thumb: 0.35 };
     }
     if (h.kind === 'open') {
       // left hand holds the box, right hand pries the latch on top
