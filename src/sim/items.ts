@@ -134,7 +134,7 @@ const D: ItemDef[] = [
   // what the pistols fire, thirty to a magazine, for as long as the trigger is held; it is slung on the back.
   {
     id: 'mpa', name: 'MPA30 SMG', model: 'smg', w: 5, h: 3, weight: 2.6, category: 'weapon', slot: 'long',
-    desc: 'Submachine gun in 9x19mm. Thirty rounds in the magazine up its grip, and it empties it in under three seconds: a great deal of fire across a room, and a pistol\'s round past the end of the street. B changes it to single shots. Takes a holographic sight and the 9 mm suppressor.',
+    desc: 'Submachine gun in 9x19mm. Thirty rounds in the magazine up its grip, and it empties it in under three seconds: a great deal of fire across a room, and a pistol\'s round past the end of the street. B changes it to single shots. Takes a holographic sight, the 9 mm suppressor, a foregrip and a light.',
     weapon: { kind: 'auto', ammo: 'ammo_9mm', capacity: 30, mag: 'mag_mpa', ergo: 68, modes: ['auto', 'semi'], shows: { mag_mpa: ['mag'] } }, iconYaw: 0,
   },
   // Ammunition (2026-10-10). Loose rounds lie thirty to a place in a pocket, whatever they are. A box is one place,
@@ -324,8 +324,8 @@ const D: ItemDef[] = [
   },
   {
     id: 'foregrip', name: 'Foregrip', model: 'ar15', nodeRe: '^foregrip', w: 1, h: 2, weight: 0.12, category: 'attachment',
-    desc: 'A grip for the forward hand, clamped under the AR-15. It holds the rifle down when it fires: a fifth less kick, and it comes up a little faster.',
-    attach: { fits: ['ar15'], slot: 'grip', ergo: 4, recoil: 0.8 },
+    desc: 'A grip for the forward hand, clamped to the rail under the AR-15 or the MPA30. It holds the gun down when it fires: a fifth less kick, and it comes up a little faster.',
+    attach: { fits: ['ar15', 'mpa'], slot: 'grip', ergo: 4, recoil: 0.8 },
   },
   // ---------------------------------------------------------------- melee
   // (The long ones are carried slung on the back, in either of its two places, or in a pack that is tall enough;

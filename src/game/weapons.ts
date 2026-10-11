@@ -72,7 +72,7 @@ function boltAction(id: string): boolean {
  *           found: the underside of the gun at that place is what its top is set against (y
  *           here is added to that).
  */
-const FIT: Record<string, { dot?: { at: [number, number, number]; size: number }; light?: { at: [number, number, number]; size: number; /** how high the gun's underside is where the light hangs (measured off the model: looked for there, where it is not said) */ under?: number; /** clamped to the gun's right side and not hung under it: `at` is then where its foot meets that side, at the height of its middle */ side?: boolean }; /** magazines that are models of their own, not a piece of the gun's: which, where its top goes (hung by it), how big, and turned how far about the upright */ mags?: Record<string, { model: string; at: [number, number, number]; size: number; turn?: number }>; /** a suppressor out of a model of its own, screwed onto the mouth of the barrel */ can?: { model: string; size: number }; /** how far down its slide a pistol's barrel lies, as a share of the slide's height (0.42 where not said) */ bore?: number }> = {
+const FIT: Record<string, { dot?: { at: [number, number, number]; size: number }; light?: { at: [number, number, number]; size: number; /** how high the gun's underside is where the light hangs (measured off the model: looked for there, where it is not said) */ under?: number; /** clamped to the gun's right side and not hung under it: `at` is then where its foot meets that side, at the height of its middle */ side?: boolean }; /** the foregrip, which is the AR-15's own taken off its rifle: where the middle of its top meets the rail under this gun */ grip?: { at: [number, number, number]; size: number }; /** magazines that are models of their own, not a piece of the gun's: which, where its top goes (hung by it), how big, and turned how far about the upright */ mags?: Record<string, { model: string; at: [number, number, number]; size: number; turn?: number }>; /** a suppressor out of a model of its own, screwed onto the mouth of the barrel */ can?: { model: string; size: number }; /** how far down its slide a pistol's barrel lies, as a share of the slide's height (0.42 where not said) */ bore?: number }> = {
   // (The undersides are measured off each model. Looked for by rule, the M9's was not found at
   // all and the other pistol's was its trigger guard: both lights hung in the air under the gun.)
   m9: { dot: { at: [0.045, 0.0835, 0.0035], size: 0.5 }, light: { at: [0.167, 0, 0.0035], size: 0.62, under: 0.046 } },
@@ -93,7 +93,10 @@ const FIT: Record<string, { dot?: { at: [number, number, number]; size: number }
   // (The submachine gun: the sight on the rail along its top. Its light is on the rail down the right side of its
   // fore-end, high and well forward: hung under the fore-end, where it was first put by the figures alone, it was
   // inside the left hand, which holds the gun there. Looked at 2026-10-11.)
-  mpa: { dot: { at: [0.035, 0.082, -0.003], size: 0.8 }, light: { at: [0.197, 0.066, 0.025], size: 0.62, side: true } },
+  // (And a foregrip, 2026-10-11, asked: "it can handle a grip and flashlight too since it has rails". It is on the
+  // rail under the fore-end at its very front, ahead of the left hand, which holds the fore-end itself: a stop for
+  // that hand, as is put on a gun this short. Further back it was inside the fist.)
+  mpa: { dot: { at: [0.035, 0.082, -0.003], size: 0.8 }, light: { at: [0.197, 0.066, 0.025], size: 0.62, side: true }, grip: { at: [0.213, 0.021, -0.003], size: 0.65 } },
   // (the big pistol: under its barrel, ahead of the guard, as on the other two)
   deagle: { light: { at: [0.185, 0, 0.0035], size: 0.62 } },
 };
@@ -1387,11 +1390,12 @@ export class Weapons {
     const fit = FIT[o.item];
     let dotAt: THREE.Vector3 | null = null;
     let lamp: THREE.Vector3 | null = null;
-    const fitted = async (name: string, modelId: string, at: [number, number, number], size: number, on: string, place: (obj: THREE.Object3D, box: THREE.Box3) => void, twin?: [string, string]) => {
+    /** @param only the pieces of that model wanted, by name (all of it, where not said) */
+    const fitted = async (name: string, modelId: string, at: [number, number, number], size: number, on: string, place: (obj: THREE.Object3D, box: THREE.Box3) => void, twin?: [string, string], only?: RegExp) => {
       const make = async () => {
         const obj = new THREE.Group();
         obj.name = name;
-        for (const p of modelId === 'holo' ? await holoParts() : extractParts(await assets.model(modelId))) {
+        for (const p of modelId === 'holo' ? await holoParts() : extractParts(await assets.model(modelId), only ? (n) => only.test(n) : undefined)) {
           const reticle = /crosshair/i.test((p.material as THREE.Material).name);
           const mesh = new THREE.Mesh(p.geometry, reticle ? reticleMaterial(p.material) : packMaterial(p.material));
           mesh.name = reticle ? 'reticle' : name;
@@ -1465,6 +1469,25 @@ export class Weapons {
       rig.root.updateMatrixWorld(true);
       const lb = new THREE.Box3().setFromObject(light);
       lamp = new THREE.Vector3((lb.min.x + lb.max.x) / 2, (lb.min.y + lb.max.y) / 2, lb.min.z);
+    }
+    // (A gun whose light is a piece of its own, the AR-15: the beam starts at the front of that piece. It was never
+    // looked for, so that rifle's light could be fitted and seen and never switched on.)
+    if (!lamp) {
+      const own = (shows.gun_light ?? []).map((piece) => rig.node(piece)).filter((n): n is THREE.Object3D => !!n);
+      if (own.length) {
+        rig.root.updateMatrixWorld(true);
+        const lb = new THREE.Box3();
+        for (const n of own) lb.expandByObject(n);
+        if (!lb.isEmpty()) lamp = new THREE.Vector3((lb.min.x + lb.max.x) / 2, (lb.min.y + lb.max.y) / 2, lb.min.z);
+      }
+    }
+    if (fit?.grip) {
+      // (the piece lies where it hung on its own rifle: it is brought here by the middle of its top)
+      await fitted('foregrip', 'ar15', fit.grip.at, fit.grip.size, onBody, (obj, box) => {
+        obj.position.x -= (box.min.x + box.max.x) / 2;
+        obj.position.y -= box.max.y;
+        obj.position.z -= (box.min.z + box.max.z) / 2;
+      }, undefined, /^foregrip/);
     }
     // A magazine that is a model of its own (a drum, a long one): hung where the gun's own magazine hangs, by its
     // top, and there when it is the one in the gun.
