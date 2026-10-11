@@ -120,3 +120,8 @@ Admins only:
 - **Kill me** (Me tab, or `/die`).
 - **Tag colour** (Me tab): the colour of the word ADMIN before your name in the chat. RGB is the default and the RGB button goes back to it. Your name itself is no longer rainbow.
 - The Players tab also shows health, kills and tags cashed, and the top line shows server uptime, stashes standing and characters kept.
+
+## Stashes left standing
+
+- A stash that is not buried is cleared away when nobody has opened it, changed what is in it, or dug it up for 7 days (empty) or 14 days (with anything in it). A buried stash stays until it is dug up.
+- On Render: `STASH_EMPTY_S` and `STASH_FULL_S` change those times (in seconds).

@@ -76,7 +76,7 @@ class Player {
 
 const dir = mkdtempSync(path.join(os.tmpdir(), 'zona-stash-'));
 const server = spawn(process.execPath, [path.join('node_modules', 'tsx', 'dist', 'cli.mjs'), 'server/index.ts'], {
-  env: { ...process.env, PORT: String(PORT), SITE_URL: 'http://127.0.0.1:9', DATA_DIR: dir, INFECTED: 'off', CHECKS: 'watch', LINGER_S: '0', KEEP: 'off' },
+  env: { ...process.env, PORT: String(PORT), SITE_URL: 'http://127.0.0.1:9', DATA_DIR: dir, INFECTED: 'off', CHECKS: 'watch', LINGER_S: '0', KEEP: 'off', STASH_EMPTY_S: '45', STASH_FULL_S: '90' },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
 let logged = '';
@@ -197,6 +197,68 @@ try {
 if (failed) {
   console.error(logged.slice(-1200));
   throw failed;
+}
+
+// ---- a stash left standing is cleared away when nobody has touched it for its time: sooner empty than not, and
+// never while it is under the ground. (The server again, with a week of three seconds and a fortnight of six.)
+{
+  const dir2 = mkdtempSync(path.join(os.tmpdir(), 'zona-stash-'));
+  const again = spawn(process.execPath, [path.join('node_modules', 'tsx', 'dist', 'cli.mjs'), 'server/index.ts'], {
+    env: { ...process.env, PORT: String(PORT), SITE_URL: 'http://127.0.0.1:9', DATA_DIR: dir2, INFECTED: 'off', CHECKS: 'watch', LINGER_S: '0', KEEP: 'off', STASH_EMPTY_S: '3', STASH_FULL_S: '6' },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let said = '';
+  again.stdout!.on('data', (d) => (said += d));
+  again.stderr!.on('data', (d) => (said += d));
+  let wrong: unknown = null;
+  try {
+    for (let k = 0; k < 600 && !said.includes('listening'); k++) await sleep(100);
+    assert.ok(said.includes('listening'), `the server did not start:\n${said.slice(-600)}`);
+    const dee = new Player('Dee');
+    assert.ok(await dee.join());
+    const [wx, wz] = wild!;
+    dee.say(wx + 1, wz, 'shovel');
+    await sleep(200);
+    const at = (uid: string, dx: number) => ({ uid, x: wx + dx, y: ground(wx + dx, wz), z: wz, rot: 0 });
+    dee.send({ t: 'stash+', s: at('empty', 0) });
+    dee.send({ t: 'stash+', s: at('full', 2) });
+    dee.send({ t: 'stash+', s: at('buried', 4) });
+    await sleep(200);
+    dee.send({ t: 'copen', cid: 'full' });
+    await sleep(200);
+    dee.send({ t: 'cset', cid: 'full', items: [{ uid: 'stash-test-tin-2', id: 'beans', qty: 1, x: 0, y: 0, rot: false }] });
+    dee.send({ t: 'cclose', cid: 'full' });
+    dee.send({ t: 'bury', uid: 'buried', on: true });
+    const gone = (uid: string) => dee.got.some((m) => m.t === 'stash-' && m.uid === uid);
+    await sleep(2000);
+    assert.ok(!gone('empty') && !gone('full'), 'a stash was cleared away before its time');
+    await sleep(2600);
+    assert.ok(gone('empty'), 'an empty stash nobody touched was still there after its time');
+    assert.ok(!gone('full'), 'a stash with something in it went as soon as an empty one');
+    await sleep(3200);
+    assert.ok(gone('full'), 'a stash with something in it was still there after its time');
+    assert.ok(!gone('buried'), 'a buried stash was cleared away');
+    // (and it is there still, under the ground, for whoever comes with a shovel)
+    dee.send({ t: 'bury', uid: 'buried', on: false });
+    await sleep(300);
+    assert.equal(dee.last('stash~')?.buried, false, 'a buried stash could not be dug up after everything round it had gone');
+    checks++;
+    console.log('  ok  left standing and untouched, an empty stash is cleared away, one with things in it later, and a buried one never');
+  } catch (e) {
+    wrong = e;
+  } finally {
+    again.kill();
+    await sleep(500);
+    try {
+      rmSync(dir2, { recursive: true, force: true });
+    } catch {
+      /* the server still letting go of it */
+    }
+  }
+  if (wrong) {
+    console.error(said.slice(-1200));
+    throw wrong;
+  }
 }
 console.log(`\n${checks} checks passed`);
 process.exit(0);

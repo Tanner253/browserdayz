@@ -77,6 +77,8 @@ interface Box {
   /** a stash: what was put down (a pack's item; not said, the stash case), and whether it is under the ground */
   item?: string;
   buried?: boolean;
+  /** a stash: when somebody last had anything to do with it (put it down, opened it, changed what is in it, dug it up) */
+  touchedAt?: number;
   emptiedAt: number;
   /** corpse and supply drop: expiry (economy time). Corpse: owner name, how it fell */
   name?: string;
@@ -938,7 +940,7 @@ async function loadKept() {
         return it ? [{ ...it, x: s.x, y: s.y, rot: !!s.rot }] : [];
       });
       for (const it of items) issue(it);
-      boxes.set(b.cid, { ...b, items, y: moved ? world.groundAt(b.x, b.z) : b.y, emptiedAt: -1 });
+      boxes.set(b.cid, { ...b, items, y: moved ? world.groundAt(b.x, b.z) : b.y, emptiedAt: -1, touchedAt: num(b.touchedAt) ? b.touchedAt : now });
       stashes++;
     }
     open(`${KEPT.chars.size} characters and ${stashes} stashes as they were kept at ${save.at}${save.final ? '' : ' (not a last word: the server before this one stopped without one)'}${moved ? '; the map has been made again since, so everybody starts from the edge with what they had' : ''}`);
@@ -1443,6 +1445,33 @@ function underCheck(c: Client, now = Date.now()) {
 }
 /** how far round the bunker's middle the ground is not asked about: its rooms and its stair are under it */
 const UNDER_BUNKER = 48;
+// A stash left standing is not there for ever: one nobody has had anything to do with for STASH_EMPTY (a week) is
+// cleared away if it is empty, and after STASH_FULL (a fortnight) if anything is in it. One under the ground stays
+// until it is dug up, however long that is: burying is what keeps a thing. (2026-10-12: "unburried stashes
+// autodelete after 7 days of no interaction. 14 days if the unburries stash has an item(s) within".)
+const STASH_EMPTY_MS = (Number(process.env.STASH_EMPTY_S) || 7 * 86400) * 1000;
+const STASH_FULL_MS = (Number(process.env.STASH_FULL_S) || 14 * 86400) * 1000;
+/** somebody has had something to do with a stash: its time starts again */
+function touched(b: Box) {
+  if (b.kind !== 'stash') return;
+  b.touchedAt = Date.now();
+  KEPT.dirty = true;
+}
+function clearStashes(now: number) {
+  for (const b of [...boxes.values()]) {
+    if (b.kind !== 'stash' || b.buried) continue;
+    const holder = locks.get(b.cid);
+    if (holder !== undefined && clients.has(holder)) continue;
+    if (now - (b.touchedAt ?? now) <= (b.items.length ? STASH_FULL_MS : STASH_EMPTY_MS)) continue;
+    log(`a stash at ${b.x.toFixed(0)}, ${b.z.toFixed(0)} is cleared away: nobody has touched it for ${Math.round((now - (b.touchedAt ?? now)) / 86400000)} days${b.items.length ? `, with ${b.items.length} things in it` : ''}`);
+    locks.delete(b.cid);
+    boxes.delete(b.cid);
+    KEPT.dirty = true;
+    broadcast({ t: 'stash-', uid: b.cid });
+  }
+}
+setInterval(() => clearStashes(Date.now()), Math.max(1000, Math.min(600_000, STASH_EMPTY_MS / 4))).unref();
+
 /** Is somebody out of the game for being under the ground? (past the moment that is let go) */
 const buried = (c: Client, now = Date.now()) => c.underAt > 0 && now - c.underAt >= UNDER.grace * 1000;
 
@@ -2166,6 +2195,7 @@ function handle(c: Client, m: C2S) {
       releaseLock(c);
       locks.set(m.cid, c.id);
       c.openCid = m.cid;
+      touched(b);
       send(c, { t: 'cdata', cid: m.cid, items: b.items });
       return;
     }
@@ -2180,6 +2210,7 @@ function handle(c: Client, m: C2S) {
         for (const it of b.items) issue(it);
       }
       if (b.kind === 'crate' || b.kind === 'drop') b.emptiedAt = b.items.length ? -1 : b.emptiedAt < 0 ? economy.time : b.emptiedAt;
+      touched(b);
       return;
     }
     case 'cclose': {
@@ -2201,7 +2232,7 @@ function handle(c: Client, m: C2S) {
       });
       if (CHECKS !== 'off' && items.some((it) => [...things({ slots: { it }, active: null, containers: [] })].some(invented)) && flag(c, 'put down a stash with something in it that the server never put in the world')) return;
       const st: StashInfo = { uid: s.uid, x: s.x, y: s.y, z: s.z, rot: s.rot, ...(def.id === 'stash_kit' ? {} : { item: def.id }) };
-      boxes.set(s.uid, { cid: s.uid, kind: 'stash', w, h, items, ...st, emptiedAt: -1 });
+      boxes.set(s.uid, { cid: s.uid, kind: 'stash', w, h, items, ...st, emptiedAt: -1, touchedAt: Date.now() });
       for (const it of items) issue(it);
       KEPT.dirty = true;
       broadcast({ t: 'stash+', s: st }, c);
@@ -2236,7 +2267,7 @@ function handle(c: Client, m: C2S) {
       locks.delete(m.uid);
       if (c.openCid === m.uid) c.openCid = null;
       b.buried = !!m.on;
-      KEPT.dirty = true;
+      touched(b);
       log(`${c.name} ${b.buried ? 'buried' : 'dug up'} a stash at ${b.x.toFixed(0)}, ${b.z.toFixed(0)}`);
       broadcast({ t: 'stash~', uid: m.uid, buried: b.buried });
       return;
