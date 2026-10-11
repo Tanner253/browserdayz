@@ -11,7 +11,10 @@ import path from 'node:path';
 import WebSocket from 'ws';
 import { TAG_HOLD, TAG_OUT } from '../src/sim/items';
 import { PROTOCOL, type S2C } from '../src/net/protocol';
-import { inPlay } from '../src/world/worldgen';
+import { generateWorld, heightAt, inPlay } from '../src/world/worldgen';
+
+/** the ground, as the server has it */
+const HEIGHTS = generateWorld().heights;
 
 const PORT = 8137;
 const dir = mkdtempSync(path.join(os.tmpdir(), 'zona-zone-'));
@@ -65,7 +68,8 @@ class Player {
   /** stand at a place for so long, saying so ten times a second as the game does */
   async stand(x: number, z: number, seconds: number) {
     for (let k = 0; k < seconds * 10; k++) {
-      this.send({ t: 's', p: [x, 20, z, 0, 0, 0], w: null, m: [] });
+      // (standing on the ground there: said to be at one height everywhere, they were under a hill wherever the ground is higher, which is its own way of being out of the game)
+      this.send({ t: 's', p: [x, heightAt(HEIGHTS, x, z), z, 0, 0, 0], w: null, m: [] });
       await sleep(100);
     }
   }
