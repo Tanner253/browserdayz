@@ -623,6 +623,11 @@ function zoneCheck(c: Client, now = Date.now()) {
   if (!c.outAt) c.outAt = now;
   if (now - c.outAt < TAG_OUT * 1000) return;
   c.outAt = 0;
+  voidTags(c, 'out of the Zona');
+}
+
+/** Every tag somebody carries that they took off another is void: forgotten here, taken out of this server's copy of their pockets, and they are told. */
+function voidTags(c: Client, where: string) {
   const uids: string[] = [];
   for (const t of carriedTags(c.inv)) {
     const from = lootedTags.get(t.uid);
@@ -649,8 +654,40 @@ function zoneCheck(c: Client, now = Date.now()) {
     for (const cont of c.inv.containers) cont.items = cont.items.filter((it) => !gone.has((it as { uid?: string }).uid ?? ''));
   }
   send(c, { t: 'void', uids });
-  log(`${c.name} carried ${uids.length} dog tag${uids.length === 1 ? '' : 's'} out of the Zona: void`);
+  log(`${c.name} carried ${uids.length} dog tag${uids.length === 1 ? '' : 's'} ${where}: void`);
 }
+
+/**
+ * Under the ground (2026-10-11). Somebody sunk into the ground cannot be shot: every round at them stops in the
+ * earth over them. One was found there with the tags he had taken, waiting out their ten minutes where nobody
+ * could take them back. So a body that says it is more than `deep` metres under the ground, and is not down the
+ * bunker (which is under the ground, and is a place), is out of the game for as long as it is there. After
+ * `grace` seconds of it (a moment is let go: a lagging step, a ledge) it hits nobody, takes nothing off the
+ * ground or out of a body, and cashes nothing in; after `void` seconds every tag it took is void, as tags
+ * carried over the line are; after `off` it is put off the server. This is a rule of the game and not a guess
+ * about anybody: it holds whatever CHECKS says. (An honest game puts its player back on the ground within two
+ * seconds of finding them under it: see `Game.unbury`.)
+ */
+const UNDER = { deep: 1.1, grace: 3, void: 10, off: 25 };
+function underCheck(c: Client, now = Date.now()) {
+  const [x, y, z] = c.pose;
+  const b = world.bunker;
+  const down = c.alive && !c.seatAt && now >= c.check.free && y < world.groundAt(x, z) - UNDER.deep && !(b && Math.hypot(x - b.x, z - b.z) < UNDER_BUNKER);
+  if (!down) {
+    c.underAt = 0;
+    return;
+  }
+  if (!c.underAt) c.underAt = now;
+  const secs = (now - c.underAt) / 1000;
+  if (secs < UNDER.grace) return;
+  flag(c, `is ${(world.groundAt(x, z) - y).toFixed(1)} m under the ground at ${x.toFixed(0)}, ${z.toFixed(0)}, ${secs.toFixed(0)} s now`, false);
+  if (secs >= UNDER.void) voidTags(c, 'under the ground');
+  if (secs >= UNDER.off) putOff(c, `was under the ground for ${UNDER.off} seconds`);
+}
+/** how far round the bunker's middle the ground is not asked about: its rooms and its stair are under it */
+const UNDER_BUNKER = 48;
+/** Is somebody out of the game for being under the ground? (past the moment that is let go) */
+const buried = (c: Client, now = Date.now()) => c.underAt > 0 && now - c.underAt >= UNDER.grace * 1000;
 
 interface Client {
   ws: WebSocket;
@@ -671,6 +708,8 @@ interface Client {
   seatAt: number;
   /** when they were first seen outside the Zona with a tag they took (0: they are not) */
   outAt: number;
+  /** when they were first seen under the ground this time (0: they are not): see `underCheck` */
+  underAt: number;
   /** when this player last threw a grenade, and how many hits have been claimed for it */
   lastNade: number;
   nadeHits: number;
@@ -1060,6 +1099,7 @@ function handle(c: Client, m: C2S) {
       // (somewhere they cannot have got to: they are kept where they were, and only the way they look is taken)
       c.pose = moveCheck(c, m.p, Date.now()) ? m.p : [was[0], was[1], was[2], m.p[3], m.p[4], m.p[5]];
       zoneCheck(c);
+      underCheck(c);
       const w = typeof m.w === 'string' && ITEMS[m.w] ? m.w : null;
       c.w = w;
       c.m = Array.isArray(m.m) ? m.m.filter((x) => typeof x === 'string').slice(0, 4) : [];
@@ -1151,6 +1191,8 @@ function handle(c: Client, m: C2S) {
       if (!target || !target.alive || !c.alive || !rule || target === c) return;
       if (!['head', 'torso', 'legs'].includes(m.zone)) return;
       const now = Date.now();
+      // (nobody is hit from under the ground: see UNDER)
+      if (buried(c, now)) return;
       const d = Math.hypot(c.pose[0] - target.pose[0], c.pose[1] - target.pose[1], c.pose[2] - target.pose[2]);
       if (d > rule.range + 4) return;
       let amount: number;
@@ -1287,6 +1329,11 @@ function handle(c: Client, m: C2S) {
     }
     case 'take': {
       if (typeof m.uid !== 'string' || !c.alive) return;
+      // (nothing is picked up from under the ground)
+      if (buried(c)) {
+        send(c, { t: 'denied', uid: m.uid });
+        return;
+      }
       // first request wins; the economy's despawn event tells everyone it is gone
       // (and nobody reaches the ground from a jeep's seat)
       const lying = economy.loot.get(m.uid);
@@ -1310,7 +1357,7 @@ function handle(c: Client, m: C2S) {
     case 'copen': {
       const b = boxes.get(m.cid);
       // (a body, a crate, a stash, a drop: none of them is searched from a jeep's seat)
-      if (!b || !c.alive || c.seatAt) return;
+      if (!b || !c.alive || c.seatAt || buried(c)) return;
       if (Math.hypot(b.x - c.pose[0], b.z - c.pose[2]) > 6) return;
       const holder = locks.get(m.cid);
       if (holder !== undefined && holder !== c.id && clients.has(holder)) {
@@ -1538,7 +1585,7 @@ function handle(c: Client, m: C2S) {
       const from = lootedTags.get(tag.uid);
       const now = Date.now();
       // (a tag this server did not see taken: it has restarted since, and no longer knows whose pockets it came out of)
-      const why = voided.has(tag.uid) ? 'it was carried out of the Zona' : from ? notEarned(c, from, tagSeen.get(`${c.key}|${tag.uid}`), now) : 'the server restarted while you were carrying it';
+      const why = buried(c, now) ? 'it was cashed in from under the ground' : voided.has(tag.uid) ? 'it was carried out of the Zona or under the ground' : from ? notEarned(c, from, tagSeen.get(`${c.key}|${tag.uid}`), now) : 'the server restarted while you were carrying it';
       log(`${c.name} cashed in ${owner}'s dog tag${why ? ` (not listed for a reward: ${why})` : ''}`);
       lootedTags.delete(tag.uid);
       tagSeen.delete(`${c.key}|${tag.uid}`);
@@ -1589,7 +1636,7 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
     pose: [sp.x, 'y' in sp && sp.y !== undefined ? sp.y : world.groundAt(sp.x, sp.z), sp.z, sp.yaw, 0, 0],
     w: null, m: [], g: [], b: [], alive: true,
     inv: resume?.inv ?? null, vitals: resume?.vitals ?? null,
-    outAt: 0, lastHit: 0, lastVHit: 0, seatAt: 0, lastNade: 0, nadeHits: 0, blasts: [], lastEmote: 0, lastChat: 0, lastHitBy: null, openCid: null, check: { at: Date.now(), carry: 0, free: Date.now() + CHECK.free, high: 0, flags: 0, said: 0, refused: [], hp: Math.min(100, resume?.vitals?.health ?? 100), hpAt: Date.now(), downAt: 0, unknown: new Set() }, activeAt: Date.now(), joinedAt: Date.now(), ip: ipOf.get(ws) ?? '', lifeAt: Date.now(), msgCount: 0, msgWindow: Date.now(),
+    outAt: 0, underAt: 0, lastHit: 0, lastVHit: 0, seatAt: 0, lastNade: 0, nadeHits: 0, blasts: [], lastEmote: 0, lastChat: 0, lastHitBy: null, openCid: null, check: { at: Date.now(), carry: 0, free: Date.now() + CHECK.free, high: 0, flags: 0, said: 0, refused: [], hp: Math.min(100, resume?.vitals?.health ?? 100), hpAt: Date.now(), downAt: 0, unknown: new Set() }, activeAt: Date.now(), joinedAt: Date.now(), ip: ipOf.get(ws) ?? '', lifeAt: Date.now(), msgCount: 0, msgWindow: Date.now(),
   };
   records.delete(key);
   const others = [...clients.values()].map(info);
