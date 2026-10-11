@@ -325,7 +325,11 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
           [-1.9, 0.371, -6.4], [3.6, 0.371, -5.9], [-1.4, 0.371, 3.1], [3.6, 0.371, 4.1],
           // (measured in the game, a ray down from each: its first floor is boards at two heights nine centimetres apart)
           [-0.9, 3.072, -6.4], [3.6, 2.982, -3.4], [-1.4, 2.982, -0.4], [3.1, 2.982, -0.9], [2.1, 3.072, 3.6], [3.6, 3.012, 6.6],
-          [3.6, 6.21, -3.4], [0.1, 6.1, 2.6],
+          // (These two lay on the decks on the roof, which nothing leads up to: "spawns loot on the roof but theres
+          // no way to get to the roof", 2026-10-12. They are on the first floor now, where the model's own file says
+          // there is floor at that height and a roof over it: assets-src/_wf/me/floor-at.mjs. Two places still, and
+          // in the same turn, so that every place after them keeps its number.)
+          [3.35, 2.982, -2.15], [-1.4, 2.982, 1.5],
         ],
         usage: ['Hunting', 'Village', 'Industrial'],
       };

@@ -69,13 +69,19 @@
 
 .adm-list { display: flex; flex-direction: column; min-height: 96px; max-height: 250px; overflow-y: auto; border: 1px solid rgba(233, 228, 216, 0.14); background: rgba(0, 0, 0, 0.25); }
 .adm-list.tall { max-height: none; flex: 1; }
-.adm-row { display: grid; grid-template-columns: 54px minmax(120px, 1.6fr) 70px 110px 70px 60px minmax(80px, 1.4fr) auto; gap: 8px; align-items: center; padding: 2px 8px; font-size: 14px; }
+.adm-row { display: grid; grid-template-columns: 50px minmax(120px, 1.5fr) 58px 100px 62px 40px 48px minmax(120px, 1.7fr); gap: 8px; align-items: center; padding: 2px 8px; font-size: 14px; }
 .adm-row > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .adm-row.headrow { position: sticky; top: 0; background: #131614; font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint); padding: 4px 8px; }
 .adm-row.pickable { cursor: pointer; }
 .adm-row.pickable:hover { background: rgba(233, 228, 216, 0.07); }
 .adm-row.on { background: rgba(200, 168, 255, 0.2); }
-.adm-row.hot > span:nth-child(6) { color: #ee7a6e; font-weight: 600; }
+.adm-row.hot > span:nth-child(7) { color: #ee7a6e; font-weight: 600; }
+.adm-b.toggle.inline { display: inline-block; width: auto; padding: 4px 9px; }
+.adm-b.swatch { width: 22px; height: 22px; padding: 0; border: 1px solid rgba(233, 228, 216, 0.4); }
+.adm-b.swatch.on { outline: 2px solid #fff; outline-offset: 1px; }
+.adm-colour { width: 30px; height: 24px; padding: 0; border: 1px solid rgba(233, 228, 216, 0.4); background: none; cursor: pointer; }
+.adm-tag { font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: 0.08em; }
+.adm-tag.rgb { color: transparent; background: linear-gradient(90deg, #ff3b3b, #ff9f2e, #ffe82e, #46f25a, #2ed8ff, #5b78ff, #d24dff, #ff3b3b) 0 0 / 200% 100%; -webkit-background-clip: text; background-clip: text; animation: adminband 3.5s linear infinite; }
 .adm-row.item { grid-template-columns: minmax(150px, 1.4fr) minmax(120px, 1fr) 110px 110px auto; }
 .adm-gone .adm-row { grid-template-columns: 54px minmax(120px, 1fr) 110px auto; }
 .adm-list.bans .adm-row { grid-template-columns: 36px minmax(120px, 1fr) 110px 96px minmax(120px, 2fr) auto; }

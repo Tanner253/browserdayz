@@ -24,7 +24,7 @@ import { BARREL } from '../sim/barrels';
 import { EMOTE, EMOTES, EMOTE_GAP, SAY_RANGE, SAY_TIME, voiceOf } from '../sim/emotes';
 import { loadSave, writeSave, type SaveData } from '../sim/save';
 import { Net, playerName, publicId, remoteServer, serverStatus, setPlayerName } from '../net/client';
-import { F_AIM, F_BLEED, F_CROUCH, F_DANCE, F_DEAD, F_GROUND, F_GUARD, F_LEAN_L, F_LEAN_R, F_LIMP, F_LIGHT, F_PRONE, F_SEAT, F_SIT, F_SPRINT, F_SURRENDER, MAX_STAMINA, crateId, type Act, type CorpseInfo, type PlayerInfo, type Pose, type S2C, type StashInfo } from '../net/protocol';
+import { F_AIM, F_BLEED, F_CROUCH, F_DANCE, F_DEAD, F_GROUND, F_GUARD, F_LEAN_L, F_LEAN_R, F_LIMP, F_LIGHT, F_PRONE, F_SEAT, F_SIT, F_SPRINT, F_SURRENDER, MAX_STAMINA, crateId, type Act, type CorpseInfo, type PlayerInfo, type Pose, type StoredItem, type S2C, type StashInfo } from '../net/protocol';
 import { Player } from './player';
 import { Avatar, AVATAR_LAYER, DEATH_REST, FP_BODY_LAYER, GEAR_SHOWN, type Hold, facepiece } from './avatar';
 import { lookFor } from './look';
@@ -97,6 +97,8 @@ export interface WorldSystems {
 
 /** seconds with a shovel to put a stash under the ground, or to bring one up */
 const DIG_SECONDS = BURY.seconds;
+/** how far off an admin's free camera shows names over heads, metres */
+const ESP_RANGE = 220;
 
 interface TimedAction {
   label: string;
@@ -186,8 +188,9 @@ export class Game {
     scene: () => this.s.r.scene,
     world: () => this.s.world,
     buildings: () => this.s.buildings,
-    me: () => ({ id: this.net.id || 1, pos: this.player.pos, crouched: this.player.crouched || this.player.prone, speed: Math.hypot(this.player.vel.x, this.player.vel.z), alive: this.started && !this.player.dead, seated: !!this.garage.ride }),
-    others: () => this.remotes.values(),
+    me: () => ({ id: this.net.id || 1, pos: this.player.pos, crouched: this.player.crouched || this.player.prone, speed: Math.hypot(this.player.vel.x, this.player.vel.z), alive: this.started && !this.player.dead && !this.powers.hidden, seated: !!this.garage.ride }),
+    // (whoever has vanished is not there, to the infected)
+    others: () => this.seenByInfected(),
     online: () => this.online,
     send: (m) => this.net.send(m),
     bunkerOpen: () => this.bunker.open,
@@ -685,6 +688,15 @@ export class Game {
           this.adminUI.close();
           this.toggleMap(true);
         },
+        watch: (id) => {
+          this.toggleAdmin(false);
+          this.watch(id);
+        },
+        night: (on) => {
+          this.nightSight = on && this.role === 'admin';
+          this.adminUI.setSelf(this.adminSelf());
+        },
+        tint: (color) => this.setTint(color),
         close: () => this.toggleAdmin(false),
       });
       document.getElementById('ui')!.appendChild(this.adminUI.root);
@@ -908,6 +920,10 @@ export class Game {
     const inv = this.inv;
     if (this.player.dead) return;
     if (!m.adds) {
+      // (whatever the hands were at is dropped: a kit asked for again is the same kit, whole, in place of what is left of the last)
+      if (this.use) this.breakOff();
+      if (this.invUI.isOpen) this.toggleInventory(false);
+      this.loose = null;
       this.weapons.take(null);
       const me = publicId();
       inv.sortTags((tag) => tag.pid === me);
@@ -925,7 +941,7 @@ export class Game {
     this.autoHot();
     this.inventoryChanged();
     this.meDirty = true;
-    this.hud.note(`${m.by ? `${m.by}, an admin, has given you` : 'You have'} the ${m.name} kit${over.length ? `: ${over.length} of its things found no room and lie at your feet` : ''}`, 'good');
+    if (m.by || over.length) this.hud.note(`${m.by ? `${m.by}, an admin, has given you the ${m.name} kit` : `The ${m.name} kit`}${over.length ? `: ${over.length} of its things found no room and lie at your feet` : ''}`, 'good');
   }
 
   /** Every survivor wears a dog tag stamped with their own name, round their neck (see PlayerInventory.neck). */
@@ -1260,7 +1276,7 @@ export class Game {
         if (this.openStash === st) this.toggleInventory(false);
         this.loot.removeStash(st);
       }
-      this.carryOff(m.item);
+      this.carryOff(m.item, m.items);
     });
     net.on('stash~', (m) => {
       const st = this.loot.stashes.find((s) => s.uid === m.uid);
@@ -1294,7 +1310,7 @@ export class Game {
       this.meDirty = true;
       this.resume();
     });
-    net.on('chat', (m) => this.hud.chatLine(m.ch ?? 'global', m.from, m.text, m.role));
+    net.on('chat', (m) => this.hud.chatLine(m.ch ?? 'global', m.from, m.text, m.role, m.tint));
     // everyone carrying a tag they took, shown on the map for a few seconds
     net.on('tags', (m) => {
       const me = m.p.some(([id]) => id === net.id);
@@ -1320,8 +1336,11 @@ export class Game {
         this.order(`/tp ${x.toFixed(0)} ${z.toFixed(0)}`);
         this.toggleMap(false);
       } : null;
+      if (m.role === 'admin' && this.tint) this.net.send({ t: 'tint', color: this.tint });
       if (m.role !== 'admin') {
         this.toggleFreecam(false);
+        this.nightSight = false;
+        this.map.setPeople([]);
         if (!m.role) this.toggleAdmin(false);
       }
       this.adminUI.setSelf(this.adminSelf());
@@ -1330,7 +1349,21 @@ export class Game {
       this.hud.chatLine('system', '', m.text);
       this.adminUI.say(m.text);
     });
-    net.on('adm', (m) => this.adminUI.setLists(m));
+    net.on('adm', (m) => {
+      this.adminUI.setLists(m);
+      // (and an admin's map shows where everybody is)
+      if (this.role === 'admin') this.map.setPeople(m.players.filter((q) => q.id !== net.id).map((q) => ({ x: q.x, z: q.z, name: q.name, dead: !q.alive, faint: !!q.hidden || !!q.asleep, staff: !!q.role })));
+    });
+    net.on('ghost', (m) => this.remotes.get(m.id)?.setGhost(m.on));
+    net.on('announce', (m) => {
+      this.hud.announce(m.text, m.by);
+      this.hud.chatLine('system', '', `${m.by}, to everybody: ${m.text}`);
+      this.adminUI.say(`${m.by}, to everybody: ${m.text}`);
+    });
+    net.on('pm', (m) => {
+      this.hud.chatLine('pm', m.from, m.text, m.role);
+      this.hud.note(`${m.role === 'admin' ? 'An admin' : 'A mod'} (${m.from}) to you: ${m.text}`, 'warn');
+    });
     net.on('powers', (m) => {
       this.powers = { god: m.god, hidden: m.hidden, clip: m.clip, voidInv: m.voidInv, voidTag: m.voidTag };
       this.player.god = m.god;
@@ -1463,6 +1496,7 @@ export class Game {
     await r.load(this.s.atmo, this.s.r.scene, p.pose);
     r.setWeapon(p.w, p.m);
     void this.wear(r.avatar, p.g ?? []);
+    r.setGhost(!!p.hidden);
     r.avatar.setSlung(this.weapons.slungOf(p.b ?? []));
     r.setAlive(p.alive);
     // (they may have been sitting in a jeep since before this game knew of them)
@@ -2105,7 +2139,37 @@ export class Game {
 
   // ---- what an admin can do that nobody else can (the server holds every one of them to having the role)
 
+  private *seenByInfected() {
+    for (const r of this.remotes.values()) if (!r.ghost) yield r;
+  }
+
   private adminUI!: AdminUI;
+  private mapAskT = 0;
+  /**
+   * The colour this admin has chosen for the word ADMIN before their name in the chat (null: the rainbow it is by
+   * default). Kept by this browser, and said to the server whenever it says this player is an admin.
+   */
+  private tint: string | null = (() => {
+    try {
+      const c = localStorage.getItem('zona.adminTint');
+      return c && /^#[0-9a-f]{6}$/i.test(c) ? c : null;
+    } catch {
+      return null;
+    }
+  })();
+  private setTint(color: string | null) {
+    this.tint = color && /^#[0-9a-f]{6}$/i.test(color) ? color.toLowerCase() : null;
+    try {
+      if (this.tint) localStorage.setItem('zona.adminTint', this.tint);
+      else localStorage.removeItem('zona.adminTint');
+    } catch {
+      /* a browser that keeps nothing: it lasts as long as the page does */
+    }
+    if (this.online && this.role === 'admin') this.net.send({ t: 'tint', color: this.tint });
+    this.adminUI.setSelf(this.adminSelf());
+  }
+  /** an admin's night vision: it is day in this game alone, whatever the hour (the hour itself goes on as it does) */
+  private nightSight = false;
   private powers = { god: false, hidden: false, clip: false, voidInv: false, voidTag: false };
   /** the view has left the body: where it is, and which way it looks */
   private freecam: { pos: THREE.Vector3; yaw: number; pitch: number } | null = null;
@@ -2117,11 +2181,12 @@ export class Game {
   }
 
   private adminSelf(): AdminSelf {
-    return { role: this.role, id: this.net?.id ?? 0, ...this.powers, freecam: !!this.freecam, x: Math.round(this.player.pos.x), z: Math.round(this.player.pos.z) };
+    return { role: this.role, id: this.net?.id ?? 0, ...this.powers, night: this.nightSight, tint: this.tint, freecam: !!this.freecam, x: Math.round(this.player.pos.x), z: Math.round(this.player.pos.z) };
   }
 
   private showPowers() {
-    const on = [this.powers.god && 'GOD MODE', this.powers.hidden && 'VANISHED', this.powers.clip && 'NOCLIP', this.freecam && 'FREE CAMERA  ·  H: BODY HERE  ·  K: BACK'].filter(Boolean);
+    const seen = this.watching ? this.remotes.get(this.watching.id)?.name : '';
+    const on = [this.powers.god && 'GOD MODE', this.powers.hidden && 'VANISHED', this.powers.clip && 'NOCLIP', this.freecam && `${seen ? `WATCHING ${seen.toUpperCase()}` : 'FREE CAMERA'}  ·  H: BODY HERE  ·  K: BACK`].filter(Boolean);
     this.hud.setPowers(on.join('  ·  '));
     this.adminUI?.setSelf(this.adminSelf());
   }
@@ -2159,11 +2224,54 @@ export class Game {
       this.director.third = this.freeView;
     } else {
       this.freecam = null;
+      this.watching = null;
       this.director.third = this.garage.ride ? this.garage.view : null;
     }
     this.director.shift(0.25);
     this.showPowers();
   }
+
+  /** whoever the free camera is kept with as they go: their number, and where they last were */
+  private watching: { id: number; last: THREE.Vector3 } | null = null;
+
+  /** The free camera set behind a player and a little over them, and carried along with them from then on (it is still flown). */
+  private watch(id: number) {
+    const r = this.remotes.get(id);
+    if (!r || this.role !== 'admin') return;
+    this.toggleFreecam(true);
+    if (!this.freecam) return;
+    this.freecam.pos.set(r.pos.x + Math.sin(r.yaw) * 4.5, r.pos.y + 2.6, r.pos.z + Math.cos(r.yaw) * 4.5);
+    this.freecam.yaw = r.yaw;
+    this.freecam.pitch = -0.22;
+    this.watching = { id, last: r.pos.clone() };
+    this.showPowers();
+  }
+
+  /**
+   * Names over heads, for an admin whose view has left their body: everybody within ESP_RANGE of the view, through
+   * whatever is in the way, with how far off they are. (Asked for 2026-10-12: "when im in freecam or spectate i
+   * should see everyone names in text above their heads once i get close to them".)
+   */
+  private drawNames(cam: THREE.PerspectiveCamera) {
+    if (!this.freecam || this.role !== 'admin') {
+      if (this.namesOn) this.hud.esp([]);
+      this.namesOn = false;
+      return;
+    }
+    this.namesOn = true;
+    const out: { x: number; y: number; text: string; faint?: boolean }[] = [], v = new THREE.Vector3();
+    const label = (name: string, at: THREE.Vector3, up: number, more: string, faint: boolean) => {
+      const d = at.distanceTo(cam.position);
+      if (d > ESP_RANGE) return;
+      v.set(at.x, at.y + up, at.z).project(cam);
+      if (v.z < -1 || v.z > 1 || Math.abs(v.x) > 1.05 || Math.abs(v.y) > 1.05) return;
+      out.push({ x: (v.x * 0.5 + 0.5) * 100, y: (-v.y * 0.5 + 0.5) * 100, text: `${name} · ${Math.round(d)} m${more}`, faint });
+    };
+    for (const r of this.remotes.values()) label(r.name, r.pos, r.alive ? 1.95 : 0.5, `${r.alive ? '' : ' · dead'}${r.ghost ? ' · vanished' : ''}`, !r.alive);
+    label('you', this.player.pos, 1.95, '', true);
+    this.hud.esp(out);
+  }
+  private namesOn = false;
   private freeView = (cam: THREE.PerspectiveCamera) => {
     const f = this.freecam;
     if (!f) return;
@@ -3166,9 +3274,12 @@ export class Game {
     this.inv.remove(item);
     this.openStash?.container.remove(item);
     const st = this.newStash({ uid: newUid(), x, y: hit.point.y, z, rot: p.yaw, item: item.id });
+    // (put down with whatever was in it while it was carried)
+    const items = (item.cargo ?? []).map((q) => ({ ...q.item, x: q.x, y: q.y, rot: q.rot }));
+    if (items.length) st.container.load({ items });
     st.known = true;
     void this.loot.addStash(st).then(() => this.save());
-    this.net.send({ t: 'stash+', s: { uid: st.uid, x: st.x, y: st.y, z: st.z, rot: st.rot, ...(st.item === 'stash_kit' ? {} : { item: st.item }) } });
+    this.net.send({ t: 'stash+', s: { uid: st.uid, x: st.x, y: st.y, z: st.z, rot: st.rot, ...(st.item === 'stash_kit' ? {} : { item: st.item }) }, ...(items.length ? { items } : {}) });
     this.toggleInventory(false);
     this.inventoryChanged();
     audio.ui('drop');
@@ -3184,10 +3295,17 @@ export class Game {
     return st;
   }
 
-  /** A stash picked up (empty): into the pockets, or at the feet with no room. */
-  private carryOff(id: string) {
+  /**
+   * A stash picked up, with whatever is in it: into a pocket when it is empty, into the pack on the back when it
+   * is not (a full one goes into no pocket), and with room nowhere into the hands, or to the feet if they are full.
+   */
+  private carryOff(id: string, items: StoredItem[]) {
     const it = makeItem(ITEMS[id]?.category === 'stash' ? id : 'stash_kit', 1);
-    if (this.inv.add(it)) this.dropItem(it);
+    if (items.length) it.cargo = items.map(({ x, y, rot, ...item }) => ({ item, x, y, rot }));
+    if (this.inv.add(it)) {
+      if (!this.weapons.equippedItem && !this.inHand && !this.loose && !this.use) this.takeUp(it, true);
+      else this.dropItem(it);
+    }
     audio.ui('pickup');
     this.inventoryChanged();
     this.meDirty = true;
@@ -3515,24 +3633,21 @@ export class Game {
       // A stash somebody put down: opened, picked up when it is empty, and with a shovel in the hands buried, or
       // dug up again, by holding the left button.
       const shovel = !owner.fixed && this.weapons.equippedItem?.id === 'shovel';
-      const canPack = !owner.fixed && !owner.buried && owner.container.items.length === 0 && (!this.online || owner.known);
+      const canPack = !owner.fixed && !owner.buried;
       this.prompt = owner.fixed
         ? `<kbd>F</kbd>Search ${owner.label}`
         : owner.buried
           ? shovel ? '<kbd>LMB</kbd>Hold to dig here' : 'Something is buried here <small>a shovel would dig it up</small>'
-          : `<kbd>F</kbd>Open ${owner.label}${canPack ? ' <small>G to pack up</small>' : ''}${shovel ? ' <small>hold the left button to bury it</small>' : ''}`;
+          : `<kbd>F</kbd>Open ${owner.label}${canPack ? ' <small>G to pick up</small>' : ''}${shovel ? ' <small>hold the left button to bury it</small>' : ''}`;
       if (key && !owner.buried) this.toggleInventory(true);
       if (shovel && !this.use && !this.invUI.isOpen && this.input.pressed('Mouse0')) this.dig(owner, !owner.buried);
       if (canPack && this.input.pressed('KeyG')) {
-        if (!this.inv.hasRoom(makeItem(owner.item, 1))) {
-          this.hud.note('No room to carry it', 'warn');
-          return;
-        }
-        // (online it is theirs when the server says so: see 'stashgot')
+        // (online it is theirs when the server says so, with what the server says is in it: see 'stashgot')
+        if (this.invUI.isOpen) this.toggleInventory(false);
         if (this.online) this.net.send({ t: 'stash-', uid: owner.uid });
         else {
           this.loot.removeStash(owner);
-          this.carryOff(owner.item);
+          this.carryOff(owner.item, owner.container.serialize().items);
         }
       }
     }
@@ -3747,7 +3862,23 @@ export class Game {
     this.weapons.stowed = !!this.hold || this.armsUntil > now || !!ride || !!this.glass;
     const sens = this.glass ? 0.22 : this.weapons.scoped ? 0.28 : this.weapons.aiming ? 0.7 : 1;
     if (!uiOpen && playing && !this.wheelOn) p.look(input, sens);
+    // (kept with whoever it is watching: it goes as they go, and is flown about them)
+    if (this.freecam && this.watching) {
+      const r = this.remotes.get(this.watching.id);
+      if (!r) {
+        this.watching = null;
+        this.showPowers();
+      } else {
+        this.freecam.pos.add(r.pos).sub(this.watching.last);
+        this.watching.last.copy(r.pos);
+      }
+    }
     if (this.freecam && !panels && playing && !typing) this.flyCamera(dt, input);
+    // an admin's map: where everybody is, asked of the server while it is open
+    if (this.map.open && this.role === 'admin' && this.online && (this.mapAskT -= dt) <= 0) {
+      this.mapAskT = 1.5;
+      this.net.send({ t: 'adm' });
+    }
 
     // (The legs are free while the inventory is open: it is walked about with, to see what lies near, as in DayZ.
     // What is nearby is read again as it changes: see `vicinityT`. The trader's counter is stood at.)
@@ -3904,6 +4035,7 @@ export class Game {
     this.syncHeld();
 
     this.director.update(dt);
+    this.drawNames(cam);
     if (this.director.avatarVisible) cam.layers.enable(AVATAR_LAYER);
     else cam.layers.disable(AVATAR_LAYER);
     // your own body below the camera, first person only
@@ -4049,7 +4181,9 @@ export class Game {
 
     // the hour: before a game has begun it is always day behind the menu
     const hour = hourAt(this.started ? this.hourNow() : DAY.menu);
-    atmo.setHour(hour.light, hour.low);
+    // (an admin's night vision: what is seen is the day behind the menu; what hour it is, is as it was)
+    const seen = this.nightSight && this.started ? hourAt(DAY.menu) : hour;
+    atmo.setHour(seen.light, seen.low);
     if (this.started && hour.night !== this.wasNight) {
       if (this.wasNight !== null) this.hud.note(hour.night ? 'Night has fallen' : 'First light', hour.night ? 'warn' : 'good');
       this.wasNight = hour.night;

@@ -1977,6 +1977,36 @@ export class Avatar {
     }
   }
 
+  /**
+   * Drawn faintly, or as anybody is: a vanished admin, as another admin sees them. Each piece is given a faint
+   * copy of its own paint (the paints are shared between bodies, and are not touched), and its own back again
+   * after. Asked again while it is faint, it catches whatever has been put on or taken up since.
+   */
+  setGhost(on: boolean) {
+    this.root.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) return;
+      const solid = m.userData.solid as THREE.Material | THREE.Material[] | undefined;
+      if (on && !solid) {
+        m.userData.solid = m.material;
+        const faint = (x: THREE.Material) => {
+          const c = x.clone();
+          c.transparent = true;
+          c.opacity = 0.38;
+          c.depthWrite = false;
+          return c;
+        };
+        m.material = Array.isArray(m.material) ? m.material.map(faint) : faint(m.material);
+        m.castShadow = false;
+      } else if (!on && solid) {
+        for (const x of Array.isArray(m.material) ? m.material : [m.material]) x.dispose();
+        m.material = solid;
+        delete m.userData.solid;
+        m.castShadow = true;
+      }
+    });
+  }
+
   dispose() {
     this.root.removeFromParent();
     this.fpRoot.removeFromParent();

@@ -407,11 +407,10 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 .chat-hint-orders { display: none; }
 .hud-chat.staff .chat-hint-orders { display: inline; }
 /* who said it has a role: written before the channel. A mod's is one steady colour; an admin's, and an admin's
-   name, are the whole rainbow going by (the words they say are left as anybody's, to be read) */
+   word is the whole rainbow going by (their name and what they say are as anybody's) */
 .chat-line em { font-style: normal; font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: 0.08em; margin-right: 6px; }
 .chat-line[data-role='mod'] em { color: #6fd6a8; }
-.chat-line[data-role='admin'] em,
-.chat-line[data-role='admin'] b {
+.chat-line[data-role='admin'] em:not(.plain) {
   color: transparent;
   background: linear-gradient(90deg, #ff3b3b, #ff9f2e, #ffe82e, #46f25a, #2ed8ff, #5b78ff, #d24dff, #ff3b3b) 0 0 / 200% 100%;
   -webkit-background-clip: text;
@@ -423,7 +422,7 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 }
 .chat-line[data-role='admin'] em { font-size: 11px; }
 @keyframes adminband { to { background-position: 200% 0; } }
-@media (prefers-reduced-motion: reduce) { .chat-line[data-role='admin'] em, .chat-line[data-role='admin'] b { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .chat-line[data-role='admin'] em { animation: none; } }
 /* an order being typed (a role is needed): what could be meant, above the box */
 .chat-orders { display: none; flex-direction: column; padding: 4px 0; background: rgba(8, 10, 9, 0.88); border-left: 2px solid #c8a8ff; pointer-events: auto; }
 .hud-chat.open .chat-orders.show { display: flex; }
@@ -1251,6 +1250,18 @@ kbd.hot { color: #121413; background: linear-gradient(#d8c594, #b89f66); border-
 .hud-start.paused.live .start-out { display: block; }
 .hud-logout { position: absolute; top: 96px; left: 50%; transform: translateX(-50%); display: none; padding: 6px 14px; font-family: var(--mono); font-size: 12px; letter-spacing: 0.06em; color: #ffd58a; background: rgba(10, 12, 11, 0.78); border: 1px solid rgba(255, 213, 138, 0.5); pointer-events: none; z-index: 40; white-space: nowrap; }
 .hud-logout.show { display: block; }
+/* said to everybody by an admin: across the screen, for a while */
+.hud-announce { position: absolute; top: 18%; left: 50%; transform: translateX(-50%); display: none; max-width: min(820px, 86vw); padding: 12px 22px 14px; text-align: center; background: rgba(10, 12, 11, 0.82); border: 1px solid rgba(255, 213, 138, 0.6); box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5); pointer-events: none; z-index: 45; }
+.hud-announce.show { display: block; animation: announce 9s ease both; }
+.hud-announce small { display: block; margin-bottom: 4px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: #ffd58a; }
+.hud-announce div { font-size: 26px; font-weight: 600; line-height: 1.2; color: var(--ink); overflow-wrap: anywhere; }
+@keyframes announce { 0% { opacity: 0; transform: translate(-50%, -8px); } 4%, 90% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; transform: translate(-50%, 0); } }
+/* names over heads, as an admin's free camera shows them */
+.hud-esp { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.hud-esp i { position: absolute; transform: translate(-50%, -100%); padding: 1px 6px; font-style: normal; font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em; white-space: nowrap; color: #fff; background: rgba(10, 12, 11, 0.55); border-left: 2px solid #c8a8ff; text-shadow: 0 1px 2px #000; }
+/* a line said to one player alone by an admin or a mod */
+.chat-line[data-ch='pm'] { color: #ffd58a; }
+.chat-line[data-ch='pm'] b { color: #ffd58a; }
 .hud-start.paused .start-btn { min-height: 58px; }
 
 /* --- the entrance: once, as the loading screen lifts */

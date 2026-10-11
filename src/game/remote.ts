@@ -48,6 +48,14 @@ export class RemotePlayer implements Damageable {
   /** they have an open wound: it drips as they go */
   bleeding = false;
   dripT = 0;
+  /** a vanished admin, seen by another admin: drawn faintly (see Avatar.setGhost) */
+  ghost = false;
+  private ghostT = 0;
+
+  setGhost(on: boolean) {
+    this.ghost = on;
+    if (this.ready) this.avatar.setGhost(on);
+  }
   private body!: RAPIER.RigidBody;
   private stand: RAPIER.Collider[] = [];
   private crouch: RAPIER.Collider[] = [];
@@ -343,6 +351,11 @@ export class RemotePlayer implements Damageable {
     this.body.setNextKinematicTranslation(this.pos);
     this.body.setNextKinematicRotation({ x: 0, y: Math.sin(half), z: 0, w: Math.cos(half) });
 
+    // (faint, and whatever they have put on or taken up since is made faint with them)
+    if (this.ghost && (this.ghostT += dt) > 0.6) {
+      this.ghostT = 0;
+      this.avatar.setGhost(true);
+    }
     this.flinch = Math.max(0, this.flinch - dt * 4);
     this.avatar.update(dt, this.pos, this.vel, this.yaw, this.crouched, !this.alive, false, this.pitch, this.grounded, this.aiming);
     // (sat in it, they lean and tip as it does)

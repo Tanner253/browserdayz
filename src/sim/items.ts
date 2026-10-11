@@ -751,6 +751,12 @@ export function itemWeight(it: ItemInstance): number {
 /** things that are gone, and what one of them carried from before is now: the Pistol 43 and its magazines (2026-10-11) */
 const NOW: Record<string, string> = { p38: 'colt', mag_p38: 'mag_colt', mag_p38_ext: 'mag_colt' };
 
+/**
+ * How big a thing is inside, if things are kept in it: a bag or a vest that is worn, or a stash, which keeps what
+ * is in it while it is carried (a stash case picked up full is put down full).
+ */
+export const holds = (id: string): [number, number] | undefined => ITEMS[id]?.wear?.cargo ?? ITEMS[id]?.stash;
+
 export function sanitizeItem(it: ItemInstance): ItemInstance | null {
   if (it && NOW[it.id]) it.id = NOW[it.id];
   if (it?.mag && NOW[it.mag]) it.mag = NOW[it.mag];
@@ -776,7 +782,7 @@ export function sanitizeItem(it: ItemInstance): ItemInstance | null {
   if (it.mods) it.mods = it.mods.filter((m) => !ITEMS[m]?.mag && ITEMS[m]?.attach?.fits.includes(it.id));
   if (it.cargo) {
     it.cargo = it.cargo.filter((p) => p && p.item && sanitizeItem(p.item));
-    if (!ITEMS[it.id].wear?.cargo) delete it.cargo;
+    if (!holds(it.id)) delete it.cargo;
   }
   return it;
 }

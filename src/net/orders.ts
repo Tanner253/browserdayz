@@ -22,7 +22,9 @@ export const ORDERS: Order[] = [
   { name: 'flagged', args: [], does: 'Who the cheat checks have flagged' },
   { name: 'kick', args: ['who', '[why]'], does: 'Put somebody off the server (they can come straight back)' },
   { name: 'timeout', args: ['who', 'minutes', '[why]'], does: 'Keep somebody off for up to 60 minutes' },
-  { name: 'say', args: ['words'], does: 'Say something across everybody’s screen' },
+  { name: 'say', args: ['words'], does: 'Say something across everybody’s screen, and in the chat' },
+  { name: 'msg', args: ['who', 'words'], does: 'Say something to one player alone' },
+  { name: 'inv', args: ['who'], does: 'What somebody carries, as their game last said' },
   { name: 'warn', args: ['who', 'words'], does: 'Put a warning on somebody’s screen' },
   { name: 'mute', args: ['who', 'minutes'], does: 'What they type and say reaches nobody, for up to 60 minutes' },
   { name: 'unmute', args: ['who'], does: 'Let them be heard again' },
@@ -33,11 +35,12 @@ export const ORDERS: Order[] = [
   { name: 'kit', args: ['kit', '[who]'], does: 'A whole set of the best there is, in place of what is carried', admin: true },
   { name: 'heal', args: ['[who]'], does: 'Whole, fed and watered: you, or somebody', admin: true },
   { name: 'slay', args: ['who'], does: 'Kill somebody where they stand', admin: true },
-  { name: 'god', args: [], does: 'Nothing hurts you (again, to put it off)', admin: true },
-  { name: 'vanish', args: [], does: 'Nobody sees you (again, to be seen)', admin: true },
-  { name: 'noclip', args: [], does: 'Fly, and through anything (again, to walk)', admin: true },
-  { name: 'voidinv', args: [], does: 'Dying, you leave nothing you carried on your body (again, to leave it)', admin: true },
-  { name: 'voidtag', args: [], does: 'Dying, you leave no dog tag of your own (again, to leave one)', admin: true },
+  { name: 'die', args: [], does: 'Kill yourself where you stand', admin: true },
+  { name: 'god', args: ['[who]'], does: 'Nothing hurts you, or another admin (again, to put it off)', admin: true },
+  { name: 'vanish', args: ['[who]'], does: 'Nobody but an admin sees you, or another admin (again, to be seen)', admin: true },
+  { name: 'noclip', args: ['[who]'], does: 'You fly, and through anything; or another admin does (again, to walk)', admin: true },
+  { name: 'voidinv', args: ['[who]'], does: 'Dying, an admin leaves nothing they carried on their body (again, to leave it)', admin: true },
+  { name: 'voidtag', args: ['[who]'], does: 'Dying, an admin leaves no dog tag of their own (again, to leave one)', admin: true },
   { name: 'ban', args: ['who', '[why]'], does: 'Ban for good: their game and their address', admin: true },
   { name: 'bans', args: [], does: 'Who is banned, numbered for /unban', admin: true },
   { name: 'unban', args: ['number-or-name'], does: 'Lift a ban (the number is from /bans)', admin: true },
@@ -81,7 +84,9 @@ export function offer(text: string, role: Role | null, here: { id: number; name:
   const mine = ordersOf(role), words = text.slice(1).split(/\s+/);
   if (words.length === 1) {
     const w = words[0].toLowerCase();
-    const picks = mine.filter((o) => o.name.startsWith(w)).map((o) => ({ label: written(o), note: o.does, fill: `/${o.name}${o.args.length ? ' ' : ''}`, whole: !o.args.length }));
+    // (an order whose every word can be left out is given whole by Enter, as one with no words is)
+    const bare = (o: Order) => o.args.every((a) => a.startsWith('['));
+    const picks = mine.filter((o) => o.name.startsWith(w)).map((o) => ({ label: written(o), note: o.does, fill: `/${o.name}${bare(o) ? '' : ' '}`, whole: bare(o) }));
     return picks.length ? { order: null, at: -1, picks } : null;
   }
   const order = mine.find((o) => o.name === words[0].toLowerCase());

@@ -22,6 +22,12 @@ export interface AdminActions {
   freecam(on: boolean): void;
   /** the map, opened to be right-clicked on */
   map(): void;
+  /** the free camera, set behind a player and kept with them as they go */
+  watch(id: number): void;
+  /** night made day, in this game alone */
+  night(on: boolean): void;
+  /** the colour of the word ADMIN before this admin's name in the chat (null: the rainbow) */
+  tint(color: string | null): void;
   close(): void;
 }
 
@@ -34,6 +40,10 @@ export interface AdminSelf {
   clip: boolean;
   voidInv: boolean;
   voidTag: boolean;
+  /** it is day in this game alone, whatever the hour */
+  night: boolean;
+  /** the colour chosen for the word ADMIN in the chat (null: the rainbow) */
+  tint: string | null;
   freecam: boolean;
   x: number;
   z: number;
@@ -54,7 +64,7 @@ export class AdminUI {
   root = el('div', 'adm');
   isOpen = false;
   private tab: Tab = 'players';
-  private self: AdminSelf = { role: null, id: 0, god: false, hidden: false, clip: false, voidInv: false, voidTag: false, freecam: false, x: 0, z: 0 };
+  private self: AdminSelf = { role: null, id: 0, god: false, hidden: false, clip: false, voidInv: false, voidTag: false, night: false, tint: null, freecam: false, x: 0, z: 0 };
   private lists: AdminLists = { players: [], gone: [], bans: [], roles: [], checks: '' };
   /** who is picked in the list of players (their number), and what is typed in the boxes: kept while the lists are drawn again */
   private picked = 0;
@@ -214,19 +224,20 @@ export class AdminUI {
     const shown = this.lists.players.filter((p) => !f || p.name.toLowerCase().includes(f) || `#${p.id}`.startsWith(f));
     const pick = this.lists.players.find((p) => p.id === this.picked) ?? null;
     const top = el('div', 'adm-line');
+    const st = this.lists.stats;
     top.append(
       this.input(this.find, 'Find a player', (v) => {
         this.find = v;
         this.redrawList();
       }, 'wide'),
-      el('span', 'dim', `${this.lists.players.length} online · cheat checks: ${this.lists.checks || '?'}`),
+      el('span', 'dim', `${this.lists.players.length} online${st?.asleep ? ` (${st.asleep} gone, body left)` : ''} · cheat checks: ${this.lists.checks || '?'}${st ? ` · up ${st.up} min · ${st.stashes} stashes · ${st.kept} characters kept` : ''}`),
     );
     const list = el('div', 'adm-list');
-    list.append(this.row('#', 'Name', 'Role', 'At', 'On', 'Flags', ''));
+    list.append(this.row('#', 'Name', 'Role', 'At', 'On', 'HP', 'Flags', ''));
     list.firstElementChild!.classList.add('headrow');
     for (const p of shown) {
       const marks = [p.alive ? '' : 'dead', p.asleep ? 'gone: body left behind' : p.away ? 'not answering (tabbed out)' : '', p.seat ? 'in a car' : '', p.muted ? 'muted' : '', p.god ? 'god' : '', p.hidden ? 'vanished' : '', p.clip ? 'noclip' : ''].filter(Boolean).join(' · ');
-      const r = this.row(`#${p.id}`, p.name + (p.id === this.self.id ? '  (you)' : ''), p.role ?? '', `${p.x}, ${p.z}`, `${p.mins} min`, p.flags ? String(p.flags) : '', marks);
+      const r = this.row(`#${p.id}`, p.name + (p.id === this.self.id ? '  (you)' : ''), p.role ?? '', `${p.x}, ${p.z}`, `${p.mins} min`, p.alive ? String(p.hp) : '', p.flags ? String(p.flags) : '', [marks, p.kills || p.tags ? `${p.kills} kill${p.kills === 1 ? '' : 's'}, ${p.tags} tag${p.tags === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · '));
       r.classList.add('pickable');
       if (p.id === this.picked) r.classList.add('on');
       if (p.flags > 20) r.classList.add('hot');
@@ -243,17 +254,23 @@ export class AdminUI {
     else {
       const who = `#${pick.id}`, me = pick.id === this.self.id, why = () => (this.why.trim() ? ` ${this.why.trim()}` : '');
       acts.append(el('div', 'adm-who', `#${pick.id}  ${pick.name}${pick.role ? `  [${pick.role}]` : ''}`));
-      const reason = this.input(this.why, 'Why (shown to them), or the words of a warning', (v) => (this.why = v), 'wide');
+      const reason = this.input(this.why, 'Why (shown to them), or the words of a message or a warning', (v) => (this.why = v), 'wide');
       const line = (label: string, ...b: HTMLElement[]) => {
         const l = el('div', 'adm-line');
         l.append(el('span', 'adm-label', label), ...b);
         return l;
       };
-      if (admin && !me) acts.append(line('Move', this.button('Go to them', () => this.send(`/goto ${who}`)), this.button('Bring them here', () => this.send(`/bring ${who}`))));
-      if (admin) acts.append(line('Body', this.button('Heal', () => this.send(`/heal ${who}`), 'good'), ...(me ? [] : [this.grave(`slay${pick.id}`, 'Kill', () => this.send(`/slay ${who}`))])));
+      if (admin && !me) acts.append(line('Move', this.button('Go to them', () => this.send(`/goto ${who}`)), this.button('Bring them here', () => this.send(`/bring ${who}`)), this.button('Watch them', () => this.act.watch(pick.id))));
+      if (admin) acts.append(line('Body', this.button('Heal', () => this.send(`/heal ${who}`), 'good'), ...(me ? [] : [this.grave(`slay${pick.id}`, 'Kill', () => this.send(`/slay ${who}`))]), this.button('What they carry', () => this.send(`/inv ${who}`))));
+      // (an admin's powers are another admin's to put on and off)
+      if (admin && !me && pick.role === 'admin') {
+        const power = (label: string, order: string, on: boolean | undefined) => this.button(`${on ? '[x]' : '[ ]'} ${label}`, () => this.send(`/${order} ${who} ${on ? 'off' : 'on'}`), on ? 'toggle on inline' : 'toggle inline');
+        acts.append(line('Powers', power('God', 'god', pick.god), power('Vanish', 'vanish', pick.hidden), power('Noclip', 'noclip', pick.clip), power('Void inventory', 'voidinv', pick.voidInv), power('Void tag', 'voidtag', pick.voidTag)));
+      }
       if (!me) {
         acts.append(line('Why', reason));
         acts.append(line('Order',
+          this.button('Message', () => this.send(`/msg ${who}${why() || ' an admin is watching'}`)),
           this.button('Warn', () => this.send(`/warn ${who}${why() || ' keep to the rules'}`)),
           this.button(pick.muted ? 'Unmute' : 'Mute 10 min', () => this.send(pick.muted ? `/unmute ${who}` : `/mute ${who} 10`)),
           this.button('Mute 60', () => this.send(`/mute ${who} 60`)),
@@ -300,13 +317,15 @@ export class AdminUI {
     powers.append(
       el('div', 'adm-label', 'Powers'),
       toggle('God mode: nothing hurts you', s.god, () => this.send(`/god ${s.god ? 'off' : 'on'}`)),
-      toggle('Vanish: nobody sees you', s.hidden, () => this.send(`/vanish ${s.hidden ? 'off' : 'on'}`)),
+      toggle('Vanish: nobody but an admin sees you', s.hidden, () => this.send(`/vanish ${s.hidden ? 'off' : 'on'}`)),
       toggle('Noclip: fly, through anything', s.clip, () => this.send(`/noclip ${s.clip ? 'off' : 'on'}`), 'N'),
       toggle('Free camera: the view leaves the body', s.freecam, () => {
         this.act.freecam(!s.freecam);
         this.act.close();
       }, 'K'),
+      toggle('Night vision: it is day, for you alone', s.night, () => this.act.night(!s.night)),
       this.button('Heal me', () => this.send('/heal'), 'good'),
+      this.grave('die', 'Kill me', () => this.send('/die')),
       el('div', 'adm-label', 'When you die'),
       toggle('Void inventory: nothing you carried is left on your body', s.voidInv, () => this.send(`/voidinv ${s.voidInv ? 'off' : 'on'}`)),
       toggle('Void dog tag: no tag of yours is left to be cashed in', s.voidTag, () => this.send(`/voidtag ${s.voidTag ? 'off' : 'on'}`)),
@@ -338,10 +357,25 @@ export class AdminUI {
       this.words = '';
       this.draw();
     };
-    say.append(el('span', 'adm-label', 'Say to all'), this.input(this.words, 'Across everybody’s screen', (v) => (this.words = v), 'wide', tell), this.button('Say', tell));
+    say.append(el('span', 'adm-label', 'Say to all'), this.input(this.words, 'Across everybody’s screen and in the chat (a message to one player: the Players tab)', (v) => (this.words = v), 'wide', tell), this.button('Say', tell));
+    // the colour of the word ADMIN before this admin's name in the chat: the rainbow, or one of their own
+    const tag = el('div', 'adm-line');
+    const sample = el('span', `adm-tag${s.tint ? '' : ' rgb'}`, '[ADMIN]');
+    if (s.tint) sample.style.color = s.tint;
+    const pick = el('input', 'adm-colour');
+    pick.type = 'color';
+    pick.value = s.tint ?? '#c8a8ff';
+    pick.onchange = () => this.act.tint(pick.value);
+    tag.append(el('span', 'adm-label', 'Tag colour'), sample, this.button('RGB', () => this.act.tint(null), s.tint ? 'tab' : 'tab on'),
+      ...['#ff5a4d', '#ffb02e', '#ffe45c', '#5fe36b', '#35d6ff', '#6f8cff', '#c97bff', '#ffffff'].map((c) => {
+        const b = this.button('', () => this.act.tint(c), `swatch${s.tint === c ? ' on' : ''}`);
+        b.style.background = c;
+        b.title = c;
+        return b;
+      }), pick, el('span', 'dim', 'the word ADMIN before your name in the chat'));
     const cols = el('div', 'adm-cols');
     cols.append(powers, go);
-    return [cols, say];
+    return [cols, say, tag];
   }
 
   // ---------------------------------------------------------------- things to spawn

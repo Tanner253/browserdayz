@@ -103,3 +103,20 @@ Admins only:
 ## Player slots
 
 `MAX_PLAYERS` on Render (24 now). Above it, players wait in the line.
+
+## Added on 12 October
+
+- **No check ever kicks or flags an admin**, whatever they are doing (flying, under the ground, teleporting).
+- **A new admin leaves nothing when they die**: Void inventory and Void dog tag are on by default. Turn them off in the Me tab.
+- **The map (M) shows every player** with their name, to admins. Grey is dead, violet is staff, faint is vanished or a body left behind.
+- **Other admins' powers**: pick an admin in the Players tab and a Powers row appears (God, Vanish, Noclip, Void inventory, Void tag). Or type `/god who on`, `/vanish who off`, and so on.
+- **Vanished admins are visible to other admins**, drawn faintly. The infected ignore whoever is vanished.
+- **Names over heads in the free camera**: everybody within 220 m, through walls, with the distance.
+- **Watch them** (Players tab): the free camera goes behind that player and travels with them. K comes back.
+- **Say to all** now goes across everybody's screen in a banner and into the chat, and the panel says it was sent. **Message** (Players tab, or `/msg who words`) says something to one player alone.
+- **What they carry** (Players tab, or `/inv who`): the server's last copy of their pockets, and anything in them the server never put in the world.
+- **Kits always replace everything** you carry (dog tags kept), however fast the buttons are pressed. **Spawn** is a kit too: what a new life starts with.
+- **Night vision** (Me tab): it is day for you alone.
+- **Kill me** (Me tab, or `/die`).
+- **Tag colour** (Me tab): the colour of the word ADMIN before your name in the chat. RGB is the default and the RGB button goes back to it. Your name itself is no longer rainbow.
+- The Players tab also shows health, kills and tags cashed, and the top line shows server uptime, stashes standing and characters kept.

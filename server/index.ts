@@ -14,7 +14,7 @@ import { WebSocketServer, type WebSocket } from 'ws';
 import { buildWorldData } from './world';
 import { Economy, type WorldLoot } from '../src/sim/economy';
 import { Container, type SerializedInventory } from '../src/sim/inventory';
-import { ITEMS, TAG_FRESH, TAG_HOLD, TAG_OUT, magFits, makeItem, sanitizeItem, type ItemInstance } from '../src/sim/items';
+import { ITEMS, TAG_FRESH, TAG_HOLD, TAG_OUT, holds, magFits, makeItem, sanitizeItem, type ItemInstance } from '../src/sim/items';
 import { WORLD_SIZE, inPlay } from '../src/world/worldgen';
 import { BURY, noBurying } from '../src/sim/stash';
 
@@ -461,6 +461,8 @@ let flagged = 0;
 
 /** Something a check fires on: counted, and written down (not more than once in five seconds for one player). @returns whether it is refused */
 function flag(c: Client, what: string, refuse = true): boolean {
+  // (an admin is not asked how they got anywhere, or how they are still standing: they fly, and are put where they say)
+  if (roleOf(c) === 'admin') return false;
   c.check.flags++;
   flagged++;
   const now = Date.now();
@@ -479,7 +481,7 @@ function flag(c: Client, what: string, refuse = true): boolean {
  */
 function moveCheck(c: Client, to: Pose, now: number): boolean {
   const k = c.check;
-  if (CHECKS === 'off' || !c.alive || now < k.free || c.power.clip) {
+  if (CHECKS === 'off' || !c.alive || now < k.free || c.power.clip || roleOf(c) === 'admin') {
     k.at = now;
     k.carry = 0;
     k.high = 0;
@@ -730,6 +732,8 @@ const ADMIN = {
   muted: new Map<string, number>(),
   /** when each panel last asked for its lists */
   asked: new Map<number, number>(),
+  /** the colour an admin has chosen for the word ADMIN before their name in the chat, by their number (none: the rainbow) */
+  tints: new Map<number, string>(),
   /** what each admin has chosen for their own death, by their key: it is theirs again when they come back */
   voids: new Map<string, { voidInv: boolean; voidTag: boolean }>(),
 };
@@ -983,6 +987,17 @@ function place(t: Client, x: number, y: number | null, z: number, by: Client) {
   t.underAt = 0;
   send(t, { t: 'put', x, ...(y === null ? {} : { y }), z, ...(by === t ? {} : { by: by.name }) });
 }
+/**
+ * Somebody has just been made an admin, or has come in as one. What they leave when they die is chosen for them
+ * until they choose otherwise: nothing they carried, and no tag (an admin's kit is not found on them, and nobody
+ * is paid for killing one at work). And they are shown whoever has vanished.
+ */
+function asAdmin(c: Client, fresh: boolean) {
+  Object.assign(c.power, ADMIN.voids.get(c.key) ?? { voidInv: true, voidTag: true });
+  send(c, { t: 'powers', ...c.power });
+  if (fresh) for (const o of clients.values()) if (o !== c && o.power.hidden) send(c, { t: 'join', p: info(o) });
+}
+
 /** One of an admin's powers, put on or off: they are told which they have, and (vanishing) everybody else that they have left or come. */
 function setPower(c: Client, k: keyof Client['power'], on: boolean) {
   if (c.power[k] === on) return;
@@ -992,7 +1007,8 @@ function setPower(c: Client, k: keyof Client['power'], on: boolean) {
     return void send(c, { t: 'powers', ...c.power });
   }
   const now = Date.now();
-  if (k === 'hidden') broadcast(on ? { t: 'leave', id: c.id } : { t: 'join', p: info(c) }, c);
+  // (vanished: gone from everybody's game but an admin's, where they are drawn faintly)
+  if (k === 'hidden') for (const o of clients.values()) if (o !== c) send(o, roleOf(o) === 'admin' ? { t: 'ghost', id: c.id, on } : on ? { t: 'leave', id: c.id } : { t: 'join', p: info(c) });
   if (k === 'clip') {
     c.check.free = now + CHECK.free;
     c.underAt = 0;
@@ -1047,10 +1063,32 @@ async function command(c: Client, line: string) {
       const list = [...clients.values()].filter((o) => o.check.flags > 0).sort((p, q) => q.check.flags - p.check.flags);
       return void sys(c, list.length ? `Flagged by the checks (which are set to "${CHECKS}"):` : 'Nobody online has been flagged.', ...list.map((o) => `${label(o)}  ${o.check.flags} times`));
     }
-    case 'say':
+    case 'say': {
       if (!rest.length) return void sys(c, 'Say what?');
-      log(`[admin] ${c.name} to everybody: ${rest.join(' ')}`);
-      return void broadcast({ t: 'tell', kind: 'warn', text: rest.join(' ').slice(0, 160) });
+      const words = rest.join(' ').slice(0, 160);
+      log(`[admin] ${c.name} to everybody: ${words}`);
+      broadcast({ t: 'announce', text: words, by: c.name });
+      return void sys(c, `Said to all ${clients.size}: ${words}`);
+    }
+    case 'msg':
+    case 'pm':
+    case 'w': {
+      const t = whoIs(who), words = rest.slice(1).join(' ').slice(0, 160);
+      if (!t) return void sys(c, `Nobody online is "${who}" (or more than one is): see /players.`);
+      if (!words) return void sys(c, 'Say what to them?');
+      log(`[admin] ${c.name} to ${t.name} alone: ${words}`);
+      send(t, { t: 'pm', from: c.name, role, text: words });
+      return void sys(c, `To ${t.name} alone: ${words}`);
+    }
+    case 'inv': {
+      const t = whoIs(who);
+      if (!t) return void sys(c, `Nobody online is "${who}" (or more than one is): see /players.`);
+      const worn = Object.entries(t.inv?.slots ?? {}).flatMap(([slot, it]) => (it && slot !== 'neck' ? [`${slot}: ${ITEMS[it.id]?.name ?? it.id}${it.mods?.length ? ` (${it.mods.map((m) => ITEMS[m]?.name ?? m).join(', ')})` : ''}`] : []));
+      const count = new Map<string, number>();
+      for (const it of things(t.inv)) count.set(ITEMS[it.id]?.name ?? it.id, (count.get(ITEMS[it.id]?.name ?? it.id) ?? 0) + (ITEMS[it.id]?.stack ? it.qty : 1));
+      const never = [...things(t.inv)].filter(invented).map((it) => ITEMS[it.id]?.name ?? it.id);
+      return void sys(c, `${t.name} carries (as their game last said, ${t.vitals ? `health ${Math.round(t.vitals.health)}` : 'health not said'}):`, worn.length ? worn.join(' · ') : 'nothing worn or slung', [...count].map(([n, q]) => (q > 1 ? `${q} × ${n}` : n)).join(' · ') || 'nothing at all', ...(never.length ? [`NOT put in the world by the server: ${never.join(', ')}`] : []));
+    }
     case 'kick': {
       const t = whoIs(who);
       if (!t) return void sys(c, `Nobody online is "${who}" (or more than one is): see /players.`);
@@ -1103,15 +1141,21 @@ async function command(c: Client, line: string) {
       if (!admin) return need();
       const t = whoIs(who);
       if (!t) return void sys(c, `Nobody online is "${who}" (or more than one is): they have to be here to be given a role, or to lose one.`);
-      const key = keyHash(t.key), roles = { ...ADMIN.state.roles };
+      const key = keyHash(t.key), roles = { ...ADMIN.state.roles }, was = roleOf(t) === 'admin';
       const to: Role | null = cmd === 'mod' ? 'mod' : cmd === 'demote' || cmd === 'deop' ? null : 'admin';
       if (t === c && to !== 'admin') return void sys(c, 'Not yourself: somebody else has to.');
       if (to) roles[key] = { role: to, name: t.name, by: c.name, at: new Date().toISOString() };
       else delete roles[key];
       log(`[admin] ${c.name} made ${t.name} ${to ?? 'nothing'}`);
       const kept = await saveAdmin({ roles, bans: ADMIN.state.bans });
-      if (to !== 'admin') for (const k of ['god', 'hidden', 'clip', 'voidInv', 'voidTag'] as const) setPower(t, k, false);
+      if (to !== 'admin') {
+        for (const k of ['god', 'hidden', 'clip', 'voidInv', 'voidTag'] as const) setPower(t, k, false);
+        ADMIN.voids.delete(t.key);
+        // (and whoever has vanished is gone from their game, as from anybody's)
+        if (was) for (const o of clients.values()) if (o !== t && o.power.hidden) send(t, { t: 'leave', id: o.id });
+      }
       send(t, { t: 'role', role: to });
+      if (to === 'admin' && !was) asAdmin(t, true);
       if (to) sys(t, `${c.name} has made you ${to === 'admin' ? 'an admin' : 'a mod'}: /help says what you can do.`);
       return void sys(c, `${t.name} is ${to ? (to === 'admin' ? 'an admin' : 'a mod') : 'no longer either'}.${kept ? '' : ' It could NOT be written to the site: give the order again in a minute.'}`);
     }
@@ -1219,6 +1263,13 @@ async function command(c: Client, line: string) {
       if (t !== c) sys(t, 'An admin has made you whole.');
       return void sys(c, `${t === c ? 'You are' : `${t.name} is`} whole.`);
     }
+    case 'die': {
+      if (!admin) return need();
+      if (!c.alive) return void sys(c, 'You are dead already.');
+      c.lastHitBy = null;
+      kill(c, 'their own hand');
+      return void sys(c, 'You are dead.');
+    }
     case 'slay': {
       if (!admin) return need();
       const t = whoIs(who);
@@ -1230,21 +1281,26 @@ async function command(c: Client, line: string) {
       return void sys(c, `${t.name} is dead.`);
     }
     case 'voidinv':
-    case 'voidtag': {
-      if (!admin) return need();
-      const k = cmd === 'voidinv' ? 'voidInv' : 'voidTag';
-      const on = rest[0] === 'on' ? true : rest[0] === 'off' ? false : !c.power[k];
-      setPower(c, k, on);
-      return void sys(c, k === 'voidInv' ? (on ? 'When you die, nothing you carried is left on your body.' : 'When you die, what you carried is on your body, as anybody\'s is.') : on ? 'When you die, no dog tag of your own is left.' : 'When you die, your dog tag is on your body, as anybody\'s is.');
-    }
+    case 'voidtag':
     case 'god':
     case 'vanish':
     case 'noclip': {
+      // One of an admin's powers put on or off: their own, or (named) another admin's. `on` or `off` says which;
+      // said neither, it is turned over.
       if (!admin) return need();
-      const k = cmd === 'god' ? 'god' : cmd === 'vanish' ? 'hidden' : 'clip';
-      const on = rest[0] === 'on' ? true : rest[0] === 'off' ? false : !c.power[k];
-      setPower(c, k, on);
-      return void sys(c, k === 'god' ? (on ? 'Nothing hurts you now.' : 'You can be hurt again.') : k === 'hidden' ? (on ? 'Nobody sees you now: to them you have left.' : 'You can be seen again.') : on ? 'You fly, and through anything: W A S D, Space up, Ctrl down, Shift fast.' : 'You walk again.');
+      const k = ({ god: 'god', vanish: 'hidden', noclip: 'clip', voidinv: 'voidInv', voidtag: 'voidTag' } as const)[cmd];
+      const say = rest.find((w) => w === 'on' || w === 'off'), whom = rest.find((w) => w !== 'on' && w !== 'off');
+      const t = whom ? whoIs(whom) : c;
+      if (!t) return void sys(c, `Nobody online is "${whom}" (or more than one is): see /players.`);
+      if (roleOf(t) !== 'admin') return void sys(c, `${t.name} is not an admin: these are an admin's.`);
+      const on = say ? say === 'on' : !t.power[k];
+      setPower(t, k, on);
+      const what = { god: 'god mode', hidden: 'vanish', clip: 'noclip', voidInv: 'void inventory on death', voidTag: 'void dog tag on death' }[k];
+      if (t !== c) {
+        sys(t, `${c.name} has put ${what} ${on ? 'on' : 'off'} for you.`);
+        return void sys(c, `${t.name}: ${what} is ${on ? 'on' : 'off'}.`);
+      }
+      return void sys(c, k === 'voidInv' ? (on ? 'When you die, nothing you carried is left on your body.' : 'When you die, what you carried is on your body, as anybody\'s is.') : k === 'voidTag' ? (on ? 'When you die, no dog tag of your own is left.' : 'When you die, your dog tag is on your body, as anybody\'s is.') : k === 'god' ? (on ? 'Nothing hurts you now.' : 'You can be hurt again.') : k === 'hidden' ? (on ? 'Nobody but an admin sees you now: to everybody else you have left.' : 'You can be seen again.') : on ? 'You fly, and through anything: W A S D, Space up, Ctrl down, Shift fast.' : 'You walk again.');
     }
     case 'roles':
       if (!admin) return need();
@@ -1272,11 +1328,14 @@ async function login(c: Client, pw: unknown) {
   for (const n of namesOf(c.key, c.ip)) ADMIN.tries.delete(n);
   log(`[admin] ${c.name} (#${c.id}) is an admin, by the password`);
   send(c, { t: 'role', role: 'admin' });
+  asAdmin(c, true);
   sys(c, 'You are an admin, on this and every game from now on. /help lists your orders.');
 }
 
 /** Put off the server by a check (only ever when enforcing): told so, counted, and after enough of it kept off for a while. */
 function putOff(c: Client, why: string) {
+  // (no check puts an admin off the server)
+  if (roleOf(c) === 'admin') return void log(`[check] ${c.name} is an admin and is left alone: ${why}`);
   const now = Date.now();
   let kept = false;
   for (const n of namesOf(c.key, c.ip)) {
@@ -1370,7 +1429,7 @@ const UNDER = { deep: 1.1, grace: 3, void: 10, off: 25 };
 function underCheck(c: Client, now = Date.now()) {
   const [x, y, z] = c.pose;
   const b = world.bunker;
-  const down = c.alive && !c.seatAt && !c.power.clip && now >= c.check.free && y < world.groundAt(x, z) - UNDER.deep && !(b && Math.hypot(x - b.x, z - b.z) < UNDER_BUNKER);
+  const down = c.alive && !c.seatAt && !c.power.clip && roleOf(c) !== 'admin' && now >= c.check.free && y < world.groundAt(x, z) - UNDER.deep && !(b && Math.hypot(x - b.x, z - b.z) < UNDER_BUNKER);
   if (!down) {
     c.underAt = 0;
     return;
@@ -1480,7 +1539,9 @@ function broadcast(m: S2C, except?: Client) {
   for (const c of clients.values()) if (c !== except && c.ws.readyState === 1) c.ws.send(s);
 }
 
-const info = (c: Client): PlayerInfo => ({ id: c.id, name: c.name, pose: c.pose, w: c.w, m: c.m, g: c.g, b: c.b, alive: c.alive });
+const info = (c: Client): PlayerInfo => ({ id: c.id, name: c.name, pose: c.pose, w: c.w, m: c.m, g: c.g, b: c.b, alive: c.alive, ...(c.power.hidden ? { hidden: true as const } : {}) });
+/** is somebody shown to this player: everybody is, but a vanished admin, whom only admins see */
+const shown = (who: Client, to: Client) => !who.power.hidden || roleOf(to) === 'admin';
 
 /** a spawn point on the edge of the map, as far from everyone else as possible */
 function pickSpawn() {
@@ -1532,7 +1593,7 @@ function cleanItem(raw: unknown, depth = 0): ItemInstance | null {
     it.holder = short(r.holder);
     it.held = Math.max(0, Math.min(TAG_HOLD, Number(r.held) || 0));
   }
-  if (def.wear?.cargo && Array.isArray(r.cargo)) {
+  if (holds(def.id) && Array.isArray(r.cargo)) {
     it.cargo = [];
     for (const p of r.cargo.slice(0, 40)) {
       const inner = cleanItem(p?.item, depth + 1);
@@ -2032,7 +2093,7 @@ function handle(c: Client, m: C2S) {
       // one of them that this player's game moves has struck somebody (as likely as not, this player)
       const target = clients.get(m.to);
       const b = horde.bodies.get(m.i);
-      if (!b || !target?.alive) return;
+      if (!b || !target?.alive || target.power.hidden) return;
       if (!horde.strikes(m.i, c.id, { id: target.id, x: target.pose[0], z: target.pose[2] }, Date.now())) return;
       // On guard (fists, or something in the hand to strike with), facing it, with the wind to
       // hold it off: nothing lands, and the one that threw it is stopped for a moment.
@@ -2129,20 +2190,27 @@ function handle(c: Client, m: C2S) {
       const s = m.s;
       if (!s || typeof s.uid !== 'string' || s.uid.length > 64 || boxes.has(s.uid) || ![s.x, s.y, s.z, s.rot].every(num)) return;
       if (!c.alive || Math.hypot(s.x - c.pose[0], s.z - c.pose[2]) > 8) return;
-      // (the stash case, the suitcase or the black bag: each as big inside as it is, and put down empty)
+      // (the stash case, the suitcase or the black bag: each as big inside as it is, and put down with whatever was
+      // in it while it was carried)
       const def = ITEMS[String(s.item ?? 'stash_kit')];
       if (def?.category !== 'stash') return;
       const [w, h] = def.stash ?? [8, 6];
+      const items = (Array.isArray(m.items) ? m.items : []).slice(0, 80).flatMap((x) => {
+        const it = cleanItem(x, 1);
+        return it && num(x.x) && num(x.y) ? [{ ...it, x: x.x, y: x.y, rot: !!x.rot }] : [];
+      });
+      if (CHECKS !== 'off' && items.some((it) => [...things({ slots: { it }, active: null, containers: [] })].some(invented)) && flag(c, 'put down a stash with something in it that the server never put in the world')) return;
       const st: StashInfo = { uid: s.uid, x: s.x, y: s.y, z: s.z, rot: s.rot, ...(def.id === 'stash_kit' ? {} : { item: def.id }) };
-      boxes.set(s.uid, { cid: s.uid, kind: 'stash', w, h, items: [], ...st, emptiedAt: -1 });
+      boxes.set(s.uid, { cid: s.uid, kind: 'stash', w, h, items, ...st, emptiedAt: -1 });
+      for (const it of items) issue(it);
       KEPT.dirty = true;
       broadcast({ t: 'stash+', s: st }, c);
       return;
     }
     case 'stash-': {
-      // picked up, when it is empty. Not from under the ground, and not from across a field.
+      // picked up, with whatever is in it. Not from under the ground, and not from across a field.
       const b = boxes.get(m.uid);
-      if (!b || b.kind !== 'stash' || b.buried || !c.alive || b.items.length) return;
+      if (!b || b.kind !== 'stash' || b.buried || !c.alive) return;
       if (Math.hypot(b.x - c.pose[0], b.z - c.pose[2]) > 6) return;
       const holder = locks.get(m.uid);
       if (holder !== undefined && holder !== c.id && clients.has(holder)) return;
@@ -2150,7 +2218,7 @@ function handle(c: Client, m: C2S) {
       boxes.delete(m.uid);
       KEPT.dirty = true;
       // (it is theirs when the server says so, and nobody else's: two who reached for it at once do not both carry it off)
-      send(c, { t: 'stashgot', uid: m.uid, item: b.item ?? 'stash_kit' });
+      send(c, { t: 'stashgot', uid: m.uid, item: b.item ?? 'stash_kit', items: b.items });
       broadcast({ t: 'stash-', uid: m.uid }, c);
       return;
     }
@@ -2225,7 +2293,7 @@ function handle(c: Client, m: C2S) {
     case 'chat': {
       const text = String(m.text ?? '').replace(/[\u0000-\u001f]/g, '').trim().slice(0, 160);
       const now = Date.now();
-      if (!text || now - c.lastChat < 500) return;
+      if (!text || (now - c.lastChat < 500 && !(text.startsWith('/') && roleOf(c)))) return;
       c.lastChat = now;
       // (an order, and never talk: whatever begins with a stroke is said to nobody and is not written down)
       if (text.startsWith('/')) return void command(c, text).catch((e) => log('[admin] an order failed:', e instanceof Error ? e.message : e));
@@ -2233,15 +2301,21 @@ function handle(c: Client, m: C2S) {
       if (quiet > now) return void sys(c, `You are muted for ${Math.ceil((quiet - now) / 60000)} more minutes: what you type and say reaches nobody.`);
       if (m.ch === 'near') {
         // proximity: only players standing within earshot get it (the speaker included)
-        const out: S2C = { t: 'chat', ch: 'near', from: c.name, text, role: roleOf(c) ?? undefined };
+        const out: S2C = { t: 'chat', ch: 'near', from: c.name, text, role: roleOf(c) ?? undefined, tint: ADMIN.tints.get(c.id) };
         for (const o of clients.values()) {
           if (Math.hypot(o.pose[0] - c.pose[0], o.pose[1] - c.pose[1], o.pose[2] - c.pose[2]) <= CHAT_RANGE) send(o, out);
         }
-      } else broadcast({ t: 'chat', ch: 'global', from: c.name, text, role: roleOf(c) ?? undefined });
+      } else broadcast({ t: 'chat', ch: 'global', from: c.name, text, role: roleOf(c) ?? undefined, tint: ADMIN.tints.get(c.id) });
       return;
     }
     case 'admin':
       return void login(c, m.pw).catch(() => sys(c, 'The site did not answer: try again in a minute.'));
+    case 'tint': {
+      if (roleOf(c) !== 'admin') return;
+      if (typeof m.color === 'string' && /^#[0-9a-f]{6}$/i.test(m.color)) ADMIN.tints.set(c.id, m.color.toLowerCase());
+      else ADMIN.tints.delete(c.id);
+      return;
+    }
     case 'logout': {
       if (m.cancel) return void stayOn(c, 'you called it off');
       if (!c.alive || c.logoutAt) return;
@@ -2258,14 +2332,17 @@ function handle(c: Client, m: C2S) {
         t: 'adm',
         players: [...clients.values()].map((o) => ({
           id: o.id, name: o.name, role: roleOf(o), x: Math.round(o.pose[0]), z: Math.round(o.pose[2]), alive: o.alive, flags: o.check.flags, mins: Math.round((now - o.joinedAt) / 60000),
+          hp: Math.round(o.vitals?.health ?? 100), kills: scores.get(o.key)?.kills ?? 0, tags: scores.get(o.key)?.tags ?? 0,
           ...(o.power.hidden ? { hidden: true as const } : {}), ...(o.power.god ? { god: true as const } : {}), ...(o.power.clip ? { clip: true as const } : {}),
           ...((ADMIN.muted.get(o.key) ?? 0) > now ? { muted: true as const } : {}), ...(o.seatAt ? { seat: true as const } : {}),
+          ...(o.power.voidInv ? { voidInv: true as const } : {}), ...(o.power.voidTag ? { voidTag: true as const } : {}),
           ...(o.asleep ? { asleep: true as const } : away(o, now) && o.alive ? { away: true as const } : {}),
         })),
         gone: ADMIN.gone.slice(-20).reverse().map((g) => ({ id: g.id, name: g.name, mins: Math.round((now - g.at) / 60000) })),
         bans: admin ? ADMIN.state.bans.map((b, i) => ({ n: i + 1, name: b.name, why: b.why, by: b.by, at: b.at.slice(0, 10) })) : [],
         roles: admin ? Object.values(ADMIN.state.roles).map((r) => ({ name: r.name, role: r.role, by: r.by, at: r.at.slice(0, 10) })) : [],
         checks: CHECKS,
+        stats: { up: Math.round(process.uptime() / 60), loot: economy.loot.size, stashes: [...boxes.values()].filter((b) => b.kind === 'stash').length, kept: KEPT.chars.size + records.size, asleep: [...clients.values()].filter((o) => o.asleep).length },
       });
     }
     case 'vin': {
@@ -2453,7 +2530,7 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
   };
   records.delete(key);
   KEPT.chars.delete(keyHash(key));
-  const others = [...clients.values()].filter((o) => !o.power.hidden).map(info);
+  const others = [...clients.values()].filter((o) => shown(o, c)).map(info);
   clients.set(c.id, c);
   claim();
   send(c, {
@@ -2484,11 +2561,7 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
   log(`+ ${c.name} (#${c.id})${resume ? ' resumed' : ''} — ${clients.size} online`);
   // (somebody with a role is told so as they come in: their game shows them what they may do)
   if (roleOf(c)) send(c, { t: 'role', role: roleOf(c) });
-  const chose = roleOf(c) === 'admin' ? ADMIN.voids.get(c.key) : undefined;
-  if (chose && (chose.voidInv || chose.voidTag)) {
-    Object.assign(c.power, chose);
-    send(c, { t: 'powers', ...c.power });
-  }
+  if (roleOf(c) === 'admin') asAdmin(c, false);
   return c;
 }
 
@@ -2496,6 +2569,7 @@ function drop(c: Client) {
   if (!clients.delete(c.id)) return;
   ADMIN.gone.push({ id: c.id, name: c.name, key: c.key, ip: c.ip, at: Date.now() });
   ADMIN.asked.delete(c.id);
+  ADMIN.tints.delete(c.id);
   if (ADMIN.gone.length > 60) ADMIN.gone.shift();
   releaseLock(c);
   leaveSeat(c, true);
@@ -2510,12 +2584,19 @@ function drop(c: Client) {
 setInterval(() => {
   if (clients.size < 2) return;
   const s: Extract<S2C, { t: 'ps' }>['s'] = [];
+  // (where everybody is, for everybody; and for admins, where the vanished are as well)
+  const all: typeof s = [];
   for (const c of clients.values()) {
-    if (c.power.hidden) continue;
     const p = c.pose;
-    s.push([c.id, round2(p[0]), round2(p[1]), round2(p[2]), Math.round(p[3] * 1000) / 1000, Math.round(p[4] * 1000) / 1000, p[5], c.w, c.m]);
+    const row: (typeof s)[number] = [c.id, round2(p[0]), round2(p[1]), round2(p[2]), Math.round(p[3] * 1000) / 1000, Math.round(p[4] * 1000) / 1000, p[5], c.w, c.m];
+    all.push(row);
+    if (!c.power.hidden) s.push(row);
   }
-  broadcast({ t: 'ps', s });
+  if (all.length === s.length) broadcast({ t: 'ps', s });
+  else {
+    const plain = JSON.stringify({ t: 'ps', s } satisfies S2C), whole = JSON.stringify({ t: 'ps', s: all } satisfies S2C);
+    for (const c of clients.values()) if (c.ws.readyState === 1) c.ws.send(roleOf(c) === 'admin' ? whole : plain);
+  }
 }, 1000 / TICK_HZ);
 
 setInterval(() => {
@@ -2554,7 +2635,7 @@ setInterval(() => {
     }
   }
   // the infected: new ones where nobody is looking, the dead cleared away, and whose game moves each
-  const turn = horde.tick(now, [...clients.values()].filter((c) => c.alive && !away(c)).map((c) => ({ id: c.id, x: c.pose[0], z: c.pose[2] })));
+  const turn = horde.tick(now, [...clients.values()].filter((c) => c.alive && !away(c) && !c.power.hidden).map((c) => ({ id: c.id, x: c.pose[0], z: c.pose[2] })));
   for (const i of turn.gone) broadcast({ t: 'i-', i });
   for (const b of turn.added) broadcast({ t: 'i+', b: { i: b.i, s: b.s, hp: b.hp, own: b.own, h: b.h } });
   for (const [i, to] of turn.owned) broadcast({ t: 'iown', i, to });

@@ -58,6 +58,10 @@ export const KITS: Kit[] = [
       ...many(2, { id: 'ammo_12', qty: 30 }), { id: 'box_12' }, ...many(3, { id: 'mag_mpa', rounds: 30 }), { id: 'box_9mm' }, ...CARE],
   },
   {
+    id: 'spawn', name: 'Spawn', does: 'What a new life begins with, and nothing else: something to eat, something to drink, one bandage',
+    things: [{ id: 'beans' }, { id: 'thermos' }, { id: 'bandage', qty: 1 }],
+  },
+  {
     id: 'supplies', name: 'Supplies', does: 'Dressings, stims, first aid, splints, food and water: added to what is carried', adds: true,
     things: [...many(2, { id: 'firstaid' }), ...many(2, { id: 'bandage', qty: 5 }), ...many(2, { id: 'stim', qty: 3 }), ...many(2, { id: 'splint' }), { id: 'beans' }, { id: 'sardines' }, { id: 'condensed' }, { id: 'water_jug' }, { id: 'flask' }],
   },

@@ -14,7 +14,7 @@ import { GAS } from '../sim/gas';
 import { AO_MODES, DEFAULT_GRAPHICS, FPS_LIMITS, LEVELS, MSAA, PRESETS, SCALES, VOLUMES, presetOf, saveGraphics, type Graphics, type PresetName } from '../core/settings';
 
 const CHANNELS: ChatChannel[] = ['global', 'near'];
-const CHANNEL_LABEL: Record<ChatChannel | 'system', string> = { global: 'Global', near: 'Proximity', system: '' };
+const CHANNEL_LABEL: Record<ChatChannel | 'system' | 'pm', string> = { global: 'Global', near: 'Proximity', system: '', pm: 'To you' };
 
 const ICONS = {
   health: '<path d="M12 21s-7-4.5-9.5-9A5.5 5.5 0 0 1 12 6a5.5 5.5 0 0 1 9.5 6C19 16.5 12 21 12 21z"/>',
@@ -939,6 +939,47 @@ export class HUD {
     }
   }
 
+  /** Said to everybody by an admin or a mod: across the screen for a while (and it is in the chat as well). */
+  announce(text: string, by: string) {
+    let n = this.root.querySelector('.hud-announce') as HTMLElement | null;
+    if (!n) this.root.appendChild((n = Object.assign(document.createElement('div'), { className: 'hud-announce' })));
+    const who = document.createElement('small'), what = document.createElement('div');
+    who.textContent = `${by}, to everybody`;
+    what.textContent = text;
+    n.replaceChildren(who, what);
+    n.classList.remove('show');
+    void n.offsetWidth;
+    n.classList.add('show');
+    window.clearTimeout(this.announceT);
+    this.announceT = window.setTimeout(() => n!.classList.remove('show'), 9000);
+  }
+  private announceT = 0;
+
+  /**
+   * Names over heads, as an admin's free camera shows them: each where its head is on the screen (in hundredths
+   * of the screen's width and height). An empty list takes them all away.
+   */
+  esp(list: { x: number; y: number; text: string; faint?: boolean }[]) {
+    let box = this.root.querySelector('.hud-esp') as HTMLElement | null;
+    if (!box) {
+      if (!list.length) return;
+      this.root.appendChild((box = Object.assign(document.createElement('div'), { className: 'hud-esp' })));
+    }
+    while (box.children.length < list.length) box.appendChild(document.createElement('i'));
+    for (let i = 0; i < box.children.length; i++) {
+      const n = box.children[i] as HTMLElement, q = list[i];
+      if (!q) {
+        n.style.display = 'none';
+        continue;
+      }
+      n.style.display = '';
+      n.style.left = `${q.x.toFixed(2)}%`;
+      n.style.top = `${q.y.toFixed(2)}%`;
+      n.style.opacity = q.faint ? '0.55' : '1';
+      if (n.textContent !== q.text) n.textContent = q.text;
+    }
+  }
+
   /** which of an admin's powers are on, said at the top of the screen for as long as any is ('' for none) */
   setPowers(text: string) {
     let n = this.root.querySelector('.hud-powers') as HTMLElement | null;
@@ -1001,7 +1042,8 @@ export class HUD {
 
   /** every channel lands in the one log, tagged and coloured by channel */
   /** @param role whoever said it is an admin or a mod: it is written before their name */
-  chatLine(ch: ChatChannel | 'system', from: string, text: string, role?: Role | null) {
+  /** @param tint an admin's own colour for their tag (not said: the rainbow) */
+  chatLine(ch: ChatChannel | 'system' | 'pm', from: string, text: string, role?: Role | null, tint?: string) {
     const log = this.root.querySelector('.chat-log') as HTMLElement;
     const n = document.createElement('div');
     n.className = 'chat-line';
@@ -1011,6 +1053,10 @@ export class HUD {
         n.dataset.role = role;
         const rank = document.createElement('em');
         rank.textContent = `[${role.toUpperCase()}]`;
+        if (role === 'admin' && tint && /^#[0-9a-f]{6}$/i.test(tint)) {
+          rank.className = 'plain';
+          rank.style.color = tint;
+        }
         n.append(rank);
       }
       const tag = document.createElement('i');

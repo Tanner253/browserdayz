@@ -80,6 +80,8 @@ export interface PlayerInfo {
   /** what is slung on their back and not in their hands: up to two things, each with what is fitted to it */
   b?: Slung[];
   alive: boolean;
+  /** a vanished admin: said only to other admins, who see them all the same (faintly) */
+  hidden?: true;
 }
 
 /** a thing slung on a back: its item, and what is fitted to it (its magazine among them) */
@@ -144,8 +146,8 @@ export type C2S =
   | { t: 'copen'; cid: string }
   | { t: 'cset'; cid: string; items: StoredItem[] }
   | { t: 'cclose'; cid: string }
-  /** a stash put down (empty) */
-  | { t: 'stash+'; s: StashInfo }
+  /** a stash put down, with whatever was in it while it was carried */
+  | { t: 'stash+'; s: StashInfo; items?: StoredItem[] }
   | { t: 'stash-'; uid: string }
   /** a shovel put to a stash: it is buried, or dug up */
   | { t: 'bury'; uid: string; on: boolean }
@@ -158,6 +160,8 @@ export type C2S =
   | { t: 'admin'; pw: string }
   /** somebody with a role has their panel open: the lists it shows are asked for */
   | { t: 'adm' }
+  /** an admin's choice of colour for the word ADMIN before their name in the chat (null: the rainbow it is by default) */
+  | { t: 'tint'; color: string | null }
   /** leaving the proper way: the wait is begun (see LOGOUT in server/index.ts), or called off */
   | { t: 'logout'; cancel?: true }
   /** a dog tag taken from another player has been carried for the full time */
@@ -244,12 +248,18 @@ export type S2C =
   | { t: 'stash-'; uid: string }
   /** a stash has been buried, or dug up */
   | { t: 'stash~'; uid: string; buried: boolean }
-  /** the (empty) stash this player asked to pick up is theirs to carry: what it was */
-  | { t: 'stashgot'; uid: string; item: string }
+  /** the stash this player asked to pick up is theirs to carry: what it was, and what is in it */
+  | { t: 'stashgot'; uid: string; item: string; items: StoredItem[] }
+  /** said to everybody by an admin or a mod: across the screen, and in the chat */
+  | { t: 'announce'; text: string; by: string }
+  /** said to this player alone by an admin or a mod */
+  | { t: 'pm'; from: string; role: 'admin' | 'mod'; text: string }
+  /** somebody this (admin's) game knows has vanished, or is seen by everybody again: they are drawn faintly, or as anybody is */
+  | { t: 'ghost'; id: number; on: boolean }
   | { t: 'corpse-'; uid: string }
   | { t: 'door'; i: number; open: boolean; swing: number }
   | { t: 'spawn'; x: number; z: number; yaw: number }
-  | { t: 'chat'; ch?: ChatChannel; from: string; text: string; role?: 'admin' | 'mod' }
+  | { t: 'chat'; ch?: ChatChannel; from: string; text: string; role?: 'admin' | 'mod'; /** an admin's own colour for their tag (not said: the rainbow) */ tint?: string }
   /** somebody cashed in a dog tag: announced to everyone */
   | { t: 'cashed'; id: number; name: string; owner: string }
   /** these tags of yours are void: you carried them out of the Zona (see TAG_OUT) */
@@ -330,13 +340,15 @@ export type S2C =
 /** What the panel of somebody with a role is shown. The last two are an admin's alone. */
 export interface AdminLists {
   /** everybody online: where they are, how long they have been on (minutes), how often the checks have fired on them */
-  players: { id: number; name: string; role: 'admin' | 'mod' | null; x: number; z: number; alive: boolean; flags: number; mins: number; hidden?: true; god?: true; clip?: true; muted?: true; seat?: true; /** gone without logging out: the body is still here */ asleep?: true; /** their game is not answering (a hidden tab): the server keeps their life */ away?: true }[];
+  players: { id: number; name: string; role: 'admin' | 'mod' | null; x: number; z: number; alive: boolean; flags: number; mins: number; /** health as their game last said it, kills and tags cashed since the server started */ hp: number; kills: number; tags: number; hidden?: true; god?: true; clip?: true; muted?: true; seat?: true; voidInv?: true; voidTag?: true; /** gone without logging out: the body is still here */ asleep?: true; /** their game is not answering (a hidden tab): the server keeps their life */ away?: true }[];
   /** who left lately, newest first */
   gone: { id: number; name: string; mins: number }[];
   bans: { n: number; name: string; why: string; by: string; at: string }[];
   roles: { name: string; role: 'admin' | 'mod'; by: string; at: string }[];
   /** what the server's own checks are set to */
   checks: string;
+  /** the server itself: minutes it has been up, things lying loose, stashes standing, characters kept for players who are away */
+  stats?: { up: number; loot: number; stashes: number; kept: number; asleep: number };
 }
 
 /** deterministic id of a crate that is part of the map (same on every client and the server) */

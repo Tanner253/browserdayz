@@ -1,8 +1,8 @@
 // Stashes put down, buried and dug up (server/index.ts 'stash+', 'stash-', 'bury'; src/sim/stash.ts): the case,
 // the suitcase and the black bag are stashes, each as big inside as it is, and a backpack is not; a shovel buries
 // one and anybody's shovel digs it up, as often as wanted; nothing is opened or picked up from under the ground;
-// nothing is buried in a town, in a building or beside one; and a stash is picked up empty, by one player and no
-// more. The real server on a port of its own. About twenty seconds.
+// nothing is buried in a town, in a building or beside one; and a stash is picked up with what is in it, by one
+// player and no more. The real server on a port of its own. About twenty seconds.
 //   npx tsx test/stash.test.ts
 
 import assert from 'node:assert/strict';
@@ -149,26 +149,25 @@ try {
   checks++;
   console.log('  ok  anybody with a shovel digs it up, as often as it is buried; not from across a field');
 
-  // ---- picked up when it is empty and not before: by one player, and gone for everybody
+  // ---- picked up with what is in it: by one player and no more; put down again, it has it still
   bob.say(wx - 1, wz);
   await sleep(200);
-  bob.send({ t: 'stash-', uid: pack.uid });
-  await sleep(300);
-  assert.equal(bob.count('stashgot'), 0, 'a stash was picked up with something in it');
-  bob.send({ t: 'copen', cid: pack.uid });
-  await sleep(300);
-  assert.deepEqual(bob.last('cdata')?.items.map((i) => i.id), ['beans'], 'what was put in it is not in it after all the burying');
-  bob.send({ t: 'cset', cid: pack.uid, items: [] });
-  bob.send({ t: 'cclose', cid: pack.uid });
-  await sleep(300);
   ann.send({ t: 'stash-', uid: pack.uid });
   bob.send({ t: 'stash-', uid: pack.uid });
   await sleep(400);
   assert.equal(ann.count('stashgot') + bob.count('stashgot'), 1, 'two who reached for it at once both carried it off (or neither did)');
-  assert.equal((ann.last('stashgot') ?? bob.last('stashgot')!).item, 'black_bag', 'whoever picked it up did not get the bag');
-  assert.ok((ann.last('stashgot') ? bob : ann).got.some((m) => m.t === 'stash-' && m.uid === pack.uid), 'the other was not told it had gone');
+  const [has, other] = ann.last('stashgot') ? [ann, bob] : [bob, ann];
+  const got = has.last('stashgot')!;
+  assert.ok(got.item === 'black_bag' && got.items.length === 1 && got.items[0].id === 'beans' && got.items[0].x === 1, 'whoever picked it up did not get the bag with what was in it');
+  assert.ok(other.got.some((m) => m.t === 'stash-' && m.uid === pack.uid), 'the other was not told it had gone');
+  has.send({ t: 'stash+', s: { ...pack, uid: 'stash-test-bag-again' }, items: got.items });
+  await sleep(300);
+  other.send({ t: 'copen', cid: 'stash-test-bag-again' });
+  await sleep(300);
+  assert.deepEqual(other.last('cdata')?.items.map((i) => [i.id, i.x]), [['beans', 1]], 'a stash put down again did not have what it was carried with');
+  other.send({ t: 'cclose', cid: 'stash-test-bag-again' });
   checks++;
-  console.log('  ok  picked up when it is empty and not before; by one player, and gone for everybody else');
+  console.log('  ok  picked up with what is in it, by one player and no more; put down again, it has it still');
 
   // ---- nothing is buried in the town
   ann.say(town.x + 2, town.z + 3, 'shovel');

@@ -275,13 +275,16 @@ await withServer(async () => {
   console.log('  ok  a thing given lies in the world for everybody; a dog tag is never made');
 
   assert.match(await ann.order('/god'), /Nothing hurts you/);
-  assert.deepEqual({ ...last(ann, 'powers'), t: 0 }, { t: 0, god: true, hidden: false, clip: false, voidInv: false, voidTag: false });
-  assert.match(await ann.order('/voidinv on'), /nothing you carried is left/);
+  // (the two choices for an admin's own death are made for them, until they make them otherwise)
+  assert.deepEqual({ ...last(ann, 'powers'), t: 0 }, { t: 0, god: true, hidden: false, clip: false, voidInv: true, voidTag: true });
+  assert.match(await ann.order('/voidtag off'), /your dog tag is on your body/);
+  assert.equal(last(ann, 'powers')?.voidTag, false, 'what an admin chose for their death was not said back');
   assert.match(await ann.order('/voidtag'), /no dog tag of your own/);
+  assert.match(await ann.order('/voidinv on'), /nothing you carried is left/);
   assert.ok(last(ann, 'powers')?.voidInv && last(ann, 'powers')?.voidTag, 'what an admin chose for their death was not said back');
   assert.match(await eve.order('/voidinv'), /not a thing you can do/);
   const seen = fay.got.length;
-  assert.match(await ann.order('/vanish'), /Nobody sees you/);
+  assert.match(await ann.order('/vanish'), /Nobody but an admin sees you/);
   assert.ok(fay.got.slice(seen).some((m) => m.t === 'leave' && m.id === ann.id), 'a vanished admin was not taken out of the game of everybody else');
   const late = new Player('Gus');
   assert.ok(await late.join());
@@ -316,6 +319,35 @@ await withServer(async () => {
   assert.ok(fay.got.some((m) => m.t === 'death' && m.k.id === eve.id), 'somebody slain did not die for everybody');
   checks++;
   console.log('  ok  a mute silences and is lifted; the chat of an admin says so; a warning, a healing and a killing reach who they are for');
+
+  // ---- another admin: the two death choices made for them, the vanished shown to them faintly, their powers an admin's to change
+  assert.match(await ann.order(`/admin #${fay.id}`), /Fay is an admin/);
+  await sleep(300);
+  assert.ok(last(fay, 'powers')?.voidInv && last(fay, 'powers')?.voidTag, 'somebody made an admin does not have the two choices for their death made for them');
+  const from = fay.got.length;
+  assert.match(await ann.order('/vanish on'), /Nobody but an admin/);
+  await sleep(400);
+  assert.ok(fay.got.slice(from).some((m) => m.t === 'ghost' && m.id === ann.id && m.on), 'another admin was not told somebody had vanished');
+  assert.ok(!fay.got.slice(from).some((m) => m.t === 'leave' && m.id === ann.id), 'a vanished admin was taken out of another admin\u2019s game');
+  assert.ok(last(fay, 'ps')?.s.some((r) => r[0] === ann.id), 'another admin is not told where a vanished admin is');
+  assert.ok(!last(late, 'ps')?.s.some((r) => r[0] === ann.id), 'somebody with no role is told where a vanished admin is');
+  assert.match(await ann.order('/vanish off'), /seen again/);
+  assert.match(await ann.order(`/god #${fay.id} on`), /Fay: god mode is on/);
+  assert.equal(last(fay, 'powers')?.god, true, 'an admin\u2019s power was not put on by another admin');
+  assert.match(await ann.order(`/noclip #${late.id}`), /not an admin/);
+  checks++;
+  console.log('  ok  somebody made an admin leaves nothing when they die until they choose to; admins see the vanished; an admin puts another admin\u2019s powers on');
+
+  // ---- said to everybody, said to one, and two orders one on the heels of the other
+  ann.send({ t: 'chat', ch: 'global', text: '/say hello all' });
+  ann.send({ t: 'chat', ch: 'global', text: `/msg #${late.id} a word with you` });
+  await sleep(700);
+  assert.ok(late.got.some((m) => m.t === 'announce' && m.text === 'hello all' && m.by === 'Ann'), 'what was said to everybody did not reach everybody');
+  assert.ok(late.got.some((m) => m.t === 'pm' && m.text === 'a word with you' && m.from === 'Ann' && m.role === 'admin'), 'the second of two orders given at once was lost, or a private word did not arrive');
+  assert.ok(!fay.got.some((m) => m.t === 'pm'), 'a private word was heard by somebody else');
+  assert.match(await ann.order(`/inv #${late.id}`), /Gus carries/);
+  checks++;
+  console.log('  ok  what is said to everybody reaches everybody; a private word reaches one; two orders at once are two orders');
 });
 
 site.close();
