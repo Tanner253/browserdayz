@@ -4,14 +4,42 @@
     {
       "name": "zona-dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 5173
     },
     {
       "name": "zona-server",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "server"],
+      "runtimeArgs": [
+        "run",
+        "server"
+      ],
       "port": 8080
+    },
+    {
+      "name": "zona-server-local",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "tsx",
+        "--env-file=.env.local-server",
+        "server/index.ts"
+      ],
+      "port": 8080
+    },
+    {
+      "name": "zona-preview",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "vite",
+        "preview",
+        "--port",
+        "4173",
+        "--strictPort"
+      ],
+      "port": 4173
     }
   ]
 }
