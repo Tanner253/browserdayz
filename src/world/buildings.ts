@@ -33,6 +33,8 @@ export interface LootPoint {
    * a firearm where firearms were kept (police, guard posts), any weapon elsewhere
    */
   arms?: 'guns' | 'any';
+  /** this very thing is always here, put back a while after it is taken (the rifle on the hospital's roof, and its parts): see Economy */
+  keeps?: string;
   /** the furniture surface this point sits on: world-space centre, yaw and usable half extents */
   surf?: { x: number; z: number; rot: number; hx: number; hz: number; /** free height above the surface */ clear: number };
 }
@@ -70,9 +72,10 @@ const BARREL_LID = 0.032;
 /** furniture whose loot sits on the very top of the model (height taken from the model, not hand-typed) */
 const TOP_SURFACE = new Set(['WoodenTable_01', 'painted_wooden_table', 'electric_stove', 'painted_wooden_cabinet', 'metal_office_desk']);
 
-type MatKey =
+export type MatKey =
   | 'plaster_ext' | 'brick_ext' | 'planks_ext' | 'planks' | 'int_plaster' | 'int_painted'
-  | 'floor_wood' | 'floor_lino' | 'floor_concrete' | 'roof_iron' | 'roof_tiles' | 'concrete' | 'trim' | 'mattress' | 'glass';
+  | 'floor_wood' | 'floor_lino' | 'floor_concrete' | 'roof_iron' | 'roof_tiles' | 'concrete' | 'trim' | 'mattress' | 'glass'
+  | 'ceiling' | 'ward_wall' | 'office_wall' | 'tile_wall' | 'steel' | 'bitumen' | 'cell_wall';
 
 const MATS: Record<Exclude<MatKey, 'glass'>, { tex: string; tile: number; color?: number; metal?: boolean; surface: Surface }> = {
   plaster_ext: { tex: 'worn_mossy_plasterwall', tile: 3, surface: 'plaster' },
@@ -90,9 +93,24 @@ const MATS: Record<Exclude<MatKey, 'glass'>, { tex: string; tile: number; color?
   trim: { tex: 'weathered_planks', tile: 1.2, color: 0x9a8f7c, surface: 'wood' },
   // (what lies on a bed's springs: old ticking, the colour of it and no more)
   mattress: { tex: 'painted_plaster_wall', tile: 0.9, color: 0xaaa48d, surface: 'cloth' },
+  // (For the buildings of several floors, 2026-10-11. No new pictures: the ones there are, painted.)
+  // a ceiling: whitewash gone grey
+  ceiling: { tex: 'painted_plaster_wall', tile: 3.2, color: 0xcfcbbd, surface: 'plaster' },
+  // a ward's walls: the pale green every such wall was painted
+  ward_wall: { tex: 'painted_plaster_wall', tile: 2.4, color: 0xa9bba6, surface: 'plaster' },
+  // an office's: cream
+  office_wall: { tex: 'painted_plaster_wall', tile: 2.4, color: 0xcdc3a2, surface: 'plaster' },
+  // where it is washed down (theatre, morgue, the cells' passage): cold and near white
+  tile_wall: { tex: 'painted_plaster_wall', tile: 1.6, color: 0xc4cdcc, surface: 'plaster' },
+  // a cell's: grey-blue to the height of a man
+  cell_wall: { tex: 'damaged_plaster', tile: 2.2, color: 0x8f9aa3, surface: 'plaster' },
+  // bars, vents, a tank, a mast
+  steel: { tex: 'metal_plate', tile: 1.4, color: 0x8b9094, metal: true, surface: 'metal' },
+  // a flat roof's felt
+  bitumen: { tex: 'asphalt_02', tile: 3.4, color: 0x8d8a84, surface: 'concrete' },
 };
 
-interface Opening {
+export interface Opening {
   a: number; // start along wall (building-local coordinate on the wall axis)
   b: number;
   bottom: number;
@@ -100,7 +118,7 @@ interface Opening {
   kind: 'door' | 'window' | 'gap';
 }
 
-interface WallDef {
+export interface WallDef {
   side: 'front' | 'back' | 'left' | 'right' | 'inner';
   from?: [number, number];
   to?: [number, number];
@@ -111,7 +129,7 @@ interface WallDef {
   still?: boolean;
 }
 
-interface Furn {
+export interface Furn {
   id: string;
   x: number;
   z: number;
@@ -121,7 +139,7 @@ interface Furn {
 }
 
 /** A floor above the ground one: its own walls, what stands in it and what is found there (heights from its own floor). */
-interface Upper {
+export interface Upper {
   h: number;
   int: MatKey;
   floor: MatKey;
@@ -131,19 +149,72 @@ interface Upper {
 }
 
 /** A straight flight of stairs along z: x0 to x1 wide, its foot at z = foot on the floor, its head at z = top on the floor above. */
-interface Stairs {
+export interface Stairs {
   x0: number;
   x1: number;
   foot: number;
   top: number;
 }
 
-interface Blueprint {
+/** A floor above the ground one, in a building of several (see Blueprint.levels). */
+export interface Level extends Upper {
+  /** what is kept on this floor, where that is not what the building at large is for */
+  usage?: Usage[];
+}
+
+/**
+ * A stairwell, the same on every floor: out from the floor along z to a landing half way up, and back beside
+ * the way out to the floor above. `x0`..`x1` is how wide it is (each half flight a little under half of that);
+ * `land` is the z at which the flights leave a floor and come to the next, `far` the z of the well's far end,
+ * where the landing is. It goes from the ground to the roof, or only as far as the floor numbered `upTo` (1 is
+ * the first above the ground).
+ */
+export interface Well {
+  x0: number;
+  x1: number;
+  land: number;
+  far: number;
+  upTo?: number;
+}
+
+/** A flat roof that is walked on: a wall round its edge, and a room over the head of each stair. */
+export interface Deck {
+  /** how high the wall round the edge stands over the roof */
+  parapet: number;
+  /** how high the rooms on it are, and their walls (side 'inner': the roof has no sides of its own) */
+  h: number;
+  walls: WallDef[];
+  /** the roof of each of those rooms */
+  roofs: { x0: number; x1: number; z0: number; z1: number }[];
+  /** plain shapes that stand on it (a vent, a tank, a mast): heights from the roof */
+  boxes: { key: MatKey; x0: number; x1: number; y0: number; y1: number; z0: number; z1: number; soft?: boolean }[];
+  furniture: Furn[];
+  loot: [number, number, number][];
+  usage?: Usage[];
+  /** places on it that always hold a thing: which thing, and which of `loot` (by its x and z) */
+  keeps?: { id: string; x: number; z: number }[];
+}
+
+/** Shapes inside a floor that are not walls: bars, a counter, a plinth. Heights from that floor. */
+export interface Fitting { key: MatKey; x0: number; x1: number; y0: number; y1: number; z0: number; z1: number; soft?: boolean; glass?: boolean }
+
+export interface Blueprint {
   w: number;
   d: number;
   h: number;
   upper?: Upper;
   stairs?: Stairs;
+  /**
+   * The floors above the ground one, where there are more than one of them (or a roof that is walked on): then
+   * `upper` and `stairs` are not used. With `wells` for the stairs between them and `deck` for the roof.
+   */
+  levels?: Level[];
+  wells?: Well[];
+  deck?: Deck;
+  /** bars, counters and the like: by floor (0 is the ground) */
+  fittings?: { level: number; list: Fitting[] }[];
+  /** what its outside is called over its door: where the board hangs, and what it says */
+  sign?: { x: number; y: number; text: string; sub: string; board?: string; ink?: string };
   ext: MatKey;
   int: MatKey;
   floor: MatKey;
@@ -1241,7 +1312,9 @@ export class Buildings {
     );
     const { w, d, h } = bp;
     const hw = w / 2, hd = d / 2;
-    this.interiors.push({ x: plot.x, z: plot.z, hw: hw - T, hd: hd - T, rot: plot.rot, y0: plot.floorY - 0.2, y1: plot.floorY + (bp.upper ? h + SLAB + bp.upper.h : h) });
+    /** how high the walls stand in all: one floor, two with the floor between them, or however many there are */
+    const H = bp.levels ? bp.levels.reduce((sum, l) => sum + SLAB + l.h, h) : bp.upper ? h + SLAB + bp.upper.h : h;
+    this.interiors.push({ x: plot.x, z: plot.z, hw: hw - T, hd: hd - T, rot: plot.rot, y0: plot.floorY - 0.2, y1: plot.floorY + H });
 
     // foundation + floor + ceiling
     const surf = (k: MatKey): Surface => (k === 'glass' ? 'glass' : MATS[k].surface);
@@ -1266,8 +1339,6 @@ export class Buildings {
       addBox('concrete', -hw - proud, hw + proud, -1.4, -0.1, -hd - proud, hd + proud, B);
       addBox(bp.floor, -hw + T * 0.5, hw - T * 0.5, -0.12, 0, -hd + T * 0.5, hd - T * 0.5, B);
     }
-    // (how high the walls stand in all: one floor, or two with the floor between them)
-    const H = bp.upper ? h + SLAB + bp.upper.h : h;
     if (bp.roofType !== 'flat' && !bp.whole) addBox(bp.upper?.int ?? bp.int, -hw + T, hw - T, H, H + 0.08, -hd + T, hd - T, B, false);
 
     // walls: of one floor, whose foot is at y0 and which is h high
@@ -1389,7 +1460,122 @@ export class Buildings {
       }
     };
     // (under a floor above, the walls go on up past the edge of it: the outside of the house is one wall from the ground to the roof)
-    raise(bp.walls, 0, bp.upper ? h + SLAB : h, h);
+    raise(bp.walls, 0, bp.upper || bp.levels ? h + SLAB : h, h);
+
+    // --- a building of several floors, with a flat roof that is walked on (the hospital, the police headquarters)
+    /** how high each floor is over the ground one: [0, the first above it, ...]; and the roof */
+    const levelY: number[] = [0];
+    let roofY = 0;
+    if (bp.levels) {
+      const ups = bp.levels, wells = bp.wells ?? [], deck = bp.deck;
+      let top = h;
+      for (const l of ups) {
+        levelY.push(top + SLAB);
+        top += SLAB + l.h;
+      }
+      roofY = top + SLAB;
+      const x0i = -hw + T, x1i = hw - T, z0i = -hd + T, z1i = hd - T;
+      /** the storeys a well climbs: storey s is the climb from floor s to the one above it (the last, to the roof) */
+      const climbs = (wl: Well) => Math.min(wl.upTo ?? ups.length + 1, ups.length + 1);
+      const lo = (wl: Well) => Math.min(wl.land, wl.far), hi = (wl: Well) => Math.max(wl.land, wl.far);
+      /**
+       * A floor, or the roof: from y0 up to y1, with a hole over every stairwell that comes up through it. Its
+       * top is one stuff and its underside, which is the ceiling of the rooms below, another: two layers, one on
+       * the other, and no face of either in a face of anything else.
+       */
+      const CEIL = 0.045;
+      const slab = (topKey: MatKey, y0: number, y1: number, holes: Well[]) => {
+        const xs = [...new Set([x0i, x1i, ...holes.flatMap((wl) => [wl.x0, wl.x1])])].sort((p, q) => p - q);
+        const zs = [...new Set([z0i, z1i, ...holes.flatMap((wl) => [lo(wl), hi(wl)])])].sort((p, q) => p - q);
+        const open = (x: number, z: number) => holes.some((wl) => x > wl.x0 && x < wl.x1 && z > lo(wl) && z < hi(wl));
+        for (let j = 0; j + 1 < zs.length; j++) {
+          let from = -1;
+          for (let i = 0; i < xs.length; i++) {
+            const solid = i + 1 < xs.length && !open((xs[i] + xs[i + 1]) / 2, (zs[j] + zs[j + 1]) / 2);
+            if (solid && from < 0) from = i;
+            if (solid || from < 0) continue;
+            this.push(topKey, boxGeo(xs[from], xs[i], y0 + CEIL, y1, zs[j], zs[j + 1], this.tile(topKey), B));
+            this.push('ceiling', boxGeo(xs[from], xs[i], y0, y0 + CEIL, zs[j], zs[j + 1], this.tile('ceiling'), B));
+            this.collider((xs[i] - xs[from]) / 2, (y1 - y0) / 2, (zs[j + 1] - zs[j]) / 2, B.clone().multiply(new THREE.Matrix4().makeTranslation((xs[from] + xs[i]) / 2, (y0 + y1) / 2, (zs[j] + zs[j + 1]) / 2)), surf(topKey));
+            from = -1;
+          }
+        }
+      };
+      ups.forEach((l, k) => {
+        slab(l.floor, levelY[k + 1] - SLAB, levelY[k + 1], wells.filter((wl) => climbs(wl) > k));
+        // (its outside walls go on up past the edge of the floor or the roof over it)
+        raise(l.walls, levelY[k + 1], l.h + SLAB, l.h);
+      });
+      slab(deck ? 'bitumen' : bp.roof, roofY - SLAB, roofY, wells.filter((wl) => climbs(wl) > ups.length));
+
+      // the stairs: in each well, from every floor to the next, two half flights and the landing between them
+      const LANDING = 1.45, GAP = 0.07;
+      for (const wl of wells) {
+        const dz = Math.sign(wl.far - wl.land), turn = wl.far - dz * LANDING, xm = (wl.x0 + wl.x1) / 2;
+        const n = climbs(wl);
+        for (let st = 0; st < n; st++) {
+          const ya = levelY[st], yb = st < ups.length ? levelY[st + 1] : roofY, ym = (ya + yb) / 2;
+          const out: Stairs = { x0: wl.x0, x1: xm - GAP, foot: wl.land, top: turn };
+          const back: Stairs = { x0: xm + GAP, x1: wl.x1, foot: turn, top: wl.land };
+          this.flight(B, plot.id, out, ya, ym, undefined, 'concrete');
+          this.flight(B, plot.id, back, ym, yb, [xm, wl.land - dz * 1.3], 'concrete');
+          // the landing: as thick as a floor, and it stops a shot
+          addBox('concrete', wl.x0, wl.x1, ym - 0.16, ym, Math.min(turn, wl.far), Math.max(turn, wl.far), B);
+          // Under each half flight, a slab along its slope: the backs of the steps are not seen from below, and
+          // a shot does not go through a stair. (Its top lies along the feet of the risers, a hair under them.)
+          for (const [f, y0, y1] of [[out, ya, ym], [back, ym, yb]] as [Stairs, number, number][]) {
+            const up = y1 - y0, L = Math.abs(f.top - f.foot), fd = Math.sign(f.top - f.foot), tilt = Math.atan2(up, L), len = Math.hypot(up, L);
+            const S = B.clone().multiply(new THREE.Matrix4().makeTranslation((f.x0 + f.x1) / 2, (y0 + y1) / 2, (f.foot + f.top) / 2)).multiply(new THREE.Matrix4().makeRotationX(-fd * tilt));
+            const half = (f.x1 - f.x0) / 2, under = 0.13;
+            this.push('concrete', boxGeo(-half, half, -under, -0.012, -len / 2 + 0.12, len / 2 - 0.12, this.tile('concrete'), S));
+            this.collider(half, under / 2, len / 2 - 0.12, S.clone().multiply(new THREE.Matrix4().makeTranslation(0, -under / 2 - 0.012, 0)), 'concrete');
+          }
+          // (on the ground the space under the way out is walled in: there is nothing under it to walk into)
+          if (st === 0) {
+            for (let k = 1; k < 4; k++) {
+              const za = wl.land + dz * (k / 4) * Math.abs(turn - wl.land), zb = wl.land + dz * ((k + 1) / 4) * Math.abs(turn - wl.land);
+              const tall = (k / 4) * (ym - ya) - 0.14;
+              if (tall > 0.05) this.collider((out.x1 - out.x0) / 2, tall / 2, Math.abs(zb - za) / 2, B.clone().multiply(new THREE.Matrix4().makeTranslation((out.x0 + out.x1) / 2, tall / 2, (za + zb) / 2)), 'concrete');
+            }
+            this.push('concrete', wedgeGeo(Math.abs(turn - wl.land), ym - ya - 0.13, 0.05, this.tile('concrete'), B.clone().multiply(new THREE.Matrix4().makeTranslation(out.x1 - 0.025, 0, wl.land)).multiply(new THREE.Matrix4().makeRotationY(dz < 0 ? Math.PI : 0))));
+          }
+          // a rail down the middle for each half flight, on its own side of the gap
+          this.rail(B, out.x1 + 0.02, wl.land, out.x1 + 0.02, turn, ya, ym, 'steel');
+          this.rail(B, back.x0 - 0.02, turn, back.x0 - 0.02, wl.land, ym, yb, 'steel');
+        }
+        // At the head of the well nothing goes on up: the side the next flight would have left by is open over
+        // the one below, and is railed off.
+        const headY = n <= ups.length ? levelY[n] : roofY;
+        this.rail(B, wl.x0, wl.land, xm, wl.land, headY, headY, 'steel');
+      }
+
+      // bars, counters, plinths: plain shapes on a floor
+      for (const fl of bp.fittings ?? []) {
+        for (const f of fl.list) {
+          const y = levelY[fl.level] ?? 0;
+          if (f.glass) this.push('glass', boxGeo(f.x0, f.x1, y + f.y0, y + f.y1, f.z0, f.z1, 1, B));
+          else addBox(f.key, f.x0, f.x1, y + f.y0, y + f.y1, f.z0, f.z1, B, !f.soft);
+          if (f.glass) this.collider((f.x1 - f.x0) / 2, (f.y1 - f.y0) / 2, Math.max(0.04, (f.z1 - f.z0) / 2), B.clone().multiply(new THREE.Matrix4().makeTranslation((f.x0 + f.x1) / 2, y + (f.y0 + f.y1) / 2, (f.z0 + f.z1) / 2)), 'glass', GLASS_GROUPS);
+        }
+      }
+
+      if (deck) {
+        // the wall round the roof's edge: the outside walls carried on up, and a coping on them
+        const p0 = roofY, p1 = roofY + deck.parapet;
+        addBox(bp.ext, -hw, hw, p0, p1, hd - T, hd, B);
+        addBox(bp.ext, -hw, hw, p0, p1, -hd, -hd + T, B);
+        addBox(bp.ext, -hw, -hw + T, p0, p1, -hd + T, hd - T, B);
+        addBox(bp.ext, hw - T, hw, p0, p1, -hd + T, hd - T, B);
+        addBox('concrete', -hw - 0.05, hw + 0.05, p1, p1 + 0.07, hd - T - 0.05, hd + 0.05, B, false);
+        addBox('concrete', -hw - 0.05, hw + 0.05, p1, p1 + 0.07, -hd - 0.05, -hd + T + 0.05, B, false);
+        addBox('concrete', -hw - 0.05, -hw + T + 0.05, p1, p1 + 0.07, -hd + T + 0.05, hd - T - 0.05, B, false);
+        addBox('concrete', hw - T - 0.05, hw + 0.05, p1, p1 + 0.07, -hd + T + 0.05, hd - T - 0.05, B, false);
+        // what stands over each stair, and its roof
+        raise(deck.walls, roofY, deck.h, deck.h);
+        for (const r of deck.roofs) addBox('concrete', r.x0 - 0.18, r.x1 + 0.18, roofY + deck.h, roofY + deck.h + 0.16, r.z0 - 0.18, r.z1 + 0.18, B);
+        for (const b of deck.boxes) addBox(b.key, b.x0, b.x1, roofY + b.y0, roofY + b.y1, b.z0, b.z1, B, !b.soft);
+      }
+    }
 
     // --- the floor above, and the stairs to it
     if (bp.upper && bp.stairs) {
@@ -1459,6 +1645,7 @@ export class Buildings {
       addBox('concrete', cx - 0.36, cx + 0.36, roofAt + 0.85, roofAt + 0.92, cz - 0.36, cz + 0.36, B, false);
     }
 
+    if (bp.sign) this.signs.push({ m: B.clone().multiply(new THREE.Matrix4().makeTranslation(bp.sign.x, bp.sign.y, hd + 0.03)), text: bp.sign.text, sub: bp.sign.sub, board: bp.sign.board, ink: bp.sign.ink });
     if (plot.type === 'police') {
       this.signs.push({ m: B.clone().multiply(new THREE.Matrix4().makeTranslation(0, 2.55, hd + 0.03)), text: 'ПОЛИЦИЯ', sub: 'POLICE' });
     }
@@ -1515,7 +1702,7 @@ export class Buildings {
         const G = B.clone().multiply(new THREE.Matrix4().makeTranslation(sx * (hw - T / 2), h, -hd));
         this.push(bp.ext, wedgeGeo(d - T, (rise * (d - T)) / d, T, this.tile(bp.ext), G));
       }
-    } else {
+    } else if (!bp.levels) {
       addBox(bp.roof, -hw - 0.25, hw + 0.25, H, H + 0.22, -hd - 0.25, hd + 0.25, B);
     }
 
@@ -1527,7 +1714,7 @@ export class Buildings {
       this.world.props.push({ kind: id, x: p.x, y: p.y, z: p.z, rot: rot + plot.rot, scale, far: indoorFar });
     };
     // what stands on a floor (whose own level is y0), and where things are found on it
-    const stock = (furniture: Furn[], loot: [number, number, number][], y0: number) => {
+    const stock = (furniture: Furn[], loot: [number, number, number][], y0: number, usage: Usage[] = bp.usage) => {
       for (const f of furniture) inst(f.id, f.x, f.z, f.rot, f.scale ?? 1, (f.y ?? 0) + y0);
       // A bed is a frame with a few wires across it and nothing on them: whatever was kept on one hung in the air
       // over the springs (59 places on the map). Each has a mattress, and what is kept on it lies on that.
@@ -1553,7 +1740,7 @@ export class Buildings {
         // (on the ground floor, or on one of the floors of a building that is a model's)
         if (ly < 0.1 || bp.whole?.floors.some((f) => Math.abs(ly - f) < 0.1)) {
           const p = new THREE.Vector3(lx, ly + y0, lz).applyMatrix4(B);
-          this.lootPoints.push({ x: p.x, y: p.y, z: p.z, usage: bp.usage, building: plot.id, floor: true });
+          this.lootPoints.push({ x: p.x, y: p.y, z: p.z, usage, building: plot.id, floor: true });
           continue;
         }
         const f = furniture.find((q) => {
@@ -1586,7 +1773,7 @@ export class Buildings {
           const sy = levels ? levels.reduce((best, l) => (Math.abs(l - lh) < Math.abs(best - lh) ? l : best)) + 0.003 : lh;
           const p = new THREE.Vector3(f.x + ox * c + oz * s, (f.id === 'old_bed_frame' ? BED.springs + BED.mattress + 0.003 : TOP_SURFACE.has(f.id) ? b.top + 0.003 : sy) + up + y0, f.z - ox * s + oz * c).applyMatrix4(B);
           this.lootPoints.push({
-            x: p.x, y: p.y, z: p.z, usage: bp.usage, building: plot.id, floor: false,
+            x: p.x, y: p.y, z: p.z, usage, building: plot.id, floor: false,
             surf: { x: p.x, z: p.z, rot: f.rot + plot.rot, hx: along ? seg : HX, hz: along ? HZ : seg, clear: SHELF_CLEARANCE[f.id] ?? 10 },
           });
         });
@@ -1597,6 +1784,18 @@ export class Buildings {
     const his = plot.type !== 'hut' && this.world.sites.some((st) => st.kind === 'market' && Math.hypot(st.x - plot.x, st.z - plot.z) < 40);
     stock(bp.furniture, his ? [] : bp.loot, 0);
     if (bp.upper) stock(bp.upper.furniture, bp.upper.loot, h + SLAB);
+    (bp.levels ?? []).forEach((l, k) => stock(l.furniture, l.loot, levelY[k + 1], l.usage));
+    if (bp.deck) {
+      const firstUp = this.lootPoints.length;
+      stock(bp.deck.furniture, bp.deck.loot, roofY, bp.deck.usage);
+      // (the places on the roof that always hold a thing: each the nearest of the roof's places to where it is said to be)
+      for (const k of bp.deck.keeps ?? []) {
+        const at = new THREE.Vector3(k.x, roofY, k.z).applyMatrix4(B);
+        const mine = this.lootPoints.slice(firstUp).filter((q) => !q.keeps);
+        mine.sort((p, q) => Math.hypot(p.x - at.x, p.z - at.z) - Math.hypot(q.x - at.x, q.z - at.z));
+        if (mine[0]) mine[0].keeps = k.id;
+      }
+    }
 
     // where a weapon is always to be found: on the floor first (anything fits there)
     if (plot.arms) {
@@ -1657,16 +1856,16 @@ export class Buildings {
    * the last. A body goes up it as up a bank, with no step to catch its feet on; it stops
    * feet and nothing else.
    */
-  private flight(B: THREE.Matrix4, plot: string, st: Stairs, y0: number, y1: number, off?: [number, number]) {
+  private flight(B: THREE.Matrix4, plot: string, st: Stairs, y0: number, y1: number, off?: [number, number], key: MatKey = 'planks') {
     const up = y1 - y0, dz = Math.sign(st.top - st.foot), L = Math.abs(st.top - st.foot);
     const N = Math.round(up / 0.2), rise = up / N, run = L / N;
-    const tile = this.tile('planks');
+    const tile = this.tile(key);
     for (let i = 0; i < N; i++) {
       const za = st.foot + dz * i * run, zb = st.foot + dz * (i + 1) * run;
       // (each tread overhangs the one under it; the last does not overhang the floor it comes up to, whose top is its own)
       const last = i === N - 1;
-      this.push('planks', boxGeo(st.x0, st.x1, y0 + (i + 1) * rise - 0.045, y0 + (i + 1) * rise, Math.min(za, zb) - (last && dz < 0 ? 0 : 0.015), Math.max(za, zb) + (last && dz > 0 ? 0 : 0.015), tile, B));
-      this.push('planks', boxGeo(st.x0 + 0.02, st.x1 - 0.02, y0 + i * rise, y0 + (i + 1) * rise - 0.045, Math.min(za, za + dz * 0.025), Math.max(za, za + dz * 0.025), tile, B));
+      this.push(key, boxGeo(st.x0, st.x1, y0 + (i + 1) * rise - 0.045, y0 + (i + 1) * rise, Math.min(za, zb) - (last && dz < 0 ? 0 : 0.015), Math.max(za, zb) + (last && dz > 0 ? 0 : 0.015), tile, B));
+      this.push(key, boxGeo(st.x0 + 0.02, st.x1 - 0.02, y0 + i * rise, y0 + (i + 1) * rise - 0.045, Math.min(za, za + dz * 0.025), Math.max(za, za + dz * 0.025), tile, B));
     }
     const tilt = Math.atan2(up, L), HALF = 0.04, xc = (st.x0 + st.x1) / 2;
     const ramp = new THREE.Matrix4()

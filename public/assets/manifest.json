@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-11T08:58:13.923Z",
+ "generated": "2026-10-11T19:07:53.569Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr"
@@ -3455,6 +3455,578 @@
    },
    "hi": "assets/models/hi/benelli_m3.glb",
    "hiBytes": 13045080
+  },
+  "hospital_desk": {
+   "url": "assets/models/hospital_desk.glb",
+   "tags": [
+    "furniture"
+   ],
+   "bytes": 84904,
+   "srcTris": 10642,
+   "tris": 402,
+   "min": [
+    -1.495,
+    0,
+    -0.4751
+   ],
+   "max": [
+    1.495,
+    1.4189,
+    0.4751
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/hospital_desk.glb",
+   "hiBytes": 1256580
+  },
+  "hospital_pc": {
+   "url": "assets/models/hospital_pc.glb",
+   "tags": [
+    "furniture"
+   ],
+   "bytes": 52028,
+   "srcTris": 10642,
+   "tris": 468,
+   "min": [
+    -0.415,
+    0,
+    -0.3946
+   ],
+   "max": [
+    0.415,
+    0.4264,
+    0.3946
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/hospital_pc.glb",
+   "hiBytes": 146956
+  },
+  "hospital_bench": {
+   "url": "assets/models/hospital_bench.glb",
+   "tags": [
+    "furniture"
+   ],
+   "bytes": 101576,
+   "srcTris": 10642,
+   "tris": 1176,
+   "min": [
+    -1.015,
+    0,
+    -0.3026
+   ],
+   "max": [
+    1.015,
+    0.8744,
+    0.3026
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/hospital_bench.glb",
+   "hiBytes": 1041240
+  },
+  "water_cooler": {
+   "url": "assets/models/water_cooler.glb",
+   "tags": [
+    "furniture"
+   ],
+   "bytes": 100372,
+   "srcTris": 10642,
+   "tris": 486,
+   "min": [
+    -0.1694,
+    0,
+    -0.1898
+   ],
+   "max": [
+    0.1694,
+    1.62,
+    0.1898
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/water_cooler.glb",
+   "hiBytes": 924860
+  },
+  "ward_curtain": {
+   "url": "assets/models/ward_curtain.glb",
+   "tags": [
+    "furniture"
+   ],
+   "bytes": 94148,
+   "srcTris": 10642,
+   "tris": 1284,
+   "min": [
+    -0.6636,
+    0,
+    -0.2141
+   ],
+   "max": [
+    0.6636,
+    2.14,
+    0.2141
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/ward_curtain.glb",
+   "hiBytes": 563444
+  },
+  "ventilator": {
+   "url": "assets/models/ventilator.glb",
+   "tags": [
+    "furniture"
+   ],
+   "bytes": 139772,
+   "srcTris": 10642,
+   "tris": 4018,
+   "min": [
+    -0.3146,
+    0,
+    -0.3146
+   ],
+   "max": [
+    0.3146,
+    1.39,
+    0.3146
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/ventilator.glb",
+   "hiBytes": 309336
+  },
+  "computer_cart": {
+   "url": "assets/models/computer_cart.glb",
+   "tags": [
+    "furniture"
+   ],
+   "bytes": 49408,
+   "srcTris": 10642,
+   "tris": 811,
+   "min": [
+    -0.2865,
+    0,
+    -0.3961
+   ],
+   "max": [
+    0.2865,
+    1.49,
+    0.3961
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/computer_cart.glb",
+   "hiBytes": 119672
+  },
+  "ceiling_arm": {
+   "url": "assets/models/ceiling_arm.glb",
+   "tags": [
+    "furniture"
+   ],
+   "bytes": 38364,
+   "srcTris": 10642,
+   "tris": 1167,
+   "min": [
+    -0.6873,
+    0,
+    -0.825
+   ],
+   "max": [
+    0.6873,
+    2.55,
+    0.825
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/ceiling_arm.glb",
+   "hiBytes": 239876
+  },
+  "mop_bucket": {
+   "url": "assets/models/mop_bucket.glb",
+   "tags": [
+    "furniture"
+   ],
+   "bytes": 99176,
+   "srcTris": 10642,
+   "tris": 464,
+   "min": [
+    -0.3964,
+    0,
+    -0.2418
+   ],
+   "max": [
+    0.3964,
+    1.46,
+    0.2418
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/mop_bucket.glb",
+   "hiBytes": 923664
+  },
+  "extinguisher_box": {
+   "url": "assets/models/extinguisher_box.glb",
+   "tags": [
+    "furniture"
+   ],
+   "bytes": 92484,
+   "srcTris": 10642,
+   "tris": 106,
+   "min": [
+    -0.275,
+    0,
+    -0.1526
+   ],
+   "max": [
+    0.275,
+    0.65,
+    0.1526
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/extinguisher_box.glb",
+   "hiBytes": 916976
+  },
+  "folded_blanket": {
+   "url": "assets/models/folded_blanket.glb",
+   "tags": [
+    "furniture"
+   ],
+   "bytes": 42860,
+   "srcTris": 10642,
+   "tris": 260,
+   "min": [
+    -0.18,
+    0,
+    -0.1052
+   ],
+   "max": [
+    0.18,
+    0.152,
+    0.1052
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/folded_blanket.glb",
+   "hiBytes": 392044
+  },
+  "body_lockers": {
+   "url": "assets/models/body_lockers.glb",
+   "tags": [
+    "furniture"
+   ],
+   "bytes": 159592,
+   "srcTris": 14080,
+   "tris": 1660,
+   "min": [
+    -2.0575,
+    0,
+    -1.5023
+   ],
+   "max": [
+    2.0575,
+    2.7686,
+    1.5023
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/body_lockers.glb",
+   "hiBytes": 1095132
+  },
+  "autopsy_table": {
+   "url": "assets/models/autopsy_table.glb",
+   "tags": [
+    "furniture"
+   ],
+   "bytes": 210964,
+   "srcTris": 14080,
+   "tris": 1734,
+   "min": [
+    -1.1175,
+    0,
+    -0.4128
+   ],
+   "max": [
+    1.1175,
+    1.0734,
+    0.4128
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/autopsy_table.glb",
+   "hiBytes": 1208212
+  },
+  "surgical_trolley": {
+   "url": "assets/models/surgical_trolley.glb",
+   "tags": [
+    "furniture"
+   ],
+   "bytes": 152452,
+   "srcTris": 14080,
+   "tris": 888,
+   "min": [
+    -0.273,
+    0,
+    -0.2834
+   ],
+   "max": [
+    0.273,
+    0.8891,
+    0.2834
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/surgical_trolley.glb",
+   "hiBytes": 664416
+  },
+  "med_cabinet": {
+   "url": "assets/models/med_cabinet.glb",
+   "tags": [
+    "furniture"
+   ],
+   "bytes": 133552,
+   "srcTris": 14080,
+   "tris": 138,
+   "min": [
+    -0.6266,
+    0,
+    -0.2724
+   ],
+   "max": [
+    0.6266,
+    1.9711,
+    0.2724
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/med_cabinet.glb",
+   "hiBytes": 645516
+  },
+  "lab_counter": {
+   "url": "assets/models/lab_counter.glb",
+   "tags": [
+    "furniture"
+   ],
+   "bytes": 132736,
+   "srcTris": 14080,
+   "tris": 68,
+   "min": [
+    -1.0014,
+    0,
+    -0.3041
+   ],
+   "max": [
+    1.0014,
+    0.8892,
+    0.3041
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/lab_counter.glb",
+   "hiBytes": 644700
+  },
+  "med_sink": {
+   "url": "assets/models/med_sink.glb",
+   "tags": [
+    "furniture"
+   ],
+   "bytes": 140268,
+   "srcTris": 14080,
+   "tris": 618,
+   "min": [
+    -0.2874,
+    0,
+    -0.3514
+   ],
+   "max": [
+    0.2874,
+    0.9282,
+    0.3514
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/med_sink.glb",
+   "hiBytes": 652232
+  },
+  "surgical_lamp": {
+   "url": "assets/models/surgical_lamp.glb",
+   "tags": [
+    "furniture"
+   ],
+   "bytes": 240788,
+   "srcTris": 14080,
+   "tris": 1520,
+   "min": [
+    -0.8261,
+    0,
+    -0.4254
+   ],
+   "max": [
+    0.8261,
+    0.7045,
+    0.4254
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/surgical_lamp.glb",
+   "hiBytes": 1755348
+  },
+  "autopsy_scales": {
+   "url": "assets/models/autopsy_scales.glb",
+   "tags": [
+    "furniture"
+   ],
+   "bytes": 243688,
+   "srcTris": 14080,
+   "tris": 1752,
+   "min": [
+    -0.2025,
+    0,
+    -0.1518
+   ],
+   "max": [
+    0.2025,
+    0.8876,
+    0.1518
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/autopsy_scales.glb",
+   "hiBytes": 1758252
+  },
+  "covered_body": {
+   "url": "assets/models/covered_body.glb",
+   "tags": [
+    "furniture"
+   ],
+   "bytes": 233392,
+   "srcTris": 14080,
+   "tris": 1368,
+   "min": [
+    -0.8963,
+    0,
+    -0.4973
+   ],
+   "max": [
+    0.8963,
+    0.7173,
+    0.4973
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/covered_body.glb",
+   "hiBytes": 1747956
+  },
+  "instrument_tray": {
+   "url": "assets/models/instrument_tray.glb",
+   "tags": [
+    "furniture"
+   ],
+   "bytes": 228940,
+   "srcTris": 14080,
+   "tris": 402,
+   "min": [
+    -0.2255,
+    0,
+    -0.2147
+   ],
+   "max": [
+    0.2255,
+    0.0176,
+    0.2147
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/instrument_tray.glb",
+   "hiBytes": 1743508
+  },
+  "xray_viewer": {
+   "url": "assets/models/xray_viewer.glb",
+   "tags": [
+    "furniture"
+   ],
+   "bytes": 613320,
+   "srcTris": 12511,
+   "tris": 12511,
+   "min": [
+    -0.7729,
+    0,
+    -0.1191
+   ],
+   "max": [
+    0.7729,
+    0.8,
+    0.1191
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/xray_viewer.glb",
+   "hiBytes": 17685856
+  },
+  "screen_curtain": {
+   "url": "assets/models/screen_curtain.glb",
+   "tags": [
+    "furniture"
+   ],
+   "bytes": 904016,
+   "srcTris": 46706,
+   "tris": 17135,
+   "min": [
+    -0.282,
+    0,
+    -0.7365
+   ],
+   "max": [
+    0.282,
+    1.6512,
+    0.7365
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/screen_curtain.glb",
+   "hiBytes": 15744896
+  },
+  "medical_light": {
+   "url": "assets/models/medical_light.glb",
+   "tags": [
+    "furniture"
+   ],
+   "bytes": 469464,
+   "srcTris": 46706,
+   "tris": 11452,
+   "min": [
+    -0.4219,
+    0,
+    -0.5141
+   ],
+   "max": [
+    0.4219,
+    1.6612,
+    0.5141
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/medical_light.glb",
+   "hiBytes": 2077620
+  },
+  "steel_table": {
+   "url": "assets/models/steel_table.glb",
+   "tags": [
+    "furniture"
+   ],
+   "bytes": 245468,
+   "srcTris": 46706,
+   "tris": 6252,
+   "min": [
+    -0.5847,
+    0,
+    -1.2271
+   ],
+   "max": [
+    0.5847,
+    0.7928,
+    1.2271
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/steel_table.glb",
+   "hiBytes": 4258912
+  },
+  "lab_table": {
+   "url": "assets/models/lab_table.glb",
+   "tags": [
+    "furniture"
+   ],
+   "bytes": 727712,
+   "srcTris": 46706,
+   "tris": 18119,
+   "min": [
+    -0.5847,
+    0,
+    -1.2271
+   ],
+   "max": [
+    0.5847,
+    1.3356,
+    1.2271
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/lab_table.glb",
+   "hiBytes": 5970884
   }
  }
 }

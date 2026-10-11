@@ -60,6 +60,8 @@ const SOON = 0.95;
 const ARMS: [string, number][] = [['colt', 2.4], ['m9', 1.8], ['hatchet', 1.6], ['bat', 1.6], ['crowbar', 1.4], ['machete', 1.4], ['shovel', 1.4], ['knife', 1]];
 /** seconds an armed point stays bare once its weapon has been taken */
 export const ARMS_RESTOCK = 180;
+/** seconds before a place that always keeps one named thing has it again (the rifle on the hospital roof, and its parts) */
+export const KEEPS_RESTOCK = 900;
 
 // How many of each, and where: `npx tsx scripts/loot-audit.ts` says what the rules come to on the map as it is,
 // and test/loot.test.ts holds them to what was asked (2026-10-10):
@@ -341,7 +343,7 @@ export class Economy {
     let total = 0;
     this.points.forEach((p, i) => {
       // armed points are stocked on their own (see arm)
-      if (p.arms || this.pointBusy.has(i) || this.tier[i] !== where) return;
+      if (p.arms || p.keeps || this.pointBusy.has(i) || this.tier[i] !== where) return;
       // (TEMPORARY, THE SHOWCASE: in Kamenka its things lie in the town's houses as well as where each was kept)
       const kinds = where === 3 && id in SHOWCASE.kamenka && id !== 'gasmask' ? SHOWN_IN : rule.usage;
       if (sorted && !p.usage.some((u) => kinds.includes(u))) return;
@@ -399,14 +401,20 @@ export class Economy {
   /** Puts a weapon at every armed point that has been bare long enough (at once, when `now`). */
   private arm(now = false) {
     this.points.forEach((p, i) => {
-      if (!p.arms) return;
+      if (!p.arms && !p.keeps) return;
       if (this.pointBusy.has(i)) {
         this.bare.delete(i);
         return;
       }
       if (!now) {
         if (!this.bare.has(i)) this.bare.set(i, this.time);
-        if (this.time - this.bare.get(i)! < ARMS_RESTOCK) return;
+        if (this.time - this.bare.get(i)! < (p.keeps ? KEEPS_RESTOCK : ARMS_RESTOCK)) return;
+      }
+      // (a place that keeps one named thing: that thing, and nothing in its stead)
+      if (p.keeps) {
+        if (ITEMS[p.keeps]) this.spawnType(p.keeps, i);
+        this.bare.delete(i);
+        return;
       }
       // a few tries: a rifle will not lie on a shelf
       // (on the outskirts, something to hit with and never a gun; further in, a pistol where guns were kept)
