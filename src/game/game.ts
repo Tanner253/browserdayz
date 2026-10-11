@@ -499,6 +499,17 @@ export class Game {
     this.invUI = new InventoryUI(this.inv, {
       take: (w) => this.takeWorldItem(w),
       drop: (item) => {
+        // A case, a suitcase or a bag let go of is one put down: it stands where it lands and is a stash, as if it
+        // had been placed. ("for stashing items the user does not need to right click place them, theyd just drop
+        // the container on the ground from their inventory", 2026-10-11.) With nowhere near to stand it, it goes
+        // back into the pockets; with no room there either it lies loose, as it used to.
+        if (ITEMS[item.id]?.category === 'stash') {
+          if (this.placeStash(item, true)) {
+            this.vicinityDue = [performance.now() + 150, performance.now() + 700];
+            return;
+          }
+          if (!this.inv.add(item)) return void this.inventoryChanged();
+        }
         this.dropItem(item);
         // it lands a moment later: the list of what lies about is read again then, and once more
         // after it has settled (left to the five-second tick, a dropped thing seemed to vanish)
@@ -3279,15 +3290,30 @@ export class Game {
     this.inventoryChanged();
   }
 
-  private placeStash(item: ItemInstance) {
+  /**
+   * A case, a suitcase or a bag put down as a stash.
+   * @param dropped let go of out of the inventory, and not placed by hand: it is stood wherever near the feet there
+   * is room for it, and the inventory stays open
+   * @returns whether it was put down
+   */
+  private placeStash(item: ItemInstance, dropped = false): boolean {
     const p = this.player;
     const fwd = new THREE.Vector3(-Math.sin(p.yaw), 0, -Math.cos(p.yaw));
-    const x = p.pos.x + fwd.x * 1.6, z = p.pos.z + fwd.z * 1.6;
-    const hit = physics.raycast({ x, y: p.pos.y + 1.5, z }, { x: 0, y: -1, z: 0 }, 5, SOLID_GROUPS);
-    if (!hit || hit.toi < 1e-3 || hit.point.y > p.pos.y + 0.6 || physics.boxOverlaps({ x, y: hit.point.y + 0.3, z }, p.yaw, 0.6, 0.22, 0.26)) {
-      this.hud.note('Not enough room to place the crate here', 'warn');
-      return;
+    // (ahead first; then nearer, to either side, and behind: [ahead, to the right])
+    const tries = dropped ? [[1.6, 0], [1.1, 0], [0.9, 0.8], [0.9, -0.8], [0.1, 1.2], [0.1, -1.2], [-1.1, 0]] : [[1.6, 0]];
+    let at: { x: number; y: number; z: number } | null = null;
+    for (const [f, r] of tries) {
+      const x = p.pos.x + fwd.x * f - fwd.z * r, z = p.pos.z + fwd.z * f + fwd.x * r;
+      const hit = physics.raycast({ x, y: p.pos.y + 1.5, z }, { x: 0, y: -1, z: 0 }, 5, SOLID_GROUPS);
+      if (!hit || hit.toi < 1e-3 || hit.point.y > p.pos.y + 0.6 || physics.boxOverlaps({ x, y: hit.point.y + 0.3, z }, p.yaw, 0.6, 0.22, 0.26)) continue;
+      at = { x, y: hit.point.y, z };
+      break;
     }
+    if (!at) {
+      this.hud.note(`Not enough room to put the ${itemName(item).toLowerCase()} down here`, 'warn');
+      return false;
+    }
+    const { x, z } = at, hit = { point: at };
     this.inv.remove(item);
     this.openStash?.container.remove(item);
     const st = this.newStash({ uid: newUid(), x, y: hit.point.y, z, rot: p.yaw, item: item.id });
@@ -3297,9 +3323,10 @@ export class Game {
     st.known = true;
     void this.loot.addStash(st).then(() => this.save());
     this.net.send({ t: 'stash+', s: { uid: st.uid, x: st.x, y: st.y, z: st.z, rot: st.rot, ...(st.item === 'stash_kit' ? {} : { item: st.item }) }, ...(items.length ? { items } : {}) });
-    this.toggleInventory(false);
+    if (!dropped) this.toggleInventory(false);
     this.inventoryChanged();
     audio.ui('drop');
+    return true;
   }
 
   /** A stash as the game holds one: the case, the suitcase or the bag, as big inside as that thing is (see `stash` in src/sim/items.ts). */
