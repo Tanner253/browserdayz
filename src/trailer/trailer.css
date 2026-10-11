@@ -406,3 +406,70 @@ body.tr-phone6 #game { border-radius: 4.5vh; }
 .arm7 .a7 i { display: block; height: 0.5vh; margin-top: 0.9vh; background: rgba(255, 255, 255, 0.14); }
 .arm7 .a7 i::after { content: ''; display: block; height: 100%; width: var(--w, 0%); background: #ffd35a; }
 .arm7 .a7 span { display: block; margin-top: 0.8vh; font-size: 1.35vh; letter-spacing: 0.16em; color: #c9c0aa; white-space: nowrap; }
+
+/* ------------------------------------------------------------------------------------------------
+   The eighth film: a spec sheet. Nothing of the other films' cards: a fine grid over the whole
+   picture with marks at its corners, a chip that says which part of the sheet this is, a block of
+   figures for the thing shown, labels on fine lines to each part of it, and one word the size of
+   the screen where a part begins. */
+.x8-grid { position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: var(--o, 1);
+  background-image: linear-gradient(rgba(255, 211, 90, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 211, 90, 0.05) 1px, transparent 1px);
+  background-size: 6.25vw 6.25vw; background-position: 50% 50%; }
+.x8-grid::before, .x8-grid::after { content: ''; position: absolute; width: 3.2vw; height: 3.2vw; border: 0.22vh solid rgba(255, 211, 90, 0.7); }
+.x8-grid::before { left: 2.2vw; top: 3.6vh; border-right: 0; border-bottom: 0; }
+.x8-grid::after { right: 2.2vw; bottom: 3.6vh; border-left: 0; border-top: 0; }
+.x8-chip { inset: 5.2vh auto auto 4.4vw; display: flex; align-items: baseline; gap: 1.1vw; text-transform: uppercase; white-space: nowrap; }
+.x8-chip b { font-size: 2.1vh; font-weight: 700; letter-spacing: 0.34em; color: #14110b; background: #ffd35a; padding: 0.35em 0.7em 0.35em 0.95em; }
+.x8-chip span { font-size: 2.1vh; font-weight: 600; letter-spacing: 0.42em; color: #f3efe6; }
+.x8-mark { inset: 5.2vh 4.4vw auto auto; font-size: 2.1vh; font-weight: 700; letter-spacing: 0.5em; margin-right: -0.5em; color: rgba(243, 239, 230, 0.72); text-transform: uppercase; white-space: nowrap; }
+.x8-mark i { font-style: normal; color: #ffd35a; }
+
+/* the figures for the thing shown */
+.x8-spec { inset: auto auto 8.6vh 4.4vw; text-transform: uppercase; opacity: var(--o, 0); transform: translateY(calc((1 - var(--o, 0)) * 1.6vh)); }
+.x8-spec .s8-idx { font-size: 1.9vh; font-weight: 600; letter-spacing: 0.5em; color: #ffd35a; }
+.x8-spec .s8-name { margin-top: 0.3vh; font-size: 11.5vh; line-height: 0.92; font-weight: 800; font-stretch: condensed; letter-spacing: 0.06em; color: #fff3d6; white-space: nowrap; }
+.x8-spec .s8-rows { margin-top: 1.1vh; display: grid; grid-template-columns: auto auto; column-gap: 1.3vw; row-gap: 0.45vh; justify-content: start; align-items: baseline; }
+.x8-spec .s8-rows i { font-style: normal; font-size: 1.55vh; font-weight: 600; letter-spacing: 0.34em; color: #ffd35a; }
+.x8-spec .s8-rows span { font-size: 2.35vh; font-weight: 700; letter-spacing: 0.16em; color: #f3efe6; white-space: nowrap; }
+
+/* a part, named: a label on a fine line to it */
+.x8-lines { position: absolute; inset: 0; z-index: 2; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.x8-lines line { stroke: #ffd35a; stroke-width: 1.5; opacity: 0.9; }
+.x8-lines circle { fill: none; stroke: #ffd35a; stroke-width: 2; }
+.x8-lines circle.dot { fill: #ffd35a; stroke: none; }
+.x8-call { position: absolute; z-index: 2; transform: translate(-50%, -50%) scale(var(--k, 1)); padding: 0.5vh 0.9vw 0.5vh 1.1vw; background: rgba(8, 9, 8, 0.86); border: 0.18vh solid #ffd35a; text-transform: uppercase; white-space: nowrap; font-size: 1.9vh; font-weight: 700; letter-spacing: 0.24em; color: #fff3d6; opacity: var(--o, 0); }
+.x8-call b { margin-right: 0.7em; color: #ffd35a; font-size: 1.25em; font-stretch: condensed; letter-spacing: 0.04em; }
+.x8-call.new { background: #ffd35a; color: #14110b; }
+.x8-call.new b { color: #14110b; }
+
+/* a word the size of the screen, for a few frames, where a part of the sheet begins */
+.x8-word { z-index: 4; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #080908; text-transform: uppercase; }
+.x8-word b { font-size: 30vh; line-height: 0.9; font-weight: 800; font-stretch: condensed; letter-spacing: 0.04em; color: #ffd35a; white-space: nowrap; transform: scale(var(--k, 1)); }
+.x8-word span { margin-top: 2vh; font-size: 2.6vh; font-weight: 600; letter-spacing: 0.7em; margin-right: -0.7em; color: #f3efe6; }
+
+/* what the hands are at, counted */
+.x8-count { inset: auto auto 8.6vh 4.4vw; text-transform: uppercase; opacity: var(--o, 1); }
+.x8-count .c8-kick { font-size: 1.9vh; font-weight: 600; letter-spacing: 0.5em; color: #ffd35a; white-space: nowrap; }
+.x8-count .c8-n { margin-top: 0.2vh; display: flex; align-items: baseline; gap: 0.6vw; font-weight: 800; font-stretch: condensed; color: #fff3d6; line-height: 0.95; font-variant-numeric: tabular-nums; }
+.x8-count .c8-n b { font-size: 15vh; transform-origin: 0 100%; transform: scale(var(--k, 1)); color: #fff3d6; }
+.x8-count .c8-n i { font-style: normal; font-size: 6vh; color: rgba(243, 239, 230, 0.55); }
+.x8-count .c8-n em { font-style: normal; font-size: 2.3vh; font-weight: 700; letter-spacing: 0.3em; color: #f3efe6; margin-left: 0.6vw; }
+.x8-count .c8-bar { margin-top: 0.9vh; width: 30vw; height: 0.7vh; background: rgba(255, 255, 255, 0.16); }
+.x8-count .c8-bar::after { content: ''; display: block; height: 100%; width: var(--w, 0%); background: #ffd35a; }
+.x8-count .c8-line { margin-top: 1vh; font-size: 2.2vh; font-weight: 700; letter-spacing: 0.24em; color: #f3efe6; white-space: nowrap; }
+
+/* the first frame, and the last */
+.x8-card { z-index: 3; display: flex; flex-direction: column; justify-content: center; padding-left: 6.6vw; text-transform: uppercase; background: linear-gradient(90deg, rgba(6, 7, 6, 0.9) 0%, rgba(6, 7, 6, 0.74) 34%, rgba(6, 7, 6, 0) 68%); }
+.x8-card .k8-kick { font-size: 2.5vh; font-weight: 700; letter-spacing: 0.62em; color: #ffd35a; white-space: nowrap; }
+.x8-card .k8-logo { margin-top: 0.6vh; font-size: 30vh; line-height: 0.86; font-weight: 800; font-stretch: condensed; letter-spacing: 0.12em; color: #fff3d6; }
+.x8-card .k8-line { margin-top: 1.4vh; font-size: 5.6vh; font-weight: 800; font-stretch: condensed; letter-spacing: 0.3em; color: #f3efe6; white-space: nowrap; }
+.x8-card .k8-tiles { margin-top: 3.4vh; display: flex; gap: 1vw; }
+.x8-card .k8-tiles div { min-width: 9.6vw; padding: 1.1vh 1vw 1.2vh; border-top: 0.5vh solid #ffd35a; background: rgba(10, 12, 10, 0.82); }
+.x8-card .k8-tiles b { display: block; font-size: 7.4vh; line-height: 1; font-weight: 800; font-stretch: condensed; color: #ffd35a; }
+.x8-card .k8-tiles span { display: block; margin-top: 0.4vh; font-size: 1.5vh; font-weight: 700; letter-spacing: 0.26em; color: #e2d9c2; white-space: nowrap; }
+.x8-end { z-index: 3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.1vh; text-transform: uppercase; background: radial-gradient(ellipse at 50% 46%, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.92)); opacity: calc(min(1, var(--t, 0) * 2.6)); }
+.x8-end .k8-logo { font-size: 28vh; line-height: 0.88; font-weight: 800; font-stretch: condensed; letter-spacing: 0.16em; margin-right: -0.16em; color: #fff3d6; }
+.x8-end .k8-line { font-size: 4.4vh; font-weight: 700; font-stretch: condensed; letter-spacing: 0.5em; margin-right: -0.5em; color: #f3efe6; }
+.x8-end .k8-url { margin-top: 1.6vh; padding: 0.35em 1.1em 0.35em 1.45em; font-size: 5.6vh; font-weight: 800; font-stretch: condensed; letter-spacing: 0.34em; color: #14110b; background: #ffd35a; }
+.x8-end .k8-rows { display: flex; gap: 3vw; margin-top: 1.4vh; font-size: 2.5vh; letter-spacing: 0.26em; font-weight: 600; color: #e2d9c2; }
+.x8-end .k8-ca { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 2vh; letter-spacing: 0.08em; text-transform: none; color: #d8cfb8; opacity: 0.75; }

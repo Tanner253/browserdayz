@@ -420,7 +420,7 @@ let pumping = true;
 /** Every sound the game asks for is written down instead of played; the soundtrack is rendered from the list afterwards. */
 function hookAudio() {
   const plain = (v: unknown): unknown => (v && typeof v === 'object' && 'x' in (v as Any) ? { x: (v as Any).x, y: (v as Any).y, z: (v as Any).z } : v);
-  const names = ['gunshot', 'dryFire', 'click', 'blow', 'boltCycle', 'reloadNear', 'magOut', 'magIn', 'slideRack', 'shellDrop', 'whiz', 'hitTick', 'equip', 'jump', 'land', 'death', 'body', 'door', 'impact', 'footstep', 'whoosh', 'explosion', 'ui', 'hurt', 'shout', 'infected', 'setListener', 'updateAmbience'];
+  const names = ['gunshot', 'dryFire', 'click', 'blow', 'boltCycle', 'reloadNear', 'magOut', 'magIn', 'shellIn', 'slideRack', 'shellDrop', 'whiz', 'hitTick', 'equip', 'jump', 'land', 'death', 'body', 'door', 'impact', 'footstep', 'whoosh', 'explosion', 'ui', 'hurt', 'shout', 'infected', 'setListener', 'updateAmbience'];
   for (const n of names) {
     (audio as unknown as Any)[n] = (...a: unknown[]) => {
       if (logging && !S.mute) soundLog.push({ t: frameIndex / fps, n, a: a.map(plain) });
@@ -552,7 +552,13 @@ async function stage() {
   S.bullet.visible = S.trail.visible = false;
   g.s.r.scene.add(S.bullet, S.trail);
 
-  if (CUT === 7) {
+  if (CUT === 8) {
+    // (the eighth brings its own score, as the third did: see music8.ts)
+    const cut = await import('./shots8');
+    shots = cut.buildShots(S);
+    seconds = cut.SECONDS8;
+    ownScore = (await import('./music8')).scoreMusic8;
+  } else if (CUT === 7) {
     const cut = await import('./shots7');
     shots = cut.buildShots(S);
     arrangement = cut.ARRANGEMENT;
