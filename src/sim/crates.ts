@@ -22,7 +22,7 @@ const MILITARY: Table = [
 const CIVILIAN: Table = [
   ['beans', 2], ['sardines', 2], ['sprats', 2], ['tomatoes', 1.5], ['apple', 1.5], ['milk', 1], ['thermos', 0.6], ['water_jug', 0.9], ['flask', 0.5],
   ['bandage', 1.2], ['splint', 0.6], ['cigarettes', 1.2], ['ammo_9mm', 0.6], ['ammo_762', 0.3],
-  ['knife', 0.9], ['hatchet', 0.9], ['bat', 0.8], ['crowbar', 0.8], ['machete', 0.6],
+  ['knife', 0.9], ['hatchet', 0.9], ['bat', 0.8], ['crowbar', 0.8], ['machete', 0.6], ['shovel', 0.6],
   ['garden_gloves', 0.8], ['fishermans_hat', 0.6], ['sack_pack', 0.8], ['chest_rig', 0.5], ['flashlight', 1], ['compass', 0.3], ['jerrycan', 0.4],
 ];
 

@@ -33,6 +33,8 @@ What is not CC0 is listed first, with the credit its licence asks for.
   Changes made: Stood on the ground about its own middle; its colour and its relief re-encoded as WebP at the size they came, its other maps left out; geometry compressed.
 - This work is based on "Old barrack from DayZ" (https://sketchfab.com/3d-models/old-barrack-from-dayz-9419706c98c94dfb83d7d3e19f7a6a37) by Shotkey (https://sketchfab.com/shotkey) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
   Changes made: Stood on the ground about its own middle; the boards its windows and its door were painted on taken out (ten windows and a door: 22 triangles); its texture re-encoded as WebP at 2048; geometry compressed.
+- This work is based on "Shovel Low-poly" (https://sketchfab.com/3d-models/shovel-low-poly-a402ec2c06d04bd09b301c2a76d2f630) by MaX3Dd (https://sketchfab.com/MaX3Dd) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Changes made: Stood upright on its handle about its own middle; textures re-encoded as WebP at the size they came; geometry compressed.
 - This work is based on "Tent_Military" (https://sketchfab.com/3d-models/tent-military-e06d68ead08a4c44bfd5f826ecca4987) by Mehdi Shahsavan (https://sketchfab.com/ahmagh2e) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
   Changes made: Its guy ropes and pegs taken off, and the pole inside its doorway; stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.
 - This work is based on "Combat helmet K6-3" (https://sketchfab.com/3d-models/combat-helmet-k6-3-94701874d8b949718708b018c8d4f61d) by shamanoff (https://sketchfab.com/shamanoff) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

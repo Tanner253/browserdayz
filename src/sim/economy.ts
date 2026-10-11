@@ -57,7 +57,7 @@ const SOON = 0.95;
  * On the outskirts that is something to hit with and never a gun; from the village on, a pistol where guns were
  * kept, and either elsewhere. [item, weight]
  */
-const ARMS: [string, number][] = [['p38', 2.4], ['m9', 1.8], ['hatchet', 1.6], ['bat', 1.6], ['crowbar', 1.4], ['machete', 1.4], ['knife', 1]];
+const ARMS: [string, number][] = [['p38', 2.4], ['m9', 1.8], ['hatchet', 1.6], ['bat', 1.6], ['crowbar', 1.4], ['machete', 1.4], ['shovel', 1.4], ['knife', 1]];
 /** seconds an armed point stays bare once its weapon has been taken */
 export const ARMS_RESTOCK = 180;
 
@@ -112,6 +112,8 @@ export const TYPES: Record<string, TypeRule> = {
   machete: { at: [12, 0, 0, 0, 0], lifetime: 3600, restock: 180, usage: SHEDS, favour: { Farm: 2 } },
   crowbar: { at: [14, 0, 0, 0, 0], lifetime: 3600, restock: 180, usage: SHEDS, favour: { Industrial: 2 } },
   bat: { at: [13, 0, 0, 0, 0], lifetime: 3600, restock: 180, usage: [...HOMES, 'Farm'] },
+  // (a tool of yards and sheds: it lies on a floor, being as long as a rifle is)
+  shovel: { at: [11, 0, 0, 0, 0], lifetime: 3600, restock: 180, usage: SHEDS, favour: { Farm: 2, Industrial: 2 } },
   knife: { at: [16, 0, 0, 0, 0], lifetime: 3600, restock: 180, usage: [...HOMES, 'Farm', 'Hunting', 'Industrial'] },
   // ------------------------------------------------------------ food and drink: the shop before anywhere
   sprats: { at: [8, 10, 5, 0, 0], lifetime: 2400, restock: 300, usage: ['Shop', ...HOMES], favour: LARDER },
@@ -127,9 +129,9 @@ export const TYPES: Record<string, TypeRule> = {
   thermos: { at: [4, 7, 5, 1, 2], lifetime: 2400, restock: 300, usage: ['Military', 'Hunting', 'Village', 'Police', 'Industrial', 'Shop'] },
   // ------------------------------------------------------------ medical: the clinic, and the shop until there is a hospital
   // (What stops bleeding is what a fight is lost for want of.)
-  bandage: { at: [5, 22, 14, 4, 5], lifetime: 2400, restock: 240, usage: ['Medic', 'Shop', ...HOMES, 'Military', 'Police', 'Hunting', 'Farm'], favour: { Medic: 6, Shop: 4, Military: 2 } },
+  bandage: { at: [5, 22, 14, 4, 5], lifetime: 2400, restock: 240, usage: ['Medic', 'Shop', ...HOMES, 'Military', 'Police', 'Hunting', 'Farm'], favour: { Medic: 10, Shop: 6, Military: 2 } },
   stim: { at: [0, 9, 6, 4, 4], lifetime: 3000, restock: 420, usage: ['Medic', 'Military', 'Police', 'Shop'], favour: { Medic: 5, Military: 3 } },
-  firstaid: { at: [0, 9, 8, 3, 4], lifetime: 3600, restock: 600, usage: ['Medic', 'Military', 'Police'], favour: { Medic: 8 } },
+  firstaid: { at: [0, 9, 8, 3, 4], lifetime: 3600, restock: 600, usage: ['Medic', 'Military', 'Police'], favour: { Medic: 12 } },
   // (what sets a broken leg and does nothing else: commoner than the kit, and where there are ladders and lofts to fall off)
   splint: { at: [5, 10, 6, 2, 2], lifetime: 3600, restock: 420, usage: ['Medic', 'Shop', ...HOMES, 'Farm', 'Hunting', 'Industrial', 'Police'], favour: { Medic: 5, Shop: 2 } },
   // ------------------------------------------------------------ what is worn and carried

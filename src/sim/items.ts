@@ -209,6 +209,8 @@ const D: ItemDef[] = [
   { id: 'machete', name: 'Machete', model: 'machete', w: 1, h: 5, weight: 0.6, category: 'melee', slot: 'melee', desc: 'Long blade. Fast swings.', melee: { damage: 38, range: 1.9, rate: 0.55 } },
   { id: 'crowbar', name: 'Crowbar', model: 'crowbar_01', w: 1, h: 4, weight: 1.6, category: 'melee', slot: 'melee', desc: 'Heavy steel. Opens things, closes arguments.', melee: { damage: 42, range: 1.8, rate: 0.85 } },
   { id: 'bat', name: 'Baseball Bat', model: 'baseball_bat', w: 1, h: 6, weight: 0.9, category: 'melee', slot: 'melee', desc: 'Wooden bat.', melee: { damage: 30, range: 2.0, rate: 0.7 } },
+  // (2026-10-10: swung as the bat is, in both hands; heavier, a little slower, and its edge bites)
+  { id: 'shovel', name: 'Shovel', model: 'shovel', w: 2, h: 6, weight: 1.7, category: 'melee', slot: 'melee', desc: 'A short-handled digging shovel with a steel blade. Swung in both hands like a bat: heavier, a little slower, and it hits harder.', melee: { damage: 36, range: 2.0, rate: 0.78 } },
   { id: 'knife', name: 'Fish Knife', model: 'fish_knife', w: 1, h: 2, weight: 0.15, category: 'melee', slot: 'melee', desc: 'Thin filleting blade. Quick, short reach.', melee: { damage: 27, range: 1.45, rate: 0.42 } },
   // ---------------------------------------------------------------- food & drink
   { id: 'sprats', name: 'Tinned Sprats', model: 'russian_food_cans_01', node: 'russian_food_cans_01_can_fish', scale: 2.2, w: 1, h: 1, weight: 0.24, category: 'food', desc: 'Smoked sprats in oil. Шпроты.', use: { verb: 'Eat', time: 2.5, energy: 28, water: -2, sound: 'eat' } },

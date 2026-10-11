@@ -223,6 +223,17 @@ export const LOCAL_MODELS = {
     tags: ['prop'],
     changes: 'Stood on the ground about its own middle; the boards its windows and its door were painted on taken out (ten windows and a door: 22 triangles); its texture re-encoded as WebP at 2048; geometry compressed.',
   },
+  // The shovel (2026-10-10): as it came, every triangle and its pictures at their own size. It lies on the ground
+  // in its file, 22 degrees off the x axis, its blade toward -x: it is turned along x and then stood on its
+  // handle, blade up, the way the bat and the hatchet stand (what is held is held by the foot of it).
+  shovel: {
+    dir: 'shovel',
+    rot: [0, -0.3805, -Math.PI / 2],
+    scale: 1,
+    tex: 2048,
+    tags: ['loot'],
+    changes: 'Stood upright on its handle about its own middle; textures re-encoded as WebP at the size they came; geometry compressed.',
+  },
   // The army's tent (2026-10-10): gone into, like a building (see `tent` in src/world/buildings.ts). Its guy ropes
   // and their pegs are taken off: what stops a body in a building that is all a model is the model's own
   // triangles, and a rope nobody sees until they have walked into it is a wall. Its cloth lies within 3 m of its

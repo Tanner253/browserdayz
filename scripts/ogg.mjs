@@ -3,6 +3,8 @@
 //
 //   node scripts/ogg.mjs impactWood_heavy impactWood_light      Kenney's "Impact Sounds", every take of each kind:
 //        assets-src/sounds/kenney-impact/Audio/<kind>_00<n>.ogg -> assets-src/sounds/decoded/k-<kind>-<n>.wav
+//   node scripts/ogg.mjs --dir cc0-wood-metal door_open_01 wood_close_01        files of another pack, by name:
+//        assets-src/sounds/<dir>/<name>.ogg -> assets-src/sounds/decoded/c-<name>.wav
 //
 // scripts/sounds.mjs reads them from there.
 
@@ -14,7 +16,9 @@ import WebSocket from 'ws';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
 const SRC = path.join(ROOT, 'assets-src', 'sounds', 'kenney-impact', 'Audio'), OUT = path.join(ROOT, 'assets-src', 'sounds', 'decoded');
-const kinds = process.argv.slice(2);
+const args = process.argv.slice(2);
+const pack = args[0] === '--dir' ? args[1] : null;
+const kinds = pack ? args.slice(2) : args;
 if (!kinds.length) throw new Error('which kinds? e.g. node scripts/ogg.mjs impactWood_heavy');
 const PORT = 9336;
 const CHROME = ['C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'].find((p) => fs.existsSync(p));
@@ -51,9 +55,10 @@ try {
     ws.send(JSON.stringify({ id, method: 'Runtime.evaluate', params: { expression, awaitPromise: true, returnByValue: true } }));
   });
   fs.mkdirSync(OUT, { recursive: true });
-  for (const kind of kinds) {
-    for (let n = 0; n < 5; n++) {
-      const file = path.join(SRC, `${kind}_00${n}.ogg`);
+  // (of Kenney's pack, the five takes of each kind; of another, the one file of each name)
+  const jobs = pack ? kinds.map((name) => [path.join(ROOT, 'assets-src', 'sounds', pack, `${name}.ogg`), `c-${name}`]) : kinds.flatMap((kind) => [0, 1, 2, 3, 4].map((n) => [path.join(SRC, `${kind}_00${n}.ogg`), `k-${kind}-${n}`]));
+  {
+    for (const [file, out] of jobs) {
       if (!fs.existsSync(file)) continue;
       // (the decoder gives it at the rate asked for, mixed down to one channel here)
       const got = await run(`(async () => {
@@ -78,8 +83,8 @@ try {
       head.writeUInt16LE(16, 34);
       head.write('data', 36);
       head.writeUInt32LE(pcm.length, 40);
-      fs.writeFileSync(path.join(OUT, `k-${kind}-${n}.wav`), Buffer.concat([head, pcm]));
-      console.log(`k-${kind}-${n}.wav  ${(pcm.length / 2 / got.rate).toFixed(2)} s`);
+      fs.writeFileSync(path.join(OUT, `${out}.wav`), Buffer.concat([head, pcm]));
+      console.log(`${out}.wav  ${(pcm.length / 2 / got.rate).toFixed(2)} s`);
     }
   }
   ws.close();

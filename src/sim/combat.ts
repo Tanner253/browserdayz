@@ -30,6 +30,7 @@ export const WEAPON_RULES: Record<string, WeaponRule> = {
   machete: { damage: 38, melee: true, range: 3.8, interval: 0.4, falloff: 1 },
   crowbar: { damage: 42, melee: true, range: 3.7, interval: 0.6, falloff: 1 },
   bat: { damage: 30, melee: true, range: 3.9, interval: 0.5, falloff: 1 },
+  shovel: { damage: 36, melee: true, range: 3.9, interval: 0.55, falloff: 1 },
   knife: { damage: 27, melee: true, range: 3.3, interval: 0.3, falloff: 1 },
   grenade: { damage: 150, melee: false, range: 70, interval: 0, falloff: 1, blast: 9 },
   // a fuel drum somebody shot (see src/sim/barrels.ts): whoever fired may be a rifle shot away

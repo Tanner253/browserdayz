@@ -35,7 +35,7 @@ export interface EngineVoice {
  * made-up sound is what is heard: but for the infected (z_), who have no made-up voice any more
  * and are silent until theirs is there.
  */
-const RECORDED: Record<string, number> = { punch: 5, blow: 5, hit_metal: 6, shot_rifle: 1, shot_pistol: 3, shot_quiet: 1, bolt: 1, rifle_mag_out: 1, rifle_mag_in: 1, pistol_mag_out: 1, pistol_mag_in: 1, rack: 1, shot_shotgun: 2, shot_magnum: 2, shell_in: 1, z_groan: 4, z_growl: 4, z_alert: 4, z_attack: 4, z_hurt: 4, z_die: 4, door_close: 3, door_latch: 3 };
+const RECORDED: Record<string, number> = { punch: 5, blow: 5, hit_metal: 6, shot_rifle: 1, shot_pistol: 3, shot_quiet: 1, bolt: 1, rifle_mag_out: 1, rifle_mag_in: 1, pistol_mag_out: 1, pistol_mag_in: 1, rack: 1, shot_shotgun: 2, shot_magnum: 2, shell_in: 1, z_groan: 4, z_growl: 4, z_alert: 4, z_attack: 4, z_hurt: 4, z_die: 4, door_open: 1, door_creak: 2, door_close: 2, gate_open: 1, gate_close: 1, gate_slam: 1 };
 const bank = new Map<string, AudioBuffer[]>();
 let fetched: Promise<void> | null = null;
 /** Fetches the recordings, once. (They are kept apart from any one engine: the trailer renders its soundtrack on an engine of its own.) */
@@ -399,8 +399,13 @@ export class AudioEngine {
     const ctx = this.ctx;
     const t = ctx.currentTime + distance / 343;
     const out = this.out(pos, 16, 0.85, distance * 0.6);
-    // the klaxon: two notes, turn about, for as long as it moves
-    for (let k = 0; k < 6; k++) {
+    // A steel door, recorded: drawn open or pushed to as it begins to move, and slammed home as it stops, each
+    // slowed to the weight of this one. With those there is no klaxon (it was the made-up part of it, and what was
+    // heard across the whole map) and the grinding under them is half what it was.
+    const real = this.rec(opening ? 'gate_open' : 'gate_close', out, t + 0.05, 2.6, 0.8);
+    if (real) this.rec('gate_slam', out, t + 2.95, 2.8, 0.72);
+    // the klaxon: two notes, turn about, for as long as it moves (only until the recordings have come)
+    for (let k = 0; k < (real ? 0 : 6); k++) {
       const o = ctx.createOscillator();
       o.type = 'sawtooth';
       o.frequency.value = k % 2 ? 392 : 523;
@@ -415,7 +420,7 @@ export class AudioEngine {
       o.stop(t + k * 0.5 + 0.5);
     }
     // the bolts, at the start; and the stop it comes up against, at the end
-    for (const [at, vol] of [[0.05, 1.6], [0.32, 1.2], [3.05, 2.2]]) {
+    for (const [at, vol] of real ? [] : [[0.05, 1.6], [0.32, 1.2], [3.05, 2.2]]) {
       // (a recording of steel struck, played at half its speed: an octave down, and twice as long in dying.
       // Until the recordings have come, the made-up thump.)
       if (this.rec('hit_metal', out, t + at, vol * 1.5, 0.5)) continue;
@@ -440,13 +445,13 @@ export class AudioEngine {
     lp.frequency.linearRampToValueAtTime(opening ? 520 : 300, t + 3.1);
     const rg = ctx.createGain();
     rg.gain.setValueAtTime(0.0001, t + 0.3);
-    rg.gain.linearRampToValueAtTime(1.9, t + 0.6);
-    rg.gain.setValueAtTime(1.9, t + 2.8);
+    rg.gain.linearRampToValueAtTime(real ? 0.9 : 1.9, t + 0.6);
+    rg.gain.setValueAtTime(real ? 0.9 : 1.9, t + 2.8);
     rg.gain.linearRampToValueAtTime(0.0001, t + 3.2);
     const shake = ctx.createOscillator();
     shake.frequency.value = 17;
     const sg = ctx.createGain();
-    sg.gain.value = 0.7;
+    sg.gain.value = real ? 0.3 : 0.7;
     shake.connect(sg).connect(rg.gain);
     run.connect(lp).connect(rg).connect(out);
     shake.start(t + 0.3);
@@ -734,8 +739,13 @@ export class AudioEngine {
     const out = this.out(pos, 3, 1.2);
     // (from where the door is, like the rest of it: with no place given, the click of every
     // door on the map was heard by everybody, at full strength, wherever they stood)
-    // the latch: a recording of wood knocked lightly, where there is one
-    if (!this.rec('door_latch', out, t, opening ? 0.9 : 0.5, opening ? 1.25 : 1)) this.click(opening ? 1400 : 900, 0.4, 0.04, 0, pos);
+    // Recordings of a wooden door, where they have come: opened (the handle, and its hinge a moment after, quietly),
+    // or swung to and shut. Until then, the made-up click, creak and thud.
+    if (opening ? this.rec('door_open', out, t, 1.5) : this.rec('door_close', out, t + 0.28, 1.6)) {
+      if (opening) this.rec('door_creak', out, t + 0.14, 0.45);
+      return;
+    }
+    this.click(opening ? 1400 : 900, 0.4, 0.04, 0, pos);
     if (opening) {
       const o = this.ctx.createOscillator();
       o.type = 'sawtooth';
@@ -760,9 +770,6 @@ export class AudioEngine {
       o.stop(t + 0.85);
       wob.stop(t + 0.85);
     } else {
-      // shut: wood meeting its frame. A recording of a heavy blow on wood, a little low; the made-up thud and
-      // click only until the recordings have come.
-      if (this.rec('door_close', out, t + 0.35, 1.5, 0.85)) return;
       const n = this.noise(t + 0.35, 0.15);
       const f = this.filter('lowpass', 380, 1);
       const g = this.ctx.createGain();

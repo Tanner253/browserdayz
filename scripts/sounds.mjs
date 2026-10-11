@@ -10,6 +10,7 @@
 //                       Heras and Matthew Nanney (CC0)
 //   kenney-impact/      "Impact Sounds" by Kenney (www.kenney.nl), CC0
 //   qubodup-punch/      "Punch" by qubodup (opengameart.org/content/punch), CC0
+//   cc0-wood-metal/     "100 CC0 metal and wood SFX" (opengameart.org/content/100-cc0-metal-and-wood-sfx), CC0
 //   decoded/            the two above come as Ogg, and nothing on this machine reads Ogg but a
 //                       browser: the ones used were decoded in one and written out as they are
 //                       (k-impact<Kind>-<n>.wav, q-punch-<n>.wav), and are read from here
@@ -108,11 +109,19 @@ const dec = (n) => path.join(SRC, 'decoded', `${n}.wav`);
 const several = (name, files, o) => files.forEach((f, n) => (SOUNDS[`${name}${n ? `_${n + 1}` : ''}`] = { src: dec(f), ...o }));
 several('punch', [1, 2, 3, 4, 5].map((k) => `q-punch-${k}`), { rate: 32000, gain: 0.9 });
 several('blow', [0, 1, 2, 3, 4].map((k) => `k-impactPunch_heavy-${k}`), { rate: 32000, gain: 0.9 });
-// A door: wood meeting its frame as it shuts (Kenney's heavy blows on wood), and the latch as it is let go (his
-// light ones). There is no recording of a door among what was downloaded; these are the nearest things that are
-// real. (Decoded from Ogg by scripts/ogg.mjs.)
-several('door_close', ['k-impactWood_heavy-0', 'k-impactWood_heavy-2', 'k-impactWood_heavy-4'], { rate: 44100, gain: 0.9 });
-several('door_latch', ['k-impactWood_light-0', 'k-impactWood_light-2', 'k-impactWood_light-3'], { rate: 44100, gain: 0.7 });
+// Doors, out of "100 CC0 metal and wood SFX" (opengameart.org/content/100-cc0-metal-and-wood-sfx, CC0; unpacked by
+// hand into cc0-wood-metal/, and decoded from Ogg by `node scripts/ogg.mjs --dir cc0-wood-metal <names>`). A wooden
+// door opened, its hinge, and shut; and for the bunker's, a steel door drawn open, pushed to, and slammed. Nobody
+// who chose these could hear them: they are what their maker called them.
+const door = (name) => path.join(SRC, 'decoded', `c-${name}.wav`);
+SOUNDS.door_open = { src: door('door_open_01'), rate: 44100, gain: 0.9 };
+SOUNDS.door_creak = { src: door('wood_squeak_01'), rate: 44100, gain: 0.8 };
+SOUNDS.door_creak_2 = { src: door('wood_squeak_02'), rate: 44100, gain: 0.8 };
+SOUNDS.door_close = { src: door('wood_close_01'), rate: 44100, gain: 0.9 };
+SOUNDS.door_close_2 = { src: door('wood_close_02'), rate: 44100, gain: 0.9 };
+SOUNDS.gate_open = { src: door('metal_open_01'), rate: 44100, gain: 0.9 };
+SOUNDS.gate_close = { src: door('metal_close_01'), rate: 44100, gain: 0.9 };
+SOUNDS.gate_slam = { src: door('metal_slam_01'), rate: 44100, gain: 0.9 };
 several('hit_metal', ['k-impactPlate_heavy-0', 'k-impactPlate_heavy-1', 'k-impactPlate_heavy-3', 'k-impactMetal_heavy-1', 'k-impactMetal_heavy-3', 'k-impactMetal_light-3'], { rate: 44100, gain: 0.9 });
 
 /** a .wav as one channel of numbers between -1 and 1: one of its channels, or all of them together */

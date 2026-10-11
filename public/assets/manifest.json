@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-11T00:14:33.949Z",
+ "generated": "2026-10-11T00:24:51.945Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr"
@@ -1907,6 +1907,26 @@
     7.535,
     4.7243,
     3.498
+   ],
+   "lods": []
+  },
+  "shovel": {
+   "url": "assets/models/shovel.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 1244180,
+   "srcTris": 2108,
+   "tris": 2108,
+   "min": [
+    -0.022,
+    0,
+    -0.0945
+   ],
+   "max": [
+    0.022,
+    0.9132,
+    0.0945
    ],
    "lods": []
   },

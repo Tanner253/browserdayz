@@ -15,7 +15,7 @@ const W = window as unknown as Any;
 const T = W.T as Any, g = W.__game as Any;
 
 const GUNS = ['m9', 'deagle', 'p38', 'mosin', 'benelli'];
-const MELEE = ['hatchet', 'bat', 'knife', 'crowbar', 'machete'];
+const MELEE = ['hatchet', 'bat', 'shovel', 'knife', 'crowbar', 'machete'];
 const FACE = Math.PI * 0.75;
 const r2 = (x: number) => Math.round(x * 100) / 100;
 const r3 = (x: number) => Math.round(x * 1000) / 1000;

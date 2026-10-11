@@ -347,7 +347,8 @@ const BACK: Stroke = [
 ];
 // (The hands are drawn through a lens of 48 degrees: at arm's length the picture is 40 cm
 // high. A fist more than 14 cm below the eye's own line is under the bottom of it.)
-const MELEE_STYLE: Record<string, MeleeStyle> = {
+const MELEE_STYLE: Record<string, MeleeStyle> = (() => {
+  const styles: Record<string, MeleeStyle> = {
   hatchet: {
     idle: { p: [0.16, -0.125, -0.42], tip: [-0.3, 0.84, -0.45], edge: [-0.25, -0.45, -0.86] },
     guard: { p: [0.1, -0.04, -0.4], tip: [-0.88, 0.46, -0.12], edge: [0.1, -0.1, -1] },
@@ -405,7 +406,12 @@ const MELEE_STYLE: Record<string, MeleeStyle> = {
     two: false,
     grip: 0.062,
   },
-};
+  };
+  // The shovel is held and swung as the bat is: in both hands, the left on the grip at its foot and the right a
+  // hand's width up the shaft, carried back over the right shoulder, the same two strokes.
+  styles.shovel = { ...styles.bat, grip: 0.2 };
+  return styles;
+})();
 const _sx = new THREE.Vector3(), _sy = new THREE.Vector3(), _sz = new THREE.Vector3(), _sm = new THREE.Matrix4();
 const _mp = new THREE.Vector3(), _mv = new THREE.Vector3(), _mel = new THREE.Vector3(), _mel2 = new THREE.Vector3(), _mq = new THREE.Quaternion(), _mq2 = new THREE.Quaternion(), _mq3 = new THREE.Quaternion(), _me = new THREE.Euler();
 /** a stance as a place and a turn: the thing's own up is toward its head, and its edge is on its far side (-z) */
@@ -816,7 +822,7 @@ export class Weapons {
     }));
 
     // ---- melee weapons: held upright in the right hand
-    for (const id of ['hatchet', 'machete', 'crowbar', 'bat', 'knife']) {
+    for (const id of ['hatchet', 'machete', 'crowbar', 'bat', 'shovel', 'knife']) {
       const def = ITEMS[id];
       const sc = await assets.model(def.model);
       const root = new THREE.Group();

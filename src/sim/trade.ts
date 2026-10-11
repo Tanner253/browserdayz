@@ -13,7 +13,7 @@ import { ITEMS, type ItemInstance } from './items';
 const WORTH: Record<string, number> = {
   // guns: he takes them, and does not sell them
   p38: 12, m9: 16, mosin: 28, deagle: 40, benelli: 45,
-  hatchet: 5, machete: 5, crowbar: 4, bat: 3, knife: 3,
+  hatchet: 5, machete: 5, crowbar: 4, bat: 3, shovel: 4, knife: 3,
   // rounds by the one (a sealed box is worth the rounds in it: see `worth`)
   ammo_9mm: 0.4, ammo_762: 0.6, ammo_50: 1.5, ammo_12: 1.2,
   // fittings
