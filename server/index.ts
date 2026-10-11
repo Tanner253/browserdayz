@@ -6,7 +6,7 @@
 // hurts. Clients own their movement, aim and inventory.
 
 import http from 'node:http';
-import { randomBytes } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes } from 'node:crypto';
 import { createReadStream, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
@@ -14,8 +14,9 @@ import { WebSocketServer, type WebSocket } from 'ws';
 import { buildWorldData } from './world';
 import { Economy, type WorldLoot } from '../src/sim/economy';
 import { Container, type SerializedInventory } from '../src/sim/inventory';
-import { ITEMS, TAG_FRESH, TAG_HOLD, TAG_OUT, magFits, makeItem, sanitizeItem, type ItemInstance } from '../src/sim/items';
+import { ITEMS, TAG_FRESH, TAG_HOLD, TAG_OUT, holds, magFits, makeItem, sanitizeItem, type ItemInstance } from '../src/sim/items';
 import { WORLD_SIZE, inPlay } from '../src/world/worldgen';
+import { BURY, noBurying } from '../src/sim/stash';
 
 /** how far from the middle anything may say it is: the edge of the ground, and a little (the walls stand 4 m inside it) */
 const EDGE = WORLD_SIZE / 2 + 8;
@@ -31,7 +32,9 @@ import { BARREL } from '../src/sim/barrels';
 import { JEEP, POLICE_CAR, SEATS, crashDamage, restState, type VehicleInfo, type VState } from '../src/sim/vehicles';
 import { Director, INFECTED, guarded, infectedDrop } from '../src/sim/infected';
 import { EMOTE, EMOTE_GAP, SHOUT_RANGE } from '../src/sim/emotes';
-import { ACTS, CHAT_RANGE, F_DEAD, F_GUARD, MAX_STAMINA, PROTOCOL, type C2S, type CorpseInfo, type KillInfo, type PlayerInfo, type Pose, type S2C, type Slung, type StashInfo, type StoredItem, type Vitals } from '../src/net/protocol';
+import { ACTS, CHAT_RANGE, F_BLEED, F_DEAD, F_GROUND, F_GUARD, F_SIT, MAX_STAMINA, PROTOCOL, type C2S, type CorpseInfo, type KillInfo, type PlayerInfo, type Pose, type S2C, type Slung, type StashInfo, type StoredItem, type Vitals } from '../src/net/protocol';
+import { ORDERS, written } from '../src/net/orders';
+import { KITS } from '../src/sim/kits';
 import { FIRE, Hearths } from '../src/sim/fires';
 
 const PORT = Number(process.env.PORT ?? 8080);
@@ -42,7 +45,9 @@ const SAVE_FILE = path.join(DATA_DIR, 'world.json');
 const MAX_PLAYERS = Number(process.env.MAX_PLAYERS ?? 24);
 const TICK_HZ = 15;
 const CORPSE_LIFETIME = 600; // seconds
-const RECORD_LIFETIME = 30 * 60 * 1000; // a logged-out character is remembered this long
+// (A character is its player's until it dies: whoever comes back in a year has what they left with. It was
+    // half an hour.)
+const RECORD_LIFETIME = 400 * 24 * 3600 * 1000; // a logged-out character is remembered this long
 /** bump when loot points change: world loot from an older save is re-rolled */
 const WORLD_REV = 22;
 
@@ -69,6 +74,11 @@ interface Box {
   rot: number;
   /** crate prop kind (loot table) */
   crate?: string;
+  /** a stash: what was put down (a pack's item; not said, the stash case), and whether it is under the ground */
+  item?: string;
+  buried?: boolean;
+  /** a stash: when somebody last had anything to do with it (put it down, opened it, changed what is in it, dug it up) */
+  touchedAt?: number;
   emptiedAt: number;
   /** corpse and supply drop: expiry (economy time). Corpse: owner name, how it fell */
   name?: string;
@@ -276,7 +286,22 @@ const pairPaidAt = new Map<string, number>();
 /** where a connection comes from, as near as the host lets it be known */
 function addressOf(req: http.IncomingMessage): string {
   const first = (v: string | string[] | undefined) => ((Array.isArray(v) ? v[0] : v) ?? '').split(',')[0].trim();
-  return first(req.headers['cf-connecting-ip']) || first(req.headers['true-client-ip']) || first(req.headers['x-forwarded-for']) || req.socket.remoteAddress || '';
+  return netOf(first(req.headers['cf-connecting-ip']) || first(req.headers['true-client-ip']) || first(req.headers['x-forwarded-for']) || req.socket.remoteAddress || '');
+}
+/**
+ * An address as far as it says whose connection it is. One of the old kind is that; one of the new kind (with
+ * colons) is a different number for every device and every day, and it is the first half of it that is the
+ * household's: that half is what is kept, so that a ban of an address, and one player to an address, mean on
+ * the new kind what they mean on the old.
+ */
+function netOf(ip: string): string {
+  if (!ip.includes(':') || ip === '::1') return ip;
+  const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(ip);
+  if (mapped) return mapped[1];
+  const [head, tail] = ip.split('::');
+  const h = head ? head.split(':') : [], t = tail ? tail.split(':') : [];
+  const groups = ip.includes('::') ? [...h, ...Array<string>(Math.max(0, 8 - h.length - t.length)).fill('0'), ...t] : h;
+  return `${groups.slice(0, 4).map((g) => g.toLowerCase().replace(/^0+(?=.)/, '')).join(':')}::/64`;
 }
 const ipOf = new WeakMap<WebSocket, string>();
 /** addresses only mean something while they tell players apart: if three or more are on and all seem to come from one place, the host is hiding them */
@@ -438,6 +463,8 @@ let flagged = 0;
 
 /** Something a check fires on: counted, and written down (not more than once in five seconds for one player). @returns whether it is refused */
 function flag(c: Client, what: string, refuse = true): boolean {
+  // (an admin is not asked how they got anywhere, or how they are still standing: they fly, and are put where they say)
+  if (roleOf(c) === 'admin') return false;
   c.check.flags++;
   flagged++;
   const now = Date.now();
@@ -456,7 +483,7 @@ function flag(c: Client, what: string, refuse = true): boolean {
  */
 function moveCheck(c: Client, to: Pose, now: number): boolean {
   const k = c.check;
-  if (CHECKS === 'off' || !c.alive || now < k.free) {
+  if (CHECKS === 'off' || !c.alive || now < k.free || c.power.clip || roleOf(c) === 'admin') {
     k.at = now;
     k.carry = 0;
     k.high = 0;
@@ -514,11 +541,105 @@ const SOAK = (() => {
  * has taken more than a body can (see `standing`).
  */
 function dealt(target: Client, amount: number, zone: string, w: string) {
+  keep(target, amount, zone, w);
+  stayOn(target, 'you were hit');
   if (CHECKS === 'off' || !target.alive) return;
   const now = Date.now(), k = target.check;
   k.hp = Math.min(100, k.hp + (CHECK.heal * (now - k.hpAt)) / 1000) - amount * (w === 'crash' ? 1 : zone === 'torso' ? SOAK.torso : zone === 'head' ? SOAK.head : 1);
   k.hpAt = now;
   if (k.hp < -CHECK.over && !k.downAt) k.downAt = now;
+}
+
+// ------------------------------------------------------------------ a life kept by the server
+//
+// A player's health is their own game's to keep for as long as that game is answering: it is the one that knows
+// what they ate, what they fell off and what they bound up. But a game that is not answering is a body standing in
+// the world all the same: a tab put behind another (a browser stops the game in it), a game that has frozen, a
+// window shut. Nothing could kill such a body, because nothing was there to say it had died.
+//
+// So: from SILENT after a game last said where its player was, the server keeps that player's life. What hits
+// them comes off the health they last reported, through the armour they were last seen wearing; an open wound
+// runs; and at nothing the server says they are dead, as their own game would have. When the game is heard from
+// again it is told what the figure is now.
+//
+// And a connection that goes without a proper leave leaves its body where it stood, sat on the ground, for
+// LINGER: seen, hit and killed like anybody, and what it carried is on it. Whoever comes back within that time is
+// back in that body. The proper leave is asked for and waited out, LOGOUT seconds, standing still and unhurt:
+// then the body goes with the player, at once.
+
+/** seconds of nothing heard before a life is the server's to keep; a body left behind stays so long; the wait to leave properly */
+const SILENT_MS = 1500;
+const LINGER_MS = (process.env.LINGER_S === undefined ? 300 : Math.max(0, Number(process.env.LINGER_S) || 0)) * 1000;
+const LOGOUT_MS = (process.env.LOGOUT_S === undefined ? 60 : Math.max(0, Number(process.env.LOGOUT_S) || 0)) * 1000;
+/** how far somebody waiting to leave may shift before the wait is off, metres; and how long an open wound runs by itself, seconds */
+const LOGOUT_STIR = 1.5, BLEED_S = 42;
+
+const away = (c: Client, now = Date.now()) => c.asleep > 0 || now - c.heardAt > SILENT_MS;
+/** what worn things do to a hit: every plate and helmet they were last seen in (as their own game reckons it: Game.takeHit) */
+const worn = (c: Client, k: 'armor' | 'head') => Object.values(c.inv?.slots ?? {}).flatMap((it) => (it && ITEMS[it.id]?.wear?.[k] !== undefined ? [ITEMS[it.id].wear![k] as number] : []));
+
+/** Something has hit somebody whose game is not answering: it comes off the health the server holds for them. */
+function keep(c: Client, amount: number, zone: string, w: string) {
+  if (!c.alive || !away(c)) return;
+  const v = (c.vitals ??= { health: 100, energy: 80, water: 80, stamina: MAX_STAMINA, bleeding: false });
+  let a = amount;
+  if (w !== 'crash') for (const m of zone === 'torso' ? worn(c, 'armor') : zone === 'head' ? worn(c, 'head') : []) a *= m;
+  v.health = Math.max(0, v.health - a);
+  c.kept = true;
+  // (a round nearly always opens a wound, the infected and a blade often, a blast or a blow seldom)
+  if (w !== 'crash' && Math.random() < (ITEMS[w]?.weapon ? (a > 12 ? 0.85 : 0.4) : w === 'infected' ? INFECTED.bleed : 0.25)) v.bleeding = true;
+  // (after whoever dealt it has been told it landed)
+  if (v.health <= 0) setImmediate(() => kill(c, w === 'infected' ? 'the infected' : ITEMS[w]?.name ? 'wounds' : w));
+}
+
+/** Once a second: the wounds of those whose lives the server is keeping, the bodies left behind whose time is up, and the waits to leave that are over. */
+function keeping(now: number) {
+  for (const c of [...clients.values()]) {
+    if (c.asleep && now - c.asleep >= LINGER_MS) {
+      log(`${c.name}'s body has been left ${Math.round(LINGER_MS / 1000)} s: it goes, with what it carried`);
+      drop(c);
+      continue;
+    }
+    if (c.logoutAt && now >= c.logoutAt && !c.asleep) {
+      log(`${c.name} left the proper way`);
+      send(c, { t: 'kick', reason: 'You have logged out. Your character is saved where you stood, with everything you carried.' });
+      drop(c);
+      c.ws.close();
+      continue;
+    }
+    if (!c.alive || !away(c, now)) continue;
+    const v = c.vitals;
+    if (!v?.bleeding) continue;
+    c.kept = true;
+    v.health = Math.max(0, v.health - 1);
+    if (++c.bled > BLEED_S) {
+      v.bleeding = false;
+      c.bled = 0;
+    }
+    if (v.health <= 0) kill(c, 'blood loss');
+  }
+}
+setInterval(() => keeping(Date.now()), 1000);
+
+/** The wait to leave properly is off: they are told why. */
+function stayOn(c: Client, why: string) {
+  if (!c.logoutAt) return;
+  c.logoutAt = 0;
+  send(c, { t: 'logout', left: 0, why });
+}
+
+/** A connection has gone. Dead, or with nothing kept of bodies: out of the world. Alive: the body stays, sat where it stood. */
+function gone(c: Client) {
+  if (!clients.has(c.id)) return;
+  if (!c.alive || !LINGER_MS) return void drop(c);
+  c.asleep = Date.now();
+  c.logoutAt = 0;
+  releaseLock(c);
+  leaveSeat(c, true);
+  c.w = null;
+  c.m = [];
+  c.pose[5] = F_SIT | F_GROUND | (c.vitals?.bleeding ? F_BLEED : 0);
+  log(`~ ${c.name} (#${c.id}) went without logging out: their body stays ${Math.round(LINGER_MS / 1000)} s`);
 }
 
 /** Twice a second: whoever ought to have been dead for a while and has not said so. Enforcing, the server says it for them. */
@@ -569,6 +690,7 @@ const listOf = (v: string | undefined) => (v ?? '').split(',').map((x) => x.trim
 const BANS = { keys: new Set(listOf(process.env.BAN_KEYS)), ips: new Set(listOf(process.env.BAN_IPS)), temp: new Map<string, { until: number; why: string }>(), strikes: new Map<string, number[]>() };
 function bannedFor(key: string, ip: string): string | null {
   if (BANS.keys.has(key) || (!!ip && BANS.ips.has(ip))) return 'kept off by name';
+  if (adminBan(key, ip)) return 'banned';
   const now = Date.now();
   for (const n of [key, ...(ip ? [`ip:${ip}`] : [])]) {
     const b = BANS.temp.get(n);
@@ -577,8 +699,645 @@ function bannedFor(key: string, ip: string): string | null {
   }
   return null;
 }
+// ------------------------------------------------------------------ admins, and who they have banned (2026-10-11)
+//
+// Asked for the day players were found flying and sunk in the ground: "i need a way to become admin and a way to
+// make someone else admin ... mainly need a way to ban people asap, permanantley as well as unban", "i will set
+// password in vercel env, make in game command for me to admin myself", "once im admin role in the game i should
+// be good permanantley".
+//
+// Who is an admin (or a mod), and who is banned, is kept by the site (api/admin.ts), since this server forgets
+// everything when it restarts. It is read from there when the server starts and written there when an admin
+// changes it. The password is the site's and is checked there: what a player types is passed on and kept nowhere,
+// here or in the log. A player is known by a hash of the key their game gives, and an address by a hash made with
+// a secret the site hands over (`pepper`): the lists hold nobody's key and nobody's address.
+//
+// The orders are typed where talk is typed, with a stroke in front (`/ban name`): see `command`. Nothing that
+// begins with a stroke is ever said to anybody.
+type Role = 'admin' | 'mod';
+interface AdminState {
+  roles: Record<string, { role: Role; name: string; by: string; at: string }>;
+  bans: { key: string; ip: string; name: string; why: string; by: string; at: string }[];
+}
+const ADMIN = {
+  state: { roles: {}, bans: [] } as AdminState,
+  pepper: '',
+  /** read from the site at least once since this server started */
+  ready: false,
+  /** what the site is about to ask this server to vouch for: a number, and what it stands for */
+  ops: new Map<string, Record<string, unknown>>(),
+  /** tries at the password: by key and by address, the times of them */
+  tries: new Map<string, number[]>(),
+  /** whoever has left lately (the newest last): somebody who does a thing and goes can still be banned */
+  gone: [] as { id: number; name: string; key: string; ip: string; at: number }[],
+  /** until when what somebody types and says reaches nobody: by their key */
+  muted: new Map<string, number>(),
+  /** when each panel last asked for its lists */
+  asked: new Map<number, number>(),
+  /** the colour an admin has chosen for the word ADMIN before their name in the chat, by their number (none: the rainbow) */
+  tints: new Map<number, string>(),
+  /** what each admin has chosen for their own death, by their key: it is theirs again when they come back */
+  voids: new Map<string, { voidInv: boolean; voidTag: boolean }>(),
+};
+const keyHash = (key: string) => createHash('sha256').update(`zona key ${key}`).digest('hex').slice(0, 40);
+/** Is this an address out in the world? (Not this machine's own, nor one of a private network: those are whatever stands in front of the server, and are everybody's.) */
+const publicIp = (ip: string) => !!ip && !/^(::1$|0:0:0:0::|::ffff:127\.|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|f[cd][0-9a-f]{2}:|fe80:)/i.test(ip);
+const ipHash = (ip: string) => (publicIp(ip) && ADMIN.pepper ? createHash('sha256').update(`${ADMIN.pepper} ${ip}`).digest('hex').slice(0, 40) : '');
+const roleOf = (c: Client): Role | null => ADMIN.state.roles[keyHash(c.key)]?.role ?? null;
+function adminBan(key: string, ip: string): boolean {
+  const k = keyHash(key), a = ipHash(ip);
+  // (Somebody with a role is never kept off by an address: an address is a household's, a café's, a whole
+  // phone network's, and an admin who banned somebody at their own would have banned themselves.)
+  const mine = !!ADMIN.state.roles[k];
+  return ADMIN.state.bans.some((b) => b.key === k || (!mine && !!a && b.ip === a && ipsTellApart()));
+}
+/**
+ * How many may play from one address at a time (PER_ADDRESS; 0: any number). Asked for 2026-10-11, the day of
+ * the cheats: "we should limit 1 connection per IP". It costs two friends in one house their game together, and
+ * a whole street behind one address on some phone networks: it is the owner's to set. Whoever has a role is not
+ * counted or refused, and it is not asked while the host hides addresses (see ipsTellApart).
+ */
+const PER_ADDRESS = process.env.PER_ADDRESS === undefined ? 1 : Math.max(0, Number(process.env.PER_ADDRESS) || 0);
+function addressFull(key: string, ip: string): boolean {
+  if (!PER_ADDRESS || !publicIp(ip) || !ipsTellApart() || ADMIN.state.roles[keyHash(key)]) return false;
+  return [...clients.values()].filter((o) => o.ip === ip && o.key !== key && !roleOf(o)).length >= PER_ADDRESS;
+}
+/** Something asked of the site: it is told a number, and asks this server back what the number stands for (see /adminop below). */
+async function siteAdmin(op: Record<string, unknown>): Promise<{ ok?: boolean; why?: string; state?: AdminState; pepper?: string; set?: boolean } | null> {
+  const n = randomBytes(16).toString('hex');
+  ADMIN.ops.set(n, op);
+  try {
+    const r = await fetch(`${SITE_URL}/api/admin?n=${n}`, { method: 'POST', signal: AbortSignal.timeout(30_000) });
+    if (!r.ok) return null;
+    const out = (await r.json()) as { ok?: boolean; why?: string; state?: AdminState; pepper?: string; set?: boolean };
+    if (out.ok && out.state) {
+      ADMIN.state = { roles: out.state.roles ?? {}, bans: out.state.bans ?? [] };
+      if (out.pepper) ADMIN.pepper = out.pepper;
+      ADMIN.ready = true;
+    }
+    return out;
+  } catch {
+    return null;
+  } finally {
+    ADMIN.ops.delete(n);
+  }
+}
+// ------------------------------------------------------------------ kept between restarts
+//
+// Everybody's character (where they stood, what they carried, how they were) and every stash, with what is in it:
+// handed to the site, which keeps it in one file (api/keep.ts), and read back when the server starts. This server
+// has no disk that outlasts it. What lies loose in the world is not kept: only what is in somebody's pockets or in
+// a container somebody put down.
+//
+// It is sealed here before it leaves (with a key drawn from the secret this server shares with the site), so the
+// file says nothing to anybody else: not who anybody is, and not where a stash is buried. A player is in it by a
+// hash of their key and never the key.
+//
+// When it is written: once a server with somebody on it begins (`claim`: from then on the file says a server is
+// alive that has more to say), every KEEP_EVERY while anybody has been on, and as it stops (its last word). At a
+// deploy the new server is started before the old one is stopped: so a server that finds the file is not a last
+// word waits a little for one before it reads, and whoever arrives meanwhile waits in the line.
+//
+// WIPE on the host is the name of the world: what was kept under another name is not read, and is written over.
+// (Changing it is how everything is wiped, when that is wanted.)
+
+/** this run of the server, by a name of its own */
+const BOOT = randomBytes(8).toString('hex');
+/** on the host it is kept; on somebody's own machine it is not, unless asked for (KEEP=on) */
+const KEEP_ON = process.env.KEEP ? process.env.KEEP !== 'off' : !!process.env.RENDER;
+const KEEP_EVERY_MS = (process.env.KEEP_EVERY_MIN === undefined ? 180 : Math.max(0, Number(process.env.KEEP_EVERY_MIN) || 0)) * 60_000;
+const KEEP_WAIT_MS = (process.env.KEEP_WAIT_S === undefined ? 25 : Math.max(0, Number(process.env.KEEP_WAIT_S) || 0)) * 1000;
+const WIPE = (process.env.WIPE ?? '').slice(0, 40);
+const KEPT = {
+  /** what was kept has been read (or there was nothing, or it is not kept here): players are let in */
+  ready: !KEEP_ON,
+  /** characters from before this server started, by the hash of their key, until their players come for them */
+  chars: new Map<string, Record_>(),
+  /** the file says this server is alive; something has happened since it was last written; when that was; a writing is under way */
+  claimed: false,
+  dirty: false,
+  savedAt: 0,
+  busy: false,
+};
+const pause = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));
+
+interface Snapshot {
+  rev: number;
+  wipe: string;
+  chars: [string, Record_][];
+  stashes: Box[];
+}
+interface KeptFile { at: string; boot: string; final: boolean; z: string }
+
+const sealKey = () => createHash('sha256').update(`zona world save ${ADMIN.pepper}`).digest();
+function seal(data: unknown): string {
+  const iv = randomBytes(12), c = createCipheriv('aes-256-gcm', sealKey(), iv);
+  const body = Buffer.concat([c.update(zlib.gzipSync(JSON.stringify(data))), c.final()]);
+  return Buffer.concat([iv, c.getAuthTag(), body]).toString('base64');
+}
+function unseal(z: string): unknown {
+  const b = Buffer.from(z, 'base64'), d = createDecipheriv('aes-256-gcm', sealKey(), b.subarray(0, 12));
+  d.setAuthTag(b.subarray(12, 28));
+  return JSON.parse(zlib.gunzipSync(Buffer.concat([d.update(b.subarray(28)), d.final()])).toString('utf8'));
+}
+
+/** Something asked of the site about what is kept: signed with the secret the two share (see api/keep.ts). */
+async function siteKeep(op: Record<string, unknown>): Promise<{ ok?: boolean; why?: string; save?: KeptFile | null } | null> {
+  if (!ADMIN.pepper) return null;
+  const body = JSON.stringify(op), at = String(Date.now());
+  const sig = createHmac('sha256', `zona keep ${ADMIN.pepper}`).update(`${at}.${createHash('sha256').update(body).digest('hex')}`).digest('hex');
+  try {
+    const r = await fetch(`${SITE_URL}/api/keep`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-zona-at': at, 'x-zona-auth': sig }, body, signal: AbortSignal.timeout(20_000) });
+    return r.ok ? ((await r.json()) as { ok?: boolean; why?: string; save?: KeptFile | null }) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** everything that is kept, as it is this moment */
+function snapshot(): Snapshot {
+  const now = Date.now(), chars = new Map<string, Record_>(KEPT.chars);
+  for (const [k, r] of records) if (r.alive && r.inv) chars.set(keyHash(k), r);
+  for (const c of clients.values()) if (c.alive && c.inv) chars.set(keyHash(c.key), { pose: c.pose, inv: c.inv, vitals: c.vitals, alive: true, leftAt: now });
+  // (no more of them than can be carried: the newest, if it ever came to that)
+  const newest = [...chars].sort((a, b) => b[1].leftAt - a[1].leftAt).slice(0, 6000);
+  return { rev: WORLD_REV, wipe: WIPE, chars: newest, stashes: [...boxes.values()].filter((b) => b.kind === 'stash') };
+}
+
+/** What is kept is written to the site. @param final this server's last word @returns whether it was */
+async function keepNow(final: boolean, why: string): Promise<boolean> {
+  if (!KEEP_ON || !KEPT.ready || !ADMIN.pepper || KEPT.busy) return false;
+  // (a server nobody came to has nothing to say that the file does not say already)
+  if (!KEPT.claimed && !KEPT.dirty) return false;
+  KEPT.busy = true;
+  try {
+    const snap = snapshot();
+    for (let tries = 0; tries < 3; tries++) {
+      const r = await siteKeep({ op: 'save', at: new Date().toISOString(), boot: BOOT, final, z: seal(snap) });
+      if (r?.ok) {
+        KEPT.claimed = true;
+        KEPT.dirty = clients.size > 0;
+        KEPT.savedAt = Date.now();
+        log(`[keep] ${why}: ${snap.chars.length} characters and ${snap.stashes.length} stashes written to the site${final ? ' (the last word)' : ''}`);
+        return true;
+      }
+      await pause(700);
+    }
+    log(`[keep] ${why}: it could NOT be written to the site`);
+    return false;
+  } finally {
+    KEPT.busy = false;
+  }
+}
+
+/** The first player of this run has come in: the file is made to say a server is alive, with more to say. */
+function claim() {
+  KEPT.dirty = true;
+  if (KEEP_ON && KEPT.ready && !KEPT.claimed && !KEPT.busy) void keepNow(false, 'somebody is on');
+}
+setInterval(() => {
+  if (KEEP_EVERY_MS && KEPT.dirty && Date.now() - KEPT.savedAt >= KEEP_EVERY_MS) void keepNow(false, 'time has gone by');
+}, Math.max(1000, Math.min(60_000, KEEP_EVERY_MS || 60_000))).unref();
+
+/** What was kept is read, and the world is as it was left: then players are let in. */
+async function loadKept() {
+  const open = (what: string) => {
+    if (KEPT.ready) return;
+    KEPT.ready = true;
+    log(`[keep] ${what}`);
+    fillFromQueue();
+  };
+  if (!KEEP_ON) return;
+  try {
+    // (the secret it is read with comes with the admin lists: see `loadAdmin`)
+    for (let k = 0; k < 35 && !ADMIN.pepper; k++) await pause(1000);
+    if (!ADMIN.pepper) return open('nothing is kept between restarts: the site did not answer, or no admin password is set on it');
+    let save: KeptFile | null = null;
+    const until = Date.now() + KEEP_WAIT_MS;
+    for (;;) {
+      const r = await siteKeep({ op: 'load' });
+      if (r?.ok) save = r.save ?? null;
+      // (written by a server that has not said its last word: it may be about to, if this is a deploy and it is still alive)
+      if ((r?.ok && (!save || save.final || save.boot === BOOT)) || Date.now() >= until) break;
+      await pause(2500);
+    }
+    if (!save) return open('nothing has been kept yet: everybody begins afresh');
+    const snap = unseal(save.z) as Snapshot;
+    if ((snap.wipe ?? '') !== WIPE) return open(`what was kept is of the world "${snap.wipe ?? ''}", and this is "${WIPE}": everybody begins afresh`);
+    const moved = snap.rev !== WORLD_REV, now = Date.now();
+    for (const [k, r] of snap.chars ?? []) {
+      if (!r?.inv || !r.alive || now - r.leftAt > RECORD_LIFETIME || !isPose(r.pose)) continue;
+      const inv = cleanInventory(r.inv);
+      for (const it of things(inv)) issue(it);
+      // (the map has been made again since: what they carried is theirs, where they stood may be inside a wall)
+      KEPT.chars.set(k, { pose: r.pose, inv, vitals: r.vitals, alive: true, leftAt: r.leftAt, ...(moved ? { afresh: true } : {}) });
+    }
+    let stashes = 0;
+    for (const b of snap.stashes ?? []) {
+      if (b?.kind !== 'stash' || typeof b.cid !== 'string' || boxes.has(b.cid) || ![b.x, b.y, b.z, b.rot].every(num)) continue;
+      const items = (Array.isArray(b.items) ? b.items : []).flatMap((s) => {
+        const it = cleanItem(s);
+        return it ? [{ ...it, x: s.x, y: s.y, rot: !!s.rot }] : [];
+      });
+      for (const it of items) issue(it);
+      boxes.set(b.cid, { ...b, items, y: moved ? world.groundAt(b.x, b.z) : b.y, emptiedAt: -1, touchedAt: num(b.touchedAt) ? b.touchedAt : now });
+      stashes++;
+    }
+    open(`${KEPT.chars.size} characters and ${stashes} stashes as they were kept at ${save.at}${save.final ? '' : ' (not a last word: the server before this one stopped without one)'}${moved ? '; the map has been made again since, so everybody starts from the edge with what they had' : ''}`);
+  } catch (e) {
+    open(`what was kept could not be read (${e instanceof Error ? e.message : e}): everybody begins afresh`);
+  }
+}
+
+/** The lists are read when the server starts, and again every little while until they have been (the site may be asleep). */
+function loadAdmin(tries = 0) {
+  void siteAdmin({ op: 'load' }).then((r) => {
+    if (r?.ok) return void log(`[admin] lists read from the site: ${Object.keys(ADMIN.state.roles).length} with a role, ${ADMIN.state.bans.length} banned${r.set ? '' : ' (no ADMIN_PASSWORD is set there: nobody can become an admin)'}`);
+    // (often at first: at a deploy the site's call back reaches the server before this one until this one is the one being served)
+    if (tries < 44) setTimeout(() => loadAdmin(tries + 1), tries < 24 ? 5_000 : 30_000).unref();
+  });
+}
+/** What an admin changed is written to the site. @returns whether it was */
+async function saveAdmin(next: AdminState): Promise<boolean> {
+  const was = ADMIN.state;
+  // (held here at once, so that it bites whether or not the site answers)
+  ADMIN.state = next;
+  const r = await siteAdmin({ op: 'save', state: next });
+  if (r?.ok) return true;
+  if (ADMIN.state !== next) return true;
+  void was;
+  return false;
+}
+const sys = (c: Client, ...lines: string[]) => lines.forEach((text) => send(c, { t: 'sys', text }));
+/** the player meant by a word: `#12` (their number), their name, or the start or some part of it if only one fits */
+function whoIs(word: string): Client | null {
+  const all = [...clients.values()];
+  if (/^#\d+$/.test(word)) return clients.get(Number(word.slice(1))) ?? null;
+  const w = word.toLowerCase();
+  const exact = all.filter((o) => o.name.toLowerCase() === w);
+  if (exact.length === 1) return exact[0];
+  const part = all.filter((o) => o.name.toLowerCase().includes(w));
+  return part.length === 1 ? part[0] : null;
+}
+/** Somebody set down somewhere by an admin: there at once for everybody, and not asked how they got there. */
+function place(t: Client, x: number, y: number | null, z: number, by: Client) {
+  const now = Date.now();
+  t.pose = [x, y ?? world.groundAt(x, z), z, t.pose[3], t.pose[4], t.pose[5]];
+  t.check.free = now + CHECK.free;
+  t.check.at = now;
+  t.check.carry = 0;
+  t.underAt = 0;
+  send(t, { t: 'put', x, ...(y === null ? {} : { y }), z, ...(by === t ? {} : { by: by.name }) });
+}
+/**
+ * Somebody has just been made an admin, or has come in as one. What they leave when they die is chosen for them
+ * until they choose otherwise: nothing they carried, and no tag (an admin's kit is not found on them, and nobody
+ * is paid for killing one at work). And they are shown whoever has vanished.
+ */
+function asAdmin(c: Client, fresh: boolean) {
+  Object.assign(c.power, ADMIN.voids.get(c.key) ?? { voidInv: true, voidTag: true });
+  send(c, { t: 'powers', ...c.power });
+  if (fresh) for (const o of clients.values()) if (o !== c && o.power.hidden) send(c, { t: 'join', p: info(o) });
+}
+
+/** One of an admin's powers, put on or off: they are told which they have, and (vanishing) everybody else that they have left or come. */
+function setPower(c: Client, k: keyof Client['power'], on: boolean) {
+  if (c.power[k] === on) return;
+  c.power[k] = on;
+  if (k === 'voidInv' || k === 'voidTag') {
+    ADMIN.voids.set(c.key, { voidInv: c.power.voidInv, voidTag: c.power.voidTag });
+    return void send(c, { t: 'powers', ...c.power });
+  }
+  const now = Date.now();
+  // (vanished: gone from everybody's game but an admin's, where they are drawn faintly)
+  if (k === 'hidden') for (const o of clients.values()) if (o !== c) send(o, roleOf(o) === 'admin' ? { t: 'ghost', id: c.id, on } : on ? { t: 'leave', id: c.id } : { t: 'join', p: info(c) });
+  if (k === 'clip') {
+    c.check.free = now + CHECK.free;
+    c.underAt = 0;
+  }
+  if (k === 'god') {
+    c.check.hp = 100;
+    c.check.hpAt = now;
+    c.check.downAt = 0;
+  }
+  send(c, { t: 'powers', ...c.power });
+  log(`[admin] ${c.name} has ${on ? 'put on' : 'put off'} ${k === 'hidden' ? 'vanish' : k === 'clip' ? 'noclip' : 'god mode'}`);
+}
+/** the thing meant by a word: its id, its name, or some part of either if only one thing fits */
+function itemBy(word: string): string | null {
+  const w = word.toLowerCase();
+  if (!w) return null;
+  if (ITEMS[w]) return w;
+  const all = Object.values(ITEMS);
+  const named = all.filter((d) => d.name.toLowerCase().replace(/\s+/g, '_') === w);
+  if (named.length === 1) return named[0].id;
+  const part = all.filter((d) => d.id.includes(w) || d.name.toLowerCase().includes(w.replace(/_/g, ' ')));
+  return part.length === 1 ? part[0].id : null;
+}
+/** put off the server by somebody with the right to: told why, and gone */
+function eject(target: Client, reason: string) {
+  send(target, { t: 'kick', reason });
+  target.ws.close();
+  drop(target);
+}
+/**
+ * An order typed where talk is typed. @returns nothing: whoever gave it is told what came of it.
+ * Mods: players, recent, flagged, kick, timeout, say. Admins: those, and ban, unban, bans, admin, mod, demote, roles.
+ */
+async function command(c: Client, line: string) {
+  const [word = '', ...rest] = line.slice(1).trim().split(/\s+/);
+  const cmd = word.toLowerCase(), role = roleOf(c);
+  if (!role) return void sys(c, cmd === 'help' ? 'There is nothing here to give orders with.' : 'That is not a thing you can do here.');
+  const admin = role === 'admin';
+  const need = () => void sys(c, 'Only an admin can do that.');
+  const who = rest[0] ?? '', why = rest.slice(1).join(' ').slice(0, 120);
+  const label = (o: Client) => `#${o.id} ${o.name}${roleOf(o) ? ` [${roleOf(o)}]` : ''}`;
+  switch (cmd) {
+    case 'help':
+      return void sys(c, `Orders: ${ORDERS.filter((o) => !o.admin).map(written).join(' · ')}`, ...(admin ? [`Admins: ${ORDERS.filter((o) => o.admin).map(written).join(' · ')}`] : []), '"who" is a name, part of one, or #number from /players.', ...(admin ? ['/ban also finds somebody who has just left (/recent).'] : []));
+    case 'players':
+    case 'who':
+    case 'list':
+      return void sys(c, `${clients.size} online:`, ...[...clients.values()].map((o) => `${label(o)}  at ${o.pose[0].toFixed(0)}, ${o.pose[2].toFixed(0)}${o.alive ? '' : ' (dead)'}${o.check.flags ? `  ${o.check.flags} flagged` : ''}`));
+    case 'recent':
+      return void sys(c, ADMIN.gone.length ? 'Left lately (newest last):' : 'Nobody has left lately.', ...ADMIN.gone.slice(-15).map((g) => `${g.name}  ${Math.round((Date.now() - g.at) / 60000)} min ago`));
+    case 'flagged': {
+      const list = [...clients.values()].filter((o) => o.check.flags > 0).sort((p, q) => q.check.flags - p.check.flags);
+      return void sys(c, list.length ? `Flagged by the checks (which are set to "${CHECKS}"):` : 'Nobody online has been flagged.', ...list.map((o) => `${label(o)}  ${o.check.flags} times`));
+    }
+    case 'say': {
+      if (!rest.length) return void sys(c, 'Say what?');
+      const words = rest.join(' ').slice(0, 160);
+      log(`[admin] ${c.name} to everybody: ${words}`);
+      broadcast({ t: 'announce', text: words, by: c.name });
+      return void sys(c, `Said to all ${clients.size}: ${words}`);
+    }
+    case 'msg':
+    case 'pm':
+    case 'w': {
+      const t = whoIs(who), words = rest.slice(1).join(' ').slice(0, 160);
+      if (!t) return void sys(c, `Nobody online is "${who}" (or more than one is): see /players.`);
+      if (!words) return void sys(c, 'Say what to them?');
+      log(`[admin] ${c.name} to ${t.name} alone: ${words}`);
+      send(t, { t: 'pm', from: c.name, role, text: words });
+      return void sys(c, `To ${t.name} alone: ${words}`);
+    }
+    case 'inv': {
+      const t = whoIs(who);
+      if (!t) return void sys(c, `Nobody online is "${who}" (or more than one is): see /players.`);
+      const worn = Object.entries(t.inv?.slots ?? {}).flatMap(([slot, it]) => (it && slot !== 'neck' ? [`${slot}: ${ITEMS[it.id]?.name ?? it.id}${it.mods?.length ? ` (${it.mods.map((m) => ITEMS[m]?.name ?? m).join(', ')})` : ''}`] : []));
+      const count = new Map<string, number>();
+      for (const it of things(t.inv)) count.set(ITEMS[it.id]?.name ?? it.id, (count.get(ITEMS[it.id]?.name ?? it.id) ?? 0) + (ITEMS[it.id]?.stack ? it.qty : 1));
+      const never = [...things(t.inv)].filter(invented).map((it) => ITEMS[it.id]?.name ?? it.id);
+      return void sys(c, `${t.name} carries (as their game last said, ${t.vitals ? `health ${Math.round(t.vitals.health)}` : 'health not said'}):`, worn.length ? worn.join(' · ') : 'nothing worn or slung', [...count].map(([n, q]) => (q > 1 ? `${q} × ${n}` : n)).join(' · ') || 'nothing at all', ...(never.length ? [`NOT put in the world by the server: ${never.join(', ')}`] : []));
+    }
+    case 'kick': {
+      const t = whoIs(who);
+      if (!t) return void sys(c, `Nobody online is "${who}" (or more than one is): see /players.`);
+      if (roleOf(t) === 'admin' && !admin) return need();
+      log(`[admin] ${c.name} kicked ${t.name}${why ? `: ${why}` : ''}`);
+      eject(t, `You were put off the server${why ? `: ${why}` : '.'}`);
+      return void sys(c, `${t.name} is off the server.`);
+    }
+    case 'timeout': {
+      const t = whoIs(who), mins = Math.min(60, Math.max(1, Math.round(Number(rest[1]) || 10)));
+      if (!t) return void sys(c, `Nobody online is "${who}" (or more than one is): see /players.`);
+      if (roleOf(t) === 'admin' && !admin) return need();
+      const reason = rest.slice(2).join(' ').slice(0, 120);
+      for (const n of namesOf(t.key, t.ip)) BANS.temp.set(n, { until: Date.now() + mins * 60000, why: `timed out by ${c.name}${reason ? `: ${reason}` : ''}` });
+      log(`[admin] ${c.name} timed ${t.name} out for ${mins} minutes${reason ? `: ${reason}` : ''}`);
+      eject(t, `You are kept off the server for ${mins} minutes${reason ? `: ${reason}` : '.'}`);
+      return void sys(c, `${t.name} is off the server for ${mins} minutes.`);
+    }
+    case 'ban': {
+      if (!admin) return need();
+      const t = whoIs(who);
+      const left = t ? null : (/^#\d+$/.test(who) ? ADMIN.gone.find((g) => g.id === Number(who.slice(1))) : undefined) ?? [...ADMIN.gone].reverse().find((g) => g.name.toLowerCase() === who.toLowerCase()) ?? [...ADMIN.gone].reverse().find((g) => g.name.toLowerCase().includes(who.toLowerCase()) && who.length > 1);
+      if (!t && !left) return void sys(c, `Nobody online or lately gone is "${who}": see /players and /recent.`);
+      if (t === c) return void sys(c, 'That is you.');
+      const name = t ? t.name : left!.name, key = keyHash(t ? t.key : left!.key), ip = ipHash(t ? t.ip : left!.ip);
+      if (ADMIN.state.roles[key]?.role === 'admin') return void sys(c, `${name} is an admin: /demote first.`);
+      const next: AdminState = { roles: ADMIN.state.roles, bans: [...ADMIN.state.bans.filter((b) => b.key !== key), { key, ip, name, why, by: c.name, at: new Date().toISOString() }] };
+      log(`[admin] ${c.name} banned ${name}${why ? `: ${why}` : ''}${ip ? '' : ' (by key only: no address is known)'}`);
+      if (t) eject(t, 'You are banned from this server.');
+      const kept = await saveAdmin(next);
+      return void sys(c, `${name} is banned${ip ? ', by their game and by their address' : ' (by their game only: the address could not be told)'}.${kept ? '' : ' It could NOT be written to the site: it holds until this server restarts. Give the order again in a minute.'}`);
+    }
+    case 'bans':
+      if (!admin) return need();
+      return void sys(c, ADMIN.state.bans.length ? 'Banned (the number is what /unban takes):' : 'Nobody is banned.', ...ADMIN.state.bans.map((b, i) => `${i + 1}. ${b.name}  by ${b.by}, ${b.at.slice(0, 10)}${b.why ? `: ${b.why}` : ''}`));
+    case 'unban': {
+      if (!admin) return need();
+      const i = /^\d+$/.test(who) ? Number(who) - 1 : ADMIN.state.bans.findIndex((b) => b.name.toLowerCase() === who.toLowerCase());
+      const b = ADMIN.state.bans[i];
+      if (!b) return void sys(c, `No ban is "${who}": see /bans.`);
+      log(`[admin] ${c.name} unbanned ${b.name}`);
+      const kept = await saveAdmin({ roles: ADMIN.state.roles, bans: ADMIN.state.bans.filter((x) => x !== b) });
+      return void sys(c, `${b.name} is no longer banned.${kept ? '' : ' It could NOT be written to the site: give the order again in a minute.'}`);
+    }
+    case 'admin':
+    case 'op':
+    case 'mod':
+    case 'demote':
+    case 'deop': {
+      if (!admin) return need();
+      const t = whoIs(who);
+      if (!t) return void sys(c, `Nobody online is "${who}" (or more than one is): they have to be here to be given a role, or to lose one.`);
+      const key = keyHash(t.key), roles = { ...ADMIN.state.roles }, was = roleOf(t) === 'admin';
+      const to: Role | null = cmd === 'mod' ? 'mod' : cmd === 'demote' || cmd === 'deop' ? null : 'admin';
+      if (t === c && to !== 'admin') return void sys(c, 'Not yourself: somebody else has to.');
+      if (to) roles[key] = { role: to, name: t.name, by: c.name, at: new Date().toISOString() };
+      else delete roles[key];
+      log(`[admin] ${c.name} made ${t.name} ${to ?? 'nothing'}`);
+      const kept = await saveAdmin({ roles, bans: ADMIN.state.bans });
+      if (to !== 'admin') {
+        for (const k of ['god', 'hidden', 'clip', 'voidInv', 'voidTag'] as const) setPower(t, k, false);
+        ADMIN.voids.delete(t.key);
+        // (and whoever has vanished is gone from their game, as from anybody's)
+        if (was) for (const o of clients.values()) if (o !== t && o.power.hidden) send(t, { t: 'leave', id: o.id });
+      }
+      send(t, { t: 'role', role: to });
+      if (to === 'admin' && !was) asAdmin(t, true);
+      if (to) sys(t, `${c.name} has made you ${to === 'admin' ? 'an admin' : 'a mod'}: /help says what you can do.`);
+      return void sys(c, `${t.name} is ${to ? (to === 'admin' ? 'an admin' : 'a mod') : 'no longer either'}.${kept ? '' : ' It could NOT be written to the site: give the order again in a minute.'}`);
+    }
+    case 'warn': {
+      const t = whoIs(who), words = rest.slice(1).join(' ').slice(0, 160);
+      if (!t) return void sys(c, `Nobody online is "${who}" (or more than one is): see /players.`);
+      if (!words) return void sys(c, 'Warn them of what?');
+      log(`[admin] ${c.name} warned ${t.name}: ${words}`);
+      send(t, { t: 'tell', kind: 'warn', text: `${admin ? 'An admin' : 'A mod'} warns you: ${words}` });
+      sys(t, `${admin ? 'An admin' : 'A mod'} warns you: ${words}`);
+      return void sys(c, `${t.name} has been warned.`);
+    }
+    case 'mute':
+    case 'unmute': {
+      const t = whoIs(who);
+      if (!t) return void sys(c, `Nobody online is "${who}" (or more than one is): see /players.`);
+      if (cmd === 'unmute') {
+        ADMIN.muted.delete(t.key);
+        sys(t, 'You can be heard again.');
+        return void sys(c, `${t.name} can be heard again.`);
+      }
+      if (roleOf(t)) return void sys(c, `${t.name} has a role: nobody with one is muted.`);
+      const mins = Math.min(60, Math.max(1, Math.round(Number(rest[1]) || 10)));
+      ADMIN.muted.set(t.key, Date.now() + mins * 60000);
+      log(`[admin] ${c.name} muted ${t.name} for ${mins} minutes`);
+      sys(t, `You are muted for ${mins} minutes: what you type and say reaches nobody.`);
+      return void sys(c, `${t.name} is muted for ${mins} minutes.`);
+    }
+    case 'goto':
+    case 'bring': {
+      if (!admin) return need();
+      const t = whoIs(who);
+      if (!t) return void sys(c, `Nobody online is "${who}" (or more than one is): see /players.`);
+      if (t === c) return void sys(c, 'That is you.');
+      const [moved, to] = cmd === 'goto' ? [c, t] : [t, c];
+      if (!moved.alive) return void sys(c, `${moved === c ? 'You are' : `${moved.name} is`} dead: the dead are not moved.`);
+      if (moved.seatAt) return void sys(c, `${moved === c ? 'You are' : `${moved.name} is`} in a car: out of it first.`);
+      // (a step short of them, on the side they are not looking)
+      const back = cmd === 'goto' ? 1 : -1.6, yaw = to.pose[3];
+      place(moved, to.pose[0] + Math.sin(yaw) * back, to.pose[1] + 0.1, to.pose[2] + Math.cos(yaw) * back, c);
+      log(`[admin] ${c.name} ${cmd === 'goto' ? `went to ${t.name}` : `brought ${t.name}`}`);
+      return void sys(c, cmd === 'goto' ? `You are with ${t.name}.` : `${t.name} is with you.`);
+    }
+    case 'tp': {
+      if (!admin) return need();
+      const n = rest.slice(0, 3).map(Number);
+      if (n.length < 2 || n.some((v) => !Number.isFinite(v))) return void sys(c, 'Where to? /tp x z (the numbers the map and /players give), or right-click the map.');
+      if (!c.alive) return void sys(c, 'You are dead: the dead are not moved.');
+      if (c.seatAt) return void sys(c, 'You are in a car: out of it first.');
+      const [x, y, z] = n.length === 3 ? n : [n[0], null, n[1]];
+      if (Math.abs(x) > EDGE || Math.abs(z) > EDGE) return void sys(c, 'That is off the map.');
+      place(c, x, y, z, c);
+      return void sys(c, `You are at ${x.toFixed(0)}, ${z.toFixed(0)}.`);
+    }
+    case 'give': {
+      if (!admin) return need();
+      const id = itemBy(rest[0] ?? '');
+      if (!id) return void sys(c, `No thing is "${rest[0] ?? ''}" (or more than one is): type some of its name after /give and take one from the list.`);
+      // (a tag is somebody's death, and is money: none is ever made)
+      if (id === 'dogtag') return void sys(c, 'Not a dog tag: one is only ever taken from somebody.');
+      const counted = /^\d+$/.test(rest[1] ?? ''), whom = counted ? rest[2] : rest[1];
+      const t = whom ? whoIs(whom) : c;
+      if (!t) return void sys(c, `Nobody online is "${whom}" (or more than one is): see /players.`);
+      const per = ITEMS[id].stack ?? 1;
+      let left = Math.max(1, Math.min(counted ? Number(rest[1]) : 1, per > 1 ? per * 10 : 10)), made = 0;
+      while (left > 0) {
+        const q = Math.min(per, left);
+        economy.drop(makeItem(id, per > 1 ? q : undefined), t.pose[0] + (Math.random() - 0.5) * 0.9, t.pose[1] + 0.05, t.pose[2] + (Math.random() - 0.5) * 0.9, Math.random() * Math.PI * 2);
+        left -= q;
+        made += q;
+      }
+      log(`[admin] ${c.name} made ${made} of ${id}${t === c ? '' : ` at ${t.name}'s feet`}`);
+      return void sys(c, `${made > 1 ? `${made} × ` : ''}${ITEMS[id].name} ${t === c ? 'at your feet' : `at ${t.name}'s feet`}.`);
+    }
+    case 'kit': {
+      if (!admin) return need();
+      const kit = KITS.find((k) => k.id === (rest[0] ?? '').toLowerCase());
+      if (!kit) return void sys(c, `The kits are: ${KITS.map((k) => k.id).join(', ')}.`);
+      const t = rest[1] ? whoIs(rest[1]) : c;
+      if (!t) return void sys(c, `Nobody online is "${rest[1]}" (or more than one is): see /players.`);
+      if (!t.alive) return void sys(c, `${t === c ? 'You are' : `${t.name} is`} dead: there is nobody to put it on.`);
+      // (every thing of it is made here, so that each is one the server knows it put in the world)
+      const items = kit.things.map((th) => {
+        const it = makeItem(th.id, th.qty);
+        if (th.mag !== undefined) it.mag = th.mag;
+        if (th.loaded !== undefined) it.loaded = th.loaded;
+        if (th.mods) it.mods = [...th.mods];
+        if (th.rounds !== undefined) it.rounds = th.rounds;
+        issue(it);
+        return it;
+      });
+      log(`[admin] ${c.name} gave ${t === c ? 'themselves' : t.name} the ${kit.id} kit`);
+      send(t, { t: 'kit', name: kit.name, items, ...(kit.adds ? { adds: true as const } : {}), ...(t === c ? {} : { by: c.name }) });
+      return void sys(c, `${t === c ? 'You have' : `${t.name} has`} the ${kit.name} kit.`);
+    }
+    case 'heal': {
+      if (!admin) return need();
+      const t = who ? whoIs(who) : c;
+      if (!t) return void sys(c, `Nobody online is "${who}" (or more than one is): see /players.`);
+      if (!t.alive) return void sys(c, `${t === c ? 'You are' : `${t.name} is`} dead: that is past mending.`);
+      t.check.hp = 100;
+      t.check.hpAt = Date.now();
+      t.check.downAt = 0;
+      send(t, { t: 'mend' });
+      if (t !== c) sys(t, 'An admin has made you whole.');
+      return void sys(c, `${t === c ? 'You are' : `${t.name} is`} whole.`);
+    }
+    case 'die': {
+      if (!admin) return need();
+      if (!c.alive) return void sys(c, 'You are dead already.');
+      c.lastHitBy = null;
+      kill(c, 'their own hand');
+      return void sys(c, 'You are dead.');
+    }
+    case 'slay': {
+      if (!admin) return need();
+      const t = whoIs(who);
+      if (!t) return void sys(c, `Nobody online is "${who}" (or more than one is): see /players.`);
+      if (!t.alive) return void sys(c, `${t.name} is dead already.`);
+      log(`[admin] ${c.name} slew ${t.name}`);
+      t.lastHitBy = null;
+      kill(t, 'an admin');
+      return void sys(c, `${t.name} is dead.`);
+    }
+    case 'voidinv':
+    case 'voidtag':
+    case 'god':
+    case 'vanish':
+    case 'noclip': {
+      // One of an admin's powers put on or off: their own, or (named) another admin's. `on` or `off` says which;
+      // said neither, it is turned over.
+      if (!admin) return need();
+      const k = ({ god: 'god', vanish: 'hidden', noclip: 'clip', voidinv: 'voidInv', voidtag: 'voidTag' } as const)[cmd];
+      const say = rest.find((w) => w === 'on' || w === 'off'), whom = rest.find((w) => w !== 'on' && w !== 'off');
+      const t = whom ? whoIs(whom) : c;
+      if (!t) return void sys(c, `Nobody online is "${whom}" (or more than one is): see /players.`);
+      if (roleOf(t) !== 'admin') return void sys(c, `${t.name} is not an admin: these are an admin's.`);
+      const on = say ? say === 'on' : !t.power[k];
+      setPower(t, k, on);
+      const what = { god: 'god mode', hidden: 'vanish', clip: 'noclip', voidInv: 'void inventory on death', voidTag: 'void dog tag on death' }[k];
+      if (t !== c) {
+        sys(t, `${c.name} has put ${what} ${on ? 'on' : 'off'} for you.`);
+        return void sys(c, `${t.name}: ${what} is ${on ? 'on' : 'off'}.`);
+      }
+      return void sys(c, k === 'voidInv' ? (on ? 'When you die, nothing you carried is left on your body.' : 'When you die, what you carried is on your body, as anybody\'s is.') : k === 'voidTag' ? (on ? 'When you die, no dog tag of your own is left.' : 'When you die, your dog tag is on your body, as anybody\'s is.') : k === 'god' ? (on ? 'Nothing hurts you now.' : 'You can be hurt again.') : k === 'hidden' ? (on ? 'Nobody but an admin sees you now: to everybody else you have left.' : 'You can be seen again.') : on ? 'You fly, and through anything: W A S D, Space up, Ctrl down, Shift fast.' : 'You walk again.');
+    }
+    case 'roles':
+      if (!admin) return need();
+      return void sys(c, 'With a role:', ...Object.values(ADMIN.state.roles).map((r) => `${r.name}  ${r.role}  (by ${r.by}, ${r.at.slice(0, 10)})`));
+    default:
+      return void sys(c, `There is no /${cmd}: /help lists what there is.`);
+  }
+}
+/** The password, typed by somebody who wants to be an admin: asked of the site, which alone knows it. */
+async function login(c: Client, pw: unknown) {
+  const now = Date.now();
+  for (const n of namesOf(c.key, c.ip)) {
+    const times = (ADMIN.tries.get(n) ?? []).filter((t) => now - t < 600000);
+    if (times.length >= 5) return void sys(c, 'Too many tries: wait ten minutes.');
+    times.push(now);
+    ADMIN.tries.set(n, times);
+  }
+  if (typeof pw !== 'string' || !pw || pw.length > 200) return void sys(c, 'No password was given.');
+  const r = await siteAdmin({ op: 'login', pw, key: keyHash(c.key), name: c.name });
+  if (!r) return void sys(c, 'The site did not answer: try again in a minute.');
+  if (!r.ok) {
+    log(`[admin] ${c.name} (#${c.id}) gave a wrong admin password`);
+    return void sys(c, r.why ?? 'That is not the password.');
+  }
+  for (const n of namesOf(c.key, c.ip)) ADMIN.tries.delete(n);
+  log(`[admin] ${c.name} (#${c.id}) is an admin, by the password`);
+  send(c, { t: 'role', role: 'admin' });
+  asAdmin(c, true);
+  sys(c, 'You are an admin, on this and every game from now on. /help lists your orders.');
+}
+
 /** Put off the server by a check (only ever when enforcing): told so, counted, and after enough of it kept off for a while. */
 function putOff(c: Client, why: string) {
+  // (no check puts an admin off the server)
+  if (roleOf(c) === 'admin') return void log(`[check] ${c.name} is an admin and is left alone: ${why}`);
   const now = Date.now();
   let kept = false;
   for (const n of namesOf(c.key, c.ip)) {
@@ -672,7 +1431,7 @@ const UNDER = { deep: 1.1, grace: 3, void: 10, off: 25 };
 function underCheck(c: Client, now = Date.now()) {
   const [x, y, z] = c.pose;
   const b = world.bunker;
-  const down = c.alive && !c.seatAt && now >= c.check.free && y < world.groundAt(x, z) - UNDER.deep && !(b && Math.hypot(x - b.x, z - b.z) < UNDER_BUNKER);
+  const down = c.alive && !c.seatAt && !c.power.clip && roleOf(c) !== 'admin' && now >= c.check.free && y < world.groundAt(x, z) - UNDER.deep && !(b && Math.hypot(x - b.x, z - b.z) < UNDER_BUNKER);
   if (!down) {
     c.underAt = 0;
     return;
@@ -686,6 +1445,33 @@ function underCheck(c: Client, now = Date.now()) {
 }
 /** how far round the bunker's middle the ground is not asked about: its rooms and its stair are under it */
 const UNDER_BUNKER = 48;
+// A stash left standing is not there for ever: one nobody has had anything to do with for STASH_EMPTY (a week) is
+// cleared away if it is empty, and after STASH_FULL (a fortnight) if anything is in it. One under the ground stays
+// until it is dug up, however long that is: burying is what keeps a thing. (2026-10-12: "unburried stashes
+// autodelete after 7 days of no interaction. 14 days if the unburries stash has an item(s) within".)
+const STASH_EMPTY_MS = (Number(process.env.STASH_EMPTY_S) || 7 * 86400) * 1000;
+const STASH_FULL_MS = (Number(process.env.STASH_FULL_S) || 14 * 86400) * 1000;
+/** somebody has had something to do with a stash: its time starts again */
+function touched(b: Box) {
+  if (b.kind !== 'stash') return;
+  b.touchedAt = Date.now();
+  KEPT.dirty = true;
+}
+function clearStashes(now: number) {
+  for (const b of [...boxes.values()]) {
+    if (b.kind !== 'stash' || b.buried) continue;
+    const holder = locks.get(b.cid);
+    if (holder !== undefined && clients.has(holder)) continue;
+    if (now - (b.touchedAt ?? now) <= (b.items.length ? STASH_FULL_MS : STASH_EMPTY_MS)) continue;
+    log(`a stash at ${b.x.toFixed(0)}, ${b.z.toFixed(0)} is cleared away: nobody has touched it for ${Math.round((now - (b.touchedAt ?? now)) / 86400000)} days${b.items.length ? `, with ${b.items.length} things in it` : ''}`);
+    locks.delete(b.cid);
+    boxes.delete(b.cid);
+    KEPT.dirty = true;
+    broadcast({ t: 'stash-', uid: b.cid });
+  }
+}
+setInterval(() => clearStashes(Date.now()), Math.max(1000, Math.min(600_000, STASH_EMPTY_MS / 4))).unref();
+
 /** Is somebody out of the game for being under the ground? (past the moment that is let go) */
 const buried = (c: Client, now = Date.now()) => c.underAt > 0 && now - c.underAt >= UNDER.grace * 1000;
 
@@ -710,6 +1496,24 @@ interface Client {
   outAt: number;
   /** when they were first seen under the ground this time (0: they are not): see `underCheck` */
   underAt: number;
+  /**
+   * The body in the world when its game is not (see "a life kept by the server", below): when their game last said
+   * where they were; whether the server has had to keep their health for them since; when the connection went
+   * without a proper leave (0: it has not), the body staying where it was; for how many seconds a wound has run
+   * while the server kept it; and when the wait to leave properly ends (0: nobody is waiting), begun where.
+   */
+  heardAt: number;
+  kept: boolean;
+  asleep: number;
+  bled: number;
+  logoutAt: number;
+  logoutFrom: [number, number];
+  /**
+   * An admin's powers that are on: nothing hurts them, nobody is shown them, and where they go is not questioned.
+   * And two things chosen for their own death: nothing they carried is left on the body (what an admin makes for
+   * themselves is not found on them by whoever kills them), and no dog tag of their own is.
+   */
+  power: { god: boolean; hidden: boolean; clip: boolean; voidInv: boolean; voidTag: boolean };
   /** when this player last threw a grenade, and how many hits have been claimed for it */
   lastNade: number;
   nadeHits: number;
@@ -747,6 +1551,8 @@ interface Record_ {
   vitals: Vitals | null;
   alive: boolean;
   leftAt: number;
+  /** kept from a world of another making: what they carried is theirs, where they stood is not */
+  afresh?: boolean;
 }
 
 const clients = new Map<number, Client>();
@@ -762,7 +1568,9 @@ function broadcast(m: S2C, except?: Client) {
   for (const c of clients.values()) if (c !== except && c.ws.readyState === 1) c.ws.send(s);
 }
 
-const info = (c: Client): PlayerInfo => ({ id: c.id, name: c.name, pose: c.pose, w: c.w, m: c.m, g: c.g, b: c.b, alive: c.alive });
+const info = (c: Client): PlayerInfo => ({ id: c.id, name: c.name, pose: c.pose, w: c.w, m: c.m, g: c.g, b: c.b, alive: c.alive, ...(c.power.hidden ? { hidden: true as const } : {}) });
+/** is somebody shown to this player: everybody is, but a vanished admin, whom only admins see */
+const shown = (who: Client, to: Client) => !who.power.hidden || roleOf(to) === 'admin';
 
 /** a spawn point on the edge of the map, as far from everyone else as possible */
 function pickSpawn() {
@@ -814,7 +1622,7 @@ function cleanItem(raw: unknown, depth = 0): ItemInstance | null {
     it.holder = short(r.holder);
     it.held = Math.max(0, Math.min(TAG_HOLD, Number(r.held) || 0));
   }
-  if (def.wear?.cargo && Array.isArray(r.cargo)) {
+  if (holds(def.id) && Array.isArray(r.cargo)) {
     it.cargo = [];
     for (const p of r.cargo.slice(0, 40)) {
       const inner = cleanItem(p?.item, depth + 1);
@@ -867,7 +1675,7 @@ function pidOf(key: string): string {
  */
 const said = new Map<number, { at: number; left: number }>();
 function voice(c: Client, piece: Buffer) {
-  if (!c.alive || piece.length < 3 || piece.length > VOICE.bytes) return;
+  if (!c.alive || piece.length < 3 || piece.length > VOICE.bytes || (ADMIN.muted.get(c.key) ?? 0) > Date.now()) return;
   const now = Date.now();
   // (an allowance that fills at VOICE.rate a second and holds VOICE.burst: what comes all at once after a stop is passed on whole)
   let k = said.get(c.id);
@@ -989,7 +1797,7 @@ function blowJeep(v: Veh, byId: number) {
     const inside = v.seats.includes(c.id);
     const d = Math.hypot(c.pose[0] - v.s[0], c.pose[1] + 1 - v.s[1], c.pose[2] - v.s[2]);
     const amount = inside ? 400 : hitDamage('barrel', 'torso', Math.max(0, d - 1.5));
-    if (amount <= 0 || d > rule.blast! + 3) continue;
+    if (amount <= 0 || d > rule.blast! + 3 || c.power.god) continue;
     if (by && by !== c) c.lastHitBy = { id: by.id, name: by.name, w: 'fire', zone: 'torso', dist: d, at: now };
     const len = Math.max(0.001, Math.hypot(c.pose[0] - v.s[0], c.pose[2] - v.s[2]));
     dealt(c, amount, 'torso', 'fire');
@@ -1024,6 +1832,9 @@ function makeCorpse(c: Client, v: number): CorpseInfo | null {
   const mine = pidOf(c.key);
   const own = inv ? carriedTags(inv).find((t) => !lootedTags.has(t.uid) && (t.pid === mine || (t.owner ?? '') === c.name)) : undefined;
   const lived = Date.now() - c.lifeAt, fresh = lived < TAG_FRESH_MS;
+  // (and an admin who has chosen so leaves no tag of their own either, however long they lived; or nothing at all
+  // of what they carried but the tags they took off other people)
+  const noTag = fresh || c.power.voidTag, bare = c.power.voidInv;
   /** a tag that is on a body whoever's body it is: one taken off somebody else */
   const taken = (t: ItemInstance) => {
     const from = lootedTags.get(t.uid);
@@ -1036,8 +1847,8 @@ function makeCorpse(c: Client, v: number): CorpseInfo | null {
     return true;
   };
   const put = (it: ItemInstance | null) => {
-    if (!it || (fresh && theirs(it))) return;
-    if (fresh && it.cargo) it.cargo = it.cargo.filter((p) => !theirs(p.item));
+    if (!it || (noTag && theirs(it)) || (bare && it.id !== 'dogtag')) return;
+    if (noTag && it.cargo) it.cargo = it.cargo.filter((p) => !theirs(p.item));
     stopTagClocks(it);
     const left = box.add(it);
     if (left) spill.push(left);
@@ -1045,12 +1856,13 @@ function makeCorpse(c: Client, v: number): CorpseInfo | null {
   if (inv) {
     for (const it of Object.values(inv.slots)) put(it);
     for (const cont of inv.containers) for (const s of cont.items) put(cleanItem(s));
-    if (own && !fresh) lootedTags.set(own.uid, { owner: c.name, ownerKey: c.key, ownerIp: c.ip, livedMs: lived });
+    if (own && !noTag) lootedTags.set(own.uid, { owner: c.name, ownerKey: c.key, ownerIp: c.ip, livedMs: lived });
     else if (own || older) {
-      log(`${c.name} left no dog tag: alive ${Math.round(lived / 1000)} s${older ? ` (nor ${older} older of their own, taken back)` : ''}`);
+      log(`${c.name} left no dog tag: ${fresh ? `alive ${Math.round(lived / 1000)} s` : 'an admin, who chose so'}${older ? ` (nor ${older} older of their own, taken back)` : ''}`);
       const by = c.lastHitBy && Date.now() - c.lastHitBy.at < 15000 ? clients.get(c.lastHitBy.id) : undefined;
-      if (by && by !== c) send(by, { t: 'tell', kind: 'info', text: `No dog tag on ${c.name}: alive less than ${Math.round(TAG_FRESH_MS / 60000)} minutes.` });
+      if (by && by !== c) send(by, { t: 'tell', kind: 'info', text: fresh ? `No dog tag on ${c.name}: alive less than ${Math.round(TAG_FRESH_MS / 60000)} minutes.` : `No dog tag on ${c.name}: an admin, at work.` });
     }
+    if (bare) log(`${c.name} left nothing they carried on their body: an admin, who chose so`);
   }
   for (const it of spill) {
     const a = Math.random() * Math.PI * 2;
@@ -1066,6 +1878,9 @@ function makeCorpse(c: Client, v: number): CorpseInfo | null {
 function kill(c: Client, cause: string, v = 0) {
   if (!c.alive) return;
   c.alive = false;
+  c.logoutAt = 0;
+  // (a body left behind has nobody to come back to it: it is out of the world once it has fallen)
+  if (c.asleep) setTimeout(() => drop(c), 3000);
   releaseLock(c);
   leaveSeat(c);
   const now = Date.now();
@@ -1097,7 +1912,17 @@ function handle(c: Client, m: C2S) {
       const was = c.pose;
       if (Math.abs(m.p[0] - was[0]) + Math.abs(m.p[2] - was[2]) > 0.02 || Math.abs(m.p[3] - was[3]) + Math.abs(m.p[4] - was[4]) > 0.004) c.activeAt = Date.now();
       // (somewhere they cannot have got to: they are kept where they were, and only the way they look is taken)
+      // (heard from again after the server kept their life for them: its figure is the figure)
+      if (c.kept) {
+        c.kept = false;
+        c.bled = 0;
+        if (c.alive && c.vitals) send(c, { t: 'hp', health: c.vitals.health, bleeding: !!c.vitals.bleeding });
+      }
+      c.heardAt = Date.now();
+      if (c.logoutAt && Math.hypot(m.p[0] - c.logoutFrom[0], m.p[2] - c.logoutFrom[1]) > LOGOUT_STIR) stayOn(c, 'you moved');
       c.pose = moveCheck(c, m.p, Date.now()) ? m.p : [was[0], was[1], was[2], m.p[3], m.p[4], m.p[5]];
+      // (dead here is dead in what is passed on, whatever their own game had heard when it sent this)
+      if (!c.alive) c.pose[5] |= F_DEAD;
       zoneCheck(c);
       underCheck(c);
       const w = typeof m.w === 'string' && ITEMS[m.w] ? m.w : null;
@@ -1107,6 +1932,7 @@ function handle(c: Client, m: C2S) {
     }
     case 'shot': {
       if (!c.alive || !isVec3(m.o) || !isVec3(m.d) || !WEAPON_RULES[m.w] || WEAPON_RULES[m.w].melee) return;
+      stayOn(c, 'you fired');
       broadcast({ t: 'shot', id: c.id, o: m.o, d: m.d, w: m.w, sup: !!m.sup }, c);
       return;
     }
@@ -1241,6 +2067,7 @@ function handle(c: Client, m: C2S) {
       }
       if (amount <= 0) return;
       const len = Math.max(0.001, Math.hypot(target.pose[0] - from[0], target.pose[2] - from[1]));
+      if (target.power.god) return;
       target.lastHitBy = { id: c.id, name: c.name, w: m.w, zone: m.zone, dist: d, at: now };
       dealt(target, amount, m.zone, m.w);
       send(target, { t: 'dmg', from: c.id, amount, zone: m.zone, w: m.w, dir: [(target.pose[0] - from[0]) / len, 0, (target.pose[2] - from[1]) / len] });
@@ -1295,7 +2122,7 @@ function handle(c: Client, m: C2S) {
       // one of them that this player's game moves has struck somebody (as likely as not, this player)
       const target = clients.get(m.to);
       const b = horde.bodies.get(m.i);
-      if (!b || !target?.alive) return;
+      if (!b || !target?.alive || target.power.hidden) return;
       if (!horde.strikes(m.i, c.id, { id: target.id, x: target.pose[0], z: target.pose[2] }, Date.now())) return;
       // On guard (fists, or something in the hand to strike with), facing it, with the wind to
       // hold it off: nothing lands, and the one that threw it is stopped for a moment.
@@ -1306,6 +2133,7 @@ function handle(c: Client, m: C2S) {
         return;
       }
       const len = Math.max(0.001, Math.hypot(target.pose[0] - b.s[0], target.pose[2] - b.s[2]));
+      if (target.power.god) return;
       const bite = INFECTED.damage + Math.round((Math.random() - 0.5) * 6);
       dealt(target, bite, 'torso', 'infected');
       send(target, { t: 'dmg', from: 0, amount: bite, zone: 'torso', w: 'infected', dir: [(target.pose[0] - b.s[0]) / len, 0, (target.pose[2] - b.s[2]) / len] });
@@ -1357,7 +2185,7 @@ function handle(c: Client, m: C2S) {
     case 'copen': {
       const b = boxes.get(m.cid);
       // (a body, a crate, a stash, a drop: none of them is searched from a jeep's seat)
-      if (!b || !c.alive || c.seatAt || buried(c)) return;
+      if (!b || !c.alive || c.seatAt || buried(c) || b.buried) return;
       if (Math.hypot(b.x - c.pose[0], b.z - c.pose[2]) > 6) return;
       const holder = locks.get(m.cid);
       if (holder !== undefined && holder !== c.id && clients.has(holder)) {
@@ -1367,6 +2195,7 @@ function handle(c: Client, m: C2S) {
       releaseLock(c);
       locks.set(m.cid, c.id);
       c.openCid = m.cid;
+      touched(b);
       send(c, { t: 'cdata', cid: m.cid, items: b.items });
       return;
     }
@@ -1381,6 +2210,7 @@ function handle(c: Client, m: C2S) {
         for (const it of b.items) issue(it);
       }
       if (b.kind === 'crate' || b.kind === 'drop') b.emptiedAt = b.items.length ? -1 : b.emptiedAt < 0 ? economy.time : b.emptiedAt;
+      touched(b);
       return;
     }
     case 'cclose': {
@@ -1390,20 +2220,56 @@ function handle(c: Client, m: C2S) {
     case 'stash+': {
       const s = m.s;
       if (!s || typeof s.uid !== 'string' || s.uid.length > 64 || boxes.has(s.uid) || ![s.x, s.y, s.z, s.rot].every(num)) return;
-      if (Math.hypot(s.x - c.pose[0], s.z - c.pose[2]) > 8) return;
-      const st: StashInfo = { uid: s.uid, x: s.x, y: s.y, z: s.z, rot: s.rot };
-      boxes.set(s.uid, { cid: s.uid, kind: 'stash', w: 8, h: 6, items: [], ...st, emptiedAt: -1 });
+      if (!c.alive || Math.hypot(s.x - c.pose[0], s.z - c.pose[2]) > 8) return;
+      // (the stash case, the suitcase or the black bag: each as big inside as it is, and put down with whatever was
+      // in it while it was carried)
+      const def = ITEMS[String(s.item ?? 'stash_kit')];
+      if (def?.category !== 'stash') return;
+      const [w, h] = def.stash ?? [8, 6];
+      const items = (Array.isArray(m.items) ? m.items : []).slice(0, 80).flatMap((x) => {
+        const it = cleanItem(x, 1);
+        return it && num(x.x) && num(x.y) ? [{ ...it, x: x.x, y: x.y, rot: !!x.rot }] : [];
+      });
+      if (CHECKS !== 'off' && items.some((it) => [...things({ slots: { it }, active: null, containers: [] })].some(invented)) && flag(c, 'put down a stash with something in it that the server never put in the world')) return;
+      const st: StashInfo = { uid: s.uid, x: s.x, y: s.y, z: s.z, rot: s.rot, ...(def.id === 'stash_kit' ? {} : { item: def.id }) };
+      boxes.set(s.uid, { cid: s.uid, kind: 'stash', w, h, items, ...st, emptiedAt: -1, touchedAt: Date.now() });
+      for (const it of items) issue(it);
+      KEPT.dirty = true;
       broadcast({ t: 'stash+', s: st }, c);
       return;
     }
     case 'stash-': {
+      // picked up, with whatever is in it. Not from under the ground, and not from across a field.
       const b = boxes.get(m.uid);
-      if (!b || b.kind !== 'stash' || b.items.length) return;
+      if (!b || b.kind !== 'stash' || b.buried || !c.alive) return;
+      if (Math.hypot(b.x - c.pose[0], b.z - c.pose[2]) > 6) return;
       const holder = locks.get(m.uid);
       if (holder !== undefined && holder !== c.id && clients.has(holder)) return;
       locks.delete(m.uid);
       boxes.delete(m.uid);
+      KEPT.dirty = true;
+      // (it is theirs when the server says so, and nobody else's: two who reached for it at once do not both carry it off)
+      send(c, { t: 'stashgot', uid: m.uid, item: b.item ?? 'stash_kit', items: b.items });
       broadcast({ t: 'stash-', uid: m.uid }, c);
+      return;
+    }
+    case 'bury': {
+      // A shovel in the hands, beside a stash: it goes under the ground, or comes up out of it. Anybody's shovel
+      // brings up anybody's stash; it is the finding of the place that keeps it.
+      const b = boxes.get(m.uid);
+      if (!b || b.kind !== 'stash' || !c.alive || c.seatAt || !!b.buried === !!m.on) return;
+      if (c.w !== 'shovel' || Math.hypot(b.x - c.pose[0], b.z - c.pose[2]) > BURY.reach) return;
+      const holder = locks.get(m.uid);
+      if (holder !== undefined && holder !== c.id && clients.has(holder)) return void send(c, { t: 'tell', kind: 'warn', text: 'Somebody has it open.' });
+      // (out in the country and nowhere else: not in a town or a camp, not in a building, not beside one)
+      const no = m.on ? noBurying(b.x, b.y, b.z, world.groundAt(b.x, b.z), world.places, world.buildings) : null;
+      if (no) return void send(c, { t: 'tell', kind: 'warn', text: `${no}.` });
+      locks.delete(m.uid);
+      if (c.openCid === m.uid) c.openCid = null;
+      b.buried = !!m.on;
+      touched(b);
+      log(`${c.name} ${b.buried ? 'buried' : 'dug up'} a stash at ${b.x.toFixed(0)}, ${b.z.toFixed(0)}`);
+      broadcast({ t: 'stash~', uid: m.uid, buried: b.buried });
       return;
     }
     case 'door': {
@@ -1430,7 +2296,9 @@ function handle(c: Client, m: C2S) {
       const v = m.vitals;
       // (less health than the server allowed them is taken at their word; more is not)
       if (v && num(v.health)) c.check.hp = Math.min(c.check.hp, Math.max(0, v.health) + 1);
-      if (v && num(v.health) && num(v.energy) && num(v.water)) c.vitals = { health: v.health, energy: v.energy, water: v.water, stamina: num(v.stamina) ? v.stamina : MAX_STAMINA, bleeding: !!v.bleeding, broken: !!v.broken };
+      // (and while the server is keeping their life for them, what their game says puts no health back)
+      const held = c.kept && c.vitals ? c.vitals : null;
+      if (v && num(v.health) && num(v.energy) && num(v.water)) c.vitals = { health: held ? Math.min(held.health, v.health) : v.health, energy: v.energy, water: v.water, stamina: num(v.stamina) ? v.stamina : MAX_STAMINA, bleeding: held ? held.bleeding || !!v.bleeding : !!v.bleeding, broken: !!v.broken };
       return;
     }
     case 'died': {
@@ -1456,16 +2324,57 @@ function handle(c: Client, m: C2S) {
     case 'chat': {
       const text = String(m.text ?? '').replace(/[\u0000-\u001f]/g, '').trim().slice(0, 160);
       const now = Date.now();
-      if (!text || now - c.lastChat < 500) return;
+      if (!text || (now - c.lastChat < 500 && !(text.startsWith('/') && roleOf(c)))) return;
       c.lastChat = now;
+      // (an order, and never talk: whatever begins with a stroke is said to nobody and is not written down)
+      if (text.startsWith('/')) return void command(c, text).catch((e) => log('[admin] an order failed:', e instanceof Error ? e.message : e));
+      const quiet = ADMIN.muted.get(c.key) ?? 0;
+      if (quiet > now) return void sys(c, `You are muted for ${Math.ceil((quiet - now) / 60000)} more minutes: what you type and say reaches nobody.`);
       if (m.ch === 'near') {
         // proximity: only players standing within earshot get it (the speaker included)
-        const out: S2C = { t: 'chat', ch: 'near', from: c.name, text };
+        const out: S2C = { t: 'chat', ch: 'near', from: c.name, text, role: roleOf(c) ?? undefined, tint: ADMIN.tints.get(c.id) };
         for (const o of clients.values()) {
           if (Math.hypot(o.pose[0] - c.pose[0], o.pose[1] - c.pose[1], o.pose[2] - c.pose[2]) <= CHAT_RANGE) send(o, out);
         }
-      } else broadcast({ t: 'chat', ch: 'global', from: c.name, text });
+      } else broadcast({ t: 'chat', ch: 'global', from: c.name, text, role: roleOf(c) ?? undefined, tint: ADMIN.tints.get(c.id) });
       return;
+    }
+    case 'admin':
+      return void login(c, m.pw).catch(() => sys(c, 'The site did not answer: try again in a minute.'));
+    case 'tint': {
+      if (roleOf(c) !== 'admin') return;
+      if (typeof m.color === 'string' && /^#[0-9a-f]{6}$/i.test(m.color)) ADMIN.tints.set(c.id, m.color.toLowerCase());
+      else ADMIN.tints.delete(c.id);
+      return;
+    }
+    case 'logout': {
+      if (m.cancel) return void stayOn(c, 'you called it off');
+      if (!c.alive || c.logoutAt) return;
+      c.logoutAt = Date.now() + LOGOUT_MS;
+      c.logoutFrom = [c.pose[0], c.pose[2]];
+      return void send(c, { t: 'logout', left: Math.round(LOGOUT_MS / 1000) });
+    }
+    case 'adm': {
+      const role = roleOf(c), now = Date.now();
+      if (!role || now - (ADMIN.asked.get(c.id) ?? 0) < 600) return;
+      ADMIN.asked.set(c.id, now);
+      const admin = role === 'admin';
+      return void send(c, {
+        t: 'adm',
+        players: [...clients.values()].map((o) => ({
+          id: o.id, name: o.name, role: roleOf(o), x: Math.round(o.pose[0]), z: Math.round(o.pose[2]), alive: o.alive, flags: o.check.flags, mins: Math.round((now - o.joinedAt) / 60000),
+          hp: Math.round(o.vitals?.health ?? 100), kills: scores.get(o.key)?.kills ?? 0, tags: scores.get(o.key)?.tags ?? 0,
+          ...(o.power.hidden ? { hidden: true as const } : {}), ...(o.power.god ? { god: true as const } : {}), ...(o.power.clip ? { clip: true as const } : {}),
+          ...((ADMIN.muted.get(o.key) ?? 0) > now ? { muted: true as const } : {}), ...(o.seatAt ? { seat: true as const } : {}),
+          ...(o.power.voidInv ? { voidInv: true as const } : {}), ...(o.power.voidTag ? { voidTag: true as const } : {}),
+          ...(o.asleep ? { asleep: true as const } : away(o, now) && o.alive ? { away: true as const } : {}),
+        })),
+        gone: ADMIN.gone.slice(-20).reverse().map((g) => ({ id: g.id, name: g.name, mins: Math.round((now - g.at) / 60000) })),
+        bans: admin ? ADMIN.state.bans.map((b, i) => ({ n: i + 1, name: b.name, why: b.why, by: b.by, at: b.at.slice(0, 10) })) : [],
+        roles: admin ? Object.values(ADMIN.state.roles).map((r) => ({ name: r.name, role: r.role, by: r.by, at: r.at.slice(0, 10) })) : [],
+        checks: CHECKS,
+        stats: { up: Math.round(process.uptime() / 60), loot: economy.loot.size, stashes: [...boxes.values()].filter((b) => b.kind === 'stash').length, kept: KEPT.chars.size + records.size, asleep: [...clients.values()].filter((o) => o.asleep).length },
+      });
     }
     case 'vin': {
       const v = vehicles.get(m.i);
@@ -1560,7 +2469,7 @@ function handle(c: Client, m: C2S) {
       if (cost.people > 0) {
         for (const id of riders) {
           const o = id === null ? undefined : clients.get(id);
-          if (!o?.alive) continue;
+          if (!o?.alive || o.power.god) continue;
           dealt(o, cost.people, 'torso', 'crash');
           send(o, { t: 'dmg', from: 0, amount: cost.people, zone: 'torso', w: 'crash', dir: [0, 0, 0] });
         }
@@ -1579,7 +2488,10 @@ function handle(c: Client, m: C2S) {
       // the tag has to be one this player really carries, with its time (nearly) served:
       // our copy of their inventory is a few seconds behind theirs
       const tag = findCarried(c, m.uid);
-      if (!tag || tag.id !== 'dogtag' || (tag.held ?? 0) < TAG_HOLD - 30) return;
+      const seenAt = tag ? tagSeen.get(`${c.key}|${tag.uid}`) : undefined;
+      if (!tag || tag.id !== 'dogtag' || ((tag.held ?? 0) < TAG_HOLD - 30 && !(seenAt !== undefined && Date.now() - seenAt >= CASH_HOLD_MS))) return;
+      // (nothing is earned by somebody nothing can hurt, nobody can see, or no wall stops)
+      if (c.power.god || c.power.hidden || c.power.clip) return void sys(c, 'No tag is cashed in with god mode, vanish or noclip on: put them off first.');
       tag.held = 0;
       const owner = tag.owner ?? 'Survivor';
       const from = lootedTags.get(tag.uid);
@@ -1613,7 +2525,13 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
   const off = bannedFor(key, ipOf.get(ws) ?? '');
   if (off) {
     log(`${cleanName(m.name)} is not let in: ${off}`);
-    ws.send(JSON.stringify({ t: 'kick', reason: 'You are kept off this server for now.' } satisfies S2C));
+    ws.send(JSON.stringify({ t: 'kick', reason: off === 'banned' ? 'You are banned from this server.' : off.startsWith('timed out') ? 'You are kept off this server for a while yet.' : 'You are kept off this server for now.' } satisfies S2C));
+    ws.close();
+    return null;
+  }
+  if (addressFull(key, ipOf.get(ws) ?? '')) {
+    log(`${cleanName(m.name)} is not let in: ${PER_ADDRESS} already playing from their address`);
+    ws.send(JSON.stringify({ t: 'kick', reason: PER_ADDRESS === 1 ? 'Somebody is already playing from your connection: one player to a connection.' : `There are already ${PER_ADDRESS} playing from your connection.` } satisfies S2C));
     ws.close();
     return null;
   }
@@ -1625,27 +2543,32 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
       drop(o);
     }
   }
-  const rec = records.get(key);
+  const rec = records.get(key) ?? KEPT.chars.get(keyHash(key));
   const resume = rec && rec.alive && rec.inv && Date.now() - rec.leftAt < RECORD_LIFETIME ? rec : null;
+  // (a tag is carried for its time in the world: the time its carrier was out of it is not counted)
+  if (resume) for (const [k, since] of tagSeen) if (k.startsWith(`${key}|`)) tagSeen.set(k, since + (Date.now() - resume.leftAt));
   // (Somebody who left the game down in the bunker comes back with what they carried, at one
   // of the map's own starting places: nobody waits behind its door for it to be opened for them.)
   const under = !!resume && bunkerDark(world.bunker, resume.pose[0], resume.pose[1] + 1, resume.pose[2]) > 0;
-  const sp = resume && !under ? { x: resume.pose[0], y: resume.pose[1], z: resume.pose[2], yaw: resume.pose[3] } : pickSpawn();
+  const sp = resume && !under && !resume.afresh ? { x: resume.pose[0], y: resume.pose[1], z: resume.pose[2], yaw: resume.pose[3] } : pickSpawn();
   const c: Client = {
     ws, id: nextId++, key, name: cleanName(m.name),
     pose: [sp.x, 'y' in sp && sp.y !== undefined ? sp.y : world.groundAt(sp.x, sp.z), sp.z, sp.yaw, 0, 0],
-    w: null, m: [], g: [], b: [], alive: true,
+    w: null, m: [], g: [], b: [], alive: true, power: { god: false, hidden: false, clip: false, voidInv: false, voidTag: false },
+    heardAt: Date.now(), kept: false, asleep: 0, bled: 0, logoutAt: 0, logoutFrom: [0, 0],
     inv: resume?.inv ?? null, vitals: resume?.vitals ?? null,
     outAt: 0, underAt: 0, lastHit: 0, lastVHit: 0, seatAt: 0, lastNade: 0, nadeHits: 0, blasts: [], lastEmote: 0, lastChat: 0, lastHitBy: null, openCid: null, check: { at: Date.now(), carry: 0, free: Date.now() + CHECK.free, high: 0, flags: 0, said: 0, refused: [], hp: Math.min(100, resume?.vitals?.health ?? 100), hpAt: Date.now(), downAt: 0, unknown: new Set() }, activeAt: Date.now(), joinedAt: Date.now(), ip: ipOf.get(ws) ?? '', lifeAt: Date.now(), msgCount: 0, msgWindow: Date.now(),
   };
   records.delete(key);
-  const others = [...clients.values()].map(info);
+  KEPT.chars.delete(keyHash(key));
+  const others = [...clients.values()].filter((o) => shown(o, c)).map(info);
   clients.set(c.id, c);
+  claim();
   send(c, {
     t: 'welcome', v: PROTOCOL, you: c.id, players: others,
     loot: [...economy.loot.values()],
     doors: [...doors].map(([i, [open, swing]]) => [i, open, swing]),
-    stashes: [...boxes.values()].filter((b) => b.kind === 'stash').map((b) => ({ uid: b.cid, x: b.x, y: b.y, z: b.z, rot: b.rot })),
+    stashes: [...boxes.values()].filter((b) => b.kind === 'stash').map((b) => ({ uid: b.cid, x: b.x, y: b.y, z: b.z, rot: b.rot, ...(b.item ? { item: b.item } : {}), ...(b.buried ? { buried: true } : {}) })),
     corpses: [...boxes.values()].filter((b) => b.kind === 'corpse').map((b) => ({ uid: b.cid, x: b.x, y: b.y, z: b.z, rot: b.rot, name: b.name ?? 'Survivor', v: b.v ?? 0 })),
     drops: [...boxes.values()].filter((b) => b.kind === 'drop').map(dropInfo),
     barrels: [...barrelsGone.keys()],
@@ -1667,11 +2590,18 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
     sendBoard();
   } else sendBoard(c);
   log(`+ ${c.name} (#${c.id})${resume ? ' resumed' : ''} — ${clients.size} online`);
+  // (somebody with a role is told so as they come in: their game shows them what they may do)
+  if (roleOf(c)) send(c, { t: 'role', role: roleOf(c) });
+  if (roleOf(c) === 'admin') asAdmin(c, false);
   return c;
 }
 
 function drop(c: Client) {
   if (!clients.delete(c.id)) return;
+  ADMIN.gone.push({ id: c.id, name: c.name, key: c.key, ip: c.ip, at: Date.now() });
+  ADMIN.asked.delete(c.id);
+  ADMIN.tints.delete(c.id);
+  if (ADMIN.gone.length > 60) ADMIN.gone.shift();
   releaseLock(c);
   leaveSeat(c, true);
   records.set(c.key, { pose: c.pose, inv: c.inv, vitals: c.vitals, alive: c.alive, leftAt: Date.now() });
@@ -1685,11 +2615,19 @@ function drop(c: Client) {
 setInterval(() => {
   if (clients.size < 2) return;
   const s: Extract<S2C, { t: 'ps' }>['s'] = [];
+  // (where everybody is, for everybody; and for admins, where the vanished are as well)
+  const all: typeof s = [];
   for (const c of clients.values()) {
     const p = c.pose;
-    s.push([c.id, round2(p[0]), round2(p[1]), round2(p[2]), Math.round(p[3] * 1000) / 1000, Math.round(p[4] * 1000) / 1000, p[5], c.w, c.m]);
+    const row: (typeof s)[number] = [c.id, round2(p[0]), round2(p[1]), round2(p[2]), Math.round(p[3] * 1000) / 1000, Math.round(p[4] * 1000) / 1000, p[5], c.w, c.m];
+    all.push(row);
+    if (!c.power.hidden) s.push(row);
   }
-  broadcast({ t: 'ps', s });
+  if (all.length === s.length) broadcast({ t: 'ps', s });
+  else {
+    const plain = JSON.stringify({ t: 'ps', s } satisfies S2C), whole = JSON.stringify({ t: 'ps', s: all } satisfies S2C);
+    for (const c of clients.values()) if (c.ws.readyState === 1) c.ws.send(roleOf(c) === 'admin' ? whole : plain);
+  }
 }, 1000 / TICK_HZ);
 
 setInterval(() => {
@@ -1728,7 +2666,7 @@ setInterval(() => {
     }
   }
   // the infected: new ones where nobody is looking, the dead cleared away, and whose game moves each
-  const turn = horde.tick(now, [...clients.values()].filter((c) => c.alive).map((c) => ({ id: c.id, x: c.pose[0], z: c.pose[2] })));
+  const turn = horde.tick(now, [...clients.values()].filter((c) => c.alive && !away(c) && !c.power.hidden).map((c) => ({ id: c.id, x: c.pose[0], z: c.pose[2] })));
   for (const i of turn.gone) broadcast({ t: 'i-', i });
   for (const b of turn.added) broadcast({ t: 'i+', b: { i: b.i, s: b.s, hp: b.hp, own: b.own, h: b.h } });
   for (const [i, to] of turn.owned) broadcast({ t: 'iown', i, to });
@@ -1780,7 +2718,7 @@ function mustWait(m: Extract<C2S, { t: 'hello' }>) {
   if (m.v !== PROTOCOL) return false; // join() turns them away itself
   const key = keyOf(m);
   if (key && [...clients.values()].some((o) => o.key === key)) return false;
-  return clients.size >= MAX_PLAYERS || queue.length > 0;
+  return clients.size >= MAX_PLAYERS || queue.length > 0 || !KEPT.ready;
 }
 
 /** when the line was last told where it stands */
@@ -1829,7 +2767,7 @@ function leaveQueue(ws: WebSocket) {
 /** somebody has left: the next in line comes in */
 function fillFromQueue() {
   let moved = false;
-  while (clients.size < MAX_PLAYERS && queue.length) {
+  while (KEPT.ready && clients.size < MAX_PLAYERS && queue.length) {
     const w = queue.shift()!;
     moved = true;
     if (w.ws.readyState !== 1) continue;
@@ -1843,7 +2781,7 @@ function fillFromQueue() {
 function kickIdle(now: number) {
   if (!queue.length) return;
   for (const c of [...clients.values()]) {
-    if (now - c.activeAt < IDLE_KICK_MS) continue;
+    if (now - c.activeAt < IDLE_KICK_MS || c.asleep) continue;
     send(c, { t: 'kick', reason: 'You were away while others were waiting to play. Reconnect to join the line.' });
     log(`${c.name} was idle with ${queue.length} waiting: their place goes to the next in line`);
     c.ws.close();
@@ -2020,7 +2958,17 @@ function serve(req: http.IncomingMessage, res: http.ServerResponse) {
     // readable from a client hosted somewhere else (e.g. Vercel) for the start-screen player count
     res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'no-store' });
     // (places: how many different addresses the players come from. One, with several players on, means the host is not passing addresses through.)
-    res.end(JSON.stringify({ ok: true, players: clients.size, max: MAX_PLAYERS, queue: queue.length, uptime: Math.round(process.uptime()), checks: CHECKS, flagged, keptOff: BANS.temp.size, loot: economy.loot.size, places: new Set([...clients.values()].map((c) => c.ip)).size }));
+    res.end(JSON.stringify({ ok: true, players: [...clients.values()].filter((c) => !c.asleep).length, asleep: [...clients.values()].filter((c) => c.asleep).length, max: MAX_PLAYERS, queue: queue.length, uptime: Math.round(process.uptime()), checks: CHECKS, flagged, keptOff: BANS.temp.size, loot: economy.loot.size, places: new Set([...clients.values()].map((c) => c.ip)).size }));
+    return;
+  }
+  // the website's function asks here what it has just been asked to do with the lists of admins and bans (see siteAdmin)
+  if (url.pathname.startsWith('/adminop/')) {
+    // (once, and only for a number this server made up a moment ago)
+    const n = url.pathname.split('/')[2] ?? '';
+    const body = ADMIN.ops.get(n);
+    ADMIN.ops.delete(n);
+    res.writeHead(body ? 200 : 404, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+    res.end(JSON.stringify(body ?? { error: 'unknown' }));
     return;
   }
   // the website's function asks here whether a cash-in it was told about is real
@@ -2131,18 +3079,26 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
   ws.on('close', () => {
     clearTimeout(hello);
     if (waiting) leaveQueue(ws);
-    if (c) drop(c);
+    if (c) gone(c);
   });
   ws.on('error', () => ws.close());
 });
 
 loadWorld();
 server.listen(PORT, () => log(`listening on :${PORT}${existsSync(DIST) ? '' : ' (no client build found: API only)'}`));
+// (who may give orders here and who is kept off: read from the site, which keeps them between this server's restarts)
+loadAdmin();
 
+void loadKept();
+
+let stopping = false;
 for (const sig of ['SIGINT', 'SIGTERM'] as const) {
   process.on(sig, () => {
+    if (stopping) return;
+    stopping = true;
     log('shutting down, saving world');
     saveWorld();
-    process.exit(0);
+    // (and its last word to the site, where it outlasts this server: a few seconds are allowed for it)
+    void Promise.race([keepNow(true, 'this server is stopping'), pause(12_000)]).finally(() => process.exit(0));
   });
 }

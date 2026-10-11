@@ -48,6 +48,14 @@ export class RemotePlayer implements Damageable {
   /** they have an open wound: it drips as they go */
   bleeding = false;
   dripT = 0;
+  /** a vanished admin, seen by another admin: drawn faintly (see Avatar.setGhost) */
+  ghost = false;
+  private ghostT = 0;
+
+  setGhost(on: boolean) {
+    this.ghost = on;
+    if (this.ready) this.avatar.setGhost(on);
+  }
   private body!: RAPIER.RigidBody;
   private stand: RAPIER.Collider[] = [];
   private crouch: RAPIER.Collider[] = [];
@@ -121,9 +129,22 @@ export class RemotePlayer implements Damageable {
     this.avatar.setHeld(h?.obj ?? null, h?.grips ?? null, h?.kind);
   }
 
+  /** when they were last told dead */
+  private diedAt = 0;
+
+  /**
+   * A position of theirs that does not say they are dead. Just after a death that is no news: it was sent before
+   * their own game knew, and reached the server after the server did. (Taken for a return to life, it stood them
+   * up again on their own body, for as long as they stayed dead.)
+   */
+  seenAlive(now: number) {
+    if (!this.alive && now - this.diedAt > 3000) this.setAlive(true);
+  }
+
   setAlive(alive: boolean) {
     if (alive === this.alive) return;
     this.alive = alive;
+    if (!alive) this.diedAt = performance.now();
     // back from the dead is a new life in clean clothes
     if (alive) this.avatar.clearWounds();
     this.fall = 0;
@@ -330,6 +351,11 @@ export class RemotePlayer implements Damageable {
     this.body.setNextKinematicTranslation(this.pos);
     this.body.setNextKinematicRotation({ x: 0, y: Math.sin(half), z: 0, w: Math.cos(half) });
 
+    // (faint, and whatever they have put on or taken up since is made faint with them)
+    if (this.ghost && (this.ghostT += dt) > 0.6) {
+      this.ghostT = 0;
+      this.avatar.setGhost(true);
+    }
     this.flinch = Math.max(0, this.flinch - dt * 4);
     this.avatar.update(dt, this.pos, this.vel, this.yaw, this.crouched, !this.alive, false, this.pitch, this.grounded, this.aiming);
     // (sat in it, they lean and tip as it does)
@@ -368,11 +394,13 @@ export class RemotePlayer implements Damageable {
 export class CorpseBody {
   private avatar = new Avatar();
   /** @param name whose body it is: it is dressed the way they were */
-  async load(atmo: Atmosphere, scene: THREE.Scene, x: number, y: number, z: number, yaw: number, name: string, variant = 0) {
+  /** @param slope which way is up out of what it lies on (on a hillside it lies along the hill, not level in the air over it) */
+  async load(atmo: Atmosphere, scene: THREE.Scene, x: number, y: number, z: number, yaw: number, name: string, variant = 0, slope?: THREE.Vector3) {
     await this.avatar.load(atmo, 0, false, lookFor(name));
     scene.add(this.avatar.root);
     this.avatar.layDown(variant);
     this.avatar.update(0, new THREE.Vector3(x, y, z), new THREE.Vector3(), yaw, false, true);
+    if (slope && slope.y > 0.6 && slope.y < 0.9995) this.avatar.root.quaternion.premultiply(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), slope));
   }
   dispose() {
     this.avatar.dispose();

@@ -10,7 +10,7 @@
 // equip, use or take it) and the ground (the whole left column). Over a grid the outline is where it will land,
 // which is the nearest free spot to the pointer, not only the cell under it.
 
-import { GEAR_SLOTS, ITEMS, SLOT_KIND, SLOT_LABEL, TAG_HOLD_MIN, WEAPON_SLOTS, makeItem, type AttachSlot, capacityOf, handlingOf, itemName, itemWeight, magRoom, tagClock, tagOwner, type ItemInstance, type Slot } from '../sim/items';
+import { GEAR_SLOTS, ITEMS, SLOT_KIND, SLOT_LABEL, TAG_HOLD_MIN, WEAPON_SLOTS, makeItem, type AttachSlot, capacityOf, handlingOf, itemName, itemWeight, magRoom, tagClock, tagOwner, type ItemInstance, type Slot, holds } from '../sim/items';
 import { Container, splitPile, swapPlaces, type PlayerInventory } from '../sim/inventory';
 import type { WorldItem, Stash } from '../game/loot';
 import type { Vitals } from '../game/player';
@@ -417,7 +417,8 @@ export class InventoryUI {
     if (item) {
       const el = document.createElement('div');
       el.className = 'inv-item in-slot' + (item === this.selected ? ' sel' : '') + (this.actions.inHands() === item ? ' active' : '');
-      const url = this.icons[item.id];
+      // (what is worn has a picture of its own for where it is worn: see `slot:` in icons.ts)
+      const url = this.icons[`slot:${item.id}`] ?? this.icons[item.id];
       el.innerHTML = `<div class="inv-item-img fit" style="${url ? `background-image:url(${url})` : ''}"></div>${this.tags(item)}`;
       el.title = itemName(item);
       this.bindItem(el, { kind: 'slot', slot, item });
@@ -560,6 +561,7 @@ export class InventoryUI {
     if (d.mag) stats.push(`<div><span>Rounds</span><b>${it.rounds ?? 0}/${d.mag.capacity}</b></div>`, `<div><span>Holds</span><b>${ITEMS[d.mag.ammo].name}</b></div>`);
     if (d.melee) stats.push(`<div><span>Damage</span><b>${d.melee.damage}</b></div>`);
     if (d.wear?.cargo) stats.push(`<div><span>Adds</span><b>${d.wear.cargo[0]}×${d.wear.cargo[1]} slots</b></div>`);
+    if (d.stash) stats.push(`<div><span>Holds</span><b>${d.stash[0]}×${d.stash[1]} slots</b></div>`);
     if (d.wear?.armor) stats.push(`<div><span>Chest hits</span><b>−${Math.round((1 - d.wear.armor) * 100)}%</b></div>`);
     if (d.wear?.fall) stats.push(`<div><span>Fall damage</span><b>−${Math.round((1 - d.wear.fall) * 100)}%</b></div>`);
     const hd = handlingOf(it);
@@ -854,12 +856,13 @@ export class InventoryUI {
 
   /** the grid of a bag that is not worn: its own things, where they are in it */
   private bagOf(item: ItemInstance, depth: number): Container | null {
-    const d = ITEMS[item.id];
-    if (!d.wear?.cargo || depth > 2) return null;
+    const d = ITEMS[item.id], room = holds(item.id);
+    if (!room || depth > 2) return null;
     item.cargo ??= [];
     let c = this.bags.get(item.uid);
     if (!c || c.items !== item.cargo) {
-      c = new Container(`bag:${item.uid}`, d.name, d.wear.cargo[0], d.wear.cargo[1], item.cargo, d.slot === 'back');
+      // (a stash carried is opened where it lies as a bag is, and takes what a stash takes)
+      c = new Container(`bag:${item.uid}`, d.name, room[0], room[1], item.cargo, d.slot === 'back' || !!d.stash);
       this.bags.set(item.uid, c);
     }
     c.depth = depth;
@@ -888,7 +891,7 @@ export class InventoryUI {
 
   /** is this a bag lying somewhere it can be opened (not worn: what is worn is open already; not on the ground: that is picked up first) */
   private opens(loc: Source): boolean {
-    return loc.kind === 'container' && !!ITEMS[loc.item.id].wear?.cargo && loc.c.depth < 2;
+    return loc.kind === 'container' && !!holds(loc.item.id) && loc.c.depth < 2;
   }
 
   /** grid cell under the dragged item's top-left corner */

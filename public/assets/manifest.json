@@ -2134,22 +2134,22 @@
     "loot",
     "gear"
    ],
-   "bytes": 1186500,
+   "bytes": 1207992,
    "srcTris": 59114,
    "tris": 59114,
    "min": [
-    -0.135,
+    -0.1204,
     0,
-    -0.0523
+    -0.1236
    ],
    "max": [
-    0.135,
-    0.2342,
-    0.0523
+    0.1204,
+    0.1303,
+    0.1236
    ],
    "lods": [],
    "hi": "assets/models/hi/tactical_gloves.glb",
-   "hiBytes": 4400680
+   "hiBytes": 4422172
   },
   "heli_wreck": {
    "url": "assets/models/heli_wreck.glb",

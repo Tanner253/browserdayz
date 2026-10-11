@@ -14,7 +14,7 @@ import type { DropInfo } from '../sim/drops';
 import type { VehicleInfo, VState } from '../sim/vehicles';
 import type { IState, InfectedInfo } from '../sim/infected';
 
-export const PROTOCOL = 26;
+export const PROTOCOL = 29;
 
 /** chat channels: everyone on the server, or only players standing near the speaker */
 export type ChatChannel = 'global' | 'near';
@@ -80,6 +80,8 @@ export interface PlayerInfo {
   /** what is slung on their back and not in their hands: up to two things, each with what is fitted to it */
   b?: Slung[];
   alive: boolean;
+  /** a vanished admin: said only to other admins, who see them all the same (faintly) */
+  hidden?: true;
 }
 
 /** a thing slung on a back: its item, and what is fitted to it (its magazine among them) */
@@ -94,6 +96,10 @@ export interface StashInfo {
   y: number;
   z: number;
   rot: number;
+  /** what was put down: the stash case (when it is not said), or another thing of the kind, by its item (see `stash` in src/sim/items.ts) */
+  item?: string;
+  /** it is under the ground: nothing is seen of it but turned earth, and a shovel brings it up */
+  buried?: boolean;
 }
 
 export interface CorpseInfo extends StashInfo {
@@ -140,13 +146,24 @@ export type C2S =
   | { t: 'copen'; cid: string }
   | { t: 'cset'; cid: string; items: StoredItem[] }
   | { t: 'cclose'; cid: string }
-  | { t: 'stash+'; s: StashInfo }
+  /** a stash put down, with whatever was in it while it was carried */
+  | { t: 'stash+'; s: StashInfo; items?: StoredItem[] }
   | { t: 'stash-'; uid: string }
+  /** a shovel put to a stash: it is buried, or dug up */
+  | { t: 'bury'; uid: string; on: boolean }
   | { t: 'door'; i: number; open: boolean; swing: number }
   | { t: 'me'; inv: SerializedInventory; vitals: Vitals }
   | { t: 'died'; cause: string; v?: number }
   | { t: 'respawn' }
   | { t: 'chat'; ch?: ChatChannel; text: string }
+  /** the admin password, as typed (the server passes it to the site, which alone knows it; it is kept nowhere) */
+  | { t: 'admin'; pw: string }
+  /** somebody with a role has their panel open: the lists it shows are asked for */
+  | { t: 'adm' }
+  /** an admin's choice of colour for the word ADMIN before their name in the chat (null: the rainbow it is by default) */
+  | { t: 'tint'; color: string | null }
+  /** leaving the proper way: the wait is begun (see LOGOUT in server/index.ts), or called off */
+  | { t: 'logout'; cancel?: true }
   /** a dog tag taken from another player has been carried for the full time */
   | { t: 'cash'; uid: string; /** where a reward for it should go, if the player has given an address */ wallet?: string }
   /** getting into jeep number i (see src/sim/vehicles.ts), in this seat; and getting out of whatever we are in */
@@ -229,10 +246,20 @@ export type S2C =
   | { t: 'cbusy'; cid: string }
   | { t: 'stash+'; s: StashInfo }
   | { t: 'stash-'; uid: string }
+  /** a stash has been buried, or dug up */
+  | { t: 'stash~'; uid: string; buried: boolean }
+  /** the stash this player asked to pick up is theirs to carry: what it was, and what is in it */
+  | { t: 'stashgot'; uid: string; item: string; items: StoredItem[] }
+  /** said to everybody by an admin or a mod: across the screen, and in the chat */
+  | { t: 'announce'; text: string; by: string }
+  /** said to this player alone by an admin or a mod */
+  | { t: 'pm'; from: string; role: 'admin' | 'mod'; text: string }
+  /** somebody this (admin's) game knows has vanished, or is seen by everybody again: they are drawn faintly, or as anybody is */
+  | { t: 'ghost'; id: number; on: boolean }
   | { t: 'corpse-'; uid: string }
   | { t: 'door'; i: number; open: boolean; swing: number }
   | { t: 'spawn'; x: number; z: number; yaw: number }
-  | { t: 'chat'; ch?: ChatChannel; from: string; text: string }
+  | { t: 'chat'; ch?: ChatChannel; from: string; text: string; role?: 'admin' | 'mod'; /** an admin's own colour for their tag (not said: the rainbow) */ tint?: string }
   /** somebody cashed in a dog tag: announced to everyone */
   | { t: 'cashed'; id: number; name: string; owner: string }
   /** these tags of yours are void: you carried them out of the Zona (see TAG_OUT) */
@@ -284,7 +311,45 @@ export type S2C =
   | { t: 'pong'; n: number }
   /** something the server has to say to this player alone (what became of a tag they cashed in) */
   | { t: 'tell'; text: string; kind: 'good' | 'warn' | 'info' }
+  /** what this player may do on the server: nothing out of the way (null), keep order (mod), or everything (admin) */
+  | { t: 'role'; role: 'admin' | 'mod' | null }
+  /** a line from the server to this player alone, shown where talk is shown (what an order did, a list asked for) */
+  | { t: 'sys'; text: string }
+  /** put somewhere by an admin (by themselves, or by `by`). With no height, it is on top of whatever is there */
+  | { t: 'put'; x: number; y?: number; z: number; by?: string }
+  /** made whole by an admin: health, food, water, the wound and the leg */
+  | { t: 'mend' }
+  /**
+   * What this player's health is, and whether a wound is open: said when their game is heard from again after the
+   * server has been keeping their life for them (a hidden tab, a frozen game). The server's figure is the figure.
+   */
+  | { t: 'hp'; health: number; bleeding: boolean }
+  /** leaving the proper way: so many seconds of the wait are left; or (0, with why) it has been called off */
+  | { t: 'logout'; left: number; why?: string }
+  /** a whole set handed over by an admin (see src/sim/kits.ts): put on and away in place of what is carried, or (adds) beside it */
+  | { t: 'kit'; name: string; items: ItemInstance[]; adds?: true; by?: string }
+  /**
+   * Which of an admin's powers this player has on: nothing hurts them, nobody sees them, they fly through things.
+   * And what they have chosen for their own death: nothing they carried is left on the body, no tag of theirs is.
+   */
+  | { t: 'powers'; god: boolean; hidden: boolean; clip: boolean; voidInv: boolean; voidTag: boolean }
+  /** the lists the panel shows (see AdminLists) */
+  | ({ t: 'adm' } & AdminLists)
   | { t: 'kick'; reason: string };
+
+/** What the panel of somebody with a role is shown. The last two are an admin's alone. */
+export interface AdminLists {
+  /** everybody online: where they are, how long they have been on (minutes), how often the checks have fired on them */
+  players: { id: number; name: string; role: 'admin' | 'mod' | null; x: number; z: number; alive: boolean; flags: number; mins: number; /** health as their game last said it, kills and tags cashed since the server started */ hp: number; kills: number; tags: number; hidden?: true; god?: true; clip?: true; muted?: true; seat?: true; voidInv?: true; voidTag?: true; /** gone without logging out: the body is still here */ asleep?: true; /** their game is not answering (a hidden tab): the server keeps their life */ away?: true }[];
+  /** who left lately, newest first */
+  gone: { id: number; name: string; mins: number }[];
+  bans: { n: number; name: string; why: string; by: string; at: string }[];
+  roles: { name: string; role: 'admin' | 'mod'; by: string; at: string }[];
+  /** what the server's own checks are set to */
+  checks: string;
+  /** the server itself: minutes it has been up, things lying loose, stashes standing, characters kept for players who are away */
+  stats?: { up: number; loot: number; stashes: number; kept: number; asleep: number };
+}
 
 /** deterministic id of a crate that is part of the map (same on every client and the server) */
 export function crateId(x: number, z: number) {

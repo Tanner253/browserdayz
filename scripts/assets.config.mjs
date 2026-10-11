@@ -303,7 +303,8 @@ export const LOCAL_MODELS = {
     size: 0.27,
     tex: 4096,
     tags: ['loot', 'gear'],
-    changes: 'Scaled to metres and stood on the ground; brought down to about five thousand triangles; textures re-encoded as WebP; geometry compressed.',
+    // (and then scripts/gloves.mjs: run it again after anything rebuilds this model)
+    changes: 'Scaled to metres; one glove turned into its pair and both laid flat, one half over the other; textures re-encoded as WebP; geometry compressed.',
   },
   // The packs of 2026-10-10: a wreck for the helicopter that comes down, a bigger pack, and two whole buildings.
   heli_wreck: {

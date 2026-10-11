@@ -41,6 +41,10 @@ export function buildWorldData(root: string) {
   if (under) for (const c of bunkerCrates(under)) crates.push({ cid: crateId(c.x, c.z), kind: c.kind, x: c.x, y: c.y, z: c.z });
   return {
     lootPoints: buildings.lootPoints,
+    /** where every building stands, and how it is turned (nothing is buried under a floor) */
+    buildings: world.buildings.map((q) => ({ type: q.type, x: q.x, z: q.z, rot: q.rot })),
+    /** the towns, camps and other named places, each as far round as it reaches (nothing is buried in one) */
+    places: world.pois.map((q) => ({ x: q.x, z: q.z, radius: q.radius })),
     crates,
     /** where the bunker stands (null: the world has none) */
     bunker: bunkerPlace(world),

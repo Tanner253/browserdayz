@@ -39,6 +39,13 @@ export interface ItemDef {
   nodeRe?: string;
   /** extra uniform scale for the world model */
   scale?: number;
+  /**
+   * A thing put down to keep other things in (category 'stash'): how many places wide and high it is inside, and
+   * how big it stands on the ground beside the size its model was made (1 when not said). It is put down empty,
+   * picked up empty, and with a shovel buried and dug up (see src/sim/stash.ts).
+   */
+  stash?: [number, number];
+  place?: number;
   w: number;
   h: number;
   weight: number;
@@ -419,7 +426,7 @@ const D: ItemDef[] = [
   },
   {
     // (still `rubber_boots`)
-    id: 'rubber_boots', name: 'Combat Boots', model: 'combat_boots', w: 2, h: 3, weight: 1.4, category: 'clothing', slot: 'feet',
+    id: 'rubber_boots', name: 'Combat Boots', model: 'combat_boots', w: 2, h: 2, weight: 1.4, category: 'clothing', slot: 'feet',
     desc: 'Laced leather boots with a stiff sole. Cushions a bad landing: a third less fall damage.', wear: { fall: 0.67 },
   },
   {
@@ -454,7 +461,10 @@ const D: ItemDef[] = [
     desc: 'Stamped steel on a ball chain. Every survivor carries their own. Take one off a body and stay alive with it for 10 minutes to cash it in.',
   },
   // ---------------------------------------------------------------- base building
-  { id: 'stash_kit', name: 'Stash Case', model: 'weapons_case', w: 4, h: 3, weight: 6, category: 'stash', scale: 0.55, desc: 'A hard case you can put down anywhere (right-click → Place). It stays in the world and keeps whatever you store in it.' },
+  { id: 'stash_kit', name: 'Stash Case', model: 'weapons_case', w: 4, h: 3, weight: 6, category: 'stash', scale: 0.55, stash: [8, 6], desc: 'A hard case you can put down anywhere (right-click → Place). It stays in the world and keeps whatever you store in it. Out in the country, a shovel buries it.' },
+  // (two more things to keep things in, 2026-10-12: smaller than the case, lighter, and found in houses)
+  { id: 'old_suitcase', name: 'Suitcase', model: 'vintage_suitcase', w: 4, h: 3, weight: 3, category: 'stash', scale: 0.3, place: 0.5, stash: [6, 5], desc: 'An old travelling case. Put it down anywhere (right-click → Place) and it keeps what you store in it. Out in the country, a shovel buries it.' },
+  { id: 'black_bag', name: 'Black Bag', model: 'trashbag', w: 2, h: 3, weight: 0.3, category: 'stash', scale: 0.5, stash: [5, 4], desc: 'A heavy black sack. Put it down anywhere (right-click → Place) and it keeps what you store in it. Out in the country, a shovel buries it.' },
 ];
 
 export const ITEMS: Record<string, ItemDef> = Object.fromEntries(D.map((d) => [d.id, d]));
@@ -741,6 +751,12 @@ export function itemWeight(it: ItemInstance): number {
 /** things that are gone, and what one of them carried from before is now: the Pistol 43 and its magazines (2026-10-11) */
 const NOW: Record<string, string> = { p38: 'colt', mag_p38: 'mag_colt', mag_p38_ext: 'mag_colt' };
 
+/**
+ * How big a thing is inside, if things are kept in it: a bag or a vest that is worn, or a stash, which keeps what
+ * is in it while it is carried (a stash case picked up full is put down full).
+ */
+export const holds = (id: string): [number, number] | undefined => ITEMS[id]?.wear?.cargo ?? ITEMS[id]?.stash;
+
 export function sanitizeItem(it: ItemInstance): ItemInstance | null {
   if (it && NOW[it.id]) it.id = NOW[it.id];
   if (it?.mag && NOW[it.mag]) it.mag = NOW[it.mag];
@@ -766,7 +782,7 @@ export function sanitizeItem(it: ItemInstance): ItemInstance | null {
   if (it.mods) it.mods = it.mods.filter((m) => !ITEMS[m]?.mag && ITEMS[m]?.attach?.fits.includes(it.id));
   if (it.cargo) {
     it.cargo = it.cargo.filter((p) => p && p.item && sanitizeItem(p.item));
-    if (!ITEMS[it.id].wear?.cargo) delete it.cargo;
+    if (!holds(it.id)) delete it.cargo;
   }
   return it;
 }

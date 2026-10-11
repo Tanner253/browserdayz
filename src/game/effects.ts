@@ -551,13 +551,15 @@ export class Effects {
       this.spawn({ p: at.clone(), v: rand().multiplyScalar(22).setY(Math.random() * 11), max: 0.25 + Math.random() * 0.3, size: 0.03, color: new THREE.Color(4, 2.2, 0.8), alpha: 1, gravity: 9.8, drag: 0.6, additive: true });
     }
     // the ground it leaves behind
-    const g = physics.raycast(at.clone().setY(at.y + 0.5), _DOWN, 3, SOLID_GROUPS);
-    if (g && g.toi > 0.02) {
+    // (Each patch of it on the ground under itself, and lying the way that ground lies. They were all put at the
+    // height of the middle and turned as the middle was: on a slope the ones downhill hung in the air. "the
+    // residue from exploding barrells" hovers, 2026-10-12.)
+    for (let i = 0; i < 5; i++) {
+      const g = physics.raycast({ x: at.x + (Math.random() - 0.5) * 1.4, y: at.y + 0.8, z: at.z + (Math.random() - 0.5) * 1.4 }, _DOWN, 4, SOLID_GROUPS);
+      if (!g || g.toi <= 0.02) continue;
+      // (smaller on a slope: a wide flat patch on ground that curves lifts off it at the edges)
       const n = new THREE.Vector3(g.normal.x, g.normal.y, g.normal.z);
-      for (let i = 0; i < 5; i++) {
-        const p = new THREE.Vector3(g.point.x + (Math.random() - 0.5) * 1.4, g.point.y, g.point.z + (Math.random() - 0.5) * 1.4);
-        this.decal(p, n, 'soil', undefined, 5 + Math.random() * 4);
-      }
+      this.decal(new THREE.Vector3(g.point.x, g.point.y, g.point.z), n, 'soil', undefined, (5 + Math.random() * 4) * (n.y > 0.97 ? 1 : 0.6));
     }
   }
 
@@ -712,10 +714,10 @@ export class Effects {
 
   /** a pool spreading under a body */
   pool(x: number, y: number, z: number) {
-    const g = physics.raycast({ x, y: y + 0.6, z }, _DOWN, 2, SOLID_GROUPS);
-    const at = g && g.toi > 0.02 ? new THREE.Vector3(g.point.x, g.point.y, g.point.z) : new THREE.Vector3(x, y, z);
-    const n = g ? new THREE.Vector3(g.normal.x, g.normal.y, g.normal.z) : new THREE.Vector3(0, 1, 0);
-    this.bloodDecal(at, n, 1, 0.95 + Math.random() * 0.3);
+    // (on what is under the place, however far down that is: with nothing found near, it was drawn where it was asked for, in the air)
+    const g = physics.raycast({ x, y: y + 0.6, z }, _DOWN, 60, SOLID_GROUPS);
+    if (!g || g.toi <= 0.02) return;
+    this.bloodDecal(new THREE.Vector3(g.point.x, g.point.y, g.point.z), new THREE.Vector3(g.normal.x, g.normal.y, g.normal.z), 1, 0.95 + Math.random() * 0.3);
   }
 
   /**

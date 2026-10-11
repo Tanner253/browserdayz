@@ -83,7 +83,7 @@ async function withServer(mode: string, play: (log: () => string) => Promise<voi
   const dir = mkdtempSync(path.join(os.tmpdir(), 'zona-checks-'));
   // (the site it would report a cash-in to is nowhere: nothing in this test is paid, and nothing may be)
   const server: ChildProcess = spawn(process.execPath, [path.join('node_modules', 'tsx', 'dist', 'cli.mjs'), 'server/index.ts'], {
-    env: { ...process.env, PORT: String(PORT), SITE_URL: 'http://127.0.0.1:9', DATA_DIR: dir, INFECTED: 'off', CHECKS: mode, ...more },
+    env: { ...process.env, PORT: String(PORT), SITE_URL: 'http://127.0.0.1:9', DATA_DIR: dir, INFECTED: 'off', LINGER_S: '0', CHECKS: mode, ...more },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let logged = '';
@@ -200,12 +200,15 @@ await withServer('enforce', async (log) => {
   gil.hit(ivy, 'mosin');
   await sleep(200);
   ivy.send({ t: 'died', cause: 'gunshot wounds' });
-  // Hal is hit six times and never says a word
+  // Hal is hit six times and never says he is dead. (His game goes on saying where he is: one that said nothing
+  // at all would be a body with nobody in it, whose life the server keeps, and it would have died of the second.)
+  const up = setInterval(() => hal.say(...open![1]), 300);
   for (let k = 0; k < 6; k++) {
     await sleep(650);
     gil.hit(hal, 'mosin');
   }
   await sleep(2800);
+  clearInterval(up);
   assert.ok(/\[check:enforce\] Hal is on their feet after/.test(log()), `nothing was written down of somebody who cannot be killed:\n${log().slice(-500)}`);
   assert.ok(hal.got.some((m) => m.t === 'death' && (m as { k: { id: number } }).k.id === hal.id), 'the server did not say he was dead');
   assert.ok(!/Ivy is on their feet/.test(log()), 'somebody who died as anybody would was written down');

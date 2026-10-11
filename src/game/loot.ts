@@ -333,17 +333,35 @@ export class Stash {
   kind = '';
   /** game time when a map crate was last found empty (drives restocking) */
   emptiedAt = -1;
+  /** a stash somebody put down: what it is (the stash case, or a pack by its item) */
+  item = 'stash_kit';
+  /** it is under the ground: turned earth is all that is seen of it, and a shovel brings it up */
+  buried = false;
+  private scene?: THREE.Scene;
+  /** how big what stands there is */
+  private box?: THREE.Vector3;
+  private mound?: THREE.Mesh;
   constructor(public uid: string, public x: number, public y: number, public z: number, public rot: number, w = 8, h = 6, public label = 'Stash Crate') {
     this.container = new Container(`stash:${uid}`, label, w, h, [], true);
   }
 
   spawn(tpl: ItemTemplate, scene: THREE.Scene) {
     this.obj = tpl.group.clone();
-    this.obj.scale.setScalar(1);
+    // (it stands as big as it is, which is bigger than it is carried: see `place` in src/sim/items.ts)
+    const def = ITEMS[this.item] ?? ITEMS.stash_kit, big = def.place ?? 1;
+    this.obj.scale.setScalar(big);
     this.obj.position.set(this.x, this.y, this.z);
     this.obj.rotation.y = this.rot;
     scene.add(this.obj);
-    const s = tpl.size.clone().divideScalar(ITEMS.stash_kit.scale ?? 1);
+    this.scene = scene;
+    this.box = tpl.size.clone().multiplyScalar(big / (def.scale ?? 1));
+    this.stand();
+    if (this.buried) this.setBuried(true);
+  }
+
+  /** what stands there is in the way of feet and of rounds */
+  private stand() {
+    const s = this.box!;
     const half = this.rot / 2;
     const desc = physics.R.ColliderDesc.cuboid(s.x / 2, s.y / 2, s.z / 2)
       .setTranslation(this.x, this.y + s.y / 2, this.z)
@@ -351,7 +369,31 @@ export class Stash {
       .setCollisionGroups(WORLD_GROUPS)
       .setSolverGroups(WORLD_GROUPS);
     this.collider = physics.world.createCollider(desc);
-    physics.tag(this.collider, { surface: 'wood', owner: this });
+    physics.tag(this.collider, { surface: this.item === 'black_bag' ? 'cloth' : 'wood', owner: this });
+  }
+
+  /**
+   * Under the ground, or up out of it. Buried, nothing of it is seen but a low heap of turned earth, which is
+   * walked over, and looked at by whoever has a shovel.
+   */
+  setBuried(on: boolean) {
+    this.buried = on;
+    if (!this.obj || !this.scene || !this.box) return;
+    this.obj.visible = !on;
+    physics.tags.delete(this.collider.handle);
+    physics.world.removeCollider(this.collider, false);
+    if (!on) {
+      this.stand();
+      if (this.mound) this.scene.remove(this.mound);
+      return;
+    }
+    const desc = physics.R.ColliderDesc.cuboid(0.6, 0.16, 0.6).setSensor(true).setTranslation(this.x, this.y + 0.1, this.z).setCollisionGroups(TRIGGER_GROUPS);
+    this.collider = physics.world.createCollider(desc);
+    physics.tag(this.collider, { surface: 'grass', owner: this });
+    this.mound ??= turnedEarth();
+    this.mound.position.set(this.x, this.y - 0.03, this.z);
+    this.mound.rotation.y = this.rot;
+    this.scene.add(this.mound);
   }
 
   /** interaction-only volume (bodies): you can look at it and search it, but walk through it */
@@ -378,17 +420,43 @@ export class Stash {
 
   dispose(scene: THREE.Scene) {
     if (this.obj) scene.remove(this.obj);
+    if (this.mound) scene.remove(this.mound);
     physics.tags.delete(this.collider.handle);
     physics.world.removeCollider(this.collider, false);
   }
 
   serialize() {
-    return { uid: this.uid, x: this.x, y: this.y, z: this.z, rot: this.rot, container: this.container.serialize() };
+    return { uid: this.uid, x: this.x, y: this.y, z: this.z, rot: this.rot, container: this.container.serialize(), ...(this.item !== 'stash_kit' ? { item: this.item } : {}), ...(this.buried ? { buried: true } : {}) };
   }
 }
 
 /** how near the eye a thing lying in the world is made, metres: well beyond the 55 at which it is first drawn, so that it is there by then */
 const MAKE_WITHIN = 90;
+
+/**
+ * Where something has been buried: a low heap of the ground's own mud, a little uneven, as a spade leaves it.
+ * (One of the ground's own pictures, so that it is earth of the place and not a thing set down on it.)
+ */
+let earth: THREE.MeshStandardMaterial | null = null;
+function turnedEarth(): THREE.Mesh {
+  if (!earth) {
+    const t = assets.pbr('brown_mud_leaves_01');
+    earth = new THREE.MeshStandardMaterial({ map: t.map, normalMap: t.normalMap, roughness: 1, metalness: 0, color: 0x74685a });
+  }
+  const g = new THREE.SphereGeometry(0.72, 22, 9, 0, Math.PI * 2, 0, Math.PI / 2);
+  const p = g.attributes.position as THREE.BufferAttribute, uv = g.attributes.uv as THREE.BufferAttribute;
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+    // (low, longer than it is wide, and lumpy: clods, not a dome)
+    const lump = 1 + 0.16 * Math.sin(x * 9.1 + z * 4.3) * Math.cos(z * 7.7 - x * 2.9);
+    p.setXYZ(i, x * 1.12 * lump, y * 0.2 * lump, z * 0.82 * lump);
+    uv.setXY(i, x * 0.9 + 0.5, z * 0.9 + 0.5);
+  }
+  g.computeVertexNormals();
+  const m = new THREE.Mesh(g, earth);
+  m.receiveShadow = true;
+  return m;
+}
 
 export class LootManager {
   items = new Map<string, WorldItem>();
@@ -575,7 +643,7 @@ export class LootManager {
   }
 
   async addStash(s: Stash) {
-    const tpl = await this.models.get('stash_kit');
+    const tpl = await this.models.get(ITEMS[s.item] ? s.item : 'stash_kit');
     s.spawn(tpl, this.scene);
     this.stashes.push(s);
   }

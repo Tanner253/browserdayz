@@ -103,7 +103,8 @@ export function installHarness(g: Game) {
     async icons() {
       const { renderIcons, iconSig } = await import('../ui/icons');
       const made = await renderIcons(g.s.r.renderer, g.loot.models, g.s.atmo.envMap);
-      return Object.fromEntries(Object.entries(made).map(([id, url]) => [id, { url, sig: iconSig(id) }]));
+      // (a thing's second picture, `slot:<id>`, is made from what the first is)
+      return Object.fromEntries(Object.entries(made).map(([id, url]) => [id, { url, sig: iconSig(id.replace(/^slot:/, '')) }]));
     },
     /** give the player an item (testing) */
     give(id: string, qty?: number) {

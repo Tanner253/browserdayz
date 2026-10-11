@@ -80,21 +80,23 @@
 }
 .hud-prompt.show { opacity: 1; }
 /* what the hands can do with what is in them: in the corner, a small mouse with the button lit and the word for it */
+/* (bottom left, over the chat: "would look better in the bottom left corner than the right corner above the
+   player status bars", 2026-10-12. Each is the mouse, then what it does.) */
 .hud-acts {
   position: absolute;
-  right: 26px;
-  bottom: 212px;
+  left: 22px;
+  bottom: 272px;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: 9px;
   opacity: 0;
   transition: opacity 0.12s;
   pointer-events: none;
 }
 .hud-acts.show { opacity: 1; }
-.hud-act { display: flex; align-items: center; gap: 11px; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); }
-.hud-act-text { text-align: right; line-height: 1.2; }
+.hud-act { display: flex; flex-direction: row-reverse; align-items: center; gap: 11px; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); }
+.hud-act-text { text-align: left; line-height: 1.2; }
 .hud-act-text b { display: block; font-size: 13px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink); }
 .hud-act-text small { display: block; font-family: var(--mono); font-size: 11px; letter-spacing: 0.03em; color: var(--ink-dim); }
 .hud-act svg { flex: none; width: 21px; height: 33px; overflow: visible; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7)); }
@@ -404,6 +406,37 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 .chat-input { flex: 1; min-width: 0; font-family: var(--font); font-size: 15px; color: var(--ink); background: transparent; border: 0; outline: none; }
 .chat-hint { display: none; padding-left: 10px; font-size: 11px; color: var(--ink-faint); text-shadow: 0 1px 2px #000; }
 .chat-hint b { font-family: var(--mono); font-size: 10px; font-weight: 400; color: var(--ink-dim); }
+.chat-hint-orders { display: none; }
+.hud-chat.staff .chat-hint-orders { display: inline; }
+/* who said it has a role: written before the channel. A mod's is one steady colour; an admin's, and an admin's
+   word is the whole rainbow going by (their name and what they say are as anybody's) */
+.chat-line em { font-style: normal; font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: 0.08em; margin-right: 6px; }
+.chat-line[data-role='mod'] em { color: #6fd6a8; }
+.chat-line[data-role='admin'] em:not(.plain) {
+  color: transparent;
+  background: linear-gradient(90deg, #ff3b3b, #ff9f2e, #ffe82e, #46f25a, #2ed8ff, #5b78ff, #d24dff, #ff3b3b) 0 0 / 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: adminband 3.5s linear infinite;
+  /* (the line's own shadow is drawn over a background, and this colour is one: a shadow of the finished letters instead) */
+  text-shadow: none;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.9));
+}
+.chat-line[data-role='admin'] em { font-size: 11px; }
+@keyframes adminband { to { background-position: 200% 0; } }
+@media (prefers-reduced-motion: reduce) { .chat-line[data-role='admin'] em { animation: none; } }
+/* an order being typed (a role is needed): what could be meant, above the box */
+.chat-orders { display: none; flex-direction: column; padding: 4px 0; background: rgba(8, 10, 9, 0.88); border-left: 2px solid #c8a8ff; pointer-events: auto; }
+.hud-chat.open .chat-orders.show { display: flex; }
+.co-head { padding: 2px 8px 4px; font-family: var(--mono); font-size: 12px; color: var(--ink-faint); }
+.co-head u { color: var(--ink); text-decoration-color: #c8a8ff; text-underline-offset: 3px; }
+.co-row { display: flex; align-items: baseline; gap: 10px; padding: 2px 8px; cursor: pointer; }
+.co-row b { font-family: var(--mono); font-size: 12px; font-weight: 400; color: var(--ink-dim); white-space: nowrap; }
+.co-row span { min-width: 0; font-size: 12px; color: var(--ink-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.co-row.on { background: rgba(200, 168, 255, 0.17); }
+.co-row.on b { color: #fff; }
+.co-row.on span { color: var(--ink-dim); }
+.co-keys { padding: 4px 8px 0; font-size: 10px; color: var(--ink-faint); }
 .hud-chat.open .chat-hint { display: block; }
 
 .hud-scope {
@@ -549,6 +582,7 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
   pointer-events: auto;
 }
 .hud-dead.show, .hud-start.show { display: grid; }
+.dead-btn small { margin-left: 10px; padding: 1px 6px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; border: 1px solid currentColor; border-radius: 3px; opacity: 0.65; vertical-align: 2px; }
 .hud-dead { background: radial-gradient(ellipse at center, rgba(40, 0, 0, 0.45), rgba(0, 0, 0, 0.85)); text-align: center; }
 .dead-title { font-size: 58px; font-weight: 600; letter-spacing: 0.25em; text-transform: uppercase; color: #d9cfc0; }
 .dead-sub { margin: 10px 0 26px; font-family: var(--mono); font-size: 12px; color: var(--ink-dim); }
@@ -709,7 +743,7 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 .slot-label { position: absolute; top: 4px; left: 6px; z-index: 1; font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-faint); pointer-events: none; }
 .slot-label b { margin-left: 4px; font-family: var(--mono); font-weight: 400; color: var(--accent); }
 .inv-item.in-slot { position: absolute; inset: 0; border: 0; background: transparent; box-shadow: none; }
-.inv-item.in-slot .inv-item-img.fit { inset: 16px 6px 6px; }
+.inv-item.in-slot .inv-item-img.fit { inset: 13px 4px 3px; }
 .inv-item.in-slot:hover { background: rgba(233, 228, 216, 0.07); }
 .inv-item.in-slot.sel { box-shadow: inset 0 0 0 1px var(--accent); }
 .inv-item.in-slot.active::after { content: 'in hands'; position: absolute; left: 6px; bottom: 3px; font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); }
@@ -1212,6 +1246,25 @@ kbd.hot { color: #121413; background: linear-gradient(#d8c594, #b89f66); border-
 .hud-start.paused .sm-hero { align-self: center; padding-bottom: 60px; }
 .hud-start.paused .start-title { font-size: 92px; }
 .hud-start.paused .start-sub { font-size: 20px; color: var(--ink-dim); }
+.hud-start.paused.live .start-sub { max-width: 620px; font-size: 17px; line-height: 1.35; }
+/* leaving the proper way: under Resume on the pause screen, when playing on a server */
+.start-out { display: none; margin-top: 10px; padding: 8px 18px; font-family: var(--mono); font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-dim); background: rgba(10, 12, 11, 0.7); border: 1px solid rgba(233, 228, 216, 0.3); cursor: pointer; }
+.start-out:hover { color: var(--ink); border-color: rgba(233, 228, 216, 0.6); }
+.hud-start.paused.live .start-out { display: block; }
+.hud-logout { position: absolute; top: 96px; left: 50%; transform: translateX(-50%); display: none; padding: 6px 14px; font-family: var(--mono); font-size: 12px; letter-spacing: 0.06em; color: #ffd58a; background: rgba(10, 12, 11, 0.78); border: 1px solid rgba(255, 213, 138, 0.5); pointer-events: none; z-index: 40; white-space: nowrap; }
+.hud-logout.show { display: block; }
+/* said to everybody by an admin: across the screen, for a while */
+.hud-announce { position: absolute; top: 18%; left: 50%; transform: translateX(-50%); display: none; max-width: min(820px, 86vw); padding: 12px 22px 14px; text-align: center; background: rgba(10, 12, 11, 0.82); border: 1px solid rgba(255, 213, 138, 0.6); box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5); pointer-events: none; z-index: 45; }
+.hud-announce.show { display: block; animation: announce 9s ease both; }
+.hud-announce small { display: block; margin-bottom: 4px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: #ffd58a; }
+.hud-announce div { font-size: 26px; font-weight: 600; line-height: 1.2; color: var(--ink); overflow-wrap: anywhere; }
+@keyframes announce { 0% { opacity: 0; transform: translate(-50%, -8px); } 4%, 90% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; transform: translate(-50%, 0); } }
+/* names over heads, as an admin's free camera shows them */
+.hud-esp { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.hud-esp i { position: absolute; transform: translate(-50%, -100%); padding: 1px 6px; font-style: normal; font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em; white-space: nowrap; color: #fff; background: rgba(10, 12, 11, 0.55); border-left: 2px solid #c8a8ff; text-shadow: 0 1px 2px #000; }
+/* a line said to one player alone by an admin or a mod */
+.chat-line[data-ch='pm'] { color: #ffd58a; }
+.chat-line[data-ch='pm'] b { color: #ffd58a; }
 .hud-start.paused .start-btn { min-height: 58px; }
 
 /* --- the entrance: once, as the loading screen lifts */

@@ -70,16 +70,19 @@ quit();
 fs.mkdirSync(OUT, { recursive: true });
 const index = {};
 let bytes = 0;
+// (what is worn has a second picture, for the place it is worn in: `slot:<id>` in the list, slot-<id>.webp on disk)
+const fileOf = (id) => `${id.replace(/^slot:/, 'slot-')}.webp`;
 for (const id of Object.keys(made).sort()) {
   const { url, sig } = made[id];
   const png = Buffer.from(url.split(',')[1], 'base64');
   const webp = await sharp(png).webp({ quality: 90, alphaQuality: 100, effort: 6 }).toBuffer();
-  fs.writeFileSync(path.join(OUT, `${id}.webp`), webp);
+  fs.writeFileSync(path.join(OUT, fileOf(id)), webp);
   index[id] = sig;
   bytes += webp.length;
 }
 // (a picture of what is no longer an item goes)
-for (const f of fs.readdirSync(OUT)) if (f.endsWith('.webp') && !(f.slice(0, -5) in index)) fs.rmSync(path.join(OUT, f));
+const kept = new Set(Object.keys(index).map(fileOf));
+for (const f of fs.readdirSync(OUT)) if (f.endsWith('.webp') && !kept.has(f)) fs.rmSync(path.join(OUT, f));
 fs.writeFileSync(path.join(OUT, 'index.json'), JSON.stringify(index, null, 1) + '\n');
 console.log(`${Object.keys(index).length} pictures, ${(bytes / 1024).toFixed(0)} KB in all, in public/assets/icons`);
 try { fs.rmSync(profile, { recursive: true, force: true }); } catch { /* Chrome still letting go */ }

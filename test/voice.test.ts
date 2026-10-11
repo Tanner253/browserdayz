@@ -77,7 +77,7 @@ class Player {
 
 const dir = mkdtempSync(path.join(os.tmpdir(), 'zona-voice-'));
 const server = spawn(process.execPath, [path.join('node_modules', 'tsx', 'dist', 'cli.mjs'), 'server/index.ts'], {
-  env: { ...process.env, PORT: String(PORT), SITE_URL: 'http://127.0.0.1:9', DATA_DIR: dir, INFECTED: 'off', CHECKS: 'off' },
+  env: { ...process.env, PORT: String(PORT), SITE_URL: 'http://127.0.0.1:9', DATA_DIR: dir, INFECTED: 'off', LINGER_S: '0', CHECKS: 'off' },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
 let logged = '';

@@ -61,6 +61,15 @@ export class BigMap {
   open = false;
   /** asked to be shut (its X, or a tap outside it) */
   onClose: () => void = () => {};
+  /** everybody on the server, where they stand (an admin's map alone): each a dot with their name by it */
+  private people: { x: number; z: number; name: string; dead?: boolean; faint?: boolean; staff?: boolean }[] = [];
+  setPeople(list: BigMap['people']) {
+    if (!list.length && !this.people.length) return;
+    this.people = list;
+    this.dirty = true;
+  }
+  /** a place on the sheet right-clicked (an admin goes there): null, and a right-click is nothing */
+  onPick: ((x: number, z: number) => void) | null = null;
   private sheet: HTMLCanvasElement | null = null;
   /** pixels of the sheet to a metre: finer on a computer, which has the memory for it and looks closer */
   private S = TOUCH ? 1 : 2;
@@ -228,6 +237,12 @@ export class BigMap {
     v.addEventListener('pointerup', up);
     v.addEventListener('pointercancel', up);
     v.addEventListener('pointerleave', () => (this.tip.hidden = true));
+    v.addEventListener('contextmenu', (e) => {
+      if (!this.onPick) return;
+      e.preventDefault();
+      const r = v.getBoundingClientRect(), k = this.perMetre();
+      this.onPick(this.at.x + (((e.clientX - r.left) / r.width - 0.5) * v.width) / k, this.at.z + (((e.clientY - r.top) / r.height - 0.5) * v.height) / k);
+    });
     window.addEventListener('resize', () => (this.dirty = true));
   }
 
@@ -688,6 +703,22 @@ export class BigMap {
       g.stroke();
       g.fill();
       text('N', nx, ny + 17 * u, 12);
+    }
+
+    // everybody else, to an admin: a dot each, and their name
+    for (const q of this.people) {
+      const px = sx(q.x), py = sy(q.z);
+      if (!on(px, py, 60 * u)) continue;
+      g.globalAlpha = q.faint ? 0.6 : 1;
+      g.beginPath();
+      g.arc(px, py, 4.5 * u, 0, Math.PI * 2);
+      g.lineWidth = 2.4 * u;
+      g.strokeStyle = '#fff8e0';
+      g.stroke();
+      g.fillStyle = q.dead ? '#6b6b63' : q.staff ? '#7a3fd0' : '#1f5fd0';
+      g.fill();
+      text(q.name + (q.dead ? ' (dead)' : ''), px + 8 * u, py + 4 * u, 12, q.dead ? '#55554e' : INK, 600);
+      g.globalAlpha = 1;
     }
 
     // you: an arrow pointing the way you face
