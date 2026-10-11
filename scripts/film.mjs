@@ -9,6 +9,7 @@
 //   node scripts/film.mjs --stills 6 --big    and each still kept as a file of its own, at the size it was filmed (to look closely at one)
 //   node scripts/film.mjs --twice             film the stretch twice and report how many frames differ
 //   node scripts/film.mjs --cut 2             the second trailer (src/trailer/shots2.ts) -> zona-trailer-2.mp4
+//   node scripts/film.mjs --cut 8 --menu      the cut of a film that the main menu plays: 1280x720 at 30 fps, a light file -> zona-trailer-8-menu.mp4
 //
 // The dev server must not reload during a take: do not edit game source while this runs.
 
@@ -26,8 +27,9 @@ const arg = (name, fallback) => {
   return i < 0 ? fallback : process.argv[i + 1] && !process.argv[i + 1].startsWith('--') ? process.argv[i + 1] : true;
 };
 const draft = !!arg('draft', false);
-const fps = draft ? 30 : 60;
-const scale = draft ? 0.75 : 1.5; // the page is laid out at 1280x720 and drawn denser (or sparser)
+const menu = !!arg('menu', false);
+const fps = draft || menu ? 30 : 60;
+const scale = draft ? 0.75 : menu ? 1 : 1.5; // the page is laid out at 1280x720 and drawn denser (or sparser)
 const from = Number(arg('from', 0));
 const to = arg('to', null) === null ? null : Number(arg('to'));
 const stills = Number(arg('stills', 0));
@@ -35,8 +37,8 @@ const noVideo = !!arg('no-video', false);
 const big = !!arg('big', false);
 const twice = !!arg('twice', false);
 const cut = String(arg('cut', '1'));
-const name = String(arg('out', (draft ? 'draft' : 'zona-trailer') + (cut === '1' ? '' : `-${cut}`)));
-const URL_ = String(arg('url', `http://localhost:5173/trailer.html${cut === '1' ? '' : `?cut=${cut}`}`));
+const name = String(arg('out', (draft ? 'draft' : 'zona-trailer') + (cut === '1' ? '' : `-${cut}`) + (menu ? '-menu' : '')));
+const URL_ = String(arg('url', `http://localhost:5173/trailer.html?cut=${cut}${menu ? '&menu=1' : ''}`));
 const PORT = 9333;
 const CHROME = ['C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'].find((p) => fs.existsSync(p));
 if (!CHROME) throw new Error('no Chrome or Edge found');
@@ -106,7 +108,7 @@ console.log(`${name}: ${(first / fps).toFixed(2)}s to ${(last / fps).toFixed(2)}
 const kept = [];
 async function take(pass) {
   const hashes = [];
-  await run(`window.tr.begin(${JSON.stringify({ fps, first, last, width: Math.round(1280 * scale), height: Math.round(720 * scale), video: !noVideo && pass === 0 })})`);
+  await run(`window.tr.begin(${JSON.stringify({ fps, first, last, width: Math.round(1280 * scale), height: Math.round(720 * scale), video: !noVideo && pass === 0, ...(menu ? { bitrate: 3_000_000 } : {}) })})`);
   const t0 = Date.now();
   for (let i = first; i < last; i++) {
     await run(`window.tr.step(${i})`);

@@ -29,8 +29,8 @@ export interface MenuHost {
   held(id: string, mods: string[]): { obj: THREE.Object3D; grips: Grips; kind: 'rifle' | 'pistol' | 'auto' | 'melee' } | null;
   /** what a body has on: helmet, vest, pack, mask */
   wear(body: Avatar, ids: string[]): Promise<void>;
-  /** the film of the map is there to be shown (it comes over the wire like anything else) */
-  filmReady(): boolean;
+  /** the film that has this second in it is there to be shown (each comes over the wire like anything else) */
+  filmReady(film: number): boolean;
 }
 
 interface View { p: THREE.Vector3; l: THREE.Vector3; fov: number }
@@ -154,15 +154,23 @@ export class MenuScenes {
     }
     // (between the scenes, the map on its table: a corner of it at a time, as the film has them)
     const map = (caption: string, from: number, to: number): Vignette => ({ caption, seconds: to - from, film: from, setup: () => {}, tick: () => {}, view: () => ({ p: _a, l: _b, fov: 40 }) });
+    // (and the new guns, each alone in a lit room with its parts going on to it one by one: out of the film made of
+    // them, src/trailer/shots8.ts, which was cut for this with the gun at the right of the picture. The second
+    // reel: its seconds are counted from GUNS.)
+    const GUNS = 100;
     this.list = [
       this.chase(),
+      map('The armoury · the AK, and what goes on it', GUNS + 0.15, GUNS + 4.85),
       map('The squad’s map · what they are going on', 0.2, 3.75),
       this.firefight(),
+      map('The armoury · the AR-15: sight, suppressor, grip, light, sixty rounds', GUNS + 5.15, GUNS + 9.85),
       map('The squad’s map · the keycard is in the gas', 3.95, 7.5),
       this.sidearm(),
+      map('The armoury · the Colt 1911', GUNS + 12.65, GUNS + 14.85),
       map('The squad’s map · Bunker 17', 7.7, 11.25),
       this.stand(),
       this.shotgun(),
+      map('The armoury · the MPA30', GUNS + 10.15, GUNS + 12.35),
       map('The squad’s map · trust nobody at the door', 11.4, 13.1),
       this.works(),
     ].filter((v): v is Vignette => !!v);
@@ -559,7 +567,7 @@ export class MenuScenes {
       }
       // (a stretch of the film that has not come over the wire yet is passed over)
       let k = this.at + 1;
-      while (k < this.list.length && this.list[k].film !== undefined && !this.h.filmReady()) k++;
+      while (k < this.list.length && this.list[k].film !== undefined && !this.h.filmReady(this.list[k].film!)) k++;
       if (k < this.list.length) this.begin(k);
       else {
         // the round is done: back up into the air for a while

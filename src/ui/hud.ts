@@ -88,6 +88,9 @@ function wheelSvg() {
   return `<svg viewBox="-160 -160 320 320" aria-hidden="true">${wedges.join('')}</svg>`;
 }
 
+/** the menu's films are told apart by the second asked for: each has this many seconds of the count to itself */
+export const REEL = 100;
+
 export class HUD {
   root: HTMLDivElement;
   private el: Record<string, HTMLElement> = {};
@@ -159,6 +162,7 @@ export class HUD {
       <div class="hud-dead"><div class="dead-title">You are dead</div><div class="dead-sub"></div><button class="dead-btn">Respawn</button><a class="dead-back" data-back><b>Back ZONA on X</b><span>Like, reply, repost. ${BACK_SHORT}</span></a></div>
       <div class="hud-start">
         <video class="sm-film" muted playsinline preload="auto" src="/menu/map-pan.mp4"></video>
+        <video class="sm-film" muted playsinline preload="auto" src="/menu/armoury.mp4"></video>
         <div class="sm-cut"></div>
         <header class="sm-top">
           <div class="sm-brand"><img src="/brand/zona-mark-plain.svg" alt=""><b>ZONA</b></div>
@@ -556,22 +560,24 @@ export class HUD {
       this.last.cut = v;
       (this.root.querySelector('.sm-cut') as HTMLElement).style.opacity = v;
     }
-    // the film of the map, when it is its turn: played from the second asked for, and kept to it
-    const reel = this.root.querySelector('.sm-film') as HTMLVideoElement | null;
-    if (!reel) return;
-    const on = film >= 0;
-    if (on !== reel.classList.contains('on')) {
-      reel.classList.toggle('on', on);
-      if (on) {
-        reel.currentTime = film;
-        void reel.play().catch(() => {});
-      } else reel.pause();
-    } else if (on && Math.abs(reel.currentTime - film) > 0.4) reel.currentTime = film;
+    // a film, when it is its turn: played from the second asked for, and kept to it. (There are two: the map on
+    // its table, and the new guns with their parts going on. Which of them, and where in it, is one number: the
+    // second reel's seconds are counted from REEL.)
+    this.root.querySelectorAll<HTMLVideoElement>('.sm-film').forEach((reel, k) => {
+      const on = film >= 0 && Math.floor(film / REEL) === k, at = film - k * REEL;
+      if (on !== reel.classList.contains('on')) {
+        reel.classList.toggle('on', on);
+        if (on) {
+          reel.currentTime = at;
+          void reel.play().catch(() => {});
+        } else reel.pause();
+      } else if (on && Math.abs(reel.currentTime - at) > 0.4) reel.currentTime = at;
+    });
   }
 
-  /** the film of the map has come and can be played */
-  filmReady() {
-    const reel = this.root.querySelector('.sm-film') as HTMLVideoElement | null;
+  /** the film that has this second in it has come and can be played */
+  filmReady(film = 0) {
+    const reel = this.root.querySelectorAll<HTMLVideoElement>('.sm-film')[Math.floor(film / REEL)];
     return !!reel && reel.readyState >= 3;
   }
 

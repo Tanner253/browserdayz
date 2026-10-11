@@ -556,7 +556,7 @@ async function stage() {
     // (the eighth brings its own score, as the third did: see music8.ts)
     const cut = await import('./shots8');
     shots = cut.buildShots(S);
-    seconds = cut.SECONDS8;
+    seconds = cut.seconds8;
     ownScore = (await import('./music8')).scoreMusic8;
   } else if (CUT === 7) {
     const cut = await import('./shots7');
@@ -698,7 +698,7 @@ tr.info = () => {
   return { gpu: ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : 'unknown', seconds, shots: shots.map((s) => [s.name, s.start, s.end]) };
 };
 
-tr.begin = async (o: { fps: number; first: number; last: number; width: number; height: number; video: boolean }) => {
+tr.begin = async (o: { fps: number; first: number; last: number; width: number; height: number; video: boolean; bitrate?: number }) => {
   fps = o.fps;
   take = o;
   soundLog.length = 0;
@@ -709,7 +709,7 @@ tr.begin = async (o: { fps: number; first: number; last: number; width: number; 
   if (o.video) {
     muxer = new Muxer({ target: new ArrayBufferTarget(), video: { codec: 'avc', width: o.width, height: o.height, frameRate: fps }, audio: { codec: 'aac', sampleRate: 48000, numberOfChannels: 2 }, fastStart: 'in-memory' });
     venc = new VideoEncoder({ output: (chunk, meta) => muxer!.addVideoChunk(chunk, meta), error: (e) => console.error('[tr] video encoder', e.message) });
-    venc.configure({ codec: 'avc1.64002A', width: o.width, height: o.height, bitrate: o.width >= 1900 ? 14_000_000 : 5_000_000, framerate: fps, latencyMode: 'quality', avc: { format: 'avc' } });
+    venc.configure({ codec: 'avc1.64002A', width: o.width, height: o.height, bitrate: o.bitrate ?? (o.width >= 1900 ? 14_000_000 : 5_000_000), framerate: fps, latencyMode: 'quality', avc: { format: 'avc' } });
   }
   // a stretch from the middle: replay its shot from the top, unseen, so it arrives in the right state
   const T = o.first / fps;

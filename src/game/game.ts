@@ -635,7 +635,7 @@ export class Game {
       for (const w of wellSpots(world)) spots.push({ x: w.x, z: w.z, name: 'Well', tip: 'Drink your fill, and fill every bottle you carry.', kind: 'well' });
       this.hud.setMenuMap(this.minimap.poster(), WORLD_SIZE, spots, atmo.gas);
     }
-    this.menu = new MenuScenes({ world, atmo, scene: r.scene, effects: this.effects, held: (id, mods) => this.makeHeld(id, mods), wear: (body, ids) => this.wear(body, ids), filmReady: () => this.hud.filmReady() });
+    this.menu = new MenuScenes({ world, atmo, scene: r.scene, effects: this.effects, held: (id, mods) => this.makeHeld(id, mods), wear: (body, ids) => this.wear(body, ids), filmReady: (film) => this.hud.filmReady(film) });
     void this.menu.load();
     // The ground ends at the edge of the square, and there was nothing there to stop anybody walking or
     // driving off it. Four walls that cannot be seen, a few paces in from the edge: the wild country round

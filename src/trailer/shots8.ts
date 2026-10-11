@@ -33,7 +33,14 @@ import { CAR_SIT } from '../game/avatar';
 import { TOWN } from '../world/worldgen';
 import { CONTRACT, DISCORD, X_HANDLE } from '../ui/hud';
 
-export { SECONDS8 };
+/**
+ * How long this film is. The whole of it, unless it is the cut made for the main menu (`&menu` on the address:
+ * `node scripts/film.mjs --cut 8 --menu`): the four guns and their parts and nothing else, with none of the film's
+ * own words, and each gun set to the right of the picture, where the menu leaves room. That one is played by the
+ * menu between its own scenes (public/menu/armoury.mp4: see src/game/menu-scenes.ts).
+ */
+export let seconds8 = SECONDS8;
+const MENU = typeof location !== 'undefined' && new URLSearchParams(location.search).has('menu');
 
 const ease = (x: number) => { const t = Math.min(1, Math.max(0, x)); return t * t * (3 - 2 * t); };
 const beats = (n: number) => n * BEAT8;
@@ -394,11 +401,11 @@ export function buildShots(S: Stage): Shot[] {
     for (const row of [-1, 1]) {
       // (side by side in their row, in the order their parts are in, and never one on another)
       const list = live.filter((q) => q.row === row).sort((p, q) => p.x - q.x);
-      const xs = list.map((q) => Math.min(88, Math.max(row < 0 ? 16 : 40, q.x)));
-      for (let i = 1; i < xs.length; i++) xs[i] = Math.max(xs[i], xs[i - 1] + 17);
-      const over = xs.length ? Math.max(0, xs[xs.length - 1] - 90) : 0;
+      const xs = list.map((q) => Math.min(MENU ? 68 : 88, Math.max(MENU ? 42 : row < 0 ? 16 : 40, q.x)));
+      for (let i = 1; i < xs.length; i++) xs[i] = Math.max(xs[i], xs[i - 1] + (MENU ? 12.5 : 17));
+      const over = xs.length ? Math.max(0, xs[xs.length - 1] - (MENU ? 70 : 90)) : 0;
       list.forEach((q, i) => {
-        const x = xs[i] - over, y = row < 0 ? 19 : 71;
+        const x = xs[i] - over, y = MENU ? (row < 0 ? 31 : 66) : row < 0 ? 19 : 71;
         q.el.style.display = '';
         q.el.style.left = `${x}%`;
         q.el.style.top = `${y}%`;
@@ -541,7 +548,7 @@ export function buildShots(S: Stage): Shot[] {
     await sharpen(() => r.pivot, `the ${r.id}`);
     S.cam = null;
   };
-  add(4, {
+  if (!MENU) add(4, {
     name: 'card',
     setup: async () => {
       const r = rackOf('ak');
@@ -562,19 +569,24 @@ export function buildShots(S: Stage): Shot[] {
   SHEET.forEach(({ id, len: n }, nth) => {
     const r = rackOf(id), len = beats(n);
     let done = -1;
+    // (for the menu: further off and well to the right, with no words of the film's own on it)
+    // (The menu has its own words down the left of the picture and its news down the right, and on a very wide screen
+    // only the middle half of the height is seen at all: the gun and its labels are kept to the middle of both.)
+    const [far, aside] = MENU ? [1.86, 0.07] : [1, 0.07];
     add(n, {
       name: `gun-${id}`,
-      flash: 0.45,
-      chip: ['01', 'THE GUNS'],
-      word: nth ? undefined : ['GUNS', 'FOUR NEW ONES · AND WHAT GOES ON THEM'],
+      flash: MENU ? 0 : 0.45,
+      chip: MENU ? undefined : ['01', 'THE GUNS'],
+      word: nth || MENU ? undefined : ['GUNS', 'FOUR NEW ONES · AND WHAT GOES ON THEM'],
+      grid: MENU ? 0 : 1,
       setup: async () => {
         done = 0;
         turn(r, AZ, 0);
-        await dress(r, lens(r, 0).cam);
+        await dress(r, lens(r, 0, far, aside).cam);
         r.looks.forEach((o, k) => (o.visible = k === 0));
       },
       cam: (t) => {
-        const k = t / len, o = lens(r, k, 1 - k * 0.05);
+        const k = t / len, o = lens(r, k, far * (1 - k * 0.05), aside);
         turn(r, o.a, k);
         return hand(o.cam, t, 0.35, nth);
       },
@@ -593,10 +605,15 @@ export function buildShots(S: Stage): Shot[] {
           }
         }
         label(r, step, t);
-        show(r.spec, t, ease(t / 0.2));
+        if (!MENU) show(r.spec, t, ease(t / 0.2));
       },
     });
   });
+  if (MENU) {
+    seconds8 = beats(cur);
+    console.log(`[tr] cut 8, for the menu: ${shots.length} shots, ${seconds8.toFixed(2)} s`);
+    return shots;
+  }
 
   // ------------------------------------------------------------ 3. a gun looked over, at the pace it is turned at
   const VIEW = { at: K(-46, 0.9), yaw: DOWN };
