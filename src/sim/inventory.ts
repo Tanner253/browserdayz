@@ -35,6 +35,13 @@ export class Container {
    */
   constructor(public id: string, public name: string, public w: number, public h: number, public items: Placed[] = [], public holdsBags = false) {}
 
+  /**
+   * How far down this grid is: 0 for a pocket, a crate or a body; 1 for what is in a bag that lies in one of
+   * those, or is worn; 2 for what is in a bag inside such a bag. Nothing is kept deeper than that (the server
+   * reads no further: see cleanItem), so a bag with things in it does not go into a grid that is 2 down.
+   */
+  depth = 0;
+
   /** the one kind of item this is for (null: anything) */
   only: string | null = null;
 
@@ -43,11 +50,17 @@ export class Container {
     return rot ? [d.h, d.w] : [d.w, d.h];
   }
 
-  /** a bag can't go inside itself, and a packed bag can't be stuffed into pockets */
+  /**
+   * A bag can't go inside itself, nor inside a bag that is inside it; a packed bag can't be stuffed into a
+   * pocket or a vest, but it goes into another bag (bags are stacked, and each is opened in its turn), into a
+   * crate and onto a body, so long as nothing ends up deeper than is kept.
+   */
   accepts(item: ItemInstance): boolean {
     if (this.only && item.id !== this.only) return false;
-    if (this.id === `gear:${item.uid}`) return false;
-    if (item.cargo?.length && !this.holdsBags) return false;
+    if (this.id === `gear:${item.uid}` || this.id === `bag:${item.uid}`) return false;
+    const within = (it: ItemInstance): boolean => !!it.cargo && (it.cargo === this.items || it.cargo.some((p) => within(p.item)));
+    if (within(item)) return false;
+    if (item.cargo?.length && (!this.holdsBags || this.depth >= 2 || (this.depth >= 1 && item.cargo.some((p) => p.item.cargo?.length)))) return false;
     return true;
   }
 
@@ -157,8 +170,9 @@ export type SerializedInventory = { slots: Record<string, ItemInstance | null>; 
 /** Everything the player carries. */
 export class PlayerInventory {
   slots: Record<Slot, ItemInstance | null> = EMPTY_SLOTS();
-  jacket = new Container('jacket', 'Jacket', 4, 3);
-  pants = new Container('pants', 'Trousers', 4, 2);
+  // (a row taller each than they were, 2026-10-10: a rifle's magazine is three cells tall, and stood in neither)
+  jacket = new Container('jacket', 'Jacket', 4, 4);
+  pants = new Container('pants', 'Trousers', 4, 3);
   /** the pouch: ten places for dog tags taken off other people, and for nothing else */
   tags = Object.assign(new Container('tags', 'Dog tags', 5, 2), { only: 'dogtag' });
   /** the survivor's own dog tag, round their neck */
@@ -233,7 +247,9 @@ export class PlayerInventory {
     item.cargo ??= [];
     let c = this.gearCargo.get(item.uid);
     if (!c || c.items !== item.cargo) {
-      c = new Container(`gear:${item.uid}`, d.name, d.wear.cargo[0], d.wear.cargo[1], item.cargo);
+      // (what is worn on the back is a bag, and takes other bags; a vest's pouches do not)
+      c = new Container(`gear:${item.uid}`, d.name, d.wear.cargo[0], d.wear.cargo[1], item.cargo, d.slot === 'back');
+      c.depth = 1;
       this.gearCargo.set(item.uid, c);
     }
     return c;

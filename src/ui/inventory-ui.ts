@@ -450,7 +450,11 @@ export class InventoryUI {
     if (this.stash) {
       vic.insertAdjacentHTML('beforeend', `<h3>${this.stash.label} <span>${this.stash.container.w}×${this.stash.container.h}</span></h3>`);
       if (this.stashState) vic.insertAdjacentHTML('beforeend', `<div class="inv-empty">${this.stashState}</div>`);
-      else vic.appendChild(this.gridEl(this.stash.container));
+      else {
+        vic.appendChild(this.gridEl(this.stash.container));
+        // (a pack on a body or in a crate is opened where it lies, and gone through)
+        this.openBags(vic, this.stash.container);
+      }
     }
 
     // ---- character: paper doll with gear slots, weapons underneath
@@ -499,7 +503,11 @@ export class InventoryUI {
     cargo.innerHTML = `<h3>Carried <span>${inv.weight().toFixed(1)} kg</span></h3>`;
     const grids = document.createElement('div');
     grids.className = 'inv-grids';
-    for (const c of inv.containers) if (c !== inv.tags) grids.appendChild(this.gridBox(c));
+    for (const c of inv.containers) {
+      if (c === inv.tags) continue;
+      grids.appendChild(this.gridBox(c));
+      this.openBags(grids, c);
+    }
     cargo.appendChild(grids);
     if (!GEAR_SLOTS.some((s) => inv.slots[s] && ITEMS[inv.slots[s]!.id].wear?.cargo)) {
       cargo.insertAdjacentHTML('beforeend', `<div class="inv-tip">Only your pockets. A vest or a bag on your back adds more space.</div>`);
@@ -623,11 +631,19 @@ export class InventoryUI {
       const held = this.actions.inHands() === it;
       if (!held) out.push({ label: 'Take in hands', run: () => this.actions.hold(it), primary: !d.attach || !this.actions.attachTargets(it).length });
     }
+    if (this.opens(loc)) {
+      const open = this.opened.has(it.uid);
+      out.push({ label: open ? 'Close it' : `Open (${it.cargo?.length ?? 0} inside)`, primary: true, run: () => {
+        if (!this.opened.delete(it.uid)) this.opened.add(it.uid);
+        this.actions.sound('move');
+        this.render();
+      } });
+    }
     if (d.category === 'stash') out.push({ label: 'Place', run: () => this.actions.place(it) });
     if (d.attach) {
       for (const w of this.actions.attachTargets(it)) out.push({ label: `Attach to ${ITEMS[w.id].name}`, run: () => this.actions.attach(it, w), primary: true });
     }
-    if (d.slot && loc.kind === 'container') out.push({ label: d.category === 'clothing' ? gearWord : 'Sling on your back', run: () => this.equip(loc), primary: d.category === 'clothing' });
+    if (d.slot && loc.kind === 'container') out.push({ label: d.category === 'clothing' ? gearWord : 'Sling on your back', run: () => this.equip(loc), primary: d.category === 'clothing' && !this.opens(loc) });
     if (loc.kind === 'slot') {
       out.push({
         label: d.category === 'clothing' ? 'Take off' : 'Stow',
@@ -794,7 +810,51 @@ export class InventoryUI {
 
   private containerById(id: string): Container | null {
     if (this.stash && this.stash.container.id === id) return this.stash.container;
+    if (id.startsWith('bag:')) return this.bags.get(id.slice(4)) ?? null;
     return this.inv.containers.find((c) => c.id === id) ?? null;
+  }
+
+  /** the bags that have been opened where they lie (in a pocket, in another bag, in a crate, on a body), by their own number */
+  private opened = new Set<string>();
+  private bags = new Map<string, Container>();
+
+  /** the grid of a bag that is not worn: its own things, where they are in it */
+  private bagOf(item: ItemInstance, depth: number): Container | null {
+    const d = ITEMS[item.id];
+    if (!d.wear?.cargo || depth > 2) return null;
+    item.cargo ??= [];
+    let c = this.bags.get(item.uid);
+    if (!c || c.items !== item.cargo) {
+      c = new Container(`bag:${item.uid}`, d.name, d.wear.cargo[0], d.wear.cargo[1], item.cargo, d.slot === 'back');
+      this.bags.set(item.uid, c);
+    }
+    c.depth = depth;
+    return c;
+  }
+
+  /** Under a grid, the bags in it that have been opened, each with its own grid, and under each of those the bags opened in it. */
+  private openBags(into: HTMLElement, c: Container) {
+    for (const p of c.items) {
+      if (!this.opened.has(p.item.uid)) continue;
+      const bag = this.bagOf(p.item, c.depth + 1);
+      if (!bag) continue;
+      const box = this.gridBox(bag);
+      box.classList.add('inv-bag');
+      const h4 = box.querySelector('h4');
+      if (h4) h4.insertAdjacentHTML('beforeend', `<em title="Close it">in ${c.name.toLowerCase()} · close</em>`);
+      h4?.querySelector('em')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.opened.delete(p.item.uid);
+        this.render();
+      });
+      into.appendChild(box);
+      this.openBags(into, bag);
+    }
+  }
+
+  /** is this a bag lying somewhere it can be opened (not worn: what is worn is open already; not on the ground: that is picked up first) */
+  private opens(loc: Source): boolean {
+    return loc.kind === 'container' && !!ITEMS[loc.item.id].wear?.cargo && loc.c.depth < 2;
   }
 
   /** grid cell under the dragged item's top-left corner */
