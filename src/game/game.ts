@@ -502,6 +502,7 @@ export class Game {
       release: (item) => this.release(item),
       changed: () => this.inventoryChanged(),
       sound: (k) => audio.ui(k),
+      note: (text) => this.hud.note(text, 'info'),
     });
     // (the bunker's own gas: over the ground above it and all through it, breathed like the works' and hardly seen)
     this.gas.also = (x, y, z) => bunkerGas(this.bunker.place, x, y, z);

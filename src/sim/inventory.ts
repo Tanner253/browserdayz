@@ -167,6 +167,64 @@ export class Container {
 
 export type SerializedInventory = { slots: Record<string, ItemInstance | null>; active: Slot | null; containers: ReturnType<Container['serialize']>[]; hot?: (HotBind | null)[] };
 
+/**
+ * Two things change places: `item`, out of `from` (null: it lies on the ground, or is in the hands and carried
+ * nowhere), goes into `into` where `other` lies, and `other` goes where `item` lay (with no `from`, it is handed
+ * back to be put down). `item` is tried first at the very cell it was let go on, then where `other` lay, either way
+ * up; `other` where `item` lay, either way up, and failing that anywhere in that grid. Nothing is moved unless
+ * both have a place.
+ * @returns whether they changed places
+ */
+export function swapPlaces(item: ItemInstance, from: Container | null, into: Container, other: ItemInstance, at: { x: number; y: number; rot: boolean }): boolean {
+  if (item === other || !into.accepts(item) || (from && !from.accepts(other))) return false;
+  const theirs = into.items.find((p) => p.item === other), mine = from?.items.find((p) => p.item === item) ?? null;
+  if (!theirs || (from && !mine)) return false;
+  const keptInto = [...into.items], keptFrom = from ? [...from.items] : null;
+  const back = () => {
+    into.items.splice(0, into.items.length, ...keptInto);
+    if (from && keptFrom && from !== into) from.items.splice(0, from.items.length, ...keptFrom);
+    return false;
+  };
+  into.remove(other);
+  from?.remove(item);
+  const put = (c: Container, it: ItemInstance, spots: [number, number, boolean][]) => spots.some(([x, y, rot]) => c.place(it, x, y, rot));
+  if (!put(into, item, [[at.x, at.y, at.rot], [theirs.x, theirs.y, at.rot], [theirs.x, theirs.y, !at.rot]])) return back();
+  if (from && mine) {
+    if (!put(from, other, [[mine.x, mine.y, theirs.rot], [mine.x, mine.y, !theirs.rot]])) {
+      const spot = from.findSpace(other);
+      if (!spot || !from.place(other, spot.x, spot.y, spot.rot)) return back();
+    }
+  }
+  return true;
+}
+
+/**
+ * A pile is halved: the smaller half is made a pile of its own (a new thing, with its own number) and laid in the
+ * same grid, as near the first as there is room. Null: it is not a pile of two or more, or there is no room.
+ */
+export function splitPile(c: Container, item: ItemInstance, make: (id: string, qty: number) => ItemInstance): ItemInstance | null {
+  const def = ITEMS[item.id], placed = c.items.find((p) => p.item === item);
+  if (!def.stack || !placed || item.qty < 2) return null;
+  const half = make(item.id, Math.floor(item.qty / 2));
+  let best: { x: number; y: number; rot: boolean } | null = null, bd = Infinity;
+  for (const rot of [placed.rot, !placed.rot]) {
+    const [w, h] = Container.size(half, rot);
+    for (let y = 0; y <= c.h - h; y++) {
+      for (let x = 0; x <= c.w - w; x++) {
+        const d = Math.hypot(x - placed.x, y - placed.y);
+        if (d < bd && c.fits(half, x, y, rot)) {
+          bd = d;
+          best = { x, y, rot };
+        }
+      }
+    }
+  }
+  if (!best) return null;
+  item.qty -= half.qty;
+  c.items.push({ item: half, ...best });
+  return half;
+}
+
 /** Everything the player carries. */
 export class PlayerInventory {
   slots: Record<Slot, ItemInstance | null> = EMPTY_SLOTS();

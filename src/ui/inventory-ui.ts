@@ -11,7 +11,7 @@
 // which is the nearest free spot to the pointer, not only the cell under it.
 
 import { GEAR_SLOTS, ITEMS, SLOT_KIND, SLOT_LABEL, TAG_HOLD_MIN, WEAPON_SLOTS, makeItem, type AttachSlot, capacityOf, handlingOf, itemName, itemWeight, magRoom, tagClock, tagOwner, type ItemInstance, type Slot } from '../sim/items';
-import { Container, type PlayerInventory } from '../sim/inventory';
+import { Container, splitPile, swapPlaces, type PlayerInventory } from '../sim/inventory';
 import type { WorldItem, Stash } from '../game/loot';
 import type { Vitals } from '../game/player';
 
@@ -55,6 +55,8 @@ export interface InvActions {
   inHands(): ItemInstance | null;
   changed(): void;
   sound(kind: 'pickup' | 'drop' | 'move'): void;
+  /** a line said to the player */
+  note(text: string): void;
 }
 
 type Source =
@@ -524,7 +526,7 @@ export class InventoryUI {
       cargo.insertAdjacentHTML('beforeend', `<div class="inv-tip">Only your pockets. A vest or a bag on your back adds more space.</div>`);
     }
     cargo.appendChild(this.inspector());
-    cargo.insertAdjacentHTML('beforeend', `<div class="inv-help"><b>Drag</b> to move: onto your character to wear it, sling it or take it in your hands, onto the left side to drop · <b>R</b> rotate · <b>Double-click</b> or <b>Shift-click</b>: take in hands, wear or pick up · point + <b>1</b>–<b>0</b>: put it on that key · point + <b>G</b> drop · <b>Right-click</b> for the rest. What is in your hands is used with the <b>left button</b>, held, once this is shut.</div>`);
+    cargo.insertAdjacentHTML('beforeend', `<div class="inv-help"><b>Drag</b> to move: onto your character to wear it, sling it or take it in your hands, onto another thing to change places with it, onto the left side to drop · <b>R</b> rotate · <b>Double-click</b> or <b>Shift-click</b>: take in hands, wear or pick up · point + <b>1</b>–<b>0</b>: put it on that key · point + <b>G</b> drop · <b>Right-click</b> for the rest (a pile is split there). What is in your hands is used with the <b>left button</b>, held, once this is shut.</div>`);
     if (this.vitals) {
       const v = this.vitals;
       const bar = (label: string, val: number, cls: string) => `<div class="vbar ${cls}"><span>${label}</span><div><i style="width:${Math.max(0, Math.min(100, val))}%"></i></div><b>${Math.round(val)}</b></div>`;
@@ -677,6 +679,17 @@ export class InventoryUI {
     }
     if (d.mag) {
       if ((it.rounds ?? 0) > 0) out.push({ label: `Empty (${it.rounds})`, run: () => this.actions.emptyMag(it) });
+    }
+    // a pile of two or more is halved: the half is laid beside it, to be given away, put elsewhere or dropped
+    if (d.stack && it.qty > 1 && loc.kind === 'container') {
+      const pile = loc.c;
+      out.push({
+        label: `Split (${it.qty - Math.floor(it.qty / 2)} and ${Math.floor(it.qty / 2)})`,
+        run: () => {
+          if (splitPile(pile, it, makeItem)) this.finish('move');
+          else this.actions.note('No room beside it for the other half');
+        },
+      });
     }
     if (d.weapon?.mag) {
       if (it.mag) out.push({ label: `Take out the ${ITEMS[it.mag].name.toLowerCase()}`, run: () => this.actions.detach(it, it.mag!) });
@@ -1144,6 +1157,20 @@ export class InventoryUI {
         }
         this.actions.fillMag(onto.item);
         return this.render();
+      }
+      // Let go on another thing: the two change places, where each has room where the other lay (as in DayZ). Off
+      // the ground, what was in the grid is put down in its stead.
+      if (onto && onto.item !== item && (d.src.kind === 'container' || d.src.kind === 'ground')) {
+        const from = d.src.kind === 'container' ? d.src.c : null, other = onto.item, where = { x: cx, y: cy, rot: d.rot };
+        // (a thing on the ground is picked up only once there is known to be a place for it: tried on a copy of the grid first)
+        const copy = () => Object.assign(new Container(c.id, c.name, c.w, c.h, [...c.items], c.holdsBags), { depth: c.depth, only: c.only });
+        if ((from || swapPlaces(item, null, copy(), other, where)) && (from || this.materialize(d.src)) && swapPlaces(item, from, c, other, where)) {
+          if (!from) {
+            this.removeFrom(d.src);
+            this.actions.drop(other);
+          }
+          return this.finish(from ? 'move' : 'pickup');
+        }
       }
       const at = this.landing(c, item, cx, cy, d.rot);
       if (!at) return this.render();
