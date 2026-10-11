@@ -1,3 +1,4 @@
+import { GUNS } from './gunplay';
 // Item database. Pure data; shared by the client UI, world spawning and the server.
 // Grid sizes follow DayZ conventions (1 cell ~ 10 cm).
 
@@ -72,15 +73,7 @@ export interface ItemDef {
     hides?: Record<string, string[]>;
     /** how it is made ready after a shot, where its kind does not say: by hand (a bolt), or by itself */
     action?: 'bolt' | 'self';
-    /**
-     * What it fires, where that is not what its kind fires (see BALLISTICS in weapons.ts): the
-     * speed it leaves at (m/s), how fast the air slows it, what one of them does, the range it
-     * is sighted for; how many leave at once, and how wide they go (radians across).
-     */
-    round?: { muzzleVel: number; drag: number; damage: number; zero: number; pellets?: number; cone?: number };
-    /** its kick, and the least time between its shots, as multiples of its kind's */
-    kick?: number;
-    pace?: number;
+    // (what it fires, how fast, how it kicks and what its sights are set for: src/sim/gunplay.ts, by its id)
     /** fed one at a time into a tube under the barrel, not by a magazine */
     tube?: boolean;
   };
@@ -127,12 +120,12 @@ const D: ItemDef[] = [
     // nothing as slow as a pistol's does all of it (see where a round lands in src/game/weapons.ts): at 58 this
     // did 50 at the muzzle, and two to the body left a man standing with a sliver. At 82 it does 70: two to the
     // body are the end of anybody not in plates, and of whoever wears the armoured vest, barely.)
-    weapon: { kind: 'pistol', ammo: 'ammo_50', capacity: 7, mag: 'mag_deagle', ergo: 56, round: { muzzleVel: 440, drag: 0.0017, damage: 82, zero: 30 }, kick: 2.1, pace: 2.1 }, iconYaw: 0,
+    weapon: { kind: 'pistol', ammo: 'ammo_50', capacity: 7, mag: 'mag_deagle', ergo: 56 }, iconYaw: 0,
   },
   {
     id: 'benelli', name: 'Benelli M3', model: 'benelli_m3', w: 8, h: 2, weight: 3.5, category: 'weapon', slot: 'long',
     desc: 'Twelve-gauge shotgun, self-loading. Seven shells in the tube, pushed in one at a time: it takes no magazine. Nine pellets a shell: nothing is worse to meet in a corridor, and little is less use across a field. Takes a holographic sight, a suppressor and a light.',
-    weapon: { kind: 'rifle', ammo: 'ammo_12', capacity: 7, ergo: 52, action: 'self', tube: true, round: { muzzleVel: 400, drag: 0.011, damage: 14, zero: 25, pellets: 9, cone: 0.075 }, kick: 1.3, pace: 1.7, shows: { red_dot: ['sight'], suppressor_12: ['silencer'] } }, iconYaw: 0,
+    weapon: { kind: 'rifle', ammo: 'ammo_12', capacity: 7, ergo: 52, action: 'self', tube: true, shows: { red_dot: ['sight'], suppressor_12: ['silencer'] } }, iconYaw: 0,
   },
   // Ammunition (2026-10-10). Loose rounds lie thirty to a place in a pocket, whatever they are. A box is one place,
   // and holds twenty-five: it is unwrapped in the hands, and what was in it is loose rounds. Rounds go into a
@@ -144,12 +137,12 @@ const D: ItemDef[] = [
   {
     id: 'ak', name: 'AK', model: 'ak', w: 8, h: 3, weight: 3.6, category: 'weapon', slot: 'long',
     desc: 'Assault rifle in 7.62x39. Thirty rounds in its magazine, seventy-five in the drum. It fires for as long as the trigger is held, kicks up and to the right, and hits hard at any range a man is seen at. B changes it to single shots. Takes a holographic sight, a suppressor and the drum.',
-    weapon: { kind: 'auto', ammo: 'ammo_739', capacity: 30, mag: 'mag_ak', ergo: 46, modes: ['auto', 'semi'], round: { muzzleVel: 715, drag: 0.0012, damage: 52, zero: 100 }, kick: 1.2, shows: { mag_ak: ['mag'] } }, iconYaw: 0,
+    weapon: { kind: 'auto', ammo: 'ammo_739', capacity: 30, mag: 'mag_ak', ergo: 46, modes: ['auto', 'semi'], shows: { mag_ak: ['mag'] } }, iconYaw: 0,
   },
   {
     id: 'ar15', name: 'AR-15', model: 'ar15', w: 7, h: 3, weight: 3.0, category: 'weapon', slot: 'long',
     desc: 'Carbine in 5.56. Thirty rounds in its magazine, sixty in the long one. Faster and flatter than the AK and easier to hold on a target, and each round does less. B changes it to single shots. Takes a holographic sight, a suppressor, a foregrip, a light and the long magazine.',
-    weapon: { kind: 'auto', ammo: 'ammo_556', capacity: 30, mag: 'mag_ar', ergo: 62, modes: ['auto', 'semi'], round: { muzzleVel: 880, drag: 0.001, damage: 42, zero: 100 }, kick: 0.85, pace: 0.86, shows: { mag_ar: ['mag'], suppressor_556: ['silencer'], red_dot: ['sight'], foregrip: ['foregrip'], gun_light: ['light'] }, hides: { suppressor_556: ['brake'] } }, iconYaw: 0,
+    weapon: { kind: 'auto', ammo: 'ammo_556', capacity: 30, mag: 'mag_ar', ergo: 62, modes: ['auto', 'semi'], shows: { mag_ar: ['mag'], suppressor_556: ['silencer'], red_dot: ['sight'], foregrip: ['foregrip'], gun_light: ['light'] }, hides: { suppressor_556: ['brake'] } }, iconYaw: 0,
   },
   {
     id: 'ammo_739', name: '7.62x39 Rounds', model: 'bolt_action_rifle_7_62', node: 'bolt_action_rifle_7_62_bullet_54mm', w: 1, h: 1, weight: 0.016, category: 'ammo', stack: 30, scale: 0.95, pile: 5,
@@ -464,6 +457,8 @@ export interface ItemInstance {
   rounds?: number;
   /** attachment item ids fitted to this weapon (not its magazine: see `mag`) */
   mods?: string[];
+  /** a gun whose sights can be set: the range they are set for, metres (not said: how it comes; see GUNS in gunplay.ts) */
+  zero?: number;
   /** contents of a bag or vest: they stay inside it when it is dropped or handed over */
   cargo?: Placed[];
   /** dog tag: the name stamped on it and that player's public id */
@@ -721,6 +716,8 @@ export function sanitizeItem(it: ItemInstance): ItemInstance | null {
   } else delete it.mag;
   if (d.mag) it.rounds = Math.max(0, Math.min(d.mag.capacity, Math.floor(Number(it.rounds) || 0)));
   else delete it.rounds;
+  // (its sights: one of the ranges that gun's can be set for, or as it comes)
+  if (it.zero !== undefined && !(d.weapon && GUNS[it.id]?.zero.includes(it.zero))) delete it.zero;
   if (it.mods) it.mods = it.mods.filter((m) => !ITEMS[m]?.mag && ITEMS[m]?.attach?.fits.includes(it.id));
   if (it.cargo) {
     it.cargo = it.cargo.filter((p) => p && p.item && sanitizeItem(p.item));

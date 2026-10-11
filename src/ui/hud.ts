@@ -232,12 +232,15 @@ export class HUD {
                     <text x="26" y="128" text-anchor="end">FIRE</text><text x="94" y="128">AIM</text><text x="60" y="146" text-anchor="middle">WHEEL · NEXT WEAPON</text>
                     <path d="M40 46v62H28M80 46v62h12" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="2 3"/>
                   </svg>
-                  <p><kbd>R</kbd> reload <kbd>X</kbd> holster</p>
+                  <p><kbd>R</kbd> reload <kbd>X</kbd> empty hands</p>
+                  <p><kbd>B</kbd> automatic · single shots</p>
+                  <p><kbd class="wide">PgUp</kbd><kbd class="wide">PgDn</kbd> set the range of the sights</p>
                 </div>
                 <div class="kb-group">
                   <h4>Gear</h4>
-                  <div class="kb-row"><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>4</kbd><em>primary · secondary · pistol · melee</em></div>
-                  <div class="kb-row"><kbd>5</kbd><kbd>6</kbd><kbd>7</kbd><kbd>8</kbd><em>eat · drink · heal</em></div>
+                  <div class="kb-row"><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><em>what is on your back · your holster</em></div>
+                  <div class="kb-row"><kbd>4</kbd><kbd>…</kbd><kbd>0</kbd><em>anything: drop it on a key in the inventory</em></div>
+                  <p>Hold the left button to use what is in your hands</p>
                   <p><kbd>F</kbd> take · doors · search <kbd>G</kbd> hold: drop what you hold</p>
                   <p><kbd>L</kbd> light: the one on your gun, or a flashlight you carry</p>
                   <p><kbd class="wide">Tab</kbd> inventory <kbd>M</kbd> map</p>
@@ -919,7 +922,7 @@ export class HUD {
     prompt: string | null;
     /** where on screen the thing the prompt is about sits, as fractions of the screen (null = no marker) */
     mark: [number, number] | null;
-    weapon: { name: string; ammo: { loaded: number; reserve: number; cap: number; mags?: number; bare?: boolean } | null; action: string | null; mode: string | null } | null;
+    weapon: { name: string; ammo: { loaded: number; reserve: number; cap: number; mags?: number; bare?: boolean } | null; action: string | null; mode: string | null; /** the range its sights are set for, metres, where that can be changed */ zero?: number | null } | null;
     /** looking through binoculars */
     glass: boolean;
     aiming: boolean;
@@ -1039,7 +1042,7 @@ export class HUD {
 
     if (s.weapon) {
       this.toggle(e.weapon, 'show', true);
-      this.set('wname', e.weapon.firstElementChild as HTMLElement, s.weapon.name + (s.weapon.mode ? ` · ${s.weapon.mode === 'auto' ? 'AUTO' : 'SEMI'}` : ''));
+      this.set('wname', e.weapon.firstElementChild as HTMLElement, s.weapon.name + (s.weapon.mode ? ` · ${s.weapon.mode === 'auto' ? 'AUTO' : 'SEMI'}` : '') + (s.weapon.zero ? ` · ${s.weapon.zero} M` : ''));
       const a = s.weapon.ammo;
       // (a gun fed by a magazine: what is in it over what its magazine holds, then the magazines carried for it and the rounds in them)
       const txt = a ? (a.mags !== undefined ? `<b>${a.loaded}</b><span>/${a.bare ? 'no mag' : a.cap}</span> <em>${a.mags ? `${a.mags} mag${a.mags === 1 ? '' : 's'} · ${a.reserve}` : 'no spare'}</em>` : `<b>${a.loaded}</b><span>/${a.cap}</span> <em>${a.reserve}</em>`) : '';

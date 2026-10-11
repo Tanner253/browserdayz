@@ -127,7 +127,7 @@ ok('food is in the shop before anywhere, and dressings in the clinic and the sho
 });
 
 ok('the K6-3 stops a sniper\'s round to the head, barely; nothing else does', () => {
-  // (a rifle's round does 95 at the muzzle, and 3.2 times that to the head: see BALLISTICS and ZONE_MULT in src/game/weapons.ts)
+  // (a rifle's round does 95 at the muzzle, and 3.2 times that to the head: see CARTRIDGES in src/sim/gunplay.ts and ZONE_MULT in src/game/weapons.ts)
   const head = 95 * 3.2;
   const left = 100 - head * ITEMS.helmet_k63.wear!.head!;
   assert.ok(left > 0 && left < 10, `it leaves ${left.toFixed(1)} of 100`);

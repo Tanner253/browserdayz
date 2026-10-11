@@ -19,6 +19,7 @@ import { WeaponRig, liftPack } from './rig';
 import { type Curl, FPArms, type Grips, type HandGrip, mixCurl } from './arms';
 import type { Look } from './look';
 import { MAX_STAMINA } from '../net/protocol';
+import { GRAVITY, GUNS, coneOf, damageKept, elevationFor, intervalOf, kickOf, shotOf, zeroOf } from '../sim/gunplay';
 import type { ItemModels } from './loot';
 
 export type HitZone = 'head' | 'torso' | 'legs';
@@ -56,24 +57,6 @@ export interface HitInfo {
   melee: boolean;
 }
 
-interface Ballistics {
-  muzzleVel: number;
-  drag: number; // quadratic drag coefficient (1/m)
-  damage: number;
-  zero: number; // metres
-}
-
-const BALLISTICS: Record<GunKind, Ballistics> = {
-  rifle: { muzzleVel: 820, drag: 0.00072, damage: 95, zero: 100 },
-  pistol: { muzzleVel: 350, drag: 0.0021, damage: 34, zero: 25 },
-  auto: { muzzleVel: 715, drag: 0.0011, damage: 48, zero: 100 },
-};
-
-/** What a gun fires: its kind's round, unless it says otherwise (see `round` on the weapon); how many leave at once, and how wide. */
-function roundOf(id: string): Ballistics & { pellets: number; cone: number } {
-  const w = ITEMS[id]?.weapon;
-  return { ...BALLISTICS[w?.kind ?? 'pistol'], ...(w?.round ?? {}), pellets: w?.round?.pellets ?? 1, cone: w?.round?.cone ?? 0 };
-}
 /** Is its bolt worked by hand after every shot? (a rifle's is, unless the gun says it loads itself) */
 function boltAction(id: string): boolean {
   const w = ITEMS[id]?.weapon;
@@ -108,13 +91,6 @@ const FIT: Record<string, { dot?: { at: [number, number, number]; size: number }
 /** the pieces of a gun that come from another model, and what has to be fitted for each to be there */
 const EXTRA: Record<string, string> = { suppressor: 'suppressor_9', red_dot: 'red_dot', gun_light: 'gun_light' };
 
-/** per-weapon handling: cyclic rate, recoil (camera kick in rad), hip spread */
-const HANDLING: Record<GunKind, { interval: number; kickV: number; kickH: number; climb: number; spread: number; vmKick: number }> = {
-  rifle: { interval: 0.2, kickV: 0.85, kickH: 0.35, climb: 0.012, spread: 0.022, vmKick: 3.2 },
-  pistol: { interval: 0.13, kickV: 0.42, kickH: 0.2, climb: 0.006, spread: 0.03, vmKick: 1.6 },
-  auto: { interval: 0.1, kickV: 0.3, kickH: 0.22, climb: 0.0062, spread: 0.035, vmKick: 1.35 },
-};
-
 interface Bullet {
   /** someone else's bullet has already been heard going past */
   heard?: boolean;
@@ -122,6 +98,8 @@ interface Bullet {
   vel: THREE.Vector3;
   drag: number;
   damage: number;
+  /** the speed it left the barrel at: what it does when it lands goes by how much of that it has left */
+  v0: number;
   life: number;
   travelled: number;
   weapon: string;
@@ -521,6 +499,8 @@ const HELD_RIFLE = 0.9;
  * the trigger or the sights the legs will not sprint. Seconds.
  */
 const SPRINT_OUT = { up: 0.22, keep: 0.45, lock: 0.4 };
+/** shots no further apart than this are one string: the kick of each goes by which shot of the string it is. Seconds. */
+const STRING_GAP = 0.28;
 
 /**
  * Where a gun that rides in another pack's hands sits in them, from where the fitting of the
@@ -665,6 +645,8 @@ export class Weapons {
   private kickRot = new Spring(170, 15);
   private sway = new Spring(120, 14);
   private aimRecoil = new Spring(90, 13);
+  /** how the aim comes back from a shot: a spring this near to dead-beat, which a push of v gets `RECOIL.peak` v / w out of before it turns (w its own rate) */
+  private static RECOIL = { damp: 0.68, peak: 0.466 };
   private adsT = 0;
   private sprintT = 0;
   /** seconds for which a trigger pulled on the run is remembered: the shot goes when the gun has come up */
@@ -1527,9 +1509,9 @@ export class Weapons {
   /** current weapon status for the HUD */
   status() {
     const it = this.currentItem;
-    if (!it) return { name: 'Fists', ammo: null as null | { loaded: number; reserve: number; cap: number; mags?: number; bare?: boolean }, action: this.action?.name ?? null, mode: null as FireMode | null };
+    if (!it) return { name: 'Fists', ammo: null as null | { loaded: number; reserve: number; cap: number; mags?: number; bare?: boolean }, action: this.action?.name ?? null, mode: null as FireMode | null, zero: null as number | null };
     const def = ITEMS[it.id];
-    if (!def.weapon) return { name: def.name, ammo: null as null | { loaded: number; reserve: number; cap: number; mags?: number; bare?: boolean }, action: this.action?.name ?? null, mode: null as FireMode | null };
+    if (!def.weapon) return { name: def.name, ammo: null as null | { loaded: number; reserve: number; cap: number; mags?: number; bare?: boolean }, action: this.action?.name ?? null, mode: null as FireMode | null, zero: null as number | null };
     // (a gun fed by a magazine: what its magazine holds, and what is in the others carried for it; the rounds loose in the pockets are not its to fire)
     const spare = def.weapon.mag ? this.magsFor(it) : null;
     return {
@@ -1539,6 +1521,8 @@ export class Weapons {
         : { loaded: it.loaded ?? 0, reserve: this.inv.count(def.weapon.ammo), cap: capacityOf(it) },
       action: this.action?.name ?? null,
       mode: def.weapon.modes ? this.fireMode(it) : null,
+      // (the range its sights are set for, where that can be changed)
+      zero: (GUNS[it.id]?.zero.length ?? 0) > 1 ? zeroOf(it.id, it.zero) : null,
     };
   }
 
@@ -1655,6 +1639,23 @@ export class Weapons {
 
   private selectorT = 0;
 
+  /**
+   * The sights set for a longer range or a shorter (Page Up, Page Down, as it is done in DayZ): a click of the
+   * drum, and the barrel points that much higher for the round to come down onto the mark at that distance. A
+   * gun with one setting has no drum to turn.
+   */
+  setZero(item: ItemInstance, by: 1 | -1) {
+    const steps = GUNS[item.id]?.zero;
+    if (!steps || steps.length < 2) return;
+    const at = steps.indexOf(zeroOf(item.id, item.zero));
+    const next = steps[Math.max(0, Math.min(steps.length - 1, at + by))];
+    if (next === zeroOf(item.id, item.zero)) return;
+    item.zero = next;
+    audio.click(3000, 0.3, 0.012);
+    this.onSay(`Sights set for ${next} m`, 'info');
+    this.onCarried();
+  }
+
   update(dt: number, input: Input, camera: THREE.PerspectiveCamera, enabled: boolean) {
     if (this.wanted !== undefined && !this.action) {
       const next = this.wanted;
@@ -1676,6 +1677,7 @@ export class Weapons {
       if (input.wheel !== 0 && this.abortReload()) input.wheel = 0;
       if (input.wheel !== 0 && !this.aiming) this.cycle(input.wheel > 0 ? 1 : -1);
       if (input.pressed('KeyB') && this.currentItem) this.toggleMode(this.currentItem);
+      if (this.currentItem && (input.pressed('PageUp') || input.pressed('PageDown'))) this.setZero(this.currentItem, input.pressed('PageUp') ? 1 : -1);
     }
 
     const m = this.current;
@@ -1686,7 +1688,7 @@ export class Weapons {
     // ----- aiming
     const canAim = enabled && !this.held && !!m && !p.sprinting && (!this.action || this.action.name === 'bolt') && !p.dead;
     this.aiming = canAim && input.held('Mouse2');
-    this.spread = def?.weapon ? this.spreadNow(def.weapon.kind) : 0;
+    this.spread = def?.weapon && item ? this.spreadNow(item.id) : 0;
     p.aiming = this.aiming;
     // a handy gun is at the eye in a fifth of a second; a long heavy one takes twice that
     const hd = handlingOf(item) ?? { ergo: 80, weight: 0.5, recoil: 1 };
@@ -1711,6 +1713,9 @@ export class Weapons {
 
     // ----- trigger / actions
     this.wantShot = Math.max(0, this.wantShot - dt);
+    // (shots close together are one string, however the trigger was worked: a quarter of a second without one ends it)
+    this.sinceShot += dt;
+    if (this.sinceShot > STRING_GAP) this.burst = 0;
     if (enabled && !this.held && m && item && def && !p.dead) {
       if (def.weapon) {
         const auto = this.fireMode(item) === 'auto';
@@ -1721,7 +1726,6 @@ export class Weapons {
         const up = this.sprintT < SPRINT_OUT.up;
         if (input.held('Mouse0') || input.held('Mouse2')) p.sprintLock = Math.max(p.sprintLock, SPRINT_OUT.lock);
         if (input.pressed('Mouse0')) {
-          this.burst = 0;
           if (up) this.tryFire(m, item, camera, true);
           else this.wantShot = SPRINT_OUT.keep;
         } else if (this.wantShot > 0 && up) {
@@ -1730,7 +1734,6 @@ export class Weapons {
         } else if (auto && input.held('Mouse0') && up) {
           this.tryFire(m, item, camera, false);
         }
-        if (!input.held('Mouse0')) this.burst = 0;
         if (input.pressed('KeyR') && !this.action) this.reload(m, item);
       } else if (def.melee) {
         // put up across the body to stop a blow (the other button), or swung
@@ -1777,23 +1780,19 @@ export class Weapons {
     this.animate(dt, input, camera);
   }
 
+  /** which shot of a string the last one was, and how long ago it went */
   private burst = 0;
+  private sinceShot = 9;
   /**
    * How far off the line of sight the next shot can land, radians (the full width of the
-   * cone). Standing still it is the weapon's own figure; moving opens it, being off the
+   * cone). At the eye and still it is the gun's own figure; moving opens it, being off the
    * ground opens it wide, crouching closes it a little. The crosshair is drawn this wide.
    */
   spread = 0;
 
-  private spreadNow(kind: GunKind): number {
+  private spreadNow(id: string): number {
     const p = this.player;
-    const hd = HANDLING[kind];
-    const move = p.movingSmooth;
-    const air = p.grounded ? 0 : 1;
-    const bloom = kind === 'auto' ? Math.min(Math.max(0, this.burst - 1), 8) * 0.0025 : 0;
-    const hip = hd.spread * (1 + move * 1.3) * (p.crouched ? 0.75 : 1) + air * 0.035;
-    const ads = 0.002 + move * 0.007 + air * 0.02;
-    return THREE.MathUtils.lerp(hip, ads, this.adsT) + bloom;
+    return coneOf(id, { aimed: this.adsT, moving: p.movingSmooth, air: !p.grounded, crouched: p.crouched, prone: p.prone, heat: this.burst });
   }
 
   private tryFire(m: VmModel, item: ItemInstance, camera: THREE.PerspectiveCamera, trigger: boolean) {
@@ -1807,55 +1806,50 @@ export class Weapons {
     }
     item.loaded = (item.loaded ?? 0) - 1;
     const kind = def.weapon.kind;
-    const b = roundOf(item.id);
-    // (its kind's handling, with its own kick and its own pace)
-    const kick = def.weapon.kick ?? 1;
-    const hd = { ...HANDLING[kind] };
-    hd.interval *= def.weapon.pace ?? 1;
-    hd.kickV *= kick;
-    hd.kickH *= kick;
-    hd.climb *= kick;
-    hd.vmKick *= Math.min(1.7, kick);
+    // (what it fires and how it kicks: see src/sim/gunplay.ts)
+    const gun = GUNS[item.id];
+    const b = shotOf(item.id);
+    const interval = intervalOf(item.id);
     this.burst++;
-    // eye-origin shot with zeroing elevation (bullet crosses line of sight at the zero range),
-    // along the way the gun is pointing: on the eye's own line unless it is still catching up with a turn
-    const dir = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(this.lag.y, this.lag.x, 0, 'YXZ')).applyQuaternion(camera.quaternion);
-    const t0 = b.zero / b.muzzleVel;
-    const elev = (0.5 * 9.81 * t0 * t0) / b.zero;
-    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
-    dir.addScaledVector(up, elev).normalize();
-    // hip fire is less precise, moving less still; sustained auto fire blooms
-    const spread = this.spreadNow(kind);
-    dir.x += (Math.random() - 0.5) * spread;
-    dir.y += (Math.random() - 0.5) * spread;
-    dir.z += (Math.random() - 0.5) * spread;
-    dir.normalize();
+    this.sinceShot = 0;
     const suppressed = quietOf(item);
+    const v0 = b.muzzleVel * (suppressed ? 0.9 : 1);
+    // From the eye, along the way the gun is pointing (on the eye's own line unless it is still catching up with a
+    // turn), and lifted by what brings the round back down onto that line at the range its sights are set for.
+    const dir = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(this.lag.y, this.lag.x, 0, 'YXZ')).applyQuaternion(camera.quaternion);
+    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion), right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+    dir.addScaledVector(up, elevationFor(v0, b.drag, zeroOf(item.id, item.zero))).normalize();
+    // Somewhere in the cone it can land in: anywhere across it, as likely near the edge as the middle of a ring
+    // of the same width (so most land a little way off the middle, few on it and few at the edge).
+    const spread = this.spreadNow(item.id);
+    const off = (spread / 2) * Math.sqrt(Math.random()), round = Math.random() * Math.PI * 2;
+    dir.addScaledVector(right, Math.cos(round) * off).addScaledVector(up, Math.sin(round) * off).normalize();
     this.onShot({ origin: camera.position.clone(), dir: dir.clone(), weapon: item.id, suppressed });
     // (a shell's pellets go out round the line of the shot, each its own way)
     for (let k = 0; k < b.pellets; k++) {
       const d = dir.clone();
       if (b.cone) d.add(new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(b.cone)).normalize();
-      this.bullets.push({ pos: camera.position.clone(), vel: d.multiplyScalar(b.muzzleVel * (suppressed ? 0.9 : 1)), drag: b.drag, damage: b.damage * (suppressed ? 0.9 : 1), life: 4, travelled: 0, weapon: item.id });
+      this.bullets.push({ pos: camera.position.clone(), vel: d.multiplyScalar(v0), drag: b.drag, damage: b.damage * (suppressed ? 0.9 : 1), v0, life: 4, travelled: 0, weapon: item.id });
     }
 
-    // feel: recoil springs, camera kick, flash, sound. Auto fire climbs up and
-    // drifts right, sawing left/right after the first few rounds.
-    const big = kind === 'rifle' || kick > 1.5;
-    // (tired arms and an unhandy gun kick harder; what is screwed on the muzzle takes some of it)
+    // The kick. What the shot does to the aim is the gun's own (and whoever is holding it: a knee, the ground,
+    // the sights, tired arms, what is screwed on the muzzle): part of it throws the aim up and across and comes
+    // back by itself, part of it stays and has to be pulled down. What is seen of the gun jumping is beside that.
+    const big = !!gun?.heavy;
     const feel = handlingOf(item) ?? { ergo: 80, weight: 0.5, recoil: 1 };
-    const stance = (this.player.crouched ? 0.7 : 1) * (this.aiming ? 0.85 : 1) * feel.recoil * (1 + (1 - this.armStamina) * 0.5) * THREE.MathUtils.lerp(1.12, 0.92, feel.ergo / 100);
-    const drift = kind === 'auto' ? (this.burst < 4 ? 0.12 : Math.sin(this.burst * 1.7) * 0.28) : (Math.random() - 0.5);
+    const kick = kickOf(item.id, { shot: this.burst, crouched: this.player.crouched, prone: this.player.prone, aimed: this.aiming, arms: this.armStamina, ergo: feel.ergo, fitted: feel.recoil }, Math.random);
+    this.aimRecoil.k = kick.back * kick.back;
+    this.aimRecoil.d = 2 * Weapons.RECOIL.damp * kick.back;
+    this.aimRecoil.v.y += (kick.up * kick.back) / Weapons.RECOIL.peak;
+    this.aimRecoil.v.x -= (kick.across * kick.back) / Weapons.RECOIL.peak;
+    this.player.pitch += kick.stayUp;
+    this.player.yaw -= kick.stayAcross;
     // (a pack's hands take the shot themselves: on top of that, half the kick the game gives a still model)
     const own = m.rig ? 0.5 : 1;
-    this.kick.v.z += hd.vmKick * own;
+    this.kick.v.z += (gun?.jump ?? 1.6) * own;
     this.kick.v.y += (big ? 0.25 : 0.4) * own;
     this.kickRot.v.x += (big ? 9 : kind === 'auto' ? 5.5 : 7) * own;
     this.kickRot.v.z += (Math.random() - 0.5) * (big ? 3 : 2) * own;
-    this.aimRecoil.v.y += hd.kickV * stance;
-    this.aimRecoil.v.x += drift * hd.kickH * stance;
-    this.player.pitch += hd.climb * stance; // part of the kick stays: you have to pull down
-    this.player.yaw -= drift * hd.climb * 0.35 * stance;
     // (the light and the smoke of it are in the world: they come from where the barrel's end is seen to be)
     const muzzleWorld = m.flash.root.parent
       ? this.toWorld(this.vmCamera.worldToLocal(m.flash.root.getWorldPosition(new THREE.Vector3())), camera)
@@ -1870,12 +1864,12 @@ export class Weapons {
     m.shotClip = m.rig?.has('fireLast') && (item.loaded ?? 0) === 0 ? 'fireLast' : 'fire';
     if (boltAction(item.id)) {
       this.boltReady = false;
-      this.fireCooldown = hd.interval;
+      this.fireCooldown = interval;
       setTimeout(() => {
         if (this.current === m && !this.action) this.cycleBolt(m);
       }, m.rig ? 300 : 260);
     } else {
-      this.fireCooldown = hd.interval;
+      this.fireCooldown = interval;
       this.slideKick = 1;
       // (a pack throws its own case)
       if (!m.rig || m.brass) this.eject(m, kind === 'rifle');
@@ -2231,14 +2225,14 @@ export class Weapons {
   remoteShot(origin: THREE.Vector3, dir: THREE.Vector3, weaponId: string, suppressed: boolean, from?: { pos: THREE.Vector3; dir: THREE.Vector3 } | null) {
     const kind = ITEMS[weaponId]?.weapon?.kind;
     if (!kind) return;
-    const b = roundOf(weaponId);
+    const b = shotOf(weaponId);
     // The shot is reported from the shooter's eye, which in this world is inside their own
     // head hit zone: the bullet starts a forearm's length out, or it would land on them.
     const out = dir.clone().normalize();
     for (let k = 0; k < b.pellets; k++) {
       const d = out.clone();
       if (b.cone) d.add(new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(b.cone)).normalize();
-      this.bullets.push({ pos: origin.clone().addScaledVector(out, 0.35), vel: d.multiplyScalar(b.muzzleVel), drag: b.drag, damage: 0, life: 4, travelled: 0.35, weapon: weaponId, ghost: true });
+      this.bullets.push({ pos: origin.clone().addScaledVector(out, 0.35), vel: d.multiplyScalar(b.muzzleVel), drag: b.drag, damage: 0, v0: b.muzzleVel, life: 4, travelled: 0.35, weapon: weaponId, ghost: true });
     }
     const d = this.mainCam ? origin.distanceTo(this.mainCam.position) : 0;
     // The flash is at the end of their barrel. (It was put three fifths of a metre out from
@@ -2352,7 +2346,7 @@ export class Weapons {
   }
 
   private updateBullets(dt: number) {
-    const g = 9.81;
+    const g = GRAVITY;
     for (let i = this.bullets.length - 1; i >= 0; i--) {
       const b = this.bullets[i];
       let remaining = dt;
@@ -2373,11 +2367,11 @@ export class Weapons {
           const n = new THREE.Vector3(hit.normal.x, hit.normal.y, hit.normal.z);
           const target = this.resolveTarget(hit.tag?.owner);
           const dist = b.travelled + hit.toi;
-          const energy = (speed * speed) / (BALLISTICS.rifle.muzzleVel * BALLISTICS.rifle.muzzleVel);
           if (target || hit.tag?.surface === 'flesh') {
             if (target && !b.ghost) {
               const zone = hit.tag?.zone ?? 'torso';
-              const dmg = b.damage * Math.max(0.35, Math.min(1, energy * 1.6 + 0.4)) * ZONE_MULT[zone][0];
+              // (by how much of its speed it has left: the same sum the server does from how far off it was)
+              const dmg = b.damage * damageKept(speed / b.v0) * ZONE_MULT[zone][0];
               const killed = target.damage(dmg, pt, dir, zone);
               this.markHit(killed, zone === 'head');
               this.onHit({ victim: target, weapon: b.weapon, target: target.name, zone, damage: dmg, killed, distance: dist, melee: false });

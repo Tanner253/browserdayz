@@ -1,6 +1,8 @@
 // Damage rules. The server uses these to decide how much a reported hit hurts, so a
 // client can say "I hit player 7 in the head with a Mosin" but never "for 5000 damage".
 
+import { CARTRIDGES, GUNS, damageKept, speedAt } from './gunplay';
+
 export type HitZone = 'head' | 'torso' | 'legs';
 
 export interface WeaponRule {
@@ -12,22 +14,29 @@ export interface WeaponRule {
   interval: number;
   /** damage kept at `range` (bullets lose energy) */
   falloff: number;
+  /** a gun: how the air slows what it fires, 1/m. What a hit does at a distance goes by the speed the round has left there (see gunplay.ts), not by a straight line to `falloff`. */
+  drag?: number;
   /** an explosion: the damage falls to nothing this many metres from where it went off */
   blast?: number;
   /** a shotgun: `damage` is one pellet's, and no shot is believed to land more than this many */
   pellets?: number;
 }
 
+/**
+ * The guns' rules, out of the one table the game shoots by (src/sim/gunplay.ts): what a round does is its
+ * cartridge's, how fast a gun can hit is its own rate (a bolt's: its cycle), how far a hit is believed is its
+ * reach, and what is left of a round at a distance is what its speed there leaves it.
+ */
+const gunRules = (): Record<string, WeaponRule> =>
+  Object.fromEntries(
+    Object.entries(GUNS).map(([id, g]) => {
+      const c = CARTRIDGES[g.ammo];
+      return [id, { damage: c.damage, melee: false, range: g.reach, interval: g.cycle ?? 60 / g.rpm, falloff: damageKept(speedAt(c.drag, g.reach)), drag: c.drag, ...(c.pellets ? { pellets: c.pellets } : {}) }];
+    }),
+  );
+
 export const WEAPON_RULES: Record<string, WeaponRule> = {
-  mosin: { damage: 95, melee: false, range: 900, interval: 0.8, falloff: 0.6 },
-  p38: { damage: 34, melee: false, range: 220, interval: 0.1, falloff: 0.45 },
-  m9: { damage: 34, melee: false, range: 220, interval: 0.1, falloff: 0.45 },
-  deagle: { damage: 58, melee: false, range: 260, interval: 0.2, falloff: 0.5 },
-  // (the two assault rifles: what each round does is what the item says it does, and no faster than each can cycle)
-  ak: { damage: 52, melee: false, range: 500, interval: 0.1, falloff: 0.5 },
-  ar15: { damage: 42, melee: false, range: 550, interval: 0.086, falloff: 0.5 },
-  // (buckshot: nine pellets, each little by itself and spent within a field's width)
-  benelli: { damage: 14, melee: false, range: 70, interval: 0.25, falloff: 0.3, pellets: 9 },
+  ...gunRules(),
   fists: { damage: 14, melee: true, range: 3.2, interval: 0.3, falloff: 1 },
   hatchet: { damage: 45, melee: true, range: 3.6, interval: 0.5, falloff: 1 },
   machete: { damage: 38, melee: true, range: 3.8, interval: 0.4, falloff: 1 },
@@ -59,7 +68,7 @@ export function hitDamage(weapon: string, zone: HitZone, distance: number, suppr
   if (!r) return 0;
   // a blast: `distance` is how far the victim was from it
   if (r.blast) return r.damage * Math.pow(Math.min(1, Math.max(0, 1 - distance / r.blast)), 1.3);
-  const k = r.melee ? 1 : 1 - (1 - r.falloff) * Math.min(1, Math.max(0, distance) / r.range);
+  const k = r.melee ? 1 : r.drag ? damageKept(speedAt(r.drag, distance)) : 1 - (1 - r.falloff) * Math.min(1, Math.max(0, distance) / r.range);
   const base = r.melee ? r.damage + Math.min(10, Math.max(0, bonus)) : r.damage * (suppressed ? 0.9 : 1);
   const n = r.pellets ? Math.max(1, Math.min(r.pellets, Math.floor(pellets) || 1)) : 1;
   return base * k * zoneMultiplier(zone, r.melee) * n;

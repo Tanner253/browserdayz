@@ -19,6 +19,7 @@
 // the fifth film). What is not in the game is said to be coming, on the picture.
 
 import * as THREE from 'three';
+import { shotOf } from '../sim/gunplay';
 import type { Actor, CamPose, Shot, Stage } from './director';
 import type { Arrangement, Level } from './music';
 import { BAR } from './shots';
@@ -40,7 +41,7 @@ export const SECONDS6 = BARS6 * BAR;
 
 /** what https://www.zonapvp.fun/api/cashins?format=json said when this was filmed (a read; never /api/tick) */
 const LIVE = { on: '9 OCT 2026', paidTags: 37, paidSol: 0.74, tagPays: 0.02, share: 2 };
-/** a 9 mm round and a rifle round, as the game has them (BALLISTICS in src/game/weapons.ts, which keeps them to itself) */
+/** a 9 mm round and a rifle round, as the game has them (CARTRIDGES in src/sim/gunplay.ts) */
 const NINE = 34, RIFLE = 95;
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -187,11 +188,11 @@ export function buildShots(S: Stage): Shot[] {
     tag: plate('TAKE THE TAG', ['off whoever you put down', 'stay alive 10:00 holding it', 'the map gives you away', 'cash it in: paid in SOL']),
     p38: plate('PISTOL 43', ['9 mm', `${gun('p38').capacity} rounds`, `${NINE} a round`]),
     m9: plate('M9', ['9 mm', `${gun('m9').capacity} rounds`, 'suppressor · sight · light']),
-    deagle: plate('DESERT EAGLE', ['.50', `${gun('deagle').capacity} rounds`, `${gun('deagle').round.damage} a round`]),
+    deagle: plate('DESERT EAGLE', ['.50', `${gun('deagle').capacity} rounds`, `${shotOf('deagle').damage} a round`]),
     sniper: plate('SNIPER RIFLE', ['7.62, bolt action', `${gun('mosin').capacity} rounds`, `${RIFLE} a round`]),
-    benelli: plate('BENELLI M3', ['12 gauge', `${gun('benelli').capacity} shells`, `${gun('benelli').round.pellets} pellets of ${gun('benelli').round.damage}`]),
-    eagle: plate('DESERT EAGLE', [`${gun('deagle').round.damage} a round`, `a 9 mm does ${NINE}`, 'the hardest-hitting pistol in the Zone']),
-    shotgun: plate('BENELLI M3', [`${gun('benelli').round.pellets} pellets a shell`, `${gun('benelli').round.pellets * gun('benelli').round.damage} if they all land`, 'nothing is worse to meet in a corridor']),
+    benelli: plate('BENELLI M3', ['12 gauge', `${gun('benelli').capacity} shells`, `${shotOf('benelli').pellets} pellets of ${shotOf('benelli').damage}`]),
+    eagle: plate('DESERT EAGLE', [`${shotOf('deagle').damage} a round`, `a 9 mm does ${NINE}`, 'the hardest-hitting pistol in the Zone']),
+    shotgun: plate('BENELLI M3', [`${shotOf('benelli').pellets} pellets a shell`, `${shotOf('benelli').pellets * shotOf('benelli').damage} if they all land`, 'nothing is worse to meet in a corridor']),
     fits: plate('WHAT FITS ON THEM', ['a holographic sight', 'suppressors: 9 mm, sniper, shotgun', 'a weapon light', 'longer magazines']),
     pace: plate('EMPTY HANDS RUN', ['holstered: 20% faster', 'aiming: 20% slower', 'X puts it away']),
     night: plate('NIGHT', [`a day is ${dayMin} minutes`, `${nightMin} of them are dark`, 'a flashlight · a weapon light · headlights']),

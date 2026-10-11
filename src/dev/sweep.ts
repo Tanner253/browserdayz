@@ -14,7 +14,7 @@ type Any = Record<string, any>;
 const W = window as unknown as Any;
 const T = W.T as Any, g = W.__game as Any;
 
-const GUNS = ['m9', 'deagle', 'p38', 'mosin', 'benelli'];
+const GUNS = ['m9', 'deagle', 'p38', 'mosin', 'benelli', 'ak', 'ar15'];
 const MELEE = ['hatchet', 'bat', 'shovel', 'knife', 'crowbar', 'machete'];
 const FACE = Math.PI * 0.75;
 const r2 = (x: number) => Math.round(x * 100) / 100;
@@ -184,7 +184,7 @@ const S = {
     if (o.mods) it.mods = o.mods;
     const slot = Object.entries(g.inv.slots).find(([, x]) => x === it)?.[0];
     const isGun = GUNS.includes(id);
-    const ammo = { m9: 'ammo_9mm', p38: 'ammo_9mm', deagle: 'ammo_50', mosin: 'ammo_762', benelli: 'ammo_12' }[id];
+    const ammo = { m9: 'ammo_9mm', p38: 'ammo_9mm', deagle: 'ammo_50', mosin: 'ammo_762', benelli: 'ammo_12', ak: 'ammo_739', ar15: 'ammo_556' }[id];
     if (ammo) for (let k = 0; k < 3; k++) T.give(ammo, 30);
     const second = T.give(id === 'hatchet' ? 'm9' : 'hatchet') as Any;
     const otherSlot = Object.entries(g.inv.slots).find(([, x]) => x === second)?.[0];

@@ -758,6 +758,8 @@ function cleanItem(raw: unknown, depth = 0): ItemInstance | null {
     if (Array.isArray(r.mods)) it.mods = r.mods.filter((m) => typeof m === 'string').slice(0, 6);
     // (its magazine: one it takes, or none; said by nobody, it is a gun from before magazines, and is given its own)
     if (def.weapon.mag && r.mag !== undefined) it.mag = typeof r.mag === 'string' && magFits(r.mag, r.id) ? r.mag : null;
+    // (the range its sights are set for: sanitizeItem holds it to one that gun has)
+    if (num(r.zero)) it.zero = r.zero;
   }
   if (def.mag) it.rounds = Math.max(0, Math.min(def.mag.capacity, Math.floor(Number(r.rounds) || 0)));
   if (def.use?.sips) it.left = Number.isFinite(Number(r.left)) ? Number(r.left) : def.use.sips;

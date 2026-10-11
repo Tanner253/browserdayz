@@ -19,6 +19,7 @@ import { PlayerInventory, SLOT_ORDER, type Container } from '../sim/inventory';
 import { Economy, type WorldLoot } from '../sim/economy';
 import { CRATE_RESTOCK, CRATE_SPECS, fillCrate } from '../sim/crates';
 import { WEAPON_RULES } from '../sim/combat';
+import { shotOf } from '../sim/gunplay';
 import { BARREL } from '../sim/barrels';
 import { EMOTE, EMOTES, EMOTE_GAP, SAY_RANGE, SAY_TIME, voiceOf } from '../sim/emotes';
 import { loadSave, writeSave, type SaveData } from '../sim/save';
@@ -1605,7 +1606,7 @@ export class Game {
   private onHit(h: HitInfo) {
     // A shotgun: nine hits in a few hundredths of a second. The server is told once for each
     // body, a moment later: how many landed, and where most of them did.
-    if (!h.melee && ITEMS[h.weapon]?.weapon?.round?.pellets && !this.pelletsOut && (h.victim instanceof Infected || h.victim instanceof RemotePlayer)) {
+    if (!h.melee && shotOf(h.weapon).pellets > 1 && !this.pelletsOut && (h.victim instanceof Infected || h.victim instanceof RemotePlayer)) {
       const got = this.pellets.get(h.victim) ?? { h, zones: {}, n: 0 };
       got.zones[h.zone] = (got.zones[h.zone] ?? 0) + 1;
       got.n++;
