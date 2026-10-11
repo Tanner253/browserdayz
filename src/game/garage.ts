@@ -53,6 +53,8 @@ const SIT_OF: (SeatPose | null)[][] = [[null, null, null, null], [CAR_SIT.front,
 /** the seats of each kind of car (the `k` of a VehicleInfo), and where its engine is, for the smoke */
 const SEATS_OF = [SEAT_AT, SEAT_CAR];
 const ENGINE_AT: [number, number, number][] = [[0, 0.5, -1.45], [0, 0.22, -1.9]];
+/** and what each is called, where a player is told what hurt them */
+const CALLED = ['jeep', 'police car'];
 /** how bright the lamps burn while somebody is at the wheel */
 const LAMPS = 1.8;
 /** how much of the metal the model's paint is drawn with is kept (see fromModel) */
@@ -407,7 +409,7 @@ export class Garage {
     // jumping from a jeep that is moving: it is the ground that hurts
     const speed = j.vel.length();
     p.vel.copy(j.vel).multiplyScalar(0.6);
-    if (speed > 7 && !p.dead) this.h.hurt((speed - 7) * 5, 'jumping from a moving jeep');
+    if (speed > 7 && !p.dead) this.h.hurt((speed - 7) * 5, `jumping from a moving ${CALLED[j.kind]}`);
     if (tell) {
       if (this.h.online()) this.h.net.send({ t: 'vout' });
       else {
@@ -582,7 +584,7 @@ export class Garage {
     this.char(j);
     this.h.boom(j.point(0, 0.3, -0.4, new THREE.Vector3()), mine);
     if (!this.h.online()) {
-      if (inside) this.h.hurt(400, 'a burning jeep');
+      if (inside) this.h.hurt(400, `a burning ${CALLED[j.kind]}`);
       const home = this.homes.get(j.i);
       if (home !== undefined) this.due.push({ home, t: JEEP.respawn });
       setTimeout(() => this.remove(j.i), 120_000);

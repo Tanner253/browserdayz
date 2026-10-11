@@ -1078,14 +1078,14 @@ export class Game {
       const zone = k.zone === 'head' ? ' · headshot' : '';
       const drum = k.w === 'barrel';
       const jeep = k.w === 'jeep' || k.w === 'fire';
-      const how = k.by !== null ? `${k.byName} killed ${k.name} · ${ITEMS[k.w]?.name ?? (drum ? 'fuel drum' : k.w === 'fire' ? 'burning jeep' : k.w)}${zone}${k.dist > 3 && !jeep ? ` · ${k.dist} m` : ''}` : `${k.name} died (${k.w})`;
+      const how = k.by !== null ? `${k.byName} killed ${k.name} · ${ITEMS[k.w]?.name ?? (drum ? 'fuel drum' : k.w === 'fire' ? 'burning wreck' : k.w === 'jeep' ? 'run down' : k.w)}${zone}${k.dist > 3 && !jeep ? ` · ${k.dist} m` : ''}` : `${k.name} died (${k.w})`;
       this.hud.feed(how, k.by === net.id || me);
       if (k.by === net.id) {
         this.weapons.confirmKill();
         this.hud.note(`You killed ${k.name}${zone}${k.dist > 3 ? ` · ${k.dist} m` : ''}`, 'good');
       }
       if (!me) this.remotes.get(k.id)?.avatar.setDeath(k.v ?? 0);
-      if (me) this.deathInfo = k.by !== null ? `Killed by ${k.byName} with ${drum ? 'a fuel drum' : k.w === 'fire' ? 'a burning jeep' : jeep ? 'a jeep' : ITEMS[k.w]?.name ?? 'bare hands'}${zone}. Your body and gear are where you fell.` : `You died of ${k.w}. Your body and gear are where you fell.`;
+      if (me) this.deathInfo = k.by !== null ? `Killed by ${k.byName} with ${drum ? 'a fuel drum' : k.w === 'fire' ? 'a burning wreck' : jeep ? 'the car they were driving' : ITEMS[k.w]?.name ?? 'bare hands'}${zone}. Your body and gear are where you fell.` : `You died of ${k.w}. Your body and gear are where you fell.`;
       else this.remotes.get(k.id)?.setAlive(false);
       if (m.corpse) void this.addCorpse(m.corpse);
     });
@@ -1219,7 +1219,7 @@ export class Game {
       const chest = new THREE.Vector3(b.pos.x, b.pos.y + 1.2, b.pos.z);
       const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(quat);
       this.effects.bleed(chest, dir, 0.8);
-      if (b.damage(Math.max(0, speed - JEEP.bumpFrom) * JEEP.bumpPer, chest, dir, 'torso')) this.hud.note('Infected down · jeep', 'good');
+      if (b.damage(Math.max(0, speed - JEEP.bumpFrom) * JEEP.bumpPer, chest, dir, 'torso')) this.hud.note('Infected down · run down', 'good');
       if (this.online) this.net.send({ t: 'ihit', i: b.i, zone: 'torso', w: 'jeep', dist: Math.round(speed * 10) / 10, sup: false, bonus: 0 });
     }
     for (const d of this.dummies) {
@@ -1229,7 +1229,7 @@ export class Game {
       const chest = new THREE.Vector3(d.pos.x, d.pos.y + 1.2, d.pos.z);
       const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(quat);
       this.effects.bleed(chest, dir, 0.8);
-      if (d.damage(Math.max(0, speed - JEEP.bumpFrom) * JEEP.bumpPer, chest, dir, 'torso')) this.hud.note('Training dummy down · jeep', 'good');
+      if (d.damage(Math.max(0, speed - JEEP.bumpFrom) * JEEP.bumpPer, chest, dir, 'torso')) this.hud.note('Training dummy down · run down', 'good');
     }
   }
 
@@ -1464,7 +1464,7 @@ export class Game {
     const blast = m.w === 'grenade' || m.w === 'barrel' || m.w === 'fire';
     const melee = !blast && !ITEMS[m.w]?.weapon;
     const sick = m.w === 'infected';
-    p.damage(amount, sick ? 'the infected' : m.w === 'fire' ? 'a burning jeep' : m.w === 'jeep' ? 'being run down' : blast ? 'an explosion' : melee ? 'a beating' : 'gunshot wounds');
+    p.damage(amount, sick ? 'the infected' : m.w === 'fire' ? 'a burning wreck' : m.w === 'jeep' ? 'being run down' : blast ? 'an explosion' : melee ? 'a beating' : 'gunshot wounds');
     this.glass = 0;
     this.setHold(null);
     // a bullet nearly always opens a wound, a blade often, a fist or a bat seldom
@@ -1703,7 +1703,7 @@ export class Game {
     const cam = this.s.r.camera, p = this.player, atmo = this.s.atmo;
     const carried = this.weapons.hasLamp || this.inv.count('flashlight') > 0;
     if (free && this.input.pressed('KeyL')) {
-      if (this.garage.ride) this.hud.note('The jeep lights its own lamps while somebody drives', 'warn');
+      if (this.garage.ride) this.hud.note('It lights its own lamps while somebody drives', 'warn');
       else if (!carried) this.hud.note('Nothing to light: find a flashlight, or a weapon light for your gun', 'warn');
       else {
         this.lit = !this.lit;
@@ -2314,7 +2314,7 @@ export class Game {
       if (k > 0) {
         let amount = spec.damage * k;
         for (const a of this.inv.wear('armor')) amount *= a;
-        p.damage(amount, jeep ? 'a burning jeep' : drum ? 'a fuel drum you set off' : 'your own grenade');
+        p.damage(amount, jeep ? 'a burning wreck' : drum ? 'a fuel drum you set off' : 'your own grenade');
         if (amount > 12) p.bleed();
         this.hud.hitFrom(p.yaw - Math.atan2(p.pos.x - at.x, p.pos.z - at.z));
         this.meDirty = true;

@@ -101,7 +101,7 @@ export class HUD {
       </div>
       <div class="hud-arms"><div></div></div>
       <div class="hud-stamina"><div></div></div>
-      <div class="hud-ride"><b>0</b><small>km/h</small><div class="ride-bars"><div class="ride-fuel" title="fuel"><i></i></div><div class="ride-hp" title="the jeep"><i></i></div></div></div>
+      <div class="hud-ride"><b>0</b><small>km/h</small><div class="ride-bars"><div class="ride-fuel" title="fuel"><i></i></div><div class="ride-hp" title="what it has left in it"><i></i></div></div></div>
       <div class="hud-hotbar"></div>
       <div class="hud-chat">
         <div class="chat-log"></div>
