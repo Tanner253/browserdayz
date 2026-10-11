@@ -10,7 +10,7 @@ import type { Input, MoveInput } from '../core/input';
 import { physics, SOLID_GROUPS } from '../core/physics';
 import type { Atmosphere } from '../world/atmosphere';
 import { WEAPON_RULES } from '../sim/combat';
-import { JEEP, RIDE_HEIGHT, SEATS, crashDamage, jeepSpots, restState, type VehicleInfo, type VState } from '../sim/vehicles';
+import { JEEP, POLICE_CAR, RIDE_HEIGHT, SEATS, crashDamage, jeepSpots, policeSpots, restState, type VehicleInfo, type VState } from '../sim/vehicles';
 import type { Net } from '../net/client';
 import { roadLift } from '../world/road';
 import type { World } from '../world/worldgen';
@@ -19,7 +19,7 @@ import type { Avatar } from './avatar';
 import type { Effects } from './effects';
 import type { Player } from './player';
 import type { RemotePlayer } from './remote';
-import { DRIVE, Jeep, groundOf, type Controls } from './vehicle';
+import { DRIVE, DRIVES, DRIVE_CAR, Jeep, groundOf, type Controls } from './vehicle';
 
 /**
  * Where whoever sits in each seat has their feet, in the jeep's own frame (x to its right,
@@ -31,6 +31,16 @@ export const SEAT_AT: [number, number, number][] = [
   [-0.41, -0.34, 1.0],
   [0.41, -0.34, 1.0],
 ];
+/** and in the police car: lower, the floor a hand over the road, the back seat a little further back */
+const SEAT_CAR: [number, number, number][] = [
+  [-0.4, -0.5, 0.12],
+  [0.4, -0.5, 0.12],
+  [-0.4, -0.5, 1.02],
+  [0.4, -0.5, 1.02],
+];
+/** the seats of each kind of car (the `k` of a VehicleInfo), and where its engine is, for the smoke */
+const SEATS_OF = [SEAT_AT, SEAT_CAR];
+const ENGINE_AT: [number, number, number][] = [[0, 0.5, -1.45], [0, 0.22, -1.9]];
 /** how bright the lamps burn while somebody is at the wheel */
 const LAMPS = 1.8;
 /** how much of the metal the model's paint is drawn with is kept (see fromModel) */
@@ -88,6 +98,8 @@ export class Garage {
   ready = false;
   private extra = new Map<Jeep, Extra>();
   private proto: { body: THREE.Object3D; wheels: THREE.Object3D[] } | null = null;
+  /** the police car's model (see POLICE_CAR): without it, one is drawn as a jeep */
+  private protoCar: { body: THREE.Object3D; wheels: THREE.Object3D[] } | null = null;
   private sendT = 0;
   /** a seat asked for and not yet given */
   private asked = 0;
@@ -112,11 +124,18 @@ export class Garage {
       DRIVE.base = m.base;
     } else if ((import.meta as { env?: { DEV?: boolean } }).env?.DEV) this.proto = standIn();
     this.ready = !!this.proto;
+    if (this.ready && assets.manifest.models[POLICE_CAR.model]) {
+      const m = fromModel(await assets.model(POLICE_CAR.model));
+      this.protoCar = m;
+      DRIVE_CAR.radius = m.radius;
+      DRIVE_CAR.track = m.track;
+      DRIVE_CAR.base = m.base;
+    }
   }
 
   /** One jeep's worth of the model: the shapes are shared, the paint is its own (one burns black, another has its lamps on). */
-  private make() {
-    const p = this.proto!;
+  private make(kind = 0) {
+    const p = (kind === POLICE_CAR.kind && this.protoCar) || this.proto!;
     const body = p.body.clone(true), wheels = p.wheels.map((w) => w.clone(true));
     const own = new Map<THREE.Material, THREE.Material>();
     const lamps: THREE.MeshStandardMaterial[] = [];
@@ -152,8 +171,9 @@ export class Garage {
 
   add(v: VehicleInfo) {
     if (!this.ready || this.jeeps.has(v.i)) return;
-    const j = new Jeep(v.i, this.groundAt);
-    const made = this.make();
+    const kind = v.k === POLICE_CAR.kind && this.protoCar ? POLICE_CAR.kind : 0;
+    const j = new Jeep(v.i, this.groundAt, DRIVES[kind], kind);
+    const made = this.make(kind);
     j.build(this.h.scene, v.s, made);
     j.hp = v.hp;
     j.fuel = v.fuel;
@@ -184,13 +204,19 @@ export class Garage {
   startAlone() {
     this.clear();
     if (!this.ready) return;
-    jeepSpots(this.h.world).forEach((p, home) => this.standAlone(p, home));
+    this.parks().forEach((p, home) => this.standAlone(p, home));
   }
 
-  private standAlone(p: { x: number; y: number; z: number; yaw: number }, home: number) {
+  /** where every car stands when the world is new: the jeeps, and after them the police cars (as the server numbers them) */
+  private parks() {
+    const jeeps = jeepSpots(this.h.world);
+    return [...jeeps.map((p) => ({ ...p, k: 0 })), ...policeSpots(this.h.world, jeeps).map((p) => ({ ...p, k: POLICE_CAR.kind }))];
+  }
+
+  private standAlone(p: { x: number; y: number; z: number; yaw: number; k: number }, home: number) {
     const i = this.nextId++;
     this.homes.set(i, home);
-    this.add({ i, s: restState(p.x, p.y, p.z, p.yaw), hp: JEEP.hp, fuel: Math.round(JEEP.tank * (0.3 + Math.random() * 0.45)), seats: Array(SEATS).fill(null), sim: null });
+    this.add({ i, s: restState(p.x, p.y, p.z, p.yaw), hp: JEEP.hp, fuel: Math.round(JEEP.tank * (0.3 + Math.random() * 0.45)), seats: Array(SEATS).fill(null), sim: null, ...(p.k ? { k: p.k } : {}) });
   }
 
   /** what the server sends about them, wired to what is done about it here */
@@ -223,7 +249,7 @@ export class Garage {
     for (const j of this.jeeps.values()) {
       for (const r of this.h.remotes.values()) {
         const k = j.seats.indexOf(r.id);
-        if (k >= 0) r.seat = { jeep: j, at: SEAT_AT[k] };
+        if (k >= 0) r.seat = { jeep: j, at: SEATS_OF[j.kind][k] };
       }
     }
   }
@@ -238,7 +264,7 @@ export class Garage {
     // everybody else, into and out of their seats
     for (const r of this.h.remotes.values()) {
       const k = seats.indexOf(r.id);
-      if (k >= 0) r.seat = { jeep: j, at: SEAT_AT[k] };
+      if (k >= 0) r.seat = { jeep: j, at: SEATS_OF[j.kind][k] };
       else if (r.seat?.jeep === j) r.seat = null;
     }
     const mine = online ? seats.indexOf(me) : this.ride?.jeep === j ? this.ride.seat : -1;
@@ -264,7 +290,7 @@ export class Garage {
     let best = -1, bd = Infinity;
     for (let k = 0; k < SEATS; k++) {
       if (j.seats[k] !== null) continue;
-      const s = SEAT_AT[k];
+      const s = SEATS_OF[j.kind][k];
       const d = j.point(s[0] * 2.6, 0, s[2], _a).distanceTo(from) - (k === 0 ? 0.35 : 0);
       if (d < bd) {
         bd = d;
@@ -342,7 +368,7 @@ export class Garage {
     this.ride = null;
     p.seat(false);
     this.h.avatar.setSeat(false);
-    const s = SEAT_AT[r.seat];
+    const s = SEATS_OF[r.jeep.kind][r.seat];
     const side = Math.sign(s[0]);
     // beside their own door, then the other side, then behind it, then in front, then on top of it
     const tries: [number, number][] = [[side * 1.75, s[2]], [-side * 1.75, s[2]], [side * 1.75, s[2] + 1], [0, 3.1], [0, -3.1]];
@@ -427,7 +453,7 @@ export class Garage {
 
     const r = this.ride;
     if (r) {
-      const j = r.jeep, s = SEAT_AT[r.seat];
+      const j = r.jeep, s = SEATS_OF[r.jeep.kind][r.seat];
       p.ride(j.point(s[0], s[1], s[2], _a), j.vel);
       // the view turns with the jeep; the mouse turns it round the jeep
       const yaw = j.yaw;
@@ -447,7 +473,7 @@ export class Garage {
   seatBody() {
     const r = this.ride;
     if (!r) return;
-    const s = SEAT_AT[r.seat];
+    const s = SEATS_OF[r.jeep.kind][r.seat];
     r.jeep.point(s[0], s[1], s[2], this.h.avatar.root.position);
     this.h.avatar.root.quaternion.copy(r.jeep.quat);
   }
@@ -494,7 +520,7 @@ export class Garage {
   private crashed(j: Jeep, hard: number) {
     const x = this.extra.get(j)!;
     const now = performance.now();
-    audio.crash(j.pos, Math.min(1, (hard - DRIVE.crash) / 10));
+    audio.crash(j.pos, Math.min(1, (hard - j.d.crash) / 10));
     if (now - x.crashAt < 350) return;
     x.crashAt = now;
     if (this.h.online()) this.h.net.send({ t: 'vcrash', i: j.i, n: Math.round(hard * 10) / 10 });
@@ -509,7 +535,7 @@ export class Garage {
   private runDown(j: Jeep, x: Extra, now: number) {
     const speed = j.vel.length();
     if (speed < JEEP.bumpFrom) return;
-    const [hx, , hz] = DRIVE.hull;
+    const [hx, , hz] = j.d.hull;
     _q.copy(j.quat).invert();
     for (const r of this.h.remotes.values()) {
       if (!r.alive || r.seat || now - (x.hitAt.get(r.id) ?? -1e9) < 700) continue;
@@ -580,7 +606,7 @@ export class Garage {
   private aloneTick(dt: number) {
     for (let k = this.due.length - 1; k >= 0; k--) {
       const d = this.due[k];
-      const p = jeepSpots(this.h.world)[d.home];
+      const p = this.parks()[d.home];
       if ((d.t -= dt) > 0 || !p || Math.hypot(p.x - this.h.player.pos.x, p.z - this.h.player.pos.z) < 25) continue;
       this.due.splice(k, 1);
       this.standAlone(p, d.home);
@@ -603,15 +629,15 @@ export class Garage {
       for (const m of x.lamps) m.emissiveIntensity = lit ? LAMPS : 0;
     }
     const left = j.hp / JEEP.hp;
-    if (!j.wreck && left < JEEP.smokeAt) fx.engineSmoke(j.point(0, 0.5, -1.45, _a), x.smoke, dt, left < JEEP.fireAt, 1 - left / JEEP.smokeAt);
+    if (!j.wreck && left < JEEP.smokeAt) fx.engineSmoke(j.point(...ENGINE_AT[j.kind], _a), x.smoke, dt, left < JEEP.fireAt, 1 - left / JEEP.smokeAt);
     else if (j.wreck) fx.engineSmoke(j.point(0, 0.6, -0.4, _a), x.smoke, dt * 0.5, false, 0.6);
     // what the rear wheels throw up, off the road
     const fast = Math.abs(j.speed);
     if (j.grounded >= 2 && (fast > 5 || j.slide > 0.25) && j.ground !== 'rock') {
       const amount = j.ground === 'asphalt' ? j.slide * 0.5 : THREE.MathUtils.clamp(fast / 16, 0.2, 1) + j.slide;
       if (amount > 0.05) {
-        fx.dust(j.point(-DRIVE.track, -0.7, DRIVE.base, _a), j.vel, j.ground, amount, x.dust, dt);
-        fx.dust(j.point(DRIVE.track, -0.7, DRIVE.base, _a), j.vel, j.ground, amount, x.dust, dt);
+        fx.dust(j.point(-j.d.track, -0.7, j.d.base, _a), j.vel, j.ground, amount, x.dust, dt);
+        fx.dust(j.point(j.d.track, -0.7, j.d.base, _a), j.vel, j.ground, amount, x.dust, dt);
       }
     }
   }

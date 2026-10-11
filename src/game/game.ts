@@ -102,6 +102,8 @@ interface TimedAction {
 const LOOT_REV = 17;
 /** where a jeep's headlamps are on it: so far either side of its middle, so far over its middle, so far forward (it is 2.08 m to its nose) */
 const HEADLAMP = { x: 0.5, y: 0.14, z: -2.12 };
+/** and the police car's: wider apart, lower, and further forward (it is 2.58 m to its nose) */
+const HEADLAMP_CAR = { x: 0.68, y: -0.14, z: -2.6 };
 const QUICK_KEYS = ['Digit5', 'Digit6', 'Digit7', 'Digit8'];
 /** the keys that put something else in the hands */
 const HAND_KEYS = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'KeyX'];
@@ -1721,8 +1723,9 @@ export class Game {
         // One light, thrown from between the two lamps at the front of the car and at their height, with no
         // disc of its own: each lens is a point of light to whoever is in front and some way off. (It was thrown
         // from a metre over the middle of the car, with a white disc there: a ball of light sitting on the bonnet.)
-        this.lamps.beam(_lampPos.set(0, HEADLAMP.y, HEADLAMP.z).applyQuaternion(j.quat).add(j.pos), _lampDir, 2.4, 1.5, 0);
-        for (const side of [-1, 1]) this.lamps.flare(_lampPos.set(side * HEADLAMP.x, HEADLAMP.y, HEADLAMP.z + 0.06).applyQuaternion(j.quat).add(j.pos), _lampDir, 1);
+        const L = j.kind ? HEADLAMP_CAR : HEADLAMP;
+        this.lamps.beam(_lampPos.set(0, L.y, L.z).applyQuaternion(j.quat).add(j.pos), _lampDir, 2.4, 1.5, 0);
+        for (const side of [-1, 1]) this.lamps.flare(_lampPos.set(side * L.x, L.y, L.z + 0.06).applyQuaternion(j.quat).add(j.pos), _lampDir, 1);
       }
       // the street lamps of the village, from dusk
       for (const at of this.streetLamps) if (at.distanceToSquared(cam.position) < 260 * 260) this.lamps.glow(at, STREET_LAMP, Math.min(1, (atmo.night - 0.3) / 0.3), 22);

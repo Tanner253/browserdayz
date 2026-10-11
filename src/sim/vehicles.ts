@@ -68,7 +68,16 @@ export interface VehicleInfo {
   seats: (number | null)[];
   /** whose game is working out how it moves (null: it stands still) */
   sim: number | null;
+  /** which car it is: 1 is the police car (see POLICE_CAR). The jeep says nothing. */
+  k?: number;
 }
+
+/**
+ * The second car (2026-10-10): a police car, one beside each police station. A road car: on the road it leaves a
+ * jeep behind, and off it a jeep leaves it (how each drives is in src/game/vehicle.ts). In everything else it is a
+ * jeep: four seats, the same tank, the same fire.
+ */
+export const POLICE_CAR = { model: 'police_car', kind: 1 };
 
 export const SEATS = 4;
 
@@ -156,6 +165,41 @@ export function jeepSpots(world: World, count = JEEP.count, outlying = JEEP.outl
         out.push({ x, y: heightAt(H, x, z), z, yaw: st.rot });
         break place;
       }
+    }
+  }
+  return out;
+}
+
+/**
+ * Where the police cars stand when the world is new: one beside each police station, alongside it with its nose
+ * the way the station's door faces, on ground that is level and clear. The same on every game and on the server.
+ * @param taken where cars stand already: none is stood within a few paces of those
+ */
+export function policeSpots(world: World, taken: { x: number; z: number }[] = []): { x: number; y: number; z: number; yaw: number }[] {
+  const H = world.heights;
+  const out: { x: number; y: number; z: number; yaw: number }[] = [];
+  const free = (x: number, z: number) => {
+    const y = heightAt(H, x, z);
+    for (const [dx, dz] of [[2.4, 0], [-2.4, 0], [0, 2.4], [0, -2.4]]) if (Math.abs(heightAt(H, x + dx, z + dz) - y) > 0.4) return false;
+    // (clear of every wall by more than its own width, and of every tree, rock and thing left in a yard)
+    if (world.buildings.some((b) => {
+      const [w, d] = BUILDING_FOOTPRINT[b.type];
+      const dx = x - b.x, dz = z - b.z, c = Math.cos(b.rot), s = Math.sin(b.rot);
+      return Math.abs(dx * c - dz * s) < w / 2 + 3 && Math.abs(dx * s + dz * c) < d / 2 + 3;
+    })) return false;
+    if ([...taken, ...out].some((o) => Math.hypot(o.x - x, o.z - z) < 7)) return false;
+    return !world.trees.some((t) => Math.hypot(t.x - x, t.z - z) < 3.2) && !world.rocks.some((t) => Math.hypot(t.x - x, t.z - z) < 3.2) && !world.props.some((t) => Math.hypot(t.x - x, t.z - z) < 3.4);
+  };
+  for (const b of world.buildings) {
+    if (b.type !== 'police') continue;
+    const [w, d] = BUILDING_FOOTPRINT.police, c = Math.cos(b.rot), s = Math.sin(b.rot);
+    // (beside it first, then before its door, then behind: [to its right, toward its front])
+    for (const [right, fwd] of [[w / 2 + 3.6, 1], [-(w / 2 + 3.6), 1], [w / 2 + 3.6, d / 2 + 2.5], [-(w / 2 + 3.6), d / 2 + 2.5], [3, d / 2 + 6], [-3, d / 2 + 6], [w / 2 + 6.5, -2], [-(w / 2 + 6.5), -2], [0, -(d / 2 + 5.5)], [w / 2 + 9, 3], [-(w / 2 + 9), 3]]) {
+      const x = b.x + right * c + fwd * s, z = b.z - right * s + fwd * c;
+      if (!free(x, z)) continue;
+      // (a building's front is the way its rot turns +z; a car at yaw 0 looks down -z)
+      out.push({ x, y: heightAt(H, x, z), z, yaw: b.rot + Math.PI });
+      break;
     }
   }
   return out;

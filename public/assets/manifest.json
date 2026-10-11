@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-10T23:50:23.263Z",
+ "generated": "2026-10-11T00:05:22.397Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr"
@@ -2153,6 +2153,26 @@
     0.9133,
     2.1543,
     2.0546
+   ],
+   "lods": []
+  },
+  "police_car": {
+   "url": "assets/models/police_car.glb",
+   "tags": [
+    "vehicle"
+   ],
+   "bytes": 888112,
+   "srcTris": 256420,
+   "tris": 60131,
+   "min": [
+    -0.9915,
+    0,
+    -2.5767
+   ],
+   "max": [
+    1.0049,
+    1.5984,
+    2.8265
    ],
    "lods": []
   },

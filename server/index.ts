@@ -28,7 +28,7 @@ import { BUNKER, bunkerDark, inBunker } from '../src/sim/bunker';
 import { phaseOf } from '../src/sim/daynight';
 import { WEAPON_RULES, hitDamage, type HitZone } from '../src/sim/combat';
 import { BARREL } from '../src/sim/barrels';
-import { JEEP, SEATS, crashDamage, restState, type VehicleInfo, type VState } from '../src/sim/vehicles';
+import { JEEP, POLICE_CAR, SEATS, crashDamage, restState, type VehicleInfo, type VState } from '../src/sim/vehicles';
 import { Director, INFECTED, guarded, infectedDrop } from '../src/sim/infected';
 import { EMOTE, EMOTE_GAP, SHOUT_RANGE } from '../src/sim/emotes';
 import { ACTS, CHAT_RANGE, F_DEAD, F_GUARD, MAX_STAMINA, PROTOCOL, type C2S, type CorpseInfo, type KillInfo, type PlayerInfo, type Pose, type S2C, type StashInfo, type StoredItem, type Vitals } from '../src/net/protocol';
@@ -104,14 +104,16 @@ const vehicles = new Map<number, Veh>();
 /** spots whose jeep burned: which -> when a new one may be stood there */
 const jeepsDue = new Map<number, number>();
 let nextVeh = 1;
+/** where every car stands when the world is new, by the number of its place: the jeeps, and after them the police cars */
+const PARKS = [...world.jeeps.map((p) => ({ ...p, k: 0 })), ...world.cars.map((p) => ({ ...p, k: POLICE_CAR.kind }))];
 function standJeep(home: number): Veh {
-  const p = world.jeeps[home];
-  const v: Veh = { i: nextVeh++, s: restState(p.x, p.y, p.z, p.yaw), hp: JEEP.hp, fuel: Math.round(JEEP.tank * (0.3 + Math.random() * 0.45)), seats: Array(SEATS).fill(null), sim: null, home, heard: 0, burnAt: 0, by: 0, goneAt: 0 };
+  const p = PARKS[home];
+  const v: Veh = { i: nextVeh++, s: restState(p.x, p.y, p.z, p.yaw), hp: JEEP.hp, fuel: Math.round(JEEP.tank * (0.3 + Math.random() * 0.45)), seats: Array(SEATS).fill(null), sim: null, home, heard: 0, burnAt: 0, by: 0, goneAt: 0, ...(p.k ? { k: p.k } : {}) };
   vehicles.set(v.i, v);
   return v;
 }
-world.jeeps.forEach((_, k) => standJeep(k));
-const vehInfo = (v: Veh): VehicleInfo => ({ i: v.i, s: v.s, hp: v.goneAt ? 0 : v.hp, fuel: v.fuel, seats: v.seats, sim: v.sim });
+PARKS.forEach((_, k) => standJeep(k));
+const vehInfo = (v: Veh): VehicleInfo => ({ i: v.i, s: v.s, hp: v.goneAt ? 0 : v.hp, fuel: v.fuel, seats: v.seats, sim: v.sim, ...(v.k ? { k: v.k } : {}) });
 const tellSeats = (v: Veh, rest = false) => broadcast({ t: 'vseat', i: v.i, seats: v.seats, sim: v.sim, ...(rest ? { s: v.s } : {}) });
 const isVState = (s: unknown): s is VState => Array.isArray(s) && s.length === 12 && s.every(num) && Math.abs(s[0]) < EDGE && Math.abs(s[2]) < EDGE && Math.abs(s[1]) < 500 && Math.abs(Math.hypot(s[3], s[4], s[5], s[6]) - 1) < 0.02 && Math.hypot(s[7], s[8], s[9]) < 60;
 
@@ -1632,7 +1634,7 @@ setInterval(() => {
       broadcast({ t: 'v-', i: v.i });
     } else if (!v.goneAt && (v.s[1] < JEEP.floor || Math.abs(v.s[0]) > EDGE || Math.abs(v.s[2]) > EDGE) && v.seats.every((s) => s === null)) {
       // off the edge of the world, or through the bottom of it: stood back where it started
-      const p = world.jeeps[v.home];
+      const p = PARKS[v.home];
       v.s = restState(p.x, p.y, p.z, p.yaw);
       v.sim = null;
       tellSeats(v, true);
@@ -1658,7 +1660,7 @@ setInterval(() => {
   }
   // a new one for each that burned, once its time has come and nobody is standing on the spot
   for (const [home, at] of jeepsDue) {
-    const p = world.jeeps[home];
+    const p = PARKS[home];
     if (now < at || [...clients.values()].some((c) => c.alive && Math.hypot(c.pose[0] - p.x, c.pose[2] - p.z) < JEEP.respawnClear) || [...vehicles.values()].some((v) => Math.hypot(v.s[0] - p.x, v.s[2] - p.z) < 8)) continue;
     jeepsDue.delete(home);
     broadcast({ t: 'v+', v: vehInfo(standJeep(home)) });

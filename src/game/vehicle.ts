@@ -90,6 +90,37 @@ export const DRIVE = {
   crash: 3.2,
 };
 
+/**
+ * The police car: the same machine with a road car's numbers. Long, low and stiff: half as fast again as the jeep on
+ * the road and quicker to get there, and on grass and dirt slower than it, with less hold and little room under it
+ * before the ground is something it has run into. Its wheels are where its model's are (see Garage.load).
+ */
+export const DRIVE_CAR: typeof DRIVE = {
+  ...DRIVE,
+  mass: 1850,
+  hull: [0.9, 0.37, 2.6, 0.14, -0.21],
+  roof: [0.72, 0.06, 0.95, 0.56, 0.45],
+  low: 0.3,
+  inertia: [1.6, 1.3, 2.0],
+  rest: 0.27,
+  travel: 0.15,
+  stiff: 27,
+  comp: 4.4,
+  relax: 7.6,
+  force: 12500,
+  top: { asphalt: 31, gravel: 21, grass: 14, dirt: 12.5, rock: 9 },
+  reverse: [8, 0.6],
+  roll: { asphalt: 0.16, gravel: 0.5, grass: 0.9, dirt: 1.05, rock: 1.2 },
+  grip: { asphalt: 1.32, gravel: 1.0, grass: 0.86, dirt: 0.8, rock: 0.85 },
+  rear: 0.88,
+  lean: [0.85, 7.5],
+  brake: 10.5,
+  steer: [0.56, 0.12],
+  steerAt: 26,
+};
+/** how each kind of car drives: 0 the jeep, 1 the police car (the `k` of a VehicleInfo) */
+export const DRIVES = [DRIVE, DRIVE_CAR];
+
 export interface Controls {
   /** -1 (back) .. 1 */
   throttle: number;
@@ -162,11 +193,12 @@ export class Jeep {
   /** seconds it has been all but still (see atRest) */
   private still = 0;
 
-  constructor(public i: number, private groundAt: (x: number, z: number) => Ground) {}
+  /** @param d how it drives: the jeep's numbers, or another car's (see DRIVES) @param kind which car it is */
+  constructor(public i: number, private groundAt: (x: number, z: number) => Ground, readonly d: typeof DRIVE = DRIVE, readonly kind = 0) {}
 
   /** @param visual the model: its body, and four wheels each turning about its own middle (in the order of `wheels`) */
   build(scene: THREE.Scene, s: VState, visual: { body: THREE.Object3D; wheels: THREE.Object3D[] }) {
-    const R = physics.R, D = DRIVE;
+    const R = physics.R, D = this.d;
     const [hx, hy, hz, round, hullUp] = D.hull;
     const w = hx * 2, h = hy * 2, l = hz * 2;
     const m = D.mass / 12;
@@ -221,7 +253,7 @@ export class Jeep {
 
   /** the springs, as DRIVE has them now */
   tune() {
-    const D = DRIVE;
+    const D = this.d;
     for (let i = 0; i < 4; i++) {
       this.ctrl.setWheelSuspensionRestLength(i, D.rest);
       this.ctrl.setWheelMaxSuspensionTravel(i, D.travel);
@@ -310,7 +342,7 @@ export class Jeep {
     this.prevPos.set(t.x, t.y, t.z);
     this.prevQuat.set(rot.x, rot.y, rot.z, rot.w);
     if (this.mode !== 'sim') return;
-    const D = DRIVE, ctrl = this.ctrl;
+    const D = this.d, ctrl = this.ctrl;
     const lv = b.linvel();
     // What the last step did to it that the springs and the engine did not: it ran into something.
     if (this.hasPost) {
@@ -512,7 +544,7 @@ export class Jeep {
   }
 
   private draw(dt: number) {
-    const D = DRIVE;
+    const D = this.d;
     this.root.position.copy(this.pos);
     this.root.quaternion.copy(this.quat);
     for (let i = 0; i < this.wheels.length; i++) {

@@ -10,7 +10,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
-import { dedup, prune, weld, textureCompress, meshopt, getBounds, transformMesh } from '@gltf-transform/functions';
+import { dedup, prune, weld, simplify, textureCompress, meshopt, getBounds, transformMesh } from '@gltf-transform/functions';
 import { MeshoptEncoder, MeshoptSimplifier } from 'meshoptimizer';
 import sharp from 'sharp';
 import { HDRI, TEXTURES, MODELS, LOCAL_MODELS, WEAPON_PACKS } from './assets.config.mjs';
@@ -305,7 +305,7 @@ async function processLocal(id) {
   localCredits.push({ id, ...cfg.credit });
   const io = await getIO();
   const dest = path.join(OUT, 'models', `${id}.glb`);
-  const stamp = JSON.stringify({ tex: cfg.tex, scale: cfg.scale, turn: cfg.turn, v: 1 });
+  const stamp = JSON.stringify({ tex: cfg.tex, scale: cfg.scale, turn: cfg.turn, wheel: cfg.wheel?.source, skip: cfg.skip?.source, budget: cfg.budget, v: 1 });
   const metaPath = path.join(dir, '_meta.json');
   let meta;
   if (!FORCE && (await exists(dest)) && (await exists(metaPath))) {
@@ -318,8 +318,12 @@ async function processLocal(id) {
     await doc.transform(prune(), weld());
     const srcTris = countTris(doc);
     const scene = doc.getRoot().listScenes()[0];
+    // (`skip`: pieces of the download that are left out; `wheel`: which of the rest are its four wheels, where the
+    // word alone does not say: a car whose brakes are pieces of their own has eight things called a wheel)
+    const label = (n) => `${n.getName()} ${n.getParentNode()?.getName() ?? ''}`;
+    for (const n of doc.getRoot().listNodes()) if (n.getMesh() && cfg.skip?.test(label(n))) n.setMesh(null);
     const drawn = doc.getRoot().listNodes().filter((n) => n.getMesh());
-    const wheels = drawn.filter((n) => /wheel/i.test(`${n.getName()} ${n.getParentNode()?.getName() ?? ''}`));
+    const wheels = drawn.filter((n) => (cfg.wheel ?? /wheel/i).test(label(n)));
     if (wheels.length !== 4) throw new Error(`${id}: expected four wheels, found ${wheels.length}`);
     // To metres, nose toward -z: and then stood on y = 0 with the middle of its wheelbase at the origin.
     const turned = mat4.mul(mat4.turnY(cfg.turn ?? 0), mat4.scale(cfg.scale ?? 1));
@@ -349,6 +353,8 @@ async function processLocal(id) {
     for (const n of drawn) n.setMesh(null);
     for (const p of parts) scene.addChild(p);
     await doc.transform(prune());
+    // (`budget`: about how many triangles it is brought down to. A car modelled for a close-up has a hundred thousand in its body and thirty thousand in every wheel)
+    if (cfg.budget && countTris(doc) > cfg.budget) await doc.transform(weld(), simplify({ simplifier: MeshoptSimplifier, ratio: cfg.budget / countTris(doc), error: 0.004 }));
     const bounds = getBounds(scene);
     const tris = countTris(doc);
     await doc.transform(

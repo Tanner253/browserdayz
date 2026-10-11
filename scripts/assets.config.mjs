@@ -348,6 +348,27 @@ export const LOCAL_MODELS = {
       changes: 'Scaled to metres and turned to face the way the game drives; each wheel re-centred on its own middle; textures re-encoded as WebP; geometry compressed.',
     },
   },
+  // The police car (2026-10-10): the second car, a road car. It came 6.7 long, nose toward +z, a quarter of a
+  // million triangles, and with its brakes as pieces of their own (four more things called a wheel): those are
+  // left out, it is made the length of the car it is drawn from, and brought down to what a game can draw.
+  police_car: {
+    kind: 'vehicle',
+    file: 'scene.gltf',
+    tex: 2048,
+    scale: 0.806,
+    turn: Math.PI,
+    wheel: /Wheel\.(Ft|Bk)\./,
+    skip: /WheelBrake/,
+    budget: 60000,
+    tags: ['vehicle'],
+    credit: {
+      name: 'Police car',
+      url: 'https://sketchfab.com/3d-models/police-car-9166b13b6ae341f4bfc093edb71d74f4',
+      author: 'Mateusz Woliński',
+      line: 'This work is based on "Police car" (https://sketchfab.com/3d-models/police-car-9166b13b6ae341f4bfc093edb71d74f4) by Mateusz Woliński (https://sketchfab.com/jeandiz) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)',
+      changes: 'Scaled to metres and turned to face the way the game drives; each wheel re-centred on its own middle; its brake discs left out; brought down to about sixty thousand triangles; textures re-encoded as WebP; geometry compressed.',
+    },
+  },
   // The bunker's own fittings, all out of one download ("Bunker PBR Showcase Props JFG"): each is
   // a few of its shapes, picked out by name and brought to the size of a room three metres high.
   bunker_terminal: { dir: 'bunker_props', only: /^SM_TerminalBaseOnly/, size: 1.5, tex: 2048, tags: ['prop'], changes: 'Only these of its shapes are used here, scaled to the rooms of the bunker and stood on the ground; textures re-encoded as WebP; geometry compressed.' },
