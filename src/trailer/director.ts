@@ -14,7 +14,7 @@ import { physics, SHOT_GROUPS } from '../core/physics';
 import { RemotePlayer } from '../game/remote';
 import { heightAt } from '../world/worldgen';
 import { wind } from '../world/foliage';
-import { makeItem, type ItemInstance } from '../sim/items';
+import { ITEMS, makeItem, type ItemInstance } from '../sim/items';
 import { EMOTE } from '../sim/emotes';
 import { WEAPON_RULES } from '../sim/combat';
 import { F_DANCE, F_SURRENDER } from '../net/protocol';
@@ -351,7 +351,9 @@ export class Stage {
   hold(slot: string | null, rise = false) {
     const w = this.g.weapons;
     w.action = null;
-    this.g.inv.active = slot;
+    // (the body has no place of its own for a thing to hit with any more: 'melee' is whichever one is carried)
+    const inv = this.g.inv;
+    inv.hold(slot === 'melee' ? [...inv.carried()].find((i: { id: string }) => !!ITEMS[i.id].melee) ?? null : slot ? inv.slots[slot] ?? null : null);
     w.validate();
     w.boltReady = true;
     w.chamberEmpty = false;

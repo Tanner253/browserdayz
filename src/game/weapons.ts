@@ -8,7 +8,7 @@ import { physics, SHOT_GROUPS, type Surface } from '../core/physics';
 import { audio } from '../core/audio';
 import type { Input } from '../core/input';
 import { extractParts, type MeshPart } from '../core/gltf-utils';
-import { ITEMS, capacityOf, chambered, handlingOf, hasMod, magFits, magRoom, pieceShown, swapMag, type ItemInstance, type Slot, quietOf } from '../sim/items';
+import { ITEMS, capacityOf, chambered, fittedOf, handlingOf, hasMod, magFits, magRoom, pieceShown, swapMag, type ItemInstance, type Slot, quietOf } from '../sim/items';
 import { suppressorGeometry } from './procedural';
 import { SLOT_ORDER, type PlayerInventory } from '../sim/inventory';
 import type { Atmosphere } from '../world/atmosphere';
@@ -738,7 +738,7 @@ export class Weapons {
   private cockT = 1;
   private guardHold = 0;
   /** what was asked for while something else was being drawn (undefined: nothing) */
-  private wanted: Slot | null | undefined = undefined;
+  private wanted: ItemInstance | null | undefined = undefined;
   /** the guard button is down, with the fists or something to strike with in the hands */
   private guardHeld = false;
   /** which blow of the run this is, and when the last was struck (one soon after another comes back the other way) */
@@ -778,7 +778,7 @@ export class Weapons {
   stowed = false;
   /** lets the game resolve a collider owner to a damageable entity */
   resolveTarget: (owner: unknown) => Damageable | null = () => null;
-  onSlungChange: (obj: THREE.Object3D | null) => void = () => {};
+  onSlungChange: (objs: THREE.Object3D[]) => void = () => {};
 
   constructor(
     private vmScene: THREE.Scene,
@@ -1324,13 +1324,35 @@ export class Weapons {
     added.forEach((o) => this.vmRoot.remove(o));
   }
 
-  /** world-space model of the long gun on the back (not in hands), for the avatar */
-  slungModel(): THREE.Object3D | null {
-    const it = [this.inv.slots.primary, this.inv.slots.secondary].find((i) => i && i !== this.currentItem);
-    if (!it) return null;
-    const m = this.models.get(it.id);
-    if (m?.world) return this.dressed(m, it.id, it.mods ?? []);
-    return m ? m.root.children[0] : null;
+  /** world-space models of what is slung on the back and not in the hands (two places: either, both or neither), for the avatar */
+  slungModel(): THREE.Object3D[] {
+    const out: THREE.Object3D[] = [];
+    for (const it of [this.inv.slots.primary, this.inv.slots.secondary]) {
+      if (!it || it === this.currentItem) continue;
+      const m = this.models.get(it.id);
+      if (m?.kind === 'melee') {
+        // A thing to hit with is drawn standing on its handle, and a gun lying along its barrel: laid along the
+        // same line as a gun, about its own middle, it is slung as a gun is (left as it stands, it stuck straight
+        // out of the back).
+        const body = this.worldModel(it.id);
+        if (!body) continue;
+        body.position.set(0, 0, 0);
+        body.rotation.set(0, 0, 0);
+        body.updateMatrixWorld(true);
+        const box = new THREE.Box3().setFromObject(body);
+        const lie = new THREE.Group();
+        body.position.y = -(box.min.y + box.max.y) / 2;
+        lie.add(body);
+        lie.rotation.z = -Math.PI / 2;
+        const held = new THREE.Group();
+        held.add(lie);
+        out.push(held);
+        continue;
+      }
+      const obj = m?.world ? this.dressed(m, it.id, fittedOf(it)) : m ? m.root.children[0] : null;
+      if (obj) out.push(obj);
+    }
+    return out;
   }
 
   /** a pack's gun alone, with the pieces that go with what is fitted to it */
@@ -1432,22 +1454,36 @@ export class Weapons {
     this.action = { name, t: 0, dur, done, data };
   }
 
-  /** switch the item in hands (null = holster) */
+  /** What the body's own place holds is taken into the hands (null: the hands are emptied). */
   equip(slot: Slot | null) {
+    this.take(slot ? this.inv.slots[slot] : null);
+  }
+
+  /**
+   * Something carried is taken into the hands: off the back, out of the holster, or out of a pocket (null: the
+   * hands are emptied). A gun or a thing to hit with is this code's to draw and work; anything else is held by
+   * the game (see `ready` in game.ts), and here the hands are simply made free for it.
+   */
+  take(item: ItemInstance | null) {
     // (Asked for while another is still coming up, it waits for that: changed at once, the one half drawn was
     // gone and the next was there in a single frame.)
     if (this.action?.name === 'equip') {
-      this.wanted = slot;
+      this.wanted = item;
       return;
     }
     this.wanted = undefined;
     if (this.action) return;
-    const next = slot ? this.inv.slots[slot] : null;
-    if (next === this.currentItem) return;
+    const armed = (it: ItemInstance | null) => (it && (ITEMS[it.id].weapon || ITEMS[it.id].melee) ? it : null);
+    const next = armed(item);
+    if (next === this.currentItem) {
+      // (the same gun, or still nothing that is this code's: only what the inventory says is held changes)
+      this.inv.hold(item);
+      return;
+    }
     const swap = () => {
       if (this.current) this.vmRoot.remove(this.current.root);
       this.currentItem = next;
-      this.inv.active = next ? slot : null;
+      this.inv.hold(item);
       this.current = next ? this.models.get(next.id) ?? null : null;
       if (this.current) {
         this.vmRoot.add(this.current.root);
@@ -1468,8 +1504,8 @@ export class Weapons {
 
   /** inventory changed under us (item dropped / moved) */
   validate() {
-    const slot = this.inv.active;
-    const item = slot ? this.inv.slots[slot] : null;
+    const held = this.inv.held();
+    const item = held && (ITEMS[held.id].weapon || ITEMS[held.id].melee) ? held : null;
     if (item !== this.currentItem) {
       if (this.current) this.vmRoot.remove(this.current.root);
       this.current = item ? this.models.get(item.id) ?? null : null;
@@ -1508,9 +1544,9 @@ export class Weapons {
 
   update(dt: number, input: Input, camera: THREE.PerspectiveCamera, enabled: boolean) {
     if (this.wanted !== undefined && !this.action) {
-      const slot = this.wanted;
+      const next = this.wanted;
       this.wanted = undefined;
-      this.equip(slot);
+      this.take(next);
     }
     this.time += dt;
     this.selectorT = Math.max(0, this.selectorT - dt);
@@ -1521,11 +1557,8 @@ export class Weapons {
     for (const m of this.models.values()) m.flash.update(dt);
 
     if (enabled && !this.player.dead) {
-      if (input.pressed('Digit1')) this.equip('primary');
-      if (input.pressed('Digit2')) this.equip('secondary');
-      if (input.pressed('Digit3')) this.equip('holster');
-      if (input.pressed('Digit4')) this.equip('melee');
-      if (input.pressed('KeyX')) this.equip(null);
+      // (which thing each number key brings up is the game's to say: the keys are bound to things, see game.ts)
+      if (input.pressed('KeyX')) this.take(null);
       // (the wheel breaks off a reload before it does anything else)
       if (input.wheel !== 0 && this.abortReload()) input.wheel = 0;
       if (input.wheel !== 0 && !this.aiming) this.cycle(input.wheel > 0 ? 1 : -1);

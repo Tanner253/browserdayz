@@ -14,7 +14,7 @@ import { Barrel, type Vegetation } from '../world/vegetation';
 import type { Grass } from '../world/grass';
 import { Door, type Buildings } from '../world/buildings';
 import { WORLD_SIZE, bunkerPlace, heightAt, inPlay, type SiteKind, type World } from '../world/worldgen';
-import { ITEMS, WEAPON_SLOTS, itemName, TAG_HOLD, TAG_HOLD_MIN, TAG_OUT, capacityOf, chambered, fillMag, fittedOf, magRoom, makeItem, newUid, swapMag, tagClock, tagOwner, type ItemInstance, type Slot, quietOf } from '../sim/items';
+import { ITEMS, WEAPON_SLOTS, itemName, TAG_HOLD, TAG_HOLD_MIN, TAG_OUT, capacityOf, chambered, fillMag, fittedOf, magRoom, makeItem, newUid, swapMag, tagClock, tagOwner, type ItemInstance, quietOf } from '../sim/items';
 import { PlayerInventory, SLOT_ORDER, type Container } from '../sim/inventory';
 import { Economy, type WorldLoot } from '../sim/economy';
 import { CRATE_RESTOCK, CRATE_SPECS, fillCrate } from '../sim/crates';
@@ -97,6 +97,14 @@ interface TimedAction {
   sound: 'eat' | 'drink' | 'bandage' | 'inject' | 'smoke' | null;
   soundT: number;
   done: () => void;
+  /**
+   * Asked every frame while the hands are at it: is what it is being done to still there to do it to? (the car
+   * within reach, the well, the door's reader, the fireplace.) When it is not, the action is broken off there and
+   * then, and its movement with it: nothing is done from across the yard by having begun it beside the thing.
+   */
+  valid?: () => boolean;
+  /** what the player is told when `valid` says no */
+  lost?: string;
 }
 
 /** bump when the map's loot points change: spawned loot from older saves is re-rolled */
@@ -105,11 +113,15 @@ const LOOT_REV = 17;
 const HEADLAMP = { x: 0.5, y: 0.14, z: -2.12 };
 /** and the police car's: wider apart, lower, and further forward (it is 2.58 m to its nose) */
 const HEADLAMP_CAR = { x: 0.68, y: -0.14, z: -2.6 };
-const QUICK_KEYS = ['Digit5', 'Digit6', 'Digit7', 'Digit8'];
-/** the keys that put something else in the hands */
-const HAND_KEYS = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'KeyX'];
-/** what can be held, in the order of the keys 1 to 4 */
-const HAND_SLOTS = ['primary', 'secondary', 'holster', 'melee'] as const;
+/**
+ * The hot keys, 1 to 9 and then 0. Each brings up whatever was put on it (PlayerInventory.hot): anything carried,
+ * on any key. Pressed, the thing is taken into the hands; pressed again, it is put away. What is in the hands is
+ * then used by holding the left button down for as long as the using takes (see `handFire`), which is how
+ * everything is done: a tin is eaten, a box of rounds unwrapped, a magazine filled, a tank poured into.
+ */
+const HOT_CODES = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0'];
+/** the first key a thing to eat, drink or dress a wound with takes by itself when it is first picked up (the ones before it are the back's and the holster's) */
+const HOT_FREE = 3;
 /** the wheel: how far the mouse travels from its middle to its rim (pixels), and how far out an entry is picked */
 const WHEEL_REACH = 120, WHEEL_PICK = 0.35;
 const SEND_HZ = 15;
@@ -469,8 +481,10 @@ export class Game {
       fillMag: (mag) => this.fillMagazine(mag),
       emptyMag: (mag) => this.emptyMagazine(mag),
       looseFor: (mag) => this.inv.count(ITEMS[mag.id].mag?.ammo ?? ''),
-      assignQuick: (item, i) => this.assignQuick(i, item.id),
-      quickIndex: (id) => this.quick.indexOf(id),
+      assignHot: (item, i) => this.assignHot(i, item),
+      hotIndex: (item) => this.inv.hotOf(item),
+      hold: (item) => this.takeUp(item),
+      inHands: () => this.inv.held(),
       changed: () => this.inventoryChanged(),
       sound: (k) => audio.ui(k),
     });
@@ -542,11 +556,11 @@ export class Game {
     // on the weapon that is already in the hands puts it away (X on a keyboard), and that is
     // remembered: empty hands that were asked for are left empty (see the frame loop).
     this.hud.onHotbar((key) => {
-      const slot = HAND_SLOTS[Number(key) - 1];
-      if (this.touch && slot) {
-        const mine = this.inv.active === slot;
+      const item = this.inv.hotItem((Number(key) + 9) % 10);
+      if (this.touch && item && (ITEMS[item.id].weapon || ITEMS[item.id].melee)) {
+        const mine = this.inv.held() === item;
         this.handsFree = mine;
-        if (mine) return this.weapons.equip(null);
+        if (mine) return this.weapons.take(null);
       }
       this.input.simulate(`Digit${key}`, true);
       setTimeout(() => this.input.simulate(`Digit${key}`, false), 80);
@@ -803,7 +817,6 @@ export class Game {
   /** A new life: bare hands, one thing to eat and one thing to drink. Everything else is out there. */
   private freshKit() {
     this.inv.clear();
-    this.quick = [null, null, null, null];
     const pick = (ids: string[]) => ids[Math.floor(Math.random() * ids.length)];
     this.inv.add(makeItem(pick(['sprats', 'beans', 'sardines', 'tomatoes'])));
     this.inv.add(makeItem(pick(['thermos', 'milk'])));
@@ -813,9 +826,11 @@ export class Game {
     this.player.vitals = { health: 100, energy: 80, water: 80, stamina: MAX_STAMINA, bleeding: false };
     this.player.boost = 0;
     this.ready = null;
+    this.inHand = null;
+    this.holding = false;
     this.avatar.clearWounds();
     this.weapons.validate();
-    this.refreshQuick();
+    this.autoHot();
   }
 
   /** Every survivor wears a dog tag stamped with their own name, round their neck (see PlayerInventory.neck). */
@@ -951,9 +966,13 @@ export class Game {
       Object.assign(this.player.vitals, p.vitals);
       // pockets are smaller than they used to be: whatever no longer fits lands at your feet
       for (const it of this.inv.load(p.inventory)) this.dropItem(it, this.player.pos, 0.8);
-      if (p.quick) this.quick = [0, 1, 2, 3].map((i) => (p.quick![i] && ITEMS[p.quick![i]!] ? p.quick![i] : null));
+      // (a save from when keys 5 to 8 were for kinds of thing to use: each kind is on the same key still, as the thing itself)
+      (p.quick ?? []).forEach((id, i) => {
+        const it = id && !this.inv.hot[4 + i] ? [...this.inv.carried()].find((x) => x.id === id) : null;
+        if (it && this.inv.hotOf(it) < 0) this.inv.bind(4 + i, it);
+      });
       this.ensureTag();
-      this.refreshQuick();
+      this.autoHot();
       this.weapons.validate();
     } else {
       // the map changed under the old character (or they were dead): a new life on the edge
@@ -971,7 +990,7 @@ export class Game {
     writeSave({
       version: 1,
       savedAt: Date.now(),
-      player: p.dead ? null : { x: p.pos.x, y: p.pos.y, z: p.pos.z, yaw: p.yaw, vitals: { ...p.vitals }, inventory: this.inv.serialize(), quick: this.quick },
+      player: p.dead ? null : { x: p.pos.x, y: p.pos.y, z: p.pos.z, yaw: p.yaw, vitals: { ...p.vitals }, inventory: this.inv.serialize() },
       economy: { ...this.economy.serialize(), rev: LOOT_REV },
       stashes: this.loot.stashes.map((s) => s.serialize()),
       crates: this.loot.crates.map((c) => ({ uid: c.uid, emptiedAt: c.emptiedAt, container: c.container.serialize() })),
@@ -1007,7 +1026,7 @@ export class Game {
       Object.assign(this.player.vitals, w.me.vitals);
       this.ensureTag();
       this.weapons.validate();
-      this.refreshQuick();
+      this.autoHot();
     } else this.freshKit();
     this.meDirty = true;
     // the server has not heard what we are wearing yet
@@ -1627,10 +1646,11 @@ export class Game {
 
   /** The next weapon carried, round and round (the mouse wheel, for a thumb: it never stops on empty hands). */
   private nextWeapon() {
-    const have = HAND_SLOTS.filter((s) => this.inv.slots[s]);
+    const have = SLOT_ORDER.filter((s) => this.inv.slots[s]);
     if (!have.length || this.use || this.garage.ride) return;
-    const at = have.indexOf(this.inv.active as (typeof HAND_SLOTS)[number]);
+    const at = this.inv.active ? have.indexOf(this.inv.active) : -1;
     this.handsFree = false;
+    this.stow();
     this.weapons.equip(have[(at + 1) % have.length]);
   }
 
@@ -1843,30 +1863,90 @@ export class Game {
     this.slowT = 1; // refresh carried weight on the next frame
     this.weapons.validate();
     this.syncGear();
-    this.refreshQuick();
+    this.autoHot();
     this.meDirty = true;
     this.syncOpenBox();
     this.save();
   }
 
-  // ------------------------------------------------------------ quick slots (5-8)
+  // ------------------------------------------------------------ hot keys, and the hands
 
-  private assignQuick(i: number, id: string | null) {
-    if (id) this.quick = this.quick.map((q) => (q === id ? null : q));
-    this.quick[i] = id;
+  private assignHot(i: number, item: ItemInstance | null) {
+    this.inv.bind(i, item);
     this.save();
   }
 
-  /** New kinds of food, drink and medical supplies take the first free quick key on their own. */
-  private refreshQuick() {
-    for (const c of this.inv.containers) {
-      for (const pl of c.items) {
-        const id = pl.item.id;
-        if (!ITEMS[id].use || this.quick.includes(id)) continue;
-        const i = this.quick.findIndex((q) => q === null || this.countOf(q) === 0);
-        if (i >= 0) this.quick[i] = id;
+  /**
+   * What goes on the back or in the holster takes the key of its place, and a new kind of thing to eat, drink or
+   * dress a wound with takes the first free key after those, by itself: nobody has to open their pack under fire
+   * to find out which key the bandage they have just picked up is on. Everything else is put on a key by hand.
+   */
+  private autoHot() {
+    this.inv.autoBind();
+    for (const it of this.inv.carried()) {
+      if (!ITEMS[it.id].use || this.inv.hotOf(it) >= 0 || this.inv.hot.some((b) => b?.id === it.id)) continue;
+      for (let i = HOT_FREE; i < this.inv.hot.length; i++) {
+        if (this.inv.hot[i] && this.inv.hotItem(i)) continue;
+        this.inv.bind(i, it);
+        break;
       }
     }
+  }
+
+  /** A hot key is pressed: what is on it comes into the hands, or goes out of them if it is there already. */
+  private hot(i: number) {
+    const key = (i + 1) % 10, bound = this.inv.hot[i], item = this.inv.hotItem(i);
+    if (!item) {
+      this.hud.note(bound ? `No ${ITEMS[bound.id].name.toLowerCase()} left` : `Key ${key} has nothing on it: point at a thing in your inventory and press ${key}`, bound ? 'warn' : 'info');
+      return;
+    }
+    if (this.inv.held() === item || this.inHand === item) return this.emptyHands();
+    this.takeUp(item);
+  }
+
+  /** the hands are emptied: what was in them is put away where it is carried, and anything they were at is broken off */
+  private emptyHands() {
+    if (this.use) this.breakOff();
+    this.stow();
+    this.handsFree = true;
+    this.weapons.take(null);
+  }
+
+  /** a thing that is not a weapon, held: put away (it stays where it is carried), with nothing taken up in its place */
+  private stow() {
+    if (!this.inHand && !this.ready) return;
+    this.ready = null;
+    this.inHand = null;
+    this.holding = false;
+    this.weapons.endUse();
+    this.settle();
+  }
+
+  /**
+   * Something carried is taken into the hands: a gun or a thing to hit with comes up as it always did; anything
+   * else is held out in the right hand, waiting (see `ready`), and the left button then does with it what is done
+   * with such a thing (see `handFire`). Whatever was in the hands before goes back where it is carried.
+   */
+  private takeUp(item: ItemInstance) {
+    const def = ITEMS[item.id];
+    if (this.player.dead || !def) return;
+    if (this.use) this.breakOff();
+    this.stow();
+    this.handsFree = false;
+    this.glass = 0;
+    this.weapons.take(item);
+    if (def.weapon || def.melee) return;
+    this.inHand = item;
+    this.ready = { item, t: 0 };
+    this.weapons.beginUse(item.id, this.poseOf(item), def.use?.time ?? def.open?.time ?? 2, true);
+  }
+
+  /** how the hands hold a thing while they wait to use it, and work on it when they do */
+  private poseOf(item: ItemInstance): UseKind {
+    const def = ITEMS[item.id];
+    if (item.id === 'keycard') return 'swipe';
+    if (def.throw || def.call || def.open || def.mag || !def.use) return 'open';
+    return def.look ? 'drink' : def.use.sound;
   }
 
   /** how many uses of an item type are in the pockets (stack quantity, or number of items) */
@@ -1877,20 +1957,109 @@ export class Game {
     return n;
   }
 
-  private useQuick(i: number) {
-    const id = this.quick[i];
-    if (!id) {
-      this.hud.note(`Quick key ${i + 5} is empty: hover an item in the inventory and press ${i + 5}`, 'info');
-      return;
-    }
-    const item = this.inv.containers.flatMap((c) => c.items).find((pl) => pl.item.id === id)?.item;
-    if (!item) {
-      this.hud.note(`No ${ITEMS[id].name} left`, 'warn');
-      return;
-    }
+  /**
+   * The left button, with a thing that is not a weapon in the hands: what is done with such a thing is begun, and
+   * goes on for as long as the button is held (`holding`: let go, it is broken off, and nothing is lost by it).
+   * What a thing does depends on what it is and, for some, on what is in front of the hands: a jerrycan at a car,
+   * a bottle at a well, a keycard at the bunker's reader. This is the one place that says which.
+   */
+  private handFire(item: ItemInstance) {
     const def = ITEMS[item.id];
-    if (def.use) this.useItem(item);
+    if (this.use || this.player.dead || this.weapons.working) return;
+    const well = def.use?.sips ? this.wellHere() : null;
+    if (def.mag) this.fillMagazine(item);
     else if (def.open) this.openBox(item);
+    else if (item.id === 'jerrycan') this.pourFuel(item);
+    else if (item.id === 'keycard') this.swipeCard();
+    else if (well && (item.left ?? 0) < def.use!.sips!) this.fillBottle(item, well);
+    else if (def.use) this.useItem(item, true);
+    else if (def.category === 'stash') this.placeStash(item);
+    else this.hud.note(def.category === 'ammo' ? 'Loose rounds go into a magazine: hold the magazine, and hold the button' : def.attach ? `The ${def.name.toLowerCase()} goes on a gun: drag it onto one in your inventory` : `Nothing to do with the ${def.name.toLowerCase()} here`, 'info');
+    // (it goes on for as long as the button is held; a thumb on a phone has only to tap)
+    this.holding = !!this.use && !this.touch;
+    if (this.use) this.ready = null;
+  }
+
+  /** the left button is being held on what the hands are at: let go, it is broken off */
+  private holding = false;
+  /** what the eye is on within arm's reach this frame (a door, a car, a crate, a thing on the ground), as `interact` found it */
+  private lookedAt: unknown = null;
+
+  /** the well stood at, if there is one */
+  private wellHere(): Well | null {
+    const p = this.player.pos;
+    return this.wells.find((w) => Math.hypot(w.x - p.x, w.z - p.z) < WELL.reach && Math.abs(w.y - p.y) < 1.5) ?? null;
+  }
+
+  /** The keycard, held in the hands at the bunker's reader: held out to it and pushed home, and only then does anything move. */
+  private swipeCard() {
+    const at = this.bunker.open ? null : this.bunker.doorAt(_lampPos);
+    if (!at || at.distanceTo(this.s.r.camera.position) > 2.6) return void this.hud.note('The card opens the door of Bunker 17: stand at the reader beside it', 'info');
+    const near = () => {
+      const d = this.bunker.open ? null : this.bunker.doorAt(_lampPos);
+      return !!d && d.distanceTo(this.s.r.camera.position) <= 3.1;
+    };
+    this.startUse('Putting the keycard in', 2.1, 'keycard', 'swipe', null, () => {
+      if (!near() || this.inv.count('keycard') < 1) return;
+      this.inv.take('keycard', 1);
+      this.inventoryChanged();
+      this.hud.note('The reader keeps the card. The door stays open while anybody is inside, and shuts a minute after', 'good');
+      if (this.online) this.net.send({ t: 'bunker' });
+      else {
+        this.bunkerEmpty = 0;
+        this.bunker.setOpen(true);
+      }
+    });
+    if (this.use) Object.assign(this.use, { valid: near, lost: 'You stepped away from the reader: the card is still yours' });
+  }
+  /** the thing that is not a weapon that is in the hands, waiting or being used (null: none) */
+  private inHand: ItemInstance | null = null;
+
+  /** What the hands were at is over, done or broken off: a thing still carried is held as it was before; one used up leaves the hands empty. */
+  private rest() {
+    const item = this.inHand;
+    this.holding = false;
+    if (!item) return;
+    if (this.player.dead || !this.inv.containerOf(item)) {
+      this.inHand = null;
+      this.ready = null;
+      this.inv.hold(null);
+      this.weapons.endUse();
+      return;
+    }
+    this.ready = { item, t: 0.3 };
+    this.weapons.beginUse(item.id, this.poseOf(item), ITEMS[item.id].use?.time ?? 2, true);
+  }
+
+  /** Ten litres out of a jerrycan held in the hands, into the tank of the car in front of them. */
+  private pourFuel(can: ItemInstance) {
+    const jeep = this.lookedAt instanceof Jeep ? this.lookedAt : null;
+    if (!jeep || jeep.wreck) return void this.hud.note('Stand at a jeep or a car and look at it to pour this in', 'info');
+    if (jeep.fuel >= JEEP.tank - 0.5) return void this.hud.note('Its tank is full', 'info');
+    const near = () => !jeep.wreck && jeep.pos.distanceTo(this.player.pos) <= JEEP.reach + 1;
+    this.startUse('Filling the tank', 4, 'jerrycan', 'open', null, () => {
+      if (!near() || !this.inv.find((i) => i === can)) return;
+      this.inv.remove(can);
+      this.garage.refuel(jeep);
+      audio.ui('drink');
+      this.hud.note(`${JEEP.can} litres into the tank`, 'good');
+      this.inventoryChanged();
+    });
+    if (this.use) Object.assign(this.use, { valid: near, lost: 'You walked off from it: the can is still full' });
+  }
+
+  /** A bottle held in the hands, filled at the well beside them. */
+  private fillBottle(bottle: ItemInstance, w: Well) {
+    const full = ITEMS[bottle.id].use!.sips!;
+    const near = () => Math.hypot(w.x - this.player.pos.x, w.z - this.player.pos.z) <= WELL.reach + 0.8;
+    this.startUse(`Filling the ${ITEMS[bottle.id].name.toLowerCase()}`, WELL.drink * 0.6, bottle.id, 'open', null, () => {
+      if (!near()) return;
+      bottle.left = full;
+      audio.ui('drink');
+      this.hud.note(`The ${ITEMS[bottle.id].name.toLowerCase()} is full`, 'good');
+      this.inventoryChanged();
+    });
+    if (this.use) Object.assign(this.use, { valid: near, lost: 'You walked off from the well' });
   }
 
   // ------------------------------------------------------------ item actions
@@ -1915,23 +2084,15 @@ export class Game {
   private drinkAt(w: Well) {
     this.putAway();
     this.toggleInventory(false);
-    const held = this.bottles()[0];
-    this.use = { label: 'Drinking at the well', t: 0, dur: WELL.drink, sound: 'drink', soundT: 0, done: () => {
-      const p = this.player;
-      if (Math.hypot(w.x - p.pos.x, w.z - p.pos.z) > WELL.reach + 0.8) return void this.hud.note('You walked off from the well', 'info');
-      let filled = 0;
-      for (const it of this.bottles()) {
-        const full = ITEMS[it.id].use!.sips!;
-        if ((it.left ?? 0) < full) filled++;
-        it.left = full;
-      }
-      p.vitals.water = 100;
-      this.inventoryChanged();
+    const near = () => Math.hypot(w.x - this.player.pos.x, w.z - this.player.pos.z) <= WELL.reach + 0.8;
+    // (Out of cupped hands. A bottle is filled by holding it here and holding the button: see fillBottle. Walk off
+    // and the drinking stops there: it was finished from across the yard, by having begun it at the well.)
+    this.use = { label: 'Drinking at the well', t: 0, dur: WELL.drink, sound: 'drink', soundT: 0, valid: near, lost: 'You walked off from the well', done: () => {
+      if (!near()) return;
+      this.player.vitals.water = 100;
       this.meDirty = true;
-      this.hud.note(filled ? `You drink your fill, and fill ${filled === 1 ? 'your bottle' : `${filled} bottles`}` : 'You drink your fill', 'good');
+      this.hud.note('You drink your fill', 'good');
     } };
-    // (a bottle in the hands, if one is carried: the drinking is seen by everybody as drinking is)
-    if (held) this.weapons.beginUse(held.id, 'drink', WELL.drink);
     this.act('drink', WELL.drink);
   }
 
@@ -1939,13 +2100,15 @@ export class Game {
   private lightFire(i: number) {
     this.startUse('Lighting the fire', FIRE.lighting, 'cigarettes', 'open', null, () => {
       const p = this.player.pos;
-      // (walked off from it meanwhile, or somebody else got it going first)
+      // (somebody else got it going first)
       if (this.fires.at(p) !== i || this.fires.left[i] > 0) return;
       if (this.online) this.net.send({ t: 'fire', i });
       else if (this.hearths.light(i, p.x, p.z, performance.now() / 1000)) this.fires.set(i, FIRE.burns);
       audio.ui('open');
       this.hud.note('The fire is lit: its smoke can be seen a long way off', 'good');
     });
+    // (walk off from it and the hands stop: a fire is not lit from across the yard)
+    if (this.use) Object.assign(this.use, { valid: () => this.fires.at(this.player.pos) === i, lost: 'You walked off from the fireplace' });
   }
 
   /** wherever the item currently is: player inventory or the open crate */
@@ -2004,10 +2167,10 @@ export class Game {
   private ready: { item: ItemInstance; t: number } | null = null;
 
   private putAway() {
-    if (!this.ready) return;
-    this.ready = null;
-    this.weapons.endUse();
-    this.settle();
+    if (!this.ready && !this.inHand) return;
+    this.stow();
+    this.inv.hold(null);
+    this.weapons.validate();
   }
 
   /**
@@ -2019,10 +2182,14 @@ export class Game {
   private breakOff(): boolean {
     if (this.use) {
       this.use = null;
-      this.weapons.endUse();
       this.act('stop');
-      if (!this.player.dead) this.hud.note('Cancelled', 'info');
-      this.settle();
+      if (!this.player.dead && !this.holding) this.hud.note('Cancelled', 'info');
+      // (a thing that was in the hands to begin with stays in them: only what the hands were doing with it stops)
+      if (this.inHand) this.rest();
+      else {
+        this.weapons.endUse();
+        this.settle();
+      }
       return true;
     }
     if (this.ready) {
@@ -2043,12 +2210,8 @@ export class Game {
       this.hud.note(`The ${def.name.toLowerCase()} is empty: a well fills it (marked on the map)`, 'info');
       return;
     }
-    // (an injector is in the hand already: its own key puts it away again, another thing takes its place)
-    if (this.ready && !now) {
-      const same = this.ready.item.id === item.id;
-      this.putAway();
-      if (same) return;
-    }
+    // (something is in the hand already and this is another thing, asked for out of the inventory: that one is put away)
+    if (this.inHand && this.inHand !== item) this.putAway();
     // (asked before it is taken out of anything: refused after, the radio was out of the crate and nowhere)
     if (def.call && !this.openSky()) {
       this.hud.note('No signal under a roof: take the radio out under open sky', 'warn');
@@ -2063,11 +2226,10 @@ export class Game {
       // thing used off the ground does. It was lost: out of the crate, and never put anywhere again.)
       if (!def.look && !def.call) this.loose = item;
     }
+    // (what is used from the hand is taken into it first, and used by the button: see takeUp and handFire)
     if (u.hold && !now) {
       this.toggleInventory(false);
-      this.glass = 0;
-      this.ready = { item, t: 0 };
-      this.weapons.beginUse(item.id, 'inject', u.time, true);
+      this.takeUp(item);
       return;
     }
     // how the hands hold it while it is used: a smoke goes to the mouth, a grenade is worked with both
@@ -2732,23 +2894,11 @@ export class Game {
     // at the bunker's door, shut: a keycard is what F does there
     const door = this.bunker.open ? null : this.bunker.doorAt(_lampPos);
     if (door && door.distanceTo(cam.position) < 2.6 && !this.garage.ride) {
-      const has = this.inv.count('keycard') > 0;
-      this.prompt = has ? '<kbd>F</kbd>Use the keycard' : '<small>Locked. A keycard opens it: they are kept under the gas</small>';
-      if (has && this.input.pressed('KeyF') && !this.hud.chatOpen) {
-        // the card is held out to the reader and pushed home, and only then does anything move
-        this.startUse('Putting the keycard in', 2.1, 'keycard', 'swipe', null, () => {
-          const at = this.bunker.doorAt(_lampPos);
-          if (!at || at.distanceTo(this.s.r.camera.position) > 3.4 || this.bunker.open || this.inv.count('keycard') < 1) return;
-          this.inv.take('keycard', 1);
-          this.inventoryChanged();
-          this.hud.note('The reader keeps the card. The door stays open while anybody is inside, and shuts a minute after', 'good');
-          if (this.online) this.net.send({ t: 'bunker' });
-          else {
-            this.bunkerEmpty = 0;
-            this.bunker.setOpen(true);
-          }
-        });
-      }
+      // (the card is used from the hands, like everything: F takes it into them, and the button puts it in)
+      const card = this.inv.find((i) => i.id === 'keycard');
+      const inHand = this.inHand?.id === 'keycard';
+      this.prompt = inHand ? (this.touch ? '<small>Tap fire to put the card in</small>' : '<small>Hold the left button to put the card in</small>') : card ? '<kbd>F</kbd>Take out the keycard' : '<small>Locked. A keycard opens it: they are kept under the gas</small>';
+      if (card && !inHand && this.input.pressed('KeyF') && !this.hud.chatOpen && !this.use) this.takeUp(card);
       return;
     }
     // sat in a jeep there is one thing to do with F
@@ -2761,6 +2911,7 @@ export class Game {
     const range = 2.6;
     const hit = physics.raycast(cam.position, dir, range, USE_GROUPS, this.player.collider);
     const owner = hit?.tag?.owner ?? this.nearestLoose(cam, dir, range);
+    this.lookedAt = owner ?? null;
     if (!owner) {
       // nobody has a name floating over their head: you only learn it by looking right at them, up close
       const c = new THREE.Vector3();
@@ -2769,9 +2920,11 @@ export class Game {
       if (well && c.set(well.x, well.y + 0.8, well.z).sub(cam.position).normalize().dot(dir) > 0.55) {
         const bottles = this.bottles().filter((it) => (it.left ?? 0) < ITEMS[it.id].use!.sips!).length;
         const dry = this.player.vitals.water < 99;
-        if (!dry && !bottles) this.prompt = '<small>The well · you have drunk your fill, and your bottles are full</small>';
+        const held = this.inHand && ITEMS[this.inHand.id].use?.sips ? this.inHand : null;
+        const fill = held && (held.left ?? 0) < ITEMS[held.id].use!.sips! ? (this.touch ? 'Tap fire to fill it' : 'Hold the left button to fill it') : bottles ? 'Take a bottle into your hands to fill it here' : '';
+        if (!dry) this.prompt = `<small>The well · ${fill || 'you have drunk your fill, and your bottles are full'}</small>`;
         else {
-          this.prompt = `<kbd>F</kbd>${dry ? 'Drink' : 'Fill'}${dry && bottles ? ' and fill' : ''}${bottles ? (bottles === 1 ? ' your bottle' : ` your ${bottles} bottles`) : ''}`;
+          this.prompt = `<kbd>F</kbd>Drink${fill ? ` <small>${fill}</small>` : ''}`;
           if (this.input.pressed('KeyF') && !this.use && !this.hud.chatOpen) this.drinkAt(well);
         }
         return;
@@ -2834,17 +2987,6 @@ export class Game {
       const tagged = this.tagged;
       this.prompt = this.garage.prompt(owner, !!can, tagged);
       if (key) this.garage.use(owner, tagged);
-      else if (can && !owner.wreck && owner.fuel < JEEP.tank - 0.5 && this.input.pressed('KeyG')) {
-        const jeep = owner;
-        this.startUse('Filling the tank', 4, 'jerrycan', 'open', null, () => {
-          if (jeep.wreck || jeep.pos.distanceTo(this.player.pos) > JEEP.reach + 1 || !this.inv.find((i) => i === can)) return;
-          this.inv.remove(can);
-          this.garage.refuel(jeep);
-          audio.ui('drink');
-          this.hud.note(`${JEEP.can} litres into the tank`, 'good');
-          this.inventoryChanged();
-        });
-      }
     } else if (owner instanceof Stash) {
       const canPack = !owner.fixed && owner.container.items.length === 0 && (!this.online || owner.known);
       this.prompt = owner.fixed
@@ -2894,14 +3036,14 @@ export class Game {
 
   /** G, held a moment: what is in the hands goes on the ground in front of you. */
   private dropInHands() {
-    const slot = this.inv.active;
-    const item = slot ? this.inv.slots[slot] : null;
-    if (!slot || !item) {
+    const item = this.inv.held() ?? this.inHand;
+    if (!item) {
       this.hud.note('Nothing in your hands to drop', 'warn');
       return;
     }
-    this.inv.slots[slot] = null;
-    this.inv.active = null;
+    if (this.use) this.breakOff();
+    this.stow();
+    this.inv.remove(item);
     this.dropItem(item);
     audio.ui('drop');
     this.hud.note(`Dropped ${itemName(item)}`);
@@ -2928,26 +3070,25 @@ export class Game {
   private hasCompass = false;
 
   private hotbar(): HotbarEntry[] {
-    const out: HotbarEntry[] = [];
-    SLOT_ORDER.forEach((s: Slot, i) => {
-      const it = this.inv.slots[s];
+    // each key, the thing on it, and what there is of it: rounds in a gun or a magazine, drinks in a bottle, how many of a thing that is used up
+    const held = this.inv.held() ?? this.inHand;
+    return this.inv.hot.map((b, i) => {
+      const it = b ? this.inv.hotItem(i) : null;
       const d = it ? ITEMS[it.id] : null;
-      out.push({ key: String(i + 1), id: it?.id ?? null, label: it && d?.weapon ? String(it.loaded ?? 0) : '', active: this.inv.active === s, dim: false });
+      const label = !it || !d ? '' : d.weapon ? String(it.loaded ?? 0) : d.mag ? String(it.rounds ?? 0) : d.use?.sips ? `${it.left ?? d.use.sips}/${d.use.sips}` : d.melee || d.slot ? '' : String(this.countOf(it.id));
+      return { key: String((i + 1) % 10), id: it?.id ?? b?.id ?? null, label, active: !!it && it === held, dim: !!b && !it };
     });
-    this.quick.forEach((id, i) => {
-      const n = id ? this.countOf(id) : 0;
-      out.push({ key: String(i + 5), id, label: id ? String(n) : '', active: false, dim: !!id && n === 0 });
-    });
-    return out;
   }
 
   /** What to do about an open wound, in as few words as it takes: the key that holds a dressing, if there is one. */
   private bleedHint(): string {
     if (this.use?.sound === 'bandage' || (this.use?.sound === 'inject' && !/Adrenaline/.test(this.use.label))) return 'Treating the wound…';
-    const i = this.quick.findIndex((id) => !!id && !!ITEMS[id].use?.stopBleed && this.countOf(id) > 0);
+    const held = this.inHand && ITEMS[this.inHand.id].use?.stopBleed ? this.inHand : null;
+    if (held) return this.touch ? `Tap fire to use the ${ITEMS[held.id].name.toLowerCase()}` : `Hold the left button to use the ${ITEMS[held.id].name.toLowerCase()}`;
+    const i = this.inv.hot.findIndex((_, k) => !!ITEMS[this.inv.hotItem(k)?.id ?? '']?.use?.stopBleed);
     if (i >= 0) {
-      const d = ITEMS[this.quick[i]!];
-      return this.touch ? `Tap the ${d.name} below to stop it` : `<kbd>${i + 5}</kbd>${d.name}: stop the bleeding`;
+      const d = ITEMS[this.inv.hotItem(i)!.id];
+      return this.touch ? `Tap the ${d.name} below, then fire, to stop it` : `<kbd>${(i + 1) % 10}</kbd>${d.name}, then hold the left button`;
     }
     const carried = this.inv.find((it) => !!ITEMS[it.id].use?.stopBleed);
     if (carried) return `${this.touch ? 'Open your pack' : '<kbd>Tab</kbd>'} and use the ${ITEMS[carried.id].name}`;
@@ -3018,12 +3159,12 @@ export class Game {
     // A phone has no row of number keys under the fingers: whatever is picked up to fight with
     // comes into the hands by itself when they are empty, unless they were emptied on purpose.
     if (this.touch && playing && !uiOpen && !this.use && !this.garage.ride && !this.handsFree && !this.weapons.equippedItem && !this.weapons.busy) {
-      const slot = HAND_SLOTS.find((s) => this.inv.slots[s]);
+      const slot = this.inHand ? null : SLOT_ORDER.find((s) => this.inv.slots[s]);
       if (slot) this.weapons.equip(slot);
     }
 
     // binoculars come down for anything else: a trigger, a sprint, the pockets, a hit
-    if (this.glass && (!playing || uiOpen || this.use || input.pressed('Mouse0') || input.pressed('Mouse2') || p.sprinting || QUICK_KEYS.some((k) => input.pressed(k)))) {
+    if (this.glass && (!playing || uiOpen || this.use || input.pressed('Mouse0') || input.pressed('Mouse2') || p.sprinting || HOT_CODES.some((k) => input.pressed(k)))) {
       this.glass = 0;
       this.glassDown = now;
     }
@@ -3126,31 +3267,22 @@ export class Game {
       if (this.fireTag.textContent !== say) this.fireTag.textContent = say;
     }
 
-    // quick-use keys
-    if (playing && !uiOpen && !typing && !this.use) {
-      QUICK_KEYS.forEach((k, i) => {
-        if (input.pressed(k)) this.useQuick(i);
+    // the hot keys: each brings up what is on it (and puts it away again); X empties the hands
+    if (playing && !uiOpen && !typing && !p.dead) {
+      HOT_CODES.forEach((k, i) => {
+        if (input.pressed(k)) this.hot(i);
       });
+      if (input.pressed('KeyX') && (this.inHand || this.use)) this.emptyHands();
     }
 
-    // an injector in the hand: a click uses it; the wheel, the other button, a weapon's key or the inventory puts it away
+    // A thing in the hand that is not a weapon: holding the left button uses it. The wheel puts it away (and goes
+    // on to the next weapon); it is kept in the hand through everything else, the inventory included.
     if (this.ready) {
       const r = this.ready;
       r.t += dt;
       const kept = this.loose === r.item || this.inv.containers.some((c) => c.has(r.item));
-      if (p.dead || uiOpen || !!ride || !kept || input.wheel !== 0 || input.pressed('Mouse2') || HAND_KEYS.some((k) => input.pressed(k))) {
-        // (the wheel has done its work: it does not change the weapon as well)
-        input.wheel = 0;
-        this.putAway();
-      } else if (playing && !typing && r.t > 0.3 && input.pressed('Mouse0')) {
-        this.ready = null;
-        this.useItem(r.item, true);
-        // (it could not be begun after all: it is not left in the hand with nothing to say what it is doing there)
-        if (!this.use) {
-          this.weapons.endUse();
-          this.settle();
-        }
-      }
+      if (p.dead || !kept || (input.wheel !== 0 && !uiOpen)) this.putAway();
+      else if (playing && !uiOpen && !typing && r.t > 0.3 && (input.pressed('Mouse0') || (input.held('Mouse0') && r.t > 0.55))) this.handFire(r.item);
     }
 
     // timed item use (eat, drink, bandage, open a box): shown in the hands; the wheel or the other button breaks it off
@@ -3168,14 +3300,22 @@ export class Game {
         u.soundT = 0;
         audio.ui(u.sound);
       }
-      if (p.dead || ((input.pressed('Mouse2') || input.wheel !== 0) && !uiOpen)) {
+      const gone = !!u.valid && !u.valid();
+      if (gone || p.dead || ((input.pressed('Mouse2') || input.wheel !== 0) && !uiOpen) || (this.holding && !uiOpen && !input.held('Mouse0'))) {
         input.wheel = 0;
+        if (gone && u.lost && !p.dead) this.hud.note(u.lost, 'info');
         this.breakOff();
       } else if (u.t >= u.dur) {
         this.use = null;
-        this.weapons.endUse();
+        const hold = this.holding;
         u.done();
-        this.settle();
+        // (what is done a round at a time has begun on the next one: the button is still what keeps it going)
+        if (this.use) this.holding = hold;
+        else if (this.inHand) this.rest();
+        else {
+          this.weapons.endUse();
+          this.settle();
+        }
       }
     }
 
@@ -3376,7 +3516,7 @@ export class Game {
       bleed: v.bleeding && !p.dead ? this.bleedHint() : null,
       heading: !uiOpen ? heading : null,
       bearing: hasCompass,
-      progress: this.use ? { label: this.use.label, t: this.use.t / this.use.dur } : this.ready ? { label: `${ITEMS[this.ready.item.id].name}: ${this.touch ? 'fire to use it' : 'click to use it · scroll to put it away'}`, t: -1 } : null,
+      progress: this.use ? { label: this.use.label, t: this.use.t / this.use.dur } : this.ready ? { label: `${ITEMS[this.ready.item.id].name}: ${this.touch ? 'fire to use it' : 'hold the left button to use it · its key again puts it away'}`, t: -1 } : null,
       boost: p.boost,
       hotbar: this.hotbar(),
       fps: this.fps,

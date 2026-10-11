@@ -741,16 +741,21 @@ export class Avatar {
     return { arm, fore, hand, la: pa.distanceTo(pf), lb: pf.distanceTo(ph), fingersLocal: fingersW.applyQuaternion(hq), palmLocal: palmW.applyQuaternion(hq), fingers, open: fingers.map((chain) => chain.map((b) => b.quaternion.clone())), thumb, pole: pole.normalize() };
   }
 
-  /** Puts a copy of the shouldered weapon on the back. */
-  setSlung(obj: THREE.Object3D | null) {
+  /**
+   * Puts copies of what is slung on the back there: the first with its muzzle up over the left shoulder, flat
+   * against the back, and a second crossing it, up over the right.
+   */
+  setSlung(objs: THREE.Object3D[] | THREE.Object3D | null) {
     this.slung.clear();
-    if (!obj) return;
-    const c = obj.clone();
-    c.traverse((o) => (o.layers.mask = this.layerMask));
-    // muzzle up over the left shoulder, flat against the back
-    c.rotation.set(0.25, -Math.PI / 2, Math.PI * 0.62);
-    c.position.set(0.1, 0.04, 0.01 + this.packOut);
-    this.slung.add(c);
+    const list = !objs ? [] : Array.isArray(objs) ? objs : [objs];
+    list.slice(0, 2).forEach((obj, k) => {
+      const c = obj.clone();
+      c.traverse((o) => (o.layers.mask = this.layerMask));
+      c.rotation.set(0.25, -Math.PI / 2, Math.PI * (k ? 0.38 : 0.62));
+      c.position.set(k ? -0.1 : 0.1, 0.04, 0.01 + this.packOut + k * 0.045);
+      c.userData.over = k * 0.045;
+      this.slung.add(c);
+    });
   }
 
   /** Hat, vest, pack: whatever of it is drawn (see GEAR). The models are this body's to keep. */
@@ -781,7 +786,7 @@ export class Avatar {
       this.gearObjs.push(holder);
       if (g.pack) this.packOut = 0.2;
     }
-    for (const c of this.slung.children) c.position.z = 0.01 + this.packOut;
+    for (const c of this.slung.children) c.position.z = 0.01 + this.packOut + (c.userData.over ?? 0);
   }
 
   /**

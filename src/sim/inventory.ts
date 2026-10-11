@@ -11,8 +11,20 @@
 import { ALL_SLOTS, GEAR_SLOTS, ITEMS, SLOT_KIND, WEAPON_SLOTS, itemWeight, sanitizeItem, type ItemInstance, type Placed, type Slot } from './items';
 
 const EMPTY_SLOTS = (): Record<Slot, ItemInstance | null> => Object.fromEntries(ALL_SLOTS.map((s) => [s, null])) as Record<Slot, ItemInstance | null>;
-/** hand-held slots in number-key order */
+/** the body's own places for weapons, in the order of the keys they are first put on: the two on the back, and the holster */
 export const SLOT_ORDER: Slot[] = WEAPON_SLOTS;
+
+/**
+ * Hot keys: ten of them (1 to 9, and 0), each bound to a thing and not to a place. Anything carried can be put on
+ * any of them, and pressing it takes that thing into the hands. A key remembers the very thing it was given (by
+ * the thing's own number) and, when that is gone, another of its kind: the key a bandage was on is the key the
+ * next bandage is on.
+ */
+export const HOT_KEYS = 10;
+export interface HotBind {
+  uid: string;
+  id: string;
+}
 
 export type { Placed };
 
@@ -140,7 +152,7 @@ export class Container {
   }
 }
 
-export type SerializedInventory = { slots: Record<string, ItemInstance | null>; active: Slot | null; containers: ReturnType<Container['serialize']>[] };
+export type SerializedInventory = { slots: Record<string, ItemInstance | null>; active: Slot | null; containers: ReturnType<Container['serialize']>[]; hot?: (HotBind | null)[] };
 
 /** Everything the player carries. */
 export class PlayerInventory {
@@ -151,8 +163,67 @@ export class PlayerInventory {
   tags = Object.assign(new Container('tags', 'Dog tags', 5, 2), { only: 'dogtag' });
   /** the survivor's own dog tag, round their neck */
   neck: ItemInstance | null = null;
-  /** which slot is in hands: weapon/melee, or null = bare hands */
+  /** which of the body's own places has its thing in the hands (null: none of them) */
   active: Slot | null = null;
+  /** a thing carried in a pocket or a pack that is in the hands: it stays where it is carried, and is held (see `hold`) */
+  hand: ItemInstance | null = null;
+  /** what each hot key is bound to */
+  hot: (HotBind | null)[] = Array.from({ length: HOT_KEYS }, () => null);
+
+  /** What is in the hands: something off the back or out of the holster, or a thing out of a pocket. */
+  held(): ItemInstance | null {
+    if (this.active) return this.slots[this.active];
+    return this.hand && this.containerOf(this.hand) ? this.hand : null;
+  }
+
+  /** A thing carried is taken into the hands (null: the hands are emptied). It stays where it is carried. */
+  hold(item: ItemInstance | null) {
+    const slot = item ? WEAPON_SLOTS.find((s) => this.slots[s] === item) ?? null : null;
+    this.active = slot;
+    this.hand = item && !slot && this.containerOf(item) ? item : null;
+  }
+
+  /** every thing carried that a hand could take up: on the back and in the holster, in the pockets, and in what is worn */
+  *carried(): Generator<ItemInstance> {
+    for (const s of WEAPON_SLOTS) if (this.slots[s]) yield this.slots[s]!;
+    for (const c of this.containers) if (c !== this.tags) for (const p of c.items) yield p.item;
+  }
+
+  /** The thing a hot key brings up: the one it was given, or failing that another of its kind (null: nothing of the sort is carried). */
+  hotItem(i: number): ItemInstance | null {
+    const b = this.hot[i];
+    if (!b) return null;
+    let other: ItemInstance | null = null;
+    for (const it of this.carried()) {
+      if (it.uid === b.uid) return it;
+      if (!other && it.id === b.id) other = it;
+    }
+    return other;
+  }
+
+  /** Put a thing on a hot key (it comes off any other it was on), or clear the key. */
+  bind(i: number, item: ItemInstance | null) {
+    if (i < 0 || i >= HOT_KEYS) return;
+    if (item) this.hot = this.hot.map((b) => (b && b.uid === item.uid ? null : b));
+    this.hot[i] = item ? { uid: item.uid, id: item.id } : null;
+  }
+
+  /** the hot key this thing is on, or one of its kind is (-1: none) */
+  hotOf(item: ItemInstance): number {
+    const own = this.hot.findIndex((b) => b?.uid === item.uid);
+    return own >= 0 ? own : this.hot.findIndex((b, i) => b?.id === item.id && this.hotItem(i) === item);
+  }
+
+  /**
+   * What goes on the back or into the holster takes the key of its place if that key is free and the thing is on
+   * none: 1 and 2 for the back, 3 for the holster. (Any of them can be given to something else afterwards.)
+   */
+  autoBind() {
+    WEAPON_SLOTS.forEach((s, i) => {
+      const it = this.slots[s];
+      if (it && this.hotOf(it) < 0 && !this.hotItem(i)) this.bind(i, it);
+    });
+  }
   private gearCargo = new Map<string, Container>();
 
   /** cargo grid of a worn item (a live view of the item's own contents) */
@@ -182,6 +253,8 @@ export class PlayerInventory {
   clear() {
     this.slots = EMPTY_SLOTS();
     this.active = null;
+    this.hand = null;
+    this.hot = Array.from({ length: HOT_KEYS }, () => null);
     this.jacket.items = [];
     this.pants.items = [];
     this.tags.items = [];
@@ -243,6 +316,7 @@ export class PlayerInventory {
         if (this.active === s) this.active = null;
       }
     }
+    if (this.hand === item) this.hand = null;
     for (const c of this.containers) c.remove(item);
   }
 
@@ -304,7 +378,7 @@ export class PlayerInventory {
 
   serialize(): SerializedInventory {
     // (the tag round the neck goes with the slots: to the server it is one more thing worn, and so it is on the body)
-    return { slots: { ...this.slots, neck: this.neck }, active: this.active, containers: [this.tags, this.jacket, this.pants].map((c) => c.serialize()) };
+    return { slots: { ...this.slots, neck: this.neck }, active: this.active, containers: [this.tags, this.jacket, this.pants].map((c) => c.serialize()), hot: this.hot.map((b) => (b ? { ...b } : null)) };
   }
 
   /** Returns items that no longer fit anywhere (the caller drops them at the player's feet). */
@@ -315,6 +389,9 @@ export class PlayerInventory {
     const overflow: ItemInstance[] = [];
     // migrate saves from the single 'shoulder' slot layout
     if (raw.shoulder && !raw.primary) raw.primary = raw.shoulder;
+    // (and from when the body had a place for something to hit with: it goes on the back if it is long and there is room, or into a pocket)
+    const loose = raw.melee ? sanitizeItem(raw.melee) : null;
+    if (loose) overflow.push(loose);
     for (const s of ALL_SLOTS) {
       const it = raw[s] ? sanitizeItem(raw[s]!) : null;
       if (!it) continue;
@@ -322,6 +399,7 @@ export class PlayerInventory {
       else overflow.push(it);
     }
     this.active = null;
+    this.hand = null;
     const neck = raw.neck ? sanitizeItem(raw.neck) : null;
     this.neck = neck?.id === 'dogtag' ? neck : null;
     this.tags.items = [];
@@ -330,6 +408,13 @@ export class PlayerInventory {
       if (c) overflow.push(...c.load(cd as never));
     }
     // things that fell out of a shrunken pocket go wherever there is room
-    return overflow.map((it) => this.add(it)).filter((it): it is ItemInstance => !!it);
+    const left = overflow.map((it) => this.add(it)).filter((it): it is ItemInstance => !!it);
+    // the hot keys as they were left; a save from before there were any gets the back and the holster on 1, 2 and 3
+    this.hot = Array.from({ length: HOT_KEYS }, (_, i) => {
+      const b = d.hot?.[i];
+      return b && typeof b.uid === 'string' && typeof b.id === 'string' && ITEMS[b.id] ? { uid: b.uid.slice(0, 64), id: b.id } : null;
+    });
+    this.autoBind();
+    return left;
   }
 }

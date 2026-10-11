@@ -188,7 +188,9 @@ const S = {
     if (ammo) for (let k = 0; k < 3; k++) T.give(ammo, 30);
     const second = T.give(id === 'hatchet' ? 'm9' : 'hatchet') as Any;
     const otherSlot = Object.entries(g.inv.slots).find(([, x]) => x === second)?.[0];
-    const digit = (s?: string) => ({ primary: 'Digit1', secondary: 'Digit2', holster: 'Digit3', melee: 'Digit4' }[s ?? ''] ?? 'KeyX');
+    // (what is not on the back or in the holster is put on the key 4, and brought up with it)
+    const digit = (s?: string) => ({ primary: 'Digit1', secondary: 'Digit2', holster: 'Digit3' }[s ?? ''] ?? 'Digit4');
+    for (const x of [second, it]) if (x && !Object.values(g.inv.slots).includes(x)) g.inv.bind(3, x);
     const band = T.give('bandage') as Any, food = T.give('beans') as Any;
     if (isGun) it.loaded = 3;
     p.vitals.health = 60;

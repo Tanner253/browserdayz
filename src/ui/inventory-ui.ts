@@ -10,7 +10,7 @@
 // equip, use or take it) and the ground (the whole left column). Over a grid the outline is where it will land,
 // which is the nearest free spot to the pointer, not only the cell under it.
 
-import { GEAR_SLOTS, ITEMS, SLOT_KIND, SLOT_LABEL, TAG_HOLD_MIN, capacityOf, handlingOf, itemName, itemWeight, magRoom, tagClock, tagOwner, type ItemInstance, type Slot } from '../sim/items';
+import { GEAR_SLOTS, ITEMS, SLOT_KIND, SLOT_LABEL, TAG_HOLD_MIN, WEAPON_SLOTS, capacityOf, handlingOf, itemName, itemWeight, magRoom, tagClock, tagOwner, type ItemInstance, type Slot } from '../sim/items';
 import { Container, type PlayerInventory } from '../sim/inventory';
 import type { WorldItem, Stash } from '../game/loot';
 import type { Vitals } from '../game/player';
@@ -39,10 +39,14 @@ export interface InvActions {
   emptyMag(mag: ItemInstance): void;
   /** how many loose rounds are carried of the kind this magazine holds */
   looseFor(mag: ItemInstance): number;
-  /** put this item type on quick key 5 + i */
-  assignQuick(item: ItemInstance, i: number): void;
-  /** quick key index (0-3) this item type is on, or -1 */
-  quickIndex(id: string): number;
+  /** put this thing on hot key i (0: the key 1 ... 9: the key 0) */
+  assignHot(item: ItemInstance, i: number): void;
+  /** the hot key this thing is on (0-9), or -1 */
+  hotIndex(item: ItemInstance): number;
+  /** take a carried thing into the hands: what is then done with it is done with the left button, out of this screen */
+  hold(item: ItemInstance): void;
+  /** what is in the hands */
+  inHands(): ItemInstance | null;
   changed(): void;
   sound(kind: 'pickup' | 'drop' | 'move'): void;
 }
@@ -111,10 +115,10 @@ export class InventoryUI {
         this.finish('drop');
         return;
       }
-      // hover an item and press 5-8 to put it on that quick key
-      const q = ['Digit5', 'Digit6', 'Digit7', 'Digit8'].indexOf(e.code);
-      if (q >= 0 && this.hover && this.hover.kind !== 'ground' && this.usable(this.hover.item)) {
-        this.actions.assignQuick(this.hover.item, q);
+      // point at anything carried and press a number: it goes on that hot key (1 to 9, and 0)
+      const q = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0'].indexOf(e.code);
+      if (q >= 0 && !this.drag && this.hover && this.hover.kind !== 'ground' && this.carried(this.hover)) {
+        this.actions.assignHot(this.hover.item, q);
         this.actions.sound('move');
         this.render();
       }
@@ -201,8 +205,8 @@ export class InventoryUI {
       this.clocks.set(item.uid, item);
       t.push(`<span class="tagclock" data-clock="${item.uid}">${tagClock(item)}</span>`);
     }
-    const qi = this.actions.quickIndex(item.id);
-    if (qi >= 0) t.push(`<span class="qkey">${qi + 5}</span>`);
+    const qi = this.actions.hotIndex(item);
+    if (qi >= 0) t.push(`<span class="qkey">${(qi + 1) % 10}</span>`);
     return t.join('');
   }
 
@@ -272,7 +276,7 @@ export class InventoryUI {
     s.innerHTML = `<div class="slot-label">${SLOT_LABEL[slot]}${hint ? ` <b>${hint}</b>` : ''}</div>`;
     if (item) {
       const el = document.createElement('div');
-      el.className = 'inv-item in-slot' + (item === this.selected ? ' sel' : '') + (this.inv.active === slot ? ' active' : '');
+      el.className = 'inv-item in-slot' + (item === this.selected ? ' sel' : '') + (this.actions.inHands() === item ? ' active' : '');
       const url = this.icons[item.id];
       el.innerHTML = `<div class="inv-item-img fit" style="${url ? `background-image:url(${url})` : ''}"></div>${this.tags(item)}`;
       el.title = itemName(item);
@@ -345,7 +349,7 @@ export class InventoryUI {
     long.append(this.slotEl('primary', '1'), this.slotEl('secondary', '2'));
     const small = document.createElement('div');
     small.className = 'inv-slots';
-    small.append(this.slotEl('holster', '3'), this.slotEl('melee', '4'));
+    small.append(this.slotEl('holster', '3'));
     gear.append(long, small);
 
     // ---- carried: every cargo grid, then the inspector
@@ -378,7 +382,7 @@ export class InventoryUI {
       const bar = (label: string, val: number, cls: string) => `<div class="vbar ${cls}"><span>${label}</span><div><i style="width:${Math.max(0, Math.min(100, val))}%"></i></div><b>${Math.round(val)}</b></div>`;
       cargo.insertAdjacentHTML('beforeend', `<div class="inv-status"><h3>Status</h3>${bar('Health', v.health, v.health < 30 ? 'bad' : '')}${bar('Energy', v.energy, v.energy < 25 ? 'bad' : '')}${bar('Water', v.water, v.water < 25 ? 'bad' : '')}${v.bleeding ? '<div class="bleeding">Bleeding: use a bandage</div>' : ''}</div>`);
     }
-    cargo.insertAdjacentHTML('beforeend', `<div class="inv-help"><b>Drag</b> to move: onto your character to wear, equip or use, onto the left side to drop · <b>R</b> rotate · <b>Double-click</b> or <b>Shift-click</b> to use, wear or take · <b>Right-click</b> for everything else · hover + <b>G</b> drop · hover + <b>5</b>–<b>8</b> quick key · <b>Tab</b> or <b>Esc</b> close</div>`);
+    cargo.insertAdjacentHTML('beforeend', `<div class="inv-help"><b>Drag</b> to move: onto your character to wear it, sling it or take it in your hands, onto the left side to drop · <b>R</b> rotate · <b>Double-click</b> or <b>Shift-click</b>: take in hands, wear or pick up · point + <b>1</b>–<b>0</b>: put it on that key · point + <b>G</b> drop · <b>Right-click</b> for the rest. What is in your hands is used with the <b>left button</b>, held, once this is shut.</div>`);
 
     wrap.append(vic, gear, cargo);
     r.appendChild(wrap);
@@ -443,9 +447,9 @@ export class InventoryUI {
     return box;
   }
 
-  private usable(item: ItemInstance) {
-    const d = ITEMS[item.id];
-    return !!d.use || !!d.open;
+  /** is this thing on the survivor (and not in the crate that is open, or on the ground)? */
+  private carried(src: Source) {
+    return src.kind === 'slot' || (src.kind === 'container' && this.inv.containers.includes(src.c));
   }
 
   /** put an item into its equipment slot (swapping out whatever was there) */
@@ -479,23 +483,22 @@ export class InventoryUI {
     if (loc.kind === 'ground') {
       out.push({ label: 'Take', run: () => this.quickMove(loc), primary: true });
       if (d.slot) out.push({ label: gearWord, run: () => this.equip(loc) });
-      // what can be done with a thing in the pockets can be done with it where it lies
-      const there = (how: 'use' | 'open') => () => {
-        this.vicinity = this.vicinity.filter((v) => v !== loc.w);
-        this.actions.onGround(loc.w, how);
-      };
-      if (d.use) out.push({ label: d.use.verb, run: there('use') });
-      if (d.open) out.push({ label: 'Open box', run: there('open') });
       return out;
     }
     const inStash = loc.kind === 'container' && !!this.stash && loc.c === this.stash.container;
-    if (d.use) out.push({ label: d.use.verb, run: () => this.actions.use(it), primary: true });
-    if (d.open) out.push({ label: 'Open box', run: () => this.actions.open(it), primary: true });
-    if (d.category === 'stash') out.push({ label: 'Place', run: () => this.actions.place(it), primary: true });
+    // What is done with a thing is done with it in the hands, out of this screen, by the left button (2026-10-10):
+    // here it is taken into them. (Worn things are worn; what is on the back or in the holster comes into the
+    // hands the same way.)
+    const worn = loc.kind === 'slot' && !WEAPON_SLOTS.includes(loc.slot);
+    if (this.carried(loc) && !worn && d.category !== 'clothing') {
+      const held = this.actions.inHands() === it;
+      if (!held) out.push({ label: 'Take in hands', run: () => this.actions.hold(it), primary: !d.attach || !this.actions.attachTargets(it).length });
+    }
+    if (d.category === 'stash') out.push({ label: 'Place', run: () => this.actions.place(it) });
     if (d.attach) {
       for (const w of this.actions.attachTargets(it)) out.push({ label: `Attach to ${ITEMS[w.id].name}`, run: () => this.actions.attach(it, w), primary: true });
     }
-    if (d.slot && loc.kind === 'container') out.push({ label: gearWord, run: () => this.equip(loc), primary: !d.use && !d.open });
+    if (d.slot && loc.kind === 'container') out.push({ label: d.category === 'clothing' ? gearWord : 'Sling on your back', run: () => this.equip(loc), primary: d.category === 'clothing' });
     if (loc.kind === 'slot') {
       out.push({
         label: d.category === 'clothing' ? 'Take off' : 'Stow',
@@ -509,8 +512,6 @@ export class InventoryUI {
       });
     }
     if (d.mag) {
-      const loose = this.actions.looseFor(it), room = d.mag.capacity - (it.rounds ?? 0);
-      if (room > 0 && loose > 0) out.push({ label: `Fill (${Math.min(room, loose)} rounds)`, run: () => this.actions.fillMag(it), primary: true });
       if ((it.rounds ?? 0) > 0) out.push({ label: `Empty (${it.rounds})`, run: () => this.actions.emptyMag(it) });
     }
     if (d.weapon?.mag) {
@@ -519,10 +520,6 @@ export class InventoryUI {
     } else if (d.weapon && (it.loaded ?? 0) > 0) out.push({ label: `Unload (${it.loaded})`, run: () => this.actions.unload(it) });
     for (const m of it.mods ?? []) out.push({ label: `Detach ${ITEMS[m].name}`, run: () => this.actions.detach(it, m) });
     if (this.stash && !this.stashState) out.push({ label: inStash ? 'Take' : `Move to ${this.stash.label}`, run: () => this.transfer(loc), primary: inStash });
-    if (this.usable(it)) {
-      const cur = this.actions.quickIndex(it.id);
-      for (let i = 0; i < 4; i++) if (i !== cur) out.push({ label: `Quick key ${i + 5}`, run: () => this.actions.assignQuick(it, i) });
-    }
     out.push({
       label: 'Drop',
       run: () => {
@@ -736,11 +733,8 @@ export class InventoryUI {
       const w = this.actions.attachTargets(it)[0];
       if (w) return { label: `Fit to ${ITEMS[w.id].name}`, run: () => this.fit(src, w) };
     }
-    if (mine) {
-      if (d.use) return { label: d.use.verb, run: () => this.actions.use(it) };
-      if (d.open) return { label: 'Open', run: () => this.actions.open(it) };
-      return null;
-    }
+    // (let go over the survivor, a thing carried comes into their hands)
+    if (mine) return this.actions.inHands() === it ? null : { label: 'Take in hands', run: () => this.actions.hold(it) };
     if (!this.inv.hasRoom(it)) return null;
     return { label: 'Take', run: () => (src.kind === 'ground' ? this.quickMove(src) : this.transfer(src)) };
   }

@@ -9,7 +9,7 @@
 
 import * as THREE from 'three';
 import type { Actor, CamPose, Shot, Stage } from './director';
-import { makeItem, TAG_HOLD } from '../sim/items';
+import { ITEMS, makeItem, TAG_HOLD } from '../sim/items';
 import { physics, USE_GROUPS } from '../core/physics';
 
 export const BPM = 128;
@@ -275,7 +275,7 @@ export function buildShots(S: Stage): Shot[] {
           fn: () => {
             if (i >= 2) {
               // one melee weapon at a time has a place on the belt
-              if (g.inv.slots.melee) g.inv.remove(g.inv.slots.melee);
+              for (const x of [...g.inv.carried()]) if (ITEMS[x.id].melee) g.inv.remove(x);
               g.inv.add(makeItem(id));
             }
             S.hold(i === 0 ? 'primary' : i === 1 ? 'holster' : 'melee');

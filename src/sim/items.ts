@@ -2,19 +2,25 @@
 // Grid sizes follow DayZ conventions (1 cell ~ 10 cm).
 
 export type Category = 'weapon' | 'ammo' | 'magazine' | 'food' | 'drink' | 'medical' | 'melee' | 'tool' | 'misc' | 'stash' | 'attachment' | 'clothing';
-/** physical equipment slots on the character: weapons and worn gear */
-export type Slot = 'primary' | 'secondary' | 'holster' | 'melee' | 'head' | 'face' | 'vest' | 'back' | 'hands' | 'feet';
-/** what kind of slot an item fits: long guns fit primary or secondary, gear fits its own slot */
-export type SlotKind = 'long' | 'holster' | 'melee' | 'head' | 'face' | 'vest' | 'back' | 'hands' | 'feet';
+/**
+ * Physical equipment slots on the character: weapons and worn gear. Two things are carried slung on the back
+ * (`primary`, `secondary`: a long gun, or something long to hit with), a sidearm in a holster, and that is all the
+ * body has places for (2026-10-10, as DayZ has it: there was a place for a melee weapon, and there is not). A
+ * knife or a hatchet goes in a pocket like anything else. What is in the hands is whatever was taken into them:
+ * see `hold` on the inventory, and the hot keys, which are bound to things and not to places.
+ */
+export type Slot = 'primary' | 'secondary' | 'holster' | 'head' | 'face' | 'vest' | 'back' | 'hands' | 'feet';
+/** what kind of slot an item fits: long things fit either place on the back, gear fits its own slot */
+export type SlotKind = 'long' | 'holster' | 'head' | 'face' | 'vest' | 'back' | 'hands' | 'feet';
 export const SLOT_KIND: Record<Slot, SlotKind> = {
-  primary: 'long', secondary: 'long', holster: 'holster', melee: 'melee',
+  primary: 'long', secondary: 'long', holster: 'holster',
   head: 'head', face: 'face', vest: 'vest', back: 'back', hands: 'hands', feet: 'feet',
 };
-export const WEAPON_SLOTS: Slot[] = ['primary', 'secondary', 'holster', 'melee'];
+export const WEAPON_SLOTS: Slot[] = ['primary', 'secondary', 'holster'];
 export const GEAR_SLOTS: Slot[] = ['head', 'face', 'vest', 'back', 'hands', 'feet'];
 export const ALL_SLOTS: Slot[] = [...WEAPON_SLOTS, ...GEAR_SLOTS];
 export const SLOT_LABEL: Record<Slot, string> = {
-  primary: 'Primary', secondary: 'Secondary', holster: 'Holster', melee: 'Melee',
+  primary: 'On the back', secondary: 'On the back', holster: 'Holster',
   head: 'Head', face: 'Face', vest: 'Vest', back: 'Back', hands: 'Hands', feet: 'Feet',
 };
 
@@ -242,13 +248,15 @@ const D: ItemDef[] = [
     attach: { fits: ['mosin', 'p38', 'm9', 'benelli'], slot: 'light', ergo: -2 },
   },
   // ---------------------------------------------------------------- melee
-  { id: 'hatchet', name: 'Hatchet', model: 'hatchet', w: 1, h: 3, weight: 0.8, category: 'melee', slot: 'melee', desc: 'Chops wood and anything else.', melee: { damage: 45, range: 1.7, rate: 0.75 } },
-  { id: 'machete', name: 'Machete', model: 'machete', w: 1, h: 5, weight: 0.6, category: 'melee', slot: 'melee', desc: 'Long blade. Fast swings.', melee: { damage: 38, range: 1.9, rate: 0.55 } },
-  { id: 'crowbar', name: 'Crowbar', model: 'crowbar_01', w: 1, h: 4, weight: 1.6, category: 'melee', slot: 'melee', desc: 'Heavy steel. Opens things, closes arguments.', melee: { damage: 42, range: 1.8, rate: 0.85 } },
-  { id: 'bat', name: 'Baseball Bat', model: 'baseball_bat', w: 1, h: 6, weight: 0.9, category: 'melee', slot: 'melee', desc: 'Wooden bat.', melee: { damage: 30, range: 2.0, rate: 0.7 } },
+  // (The long ones are carried slung on the back, in either of its two places, or in a pack that is tall enough;
+  // the hatchet and the knife go in a pocket. Any of them is put on a hot key and taken into the hands with it.)
+  { id: 'hatchet', name: 'Hatchet', model: 'hatchet', w: 1, h: 3, weight: 0.8, category: 'melee', desc: 'Chops wood and anything else.', melee: { damage: 45, range: 1.7, rate: 0.75 } },
+  { id: 'machete', name: 'Machete', model: 'machete', w: 1, h: 5, weight: 0.6, category: 'melee', slot: 'long', desc: 'Long blade. Fast swings.', melee: { damage: 38, range: 1.9, rate: 0.55 } },
+  { id: 'crowbar', name: 'Crowbar', model: 'crowbar_01', w: 1, h: 4, weight: 1.6, category: 'melee', slot: 'long', desc: 'Heavy steel. Opens things, closes arguments.', melee: { damage: 42, range: 1.8, rate: 0.85 } },
+  { id: 'bat', name: 'Baseball Bat', model: 'baseball_bat', w: 1, h: 6, weight: 0.9, category: 'melee', slot: 'long', desc: 'Wooden bat.', melee: { damage: 30, range: 2.0, rate: 0.7 } },
   // (2026-10-10: swung as the bat is, in both hands; heavier, a little slower, and its edge bites)
-  { id: 'shovel', name: 'Shovel', model: 'shovel', w: 2, h: 6, weight: 1.7, category: 'melee', slot: 'melee', desc: 'A short-handled digging shovel with a steel blade. Swung in both hands like a bat: heavier, a little slower, and it hits harder.', melee: { damage: 36, range: 2.0, rate: 0.78 } },
-  { id: 'knife', name: 'Fish Knife', model: 'fish_knife', w: 1, h: 2, weight: 0.15, category: 'melee', slot: 'melee', desc: 'Thin filleting blade. Quick, short reach.', melee: { damage: 27, range: 1.45, rate: 0.42 } },
+  { id: 'shovel', name: 'Shovel', model: 'shovel', w: 2, h: 6, weight: 1.7, category: 'melee', slot: 'long', desc: 'A short-handled digging shovel with a steel blade. Swung in both hands like a bat: heavier, a little slower, and it hits harder.', melee: { damage: 36, range: 2.0, rate: 0.78 } },
+  { id: 'knife', name: 'Fish Knife', model: 'fish_knife', w: 1, h: 2, weight: 0.15, category: 'melee', desc: 'Thin filleting blade. Quick, short reach.', melee: { damage: 27, range: 1.45, rate: 0.42 } },
   // ---------------------------------------------------------------- food & drink
   { id: 'sprats', name: 'Tinned Sprats', model: 'russian_food_cans_01', node: 'russian_food_cans_01_can_fish', scale: 2.2, w: 1, h: 1, weight: 0.24, category: 'food', desc: 'Smoked sprats in oil. Шпроты.', use: { verb: 'Eat', time: 2.5, energy: 28, water: -2, sound: 'eat' } },
   { id: 'condensed', name: 'Condensed Milk', model: 'russian_food_cans_01', node: 'russian_food_cans_01_can_cond', scale: 2, w: 1, h: 1, weight: 0.4, category: 'food', desc: 'Sweet, thick, calorie dense.', use: { verb: 'Eat', time: 2.5, energy: 34, water: 4, sound: 'eat' } },
@@ -355,7 +363,7 @@ const D: ItemDef[] = [
   { id: 'watch', name: 'Wrist Watch', model: 'digital_wrist_watch', w: 1, h: 1, weight: 0.05, category: 'tool', desc: 'Still ticking.' },
   { id: 'radio', name: 'Field Radio', model: 'vintage_radio_transceiver', w: 4, h: 3, weight: 6.5, category: 'misc', desc: 'Military transceiver, good for one call: use it under open sky and a supply drop comes down where you stand. Everybody hears it called.', use: { verb: 'Call a drop on the', time: 5, sound: 'bandage' }, call: true },
   { id: 'cigarettes', name: 'Cigarettes', model: 'cigarette_pack', w: 1, h: 1, weight: 0.03, category: 'misc', stack: 5, desc: 'Kentucky Ace. A smoke steadies you: each one gives back 12 health.', use: { verb: 'Smoke', time: 4, health: 12, sound: 'smoke' } },
-  { id: 'jerrycan', name: 'Jerrycan', model: 'metal_jerrycan_green', w: 2, h: 3, weight: 8.5, category: 'misc', desc: 'Ten litres of fuel, a quarter of a tank. Look at a jeep or a police car and press G to pour it in.' },
+  { id: 'jerrycan', name: 'Jerrycan', model: 'metal_jerrycan_green', w: 2, h: 3, weight: 8.5, category: 'misc', desc: 'Ten litres of fuel, a quarter of a tank. Hold it, look at a jeep or a police car, and hold the left button to pour it in.' },
   { id: 'grenade', name: 'Stick Grenade', model: 'stick_grenade', w: 1, h: 3, weight: 0.6, category: 'misc', desc: 'Pull the cord and throw. Four seconds, then everything within nine metres is hurt, you included.', use: { verb: 'Throw', time: 0.75, sound: 'bandage' }, throw: { fuse: 4, damage: 150, radius: 9 } },
   // ---------------------------------------------------------------- identity
   {

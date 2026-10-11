@@ -354,7 +354,7 @@ export class Garage {
     if (j.wreck) return '<small>Burned out</small>';
     if (j.over) return j.seats.some((s) => s !== null) ? null : '<kbd>F</kbd>Turn it over';
     const seat = this.seatFor(j, this.h.player.pos);
-    const fuel = hasCan && j.fuel < JEEP.tank - 0.5 ? ' <small>G to pour in a jerrycan</small>' : '';
+    const fuel = hasCan && j.fuel < JEEP.tank - 0.5 ? ' <small>hold your jerrycan, and the left button, to pour it in</small>' : '';
     if (tagged) return `<small>${JEEP.noTag}</small>${fuel}`;
     if (seat < 0) return `<small>No free seat</small>${fuel}`;
     return `<kbd>F</kbd>${seat === 0 ? 'Drive' : 'Get in'}${j.fuel <= 0 ? ' <small>the tank is empty</small>' : ''}${fuel}`;

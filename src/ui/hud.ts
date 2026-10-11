@@ -981,7 +981,7 @@ export class HUD {
       e.hotbar.innerHTML = s.hotbar
         .map((h, i) => {
           const icon = h.id && this.icons[h.id] ? `<i style="background-image:url(${this.icons[h.id]})"></i>` : '';
-          return `${i === 4 ? '<span class="hb-gap"></span>' : ''}<div class="hb${h.active ? ' on' : ''}${h.dim ? ' dim' : ''}${h.id ? '' : ' empty'}"><b>${h.key}</b>${icon}<em>${h.label}</em></div>`;
+          return `${i === 3 ? '<span class="hb-gap"></span>' : ''}<div class="hb${h.active ? ' on' : ''}${h.dim ? ' dim' : ''}${h.id ? '' : ' empty'}"><b>${h.key}</b>${icon}<em>${h.label}</em></div>`;
         })
         .join('');
     }
