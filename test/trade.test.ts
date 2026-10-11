@@ -3,7 +3,7 @@
 
 import assert from 'node:assert/strict';
 import { ITEMS, makeItem } from '../src/sim/items';
-import { KEPT_ON_DEATH, STOCK, aDay, asks, pays, worth } from '../src/sim/trade';
+import { KEPT_ON_DEATH, STOCK, aDay, asks, pays, sold, worth } from '../src/sim/trade';
 import { generateWorld } from '../src/world/worldgen';
 import { buildWorldData } from '../server/world';
 import { bookFor, jobsFor, progress } from '../src/sim/jobs';
@@ -30,7 +30,8 @@ ok('everything he sells is a real thing with a price, and he sells no guns, tags
 ok('nothing is gained by buying from him and selling it back, opened or not', () => {
   for (const id of STOCK) {
     const def = ITEMS[id];
-    const bought = makeItem(id, def.stack);
+    // (what he hands over for that: a full pile of what is piled, one of what is sold one at a time)
+    const bought = makeItem(id, sold(id));
     assert.ok(asks(id) >= 2 * pays(bought), `${id}: asks ${asks(id)}, pays ${pays(bought)}`);
     if (def.open) {
       const out = makeItem(def.open.gives, def.open.qty);
@@ -76,7 +77,7 @@ ok('the day has three jobs, the same whoever asks, of real things, and they pay 
       const over = pays(makeItem(j.item!, ITEMS[j.item!].stack ? 1 : undefined)) * j.n;
       assert.ok(j.pays > over, `${j.id}: the job pays ${j.pays}, the counter ${over}`);
       // (and not so well that it is done by buying the thing from him)
-      if (STOCK.includes(j.item!)) assert.ok(j.pays < (asks(j.item!) / (ITEMS[j.item!].stack ?? 1)) * j.n, `${j.id}: the job pays ${j.pays}, and he sells them for ${asks(j.item!)}`);
+      if (STOCK.includes(j.item!)) assert.ok(j.pays < (asks(j.item!) / sold(j.item!)) * j.n, `${j.id}: the job pays ${j.pays}, and he sells them for ${asks(j.item!)}`);
     }
   }
   assert.ok(new Set(Array.from({ length: 60 }, (_, k) => jobsFor(20700 + k).map((j) => j.id).join())).size > 20, 'the days are all alike');

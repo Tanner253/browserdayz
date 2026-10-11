@@ -128,6 +128,9 @@ export function playOutline(): { x: number; z: number; r: number; from: number; 
   return out;
 }
 
+/** the village's second clinic and second shop: how far out along its street from its middle they are looked for a place (metres: no nearer, no farther, and where first) */
+export const SERVICES = { from: 68, to: 116, out: 90 };
+
 export type BuildingType = 'house_small' | 'house_brick' | 'barn' | 'shed' | 'cabin' | 'guardpost' | 'police' | 'clinic' | 'store' | 'barracks' | 'garage' | 'house_two' | 'tower' | 'hut' | 'townhouse' | 'shanty' | 'tent';
 
 /** footprint (x = width, z = depth) in metres, used for terrain pads + spacing */
@@ -1604,6 +1607,76 @@ export function generateWorld(seed = WORLD_SEED): World {
     for (const [x, z] of line) mark(x, z, 19);
     for (const [x, z] of way) mark(x, z, PASS.reach + 3);
     for (const b of added) mark(b.x, b.z, 24);
+    for (const k of again) {
+      paint(k % N, Math.floor(k / N));
+      if (surface) surface[k] = heights[k];
+    }
+  }
+
+  // --- a second clinic and a second shop in the village (2026-10-11). Asked: "we should space out the police
+  // station from the store from the medical clinic, theyre all right next to eachother, i think if we spaced them
+  // out it would be more meaningful to their specific loot pools", and, when the first ones were moved to do it:
+  // "why remove the house entirely instead of just add more ... maintaining both locations". So the first stand
+  // where they stood, and there is another of each: the clinic at the east end of the village street and the shop
+  // at the west end, a hundred and more metres from the police station and from one another. They come after
+  // every building there is, so that none is renumbered; they take nothing from anybody's dice (they have their
+  // own), and the ground is levelled under them and cleared as it was for the first.
+  {
+    const first = buildings.length;
+    const before = heights.slice();
+    const rng5 = new RNG(seed + 6161);
+    const cell = (x: number, z: number) => idx(clamp(Math.round((x + half) / CELL), 0, N - 1), clamp(Math.round((z + half) / CELL), 0, N - 1));
+    const reach = (type: BuildingType) => Math.hypot(...BUILDING_FOOTPRINT[type]) / 2;
+    const free = (type: BuildingType, x: number, z: number) => {
+      const r = reach(type);
+      if (buildings.some((b) => Math.hypot(b.x - x, b.z - z) < reach(b.type) + r + 5)) return false;
+      return roadNearest(x, z).d >= r + ROAD_W / 2 + 2.5 && trackDist[cell(x, z)] >= r + 3 && slopeAt(heights, x, z) < 0.22;
+    };
+    // at one end of the village street, as near `SERVICES.out` metres from its middle as there is room: its door to the road
+    const atEnd = (type: BuildingType, back: number, east: boolean) => {
+      const order = path2
+        .map((q, i) => ({ i, d: Math.hypot(q[0] - VILLAGE.x, q[1] - VILLAGE.z) }))
+        .filter((q) => q.d > SERVICES.from && q.d < SERVICES.to && q.i < path2.length - 1 && path2[q.i][0] > VILLAGE.x === east)
+        .sort((a, b) => Math.abs(a.d - SERVICES.out) - Math.abs(b.d - SERVICES.out));
+      for (const { i } of order) {
+        const [x, z] = path2[i], [nx, nz] = path2[i + 1];
+        const tl = Math.hypot(nx - x, nz - z);
+        const px = -(nz - z) / tl, pz = (nx - x) / tl;
+        const off = back + BUILDING_FOOTPRINT[type][1] / 2 + ROAD_W / 2;
+        for (const side of [1, -1]) {
+          const bx = x + px * off * side, bz = z + pz * off * side;
+          if (!free(type, bx, bz)) continue;
+          buildings.push({ id: `${type}_${buildings.length}`, type, x: bx, z: bz, rot: Math.atan2(-px * side, -pz * side), floorY: 0, seed: Math.floor(rng5.next() * 1e9) });
+          return true;
+        }
+      }
+      return false;
+    };
+    atEnd('clinic', 9, true);
+    atEnd('store', 8, false);
+    const added = buildings.slice(first);
+    for (const b of added) seat(b);
+    for (const b of buildings) if (added.some((n) => n === b || Math.hypot(n.x - b.x, n.z - b.z) < reach(n.type) + reach(b.type) + 9.5)) pad(b, 3.2, 2.2);
+    // what grew or lay where one now stands goes, and what is left about it stands on the ground as it is now
+    const inAdded = (x: number, z: number, margin: number) =>
+      added.some((b) => {
+        const [w, d] = BUILDING_FOOTPRINT[b.type];
+        const dx = x - b.x, dz = z - b.z, c = Math.cos(b.rot), sn = Math.sin(b.rot);
+        return Math.abs(dx * c - dz * sn) < w / 2 + margin && Math.abs(dx * sn + dz * c) < d / 2 + margin;
+      });
+    for (const list of [trees, rocks, props]) {
+      for (let k = list.length - 1; k >= 0; k--) {
+        const t = list[k];
+        if (!added.some((b) => Math.hypot(b.x - t.x, b.z - t.z) < 30)) continue;
+        if (inAdded(t.x, t.z, list === trees ? 4 : 2.5)) list.splice(k, 1);
+        else t.y += heightAt(heights, t.x, t.z) - heightAt(before, t.x, t.z);
+      }
+    }
+    // and the ground is painted again wherever this reaches
+    const again = new Set<number>();
+    for (const b of added)
+      for (let iz = Math.max(0, Math.floor((b.z - 24 + half) / CELL)); iz <= Math.min(N - 1, Math.ceil((b.z + 24 + half) / CELL)); iz++)
+        for (let ix = Math.max(0, Math.floor((b.x - 24 + half) / CELL)); ix <= Math.min(N - 1, Math.ceil((b.x + 24 + half) / CELL)); ix++) again.add(iz * N + ix);
     for (const k of again) {
       paint(k % N, Math.floor(k / N));
       if (surface) surface[k] = heights[k];

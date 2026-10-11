@@ -37,7 +37,7 @@ const ok = (name: string, fn: () => void) => {
 // 4.2 m, when the upstairs wall of the two-floor house was moved clear of its window and closets were built:
 // compared place by place, before and after, with assets-src/_wf/me/loot-points.ts. None was added or renumbered.)
 import { JEEP } from '../src/sim/vehicles';
-const WAS = { cells: 191458, heights: 1415315074, buildings: 72, buildingsHash: 2448790248, lastId: 'tower_71', spawns: 2697513077, trees: 9494, treesHash: 1630127803, lootPoints: 675, lootHash: 2826555666, jeeps: 8, jeepsHash: 207674058, fires: 6 };
+const WAS = { cells: 190604, heights: 3515396887, buildings: 72, buildingsHash: 2448790248, lastId: 'tower_71', spawns: 2697513077, trees: 9494, treesHash: 1630127803, lootPoints: 675, lootHash: 2826555666, jeeps: 8, jeepsHash: 207674058, fires: 6 };
 const hash = (parts: number[]) => {
   let h = 2166136261 >>> 0;
   for (const v of parts) {
@@ -53,6 +53,8 @@ const HUT_AT = { x: 160.1, z: 163.1 };
 
 /** where a brick block, a plank house and a long hut were stood behind the village street: fenced off before they were built */
 const IN_VILLAGE = [{ type: 'townhouse', x: 44, z: -28 }, { type: 'shanty', x: 14, z: 50 }, { type: 'hut', x: 46, z: 50 }];
+/** the village's second clinic and second shop (2026-10-11), at the two ends of its street: the ground fenced off for each */
+const SECOND = [{ type: 'clinic', x: 136.7, z: 23.5 }, { type: 'store', x: -63.1, z: -17.6 }];
 
 const world = generateWorld();
 /** the map as it was first made: 513 samples a side, 1024 m, in the middle of whatever the grid is now */
@@ -82,6 +84,7 @@ const touched = (x: number, z: number) => {
   if (Math.hypot(x - HUT_AT.x, z - HUT_AT.z) < 24) return true;
   // (and where one of each of the downloaded buildings was stood in the village, 2026-10-10: 24 m round each)
   if (IN_VILLAGE.some((q) => Math.hypot(x - q.x, z - q.z) < 24)) return true;
+  if (SECOND.some((q) => Math.hypot(x - q.x, z - q.z) < 30)) return true;
   // (and Kamenka's valley, 2026-10-10: its rim stands on the old map's ground west and north of the town)
   if (kamenkaQ(x, z) < KAMENKA.foot + 0.1) return true;
   // (and the bunker's hollow, on the far side of the map)
@@ -96,7 +99,7 @@ const inl = Math.hypot(camp.x - E.x, camp.z - E.z);
 const ux = (camp.x - E.x) / inl, uz = (camp.z - E.z) / inl;
 const works = world.sites.find((s) => s.kind === 'works')!;
 // (what was built with the works: not the trading post's two, which came later and stand in the old map's meadow)
-const added = world.buildings.slice(WAS.buildings).filter((b) => !['hut', 'townhouse', 'shanty', 'tent'].includes(b.type) && Math.hypot(b.x - TRADE_AT.x, b.z - TRADE_AT.z) > 78 && Math.hypot(b.x - ARMY_CAMP.x, b.z - ARMY_CAMP.z) > 78 && inOld(b.x, b.z));
+const added = world.buildings.slice(WAS.buildings).filter((b) => !['hut', 'townhouse', 'shanty', 'tent'].includes(b.type) && !SECOND.some((q) => Math.hypot(b.x - q.x, b.z - q.z) < 3) && Math.hypot(b.x - TRADE_AT.x, b.z - TRADE_AT.z) > 78 && Math.hypot(b.x - ARMY_CAMP.x, b.z - ARMY_CAMP.z) > 78 && inOld(b.x, b.z));
 
 // To take the old map's figures again after fencing off more ground (do it BEFORE building there): FIGURES=1 npx tsx test/expansion.test.ts
 if (process.env.FIGURES) {
@@ -243,6 +246,19 @@ ok('the long huts stand where they were meant to: beside the trading post, behin
   assert.equal(huts.length, 3, `${huts.length} huts`);
   // and in the village, one of each of the downloaded buildings, where the ground was fenced off for it
   for (const q of IN_VILLAGE) assert.ok(world.buildings.some((b) => b.type === q.type && Math.hypot(b.x - q.x, b.z - q.z) < 0.5), `no ${q.type} in the village at ${q.x}, ${q.z}`);
+  // and the village's second clinic and second shop: the last two buildings of all, each where its ground was fenced
+  // off, well away from the police station, from the first of its kind and from one another, and still in the village
+  const police = world.buildings.find((b) => b.type === 'police')!, village = world.pois[0];
+  const last = world.buildings.slice(-SECOND.length);
+  SECOND.forEach((q, i) => {
+    const b = last[i];
+    assert.ok(b.type === q.type && Math.hypot(b.x - q.x, b.z - q.z) < 0.5, `no second ${q.type} at ${q.x}, ${q.z}: ${b.id} is at ${b.x.toFixed(1)}, ${b.z.toFixed(1)}`);
+    assert.ok(Math.hypot(b.x - police.x, b.z - police.z) > 80, `the second ${q.type} is by the police station`);
+    assert.ok(Math.hypot(b.x - village.x, b.z - village.z) < 118, `the second ${q.type} is out of the village`);
+    const firstOf = world.buildings.find((o) => o.type === q.type && Math.hypot(o.x - village.x, o.z - village.z) < 60)!;
+    assert.ok(Math.hypot(b.x - firstOf.x, b.z - firstOf.z) > 80, `the second ${q.type} is by the first`);
+  });
+  assert.ok(Math.hypot(last[0].x - last[1].x, last[0].z - last[1].z) > 150, 'the second clinic and the second shop are together');
   assert.ok(huts.some((b) => Math.hypot(b.x - TRADE_AT.x, b.z - TRADE_AT.z) < 60), 'none at the trading post');
   assert.ok(huts.some((b) => Math.hypot(b.x - HUT_AT.x, b.z - HUT_AT.z) < 2), 'none behind the depot, where the ground was fenced off for it');
   // (the third is on ground the works' track had already moved)
