@@ -147,6 +147,8 @@ export type C2S =
   | { t: 'died'; cause: string; v?: number }
   | { t: 'respawn' }
   | { t: 'chat'; ch?: ChatChannel; text: string }
+  /** the admin password, as typed (the server passes it to the site, which alone knows it; it is kept nowhere) */
+  | { t: 'admin'; pw: string }
   /** a dog tag taken from another player has been carried for the full time */
   | { t: 'cash'; uid: string; /** where a reward for it should go, if the player has given an address */ wallet?: string }
   /** getting into jeep number i (see src/sim/vehicles.ts), in this seat; and getting out of whatever we are in */
@@ -284,6 +286,10 @@ export type S2C =
   | { t: 'pong'; n: number }
   /** something the server has to say to this player alone (what became of a tag they cashed in) */
   | { t: 'tell'; text: string; kind: 'good' | 'warn' | 'info' }
+  /** what this player may do on the server: nothing out of the way (null), keep order (mod), or everything (admin) */
+  | { t: 'role'; role: 'admin' | 'mod' | null }
+  /** a line from the server to this player alone, shown where talk is shown (what an order did, a list asked for) */
+  | { t: 'sys'; text: string }
   | { t: 'kick'; reason: string };
 
 /** deterministic id of a crate that is part of the map (same on every client and the server) */

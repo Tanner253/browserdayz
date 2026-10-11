@@ -534,6 +534,10 @@ export class Game {
       this.hud.note('The bleeding has stopped on its own', 'good');
       this.meDirty = true;
     };
+    this.hud.onPass = (pw) => {
+      if (this.online) this.net.send({ t: 'admin', pw });
+      else this.hud.chatLine('system', '', 'You are playing offline: there is no server to be an admin of.');
+    };
     this.hud.onChat(
       (ch, text) => {
         if (this.online) this.net.send({ t: 'chat', ch, text });
@@ -1217,6 +1221,11 @@ export class Game {
       }
     });
     // what became of a tag we cashed in (paid, on its way, why not)
+    // what the server says to this player alone: a role given or taken, and what came of an order (see `command` in server/index.ts)
+    net.on('role', (m) => {
+      this.role = m.role;
+    });
+    net.on('sys', (m) => this.hud.chatLine('system', '', m.text));
     net.on('tell', (m) => {
       this.hud.note(m.text, m.kind);
       this.hud.chatLine('system', '', m.text);
@@ -1946,6 +1955,8 @@ export class Game {
     this.hud.note('You were under the ground: back on your feet', 'warn');
   }
   private buriedT = 0;
+  /** what the server lets this player do out of the way: nothing (null), keep order, or everything */
+  role: 'admin' | 'mod' | null = null;
 
   /** A hot key is pressed: what is on it comes into the hands, or goes out of them if it is there already. */
   private hot(i: number) {

@@ -315,6 +315,21 @@ export class HUD {
         // the key that opened the box is still held down
         if (e.repeat) return;
         const text = chat.value.trim();
+        // The admin password. `/admin` by itself turns this same box into one that does not show what is typed
+        // in it; what is typed then goes to the server as a thing of its own, never as talk, and is kept nowhere.
+        if (this.passMode) {
+          const pw = chat.value;
+          this.closeChat();
+          if (pw) this.onPass(pw);
+          return;
+        }
+        if (/^\/admin$/i.test(text)) {
+          chat.value = '';
+          chat.type = 'password';
+          chat.placeholder = 'Admin password, then Enter (Esc to leave)';
+          this.passMode = true;
+          return;
+        }
         this.closeChat();
         if (text) this.chatSend(this.channel, text);
       } else if (e.key === 'Escape') this.closeChat();
@@ -831,9 +846,22 @@ export class HUD {
     if (!this.chatOpen) return;
     this.chatOpen = false;
     this.toggle(this.el.chat, 'open', false);
-    (this.root.querySelector('.chat-input') as HTMLInputElement).blur();
+    const box = this.root.querySelector('.chat-input') as HTMLInputElement;
+    // (a password that was being typed is not left in the box, nor the box left a password's)
+    if (this.passMode) {
+      this.passMode = false;
+      box.value = '';
+      box.type = 'text';
+      box.placeholder = '';
+    }
+    box.blur();
     this.chatClosed();
   }
+
+  /** the box is asking for the admin password (see the Enter key, above) */
+  private passMode = false;
+  /** the admin password, typed: the game sends it to the server */
+  onPass: (pw: string) => void = () => {};
 
   /** every channel lands in the one log, tagged and coloured by channel */
   chatLine(ch: ChatChannel | 'system', from: string, text: string) {

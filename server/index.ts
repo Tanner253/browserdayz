@@ -6,7 +6,7 @@
 // hurts. Clients own their movement, aim and inventory.
 
 import http from 'node:http';
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { createReadStream, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
@@ -276,7 +276,22 @@ const pairPaidAt = new Map<string, number>();
 /** where a connection comes from, as near as the host lets it be known */
 function addressOf(req: http.IncomingMessage): string {
   const first = (v: string | string[] | undefined) => ((Array.isArray(v) ? v[0] : v) ?? '').split(',')[0].trim();
-  return first(req.headers['cf-connecting-ip']) || first(req.headers['true-client-ip']) || first(req.headers['x-forwarded-for']) || req.socket.remoteAddress || '';
+  return netOf(first(req.headers['cf-connecting-ip']) || first(req.headers['true-client-ip']) || first(req.headers['x-forwarded-for']) || req.socket.remoteAddress || '');
+}
+/**
+ * An address as far as it says whose connection it is. One of the old kind is that; one of the new kind (with
+ * colons) is a different number for every device and every day, and it is the first half of it that is the
+ * household's: that half is what is kept, so that a ban of an address, and one player to an address, mean on
+ * the new kind what they mean on the old.
+ */
+function netOf(ip: string): string {
+  if (!ip.includes(':') || ip === '::1') return ip;
+  const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(ip);
+  if (mapped) return mapped[1];
+  const [head, tail] = ip.split('::');
+  const h = head ? head.split(':') : [], t = tail ? tail.split(':') : [];
+  const groups = ip.includes('::') ? [...h, ...Array<string>(Math.max(0, 8 - h.length - t.length)).fill('0'), ...t] : h;
+  return `${groups.slice(0, 4).map((g) => g.toLowerCase().replace(/^0+(?=.)/, '')).join(':')}::/64`;
 }
 const ipOf = new WeakMap<WebSocket, string>();
 /** addresses only mean something while they tell players apart: if three or more are on and all seem to come from one place, the host is hiding them */
@@ -569,6 +584,7 @@ const listOf = (v: string | undefined) => (v ?? '').split(',').map((x) => x.trim
 const BANS = { keys: new Set(listOf(process.env.BAN_KEYS)), ips: new Set(listOf(process.env.BAN_IPS)), temp: new Map<string, { until: number; why: string }>(), strikes: new Map<string, number[]>() };
 function bannedFor(key: string, ip: string): string | null {
   if (BANS.keys.has(key) || (!!ip && BANS.ips.has(ip))) return 'kept off by name';
+  if (adminBan(key, ip)) return 'banned';
   const now = Date.now();
   for (const n of [key, ...(ip ? [`ip:${ip}`] : [])]) {
     const b = BANS.temp.get(n);
@@ -577,6 +593,237 @@ function bannedFor(key: string, ip: string): string | null {
   }
   return null;
 }
+// ------------------------------------------------------------------ admins, and who they have banned (2026-10-11)
+//
+// Asked for the day players were found flying and sunk in the ground: "i need a way to become admin and a way to
+// make someone else admin ... mainly need a way to ban people asap, permanantley as well as unban", "i will set
+// password in vercel env, make in game command for me to admin myself", "once im admin role in the game i should
+// be good permanantley".
+//
+// Who is an admin (or a mod), and who is banned, is kept by the site (api/admin.ts), since this server forgets
+// everything when it restarts. It is read from there when the server starts and written there when an admin
+// changes it. The password is the site's and is checked there: what a player types is passed on and kept nowhere,
+// here or in the log. A player is known by a hash of the key their game gives, and an address by a hash made with
+// a secret the site hands over (`pepper`): the lists hold nobody's key and nobody's address.
+//
+// The orders are typed where talk is typed, with a stroke in front (`/ban name`): see `command`. Nothing that
+// begins with a stroke is ever said to anybody.
+type Role = 'admin' | 'mod';
+interface AdminState {
+  roles: Record<string, { role: Role; name: string; by: string; at: string }>;
+  bans: { key: string; ip: string; name: string; why: string; by: string; at: string }[];
+}
+const ADMIN = {
+  state: { roles: {}, bans: [] } as AdminState,
+  pepper: '',
+  /** read from the site at least once since this server started */
+  ready: false,
+  /** what the site is about to ask this server to vouch for: a number, and what it stands for */
+  ops: new Map<string, Record<string, unknown>>(),
+  /** tries at the password: by key and by address, the times of them */
+  tries: new Map<string, number[]>(),
+  /** whoever has left lately (the newest last): somebody who does a thing and goes can still be banned */
+  gone: [] as { name: string; key: string; ip: string; at: number }[],
+};
+const keyHash = (key: string) => createHash('sha256').update(`zona key ${key}`).digest('hex').slice(0, 40);
+/** Is this an address out in the world? (Not this machine's own, nor one of a private network: those are whatever stands in front of the server, and are everybody's.) */
+const publicIp = (ip: string) => !!ip && !/^(::1$|0:0:0:0::|::ffff:127\.|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|f[cd][0-9a-f]{2}:|fe80:)/i.test(ip);
+const ipHash = (ip: string) => (publicIp(ip) && ADMIN.pepper ? createHash('sha256').update(`${ADMIN.pepper} ${ip}`).digest('hex').slice(0, 40) : '');
+const roleOf = (c: Client): Role | null => ADMIN.state.roles[keyHash(c.key)]?.role ?? null;
+function adminBan(key: string, ip: string): boolean {
+  const k = keyHash(key), a = ipHash(ip);
+  // (Somebody with a role is never kept off by an address: an address is a household's, a café's, a whole
+  // phone network's, and an admin who banned somebody at their own would have banned themselves.)
+  const mine = !!ADMIN.state.roles[k];
+  return ADMIN.state.bans.some((b) => b.key === k || (!mine && !!a && b.ip === a && ipsTellApart()));
+}
+/**
+ * How many may play from one address at a time (PER_ADDRESS; 0: any number). Asked for 2026-10-11, the day of
+ * the cheats: "we should limit 1 connection per IP". It costs two friends in one house their game together, and
+ * a whole street behind one address on some phone networks: it is the owner's to set. Whoever has a role is not
+ * counted or refused, and it is not asked while the host hides addresses (see ipsTellApart).
+ */
+const PER_ADDRESS = process.env.PER_ADDRESS === undefined ? 1 : Math.max(0, Number(process.env.PER_ADDRESS) || 0);
+function addressFull(key: string, ip: string): boolean {
+  if (!PER_ADDRESS || !publicIp(ip) || !ipsTellApart() || ADMIN.state.roles[keyHash(key)]) return false;
+  return [...clients.values()].filter((o) => o.ip === ip && o.key !== key && !roleOf(o)).length >= PER_ADDRESS;
+}
+/** Something asked of the site: it is told a number, and asks this server back what the number stands for (see /adminop below). */
+async function siteAdmin(op: Record<string, unknown>): Promise<{ ok?: boolean; why?: string; state?: AdminState; pepper?: string; set?: boolean } | null> {
+  const n = randomBytes(16).toString('hex');
+  ADMIN.ops.set(n, op);
+  try {
+    const r = await fetch(`${SITE_URL}/api/admin?n=${n}`, { method: 'POST', signal: AbortSignal.timeout(30_000) });
+    if (!r.ok) return null;
+    const out = (await r.json()) as { ok?: boolean; why?: string; state?: AdminState; pepper?: string; set?: boolean };
+    if (out.ok && out.state) {
+      ADMIN.state = { roles: out.state.roles ?? {}, bans: out.state.bans ?? [] };
+      if (out.pepper) ADMIN.pepper = out.pepper;
+      ADMIN.ready = true;
+    }
+    return out;
+  } catch {
+    return null;
+  } finally {
+    ADMIN.ops.delete(n);
+  }
+}
+/** The lists are read when the server starts, and again every little while until they have been (the site may be asleep). */
+function loadAdmin(tries = 0) {
+  void siteAdmin({ op: 'load' }).then((r) => {
+    if (r?.ok) return void log(`[admin] lists read from the site: ${Object.keys(ADMIN.state.roles).length} with a role, ${ADMIN.state.bans.length} banned${r.set ? '' : ' (no ADMIN_PASSWORD is set there: nobody can become an admin)'}`);
+    if (tries < 20) setTimeout(() => loadAdmin(tries + 1), 30_000).unref();
+  });
+}
+/** What an admin changed is written to the site. @returns whether it was */
+async function saveAdmin(next: AdminState): Promise<boolean> {
+  const was = ADMIN.state;
+  // (held here at once, so that it bites whether or not the site answers)
+  ADMIN.state = next;
+  const r = await siteAdmin({ op: 'save', state: next });
+  if (r?.ok) return true;
+  if (ADMIN.state !== next) return true;
+  void was;
+  return false;
+}
+const sys = (c: Client, ...lines: string[]) => lines.forEach((text) => send(c, { t: 'sys', text }));
+/** the player meant by a word: `#12` (their number), their name, or the start or some part of it if only one fits */
+function whoIs(word: string): Client | null {
+  const all = [...clients.values()];
+  if (/^#\d+$/.test(word)) return clients.get(Number(word.slice(1))) ?? null;
+  const w = word.toLowerCase();
+  const exact = all.filter((o) => o.name.toLowerCase() === w);
+  if (exact.length === 1) return exact[0];
+  const part = all.filter((o) => o.name.toLowerCase().includes(w));
+  return part.length === 1 ? part[0] : null;
+}
+/** put off the server by somebody with the right to: told why, and gone */
+function eject(target: Client, reason: string) {
+  send(target, { t: 'kick', reason });
+  target.ws.close();
+  drop(target);
+}
+/**
+ * An order typed where talk is typed. @returns nothing: whoever gave it is told what came of it.
+ * Mods: players, recent, flagged, kick, timeout, say. Admins: those, and ban, unban, bans, admin, mod, demote, roles.
+ */
+async function command(c: Client, line: string) {
+  const [word = '', ...rest] = line.slice(1).trim().split(/\s+/);
+  const cmd = word.toLowerCase(), role = roleOf(c);
+  if (!role) return void sys(c, cmd === 'help' ? 'There is nothing here to give orders with.' : 'That is not a thing you can do here.');
+  const admin = role === 'admin';
+  const need = () => void sys(c, 'Only an admin can do that.');
+  const who = rest[0] ?? '', why = rest.slice(1).join(' ').slice(0, 120);
+  const label = (o: Client) => `#${o.id} ${o.name}${roleOf(o) ? ` [${roleOf(o)}]` : ''}`;
+  switch (cmd) {
+    case 'help':
+      return void sys(c, 'Orders: /players · /recent · /flagged · /kick who [why] · /timeout who minutes [why] · /say words', ...(admin ? ['Admins: /ban who [why] · /bans · /unban number-or-name · /admin who · /mod who · /demote who · /roles', '"who" is a name, part of one, or #number from /players. /ban also finds somebody who has just left (/recent).'] : []));
+    case 'players':
+    case 'who':
+    case 'list':
+      return void sys(c, `${clients.size} online:`, ...[...clients.values()].map((o) => `${label(o)}  at ${o.pose[0].toFixed(0)}, ${o.pose[2].toFixed(0)}${o.alive ? '' : ' (dead)'}${o.check.flags ? `  ${o.check.flags} flagged` : ''}`));
+    case 'recent':
+      return void sys(c, ADMIN.gone.length ? 'Left lately (newest last):' : 'Nobody has left lately.', ...ADMIN.gone.slice(-15).map((g) => `${g.name}  ${Math.round((Date.now() - g.at) / 60000)} min ago`));
+    case 'flagged': {
+      const list = [...clients.values()].filter((o) => o.check.flags > 0).sort((p, q) => q.check.flags - p.check.flags);
+      return void sys(c, list.length ? `Flagged by the checks (which are set to "${CHECKS}"):` : 'Nobody online has been flagged.', ...list.map((o) => `${label(o)}  ${o.check.flags} times`));
+    }
+    case 'say':
+      if (!rest.length) return void sys(c, 'Say what?');
+      log(`[admin] ${c.name} to everybody: ${rest.join(' ')}`);
+      return void broadcast({ t: 'tell', kind: 'warn', text: rest.join(' ').slice(0, 160) });
+    case 'kick': {
+      const t = whoIs(who);
+      if (!t) return void sys(c, `Nobody online is "${who}" (or more than one is): see /players.`);
+      if (roleOf(t) === 'admin' && !admin) return need();
+      log(`[admin] ${c.name} kicked ${t.name}${why ? `: ${why}` : ''}`);
+      eject(t, `You were put off the server${why ? `: ${why}` : '.'}`);
+      return void sys(c, `${t.name} is off the server.`);
+    }
+    case 'timeout': {
+      const t = whoIs(who), mins = Math.min(60, Math.max(1, Math.round(Number(rest[1]) || 10)));
+      if (!t) return void sys(c, `Nobody online is "${who}" (or more than one is): see /players.`);
+      if (roleOf(t) === 'admin' && !admin) return need();
+      const reason = rest.slice(2).join(' ').slice(0, 120);
+      for (const n of namesOf(t.key, t.ip)) BANS.temp.set(n, { until: Date.now() + mins * 60000, why: `timed out by ${c.name}${reason ? `: ${reason}` : ''}` });
+      log(`[admin] ${c.name} timed ${t.name} out for ${mins} minutes${reason ? `: ${reason}` : ''}`);
+      eject(t, `You are kept off the server for ${mins} minutes${reason ? `: ${reason}` : '.'}`);
+      return void sys(c, `${t.name} is off the server for ${mins} minutes.`);
+    }
+    case 'ban': {
+      if (!admin) return need();
+      const t = whoIs(who);
+      const left = t ? null : [...ADMIN.gone].reverse().find((g) => g.name.toLowerCase() === who.toLowerCase()) ?? [...ADMIN.gone].reverse().find((g) => g.name.toLowerCase().includes(who.toLowerCase()) && who.length > 1);
+      if (!t && !left) return void sys(c, `Nobody online or lately gone is "${who}": see /players and /recent.`);
+      if (t === c) return void sys(c, 'That is you.');
+      const name = t ? t.name : left!.name, key = keyHash(t ? t.key : left!.key), ip = ipHash(t ? t.ip : left!.ip);
+      if (ADMIN.state.roles[key]?.role === 'admin') return void sys(c, `${name} is an admin: /demote first.`);
+      const next: AdminState = { roles: ADMIN.state.roles, bans: [...ADMIN.state.bans.filter((b) => b.key !== key), { key, ip, name, why, by: c.name, at: new Date().toISOString() }] };
+      log(`[admin] ${c.name} banned ${name}${why ? `: ${why}` : ''}${ip ? '' : ' (by key only: no address is known)'}`);
+      if (t) eject(t, 'You are banned from this server.');
+      const kept = await saveAdmin(next);
+      return void sys(c, `${name} is banned${ip ? ', by their game and by their address' : ' (by their game only: the address could not be told)'}.${kept ? '' : ' It could NOT be written to the site: it holds until this server restarts. Give the order again in a minute.'}`);
+    }
+    case 'bans':
+      if (!admin) return need();
+      return void sys(c, ADMIN.state.bans.length ? 'Banned (the number is what /unban takes):' : 'Nobody is banned.', ...ADMIN.state.bans.map((b, i) => `${i + 1}. ${b.name}  by ${b.by}, ${b.at.slice(0, 10)}${b.why ? `: ${b.why}` : ''}`));
+    case 'unban': {
+      if (!admin) return need();
+      const i = /^\d+$/.test(who) ? Number(who) - 1 : ADMIN.state.bans.findIndex((b) => b.name.toLowerCase() === who.toLowerCase());
+      const b = ADMIN.state.bans[i];
+      if (!b) return void sys(c, `No ban is "${who}": see /bans.`);
+      log(`[admin] ${c.name} unbanned ${b.name}`);
+      const kept = await saveAdmin({ roles: ADMIN.state.roles, bans: ADMIN.state.bans.filter((x) => x !== b) });
+      return void sys(c, `${b.name} is no longer banned.${kept ? '' : ' It could NOT be written to the site: give the order again in a minute.'}`);
+    }
+    case 'admin':
+    case 'op':
+    case 'mod':
+    case 'demote':
+    case 'deop': {
+      if (!admin) return need();
+      const t = whoIs(who);
+      if (!t) return void sys(c, `Nobody online is "${who}" (or more than one is): they have to be here to be given a role, or to lose one.`);
+      const key = keyHash(t.key), roles = { ...ADMIN.state.roles };
+      const to: Role | null = cmd === 'mod' ? 'mod' : cmd === 'demote' || cmd === 'deop' ? null : 'admin';
+      if (t === c && to !== 'admin') return void sys(c, 'Not yourself: somebody else has to.');
+      if (to) roles[key] = { role: to, name: t.name, by: c.name, at: new Date().toISOString() };
+      else delete roles[key];
+      log(`[admin] ${c.name} made ${t.name} ${to ?? 'nothing'}`);
+      const kept = await saveAdmin({ roles, bans: ADMIN.state.bans });
+      send(t, { t: 'role', role: to });
+      if (to) sys(t, `${c.name} has made you ${to === 'admin' ? 'an admin' : 'a mod'}: /help says what you can do.`);
+      return void sys(c, `${t.name} is ${to ? (to === 'admin' ? 'an admin' : 'a mod') : 'no longer either'}.${kept ? '' : ' It could NOT be written to the site: give the order again in a minute.'}`);
+    }
+    case 'roles':
+      if (!admin) return need();
+      return void sys(c, 'With a role:', ...Object.values(ADMIN.state.roles).map((r) => `${r.name}  ${r.role}  (by ${r.by}, ${r.at.slice(0, 10)})`));
+    default:
+      return void sys(c, `There is no /${cmd}: /help lists what there is.`);
+  }
+}
+/** The password, typed by somebody who wants to be an admin: asked of the site, which alone knows it. */
+async function login(c: Client, pw: unknown) {
+  const now = Date.now();
+  for (const n of namesOf(c.key, c.ip)) {
+    const times = (ADMIN.tries.get(n) ?? []).filter((t) => now - t < 600000);
+    if (times.length >= 5) return void sys(c, 'Too many tries: wait ten minutes.');
+    times.push(now);
+    ADMIN.tries.set(n, times);
+  }
+  if (typeof pw !== 'string' || !pw || pw.length > 200) return void sys(c, 'No password was given.');
+  const r = await siteAdmin({ op: 'login', pw, key: keyHash(c.key), name: c.name });
+  if (!r) return void sys(c, 'The site did not answer: try again in a minute.');
+  if (!r.ok) {
+    log(`[admin] ${c.name} (#${c.id}) gave a wrong admin password`);
+    return void sys(c, r.why ?? 'That is not the password.');
+  }
+  for (const n of namesOf(c.key, c.ip)) ADMIN.tries.delete(n);
+  log(`[admin] ${c.name} (#${c.id}) is an admin, by the password`);
+  send(c, { t: 'role', role: 'admin' });
+  sys(c, 'You are an admin, on this and every game from now on. /help lists your orders.');
+}
+
 /** Put off the server by a check (only ever when enforcing): told so, counted, and after enough of it kept off for a while. */
 function putOff(c: Client, why: string) {
   const now = Date.now();
@@ -1458,6 +1705,8 @@ function handle(c: Client, m: C2S) {
       const now = Date.now();
       if (!text || now - c.lastChat < 500) return;
       c.lastChat = now;
+      // (an order, and never talk: whatever begins with a stroke is said to nobody and is not written down)
+      if (text.startsWith('/')) return void command(c, text).catch((e) => log('[admin] an order failed:', e instanceof Error ? e.message : e));
       if (m.ch === 'near') {
         // proximity: only players standing within earshot get it (the speaker included)
         const out: S2C = { t: 'chat', ch: 'near', from: c.name, text };
@@ -1467,6 +1716,8 @@ function handle(c: Client, m: C2S) {
       } else broadcast({ t: 'chat', ch: 'global', from: c.name, text });
       return;
     }
+    case 'admin':
+      return void login(c, m.pw).catch(() => sys(c, 'The site did not answer: try again in a minute.'));
     case 'vin': {
       const v = vehicles.get(m.i);
       if (!v || !c.alive || v.goneAt || c.seatAt || !Number.isInteger(m.seat) || m.seat < 0 || m.seat >= SEATS || v.seats[m.seat] !== null) return;
@@ -1613,7 +1864,13 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
   const off = bannedFor(key, ipOf.get(ws) ?? '');
   if (off) {
     log(`${cleanName(m.name)} is not let in: ${off}`);
-    ws.send(JSON.stringify({ t: 'kick', reason: 'You are kept off this server for now.' } satisfies S2C));
+    ws.send(JSON.stringify({ t: 'kick', reason: off === 'banned' ? 'You are banned from this server.' : off.startsWith('timed out') ? 'You are kept off this server for a while yet.' : 'You are kept off this server for now.' } satisfies S2C));
+    ws.close();
+    return null;
+  }
+  if (addressFull(key, ipOf.get(ws) ?? '')) {
+    log(`${cleanName(m.name)} is not let in: ${PER_ADDRESS} already playing from their address`);
+    ws.send(JSON.stringify({ t: 'kick', reason: PER_ADDRESS === 1 ? 'Somebody is already playing from your connection: one player to a connection.' : `There are already ${PER_ADDRESS} playing from your connection.` } satisfies S2C));
     ws.close();
     return null;
   }
@@ -1667,11 +1924,15 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
     sendBoard();
   } else sendBoard(c);
   log(`+ ${c.name} (#${c.id})${resume ? ' resumed' : ''} — ${clients.size} online`);
+  // (somebody with a role is told so as they come in: their game shows them what they may do)
+  if (roleOf(c)) send(c, { t: 'role', role: roleOf(c) });
   return c;
 }
 
 function drop(c: Client) {
   if (!clients.delete(c.id)) return;
+  ADMIN.gone.push({ name: c.name, key: c.key, ip: c.ip, at: Date.now() });
+  if (ADMIN.gone.length > 60) ADMIN.gone.shift();
   releaseLock(c);
   leaveSeat(c, true);
   records.set(c.key, { pose: c.pose, inv: c.inv, vitals: c.vitals, alive: c.alive, leftAt: Date.now() });
@@ -2023,6 +2284,16 @@ function serve(req: http.IncomingMessage, res: http.ServerResponse) {
     res.end(JSON.stringify({ ok: true, players: clients.size, max: MAX_PLAYERS, queue: queue.length, uptime: Math.round(process.uptime()), checks: CHECKS, flagged, keptOff: BANS.temp.size, loot: economy.loot.size, places: new Set([...clients.values()].map((c) => c.ip)).size }));
     return;
   }
+  // the website's function asks here what it has just been asked to do with the lists of admins and bans (see siteAdmin)
+  if (url.pathname.startsWith('/adminop/')) {
+    // (once, and only for a number this server made up a moment ago)
+    const n = url.pathname.split('/')[2] ?? '';
+    const body = ADMIN.ops.get(n);
+    ADMIN.ops.delete(n);
+    res.writeHead(body ? 200 : 404, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+    res.end(JSON.stringify(body ?? { error: 'unknown' }));
+    return;
+  }
   // the website's function asks here whether a cash-in it was told about is real
   if (url.pathname.startsWith('/cashins')) {
     // (one at a time, by its id, which only the site is told: the list is not given out)
@@ -2138,6 +2409,8 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
 
 loadWorld();
 server.listen(PORT, () => log(`listening on :${PORT}${existsSync(DIST) ? '' : ' (no client build found: API only)'}`));
+// (who may give orders here and who is kept off: read from the site, which keeps them between this server's restarts)
+loadAdmin();
 
 for (const sig of ['SIGINT', 'SIGTERM'] as const) {
   process.on(sig, () => {
