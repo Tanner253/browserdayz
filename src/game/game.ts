@@ -1427,10 +1427,32 @@ export class Game {
         this.hud.chatLine('system', '', `${BACK_SHORT} Like and repost ZONA on X: the link is on the menu.`);
       }
     });
+    // The server says it is about to restart (an update is going on, or it has been told to stop): said across the
+    // top, and when the connection then goes, the game waits for the server that comes after and loads itself
+    // again when that one answers. (Whoever was on is kept as they were: they have only to press Play.)
+    net.on('restart', (m) => {
+      this.restartSaid = { why: m.why || this.restartSaid?.why || '', at: performance.now() };
+      this.hud.restarting(this.restartSaid.why, m.in);
+    });
     net.onClose = (reason) => {
       this.paused = true;
       this.input.unlock();
-      this.hud.fatal(reason);
+      const said = this.restartSaid && performance.now() - this.restartSaid.at < 180_000 ? this.restartSaid : null;
+      if (!said || this.net.refused) return void this.hud.fatal(reason);
+      this.hud.fatal(`The server is restarting${said.why ? ` (${said.why})` : ''}. You are kept as you were. This page loads again by itself when the server is back.`);
+      const remote = remoteServer() ?? location.origin, began = performance.now();
+      const look = async () => {
+        // (a server that answers, and has not been running for long: the one that came after)
+        try {
+          const r = await fetch(`${remote}/healthz`, { cache: 'no-store' });
+          const j = r.ok ? ((await r.json()) as { uptime?: number }) : null;
+          if (j && typeof j.uptime === 'number' && (j.uptime < 240 || performance.now() - began > 150_000)) return void location.reload();
+        } catch {
+          /* not there yet */
+        }
+        if (performance.now() - began < 600_000) window.setTimeout(look, 4000);
+      };
+      window.setTimeout(look, 6000);
     };
     this.maxPlayers = w.max;
     this.hud.setLive(true);
@@ -1439,6 +1461,8 @@ export class Game {
   }
 
   private maxPlayers = 0;
+  /** the server said it was about to restart: why, and when it said so (by this game's clock) */
+  private restartSaid: { why: string; at: number } | null = null;
   /** carrying a tag taken off somebody (the one round their own neck does not count): no jeep takes them (see Garage.use) */
   private get tagged() {
     const me = publicId();

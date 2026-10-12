@@ -23,6 +23,7 @@ export const ORDERS: Order[] = [
   { name: 'kick', args: ['who', '[why]'], does: 'Put somebody off the server (they can come straight back)' },
   { name: 'timeout', args: ['who', 'minutes', '[why]'], does: 'Keep somebody off for up to 60 minutes' },
   { name: 'say', args: ['words'], does: 'Say something across everybody’s screen, and in the chat' },
+  { name: 'restart', args: ['[seconds]', '[why]'], does: 'Tell everybody the server is about to restart (it only says so)', admin: true },
   { name: 'msg', args: ['who', 'words'], does: 'Say something to one player alone' },
   { name: 'inv', args: ['who'], does: 'What somebody carries, as their game last said' },
   { name: 'warn', args: ['who', 'words'], does: 'Put a warning on somebody’s screen' },
