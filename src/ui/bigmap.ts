@@ -18,6 +18,7 @@
 //
 // The small round map in the corner of the screen is another thing (minimap.ts) and is as it was.
 
+import { breathe } from '../core/breathe';
 import { TOUCH } from '../core/device';
 import type { GasZone } from '../sim/gas';
 import { TIERS, type Tier } from '../sim/tiers';
@@ -259,6 +260,7 @@ export class BigMap {
     this.down.clear();
     this.tip.hidden = true;
     this.sheet ??= this.print();
+    this.press = null;
     this.dirty = true;
   }
 
@@ -359,7 +361,41 @@ export class BigMap {
 
   // ------------------------------------------------------------------ the sheet, printed once
 
+  /** the sheet as it is being printed ahead of the first time it is asked for (see `ahead`) */
+  private press: Generator<void, HTMLCanvasElement> | null = null;
+
+  /**
+   * The sheet is printed before anybody opens the map, a strip of it in each frame's spare time. Printed whole
+   * the first time M was pressed, it was a quarter of a second in which nothing moved (257 and 284 ms measured).
+   */
+  ahead() {
+    if (this.sheet || this.press) return;
+    const press = (this.press = this.printing());
+    void (async () => {
+      for (;;) {
+        await breathe();
+        // (opened before it was done: it was finished there and then, in `print`)
+        if (this.press !== press) return;
+        const step = press.next();
+        if (!step.done) continue;
+        this.sheet = step.value;
+        this.press = null;
+        this.dirty = true;
+        return;
+      }
+    })();
+  }
+
+  /** the sheet whole, now: what is left of it, if it was being printed ahead */
   private print(): HTMLCanvasElement {
+    const press = this.press ?? this.printing();
+    for (;;) {
+      const step = press.next();
+      if (step.done) return step.value;
+    }
+  }
+
+  private *printing(): Generator<void, HTMLCanvasElement> {
     const world = this.world, S = this.S, N = Math.round(WORLD_SIZE * S);
     const c = document.createElement('canvas');
     c.width = c.height = N;
@@ -407,17 +443,25 @@ export class BigMap {
       const t = cur;
       cur = next;
       next = t;
+      // (a strip of sixteen rows put down, and a pause)
+      if ((y & 15) === 15 || y === N - 1) {
+        const from = y - (y & 15);
+        g.putImageData(img, 0, 0, 0, from, N, y - from + 1);
+        yield;
+      }
     }
-    g.putImageData(img, 0, 0);
     const X = (wx: number) => (wx + WORLD_SIZE / 2) * S, Y = (wz: number) => (wz + WORLD_SIZE / 2) * S;
     // the woods: green, deeper where the trees stand close
     g.fillStyle = 'rgba(92, 132, 66, 0.2)';
+    let trees = 0;
     for (const t of world.trees) {
       if (t.kind.startsWith('bush')) continue;
       g.beginPath();
       g.arc(X(t.x), Y(t.z), 3.4 * S, 0, Math.PI * 2);
       g.fill();
+      if (++trees % 400 === 0) yield;
     }
+    yield;
     // the grid: hundred-metre squares
     g.strokeStyle = 'rgba(36, 58, 92, 0.3)';
     g.lineWidth = Math.max(1, S * 0.5);
@@ -444,6 +488,7 @@ export class BigMap {
         g.stroke();
       }
     }
+    yield;
     // every building, by its own footprint
     g.fillStyle = INK;
     for (const b of world.buildings) {

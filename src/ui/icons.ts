@@ -8,6 +8,7 @@ import { assets } from '../core/assets';
 import type { ItemModels } from '../game/loot';
 import { BEARD, HAIR_STYLES, loadCharacter, lookPatch, lookUniforms, setLookUniforms, suitPatch, type Look } from '../game/look';
 import { BODY_SCALE, GEAR, WORN } from '../game/avatar';
+import { made, programsOf } from '../core/renderer';
 
 const PX = 64; // pixels per grid cell
 
@@ -285,14 +286,24 @@ export async function renderDoll(renderer: THREE.WebGLRenderer, env: THREE.Textu
   const cam = new THREE.OrthographicCamera(-0.52, 0.52, 1.93, -0.15, 0.01, 50);
   cam.position.set(0, 0, 10);
   cam.lookAt(0, 0, 0);
-  const prev = renderer.getRenderTarget();
+  // The figure is drawn again every time something is put on or taken off, in the middle of play. So nothing of
+  // it is waited for inside a frame: the shaders of what is worn are made by the card's own workers and waited
+  // for between frames (drawn straight off, each new one was made in the frame: a second and a tenth, the first
+  // time a whole kit went on); the picture is read back from the card when the card says it is drawn, not asked
+  // for and stood waiting on (12 to 80 ms); and it is packed as a file by the browser's own worker.
+  let prev = renderer.getRenderTarget();
+  renderer.setRenderTarget(rt);
+  const programs = programsOf(renderer, renderer.compile(scene, cam) as unknown as Set<THREE.Material>);
+  renderer.setRenderTarget(prev);
+  await made(programs);
+  prev = renderer.getRenderTarget();
   renderer.setRenderTarget(rt);
   renderer.setClearColor(0x000000, 0);
   renderer.clear();
   renderer.render(scene, cam);
-  const buf = new Uint8Array(W * H * 4);
-  renderer.readRenderTargetPixels(rt, 0, 0, W, H, buf);
   renderer.setRenderTarget(prev);
+  const buf = new Uint8Array(W * H * 4);
+  await renderer.readRenderTargetPixelsAsync(rt, 0, 0, W, H, buf);
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = H;
@@ -302,5 +313,14 @@ export async function renderDoll(renderer: THREE.WebGLRenderer, env: THREE.Textu
   ctx.putImageData(img, 0, 0);
   rt.dispose();
   for (const m of own) m.dispose();
-  return canvas.toDataURL('image/png');
+  const file = await new Promise<Blob | null>((done) => canvas.toBlob(done, 'image/png'));
+  const url = file
+    ? await new Promise<string>((done) => {
+        const reader = new FileReader();
+        reader.onload = () => done(String(reader.result));
+        reader.onerror = () => done('');
+        reader.readAsDataURL(file);
+      })
+    : '';
+  return url || canvas.toDataURL('image/png');
 }

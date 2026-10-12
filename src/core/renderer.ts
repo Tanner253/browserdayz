@@ -16,6 +16,65 @@ import {
 import { N8AOPostPass } from 'n8ao';
 import { breathe } from './breathe';
 
+/** a shader as the library keeps it: whether the card has finished making it, and how many materials are drawn with it */
+interface Program { id: number; isReady(): boolean; usedTimes: number; getUniforms(): unknown; getAttributes(): unknown }
+
+/** a part of a thing to be drawn once ahead of its being shown, as the world is lit or the other way, and what that is a first drawing with */
+interface Ahead { o: THREE.Object3D; lit: boolean | null; keys: string[]; low: boolean }
+/** what is got ready for later (the other lighting): this long between one piece of it and the next, ms */
+const LATER_APART = 120;
+/** the layer a thing is on while it is drawn ahead (see Renderer.drawAhead): nothing else is on it */
+const AHEAD_LAYER = 29;
+/** development: parts of getting a thing ready left out, to see what each costs (?try=noother,noahead,nolook) */
+const TRY = new Set((import.meta.env.DEV && typeof location !== 'undefined' ? new URLSearchParams(location.search).get('try') ?? '' : '').split(','));
+
+const shapes = new WeakMap<THREE.BufferGeometry, string>();
+/**
+ * What kind of shape a thing is drawn from, as the card's driver tells kinds apart: which measures each point has
+ * and what sort of number each is kept as, and whether it is one of a list or moved by bones. A shader is made
+ * over by the driver for each kind it is first drawn with.
+ */
+function shapeOf(o: THREE.Object3D): string {
+  const g = (o as THREE.Mesh).geometry as THREE.BufferGeometry | undefined;
+  let s = g ? shapes.get(g) : '';
+  if (g && s === undefined) {
+    s = Object.keys(g.attributes)
+      .sort()
+      .map((k) => {
+        const at = g.attributes[k] as THREE.BufferAttribute;
+        return `${k}${at.itemSize}${at.array?.constructor.name.slice(0, 3) ?? ''}${at.normalized ? 'n' : ''}`;
+      })
+      .join(',');
+    shapes.set(g, s);
+  }
+  return `${s}${(o as THREE.InstancedMesh).isInstancedMesh ? '|list' : ''}${(o as THREE.SkinnedMesh).isSkinnedMesh ? '|bones' : ''}`;
+}
+
+/** The shader each of these materials was last written with. */
+export function programsOf(renderer: THREE.WebGLRenderer, materials: Iterable<THREE.Material>): Program[] {
+  const out: Program[] = [];
+  for (const m of materials) {
+    const p = (renderer.properties.get(m) as { currentProgram?: Program }).currentProgram;
+    if (p) out.push(p);
+  }
+  return out;
+}
+
+/**
+ * Over when the card has made every one of these shaders (its own workers make them, where it has any, while the
+ * game goes on). (The library's own waiting asks the card every hundredth of a second, of every material, whether
+ * its shader is made; and each asking is a trip to the card and back, behind whatever the card is busy with: 17 ms
+ * measured, with nothing drawn. Asked once now, and then a few times a good while apart. A dozen shaders asked for
+ * together are four seconds in the making on a laptop: waited for as long as six, and then drawn as they are.)
+ */
+export async function made(programs: Iterable<Program>) {
+  const done = () => {
+    for (const p of programs) if (!p.isReady()) return false;
+    return true;
+  };
+  for (let i = 0; i < 40 && !done(); i++) await new Promise((r) => setTimeout(r, i ? 150 : 250));
+}
+
 export interface QualitySettings {
   renderScale: number;
   msaa: number;
@@ -186,27 +245,325 @@ export class Renderer {
   }
 
   /**
-   * A thing that has just come is got ready to be drawn in the world as it is lit now: its shaders are made, by
-   * the graphics card's own workers where it has them, and this is over when they are. The thing is put into the
-   * world after: its first frame then costs what any other does.
+   * How the world is lit: with the lamps' real lights in it, or without (see Lamps); and a way to have it lit
+   * either way for a moment, with the way back. A shader is written for the lights there are; a thing got ready
+   * under the one lighting only was a freeze the first time it was drawn under the other. Measured 2026-10-12,
+   * with a jeep, a pack and three bodies in sight that had come since the game loaded: 4.6 seconds in which
+   * nothing moved, the first time the player switched on the lamp on their own gun; and four more at nightfall,
+   * for what was in sight then.
+   */
+  lighting: { lit(): boolean; as(lit: boolean): () => void } | null = null;
+  /** shaders that are kept whatever becomes of the things first drawn with them (see `keep`) */
+  private kept = new Set<Program>();
+  /** how many things are being got ready to be shown just now: what is for later waits on them */
+  private readying = 0;
+
+  /**
+   * A thing that has just come is got ready to be drawn in the world, and this is over when it is. The thing is
+   * put into the world after: its first frame then costs what any other does. Four things are done ahead that
+   * were all done in the frame a thing was first drawn in:
+   *   - its shaders are written, and made by the graphics card's own workers where it has them (a part of the
+   *     thing at a time, each in a frame's spare time: a shader asked for is a millisecond or several of writing
+   *     before the card has it);
+   *   - each shader is looked over (see `lookOver`);
+   *   - its pictures are put on the card, one to a frame's spare time (see `send`);
+   *   - and each part is drawn once, off the picture (see `drawAhead`).
+   * That is for the world as it is lit now. The same is then done for the other lighting, behind everything else
+   * and a little at a time (see `workLater`): nobody waits for that.
    */
   async ready(obj: THREE.Object3D | THREE.Object3D[]) {
-    const prev = this.renderer.getRenderTarget();
-    this.renderer.setRenderTarget(this.composer.inputBuffer);
-    const made = new Set<THREE.Material>();
-    for (const o of Array.isArray(obj) ? obj : [obj]) for (const m of this.renderer.compile(o, this.camera, this.scene) as unknown as Set<THREE.Material>) made.add(m);
-    this.renderer.setRenderTarget(prev);
-    // (The library's own waiting asks the card every hundredth of a second, of every material, whether its shader
-    // is made; and each asking is a trip to the card and back, behind whatever the card is busy with: 17 ms
-    // measured, with nothing drawn. Asked once now, and then a few times a good while apart.)
-    const done = () => {
-      for (const m of made) {
-        const program = (this.renderer.properties.get(m) as { currentProgram?: { isReady(): boolean } }).currentProgram;
-        if (program && !program.isReady()) return false;
+    const list = Array.isArray(obj) ? obj : [obj];
+    const drawn: THREE.Object3D[] = [];
+    for (const o of list) {
+      o.traverse((c) => {
+        const d = c as THREE.Mesh & { isPoints?: boolean; isLine?: boolean; isSprite?: boolean };
+        if (d.isMesh || d.isPoints || d.isLine || d.isSprite) drawn.push(c);
+      });
+    }
+    this.readying++;
+    try {
+      const { programs, entries } = await this.write(drawn, null);
+      await made(programs);
+      if (!TRY.has('nolook')) await this.lookOver(programs);
+      for (const o of list) await this.send(o);
+      if (!TRY.has('noahead')) await this.drawAhead(entries);
+    } finally {
+      this.readying--;
+    }
+    if (this.lighting && !TRY.has('noother')) {
+      this.later.push({ drawn, lit: !this.lighting.lit() });
+      void this.workLater();
+    }
+  }
+
+  /**
+   * The shaders of these parts written, as the world is lit (null) or as it would be lit the other way; and what
+   * there then is to draw ahead with them.
+   * @param slowly for later: a shader newly asked for is not followed at once by another
+   */
+  private async write(drawn: THREE.Object3D[], lit: boolean | null, slowly = false) {
+    const programs = new Set<Program>(), entries: Ahead[] = [];
+    // (the one part and nothing under it: each is come to in its turn)
+    const only = (o: THREE.Object3D) => ({ traverse: (f: (x: THREE.Object3D) => void) => f(o), traverseVisible: (f: (x: THREE.Object3D) => void) => f(o) }) as unknown as THREE.Object3D;
+    const count = () => (this.renderer.info.programs as unknown[] | null)?.length ?? 0;
+    for (const o of drawn) {
+      await breathe();
+      const had = count();
+      const back = lit === null ? null : (this.lighting?.as(lit) ?? null);
+      const prev = this.renderer.getRenderTarget();
+      this.renderer.setRenderTarget(this.composer.inputBuffer);
+      const ps = programsOf(this.renderer, this.renderer.compile(only(o), this.camera, this.scene) as unknown as Set<THREE.Material>);
+      this.renderer.setRenderTarget(prev);
+      back?.();
+      const shape = shapeOf(o);
+      const keys = ps.map((p) => `${p.id}|${shape}`);
+      for (const p of ps) programs.add(p);
+      if (keys.some((k) => !this.drawnWith.has(k))) entries.push({ o, lit, keys, low: slowly });
+      // (A shader newly asked for is the card's one thread busy for a moment, before its workers have it: two
+      // asked for on each other's heels are a frame half as long again. For later, they are asked for apart.)
+      if (slowly && count() > had) await new Promise((r) => setTimeout(r, LATER_APART));
+    }
+    // (The library throws a shader away when the last thing drawn with it is: the last of the infected of a kind
+    // to be cleared off, somebody who left; and the next of them was a shader made in the frame again. Counted
+    // as used once more than it is, it is kept.)
+    for (const p of programs) {
+      if (this.kept.has(p)) continue;
+      this.kept.add(p);
+      p.usedTimes++;
+    }
+    return { programs, entries };
+  }
+
+  private later: { drawn: THREE.Object3D[]; lit: boolean }[] = [];
+  private working = false;
+  /**
+   * What has been got ready for the world as it is lit is got ready for the other lighting as well: when nothing
+   * is waiting to be shown, one part at a time, the shaders asked for well apart, and each part drawn ahead a
+   * tenth of a second after the last. Done with the rest, in the moment a thing came, it was all of it twice over
+   * at the busiest time there is (coming into the game, with every kind of thing arriving at once): counted over
+   * the first forty seconds of a session, four times the frames over a thirtieth of a second.
+   */
+  private async workLater() {
+    if (this.working) return;
+    this.working = true;
+    try {
+      for (let job; (job = this.later.shift()); ) {
+        while (this.readying > 0) await new Promise((r) => setTimeout(r, LATER_APART));
+        const { programs, entries } = await this.write(job.drawn, job.lit, true);
+        await made(programs);
+        if (!TRY.has('nolook')) await this.lookOver(programs);
+        if (!TRY.has('noahead')) await this.drawAhead(entries);
       }
-      return true;
-    };
-    for (let i = 0; i < 12 && !done(); i++) await new Promise((r) => setTimeout(r, i ? 150 : 250));
+    } finally {
+      this.working = false;
+    }
+  }
+
+  /** what has been drawn with already: a shader, and the kind of shape it was drawn with (see `drawAhead`) */
+  private drawnWith = new Set<string>();
+  private aheadQueue: (Ahead & { job: { left: number; done: () => void } })[] = [];
+  private aheadLow: (Ahead & { job: { left: number; done: () => void } })[] = [];
+  private aheadLowAt = 0;
+  private aheadTarget: THREE.WebGLRenderTarget | null = null;
+  private drawingAhead = false;
+
+  /**
+   * Each of these is drawn once, off the picture, in the spare of a frame: one to a frame.
+   *
+   * The first time anything is DRAWN with a shader, the card's driver has work of its own to do for it, however
+   * little is drawn: the shader is made over for the kind of shape it is given and the kind of picture it is
+   * drawn into, and nothing is shown until that is done. It cannot be asked for ahead except by drawing. Measured
+   * 2026-10-12, with every shader already written, made and looked over: the first frame the lamps' lights were in
+   * the world (the player's own gun lamp switched on, by day) was 640 to 700 ms, none of it the game's; with the
+   * world drawn once off the picture before, under that lighting, into four pixels, it was 15 to 17, a frame like
+   * any other. So: four pixels of the same kind as the game's own picture, and each new thing drawn into them
+   * once under each lighting before it is ever shown.
+   *
+   * It is drawn from inside the game's own drawing of the world, when that is done (`scene.onAfterRender`): the
+   * library then keeps what it knows of the lights for this drawing apart from what it knows for the game's, and
+   * the lamps can be put in or taken out for it without every material in sight being looked up afresh in the
+   * frame after.
+   */
+  private drawAhead(entries: Ahead[]): Promise<void> {
+    const fresh = entries.filter((e) => e.keys.some((k) => !this.drawnWith.has(k)));
+    // (nothing is drawn while the page is hidden: what is asked for then is drawn in its first frames, as it was)
+    if (!fresh.length || (typeof document !== 'undefined' && document.hidden)) return Promise.resolve();
+    this.scene.onAfterRender = this.aheadSlice;
+    return new Promise<void>((done) => {
+      const job = { left: fresh.length, done };
+      for (const e of fresh) (e.low ? this.aheadLow : this.aheadQueue).push({ ...e, job });
+      // (and never waited on for long, if frames are not coming: it is drawn when they do)
+      setTimeout(done, 5000);
+    });
+  }
+
+  private aheadSlice = () => {
+    if (this.drawingAhead || (!this.aheadQueue.length && !this.aheadLow.length)) return;
+    // (in the game's own frame, and not in some other drawing of the world)
+    if (this.renderer.getRenderTarget() !== this.composer.inputBuffer) return;
+    // (what somebody is waiting to be shown first; what is for the other lighting after, and well apart)
+    const now = performance.now();
+    const from = this.aheadQueue.length ? this.aheadQueue : now - this.aheadLowAt >= LATER_APART ? this.aheadLow : null;
+    if (!from) return;
+    for (let skipped = 0; skipped < 400; skipped++) {
+      const e = from.shift();
+      if (!e) return;
+      const fresh = e.keys.some((k) => !this.drawnWith.has(k));
+      if (fresh) {
+        this.drawingAhead = true;
+        try {
+          this.drawOnce([e.o], e.lit);
+        } finally {
+          this.drawingAhead = false;
+        }
+        for (const k of e.keys) this.drawnWith.add(k);
+        if (e.low) this.aheadLowAt = now;
+      }
+      if (--e.job.left === 0) e.job.done();
+      if (fresh) return;
+    }
+  };
+
+  /** These, drawn once into four pixels that are never shown: as the world is lit (null), or lit as asked. */
+  private drawOnce(list: THREE.Object3D[], lit: boolean | null, all = false) {
+    const R = this.renderer, scene = this.scene, cam = this.camera, inBuf = this.composer.inputBuffer;
+    const target = (this.aheadTarget ??= new THREE.WebGLRenderTarget(4, 4, {
+      samples: inBuf.samples,
+      type: inBuf.texture.type,
+      format: inBuf.texture.format as THREE.PixelFormat,
+      colorSpace: inBuf.texture.colorSpace as THREE.ColorSpace,
+      depthBuffer: true,
+    }));
+    const undo: (() => void)[] = [];
+    const lights: THREE.Object3D[] = [];
+    if (!all) {
+      for (const o of list) {
+        // shown, with all it hangs from; in the world, if it is not yet; on the one layer that is drawn; and not asked whether it is in sight
+        let top: THREE.Object3D = o;
+        for (let t: THREE.Object3D | null = o; t; t = t.parent) {
+          if (!t.visible) {
+            const hidden = t;
+            hidden.visible = true;
+            undo.push(() => (hidden.visible = false));
+          }
+          top = t;
+        }
+        if (top !== scene) {
+          const loose = top;
+          scene.add(loose);
+          loose.updateMatrixWorld(true);
+          undo.push(() => scene.remove(loose));
+        }
+        const mask = o.layers.mask, culled = o.frustumCulled;
+        o.layers.enable(AHEAD_LAYER);
+        o.frustumCulled = false;
+        undo.push(() => {
+          o.layers.mask = mask;
+          o.frustumCulled = culled;
+        });
+        const many = o as THREE.InstancedMesh;
+        if (many.isInstancedMesh && many.count === 0) {
+          many.count = 1;
+          undo.push(() => (many.count = 0));
+        }
+      }
+      // (every light there is counts for this drawing as it does for the game's: a shader is written for how many there are)
+      scene.traverse((o) => {
+        if (!(o as THREE.Light).isLight || o.layers.isEnabled(AHEAD_LAYER)) return;
+        o.layers.enable(AHEAD_LAYER);
+        lights.push(o);
+      });
+    } else {
+      // (The whole world as it stands, whether or not it is in sight. Not what has nothing in it yet, a list of
+      // some furniture none of which is near: to draw one of each would be to put every picture in the game on
+      // the card at once, which is what the game was changed not to do.)
+      scene.traverse((o) => {
+        if (!o.frustumCulled) return;
+        o.frustumCulled = false;
+        undo.push(() => (o.frustumCulled = true));
+      });
+    }
+    const prev = R.getRenderTarget(), layers = cam.layers.mask, auto = scene.matrixWorldAutoUpdate;
+    const shadows = [R.shadowMap.autoUpdate, R.shadowMap.needsUpdate];
+    if (!all) {
+      cam.layers.set(AHEAD_LAYER);
+      // (Where everything is has just been worked out, for the frame this is in. And the sun's shadow maps are
+      // left as they are. Drawing the thing into them as well was tried, for the shaders shadows are drawn with:
+      // the three maps cleared and drawn whole again the frame after, every frame something was drawn ahead, and
+      // the frame the lamps are first lit in no shorter for it.)
+      scene.matrixWorldAutoUpdate = false;
+      R.shadowMap.autoUpdate = false;
+      R.shadowMap.needsUpdate = false;
+    }
+    const back = lit === null ? null : (this.lighting?.as(lit) ?? null);
+    try {
+      R.setRenderTarget(target);
+      R.render(scene, cam);
+    } finally {
+      R.setRenderTarget(prev);
+      back?.();
+      cam.layers.mask = layers;
+      scene.matrixWorldAutoUpdate = auto;
+      R.shadowMap.autoUpdate = shadows[0];
+      R.shadowMap.needsUpdate = shadows[1];
+      for (const l of lights) l.layers.disable(AHEAD_LAYER);
+      for (let i = undo.length - 1; i >= 0; i--) undo[i]();
+    }
+  }
+
+  /**
+   * While the game loads, with the screen that says so up: the whole world drawn once off the picture under each
+   * lighting (see `drawAhead` for why). What it costs was being paid in the first frames of the menu for the one
+   * lighting, and in the frame the first lamp was lit for the other.
+   */
+  drawWorldAhead() {
+    this.drawingAhead = true;
+    try {
+      if (this.lighting) this.drawOnce([], !this.lighting.lit(), true);
+      this.drawOnce([], null, true);
+    } finally {
+      this.drawingAhead = false;
+    }
+    // (and what was drawn with is known for drawn with: nothing of the world as it stood is drawn ahead again)
+    const seen = new Set<THREE.Material>();
+    this.scene.traverse((o) => {
+      const m = (o as THREE.Mesh).material;
+      if (!m || !o.visible) return;
+      const shape = shapeOf(o);
+      for (const x of Array.isArray(m) ? m : [m]) {
+        if (seen.has(x)) continue;
+        seen.add(x);
+        const ps = (this.renderer.properties.get(x) as { programs?: Map<string, Program> }).programs;
+        for (const p of ps?.values() ?? []) this.drawnWith.add(`${p.id}|${shape}`);
+      }
+    });
+  }
+
+  private looked = new WeakSet<Program>();
+  /**
+   * A shader that is made is looked over before anything is drawn with it. The first time the library draws with
+   * one it asks the card for the name and the place of every setting in it, a trip to the card and back for each:
+   * hundreds, for a shader written for the sun's three shadow maps and eight lamps, three to six milliseconds of
+   * it a shader. Left to the frame, the first frame the lamps were lit in had that to do for every shader in
+   * sight, none of which had been drawn with before: 620 to 670 ms measured, with nothing being made. One shader
+   * to a frame's spare time, here.
+   */
+  private async lookOver(programs: Iterable<Program>) {
+    for (const p of programs) {
+      if (this.looked.has(p) || !p.isReady()) continue;
+      await breathe();
+      this.looked.add(p);
+      p.getUniforms();
+      p.getAttributes();
+    }
+  }
+
+  /** Every shader there is, looked over (see `lookOver`): asked for when the game has loaded, for all that were written while it did. */
+  async lookOverAll() {
+    const all = this.renderer.info.programs as unknown as Program[] | null;
+    if (!all) return;
+    await made([...all]);
+    await this.lookOver([...all]);
   }
 
   /**

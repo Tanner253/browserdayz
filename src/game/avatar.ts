@@ -493,6 +493,12 @@ export class Avatar {
    */
   /** bodies are made one at a time, a person's before one of the infected's: see `make` */
   private static line = new Line();
+  /**
+   * A body has been made: what gets it ready to be drawn before it is handed to whoever asked for it (the game
+   * sets this: Renderer.ready, and its pictures sent). `kind` is what bodies are alike by: the first of a kind is
+   * waited for, and the rest are drawn with what was made for it.
+   */
+  static onMade: (parts: THREE.Object3D[], kind: string) => Promise<void> = async () => {};
 
   load(atmo: Atmosphere, layer = AVATAR_LAYER, firstPersonBody = false, look: Look = lookFor(''), file: BodyFile = 'survivor') {
     return Avatar.line.take(file === 'survivor', () => this.make(atmo, layer, firstPersonBody, look, file));
@@ -735,6 +741,7 @@ export class Avatar {
       this.fpRoot.add(fpRig);
     }
     this.setLook(look);
+    await Avatar.onMade(firstPersonBody ? [this.root, this.fpRoot] : [this.root], `${file}|${firstPersonBody ? 'own' : ''}`).catch(() => {});
   }
 
   /** Dresses the body: jacket and trouser colours, skin tone, hair. */

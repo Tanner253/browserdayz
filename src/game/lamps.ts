@@ -122,6 +122,19 @@ export class Lamps {
   }
 
   /**
+   * The world lit as asked for a moment (the real lights in it, or out of it), with the way back: so that the
+   * shaders of a thing that comes after the game has loaded are written under both lightings (Renderer.ready),
+   * as the world's own were (`warm`).
+   */
+  as(lit: boolean): () => void {
+    const was = this.pool.visible;
+    this.pool.visible = lit;
+    return () => {
+      this.pool.visible = was;
+    };
+  }
+
+  /**
    * This frame, a lamp that throws a beam: a flashlight, a headlight.
    * @param power 1 is a flashlight @param wide 1 is a flashlight's cone
    * @param glare how much of a bright disc it is to whoever looks into it (1: a headlight; 0: none, which is a lamp in

@@ -78,6 +78,8 @@ export interface GarageHost {
   effects: Effects;
   input: Input;
   remotes: Map<number, RemotePlayer>;
+  /** a car has been made: its own paints are met under each lighting before the lamps are first lit (Renderer.ready) */
+  ready?: (parts: THREE.Object3D[]) => void;
   online: () => boolean;
   /** something to tell the player, in the corner */
   note: (text: string, kind: 'good' | 'warn' | 'info') => void;
@@ -210,6 +212,22 @@ export class Garage {
 
   private groundAt = (x: number, z: number) => (roadLift(this.h.world, x, z) > 0 ? 'asphalt' : groundOf(this.h.terrain.surfaceAt(x, z)));
 
+  /**
+   * One of each car as it is drawn in the world (painted, lamps and all), in no place: for its shaders to be made
+   * with the world's while the game loads. The first jeep and the first police car to be seen were nine shaders
+   * made in the frame they were first drawn in: a second and a half in which nothing moved, on coming in.
+   */
+  warmers(): THREE.Object3D[] {
+    if (!this.ready) return [];
+    const out: THREE.Object3D[] = [];
+    for (const kind of this.protoCar ? [0, POLICE_CAR.kind] : [0]) {
+      const made = this.make(kind);
+      // (its lighter copy, where it has one, is in the same pieces)
+      out.push(made.body, ...made.wheels);
+    }
+    return out;
+  }
+
   /** the jeeps whose lamps are on (somebody is at the wheel): each throws its headlights when it is dark */
   *lit(): Iterable<Jeep> {
     for (const [j, x] of this.extra) if (x.lit && !j.wreck) yield j;
@@ -221,6 +239,7 @@ export class Garage {
     const j = new Jeep(v.i, this.groundAt, DRIVES[kind], kind);
     const made = this.make(kind);
     j.build(this.h.scene, v.s, made);
+    this.h.ready?.([made.body, ...made.wheels]);
     if (made.lod) this.lods.set(j, made.lod);
     j.hp = v.hp;
     j.fuel = v.fuel;

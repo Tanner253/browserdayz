@@ -339,6 +339,8 @@ export class Game {
     this.effects = new Effects(r.scene, atmo);
     this.fires = new Fires(world, r.scene, this.effects, atmo);
     this.lamps = new Lamps(r.scene);
+    // (whatever is got ready after the game has loaded is got ready for the lamps lit and for the lamps out)
+    r.lighting = { lit: () => this.lamps.pool.visible, as: (lit) => this.lamps.as(lit) };
     this.bunker = new BunkerSite(world, atmo, r.scene, this.s.terrain.lid);
     // Its door is loud: heard by everybody on the map, wherever they are, and from where it is. (It was heard
     // within two hundred and seventy metres and by nobody else.) Far off it is as late and as dull as a far
@@ -364,7 +366,21 @@ export class Game {
     // (no model of a thing is fetched here any more: each is, when a thing of its kind is first near. See LootManager.spawn.)
     // (never waited on for long: a card that will not say its shaders are made is not what keeps a thing out of the world)
     // (both ways it is drawn: by itself in the hands, and as a line of the list of its kind on the ground)
-    this.loot.models.onMade = (tpl) => Promise.race([r.ready([tpl.group, ...this.loot.drawnWith(tpl)]).then(() => r.send(tpl.group)), new Promise<void>((done) => setTimeout(done, 1500))]);
+    this.loot.models.onMade = (tpl) => Promise.race([r.ready([tpl.group, ...this.loot.drawnWith(tpl)]).then(() => r.send(tpl.group)), new Promise<void>((done) => setTimeout(done, 6000))]);
+    // (And a body is got ready before it is handed to whoever asked for it. The first of the infected and the
+    // first other player to come into sight were five shaders each made in the frame: a second and a half in
+    // which nothing moved. The first of a kind is what there is to wait for; each one after it has only its own
+    // paints to be met under each lighting, a millisecond apiece, which was sixty of them in the one frame the
+    // lamps were first lit in.)
+    const bodies = new Set<string>();
+    Avatar.onMade = (parts, kind) => {
+      const first = !bodies.has(kind);
+      bodies.add(kind);
+      const all = r.ready(parts).then(async () => {
+        if (first) for (const o of parts) await r.send(o);
+      });
+      return Promise.race([all, new Promise<void>((done) => setTimeout(done, first ? 8000 : 2000))]);
+    };
     this.loot.onPlaced = (l) => this.lootPlaced(l);
     this.grenades = new Grenades(r.scene, this.loot.models);
     await this.grenades.preload();
@@ -380,6 +396,7 @@ export class Game {
       effects: this.effects,
       input: this.input,
       remotes: this.remotes,
+      ready: (parts) => void r.ready(parts),
       online: () => this.online,
       note: (text, kind) => this.hud.note(text, kind),
       boom: (at, mine) => this.explode(at, mine, 'jeep'),
@@ -474,12 +491,22 @@ export class Game {
       const held = this.weapons.worldModel(id);
       if (held) warm.add(held);
     }
+    // (and one of each car, as it is painted for the world: see Garage.warmers)
+    const cars = this.garage.warmers();
+    for (const o of cars) warm.add(o);
     warm.position.copy(r.camera.position);
     r.scene.add(warm);
     r.precompile(r.scene, r.camera);
     // (and once more with the lamps in the scene: see Lamps.warm)
     this.lamps.warm(() => r.precompile(r.scene, r.camera));
+    // (And drawn once with each, off the picture: see Renderer.drawAhead. Not on a phone, where the start is as
+    // it was: the whole world drawn twice over before the first frame is more than is asked of one there untried.)
+    if (!TOUCH) r.drawWorldAhead();
     r.scene.remove(warm);
+    // (their pictures are put on the card now, one to a frame's spare time: a car is in sight of where one comes in as often as not)
+    void (async () => {
+      for (const o of cars) await r.send(o);
+    })();
     progress('rendering icons');
     // The pictures of things are kept from the build (public/assets/icons: `npm run icons`), one small file each,
     // fetched when it is first shown. Any whose thing has changed since it was made is made here, as all were.
@@ -696,6 +723,7 @@ export class Game {
       this.hud.setMenuMap(this.minimap.poster(), WORLD_SIZE, spots, atmo.gas);
       // (and the map opened in the game says the same of the same places)
       this.map = new BigMap(world, buildings.lootPoints, spots, atmo.gas, () => this.minimap.live);
+      this.map.ahead();
       this.map.onClose = () => this.toggleMap(false);
       document.getElementById('ui')!.appendChild(this.map.root);
       // the panel of whoever has a role (shut and empty for everybody else)
@@ -1230,7 +1258,7 @@ export class Game {
       for (const s of m.s) {
         const r = this.remotes.get(s[0]);
         if (!r) continue;
-        r.push([s[1], s[2], s[3], s[4], s[5], s[6]], now);
+        r.push([s[1], s[2], s[3], s[4], s[5], s[6]], now, typeof s[9] === 'number' ? s[9] : undefined);
         r.setWeapon(s[7], s[8]);
         if (!(s[6] & F_DEAD)) r.seenAlive(now);
         else r.seenDead(now);
@@ -1844,7 +1872,7 @@ export class Game {
       const it = this.weapons.equippedItem;
       const flags = (p.crouched ? F_CROUCH : 0) | (p.sprinting ? F_SPRINT : 0) | (this.weapons.aiming ? F_AIM : 0) | (p.grounded ? F_GROUND : 0) | (p.dead ? F_DEAD : 0) | (p.vitals.bleeding ? F_BLEED : 0) | (p.lean > 0.3 ? F_LEAN_R : p.lean < -0.3 ? F_LEAN_L : 0) | (this.hold === 'dance' ? F_DANCE : 0) | (this.hold === 'sit' ? F_SIT : 0) | (p.prone ? F_PRONE : 0) | (this.hold === 'surrender' ? F_SURRENDER : 0) | (this.garage.ride ? F_SEAT : 0) | (this.weapons.guarding ? F_GUARD : 0) | (p.vitals.broken ? F_LIMP : 0) | (this.lit && !this.garage.ride ? F_LIGHT : 0);
       const pose: Pose = [p.pos.x, p.pos.y, p.pos.z, p.yaw, p.pitch, flags];
-      this.net.send({ t: 's', p: pose, w: it?.id ?? null, m: fittedOf(it) });
+      this.net.send({ t: 's', p: pose, w: it?.id ?? null, m: fittedOf(it), n: Math.round(performance.now()) });
     }
     // the server keeps a copy of what we carry so it can leave a body with our gear on it
     this.meT += dt;
@@ -2121,6 +2149,8 @@ export class Game {
    * before the menu was seen. Until each has come the menu has what it has: the soft sky, and the view from the air.
    */
   afterBoot() {
+    // (the shaders written while the game loaded, for the lamps lit and for the lamps out, are looked over now, behind the menu: see Renderer.lookOver)
+    void this.s.r.lookOverAll();
     this.s.atmo.afterBoot();
     this.hud.fetchFilms();
     void this.menu.load();
