@@ -831,7 +831,10 @@ const BOOT = randomBytes(8).toString('hex');
 /** on the host it is kept; on somebody's own machine it is not, unless asked for (KEEP=on) */
 const KEEP_ON = process.env.KEEP ? process.env.KEEP !== 'off' : !!process.env.RENDER;
 const KEEP_EVERY_MS = (process.env.KEEP_EVERY_MIN === undefined ? 180 : Math.max(0, Number(process.env.KEEP_EVERY_MIN) || 0)) * 60_000;
-const KEEP_WAIT_MS = (process.env.KEEP_WAIT_S === undefined ? 25 : Math.max(0, Number(process.env.KEEP_WAIT_S) || 0)) * 1000;
+// (100 s: on 2026-10-12 02:30 UTC a server waited 25 s after the world reached it, and the one before it, which the
+// host tells to stop a minute after that, had not yet said its last word: everybody came back as they had been ten
+// minutes before. A server of this build says its last word as soon as it sees it has been replaced: see `replaced`.)
+const KEEP_WAIT_MS = (process.env.KEEP_WAIT_S === undefined ? 100 : Math.max(0, Number(process.env.KEEP_WAIT_S) || 0)) * 1000;
 /** however long the server before this one goes on answering, it is not waited for longer than this */
 const KEEP_MAX_MS = (process.env.KEEP_MAX_S === undefined ? 420 : Math.max(0, Number(process.env.KEEP_MAX_S) || 0)) * 1000;
 /**
@@ -923,6 +926,8 @@ const KEPT = {
   dirty: false,
   savedAt: 0,
   busy: false,
+  /** what became of what was kept when this server started, in a line (it is on /healthz: a count and a time, nobody's anything) */
+  how: 'not read yet',
 };
 keptListed = true;
 const pause = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));
@@ -1015,6 +1020,7 @@ async function loadKept() {
   const open = (what: string) => {
     if (KEPT.ready) return;
     KEPT.ready = true;
+    KEPT.how = what;
     log(`[keep] ${what}`);
     fillFromQueue();
   };
@@ -1061,19 +1067,33 @@ async function loadKept() {
     KEPT.read = true;
     if (save && !save.final && save.boot !== BOOT) log(`[keep] the server before this one never said its last word: what it wrote at ${save.at} is all there is`);
     if (!save) return open('nothing has been kept yet: everybody begins afresh');
-    // (from here on something goes wrong only by what is in the file: if it cannot be made sense of it is left alone)
-    KEPT.read = false;
-    const snap = unseal(save.z) as Snapshot;
+    // (from here on something goes wrong only by what is in the file)
+    let snap: Snapshot;
+    try {
+      snap = unseal(save.z) as Snapshot;
+    } catch (e) {
+      // A file that cannot be opened is no use to anybody, now or later: it is not left to stand in the way for
+      // ever. (Left alone, with nothing written over it, every server after this one would have found it again,
+      // opened with nothing again, and kept nothing again.)
+      return open(`what was kept at ${save.at} could not be opened (${e instanceof Error ? e.message : e}): everybody begins afresh, and what is kept from now on is written over it`);
+    }
     if ((snap.wipe ?? '') !== WIPE) KEPT.read = true;
     if ((snap.wipe ?? '') !== WIPE) return open(`what was kept is of the world "${snap.wipe ?? ''}", and this is "${WIPE}": everybody begins afresh`);
     const moved = snap.rev !== WORLD_REV, now = Date.now();
+    let bad = 0;
     for (const [k, r] of snap.chars ?? []) {
-      if (!r?.inv || !r.alive || now - r.leftAt > RECORD_LIFETIME || !isPose(r.pose)) continue;
-      const inv = cleanInventory(r.inv);
-      for (const it of things(inv)) issue(it);
-      // (the map has been made again since: what they carried is theirs, where they stood may be inside a wall)
-      KEPT.chars.set(k, { pose: r.pose, inv, vitals: r.vitals, alive: true, leftAt: r.leftAt, ...(moved ? { afresh: true } : {}) });
+      try {
+        if (!r?.inv || !r.alive || now - r.leftAt > RECORD_LIFETIME || !isPose(r.pose)) continue;
+        const inv = cleanInventory(r.inv);
+        for (const it of things(inv)) issue(it);
+        // (the map has been made again since: what they carried is theirs, where they stood may be inside a wall)
+        KEPT.chars.set(k, { pose: r.pose, inv, vitals: r.vitals, alive: true, leftAt: r.leftAt, ...(moved ? { afresh: true } : {}) });
+      } catch {
+        // (one character that cannot be made sense of is one character lost, not everybody)
+        bad++;
+      }
     }
+    if (bad) log(`[keep] ${bad} characters in what was kept could not be made sense of, and are left out`);
     let stashes = 0;
     for (const b of snap.stashes ?? []) {
       if (b?.kind !== 'stash' || typeof b.cid !== 'string' || boxes.has(b.cid) || ![b.x, b.y, b.z, b.rot].every(num)) continue;
@@ -1095,10 +1115,11 @@ async function loadKept() {
       economy.drop(item, l.x, moved ? world.groundAt(l.x, l.z) : l.y, l.z, l.rot).keptAt = num(l.at) ? l.at : now;
       stashes++;
     }
-    KEPT.read = true;
     open(`${KEPT.chars.size} characters and ${stashes} stashes as they were kept at ${save.at}${save.final ? '' : ' (not a last word: the server before this one stopped without one)'}${moved ? '; the map has been made again since, so everybody starts from the edge with what they had' : ''}`);
   } catch (e) {
-    open(`what was kept could not be read (${e instanceof Error ? e.message : e}): everybody begins afresh`);
+    // (what could be taken in has been: it is not thrown away for the sake of what could not)
+    KEPT.read = true;
+    open(`what was kept could not all be taken in (${e instanceof Error ? e.message : e}): ${KEPT.chars.size} characters were`);
   }
 }
 
@@ -3118,7 +3139,7 @@ function serve(req: http.IncomingMessage, res: http.ServerResponse) {
     // readable from a client hosted somewhere else (e.g. Vercel) for the start-screen player count
     res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'no-store' });
     // (places: how many different addresses the players come from. One, with several players on, means the host is not passing addresses through.)
-    res.end(JSON.stringify({ ok: true, boot: BOOT, why: RESTART.why, players: [...clients.values()].filter((c) => !c.asleep).length, asleep: [...clients.values()].filter((c) => c.asleep).length, max: MAX_PLAYERS, queue: queue.length, uptime: Math.round(process.uptime()), checks: CHECKS, flagged, keptOff: BANS.temp.size, loot: economy.loot.size, places: new Set([...clients.values()].map((c) => c.ip)).size }));
+    res.end(JSON.stringify({ ok: true, boot: BOOT, why: RESTART.why, kept: KEPT.how, players: [...clients.values()].filter((c) => !c.asleep).length, asleep: [...clients.values()].filter((c) => c.asleep).length, max: MAX_PLAYERS, queue: queue.length, uptime: Math.round(process.uptime()), checks: CHECKS, flagged, keptOff: BANS.temp.size, loot: economy.loot.size, places: new Set([...clients.values()].map((c) => c.ip)).size }));
     return;
   }
   // the website's function asks here what it has just been asked to do with the lists of admins and bans (see siteAdmin)
@@ -3252,6 +3273,33 @@ loadAdmin();
 void loadKept();
 
 let stopping = false;
+/**
+ * A server that has been the one the world reaches, and now finds another answering there, has been replaced: a
+ * new one is up, and the host will tell this one to stop in a minute or so. It does not wait to be told. It says
+ * its last word at once (which is what the new one is waiting for before it lets anybody in), tells everybody on
+ * that the server is restarting, and goes: their games find the new one, and they are in it seconds later with
+ * what they had. (Left to play on here for that minute, whatever they did in it would have been played on a server
+ * nobody else could join, and the new one would have stood shut for as long.)
+ */
+{
+  let reached = false, away = 0;
+  const watch = setInterval(async () => {
+    if (stopping || !PUBLIC_URL || !KEPT.ready) return;
+    const here = await reachedHere();
+    if (here === true) {
+      reached = true;
+      away = 0;
+    } else if (here === false && reached && ++away >= 2 && !stopping) {
+      stopping = true;
+      clearInterval(watch);
+      log('another server answers where this one was reached: this one has been replaced, says its last word and goes');
+      sayRestart(RESTART.why, 0);
+      saveWorld();
+      void Promise.race([keepNow(true, 'another server has taken over'), pause(12_000)]).finally(() => setTimeout(() => process.exit(0), 600));
+    } else if (here !== false) away = 0;
+  }, Number(process.env.REPLACED_EVERY_MS) || 4000);
+  watch.unref();
+}
 // (A test stops it as a host does, by a word on its input: on Windows a process cannot be asked to stop, only stopped.)
 if (process.env.STOP_BY_WORD) process.stdin.on('data', (d) => String(d).includes('stop') && process.emit('SIGTERM'));
 for (const sig of ['SIGINT', 'SIGTERM'] as const) {
