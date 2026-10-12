@@ -26,6 +26,7 @@ import { VOICE } from '../src/sim/voice';
 import { CRATE_RESTOCK, CRATE_SPECS, fillCrate } from '../src/sim/crates';
 import { News, type NewsKept } from '../src/sim/news';
 import { gasEdge, underGas } from '../src/sim/gas';
+import { RangeJudge, dealing, rangeOf, shotMisses, type RangeSpec } from '../src/sim/range';
 import { BUNKER, bunkerDark, inBunker } from '../src/sim/bunker';
 import { phaseOf } from '../src/sim/daynight';
 import { WEAPON_RULES, hitDamage, type HitZone } from '../src/sim/combat';
@@ -635,7 +636,7 @@ const awake = () => {
   return n;
 };
 /** what has been turned away, for /healthz: by what */
-const TURNED = { address: 0, flood: 0, origin: 0, silent: 0, hover: 0, flags: 0, banned: 0, captcha: 0 };
+const TURNED = { address: 0, flood: 0, origin: 0, silent: 0, hover: 0, flags: 0, banned: 0, captcha: 0, range: 0 };
 /** when each connection lately said hello, by where it came from: see `flooding` */
 const hellos = new Map<string, number[]>();
 /** More hellos from one address in a minute than anybody playing sends (a game says it once, and again when its line drops). */
@@ -648,6 +649,59 @@ function flooding(ip: string): boolean {
   return times.length > HELLOS_A_MINUTE;
 }
 const HELLOS_A_MINUTE = Number(process.env.HELLOS_A_MINUTE) || 20;
+
+// ---- the bot check (2026-10-12: "lets build our own bot detector... no ip can reach the server and join the game
+// without passing this bot check. the players character wont spawn in the game and they wont join the game server
+// until they pass this check")
+//
+// Whoever asks to come in is dealt a range first (src/sim/range.ts): they are nobody in the world while they are
+// on it, hold no place, and are seen by nobody. Their game says where its player stands and looks and what it
+// fires; the judge here says whether the figures went down, and whether it was a person that put them down. It
+// is asked of everybody, whatever role they have. Passed, it holds for a game at an address for BOTCHECK_HOURS
+// (six), so that a line that drops is not the range again; whoever the checks put off the server shoots it again.
+// On wherever the host is Render, and wherever BOTCHECK says so ("off": never).
+const BOTCHECK = {
+  on: process.env.BOTCHECK ? process.env.BOTCHECK !== 'off' : !!process.env.RENDER,
+  ms: (process.env.BOTCHECK_HOURS === undefined ? 6 : Math.max(0, Number(process.env.BOTCHECK_HOURS) || 0)) * 3600_000,
+  goes: 4,
+  /** and the browser is asked what it is (BOTCHECK_ENV=off: not asked): one that says a program is driving it, or that draws with no graphics card, as a browser on a rented server does, has not passed whatever it shot */
+  env: process.env.BOTCHECK_ENV !== 'off',
+};
+/** who has passed, and until when: by their game and where they play from */
+const shooters = new Map<string, number>();
+/**
+ * Ranges dealt ahead. Dealing one is a hundred tryings some of the time, a tenth of a second of this server's one
+ * thread with everybody's game waiting on it: so a few are kept ready, each dealt a trying at a time between
+ * other things, and whoever asks to come in is handed one.
+ */
+const DEALT: RangeSpec[] = [];
+let dealingNow = false;
+function dealAhead() {
+  if (dealingNow || !BOTCHECK.on || DEALT.length >= 8) return;
+  dealingNow = true;
+  const deal = dealing(1 + Math.floor(Math.random() * 2147483646));
+  const step = () => {
+    const s = deal.next();
+    if (!s.done) return void setImmediate(step);
+    DEALT.push(s.value);
+    dealingNow = false;
+    dealAhead();
+  };
+  setImmediate(step);
+}
+const nextRange = (): RangeSpec => {
+  const spec = DEALT.shift() ?? rangeOf(1 + Math.floor(Math.random() * 2147483646));
+  dealAhead();
+  return spec;
+};
+dealAhead();
+const RANGES = { dealt: 0, passed: 0, failed: 0, on: 0 };
+function knownShooter(key: string, ip: string): boolean {
+  if (!BOTCHECK.on) return true;
+  if (!key || !BOTCHECK.ms) return false;
+  const until = shooters.get(`${keyHash(key)}|${ip}`);
+  return !!until && until > Date.now();
+}
 
 // ---- a person, and not a program (2026-10-12: "we should add a captcha or something")
 //
@@ -1773,6 +1827,7 @@ function putOff(c: Client, why: string) {
       kept = true;
     }
   }
+  shooters.delete(`${keyHash(c.key)}|${c.ip}`);
   log(`[check] ${c.name} is put off the server: ${why}${kept ? `; and kept off it for ${CHECK.ban} hours` : ''}`);
   send(c, { t: 'kick', reason: kept ? 'The server could not make sense of what your game told it, more than once. You are kept off it for a while.' : 'The server could not make sense of what your game told it. Reconnect.' });
   c.ws.close();
@@ -1851,7 +1906,7 @@ function voidTags(c: Client, where: string) {
  * about anybody: it holds whatever CHECKS says. (An honest game puts its player back on the ground within two
  * seconds of finding them under it: see `Game.unbury`.)
  */
-const UNDER = { deep: 1.1, grace: 3, void: 10, off: 25 };
+const UNDER = { deep: 1.1, grace: 3, void: 10, off: 8 };
 function underCheck(c: Client, now = Date.now()) {
   const [x, y, z] = c.pose;
   const b = world.bunker;
@@ -1861,11 +1916,37 @@ function underCheck(c: Client, now = Date.now()) {
     return;
   }
   if (!c.underAt) c.underAt = now;
+  // (2026-10-12: "player should never be able to go under the map". Wherever their game says they are under it,
+  // they are on it for everybody else, from the first word: seen there, and hit there. The programs that came by
+  // the dozen that day slid about the map at one height, metres under it, where nothing could touch them.)
+  if (CHECKS === 'enforce') c.pose[1] = world.groundAt(x, z);
   const secs = (now - c.underAt) / 1000;
   if (secs < UNDER.grace) return;
   flag(c, `is ${(world.groundAt(x, z) - y).toFixed(1)} m under the ground at ${x.toFixed(0)}, ${z.toFixed(0)}, ${secs.toFixed(0)} s now`, false);
   if (secs >= UNDER.void) voidTags(c, 'under the ground');
   if (secs >= UNDER.off) putOff(c, `was under the ground for ${UNDER.off} seconds`);
+}
+/**
+ * To and fro without the head once turning (2026-10-12: "can we not detect rigid inhuman movements like these
+ * players?"). Somebody who goes about has their eyes on where they go: the turn and the tilt of their head change
+ * with every twitch of the hand. A program that walks a body up and down to seem alive turns it about without
+ * the head moving at all. Four turns back the way it came and twenty metres covered, in half a minute in which
+ * the head did not move by a hair: written down, and (enforcing) put off.
+ */
+const GAIT = { ms: 30_000, turns: 4, far: 20 };
+function gaitCheck(c: Client, was: Pose, now = Date.now()) {
+  if (CHECKS === 'off' || !c.alive || c.seatAt || c.power.clip || roleOf(c) === 'admin') return;
+  const k = c.check, to = c.pose;
+  if (!k.gait || to[3] !== k.gait.yaw || to[4] !== k.gait.pitch || now - k.gait.since > GAIT.ms) k.gait = { since: now, yaw: to[3], pitch: to[4], far: 0, turns: 0, dx: 0, dz: 0 };
+  const g = k.gait, dx = to[0] - was[0], dz = to[2] - was[2], step = Math.hypot(dx, dz);
+  if (step < 0.05) return;
+  g.far += step;
+  if (g.dx * dx + g.dz * dz < -0.5 * step * Math.hypot(g.dx, g.dz)) g.turns++;
+  g.dx = dx;
+  g.dz = dz;
+  if (g.turns < GAIT.turns || g.far < GAIT.far) return;
+  k.gait = undefined;
+  if (flag(c, `went to and fro ${GAIT.turns} times over ${g.far.toFixed(0)} m without their head once turning`)) putOff(c, 'they walked to and fro without their head once turning, as a program walks a body');
 }
 /** how far round the bunker's middle the ground is not asked about: its rooms and its stair are under it */
 const UNDER_BUNKER = 48;
@@ -1948,6 +2029,8 @@ interface Client {
    */
   check: {
     at: number; carry: number; free: number; high: number; hovered: number; flags: number; said: number; refused: number[];
+    /** how they have been going about lately: see gaitCheck */
+    gait?: { since: number; yaw: number; pitch: number; far: number; turns: number; dx: number; dz: number };
     /** the most health they can have (see `dealt`), when that was reckoned, and since when it has been less than none (0: it is not) */
     hp: number; hpAt: number; downAt: number;
     /** things they have said they carry that the server never put in the world: each written down once */
@@ -2336,6 +2419,7 @@ function handle(c: Client, m: C2S) {
       if (!c.alive) c.pose[5] |= F_DEAD;
       zoneCheck(c);
       underCheck(c);
+      gaitCheck(c, was);
       const w = typeof m.w === 'string' && ITEMS[m.w] ? m.w : null;
       c.w = w;
       c.m = Array.isArray(m.m) ? m.m.filter((x) => typeof x === 'string').slice(0, 4) : [];
@@ -3423,7 +3507,7 @@ function serve(req: http.IncomingMessage, res: http.ServerResponse) {
     // readable from a client hosted somewhere else (e.g. Vercel) for the start-screen player count
     res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'no-store' });
     // (places: how many different addresses the players come from. One, with several players on, means the host is not passing addresses through.)
-    res.end(JSON.stringify({ ok: true, boot: BOOT, protocol: PROTOCOL, why: RESTART.why, kept: KEPT.how, players: [...clients.values()].filter((c) => !c.asleep).length, asleep: [...clients.values()].filter((c) => c.asleep).length, max: MAX_PLAYERS, queue: queue.length, uptime: Math.round(process.uptime()), checks: CHECKS, flagged, keptOff: BANS.temp.size, loot: economy.loot.size, places: new Set([...clients.values()].map((c) => c.ip)).size, unspoken: [...clients.values()].filter((c) => !c.spoke && !c.asleep).length, turned: TURNED, captcha: CAPTCHA_ON, ...(CAPTCHA_ON ? { captchaKey: CAPTCHA.site, captchaSays: SLIPS } : {}) }));
+    res.end(JSON.stringify({ ok: true, boot: BOOT, protocol: PROTOCOL, why: RESTART.why, kept: KEPT.how, players: [...clients.values()].filter((c) => !c.asleep).length, asleep: [...clients.values()].filter((c) => c.asleep).length, max: MAX_PLAYERS, queue: queue.length, uptime: Math.round(process.uptime()), checks: CHECKS, flagged, keptOff: BANS.temp.size, loot: economy.loot.size, places: new Set([...clients.values()].map((c) => c.ip)).size, unspoken: [...clients.values()].filter((c) => !c.spoke && !c.asleep).length, turned: TURNED, captcha: CAPTCHA_ON, ...(CAPTCHA_ON ? { captchaKey: CAPTCHA.site, captchaSays: SLIPS } : {}), botcheck: BOTCHECK.on, ...(BOTCHECK.on ? { ranges: RANGES } : {}) }));
     return;
   }
   // the changelog page asks here for its hearts and comments, and gives them (see `news`)
@@ -3556,7 +3640,27 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
   let waiting = false;
   /** Cloudflare is being asked whether the slip this connection gave is good */
   let asking = false;
-  const hello = setTimeout(() => !c && !waiting && !asking && ws.close(), 8000);
+  /** on the bot check's range, and not yet anybody in the world: the judge of this go, when it was dealt, which go it is */
+  let range: { judge: RangeJudge; began: number; go: number; hello: Extract<C2S, { t: 'hello' }>; said: number; saidAt: number; dealtAt: number; begun: boolean } | null = null;
+  /** what this connection's browser has said of itself on the range */
+  let browser: { wd: boolean; gl: string } | null = null;
+  /** into the world, or into the line for it */
+  const letIn = (h: Extract<C2S, { t: 'hello' }>) => {
+    if (mustWait(h)) {
+      waiting = !!enqueue(ws, h, (client) => {
+        waiting = false;
+        c = client;
+      });
+    } else c = join(ws, h);
+  };
+  let ranging: ReturnType<typeof setInterval> | null = null;
+  const offRange = () => {
+    if (ranging) clearInterval(ranging);
+    ranging = null;
+    if (range) RANGES.on--;
+    range = null;
+  };
+  const hello = setTimeout(() => !c && !waiting && !asking && !range && ws.close(), 8000);
   ws.on('message', (data, isBinary) => {
     // (what is not words is speech: see `voice`)
     if (isBinary) {
@@ -3570,6 +3674,54 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
       return;
     }
     if (!m || typeof m !== 'object' || typeof m.t !== 'string') return;
+    if (!c && range) {
+      // (on the range: what the game says of where it stands and what it fires, and nothing else)
+      const now = Date.now(), r = range;
+      if (now - r.saidAt > 1000) {
+        r.saidAt = now;
+        r.said = 0;
+      }
+      if (++r.said > 90) return;
+      const at = now - r.began;
+      if (m.t === 'renv') browser = { wd: m.wd === true, gl: String(m.gl ?? '').slice(0, 160) };
+      // (The game has built the range and stood the figures on it: the go's clock starts here, and not when it
+      // was dealt. A slow machine is a dozen seconds at that, which were coming off its forty. Said once, and
+      // only in the first quarter of a minute: nobody is given a go that never ends.)
+      else if (m.t === 'rgo') {
+        if (m.g === r.go && !r.begun && now - r.dealtAt < 15_000) {
+          r.begun = true;
+          r.began = now;
+          r.judge = new RangeJudge(r.judge.spec);
+        }
+      }
+      // (of the go before this one, and late: nothing to this one)
+      else if ((m.t === 'r' || m.t === 'rs') && m.g !== r.go) return;
+      else if (m.t === 'r' && Array.isArray(m.p) && m.p.length === 4) r.judge.seen(Number(m.n), Number(m.p[0]), Number(m.p[1]), Number(m.p[2]), Number(m.p[3]), at);
+      else if (m.t === 'rs' && Array.isArray(m.o) && Array.isArray(m.d) && m.o.length === 3 && m.d.length === 3) {
+        const i = r.judge.shot(Number(m.n), m.o.map(Number), m.d.map(Number), at);
+        if (process.env.RANGE_DEBUG) log(`[range] shot at ${m.n} (server ${at}) from ${m.o.map((v: number) => Number(v).toFixed(2)).join(',')} along ${m.d.map((v: number) => Number(v).toFixed(3)).join(',')}: ${i >= 0 ? `figure ${i} down` : r.judge.why || 'landed on nothing'}; ${shotMisses(r.judge.spec, m.o.map(Number), m.d.map(Number), Number(m.n))}`);
+        if (i >= 0) ws.send(JSON.stringify({ t: 'rhit', i } satisfies S2C));
+        if (r.judge.passed && BOTCHECK.env && (!browser || browser.wd || /swiftshader|llvmpipe|softpipe|software|basic render/i.test(browser.gl))) {
+          TURNED.range++;
+          log(`${cleanName(r.hello.name)} shot the range, in a browser that ${!browser ? 'said nothing of itself' : browser.wd ? 'a program is driving' : `draws with "${browser.gl}"`}: turned away`);
+          offRange();
+          ws.send(JSON.stringify({ t: 'kick', reason: 'The bot check was not passed: this browser is being driven by a program, or has no graphics card to draw with.' } satisfies S2C));
+          ws.close();
+          return;
+        }
+        if (r.judge.passed) {
+          const h = r.hello, key = keyOf(h);
+          log(`${cleanName(h.name)} passed the bot check in ${(at / 1000).toFixed(0)} s (go ${r.go}): ${r.judge.report}`);
+          RANGES.passed++;
+          offRange();
+          if (key && BOTCHECK.ms) shooters.set(`${keyHash(key)}|${ipOf.get(ws) ?? ''}`, now + BOTCHECK.ms);
+          if (shooters.size > 20000) for (const [k, until] of shooters) if (until < now) shooters.delete(k);
+          ws.send(JSON.stringify({ t: 'rpass' } satisfies S2C));
+          letIn(h);
+        }
+      }
+      return;
+    }
     if (!c) {
       if (m.t !== 'hello' || waiting) return;
       if (m.v === PROTOCOL && flooding(ipOf.get(ws) ?? '')) {
@@ -3578,15 +3730,38 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
         ws.close();
         return;
       }
-      const enter = (h: Extract<C2S, { t: 'hello' }>) => {
-        if (mustWait(h)) {
-          waiting = !!enqueue(ws, h, (client) => {
-            waiting = false;
-            c = client;
-          });
-        } else c = join(ws, h);
-      };
       const ip = ipOf.get(ws) ?? '', key = keyOf(m);
+      // (Shown to be a person's browser, or not asked: now the range, for whoever has not lately passed it.
+      // Not for somebody who is to be turned away whatever they shoot: they are told so at once, by `join`.)
+      const enter = (h: Extract<C2S, { t: 'hello' }>) => {
+        if (h.v !== PROTOCOL || knownShooter(key, ip) || bannedFor(key || 'nobody', ip) || addressFull(key, ip)) return void letIn(h);
+        const deal = (go: number) => {
+          const spec = nextRange();
+          if (range) RANGES.on--;
+          range = { judge: new RangeJudge(spec), began: Date.now(), go, hello: h, said: 0, saidAt: 0, dealtAt: Date.now(), begun: false };
+          RANGES.on++;
+          RANGES.dealt++;
+          ws.send(JSON.stringify({ t: 'range', seed: spec.seed, turn: spec.turn, go } satisfies S2C));
+          if (process.env.RANGE_DEBUG) log(`[range] dealt ${spec.seed} turn ${spec.turn}: ${JSON.stringify(spec.figures.map((f) => [+f.x.toFixed(2), f.z, +f.reach.toFixed(2), +f.secs.toFixed(2), +f.start.toFixed(3)]))}`);
+        };
+        deal(1);
+        ranging = setInterval(() => {
+          const r = range;
+          if (!r || ws.readyState !== 1) return void offRange();
+          if (!r.judge.failed(Date.now() - r.began)) return;
+          RANGES.failed++;
+          log(`${cleanName(h.name)} did not pass go ${r.go} of the bot check: ${r.judge.report}`);
+          if (r.go >= BOTCHECK.goes) {
+            TURNED.range++;
+            log(`${cleanName(h.name)} did not pass the bot check in ${BOTCHECK.goes} goes: turned away`);
+            offRange();
+            ws.send(JSON.stringify({ t: 'kick', reason: 'The bot check was not passed. Press Deploy to try again.' } satisfies S2C));
+            ws.close();
+            return;
+          }
+          deal(r.go + 1);
+        }, 500);
+      };
       if (m.v !== PROTOCOL || knownPerson(key, ip)) return void enter(m);
       // (not known for a person: the slip, or the asking for one)
       const again = (reason: string) => {
@@ -3627,6 +3802,7 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
   });
   ws.on('close', () => {
     clearTimeout(hello);
+    offRange();
     if (waiting) leaveQueue(ws);
     if (c) gone(c);
   });

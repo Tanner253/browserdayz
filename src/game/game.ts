@@ -14,7 +14,7 @@ import { Barrel, type Vegetation } from '../world/vegetation';
 import type { Grass } from '../world/grass';
 import { Door, type Buildings } from '../world/buildings';
 import { WORLD_SIZE, bunkerPlace, heightAt, inPlay, type SiteKind, type World } from '../world/worldgen';
-import { ITEMS, WEAPON_SLOTS, itemName, TAG_HOLD, TAG_HOLD_MIN, TAG_OUT, capacityOf, chambered, fillMag, fittedOf, magRoom, makeItem, newUid, swapMag, tagClock, tagOwner, type ItemInstance, quietOf } from '../sim/items';
+import { ITEMS, WEAPON_SLOTS, itemName, TAG_HOLD, TAG_HOLD_MIN, TAG_OUT, capacityOf, chambered, fillMag, fittedOf, magRoom, makeItem, newUid, swapMag, tagClock, tagOwner, type ItemInstance, quietOf, makeMag } from '../sim/items';
 import { PlayerInventory, SLOT_ORDER, type Container } from '../sim/inventory';
 import { Economy, type WorldLoot } from '../sim/economy';
 import { CRATE_RESTOCK, CRATE_SPECS, fillCrate } from '../sim/crates';
@@ -52,6 +52,7 @@ import { Voice } from './voice';
 import { TIERS, type Tier } from '../sim/tiers';
 import { hasSlotIcon, iconSig, renderDoll, renderIcons } from '../ui/icons';
 import { askPerson } from '../ui/person';
+import { BotCheck } from './botcheck';
 import { Near } from './near';
 import { Perf } from '../core/perf';
 import { loadGraphics, type Graphics } from '../core/settings';
@@ -257,6 +258,9 @@ export class Game {
   private vicinitySig = '';
   /** the pockets were closed but the mouse is not the game's yet: one click and it is */
   private awaitClick = false;
+  /** the bot check's range, while the server has this game on it (see ./botcheck.ts): not yet anybody in the world */
+  private botCheck: BotCheck | null = null;
+  private rangeHeard = false;
   /** the men behind the shops' counters, and the counter itself (see src/sim/trade.ts) */
   private traders: Traders | null = null;
   /** talking to whoever is near: hold V (src/game/voice.ts) */
@@ -459,6 +463,8 @@ export class Game {
       body?.wound(pt, dir, 0.05 + power * 0.04, power > 0.58);
     };
     this.weapons.onShot = (s) => {
+      // (on the bot check's range the server is told of it as the range's own, and nobody else of anything)
+      if (this.botCheck?.active) return void this.botCheck.shot(s.origin, s.dir);
       this.net.send({ t: 'shot', o: s.origin.toArray(), d: s.dir.toArray(), w: s.weapon, sup: s.suppressed });
       // the infected hear it as well as anybody
       this.horde.noise(s.origin.x, s.origin.z, s.suppressed ? INFECTED.hearQuiet : INFECTED.hearShot);
@@ -894,6 +900,14 @@ export class Game {
       this.hud.showStart(true);
       this.hud.note('The check that you are a person was not passed: press Deploy to try again', 'warn');
     };
+    // (The bot check: a range dealt, a figure counted down, the range passed. Listened for before anything is asked
+    // of the server: it deals the range in place of a welcome. See `onRange`.)
+    if (!this.rangeHeard) {
+      this.rangeHeard = true;
+      this.net.on('range', (m) => void this.onRange(m.seed, m.turn, m.go));
+      this.net.on('rhit', (m) => this.botCheck?.hit(m.i));
+      this.net.on('rpass', () => this.botCheck?.passed());
+    }
     let slip = '';
     const ask = await personKey();
     if (ask) {
@@ -904,6 +918,22 @@ export class Game {
       this.hud.showStart(true, false, 'Connecting…');
     }
     let welcome = await this.net.connect(name, (text) => this.hud.showStart(true, false, text), slip);
+    // (the bot check's range, if the server put this game on it, is over one way or the other: see `onRange`)
+    const ranged = !!this.botCheck;
+    this.botCheck?.end();
+    this.botCheck = null;
+    this.player.god = false;
+    if (ranged && !welcome) {
+      // not passed, or the line dropped: back at the way in, and not into the game alone
+      this.joining = false;
+      this.started = false;
+      this.weapons.take(null);
+      this.inv.clear();
+      this.input.unlock();
+      this.hud.showStart(true);
+      this.hud.note(this.net.refused || 'The bot check was not finished: press Deploy to try again', 'warn');
+      return;
+    }
     // Turned away for being of another version than the server. Which of the two is behind is told by the site as
     // it is served this moment (version.json, made with the build). If that is not this page, this page is the old
     // one and is loaded again. If it is, the server is the one behind: a new site goes out before its server does
@@ -972,6 +1002,57 @@ export class Game {
     this.avatar.setLook(look);
     this.weapons.setLook(look);
     if (portrait) this.portrait();
+  }
+
+  /**
+   * The server has dealt this game a range (the bot check: ./botcheck.ts, ../sim/range.ts) before it will let it
+   * in. The player is put on it alone, with a rifle: not in the world, and with nothing of their own. It ends in
+   * `join`, when the server either welcomes this game or turns it away.
+   */
+  private async onRange(seed: number, turn: number, go: number) {
+    const { r, atmo, world } = this.s;
+    if (!this.botCheck) {
+      let top = 0;
+      for (let i = 0; i < world.heights.length; i += 7) top = Math.max(top, world.heights[i]);
+      this.botCheck = new BotCheck({
+        scene: r.scene,
+        atmo,
+        camera: r.camera,
+        floor: Math.round(top + 140),
+        place: (x, y, z) => this.player.spawn(x, y, z, 0),
+        where: () => this.player.pos,
+        send: (m) => this.net.send(m),
+        ready: (o) => r.ready(o),
+      });
+      // a rifle with a sight on it, and more rounds than the range lets anybody fire
+      if (this.use) this.breakOff();
+      this.weapons.take(null);
+      this.inv.clear();
+      const gun = Object.assign(makeItem('ar15'), { mag: 'mag_ar', loaded: 31, mods: ['red_dot'] });
+      this.inv.add(gun);
+      for (let k = 0; k < 2; k++) this.inv.add(makeMag('mag_ar', 30));
+      this.weapons.validate();
+      this.autoHot();
+      this.player.vitals = { health: 100, energy: 80, water: 80, stamina: MAX_STAMINA, bleeding: false };
+      this.player.god = true;
+      this.started = true;
+      this.menu.dispose();
+      this.hud.menuScene('', 0);
+      this.hud.showStart(false);
+      await this.botCheck.deal(seed, turn, go);
+      // (straight to the eyes: the range's clock is running)
+      this.director.flyIn(0.5);
+      const slot = (['primary', 'secondary', 'holster'] as const).find((k) => this.inv.slots[k]);
+      if (slot && !this.weapons.equippedItem) this.weapons.equip(slot);
+      // (the mouse was let go for the check before this one: the next click on the game takes it again)
+      if (this.input.locked) this.unpause();
+      else this.awaitClick = true;
+      return;
+    }
+    // (another go: a fresh magazine with the fresh range)
+    const held = this.weapons.equippedItem;
+    if (held?.id === 'ar15') Object.assign(held, { mag: 'mag_ar', loaded: 31 });
+    await this.botCheck.deal(seed, turn, go);
   }
 
   private async enterOffline() {
@@ -1214,7 +1295,7 @@ export class Game {
 
   /** Offline only: the server owns the world and your character when you play online. */
   save() {
-    if (!this.economy || this.online || !this.started) return;
+    if (!this.economy || this.online || !this.started || this.botCheck?.active) return;
     const p = this.player;
     writeSave({
       version: 1,
@@ -2018,7 +2099,8 @@ export class Game {
   }
 
   private resume() {
-    if (this.joining) return;
+    // (on the bot check's range the game is still on its way in, and is being played all the same: Resume resumes)
+    if (this.joining && !this.botCheck?.active) return;
     document.title = this.title;
     // keys must reach the game, not the name field
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
@@ -4319,11 +4401,17 @@ export class Game {
       this.saveT = 0;
       this.save();
     }
+    if (this.botCheck?.active) {
+      this.botCheck.update(dt);
+      // (nobody is kept on the range by an empty magazine)
+      const held = this.weapons.equippedItem;
+      if (held?.id === 'ar15' && (held.loaded ?? 0) < 4) Object.assign(held, { mag: 'mag_ar', loaded: 31 });
+    }
     this.sendState(dt);
 
     // points of interest
     const here = world.pois.find((q) => Math.hypot(q.x - p.pos.x, q.z - p.pos.z) < q.radius);
-    if (here && here.name !== this.poi && this.started) this.hud.area(here.name);
+    if (here && here.name !== this.poi && this.started && !this.botCheck?.active) this.hud.area(here.name);
     this.poi = here?.name ?? null;
 
     // vitals warnings

@@ -6,6 +6,8 @@
 //     somebody awake at an address still does;
 //   - more hellos from one address in a minute than a game sends are turned away;
 //   - where it is asked, a connection not asked for by the game's own page is not taken;
+//   - where the bot check is on: nobody is in the world until they have shot its range; somebody who plays it is
+//     let in, and is not asked again; a browser that says a program is driving it is not, whatever it shot;
 //   - where the check that somebody is a person is set up: nobody is let in without a good slip from it, a good
 //     one is asked for every time, and with the check down nobody comes in.
 // The real server on ports of its own, connections over the wire. About twenty-five seconds.
@@ -19,6 +21,8 @@ import os from 'node:os';
 import path from 'node:path';
 import WebSocket from 'ws';
 import { PROTOCOL, type S2C } from '../src/net/protocol';
+import { rangeOf } from '../src/sim/range';
+import { playRange } from './range-player';
 import { generateWorld, heightAt } from '../src/world/worldgen';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -34,7 +38,7 @@ class Conn {
   proof = '';
   constructor(public port: number, public name: string, public ip = '', public origin = '', public key = `bots-test-key-${name}-${String(++n).padStart(20, '0')}`) {}
   /** @returns welcomed, refused (with the reason given), or not taken at all */
-  async hello(): Promise<'in' | 'refused' | 'waiting' | 'no'> {
+  async hello(): Promise<'in' | 'refused' | 'waiting' | 'range' | 'no'> {
     const headers: Record<string, string> = {};
     if (this.ip) headers['x-forwarded-for'] = this.ip;
     if (this.origin) headers.origin = this.origin;
@@ -54,6 +58,7 @@ class Conn {
       if (this.got.some((m) => m.t === 'welcome')) return 'in';
       if (this.got.some((m) => m.t === 'kick')) return 'refused';
       if (this.got.some((m) => m.t === 'queue')) return 'waiting';
+      if (this.got.some((m) => m.t === 'range')) return 'range';
       await sleep(50);
     }
     return 'no';
@@ -67,6 +72,29 @@ class Conn {
   }
   say(x = 20, z = 0) {
     if (this.ws.readyState === 1) this.ws.send(JSON.stringify({ t: 's', p: [x, heightAt(world.heights, x, z), z, 0, 0, 8], w: null, m: [], n: Math.round(performance.now()) }));
+  }
+  /**
+   * Plays the range it has been dealt, as somebody honest does (test/range-player.ts), in real time over the wire.
+   * @param browser what its browser says of itself @returns whether it was welcomed into the world
+   */
+  async shoot(browser: { wd: boolean; gl: string } = { wd: false, gl: 'ANGLE (NVIDIA, NVIDIA GeForce RTX 3070 Ti Direct3D11)' }): Promise<boolean> {
+    const dealt = [...this.got].reverse().find((m) => m.t === 'range') as { seed: number; turn: number; go: number } | undefined;
+    if (!dealt) return false;
+    const spec = rangeOf(dealt.seed, dealt.turn), g = dealt.go, send = (m: unknown) => this.ws.readyState === 1 && this.ws.send(JSON.stringify(m));
+    send({ t: 'renv', ...browser });
+    send({ t: 'rgo', g });
+    const t0 = Date.now(), r3 = (v: number) => +v.toFixed(4);
+    await playRange(spec, {
+      seen: (ms, x, z, yaw, pitch) => send({ t: 'r', p: [r3(x), r3(z), r3(yaw), r3(pitch)], n: ms, g }),
+      shot: (ms, o, d) => send({ t: 'rs', o, d, n: ms, g }),
+      down: () => new Set(this.got.flatMap((m) => (m.t === 'rhit' ? [m.i] : []))),
+      done: () => this.closed || this.got.some((m) => m.t === 'rpass' || m.t === 'welcome' || m.t === 'kick'),
+      until: async (ms) => {
+        await sleep(Math.max(0, t0 + ms - Date.now()));
+      },
+    });
+    for (let k = 0; k < 40 && !this.closed && !this.got.some((m) => m.t === 'welcome' || m.t === 'kick'); k++) await sleep(50);
+    return this.got.some((m) => m.t === 'welcome');
   }
   /** says where it is for a while, as a game does */
   async play(ms: number, x = 20, z = 0) {
@@ -223,6 +251,45 @@ try {
     assert.equal(await leaper.hello(), 'refused', 'somebody put out twice in an hour was let straight back in');
     assert.match(leaper.why(), /kept off/);
     ok('enforcing, somebody the checks have flagged so many times is put out; twice in an hour, and they are kept off');
+  }
+
+  // ---- the bot check: nobody in the world until its range is shot
+  const E = 8166;
+  const e = await server(E, { BOTCHECK: 'on' });
+  {
+    const health = async () => (await e.health()) as unknown as { players: number; botcheck: boolean; ranges: { dealt: number; passed: number; on: number } };
+    assert.equal((await health()).botcheck, true);
+    // (what the programs of 2026-10-12 did: say hello, and stand there)
+    const idle = new Conn(E, 'JoinsAndStands', '8.8.8.1');
+    assert.equal(await idle.hello(), 'range', 'somebody was let in, or turned away, without being dealt a range');
+    await sleep(2500);
+    let h = await health();
+    assert.deepEqual([h.players, h.ranges.on], [0, 1], `somebody on the range is in the world: ${JSON.stringify(h)}`);
+    assert.ok(!idle.got.some((m) => m.t === 'welcome'), 'somebody who shot nothing was welcomed');
+    idle.leave();
+    // somebody who plays it
+    const ann = new Conn(E, 'Ann', '8.8.8.2');
+    assert.equal(await ann.hello(), 'range');
+    assert.ok(await ann.shoot(), `somebody who played the range honestly was not let in: ${ann.why()}\n${e.log().slice(-500)}`);
+    await ann.play(400);
+    h = await health();
+    assert.equal(h.players, 1);
+    assert.equal(h.ranges.passed, 1);
+    ann.leave();
+    await sleep(400);
+    // (and is not asked again, coming back from the same place)
+    assert.equal(await ann.hello(), 'in', 'somebody who had passed was dealt the range again');
+    ann.leave();
+    // the same shooting, in a browser that says a program is driving it
+    const driven = new Conn(E, 'Driven', '8.8.8.3');
+    assert.equal(await driven.hello(), 'range');
+    assert.ok(!(await driven.shoot({ wd: true, gl: 'ANGLE (NVIDIA, NVIDIA GeForce RTX 3070 Ti Direct3D11)' })), 'a browser driven by a program was let in');
+    assert.match(driven.why(), /driven by a program/);
+    // and one that draws with no graphics card, as a browser on a rented server does
+    const blind = new Conn(E, 'Blind', '8.8.8.4');
+    assert.equal(await blind.hello(), 'range');
+    assert.ok(!(await blind.shoot({ wd: false, gl: 'ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero)), SwiftShader driver)' })), 'a browser with no graphics card was let in');
+    ok('the bot check: nobody in the world until its range is shot; who shoots it is in, and not asked again; not a browser a program drives');
   }
 
   // ---- where the check that somebody is a person is set up (the one asked is a stand-in here, and says yes to one slip)

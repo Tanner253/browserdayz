@@ -429,6 +429,12 @@ export class InventoryUI {
   render() {
     const inv = this.inv;
     const r = this.root;
+    // (Everything here is made afresh each time anything changes, and what is made afresh is scrolled to its top:
+    // the list of what lies about went back to its first thing every time one of them was taken. 2026-10-12:
+    // "the scroll view resets and scrolls to the top on the vicinity side when interacting with loot". How far
+    // each part that scrolls was scrolled is kept, and given back to the part made in its place.)
+    const scrolls = '.inv-col, .inv-ground';
+    const was = [...r.querySelectorAll<HTMLElement>(scrolls)].map((e) => [e.scrollTop, e.scrollLeft]);
     r.innerHTML = '';
     this.clocks.clear();
     this.hover = null;
@@ -536,6 +542,11 @@ export class InventoryUI {
     wrap.append(vic, gear, cargo);
     r.appendChild(wrap);
     r.appendChild(this.hotEl());
+    [...r.querySelectorAll<HTMLElement>(scrolls)].forEach((e, i) => {
+      if (!was[i]) return;
+      e.scrollTop = was[i][0];
+      e.scrollLeft = was[i][1];
+    });
     r.appendChild(this.hoverOutline);
     if (this.menu) r.appendChild(this.menu);
   }

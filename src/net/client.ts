@@ -264,6 +264,8 @@ export class Net {
           this.onQueue(m.pos, m.of, m.max);
           return;
         }
+        // (on the bot check's range: the welcome comes when it is passed, however long that takes)
+        if (m.t === 'range') clearTimeout(timer);
         if (m.t === 'kick') {
           this.kicked = m.reason;
           this.kickedV = m.v;

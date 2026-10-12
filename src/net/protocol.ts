@@ -14,7 +14,7 @@ import type { DropInfo } from '../sim/drops';
 import type { VehicleInfo, VState } from '../sim/vehicles';
 import type { IState, InfectedInfo } from '../sim/infected';
 
-export const PROTOCOL = 31;
+export const PROTOCOL = 32;
 
 /** chat channels: everyone on the server, or only players standing near the speaker */
 export type ChatChannel = 'global' | 'near';
@@ -186,7 +186,19 @@ export type C2S =
   | { t: 'ihit'; i: number; zone: HitZone; w: string; dist: number; sup: boolean; bonus: number; n?: number }
   /** one of them that this game moves has brought its arms down on this player */
   | { t: 'iatk'; i: number; to: number }
-  | { t: 'ping'; n: number };
+  | { t: 'ping'; n: number }
+  /**
+   * On the bot check's range, before being let in (src/sim/range.ts): where the player stands and looks (the
+   * range's own x and z, the turn and the tilt), and a shot fired (from where, and along what); `n` is how long
+   * since the range was dealt, by the game's own count, in thousandths of a second; `g` is which go at it this
+   * is of (what was said of the go before, and comes late, is not taken for this one's).
+   */
+  | { t: 'r'; p: [number, number, number, number]; n: number; g: number }
+  | { t: 'rs'; o: [number, number, number]; d: [number, number, number]; n: number; g: number }
+  /** on the range: it is built and the figures stand on it; the go's clock starts now (said once a go, and not waited for long) */
+  | { t: 'rgo'; g: number }
+  /** on the range: what the browser says of itself: whether a program is driving it, and what it draws with */
+  | { t: 'renv'; wd: boolean; gl: string };
 
 export type S2C =
   | {
@@ -309,6 +321,14 @@ export type S2C =
   /** a blow of one's was stopped by the guard of the player it was thrown at */
   | { t: 'iblk'; i: number; to: number }
   | { t: 'pong'; n: number }
+  /**
+   * The bot check: a range is dealt (its number and the trying its dealing ended at are all of it: src/sim/range.ts
+   * `rangeOf`), `go` is which go at it this is. Nobody is in the world until it is passed.
+   */
+  | { t: 'range'; seed: number; turn: number; go: number }
+  /** on the range: the server has counted this figure down; and the range is passed (the welcome follows) */
+  | { t: 'rhit'; i: number }
+  | { t: 'rpass' }
   /** something the server has to say to this player alone (what became of a tag they cashed in) */
   | { t: 'tell'; text: string; kind: 'good' | 'warn' | 'info' }
   /** what this player may do on the server: nothing out of the way (null), keep order (mod), or everything (admin) */
