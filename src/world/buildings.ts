@@ -9,7 +9,7 @@ import type RAPIER from '@dimforge/rapier3d-compat';
 import { assets } from '../core/assets';
 import { physics, AJAR_GROUPS, BODY_QUERY, GLASS_GROUPS, WORLD_GROUPS, type Surface } from '../core/physics';
 import { RNG } from '../core/noise';
-import type { Atmosphere } from './atmosphere';
+import { SHADOW_FRUSTA, type Atmosphere } from './atmosphere';
 import { GAS, gasDepth, gasZone } from '../sim/gas';
 import type { Tier } from '../sim/tiers';
 import { BUILDING_FOOTPRINT, CELL, TOWN, WORLD_RES, WORLD_SIZE, bunkerPlace, heightAt, idx, type BuildingPlot, type Instance, type SiteKind, type World } from './worldgen';
@@ -2773,6 +2773,37 @@ export class Buildings {
       mesh.name = `building:${key}`;
       mesh.renderOrder = key === 'glass' ? 2 : WALLS_FIRST;
       group.add(mesh);
+    }
+    // One shape for the sun's shadow maps (2026-10-12). Every wall, floor and roof of the map is one mesh for each
+    // paint, forty-odd of them, and a shadow map takes no notice of paint: each was a thing to draw again in every
+    // shadow map, ninety draws a frame for what one draw says. The same triangles, as one mesh that is drawn only
+    // into the shadow maps (one for each way a paint's faces are turned for a shadow); the painted ones cast
+    // nothing of their own. A paint with holes in it (none today) would go on casting for itself.
+    {
+      const casters = new Map<string, { side: THREE.Side; shadowSide: THREE.Side | null; shapes: THREE.BufferGeometry[]; of: THREE.Mesh[] }>();
+      for (const mesh of group.children as THREE.Mesh[]) {
+        const mat = mesh.material as THREE.Material;
+        if (!mesh.castShadow || mat.transparent || mat.alphaTest > 0) continue;
+        const k = `${mat.side}|${mat.shadowSide}`;
+        if (!casters.has(k)) casters.set(k, { side: mat.side, shadowSide: mat.shadowSide, shapes: [], of: [] });
+        const c = casters.get(k)!;
+        c.shapes.push(new THREE.BufferGeometry().setAttribute('position', mesh.geometry.getAttribute('position')));
+        c.of.push(mesh);
+      }
+      for (const c of casters.values()) {
+        const shape = c.shapes.length > 1 ? mergeGeometries(c.shapes, false) : c.shapes[0];
+        if (!shape) continue;
+        const caster = new THREE.Mesh(shape, new THREE.MeshBasicMaterial({ side: c.side, shadowSide: c.shadowSide }));
+        caster.castShadow = true;
+        caster.receiveShadow = false;
+        // (in the shadow maps and not in the view: three asks this of every pass it draws)
+        caster.frustumCulled = true;
+        caster.intersectsFrustum = (f) => SHADOW_FRUSTA.has(f);
+        caster.matrixAutoUpdate = false;
+        caster.name = 'buildings shadow';
+        group.add(caster);
+        for (const m of c.of) m.castShadow = false;
+      }
     }
     scene.add(group);
 
