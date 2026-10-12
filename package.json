@@ -8,7 +8,7 @@
     "server": "tsx server/index.ts",
     "dev:server": "tsx watch server/index.ts",
     "build": "tsc --noEmit && tsc -p tsconfig.server.json && tsc -p tsconfig.api.json && vite build",
-    "start": "tsx server/index.ts",
+    "start": "node --import tsx server/index.ts",
     "preview": "vite preview",
     "assets": "node scripts/fetch-assets.mjs",
     "icons": "node scripts/icons.mjs",

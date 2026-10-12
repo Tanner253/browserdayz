@@ -5,7 +5,8 @@
 //     with why;
 //   - the new one lets nobody in, and reads nothing, for as long as the old one is the one being reached, however
 //     long that is (forty seconds here: it used to give up after thirty-five and open with nothing kept);
-//   - told to stop, the old one says so to whoever is on and writes its last word;
+//   - when the address is handed over, the old one sees for itself that it has been replaced: without being told
+//     to stop (the host tells it a whole minute later) it says so to whoever is on, writes its last word and goes;
 //   - the new one then has everybody as they were at that last word, not as they were when the old one last
 //     happened to write.
 // Two real game servers on this machine, a stand-in for the site (the real api/admin and api/keep over a store that
@@ -125,7 +126,7 @@ function start(port: number, commit: string) {
     env: {
       ...process.env, PORT: String(port), SITE_URL: `http://127.0.0.1:${SITE}`, DATA_DIR: dir, INFECTED: 'off', CHECKS: 'watch', LINGER_S: '0',
       // (it writes when somebody first comes in and when it is told to stop, and at no other time: as on the host, near enough)
-      KEEP: 'on', KEEP_EVERY_MIN: '600', KEEP_WAIT_S: '3', OTHER_URL: `http://127.0.0.1:${PUB}`, STOP_BY_WORD: '1',
+      KEEP: 'on', KEEP_EVERY_MIN: '600', KEEP_WAIT_S: '3', OTHER_URL: `http://127.0.0.1:${PUB}`, STOP_BY_WORD: '1', REPLACED_EVERY_MS: '1000',
       WATCH_URL: `http://127.0.0.1:${GIT}`, WATCH_MINE: commit, RESTART_WATCH_S: '2', RESTART_ABOUT_S: '40',
     },
     stdio: ['pipe', 'pipe', 'pipe'],
@@ -189,19 +190,19 @@ try {
   checks++;
   console.log('  ok  for as long as the old server is the one being reached, the new one lets nobody in and decides nothing');
 
-  // ---- she plays to the last moment; the address is handed over, and the old server is told to stop
+  // ---- she plays to the last moment; the address is handed over. Nobody tells the old server to stop (the host
+  // does that a minute later): it sees that another server answers where it was reached, and goes by itself
   ann.send(me(33, 3));
   await sleep(400);
   const before = ann.got.filter((m) => m.t === 'restart').length;
   reached = B;
-  old.server.stdin!.write('stop\n');
-  for (let k = 0; k < 150 && old.server.exitCode === null; k++) await sleep(100);
-  assert.notEqual(old.server.exitCode, null, 'the old server did not stop when told to');
+  for (let k = 0; k < 200 && old.server.exitCode === null; k++) await sleep(100);
+  assert.notEqual(old.server.exitCode, null, `the old server did not go when it had been replaced:\n${old.log.slice(-500)}`);
   assert.ok(ann.got.filter((m) => m.t === 'restart').length > before && ann.last('restart')!.in === 0, 'whoever was on was not told the server was stopping');
-  assert.ok(/this server is stopping: \d+ characters .*\(the last word\)/.test(old.log), `the old server did not say its last word:\n${old.log.slice(-500)}`);
+  assert.ok(/another server has taken over: \d+ characters .*\(the last word\)/.test(old.log), `the old server did not say its last word:\n${old.log.slice(-500)}`);
   assert.ok(kept()?.final, 'the site does not hold a last word');
   checks++;
-  console.log('  ok  told to stop, the old server says so to whoever is on, and writes its last word');
+  console.log('  ok  replaced, the old server sees it for itself: it says so to whoever is on, writes its last word and goes');
 
   // ---- the new server reads that, and everybody is as they were at the last moment
   assert.ok(await waiting, `whoever was waiting was never let in:\n${young.log.slice(-700)}`);
@@ -211,8 +212,9 @@ try {
   assert.equal(w.me?.vitals.health, 33, `she is not as she was at the last moment (health ${w.me?.vitals.health}: 64 is the first writing, 41 and 37 are from before it stopped)`);
   assert.equal(JSON.stringify(w.me?.inv).split('handover-test-tin-').length - 1, 3, 'she has not what she carried at the last moment');
   assert.ok(Math.hypot(w.spawn.x - at[0], w.spawn.z - at[1]) < 0.5, 'she is not where she stood');
-  const h = (await (await fetch(`http://127.0.0.1:${PUB}/healthz`)).json()) as { boot?: string; why?: string };
+  const h = (await (await fetch(`http://127.0.0.1:${PUB}/healthz`)).json()) as { boot?: string; why?: string; kept?: string };
   assert.ok(typeof h.boot === 'string' && h.boot.length >= 8, 'the server does not say who it is');
+  assert.ok(/^1 characters and 0 stashes as they were kept/.test(h.kept ?? ''), `the server does not say what became of what was kept: ${h.kept}`);
   checks++;
   console.log('  ok  the new server has everybody as they were when the old one stopped, not as they were when it last happened to write');
 } catch (e) {
