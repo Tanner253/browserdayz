@@ -116,10 +116,11 @@ const MATS: Record<Exclude<MatKey, 'glass'>, { tex: string; tile: number; color?
   // (For the faces of the two big buildings, 2026-10-12: "the new buildings need more character ... everything is
   // too plain". What a public building of that country and those years was painted, on the plaster there is.)
   // a hospital's: pale yellow gone dull
-  // (on bare plaster: on the mossy one, which is dark and green, it came out the colour of a ditch)
-  hosp_ext: { tex: 'grey_plaster_02', tile: 3.2, color: 0xecd9a0, surface: 'plaster' },
+  // (on the plain painted plaster: the mossy one is dark and green, and it came out the colour of a ditch; the
+  // bare grey one is stained in great patches, and a wall of it painted yellow was spotted like a hide)
+  hosp_ext: { tex: 'painted_plaster_wall', tile: 3.2, color: 0xfff0b4, surface: 'plaster' },
   // a police station's: ochre
-  ochre_ext: { tex: 'grey_plaster_02', tile: 3.2, color: 0xdfae62, surface: 'plaster' },
+  ochre_ext: { tex: 'painted_plaster_wall', tile: 3.2, color: 0xf6bb62, surface: 'plaster' },
   // what stands proud of such a wall, painted white once: bands, the surrounds of windows, pilasters
   trim_white: { tex: 'painted_plaster_wall', tile: 2.2, color: 0xe7e2d2, surface: 'plaster' },
   // the foot of the wall: rendered and painted grey
@@ -141,8 +142,9 @@ const MATS: Record<Exclude<MatKey, 'glass'>, { tex: string; tile: number; color?
   brick_rough: { tex: 'rough_plaster_brick_02', tile: 2.8, surface: 'concrete' },
   // plaster: bare, and distempered yellow or green
   plaster_grey: { tex: 'grey_plaster_02', tile: 3, surface: 'plaster' },
-  plaster_yellow: { tex: 'grey_plaster_02', tile: 3, color: 0xe6d49c, surface: 'plaster' },
-  plaster_green: { tex: 'grey_plaster_02', tile: 3, color: 0xb7c9ad, surface: 'plaster' },
+  // (the two painted ones on the plain plaster: the bare one's stains show through paint as spots)
+  plaster_yellow: { tex: 'painted_plaster_wall', tile: 3, color: 0xf6e3a4, surface: 'plaster' },
+  plaster_green: { tex: 'painted_plaster_wall', tile: 3, color: 0xc3d8b8, surface: 'plaster' },
   // boards: painted, as a village's houses are
   planks_green: { tex: 'weathered_plank_siding', tile: 2.4, color: 0x9fb592, surface: 'wood' },
   planks_blue: { tex: 'weathered_plank_siding', tile: 2.4, color: 0x9db3c4, surface: 'wood' },
@@ -1535,7 +1537,9 @@ export class Buildings {
    */
   private planYards() {
     const H = this.world.heights, village = this.world.pois[0], UP = new THREE.Vector3(0, 1, 0), ONE = new THREE.Vector3(1, 1, 1);
-    const TOP = 0.62, tile = this.tile('planks');
+    // (to the knee: a jump clears 0.73 m from level ground, and a yard's ground is seldom level. At 0.62 it was
+    // not cleared from ground that fell away a hand's breadth before it.)
+    const TOP = 0.5, tile = this.tile('planks');
     const roads = [this.world.road, ...this.world.roads];
     const offRoad = (x: number, z: number) => {
       let best = 1e9;
@@ -1590,7 +1594,7 @@ export class Buildings {
           const turn = plot.rot + Math.atan2(-dz, dx);
           const F = new THREE.Matrix4().compose(new THREE.Vector3(sx, Math.min(ya, yb) - 0.04, sz), new THREE.Quaternion().setFromAxisAngle(UP, turn), ONE);
           for (const px of [0, L]) this.push('planks', boxGeo(px - 0.035, px + 0.035, 0, TOP + 0.1, -0.035, 0.035, tile, F));
-          for (const [y0, y1] of [[0.16, 0.27], [0.34, 0.45], [0.52, TOP + 0.04]]) this.push('planks', boxGeo(0.02, L - 0.02, y0, y1, 0.036, 0.058, tile, F));
+          for (const [y0, y1] of [[0.1, 0.2], [0.26, 0.36], [0.42, TOP + 0.04]]) this.push('planks', boxGeo(0.02, L - 0.02, y0, y1, 0.036, 0.058, tile, F));
           this.collider(L / 2, (TOP + 0.04) / 2, 0.045, F.clone().multiply(new THREE.Matrix4().makeTranslation(L / 2, (TOP + 0.04) / 2, 0.01)), 'wood');
         }
       }
