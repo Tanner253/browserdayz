@@ -524,7 +524,15 @@ function moveCheck(c: Client, to: Pose, now: number): boolean {
   if (k.high > CHECK.high[1]) {
     k.high = 0;
     flag(c, `is ${(to[1] - world.groundAt(to[0], to[2])).toFixed(0)} m over the ground at ${to[0].toFixed(0)}, ${to[2].toFixed(0)}`, false);
-  }
+    // (Once is a fall off the highest thing there is. Three times running, twelve seconds and more held thirty
+    // metres up with nothing under them, is nothing anybody playing does: enforcing, they are put off.)
+    if (++k.hovered >= 3 && CHECKS === 'enforce') {
+      k.hovered = 0;
+      TURNED.hover++;
+      putOff(c, 'they were held in the air, far over the ground, for twelve seconds and more');
+      return false;
+    }
+  } else if (!k.high) k.hovered = 0;
   if (dist <= allow + CHECK.grace) {
     k.at = now;
     k.carry = Math.min(most * CHECK.carry, Math.max(0, allow - dist));
@@ -603,6 +611,29 @@ const LOGOUT_MS = (process.env.LOGOUT_S === undefined ? 60 : Math.max(0, Number(
 const LOGOUT_STIR = 1.5, BLEED_S = 42;
 
 const away = (c: Client, now = Date.now()) => c.asleep > 0 || now - c.heardAt > SILENT_MS;
+/** a life new to the world leaves no body behind if its connection goes this soon; and a connection whose game has said nothing of where it is by this long after it was let in is not a game, and goes (ms) */
+const FRESH_MS = (Number(process.env.FRESH_S) || 60) * 1000;
+const NEVER_SPOKE_MS = (Number(process.env.NEVER_SPOKE_S) || 60) * 1000;
+/** how many are in the world and awake: a body left behind is not somebody playing */
+const awake = () => {
+  let n = 0;
+  for (const c of clients.values()) if (!c.asleep) n++;
+  return n;
+};
+/** what has been turned away, for /healthz: by what */
+const TURNED = { address: 0, flood: 0, origin: 0, silent: 0, hover: 0 };
+/** when each connection lately said hello, by where it came from: see `flooding` */
+const hellos = new Map<string, number[]>();
+/** More hellos from one address in a minute than anybody playing sends (a game says it once, and again when its line drops). */
+function flooding(ip: string): boolean {
+  if (!publicIp(ip)) return false;
+  const now = Date.now(), times = (hellos.get(ip) ?? []).filter((t) => now - t < 60_000);
+  times.push(now);
+  hellos.set(ip, times);
+  if (hellos.size > 5000) for (const [k, v] of hellos) if (!v.some((t) => now - t < 60_000)) hellos.delete(k);
+  return times.length > HELLOS_A_MINUTE;
+}
+const HELLOS_A_MINUTE = Number(process.env.HELLOS_A_MINUTE) || 20;
 /** what worn things do to a hit: every plate and helmet they were last seen in (as their own game reckons it: Game.takeHit) */
 const worn = (c: Client, k: 'armor' | 'head') => Object.values(c.inv?.slots ?? {}).flatMap((it) => (it && ITEMS[it.id]?.wear?.[k] !== undefined ? [ITEMS[it.id].wear![k] as number] : []));
 
@@ -626,6 +657,14 @@ function keeping(now: number) {
     if (c.asleep && now - c.asleep >= LINGER_MS) {
       log(`${c.name}'s body has been left ${Math.round(LINGER_MS / 1000)} s: it goes, with what it carried`);
       drop(c);
+      continue;
+    }
+    if (!c.spoke && !c.asleep && now - c.since > NEVER_SPOKE_MS) {
+      log(`${c.name} (#${c.id}) has said nothing of where they are in ${Math.round(NEVER_SPOKE_MS / 1000)} s: not a game, and gone`);
+      TURNED.silent++;
+      send(c, { t: 'kick', reason: 'Your game did not start in time. Press Play again.' });
+      drop(c);
+      c.ws.close();
       continue;
     }
     if (c.logoutAt && now >= c.logoutAt && !c.asleep) {
@@ -660,6 +699,11 @@ function stayOn(c: Client, why: string) {
 function gone(c: Client) {
   if (!clients.has(c.id)) return;
   if (!c.alive || !LINGER_MS) return void drop(c);
+  // (A body is left by somebody who was playing. A connection whose game never said where it stood, or one new to
+  // the world that went within its first minute, was nobody to leave one: 2026-10-12, connections made by a
+  // program came and went by the dozen, and each left a body for five minutes that held a place on the server
+  // and stood in everybody's way.)
+  if (!c.spoke || (!c.resumed && Date.now() - c.since < FRESH_MS)) return void drop(c);
   c.asleep = Date.now();
   c.logoutAt = 0;
   releaseLock(c);
@@ -788,7 +832,12 @@ function adminBan(key: string, ip: string): boolean {
 const PER_ADDRESS = process.env.PER_ADDRESS === undefined ? 1 : Math.max(0, Number(process.env.PER_ADDRESS) || 0);
 function addressFull(key: string, ip: string): boolean {
   if (!PER_ADDRESS || !publicIp(ip) || !ipsTellApart() || ADMIN.state.roles[keyHash(key)]) return false;
-  return [...clients.values()].filter((o) => o.ip === ip && o.key !== key && !roleOf(o)).length >= PER_ADDRESS;
+  // (Not counted: a body left behind by a connection that has gone. It was, for the five minutes it lies there:
+  // and whoever came back in another browser, on another device, or with a browser that had forgotten who they
+  // were, was told somebody was already playing from their connection, with one window open. 2026-10-12: "people
+  // swear they only have 1 window open but then get blocked". A tag off such a body is still not paid to
+  // somebody at its own address: see notEarned.)
+  return [...clients.values()].filter((o) => o.ip === ip && o.key !== key && !roleOf(o) && !o.asleep).length >= PER_ADDRESS;
 }
 /** Something asked of the site: it is told a number, and asks this server back what the number stands for (see /adminop below). */
 async function siteAdmin(op: Record<string, unknown>): Promise<{ ok?: boolean; why?: string; state?: AdminState; pepper?: string; set?: boolean } | null> {
@@ -1735,6 +1784,10 @@ interface Client {
   pose: Pose;
   /** when their game said that was so, by its own clock (ms) */
   n?: number;
+  /** when they came in; whether their game has yet said where they are; whether they came back into a life they had */
+  since: number;
+  spoke: boolean;
+  resumed: boolean;
   w: string | null;
   m: string[];
   g: string[];
@@ -1791,7 +1844,7 @@ interface Client {
    * often a check has fired on them, when that was last written down, and when it last refused them.
    */
   check: {
-    at: number; carry: number; free: number; high: number; flags: number; said: number; refused: number[];
+    at: number; carry: number; free: number; high: number; hovered: number; flags: number; said: number; refused: number[];
     /** the most health they can have (see `dealt`), when that was reckoned, and since when it has been less than none (0: it is not) */
     hp: number; hpAt: number; downAt: number;
     /** things they have said they carry that the server never put in the world: each written down once */
@@ -2173,6 +2226,7 @@ function handle(c: Client, m: C2S) {
         if (c.alive && c.vitals) send(c, { t: 'hp', health: c.vitals.health, bleeding: !!c.vitals.bleeding });
       }
       c.heardAt = Date.now();
+      c.spoke = true;
       if (c.logoutAt && Math.hypot(m.p[0] - c.logoutFrom[0], m.p[2] - c.logoutFrom[1]) > LOGOUT_STIR) stayOn(c, 'you moved');
       c.pose = moveCheck(c, m.p, Date.now()) ? m.p : [was[0], was[1], was[2], m.p[3], m.p[4], m.p[5]];
       // (dead here is dead in what is passed on, whatever their own game had heard when it sent this)
@@ -2772,10 +2826,16 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
     return null;
   }
   if (addressFull(key, ipOf.get(ws) ?? '')) {
+    TURNED.address++;
     log(`${cleanName(m.name)} is not let in: ${PER_ADDRESS} already playing from their address`);
     ws.send(JSON.stringify({ t: 'kick', reason: PER_ADDRESS === 1 ? 'Somebody is already playing from your connection: one player to a connection.' : `There are already ${PER_ADDRESS} playing from your connection.` } satisfies S2C));
     ws.close();
     return null;
+  }
+  // (and never more in the world than twice the places there are: the bodies longest left go first, as they were)
+  for (const o of [...clients.values()].filter((x) => x.asleep).sort((a, b) => a.asleep - b.asleep)) {
+    if (clients.size < MAX_PLAYERS * 2) break;
+    drop(o);
   }
   // the same character can only be in the world once
   for (const o of clients.values()) {
@@ -2795,11 +2855,14 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
   const sp = resume && !under && !resume.afresh ? { x: resume.pose[0], y: resume.pose[1], z: resume.pose[2], yaw: resume.pose[3] } : pickSpawn();
   const c: Client = {
     ws, id: nextId++, key, name: cleanName(m.name),
-    pose: [sp.x, 'y' in sp && sp.y !== undefined ? sp.y : world.groundAt(sp.x, sp.z), sp.z, sp.yaw, 0, 0],
+    // (on the ground, until their own game says otherwise: with no word of the ground they were drawn by everybody
+    // else as somebody in the air, arms out, for as long as their game took to start, or for good if it never did)
+    pose: [sp.x, 'y' in sp && sp.y !== undefined ? sp.y : world.groundAt(sp.x, sp.z), sp.z, sp.yaw, 0, F_GROUND],
     w: null, m: [], g: [], b: [], alive: true, power: { god: false, hidden: false, clip: false, voidInv: false, voidTag: false },
     heardAt: Date.now(), kept: false, asleep: 0, bled: 0, logoutAt: 0, logoutFrom: [0, 0],
+    since: Date.now(), spoke: false, resumed: !!resume,
     inv: resume?.inv ?? null, vitals: resume?.vitals ?? null,
-    outAt: 0, underAt: 0, lastHit: 0, lastVHit: 0, seatAt: 0, lastNade: 0, nadeHits: 0, blasts: [], lastEmote: 0, lastChat: 0, lastHitBy: null, openCid: null, check: { at: Date.now(), carry: 0, free: Date.now() + CHECK.free, high: 0, flags: 0, said: 0, refused: [], hp: Math.min(100, resume?.vitals?.health ?? 100), hpAt: Date.now(), downAt: 0, unknown: new Set() }, activeAt: Date.now(), joinedAt: Date.now(), ip: ipOf.get(ws) ?? '', lifeAt: Date.now(), msgCount: 0, msgWindow: Date.now(),
+    outAt: 0, underAt: 0, lastHit: 0, lastVHit: 0, seatAt: 0, lastNade: 0, nadeHits: 0, blasts: [], lastEmote: 0, lastChat: 0, lastHitBy: null, openCid: null, check: { at: Date.now(), carry: 0, free: Date.now() + CHECK.free, high: 0, hovered: 0, flags: 0, said: 0, refused: [], hp: Math.min(100, resume?.vitals?.health ?? 100), hpAt: Date.now(), downAt: 0, unknown: new Set() }, activeAt: Date.now(), joinedAt: Date.now(), ip: ipOf.get(ws) ?? '', lifeAt: Date.now(), msgCount: 0, msgWindow: Date.now(),
   };
   records.delete(key);
   KEPT.chars.delete(keyHash(key));
@@ -2962,7 +3025,8 @@ function mustWait(m: Extract<C2S, { t: 'hello' }>) {
   if (m.v !== PROTOCOL) return false; // join() turns them away itself
   const key = keyOf(m);
   if (key && [...clients.values()].some((o) => o.key === key)) return false;
-  return clients.size >= MAX_PLAYERS || queue.length > 0 || !KEPT.ready;
+  // (a body left behind does not hold a place: eleven of them and eleven players were a server of twenty-four all but full)
+  return awake() >= MAX_PLAYERS || queue.length > 0 || !KEPT.ready;
 }
 
 /** when the line was last told where it stands */
@@ -3011,7 +3075,7 @@ function leaveQueue(ws: WebSocket) {
 /** somebody has left: the next in line comes in */
 function fillFromQueue() {
   let moved = false;
-  while (KEPT.ready && clients.size < MAX_PLAYERS && queue.length) {
+  while (KEPT.ready && awake() < MAX_PLAYERS && queue.length) {
     const w = queue.shift()!;
     moved = true;
     if (w.ws.readyState !== 1) continue;
@@ -3256,7 +3320,7 @@ function serve(req: http.IncomingMessage, res: http.ServerResponse) {
     // readable from a client hosted somewhere else (e.g. Vercel) for the start-screen player count
     res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'no-store' });
     // (places: how many different addresses the players come from. One, with several players on, means the host is not passing addresses through.)
-    res.end(JSON.stringify({ ok: true, boot: BOOT, protocol: PROTOCOL, why: RESTART.why, kept: KEPT.how, players: [...clients.values()].filter((c) => !c.asleep).length, asleep: [...clients.values()].filter((c) => c.asleep).length, max: MAX_PLAYERS, queue: queue.length, uptime: Math.round(process.uptime()), checks: CHECKS, flagged, keptOff: BANS.temp.size, loot: economy.loot.size, places: new Set([...clients.values()].map((c) => c.ip)).size }));
+    res.end(JSON.stringify({ ok: true, boot: BOOT, protocol: PROTOCOL, why: RESTART.why, kept: KEPT.how, players: [...clients.values()].filter((c) => !c.asleep).length, asleep: [...clients.values()].filter((c) => c.asleep).length, max: MAX_PLAYERS, queue: queue.length, uptime: Math.round(process.uptime()), checks: CHECKS, flagged, keptOff: BANS.temp.size, loot: economy.loot.size, places: new Set([...clients.values()].map((c) => c.ip)).size, unspoken: [...clients.values()].filter((c) => !c.spoke && !c.asleep).length, turned: TURNED }));
     return;
   }
   // the changelog page asks here for its hearts and comments, and gives them (see `news`)
@@ -3320,6 +3384,48 @@ function serve(req: http.IncomingMessage, res: http.ServerResponse) {
   createReadStream(file).pipe(res);
 }
 
+/**
+ * Whose page a connection is asked for from. A browser says, of every such connection, which page asked for it;
+ * a program written to open connections by the dozen mostly says nothing, or something else. It can be made to
+ * say anything, so this stops only what has not bothered: which, 2026-10-12, was worth stopping. Asked on the
+ * host (Render) or wherever ORIGINS is set (hosts, comma between; "off" for never); a development machine and
+ * the tests are let alone.
+ */
+const ORIGINS = (() => {
+  const set = process.env.ORIGINS ?? '';
+  if (set === 'off' || (!set && !process.env.RENDER)) return null;
+  const hosts = new Set<string>(['localhost', '127.0.0.1']);
+  const add = (u: string) => {
+    try {
+      const h = new URL(u.includes('://') ? u : `https://${u}`).hostname.toLowerCase();
+      hosts.add(h);
+      // (with and without the three letters before it)
+      hosts.add(h.startsWith('www.') ? h.slice(4) : `www.${h}`);
+    } catch {
+      /* not an address */
+    }
+  };
+  add(SITE_URL);
+  // (and the game's own name, whatever the site is set to be here)
+  add('https://www.zonapvp.fun');
+  if (process.env.RENDER_EXTERNAL_URL) add(process.env.RENDER_EXTERNAL_URL);
+  if (process.env.OTHER_URL) add(process.env.OTHER_URL);
+  for (const h of set.split(',').map((x) => x.trim()).filter(Boolean)) add(h);
+  return hosts;
+})();
+function fromOurPage(req: http.IncomingMessage): boolean {
+  if (!ORIGINS) return true;
+  const said = String(req.headers.origin ?? '');
+  let host = '';
+  try {
+    host = new URL(said).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  // (the site's own trial copies, before they are the site)
+  return ORIGINS.has(host) || /^dayz-web-slice[\w-]*\.vercel\.app$/.test(host);
+}
+
 const wss = new WebSocketServer({ noServer: true, maxPayload: 256 * 1024 });
 server.on('upgrade', (req, socket, head) => {
   let wanted = '';
@@ -3329,6 +3435,12 @@ server.on('upgrade', (req, socket, head) => {
     /* not an address at all */
   }
   if (wanted !== '/ws') {
+    socket.destroy();
+    return;
+  }
+  if (!fromOurPage(req)) {
+    TURNED.origin++;
+    if (TURNED.origin < 20 || TURNED.origin % 100 === 0) log(`a connection asked for from ${String(req.headers.origin ?? 'no page at all').slice(0, 80)} is not taken (${TURNED.origin} so far)`);
     socket.destroy();
     return;
   }
@@ -3355,6 +3467,12 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
     if (!m || typeof m !== 'object' || typeof m.t !== 'string') return;
     if (!c) {
       if (m.t !== 'hello' || waiting) return;
+      if (m.v === PROTOCOL && flooding(ipOf.get(ws) ?? '')) {
+        TURNED.flood++;
+        ws.send(JSON.stringify({ t: 'kick', reason: 'Too many tries from your connection in a minute. Wait a little and press Play again.' } satisfies S2C));
+        ws.close();
+        return;
+      }
       if (mustWait(m)) {
         waiting = !!enqueue(ws, m, (client) => {
           waiting = false;
