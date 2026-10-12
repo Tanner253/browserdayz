@@ -123,7 +123,7 @@ interface TimedAction {
 }
 
 /** bump when the map's loot points change: spawned loot from older saves is re-rolled */
-const LOOT_REV = 19;
+const LOOT_REV = 20;
 /** where a jeep's headlamps are on it: so far either side of its middle, so far over its middle, so far forward (it is 2.08 m to its nose) */
 const HEADLAMP = { x: 0.5, y: 0.14, z: -2.12 };
 /** and the police car's: wider apart, lower, and further forward (it is 2.58 m to its nose) */
