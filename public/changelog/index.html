@@ -151,8 +151,28 @@
         </div>
       </section>
 
-      <article class="entry" id="hospital-hq-streets">
+      <article class="entry" id="no-long-stops">
         <div class="when"><time datetime="2026-10-12">12 Oct 2026</time><span class="tag">Latest</span></div>
+        <div>
+          <h2>The long stops are gone, and nobody jumps about</h2>
+          <p class="lead">Nothing looks different. The game no longer stands still when a lamp is first lit or night falls, and other players are drawn where they were when they moved, not where the news of it happened to find them.</p>
+          <div class="media">
+            <figure class="wide"><img loading="lazy" src="/changelog/media/no-freezes.jpg" alt="A board of figures, the longest stop before and after: your own lamp switched on for the first time, 4.6 seconds to 0.1; nightfall, 4.0 seconds to 0.05; a whole kit put on at once, 1.1 seconds to 0.33; opening the map the first time, 0.28 seconds to under 0.06; a runner on a bad line stood still in 13 frames of 100 and now in 0.5" /><figcaption><b>Measured on one laptop,</b> the same scripted session before and after: an RTX 3070 Ti with 8 GB. Yours will differ.</figcaption></figure>
+          </div>
+          <ul>
+            <li><b>Lighting a lamp no longer stops the game.</b> The first time your own light went on, or the street lamps at dusk, everything in sight that had arrived since the game loaded was made over for lamplight in that one frame: 4.6 seconds on our test laptop with a jeep and three bodies in view. It is made ready ahead now, a little at a time: 0.1 of a second.</li>
+            <li><b>Other players run, they do not jump.</b> Each report of where somebody is carries the time it was true, and they are drawn by that. Before, a report held up on the way, or waited for behind a slow frame, was a runner who stopped dead and then leapt. Watching a runner over a connection made to behave like one across an ocean: stood still in 13 frames of 100 before, 1 in 200 now.</li>
+            <li><b>The first jeep, the first of the infected and the first player you meet</b> are made ready before they are shown.</li>
+            <li><b>The map opens at once.</b> Its sheet is drawn while you play, not in the frame you first press M.</li>
+            <li><b>Putting gear on</b> no longer draws the figure in your inventory inside a frame. A whole kit put on at once was a stop of 1.1 seconds; it is a third of one.</li>
+            <li>The server is in one place, the west of the United States. From far off, what you see of others is a little later than it is for somebody near; it is no longer uneven.</li>
+            <li class="fix">A player who died could be seen standing again over their own body, looking about, until they pressed Respawn. They lie down, and stay down.</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="entry" id="hospital-hq-streets">
+        <div class="when"><time datetime="2026-10-12">12 Oct 2026</time></div>
         <div>
           <h2>A hospital, a headquarters, and streets in the village</h2>
           <p class="lead">Kamenka has a district hospital and Zelenaya Dolina a police headquarters: two big buildings of several parts, each with more than one way up and more than one way out. The village is laid out on streets, with thirteen more buildings on them and a fenced yard behind each house.</p>
