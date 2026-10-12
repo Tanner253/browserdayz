@@ -500,8 +500,20 @@ function flag(c: Client, what: string, refuse = true): boolean {
     c.check.said = now;
     log(`[check:${CHECKS}] ${c.name} ${what} (${c.check.flags} so far)`);
   }
+  // (2026-10-12: "if a user gets flagged by the enforce check 50 times they should be kicked from the server".
+  // When whatever was being done with them is done: this is called from the middle of it.)
+  if (CHECKS === 'enforce' && c.check.flags === FLAGS_OUT) {
+    setImmediate(() => {
+      if (!clients.has(c.id)) return;
+      TURNED.flags++;
+      log(`[check] ${c.name} (#${c.id}) has been flagged ${FLAGS_OUT} times (the last: ${what}): put out`);
+      eject(c, 'The checks of this server flagged what your game was doing too many times, and put you out. Press Play to come back in.');
+    });
+  }
   return refuse && CHECKS === 'enforce';
 }
+/** enforcing, somebody the checks have flagged this many times since they came in is put out of the server (FLAGS_OUT) */
+const FLAGS_OUT = Number(process.env.FLAGS_OUT) || 50;
 
 /**
  * Whether the place a player says they have got to is one they could have got to since they were last where
@@ -621,7 +633,7 @@ const awake = () => {
   return n;
 };
 /** what has been turned away, for /healthz: by what */
-const TURNED = { address: 0, flood: 0, origin: 0, silent: 0, hover: 0 };
+const TURNED = { address: 0, flood: 0, origin: 0, silent: 0, hover: 0, flags: 0, banned: 0 };
 /** when each connection lately said hello, by where it came from: see `flooding` */
 const hellos = new Map<string, number[]>();
 /** More hellos from one address in a minute than anybody playing sends (a game says it once, and again when its line drops). */
@@ -1302,6 +1314,37 @@ function eject(target: Client, reason: string) {
   drop(target);
 }
 /**
+ * Everybody a ban or a time off the server now covers is put out, there and then: by their game or by their
+ * address, playing, lying where their connection left them, or waiting in line. (2026-10-12: "when I ban people
+ * in game the ip and server ban should take effect instantly not at server restart". The one named was put out;
+ * anybody else at their address, a second game of theirs already in the world, the body they had left a minute
+ * before, stayed until they next tried to come in.)
+ * @returns the names of those put out
+ */
+function sweepKeptOff(but?: Client): string[] {
+  const out: string[] = [];
+  for (const o of [...clients.values()]) {
+    if (o === but || !clients.has(o.id)) continue;
+    const why = bannedFor(o.key, o.ip);
+    if (!why) continue;
+    out.push(o.name);
+    TURNED.banned++;
+    eject(o, why === 'banned' ? 'You are banned from this server.' : 'You are kept off this server for now.');
+  }
+  for (const w of [...queue]) {
+    if (!bannedFor(w.key, ipOf.get(w.ws) ?? '')) continue;
+    out.push(cleanName(w.hello.name));
+    TURNED.banned++;
+    try {
+      w.ws.send(JSON.stringify({ t: 'kick', reason: 'You are banned from this server.' } satisfies S2C));
+    } catch {
+      /* gone already */
+    }
+    w.ws.close();
+  }
+  return out;
+}
+/**
  * An order typed where talk is typed. @returns nothing: whoever gave it is told what came of it.
  * Mods: players, recent, flagged, kick, timeout, say. Admins: those, and ban, unban, bans, admin, mod, demote, roles.
  */
@@ -1428,7 +1471,8 @@ async function command(c: Client, line: string) {
       for (const n of namesOf(t.key, t.ip)) BANS.temp.set(n, { until: Date.now() + mins * 60000, why: `timed out by ${c.name}${reason ? `: ${reason}` : ''}` });
       log(`[admin] ${c.name} timed ${t.name} out for ${mins} minutes${reason ? `: ${reason}` : ''}`);
       eject(t, `You are kept off the server for ${mins} minutes${reason ? `: ${reason}` : '.'}`);
-      return void sys(c, `${t.name} is off the server for ${mins} minutes.`);
+      const more = sweepKeptOff(c);
+      return void sys(c, `${t.name} is off the server for ${mins} minutes.${more.length ? ` Put out with them, from the same address: ${more.join(', ')}.` : ''}`);
     }
     case 'ban': {
       if (!admin) return need();
@@ -1441,8 +1485,11 @@ async function command(c: Client, line: string) {
       const next: AdminState = { roles: ADMIN.state.roles, bans: [...ADMIN.state.bans.filter((b) => b.key !== key), { key, ip, name, why, by: c.name, at: new Date().toISOString() }] };
       log(`[admin] ${c.name} banned ${name}${why ? `: ${why}` : ''}${ip ? '' : ' (by key only: no address is known)'}`);
       if (t) eject(t, 'You are banned from this server.');
-      const kept = await saveAdmin(next);
-      return void sys(c, `${name} is banned${ip ? ', by their game and by their address' : ' (by their game only: the address could not be told)'}.${kept ? '' : ' It could NOT be written to the site: it holds until this server restarts. Give the order again in a minute.'}`);
+      // (it holds from this line on: see saveAdmin. And whoever else it covers goes now.)
+      const saving = saveAdmin(next);
+      const more = sweepKeptOff(c);
+      const kept = await saving;
+      return void sys(c, `${name} is banned${ip ? ', by their game and by their address' : ' (by their game only: the address could not be told)'}, from now.${more.length ? ` Put out with them: ${more.join(', ')}.` : ''}${kept ? '' : ' It could NOT be written to the site: it holds until this server restarts. Give the order again in a minute.'}`);
     }
     case 'bans':
       if (!admin) return need();

@@ -97,10 +97,10 @@ class Player {
   }
 }
 
-async function withServer(play: (log: () => string) => Promise<void>) {
+async function withServer(play: (log: () => string) => Promise<void>, more: Record<string, string> = {}) {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'zona-admin-'));
   const server: ChildProcess = spawn(process.execPath, [path.join('node_modules', 'tsx', 'dist', 'cli.mjs'), 'server/index.ts'], {
-    env: { ...process.env, PORT: String(PORT), SITE_URL: `http://127.0.0.1:${SITE}`, DATA_DIR: dir, INFECTED: 'off', LINGER_S: '0', CHECKS: 'watch' },
+    env: { ...process.env, PORT: String(PORT), SITE_URL: `http://127.0.0.1:${SITE}`, DATA_DIR: dir, INFECTED: 'off', LINGER_S: '0', CHECKS: 'watch', ...more },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let logged = '';
@@ -187,7 +187,21 @@ await withServer(async (log) => {
   assert.match(await ann.order('/bans'), /1\. Bob/);
   checks++;
   console.log('  ok  a timeout keeps somebody off for its minutes; a ban puts them off, keeps them off, and is written to the site');
-});
+
+  // ---- a ban is of an address too, and bites there and then: whoever else is on from it goes with the one named
+  const gus = new Player('Gus', '203.0.113.200'), hob = new Player('Hob', '203.0.113.200');
+  assert.ok(await gus.join());
+  assert.ok(await hob.join());
+  assert.match(await ann.order('/ban Gus two of them'), /Gus is banned[\s\S]*from now[\s\S]*Put out with them: Hob/);
+  await sleep(300);
+  assert.match(gus.kicked ?? '', /banned/);
+  assert.match(hob.kicked ?? '', /banned/, 'somebody else at a banned address was left in the world');
+  assert.ok(!(await hob.join()), 'somebody at a banned address was let back in');
+  assert.match(await ann.order('/unban Gus'), /no longer banned/);
+  checks++;
+  console.log('  ok  a ban puts out, at once, everybody on from the address it is of');
+  // (two to an address here, for that: the rule of one is tried further down, on a server that has it)
+}, { PER_ADDRESS: '2' });
 
 // ---- the server restarts, and forgets nothing of it
 await withServer(async () => {

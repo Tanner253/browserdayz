@@ -183,6 +183,25 @@ try {
     assert.equal((await b.health()).turned.origin, 2);
     ok('a connection not asked for by the game\'s own page is not taken');
   }
+
+  // ---- enforcing: flagged so many times, and out
+  const C = 8163;
+  const c = await server(C, { CHECKS: 'enforce', FLAGS_OUT: '5' });
+  {
+    const leaper = new Conn(C, 'Leaper', '8.8.6.1');
+    assert.equal(await leaper.hello(), 'in');
+    await leaper.play(3200);
+    // (across the map in one step, said eight times: each is refused and written down)
+    for (let k = 0; k < 8 && !leaper.closed; k++) {
+      leaper.say(320, 0);
+      await sleep(120);
+    }
+    await sleep(400);
+    assert.ok(leaper.closed, `somebody flagged five times and more was left in:\n${c.log().slice(-400)}`);
+    assert.match(leaper.why(), /flagged what your game was doing too many times/);
+    assert.equal((await c.health()).turned.flags, 1);
+    ok('enforcing, somebody the checks have flagged so many times is put out');
+  }
 } catch (e) {
   failed = e;
 } finally {
