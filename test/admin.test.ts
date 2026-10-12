@@ -348,6 +348,29 @@ await withServer(async () => {
   assert.match(await ann.order(`/inv #${late.id}`), /Gus carries/);
   checks++;
   console.log('  ok  what is said to everybody reaches everybody; a private word reaches one; two orders at once are two orders');
+
+  // ---- taken out of the world by an admin: a thing on the ground; and a restart said to everybody
+  const at = ann.got.filter((m) => m.t === 'welcome').pop() as unknown as { spawn: { x: number; z: number } };
+  // (she has been about: she says where she stands, and puts it down there)
+  ann.send({ t: 's', p: [at.spawn.x, 0, at.spawn.z, 0, 0, 0], w: null, m: [] });
+  await sleep(200);
+  ann.send({ t: 'drop', l: { item: { uid: 'admin-test-tin', id: 'beans', qty: 1 }, x: at.spawn.x, y: 0, z: at.spawn.z, rot: 0 } });
+  await sleep(300);
+  assert.ok(late.got.some((m) => m.t === 'loot+' && m.l.uid === 'admin-test-tin'), 'a thing put down does not lie there');
+  assert.match(await late.order('/del item admin-test-tin'), /not a thing you can do/, 'somebody with no role took a thing out of the world');
+  assert.ok(!late.got.some((m) => m.t === 'loot-' && m.uid === 'admin-test-tin'), 'somebody with no role took a thing out of the world');
+  assert.match(await ann.order('/del item admin-test-tin'), /Taken away: /);
+  await sleep(300);
+  assert.ok(late.got.some((m) => m.t === 'loot-' && m.uid === 'admin-test-tin'), 'a thing an admin took away still lies there for everybody else');
+  assert.match(await ann.order('/del item admin-test-tin'), /Nothing of that number/);
+  assert.match(await ann.order('/del box no-such-box'), /No body, drop or buried stash/);
+  assert.match(await ann.order('/del'), /Take away what/);
+  assert.match(await ann.order('/restart 45 update: buildings'), /restarts in 45 s \(update: buildings\)/);
+  await sleep(300);
+  const said = late.got.filter((m) => m.t === 'restart').pop() as { why: string; in: number } | undefined;
+  assert.ok(said && said.why === 'update: buildings' && said.in === 45, 'a restart an admin warned of was not said to everybody');
+  checks++;
+  console.log('  ok  an admin takes a thing out of the world, and nobody else does; a restart warned of is said to everybody, with why');
 });
 
 site.close();

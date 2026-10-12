@@ -2301,6 +2301,28 @@ export class Game {
   /** what the server last said of everybody, for an admin's map: who has a role, whose body was left behind (by their number) */
   private mapKnown = new Map<number, { x: number; z: number; name: string; alive: boolean; role: 'admin' | 'mod' | null; asleep: boolean }>();
   private mapWasOpen = false;
+  /**
+   * An admin's Delete key: whatever the middle of the view is on is taken out of the world, by the order that does
+   * it (`/del`), which says back what was taken. From the eyes, or from the free camera, as far as a hundred and
+   * twenty metres. A thing on the ground, a body, a supply drop, a place where something is buried, a car, one of
+   * the infected. Not a player (they are kicked, from the panel), and not the map itself: its buildings, its trees
+   * and its crates are the same in every game and are not anybody's to take away.
+   */
+  private deleteLooked() {
+    const cam = this.s.r.camera, dir = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
+    const hit = physics.raycast(cam.position, dir, 120, SHOT_GROUPS, this.freecam ? undefined : this.player.collider);
+    // (what the hands could reach is what is meant, when the eye is on something that small)
+    const o = (!this.freecam && (this.focus instanceof WorldItem || this.focus instanceof Stash) ? this.focus : null) ?? hit?.tag?.owner;
+    let line = '';
+    if (o instanceof WorldItem) line = `/del item ${o.loot.uid}`;
+    else if (o instanceof Stash) line = o.fixed && !o.corpse ? '' : `/del box ${o.uid}`;
+    else if (o instanceof Jeep) line = `/del car ${o.i}`;
+    else if (o instanceof Infected) line = `/del z ${o.i}`;
+    else if (o instanceof RemotePlayer) return void this.hud.note(`That is ${o.name}: a player is kicked from the panel, not taken away`, 'warn');
+    if (!line) return void this.hud.note('Nothing there to take away: a thing on the ground, a body, a drop, a buried stash, a car or one of the infected', 'info');
+    this.order(line);
+  }
+
   /** whoever the free camera is kept with as they go: their number, and where they last were */
   private watching: { id: number; last: THREE.Vector3 } | null = null;
 
@@ -4007,6 +4029,7 @@ export class Game {
       if (this.role === 'admin' && playing && !this.invUI.isOpen && !this.shop.isOpen && !this.map.open && !this.adminUI.isOpen) {
         if (input.pressed('KeyN')) this.order('/noclip');
         if (input.pressed('KeyK')) this.toggleFreecam();
+        if (input.pressed('Delete')) this.deleteLooked();
       }
     }
     if (this.adminUI.isOpen && (!this.started || this.paused)) this.toggleAdmin(false);
