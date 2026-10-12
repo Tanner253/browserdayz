@@ -461,10 +461,10 @@ const D: ItemDef[] = [
     desc: 'Stamped steel on a ball chain. Every survivor carries their own. Take one off a body and stay alive with it for 10 minutes to cash it in.',
   },
   // ---------------------------------------------------------------- base building
-  { id: 'stash_kit', name: 'Stash Case', model: 'weapons_case', w: 4, h: 3, weight: 6, category: 'stash', scale: 0.55, stash: [8, 6], desc: 'A hard case you can put down anywhere: drop it, and it stands where it lands. It stays in the world and keeps whatever you store in it. Out in the country, a shovel buries it.' },
+  { id: 'stash_kit', name: 'Stash Case', model: 'weapons_case', w: 4, h: 3, weight: 6, category: 'stash', scale: 0.55, stash: [8, 6], desc: 'A hard case. Dropped, it lies where it lands and can be opened there: it stays in the world and keeps whatever you store in it. Out in the country, a shovel buries it.' },
   // (two more things to keep things in, 2026-10-12: smaller than the case, lighter, and found in houses)
-  { id: 'old_suitcase', name: 'Suitcase', model: 'vintage_suitcase', w: 4, h: 3, weight: 3, category: 'stash', scale: 0.3, place: 0.5, stash: [6, 5], desc: 'An old travelling case. Drop it anywhere and it stands where it lands, and keeps what you store in it. Out in the country, a shovel buries it.' },
-  { id: 'black_bag', name: 'Black Bag', model: 'trashbag', w: 2, h: 3, weight: 0.3, category: 'stash', scale: 0.5, stash: [5, 4], desc: 'A heavy black sack. Drop it anywhere and it stays where it lands, and keeps what you store in it. Out in the country, a shovel buries it.' },
+  { id: 'old_suitcase', name: 'Suitcase', model: 'vintage_suitcase', w: 4, h: 3, weight: 3, category: 'stash', scale: 0.3, place: 0.5, stash: [6, 5], desc: 'An old travelling case. Dropped, it lies where it lands and can be opened there: it keeps what you store in it. Out in the country, a shovel buries it.' },
+  { id: 'black_bag', name: 'Black Bag', model: 'trashbag', w: 2, h: 3, weight: 0.3, category: 'stash', scale: 0.5, stash: [5, 4], desc: 'A heavy black sack. Dropped, it lies where it lands and can be opened there: it keeps what you store in it. Out in the country, a shovel buries it.' },
 ];
 
 export const ITEMS: Record<string, ItemDef> = Object.fromEntries(D.map((d) => [d.id, d]));

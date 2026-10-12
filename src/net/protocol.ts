@@ -14,7 +14,7 @@ import type { DropInfo } from '../sim/drops';
 import type { VehicleInfo, VState } from '../sim/vehicles';
 import type { IState, InfectedInfo } from '../sim/infected';
 
-export const PROTOCOL = 29;
+export const PROTOCOL = 30;
 
 /** chat channels: everyone on the server, or only players standing near the speaker */
 export type ChatChannel = 'global' | 'near';
@@ -147,8 +147,6 @@ export type C2S =
   | { t: 'cset'; cid: string; items: StoredItem[] }
   | { t: 'cclose'; cid: string }
   /** a stash put down, with whatever was in it while it was carried */
-  | { t: 'stash+'; s: StashInfo; items?: StoredItem[] }
-  | { t: 'stash-'; uid: string }
   /** a shovel put to a stash: it is buried, or dug up */
   | { t: 'bury'; uid: string; on: boolean }
   | { t: 'door'; i: number; open: boolean; swing: number }
@@ -249,7 +247,6 @@ export type S2C =
   /** a stash has been buried, or dug up */
   | { t: 'stash~'; uid: string; buried: boolean }
   /** the stash this player asked to pick up is theirs to carry: what it was, and what is in it */
-  | { t: 'stashgot'; uid: string; item: string; items: StoredItem[] }
   /** said to everybody by an admin or a mod: across the screen, and in the chat */
   | { t: 'announce'; text: string; by: string }
   /** said to this player alone by an admin or a mod */

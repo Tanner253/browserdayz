@@ -131,6 +131,8 @@ interface Bullet {
   weapon: string;
   /** someone else's bullet: flies and lands for show, the shooter's own game decides what it hit */
   ghost?: boolean;
+  /** whose it is, when it is somebody else's: it does not land on the body it came out of */
+  from?: unknown;
 }
 
 const _toCam = new THREE.Vector3();
@@ -271,6 +273,8 @@ const SMG_CARRY = {
   pistol: { p: [0.2, -0.06, -0.2] as [number, number, number], r: [1.25, 0, 0] as [number, number, number], free: true },
   smg: { p: [0.2, -0.2, -0.22] as [number, number, number], r: [1.2, 0, 0] as [number, number, number], free: true },
 };
+/** a stroke of the spade when something is being buried or dug up, seconds */
+const DIG_STROKE = 1.15;
 /** how far back a pistol's slide stays when it has run dry, metres */
 const SLIDE_LOCK = 0.03;
 
@@ -2496,6 +2500,27 @@ export class Weapons {
     if (this.held && !this.held.ending) this.held.ending = 1e-4;
   }
 
+  /**
+   * Digging: a stroke of the spade, and the next when that one is done, for as long as this is called every frame.
+   * It is the movement a thing is hit with, driven down at the ground in front of the feet, and hits nobody.
+   * @returns true when a new stroke has just begun
+   */
+  dig(): boolean {
+    if (this.action) return false;
+    this.start('swing', DIG_STROKE, undefined, { hit: 1, dmg: 0, range: 0, stroke: 0, dig: 1 });
+    this.onSwing(DIG_STROKE);
+    return true;
+  }
+  /** how far through a stroke of the spade the hands are (0 when they are not digging) */
+  get digStroke(): number {
+    const a = this.action;
+    return a?.name === 'swing' && a.data?.dig ? Math.min(1, a.t / a.dur) : 0;
+  }
+  /** the digging has stopped, done or broken off: the stroke in hand with it */
+  endDig() {
+    if (this.action?.name === 'swing' && this.action.data?.dig) this.action = null;
+  }
+
   private swing(melee: NonNullable<(typeof ITEMS)[string]['melee']>, camera: THREE.PerspectiveCamera) {
     this.fireCooldown = melee.rate;
     this.player.vitals.stamina = Math.max(0, this.player.vitals.stamina - 6);
@@ -2586,17 +2611,21 @@ export class Weapons {
    * Another player fired: their bullet flies in this world too, so you see and hear where it lands.
    * @param from the end of the barrel on the body that fired, and which way it points, where that body is seen
    */
-  remoteShot(origin: THREE.Vector3, dir: THREE.Vector3, weaponId: string, suppressed: boolean, from?: { pos: THREE.Vector3; dir: THREE.Vector3 } | null) {
+  remoteShot(origin: THREE.Vector3, dir: THREE.Vector3, weaponId: string, suppressed: boolean, from?: { pos: THREE.Vector3; dir: THREE.Vector3 } | null, shooter?: unknown) {
     const kind = ITEMS[weaponId]?.weapon?.kind;
     if (!kind) return;
     const b = shotOf(weaponId);
     // The shot is reported from the shooter's eye, which in this world is inside their own
-    // head hit zone: the bullet starts a forearm's length out, or it would land on them.
+    // head hit zone: the bullet starts a forearm's length out, or it would land on them. (And it is known whose
+    // it is, and passes through that body wherever it meets it: a forearm's length was not always enough. The
+    // body is drawn a moment behind where its player is, so whoever fired stepping back, or leaning, or down at
+    // their own feet, was hit by their own shot in everybody else's game: the blood was on them, and none on
+    // whoever they had hit. "blood splatter is rendering at the player who is inflicting damage", 2026-10-12.)
     const out = dir.clone().normalize();
     for (let k = 0; k < b.pellets; k++) {
       const d = out.clone();
       if (b.cone) d.add(new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(b.cone)).normalize();
-      this.bullets.push({ pos: origin.clone().addScaledVector(out, 0.35), vel: d.multiplyScalar(b.muzzleVel), drag: b.drag, damage: 0, v0: b.muzzleVel, life: 4, travelled: 0.35, weapon: weaponId, ghost: true });
+      this.bullets.push({ pos: origin.clone().addScaledVector(out, 0.35), vel: d.multiplyScalar(b.muzzleVel), drag: b.drag, damage: 0, v0: b.muzzleVel, life: 4, travelled: 0.35, weapon: weaponId, ghost: true, from: shooter });
     }
     const d = this.mainCam ? origin.distanceTo(this.mainCam.position) : 0;
     // The flash is at the end of their barrel. (It was put three fifths of a metre out from
@@ -2725,7 +2754,17 @@ export class Weapons {
         const len = step.length();
         const dir = step.clone().divideScalar(len);
         // other players' bullets pass through nothing special: they stop on the world and on bodies alike
-        const hit = physics.raycast(b.pos, dir, len, SHOT_GROUPS, b.ghost ? undefined : this.player.collider);
+        let hit = physics.raycast(b.pos, dir, len, SHOT_GROUPS, b.ghost ? undefined : this.player.collider);
+        // (somebody else's, and what it met is the body it came out of: on through it)
+        for (let past = 0, k = 0; hit && b.from && hit.tag?.owner === b.from && k < 6; k++) {
+          past = hit.toi + 0.04;
+          if (past >= len) {
+            hit = null;
+            break;
+          }
+          const next = physics.raycast(b.pos.clone().addScaledVector(dir, past), dir, len - past, SHOT_GROUPS);
+          hit = next ? { ...next, toi: next.toi + past } : null;
+        }
         if (hit) {
           const pt = new THREE.Vector3(hit.point.x, hit.point.y, hit.point.z);
           const n = new THREE.Vector3(hit.normal.x, hit.normal.y, hit.normal.z);
@@ -2951,6 +2990,16 @@ export class Weapons {
           const pull = THREE.MathUtils.smoothstep(a.t, 1.8, 1.92) * (1 - THREE.MathUtils.smoothstep(a.t, 1.98, 2.08));
           m.charging.position.x = -pull * 0.085;
         }
+      } else if (a.name === 'swing' && a.data?.dig) {
+        // the spade: lifted a little, driven down into the ground ahead of the feet, levered back, and brought up
+        // with what it holds
+        const lift = THREE.MathUtils.smoothstep(k, 0, 0.14);
+        const drive = THREE.MathUtils.smoothstep(k, 0.14, 0.32);
+        const lever = THREE.MathUtils.smoothstep(k, 0.38, 0.62);
+        const up = THREE.MathUtils.smoothstep(k, 0.66, 1);
+        rot.x += (lift * 0.25 - drive * 1.25 + lever * 0.55) * (1 - up);
+        rot.y += (drive * 0.12 - lever * 0.3) * (1 - up);
+        pos.add(new THREE.Vector3(0.02 * drive - 0.05 * lever, 0.07 * lift - 0.2 * drive + 0.11 * lever, -0.1 * drive + 0.05 * lever).multiplyScalar(1 - up));
       } else if (a.name === 'swing') {
         const wind = THREE.MathUtils.smoothstep(k, 0, 0.3);
         const strike = THREE.MathUtils.smoothstep(k, 0.3, 0.5);

@@ -295,7 +295,16 @@ export interface WorldLoot {
   rot: number;
   point: number; // loot point index, -1 for player-dropped
   spawnedAt: number;
+  /**
+   * A case, a suitcase or a bag somebody dropped: when (milliseconds since 1970). It is not cleared away as other
+   * dropped things are, after an hour: it lies for a week if it is empty and a fortnight if anything is in it
+   * (`CONTAINER_LIFE`), and the server keeps it between its restarts with what is in it.
+   */
+  keptAt?: number;
 }
+
+/** how long a dropped container lies before it is cleared away, milliseconds: empty, and with anything in it */
+export const CONTAINER_LIFE = { empty: 7 * 86400_000, full: 14 * 86400_000 };
 
 export interface EconomyEvents {
   spawn(l: WorldLoot): void;
@@ -485,9 +494,13 @@ export class Economy {
     return l;
   }
 
+  /** how long a dropped container lies (the server's may be set otherwise: see STASH_EMPTY_S and STASH_FULL_S there) */
+  containerLife = { ...CONTAINER_LIFE };
+
   /** Player dropped an item into the world. */
   drop(item: ItemInstance, x: number, y: number, z: number, rot: number) {
     const l: WorldLoot = { uid: item.uid, item, x, y, z, rot, point: -1, spawnedAt: this.time };
+    if (ITEMS[item.id]?.category === 'stash') l.keptAt = Date.now();
     this.loot.set(l.uid, l);
     this.events.spawn(l);
     return l;
@@ -497,7 +510,13 @@ export class Economy {
   tick(dt: number, players: { x: number; z: number }[]) {
     this.time += dt;
     const near = (l: WorldLoot) => players.some((p) => Math.hypot(l.x - p.x, l.z - p.z) < 60);
+    const now = Date.now();
     for (const l of [...this.loot.values()]) {
+      // (a container somebody dropped goes by the calendar, and not by how long this game has been running)
+      if (l.keptAt !== undefined) {
+        if (now - l.keptAt > (l.item.cargo?.length ? this.containerLife.full : this.containerLife.empty) && !near(l)) this.take(l.uid);
+        continue;
+      }
       const rule = TYPES[l.item.id];
       const life = rule ? rule.lifetime : 3600;
       if (this.time - l.spawnedAt > life && !near(l)) this.take(l.uid);

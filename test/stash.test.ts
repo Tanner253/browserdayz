@@ -1,8 +1,10 @@
-// Stashes put down, buried and dug up (server/index.ts 'stash+', 'stash-', 'bury'; src/sim/stash.ts): the case,
-// the suitcase and the black bag are stashes, each as big inside as it is, and a backpack is not; a shovel buries
-// one and anybody's shovel digs it up, as often as wanted; nothing is opened or picked up from under the ground;
-// nothing is buried in a town, in a building or beside one; and a stash is picked up with what is in it, by one
-// player and no more. The real server on a port of its own. About twenty seconds.
+// A case, a suitcase or a bag is a thing like any other (server/index.ts 'drop', 'take', 'bury'; src/sim/stash.ts;
+// src/sim/economy.ts `keptAt`): dropped, it lies on the ground with what is in it and is taken again as anything is,
+// by one player and no more; nothing is "put down" or "packed up". A shovel buries one that lies on the ground, and
+// anybody's shovel digs it up, as often as wanted: it lies there again with what was in it. Nothing is taken or
+// opened from under the ground; nothing is buried in a town, in a building or beside one; nothing but a case, a
+// suitcase or a bag is buried at all. Left lying, an empty one is cleared away after its time, one with things in it
+// later, a buried one never. The real server on a port of its own. About fifty seconds.
 //   npx tsx test/stash.test.ts
 
 import assert from 'node:assert/strict';
@@ -93,93 +95,107 @@ try {
   bob.say(wx - 1, wz);
   await sleep(200);
 
-  // ---- a black bag put down is a stash; a rifle is not, and neither is a backpack
-  const pack = { uid: 'stash-test-bag', x: wx, y: ground(wx, wz), z: wz, rot: 0.3, item: 'black_bag' };
-  const tin = { uid: 'stash-test-tin', id: 'beans', qty: 1, x: 1, y: 0, rot: false };
-  ann.send({ t: 'stash+', s: pack });
-  await sleep(300);
-  assert.equal(bob.last('stash+')?.s.item, 'black_bag', 'a bag put down is not said to be one');
-  bob.send({ t: 'copen', cid: pack.uid });
-  await sleep(300);
-  assert.deepEqual(bob.last('cdata')?.items, [], 'a stash put down was not empty');
-  bob.send({ t: 'cset', cid: pack.uid, items: [tin] });
-  bob.send({ t: 'cclose', cid: pack.uid });
-  for (const item of ['ak', 'suitcase', 'no_such_thing']) ann.send({ t: 'stash+', s: { ...pack, uid: `stash-test-not-${item}`, item } });
-  await sleep(300);
-  assert.equal(bob.count('stash+'), 1, 'a rifle or a backpack was put down as a stash');
-  checks++;
-  console.log('  ok  a black bag put down is a stash, and keeps what is put in it; a rifle or a backpack is not one');
+  type Lying = Extract<S2C, { t: 'loot+' }>['l'];
+  const lying = (p: Player, uid: string) => p.got.filter((m): m is Extract<S2C, { t: 'loot+' }> => m.t === 'loot+').map((m) => m.l).filter((l: Lying) => l.uid === uid).pop();
+  const gone = (p: Player, uid: string) => p.got.filter((m) => m.t === 'loot-' && m.uid === uid).length;
+  const under = (p: Player, uid: string) => p.got.filter((m) => m.t === 'stash+' && m.s.uid === uid).length;
+  const up = (p: Player, uid: string) => p.got.filter((m) => m.t === 'stash-' && m.uid === uid).length;
+  const tin = { uid: 'stash-test-tin', id: 'beans', qty: 1 };
+  const bag = { uid: 'stash-test-bag', id: 'black_bag', qty: 1, cargo: [{ item: tin, x: 1, y: 0, rot: false }] };
+  const at = (item: unknown, dx = 0, x = wx, z = wz) => ({ item, x: x + dx, y: ground(x + dx, z), z, rot: 0.3 });
 
-  // ---- buried with a shovel, and only with one; then nothing is opened or picked up
-  ann.send({ t: 'bury', uid: pack.uid, on: true });
+  // ---- a black bag dropped lies on the ground like anything else, with what is in it; nothing is "put down"
+  ann.send({ t: 'drop', l: at(bag) });
   await sleep(300);
-  assert.equal(bob.count('stash~'), 0, 'something was buried with bare hands');
+  const seen = lying(bob, bag.uid);
+  assert.ok(seen && seen.item.id === 'black_bag', 'a bag dropped does not lie on the ground as a bag');
+  assert.ok(seen.item.cargo?.length === 1 && seen.item.cargo[0].item.id === 'beans' && seen.item.cargo[0].x === 1, 'a bag dropped does not have in it what it was carried with');
+  ann.send({ t: 'stash+', s: { uid: 'stash-test-placed', x: wx, y: ground(wx, wz), z: wz, rot: 0 } });
+  ann.send({ t: 'stash-', uid: bag.uid });
+  await sleep(300);
+  assert.equal(bob.count('stash+') + bob.count('stash-'), 0, 'a stash can still be put down, or packed up, by saying so');
+  assert.equal(gone(bob, bag.uid), 0, 'the bag went from the ground without being taken');
+  checks++;
+  console.log('  ok  a bag dropped lies on the ground as a bag, with what is in it; nothing is put down or packed up by saying so');
+
+  // ---- buried with a shovel, and only with one; and nothing but a case, a suitcase or a bag
+  ann.send({ t: 'bury', uid: bag.uid, on: true });
+  await sleep(300);
+  assert.equal(under(bob, bag.uid), 0, 'something was buried with bare hands');
   ann.say(wx + 1, wz, 'shovel');
   await sleep(200);
-  ann.send({ t: 'bury', uid: pack.uid, on: true });
+  ann.send({ t: 'drop', l: at({ uid: 'stash-test-loose-tin', id: 'beans', qty: 1 }, 0.6) });
+  await sleep(200);
+  ann.send({ t: 'bury', uid: 'stash-test-loose-tin', on: true });
   await sleep(300);
-  assert.equal(bob.last('stash~')?.buried, true, 'a stash was not buried by somebody with a shovel beside it');
-  assert.equal(ann.last('stash~')?.buried, true, 'whoever buried it was not told it was');
-  const opened = bob.count('cdata');
-  bob.send({ t: 'copen', cid: pack.uid });
-  bob.send({ t: 'stash-', uid: pack.uid });
+  assert.equal(under(bob, 'stash-test-loose-tin'), 0, 'a tin of beans was buried as a stash');
+  ann.send({ t: 'bury', uid: bag.uid, on: true });
+  await sleep(300);
+  for (const p of [ann, bob]) {
+    const s = p.got.filter((m): m is Extract<S2C, { t: 'stash+' }> => m.t === 'stash+' && m.s.uid === bag.uid).pop()?.s;
+    assert.ok(s?.buried && s.item === 'black_bag' && Math.abs(s.x - wx) < 0.01, `${p.name} was not told the bag is under the ground there`);
+    assert.equal(gone(p, bag.uid), 1, `${p.name} still sees the bag lying on the ground`);
+  }
+  // (under the ground it is not taken, and not opened)
+  const opened = bob.count('cdata'), refused = bob.count('denied');
+  bob.send({ t: 'take', uid: bag.uid });
+  bob.send({ t: 'copen', cid: bag.uid });
   await sleep(300);
   assert.equal(bob.count('cdata'), opened, 'a stash was opened from under the ground');
-  assert.equal(bob.count('stashgot'), 0, 'a stash was picked up from under the ground');
+  assert.equal(bob.count('denied'), refused + 1, 'a stash was taken from under the ground');
   const late = new Player('Cat');
   assert.ok(await late.join());
-  assert.ok(late.last('welcome')!.stashes.some((s) => s.uid === pack.uid && s.buried && s.item === 'black_bag'), 'somebody who came in later is not shown that it is buried');
+  const w = late.last('welcome')!;
+  assert.ok(w.stashes.some((s) => s.uid === bag.uid && s.buried && s.item === 'black_bag'), 'somebody who came in later is not shown where it is buried');
+  assert.ok(!w.loot.some((l) => l.uid === bag.uid), 'somebody who came in later is shown it lying on the ground as well');
   checks++;
-  console.log('  ok  a shovel buries a stash and bare hands do not; buried, it is neither opened nor picked up');
+  console.log('  ok  a shovel buries a bag that lies on the ground, bare hands do not, and a tin is not buried; under the ground it is neither taken nor opened');
 
-  // ---- anybody with a shovel digs it up; and it is buried and dug up as often as wanted
+  // ---- anybody with a shovel digs it up, and it lies there again with what was in it; as often as wanted
   bob.say(wx - 1, wz, 'shovel');
   await sleep(200);
-  for (const on of [false, true, false]) {
-    bob.send({ t: 'bury', uid: pack.uid, on });
+  for (const [k, on] of [false, true, false].entries()) {
+    bob.send({ t: 'bury', uid: bag.uid, on });
     await sleep(300);
-    assert.equal(ann.last('stash~')?.buried, on, `somebody else's shovel did not ${on ? 'bury it again' : 'dig it up'}`);
+    assert.equal(up(ann, bag.uid), on ? 1 : (k + 2) / 2, `somebody else's shovel did not ${on ? 'bury it again' : 'dig it up'}`);
+    assert.equal(under(ann, bag.uid), on ? 2 : (k + 2) / 2, `somebody else's shovel did not ${on ? 'bury it again' : 'dig it up'}`);
+    if (!on) {
+      const back = lying(ann, bag.uid);
+      assert.ok(back && back.item.id === 'black_bag' && back.item.cargo?.[0].item.id === 'beans' && back.item.cargo[0].x === 1, 'dug up, the bag does not lie there with what was in it');
+    }
   }
   // (not from across a field)
   bob.say(wx - 30, wz, 'shovel');
   await sleep(200);
-  bob.send({ t: 'bury', uid: pack.uid, on: true });
+  bob.send({ t: 'bury', uid: bag.uid, on: true });
   await sleep(300);
-  assert.equal(ann.last('stash~')?.buried, false, 'a stash was buried from thirty metres off');
+  assert.equal(under(ann, bag.uid), 2, 'a bag was buried from thirty metres off');
   checks++;
-  console.log('  ok  anybody with a shovel digs it up, as often as it is buried; not from across a field');
+  console.log('  ok  anybody with a shovel digs it up, and it lies there again with what was in it, as often as it is buried; not from across a field');
 
-  // ---- picked up with what is in it: by one player and no more; put down again, it has it still
+  // ---- taken like anything: by one player and no more
   bob.say(wx - 1, wz);
   await sleep(200);
-  ann.send({ t: 'stash-', uid: pack.uid });
-  bob.send({ t: 'stash-', uid: pack.uid });
+  const was = ann.count('denied') + bob.count('denied'), left = gone(late, bag.uid);
+  ann.send({ t: 'take', uid: bag.uid });
+  bob.send({ t: 'take', uid: bag.uid });
   await sleep(400);
-  assert.equal(ann.count('stashgot') + bob.count('stashgot'), 1, 'two who reached for it at once both carried it off (or neither did)');
-  const [has, other] = ann.last('stashgot') ? [ann, bob] : [bob, ann];
-  const got = has.last('stashgot')!;
-  assert.ok(got.item === 'black_bag' && got.items.length === 1 && got.items[0].id === 'beans' && got.items[0].x === 1, 'whoever picked it up did not get the bag with what was in it');
-  assert.ok(other.got.some((m) => m.t === 'stash-' && m.uid === pack.uid), 'the other was not told it had gone');
-  has.send({ t: 'stash+', s: { ...pack, uid: 'stash-test-bag-again' }, items: got.items });
-  await sleep(300);
-  other.send({ t: 'copen', cid: 'stash-test-bag-again' });
-  await sleep(300);
-  assert.deepEqual(other.last('cdata')?.items.map((i) => [i.id, i.x]), [['beans', 1]], 'a stash put down again did not have what it was carried with');
-  other.send({ t: 'cclose', cid: 'stash-test-bag-again' });
+  assert.equal(ann.count('denied') + bob.count('denied'), was + 1, 'two who reached for it at once both carried it off (or neither did)');
+  assert.equal(gone(late, bag.uid), left + 1, 'the others were not told it had gone');
   checks++;
-  console.log('  ok  picked up with what is in it, by one player and no more; put down again, it has it still');
+  console.log('  ok  taken off the ground like anything, by one player and no more');
 
   // ---- nothing is buried in the town
   ann.say(town.x + 2, town.z + 3, 'shovel');
   await sleep(2600);
-  const inTown = { uid: 'stash-test-in-town', x: town.x + 3, y: ground(town.x + 3, town.z + 3), z: town.z + 3, rot: 0 };
-  ann.send({ t: 'stash+', s: inTown });
+  const inTown = { uid: 'stash-test-in-town', id: 'old_suitcase', qty: 1 };
+  ann.send({ t: 'drop', l: at(inTown, 1, town.x + 2, town.z + 3) });
   ann.say(town.x + 2, town.z + 3, 'shovel');
   await sleep(300);
-  const before = bob.count('stash~');
+  assert.ok(lying(bob, inTown.uid), 'a suitcase dropped in the town does not lie there');
   ann.send({ t: 'bury', uid: inTown.uid, on: true });
   await sleep(300);
-  assert.equal(bob.count('stash~'), before, 'a stash was buried in the middle of the town');
+  assert.equal(under(bob, inTown.uid), 0, 'a suitcase was buried in the middle of the town');
   assert.ok(ann.got.some((m) => m.t === 'tell' && /town or a camp/.test(m.text)), 'whoever tried was not told why');
   checks++;
   console.log('  ok  nothing is buried in the town, and whoever tries is told why');
@@ -199,12 +215,12 @@ if (failed) {
   throw failed;
 }
 
-// ---- a stash left standing is cleared away when nobody has touched it for its time: sooner empty than not, and
-// never while it is under the ground. (The server again, with a week of three seconds and a fortnight of six.)
+// ---- a container left lying is cleared away when its time is up: sooner empty than not, and never while it is under
+// the ground. (The server again, with a week of four seconds and a fortnight of fourteen. It looks every five.)
 {
   const dir2 = mkdtempSync(path.join(os.tmpdir(), 'zona-stash-'));
   const again = spawn(process.execPath, [path.join('node_modules', 'tsx', 'dist', 'cli.mjs'), 'server/index.ts'], {
-    env: { ...process.env, PORT: String(PORT), SITE_URL: 'http://127.0.0.1:9', DATA_DIR: dir2, INFECTED: 'off', CHECKS: 'watch', LINGER_S: '0', KEEP: 'off', STASH_EMPTY_S: '3', STASH_FULL_S: '6' },
+    env: { ...process.env, PORT: String(PORT), SITE_URL: 'http://127.0.0.1:9', DATA_DIR: dir2, INFECTED: 'off', CHECKS: 'watch', LINGER_S: '0', KEEP: 'off', STASH_EMPTY_S: '4', STASH_FULL_S: '14' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let said = '';
@@ -219,31 +235,33 @@ if (failed) {
     const [wx, wz] = wild!;
     dee.say(wx + 1, wz, 'shovel');
     await sleep(200);
-    const at = (uid: string, dx: number) => ({ uid, x: wx + dx, y: ground(wx + dx, wz), z: wz, rot: 0 });
-    dee.send({ t: 'stash+', s: at('empty', 0) });
-    dee.send({ t: 'stash+', s: at('full', 2) });
-    dee.send({ t: 'stash+', s: at('buried', 4) });
+    const drop = (uid: string, dx: number, cargo?: unknown[]) => dee.send({ t: 'drop', l: { item: { uid, id: 'stash_kit', qty: 1, ...(cargo ? { cargo } : {}) }, x: wx + dx, y: ground(wx + dx, wz), z: wz, rot: 0 } });
+    drop('empty', 0);
+    drop('full', 1, [{ item: { uid: 'stash-test-tin-2', id: 'beans', qty: 1 }, x: 0, y: 0, rot: false }]);
+    drop('buried', 2);
     await sleep(200);
-    dee.send({ t: 'copen', cid: 'full' });
-    await sleep(200);
-    dee.send({ t: 'cset', cid: 'full', items: [{ uid: 'stash-test-tin-2', id: 'beans', qty: 1, x: 0, y: 0, rot: false }] });
-    dee.send({ t: 'cclose', cid: 'full' });
     dee.send({ t: 'bury', uid: 'buried', on: true });
-    const gone = (uid: string) => dee.got.some((m) => m.t === 'stash-' && m.uid === uid);
-    await sleep(2000);
-    assert.ok(!gone('empty') && !gone('full'), 'a stash was cleared away before its time');
-    await sleep(2600);
-    assert.ok(gone('empty'), 'an empty stash nobody touched was still there after its time');
-    assert.ok(!gone('full'), 'a stash with something in it went as soon as an empty one');
-    await sleep(3200);
-    assert.ok(gone('full'), 'a stash with something in it was still there after its time');
-    assert.ok(!gone('buried'), 'a buried stash was cleared away');
+    await sleep(300);
+    assert.ok(dee.got.some((m) => m.t === 'stash+' && m.s.uid === 'buried' && m.s.buried), 'a case could not be buried');
+    // (nothing is cleared away under anybody's eyes: she walks off)
+    dee.say(wx + 150, wz, 'shovel');
+    const t0 = Date.now(), cleared = (uid: string) => dee.got.some((m) => m.t === 'loot-' && m.uid === uid), until = (s: number) => sleep(Math.max(0, t0 + s * 1000 - Date.now()));
+    await until(2);
+    assert.ok(!cleared('empty') && !cleared('full'), 'a case was cleared away before its time');
+    await until(9.6);
+    assert.ok(cleared('empty'), 'an empty case nobody came back to was still there after its time');
+    assert.ok(!cleared('full'), 'a case with something in it went as soon as an empty one');
+    await until(19.8);
+    assert.ok(cleared('full'), 'a case with something in it was still there after its time');
+    assert.ok(!dee.got.some((m) => m.t === 'stash-' && m.uid === 'buried'), 'a buried case was cleared away');
     // (and it is there still, under the ground, for whoever comes with a shovel)
+    dee.say(wx + 1, wz, 'shovel');
+    await sleep(2600);
     dee.send({ t: 'bury', uid: 'buried', on: false });
     await sleep(300);
-    assert.equal(dee.last('stash~')?.buried, false, 'a buried stash could not be dug up after everything round it had gone');
+    assert.ok(dee.got.some((m) => m.t === 'stash-' && m.uid === 'buried') && dee.got.some((m) => m.t === 'loot+' && m.l.uid === 'buried'), 'a buried case could not be dug up after everything round it had gone');
     checks++;
-    console.log('  ok  left standing and untouched, an empty stash is cleared away, one with things in it later, and a buried one never');
+    console.log('  ok  left lying, an empty case is cleared away, one with things in it later, and a buried one never');
   } catch (e) {
     wrong = e;
   } finally {
