@@ -422,7 +422,8 @@ export class Player {
     this.vel.y -= GRAVITY * h;
     if (this.grounded && this.vel.y < 0) this.vel.y = -PRESS;
 
-    const desired = { x: this.vel.x * h, y: this.vel.y * h, z: this.vel.z * h };
+    const pace = { x: this.vel.x * h, z: this.vel.z * h }, wasOnGround = this.grounded;
+    const desired = { x: pace.x, y: this.vel.y * h, z: pace.z };
     const laid = this.grounded && this.vel.y < 0 ? this.alongGround(desired, h) : 0;
     this.kcc.computeColliderMovement(this.collider, desired, physics.R.QueryFilterFlags.EXCLUDE_SENSORS, PLAYER_GROUPS);
     let mv = this.kcc.computedMovement();
@@ -430,17 +431,62 @@ export class Player {
     // round such things worse than a level one, and a rising one would carry the body up their
     // face: take the step again the plain way.
     if (laid > 0 && Math.hypot(mv.x, mv.z) < laid * 0.9) {
-      desired.x = this.vel.x * h;
+      desired.x = pace.x;
       desired.y = this.vel.y * h;
-      desired.z = this.vel.z * h;
+      desired.z = pace.z;
       this.kcc.computeColliderMovement(this.collider, desired, physics.R.QueryFilterFlags.EXCLUDE_SENSORS, PLAYER_GROUPS);
       mv = this.kcc.computedMovement();
+    }
+    let landed = this.kcc.computedGrounded();
+    // A step that leans on a wall is taken along the wall. ("when i walk up stairs and my shoulder rubs against
+    // the side of the wall my character gets stuck in the kamenka 2 story buildings", 2026-10-12. Measured on that
+    // stair with the body's own physics: straight up it, 53 steps and none lost; with A or D held as well, 420
+    // steps and still not at the top, on every leg of it.) The controller climbs a step only if the way on from
+    // the top of it is clear in the direction the body is going; a step that goes partly into the wall or the rail
+    // beside the stair is not clear that way, so the stair was not climbed: the body slid along the riser into the
+    // wall and stood there. So where a step comes to little and something upright stopped it, it is taken again
+    // two other ways for each such thing, along it and straight at it, and whichever gets furthest is kept. (Along
+    // the wall it runs up the stair; straight at the wall it goes nowhere and is not kept; straight at the riser
+    // it is climbed. Nothing is guessed about which is which.)
+    // (And a step that only slides along something upright is tried straight at it as well, and that is kept if
+    // it climbs: a stair that begins in a doorway is got onto by somebody who comes at it along the wall, who
+    // otherwise slid on past it.)
+    const want = Math.hypot(pace.x, pace.z), got = Math.hypot(mv.x, mv.z);
+    if (wasOnGround && want > 1e-4 && got < want * 0.9) {
+      const hard = got < want * 0.55;
+      const uprights: [number, number][] = [];
+      for (let i = 0; i < this.kcc.numComputedCollisions() && uprights.length < 3; i++) {
+        const n = this.kcc.computedCollision(i)?.normal1;
+        if (!n || Math.abs(n.y) > 0.3) continue;
+        const l = Math.hypot(n.x, n.z) || 1, nx = n.x / l, nz = n.z / l;
+        if (pace.x * nx + pace.z * nz < -want * 0.05 && !uprights.some(([ux, uz]) => ux * nx + uz * nz > 0.97)) uprights.push([nx, nz]);
+      }
+      let best = got, climbed = false;
+      let kept = { x: mv.x, y: mv.y, z: mv.z };
+      for (const [nx, nz] of uprights) {
+        const into = pace.x * nx + pace.z * nz;
+        const ways = [{ x: nx * into, z: nz * into, at: true }, ...(hard ? [{ x: pace.x - nx * into, z: pace.z - nz * into, at: false }] : [])];
+        for (const go of ways) {
+          if (climbed || Math.hypot(go.x, go.z) < want * 0.15) continue;
+          this.kcc.computeColliderMovement(this.collider, { x: go.x, y: this.vel.y * h, z: go.z }, physics.R.QueryFilterFlags.EXCLUDE_SENSORS, PLAYER_GROUPS);
+          const m = this.kcc.computedMovement(), far = Math.hypot(m.x, m.z);
+          // (straight at it and up onto it; or, where the step came to nothing, whichever way gets furthest)
+          const up = go.at && m.y > 0.03 && far > want * 0.2;
+          if (up || (hard && far > best * 1.25 + 1e-4)) {
+            best = far;
+            climbed = up;
+            kept = { x: m.x, y: m.y, z: m.z };
+            landed = this.kcc.computedGrounded();
+          }
+        }
+      }
+      mv = kept;
     }
     const t = this.body.translation();
     const next = { x: t.x + mv.x, y: t.y + mv.y, z: t.z + mv.z };
     this.body.setNextKinematicTranslation(next);
     const wasGrounded = this.grounded;
-    this.grounded = this.kcc.computedGrounded();
+    this.grounded = landed;
     // velocity actually achieved (wall slides etc.)
     if (Math.abs(mv.y - desired.y) > 1e-4 && this.vel.y > 0 && mv.y < desired.y * 0.5) this.vel.y = 0;
     // A fall is measured by how far the body really came down, and it lands no faster than a fall of that
