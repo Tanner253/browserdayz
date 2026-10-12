@@ -14,7 +14,7 @@ import { GAS, gasDepth, gasZone } from '../sim/gas';
 import type { Tier } from '../sim/tiers';
 import { BUILDING_FOOTPRINT, CELL, TOWN, WORLD_RES, WORLD_SIZE, bunkerPlace, heightAt, idx, type BuildingPlot, type Instance, type SiteKind, type World } from './worldgen';
 import { bunkerAt, bunkerPlan, levelY } from '../sim/bunker';
-import { hospitalPlan, policeHqPlan } from './big-buildings';
+import { hospitalLobbyPlan, hospitalPlan, hospitalWingPlan, policeCellsPlan, policeGaragePlan, policeHqPlan } from './big-buildings';
 
 /** (`Gas` is not a kind of building: it is whatever stands under the gas, whatever else it is. See src/sim/gas.ts.) */
 export type Usage = 'Village' | 'Town' | 'Farm' | 'Industrial' | 'Military' | 'Hunting' | 'Medic' | 'Police' | 'Shop' | 'Gas' | 'Bunker' | 'East';
@@ -633,8 +633,16 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
       };
     case 'hospital':
       return hospitalPlan();
+    case 'hospital_wing':
+      return hospitalWingPlan();
+    case 'hospital_lobby':
+      return hospitalLobbyPlan();
     case 'police_hq':
       return policeHqPlan();
+    case 'police_cells':
+      return policeCellsPlan();
+    case 'police_garage':
+      return policeGaragePlan();
     case 'police':
       // lobby with the duty desk, a holding cell on the left, the armoury behind a door on the right
       return {
@@ -1352,7 +1360,12 @@ export class Buildings {
         wall(-33.2, 20.7, -14.2, 20.7, [3], [3]);
         wall(9.6, 20.7, 29.2, 20.7, [5]);
         wall(-33.2, 20.7, -33.2, -15.4, [2, 9, 10], [2]);
-        wall(-33.2, -15.4, 9.3, -15.4, [4, 9, 10], [9]);
+        // (round the wing: out behind it and back, a slab gone opposite the door at its far end)
+        wall(-33.2, -15.4, -20.6, -15.4, [2], [2]);
+        wall(-20.6, -15.4, -20.6, -26.3);
+        wall(-20.6, -26.3, 1.4, -26.3, [3, 4]);
+        wall(1.4, -26.3, 1.4, -15.4, [1]);
+        wall(1.4, -15.4, 9.3, -15.4);
         wall(15.7, -15.4, 29.2, -15.4);
         wall(29.2, -15.4, 29.2, 20.7, [3, 4, 10], [10]);
 
@@ -1398,7 +1411,6 @@ export class Buildings {
         stand('barrel_03', 5.3, 16.8, 0.4);
         stand('trashbag', 6.0, 17.4, 2.0, { far: 110 });
         stand('trashbag', 4.7, 17.6, 0.3, { far: 110 });
-        stand('metal_trash_can@1', 5.2, 8.55, 0);
         stand('old_tyre', 22.4, 9.2, 0.8, { up: 0.08, far: 110 });
         // benches against the front, either side of the doors
         for (const lx of [-8.0, -17.6, 8.0]) stand('hospital_bench', lx, 8.43, 0);
@@ -1406,7 +1418,7 @@ export class Buildings {
         // ---- west of the doors, between the drive and the front: a bed for flowers inside a kerb, gone to fern
         {
           const B = frame(0, 0, 0, plot.floorY);
-          const [x0, x1, z0, z1] = [-21.6, -5.4, 10.0, 11.8];
+          const [x0, x1, z0, z1] = [-21.6, -8.8, 10.0, 11.8];
           box(B, 'concrete', x0, x1, -0.3, 0.05, z0 - 0.12, z0, false);
           box(B, 'concrete', x0, x1, -0.3, 0.05, z1, z1 + 0.12, false);
           box(B, 'concrete', x0 - 0.12, x0, -0.3, 0.043, z0 - 0.12, z1 + 0.12, false);
@@ -1414,10 +1426,11 @@ export class Buildings {
           for (let lx = x0 + 1.2; lx < x1 - 0.6; lx += 2.3) stand('fern_02', lx - 0.4, 10.9 + dice.range(-0.15, 0.15), dice.range(0, 6.28), { scale: dice.range(0.75, 1.05), far: 110 });
         }
 
-        // ---- the west end: the car that brought the last of them, by the roof over the door; a cot and a trolley under it
+        // ---- the west end: the car that brought the last of them, by the door under the stairs outside; a cot and a
+        // trolley left beside it (clear of the foot of those stairs)
         stand('covered_car', -28.7, 1.6, 0.06);
-        stand('old_bed_frame', -24.7, 0.9, Q, { far: 130 });
-        stand('surgical_trolley', -24.4, -1.0, 0.2, { far: 110 });
+        stand('old_bed_frame', -24.9, 2.4, Q, { far: 130 });
+        stand('surgical_trolley', -25.5, 3.7, 0.2, { far: 110 });
         // ---- behind: drums and a tyre by the boiler's door
         stand('barrel_03', 9.8, -9.3, 0);
         stand('barrel_03', 10.5, -9.8, 1);
@@ -1425,30 +1438,31 @@ export class Buildings {
         stand('trashbag', 6.2, -9.1, 0.7, { far: 110 });
       } else {
         // ---- the headquarters stands in a cut in the hill: a wall at the foot of the bank down both sides of its
-        // yard and across the back of it
-        wall(-15.4, 9.2, -15.4, -12.3, [4], [4]);
-        wall(-15.4, -12.3, 15.6, -12.3, [7]);
-        // (the east one stops short of the front: a car stands there)
-        wall(15.6, -12.3, 15.6, 5.4, [1, 5], [5]);
-        // lamps either side of the ground before its doors; blocks set to make whatever drove up to it slow down
-        stand('street_lamp_01', -9.6, 9.6, 0);
-        stand('street_lamp_01', 9.6, 9.6, 0);
-        stand('concrete_road_barrier', -2.0, 15.5, 0.12);
-        stand('concrete_road_barrier', 2.0, 19.2, -0.1);
-        // what was driven: one before the front, one down the side of the yard
-        stand('covered_car', -7.4, 10.6, 0.12);
-        stand('covered_car', 13.4, -1.5, 0.03);
-        stand('hospital_bench', 6.0, 6.93, 0);
-        stand('metal_trash_can@0', 3.2, 7.0, 0);
-        // the yard behind: drums, tyres, what was thrown out of the back door
-        stand('barrel_03', -13.6, -10.6, 0);
-        stand('barrel_03', -12.8, -11.1, 1.3);
-        stand('old_tyre', -13.2, -4.2, 0.4, { up: 0.08, far: 110 });
-        stand('old_tyre', -12.9, -3.5, 2.0, { up: 0.08, far: 110 });
-        stand('crate_big', -13.4, 2.6, 0.2);
-        stand('trashbag', 7.6, -7.6, 0.3, { far: 110 });
-        stand('trashbag', 8.3, -8.1, 1.8, { far: 110 });
-        stand('metal_trash_can@1', 4.4, -7.2, 0);
+        // main block and across the back of it. (Clear of the stairs outside each end, and of where its car stands.)
+        wall(-21, 4.4, -21, -11.4, [3], [3]);
+        wall(-21, -11.4, 21, -11.4, [5, 11], [11]);
+        wall(21, -11.4, 21, 4.4, [2]);
+        // lamps at the mouth of the yard between its wings; blocks in the street before it, set so that whatever
+        // drove up had to slow down and turn
+        stand('street_lamp_01', -4.1, 19.5, Q);
+        stand('street_lamp_01', 4.1, 19.5, Q);
+        stand('concrete_road_barrier', -1.9, 23.6, 0.12);
+        stand('concrete_road_barrier', 1.9, 27.2, -0.1);
+        // what was driven: one left in the yard, one half out of the garage
+        stand('covered_car', 3.4, 15.2, -0.08);
+        stand('covered_car', 12.3, 20.9, 0.05);
+        stand('hospital_bench', 3.2, 6.93, 0);
+        stand('barrel_03', 9.7, 19.15, 0.3);
+        stand('old_tyre', 14.3, 19.5, 0.8, { up: 0.08, far: 110 });
+        // behind: drums, tyres, what was thrown out of the back door
+        stand('barrel_03', -16.6, -9.7, 0);
+        stand('barrel_03', -15.8, -10.2, 1.3);
+        stand('old_tyre', -18.4, -7.2, 0.4, { up: 0.08, far: 110 });
+        stand('old_tyre', -18.1, -6.5, 2.0, { up: 0.08, far: 110 });
+        stand('crate_big', -18.6, 2.6, 0.2);
+        stand('trashbag', 1.7, -7.7, 0.3, { far: 110 });
+        stand('trashbag', 2.4, -8.2, 1.8, { far: 110 });
+        stand('metal_trash_can@1', -2.0, -7.3, 0);
       }
     }
   }
@@ -2275,6 +2289,12 @@ export class Buildings {
       else if (side === 2) { lx = hw + rng.range(0.5, 1.4); lz = rng.range(-hd, hd); }
       else { lx = rng.chance(0.5) ? -hw + 0.6 : hw - 0.6; lz = hd + rng.range(0.6, 1.4); }
       const p = new THREE.Vector3(lx, 0, lz).applyMatrix4(B);
+      // (round a building of several parts: not where another of its parts stands, nor against that one's wall)
+      if ((bp.joined || plot.type === 'hospital' || plot.type === 'police_hq') && this.world.buildings.some((o) => {
+        if (o === plot) return false;
+        const [ow, od] = BUILDING_FOOTPRINT[o.type], dx = p.x - o.x, dz = p.z - o.z, oc = Math.cos(o.rot), os = Math.sin(o.rot);
+        return Math.abs(dx * oc - dz * os) < ow / 2 + 0.7 && Math.abs(dx * os + dz * oc) < od / 2 + 0.7;
+      })) continue;
       // never two things in the one spot
       if (placed.some((q) => Math.hypot(q.x - p.x, q.z - p.z) < 1.15)) continue;
       placed.push(p);

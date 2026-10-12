@@ -147,9 +147,16 @@ export const HOSPITAL_AT = { right: 46, along: -0.7 };
  * the boiler, for the coal; the other by the drive, the porter's; the barn clear of its east end.
  */
 export const HOSPITAL_GROUNDS = {
-  /** [x from, to, z from, to], and how far beyond that the ground is eased into what it was */
-  yard: [-33, 29.5, -15.5, 19.5] as [number, number, number, number],
+  /** each [x from, to, z from, to] (the second is the ground round the wing behind it), and how far beyond them the ground is eased into what it was */
+  yard: [[-33, 29.5, -15.5, 19.5], [-20.4, 1.2, -26.2, -15.5]] as [number, number, number, number][],
   ease: 7,
+  /**
+   * Its other parts (2026-10-12: "i dont like the rigid box style we have, can we not come up with more creative
+   * layouts?"): each a building of its own stood against the main block, with no wall where the two meet and its
+   * floors at the same heights (see Blueprint.joined in buildings.ts). [which, the x and z of its middle]: the wing
+   * behind it, west of its middle; the block before its doors.
+   */
+  parts: [['hospital_wing', -9.6, -15], ['hospital_lobby', 0, 9.8]] as [BuildingType, number, number][],
   drive: 4.5,
   /** [which, x, z, turned from the way the hospital faces] */
   moved: [['shed_113', 12.5, -13.3, 0], ['shed_114', 6.9, 24.4, -Math.PI / 2], ['barn_115', 38, 9, 0]] as [string, number, number, number][],
@@ -158,6 +165,12 @@ export const HOSPITAL_GROUNDS = {
   /** birches: between the drive and the backs of the houses, and at its east end */
   trees: [[-21.5, 19.2], [-15.2, 19.4], [-9.4, 19.1], [10.8, 19.4], [16.4, 19.2], [22.2, 19.3], [-31.2, 16.8], [-31.4, -8.5], [26.6, 6.2]] as [number, number][],
 };
+/**
+ * The police headquarters' other two parts, in the main block's own measure (x along its front, z out from its
+ * middle the way it faces): [which, the x and z of its middle]. West of the yard the cells with the men's quarters
+ * over them; east of it the garage. Each stands against the main block's front, 12 m out from it.
+ */
+export const POLICE_PARTS: [BuildingType, number, number][] = [['police_cells', -9.9, 12.5], ['police_garage', 9.9, 12.5]];
 /** the line of the hospital's drive, in the hospital's own measure: from the street's edge to the door at its west end */
 export function hospitalDrive(roadW: number): [number, number][] {
   const line: [number, number][] = [];
@@ -218,7 +231,7 @@ export const VILLAGE_STREETS = {
 /** the village's second clinic and second shop: how far out along its street from its middle they are looked for a place (metres: no nearer, no farther, and where first) */
 export const SERVICES = { from: 68, to: 116, out: 90 };
 
-export type BuildingType = 'house_small' | 'house_brick' | 'barn' | 'shed' | 'cabin' | 'guardpost' | 'police' | 'clinic' | 'store' | 'barracks' | 'garage' | 'house_two' | 'tower' | 'hut' | 'townhouse' | 'shanty' | 'tent' | 'hospital' | 'police_hq';
+export type BuildingType = 'house_small' | 'house_brick' | 'barn' | 'shed' | 'cabin' | 'guardpost' | 'police' | 'clinic' | 'store' | 'barracks' | 'garage' | 'house_two' | 'tower' | 'hut' | 'townhouse' | 'shanty' | 'tent' | 'hospital' | 'police_hq' | 'hospital_wing' | 'hospital_lobby' | 'police_cells' | 'police_garage';
 
 /** footprint (x = width, z = depth) in metres, used for terrain pads + spacing */
 export const BUILDING_FOOTPRINT: Record<BuildingType, [number, number]> = {
@@ -244,7 +257,12 @@ export const BUILDING_FOOTPRINT: Record<BuildingType, [number, number]> = {
   tent: [6.3, 8.5],
   // (2026-10-11: the district hospital, three floors and the roof; and the police headquarters, two: see src/world/big-buildings.ts)
   hospital: [46, 16],
-  police_hq: [22, 13],
+  // (a building that is not one box is several stood against one another: see Blueprint.joined in buildings.ts)
+  hospital_wing: [12.8, 14],
+  hospital_lobby: [12.8, 3.6],
+  police_cells: [10.2, 12],
+  police_garage: [10.2, 12],
+  police_hq: [30, 13],
 };
 
 export interface BuildingPlot {
@@ -1800,13 +1818,22 @@ export function generateWorld(seed = WORLD_SEED): World {
         for (let ix = Math.max(0, Math.floor((hosp.x - R + half) / CELL)); ix <= Math.min(N - 1, Math.ceil((hosp.x + R + half) / CELL)); ix++) fn(iz * N + ix, -half + ix * CELL, -half + iz * CELL);
     };
     // the yard
+    /** how far a spot (in the hospital's measure) is outside the yard: 0 in it */
+    const offYard = (lx: number, lz: number) => Math.min(...G.yard.map(([x0, x1, z0, z1]) => Math.hypot(Math.max(0, x0 - lx, lx - x1), Math.max(0, z0 - lz, lz - z1))));
     cells((i, x, z) => {
-      const [lx, lz] = own(x, z), [x0, x1, z0, z1] = G.yard;
-      const e = Math.hypot(Math.max(0, x0 - lx, lx - x1), Math.max(0, z0 - lz, lz - z1));
+      const e = offYard(...own(x, z));
       if (e < G.ease) heights[i] = lerp(heights[i], padY, 1 - smoothstep(0, G.ease, e));
     });
-    // what stood in the way of it, stood again (each is the building it was, in the place of the list it had)
     const stood: BuildingPlot[] = [hosp];
+    // its other parts: after it in the list, on its floor's level
+    for (const [type, lx, lz] of G.parts) {
+      const [x, z] = out(lx, lz);
+      const q: BuildingPlot = { id: `${type}_${buildings.length}`, type, x, z, rot: hosp.rot, floorY: hosp.floorY, seed: Math.floor(rng6.next() * 1e9) };
+      buildings.push(q);
+      pad(q, 6, 0.3);
+      stood.push(q);
+    }
+    // what stood in the way of it, stood again (each is the building it was, in the place of the list it had)
     for (const [id, lx, lz, turn] of G.moved) {
       const q = buildings.find((o) => o.id === id);
       if (!q) throw new Error(`the hospital's grounds name ${id}, and there is no such building`);
@@ -1860,8 +1887,7 @@ export function generateWorld(seed = WORLD_SEED): World {
       for (let k = list.length - 1; k >= 0; k--) {
         const t = list[k];
         if (Math.hypot(hosp.x - t.x, hosp.z - t.z) > R) continue;
-        const [lx, lz] = own(t.x, t.z), [x0, x1, z0, z1] = G.yard, m = list === trees ? 2 : 0.5;
-        if (inStood(t.x, t.z, list === trees ? 4 : 2.5) || (lx > x0 - m && lx < x1 + m && lz > z0 - m && lz < z1 + m) || dd[cell(t.x, t.z)] < G.drive / 2 + (list === trees ? 3 : 1.5)) list.splice(k, 1);
+        if (inStood(t.x, t.z, list === trees ? 4 : 2.5) || offYard(...own(t.x, t.z)) < (list === trees ? 2 : 0.5) || dd[cell(t.x, t.z)] < G.drive / 2 + (list === trees ? 3 : 1.5)) list.splice(k, 1);
         else t.y += heightAt(heights, t.x, t.z) - heightAt(before, t.x, t.z);
       }
     }
@@ -2049,11 +2075,24 @@ export function generateWorld(seed = WORLD_SEED): World {
       if (b.type === 'police_hq') pad(b, 16, 5);
       else pad(b, 6, 0.3);
     }
+    // The headquarters' other two parts, either side of the yard the street runs into (see POLICE_PARTS): after it
+    // in the list, on its floor's level.
+    const hq = buildings.find((b) => b.type === 'police_hq')!;
+    const ofHq = (b: BuildingPlot) => b.type === 'police_hq' || POLICE_PARTS.some(([type]) => type === b.type);
+    for (const [type, lx, lz] of POLICE_PARTS) {
+      const qc = Math.cos(hq.rot), qs = Math.sin(hq.rot);
+      const q: BuildingPlot = { id: `${type}_${buildings.length}`, type, x: hq.x + lx * qc + lz * qs, z: hq.z - lx * qs + lz * qc, rot: hq.rot, floorY: hq.floorY, seed: Math.floor(rng7.next() * 1e9) };
+      buildings.push(q);
+      pad(q, 9, 3);
+      moved.push(q);
+    }
     const reach = (type: BuildingType) => Math.hypot(...BUILDING_FOOTPRINT[type]) / 2;
-    for (const b of buildings) if (b.type !== 'police_hq' && moved.some((n) => n === b || Math.hypot(n.x - b.x, n.z - b.z) < reach(n.type) + reach(b.type) + 9.5)) pad(b, 3.2, 2.2);
+    for (const b of buildings) if (!ofHq(b) && moved.some((n) => n === b || Math.hypot(n.x - b.x, n.z - b.z) < reach(n.type) + reach(b.type) + 9.5)) pad(b, 3.2, 2.2);
     // (a house's skirt reaches the street beside it: the street is level across, whatever stands by it)
     bed(LANE / 2 + 1.6);
-    for (const b of moved) if (b.type !== 'police_hq') pad(b, 2.0, 1.6);
+    for (const b of moved) if (!ofHq(b)) pad(b, 2.0, 1.6);
+    // (and the yard between the headquarters' wings is the headquarters' level, to which the street comes up)
+    for (const b of moved) if (ofHq(b) && b !== hq) pad(b, 6, 2.5);
     for (let i = 0; i < N * N; i++) {
       if (laneDist[i] >= 12) continue;
       // (a street narrower than the road: the ground is painted by how far a spot is from a road as wide as that one)
@@ -2067,11 +2106,12 @@ export function generateWorld(seed = WORLD_SEED): World {
       if (!r.side) continue;
       for (let i = 0; i < r.points.length / 3; i++) r.points[i * 3 + 1] = heightAt(heights, r.points[i * 3], r.points[i * 3 + 2]) + 0.08;
     }
-    // (the headquarters' yard is bare ground, as a yard is that cars stood in: before its doors, down its sides, behind it)
+    // (the headquarters' ground is bare, as a yard is that cars stood in: the yard between its wings, the ground
+    // before the garage's doors, down its sides, behind it)
     {
-      const q = buildings[buildings.length - 1], qc = Math.cos(q.rot), qs = Math.sin(q.rot);
-      const o = (lx: number, lz: number): [number, number] => [q.x + lx * qc + lz * qs, q.z - lx * qs + lz * qc];
-      for (const [ax, az, bx, bz] of [[-10, 8.2, 10, 8.2], [-10, 10.2, 10, 10.2], [-13.3, 8, -13.3, -9.5], [13.4, 8, 13.4, -9.5], [-13.3, -9.6, 13.4, -9.6]]) rasterLine([o(ax, az), o(bx, bz)], null, 4, trackDist, trackH);
+      const qc = Math.cos(hq.rot), qs = Math.sin(hq.rot);
+      const o = (lx: number, lz: number): [number, number] => [hq.x + lx * qc + lz * qs, hq.z - lx * qs + lz * qc];
+      for (const [ax, az, bx, bz] of [[-3.4, 7, -3.4, 18], [-1.2, 7, -1.2, 18], [1.2, 7, 1.2, 18], [3.4, 7, 3.4, 18], [5, 20, 15, 20], [5, 22, 15, 22], [-17.4, 6, -17.4, -9], [17.4, 6, 17.4, -9], [-17.4, -9.2, 17.4, -9.2]]) rasterLine([o(ax, az), o(bx, bz)], null, 4, trackDist, trackH);
     }
 
     // 4. what grew or lay where a building or a street now is goes; the rest stands on the ground as it is now
