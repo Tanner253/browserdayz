@@ -16,7 +16,7 @@
 
 import assert from 'node:assert/strict';
 import { spawn, type ChildProcess } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
@@ -158,6 +158,12 @@ try {
   // (and then she goes on playing: this is not written anywhere until the server says its last word)
   ann.send(me(41, 1));
   await sleep(300);
+  // (and a heart is given to an entry of the changelog, and something said under it: neither is written anywhere
+  // until then either)
+  const entry = /<article class="entry" id="([a-z0-9-]+)"/.exec(readFileSync('public/changelog/index.html', 'utf8'))![1], mark = 'c'.repeat(32);
+  const told = async (port: number, at: string, body: unknown) => (await (await fetch(`http://127.0.0.1:${port}${at}`, { method: 'POST', body: JSON.stringify(body) })).json()) as { ok: boolean };
+  assert.ok((await told(A, '/news/heart', { entry, by: mark })).ok, 'a heart was not taken');
+  assert.ok((await told(A, '/news/comment', { entry, by: mark, name: 'Ann', text: 'kept through the restart' })).ok, 'a comment was not taken');
 
   // ---- something newer is published: the server sees it by itself, and says so, with why
   newest = 'bbbbbbb2';
@@ -178,7 +184,8 @@ try {
   // ---- the new server is started while the old one is still the one being reached: it lets nobody in
   young = start(B, 'bbbbbbb2');
   await up(young);
-  const waiting = bob.join(B, 40_000);
+  // (waited for well past the forty seconds below: by the clock of a machine whose timers are fine it ran out as the old server went)
+  const waiting = bob.join(B, 120_000);
   // (forty seconds of it: longer than the server used to wait for anything)
   for (let k = 0; k < 40; k++) {
     await sleep(1000);
@@ -217,6 +224,12 @@ try {
   assert.ok(/^1 characters and 0 stashes as they were kept/.test(h.kept ?? ''), `the server does not say what became of what was kept: ${h.kept}`);
   checks++;
   console.log('  ok  the new server has everybody as they were when the old one stopped, not as they were when it last happened to write');
+
+  // ---- and what was said under the changelog is there, with its heart
+  const news = (await (await fetch(`http://127.0.0.1:${B}/news?by=${mark}`)).json()) as { entries: Record<string, { hearts: number; mine: boolean; comments: { text: string }[] } | undefined> };
+  assert.deepEqual([news.entries[entry]?.hearts, news.entries[entry]?.mine, news.entries[entry]?.comments.map((c) => c.text)], [1, true, ['kept through the restart']], `the new server has not the changelog's hearts and comments: ${JSON.stringify(news.entries[entry])}`);
+  checks++;
+  console.log('  ok  the hearts and the comments under the changelog came through with the rest');
 } catch (e) {
   failed = e;
 } finally {

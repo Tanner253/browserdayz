@@ -64,6 +64,32 @@
       .entry li::before { content: ''; position: absolute; left: 0; top: 0.62em; width: 6px; height: 6px; background: var(--brand); }
       .entry li b { font-weight: 600; color: var(--ink); }
       .entry li.fix::before { background: var(--ok); }
+      /* hearts, and what people say under an entry (kept by the game server: see src/sim/news.ts). Shut until opened. */
+      .talk { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 22px 0 0; font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; }
+      .talk[hidden] { display: none; }
+      .talk button { display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px 8px; font: inherit; letter-spacing: inherit; text-transform: inherit; color: var(--dim); background: none; border: 1px solid var(--line); cursor: pointer; }
+      .talk button:hover { color: var(--brand); border-color: var(--brand); }
+      .talk button:disabled { opacity: 0.5; cursor: default; }
+      .talk .heart svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; }
+      .talk .heart.mine { color: #ff6b6b; border-color: rgba(255, 107, 107, 0.6); }
+      .talk .heart.mine svg { fill: currentColor; }
+      .said { flex-basis: 100%; max-width: 760px; margin-top: 4px; font-family: var(--font); font-size: 18px; letter-spacing: 0; text-transform: none; }
+      .said[hidden] { display: none; }
+      .said ol { margin: 0 0 14px; padding: 0; list-style: none; border-top: 1px solid var(--line); }
+      .said li { padding: 10px 0 11px; color: var(--dim); border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+      .said li::before { content: none; }
+      .said li b { margin-right: 8px; font-weight: 600; color: var(--ink); }
+      .said li small { font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; color: var(--faint); }
+      .said li p { margin: 3px 0 0; }
+      .said li a { margin-left: 10px; font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); cursor: pointer; }
+      .said .none { padding: 10px 0 14px; color: var(--faint); }
+      .said form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+      .said textarea, .said input { width: 100%; padding: 9px 11px; font: inherit; color: var(--ink); background: rgba(8, 10, 8, 0.7); border: 1px solid var(--line); border-radius: 0; }
+      .said textarea { grid-column: 1 / -1; min-height: 74px; resize: vertical; }
+      .said textarea:focus, .said input:focus { outline: none; border-color: var(--brand); }
+      .said form button { color: #14160f; background: var(--brand); border-color: var(--brand); font-weight: 600; }
+      .said form button:hover { color: #14160f; filter: brightness(1.08); }
+      .said .why { grid-column: 1 / -1; min-height: 1.2em; margin: 0; font-family: var(--mono); font-size: 12px; letter-spacing: 0.04em; color: #ff9d7a; }
       .foot { padding: 34px 0 0; font-family: var(--mono); font-size: 12px; letter-spacing: 0.06em; color: var(--faint); }
       .box { position: fixed; inset: 0; z-index: 20; display: none; align-items: center; justify-content: center; padding: 3vmin; background: rgba(4, 5, 4, 0.94); cursor: zoom-out; }
       .box.on { display: flex; }
@@ -728,6 +754,123 @@
       }));
       box.addEventListener('click', (e) => e.target.tagName !== 'VIDEO' && shut());
       addEventListener('keydown', (e) => e.key === 'Escape' && shut());
+
+      // Hearts and comments under each entry. They are kept by the game server (the site keeps nothing of them):
+      // if it cannot be asked, or is a server from before it kept them, nothing of this is shown.
+      (async () => {
+        const entries = [...document.querySelectorAll('article.entry[id]')];
+        const el = (tag, cls, text) => {
+          const n = document.createElement(tag);
+          if (cls) n.className = cls;
+          if (text !== undefined) n.textContent = text;
+          return n;
+        };
+        let server = new URLSearchParams(location.search).get('server') ?? '';
+        if (!server) server = await fetch('/version.json', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).then((j) => (j && j.server) || '').catch(() => '');
+        if (!server) server = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? '' : 'https://browserdayz.onrender.com';
+        server = server.replace(/\/$/, '');
+        // who this browser is, to the server: a mark made from the key the game keeps here (never the key itself)
+        const mark = await (async () => {
+          try {
+            let key = localStorage.getItem('zona.player.key');
+            if (!key) localStorage.setItem('zona.player.key', (key = crypto.randomUUID()));
+            const sum = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(key + ':news'));
+            return [...new Uint8Array(sum)].slice(0, 16).map((b) => b.toString(16).padStart(2, '0')).join('');
+          } catch {
+            return '';
+          }
+        })();
+        const ask = async (path, body) => {
+          const r = await fetch(server + path, body ? { method: 'POST', headers: { 'content-type': 'text/plain' }, body: JSON.stringify(body) } : { cache: 'no-store' });
+          return r.ok ? r.json() : null;
+        };
+        const state = await ask('/news?by=' + mark).catch(() => null);
+        if (!state || !state.ok || !mark) return;
+        const ago = (at) => {
+          const m = Math.max(0, Math.round((Date.now() - at) / 60000));
+          return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' d ago';
+        };
+        for (const entry of entries) {
+          const id = entry.id, had = state.entries[id] ?? { hearts: 0, mine: false, comments: [] };
+          const bar = el('div', 'talk'), heart = el('button', 'heart'), count = el('span', '', String(had.hearts));
+          heart.type = 'button';
+          heart.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.18L12 21z"/></svg>';
+          heart.append(count);
+          heart.classList.toggle('mine', had.mine);
+          heart.setAttribute('aria-label', 'Heart this update');
+          heart.setAttribute('aria-pressed', String(had.mine));
+          heart.addEventListener('click', async () => {
+            heart.disabled = true;
+            const r = await ask('/news/heart', { entry: id, by: mark }).catch(() => null);
+            heart.disabled = false;
+            if (!r || !r.ok) return;
+            count.textContent = String(r.hearts);
+            heart.classList.toggle('mine', r.mine);
+            heart.setAttribute('aria-pressed', String(r.mine));
+          });
+          const open = el('button', 'open'), panel = el('div', 'said'), list = el('ol');
+          open.type = 'button';
+          panel.hidden = true;
+          const comments = had.comments.slice();
+          const label = () => (open.textContent = (panel.hidden ? 'Comments' : 'Hide comments') + (comments.length ? ' (' + comments.length + ')' : ''));
+          const none = el('div', 'none', 'Nobody has said anything yet. Ideas are welcome.');
+          const show = (c) => {
+            const li = el('li');
+            li.append(el('b', '', c.name), el('small', '', ago(c.at)));
+            if (c.mine) {
+              const del = el('a', '', 'remove');
+              del.addEventListener('click', async () => {
+                const r = await ask('/news/remove', { id: c.id, by: mark }).catch(() => null);
+                if (!r || !r.ok) return;
+                li.remove();
+                comments.splice(comments.indexOf(c), 1);
+                none.hidden = comments.length > 0;
+                label();
+              });
+              li.append(del);
+            }
+            li.append(el('p', '', c.text));
+            list.append(li);
+          };
+          comments.forEach(show);
+          none.hidden = comments.length > 0;
+          const form = el('form'), text = el('textarea'), name = el('input'), post = el('button', '', 'Post'), why = el('p', 'why');
+          text.maxLength = 400;
+          text.placeholder = 'What do you think of it? What should come next?';
+          text.setAttribute('aria-label', 'Your comment');
+          name.maxLength = 20;
+          name.placeholder = 'Name';
+          name.setAttribute('aria-label', 'Your name');
+          try { name.value = localStorage.getItem('zona.player.name') ?? ''; } catch { /* private mode */ }
+          post.type = 'submit';
+          form.append(text, name, post, why);
+          form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!text.value.trim()) return;
+            post.disabled = true;
+            why.textContent = '';
+            const r = await ask('/news/comment', { entry: id, by: mark, name: name.value, text: text.value }).catch(() => null);
+            post.disabled = false;
+            if (!r) return void (why.textContent = 'It could not be sent. Try again in a moment.');
+            if (!r.ok) return void (why.textContent = r.why || 'Not taken.');
+            comments.push(r.comment);
+            show(r.comment);
+            none.hidden = true;
+            text.value = '';
+            label();
+          });
+          panel.append(list, none, form);
+          open.addEventListener('click', () => {
+            panel.hidden = !panel.hidden;
+            open.setAttribute('aria-expanded', String(!panel.hidden));
+            label();
+          });
+          open.setAttribute('aria-expanded', 'false');
+          label();
+          bar.append(heart, open, panel);
+          entry.lastElementChild.append(bar);
+        }
+      })();
     </script>
   </body>
 </html>

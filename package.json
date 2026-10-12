@@ -32,6 +32,7 @@
     "test:cars": "tsx test/cars.test.ts",
     "test:voice": "tsx test/voice.test.ts",
     "test:overlap": "tsx scripts/overlap-audit.ts",
+    "test:news": "tsx test/news.test.ts && tsx test/news-http.test.ts",
     "treasury": "tsx scripts/treasury.ts",
     "sounds": "node scripts/sounds.mjs",
     "test:rules": "tsx test/bunker.test.ts && tsx test/cars.test.ts && tsx test/checks.test.ts && tsx test/daynight.test.ts && tsx test/expansion.test.ts && tsx test/fires.test.ts && tsx test/gas.test.ts && tsx test/gunplay.test.ts && tsx test/infected.test.ts && tsx test/injury.test.ts && tsx test/inventory.test.ts && tsx test/loot.test.ts && tsx test/mags.test.ts && tsx test/thirst.test.ts && tsx test/trade.test.ts && tsx test/voice.test.ts && tsx test/zone.test.ts"

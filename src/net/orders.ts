@@ -25,6 +25,7 @@ export const ORDERS: Order[] = [
   { name: 'say', args: ['words'], does: 'Say something across everybody’s screen, and in the chat' },
   { name: 'del', args: ['what', 'number'], does: 'Take a thing out of the world: item, box (a body, a drop, a buried stash), car or z (one of the infected), by its number. The Delete key does it for whatever you are looking at', admin: true },
   { name: 'restart', args: ['[seconds]', '[why]'], does: 'Tell everybody the server is about to restart (it only says so)', admin: true },
+  { name: 'delc', args: ['[number]'], does: 'Take a comment off the changelog by its number; with no number, the newest are read out', admin: true },
   { name: 'msg', args: ['who', 'words'], does: 'Say something to one player alone' },
   { name: 'inv', args: ['who'], does: 'What somebody carries, as their game last said' },
   { name: 'warn', args: ['who', 'words'], does: 'Put a warning on somebody’s screen' },

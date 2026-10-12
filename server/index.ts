@@ -24,6 +24,7 @@ import { CALL, CRASH, DROP, fillCrash, fillDrop, type DropInfo } from '../src/si
 import { STOCK } from '../src/sim/trade';
 import { VOICE } from '../src/sim/voice';
 import { CRATE_RESTOCK, CRATE_SPECS, fillCrate } from '../src/sim/crates';
+import { News, type NewsKept } from '../src/sim/news';
 import { gasEdge, underGas } from '../src/sim/gas';
 import { BUNKER, bunkerDark, inBunker } from '../src/sim/bunker';
 import { phaseOf } from '../src/sim/daynight';
@@ -942,6 +943,8 @@ interface Snapshot {
   stashes: Box[];
   /** the containers lying on it: each a thing with what is in it, where it lies, and when it was dropped */
   loose?: { item: ItemInstance; x: number; y: number; z: number; rot: number; at: number }[];
+  /** the hearts and the comments under the changelog's entries (see src/sim/news.ts) */
+  news?: NewsKept;
 }
 interface KeptFile { at: string; boot: string; final: boolean; z: string }
 
@@ -970,6 +973,37 @@ async function siteKeep(op: Record<string, unknown>): Promise<{ ok?: boolean; wh
   }
 }
 
+/**
+ * The changelog's hearts and comments (2026-10-12: "can we add a blog/forum layout to the changelog so users can
+ * heart the changelog posts, as well as leave a comment ... public comment section"). Held here, because this
+ * server is always there and the site keeps next to nothing (its file store allows two thousand writes a month,
+ * and the payouts live on them): they go into what is kept with everything else, at the times that is written,
+ * and not once more. What a server that dies without a last word had heard since it last wrote is lost with it.
+ * The rules are in src/sim/news.ts; the page is public/changelog/index.html.
+ */
+const news = new News();
+{
+  // the entries there are to speak under: the page as this server was built with it, and then the page as the site
+  // serves it (a new entry goes out with the site, and may be days ahead of this server)
+  const ids = (html: string) => new Set([...html.matchAll(/<article class="entry" id="([a-z0-9][a-z0-9-]{1,47})"/g)].map((m) => m[1]));
+  try {
+    const own = ids(readFileSync(path.join(ROOT, 'public', 'changelog', 'index.html'), 'utf8'));
+    if (own.size) news.known = own;
+  } catch {
+    /* no page here: whatever is asked of is taken, up to so many entries */
+  }
+  const look = () =>
+    void fetch(`${SITE_URL}/changelog/`, { signal: AbortSignal.timeout(20_000) })
+      .then((r) => (r.ok ? r.text() : ''))
+      .then((html) => {
+        const live = ids(html);
+        if (live.size) news.known = new Set([...(news.known ?? []), ...live]);
+      })
+      .catch(() => {});
+  setTimeout(look, 15_000).unref();
+  setInterval(look, 10 * 60_000).unref();
+}
+
 /** everything that is kept, as it is this moment */
 function snapshot(): Snapshot {
   const now = Date.now(), chars = new Map<string, Record_>(KEPT.chars);
@@ -978,7 +1012,7 @@ function snapshot(): Snapshot {
   // (no more of them than can be carried: the newest, if it ever came to that)
   const newest = [...chars].sort((a, b) => b[1].leftAt - a[1].leftAt).slice(0, 6000);
   const loose = [...economy.loot.values()].filter((l) => l.keptAt !== undefined).map((l) => ({ item: l.item, x: l.x, y: l.y, z: l.z, rot: l.rot, at: l.keptAt! }));
-  return { rev: WORLD_REV, wipe: WIPE, chars: newest, stashes: [...boxes.values()].filter((b) => b.kind === 'stash' && b.buried), loose };
+  return { rev: WORLD_REV, wipe: WIPE, chars: newest, stashes: [...boxes.values()].filter((b) => b.kind === 'stash' && b.buried), loose, news: news.keep() };
 }
 
 /** What is kept is written to the site. @param final this server's last word @returns whether it was */
@@ -1117,6 +1151,8 @@ async function loadKept() {
       economy.drop(item, l.x, moved ? world.groundAt(l.x, l.z) : l.y, l.z, l.rot).keptAt = num(l.at) ? l.at : now;
       stashes++;
     }
+    // (what has been said under the changelog, and its hearts: kept with the rest, and no worse for a new map)
+    news.restore(snap.news);
     open(`${KEPT.chars.size} characters and ${stashes} stashes as they were kept at ${save.at}${save.final ? '' : ' (not a last word: the server before this one stopped without one)'}${moved ? '; the map has been made again since, so everybody starts from the edge with what they had' : ''}`);
   } catch (e) {
     // (what could be taken in has been: it is not thrown away for the sake of what could not)
@@ -1287,6 +1323,19 @@ async function command(c: Client, line: string) {
       const why = (/^\d+$/.test(rest[0] ?? '') ? rest.slice(1) : rest).join(' ').slice(0, 120);
       sayRestart(why, secs);
       return void sys(c, `Everybody is told: the server restarts in ${secs} s${why ? ` (${why})` : ''}. Saying so restarts nothing.`);
+    }
+    case 'delc': {
+      // a comment under the changelog taken down by its number; with no number, the newest of them are read out
+      if (!admin) return need();
+      const n = Number(rest[0]);
+      if (!rest.length || !Number.isInteger(n)) {
+        const last = news.latest(14);
+        return void sys(c, last.length ? 'Comments on the changelog, newest last (/delc <number> takes one down):' : 'Nobody has commented on the changelog.', ...last.map((q) => `#${q.id} [${q.entry}] ${q.name}: ${q.text}`));
+      }
+      if (!news.remove(n)) return void sys(c, `There is no comment #${n}.`);
+      KEPT.dirty = true;
+      log(`[admin] ${c.name} took comment #${n} off the changelog`);
+      return void sys(c, `Comment #${n} is gone from the changelog.`);
     }
     case 'say': {
       if (!rest.length) return void sys(c, 'Say what?');
@@ -3135,6 +3184,60 @@ const server = http.createServer((req, res) => {
   }
 });
 
+/**
+ * The changelog's hearts and comments, over plain requests from the page (which is on another host: anybody may
+ * ask). What is sent is read as text and may not be long. Who is asking is told by where they ask from, and by the
+ * mark their browser gives.
+ */
+function newsHttp(req: http.IncomingMessage, res: http.ServerResponse, url: URL) {
+  const head = { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'no-store' };
+  const say = (code: number, body: unknown) => {
+    res.writeHead(code, head);
+    res.end(JSON.stringify(body));
+  };
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204, { ...head, 'access-control-allow-methods': 'GET, POST', 'access-control-allow-headers': 'content-type', 'access-control-max-age': '86400' });
+    return void res.end();
+  }
+  if (req.method === 'GET' && url.pathname === '/news') return say(200, { ok: true, entries: news.view(url.searchParams.get('by') ?? undefined) });
+  if (req.method !== 'POST') return say(405, { ok: false, why: 'Not that way.' });
+  const address = addressOf(req);
+  let raw = '', over = false;
+  req.setEncoding('utf8');
+  req.on('data', (d: string) => {
+    raw += d;
+    if (raw.length > 4096 && !over) {
+      over = true;
+      say(413, { ok: false, why: 'Too long.' });
+      req.destroy();
+    }
+  });
+  req.on('end', () => {
+    if (over) return;
+    let m: Record<string, unknown>;
+    try {
+      m = JSON.parse(raw) as Record<string, unknown>;
+      if (!m || typeof m !== 'object') throw new Error('not a thing');
+    } catch {
+      return say(400, { ok: false, why: 'Not understood.' });
+    }
+    const now = Date.now();
+    const r =
+      url.pathname === '/news/heart' ? news.heart(m.entry, m.by, address, now)
+      : url.pathname === '/news/comment' ? news.say(m.entry, m.by, address, m.name, m.text, now)
+      : url.pathname === '/news/remove' ? { ok: typeof m.id === 'number' && typeof m.by === 'string' && news.remove(m.id, m.by) }
+      : null;
+    if (!r) return say(404, { ok: false, why: 'No such thing.' });
+    if (r.ok) {
+      // (it goes into what is kept the next time that is written: nothing is written for it now)
+      KEPT.dirty = true;
+      if ('comment' in r) log(`[news] #${r.comment.id} under ${String(m.entry)} by ${r.comment.name}: ${r.comment.text}`);
+    }
+    say(200, r);
+  });
+  req.on('error', () => {});
+}
+
 function serve(req: http.IncomingMessage, res: http.ServerResponse) {
   const url = new URL(req.url ?? '/', 'http://x');
   if (url.pathname === '/healthz') {
@@ -3144,6 +3247,8 @@ function serve(req: http.IncomingMessage, res: http.ServerResponse) {
     res.end(JSON.stringify({ ok: true, boot: BOOT, protocol: PROTOCOL, why: RESTART.why, kept: KEPT.how, players: [...clients.values()].filter((c) => !c.asleep).length, asleep: [...clients.values()].filter((c) => c.asleep).length, max: MAX_PLAYERS, queue: queue.length, uptime: Math.round(process.uptime()), checks: CHECKS, flagged, keptOff: BANS.temp.size, loot: economy.loot.size, places: new Set([...clients.values()].map((c) => c.ip)).size }));
     return;
   }
+  // the changelog page asks here for its hearts and comments, and gives them (see `news`)
+  if (url.pathname === '/news' || url.pathname.startsWith('/news/')) return void newsHttp(req, res, url);
   // the website's function asks here what it has just been asked to do with the lists of admins and bans (see siteAdmin)
   if (url.pathname.startsWith('/adminop/')) {
     // (once, and only for a number this server made up a moment ago)

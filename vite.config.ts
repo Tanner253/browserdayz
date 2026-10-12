@@ -48,10 +48,12 @@ function assetVersions(): Plugin {
 /**
  * version.json: which version of the wire this build of the site speaks (PROTOCOL in src/net/protocol.ts). A page
  * that the server has turned away for its version asks the site for this, to tell whether it is itself the old
- * one (and is to be loaded again) or the server is (and is to be waited for): see the game's `start`.
+ * one (and is to be loaded again) or the server is (and is to be waited for): see the game's `start`. And where
+ * the game server is (VITE_SERVER_URL), for a page of the site that is not the game: the changelog asks it for its
+ * hearts and comments.
  */
 function siteVersion(): Plugin {
-  const said = () => JSON.stringify({ protocol: Number(/export const PROTOCOL = (\d+)/.exec(fs.readFileSync(path.resolve('src/net/protocol.ts'), 'utf8'))?.[1]) });
+  const said = () => JSON.stringify({ protocol: Number(/export const PROTOCOL = (\d+)/.exec(fs.readFileSync(path.resolve('src/net/protocol.ts'), 'utf8'))?.[1]), server: (process.env.VITE_SERVER_URL ?? '').replace(/\/ws$/, '').replace(/\/$/, '') });
   return {
     name: 'site-version',
     configureServer(server) {
