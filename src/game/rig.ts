@@ -339,13 +339,6 @@ export class WeaponRig {
     for (const h of this.hung) h.holder.matrix.copy(h.base).multiply(this.seat);
   }
 
-  /** how far a piece is from where it rests, in the movement being played: in its own parent's measure (see `still`). Call after `pose`. */
-  away(name: string): number {
-    const n = this.node(name);
-    const r = n && this.atRest.get(n);
-    return n && r ? n.position.distanceTo(r.p) : 0;
-  }
-
   /** A piece pushed along the barrel from where the movement being played has it, metres (toward the muzzle: more). Call after `pose`. */
   slide(name: string, by: number) {
     const n = this.node(name);
