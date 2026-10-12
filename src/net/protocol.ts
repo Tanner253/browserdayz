@@ -334,7 +334,8 @@ export type S2C =
   | ({ t: 'adm' } & AdminLists)
   /** the server is about to be restarted (in so many seconds: 0, it is stopping now), and why, if that was said */
   | { t: 'restart'; why: string; in: number }
-  | { t: 'kick'; reason: string };
+  /** (`v`: turned away for being of another version than the server, which is of this one) */
+  | { t: 'kick'; reason: string; v?: number };
 
 /** What the panel of somebody with a role is shown. The last two are an admin's alone. */
 export interface AdminLists {

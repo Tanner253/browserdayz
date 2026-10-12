@@ -160,13 +160,29 @@ export class WeaponRig {
 
   /** Stand in one movement, `k` of the way through it (0..1). */
   pose(clip: string, k: number) {
+    this.unslide();
     const [a, b] = this.info.clips[clip] ?? [0, 0];
     this.mixer.setTime(Math.min(this.length - 1e-4, (a + (b - a) * THREE.MathUtils.clamp(k, 0, 1)) / this.info.fps));
   }
 
   /** the pose the gun is simply held in */
   rest() {
+    this.unslide();
     this.mixer.setTime(0);
+  }
+
+  /**
+   * What `slide` has added to each piece since it was last stood in a movement: taken off again before the next.
+   * (A movement that leaves a piece where it was a moment ago does not put it there again: what plays them writes
+   * only what has changed. So a slide held back on a gun standing still was pushed back again every frame, one
+   * lock's length each time, until something moved it: an empty pistol's slide flew off backwards and snapped
+   * home whenever its holder stopped walking. 2026-10-12.)
+   */
+  private slid = new Map<THREE.Object3D, THREE.Vector3>();
+  private unslide() {
+    if (!this.slid.size) return;
+    for (const [n, by] of this.slid) n.position.sub(by);
+    this.slid.clear();
   }
 
   private tracked = new Set<string>();
@@ -346,7 +362,11 @@ export class WeaponRig {
     // (along the barrel in the gun-alone file is x: which way that is for this piece's parent, as the file has it standing)
     const along = _v1.set(1, 0, 0).transformDirection(_m1.fromArray(this.info.frame).invert()).transformDirection(_m2.copy(this.asFiled.get(n.parent) ?? _m2.identity()).invert());
     const size = _v2.setFromMatrixScale(_m1.fromArray(this.info.frame)).x * _v3.setFromMatrixScale(this.asFiled.get(n.parent) ?? _m2.identity()).x;
-    n.position.addScaledVector(along, by / size);
+    const add = along.clone().multiplyScalar(by / size);
+    n.position.add(add);
+    const had = this.slid.get(n);
+    if (had) had.add(add);
+    else this.slid.set(n, add);
   }
 
   /** a pack's arm, as its maker's skeleton has it: the upper arm, the forearm, and what the hand hangs on */

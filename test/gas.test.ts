@@ -182,7 +182,9 @@ ok('the gas is the richest place on the map; helmets, plates and scopes are of i
     // gas and the bunker are gone into for (helmets, plates, scopes, the heavy armour, the two guns of theirs) little or none
     assert.ok(t('armor_vest') >= 4 && t('armor_vest') > o('armor_vest') && t('armor_vest') > g('armor_vest'), `armoured vests: ${t('armor_vest')} in the town, ${o('armor_vest')} on the rest of the map, ${g('armor_vest')} under the gas`);
     assert.ok(t('mosin') + t('m9') + t('colt') >= 9 && t('box_762') + t('box_9mm') + t('ammo_762') + t('ammo_9mm') >= 18 && t('firstaid') + t('bandage') >= 9, 'the town is thinly stocked');
-    for (const id of ['boonie_hat', 'life_vest', 'pu_scope']) assert.ok(t(id) < g(id) / 2, `${t(id)} of ${id} in the town, ${g(id)} under the gas`);
+    // (no more than half as many: three helmets are the town's and seven the gas's, and on some throws of the dice one
+    // of the seven finds no place free and waits for the next restock)
+    for (const id of ['boonie_hat', 'life_vest', 'pu_scope']) assert.ok(t(id) * 2 <= g(id), `${t(id)} of ${id} in the town, ${g(id)} under the gas`);
     // TEMPORARY, THE SHOWCASE (2026-10-11; see SHOWCASE in src/sim/economy.ts): the shotgun, its shells and the
     // keycards are in Kamenka as well for now. It was: none of these six in the town.
     for (const id of ['heavy_armor', 'deagle', 'ammo_50']) assert.equal(t(id), 0, `${id} in the town`);

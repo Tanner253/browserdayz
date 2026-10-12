@@ -133,6 +133,8 @@ interface Bullet {
   ghost?: boolean;
   /** whose it is, when it is somebody else's: it does not land on the body it came out of */
   from?: unknown;
+  /** the thin thing it last went through (a curtain, a door of boards): its hole is made there once */
+  through?: unknown;
 }
 
 const _toCam = new THREE.Vector3();
@@ -211,6 +213,8 @@ interface VmModel {
   shotClip?: string;
   /** a pistol in a pack whose bolt is its slide: the joint that is */
   slideOn?: string;
+  /** its hammer, where that is let down when the slide is home (see HAMMER): the piece, where it turns (the space the piece is in), how far down */
+  hammer?: { piece: THREE.Object3D; at: THREE.Vector3; down: number };
   /** arms of the pack's that are put elsewhere than they were drawn (see WeaponRig.reseat): the joint the gun's body follows, and for each arm where its hand goes on this gun and where its shoulder goes */
   reseat?: { body: string; L?: Reseat; R?: Reseat };
   /** the pack's own walk and run are played under it as it is carried (and the game's own swing of a carried gun is not) */
@@ -277,6 +281,14 @@ const SMG_CARRY = {
 const DIG_STROKE = 1.15;
 /** how far back a pistol's slide stays when it has run dry, metres */
 const SLIDE_LOCK = 0.03;
+/**
+ * A pistol whose hammer is drawn cocked: where it turns (the gun-alone file's own x and y, metres) and how far it
+ * falls forward from there to lie down (radians about the gun's right). It lies down but while the slide is back:
+ * for the moment of a shot, and for as long as the gun is empty. (2026-10-12: "the hammer is always cocked back".
+ * The M9's stands out behind its slide; the Colt's is carried cocked, and is left so.)
+ */
+const HAMMER: Record<string, { at: [number, number]; down: number }> = { m9: { at: [0.003, 0.056], down: -0.7 } };
+const _Z = new THREE.Vector3(0, 0, 1);
 
 /**
  * A magazine where it sits in its gun, as a mark to set one gun on another by (the gun-alone file's space): the
@@ -1639,6 +1651,7 @@ export class Weapons {
     if (suppressor) shown.push([suppressor, 'suppressor_9']);
     const m: VmModel = {
       root, kind: o.kind, flash: o.flash, body, rig, world, suppressor, brass: !!o.gun, shown, marks,
+      hammer: HAMMER[o.item] && hung.has('hammer') ? { piece: hung.get('hammer')!, at: new THREE.Vector3(HAMMER[o.item].at[0], HAMMER[o.item].at[1], 0).add(nudge), down: HAMMER[o.item].down } : undefined,
       scope: rig.node('scope') ?? undefined,
       wrap: rig.node('cheekrest') ?? undefined,
       hip: o.hip.clone(),
@@ -2765,6 +2778,21 @@ export class Weapons {
           const next = physics.raycast(b.pos.clone().addScaledVector(dir, past), dir, len - past, SHOT_GROUPS);
           hit = next ? { ...next, toi: next.toi + past } : null;
         }
+        // What is thin lets a round through (2026-10-12: "the curtains and thin stuff needs to be wallbangable",
+        // "wooden doors should be wall bangable"): a curtain, a door of boards. It leaves its hole there, and the
+        // sound of it, and flies on.
+        for (let k = 0; hit && hit.tag?.thin && k < 4; k++) {
+          const thin = hit.collider;
+          if (b.through !== thin) {
+            const at = new THREE.Vector3(hit.point.x, hit.point.y, hit.point.z);
+            this.fx.impact(hit.tag.surface, at, new THREE.Vector3(hit.normal.x, hit.normal.y, hit.normal.z), true, (hit.tag.owner as { pivot?: THREE.Object3D } | undefined)?.pivot);
+            audio.impact(hit.tag.surface, at, b.ghost ? at.distanceTo(this.mainCam?.position ?? at) : b.travelled + hit.toi);
+            b.through = thin;
+          }
+          const past = hit.toi + 0.01;
+          const next = past < len ? physics.raycast(b.pos.clone().addScaledVector(dir, past), dir, len - past, SHOT_GROUPS, thin) : null;
+          hit = next ? { ...next, toi: next.toi + past } : null;
+        }
         if (hit) {
           const pt = new THREE.Vector3(hit.point.x, hit.point.y, hit.point.z);
           const n = new THREE.Vector3(hit.normal.x, hit.normal.y, hit.normal.z);
@@ -3101,6 +3129,7 @@ export class Weapons {
       else if (a.name === 'check' && this.checkDrawn(m)) rig.pose('check', k);
       else rig.rest();
       if (m.slideOn && this.chamberEmpty && a.name !== 'magswap') rig.slide(m.slideOn, -SLIDE_LOCK);
+      this.cockHammer(m);
       this.reseat(m);
       return;
     }
@@ -3125,7 +3154,20 @@ export class Weapons {
     }
     // (a pistol on a pack with no drawing of a last shot: run dry, its slide stays back)
     if (m.slideOn && this.chamberEmpty && m.shotT >= len) rig.slide(m.slideOn, -SLIDE_LOCK);
+    this.cockHammer(m);
     this.reseat(m);
+  }
+
+  /** A hammer that is let down (see HAMMER): back for the moment of a shot and while the gun is empty, down otherwise. */
+  private cockHammer(m: VmModel) {
+    const h = m.hammer;
+    if (!h) return;
+    const t = m.shotT ?? 9;
+    // (the slide throws it back in a twentieth of a second, and it is down again in a tenth)
+    const fired = t < 0.05 ? t / 0.05 : Math.max(0, 1 - (t - 0.05) / 0.09);
+    const cock = Math.max(fired, this.chamberEmpty ? 1 : 0);
+    h.piece.quaternion.setFromAxisAngle(_Z, h.down * (1 - cock));
+    h.piece.position.copy(h.at).applyQuaternion(h.piece.quaternion).negate().add(h.at);
   }
 
   /** the pack's hands put where this gun has something for them to hold (see WeaponRig.reseat): after the movement of the frame is set */

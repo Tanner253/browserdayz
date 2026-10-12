@@ -42,6 +42,13 @@ export interface LootPoint {
 
 /** props that are searched as containers (loot is inside, never lying on top) */
 export const CRATE_KINDS = new Set(['wooden_crate_01', 'wooden_military_crate', 'old_military_crate', 'weapons_case']);
+/**
+ * Furniture that is searched as a crate is (2026-10-12: "the metal lockers found in the police station and the
+ * medical station should be lootable and have inventories"): the steel cabinet with two doors that stands in the
+ * headquarters and the hospital. Kept apart from the crates: a crate has no place for a thing on it, and these
+ * are asked nothing of where places are, so that not one place on the map is other than it was.
+ */
+export const SEARCHED_KINDS = new Set(['med_cabinet']);
 
 /**
  * Walls and doors are drawn before anything that grows or lies about (trees, grass and props
@@ -77,7 +84,7 @@ export type MatKey =
   | 'plaster_ext' | 'brick_ext' | 'planks_ext' | 'planks' | 'int_plaster' | 'int_painted'
   | 'floor_wood' | 'floor_lino' | 'floor_concrete' | 'roof_iron' | 'roof_tiles' | 'concrete' | 'trim' | 'mattress' | 'glass'
   | 'ceiling' | 'ward_wall' | 'office_wall' | 'tile_wall' | 'steel' | 'bitumen' | 'cell_wall'
-  | 'hosp_ext' | 'ochre_ext' | 'trim_white' | 'plinth' | 'ward_dado' | 'office_dado' | 'tile_dado' | 'cell_dado' | 'lamp'
+  | 'hosp_ext' | 'ochre_ext' | 'trim_white' | 'plinth' | 'cold_steel' | 'ward_dado' | 'office_dado' | 'tile_dado' | 'cell_dado' | 'lamp'
   | 'brick_red' | 'brick_white' | 'brick_rough' | 'plaster_grey' | 'plaster_yellow' | 'plaster_green' | 'planks_green' | 'planks_blue' | 'planks_brown'
   | 'roof_iron_clean' | 'roof_iron_green' | 'roof_iron_red' | 'roof_slate' | 'slab' | 'paving' | 'floor_garage';
 
@@ -131,6 +138,8 @@ const MATS: Record<Exclude<MatKey, 'glass'>, { tex: string; tile: number; color?
   office_dado: { tex: 'painted_plaster_wall', tile: 2.4, color: 0x8b7a56, surface: 'plaster' },
   tile_dado: { tex: 'painted_plaster_wall', tile: 1.6, color: 0x93abb0, surface: 'plaster' },
   cell_dado: { tex: 'damaged_plaster', tile: 2.2, color: 0x596672, surface: 'plaster' },
+  // the casing of the morgue's cold chambers: sheet steel, bare
+  cold_steel: { tex: 'painted_plaster_wall', tile: 1.6, color: 0xc4c8ca, surface: 'metal' },
   // the box of a ceiling light, its tubes long dead
   lamp: { tex: 'painted_plaster_wall', tile: 1.2, color: 0xe8e8e0, surface: 'metal' },
   // (2026-10-12: "we need more texture variations for our hand made buildings so they dont all use the same
@@ -1167,7 +1176,8 @@ export class Door {
       R.ColliderDesc.cuboid(this.half.x, this.half.y, this.half.z).setTranslation(width / 2, height / 2, 0).setCollisionGroups(WORLD_GROUPS).setSolverGroups(WORLD_GROUPS),
       this.body,
     );
-    physics.tag(this.collider, { surface: leaf?.surface ?? 'wood', owner: this });
+    // (a door of boards lets a round through: 2026-10-12, "wooden doors should be wall bangable". A leaf of steel does not.)
+    physics.tag(this.collider, { surface: leaf?.surface ?? 'wood', owner: this, thin: !leaf });
   }
 
   /** shut, still, and nobody standing where the leaf is: then it is a wall. Otherwise bodies pass. */
@@ -2322,7 +2332,10 @@ export class Buildings {
     const indoorFar = plot.type === 'barn' || plot.type === 'garage' ? 95 : 46;
     const inst = (id: string, lx: number, lz: number, rot: number, scale = 1, y = 0) => {
       const p = new THREE.Vector3(lx, y, lz).applyMatrix4(B);
-      this.world.props.push({ kind: id, x: p.x, y: p.y, z: p.z, rot: rot + plot.rot, scale, far: indoorFar });
+      // (A bed's frame is drawn as far off as its mattress is seen: the mattress is part of the building and is
+      // there at any distance, and from the far end of a ward the frames were gone from under them. 2026-10-12:
+      // "some of the props in the hospital are floating like the hospital bed tops".)
+      this.world.props.push({ kind: id, x: p.x, y: p.y, z: p.z, rot: rot + plot.rot, scale, far: id === 'old_bed_frame' ? Math.max(indoorFar, 110) : indoorFar });
     };
     // what stands on a floor (whose own level is y0), and where things are found on it
     const stock = (furniture: Furn[], loot: [number, number, number][], y0: number, usage: Usage[] = bp.usage) => {

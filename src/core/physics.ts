@@ -39,6 +39,8 @@ export interface ColliderTag {
   owner?: unknown;
   /** hit zone of a character (damage multiplier is looked up from this) */
   zone?: 'head' | 'torso' | 'legs';
+  /** a round goes through it and flies on: a curtain, a door of boards. A body, a look and a thrown thing are stopped by it as by anything */
+  thin?: boolean;
 }
 
 export class Physics {

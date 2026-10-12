@@ -45,9 +45,32 @@ function assetVersions(): Plugin {
   };
 }
 
+/**
+ * version.json: which version of the wire this build of the site speaks (PROTOCOL in src/net/protocol.ts). A page
+ * that the server has turned away for its version asks the site for this, to tell whether it is itself the old
+ * one (and is to be loaded again) or the server is (and is to be waited for): see the game's `start`.
+ */
+function siteVersion(): Plugin {
+  const said = () => JSON.stringify({ protocol: Number(/export const PROTOCOL = (\d+)/.exec(fs.readFileSync(path.resolve('src/net/protocol.ts'), 'utf8'))?.[1]) });
+  return {
+    name: 'site-version',
+    configureServer(server) {
+      server.middlewares.use('/version.json', (_req, res) => {
+        res.setHeader('content-type', 'application/json');
+        res.setHeader('cache-control', 'no-store');
+        res.end(said());
+      });
+    },
+    generateBundle() {
+      this.emitFile({ type: 'asset', fileName: 'version.json', source: said() });
+    },
+  };
+}
+
 export default defineConfig({
   plugins: [
     assetVersions(),
+    siteVersion(),
     {
       // The site's own news (api/updates.ts) is a function of the site, which the dev page has none of: here it
       // is run in place, so the menu shows the same posts at a desk as it does live. (Nothing else under /api is:

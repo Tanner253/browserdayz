@@ -3,7 +3,7 @@
 
 import * as THREE from 'three';
 import type RAPIER from '@dimforge/rapier3d-compat';
-import { CONTAINER, CRATE_KINDS, paintBlue } from './buildings';
+import { CONTAINER, CRATE_KINDS, SEARCHED_KINDS, paintBlue } from './buildings';
 import { spotKey } from './bunker';
 import { assets, type TreeEntry } from '../core/assets';
 import { physics, type Surface } from '../core/physics';
@@ -89,6 +89,15 @@ const SOLID: Record<string, [Surface, number]> = {
   med_sink: ['metal', 0.9],
   mop_bucket: ['metal', 0.6],
 };
+
+/** what a round goes through (2026-10-12: "the curtains and thin stuff needs to be wallbangable"): cloth on a frame */
+const THIN = new Set(['ward_curtain', 'screen_curtain']);
+/**
+ * Things whose solid part is not the whole of their model's box: how much of its depth is (the model's own z). The
+ * cold chambers are a face and what is behind it; before the face a door lies on the floor, a door's length out,
+ * and the box of the whole model stopped a body that far from the face.
+ */
+const SOLID_DEPTH: Record<string, [number, number]> = { body_lockers: [-1.5, 0.47] };
 
 /**
  * Where a tree's simpler model gives way to its baked card, metres. It was 115-130, which from
@@ -766,7 +775,9 @@ export class Vegetation {
               // (A bed is solid as high as its mattress, so that it can be got up on, and its head and its foot stand
               // up from that as boards of their own: as one box the height of its head, it was a wall a bed long.)
               const low = id === 'old_bed_frame' ? (BED_TOP * it.scale) / 2 : hy;
-              const col = physics.addStatic(physics.R.ColliderDesc.cuboid(hx * shrink, low, hz * shrink), surface, { x: it.x, y: it.y + low, z: it.z }, it.rot, drum);
+              const deep = SOLID_DEPTH[id], dz = deep ? ((deep[0] + deep[1]) / 2) * it.scale : 0, half = deep ? ((deep[1] - deep[0]) / 2) * it.scale : hz * shrink;
+              const col = physics.addStatic(physics.R.ColliderDesc.cuboid(hx * shrink, low, half), surface, { x: it.x + Math.sin(it.rot) * dz, y: it.y + low, z: it.z + Math.cos(it.rot) * dz }, it.rot, drum);
+              if (THIN.has(id)) physics.tagOf(col)!.thin = true;
               if (low < hy) {
                 for (const [end, tall] of [[-1, size.y], [1, size.y * 0.68]] as const) {
                   const dz = end * (hz - 0.03), half = (tall * it.scale) / 2;
@@ -775,7 +786,7 @@ export class Vegetation {
               }
               if (drum) drum.collider = col;
               this.solidAt.set(spotKey(it.x, it.z), col);
-              if (CRATE_KINDS.has(id)) this.crates.push({ kind: id, x: it.x, y: it.y, z: it.z, rot: it.rot, collider: col });
+              if (CRATE_KINDS.has(id) || SEARCHED_KINDS.has(id)) this.crates.push({ kind: id, x: it.x, y: it.y, z: it.z, rot: it.rot, collider: col });
             });
           }
         }

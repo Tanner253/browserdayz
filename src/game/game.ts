@@ -24,7 +24,7 @@ import { BARREL } from '../sim/barrels';
 import { EMOTE, EMOTES, EMOTE_GAP, SAY_RANGE, SAY_TIME, voiceOf } from '../sim/emotes';
 import { loadSave, writeSave, type SaveData } from '../sim/save';
 import { Net, playerName, publicId, remoteServer, serverStatus, setPlayerName } from '../net/client';
-import { F_AIM, F_BLEED, F_CROUCH, F_DANCE, F_DEAD, F_GROUND, F_GUARD, F_LEAN_L, F_LEAN_R, F_LIMP, F_LIGHT, F_PRONE, F_SEAT, F_SIT, F_SPRINT, F_SURRENDER, MAX_STAMINA, crateId, type Act, type CorpseInfo, type PlayerInfo, type Pose, type StoredItem, type S2C, type StashInfo } from '../net/protocol';
+import { F_AIM, F_BLEED, F_CROUCH, F_DANCE, F_DEAD, F_GROUND, F_GUARD, F_LEAN_L, F_LEAN_R, F_LIMP, F_LIGHT, F_PRONE, F_SEAT, F_SIT, F_SPRINT, F_SURRENDER, MAX_STAMINA, PROTOCOL, crateId, type Act, type CorpseInfo, type PlayerInfo, type Pose, type StoredItem, type S2C, type StashInfo } from '../net/protocol';
 import { Player } from './player';
 import { Avatar, AVATAR_LAYER, DEATH_REST, FP_BODY_LAYER, GEAR_SHOWN, type Hold, facepiece } from './avatar';
 import { lookFor } from './look';
@@ -97,7 +97,7 @@ export interface WorldSystems {
 
 /** seconds with a shovel to put a stash under the ground, or to bring one up */
 const DIG_SECONDS = BURY.seconds;
-/** how far off an admin's free camera shows names over heads, metres */
+/** how far off an admin's free camera shows a name over a head at its full strength, metres: further off it is there still, and faint */
 const ESP_RANGE = 220;
 
 interface TimedAction {
@@ -856,7 +856,27 @@ export class Game {
       this.hud.setQueue({ pos, of, max }, () => this.net.leaveQueue());
       document.title = `(${pos}) in line · ${this.title}`;
     };
-    const welcome = await this.net.connect(name, (text) => this.hud.showStart(true, false, text));
+    let welcome = await this.net.connect(name, (text) => this.hud.showStart(true, false, text));
+    // Turned away for being of another version than the server. Which of the two is behind is told by the site as
+    // it is served this moment (version.json, made with the build). If that is not this page, this page is the old
+    // one and is loaded again. If it is, the server is the one behind: a new site goes out before its server does
+    // (2026-10-12: "why not just deploy the front end early so its ready for the server when it launches"), and it
+    // is waited for here, asked again every few seconds, for as long as ten minutes.
+    for (const began = performance.now(); !welcome && this.net.outdated && performance.now() - began < 600_000; ) {
+      const site = (await fetch(`/version.json?t=${Date.now()}`, { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).catch(() => null)) as { protocol?: number } | null;
+      if (site && typeof site.protocol === 'number' && site.protocol !== PROTOCOL) {
+        // (once in a while only: a page that came back the same is not asked for over and over)
+        const last = Number(sessionStorage.getItem('zona:reloaded') ?? 0);
+        if (Date.now() - last > 20_000) {
+          sessionStorage.setItem('zona:reloaded', String(Date.now()));
+          return void location.reload();
+        }
+      }
+      this.input.unlock();
+      this.hud.showStart(true, false, 'The server is being updated. You are let in as soon as it is up');
+      await new Promise((r) => setTimeout(r, 4000));
+      welcome = await this.net.connect(name);
+    }
     this.hud.setQueue(null);
     document.title = this.title;
     if (welcome) {
@@ -2249,6 +2269,8 @@ export class Game {
   private powers = { god: false, hidden: false, clip: false, voidInv: false, voidTag: false };
   /** the view has left the body: where it is, and which way it looks */
   private freecam: { pos: THREE.Vector3; yaw: number; pitch: number } | null = null;
+  /** how fast the free camera flies, metres a second (the wheel changes it) */
+  private freeSpeed = 14;
 
   /** an order, sent as if it had been typed */
   private order(line: string) {
@@ -2262,7 +2284,7 @@ export class Game {
 
   private showPowers() {
     const seen = this.watching ? this.remotes.get(this.watching.id)?.name : '';
-    const on = [this.powers.god && 'GOD MODE', this.powers.hidden && 'VANISHED', this.powers.clip && 'NOCLIP', this.freecam && `${seen ? `WATCHING ${seen.toUpperCase()}` : 'FREE CAMERA'}  ·  H: BODY HERE  ·  K: BACK`].filter(Boolean);
+    const on = [this.powers.god && 'GOD MODE', this.powers.hidden && 'VANISHED', this.powers.clip && 'NOCLIP', this.freecam && `${seen ? `WATCHING ${seen.toUpperCase()}` : 'FREE CAMERA'}  ·  ${Math.round(this.freeSpeed)} M/S (WHEEL)  ·  H: BODY HERE  ·  K: BACK`].filter(Boolean);
     this.hud.setPowers(on.join('  ·  '));
     this.adminUI?.setSelf(this.adminSelf());
   }
@@ -2346,9 +2368,11 @@ export class Game {
   }
 
   /**
-   * Names over heads, for an admin whose view has left their body: everybody within ESP_RANGE of the view, through
-   * whatever is in the way, with how far off they are. (Asked for 2026-10-12: "when im in freecam or spectate i
-   * should see everyone names in text above their heads once i get close to them".)
+   * Names over heads, for an admin whose view has left their body: everybody, however far, through whatever is in
+   * the way, with how far off they are (faint past ESP_RANGE). (Asked for 2026-10-12: "when im in freecam or
+   * spectate i should see everyone names in text above their heads once i get close to them"; and the same day,
+   * "i want to see everyone name from the sky from a distance ... like a cheat menu would so i can easily find
+   * people manually": so no distance is too far.)
    */
   private drawNames(cam: THREE.PerspectiveCamera) {
     if (!this.freecam || this.role !== 'admin') {
@@ -2360,10 +2384,9 @@ export class Game {
     const out: { x: number; y: number; text: string; faint?: boolean }[] = [], v = new THREE.Vector3();
     const label = (name: string, at: THREE.Vector3, up: number, more: string, faint: boolean) => {
       const d = at.distanceTo(cam.position);
-      if (d > ESP_RANGE) return;
       v.set(at.x, at.y + up, at.z).project(cam);
       if (v.z < -1 || v.z > 1 || Math.abs(v.x) > 1.05 || Math.abs(v.y) > 1.05) return;
-      out.push({ x: (v.x * 0.5 + 0.5) * 100, y: (-v.y * 0.5 + 0.5) * 100, text: `${name} · ${Math.round(d)} m${more}`, faint });
+      out.push({ x: (v.x * 0.5 + 0.5) * 100, y: (-v.y * 0.5 + 0.5) * 100, text: `${name} · ${Math.round(d)} m${more}`, faint: faint || d > ESP_RANGE });
     };
     for (const r of this.remotes.values()) label(r.name, r.pos, r.alive ? 1.95 : 0.5, `${r.alive ? '' : ' · dead'}${r.ghost ? ' · vanished' : ''}`, !r.alive);
     label('you', this.player.pos, 1.95, '', true);
@@ -2385,7 +2408,14 @@ export class Game {
     const fwd = (input.held('KeyW') ? 1 : 0) - (input.held('KeyS') ? 1 : 0);
     const str = (input.held('KeyD') ? 1 : 0) - (input.held('KeyA') ? 1 : 0);
     const up = (input.held('Space') ? 1 : 0) - (input.held('ControlLeft') || input.held('KeyC') ? 1 : 0);
-    const speed = input.held('ShiftLeft') ? 60 : input.held('AltLeft') ? 3 : 14;
+    // (the wheel: how fast it flies, a third more or less a notch. 2026-10-12: "when im in freecam scrollwheel allows
+    // me to adjust my flight speed, so i can fly much faster, if i want". Shift is four times that, Alt a fifth.)
+    if (input.wheel !== 0) {
+      this.freeSpeed = THREE.MathUtils.clamp(this.freeSpeed * Math.pow(1.3, -input.wheel), 2, 400);
+      input.wheel = 0;
+      this.showPowers();
+    }
+    const speed = this.freeSpeed * (input.held('ShiftLeft') ? 4 : input.held('AltLeft') ? 0.2 : 1);
     const cp = Math.cos(f.pitch), sy = Math.sin(f.yaw), cy = Math.cos(f.yaw);
     const d = new THREE.Vector3(-sy * cp * fwd + cy * str, Math.sin(f.pitch) * fwd + up, -cy * cp * fwd - sy * str);
     if (d.lengthSq() > 1) d.normalize();

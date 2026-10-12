@@ -61,6 +61,18 @@ IN_BUNKER.push(['mpa', 0.9], ['mag_mpa', 1.1], ['colt', 0.5], ['mag_colt', 0.6],
 /** and on its racks, the long things */
 const ON_RACKS: Table = [['mpa', 1.5], ['benelli', 3], ['mosin', 2], ['ar15', 2], ['ak', 1.5], ['box_556', 1.2], ['box_739', 1], ['ammo_12', 2], ['box_12', 1.5], ['box_762', 1.5], ['suppressor_12', 0.8], ['suppressor_762', 0.8], ['pu_scope', 1.2], ['red_dot', 0.8], ['gun_light', 0.8]];
 
+/**
+ * The steel cabinets of the hospital and of the police (2026-10-12: "the metal lockers found in the police station
+ * and the medical station should be lootable and have inventories"). A hospital's holds what a hospital has, and
+ * a great deal of it ("the hospital loot pool leans heavily into meds, lots of stims ... and medkits"); a
+ * constable's holds what the village's police carried: a pistol now and then, what it fires, a vest.
+ */
+const IN_MEDICINE: Table = [['bandage', 4], ['stim', 4], ['firstaid', 2.6], ['splint', 1.6], ['flask', 0.4], ['work_gloves', 0.3]];
+const IN_POLICE: Table = [
+  ['box_9mm', 3], ['ammo_9mm', 2.4], ['box_45', 1.2], ['ammo_45', 1.4], ['mag_m9', 1.6], ['mag_colt', 1.6], ['m9', 0.9], ['colt', 1],
+  ['soft_vest', 0.9], ['patrol_cap', 0.9], ['flashlight', 0.9], ['bandage', 1.4], ['stim', 0.6], ['gun_light', 0.3], ['suppressor_9', 0.2], ['thermos', 0.5], ['cigarettes', 0.5],
+];
+
 export interface CrateSpec {
   label: string;
   w: number;
@@ -75,6 +87,10 @@ export const CRATE_SPECS: Record<string, CrateSpec> = {
   // (the hard case that stands wherever a military crate or an ammunition crate stood, and a little better filled)
   weapons_case: { label: 'Weapons Case', w: 8, h: 4, table: MILITARY, count: [2, 5] },
   wooden_crate_01: { label: 'Wooden Crate', w: 6, h: 3, table: CIVILIAN, count: [1, 3] },
+  // a steel cabinet (see IN_MEDICINE). The same cabinet in a police building is filled as a constable's locker: the
+  // server knows which it is by where it stands, and the game is told nothing but what is in it.
+  med_cabinet: { label: 'Locker', w: 4, h: 6, table: IN_MEDICINE, count: [2, 4] },
+  police_locker: { label: 'Locker', w: 4, h: 6, table: IN_POLICE, count: [1, 3] },
   // what is searched in the bunker and is no crate (see bunkerCrates): some of them are empty
   locker: { label: 'Locker', w: 4, h: 6, table: IN_BUNKER, count: [0, 2] },
   gun_rack: { label: 'Weapon Rack', w: 8, h: 4, table: ON_RACKS, count: [1, 3] },
@@ -83,6 +99,8 @@ export const CRATE_SPECS: Record<string, CrateSpec> = {
 };
 /** the kinds that are the bunker's own furniture: what they hold is theirs whatever is said of where they stand */
 const OF_BUNKER = new Set(['locker', 'gun_rack', 'bunker_cabinet', 'bunker_desk']);
+/** and the kinds that hold what is theirs wherever they stand (a cabinet under the gas would else be a crate of rifles) */
+const OWN_TABLE = new Set([...OF_BUNKER, 'med_cabinet', 'police_locker']);
 
 /** seconds an emptied crate stays empty before it refills (only while nobody is near): five minutes, it was twenty */
 export const CRATE_RESTOCK = 300;
@@ -94,7 +112,7 @@ export const CRATE_RESTOCK = 300;
 export function fillCrate(c: Container, kind: string, rnd: () => number = Math.random, rich: boolean | 'bunker' = false) {
   const spec = CRATE_SPECS[kind];
   if (!spec) return;
-  const own = OF_BUNKER.has(kind);
+  const own = OWN_TABLE.has(kind);
   const table = own ? spec.table : rich === 'bunker' ? IN_BUNKER : rich ? UNDER_GAS : spec.table;
   const total = table.reduce((s, [, w]) => s + w, 0);
   const n = spec.count[0] + Math.floor(rnd() * (spec.count[1] - spec.count[0] + 1)) + (rich && !own ? 1 : 0);

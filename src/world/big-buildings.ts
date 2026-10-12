@@ -123,7 +123,7 @@ export function hospitalPlan(): Blueprint {
   g.put('water_cooler', 5.95, 2.3, -Q).put('extinguisher_box', -6.13, 2.3, Q, 1.05);
   g.floor([-2.6, 5.6], [2.8, 6.0], [-3.8, 2.6]);
   // the dispensary: a counter behind the hatch, shelves round the walls and down the middle
-  g.top('lab_counter', 8.7, 2.05, 0, 0.9, 3);
+  g.top('lab_counter', 8.7, 1.82, 0, 0.9, 3);
   g.shelves(6.77, 3.9, Q).shelves(6.77, 5.1, Q, [0, 1, 2, 3]).shelves(6.77, 6.3, Q).shelves(12.43, 3.9, -Q).shelves(12.43, 5.1, -Q, [0, 1, 2, 3]).shelves(12.43, 6.3, -Q);
   g.shelves(9.6, 4.4, Q, [1, 2]).shelves(9.6, 5.6, Q, [0, 2]).put('med_cabinet', 9.6, 7.5, PI);
   g.floor([8.2, 3.6], [11.2, 4.6]);
@@ -143,13 +143,23 @@ export function hospitalPlan(): Blueprint {
   g.top('lab_counter', 1.7, -7.46, 0, 0.9).put('autopsy_scales', 2.4, -7.46, 0, 0.89).put('instrument_tray', 1.2, -7.46, 0.2, 0.9).put('med_sink', 2.73, -3.0, -Q).top('surgical_trolley', -5.6, -2.9, 0.2, 0.9).put('med_cabinet', -6.4, -7.5, 0);
   g.floor([-0.6, -2.6], [1.6, -2.8]);
   // the boiler room, and the door for the coal
-  g.put('bunker_machine', 8.55, -4.3, Q).put('bunker_pipes', 3.46, -4.6, Q).put('utility_box_01', 4.0, -7.5, 0).put('utility_box_01', 3.56, -2.4, Q).put('wooden_crate_01', 4.7, -5.9, 0.4);
+  g.put('bunker_machine', 8.55, -4.3, -Q).put('bunker_pipes', 3.46, -4.6, Q).put('utility_box_01', 4.0, -7.5, 0).put('utility_box_01', 3.56, -2.4, Q).put('wooden_crate_01', 4.7, -5.9, 0.4);
   g.floor([6.0, -3.2], [6.4, -6.0], [5.0, -4.2]);
   // records, and whoever watched the door
   g.top('metal_office_desk', 12.7, -4.2, 0, 0.81, 2).put('SchoolChair_01', 12.7, -3.35, PI).top('metal_office_desk', 16.6, -6.4, PI, 0.81, 2).put('SchoolChair_01', 16.6, -7.3, 0);
   g.case('wooden_bookshelf_worn', 19.28, -3.0, -Q, [0.67, 1.28]).case('wooden_bookshelf_worn', 19.28, -4.5, -Q, [0.39, 1.28]).case('wooden_bookshelf_worn', 19.28, -6.0, -Q, [0.67, 0.96]);
   g.case('Shelf_01', 9.85, -4.0, Q, [0.66, 1.22]).case('Shelf_01', 9.85, -5.2, Q, [0.38, 0.94]).top('painted_wooden_cabinet', 14.2, -7.47, 0, 1.2).put('Television_01', 13.7, -7.45, 0.2, 1.18);
   g.floor([14.8, -3.0], [18.0, -4.4]);
+
+  // The cold chambers are a face of nine doors with two of the chambers behind it and nothing else: from the side it
+  // was a wall standing free, with room behind it (2026-10-12: "the crematorium needs a silver box built around it
+  // it seems like its only the slots themselves and you can walk behind them a bit"). Cased in steel: a side at each
+  // end of the face, from it back to the wall behind, and a top over the two.
+  const cold: Fitting[] = [
+    { key: 'cold_steel', x0: -9.56, x1: -7.52, y0: 0, y1: 2.77, z0: -6.645, z1: -6.605 },
+    { key: 'cold_steel', x0: -9.56, x1: -7.52, y0: 0, y1: 2.77, z0: -2.59, z1: -2.55 },
+    { key: 'cold_steel', x0: -9.56, x1: -7.52, y0: 2.77, y1: 2.81, z0: -6.645, z1: -2.55 },
+  ];
 
   const ground: WallDef[] = [
     // (the dispensary's windows were boarded when the looting began, and one by the way in was put through)
@@ -366,7 +376,7 @@ export function hospitalPlan(): Blueprint {
     // (out at either end from every floor and from the roof)
     escapes: [{ side: 'left', at: 0, dir: -1, floors: 2, roof: true }, { side: 'right', at: 0, dir: -1, floors: 2, roof: true }],
     fittings: [
-      { level: 0, list: [...outside, ...lamps(3.2, [1, 3, 4, 6, 7, 9, 10, 12], [1, 2, 3, 5, 7, 9, 11, 12])] },
+      { level: 0, list: [...outside, ...cold, ...lamps(3.2, [1, 3, 4, 6, 7, 9, 10, 12], [1, 2, 3, 5, 7, 9, 11, 12])] },
       { level: 1, list: [...pillars, ...lamps(3.0, [0, 2, 4, 6, 7, 9, 11, 13], [1, 3, 5, 7, 8, 10, 12])] },
       { level: 2, list: lamps(3.0, [0, 2, 4, 6, 8, 10, 12], [1, 3, 5, 7, 9, 11, 12]) },
     ],
@@ -771,7 +781,7 @@ export function policeCellsPlan(): Blueprint {
   for (const [k, z] of [-4.5, -1.5, 1.5, 4.4].entries()) g.bed(-4.4, z, 0, k !== 1);
   g.put('painted_wooden_chair_01', -2.2, 1.9, 2.4).floor([-2.6, -4.6], [-2.4, -1.2], [-2.8, 4.8]);
   // the guard: a desk, the keys
-  g.top('metal_office_desk', 3.2, -5.45, 0, 0.81, 2).put('SchoolChair_01', 3.2, -4.6, PI).case('Shelf_01', 2.4, -3.25, PI, [0.66, 1.22]).floor([2.2, -4.2]);
+  g.top('metal_office_desk', 3.2, -5.3, 0, 0.81, 2).put('SchoolChair_01', 3.2, -4.6, PI).case('Shelf_01', 2.4, -3.25, PI, [0.66, 1.22]).floor([2.2, -4.2]);
   // booking: a counter, and what was taken off them
   g.top('lab_counter', 3.2, -0.42, PI, 0.9, 2).shelves(3.3, -2.63, 0, [0, 1]).put('cardboard_box_01', 4.5, -2.5, 0.3).floor([3.2, -1.6]);
   // the visitors' room: a table between two chairs

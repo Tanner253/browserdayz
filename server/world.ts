@@ -5,7 +5,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { bunkerPlace, generateWorld, heightAt } from '../src/world/worldgen';
 import { BUNKER, bunkerAt, bunkerCrates, levelY } from '../src/sim/bunker';
-import { Buildings, CRATE_KINDS } from '../src/world/buildings';
+import { Buildings, CRATE_KINDS, SEARCHED_KINDS } from '../src/world/buildings';
 import { assets } from '../src/core/assets';
 import { crateId } from '../src/net/protocol';
 import { pickDropSite } from '../src/sim/drops';
@@ -34,7 +34,7 @@ export function buildWorldData(root: string) {
   buildings.plan();
   const crates: CrateSpot[] = world.props
     .map((p) => ({ p, kind: p.kind.split(/[#@]/)[0] }))
-    .filter(({ kind }) => CRATE_KINDS.has(kind))
+    .filter(({ kind }) => CRATE_KINDS.has(kind) || SEARCHED_KINDS.has(kind))
     .map(({ p, kind }) => ({ cid: crateId(p.x, p.z), kind, x: p.x, y: p.y, z: p.z }));
   // (and what is searched in the bunker that is no crate: its lockers, racks, cabinets and desks)
   const under = bunkerPlace(world);

@@ -111,9 +111,14 @@ export class Net {
   private ws: WebSocket | null = null;
   private handlers = new Map<string, ((m: S2C) => void)[]>();
   private kicked = '';
+  private kickedV: number | undefined;
   /** why the server turned us away before we got in (full, outdated client) */
   get refused() {
     return this.online ? '' : this.kicked;
+  }
+  /** turned away for being of another version than the server (a server from before it said which it is says so in words) */
+  get outdated() {
+    return !this.online && !!this.kicked && (this.kickedV !== undefined ? this.kickedV !== PROTOCOL : /updated/i.test(this.kicked));
   }
   onClose: (reason: string) => void = () => {};
   /**
@@ -149,6 +154,9 @@ export class Net {
    * while it wakes up (the first request can take a minute).
    */
   async connect(name: string, onStatus: (text: string) => void = () => {}): Promise<Welcome | null> {
+    // (asked again after being turned away: what was said then is not what is said now)
+    this.kicked = '';
+    this.kickedV = undefined;
     const remote = remoteServer();
     if (remote) {
       // any answer at all means it is awake; the request itself is what wakes it
@@ -231,7 +239,10 @@ export class Net {
           this.onQueue(m.pos, m.of, m.max);
           return;
         }
-        if (m.t === 'kick') this.kicked = m.reason;
+        if (m.t === 'kick') {
+          this.kicked = m.reason;
+          this.kickedV = m.v;
+        }
         if (m.t === 'pong') {
           this.ping = Math.round(performance.now() - m.n);
           return;

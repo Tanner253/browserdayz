@@ -205,7 +205,9 @@ function loadWorld() {
   for (const c of world.crates) {
     const spec = CRATE_SPECS[c.kind];
     if (!spec) continue;
-    boxes.set(c.cid, { cid: c.cid, kind: 'crate', w: spec.w, h: spec.h, items: [], x: c.x, y: c.y, z: c.z, rot: 0, crate: c.kind, emptiedAt: -1 });
+    // (a steel cabinet is filled with what its building kept: in a police building a constable's locker, elsewhere a medicine cabinet)
+    const kind = c.kind === 'med_cabinet' && world.buildings.some((q) => q.type.startsWith('police') && Math.hypot(q.x - c.x, q.z - c.z) < 17) ? 'police_locker' : c.kind;
+    boxes.set(c.cid, { cid: c.cid, kind: 'crate', w: spec.w, h: spec.h, items: [], x: c.x, y: c.y, z: c.z, rot: 0, crate: kind, emptiedAt: -1 });
   }
   let saved: {
     rev: number;
@@ -2696,7 +2698,7 @@ function handle(c: Client, m: C2S) {
 
 function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
   if (m.v !== PROTOCOL) {
-    ws.send(JSON.stringify({ t: 'kick', reason: 'This game was updated. Reload the page.' } satisfies S2C));
+    ws.send(JSON.stringify({ t: 'kick', reason: 'This game was updated. Reload the page.', v: PROTOCOL } satisfies S2C));
     ws.close();
     return null;
   }
@@ -3139,7 +3141,7 @@ function serve(req: http.IncomingMessage, res: http.ServerResponse) {
     // readable from a client hosted somewhere else (e.g. Vercel) for the start-screen player count
     res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'no-store' });
     // (places: how many different addresses the players come from. One, with several players on, means the host is not passing addresses through.)
-    res.end(JSON.stringify({ ok: true, boot: BOOT, why: RESTART.why, kept: KEPT.how, players: [...clients.values()].filter((c) => !c.asleep).length, asleep: [...clients.values()].filter((c) => c.asleep).length, max: MAX_PLAYERS, queue: queue.length, uptime: Math.round(process.uptime()), checks: CHECKS, flagged, keptOff: BANS.temp.size, loot: economy.loot.size, places: new Set([...clients.values()].map((c) => c.ip)).size }));
+    res.end(JSON.stringify({ ok: true, boot: BOOT, protocol: PROTOCOL, why: RESTART.why, kept: KEPT.how, players: [...clients.values()].filter((c) => !c.asleep).length, asleep: [...clients.values()].filter((c) => c.asleep).length, max: MAX_PLAYERS, queue: queue.length, uptime: Math.round(process.uptime()), checks: CHECKS, flagged, keptOff: BANS.temp.size, loot: economy.loot.size, places: new Set([...clients.values()].map((c) => c.ip)).size }));
     return;
   }
   // the website's function asks here what it has just been asked to do with the lists of admins and bans (see siteAdmin)
