@@ -134,6 +134,8 @@ const tin = { uid: 'keep-test-tin', id: 'beans', qty: 1 };
 let at: [number, number] = [0, 0];
 for (let x = -300, found = false; x <= 300 && !found; x += 20) for (let z = -300; z <= 300 && !found; z += 20) if (!noBurying(x + 2, ground(x + 2, z), z, ground(x + 2, z), world.pois, world.buildings)) [at, found] = [[x, z], true];
 const stash = { uid: 'keep-test-stash', x: at[0] + 2, y: ground(at[0] + 2, at[1]), z: at[1], rot: 0.5, item: 'black_bag' };
+/** a suitcase left lying beside it, with a tin in it too: kept as it lies, with no shovel put to it */
+const lying = { uid: 'keep-test-suitcase', id: 'old_suitcase', qty: 1, cargo: [{ item: { uid: 'keep-test-tin-2', id: 'beans', qty: 1 }, x: 2, y: 1, rot: false }] };
 
 // ---- the first run: nothing was kept; she comes in, carries, puts a stash down with a tin in it
 await withServer(async (log) => {
@@ -142,27 +144,23 @@ await withServer(async (log) => {
   assert.equal(ann.last('welcome')!.me, null);
   ann.send({ t: 's', p: [at[0], ground(...at), at[1], 1.25, 0, 0], w: null, m: [] });
   ann.send({ t: 'me', inv: { slots: { primary: rifle }, active: null, containers: [] }, vitals: { health: 64, energy: 50, water: 40, stamina: 300, bleeding: false } });
-  // (a black bag put down, a tin put in it, and the bag buried)
-  ann.send({ t: 'stash+', s: stash });
-  await sleep(300);
-  ann.send({ t: 'copen', cid: stash.uid });
-  await sleep(300);
-  ann.send({ t: 'cset', cid: stash.uid, items: [{ ...tin, x: 0, y: 0, rot: false }] });
-  ann.send({ t: 'cclose', cid: stash.uid });
+  // (a black bag dropped with a tin in it, and buried; and a suitcase dropped beside it and left lying)
+  ann.send({ t: 'drop', l: { item: { uid: stash.uid, id: 'black_bag', qty: 1, cargo: [{ item: tin, x: 0, y: 0, rot: false }] }, x: stash.x, y: stash.y, z: stash.z, rot: stash.rot } });
+  ann.send({ t: 'drop', l: { item: lying, x: stash.x + 1.5, y: ground(stash.x + 1.5, stash.z), z: stash.z, rot: 1 } });
   ann.send({ t: 's', p: [at[0], ground(...at), at[1], 1.25, 0, 0], w: 'shovel', m: [] });
   await sleep(300);
   ann.send({ t: 'bury', uid: stash.uid, on: true });
   await sleep(300);
-  assert.equal(ann.last('stash~')?.buried, true, 'the stash she put down could not be buried');
+  assert.ok(ann.got.some((m) => m.t === 'stash+' && m.s.uid === stash.uid && m.s.buried), 'the bag she dropped could not be buried');
   // (written once she was in, and again as time goes by: the second has what she did since)
-  for (let k = 0; k < 120 && !/time has gone by: 1 characters and 1 stashes/.test(log()); k++) await sleep(100);
-  assert.ok(/\[keep\] time has gone by: 1 characters and 1 stashes written/.test(log()), `nothing was written to the site as time went by:\n${log().slice(-600)}`);
+  for (let k = 0; k < 120 && !/time has gone by: 1 characters and 2 stashes/.test(log()); k++) await sleep(100);
+  assert.ok(/\[keep\] time has gone by: 1 characters and 2 stashes written/.test(log()), `nothing was written to the site as time went by:\n${log().slice(-600)}`);
   const file = kept();
   assert.ok(file && !file.final && file.z.length > 100, 'the site holds nothing, or holds a last word that was never said');
   const raw = files.get('zona/world.json')!.text;
   assert.ok(![ann.key, 'keep-test-rifle', 'keep-test-stash', 'Ann'].some((s) => raw.includes(s)), 'what the site holds can be read by whoever comes by it');
   checks++;
-  console.log('  ok  what a player carries and the stash she put down are written to the site, sealed');
+  console.log('  ok  what a player carries, the bag she buried and the suitcase she left lying are written to the site, sealed');
 });
 
 // ---- nobody but the game server is answered
@@ -177,7 +175,7 @@ console.log('  ok  the site answers nobody about it but the game server');
 const before = writes;
 await withServer(async (log) => {
   assert.ok(await ann.join(), `she was not let in after the restart:\n${log().slice(-500)}`);
-  assert.ok(/\[keep\] 1 characters and 1 stashes as they were kept/.test(log()), `what was kept was not read:\n${log().slice(-500)}`);
+  assert.ok(/\[keep\] 1 characters and 2 stashes as they were kept/.test(log()), `what was kept was not read:\n${log().slice(-500)}`);
   const w = ann.last('welcome')!;
   assert.ok(Math.hypot(w.spawn.x - at[0], w.spawn.z - at[1]) < 0.5 && Math.abs(w.spawn.yaw - 1.25) < 0.01, `she is not where she was: ${JSON.stringify(w.spawn)}`);
   assert.equal((w.me?.inv.slots as Record<string, { id: string } | null>).primary?.id, 'ak', 'she has not what she carried');
@@ -185,11 +183,12 @@ await withServer(async (log) => {
   assert.ok(w.stashes.some((s) => s.uid === stash.uid && Math.abs(s.x - stash.x) < 0.01 && s.buried && s.item === 'black_bag'), 'her stash is not where she buried it, or not buried, or not the bag it was');
   ann.send({ t: 's', p: [at[0], ground(...at), at[1], 1.25, 0, 0], w: 'shovel', m: [] });
   await sleep(200);
+  const left = w.loot.find((l) => l.uid === lying.uid);
+  assert.ok(left && left.item.id === 'old_suitcase' && left.item.cargo?.[0].item.id === 'beans' && left.item.cargo[0].x === 2 && Math.abs(left.x - stash.x - 1.5) < 0.01, 'the suitcase she left lying is not where it lay, or has not what was in it');
   ann.send({ t: 'bury', uid: stash.uid, on: false });
-  await sleep(300);
-  ann.send({ t: 'copen', cid: stash.uid });
   await sleep(400);
-  assert.deepEqual(ann.last('cdata')?.items.map((i) => i.id), ['beans'], 'what was in her stash is not in it');
+  const dug = ann.got.filter((m): m is Extract<S2C, { t: 'loot+' }> => m.t === 'loot+').map((m) => m.l).find((l) => l.uid === stash.uid);
+  assert.deepEqual(dug?.item.cargo?.map((q) => q.item.id), ['beans'], 'what was in the bag she buried is not in it when it is dug up');
   // (and somebody who was never here begins as anybody does)
   assert.ok(await bob.join());
   assert.equal(bob.last('welcome')!.me, null);
@@ -197,7 +196,7 @@ await withServer(async (log) => {
   for (let k = 0; k < 60 && writes === before; k++) await sleep(100);
   assert.ok(writes > before, 'the server that is alive now never said so');
   checks++;
-  console.log('  ok  after the server is stopped dead and started again: she is where she was, as she was, with what she carried, and her stash has what she put in it');
+  console.log('  ok  after the server is stopped dead and started again: she is where she was, as she was, with what she carried; the bag she buried and the suitcase she left lying have what she put in them');
 });
 
 site.close();

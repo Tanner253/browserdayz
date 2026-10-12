@@ -28,7 +28,6 @@ export interface InvActions {
   onGround(w: WorldItem, how: 'use' | 'open'): void;
   /** take the rounds out of a weapon */
   unload(item: ItemInstance): void;
-  place(item: ItemInstance): void;
   /** carried weapons this attachment can be fitted to right now */
   attachTargets(att: ItemInstance): ItemInstance[];
   attach(att: ItemInstance, weapon: ItemInstance): void;
@@ -660,7 +659,6 @@ export class InventoryUI {
         this.render();
       } });
     }
-    if (d.category === 'stash') out.push({ label: 'Place', run: () => this.actions.place(it) });
     if (d.attach) {
       for (const w of this.actions.attachTargets(it)) out.push({ label: `Attach to ${ITEMS[w.id].name}`, run: () => this.actions.attach(it, w), primary: true });
     }

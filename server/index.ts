@@ -160,13 +160,35 @@ function* things(inv: SerializedInventory | null): Generator<ItemInstance> {
 }
 const invented = (it: ItemInstance) => GUARDED.has(it.id) && !issued.has(it.uid);
 
+/** (what is kept is listed further down: until that list is made, nothing has changed that it does not know of) */
+let keptListed = false;
+const keptChanged = () => {
+  if (keptListed) KEPT.dirty = true;
+};
 const economy = new Economy(world.lootPoints, {
   spawn: (l) => {
     issue(l.item);
+    // (a case, a suitcase or a bag somebody dropped is kept between restarts: see `keptAt`)
+    if (l.keptAt !== undefined) keptChanged();
     broadcast({ t: 'loot+', l });
   },
-  despawn: (l) => broadcast({ t: 'loot-', uid: l.uid }),
+  despawn: (l) => {
+    if (l.keptAt !== undefined) keptChanged();
+    broadcast({ t: 'loot-', uid: l.uid });
+  },
 });
+// A container left lying is not there for ever: an empty one is cleared away after STASH_EMPTY_S (a week), one with
+// anything in it after STASH_FULL_S (a fortnight). One under the ground stays until it is dug up. (2026-10-12:
+// "unburried stashes autodelete after 7 days of no interaction. 14 days if the unburries stash has an item(s) within".)
+economy.containerLife = { empty: (Number(process.env.STASH_EMPTY_S) || 7 * 86400) * 1000, full: (Number(process.env.STASH_FULL_S) || 14 * 86400) * 1000 };
+
+/**
+ * A stash as a thing to carry, and a thing carried as what a stash holds. A case, a suitcase or a bag is an item
+ * like any other: dropped, it lies on the ground as one (with what is in it), is picked up as one, and only a
+ * shovel makes anything else of it. Buried, it is a `Box` under the ground, going by the same number as the item.
+ */
+const stashItem = (b: Box): ItemInstance => ({ uid: b.cid, id: b.item ?? 'stash_kit', qty: 1, ...(b.items.length ? { cargo: b.items.map(({ x, y, rot, ...item }) => ({ item, x, y, rot })) } : {}) }) as ItemInstance;
+const cargoOf = (item: ItemInstance): Box['items'] => (item.cargo ?? []).map((q) => ({ ...q.item, x: q.x, y: q.y, rot: q.rot }));
 
 function fillBox(b: Box) {
   const spec = CRATE_SPECS[b.crate ?? ''];
@@ -204,7 +226,10 @@ function loadWorld() {
       if (b.kind === 'crate') {
         const cur = boxes.get(b.cid);
         if (cur) Object.assign(cur, { items: b.items, emptiedAt: b.emptiedAt });
-      } else if (b.kind === 'stash') boxes.set(b.cid, b);
+      } else if (b.kind === 'stash') {
+        if (b.buried) boxes.set(b.cid, b);
+        else if (!economy.loot.has(b.cid)) economy.drop(stashItem(b), b.x, b.y, b.z, b.rot).keptAt = b.touchedAt ?? Date.now();
+      }
     }
     for (const [i, open, swing] of saved.doors ?? []) doors.set(i, [open, swing]);
     economy.tick(0, []);
@@ -819,13 +844,17 @@ const KEPT = {
   savedAt: 0,
   busy: false,
 };
+keptListed = true;
 const pause = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));
 
 interface Snapshot {
   rev: number;
   wipe: string;
   chars: [string, Record_][];
+  /** what is under the ground */
   stashes: Box[];
+  /** the containers lying on it: each a thing with what is in it, where it lies, and when it was dropped */
+  loose?: { item: ItemInstance; x: number; y: number; z: number; rot: number; at: number }[];
 }
 interface KeptFile { at: string; boot: string; final: boolean; z: string }
 
@@ -861,7 +890,8 @@ function snapshot(): Snapshot {
   for (const c of clients.values()) if (c.alive && c.inv) chars.set(keyHash(c.key), { pose: c.pose, inv: c.inv, vitals: c.vitals, alive: true, leftAt: now });
   // (no more of them than can be carried: the newest, if it ever came to that)
   const newest = [...chars].sort((a, b) => b[1].leftAt - a[1].leftAt).slice(0, 6000);
-  return { rev: WORLD_REV, wipe: WIPE, chars: newest, stashes: [...boxes.values()].filter((b) => b.kind === 'stash') };
+  const loose = [...economy.loot.values()].filter((l) => l.keptAt !== undefined).map((l) => ({ item: l.item, x: l.x, y: l.y, z: l.z, rot: l.rot, at: l.keptAt! }));
+  return { rev: WORLD_REV, wipe: WIPE, chars: newest, stashes: [...boxes.values()].filter((b) => b.kind === 'stash' && b.buried), loose };
 }
 
 /** What is kept is written to the site. @param final this server's last word @returns whether it was */
@@ -878,7 +908,7 @@ async function keepNow(final: boolean, why: string): Promise<boolean> {
         KEPT.claimed = true;
         KEPT.dirty = clients.size > 0;
         KEPT.savedAt = Date.now();
-        log(`[keep] ${why}: ${snap.chars.length} characters and ${snap.stashes.length} stashes written to the site${final ? ' (the last word)' : ''}`);
+        log(`[keep] ${why}: ${snap.chars.length} characters and ${snap.stashes.length + (snap.loose?.length ?? 0)} stashes written to the site${final ? ' (the last word)' : ''}`);
         return true;
       }
       await pause(700);
@@ -940,7 +970,17 @@ async function loadKept() {
         return it ? [{ ...it, x: s.x, y: s.y, rot: !!s.rot }] : [];
       });
       for (const it of items) issue(it);
-      boxes.set(b.cid, { ...b, items, y: moved ? world.groundAt(b.x, b.z) : b.y, emptiedAt: -1, touchedAt: num(b.touchedAt) ? b.touchedAt : now });
+      const box: Box = { ...b, items, y: moved ? world.groundAt(b.x, b.z) : b.y, emptiedAt: -1, touchedAt: num(b.touchedAt) ? b.touchedAt : now };
+      // (one that stood on the ground, kept by a server from before a stash was a thing to drop: it lies there as one now)
+      if (box.buried) boxes.set(b.cid, box);
+      else if (!economy.loot.has(b.cid)) economy.drop(stashItem(box), box.x, box.y, box.z, box.rot).keptAt = box.touchedAt;
+      stashes++;
+    }
+    for (const l of snap.loose ?? []) {
+      const item = cleanItem(l?.item);
+      if (!item || ITEMS[item.id]?.category !== 'stash' || economy.loot.has(item.uid) || boxes.has(item.uid) || ![l.x, l.y, l.z, l.rot].every(num)) continue;
+      for (const it of things({ slots: { it: item }, active: null, containers: [] })) issue(it);
+      economy.drop(item, l.x, moved ? world.groundAt(l.x, l.z) : l.y, l.z, l.rot).keptAt = num(l.at) ? l.at : now;
       stashes++;
     }
     open(`${KEPT.chars.size} characters and ${stashes} stashes as they were kept at ${save.at}${save.final ? '' : ' (not a last word: the server before this one stopped without one)'}${moved ? '; the map has been made again since, so everybody starts from the edge with what they had' : ''}`);
@@ -1445,32 +1485,12 @@ function underCheck(c: Client, now = Date.now()) {
 }
 /** how far round the bunker's middle the ground is not asked about: its rooms and its stair are under it */
 const UNDER_BUNKER = 48;
-// A stash left standing is not there for ever: one nobody has had anything to do with for STASH_EMPTY (a week) is
-// cleared away if it is empty, and after STASH_FULL (a fortnight) if anything is in it. One under the ground stays
-// until it is dug up, however long that is: burying is what keeps a thing. (2026-10-12: "unburried stashes
-// autodelete after 7 days of no interaction. 14 days if the unburries stash has an item(s) within".)
-const STASH_EMPTY_MS = (Number(process.env.STASH_EMPTY_S) || 7 * 86400) * 1000;
-const STASH_FULL_MS = (Number(process.env.STASH_FULL_S) || 14 * 86400) * 1000;
-/** somebody has had something to do with a stash: its time starts again */
+/** somebody has had something to do with a stash: noted, and it is kept again */
 function touched(b: Box) {
   if (b.kind !== 'stash') return;
   b.touchedAt = Date.now();
   KEPT.dirty = true;
 }
-function clearStashes(now: number) {
-  for (const b of [...boxes.values()]) {
-    if (b.kind !== 'stash' || b.buried) continue;
-    const holder = locks.get(b.cid);
-    if (holder !== undefined && clients.has(holder)) continue;
-    if (now - (b.touchedAt ?? now) <= (b.items.length ? STASH_FULL_MS : STASH_EMPTY_MS)) continue;
-    log(`a stash at ${b.x.toFixed(0)}, ${b.z.toFixed(0)} is cleared away: nobody has touched it for ${Math.round((now - (b.touchedAt ?? now)) / 86400000)} days${b.items.length ? `, with ${b.items.length} things in it` : ''}`);
-    locks.delete(b.cid);
-    boxes.delete(b.cid);
-    KEPT.dirty = true;
-    broadcast({ t: 'stash-', uid: b.cid });
-  }
-}
-setInterval(() => clearStashes(Date.now()), Math.max(1000, Math.min(600_000, STASH_EMPTY_MS / 4))).unref();
 
 /** Is somebody out of the game for being under the ground? (past the moment that is let go) */
 const buried = (c: Client, now = Date.now()) => c.underAt > 0 && now - c.underAt >= UNDER.grace * 1000;
@@ -2217,59 +2237,37 @@ function handle(c: Client, m: C2S) {
       if (c.openCid === m.cid) releaseLock(c);
       return;
     }
-    case 'stash+': {
-      const s = m.s;
-      if (!s || typeof s.uid !== 'string' || s.uid.length > 64 || boxes.has(s.uid) || ![s.x, s.y, s.z, s.rot].every(num)) return;
-      if (!c.alive || Math.hypot(s.x - c.pose[0], s.z - c.pose[2]) > 8) return;
-      // (the stash case, the suitcase or the black bag: each as big inside as it is, and put down with whatever was
-      // in it while it was carried)
-      const def = ITEMS[String(s.item ?? 'stash_kit')];
-      if (def?.category !== 'stash') return;
-      const [w, h] = def.stash ?? [8, 6];
-      const items = (Array.isArray(m.items) ? m.items : []).slice(0, 80).flatMap((x) => {
-        const it = cleanItem(x, 1);
-        return it && num(x.x) && num(x.y) ? [{ ...it, x: x.x, y: x.y, rot: !!x.rot }] : [];
-      });
-      if (CHECKS !== 'off' && items.some((it) => [...things({ slots: { it }, active: null, containers: [] })].some(invented)) && flag(c, 'put down a stash with something in it that the server never put in the world')) return;
-      const st: StashInfo = { uid: s.uid, x: s.x, y: s.y, z: s.z, rot: s.rot, ...(def.id === 'stash_kit' ? {} : { item: def.id }) };
-      boxes.set(s.uid, { cid: s.uid, kind: 'stash', w, h, items, ...st, emptiedAt: -1, touchedAt: Date.now() });
-      for (const it of items) issue(it);
-      KEPT.dirty = true;
-      broadcast({ t: 'stash+', s: st }, c);
-      return;
-    }
-    case 'stash-': {
-      // picked up, with whatever is in it. Not from under the ground, and not from across a field.
+    case 'bury': {
+      // A shovel in the hands, beside a case, a suitcase or a bag lying on the ground: it goes under the ground, with
+      // what is in it, and all that is left to see is the turned earth. Or beside such a place: what is under it
+      // comes up, and lies there again. Anybody's shovel brings up anybody's; it is the finding of the place that
+      // keeps it.
+      if (!c.alive || c.seatAt || c.w !== 'shovel' || typeof m.uid !== 'string') return;
+      if (m.on) {
+        const l = economy.loot.get(m.uid);
+        if (!l || ITEMS[l.item.id]?.category !== 'stash' || boxes.has(m.uid)) return;
+        if (Math.hypot(l.x - c.pose[0], l.z - c.pose[2]) > BURY.reach) return;
+        // (out in the country and nowhere else: not in a town or a camp, not in a building, not beside one)
+        const no = noBurying(l.x, l.y, l.z, world.groundAt(l.x, l.z), world.places, world.buildings);
+        if (no) return void send(c, { t: 'tell', kind: 'warn', text: `${no}.` });
+        const def = ITEMS[l.item.id], [w, h] = def.stash ?? [8, 6];
+        if (!economy.take(m.uid)) return;
+        const st: StashInfo = { uid: m.uid, x: l.x, y: world.groundAt(l.x, l.z), z: l.z, rot: l.rot, ...(def.id === 'stash_kit' ? {} : { item: def.id }), buried: true };
+        boxes.set(m.uid, { cid: m.uid, kind: 'stash', w, h, items: cargoOf(l.item), ...st, emptiedAt: -1, touchedAt: Date.now() });
+        KEPT.dirty = true;
+        log(`${c.name} buried a ${def.name.toLowerCase()} at ${l.x.toFixed(0)}, ${l.z.toFixed(0)}`);
+        broadcast({ t: 'stash+', s: st });
+        return;
+      }
       const b = boxes.get(m.uid);
-      if (!b || b.kind !== 'stash' || b.buried || !c.alive) return;
-      if (Math.hypot(b.x - c.pose[0], b.z - c.pose[2]) > 6) return;
-      const holder = locks.get(m.uid);
-      if (holder !== undefined && holder !== c.id && clients.has(holder)) return;
+      if (!b || b.kind !== 'stash' || !b.buried) return;
+      if (Math.hypot(b.x - c.pose[0], b.z - c.pose[2]) > BURY.reach) return;
       locks.delete(m.uid);
       boxes.delete(m.uid);
       KEPT.dirty = true;
-      // (it is theirs when the server says so, and nobody else's: two who reached for it at once do not both carry it off)
-      send(c, { t: 'stashgot', uid: m.uid, item: b.item ?? 'stash_kit', items: b.items });
-      broadcast({ t: 'stash-', uid: m.uid }, c);
-      return;
-    }
-    case 'bury': {
-      // A shovel in the hands, beside a stash: it goes under the ground, or comes up out of it. Anybody's shovel
-      // brings up anybody's stash; it is the finding of the place that keeps it.
-      const b = boxes.get(m.uid);
-      if (!b || b.kind !== 'stash' || !c.alive || c.seatAt || !!b.buried === !!m.on) return;
-      if (c.w !== 'shovel' || Math.hypot(b.x - c.pose[0], b.z - c.pose[2]) > BURY.reach) return;
-      const holder = locks.get(m.uid);
-      if (holder !== undefined && holder !== c.id && clients.has(holder)) return void send(c, { t: 'tell', kind: 'warn', text: 'Somebody has it open.' });
-      // (out in the country and nowhere else: not in a town or a camp, not in a building, not beside one)
-      const no = m.on ? noBurying(b.x, b.y, b.z, world.groundAt(b.x, b.z), world.places, world.buildings) : null;
-      if (no) return void send(c, { t: 'tell', kind: 'warn', text: `${no}.` });
-      locks.delete(m.uid);
-      if (c.openCid === m.uid) c.openCid = null;
-      b.buried = !!m.on;
-      touched(b);
-      log(`${c.name} ${b.buried ? 'buried' : 'dug up'} a stash at ${b.x.toFixed(0)}, ${b.z.toFixed(0)}`);
-      broadcast({ t: 'stash~', uid: m.uid, buried: b.buried });
+      log(`${c.name} dug up a ${(ITEMS[b.item ?? 'stash_kit']?.name ?? 'stash').toLowerCase()} at ${b.x.toFixed(0)}, ${b.z.toFixed(0)}`);
+      broadcast({ t: 'stash-', uid: m.uid });
+      economy.drop(stashItem(b), b.x, b.y + 0.02, b.z, b.rot);
       return;
     }
     case 'door': {
@@ -2373,7 +2371,7 @@ function handle(c: Client, m: C2S) {
         bans: admin ? ADMIN.state.bans.map((b, i) => ({ n: i + 1, name: b.name, why: b.why, by: b.by, at: b.at.slice(0, 10) })) : [],
         roles: admin ? Object.values(ADMIN.state.roles).map((r) => ({ name: r.name, role: r.role, by: r.by, at: r.at.slice(0, 10) })) : [],
         checks: CHECKS,
-        stats: { up: Math.round(process.uptime() / 60), loot: economy.loot.size, stashes: [...boxes.values()].filter((b) => b.kind === 'stash').length, kept: KEPT.chars.size + records.size, asleep: [...clients.values()].filter((o) => o.asleep).length },
+        stats: { up: Math.round(process.uptime() / 60), loot: economy.loot.size, stashes: [...boxes.values()].filter((b) => b.kind === 'stash').length + [...economy.loot.values()].filter((l) => l.keptAt !== undefined).length, kept: KEPT.chars.size + records.size, asleep: [...clients.values()].filter((o) => o.asleep).length },
       });
     }
     case 'vin': {

@@ -115,6 +115,8 @@ interface TimedAction {
   valid?: () => boolean;
   /** what the player is told when `valid` says no */
   lost?: string;
+  /** digging: the spade goes in again and again for as long as this lasts (how far through its stroke the last sound was made) */
+  dig?: number;
 }
 
 /** bump when the map's loot points change: spawned loot from older saves is re-rolled */
@@ -499,17 +501,6 @@ export class Game {
     this.invUI = new InventoryUI(this.inv, {
       take: (w) => this.takeWorldItem(w),
       drop: (item) => {
-        // A case, a suitcase or a bag let go of is one put down: it stands where it lands and is a stash, as if it
-        // had been placed. ("for stashing items the user does not need to right click place them, theyd just drop
-        // the container on the ground from their inventory", 2026-10-11.) With nowhere near to stand it, it goes
-        // back into the pockets; with no room there either it lies loose, as it used to.
-        if (ITEMS[item.id]?.category === 'stash') {
-          if (this.placeStash(item, true)) {
-            this.vicinityDue = [performance.now() + 150, performance.now() + 700];
-            return;
-          }
-          if (!this.inv.add(item)) return void this.inventoryChanged();
-        }
         this.dropItem(item);
         // it lands a moment later: the list of what lies about is read again then, and once more
         // after it has settled (left to the five-second tick, a dropped thing seemed to vanish)
@@ -519,7 +510,6 @@ export class Game {
       open: (item) => this.openBox(item),
       onGround: (w, how) => this.onGround(w, how),
       unload: (item) => this.unloadWeapon(item),
-      place: (item) => this.placeStash(item),
       attachTargets: (att) => this.attachTargets(att),
       attach: (att, weapon) => this.attachMod(att, weapon),
       detach: (weapon, mod, loose) => this.detachMod(weapon, mod, loose),
@@ -930,6 +920,10 @@ export class Game {
     this.avatar.clearWounds();
     this.weapons.validate();
     this.autoHot();
+    // (and it is seen with nothing on: the helmet, the vest and the pack of the life before were still on the body,
+    // and on the figure in the inventory, until something was next picked up. "when i die and respawn my player
+    // model still has its old equipement shown", 2026-10-12.)
+    this.syncGear();
   }
 
   /**
@@ -1083,7 +1077,9 @@ export class Game {
     for (const sd of save.stashes as (SaveData['stashes'][number] & { item?: string; buried?: boolean })[]) {
       const st = this.newStash(sd);
       st.container.load(sd.container as never);
-      await this.loot.addStash(st);
+      // (one that stood on the ground, kept from before a stash was a thing to drop: it lies there as one now)
+      if (sd.buried) await this.loot.addStash(st);
+      else if (!this.economy.loot.has(st.uid)) this.economy.drop(this.stashItem(st), st.x, st.y, st.z, st.rot);
     }
     const saved = new Map((save.crates ?? []).map((c) => [c.uid, c]));
     for (const c of this.loot.crates) {
@@ -1204,7 +1200,7 @@ export class Game {
     net.on('ihp', (m) => this.horde.hp(m.i, m.dead, m.by, m.zone, m.dir, !!m.melee));
     net.on('iblk', (m) => this.horde.blocked(m.i, m.to));
     net.on('shot', (m) => {
-      this.weapons.remoteShot(new THREE.Vector3(...m.o), new THREE.Vector3(...m.d), m.w, m.sup, this.remotes.get(m.id)?.muzzle());
+      this.weapons.remoteShot(new THREE.Vector3(...m.o), new THREE.Vector3(...m.d), m.w, m.sup, this.remotes.get(m.id)?.muzzle(), this.remotes.get(m.id));
       this.horde.noise(m.o[0], m.o[2], m.sup ? INFECTED.hearQuiet : INFECTED.hearShot);
       // (nobody shoots and waves at once)
       this.remotes.get(m.id)?.avatar.emote(null);
@@ -1288,15 +1284,6 @@ export class Game {
     net.on('stash-', (m) => {
       const st = this.loot.stashes.find((s) => s.uid === m.uid);
       if (st) this.loot.removeStash(st);
-    });
-    // (the one this player asked to pick up: it is theirs to carry, with what the server says was in it)
-    net.on('stashgot', (m) => {
-      const st = this.loot.stashes.find((s) => s.uid === m.uid);
-      if (st) {
-        if (this.openStash === st) this.toggleInventory(false);
-        this.loot.removeStash(st);
-      }
-      this.carryOff(m.item, m.items);
     });
     net.on('stash~', (m) => {
       const st = this.loot.stashes.find((s) => s.uid === m.uid);
@@ -2094,6 +2081,11 @@ export class Game {
   }
 
   dropItem(item: ItemInstance, at?: THREE.Vector3, spread = 0.5) {
+    // (A case, a suitcase or a bag is dropped like anything else and lies there as anything does, with what is in
+    // it: taken with F or dragged out of what lies about, like anything. Only a shovel makes anything else of it:
+    // see `dig`. "there should be no G key ... all interactions are unchanged with this object ... to drop a
+    // container to stash the player will just drop it from their inventory LIKE normal, to pick it up theyll use F
+    // LIKE NORMAL or drag from vicinity", 2026-10-12.)
     const p = at ?? this.player.pos;
     const a = Math.random() * Math.PI * 2;
     const r = 0.35 + Math.random() * spread;
@@ -2416,7 +2408,8 @@ export class Game {
     else if (item.id === 'keycard') this.swipeCard();
     else if (well && (item.left ?? 0) < def.use!.sips!) this.fillBottle(item, well);
     else if (def.use) this.useItem(item, true);
-    else if (def.category === 'stash') this.placeStash(item);
+    // (a case or a bag is not "placed": it is dropped like anything else. What makes a stash of it is a shovel.)
+    else if (def.category === 'stash') this.hud.note(`Drop the ${def.name.toLowerCase()} like anything else. Where it lies, a shovel buries it.`);
     else this.hud.note(def.category === 'ammo' ? 'Loose rounds go into a magazine: hold the magazine, and hold the button' : def.attach ? `The ${def.name.toLowerCase()} goes on a gun: drag it onto one in your inventory` : `Nothing to do with the ${def.name.toLowerCase()} here`, 'info');
     // (it goes on for as long as the button is held; a thumb on a phone has only to tap)
     this.holding = !!this.use && !this.touch;
@@ -2652,6 +2645,8 @@ export class Game {
    */
   private breakOff(): boolean {
     if (this.use) {
+      // (digging: the stroke in hand stops where it is)
+      if (this.use.dig !== undefined) this.weapons.endDig();
       this.use = null;
       this.act('stop');
       if (!this.player.dead && !this.holding) this.hud.note('Cancelled', 'info');
@@ -3290,45 +3285,6 @@ export class Game {
     this.inventoryChanged();
   }
 
-  /**
-   * A case, a suitcase or a bag put down as a stash.
-   * @param dropped let go of out of the inventory, and not placed by hand: it is stood wherever near the feet there
-   * is room for it, and the inventory stays open
-   * @returns whether it was put down
-   */
-  private placeStash(item: ItemInstance, dropped = false): boolean {
-    const p = this.player;
-    const fwd = new THREE.Vector3(-Math.sin(p.yaw), 0, -Math.cos(p.yaw));
-    // (ahead first; then nearer, to either side, and behind: [ahead, to the right])
-    const tries = dropped ? [[1.6, 0], [1.1, 0], [0.9, 0.8], [0.9, -0.8], [0.1, 1.2], [0.1, -1.2], [-1.1, 0]] : [[1.6, 0]];
-    let at: { x: number; y: number; z: number } | null = null;
-    for (const [f, r] of tries) {
-      const x = p.pos.x + fwd.x * f - fwd.z * r, z = p.pos.z + fwd.z * f + fwd.x * r;
-      const hit = physics.raycast({ x, y: p.pos.y + 1.5, z }, { x: 0, y: -1, z: 0 }, 5, SOLID_GROUPS);
-      if (!hit || hit.toi < 1e-3 || hit.point.y > p.pos.y + 0.6 || physics.boxOverlaps({ x, y: hit.point.y + 0.3, z }, p.yaw, 0.6, 0.22, 0.26)) continue;
-      at = { x, y: hit.point.y, z };
-      break;
-    }
-    if (!at) {
-      this.hud.note(`Not enough room to put the ${itemName(item).toLowerCase()} down here`, 'warn');
-      return false;
-    }
-    const { x, z } = at, hit = { point: at };
-    this.inv.remove(item);
-    this.openStash?.container.remove(item);
-    const st = this.newStash({ uid: newUid(), x, y: hit.point.y, z, rot: p.yaw, item: item.id });
-    // (put down with whatever was in it while it was carried)
-    const items = (item.cargo ?? []).map((q) => ({ ...q.item, x: q.x, y: q.y, rot: q.rot }));
-    if (items.length) st.container.load({ items });
-    st.known = true;
-    void this.loot.addStash(st).then(() => this.save());
-    this.net.send({ t: 'stash+', s: { uid: st.uid, x: st.x, y: st.y, z: st.z, rot: st.rot, ...(st.item === 'stash_kit' ? {} : { item: st.item }) }, ...(items.length ? { items } : {}) });
-    if (!dropped) this.toggleInventory(false);
-    this.inventoryChanged();
-    audio.ui('drop');
-    return true;
-  }
-
   /** A stash as the game holds one: the case, the suitcase or the bag, as big inside as that thing is (see `stash` in src/sim/items.ts). */
   private newStash(s: StashInfo): Stash {
     const def = s.item && ITEMS[s.item]?.category === 'stash' ? ITEMS[s.item] : ITEMS.stash_kit;
@@ -3340,40 +3296,47 @@ export class Game {
   }
 
   /**
-   * A stash picked up, with whatever is in it: into a pocket when it is empty, into the pack on the back when it
-   * is not (a full one goes into no pocket), and with room nowhere into the hands, or to the feet if they are full.
+   * A shovel put to a case, a suitcase or a bag lying on the ground, or to a place where one is buried, the left
+   * button held: so many seconds of digging, and it is under the ground with what is in it (or up out of it, lying
+   * there again). The spade goes in for as long as that takes; let go of the button, put the shovel away or walk
+   * off, and the digging stops there with nothing done.
    */
-  private carryOff(id: string, items: StoredItem[]) {
-    const it = makeItem(ITEMS[id]?.category === 'stash' ? id : 'stash_kit', 1);
-    if (items.length) it.cargo = items.map(({ x, y, rot, ...item }) => ({ item, x, y, rot }));
-    if (this.inv.add(it)) {
-      if (!this.weapons.equippedItem && !this.inHand && !this.loose && !this.use) this.takeUp(it, true);
-      else this.dropItem(it);
-    }
-    audio.ui('pickup');
-    this.inventoryChanged();
-    this.meDirty = true;
-    this.save();
-  }
-
-  /**
-   * A shovel put to a stash, the left button held: so many seconds of digging, and it is under the ground (or up
-   * out of it). Let go of the button, put the shovel away or walk off, and the digging stops there.
-   */
-  private dig(st: Stash, bury: boolean) {
+  private dig(what: WorldItem | Stash) {
     const p = this.player;
     const { world } = this.s;
-    const no = bury ? noBurying(st.x, st.y, st.z, heightAt(world.heights, st.x, st.z), world.pois, world.buildings) : null;
+    const bury = what instanceof WorldItem;
+    const at = bury ? what.loot : what, uid = bury ? what.loot.uid : what.uid;
+    const no = bury ? noBurying(at.x, at.y, at.z, heightAt(world.heights, at.x, at.z), world.pois, world.buildings) : null;
     if (no) return void this.hud.note(no, 'warn');
-    const still = () => this.input.held('Mouse0') && this.weapons.equippedItem?.id === 'shovel' && st.buried !== bury && this.loot.stashes.includes(st) && Math.hypot(st.x - p.pos.x, st.z - p.pos.z) <= BURY.reach - 0.5;
-    this.use = { label: bury ? 'Burying it' : 'Digging', t: 0, dur: DIG_SECONDS, sound: null, soundT: 0, valid: still, lost: 'You stopped digging', done: () => {
-      if (st.buried === bury || !this.loot.stashes.includes(st)) return;
-      if (this.online) this.net.send({ t: 'bury', uid: st.uid, on: bury });
-      else {
-        st.setBuried(bury);
+    const there = () => (bury ? this.loot.items.get(uid) === what : this.loot.stashes.includes(what as Stash));
+    const still = () => this.input.held('Mouse0') && this.weapons.equippedItem?.id === 'shovel' && there() && Math.hypot(at.x - p.pos.x, at.z - p.pos.z) <= BURY.reach - 0.5;
+    this.use = { label: bury ? 'Burying it' : 'Digging it up', t: 0, dur: DIG_SECONDS, sound: null, soundT: 0, valid: still, lost: 'You stopped digging', dig: 0, done: () => {
+      if (!there()) return;
+      if (this.online) return void this.net.send({ t: 'bury', uid, on: bury });
+      // (playing alone: there is nobody to ask)
+      if (bury) {
+        const l = this.economy.take(uid);
+        if (!l) return;
+        const st = this.newStash({ uid, x: l.x, y: heightAt(world.heights, l.x, l.z), z: l.z, rot: l.rot, item: l.item.id, buried: true });
+        const items = (l.item.cargo ?? []).map((q) => ({ ...q.item, x: q.x, y: q.y, rot: q.rot }));
+        if (items.length) st.container.load({ items });
+        void this.loot.addStash(st).then(() => this.save());
+      } else {
+        const st = what as Stash;
+        this.loot.removeStash(st);
+        this.economy.drop(this.stashItem(st), st.x, st.y + 0.02, st.z, st.rot);
         this.save();
       }
     } };
+  }
+
+  /** what is under the ground at a stash, as the thing it is when it lies on it: the case, the suitcase or the bag, with what is in it */
+  private stashItem(st: Stash): ItemInstance {
+    const it = makeItem(ITEMS[st.item]?.category === 'stash' ? st.item : 'stash_kit', 1);
+    it.uid = st.uid;
+    const items = st.container.serialize().items as StoredItem[];
+    if (items.length) it.cargo = items.map(({ x, y, rot, ...item }) => ({ item, x, y, rot }));
+    return it;
   }
 
   private nearbyStash(): Stash | null {
@@ -3633,7 +3596,10 @@ export class Game {
       const item = owner.loot.item;
       const d = ITEMS[item.id];
       const qty = d.stack ? ` <small>×${item.qty}</small>` : d.weapon ? ` <small>${item.loaded ?? 0}/${d.weapon.mag ? (item.mag ? magRoom(item) : 'no mag') : capacityOf(item)}</small>` : d.mag ? ` <small>${item.rounds ?? 0}/${d.mag.capacity}</small>` : item.cargo?.length ? ` <small>${item.cargo.length} inside</small>` : '';
-      this.prompt = `<kbd>F</kbd>Take ${d.name}${qty}`;
+      // (a case, a suitcase or a bag, and a shovel in the hands: the left button, held, buries it where it lies)
+      const spade = d.category === 'stash' && this.weapons.equippedItem?.id === 'shovel';
+      this.prompt = `<kbd>F</kbd>Take ${d.name}${qty}${spade ? ' <small>hold the left button to bury it</small>' : ''}`;
+      if (spade && !this.use && !this.invUI.isOpen && this.input.pressed('Mouse0')) this.dig(owner);
       // four corners round it, so there is no doubt which thing that is
       const at = new THREE.Vector3(owner.loot.x, owner.loot.y + 0.05, owner.loot.z).project(cam);
       if (at.z < 1) this.mark = [at.x * 0.5 + 0.5, 0.5 - at.y * 0.5];
@@ -3674,26 +3640,14 @@ export class Game {
       this.prompt = this.garage.prompt(owner, !!can, tagged);
       if (key) this.garage.use(owner, tagged);
     } else if (owner instanceof Stash) {
-      // A stash somebody put down: opened, picked up when it is empty, and with a shovel in the hands buried, or
-      // dug up again, by holding the left button.
-      const shovel = !owner.fixed && this.weapons.equippedItem?.id === 'shovel';
-      const canPack = !owner.fixed && !owner.buried;
-      this.prompt = owner.fixed
-        ? `<kbd>F</kbd>Search ${owner.label}`
-        : owner.buried
-          ? shovel ? '<kbd>LMB</kbd>Hold to dig here' : 'Something is buried here <small>a shovel would dig it up</small>'
-          : `<kbd>F</kbd>Open ${owner.label}${canPack ? ' <small>G to pick up</small>' : ''}${shovel ? ' <small>hold the left button to bury it</small>' : ''}`;
+      // A crate of the map's, a body, a drop: searched. Or a place where somebody buried a case, a suitcase or a
+      // bag: with a shovel in the hands, dug up by holding the left button, and what was under it lies there again.
+      const shovel = !owner.fixed && owner.buried && this.weapons.equippedItem?.id === 'shovel';
+      this.prompt = owner.buried
+        ? shovel ? '<kbd>LMB</kbd>Hold to dig here' : 'Something is buried here <small>a shovel would dig it up</small>'
+        : `<kbd>F</kbd>${owner.fixed ? 'Search' : 'Open'} ${owner.label}`;
       if (key && !owner.buried) this.toggleInventory(true);
-      if (shovel && !this.use && !this.invUI.isOpen && this.input.pressed('Mouse0')) this.dig(owner, !owner.buried);
-      if (canPack && this.input.pressed('KeyG')) {
-        // (online it is theirs when the server says so, with what the server says is in it: see 'stashgot')
-        if (this.invUI.isOpen) this.toggleInventory(false);
-        if (this.online) this.net.send({ t: 'stash-', uid: owner.uid });
-        else {
-          this.loot.removeStash(owner);
-          this.carryOff(owner.item, owner.container.serialize().items);
-        }
-      }
+      if (shovel && !this.use && !this.invUI.isOpen && this.input.pressed('Mouse0')) this.dig(owner);
     }
   }
 
@@ -4047,6 +4001,18 @@ export class Game {
       } else if (u.sound && u.sound !== 'smoke' && u.soundT > 1.05 && u.t < u.dur - 0.4) {
         u.soundT = 0;
         audio.ui(u.sound);
+      }
+      if (u.dig !== undefined) {
+        // (a stroke, and the next when that one is done: each is heard going in, and coming out with what it lifted)
+        if (this.weapons.dig()) u.dig = 0;
+        const k = this.weapons.digStroke;
+        if (u.dig < 1 && k > 0.3) {
+          u.dig = 1;
+          audio.land('dirt', 3.2);
+        } else if (u.dig < 2 && k > 0.7) {
+          u.dig = 2;
+          audio.footstep('gravel', 1.4);
+        }
       }
       const gone = !!u.valid && !u.valid();
       if (gone || p.dead || ((input.pressed('Mouse2') || input.wheel !== 0) && !uiOpen) || (this.holding && !uiOpen && !input.held('Mouse0'))) {
