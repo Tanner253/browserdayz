@@ -1713,3 +1713,10 @@ body.touch .hm-short { display: inline; }
 body.touch .hm-show [data-show="grid"] { display: none; }
 body.touch .hm-bar { flex-wrap: nowrap; }
 body.touch .hm-tiers, body.touch .hm-show, body.touch .hm-zoom { gap: 3px; }
+
+/* the server is about to restart: across the top, over everything but the menus */
+.hud-restart { position: absolute; top: 46px; left: 50%; transform: translateX(-50%); display: none; flex-direction: column; align-items: center; gap: 2px; max-width: min(760px, 90vw); padding: 10px 26px 11px; text-align: center; background: rgba(40, 14, 10, 0.9); border: 1px solid rgba(255, 150, 110, 0.75); box-shadow: 0 8px 30px rgba(0, 0, 0, 0.55); pointer-events: none; z-index: 40; }
+.hud-restart.show { display: flex; }
+.hud-restart b { font-family: var(--mono); font-size: 15px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: #ffb49a; }
+.hud-restart span { font-size: 22px; font-weight: 600; line-height: 1.15; color: var(--ink); overflow-wrap: anywhere; }
+.hud-restart small { font-size: 13px; color: var(--ink-dim); }

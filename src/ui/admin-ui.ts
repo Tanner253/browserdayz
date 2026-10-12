@@ -784,6 +784,11 @@ export class AdminUI {
         this.line(this.button('Say it to everybody', tell, 'good', 'megaphone')),
         el('div', 'dim', 'A word to one player alone: pick them on the left.'),
       ));
+      const warn = (secs: number) => this.button(`${secs < 120 ? `${secs} s` : `${secs / 60} min`}`, () => this.send(`/restart ${secs}${this.toAll.trim() ? ` ${this.toAll.trim()}` : ''}`), 'bad', 'clock');
+      grid.append(this.card('Warn of a restart', 'warn',
+        this.line('Restarting in', warn(30), warn(60), warn(300)),
+        el('div', 'dim', 'A banner across everybody’s screen, counting down, with what is written in the box above as the reason. It only says so: nothing is restarted by it. (An update that restarts the server says so by itself.)'),
+      ));
     }
     const tiles = el('div', 'adm-tiles');
     const tile = (n: string | number, label: string, ic: string) => {

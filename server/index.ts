@@ -832,6 +832,84 @@ const BOOT = randomBytes(8).toString('hex');
 const KEEP_ON = process.env.KEEP ? process.env.KEEP !== 'off' : !!process.env.RENDER;
 const KEEP_EVERY_MS = (process.env.KEEP_EVERY_MIN === undefined ? 180 : Math.max(0, Number(process.env.KEEP_EVERY_MIN) || 0)) * 60_000;
 const KEEP_WAIT_MS = (process.env.KEEP_WAIT_S === undefined ? 25 : Math.max(0, Number(process.env.KEEP_WAIT_S) || 0)) * 1000;
+/** however long the server before this one goes on answering, it is not waited for longer than this */
+const KEEP_MAX_MS = (process.env.KEEP_MAX_S === undefined ? 420 : Math.max(0, Number(process.env.KEEP_MAX_S) || 0)) * 1000;
+/**
+ * Where the world reaches this server from outside (Render says: RENDER_EXTERNAL_URL). At a deploy the server
+ * before this one goes on answering there until this one is ready, and only then is told to stop: asked there who
+ * it is, a server knows whether it is the one being reached yet. (OTHER_URL: for a test of that, with two on one
+ * machine.)
+ */
+const PUBLIC_URL = (process.env.OTHER_URL || process.env.RENDER_EXTERNAL_URL || '').replace(/\/$/, '');
+/** who answers at the public address: this server (true), another (false), nobody (null) */
+async function reachedHere(): Promise<boolean | null> {
+  if (!PUBLIC_URL) return true;
+  try {
+    const r = await fetch(`${PUBLIC_URL}/healthz`, { signal: AbortSignal.timeout(4000) });
+    return r.ok ? ((await r.json()) as { boot?: string }).boot === BOOT : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A restart, said to everybody before it happens (2026-10-12: "would be great if could have a banner overhead that
+ * says server restarting, then reason"). Nobody tells a server it is about to be replaced until the moment it is
+ * told to stop, so it finds out for itself: it is run from a commit (Render says which, and of what), and every
+ * minute and a half it asks where that came from what the newest one is. When that is no longer its own, the one
+ * that will replace it is being built: it says so to everybody on, with why, as the note that came with the new one
+ * says (server/restart-note.json, written by whoever made the change). And a server told to stop says so to whoever
+ * is still on, as its last word to them. (An admin can say it by hand as well: `/restart`.)
+ */
+const RESTART = {
+  /** why this server was started, as the note that came with it says */
+  why: (() => {
+    try {
+      return String((JSON.parse(readFileSync(path.join(ROOT, 'server', 'restart-note.json'), 'utf8')) as { why?: unknown }).why ?? '').slice(0, 120);
+    } catch {
+      return '';
+    }
+  })(),
+  /** something newer than this server has been seen to be on its way (when), and why it is coming */
+  seen: 0,
+  pending: null as string | null,
+  /** how long the host takes to have the new one ready, about: what the count on everybody's screen starts from */
+  about: Math.max(20, Number(process.env.RESTART_ABOUT_S) || 150),
+};
+function sayRestart(why: string, seconds: number) {
+  log(`[restart] said to ${clients.size}: restarting${seconds ? ` in ${seconds} s` : ''}${why ? ` (${why})` : ''}`);
+  broadcast({ t: 'restart', why: why.slice(0, 120), in: Math.max(0, Math.round(seconds)) });
+}
+{
+  const mine = process.env.RENDER_GIT_COMMIT, slug = process.env.RENDER_GIT_REPO_SLUG, branch = process.env.RENDER_GIT_BRANCH || 'main';
+  // (WATCH_URL: for a test of it. It answers with the newest commit's name, and with the note under /note/<name>.)
+  const at = process.env.WATCH_URL;
+  if (process.env.RESTART_WATCH !== 'off' && ((mine && slug) || at)) {
+    const head = at ? `${at}/head` : `https://api.github.com/repos/${slug}/commits/${branch}`;
+    const note = (sha: string) => (at ? `${at}/note/${sha}` : `https://raw.githubusercontent.com/${slug}/${sha}/server/restart-note.json`);
+    setInterval(async () => {
+      if (RESTART.seen || stopping) return;
+      try {
+        const r = await fetch(head, { headers: { accept: 'application/vnd.github.sha', 'user-agent': 'zona-server' }, signal: AbortSignal.timeout(8000) });
+        const sha = r.ok ? (await r.text()).trim() : '';
+        if (!/^[0-9a-f]{7,64}$/.test(sha) || sha === (mine ?? process.env.WATCH_MINE)) return;
+        RESTART.seen = Date.now();
+        let why = '';
+        try {
+          const n = await fetch(note(sha), { signal: AbortSignal.timeout(8000) });
+          if (n.ok) why = String(((await n.json()) as { why?: unknown }).why ?? '').slice(0, 120);
+        } catch {
+          /* no note came with it: it is said without a reason */
+        }
+        sayRestart(why, RESTART.about);
+        // (and to whoever comes in before it happens)
+        RESTART.pending = why;
+      } catch {
+        /* not answered: asked again in a while */
+      }
+    }, Math.max(2, Number(process.env.RESTART_WATCH_S) || 90) * 1000).unref();
+  }
+}
 const WIPE = (process.env.WIPE ?? '').slice(0, 40);
 const KEPT = {
   /** what was kept has been read (or there was nothing, or it is not kept here): players are let in */
@@ -840,6 +918,8 @@ const KEPT = {
   chars: new Map<string, Record_>(),
   /** the file says this server is alive; something has happened since it was last written; when that was; a writing is under way */
   claimed: false,
+  /** what was kept has been read and taken in (or there was nothing): only then is anything written over it */
+  read: false,
   dirty: false,
   savedAt: 0,
   busy: false,
@@ -896,7 +976,8 @@ function snapshot(): Snapshot {
 
 /** What is kept is written to the site. @param final this server's last word @returns whether it was */
 async function keepNow(final: boolean, why: string): Promise<boolean> {
-  if (!KEEP_ON || !KEPT.ready || !ADMIN.pepper || KEPT.busy) return false;
+  // (a server that never read what was kept does not write over it: what it holds is not what there is)
+  if (!KEEP_ON || !KEPT.ready || !KEPT.read || !ADMIN.pepper || KEPT.busy) return false;
   // (a server nobody came to has nothing to say that the file does not say already)
   if (!KEPT.claimed && !KEPT.dirty) return false;
   KEPT.busy = true;
@@ -939,20 +1020,51 @@ async function loadKept() {
   };
   if (!KEEP_ON) return;
   try {
-    // (the secret it is read with comes with the admin lists: see `loadAdmin`)
-    for (let k = 0; k < 35 && !ADMIN.pepper; k++) await pause(1000);
-    if (!ADMIN.pepper) return open('nothing is kept between restarts: the site did not answer, or no admin password is set on it');
+    // The secret it is read with comes with the admin lists (see `loadAdmin`), and the site gives those only to a
+    // server it can reach at the address the world reaches it at. At a deploy that address is still the server
+    // before this one's, until this one is ready: so the secret is waited for as long as another server answers
+    // there, and for a minute after this one does. (It used to be waited for 35 seconds from this server's start,
+    // and a server that had not been reached by then opened with nothing kept. Worse, it then wrote that over
+    // what was kept. A server that has not read what was kept writes nothing now: see `KEPT.read`.)
+    const began = Date.now();
+    for (let mine = 0; !ADMIN.pepper; ) {
+      const here = await reachedHere();
+      if (here === false) mine = 0;
+      else if (!mine) mine = Date.now();
+      if ((mine && Date.now() - mine >= Math.max(KEEP_WAIT_MS, 60_000)) || Date.now() - began >= KEEP_MAX_MS) break;
+      await pause(1000);
+    }
+    if (!ADMIN.pepper) return open('what is kept could NOT be read: the site did not answer, or no admin password is set on it. Everybody begins afresh, and nothing is written over what is kept');
     let save: KeptFile | null = null;
-    const until = Date.now() + KEEP_WAIT_MS;
-    for (;;) {
+    // What is kept was written by a server that has not said its last word: at a deploy that server is alive, and
+    // goes on being the one players reach until this one is ready. Only then is it told to stop, and only then
+    // does it say its last word. So it is waited for: for as long as it is another server that answers where the
+    // world reaches this one, and for KEEP_WAIT after this one does (the other has been told to stop by then, and
+    // its last word comes in seconds or not at all). (It used to be waited for 25 seconds from this server's own
+    // start, whatever the other was doing: on the night of 2026-10-11 the other was told to stop a few seconds
+    // after that, and everybody came back as they had been two hours before.)
+    let read = false;
+    for (let mine = 0; ; ) {
       const r = await siteKeep({ op: 'load' });
-      if (r?.ok) save = r.save ?? null;
-      // (written by a server that has not said its last word: it may be about to, if this is a deploy and it is still alive)
-      if ((r?.ok && (!save || save.final || save.boot === BOOT)) || Date.now() >= until) break;
+      if (r?.ok) {
+        save = r.save ?? null;
+        read = true;
+      }
+      if (r?.ok && (!save || save.final || save.boot === BOOT)) break;
+      const here = await reachedHere();
+      if (here === false) mine = 0;
+      else if (!mine) mine = Date.now();
+      if ((mine && Date.now() - mine >= KEEP_WAIT_MS) || Date.now() - began >= KEEP_MAX_MS) break;
       await pause(2500);
     }
+    if (!read) return open('what is kept could NOT be read: the site did not answer. Everybody begins afresh, and nothing is written over what is kept');
+    KEPT.read = true;
+    if (save && !save.final && save.boot !== BOOT) log(`[keep] the server before this one never said its last word: what it wrote at ${save.at} is all there is`);
     if (!save) return open('nothing has been kept yet: everybody begins afresh');
+    // (from here on something goes wrong only by what is in the file: if it cannot be made sense of it is left alone)
+    KEPT.read = false;
     const snap = unseal(save.z) as Snapshot;
+    if ((snap.wipe ?? '') !== WIPE) KEPT.read = true;
     if ((snap.wipe ?? '') !== WIPE) return open(`what was kept is of the world "${snap.wipe ?? ''}", and this is "${WIPE}": everybody begins afresh`);
     const moved = snap.rev !== WORLD_REV, now = Date.now();
     for (const [k, r] of snap.chars ?? []) {
@@ -983,6 +1095,7 @@ async function loadKept() {
       economy.drop(item, l.x, moved ? world.groundAt(l.x, l.z) : l.y, l.z, l.rot).keptAt = num(l.at) ? l.at : now;
       stashes++;
     }
+    KEPT.read = true;
     open(`${KEPT.chars.size} characters and ${stashes} stashes as they were kept at ${save.at}${save.final ? '' : ' (not a last word: the server before this one stopped without one)'}${moved ? '; the map has been made again since, so everybody starts from the edge with what they had' : ''}`);
   } catch (e) {
     open(`what was kept could not be read (${e instanceof Error ? e.message : e}): everybody begins afresh`);
@@ -994,7 +1107,7 @@ function loadAdmin(tries = 0) {
   void siteAdmin({ op: 'load' }).then((r) => {
     if (r?.ok) return void log(`[admin] lists read from the site: ${Object.keys(ADMIN.state.roles).length} with a role, ${ADMIN.state.bans.length} banned${r.set ? '' : ' (no ADMIN_PASSWORD is set there: nobody can become an admin)'}`);
     // (often at first: at a deploy the site's call back reaches the server before this one until this one is the one being served)
-    if (tries < 44) setTimeout(() => loadAdmin(tries + 1), tries < 24 ? 5_000 : 30_000).unref();
+    if (tries < 110) setTimeout(() => loadAdmin(tries + 1), tries < 90 ? 5_000 : 30_000).unref();
   });
 }
 /** What an admin changed is written to the site. @returns whether it was */
@@ -1104,6 +1217,13 @@ async function command(c: Client, line: string) {
     case 'flagged': {
       const list = [...clients.values()].filter((o) => o.check.flags > 0).sort((p, q) => q.check.flags - p.check.flags);
       return void sys(c, list.length ? `Flagged by the checks (which are set to "${CHECKS}"):` : 'Nobody online has been flagged.', ...list.map((o) => `${label(o)}  ${o.check.flags} times`));
+    }
+    case 'restart': {
+      // (said, and no more: nothing is restarted by saying so. For a warning before somebody restarts it by hand.)
+      const secs = /^\d+$/.test(rest[0] ?? '') ? Math.min(600, Number(rest[0])) : 60;
+      const why = (/^\d+$/.test(rest[0] ?? '') ? rest.slice(1) : rest).join(' ').slice(0, 120);
+      sayRestart(why, secs);
+      return void sys(c, `Everybody is told: the server restarts in ${secs} s${why ? ` (${why})` : ''}. Saying so restarts nothing.`);
     }
     case 'say': {
       if (!rest.length) return void sys(c, 'Say what?');
@@ -2580,6 +2700,8 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
     me: resume ? { inv: resume.inv!, vitals: resume.vitals ?? { health: 100, energy: 80, water: 80, stamina: MAX_STAMINA, bleeding: false } } : null,
     max: MAX_PLAYERS,
   });
+  // (a restart is on its way: whoever comes in before it happens is told as the others were)
+  if (RESTART.pending !== null) send(c, { t: 'restart', why: RESTART.pending, in: Math.max(0, Math.round(RESTART.about - (Date.now() - RESTART.seen) / 1000)) });
   broadcast({ t: 'join', p: info(c) }, c);
   // back under another name: the board says so, to everybody
   const had = scores.get(c.key);
@@ -2956,7 +3078,7 @@ function serve(req: http.IncomingMessage, res: http.ServerResponse) {
     // readable from a client hosted somewhere else (e.g. Vercel) for the start-screen player count
     res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'no-store' });
     // (places: how many different addresses the players come from. One, with several players on, means the host is not passing addresses through.)
-    res.end(JSON.stringify({ ok: true, players: [...clients.values()].filter((c) => !c.asleep).length, asleep: [...clients.values()].filter((c) => c.asleep).length, max: MAX_PLAYERS, queue: queue.length, uptime: Math.round(process.uptime()), checks: CHECKS, flagged, keptOff: BANS.temp.size, loot: economy.loot.size, places: new Set([...clients.values()].map((c) => c.ip)).size }));
+    res.end(JSON.stringify({ ok: true, boot: BOOT, why: RESTART.why, players: [...clients.values()].filter((c) => !c.asleep).length, asleep: [...clients.values()].filter((c) => c.asleep).length, max: MAX_PLAYERS, queue: queue.length, uptime: Math.round(process.uptime()), checks: CHECKS, flagged, keptOff: BANS.temp.size, loot: economy.loot.size, places: new Set([...clients.values()].map((c) => c.ip)).size }));
     return;
   }
   // the website's function asks here what it has just been asked to do with the lists of admins and bans (see siteAdmin)
@@ -3090,11 +3212,15 @@ loadAdmin();
 void loadKept();
 
 let stopping = false;
+// (A test stops it as a host does, by a word on its input: on Windows a process cannot be asked to stop, only stopped.)
+if (process.env.STOP_BY_WORD) process.stdin.on('data', (d) => String(d).includes('stop') && process.emit('SIGTERM'));
 for (const sig of ['SIGINT', 'SIGTERM'] as const) {
   process.on(sig, () => {
     if (stopping) return;
     stopping = true;
     log('shutting down, saving world');
+    // (to whoever is still on: their game says so, and looks for the server that comes after this one)
+    sayRestart('', 0);
     saveWorld();
     // (and its last word to the site, where it outlasts this server: a few seconds are allowed for it)
     void Promise.race([keepNow(true, 'this server is stopping'), pause(12_000)]).finally(() => process.exit(0));
