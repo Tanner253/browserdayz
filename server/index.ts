@@ -1218,6 +1218,46 @@ async function command(c: Client, line: string) {
       const list = [...clients.values()].filter((o) => o.check.flags > 0).sort((p, q) => q.check.flags - p.check.flags);
       return void sys(c, list.length ? `Flagged by the checks (which are set to "${CHECKS}"):` : 'Nobody online has been flagged.', ...list.map((o) => `${label(o)}  ${o.check.flags} times`));
     }
+    case 'del': {
+      // Something taken out of the world, for good: what a spawned thing, a body left lying or a car in the way is
+      // cleared away with. (2026-10-12: "for the admin can you make it so the del key will delete a model or prop
+      // or item when looked at".) The game says what the admin is looking at; what can be taken away is decided here.
+      if (!admin) return need();
+      const what = (rest[0] ?? '').toLowerCase(), id = rest[1] ?? '';
+      if (what === 'item') {
+        const l = economy.take(id);
+        if (l) log(`[admin] ${c.name} took away ${ITEMS[l.item.id]?.name ?? l.item.id} at ${l.x.toFixed(0)}, ${l.z.toFixed(0)}`);
+        return void sys(c, l ? `Taken away: ${ITEMS[l.item.id]?.name ?? l.item.id}${l.item.cargo?.length ? `, with the ${l.item.cargo.length} things in it` : ''}.` : 'Nothing of that number lies there (any more).');
+      }
+      if (what === 'box') {
+        const b = boxes.get(id);
+        if (!b) return void sys(c, 'No body, drop or buried stash of that number.');
+        if (b.kind === 'crate') return void sys(c, 'A crate of the map is not taken away: it is part of the place.');
+        locks.delete(id);
+        boxes.delete(id);
+        if (b.kind === 'stash') KEPT.dirty = true;
+        broadcast({ t: b.kind === 'corpse' ? 'corpse-' : b.kind === 'drop' ? 'drop-' : 'stash-', uid: id });
+        const name = b.kind === 'corpse' ? 'a body' : b.kind === 'drop' ? 'a supply drop' : 'a buried stash';
+        log(`[admin] ${c.name} took away ${name} at ${b.x.toFixed(0)}, ${b.z.toFixed(0)} (${b.items.length} things in it)`);
+        return void sys(c, `Taken away: ${name}${b.items.length ? `, with the ${b.items.length} things in it` : ''}.`);
+      }
+      if (what === 'car') {
+        const v = vehicles.get(Number(id));
+        if (!v) return void sys(c, 'No car of that number.');
+        if (v.seats.some((s) => s !== null)) return void sys(c, 'Somebody is in it: they get out first.');
+        vehicles.delete(v.i);
+        broadcast({ t: 'v-', i: v.i });
+        log(`[admin] ${c.name} took away car ${v.i}`);
+        return void sys(c, 'Taken away: the car. (It is back when the server next starts.)');
+      }
+      if (what === 'z') {
+        const i = Number(id), r = Number.isInteger(i) ? horde.hurt(i, 1e6, Date.now()) : null;
+        if (!r) return void sys(c, 'None of the infected has that number.');
+        broadcast({ t: 'ihp', i, hp: r.hp, dead: r.dead, by: c.id, zone: 'torso', dir: [0, 1], melee: false });
+        return void sys(c, 'One of the infected is put down.');
+      }
+      return void sys(c, 'Take away what? /del item, box, car or z, and its number. The Delete key does it for whatever you are looking at.');
+    }
     case 'restart': {
       // (said, and no more: nothing is restarted by saying so. For a warning before somebody restarts it by hand.)
       const secs = /^\d+$/.test(rest[0] ?? '') ? Math.min(600, Number(rest[0])) : 60;

@@ -23,6 +23,7 @@ export const ORDERS: Order[] = [
   { name: 'kick', args: ['who', '[why]'], does: 'Put somebody off the server (they can come straight back)' },
   { name: 'timeout', args: ['who', 'minutes', '[why]'], does: 'Keep somebody off for up to 60 minutes' },
   { name: 'say', args: ['words'], does: 'Say something across everybody’s screen, and in the chat' },
+  { name: 'del', args: ['what', 'number'], does: 'Take a thing out of the world: item, box (a body, a drop, a buried stash), car or z (one of the infected), by its number. The Delete key does it for whatever you are looking at', admin: true },
   { name: 'restart', args: ['[seconds]', '[why]'], does: 'Tell everybody the server is about to restart (it only says so)', admin: true },
   { name: 'msg', args: ['who', 'words'], does: 'Say something to one player alone' },
   { name: 'inv', args: ['who'], does: 'What somebody carries, as their game last said' },
