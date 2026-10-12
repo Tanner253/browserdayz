@@ -3,6 +3,8 @@ import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
 import { LEAN, TOUCH } from './device';
+import { Strips } from './strips';
+import { breathe } from './breathe';
 
 export interface ModelEntry {
   url: string;
@@ -107,6 +109,67 @@ function thin(t: THREE.Texture, over = THIN_OVER) {
 const KEEP_SHARP = 10;
 /** one picture goes onto the card at a time, this many milliseconds apart: each is a frame's worth of work for it, and a gun's nine at once were half a second of nothing */
 const SHARPEN_EVERY = 45;
+/** a picture bigger than this a side is more than a frame's worth however it is spaced: it goes a strip at a time (see ./strips.ts) */
+const STRIP_OVER = 1024;
+
+/** as many pictures waiting to go on as this, and the next model's are not unpacked yet: each one waiting is up to 64 MB of the page's memory */
+const SHARP_BACKLOG = 3;
+
+/**
+ * Whether a picture's file is nothing but an opaque picture: a webp with no alpha in it, no colour profile, and no
+ * note of which way up it is. Nine in ten of the pictures a model comes with are.
+ */
+async function plainPicture(file: Blob) {
+  const b = new Uint8Array(await file.slice(0, 32).arrayBuffer());
+  const tag = (at: number) => String.fromCharCode(b[at], b[at + 1], b[at + 2], b[at + 3]);
+  if (b.length < 30 || tag(0) !== 'RIFF' || tag(8) !== 'WEBP') return false;
+  const kind = tag(12);
+  // (the plain lossy kind has no room for any of them)
+  if (kind === 'VP8 ') return true;
+  if (kind === 'VP8L') return b[20] === 0x2f && !((b[24] >> 4) & 1);
+  // (the extended kind says what it carries: a colour profile 0x20, alpha 0x10, EXIF 0x08, more frames than one 0x02)
+  if (kind === 'VP8X') return !(b[20] & 0x3a);
+  return false;
+}
+
+/**
+ * What unpacks a full-size model's pictures, in place of the model loader's own (2026-10-12). The loader's asks the
+ * browser for each with two wishes (alpha left as it is, colours left as they are), and a picture asked for with
+ * any wish at all is copied whole by the browser, on the page's own thread, as it is handed over: 18 ms for one of
+ * four thousand pixels a side, after the unpacking itself was done elsewhere, and two or three of those between two
+ * frames was a frame lost. Asked for with no wish it is handed over as it was unpacked, in half a millisecond. For
+ * a picture that has no alpha and no colour profile the wishes change nothing (measured: the same bytes on the
+ * card), so those are asked for plainly; the few that have either are asked for as before.
+ */
+/** as much of the model loader's workings as is reached into (three r186: GLTFParser) */
+type SharpParser = {
+  textureLoader: unknown;
+  json: { images?: { bufferView?: number; mimeType?: string; extras?: unknown }[]; bufferViews?: { buffer: number; byteOffset?: number; byteLength: number; extensions?: unknown }[] };
+  sourceCache: Record<number, Promise<THREE.Texture> | undefined>;
+  getDependency(kind: 'buffer', index: number): Promise<ArrayBuffer>;
+  loadImageSource(index: number, loader: unknown): Promise<THREE.Texture>;
+};
+
+const sharpPictures = {
+  isImageBitmapLoader: true,
+  load(url: string, onLoad: (picture: ImageBitmap) => void, _onProgress: unknown, onError: (err: unknown) => void) {
+    fetch(url)
+      .then((r) => r.blob())
+      .then(async (file) => ((await plainPicture(file)) ? createImageBitmap(file) : createImageBitmap(file, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' })))
+      .then(onLoad, onError);
+  },
+};
+
+/**
+ * The world's own pictures (its ground, walls, bark, leaves) unpacked as they arrive, not as they are first drawn
+ * (2026-10-12). They came as image elements, and an image element is unpacked by the browser at the moment it is
+ * first put on the graphics card, on the page's own thread: 15 to 45 ms for each, three to a surface, so the first
+ * sight of every kind of wall and ground in the game was a frame or two lost. Unpacked beforehand on another
+ * thread, each is a millisecond and a half to put on. The same bytes reach the card (read back and compared, the
+ * leaves with their alpha among them): the picture is turned over as it is unpacked instead of as it is put on.
+ * Only where that has been measured: the Chrome family, on a computer.
+ */
+const UNPACK_AHEAD = !TOUCH && typeof createImageBitmap === 'function' && typeof navigator !== 'undefined' && /Chrome\//.test(navigator.userAgent);
 
 /** A texture's picture made no bigger than `cap` on a side, before it has gone to the graphics card. */
 async function shrink(t: THREE.Texture, cap: number) {
@@ -190,6 +253,38 @@ export class Assets {
   constructor() {
     this.gltf.setMeshoptDecoder(MeshoptDecoder);
     this.paint.setMeshoptDecoder(MeshoptDecoder);
+    this.paint.register((parser) => {
+      // (on a phone the pictures are made smaller as they are read, which is its own asking: left as it was)
+      if (TOUCH) return { name: 'ZONA_sharp_pictures' };
+      const p = parser as unknown as SharpParser;
+      p.textureLoader = sharpPictures;
+      // The loader's own way to a picture inside a model's file is: copy its bytes out of the file, wrap the copy
+      // as a file of its own (a second copy), give that an address, and fetch the address (a third, and a trip
+      // through the browser's network code). For a model of fifteen megabytes that was 25 to 45 ms in one go, on
+      // the page's own thread. Here the bytes are wrapped where they lie, once, a picture to a frame's spare time.
+      const itsOwn = p.loadImageSource.bind(p);
+      p.loadImageSource = (index, loader) => {
+        const def = p.json.images?.[index];
+        const view = def?.bufferView !== undefined ? p.json.bufferViews?.[def.bufferView] : undefined;
+        // (bytes that are packed some way of their own are left to the loader, which knows how)
+        if (!def || !view || view.extensions) return itsOwn(index, loader);
+        const had = p.sourceCache[index];
+        if (had !== undefined) return had.then((t) => t.clone());
+        const made = p.getDependency('buffer', view.buffer).then(async (bin) => {
+          await breathe();
+          const file = new Blob([new Uint8Array(bin, view.byteOffset ?? 0, view.byteLength)], { type: def.mimeType });
+          const picture = (await plainPicture(file)) ? await createImageBitmap(file) : await createImageBitmap(file, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
+          const t = new THREE.Texture(picture);
+          t.needsUpdate = true;
+          if (def.extras && typeof def.extras === 'object') Object.assign(t.userData, def.extras);
+          t.userData.mimeType = def.mimeType;
+          return t;
+        });
+        p.sourceCache[index] = made;
+        return made;
+      };
+      return { name: 'ZONA_sharp_pictures' };
+    });
     this.paint.register(() => ({ name: 'ZONA_paint_only', loadMesh: () => Promise.resolve(new THREE.Group()), loadAnimation: () => Promise.resolve(new THREE.AnimationClip('', 0, [])) }) as never);
   }
 
@@ -363,8 +458,14 @@ export class Assets {
   // ------------------------------------------------------------------ pictures at the size they came, for what is close
 
   private sharp = new Map<string, { users: number; mats: Promise<Painted[]>; pictures: Set<THREE.Texture>; drop: ReturnType<typeof setTimeout> | null }>();
-  private swaps: (() => boolean)[] = [];
+  private swaps: (() => boolean | Promise<boolean>)[] = [];
+  /** the same for what is in the hands or looked at: put on before what is only walked past */
+  private firsts: (() => boolean | Promise<boolean>)[] = [];
   private swapping = false;
+  /** what puts the big ones on the card a strip at a time: the game's own renderer, once there is one (src/main.ts) */
+  strips: Strips | null = null;
+  /** a big picture as it came, and the copy of it on the card that is painted with (or that is on its way there) */
+  private onCard = new Map<THREE.Texture, Promise<THREE.Texture | null>>();
   private queued = new WeakSet<THREE.Texture>();
   private marked = new WeakSet<object>();
   /** development: every model is loaded as it came, whatever it is for (the inventory's pictures are made so: see scripts/icons.mjs) */
@@ -393,9 +494,10 @@ export class Assets {
    *
    * On a phone the same is done a size down: what is far is drawn with very small pictures (PHONE_FAR), and what
    * is close with the world's own (PHONE_CAP), read again out of the file the browser already has.
+   * @param first it is in the hands or being looked at: its pictures go on before those of what is walked past
    * @returns the letting go
    */
-  sharpen(root: THREE.Object3D | THREE.Material[]): () => void {
+  sharpen(root: THREE.Object3D | THREE.Material[], first = false): () => void {
     // (a phone the game has already failed to start on is asked for nothing more than the small pictures: see LEAN)
     if (this.allSharp || LEAN) return () => {};
     const want = new Map<string, Painted[]>();
@@ -432,7 +534,7 @@ export class Assets {
       this.worn.set(mat, w);
     }
     for (const [id, mats] of want) {
-      void this.holdSharp(id).then((full) => {
+      void this.holdSharp(id, first).then((full) => {
         if (!live) return;
         for (const mat of mats) {
           const f = full[mat.userData.hi![1]];
@@ -440,9 +542,33 @@ export class Assets {
           for (const slot of MAPS) {
             const hi = f[slot];
             if (!mat[slot] || !hi) continue;
-            this.swaps.push(() => {
+            (first ? this.firsts : this.swaps).push(() => {
               const w = this.worn.get(mat);
               if (!w || w.n <= 0 || !mat[slot] || mat[slot] === hi) return false;
+              const size = hi.image as { width: number; height: number } | undefined;
+              if (this.onCard.has(hi) || (this.strips && size && Math.max(size.width, size.height) > STRIP_OVER)) {
+                // (A big one: sent to the card over as many frames as it takes, and painted with when the whole of
+                // it is there. Whatever else is painted with the same picture waits for the same sending.)
+                let on = this.onCard.get(hi);
+                if (!on) {
+                  const wanted = () => !hi.userData.gone && (this.worn.get(mat)?.n ?? 0) > 0;
+                  on = this.strips!.put(hi, mat[slot]!.anisotropy, wanted).then((card) => {
+                    // (the page's copy goes as soon as the card has it; one that was dropped part way is begun again by whoever wants it next)
+                    // (not in the frame its last strip went in: giving 64 MB back is four milliseconds of its own)
+                    if (card) void Promise.resolve(breathe()).then(() => (hi.image as ImageBitmap | undefined)?.close?.());
+                    else if (this.onCard.get(hi) === on) this.onCard.delete(hi);
+                    return card;
+                  });
+                  this.onCard.set(hi, on);
+                }
+                return on.then((card) => {
+                  const w = this.worn.get(mat);
+                  if (!card || !w || w.n <= 0 || !mat[slot] || mat[slot] === card) return false;
+                  if (!(slot in w.lo)) w.lo[slot] = mat[slot]!;
+                  mat[slot] = card;
+                  return false;
+                });
+              }
               if (!(slot in w.lo)) w.lo[slot] = mat[slot]!;
               // (seen at a slant as the one it takes the place of is)
               if (!this.queued.has(hi)) hi.anisotropy = mat[slot]!.anisotropy;
@@ -475,21 +601,65 @@ export class Assets {
   private pump() {
     if (this.swapping) return;
     this.swapping = true;
-    const next = () => {
-      while (this.swaps.length) if (this.swaps.shift()!()) break;
-      if (this.swaps.length) setTimeout(next, SHARPEN_EVERY);
+    const next = async () => {
+      let wait = false;
+      try {
+        for (let f; !wait && (f = this.firsts.shift() ?? this.swaps.shift()); ) wait = await f();
+      } catch {
+        /* one that could not be put on: the world's own is what is seen */
+      }
+      if (this.firsts.length || this.swaps.length) setTimeout(next, wait ? SHARPEN_EVERY : 0);
       else this.swapping = false;
     };
-    next();
+    void next();
   }
 
-  private holdSharp(id: string): Promise<Painted[]> {
+  /**
+   * One model's pictures as they came are unpacked at a time, and the next model's not until most of the last one's
+   * are on the card. All of a room's at once was every spare thread of the processor unpacking for a second, and a
+   * gigabyte of pictures in the page waiting their turn to go on. What is in the hands does not wait behind what is
+   * walked past.
+   */
+  private sharpLine: { first: boolean; go: () => void }[] = [];
+  private sharpBusy = false;
+  private sharpPoll: ReturnType<typeof setTimeout> | null = null;
+  private sharpNext() {
+    if (this.sharpBusy || !this.sharpLine.length) return;
+    let i = this.sharpLine.findIndex((q) => q.first);
+    if (i < 0) {
+      if (this.firsts.length + this.swaps.length > SHARP_BACKLOG) {
+        this.sharpPoll ??= setTimeout(() => {
+          this.sharpPoll = null;
+          this.sharpNext();
+        }, 60);
+        return;
+      }
+      i = 0;
+    }
+    this.sharpBusy = true;
+    this.sharpLine.splice(i, 1)[0].go();
+  }
+  private async sharpTurn<T>(first: boolean, work: () => Promise<T>): Promise<T> {
+    await new Promise<void>((go) => {
+      this.sharpLine.push({ first, go });
+      this.sharpNext();
+    });
+    try {
+      return await work();
+    } finally {
+      this.sharpBusy = false;
+      // (a moment on: whoever asked for these has by then put them in the line to go on)
+      setTimeout(() => this.sharpNext(), 0);
+    }
+  }
+
+  private holdSharp(id: string, first = false): Promise<Painted[]> {
     let s = this.sharp.get(id);
     if (!s) {
       const pictures = new Set<THREE.Texture>();
       const entry = this.manifest.models[id];
       const mats = this.bytes(TOUCH ? entry.url : entry.hi!).then((data) =>
-        this.turn(async () => {
+        this.sharpTurn(first, () => this.turn(async () => {
           // (only what it is painted with is unpacked: its shapes are in the world already)
           const g = await this.paint.parseAsync(data, '');
           const list = (await g.parser.getDependencies('material')) as unknown as Painted[];
@@ -500,7 +670,7 @@ export class Assets {
             thin(m[slot]!, 0);
           }
           return list;
-        }),
+        })),
       );
       this.sharp.set(id, (s = { users: 0, mats, pictures, drop: null }));
       // (one that could not be fetched is asked for again the next time it is wanted)
@@ -520,10 +690,22 @@ export class Assets {
     s.drop = setTimeout(() => {
       this.sharp.delete(id);
       // (when they have come, if they are still on their way)
-      const gone = () => {
+      const gone = async () => {
         for (const t of s.pictures) {
+          // (and its copy on the card, if it was a big one: when that has come, if it is still on its way)
+          t.userData.gone = true;
+          const on = this.onCard.get(t);
+          this.onCard.delete(t);
+          void on?.then((card) => card?.dispose());
           t.dispose();
-          (t.image as ImageBitmap | undefined)?.close?.();
+        }
+        // (A picture that was unpacked and never put on is still whole in the page, 64 MB of it, and giving that
+        // back is four milliseconds: one to a frame's spare time. A model's ten at once was 45 ms of nothing drawn.)
+        for (const t of s.pictures) {
+          const img = t.image as ImageBitmap | undefined;
+          if (!img?.close || !img.width) continue;
+          await breathe();
+          img.close();
         }
       };
       void s.mats.then(gone, gone);
@@ -570,8 +752,27 @@ export class Assets {
     let resolve!: () => void;
     const loaded = new Promise<void>((r) => (resolve = r));
     const made = (t = new THREE.Texture());
-    const ask = (go: number) =>
-      this.img.load(
+    const again = (go: number) => void (go < TRIES - 1 ? setTimeout(() => ask(go + 1), 700 * (go + 1)) : resolve());
+    const ask = (go: number): unknown =>
+      UNPACK_AHEAD
+        ? fetch(this.url(rel))
+            .then((r) => (r.ok ? r.blob() : Promise.reject(new Error(String(r.status)))))
+            // (turned over here if whoever asked for it has not said it is to go on as it lies: see src/game/look.ts)
+            .then((file) => createImageBitmap(file, { ...(made.flipY ? { imageOrientation: 'flipY' as const } : {}), premultiplyAlpha: 'none', colorSpaceConversion: 'none' }))
+            .then(
+              (picture) => {
+                made.image = picture;
+                made.flipY = false;
+                // (the page's copy goes when the card has it: nothing puts one of these on a second time)
+                thin(made, 0);
+                made.needsUpdate = true;
+                // (and the card has it now, not in the frame it is first seen in)
+                this.strips?.whole(made);
+                resolve();
+              },
+              () => again(go),
+            )
+        : this.img.load(
         this.url(rel),
         (image) => {
           made.image = image;

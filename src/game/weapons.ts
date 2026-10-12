@@ -1225,14 +1225,14 @@ export class Weapons {
     const as = this.currentItem ? `${this.currentItem.uid}|${fittedOf(this.currentItem).join()}` : '';
     if ((this.sharpGun?.of ?? null) !== m || (m && this.sharpGun!.as !== as)) {
       const was = this.sharpGun;
-      this.sharpGun = m ? { of: m, as, drop: assets.sharpen(m.root) } : null;
+      this.sharpGun = m ? { of: m, as, drop: assets.sharpen(m.root, true) } : null;
       // (the new hold taken before the old is let go: what both want is never dropped between them)
       was?.drop();
     }
     const h = this.held?.root ?? null;
     if ((this.sharpHeld?.of ?? null) !== h) {
       this.sharpHeld?.drop();
-      this.sharpHeld = h ? { of: h, drop: assets.sharpen(h) } : null;
+      this.sharpHeld = h ? { of: h, drop: assets.sharpen(h, true) } : null;
     }
   }
   /** the lit mark of a holographic sight: one material, whichever gun it is on */

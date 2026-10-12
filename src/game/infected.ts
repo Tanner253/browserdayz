@@ -750,10 +750,12 @@ export class Horde {
   }
 
   /** On a server: what it says is standing in the world now. */
-  online(list: InfectedInfo[]) {
+  online(list: InfectedInfo[], near: { x: number; z: number } = this.host.me().pos) {
     this.clear();
     this.director = null;
-    for (const b of list) this.add(b);
+    // (the nearest first: their bodies are made one after another, a little in each frame)
+    const far = (b: InfectedInfo) => (b.s[0] - near.x) ** 2 + (b.s[2] - near.z) ** 2;
+    for (const b of [...list].sort((p, q) => far(p) - far(q))) this.add(b);
   }
 
   clear() {

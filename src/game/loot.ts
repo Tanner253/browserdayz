@@ -7,7 +7,8 @@ import type RAPIER from '@dimforge/rapier3d-compat';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { assets } from '../core/assets';
 import { physics, G_TRIGGER, groups, WORLD_GROUPS, SOLID_GROUPS } from '../core/physics';
-import { extractParts, groundParts, restWhileHidden, type MeshPart } from '../core/gltf-utils';
+import { extractPartsSlowly, groundPartsSlowly, restWhileHidden, type MeshPart } from '../core/gltf-utils';
+import { breathe, Line } from '../core/breathe';
 import { ITEMS, type ItemInstance, pieceShown } from '../sim/items';
 import { liftPack } from './rig';
 import { fitsPoint } from '../sim/placement';
@@ -141,14 +142,27 @@ export class ItemModels {
     return this.get(item.id, (item.mods ?? []).filter((m) => m === 'pu_scope' || m === 'rifle_wrap'), true);
   }
 
+  /** one model is shaped at a time, the whole model of a thing (which is asked for when the thing is near) before the lighter copies of others: see `shape` */
+  private shaping = new Line();
+
   private async build(id: string, mods: string[], far = false): Promise<ItemTemplate> {
     const def = ITEMS[id];
+    const scene = def.model.startsWith('@') ? null : await assets.model(def.model, far ? 1 : 0);
+    return this.shaping.take(!far, () => this.shape(id, mods, far, scene));
+  }
+
+  /**
+   * The model as it came, made into the thing that lies on the ground: its points unpacked, turned, set down,
+   * its pieces joined. A little of it in each frame (see ../core/breathe.ts): done in one go it was fifty
+   * milliseconds for a rifle, with nothing drawn the while, the first time one came near.
+   */
+  private async shape(id: string, mods: string[], far: boolean, scene: THREE.Group | null): Promise<ItemTemplate> {
+    const def = ITEMS[id];
     let parts: MeshPart[];
-    if (def.model.startsWith('@')) parts = proceduralParts(def.model);
+    if (!scene) parts = proceduralParts(def.model);
     else {
-      const scene = await assets.model(def.model, far ? 1 : 0);
       const re = def.nodeRe ? new RegExp(def.nodeRe) : null;
-      parts = re ? extractParts(scene, (n) => re.test(n)) : def.node ? extractParts(scene, (n) => n === def.node) : extractParts(scene);
+      parts = await (re ? extractPartsSlowly(scene, (n) => re.test(n)) : def.node ? extractPartsSlowly(scene, (n) => n === def.node) : extractPartsSlowly(scene));
       // a gun lies there as it is: bare, or with whatever is fitted to it
       if (def.weapon) parts = parts.filter((p) => pieceShown(id, p.name.replace(/_\d+$/, ''), mods));
       // (what came out of a weapon pack is painted near black: lifted once, for the ground and the icon alike)
@@ -168,6 +182,7 @@ export class ItemModels {
       });
     }
     if (def.paint !== undefined) {
+      await breathe();
       parts = parts.map((p) => {
         const m = (p.material as THREE.MeshStandardMaterial).clone();
         // (its own picture, made here: not changed for the model's as it came when the thing is close)
@@ -179,9 +194,12 @@ export class ItemModels {
     // guns rest on their side when dropped, not balanced on the magazine
     if (def.category === 'weapon') {
       const lay = new THREE.Matrix4().makeRotationX(-Math.PI / 2);
-      for (const p of parts) p.geometry = p.geometry.clone().applyMatrix4(lay);
+      for (const p of parts) {
+        await breathe();
+        p.geometry = p.geometry.clone().applyMatrix4(lay);
+      }
     }
-    let box = groundParts(parts);
+    let box = await groundPartsSlowly(parts);
     // Things the model stands on end or on a thin edge lie down in the world: bats,
     // crowbars, machetes, knives, stick grenades, magazines, a vest, upright cartridges.
     // Cans, bottles, boxes and boots stay standing.
@@ -194,8 +212,11 @@ export class ItemModels {
       if (def.category !== 'weapon' && (stick || onEdge)) {
         // tip it over its thinnest side so it rests on its biggest face
         const lay = sz.x <= sz.z ? new THREE.Matrix4().makeRotationZ(Math.PI / 2) : new THREE.Matrix4().makeRotationX(-Math.PI / 2);
-        for (const p of parts) p.geometry = p.geometry.clone().applyMatrix4(lay);
-        box = groundParts(parts);
+        for (const p of parts) {
+          await breathe();
+          p.geometry = p.geometry.clone().applyMatrix4(lay);
+        }
+        box = await groundPartsSlowly(parts);
       }
     }
     if (def.pile) {
@@ -214,8 +235,9 @@ export class ItemModels {
           copies.push(g);
         }
         p.geometry = mergeGeometries(copies, false)!;
+        await breathe();
       }
-      box = groundParts(parts);
+      box = await groundPartsSlowly(parts);
     }
     // The pieces of it that are painted with the one paint are made one piece: a box of rounds came as fifty-three
     // (every round of it its own), a rifle as twenty-nine, and each piece is a thing for the card to be told of
@@ -229,6 +251,7 @@ export class ItemModels {
         // (they can be made one if the same things are said of every point of each, and each says its triangles the same way)
         const said = (g: THREE.BufferGeometry) => `${!!g.index}|${Object.keys(g.attributes).sort().map((k) => `${k}${g.attributes[k].itemSize}${g.attributes[k].array.constructor.name}${g.attributes[k].normalized}`).join()}|${Object.keys(g.morphAttributes).length}`;
         const alike = list.every((p) => said(p.geometry) === said(list[0].geometry));
+        await breathe();
         const one = list.length > 1 && alike ? mergeGeometries(list.map((p) => p.geometry), false) : null;
         if (one) made.push({ ...list[0], geometry: one, material });
         else made.push(...list);

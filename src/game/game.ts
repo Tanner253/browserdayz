@@ -363,7 +363,7 @@ export class Game {
     this.near = new Near(r.scene);
     // (no model of a thing is fetched here any more: each is, when a thing of its kind is first near. See LootManager.spawn.)
     // (never waited on for long: a card that will not say its shaders are made is not what keeps a thing out of the world)
-    this.loot.models.onMade = (tpl) => Promise.race([r.ready(tpl.group), new Promise<void>((done) => setTimeout(done, 1500))]);
+    this.loot.models.onMade = (tpl) => Promise.race([r.ready(tpl.group).then(() => r.send(tpl.group)), new Promise<void>((done) => setTimeout(done, 1500))]);
     this.loot.onPlaced = (l) => this.lootPlaced(l);
     this.grenades = new Grenades(r.scene, this.loot.models);
     await this.grenades.preload();
@@ -1188,7 +1188,7 @@ export class Game {
     this.garage.clear();
     for (const v of w.vehicles ?? []) this.garage.add(v);
     this.garage.bind();
-    this.horde.online(w.infected ?? []);
+    this.horde.online(w.infected ?? [], w.spawn);
     const y = w.spawn.y ?? heightAt(world.heights, w.spawn.x, w.spawn.z);
     this.player.spawn(w.spawn.x, y + 0.05, w.spawn.z, w.spawn.yaw);
     if (w.me) {
@@ -4237,7 +4237,7 @@ export class Game {
     const close = this.focus instanceof WorldItem ? this.focus : null;
     if ((this.sharpFocus?.of ?? null) !== close) {
       const was = this.sharpFocus;
-      this.sharpFocus = close ? { of: close, drop: assets.sharpen(close.obj) } : null;
+      this.sharpFocus = close ? { of: close, drop: assets.sharpen(close.obj, true) } : null;
       was?.drop();
     }
 

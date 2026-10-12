@@ -2,6 +2,7 @@ import './ui/style.css';
 import './ui/hud.css';
 import { Renderer } from './core/renderer';
 import { assets } from './core/assets';
+import { Strips } from './core/strips';
 import { physics } from './core/physics';
 import { DEATHS, DIED_AT, LEAN, TOUCH, bootDone, bootStage } from './core/device';
 import { generateWorld, heightAt } from './world/worldgen';
@@ -111,6 +112,7 @@ async function boot() {
     /* a browser that will not say */
   }
   assets.maxAnisotropy = Math.min(16, r.maxAnisotropy);
+  assets.strips = new Strips(r.renderer);
   assets.onProgress = (d, t, l) => {
     fill.style.width = `${(d / Math.max(t, 1)) * 100}%`;
     label.textContent = l;

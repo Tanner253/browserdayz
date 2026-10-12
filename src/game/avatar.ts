@@ -9,6 +9,7 @@
 
 import * as THREE from 'three';
 import { restWhileHidden } from '../core/gltf-utils';
+import { breathe, Line } from '../core/breathe';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import type { Atmosphere } from '../world/atmosphere';
 import { type Curl, bent, type Grips, type HandGrip } from './arms';
@@ -490,9 +491,22 @@ export class Avatar {
    * @param look clothes, skin and hair (see setLook)
    * @param file which body (see BodyFile)
    */
-  async load(atmo: Atmosphere, layer = AVATAR_LAYER, firstPersonBody = false, look: Look = lookFor(''), file: BodyFile = 'survivor') {
+  /** bodies are made one at a time, a person's before one of the infected's: see `make` */
+  private static line = new Line();
+
+  load(atmo: Atmosphere, layer = AVATAR_LAYER, firstPersonBody = false, look: Look = lookFor(''), file: BodyFile = 'survivor') {
+    return Avatar.line.take(file === 'survivor', () => this.make(atmo, layer, firstPersonBody, look, file));
+  }
+
+  private async make(atmo: Atmosphere, layer: number, firstPersonBody: boolean, look: Look, file: BodyFile) {
     const gltf = await loadCharacter(file);
+    // (A body is made over several frames, a part in each: see ../core/breathe.ts. In one go it was 25 to 30 ms
+    // every time one of the infected or another player came near, and all sixty-odd of the infected at once on
+    // coming into the game. Nothing of it is in the world until it is whole: whoever asked for it puts it there
+    // when this is done.)
+    await breathe();
     const model = SkeletonUtils.clone(gltf.scene) as THREE.Group;
+    await breathe();
     // the model faces +Z; everything in the game (and the camera) faces -Z
     const rig = new THREE.Group();
     rig.rotation.y = Math.PI;
@@ -662,7 +676,9 @@ export class Avatar {
     this.armL = this.makeArm(model, 'l', new THREE.Vector3(-0.7, -1, 0.1));
 
     // the unseen skeleton the clips play on
+    await breathe();
     const driver = SkeletonUtils.clone(gltf.scene) as THREE.Group;
+    await breathe();
     const src = new Map<string, THREE.Object3D>();
     driver.traverse((o) => {
       if ((o as THREE.Bone).isBone) src.set(o.name, o);
@@ -679,6 +695,7 @@ export class Avatar {
     for (const name of CLIPS) {
       const clip = gltf.animations.find((c) => c.name === name);
       if (!clip) throw new Error(`character has no "${name}" clip`);
+      await breathe();
       const a = this.mixer.clipAction(clip);
       // every clip is scrubbed by hand: see update()
       a.timeScale = 0;
@@ -691,6 +708,7 @@ export class Avatar {
     if (firstPersonBody) {
       // A second copy of the rig that mirrors the animated one bone for bone, with the head
       // and arms shrunk to nothing: looking down shows your own chest, legs and feet walking.
+      await breathe();
       const fp = SkeletonUtils.clone(gltf.scene) as THREE.Group;
       const shown = new Map<string, THREE.Object3D>();
       model.traverse((o) => {

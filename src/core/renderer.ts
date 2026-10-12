@@ -14,6 +14,7 @@ import {
   BlendFunction,
 } from 'postprocessing';
 import { N8AOPostPass } from 'n8ao';
+import { breathe } from './breathe';
 
 export interface QualitySettings {
   renderScale: number;
@@ -51,6 +52,11 @@ export class Renderer {
       depth: true,
       powerPreference: 'high-performance',
     });
+    // (The first time a shader is drawn with, three asks the card what it had to say of it, three questions, and
+    // each waits for everything the card has been told to do before it: a few milliseconds with the card at rest,
+    // a third of a second measured with it busy. Asked while the game is being made, where a broken shader is
+    // wanted known; not of somebody playing. `?shaderlog` asks anyway.)
+    this.renderer.debug.checkShaderErrors = import.meta.env.DEV ? !new URLSearchParams(location.search).has('asplayed') : new URLSearchParams(location.search).has('shaderlog');
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.NoToneMapping;
     this.renderer.toneMappingExposure = 1.0;
@@ -175,9 +181,40 @@ export class Renderer {
   async ready(obj: THREE.Object3D) {
     const prev = this.renderer.getRenderTarget();
     this.renderer.setRenderTarget(this.composer.inputBuffer);
-    const made = this.renderer.compileAsync(obj, this.camera, this.scene);
+    const made = this.renderer.compile(obj, this.camera, this.scene) as unknown as Set<THREE.Material>;
     this.renderer.setRenderTarget(prev);
-    await made;
+    // (The library's own waiting asks the card every hundredth of a second, of every material, whether its shader
+    // is made; and each asking is a trip to the card and back, behind whatever the card is busy with: 17 ms
+    // measured, with nothing drawn. Asked once now, and then a few times a good while apart.)
+    const done = () => {
+      for (const m of made) {
+        const program = (this.renderer.properties.get(m) as { currentProgram?: { isReady(): boolean } }).currentProgram;
+        if (program && !program.isReady()) return false;
+      }
+      return true;
+    };
+    for (let i = 0; i < 12 && !done(); i++) await new Promise((r) => setTimeout(r, i ? 150 : 250));
+  }
+
+  /**
+   * A thing's pictures are put on the graphics card before it is first drawn, one to a frame's spare time. Left to
+   * the frame it is first drawn in, a thing with seven pictures was seven of them sent in that one frame.
+   */
+  async send(obj: THREE.Object3D) {
+    const pictures = new Set<THREE.Texture>();
+    obj.traverse((o) => {
+      const m = (o as THREE.Mesh).material;
+      for (const mat of m ? (Array.isArray(m) ? m : [m]) : []) {
+        for (const v of Object.values(mat)) {
+          const t = v as THREE.Texture | null;
+          if (t && t.isTexture && !t.isRenderTargetTexture && t.image) pictures.add(t);
+        }
+      }
+    });
+    for (const t of pictures) {
+      await breathe();
+      this.renderer.initTexture(t);
+    }
   }
 
   render(dt: number) {
