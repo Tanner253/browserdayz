@@ -1,6 +1,6 @@
 // Day and night. The Zone has a day of thirty-two minutes: three quarters of it light (first
 // light, a long day, dusk) and one quarter, eight minutes, night. The night is kept shorter
-// than the ten minutes a dog tag has to be held for: nobody sits a tag out in the dark.
+// than the time a dog tag has to be held for (fifteen minutes): nobody sits a tag out in the dark.
 // Rules and numbers only: the server keeps the clock in multiplayer (every
 // game there is at the same hour), the game itself when playing alone; what the hour does to
 // the light is in src/world/atmosphere.ts.
