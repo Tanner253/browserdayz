@@ -332,6 +332,8 @@ export type S2C =
   | { t: 'powers'; god: boolean; hidden: boolean; clip: boolean; voidInv: boolean; voidTag: boolean }
   /** the lists the panel shows (see AdminLists) */
   | ({ t: 'adm' } & AdminLists)
+  /** the server is about to be restarted (in so many seconds: 0, it is stopping now), and why, if that was said */
+  | { t: 'restart'; why: string; in: number }
   | { t: 'kick'; reason: string };
 
 /** What the panel of somebody with a role is shown. The last two are an admin's alone. */

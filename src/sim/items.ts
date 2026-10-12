@@ -159,7 +159,7 @@ const D: ItemDef[] = [
   {
     id: 'ar15', name: 'AR-15', model: 'ar15', w: 7, h: 3, weight: 3.0, category: 'weapon', slot: 'long',
     desc: 'Carbine in 5.56. Thirty rounds in its magazine, sixty in the long one. Faster and flatter than the AK and easier to hold on a target, and each round does less. B changes it to single shots. Takes a holographic sight, a suppressor, a foregrip, a light and the long magazine.',
-    weapon: { kind: 'auto', ammo: 'ammo_556', capacity: 30, mag: 'mag_ar', ergo: 62, modes: ['auto', 'semi'], shows: { mag_ar: ['mag'], suppressor_556: ['silencer'], red_dot: ['sight'], foregrip: ['foregrip'], gun_light: ['light'] }, hides: { suppressor_556: ['brake'] } }, iconYaw: 0,
+    weapon: { kind: 'auto', ammo: 'ammo_556', capacity: 30, mag: 'mag_ar', ergo: 62, modes: ['auto', 'semi'], shows: { mag_ar: ['mag'], suppressor_556: ['silencer'], red_dot: [], foregrip: ['foregrip'], gun_light: ['light'] }, never: ['sight'], hides: { suppressor_556: ['brake'] } }, iconYaw: 0,
   },
   {
     id: 'ammo_739', name: '7.62x39 Rounds', model: 'round_739', w: 1, h: 1, weight: 0.016, category: 'ammo', stack: 30, scale: 1.3, pile: 5,
@@ -458,7 +458,7 @@ const D: ItemDef[] = [
   // ---------------------------------------------------------------- identity
   {
     id: 'dogtag', name: 'Dog Tag', model: '@dogtag', scale: 1.5, w: 1, h: 1, weight: 0.02, category: 'misc',
-    desc: 'Stamped steel on a ball chain. Every survivor carries their own. Take one off a body and stay alive with it for 10 minutes to cash it in.',
+    desc: 'Stamped steel on a ball chain. Every survivor carries their own. Take one off a body and stay alive with it for 15 minutes to cash it in.',
   },
   // ---------------------------------------------------------------- base building
   { id: 'stash_kit', name: 'Stash Case', model: 'weapons_case', w: 4, h: 3, weight: 6, category: 'stash', scale: 0.55, stash: [8, 6], desc: 'A hard case. Dropped, it lies where it lands and can be opened there: it stays in the world and keeps whatever you store in it. Out in the country, a shovel buries it.' },
@@ -503,19 +503,24 @@ export interface ItemInstance {
   left?: number;
 }
 
-/** seconds somebody else's dog tag has to be carried before it is cashed in */
-export const TAG_HOLD = 10 * 60;
+/**
+ * seconds somebody else's dog tag has to be carried before it is cashed in
+ * (fifteen minutes since 2026-10-12, when it was asked for: "i think we should bump the hold time requirement to
+ * 15 minutes, and the time to be alive for tag drops is 10 minutes". It was ten; before that, thirty.)
+ */
+export const TAG_HOLD = 15 * 60;
 /**
  * The Zona is the played part of the map, the dotted line on it (PLAY_AREAS in the world's generator): tags are
  * earned inside it. The country outside is for stashes and for building. A tag taken off somebody and carried
- * over that line is void after this many seconds out there: no sitting out its ten minutes in the hills.
+ * over that line is void after this many seconds out there: no sitting out its fifteen minutes in the hills.
  */
 export const TAG_OUT = 15;
 /**
  * Seconds somebody has to have been alive before there is a tag on their body at all. Whoever has just arrived
- * has nothing on them worth a reward, and is not to be farmed for one where they are set down.
+ * has nothing on them worth a reward, and is not to be farmed for one where they are set down. (Ten minutes since
+ * 2026-10-12; five before.)
  */
-export const TAG_FRESH = 5 * 60;
+export const TAG_FRESH = 10 * 60;
 /** the same in minutes, for everything that says so in words */
 export const TAG_HOLD_MIN = TAG_HOLD / 60;
 

@@ -971,6 +971,30 @@ export class HUD {
   private announceT = 0;
 
   /**
+   * The server is about to be restarted: said across the top of the picture, with why if that was said, and counted
+   * down. It stays until the game has gone (see Game, 'restart').
+   * @param seconds how long until it does (0: it is stopping now)
+   */
+  restarting(why: string, seconds: number) {
+    let n = this.root.querySelector('.hud-restart') as HTMLElement | null;
+    if (!n) this.root.appendChild((n = Object.assign(document.createElement('div'), { className: 'hud-restart' })));
+    const head = document.createElement('b'), reason = document.createElement('span'), kept = document.createElement('small');
+    reason.textContent = why;
+    kept.textContent = 'You are kept as you are, where you stand. The game comes back by itself.';
+    n.replaceChildren(head, ...(why ? [reason] : []), kept);
+    n.classList.add('show');
+    const until = performance.now() + seconds * 1000;
+    const tick = () => {
+      const left = Math.ceil((until - performance.now()) / 1000);
+      head.textContent = left > 0 ? `Server restarting in ${left} s` : 'Server restarting';
+    };
+    tick();
+    window.clearInterval(this.restartT);
+    this.restartT = window.setInterval(tick, 250);
+  }
+  private restartT = 0;
+
+  /**
    * Names over heads, as an admin's free camera shows them: each where its head is on the screen (in hundredths
    * of the screen's width and height). An empty list takes them all away.
    */

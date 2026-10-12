@@ -130,7 +130,7 @@ function page(book: Book, s: Snapshot, now: number): string {
 <body>
 <main>
   <h1>ZONA payouts</h1>
-  <p>Take another player's dog tag, stay alive with it for ten minutes, and it is cashed in. This page is the whole account of what is paid for that: nothing is paid that is not listed here, and every payment listed here is a transaction on Solana that anybody can look up.</p>
+  <p>Take another player's dog tag, stay alive with it for fifteen minutes, and it is cashed in. This page is the whole account of what is paid for that: nothing is paid that is not listed here, and every payment listed here is a transaction on Solana that anybody can look up.</p>
   <div class="state ${state[0]}"><b>${state[1]}</b>${esc(state[2])}</div>
   <div class="tiles">
     ${tile(s.balance === null ? '?' : amount(s.balance), 'SOL in the treasury', s.treasury ? `<a href="https://solscan.io/account/${esc(s.treasury)}" target="_blank" rel="noopener">${esc(short(s.treasury))}</a>${s.madeTheCoin ? ', the wallet that made the coin' : ''}` : '')}

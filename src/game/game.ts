@@ -14,7 +14,7 @@ import { Barrel, type Vegetation } from '../world/vegetation';
 import type { Grass } from '../world/grass';
 import { Door, type Buildings } from '../world/buildings';
 import { WORLD_SIZE, bunkerPlace, heightAt, inPlay, type SiteKind, type World } from '../world/worldgen';
-import { ITEMS, WEAPON_SLOTS, itemName, TAG_HOLD, TAG_HOLD_MIN, TAG_OUT, capacityOf, chambered, fillMag, fittedOf, magRoom, makeItem, newUid, swapMag, tagClock, tagOwner, type ItemInstance, quietOf } from '../sim/items';
+import { holds, ITEMS, WEAPON_SLOTS, itemName, TAG_HOLD, TAG_HOLD_MIN, TAG_OUT, capacityOf, chambered, fillMag, fittedOf, magRoom, makeItem, newUid, swapMag, tagClock, tagOwner, type ItemInstance, quietOf } from '../sim/items';
 import { PlayerInventory, SLOT_ORDER, type Container } from '../sim/inventory';
 import { Economy, type WorldLoot } from '../sim/economy';
 import { CRATE_RESTOCK, CRATE_SPECS, fillCrate } from '../sim/crates';
@@ -41,7 +41,7 @@ import { Jeep } from './vehicle';
 import { JEEP } from '../sim/vehicles';
 import { HUD, type HandAct, type HotbarEntry } from '../ui/hud';
 import { BACK_SHORT } from '../ui/updates';
-import { InventoryUI } from '../ui/inventory-ui';
+import { InventoryUI, type NearBox } from '../ui/inventory-ui';
 import { Minimap } from '../ui/minimap';
 import { BigMap } from '../ui/bigmap';
 import { BURY, noBurying } from '../sim/stash';
@@ -97,7 +97,10 @@ export interface WorldSystems {
 
 /** seconds with a shovel to put a stash under the ground, or to bring one up */
 const DIG_SECONDS = BURY.seconds;
+/** where the browser keeps a case that is open off the ground (see `outBag`) */
+const OUT_KEY = 'zona.outBag';
 /** how far off an admin's free camera shows names over heads, metres */
+/** names over heads from the free camera: beyond this they are written fainter (nobody is left out for being far) */
 const ESP_RANGE = 220;
 
 interface TimedAction {
@@ -540,6 +543,8 @@ export class Game {
       inHands: () => this.inv.held() ?? this.inHand,
       release: (item) => this.release(item),
       changed: () => this.inventoryChanged(),
+      near: () => this.nearBoxes(),
+      pickNear: (key) => this.pickNear(key),
       sound: (k) => audio.ui(k),
       note: (text) => this.hud.note(text, 'info'),
     });
@@ -875,6 +880,8 @@ export class Game {
     }
     this.joining = false;
     this.started = true;
+    // (a case this game had open off the ground when it last went away lies there again)
+    this.restoreOut();
     this.menu.dispose();
     this.hud.menuScene('', 0);
     // out of the aerial shot and down into the character's eyes
@@ -1274,6 +1281,11 @@ export class Game {
     net.on('alive', (m) => this.remotes.get(m.id)?.setAlive(true));
     net.on('loot+', (m) => this.economy.inject(m.l));
     net.on('loot-', (m) => {
+      // (the case this player asked to open where it lay: the server has let it go, and it is theirs to go through)
+      if (this.outBag?.waiting && m.uid === this.outBag.item.uid) {
+        this.outBag.waiting = false;
+        if (this.openStash === this.outBag.st) this.invUI.setStashState('');
+      }
       this.economy.take(m.uid);
       if (this.invUI.isOpen) this.invUI.refresh(this.around(), this.openStash);
     });
@@ -1282,6 +1294,16 @@ export class Game {
       const t = this.pendingTakes.get(m.uid);
       if (!t) return;
       this.pendingTakes.delete(m.uid);
+      // (a case that was to be opened where it lay: somebody else has it, and nothing of it was this player's)
+      if (this.outBag && m.uid === this.outBag.item.uid) {
+        const was = this.outBag;
+        this.outBag = null;
+        this.forgetOut();
+        if (this.openStash === was.st) this.openStash = null;
+        this.hud.note('Somebody else has that open, or has taken it', 'warn');
+        if (this.invUI.isOpen) this.invUI.refresh(this.around(), this.openStash);
+        return;
+      }
       if (this.inv.find((i) => i === t.item)) this.inv.remove(t.item);
       else this.inv.take(t.id, t.qty);
       this.hud.note('Someone else took it first', 'warn');
@@ -1380,7 +1402,7 @@ export class Game {
     net.on('adm', (m) => {
       this.adminUI.setLists(m);
       // (and an admin's map shows where everybody is)
-      if (this.role === 'admin') this.map.setPeople(m.players.filter((q) => q.id !== net.id).map((q) => ({ x: q.x, z: q.z, name: q.name, dead: !q.alive, faint: !!q.hidden || !!q.asleep, staff: !!q.role })));
+      this.mapKnown = new Map(m.players.map((q) => [q.id, { x: q.x, z: q.z, name: q.name, alive: q.alive, role: q.role, asleep: !!q.asleep }]));
     });
     net.on('ghost', (m) => this.remotes.get(m.id)?.setGhost(m.on));
     net.on('announce', (m) => {
@@ -1448,10 +1470,32 @@ export class Game {
         this.hud.chatLine('system', '', `${BACK_SHORT} Like and repost ZONA on X: the link is on the menu.`);
       }
     });
+    // The server says it is about to restart (an update is going on, or it has been told to stop): said across the
+    // top, and when the connection then goes, the game waits for the server that comes after and loads itself
+    // again when that one answers. (Whoever was on is kept as they were: they have only to press Play.)
+    net.on('restart', (m) => {
+      this.restartSaid = { why: m.why || this.restartSaid?.why || '', at: performance.now() };
+      this.hud.restarting(this.restartSaid.why, m.in);
+    });
     net.onClose = (reason) => {
       this.paused = true;
       this.input.unlock();
-      this.hud.fatal(reason);
+      const said = this.restartSaid && performance.now() - this.restartSaid.at < 180_000 ? this.restartSaid : null;
+      if (!said || this.net.refused) return void this.hud.fatal(reason);
+      this.hud.fatal(`The server is restarting${said.why ? ` (${said.why})` : ''}. You are kept as you were. This page loads again by itself when the server is back.`);
+      const remote = remoteServer() ?? location.origin, began = performance.now();
+      const look = async () => {
+        // (a server that answers, and has not been running for long: the one that came after)
+        try {
+          const r = await fetch(`${remote}/healthz`, { cache: 'no-store' });
+          const j = r.ok ? ((await r.json()) as { uptime?: number }) : null;
+          if (j && typeof j.uptime === 'number' && (j.uptime < 240 || performance.now() - began > 150_000)) return void location.reload();
+        } catch {
+          /* not there yet */
+        }
+        if (performance.now() - began < 600_000) window.setTimeout(look, 4000);
+      };
+      window.setTimeout(look, 6000);
     };
     this.maxPlayers = w.max;
     this.hud.setLive(true);
@@ -1460,6 +1504,8 @@ export class Game {
   }
 
   private maxPlayers = 0;
+  /** the server said it was about to restart: why, and when it said so (by this game's clock) */
+  private restartSaid: { why: string; at: number } | null = null;
   /** carrying a tag taken off somebody (the one round their own neck does not count): no jeep takes them (see Garage.use) */
   private get tagged() {
     const me = publicId();
@@ -1817,6 +1863,7 @@ export class Game {
 
   private syncOpenBox() {
     const st = this.openStash;
+    if (st && this.outBag?.st === st) return void this.keepOut();
     if (!this.online || !st || !st.known) return;
     this.net.send({ t: 'cset', cid: st.uid, items: st.container.serialize().items });
   }
@@ -2283,6 +2330,31 @@ export class Game {
     this.showPowers();
   }
 
+  /** what the server last said of everybody, for an admin's map: who has a role, whose body was left behind (by their number) */
+  private mapKnown = new Map<number, { x: number; z: number; name: string; alive: boolean; role: 'admin' | 'mod' | null; asleep: boolean }>();
+  private mapWasOpen = false;
+  /**
+   * An admin's Delete key: whatever the middle of the view is on is taken out of the world, by the order that does
+   * it (`/del`), which says back what was taken. From the eyes, or from the free camera, as far as a hundred and
+   * twenty metres. A thing on the ground, a body, a supply drop, a place where something is buried, a car, one of
+   * the infected. Not a player (they are kicked, from the panel), and not the map itself: its buildings, its trees
+   * and its crates are the same in every game and are not anybody's to take away.
+   */
+  private deleteLooked() {
+    const cam = this.s.r.camera, dir = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
+    const hit = physics.raycast(cam.position, dir, 120, SHOT_GROUPS, this.freecam ? undefined : this.player.collider);
+    // (what the hands could reach is what is meant, when the eye is on something that small)
+    const o = (!this.freecam && (this.focus instanceof WorldItem || this.focus instanceof Stash) ? this.focus : null) ?? hit?.tag?.owner;
+    let line = '';
+    if (o instanceof WorldItem) line = `/del item ${o.loot.uid}`;
+    else if (o instanceof Stash) line = o.fixed && !o.corpse ? '' : `/del box ${o.uid}`;
+    else if (o instanceof Jeep) line = `/del car ${o.i}`;
+    else if (o instanceof Infected) line = `/del z ${o.i}`;
+    else if (o instanceof RemotePlayer) return void this.hud.note(`That is ${o.name}: a player is kicked from the panel, not taken away`, 'warn');
+    if (!line) return void this.hud.note('Nothing there to take away: a thing on the ground, a body, a drop, a buried stash, a car or one of the infected', 'info');
+    this.order(line);
+  }
+
   /** whoever the free camera is kept with as they go: their number, and where they last were */
   private watching: { id: number; last: THREE.Vector3 } | null = null;
 
@@ -2300,9 +2372,10 @@ export class Game {
   }
 
   /**
-   * Names over heads, for an admin whose view has left their body: everybody within ESP_RANGE of the view, through
-   * whatever is in the way, with how far off they are. (Asked for 2026-10-12: "when im in freecam or spectate i
-   * should see everyone names in text above their heads once i get close to them".)
+   * Names over heads, for an admin whose view has left their body: everybody there is, through whatever is in the
+   * way and however far, with how far off they are; those a long way off written fainter. (Asked for 2026-10-12:
+   * "when im in freecam or spectate i should see everyone names in text above their heads", and then, of the 220 m
+   * they were first shown within: "when in freecam mode the admin should be able to see the name of all people".)
    */
   private drawNames(cam: THREE.PerspectiveCamera) {
     if (!this.freecam || this.role !== 'admin') {
@@ -2314,10 +2387,9 @@ export class Game {
     const out: { x: number; y: number; text: string; faint?: boolean }[] = [], v = new THREE.Vector3();
     const label = (name: string, at: THREE.Vector3, up: number, more: string, faint: boolean) => {
       const d = at.distanceTo(cam.position);
-      if (d > ESP_RANGE) return;
       v.set(at.x, at.y + up, at.z).project(cam);
       if (v.z < -1 || v.z > 1 || Math.abs(v.x) > 1.05 || Math.abs(v.y) > 1.05) return;
-      out.push({ x: (v.x * 0.5 + 0.5) * 100, y: (-v.y * 0.5 + 0.5) * 100, text: `${name} · ${Math.round(d)} m${more}`, faint });
+      out.push({ x: (v.x * 0.5 + 0.5) * 100, y: (-v.y * 0.5 + 0.5) * 100, text: `${name} · ${Math.round(d)} m${more}`, faint: faint || d > ESP_RANGE });
     };
     for (const r of this.remotes.values()) label(r.name, r.pos, r.alive ? 1.95 : 0.5, `${r.alive ? '' : ' · dead'}${r.ghost ? ' · vanished' : ''}`, !r.alive);
     label('you', this.player.pos, 1.95, '', true);
@@ -3371,6 +3443,153 @@ export class Game {
     return it;
   }
 
+  /**
+   * A case, a suitcase or a bag lying near, opened where it lies (2026-10-12: "i need to be able to interact with
+   * the inventories of containers around me so i can for example drop the stash crate, and THEN fill it with stuff
+   * while its on the ground"). The server keeps a thing on the ground whole, and has no word yet for changing what
+   * is in one. So while it is open it is off the ground and in this game's keeping (taken, as F takes it), and when
+   * it is shut it is put back where it lay with what is now in it. To everybody else it is not there for as long
+   * as it is open: which also means no two are in it at once. It is written down in the browser while it is out,
+   * so that a game that goes away with one open puts it back the next time it comes in (see `restoreOut`).
+   */
+  private outBag: { item: ItemInstance; x: number; y: number; z: number; rot: number; st: Stash; waiting: boolean } | null = null;
+
+  /** what is near that things are kept in: the crates, bodies and drops in reach, and the cases and bags lying loose */
+  private nearBoxes(): NearBox[] {
+    if (this.garage.ride) return [];
+    const p = this.player.pos, out: NearBox[] = [];
+    const room = (st: Stash) => `${st.container.items.reduce((n, q) => n + ITEMS[q.item.id].w * ITEMS[q.item.id].h, 0)} / ${st.container.w * st.container.h}`;
+    for (const st of [...this.loot.crates, ...[...this.corpses.values()].map((c) => c.stash), ...[...this.drops.values()].map((d) => d.stash)]) {
+      if (st.buried || Math.abs(st.y - p.y) > 1.5 || Math.hypot(st.x - p.x, st.z - p.z) > (st === this.openStash ? 3.4 : 2.6)) continue;
+      out.push({ key: `box:${st.uid}`, label: st.label, note: st === this.openStash || st.known ? room(st) : 'not searched', open: st === this.openStash });
+    }
+    if (this.outBag) out.push({ key: `bag:${this.outBag.item.uid}`, label: itemName(this.outBag.item), note: room(this.outBag.st), open: this.openStash === this.outBag.st });
+    for (const w of this.around()) {
+      const it = w.loot.item, r = holds(it.id);
+      if (r) out.push({ key: `bag:${it.uid}`, label: itemName(it), note: `${it.cargo?.length ?? 0} in · ${r[0]}×${r[1]}`, open: false });
+    }
+    return out;
+  }
+
+  /** one of them clicked in the inventory: opened, and whichever was open shut; the open one clicked is shut */
+  private pickNear(key: string) {
+    const st0 = this.openStash;
+    const was = st0 ? (this.outBag?.st === st0 ? `bag:${st0.uid}` : `box:${st0.uid}`) : '';
+    this.shutOpen();
+    if (key !== was) {
+      const uid = key.slice(4);
+      if (key.startsWith('box:')) {
+        const st = this.findBox(uid);
+        if (st && !st.buried) {
+          this.openStash = st;
+          if (this.online) {
+            // the server holds what is inside; show it once it answers
+            this.invUI.setStashState('Opening…');
+            this.net.send({ t: 'copen', cid: st.uid });
+          }
+        }
+      } else {
+        const w = this.loot.items.get(uid);
+        if (w && holds(w.loot.item.id)) this.takeOut(w);
+      }
+    }
+    audio.ui(this.openStash ? 'open' : 'close');
+    this.invUI.refresh(this.around(), this.openStash);
+    if (!this.openStash) this.invUI.setStashState('');
+    this.vicinityDue = [performance.now() + 250, performance.now() + 900];
+  }
+
+  /** a case that lies near is opened: off the ground, and gone through as a crate is */
+  private takeOut(w: WorldItem) {
+    const { x, y, z, rot } = w.loot;
+    const item = this.takeWorldItem(w);
+    const r = item && holds(item.id);
+    if (!item || !r) return;
+    const st = new Stash(item.uid, x, y, z, rot, r[0], r[1], itemName(item));
+    st.item = item.id;
+    st.known = true;
+    st.container.load({ items: (item.cargo ?? []).map((q) => ({ ...q.item, x: q.x, y: q.y, rot: q.rot })) });
+    this.outBag = { item, x, y, z, rot, st, waiting: this.online };
+    this.openStash = st;
+    this.keepOut();
+    if (!this.online) return;
+    // (until the server says it is this player's: somebody else may have reached for it first)
+    this.invUI.setStashState('Opening…');
+    setTimeout(() => {
+      if (this.outBag?.item !== item || !this.outBag.waiting) return;
+      this.outBag.waiting = false;
+      if (this.openStash === st) this.invUI.setStashState('');
+    }, 2500);
+  }
+
+  /** whatever is open is shut: a crate or a body is let go of; a case that lay loose is put back where it lay */
+  private shutOpen() {
+    const st = this.openStash;
+    this.openStash = null;
+    if (!st) return;
+    if (this.outBag?.st === st) return void this.putBack();
+    if (this.online && st.known) this.net.send({ t: 'cset', cid: st.uid, items: st.container.serialize().items });
+    if (this.online) this.net.send({ t: 'cclose', cid: st.uid });
+  }
+
+  /** the case that was open where it lay lies there again, with what is in it now */
+  private putBack() {
+    const b = this.outBag;
+    if (!b) return;
+    this.outBag = null;
+    this.packOut(b);
+    if (this.online) this.localDrops.add(b.item.uid);
+    this.economy.drop(b.item, b.x, b.y, b.z, b.rot);
+    this.forgetOut();
+    this.vicinityDue = [performance.now() + 150, performance.now() + 700];
+  }
+
+  /** what is in the open case, written into the thing itself */
+  private packOut(b: NonNullable<Game['outBag']>) {
+    const items = b.st.container.serialize().items as StoredItem[];
+    if (items.length) b.item.cargo = items.map(({ x, y, rot, ...item }) => ({ item, x, y, rot }));
+    else delete b.item.cargo;
+  }
+
+  /** the case that is out, written down in the browser: put back from there if the game goes away with it open */
+  private keepOut() {
+    const b = this.outBag;
+    if (!b) return;
+    this.packOut(b);
+    try {
+      localStorage.setItem(OUT_KEY, JSON.stringify({ item: b.item, x: b.x, y: b.y, z: b.z, rot: b.rot }));
+    } catch {
+      /* no room, or not allowed: it is only a second line of defence */
+    }
+  }
+  private forgetOut() {
+    try {
+      localStorage.removeItem(OUT_KEY);
+    } catch {
+      /* nothing to forget */
+    }
+  }
+
+  /** a case that was open where it lay when the game last went away: it lies there again */
+  private restoreOut() {
+    let raw: string | null = null;
+    try {
+      raw = localStorage.getItem(OUT_KEY);
+    } catch {
+      return;
+    }
+    if (!raw) return;
+    this.forgetOut();
+    try {
+      const b = JSON.parse(raw) as { item: ItemInstance; x: number; y: number; z: number; rot: number };
+      if (!b?.item?.uid || !holds(b.item.id) || ![b.x, b.y, b.z, b.rot].every((v) => Number.isFinite(v)) || this.economy.loot.has(b.item.uid) || this.inv.find((i) => i.uid === b.item.uid)) return;
+      if (this.online) this.localDrops.add(b.item.uid);
+      this.economy.drop(b.item, b.x, b.y, b.z, b.rot);
+    } catch {
+      /* not something this game wrote */
+    }
+  }
+
   private nearbyStash(): Stash | null {
     // (nothing is searched from a jeep's seat)
     if (this.garage.ride) return null;
@@ -3520,13 +3739,9 @@ export class Game {
       this.input.unlock();
       audio.ui('open');
     } else {
-      if (this.online && this.openStash) {
-        this.syncOpenBox();
-        this.net.send({ t: 'cclose', cid: this.openStash.uid });
-      }
+      this.shutOpen();
       this.invUI.close();
       this.input.uiMode = false;
-      this.openStash = null;
       if (byEscape && !this.input.touch) this.awaitClick = true;
       else if (this.started) this.input.lock();
       // if the browser refuses the re-capture, the next click on the game takes it (see awaitClick)
@@ -3813,6 +4028,11 @@ export class Game {
     // the inventory open and the survivor on the move: what lies near comes into the list and goes out of it as they walk
     if (this.invUI.isOpen && (this.vicinityT += dt) > 0.25) {
       this.vicinityT = 0;
+      // (a case opened where it lies is not carried off by walking away with it open: it is shut, and lies there)
+      if (this.outBag && Math.hypot(this.outBag.x - p.pos.x, this.outBag.z - p.pos.z) > 3.4) {
+        this.shutOpen();
+        this.vicinitySig = '';
+      }
       const near = this.around();
       const sig = near.map((w) => w.loot.uid).join(',');
       if (sig !== this.vicinitySig) {
@@ -3841,6 +4061,7 @@ export class Game {
       if (this.role === 'admin' && playing && !this.invUI.isOpen && !this.shop.isOpen && !this.map.open && !this.adminUI.isOpen) {
         if (input.pressed('KeyN')) this.order('/noclip');
         if (input.pressed('KeyK')) this.toggleFreecam();
+        if (input.pressed('Delete')) this.deleteLooked();
       }
     }
     if (this.adminUI.isOpen && (!this.started || this.paused)) this.toggleAdmin(false);
@@ -3903,12 +4124,35 @@ export class Game {
         this.watching.last.copy(r.pos);
       }
     }
+    // (and let go of by flying off: "once i move my camera with wasd i should be no longer watching the player", 2026-10-12.
+    // The mouse still looks about them while they are watched.)
+    if (this.freecam && this.watching && !panels && playing && !typing && ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ControlLeft', 'KeyC'].some((k) => input.held(k))) {
+      this.watching = null;
+      this.showPowers();
+      this.hud.note('No longer watching them: the camera is yours', 'info');
+    }
     if (this.freecam && !panels && playing && !typing) this.flyCamera(dt, input);
     // an admin's map: where everybody is, asked of the server while it is open
-    if (this.map.open && this.role === 'admin' && this.online && (this.mapAskT -= dt) <= 0) {
-      this.mapAskT = 1.5;
-      this.net.send({ t: 'adm' });
+    // (Where they are is known to this game already, many times a second: the map is drawn from that. What the
+    // server is asked for is only what this game is not told: who has a role, whose body is one left behind. It used
+    // to be drawn from the server's list alone, asked every second and a half from whenever the map happened to be
+    // opened: "the map is not showing names often enough", 2026-10-12.)
+    if (this.map.open && this.role === 'admin' && this.online) {
+      if (!this.mapWasOpen || (this.mapAskT -= dt) <= 0) {
+        this.mapAskT = 2;
+        this.net.send({ t: 'adm' });
+      }
+      const seen = new Set<number>();
+      const people = [...this.remotes.entries()].map(([id, r]) => {
+        seen.add(id);
+        const k = this.mapKnown.get(id);
+        return { x: r.pos.x, z: r.pos.z, name: r.name, dead: !r.alive, faint: r.ghost || !!k?.asleep, staff: !!k?.role };
+      });
+      // (and whoever the server lists that this game has no body for: a body left behind by a shut window)
+      for (const [id, k] of this.mapKnown) if (!seen.has(id) && id !== this.net.id) people.push({ x: k.x, z: k.z, name: k.name, dead: !k.alive, faint: true, staff: !!k.role });
+      this.map.setPeople(people);
     }
+    this.mapWasOpen = this.map.open;
 
     // (The legs are free while the inventory is open: it is walked about with, to see what lies near, as in DayZ.
     // What is nearby is read again as it changes: see `vicinityT`. The trader's counter is stood at.)
