@@ -40,7 +40,9 @@ const stock = (seed: number) => {
   (e as unknown as { rng: RNG }).rng = new RNG(seed);
   e.populate();
   const on = (id: string, t: Tier) => [...e.loot.values()].filter((l) => l.item.id === id && points[l.point].tier === t).length;
-  return { e, on, all: [...e.loot.values()].map((l) => ({ id: l.item.id, p: points[l.point] })) };
+  // (by the rules alone: not what a place always keeps, whatever the rules say: the rifle on the hospital's roof and its parts)
+  const ruled = (id: string, t: Tier) => [...e.loot.values()].filter((l) => l.item.id === id && points[l.point].tier === t && !points[l.point].keeps).length;
+  return { e, on, ruled, all: [...e.loot.values()].map((l) => ({ id: l.item.id, p: points[l.point] })) };
 };
 const worlds = [11, 2026, 77123].map(stock);
 
@@ -57,7 +59,7 @@ ok('every place for a thing is on a step, and every step has places: the camp, t
 ok('every sort of thing has a rule, and gets what its rule says on every step it is kept on', () => {
   for (const id of Object.keys(ITEMS)) if (!['dogtag', 'watch'].includes(id)) assert.ok(TYPES[id], `${id} is kept nowhere`);
   for (const id of Object.keys(TYPES)) assert.ok(ITEMS[id], `a rule for ${id}, which there is no such thing as`);
-  const { on } = worlds[0];
+  const { ruled: on } = worlds[0];
   for (const [id, rule] of Object.entries(TYPES)) for (const t of STEPS) {
     // (a thing or two short where a step is nearly full, and never one too many beyond what is always left at an armed place)
     const got = on(id, t), spare = guns.includes(id) || melee.includes(id) ? 40 : 0;

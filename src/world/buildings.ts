@@ -1243,6 +1243,178 @@ export class Buildings {
       const ends = [new THREE.Matrix4().makeTranslation(-hx, 0, hz - 0.015), new THREE.Matrix4().makeTranslation(hx, 0, -hz + 0.015).multiply(new THREE.Matrix4().makeRotationY(Math.PI))];
       ends.forEach((e, k) => this.doorSpecs.push({ m: m.clone().multiply(e), w: leaf, h, id: `container${n}_${k}`, open: lot.chance(0.5), swing: 1, leaf: it.kind === CONTAINER.blue ? 1 : 0 }));
     });
+    // and what stands in the grounds of the two big buildings: after every other thing, so that none is renumbered
+    this.planGrounds();
+  }
+
+  /**
+   * What stands in the grounds of the hospital and of the headquarters (2026-10-12: "the new buildings need more,
+   * character to them. the surroundings are boring, the path to the hospital is boring, everything is too plain").
+   * Round each a wall of concrete slabs with slabs gone; lamps; what was left lying when the place was given up.
+   * The hospital's: a gateway on its drive with its name over it, the dead laid out in rows before its doors and
+   * the cots they ran out of room for, the cars the wounded came in. (The ground itself, the drive and the trees
+   * are the map's: see HOSPITAL_GROUNDS in worldgen.)
+   *
+   * Everything is given in the building's own measure: x along its front, z out from its middle the way it faces.
+   * After every other thing that stands anywhere: nothing is renumbered. Nothing here is searched, burns or is lit
+   * by hand.
+   */
+  private planGrounds() {
+    const H = this.world.heights, UP = new THREE.Vector3(0, 1, 0), ONE = new THREE.Vector3(1, 1, 1), Q = Math.PI / 2;
+    for (const plot of this.world.buildings) {
+      if (plot.type !== 'hospital' && plot.type !== 'police_hq') continue;
+      const c = Math.cos(plot.rot), s = Math.sin(plot.rot);
+      const out = (lx: number, lz: number): [number, number] => [plot.x + lx * c + lz * s, plot.z - lx * s + lz * c];
+      const ground = (lx: number, lz: number) => heightAt(H, ...out(lx, lz));
+      /** a frame stood at a spot: its x turned `turn` from the building's, its floor the ground there (or `y`) */
+      const frame = (lx: number, lz: number, turn = 0, y?: number) => {
+        const [x, z] = out(lx, lz);
+        return new THREE.Matrix4().compose(new THREE.Vector3(x, y ?? heightAt(H, x, z), z), new THREE.Quaternion().setFromAxisAngle(UP, plot.rot + turn), ONE);
+      };
+      const box = (M: THREE.Matrix4, key: Exclude<MatKey, 'glass'>, x0: number, x1: number, y0: number, y1: number, z0: number, z1: number, solid = true) => {
+        this.push(key, boxGeo(x0, x1, y0, y1, z0, z1, this.tile(key), M));
+        if (solid) this.collider((x1 - x0) / 2, (y1 - y0) / 2, (z1 - z0) / 2, M.clone().multiply(new THREE.Matrix4().makeTranslation((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2)), MATS[key].surface);
+      };
+      /** a thing off the shelf, stood on the ground (`far`: seen only from so near: what is small) */
+      const stand = (kind: string, lx: number, lz: number, turn = 0, o: { far?: number; scale?: number; up?: number } = {}) => {
+        const [x, z] = out(lx, lz);
+        this.world.props.push({ kind, x, y: heightAt(H, x, z) + (o.up ?? 0), z, rot: plot.rot + turn, scale: o.scale ?? 1, ...(o.far ? { far: o.far } : {}) });
+      };
+      /**
+       * A wall of concrete slabs from one spot to another: a slab every two and a half metres between posts, each
+       * on two feet, each stood on the ground where it is. `gone`: the slabs that are not there (counted from the
+       * first end); `down`: of those, the ones that lie on the ground by their places.
+       */
+      const wall = (ax: number, az: number, bx: number, bz: number, gone: number[] = [], down: number[] = []) => {
+        const len = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.round(len / 2.5)), w = len / n, dx = (bx - ax) / len, dz = (bz - az) / len;
+        const turn = Math.atan2(-dz, dx);
+        for (let k = 0; k < n; k++) {
+          const mx = ax + dx * w * (k + 0.5), mz = az + dz * w * (k + 0.5);
+          const y = Math.min(ground(mx, mz), ground(mx - dx * w * 0.5, mz - dz * w * 0.5), ground(mx + dx * w * 0.5, mz + dz * w * 0.5)) - 0.1;
+          const M = frame(mx, mz, turn, y);
+          // a post at its first end (and at the wall's last end): where a slab is gone its posts still stand
+          box(M, 'concrete', -w / 2 - 0.1, -w / 2 + 0.1, 0, 2.5, -0.1, 0.1);
+          if (k === n - 1) box(M, 'concrete', w / 2 - 0.1, w / 2 + 0.1, 0, 2.46, -0.1, 0.1);
+          if (gone.includes(k)) {
+            // (flat on the ground on the yard's side of its place, a corner on its neighbour's foot)
+            if (down.includes(k)) {
+              // (on the side of the wall the building is)
+              const side = -dz * -mx + dx * -mz > 0 ? 1 : -1, fx = mx - dz * 1.5 * side, fz = mz + dx * 1.5 * side;
+              this.push('concrete', boxGeo(-w / 2 + 0.25, w / 2 - 0.05, 0, 0.1, -1.1, 1.1, this.tile('concrete'), frame(fx, fz, turn + 0.14 * (k % 2 ? 1 : -1), ground(fx, fz) + 0.02)));
+            }
+            continue;
+          }
+          for (const fx of [-w * 0.3, w * 0.3]) box(M, 'concrete', fx - 0.16, fx + 0.16, 0, 0.24, -0.17, 0.17, false);
+          box(M, 'concrete', -w / 2 + 0.03, w / 2 - 0.03, 0.2, 2.38, -0.045, 0.045);
+        }
+      };
+      const dice = new RNG(plot.seed ^ 0x67d5);
+
+      if (plot.type === 'hospital') {
+        // ---- the wall round it: along the backs of the houses on the street either side of the drive, down both
+        // ends, along the back
+        wall(-33.2, 20.7, -14.2, 20.7, [3], [3]);
+        wall(9.6, 20.7, 29.2, 20.7, [5]);
+        wall(-33.2, 20.7, -33.2, -15.4, [2, 9, 10], [2]);
+        wall(-33.2, -15.4, 9.3, -15.4, [4, 9, 10], [9]);
+        wall(15.7, -15.4, 29.2, -15.4);
+        wall(29.2, -15.4, 29.2, 20.7, [3, 4, 10], [10]);
+
+        // ---- the gateway, where the drive leaves the street between the two houses: two brick piers, a beam
+        // across them with the name of the place stood on it, and the two leaves of the gate swung back
+        {
+          const G = frame(0, 40.4);
+          for (const sx of [-1, 1]) {
+            box(G, 'brick_ext', sx * 2.85 - 0.3, sx * 2.85 + 0.3, -0.5, 3.3, -0.3, 0.3);
+            box(G, 'concrete', sx * 2.85 - 0.37, sx * 2.85 + 0.37, 3.3, 3.4, -0.37, 0.37, false);
+            // a leaf: uprights between three rails, open inward along the drive's edge and not quite square to it
+            const L = frame(sx * 2.5, 40.06, sx * 0.13 + Math.PI / 2);
+            for (let k = 0; k <= 13; k++) this.push('steel', boxGeo(0.12 + k * 0.165 - 0.011, 0.12 + k * 0.165 + 0.011, 0.16, 1.92 - Math.abs(k - 6.5) * 0.012, -0.011, 0.011, this.tile('steel'), L));
+            for (const y of [0.22, 1.02, 1.8]) this.push('steel', boxGeo(0.06, 2.32, y - 0.02, y + 0.02, -0.018, 0.018, this.tile('steel'), L));
+            this.collider(1.13, 0.9, 0.03, L.clone().multiply(new THREE.Matrix4().makeTranslation(1.19, 1.0, 0)), 'metal');
+          }
+          box(G, 'steel', -2.55, 2.55, 3.1, 3.22, -0.06, 0.06, false);
+          this.signs.push({ m: G.clone().multiply(new THREE.Matrix4().makeTranslation(0, 3.22 + 0.49, 0)), text: 'ГОРБОЛЬНИЦА', sub: 'KAMENKA TOWN HOSPITAL', board: '#e4e0d4', ink: '#8c1f1f', size: 1.5 });
+        }
+
+        // ---- lamps: on the drive, round its bend, along the far edge of it before the front, at its end, and on
+        // the bare ground before the doors
+        for (const [lx, lz, turn] of [[2.85, 33.5, Q], [3.4, 19.4, 0.9], [-10.2, 18.0, 0], [-20.4, 18.0, 0], [-31.5, 5.6, Q], [12.6, 19.0, 0], [23.3, 12.4, Q]] as [number, number, number][]) stand('street_lamp_01', lx, lz, turn);
+
+        // ---- the drive was shut: one block still across half of it, the other pushed off into the verge
+        stand('concrete_road_barrier', -1.75, 36.6, 0.08);
+        stand('concrete_road_barrier', 2.5, 29.6, 1.35);
+        stand('surgical_trolley', 1.1, 26.2, 0.7, { far: 110 });
+        stand('trashbag', -2.6, 24.6, 1.1, { far: 110 });
+
+        // ---- before the doors, east of the drive: the dead in rows under their sheets, the row they did not
+        // finish; the cots put out when the wards were full; a line of blocks to keep the town back; a car left
+        for (const [k, lx] of [8.0, 9.25, 10.5, 11.75, 13.0, 14.25].entries()) stand('covered_body', lx, 10.3 + (k % 2) * 0.12, Q + dice.range(-0.07, 0.07), { far: 130 });
+        for (const lx of [8.0, 9.25, 10.5]) stand('covered_body', lx, 12.9, Q + dice.range(-0.07, 0.07), { far: 130 });
+        stand('covered_body', 12.5, 13.3, 0.5, { far: 130 });
+        for (const [lx, lz, turn] of [[17.2, 10.0, 0.04], [18.8, 10.15, -0.05], [20.4, 9.9, 0.08], [19.3, 13.2, 1.3]] as [number, number, number][]) stand('old_bed_frame', lx, lz, turn, { far: 130 });
+        stand('ward_curtain', 16.2, 10.0, Q, { far: 130 });
+        stand('surgical_trolley', 21.3, 11.9, 0.5, { far: 110 });
+        stand('cardboard_box_01', 16.6, 12.6, 0.3, { far: 110 });
+        stand('cardboard_box_01', 17.1, 13.2, 1.2, { far: 110 });
+        for (const [lx, lz, turn] of [[6.9, 18.5, 0.05], [10.3, 18.7, -0.06], [16.2, 18.5, 0.1], [19.5, 18.2, -0.2]] as [number, number, number][]) stand('concrete_road_barrier', lx, lz, turn);
+        stand('covered_car', 21.2, 15.4, 1.25);
+        stand('barrel_03', 5.3, 16.8, 0.4);
+        stand('trashbag', 6.0, 17.4, 2.0, { far: 110 });
+        stand('trashbag', 4.7, 17.6, 0.3, { far: 110 });
+        stand('metal_trash_can@1', 5.2, 8.55, 0);
+        stand('old_tyre', 22.4, 9.2, 0.8, { up: 0.08, far: 110 });
+        // benches against the front, either side of the doors
+        for (const lx of [-8.0, -17.6, 8.0]) stand('hospital_bench', lx, 8.43, 0);
+
+        // ---- west of the doors, between the drive and the front: a bed for flowers inside a kerb, gone to fern
+        {
+          const B = frame(0, 0, 0, plot.floorY);
+          const [x0, x1, z0, z1] = [-21.6, -5.4, 10.0, 11.8];
+          box(B, 'concrete', x0, x1, -0.3, 0.05, z0 - 0.12, z0, false);
+          box(B, 'concrete', x0, x1, -0.3, 0.05, z1, z1 + 0.12, false);
+          box(B, 'concrete', x0 - 0.12, x0, -0.3, 0.043, z0 - 0.12, z1 + 0.12, false);
+          box(B, 'concrete', x1, x1 + 0.12, -0.3, 0.043, z0 - 0.12, z1 + 0.12, false);
+          for (let lx = x0 + 1.2; lx < x1 - 0.6; lx += 2.3) stand('fern_02', lx - 0.4, 10.9 + dice.range(-0.15, 0.15), dice.range(0, 6.28), { scale: dice.range(0.75, 1.05), far: 110 });
+        }
+
+        // ---- the west end: the car that brought the last of them, by the roof over the door; a cot and a trolley under it
+        stand('covered_car', -28.7, 1.6, 0.06);
+        stand('old_bed_frame', -24.7, 0.9, Q, { far: 130 });
+        stand('surgical_trolley', -24.4, -1.0, 0.2, { far: 110 });
+        // ---- behind: drums and a tyre by the boiler's door
+        stand('barrel_03', 9.8, -9.3, 0);
+        stand('barrel_03', 10.5, -9.8, 1);
+        stand('old_tyre', 2.6, -9.4, 0.5, { up: 0.08, far: 110 });
+        stand('trashbag', 6.2, -9.1, 0.7, { far: 110 });
+      } else {
+        // ---- the headquarters stands in a cut in the hill: a wall at the foot of the bank down both sides of its
+        // yard and across the back of it
+        wall(-15.4, 9.2, -15.4, -12.3, [4], [4]);
+        wall(-15.4, -12.3, 15.6, -12.3, [7]);
+        // (the east one stops short of the front: a car stands there)
+        wall(15.6, -12.3, 15.6, 5.4, [1, 5], [5]);
+        // lamps either side of the ground before its doors; blocks set to make whatever drove up to it slow down
+        stand('street_lamp_01', -9.6, 9.6, 0);
+        stand('street_lamp_01', 9.6, 9.6, 0);
+        stand('concrete_road_barrier', -2.0, 15.5, 0.12);
+        stand('concrete_road_barrier', 2.0, 19.2, -0.1);
+        // what was driven: one before the front, one down the side of the yard
+        stand('covered_car', -7.4, 10.6, 0.12);
+        stand('covered_car', 13.4, -1.5, 0.03);
+        stand('hospital_bench', 6.0, 6.93, 0);
+        stand('metal_trash_can@0', 3.2, 7.0, 0);
+        // the yard behind: drums, tyres, what was thrown out of the back door
+        stand('barrel_03', -13.6, -10.6, 0);
+        stand('barrel_03', -12.8, -11.1, 1.3);
+        stand('old_tyre', -13.2, -4.2, 0.4, { up: 0.08, far: 110 });
+        stand('old_tyre', -12.9, -3.5, 2.0, { up: 0.08, far: 110 });
+        stand('crate_big', -13.4, 2.6, 0.2);
+        stand('trashbag', 7.6, -7.6, 0.3, { far: 110 });
+        stand('trashbag', 8.3, -8.1, 1.8, { far: 110 });
+        stand('metal_trash_can@1', 4.4, -7.2, 0);
+      }
+    }
   }
 
   /** buildings whose outsides are models: which, and where each stands */
@@ -1327,7 +1499,7 @@ export class Buildings {
       town: [
         ['covered_car', 5.3, -36], ['covered_car', -5.4, 30], ['covered_car', 5.2, 78], ['covered_car', -5.3, -70],
         ['concrete_road_barrier', -2.2, 93.5, 0], ['concrete_road_barrier', 2.4, 94.5, 0],
-        ['wooden_crate_01', 17, -51], ['cardboard_box_01', 16.2, -38.5], ['Barrel_01', 17.2, -37.5], ['metal_trash_can@1', 5.6, 2], ['trashbag', 5.9, 3.2],
+        ['wooden_crate_01', 17, -51], ['cardboard_box_01', 16.2, -38.5], ['Barrel_01', 17.2, -37.5], ['metal_trash_can@1', 5.6, -6], ['trashbag', 5.9, -7.2],
         ['old_tyre', 17.5, 61], ['Barrel_01', 17.8, 72], ['barrel_03', 18.9, 73], ['weapons_case', 18.5, 22],
         [CONTAINER.orange, 27, 80, 0.15], [CONTAINER.blue, 24, -74, Math.PI / 2], ['crate_big', 22, 76], ['crate_big', 23.2, 77],
         ['metal_trash_can@0', -5.7, -14], ['trashbag', -6.4, 46], ['stone_fire_pit', -25, 24], ['dry_branches_medium_01', 26, 44],

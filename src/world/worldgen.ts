@@ -128,8 +128,46 @@ export function playOutline(): { x: number; z: number; r: number; from: number; 
   return out;
 }
 
-/** where the hospital stands in Kamenka: metres to the right of its street (looking down it), and along it from the town's middle */
-export const HOSPITAL_AT = { right: 46, along: -4 };
+/**
+ * Where the hospital stands in Kamenka: metres to the right of its street (looking down it), and along it from the
+ * town's middle. (Along: its door is opposite the middle of the way through between the plank house and the brick
+ * block, where its drive comes in. It stood 3.3 m short of that.)
+ */
+export const HOSPITAL_AT = { right: 46, along: -0.7 };
+/**
+ * The hospital's grounds (2026-10-12: "the surroundings are boring, the path to the hospital is boring, everything
+ * is too plain"), in the hospital's own measure: x along its front the way the street runs on, z out from its
+ * middle towards the street. Its front wall is at z = 8, the middle of the street at z = 46.
+ *
+ * A yard level with its floor before it, round its ends and behind it. A drive of asphalt in from the street,
+ * between the two houses, round to the left along its front and round its west end to the door the wounded were
+ * carried in at. The ground before its doors east of the drive trodden bare. A wall of concrete slabs round all of
+ * it, with slabs gone (see `planGrounds` in buildings.ts, which stands everything here that is not ground). Two
+ * sheds and a barn that stood where its yard now is stand where a hospital would have them: the one behind it by
+ * the boiler, for the coal; the other by the drive, the porter's; the barn clear of its east end.
+ */
+export const HOSPITAL_GROUNDS = {
+  /** [x from, to, z from, to], and how far beyond that the ground is eased into what it was */
+  yard: [-33, 29.5, -15.5, 19.5] as [number, number, number, number],
+  ease: 7,
+  drive: 4.5,
+  /** [which, x, z, turned from the way the hospital faces] */
+  moved: [['shed_113', 12.5, -13.3, 0], ['shed_114', 6.9, 24.4, -Math.PI / 2], ['barn_115', 38, 9, 0]] as [string, number, number, number][],
+  /** bare ground: lines of it, each [x, z] to [x, z] */
+  bare: [[-2.5, 9.4, 21.5, 9.4], [-2.5, 11.4, 21.5, 11.4], [3, 13.4, 21.5, 13.4], [3, 15.4, 21.5, 15.4], [3.5, 17.4, 21.5, 17.4], [-26.4, 0, -23.6, 0], [2, -10, 15, -10]] as [number, number, number, number][],
+  /** birches: between the drive and the backs of the houses, and at its east end */
+  trees: [[-21.5, 19.2], [-15.2, 19.4], [-9.4, 19.1], [10.8, 19.4], [16.4, 19.2], [22.2, 19.3], [-31.2, 16.8], [-31.4, -8.5], [26.6, 6.2]] as [number, number][],
+};
+/** the line of the hospital's drive, in the hospital's own measure: from the street's edge to the door at its west end */
+export function hospitalDrive(roadW: number): [number, number][] {
+  const line: [number, number][] = [];
+  for (let z = HOSPITAL_AT.right - (roadW / 2 - 1.1); z > 21.5; z -= 3) line.push([0, z]);
+  for (let a = 0; a <= 90; a += 15) line.push([-6 + 6 * Math.cos((a * Math.PI) / 180), 21 - 6 * Math.sin((a * Math.PI) / 180)]);
+  for (let x = -9; x > -22; x -= 3) line.push([x, 15]);
+  for (let a = 0; a <= 90; a += 15) line.push([-22.5 - 6 * Math.sin((a * Math.PI) / 180), 9 + 6 * Math.cos((a * Math.PI) / 180)]);
+  for (let z = 6; z >= -3; z -= 3) line.push([-28.5, z]);
+  return line;
+}
 /**
  * The village's streets and what stands on them (2026-10-12: see "the village laid out as a place is", at the end
  * of the map's making). `streets`: where each side street leaves the road (metres along it from the village's
@@ -1741,43 +1779,100 @@ export function generateWorld(seed = WORLD_SEED): World {
   // brick block. After every building there was: none is renumbered. The ground under it is the floor's, level
   // already; what grew or lay there goes.
   {
-    const first = buildings.length;
     const before = heights.slice();
     const rng6 = new RNG(seed + 7373);
     const cell = (x: number, z: number) => idx(clamp(Math.round((x + half) / CELL), 0, N - 1), clamp(Math.round((z + half) / CELL), 0, N - 1));
     const [sx, sz] = TOWN.street, street = Math.atan2(sx, sz);
     const inTown = (right: number, along: number): [number, number] => [TOWN.x + right * sz + along * sx, TOWN.z - right * sx + along * sz];
     const [hx, hz] = inTown(HOSPITAL_AT.right, HOSPITAL_AT.along);
-    buildings.push({ id: `hospital_${buildings.length}`, type: 'hospital', x: hx, z: hz, rot: street - Math.PI / 2, floorY: 0, seed: Math.floor(rng6.next() * 1e9) });
-    const added = buildings.slice(first);
+    const hosp: BuildingPlot = { id: `hospital_${buildings.length}`, type: 'hospital', x: hx, z: hz, rot: street - Math.PI / 2, floorY: 0, seed: Math.floor(rng6.next() * 1e9) };
+    buildings.push(hosp);
     const reach = (type: BuildingType) => Math.hypot(...BUILDING_FOOTPRINT[type]) / 2;
-    for (const b of added) seat(b);
-    for (const b of buildings) if (added.some((n) => n === b || Math.hypot(n.x - b.x, n.z - b.z) < reach(n.type) + reach(b.type) + 9.5)) pad(b, 3.2, 2.2);
-    const inAdded = (x: number, z: number, margin: number) =>
-      added.some((b) => {
+    seat(hosp);
+
+    // Its grounds (see HOSPITAL_GROUNDS). `out`: from its own measure to the map's; `own`: the other way.
+    const G = HOSPITAL_GROUNDS, hc = Math.cos(hosp.rot), hs = Math.sin(hosp.rot), padY = hosp.floorY - 0.08;
+    const out = (lx: number, lz: number): [number, number] => [hosp.x + lx * hc + lz * hs, hosp.z - lx * hs + lz * hc];
+    const own = (x: number, z: number): [number, number] => [(x - hosp.x) * hc - (z - hosp.z) * hs, (x - hosp.x) * hs + (z - hosp.z) * hc];
+    const R = reach('hospital') + 34;
+    const cells = (fn: (i: number, x: number, z: number) => void) => {
+      for (let iz = Math.max(0, Math.floor((hosp.z - R + half) / CELL)); iz <= Math.min(N - 1, Math.ceil((hosp.z + R + half) / CELL)); iz++)
+        for (let ix = Math.max(0, Math.floor((hosp.x - R + half) / CELL)); ix <= Math.min(N - 1, Math.ceil((hosp.x + R + half) / CELL)); ix++) fn(iz * N + ix, -half + ix * CELL, -half + iz * CELL);
+    };
+    // the yard
+    cells((i, x, z) => {
+      const [lx, lz] = own(x, z), [x0, x1, z0, z1] = G.yard;
+      const e = Math.hypot(Math.max(0, x0 - lx, lx - x1), Math.max(0, z0 - lz, lz - z1));
+      if (e < G.ease) heights[i] = lerp(heights[i], padY, 1 - smoothstep(0, G.ease, e));
+    });
+    // what stood in the way of it, stood again (each is the building it was, in the place of the list it had)
+    const stood: BuildingPlot[] = [hosp];
+    for (const [id, lx, lz, turn] of G.moved) {
+      const q = buildings.find((o) => o.id === id);
+      if (!q) throw new Error(`the hospital's grounds name ${id}, and there is no such building`);
+      [q.x, q.z] = out(lx, lz);
+      q.rot = hosp.rot + turn;
+      seat(q);
+      stood.push(q);
+    }
+    // the drive: its height the street's where it leaves it, and the yard's from the backs of the houses on
+    const line = hospitalDrive(ROAD_W).map(([lx, lz]) => out(lx, lz));
+    const streetY = roadH[cell(line[0][0], line[0][1])];
+    let gone = 0;
+    const ys = line.map(([x, z], i) => {
+      if (i) gone += Math.hypot(x - line[i - 1][0], z - line[i - 1][1]);
+      return lerp(streetY, padY + 0.08, smoothstep(1, 17, gone));
+    });
+    const dd = new Float32Array(N * N).fill(1e9), dh = new Float32Array(N * N);
+    rasterLine(line, ys, 10, dd, dh);
+    cells((i) => {
+      if (dd[i] >= 8) return;
+      // (not the street's own bed, where the drive leaves it)
+      const w = (1 - smoothstep(G.drive / 2 + 0.4, 8, dd[i])) * smoothstep(ROAD_W / 2 - 0.4, ROAD_W / 2 + 1.2, roadDist[i]);
+      heights[i] = lerp(heights[i], dh[i] - 0.08, w);
+    });
+    for (const b of buildings) if (stood.some((n) => n === b || Math.hypot(n.x - b.x, n.z - b.z) < reach(n.type) + reach(b.type) + 9.5)) pad(b, 3.2, 2.2);
+    cells((i) => {
+      if (dd[i] >= 10) return;
+      // (a drive narrower than the road: the ground is painted by how far a spot is from a road as wide as that one)
+      const d = dd[i] + (ROAD_W - G.drive) / 2;
+      if (d < roadDist[i]) {
+        roadDist[i] = d;
+        roadH[i] = dh[i];
+      }
+    });
+    {
+      const pts = new Float32Array(line.length * 3);
+      line.forEach(([x, z], i) => pts.set([x, heightAt(heights, x, z) + 0.08, z], i * 3));
+      roads.push({ points: pts, width: G.drive, side: true });
+    }
+    // bare ground, painted as a track is
+    for (const [ax, az, bx, bz] of G.bare) rasterLine([out(ax, az), out(bx, bz)], null, 4, trackDist, trackH);
+
+    const inStood = (x: number, z: number, margin: number) =>
+      stood.some((b) => {
         const [w, d] = BUILDING_FOOTPRINT[b.type];
         const dx = x - b.x, dz = z - b.z, c = Math.cos(b.rot), sn = Math.sin(b.rot);
         return Math.abs(dx * c - dz * sn) < w / 2 + margin && Math.abs(dx * sn + dz * c) < d / 2 + margin;
       });
+    // what grew or lay in the yard goes; what is left about it stands on the ground as it is now
     for (const list of [trees, rocks, props]) {
       for (let k = list.length - 1; k >= 0; k--) {
         const t = list[k];
-        if (!added.some((b) => Math.hypot(b.x - t.x, b.z - t.z) < reach(b.type) + 14)) continue;
-        if (inAdded(t.x, t.z, list === trees ? 4 : 2.5)) list.splice(k, 1);
+        if (Math.hypot(hosp.x - t.x, hosp.z - t.z) > R) continue;
+        const [lx, lz] = own(t.x, t.z), [x0, x1, z0, z1] = G.yard, m = list === trees ? 2 : 0.5;
+        if (inStood(t.x, t.z, list === trees ? 4 : 2.5) || (lx > x0 - m && lx < x1 + m && lz > z0 - m && lz < z1 + m) || dd[cell(t.x, t.z)] < G.drive / 2 + (list === trees ? 3 : 1.5)) list.splice(k, 1);
         else t.y += heightAt(heights, t.x, t.z) - heightAt(before, t.x, t.z);
       }
     }
-    const again = new Set<number>();
-    for (const b of added) {
-      const R = reach(b.type) + 8;
-      for (let iz = Math.max(0, Math.floor((b.z - R + half) / CELL)); iz <= Math.min(N - 1, Math.ceil((b.z + R + half) / CELL)); iz++)
-        for (let ix = Math.max(0, Math.floor((b.x - R + half) / CELL)); ix <= Math.min(N - 1, Math.ceil((b.x + R + half) / CELL)); ix++) again.add(iz * N + ix);
+    for (const [lx, lz] of G.trees) {
+      const [x, z] = out(lx, lz);
+      trees.push({ kind: 'birch_a', x, y: heightAt(heights, x, z), z, rot: rng6.next() * Math.PI * 2, scale: 0.9 + rng6.next() * 0.3 });
     }
-    for (const k of again) {
-      paint(k % N, Math.floor(k / N));
-      if (surface) surface[k] = heights[k];
-    }
-    void cell;
+    cells((i, x, z) => {
+      paint(Math.round((x + half) / CELL), Math.round((z + half) / CELL));
+      if (surface) surface[i] = heights[i];
+    });
   }
 
   // --- the village laid out as a place is (2026-10-12). Asked: "we will need to make the building layout in the
@@ -1971,6 +2066,12 @@ export function generateWorld(seed = WORLD_SEED): World {
     for (const r of roads) {
       if (!r.side) continue;
       for (let i = 0; i < r.points.length / 3; i++) r.points[i * 3 + 1] = heightAt(heights, r.points[i * 3], r.points[i * 3 + 2]) + 0.08;
+    }
+    // (the headquarters' yard is bare ground, as a yard is that cars stood in: before its doors, down its sides, behind it)
+    {
+      const q = buildings[buildings.length - 1], qc = Math.cos(q.rot), qs = Math.sin(q.rot);
+      const o = (lx: number, lz: number): [number, number] => [q.x + lx * qc + lz * qs, q.z - lx * qs + lz * qc];
+      for (const [ax, az, bx, bz] of [[-10, 8.2, 10, 8.2], [-10, 10.2, 10, 10.2], [-13.3, 8, -13.3, -9.5], [13.4, 8, 13.4, -9.5], [-13.3, -9.6, 13.4, -9.6]]) rasterLine([o(ax, az), o(bx, bz)], null, 4, trackDist, trackH);
     }
 
     // 4. what grew or lay where a building or a street now is goes; the rest stands on the ground as it is now

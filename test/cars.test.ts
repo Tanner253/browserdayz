@@ -16,9 +16,9 @@ const world = generateWorld();
 const jeeps = jeepSpots(world);
 const cars = policeSpots(world, jeeps);
 
-ok('a police car beside each police station: the village\'s and Kamenka\'s, on level ground, clear of every wall and of every jeep', () => {
-  const stations = world.buildings.filter((b) => b.type === 'police');
-  assert.equal(stations.length, 2);
+ok('a police car beside each police station: the village\'s and Kamenka\'s, and the headquarters\', on level ground, clear of every wall and of every jeep', () => {
+  const stations = world.buildings.filter((b) => b.type === 'police' || b.type === 'police_hq');
+  assert.equal(stations.length, 3);
   assert.equal(cars.length, stations.length, `${cars.length} police cars for ${stations.length} stations`);
   cars.forEach((c, k) => {
     const st = stations[k];

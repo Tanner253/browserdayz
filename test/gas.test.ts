@@ -141,7 +141,8 @@ ok('what is kept under the gas is marked so, and the masks are kept out of it, i
   assert.ok(under.length >= 8, `only ${under.length} places to find anything under the gas`);
   for (const p of data.lootPoints) assert.equal(p.usage.includes('Gas'), gasDepth(zone, p.x, p.y, p.z) > GAS.breathe);
   // stocked as a fresh server stocks it: every mask is in the police station, none under the gas
-  const police = world.buildings.filter((b) => b.type === 'police').map((b) => b.id);
+  // (and in the headquarters, which is one)
+  const police = world.buildings.filter((b) => b.type === 'police' || b.type === 'police_hq').map((b) => b.id);
   assert.ok(police.length >= 1, 'no police station on this map');
   const eco = new Economy(data.lootPoints, { spawn: () => {}, despawn: () => {} });
   eco.populate();
