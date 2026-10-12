@@ -78,6 +78,22 @@ try {
   vic.say(50, 0);
   await sleep(400);
 
+  // ---- when a position was true by the clock of the game it is of goes on with it (src/net/timeline.ts); a game
+  // that says no time is passed on with none, and something that is not a time is not passed on as one
+  {
+    const mark = ann.got.length;
+    vic.send({ t: 's', p: [50, ground(50, 0), 0, 0.2, 0, 0], w: null, m: [], n: 4_321_987.4 });
+    await sleep(250);
+    assert.ok(ann.rows(vic, mark).some((r) => r[9] === 4_321_987), 'the time a position was true was not passed on with it');
+    const mark2 = ann.got.length;
+    vic.send({ t: 's', p: [50, ground(50, 0), 0, 0.3, 0, 0], w: null, m: [], n: 'soon' });
+    await sleep(250);
+    const rows = ann.rows(vic, mark2);
+    assert.ok(rows.length > 0 && rows[rows.length - 1][9] == null, 'what is not a time was passed on as one');
+    checks++;
+    console.log('  ok  the time a position was true goes on with it, and only a time does');
+  }
+
   // ---- dead, and looking about on the death screen: dead in every position passed on, and nobody told otherwise
   vic.send({ t: 'died', cause: 'injuries', v: 1 });
   await sleep(300);

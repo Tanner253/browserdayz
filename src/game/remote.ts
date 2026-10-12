@@ -15,15 +15,15 @@ import { lookFor } from './look';
 import type { Damageable, HitZone } from './weapons';
 import type { Grips } from './arms';
 import type { Jeep } from './vehicle';
+import { Timeline, between, caughtUp } from '../net/timeline';
 
-/** render other players this far in the past: long enough to always have two poses to blend between */
-const INTERP_DELAY = 110;
 
 interface Snap {
   t: number;
   p: Pose;
 }
 
+const _to = new THREE.Vector3();
 const lerpAngle = (a: number, b: number, t: number) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * t;
 
 export type HeldFactory = (id: string | null, mods: string[]) => { obj: THREE.Object3D; grips: Grips; kind: 'rifle' | 'pistol' | 'auto' | 'melee' } | null;
@@ -61,6 +61,10 @@ export class RemotePlayer implements Damageable {
   private crouch: RAPIER.Collider[] = [];
   private blocker!: RAPIER.Collider;
   private snaps: Snap[] = [];
+  /** when each of those was true, and how far in the past they are shown: see src/net/timeline.ts */
+  private line = new Timeline();
+  /** the time their game put to the last report of them */
+  private stamped: number | undefined;
   private vel = new THREE.Vector3();
   private fall = 0;
   private grounded = true;
@@ -109,13 +113,37 @@ export class RemotePlayer implements Damageable {
     this.pos.set(pose[0], pose[1], pose[2]);
     this.yaw = pose[3];
     this.ready = true;
-    this.push(pose, performance.now());
+    // (where they are as the server first said: kept by no clock, and gone when their own first report comes)
+    this.snaps.push({ t: 0, p: pose });
     this.setAlive(!(pose[5] & F_DEAD));
   }
 
-  /** a pose arrived from the server */
-  push(p: Pose, now: number) {
-    this.snaps.push({ t: now, p });
+  /**
+   * A pose arrived from the server.
+   * @param stamp when it was true by the clock of the game it is of, where the server passes that on (an older
+   *   server does not: it is then kept by when it came, as all were)
+   */
+  push(p: Pose, now: number, stamp?: number) {
+    let last: Snap | undefined = this.snaps[this.snaps.length - 1];
+    let at: number;
+    if (stamp !== undefined && stamp === this.stamped) {
+      // Nothing new from their game since the server last said: it has passed the same report on again (its
+      // fifteen a second and theirs are not in step). Taken for news, that was a runner stopped dead for a tick.
+      if (last && last.p.every((v, i) => v === p[i])) return;
+      // (what differs then is the server's own doing: they were killed, moved, brought back. True as of now.)
+      at = this.line.theirs(now);
+    } else {
+      const epoch = this.line.epoch;
+      at = this.line.place(stamp ?? now, now);
+      if (this.line.epoch !== epoch) {
+        this.snaps.length = 0;
+        last = undefined;
+      }
+      this.stamped = stamp;
+    }
+    // (two with one time to them: the later is what is so)
+    if (last && at <= last.t) last.p = p;
+    else this.snaps.push({ t: at, p });
     if (this.snaps.length > 12) this.snaps.shift();
   }
 
@@ -298,23 +326,20 @@ export class RemotePlayer implements Damageable {
   update(dt: number, now: number, listener: THREE.Vector3) {
     if (!this.ready) return;
     this.heard.copy(listener);
-    // --- interpolate between the two poses around (now - delay)
-    const t = now - INTERP_DELAY;
-    const s = this.snaps;
-    let a = s[0], b = s[s.length - 1];
-    for (let i = s.length - 1; i > 0; i--) {
-      if (s[i - 1].t <= t) {
-        a = s[i - 1];
-        b = s[i];
-        break;
-      }
-    }
-    if (a && b) {
-      const k = b.t > a.t ? THREE.MathUtils.clamp((t - a.t) / (b.t - a.t), 0, 1.25) : 1;
+    // --- between the two poses either side of the moment being shown: a little in the past, by their clock
+    const t = this.line.at(now, dt);
+    const span = between(this.snaps, t);
+    if (span) {
+      const { a, b, k } = span;
       const prev = this.pos.clone();
       // a jump of more than a few metres is a teleport (respawn), not a sprint
       const tele = Math.hypot(b.p[0] - this.pos.x, b.p[2] - this.pos.z) > 12;
-      this.pos.set(a.p[0] + (b.p[0] - a.p[0]) * k, a.p[1] + (b.p[1] - a.p[1]) * k, a.p[2] + (b.p[2] - a.p[2]) * k);
+      _to.set(a.p[0] + (b.p[0] - a.p[0]) * k, a.p[1] + (b.p[1] - a.p[1]) * k, a.p[2] + (b.p[2] - a.p[2]) * k);
+      // (somebody a held-up report left behind makes the ground up at a run: see caughtUp)
+      const secs = (b.t - a.t) / 1000;
+      const going = secs > 0 ? Math.hypot(b.p[0] - a.p[0], b.p[1] - a.p[1], b.p[2] - a.p[2]) / secs : 0;
+      if (tele) this.pos.copy(_to);
+      else this.pos.lerp(_to, caughtUp(this.pos.distanceTo(_to), going, dt));
       this.yaw = lerpAngle(a.p[3], b.p[3], Math.min(1, k));
       this.pitch = a.p[4] + (b.p[4] - a.p[4]) * Math.min(1, k);
       this.grounded = !!(b.p[5] & F_GROUND);

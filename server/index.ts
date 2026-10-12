@@ -1733,6 +1733,8 @@ interface Client {
   key: string;
   name: string;
   pose: Pose;
+  /** when their game said that was so, by its own clock (ms) */
+  n?: number;
   w: string | null;
   m: string[];
   g: string[];
@@ -2180,6 +2182,8 @@ function handle(c: Client, m: C2S) {
       const w = typeof m.w === 'string' && ITEMS[m.w] ? m.w : null;
       c.w = w;
       c.m = Array.isArray(m.m) ? m.m.filter((x) => typeof x === 'string').slice(0, 4) : [];
+      // (when their game says this was so, by its own clock: passed on as it is, for the others to space what they are shown by)
+      c.n = typeof m.n === 'number' && Number.isFinite(m.n) ? Math.round(m.n) : undefined;
       return;
     }
     case 'shot': {
@@ -2859,7 +2863,7 @@ setInterval(() => {
   const all: typeof s = [];
   for (const c of clients.values()) {
     const p = c.pose;
-    const row: (typeof s)[number] = [c.id, round2(p[0]), round2(p[1]), round2(p[2]), Math.round(p[3] * 1000) / 1000, Math.round(p[4] * 1000) / 1000, p[5], c.w, c.m];
+    const row: (typeof s)[number] = [c.id, round2(p[0]), round2(p[1]), round2(p[2]), Math.round(p[3] * 1000) / 1000, Math.round(p[4] * 1000) / 1000, p[5], c.w, c.m, c.n ?? null];
     all.push(row);
     if (!c.power.hidden) s.push(row);
   }

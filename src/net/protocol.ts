@@ -122,7 +122,8 @@ export interface KillInfo {
 
 export type C2S =
   | { t: 'hello'; v: number; key: string; name: string }
-  | { t: 's'; p: Pose; w: string | null; m: string[] }
+  /** `n`: when this was true by the sending game's own clock, ms (passed on with it: see src/net/timeline.ts) */
+  | { t: 's'; p: Pose; w: string | null; m: string[]; n?: number }
   | { t: 'shot'; o: [number, number, number]; d: [number, number, number]; w: string; sup: boolean }
   | { t: 'swing' }
   /** a grenade left the hand: where, and how fast */
@@ -218,7 +219,8 @@ export type S2C =
     }
   | { t: 'join'; p: PlayerInfo }
   | { t: 'leave'; id: number }
-  | { t: 'ps'; s: [number, ...Pose, string | null, string[]][] }
+  /** each: who, where, what is in their hands and on it, and when their game said so by its own clock (ms) */
+  | { t: 'ps'; s: [number, ...Pose, string | null, string[], (number | null)?][] }
   | { t: 'shot'; id: number; o: [number, number, number]; d: [number, number, number]; w: string; sup: boolean }
   | { t: 'swing'; id: number }
   | { t: 'nade'; id: number; o: [number, number, number]; v: [number, number, number] }
