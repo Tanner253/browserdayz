@@ -161,13 +161,14 @@ export function hospitalPlan(): Blueprint {
     { side: 'left', ext: 'hosp_ext', int: 'int_painted', openings: [door(-0.55, 0.55, 2.2), win(3.6, 5.0)] },
     { side: 'right', ext: 'hosp_ext', int: 'int_painted', openings: [door(-0.55, 0.55, 2.2), win(3.6, 5.0)] },
     // the corridor's front wall, in two (the hall between them is open to it), and its back wall
-    inner([X0, CF], [-6.4, CF], [door(-18.0, -17.0), door(-10.2, -9.2)], 'ward_wall'),
-    inner([6.4, CF], [X1, CF], [win(7.6, 9.8, 1.05, 2.0), door(11.4, 12.4), door(14.2, 15.2)], 'tile_wall'),
+    inner([X0, CF], [-6.3, CF], [door(-18.0, -17.0), door(-10.2, -9.2)], 'ward_wall'),
+    inner([6.3, CF], [X1, CF], [win(7.6, 9.8, 1.05, 2.0), door(11.4, 12.4), door(14.2, 15.2)], 'tile_wall'),
     inner([X0, CB], [X1, CB], [gap(-22.3, -20.7, 2.3), door(-17.2, -16.2), door(-11.7, -10.7), door(-2.5, -1.45), door(-1.35, -0.3), door(5.9, 6.9), door(13.6, 14.6), gap(20.7, 22.3, 2.3)]),
     // across the front
     inner([-12.8, RF], [-12.8, Z1], [door(4.0, 5.0)], 'ward_wall', 'ward_wall'),
-    inner([-6.4, 1.3], [-6.4, Z1], [], 'ward_wall'),
-    inner([6.4, 1.3], [6.4, Z1], [], 'int_painted', 'tile_wall'),
+    // (each from the corridor wall's face on: begun in that wall, its end lay in the wall's own face)
+    inner([-6.4, RF], [-6.4, Z1], [], 'ward_wall'),
+    inner([6.4, RF], [6.4, Z1], [], 'int_painted', 'tile_wall'),
     inner([12.8, RF], [12.8, Z1], [], 'tile_wall', 'tile_wall'),
     // across the back
     inner([WW, Z0], [WW, RB]),
@@ -714,7 +715,7 @@ export function policeHqPlan(): Blueprint {
     furniture: r.furniture,
     loot: r.loot,
     // (onto the roof of the men's quarters, which is this roof carried on; and onto the stairs outside each end)
-    open: [{ side: 'front', a: -PW, b: -4.8 }, { side: 'left', a: -1.1, b: 0.6 }, { side: 'right', a: -1.1, b: 0.6 }],
+    open: [{ side: 'front', a: -PW, b: -4.8 }, { side: 'left', a: -1.04, b: 0.6 }, { side: 'right', a: -1.04, b: 0.6 }],
     usage: ['Police', 'Military'],
   };
 

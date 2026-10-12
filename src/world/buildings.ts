@@ -2045,7 +2045,8 @@ export class Buildings {
             const up = y1 - y0, L = Math.abs(f.top - f.foot), fd = Math.sign(f.top - f.foot), tilt = Math.atan2(up, L), len = Math.hypot(up, L);
             const S = B.clone().multiply(new THREE.Matrix4().makeTranslation((f.x0 + f.x1) / 2, (y0 + y1) / 2, (f.foot + f.top) / 2)).multiply(new THREE.Matrix4().makeRotationX(-fd * tilt));
             const half = (f.x1 - f.x0) / 2, under = 0.13;
-            this.push('concrete', boxGeo(-half, half, -under, -0.012, -len / 2 + 0.12, len / 2 - 0.12, this.tile('concrete'), S));
+            // (a finger narrower than the flight each side: its sides lay in the plane of the treads' ends)
+            this.push('concrete', boxGeo(-half + 0.008, half - 0.008, -under, -0.012, -len / 2 + 0.12, len / 2 - 0.12, this.tile('concrete'), S));
             this.collider(half, under / 2, len / 2 - 0.12, S.clone().multiply(new THREE.Matrix4().makeTranslation(0, -under / 2 - 0.012, 0)), 'concrete');
           }
           // (on the ground the space under the way out is walled in: there is nothing under it to walk into)
@@ -2167,11 +2168,12 @@ export class Buildings {
           // rails: round the landing at the doors (not the side the flights are on), down the outside of the upper
           // flight and between it and the lower, round the landing half way
           this.rail(E, far, -DOOR, far, DOOR, upper, upper, 'steel');
-          this.rail(E, X0 + (o > 0 ? 0 : 0), -DOOR, X1, -DOOR, upper, upper, 'steel');
+          // (begun a hand's breadth off the wall: its first post stood in the band round the building at that floor)
+          this.rail(E, o > 0 ? X0 + 0.07 : X0, -DOOR, o > 0 ? X1 : X1 - 0.07, -DOOR, upper, upper, 'steel');
           this.rail(E, far, DOOR, far, DOOR + RUN, upper, mid, 'steel');
-          this.rail(E, (a1 + b0) / 2 + (o > 0 ? 0 : 0) * 0, DOOR, (o > 0 ? a1 : a0) + o * 0.005, DOOR + RUN, upper, mid, 'steel');
+          this.rail(E, (o > 0 ? a1 : a0) + o * 0.005, DOOR, (o > 0 ? a1 : a0) + o * 0.005, DOOR + RUN, upper, mid, 'steel');
           this.rail(E, far, DOOR + RUN, far, DOOR + RUN + TURN, mid, mid, 'steel');
-          this.rail(E, X0, DOOR + RUN + TURN, X1, DOOR + RUN + TURN, mid, mid, 'steel');
+          this.rail(E, o > 0 ? X0 + 0.07 : X0, DOOR + RUN + TURN, o > 0 ? X1 : X1 - 0.07, DOOR + RUN + TURN, mid, mid, 'steel');
         }
         // what it stands on: posts from the ground to the rail of the highest landing, at its outer corners
         const topY = stops[stops.length - 1] + 0.93;
@@ -2210,7 +2212,8 @@ export class Buildings {
       this.push('planks', boxGeo(st.x0, st.x1, 0, h, Math.min(st.top, st.top + dz * 0.04), Math.max(st.top, st.top + dz * 0.04), this.tile('planks'), B));
       // rails: up the open side of the flight, and round the well on the floor above
       this.rail(B, open + away * 0.035, st.foot, open + away * 0.035, st.top, rise, y1);
-      this.rail(B, open + away * 0.035, st.foot + dz * run, open + away * 0.035, st.top - dz * 0.02, y1, y1);
+      // (a hand's breadth short of the head of the rail that comes up the flight: the two bars ended in one another)
+      this.rail(B, open + away * 0.035, st.foot + dz * run, open + away * 0.035, st.top - dz * 0.09, y1, y1);
       this.rail(B, st.x0, st.foot + dz * run, st.x1, st.foot + dz * run, y1, y1);
       raise(up.walls, y1, up.h);
     }
@@ -2409,6 +2412,7 @@ export class Buildings {
     }
 
     // yard clutter
+    const later = this.world.buildings.indexOf(plot) >= this.world.buildings.findIndex((o) => o.type === 'hospital');
     const yard = ['Barrel_01', 'barrel_03', 'wooden_crate_01', 'cardboard_box_01', 'metal_trash_can', 'old_tyre', 'trashbag', 'trashbag', 'cardboard_box_01'];
     const n = plot.type === 'guardpost' ? 1 : rng.int(2, 5);
     const placed: THREE.Vector3[] = [];
@@ -2420,12 +2424,14 @@ export class Buildings {
       else if (side === 2) { lx = hw + rng.range(0.5, 1.4); lz = rng.range(-hd, hd); }
       else { lx = rng.chance(0.5) ? -hw + 0.6 : hw - 0.6; lz = hd + rng.range(0.6, 1.4); }
       const p = new THREE.Vector3(lx, 0, lz).applyMatrix4(B);
-      // (round a building of several parts: not where another of its parts stands, nor against that one's wall)
-      if ((bp.joined || plot.type === 'hospital' || plot.type === 'police_hq') && this.world.buildings.some((o) => {
+      // (Round a building built since the hospital, which is every one that stands close to others or is one part
+      // of several: not where another building stands, nor against its wall, nor on what already lies in the next
+      // yard. The buildings before that are left to their dice: what lies round them lies where it has always lain.)
+      if (later && (this.world.buildings.some((o) => {
         if (o === plot) return false;
         const [ow, od] = BUILDING_FOOTPRINT[o.type], dx = p.x - o.x, dz = p.z - o.z, oc = Math.cos(o.rot), os = Math.sin(o.rot);
         return Math.abs(dx * oc - dz * os) < ow / 2 + 0.7 && Math.abs(dx * os + dz * oc) < od / 2 + 0.7;
-      })) continue;
+      }) || this.world.props.some((q) => !q.far && Math.hypot(q.x - p.x, q.z - p.z) < 1.5))) continue;
       // never two things in the one spot
       if (placed.some((q) => Math.hypot(q.x - p.x, q.z - p.z) < 1.15)) continue;
       placed.push(p);
