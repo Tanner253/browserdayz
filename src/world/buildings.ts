@@ -175,6 +175,8 @@ export interface Opening {
   boards?: boolean;
   /** a window with bars over it outside */
   bars?: boolean;
+  /** it leads into another part of the same building (see Blueprint.joined), not out of doors: no step before it */
+  join?: boolean;
 }
 
 /**
@@ -203,7 +205,14 @@ export interface WallDef {
   openings: Opening[];
   /** added after the map's dice were cast: its doors are hung shut and throw none (a door's two throws moved every yard after them) */
   still?: boolean;
+  /**
+   * Stretches of an outside wall that another part of the same building stands against on this floor (the
+   * building's own measure along the wall): the wall is there, and nothing of its face is put on them.
+   */
+  covered?: [number, number][];
 }
+
+export type Side = 'front' | 'back' | 'left' | 'right';
 
 export interface Furn {
   id: string;
@@ -269,6 +278,23 @@ export interface Deck {
   usage?: Usage[];
   /** places on it that always hold a thing: which thing, and which of `loot` (by its x and z) */
   keeps?: { id: string; x: number; z: number }[];
+  /** where the wall round its edge is left out: the way onto another roof beside it, or onto stairs outside */
+  open?: { side: Side; a: number; b: number }[];
+}
+
+/**
+ * Stairs of steel outside a wall, for getting out by: a landing at the door of every floor above the ground, and
+ * between one landing and the next two half flights that turn on a landing of their own, the lower under the
+ * upper. `at`: where along the wall the doors are (the building's own measure); `dir`: which way along the wall
+ * the flights run from the doors (1: the way the measure grows); `floors`: how many floors above the ground have
+ * a door onto it; `roof`: it goes on up to the roof (whose wall is left open there: see Deck.open).
+ */
+export interface Escape {
+  side: Side;
+  at: number;
+  dir: 1 | -1;
+  floors: number;
+  roof?: boolean;
 }
 
 /** Shapes inside a floor that are not walls: bars, a counter, a plinth. Heights from that floor. */
@@ -294,6 +320,16 @@ export interface Blueprint {
   sign?: { x: number; y: number; text: string; sub: string; board?: string; ink?: string; out?: number; size?: number };
   /** what its outside has on it beside its walls (see Dress) */
   dress?: Dress;
+  /**
+   * The sides it has no wall on, because it is one part of a building of several and another part's wall is there
+   * (2026-10-12: "i dont like the rigid box style we have, can we not come up with more creative layouts?"). A
+   * building that is not one box is several of these stood against one another, their floors at one height: a
+   * wing has no wall where it meets the block it is a wing of, its floors run on to that block's wall, and the way
+   * between the two is a door in that wall (an Opening with `join`).
+   */
+  joined?: Side[];
+  /** stairs of steel outside it (see Escape) */
+  escapes?: Escape[];
   ext: MatKey;
   int: MatKey;
   floor: MatKey;
@@ -1578,6 +1614,18 @@ export class Buildings {
     );
     const { w, d, h } = bp;
     const hw = w / 2, hd = d / 2;
+    const joined = new Set<Side>(bp.joined ?? []);
+    /** what is left of lo..hi when the stretches in `cut` are taken out of it */
+    const spans = (lo: number, hi: number, cut: [number, number][]) => {
+      const out: [number, number][] = [];
+      let from = lo;
+      for (const [a, b] of cut.map(([p, q]) => [Math.min(p, q), Math.max(p, q)]).sort((p, q) => p[0] - q[0])) {
+        if (a > from) out.push([from, Math.min(a, hi)]);
+        from = Math.max(from, b);
+      }
+      if (from < hi) out.push([from, hi]);
+      return out.filter(([a, b]) => b - a > 0.02);
+    };
     /** how high the walls stand in all: one floor, two with the floor between them, or however many there are */
     const H = bp.levels ? bp.levels.reduce((sum, l) => sum + SLAB + l.h, h) : bp.upper ? h + SLAB + bp.upper.h : h;
     this.interiors.push({ x: plot.x, z: plot.z, hw: hw - T, hd: hd - T, rot: plot.rot, y0: plot.floorY - 0.2, y1: plot.floorY + H });
@@ -1603,7 +1651,8 @@ export class Buildings {
       });
     } else {
       addBox('concrete', -hw - proud, hw + proud, -1.4, -0.1, -hd - proud, hd + proud, B);
-      addBox(bp.floor, -hw + T * 0.5, hw - T * 0.5, -0.12, 0, -hd + T * 0.5, hd - T * 0.5, B);
+      // (where it has no wall of its own, its floor runs on to the middle of the wall that is there)
+      addBox(bp.floor, joined.has('left') ? -hw - T * 0.5 : -hw + T * 0.5, joined.has('right') ? hw + T * 0.5 : hw - T * 0.5, -0.12, 0, joined.has('back') ? -hd - T * 0.5 : -hd + T * 0.5, joined.has('front') ? hd + T * 0.5 : hd - T * 0.5, B);
     }
     // (The ceiling under a pitched roof: it stops a body. It was a picture of a ceiling and nothing else, and a jump in
     // a room went up through it into the roof: "ceilings in our buildings need collision so when you jump your camera
@@ -1616,14 +1665,16 @@ export class Buildings {
     /** @param under how high a wall between two rooms goes, when a floor is laid over it (the outside walls go on up past the floor's edge) */
     const raise = (walls: WallDef[], y0: number, tall: number, under = tall) => {
       for (const wd of walls) {
+        if (wd.side !== 'inner' && joined.has(wd.side)) continue;
         // (a wall between rooms stops under the floor above: carried up through it, its top lay in the same plane as the boards and the two flickered through each other)
         const h = wd.side === 'inner' ? under : tall;
         let a: THREE.Vector2, b: THREE.Vector2;
         switch (wd.side) {
           case 'front': a = new THREE.Vector2(-hw, hd - T / 2); b = new THREE.Vector2(hw, hd - T / 2); break;
           case 'back': a = new THREE.Vector2(hw, -hd + T / 2); b = new THREE.Vector2(-hw, -hd + T / 2); break;
-          case 'left': a = new THREE.Vector2(-hw + T / 2, -hd + T); b = new THREE.Vector2(-hw + T / 2, hd - T); break;
-          case 'right': a = new THREE.Vector2(hw - T / 2, hd - T); b = new THREE.Vector2(hw - T / 2, -hd + T); break;
+          // (a side wall runs between the front wall and the back one: where one of those is not built, to the edge)
+          case 'left': a = new THREE.Vector2(-hw + T / 2, joined.has('back') ? -hd : -hd + T); b = new THREE.Vector2(-hw + T / 2, joined.has('front') ? hd : hd - T); break;
+          case 'right': a = new THREE.Vector2(hw - T / 2, joined.has('front') ? hd : hd - T); b = new THREE.Vector2(hw - T / 2, joined.has('back') ? -hd : -hd + T); break;
           default: a = new THREE.Vector2(...wd.from!); b = new THREE.Vector2(...wd.to!);
         }
         const dir = b.clone().sub(a);
@@ -1648,11 +1699,19 @@ export class Buildings {
             return { ...o, a: Math.min(p0, p1), b: Math.max(p0, p1) };
           })
           .sort((x, y) => x.a - y.a);
+        const cov = (wd.covered ?? []).map(([p, q]): [number, number] => [Math.min(axisCoord(p), axisCoord(q)), Math.max(axisCoord(p), axisCoord(q))]);
+        const hidden = (at: number) => cov.some(([p, q]) => at > p && at < q);
         if (wd.side !== 'inner' && y0 === 0 && !bp.shell) {
           // a skirt of concrete where the wall meets the ground, broken at the doors
           let from = 0;
           const pl = bp.dress?.plinth;
-          const skirt = (to: number) => to - from > 0.05 && (pl ? addBox(pl.key, from, to, -0.1, pl.h, T / 2 + 0.002, T / 2 + 0.055, F, false) : addBox('concrete', from, to, -0.1, 0.26, T / 2, T / 2 + 0.04, F, false));
+          const skirt = (to: number) => {
+            for (const [p, q] of spans(from, to, cov)) {
+              if (q - p <= 0.05) continue;
+              if (pl) addBox(pl.key, p, q, -0.1, pl.h, T / 2 + 0.002, T / 2 + 0.055, F, false);
+              else addBox('concrete', p, q, -0.1, 0.26, T / 2, T / 2 + 0.04, F, false);
+            }
+          };
           for (const o of ops) {
             if (o.kind === 'window' || o.kind === 'grille') continue;
             skirt(o.a);
@@ -1720,7 +1779,7 @@ export class Buildings {
             if (rng.chance(0.7) && !o.boards) {
               this.push('glass', boxGeo(o.a + fw, o.b - fw, o.bottom, o.top - fw, -0.006, 0.006, 1, F));
             }
-            if (wd.side !== 'inner') {
+            if (wd.side !== 'inner' && !hidden((o.a + o.b) / 2)) {
               const tr = bp.dress?.trim;
               if (tr) {
                 // a lintel over it and a sill under it, of the wall's own stuff painted: each a hair off the wall
@@ -1765,11 +1824,11 @@ export class Buildings {
             this.doorSpecs.push({ m: hinge, w: o.b - o.a - fw * 2, h: o.top - fw, id: `${plot.id}_door${this.doorSpecs.length}`, open: wd.still ? false : rng.chance(0.35), swing: wd.still ? 1 : rng.chance(0.5) ? 1 : -1 });
           }
           // (a barn's open front has the same lip as a door)
-          if (o.kind !== 'window' && o.kind !== 'grille' && wd.side !== 'inner' && y0 === 0) {
+          if (o.kind !== 'window' && o.kind !== 'grille' && wd.side !== 'inner' && y0 === 0 && !o.join) {
             this.doorstep(F, o.a, o.b);
             outside.push({ F, a: o.a, b: o.b, front: wd.side === 'front' });
           }
-          if (o.kind === 'window' && wd.side !== 'inner') panes.push({ F, a: o.a, b: o.b, bottom: o.bottom, top: o.top, L });
+          if (o.kind === 'window' && wd.side !== 'inner' && !hidden((o.a + o.b) / 2)) panes.push({ F, a: o.a, b: o.b, bottom: o.bottom, top: o.top, L });
         }
       }
     };
@@ -1788,7 +1847,7 @@ export class Buildings {
         top += SLAB + l.h;
       }
       roofY = top + SLAB;
-      const x0i = -hw + T, x1i = hw - T, z0i = -hd + T, z1i = hd - T;
+      const x0i = joined.has('left') ? -hw : -hw + T, x1i = joined.has('right') ? hw : hw - T, z0i = joined.has('back') ? -hd : -hd + T, z1i = joined.has('front') ? hd : hd - T;
       /** the storeys a well climbs: storey s is the climb from floor s to the one above it (the last, to the roof) */
       const climbs = (wl: Well) => Math.min(wl.upTo ?? ups.length + 1, ups.length + 1);
       const lo = (wl: Well) => Math.min(wl.land, wl.far), hi = (wl: Well) => Math.max(wl.land, wl.far);
@@ -1879,16 +1938,20 @@ export class Buildings {
       const dr = bp.dress;
       if (dr) {
         const topY = roofY + (deck?.parapet ?? 0);
-        const round = (key: MatKey, y0: number, y1: number, out: number) => {
-          addBox(key, -hw - out, hw + out, y0, y1, hd + 0.002, hd + out, B, false);
-          addBox(key, -hw - out, hw + out, y0, y1, -hd - out, -hd - 0.002, B, false);
-          addBox(key, -hw - out, -hw - 0.002, y0, y1, -hd - 0.002, hd + 0.002, B, false);
-          addBox(key, hw + 0.002, hw + out, y0, y1, -hd - 0.002, hd + 0.002, B, false);
+        // (`storey`: the floor whose walls it runs along the top of: not on a side that is not built, nor where
+        // another part of the building stands against that floor; nor across a way left open in the wall round the roof)
+        const storeys = [bp.walls, ...ups.map((l) => l.walls)];
+        const round = (key: MatKey, y0: number, y1: number, out: number, storey: number | null) => {
+          const cut = (side: Side): [number, number][] => (storey === null ? (deck?.open ?? []).filter((o) => o.side === side).map((o): [number, number] => [o.a, o.b]) : storeys[storey].find((q) => q.side === side)?.covered ?? []);
+          if (!joined.has('front')) for (const [a, b] of spans(-hw - out, hw + out, cut('front'))) addBox(key, a, b, y0, y1, hd + 0.002, hd + out, B, false);
+          if (!joined.has('back')) for (const [a, b] of spans(-hw - out, hw + out, cut('back'))) addBox(key, a, b, y0, y1, -hd - out, -hd - 0.002, B, false);
+          if (!joined.has('left')) for (const [a, b] of spans(-hd - 0.002, hd + 0.002, cut('left'))) addBox(key, -hw - out, -hw - 0.002, y0, y1, a, b, B, false);
+          if (!joined.has('right')) for (const [a, b] of spans(-hd - 0.002, hd + 0.002, cut('right'))) addBox(key, hw + 0.002, hw + out, y0, y1, a, b, B, false);
         };
         if (dr.bands) {
-          for (let k = 1; k < storeyY.length; k++) round(dr.bands, storeyY[k] - SLAB - 0.04, storeyY[k] + 0.05, 0.062);
-          round(dr.bands, roofY - SLAB - 0.04, roofY + 0.05, 0.062);
-          if (deck) round(dr.bands, topY - 0.24, topY - 0.03, 0.088);
+          for (let k = 1; k < storeyY.length; k++) round(dr.bands, storeyY[k] - SLAB - 0.04, storeyY[k] + 0.05, 0.062, k - 1);
+          round(dr.bands, roofY - SLAB - 0.04, roofY + 0.05, 0.062, ups.length);
+          if (deck) round(dr.bands, topY - 0.24, topY - 0.03, 0.088, null);
         }
         if (dr.piers) {
           const y0 = (dr.plinth?.h ?? 0.26) - 0.012, y1 = topY - 0.03, half = dr.piers.w / 2, out = 0.075, key = dr.piers.key;
@@ -1902,18 +1965,74 @@ export class Buildings {
       if (deck) {
         // the wall round the roof's edge: the outside walls carried on up, and a coping on them
         const p0 = roofY, p1 = roofY + deck.parapet;
-        addBox(bp.ext, -hw, hw, p0, p1, hd - T, hd, B);
-        addBox(bp.ext, -hw, hw, p0, p1, -hd, -hd + T, B);
-        addBox(bp.ext, -hw, -hw + T, p0, p1, -hd + T, hd - T, B);
-        addBox(bp.ext, hw - T, hw, p0, p1, -hd + T, hd - T, B);
-        addBox('concrete', -hw - 0.05, hw + 0.05, p1, p1 + 0.07, hd - T - 0.05, hd + 0.05, B, false);
-        addBox('concrete', -hw - 0.05, hw + 0.05, p1, p1 + 0.07, -hd - 0.05, -hd + T + 0.05, B, false);
-        addBox('concrete', -hw - 0.05, -hw + T + 0.05, p1, p1 + 0.07, -hd + T + 0.05, hd - T - 0.05, B, false);
-        addBox('concrete', hw - T - 0.05, hw + 0.05, p1, p1 + 0.07, -hd + T + 0.05, hd - T - 0.05, B, false);
+        // (not on a side that is not built: the roof runs on there; and not across a way left open. The coping
+        // overhangs at the building's corners and stops flush at an opening; a side's stops short of the front's
+        // and the back's, so that the tops of two never lie in one plane over one another.)
+        const gaps = (side: Side) => (deck.open ?? []).filter((o) => o.side === side).map((o): [number, number] => [o.a, o.b]);
+        for (const [side, za, zb] of [['front', hd - T, hd], ['back', -hd, -hd + T]] as [Side, number, number][]) {
+          if (joined.has(side)) continue;
+          for (const [a, b] of spans(-hw, hw, gaps(side))) {
+            addBox(bp.ext, a, b, p0, p1, za, zb, B);
+            addBox('concrete', a - (a === -hw ? 0.05 : 0), b + (b === hw ? 0.05 : 0), p1, p1 + 0.07, za - 0.05, zb + 0.05, B, false);
+          }
+        }
+        const zlo = joined.has('back') ? -hd : -hd + T, zhi = joined.has('front') ? hd : hd - T;
+        for (const [side, xa, xb] of [['left', -hw, -hw + T], ['right', hw - T, hw]] as [Side, number, number][]) {
+          if (joined.has(side)) continue;
+          for (const [a, b] of spans(zlo, zhi, gaps(side))) {
+            addBox(bp.ext, xa, xb, p0, p1, a, b, B);
+            addBox('concrete', xa - 0.05, xb + 0.05, p1, p1 + 0.07, a === zlo && !joined.has('back') ? a + 0.05 : a, b === zhi && !joined.has('front') ? b - 0.05 : b, B, false);
+          }
+        }
         // what stands over each stair, and its roof
         raise(deck.walls, roofY, deck.h, deck.h);
         for (const r of deck.roofs) addBox('concrete', r.x0 - 0.18, r.x1 + 0.18, roofY + deck.h, roofY + deck.h + 0.16, r.z0 - 0.18, r.z1 + 0.18, B);
         for (const b of deck.boxes) addBox(b.key, b.x0, b.x1, roofY + b.y0, roofY + b.y1, b.z0, b.z1, B, !b.soft);
+      }
+
+      // Stairs of steel outside (see Escape). In a frame of its own: z along the wall the way the flights run
+      // from the doors, x across it (out from the wall is x times `o`), the floor of the building at y = 0. Two
+      // lanes, the inner against the wall. From each landing the way down leaves by the outer lane, turns on a
+      // landing half way, and comes back by the inner to the landing below, under the flight it left by.
+      for (const es of bp.escapes ?? []) {
+        const along = es.side === 'left' || es.side === 'right';
+        // (the middle of the doors, on the wall's outer face)
+        const at = new THREE.Vector3(es.side === 'left' ? -hw : es.side === 'right' ? hw : es.at, 0, es.side === 'front' ? hd : es.side === 'back' ? -hd : es.at);
+        const turn = along ? (es.dir > 0 ? 0 : Math.PI) : es.dir > 0 ? Math.PI / 2 : -Math.PI / 2;
+        // (which way x is out: the frame's x, turned so, is +x of the building at 0, -z at a quarter turn, ...)
+        const fx = new THREE.Vector3(Math.cos(turn), 0, -Math.sin(turn)), outV = new THREE.Vector3(es.side === 'left' ? -1 : es.side === 'right' ? 1 : 0, 0, es.side === 'front' ? 1 : es.side === 'back' ? -1 : 0);
+        const o = Math.sign(fx.dot(outV)) || 1;
+        const E = B.clone().multiply(new THREE.Matrix4().makeTranslation(at.x, 0, at.z)).multiply(new THREE.Matrix4().makeRotationY(turn));
+        const lane = (k: 0 | 1): [number, number] => (o > 0 ? [0.04 + k * 0.99, 0.99 + k * 0.99] : [-0.99 - k * 0.99, -0.04 - k * 0.99]);
+        const X0 = o > 0 ? 0.04 : -1.98, X1 = o > 0 ? 1.98 : -0.04, far = o > 0 ? X1 : X0, DOOR = 0.85, RUN = 2.4, TURN = 1.0, GROUND = -0.1;
+        // the heights it stops at, from the ground up: the ground, each floor with a door, the roof
+        const stops = [GROUND, ...storeyY.slice(1, 1 + es.floors), ...(es.roof ? [roofY] : [])];
+        const plate = (z0: number, z1: number, y: number) => {
+          addBox('steel', X0, X1, y - 0.05, y, z0, z1, E);
+          // (a channel under its outer edge and its two ends)
+          addBox('steel', far - 0.03, far + 0.03, y - 0.16, y - 0.05, z0, z1, E, false);
+        };
+        for (let k = 1; k < stops.length; k++) {
+          const lower = stops[k - 1], upper = stops[k], mid = (lower + upper) / 2;
+          plate(-DOOR, DOOR, upper);
+          plate(DOOR + RUN, DOOR + RUN + TURN, mid);
+          const [a0, a1] = lane(0), [b0, b1] = lane(1);
+          this.flight(E, plot.id, { x0: b0, x1: b1, foot: DOOR + RUN, top: DOOR }, mid, upper, undefined, 'steel');
+          this.flight(E, plot.id, { x0: a0, x1: a1, foot: DOOR, top: DOOR + RUN }, lower, mid, undefined, 'steel');
+          // rails: round the landing at the doors (not the side the flights are on), down the outside of the upper
+          // flight and between it and the lower, round the landing half way
+          this.rail(E, far, -DOOR, far, DOOR, upper, upper, 'steel');
+          this.rail(E, X0 + (o > 0 ? 0 : 0), -DOOR, X1, -DOOR, upper, upper, 'steel');
+          this.rail(E, far, DOOR, far, DOOR + RUN, upper, mid, 'steel');
+          this.rail(E, (a1 + b0) / 2 + (o > 0 ? 0 : 0) * 0, DOOR, (o > 0 ? a1 : a0) + o * 0.005, DOOR + RUN, upper, mid, 'steel');
+          this.rail(E, far, DOOR + RUN, far, DOOR + RUN + TURN, mid, mid, 'steel');
+          this.rail(E, X0, DOOR + RUN + TURN, X1, DOOR + RUN + TURN, mid, mid, 'steel');
+        }
+        // what it stands on: posts from the ground to the rail of the highest landing, at its outer corners
+        const topY = stops[stops.length - 1] + 0.93;
+        for (const z of [-DOOR, DOOR, DOOR + RUN, DOOR + RUN + TURN]) addBox('steel', far - 0.04, far + 0.04, -0.5, z > DOOR ? topY - (stops[stops.length - 1] - stops[stops.length - 2]) / 2 : topY, z - 0.04, z + 0.04, E);
+        const near = o > 0 ? X0 : X1;
+        addBox('steel', near - 0.04, near + 0.04, -0.5, topY - (stops[stops.length - 1] - stops[stops.length - 2]) / 2, DOOR + RUN + TURN - 0.04, DOOR + RUN + TURN + 0.04, E);
       }
     }
 
