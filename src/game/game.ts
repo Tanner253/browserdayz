@@ -23,7 +23,7 @@ import { shotOf } from '../sim/gunplay';
 import { BARREL } from '../sim/barrels';
 import { EMOTE, EMOTES, EMOTE_GAP, SAY_RANGE, SAY_TIME, voiceOf } from '../sim/emotes';
 import { loadSave, writeSave, type SaveData } from '../sim/save';
-import { Net, playerName, publicId, remoteServer, serverStatus, setPlayerName } from '../net/client';
+import { Net, playerName, publicId, remoteServer, serverStatus, setPlayerName, personKey } from '../net/client';
 import { F_AIM, F_BLEED, F_CROUCH, F_DANCE, F_DEAD, F_GROUND, F_GUARD, F_LEAN_L, F_LEAN_R, F_LIMP, F_LIGHT, F_PRONE, F_SEAT, F_SIT, F_SPRINT, F_SURRENDER, MAX_STAMINA, PROTOCOL, crateId, type Act, type CorpseInfo, type PlayerInfo, type Pose, type StoredItem, type S2C, type StashInfo } from '../net/protocol';
 import { Player } from './player';
 import { Avatar, AVATAR_LAYER, DEATH_REST, FP_BODY_LAYER, GEAR_SHOWN, type Hold, facepiece } from './avatar';
@@ -886,7 +886,24 @@ export class Game {
       this.hud.setQueue({ pos, of, max }, () => this.net.leaveQueue());
       document.title = `(${pos}) in line · ${this.title}`;
     };
-    let welcome = await this.net.connect(name, (text) => this.hud.showStart(true, false, text));
+    // The check that this is a person, where the server asks it: shown the moment Deploy is pressed, to everybody,
+    // before anything is asked of the server. Not passed, or given up: back at the way in, and not into the game.
+    const notAPerson = () => {
+      this.joining = false;
+      this.input.unlock();
+      this.hud.showStart(true);
+      this.hud.note('The check that you are a person was not passed: press Deploy to try again', 'warn');
+    };
+    let slip = '';
+    const ask = await personKey();
+    if (ask) {
+      this.input.unlock();
+      this.hud.showStart(true, false, 'One check that you are a person');
+      slip = (await askPerson(ask)) ?? '';
+      if (!slip) return void notAPerson();
+      this.hud.showStart(true, false, 'Connecting…');
+    }
+    let welcome = await this.net.connect(name, (text) => this.hud.showStart(true, false, text), slip);
     // Turned away for being of another version than the server. Which of the two is behind is told by the site as
     // it is served this moment (version.json, made with the build). If that is not this page, this page is the old
     // one and is loaded again. If it is, the server is the one behind: a new site goes out before its server does
@@ -912,11 +929,13 @@ export class Game {
     for (let tries = 0; !welcome && this.net.wantsProof && tries < 2; tries++) {
       this.input.unlock();
       this.hud.showStart(true, false, 'One check that you are a person');
-      const slip = await askPerson(this.net.wantsProof);
-      if (!slip) break;
+      const again = await askPerson(this.net.wantsProof);
+      if (!again) return void notAPerson();
       this.hud.showStart(true, false, 'Connecting…');
-      welcome = await this.net.connect(name, (text) => this.hud.showStart(true, false, text), slip);
+      welcome = await this.net.connect(name, (text) => this.hud.showStart(true, false, text), again);
     }
+    // (asked twice and still turned away for it: not into the game)
+    if (!welcome && this.net.wantsProof) return void notAPerson();
     this.hud.setQueue(null);
     document.title = this.title;
     if (welcome) {

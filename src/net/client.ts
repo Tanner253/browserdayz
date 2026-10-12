@@ -49,6 +49,25 @@ export async function serverStatus(timeout = 6000): Promise<{ players: number; m
   }
 }
 
+/**
+ * The key to ask the check that this is a person with (src/ui/person.ts), where the server is set up to ask it;
+ * '' where it is not, or cannot be asked just now (it then says so itself when it turns the game away).
+ */
+export async function personKey(timeout = 5000): Promise<string> {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), timeout);
+  try {
+    const r = await fetch(`${remoteServer() ?? ''}/healthz`, { cache: 'no-store', signal: ctl.signal });
+    if (!r.ok) return '';
+    const j = (await r.json()) as { captchaKey?: unknown };
+    return typeof j.captchaKey === 'string' ? j.captchaKey : '';
+  } catch {
+    return '';
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export function playerName(): string {
   try {
     return localStorage.getItem(NAME_STORE) ?? '';

@@ -7,7 +7,7 @@
 //   - more hellos from one address in a minute than a game sends are turned away;
 //   - where it is asked, a connection not asked for by the game's own page is not taken;
 //   - where the check that somebody is a person is set up: nobody is let in without a good slip from it, a good
-//     one is asked for once of a game at an address, and the check's being down keeps nobody out.
+//     one is asked for every time, and with the check down nobody comes in.
 // The real server on ports of its own, connections over the wire. About twenty-five seconds.
 //   npx tsx test/bots.test.ts
 
@@ -254,21 +254,22 @@ try {
     await pat.play(400);
     pat.leave();
     await sleep(300);
-    // (the same game at the same address, with no slip: it is known for a person's)
+    // (the same game at the same address a moment later, with no slip: asked again, every time)
     pat.proof = '';
-    assert.equal(await pat.hello(), 'in', 'somebody who had shown they are a person was asked again');
-    pat.leave();
-    assert.deepEqual(asked, ['made-up', 'good-slip'], 'the check was asked more than it needed to be');
-    // (the same game from somewhere else: asked again)
-    const moved = new Conn(D, 'Pat', '8.8.7.2', '', pat.key);
-    assert.equal(await moved.hello(), 'refused', 'a game known at one address was let in from another with no slip');
-    // (the check cannot be reached: nobody is kept out by that)
+    assert.equal(await pat.hello(), 'refused', 'somebody who had passed once was let in again with no slip');
+    assert.equal(pat.asked(), 'site-key-for-the-test');
+    assert.deepEqual(asked, ['made-up', 'good-slip'], 'the check was asked about no slip at all');
+    assert.equal(((await d.health()) as unknown as { captchaKey: string }).captchaKey, 'site-key-for-the-test', 'the key to ask the check with is not said');
+    const says = ((await d.health()) as unknown as { captchaSays: { passed: number; failed: number; unreachable: number } }).captchaSays;
+    assert.deepEqual([says.passed, says.failed, says.unreachable], [1, 1, 0], JSON.stringify(says));
+    // (the check cannot be reached: nobody new comes in, and they are told to try again)
     await new Promise<void>((done) => standIn.close(() => done()));
     const quinn = new Conn(D, 'Quinn', '8.8.7.3');
     quinn.proof = 'whatever';
-    assert.equal(await quinn.hello(), 'in', 'the check being down kept somebody out');
-    quinn.leave();
-    ok('with the check set up: no way in without a good slip, one slip for a game at an address, and nobody kept out by its being down');
+    assert.equal(await quinn.hello(), 'refused', 'somebody came in with the check down');
+    assert.match(quinn.why(), /could not be confirmed/);
+    assert.equal(quinn.asked(), 'site-key-for-the-test');
+    ok('with the check set up: no way in without a good slip, every time; and nobody in with the check down');
   } finally {
     standIn.close();
   }

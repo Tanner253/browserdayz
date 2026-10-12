@@ -654,34 +654,51 @@ const HELLOS_A_MINUTE = Number(process.env.HELLOS_A_MINUTE) || 20;
 // Cloudflare's Turnstile. On when its two keys are set here (TURNSTILE_SITEKEY, which anybody may know, and
 // TURNSTILE_SECRET, which nobody but the owner and this server may). Somebody who asks to come in is then asked
 // for the slip the check gives a person's browser (src/ui/person.ts), and Cloudflare is asked whether it is good.
-// It is asked once of a game at an address, and holds for CAPTCHA_HOURS (twelve): a line that drops, a server
-// that restarts, a death, are not another check. Whoever has a role is not asked. If Cloudflare cannot be
-// reached the game is let in: its being down is not to be everybody's being kept out.
+// It is asked of everybody, every time they ask to come in, whatever role they have (2026-10-12: "it should be the
+// interactive one blocking bots entirely. user cannot join the game unless they pass captcha"): a pass can be made
+// to hold for a while for a game at an address by setting CAPTCHA_HOURS, and by default holds for none. If
+// Cloudflare cannot be reached, or says no for any reason, they are turned away and may try again. What Cloudflare last said is told on /healthz (`captchaSays`), so that a secret
+// set wrongly here, which is everybody turned away, can be told from outside for what it is.
 const CAPTCHA = {
   site: process.env.TURNSTILE_SITEKEY ?? '',
   secret: process.env.TURNSTILE_SECRET ?? '',
   url: process.env.TURNSTILE_VERIFY_URL ?? 'https://challenges.cloudflare.com/turnstile/v0/siteverify',
-  ms: (Number(process.env.CAPTCHA_HOURS) || 12) * 3600_000,
+  ms: Math.max(0, Number(process.env.CAPTCHA_HOURS) || 0) * 3600_000,
 };
 const CAPTCHA_ON = !!CAPTCHA.site && !!CAPTCHA.secret;
 /** who has shown they are a person, and until when: by their game and where they play from */
 const persons = new Map<string, number>();
 const personOf = (key: string, ip: string) => `${keyHash(key)}|${ip}`;
 function knownPerson(key: string, ip: string): boolean {
-  if (!CAPTCHA_ON || (key && ADMIN.state.roles[keyHash(key)])) return true;
-  if (!key) return false;
+  if (!CAPTCHA_ON) return true;
+  if (!key || !CAPTCHA.ms) return false;
   const until = persons.get(personOf(key, ip));
   return !!until && until > Date.now();
 }
+/** how the asking has gone since this server started, and what Cloudflare said of the last slip it did not take */
+const SLIPS = { passed: 0, failed: 0, unreachable: 0, last: [] as string[] };
 /** @returns whether the slip is good; null if Cloudflare could not be asked */
 async function goodSlip(slip: string, ip: string): Promise<boolean | null> {
   try {
     const body = new URLSearchParams({ secret: CAPTCHA.secret, response: slip });
     if (publicIp(ip) && !ip.includes('/')) body.set('remoteip', ip);
     const r = await fetch(CAPTCHA.url, { method: 'POST', body, signal: AbortSignal.timeout(8000) });
-    if (!r.ok) return null;
-    return !!((await r.json()) as { success?: boolean }).success;
+    if (!r.ok) {
+      SLIPS.unreachable++;
+      return null;
+    }
+    const said = (await r.json()) as { success?: boolean; 'error-codes'?: unknown };
+    if (said.success) {
+      SLIPS.passed++;
+      return true;
+    }
+    SLIPS.failed++;
+    SLIPS.last = (Array.isArray(said['error-codes']) ? said['error-codes'] : []).filter((x): x is string => typeof x === 'string').slice(0, 4);
+    // (the secret set on this server is not the one of the key it is set with: nobody at all will pass until it is put right)
+    if (SLIPS.last.some((c) => /secret/.test(c))) log(`THE CAPTCHA SECRET IS NOT ACCEPTED BY CLOUDFLARE (${SLIPS.last.join(', ')}): nobody can come in until TURNSTILE_SECRET is put right, or taken away`);
+    return false;
   } catch {
+    SLIPS.unreachable++;
     return null;
   }
 }
@@ -3406,7 +3423,7 @@ function serve(req: http.IncomingMessage, res: http.ServerResponse) {
     // readable from a client hosted somewhere else (e.g. Vercel) for the start-screen player count
     res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'no-store' });
     // (places: how many different addresses the players come from. One, with several players on, means the host is not passing addresses through.)
-    res.end(JSON.stringify({ ok: true, boot: BOOT, protocol: PROTOCOL, why: RESTART.why, kept: KEPT.how, players: [...clients.values()].filter((c) => !c.asleep).length, asleep: [...clients.values()].filter((c) => c.asleep).length, max: MAX_PLAYERS, queue: queue.length, uptime: Math.round(process.uptime()), checks: CHECKS, flagged, keptOff: BANS.temp.size, loot: economy.loot.size, places: new Set([...clients.values()].map((c) => c.ip)).size, unspoken: [...clients.values()].filter((c) => !c.spoke && !c.asleep).length, turned: TURNED, captcha: CAPTCHA_ON }));
+    res.end(JSON.stringify({ ok: true, boot: BOOT, protocol: PROTOCOL, why: RESTART.why, kept: KEPT.how, players: [...clients.values()].filter((c) => !c.asleep).length, asleep: [...clients.values()].filter((c) => c.asleep).length, max: MAX_PLAYERS, queue: queue.length, uptime: Math.round(process.uptime()), checks: CHECKS, flagged, keptOff: BANS.temp.size, loot: economy.loot.size, places: new Set([...clients.values()].map((c) => c.ip)).size, unspoken: [...clients.values()].filter((c) => !c.spoke && !c.asleep).length, turned: TURNED, captcha: CAPTCHA_ON, ...(CAPTCHA_ON ? { captchaKey: CAPTCHA.site, captchaSays: SLIPS } : {}) }));
     return;
   }
   // the changelog page asks here for its hearts and comments, and gives them (see `news`)
@@ -3585,8 +3602,11 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
         asking = false;
         if (ws.readyState !== 1 || c) return;
         if (good === false) return void again('The check that you are a person did not pass. Press Play to try again.');
-        if (good === null) log(`the check that ${cleanName(m.name)} is a person could not be asked of Cloudflare: let in`);
-        else if (key) persons.set(personOf(key, ip), Date.now() + CAPTCHA.ms);
+        if (good === null) {
+          log(`the check that ${cleanName(m.name)} is a person could not be asked of Cloudflare: turned away`);
+          return void again('The check that you are a person could not be confirmed just now. Press Play to try again in a moment.');
+        }
+        if (key && CAPTCHA.ms) persons.set(personOf(key, ip), Date.now() + CAPTCHA.ms);
         if (persons.size > 20000) for (const [k, until] of persons) if (until < Date.now()) persons.delete(k);
         enter(m);
       });

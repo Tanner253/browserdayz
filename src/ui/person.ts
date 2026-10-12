@@ -1,9 +1,9 @@
 // The check that it is a person who is asking to play, and not a program (2026-10-12: connections made by a
-// program came by the dozen, and stood in the world as players). It is Cloudflare's Turnstile: a small box that
-// mostly passes a person without asking anything of them, and hands back a slip that the game gives the server,
-// which asks Cloudflare whether the slip is good. The server asks for it only when it is set up to (it says so,
-// and with which key, when it turns a game away for the want of one: see Net.wantsProof), and only of somebody it
-// has not lately had one from.
+// program came by the dozen, and stood in the world as players). It is Cloudflare's Turnstile: a box that asks a
+// person to tick it when Cloudflare is in any doubt of them, and hands back a slip that the game gives the server,
+// which asks Cloudflare whether the slip is good. Where the server is set up for it, it is shown to everybody the
+// moment they press Deploy, every time, in the middle of the screen; and nobody is let in without it
+// ("an interactive captcha that shows when you click deploy and either allows or prevents the player into the game").
 
 interface Turnstile {
   render(el: HTMLElement, opts: Record<string, unknown>): string;
@@ -29,47 +29,71 @@ function turnstile(): Promise<Turnstile | null> {
   return loading;
 }
 
+const el = (tag: string, css: string, text = '') => {
+  const e = document.createElement(tag);
+  e.style.cssText = css;
+  if (text) e.textContent = text;
+  return e;
+};
+const TYPE = 'font-family:"Barlow Condensed","Arial Narrow",sans-serif;text-transform:uppercase;';
+
 /**
- * The box is shown over the way in, and this is over when it has a slip to give, or cannot.
+ * The check is shown over the whole of the way in, and this is over when it has a slip to give, or cannot.
  * @param sitekey the key the server said to ask with
- * @returns the slip, or null: the script could not be had, the check failed, or a minute and a half went by
+ * @returns the slip, or null: the script could not be had, the check failed, it was given up, or two minutes went by
  */
 export async function askPerson(sitekey: string): Promise<string | null> {
+  const veil = el('div', 'position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(6,7,5,0.78);pointer-events:auto;');
+  const card = el('div', `display:flex;flex-direction:column;align-items:center;gap:14px;min-width:340px;padding:26px 30px 22px;background:#12140f;border:1px solid rgba(243,239,230,0.28);color:#f3efe6;${TYPE}`);
+  const head = el('div', 'font-size:26px;font-weight:700;letter-spacing:0.1em;', 'Are you a person?');
+  const say = el('div', 'font-size:15px;font-weight:500;letter-spacing:0.08em;color:#d8cfb8;text-align:center;max-width:320px;line-height:1.35;', 'One check before you go in. Tick the box if it asks you to.');
+  const box = el('div', 'min-height:65px;display:flex;align-items:center;justify-content:center;');
+  const quit = el('button', `margin-top:2px;padding:6px 14px;background:none;border:1px solid rgba(243,239,230,0.25);color:#d8cfb8;font-size:13px;letter-spacing:0.14em;cursor:pointer;${TYPE}`, 'Not now');
+  card.append(head, say, box, quit);
+  veil.appendChild(card);
+  document.body.appendChild(veil);
   const ts = await turnstile();
   if (!ts) {
     loading = null;
+    say.textContent = 'The check could not be fetched from Cloudflare. Something on this machine or this network is stopping it.';
+    await new Promise((r) => setTimeout(r, 3500));
+    veil.remove();
     return null;
   }
-  const panel = document.createElement('div');
-  panel.style.cssText =
-    'position:fixed;left:50%;bottom:9vh;transform:translateX(-50%);z-index:10000;display:flex;flex-direction:column;align-items:center;gap:10px;padding:14px 18px;' +
-    'background:rgba(12,13,11,0.94);border:1px solid rgba(243,239,230,0.25);color:#f3efe6;font:500 14px/1.3 "Barlow Condensed","Arial Narrow",sans-serif;letter-spacing:0.08em;text-transform:uppercase;pointer-events:auto;';
-  const say = document.createElement('div');
-  say.textContent = 'One check that you are a person, and you are in';
-  const box = document.createElement('div');
-  panel.append(say, box);
-  document.body.appendChild(panel);
   return new Promise<string | null>((done) => {
     let id = '', over = false;
-    const end = (slip: string | null) => {
+    const end = (slip: string | null, wait = 0) => {
       if (over) return;
       over = true;
       clearTimeout(late);
-      try {
-        if (id) ts.remove(id);
-      } catch {
-        /* gone already */
-      }
-      panel.remove();
-      done(slip);
+      setTimeout(() => {
+        try {
+          if (id) ts.remove(id);
+        } catch {
+          /* gone already */
+        }
+        veil.remove();
+        done(slip);
+      }, wait);
     };
-    const late = setTimeout(() => end(null), 90_000);
+    const late = setTimeout(() => end(null), 120_000);
+    quit.onclick = () => end(null);
     try {
       id = ts.render(box, {
         sitekey,
         theme: 'dark',
-        callback: (slip: string) => end(slip),
-        'error-callback': () => end(null),
+        appearance: 'always',
+        callback: (slip: string) => {
+          // (seen to have passed, for a moment, before the way in is asked for with it)
+          head.textContent = 'Passed';
+          say.textContent = 'Going in.';
+          end(slip, 600);
+        },
+        'error-callback': () => {
+          head.textContent = 'Not passed';
+          say.textContent = 'The check did not pass. Press Deploy to try again.';
+          end(null, 2200);
+        },
         'timeout-callback': () => end(null),
       });
     } catch {
