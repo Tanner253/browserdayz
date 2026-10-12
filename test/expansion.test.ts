@@ -37,7 +37,9 @@ const ok = (name: string, fn: () => void) => {
 // 4.2 m, when the upstairs wall of the two-floor house was moved clear of its window and closets were built:
 // compared place by place, before and after, with assets-src/_wf/me/loot-points.ts. None was added or renumbered.)
 import { JEEP } from '../src/sim/vehicles';
-const WAS = { cells: 190604, heights: 3515396887, buildings: 72, buildingsHash: 2448790248, lastId: 'tower_71', spawns: 2697513077, trees: 9494, treesHash: 1630127803, lootPoints: 675, lootHash: 2826555666, jeeps: 8, jeepsHash: 207674058, fires: 6 };
+// (2026-10-12, with the village fenced off (see VILLAGE_FENCE), off the map as it was live that day. They were: 190604
+// cells, 3515396887; all 72 buildings, 2448790248; 9494 trees, 1630127803; all 675 loot points, 2826555666.)
+const WAS = { cells: 181893, heights: 1379160507, buildings: 72, away: 46, buildingsHash: 192416693, lastId: 'tower_71', spawns: 2697513077, trees: 9454, treesHash: 3496676067, lootPoints: 675, lootAway: 371, lootHash: 4064289616, jeeps: 8, jeepsAway: 7, jeepsHash: 1649467612, fires: 6 };
 const hash = (parts: number[]) => {
   let h = 2166136261 >>> 0;
   for (const v of parts) {
@@ -53,6 +55,15 @@ const HUT_AT = { x: 160.1, z: 163.1 };
 
 /** where a brick block, a plank house and a long hut were stood behind the village street: fenced off before they were built */
 const IN_VILLAGE = [{ type: 'townhouse', x: 44, z: -28 }, { type: 'shanty', x: 14, z: 50 }, { type: 'hut', x: 46, z: 50 }];
+/**
+ * The village, laid out again on 2026-10-12 (streets, every building stood on one, more of them, the police
+ * headquarters): all of it is fenced off. (As far as it reaches, measured against the map that was live that day:
+ * ground moved from x -86 to 148 and z -66 to 130, no tree, and twenty-two of the old buildings; six metres are
+ * allowed beyond.) What is asked of the old map is asked of the rest of it: the figures in WAS were taken with
+ * this fence up, off the map as it was before.
+ */
+const VILLAGE_FENCE = { x0: -92, x1: 154, z0: -72, z1: 136 };
+const inVillage = (x: number, z: number) => x >= VILLAGE_FENCE.x0 && x <= VILLAGE_FENCE.x1 && z >= VILLAGE_FENCE.z0 && z <= VILLAGE_FENCE.z1;
 /** the village's second clinic and second shop (2026-10-11), at the two ends of its street: the ground fenced off for each */
 const SECOND = [{ type: 'clinic', x: 136.7, z: 23.5 }, { type: 'store', x: -63.1, z: -17.6 }];
 
@@ -76,6 +87,7 @@ for (let i = 0; i < 26; i++) passLine.push([world.roads[0].points[i * 3], world.
 /** the only ground the expansion may have touched: the cirque itself, and a strip along the track up to it from the checkpoint */
 const touched = (x: number, z: number) => {
   if (Math.hypot(x - E.x, z - E.z) < 160) return true;
+  if (inVillage(x, z)) return true;
   // (and the meadow the trading post was built in, later: 78 m round it)
   if (Math.hypot(x - TRADE_AT.x, z - TRADE_AT.z) < 78) return true;
   // (and the clearing the army's camp was pitched in, 2026-10-10: 78 m round it, as round the trading post)
@@ -99,12 +111,16 @@ const inl = Math.hypot(camp.x - E.x, camp.z - E.z);
 const ux = (camp.x - E.x) / inl, uz = (camp.z - E.z) / inl;
 const works = world.sites.find((s) => s.kind === 'works')!;
 // (what was built with the works: not the trading post's two, which came later and stand in the old map's meadow)
-const added = world.buildings.slice(WAS.buildings).filter((b) => !['hut', 'townhouse', 'shanty', 'tent'].includes(b.type) && !SECOND.some((q) => Math.hypot(b.x - q.x, b.z - q.z) < 3) && Math.hypot(b.x - TRADE_AT.x, b.z - TRADE_AT.z) > 78 && Math.hypot(b.x - ARMY_CAMP.x, b.z - ARMY_CAMP.z) > 78 && inOld(b.x, b.z));
+const added = world.buildings.slice(WAS.buildings).filter((b) => !['hut', 'townhouse', 'shanty', 'tent'].includes(b.type) && !SECOND.some((q) => Math.hypot(b.x - q.x, b.z - q.z) < 3) && Math.hypot(b.x - TRADE_AT.x, b.z - TRADE_AT.z) > 78 && Math.hypot(b.x - ARMY_CAMP.x, b.z - ARMY_CAMP.z) > 78 && inOld(b.x, b.z) && !inVillage(b.x, b.z));
 
 // To take the old map's figures again after fencing off more ground (do it BEFORE building there): FIGURES=1 npx tsx test/expansion.test.ts
 if (process.env.FIGURES) {
   const hs = oldGround((x, z) => !touched(x, z));
   const trees = world.trees.filter((t) => inOld(t.x, t.z) && !touched(t.x, t.z));
+  const oldB = world.buildings.slice(0, WAS.buildings).filter((b) => !inVillage(b.x, b.z)), oldP = data.lootPoints.slice(0, WAS.lootPoints).filter((p) => !inVillage(p.x, p.z));
+  const oldJ = data.jeeps.slice(0, WAS.jeeps).filter((j: { x: number; z: number }) => !inVillage(j.x, j.z));
+  console.log(JSON.stringify({ jeepsAway: oldJ.length, jeepsHash: hash(oldJ.flatMap((j: { x: number; z: number }) => [j.x, j.z])) }));
+  console.log(JSON.stringify({ away: oldB.length, buildingsHash: hash(oldB.flatMap((b) => [b.x, b.z, b.rot, b.floorY])), lootAway: oldP.length, lootHash: hash(oldP.flatMap((p) => [p.x, p.y, p.z])) }));
   console.log(JSON.stringify({ cells: hs.length, heights: hash(hs), trees: trees.length, treesHash: hash(trees.flatMap((t) => [t.x, t.y, t.z])), huts: world.buildings.filter((b) => b.type === 'hut').map((b) => [b.id, +b.x.toFixed(1), +b.z.toFixed(1), +b.floorY.toFixed(2)]) }));
   process.exit(0);
 }
@@ -115,7 +131,10 @@ ok('the map as it was is still exactly there: its ground, its buildings, its sta
   assert.equal(hash(hs), WAS.heights, 'the old ground has moved');
   const old = world.buildings.slice(0, WAS.buildings);
   assert.equal(old[old.length - 1].id, WAS.lastId);
-  assert.equal(hash(old.flatMap((b) => [b.x, b.z, b.rot, b.floorY])), WAS.buildingsHash, 'an old building has moved');
+  // (those of them that are not the village's: the village's stand on its streets now, each still the building it was)
+  const away = old.filter((b) => !inVillage(b.x, b.z));
+  assert.equal(away.length, WAS.away, 'an old building has come into the village or left it');
+  assert.equal(hash(away.flatMap((b) => [b.x, b.z, b.rot, b.floorY])), WAS.buildingsHash, 'an old building away from the village has moved');
   assert.equal(hash(world.spawnRing.flatMap((s) => [s.x, s.z, s.yaw])), WAS.spawns, 'a starting point has moved');
   // (and of those, nobody is set down by the bunker any more, nor between the valley and the town in the east)
   assert.ok(world.spawns.length >= 16 && world.spawns.length < world.spawnRing.length, `${world.spawns.length} starts left of ${world.spawnRing.length}`);
@@ -128,11 +147,17 @@ ok('the map as it was is still exactly there: its ground, its buildings, its sta
   assert.equal(trees.length, WAS.trees);
   assert.equal(hash(trees.flatMap((t) => [t.x, t.y, t.z])), WAS.treesHash, 'a tree away from the works has moved');
   // (what is kept between restarts goes by a loot point's number: the old ones are the first, in their old order)
-  const points = data.lootPoints.slice(0, WAS.lootPoints);
-  assert.equal(hash(points.flatMap((p) => [p.x, p.y, p.z])), WAS.lootHash, 'an old loot point has moved or been renumbered');
+  // (the village's moved with their buildings, each keeping its number: the first of all are still the old ones,
+  // and those away from the village are where they were)
+  const points = data.lootPoints.slice(0, WAS.lootPoints).filter((p) => !inVillage(p.x, p.z));
+  assert.equal(points.length, WAS.lootAway, 'an old loot point has come into the village or left it');
+  assert.equal(hash(points.flatMap((p) => [p.x, p.y, p.z])), WAS.lootHash, 'an old loot point away from the village has moved or been renumbered');
   // (2026-10-11: five more cars stand where the map had none, found after all the others: the eight that stood stand where they stood)
   assert.equal(data.jeeps.length, WAS.jeeps + JEEP.far);
-  assert.equal(hash(data.jeeps.slice(0, WAS.jeeps).flatMap((j: { x: number; z: number }) => [j.x, j.z])), WAS.jeepsHash);
+  // (those that do not stand in the village: the one or two that do stand where there is room for them now)
+  const cars = data.jeeps.slice(0, WAS.jeeps).filter((j: { x: number; z: number }) => !inVillage(j.x, j.z));
+  assert.equal(cars.length, WAS.jeepsAway);
+  assert.equal(hash(cars.flatMap((j: { x: number; z: number }) => [j.x, j.z])), WAS.jeepsHash);
   // (the old six, and one each at the three places built in the east country)
   // (and one where the lane crosses in the army's camp)
   assert.equal(data.fires.length, WAS.fires + 4);
@@ -242,10 +267,11 @@ ok('the infected keep to it too, and nowhere else has fewer for it', () => {
 
 ok('the long huts stand where they were meant to: beside the trading post, behind the depot, and on the track up to the works', () => {
   // (three on the old map, apart from the one in the village; the town's and the camp's are the east country's, below)
-  const huts = world.buildings.filter((b) => b.type === 'hut' && inOld(b.x, b.z) && !IN_VILLAGE.some((q) => Math.hypot(b.x - q.x, b.z - q.z) < 3));
+  const huts = world.buildings.filter((b) => b.type === 'hut' && inOld(b.x, b.z) && !inVillage(b.x, b.z));
   assert.equal(huts.length, 3, `${huts.length} huts`);
-  // and in the village, one of each of the downloaded buildings, where the ground was fenced off for it
-  for (const q of IN_VILLAGE) assert.ok(world.buildings.some((b) => b.type === q.type && Math.hypot(b.x - q.x, b.z - q.z) < 0.5), `no ${q.type} in the village at ${q.x}, ${q.z}`);
+  // and in the village, one of each of the downloaded buildings (each stood on a street of it since 2026-10-12: it
+  // was where the ground had been fenced off for it)
+  for (const q of IN_VILLAGE) assert.equal(world.buildings.filter((b) => b.type === q.type && inVillage(b.x, b.z)).length, 1, `not one ${q.type} in the village`);
   // and the village's second clinic and second shop: the last two buildings of all, each where its ground was fenced
   // off, well away from the police station, from the first of its kind and from one another, and still in the village
   const police = world.buildings.find((b) => b.type === 'police')!, village = world.pois[0];
@@ -330,6 +356,8 @@ ok('the east country: a town out of the valley by the road, two places far out, 
     // (neither's ground plan reaches into the other's: tried at the corners and the middles of the sides of each)
     for (const o of built) {
       if (o === b) continue;
+      // (the hospital is three buildings stood against one another: its main block, its wing and the block before its doors)
+      if (b.type.startsWith('hospital') && o.type.startsWith('hospital')) continue;
       const [ow, od] = BUILDING_FOOTPRINT[o.type], [bw, bd] = BUILDING_FOOTPRINT[b.type], oc = Math.cos(o.rot), os = Math.sin(o.rot), bc = Math.cos(b.rot), bs = Math.sin(b.rot);
       for (const [fx, fz] of [[1, 1], [1, -1], [-1, 1], [-1, -1], [1, 0], [-1, 0], [0, 1], [0, -1], [0, 0]]) {
         const lx = (fx * bw) / 2, lz = (fz * bd) / 2;
@@ -347,7 +375,9 @@ ok('the east country: a town out of the valley by the road, two places far out, 
   }
   // the road: a second line, picked up where the first ran out, down the town's street, and never a point added to the first
   assert.equal(world.road.points.length, 295 * 3, 'the old road has been lengthened: jeeps and lamps are told off along it by number');
-  assert.equal(world.roads.length, 1);
+  // (one road; what has been laid since is streets: the village's, and the hospital's drive)
+  assert.ok(!world.roads[0].side && world.roads.slice(1).every((r) => r.side), 'a second road that is not a street');
+  assert.equal(world.roads.length, 5);
   const p = world.roads[0].points, n = p.length / 3, last = world.road.points.length - 3;
   assert.ok(Math.hypot(p[0] - world.road.points[last], p[2] - world.road.points[last + 2]) < 0.01 && Math.abs(p[1] - world.road.points[last + 1]) < 0.01, 'the new road does not begin where the old one ends');
   let nearest = 1e9, steep = 0;
