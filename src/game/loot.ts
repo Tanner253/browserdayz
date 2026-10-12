@@ -20,6 +20,8 @@ import type { LootPoint } from '../world/buildings';
 export interface ItemTemplate {
   group: THREE.Group;
   size: THREE.Vector3;
+  /** this is the lighter copy of it, drawn from a few metres off: the whole model is got with this, when the eye comes near */
+  whole?: () => Promise<ItemTemplate>;
   /** when one of it was last near enough to be drawn, seconds of this game (see LootManager.update) */
   seen?: number;
   /** its pictures have been taken off the graphics card since: they go back on the next time one of it is drawn */
@@ -28,6 +30,14 @@ export interface ItemTemplate {
 
 /** seconds a sort of thing has to have been out of sight before its pictures are taken off the card */
 const COLD_AFTER = 15;
+/**
+ * How near the eye comes before a thing on the ground is drawn with its whole model in place of its lighter copy,
+ * and how far it goes before the lighter copy comes back (metres). The copy is the same shape and the same paint
+ * with a tenth or a fiftieth of the triangles (scripts/lods.mjs): at nine metres a box of rounds is twenty-five pixels
+ * across. (2026-10-12: nineteen such boxes in sight were 1.7 million triangles a frame, and the first sight of
+ * each sort of thing stopped the game while a hundred thousand triangles were laid out.)
+ */
+const WHOLE_WITHIN = 9, WHOLE_UNTIL = 11;
 
 const TRIGGER_GROUPS = groups(G_TRIGGER, 0xffff);
 const DOWN = { x: 0, y: -1, z: 0 };
@@ -88,12 +98,16 @@ export class ItemModels {
   sizes = new Map<string, THREE.Vector3>();
   constructor(private atmo: Atmosphere) {}
 
-  get(id: string, mods: string[] = []): Promise<ItemTemplate> {
-    const key = mods.length ? `${id}+${[...mods].sort().join('+')}` : id;
+  /** @param far its lighter copy, where it has one (see getFar): the model itself otherwise */
+  get(id: string, mods: string[] = [], far = false): Promise<ItemTemplate> {
+    const def = ITEMS[id];
+    far &&= !def.model.startsWith('@') && !!assets.manifest.models[def.model]?.lods?.[0]?.far;
+    const key = (mods.length ? `${id}+${[...mods].sort().join('+')}` : id) + (far ? '~far' : '');
     let p = this.cache.get(key);
     if (!p) {
       // (made, and then got ready to be drawn before anybody is handed it: see `onMade`)
-      p = this.build(id, mods).then(async (tpl) => {
+      p = this.build(id, mods, far).then(async (tpl) => {
+        if (far) tpl.whole = () => this.get(id, mods);
         await this.onMade(tpl).catch(() => {});
         return tpl;
       });
@@ -122,12 +136,17 @@ export class ItemModels {
     return this.get(item.id, (item.mods ?? []).filter((m) => m === 'pu_scope' || m === 'rifle_wrap'));
   }
 
-  private async build(id: string, mods: string[]): Promise<ItemTemplate> {
+  /** The model a thing is laid on the ground with: its lighter copy where there is one (its `whole` gets the model itself). */
+  getFar(item: ItemInstance): Promise<ItemTemplate> {
+    return this.get(item.id, (item.mods ?? []).filter((m) => m === 'pu_scope' || m === 'rifle_wrap'), true);
+  }
+
+  private async build(id: string, mods: string[], far = false): Promise<ItemTemplate> {
     const def = ITEMS[id];
     let parts: MeshPart[];
     if (def.model.startsWith('@')) parts = proceduralParts(def.model);
     else {
-      const scene = await assets.model(def.model);
+      const scene = await assets.model(def.model, far ? 1 : 0);
       const re = def.nodeRe ? new RegExp(def.nodeRe) : null;
       parts = re ? extractParts(scene, (n) => re.test(n)) : def.node ? extractParts(scene, (n) => n === def.node) : extractParts(scene);
       // a gun lies there as it is: bare, or with whatever is fitted to it
@@ -227,7 +246,7 @@ export class ItemModels {
     const s = def.scale ?? 1;
     group.scale.setScalar(s);
     const size = box.getSize(new THREE.Vector3()).multiplyScalar(s);
-    if (!mods.length) this.sizes.set(id, size);
+    if (!mods.length && !far) this.sizes.set(id, size);
     return { group, size };
   }
 }
@@ -300,6 +319,29 @@ export class WorldItem {
 
   update(dt: number) {
     this.fly(dt);
+  }
+
+  /** it is drawn with its whole model now, not its lighter copy (see WHOLE_WITHIN) */
+  whole = false;
+  /** the whole model has been sent for */
+  asked = false;
+
+  /** Drawn with another model of the same thing: its whole one in place of its lighter copy, or back. */
+  useModel(tpl: ItemTemplate, whole: boolean) {
+    if (this.whole === whole) return;
+    this.whole = whole;
+    for (const m of this.meshes) this.obj.remove(m);
+    this.meshes = [];
+    for (const c of tpl.group.children) {
+      if (!(c as THREE.Mesh).isMesh) continue;
+      const m = (c as THREE.Mesh).clone();
+      m.castShadow = this.shadows;
+      m.matrixAutoUpdate = false;
+      m.updateMatrix();
+      this.obj.add(m);
+      this.meshes.push(m);
+    }
+    this.obj.updateMatrixWorld(true);
   }
 
   /** each shadow-casting mesh is drawn once per shadow cascade: only worth it up close */
@@ -507,7 +549,8 @@ export class LootManager {
 
   private make(l: WorldLoot) {
     this.pending.add(l.uid);
-    void this.models.getFor(l.item).then((tpl) => {
+    // (what a hand has just let go of is at arm's length: its whole model at once)
+    void (this.hands.has(l.uid) ? this.models.getFor(l.item) : this.models.getFar(l.item)).then((tpl) => {
       if (!this.pending.has(l.uid)) return; // despawned before the model loaded
       this.pending.delete(l.uid);
       const normal = this.place(l, tpl);
@@ -706,6 +749,27 @@ export class LootManager {
         w.tpl.seen = this.clock;
         w.tpl.cold = false;
       }
+      // its whole model when the eye is near it, its lighter copy again when the eye has gone
+      const far = w.tpl.whole;
+      if (!far) continue;
+      if (d2 < WHOLE_WITHIN * WHOLE_WITHIN) {
+        const had = this.wholes.get(w.tpl);
+        if (had) {
+          had.seen = this.clock;
+          had.cold = false;
+          w.useModel(had, true);
+        } else if (!w.asked) {
+          w.asked = true;
+          void far().then((tpl) => {
+            this.wholes.set(w.tpl, tpl);
+            w.asked = false;
+          }, () => {});
+        }
+      } else if (w.whole && d2 > WHOLE_UNTIL * WHOLE_UNTIL) w.useModel(w.tpl, false);
+      else if (w.whole) {
+        const had = this.wholes.get(w.tpl);
+        if (had) had.seen = this.clock;
+      }
     }
     // What has not been near for a while has its pictures taken off the graphics card: every sort of thing a walk
     // through a town had passed stayed there for good, a gigabyte of it by the far end of the street. They are
@@ -729,4 +793,6 @@ export class LootManager {
   }
   private clock = 0;
   private swept = 0;
+  /** the whole model of each lighter copy that has been needed so far */
+  private wholes = new Map<ItemTemplate, ItemTemplate>();
 }

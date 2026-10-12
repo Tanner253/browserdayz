@@ -64,6 +64,9 @@ const PAINT_METAL = 0.25;
 const VIEW = { back: 7.4, up: 2.15, fov: 1.1 };
 const SEND_HZ = 15;
 
+/** how far off a car that has a lighter copy is drawn with it, metres */
+const FAR_CAR = 38;
+
 export interface GarageHost {
   scene: THREE.Scene;
   atmo: Atmosphere;
@@ -115,6 +118,13 @@ export class Garage {
   private proto: { body: THREE.Object3D; wheels: THREE.Object3D[] } | null = null;
   /** the police car's model (see POLICE_CAR): without it, one is drawn as a jeep */
   private protoCar: { body: THREE.Object3D; wheels: THREE.Object3D[] } | null = null;
+  /**
+   * The police car's lighter copy (scripts/lods.mjs), drawn in its place from FAR_CAR metres off: the same car, its
+   * wheels where the whole one's are, with a twentieth of the triangles. (The whole one is 256,000 of them, drawn
+   * from any distance and again for every shadow: 2026-10-12.)
+   */
+  private protoCarFar: { body: THREE.Object3D; wheels: THREE.Object3D[] } | null = null;
+  private lods = new Map<Jeep, { near: THREE.Object3D[]; far: THREE.Object3D[]; isFar: boolean }>();
   private sendT = 0;
   /** a seat asked for and not yet given */
   private asked = 0;
@@ -145,13 +155,32 @@ export class Garage {
       DRIVE_CAR.radius = m.radius;
       DRIVE_CAR.track = m.track;
       DRIVE_CAR.base = m.base;
+      if (assets.manifest.models[POLICE_CAR.model].lods?.[0]?.far) {
+        // (if its lighter copy cannot be read as a car, the whole one is drawn at any distance, as it was)
+        try {
+          this.protoCarFar = fromModel(await assets.model(POLICE_CAR.model, 1), POLICE_CAR.kind);
+        } catch {
+          this.protoCarFar = null;
+        }
+      }
     }
   }
 
   /** One jeep's worth of the model: the shapes are shared, the paint is its own (one burns black, another has its lamps on). */
   private make(kind = 0) {
     const p = (kind === POLICE_CAR.kind && this.protoCar) || this.proto!;
-    const body = p.body.clone(true), wheels = p.wheels.map((w) => w.clone(true));
+    let body = p.body.clone(true), wheels = p.wheels.map((w) => w.clone(true));
+    // (with a lighter copy: each of its five pieces is the whole one and the lighter one together, one of them shown)
+    const pf = kind === POLICE_CAR.kind && this.protoCar ? this.protoCarFar : null;
+    let lod: { near: THREE.Object3D[]; far: THREE.Object3D[]; isFar: boolean } | undefined;
+    if (pf) {
+      const fb = pf.body.clone(true), fw = pf.wheels.map((w) => w.clone(true));
+      lod = { near: [body, ...wheels], far: [fb, ...fw], isFar: false };
+      for (const o of lod.far) o.visible = false;
+      const both = (a: THREE.Object3D, b: THREE.Object3D) => new THREE.Group().add(a, b);
+      wheels = wheels.map((w, i) => both(w, fw[i]));
+      body = both(body, fb);
+    }
     const own = new Map<THREE.Material, THREE.Material>();
     const lamps: THREE.MeshStandardMaterial[] = [];
     const paint = (src: THREE.Material) => {
@@ -176,7 +205,7 @@ export class Garage {
         if (mesh.isMesh) mesh.material = Array.isArray(mesh.material) ? mesh.material.map(paint) : paint(mesh.material);
       });
     }
-    return { body, wheels, lamps };
+    return { body, wheels, lamps, lod };
   }
 
   private groundAt = (x: number, z: number) => (roadLift(this.h.world, x, z) > 0 ? 'asphalt' : groundOf(this.h.terrain.surfaceAt(x, z)));
@@ -192,6 +221,7 @@ export class Garage {
     const j = new Jeep(v.i, this.groundAt, DRIVES[kind], kind);
     const made = this.make(kind);
     j.build(this.h.scene, v.s, made);
+    if (made.lod) this.lods.set(j, made.lod);
     j.hp = v.hp;
     j.fuel = v.fuel;
     this.jeeps.set(v.i, j);
@@ -207,6 +237,7 @@ export class Garage {
     if (this.ride?.jeep === j) this.out(false);
     this.extra.get(j)?.voice?.stop();
     this.extra.delete(j);
+    this.lods.delete(j);
     this.jeeps.delete(i);
     j.dispose(this.h.scene);
   }
@@ -451,6 +482,16 @@ export class Garage {
     }
     for (const j of this.jeeps.values()) {
       j.update(dt, now, alpha);
+      // its lighter copy from FAR_CAR off, its whole self again a little nearer than that
+      const lod = this.lods.get(j);
+      if (lod) {
+        const d2 = j.pos.distanceToSquared(listener), far = lod.isFar ? d2 > (FAR_CAR - 6) ** 2 : d2 > FAR_CAR ** 2;
+        if (far !== lod.isFar) {
+          lod.isFar = far;
+          for (const o of lod.near) o.visible = !far;
+          for (const o of lod.far) o.visible = far;
+        }
+      }
       const x = this.extra.get(j)!;
       const near = j.pos.distanceToSquared(listener) < 220 * 220;
       this.sound(j, x, dt, near);

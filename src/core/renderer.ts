@@ -90,6 +90,15 @@ export class Renderer {
     c.denoiseSamples = 4;
     c.denoiseRadius = 10;
     c.halfRes = q.aoHalfRes;
+    // Left to itself this pass looks through the scene every frame for anything see-through, and finding one (a
+    // pane of glass is enough) draws the whole scene twice more, to keep its shading off such things: measured
+    // 2026-10-12 at 3 to 5 ms of a frame of 18 on the card (2560x1440), and a walk over all eleven thousand
+    // things in the scene four times a frame besides. The picture with and without was the same to the eye: what
+    // is see-through here is glass, and the shade of a corner behind a pane belongs there.
+    // (Said to the pass itself as well: its setting only stops the looking when it CHANGES, and off is what it
+    // starts at, so setting it off alone left the pass to turn it on again by itself.)
+    (this.ao as unknown as { autoDetectTransparency: boolean }).autoDetectTransparency = false;
+    c.transparencyAware = false;
     c.gammaCorrection = false;
     c.color = new THREE.Color(0.02, 0.025, 0.03);
     this.ao.enabled = q.ao;

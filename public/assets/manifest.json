@@ -190,7 +190,14 @@
     0.0957,
     0.0402
    ],
-   "lods": [],
+   "lods": [
+    {
+     "url": "assets/models/bolt_action_rifle_7_62_lod1.glb",
+     "tris": 2757,
+     "far": 2,
+     "of": "1092704:1791709094271"
+    }
+   ],
    "hi": "assets/models/hi/bolt_action_rifle_7_62.glb",
    "hiBytes": 6179948
   },
@@ -212,7 +219,14 @@
     0.2285,
     0.0157
    ],
-   "lods": [],
+   "lods": [
+    {
+     "url": "assets/models/service_pistol_lod1.glb",
+     "tris": 3334,
+     "far": 2,
+     "of": "625884:1791709094506"
+    }
+   ],
    "hi": "assets/models/hi/service_pistol.glb",
    "hiBytes": 2355640
   },
@@ -274,7 +288,14 @@
     0.2359,
     0.0568
    ],
-   "lods": []
+   "lods": [
+    {
+     "url": "assets/models/long_life_food_lod1.glb",
+     "tris": 1600,
+     "far": 2,
+     "of": "500484:1791630567763"
+    }
+   ]
   },
   "metal_jerrycan_green": {
    "url": "assets/models/metal_jerrycan_green.glb",
@@ -294,7 +315,14 @@
     0.4999,
     0.0854
    ],
-   "lods": []
+   "lods": [
+    {
+     "url": "assets/models/metal_jerrycan_green_lod1.glb",
+     "tris": 1599,
+     "far": 2,
+     "of": "690444:1791704546632"
+    }
+   ]
   },
   "plastic_thermos": {
    "url": "assets/models/plastic_thermos.glb",
@@ -314,7 +342,14 @@
     0.3204,
     0.0546
    ],
-   "lods": []
+   "lods": [
+    {
+     "url": "assets/models/plastic_thermos_lod1.glb",
+     "tris": 1600,
+     "far": 2,
+     "of": "303964:1791704546684"
+    }
+   ]
   },
   "plastic_bottle_gallon": {
    "url": "assets/models/plastic_bottle_gallon.glb",
@@ -334,7 +369,14 @@
     0.2744,
     0.0613
    ],
-   "lods": []
+   "lods": [
+    {
+     "url": "assets/models/plastic_bottle_gallon_lod1.glb",
+     "tris": 1600,
+     "far": 2,
+     "of": "235944:1791704546661"
+    }
+   ]
   },
   "medical_box": {
    "url": "assets/models/medical_box.glb",
@@ -354,7 +396,14 @@
     0.0975,
     0.1779
    ],
-   "lods": []
+   "lods": [
+    {
+     "url": "assets/models/medical_box_lod1.glb",
+     "tris": 1599,
+     "far": 2,
+     "of": "437164:1791704546604"
+    }
+   ]
   },
   "medical_tape": {
    "url": "assets/models/medical_tape.glb",
@@ -394,7 +443,14 @@
     0.0637,
     0.0589
    ],
-   "lods": []
+   "lods": [
+    {
+     "url": "assets/models/binoculars_lod1.glb",
+     "tris": 2096,
+     "far": 2,
+     "of": "513636:1791704546223"
+    }
+   ]
   },
   "hatchet": {
    "url": "assets/models/hatchet.glb",
@@ -414,7 +470,14 @@
     0.2269,
     0.0771
    ],
-   "lods": []
+   "lods": [
+    {
+     "url": "assets/models/hatchet_lod1.glb",
+     "tris": 1600,
+     "far": 2,
+     "of": "390628:1791704546424"
+    }
+   ]
   },
   "crowbar_01": {
    "url": "assets/models/crowbar_01.glb",
@@ -454,7 +517,14 @@
     0.5412,
     0.0417
    ],
-   "lods": []
+   "lods": [
+    {
+     "url": "assets/models/machete_lod1.glb",
+     "tris": 1600,
+     "far": 2,
+     "of": "742948:1791630569073"
+    }
+   ]
   },
   "baseball_bat": {
    "url": "assets/models/baseball_bat.glb",
@@ -474,7 +544,14 @@
     0.659,
     0.0314
    ],
-   "lods": []
+   "lods": [
+    {
+     "url": "assets/models/baseball_bat_lod1.glb",
+     "tris": 1599,
+     "far": 2,
+     "of": "352144:1791704546175"
+    }
+   ]
   },
   "old_gas_mask": {
    "url": "assets/models/old_gas_mask.glb",
@@ -494,7 +571,14 @@
     0.121,
     0.1864
    ],
-   "lods": []
+   "lods": [
+    {
+     "url": "assets/models/old_gas_mask_lod1.glb",
+     "tris": 1599,
+     "far": 2,
+     "of": "404984:1791630569390"
+    }
+   ]
   },
   "vintage_flashlight": {
    "url": "assets/models/vintage_flashlight.glb",
@@ -514,7 +598,14 @@
     0.1443,
     0.1527
    ],
-   "lods": []
+   "lods": [
+    {
+     "url": "assets/models/vintage_flashlight_lod1.glb",
+     "tris": 1653,
+     "far": 2,
+     "of": "402716:1791704547196"
+    }
+   ]
   },
   "cigarette_pack": {
    "url": "assets/models/cigarette_pack.glb",
@@ -534,7 +625,14 @@
     0.1024,
     0.0233
    ],
-   "lods": []
+   "lods": [
+    {
+     "url": "assets/models/cigarette_pack_lod1.glb",
+     "tris": 1599,
+     "far": 2,
+     "of": "317232:1791704546227"
+    }
+   ]
   },
   "food_apple_01": {
    "url": "assets/models/food_apple_01.glb",
@@ -554,7 +652,14 @@
     0.0854,
     0.0501
    ],
-   "lods": []
+   "lods": [
+    {
+     "url": "assets/models/food_apple_01_lod1.glb",
+     "tris": 1630,
+     "far": 2,
+     "of": "282648:1791704546374"
+    }
+   ]
   },
   "can_rusted": {
    "url": "assets/models/can_rusted.glb",
@@ -594,7 +699,14 @@
     0.0866,
     0.063
    ],
-   "lods": []
+   "lods": [
+    {
+     "url": "assets/models/seadogs_compass_lod1.glb",
+     "tris": 1696,
+     "far": 2,
+     "of": "726036:1791704546784"
+    }
+   ]
   },
   "digital_wrist_watch": {
    "url": "assets/models/digital_wrist_watch.glb",
@@ -614,7 +726,14 @@
     0.0059,
     0.1278
    ],
-   "lods": []
+   "lods": [
+    {
+     "url": "assets/models/digital_wrist_watch_lod1.glb",
+     "tris": 2451,
+     "far": 2,
+     "of": "491016:1791704546279"
+    }
+   ]
   },
   "stick_grenade": {
    "url": "assets/models/stick_grenade.glb",
@@ -634,7 +753,14 @@
     0.219,
     0.0387
    ],
-   "lods": []
+   "lods": [
+    {
+     "url": "assets/models/stick_grenade_lod1.glb",
+     "tris": 1600,
+     "far": 2,
+     "of": "460544:1791704547094"
+    }
+   ]
   },
   "vintage_radio_transceiver": {
    "url": "assets/models/vintage_radio_transceiver.glb",
@@ -654,7 +780,14 @@
     0.4329,
     0.2749
    ],
-   "lods": []
+   "lods": [
+    {
+     "url": "assets/models/vintage_radio_transceiver_lod1.glb",
+     "tris": 5825,
+     "far": 2,
+     "of": "1712140:1791704547236"
+    }
+   ]
   },
   "fish_knife": {
    "url": "assets/models/fish_knife.glb",
@@ -674,7 +807,14 @@
     0.1054,
     0.0081
    ],
-   "lods": []
+   "lods": [
+    {
+     "url": "assets/models/fish_knife_lod1.glb",
+     "tris": 1599,
+     "far": 2,
+     "of": "742548:1791704546287"
+    }
+   ]
   },
   "fishermans_hat": {
    "url": "assets/models/fishermans_hat.glb",
@@ -694,7 +834,14 @@
     0.0895,
     0.1777
    ],
-   "lods": []
+   "lods": [
+    {
+     "url": "assets/models/fishermans_hat_lod1.glb",
+     "tris": 1600,
+     "far": 2,
+     "of": "561260:1791630570594"
+    }
+   ]
   },
   "life_jacket": {
    "url": "assets/models/life_jacket.glb",
@@ -714,7 +861,14 @@
     0.5293,
     0.0953
    ],
-   "lods": []
+   "lods": [
+    {
+     "url": "assets/models/life_jacket_lod1.glb",
+     "tris": 1586,
+     "far": 2,
+     "of": "513840:1791630570690"
+    }
+   ]
   },
   "rubber_boots": {
    "url": "assets/models/rubber_boots.glb",
@@ -734,7 +888,14 @@
     0.3728,
     0.1323
    ],
-   "lods": []
+   "lods": [
+    {
+     "url": "assets/models/rubber_boots_lod1.glb",
+     "tris": 1600,
+     "far": 2,
+     "of": "257552:1791630570841"
+    }
+   ]
   },
   "garden_gloves_01": {
    "url": "assets/models/garden_gloves_01.glb",
@@ -754,7 +915,14 @@
     0.0759,
     0.1715
    ],
-   "lods": []
+   "lods": [
+    {
+     "url": "assets/models/garden_gloves_01_lod1.glb",
+     "tris": 1600,
+     "far": 2,
+     "of": "253128:1791630571163"
+    }
+   ]
   },
   "vintage_suitcase": {
    "url": "assets/models/vintage_suitcase.glb",
@@ -774,7 +942,14 @@
     0.5678,
     0.1104
    ],
-   "lods": []
+   "lods": [
+    {
+     "url": "assets/models/vintage_suitcase_lod1.glb",
+     "tris": 2196,
+     "far": 2,
+     "of": "811068:1791630571163"
+    }
+   ]
   },
   "wooden_military_crate": {
    "url": "assets/models/wooden_military_crate.glb",
@@ -1670,7 +1845,14 @@
     0.0575,
     0.0224
    ],
-   "lods": [],
+   "lods": [
+    {
+     "url": "assets/models/gun_light_lod1.glb",
+     "tris": 2058,
+     "far": 2,
+     "of": "244072:1791709094715"
+    }
+   ],
    "hi": "assets/models/hi/gun_light.glb",
    "hiBytes": 1445100
   },
@@ -1693,7 +1875,14 @@
     0.0406,
     0.0203
    ],
-   "lods": [],
+   "lods": [
+    {
+     "url": "assets/models/rifle_suppressor_lod1.glb",
+     "tris": 1600,
+     "far": 2,
+     "of": "229364:1791709094891"
+    }
+   ],
    "hi": "assets/models/hi/rifle_suppressor.glb",
    "hiBytes": 1820168
   },
@@ -1716,7 +1905,14 @@
     0.0736,
     0.0295
    ],
-   "lods": [],
+   "lods": [
+    {
+     "url": "assets/models/holo_sight_lod1.glb",
+     "tris": 1968,
+     "far": 2,
+     "of": "298148:1791709095205"
+    }
+   ],
    "hi": "assets/models/hi/holo_sight.glb",
    "hiBytes": 4556240
   },
@@ -1739,7 +1935,14 @@
     0.22,
     0.0603
    ],
-   "lods": [],
+   "lods": [
+    {
+     "url": "assets/models/flask_lod1.glb",
+     "tris": 1600,
+     "far": 2,
+     "of": "406596:1791709095701"
+    }
+   ],
    "hi": "assets/models/hi/flask.glb",
    "hiBytes": 10230112
   },
@@ -1911,7 +2114,14 @@
     0.0359,
     0.065
    ],
-   "lods": [],
+   "lods": [
+    {
+     "url": "assets/models/ammo_box_9mm_lod1.glb",
+     "tris": 21388,
+     "far": 2,
+     "of": "1299396:1791709096252"
+    }
+   ],
    "hi": "assets/models/hi/ammo_box_9mm.glb",
    "hiBytes": 2432072
   },
@@ -1934,7 +2144,14 @@
     0.0525,
     0.065
    ],
-   "lods": [],
+   "lods": [
+    {
+     "url": "assets/models/ammo_box_739_lod1.glb",
+     "tris": 30894,
+     "far": 2,
+     "of": "1223904:1791709096586"
+    }
+   ],
    "hi": "assets/models/hi/ammo_box_739.glb",
    "hiBytes": 5697164
   },
@@ -1957,7 +2174,14 @@
     0.0381,
     0.0351
    ],
-   "lods": [],
+   "lods": [
+    {
+     "url": "assets/models/ammo_box_45_lod1.glb",
+     "tris": 6340,
+     "far": 2,
+     "of": "1749248:1791709097127"
+    }
+   ],
    "hi": "assets/models/hi/ammo_box_45.glb",
    "hiBytes": 15562048
   },
@@ -2064,7 +2288,14 @@
     0.1923,
     0.0613
    ],
-   "lods": [],
+   "lods": [
+    {
+     "url": "assets/models/ak_drum_lod1.glb",
+     "tris": 1869,
+     "far": 2,
+     "of": "406608:1791709097363"
+    }
+   ],
    "hi": "assets/models/hi/ak_drum.glb",
    "hiBytes": 2144968
   },
@@ -2108,7 +2339,14 @@
     0.56,
     0.2504
    ],
-   "lods": []
+   "lods": [
+    {
+     "url": "assets/models/plate_carrier_lod1.glb",
+     "tris": 2173,
+     "far": 2,
+     "of": "308492:1791630581087"
+    }
+   ]
   },
   "weapons_case": {
    "url": "assets/models/weapons_case.glb",
@@ -2173,7 +2411,14 @@
     0.2252,
     0.1317
    ],
-   "lods": [],
+   "lods": [
+    {
+     "url": "assets/models/combat_helmet_lod1.glb",
+     "tris": 1594,
+     "far": 2,
+     "of": "311572:1791709097802"
+    }
+   ],
    "hi": "assets/models/hi/combat_helmet.glb",
    "hiBytes": 775636
   },
@@ -2217,7 +2462,14 @@
     0.1303,
     0.1236
    ],
-   "lods": [],
+   "lods": [
+    {
+     "url": "assets/models/tactical_gloves_lod1.glb",
+     "tris": 4245,
+     "far": 2,
+     "of": "1207992:1791759634303"
+    }
+   ],
    "hi": "assets/models/hi/tactical_gloves.glb",
    "hiBytes": 4422172
   },
@@ -2260,7 +2512,14 @@
     0.66,
     0.2225
    ],
-   "lods": []
+   "lods": [
+    {
+     "url": "assets/models/camping_backpack_lod1.glb",
+     "tris": 2412,
+     "far": 2,
+     "of": "1092488:1791630587373"
+    }
+   ]
   },
   "house_interior": {
    "url": "assets/models/house_interior.glb",
@@ -2367,7 +2626,14 @@
     0.2799,
     0.1886
    ],
-   "lods": [],
+   "lods": [
+    {
+     "url": "assets/models/helmet_k63_lod1.glb",
+     "tris": 1945,
+     "far": 2,
+     "of": "288352:1791709099116"
+    }
+   ],
    "hi": "assets/models/hi/helmet_k63.glb",
    "hiBytes": 1433136
   },
@@ -2453,7 +2719,14 @@
     0.6,
     0.1891
    ],
-   "lods": [],
+   "lods": [
+    {
+     "url": "assets/models/heavy_armor_lod1.glb",
+     "tris": 1954,
+     "far": 2,
+     "of": "958852:1791709099462"
+    }
+   ],
    "hi": "assets/models/hi/heavy_armor.glb",
    "hiBytes": 4029372
   },
@@ -2538,7 +2811,14 @@
     0.56,
     0.2181
    ],
-   "lods": []
+   "lods": [
+    {
+     "url": "assets/models/military_backpack_lod1.glb",
+     "tris": 2432,
+     "far": 2,
+     "of": "746108:1791630595931"
+    }
+   ]
   },
   "syringe": {
    "url": "assets/models/syringe.glb",
@@ -2602,7 +2882,14 @@
     1.5984,
     2.8268
    ],
-   "lods": [],
+   "lods": [
+    {
+     "url": "assets/models/police_car_lod1.glb",
+     "tris": 14385,
+     "far": 2,
+     "of": "1946268:1791709100387"
+    }
+   ],
    "hi": "assets/models/hi/police_car.glb",
    "hiBytes": 2271112
   },
@@ -2892,7 +3179,14 @@
     0.165,
     0.052
    ],
-   "lods": [],
+   "lods": [
+    {
+     "url": "assets/models/sniper_lod1.glb",
+     "tris": 2578,
+     "far": 2,
+     "of": "487192:1791709101239"
+    }
+   ],
    "holds": {
     "right": [
      -0.425,
@@ -3013,7 +3307,14 @@
     0.0976,
     0.0224
    ],
-   "lods": [],
+   "lods": [
+    {
+     "url": "assets/models/m9_lod1.glb",
+     "tris": 2548,
+     "far": 2,
+     "of": "573664:1791709101638"
+    }
+   ],
    "holds": {
     "right": [
      -0.072,
@@ -3138,7 +3439,14 @@
     0.1191,
     0.0436
    ],
-   "lods": [],
+   "lods": [
+    {
+     "url": "assets/models/ak_lod1.glb",
+     "tris": 3204,
+     "far": 2,
+     "of": "2730920:1791709102328"
+    }
+   ],
    "holds": {
     "right": [
      -0.3,
@@ -3273,7 +3581,14 @@
     0.0862,
     0.0254
    ],
-   "lods": [],
+   "lods": [
+    {
+     "url": "assets/models/smg_lod1.glb",
+     "tris": 3014,
+     "far": 2,
+     "of": "3336896:1791709103375"
+    }
+   ],
    "holds": {
     "right": [
      -0.08,
@@ -3408,7 +3723,14 @@
     0.1685,
     0.0513
    ],
-   "lods": [],
+   "lods": [
+    {
+     "url": "assets/models/ar15_lod1.glb",
+     "tris": 22487,
+     "far": 2,
+     "of": "3413424:1791709104697"
+    }
+   ],
    "holds": {
     "right": [
      -0.3,
@@ -3442,7 +3764,14 @@
     0.0976,
     0.0189
    ],
-   "lods": [],
+   "lods": [
+    {
+     "url": "assets/models/colt_1911_lod1.glb",
+     "tris": 2086,
+     "far": 2,
+     "of": "438944:1791709104999"
+    }
+   ],
    "holds": {
     "right": [
      -0.072,
@@ -3476,7 +3805,14 @@
     0.0978,
     0.0306
    ],
-   "lods": [],
+   "lods": [
+    {
+     "url": "assets/models/desert_eagle_lod1.glb",
+     "tris": 3152,
+     "far": 2,
+     "of": "947240:1791709105478"
+    }
+   ],
    "holds": {
     "right": [
      -0.072,
@@ -3510,7 +3846,14 @@
     0.148,
     0.0376
    ],
-   "lods": [],
+   "lods": [
+    {
+     "url": "assets/models/benelli_m3_lod1.glb",
+     "tris": 3776,
+     "far": 2,
+     "of": "720964:1791709105937"
+    }
+   ],
    "holds": {
     "right": [
      -0.425,

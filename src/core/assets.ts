@@ -11,7 +11,8 @@ export interface ModelEntry {
   tris: number;
   min: [number, number, number];
   max: [number, number, number];
-  lods: { url: string; tris: number }[];
+  /** lighter copies of it, for further off. `far`: one made by scripts/lods.mjs, for a thing on the ground or a car (see ItemModels.getFar) */
+  lods: { url: string; tris: number; far?: number }[];
   /** a gun out of a weapon pack: where the two wrists of whoever holds it are, in the model's own space */
   holds?: { right: [number, number, number]; left: [number, number, number] };
   /** a weapon pack whole (arms, gun and its movements): see src/game/rig.ts */
