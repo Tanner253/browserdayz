@@ -1023,6 +1023,7 @@ export class Game {
         where: () => this.player.pos,
         send: (m) => this.net.send(m),
         ready: (o) => r.ready(o),
+        playing: () => this.input.locked || this.input.touch,
       });
       // a rifle with a sight on it, and more rounds than the range lets anybody fire
       if (this.use) this.breakOff();

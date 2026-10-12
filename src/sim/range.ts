@@ -142,8 +142,9 @@ function laid(seed: number, turn: number): RangeSpec {
     [lanes[i], lanes[j]] = [lanes[j], lanes[i]];
   }
   const figures: Figure[] = lanes.map((z) => ({ x: (r() - 0.5) * 12, z, reach: 1.4 + r() * 2.2, secs: 3 + r() * 2.6, start: r() }));
-  // (three of the four are asked for: one that walks where it is awkward to get at may be left)
-  return { seed, turn, cover, figures, need: 3, secs: 40 };
+  // (All of them, in half a minute. 2026-10-12, an hour after it went in asking for three in forty seconds: "the
+  // user has 30 seconds to kill all the bots".)
+  return { seed, turn, cover, figures, need: figures.length, secs: 30 };
 }
 
 /**
@@ -173,8 +174,8 @@ const plain = (seed: number): RangeSpec => ({
   turn: TRIES,
   cover: [{ x: 0, z: -8, w: 5, d: 0.6, h: 2.5 }, { x: -6.5, z: -9, w: 4, d: 0.6, h: 2.5 }, { x: 6.5, z: -7, w: 4, d: 0.6, h: 2.5 }],
   figures: [{ x: 0, z: -16.5, reach: 1.6, secs: 4, start: 0 }, { x: -9, z: -13.5, reach: 1.5, secs: 3.5, start: 0.3 }, { x: 9, z: -19.5, reach: 1.5, secs: 4.4, start: 0.6 }, { x: 0, z: -22.5, reach: 1.4, secs: 5, start: 0.1 }],
-  need: 3,
-  secs: 40,
+  need: 4,
+  secs: 30,
 });
 
 /**
@@ -300,6 +301,18 @@ export class RangeJudge {
     // the sights. And no hand goes round faster than four turns a second.)
     if (travel < 0.01) return (this.why = 'the aim stood dead still before it', -1);
     if (most > 25) return (this.why = 'the aim came round faster than a hand can', -1);
+    // ---- and were the sights ON it? (2026-10-12, the first hour: "they did not have to kill all the bots, they
+    // just moved left and right and it passed". Whatever landed was counted, so a rifle held down and swept
+    // along the range brought figures down by the dozen rounds. A shot is somebody's who had the figure in
+    // their sights when they fired: for the tenth of a second and more before it, each time the game told
+    // where they were looking, the look passed within the width of a doorway of where the figure then was.)
+    // (On a machine that draws slowly less is told in that time: then it is the last three tellings, however long ago.)
+    const near = before.filter((s) => s.ms >= ms - 170), held = near.length >= 3 ? near : before.slice(-3);
+    for (const s of held) {
+      const p = figureAt(this.spec.figures[hit], s.ms), l = lookOf(s.yaw, s.pitch), flat = l[0] * l[0] + l[2] * l[2];
+      const t = flat > 1e-9 ? ((p.x - s.x) * l[0] + (p.z - s.z) * l[2]) / flat : -1;
+      if (t <= 0 || Math.hypot(s.x + l[0] * t - p.x, s.z + l[2] * t - p.z) > 0.8) return (this.why = 'the sights were not on it before it was fired', -1);
+    }
     this.down.add(hit);
     this.lastDown = ms;
     return hit;
@@ -317,6 +330,7 @@ export class RangeJudge {
 
   /** over, and not passed: the time is up, too much was said that could not be so, or more was fired than anybody fires */
   failed(now: number) {
-    return !this.passed && (now > this.spec.secs * 1000 + 1500 || this.wrong >= 3 || this.shots > 130);
+    // (and nobody who is aiming fires four magazines in half a minute)
+    return !this.passed && (now > this.spec.secs * 1000 + 1500 || this.wrong >= 3 || this.shots > 120);
   }
 }

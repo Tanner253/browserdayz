@@ -60,7 +60,7 @@ const play = (spec: RangeSpec, judge: RangeJudge, how: { walk?: boolean; follow?
     assert.ok(judge.passed, `range ${seed}: somebody who walked, looked and shot did not pass (${judge.down.size} of ${spec.need} down, last: ${judge.why || 'no reason'}, wrong ${judge.wrong})`);
     slowest = Math.max(slowest, took);
   }
-  assert.ok(slowest < 40_000, `the slowest of them took ${(slowest / 1000).toFixed(0)} s`);
+  assert.ok(slowest < 26_000, `the slowest of them took ${(slowest / 1000).toFixed(0)} s of the thirty there are`);
   ok(`two hundred ranges played by walking, turning, following and firing: all passed (the slowest in ${(slowest / 1000).toFixed(0)} s)`);
 }
 
@@ -121,6 +121,25 @@ const play = (spec: RangeSpec, judge: RangeJudge, how: { walk?: boolean; follow?
     });
     assert.equal(judge.down.size, 0, 'a figure was counted down before anybody could have seen it');
   }
+  // a rifle held down and swept along the range, by somebody walking to and fro: twenty ranges of it
+  {
+    let most = 0;
+    for (let seed = 1; seed <= 20; seed++) {
+      const swept = rangeOf(seed * 99991 + 3), judge = new RangeJudge(swept);
+      let lastShot = 0;
+      for (let ms = 0; ms < swept.secs * 1000; ms += 50) {
+        const x = Math.sin(ms / 2600) * 8, yaw = Math.sin(ms / 700) * 0.7, pitch = -0.02;
+        judge.seen(ms, x, 3, yaw, pitch, ms + 40);
+        if (ms > 800 && ms - lastShot >= 100) {
+          lastShot = ms;
+          judge.shot(ms + 1, [x, EYE, 3], lookOf(yaw, pitch), ms + 45);
+        }
+      }
+      most = Math.max(most, judge.down.size);
+      assert.ok(!judge.passed, `range ${seed}: a rifle swept along the range passed it (${judge.report})`);
+    }
+    assert.ok(most <= 1, `a rifle swept along the range brought ${most} figures down in one go`);
+  }
   // a time from the future, three times: the go is over
   {
     const judge = new RangeJudge(spec);
@@ -129,7 +148,7 @@ const play = (spec: RangeSpec, judge: RangeJudge, how: { walk?: boolean; follow?
   }
   // and time itself: nobody passes by waiting
   assert.ok(new RangeJudge(spec).failed(spec.secs * 1000 + 2000));
-  ok('not passed: shots with no player behind them, shots through the cover, a leap from place to place, an aim that never moved, everything at once');
+  ok('not passed: shots with no player behind them, shots through the cover, a leap from place to place, an aim that never moved, everything at once, a rifle swept along the range');
 }
 
 console.log(`\n${checks} checks passed`);

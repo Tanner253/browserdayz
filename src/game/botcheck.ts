@@ -118,6 +118,8 @@ export interface BotCheckHost {
   send(m: C2S): void;
   /** a thing made ready to be drawn before it is shown (Renderer.ready) */
   ready(o: THREE.Object3D): Promise<void>;
+  /** the player has their hands on the game: the mouse is taken, or it is a touch screen */
+  playing(): boolean;
 }
 
 export class BotCheck {
@@ -244,6 +246,9 @@ export class BotCheck {
     // (The go's clock starts when the range stands and the figures are on it, and the server is told so: on a
     // slow machine that is some seconds, which were coming off the forty. Not waited for longer than twelve.)
     await Promise.race([Promise.all(made), new Promise((r) => setTimeout(r, 12_000))]);
+    // (nor before the player has their hands on the game: the check before this one took the mouse from them, and
+    // a click gives it back. Not waited for longer than six seconds more.)
+    for (let k = 0; k < 60 && this.active && !this.h.playing(); k++) await new Promise((r) => setTimeout(r, 100));
     if (!this.active || !this.spec || this.spec.seed !== seed || this.go !== go) return;
     this.t0 = performance.now();
     this.begun = true;
@@ -305,9 +310,10 @@ export class BotCheck {
         'color:#f3efe6;font-family:"Barlow Condensed","Arial Narrow",sans-serif;text-transform:uppercase;letter-spacing:0.1em;';
       ui.appendChild(this.sign);
     }
-    const need = this.spec?.need ?? 3, left = Math.max(0, Math.ceil((this.spec?.secs ?? 40) - this.ms / 1000));
-    const head = done ? 'Bot check passed' : !this.begun ? 'Bot check · setting up the range' : `Bot check · ${this.fell.size} of ${need} down · ${left} s`;
-    const sub = done ? 'Going in.' : this.go > 1 ? `Not passed. A new range: go ${this.go} of 4. Bring down ${need} of the figures that walk behind the walls: move along the line to find them.` : `Bring down ${need} of the figures that walk behind the walls. Move along the line to find them.`;
+    const need = this.spec?.need ?? 4, left = Math.max(0, Math.ceil((this.spec?.secs ?? 30) - this.ms / 1000));
+    const head = done ? 'Bot check passed' : !this.begun ? (this.h.playing() ? 'Bot check · setting up the range' : 'Bot check · click to begin') : `Bot check · ${this.fell.size} of ${need} down · ${left} s`;
+    const how = `Bring down all ${need} figures that walk behind the walls. Move along the line to find them, and hold your sights on each before you fire.`;
+    const sub = done ? 'Going in.' : this.go > 1 ? `Not passed. A new range: go ${this.go} of 4. ${how}` : how;
     const html = `<div style="font-size:24px;font-weight:700;color:${done ? '#9fe08a' : '#ffd35a'}">${head}</div><div style="margin-top:4px;font-size:15px;font-weight:500;color:#d8cfb8;letter-spacing:0.06em">${sub}</div>`;
     if (this.sign.dataset.said !== html) {
       this.sign.dataset.said = html;
