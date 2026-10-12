@@ -248,6 +248,8 @@ const BOOK = 'ledger/book.json';
 const ROWS_KEPT = 500;
 const emptyBook = (): Book => ({ v: 1, since: null, rows: [], tags: 0, paid: 0, paidLamports: 0, claims: [], claimedLamports: 0, claimNote: '' });
 const open = (r: Row) => r.state === 'sending' || r.state === 'waiting';
+/** taken in, and kept waiting by this machine: for room under the day's limits, or for the treasury to fill */
+const owed = (r: Row | undefined) => r?.state === 'waiting' && (r.hold === 'day' || r.hold === 'funds');
 
 /** (rows written before a tag had a reference carried its id: they are given their reference, and the id is dropped) */
 function tidy(book: Book): Book {
@@ -544,7 +546,10 @@ async function settle(w: World, t: Tag, at: { held: Held }): Promise<Outcome> {
     if (tries.length >= MAX_TRIES) return { state: 'waiting', why: `${MAX_TRIES} attempts did not go through: this one needs looking at`, hold: 'hand' };
   } else {
     // --- whether it is to be paid at all (asked afresh each time until its first attempt)
-    if (!(now - Date.parse(t.at) < MAX_AGE_MS)) return { state: 'skipped', why: 'cashed in more than three days ago' };
+    // (too old is said of a tag that comes late. One the book has had waiting, for room under the day's limits or
+    // for the treasury to fill, came in time: the wait since is this machine's own, and is not counted against it.
+    // Before 2026-10-12 it was, and a wallet with more tags than three days of its limit lost the rest.)
+    if (!owed(had) && !(now - Date.parse(t.at) < MAX_AGE_MS)) return { state: 'skipped', why: 'cashed in more than three days ago' };
     const since = at.held.book.since;
     if (since && Date.parse(t.at) < Date.parse(since)) return { state: 'skipped', why: 'cashed in before automatic payouts began' };
     const wrong = await setup(w);
@@ -772,7 +777,7 @@ export async function sweep(w: World, limit = 200): Promise<{ tried: number; pai
   if (w.cfg.mode !== 'off') {
     const waiting: Row[] = [];
     const glanced = await glanceBook(w.store);
-    for (const r of glanced.rows) if (open(r) && w.now() - Date.parse(r.at) < MAX_AGE_MS + 24 * 3600 * 1000 && (await due(w, r, glanced))) waiting.push(r);
+    for (const r of glanced.rows) if (open(r) && (owed(r) || w.now() - Date.parse(r.at) < MAX_AGE_MS + 24 * 3600 * 1000) && (await due(w, r, glanced))) waiting.push(r);
     if (waiting.length) {
       const held = await freshBook(w.store);
       const began = w.now();

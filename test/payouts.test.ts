@@ -258,6 +258,29 @@ await test('one wallet, so many tags a day', async () => {
   assert.equal((await readBook(w.store)).rows.filter((r) => r.wallet === wallet(12) && r.state === 'paid').length, 4);
 });
 
+await test('a tag kept waiting by the day\'s limits is not too old when its turn comes', async () => {
+  // fourteen tags to one wallet in an hour: three a day, so the last of them waits four days
+  const w = world(5);
+  const all: Entry[] = [];
+  for (let i = 0; i < 14; i++) {
+    all.push(tag(w, 14));
+    await handle(w, all[i]);
+  }
+  for (let d = 0; d < 5; d++) {
+    w.skip(24 * 3600 * 1000);
+    await sweep(w);
+  }
+  const rows = (await readBook(w.store)).rows.filter((r) => r.wallet === wallet(14));
+  assert.deepEqual([rows.length, rows.filter((r) => r.state === 'paid').length, rows.filter((r) => r.state === 'skipped').length], [14, 14, 0]);
+  // and never more than three of them on one day
+  const days = new Map<string, number>();
+  for (const r of rows) days.set(r.day!, (days.get(r.day!) ?? 0) + 1);
+  assert.ok([...days.values()].every((n) => n <= 3));
+  // one that comes four days late is still refused
+  const late = await handle(w, tag(w, 15, { at: new Date(w.now() - 4 * 24 * 3600 * 1000).toISOString() }));
+  assert.equal(late.state, 'skipped');
+});
+
 await test('no more than three quarters of the treasury in a day', async () => {
   const w = world(0.21);
   const states: string[] = [];
