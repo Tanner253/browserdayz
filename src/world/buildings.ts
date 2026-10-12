@@ -14,7 +14,7 @@ import { GAS, gasDepth, gasZone } from '../sim/gas';
 import type { Tier } from '../sim/tiers';
 import { BUILDING_FOOTPRINT, CELL, TOWN, WORLD_RES, WORLD_SIZE, bunkerPlace, heightAt, idx, type BuildingPlot, type Instance, type SiteKind, type World } from './worldgen';
 import { bunkerAt, bunkerPlan, levelY } from '../sim/bunker';
-import { hospitalLobbyPlan, hospitalPlan, hospitalWingPlan, policeCellsPlan, policeGaragePlan, policeHqPlan } from './big-buildings';
+import { flatsPlan, hospitalLobbyPlan, hospitalPlan, hospitalWingPlan, policeCellsPlan, policeGaragePlan, policeHqPlan } from './big-buildings';
 
 /** (`Gas` is not a kind of building: it is whatever stands under the gas, whatever else it is. See src/sim/gas.ts.) */
 export type Usage = 'Village' | 'Town' | 'Farm' | 'Industrial' | 'Military' | 'Hunting' | 'Medic' | 'Police' | 'Shop' | 'Gas' | 'Bunker' | 'East';
@@ -684,6 +684,9 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
         loot: [[2.3, 0.48, -0.9], [-1.5, 0.57, 0.7], [-1.5, 0.57, 1.3], [0.6, 0.56, -2.0], [0.6, 1.02, -2.0], [-2.4, 0.02, -1.75]],
         usage: ['Hunting'],
       };
+    case 'flats':
+      // (a block of four flats: see flatsPlan)
+      return flatsPlan(ext, rng.chance(0.6) ? 'roof_tiles' : 'roof_iron', rng.chance(0.5) ? 'floor_wood' : 'floor_lino');
     case 'hospital':
       return hospitalPlan();
     case 'hospital_wing':
@@ -1342,6 +1345,8 @@ export class Buildings {
     });
     // and what stands in the grounds of the two big buildings: after every other thing, so that none is renumbered
     this.planGrounds();
+    // (and the fences of the village's back yards: shapes only, after everything)
+    this.planYards();
   }
 
   /**
@@ -1501,12 +1506,11 @@ export class Buildings {
         stand('street_lamp_01', 4.1, 19.5, Q);
         stand('concrete_road_barrier', -1.9, 23.6, 0.12);
         stand('concrete_road_barrier', 1.9, 27.2, -0.1);
-        // what was driven: one left in the yard, one half out of the garage
-        stand('covered_car', 3.4, 15.2, -0.08);
+        // what was driven: one left half out of the garage
         stand('covered_car', 12.3, 20.9, 0.05);
         stand('hospital_bench', 3.2, 6.93, 0);
         stand('barrel_03', 9.7, 19.15, 0.3);
-        stand('old_tyre', 14.3, 19.5, 0.8, { up: 0.08, far: 110 });
+        stand('old_tyre', 9.4, 22.6, 0.8, { up: 0.08, far: 110 });
         // behind: drums, tyres, what was thrown out of the back door
         stand('barrel_03', -16.6, -9.7, 0);
         stand('barrel_03', -15.8, -10.2, 1.3);
@@ -1517,6 +1521,80 @@ export class Buildings {
         stand('trashbag', 2.4, -8.2, 1.8, { far: 110 });
         stand('metal_trash_can@1', -2.0, -7.3, 0);
       }
+    }
+  }
+
+  /**
+   * A yard behind each house of the village, with a fence round it (2026-10-12: "make some fences yard behind
+   * them etc. we dont have vault yet so we need to make sure the player can jump over backyard fences"). A jump
+   * lifts the feet 0.73 m: the fence is 0.62 m to the top of its top board, three boards on posts, and is jumped.
+   * Down both sides of the yard from the house's back corners and across the back, a panel every two metres or so,
+   * each stood on the ground where it is; a way through left in the back, and a panel gone here and there. No
+   * panel where anything is: another building, a street, a tree, a thing lying about, another yard's fence, or
+   * ground that falls away under it. Nothing is added to what stands in the world, so nothing is renumbered.
+   */
+  private planYards() {
+    const H = this.world.heights, village = this.world.pois[0], UP = new THREE.Vector3(0, 1, 0), ONE = new THREE.Vector3(1, 1, 1);
+    const TOP = 0.62, tile = this.tile('planks');
+    const roads = [this.world.road, ...this.world.roads];
+    const offRoad = (x: number, z: number) => {
+      let best = 1e9;
+      for (const r of roads) {
+        const p = r.points;
+        for (let i = 0; i + 5 < p.length; i += 3) {
+          const ax = p[i], az = p[i + 2], dx = p[i + 3] - ax, dz = p[i + 5] - az;
+          if (Math.abs(ax - x) > 60 || Math.abs(az - z) > 60) continue;
+          const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz || 1)));
+          best = Math.min(best, Math.hypot(x - ax - dx * t, z - az - dz * t) - r.width / 2);
+        }
+      }
+      return best;
+    };
+    const inBuilding = (x: number, z: number, but: BuildingPlot, margin: number) =>
+      this.world.buildings.some((o) => {
+        if (o === but) return false;
+        const [w, d] = BUILDING_FOOTPRINT[o.type], dx = x - o.x, dz = z - o.z, c = Math.cos(o.rot), s = Math.sin(o.rot);
+        return Math.abs(dx * c - dz * s) < w / 2 + margin && Math.abs(dx * s + dz * c) < d / 2 + margin;
+      });
+    const lying = this.world.props.filter((q) => !q.far);
+    const laid: [number, number][] = [];
+    /** the yards fenced so far: no later yard's fence is run through one of them */
+    const yards: { plot: BuildingPlot; x0: number; x1: number; z0: number; z1: number }[] = [];
+    const inYard = (x: number, z: number) =>
+      yards.some((y) => {
+        const dx = x - y.plot.x, dz = z - y.plot.z, c = Math.cos(y.plot.rot), s = Math.sin(y.plot.rot), lx = dx * c - dz * s, lz = dx * s + dz * c;
+        return lx > y.x0 + 0.4 && lx < y.x1 - 0.4 && lz > y.z0 + 0.4 && lz < y.z1 - 0.4;
+      });
+    for (const plot of this.world.buildings) {
+      if (!['house_small', 'house_brick', 'house_two', 'flats'].includes(plot.type) || Math.hypot(plot.x - village.x, plot.z - village.z) > 175) continue;
+      const [w, d] = BUILDING_FOOTPRINT[plot.type], c = Math.cos(plot.rot), s = Math.sin(plot.rot), dice = new RNG(plot.seed ^ 0x9a2d);
+      const out = (lx: number, lz: number): [number, number] => [plot.x + lx * c + lz * s, plot.z - lx * s + lz * c];
+      const deep = plot.type === 'flats' ? 9 : 7 + Math.floor(dice.next() * 3), x0 = -w / 2 - 1.0, x1 = w / 2 + 1.0, zb = -d / 2 - deep;
+      // (down one side, across the back, up the other)
+      const runs: [number, number, number, number, boolean][] = [[x0, -d / 2 + 0.5, x0, zb, false], [x0, zb, x1, zb, true], [x1, zb, x1, -d / 2 + 0.5, false]];
+      for (const [ax, az, bx, bz, back] of runs) {
+        const len = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.round(len / 2.1)), L = len / n, dx = (bx - ax) / len, dz = (bz - az) / len;
+        const gate = back ? Math.floor(n / 2) : -1;
+        for (let k = 0; k < n; k++) {
+          // (its dice are thrown whether or not it is stood, so that one panel's fate is not another's)
+          const gone = dice.next() < 0.08;
+          if (k === gate || gone) continue;
+          const [sx, sz] = out(ax + dx * L * k, az + dz * L * k), [ex, ez] = out(ax + dx * L * (k + 1), az + dz * L * (k + 1)), mx = (sx + ex) / 2, mz = (sz + ez) / 2;
+          const ya = heightAt(H, sx, sz), yb = heightAt(H, ex, ez);
+          if (Math.abs(ya - yb) > 0.45) continue;
+          if ([[sx, sz], [mx, mz], [ex, ez]].some(([x, z]) => inBuilding(x, z, plot, 0.5) || offRoad(x, z) < 0.9)) continue;
+          if (lying.some((q) => Math.hypot(q.x - mx, q.z - mz) < 0.95) || this.world.trees.some((q) => Math.hypot(q.x - mx, q.z - mz) < 1.2)) continue;
+          if (laid.some(([x, z]) => Math.hypot(x - mx, z - mz) < 1.0) || inYard(mx, mz)) continue;
+          laid.push([mx, mz]);
+          // a frame at its first end: x along it, the ground under its lower end
+          const turn = plot.rot + Math.atan2(-dz, dx);
+          const F = new THREE.Matrix4().compose(new THREE.Vector3(sx, Math.min(ya, yb) - 0.04, sz), new THREE.Quaternion().setFromAxisAngle(UP, turn), ONE);
+          for (const px of [0, L]) this.push('planks', boxGeo(px - 0.035, px + 0.035, 0, TOP + 0.1, -0.035, 0.035, tile, F));
+          for (const [y0, y1] of [[0.16, 0.27], [0.34, 0.45], [0.52, TOP + 0.04]]) this.push('planks', boxGeo(0.02, L - 0.02, y0, y1, 0.036, 0.058, tile, F));
+          this.collider(L / 2, (TOP + 0.04) / 2, 0.045, F.clone().multiply(new THREE.Matrix4().makeTranslation(L / 2, (TOP + 0.04) / 2, 0.01)), 'wood');
+        }
+      }
+      yards.push({ plot, x0, x1, z0: zb, z1: -d / 2 });
     }
   }
 
@@ -2353,7 +2431,16 @@ export class Buildings {
       placed.push(p);
       let kind = rng.pick(yard);
       // one can per placement (the source file has a clean and a rusty one)
-      if (kind === 'metal_trash_can') kind += rng.chance(0.5) ? '@0' : '@1';
+      if (kind === 'metal_trash_can') {
+        kind += rng.chance(0.5) ? '@0' : '@1';
+        // (The cans are a pair, 1.8 m from end to end, and are turned any way: stood half a metre from a wall, one
+        // of them was in it. They stand a full metre off, on the side they were on. No dice are thrown for this.)
+        if (side === 0) lz = Math.min(lz, -hd - 1.05);
+        else if (side === 1) lx = Math.min(lx, -hw - 1.05);
+        else if (side === 2) lx = Math.max(lx, hw + 1.05);
+        else lz = Math.max(lz, hd + 1.05);
+        p.set(lx, 0, lz).applyMatrix4(B);
+      }
       const gy = heightAt(this.world.heights, p.x, p.z) + (kind === 'old_tyre' ? 0.08 : 0);
       this.world.props.push({ kind, x: p.x, y: gy, z: p.z, rot: rng.range(0, Math.PI * 2), scale: 1 });
       if (kind === 'barrel_03') {

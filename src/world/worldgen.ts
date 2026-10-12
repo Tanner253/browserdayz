@@ -227,11 +227,38 @@ export const VILLAGE_STREETS = {
     ['shanty_78', 'middleW', 54, 4],
     ['barn_20', 'middleE', 42, 6],
   ] as [string, string, number, number][],
+  /**
+   * More of them (2026-10-12: "looking at the village from the sky i think we could fit more house and buildings on
+   * the street, especially around the cross streets. perhaps we need a new residential building"; and, on a picture
+   * of the village with four places ringed: "i feel like we could fit some new buildings in the green circles":
+   * the head of the middle street, the ground east of it behind the sheds, the west side of the west street, and
+   * the foot of the west street). New buildings, each after every other in the list: [what, on what, how far
+   * along, how far its front is from the edge]. <street>Head and <street>Foot: across the north end of a side
+   * street or its south end, looking back down it (the last number is how far beyond its end). Three blocks of
+   * flats (the new kind), and houses in the gaps of the road and of both side streets.
+   */
+  more: [
+    ['house_brick', 'N', -65, 7],
+    ['house_two', 'N', 63, 7],
+    ['house_brick', 'S', 110, 7],
+    // the west street: its west side, and across its foot
+    ['flats', 'westW', 31, 5],
+    ['house_small', 'westW', 52, 5],
+    ['house_two', 'westFoot', 0, 6.5],
+    // the middle street north of the road: between the sheds, one set back behind them, and across its head
+    ['house_small', 'middleE', -35.5, 5],
+    ['house_two', 'middleE', -56, 5],
+    ['house_brick', 'middleE', -30, 14],
+    ['flats', 'middleHead', 0, 6.5],
+    // and south of it
+    ['house_small', 'middleE', 26, 5],
+    ['flats', 'middleE', 57, 5],
+  ] as [BuildingType, string, number, number][],
 };
 /** the village's second clinic and second shop: how far out along its street from its middle they are looked for a place (metres: no nearer, no farther, and where first) */
 export const SERVICES = { from: 68, to: 116, out: 90 };
 
-export type BuildingType = 'house_small' | 'house_brick' | 'barn' | 'shed' | 'cabin' | 'guardpost' | 'police' | 'clinic' | 'store' | 'barracks' | 'garage' | 'house_two' | 'tower' | 'hut' | 'townhouse' | 'shanty' | 'tent' | 'hospital' | 'police_hq' | 'hospital_wing' | 'hospital_lobby' | 'police_cells' | 'police_garage';
+export type BuildingType = 'house_small' | 'house_brick' | 'barn' | 'shed' | 'cabin' | 'guardpost' | 'police' | 'clinic' | 'store' | 'barracks' | 'garage' | 'house_two' | 'tower' | 'hut' | 'townhouse' | 'shanty' | 'tent' | 'hospital' | 'police_hq' | 'hospital_wing' | 'hospital_lobby' | 'police_cells' | 'police_garage' | 'flats';
 
 /** footprint (x = width, z = depth) in metres, used for terrain pads + spacing */
 export const BUILDING_FOOTPRINT: Record<BuildingType, [number, number]> = {
@@ -263,6 +290,8 @@ export const BUILDING_FOOTPRINT: Record<BuildingType, [number, number]> = {
   police_cells: [10.2, 12],
   police_garage: [10.2, 12],
   police_hq: [30, 13],
+  // (2026-10-12: a block of four flats, the village's new kind of house: see flatsPlan in big-buildings.ts)
+  flats: [13, 8.6],
 };
 
 export interface BuildingPlot {
@@ -2038,13 +2067,23 @@ export function generateWorld(seed = WORLD_SEED): World {
       b.rot = side ? Math.atan2(fz, -fx) : Math.atan2(fx, fz);
       moved.push(b);
     };
-    for (const [id, on, along, back] of VILLAGE_STREETS.plots) {
-      const b = buildings.find((q) => q.id === id);
+    const built = VILLAGE_STREETS.more.map(([type]): BuildingPlot => {
+      const b: BuildingPlot = { id: `${type}_${buildings.length}`, type, x: 0, z: 0, rot: 0, floorY: 0, seed: Math.floor(rng7.next() * 1e9) };
+      buildings.push(b);
+      return b;
+    });
+    for (const [k, [id, on, along, back]] of [...VILLAGE_STREETS.plots, ...VILLAGE_STREETS.more].entries()) {
+      const b = k < VILLAGE_STREETS.plots.length ? buildings.find((q) => q.id === id) : built[k - VILLAGE_STREETS.plots.length];
       if (!b) throw new Error(`the village's plan names ${id}, and there is no such building`);
       if (on === 'N' || on === 'S') {
         const p = at(along), k = on === 'S' ? 1 : -1;
         // (its front looks back at the road)
         stand(b, p.x - p.tz * k * (ROAD_W / 2), p.z + p.tx * k * (ROAD_W / 2), p.tz * k, -p.tx * k, back, p.y);
+      } else if (on.endsWith('Head') || on.endsWith('Foot')) {
+        // (across the end of a side street, its front to the street: as the headquarters stands at the middle one's foot)
+        const name = on.slice(0, -4), f = frames.get(name)!, st = VILLAGE_STREETS.streets[name], k = on.endsWith('Foot') ? 1 : -1;
+        const end = k > 0 ? st.south : -st.north, t = end + k * back;
+        stand(b, f.x + f.dx * t, f.z + f.dz * t, -f.dx * k, -f.dz * k, 0, laneH[cellOf(f.x + f.dx * end, f.z + f.dz * end)]);
       } else {
         const f = frames.get(on.slice(0, -1))!, k = on.endsWith('E') ? 1 : -1;
         stand(b, f.x + f.dx * along + f.ex * k * (LANE / 2), f.z + f.dz * along + f.ez * k * (LANE / 2), -f.ex * k, -f.ez * k, back, laneH[cellOf(f.x + f.dx * along, f.z + f.dz * along)]);

@@ -15,7 +15,7 @@
 // x is along the building (its long side), z across it; the front, with the main door, is +z. Heights are from
 // the floor a thing stands on.
 
-import type { Blueprint, Deck, Fitting, Furn, Level, Opening, WallDef } from './buildings';
+import type { Blueprint, Deck, Fitting, Furn, Level, MatKey, Opening, WallDef } from './buildings';
 
 const win = (a: number, b: number, bottom = 0.9, top = 2.05): Opening => ({ a, b, bottom, top, kind: 'window' });
 const door = (a: number, b: number, top = 2.1): Opening => ({ a, b, bottom: 0, top, kind: 'door' });
@@ -891,5 +891,82 @@ export function policeGaragePlan(): Blueprint {
       piers: { front: [-4.88, -0.2, 4.88], left: [-2.2, 1.75, 5.78], right: [2.6, 5.78], w: 0.4, key: 'trim_white' },
     },
     usage: ['Police'],
+  };
+}
+
+// ------------------------------------------------------------------------------------------------ a block of four flats
+
+/**
+ * A block of four flats (2026-10-12: "we could fit more house and buildings on the street, especially around the
+ * cross streets. perhaps we need a new residential building"): what a village of that country built when it built
+ * for more than one family. Two floors under one roof; a hall in the middle with the door to the street and the
+ * stair up its left wall; a flat either side of the hall on each floor, two rooms each (the one you come into,
+ * and a kitchen or a bedroom behind a door). Eight rooms and a stair: more to go through, and more to be met in,
+ * than any house in the village.
+ *
+ * x along its front (-6.5 to 6.5), z from its back (-4.3) to its front (4.3), where the door is.
+ */
+export function flatsPlan(ext: MatKey, roof: MatKey, floor: MatKey): Blueprint {
+  const FW = 6.5, FD = 4.3, x0 = -FW + 0.2, x1 = FW - 0.2, z0 = -FD + 0.2, z1 = FD - 0.2;
+  // the hall's two walls (their middles)
+  const HL = -1.6, HR = 1.6;
+  const w2 = (a: number): Opening => win(a, a + 1.1);
+  const front = [w2(-5.1), w2(-3.2), w2(2.1), w2(4.0)], back = [w2(-5.1), w2(-3.2), w2(-0.3), w2(2.1), w2(4.0)];
+  const ends = [win(-2.6, -1.5), win(1.5, 2.6)];
+
+  // ---------------------------------------------------------------- below
+  const g = new Floor();
+  // the flat on the left: the room you come into, with a bed in it
+  g.bed(-5.75, 2.0, 0).case('wooden_bookshelf_worn', -3.4, 0.42, 0, [0.67, 1.28]).top('WoodenTable_01', -3.9, 3.45, 0, 0.57, 2).put('painted_wooden_chair_01', -3.6, 2.8, 0).floor([-2.4, 1.6]);
+  // its kitchen
+  g.top('electric_stove', -5.9, -3.77, 0, 0.88).top('painted_wooden_cabinet', -2.5, -3.79, 0, 1.2).top('WoodenTable_01', -4.3, -1.7, 0, 0.57).put('painted_wooden_chair_01', -4.0, -1.05, PI).put('painted_wooden_chair_01', -4.7, -2.35, 0.2).case('Shelf_01', -6.17, -0.75, Q, [0.94, 1.51]).floor([-2.6, -1.4]);
+  // the flat on the right
+  g.bed(5.75, 2.0, 0).top('painted_wooden_cabinet', 3.4, 0.44, 0, 1.2).put('Television_01', 3.4, 0.46, 0.15, 1.18).put('painted_wooden_chair_01', 3.3, 2.2, PI + 0.3).case('Shelf_01', 1.85, 3.0, Q, [0.66, 1.22]).floor([2.6, 3.0]);
+  g.top('electric_stove', 5.9, -3.77, 0, 0.88).top('WoodenTable_01', 4.1, -1.9, Q, 0.57, 2).put('painted_wooden_chair_01', 3.4, -1.9, Q).put('painted_wooden_chair_01', 4.8, -2.1, -Q).case('wooden_bookshelf_worn', 1.99, -2.3, Q, [0.67, 1.28]).case('Shelf_01', 6.17, -0.75, -Q, [0.94]).floor([2.6, -0.9]);
+  // the hall
+  g.floor([0.6, 3.2], [0.8, -3.2]);
+
+  const below: WallDef[] = [
+    { side: 'front', ext, int: 'int_painted', openings: [front[0], front[1], door(-0.5, 0.5), front[2], front[3]] },
+    { side: 'back', ext, int: 'int_painted', openings: [back[0], back[1], back[3], back[4]] },
+    { side: 'left', ext, int: 'int_painted', openings: ends },
+    { side: 'right', ext, int: 'int_painted', openings: ends },
+    // the hall's walls: the left flat's door is before the foot of the stair, which goes up that wall
+    inner([HL, z0], [HL, z1], [door(3.0, 3.9)], 'int_painted', 'int_plaster'),
+    inner([HR, z0], [HR, z1], [door(0.4, 1.3)], 'int_plaster', 'int_painted'),
+    // each flat's two rooms
+    inner([x0, 0], [HL - 0.1, 0], [door(-5.5, -4.6)], 'int_painted', 'int_painted'),
+    inner([HR + 0.1, 0], [x1, 0], [door(4.6, 5.5)], 'int_painted', 'int_painted'),
+  ];
+
+  // ---------------------------------------------------------------- above
+  const u = new Floor();
+  // (left: its door is at the back of the landing, into the back room: a bedroom there, and the room on the street beyond)
+  u.bed(-5.75, -2.2, 0).top('painted_wooden_cabinet', -2.5, -0.44, PI, 1.2).case('Shelf_01', -6.17, -0.7, Q, [0.94, 1.51]).floor([-3.6, -2.4]);
+  u.top('metal_office_desk', -3.9, 3.6, PI, 0.81, 2).put('SchoolChair_01', -3.9, 2.75, 0).case('wooden_bookshelf_worn', -1.99, 1.4, -Q, [0.67, 1.28]).bed(-5.75, 2.1, 0, false).floor([-3.2, 1.2]);
+  // (right)
+  u.bed(5.75, 2.0, 0).top('WoodenTable_01', 3.6, 3.5, 0, 0.57).put('painted_wooden_chair_01', 3.3, 2.85, 0.1).case('wooden_bookshelf_worn', 3.15, 0.42, 0, [0.67, 1.28]).floor([2.6, 2.0]);
+  u.bed(5.75, -2.5, 0, false).top('painted_wooden_cabinet', 2.4, -3.79, 0, 1.2).top('electric_stove', 4.7, -3.77, 0, 0.88).case('Shelf_01', 6.17, -0.7, -Q, [0.94, 1.51]).floor([3.4, -1.6]);
+  u.floor([0.6, 0.4], [0.2, -3.3]);
+
+  const above: WallDef[] = [
+    { side: 'front', ext, int: 'int_painted', openings: [front[0], front[1], w2(-0.55), front[2], front[3]] },
+    { side: 'back', ext, int: 'int_painted', openings: back },
+    { side: 'left', ext, int: 'int_painted', openings: ends },
+    { side: 'right', ext, int: 'int_painted', openings: ends },
+    // (the left flat's door is past the head of the stair, at the back of the landing)
+    inner([HL, z0], [HL, z1], [door(-3.9, -3.0)], 'int_painted', 'int_plaster'),
+    inner([HR, z0], [HR, z1], [door(0.4, 1.3)], 'int_plaster', 'int_painted'),
+    inner([x0, 0], [HL - 0.1, 0], [door(-4.4, -3.5)], 'int_painted', 'int_painted'),
+    inner([HR + 0.1, 0], [x1, 0], [door(4.6, 5.5)], 'int_painted', 'int_painted'),
+  ];
+
+  return {
+    w: FW * 2, d: FD * 2, h: 2.8, ext, int: 'int_painted', floor, roof, roofType: 'gable',
+    walls: below, furniture: g.furniture, loot: g.loot,
+    // (up the hall's left wall, from just inside the door to the back)
+    stairs: { x0: HL + 0.1, x1: -0.45, foot: 2.3, top: -2.5 },
+    upper: { h: 2.6, int: 'int_painted', floor: 'floor_wood', walls: above, furniture: u.furniture, loot: u.loot },
+    usage: ['Town', 'Village'],
   };
 }
