@@ -76,7 +76,8 @@ const TOP_SURFACE = new Set(['WoodenTable_01', 'painted_wooden_table', 'electric
 export type MatKey =
   | 'plaster_ext' | 'brick_ext' | 'planks_ext' | 'planks' | 'int_plaster' | 'int_painted'
   | 'floor_wood' | 'floor_lino' | 'floor_concrete' | 'roof_iron' | 'roof_tiles' | 'concrete' | 'trim' | 'mattress' | 'glass'
-  | 'ceiling' | 'ward_wall' | 'office_wall' | 'tile_wall' | 'steel' | 'bitumen' | 'cell_wall';
+  | 'ceiling' | 'ward_wall' | 'office_wall' | 'tile_wall' | 'steel' | 'bitumen' | 'cell_wall'
+  | 'hosp_ext' | 'ochre_ext' | 'trim_white' | 'plinth' | 'ward_dado' | 'office_dado' | 'tile_dado' | 'cell_dado' | 'lamp';
 
 const MATS: Record<Exclude<MatKey, 'glass'>, { tex: string; tile: number; color?: number; metal?: boolean; surface: Surface }> = {
   plaster_ext: { tex: 'worn_mossy_plasterwall', tile: 3, surface: 'plaster' },
@@ -110,6 +111,57 @@ const MATS: Record<Exclude<MatKey, 'glass'>, { tex: string; tile: number; color?
   steel: { tex: 'painted_plaster_wall', tile: 1.2, color: 0x565d63, surface: 'metal' },
   // a flat roof's felt
   bitumen: { tex: 'asphalt_02', tile: 3.4, color: 0x8d8a84, surface: 'concrete' },
+  // (For the faces of the two big buildings, 2026-10-12: "the new buildings need more character ... everything is
+  // too plain". What a public building of that country and those years was painted, on the plaster there is.)
+  // a hospital's: pale yellow gone dull
+  hosp_ext: { tex: 'worn_mossy_plasterwall', tile: 3, color: 0xdccf9f, surface: 'plaster' },
+  // a police station's: ochre
+  ochre_ext: { tex: 'worn_mossy_plasterwall', tile: 3, color: 0xcfa862, surface: 'plaster' },
+  // what stands proud of such a wall, painted white once: bands, the surrounds of windows, pilasters
+  trim_white: { tex: 'painted_plaster_wall', tile: 2.2, color: 0xe7e2d2, surface: 'plaster' },
+  // the foot of the wall: rendered and painted grey
+  plinth: { tex: 'dirty_concrete', tile: 3, color: 0x8c8a82, surface: 'concrete' },
+  // the lower part of an inside wall, in oil paint, to the height of a shoulder: what a ward, an office, a washed-down
+  // room and a cell had
+  ward_dado: { tex: 'painted_plaster_wall', tile: 2.4, color: 0x6e8f78, surface: 'plaster' },
+  office_dado: { tex: 'painted_plaster_wall', tile: 2.4, color: 0x8b7a56, surface: 'plaster' },
+  tile_dado: { tex: 'painted_plaster_wall', tile: 1.6, color: 0x93abb0, surface: 'plaster' },
+  cell_dado: { tex: 'damaged_plaster', tile: 2.2, color: 0x596672, surface: 'plaster' },
+  // the box of a ceiling light, its tubes long dead
+  lamp: { tex: 'painted_plaster_wall', tile: 1.2, color: 0xe8e8e0, surface: 'metal' },
+};
+/** how high the oil paint goes up an inside wall */
+const DADO = 1.45;
+/** what is big enough, and plain enough, for its picture to be seen coming round again */
+const MACRO = new Set<MatKey>(['plaster_ext', 'brick_ext', 'planks_ext', 'int_plaster', 'int_painted', 'floor_concrete', 'roof_iron', 'roof_tiles', 'concrete', 'ceiling', 'ward_wall', 'office_wall', 'tile_wall', 'cell_wall', 'bitumen', 'hosp_ext', 'ochre_ext', 'plinth', 'ward_dado', 'office_dado', 'tile_dado', 'cell_dado']);
+/** a slow change of tone by where in the world a thing is (see `material`) */
+const macroTone = (shader: { vertexShader: string; fragmentShader: string }) => {
+  shader.vertexShader = shader.vertexShader
+    .replace('#include <common>', '#include <common>\nvarying vec3 vMacroW;')
+    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvMacroW = ( modelMatrix * vec4( position, 1.0 ) ).xyz;');
+  shader.fragmentShader = shader.fragmentShader
+    .replace(
+      '#include <common>',
+      `#include <common>
+varying vec3 vMacroW;
+float macroHash( vec3 p ) { return fract( sin( dot( p, vec3( 12.9898, 78.233, 37.719 ) ) ) * 43758.5453 ); }
+float macroNoise( vec3 p ) {
+  vec3 i = floor( p ), f = fract( p );
+  f = f * f * ( 3.0 - 2.0 * f );
+  return mix(
+    mix( mix( macroHash( i ), macroHash( i + vec3( 1.0, 0.0, 0.0 ) ), f.x ), mix( macroHash( i + vec3( 0.0, 1.0, 0.0 ) ), macroHash( i + vec3( 1.0, 1.0, 0.0 ) ), f.x ), f.y ),
+    mix( mix( macroHash( i + vec3( 0.0, 0.0, 1.0 ) ), macroHash( i + vec3( 1.0, 0.0, 1.0 ) ), f.x ), mix( macroHash( i + vec3( 0.0, 1.0, 1.0 ) ), macroHash( i + vec3( 1.0, 1.0, 1.0 ) ), f.x ), f.y ),
+    f.z );
+}`,
+    )
+    .replace(
+      '#include <map_fragment>',
+      `#include <map_fragment>
+{
+  float macroT = macroNoise( vMacroW * 0.19 ) * 0.62 + macroNoise( vMacroW * 0.61 + 11.0 ) * 0.38;
+  diffuseColor.rgb *= 0.86 + 0.28 * macroT;
+}`,
+    );
 };
 
 export interface Opening {
@@ -119,6 +171,27 @@ export interface Opening {
   top: number;
   /** (`grille`: bars from `bottom` to `top`, as a cell has: a body does not pass, the eye and a shot do) */
   kind: 'door' | 'window' | 'gap' | 'grille';
+  /** a window boarded up from outside: planks nailed across it, and no glass left in it */
+  boards?: boolean;
+  /** a window with bars over it outside */
+  bars?: boolean;
+}
+
+/**
+ * What the outside of a building has on it beside its walls: everything that makes a wall a face. All of it stands
+ * a hair proud of the wall it is on, and no face of any of it lies in a face of anything else.
+ */
+export interface Dress {
+  /** the foot of the wall: how high, and of what */
+  plinth?: { h: number; key: MatKey };
+  /** a band round the building at every floor, and one under the wall round the roof */
+  bands?: MatKey;
+  /** a lintel over every window and a sill under it */
+  trim?: MatKey;
+  /** flat piers up the face, from the plinth to the top: where along each side (the building's own x, or z for its ends), how wide */
+  piers?: { front?: number[]; back?: number[]; left?: number[]; right?: number[]; w: number; key: MatKey };
+  /** inside: which paint has which oil paint under it, to the height of a shoulder */
+  dado?: Partial<Record<MatKey, MatKey>>;
 }
 
 export interface WallDef {
@@ -217,7 +290,10 @@ export interface Blueprint {
   /** bars, counters and the like: by floor (0 is the ground) */
   fittings?: { level: number; list: Fitting[] }[];
   /** what its outside is called over its door: where the board hangs, and what it says */
-  sign?: { x: number; y: number; text: string; sub: string; board?: string; ink?: string };
+  /** (`out`: how far before the wall, when it stands on something built out from it; `size`: how many times the usual board) */
+  sign?: { x: number; y: number; text: string; sub: string; board?: string; ink?: string; out?: number; size?: number };
+  /** what its outside has on it beside its walls (see Dress) */
+  dress?: Dress;
   ext: MatKey;
   int: MatKey;
   floor: MatKey;
@@ -1403,7 +1479,8 @@ export class Buildings {
         if (wd.side !== 'inner' && y0 === 0 && !bp.shell) {
           // a skirt of concrete where the wall meets the ground, broken at the doors
           let from = 0;
-          const skirt = (to: number) => to - from > 0.05 && addBox('concrete', from, to, -0.1, 0.26, T / 2, T / 2 + 0.04, F, false);
+          const pl = bp.dress?.plinth;
+          const skirt = (to: number) => to - from > 0.05 && (pl ? addBox(pl.key, from, to, -0.1, pl.h, T / 2 + 0.002, T / 2 + 0.055, F, false) : addBox('concrete', from, to, -0.1, 0.26, T / 2, T / 2 + 0.04, F, false));
           for (const o of ops) {
             if (o.kind === 'window' || o.kind === 'grille') continue;
             skirt(o.a);
@@ -1435,9 +1512,15 @@ export class Buildings {
           // the inner half stands a hair back from each opening: its ends lay in the sides of the model's, and flickered.)
           const modelled = !!bp.shell && wd.side !== 'inner';
           const drawn = !(modelled && z1 > 0), e = modelled ? 0.006 : 0;
+          // (inside: the half of an outside wall that is the room's, and both halves of a wall between rooms)
+          const dado = z1 <= 0 || wd.side === 'inner' ? bp.dress?.dado?.[key] : undefined;
           const part = (x0: number, x1: number, ya: number, yb: number) => {
             if (x1 - x0 < 0.001 || yb - ya < 0.001) return;
-            if (drawn) addBox(key, x0, x1, ya, yb, z0, z1, F);
+            if (drawn && dado && ya < DADO - 0.01) {
+              // (one piece of wall in two paints: the lower stands on the floor, the upper on it)
+              addBox(dado, x0, x1, ya, Math.min(yb, DADO), z0, z1, F);
+              if (yb > DADO) addBox(key, x0, x1, DADO, yb, z0, z1, F);
+            } else if (drawn) addBox(key, x0, x1, ya, yb, z0, z1, F);
             else this.collider((x1 - x0) / 2, (yb - ya) / 2, (z1 - z0) / 2, F.clone().multiply(new THREE.Matrix4().makeTranslation((x0 + x1) / 2, (ya + yb) / 2, (z0 + z1) / 2)), surf(key));
           };
           let cur = 0;
@@ -1461,8 +1544,36 @@ export class Buildings {
             addBox('trim', o.a - 0.04, o.b + 0.04, o.bottom - 0.04, o.bottom + 0.02, fz0 - 0.04, fz1 + 0.06, F, false);
             addBox('trim', (o.a + o.b) / 2 - 0.025, (o.a + o.b) / 2 + 0.025, o.bottom, o.top, -0.03, 0.03, F, false);
             addBox('trim', o.a, o.b, (o.bottom + o.top) / 2 + 0.15, (o.bottom + o.top) / 2 + 0.2, -0.03, 0.03, F, false);
-            if (rng.chance(0.7)) {
+            // (boarded up: its glass went long ago)
+            if (rng.chance(0.7) && !o.boards) {
               this.push('glass', boxGeo(o.a + fw, o.b - fw, o.bottom, o.top - fw, -0.006, 0.006, 1, F));
+            }
+            if (wd.side !== 'inner') {
+              const tr = bp.dress?.trim;
+              if (tr) {
+                // a lintel over it and a sill under it, of the wall's own stuff painted: each a hair off the wall
+                addBox(tr, o.a - 0.12, o.b + 0.12, o.top - 0.003, o.top + 0.17, T / 2 + 0.002, T / 2 + 0.05, F, false);
+                addBox(tr, o.a - 0.1, o.b + 0.1, o.bottom - 0.125, o.bottom - 0.044, T / 2 + 0.002, T / 2 + 0.095, F, false);
+              }
+              if (o.boards) {
+                // planks nailed across it from outside, none of them quite level, a gap between each and the next
+                const tall = o.top - o.bottom, n = Math.max(3, Math.round(tall / 0.3)), tile = this.tile('planks');
+                for (let k = 0; k < n; k++) {
+                  const y = o.bottom + (tall * (k + 0.5)) / n, lean = (((k * 7 + Math.round(o.a * 10)) % 5) - 2) * 0.035, wide = 0.085 + ((k * 3) % 4) * 0.008;
+                  const P = F.clone().multiply(new THREE.Matrix4().makeTranslation((o.a + o.b) / 2, y, T / 2 + 0.035 + (k % 2) * 0.012)).multiply(new THREE.Matrix4().makeRotationZ(lean));
+                  this.push('planks', boxGeo(-(o.b - o.a) / 2 - 0.16, (o.b - o.a) / 2 + 0.16, -wide, wide, -0.011, 0.011, tile, P));
+                }
+                // (and they stop a shot, as boards do)
+                this.collider((o.b - o.a) / 2, tall / 2, 0.012, F.clone().multiply(new THREE.Matrix4().makeTranslation((o.a + o.b) / 2, (o.bottom + o.top) / 2, T / 2 + 0.035)), 'wood');
+              }
+              if (o.bars) {
+                const bars = Math.max(2, Math.round((o.b - o.a) / 0.14)), tile = this.tile('steel');
+                for (let k = 1; k < bars; k++) {
+                  const x = o.a + ((o.b - o.a) * k) / bars;
+                  this.push('steel', boxGeo(x - 0.009, x + 0.009, o.bottom + 0.02, o.top - fw, T / 2 - 0.05, T / 2 - 0.032, tile, F));
+                }
+                for (const at of [o.bottom + 0.3, o.top - 0.35]) this.push('steel', boxGeo(o.a + fw, o.b - fw, at - 0.012, at + 0.012, T / 2 - 0.058, T / 2 - 0.05, tile, F));
+              }
             }
             // windows block movement but not bullets
             const c = new THREE.Matrix4().makeTranslation((o.a + o.b) / 2, (o.bottom + o.top) / 2, 0);
@@ -1590,6 +1701,32 @@ export class Buildings {
         }
       }
 
+      // What its face has on it (see Dress): a band round it at every floor and under the wall round its roof, and
+      // piers up it. Each a hair off the wall, and each standing out a different distance from every other, so that
+      // where two cross neither's face lies in the other's.
+      const dr = bp.dress;
+      if (dr) {
+        const topY = roofY + (deck?.parapet ?? 0);
+        const round = (key: MatKey, y0: number, y1: number, out: number) => {
+          addBox(key, -hw - out, hw + out, y0, y1, hd + 0.002, hd + out, B, false);
+          addBox(key, -hw - out, hw + out, y0, y1, -hd - out, -hd - 0.002, B, false);
+          addBox(key, -hw - out, -hw - 0.002, y0, y1, -hd - 0.002, hd + 0.002, B, false);
+          addBox(key, hw + 0.002, hw + out, y0, y1, -hd - 0.002, hd + 0.002, B, false);
+        };
+        if (dr.bands) {
+          for (let k = 1; k < storeyY.length; k++) round(dr.bands, storeyY[k] - SLAB - 0.04, storeyY[k] + 0.05, 0.062);
+          round(dr.bands, roofY - SLAB - 0.04, roofY + 0.05, 0.062);
+          if (deck) round(dr.bands, topY - 0.24, topY - 0.03, 0.088);
+        }
+        if (dr.piers) {
+          const y0 = (dr.plinth?.h ?? 0.26) - 0.012, y1 = topY - 0.03, half = dr.piers.w / 2, out = 0.075, key = dr.piers.key;
+          for (const x of dr.piers.front ?? []) addBox(key, x - half, x + half, y0, y1, hd + 0.002, hd + out, B, false);
+          for (const x of dr.piers.back ?? []) addBox(key, x - half, x + half, y0, y1, -hd - out, -hd - 0.002, B, false);
+          for (const z of dr.piers.left ?? []) addBox(key, -hw - out, -hw - 0.002, y0, y1, z - half, z + half, B, false);
+          for (const z of dr.piers.right ?? []) addBox(key, hw + 0.002, hw + out, y0, y1, z - half, z + half, B, false);
+        }
+      }
+
       if (deck) {
         // the wall round the roof's edge: the outside walls carried on up, and a coping on them
         const p0 = roofY, p1 = roofY + deck.parapet;
@@ -1676,7 +1813,7 @@ export class Buildings {
       addBox('concrete', cx - 0.36, cx + 0.36, roofAt + 0.85, roofAt + 0.92, cz - 0.36, cz + 0.36, B, false);
     }
 
-    if (bp.sign) this.signs.push({ m: B.clone().multiply(new THREE.Matrix4().makeTranslation(bp.sign.x, bp.sign.y, hd + 0.03)), text: bp.sign.text, sub: bp.sign.sub, board: bp.sign.board, ink: bp.sign.ink });
+    if (bp.sign) this.signs.push({ m: B.clone().multiply(new THREE.Matrix4().makeTranslation(bp.sign.x, bp.sign.y, hd + 0.03 + (bp.sign.out ?? 0))), text: bp.sign.text, sub: bp.sign.sub, board: bp.sign.board, ink: bp.sign.ink, size: bp.sign.size });
     if (plot.type === 'police') {
       this.signs.push({ m: B.clone().multiply(new THREE.Matrix4().makeTranslation(0, 2.55, hd + 0.03)), text: 'ПОЛИЦИЯ', sub: 'POLICE' });
     }
@@ -2044,7 +2181,7 @@ export class Buildings {
   /** (`leaf`: it is a container's leaf, of the orange one (0) or the blue (1), and not a door of boards) */
   doorSpecs: { m: THREE.Matrix4; w: number; h: number; id: string; open: boolean; swing: number; leaf?: number }[] = [];
   /** sign boards to hang (police station): world matrix of the board's centre, facing +z */
-  private signs: { m: THREE.Matrix4; text: string; sub: string; board?: string; ink?: string }[] = [];
+  private signs: { m: THREE.Matrix4; text: string; sub: string; board?: string; ink?: string; size?: number }[] = [];
 
   private planVillageProps() {
     const rng = new RNG(4711);
@@ -2126,7 +2263,7 @@ export class Buildings {
       tex.anisotropy = 8;
       const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.55, metalness: 0.25 });
       this.atmo.register(mat);
-      const board = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.65, 0.04), [this.material('trim'), this.material('trim'), this.material('trim'), this.material('trim'), mat, this.material('trim')]);
+      const board = new THREE.Mesh(new THREE.BoxGeometry(2.6 * (sg.size ?? 1), 0.65 * (sg.size ?? 1), 0.04), [this.material('trim'), this.material('trim'), this.material('trim'), this.material('trim'), mat, this.material('trim')]);
       board.applyMatrix4(sg.m);
       board.castShadow = board.receiveShadow = true;
       scene.add(board);
@@ -2249,7 +2386,11 @@ export class Buildings {
         color: def.color ?? 0xffffff,
       });
     }
-    this.atmo.register(m);
+    // (Walls, floors and roofs are one picture each, laid over and over: on a wall forty metres long the same stain
+    // came round every three, in rows. A slow change of tone across the world, different at every place, is put over
+    // the picture: the rows are not seen for it. "we are re-using the same textures too much", 2026-10-11.)
+    if (key !== 'glass' && MACRO.has(key)) this.atmo.register(m, macroTone, 'macro');
+    else this.atmo.register(m);
     this.matCache.set(key, m);
     return m;
   }
