@@ -5,13 +5,16 @@
 //   - a body left behind does not count as somebody playing from its address, nor hold a place on a full server;
 //     somebody awake at an address still does;
 //   - more hellos from one address in a minute than a game sends are turned away;
-//   - where it is asked, a connection not asked for by the game's own page is not taken.
+//   - where it is asked, a connection not asked for by the game's own page is not taken;
+//   - where the check that somebody is a person is set up: nobody is let in without a good slip from it, a good
+//     one is asked for once of a game at an address, and the check's being down keeps nobody out.
 // The real server on ports of its own, connections over the wire. About twenty-five seconds.
 //   npx tsx test/bots.test.ts
 
 import assert from 'node:assert/strict';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
+import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import WebSocket from 'ws';
@@ -27,6 +30,8 @@ class Conn {
   got: S2C[] = [];
   open = false;
   closed = false;
+  /** the slip the check that this is a person gave, if it is to say one */
+  proof = '';
   constructor(public port: number, public name: string, public ip = '', public origin = '', public key = `bots-test-key-${name}-${String(++n).padStart(20, '0')}`) {}
   /** @returns welcomed, refused (with the reason given), or not taken at all */
   async hello(): Promise<'in' | 'refused' | 'waiting' | 'no'> {
@@ -42,7 +47,9 @@ class Conn {
     });
     if (!up) return 'no';
     this.open = true;
-    this.ws.send(JSON.stringify({ t: 'hello', v: PROTOCOL, key: this.key, name: this.name }));
+    this.got = [];
+    this.closed = false;
+    this.ws.send(JSON.stringify({ t: 'hello', v: PROTOCOL, key: this.key, name: this.name, ...(this.proof ? { proof: this.proof } : {}) }));
     for (let k = 0; k < 100; k++) {
       if (this.got.some((m) => m.t === 'welcome')) return 'in';
       if (this.got.some((m) => m.t === 'kick')) return 'refused';
@@ -53,6 +60,10 @@ class Conn {
   }
   why() {
     return (this.got.find((m) => m.t === 'kick') as { reason?: string } | undefined)?.reason ?? '';
+  }
+  /** the key it was told to ask the check with, when it was turned away for want of it */
+  asked() {
+    return (this.got.find((m) => m.t === 'kick') as { captcha?: string } | undefined)?.captcha ?? '';
   }
   say(x = 20, z = 0) {
     if (this.ws.readyState === 1) this.ws.send(JSON.stringify({ t: 's', p: [x, heightAt(world.heights, x, z), z, 0, 0, 8], w: null, m: [], n: Math.round(performance.now()) }));
@@ -198,9 +209,68 @@ try {
     }
     await sleep(400);
     assert.ok(leaper.closed, `somebody flagged five times and more was left in:\n${c.log().slice(-400)}`);
-    assert.match(leaper.why(), /flagged what your game was doing too many times/);
+    assert.match(leaper.why(), /could not make sense of what your game told it/);
     assert.equal((await c.health()).turned.flags, 1);
-    ok('enforcing, somebody the checks have flagged so many times is put out');
+    // (back in, and at it again: the second time within the hour they are kept off)
+    assert.equal(await leaper.hello(), 'in', 'somebody put out once could not come back');
+    await leaper.play(3200);
+    for (let k = 0; k < 8 && !leaper.closed; k++) {
+      leaper.say(320, 0);
+      await sleep(120);
+    }
+    await sleep(400);
+    assert.ok(leaper.closed, 'flagged five times again, and left in');
+    assert.equal(await leaper.hello(), 'refused', 'somebody put out twice in an hour was let straight back in');
+    assert.match(leaper.why(), /kept off/);
+    ok('enforcing, somebody the checks have flagged so many times is put out; twice in an hour, and they are kept off');
+  }
+
+  // ---- where the check that somebody is a person is set up (the one asked is a stand-in here, and says yes to one slip)
+  const D = 8164, CHECK = 8165;
+  const asked: string[] = [];
+  const standIn = http.createServer((req, res) => {
+    let body = '';
+    req.on('data', (d) => (body += d));
+    req.on('end', () => {
+      const q = new URLSearchParams(body);
+      asked.push(q.get('response') ?? '');
+      res.setHeader('content-type', 'application/json');
+      res.end(JSON.stringify({ success: q.get('secret') === 'not-a-real-secret' && q.get('response') === 'good-slip' }));
+    });
+  });
+  await new Promise<void>((done) => standIn.listen(CHECK, '127.0.0.1', done));
+  const d = await server(D, { TURNSTILE_SITEKEY: 'site-key-for-the-test', TURNSTILE_SECRET: 'not-a-real-secret', TURNSTILE_VERIFY_URL: `http://127.0.0.1:${CHECK}/siteverify` });
+  try {
+    assert.equal(((await d.health()) as unknown as { captcha: boolean }).captcha, true);
+    const pat = new Conn(D, 'Pat', '8.8.7.1');
+    assert.equal(await pat.hello(), 'refused', 'somebody with no slip was let in');
+    assert.equal(pat.asked(), 'site-key-for-the-test', 'they were not told what to ask the check with');
+    assert.equal(asked.length, 0, 'the check was asked about nothing');
+    pat.proof = 'made-up';
+    assert.equal(await pat.hello(), 'refused', 'a slip that is not good was taken');
+    assert.match(pat.why(), /did not pass/);
+    pat.proof = 'good-slip';
+    assert.equal(await pat.hello(), 'in', `a good slip was not taken: ${pat.why()}`);
+    await pat.play(400);
+    pat.leave();
+    await sleep(300);
+    // (the same game at the same address, with no slip: it is known for a person's)
+    pat.proof = '';
+    assert.equal(await pat.hello(), 'in', 'somebody who had shown they are a person was asked again');
+    pat.leave();
+    assert.deepEqual(asked, ['made-up', 'good-slip'], 'the check was asked more than it needed to be');
+    // (the same game from somewhere else: asked again)
+    const moved = new Conn(D, 'Pat', '8.8.7.2', '', pat.key);
+    assert.equal(await moved.hello(), 'refused', 'a game known at one address was let in from another with no slip');
+    // (the check cannot be reached: nobody is kept out by that)
+    await new Promise<void>((done) => standIn.close(() => done()));
+    const quinn = new Conn(D, 'Quinn', '8.8.7.3');
+    quinn.proof = 'whatever';
+    assert.equal(await quinn.hello(), 'in', 'the check being down kept somebody out');
+    quinn.leave();
+    ok('with the check set up: no way in without a good slip, one slip for a game at an address, and nobody kept out by its being down');
+  } finally {
+    standIn.close();
   }
 } catch (e) {
   failed = e;

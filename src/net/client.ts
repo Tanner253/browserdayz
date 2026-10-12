@@ -112,6 +112,11 @@ export class Net {
   private handlers = new Map<string, ((m: S2C) => void)[]>();
   private kicked = '';
   private kickedV: number | undefined;
+  private proofKey = '';
+  /** turned away for want of the check that this is a person: the key the server said to ask for it with (see src/ui/person.ts) */
+  get wantsProof() {
+    return this.online ? '' : this.proofKey;
+  }
   /** why the server turned us away before we got in (full, outdated client) */
   get refused() {
     return this.online ? '' : this.kicked;
@@ -153,10 +158,11 @@ export class Net {
    * A server on a free host sleeps when nobody is around: `onStatus` reports the wait
    * while it wakes up (the first request can take a minute).
    */
-  async connect(name: string, onStatus: (text: string) => void = () => {}): Promise<Welcome | null> {
+  async connect(name: string, onStatus: (text: string) => void = () => {}, proof = ''): Promise<Welcome | null> {
     // (asked again after being turned away: what was said then is not what is said now)
     this.kicked = '';
     this.kickedV = undefined;
+    this.proofKey = '';
     const remote = remoteServer();
     if (remote) {
       // any answer at all means it is awake; the request itself is what wakes it
@@ -176,14 +182,14 @@ export class Net {
     }
     const timeout = remote ? 12_000 : 4000;
     this.left = false;
-    const first = await this.open(name, timeout);
+    const first = await this.open(name, timeout, proof);
     if (first || this.kicked || this.left) return first;
     // one more try: a proxy or a server that has only just started can drop the first connection
     await new Promise((r) => setTimeout(r, 400));
-    return this.open(name, timeout);
+    return this.open(name, timeout, proof);
   }
 
-  private open(name: string, timeout: number): Promise<Welcome | null> {
+  private open(name: string, timeout: number, proof = ''): Promise<Welcome | null> {
     return new Promise((resolve) => {
       let settled = false;
       const done = (v: Welcome | null) => {
@@ -208,7 +214,7 @@ export class Net {
         return;
       }
       this.ws = ws;
-      ws.onopen = () => this.send({ t: 'hello', v: PROTOCOL, key: playerKey(), name });
+      ws.onopen = () => this.send({ t: 'hello', v: PROTOCOL, key: playerKey(), name, ...(proof ? { proof } : {}) });
       ws.onerror = () => done(null);
       ws.onclose = () => {
         const was = this.online;
@@ -242,6 +248,7 @@ export class Net {
         if (m.t === 'kick') {
           this.kicked = m.reason;
           this.kickedV = m.v;
+          this.proofKey = typeof m.captcha === 'string' ? m.captcha : '';
         }
         if (m.t === 'pong') {
           this.ping = Math.round(performance.now() - m.n);

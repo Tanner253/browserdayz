@@ -51,6 +51,7 @@ import { WELL, stage, wellSpots, type Well } from '../sim/wells';
 import { Voice } from './voice';
 import { TIERS, type Tier } from '../sim/tiers';
 import { hasSlotIcon, iconSig, renderDoll, renderIcons } from '../ui/icons';
+import { askPerson } from '../ui/person';
 import { Near } from './near';
 import { Perf } from '../core/perf';
 import { loadGraphics, type Graphics } from '../core/settings';
@@ -905,6 +906,16 @@ export class Game {
       this.hud.showStart(true, false, 'The server is being updated. You are let in as soon as it is up');
       await new Promise((r) => setTimeout(r, 4000));
       welcome = await this.net.connect(name);
+    }
+    // Turned away for want of the check that this is a person (the server asks it of whoever it has not lately had
+    // it from: see src/ui/person.ts). The check is shown, and the way in is asked for again with what it gave.
+    for (let tries = 0; !welcome && this.net.wantsProof && tries < 2; tries++) {
+      this.input.unlock();
+      this.hud.showStart(true, false, 'One check that you are a person');
+      const slip = await askPerson(this.net.wantsProof);
+      if (!slip) break;
+      this.hud.showStart(true, false, 'Connecting…');
+      welcome = await this.net.connect(name, (text) => this.hud.showStart(true, false, text), slip);
     }
     this.hud.setQueue(null);
     document.title = this.title;

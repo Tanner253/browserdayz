@@ -121,7 +121,8 @@ export interface KillInfo {
 }
 
 export type C2S =
-  | { t: 'hello'; v: number; key: string; name: string }
+  /** `proof`: the slip the check that this is a person gave (src/ui/person.ts), where the server has asked for one */
+  | { t: 'hello'; v: number; key: string; name: string; proof?: string }
   /** `n`: when this was true by the sending game's own clock, ms (passed on with it: see src/net/timeline.ts) */
   | { t: 's'; p: Pose; w: string | null; m: string[]; n?: number }
   | { t: 'shot'; o: [number, number, number]; d: [number, number, number]; w: string; sup: boolean }
@@ -337,7 +338,8 @@ export type S2C =
   /** the server is about to be restarted (in so many seconds: 0, it is stopping now), and why, if that was said */
   | { t: 'restart'; why: string; in: number }
   /** (`v`: turned away for being of another version than the server, which is of this one) */
-  | { t: 'kick'; reason: string; v?: number };
+  /** `captcha`: turned away for want of the check that this is a person; the key to ask for it with */
+  | { t: 'kick'; reason: string; v?: number; captcha?: string };
 
 /** What the panel of somebody with a role is shown. The last two are an admin's alone. */
 export interface AdminLists {

@@ -501,13 +501,15 @@ function flag(c: Client, what: string, refuse = true): boolean {
     log(`[check:${CHECKS}] ${c.name} ${what} (${c.check.flags} so far)`);
   }
   // (2026-10-12: "if a user gets flagged by the enforce check 50 times they should be kicked from the server".
-  // When whatever was being done with them is done: this is called from the middle of it.)
+  // When whatever was being done with them is done: this is called from the middle of it. Put off as the other
+  // checks put off: the first time they may come straight back, and the second time within the hour their game
+  // and their address are kept off for hours. In the five minutes after this rule went in as a plain kick it put
+  // six out, and the flags went on at one a second: the same ones, back in each time.)
   if (CHECKS === 'enforce' && c.check.flags === FLAGS_OUT) {
     setImmediate(() => {
       if (!clients.has(c.id)) return;
       TURNED.flags++;
-      log(`[check] ${c.name} (#${c.id}) has been flagged ${FLAGS_OUT} times (the last: ${what}): put out`);
-      eject(c, 'The checks of this server flagged what your game was doing too many times, and put you out. Press Play to come back in.');
+      putOff(c, `the checks flagged them ${FLAGS_OUT} times (the last: ${what})`);
     });
   }
   return refuse && CHECKS === 'enforce';
@@ -633,7 +635,7 @@ const awake = () => {
   return n;
 };
 /** what has been turned away, for /healthz: by what */
-const TURNED = { address: 0, flood: 0, origin: 0, silent: 0, hover: 0, flags: 0, banned: 0 };
+const TURNED = { address: 0, flood: 0, origin: 0, silent: 0, hover: 0, flags: 0, banned: 0, captcha: 0 };
 /** when each connection lately said hello, by where it came from: see `flooding` */
 const hellos = new Map<string, number[]>();
 /** More hellos from one address in a minute than anybody playing sends (a game says it once, and again when its line drops). */
@@ -646,6 +648,43 @@ function flooding(ip: string): boolean {
   return times.length > HELLOS_A_MINUTE;
 }
 const HELLOS_A_MINUTE = Number(process.env.HELLOS_A_MINUTE) || 20;
+
+// ---- a person, and not a program (2026-10-12: "we should add a captcha or something")
+//
+// Cloudflare's Turnstile. On when its two keys are set here (TURNSTILE_SITEKEY, which anybody may know, and
+// TURNSTILE_SECRET, which nobody but the owner and this server may). Somebody who asks to come in is then asked
+// for the slip the check gives a person's browser (src/ui/person.ts), and Cloudflare is asked whether it is good.
+// It is asked once of a game at an address, and holds for CAPTCHA_HOURS (twelve): a line that drops, a server
+// that restarts, a death, are not another check. Whoever has a role is not asked. If Cloudflare cannot be
+// reached the game is let in: its being down is not to be everybody's being kept out.
+const CAPTCHA = {
+  site: process.env.TURNSTILE_SITEKEY ?? '',
+  secret: process.env.TURNSTILE_SECRET ?? '',
+  url: process.env.TURNSTILE_VERIFY_URL ?? 'https://challenges.cloudflare.com/turnstile/v0/siteverify',
+  ms: (Number(process.env.CAPTCHA_HOURS) || 12) * 3600_000,
+};
+const CAPTCHA_ON = !!CAPTCHA.site && !!CAPTCHA.secret;
+/** who has shown they are a person, and until when: by their game and where they play from */
+const persons = new Map<string, number>();
+const personOf = (key: string, ip: string) => `${keyHash(key)}|${ip}`;
+function knownPerson(key: string, ip: string): boolean {
+  if (!CAPTCHA_ON || (key && ADMIN.state.roles[keyHash(key)])) return true;
+  if (!key) return false;
+  const until = persons.get(personOf(key, ip));
+  return !!until && until > Date.now();
+}
+/** @returns whether the slip is good; null if Cloudflare could not be asked */
+async function goodSlip(slip: string, ip: string): Promise<boolean | null> {
+  try {
+    const body = new URLSearchParams({ secret: CAPTCHA.secret, response: slip });
+    if (publicIp(ip) && !ip.includes('/')) body.set('remoteip', ip);
+    const r = await fetch(CAPTCHA.url, { method: 'POST', body, signal: AbortSignal.timeout(8000) });
+    if (!r.ok) return null;
+    return !!((await r.json()) as { success?: boolean }).success;
+  } catch {
+    return null;
+  }
+}
 /** what worn things do to a hit: every plate and helmet they were last seen in (as their own game reckons it: Game.takeHit) */
 const worn = (c: Client, k: 'armor' | 'head') => Object.values(c.inv?.slots ?? {}).flatMap((it) => (it && ITEMS[it.id]?.wear?.[k] !== undefined ? [ITEMS[it.id].wear![k] as number] : []));
 
@@ -3367,7 +3406,7 @@ function serve(req: http.IncomingMessage, res: http.ServerResponse) {
     // readable from a client hosted somewhere else (e.g. Vercel) for the start-screen player count
     res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'no-store' });
     // (places: how many different addresses the players come from. One, with several players on, means the host is not passing addresses through.)
-    res.end(JSON.stringify({ ok: true, boot: BOOT, protocol: PROTOCOL, why: RESTART.why, kept: KEPT.how, players: [...clients.values()].filter((c) => !c.asleep).length, asleep: [...clients.values()].filter((c) => c.asleep).length, max: MAX_PLAYERS, queue: queue.length, uptime: Math.round(process.uptime()), checks: CHECKS, flagged, keptOff: BANS.temp.size, loot: economy.loot.size, places: new Set([...clients.values()].map((c) => c.ip)).size, unspoken: [...clients.values()].filter((c) => !c.spoke && !c.asleep).length, turned: TURNED }));
+    res.end(JSON.stringify({ ok: true, boot: BOOT, protocol: PROTOCOL, why: RESTART.why, kept: KEPT.how, players: [...clients.values()].filter((c) => !c.asleep).length, asleep: [...clients.values()].filter((c) => c.asleep).length, max: MAX_PLAYERS, queue: queue.length, uptime: Math.round(process.uptime()), checks: CHECKS, flagged, keptOff: BANS.temp.size, loot: economy.loot.size, places: new Set([...clients.values()].map((c) => c.ip)).size, unspoken: [...clients.values()].filter((c) => !c.spoke && !c.asleep).length, turned: TURNED, captcha: CAPTCHA_ON }));
     return;
   }
   // the changelog page asks here for its hearts and comments, and gives them (see `news`)
@@ -3498,7 +3537,9 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
   ipOf.set(ws, addressOf(req));
   let c: Client | null = null;
   let waiting = false;
-  const hello = setTimeout(() => !c && !waiting && ws.close(), 8000);
+  /** Cloudflare is being asked whether the slip this connection gave is good */
+  let asking = false;
+  const hello = setTimeout(() => !c && !waiting && !asking && ws.close(), 8000);
   ws.on('message', (data, isBinary) => {
     // (what is not words is speech: see `voice`)
     if (isBinary) {
@@ -3520,12 +3561,35 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
         ws.close();
         return;
       }
-      if (mustWait(m)) {
-        waiting = !!enqueue(ws, m, (client) => {
-          waiting = false;
-          c = client;
-        });
-      } else c = join(ws, m);
+      const enter = (h: Extract<C2S, { t: 'hello' }>) => {
+        if (mustWait(h)) {
+          waiting = !!enqueue(ws, h, (client) => {
+            waiting = false;
+            c = client;
+          });
+        } else c = join(ws, h);
+      };
+      const ip = ipOf.get(ws) ?? '', key = keyOf(m);
+      if (m.v !== PROTOCOL || knownPerson(key, ip)) return void enter(m);
+      // (not known for a person: the slip, or the asking for one)
+      const again = (reason: string) => {
+        TURNED.captcha++;
+        ws.send(JSON.stringify({ t: 'kick', reason, captcha: CAPTCHA.site } satisfies S2C));
+        ws.close();
+      };
+      const slip = typeof m.proof === 'string' ? m.proof.slice(0, 4096) : '';
+      if (!slip) return void again('One check that you are a person, and you are in.');
+      if (asking) return;
+      asking = true;
+      void goodSlip(slip, ip).then((good) => {
+        asking = false;
+        if (ws.readyState !== 1 || c) return;
+        if (good === false) return void again('The check that you are a person did not pass. Press Play to try again.');
+        if (good === null) log(`the check that ${cleanName(m.name)} is a person could not be asked of Cloudflare: let in`);
+        else if (key) persons.set(personOf(key, ip), Date.now() + CAPTCHA.ms);
+        if (persons.size > 20000) for (const [k, until] of persons) if (until < Date.now()) persons.delete(k);
+        enter(m);
+      });
       return;
     }
     // crude flood guard: nobody legitimately sends more than ~80 messages a second
