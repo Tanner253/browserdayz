@@ -77,7 +77,9 @@ export type MatKey =
   | 'plaster_ext' | 'brick_ext' | 'planks_ext' | 'planks' | 'int_plaster' | 'int_painted'
   | 'floor_wood' | 'floor_lino' | 'floor_concrete' | 'roof_iron' | 'roof_tiles' | 'concrete' | 'trim' | 'mattress' | 'glass'
   | 'ceiling' | 'ward_wall' | 'office_wall' | 'tile_wall' | 'steel' | 'bitumen' | 'cell_wall'
-  | 'hosp_ext' | 'ochre_ext' | 'trim_white' | 'plinth' | 'ward_dado' | 'office_dado' | 'tile_dado' | 'cell_dado' | 'lamp';
+  | 'hosp_ext' | 'ochre_ext' | 'trim_white' | 'plinth' | 'ward_dado' | 'office_dado' | 'tile_dado' | 'cell_dado' | 'lamp'
+  | 'brick_red' | 'brick_white' | 'brick_rough' | 'plaster_grey' | 'plaster_yellow' | 'plaster_green' | 'planks_green' | 'planks_blue' | 'planks_brown'
+  | 'roof_iron_clean' | 'roof_iron_green' | 'roof_iron_red' | 'roof_slate' | 'slab' | 'paving' | 'floor_garage';
 
 const MATS: Record<Exclude<MatKey, 'glass'>, { tex: string; tile: number; color?: number; metal?: boolean; surface: Surface }> = {
   plaster_ext: { tex: 'worn_mossy_plasterwall', tile: 3, surface: 'plaster' },
@@ -129,7 +131,57 @@ const MATS: Record<Exclude<MatKey, 'glass'>, { tex: string; tile: number; color?
   cell_dado: { tex: 'damaged_plaster', tile: 2.2, color: 0x596672, surface: 'plaster' },
   // the box of a ceiling light, its tubes long dead
   lamp: { tex: 'painted_plaster_wall', tile: 1.2, color: 0xe8e8e0, surface: 'metal' },
+  // (2026-10-12: "we need more texture variations for our hand made buildings so they dont all use the same
+  // textures". Ten more pictures (scripts/assets.config.mjs), and what a house is faced and roofed with is its own:
+  // see SKINS.)
+  // brick: new and red, whitewashed, rendered and coming through
+  brick_red: { tex: 'red_brick_03', tile: 2.4, surface: 'concrete' },
+  brick_white: { tex: 'white_bricks', tile: 2.6, surface: 'concrete' },
+  brick_rough: { tex: 'rough_plaster_brick_02', tile: 2.8, surface: 'concrete' },
+  // plaster: bare, and distempered yellow or green
+  plaster_grey: { tex: 'grey_plaster_02', tile: 3, surface: 'plaster' },
+  plaster_yellow: { tex: 'grey_plaster_02', tile: 3, color: 0xe6d49c, surface: 'plaster' },
+  plaster_green: { tex: 'grey_plaster_02', tile: 3, color: 0xb7c9ad, surface: 'plaster' },
+  // boards: painted, as a village's houses are
+  planks_green: { tex: 'weathered_plank_siding', tile: 2.4, color: 0x9fb592, surface: 'wood' },
+  planks_blue: { tex: 'weathered_plank_siding', tile: 2.4, color: 0x9db3c4, surface: 'wood' },
+  planks_brown: { tex: 'weathered_plank_siding', tile: 2.4, color: 0xc49a72, surface: 'wood' },
+  // sheet iron not yet rusted through: bare, and painted
+  roof_iron_clean: { tex: 'corrugated_iron', tile: 2, metal: true, surface: 'metal' },
+  roof_iron_green: { tex: 'corrugated_iron', tile: 2, color: 0x7f9a7c, metal: true, surface: 'metal' },
+  roof_iron_red: { tex: 'corrugated_iron', tile: 2, color: 0xa3604f, metal: true, surface: 'metal' },
+  roof_slate: { tex: 'grey_roof_tiles_02', tile: 2.2, surface: 'concrete' },
+  // the slabs of a wall round a yard; what is laid before a door; a garage's floor
+  slab: { tex: 'concrete_panels', tile: 2.5, color: 0xb9b6ad, surface: 'concrete' },
+  paving: { tex: 'concrete_tiles_02', tile: 1.6, surface: 'concrete' },
+  floor_garage: { tex: 'garage_floor', tile: 3, surface: 'concrete' },
 };
+/**
+ * What a building is faced and roofed with is one of several, chosen by its own number (and by no dice that
+ * anything else is thrown with): two brick houses side by side are not the same brick. Not a building whose
+ * outside is a model's, nor one that has a face of its own (see Dress).
+ */
+const SKINS: Partial<Record<MatKey, MatKey[]>> = {
+  brick_ext: ['brick_ext', 'brick_red', 'brick_red', 'brick_white', 'brick_rough'],
+  plaster_ext: ['plaster_ext', 'plaster_grey', 'plaster_grey', 'plaster_yellow', 'plaster_green'],
+  planks_ext: ['planks_ext', 'planks_ext', 'planks_green', 'planks_blue', 'planks_brown'],
+  roof_iron: ['roof_iron', 'roof_iron', 'roof_iron_clean', 'roof_iron_green', 'roof_iron_red'],
+  roof_tiles: ['roof_tiles', 'roof_tiles', 'roof_slate'],
+};
+function reskin(bp: Blueprint, seed: number): Blueprint {
+  if (bp.shell || bp.whole || bp.dress) return bp;
+  const dice = new RNG(seed ^ 0x5c1a7), chosen = new Map<MatKey, MatKey>();
+  const as = (key: MatKey): MatKey => {
+    const list = SKINS[key];
+    if (!list) return key;
+    if (!chosen.has(key)) chosen.set(key, list[Math.floor(dice.next() * list.length) % list.length]);
+    return chosen.get(key)!;
+  };
+  const outer = (walls: WallDef[]) => walls.map((wd) => (wd.side === 'inner' ? wd : { ...wd, ext: as(wd.ext) }));
+  // (in this order always: the face, then the roof)
+  const ext = as(bp.ext), walls = outer(bp.walls), upper = bp.upper ? { ...bp.upper, walls: outer(bp.upper.walls) } : undefined;
+  return { ...bp, ext, walls, ...(upper ? { upper } : {}), roof: as(bp.roof) };
+}
 /** how high the oil paint goes up an inside wall */
 const DADO = 1.45;
 /** what is big enough, and plain enough, for its picture to be seen coming round again */
@@ -1620,7 +1672,7 @@ export class Buildings {
     if (plot.type === 'tower') return this.planTower(plot);
     const rng = new RNG(plot.seed);
     const firstPoint = this.lootPoints.length;
-    const bp = blueprint(plot.type, rng);
+    const bp = reskin(blueprint(plot.type, rng), plot.seed);
     const B = new THREE.Matrix4().compose(
       new THREE.Vector3(plot.x, plot.floorY, plot.z),
       new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), plot.rot),
