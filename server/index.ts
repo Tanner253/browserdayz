@@ -2536,7 +2536,15 @@ function handle(c: Client, m: C2S) {
       return;
     }
     case 'respawn': {
-      if (c.alive) return;
+      // (Dead on their own screen, by what their game last said of where they are, and alive here: this server was
+      // not told of the death, or took a return to life that their game never acted on. Whichever it was, they
+      // are looking at the word Respawn and pressing it, and were left looking at it for good; and everybody
+      // else saw them standing over their own body. What they carried is left where they are, and they come back.)
+      if (c.alive) {
+        if (!(c.pose[5] & F_DEAD)) return;
+        log(`${c.name} asks to come back while alive here and dead by their own game: taken as a death`);
+        kill(c, 'injuries');
+      }
       const sp = pickSpawn();
       c.alive = true;
       c.lifeAt = Date.now();

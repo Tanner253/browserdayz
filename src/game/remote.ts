@@ -129,6 +129,9 @@ export class RemotePlayer implements Damageable {
     this.avatar.setHeld(h?.obj ?? null, h?.grips ?? null, h?.kind);
   }
 
+  /** where the physics was last told they are, and which way they faced */
+  private told = { x: NaN, y: NaN, z: NaN, yaw: NaN };
+
   /** when they were last told dead */
   private diedAt = 0;
 
@@ -138,13 +141,29 @@ export class RemotePlayer implements Damageable {
    * up again on their own body, for as long as they stayed dead.)
    */
   seenAlive(now: number) {
-    if (!this.alive && now - this.diedAt > 3000) this.setAlive(true);
+    if (this.ready && !this.alive && now - this.diedAt > 3000) this.setAlive(true);
+  }
+
+  /** when they were last told alive */
+  private aliveAt = 0;
+
+  /**
+   * A position of theirs that says they are dead, while this game has them alive. Whatever stood them up (a word
+   * that they were back which their own game never acted on, one missed while their body was still being made
+   * here), they are not drawn standing over their own body while they are lying dead: 2026-10-12, "their player
+   * model spawned again over their dead body and was looking around but they couldn't move". Just after a return
+   * to life it is no news: their game sends a position or two before it has heard.
+   */
+  seenDead(now: number) {
+    if (this.ready && this.alive && now - this.aliveAt > 1500) this.setAlive(false);
   }
 
   setAlive(alive: boolean) {
-    if (alive === this.alive) return;
+    // (a body still being made here has nothing yet to stand up or lay down: what their positions say settles it when it is made)
+    if (alive === this.alive || !this.ready) return;
     this.alive = alive;
     if (!alive) this.diedAt = performance.now();
+    else this.aliveAt = performance.now();
     // back from the dead is a new life in clean clothes
     if (alive) this.avatar.clearWounds();
     this.fall = 0;
@@ -347,9 +366,17 @@ export class RemotePlayer implements Damageable {
       this.blocker.setEnabled(this.alive && !this.sat);
     }
 
-    const half = this.yaw / 2;
-    this.body.setNextKinematicTranslation(this.pos);
-    this.body.setNextKinematicRotation({ x: 0, y: Math.sin(half), z: 0, w: Math.cos(half) });
+    // (the physics is told where they are when they have moved: somebody standing still is not a body to work out afresh every step)
+    const was = this.told;
+    if (this.pos.x !== was.x || this.pos.y !== was.y || this.pos.z !== was.z || this.yaw !== was.yaw) {
+      was.x = this.pos.x;
+      was.y = this.pos.y;
+      was.z = this.pos.z;
+      was.yaw = this.yaw;
+      const half = this.yaw / 2;
+      this.body.setNextKinematicTranslation(this.pos);
+      this.body.setNextKinematicRotation({ x: 0, y: Math.sin(half), z: 0, w: Math.cos(half) });
+    }
 
     // (faint, and whatever they have put on or taken up since is made faint with them)
     if (this.ghost && (this.ghostT += dt) > 0.6) {

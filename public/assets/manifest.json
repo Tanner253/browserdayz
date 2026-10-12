@@ -172,64 +172,6 @@
   }
  },
  "models": {
-  "bolt_action_rifle_7_62": {
-   "url": "assets/models/bolt_action_rifle_7_62.glb",
-   "tags": [
-    "weapon"
-   ],
-   "bytes": 1092704,
-   "srcTris": 19985,
-   "tris": 19985,
-   "min": [
-    -0.6351,
-    -0.1088,
-    -0.0264
-   ],
-   "max": [
-    0.5959,
-    0.0957,
-    0.0402
-   ],
-   "lods": [
-    {
-     "url": "assets/models/bolt_action_rifle_7_62_lod1.glb",
-     "tris": 2757,
-     "far": 2,
-     "of": "1092704:1791709094271"
-    }
-   ],
-   "hi": "assets/models/hi/bolt_action_rifle_7_62.glb",
-   "hiBytes": 6179948
-  },
-  "service_pistol": {
-   "url": "assets/models/service_pistol.glb",
-   "tags": [
-    "weapon"
-   ],
-   "bytes": 625884,
-   "srcTris": 25064,
-   "tris": 25064,
-   "min": [
-    -0.1278,
-    -0.0521,
-    -0.0161
-   ],
-   "max": [
-    0.1738,
-    0.2285,
-    0.0157
-   ],
-   "lods": [
-    {
-     "url": "assets/models/service_pistol_lod1.glb",
-     "tris": 3334,
-     "far": 2,
-     "of": "625884:1791709094506"
-    }
-   ],
-   "hi": "assets/models/hi/service_pistol.glb",
-   "hiBytes": 2355640
-  },
   "ammo_box": {
    "url": "assets/models/ammo_box.glb",
    "tags": [
@@ -840,33 +782,6 @@
      "tris": 1600,
      "far": 2,
      "of": "561260:1791630570594"
-    }
-   ]
-  },
-  "life_jacket": {
-   "url": "assets/models/life_jacket.glb",
-   "tags": [
-    "loot"
-   ],
-   "bytes": 513840,
-   "srcTris": 8968,
-   "tris": 4498,
-   "min": [
-    -0.354,
-    -0.463,
-    -0.0889
-   ],
-   "max": [
-    0.3416,
-    0.5293,
-    0.0953
-   ],
-   "lods": [
-    {
-     "url": "assets/models/life_jacket_lod1.glb",
-     "tris": 1586,
-     "far": 2,
-     "of": "513840:1791630570690"
     }
    ]
   },
@@ -3052,26 +2967,6 @@
     0.8485,
     1.9,
     0.1347
-   ],
-   "lods": []
-  },
-  "bunker_chain": {
-   "url": "assets/models/bunker_chain.glb",
-   "tags": [
-    "prop"
-   ],
-   "bytes": 558852,
-   "srcTris": 8436,
-   "tris": 1152,
-   "min": [
-    -1.025,
-    0,
-    -0.0965
-   ],
-   "max": [
-    1.025,
-    0.1927,
-    0.0965
    ],
    "lods": []
   },

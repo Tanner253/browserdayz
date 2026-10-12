@@ -134,6 +134,10 @@ export class Infected implements Damageable {
   /** time its body has not been moved for (the far ones are posed every second or third frame) */
   private poseDt = 0;
   private frameNo = 0;
+  /** where the physics was last told this body is, and which way it faced (see `update`) */
+  private told = { x: NaN, y: NaN, z: NaN, yaw: NaN, n: 0 };
+  private toldHead = new THREE.Vector3(NaN, 0, 0);
+  private toldChest = new THREE.Vector3(NaN, 0, 0);
   private said: IState = [0, 0, 0, 0, -1, 0];
 
   constructor(public i: number, private host: HordeHost, private horde: Horde) {}
@@ -632,9 +636,20 @@ export class Infected implements Damageable {
       this.vel.z += ((this.pos.z - pz) / dt - this.vel.z) * k;
       this.vel.y = (this.pos.y - py) / dt;
     }
-    this.body.setNextKinematicTranslation(this.pos);
-    const half = this.yaw / 2;
-    this.body.setNextKinematicRotation({ x: 0, y: Math.sin(half), z: 0, w: Math.cos(half) });
+    // The physics is told where it is when it has moved, and not otherwise (2026-10-12). Told every frame, every one
+    // of them on the map was a body the physics had to work out afresh every step, moved or not: 1.6 ms of every
+    // frame for seventy-eight of them, most standing where they stood. One too far off to be drawn is told every
+    // sixth frame: nothing aimed at what cannot be seen is the worse for a body a hand's breadth behind itself.
+    const t = this.told;
+    if ((!far || (t.n++ + this.i) % 6 === 0) && (Math.abs(this.pos.x - t.x) + Math.abs(this.pos.y - t.y) + Math.abs(this.pos.z - t.z) > 1e-4 || Math.abs(this.yaw - t.yaw) > 1e-4 || t.x !== t.x)) {
+      t.x = this.pos.x;
+      t.y = this.pos.y;
+      t.z = this.pos.z;
+      t.yaw = this.yaw;
+      this.body.setNextKinematicTranslation(this.pos);
+      const half = this.yaw / 2;
+      this.body.setNextKinematicRotation({ x: 0, y: Math.sin(half), z: 0, w: Math.cos(half) });
+    }
     if (far) return;
     // (where it is, is said every frame: only its pose is done less often. Moved with the pose, one across the
     // street went in steps of two or three frames.)
@@ -657,8 +672,10 @@ export class Infected implements Damageable {
           const x = v.x - this.pos.x, z = v.z - this.pos.z;
           v.set(x * c - z * s, v.y - this.pos.y, x * s + z * c);
         }
-        this.zones[0].setTranslationWrtParent(_head);
-        this.zones[1].setTranslationWrtParent(_pelvis.lerp(_neck, 0.54));
+        // (moved when they have moved two millimetres: a body standing and breathing shifts its head by less each frame)
+        if (!(_head.distanceToSquared(this.toldHead) < 4e-6)) this.zones[0].setTranslationWrtParent(this.toldHead.copy(_head));
+        _pelvis.lerp(_neck, 0.54);
+        if (!(_pelvis.distanceToSquared(this.toldChest) < 4e-6)) this.zones[1].setTranslationWrtParent(this.toldChest.copy(_pelvis));
       }
       this.flinch = Math.max(0, this.flinch - dt * 4);
       if (this.flinch > 0) this.avatar.root.rotation.x += this.flinch * 0.06;

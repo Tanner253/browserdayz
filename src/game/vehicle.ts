@@ -543,18 +543,36 @@ export class Jeep {
     this.draw(dt);
   }
 
+  /** where it stood when its wheels were last let down, and for how many frames they have not moved since (see `draw`) */
+  private stoodAt = new THREE.Vector3(NaN, 0, 0);
+  private stoodQuat = new THREE.Quaternion();
+  private settled = 0;
+
   private draw(dt: number) {
     const D = this.d;
     this.root.position.copy(this.pos);
     this.root.quaternion.copy(this.quat);
+    // A jeep standing where it was left has its wheels on the ground already: what is under each is not asked
+    // again every frame (four questions of the physics a frame for every jeep on the map, sixteen of them: sixty-four
+    // a frame, most of all the questions the game asked). It is asked while it moves, until its wheels have come to
+    // rest, and twice a second after that in case what it stands on has gone.
+    const stood = this.mode === 'parked' && this.pos.equals(this.stoodAt) && this.quat.equals(this.stoodQuat);
+    if (!stood) {
+      this.stoodAt.copy(this.pos);
+      this.stoodQuat.copy(this.quat);
+      this.settled = 0;
+    }
+    const ask = this.mode !== 'sim' && dt > 0 && (this.settled < 3 || this.settled % 32 === 0);
+    let moved = 0;
     for (let i = 0; i < this.wheels.length; i++) {
       const w = this.wheels[i], at = this.hard[i];
-      if (this.mode !== 'sim' && dt > 0) {
+      if (ask) {
         // not sprung here: each wheel is simply let down onto whatever is under it
         _v.copy(at).applyQuaternion(this.quat).add(this.pos);
         _d.set(0, -1, 0).applyQuaternion(this.quat);
         const hit = physics.world.castRay(new physics.R.Ray(_v, _d), D.rest + D.radius, true, undefined, SOLID_GROUPS, undefined, this.body);
         const len = hit ? THREE.MathUtils.clamp(hit.timeOfImpact - D.radius, D.rest - D.travel, D.rest) : D.rest;
+        moved = Math.max(moved, Math.abs(len - this.susp[i]));
         this.susp[i] += (len - this.susp[i]) * (1 - Math.exp(-18 * dt));
       }
       const rear = i >= 2;
@@ -562,6 +580,8 @@ export class Jeep {
       w.position.set(at.x, at.y - this.susp[i], at.z);
       w.rotation.set(-this.spinAngle[i], rear ? 0 : this.steer, 0, 'YXZ');
     }
+    // (at rest: no wheel a tenth of a millimetre from where it is going)
+    if (stood && dt > 0) this.settled = ask && moved > 1e-4 ? 0 : this.settled + 1;
   }
 
   /** a point given in its own frame (x to its right, y up, z back), as it is drawn */

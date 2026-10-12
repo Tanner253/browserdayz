@@ -542,7 +542,6 @@ export const LOCAL_MODELS = {
   bunker_ladder: { dir: 'bunker_props', only: /^SM_MetalLadder/, size: 3.0, tex: 1024, tags: ['prop'], changes: 'Only these of its shapes are used here, scaled to the rooms of the bunker and stood on the ground; textures re-encoded as WebP; geometry compressed.' },
   bunker_pipe: { dir: 'bunker_props', only: /^SM_Tubes_JFG_1_M_/, size: 3.0, tex: 1024, tags: ['prop'], changes: 'Only these of its shapes are used here, scaled to the rooms of the bunker and stood on the ground; textures re-encoded as WebP; geometry compressed.' },
   bunker_pipes: { dir: 'bunker_props', only: /^SM_Tubes_JFG_5/, size: 1.9, tex: 1024, tags: ['prop'], changes: 'Only these of its shapes are used here, scaled to the rooms of the bunker and stood on the ground; textures re-encoded as WebP; geometry compressed.' },
-  bunker_chain: { dir: 'bunker_props', only: /^SM_Chain_1/, size: 2.05, tex: 1024, tags: ['prop'], changes: 'Only these of its shapes are used here, scaled to the rooms of the bunker and stood on the ground; textures re-encoded as WebP; geometry compressed.' },
   bunker_cable: { dir: 'bunker_props', only: /^SM_Cable_JFG_3/, size: 6, tex: 1024, tags: ['prop'], changes: 'Only these of its shapes are used here, scaled to the rooms of the bunker and stood on the ground; textures re-encoded as WebP; geometry compressed.' },
   // The hospital's fittings and the clinics' (2026-10-11): out of six downloads the user brought in, each a room's
   // worth of things in one file. Each is a few of its shapes picked out by name. (What stands on a floor is
@@ -816,8 +815,6 @@ export const WEAPON_PACKS = {
 
 export const MODELS = {
   // weapons (viewmodels get 2k textures)
-  bolt_action_rifle_7_62: { res: '2k', tex: 2048, tags: ['weapon'] },
-  service_pistol: { res: '2k', tex: 2048, tags: ['weapon'] },
   ammo_box: { res: '1k', tex: 1024, budget: 2500, tags: ['loot'] },
 
   // loot
@@ -846,7 +843,6 @@ export const MODELS = {
 
   // clothing and bags
   fishermans_hat: { res: '1k', tex: 1024, budget: 4000, tags: ['loot'] },
-  life_jacket: { res: '1k', tex: 1024, budget: 4500, tags: ['loot'] },
   rubber_boots: { res: '1k', tex: 1024, budget: 5000, tags: ['loot'] },
   garden_gloves_01: { res: '1k', tex: 512, budget: 3000, tags: ['loot'] },
   vintage_suitcase: { res: '1k', tex: 1024, budget: 5000, tags: ['loot'] },

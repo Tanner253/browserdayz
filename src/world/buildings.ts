@@ -202,7 +202,8 @@ const MACRO = new Set<MatKey>(['plaster_ext', 'brick_ext', 'planks_ext', 'int_pl
 const macroTone = (shader: { vertexShader: string; fragmentShader: string }) => {
   shader.vertexShader = shader.vertexShader
     .replace('#include <common>', '#include <common>\nvarying vec3 vMacroW;')
-    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvMacroW = ( modelMatrix * vec4( position, 1.0 ) ).xyz;');
+    // (where in the world a point is: of a thing drawn as one line of a list, that is through its own line of it)
+    .replace('#include <begin_vertex>', '#include <begin_vertex>\n#ifdef USE_INSTANCING\nvMacroW = ( modelMatrix * instanceMatrix * vec4( position, 1.0 ) ).xyz;\n#else\nvMacroW = ( modelMatrix * vec4( position, 1.0 ) ).xyz;\n#endif');
   shader.fragmentShader = shader.fragmentShader
     .replace(
       '#include <common>',
@@ -1120,10 +1121,83 @@ const HANDLES = mergeGeometries([new THREE.BoxGeometry(0.12, 0.03, 0.05).transla
 /** how far off a door's handle is still drawn, metres: it is a finger's length of steel */
 const HANDLE_SEEN = 45;
 
+/**
+ * Every door leaf of one size, and every door handle, drawn in one go (2026-10-12). Each leaf was a thing of its
+ * own to draw, a box of twelve triangles, and its handle another: in Kamenka three hundred of the picture's nine
+ * hundred draws were door leaves, and they were drawn again in each of the sun's shadow maps. The same boxes in the
+ * same places with the same paint; a leaf is moved by writing where it is into its line of the one list.
+ */
+export class DoorBatch {
+  private leaves = new Map<string, { mesh: THREE.InstancedMesh; n: number }>();
+  private handles: THREE.InstancedMesh;
+  private nHandles = 0;
+
+  constructor(scene: THREE.Scene, doors: Door[], mat: THREE.Material, handleMat: THREE.Material) {
+    const plain = doors.filter((d) => d.size);
+    const count = new Map<string, number>();
+    for (const d of plain) count.set(d.size!.join(), (count.get(d.size!.join()) ?? 0) + 1);
+    for (const [key, n] of count) {
+      const [w, h] = key.split(',').map(Number);
+      const mesh = new THREE.InstancedMesh(boxGeo(0, w - 0.02, 0, h - 0.02, -0.025, 0.025, 1.2, new THREE.Matrix4()), mat, n);
+      mesh.castShadow = mesh.receiveShadow = true;
+      mesh.renderOrder = WALLS_FIRST;
+      // (they stand all over the map: there is no one place to ask whether it is in sight)
+      mesh.frustumCulled = false;
+      mesh.matrixAutoUpdate = false;
+      mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      mesh.name = `doors ${key}`;
+      scene.add(mesh);
+      this.leaves.set(key, { mesh, n: 0 });
+    }
+    this.handles = new THREE.InstancedMesh(HANDLES, handleMat, Math.max(1, plain.length));
+    this.handles.frustumCulled = false;
+    this.handles.matrixAutoUpdate = false;
+    this.handles.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.handles.name = 'door handles';
+    scene.add(this.handles);
+    for (const d of plain) {
+      const l = this.leaves.get(d.size!.join())!;
+      d.hang(this, l.mesh, l.n++, this.nHandles++);
+    }
+  }
+
+  private static none = new THREE.Matrix4().makeScale(0, 0, 0);
+  private static m = new THREE.Matrix4();
+
+  /** a leaf is where its door's hinge now has it; its handle on it, if the handle is near enough to be drawn */
+  place(d: Door, leaf: THREE.InstancedMesh, at: number, handle: number) {
+    d.pivot.updateMatrix();
+    leaf.setMatrixAt(at, d.pivot.matrix);
+    leaf.instanceMatrix.needsUpdate = true;
+    this.handles.setMatrixAt(handle, d.handleShown ? DoorBatch.m.makeTranslation(d.size![0] - 0.12, 1.0, 0).premultiply(d.pivot.matrix) : DoorBatch.none);
+    this.handles.instanceMatrix.needsUpdate = true;
+  }
+}
+
 export class Door {
   pivot = new THREE.Group();
-  /** its handles (a door of the game's own making has them; a leaf out of a model is whatever it is) */
-  handle: THREE.Mesh | null = null;
+  /** how wide and high its leaf is, if it is a door of the game's own making (a leaf out of a model is whatever it is) */
+  size: [number, number] | null = null;
+  /** whether its handles are near enough to be drawn (see HANDLE_SEEN) */
+  handleShown = true;
+  private drawn: { batch: DoorBatch; leaf: THREE.InstancedMesh; at: number; handle: number } | null = null;
+
+  /** which line of which list its leaf and its handle are drawn from (see DoorBatch) */
+  hang(batch: DoorBatch, leaf: THREE.InstancedMesh, at: number, handle: number) {
+    this.drawn = { batch, leaf, at, handle };
+    this.place();
+  }
+
+  private place() {
+    if (this.drawn) this.drawn.batch.place(this, this.drawn.leaf, this.drawn.at, this.drawn.handle);
+  }
+
+  showHandle(on: boolean) {
+    if (on === this.handleShown) return;
+    this.handleShown = on;
+    this.place();
+  }
+
   body: RAPIER.RigidBody;
   open = false;
   angle = 0;
@@ -1142,7 +1216,7 @@ export class Door {
   /** a leaf that is hung outside what it shuts (a container's): it opens outward, whoever opens it and from where */
   private oneWay = false;
 
-  constructor(world: THREE.Matrix4, width: number, height: number, mat: THREE.Material, handleMat: THREE.Material, public id: string, leaf?: { mesh: THREE.Object3D; surface: Surface }) {
+  constructor(world: THREE.Matrix4, width: number, height: number, _mat: THREE.Material, _handleMat: THREE.Material, public id: string, leaf?: { mesh: THREE.Object3D; surface: Surface }) {
     // pivot sits on the hinge edge; panel extends along +x
     world.decompose(this.pivot.position, this.baseQuat, new THREE.Vector3());
     this.pivot.quaternion.copy(this.baseQuat);
@@ -1151,19 +1225,10 @@ export class Door {
       this.swing = 1;
       this.pivot.add(leaf.mesh);
     } else {
-      const panel = new THREE.Mesh(boxGeo(0, width - 0.02, 0, height - 0.02, -0.025, 0.025, 1.2, new THREE.Matrix4()), mat);
-      panel.castShadow = panel.receiveShadow = true;
-      panel.renderOrder = WALLS_FIRST;
-      // (its two handles, one each side, are one piece: each door was three things to draw, and there are 245 doors)
-      const handle = new THREE.Mesh(HANDLES, handleMat);
-      handle.position.set(width - 0.12, 1.0, 0);
-      this.handle = handle;
-      this.pivot.add(panel, handle);
-      // (the leaf and the handle do not move on the door: only the door does)
-      for (const m of [panel, handle]) {
-        m.matrixAutoUpdate = false;
-        m.updateMatrix();
-      }
+      // (Its leaf and its handles are not things of their own: they are drawn with every other door's, see
+      // DoorBatch. To the millimetre: a width worked out from a wall's two ends comes to 0.96 one time and
+      // 0.9599999 the next, and those were two sizes of door.)
+      this.size = [Math.round(width * 1000) / 1000, Math.round(height * 1000) / 1000];
     }
     const R = physics.R;
     this.body = physics.world.createRigidBody(
@@ -1242,6 +1307,7 @@ export class Door {
   private apply(teleport = false) {
     const q = this.baseQuat.clone().multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.angle));
     this.pivot.quaternion.copy(q);
+    this.place();
     if (teleport) this.body.setRotation(q, true);
     else this.body.setNextKinematicRotation(q);
   }
@@ -2737,7 +2803,15 @@ export class Buildings {
       tex.anisotropy = 8;
       const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.55, metalness: 0.25 });
       this.atmo.register(mat);
-      const board = new THREE.Mesh(new THREE.BoxGeometry(2.6 * (sg.size ?? 1), 0.65 * (sg.size ?? 1), 0.04), [this.material('trim'), this.material('trim'), this.material('trim'), this.material('trim'), mat, this.material('trim')]);
+      // (One face of it is the sign and the other five its edge: two things to draw, the edge and the face, where
+      // each of the six faces was one, and again in every shadow map. The fifth face changes places with the sixth
+      // so that the five of the edge come together.)
+      const slab = new THREE.BoxGeometry(2.6 * (sg.size ?? 1), 0.65 * (sg.size ?? 1), 0.04), ix = slab.index!.array;
+      for (let k = 0; k < 6; k++) [ix[24 + k], ix[30 + k]] = [ix[30 + k], ix[24 + k]];
+      slab.clearGroups();
+      slab.addGroup(0, 30, 0);
+      slab.addGroup(30, 6, 1);
+      const board = new THREE.Mesh(slab, [this.material('trim'), mat]);
       board.applyMatrix4(sg.m);
       board.castShadow = board.receiveShadow = true;
       scene.add(board);
@@ -2764,6 +2838,7 @@ export class Buildings {
       scene.add(d.pivot);
       this.doors.push(d);
     }
+    new DoorBatch(scene, this.doors, doorMat, handleMat);
     if (leaves.length) {
       void assets.model(CONTAINER.id).then((model) => {
         let src: THREE.Material | undefined;
@@ -2875,7 +2950,7 @@ export class Buildings {
     // (a door's handle is drawn where it can be seen: from across the street it is less than a pixel, and it was one more thing to draw for every door in sight)
     if (eye && (this.handlesT += dt) > 0.4) {
       this.handlesT = 0;
-      for (const d of this.doors) if (d.handle) d.handle.visible = (d.pivot.position.x - eye.x) ** 2 + (d.pivot.position.z - eye.z) ** 2 < HANDLE_SEEN * HANDLE_SEEN;
+      for (const d of this.doors) if (d.size) d.showHandle((d.pivot.position.x - eye.x) ** 2 + (d.pivot.position.z - eye.z) ** 2 < HANDLE_SEEN * HANDLE_SEEN);
     }
   }
 }

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { breathe } from './breathe';
 
 export interface MeshPart {
@@ -90,6 +91,27 @@ export function dequantize(g: THREE.BufferGeometry): THREE.BufferGeometry {
     g.setAttribute(name, new THREE.BufferAttribute(out, a.itemSize));
   }
   return g;
+}
+
+/**
+ * The pieces of a thing that are painted with the one paint, made one piece: the same triangles, told to the
+ * graphics card in one go instead of one go a piece. (A stove came as forty pieces of one paint, and was forty
+ * things to draw in the picture and forty again in each of the sun's three shadow maps: a hundred and fifty draws
+ * for five thousand triangles.) Pieces that cannot be made one, having different things said of their points, are
+ * left as they were. The pieces handed in are not changed.
+ */
+export function joinByPaint(parts: MeshPart[]): MeshPart[] {
+  const by = new Map<THREE.Material, MeshPart[]>();
+  for (const p of parts) by.set(p.material, [...(by.get(p.material) ?? []), p]);
+  const said = (g: THREE.BufferGeometry) => `${!!g.index}|${Object.keys(g.attributes).sort().map((k) => `${k}${g.attributes[k].itemSize}${g.attributes[k].array.constructor.name}${g.attributes[k].normalized}`).join()}|${Object.keys(g.morphAttributes).length}`;
+  const made: MeshPart[] = [];
+  for (const [material, list] of by) {
+    const alike = list.every((p) => said(p.geometry) === said(list[0].geometry));
+    const one = list.length > 1 && alike ? mergeGeometries(list.map((p) => p.geometry), false) : null;
+    if (one) made.push({ ...list[0], geometry: one, material });
+    else made.push(...list);
+  }
+  return made;
 }
 
 /** Names of the top-level child nodes (one per object in a multi-object pack). */

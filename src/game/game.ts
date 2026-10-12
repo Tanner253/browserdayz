@@ -363,7 +363,8 @@ export class Game {
     this.near = new Near(r.scene);
     // (no model of a thing is fetched here any more: each is, when a thing of its kind is first near. See LootManager.spawn.)
     // (never waited on for long: a card that will not say its shaders are made is not what keeps a thing out of the world)
-    this.loot.models.onMade = (tpl) => Promise.race([r.ready(tpl.group).then(() => r.send(tpl.group)), new Promise<void>((done) => setTimeout(done, 1500))]);
+    // (both ways it is drawn: by itself in the hands, and as a line of the list of its kind on the ground)
+    this.loot.models.onMade = (tpl) => Promise.race([r.ready([tpl.group, ...this.loot.drawnWith(tpl)]).then(() => r.send(tpl.group)), new Promise<void>((done) => setTimeout(done, 1500))]);
     this.loot.onPlaced = (l) => this.lootPlaced(l);
     this.grenades = new Grenades(r.scene, this.loot.models);
     await this.grenades.preload();
@@ -1232,6 +1233,7 @@ export class Game {
         r.push([s[1], s[2], s[3], s[4], s[5], s[6]], now);
         r.setWeapon(s[7], s[8]);
         if (!(s[6] & F_DEAD)) r.seenAlive(now);
+        else r.seenDead(now);
       }
     });
     net.on('i+', (m) => this.horde.add(m.b));
@@ -4229,7 +4231,7 @@ export class Game {
     }
     for (const d of this.drops.values()) if (d.at.distanceToSquared(cam.position) < 420 * 420) this.effects.signal(d.at, d.smoke, dt, !!d.wreck);
     this.effects.update(dt);
-    this.loot.update(cam.position, dt);
+    this.loot.update(cam.position, dt, cam);
     this.near.update(cam.position, dt);
     // (The thing looked at, close enough to pick up: its pictures at the size they came, as if it were in the
     // hands already. Everything further off is drawn with the world's copies, which at that distance are more
@@ -4237,7 +4239,7 @@ export class Game {
     const close = this.focus instanceof WorldItem ? this.focus : null;
     if ((this.sharpFocus?.of ?? null) !== close) {
       const was = this.sharpFocus;
-      this.sharpFocus = close ? { of: close, drop: assets.sharpen(close.obj, true) } : null;
+      this.sharpFocus = close ? { of: close, drop: assets.sharpen(close.paints(), true) } : null;
       was?.drop();
     }
 

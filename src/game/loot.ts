@@ -15,7 +15,7 @@ import { fitsPoint } from '../sim/placement';
 import { proceduralParts } from './procedural';
 import { Container } from '../sim/inventory';
 import type { WorldLoot } from '../sim/economy';
-import type { Atmosphere } from '../world/atmosphere';
+import { SHADOW_FRUSTA, type Atmosphere } from '../world/atmosphere';
 import type { LootPoint } from '../world/buildings';
 
 export interface ItemTemplate {
@@ -41,6 +41,7 @@ const COLD_AFTER = 15;
 const WHOLE_WITHIN = 9, WHOLE_UNTIL = 11;
 
 const TRIGGER_GROUPS = groups(G_TRIGGER, 0xffff);
+const _frustum = new THREE.Frustum(), _pv = new THREE.Matrix4(), _inv = new THREE.Matrix4(), _ball = new THREE.Sphere();
 const DOWN = { x: 0, y: -1, z: 0 };
 const UP = new THREE.Vector3(0, 1, 0);
 
@@ -274,26 +275,192 @@ export class ItemModels {
   }
 }
 
+/** one piece of a kind of thing: every one of that kind in sight in one draw, and every one near enough to cast a shadow in another, drawn only into the shadow maps */
+type BatchPart = { local: THREE.Matrix4; seen: THREE.InstancedMesh; cast: THREE.InstancedMesh };
+type Batch = { parts: BatchPart[]; seen: WorldItem[]; cast: WorldItem[]; room: number };
+const _bm = new THREE.Matrix4();
+
+/**
+ * Things lying about, drawn a kind at a time (2026-10-12). Each thing was a thing of its own to draw, and one more
+ * in each of the sun's shadow maps: in the hospital's corridor, forty-nine rolls of tape, thirty-three syringes
+ * and two dozen boxes were a quarter of everything the graphics card was told to do in a frame. Every one of a
+ * kind is now one line in a list, and the list is drawn in one go: the same shapes with the same paint in the same
+ * places. A model with anything in it that is seen through (which has to be drawn in order of distance, a thing at
+ * a time) is left a thing of its own, as before.
+ */
+export class LootBatches {
+  private batches = new Map<ItemTemplate, Batch | null>();
+
+  constructor(private scene: THREE.Scene) {}
+
+  private of(tpl: ItemTemplate): Batch | null {
+    let b = this.batches.get(tpl);
+    if (b !== undefined) return b;
+    const meshes = tpl.group.children as THREE.Mesh[];
+    const plain = meshes.length > 0 && meshes.every((m) => m.isMesh && !m.children.length && !Array.isArray(m.material) && !(m.material as THREE.Material).transparent);
+    b = plain
+      ? {
+          parts: meshes.map((m) => {
+            m.updateMatrix();
+            return { local: m.matrix.clone(), seen: this.list(m, 16, false), cast: this.list(m, 16, true) };
+          }),
+          seen: [],
+          cast: [],
+          room: 16,
+        }
+      : null;
+    this.batches.set(tpl, b);
+    return b;
+  }
+
+  private list(like: THREE.Mesh, room: number, cast: boolean) {
+    const im = new THREE.InstancedMesh(like.geometry, like.material as THREE.Material, room);
+    im.count = 0;
+    im.visible = false;
+    im.matrixAutoUpdate = false;
+    im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    im.castShadow = cast;
+    im.receiveShadow = true;
+    if (cast) {
+      // (in the shadow maps and not in the view: three asks this of every pass it draws)
+      im.frustumCulled = true;
+      im.intersectsFrustum = (f) => SHADOW_FRUSTA.has(f);
+    } else im.frustumCulled = false;
+    im.name = `loot${cast ? ' shadows' : ''}`;
+    this.scene.add(im);
+    return im;
+  }
+
+  private grow(b: Batch) {
+    b.room *= 2;
+    for (const p of b.parts) {
+      for (const key of ['seen', 'cast'] as const) {
+        const old = p[key], im = this.list(old, b.room, key === 'cast');
+        (im.instanceMatrix.array as Float32Array).set(old.instanceMatrix.array as Float32Array);
+        im.count = old.count;
+        im.visible = old.visible;
+        im.instanceMatrix.needsUpdate = true;
+        this.scene.remove(old);
+        old.dispose();
+        p[key] = im;
+      }
+    }
+  }
+
+  private write(b: Batch, key: 'seen' | 'cast', at: number, item: WorldItem) {
+    for (const p of b.parts) {
+      const im = p[key];
+      _bm.multiplyMatrices(item.obj.matrix, p.local).toArray(im.instanceMatrix.array as Float32Array, at * 16);
+      im.instanceMatrix.needsUpdate = true;
+    }
+  }
+
+  private put(b: Batch, key: 'seen' | 'cast', item: WorldItem) {
+    const arr = b[key];
+    if (arr.length >= b.room) this.grow(b);
+    item.drawn![key] = arr.length;
+    arr.push(item);
+    this.write(b, key, arr.length - 1, item);
+    for (const p of b.parts) {
+      p[key].count = arr.length;
+      p[key].visible = true;
+    }
+  }
+
+  private take(b: Batch, key: 'seen' | 'cast', item: WorldItem) {
+    const arr = b[key], at = item.drawn![key], last = arr.length - 1;
+    if (at < 0) return;
+    if (at !== last) {
+      // (the last of the list takes its line)
+      const moved = arr[last];
+      arr[at] = moved;
+      moved.drawn![key] = at;
+      for (const p of b.parts) {
+        (p[key].instanceMatrix.array as Float32Array).copyWithin(at * 16, last * 16, last * 16 + 16);
+        p[key].instanceMatrix.needsUpdate = true;
+      }
+    }
+    arr.pop();
+    item.drawn![key] = -1;
+    for (const p of b.parts) {
+      p[key].count = arr.length;
+      p[key].visible = arr.length > 0;
+    }
+  }
+
+  /**
+   * How one of them is drawn from now on: with which model, whether in the picture, whether in the shadow maps.
+   * @returns false if that model is not one that is drawn so (the thing is then to draw itself)
+   */
+  draw(item: WorldItem, tpl: ItemTemplate | null, seen: boolean, cast: boolean): boolean {
+    const b = tpl ? this.of(tpl) : null;
+    const was = item.drawn;
+    if (was && (was.batch !== b || (!seen && !cast))) {
+      this.take(was.batch, 'seen', item);
+      this.take(was.batch, 'cast', item);
+      item.drawn = null;
+    }
+    if (!b) return !tpl;
+    if (!seen && !cast) return true;
+    const d = (item.drawn ??= { batch: b, seen: -1, cast: -1 });
+    if (seen && d.seen < 0) this.put(b, 'seen', item);
+    else if (!seen && d.seen >= 0) this.take(b, 'seen', item);
+    if (cast && d.cast < 0) this.put(b, 'cast', item);
+    else if (!cast && d.cast >= 0) this.take(b, 'cast', item);
+    return true;
+  }
+
+  /**
+   * The lists a model is drawn from, made now (empty) for whoever gets its shaders ready before it is first drawn:
+   * a thing drawn as a line of a list is drawn by another shader than the same thing drawn by itself, and made in
+   * the frame it was first needed that shader was a fifth of a second of nothing drawn, for each kind of thing.
+   */
+  lists(tpl: ItemTemplate): THREE.Object3D[] {
+    return this.of(tpl)?.parts.flatMap((p) => [p.seen, p.cast]) ?? [];
+  }
+
+  /** it has moved (it is falling from a hand) */
+  moved(item: WorldItem) {
+    const d = item.drawn;
+    if (!d) return;
+    if (d.seen >= 0) this.write(d.batch, 'seen', d.seen, item);
+    if (d.cast >= 0) this.write(d.batch, 'cast', d.cast, item);
+  }
+}
+
 export class WorldItem {
+  /** where it lies and which way: nothing of it hangs here unless it is a thing drawn by itself (see `redraw`) */
   obj: THREE.Object3D;
   collider: RAPIER.Collider;
+  /** its own shapes, when it is drawn as a thing of its own */
   private meshes: THREE.Mesh[] = [];
-  private shadows = true;
-  constructor(public loot: WorldLoot, public tpl: ItemTemplate, scene: THREE.Scene, normal: THREE.Vector3 | null) {
-    this.obj = tpl.group.clone();
+  private own: ItemTemplate | null = null;
+  /** which lines of which lists it is drawn from, when it is drawn with the others of its kind (see LootBatches) */
+  drawn: { batch: Batch; seen: number; cast: number } | null = null;
+  /** the model it is drawn with now */
+  private model: ItemTemplate;
+  /** near enough to be drawn at all; in the picture; in the shadow maps */
+  private within = true;
+  private seen = true;
+  private casts = true;
+  /** half the size of what holds all of it, for asking whether it is in sight */
+  readonly reach: number;
+
+  constructor(public loot: WorldLoot, public tpl: ItemTemplate, private scene: THREE.Scene, normal: THREE.Vector3 | null, private batches: LootBatches) {
+    this.model = tpl;
+    this.reach = tpl.size.length() / 2;
+    this.obj = new THREE.Group();
+    this.obj.scale.copy(tpl.group.scale);
     this.obj.position.set(loot.x, loot.y, loot.z);
     const q = new THREE.Quaternion().setFromAxisAngle(UP, loot.rot);
     // on sloped ground the item lies flat on the slope
     if (normal && normal.y < 0.9995) q.premultiply(new THREE.Quaternion().setFromUnitVectors(UP, normal));
     this.obj.quaternion.copy(q);
-    this.obj.traverse((o) => {
-      if ((o as THREE.Mesh).isMesh) this.meshes.push(o as THREE.Mesh);
-      // (it lies where it lies: where it is, is worked out when it is put there, and not again on every frame)
-      o.matrixAutoUpdate = false;
-      o.updateMatrix();
-    });
+    // (it lies where it lies: where it is, is worked out when it is put there, and not again on every frame)
+    this.obj.matrixAutoUpdate = false;
+    this.obj.updateMatrix();
     restWhileHidden(this.obj);
-    scene.add(this.obj);
+    this.redraw();
     const hx = Math.max(0.08, tpl.size.x / 2 + 0.03);
     const hy = Math.max(0.06, tpl.size.y / 2 + 0.02);
     const hz = Math.max(0.08, tpl.size.z / 2 + 0.03);
@@ -316,6 +483,7 @@ export class WorldItem {
     this.obj.position.copy(from);
     this.obj.quaternion.copy(this.toss.spin);
     this.obj.updateMatrix();
+    this.batches.moved(this);
   }
 
   /** advance the fall; true once it has landed */
@@ -334,6 +502,7 @@ export class WorldItem {
       this.toss = null;
     }
     this.obj.updateMatrix();
+    this.batches.moved(this);
   }
 
   get flying() {
@@ -353,29 +522,60 @@ export class WorldItem {
   useModel(tpl: ItemTemplate, whole: boolean) {
     if (this.whole === whole) return;
     this.whole = whole;
-    for (const m of this.meshes) this.obj.remove(m);
-    this.meshes = [];
-    for (const c of tpl.group.children) {
-      if (!(c as THREE.Mesh).isMesh) continue;
-      const m = (c as THREE.Mesh).clone();
-      m.castShadow = this.shadows;
-      m.matrixAutoUpdate = false;
-      m.updateMatrix();
-      this.obj.add(m);
-      this.meshes.push(m);
-    }
-    this.obj.updateMatrixWorld(true);
+    this.model = tpl;
+    this.redraw();
   }
 
-  /** each shadow-casting mesh is drawn once per shadow cascade: only worth it up close */
-  setShadows(on: boolean) {
-    if (on === this.shadows) return;
-    this.shadows = on;
-    for (const m of this.meshes) m.castShadow = on;
+  /**
+   * Whether it is drawn: near enough to be drawn at all, in the picture (in front of the eye), and in the shadow
+   * maps (a shadow is only worth it up close, and is cast from behind the eye as well as before it).
+   */
+  show(within: boolean, seen: boolean, casts: boolean) {
+    if (within === this.within && seen === this.seen && casts === this.casts) return;
+    this.within = within;
+    this.seen = seen;
+    this.casts = casts;
+    this.redraw();
+  }
+
+  /** what it is painted with now (for whoever wants its pictures at the size they came) */
+  paints(): THREE.Material[] {
+    return (this.model.group.children as THREE.Mesh[]).flatMap((m) => (m.isMesh ? (Array.isArray(m.material) ? m.material : [m.material]) : []));
+  }
+
+  private redraw() {
+    if (this.batches.draw(this, this.model, this.within && this.seen, this.within && this.casts)) {
+      if (this.own) {
+        this.scene.remove(this.obj);
+        for (const m of this.meshes) this.obj.remove(m);
+        this.meshes = [];
+        this.own = null;
+      }
+      return;
+    }
+    // (a model with something in it that is seen through: a thing of its own, as every thing used to be)
+    if (this.own !== this.model) {
+      for (const m of this.meshes) this.obj.remove(m);
+      this.meshes = [];
+      for (const c of this.model.group.children) {
+        if (!(c as THREE.Mesh).isMesh) continue;
+        const m = (c as THREE.Mesh).clone();
+        m.matrixAutoUpdate = false;
+        m.updateMatrix();
+        this.obj.add(m);
+        this.meshes.push(m);
+      }
+      if (!this.own) this.scene.add(this.obj);
+      this.own = this.model;
+      this.obj.updateMatrixWorld(true);
+    }
+    this.obj.visible = this.within;
+    for (const m of this.meshes) m.castShadow = this.casts;
   }
 
   dispose(scene: THREE.Scene) {
-    scene.remove(this.obj);
+    this.batches.draw(this, null, false, false);
+    if (this.own) scene.remove(this.obj);
     physics.tags.delete(this.collider.handle);
     physics.world.removeCollider(this.collider, false);
   }
@@ -533,8 +733,11 @@ export class LootManager {
   onPlaced: (l: WorldLoot) => void = () => {};
   private pending = new Set<string>();
 
+  private batches: LootBatches;
+
   constructor(private scene: THREE.Scene, atmo: Atmosphere, private points: LootPoint[]) {
     this.models = new ItemModels(atmo);
+    this.batches = new LootBatches(scene);
     // (a thing repainted from its model's picture reads that picture when it is first made, whenever that is)
     for (const d of Object.values(ITEMS)) if (d.paint !== undefined && !d.model.startsWith('@')) assets.keepPictures(d.model);
   }
@@ -548,6 +751,11 @@ export class LootManager {
   private waiting = new Map<string, WorldLoot>();
   private eye: THREE.Vector3 | null = null;
   private looked = 0;
+
+  /** what a model is drawn with in the world, besides itself: the lists every one of its kind is a line of (see LootBatches) */
+  drawnWith(tpl: ItemTemplate): THREE.Object3D[] {
+    return this.batches.lists(tpl);
+  }
 
   /** every thing lying in the world, made or not (what looks for one of a kind anywhere on the map asks this) */
   lying(): WorldLoot[] {
@@ -577,7 +785,7 @@ export class LootManager {
       if (!this.pending.has(l.uid)) return; // despawned before the model loaded
       this.pending.delete(l.uid);
       const normal = this.place(l, tpl);
-      const w = new WorldItem(l, tpl, this.scene, normal);
+      const w = new WorldItem(l, tpl, this.scene, normal, this.batches);
       this.items.set(l.uid, w);
       const hand = this.hands.get(l.uid);
       if (hand) {
@@ -745,7 +953,13 @@ export class LootManager {
    * Distance culling. Every item is its own draw call, and one more in each shadow
    * cascade: a tin of beans is a few pixels at 55 m and its shadow is less than one at 26.
    */
-  update(cam: THREE.Vector3, dt = 0) {
+  update(cam: THREE.Vector3, dt = 0, view?: THREE.Camera) {
+    // (what the eye can see of them: a thing behind it is not told to the card. Asked of a view a metre and a half
+    // wider than the thing: the eye turns between this and the picture being drawn.)
+    if (view) {
+      view.updateMatrixWorld();
+      _frustum.setFromProjectionMatrix(_pv.multiplyMatrices((view as THREE.PerspectiveCamera).projectionMatrix, _inv.copy(view.matrixWorld).invert()));
+    }
     for (const w of this.falling) {
       w.update(dt);
       if (!w.flying) this.falling.delete(w);
@@ -766,8 +980,13 @@ export class LootManager {
     for (const w of this.items.values()) {
       const d2 = (w.loot.x - cam.x) ** 2 + (w.loot.z - cam.z) ** 2;
       const near = d2 < 55 * 55;
-      w.obj.visible = near;
-      w.setShadows(d2 < s2);
+      let seen = near;
+      if (near && view && d2 > 16) {
+        _ball.center.set(w.loot.x, w.loot.y, w.loot.z);
+        _ball.radius = w.reach + 1.5;
+        seen = _frustum.intersectsSphere(_ball);
+      }
+      w.show(near, seen, d2 < s2);
       if (near) {
         w.tpl.seen = this.clock;
         w.tpl.cold = false;

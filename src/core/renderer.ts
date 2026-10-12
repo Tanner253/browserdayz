@@ -178,10 +178,11 @@ export class Renderer {
    * the graphics card's own workers where it has them, and this is over when they are. The thing is put into the
    * world after: its first frame then costs what any other does.
    */
-  async ready(obj: THREE.Object3D) {
+  async ready(obj: THREE.Object3D | THREE.Object3D[]) {
     const prev = this.renderer.getRenderTarget();
     this.renderer.setRenderTarget(this.composer.inputBuffer);
-    const made = this.renderer.compile(obj, this.camera, this.scene) as unknown as Set<THREE.Material>;
+    const made = new Set<THREE.Material>();
+    for (const o of Array.isArray(obj) ? obj : [obj]) for (const m of this.renderer.compile(o, this.camera, this.scene) as unknown as Set<THREE.Material>) made.add(m);
     this.renderer.setRenderTarget(prev);
     // (The library's own waiting asks the card every hundredth of a second, of every material, whether its shader
     // is made; and each asking is a trip to the card and back, behind whatever the card is busy with: 17 ms

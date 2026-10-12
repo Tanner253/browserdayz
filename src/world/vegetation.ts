@@ -7,7 +7,7 @@ import { CONTAINER, CRATE_KINDS, SEARCHED_KINDS, paintBlue } from './buildings';
 import { spotKey } from './bunker';
 import { assets, type TreeEntry } from '../core/assets';
 import { physics, type Surface } from '../core/physics';
-import { extractParts, groundParts, type MeshPart } from '../core/gltf-utils';
+import { extractParts, groundParts, joinByPaint, type MeshPart } from '../core/gltf-utils';
 import { antiFirefly, SHADOW_FRUSTA, type Atmosphere } from './atmosphere';
 import { foliagePatch, setLodFade, wind } from './foliage';
 import { heightAt, type Instance, type World } from './worldgen';
@@ -724,8 +724,9 @@ export class Vegetation {
           const isFern = id.startsWith('fern') || id.startsWith('dry_branches');
           if (ON_ITS_WHEELS.has(id)) for (const it of instances) it.lean = leanOn(this.world, it, size.x / 2, size.z / 2);
           const set = new LodSet(instances, { cullRadius: Math.max(size.x, size.y, size.z), shadowRadius: 20 }, kind);
+          // (drawn a paint at a time, not a piece at a time: see joinByPaint. What it is solid as, below, is still its pieces.)
           const mats = (parts: MeshPart[], fadeIn: [number, number] | null, fadeOut: [number, number] | null) =>
-            parts.map((p) => {
+            joinByPaint(parts).map((p) => {
               const m = (p.material as THREE.MeshStandardMaterial).clone();
               if (isFern) {
                 m.side = THREE.DoubleSide;
