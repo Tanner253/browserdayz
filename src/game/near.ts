@@ -44,6 +44,17 @@ interface Seen {
  */
 const REACH = TOUCH ? 6.5 : 5.4;
 
+/**
+ * How much of the graphics card everything sharp may have at once, megabytes (2026-10-12). A picture of four
+ * thousand pixels a side is 85 MB there, and a thing may have ten. With nothing to hold it, standing in the
+ * hospital had two and a half gigabytes of them on a card of eight that the game at 5120x1440 had already
+ * five and a half of: the card was full, and the game went at fourteen frames a second for as long as one stood
+ * there. What is nearest for its size is sharp first; what there is no room for is drawn with the world's copy,
+ * as it is from a few steps further off, until there is. The nearest thing of all is never left out, and what
+ * is in the hands or looked at is not this file's to refuse: it is taken off what is left for the rest.
+ */
+const SHARP_BUDGET_MB = 900;
+
 const _v = new THREE.Vector3(), _m = new THREE.Matrix4();
 
 export class Near {
@@ -100,9 +111,11 @@ export class Near {
     }
     if ((this.measureT += dt) < MEASURE_EVERY) return;
     this.measureT = 0;
-    for (const s of this.seen.values()) {
+    const want: { s: Seen; nearness: number; cost: number }[] = [];
+    let mine = 0;
+    for (const [id, s] of this.seen) {
       // how near the nearest piece of it is, in that piece's own reaches (see REACH); and the same a little further out, for letting go
-      let near = false, about = false;
+      let near = false, about = false, nearness = Infinity;
       for (const a of s.at) {
         const moving = a.length === 3;
         const p = moving ? _v.copy(a[1]).applyMatrix4(a[0].matrixWorld) : a[0];
@@ -110,12 +123,28 @@ export class Near {
         const d = p.distanceTo(eye);
         if (d < r * REACH + 2) near = true;
         if (d < r * REACH * 1.25 + 5) about = true;
-        if (near) break;
+        nearness = Math.min(nearness, d / (r * REACH + 2));
       }
-      if (!s.drop && near && s.mats.size) s.drop = assets.sharpen([...s.mats]);
-      else if (s.drop && (!about || !s.mats.size)) {
+      const cost = assets.sharpCost(id);
+      if (s.drop) mine += cost;
+      if (s.mats.size && (s.drop ? about : near)) want.push({ s, nearness: s.drop ? nearness * 0.8 : nearness, cost });
+      else if (s.drop) {
         s.drop();
         s.drop = null;
+      }
+    }
+    // (the nearest for its size first; one that is sharp already counts as a little nearer than it is, so that two
+    // things at the edge of what there is room for do not take turns)
+    want.sort((a, b) => a.nearness - b.nearness);
+    const room = SHARP_BUDGET_MB - (assets.sharpMB - mine);
+    let used = 0;
+    for (const [k, w] of want.entries()) {
+      if (k === 0 || used + w.cost <= room) {
+        used += w.cost;
+        w.s.drop ??= assets.sharpen([...w.s.mats]);
+      } else if (w.s.drop) {
+        w.s.drop();
+        w.s.drop = null;
       }
     }
   }

@@ -27,6 +27,9 @@ export interface QualitySettings {
  * Owns the WebGL renderer and the post-processing chain:
  *   world pass -> N8AO -> viewmodel pass (own FOV, depth cleared) -> bloom/tonemap/grade
  */
+/** a picture of more points than this has its corners shaded at half size (see `resize`): 1920x1200 is under it, 2560x1440 over */
+const AO_WHOLE_UP_TO = 3.0e6;
+
 export class Renderer {
   readonly renderer: THREE.WebGLRenderer;
   readonly scene = new THREE.Scene();
@@ -142,7 +145,6 @@ export class Renderer {
     Object.assign(this.quality, q);
     this.composer.multisampling = this.quality.msaa;
     this.ao.enabled = this.quality.ao;
-    if (this.ao.configuration.halfRes !== this.quality.aoHalfRes) this.ao.configuration.halfRes = this.quality.aoHalfRes;
     this.resize();
   }
 
@@ -151,6 +153,16 @@ export class Renderer {
     const h = window.innerHeight;
     // the screen's own pixels times the share the player chose: never changed behind their back
     const pr = Math.min(window.devicePixelRatio, 2) * this.quality.renderScale;
+    // The shading of corners is worked out at half the picture's size each way, and spread back over it by depth,
+    // once the picture is a big one (2026-10-12). It looks, for each point, at eight places within a metre and a
+    // half of it, and for whatever is near the eye those are spread over half the screen: at 5120x1440 it was 6 to
+    // 10 ms of the graphics card's 20 to 30 a frame, and 49 of 69 in the hospital's long ward (fourteen frames a
+    // second, for that alone). At half size it is 4. Laid over one another with the game held still, at that
+    // screen's own size, the two pictures are 0.4 to 1.3 apart in 255 on average, and ninety-nine points in a
+    // hundred within 3 to 14: what differs is the edges of grass. A small picture keeps it at its own size, where
+    // it costs little and half of it is coarse.
+    const half = this.quality.aoHalfRes || w * h * pr * pr > AO_WHOLE_UP_TO;
+    if (this.ao.configuration.halfRes !== half) this.ao.configuration.halfRes = half;
     this.renderer.setPixelRatio(pr);
     this.renderer.setSize(w, h, false);
     this.composer.setSize(w, h, false);

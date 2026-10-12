@@ -25,6 +25,8 @@ export interface ModelEntry {
    * within arm's reach (see `sharpen`).
    */
   hi?: string;
+  /** what that copy's pictures weigh on the graphics card once unpacked there, megabytes (scripts/hi-card.mjs) */
+  hiCard?: number;
 }
 
 export interface Manifest {
@@ -651,6 +653,18 @@ export class Assets {
       // (a moment on: whoever asked for these has by then put them in the line to go on)
       setTimeout(() => this.sharpNext(), 0);
     }
+  }
+
+  /** what a model's own pictures weigh on the graphics card, megabytes */
+  sharpCost(id: string) {
+    return this.manifest.models[id]?.hiCard ?? 64;
+  }
+
+  /** megabytes of the card that everything sharp now has, is about to have, or has not yet given back */
+  get sharpMB() {
+    let mb = 0;
+    for (const id of this.sharp.keys()) mb += this.sharpCost(id);
+    return mb;
   }
 
   private holdSharp(id: string, first = false): Promise<Painted[]> {

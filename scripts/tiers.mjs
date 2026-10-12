@@ -35,6 +35,17 @@ export const WORLD_CAP_OTHER = 512;
 /** what the world's copy says of itself: how it was made. One made another way is made again from the copy as it came. */
 const MARK = `world ${WORLD_CAP}/${WORLD_CAP_OTHER}`;
 const COLOUR = /baseColor|emissive|diffuse/i;
+/**
+ * A model whose pictures as they came are bigger than anything on a screen can show of it has them made no bigger
+ * than this, in its full-size copy too. The x-ray viewer on the hospital's wall came with ten pictures of 4096 a
+ * side: 853 MB on the graphics card for a light box a metre and a half across, painted at two and a half to four
+ * thousand pixels to the metre. At 2048 it is painted as finely as the rest of the hospital's furniture came
+ * (1,200 to 2,000 to the metre, which is what a 1440-line screen shows of a thing half a metre off) and is 213 MB.
+ * Nothing that is held in the hands is in this list.
+ */
+const HI_CAP = { xray_viewer: 2048 };
+/** megabytes a file's pictures are on the graphics card once unpacked there: four bytes a pixel, and a third again for the smaller copies the card makes */
+const onCard = (doc) => Math.round(doc.getRoot().listTextures().reduce((s, t) => { const [w, h] = t.getSize() ?? [0, 0]; return s + (w * h * 4 * 4) / 3 / 1048576; }, 0));
 
 let io;
 async function getIO() {
@@ -71,7 +82,14 @@ export async function tierModels(entries, { SRC, OUT }) {
       const fresh = !mark && big > WORLD_CAP;
       if (fresh || (mark && mark !== MARK)) {
         // (a fresh one is kept as it came; a world's copy made by an older rule is made again from the one that was kept)
-        if (fresh) await fs.copyFile(dest, hi);
+        if (fresh) {
+          await fs.copyFile(dest, hi);
+          if (HI_CAP[id]) {
+            const capped = await (await getIO()).read(hi);
+            await capped.transform(textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [HI_CAP[id], HI_CAP[id]], quality: 92 }));
+            await (await getIO()).write(hi, capped);
+          }
+        }
         const full = fresh ? doc : await (await getIO()).read(hi);
         const was = Math.max(0, ...full.getRoot().listTextures().map((t) => Math.max(...(t.getSize() ?? [0, 0]))));
         await full.transform(
@@ -97,6 +115,13 @@ export async function tierModels(entries, { SRC, OUT }) {
       const hs = await fs.stat(hi);
       entry.hi = `assets/models/hi/${id}.glb`;
       entry.hiBytes = hs.size;
+      // (what it weighs on the card, for the game's budget of what is sharp at once: src/game/near.ts. Worked out
+      // once for each copy as it stands, and again if the copy changes.)
+      if (seen[id].card === undefined || seen[id].cardOf !== hs.size) {
+        seen[id].card = onCard(await (await getIO()).read(hi));
+        seen[id].cardOf = hs.size;
+      }
+      entry.hiCard = seen[id].card;
       full += hs.size;
     }
   }
