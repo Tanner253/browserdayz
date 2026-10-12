@@ -263,7 +263,7 @@ function saveWorld() {
 //
 // A tag counts for a reward only if this server watched it happen: the tag came off a body
 // the server itself made when its owner died, somebody else has carried it, and the hold
-// time (TAG_HOLD, ten minutes) of the server's own clock has passed since the server first
+// time (TAG_HOLD, fifteen minutes) of the server's own clock has passed since the server first
 // saw it in their pockets. What a client says about its own inventory is not enough.
 
 /** the website keeps the list (this server has no disk): it is told the id and asks back for the entry */
@@ -2498,7 +2498,7 @@ function handle(c: Client, m: C2S) {
       const v = vehicles.get(m.i);
       if (!v || !c.alive || v.goneAt || c.seatAt || !Number.isInteger(m.seat) || m.seat < 0 || m.seat >= SEATS || v.seats[m.seat] !== null) return;
       if (Math.hypot(c.pose[0] - v.s[0], c.pose[1] - v.s[1], c.pose[2] - v.s[2]) > JEEP.reach + 3) return;
-      // A tag taken off somebody is carried on foot, for ten minutes, with the map showing
+      // A tag taken off somebody is carried on foot, for fifteen minutes, with the map showing
       // everybody where: not driven round in circles.
       if (takenTag(c) || carries(c.inv, 'keycard')) {
         send(c, { t: 'tell', kind: 'warn', text: JEEP.noTag });
@@ -2999,7 +2999,7 @@ function tickDrops(anyoneAlive: boolean) {
   }
 }
 
-// A tag taken off somebody is worth a reward once it has been carried for ten minutes, so
+// A tag taken off somebody is worth a reward once it has been carried for fifteen minutes, so
 // the safest thing to do with one was to sit in a bush until the clock ran out. Every half
 // minute the map shows everybody where each carrier is: the tag has to be defended, or run with.
 const TAG_PING_MS = (Number(process.env.TAG_PING_S) || 30) * 1000;

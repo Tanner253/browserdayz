@@ -1,4 +1,4 @@
-// Called by the game server when a dog tag has been held for the full ten minutes, and
+// Called by the game server when a dog tag has been held for its full time (fifteen minutes), and
 // again for as long as that tag has not been settled.
 //
 // The call carries only an id. This function asks the game server itself for that entry, so
