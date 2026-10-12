@@ -99,6 +99,76 @@
    "diff": "assets/tex/bark_brown_02_diff.webp",
    "nor": "assets/tex/bark_brown_02_nor.webp",
    "arm": "assets/tex/bark_brown_02_arm.webp"
+  },
+  "red_brick_03": {
+   "diff": "assets/tex/red_brick_03_diff.webp",
+   "nor": "assets/tex/red_brick_03_nor.webp",
+   "arm": "assets/tex/red_brick_03_arm.webp"
+  },
+  "white_bricks": {
+   "diff": "assets/tex/white_bricks_diff.webp",
+   "nor": "assets/tex/white_bricks_nor.webp",
+   "arm": "assets/tex/white_bricks_arm.webp"
+  },
+  "painted_brick": {
+   "diff": "assets/tex/painted_brick_diff.webp",
+   "nor": "assets/tex/painted_brick_nor.webp",
+   "arm": "assets/tex/painted_brick_arm.webp"
+  },
+  "plaster_brick_01": {
+   "diff": "assets/tex/plaster_brick_01_diff.webp",
+   "nor": "assets/tex/plaster_brick_01_nor.webp",
+   "arm": "assets/tex/plaster_brick_01_arm.webp"
+  },
+  "rough_plaster_brick_02": {
+   "diff": "assets/tex/rough_plaster_brick_02_diff.webp",
+   "nor": "assets/tex/rough_plaster_brick_02_nor.webp",
+   "arm": "assets/tex/rough_plaster_brick_02_arm.webp"
+  },
+  "grey_plaster_02": {
+   "diff": "assets/tex/grey_plaster_02_diff.webp",
+   "nor": "assets/tex/grey_plaster_02_nor.webp",
+   "arm": "assets/tex/grey_plaster_02_arm.webp"
+  },
+  "beige_wall_001": {
+   "diff": "assets/tex/beige_wall_001_diff.webp",
+   "nor": "assets/tex/beige_wall_001_nor.webp",
+   "arm": "assets/tex/beige_wall_001_arm.webp"
+  },
+  "concrete_block_wall_02": {
+   "diff": "assets/tex/concrete_block_wall_02_diff.webp",
+   "nor": "assets/tex/concrete_block_wall_02_nor.webp",
+   "arm": "assets/tex/concrete_block_wall_02_arm.webp"
+  },
+  "concrete_panels": {
+   "diff": "assets/tex/concrete_panels_diff.webp",
+   "nor": "assets/tex/concrete_panels_nor.webp",
+   "arm": "assets/tex/concrete_panels_arm.webp"
+  },
+  "corrugated_iron": {
+   "diff": "assets/tex/corrugated_iron_diff.webp",
+   "nor": "assets/tex/corrugated_iron_nor.webp",
+   "arm": "assets/tex/corrugated_iron_arm.webp"
+  },
+  "grey_roof_tiles_02": {
+   "diff": "assets/tex/grey_roof_tiles_02_diff.webp",
+   "nor": "assets/tex/grey_roof_tiles_02_nor.webp",
+   "arm": "assets/tex/grey_roof_tiles_02_arm.webp"
+  },
+  "bitumen": {
+   "diff": "assets/tex/bitumen_diff.webp",
+   "nor": "assets/tex/bitumen_nor.webp",
+   "arm": "assets/tex/bitumen_arm.webp"
+  },
+  "garage_floor": {
+   "diff": "assets/tex/garage_floor_diff.webp",
+   "nor": "assets/tex/garage_floor_nor.webp",
+   "arm": "assets/tex/garage_floor_arm.webp"
+  },
+  "concrete_tiles_02": {
+   "diff": "assets/tex/concrete_tiles_02_diff.webp",
+   "nor": "assets/tex/concrete_tiles_02_nor.webp",
+   "arm": "assets/tex/concrete_tiles_02_arm.webp"
   }
  },
  "models": {

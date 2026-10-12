@@ -30,6 +30,25 @@ export const TEXTURES = {
   clay_roof_tiles_02: { res: '2k', tex: 1024 },
   dirty_concrete: { res: '2k', tex: 1024 },
   asphalt_02: { res: '2k', tex: 1024 },
+  // (2026-10-12: "we need more texture variations for our hand made buildings so they dont all use the same
+  // textures". One plaster was under twelve of the paints. Fetched by themselves with `node scripts/textures.mjs`.)
+  // walls
+  red_brick_03: { res: '2k', tex: 1024 },
+  white_bricks: { res: '2k', tex: 1024 },
+  painted_brick: { res: '2k', tex: 1024 },
+  plaster_brick_01: { res: '2k', tex: 1024 },
+  rough_plaster_brick_02: { res: '2k', tex: 1024 },
+  grey_plaster_02: { res: '2k', tex: 1024 },
+  beige_wall_001: { res: '2k', tex: 1024 },
+  concrete_block_wall_02: { res: '2k', tex: 1024 },
+  concrete_panels: { res: '2k', tex: 1024 },
+  // roofs
+  corrugated_iron: { res: '2k', tex: 1024 },
+  grey_roof_tiles_02: { res: '2k', tex: 1024 },
+  bitumen: { res: '2k', tex: 1024 },
+  // floors
+  garage_floor: { res: '2k', tex: 1024 },
+  concrete_tiles_02: { res: '2k', tex: 1024 },
   // bark for procedural trees
   pine_bark: { res: '1k', tex: 1024 },
   bark_brown_02: { res: '1k', tex: 1024 },
