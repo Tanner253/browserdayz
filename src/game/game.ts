@@ -720,7 +720,7 @@ export class Game {
         },
         tint: (color) => this.setTint(color),
         close: () => this.toggleAdmin(false),
-      });
+      }, icons);
       document.getElementById('ui')!.appendChild(this.adminUI.root);
     }
     this.menu = new MenuScenes({ world, atmo, scene: r.scene, effects: this.effects, held: (id, mods) => this.makeHeld(id, mods), wear: (body, ids) => this.wear(body, ids), filmReady: (film) => this.hud.filmReady(film) });
