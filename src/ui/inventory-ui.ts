@@ -17,7 +17,23 @@ import type { Vitals } from '../game/player';
 
 const CELL = 46;
 
+/**
+ * Something near that things are kept in: a crate, a body, a drop, or a case, a suitcase or a bag lying on the ground.
+ * Each is a bar in the left column, as the pockets are bars on the right; the one that is open has its grid under it.
+ */
+export interface NearBox {
+  key: string;
+  label: string;
+  /** beside its name: how much is in it, or that it has not been looked into */
+  note: string;
+  open: boolean;
+}
+
 export interface InvActions {
+  /** what is near that things are kept in (asked every time the screen is drawn) */
+  near(): NearBox[];
+  /** one of them clicked: it is opened, and whichever was open is shut; the open one clicked is shut */
+  pickNear(key: string): void;
   /** remove a world item from the ground and hand it over */
   take(w: WorldItem): ItemInstance | null;
   drop(item: ItemInstance): void;
@@ -458,7 +474,38 @@ export class InventoryUI {
       ground.appendChild(row);
     }
     vic.appendChild(ground);
-    if (this.stash) {
+    // What is near that things are kept in, under what lies loose: a bar each, and the grid of the one that is
+    // open under its bar. (2026-10-12: "the icons stay listed at the top, but the bottom half of the vicinity pane
+    // is a scroll wheel of containers tabbable like it is on the top of the carried side".)
+    const near = this.actions.near();
+    if (near.length) {
+      vic.insertAdjacentHTML('beforeend', `<h3>Containers nearby <span>${near.length}</span></h3>`);
+      const list = document.createElement('div');
+      list.className = 'inv-nears';
+      // (a grid dropped onto is the ground no longer: what is let go between two bars is not thrown down)
+      for (const n of near) {
+        const box = document.createElement('div');
+        const live = n.open && !!this.stash;
+        box.className = 'inv-gridbox inv-near' + (live ? '' : ' shut');
+        const h4 = document.createElement('h4'), i = document.createElement('i'), sp = document.createElement('span');
+        h4.title = live ? 'Close it' : 'Open it';
+        i.textContent = live ? '▾' : '▸';
+        sp.textContent = n.note;
+        h4.append(i, document.createTextNode(`${n.label} `), sp);
+        h4.addEventListener('click', () => this.actions.pickNear(n.key));
+        box.appendChild(h4);
+        if (live) {
+          if (this.stashState) box.insertAdjacentHTML('beforeend', `<div class="inv-empty">${this.stashState}</div>`);
+          else {
+            box.appendChild(this.gridEl(this.stash!.container));
+            // (a pack on a body or in a crate is opened where it lies, and gone through)
+            this.openBags(box, this.stash!.container);
+          }
+        }
+        list.appendChild(box);
+      }
+      vic.appendChild(list);
+    } else if (this.stash) {
       vic.insertAdjacentHTML('beforeend', `<h3>${this.stash.label} <span>${this.stash.container.w}×${this.stash.container.h}</span></h3>`);
       if (this.stashState) vic.insertAdjacentHTML('beforeend', `<div class="inv-empty">${this.stashState}</div>`);
       else {

@@ -89,7 +89,9 @@ const FIT: Record<string, { dot?: { at: [number, number, number]; size: number }
   // hand that holds the rifle up has the fore-end itself.)
   ak: { dot: { at: [-0.095, 0.1062, 0.0012], size: 0.85 }, light: { at: [0.27, 0, 0.001], size: 0.85 }, mags: { drum_ak: { model: 'ak_drum', at: [-0.035, 0.0678, 0.0015], size: 1, turn: Math.PI / 2 } }, can: { model: 'rifle_suppressor', size: 1 } },
   // (the long magazine lies across its file, its foot to the back: turned a quarter, to hang along the gun with its foot forward)
-  ar15: { mags: { mag_ar_60: { model: 'ar_mag_60', at: [-0.042, 0.0678, 0.0015], size: 1, turn: -Math.PI / 2 } } },
+  // (Its sight is the shotgun's, as every gun's is: its own came with a window drawn grey on it, a fog over whatever
+  // was aimed at. Stood on the rail where its own stood, at the size its own was. 2026-10-12.)
+  ar15: { dot: { at: [-0.06, 0.095, 0], size: 0.82 }, mags: { mag_ar_60: { model: 'ar_mag_60', at: [-0.042, 0.0678, 0.0015], size: 1, turn: -Math.PI / 2 } } },
   // (The submachine gun: the sight on the rail along its top. Its light is on the rail down the right side of its
   // fore-end, high and well forward: hung under the fore-end, where it was first put by the figures alone, it was
   // inside the left hand, which holds the gun there. Looked at 2026-10-11.)
@@ -194,6 +196,8 @@ interface VmModel {
   shotClip?: string;
   /** a pistol in a pack whose bolt is its slide: the joint that is */
   slideOn?: string;
+  /** and how far that slide goes, metres as it is drawn: a shot's stroke, and where its catch holds it open */
+  slideBy?: { stroke: number; catch: number };
   /** arms of the pack's that are put elsewhere than they were drawn (see WeaponRig.reseat): the joint the gun's body follows, and for each arm where its hand goes on this gun and where its shoulder goes */
   reseat?: { body: string; L?: Reseat; R?: Reseat };
   /** the pack's own walk and run are played under it as it is carried (and the game's own swing of a carried gun is not) */
@@ -260,6 +264,30 @@ const SMG_CARRY = {
 const DIG_STROKE = 1.15;
 /** how far back a pistol's slide stays when it has run dry, metres */
 const SLIDE_LOCK = 0.03;
+/**
+ * The slides of the pistols held in the submachine gun's hands (2026-10-12). Each is hung on that gun's bolt, and
+ * was moved by whatever the bolt does in each of that pack's movements: nine centimetres back with every shot (the
+ * length of a submachine gun's stroke, on a pistol whose own is four), over a third of a second, begun again from
+ * nothing by the next shot before it was home. With the sights on the slide, that was the sights jumping about
+ * ("the m9 chamber is glitching animated sometimes causing the ads to shake"), and on the Desert Eagle, whose slide
+ * is short and half hidden by its barrel, nothing to be seen at all ("the deagle's slide doesnt move when firing").
+ * Now the slide has one way to go, along the barrel, and how far along is said here for every moment:
+ *   - a shot: back the gun's own stroke in a fortieth of a second and home in six hundredths more;
+ *   - the last round: back, and it stays back, on its catch (the chamber open, the barrel showing);
+ *   - a full magazine into an empty gun: it stays back until the hand works it, then goes home;
+ *   - a magazine changed with a round in the chamber: it does not move;
+ *   - looked over: drawn back part of the way as the hand draws the bolt in that movement, and let go.
+ * `stroke` and `catch` are metres on the gun as it was made (they are brought to the size it is drawn at).
+ */
+const SLIDES: Record<string, { stroke: number; catch: number }> = {
+  m9: { stroke: 0.04, catch: 0.033 },
+  colt: { stroke: 0.042, catch: 0.035 },
+  deagle: { stroke: 0.047, catch: 0.04 },
+};
+/** a shot's slide: how far back (0..1) so long after it, seconds */
+const slideKick = (t: number) => (t < 0 ? 0 : t < 0.024 ? t / 0.024 : Math.max(0, 1 - (t - 0.024) / 0.062));
+/** how far the submachine gun's bolt goes in the movements a pistol's slide follows it in: looked over, and worked by the hand (the pack's measure) */
+const SMG_BOLT = { check: 0.0567, rack: 0.064 };
 
 /**
  * A magazine where it sits in its gun, as a mark to set one gun on another by (the gun-alone file's space): the
@@ -1000,6 +1028,7 @@ export class Weapons {
         seat: { move: (smgMark && mark ? smgMark.clone().sub(mark.multiplyScalar(set.size)) : new THREE.Vector3()).add(new THREE.Vector3(...set.move)), turn: euler(set.turn), size: set.size },
       });
       m.slideOn = smgRide.bolt;
+      if (SLIDES[item]) m.slideBy = { stroke: SLIDES[item].stroke * set.size, catch: SLIDES[item].catch * set.size };
       m.reseat = { body: smgRide.base, L: { move: new THREE.Vector3(...set.left.move), turn: new THREE.Quaternion().setFromEuler(euler(set.left.turn)), shoulder: SMG_SHOULDERS.L }, R: { shoulder: SMG_SHOULDERS.R } };
       m.gait = true;
       m.fast = { body: smgRide.base, to: [smgRide.mag, 'IK_Hand_Cntrl_R_037'] };
@@ -1025,7 +1054,7 @@ export class Weapons {
     this.models.set('ak', await this.packGun({ pack: 'ak', item: 'ak', gun: 'ak', kind: 'auto', hip: HELD.ak, flashSize: 0.3, flash: mkFlash(), ownArms: true, square: true, strip: ['Object_97', 'Object_99'], ride: akRide, spare: ['Pmag2_063', akRide.mag] }));
     this.models.set('ar15', await this.packGun({
       pack: 'ak', item: 'ar15', gun: 'ar15', kind: 'auto', hip: HELD.ak, flashSize: 0.28, flash: mkFlash(), ownArms: true, square: true, strip: ['Object_97', 'Object_99'],
-      ride: { base: akRide.base, mag: akRide.mag, brake: akRide.base, silencer: akRide.base, sight: akRide.base, foregrip: akRide.base, light: akRide.base },
+      ride: { base: akRide.base, mag: akRide.mag, brake: akRide.base, silencer: akRide.base, foregrip: akRide.base, light: akRide.base },
       spare: ['Pmag2_063', akRide.mag],
     }));
 
@@ -3038,13 +3067,14 @@ export class Weapons {
         rig.pose(a.data?.empty ? 'reloadEmpty' : 'reload', k);
         // (the pack's plain reload has the slide back for the middle of it, as if the gun had
         // run dry; with a round still in the chamber it stays shut)
-        if (!a.data?.empty && m.kind === 'pistol') rig.still(m.slideOn ? [m.slideOn] : ['slide', 'stopper']);
+        if (!a.data?.empty && m.kind === 'pistol' && !m.slideBy) rig.still(m.slideOn ? [m.slideOn] : ['slide', 'stopper']);
         // (run dry, its slide is back until the hand has worked it, late in the movement)
-        if (a.data?.empty && m.slideOn) rig.slide(m.slideOn, -SLIDE_LOCK * (1 - THREE.MathUtils.smoothstep(k, 0.7, 0.76)));
+        if (a.data?.empty && m.slideOn && !m.slideBy) rig.slide(m.slideOn, -SLIDE_LOCK * (1 - THREE.MathUtils.smoothstep(k, 0.7, 0.76)));
       }
       else if (a.name === 'check' && rig.has('check')) rig.pose('check', k);
       else rig.rest();
-      if (m.slideOn && this.chamberEmpty && a.name !== 'magswap') rig.slide(m.slideOn, -SLIDE_LOCK);
+      if (m.slideBy) this.poseSlide(m, a);
+      else if (m.slideOn && this.chamberEmpty && a.name !== 'magswap') rig.slide(m.slideOn, -SLIDE_LOCK);
       this.reseat(m);
       return;
     }
@@ -3068,8 +3098,36 @@ export class Weapons {
       rig.mix('run', stride, this.sprintT, m.fast);
     }
     // (a pistol on a pack with no drawing of a last shot: run dry, its slide stays back)
-    if (m.slideOn && this.chamberEmpty && m.shotT >= len) rig.slide(m.slideOn, -SLIDE_LOCK);
+    if (m.slideBy) this.poseSlide(m, null);
+    else if (m.slideOn && this.chamberEmpty && m.shotT >= len) rig.slide(m.slideOn, -SLIDE_LOCK);
     this.reseat(m);
+  }
+
+  /**
+   * Where a pistol's slide is this frame (see SLIDES): put there after the movement of the frame is set, whatever
+   * that movement did with the joint it is hung on.
+   */
+  private poseSlide(m: VmModel, a: Action | null) {
+    const rig = m.rig!, by = m.slideBy!, on = m.slideOn!;
+    // (how far the pack's own bolt is drawn in this movement, before it is put by)
+    const drawn = rig.away(on);
+    const dry = this.chamberEmpty, held = dry ? by.catch : 0;
+    let back = held;
+    if (a?.name === 'magswap') {
+      if (!a.data?.empty) back = 0;
+      else {
+        // (on its catch until the hand takes hold of it; drawn the rest of the way, let go, and home)
+        const pull = Math.min(1, drawn / SMG_BOLT.rack), k = a.t / a.dur;
+        back = k > 0.79 && pull < 0.02 ? 0 : Math.max(k < 0.79 ? by.catch : 0, pull * by.stroke);
+      }
+    } else if (a?.name === 'check') back = Math.max(held, Math.min(1, drawn / SMG_BOLT.check) * by.stroke * 0.62);
+    else if (!a) {
+      // (a shot: the whole stroke, and home again; the last one comes to rest on the catch)
+      const kick = slideKick(m.shotT ?? 9) * by.stroke;
+      back = Math.max(held * (m.shotT !== undefined && m.shotT < 0.024 ? m.shotT / 0.024 : 1), kick);
+    }
+    rig.still([on]);
+    if (back > 1e-5) rig.slide(on, -back);
   }
 
   /** the pack's hands put where this gun has something for them to hold (see WeaponRig.reseat): after the movement of the frame is set */

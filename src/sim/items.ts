@@ -159,7 +159,7 @@ const D: ItemDef[] = [
   {
     id: 'ar15', name: 'AR-15', model: 'ar15', w: 7, h: 3, weight: 3.0, category: 'weapon', slot: 'long',
     desc: 'Carbine in 5.56. Thirty rounds in its magazine, sixty in the long one. Faster and flatter than the AK and easier to hold on a target, and each round does less. B changes it to single shots. Takes a holographic sight, a suppressor, a foregrip, a light and the long magazine.',
-    weapon: { kind: 'auto', ammo: 'ammo_556', capacity: 30, mag: 'mag_ar', ergo: 62, modes: ['auto', 'semi'], shows: { mag_ar: ['mag'], suppressor_556: ['silencer'], red_dot: ['sight'], foregrip: ['foregrip'], gun_light: ['light'] }, hides: { suppressor_556: ['brake'] } }, iconYaw: 0,
+    weapon: { kind: 'auto', ammo: 'ammo_556', capacity: 30, mag: 'mag_ar', ergo: 62, modes: ['auto', 'semi'], shows: { mag_ar: ['mag'], suppressor_556: ['silencer'], red_dot: [], foregrip: ['foregrip'], gun_light: ['light'] }, never: ['sight'], hides: { suppressor_556: ['brake'] } }, iconYaw: 0,
   },
   {
     id: 'ammo_739', name: '7.62x39 Rounds', model: 'round_739', w: 1, h: 1, weight: 0.016, category: 'ammo', stack: 30, scale: 1.3, pile: 5,
