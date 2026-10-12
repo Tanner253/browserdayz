@@ -533,7 +533,7 @@ export function hospitalLobbyPlan(): Blueprint {
         // a slab over the doors, and paving before them
         { key: 'concrete', x0: -2.3, x1: 2.3, y0: 2.52, y1: 2.64, z0: LD + 0.002, z1: LD + 1.2 },
         { key: 'trim_white', x0: -2.36, x1: 2.36, y0: 2.64, y1: 2.71, z0: LD + 0.004, z1: LD + 1.26, soft: true },
-        { key: 'plinth', x0: -3.2, x1: 3.2, y0: -0.7, y1: -0.066, z0: LD + 0.06, z1: LD + 1.3, soft: true },
+        { key: 'paving', x0: -3.2, x1: 3.2, y0: -0.7, y1: -0.066, z0: LD + 0.06, z1: LD + 1.3, soft: true },
       ],
     }],
     dress: {
@@ -721,7 +721,7 @@ export function policeHqPlan(): Blueprint {
   // What stands against it outside: a slab over its doors (the board with its name stands on the slab's edge), a
   // light under it, paving before them; a slab over the door at the back.
   const outside: Fitting[] = [
-    { key: 'plinth', x0: -2.6, x1: 2.6, y0: -0.7, y1: -0.066, z0: PD + 0.06, z1: PD + 2.0, soft: true },
+    { key: 'paving', x0: -2.6, x1: 2.6, y0: -0.7, y1: -0.066, z0: PD + 0.06, z1: PD + 2.0, soft: true },
     { key: 'concrete', x0: -2.3, x1: 2.3, y0: 2.6, y1: 2.74, z0: PD + 0.002, z1: PD + 1.6 },
     { key: 'trim_white', x0: -2.36, x1: 2.36, y0: 2.74, y1: 2.81, z0: PD + 0.004, z1: PD + 1.66, soft: true },
     { key: 'lamp', x0: -0.3, x1: 0.3, y0: 2.52, y1: 2.598, z0: PD + 0.6, z1: PD + 0.9, soft: true },
@@ -866,7 +866,7 @@ export function policeGaragePlan(): Blueprint {
   r.put('concrete_road_barrier', -4.35, 3.4, Q).put('concrete_road_barrier', -4.35, 1.6, Q).put('concrete_road_barrier', -1.0, 5.25, 0).top('WoodenTable_01', 1.6, -3.2, 0.1, 0.57, 2).put('painted_wooden_chair_01', 1.0, -2.4, 2.9).put('painted_wooden_chair_01', 2.4, -4.0, 0.2).put('wooden_military_crate', -3.6, 4.6, 0.4);
   r.floor([-3.2, 2.4], [0.6, 4.2], [-1.0, -1.0], [3.4, 2.0]);
   return {
-    w: GW * 2, d: GD * 2, h: 3.0, ext: 'ochre_ext', int: 'int_plaster', floor: 'concrete', roof: 'concrete', roofType: 'flat',
+    w: GW * 2, d: GD * 2, h: 3.0, ext: 'ochre_ext', int: 'int_plaster', floor: 'floor_garage', roof: 'concrete', roofType: 'flat',
     walls: [
       { side: 'front', ext: 'ochre_ext', int: 'int_plaster', openings: [gap(-4.3, -1.3, 2.6), gap(0.9, 3.9, 2.6)] },
       { side: 'left', ext: 'ochre_ext', int: 'int_plaster', openings: [door(-4.7, -3.6), { ...win(-0.65, 0.65, 0.9, 2.2), bars: true }, { ...win(2.85, 4.15, 0.9, 2.2), boards: true }] },

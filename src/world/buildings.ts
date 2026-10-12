@@ -112,17 +112,18 @@ const MATS: Record<Exclude<MatKey, 'glass'>, { tex: string; tile: number; color?
   // (painted steel: there is no picture of bare plate among the ones the game has)
   steel: { tex: 'painted_plaster_wall', tile: 1.2, color: 0x565d63, surface: 'metal' },
   // a flat roof's felt
-  bitumen: { tex: 'asphalt_02', tile: 3.4, color: 0x8d8a84, surface: 'concrete' },
+  bitumen: { tex: 'bitumen', tile: 2.6, color: 0xb9b5ad, surface: 'concrete' },
   // (For the faces of the two big buildings, 2026-10-12: "the new buildings need more character ... everything is
   // too plain". What a public building of that country and those years was painted, on the plaster there is.)
   // a hospital's: pale yellow gone dull
-  hosp_ext: { tex: 'worn_mossy_plasterwall', tile: 3, color: 0xdccf9f, surface: 'plaster' },
+  // (on bare plaster: on the mossy one, which is dark and green, it came out the colour of a ditch)
+  hosp_ext: { tex: 'grey_plaster_02', tile: 3.2, color: 0xecd9a0, surface: 'plaster' },
   // a police station's: ochre
-  ochre_ext: { tex: 'worn_mossy_plasterwall', tile: 3, color: 0xcfa862, surface: 'plaster' },
+  ochre_ext: { tex: 'grey_plaster_02', tile: 3.2, color: 0xdfae62, surface: 'plaster' },
   // what stands proud of such a wall, painted white once: bands, the surrounds of windows, pilasters
   trim_white: { tex: 'painted_plaster_wall', tile: 2.2, color: 0xe7e2d2, surface: 'plaster' },
   // the foot of the wall: rendered and painted grey
-  plinth: { tex: 'dirty_concrete', tile: 3, color: 0x8c8a82, surface: 'concrete' },
+  plinth: { tex: 'grey_plaster_02', tile: 2.6, color: 0x9d9b93, surface: 'concrete' },
   // the lower part of an inside wall, in oil paint, to the height of a shoulder: what a ward, an office, a washed-down
   // room and a cell had
   ward_dado: { tex: 'painted_plaster_wall', tile: 2.4, color: 0x6e8f78, surface: 'plaster' },
@@ -1396,12 +1397,12 @@ export class Buildings {
             if (down.includes(k)) {
               // (on the side of the wall the building is)
               const side = -dz * -mx + dx * -mz > 0 ? 1 : -1, fx = mx - dz * 1.5 * side, fz = mz + dx * 1.5 * side;
-              this.push('concrete', boxGeo(-w / 2 + 0.25, w / 2 - 0.05, 0, 0.1, -1.1, 1.1, this.tile('concrete'), frame(fx, fz, turn + 0.14 * (k % 2 ? 1 : -1), ground(fx, fz) + 0.02)));
+              this.push('slab', boxGeo(-w / 2 + 0.25, w / 2 - 0.05, 0, 0.1, -1.1, 1.1, this.tile('slab'), frame(fx, fz, turn + 0.14 * (k % 2 ? 1 : -1), ground(fx, fz) + 0.02)));
             }
             continue;
           }
           for (const fx of [-w * 0.3, w * 0.3]) box(M, 'concrete', fx - 0.16, fx + 0.16, 0, 0.24, -0.17, 0.17, false);
-          box(M, 'concrete', -w / 2 + 0.03, w / 2 - 0.03, 0.2, 2.38, -0.045, 0.045);
+          box(M, 'slab', -w / 2 + 0.03, w / 2 - 0.03, 0.2, 2.38, -0.045, 0.045);
         }
       };
       const dice = new RNG(plot.seed ^ 0x67d5);
