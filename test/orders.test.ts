@@ -3,7 +3,7 @@
 //   npx tsx test/orders.test.ts
 
 import assert from 'node:assert/strict';
-import { ENTITIES, ORDERS, entityBy, offer, ordersOf } from '../src/net/orders';
+import { ENTITIES, GROUND, ORDERS, entityBy, offer, ordersOf } from '../src/net/orders';
 
 const here = [{ id: 4, name: 'Bob' }, { id: 12, name: 'Big Bad Wolf' }, { id: 31, name: 'cat' }];
 let checks = 0;
@@ -83,7 +83,7 @@ checks++;
 // ---- what an admin carries, and fires (2026-10-13): weightless, endless ammunition, and the refill. An admin's
 // alone, offered by their names, and each given whole by Enter (a switch with no word after it is turned over; a
 // refill with nobody named is one's own)
-for (const o of ['weightless', 'ammo', 'refill']) {
+for (const o of ['weightless', 'ammo', 'bottomless', 'refill']) {
   assert.ok(ORDERS.find((x) => x.name === o)?.admin, `/${o} is not an admin's alone`);
   assert.equal(offer(`/${o} `, 'mod', here), null, `a mod was offered /${o}`);
   assert.ok(!mod.picks.some((p) => p.fill.trim() === `/${o}`), `a mod was offered /${o}`);
@@ -114,6 +114,35 @@ assert.equal(offer('/weightless #4 off ', 'admin', here)!.picks.length, 0);
 assert.equal(offer('/weightless off #4 ', 'admin', here)!.picks.length, 0);
 // (the powers that were there before are offered as they were: whose, and nothing else)
 assert.deepEqual(offer('/god ', 'admin', here)!.picks.map((p) => p.fill), ['/god #4 ', '/god #12 ', '/god #31 ']);
+// (and the inventory that never fills is a switch like the other two)
+assert.deepEqual(offer('/bot', 'admin', here)!.picks.map((p) => [p.fill, p.whole]), [['/bottomless', true]]);
+assert.deepEqual(offer('/bottomless ', 'admin', here)!.picks.map((p) => p.fill), ['/bottomless on ', '/bottomless off ']);
+assert.deepEqual(offer('/bottomless off ', 'admin', here)!.picks.map((p) => p.fill), ['/bottomless off #4 ', '/bottomless off #12 ', '/bottomless off #31 ']);
+checks++;
+
+// ---- a thing given (2026-10-13): into the inventory unless the word `ground` says otherwise. After the thing,
+// how many, who for and that word are each offered until they have been said, in whichever order they are typed.
+const things = [{ id: 'ak', name: 'AK' }, { id: 'bandage', name: 'Bandage' }, { id: 'mag_ak', name: 'AK Magazine' }];
+const give = ORDERS.find((o) => o.name === 'give')!;
+assert.deepEqual(give.args, ['item', '[count]', '[who]', '[ground]']);
+assert.match(give.does, /into your inventory/i);
+assert.match(give.does, /ground/);
+assert.deepEqual(offer('/give a', 'admin', here, [], things)!.picks.map((p) => p.fill), ['/give ak ', '/give bandage ', '/give mag_ak ']);
+const after = offer('/give ak ', 'admin', here, [], things)!;
+assert.deepEqual(after.picks.map((p) => p.fill), ['/give ak #4 ', '/give ak #12 ', '/give ak #31 ', '/give ak ground ']);
+assert.match(after.picks[3].note, /at their feet/);
+// (a number being typed is how many, and nothing is offered over it; after it, who and the word)
+assert.equal(offer('/give ak 2', 'admin', here, [], things)!.picks.length, 0);
+assert.deepEqual(offer('/give ak 2 ', 'admin', here, [], things)!.picks.map((p) => p.fill), ['/give ak 2 #4 ', '/give ak 2 #12 ', '/give ak 2 #31 ', '/give ak 2 ground ']);
+assert.deepEqual(offer('/give ak 2 bo', 'admin', here, [], things)!.picks.map((p) => p.fill), ['/give ak 2 #4 ']);
+assert.deepEqual(offer('/give ak 2 #4 ', 'admin', here, [], things)!.picks.map((p) => p.fill), ['/give ak 2 #4 ground ']);
+assert.deepEqual(offer('/give ak #4 gr', 'admin', here, [], things)!.picks.map((p) => p.fill), ['/give ak #4 ground ']);
+// (the word first, then who; with both said, nothing more; and the word half typed is not also somebody's name)
+assert.deepEqual(offer('/give ak ground ', 'admin', here, [], things)!.picks.map((p) => p.fill), ['/give ak ground #4 ', '/give ak ground #12 ', '/give ak ground #31 ']);
+assert.equal(offer('/give ak 2 #4 ground ', 'admin', here, [], things)!.picks.length, 0);
+assert.equal(offer('/give ak ground', 'admin', here, [], things)!.picks.length, 0);
+assert.deepEqual(GROUND, ['ground', 'feet', 'floor']);
+assert.equal(offer('/give ', 'mod', here, [], things), null, 'a mod was offered /give');
 checks++;
 
 console.log(`${checks} checks passed`);

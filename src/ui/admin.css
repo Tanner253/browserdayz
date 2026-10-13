@@ -159,6 +159,11 @@ button.adm-p:hover { background: rgba(233, 228, 216, 0.07); }
 .adm-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .adm-seg { display: flex; align-items: center; gap: 3px; }
 .adm-seg .adm-b { min-width: 34px; padding: 5px 6px; }
+/* where a thing given goes: a switch of two, joined, the one chosen lit (into the inventory, or at their feet) */
+.adm-where { gap: 0; }
+.adm-where .adm-b { padding: 5px 11px; }
+.adm-where .adm-b + .adm-b { margin-left: -1px; }
+.adm-where .adm-b.on { position: relative; z-index: 1; }
 .adm-check { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; font-size: 14px; background: rgba(0, 0, 0, 0.25); border: 1px solid var(--rim); color: var(--ink-dim); }
 .adm-check.on { border-color: rgba(111, 214, 168, 0.6); color: var(--ink); }
 .adm-check.on .adm-ic { color: var(--good); }

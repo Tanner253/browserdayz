@@ -90,6 +90,8 @@ export interface AdminSelf {
   /** what they carry weighs nothing; firing takes no round out of their gun (src/sim/powers.ts) */
   weightless: boolean;
   endless: boolean;
+  /** their inventory never fills: what their pockets cannot take goes into the hold (not said by a game from before it: off) */
+  bottomless?: boolean;
   /** it is day in this game alone, whatever the hour */
   night: boolean;
   /** everybody's name is shown where they are */
@@ -107,6 +109,8 @@ type Sub = 'actions' | 'items' | 'kits' | 'pockets';
 /** where the window stands and how big it is, in pixels of the screen */
 type Box = { x: number; y: number; w: number; h: number };
 const WINDOW_KEPT = 'zona.admin.window';
+/** where a thing given from the panel goes, as this admin last chose: kept in their browser ('ground': at the feet; anything else, or nothing kept: into the inventory) */
+const GIVE_KEPT = 'zona.admin.give';
 /** the least the window is made, the most it opens at when nothing is kept, and how near the edge of the screen it goes */
 const MIN_W = 720, MIN_H = 440, OPEN_W = 1760, OPEN_H = 1120, GAP = 8;
 /** the edges and corners it is resized by */
@@ -120,7 +124,7 @@ const ENTITY_ICON: Record<Entity['kind'], string> = { car: 'car', infected: 'inf
 /** what somebody carries, as the server last had it from their game (`/pockets`) */
 type Pockets = Extract<S2C, { t: 'inv' }>;
 const SLOT_NAME: Record<string, string> = { primary: 'On the back', secondary: 'On the back', holster: 'Holster', head: 'Head', face: 'Face', vest: 'Vest', back: 'Pack', hands: 'Hands', feet: 'Feet', neck: 'Round the neck', melee: 'Belt' };
-const POCKET_NAME: Record<string, string> = { tags: 'Tag pouch', jacket: 'Jacket', pants: 'Trousers' };
+const POCKET_NAME: Record<string, string> = { tags: 'Tag pouch', jacket: 'Jacket', pants: 'Trousers', hold: 'Hold (an admin’s bottomless inventory)' };
 const KIND: Record<string, string> = { weapon: 'Guns', magazine: 'Magazines', ammo: 'Ammunition', attachment: 'Attachments', melee: 'Melee', clothing: 'Clothing', medical: 'Medical', food: 'Food', drink: 'Drink', tool: 'Tools', stash: 'Containers', misc: 'Other' };
 const KINDS = [...new Set(Object.values(KIND))];
 /** everything there is to give, in the order the grid shows it, and how many there are of each kind: worked out once, the first time the grid is drawn (it was sorted and counted over at every drawing) */
@@ -179,6 +183,7 @@ const ICON: Record<string, string> = {
   weight: '<path d="M9.5 8a2.5 2.5 0 1 1 5 0"/><path d="M7.5 8h9l2.5 11.5h-14z"/>',
   rounds: '<path d="M5.5 20V10l1.5-4.5L8.5 10v10zM10.5 20V10L12 5.5l1.5 4.5v10zM15.5 20V10L17 5.5l1.5 4.5v10z"/>',
   refill: '<path d="M6 4.5h7.5v15H6z"/><path d="M6 8.5h7.5M6 12.5h7.5"/><path d="M18 7v9M15.5 13.5L18 16l2.5-2.5"/>',
+  hold: '<path d="M3.5 5h17v4.5h-17z"/><path d="M5.5 9.5V19M18.5 9.5V19"/><path d="M12 12v7.5M9 16.5l3 3 3-3"/>',
 };
 const icon = (name: string, cls = '') => {
   const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -216,6 +221,13 @@ export class AdminUI {
   private count = 1;
   /** a gun is handed over with a magazine in reach and something to put in it */
   private fed = true;
+  /**
+   * Where a thing given goes: into the inventory of whoever it is for (what finds no room there lies at their
+   * feet), or at their feet as it always did. Into the inventory unless this admin has chosen otherwise, and what
+   * they chose is kept for them (2026-10-13: "the default mode for spawning loot for somone should be in their
+   * inventory unless on space").
+   */
+  private giveTo: 'inventory' | 'ground' = 'inventory';
   private where = ['', ''];
   /** a button that has to be pressed twice (a ban, a killing): which, and until when the second press counts */
   private sure: { key: string; until: number } | null = null;
@@ -263,6 +275,11 @@ export class AdminUI {
       if (b && [b.x, b.y, b.w, b.h].every((v) => typeof v === 'number' && Number.isFinite(v))) this.box = { x: b.x!, y: b.y!, w: b.w!, h: b.h! };
     } catch {
       /* nothing kept: it opens where it is made */
+    }
+    try {
+      if (localStorage.getItem(GIVE_KEPT) === 'ground') this.giveTo = 'ground';
+    } catch {
+      /* nothing kept: into the inventory */
     }
     for (const edge of EDGES) {
       const h = el('div', `adm-edge ${edge}`);
@@ -668,10 +685,10 @@ export class AdminUI {
     if (this.view === 'server') return `${base}|${JSON.stringify(this.lists.stats ?? {})}|${this.lists.checks}|${this.lists.players.length}`;
     if (this.view === 'bans') return `${base}|${JSON.stringify(this.lists.bans)}`;
     if (this.view === 'roles') return `${base}|${JSON.stringify(this.lists.roles)}`;
-    if (this.sub === 'items') return `${base}|${this.kind}|${this.count}|${this.fed}|${Object.keys(this.pictures).length}`;
+    if (this.sub === 'items') return `${base}|${this.kind}|${this.count}|${this.fed}|${this.giveTo}|${Object.keys(this.pictures).length}`;
     if (this.sub === 'kits') return base;
     if (this.sub === 'pockets') return `${base}|${this.pockets?.id}|${JSON.stringify(this.pockets?.inv ?? null).length}|${Object.keys(this.pictures).length}`;
-    return `${base}|${p ? [p.role, p.muted, p.god, p.hidden, p.clip, p.voidInv, p.voidTag, p.weightless, p.endless, p.alive].join() : ''}|${this.mine ? [s.god, s.hidden, s.clip, s.voidInv, s.voidTag, s.weightless, s.endless, s.night, s.names, s.freecam, s.tint].join() : ''}`;
+    return `${base}|${p ? [p.role, p.muted, p.god, p.hidden, p.clip, p.voidInv, p.voidTag, p.weightless, p.endless, p.bottomless, p.alive].join() : ''}|${this.mine ? [s.god, s.hidden, s.clip, s.voidInv, s.voidTag, s.weightless, s.endless, s.bottomless, s.night, s.names, s.freecam, s.tint].join() : ''}`;
   }
 
   private bodyOf(): HTMLElement[] {
@@ -985,12 +1002,14 @@ export class AdminUI {
     const s = this.self, who = p ? ` #${p.id}` : '';
     const sw = (k: CarryPower, on: boolean | undefined, ic: string) => this.flip(CARRY_POWERS[k].label, p ? CARRY_POWERS[k].theirs : CARRY_POWERS[k].mine, on, () => this.send(`/${CARRY_POWERS[k].order}${who} ${on ? 'off' : 'on'}`), ic);
     const sws = el('div', 'adm-sws');
-    if (!p || p.role === 'admin') sws.append(sw('weightless', p ? p.weightless : s.weightless, 'weight'), sw('endless', p ? p.endless : s.endless, 'rounds'));
+    // (beside "weightless", the inventory that never fills: 2026-10-13, "admins need an infinite inventory option")
+    if (!p || p.role === 'admin') sws.append(sw('weightless', p ? p.weightless : s.weightless, 'weight'), sw('bottomless', p ? p.bottomless : s.bottomless, 'hold'), sw('endless', p ? p.endless : s.endless, 'rounds'));
     const fill = this.button(p ? `Refill ${p.name}’s magazines` : 'Refill my magazines', () => this.send(`/refill${who}`), 'good', 'refill');
     return this.card(p ? `${p.name}: carry and ammunition` : 'Carry and ammunition', 'rounds',
       ...(sws.childElementCount ? [sws] : []),
       this.line(fill),
-      el('div', 'dim', `Refill: every magazine and every gun ${p ? 'they carry' : 'you carry'} is filled at once, wherever it is: in the hands, on the back, in the holster, in a pocket, in a pack, in a bag in a pack. A gun with no magazine in it is given its own.${p && p.role !== 'admin' ? ' (Weightless and endless ammunition are an admin’s powers: they are not one.)' : ''}`),
+      el('div', 'dim', `Refill: every magazine and every gun ${p ? 'they carry' : 'you carry'} is filled at once, wherever it is: in the hands, on the back, in the holster, in a pocket, in a pack, in a bag in a pack. A gun with no magazine in it is given its own.${p && p.role !== 'admin' ? ' (Weightless, the bottomless inventory and endless ammunition are an admin’s powers: they are not one.)' : ''}`),
+      ...(sws.childElementCount ? [el('div', 'dim', `Bottomless inventory: the hold is on the inventory screen, under what is worn. Put off, what fits what ${p ? 'they wear' : 'you wear'} stays and the rest is put at ${p ? 'their' : 'your'} feet. It weighs what it weighs, unless weightless is on too.`)] : []),
     );
   }
 
@@ -1110,7 +1129,30 @@ export class AdminUI {
       this.fed = !this.fed;
       this.draw(true);
     };
-    tools.append(find, amount, fed);
+    // Where it goes: a switch of two, into the inventory unless this admin chose the ground, and kept as they left
+    // it. Every tile, and the line over them, says which it will do.
+    const ground = this.giveTo === 'ground', whose = this.mine ? 'your' : 'their';
+    const where = el('div', 'adm-seg adm-where');
+    where.setAttribute('role', 'radiogroup');
+    where.setAttribute('aria-label', 'Where a thing given goes');
+    const way = (id: 'inventory' | 'ground', label: string, ic: string) => {
+      const b = this.button(label, () => {
+        this.giveTo = id;
+        try {
+          localStorage.setItem(GIVE_KEPT, id);
+        } catch {
+          /* a browser that keeps nothing: it lasts as long as the page does */
+        }
+        this.draw(true);
+      }, this.giveTo === id ? 'on' : '', ic);
+      b.setAttribute('role', 'radio');
+      b.setAttribute('aria-checked', String(this.giveTo === id));
+      b.dataset.k = `give-to:${id}`;
+      return b;
+    };
+    where.append(way('inventory', 'Into inventory', 'pack'), way('ground', `At ${whose} feet`, 'down'));
+    tools.append(find, amount, where, fed);
+    const goes = el('div', 'dim', ground ? `A thing clicked is put on the ground at ${whose} feet, as /give with the word ground does.` : `A thing clicked goes into ${whose} inventory: onto the body where there is a free place for it, then into pockets, vest and pack. What finds no room lies at ${whose} feet${this.mine && this.self.bottomless ? ' (none will: your bottomless inventory is on)' : ''}.`);
     const kinds = el('div', 'adm-kinds');
     const count = (k: string) => counts[k] ?? 0;
     kinds.append(this.button(`All  ${all.length}`, () => {
@@ -1128,7 +1170,7 @@ export class AdminUI {
       t.type = 'button';
       t.dataset.k = `give:${d.id}`;
       t.dataset.find = `${d.name} ${d.id} ${kind}`.toLowerCase();
-      t.title = `${d.name}  (${d.id})${d.stack ? `  ·  piles of ${d.stack}` : ''}`;
+      t.title = `${d.name}  (${d.id})${d.stack ? `  ·  piles of ${d.stack}` : ''}  ·  ${ground ? `at ${whose} feet` : `into ${whose} inventory`}`;
       const pic = this.pictures[d.id];
       if (pic) {
         const img = el('img');
@@ -1140,12 +1182,13 @@ export class AdminUI {
       } else t.append(icon('box', 'huge'));
       t.append(el('span', '', d.name));
       t.onclick = () => {
-        const n = Math.max(1, this.count);
-        this.send(`/give ${d.id} ${n}${this.ref}`);
+        // (the word that puts it at their feet; with no word, the server puts it into their inventory)
+        const n = Math.max(1, this.count), to = `${this.ref}${ground ? ' ground' : ''}`;
+        this.send(`/give ${d.id} ${n}${to}`);
         // (a gun, and what it is fed with: two of its magazines and a pile of its rounds)
         if (this.fed && d.weapon) {
-          if (d.weapon.mag) this.send(`/give ${d.weapon.mag} ${2 * n}${this.ref}`);
-          if (d.weapon.ammo) this.send(`/give ${d.weapon.ammo} ${ITEMS[d.weapon.ammo]?.stack ?? 30}${this.ref}`);
+          if (d.weapon.mag) this.send(`/give ${d.weapon.mag} ${2 * n}${to}`);
+          if (d.weapon.ammo) this.send(`/give ${d.weapon.ammo} ${ITEMS[d.weapon.ammo]?.stack ?? 30}${to}`);
         }
         t.classList.remove('did');
         void t.offsetWidth;
@@ -1154,7 +1197,7 @@ export class AdminUI {
       grid.append(t);
     }
     window.setTimeout(() => this.filterItems(), 0);
-    return [this.forWhom(p, 'Click a thing to give it to'), tools, kinds, grid];
+    return [this.forWhom(p, ground ? 'Click a thing to put it at the feet of' : 'Click a thing to put it into the inventory of'), tools, goes, kinds, grid];
   }
 
   private filterItems() {

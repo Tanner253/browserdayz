@@ -7,7 +7,8 @@
 // it should be the same for all inventories. we should make the jacket and pants the user
 // spawns in with (the default inventory slots) clothing items". The jacket and the trousers
 // were two grids of the body's own until then: see `upgradeInventory` for what becomes of an
-// inventory kept from before.)
+// inventory kept from before.) The one grid a survivor can have that is no thing's and is not
+// the tag pouch is an admin's hold, which nobody else ever has: see `Hold`.
 //
 // What goes into what is DayZ's rule (see `accepts`): a thing with something in it is worn,
 // held, put on the ground or laid in a body, a crate or a stash, and is never put inside
@@ -119,10 +120,15 @@ export class Container {
     return from === this || this.accepts(item);
   }
 
+  /** how many rows down a thing may lie here: the grid's height (but for a grid that has no bottom: see `Hold`) */
+  protected get deep(): number {
+    return this.h;
+  }
+
   /** Is this very place free for it: inside the grid, and on nothing that lies there? (Whether it is taken here at all is `accepts`.) */
   free(item: ItemInstance, x: number, y: number, rot: boolean, ignore?: ItemInstance): boolean {
     const [w, h] = Container.size(item, rot);
-    if (x < 0 || y < 0 || x + w > this.w || y + h > this.h) return false;
+    if (x < 0 || y < 0 || x + w > this.w || y + h > this.deep) return false;
     for (const p of this.items) {
       if (p.item === ignore) continue;
       const [pw, ph] = Container.size(p.item, p.rot);
@@ -136,7 +142,7 @@ export class Container {
   }
 
   /** the first free place for it, upright before on its side, by room alone */
-  private anywhere(item: ItemInstance): { x: number; y: number; rot: boolean } | null {
+  protected anywhere(item: ItemInstance): { x: number; y: number; rot: boolean } | null {
     for (const rot of [false, true]) {
       for (let y = 0; y < this.h; y++) {
         for (let x = 0; x < this.w; x++) {
@@ -246,6 +252,128 @@ export class Container {
 /** a thing and where it lies in a grid, as grids are kept and sent */
 type Stored = ItemInstance & { x: number; y: number; rot: boolean };
 
+// ------------------------------------------------------------------ an admin's hold
+//
+// 2026-10-13: "admins need an infinite inventory option". An admin with the power on (`bottomless` in
+// src/sim/powers.ts; who may have it is the server's to say) has one more grid than what they wear brings: a hold,
+// which is no thing's, has no bottom, and so always has room. It is the last place looked into for room, after
+// everything that is worn, so pockets fill as they always did and only what they cannot take goes into it.
+//
+// Why a grid of its own, and not a worn thing with a very deep inside or pockets that stretch. Everything that
+// puts a thing away (a pick-up, a kit, a gift, a drag, a magazine taken out of a gun) asks `PlayerInventory.add`
+// or `hasRoom`, and both go through `containers`: one more grid there and all of them have the room, with not one
+// of them changed. Nothing that is worn is touched, so nothing of an ordinary inventory can go wrong by it, and a
+// body, a crate and a pack are what they were. And it is kept and sent as one more grid beside the tag pouch,
+// which every game and every server already carries without knowing what it is: one that has never heard of a
+// hold hands what is in it to its player as things that found no room, and loses none of them.
+
+/** the name the hold is kept and sent by */
+export const HOLD = 'hold';
+/** how many cells across it is: wider than the widest thing there is, so everything lies in it the way up it is made */
+export const HOLD_W = 10;
+/** the empty rows always under the last thing in it: as many as the longest thing is long, so anything is let go there either way up */
+const HOLD_SPARE = Math.max(...Object.values(ITEMS).map((d) => Math.max(d.w, d.h)));
+/**
+ * The most things it takes, counting what is in them. Not for want of room: what is carried is said to the server
+ * in one message, and the server reads no message of more than 256 KB (eight hundred rifles with every part fitted
+ * are about 150: test/inventory.test.ts counts them). Past this, a thing is refused as any full grid refuses it, and
+ * lies where it lay.
+ */
+export const HOLD_MOST = 800;
+/** how far down a thing may be said to lie in it (a save that says a thing lies a million rows down is not believed: it is laid where there is room) */
+const HOLD_DEEP = HOLD_MOST * HOLD_SPARE;
+
+/** a thing, and everything in it, counted */
+const counted = (it: ItemInstance): number => 1 + (it.cargo ?? []).reduce((n, p) => n + counted(p.item), 0);
+
+/**
+ * An admin's hold: a grid ten across with no bottom. It is as tall as what lies in it and a few rows more, so there
+ * is always a free place, and the screen draws all of it. It takes anything while it is `open`, a pack with things
+ * in it too (as a crate does), and what lies in it is opened and taken from where it lies, and takes nothing (it is
+ * one grid down, as the inside of a thing that is worn). Shut, it gives up what it has and takes nothing.
+ */
+export class Hold extends Container {
+  /** things are put in: the admin's power is on (see `PlayerInventory.bottomless`) */
+  open = false;
+
+  constructor() {
+    super(HOLD, 'Hold', HOLD_W, HOLD_SPARE, [], true);
+    this.depth = 1;
+    // (its height is worked out from what lies in it, whenever it is asked: nothing that moves a thing has to remember to)
+    Object.defineProperty(this, 'h', { get: () => this.used() + HOLD_SPARE, set: () => undefined, enumerable: true, configurable: true });
+  }
+
+  protected override get deep(): number {
+    return HOLD_DEEP;
+  }
+
+  /** the rows that have something in them, counted from the top */
+  used(): number {
+    let rows = 0;
+    for (const p of this.items) rows = Math.max(rows, p.y + Container.size(p.item, p.rot)[1]);
+    return rows;
+  }
+
+  /** how many things are in it, with what is in them */
+  holding(): number {
+    return this.items.reduce((n, p) => n + counted(p.item), 0);
+  }
+
+  override refusal(item: ItemInstance): string | null {
+    // (a thing that lies in it already is moved about in it whatever else is so)
+    if (this.has(item)) return null;
+    if (!this.open) return 'Nothing more goes into the hold: it is an admin’s, and the power is off';
+    if (this.holding() + counted(item) > HOLD_MOST) return `The hold has ${HOLD_MOST} things in it, and takes no more: that is as many as the server is told of`;
+    return null;
+  }
+
+  /**
+   * The first free place, as any grid's is found, on a map of the cells that are taken. (Asked of every thing that
+   * lies there for every cell, as a pocket is, a hold of some hundreds of things took a second to take one more.)
+   */
+  protected override anywhere(item: ItemInstance): { x: number; y: number; rot: boolean } | null {
+    const rows = this.h, W = this.w, taken = new Uint8Array(rows * W);
+    for (const p of this.items) {
+      const [pw, ph] = Container.size(p.item, p.rot);
+      for (let y = Math.max(0, p.y); y < Math.min(rows, p.y + ph); y++) taken.fill(1, y * W + Math.max(0, p.x), y * W + Math.min(W, p.x + pw));
+    }
+    for (const rot of [false, true]) {
+      const [w, h] = Container.size(item, rot);
+      for (let y = 0; y + h <= rows; y++) {
+        next: for (let x = 0; x + w <= W; x++) {
+          for (let dy = 0; dy < h; dy++) for (let dx = 0; dx < w; dx++) if (taken[(y + dy) * W + x + dx]) continue next;
+          return { x, y, rot };
+        }
+      }
+    }
+    return null;
+  }
+}
+
+/** the things in the hold of an inventory as it is kept and sent (none: it has no hold, or an empty one) */
+export function heldIn(inv: SerializedInventory | null | undefined): ItemInstance[] {
+  return inv?.containers?.find((c) => c.id === HOLD)?.items ?? [];
+}
+
+/**
+ * Nobody without the power puts a thing in a hold: the server's rule, for what a game says it carries. Of what the
+ * game says lies in its hold, only what the server already had there is kept; what it did not is left out of the
+ * server's copy, and an empty hold is no grid at all. So a hold with the power off only ever gets emptier (an
+ * admin's own, in the moments before the server knows them for one, loses nothing by this), and a game that makes
+ * one up has nothing kept in it.
+ * @param now what the game has just said it carries, made safe (changed in place)  @param before what the server had until then
+ * @returns how many things were left out
+ */
+export function holdOnlyEmpties(now: SerializedInventory, before: SerializedInventory | null): number {
+  const i = now.containers.findIndex((c) => c.id === HOLD);
+  if (i < 0) return 0;
+  const was = new Set(heldIn(before).map((it) => it.uid)), said = now.containers[i].items;
+  const kept = said.filter((it) => was.has(it.uid));
+  if (kept.length) now.containers[i].items = kept;
+  else now.containers.splice(i, 1);
+  return said.length - kept.length;
+}
+
 /**
  * The inside of a thing that is looked into where it lies and is not worn (what is worn: `PlayerInventory.cargoOf`):
  * a pack on a body or in a crate, a bag in a pack, a stash case that is carried. Null for a thing nothing is kept in.
@@ -305,13 +433,16 @@ export function splitPile(c: Container, item: ItemInstance, make: (id: string, q
   const def = ITEMS[item.id], placed = c.items.find((p) => p.item === item);
   if (!def.stack || !placed || item.qty < 2) return null;
   const half = make(item.id, Math.floor(item.qty / 2));
+  // (whether the grid takes such a thing at all is asked once, and not of every cell: it does not turn on where)
+  if (!c.accepts(half)) return null;
   let best: { x: number; y: number; rot: boolean } | null = null, bd = Infinity;
+  const rows = c.h;
   for (const rot of [placed.rot, !placed.rot]) {
     const [w, h] = Container.size(half, rot);
-    for (let y = 0; y <= c.h - h; y++) {
+    for (let y = 0; y <= rows - h; y++) {
       for (let x = 0; x <= c.w - w; x++) {
         const d = Math.hypot(x - placed.x, y - placed.y);
-        if (d < bd && c.fits(half, x, y, rot)) {
+        if (d < bd && c.free(half, x, y, rot)) {
           bd = d;
           best = { x, y, rot };
         }
@@ -348,6 +479,33 @@ export class PlayerInventory {
   }
   /** the pouch: ten places for dog tags taken off other people, and for nothing else */
   tags = Object.assign(new Container('tags', 'Dog tags', 5, 2), { only: 'dogtag' });
+  /**
+   * An admin's hold (see `Hold`): empty and shut for everybody else, and then it is no grid at all (`containers`).
+   * It is the game's to open, on the server's word that the power is on.
+   */
+  theHold = new Hold();
+  /** the admin's power is on: whatever finds no room in what is worn goes into the hold, which always has some */
+  get bottomless(): boolean {
+    return this.theHold.open;
+  }
+  set bottomless(on: boolean) {
+    this.theHold.open = on;
+  }
+  /**
+   * The power is put off: the hold takes nothing more, and everything in it that finds a place on the body or room
+   * in what is worn is put there. What does not stays in it, for the caller to put at the survivor's feet (a few at
+   * a time: see `emptyHold` in src/game/game.ts). Nothing is let go of here.
+   * @returns how many things are still in it
+   */
+  shutHold(): number {
+    this.theHold.open = false;
+    for (const p of [...this.theHold.items]) {
+      this.theHold.remove(p.item);
+      // (what is left of a pile that went in part into a pocket, or the thing as it was, goes back where it lay)
+      if (this.add(p.item)) this.theHold.items.push(p);
+    }
+    return this.theHold.items.length;
+  }
   /** the survivor's own dog tag, round their neck */
   neck: ItemInstance | null = null;
   /** which of the body's own places has its thing in the hands (null: none of them) */
@@ -427,7 +585,7 @@ export class PlayerInventory {
     return c;
   }
 
-  /** every grid the player can put things in right now: the tag pouch (which takes only tags), the pockets of jacket and trousers, then vest and bag */
+  /** every grid the player can put things in right now: the tag pouch (which takes only tags), the pockets of jacket and trousers, then vest and bag; and last, an admin's hold while it is open or has anything in it */
   get containers(): Container[] {
     const out: Container[] = [this.tags];
     for (const s of POCKET_ORDER) {
@@ -435,6 +593,7 @@ export class PlayerInventory {
       const c = it ? this.cargoOf(it) : null;
       if (c) out.push(c);
     }
+    if (this.theHold.open || this.theHold.items.length) out.push(this.theHold);
     return out;
   }
 
@@ -449,6 +608,8 @@ export class PlayerInventory {
     this.hand = null;
     this.hot = Array.from({ length: HOT_KEYS }, () => null);
     this.tags.items = [];
+    // (and what an admin had in the hold: everything carried goes. Whether it is open is the power's, and stays as it is.)
+    this.theHold.items = [];
     this.neck = null;
     this.gearCargo.clear();
     this.dress();
@@ -544,7 +705,8 @@ export class PlayerInventory {
   /**
    * Every top-level item carried: worn / slung things (each keeps its contents: the jacket and
    * the trousers what is in their pockets, a bag what is in it) and the tags in the pouch. Not
-   * the survivor's own tag: that is not carried, and is never among what is dropped.
+   * the survivor's own tag: that is not carried, and is never among what is dropped. (And what
+   * an admin has in the hold: it is carried, and weighs what it weighs.)
    */
   topLevel(): ItemInstance[] {
     const out: ItemInstance[] = [];
@@ -553,6 +715,7 @@ export class PlayerInventory {
       if (it) out.push(it);
     }
     for (const p of this.tags.items) out.push(p.item);
+    for (const p of this.theHold.items) out.push(p.item);
     return out;
   }
 
@@ -576,7 +739,8 @@ export class PlayerInventory {
   serialize(): SerializedInventory {
     // (the tag round the neck goes with the slots: to the server it is one more thing worn, and so it is on the body)
     // (the pockets are in the jacket and the trousers, which are among the slots: the pouch is the one grid left that is no thing's)
-    return { slots: { ...this.slots, neck: this.neck }, active: this.active, containers: [this.tags.serialize()], hot: this.hot.map((b) => (b ? { ...b } : null)) };
+    // (but for an admin's hold, said only when there is something in it: nobody else's inventory is a byte longer for it)
+    return { slots: { ...this.slots, neck: this.neck }, active: this.active, containers: [this.tags.serialize(), ...(this.theHold.items.length ? [this.theHold.serialize()] : [])], hot: this.hot.map((b) => (b ? { ...b } : null)) };
   }
 
   /**
@@ -607,8 +771,15 @@ export class PlayerInventory {
     const neck = raw.neck ? sanitizeItem(raw.neck) : null;
     this.neck = neck?.id === 'dogtag' ? neck : null;
     this.tags.items = [];
+    // An admin's hold is laid as it was kept, every thing where it lay, and is shut: whether things are still put
+    // into it is the server's to say, and it says so after this (the welcome carries what is carried, and `powers`
+    // comes after it). Nothing in it is put at anybody's feet for arriving before that word; and if the word never
+    // comes it holds what it held, gives it up as it is asked to, and takes nothing.
+    this.theHold.items = [];
+    this.theHold.open = false;
     for (const cd of d.containers ?? []) {
       if (cd.id === 'tags') overflow.push(...this.tags.load(cd as never));
+      else if (cd.id === HOLD && !this.theHold.items.length) overflow.push(...this.theHold.load(cd as never));
       // (any other grid kept: the server's `spill`, or one this game does not know. What is in it is not lost: it goes wherever there is room)
       else for (const { x: _x, y: _y, rot: _rot, ...it } of cd.items ?? []) if (sanitizeItem(it)) overflow.push(it);
     }
@@ -765,11 +936,15 @@ export function cleanItem(raw: unknown, name: (v: unknown) => string, depth = 0)
   return sanitizeItem(it);
 }
 
-/** The things in a grid as somebody's game says they lie, each made safe. */
-export function cleanStored(list: unknown, name: (v: unknown) => string): Stored[] {
+/**
+ * The things in a grid as somebody's game says they lie, each made safe.
+ * @param most how many of them are read: 120, which is every cell of the biggest grid a body has (BODY_GRID); of an
+ *   admin's hold, as many as a hold takes
+ */
+export function cleanStored(list: unknown, name: (v: unknown) => string, most = 120): Stored[] {
   if (!Array.isArray(list)) return [];
   const out: Stored[] = [];
-  for (const raw of list.slice(0, 120)) {
+  for (const raw of list.slice(0, most)) {
     const it = cleanItem(raw, name);
     if (it && num(raw.x) && num(raw.y)) out.push({ ...it, x: raw.x, y: raw.y, rot: !!raw.rot });
   }
@@ -794,7 +969,10 @@ export function cleanInventory(raw: unknown, name: (v: unknown) => string): Seri
   // that said it wore five thousand things in five thousand made-up places had them all kept, and thrown on the
   // ground one by one when it died.)
   for (const [k, v] of Object.entries(r.slots ?? {})) if (KEPT_SLOTS.has(k)) slots[k] = v ? cleanItem(v, name) : null;
-  const containers = (Array.isArray(r.containers) ? r.containers : []).slice(0, 4).map((c) => ({ id: String(c?.id).slice(0, 16), items: cleanStored(c?.items, name) }));
+  // (A grid is read to 120 things, which was the end of an admin's hold at its hundred and twenty-first: the hold is
+  // read to all a hold takes. That makes nobody a present of the room: whose hold it is, and whether anything may be
+  // put in it, is the server's to say of what comes out of here: `holdOnlyEmpties`. And one hold, not two.)
+  const containers = (Array.isArray(r.containers) ? r.containers : []).slice(0, 4).map((c) => ({ id: String(c?.id).slice(0, 16), items: cleanStored(c?.items, name, c?.id === HOLD ? HOLD_MOST : 120) })).filter((c, i, all) => c.id !== HOLD || all.findIndex((o) => o.id === HOLD) === i);
   const { inv, left } = upgradeInventory({ slots, active: null, containers, hot: cleanHot(r.hot) });
   if (left.length) {
     let spill = inv.containers.find((c) => c.id === SPILL);

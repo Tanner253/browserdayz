@@ -636,8 +636,14 @@ export class InventoryUI {
     const box = document.createElement('div');
     const used = c.items.reduce((n, p) => n + ITEMS[p.item.id].w * ITEMS[p.item.id].h, 0);
     const shut = this.folded.has(c.id);
-    box.className = 'inv-gridbox' + (shut ? ' shut' : '');
-    box.innerHTML = `<h4 title="${shut ? 'Open it' : 'Fold it away'}"><i>${shut ? '▸' : '▾'}</i>${c.name}${where ? `<small>${where}</small>` : ''} <span>${c === this.inv.tags ? `${c.items.length} / ${c.w * c.h} · taken off others` : `${used} / ${c.w * c.h}`}</span></h4>`;
+    // An admin's hold (src/sim/inventory.ts): it has no bottom, so there is no "of how many" to say of it. It says
+    // how many things lie in it and whether it still takes any. It is drawn whole, as tall as what is in it and a
+    // few rows more, and is scrolled to with everything else on this side; narrower than itself, it scrolls sideways.
+    const hold = c === this.inv.theHold;
+    box.className = 'inv-gridbox' + (shut ? ' shut' : '') + (hold ? ' inv-hold' : '');
+    const said = hold ? `${c.items.length} thing${c.items.length === 1 ? '' : 's'} · ${this.inv.bottomless ? 'never fills' : 'shut'}` : c === this.inv.tags ? `${c.items.length} / ${c.w * c.h} · taken off others` : `${used} / ${c.w * c.h}`;
+    const tip = hold ? (this.inv.bottomless ? 'An admin’s power is on: whatever finds no room in what you wear goes in here, and there is always room. /bottomless off puts it off. ' : 'The power is off: nothing more goes in here, and what is in it can be taken out. ') : '';
+    box.innerHTML = `<h4 title="${tip}${shut ? 'Open it' : 'Fold it away'}"><i>${shut ? '▸' : '▾'}</i>${c.name}${where ? `<small>${where}</small>` : ''} <span>${said}</span></h4>`;
     box.querySelector('h4')!.addEventListener('click', () => {
       if (!this.folded.delete(c.id)) this.folded.add(c.id);
       this.render();
@@ -923,10 +929,11 @@ export class InventoryUI {
     const places = [...DOLL_SLOTS[0], ...DOLL_SLOTS[1]];
     const wornIn = (c: Container) => GEAR_SLOTS.find((s) => inv.slots[s] && c.id === `gear:${inv.slots[s]!.uid}`) ?? null;
     const carried = inv.containers.filter((c) => c !== inv.tags).map((c, i) => ({ c, i, slot: wornIn(c) }));
-    const rank = (slot: Slot | null) => (slot ? (places.indexOf(slot) + 1 || places.length + 1) : 0);
-    carried.sort((a, b) => rank(a.slot) - rank(b.slot) || a.i - b.i);
+    // (an admin's hold stands last, under everything that is worn: it is where what those cannot take goes)
+    const rank = (c: Container, slot: Slot | null) => (c === inv.theHold ? places.length + 2 : slot ? (places.indexOf(slot) + 1 || places.length + 1) : 0);
+    carried.sort((a, b) => rank(a.c, a.slot) - rank(b.c, b.slot) || a.i - b.i);
     for (const { c, slot } of carried) {
-      grids.appendChild(this.gridBox(c, slot ? SLOT_LABEL[slot] : ''));
+      grids.appendChild(this.gridBox(c, slot ? SLOT_LABEL[slot] : c === inv.theHold ? 'admin' : ''));
       this.openBags(grids, c);
     }
     if (!carried.length) grids.insertAdjacentHTML('beforeend', `<div class="inv-empty">Nothing you have on has any room in it. A jacket, trousers, a vest or a pack each bring their own.</div>`);
@@ -1570,16 +1577,22 @@ export class InventoryUI {
    * free spot nearest to it, turned the other way if that is the only way it goes in.
    */
   private landing(c: Container, item: ItemInstance, cx: number, cy: number, rot: boolean): { x: number; y: number; rot: boolean } | null {
-    if (c.fits(item, cx, cy, rot, item)) return { x: cx, y: cy, rot };
+    // (Whether the grid takes such a thing at all does not turn on where: it is asked once, and each cell is then
+    // asked only whether it is free. And in a grid of very many rows, an admin's hold, the free spot is looked for
+    // within a screen of rows of the pointer and not in all of them: asked of every cell, a hold of some hundreds
+    // of things held the pointer up at every move.)
+    if (!c.accepts(item)) return null;
+    if (c.free(item, cx, cy, rot, item)) return { x: cx, y: cy, rot };
     let best: { x: number; y: number; rot: boolean } | null = null;
     let bd = Infinity;
+    const rows = c.h, tall = rows > 40;
     for (const r of [rot, !rot]) {
       const [w, h] = Container.size(item, r);
-      for (let y = 0; y <= c.h - h; y++) {
+      for (let y = tall ? Math.max(0, cy - 16) : 0; y <= (tall ? Math.min(rows - h, cy + 16) : rows - h); y++) {
         for (let x = 0; x <= c.w - w; x++) {
           // (a turn counts as a little further away: it is only taken when it has to be)
           const dist = Math.hypot(x - cx, y - cy) + (r === rot ? 0 : 0.75);
-          if (dist < bd && c.fits(item, x, y, r, item)) {
+          if (dist < bd && c.free(item, x, y, r, item)) {
             bd = dist;
             best = { x, y, rot: r };
           }

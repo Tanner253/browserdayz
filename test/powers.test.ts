@@ -216,7 +216,24 @@ ok('a refill makes what is carried heavier by the rounds it put in, and by nothi
   assert.ok(Math.abs(inv.weight() - was - put) < 1e-6, `it weighs ${(inv.weight() - was).toFixed(3)} kg more, and the rounds put in weigh ${put.toFixed(3)}`);
 });
 
-ok('the two powers are spoken of in one way, and each is an order there is, an admin’s alone, as the refill is', () => {
+ok('the inventory that never fills: what is in the hold weighs what it weighs unless weightless is on too, and a refill reaches it, the game’s and the server’s', () => {
+  assert.equal(CARRY_POWERS.bottomless.order, 'bottomless');
+  const inv = new PlayerInventory();
+  inv.bottomless = true;
+  for (let i = 0; i < 12; i++) assert.equal(inv.add(makeItem('ak')), null);
+  assert.equal(inv.theHold.items.length, 10);
+  const kg = inv.weight();
+  assert.ok(kg > 11 * ITEMS.ak.weight, `twelve rifles weigh ${kg.toFixed(1)} kg`);
+  assert.equal(weightFelt(kg, false), kg);
+  assert.equal(weightFelt(kg, true), 0);
+  // (the server's copy is read first, bare as they were made; then the game fills its own)
+  const kept = cleanInventory(JSON.parse(JSON.stringify(inv.serialize())), (v) => String(v ?? ''))!;
+  assert.equal(refill(inv.topLevel()).guns, 12);
+  assert.equal(refill(carriedOf(kept)).guns, 12, 'the server’s refill does not reach what lies in the hold');
+  assert.ok(inv.weight() > kg, 'the rounds a refill put into the guns in the hold weigh nothing');
+});
+
+ok('the powers about what is carried are spoken of in one way, and each is an order there is, an admin’s alone, as the refill is', () => {
   for (const p of Object.values(CARRY_POWERS)) {
     const o = ORDERS.find((x) => x.name === p.order);
     assert.ok(o?.admin, `/${p.order} is not an order, or not an admin's alone`);

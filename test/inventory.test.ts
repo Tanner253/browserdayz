@@ -4,7 +4,7 @@
 
 import assert from 'node:assert/strict';
 import { ITEMS, makeItem, type ItemInstance } from '../src/sim/items';
-import { BODY_GRID, Container, PlayerInventory, bagGrid, splitPile, swapPlaces } from '../src/sim/inventory';
+import { BODY_GRID, Container, HOLD, HOLD_MOST, HOLD_W, PlayerInventory, bagGrid, cleanInventory, heldIn, holdOnlyEmpties, splitPile, swapPlaces, type SerializedInventory } from '../src/sim/inventory';
 
 let n = 0;
 const ok = (name: string, fn: () => void) => {
@@ -285,5 +285,211 @@ ok('a thing does not go inside itself, nor inside a thing that is inside it', ()
   bagGrid(outer, 1)!.add(inner);
   assert.match(bagGrid(inner, 2)!.refusal(outer)!, /is inside the camping backpack|in a pocket or a pack/);
 });
+
+// ---- an admin's hold: the inventory that never fills (2026-10-13: "admins need an infinite inventory option").
+// The rules of it, with no game and no server. Who may have it, and what the server keeps of it, is test/admin.test.ts.
+{
+  const name = (v: unknown) => String(v ?? '');
+  /** what a game says it carries, as it goes over the wire, and as the server reads it */
+  const wire = (inv: PlayerInventory) => JSON.parse(JSON.stringify(inv.serialize())) as SerializedInventory;
+  const read = (inv: PlayerInventory) => cleanInventory(wire(inv), name)!;
+  /** every thing carried, and in those, by its number */
+  const uids = (things: ItemInstance[]): string[] => things.flatMap((it) => [it.uid, ...uids((it.cargo ?? []).map((p) => p.item))]);
+  const all = (inv: PlayerInventory) => uids([...inv.topLevel(), ...(inv.neck ? [inv.neck] : [])]).sort();
+  /** no two things in a grid lie on one cell, and none is off its sides */
+  const sound = (c: Container) => {
+    const taken = new Set<string>();
+    for (const p of c.items) {
+      const [w, h] = Container.size(p.item, p.rot);
+      assert.ok(p.x >= 0 && p.y >= 0 && p.x + w <= c.w && p.y + h <= c.h, `${p.item.id} lies off the grid at ${p.x}, ${p.y}`);
+      for (let y = p.y; y < p.y + h; y++) for (let x = p.x; x < p.x + w; x++) {
+        assert.ok(!taken.has(`${x},${y}`), `two things lie on cell ${x}, ${y}`);
+        taken.add(`${x},${y}`);
+      }
+    }
+  };
+  /** a thing that lies in one cell and does not pile: every one given is one more thing */
+  const small = Object.values(ITEMS).find((d) => d.w === 1 && d.h === 1 && !d.stack && !d.slot && d.id !== 'dogtag')!.id;
+
+  ok('nobody has a hold who has not been given one: an inventory is what it was, to the byte', () => {
+    const inv = new PlayerInventory();
+    assert.ok(!inv.bottomless && !inv.containers.includes(inv.theHold));
+    assert.deepEqual(inv.serialize().containers.map((c) => c.id), ['tags']);
+    // (full pockets are full: the third rifle has nowhere to go, as ever)
+    const rifles = [makeItem('ak'), makeItem('ak'), makeItem('ak')];
+    assert.deepEqual(rifles.map((it) => inv.add(it)), [null, null, rifles[2]]);
+    assert.ok(!inv.hasRoom(rifles[2]) && !inv.theHold.accepts(rifles[2]) && inv.theHold.add(rifles[2]) === rifles[2]);
+    assert.match(inv.theHold.refusal(rifles[2])!, /the power is off/);
+    assert.equal(inv.theHold.items.length, 0);
+    assert.ok(Object.values(ITEMS).every((d) => d.w <= HOLD_W), 'a thing is wider than the hold: nothing would put it there the way up it is made');
+  });
+
+  ok('with it open, forty rifles all find room, and a pack with things in it; the pockets are filled first, as ever', () => {
+    const inv = new PlayerInventory();
+    inv.bottomless = true;
+    assert.ok(inv.containers[inv.containers.length - 1] === inv.theHold, 'the hold is not the last place looked into for room');
+    const rifles = Array.from({ length: 40 }, () => makeItem('ak'));
+    for (const it of rifles) assert.ok(inv.hasRoom(it) && inv.add(it) === null, 'a rifle found no room');
+    assert.deepEqual([inv.slots.primary, inv.slots.secondary], rifles.slice(0, 2), 'the places on the back were passed over for the hold');
+    assert.deepEqual(inv.theHold.items.map((p) => p.item), rifles.slice(2));
+    // something small goes into a pocket while there is one, not into the hold
+    const tin = makeItem(small);
+    assert.equal(inv.add(tin), null);
+    assert.ok(inv.jacket.has(tin) && !inv.theHold.has(tin));
+    // a pack with a thing in it, when there is one on the back already: no pocket takes it, and the hold does
+    assert.equal(inv.add(makeItem('camping_pack')), null);
+    const full = makeItem('sack_pack');
+    assert.equal(bagGrid(full)!.add(makeItem(small)), null);
+    assert.ok(!inv.jacket.accepts(full) && !inv.cargoOf(inv.slots.back!)!.accepts(full));
+    assert.equal(inv.add(full), null);
+    assert.ok(inv.theHold.has(full) && full.cargo!.length === 1);
+    // and what lies in it is looked into and taken from where it lies, and takes nothing: it is a grid down
+    assert.equal(inv.theHold.depth, 1);
+    assert.match(bagGrid(full, inv.theHold.depth + 1)!.refusal(makeItem(small))!, /nothing is put into it while/);
+    sound(inv.theHold);
+    assert.ok(inv.theHold.h > inv.theHold.used(), 'there is no empty row under the last thing');
+    // it is carried: it weighs what it weighs, and a hot key finds what is in it
+    assert.ok(inv.weight() > 38 * ITEMS.ak.weight, `forty rifles weigh ${inv.weight().toFixed(1)} kg`);
+    assert.ok([...inv.carried()].includes(rifles[39]) && inv.containerOf(rifles[39]) === inv.theHold && inv.find((it) => it === rifles[39]) === rifles[39]);
+    // (forty rifles, the tin, the jacket and the trousers, the pack on her back, and the day pack with the tin in it)
+    assert.equal(all(inv).length, 40 + 1 + 2 + 1 + 2, 'a thing is not among what is carried');
+  });
+
+  ok('it is kept and sent as one more grid, read back whole by the server past the 120 any other grid is read to, and laid as it lay', () => {
+    const inv = new PlayerInventory();
+    inv.bottomless = true;
+    const things = [...Array.from({ length: 40 }, () => makeItem('ak')), ...Array.from({ length: 300 }, () => makeItem(small))];
+    for (const it of things) assert.equal(inv.add(it), null);
+    assert.ok(inv.theHold.items.length > 200, `only ${inv.theHold.items.length} things are in the hold: not enough to try the count with`);
+    const kept = read(inv);
+    assert.deepEqual(kept.containers.map((c) => c.id), ['tags', HOLD]);
+    assert.equal(heldIn(kept).length, inv.theHold.items.length, 'the server read fewer things out of the hold than lie in it');
+    // (any other grid is read to 120, as it was)
+    const lying = wire(inv);
+    lying.containers[1].id = 'made-up';
+    assert.equal(cleanInventory(lying, name)!.containers[1].items.length, 120);
+    // and two holds are one
+    const twice = wire(inv);
+    twice.containers.push({ id: HOLD, items: [{ ...makeItem(small), x: 0, y: 0, rot: false }] });
+    assert.deepEqual(cleanInventory(twice, name)!.containers.map((c) => c.id), ['tags', HOLD]);
+    // the game they come back in: everything where it lay, nothing at their feet, and the hold shut until it is said to be theirs
+    const back = new PlayerInventory();
+    assert.deepEqual(back.load(JSON.parse(JSON.stringify(kept))), [], 'something was handed back to be put at their feet');
+    assert.ok(!back.bottomless && back.containers.includes(back.theHold), 'a hold that came back with things in it is open before the server has said so, or is not shown');
+    assert.deepEqual(all(back), all(inv), 'what came back is not what was kept');
+    const place = (i: PlayerInventory) => i.theHold.items.map((p) => [p.item.uid, p.x, p.y, p.rot]);
+    assert.deepEqual(place(back), place(inv), 'a thing in the hold moved while it was kept');
+    sound(back.theHold);
+    // shut, it gives up what it has and takes nothing
+    const one = makeItem('ak');
+    assert.equal(back.add(one), one);
+    assert.ok(!back.hasRoom(one));
+    const out = back.theHold.items[0].item;
+    back.remove(out);
+    assert.ok(!back.theHold.has(out) && back.theHold.items.length === inv.theHold.items.length - 1);
+    // and a thing that lies in it is moved about in it, shut or open
+    const moved = back.theHold.items[0];
+    assert.ok(back.theHold.fits(moved.item, moved.x, back.theHold.used(), moved.rot, moved.item));
+    // a game that has never heard of a hold reads it as it reads any grid it does not know: its things are handed to its player, and none is lost
+    const old = wire(inv);
+    old.containers[1].id = 'unknown';
+    const stale = new PlayerInventory(), over = stale.load(old);
+    assert.equal(uids([...stale.topLevel(), ...over]).length, uids(inv.topLevel()).length);
+  });
+
+  ok('put off: what fits what is worn stays, the rest is still in the hold to be put down, and not one thing is lost', () => {
+    const inv = new PlayerInventory();
+    inv.bottomless = true;
+    for (let i = 0; i < 40; i++) assert.equal(inv.add(makeItem('ak')), null);
+    const before = all(inv), held = inv.theHold.items.length;
+    assert.equal(held, 38);
+    // (she takes the two off her back and puts them in the hold, and takes a pile of dressings into it by hand)
+    for (const s of ['primary', 'secondary'] as const) {
+      const it = inv.slots[s]!;
+      inv.remove(it);
+      assert.equal(inv.theHold.add(it), null);
+    }
+    const pile = makeItem('bandage', 5);
+    assert.equal(inv.theHold.add(pile), null);
+    const left = inv.shutHold();
+    assert.ok(!inv.bottomless);
+    // two rifles went back on her back and the dressings into a pocket; thirty-eight rifles fit nothing she wears
+    assert.equal(left, 38);
+    assert.equal(inv.theHold.items.length, 38);
+    assert.ok(inv.slots.primary && inv.slots.secondary && inv.jacket.has(pile));
+    assert.deepEqual(all(inv), [...before, pile.uid].sort(), 'a thing was lost, or made, in putting the power off');
+    sound(inv.theHold);
+    // the game then puts them at her feet a few at a time: each is out of the hold, and in the world
+    const down: ItemInstance[] = [];
+    while (inv.theHold.items.length) {
+      for (const p of inv.theHold.items.slice(0, 6)) {
+        inv.theHold.remove(p.item);
+        down.push(p.item);
+      }
+    }
+    assert.equal(down.length, 38);
+    assert.ok(!inv.containers.includes(inv.theHold), 'an empty hold that is shut is still a grid');
+    assert.deepEqual(inv.serialize().containers.map((c) => c.id), ['tags']);
+    assert.deepEqual([...all(inv), ...down.map((it) => it.uid)].sort(), [...before, pile.uid].sort());
+    // (everything carried goes when everything carried goes: a death, a kit, an admin's "empty everything")
+    inv.bottomless = true;
+    assert.equal(inv.add(makeItem('ak')), null);
+    inv.theHold.add(makeItem('ak'));
+    inv.clear();
+    assert.ok(inv.theHold.items.length === 0 && inv.bottomless, 'the hold was not emptied with the rest, or the power went with it');
+  });
+
+  ok('nobody without the power puts a thing in a hold: the server keeps of one only what it already had there', () => {
+    const inv = new PlayerInventory();
+    inv.bottomless = true;
+    const things = Array.from({ length: 6 }, () => makeItem('ak'));
+    for (const it of things) inv.theHold.add(it);
+    const had = read(inv);
+    // one taken out and one put in, by a game the server has not given the power: the first is gone, the second is not kept
+    inv.theHold.remove(things[0]);
+    const extra = makeItem('ak');
+    inv.theHold.add(extra);
+    const now = read(inv);
+    assert.equal(holdOnlyEmpties(now, had), 1);
+    assert.deepEqual(heldIn(now).map((it) => it.uid).sort(), things.slice(1).map((it) => it.uid).sort());
+    // a game that makes one up, to a server that had none of it: nothing in it is kept, and it is no grid
+    const made = read(inv);
+    assert.equal(holdOnlyEmpties(made, null), 6);
+    assert.deepEqual(made.containers.map((c) => c.id), ['tags']);
+    assert.deepEqual(heldIn(made), []);
+    // nothing said of a hold: nothing done
+    const plain = read(new PlayerInventory());
+    assert.equal(holdOnlyEmpties(plain, had), 0);
+    assert.deepEqual(plain.containers.map((c) => c.id), ['tags']);
+  });
+
+  ok('it takes eight hundred things and no more, and eight hundred of the fattest there are go to the server in one message', () => {
+    const inv = new PlayerInventory();
+    inv.bottomless = true;
+    // (the fattest thing to say: a rifle with a magazine in it and every part it takes fitted)
+    const parts = Object.values(ITEMS).filter((d) => d.attach?.fits.includes('ar15')).map((d) => d.id);
+    const fat = () => Object.assign(makeItem('ar15'), { mag: 'mag_ar_60', loaded: 61, mods: parts.slice(0, 6), zero: 300 });
+    const t0 = Date.now();
+    for (let i = 0; i < HOLD_MOST; i++) assert.equal(inv.theHold.add(fat()), null, `the hold was full at ${i}`);
+    const took = Date.now() - t0;
+    assert.ok(took < 20_000, `${HOLD_MOST} things took ${took} ms to put away`);
+    assert.equal(inv.theHold.holding(), HOLD_MOST);
+    const over = makeItem(small);
+    assert.equal(inv.theHold.add(over), over);
+    assert.match(inv.theHold.refusal(over)!, /takes no more/);
+    // (what is in a thing counts: a pack with things in it is as many things as it is)
+    const pack = makeItem('sack_pack');
+    bagGrid(pack)!.add(makeItem(small));
+    inv.theHold.remove(inv.theHold.items[0].item);
+    assert.equal(inv.theHold.add(pack), pack, 'a pack with a thing in it went in where there was room for one thing');
+    assert.equal(inv.theHold.add(over), null);
+    const said = JSON.stringify({ t: 'me', inv: inv.serialize(), vitals: { health: 100, energy: 80, water: 80, stamina: 300, bleeding: false, blood: 5000, bleed: 0, broken: false } });
+    // (the server reads no message of more than 256 KB: maxPayload in server/index.ts)
+    assert.ok(said.length < 256 * 1024 * 0.7, `a full hold is ${(said.length / 1024).toFixed(0)} KB to say: too near the 256 the server reads`);
+    assert.equal(heldIn(read(inv)).length, HOLD_MOST);
+    sound(inv.theHold);
+    console.log(`      (a full hold is ${(said.length / 1024).toFixed(0)} KB to say, ${inv.theHold.h} rows deep, and took ${took} ms to fill)`);
+  });
+}
 
 console.log(`\n${n} checks passed`);

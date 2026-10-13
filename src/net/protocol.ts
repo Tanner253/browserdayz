@@ -374,13 +374,19 @@ export type S2C =
   | { t: 'hp'; health: number; bleeding: boolean; blood?: number; bleed?: number }
   /** leaving the proper way: so many seconds of the wait are left; or (0, with why) it has been called off */
   | { t: 'logout'; left: number; why?: string }
-  /** a whole set handed over by an admin (see src/sim/kits.ts): put on and away in place of what is carried, or (adds) beside it */
-  | { t: 'kit'; name: string; items: ItemInstance[]; adds?: true; by?: string }
+  /**
+   * a whole set handed over by an admin (see src/sim/kits.ts): put on and away in place of what is carried, or (adds) beside it
+   *
+   * `gift`: these are things an admin has given (`/give`) and no kit: what they are, in words ("2 × AK"), for the
+   * note to say so. Always with `adds`. Not said by a server from before 2026-10-13, nor of a kit; and a game from
+   * before then reads `name`, which says the same, and calls it a kit.
+   */
+  | { t: 'kit'; name: string; items: ItemInstance[]; adds?: true; by?: string; gift?: string }
   /**
    * Which of an admin's powers this player has on: nothing hurts them, nobody sees them, they fly through things.
    * And what they have chosen for their own death: nothing they carried is left on the body, no tag of theirs is.
    */
-  | { t: 'powers'; god: boolean; hidden: boolean; clip: boolean; voidInv: boolean; voidTag: boolean; /** what they carry weighs nothing; firing takes no round out of their gun (src/sim/powers.ts). Not said by a server from before 2026-10-13: not said is off */ weightless?: boolean; endless?: boolean }
+  | { t: 'powers'; god: boolean; hidden: boolean; clip: boolean; voidInv: boolean; voidTag: boolean; /** what they carry weighs nothing; firing takes no round out of their gun (src/sim/powers.ts). Not said by a server from before 2026-10-13: not said is off */ weightless?: boolean; endless?: boolean; /** their inventory never fills: the hold takes what their pockets cannot (src/sim/inventory.ts). Said off to somebody who has things in a hold and is no admin, who is told nothing else of powers: their game empties it. Not said: off */ bottomless?: boolean }
   /**
    * An admin's refill (`/refill`): every magazine and every gun this player carries is to be full. Their own game
    * fills them (`refill` in src/sim/powers.ts: it alone knows what is carried at this moment) and says what it
@@ -398,7 +404,7 @@ export type S2C =
 /** What the panel of somebody with a role is shown. The last two are an admin's alone. */
 export interface AdminLists {
   /** everybody online: where they are, how long they have been on (minutes), how often the checks have fired on them */
-  players: { id: number; name: string; role: 'admin' | 'mod' | null; x: number; z: number; /** the way they face, radians (0 looks north, down -z): the admin's map points each dot that way. Not said by a server from before 2026-10-13 */ yaw?: number; alive: boolean; flags: number; mins: number; /** health as their game last said it, kills and tags cashed since the server started */ hp: number; kills: number; tags: number; hidden?: true; god?: true; clip?: true; muted?: true; seat?: true; voidInv?: true; voidTag?: true; /** an admin's: what they carry weighs nothing, and their gun spends no rounds */ weightless?: true; endless?: true; /** gone without logging out: the body is still here */ asleep?: true; /** their game is not answering (a hidden tab): the server keeps their life */ away?: true }[];
+  players: { id: number; name: string; role: 'admin' | 'mod' | null; x: number; z: number; /** the way they face, radians (0 looks north, down -z): the admin's map points each dot that way. Not said by a server from before 2026-10-13 */ yaw?: number; alive: boolean; flags: number; mins: number; /** health as their game last said it, kills and tags cashed since the server started */ hp: number; kills: number; tags: number; hidden?: true; god?: true; clip?: true; muted?: true; seat?: true; voidInv?: true; voidTag?: true; /** an admin's: what they carry weighs nothing, and their gun spends no rounds */ weightless?: true; endless?: true; /** an admin's: their inventory never fills */ bottomless?: true; /** gone without logging out: the body is still here */ asleep?: true; /** their game is not answering (a hidden tab): the server keeps their life */ away?: true }[];
   /** who left lately, newest first */
   gone: { id: number; name: string; mins: number }[];
   /**

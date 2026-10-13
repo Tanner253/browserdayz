@@ -13,7 +13,7 @@ import zlib from 'node:zlib';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { buildWorldData } from './world';
 import { Economy, type WorldLoot } from '../src/sim/economy';
-import { BODY_GRID, Container, cleanInventory as cleanCarried, cleanItem as cleanThing, layOnBody, type SerializedInventory } from '../src/sim/inventory';
+import { BODY_GRID, Container, HOLD, cleanInventory as cleanCarried, cleanItem as cleanThing, heldIn, holdOnlyEmpties, layOnBody, type SerializedInventory } from '../src/sim/inventory';
 import { GEAR_SLOTS, ITEMS, TAG_FRESH, TAG_HOLD, TAG_OUT, holds, magFits, makeItem, sanitizeItem, type ItemInstance } from '../src/sim/items';
 import { WORLD_SIZE, inPlay } from '../src/world/worldgen';
 import { BURY, noBurying } from '../src/sim/stash';
@@ -37,7 +37,7 @@ import { Director, INFECTED, guarded, infectedDrop } from '../src/sim/infected';
 import { EMOTE, EMOTE_GAP, SHOUT_RANGE } from '../src/sim/emotes';
 import { BLOOD, bleedOf, bloodOf, withWound, woundOf } from '../src/sim/blood';
 import { ACTS, CHAT_RANGE, F_BLEED, F_DEAD, F_GROUND, F_GUARD, F_SIT, MAX_STAMINA, PROTOCOL, type C2S, type CorpseInfo, type KillInfo, type PlayerInfo, type Pose, type S2C, type Slung, type StashInfo, type StoredItem, type Vitals } from '../src/net/protocol';
-import { ENTITIES, ORDERS, entityBy, written } from '../src/net/orders';
+import { ENTITIES, GROUND, ORDERS, entityBy, written } from '../src/net/orders';
 import { KITS } from '../src/sim/kits';
 import { CARRY_POWERS, carriedOf, refill, refilledWords, type CarryPower } from '../src/sim/powers';
 import { FIRE, Hearths } from '../src/sim/fires';
@@ -1729,6 +1729,8 @@ function loadAdmin(tries = 0) {
       // whoever was quickest back. They are told now.)
       for (const c of clients.values()) {
         const role = roleOf(c);
+        // (and whoever came in with an admin's hold is told it is not theirs, now that it is known who is an admin)
+        if (role !== 'admin') noHold(c);
         if (!role) continue;
         send(c, { t: 'role', role });
         if (role === 'admin') asAdmin(c, true);
@@ -1781,6 +1783,13 @@ function place(t: Client, x: number, y: number | null, z: number, by: Client) {
 function asAdmin(c: Client, fresh: boolean) {
   Object.assign(c.power, ADMIN.voids.get(c.key) ?? { voidInv: true, voidTag: true });
   Object.assign(c.power, CARRY_KEPT.get(c.key));
+  // (An admin who comes in with things in their hold has the room they lie in. Which powers were on is forgotten
+  // when this server restarts, and what is carried is not: without this, a restart put everything in an admin's
+  // hold at their feet as they came back.)
+  if (!c.power.bottomless && heldIn(c.inv).length) {
+    c.power.bottomless = true;
+    carryKept(c);
+  }
   send(c, { t: 'powers', ...c.power });
   if (fresh) for (const o of clients.values()) if (o !== c && o.power.hidden) send(c, { t: 'join', p: info(o) });
 }
@@ -1793,7 +1802,7 @@ function setPower(c: Client, k: keyof Client['power'], on: boolean) {
     ADMIN.voids.set(c.key, { voidInv: c.power.voidInv, voidTag: c.power.voidTag });
     return void send(c, { t: 'powers', ...c.power });
   }
-  if (k === 'weightless' || k === 'endless') return void carryKeep(c);
+  if (k === 'weightless' || k === 'endless' || k === 'bottomless') return void carryKeep(c);
   const now = Date.now();
   // (vanished: gone from everybody's game but an admin's, where they are drawn faintly)
   if (k === 'hidden') for (const o of clients.values()) if (o !== c) send(o, roleOf(o) === 'admin' ? { t: 'ghost', id: c.id, on } : on ? { t: 'leave', id: c.id } : { t: 'join', p: info(c) });
@@ -1831,17 +1840,45 @@ function setPower(c: Client, k: keyof Client['power'], on: boolean) {
 // nothing. And nobody but an admin has it done: the word is sent on an admin's order alone, and a game that filled
 // its own magazines without it would have said nothing it could not already say, what is in a magazine being its
 // own game's word and nobody else's.
+//
+// And a third power, the same day ("admins need an infinite inventory option"):
+//   /bottomless          the admin's inventory never fills: what finds no room in what they wear goes into a hold,
+//                        a grid with no bottom that is kept and sent beside the tag pouch (`Hold` in
+//                        src/sim/inventory.ts). Put on and off, and kept, as the two above. This one the server
+//                        does see, in three places, and each is so that the room is an admin's and nobody else's,
+//                        and so that nothing in it is lost:
+//                        - what a game says lies in its hold is kept in full only while the power is on. With it
+//                          off, a hold only ever gets emptier (`holdOnlyEmpties`, at 'me'): so a game that is not
+//                          an admin's has nothing kept in a hold it makes up, and an admin's own, in the moments
+//                          before this server has read who the admins are, loses nothing.
+//                        - an admin who comes in with things in their hold has the power on (`asAdmin`): this
+//                          server forgets which powers were on when it restarts, and must not put a hold at
+//                          anybody's feet for that. Whoever comes in with things in one and is no admin is told
+//                          they have no powers (`noHold`), and their game empties it, pockets first.
+//                        - on a body it is nobody's: what was in it lies in what room the body's grid has left
+//                          after everything that was worn, and the rest is gone (`makeCorpse`).
 
-/** which of the two each admin has on, by their key: theirs again when they come back, as what they chose for their death is (and, like that, until this server restarts) */
+/** which of them each admin has on, by their key: theirs again when they come back, as what they chose for their death is (and, like that, until this server restarts) */
 const CARRY_KEPT = new Map<string, Pick<Client['power'], CarryPower>>();
-function carryKeep(c: Client) {
-  if (c.power.weightless || c.power.endless) CARRY_KEPT.set(c.key, { weightless: c.power.weightless, endless: c.power.endless });
+function carryKept(c: Client) {
+  if (c.power.weightless || c.power.endless || c.power.bottomless) CARRY_KEPT.set(c.key, { weightless: c.power.weightless, endless: c.power.endless, bottomless: c.power.bottomless });
   else CARRY_KEPT.delete(c.key);
+}
+function carryKeep(c: Client) {
+  carryKept(c);
   send(c, { t: 'powers', ...c.power });
 }
+/**
+ * Somebody who is no admin and has things in a hold (an admin who has been made something else since they put
+ * them there): told that they have no powers, which is all their game needs to empty it into their pockets, and at
+ * their feet what finds no room. Nobody else who is no admin is ever told of powers.
+ */
+function noHold(c: Client) {
+  if (ADMIN.ready && roleOf(c) !== 'admin' && heldIn(c.inv).length) send(c, { t: 'powers', ...c.power });
+}
 
-/** `/weightless`, `/ammo` and `/refill`, given by an admin (`command` has seen that they are one). */
-function carryOrder(c: Client, cmd: 'weightless' | 'ammo' | 'refill', rest: string[]) {
+/** `/weightless`, `/ammo`, `/bottomless` and `/refill`, given by an admin (`command` has seen that they are one). */
+function carryOrder(c: Client, cmd: 'weightless' | 'ammo' | 'bottomless' | 'refill', rest: string[]) {
   if (cmd === 'refill') {
     const t = rest[0] ? whoIs(rest[0]) : c;
     if (!t) return void sys(c, `Nobody online is "${rest[0]}" (or more than one is): see /players.`);
@@ -1854,9 +1891,9 @@ function carryOrder(c: Client, cmd: 'weightless' | 'ammo' | 'refill', rest: stri
     if (r.of) return void sys(c, `Every magazine and gun ${whose} is full already.`);
     return void sys(c, t.inv ? `No magazine and no gun among what ${whose}: there is nothing to fill.` : `${t === c ? 'Your' : `${t.name}'s`} game has been told to fill what it carries (it has not yet said what that is).`);
   }
-  // One of the two powers put on or off: the admin's own, or (named) another admin's. `on` or `off` says which,
+  // One of the powers put on or off: the admin's own, or (named) another admin's. `on` or `off` says which,
   // in either order with the name; said neither, it is turned over. As god mode and the rest are: see `command`.
-  const k: CarryPower = cmd === 'ammo' ? 'endless' : 'weightless', p = CARRY_POWERS[k];
+  const k: CarryPower = cmd === 'ammo' ? 'endless' : cmd, p = CARRY_POWERS[k];
   const say = rest.find((w) => w === 'on' || w === 'off'), whom = rest.find((w) => w !== 'on' && w !== 'off');
   const t = whom ? whoIs(whom) : c;
   if (!t) return void sys(c, `Nobody online is "${whom}" (or more than one is): see /players.`);
@@ -2272,7 +2309,7 @@ async function command(c: Client, line: string) {
       log(`[admin] ${c.name} made ${t.name} ${to ?? 'nothing'}`);
       const kept = await saveAdmin({ roles, bans: ADMIN.state.bans });
       if (to !== 'admin') {
-        for (const k of ['god', 'hidden', 'clip', 'voidInv', 'voidTag', 'weightless', 'endless'] as const) setPower(t, k, false);
+        for (const k of ['god', 'hidden', 'clip', 'voidInv', 'voidTag', 'weightless', 'endless', 'bottomless'] as const) setPower(t, k, false);
         ADMIN.voids.delete(t.key);
         // (and whoever has vanished is gone from their game, as from anybody's)
         if (was) for (const o of clients.values()) if (o !== t && o.power.hidden) send(t, { t: 'leave', id: o.id });
@@ -2339,19 +2376,40 @@ async function command(c: Client, line: string) {
       if (!id) return void sys(c, `No thing is "${rest[0] ?? ''}" (or more than one is): type some of its name after /give and take one from the list.`);
       // (a tag is somebody's death, and is money: none is ever made)
       if (id === 'dogtag') return void sys(c, 'Not a dog tag: one is only ever taken from somebody.');
-      const counted = /^\d+$/.test(rest[1] ?? ''), whom = counted ? rest[2] : rest[1];
+      // Where it goes (2026-10-13: "the default mode for spawning loot for somone should be in their inventory
+      // unless on space"): into the inventory of whoever it is for, and at their feet what finds no room there.
+      // It was at their feet, always; that is still to be had, with the word `ground` (or `feet`, or `floor`)
+      // anywhere after the thing. And at their feet it is for whoever has no game to put it away: the dead, and a
+      // body left behind by a connection that has gone.
+      const said = rest.slice(1), onGround = said.some((w) => GROUND.includes(w.toLowerCase())), tail = said.filter((w) => !GROUND.includes(w.toLowerCase()));
+      const counted = /^\d+$/.test(tail[0] ?? ''), whom = counted ? tail[1] : tail[0];
       const t = whom ? whoIs(whom) : c;
       if (!t) return void sys(c, `Nobody online is "${whom}" (or more than one is): see /players.`);
-      const per = ITEMS[id].stack ?? 1;
-      let left = Math.max(1, Math.min(counted ? Number(rest[1]) : 1, per > 1 ? per * 10 : 10)), made = 0;
+      const per = ITEMS[id].stack ?? 1, away = !t.alive || !!t.asleep, feet = onGround || away;
+      let left = Math.max(1, Math.min(counted ? Number(tail[0]) : 1, per > 1 ? per * 10 : 10)), made = 0;
+      const items: ItemInstance[] = [];
       while (left > 0) {
-        const q = Math.min(per, left);
-        economy.drop(makeItem(id, per > 1 ? q : undefined), t.pose[0] + (Math.random() - 0.5) * 0.9, t.pose[1] + 0.05, t.pose[2] + (Math.random() - 0.5) * 0.9, Math.random() * Math.PI * 2);
+        const q = Math.min(per, left), it = makeItem(id, per > 1 ? q : undefined);
+        if (feet) economy.drop(it, t.pose[0] + (Math.random() - 0.5) * 0.9, t.pose[1] + 0.05, t.pose[2] + (Math.random() - 0.5) * 0.9, Math.random() * Math.PI * 2);
+        else {
+          // (made here and written down, as a kit's things are: each is one the server knows it put in the world)
+          issue(it);
+          items.push(it);
+        }
         left -= q;
         made += q;
       }
-      log(`[admin] ${c.name} made ${made} of ${id}${t === c ? '' : ` at ${t.name}'s feet`}`);
-      return void sys(c, `${made > 1 ? `${made} × ` : ''}${ITEMS[id].name} ${t === c ? 'at your feet' : `at ${t.name}'s feet`}.`);
+      const what = `${made > 1 ? `${made} × ` : ''}${ITEMS[id].name}`, whose = t === c ? 'your' : `${t.name}'s`;
+      if (feet) {
+        log(`[admin] ${c.name} made ${made} of ${id}${t === c ? '' : ` at ${t.name}'s feet`}`);
+        return void sys(c, `${what} at ${whose} feet${away && !onGround ? ` (${t === c ? 'you are' : `${t.name} is`} ${t.alive ? 'not at their game' : 'dead'}: nothing goes into an inventory)` : ''}.`);
+      }
+      // (handed over as a kit that adds to what is carried: their game puts each thing on or away as it does a thing
+      // picked up, and at their feet what finds no room. `gift` has the note say what was given; a game from
+      // before it reads `name`, and calls the same words a kit.)
+      log(`[admin] ${c.name} made ${made} of ${id}, into ${t === c ? 'their own' : `${t.name}'s`} inventory`);
+      send(t, { t: 'kit', name: what, items, adds: true, gift: what, ...(t === c ? {} : { by: c.name }) });
+      return void sys(c, `${what}: in ${whose} inventory; what finds no room there is at ${t === c ? 'your' : 'their'} feet.`);
     }
     case 'kit': {
       if (!admin) return need();
@@ -2457,8 +2515,9 @@ async function command(c: Client, line: string) {
     }
     case 'weightless':
     case 'ammo':
+    case 'bottomless':
     case 'refill':
-      // (what an admin carries weighing nothing, their gun never emptying, and every magazine filled: see `carryOrder`)
+      // (what an admin carries weighing nothing, their gun never emptying, their inventory never filling, and every magazine filled: see `carryOrder`)
       if (!admin) return need();
       return void carryOrder(c, cmd, rest);
     case 'roles':
@@ -2690,7 +2749,7 @@ interface Client {
    * And two things chosen for their own death: nothing they carried is left on the body (what an admin makes for
    * themselves is not found on them by whoever kills them), and no dog tag of their own is.
    */
-  power: { god: boolean; hidden: boolean; clip: boolean; voidInv: boolean; voidTag: boolean; /** what they carry weighs nothing, and their gun spends no rounds: their own game's to honour (see `carryOrder`) */ weightless: boolean; endless: boolean };
+  power: { god: boolean; hidden: boolean; clip: boolean; voidInv: boolean; voidTag: boolean; /** what they carry weighs nothing, and their gun spends no rounds: their own game's to honour (see `carryOrder`) */ weightless: boolean; endless: boolean; /** their inventory never fills: things are kept in their hold (see `carryOrder`) */ bottomless: boolean };
   /** when this player last threw a grenade, and how many hits have been claimed for it */
   lastNade: number;
   nadeHits: number;
@@ -3057,8 +3116,19 @@ function makeCorpse(c: Client, v: number): CorpseInfo | null {
   };
   if (inv) {
     for (const it of Object.values(inv.slots)) put(it);
-    for (const cont of inv.containers) for (const s of cont.items) put(cleanItem(s));
+    for (const cont of inv.containers) if (cont.id !== HOLD) for (const s of cont.items) put(cleanItem(s));
     spill.push(...layOnBody(box, laid));
+    // An admin's hold is nobody's on a body: a body has a body's room and no more. What was in it is laid after
+    // everything that was worn, in whatever of the grid that has left, and what finds no room there is gone: not
+    // thrown on the ground round the body, where forty rifles would lie for whoever came by. (An admin who leaves
+    // nothing when they die, which is how every admin begins, leaves none of this either: `put` sees to that.)
+    const held = heldIn(inv);
+    if (held.length) {
+      laid.length = 0;
+      for (const s of held) put(cleanItem(s));
+      const lost = layOnBody(box, laid);
+      log(`${c.name} died with ${held.length} things in an admin's hold: ${bare ? 'none of them is left (an admin, who chose so)' : `${laid.length - lost.length} lie on the body, and ${lost.length} found no room there and are gone`}`);
+    }
     if (own && !noTag) lootedTags.set(own.uid, { owner: c.name, ownerKey: c.key, ownerIp: c.ip, livedMs: lived });
     else if (own || older) {
       log(`${c.name} left no dog tag: ${fresh ? `alive ${Math.round(lived / 1000)} s` : 'an admin, who chose so'}${older ? ` (nor ${older} older of their own, taken back)` : ''}`);
@@ -3487,7 +3557,10 @@ function handle(c: Client, m: C2S) {
     }
     case 'me': {
       if (!c.alive) return;
+      const had = c.inv;
       c.inv = cleanInventory(m.inv);
+      // (nobody without the power puts a thing in a hold: see `carryOrder`)
+      if (c.inv && !c.power.bottomless) holdOnlyEmpties(c.inv, had);
       pockets(c);
       // (somebody with a keycard: remembered a moment, for when they put it in the bunker's reader)
       if (carries(c.inv, 'keycard')) cardSeen.set(c.id, Date.now());
@@ -3599,7 +3672,7 @@ function handle(c: Client, m: C2S) {
           ...(o.power.hidden ? { hidden: true as const } : {}), ...(o.power.god ? { god: true as const } : {}), ...(o.power.clip ? { clip: true as const } : {}),
           ...((ADMIN.muted.get(o.key) ?? 0) > now ? { muted: true as const } : {}), ...(o.seatAt ? { seat: true as const } : {}),
           ...(o.power.voidInv ? { voidInv: true as const } : {}), ...(o.power.voidTag ? { voidTag: true as const } : {}),
-          ...(o.power.weightless ? { weightless: true as const } : {}), ...(o.power.endless ? { endless: true as const } : {}),
+          ...(o.power.weightless ? { weightless: true as const } : {}), ...(o.power.endless ? { endless: true as const } : {}), ...(o.power.bottomless ? { bottomless: true as const } : {}),
           ...(o.asleep ? { asleep: true as const } : away(o, now) && o.alive ? { away: true as const } : {}),
         })),
         gone: ADMIN.gone.slice(-20).reverse().map((g) => ({ id: g.id, name: g.name, mins: Math.round((now - g.at) / 60000) })),
@@ -3800,7 +3873,7 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
     // (on the ground, until their own game says otherwise: with no word of the ground they were drawn by everybody
     // else as somebody in the air, arms out, for as long as their game took to start, or for good if it never did)
     pose: [sp.x, 'y' in sp && sp.y !== undefined ? sp.y : world.groundAt(sp.x, sp.z), sp.z, sp.yaw, 0, F_GROUND],
-    w: null, m: [], g: [], b: [], alive: true, power: { god: false, hidden: false, clip: false, voidInv: false, voidTag: false, weightless: false, endless: false },
+    w: null, m: [], g: [], b: [], alive: true, power: { god: false, hidden: false, clip: false, voidInv: false, voidTag: false, weightless: false, endless: false, bottomless: false },
     heardAt: Date.now(), kept: false, asleep: 0, bled: 0, logoutAt: 0, logoutFrom: [0, 0],
     since: Date.now(), spoke: false, resumed: !!resume,
     inv: resume?.inv ?? null, vitals: resume?.vitals ?? null,
@@ -3846,6 +3919,8 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
   // (somebody with a role is told so as they come in: their game shows them what they may do)
   if (roleOf(c)) send(c, { t: 'role', role: roleOf(c) });
   if (roleOf(c) === 'admin') asAdmin(c, false);
+  // (and whoever comes in with an admin's hold and is none is told so: their game empties it)
+  else noHold(c);
   return c;
 }
 

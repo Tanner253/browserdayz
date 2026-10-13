@@ -987,6 +987,13 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 .inv-col h3 span.free { color: #c8a8ff; letter-spacing: 0.12em; text-transform: uppercase; }
 /* over each grid of what is worn, after its name: the place it is worn in (it gives way first where the bar is short) */
 .inv-gridbox h4 small { flex: 0 1 auto; min-width: 0; margin-left: 8px; overflow: hidden; text-overflow: ellipsis; font-size: 9px; font-weight: 400; letter-spacing: 0.14em; color: var(--ink-faint); }
+/* An admin's hold, the inventory that never fills (2026-10-13): under everything that is worn, in the colour the
+   powers are said in. It is drawn as tall as what is in it and is scrolled to with the rest of this side; where
+   the side is narrower than its ten cells it scrolls sideways by itself, so nothing in it is off the edge. */
+.inv-gridbox.inv-hold { max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; scrollbar-color: rgba(200, 168, 255, 0.4) rgba(0, 0, 0, 0.25); }
+.inv-gridbox.inv-hold h4 { position: sticky; left: 0; border-color: rgba(200, 168, 255, 0.45); }
+.inv-gridbox.inv-hold h4 small { color: #c8a8ff; }
+.inv-gridbox.inv-hold .inv-grid { border-color: rgba(200, 168, 255, 0.45); }
 
 /* The survivor's side holds eleven places for what is worn now: what stands under the figure is closed up, so that
    the tags at its foot are not pushed further off the screen than they were. */

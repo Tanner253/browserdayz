@@ -1,15 +1,20 @@
-// Three of an admin's tools that are about what is carried (2026-10-13: "admins should have infinite weight
+// Four of an admin's tools that are about what is carried (2026-10-13: "admins should have infinite weight
 // toggle", "admins should have reload mags button and no ammo consumtion otpion for infinte ammo"):
 //
 //   weightless – a power, as god mode is: what is carried weighs nothing, and so never slows whoever carries it.
 //   endless    – a power: a shot takes no round out of the gun it is fired from, so the gun never runs dry.
 //   refill     – done once, not a power: every magazine and every gun carried is full.
+//   bottomless – a power (2026-10-13: "admins need an infinite inventory option"): whatever is put into the admin's
+//                inventory finds room. The room is a grid of its own with no bottom, the hold (`Hold` in
+//                src/sim/inventory.ts, where it is said why a grid and not a deeper pack). Unlike the two above,
+//                this one the server does see: it reads a hold out of what an admin's game says it carries, lets
+//                nobody without the power put a thing in one, and gives nobody but an admin the power.
 //
 // What each one comes to is decided here, in functions that need no game and no server, so that both ends go by
 // the same rule and it can be tried without either (test/powers.test.ts). Who may have them is the server's to say
 // (`setPower` and `carryOrder` in server/index.ts); the game does only what the server tells it.
 //
-// What the server makes of them. It counts rounds nowhere and weighs nothing: it never has. So neither power is
+// What the server makes of the first three. It counts rounds nowhere and weighs nothing: it never has. So neither power is
 // anything it sees, and nothing here makes a thing: a refill leaves every gun and every magazine the very thing it
 // was (the same number), with more rounds in it, and rounds are not among what the server's checks ask after (they
 // ask after guns, blades, armour and the keycard: `GUARDED` in server/index.ts).
@@ -93,11 +98,14 @@ export function refilledWords(r: Refilled): string {
 }
 
 /**
- * The two powers as they are spoken of: the order each is given by, what it is called, and what it does, said to
- * whoever has it and of somebody else. One list, read by the server's replies, the panel's switches and the guide.
+ * The powers that are about what is carried, as they are spoken of: the order each is given by, what it is called,
+ * and what it does, said to whoever has it and of somebody else. One list, read by the server's replies, the
+ * panel's switches and the guide. (`off` of the last is the server's first word of it; the admin's own game then
+ * says how many things found no room in what they wear.)
  */
 export const CARRY_POWERS = {
   weightless: { order: 'weightless', name: 'weightless', label: 'Weightless', mine: 'What you carry weighs nothing: however much it is, it takes nothing off your sprint and never slows you', theirs: 'What they carry weighs nothing: however much it is, it takes nothing off their sprint and never slows them', on: 'What you carry weighs nothing now: however much it is, it never slows you.', off: 'What you carry weighs what it weighs again.' },
   endless: { order: 'ammo', name: 'endless ammunition', label: 'Endless ammunition', mine: 'Firing takes no round out of your gun: it never runs dry (an empty gun is still empty: Refill fills it)', theirs: 'Firing takes no round out of their gun: it never runs dry', on: 'Firing takes no round out of your gun now: it never runs dry. (An empty gun is still empty: /refill fills it.)', off: 'Your gun spends its rounds again.' },
+  bottomless: { order: 'bottomless', name: 'bottomless inventory', label: 'Bottomless inventory', mine: 'Your inventory never fills: what your pockets and pack cannot take goes into a hold under them, which always has room', theirs: 'Their inventory never fills: what their pockets and pack cannot take goes into a hold, which always has room', on: 'Your inventory never fills now: what finds no room in what you wear goes into the hold, under your pockets on the inventory screen.', off: 'Your inventory is as big as what you wear again: what was in the hold goes into your pockets, and what finds no room there to your feet.' },
 } as const;
 export type CarryPower = keyof typeof CARRY_POWERS;

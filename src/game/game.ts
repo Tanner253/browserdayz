@@ -1256,14 +1256,23 @@ export class Game {
       this.inHand = null;
       this.holding = false;
     }
+    // (with an admin's hold open, `add` has room for every one of them: PlayerInventory.containers)
     const over = m.items.filter((it) => inv.add(it));
     for (const it of over) this.dropItem(it);
     this.weapons.validate();
     this.autoHot();
     this.inventoryChanged();
     this.meDirty = true;
+    // (things given while the pockets are open are seen to arrive)
+    if (m.adds && this.invUI.isOpen) this.invUI.render();
     // (a kit of nothing is an admin's "empty everything")
     if (!m.name) return void (m.by && this.hud.note(`${m.by}, an admin, has emptied what you carried`, 'warn'));
+    // (things an admin has given, and no kit: said as what they are, and where they went. Each pile is one thing here.)
+    if (m.gift) {
+      const none = over.length === m.items.length, lies = none ? (over.length === 1 ? 'it found no room and lies at your feet' : 'none of it found room: it lies at your feet') : over.length === 1 ? 'one found no room and lies at your feet' : `${over.length} found no room and lie at your feet`;
+      if (m.by) return void this.hud.note(`${m.by}, an admin, has given you ${m.gift}${over.length ? `; ${lies}` : ''}`, 'good');
+      return void this.hud.note(`${m.gift}: ${over.length ? lies : 'in your inventory'}`, 'good');
+    }
     if (m.by || over.length) this.hud.note(`${m.by ? `${m.by}, an admin, has given you the ${m.name} kit` : `The ${m.name} kit`}${over.length ? `: ${over.length} of its things found no room and lie at your feet` : ''}`, 'good');
   }
 
@@ -1320,13 +1329,53 @@ export class Game {
     this.hud.note(did ? `${by ? `${by}, an admin, has filled what you carry: ` : ''}${did}` : `${by ? `${by}, an admin, went to fill what you carry: ` : ''}${r.of ? 'every magazine and gun you carry is full already' : 'you carry no magazine and no gun'}`, did ? 'good' : 'info');
   }
 
-  /** The two of an admin's powers that are about what is carried (src/sim/powers.ts): said to what fires a gun and to the screen that weighs the pockets. */
+  /** Those of an admin's powers that are about what is carried (src/sim/powers.ts): said to what fires a gun, to the screen that weighs the pockets, and to the inventory, whose hold is opened or emptied. */
   private carryPowers() {
     this.weapons.endless = this.powers.endless;
     this.invUI.weightless = this.powers.weightless;
+    // The inventory that never fills. On: the hold is open, and whatever is put away finds room in it. Off (and it
+    // was on, or there are things in a hold that the server says is not to be had): what fits what is worn stays,
+    // and the rest goes to the feet.
+    if (this.powers.bottomless) {
+      window.clearTimeout(this.holdTimer);
+      this.holdTimer = 0;
+      this.inv.bottomless = true;
+      // (not while it is being emptied already: every word of any power comes through here)
+    } else if (this.inv.bottomless || (this.inv.theHold.items.length && !this.holdTimer)) this.emptyHold();
     // (and the legs are told on the next frame)
     this.slowT = 1;
     if (this.invUI.isOpen) this.invUI.render();
+  }
+
+  private holdTimer = 0;
+  /**
+   * An admin's hold is shut (the power is off, or was never theirs): everything in it that finds a place on the
+   * body or room in what is worn is put there, at once; the rest is put at the feet and counted out loud. A few at
+   * a time: each thing put down is a message to the server, which takes no more than 120 a second from anybody
+   * and says nothing of the ones it lets fall, so forty rifles put down in one frame would be forty rifles that
+   * some of them nobody else could see or take. Until the last is down they are still in the hold, shut, and
+   * still said to the server as carried: nothing is anywhere it cannot be found.
+   */
+  private emptyHold() {
+    const inv = this.inv;
+    window.clearTimeout(this.holdTimer);
+    const had = inv.theHold.items.length, left = inv.shutHold();
+    if (had) this.inventoryChanged();
+    if (left) this.hud.note(`The bottomless inventory is off: ${left === 1 ? 'one thing finds' : `${left} things find`} no room in what you wear, and ${left === 1 ? 'is' : 'are'} put at your feet`, 'warn');
+    else if (had) this.hud.note('The bottomless inventory is off: everything that was in the hold is in what you wear', 'info');
+    const step = () => {
+      this.holdTimer = 0;
+      // (dead, or the power is back on: what is still in it stays where it is)
+      if (this.player.dead || inv.bottomless || !inv.theHold.items.length) return;
+      for (const p of inv.theHold.items.slice(0, 6)) {
+        inv.theHold.remove(p.item);
+        this.dropItem(p.item, this.player.pos, 1.1);
+      }
+      this.inventoryChanged();
+      if (this.invUI.isOpen) this.invUI.render();
+      if (inv.theHold.items.length) this.holdTimer = window.setTimeout(step, 250);
+    };
+    step();
   }
 
   /** Every survivor wears a dog tag stamped with their own name, round their neck (see PlayerInventory.neck). */
@@ -1780,7 +1829,7 @@ export class Game {
       this.hud.note(`${m.role === 'admin' ? 'An admin' : 'A mod'} (${m.from}) to you: ${m.text}`, 'warn');
     });
     net.on('powers', (m) => {
-      this.powers = { god: m.god, hidden: m.hidden, clip: m.clip, voidInv: m.voidInv, voidTag: m.voidTag, weightless: !!m.weightless, endless: !!m.endless };
+      this.powers = { god: m.god, hidden: m.hidden, clip: m.clip, voidInv: m.voidInv, voidTag: m.voidTag, weightless: !!m.weightless, endless: !!m.endless, bottomless: !!m.bottomless };
       this.player.god = m.god;
       // (God mode is proof against every state a body can be in, not only against dying of it: 2026-10-13, an
       // admin with it on: "i am still being choked out by the gas, i should be immune to all status efects in
@@ -2774,7 +2823,7 @@ export class Game {
   }
   /** an admin's night vision: it is day in this game alone, whatever the hour (the hour itself goes on as it does) */
   private nightSight = false;
-  private powers = { god: false, hidden: false, clip: false, voidInv: false, voidTag: false, weightless: false, endless: false };
+  private powers = { god: false, hidden: false, clip: false, voidInv: false, voidTag: false, weightless: false, endless: false, bottomless: false };
   /** the view has left the body: where it is, and which way it looks */
   private freecam: { pos: THREE.Vector3; yaw: number; pitch: number } | null = null;
   /** how fast the free camera flies, metres a second (the wheel changes it) */
@@ -2792,7 +2841,7 @@ export class Game {
 
   private showPowers() {
     const seen = this.watching ? this.remotes.get(this.watching.id)?.name : '';
-    const on = [this.powers.god && 'GOD MODE', this.powers.hidden && 'VANISHED', this.powers.clip && 'NOCLIP', this.powers.weightless && 'WEIGHTLESS', this.powers.endless && 'ENDLESS AMMO', this.freecam && `${seen ? `WATCHING ${seen.toUpperCase()}` : 'FREE CAMERA'}  ·  ${Math.round(this.freeSpeed)} M/S (WHEEL)  ·  H: BODY HERE  ·  K: BACK`].filter(Boolean);
+    const on = [this.powers.god && 'GOD MODE', this.powers.hidden && 'VANISHED', this.powers.clip && 'NOCLIP', this.powers.weightless && 'WEIGHTLESS', this.powers.endless && 'ENDLESS AMMO', this.powers.bottomless && 'BOTTOMLESS', this.freecam && `${seen ? `WATCHING ${seen.toUpperCase()}` : 'FREE CAMERA'}  ·  ${Math.round(this.freeSpeed)} M/S (WHEEL)  ·  H: BODY HERE  ·  K: BACK`].filter(Boolean);
     this.hud.setPowers(on.join('  ·  '));
     this.adminUI?.setSelf(this.adminSelf());
   }

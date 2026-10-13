@@ -72,7 +72,8 @@ export const ORDERS: Order[] = [
   { name: 'goto', args: ['who'], does: 'Go to where somebody is', admin: true },
   { name: 'bring', args: ['who'], does: 'Bring somebody to where you are', admin: true },
   { name: 'tp', args: ['x', 'z'], does: 'Go to a place by its numbers (or right-click the map)', admin: true },
-  { name: 'give', args: ['item', '[count]', '[who]'], does: 'Put a thing at your feet, or at somebody’s', admin: true },
+  // (2026-10-13: "the default mode for spawning loot for somone should be in their inventory unless on space". It was at their feet, always.)
+  { name: 'give', args: ['item', '[count]', '[who]', '[ground]'], does: 'Put a thing into your inventory, or somebody’s: what finds no room there lies at their feet. With the word ground after it, at their feet and not into the inventory', admin: true },
   { name: 'kit', args: ['kit', '[who]'], does: 'A whole set of the best there is, in place of what is carried', admin: true },
   { name: 'clear', args: ['[who]'], does: 'Empty everything you carry and wear, or somebody else’s (dog tags are kept)', admin: true },
   { name: 'heal', args: ['[who]'], does: 'Whole, fed and watered: you, or somebody', admin: true },
@@ -86,6 +87,7 @@ export const ORDERS: Order[] = [
   // (what is carried, and what is fired, 2026-10-13: src/sim/powers.ts. `on` or `off` says which; said neither, it is turned over)
   { name: 'weightless', args: ['[on|off]', '[who]'], does: 'What you carry weighs nothing: however much it is, it never slows you. Or another admin’s (with neither word, it is turned over)', admin: true },
   { name: 'ammo', args: ['[on|off]', '[who]'], does: 'Endless ammunition: firing takes no round out of your gun. Or another admin’s (with neither word, it is turned over)', admin: true },
+  { name: 'bottomless', args: ['[on|off]', '[who]'], does: 'Your inventory never fills: what your pockets cannot take goes into a hold that always has room. Or another admin’s (with neither word, it is turned over). Put off, what does not fit what you wear lies at your feet', admin: true },
   { name: 'refill', args: ['[who]'], does: 'Every magazine and every gun you carry is filled, or somebody else’s', admin: true },
   { name: 'ban', args: ['who', '[why]'], does: 'Ban for good: their game and their address', admin: true },
   { name: 'bans', args: [], does: 'Who is banned, numbered for /unban', admin: true },
@@ -121,6 +123,12 @@ export interface Offer {
 const MINUTES = ['5', '10', '30', '60'];
 const METRES = ['30', '60', '120', '250'];
 const SWITCH = ['on', 'off'];
+/**
+ * The words that put what `/give` makes at somebody's feet, where it would otherwise go into their inventory. One
+ * list for both ends: the chat box offers the first of them, and the server reads any. (Somebody whose name is one
+ * of these is given things by their number.)
+ */
+export const GROUND = ['ground', 'feet', 'floor'];
 
 /**
  * What to offer under a line being typed. @returns null when the line is talk, or whoever types has no role.
@@ -171,6 +179,16 @@ export function offer(text: string, role: Role | null, here: { id: number; name:
     picks = ENTITIES.filter((e) => e.id.startsWith(p) || e.name.toLowerCase().startsWith(p) || !!e.also?.some((a) => a === p)).map((e) => ({ label: e.id, note: `${e.name}: ${e.does}`, fill: `${stem}${e.id} `, whole: false }));
   } else if (kind === 'metres') {
     picks = METRES.filter((m) => m.startsWith(p) && m !== p).map((m) => ({ label: m, note: 'metres', fill: `${stem}${m} `, whole: false }));
+  }
+  // After the thing in `/give`: how many, who it is for and the word `ground`, each of which can be left out, and
+  // the last two said in either order, as the server reads them. Whatever is still to be said is offered: who is
+  // online (not while a number is being typed: that is how many), and `ground`, which puts it at their feet.
+  if (order.name === 'give' && at >= 1) {
+    const before = words.slice(2, -1).map((w) => w.toLowerCase()), count = /^\d+$/.test(p);
+    const grounded = before.some((w) => GROUND.includes(w)), named = before.some((w) => !GROUND.includes(w) && !/^\d+$/.test(w));
+    const who = named || count ? [] : here.filter((o) => !p || o.name.toLowerCase().includes(p) || `#${o.id}`.startsWith(p)).map((o) => ({ label: `#${o.id}  ${o.name}`, note: 'online', fill: `${stem}#${o.id} `, whole: false }));
+    const ground = grounded || count || !GROUND[0].startsWith(p) || p === GROUND[0] ? [] : [{ label: GROUND[0], note: 'at their feet, and not into the inventory', fill: `${stem}${GROUND[0]} `, whole: false }];
+    picks = [...who, ...ground];
   }
   // A switch (`[on|off]`, then `[who]`). The word and the player may be said in either order, as the server reads
   // them: whichever is still to be said is what is offered. With nothing typed, the two words; with a name or a
