@@ -355,6 +355,31 @@ export const POSE = {
      * inside a lowered visor when aimed. Squaring the chest to it instead left the forward hand 14 cm short.)
      */
     stockless: 0.18,
+    /**
+     * Aimed, a long gun is not left at the shoulder with the head upright beside it (the user's, 2026-10-13: "looks
+     * bad, like not ADS", "the head needs to tilt towards the gun slightly as well like youre lining up sights"):
+     * its sights are put in front of the right eye, and the head is brought to the gun.
+     *   eye:     where the right eye is, in the body's resting frame as the head carries it (x right, y up, z behind);
+     *   x:       how far outside the eye the gun's middle line is at the least;
+     *   jaw:     and how far out from the middle of the head, where the head tips about: the stock stands upright
+     *            beside the jaw and the head is tipped over it, which is what brings the eye to the sights;
+     *   plate:   the same under a visor that is down, where there is no cheek to lay on the stock: further out,
+     *            so that the stock, which is lower there, runs clear of the chest it is bladed across;
+     *   beside:  how far outside whatever is worn on the cheek (a mask's rubber) the gun's line is, if that is further;
+     *   front:   how far in front of the body's own upright line the chest's front is where the butt then rests, by
+     *            the collar bone (in the resting frame, as the upper back carries it), and `slope`: how much
+     *            further forward it is for each metre lower the butt rests;
+     *   tilt, nod, shift: the head tipped toward the stock and down (radians), and the neck craned to it (right, up, back: metres);
+     *   lean:    the chest leant in to the gun, radians;
+     *   visored: how much of the head's part is done under a visor that is down. A stock cannot be laid on a
+     *            cheek that is behind a steel plate: it goes under the plate's lower edge and the sights stand in
+     *            front of the plate, as high as that lets them (see `faceGear`).
+     */
+    cheek: { eye: [0.032, 1.64, -0.075] as [number, number, number], x: 0.005, jaw: 0.09, plate: 0.12, beside: 0.025, front: 0.09, slope: 0.5, tilt: 0.22, nod: 0.08, shift: [0.035, -0.012, -0.02] as [number, number, number], lean: 0.06, visored: 0.4 },
+    /** aimed, the chest is turned this far off the aim (less than at the ready: the right shoulder comes round to the gun), the left shoulder comes this far forward, and the right this far */
+    bladeAim: 0.6,
+    reachAim: 0.75,
+    reachRight: 0.6,
     // (A pistol at the ready and carried was a hand's width nearer the chest and off to the right: the left arm
     // went through the chest to get to it. In front of the middle of the body, at arm's length less a bend.)
     pistol: {
@@ -495,16 +520,21 @@ const UP = new THREE.Vector3(0, 1, 0);
 export const GUN_ELBOW = {
   r: new THREE.Vector3(1.2, -0.75, -0.1), l: new THREE.Vector3(-1.3, -0.85, 0.05),
   stockR: new THREE.Vector3(0.9, -0.5, -0.3), stockL: new THREE.Vector3(-0.5, -0.85, 0.05),
+  // (aimed: the firing elbow down and close, the other under the gun)
+  aimR: new THREE.Vector3(0.55, -0.8, -0.2), aimL: new THREE.Vector3(-0.35, -0.9, 0.05),
 };
+const _k6 = new THREE.Vector3(), _k7 = new THREE.Vector3(), _k8 = new THREE.Vector3();
 const _k1 = new THREE.Vector3(), _k2 = new THREE.Vector3(), _k3 = new THREE.Vector3(), _k4 = new THREE.Vector3(), _k5 = new THREE.Vector3();
 const _kq = new THREE.Quaternion(), _kr = new THREE.Quaternion();
 /** the middle of each kind of long gun's butt (see `buttOf`), by the biggest of the gun's shapes */
-const BUTTS = new WeakMap<THREE.BufferGeometry, THREE.Vector3>();
+const BUTTS = new WeakMap<THREE.BufferGeometry, Butt>();
+/** a gun's butt, in the gun's own space: its middle, half its height, and how far over its middle the gun's top is where the eye is put (its sights) */
+type Butt = { at: THREE.Vector3; half: number; rise: number };
 /**
  * The middle of the butt of a gun, in the gun's own space (it lies along its own x, muzzle at +x): the middle of
  * the rearmost centimetre and a half of whatever of it is shown. Found once for each kind of gun.
  */
-function buttOf(obj: THREE.Object3D): THREE.Vector3 | null {
+function buttOf(obj: THREE.Object3D): Butt | null {
   obj.updateWorldMatrix(true, true);
   const inv = new THREE.Matrix4().copy(obj.matrixWorld).invert();
   const parts: [THREE.BufferAttribute, THREE.Matrix4][] = [];
@@ -528,7 +558,11 @@ function buttOf(obj: THREE.Object3D): THREE.Vector3 | null {
   for (const [P, M] of parts) for (let i = 0; i < P.count; i++) back = Math.min(back, _k1.fromBufferAttribute(P, i).applyMatrix4(M).x);
   const box = new THREE.Box3();
   for (const [P, M] of parts) for (let i = 0; i < P.count; i++) if (_k1.fromBufferAttribute(P, i).applyMatrix4(M).x < back + 0.015) box.expandByPoint(_k1);
-  const butt = box.getCenter(new THREE.Vector3()).setX(back);
+  const at = box.getCenter(new THREE.Vector3()).setX(back);
+  // (its sights: the top of it between a hand and three hands in front of the butt, where the eye is brought to it)
+  let top = at.y;
+  for (const [P, M] of parts) for (let i = 0; i < P.count; i++) if (_k1.fromBufferAttribute(P, i).applyMatrix4(M).x > back + 0.12 && _k1.x < back + 0.5) top = Math.max(top, _k1.y);
+  const butt = { at, half: (box.max.y - box.min.y) / 2, rise: top - at.y };
   BUTTS.set(key, butt);
   return butt;
 }
@@ -641,7 +675,11 @@ export class Avatar {
   private layerMask = 1;
   /** weapon in the hands: pivot (at the shoulders, pitches with the aim) > the model */
   private heldPivot = new THREE.Group();
-  private held: { obj: THREE.Object3D; grips: Grips; long: boolean; base: THREE.Quaternion; butt: THREE.Vector3 | null } | null = null;
+  private held: { obj: THREE.Object3D; grips: Grips; long: boolean; base: THREE.Quaternion; butt: THREE.Vector3 | null; sight: [number, number] } | null = null;
+  /** what is worn on the head that a stock brought to the cheek goes round (see `faceGear`), and the gear it was found for */
+  private face: { under: number | null; cheek: number } = { under: null, cheek: 0 };
+  private faceOf: THREE.Object3D[] | null = null;
+  private collarR?: THREE.Bone;
   /**
    * How much the hands are on the gun they hold, 0..1. They come off it to use something, to wave, to sit, and
    * when it is changed for another, and go back onto it, over a fifth of a second, the gun going down toward
@@ -863,6 +901,7 @@ export class Avatar {
       }
     }
     this.collarL = bone('clavicle_l');
+    this.collarR = bone('clavicle_r');
     // a shouldered weapon rides on the upper back: placed where it should be on the standing
     // body, then handed to the spine so it follows every lean and step
     this.slung.position.set(0, 1.3, 0.16);
@@ -1090,9 +1129,44 @@ export class Avatar {
     }
     this.heldPivot.add(obj);
     // (a long gun is held by its butt: one with a way of its own of being stood with has no stock, and is held by where the butt of one would be)
-    let butt = kind !== 'pistol' ? buttOf(obj) : null;
-    if (butt && grips.stand) butt = butt.clone().setX(butt.x - POSE.hold.stockless / obj.scale.x);
-    this.held = { obj, grips, long: kind !== 'pistol', base: obj.quaternion.clone(), butt };
+    const b = kind !== 'pistol' ? buttOf(obj) : null;
+    const butt = b && grips.stand ? b.at.clone().setX(b.at.x - POSE.hold.stockless / obj.scale.x) : (b?.at ?? null);
+    this.held = { obj, grips, long: kind !== 'pistol', base: obj.quaternion.clone(), butt, sight: b ? [b.half * obj.scale.y, b.rise * obj.scale.y] : [0.045, 0.095] };
+  }
+
+  /**
+   * What is worn on the head that a stock brought to the cheek has to go round, measured off the worn things
+   * themselves in the body's resting frame as the head carries it (once for each change of gear):
+   *   under: the lowest point of anything that stands off the face beside the cheek or out in front of it (a
+   *          visor that is down, a filter at the cheek): a stock goes under that, and null if there is none;
+   *   cheek: how far out anything lying ON the cheek comes (a mask's rubber): a stock goes beside that.
+   * (Called with the body's places in the world up to date.)
+   */
+  private faceGear() {
+    if (this.faceOf === this.gearObjs) return this.face;
+    this.faceOf = this.gearObjs;
+    const rest = this.gearRest.get('Head'), eye = POSE.hold.cheek.eye[1];
+    let under = Infinity, cheek = 0;
+    if (rest) {
+      _m1.multiplyMatrices(rest.bone.matrixWorld, rest.inv).invert();
+      for (const holder of this.gearObjs) {
+        if (holder.parent !== rest.bone) continue;
+        holder.traverse((o) => {
+          const m = o as THREE.Mesh;
+          if (!m.isMesh) return;
+          const P = m.geometry.getAttribute('position');
+          _m2.multiplyMatrices(_m1, m.matrixWorld);
+          for (let i = 0; i < P.count; i++) {
+            const { x, y, z } = _k6.fromBufferAttribute(P, i).applyMatrix4(_m2);
+            if (y > eye || y < eye - 0.2 || z > 0 || z < -0.25 || x < 0.045 || x > 0.2) continue;
+            if (x > 0.1 || z < -0.135) under = Math.min(under, y);
+            else if (y > eye - 0.12 && y < eye - 0.03 && z < -0.01) cheek = Math.max(cheek, x);
+          }
+        });
+      }
+    }
+    this.face = { under: under < Infinity ? under : null, cheek };
+    return this.face;
   }
 
   private setWorldQuat(bone: THREE.Object3D, world: THREE.Quaternion) {
@@ -1133,7 +1207,7 @@ export class Avatar {
     const stock = !!this.held?.butt, mine = r === this.armR;
     const e = _k4.copy(mine ? (stock ? GUN_ELBOW.stockR : GUN_ELBOW.r) : stock ? GUN_ELBOW.stockL : GUN_ELBOW.l);
     // (a long gun carried at a run is across a square chest: the elbows as they are for a gun out in front)
-    if (stock) e.lerp(mine ? GUN_ELBOW.r : GUN_ELBOW.l, this.carryT);
+    if (stock) e.lerp(mine ? GUN_ELBOW.aimR : GUN_ELBOW.aimL, this.aimT * (1 - this.proneT)).lerp(mine ? GUN_ELBOW.r : GUN_ELBOW.l, this.carryT);
     const up = this.joints.neck && this.spine[0] ? this.joints.neck.getWorldPosition(_k5).sub(this.spine[0].getWorldPosition(_k2)).normalize().lerp(UP, this.proneT).normalize() : _k5.copy(UP);
     const out = this.armR && this.armL ? this.armR.arm.getWorldPosition(_k1).sub(this.armL.arm.getWorldPosition(_k2)) : _k1.set(1, 0, 0).applyQuaternion(aimQ);
     out.addScaledVector(up, -out.dot(up)).normalize();
@@ -1855,7 +1929,9 @@ export class Avatar {
       // a long gun is held across the body: chest turned off the aim, left shoulder leading,
       // the head still looking down the barrel
       // (and square again for a run, the gun carried across the chest)
-      const blade = held?.long ? POSE.hold.blade * (1 - carry) * hold : 0;
+      // (aimed, a gun with a butt has the chest come round to it a little: see POSE.hold.cheek)
+      const weld = held?.butt ? this.aimT * (1 - pr) : 0;
+      const blade = held?.long ? THREE.MathUtils.lerp(POSE.hold.blade, POSE.hold.bladeAim, weld) * (1 - carry) * hold : 0;
       // (the legs' turn and the blade are two turns of the one waist: together they are no more than it can turn.
       // Stepping one way with a long gun they came to 120 degrees.)
       const waist = THREE.MathUtils.clamp(-this.twist - blade, -POSE.maxTwist, POSE.maxTwist) * alive;
@@ -1870,6 +1946,22 @@ export class Avatar {
       // (the head stays level: it is the eyes that are being put round the corner)
       if (over) for (const b of this.neck) this.turn(b, _fwd, (-over * POSE.leanAngle * 0.55) / this.neck.length);
       if (Math.abs(bladed) > 1e-4) for (const b of this.neck) this.turn(b, UP, bladed / this.neck.length);
+      // Aiming a long gun, the head goes to the gun: the chest leant in, the neck craned toward the stock, the
+      // head tipped to it and down, as somebody lining up sights. Less of it under a visor that is down.
+      const welded = weld * hold * (1 - carry) * alive;
+      if (welded > 0.002 && this.neck.length) {
+        const c = POSE.hold.cheek, k = welded * (this.faceGear().under !== null ? c.visored : 1), neck = this.neck[0];
+        if (this.chest) this.turn(this.chest, _right, -c.lean * welded);
+        if (neck.parent) {
+          neck.getWorldPosition(_k6).addScaledVector(_right, c.shift[0] * k).addScaledVector(UP, c.shift[1] * k).addScaledVector(_fwd, -c.shift[2] * k);
+          neck.position.copy(neck.parent.worldToLocal(_k6));
+          neck.updateMatrixWorld(true);
+        }
+        for (const b of this.neck) this.turn(b, _fwd, (c.tilt * k) / this.neck.length);
+        this.turn(this.neck[this.neck.length - 1], _right, -c.nod * k);
+        // (and the firing shoulder is rolled forward to the butt)
+        if (this.collarR) this.turn(this.collarR, UP, POSE.hold.reachRight * welded);
+      }
       if (pr > 0.003) {
         // lying: the chest a little up on the elbows and the head up off the ground, the eyes on what is ahead;
         // and crawling, one knee and then the other drawn out to the side
@@ -1917,15 +2009,39 @@ export class Avatar {
             _kq.setFromRotationMatrix(_m1.multiplyMatrices(chest.bone.matrixWorld, chest.inv));
             this.armR.arm.getWorldPosition(_k1);
           }
-          /** where a stance puts the gun's own origin, from the pivot: by its butt if it has one, by `p` if not */
-          const put = (s: Stance, to: [number, number, number] | null, at: THREE.Vector3) => {
+          /** where a stance puts the gun's own origin, from the pivot: by its butt if it has one (at `world`, if that is said), by `p` if not */
+          const put = (s: Stance, to: [number, number, number] | null, at: THREE.Vector3, world?: THREE.Vector3) => {
             if (!butt || !chest || !to) return at.set(s.p[0], s.p[1], s.p[2]);
             const lie = POSE.hold.butt.prone;
-            at.set(to[0] + (lie[0] - to[0]) * pr, to[1] + (lie[1] - to[1]) * pr, to[2] + (lie[2] - to[2]) * pr).applyQuaternion(_kq).add(_k1);
+            if (world) at.copy(world);
+            else at.set(to[0] + (lie[0] - to[0]) * pr, to[1] + (lie[1] - to[1]) * pr, to[2] + (lie[2] - to[2]) * pr).applyQuaternion(_kq).add(_k1);
             return this.heldPivot.worldToLocal(at).sub(_k2.copy(butt).multiply(obj.scale).applyQuaternion(turned(s, _kr).multiply(base)));
           };
           put(ready, POSE.hold.butt.ready, _k3);
           put(set.aim, POSE.hold.butt.aim, _k4);
+          const face = butt && chest && wAim > 0.001 && pr < 0.999 ? this.gearRest.get('Head') : undefined;
+          if (face && chest) {
+            // Aimed, the gun is put by the eye: the line of its butt runs under the right eye by as much as its
+            // sights stand over its butt (or as high as a stock passes under what is worn in front of the cheek),
+            // just outside the eye, and back along the aim to the chest's front, where the butt is.
+            // (Worked in the aim's own frame, the pivot's: x to the aim's right, y up, z back. The gun stands
+            // upright in that; the head is tipped in it.)
+            const c = POSE.hold.cheek, g = this.faceGear(), [half, rise] = held.sight;
+            _m1.multiplyMatrices(face.bone.matrixWorld, face.inv);
+            const eye = this.heldPivot.worldToLocal(_k6.set(c.eye[0], c.eye[1], c.eye[2]).applyMatrix4(_m1));
+            const mid = this.heldPivot.worldToLocal(face.bone.getWorldPosition(_k7));
+            const out = Math.max(g.under !== null ? c.plate : c.jaw, g.cheek ? g.cheek + c.beside : 0);
+            const line = _k8.set(Math.max(eye.x + c.x, mid.x + out), eye.y - rise, eye.z), eyeY = eye.y;
+            // (under a visor: no higher than its lower edge lets the top of the butt pass, where the gun's line is)
+            if (g.under !== null) line.y = Math.min(line.y, this.heldPivot.worldToLocal(_k6.set(line.x - mid.x, g.under, -0.1).applyMatrix4(_m1)).y - half - 0.006);
+            // and back along the aim to the chest's front, where the butt rests
+            const front = _k6.set(0, 0, -1).applyQuaternion(_kq).applyQuaternion(this.heldPivot.getWorldQuaternion(_kr).invert());
+            // (a butt held lower than the collar bone, under a visor, rests further down the chest, which stands further forward there)
+            const lower = Math.max(0, eyeY - line.y - 0.1) * c.slope;
+            const chestAt = this.heldPivot.worldToLocal(_k7.set(0, 1.45, -c.front - lower).applyMatrix4(_m1.multiplyMatrices(chest.bone.matrixWorld, chest.inv)));
+            line.z += chestAt.sub(line).dot(front) / Math.min(-0.3, front.z);
+            _k4.lerp(put(set.aim, POSE.hold.butt.aim, _k7, this.heldPivot.localToWorld(line)), 1 - pr);
+          }
           obj.position.set(0, 0, 0).addScaledVector(_k3, wReady).addScaledVector(_k5.set(carried.p[0], carried.p[1], carried.p[2]), carry).addScaledVector(_k4, wAim);
           turned(ready, _qa);
           if (carry > 0.001) _qa.slerp(turned(carried, _qb), carry / Math.max(1e-4, 1 - wAim));
@@ -1992,7 +2108,7 @@ export class Avatar {
           }
           this.heldPivot.updateMatrixWorld(true);
           // the leading shoulder comes forward to the gun
-          if (blade && this.collarL) this.turn(this.collarL, UP, -POSE.hold.reach * (1 - carry) * hold);
+          if (blade && this.collarL) this.turn(this.collarL, UP, -THREE.MathUtils.lerp(POSE.hold.reach, POSE.hold.reachAim, weld) * (1 - carry) * hold);
           // A gun is held no further out than the hands that hold it can reach. The stances are said from the
           // shoulders of a body standing still; crouched, in the air, looking down and at a run the shoulders are
           // somewhere else, and a hand sent past the end of its arm stops short of the gun: a pistol was left 2 to
