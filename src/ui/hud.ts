@@ -1053,13 +1053,18 @@ export class HUD {
    * Names over heads, as an admin's free camera shows them: each where its head is on the screen (in hundredths
    * of the screen's width and height). An empty list takes them all away.
    */
-  esp(list: { x: number; y: number; text: string; faint?: boolean }[]) {
+  esp(list: { x: number; y: number; name: string; sub: string; size: number; h: number; kind: '' | 'dead' | 'ghost' | 'me' }[]) {
     let box = this.root.querySelector('.hud-esp') as HTMLElement | null;
     if (!box) {
       if (!list.length) return;
       this.root.appendChild((box = Object.assign(document.createElement('div'), { className: 'hud-esp' })));
     }
-    while (box.children.length < list.length) box.appendChild(document.createElement('i'));
+    while (box.children.length < list.length) {
+      const n = document.createElement('i');
+      n.append(document.createElement('b'), document.createElement('small'), document.createElement('u'));
+      box.appendChild(n);
+    }
+    const tall = box.clientHeight || 1;
     for (let i = 0; i < box.children.length; i++) {
       const n = box.children[i] as HTMLElement, q = list[i];
       if (!q) {
@@ -1069,8 +1074,15 @@ export class HUD {
       n.style.display = '';
       n.style.left = `${q.x.toFixed(2)}%`;
       n.style.top = `${q.y.toFixed(2)}%`;
-      n.style.opacity = q.faint ? '0.55' : '1';
-      if (n.textContent !== q.text) n.textContent = q.text;
+      n.style.fontSize = `${q.size.toFixed(1)}px`;
+      if (n.dataset.k !== q.kind) n.dataset.k = q.kind;
+      const [name, sub, frame] = n.children as unknown as HTMLElement[];
+      if (name.textContent !== q.name) name.textContent = q.name;
+      if (sub.textContent !== q.sub) sub.textContent = q.sub;
+      // (the frame round the body: as tall as the body stands on the screen, and never too small to find)
+      const h = Math.max(6, q.h * tall);
+      frame.style.height = `${h.toFixed(1)}px`;
+      frame.style.width = `${Math.max(6, h * 0.42).toFixed(1)}px`;
     }
   }
 

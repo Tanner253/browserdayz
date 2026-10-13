@@ -5,7 +5,7 @@
   pointer-events: none;
   zoom: var(--ui-zoom, 1);
 }
-#hud.hidden > *:not(.hud-start):not(.hud-dead) {
+#hud.hidden > *:not(.hud-start):not(.hud-dead):not(.hud-esp):not(.hud-powers) {
   opacity: 0 !important;
 }
 .hud-cross {
@@ -1280,8 +1280,19 @@ kbd.hot { color: #121413; background: linear-gradient(#d8c594, #b89f66); border-
 .hud-announce div { font-size: 26px; font-weight: 600; line-height: 1.2; color: var(--ink); overflow-wrap: anywhere; }
 @keyframes announce { 0% { opacity: 0; transform: translate(-50%, -8px); } 4%, 90% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; transform: translate(-50%, 0); } }
 /* names over heads, as an admin's free camera shows them */
+/* An admin's far sight: a name where each player stands, through whatever is in the way, with a frame round the
+   body. Not put out of sight with the rest of the HUD (see #hud.hidden): it is for when the view has left the body. */
 .hud-esp { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
-.hud-esp i { position: absolute; transform: translate(-50%, -100%); padding: 1px 6px; font-style: normal; font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em; white-space: nowrap; color: #fff; background: rgba(10, 12, 11, 0.55); border-left: 2px solid #c8a8ff; text-shadow: 0 1px 2px #000; }
+.hud-esp i { position: absolute; transform: translate(-50%, -100%); display: flex; flex-direction: column; align-items: center; padding-bottom: 3px; font-style: normal; font-family: var(--mono); font-size: 12px; line-height: 1.15; white-space: nowrap; text-shadow: 0 0 3px #000, 0 1px 2px #000, 0 0 7px rgba(0, 0, 0, 0.9); }
+.hud-esp b { font-weight: 700; letter-spacing: 0.03em; color: #fff; }
+.hud-esp small { font-size: 0.82em; color: #d9c2ff; }
+.hud-esp u { position: absolute; left: 50%; top: 100%; transform: translateX(-50%); box-sizing: border-box; border: 1px solid #c8a8ff; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(0, 0, 0, 0.35); text-decoration: none; }
+.hud-esp i[data-k='dead'] b { color: #b9b4a8; }
+.hud-esp i[data-k='dead'] u { border-color: #8d897e; }
+.hud-esp i[data-k='ghost'] b { color: #9fd0ff; }
+.hud-esp i[data-k='ghost'] u { border-color: #9fd0ff; border-style: dashed; }
+.hud-esp i[data-k='me'] { opacity: 0.6; }
+.hud-esp i[data-k='me'] u { border-color: #9fe07a; }
 /* a line said to one player alone by an admin or a mod */
 .chat-line[data-ch='pm'] { color: #ffd58a; }
 .chat-line[data-ch='pm'] b { color: #ffd58a; }

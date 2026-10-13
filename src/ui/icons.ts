@@ -203,8 +203,9 @@ export async function renderIcons(renderer: THREE.WebGLRenderer, models: ItemMod
  * Portrait of the survivor for the inventory screen's paper doll (transparent PNG data URL).
  * @param worn what is in the slots that show on a body (head, vest, back): the portrait wears it
  * @param models where a pack's own model comes from (the cap, the headset and the plate carrier are pieces of the body itself)
+ * @param face the head alone, square and small: who somebody is, in a list of people
  */
-export async function renderDoll(renderer: THREE.WebGLRenderer, env: THREE.Texture, look: Look, worn: string[] = [], models?: ItemModels): Promise<string> {
+export async function renderDoll(renderer: THREE.WebGLRenderer, env: THREE.Texture, look: Look, worn: string[] = [], models?: ItemModels, face = false): Promise<string> {
   const gltf = await loadCharacter();
   const model = SkeletonUtils.clone(gltf.scene) as THREE.Group;
   model.updateMatrixWorld(true);
@@ -278,12 +279,22 @@ export async function renderDoll(renderer: THREE.WebGLRenderer, env: THREE.Textu
   const rim = new THREE.DirectionalLight(0x9fc0ff, 1.4);
   rim.position.set(-3, 2.5, -3);
   scene.add(key, rim, model);
+  // (a head in a list of people is an inch across: lit from the front, and well, so that the face is seen)
+  if (face) {
+    scene.environmentIntensity = 1.3;
+    key.intensity = 3.4;
+    key.position.set(1.2, 2.2, 4);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+  }
   // the model faces +Z: turn it a little so it reads as a figure, not a mugshot
   model.rotation.y = -0.35;
   model.updateMatrixWorld(true);
-  const W = 420, H = 840;
+  const W = face ? 144 : 420, H = face ? 144 : 840;
   const rt = new THREE.WebGLRenderTarget(W, H, { samples: 4, colorSpace: THREE.SRGBColorSpace });
-  const cam = new THREE.OrthographicCamera(-0.52, 0.52, 1.93, -0.15, 0.01, 50);
+  // (the head alone: a square about where the head's own bone is, from the collar to over a helmet)
+  const at = new THREE.Vector3();
+  (head ?? model).getWorldPosition(at);
+  const cam = face ? new THREE.OrthographicCamera(at.x - 0.2, at.x + 0.2, at.y + 0.29, at.y - 0.11, 0.01, 50) : new THREE.OrthographicCamera(-0.52, 0.52, 1.93, -0.15, 0.01, 50);
   cam.position.set(0, 0, 10);
   cam.lookAt(0, 0, 0);
   // The figure is drawn again every time something is put on or taken off, in the middle of play. So nothing of
