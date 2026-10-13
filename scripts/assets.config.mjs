@@ -39,6 +39,12 @@ export const TEXTURES = {
   castle_wall_slates: { res: '2k', tex: 1024 },
   medieval_blocks_06: { res: '2k', tex: 1024 },
   defense_wall: { res: '2k', tex: 1024 },
+  // the desert's ground (2026-10-13, fetched on the owner's word): dry trampled sand, pale desert gravel, the cracked silt of a dry river bed
+  sand_01: { res: '2k', tex: 1024 },
+  sandy_gravel_02: { res: '2k', tex: 1024 },
+  mud_cracked_dry_riverbed_002: { res: '2k', tex: 1024 },
+  // the mountain's snow, close to (2026-10-13): smooth powdery snowfield. What lies on the ground far off is still colour alone.
+  snow_02: { res: '2k', tex: 1024 },
   painted_brick: { res: '2k', tex: 1024 },
   plaster_brick_01: { res: '2k', tex: 1024 },
   rough_plaster_brick_02: { res: '2k', tex: 1024 },

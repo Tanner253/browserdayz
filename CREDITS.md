@@ -244,6 +244,7 @@ Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees ar
 | texture | [Grey Roof Tiles 02](https://polyhaven.com/a/grey_roof_tiles_02) | Rob Tuytel |
 | texture | [Leafy Grass](https://polyhaven.com/a/leafy_grass) | Charlotte Baglioni |
 | texture | [Medieval Blocks 06](https://polyhaven.com/a/medieval_blocks_06) | Rob Tuytel |
+| texture | [Mud Cracked Dry Riverbed 002](https://polyhaven.com/a/mud_cracked_dry_riverbed_002) | Dario Barresi, Dimitrios Savva |
 | texture | [Old Linoleum Flooring 01](https://polyhaven.com/a/old_linoleum_flooring_01) | Charlotte Baglioni |
 | texture | [Painted Brick](https://polyhaven.com/a/painted_brick) | Amal Kumar |
 | texture | [Painted Plaster Wall](https://polyhaven.com/a/painted_plaster_wall) | Amal Kumar |
@@ -254,6 +255,9 @@ Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees ar
 | texture | [Rocks Ground 02](https://polyhaven.com/a/rocks_ground_02) | Rob Tuytel |
 | texture | [Rough Plaster Brick 02](https://polyhaven.com/a/rough_plaster_brick_02) | Rob Tuytel |
 | texture | [Rusty Corrugated Iron](https://polyhaven.com/a/rusty_corrugated_iron) | Charlotte Baglioni |
+| texture | [Sand 01](https://polyhaven.com/a/sand_01) | Rob Tuytel |
+| texture | [Sandy Gravel 02](https://polyhaven.com/a/sandy_gravel_02) | Dario Barresi |
+| texture | [Snow 02](https://polyhaven.com/a/snow_02) | Rob Tuytel |
 | texture | [Weathered Plank Siding](https://polyhaven.com/a/weathered_plank_siding) | Dimitrios Savva |
 | texture | [Weathered Planks](https://polyhaven.com/a/weathered_planks) | Dario Barresi, Dimitrios Savva |
 | texture | [White Bricks](https://polyhaven.com/a/white_bricks) | Rob Tuytel |

@@ -184,6 +184,26 @@
    "diff": "assets/tex/defense_wall_diff.webp",
    "nor": "assets/tex/defense_wall_nor.webp",
    "arm": "assets/tex/defense_wall_arm.webp"
+  },
+  "sand_01": {
+   "diff": "assets/tex/sand_01_diff.webp",
+   "nor": "assets/tex/sand_01_nor.webp",
+   "arm": "assets/tex/sand_01_arm.webp"
+  },
+  "sandy_gravel_02": {
+   "diff": "assets/tex/sandy_gravel_02_diff.webp",
+   "nor": "assets/tex/sandy_gravel_02_nor.webp",
+   "arm": "assets/tex/sandy_gravel_02_arm.webp"
+  },
+  "mud_cracked_dry_riverbed_002": {
+   "diff": "assets/tex/mud_cracked_dry_riverbed_002_diff.webp",
+   "nor": "assets/tex/mud_cracked_dry_riverbed_002_nor.webp",
+   "arm": "assets/tex/mud_cracked_dry_riverbed_002_arm.webp"
+  },
+  "snow_02": {
+   "diff": "assets/tex/snow_02_diff.webp",
+   "nor": "assets/tex/snow_02_nor.webp",
+   "arm": "assets/tex/snow_02_arm.webp"
   }
  },
  "models": {
