@@ -20,7 +20,8 @@ const ICONS_REV = 3;
  * grip uppermost, which is right for a knife or a shovel and wrong for an axe: an axe is drawn head up.
  * (2026-10-13: "the hatchet is updside down in inventory".)
  */
-const HEAD_UP = new Set(['hatchet']);
+// (and the First Aid Kit, whose lid was drawn with its words upside down: looked at on the sheet of every picture, 2026-10-13)
+const HEAD_UP = new Set(['hatchet', 'firstaid']);
 /**
  * And every gun. A gun on the ground has lain on its thinnest side since 2026-10-13 (with what is fitted to it: see
  * `lay` in src/game/loot.ts), and the pictures made after that had every gun on its back: magazine and grip
@@ -28,7 +29,20 @@ const HEAD_UP = new Set(['hatchet']);
  * donw?": they were, and so were the game's.) Turned right over in the plane of the picture, it is the gun as it
  * was drawn before: muzzle to the right, magazine down.
  */
-const headUp = (id: string) => HEAD_UP.has(id) || !!ITEMS[id]?.weapon;
+const headUp = (id: string) => HEAD_UP.has(id);
+/**
+ * A GUN IS DRAWN FLAT: its side square to the eye, level, muzzle to the right, filling its cells from end to end, as
+ * a gun is in DayZ's inventory or on Counter-Strike's buy screen. (They were drawn as everything else is, turned a
+ * little and tipped a little, and so lay aslant across their cells and small in them: "the guns are not flat
+ * lookimg, loook at csgo gunm icons or dayuz, why ... are they anhnglerd and so small?", 2026-10-13.)
+ *
+ * Which of its two sides is shown, and whether that is turned right over in the picture, cannot be told from the
+ * shape of a gun: each gun says [turned over, seen from its other side]. Set by LOOKING: every gun was drawn all
+ * four ways on one sheet and the one with its grip down and its muzzle to the right taken. A new gun is looked at
+ * the same way (`__GUN_VIEW` below is how the sheet is made).
+ */
+const GUN_VIEW: Record<string, [boolean, boolean]> = { ak: [true, false], ar15: [true, false], mosin: [true, false], mpa: [true, false], colt: [true, false], deagle: [true, false], m9: [true, false], benelli: [false, false] };
+const gunView = (id: string): [boolean, boolean] => (globalThis as { __GUN_VIEW?: Record<string, [boolean, boolean]> }).__GUN_VIEW?.[id] ?? GUN_VIEW[id] ?? [false, false];
 /**
  * What is built lying on its back, its face to the sky, and is stood up to look out of its picture. (The gas mask's
  * hood, since it lost its hose and was laid down, 2026-10-13: drawn as it lay it was seen from the side, one
@@ -117,7 +131,7 @@ export function iconSig(id: string): string {
     return [d.model, file || Math.random(), d.node ?? '', d.nodeRe ?? '', d.tint ?? '', d.paint ?? '', d.scale ?? '', d.w, d.h, d.category, d.pile ?? '', !!d.mag, d.stack ? 1 : 0, d.weapon ? [d.weapon.mag ?? '', d.weapon.shows ?? '', (d.weapon as { hides?: unknown }).hides ?? '', d.weapon.never ?? ''] : ''];
   };
   const d = ITEMS[id];
-  const text = JSON.stringify([ICONS_REV, of(d), of(d.weapon?.mag ? ITEMS[d.weapon.mag] : undefined), ...(headUp(id) ? ['head up'] : []), 'lamps', ...LAMPS[lampsOf(d)], ...(LIT(d) ? ['lit', ...LIFT] : []), 'tone', TONE.floor, TONE.ceil, TONE.least, TONE.most]);
+  const text = JSON.stringify([ICONS_REV, of(d), of(d.weapon?.mag ? ITEMS[d.weapon.mag] : undefined), ...(headUp(id) ? ['head up'] : []), ...(d.weapon ? ['flat', ...gunView(id)] : []), 'lamps', ...LAMPS[lampsOf(d)], ...(LIT(d) ? ['lit', ...LIFT] : []), 'tone', TONE.floor, TONE.ceil, TONE.least, TONE.most]);
   let h = 2166136261 >>> 0;
   for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619) >>> 0;
   return h.toString(36);
@@ -214,6 +228,15 @@ export async function renderIcons(renderer: THREE.WebGLRenderer, models: ItemMod
       const up = unit[dims[0][1]].clone().multiplyScalar(dims[0][1] === 'y' ? 1 : -1), side = unit[dims[1][1]].clone();
       const out = new THREE.Vector3().crossVectors(side, up);
       // (what takes the model's own axes to the picture's: the inverse of the frame made of where each is to go)
+      pivot.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(side, up, out).invert());
+    } else if (def.weapon) {
+      // (flat: see GUN_VIEW. Its longest side along the picture, its thinnest toward the eye.)
+      const dims: [number, 'x' | 'y' | 'z'][] = [[size.x, 'x'], [size.y, 'y'], [size.z, 'z']];
+      dims.sort((p, q) => q[0] - p[0]);
+      const unit = { x: new THREE.Vector3(1, 0, 0), y: new THREE.Vector3(0, 1, 0), z: new THREE.Vector3(0, 0, 1) };
+      const [turned, other] = gunView(id);
+      const side = unit[dims[0][1]].clone().multiplyScalar(turned ? -1 : 1), out = unit[dims[2][1]].clone().multiplyScalar(other ? -1 : 1);
+      const up = new THREE.Vector3().crossVectors(out, side);
       pivot.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(side, up, out).invert());
     } else {
       if (upright && iconLandscape && def.w > def.h && !worn) pivot.rotation.z = Math.PI / 2;
