@@ -91,13 +91,13 @@ export const GUNS: Record<string, Gun> = {
   benelli: { ammo: 'ammo_12', rpm: 176, barrel: 1, moa: 7, hip: 1.3, up: 3.9, side: 0.9, lean: 0, first: 1, held: 1, stays: 0.24, back: 8.5, jump: 4.2, heavy: true, zero: [25], reach: 70 },
   // (The AK: a heavy round and a heavy bolt carrier. Its first shot is the worst of a string, it climbs and pulls
   // to the right, and it never quite settles: short bursts, or it is pointing at the sky.)
-  ak: { ammo: 'ammo_739', rpm: 600, auto: true, barrel: 1, moa: 4, hip: 2.1, up: 1.45, side: 0.5, lean: 0.4, first: 1.3, held: 0.78, stays: 0.32, back: 8.5, jump: 1.65, zero: [100, 200, 300, 400], reach: 500 },
+  ak: { ammo: 'ammo_739', rpm: 600, auto: true, barrel: 1, moa: 4, hip: 2.1, up: 1.45, side: 0.5, lean: 0.4, first: 1.3, held: 0.78, stays: 0.46, back: 8.5, jump: 2.1, zero: [100, 200, 300, 400], reach: 500 },
   // (The AR-15: a light round in a straight line with the shoulder. Faster, flatter, and it stays where it is put;
   // this one's barrel is a short one, and its rounds leave it a little slower than a rifle's.)
   // (The submachine gun: a pistol's round out of a barrel half as long again, fast, with nothing against the
   // shoulder. Each shot is little; there are a great many of them, and they walk.)
   mpa: { ammo: 'ammo_9mm', rpm: 780, auto: true, barrel: 1.08, moa: 6, hip: 2.3, up: 0.8, side: 0.5, lean: 0.15, first: 1.05, held: 0.85, stays: 0.34, back: 9.5, jump: 1.0, zero: [50, 100], reach: 260 },
-  ar15: { ammo: 'ammo_556', rpm: 700, auto: true, barrel: 0.94, moa: 2, hip: 1.9, up: 0.98, side: 0.32, lean: 0.1, first: 1.1, held: 0.7, stays: 0.3, back: 10.5, jump: 1.15, zero: [100, 200, 300], reach: 550 },
+  ar15: { ammo: 'ammo_556', rpm: 700, auto: true, barrel: 0.94, moa: 2, hip: 1.9, up: 0.98, side: 0.32, lean: 0.1, first: 1.1, held: 0.7, stays: 0.42, back: 10.5, jump: 1.5, zero: [100, 200, 300], reach: 550 },
 };
 
 /** What a gun's shot is when it leaves: its cartridge, through its barrel. */
@@ -181,6 +181,43 @@ const rad = (deg: number) => (deg * Math.PI) / 180;
 const lerp = (a: number, b: number, t: number) => a + (b - a) * Math.min(1, Math.max(0, t));
 
 /**
+ * The two rifles held open: where each shot of a string throws the muzzle, up and across (to the right,
+ * positive), degrees, standing and not aimed. (2026-10-12: "the recoil patterns for the AK and AR-5 are not
+ * realistic or dramatic enough, google the AK recoil pattern on rust and use something similar".)
+ *
+ * What is told of that pattern, by everybody who has written of it, is its shape and not its figures: the first
+ * few rounds go nearly straight up and hard, and then the muzzle snakes as it climbs: off to the right for about
+ * five, back across to the left for about eleven, right again for about eight, and left. The figures here are
+ * this game's own, drawn to that shape: a string is the same string every time, give or take a little, so that it
+ * can be learnt and pulled against. Each of them was a sum with a sine in it: a gun that rose a little and
+ * wandered.
+ *
+ * The AK: thirty-one and a half degrees up over a magazine if nothing is done about it, of which not quite half
+ * stays until it is pulled down; four and a half degrees to the right, seven back to the left, five right again.
+ * The AR-15, a lighter round in a straight-line stock: two thirds of the climb, and its snake goes the other way
+ * first (left, then right, then left) and half as wide.
+ * Past the end of a table (a drum, a sixty-round magazine) its last twenty go round again.
+ */
+const snake = (rows: [shots: number, up: number, upLast: number, across: number][]): [number, number][] =>
+  rows.flatMap(([n, u0, u1, a]) => Array.from({ length: n }, (_, i): [number, number] => [n > 1 ? u0 + ((u1 - u0) * i) / (n - 1) : u0, a]));
+export const PATTERNS: Record<string, [up: number, across: number][]> = {
+  ak: snake([
+    [1, 1.85, 1.85, 0.07], [3, 1.5, 1.4, 0.2],
+    [5, 1.3, 1.1, 0.78],
+    [1, 1.05, 1.05, -0.5], [9, 1.0, 0.9, -0.72], [1, 0.9, 0.9, -0.4],
+    [1, 0.9, 0.9, 0.5], [6, 0.9, 0.9, 0.72], [1, 0.9, 0.9, 0.4],
+    [2, 0.9, 0.9, -0.6],
+  ]),
+  ar15: snake([
+    [1, 1.15, 1.15, 0], [2, 1.0, 0.95, -0.07],
+    [7, 0.85, 0.7, -0.34],
+    [10, 0.65, 0.65, 0.32],
+    [10, 0.6, 0.6, -0.27],
+  ]),
+};
+const TAIL = 20;
+
+/**
  * What one shot does to the aim.
  *
  * Up: the gun's own figure; more for the first of a string where its bolt carrier is a heavy one, and less from
@@ -194,6 +231,13 @@ export function kickOf(id: string, hold: Hold, rnd: () => number): Kick {
   if (!g) return { up: 0, across: 0, stayUp: 0, stayAcross: 0, back: 9 };
   const n = Math.max(1, hold.shot);
   const body = (hold.prone ? 0.5 : hold.crouched ? 0.7 : 1) * (hold.aimed ? 0.85 : 1) * hold.fitted * (1 + (1 - hold.arms) * 0.5) * lerp(1.12, 0.92, hold.ergo / 100);
+  const table = PATTERNS[id];
+  if (table) {
+    // (a rifle with a string of its own: this shot's place in it, a little off it either way, and steadied or not as any gun is)
+    const [u, a] = table[n <= table.length ? n - 1 : table.length - TAIL + ((n - table.length - 1) % TAIL)];
+    const up = rad(u) * body * (0.94 + rnd() * 0.12), across = (rad(a) + rad(g.side) * (rnd() - 0.5) * 0.3) * body;
+    return { up: up * (1 - g.stays), across: across * (1 - g.stays), stayUp: up * g.stays, stayAcross: across * g.stays, back: g.back };
+  }
   const string = n === 1 ? g.first : lerp(1, g.held, (n - 2) / 4);
   const up = rad(g.up) * string * body * (0.92 + rnd() * 0.16);
   // (one shot by itself goes either way; in a string the gun has a way it goes, and then a sway)

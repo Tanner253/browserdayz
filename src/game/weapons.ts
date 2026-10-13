@@ -22,9 +22,10 @@ import { MAX_STAMINA } from '../net/protocol';
 import { GRAVITY, GUNS, coneOf, damageKept, elevationFor, intervalOf, kickOf, shotOf, zeroOf } from '../sim/gunplay';
 import type { ItemModels } from './loot';
 
-export type HitZone = 'head' | 'torso' | 'legs';
+import { ownHit } from '../sim/combat';
+export type HitZone = 'head' | 'torso' | 'legs' | 'arms';
 /** damage multiplier per hit zone: bullets / melee */
-const ZONE_MULT: Record<HitZone, [number, number]> = { head: [3.2, 1.6], torso: [1, 1], legs: [0.6, 0.7] };
+const ZONE_MULT: Record<HitZone, [number, number]> = { head: [3.2, 1.6], torso: [1, 1], legs: [0.6, 0.7], arms: [0.6, 0.7] };
 export type UseKind = 'eat' | 'drink' | 'bandage' | 'inject' | 'smoke' | 'open' | 'swipe' | 'load' | 'unload' | 'unbox';
 const FIST = { damage: 14, range: 1.35, rate: 0.4, stamina: 5 };
 
@@ -131,6 +132,8 @@ interface Bullet {
   weapon: string;
   /** someone else's bullet: flies and lands for show, the shooter's own game decides what it hit */
   ghost?: boolean;
+  /** fired through a suppressor (the sniper rifle's figures are not the same quieted: see RIFLE_HITS) */
+  quiet?: boolean;
   /** whose it is, when it is somebody else's: it does not land on the body it came out of */
   from?: unknown;
   /** the thin thing it last went through (a curtain, a door of boards): its hole is made there once */
@@ -2145,7 +2148,7 @@ export class Weapons {
     for (let k = 0; k < b.pellets; k++) {
       const d = dir.clone();
       if (b.cone) d.add(new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(b.cone)).normalize();
-      this.bullets.push({ pos: camera.position.clone(), vel: d.multiplyScalar(v0), drag: b.drag, damage: b.damage * (suppressed ? 0.9 : 1), v0, life: 4, travelled: 0, weapon: item.id });
+      this.bullets.push({ pos: camera.position.clone(), vel: d.multiplyScalar(v0), drag: b.drag, damage: b.damage * (suppressed ? 0.9 : 1), v0, life: 4, travelled: 0, weapon: item.id, quiet: suppressed });
     }
 
     // The kick. What the shot does to the aim is the gun's own (and whoever is holding it: a knee, the ground,
@@ -2802,7 +2805,7 @@ export class Weapons {
             if (target && !b.ghost) {
               const zone = hit.tag?.zone ?? 'torso';
               // (by how much of its speed it has left: the same sum the server does from how far off it was)
-              const dmg = b.damage * damageKept(speed / b.v0) * ZONE_MULT[zone][0];
+              const kept = damageKept(speed / b.v0), dmg = ownHit(b.weapon, zone, !!b.quiet, kept) ?? b.damage * kept * ZONE_MULT[zone][0];
               const killed = target.damage(dmg, pt, dir, zone);
               this.markHit(killed, zone === 'head');
               this.onHit({ victim: target, weapon: b.weapon, target: target.name, zone, damage: dmg, killed, distance: dist, melee: false });

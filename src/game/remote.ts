@@ -97,11 +97,17 @@ export class RemotePlayer implements Damageable {
     };
     // measured on the body: x to its right, z behind it
     zone(this.stand, R.ColliderDesc.ball(0.125).setTranslation(0, 1.64, -0.02), 'head');
-    zone(this.stand, R.ColliderDesc.cuboid(0.25, 0.31, 0.14).setTranslation(0, 1.21, 0), 'torso');
+    // (the body's box took the arms in with it, and a round through a forearm was a round through the chest: the
+    // box is the trunk's width now, and the arms hang either side of it as boxes of their own)
+    zone(this.stand, R.ColliderDesc.cuboid(0.18, 0.31, 0.14).setTranslation(0, 1.21, 0), 'torso');
+    zone(this.stand, R.ColliderDesc.cuboid(0.055, 0.3, 0.09).setTranslation(-0.24, 1.2, 0), 'arms');
+    zone(this.stand, R.ColliderDesc.cuboid(0.055, 0.3, 0.09).setTranslation(0.24, 1.2, 0), 'arms');
     zone(this.stand, R.ColliderDesc.cuboid(0.18, 0.45, 0.14).setTranslation(0, 0.45, 0.03), 'legs');
     // crouched it leans forward over one knee, hips well behind the head
     zone(this.crouch, R.ColliderDesc.ball(0.125).setTranslation(-0.07, 1.03, -0.12), 'head');
-    zone(this.crouch, R.ColliderDesc.cuboid(0.24, 0.24, 0.2).setTranslation(-0.07, 0.72, 0.1), 'torso');
+    zone(this.crouch, R.ColliderDesc.cuboid(0.17, 0.24, 0.2).setTranslation(-0.07, 0.72, 0.1), 'torso');
+    zone(this.crouch, R.ColliderDesc.cuboid(0.05, 0.22, 0.12).setTranslation(-0.29, 0.72, 0.06), 'arms');
+    zone(this.crouch, R.ColliderDesc.cuboid(0.05, 0.22, 0.12).setTranslation(0.15, 0.72, 0.06), 'arms');
     zone(this.crouch, R.ColliderDesc.cuboid(0.25, 0.24, 0.3).setTranslation(-0.02, 0.24, 0.07), 'legs');
     // lying: put where the body lies each frame (see placeZones): the legs are behind the hips, not under them
     zone(this.flat, R.ColliderDesc.ball(0.125), 'head');

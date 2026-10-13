@@ -2559,7 +2559,7 @@ function handle(c: Client, m: C2S) {
       const target = clients.get(m.to);
       const rule = WEAPON_RULES[m.w];
       if (!target || !target.alive || !c.alive || !rule || target === c) return;
-      if (!['head', 'torso', 'legs'].includes(m.zone)) return;
+      if (!['head', 'torso', 'legs', 'arms'].includes(m.zone)) return;
       const now = Date.now();
       // (nobody is hit from under the ground: see UNDER)
       if (buried(c, now)) return;
@@ -2628,7 +2628,7 @@ function handle(c: Client, m: C2S) {
       const b = horde.bodies.get(m.i);
       const rule = WEAPON_RULES[m.w];
       if (!b || b.diedAt || !c.alive || !rule || m.w === 'infected') return;
-      if (!['head', 'torso', 'legs'].includes(m.zone)) return;
+      if (!['head', 'torso', 'legs', 'arms'].includes(m.zone)) return;
       const now = Date.now();
       const d = Math.hypot(c.pose[0] - b.s[0], c.pose[1] - b.s[1], c.pose[2] - b.s[2]);
       if (d > rule.range + 6) return;

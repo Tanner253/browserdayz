@@ -8,7 +8,7 @@
 
 import assert from 'node:assert/strict';
 import { CARTRIDGES, GRAVITY, GUNS, MOA, coneOf, damageKept, elevationFor, fly, intervalOf, kickOf, shotOf, speedAt, zeroOf, type Hold } from '../src/sim/gunplay';
-import { WEAPON_RULES, hitDamage } from '../src/sim/combat';
+import { RIFLE_HITS, WEAPON_RULES, hitDamage } from '../src/sim/combat';
 import { ITEMS, sanitizeItem, makeItem } from '../src/sim/items';
 
 let n = 0;
@@ -126,7 +126,7 @@ ok('each gun kicks as itself', () => {
   assert.ok(up('mosin') > up('ak') * 1.5 && up('deagle') > up('m9') * 2, 'the big rounds do not kick hardest');
   assert.ok(up('ak', { shot: 1 }) > up('ak', { shot: 2 }) * 1.2, 'the first of an AK\'s string is not its worst');
   assert.ok(up('ak', { shot: 8 }) < up('ak', { shot: 2 }) * 0.85, 'a long string is not leaned into');
-  assert.ok(up('ak', { shot: 20 }) === up('ak', { shot: 8 }), 'and it does not go on getting easier for ever');
+  assert.ok(up('ak', { shot: 20 }) > up('ak', { shot: 8 }) * 0.7 && up('ak', { shot: 60 }) === up('ak', { shot: 20 }), 'and it does not go on getting easier for ever');
   for (const id of Object.keys(GUNS)) {
     assert.ok(up(id, { crouched: true }) < up(id) * 0.75 && up(id, { prone: true }) < up(id, { crouched: true }), `${id}: a knee and the ground do not steady it`);
     assert.ok(up(id, { aimed: true }) < up(id), `${id}: the sights at the eye do not steady it`);
@@ -142,8 +142,38 @@ ok('each gun kicks as itself', () => {
   assert.ok(across.slice(3).some((a) => a < 0) && across.slice(3).some((a) => a > 0), 'it never comes back across');
   // (thirty rounds held open, standing and aimed, with nothing done about it: the AK ends up pointing well over a man's head at fifty metres, the AR-15 a good deal less far)
   const climb = (id: string) => Array.from({ length: 30 }, (_, i) => kickOf(id, { ...standing, aimed: true, shot: i + 1 }, even).stayUp).reduce((a, b) => a + b, 0) * (180 / Math.PI);
-  assert.ok(climb('ak') > 7 && climb('ak') < 14, `an AK's magazine climbs ${climb('ak').toFixed(1)} degrees`);
-  assert.ok(climb('ar15') > 3.5 && climb('ar15') < climb('ak') * 0.75, `an AR-15's climbs ${climb('ar15').toFixed(1)}`);
+  assert.ok(climb('ak') > 10 && climb('ak') < 16, `an AK's magazine climbs ${climb('ak').toFixed(1)} degrees`);
+  assert.ok(climb('ar15') > 5.5 && climb('ar15') < climb('ak') * 0.75, `an AR-15's climbs ${climb('ar15').toFixed(1)}`);
+  // ---- the string's own shape (2026-10-12: "google the AK recoil pattern on rust and use something similar"): up
+  // hard and nearly straight, then across to the right, a long way back to the left, and right again
+  {
+    const at = (id: string, upTo: number) => {
+      let x = 0, y = 0;
+      for (let i = 1; i <= upTo; i++) {
+        const k = kickOf(id, { ...standing, shot: i }, even);
+        x += k.across + k.stayAcross;
+        y += k.up + k.stayUp;
+      }
+      return [(x * 180) / Math.PI, (y * 180) / Math.PI];
+    };
+    const [x4, y4] = at('ak', 4), [x9] = at('ak', 9), [x20] = at('ak', 20), [x28, y30] = [at('ak', 28)[0], at('ak', 30)[1]];
+    assert.ok(y4 > 5.5 && Math.abs(x4) < 1, `an AK's first four go ${y4.toFixed(1)} up and ${x4.toFixed(1)} across: not straight up, or not hard`);
+    assert.ok(x9 > x4 + 3 && x20 < x9 - 5 && x28 > x20 + 3.5, `an AK's string does not snake: ${[x4, x9, x20, x28].map((v) => v.toFixed(1)).join(', ')}`);
+    assert.ok(y30 > 28 && y30 < 36, `an AK's magazine throws the muzzle ${y30.toFixed(1)} degrees up in all`);
+    const [a3, a10, a20] = [at('ar15', 3)[0], at('ar15', 10)[0], at('ar15', 20)[0]];
+    assert.ok(a10 < a3 - 1.5 && a20 > a10 + 2.5 && at('ar15', 30)[1] < y30 * 0.72, 'the AR-15 does not go the other way first, or is no gentler');
+    // (the same string every time, give or take: two magazines never end more than a degree apart)
+    let seed = 7;
+    const dice = () => ((seed = (seed * 16807) % 2147483647) % 1000) / 1000;
+    const end = () => {
+      let x = 0;
+      for (let i = 1; i <= 30; i++) x += kickOf('ak', { ...standing, shot: i }, dice).stayAcross;
+      return (x * 180) / Math.PI;
+    };
+    const ends = Array.from({ length: 12 }, end);
+    assert.ok(Math.max(...ends) - Math.min(...ends) < 1, `an AK's string ends in a different place each time: ${ends.map((v) => v.toFixed(2)).join(' ')}`);
+    assert.equal(kickOf('ak', { ...standing, shot: 75 }, even).up, kickOf('ak', { ...standing, shot: 55 }, even).up, 'a drum does not go round its last twenty');
+  }
 });
 
 ok('how wide a shot can go: the gun\'s own at the eye, and wider every other way', () => {
@@ -163,8 +193,10 @@ ok('how wide a shot can go: the gun\'s own at the eye, and wider every other way
 ok('what a hit does at a distance is the same on the server as in the game', () => {
   for (const id of Object.keys(GUNS)) {
     const s = shotOf(id), r = WEAPON_RULES[id];
-    assert.equal(hitDamage(id, 'torso', 0), s.damage, `${id} at the muzzle`);
     assert.ok(Math.abs(r.interval - (GUNS[id].cycle ?? intervalOf(id))) < 1e-9, `${id}: the server's pace is not the gun's`);
+    // (the sniper rifle has figures of its own, by where it lands and whether it is quieted: see below)
+    if (RIFLE_HITS[id]) continue;
+    assert.equal(hitDamage(id, 'torso', 0), s.damage, `${id} at the muzzle`);
     for (const share of [0.15, 0.5, 1]) {
       const d = GUNS[id].reach * share;
       const game = s.damage * damageKept(flown(id, d).speed / s.muzzleVel), server = hitDamage(id, 'torso', d);
@@ -172,7 +204,25 @@ ok('what a hit does at a distance is the same on the server as in the game', () 
     }
     assert.ok(hitDamage(id, 'torso', GUNS[id].reach) < s.damage * 0.95 && hitDamage(id, 'torso', GUNS[id].reach) >= s.damage * 0.4, `${id}: at its furthest it has lost nothing, or everything`);
     assert.ok(hitDamage(id, 'head', 50) > hitDamage(id, 'torso', 50) * 3 && hitDamage(id, 'legs', 50) < hitDamage(id, 'torso', 50));
+    assert.equal(hitDamage(id, 'arms', 50), hitDamage(id, 'legs', 50), `${id}: an arm is not hit as a leg is`);
     assert.ok(Math.abs(hitDamage(id, 'torso', 30, true) - hitDamage(id, 'torso', 30) * 0.9) < 1e-9, `${id}: quieted`);
+  }
+  // ---- the sniper rifle, as it was asked for: one to the body with no suppressor; quieted, one to a bare head and
+  // not to a helmeted one; less to an arm or a leg
+  {
+    const worn = (id: string, k: 'armor' | 'head') => ITEMS[id].wear![k]!;
+    const helmets = Object.values(ITEMS).filter((d) => d.slot === 'head' && d.wear?.head !== undefined && d.wear.head <= 0.75).map((d) => d.id);
+    assert.ok(helmets.length >= 2, 'the helmets were not found');
+    for (const d of [0, 100, 300, 600, 900]) {
+      assert.ok(hitDamage('mosin', 'torso', d) >= 100, `loud, to the body at ${d} m: ${hitDamage('mosin', 'torso', d).toFixed(0)}`);
+      assert.ok(hitDamage('mosin', 'torso', d, true) < 100, `quieted, one to the body was the end at ${d} m`);
+      assert.ok(hitDamage('mosin', 'head', d, true) >= 100, `quieted, to a bare head at ${d} m: ${hitDamage('mosin', 'head', d, true).toFixed(0)}`);
+      for (const h of helmets) assert.ok(hitDamage('mosin', 'head', d, true) * worn(h, 'head') < 100, `quieted, one to a head under the ${ITEMS[h].name} was the end at ${d} m`);
+      for (const z of ['legs', 'arms'] as const) for (const sup of [false, true]) assert.ok(hitDamage('mosin', z, d, sup) < 100 && hitDamage('mosin', z, d, sup) < hitDamage('mosin', 'torso', d, sup), `one to the ${z} at ${d} m`);
+    }
+    // (through every vest but the heaviest, a loud one to the body up close is the end; and a K6-3 still leaves its wearer standing after a loud one to the head, as it says it does)
+    for (const v of Object.values(ITEMS).filter((d) => d.wear?.armor !== undefined && d.id !== 'heavy_armor')) assert.ok(hitDamage('mosin', 'torso', 30) * v.wear!.armor! >= 100, `loud, to the body in the ${v.name}`);
+    assert.ok(hitDamage('mosin', 'head', 0) * worn('helmet_k63', 'head') < 100 && hitDamage('mosin', 'head', 0) * worn('boonie_hat', 'head') >= 100);
   }
   // (a shell: no more pellets are believed than it has, and each is a pellet)
   assert.equal(hitDamage('benelli', 'torso', 0, false, 0, 20), CARTRIDGES.ammo_12.damage * 9);

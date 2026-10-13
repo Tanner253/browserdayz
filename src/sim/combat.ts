@@ -3,7 +3,8 @@
 
 import { CARTRIDGES, GUNS, damageKept, speedAt } from './gunplay';
 
-export type HitZone = 'head' | 'torso' | 'legs';
+/** `arms`: hit like the legs (less than the body, and nothing worn covers them), and no leg is broken by it */
+export type HitZone = 'head' | 'torso' | 'legs' | 'arms';
 
 export interface WeaponRule {
   damage: number;
@@ -53,7 +54,32 @@ export const WEAPON_RULES: Record<string, WeaponRule> = {
   infected: { damage: 13, melee: true, range: 3.4, interval: 1, falloff: 1 },
 };
 
-const ZONE: Record<HitZone, [bullet: number, melee: number]> = { head: [3.2, 1.6], torso: [1, 1], legs: [0.6, 0.7] };
+const ZONE: Record<HitZone, [bullet: number, melee: number]> = { head: [3.2, 1.6], torso: [1, 1], legs: [0.6, 0.7], arms: [0.6, 0.7] };
+
+/**
+ * The sniper rifle's own figures, by where its round lands and whether the rifle is quieted, before armour
+ * (2026-10-12: "the sniper with supressors should 1shot headshot a player with no helmet on but not 1 shot with a
+ * helmet on, sniper should be 1 shot to body with no suppressor, less damage to legs and arms"). It was a round
+ * of 95 like any other, times the part of the body: a hit to the chest left anybody with 5.
+ *   loud, the body: 210. Nobody stands up from it but whoever is in the heaviest plates there are, at a distance
+ *     (through Heavy Armour's half it is 105 at the muzzle and under a hundred from about fifty metres).
+ *   loud, the head: 304, as it always was: the end of anybody but the wearer of a K6-3, who is left with 3.
+ *   quiet, the head: 130. Bare, capped or masked it is the end; under a helmet (the Combat Helmet's 0.7) it is 91.
+ *   quiet, the body: 80. Two of them.
+ *   an arm or a leg: 60 loud, 42 quiet.
+ * A head is a head at any distance; what the body and the limbs take falls with what speed the round has left.
+ */
+export const RIFLE_HITS: Record<string, Record<'loud' | 'quiet', Record<HitZone, number>>> = {
+  mosin: { loud: { head: 304, torso: 210, legs: 60, arms: 60 }, quiet: { head: 130, torso: 80, legs: 42, arms: 42 } },
+};
+/**
+ * What a gun with figures of its own does where it landed, or null for a gun that has none.
+ * @param kept the share of its damage the round has left at that distance (damageKept)
+ */
+export function ownHit(weapon: string, zone: HitZone, suppressed: boolean, kept: number): number | null {
+  const own = RIFLE_HITS[weapon]?.[suppressed ? 'quiet' : 'loud']?.[zone];
+  return own === undefined ? null : zone === 'head' ? own : own * kept;
+}
 
 export function zoneMultiplier(zone: HitZone, melee: boolean) {
   return ZONE[zone]?.[melee ? 1 : 0] ?? 1;
@@ -69,6 +95,8 @@ export function hitDamage(weapon: string, zone: HitZone, distance: number, suppr
   // a blast: `distance` is how far the victim was from it
   if (r.blast) return r.damage * Math.pow(Math.min(1, Math.max(0, 1 - distance / r.blast)), 1.3);
   const k = r.melee ? 1 : r.drag ? damageKept(speedAt(r.drag, distance)) : 1 - (1 - r.falloff) * Math.min(1, Math.max(0, distance) / r.range);
+  const own = ownHit(weapon, zone, suppressed, k);
+  if (own !== null) return own;
   const base = r.melee ? r.damage + Math.min(10, Math.max(0, bonus)) : r.damage * (suppressed ? 0.9 : 1);
   const n = r.pellets ? Math.max(1, Math.min(r.pellets, Math.floor(pellets) || 1)) : 1;
   return base * k * zoneMultiplier(zone, r.melee) * n;
