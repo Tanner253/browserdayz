@@ -1407,4 +1407,322 @@ await test('what people are told: the page before and after the moment, one line
   assert.deepEqual(held.map((r) => [r.tags, r.pays, r.hold, String(r.why).slice(0, 31)]), [[7, 70_000_000, 'funds', '7 due: the treasury is too low:']]);
 });
 
+// ------------------------------------------------------------------ three faults, mended before the rule is switched on
+//
+// Found by an independent reading of the second cut-over on 2026-10-13, and mended that day, before any moment was
+// set for it ("yes fix those 3 then turn it on with the map release"). Every one of these failed on the code as it
+// was. The first two are one fault (a tag stranded by its age), the third is the trade rule, the last two are the
+// rule of five's own: a pack that cannot be afforded, and the way back.
+
+const DAY = 24 * 3600 * 1000;
+const ON = { PAYOUTS: 'on', TREASURY_SECRET_KEY: KEY };
+const rowsOf = async (w: W, es: Entry[]) => {
+  const book = await readBook(w.store);
+  return es.map((e) => book.rows.find((r) => r.ref === refOf(e.id))!);
+};
+const nodeDown = async () => {
+  throw new Error('getAccountInfo: the node answered 503');
+};
+
+await test('five that waited, and whose turn came when payouts were not set up to pay, are paid when they are: however old, all five, once', async () => {
+  // (0.02 SOL: not enough for five. They are due, and wait for the treasury)
+  const w = world(0.02, FIVES);
+  const five = (await cash(w, 450, 5)).map((x) => x.e);
+  assert.ok((await rowsOf(w, five)).every((r) => r.state === 'waiting' && r.hold === 'funds'));
+  // five days on the money comes, at a moment when the chain cannot say who made the coin: nothing is paid, and each
+  // of the five is written down as waiting for payouts to be set up to pay
+  w.skip(5 * DAY);
+  w.chain.balances.set(TREASURY.address, got(w, TREASURY.address) + SOL(1));
+  w.coinState = { ...w.coinState, creator: null };
+  assert.equal((await sweep(w)).paid, 0);
+  assert.ok((await rowsOf(w, five)).every((r) => r.state === 'waiting' && r.hold === 'setup'));
+  assert.equal(w.chain.handedIn.length, 0);
+  // the chain answers again: they are five still, they are looked at though they are five days old, and they are paid
+  w.coinState = { ...w.coinState, creator: TREASURY.publicKey };
+  w.skip(10 * 60_000);
+  assert.equal((await sweep(w)).paid, 5, 'five that were owed were left where they were, for being more than four days old');
+  assert.deepEqual([got(w, 450), new Set(w.chain.handedIn).size, (await readBook(w.store)).paid], [SOL(0.05), 1, 5]);
+  assert.equal(everyAttempt(w, five, 450), 1);
+  w.skip(10 * 60_000);
+  assert.equal((await sweep(w)).tried, 0);
+
+  // And five whose turn came on a dry run, switched on five days later: the same. (Payouts had been on before the
+  // dry run, so the book has its beginning: what is cashed in before payouts were ever on is listed and no more.)
+  const d = world(1, FIVES);
+  const first = await cash(d, 451, 1);
+  d.cfg = config({ ...FIVES, PAYOUTS: 'dry', TREASURY_SECRET_KEY: '', TREASURY_ADDRESS: TREASURY.address });
+  const rest = await cash(d, 451, 4);
+  assert.match(rest[3].o.state === 'waiting' ? rest[3].o.why : '', /dry run: would pay 0.01 SOL, with 4 more in one transaction/);
+  const tried = [...first, ...rest].map((x) => x.e);
+  assert.ok((await rowsOf(d, tried)).every((r) => r.state === 'waiting' && r.hold === 'setup'));
+  // (while it is a dry run nothing more is asked about them, by anybody)
+  const before = { ...d.store.ops };
+  d.skip(5 * DAY);
+  assert.equal((await sweep(d)).tried, 0);
+  assert.deepEqual([d.store.ops.read, d.store.ops.swap], [before.read, before.swap]);
+  d.cfg = config({ ...FIVES, ...ON });
+  assert.equal((await sweep(d)).paid, 5, 'five whose turn came on a dry run were never paid once payouts were on');
+  assert.deepEqual([got(d, 451), new Set(d.chain.handedIn).size], [SOL(0.05), 1]);
+
+  // And the key of the wrong wallet given, for five days, as a fifth comes: the fifth waits for the right key and is
+  // one of the five still, the four are left as they are (nothing is asked of the file service about any of them,
+  // and nothing written, in all that time), and with the right key all five are paid.
+  const k = world(1, FIVES);
+  const four = (await cash(k, 455, 4)).map((x) => x.e);
+  k.coinState = { ...k.coinState, creator: address(wallet(998)) };
+  const [late] = await cash(k, 455, 1);
+  assert.equal(have(late.o)[0], 'setup');
+  // (the housekeeping says once, in the book, that the rewards cannot be collected with this key)
+  assert.equal((await sweep(k)).tried, 0);
+  const quiet = { ...k.store.ops };
+  for (let i = 0; i < 5; i++) {
+    k.skip(DAY);
+    assert.equal((await sweep(k)).tried, 0);
+  }
+  assert.deepEqual([k.store.ops.read, k.store.ops.swap], [quiet.read, quiet.swap]);
+  assert.deepEqual((await rowsOf(k, [...four, late.e])).map((r) => r.hold), ['five', 'five', 'five', 'five', 'setup']);
+  k.coinState = { ...k.coinState, creator: TREASURY.publicKey };
+  assert.equal((await sweep(k)).paid, 5, 'a fifth that came while the wrong key was given was never counted, or paid, once the right one was');
+  assert.deepEqual([got(k, 455), new Set(k.chain.handedIn).size], [SOL(0.05), 1]);
+
+  // (a tag from before the second cut-over is left as it was in this: after three days it is refused as too old)
+  const old = world(1, RULES);
+  old.coinState = { ...old.coinState, creator: null };
+  const e = tag(old, 452);
+  assert.equal((await handle(old, e)).state, 'waiting');
+  old.coinState = { ...old.coinState, creator: TREASURY.publicKey };
+  old.skip(3 * DAY + 3600_000);
+  await sweep(old);
+  assert.deepEqual([(await handle(old, e)).state, got(old, 452)], ['skipped', 0n]);
+});
+
+await test('five first sent after days of waiting, and not seen to arrive, are followed to the end: lost, they are sent again; arrived, the book is told', async () => {
+  // lost on its way
+  const w = world(0.02, FIVES);
+  const five = (await cash(w, 453, 5)).map((x) => x.e);
+  w.skip(5 * DAY);
+  w.chain.balances.set(TREASURY.address, got(w, TREASURY.address) + SOL(1));
+  w.chain.lose = true;
+  assert.equal((await sweep(w)).paid, 0);
+  assert.ok((await rowsOf(w, five)).every((r) => r.state === 'sending'));
+  // half a minute on it could still turn up: nothing new is signed. Past its last block it is made again, for the same five.
+  w.skip(30_000);
+  await sweep(w);
+  assert.deepEqual(five.map((e) => tries(w, e.id)), [1, 1, 1, 1, 1]);
+  w.skip(100_000);
+  w.chain.lose = false;
+  assert.equal((await sweep(w)).paid, 5, 'a payment that was lost was never made again: its tags were more than four days old');
+  assert.deepEqual([got(w, 453), (await readBook(w.store)).paid, got(w, TREASURY.address)], [SOL(0.05), 5, SOL(0.02) + SOL(1) - SOL(0.05) - 5n * RENT - FEE]);
+  assert.deepEqual(five.map((e) => tries(w, e.id)), [2, 2, 2, 2, 2]);
+  assert.equal(everyAttempt(w, five, 453), 2);
+  w.skip(10 * 60_000);
+  assert.equal((await sweep(w)).tried, 0);
+
+  // arrived, but after the moment it was watched for: the book is told so at the next look, and nothing is sent again
+  const v = world(0.02, FIVES);
+  const slow = (await cash(v, 454, 5)).map((x) => x.e);
+  v.skip(5 * DAY);
+  v.chain.balances.set(TREASURY.address, got(v, TREASURY.address) + SOL(1));
+  v.chain.landAfter = 100;
+  assert.equal((await sweep(v)).paid, 0);
+  v.skip(60_000);
+  assert.equal(got(v, 454), SOL(0.05));
+  assert.ok((await rowsOf(v, slow)).every((r) => r.state === 'sending'));
+  assert.equal((await sweep(v)).paid, 5, 'a payment that had arrived was left as "sending" for good');
+  assert.ok((await rowsOf(v, slow)).every((r, i) => r.state === 'paid' && r.receipt === receiptOf(slow[i].id)));
+  assert.deepEqual([got(v, 454), new Set(v.chain.handedIn).size], [SOL(0.05), 1]);
+});
+
+await test('a traded tag is not paid though its first asking met trouble at the node; an honest one that met the same trouble is', async () => {
+  const w = world(2, RULES);
+  // Ann cashes Bob's tag: paid. Bob then cashes Ann's, and Cy cashes Dee's, at a moment when the node is not answering.
+  assert.equal((await handle(w, tag(w, 460, { name: 'Ann', owner: 'Bob' }))).state, 'paid');
+  const account = w.chain.account;
+  w.chain.account = nodeDown;
+  const back = tag(w, 461, { name: 'Bob', owner: 'Ann' }), honest = tag(w, 462, { name: 'Cy', owner: 'Dee' });
+  for (const e of [back, honest]) {
+    const o = await handle(w, e);
+    assert.match(o.state === 'waiting' ? o.why : '', /could not be done just now/);
+  }
+  // the node answers again, and both are looked at again: the trade is told for what it is, and the other is paid
+  w.chain.account = account;
+  w.skip(60_000);
+  await sweep(w);
+  const o = await handle(w, back);
+  assert.equal(o.state, 'skipped', 'the second of a trade was paid, because the node was not answering when it was first asked about');
+  assert.match(o.state === 'skipped' ? o.why : '', /cashed each other's tags inside a day/);
+  assert.equal(got(w, 461), 0n);
+  assert.equal((await handle(w, honest)).state, 'paid');
+  assert.ok(got(w, 462) > SOL(0.03));
+
+  // Under the rule of five such a tag is not one of anybody's five either: Ann has four, Bob has cashed one of
+  // hers, and her cashing of his, met by the same trouble, does not make five.
+  const v = world(1, FIVES);
+  await cash(v, 463, 4, { name: 'Ann', owner: 'Cy' });
+  await cash(v, 464, 1, { name: 'Bob', owner: 'Ann' });
+  v.skip(1000);
+  const fifth = tag(v, 463, { name: 'Ann', owner: 'Bob' });
+  const real = v.chain.account;
+  v.chain.account = nodeDown;
+  assert.equal((await handle(v, fifth)).state, 'waiting');
+  v.chain.account = real;
+  v.skip(60_000);
+  await sweep(v);
+  assert.deepEqual([(await handle(v, fifth)).state, got(v, 463), v.chain.handedIn.length, dueOf(await readBook(v.store), wallet(463)).length], ['skipped', 0n, 0, 4]);
+  // (her next honest one is the fifth: five are paid, not six)
+  assert.equal((await cash(v, 463, 1, { name: 'Ann', owner: 'Dee' }))[0].o.state, 'paid');
+  assert.equal(got(v, 463), SOL(0.05));
+});
+
+await test('five whose payment was lost, and that the treasury can no longer pay, are not tried again until it can: a look that can do nothing asks, sends and writes nothing', async () => {
+  const w = world(1, FIVES);
+  const four = await cash(w, 470, 4);
+  w.chain.lose = true;
+  const [fifth] = await cash(w, 470, 1);
+  w.chain.lose = false;
+  assert.equal(fifth.o.state, 'sending');
+  const five = [...four, fifth].map((x) => x.e);
+  // the treasury is emptied meanwhile, and the payment can no longer arrive: the five wait for the treasury, and are
+  // told so once (their attempt stays written on them: what is made again will be for the same five)
+  w.chain.balances.set(TREASURY.address, SOL(0.02));
+  w.skip(100_000);
+  assert.equal((await sweep(w)).paid, 0);
+  assert.ok((await rowsOf(w, five)).every((r) => r.state === 'waiting' && r.hold === 'funds' && r.tries?.length === 1 && r.lamports === 10_000_000));
+  // An hour of looks, with a little coming in each time (enough to collect if it were asked for, and nothing like
+  // enough to pay them), and the game server asking about them too: nothing is read, written, collected or sent
+  const before = { ...w.store.ops, sent: w.chain.handedIn.length };
+  for (let i = 0; i < 6; i++) {
+    w.skip(10 * 60_000);
+    w.chain.rewards = SOL(0.0002);
+    assert.equal((await sweep(w)).tried, 0, 'five that the treasury cannot pay were tried again');
+    assert.equal((await handle(w, five[i % 5])).state, 'waiting');
+  }
+  assert.deepEqual([w.store.ops.read, w.store.ops.swap, w.chain.handedIn.length, w.chain.rewards], [before.read, before.swap, before.sent, SOL(0.0002)]);
+  // the money comes: made again for the same five, in one transaction, and paid once
+  w.chain.rewards = 0n;
+  w.chain.balances.set(TREASURY.address, got(w, TREASURY.address) + SOL(1));
+  w.skip(10 * 60_000);
+  assert.equal((await sweep(w)).paid, 5);
+  assert.deepEqual([got(w, 470), (await readBook(w.store)).paid], [SOL(0.05), 5]);
+  assert.deepEqual(five.map((e) => tries(w, e.id)), [2, 2, 2, 2, 2]);
+  assert.equal(everyAttempt(w, five, 470), 2);
+  // (two writes for it, as for any payment: the attempt, and the five paid)
+  assert.equal(w.store.ops.swap, before.swap + 2);
+});
+
+await test('the rule of five put off after it has begun: what is owed under it is paid out as it stands, 0.01 a tag, a wallet at a time, and what comes after is paid as it was before', async () => {
+  const ENV = { ...ON, ...FIVES };
+  const w = world(100.01, FIVES);
+  const three = (await cash(w, 480, 3)).map((x) => x.e), one = (await cash(w, 481, 1)).map((x) => x.e);
+  // (they have waited forty days, as they may)
+  w.skip(40 * DAY);
+  assert.equal((await sweep(w)).tried, 0);
+  // the moment is taken away again, and nothing else is touched: the next look pays each wallet what it has due
+  w.cfg = config({ ...ENV, PAYOUT_RULES2_FROM: 'never' });
+  assert.equal(w.cfg.rules2From, Infinity);
+  const r = await sweep(w);
+  assert.deepEqual([r.tried, r.paid], [2, 4], 'with the rule put off, the tags taken in under it were left waiting for a fifth');
+  // at what they were promised, though the treasury is full (two per cent of it is 2 SOL): one transaction a wallet,
+  // with a receipt for each tag, as a five is paid
+  assert.deepEqual([got(w, 480), got(w, 481), new Set(w.chain.handedIn).size], [SOL(0.03), SOL(0.01), 2]);
+  const tx = parse(unwire(attempts(w, three[0].id)[0].wire));
+  assert.deepEqual([tx.creates.map((c) => b58(c.at)), tx.transfers.map((t) => t.lamports)], [three.map((e) => receiptOf(e.id)), [SOL(0.03)]]);
+  assert.ok((await rowsOf(w, [...three, ...one])).every((x) => x.state === 'paid' && x.lamports === 10_000_000 && x.rules === 2));
+  // what is cashed in from then on is paid as it was before the moment: by itself, at its share of the treasury
+  const [next] = await cash(w, 480, 1);
+  assert.equal(next.o.state, 'paid');
+  assert.ok(got(w, 480) > SOL(0.03) + SOL(1.9));
+  assert.equal((await rowsOf(w, [next.e]))[0].rules, undefined);
+  w.skip(10 * 60_000);
+  assert.equal((await sweep(w)).tried, 0);
+
+  // Until that look, the page says what is so: one line a wallet still, "3 due" and what it is paid, not "3 of 5";
+  // and whoever looks at it sets the paying off. The game server, asking about one of them, has it seen to.
+  const p = world(100.01, FIVES);
+  const waits = (await cash(p, 482, 3)).map((x) => x.e);
+  const page = async () => (await show(new Request('https://site.test/payouts'), p)).text();
+  let html = await page();
+  assert.ok(html.includes('>3 of 5</em>') && !html.includes("fetch('/api/tick')"));
+  p.cfg = config({ ...ENV, PAYOUT_RULES2_FROM: 'never' });
+  html = await page();
+  for (const want of ['>3 due</em>', '0.03 SOL</b> <i>for 3 tags: being paid</i>', 'owed to 1 wallet that is being paid now', "fetch('/api/tick')"]) assert.ok(html.includes(want), `with the rule put off, the page does not say "${want}"`);
+  assert.ok(!html.includes('of 5</em>') && !html.includes('are due'));
+  assert.equal(html.split('data-s="open"').length - 1, 1);
+  assert.deepEqual([(await handle(p, waits[1])).state, got(p, 482), new Set(p.chain.handedIn).size], ['paid', SOL(0.03), 1]);
+
+  // The moment moved on to one that has not come yet is the rule put off, the same.
+  const m = world(1, FIVES);
+  await cash(m, 484, 2);
+  m.cfg = config({ ...ENV, PAYOUT_RULES2_FROM: '2027-06-01T00:00:00Z' });
+  assert.deepEqual([(await sweep(m)).paid, got(m, 484)], [2, SOL(0.02)]);
+
+  // And the other way there was before this one, with the rule left on: the count set to one. What waits is paid
+  // at the next look, the same way; and each tag after it as it comes, flat.
+  const v = world(100.01, FIVES);
+  await cash(v, 485, 3);
+  await cash(v, 486, 1);
+  v.cfg = config({ ...ENV, PAYOUT_MIN_TAGS: '1' });
+  assert.deepEqual([(await sweep(v)).paid, got(v, 485), got(v, 486), new Set(v.chain.handedIn).size], [4, SOL(0.03), SOL(0.01), 2]);
+  assert.equal((await cash(v, 485, 1))[0].o.state, 'paid');
+  assert.equal(got(v, 485), SOL(0.04));
+});
+
+await test('five and more of one wallet over weeks, with payouts not set up now and then, the treasury empty now and then, payments lost and late: none is left behind for its age, none is paid twice, and with the rule put off every one is paid', async () => {
+  for (let round = 0; round < Number(process.env.ROUNDS ?? 150) / 3; round++) {
+    const ENV = { ...FIVES, PAYOUT_DAY_CAP_PERCENT: '100' };
+    const w = world(1, ENV);
+    const to = 3000 + round;
+    const count = 5 + Math.floor(Math.random() * 8);
+    const es: Entry[] = [];
+    const receipts = () => es.filter((e) => got(w, receiptOf(e.id)) > 0n).length;
+    const whole = () => assert.equal(got(w, to), BigInt(receipts()) * SOL(0.01), 'the wallet does not hold exactly 0.01 for each receipt');
+    for (let step = 0; step < 24; step++) {
+      w.chain.lose = Math.random() < 0.3;
+      w.chain.landAfter = 1 + Math.floor(Math.random() * 120);
+      w.chain.forgets = Math.random() < 0.2 ? Math.random() : 0;
+      // the chain cannot say who made the coin, for a while; the treasury is emptied, or filled again
+      w.coinState = { ...w.coinState, creator: Math.random() < 0.25 ? null : TREASURY.publicKey };
+      if (Math.random() < 0.3) w.chain.balances.set(TREASURY.address, Math.random() < 0.5 ? SOL(0.015) : SOL(1));
+      // a new tag or two while there are any to come, questions about the old ones, and the housekeeping: all at once
+      const calls: Promise<unknown>[] = [];
+      for (let k = 0; k < 2 && es.length < count; k++) {
+        if (Math.random() < 0.4) continue;
+        es.push(tag(w, to));
+        calls.push(handle(w, es[es.length - 1]).catch(() => null));
+      }
+      for (const e of es) if (Math.random() < 0.2) calls.push(handle(w, e).catch(() => null));
+      if (Math.random() < 0.5) calls.push(sweep(w).catch(() => null));
+      await Promise.all(calls);
+      // The housekeeping looks every ten minutes, and what has gone wrong may last for days: so one look by itself,
+      // with things as they are, and then as much as five days in which nobody looks at all.
+      w.skip(Math.random() < 0.5 ? 3000 : 95_000);
+      await sweep(w);
+      w.skip([0, 95_000, DAY, 5 * DAY][Math.floor(Math.random() * 4)]);
+      whole();
+    }
+    // All is well from here on, and the game server asks about every one of them as it would. In half of the
+    // rounds the rule is put off as well (the way back): then nothing is left waiting to be five.
+    Object.assign(w.chain, { lose: false, landAfter: 2, forgets: 0 });
+    w.coinState = { ...w.coinState, creator: TREASURY.publicKey };
+    w.chain.balances.set(TREASURY.address, SOL(1));
+    const off = round % 2 === 1;
+    if (off) w.cfg = config({ ...ON, ...ENV, PAYOUT_RULES2_FROM: 'never' });
+    while (es.length < count) es.push(tag(w, to));
+    for (let i = 0; i < 8; i++) {
+      for (const e of es) await handle(w, e);
+      await sweep(w);
+      w.skip(i ? 95_000 : DAY);
+      whole();
+    }
+    const rows = await rowsOf(w, es);
+    const book = await readBook(w.store);
+    const paid = rows.filter((r) => r?.state === 'paid').length;
+    assert.deepEqual([got(w, to), receipts(), book.paid, book.paidLamports], [BigInt(paid) * SOL(0.01), paid, paid, paid * 10_000_000]);
+    // each is paid; or its five attempts were used up; or, with the rule on, it is one of fewer than five that wait for the rest
+    rows.forEach((r, i) => assert.ok(r && (r.state === 'paid' || (r.state === 'waiting' && ((r.hold === 'five' && !off) || (r.hold === 'hand' && tries(w, es[i].id) === 5)))), `left ${r?.state} ${r?.hold ?? ''}: ${r?.why ?? ''} (cashed in ${r?.at})`));
+    assert.ok(rows.filter((r) => r.state === 'waiting' && r.hold === 'five').length < 5, 'five were due and were not paid');
+    everyAttempt(w, es, to);
+  }
+});
+
 console.log(`${n} checks passed`);

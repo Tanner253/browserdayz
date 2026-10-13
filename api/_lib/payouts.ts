@@ -79,6 +79,12 @@ export interface Config {
    * Which rules a tag is under is written on it when it is first put in the book (`rules` on its row), and holds
    * from then on: moving this moment never changes what a tag already in the book was promised.
    * Infinity: no moment is set for it (see RULES2_FROM), and there is no second cut-over.
+   *
+   * THE WAY BACK. If the moment is taken away again after it has come (`PAYOUT_RULES2_FROM=never`), or moved to
+   * one that has not come yet, the rule is put off: what is cashed in from then on is paid as it was before the
+   * cut-over, and what the book already holds under the rule is paid out as it stands, at what it was promised
+   * (`floor` a tag), without waiting to be five: all of a wallet's that are due together, whether that is one or
+   * nine. See `needOf`. (It used to be that such tags then waited for good, four of five for ever.)
    */
   rules2From: number;
   /** from `rules2From`: a wallet is paid when this many of its tags are due, and not before (1: each as it comes) */
@@ -100,6 +106,11 @@ const DEFAULT_MINT = 'GvfAzdPF466PJsPJMzXQeX3TSqmJm9YxAG8xBJ6ypump';
  * While it is '' (or anything that is not a moment) there is no second cut-over: every tag is paid as it is today,
  * and nothing anywhere says otherwise, however and whenever this code is deployed. That is how it is left, on
  * purpose: the change is the owner's to begin, and it begins when a moment is written here.
+ *
+ * It must be written in full, with its zone: '2026-10-14T18:00:00Z' or '2026-10-14T20:00:00+02:00'. Anything else
+ * (a day without its hour, an hour without its zone) is no moment, and nothing begins: see `config`.
+ * To go back after it has begun, nothing here is touched: PAYOUT_RULES2_FROM=never puts the rule off, and what is
+ * owed under it is then paid out as it stands (see `rules2From` in Config, and `needOf`).
  */
 export const RULES2_FROM = '';
 
@@ -335,12 +346,30 @@ const BOOK = 'ledger/book.json';
 const ROWS_KEPT = 500;
 const emptyBook = (): Book => ({ v: 1, since: null, rows: [], tags: 0, paid: 0, paidLamports: 0, claims: [], claimedLamports: 0, claimNote: '' });
 const open = (r: Row) => r.state === 'sending' || r.state === 'waiting';
-/** taken in, and kept waiting by this machine: for room under the day's limits, for the treasury to fill, or for its wallet to have enough due */
-const owed = (r: Row | undefined) => r?.state === 'waiting' && (r.hold === 'day' || r.hold === 'funds' || r.hold === 'five');
+/**
+ * Taken in, and kept waiting by this machine: for room under the day's limits, for the treasury to fill, or for its
+ * wallet to have enough due. Such a tag came in time, and is never too old, however long the wait.
+ *
+ * Under the second cut-over that is also so of one that waits for payouts to be set up to pay (`setup`). There a
+ * tag ordinarily waits days for the others, and may be ten days old when its turn comes: if its turn came on a dry
+ * run, or at a moment when the chain could not say who made the coin, it was written down `setup`, was from then on
+ * neither counted among its wallet's nor looked at again (it was past four days), and would have been refused as
+ * too old if it had been. Its wallet's other tags then waited at "4 of 5" for good.
+ * (A tag from before the cut-over is left exactly as it was in this: looked at for four days, refused after three.)
+ */
+const owed = (r: Row | undefined) => r?.state === 'waiting' && (r.hold === 'day' || r.hold === 'funds' || r.hold === 'five' || (r.hold === 'setup' && r.rules === 2));
 
 /** Is a tag under the rules of the second cut-over? Its row says, once it has one; until then, when it was cashed in. */
 const fives = (cfg: Config, t: { at: string }, had?: Row | null) => (had ? had.rules === 2 : Date.parse(t.at) >= cfg.rules2From);
 const FIVE = (cfg: Config) => `paid when ${cfg.minTags} of this wallet's tags are due`;
+/**
+ * How many of a wallet's tags must be due before it is paid, as things stand at this moment: `minTags` while the
+ * second cut-over is in force, and one while it is not. It is not in force before its moment, when there is no
+ * tag under it to ask about; and it is not in force when it has been PUT OFF after it began (the moment taken away
+ * again, or moved on): then whatever the book holds under it is paid as it stands, a wallet at a time. That is the
+ * way back, and it needs nothing but the setting.
+ */
+export const needOf = (w: Pick<World, 'cfg' | 'now'>) => (w.now() >= w.cfg.rules2From ? w.cfg.minTags : 1);
 
 /**
  * A wallet's tags that are DUE: under the rules of the second cut-over, to be paid by every other rule (one that
@@ -352,8 +381,27 @@ const FIVE = (cfg: Config) => `paid when ${cfg.minTags} of this wallet's tags ar
 export function dueOf(book: Book, wallet: string, but?: string): Row[] {
   return book.rows.filter((r) => r.rules === 2 && r.wallet === wallet && r.ref !== but && owed(r) && !r.tries?.length && !r.legacy);
 }
-/** the tags a waiting one is paid with: its wallet's, under the second cut-over; itself alone, before it */
-const lotOf = (book: Book, r: Row) => (r.rules === 2 ? dueOf(book, r.wallet) : [r]);
+/**
+ * The tags a waiting one is paid with. Before the second cut-over: itself alone. Under it: all of its wallet's that
+ * are due, if it has not been begun on; and if it has, the tags of its last attempt, which every later attempt is
+ * for (as `settle` puts them together). Never none: a pack that had been tried and then found the treasury short
+ * used to come out as no tags at all, cost nothing in the reckoning below, and so was tried again at every look.
+ */
+function lotOf(book: Book, r: Row): Row[] {
+  if (r.rules !== 2) return [r];
+  const n = r.tries?.length ?? 0;
+  if (!n) {
+    const lot = dueOf(book, r.wallet);
+    return lot.some((x) => x.ref === r.ref) ? lot : [r, ...lot];
+  }
+  const last = r.tries![n - 1].signature;
+  return book.rows.filter((x) => x.ref === r.ref || (x.wallet === r.wallet && open(x) && x.tries?.length === n && x.tries[n - 1].signature === last));
+}
+/**
+ * What a waiting tag is reckoned to cost the treasury: what it would be paid now. And for one under the second
+ * cut-over that has been begun on, what its first attempt set out to pay, which is what every later one pays.
+ */
+const costOf = (cfg: Config, r: Row, holds: bigint) => (r.rules === 2 && r.tries?.length && r.lamports ? BigInt(r.lamports) : price(holds, termsOf(cfg, r.at, r.rules === 2)));
 
 /** (rows written before a tag had a reference carried its id: they are given their reference, and the id is dropped) */
 function tidy(book: Book): Book {
@@ -602,7 +650,7 @@ async function roomToday(w: World, r: Row, book: Book): Promise<boolean> {
   const allowed = (BigInt(most) * BigInt(Math.round(cfg.dayShare * 1000))) / 1000n;
   const spent = today.reduce((s, x) => s + BigInt(x.lamports ?? 0), 0n);
   // (all that it is paid with go together or not at all: the room has to be for all of them)
-  return spent + lotOf(book, r).reduce((s, x) => s + price(balance, termsOf(cfg, x.at, x.rules === 2)), 0n) <= allowed;
+  return spent + lotOf(book, r).reduce((s, x) => s + costOf(cfg, x, balance), 0n) <= allowed;
 }
 
 /**
@@ -612,17 +660,27 @@ async function roomToday(w: World, r: Row, book: Book): Promise<boolean> {
 async function due(w: World, r: Row, book: Book): Promise<boolean> {
   if (r.state === 'sending') return true;
   if (r.state !== 'waiting' || r.hold === 'hand') return false;
+  const setUp = async () => w.cfg.mode === 'on' && (await setup(w).catch(() => 'not known')) === null;
   // (waiting for its wallet's count: the book alone says when, and until then nothing is asked of anybody)
-  if (r.hold === 'five') return r.rules !== 2 || dueOf(book, r.wallet).length >= w.cfg.minTags;
+  if (r.hold === 'five') {
+    if (r.rules !== 2) return true;
+    const lot = dueOf(book, r.wallet);
+    if (lot.length < needOf(w)) return false;
+    // (there are enough, and one of them waits for payouts to be set up to pay: then so do they all, and none of
+    // them is asked about, or written down again as waiting for that, until they are)
+    return !lot.some((x) => x.hold === 'setup') || setUp();
+  }
   if (r.hold === 'day') return r.heldOn !== dayOf(w.now()) || roomToday(w, r, book);
-  if (r.hold === 'setup') return w.cfg.mode === 'on' && (await setup(w).catch(() => 'not known')) === null;
+  if (r.hold === 'setup') return setUp();
   if (r.hold === 'funds' && w.cfg.treasury) {
-    // (when the treasury, with whatever rewards could be collected into it, would cover a tag, or all the tags it is paid with)
+    // (when the treasury, with whatever rewards could be collected into it, would cover a tag, or all the tags it is
+    // paid with: every one of them at what it costs, so that tags the treasury cannot pay are not asked about, and
+    // nothing is collected, sent or written for them, until it can)
     const has = await treasuryHolds(w);
     const s = w.cfg.mode === 'on' ? await coin(w).catch(() => null) : null;
     const more = s && s.creator && same(s.creator, w.cfg.treasury) && !s.unsupported ? s.curve + s.pool : 0n;
     const lot = lotOf(book, r);
-    return has + more >= lot.reduce((sum, x) => sum + price(has + more, termsOf(w.cfg, x.at, x.rules === 2)) + EMPTY_ACCOUNT_RENT, 0n) + FEE_ROOM * BigInt(Math.ceil(lot.length / LOT_MAX)) + w.cfg.keep;
+    return has + more >= lot.reduce((sum, x) => sum + costOf(w.cfg, x, has + more) + EMPTY_ACCOUNT_RENT, 0n) + FEE_ROOM * BigInt(Math.ceil(lot.length / LOT_MAX)) + w.cfg.keep;
   }
   return true;
 }
@@ -755,8 +813,11 @@ async function settle(w: World, t: Tag, at: { held: Held }, again = false): Prom
     if (!owed(had) && !(now - Date.parse(t.at) < MAX_AGE_MS)) return only({ state: 'skipped', why: 'cashed in more than three days ago' });
     const since = book.since;
     if (since && Date.parse(t.at) < Date.parse(since)) return only({ state: 'skipped', why: 'cashed in before automatic payouts began' });
-    // (asked of a tag when it first comes, and of none that the book has had waiting since before the rule)
-    if (!had && Date.parse(t.at) >= cfg.rulesFrom && traded(book, t)) return only({ state: 'skipped', why: `you and ${t.owner.slice(0, 16)} have cashed each other's tags inside a day: the second of the two is not paid` });
+    // (asked of a tag until it has been taken in: of none that the book has waiting to be paid, which was asked
+    // when it came. It was asked only of a tag the book had not heard of. But a tag whose first asking met trouble
+    // at the node is written down before it has been asked anything at all, as waiting and no more: at its next
+    // asking the book had heard of it, the rule was passed over, and a traded tag was paid.)
+    if (!owed(had) && Date.parse(t.at) >= cfg.rulesFrom && traded(book, t)) return only({ state: 'skipped', why: `you and ${t.owner.slice(0, 16)} have cashed each other's tags inside a day: the second of the two is not paid` });
     // (and one over its wallet's three for the day is told so at once, not told to wait for a treasury that will
     // not pay it when it fills: asked again where it is written down, below)
     if (Date.parse(t.at) >= cfg.rulesFrom && overDay(book, t, cfg)) return only({ state: 'skipped', why: OVER_DAY(cfg) });
@@ -769,11 +830,13 @@ async function settle(w: World, t: Tag, at: { held: Held }, again = false): Prom
 
     // --- under the second cut-over: has its wallet enough of them due? If not it waits, and nothing more is asked.
     if (five) {
+      // (how many it takes: one, if the rule has been put off since this tag was taken in under it. See `needOf`.)
+      const need = needOf(w);
       const mates = dueOf(book, t.wallet, t.ref);
-      if (mates.length + 1 < cfg.minTags) return only({ state: 'waiting', why: FIVE(cfg), hold: 'five' });
+      if (mates.length + 1 < need) return only({ state: 'waiting', why: FIVE(cfg), hold: 'five' });
       // (each of the others is asked of the chain as this one was: one with a receipt there already is not paid again)
       lot = [...lot, ...(await unpaid(mates.map((r) => one(tagOfRow(r), r))))];
-      if (lot.length < cfg.minTags) return [...said, ...only({ state: 'waiting', why: FIVE(cfg), hold: 'five' })];
+      if (lot.length < need) return [...said, ...only({ state: 'waiting', why: FIVE(cfg), hold: 'five' })];
       // whoever has waited longest first
       lot.sort((a, b) => (a.t.at < b.t.at ? -1 : a.t.at > b.t.at ? 1 : a.t.ref < b.t.ref ? -1 : 1));
     }
@@ -1022,10 +1085,11 @@ export function traded(book: Book, t: Tag): Row | null {
  * because it moves with every other tag of the wallet.
  * @param known the tag was in the book before it was asked about this time
  */
-function tell(cfg: Config, book: Book, t: Tag, o: Outcome, known = false): Outcome {
+function tell(w: Pick<World, 'cfg' | 'now'>, book: Book, t: Tag, o: Outcome, known = false): Outcome {
   if (o.state !== 'waiting' || o.hold !== 'five') return o;
-  const have = dueOf(book, t.wallet).length;
-  return { ...o, why: `${have} of ${cfg.minTags}: ${o.why}`, have, need: cfg.minTags, ...(known && have < cfg.minTags ? { parked: true as const } : {}) };
+  const cfg = w.cfg, have = dueOf(book, t.wallet).length;
+  // (there is nothing to ask about again only while it is the count it waits for: with the rule put off it waits for nothing but the next look)
+  return { ...o, why: `${have} of ${cfg.minTags}: ${o.why}`, have, need: cfg.minTags, ...(known && have < needOf(w) ? { parked: true as const } : {}) };
 }
 
 /**
@@ -1042,13 +1106,13 @@ async function seeTo(w: World, t: Tag, from?: Held): Promise<{ outcome: Outcome;
     // (paid is paid), or cannot change yet (waiting for room under the day's limits, or for its wallet's count)
     const glanced = await glanceBook(w.store);
     const seen = glanced.rows.find((r) => r.ref === t.ref);
-    if (seen && (settled(seen) || off || !(await due(w, seen, glanced)))) return { outcome: tell(cfg, glanced, seen, told(seen), true), paid: 0 };
+    if (seen && (settled(seen) || off || !(await due(w, seen, glanced)))) return { outcome: tell(w, glanced, seen, told(seen), true), paid: 0 };
   }
   const at = { held: from ?? (await freshBook(w.store)) };
   try {
     const had = at.held.book.rows.find((r) => r.ref === t.ref);
     // switched off, nothing already begun is touched: off is a stop, and what is in the book stays as it is
-    if (had && (settled(had) || off)) return { outcome: tell(cfg, at.held.book, had, told(had), true), paid: 0 };
+    if (had && (settled(had) || off)) return { outcome: tell(w, at.held.book, had, told(had), true), paid: 0 };
     // (what was first written down of a tag is what holds, whatever is said of it later)
     if (had) t = tagOfRow(had);
     // payouts begin with what was cashed in over the ten minutes before they first run
@@ -1062,7 +1126,7 @@ async function seeTo(w: World, t: Tag, from?: Held): Promise<{ outcome: Outcome;
       } catch (err) {
         // not being able to ask is not a no: it is asked again, and whatever the book says of it meanwhile stands
         const now = at.held.book.rows.find((r) => r.ref === t.ref);
-        if (now) return { outcome: tell(cfg, at.held.book, now, told(now), !!had), paid };
+        if (now) return { outcome: tell(w, at.held.book, now, told(now), !!had), paid };
         all = [{ t, o: { state: 'waiting', why: `could not be done just now (${plain(err)})` }, five: fives(cfg, t) }];
         passing = true;
       }
@@ -1099,8 +1163,8 @@ async function seeTo(w: World, t: Tag, from?: Held): Promise<{ outcome: Outcome;
       const outcome = wrote.get(t.ref) ?? all.find((x) => x.t.ref === t.ref)?.o ?? { state: 'waiting', why: 'being seen to' };
       // Several of one wallet's cashed in at the same moment were each counted before the others were written
       // down, and each told to wait: whichever is written last finds that there are enough, and sees to them now.
-      if (pass === 0 && outcome.state === 'waiting' && outcome.hold === 'five' && dueOf(at.held.book, t.wallet).length >= cfg.minTags) continue;
-      return { outcome: tell(cfg, at.held.book, t, outcome, !!had), paid };
+      if (pass === 0 && outcome.state === 'waiting' && outcome.hold === 'five' && dueOf(at.held.book, t.wallet).length >= needOf(w)) continue;
+      return { outcome: tell(w, at.held.book, t, outcome, !!had), paid };
     }
   } finally {
     if (from) Object.assign(from, at.held);
@@ -1119,7 +1183,13 @@ export async function sweep(w: World, limit = 200): Promise<{ tried: number; pai
   if (w.cfg.mode !== 'off') {
     const waiting: Row[] = [];
     const glanced = await glanceBook(w.store);
-    for (const r of glanced.rows) if (open(r) && (owed(r) || w.now() - Date.parse(r.at) < MAX_AGE_MS + 24 * 3600 * 1000) && (await due(w, r, glanced))) waiting.push(r);
+    // What is past four days old is left alone, unless it is owed: one that never got so far as being taken in has
+    // been refused as too old by then, or will not be looked at to any purpose. Under the second cut-over a payment
+    // that is on its way is followed to its end as well, however old its tags: there the first attempt is
+    // ordinarily made days after the first of them was cashed in, and if it was not seen to arrive in the moment
+    // it was watched for, nobody looked again: it stayed "sending" for good, whether it had arrived or was lost.
+    const followed = (r: Row) => owed(r) || (r.rules === 2 && r.state === 'sending') || w.now() - Date.parse(r.at) < MAX_AGE_MS + 24 * 3600 * 1000;
+    for (const r of glanced.rows) if (open(r) && followed(r) && (await due(w, r, glanced))) waiting.push(r);
     if (waiting.length) {
       const held = await freshBook(w.store);
       const began = w.now();

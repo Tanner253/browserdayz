@@ -90,7 +90,9 @@ function lines(book: Book, s: Snapshot): (Row | Waits)[] {
     if (!lot.includes(r)) out.push(r);
     else if (!done.has(r.wallet)) {
       done.add(r.wallet);
-      const have = lot.length, need = s.minTags;
+      // (how many it takes: one, if the rule has been put off since these were taken in under it. They are then paid
+      // as they stand at the next look, and the page says so, and calls for that look: see needOf in _lib/payouts.ts)
+      const have = lot.length, need = s.fives ? s.minTags : 1;
       // (enough are due, and they are not paid: held by the treasury or the day's limit, which one of them says; or about to be)
       const held = lot.find((x) => x.hold !== 'five');
       out.push({ wallet: r.wallet, name: r.name, at: r.at, have, need, pays: Math.max(have, need) * s.flatPay, why: have < need ? `paid when ${need} are due` : held?.why ?? 'being paid', hold: have < need ? 'five' : held?.hold ?? 'five' });
@@ -147,7 +149,7 @@ function page(book: Book, s: Snapshot, now: number): string {
         <td>${r.have} ${r.have === 1 ? 'tag' : 'tags'}</td>
         <td class="w">${account(r.wallet)}</td>
         <td><em class="c go">${r.have < r.need ? `${r.have} of ${r.need}` : `${r.have} due`}</em></td>
-        <td>${r.have < r.need ? `<span class="track five"><i style="width:${Math.round((r.have / r.need) * 100)}%"></i></span> <b class="go">${amount(r.pays)} SOL</b> <i>when ${r.need} are due</i>` : `<b class="go">${amount(r.pays)} SOL</b> <i>for ${r.have} tags: ${esc(r.why)}</i>`}</td>
+        <td>${r.have < r.need ? `<span class="track five"><i style="width:${Math.round((r.have / r.need) * 100)}%"></i></span> <b class="go">${amount(r.pays)} SOL</b> <i>when ${r.need} are due</i>` : `<b class="go">${amount(r.pays)} SOL</b> <i>for ${r.have} ${r.have === 1 ? 'tag' : 'tags'}: ${esc(r.why)}</i>`}</td>
       </tr>`
         : `<tr class="${r.state}" data-s="${r.state === 'paid' ? 'paid' : r.state === 'sending' || r.state === 'waiting' ? 'open' : 'none'}">
         <td>${when(r.at)}</td>
@@ -331,7 +333,7 @@ function page(book: Book, s: Snapshot, now: number): string {
       ${tile(s.tagPays === null ? '?' : `${amount(s.tagPays)} SOL`, 'a tag pays right now', s.fives ? `flat, whatever the treasury holds${N > 1 ? `: paid when a wallet has ${N} due` : ''}` : `${pct}% of the treasury, ${amount(s.floor)} at least`)}
       ${tile(s.balance === null ? '?' : `${amount(s.balance)} SOL`, 'in the treasury', s.treasury ? `<a href="https://solscan.io/account/${esc(s.treasury)}" target="_blank" rel="noopener">${esc(short(s.treasury))}</a>${s.madeTheCoin ? ', the wallet that made the coin' : ''}` : '')}
       ${tile(`${amount(book.claimedLamports)} SOL`, 'creator rewards collected', (s.waiting !== null ? `${amount(s.waiting)} waiting to be collected` : '') + (s.waitingNote ? `${s.waiting !== null ? '. ' : ''}${esc(s.waitingNote)}` : ''))}
-      ${tile(String(open), open === 1 ? 'tag on its way or waiting' : 'tags on their way or waiting', waitTags ? `${waitTags} of them, ${amount(waitTags * s.flatPay)} SOL, owed to ${waits.length} ${waits.length === 1 ? 'wallet that is' : 'wallets that are'} paid at ${N} due` : open ? 'Each is paid as soon as it can be' : 'Everything owed has been paid')}
+      ${tile(String(open), open === 1 ? 'tag on its way or waiting' : 'tags on their way or waiting', waitTags ? `${waitTags} of them, ${amount(waitTags * s.flatPay)} SOL, owed to ${waits.length} ${waits.length === 1 ? 'wallet that is' : 'wallets that are'} ${s.fives ? `paid at ${N} due` : 'being paid now'}` : open ? 'Each is paid as soon as it can be' : 'Everything owed has been paid')}
     </div>
   </div>
 
