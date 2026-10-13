@@ -198,6 +198,8 @@ export class RemotePlayer implements Damageable {
     this.alive = alive;
     if (!alive) this.diedAt = performance.now();
     else this.aliveAt = performance.now();
+    // (a body going down is heard from where it falls, by whoever is near)
+    if (!alive) audio.bodyFall(this.pos, this.pos.distanceTo(this.heard));
     // back from the dead is a new life in clean clothes
     if (alive) this.avatar.clearWounds();
     this.fall = 0;

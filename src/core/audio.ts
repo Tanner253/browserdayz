@@ -4,6 +4,7 @@
 
 import type { Surface } from './physics';
 import { EMOTE } from '../sim/emotes';
+import { ITEMS } from '../sim/items';
 
 type V3 = { x: number; y: number; z: number };
 
@@ -119,32 +120,111 @@ export interface EngineVoice {
  * and are silent until theirs is there.
  */
 const RECORDED: Record<string, number> = { punch: 5, blow: 5, hit_metal: 6, shot_rifle: 1, shot_pistol: 3, shot_quiet: 1, bolt: 1, rifle_mag_out: 1, rifle_mag_in: 1, pistol_mag_out: 1, pistol_mag_in: 1, mag_round: 1, rack: 1, shot_ak: 1, shot_ar: 1, ak_mag_out: 1, ak_mag_in: 1, ak_rack: 1, ar_mag_out: 1, ar_mag_in: 1, ar_rack: 1, shot_shotgun: 2, shot_magnum: 2, shell_in: 1, z_groan: 4, z_growl: 4, z_alert: 4, z_attack: 4, z_hurt: 4, z_die: 4, door_open: 1, door_creak: 2, door_close: 2, gate_open: 1, gate_close: 1, gate_slam: 1 };
+/**
+ * Recordings of what a body does all day (2026-10-13: "our sounds for drinking and doing basically everything can
+ * and should get rehauled"): feet by what is under them, a thing taken up or put down by what it is made of, a
+ * spade, a fire, a bone, a car's door (scripts/sounds.mjs, the second half of it, says what each is cut from).
+ * They are asked for only once the first set is all here, a few at a time and the feet first, so that a gun is
+ * never kept waiting by a footstep; until one has come, the made-up sound it replaces is what is heard.
+ * (Nobody who chose them could hear them: `?sounds` on the dev page plays each beside what it replaces.)
+ */
+export const EVERYDAY: Record<string, number> = { step_grass: 5, step_concrete: 5, step_wood: 5, step_soft: 3, step_metal: 5, step_snow: 5, thud: 5, take_any: 5, take_heavy: 5, take_metal: 5, take_tin: 5, take_wood: 5, take_rounds: 4, drop_gun: 3, hit_wood: 5, dig: 5, fire_crack: 4, snap: 2, latch: 1, crash_tin: 3 };
+
+/**
+ * Feet, by what is under them: [the recording, how loud against a step on grass, a second recording laid over it,
+ * and how loud that is]. Hard ground is all one recording (concrete); packed earth is the soft one (a foot on
+ * carpet: a dull pat with no slap in it); steel is a step on something hard with a plate struck lightly over it.
+ * Gravel is a hard step too, and the grit of it is still made up over that (see `footstep`): nobody has recorded any.
+ * Snow is here for when there is some (2026-10-13: a snowy mountain is planned; no ground says 'snow' yet).
+ */
+export const STEPS: Record<string, [name: string, level: number, over?: string, overLevel?: number]> = {
+  grass: ['step_grass', 1], foliage: ['step_grass', 0.8], dirt: ['step_soft', 0.8], cloth: ['step_soft', 0.65], flesh: ['step_soft', 0.65],
+  concrete: ['step_concrete', 1.1], asphalt: ['step_concrete', 1.1], plaster: ['step_concrete', 1.1], rock: ['step_concrete', 1.1], glass: ['step_concrete', 1.1], gravel: ['step_concrete', 0.9],
+  wood: ['step_wood', 0.67], metal: ['step_concrete', 0.9, 'step_metal', 0.3], snow: ['step_snow', 0.52],
+};
+/**
+ * How loud a recorded step is played, against how loud the made-up one was told to be. Set so that a step on grass
+ * comes out as loud as the made-up one did (which is what has been played with), and the other grounds beside it:
+ * at a run some 19 dB under a rifle shot of one's own over their loudest tenth of a second, walking 25, crouched
+ * 27. (Worked out, not heard: test/everyday.test.ts has the sums, and prints every level.)
+ */
+export const STEP_GAIN = 0.3;
+/**
+ * How loud and how fast the rest of them are played. Each was set beside the made-up sound it replaces (the test
+ * prints both): as loud as that was, but for a bone, a spade drawn out and wood struck, which could hardly be
+ * heard and now can.
+ */
+export const EVERY = {
+  /** a landing: the weight of the body [from a hop, and how much more from as far as a body can fall], how fast it is played [the same], and the other foot against the first */
+  land: { thud: [0.1, 0.36], rate: [1.1, -0.2], other: 0.8 },
+  /** a body going down: its weight, its clothes, and what follows (an arm, the head); and somebody else's against one's own, before the distance is taken off */
+  body: { thud: 0.46, cloth: 0.46, after: 0.2, other: 1.7 },
+  /** a thing handled, [how loud, how fast]: taken up, put down, moved; the hand on cloth with it, as a share of it; a gun let fall; and somebody else's hands against one's own */
+  hand: { pickup: [0.27, 1.06], drop: [0.25, 0.86], move: [0.09, 1.15], cloth: 0.55, gun: 0.3, other: 1.4 },
+  /** a bone, [how loud, how fast] */
+  snap: [0.37, 0.82],
+  /** a spade: going in, and coming out [how loud, how fast] */
+  dig: { in: 0.32, out: [0.1, 0.78] },
+  /** a crack of a fire, at the fire: [the quietest, and how much louder the loudest] */
+  crack: [0.08, 0.24],
+  /** wood struck (steel struck is 1.5) */
+  wood: 1.2,
+  /** a car into something, each [gently, and how much more at its hardest]: sheet steel giving, the weight behind it, steel struck */
+  crash: { tin: [0.34, 0.4], thud: [0.3, 0.3], steel: [0.2, 0.4] },
+} as const;
+
+/** what a thing in the hand is made of, as far as the ear can tell: which recording it is taken up and put down with */
+export type Handling = 'any' | 'heavy' | 'metal' | 'tin' | 'wood' | 'rounds' | 'soft' | 'gun';
+const HANDLED: Record<string, Handling> = {
+  // by what kind of thing it is ...
+  weapon: 'gun', magazine: 'heavy', attachment: 'metal', melee: 'heavy', food: 'tin', drink: 'any', medical: 'soft', clothing: 'soft', tool: 'any', misc: 'any', stash: 'any',
+  // ... and the ones that are not what the rest of their kind are
+  bat: 'wood', apple: 'any', flask: 'tin', stim: 'any', stim_stamina: 'any', firstaid: 'any', helmet_k63: 'heavy', helmet_m1: 'heavy', gasmask: 'any', gasmask_white: 'any', gasmask_orange: 'any', gasmask_skull: 'any',
+  jerrycan: 'tin', grenade: 'heavy', radio: 'heavy', dogtag: 'metal', flashlight: 'metal', stash_kit: 'heavy', black_bag: 'soft',
+};
+/** the recording a thing is handled with: [which, how loud against the rest] (`step_soft` is cloth: a hand on it, as a foot on carpet) */
+export const TAKEN: Record<Handling, [name: string, level: number]> = { any: ['take_any', 1], heavy: ['take_heavy', 1], gun: ['take_heavy', 1.15], metal: ['take_metal', 0.7], tin: ['take_tin', 1.1], wood: ['take_wood', 1.1], rounds: ['take_rounds', 0.8], soft: ['step_soft', 0.9] };
+export function handling(id?: string): Handling {
+  const d = id ? ITEMS[id] : undefined;
+  if (!d) return 'any';
+  // (loose rounds are brass on brass; a box of them is card)
+  if (d.category === 'ammo') return d.open ? 'any' : 'rounds';
+  return HANDLED[d.id] ?? HANDLED[d.category] ?? 'any';
+}
+
 const bank = new Map<string, AudioBuffer[]>();
+/** which take each recording in the bank is, counted from 0 (they arrive in any order) */
+const takeOf = new WeakMap<AudioBuffer, number>();
 let fetched: Promise<void> | null = null;
 /** Fetches the recordings, once. (They are kept apart from any one engine: the trailer renders its soundtrack on an engine of its own.) */
 export function recordings(): Promise<void> {
   return (fetched ??= (async () => {
     // (decoding needs a context, and any will do: this one makes no sound)
     const dec = new OfflineAudioContext(1, 1, 44100);
+    const one = async (name: string, k: number) => {
+      // (asked for three times before it is given up: one that failed once on a bad line is not lost for the whole game)
+      for (let go = 0; go < 3; go++) {
+        try {
+          const res = await fetch(`assets/sounds/${name}${k ? `_${k + 1}` : ''}.wav`);
+          if (res.status === 404) return;
+          if (!res.ok) throw new Error(String(res.status));
+          const buf = await dec.decodeAudioData(await res.arrayBuffer());
+          takeOf.set(buf, k);
+          bank.set(name, [...(bank.get(name) ?? []), buf]);
+          return;
+        } catch {
+          // not there yet, or not sound: again in a while, and then the made-up one stands in
+          await new Promise((r) => setTimeout(r, 1500 * (go + 1)));
+        }
+      }
+    };
+    await Promise.all(Object.entries(RECORDED).flatMap(([name, takes]) => Array.from({ length: takes }, (_, k) => one(name, k))));
+    // and then what a body does all day, six at a time, in the order they are written above
+    const rest = Object.entries(EVERYDAY).flatMap(([name, takes]) => Array.from({ length: takes }, (_, k) => [name, k] as const));
     await Promise.all(
-      Object.entries(RECORDED).flatMap(([name, takes]) =>
-        Array.from({ length: takes }, async (_, k) => {
-          // (asked for three times before it is given up: one that failed once on a bad line is not lost for the whole game)
-          for (let go = 0; go < 3; go++) {
-            try {
-              const res = await fetch(`assets/sounds/${name}${k ? `_${k + 1}` : ''}.wav`);
-              if (res.status === 404) return;
-              if (!res.ok) throw new Error(String(res.status));
-              const buf = await dec.decodeAudioData(await res.arrayBuffer());
-              bank.set(name, [...(bank.get(name) ?? []), buf]);
-              return;
-            } catch {
-              // not there yet, or not sound: again in a while, and then the made-up one stands in
-              await new Promise((r) => setTimeout(r, 1500 * (go + 1)));
-            }
-          }
-        }),
-      ),
+      Array.from({ length: 6 }, async () => {
+        for (let job = rest.shift(); job; job = rest.shift()) await one(job[0], job[1]);
+      }),
     );
   })());
 }
@@ -381,18 +461,60 @@ export class AudioEngine {
     this.ahead = [];
   }
 
-  /** @param later it belongs to a reload and can be taken back before it is heard */
-  private rec(name: string, to: AudioNode, at: number, gain = 1, rate = 1, later = false): boolean {
-    const takes = bank.get(name);
-    if (!this.ready || !takes?.length) return false;
+  /**
+   * For hearing a recording beside what it replaced (the `?sounds` page sets it): while it is on, the recordings of
+   * what a body does all day (EVERYDAY) are passed over, and the made-up sound that stood there before is played.
+   */
+  asBefore = false;
+  /** Told of every recording as it is set going: its name, which take, how loud, how fast (the `?sounds` page lists them, and a check counts by them). */
+  heard: ((name: string, take: number, gain: number, rate: number) => void) | null = null;
+  /** the take of each recording that was played last: it is not the one played next */
+  private lastTake = new Map<string, AudioBuffer>();
+
+  /** whether a recording of what a body does all day is here to be played */
+  private has(name: string): boolean {
+    return this.ready && !this.asBefore && !!bank.get(name)?.length;
+  }
+
+  /**
+   * One take of a recording, as it lies on the disk, straight to the ears: for the `?sounds` page.
+   * @returns whether there is such a take
+   */
+  audition(name: string, take: number, gain = 1): boolean {
+    const buf = bank.get(name)?.find((b) => takeOf.get(b) === take);
+    if (!this.ready || !buf) return false;
     const src = this.ctx.createBufferSource();
-    src.buffer = takes[Math.floor(Math.random() * takes.length)];
+    src.buffer = buf;
+    const g = this.ctx.createGain();
+    g.gain.value = gain;
+    src.connect(g).connect(this.sfx);
+    src.start();
+    this.heard?.(name, take, gain, 1);
+    return true;
+  }
+
+  /**
+   * @param later it belongs to a reload and can be taken back before it is heard
+   * @param vary a sound heard over and over (a step, a thing picked up): never the take that was played last, and each a little louder or quieter than the one before
+   */
+  private rec(name: string, to: AudioNode, at: number, gain = 1, rate = 1, later = false, vary = false): boolean {
+    const takes = bank.get(name);
+    if (!this.ready || !takes?.length || (this.asBefore && name in EVERYDAY)) return false;
+    const src = this.ctx.createBufferSource();
+    let take = takes[Math.floor(Math.random() * takes.length)];
+    if (vary) {
+      if (takes.length > 1 && take === this.lastTake.get(name)) take = takes[(takes.indexOf(take) + 1 + Math.floor(Math.random() * (takes.length - 1))) % takes.length];
+      this.lastTake.set(name, take);
+      gain *= 0.94 + Math.random() * 0.12;
+    }
+    src.buffer = take;
     // (no two shots from one gun are the same pitch to a hair, and one take played over and over is heard as one take)
     src.playbackRate.value = (0.97 + Math.random() * 0.06) * rate;
     const g = this.ctx.createGain();
     g.gain.value = gain;
     src.connect(g).connect(to);
     src.start(Math.max(at, this.ctx.currentTime));
+    this.heard?.(name, takeOf.get(take) ?? 0, gain, src.playbackRate.value);
     if (later) {
       const now = this.ctx.currentTime;
       this.ahead = this.ahead.filter((a) => a.at > now);
@@ -778,11 +900,32 @@ export class AudioEngine {
     n.connect(f).connect(g).connect(this.sfx);
   }
 
-  /** pushing off the ground */
-  jump() {
+  /**
+   * A recorded foot on the ground (see STEPS), if the recording has come.
+   * @param speed over the ground, m/s: a foot set down slowly is lower and has no slap in it
+   * @param vol how loud, as the made-up step is told
+   * @param after seconds from now
+   * @returns whether there was one to play: if not, the caller makes the step up as it used to
+   */
+  private step(surface: string, speed: number, vol: number, to: AudioNode, after = 0): boolean {
+    const [name, level, over, overLevel = 0] = STEPS[surface] ?? STEPS.grass;
+    if (!this.has(name)) return false;
+    const t = this.ctx.currentTime + after;
+    const tone = this.filter('lowpass', Math.min(16000, 1400 + speed * 2600), 0.5);
+    tone.connect(to);
+    const rate = 0.93 + Math.min(speed, 7) * 0.02;
+    this.rec(name, tone, t, vol * level * STEP_GAIN, rate, false, true);
+    if (over) this.rec(over, tone, t, vol * overLevel * STEP_GAIN, rate, false, true);
+    return true;
+  }
+
+  /** pushing off the ground @param surface what the feet push off */
+  jump(surface: Surface | 'grass' | 'dirt' | 'gravel' | 'snow' = 'grass') {
     if (!this.ready) return;
     const t = this.ctx.currentTime;
     this.gear(t, 0.09);
+    // (the feet leaving it: a step on whatever is under them, quietly. Until the recordings have come, a made-up scuff.)
+    if (this.step(surface, 2, 0.8, this.sfx)) return;
     const n = this.noise(t, 0.16);
     const f = this.filter('bandpass', 1100, 1.5);
     const g = this.ctx.createGain();
@@ -791,11 +934,18 @@ export class AudioEngine {
   }
 
   /** coming down: the feet, the weight behind them, and the kit catching up */
-  land(surface: Surface | 'grass' | 'dirt' | 'gravel', speed: number) {
+  land(surface: Surface | 'grass' | 'dirt' | 'gravel' | 'snow', speed: number) {
     if (!this.ready) return;
     const t = this.ctx.currentTime;
     const k = Math.min(1, speed / 11);
     this.footstep(surface, 3 + k * 5);
+    // Recorded: the other foot a moment after the first, and the weight of the body behind them, which is a
+    // soft heavy thing struck. (Until they have come, the made-up thump.)
+    if (this.rec('thud', this.sfx, t + 0.012, EVERY.land.thud[0] + k * EVERY.land.thud[1], EVERY.land.rate[0] + k * EVERY.land.rate[1], false, true)) {
+      this.step(surface, 3 + k * 5, Math.min(1, 0.36 + k * 0.35) * 3.2 * EVERY.land.other, this.sfx, 0.03 + k * 0.02);
+      this.gear(t + 0.03, 0.06 + k * 0.12);
+      return;
+    }
     const o = this.ctx.createOscillator();
     o.type = 'sine';
     o.frequency.setValueAtTime(110, t);
@@ -808,10 +958,30 @@ export class AudioEngine {
     this.gear(t + 0.03, 0.06 + k * 0.12);
   }
 
+  /**
+   * A body going down, recorded: its weight on the ground, its clothes, and a moment after the rest of it (an arm,
+   * the head). @returns whether the recordings were there
+   */
+  private fallen(to: AudioNode, at: number, level: number): boolean {
+    if (!this.rec('thud', to, at, EVERY.body.thud * level, 0.92, false, true)) return false;
+    this.rec('step_soft', to, at + 0.01, EVERY.body.cloth * level, 0.85, false, true);
+    this.rec('thud', to, at + 0.17 + Math.random() * 0.05, EVERY.body.after * level, 1.25, false, true);
+    return true;
+  }
+
+  /** Somebody else's body going down, heard from where it falls (their own is `death`). */
+  bodyFall(pos: V3, distance = 0) {
+    if (!this.ready || distance > 40) return;
+    this.fallen(this.out(pos, 3, 1.3, distance), this.ctx.currentTime + 0.45 + distance / 343, EVERY.body.other);
+  }
+
   /** the last breath going out, and the body hitting the ground */
   death() {
     if (!this.ready) return;
     const t = this.ctx.currentTime;
+    // (Recorded, it is the body alone: the breath was a voice made up out of hiss, and made-up voices are gone
+    // from this game. Until the recordings have come, both as they were.)
+    if (this.fallen(this.sfx, t + 0.45, 1)) return;
     const n = this.noise(t, 1.1);
     const f = this.filter('bandpass', 620, 1.6);
     f.frequency.setValueAtTime(760, t);
@@ -965,6 +1135,8 @@ export class AudioEngine {
     const out = this.out(pos, 3, 1.3, distance);
     // (steel struck is a recording of steel struck: a car's door, a drum, a locker. Until they have come, the made-up ring.)
     if (surface === 'metal' && this.rec('hit_metal', out, t, 1.5)) return;
+    // (and wood struck is a recording of wood struck: a door, a crate, a fence, a round or an axe into any of them)
+    if (surface === 'wood' && this.rec('hit_wood', out, t, EVERY.wood, 1, false, true)) return;
     const n = this.noise(t, 0.2);
     let f: BiquadFilterNode;
     let peak = 0.7;
@@ -1015,7 +1187,7 @@ export class AudioEngine {
   }
 
   /** @param carried weight on the player's back (own steps only): the kit shifts with each one */
-  footstep(surface: Surface | 'grass' | 'dirt' | 'gravel', speed: number, pos?: V3, carried = 0) {
+  footstep(surface: Surface | 'grass' | 'dirt' | 'gravel' | 'snow', speed: number, pos?: V3, carried = 0) {
     if (!this.ready) return;
     const t = this.ctx.currentTime;
     const vol = Math.min(1, 0.15 + speed * 0.07) * (pos ? 5.5 : 3.2);
@@ -1035,6 +1207,12 @@ export class AudioEngine {
       this.env(g, t + at, v * vol, a, d);
       n.connect(f).connect(g).connect(out);
     };
+    // A recording of a foot on that kind of ground, where it has come (see STEPS). Until then, and for the grit of
+    // gravel under the boot, which nobody has recorded, the made-up one below.
+    if (this.step(surface, speed, vol, out)) {
+      if (surface === 'gravel') for (let i = 0; i < 5; i++) layer('bandpass', 2500 + i * 700, 3, 0.18, 0.001, 0.03, i * 0.014);
+      return;
+    }
     switch (surface) {
       case 'wood':
         layer('bandpass', 320, 1.2, 1.7, 0.003, 0.07);
@@ -1145,11 +1323,25 @@ export class AudioEngine {
    * to: these are small sounds, lost within a room's length (who is near enough to be told at all is the game's
    * to say: see RemotePlayer.act).
    * @param pos somebody else's hands: where they are
+   * @param what the thing taken up, put down or moved (an item's id), where the caller knows it: a tin is not
+   *   heard as a rifle is. Not known, it is heard as anything is.
    */
-  ui(kind: 'pickup' | 'drop' | 'open' | 'close' | 'eat' | 'drink' | 'bandage' | 'inject' | 'move' | 'smoke' | 'unbox' | 'round' | 'mag', pos?: V3) {
+  ui(kind: 'pickup' | 'drop' | 'open' | 'close' | 'eat' | 'drink' | 'bandage' | 'inject' | 'move' | 'smoke' | 'unbox' | 'round' | 'mag', pos?: V3, what?: string) {
     if (!this.ready) return;
     const t = this.ctx.currentTime;
     const to = pos ? this.out(pos, 1.2, 2.2) : (this.sfx as AudioNode);
+    if (kind === 'pickup' || kind === 'drop' || kind === 'move') {
+      // Recordings, where they have come: the thing itself by what it is made of (see HANDLED), and with it the
+      // hand on cloth: closing on it as it is taken, or the pocket it is moved to. Put down, it is lower and a
+      // little louder, and a gun let go clatters. (Until they have come, the made-up rustles below.)
+      const made = handling(what), [name, level] = TAKEN[made], near = pos ? EVERY.hand.other : 1;
+      const [gain, rate] = EVERY.hand[kind];
+      if (kind === 'drop' && made === 'gun' && this.rec('drop_gun', to, t, EVERY.hand.gun * near, 1, false, true)) return;
+      if (this.rec(name, to, t + (kind === 'pickup' ? 0.03 : 0), gain * level * near, rate, false, true)) {
+        if (kind !== 'drop' && made !== 'soft') this.rec('step_soft', to, t, gain * EVERY.hand.cloth * near, 1.3, false, true);
+        return;
+      }
+    }
     const rustle = (dur: number, freq: number, vol: number, at = 0) => {
       const n = this.noise(t + at, dur);
       const f = this.filter('bandpass', freq, 0.8);
@@ -1240,6 +1432,8 @@ export class AudioEngine {
   snap() {
     if (!this.ready) return;
     const ctx = this.ctx, t = ctx.currentTime;
+    // (a recording of wood breaking, a little slowed, which is what a bone has always been on film. Until it has come, the made-up crack.)
+    if (this.rec('snap', this.sfx, t, EVERY.snap[0], EVERY.snap[1], false, true)) return;
     const src = this.noise(t, 0.06);
     const lo = this.filter('bandpass', 260, 1.2), hi = this.filter('highpass', 2400, 0.8);
     const g = ctx.createGain(), gh = ctx.createGain();
@@ -1281,6 +1475,9 @@ export class AudioEngine {
     if (this.crackT <= 0) {
       // a crack: sharp, dry, and never at an even pace
       this.crackT = 0.07 + Math.random() * Math.random() * 0.9;
+      // (a recording of wood cracking, each a good deal higher or lower than the last: no two logs split alike.
+      // Until they have come, the made-up tick. The hiss under them is made up still: there is no recording of a fire.)
+      if (this.rec('fire_crack', this.sfx, t, (EVERY.crack[0] + Math.random() * EVERY.crack[1]) * near, 0.7 + Math.random() * 0.7, false, true)) return;
       const src = this.noise(t, 0.03);
       const f = this.filter('highpass', 1700 + Math.random() * 2200, 0.9);
       const g = ctx.createGain();
@@ -1645,6 +1842,14 @@ export class AudioEngine {
     if (!this.ready) return;
     const ctx = this.ctx, t = ctx.currentTime;
     const out = this.out(pos, 8, 1.1);
+    // Recorded: sheet steel giving, the weight behind it, and the steel struck that a round on a car's door has
+    // already, an octave down for a thing that size. (Until they have come, the made-up thud and rattle.)
+    const C = EVERY.crash;
+    if (this.rec('crash_tin', out, t, C.tin[0] + k * C.tin[1], 1.05 - k * 0.3, false, true)) {
+      this.rec('thud', out, t, C.thud[0] + k * C.thud[1], 0.85, false, true);
+      this.rec('hit_metal', out, t + 0.012, C.steel[0] + k * C.steel[1], 0.55);
+      return;
+    }
     const thud = ctx.createOscillator();
     thud.type = 'sine';
     thud.frequency.setValueAtTime(95, t);
@@ -1661,6 +1866,33 @@ export class AudioEngine {
     n.connect(bp).connect(ng).connect(out);
     // something loose in it rattles on after
     for (let i = 0; i < 3; i++) this.click(600 + Math.random() * 900, 0.12 + k * 0.2, 0.03, 0.05 + i * 0.07 + Math.random() * 0.04, pos);
+  }
+
+  /**
+   * A car's door, as somebody gets in or out: the catch let go, and the door pulled to behind them. Heard from
+   * where the car is, by whoever is within a yard's length of it. Recordings and nothing else: a car's door had
+   * no sound before there were any, and has none until they have come.
+   */
+  carDoor(pos: V3) {
+    if (!this.has('latch')) return;
+    const t = this.ctx.currentTime, out = this.out(pos, 2.5, 1.6);
+    this.rec('latch', out, t, 0.8, 0.9, false, true);
+    // (the steel door the bunker and the lockers have, quicker: a door a twentieth of that one's weight)
+    this.rec('gate_slam', out, t + 0.42, 0.6, 1.3);
+  }
+
+  /**
+   * A spade at work: driven into the ground, and lifted out with what it has loosened, which is the crunch of a
+   * foot in snow played low (earth sliding off a blade: the nearest thing there is a recording of). Until they
+   * have come, what it was: a made-up landing, and a made-up step on gravel.
+   * @param part 0 as it goes in, 1 as it comes out
+   */
+  dig(part: 0 | 1) {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    if (part === 0) {
+      if (!this.rec('dig', this.sfx, t, EVERY.dig.in, 1, false, true)) this.land('dirt', 3.2);
+    } else if (!this.rec('step_snow', this.sfx, t, EVERY.dig.out[0], EVERY.dig.out[1], false, true)) this.footstep('gravel', 1.4);
   }
 
   /** the hum of the bunker (made when somebody first goes down), whether it is sounding, and how long until the place next makes a noise of its own */

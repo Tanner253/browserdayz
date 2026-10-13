@@ -59,14 +59,15 @@ export const fillOf = (stat: Stat, v: number) => (stat === 'blood' ? bloodLeft(v
  * - health falls by 0.35 with nothing eaten or drunk, by 6 to 16 in the gas, and by a blow all at once (a round's
  *   thirty, seen over three seconds, is ten a second); it rises by 0.06 to 0.12 by itself, by 0.8 beside a fire,
  *   and by a dressing's ten or a stim's thirty-five at once
- * - blood, ml: a wound in a limb is 3.6 and one in the body 6 (one arrow under five, two from there: the body's),
- *   two in the body are 12 (three); it comes back by itself at 0.5 to 1.2, from saline at 8.3, from a bag of blood at 75
+ * - blood, ml: a wound in a limb is 3.6 and one in the body 6, and every wound there is costs some multiple of 1.2,
+ *   so wounds together do too: one arrow up to 4.8, two from the body's 6, three from two in the body (12). It comes
+ *   back by itself at 0.5 to 1.2, from saline at 8.3, from a bag of blood at 75
  * - food goes at 0.045 at rest and 0.108 at a sprint, water at 0.07 and 0.168: at rest and at a walk there is no
  *   arrow (that is what steady is), at a run there is one; anything eaten or drunk comes all at once
  */
 export const PACE: Record<Stat, { down: [number, number, number]; up: [number, number, number] }> = {
   health: { down: [0.2, 3, 10], up: [0.04, 0.5, 3] },
-  blood: { down: [1, 5, 12], up: [0.3, 5, 30] },
+  blood: { down: [1, 5.4, 11.4], up: [0.3, 5, 30] },
   food: { down: [0.07, 0.5, 2], up: [0.3, 3, 8] },
   water: { down: [0.12, 0.5, 2], up: [0.3, 3, 8] },
 };

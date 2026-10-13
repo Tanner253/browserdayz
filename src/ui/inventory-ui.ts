@@ -21,9 +21,9 @@
 // equip, use or take it) and the ground (the whole left column). Over a grid the outline is where it will land,
 // which is the nearest free spot to the pointer, not only the cell under it.
 
-import { BLOOD, bloodLeft } from '../sim/blood';
 import { DOLL_SLOTS, GEAR_SLOTS, ITEMS, SLOT_KIND, SLOT_LABEL, TAG_HOLD_MIN, WEAPON_SLOTS, makeItem, type AttachSlot, capacityOf, handlingOf, itemName, itemWeight, magRoom, tagClock, tagOwner, type ItemInstance, type Slot, holds } from '../sim/items';
 import { Container, bagGrid, splitPile, swapPlaces, type PlayerInventory } from '../sim/inventory';
+import { LOAD, breathOf, heavy, paceOf } from '../sim/load';
 import type { WorldItem, Stash } from '../game/loot';
 import type { Vitals } from '../game/player';
 import type { DollBox as FigureBox } from '../game/doll';
@@ -230,11 +230,13 @@ export class InventoryUI {
   /** the bags that have been shown open by themselves once (by their numbers): one shut by hand after that stays shut */
   private shown = new Set<string>();
   /**
-   * The weight a survivor carries before it slows them, in kg (null: not told, and only the weight is shown). It is
-   * the game's to say and not this screen's: the number is written once, where the pace is worked out, in
-   * src/game/player.ts.
+   * Set by the game where what is carried weighs on a survivor (null: not told, and only the weight is shown). What
+   * a load does is src/sim/load.ts: this screen shows what it leaves of a sprint, and marks one that slows the feet.
+   * (It was the weight at which a load began to slow them, shown beside what was carried: the figure is no longer read.)
    */
   carryLimit: number | null = null;
+  /** the survivor's state, a symbol and a line of words to each: the HUD's element (HUD.statusPanel), shown in the Status column */
+  status: HTMLElement | null = null;
 
   constructor(private inv: PlayerInventory, private actions: InvActions) {
     this.root = document.createElement('div');
@@ -350,8 +352,12 @@ export class InventoryUI {
       // figure's own box. (The places lie over the hole as they lie over the veil. Over and under the row it is
       // wider than at its sides: the band the veil is laid in round its edge is not to lie over the figure's head
       // or its feet.)
-      const l = Math.ceil(Math.max(d.left - 8 * z, left)), t = Math.ceil(Math.max(d.top - 28 * z, top));
-      const r = Math.floor(Math.min(d.right + 8 * z, left + col.clientWidth * z)), b = Math.floor(Math.min(d.bottom + 28 * z, top + col.clientHeight * z));
+      // (Its edges are on whole pixels of the screen, which are not always whole pixels of the page: the veil and
+      // the band inside its edge are two layers that meet there, and meeting part way across a pixel they would
+      // leave a hair of the world between them.)
+      const dpr = window.devicePixelRatio || 1, up = (v: number) => Math.ceil(v * dpr) / dpr, down = (v: number) => Math.floor(v * dpr) / dpr;
+      const l = up(Math.max(d.left - 8 * z, left)), t = up(Math.max(d.top - 28 * z, top));
+      const r = down(Math.min(d.right + 8 * z, left + col.clientWidth * z)), b = down(Math.min(d.bottom + 28 * z, top + col.clientHeight * z));
       if (f.width >= 16 && f.height >= 16 && r - l >= 16 && b - t >= 16) {
         // (the veil, as the stylesheet has it for the figure: its colours, its blur, what colour it leaves and the band round the hole, each a number there)
         const css = getComputedStyle(this.root), said = (k: string) => css.getPropertyValue(k).split(',').map(Number);
@@ -365,15 +371,12 @@ export class InventoryUI {
     if (box && was && JSON.stringify(box) === JSON.stringify(was)) return was;
     this.figBox = box;
     // (said in the page's own measure, which is the screen's over the page's scale)
-    const at = (v: number, from: number) => `${((v - from) / z).toFixed(2)}px`;
+    const at = (v: number, from: number) => `${((v - from) / z).toFixed(4)}px`;
     const s = this.root.style;
     s.setProperty('--fig-l', box ? at(box.cx, page.left) : '0px');
     s.setProperty('--fig-t', box ? at(box.cy, page.top) : '0px');
     s.setProperty('--fig-r', box ? at(box.cx + box.cw, page.left) : '0px');
     s.setProperty('--fig-b', box ? at(box.cy + box.ch, page.top) : '0px');
-    // (and how big the page is: the band round the hole is a piece of the veil's own gradient, laid out over the whole page)
-    s.setProperty('--fig-pw', at(page.right, page.left));
-    s.setProperty('--fig-ph', at(page.bottom, page.top));
     return box;
   }
 
@@ -892,9 +895,10 @@ export class InventoryUI {
     cargo.className = 'inv-col inv-cargo';
     // (let go anywhere on this side that is no grid, a thing is put away wherever there is room for it)
     cargo.dataset.pockets = '1';
-    // (what is carried, over what can be before it slows the feet, where the game has said what that is)
-    const kg = inv.weight(), most = this.carryLimit;
-    cargo.innerHTML = `<h3>Carried <span${most !== null && kg > most ? ' class="over" title="Over this weight you are slower on your feet"' : ''}>${kg.toFixed(1)}${most !== null ? ` / ${most}` : ''} kg</span></h3>`;
+    // (what is carried and, where the game has said a load weighs on anybody, what it leaves of a sprint: the rule is
+    // src/sim/load.ts. In red past the weight that slows the feet as well.)
+    const kg = inv.weight(), told = this.carryLimit !== null;
+    cargo.innerHTML = `<h3>Carried <span${told ? `${paceOf(kg) < 1 ? ' class="over"' : ''} title="The first ${LOAD.free} kg cost nothing. Every kilogram after that takes ${+(LOAD.perKg * 100).toFixed(2)}% off how far you can sprint. It never takes more than ${Math.round((1 - LOAD.least) * 100)}% (from ${Math.round(heavy())} kg). Over ${LOAD.slowsFrom} kg you are slower on your feet as well."` : ''}>${kg.toFixed(1)} kg${told ? ` · sprint ${Math.round(breathOf(kg) * 100)}%` : ''}</span></h3>`;
     const scroll = document.createElement('div');
     scroll.className = 'inv-scroll';
     const grids = document.createElement('div');
@@ -922,10 +926,15 @@ export class InventoryUI {
     // (The inspector stood under all the grids, and with a pack on it was scrolled out of sight. It, and the body's
     // state under it, are fixed at the foot of this side now: only the grids over them scroll.)
     cargo.appendChild(this.inspector());
-    if (this.vitals) {
-      const v = this.vitals;
-      const bar = (label: string, val: number, cls: string) => `<div class="vbar ${cls}"><span>${label}</span><div><i style="width:${Math.max(0, Math.min(100, val))}%"></i></div><b>${Math.round(val)}</b></div>`;
-      cargo.insertAdjacentHTML('beforeend', `<div class="inv-status"><h3>Status</h3>${bar('Health', v.health, v.health < 30 ? 'bad' : '')}${bar('Blood', bloodLeft(v.blood) * 100, v.bleeding || v.blood < BLOOD.faint ? 'bad' : '')}${bar('Energy', v.energy, v.energy < 25 ? 'bad' : '')}${bar('Water', v.water, v.water < 25 ? 'bad' : '')}${v.bleeding ? '<div class="bleeding">Bleeding: use a bandage</div>' : ''}</div>`);
+    // (The body's state is the symbols the game has in its corner, each with what it means in words. They were four
+    // bars, drawn when this was and stale until it was drawn again; this is one element of the HUD's own, which the
+    // HUD keeps up to date while this screen is open, and it is put here each time this is drawn.)
+    if (this.vitals && this.status) {
+      const box = document.createElement('div');
+      box.className = 'inv-status';
+      box.innerHTML = '<h3>Status</h3>';
+      box.appendChild(this.status);
+      cargo.appendChild(box);
     }
 
     wrap.append(vic, gear, cargo);

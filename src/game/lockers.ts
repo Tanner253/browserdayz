@@ -1,10 +1,10 @@
-// The doors of what is searched (the rule is in src/sim/crates.ts, HUNG): a locker's leaves, hung on their
-// hinges, shut until somebody has the locker open and swung wide for as long as they do. Whoever is near sees it:
-// the server says which of the map's containers is being searched (src/net/protocol.ts, 'cdoor'), and the game
-// playing alone says it to itself.
+// The doors and lids of what is searched (the rule is in src/sim/crates.ts, HUNG): a locker's leaves and a crate's
+// lid, hung on their hinges, shut until somebody has the thing open and swung wide for as long as they do. Whoever
+// is near sees it: the server says which of the map's containers is being searched (src/net/protocol.ts, 'cdoor'),
+// and the game playing alone says it to itself.
 //
-// The case of each locker is drawn with everything else that stands about the map (src/world/vegetation.ts), which
-// leaves its leaves out. They are drawn here, every leaf of one kind in one go however many lockers there are, each
+// The case of each is drawn with everything else that stands about the map (src/world/vegetation.ts), which leaves
+// its leaves out. They are drawn here, every leaf of one kind in one go however many of the kind there are, each
 // where its own hinges are and turned as far as it stands open, and only those the eye is near enough to see the
 // case of.
 
@@ -40,6 +40,11 @@ interface Stood {
 interface Kind {
   open: number;
   time: number;
+  /** the line a leaf turns about: upright (a door), or across the thing (a lid) */
+  about: 'x' | 'y';
+  wood: boolean;
+  /** how far off its leaves are drawn at all: as far as the case is drawn as itself */
+  far: number;
   stood: Stood[];
   /** each leaf of it: where its hinges are from the foot of the case as it is drawn, and its shapes, a paint each */
   leaves: { hinge: THREE.Matrix4; meshes: THREE.InstancedMesh[] }[];
@@ -60,12 +65,18 @@ export class Lockers {
   async load() {
     for (const [id, rule] of Object.entries(HUNG)) {
       const list = this.world.props.filter((p) => p.kind.split(/[#@]/)[0] === id);
-      if (!list.length || !assets.manifest.models[id]) continue;
+      const entry = assets.manifest.models[id];
+      if (!list.length || !entry) continue;
       const model = await assets.model(id);
       // The case is stood about the middle of what is drawn of it, on its own foot (see groundParts): the hinges
       // are said from there.
       const still = boundsOf(extractParts(model, (n) => !rule.leaf.test(n)));
       const foot = still.getCenter(new THREE.Vector3()).setY(still.min.y);
+      // A thing that has a lighter copy of itself for far off is drawn as itself only so near, and the lighter
+      // copy has its lid on: the leaves go out as the case does (the same sum as there: src/world/vegetation.ts).
+      const size = still.getSize(new THREE.Vector3()), biggest = list.reduce((a, it) => Math.max(a, it.scale), 0) || 1;
+      const swap = THREE.MathUtils.clamp(Math.max(size.x, size.y, size.z) * biggest * 20, 18, 60);
+      const seen: [number, number] = entry.lods.length ? [swap, swap + Math.max(4, swap * 0.18)] : SEEN;
       const stood: Stood[] = list.map((it) => ({
         it,
         base: new THREE.Matrix4().compose(new THREE.Vector3(it.x, it.y, it.z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), it.rot), new THREE.Vector3(it.scale, it.scale, it.scale)),
@@ -74,17 +85,21 @@ export class Lockers {
       const leaves: Kind['leaves'] = [];
       for (const piece of model.children) {
         if (!rule.leaf.test(piece.name)) continue;
-        // (its shapes as they hang from its own origin, which is on the line of its hinges)
-        const meshes = joinByPaint(extractParts(piece)).map((p) => {
+        // Its shapes as they hang from the line of its hinges. A piece made to be hung has its own origin there;
+        // of one that was not, the rule says where the line is, and its shapes are said from that.
+        const at = rule.at ? new THREE.Vector3(...rule.at) : piece.position.clone();
+        const parts = rule.at ? extractParts(model, (n) => n === piece.name) : extractParts(piece);
+        if (rule.at) for (const p of parts) p.geometry.translate(-at.x, -at.y, -at.z);
+        const meshes = joinByPaint(parts).map((p) => {
           const paint = (p.material as THREE.MeshStandardMaterial).clone();
           const fp = foliagePatch({});
-          setLodFade(fp.lod, null, SEEN);
+          setLodFade(fp.lod, null, seen);
           this.atmo.register(paint, fp.patch, 'prop');
           const im = new THREE.InstancedMesh(p.geometry, paint, stood.length);
           im.count = 0;
           im.visible = false;
           im.frustumCulled = false;
-          // (a leaf is a sheet of steel in a room: it takes the room's shadows and throws none of its own worth a pass)
+          // (a leaf is a sheet of steel in a room, or a board: it takes the shadows of where it is and throws none of its own worth a pass)
           im.castShadow = false;
           im.receiveShadow = true;
           im.matrixAutoUpdate = false;
@@ -94,16 +109,16 @@ export class Lockers {
           this.scene.add(im);
           return im;
         });
-        leaves.push({ hinge: new THREE.Matrix4().makeTranslation(piece.position.x - foot.x, piece.position.y - foot.y, piece.position.z - foot.z), meshes });
+        leaves.push({ hinge: new THREE.Matrix4().makeTranslation(at.x - foot.x, at.y - foot.y, at.z - foot.z), meshes });
       }
       if (!leaves.length) continue;
-      this.kinds.push({ open: rule.open, time: rule.time, stood, leaves });
+      this.kinds.push({ open: rule.open, time: rule.time, about: rule.about ?? 'y', wood: !!rule.wood, far: seen[1], stood, leaves });
       for (const s of stood) this.by.set(crateId(s.it.x, s.it.z), s);
     }
     this.stale = true;
   }
 
-  /** has this container doors at all */
+  /** has this container doors (or a lid) at all */
   has(cid: string): boolean {
     return this.by.has(cid);
   }
@@ -134,8 +149,9 @@ export class Lockers {
         const open = s.told || s === mine;
         if (open !== s.open) {
           s.open = open;
-          const far = _p.set(s.it.x, s.it.y + 1, s.it.z).distanceTo(eye);
-          if (far < HEARD) audio.locker(open, { x: s.it.x, y: s.it.y + 1, z: s.it.z }, far, k.time);
+          const at = { x: s.it.x, y: s.it.y + 1, z: s.it.z }, far = _p.set(at.x, at.y, at.z).distanceTo(eye);
+          if (far < HEARD && k.wood) audio.door(open, at, far);
+          else if (far < HEARD) audio.locker(open, at, far, k.time);
         }
         const to = open ? 1 : 0;
         if (s.swung === to) continue;
@@ -151,10 +167,11 @@ export class Lockers {
       let n = 0;
       for (const s of k.stood) {
         // (drawn as far off as its case is, by the same measure: see LodSet.update)
-        if (_p.set(s.it.x, s.it.y, s.it.z).distanceTo(eye) > (s.it.far ?? SEEN[1])) continue;
+        if (_p.set(s.it.x, s.it.y, s.it.z).distanceTo(eye) > Math.min(s.it.far ?? Infinity, k.far)) continue;
         // eased at both ends: a door is pulled from rest and comes to rest
         const e = s.swung * s.swung * (3 - 2 * s.swung);
-        _turn.makeRotationY(k.open * e);
+        if (k.about === 'x') _turn.makeRotationX(k.open * e);
+        else _turn.makeRotationY(k.open * e);
         for (const leaf of k.leaves) {
           _m.multiplyMatrices(s.base, leaf.hinge).multiply(_turn);
           for (const im of leaf.meshes) im.setMatrixAt(n, _m);

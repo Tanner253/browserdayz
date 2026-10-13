@@ -101,7 +101,12 @@ ok('the server knows it as the game does: its places for things come after every
   const data = buildWorldData(process.cwd());
   const mine = data.lootPoints.filter((p) => p.usage.includes('Bunker'));
   assert.ok(mine.length >= 70, `${mine.length} places for things in the bunker`);
-  assert.ok(data.lootPoints.slice(-mine.length).every((p) => p.usage.includes('Bunker')), 'a place of the bunker among the others');
+  // (They were the last of all until 2026-10-13. The places on the boards of the racks stood in sheds and store rooms
+  // that day come after them, as they came after every other: each new lot goes last, and no place is renumbered.
+  // So: the bunker's are one unbroken run, and nothing follows it but what lies on a rack's board.)
+  const first = data.lootPoints.findIndex((p) => p.usage.includes('Bunker'));
+  assert.ok(data.lootPoints.slice(first, first + mine.length).every((p) => p.usage.includes('Bunker')), 'a place of the bunker among the others');
+  assert.ok(data.lootPoints.slice(first + mine.length).every((p) => !p.floor && !!p.surf && p.surf.clear < 1), 'a place after the bunker\'s that is not on a rack');
   for (const p of mine) assert.ok(inBunker(P, p.x, p.y + 0.3, p.z), 'a place for things that is not in the bunker');
   assert.ok(mine.filter((p) => p.floor).length >= 12 && mine.filter((p) => p.surf).length >= 40);
   const d = data.bunkerDoor!;

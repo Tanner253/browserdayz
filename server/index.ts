@@ -85,6 +85,8 @@ interface Box {
   emptiedAt: number;
   /** a crate: when (economy time) somebody last changed what is in it, since it was last filled (unset: nobody has) */
   pickedAt?: number;
+  /** a crate: what it was last filled with, by uid. It is filled again over what is left only if all that is left is of these: never over a thing somebody put in it. */
+  filled?: string[];
   /** corpse and supply drop: expiry (economy time). Corpse: owner name, how it fell */
   name?: string;
   expires?: number;
@@ -222,6 +224,7 @@ function fillBox(b: Box) {
   for (const it of b.items) issue(it);
   b.emptiedAt = -1;
   b.pickedAt = undefined;
+  b.filled = b.items.map((it) => it.uid);
 }
 
 function loadWorld() {
@@ -1365,7 +1368,7 @@ function takeInLate(save: KeptFile) {
       if (had && had.leftAt >= r.leftAt) continue;
       const inv = cleanInventory(r.inv);
       for (const it of things(inv)) issue(it);
-      KEPT.chars.set(k, { pose: r.pose, inv, vitals: r.vitals, alive: true, leftAt: r.leftAt, ...(moved ? { afresh: true } : {}) });
+      KEPT.chars.set(k, { pose: r.pose, inv, vitals: r.vitals, alive: true, leftAt: r.leftAt, ...(moved || r.afresh ? { afresh: true } : {}) });
       chars++;
     } catch {
       /* one that cannot be made sense of is left as this server had them */
@@ -1380,6 +1383,7 @@ function takeInLate(save: KeptFile) {
     });
     for (const it of items) issue(it);
     const box: Box = { ...b, items, y: moved ? world.groundAt(b.x, b.z) : b.y, emptiedAt: -1, touchedAt: num(b.touchedAt) ? b.touchedAt : now };
+    if (Math.abs(box.y - b.y) > 1) log(`[keep] a stash at ${Math.round(b.x)}, ${Math.round(b.z)} lies on ground that has moved ${(box.y - b.y).toFixed(1)} m: it is set on the new ground`);
     boxes.set(b.cid, box);
     // (and everybody on is shown it, as they are shown one that is buried while they watch)
     broadcast({ t: 'stash+', s: { uid: box.cid, x: box.x, y: box.y, z: box.z, rot: box.rot, ...(box.item ? { item: box.item } : {}), buried: true } });
@@ -1572,8 +1576,10 @@ async function loadKept() {
       await pause(2500);
     }
     if (!read) {
-      // (and it goes on being asked for: see `lateWatch`)
-      lateWatch();
+      // (And it is NOT asked for again afterwards. A server that opened without reading has let everybody in with
+      // a new life, and has promised to write over nothing: were the copy read late, it would become a writer, the
+      // late copy would be passed over for everybody who is back, and the next save would put their new lives in
+      // the place of what they had. Found by an independent reading, 2026-10-13, and shown on a local server.)
       return open('what is kept could NOT be read: the site did not answer. Everybody begins afresh, and nothing is written over what is kept');
     }
     KEPT.read = true;
@@ -1603,7 +1609,7 @@ async function loadKept() {
         const inv = cleanInventory(r.inv);
         for (const it of things(inv)) issue(it);
         // (the map has been made again since: what they carried is theirs, where they stood may be inside a wall)
-        KEPT.chars.set(k, { pose: r.pose, inv, vitals: r.vitals, alive: true, leftAt: r.leftAt, ...(moved ? { afresh: true } : {}) });
+        KEPT.chars.set(k, { pose: r.pose, inv, vitals: r.vitals, alive: true, leftAt: r.leftAt, ...(moved || r.afresh ? { afresh: true } : {}) });
       } catch {
         // (one character that cannot be made sense of is one character lost, not everybody)
         bad++;
@@ -1619,6 +1625,7 @@ async function loadKept() {
       });
       for (const it of items) issue(it);
       const box: Box = { ...b, items, y: moved ? world.groundAt(b.x, b.z) : b.y, emptiedAt: -1, touchedAt: num(b.touchedAt) ? b.touchedAt : now };
+      if (Math.abs(box.y - b.y) > 1) log(`[keep] a stash at ${Math.round(b.x)}, ${Math.round(b.z)} lies on ground that has moved ${(box.y - b.y).toFixed(1)} m: it is set on the new ground`);
       // (one that stood on the ground, kept by a server from before a stash was a thing to drop: it lies there as one now)
       if (box.buried) boxes.set(b.cid, box);
       else if (!economy.loot.has(b.cid)) economy.drop(stashItem(box), box.x, box.y, box.z, box.rot).keptAt = box.touchedAt;
@@ -3984,7 +3991,10 @@ setInterval(() => {
       const quiet = !locks.has(b.cid) && !alive.some((p) => Math.hypot(p.x - b.x, p.z - b.z) < 60);
       if (b.items.length) {
         b.emptiedAt = -1;
-        if (b.pickedAt !== undefined && economy.time - b.pickedAt > CRATE_RESTOCK * 3 && quiet) fillBox(b);
+        // (Not over anything that was put into it: a crate has always been somewhere to leave a thing, and a
+        // refill takes the place of all that is in it.)
+        const own = b.filled, leftOnly = !!own && b.items.every((it) => own.includes(it.uid));
+        if (b.pickedAt !== undefined && economy.time - b.pickedAt > CRATE_RESTOCK * 3 && quiet && leftOnly) fillBox(b);
       } else if (b.emptiedAt < 0) b.emptiedAt = economy.time;
       else if (economy.time - b.emptiedAt > CRATE_RESTOCK && quiet) fillBox(b);
     } else if (b.kind === 'corpse' && economy.time > (b.expires ?? 0) && !locks.has(b.cid)) {

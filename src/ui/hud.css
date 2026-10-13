@@ -287,29 +287,7 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 .hud-weapon-ammo em::before { content: '+ '; }
 .hud-weapon-ammo i { font-style: normal; color: var(--accent); margin-left: 8px; }
 
-/* health, food and water: what each is, how full, and the number */
-.hud-vitals { position: absolute; right: 22px; bottom: 20px; width: 178px; display: grid; gap: 6px; padding: 8px 10px; background: rgba(10, 12, 11, 0.42); }
-.vital { display: grid; grid-template-columns: 17px 1fr 28px; align-items: center; gap: 8px; color: var(--ink); transition: color 0.4s; }
-.vital svg { width: 17px; height: 17px; }
-.vital-bar { height: 5px; background: rgba(233, 228, 216, 0.14); }
-.vital-bar i { display: block; height: 100%; width: 100%; background: currentColor; transition: width 0.3s; }
-.vital b { font-family: var(--mono); font-size: 13px; font-weight: 600; text-align: right; line-height: 1; }
-.vital[data-k="health"] .vital-bar { height: 8px; }
-.vital[data-k="health"] b { font-size: 15px; }
-.vital[data-band="ok"] { color: rgba(233, 228, 216, 0.86); }
-.vital[data-band="mid"] { color: #e3cf8f; }
-.vital[data-band="low"] { color: #e09356; }
-.vital[data-band="crit"] { color: #ff5a44; }
-.vital[data-band="crit"] b, .vital[data-band="crit"] svg { animation: pulse 1s infinite; }
-/* blood: its own bar under health. Losing it, the drop beats; a bag running in, it is green */
-.vital[data-k="blood"] svg { color: #d8584a; }
-.vital[data-k="blood"].losing { color: #ff5a44; }
-.vital[data-k="blood"].losing svg { animation: pulse 0.8s infinite; }
-.vital[data-k="blood"].gaining { color: #8fd49a; }
-.vital[data-k="blood"].gaining svg { color: #8fd49a; }
-.vital.bleed { display: none; grid-template-columns: 17px 1fr; color: #ff4a3a; font-size: 12px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; }
-.vital.bleed svg { animation: pulse 0.8s infinite; }
-.vital.bleed.show { display: grid; }
+/* (health, blood, food and water are symbols in the corner now, with no bar and no number: at the end of this file) */
 @keyframes pulse { 50% { transform: scale(1.12); } }
 
 .hud-stamina {
@@ -474,8 +452,8 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
   background: radial-gradient(ellipse at center, transparent 45%, rgba(120, 0, 0, 0.55) 100%);
 }
 /* An open wound. Blood lands on the glass and runs; the edges of the view beat, faintly for a wound in a limb and
-   plainly for three in the body; and a card over the hotbar says how bad it is, about how long there is, and what
-   to press. (It was a line across the middle of the view, where the sights are.) */
+   plainly for three in the body; and a line over the hotbar says what to press. (How bad it is and how long there
+   is, which that line also said, the badge beside the blood says now: the end of this file.) */
 .hud-bleedfx {
   position: absolute;
   inset: 0;
@@ -527,16 +505,9 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 }
 .hud-bleed.show { display: flex; }
 .hud-bleed svg { width: 22px; height: 22px; color: #ff5a44; flex: none; animation: pulse 0.9s infinite; }
-.hud-bleed .hb-what { display: grid; gap: 3px; padding-right: 12px; border-right: 1px solid rgba(255, 120, 100, 0.28); }
-.hud-bleed b { font-family: var(--mono); font-size: 12px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: #ff6f5c; line-height: 1; }
-.hud-bleed .hb-what i { font-family: var(--mono); font-style: normal; font-size: 10px; letter-spacing: 0.12em; color: #ffb3a6; line-height: 1; }
-.hud-bleed[data-lvl="3"] { border-left-width: 5px; }
-.hud-bleed[data-lvl="3"] .hb-what i { color: #fff; }
-/* little blood and no wound: the same card, calmer, in the colour of the bar */
+/* little blood and no wound: the same line, calmer */
 .hud-bleed.low { animation: none; background: rgba(20, 16, 14, 0.8); border-left-color: #d8584a; color: #e9e4d8; }
 .hud-bleed.low svg { animation: none; color: #d8584a; }
-.hud-bleed.low b { color: #e08a7e; }
-.hud-bleed.low .hb-what i { color: #b9b2a4; }
 .hud-bleed kbd {
   display: inline-block;
   min-width: 20px;
@@ -934,13 +905,6 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 .inv-cargo { display: flex; flex-direction: column; }
 .inv-cargo > * { flex: 0 0 auto; }
 .inv-status { margin-top: auto; padding-top: 14px; }
-.vbar { display: grid; grid-template-columns: 62px 1fr 30px; align-items: center; gap: 8px; font-size: 13.5px; margin: 5px 0; }
-.vbar span { color: var(--ink-faint); }
-.vbar div { height: 5px; background: rgba(255, 255, 255, 0.08); }
-.vbar i { display: block; height: 100%; background: var(--ink-dim); }
-.vbar.bad i { background: var(--danger); }
-.vbar b { font-family: var(--mono); font-size: 11px; text-align: right; font-weight: 400; }
-.bleeding { margin-top: 8px; color: #ff6a55; font-size: 14px; }
 .inv-help { margin-top: 14px; font-size: 12.5px; color: var(--ink-faint); line-height: 1.6; }
 .inv-help b { color: var(--ink-dim); font-family: var(--mono); font-size: 11px; font-weight: 400; }
 
@@ -1015,10 +979,9 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 .ins-name { font-size: 20px; }
 .ins-actions { margin-top: 9px; }
 .ins-desc { margin: 9px 0 6px; font-size: 14px; }
-/* the body's state, two to a row: half the height it took */
-.inv-status { display: grid; grid-template-columns: 1fr 1fr; gap: 0 20px; padding-top: 10px; }
-.inv-status h3, .inv-status .bleeding { grid-column: 1 / -1; }
-.inv-cargo .inv-status h3 { margin: 0 0 3px; }
+/* the body's state: the game's own symbols, each with a line of words (the end of this file) */
+.inv-status { padding-top: 10px; }
+.inv-cargo .inv-status h3 { margin: 0 0 5px; }
 .inv-col h3 span.over { color: #ff6a55; }
 /* over each grid of what is worn, after its name: the place it is worn in (it gives way first where the bar is short) */
 .inv-gridbox h4 small { flex: 0 1 auto; min-width: 0; margin-left: 8px; overflow: hidden; text-overflow: ellipsis; font-size: 9px; font-weight: 400; letter-spacing: 0.14em; color: var(--ink-faint); }
@@ -1704,7 +1667,6 @@ body.touch .hb-gap { display: none; }
 body.touch .hud-weapon, body.touch .hud-ride { right: auto; left: 46%; bottom: 134px; transform: translateX(-50%); text-align: center; white-space: nowrap; }
 body.touch .hud-stamina { left: 46%; bottom: 196px; }
 body.touch .hud-arms { left: 46%; bottom: 204px; }
-body.touch .hud-vitals { top: 16px; bottom: auto; right: calc(158px + env(safe-area-inset-right)); }
 body.touch .hud-fps { top: auto; right: auto; left: calc(8px + env(safe-area-inset-left)); bottom: 4px; }
 body.touch .hud-online { top: auto; right: auto; left: calc(8px + env(safe-area-inset-left)); bottom: 18px; }
 /* the map is in the top right corner, and takes a tap: big, and back again */
@@ -1824,24 +1786,14 @@ body.touch .hud-start, body.touch .rw, body.touch .inv-wrap, body.touch .inv-col
 .inv-neck b { display: block; font-size: 13px; font-weight: 600; letter-spacing: 0.04em; color: var(--ink); }
 .inv-neck span { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint); }
 
-/* the gas: green in at the edges of the eyes as the lungs fill with it, and a word on what is being breathed */
+/* the gas: green in at the edges of the eyes as the lungs fill with it (what is being breathed is a badge beside the survivor's health: the end of this file) */
 .hud-gas { position: absolute; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(ellipse at 50% 50%, rgba(150, 170, 40, 0) 28%, rgba(120, 140, 28, 0.42) 68%, rgba(64, 78, 12, 0.85) 100%); }
-.hud-gas-tag { position: absolute; top: 96px; left: 50%; transform: translateX(-50%); padding: 6px 14px 6px 12px; font: 700 13px/1 'Barlow Condensed', 'Bahnschrift', sans-serif; letter-spacing: 0.22em; color: #e3ecb4; background: rgba(28, 34, 10, 0.74); border-left: 3px solid #b9cc4a; opacity: 0; transition: opacity 0.35s; white-space: nowrap; pointer-events: none; }
-.hud-gas-tag.on { opacity: 1; }
-.hud-gas-tag.bad { color: #ffdccd; background: rgba(62, 14, 8, 0.8); border-left-color: #ff6a4a; animation: gas-bad 0.9s ease-in-out infinite; }
-@keyframes gas-bad { 50% { background: rgba(116, 24, 10, 0.88); } }
 /* a gas mask from inside: the world through its two round eyepieces, their rims dark at the corners of the eyes */
 .hud-mask { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 0.4s; background: #060806;
   -webkit-mask-image: radial-gradient(ellipse 36% 56% at 30% 50%, transparent 70%, #000 100%), radial-gradient(ellipse 36% 56% at 70% 50%, transparent 70%, #000 100%);
   mask-image: radial-gradient(ellipse 36% 56% at 30% 50%, transparent 70%, #000 100%), radial-gradient(ellipse 36% 56% at 70% 50%, transparent 70%, #000 100%);
   -webkit-mask-composite: source-in; mask-composite: intersect; }
 .hud-mask.on { opacity: 0.86; }
-/* beside a fire that is alight */
-.hud-fire-tag { position: absolute; top: 96px; left: 50%; transform: translateX(-50%); padding: 6px 14px 6px 12px; font: 700 13px/1 'Barlow Condensed', 'Bahnschrift', sans-serif; letter-spacing: 0.22em; color: #ffe6c2; background: rgba(46, 22, 6, 0.74); border-left: 3px solid #ff9a3c; opacity: 0; transition: opacity 0.35s; white-space: nowrap; pointer-events: none; }
-.hud-fire-tag.on { opacity: 1; }
-/* a broken leg, for as long as it is one (under the word about the gas or the fire, which may be up at the same time) */
-.hud-leg-tag { position: absolute; top: 126px; left: 50%; transform: translateX(-50%); padding: 6px 14px 6px 12px; font: 700 13px/1 'Barlow Condensed', 'Bahnschrift', sans-serif; letter-spacing: 0.2em; color: #ffe2d6; background: rgba(60, 16, 10, 0.78); border-left: 3px solid #ff6a4a; opacity: 0; transition: opacity 0.35s; white-space: nowrap; pointer-events: none; }
-.hud-leg-tag.on { opacity: 1; }
 
 /* carrying tags out of the Zona: said in the middle of the screen, with the seconds left */
 .zone-warn {
@@ -1974,7 +1926,7 @@ body.touch .hm-tiers, body.touch .hm-show, body.touch .hm-zoom { gap: 3px; }
   .inv { --veil-band: 0; }
 }
 /* (where a blur has not been seen to keep to a cut shape: a plain veil, and darker, for there is no blur to quiet what is behind it) */
-.inv.veil-plain { --veil-in: 12, 15, 13, 0.9; --veil-out: 4, 5, 5, 0.97; --veil-blur: 0; --veil-sat: 1; --veil-band: 0; }
+.inv.veil-plain { --veil-in: 12, 15, 13, 0.9; --veil-out: 4, 5, 5, 0.97; --veil-blur: 0; --veil-sat: 1; }
 .inv.fig-live { background: none; backdrop-filter: none; }
 .inv.fig-live::before {
   content: '';
@@ -1984,7 +1936,8 @@ body.touch .hm-tiers, body.touch .hm-show, body.touch .hm-zoom { gap: 3px; }
   pointer-events: none;
   background: radial-gradient(ellipse at 50% 35%, rgba(var(--veil-in)), rgba(var(--veil-out)));
   backdrop-filter: blur(calc(var(--veil-blur) * 1px)) saturate(var(--veil-sat));
-  clip-path: polygon(evenodd, 0 0, 100% 0, 100% 100%, 0 100%, 0 0, var(--fig-l) var(--fig-t), var(--fig-l) var(--fig-b), var(--fig-r) var(--fig-b), var(--fig-r) var(--fig-t), var(--fig-l) var(--fig-t));
+  /* (the whole box, and the hole in it: the line from the one to the other goes straight down to the hole's corner, where going and coming back it is the same line and leaves nothing) */
+  clip-path: polygon(evenodd, var(--fig-l) 0, 100% 0, 100% 100%, 0 100%, 0 0, var(--fig-l) 0, var(--fig-l) var(--fig-t), var(--fig-l) var(--fig-b), var(--fig-r) var(--fig-b), var(--fig-r) var(--fig-t), var(--fig-l) var(--fig-t));
 }
 .inv.fig-live.veil-plain::before { backdrop-filter: none; }
 /* The veil's blur reaches past its own edge into the hole, and what it finds there, drawn as dark as the veil makes
@@ -1992,23 +1945,29 @@ body.touch .hm-tiers, body.touch .hm-show, body.touch .hm-zoom { gap: 3px; }
    as far as the blur reaches) the veil's dark is laid by the page, with no blur, on a layer of its own, and what is
    drawn under it is left as bright as the world is: the blur finds what it finds everywhere else. Inward the band
    thins to nothing over `--veil-ramp` (a soft edge: the picture under it is made to meet it, and a hard one would
-   show wherever the two were a part of a pixel out). It is the same gradient, laid out over the whole page. */
+   show wherever the two were a part of a pixel out; the plain veil has the band for that alone). It is the same
+   gradient over the same box as the veil, cut to the hole by the same numbers as the hole is cut by, so that the
+   two meet edge to edge: a box of its own, laid out where the hole is, came out a fiftieth of a pixel short of
+   it, and a hair of the bare world showed down the hole's side. */
 .inv.fig-live::after {
   --b: calc(var(--veil-band) * 1px);
   --r: calc((var(--veil-band) + var(--veil-ramp)) * 1px);
+  --w: calc(var(--fig-r) - var(--fig-l));
+  --h: calc(var(--fig-b) - var(--fig-t));
   content: '';
   position: absolute;
-  left: var(--fig-l);
-  top: var(--fig-t);
-  width: calc(var(--fig-r) - var(--fig-l));
-  height: calc(var(--fig-b) - var(--fig-t));
+  inset: 0;
   z-index: -1;
   pointer-events: none;
-  background: radial-gradient(ellipse at 50% 35%, rgba(var(--veil-in)), rgba(var(--veil-out))) calc(-1 * var(--fig-l)) calc(-1 * var(--fig-t)) / var(--fig-pw) var(--fig-ph) no-repeat;
+  background: radial-gradient(ellipse at 50% 35%, rgba(var(--veil-in)), rgba(var(--veil-out)));
+  clip-path: polygon(var(--fig-l) var(--fig-t), var(--fig-l) var(--fig-b), var(--fig-r) var(--fig-b), var(--fig-r) var(--fig-t));
+  /* (all of it, less the middle of the hole: the middle is what both of the other two leave, the one across and the one down) */
   mask-image: linear-gradient(#000, #000), linear-gradient(to right, transparent var(--b), #000 var(--r), #000 calc(100% - var(--r)), transparent calc(100% - var(--b))), linear-gradient(to bottom, transparent var(--b), #000 var(--r), #000 calc(100% - var(--r)), transparent calc(100% - var(--b)));
+  mask-size: auto, var(--w) var(--h), var(--w) var(--h);
+  mask-position: 0 0, var(--fig-l) var(--fig-t), var(--fig-l) var(--fig-t);
+  mask-repeat: no-repeat;
   mask-composite: exclude, intersect;
 }
-.inv.fig-live.veil-plain::after { display: none; }
 @supports not (mask-composite: exclude) {
   .inv.fig-live::after { display: none; }
 }
@@ -2016,3 +1975,92 @@ body.touch .hm-tiers, body.touch .hm-show, body.touch .hm-zoom { gap: 3px; }
 .inv.fig-ready .doll-fig { background-image: none !important; filter: none; }
 .inv.fig-live .doll-fig { cursor: grab; touch-action: pan-y; }
 .inv.fig-live.turning, .inv.fig-live.turning * { cursor: grabbing !important; }
+
+/* ------------------------------------------------------------ the survivor's state: symbols, not bars */
+/* As DayZ shows a survivor (2026-10-13: "dayz just does icons and symbols ... the internals of the icons are the
+   symbols themselves and the color correlates with the status"): a symbol each for health, blood, food and water,
+   which empties as what it stands for does; white while that is well, yellow when it is low, red when it is
+   critical, and red blinking to white when it is about to kill. Arrows beside it while it is changing, up or down,
+   one to three by how fast. A badge to the left of them for each thing that is the matter, for as long as it is.
+   No bar; and no number, unless Settings asks for them. What each is to look like is reckoned in src/ui/status.ts
+   and drawn by src/ui/status-view.ts. (They were four bars with a number each, in a box.) */
+/* (Over everything that is laid on the view: a wound's red edges and the blood on the glass, the green of the gas,
+   the dark round a scope. Those are thickest in the corners, which is where this is, and it is when they are up
+   that it has to be read. Under the menu, the death screen and the map it is not there at all.) */
+.hud-vitals { position: absolute; right: 16px; bottom: 16px; z-index: 1; display: flex; align-items: flex-start; justify-content: flex-end; transition: opacity 0.4s; }
+.hud-vitals.gone, #hud:has(> .hud-fatal.show) > .hud-vitals { opacity: 0; }
+.st-badges, .st-stats { display: flex; align-items: flex-start; }
+.st-stat, .st-badge { --c: #f3f0e6; display: grid; grid-template-columns: 32px 11px; margin-left: 5px; color: var(--c); animation: st-in 0.3s ease-out; }
+.st-badge { grid-template-columns: 28px; margin: 2px 7px 0 0; }
+.st-stat.off, .st-badge.off { display: none; }
+@keyframes st-in { from { opacity: 0; transform: translateY(5px); } }
+.st-ico { display: block; width: 32px; height: 32px; overflow: visible; }
+.st-badge .st-ico { width: 28px; height: 28px; }
+/* every symbol stands on a dark shape of itself, a little larger: it is read against snow and sky as against a wall */
+.st-back { fill: rgba(6, 8, 7, 0.52); stroke: rgba(6, 8, 7, 0.6); stroke-width: 4.6; stroke-linejoin: round; }
+.st-under { fill: none; stroke: rgba(6, 8, 7, 0.6); stroke-width: 4.6; stroke-linecap: round; stroke-linejoin: round; }
+.st-fill { fill: currentColor; }
+.st-line { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.st-more { fill: currentColor; }
+.st-mark { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; opacity: 0.75; }
+.st-mark.st-dark { stroke: rgba(6, 8, 7, 0.55); opacity: 1; }
+.st-solid { fill: currentColor; stroke: rgba(6, 8, 7, 0.72); stroke-width: 2.8; stroke-linejoin: round; paint-order: stroke fill; }
+.st-cut { fill: none; stroke: rgba(6, 8, 7, 0.7); stroke-width: 1.5; stroke-linecap: round; }
+.st-heart { fill: rgba(6, 8, 7, 0.55); stroke: none; }
+.st-slash { fill: none; stroke: currentColor; stroke-width: 2.8; stroke-linecap: round; }
+.st-slash.st-under { stroke: rgba(6, 8, 7, 0.85); stroke-width: 6; }
+/* the five looks (src/ui/status.ts: `stepOf`) */
+.st-stat[data-step="less"] { --c: #d2cec2; }
+.st-stat[data-step="low"] { --c: #ffc83d; }
+.st-stat[data-step="crit"] { --c: #ff4d3a; }
+.st-stat[data-step="last"], .st-badge.blink { --c: #ff4d3a; }
+/* (about to kill: red, and white, a quarter of a second each, as DayZ blinks. The symbol and its number blink, not
+   the words beside them in the inventory; and not the box they stand in, which would come in afresh each time) */
+.st-stat[data-step="last"] > svg, .st-stat[data-step="last"] > b, .st-badge.blink > svg, .st-badge.blink > b { animation: st-blink 0.5s steps(1, end) infinite; }
+@keyframes st-blink { 50% { color: #fff; } }
+/* the arrows: in the symbol's own colour going down, green coming up; each lit a moment after the one before it */
+.st-arrows { display: block; width: 12px; height: 32px; margin-left: -1px; overflow: visible; }
+.st-arrow { fill: none; stroke: currentColor; stroke-width: 2.3; stroke-linecap: round; stroke-linejoin: round; animation: st-run 1.1s linear infinite; animation-delay: calc(var(--i) * 0.16s); }
+.st-stat[data-going="up"] .st-arrows { color: #8fd49a; }
+@keyframes st-run { 0%, 60%, 100% { opacity: 0.7; } 20% { opacity: 1; } }
+/* the badges: red for what is killing, yellow for what hinders, green for what is doing good */
+.st-badge[data-tone="bad"] { --c: #ff4d3a; }
+.st-badge[data-tone="warn"] { --c: #ffc83d; }
+.st-badge[data-tone="good"] { --c: #8fd49a; }
+/* (a fire is the colour of a fire: solid while it mends, and only its outline while it does no more than warm) */
+.st-badge[data-id="fire"] { --c: #ffa23f; }
+.st-badge[data-id="fire"][data-tone="calm"] .st-solid { fill: rgba(6, 8, 7, 0.5); stroke: currentColor; stroke-width: 2; paint-order: normal; }
+.st-badge[data-id="fire"][data-tone="calm"] .st-heart { display: none; }
+/* (a wound: one drop, two or three by how bad; the mask: struck through when there is none on the face) */
+.st-badge[data-lv="1"] .st-d2, .st-badge[data-lv="2"] .st-d1 { display: none; }
+.st-badge:not([data-tone="bad"]) .st-slash { display: none; }
+/* the numbers, for whoever has asked for them in Settings */
+.st-fig { display: none; grid-column: 1; justify-self: center; margin-top: 2px; font: 600 10px/1 var(--mono); text-align: center; white-space: nowrap; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95), 0 0 3px rgba(0, 0, 0, 0.7); }
+.figs .st-fig { display: block; }
+.figs .st-fig:empty { display: none; }
+/* (the gun in the hands, and the speed of the jeep, stood over the four bars: they come down to stand over the row of symbols) */
+.hud-weapon, .hud-ride { bottom: 72px; }
+/* A phone: under the top edge, beside the corner map, clear of both thumbs. The four in one row and the badges
+   in a second under them, both ending at the map: in one row, with everything up, they ran in under the compass. */
+body.touch .hud-vitals { top: 14px; bottom: auto; right: calc(152px + env(safe-area-inset-right)); flex-direction: column-reverse; align-items: flex-end; gap: 5px; }
+body.touch .hud-vitals .st-stat { grid-template-columns: 38px 14px; }
+body.touch .hud-vitals .st-stat .st-ico { width: 38px; height: 38px; }
+body.touch .hud-vitals .st-arrows { width: 14px; height: 38px; }
+body.touch .hud-vitals .st-badge { grid-template-columns: 34px; margin: 0 14px 0 5px; }
+body.touch .hud-vitals .st-badge .st-ico { width: 34px; height: 34px; }
+body.touch .hud-vitals .st-fig { font-size: 12px; }
+/* in the inventory: the same symbols, each with what it means in words */
+.st-panel { display: grid; gap: 5px; }
+.st-panel .st-stat, .st-panel .st-badge { grid-template-columns: 24px 11px 1fr auto; align-items: center; margin: 0; animation: none; }
+.st-panel .st-ico, .st-panel .st-badge .st-ico { width: 24px; height: 24px; }
+.st-panel .st-arrows { width: 10px; height: 24px; margin: 0; }
+.st-panel p { grid-column: 3; grid-row: 1; margin: 0; padding-left: 7px; font-size: 13.5px; line-height: 1.22; color: var(--ink-dim); }
+/* (and the number, where numbers are asked for, at the end of its line) */
+.st-panel .st-fig { grid-column: 4; grid-row: 1; margin: 0 0 0 12px; font-size: 11px; }
+/* (blood is counted in millilitres and a wound in millilitres a second: said here, where there is room to) */
+.st-panel [data-stat="blood"] .st-fig::after { content: ' ml'; }
+.st-panel [data-id="bleed"] .st-fig::after { content: ' ml/s'; }
+/* what to do about a wound, over the hotbar: one line, with the key (the card's other half, how bad and how long, is the badge now) */
+.hud-bleed i { display: flex; }
+.hud-bleed .hb-drop, .hud-bleed.low .hb-cut { display: none; }
+.hud-bleed.low .hb-drop { display: flex; }

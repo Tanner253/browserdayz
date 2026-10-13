@@ -54,6 +54,8 @@ const ZED = { groan: [16, 20, 1, 23], growl: [17, 18, 21, 15], alert: [8, 10, 12
  *             die   – it dies away sooner than it did: to a third in this many seconds, and so on
  *   air   – how much is added to the top of it, above 3 kHz (1: as much again)
  *   press – how hard the loudest of it is pressed down, so that the rest of it comes up (0: not at all)
+ *   from  – seconds of the recording passed over before the sound is looked for (the second thing in it, not the first)
+ *   fade  – seconds it dies away over at its end (0.18, if not given: too long for a footstep a tenth of a second long)
  */
 const SOUNDS = {
   shot_rifle: { src: snake('Full Sound/7.62x54R/WAV/762x54r Single WAV.wav'), rate: 44100, gain: 1 },
@@ -135,6 +137,53 @@ SOUNDS.gate_open = { src: door('metal_open_01'), rate: 44100, gain: 0.9 };
 SOUNDS.gate_close = { src: door('metal_close_01'), rate: 44100, gain: 0.9 };
 SOUNDS.gate_slam = { src: door('metal_slam_01'), rate: 44100, gain: 0.9 };
 several('hit_metal', ['k-impactPlate_heavy-0', 'k-impactPlate_heavy-1', 'k-impactPlate_heavy-3', 'k-impactMetal_heavy-1', 'k-impactMetal_heavy-3', 'k-impactMetal_light-3'], { rate: 44100, gain: 0.9 });
+
+// What a body does all day (2026-10-13: "our sounds for drinking and doing basically everything can and should get
+// rehauled"): feet on the ground, a thing taken up or put down, a spade, a fire, a car's door. All of it is out of
+// the same two CC0 packs as the doors and the blows (Kenney's "Impact Sounds", and "100 CC0 metal and wood SFX"),
+// which is all there is on this machine: neither has anybody eating, drinking, tearing cloth, a zip, an engine or
+// the wind, and those are still made up in src/core/audio.ts. Every Ogg of both packs is decoded by
+//   node scripts/ogg.mjs <every kind of Kenney's>     and     node scripts/ogg.mjs --dir cc0-wood-metal <every name>
+// Nobody who chose these could hear them. They were chosen by what their makers called them and by their figures
+// (how long, how fast up and down, where their weight lies): `?sounds` on the dev page plays each beside what it
+// replaces, for somebody who can.
+const five = (kind) => [0, 1, 2, 3, 4].map((k) => `k-${kind}-${k}`);
+// Feet, by what is under them. Kenney's five takes of each (of the carpet, two are given twice over: three).
+several('step_grass', five('footstep_grass'), { rate: 32000, gain: 0.9, len: 0.2, fade: 0.1 });
+several('step_concrete', five('footstep_concrete'), { rate: 32000, gain: 0.9, fade: 0.03 });
+several('step_snow', five('footstep_snow'), { rate: 32000, gain: 0.9, fade: 0.1 });
+several('step_soft', ['k-footstep_carpet-0', 'k-footstep_carpet-1', 'k-footstep_carpet-3'], { rate: 32000, gain: 0.9, fade: 0.04 });
+// (A boot on a board: Kenney's is all under 250 Hz, which a telephone's loudspeaker does not carry at all, so the
+// knock of a real piece of wood struck is laid over each, ten decibels under it.)
+['wood_hit_05', 'wood_hammer_02', 'wood_hit_08', 'wood_hit_07', 'wood_misc_08'].forEach((knock, n) => (SOUNDS[`step_wood${n ? `_${n + 1}` : ''}`] = { src: dec(`k-footstep_wood-${n}`), rate: 32000, gain: 0.9, len: 0.22, fade: 0.08, with: [{ src: door(knock), level: 0.32 }] }));
+// (and on steel: a light blow on a plate, which the game lays quietly over a step on something hard)
+several('step_metal', five('impactPlate_light'), { rate: 32000, gain: 0.9, len: 0.24, fade: 0.12 });
+// The weight of a body coming down: a landing, a fall, a car into a wall.
+several('thud', five('impactSoft_heavy'), { rate: 32000, gain: 0.9, len: 0.42, fade: 0.15 });
+// A thing taken up or put down, by what it is made of: something small of steel, something heavy of steel (a gun,
+// a magazine, a tool), a tin, wood, and anything else. Loose rounds are a bunch of keys: small brass on small brass.
+several('take_metal', five('impactMetal_light'), { rate: 32000, gain: 0.9, len: 0.25, fade: 0.12 });
+several('take_heavy', five('impactMetal_medium'), { rate: 32000, gain: 0.9, fade: 0.05 });
+several('take_tin', five('impactTin_medium'), { rate: 32000, gain: 0.9, fade: 0.05 });
+several('take_wood', five('impactWood_light'), { rate: 32000, gain: 0.9, len: 0.16, fade: 0.08 });
+several('take_any', five('impactGeneric_light'), { rate: 32000, gain: 0.9, fade: 0.04 });
+// (each begins with the hand closing on them, which is quiet and is passed over: a sound that begins late is a sound that lags)
+[['keys_01', 0.109], ['keys_04', 0.07], ['keys_05', 0.16], ['keys_06', 0.125]].forEach(([name, from], n) => (SOUNDS[`take_rounds${n ? `_${n + 1}` : ''}`] = { src: door(name), from, rate: 32000, gain: 0.9, len: 0.24, fade: 0.1 }));
+// A gun let fall: metal coming down and bouncing; and twice more, a piece of wood coming down with steel struck under it.
+SOUNDS.drop_gun = { src: door('metal_falling_01'), from: 0.236, rate: 32000, gain: 0.9, len: 0.9, fade: 0.25 };
+SOUNDS.drop_gun_2 = { src: door('wood_falling_03'), rate: 32000, gain: 0.9, len: 0.45, fade: 0.15, with: [{ src: door('metal_hit_03'), level: 0.7 }] };
+SOUNDS.drop_gun_3 = { src: door('wood_falling_01'), rate: 32000, gain: 0.9, len: 0.5, fade: 0.15, with: [{ src: door('metal_sheet_05'), level: 0.6 }] };
+// A spade into the ground (Kenney calls it mining: a tool driven into earth and stone, and what it loosens settling after).
+several('dig', five('impactMining'), { rate: 32000, gain: 0.9, len: 0.55, fade: 0.15 });
+// Wood cracking, for a fire; wood breaking, for a bone (as it has always been done for films).
+several('fire_crack', ['c-wood_cracking_01', 'c-wood_cracking_02', 'c-wood_cracking_03', 'c-wood_cracking_04'], { rate: 44100, gain: 0.9, fade: 0.05 });
+several('snap', ['c-wood_breaking_01', 'c-wood_breaking_02'], { rate: 44100, gain: 0.9, len: 0.4, fade: 0.12 });
+// A car's door: its catch (a lock let go: the second thing in that recording, the first being the key), then the
+// steel door slammed that the bunker and the lockers already have. And a car into something: sheet steel giving.
+SOUNDS.latch = { src: door('lock_open_01'), from: 0.4, rate: 44100, gain: 0.9, len: 0.3, fade: 0.08 };
+several('crash_tin', ['c-metal_sheet_03', 'c-metal_sheet_06', 'c-metal_sheet_01'], { rate: 44100, gain: 0.9, fade: 0.12 });
+// A round or a blow on wood, as steel has had: five real pieces of wood struck.
+several('hit_wood', ['c-wood_hit_03', 'c-wood_hit_04', 'c-wood_hit_07', 'c-wood_hit_08', 'c-wood_hit_01'], { rate: 44100, gain: 0.9, len: 0.26, fade: 0.1 });
 
 /** a .wav as one channel of numbers between -1 and 1: one of its channels, or all of them together */
 async function readWav(file, side) {
@@ -235,6 +284,15 @@ async function writeWav(file, x, rate) {
   b.write('data', 36, 'latin1');
   b.writeUInt32LE(x.length * 2, 40);
   for (let i = 0; i < x.length; i++) b.writeInt16LE(Math.round(Math.max(-1, Math.min(1, x[i])) * 32767), 44 + i * 2);
+  // A recording that is already there, and is the same but for its last bit or two, is left as it is. (The
+  // sources that came as Ogg are decoded by a browser, and a newer browser decodes them a hair differently: 2 parts
+  // in 32768 on some samples of the blows and the steel, 2026-10-13. That is not a change, and is not written as one.)
+  const was = await fs.readFile(file).catch(() => null);
+  if (was && was.length === b.length && was.subarray(0, 44).equals(b.subarray(0, 44))) {
+    let off = 0;
+    for (let i = 44; i < b.length && off <= 2; i += 2) off = Math.max(off, Math.abs(was.readInt16LE(i) - b.readInt16LE(i)));
+    if (off <= 2) return;
+  }
   await fs.writeFile(file, b);
 }
 
@@ -242,7 +300,9 @@ await fs.mkdir(OUT, { recursive: true });
 let total = 0;
 const made = [];
 for (const [name, cfg] of Object.entries(SOUNDS)) {
-  const { rate, x } = await readWav(cfg.src, cfg.side);
+  const whole = await readWav(cfg.src, cfg.side);
+  // (what comes before `from` is as if it were not in the recording)
+  const rate = whole.rate, x = cfg.from ? whole.x.subarray(Math.round(cfg.from * rate)) : whole.x;
   const starts = onsets(x, rate, (cfg.takes ?? 1) > 1).slice(0, cfg.takes ?? 1);
   if (!starts.length) throw new Error(`${name}: nothing loud in ${cfg.src}`);
   const under = [];
@@ -278,7 +338,7 @@ for (const [name, cfg] of Object.entries(SOUNDS)) {
     if (cfg.press) cut = cut.map((v) => Math.tanh(v * cfg.press));
     let peak = 0;
     for (const v of cut) peak = Math.max(peak, Math.abs(v));
-    const fade = Math.min(cut.length, Math.round(cfg.rate * 0.18));
+    const fade = Math.min(cut.length, Math.round(cfg.rate * (cfg.fade ?? 0.18)));
     cut = cut.map((v, i) => (v / (peak || 1)) * 0.92 * cfg.gain * (i > cut.length - fade ? (cut.length - i) / fade : 1));
     const file = `${name}${k ? `_${k + 1}` : ''}.wav`;
     await writeWav(path.join(OUT, file), cut, cfg.rate);

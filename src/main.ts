@@ -102,6 +102,8 @@ canvas.addEventListener('webglcontextlost', () => {
 });
 
 async function boot() {
+  // (`?sounds` on a development build is not the game: it is the page its sounds are heard on, old beside new)
+  if (import.meta.env.DEV && new URLSearchParams(location.search).has('sounds')) return (await import('./dev/sounds')).soundsPage();
   stage('renderer');
   const r = new Renderer(canvas);
   try {

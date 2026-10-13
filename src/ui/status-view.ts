@@ -75,8 +75,8 @@ function arrowsSvg(n: number): string {
   const k = Math.abs(n), up = n > 0;
   let out = '';
   for (let i = 0; i < k; i++) {
-    const y = 16 - (k * 7 - 3) / 2 + i * 7;
-    const d = up ? `M1.5 ${y + 4}L5 ${y}L8.5 ${y + 4}` : `M1.5 ${y}L5 ${y + 4}L8.5 ${y}`;
+    const y = 16 - (k * 8 - 3) / 2 + i * 8;
+    const d = up ? `M1.5 ${y + 5}L6 ${y}L10.5 ${y + 5}` : `M1.5 ${y}L6 ${y + 5}L10.5 ${y}`;
     // (each lights a moment after the one before it, the way it points)
     out += `<path class="st-under" d="${d}"/><path class="st-arrow" style="--i:${up ? k - 1 - i : i}" d="${d}"/>`;
   }
@@ -95,7 +95,7 @@ class StatMark {
   constructor(private stat: Stat, words: boolean) {
     this.el.className = 'st-stat';
     this.el.dataset.stat = stat;
-    this.el.innerHTML = `${symbolSvg(stat, `st-c${++made}`)}<svg class="st-arrows" viewBox="0 0 10 32" aria-hidden="true"></svg><b class="st-fig"></b>${words ? '<p></p>' : ''}`;
+    this.el.innerHTML = `${symbolSvg(stat, `st-c${++made}`)}<svg class="st-arrows" viewBox="0 0 12 32" aria-hidden="true"></svg><b class="st-fig"></b>${words ? '<p></p>' : ''}`;
     this.level = this.el.querySelector('rect') as SVGRectElement;
     this.arrows = this.el.querySelector('.st-arrows') as Element;
     this.fig = this.el.querySelector('.st-fig') as HTMLElement;
@@ -174,12 +174,15 @@ export function wantFigures(on: boolean) {
 /**
  * The two places a survivor's state is drawn, kept as one: the row in the corner of the game (made in `host`), and
  * `panel`, the same with a line of words to each, which the inventory puts in its Status column whenever it is
- * drawn. Both are brought up to date ten times a second, which is as fast as anything they show can change its look.
+ * drawn. Both are brought up to date ten times a second of the game's time, which is as fast as anything they show
+ * can change its look.
  */
 export class StatusView {
   readonly panel = document.createElement('div');
   private pace: Record<Stat, Pace> = { health: new Pace(), blood: new Pace(), food: new Pace(), water: new Pace() };
   private drawn: { stats: StatMark[]; badges: BadgeMark[] }[] = [];
+  /** seconds of the game's own time that have gone by, and when in them all this was last brought up to date */
+  private clock = 0;
   private at = -1e9;
   private dead = false;
 
@@ -187,8 +190,16 @@ export class StatusView {
     this.panel.className = 'st-panel';
     for (const [el, words] of [[host, false], [this.panel, true]] as [HTMLElement, boolean][]) {
       const badges = BADGE_ORDER.map((id) => new BadgeMark(id, words)), stats = STATS.map((s) => new StatMark(s, words));
-      // (in the corner the badges stand to the left of the four; in the inventory, under them)
-      el.append(...(words ? [...stats, ...badges] : [...badges, ...stats]).map((m) => m.el));
+      // (In the corner the badges are one group and the four another: side by side, the badges to the left, or on
+      // a phone the badges under the four. In the inventory they are one list, the four first.)
+      const group = (cls: string, marks: (StatMark | BadgeMark)[]) => {
+        const g = document.createElement('div');
+        g.className = cls;
+        g.append(...marks.map((m) => m.el));
+        return g;
+      };
+      if (words) el.append(...[...stats, ...badges].map((m) => m.el));
+      else el.append(group('st-badges', badges), group('st-stats', stats));
       this.drawn.push({ stats, badges });
     }
     this.figures = figuresWanted();
@@ -201,19 +212,26 @@ export class StatusView {
   }
 
   /**
+   * Called every frame: whether it is time to bring the symbols up to date (`show` is then to be called).
+   * @param dt seconds of the game's own time since this was last called. How fast a thing is changing is measured
+   *   by the clock the rules run on: on a machine too slow to keep up, that clock runs behind the wall's, and by the
+   *   wall's a wound would seem to bleed slower than it does.
    * @param dead nothing is shown of the dead, and what was changing when they died is forgotten
-   * @param now milliseconds, by the page's clock
    */
-  update(body: Body, dead: boolean, now = performance.now()) {
+  due(dt: number, dead: boolean): boolean {
+    this.clock += dt;
     if (dead !== this.dead) {
       this.dead = dead;
       this.host.classList.toggle('gone', dead);
       for (const p of Object.values(this.pace)) p.clear();
       this.at = -1e9;
     }
-    if (dead || now - this.at < 100) return;
-    this.at = now;
-    const t = now / 1000, p = this.pace;
+    return !dead && this.clock - this.at >= 0.1;
+  }
+
+  /** the survivor's state as it is now: both places are made to show it, and nothing of the page is touched that has not changed */
+  show(body: Body) {
+    const t = (this.at = this.clock), p = this.pace;
     const r = reading(body, { health: p.health.note(body.health, t), blood: p.blood.note(body.blood, t), food: p.food.note(body.energy, t), water: p.water.note(body.water, t) });
     for (const d of this.drawn) {
       d.stats.forEach((m, i) => m.apply(r.stats[i]));

@@ -719,10 +719,11 @@ export class Vegetation {
         for (const kind of kinds) {
           const sub = kind.includes('#') ? Number(kind.split('#')[1]) : -1;
           const variant = kind.includes('@') ? VARIANTS[id]?.[Number(kind.split('@')[1])] : undefined;
-          const pick = (scene: THREE.Group) => {
+          const pick = (scene: THREE.Group, whole = false) => {
             if (variant) return extractParts(scene, variant);
-            // (a thing with doors that swing is drawn here without them: they are hung and turned by src/game/lockers.ts)
-            if (sub < 0) return extractParts(scene, HUNG[id] ? (n) => !HUNG[id].leaf.test(n) : undefined);
+            // (A thing with doors that swing, or a lid, is drawn here without them: they are hung and turned by
+            // src/game/lockers.ts. Its lighter copy for far off is drawn `whole`, lid and all: nothing swings there.)
+            if (sub < 0) return extractParts(scene, HUNG[id] && !whole ? (n) => !HUNG[id].leaf.test(n) : undefined);
             const name = scene.children[sub % scene.children.length].name;
             return extractParts(scene, (n) => n === name);
           };
@@ -730,7 +731,7 @@ export class Vegetation {
           // (the other container of the two: the same shell, in the blue of the other half of its picture)
           if (kind === CONTAINER.blue) for (const p of p0) paintBlue(p.geometry);
           const box = groundParts(p0);
-          const p1 = s1 ? pick(s1) : null;
+          const p1 = s1 ? pick(s1, true) : null;
           if (p1) {
             // align LOD1 to the same origin as LOD0
             const b1 = new THREE.Box3();

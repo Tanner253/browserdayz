@@ -84,7 +84,9 @@ ok('arrows: none when steady, one to three by how fast, by the rates the rules h
     assert.ok(PACE[s].down[0] < PACE[s].down[1] && PACE[s].down[1] < PACE[s].down[2]);
     assert.ok(PACE[s].up[0] < PACE[s].up[1] && PACE[s].up[1] < PACE[s].up[2]);
   }
-  // a wound in a limb, one in the body, two in the body, and as fast as anybody bleeds
+  // a wound in a limb, one in the body, two in the body, and as fast as anybody bleeds; and none of them is told
+  // differently for being measured a hair under what it is (every wound costs a multiple of 1.2: no line is on one)
+  for (let r = 1.2; r <= BLOOD.most + 0.01; r += 1.2) assert.equal(arrowsOf('blood', -r * 0.99), arrowsOf('blood', -r * 1.01), `a wound of ${r.toFixed(1)}`);
   assert.equal(arrowsOf('blood', -BLOOD.blunt), -1);
   assert.equal(arrowsOf('blood', -BLOOD.wound.arms), -1);
   assert.equal(arrowsOf('blood', -BLOOD.wound.torso), -2);
@@ -170,7 +172,7 @@ ok('somebody well has three white symbols, no arrows and no badge', () => {
 });
 
 ok('a wound: a badge with how bad it is and whether it will kill, and the blood beside it', () => {
-  assert.deepEqual([1.2, 3.6, 4.9, 5, 6, 11.9, 12, 18].map(bleedLevel), [1, 1, 1, 2, 2, 2, 3, 3]);
+  assert.deepEqual([1.2, 3.6, 4.8, 6, 7.2, 10.8, 12, 18].map(bleedLevel), [1, 1, 1, 2, 2, 2, 3, 3]);
   // one in a limb, with all the blood there is: it will close before it kills (a warning, and no blink)
   let r = read({ bleed: BLOOD.wound.arms, blood: 4900 }, { blood: -BLOOD.wound.arms });
   let b = r.badges.find((x) => x.id === 'bleed')!;

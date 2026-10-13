@@ -189,11 +189,8 @@ export class Game {
   lit = false;
   /** which are alight, kept by this game when it is played alone (the server keeps it otherwise) */
   private hearths!: Hearths;
-  private byFire = false;
-  /** a word at the top of the screen for as long as the survivor is resting by a fire */
-  private fireTag = document.createElement('div');
-  /** and one for as long as a leg is broken */
-  private legTag = document.createElement('div');
+  /** resting by a fire that is alight: mending by it, or only warm (a wound is open, or nothing has been eaten). The HUD has a badge for it */
+  private byFire: 'mending' | 'warm' | null = null;
   readonly horde: Horde = new Horde({
     atmo: () => this.s.atmo,
     scene: () => this.s.r.scene,
@@ -368,9 +365,6 @@ export class Game {
     };
     // the street lamps: where the head of each is
     for (const q of world.props) if (q.kind.startsWith('street_lamp')) this.streetLamps.push(new THREE.Vector3(q.x, q.y + 3.55 * (q.scale ?? 1), q.z));
-    this.fireTag.className = 'hud-fire-tag';
-    this.legTag.className = 'hud-leg-tag';
-    this.legTag.textContent = 'BROKEN LEG · SPLINT IT, OR USE A FIRST AID KIT';
     this.hearths = new Hearths(this.fires.spots);
     progress('loading loot');
     this.loot = new LootManager(r.scene, atmo, buildings.lootPoints);
@@ -550,7 +544,6 @@ export class Game {
     this.hud.setName(playerName());
     this.minimap = new Minimap(world);
     this.hud.root.insertBefore(this.minimap.root, this.hud.root.firstChild);
-    this.hud.root.append(this.fireTag, this.legTag);
     this.gas = new Gas(atmo.gases, atmo, r.scene, {
       masked: () => this.inv.wear('gas').length > 0,
       // (nothing hurts an admin in god mode, and the gas is no exception: 2026-10-13, "god mode make admin immune to gas")
@@ -598,6 +591,7 @@ export class Game {
     this.invUI.doll = doll;
     this.invUI.selfId = publicId();
     this.invUI.carryLimit = CARRY_LIMIT;
+    this.invUI.status = this.hud.statusPanel;
     // (The survivor in the middle of it, alive: see doll.ts. It asks what is worn, what is in the hands and what is
     // slung, and says when it has been drawn; until it is made, the still picture above is what is shown.)
     this.doll = new Doll(r, atmo, this.loot.models, {
@@ -2984,6 +2978,13 @@ export class Game {
   private swipeCard() {
     const at = this.bunker.open ? null : this.bunker.doorAt(_lampPos);
     if (!at || at.distanceTo(this.s.r.camera.position) > 2.6) return void this.hud.note('The card opens the door of Bunker 17: stand at the reader beside it', 'info');
+    // (A card held loose in the hand goes into a pocket first. The server opens the door for a card it has seen
+    // carried, and what is held loose it is never told of: the reader kept such a card and the door stayed shut.)
+    if (this.loose?.id === 'keycard') {
+      if (this.inv.add(this.loose)) return void this.hud.note('Make room for the keycard in a pocket first: the reader takes it from there', 'info');
+      this.loose = null;
+      this.inventoryChanged();
+    }
     const near = () => {
       const d = this.bunker.open ? null : this.bunker.doorAt(_lampPos);
       return !!d && d.distanceTo(this.s.r.camera.position) <= 3.1;
@@ -3580,7 +3581,7 @@ export class Game {
       this.inv.remove(item);
       const left = this.inv.add(makeItem(o.gives, o.qty));
       if (left) this.dropItem(left);
-      audio.ui('pickup');
+      audio.ui('pickup', undefined, o.gives);
       this.hud.note(`${o.qty} × ${ITEMS[o.gives].name}`, 'good');
       this.inventoryChanged();
     }, 'unbox');
@@ -4172,7 +4173,7 @@ export class Game {
           }
           if (!this.takeWorldItem(owner)) return;
           this.takeUp(item, true);
-          audio.ui('pickup');
+          audio.ui('pickup', undefined, item.id);
           this.hud.note(`${d.name}: in your hands, there is no room to put it away`, 'info');
           this.inventoryChanged();
           return;
@@ -4180,7 +4181,7 @@ export class Game {
         if (!this.takeWorldItem(owner)) return;
         const left = this.inv.add(item);
         if (left) this.dropItem(left);
-        audio.ui('pickup');
+        audio.ui('pickup', undefined, item.id);
         this.hud.note(`${d.name}${d.stack ? ` ×${item.qty}` : ''}`, 'good');
         this.inventoryChanged();
       }
@@ -4247,7 +4248,7 @@ export class Game {
     this.stow();
     this.inv.remove(item);
     this.dropItem(item);
-    audio.ui('drop');
+    audio.ui('drop', undefined, item.id);
     this.hud.note(`Dropped ${itemName(item)}`);
     this.inventoryChanged();
   }
@@ -4553,21 +4554,10 @@ export class Game {
     for (const at of this.fires.update(dt, this.s.r.camera.position)) this.horde.noise(at.x, at.z, FIRE.heard);
     // the lockers' doors: open while one is searched, by this player or (the server says) by anybody
     this.lockers.update(dt, this.s.r.camera.position, this.openStash?.uid ?? null);
-    // a broken leg, said for as long as it is one
-    const lame = this.started && !p.dead && !!p.vitals.broken;
-    if (lame !== this.legTag.classList.contains('on')) this.legTag.classList.toggle('on', lame);
-    const resting = this.started && !p.dead && this.fires.warm(p.pos);
-    const mending = resting && p.rest(FIRE.heal * dt);
-    if (resting !== this.byFire) {
-      this.byFire = resting;
-      this.fireTag.classList.toggle('on', resting);
-    }
-    // (said for as long as they are beside it, and why it is doing them no good when it is not)
-    if (resting) {
-      const v = p.vitals;
-      const say = mending ? 'BY THE FIRE · MENDING' : v.bleeding ? 'BY THE FIRE · STOP THE BLEEDING FIRST' : v.energy <= 10 || v.water <= 10 ? 'BY THE FIRE · EAT AND DRINK FIRST' : 'BY THE FIRE';
-      if (this.fireTag.textContent !== say) this.fireTag.textContent = say;
-    }
+    // (Resting by a fire, mending or only warm; a broken leg; the air breathed: each was a word at the top of the
+    // screen, and is a badge beside the survivor's health now, for as long as it is so. Why a fire is doing no good,
+    // when it is not, is said beside its badge in the inventory: src/ui/status.ts.)
+    this.byFire = this.started && !p.dead && this.fires.warm(p.pos) ? (p.rest(FIRE.heal * dt) ? 'mending' : 'warm') : null;
 
     // a part waiting on its gun: fitted, or taken off, the moment the gun is up (and forgotten if something else was taken up instead)
     if (this.fitting) {
@@ -4623,10 +4613,10 @@ export class Game {
         const k = this.weapons.digStroke;
         if (u.dig < 1 && k > 0.3) {
           u.dig = 1;
-          audio.land('dirt', 3.2);
+          audio.dig(0);
         } else if (u.dig < 2 && k > 0.7) {
           u.dig = 2;
-          audio.footstep('gravel', 1.4);
+          audio.dig(1);
         }
       }
       const gone = !!u.valid && !u.valid();
@@ -4854,6 +4844,7 @@ export class Game {
     const heading = THREE.MathUtils.radToDeg(-p.yaw);
     this.updateSaid(now);
     this.hud.update({
+      dt,
       vitals: v,
       winded: p.outOfBreath,
       // no keyboard on a phone: the Use button lights up instead of naming a key
@@ -4877,6 +4868,8 @@ export class Game {
       bleed: v.bleeding && !p.dead ? { rate: v.bleed, left: bleedsOutIn(v.blood, v.bleed), hint: this.bleedHint() } : null,
       lowBlood: !v.bleeding && !p.dead && this.started && v.blood < BLOOD.grey[0] - 200 ? this.bloodHint() : null,
       drip: p.drip.left > 0,
+      gas: this.gas.air,
+      fire: this.byFire,
       heading: !uiOpen ? heading : null,
       bearing: hasCompass,
       progress: this.use ? { label: this.use.label, t: this.use.t / this.use.dur } : this.ready ? { label: `${ITEMS[this.ready.item.id].name}: ${this.touch ? 'fire to use it' : 'hold the left button to use it · its key again puts it away'}`, t: -1 } : null,

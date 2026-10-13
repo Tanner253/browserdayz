@@ -16,11 +16,12 @@ type Table = [id: string, weight: number][];
 // a case and a constable's locker hold a handful of every calibre now, the rifles' and the bunker's guns' among
 // them, a little of each.)
 const MILITARY: Table = [
-  ['box_9mm', 3], ['ammo_9mm', 2.5], ['ammo_762', 1.2], ['bandage', 2], ['firstaid', 1], ['stim', 0.7], ['stim_stamina', 0.5], ['saline', 0.4],
+  ['box_9mm', 3], ['ammo_9mm', 2.5], ['ammo_762', 1.2], ['bandage', 1.8], ['firstaid', 0.7], ['aid_pouch', 0.5], ['stim', 0.7], ['stim_stamina', 0.5], ['saline', 0.4],
   ['condensed', 1.5], ['thermos', 1], ['flask', 0.9], ['binoculars', 0.5], ['compass', 0.5], ['grenade', 0.6],
   ['colt', 1], ['m9', 1], ['box_45', 0.5], ['mag_m9_ext', 0.3], ['suppressor_9', 0.25], ['gun_light', 0.3],
-  ['soft_vest', 0.6], ['patrol_cap', 0.6], ['rubber_boots', 0.4], ['work_gloves', 0.4], ['flashlight', 0.5], ['jerrycan', 0.4],
-  ['armor_vest', 0.22], ['boonie_hat', 0.2], ['gasmask', 0.3],
+  ['soft_vest', 0.6], ['patrol_cap', 0.35], ['helmet_m1', 0.25], ['rubber_boots', 0.4], ['work_gloves', 0.4], ['flashlight', 0.5], ['jerrycan', 0.4],
+  // (a mask, if you are lucky: the black one four times in five, and one of the painted ones the fifth)
+  ['armor_vest', 0.22], ['boonie_hat', 0.2], ['gasmask', 0.24], ['gasmask_white', 0.02], ['gasmask_orange', 0.02], ['gasmask_skull', 0.02],
   ['ammo_45', 1.2], ['mag_m9', 0.6], ['mag_colt', 0.6], ['ammo_739', 0.6], ['ammo_556', 0.6], ['ammo_12', 0.3], ['ammo_50', 0.25], ['mpa', 0.22], ['mag_mpa', 0.35],
 ];
 const CIVILIAN: Table = [
@@ -34,7 +35,7 @@ const CIVILIAN: Table = [
 export const UNDER_GAS: Table = [
   // (the pistols and their rounds a good deal less than they were: the rifles below have their share)
   ['box_762', 3], ['box_9mm', 1.8], ['ammo_762', 1.5], ['ammo_9mm', 0.8], ['mosin', 1.4], ['m9', 0.7], ['colt', 0.4],
-  ['boonie_hat', 2], ['life_vest', 2], ['pu_scope', 1.6], ['grenade', 1.5], ['firstaid', 1.5], ['bandage', 1.5], ['stim', 1], ['stim_stamina', 0.7], ['blood_bag', 0.7], ['saline', 0.5],
+  ['boonie_hat', 2], ['life_vest', 2], ['pu_scope', 1.6], ['grenade', 1.5], ['firstaid', 1.2], ['aid_pouch', 0.3], ['bandage', 1.5], ['stim', 1], ['stim_stamina', 0.7], ['blood_bag', 0.7], ['saline', 0.5],
   ['suppressor_9', 0.8], ['box_45', 0.8], ['rifle_wrap', 0.6], ['binoculars', 0.4], ['condensed', 0.8], ['thermos', 0.8], ['suitcase', 0.4],
   ['red_dot', 0.6], ['gun_light', 0.6], ['suppressor_762', 0.5], ['mag_m9_ext', 0.4], ['flask', 0.5], ['keycard', 0.5],
   // (2026-10-10: the two assault rifles and what feeds them)
@@ -52,7 +53,7 @@ const IN_BUNKER: Table = [
   ['benelli', 1.5], ['ammo_12', 3.2], ['box_12', 2.2], ['suppressor_12', 0.9], ['red_dot', 1.1], ['gun_light', 1.1],
   ['mosin', 1.1], ['pu_scope', 1.5], ['suppressor_762', 0.9], ['box_762', 2.2], ['ammo_762', 1.2],
   ['m9', 0.9], ['mag_m9_ext', 0.7], ['suppressor_9', 0.7], ['box_9mm', 1.8], ['deagle', 1.2], ['ammo_50', 2], ['box_50', 1], ['mag_deagle_ext', 0.6],
-  ['grenade', 1.8], ['boonie_hat', 1.8], ['life_vest', 1.8], ['heavy_armor', 0.5], ['helmet_k63', 0.35], ['suitcase', 0.7], ['firstaid', 2.2], ['bandage', 2.2], ['stim', 1.3], ['stim_stamina', 1], ['blood_bag', 1.1], ['saline', 0.7], ['splint', 0.8],
+  ['grenade', 1.8], ['boonie_hat', 1.5], ['gasmask_skull', 0.3], ['life_vest', 1.8], ['heavy_armor', 0.5], ['helmet_k63', 0.35], ['suitcase', 0.7], ['firstaid', 1.8], ['aid_pouch', 0.4], ['bandage', 2.2], ['stim', 1.3], ['stim_stamina', 1], ['blood_bag', 1.1], ['saline', 0.7], ['splint', 0.8],
   ['flashlight', 0.9], ['flask', 0.9], ['condensed', 0.8], ['thermos', 0.6], ['water_jug', 0.7], ['beans', 0.7], ['sardines', 0.6],
   // (2026-10-10: the two assault rifles, their big magazines and what is fitted to them)
   ['ar15', 1.1], ['mag_ar', 1.4], ['mag_ar_60', 0.6], ['box_556', 1.8], ['ammo_556', 1.2], ['suppressor_556', 0.6], ['foregrip', 0.7],
@@ -71,11 +72,11 @@ const ON_RACKS: Table = [['mpa', 1.5], ['benelli', 3], ['mosin', 2], ['ar15', 2]
  * medkits"); a constable's holds what the police carried: a pistol now and then, a submachine gun more seldom,
  * and what every gun fires.
  */
-const IN_MEDICINE: Table = [['bandage', 4.5], ['stim', 3.6], ['stim_stamina', 1.6], ['firstaid', 0.9], ['splint', 1.4], ['saline', 1.4], ['blood_bag', 0.4], ['flask', 0.4], ['work_gloves', 0.3]];
-const IN_HOSPITAL: Table = [['firstaid', 4], ['stim', 3.6], ['stim_stamina', 2], ['bandage', 2.2], ['splint', 1.6], ['blood_bag', 2], ['saline', 1.8], ['flask', 0.3], ['work_gloves', 0.3]];
+const IN_MEDICINE: Table = [['bandage', 4.2], ['stim', 3.6], ['stim_stamina', 1.6], ['firstaid', 0.9], ['aid_pouch', 0.3], ['splint', 1.4], ['saline', 1.4], ['blood_bag', 0.4], ['flask', 0.4], ['work_gloves', 0.3]];
+const IN_HOSPITAL: Table = [['firstaid', 3.6], ['aid_pouch', 0.4], ['stim', 3.6], ['stim_stamina', 2], ['bandage', 2.2], ['splint', 1.6], ['blood_bag', 2], ['saline', 1.8], ['flask', 0.3], ['work_gloves', 0.3]];
 const IN_POLICE: Table = [
   ['box_9mm', 3], ['ammo_9mm', 2.4], ['box_45', 1.2], ['ammo_45', 1.4], ['mag_m9', 1.6], ['mag_colt', 1.6], ['m9', 0.9], ['colt', 1],
-  ['soft_vest', 0.9], ['patrol_cap', 0.9], ['flashlight', 0.9], ['bandage', 1.4], ['stim', 0.5], ['stim_stamina', 0.3], ['gun_light', 0.3], ['suppressor_9', 0.2], ['thermos', 0.5], ['cigarettes', 0.5],
+  ['soft_vest', 0.9], ['patrol_cap', 0.9], ['flashlight', 0.9], ['bandage', 1], ['aid_pouch', 0.4], ['stim', 0.5], ['stim_stamina', 0.3], ['gun_light', 0.3], ['suppressor_9', 0.2], ['thermos', 0.5], ['cigarettes', 0.5],
   ['ammo_762', 0.8], ['ammo_739', 0.7], ['ammo_556', 0.7], ['ammo_12', 0.4], ['ammo_50', 0.3], ['mpa', 0.45], ['mag_mpa', 0.8],
 ];
 /**
@@ -132,9 +133,16 @@ const OWN_TABLE = new Set([...OF_BUNKER, 'med_cabinet', 'hospital_cabinet', 'pol
  * scripts/props.mjs), how far they swing open (radians, about that line, the free edge coming out toward the front)
  * and how long the swing takes, seconds. The leaves are left out of what is drawn standing still
  * (src/world/vegetation.ts) and drawn by src/game/lockers.ts, shut until somebody has the thing open.
+ *
+ * A lid is the same thing lying down: `about: 'x'` turns it about a line across the thing, and of a model whose lid
+ * is a piece of its own but was not made to be hung, `at` says where that line is in the model's own space ([x, y,
+ * z], metres: any point of it). The wooden crate's is its lid's upper back edge, so that the lid stands up behind
+ * the opening, a little short of upright, and no part of it goes back past the crate into a wall. `wood`: it
+ * sounds as a wooden door does, not as steel.
  */
-export const HUNG: Record<string, { leaf: RegExp; open: number; time: number }> = {
+export const HUNG: Record<string, { leaf: RegExp; open: number; time: number; about?: 'x'; at?: [number, number, number]; wood?: true }> = {
   steel_locker: { leaf: /_door_[lr]/, open: 1.68, time: 0.5 },
+  wooden_crate_01: { leaf: /_lid$/, about: 'x', at: [0, 0.3415, -0.1957], open: -1.4, time: 0.45, wood: true },
 };
 
 /** seconds an emptied crate stays empty before it refills (only while nobody is near): five minutes, it was twenty */

@@ -332,6 +332,8 @@ export class Garage {
     if (!j) return;
     const me = this.h.net.id;
     const online = this.h.online();
+    // (a seat taken or left is a door opened and shut: heard from where the car is)
+    if (seats.some((s, k) => s !== j.seats[k])) audio.carDoor(j.pos);
     j.seats = seats.slice();
     // everybody else, into and out of their seats
     for (const r of this.h.remotes.values()) {
@@ -398,6 +400,7 @@ export class Garage {
       this.h.net.send({ t: 'vin', i: j.i, seat });
     } else {
       j.seats[seat] = 0;
+      audio.carDoor(j.pos);
       this.sit(j, seat);
       if (seat === 0) j.setMode('sim');
     }
@@ -470,6 +473,7 @@ export class Garage {
       if (this.h.online()) this.h.net.send({ t: 'vout' });
       else {
         j.seats[r.seat] = null;
+        audio.carDoor(j.pos);
         // (it rolls on until it stops: see frame)
       }
     }

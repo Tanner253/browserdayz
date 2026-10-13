@@ -77,8 +77,9 @@ export class Gas {
   private at: Float32Array;
   private fade: Float32Array;
   private seeds: { x: number; z: number; up: number; size: number; ph: number; vx: number; vz: number }[] = [];
+  /** what is being breathed: gas with nothing over the face, gas through a mask, or clean air (null). The HUD has a badge for it, where a word at the top of the screen was */
+  air: 'bare' | 'masked' | null = null;
   private veil: HTMLDivElement;
-  private tag: HTMLDivElement;
   /** what is seen of the mask from inside it: the rims of its two eyepieces */
   private lens: HTMLDivElement;
   private coughT = 0;
@@ -105,12 +106,10 @@ export class Gas {
     for (const zone of zones) this.signs(zone, world);
     this.veil = document.createElement('div');
     this.veil.className = 'hud-gas';
-    this.tag = document.createElement('div');
-    this.tag.className = 'hud-gas-tag';
     this.lens = document.createElement('div');
     this.lens.className = 'hud-mask';
     hud.prepend(this.lens);
-    hud.append(this.veil, this.tag);
+    hud.append(this.veil);
     const n = zones.length ? (TOUCH ? 14 : 40) : 0;
     this.at = new Float32Array(n * 4);
     this.fade = new Float32Array(n);
@@ -313,9 +312,6 @@ export class Gas {
     const choke = alive && !masked ? Math.min(1, this.lungs.held / GAS.hold) : 0;
     this.veil.style.opacity = (choke * (0.55 + 0.45 * this.coughT)).toFixed(3);
     this.lens.classList.toggle('on', alive && masked);
-    const show = alive && breathing;
-    this.tag.classList.toggle('on', show);
-    this.tag.classList.toggle('bad', show && !masked);
-    if (show) this.tag.textContent = masked ? 'CONTAMINATED AIR · MASK ON' : 'CONTAMINATED AIR · NO MASK';
+    this.air = alive && breathing ? (masked ? 'masked' : 'bare') : null;
   }
 }

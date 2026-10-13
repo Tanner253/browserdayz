@@ -15,6 +15,7 @@ import { bunkerAt, bunkerLocal, bunkerWays, type Place } from '../sim/bunker';
 import type { Buildings } from '../world/buildings';
 import { Director, INFECTED, I_ALERT, I_ATTACK, I_CHASE, I_DEAD, I_IDLE, I_WANDER, homeSpot, infectedDrop, infectedHomes, suited, type IState, type InfectedInfo } from '../sim/infected';
 import type { C2S } from '../net/protocol';
+import { paceUp } from '../sim/slopes';
 import { Avatar } from './avatar';
 import { ZOMBIES, lookFor } from './look';
 import type { Damageable, HitZone } from './weapons';
@@ -447,6 +448,15 @@ export class Infected implements Damageable {
     if (d < 0.05) return true;
     const want = Math.atan2(-dx, -dz);
     this.yaw = turnTo(this.yaw, want, dt * (speed > 3 ? 7 : 3.2));
+    // Steep open ground slows it as it slows anybody, by the same figures (src/sim/slopes.ts), and by as much
+    // less than a survivor's pace as its own is less on the level. So nobody loses one by taking to a bank it
+    // would walk straight up, and nobody is run down by one on a face they could only scramble up themselves.
+    const ground = heightAt(this.host.world().heights, this.pos.x, this.pos.z);
+    if (Math.abs(this.pos.y - ground) < 0.4) {
+      const rise = heightAt(this.host.world().heights, this.pos.x + dx / d, this.pos.z + dz / d) - ground, most = paceUp(rise);
+      // (a pace along the way up, as a survivor's is: over the ground it is that much less)
+      if (most < Infinity) speed = Math.min(speed, (most * (INFECTED.chase / 4)) / Math.hypot(1, rise));
+    }
     // (it gathers pace over the first second and a bit: from standing to a run is not one step)
     this.stepped = true;
     this.gait += THREE.MathUtils.clamp(speed - this.gait, -8 * dt, 3.2 * dt);

@@ -2066,7 +2066,8 @@ export class Weapons {
     const p = this.player;
 
     // ----- aiming
-    const canAim = enabled && !this.held && !!m && !p.sprinting && (!this.action || this.action.name === 'bolt') && !p.dead;
+    // (nor on hands and feet up a steep face: see Player.handsBusy)
+    const canAim = enabled && !this.held && !!m && !p.sprinting && !p.handsBusy && (!this.action || this.action.name === 'bolt') && !p.dead;
     this.aiming = canAim && input.held('Mouse2');
     this.spread = def?.weapon && item ? this.spreadNow(item.id) : 0;
     p.aiming = this.aiming;
@@ -2076,7 +2077,7 @@ export class Weapons {
     this.adsT += ((this.aiming ? 1 : 0) - this.adsT) * (1 - Math.exp(-(3 / upIn) * (this.aiming ? 1 : 0.85) * dt));
     this.scoped = !!m && m.kind === 'rifle' && hasMod(this.currentItem, 'pu_scope') && this.adsT > 0.9 && this.aiming;
     this.applyMods();
-    this.sprintT += ((p.sprinting && p.moving > 0.4 ? 1 : 0) - this.sprintT) * (1 - Math.exp(-8 * dt));
+    this.sprintT += (((p.sprinting && p.moving > 0.4) || p.handsBusy ? 1 : 0) - this.sprintT) * (1 - Math.exp(-8 * dt));
     if (!enabled || p.dead || this.held || (def && !def.melee)) this.guardHeld = false;
 
     // ----- hold breath while aiming (Shift): steadier for a few seconds, and hard on the arms
@@ -2194,7 +2195,8 @@ export class Weapons {
 
   private spreadNow(id: string): number {
     const p = this.player;
-    return coneOf(id, { aimed: this.adsT, moving: p.movingSmooth, air: !p.grounded, crouched: p.crouched, prone: p.prone, heat: this.burst });
+    // (sliding down a steep face, nothing is steadier than it is in the air)
+    return coneOf(id, { aimed: this.adsT, moving: p.movingSmooth, air: !p.grounded || p.footing === 'slide', crouched: p.crouched, prone: p.prone, heat: this.burst });
   }
 
   private tryFire(m: VmModel, item: ItemInstance, camera: THREE.PerspectiveCamera, trigger: boolean) {

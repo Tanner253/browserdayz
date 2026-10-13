@@ -783,11 +783,17 @@ export function cleanStored(list: unknown, name: (v: unknown) => string): Stored
  * today (`upgradeInventory`). Whatever found no room on the way is kept in a grid named `spill`, which the game it
  * is for empties at its player's feet: the server has no feet to put it at, and loses nothing by holding it.
  */
+/** the places a kept inventory may name: every one a body has, the tag round the neck, and the two an old save may still have */
+const KEPT_SLOTS = new Set<string>([...ALL_SLOTS, 'neck', 'shoulder', 'melee']);
+
 export function cleanInventory(raw: unknown, name: (v: unknown) => string): SerializedInventory | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as SerializedInventory;
   const slots: Record<string, ItemInstance | null> = {};
-  for (const [k, v] of Object.entries(r.slots ?? {})) if (k.length < 16) slots[k] = v ? cleanItem(v, name) : null;
+  // (Only the places a body has, and the two an old save may still name. Any name at all used to be kept: a game
+  // that said it wore five thousand things in five thousand made-up places had them all kept, and thrown on the
+  // ground one by one when it died.)
+  for (const [k, v] of Object.entries(r.slots ?? {})) if (KEPT_SLOTS.has(k)) slots[k] = v ? cleanItem(v, name) : null;
   const containers = (Array.isArray(r.containers) ? r.containers : []).slice(0, 4).map((c) => ({ id: String(c?.id).slice(0, 16), items: cleanStored(c?.items, name) }));
   const { inv, left } = upgradeInventory({ slots, active: null, containers, hot: cleanHot(r.hot) });
   if (left.length) {

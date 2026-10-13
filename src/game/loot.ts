@@ -98,23 +98,34 @@ function hash01(s: string, salt: number) {
 function seenParts(root: THREE.Object3D): MeshPart[] {
   root.updateMatrixWorld(true);
   const out: MeshPart[] = [];
+  // (Each paint is copied, once: the thing these pieces come from is the gun that is seen in the hands, and what is
+  // done to a paint for the ground, its shadows and its place in the world's light, is not to be done to the hands'.)
+  const mine = new Map<THREE.Material, THREE.Material>();
+  const paint = (m: THREE.Material) => mine.get(m) ?? (mine.set(m, m.clone()), mine.get(m)!);
   const walk = (o: THREE.Object3D) => {
     if (!o.visible) return;
     const m = o as THREE.Mesh;
-    if (m.isMesh && !Array.isArray(m.material)) out.push({ name: m.name, geometry: m.geometry.clone().applyMatrix4(m.matrixWorld), material: m.material });
+    if (m.isMesh && !Array.isArray(m.material)) out.push({ name: m.name, geometry: m.geometry.clone().applyMatrix4(m.matrixWorld), material: paint(m.material) });
     for (const c of o.children) walk(c);
   };
   walk(root);
   return out;
 }
 
-/** how long a thing is, along whichever way it is longest */
-function lengthOf(parts: MeshPart[]): number {
-  const box = new THREE.Box3();
-  for (const p of parts) {
-    p.geometry.computeBoundingBox();
-    box.union(p.geometry.boundingBox!);
-  }
+/** how long a thing is that is seen, along whichever way it is longest: measured where it stands, nothing copied */
+function lengthSeen(root: THREE.Object3D): number {
+  root.updateMatrixWorld(true);
+  const box = new THREE.Box3(), one = new THREE.Box3();
+  const walk = (o: THREE.Object3D) => {
+    if (!o.visible) return;
+    const m = o as THREE.Mesh;
+    if (m.isMesh) {
+      m.geometry.computeBoundingBox();
+      box.union(one.copy(m.geometry.boundingBox!).applyMatrix4(m.matrixWorld));
+    }
+    for (const c of o.children) walk(c);
+  };
+  walk(root);
   const s = box.getSize(new THREE.Vector3());
   return Math.max(s.x, s.y, s.z);
 }
@@ -137,8 +148,7 @@ export class ItemModels {
   /** @param far its lighter copy, where it has one (see getFar): the model itself otherwise */
   get(id: string, mods: string[] = [], far = false): Promise<ItemTemplate> {
     const def = ITEMS[id];
-    // (a gun with parts on it has no lighter copy of itself: it is the one model, near and far)
-    far &&= !def.model.startsWith('@') && !!assets.manifest.models[def.model]?.lods?.[0]?.far && !(def.weapon && mods.length);
+    far &&= !def.model.startsWith('@') && !!assets.manifest.models[def.model]?.lods?.[0]?.far;
     const key = (mods.length ? `${id}+${[...mods].sort().join('+')}` : id) + (far ? '~far' : '');
     let p = this.cache.get(key);
     if (!p) {
@@ -190,7 +200,7 @@ export class ItemModels {
     if (def.weapon && mods.length && !far && this.dressed) {
       const dressed = this.dressed(id, mods), bare = dressed && this.dressed(id, []);
       if (dressed && bare) {
-        const lying = (await this.get(id)).size, long = lengthOf(seenParts(bare));
+        const lying = (await this.get(id)).size, long = lengthSeen(bare);
         if (long > 1e-4) worn = { parts: seenParts(dressed), scale: Math.max(lying.x, lying.y, lying.z) / long };
       }
     }

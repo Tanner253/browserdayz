@@ -38,8 +38,8 @@ import { Avatar, GEAR, GEAR_SHOWN, facepiece } from './avatar';
 import { lookFor, lookPatch, lookUniforms, setLookUniforms, suitPatch } from './look';
 import type { ItemModels } from './loot';
 
-/** a thing as it is seen in somebody's hands */
-type Held = { obj: THREE.Object3D; grips: Grips; kind: 'rifle' | 'pistol' | 'auto' | 'melee' };
+/** a thing as it is seen in somebody's hands (`plumb`: the part of it that hangs from the hand, and is kept upright: see `inFist`) */
+type Held = { obj: THREE.Object3D; grips: Grips; kind: 'rifle' | 'pistol' | 'auto' | 'melee'; plumb?: THREE.Object3D };
 
 /** Where things are on the page, in the page's own pixels from its top left (asked of the inventory each frame). */
 export interface DollBox {
@@ -83,15 +83,19 @@ export interface DollHost {
 }
 
 /** how much of the room the figure's own place takes in: this tall and at least this wide, metres, about a point this high */
-const FRAME = { tall: 2.04, wide: 0.94, mid: 0.9 };
+const FRAME = { tall: 1.98, wide: 0.92, mid: 0.9 };
 /** the lens: a long one from well back, so the figure is not bent by it, set a little over its middle and looking down at it */
 const LENS = { fov: 17, lift: 0.34 };
 /** where it is seen from at rest: a little to its right, where what is in its hands is seen along its side and not end on (radians round it) */
 const REST = 0.52;
 /** a drag turns it this far for each of the page's pixels, radians; let go, it turns on for about this long, seconds, and no faster than this */
-const TURN = 0.0125, GLIDE = 0.32, SPIN_MOST = 11;
+const TURN = 0.0125, GLIDE = 0.32, SPIN_MOST = 8;
 /** shut, what it wears and holds is asked after this often, ms */
 const ASK_SHUT = 300;
+/** while it only stands there its own picture is drawn again this often, ms; and on every frame for this long after anything on it has changed */
+const STANDING_EVERY = 1000 / 30, LIVELY = 2600;
+/** the layer a thing is on while it is drawn ahead (see `prime`); the lamps are on it for good, for a shader is written for the lamps there are */
+const AHEAD = 29;
 /** a blur wider than this many of the game's own pixels is worked at half size (it is the same blur to the eye, at a quarter of the work) */
 const BLUR_WHOLE = 9;
 /** the pictures a paint may have, each kept the same as the game's own */
@@ -100,7 +104,7 @@ type Painted = THREE.Material & Partial<Record<(typeof MAPS)[number], THREE.Text
 
 const ORIGIN = new THREE.Vector3(), STILL = new THREE.Vector3();
 const _eye = new THREE.Vector3(), _size = new THREE.Vector2(), _at = new THREE.Vector2(), _clear = new THREE.Color();
-const _view = new THREE.Vector4(), _cut = new THREE.Vector4();
+const _view = new THREE.Vector4(), _cut = new THREE.Vector4(), _turn = new THREE.Quaternion();
 const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
 /** a flat sheet over the whole of whatever is drawn into: every pass here that is not the room itself is one */
 const SHEET = /* glsl */ `
@@ -134,7 +138,8 @@ interface Plan {
   /** how far the veil blurs, in the game's own pixels (0: not at all), and the size it is worked at (1, or half: 2) */
   sigma: number;
   k: number;
-  /** how tall the game's picture is, in its own pixels and in the renderer's measure */
+  /** how big the game's picture was when this was worked out, in its own pixels, and how many of those the renderer has to one of its own measure */
+  wide: number;
   high: number;
   pr: number;
 }
@@ -152,6 +157,8 @@ export class Doll {
   private readonly ground: THREE.Mesh;
   /** the figure's own picture: half-float, so a glint off a barrel is rolled off toward white and not cut at it */
   private readonly target = new THREE.WebGLRenderTarget(64, 128, { samples: 4, type: THREE.HalfFloatType, depthBuffer: true });
+  /** four pixels of the same kind as the figure's picture, never shown: what is new is drawn into them once before it is drawn in earnest (see `prime`) */
+  private readonly ahead = new THREE.WebGLRenderTarget(4, 4, { samples: 4, type: THREE.HalfFloatType, depthBuffer: true });
   /** what of the game's picture lies behind the hole, copied from it each frame; and the two small pictures it is blurred through, across and then down */
   private world: THREE.FramebufferTexture | null = null;
   private readonly soft = [0, 1].map(() => new THREE.WebGLRenderTarget(8, 8, { depthBuffer: false, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter }));
@@ -162,6 +169,8 @@ export class Doll {
   private pairs: [Painted, Painted][] = [];
   private mine = new WeakSet<THREE.Material>();
   private looked = new WeakSet<object>();
+  /** the paints that have been got ready for this room already (see `warm`) */
+  private met = new WeakSet<THREE.Material>();
   // what it was last told, and which asking each kind of thing is on (a later one overtakes an earlier)
   private name = '\u0000';
   private wornKey = '\u0000';
@@ -173,6 +182,11 @@ export class Doll {
   /** drawn in the last frame; and when it was last asked what it wears */
   private showing = false;
   private askedAt = 0;
+  /** when its own picture was last drawn, and how much time the body is owed since; it is drawn on every frame until `livelyTill`, and at once while `stale` */
+  private drawnAt = 0;
+  private owed = 0;
+  private livelyTill = 0;
+  private stale = true;
   // the turn: where it is seen from, how fast that is changing, whether a hand is on it, and where it is going back to
   private angle = REST;
   private vel = 0;
@@ -181,6 +195,8 @@ export class Doll {
   private goal: number | null = null;
   /** seconds until a gun newly in the hands is looked over (-1: none is waiting to be) */
   private lookOver = -1;
+  /** what hangs from the hand just now and is kept upright (null: nothing does) */
+  private plumb: THREE.Object3D | null = null;
   /** the page's box it was last drawn for, and what was worked out for it */
   private box: DollBox | null = null;
   private plan: Plan | null = null;
@@ -191,13 +207,14 @@ export class Doll {
     // one from the right for what that leaves in shadow, and a strong one from behind that picks the figure's edge
     // out of the dark it stands in.
     this.scene.environment = atmo.envMap;
-    this.scene.environmentIntensity = 0.42;
-    const key = new THREE.DirectionalLight(0xfff1de, 2.7), fill = new THREE.DirectionalLight(0xa9bddb, 0.6), rim = new THREE.DirectionalLight(0xc3d6ff, 2.6);
+    this.scene.environmentIntensity = 0.5;
+    const key = new THREE.DirectionalLight(0xfff1de, 3.1), fill = new THREE.DirectionalLight(0xa9bddb, 0.75), rim = new THREE.DirectionalLight(0xc3d6ff, 2.9);
     // (in the rig the lens is at -z, looking at +z: the picture's left is +x)
     key.position.set(2.7, 3.3, -4.2);
     fill.position.set(-3.4, 1.1, -3.4);
     rim.position.set(-2.4, 3.1, 3.9);
     this.camera.rotation.order = 'YXZ';
+    for (const lamp of [key, fill, rim]) lamp.layers.enable(AHEAD);
     this.rig.add(this.camera, key, fill, rim);
     this.ground = this.floor();
     this.scene.add(this.rig, this.ground);
@@ -302,10 +319,22 @@ export class Doll {
 
   /**
    * These are got ready to be drawn in this room before they are put on the figure: their shaders written, made by
-   * the card's own workers, and looked over (see Renderer.ready, which does as much for what comes into the world).
-   * What has been worn or held before is ready already, and this is over at once.
+   * the card's own workers and looked over, their pictures put on the card, and each piece drawn once where nobody
+   * sees it (see Renderer.ready, which does as much for what comes into the world, and why each is needed).
+   * What is painted with nothing new (a thing worn or held before, or made of what such a thing is made of) has
+   * nothing to be got ready: it is passed over without a frame's wait, and the figure has it on the next frame.
    */
   private async warm(parts: THREE.Object3D[]) {
+    const paints = (o: THREE.Object3D) => {
+      const all: THREE.Material[] = [];
+      o.traverse((c) => {
+        const m = (c as THREE.Mesh).material;
+        if (m) all.push(...(Array.isArray(m) ? m : [m]));
+      });
+      return all;
+    };
+    parts = parts.filter((o) => paints(o).some((m) => !this.met.has(m)));
+    if (!parts.length) return;
     const R = this.r.renderer, programs = new Set<ReturnType<typeof programsOf>[number]>();
     for (const o of parts) {
       await breathe();
@@ -315,6 +344,9 @@ export class Doll {
       for (const p of programsOf(R, R.compile(o, this.camera, this.scene) as unknown as Set<THREE.Material>)) programs.add(p);
       R.setRenderTarget(prev);
     }
+    // (asked every twentieth of a second whether the card has made them, for two seconds; after that, as the game waits: see `made`)
+    const ready = () => [...programs].every((p) => p.isReady());
+    for (let i = 0; i < 40 && !ready(); i++) await new Promise((r) => setTimeout(r, 50));
     await made(programs);
     for (const p of programs) {
       if (this.looked.has(p) || !p.isReady()) continue;
@@ -322,6 +354,49 @@ export class Doll {
       this.looked.add(p);
       p.getUniforms();
       p.getAttributes();
+    }
+    for (const o of parts) await this.r.send(o);
+    await this.prime(parts);
+    for (const o of parts) for (const m of paints(o)) this.met.add(m);
+  }
+
+  /**
+   * Each piece of these is drawn once into four pixels that are never shown, one piece to a frame's spare time. The
+   * first time anything is drawn with a shader the card's driver has work of its own to do for it, which cannot be
+   * asked for except by drawing, and nothing is shown until it is done (see Renderer.drawAhead, where it was
+   * measured). Left to the first frame the figure was shown in, that frame was a second long: timed, 979 ms the
+   * first time the inventory was opened, and 70 the first time a pistol was taken into the figure's hands.
+   */
+  private async prime(parts: THREE.Object3D[]) {
+    const R = this.r.renderer;
+    for (const part of parts) {
+      const seen: THREE.Mesh[] = [];
+      part.traverseVisible((o) => {
+        if ((o as THREE.Mesh).isMesh) seen.push(o as THREE.Mesh);
+      });
+      for (const m of seen) {
+        await breathe();
+        // (what is not on the figure yet is stood in the room for the drawing, and taken out again)
+        let top: THREE.Object3D = m;
+        while (top.parent) top = top.parent;
+        if (top !== this.scene) this.scene.add(top);
+        const layers = m.layers.mask, culled = m.frustumCulled, lens = this.camera.layers.mask;
+        m.layers.enable(AHEAD);
+        m.frustumCulled = false;
+        this.camera.layers.set(AHEAD);
+        const prev = R.getRenderTarget();
+        try {
+          R.setRenderTarget(this.ahead);
+          R.clear(false, true, false);
+          R.render(this.scene, this.camera);
+        } finally {
+          R.setRenderTarget(prev);
+          this.camera.layers.mask = lens;
+          m.layers.mask = layers;
+          m.frustumCulled = culled;
+          if (top !== this.scene) this.scene.remove(top);
+        }
+      }
     }
   }
 
@@ -429,7 +504,8 @@ export class Doll {
           vec3 col = behind * ( 1.0 - veil.a ) + veil.rgb;
           // how far in from the hole's edge, across and down; and how much of the page's band lies over this point
           vec2 inside = min( page - uHole.xy, uHole.xy + uHole.zw - page );
-          float band = 0.0;
+          // (past the hole's edge, where a little is drawn over for good measure, the veil itself lies over it: all of its dark is the page's there)
+          float band = min( inside.x, inside.y ) < 0.0 ? 1.0 : 0.0;
           if ( uBand.x > 0.0 ) {
             vec2 clear = clamp( ( inside - uBand.x ) / uBand.y, 0.0, 1.0 );
             band = 1.0 - clear.x * clear.y;
@@ -437,7 +513,7 @@ export class Doll {
           // (the figure, and the light behind it, are not begun until the band has ended: they come in over a few pixels past it)
           float shown = smoothstep( 0.0, 12.0, min( inside.x, inside.y ) - uBand.x - uBand.y );
           vec2 q = ( page - uFig.xy - uFig.zw * vec2( 0.5, 0.42 ) ) / uFig.w;
-          col += vec3( 0.058, 0.068, 0.063 ) * exp( - dot( q, q ) / 0.07 ) * shown;
+          col += vec3( 0.046, 0.054, 0.05 ) * exp( - dot( q, q ) / 0.07 ) * shown;
           vec4 fig = texture2D( tFig, vUv ) * shown;
           vec3 lit = fig.a > 0.0005 ? fig.rgb / fig.a : vec3( 0.0 );
           // (as it is up to three quarters of white, and from there bent over so that it comes to white and never past it)
@@ -503,7 +579,9 @@ export class Doll {
         items.push({ id, obj });
       }
       await this.warm(items.map((i) => i.obj));
-      if (n === this.wearN) this.body.setGear(items);
+      if (n !== this.wearN) return;
+      this.body.setGear(items);
+      this.livelyTill = performance.now() + LIVELY;
     } catch {
       /* a model that will not come: the figure stays as it was */
     }
@@ -521,7 +599,9 @@ export class Doll {
       if (n !== this.holdN) return;
       // (seen, one thing is lowered and the next brought up, as the game's bodies do it; unseen, it is simply there)
       this.body.setHeld(held?.obj ?? null, held?.grips ?? null, held?.kind, !this.showing);
+      this.plumb = held?.plumb ?? null;
       this.lookOver = held && held.kind !== 'melee' && this.showing ? 0.55 : -1;
+      this.livelyTill = performance.now() + LIVELY;
     } catch {
       /* as above */
     }
@@ -535,7 +615,9 @@ export class Doll {
       const objs = this.h.slung().map((o) => o.clone());
       for (const o of objs) this.paint(o);
       await this.warm(objs);
-      if (n === this.slingN) this.body.setSlung(objs);
+      if (n !== this.slingN) return;
+      this.body.setSlung(objs);
+      this.livelyTill = performance.now() + LIVELY;
     } catch {
       /* as above */
     }
@@ -545,7 +627,8 @@ export class Doll {
    * A thing that is neither gun nor club, in the right fist: a bandage, a tin, a flask, a magazine. The game's
    * bodies have no way of holding such a thing (nobody else is shown it), so this is the one hold here that is not
    * theirs: the way a thing to hit with is carried, the fist closed round the thing's length at its middle. What is
-   * too thick to close a fist round (a fuel can, a first aid kit) is carried from its top, hanging under the hand.
+   * too thick to close a fist round (a fuel can, a first aid kit) is carried from its top, hanging under the hand:
+   * hanging, so it is kept upright whichever way the hand is turned (see `stand`), as its own weight would keep it.
    */
   private async inFist(id: string): Promise<Held | null> {
     if (!ITEMS[id]) return null;
@@ -576,12 +659,17 @@ export class Doll {
       lay(order[0], order[1], order[2], new THREE.Vector3(0, 1, 0), new THREE.Vector3(1, 0, 0));
       return { obj, grips: { right: fist(0.012 + thick / 2, THREE.MathUtils.clamp(1.2 - (thick - 0.03) * 9, 0.6, 1.3)), left: null }, kind: 'melee' };
     }
-    // (Its own top toward the wrist, the longer of its other two sides along the fist: it hangs under the fingers,
-    // and stands out from the leg by as much of it as would have been inside the leg.)
-    const [a, b] = size[0] >= size[2] ? [0, 2] : [2, 0];
-    lay(a, 1, b, new THREE.Vector3(0, 1, 0), new THREE.Vector3(1, 0, 0));
-    turned.position.set(Math.max(0, size[b] / 2 - 0.06), 0, -(size[1] / 2 + 0.012));
-    return { obj, grips: { right: fist(0.03, 1.12), left: null }, kind: 'melee' };
+    // (Said in the room's own frame, which the part that hangs is kept to. Its thinnest way is across the leg, as
+    // a case is carried. What stands upright as it comes, a fuel can, hangs upright; what lies flat as it comes, a
+    // first aid kit, is stood on its edge, its longest side fore and aft. It is under the fist by half its height,
+    // and out from the leg by as much of it as would have been inside the leg.)
+    const thin = order[2], tall = thin === 1 ? order[1] : 1, long = 3 - thin - tall;
+    lay(tall, long, thin, new THREE.Vector3(0, 1, 0), new THREE.Vector3(1, 0, 0));
+    turned.position.set(Math.max(0, size[thin] / 2 - 0.05), -(size[tall] / 2 + 0.02), 0);
+    const plumb = new THREE.Group();
+    plumb.add(turned);
+    obj.add(plumb);
+    return { obj, grips: { right: fist(0.03, 1.12), left: null }, kind: 'melee', plumb };
   }
 
   // ------------------------------------------------------------ the turn
@@ -642,6 +730,9 @@ export class Doll {
     Avatar.eye.copy(ORIGIN);
     this.body.update(dt, ORIGIN, STILL, 0, false, false, false, 0, true, false);
     Avatar.eye.copy(_eye);
+    // (what hangs from the hand hangs straight down: the room's own up, whichever way the hand has turned)
+    const hung = this.plumb;
+    if (hung?.parent) hung.quaternion.copy(hung.parent.getWorldQuaternion(_turn)).invert();
   }
 
   /** Every paint here has the pictures the game's own has now (see the top of this file). */
@@ -664,7 +755,9 @@ export class Doll {
   draw(dt: number) {
     if (!this.alive) return this.h.shown(false);
     const box = this.h.box(), now = performance.now();
-    if (box && box !== this.box) this.plan = this.layOut(box);
+    // (worked out afresh when the page has measured again; and when the game's picture is another size under the same page, as when its sharpness is changed in the options)
+    const size = this.r.renderer.getDrawingBufferSize(_size);
+    if (box && (box !== this.box || !this.plan || size.x !== this.plan.wide || size.y !== this.plan.high || this.r.renderer.getPixelRatio() !== this.plan.pr)) this.plan = this.layOut(box);
     this.box = box;
     if (!box || !this.plan) {
       this.showing = false;
@@ -680,13 +773,26 @@ export class Doll {
       this.vel = 0;
       this.goal = null;
       this.gripped = false;
+      this.stale = true;
     }
     this.ask();
     this.showing = true;
-    this.follow();
     this.spin(dt);
-    this.stand(Math.min(dt, 0.1));
-    this.picture(this.plan);
+    // The figure's own picture is what this costs: a body with a full kit on it, a rifle in its hands and another
+    // on its back is fifty things to draw (counted). While it only stands there it is drawn again thirty times a
+    // second, which is as often as breathing shows; turned, or with its hands or its clothes changing, on every
+    // frame. What lays the picture onto the page is three more, and those are drawn every frame either way, for the
+    // world behind the veil does not stand still.
+    this.owed += dt;
+    const again = this.stale || this.gripped || this.vel !== 0 || this.goal !== null || now < this.livelyTill || now - this.drawnAt >= STANDING_EVERY - 1;
+    if (again) {
+      this.follow();
+      this.stand(Math.min(this.owed, 0.1));
+      this.owed = 0;
+      this.drawnAt = now;
+      this.stale = false;
+    }
+    this.picture(this.plan, again);
     this.h.shown(true);
   }
 
@@ -722,6 +828,8 @@ export class Doll {
     }
     const sw = sx1 - sx, sh = sy1 - sy;
     if (this.target.width !== w || this.target.height !== h) this.target.setSize(w, h);
+    // (another size, another place or another lens: the figure's picture is drawn afresh for it)
+    this.stale = true;
     if (!this.world || this.world.image.width !== sw || this.world.image.height !== sh) {
       this.world?.dispose();
       // (The game's picture has no see-through to it, and a copy of it may not be asked to have one. Read between
@@ -750,24 +858,27 @@ export class Doll {
     u.uHole.value.set(box.cx, box.cy, box.cw, box.ch);
     u.uBand.value.set(v.band, v.band > 0 ? Math.max(1, v.thins) : 0);
     u.tWorld.value = sigma > 0 ? this.soft[0].texture : this.world;
-    return { x, y, w, h, sx, sy, sw, sh, sigma, k, high: H, pr };
+    return { x, y, w, h, sx, sy, sw, sh, sigma, k, wide: W, high: H, pr };
   }
 
-  private picture(p: Plan) {
+  /** @param again the figure's own picture is drawn afresh: without, it is laid on as it last was */
+  private picture(p: Plan, again: boolean) {
     const R = this.r.renderer, world = this.world!;
-    this.rig.rotation.y = -this.angle;
-    // (what shines in steel goes round with the lamps: the figure is what is being turned, not the room)
-    this.scene.environmentRotation.y = -this.angle;
     const prev = R.getRenderTarget(), auto = R.autoClear, alpha = R.getClearAlpha(), cutting = R.getScissorTest();
     R.getClearColor(_clear);
     R.getViewport(_view);
     R.getScissor(_cut);
     R.autoClear = false;
-    // the figure, in its room
-    R.setRenderTarget(this.target);
-    R.setClearColor(0x000000, 0);
-    R.clear(true, true, false);
-    R.render(this.scene, this.camera);
+    if (again) {
+      // the figure, in its room
+      this.rig.rotation.y = -this.angle;
+      // (what shines in steel goes round with the lamps: the figure is what is being turned, not the room)
+      this.scene.environmentRotation.y = -this.angle;
+      R.setRenderTarget(this.target);
+      R.setClearColor(0x000000, 0);
+      R.clear(true, true, false);
+      R.render(this.scene, this.camera);
+    }
     // what of the game's picture is behind the hole, copied on the card; and blurred as the veil blurs it, across and then down
     R.setRenderTarget(null);
     R.copyFramebufferToTexture(world, _at.set(p.sx, p.high - p.sy - p.sh));

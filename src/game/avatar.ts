@@ -81,8 +81,15 @@ export const CAR_SIT: { front: SeatPose; back: SeatPose } = { front: { legs: 0.8
 
 /** where a thing that is worn sits on the body (see GEAR) */
 type Worn = { bone: 'Head' | 'spine_03'; p: [number, number, number]; r: [number, number, number]; s: [number, number, number]; pack?: boolean };
-/** the respirator on the face: one mask in four paints, and one place for all of them */
-const MASK: Worn = { bone: 'Head', p: [0, 1.557, -0.1], r: [0, 0, 0], s: [1, 1, 1] };
+/**
+ * The respirator on the face: one mask in four paints, and one place for all of them.
+ * (Fitted by measure, 2026-10-13: tried in some thousands of places against the head as it is drawn, each judged by
+ * how far the mask's rim stands off the skin, how much of the face comes through it, and where its visor is by the
+ * eyes. It leans back with the face, a quarter of a radian: this head's mouth and chin stand as far forward as its
+ * nose. It is a little under life size, and a centimetre higher than its visor would have it: at its own size, and
+ * with the eyes dead centre, its filters hung four centimetres into the shoulders of every vest.)
+ */
+const MASK: Worn = { bone: 'Head', p: [0, 1.484, -0.12], r: [0.25, 0, 0], s: [0.94, 0.94, 0.94] };
 /**
  * Worn things that are drawn on the body. `p`, `r`, `s` place the item's model on the body
  * as it stands at rest (x to its right, y up, z behind it); the bone then carries it.
@@ -109,7 +116,7 @@ export const GEAR: Record<string, Worn> = {
   patrol_cap: { bone: 'Head', p: [0, 1.64, 0.01], r: [0, Math.PI, 0], s: [1, 1, 1] },
   fishermans_hat: { bone: 'Head', p: [0, 1.66, 0.0], r: [0, 0, 0], s: [1, 1, 1] },
   // (the steel pot: its brow is toward -z, as the K6-3's is. It is a smaller helmet than the other two, as it was made.)
-  helmet_m1: { bone: 'Head', p: [0, 1.69, -0.015], r: [0, 0, 0], s: [1, 1, 1] },
+  helmet_m1: { bone: 'Head', p: [0, 1.62, 0.012], r: [0, 0, 0], s: [1, 1, 1] },
   // (the respirator, in each of its four paints: its visor is toward -z as its model stands, the way a body faces)
   gasmask: MASK,
   gasmask_white: MASK,
@@ -124,6 +131,106 @@ export const GEAR: Record<string, Worn> = {
  */
 export function facepiece(obj: THREE.Object3D) {
   return obj;
+}
+
+/**
+ * A helmet worn over a mask. The respirator comes up over the brow and back along the temples, and a helmet comes
+ * down over both: left as they are the two pass through each other, the mask's frame standing out through the
+ * helmet's front and its straps through the sides. A real one goes UNDER the helmet, so that is what is drawn:
+ * what of the mask the helmet covers is left out, cut clean along a line a little way up inside the helmet's edge,
+ * where the edge itself hides the cut. `keep` says what of a mask stays, as flat cuts in the body's resting frame
+ * (the frame GEAR is written in): [nx, ny, nz, d], kept where nx x + ny y + nz z is no more than d. `nudge` moves
+ * the helmet itself while a mask is under it, where it sits too close to the brow for anything to go under.
+ * (Measured, 2026-10-13: each helmet's lower edge all round the head, and every point of the mask that had a
+ * helmet between it and the middle of the head.)
+ */
+export const OVER_MASK: Record<string, { keep: [number, number, number, number][]; nudge?: [number, number, number] }> = {
+  // (The pot's edge is all but flat, four centimetres higher at the brow than at the nape, and stands well off the
+  // head: the mask goes up inside it. One cut, 5 mm up inside the edge: above that the mask's frame lay in the
+  // thickness of the steel, and showed through it in slivers.)
+  helmet_m1: { keep: [[0, 1, 0.147, 1.6485]] },
+  // (The Combat Helmet's brow is turned in until it all but touches the forehead, and its sides come forward over
+  // the temples: nothing goes under it where it sits. With a mask on it rides 12 mm forward, as a helmet does
+  // that has a mask's frame under its brow, and the mask is cut along the slant of the helmet's edge over the
+  // temple, where its corner and its upper strap would stand out through the helmet's side.)
+  boonie_hat: { keep: [[0, 1, 1.05, 1.583]], nudge: [0, 0, -0.012] },
+  // (The K6-3 stands four centimetres off the face all round and its visor further: the mask is inside it whole,
+  // its filters below the cheek plates. Nothing is cut and nothing moved.)
+};
+
+/** shapes already cut (see `under`): by the shape they were cut from and where */
+const CUTS = new Map<string, THREE.BufferGeometry>();
+
+/**
+ * A shape with whatever of it is beyond any of these flat cuts left out: a triangle that lies across one is cut
+ * along it, so the edge that is left is a clean line and not the saw's edge that leaving whole triangles out
+ * gives. Cuts are [nx, ny, nz, d] in the shape's own frame: kept where n.p is no more than d.
+ */
+function cut(geo: THREE.BufferGeometry, cuts: number[][]): THREE.BufferGeometry {
+  const key = `${geo.uuid}|${cuts.map((c) => c.map((x) => x.toFixed(5)).join()).join('|')}`;
+  const had = CUTS.get(key);
+  if (had) return had;
+  const names = Object.keys(geo.attributes), attrs = names.map((n) => geo.attributes[n]);
+  const at = attrs.map((_, i) => attrs.slice(0, i).reduce((s, a) => s + a.itemSize, 0)), wide = attrs.reduce((s, a) => s + a.itemSize, 0);
+  const pos = at[names.indexOf('position')];
+  const index = geo.index, count = index ? index.count : attrs[0].count;
+  const corner = (i: number) => {
+    const v = new Float32Array(wide);
+    attrs.forEach((a, k) => {
+      for (let c = 0; c < a.itemSize; c++) v[at[k] + c] = a.getComponent(i, c);
+    });
+    return v;
+  };
+  const out: number[] = [];
+  for (let t = 0; t + 2 < count; t += 3) {
+    let poly = [0, 1, 2].map((j) => corner(index ? index.getX(t + j) : t + j));
+    for (const [nx, ny, nz, d] of cuts) {
+      const off = (v: Float32Array) => nx * v[pos] + ny * v[pos + 1] + nz * v[pos + 2] - d;
+      const next: Float32Array[] = [];
+      for (let i = 0; i < poly.length; i++) {
+        const a = poly[i], b = poly[(i + 1) % poly.length], da = off(a), db = off(b);
+        if (da <= 0) next.push(a);
+        if (da <= 0 !== db <= 0) {
+          const u = da / (da - db), mid = new Float32Array(wide);
+          for (let c = 0; c < wide; c++) mid[c] = a[c] + (b[c] - a[c]) * u;
+          next.push(mid);
+        }
+      }
+      poly = next;
+      if (poly.length < 3) break;
+    }
+    for (let i = 1; i + 1 < poly.length; i++) for (const v of [poly[0], poly[i], poly[i + 1]]) for (let c = 0; c < wide; c++) out.push(v[c]);
+  }
+  const made = new THREE.BufferGeometry();
+  const n = out.length / wide;
+  names.forEach((name, k) => {
+    const a = new Float32Array(n * attrs[k].itemSize);
+    for (let i = 0; i < n; i++) for (let c = 0; c < attrs[k].itemSize; c++) a[i * attrs[k].itemSize + c] = out[i * wide + at[k] + c];
+    made.setAttribute(name, new THREE.BufferAttribute(a, attrs[k].itemSize));
+  });
+  made.computeBoundingSphere();
+  CUTS.set(key, made);
+  return made;
+}
+
+/**
+ * A mask as it is under a helmet: every piece of it cut where the helmet says (see OVER_MASK).
+ * @param place where the mask's model is put on the body at rest (what GEAR says of it, as one turn and move)
+ */
+function under(mask: THREE.Object3D, place: THREE.Matrix4, keep: number[][]) {
+  mask.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    // (where the piece is in the mask's model, whatever the model hangs on just now)
+    _m2.identity();
+    for (let p: THREE.Object3D | null = mesh; p; p = p === mask ? null : p.parent) {
+      p.updateMatrix();
+      _m2.premultiply(p.matrix);
+    }
+    // (a cut said in the body's frame, said again in the piece's own: n.(M p) = (M' n).p + n.t)
+    const e = _m2.premultiply(place).elements;
+    mesh.geometry = cut(mesh.geometry, keep.map(([nx, ny, nz, d]) => [nx * e[0] + ny * e[1] + nz * e[2], nx * e[4] + ny * e[5] + nz * e[6], nx * e[8] + ny * e[9] + nz * e[10], d - (nx * e[12] + ny * e[13] + nz * e[14])]));
+  });
 }
 /**
  * Worn things that are part of the body itself: pieces of the suit (scripts/suit.mjs), on its
@@ -782,6 +889,8 @@ export class Avatar {
     this.gearObjs = [];
     this.packOut = 0;
     for (const p of this.pieces.values()) p.visible = false;
+    // (a helmet over a mask: the mask goes under it, and the helmet may sit a little otherwise for it: see OVER_MASK)
+    const helmet = items.some(({ id }) => GEAR[id] === MASK) ? items.map(({ id }) => OVER_MASK[id]).find((h) => !!h) : undefined;
     for (const { id, obj } of items) {
       for (const name of WORN[id] ?? []) {
         const p = this.pieces.get(name);
@@ -798,7 +907,10 @@ export class Avatar {
       const holder = new THREE.Group();
       holder.layers.mask = this.layerMask;
       holder.matrixAutoUpdate = false;
-      holder.matrix.copy(rest.inv).multiply(_m1.compose(_a.set(...g.p), _q1.setFromEuler(_euler.set(g.r[0], g.r[1], g.r[2], 'XYZ')), _b.set(...g.s)));
+      const nudge = helmet && helmet === OVER_MASK[id] ? helmet.nudge : undefined;
+      _m1.compose(_a.set(g.p[0] + (nudge?.[0] ?? 0), g.p[1] + (nudge?.[1] ?? 0), g.p[2] + (nudge?.[2] ?? 0)), _q1.setFromEuler(_euler.set(g.r[0], g.r[1], g.r[2], 'XYZ')), _b.set(...g.s));
+      if (helmet && g === MASK) under(obj, _m1, helmet.keep);
+      holder.matrix.copy(rest.inv).multiply(_m1);
       holder.add(obj);
       rest.bone.add(holder);
       this.gearObjs.push(holder);

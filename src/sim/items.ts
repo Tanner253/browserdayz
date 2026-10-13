@@ -65,7 +65,7 @@ export interface ItemDef {
   /** how many of it a new one is, where that is not six tenths of a full pile: a bandage is found one at a time, and carried five together */
   fresh?: number;
   slot?: SlotKind;
-  use?: { verb: string; time: number; energy?: number; water?: number; health?: number; stopBleed?: boolean; /** sets a broken leg (see src/sim/injury.ts) */ splint?: boolean; /** breath given back, in hundredths of all there is */ stamina?: number; /** a bottle: it holds this many drinks (what `water` and `energy` say is one of them), is kept when it is empty, and is filled at a well */ sips?: number; /** seconds afterwards in which nothing costs any breath */ boost?: number; /** blood given back, ml, and the seconds it takes to run in (a bag of a drip: see src/sim/blood.ts) */ blood?: number; over?: number; /** taken into the hand first and held there: a click then uses it (see `ready` in src/game/game.ts) */ hold?: boolean; sound: 'eat' | 'drink' | 'bandage' | 'inject' | 'smoke' };
+  use?: { verb: string; time: number; energy?: number; water?: number; health?: number; stopBleed?: boolean; /** sets a broken leg (see src/sim/injury.ts) */ splint?: boolean; /** breath given back, in hundredths of all there is */ stamina?: number; /** a bottle: it holds this many drinks (what `water` and `energy` say is one of them), is kept when it is empty, and is filled at a well */ sips?: number; /** and the kilograms of drink in a full one: it weighs that much less empty, and less with every drink */ drink?: number; /** seconds afterwards in which nothing costs any breath */ boost?: number; /** blood given back, ml, and the seconds it takes to run in (a bag of a drip: see src/sim/blood.ts) */ blood?: number; over?: number; /** taken into the hand first and held there: a click then uses it (see `ready` in src/game/game.ts) */ hold?: boolean; sound: 'eat' | 'drink' | 'bandage' | 'inject' | 'smoke' };
   /** thrown when used: seconds of fuse, damage at the centre, metres it reaches */
   throw?: { fuse: number; damage: number; radius: number };
   /** used, it calls a supply drop down where its user stands (see CALL in src/sim/drops.ts) */
@@ -173,65 +173,65 @@ const D: ItemDef[] = [
     weapon: { kind: 'auto', ammo: 'ammo_556', capacity: 30, mag: 'mag_ar', ergo: 62, modes: ['auto', 'semi'], shows: { mag_ar: ['mag'], suppressor_556: ['silencer'], red_dot: ['sight'], foregrip: ['foregrip'], gun_light: ['light'] }, hides: { suppressor_556: ['brake'] } }, iconYaw: 0,
   },
   {
-    id: 'ammo_739', name: '7.62x39 Rounds', model: 'round_739', w: 1, h: 1, weight: 0.016, category: 'ammo', stack: 30, scale: 1.3, pile: 5,
+    id: 'ammo_739', name: '7.62x39 Rounds', model: 'round_739', w: 1, h: 1, weight: 0.008, category: 'ammo', stack: 30, scale: 1.3, pile: 5,
     desc: 'Loose rifle cartridges, for the AK. They go into its magazine by hand.',
   },
   {
-    id: 'ammo_556', name: '5.56x45 Rounds', model: 'round_556', w: 1, h: 1, weight: 0.012, category: 'ammo', stack: 30, scale: 1.15, pile: 5,
+    id: 'ammo_556', name: '5.56x45 Rounds', model: 'round_556', w: 1, h: 1, weight: 0.004, category: 'ammo', stack: 30, scale: 1.15, pile: 5,
     desc: 'Loose rifle cartridges, small and fast, for the AR-15. They go into its magazine by hand.',
   },
   {
-    id: 'box_739', name: '7.62x39 Ammo Box', model: 'ammo_box_739', w: 1, h: 1, weight: 0.45, category: 'ammo',
+    id: 'box_739', name: '7.62x39 Ammo Box', model: 'ammo_box_739', w: 1, h: 1, weight: 0.23, category: 'ammo',
     desc: 'A sealed box of 25 cartridges for the AK. Hold it and unwrap it to get the rounds out.',
     open: { gives: 'ammo_739', qty: 25, time: 2.2 },
   },
   {
-    id: 'box_556', name: '5.56x45 Ammo Box', model: 'ammo_box_556', w: 1, h: 1, weight: 0.35, category: 'ammo',
+    id: 'box_556', name: '5.56x45 Ammo Box', model: 'ammo_box_556', w: 1, h: 1, weight: 0.13, category: 'ammo',
     desc: 'A sealed box of 25 cartridges for the AR-15. Hold it and unwrap it to get the rounds out.',
     open: { gives: 'ammo_556', qty: 25, time: 2.2 },
   },
   {
-    id: 'ammo_762', name: '7.62x54R Rounds', model: 'round_762', w: 1, h: 1, weight: 0.022, category: 'ammo', stack: 30, scale: 1.3, pile: 5,
+    id: 'ammo_762', name: '7.62x54R Rounds', model: 'round_762', w: 1, h: 1, weight: 0.009, category: 'ammo', stack: 30, scale: 1.3, pile: 5,
     desc: 'Loose full-power rifle cartridges, for the sniper rifle. They go into its magazine by hand.',
   },
   {
-    id: 'ammo_9mm', name: '9x19mm Rounds', model: 'round_9mm', w: 1, h: 1, weight: 0.012, category: 'ammo', stack: 30, scale: 1.6, pile: 6,
+    id: 'ammo_9mm', name: '9x19mm Rounds', model: 'round_9mm', w: 1, h: 1, weight: 0.006, category: 'ammo', stack: 30, scale: 1.6, pile: 6,
     desc: 'Loose pistol cartridges, for the M9 and the MPA30. Common among police and military. They go into a magazine by hand.',
   },
   {
-    id: 'ammo_45', name: '.45 ACP Rounds', model: 'round_45', w: 1, h: 1, weight: 0.021, category: 'ammo', stack: 30, scale: 1.6, pile: 6,
+    id: 'ammo_45', name: '.45 ACP Rounds', model: 'round_45', w: 1, h: 1, weight: 0.012, category: 'ammo', stack: 30, scale: 1.6, pile: 6,
     desc: 'Loose .45 cartridges, short and fat, for the Colt 1911. They go into its magazine by hand.',
   },
   {
-    id: 'ammo_50', name: '.50 AE Rounds', model: 'round_50', w: 1, h: 1, weight: 0.03, category: 'ammo', stack: 30, scale: 1.5, pile: 4,
+    id: 'ammo_50', name: '.50 AE Rounds', model: 'round_50', w: 1, h: 1, weight: 0.015, category: 'ammo', stack: 30, scale: 1.5, pile: 4,
     desc: 'Loose .50 cartridges. Only the Desert Eagle fires them.',
   },
   {
-    id: 'ammo_12', name: '12 Gauge Shells', model: 'shell_12', w: 1, h: 1, weight: 0.045, category: 'ammo', stack: 30, scale: 1.3, pile: 5,
+    id: 'ammo_12', name: '12 Gauge Shells', model: 'shell_12', w: 1, h: 1, weight: 0.028, category: 'ammo', stack: 30, scale: 1.3, pile: 5,
     desc: 'Buckshot: nine pellets a shell. Pushed into the shotgun\'s tube one at a time.',
   },
   {
-    id: 'box_45', name: '.45 ACP Ammo Box', model: 'ammo_box_45', w: 1, h: 1, weight: 0.55, category: 'ammo', scale: 0.75,
+    id: 'box_45', name: '.45 ACP Ammo Box', model: 'ammo_box_45', w: 1, h: 1, weight: 0.33, category: 'ammo', scale: 0.75,
     desc: 'An old box of 25 .45 cartridges for the Colt 1911. Hold it and unwrap it to get the rounds out.',
     open: { gives: 'ammo_45', qty: 25, time: 2.2 },
   },
   {
-    id: 'box_50', name: '.50 AE Ammo Box', model: 'ammo_box_50', w: 1, h: 1, weight: 0.8, category: 'ammo',
+    id: 'box_50', name: '.50 AE Ammo Box', model: 'ammo_box_50', w: 1, h: 1, weight: 0.405, category: 'ammo',
     desc: 'A sealed box of 25 .50 cartridges. Hold it and unwrap it to get the rounds out.',
     open: { gives: 'ammo_50', qty: 25, time: 2.2 },
   },
   {
-    id: 'box_12', name: '12 Gauge Shell Box', model: 'ammo_box_12', w: 1, h: 1, weight: 1.15, category: 'ammo',
+    id: 'box_12', name: '12 Gauge Shell Box', model: 'ammo_box_12', w: 1, h: 1, weight: 0.73, category: 'ammo',
     desc: 'A sealed box of 25 buckshot shells. Hold it and unwrap it to get them out.',
     open: { gives: 'ammo_12', qty: 25, time: 2.2 },
   },
   {
-    id: 'box_762', name: '7.62x54R Ammo Box', model: 'ammo_box_762', w: 1, h: 1, weight: 0.6, category: 'ammo',
+    id: 'box_762', name: '7.62x54R Ammo Box', model: 'ammo_box_762', w: 1, h: 1, weight: 0.255, category: 'ammo',
     desc: 'A sealed box of 25 rifle cartridges. Hold it and unwrap it to get the rounds out.',
     open: { gives: 'ammo_762', qty: 25, time: 2.2 },
   },
   {
-    id: 'box_9mm', name: '9x19mm Ammo Box', model: 'ammo_box_9mm', w: 1, h: 1, weight: 0.33, category: 'ammo',
+    id: 'box_9mm', name: '9x19mm Ammo Box', model: 'ammo_box_9mm', w: 1, h: 1, weight: 0.18, category: 'ammo',
     desc: 'A sealed box of 25 pistol cartridges. Hold it and unwrap it to get the rounds out.',
     open: { gives: 'ammo_9mm', qty: 25, time: 2.2 },
   },
@@ -270,7 +270,7 @@ const D: ItemDef[] = [
     mag: { ammo: 'ammo_9mm', capacity: 30 }, attach: { fits: ['mpa'], slot: 'magazine' },
   },
   {
-    id: 'mag_colt', name: 'Colt 1911 Magazine', model: 'colt_1911', nodeRe: '^mag', w: 1, h: 1, weight: 0.1, category: 'magazine',
+    id: 'mag_colt', name: 'Colt 1911 Magazine', model: 'colt_1911', nodeRe: '^mag', w: 1, h: 1, weight: 0.07, category: 'magazine',
     desc: 'Seven rounds of .45 for the Colt 1911.',
     mag: { ammo: 'ammo_45', capacity: 7 }, attach: { fits: ['colt'], slot: 'magazine' },
   },
@@ -363,9 +363,9 @@ const D: ItemDef[] = [
   { id: 'sardines', name: 'Sardines', model: 'long_life_food', node: 'long_life_food_sardines', w: 2, h: 1, weight: 0.13, category: 'food', desc: 'Flat tin of sardines.', use: { verb: 'Eat', time: 2, energy: 20, water: -1, sound: 'eat' } },
   { id: 'apple', name: 'Apple', model: 'food_apple_01', w: 1, h: 1, weight: 0.15, category: 'food', desc: 'Crisp and sour.', use: { verb: 'Eat', time: 1.5, energy: 10, water: 8, sound: 'eat' } },
   { id: 'milk', name: 'Milk Carton', model: 'long_life_food', node: 'long_life_food_milk', w: 1, h: 2, weight: 1.0, category: 'drink', desc: 'UHT milk. Still sealed.', use: { verb: 'Drink', time: 2.5, energy: 10, water: 30, sound: 'drink' } },
-  { id: 'water_jug', name: 'Water Jug', model: 'plastic_bottle_gallon', w: 2, h: 3, weight: 2.2, category: 'drink', desc: 'Two litres of clean water: four good drinks. A well fills it again.', use: { verb: 'Drink from the', time: 2.2, water: 20, sips: 4, sound: 'drink' } },
-  { id: 'flask', name: 'Water Flask', model: 'flask', w: 2, h: 2, weight: 1.1, category: 'drink', desc: 'A soldier\'s litre of water in a hard flask: three drinks. A well fills it again.', use: { verb: 'Drink from the', time: 2, water: 18, sips: 3, sound: 'drink' } },
-  { id: 'thermos', name: 'Thermos', model: 'plastic_thermos', w: 1, h: 3, weight: 0.8, category: 'drink', desc: 'Lukewarm tea, two cups of it. Filled at a well it is water, and still better than nothing.', use: { verb: 'Drink from the', time: 2, water: 20, energy: 3, sips: 2, sound: 'drink' } },
+  { id: 'water_jug', name: 'Water Jug', model: 'plastic_bottle_gallon', w: 2, h: 3, weight: 2.2, category: 'drink', desc: 'Two litres of clean water: four good drinks. A well fills it again.', use: { verb: 'Drink from the', time: 2.2, water: 20, sips: 4, drink: 2, sound: 'drink' } },
+  { id: 'flask', name: 'Water Flask', model: 'flask', w: 2, h: 2, weight: 1.25, category: 'drink', desc: 'A soldier\'s litre of water in a hard flask: three drinks. A well fills it again.', use: { verb: 'Drink from the', time: 2, water: 18, sips: 3, drink: 1, sound: 'drink' } },
+  { id: 'thermos', name: 'Thermos', model: 'plastic_thermos', w: 1, h: 3, weight: 0.8, category: 'drink', desc: 'Lukewarm tea, two cups of it. Filled at a well it is water, and still better than nothing.', use: { verb: 'Drink from the', time: 2, water: 20, energy: 3, sips: 2, drink: 0.5, sound: 'drink' } },
   // ---------------------------------------------------------------- medical
   // Two things for a wound, and the kit (2026-10-10, as asked): a bandage, common from the outskirts on, stops
   // bleeding and gives back 10; a stim, found in the village and common from Kamenka on, stops bleeding and gives
@@ -413,11 +413,11 @@ const D: ItemDef[] = [
   // body, each keeps what is in its pockets. (There is no model of either: on the ground and in a pocket each is the
   // hospital's folded blanket, dyed. Proper art is wanted.)
   {
-    id: 'field_jacket', name: 'Field Jacket', model: 'folded_blanket', tint: 0x7d8a58, scale: 1.1, w: 3, h: 3, weight: 0.6, category: 'clothing', slot: 'top',
+    id: 'field_jacket', name: 'Field Jacket', model: 'folded_blanket', tint: 0x7d8a58, scale: 1.1, w: 3, h: 3, weight: 1.3, category: 'clothing', slot: 'top',
     desc: 'The padded jacket every survivor starts in. 16 slots in its pockets. Take it off and what is in them goes with it: with nothing on your top, you have no pockets there.', wear: { cargo: [4, 4] },
   },
   {
-    id: 'field_trousers', name: 'Field Trousers', model: 'folded_blanket', tint: 0x5a5f6e, scale: 0.85, w: 3, h: 2, weight: 0.4, category: 'clothing', slot: 'legs',
+    id: 'field_trousers', name: 'Field Trousers', model: 'folded_blanket', tint: 0x5a5f6e, scale: 0.85, w: 3, h: 2, weight: 0.6, category: 'clothing', slot: 'legs',
     desc: 'The hard-wearing trousers every survivor starts in. 12 slots in their pockets. Take them off and what is in them goes with them.', wear: { cargo: [4, 3] },
   },
   {
@@ -525,12 +525,12 @@ const D: ItemDef[] = [
   // ---------------------------------------------------------------- tools & misc
   { id: 'keycard', name: 'Bunker Keycard', model: '@keycard', w: 1, h: 1, weight: 0.02, category: 'misc', desc: 'Opens the door of Bunker 17, once: the reader keeps it. It goes on foot: no car will take you while you carry one.' },
   { id: 'flashlight', name: 'Flashlight', model: 'vintage_flashlight', w: 1, h: 2, weight: 0.4, category: 'tool', desc: 'A battery lantern. Carried anywhere on you, L switches it on: it shines from your chest, wide and not far. It shows you the dark, and shows the dark where you are.' },
-  { id: 'binoculars', name: 'Binoculars', model: 'binoculars', w: 2, h: 2, weight: 0.6, category: 'tool', desc: 'Field binoculars. Use them to look five times closer; any other action puts them away.', use: { verb: 'Look through', time: 0.35, sound: 'bandage' }, look: 0.2 },
-  { id: 'compass', name: 'Compass', model: 'seadogs_compass', w: 1, h: 1, weight: 0.1, category: 'tool', desc: 'Brass pocket compass. While you carry it, your exact bearing in degrees is shown under the compass strip.' },
+  { id: 'binoculars', name: 'Binoculars', model: 'binoculars', w: 2, h: 2, weight: 0.8, category: 'tool', desc: 'Field binoculars. Use them to look five times closer; any other action puts them away.', use: { verb: 'Look through', time: 0.35, sound: 'bandage' }, look: 0.2 },
+  { id: 'compass', name: 'Compass', model: 'seadogs_compass', w: 1, h: 1, weight: 0.15, category: 'tool', desc: 'Brass pocket compass. While you carry it, your exact bearing in degrees is shown under the compass strip.' },
   { id: 'watch', name: 'Wrist Watch', model: 'digital_wrist_watch', w: 1, h: 1, weight: 0.05, category: 'tool', desc: 'Still ticking.' },
   { id: 'radio', name: 'Field Radio', model: 'vintage_radio_transceiver', w: 4, h: 3, weight: 6.5, category: 'misc', desc: 'Military transceiver, good for one call: use it under open sky and a supply drop comes down where you stand. Everybody hears it called.', use: { verb: 'Call a drop on the', time: 5, sound: 'bandage' }, call: true },
   { id: 'cigarettes', name: 'Cigarettes', model: 'cigarette_pack', w: 1, h: 1, weight: 0.03, category: 'misc', stack: 5, desc: 'Kentucky Ace. A smoke steadies you: each one gives back 12 health.', use: { verb: 'Smoke', time: 4, health: 12, sound: 'smoke' } },
-  { id: 'jerrycan', name: 'Jerrycan', model: 'metal_jerrycan_green', w: 2, h: 3, weight: 8.5, category: 'misc', desc: 'Ten litres of fuel, a quarter of a tank. Hold it, look at a jeep or a police car, and hold the left button to pour it in.' },
+  { id: 'jerrycan', name: 'Jerrycan', model: 'metal_jerrycan_green', w: 2, h: 3, weight: 10, category: 'misc', desc: 'Ten litres of fuel, a quarter of a tank. Hold it, look at a jeep or a police car, and hold the left button to pour it in.' },
   { id: 'grenade', name: 'Stick Grenade', model: 'stick_grenade', w: 1, h: 3, weight: 0.6, category: 'misc', desc: 'Pull the cord and throw. Four seconds, then everything within nine metres is hurt, you included.', use: { verb: 'Throw', time: 0.75, sound: 'bandage' }, throw: { fuse: 4, damage: 150, radius: 9 } },
   // ---------------------------------------------------------------- identity
   {
@@ -834,6 +834,8 @@ export function handlingOf(it: ItemInstance | null | undefined): { ergo: number;
 export function itemWeight(it: ItemInstance): number {
   const d = ITEMS[it.id];
   let w = d.weight * (d.stack ? it.qty : 1);
+  // (a bottle weighs what is left in it: its own weight is of a full one)
+  if (d.use?.sips && d.use.drink) w -= d.use.drink * (1 - (it.left ?? d.use.sips) / d.use.sips);
   for (const m of fittedOf(it)) w += ITEMS[m]?.weight ?? 0;
   // (the rounds in a magazine and in a gun weigh what they weigh loose)
   if (d.mag) w += (it.rounds ?? 0) * (ITEMS[d.mag.ammo]?.weight ?? 0);

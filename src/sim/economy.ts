@@ -236,11 +236,16 @@ export const TYPES: Record<string, TypeRule> = {
   // ------------------------------------------------------------ medical: the clinic and the hospital
   // (What stops bleeding is what a fight is lost for want of: a bandage is in houses, shops and barracks too.)
   // A clinic leans on bandages and stims, with a kit or two; the hospital is where the kits are, and stims by the shelf.
-  bandage: { at: [16, 34, 26, 2, 3], lifetime: 2400, restock: 240, usage: ['Medic', 'Hospital', 'Shop', ...HOMES, 'Military', 'Police', 'Hunting', 'Farm'], favour: { Medic: 26, Hospital: 2, Shop: 1.5, Military: 2 } },
+  bandage: { at: [16, 31, 23, 2, 3], lifetime: 2400, restock: 240, usage: ['Medic', 'Hospital', 'Shop', ...HOMES, 'Military', 'Police', 'Hunting', 'Farm'], favour: { Medic: 26, Hospital: 2, Shop: 1.5, Military: 2 } },
   stim: { at: [0, 20, 60, 3, 4], lifetime: 3000, restock: 360, usage: ['Medic', 'Hospital', 'Military', 'Police', ...HOMES], favour: { Medic: 16, Hospital: 6, Military: 3, Police: 2 } },
   // (the yellow one, for the breath: see items.ts. A soldier's thing as much as a nurse's.)
   stim_stamina: { at: [0, 8, 24, 1, 2], lifetime: 3000, restock: 360, usage: ['Medic', 'Hospital', 'Military', 'Police'], favour: { Medic: 10, Hospital: 5, Military: 4 } },
-  firstaid: { at: [0, 5, 55, 3, 3], lifetime: 3600, restock: 600, usage: ['Hospital', 'Medic', 'Military', 'Police'], favour: { Hospital: 14, Medic: 3 } },
+  firstaid: { at: [0, 5, 53, 2, 2], lifetime: 3600, restock: 600, usage: ['Hospital', 'Medic', 'Military', 'Police'], favour: { Hospital: 14, Medic: 3 } },
+  // (The pouch between a stim and the kit: see items.ts. A soldier's own, so it lies where soldiers and constables
+  // were before it lies in a clinic. Its places are taken out of the bandages' and the kit's: three bandages on the
+  // second step, three bandages and two kits on the third, a kit under the gas and one down the bunker. No more
+  // lies on any step than lay there before.)
+  aid_pouch: { at: [0, 3, 5, 1, 1], lifetime: 3600, restock: 480, usage: ['Military', 'Police', 'Medic', 'Hospital'], favour: { Military: 6, Police: 4 } },
   // What gives blood back (2026-10-13; src/sim/blood.ts): saline in a clinic and the hospital, and with the army's
   // medics; blood in the hospital before anywhere, a bag or two in a clinic's fridge, and where the best of
   // everything is. (Under the gas every place is spoken for: a stim and a dressing there have made way for them.)
@@ -249,7 +254,11 @@ export const TYPES: Record<string, TypeRule> = {
   // (what sets a broken leg and does nothing else: where there are ladders and lofts to fall off, too)
   splint: { at: [5, 10, 24, 1, 2], lifetime: 3600, restock: 420, usage: ['Medic', 'Hospital', 'Shop', ...HOMES, 'Farm', 'Hunting', 'Industrial', 'Police'], favour: { Medic: 6, Hospital: 4, Shop: 2 } },
   // ------------------------------------------------------------ what is worn and carried
-  patrol_cap: { at: [0, 11, 3, 0, 0], lifetime: 3600, restock: 600, usage: ARMY },
+  // (The steel pot: the army's old helmet, the weak one and the common one, as DayZ's plain ballistic helmet is the
+  // one found at every checkpoint. It is the army's and not the police's, on the pistols' own step and a couple in
+  // Kamenka; its places are five of the caps' in the village and the camp, and two of theirs in the town.)
+  helmet_m1: { at: [0, 5, 2, 0, 0], lifetime: 3600, restock: 900, usage: ['Military'] },
+  patrol_cap: { at: [0, 6, 1, 0, 0], lifetime: 3600, restock: 600, usage: ARMY },
   fishermans_hat: { at: [6, 6, 4, 0, 0], lifetime: 3600, restock: 600, usage: [...HOMES, 'Farm', 'Hunting'] },
   // (The Field Jacket and the Field Trousers have no rule: everybody is dressed in them from the start and only one
   // of each is worn, so a spare is room for nothing. They come off the dead. The places for clothes on the first
@@ -258,13 +267,23 @@ export const TYPES: Record<string, TypeRule> = {
   // (a workman's: sheds and yards before barracks)
   work_gloves: { at: [3, 8, 3, 0, 0], lifetime: 3600, restock: 900, usage: ['Industrial', 'Farm', 'Military'], favour: { Industrial: 2 } },
   rubber_boots: { at: [3, 8, 3, 0, 0], lifetime: 3600, restock: 900, usage: ['Industrial', 'Farm', 'Military', 'Police'], favour: { Industrial: 2 } },
-  boonie_hat: { at: [0, 1, 2, 5, 4], lifetime: 3600, restock: 900, usage: ['Military'] },
+  // (one of the bunker's four has made way for the painted mask that is kept there: see the masks below)
+  boonie_hat: { at: [0, 1, 2, 5, 3], lifetime: 3600, restock: 900, usage: ['Military'] },
   // (the heaviest helmet there is: the bunker's)
   helmet_k63: { at: [0, 0, 0, 0, 2], lifetime: 7200, restock: 1800, usage: [] },
   // (The mask is what lets anybody into the gas, so it is not kept IN the gas: it is a policeman's, in the
   // police station of the village and in Kamenka's, and these are what the whole map has to share, bar what one
   // of the army's cases or a supply drop turns up.)
-  gasmask: { at: [0, 3, 2, 0, 0], lifetime: 3600, restock: 900, usage: ['Police'] },
+  gasmask: { at: [0, 3, 0, 0, 0], lifetime: 3600, restock: 900, usage: ['Police'] },
+  // (The same mask in its three other paints: each keeps the gas out as the black one does. The black one is the
+  // ordinary one, the village's; a painted one is rarer and further in. The two that Kamenka's police station
+  // keeps are the white and the orange now, a quarter of an hour coming back where the black ones there took
+  // seven minutes: the map has as many masks to get into the gas with as it had, five. The skull is down the
+  // bunker, which is past the gas: nobody gets in with that one, it is brought out, and it is half an hour coming
+  // back. One of the bunker's Combat Helmets made way for it.)
+  gasmask_white: { at: [0, 0, 1, 0, 0], lifetime: 3600, restock: 900, usage: ['Police'], on: { 3: { restock: 900 } } },
+  gasmask_orange: { at: [0, 0, 1, 0, 0], lifetime: 3600, restock: 900, usage: ['Police'], on: { 3: { restock: 900 } } },
+  gasmask_skull: { at: [0, 0, 0, 0, 1], lifetime: 7200, restock: 1800, usage: [], on: { 5: { restock: 1800 } } },
   // (armour by weight: the rig in sheds and houses, the soft vest where the police and the army were, the
   // armoured vest in Kamenka and one that got as far as the village, the plate carrier under the gas, the heavy
   // armour only down the bunker)
@@ -308,8 +327,8 @@ const UNSORTED = 4;
  * anything else that may lie there has taken them.
  */
 const FIRST = [
-  'gasmask', 'benelli', 'mosin', 'ak', 'ar15', 'suppressor_12', 'suitcase', 'heavy_armor', 'life_vest', 'armor_vest', 'bat', 'crowbar', 'shovel', 'machete', 'hatchet',
-  'mpa', 'colt', 'm9', 'mag_mpa', 'mag_colt', 'mag_m9', 'firstaid', 'blood_bag', 'stim', 'stim_stamina', 'saline', 'bandage',
+  'gasmask', 'gasmask_white', 'gasmask_orange', 'benelli', 'mosin', 'ak', 'ar15', 'suppressor_12', 'suitcase', 'heavy_armor', 'life_vest', 'armor_vest', 'bat', 'crowbar', 'shovel', 'machete', 'hatchet',
+  'mpa', 'colt', 'm9', 'mag_mpa', 'mag_colt', 'mag_m9', 'firstaid', 'aid_pouch', 'blood_bag', 'stim', 'stim_stamina', 'saline', 'bandage',
 ];
 
 

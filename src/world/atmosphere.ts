@@ -417,7 +417,7 @@ export class Atmosphere {
       .join('\n    ');
     return /* glsl */ `
   #define GAS_ZONE
-  #define GAS_STEPS 10
+  #define GAS_STEPS ${TOUCH ? 5 : 10}
   #define GAS_THICK ${GAS.thick.toFixed(5)}
   // (one over how deep in the edge of what is breathed lies, depth being 0 at the dome's edge and 1 at its middle)
   #define GAS_FULL ${(1 / (1 - 1 / (out * out))).toFixed(5)}

@@ -1,6 +1,7 @@
 // Campfires as the game has them (the rules are in src/sim/fires.ts): which fireplaces are
-// alight and for how long yet, the flames and the smoke of each, the light of the nearest, the
-// sound of it, and whether the survivor is resting beside one.
+// alight and for how long yet, the ring of stones and wood that stands at each (cold, or
+// burning), the flames and the smoke of each, the light of the nearest, the sound of it, and
+// whether the survivor is resting beside one.
 
 import * as THREE from 'three';
 import { assets } from '../core/assets';
@@ -24,6 +25,15 @@ const SEEN = { flames: 70, smoke: 420 };
  * it, which is solid too, so that nobody stands in it.
  */
 const RING = { cold: 'campfire_ring_cold', lit: 'campfire_ring', seen: [128, 140] as [number, number], reach: 0.6, logs: { r: 0.3, h: 0.8 } };
+/**
+ * The wood stands a forearm high in the ring where the old pit's lay flat: the flames and the smoke begin that much
+ * higher (among the tops of the logs and over them, not shut inside them), and the light of the fire is over the
+ * wood, where it falls on the logs' own faces as well as on the ground. `embers`: how much of what is painted on the
+ * burning ring gives light of its own, and in what colour (seen by night, the embers painted on it were black
+ * wherever the lamp did not reach them: the logs' outer faces, which is all of them from outside). `byDay`: the
+ * share of that it gives at noon, when the sun lights the same paint and the two together were pale and pink.
+ */
+const BURNS = { lift: 0.3, lamp: 1.0, embers: 0.5, ember: 0xffa066, byDay: 0.2 };
 /** the light of a fire: its colour, how strong, and how far it reaches, metres */
 const GLOW = { color: 0xff8f3a, strength: 7, reach: 9, from: 48 };
 
@@ -38,17 +48,29 @@ export class Fires {
   private clock = 0;
   /** the ring at each fireplace as it is drawn: cold, and alight (one of the two is shown) */
   private rings: { cold: THREE.Object3D; lit: THREE.Object3D }[] = [];
+  /** where the flames of each begin (see BURNS) */
+  private flames: THREE.Vector3[];
+  /** what the burning ring is painted with: its embers give light, and are never still */
+  private burning: THREE.MeshStandardMaterial[] = [];
 
-  constructor(world: World, scene: THREE.Scene, private effects: Effects, atmo: Atmosphere) {
+  constructor(world: World, scene: THREE.Scene, private effects: Effects, private atmo: Atmosphere) {
     this.spots = fireSpots(world.props).map((p) => new THREE.Vector3(p.x, p.y, p.z));
+    this.flames = this.spots.map((s) => new THREE.Vector3(s.x, s.y + BURNS.lift, s.z));
     // the ring at every fireplace, with its wood laid ready: a fireplace that can be lit looks like one
     void Promise.all([assets.model(RING.cold), assets.model(RING.lit)]).then((models) => {
       // (each of the two is one shape and one paint, whatever number of fireplaces there are: the paint fades it out with distance as it does everything stood about the map)
-      const [cold, lit] = models.map((model) => {
+      const [cold, lit] = models.map((model, k) => {
         const parts = joinByPaint(extractParts(model));
         groundParts(parts);
         return parts.map((p) => {
           const paint = (p.material as THREE.MeshStandardMaterial).clone();
+          // The burning one's own colours, given off as light: the glow painted into it is a glow. (The cold one
+          // is painted the same way and gives off none: so that the two are drawn by one program, and the first
+          // fire lit in a game is not a wait while the card is taught another.)
+          paint.emissiveMap = paint.map;
+          paint.emissive.setHex(k === 1 ? BURNS.ember : 0x000000);
+          paint.emissiveIntensity = BURNS.embers;
+          if (k === 1) this.burning.push(paint);
           const fp = foliagePatch({});
           setLodFade(fp.lod, null, RING.seen);
           atmo.register(paint, fp.patch, 'prop');
@@ -146,15 +168,19 @@ export class Fires {
       }
       // (it sinks in its last half minute: less flame, less smoke)
       const life = Math.min(1, this.left[i] / 30);
-      if (d < SEEN.smoke) this.effects.campfire(s, this.owed[i], dt, life, d < SEEN.flames);
+      if (d < SEEN.smoke) this.effects.campfire(this.flames[i], this.owed[i], dt, life, d < SEEN.flames);
     }
     const on = near >= 0 && nd < GLOW.from;
     if (on) {
       const s = this.spots[near], t = this.clock;
       // never still: two slow swells and a quick shiver
       const flick = 0.78 + 0.14 * Math.sin(t * 7.3) + 0.08 * Math.sin(t * 13.1 + 1.7) + 0.06 * Math.sin(t * 31 + 0.4);
-      this.light.position.set(s.x + Math.sin(t * 5.1) * 0.05, s.y + 0.55, s.z + Math.cos(t * 4.3) * 0.05);
+      this.light.position.set(s.x + Math.sin(t * 5.1) * 0.05, s.y + BURNS.lamp, s.z + Math.cos(t * 4.3) * 0.05);
       this.light.intensity = GLOW.strength * flick * Math.min(1, this.left[near] / 30) * (1 - THREE.MathUtils.smoothstep(nd, GLOW.from * 0.7, GLOW.from));
+      // (and the embers with it: every burning ring is painted with the one paint, so they shiver together;
+      // and are brightest when the day is darkest)
+      const day = this.atmo.daylight.value;
+      for (const paint of this.burning) paint.emissiveIntensity = BURNS.embers * (0.85 + 0.6 * (flick - 0.78)) * (1 - (1 - BURNS.byDay) * day);
     } else this.light.intensity = 0;
     audio.fire(dt, on ? nd : -1);
     const heard: THREE.Vector3[] = [];

@@ -3,7 +3,9 @@
 
 import { offer, type Offer, type Pick, type Role } from '../net/orders';
 import type { Vitals } from '../game/player';
-import { bloodLeft } from '../sim/blood';
+import { BLOOD } from '../sim/blood';
+import { bleedLevel } from './status';
+import { StatusView, figuresWanted, symbol, wantFigures } from './status-view';
 import { BACK_SHORT, BACK_WHY, mountUpdates } from './updates';
 import { MAX_STAMINA, type ChatChannel } from '../net/protocol';
 import { ACTIONS, KEY_GROUPS, SENS, bind, bindable, controls, keyName, keyOf, relabel, setControls, shown, type Controls } from '../core/keys';
@@ -17,17 +19,6 @@ import { AO_MODES, DEFAULT_GRAPHICS, FPS_LIMITS, LEVELS, MSAA, PRESETS, SCALES, 
 
 const CHANNELS: ChatChannel[] = ['global', 'near'];
 const CHANNEL_LABEL: Record<ChatChannel | 'system' | 'pm', string> = { global: 'Global', near: 'Proximity', staff: 'Staff', system: '', pm: 'To you' };
-
-const ICONS = {
-  health: '<path d="M12 21s-7-4.5-9.5-9A5.5 5.5 0 0 1 12 6a5.5 5.5 0 0 1 9.5 6C19 16.5 12 21 12 21z"/>',
-  food: '<path d="M7 3v8a2 2 0 0 0 2 2v8M5 3v5M9 3v5M16 3c-2 0-3 3-3 6s1 4 3 4v8"/>',
-  water: '<path d="M12 3s6 7 6 11a6 6 0 0 1-12 0c0-4 6-11 6-11z"/>',
-  blood: '<path d="M12 3s5 6.5 5 10a5 5 0 0 1-10 0c0-3.5 5-10 5-10zM9.5 14.5a2.5 2.5 0 0 0 2.5 2.5"/>',
-};
-
-function svg(path: string) {
-  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
-}
 
 /** A mark on the menu's map: where it is in the world, what it is called, and what is said of it when it is pointed at. */
 export interface MenuSpot {
@@ -151,6 +142,8 @@ export class HUD {
   private el: Record<string, HTMLElement> = {};
   private notes: HTMLDivElement;
   private last: Record<string, string> = {};
+  /** the survivor's state: the symbols in the corner, and the same in words for the inventory (src/ui/status-view.ts) */
+  private status: StatusView;
 
   constructor(private icons: Record<string, string> = {}) {
     this.root = document.createElement('div');
@@ -169,13 +162,7 @@ export class HUD {
       <div class="hud-area"></div>
       <div class="hud-notes"></div>
       <div class="hud-weapon"><div class="hud-weapon-name"></div><div class="hud-weapon-ammo"></div></div>
-      <div class="hud-vitals">
-        <div class="vital bleed" data-k="bleed">${svg(ICONS.blood)}<span>Bleeding</span></div>
-        <div class="vital" data-k="health" title="Health">${svg(ICONS.health)}<div class="vital-bar"><i></i></div><b>100</b></div>
-        <div class="vital" data-k="blood" title="Blood: a wound takes this, not your health. Dead when it is gone">${svg(ICONS.blood)}<div class="vital-bar"><i></i></div><b>100</b></div>
-        <div class="vital" data-k="energy" title="Food">${svg(ICONS.food)}<div class="vital-bar"><i></i></div><b>100</b></div>
-        <div class="vital" data-k="water" title="Water">${svg(ICONS.water)}<div class="vital-bar"><i></i></div><b>100</b></div>
-      </div>
+      <div class="hud-vitals"></div>
       <div class="hud-arms"><div></div></div>
       <div class="hud-stamina"><div></div></div>
       <div class="hud-ride"><b>0</b><small>km/h</small><div class="ride-bars"><div class="ride-fuel" title="fuel"><i></i></div><div class="ride-hp" title="what it has left in it"><i></i></div></div></div>
@@ -209,7 +196,7 @@ export class HUD {
       <div class="hud-damage"></div>
       <div class="hud-bleedfx"></div>
       <div class="hud-blooddrops"></div>
-      <div class="hud-bleed">${svg(ICONS.blood)}<div class="hb-what"><b>Bleeding</b><i></i></div><span></span></div>
+      <div class="hud-bleed"><i class="hb-cut">${symbol('bleed')}</i><i class="hb-drop">${symbol('blood')}</i><span></span></div>
       <div class="hud-hitdir"><i></i></div>
       <div class="hud-fps"></div>
       <div class="hud-online"><i></i><b></b><span></span></div>
@@ -310,6 +297,7 @@ export class HUD {
     }
     this.notes = this.root.querySelector('.hud-notes') as HTMLDivElement;
     for (const [k, sel] of [['wheel', '.hud-wheel'], ['wheelDot', '.wheel-dot'], ['wheelB', '.wheel-mid b'], ['wheelS', '.wheel-mid span'], ['says', '.hud-says']]) this.el[k] = this.root.querySelector(sel) as HTMLElement;
+    this.status = new StatusView(this.el.vitals);
     this.buildCompass();
     // (the game's news, in a corner of the way in: it comes when it comes, and the menu does not wait for it. What X
     // gave is shut into a pill the moment it is there, and the changelog is put over it: see `mountNews`.)
@@ -980,6 +968,11 @@ export class HUD {
     land();
   }
 
+  /** the survivor's state with a line of words to each symbol: one element, kept up to date here, for the inventory to put in its Status column */
+  get statusPanel(): HTMLElement {
+    return this.status.panel;
+  }
+
   /** players connected to the server right now (null = playing offline) */
   setOnline(count: number | null, max = 0) {
     const e = this.el.online;
@@ -1087,6 +1080,12 @@ export class HUD {
 
   private setGraphic(key: string, value: string) {
     const g = this.gfx;
+    // (the numbers beside the status symbols are no setting of the picture's: kept by themselves, and nothing is drawn afresh for them)
+    if (key === 'figures') {
+      wantFigures(value === '1');
+      this.status.figures = value === '1';
+      return this.renderGraphics();
+    }
     if (key === 'preset') Object.assign(g, PRESETS[value as PresetName]);
     else if (key === 'scale' || key === 'msaa' || key === 'fpsLimit' || key === 'volume') g[key] = Number(value);
     else if (key === 'ao') g.ao = value as Graphics['ao'];
@@ -1112,6 +1111,8 @@ export class HUD {
       row('Foliage', 'foliage', g.foliage, LEVELS.map((l) => [l, cap(l)])) +
       row('Frame limit', 'fpsLimit', g.fpsLimit, FPS_LIMITS.map((f) => [f, f ? String(f) : 'Off'])) +
       row('Volume', 'volume', g.volume, VOLUMES.map((v) => [v, v ? `${v * 100}%` : 'Off'])) +
+      // (health, blood, food and water are symbols: whoever wants the numbers as well asks for them here)
+      row('Status: exact figures', 'figures', figuresWanted() ? 1 : 0, [[0, 'Off'], [1, 'On']]) +
       `<div class="gfx-info">${this.gfxInfo()}</div>`;
   }
 
@@ -1477,6 +1478,8 @@ export class HUD {
   }
 
   update(s: {
+    /** seconds of the game's own time this frame is: what the vitals are changing by is measured against it */
+    dt: number;
     vitals: Vitals;
     /** a bag of blood or saline is running in */
     drip: boolean;
@@ -1516,6 +1519,10 @@ export class HUD {
     bleed: { rate: number; left: number; hint: string } | null;
     /** no wound, and little blood: what puts it back */
     lowBlood: string | null;
+    /** breathing gas: with nothing over the face, or through a mask (null: clean air) */
+    gas?: 'bare' | 'masked' | null;
+    /** resting by a fire that is alight: mending by it, or only warm */
+    fire?: 'mending' | 'warm' | null;
     heading: number | null;
     /** carrying a compass: the heading is also given in degrees */
     bearing: boolean;
@@ -1580,46 +1587,24 @@ export class HUD {
       }
     }
 
-    // Vitals: each a bar and a number out of a hundred, always there to be read. (They were
-    // three faint icons that only changed colour, and nobody could tell how much they had.)
+    // The body's state, as DayZ shows it: a symbol each for health, blood, food and water, in the colour of how it
+    // stands, with arrows while it is changing, and a badge for each thing that is the matter. No bars and no
+    // numbers (2026-10-13: "We dont need to show the players blood unless its dropping, dayz just does icons and
+    // symbols"). What each looks like, and when blood is there at all, is reckoned in src/ui/status.ts.
     const v = s.vitals;
-    const band = (x: number) => (x > 70 ? 'ok' : x > 40 ? 'mid' : x > 15 ? 'low' : 'crit');
-    // (blood as how much of what can be lost is left: five litres, and dead at half, is a hundred down to none)
-    for (const [k, val] of [['health', v.health], ['blood', bloodLeft(v.blood) * 100], ['energy', v.energy], ['water', v.water]] as [string, number][]) {
-      // (never "0" on somebody still alive)
-      const n = String(Math.max(0, Math.min(100, Math.ceil(val))));
-      if (this.last[`vital ${k}`] === n) continue;
-      this.last[`vital ${k}`] = n;
-      const el = e.vitals.querySelector(`[data-k="${k}"]`) as HTMLElement;
-      el.dataset.band = band(val);
-      (el.querySelector('i') as HTMLElement).style.width = `${n}%`;
-      (el.lastElementChild as HTMLElement).textContent = n;
-    }
-    const bleed = e.vitals.querySelector('[data-k="bleed"]') as HTMLElement;
-    this.toggle(bleed, 'show', v.bleeding);
-    // (the bar of what is running out runs red while it does, and green while a bag runs in)
-    const blood = e.vitals.querySelector('[data-k="blood"]') as HTMLElement;
-    this.toggle(blood, 'losing', v.bleeding);
-    this.toggle(blood, 'gaining', !v.bleeding && s.drip);
-    // and said in words, with the key to press: an icon in the corner is easy to bleed out under
-    // A wound: said in words with the key to press, how bad it is and about how long there is; and seen, as blood
-    // on the glass (2026-10-13: "the ui for bleeding and what to do when bleeding needs to be reworked, we need
-    // some sort of blood on the screen when bleeding like dayz has"). The same line, in another colour, says what
-    // puts blood back when there is no wound and little of it.
-    const card = s.bleed ?? (s.lowBlood !== null ? { rate: 0, left: Infinity, hint: s.lowBlood } : null);
-    this.toggle(e.bleed, 'show', card !== null);
-    this.toggle(e.bleed, 'low', s.bleed === null && card !== null);
+    if (this.status.due(s.dt, s.dead)) this.status.show({ health: v.health, blood: v.blood, bleed: v.bleeding ? v.bleed : 0, energy: v.energy, water: v.water, broken: !!v.broken, drip: s.drip, gas: s.gas ?? null, fire: s.fire ?? null });
+    // What to do about it, in words with the key to press, over the hotbar: the one thing a symbol cannot say. It
+    // is there only for what will not wait: an open wound, and blood so low that health no longer mends on it (the
+    // drop is red by then). How bad the wound is and how long there is, which this card also said, the badge says.
+    // And the wound is seen, as blood on the glass (2026-10-13: "we need some sort of blood on the screen when
+    // bleeding like dayz has").
+    const todo = s.bleed ? s.bleed.hint : s.lowBlood !== null && v.blood < BLOOD.grey[1] ? s.lowBlood : null;
+    this.toggle(e.bleed, 'show', todo !== null);
+    this.toggle(e.bleed, 'low', todo !== null && !s.bleed);
+    if (todo !== null) this.set('bleed', e.bleed.lastElementChild as HTMLElement, todo, 'html');
     this.toggle(e.bleedfx, 'show', s.bleed !== null);
-    if (card) {
-      const lvl = card.rate >= 12 ? 3 : card.rate >= 5 ? 2 : 1;
-      const mins = card.left === Infinity ? '' : card.left < 50 ? ' · UNDER A MINUTE' : ` · ABOUT ${Math.max(1, Math.round(card.left / 60))} MIN`;
-      const [title, how] = [...e.bleed.querySelectorAll<HTMLElement>('.hb-what > *')];
-      this.set('bleed title', title, s.bleed ? 'Bleeding' : 'Low blood');
-      this.set('bleed how', how, s.bleed ? `${['LIGHT', 'HEAVY', 'SEVERE'][lvl - 1]}${mins}` : 'NO OPEN WOUND');
-      e.bleed.dataset.lvl = String(lvl);
-      e.bleedfx.dataset.lvl = String(lvl);
-      this.set('bleed', e.bleed.lastElementChild as HTMLElement, card.hint, 'html');
-    }
+    const lvl = s.bleed ? String(bleedLevel(s.bleed.rate)) : '';
+    if (lvl && this.last.bleedfx !== lvl) e.bleedfx.dataset.lvl = this.last.bleedfx = lvl;
     this.bloodOnGlass(s.bleed?.rate ?? 0);
     const reserve = (v.stamina / MAX_STAMINA) * 100;
     (e.stamina.firstElementChild as HTMLElement).style.width = `${reserve}%`;

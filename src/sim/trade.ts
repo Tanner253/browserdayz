@@ -23,9 +23,9 @@ const WORTH: Record<string, number> = {
   // food, drink, medicine
   sprats: 2, condensed: 3, beans: 3, tomatoes: 2, sardines: 2, apple: 1, milk: 2,
   water_jug: 3, flask: 3, thermos: 4,
-  bandage: 3, stim: 11, stim_stamina: 9, firstaid: 12, splint: 5, saline: 8, blood_bag: 16,
+  bandage: 3, stim: 11, stim_stamina: 9, aid_pouch: 10, firstaid: 12, splint: 5, saline: 8, blood_bag: 16,
   // what is worn and carried
-  boonie_hat: 18, chest_rig: 6, soft_vest: 12, armor_vest: 18, life_vest: 22, heavy_armor: 32, gasmask: 30, work_gloves: 3, rubber_boots: 3, sack_pack: 8, camping_pack: 14, suitcase: 20,
+  boonie_hat: 18, chest_rig: 6, soft_vest: 12, armor_vest: 18, life_vest: 22, heavy_armor: 32, gasmask: 30, gasmask_white: 34, gasmask_orange: 38, gasmask_skull: 38, helmet_m1: 9, work_gloves: 3, rubber_boots: 3, sack_pack: 8, camping_pack: 14, suitcase: 20,
   flashlight: 5, binoculars: 10, compass: 4, watch: 6, patrol_cap: 4, fishermans_hat: 4, garden_gloves: 2,
   cigarettes: 2, grenade: 15, stash_kit: 15, old_suitcase: 8, black_bag: 3, jerrycan: 8, radio: 35,
 };
