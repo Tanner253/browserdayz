@@ -993,49 +993,97 @@ await test('a tag is never too old for having waited for the others: forty days,
   assert.equal((await handle(w, tag(w, 402, { at: new Date(w.now() - 40 * 24 * 3600 * 1000).toISOString() }))).state, 'skipped');
 });
 
-await test('across the cut-over: what was cashed in before it is paid as it was promised, one at a time, and is not counted toward five', async () => {
+await test('across the cut-over the old book is closed: what was cashed in before it and is not paid by then is taken out and never paid; what was paid stays', async () => {
+  // The owner, 2026-10-13: "i want to cancel all current pending payouts and move forward wihtour new payout
+  // tracking system", and "all waiting and not paid tags on the payout screen will now be deleted entirely."
   // (the moment is half a day after this world begins. 0.025: one tag at the least, and what the treasury keeps back)
   const w = world(0.025, { PAYOUT_RULES_FROM: '2026-10-01T00:00:00Z', PAYOUT_RULES2_FROM: '2026-10-09T00:00:00Z', PAYOUT_WALLET_DAY_TAGS: '1000' });
   const old = await cash(w, 403, 3);
   assert.deepEqual(old.map((x) => have(x.o)), [['paid'], ['funds', undefined, undefined], ['funds', undefined, undefined]]);
   assert.equal(got(w, 403), SOL(0.01));
-  // past the moment: what the same wallet cashes in now waits to be five, and the two old ones are not among them
+  // (and one that was never to be paid: it gave no wallet)
+  assert.equal((await handle(w, tag(w, 403, { wallet: '' }))).state, 'skipped');
+  let book = await readBook(w.store);
+  assert.deepEqual([book.rows.length, book.tags], [4, 4]);
+  // past the moment: what the same wallet cashes in now waits to be five, and the old ones are not among them
   w.skip(13 * 3600 * 1000);
   const fresh = await cash(w, 403, 4);
   assert.deepEqual(fresh.map((x) => have(x.o)), [1, 2, 3, 4].map((k) => ['five', k, 5]));
-  // the treasury fills: the two old ones are paid, each by itself, each two per cent of the treasury as it was promised
+  // the treasury fills and the housekeeping runs: nothing of before is paid, and nothing of before that was not paid is left
   w.chain.balances.set(TREASURY.address, got(w, TREASURY.address) + SOL(5));
   w.skip(60_000);
-  assert.equal((await sweep(w)).paid, 2);
-  let book = await readBook(w.store);
-  const was = old.map((x) => book.rows.find((r) => r.ref === refOf(x.e.id))!);
-  assert.ok(was.every((r) => r.state === 'paid' && r.rules === undefined));
-  assert.ok(was.slice(1).every((r) => r.lamports! > 90_000_000 && r.lamports! < 101_000_000));
-  assert.equal(new Set(was.map((r) => r.signature)).size, 3);
-  assert.equal(got(w, 403), SOL(0.01) + BigInt(was[1].lamports!) + BigInt(was[2].lamports!));
+  const sent = w.chain.handedIn.length;
+  assert.equal((await sweep(w)).paid, 0);
+  assert.equal(w.chain.handedIn.length, sent, 'something was sent for a tag of before the cut-over');
+  book = await readBook(w.store);
+  assert.deepEqual(book.rows.filter((r) => r.rules !== 2).map((r) => [r.ref, r.state]), [[refOf(old[0].e.id), 'paid']]);
+  assert.deepEqual([book.rows.length, book.tags, book.paid], [5, 5, 1]);
+  assert.equal(got(w, 403), SOL(0.01));
+  // asked about again, as the game server asks: the answer is no, and nothing is written for it
+  const again = await handle(w, old[1].e);
+  assert.ok(again.state === 'skipped' && /before the payout rules changed/.test(again.why));
+  // one cashed in before the moment and only handed over after it: the same
+  const late = await handle(w, tag(w, 404, { at: '2026-10-08T23:59:59.000Z' }));
+  assert.equal(late.state, 'skipped');
+  assert.equal(got(w, 404), 0n);
+  assert.equal(w.chain.handedIn.length, sent);
+  book = await readBook(w.store);
+  assert.deepEqual([book.rows.length, book.tags], [5, 5]);
+  // the housekeeping again: nothing more to take out, and nothing is written
+  const writes = w.store.ops.swap;
+  w.skip(60_000);
+  await sweep(w);
+  assert.equal(w.store.ops.swap, writes, 'the book was written though nothing had changed');
   // the four new ones wait still; with the fifth they are paid 0.05, flat, though the treasury is full
   assert.equal(dueOf(book, wallet(403)).length, 4);
   const [fifth] = await cash(w, 403, 1);
   assert.equal(fifth.o.state, 'paid');
-  assert.equal(got(w, 403), SOL(0.01) + BigInt(was[1].lamports!) + BigInt(was[2].lamports!) + SOL(0.05));
-  // one cashed in before the moment and only handed over after it goes by when it was cashed in
-  const late = await handle(w, tag(w, 404, { at: '2026-10-08T23:59:59.000Z' }));
-  assert.equal(late.state, 'paid');
-  assert.ok(got(w, 404) > SOL(0.05));
+  assert.equal(got(w, 403), SOL(0.01) + SOL(0.05));
 
-  // And a tag the book already held when this code first ran is under the rules it was taken in under, wherever
-  // the moment is put: in this world every tag is after it, and this one was written down by the code before.
+  // A payment of before that is on its way when the moment comes is followed to its end. If it arrives, the tag is paid.
+  const CUT = { PAYOUT_RULES_FROM: '2026-10-01T00:00:00Z', PAYOUT_RULES2_FROM: '2026-10-08T12:00:20Z', PAYOUT_WALLET_DAY_TAGS: '1000' };
+  const u = world(1, CUT);
+  u.chain.lose = true;
+  const lands = tag(u, 411);
+  assert.equal((await handle(u, lands)).state, 'sending');
+  u.chain.lose = false;
+  u.skip(30_000);
+  await sweep(u);
+  u.skip(5000);
+  await sweep(u);
+  book = await readBook(u.store);
+  assert.deepEqual(book.rows.map((r) => r.state), ['paid']);
+  assert.ok(got(u, 411) >= SOL(0.01) && got(u, 411) === BigInt(book.rows[0].lamports!), 'it was not paid what its one attempt set out to pay');
+  assert.equal(tries(u, lands.id), 1);
+  // And if it is seen to be lost, no other is made for it, and the tag is taken out.
+  const x = world(1, CUT);
+  x.chain.lose = true;
+  const lost = tag(x, 410);
+  assert.equal((await handle(x, lost)).state, 'sending');
+  x.chain.lose = false;
+  x.skip(100_000);
+  await sweep(x);
+  book = await readBook(x.store);
+  assert.deepEqual([book.rows.length, book.tags], [0, 0]);
+  assert.equal(tries(x, lost.id), 1);
+  assert.equal(got(x, 410), 0n);
+  x.skip(120_000);
+  await sweep(x);
+  assert.equal(got(x, 410), 0n);
+
+  // And a tag the book already held when the moment was set is of before it, wherever the moment is put: in this
+  // world every tag is after it, and this one was written down by the code before. It is taken out, and not paid.
   const v = world(0.015, FIVES);
   const at = new Date(v.now() - 60_000).toISOString();
   book = { v: 1, since: new Date(v.now() - 3600_000).toISOString(), rows: [], tags: 1, paid: 0, paidLamports: 0, claims: [], claimedLamports: 0, claimNote: '' };
   book.rows.push({ ref: refOf('heldbefore001'), at, name: 'Sable', owner: 'Brick', wallet: wallet(405), state: 'waiting', why: 'the treasury is too low: paid when the next creator rewards come in', hold: 'funds', heldOn: at.slice(0, 10) });
   v.store.put('ledger/book.json', JSON.stringify(book));
-  assert.equal((await sweep(v)).tried, 0);
   v.chain.rewards = SOL(2);
   v.skip(60_000);
-  assert.equal((await sweep(v)).paid, 1);
-  assert.ok(got(v, 405) > SOL(0.03), 'it was not paid its two per cent');
-  assert.equal(v.chain.handedIn.length, 2);
+  assert.equal((await sweep(v)).paid, 0);
+  book = await readBook(v.store);
+  assert.deepEqual([book.rows.length, book.tags], [0, 0]);
+  assert.equal(got(v, 405), 0n);
 });
 
 await test("the wallet's three a day still holds: a fourth that day is not paid and is not counted, and five take two days", async () => {

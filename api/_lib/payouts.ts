@@ -14,7 +14,8 @@
 // That is how it was. From the second cut-over (RULES2_FROM, below) a tag pays the floor, flat,
 // whatever the treasury holds, and a wallet is paid only when five of its tags are due: all of
 // them in one transaction, which still makes a receipt for each. What was cashed in before
-// the cut-over is paid as it was promised, one at a time, without waiting for five.
+// the cut-over and has not been paid by then is not paid: the old book is closed at that
+// moment, and those tags are taken out of it (see `closed`).
 //
 // The one thing that must never happen is a tag paid twice, and it is the chain that sees to
 // it, not this code. Every payment begins by creating a small account whose address is made
@@ -75,7 +76,8 @@ export interface Config {
    * The second cut-over (ms): the owner, 2026-10-13, "we will pay .01 per tag now, but we wont pay out till the user
    * is due for 5 tags". For whatever is cashed in from this moment on, a tag pays `floor` and no more (the share of
    * the treasury is not asked at all, so nothing set for it can make a full treasury pay more), and a wallet is paid
-   * only when `minTags` of its tags are due: see `dueOf`. What was cashed in before it is paid as it was promised.
+   * only when `minTags` of its tags are due: see `dueOf`. What was cashed in before it and is not paid when it comes
+   * is not paid, and is taken out of the book: see `closed`.
    * Which rules a tag is under is written on it when it is first put in the book (`rules` on its row), and holds
    * from then on: moving this moment never changes what a tag already in the book was promised.
    * Infinity: no moment is set for it (see RULES2_FROM), and there is no second cut-over.
@@ -99,20 +101,22 @@ const DEFAULT_RPC = 'https://api.mainnet-beta.solana.com';
 const DEFAULT_MINT = 'GvfAzdPF466PJsPJMzXQeX3TSqmJm9YxAG8xBJ6ypump';
 /**
  * THE MOMENT OF THE SECOND CUT-OVER, in UTC, written like '2026-10-14T18:00:00Z': a tag cashed in from that moment
- * on pays 0.01 SOL flat, and its wallet is paid when five are due. TO BE SET BY WHOEVER DEPLOYS THIS, here (or as
+ * on pays 0.01 SOL flat, and its wallet is paid when five are due; and every tag cashed in before it that has not
+ * been paid by then is taken out of the book and never paid (see `closed`). TO BE SET BY WHOEVER DEPLOYS THIS, here (or as
  * PAYOUT_RULES2_FROM, which is asked first), to a moment at or after the deploy: the payouts page says this moment
  * to everybody, before it comes and after.
  *
- * While it is '' (or anything that is not a moment) there is no second cut-over: every tag is paid as it is today,
- * and nothing anywhere says otherwise, however and whenever this code is deployed. That is how it is left, on
- * purpose: the change is the owner's to begin, and it begins when a moment is written here.
+ * While it is '' (or anything that is not a moment) there is no second cut-over: every tag is paid as it was before,
+ * and nothing anywhere says otherwise, however and whenever this code is deployed. The change was the owner's to
+ * begin, and the owner began it on 2026-10-13: "i want to cancel all current pending payouts and move forward
+ * wihtour new payout tracking system". The moment below is a quarter of an hour after that deploy.
  *
  * It must be written in full, with its zone: '2026-10-14T18:00:00Z' or '2026-10-14T20:00:00+02:00'. Anything else
  * (a day without its hour, an hour without its zone) is no moment, and nothing begins: see `config`.
  * To go back after it has begun, nothing here is touched: PAYOUT_RULES2_FROM=never puts the rule off, and what is
  * owed under it is then paid out as it stands (see `rules2From` in Config, and `needOf`).
  */
-export const RULES2_FROM = '';
+export const RULES2_FROM = '2026-10-13T23:45:00Z';
 
 const lamports = (sol: number) => BigInt(Math.round(sol * LAMPORTS));
 export const sol = (l: bigint | number) => Number(l) / LAMPORTS;
@@ -271,8 +275,8 @@ export type Outcome =
    * so there is nothing to ask about again: it is paid from the book when the count is reached (see api/cashin.ts).
    */
   | { state: 'waiting'; why: string; hold?: Hold; have?: number; need?: number; parked?: true }
-  /** will not be paid, and why */
-  | { state: 'skipped'; why: string }
+  /** will not be paid, and why. `gone`: and it is not kept: not written in the book, and taken out of it if it is there (see `closed`) */
+  | { state: 'skipped'; why: string; gone?: true }
   /** payouts were not switched on when it was cashed in: listed only */
   | { state: 'off' };
 
@@ -362,6 +366,40 @@ const owed = (r: Row | undefined) => r?.state === 'waiting' && (r.hold === 'day'
 /** Is a tag under the rules of the second cut-over? Its row says, once it has one; until then, when it was cashed in. */
 const fives = (cfg: Config, t: { at: string }, had?: Row | null) => (had ? had.rules === 2 : Date.parse(t.at) >= cfg.rules2From);
 const FIVE = (cfg: Config) => `paid when ${cfg.minTags} of this wallet's tags are due`;
+/**
+ * THE OLD BOOK IS CLOSED AT THE SECOND CUT-OVER. The owner, 2026-10-13: "i want to cancel all current pending
+ * payouts and move forward wihtour new payout tracking system", and "all waiting and not paid tags on the payout
+ * screen will now be deleted entirely."
+ *
+ * So from that moment a tag cashed in before it that has not been paid is not paid: not waited for, not tried
+ * again, and not kept. It is taken out of the book, with every tag of before that was refused or only listed, and
+ * the list shows what was paid and what has come since. What was paid stays paid. A payment that was already on its
+ * way at the moment is followed to its end first: if it arrives the tag is paid, and only if it is seen to be lost
+ * is the tag taken out.
+ *
+ * It is a rule of the tag's own time, so nothing has to be remembered for it to hold: asked about such a tag in a
+ * year, by anybody, the answer is the same, and nothing is written. (Taking the rows out and no more would not have
+ * held: the game server asks again about a tag it has not seen settled, and a tag the book does not know is a new
+ * tag.) What has been taken out is not put back by moving or removing the moment afterwards.
+ */
+const CLOSED = 'cashed in before the payout rules changed: what was not paid by then is not paid';
+const GONE: Outcome = { state: 'skipped', why: CLOSED, gone: true };
+/** Is this a tag of before the second cut-over, now that the cut-over has come? (Its row says which rules it is under, once it has one.) */
+const closed = (cfg: Config, t: { at: string }, now: number, had?: Row | null) => now >= cfg.rules2From && !fives(cfg, t, had);
+/**
+ * Takes out of the book every tag of before the second cut-over that is not paid and has no attempt on record:
+ * nothing need be asked of the chain about those. (One with an attempt on record is seen to by `settle`, which
+ * asks.) The count of tags goes down with them: it is the count of what the list holds and has held.
+ * @returns how many were taken out
+ */
+const shutNow = (r: Row) => !(r.rules === 2 || r.state === 'paid' || r.state === 'sending' || !!r.tries?.length);
+export function shutOld(book: Book): number {
+  const kept = book.rows.filter((r) => !shutNow(r));
+  const n = book.rows.length - kept.length;
+  book.rows = kept;
+  book.tags = Math.max(kept.length, book.tags - n);
+  return n;
+}
 /**
  * How many of a wallet's tags must be due before it is paid, as things stand at this moment: `minTags` while the
  * second cut-over is in force, and one while it is not. It is not in force before its moment, when there is no
@@ -728,11 +766,15 @@ async function settle(w: World, t: Tag, at: { held: Held }, again = false): Prom
 
   // begun by the version before this one, whose payments left no receipt to tell by: paid if
   // its payment is seen to have arrived, and otherwise for a person to settle, never the machine
+  // (a tag of before the second cut-over, now that it has come: see `closed`)
+  const shut = closed(cfg, t, now, had);
   if (had?.legacy) {
     const [s] = had.signature ? await w.rpc.statuses([had.signature]) : [null];
     if (landed(s)) return only({ state: 'paid', lamports: had.lamports ?? 0, signature: had.signature!, at: iso(now) });
-    return only({ state: 'skipped', why: 'left unfinished by an earlier version of this system: to be settled by hand' });
+    return only(shut ? GONE : { state: 'skipped', why: 'left unfinished by an earlier version of this system: to be settled by hand' });
   }
+  // (nothing was ever sent for it: there is nothing to ask the chain)
+  if (shut && !tries.length) return only(GONE);
 
   if (!t.wallet) return only({ state: 'skipped', why: 'no wallet given' });
   let to: Bytes;
@@ -798,6 +840,11 @@ async function settle(w: World, t: Tag, at: { held: Held }, again = false): Prom
       // the very same transaction once more does no harm and may help it along
       await w.rpc.send({ wire: Uint8Array.from(Buffer.from(last.wire, 'base64')), signature: last.signature }).catch(() => {});
       for (const m of lot) say(m, { state: 'sending', lamports: m.had?.lamports ?? 0, signature: last.signature });
+      return said;
+    }
+    // (every attempt made for it is seen to be lost, and the old book is closed: no other is made)
+    if (shut) {
+      for (const m of lot) say(m, GONE);
       return said;
     }
     if (tries.length >= MAX_TRIES) {
@@ -1148,6 +1195,15 @@ async function seeTo(w: World, t: Tag, from?: Held): Promise<{ outcome: Outcome;
             // (asked again where it is written down: of several cashed in at one moment, each was asked before the others were in the book)
             const o: Outcome = x.o.state === 'waiting' && x.o.hold === 'five' && overDay(b, x.t, cfg) ? { state: 'skipped', why: OVER_DAY(cfg) } : x.o;
             wrote.set(x.t.ref, o);
+            // (the old book is closed: such a tag is not written down, and is taken out if it is there. See `closed`.)
+            if (o.state === 'skipped' && o.gone) {
+              if (row) {
+                b.rows.splice(b.rows.indexOf(row), 1);
+                b.tags = Math.max(b.rows.length, b.tags - 1);
+                changed = true;
+              }
+              continue;
+            }
             if (row && says(row, o, day)) continue;
             enter(b, x.t, o, day, x.five);
             if (o.state === 'paid') newly++;
@@ -1182,14 +1238,18 @@ export async function sweep(w: World, limit = 200): Promise<{ tried: number; pai
   let tried = 0, paid = 0;
   if (w.cfg.mode !== 'off') {
     const waiting: Row[] = [];
-    const glanced = await glanceBook(w.store);
+    let glanced = await glanceBook(w.store);
+    // (The old book is closed at the second cut-over: see `closed`. What needs nothing asked of the chain goes at
+    // once, in one write, and only if there is any; what has an attempt on record is seen to below, however old.)
+    const shut = w.now() >= w.cfg.rules2From;
+    if (shut && glanced.rows.some(shutNow)) glanced = (await editBook(w, (b) => shutOld(b) > 0)).book;
     // What is past four days old is left alone, unless it is owed: one that never got so far as being taken in has
     // been refused as too old by then, or will not be looked at to any purpose. Under the second cut-over a payment
     // that is on its way is followed to its end as well, however old its tags: there the first attempt is
     // ordinarily made days after the first of them was cashed in, and if it was not seen to arrive in the moment
     // it was watched for, nobody looked again: it stayed "sending" for good, whether it had arrived or was lost.
     const followed = (r: Row) => owed(r) || (r.rules === 2 && r.state === 'sending') || w.now() - Date.parse(r.at) < MAX_AGE_MS + 24 * 3600 * 1000;
-    for (const r of glanced.rows) if (open(r) && followed(r) && (await due(w, r, glanced))) waiting.push(r);
+    for (const r of glanced.rows) if (open(r) && ((shut && r.rules !== 2) || (followed(r) && (await due(w, r, glanced))))) waiting.push(r);
     if (waiting.length) {
       const held = await freshBook(w.store);
       const began = w.now();
