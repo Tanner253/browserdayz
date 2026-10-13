@@ -12,6 +12,8 @@ import { antiFirefly, SHADOW_FRUSTA, type Atmosphere } from './atmosphere';
 import { foliagePatch, setLodFade, wind, SNOW_LIES, SNOW_PAINT } from './foliage';
 import { heightAt, type Instance, type World } from './worldgen';
 import { BARREL } from '../sim/barrels';
+import { HUNG } from '../sim/crates';
+import { FIRE } from '../sim/fires';
 
 interface Level {
   meshes: THREE.InstancedMesh[];
@@ -85,6 +87,10 @@ const SOLID: Record<string, [Surface, number]> = {
   lab_table: ['metal', 0.92],
   surgical_trolley: ['metal', 0.85],
   med_cabinet: ['metal', 0.95],
+  // (2026-10-13: the steel locker and the two racks the owner brought in)
+  steel_locker: ['metal', 0.98],
+  rack_small: ['metal', 0.95],
+  rack_wide: ['metal', 0.95],
   lab_counter: ['concrete', 0.95],
   med_sink: ['metal', 0.9],
   mop_bucket: ['metal', 0.6],
@@ -715,7 +721,8 @@ export class Vegetation {
           const variant = kind.includes('@') ? VARIANTS[id]?.[Number(kind.split('@')[1])] : undefined;
           const pick = (scene: THREE.Group) => {
             if (variant) return extractParts(scene, variant);
-            if (sub < 0) return extractParts(scene);
+            // (a thing with doors that swing is drawn here without them: they are hung and turned by src/game/lockers.ts)
+            if (sub < 0) return extractParts(scene, HUNG[id] ? (n) => !HUNG[id].leaf.test(n) : undefined);
             const name = scene.children[sub % scene.children.length].name;
             return extractParts(scene, (n) => n === name);
           };
@@ -758,7 +765,10 @@ export class Vegetation {
           const swap = THREE.MathUtils.clamp(Math.max(size.x, size.y, size.z) * biggest * 20, 18, 60);
           const fade: [number, number] = [swap, swap + Math.max(4, swap * 0.18)];
           const out: [number, number] = isRock || id === CONTAINER.id ? [330, 350] : isFern ? [58, 70] : [128, 140];
-          if (p1) {
+          if (id === FIRE.kind) {
+            // (A fireplace is not drawn here: the ring that stands there, cold or alight, is the fires' own to draw,
+            // src/game/fires.ts. It is in the world for where it is, and for what stops a body there, below.)
+          } else if (p1) {
             set.addLevel(scene, mats(p0, null, fade), 0, 0, fade[0], fade[1], !isFern);
             set.addLevel(scene, mats(p1, fade, out), fade[0], fade[1], out[0], out[1], !isFern);
           } else {

@@ -234,6 +234,8 @@ export type S2C =
       hour?: number;
       /** the bunker's door stands open */
       bunker?: boolean;
+      /** the map's containers that somebody is searching at the moment: a locker among them stands with its doors open (see 'cdoor'). Not said by a server from before 2026-10-13 */
+      ajar?: string[];
       max: number;
     }
   | { t: 'join'; p: PlayerInfo }
@@ -263,6 +265,13 @@ export type S2C =
   | { t: 'denied'; uid: string }
   | { t: 'cdata'; cid: string; items: StoredItem[] }
   | { t: 'cbusy'; cid: string }
+  /**
+   * One of the map's containers has been opened by somebody ('copen' was answered with what is in it), or they are
+   * done with it: said to everybody, the one searching among them, so that a locker's doors are seen to swing open
+   * and stay open for as long as it is searched (src/game/lockers.ts). A game that was never told of these shows
+   * every locker shut.
+   */
+  | { t: 'cdoor'; cid: string; open: boolean }
   | { t: 'stash+'; s: StashInfo }
   | { t: 'stash-'; uid: string }
   /** a stash has been buried, or dug up */

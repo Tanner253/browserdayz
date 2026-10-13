@@ -135,6 +135,8 @@ export function hospitalPlan(): Blueprint {
   g.top('WoodenTable_01', -16.2, -4.6, 0, 0.57, 2).put('painted_wooden_chair_01', -16.6, -3.9, PI).put('painted_wooden_chair_01', -15.6, -5.3, 0.1).put('painted_wooden_chair_01', -17.5, -4.7, Q);
   g.top('electric_stove', -18.95, -7.45, 0, 0.88).top('painted_wooden_cabinet', -16.0, -7.47, 0, 1.2).case('Shelf_01', -13.05, -5.6, -Q, [0.66, 0.94, 1.22]).bed(-19.1, -3.5, 0);
   g.floor([-14.6, -2.6], [-17.8, -6.2]);
+  // (2026-10-13: the crews' own lockers, side by side on the wall the laundry is behind)
+  g.put('steel_locker', -13.2, -3.95, -Q).put('steel_locker', -13.2, -2.8, -Q);
   // the laundry
   g.put('mop_bucket', -12.25, -2.6, 0.6).shelves(-12.43, -6.8, Q, [0, 3]).shelves(-12.43, -5.6, Q, [0, 3]).put('folded_blanket', -12.43, -6.8, Q, 0.66).put('folded_blanket', -12.43, -6.6, Q + 0.2, 1.17).put('folded_blanket', -12.43, -5.6, Q, 0.66).put('folded_blanket', -12.43, -5.8, Q + 0.1, 1.17);
   g.put('cardboard_box_01', -10.1, -6.5, 0.3).put('wooden_crate_01', -10.0, -3.8, Q).floor([-11.2, -4.6]);
@@ -276,6 +278,8 @@ export function hospitalPlan(): Blueprint {
   // where the staff sat down
   s.top('painted_wooden_table', 8.0, -4.4, 0, 0.98, 2).put('painted_wooden_chair_01', 7.2, -3.5, PI).put('painted_wooden_chair_01', 8.8, -3.5, PI + 0.2).put('painted_wooden_chair_01', 7.4, -5.3, 0).put('painted_wooden_chair_01', 8.9, -5.3, -0.2);
   s.top('electric_stove', 4.0, -7.45, 0, 0.88).top('painted_wooden_cabinet', 5.0, -7.47, 0, 1.2).put('water_cooler', 12.5, -2.3, -Q).top('hospital_bench', 9.8, -7.46, 0, 0.46).floor([5.4, -3.0], [10.6, -5.6]);
+  // (2026-10-13: and their lockers, on the wall the archive is behind)
+  s.put('steel_locker', 3.6, -2.6, Q).put('steel_locker', 3.6, -3.75, Q);
   // the clerks
   s.top('metal_office_desk', 15.2, -4.0, 0, 0.81, 2).put('hospital_pc', 15.7, -4.1, 0, 0.8).put('SchoolChair_01', 15.2, -3.1, PI).top('metal_office_desk', 17.4, -6.3, PI, 0.81, 2).put('SchoolChair_01', 17.4, -7.15, 0);
   s.case('Shelf_01', 13.05, -4.2, Q, [0.66, 1.22]).case('Shelf_01', 13.05, -5.4, Q, [0.94]).case('wooden_bookshelf_worn', 19.28, -3.4, -Q, [0.67, 1.28]).floor([16.8, -2.6], [13.6, -6.8]);
@@ -611,7 +615,9 @@ export function policeHqPlan(): Blueprint {
   // the way through to the back door
   g.put('extinguisher_box', -1.34, -4.2, Q, 1.05).floor([0, -4.4]);
   // the lockers
-  g.put('med_cabinet', 1.98, -2.2, Q).put('med_cabinet', 1.98, -3.5, Q).put('med_cabinet', 1.98, -4.8, Q).put('med_cabinet', 7.62, -2.2, -Q).put('med_cabinet', 7.62, -5.3, -Q);
+  // (They were five of the hospital's cabinets. Since 2026-10-13 they are lockers, the owner's, each where a cabinet
+  // stood: what is searched there goes by where it stands, and is the same thing it was.)
+  g.put('steel_locker', 1.98, -2.2, Q).put('steel_locker', 1.98, -3.5, Q).put('steel_locker', 1.98, -4.8, Q).put('steel_locker', 7.62, -2.2, -Q).put('steel_locker', 7.62, -5.3, -Q);
   g.top('hospital_bench', 4.8, -3.7, Q, 0.46).case('Shelf_01', 4.8, -6.15, 0, [0.38, 0.94, 1.51]).put('cardboard_box_01', 6.6, -5.6, 1.2).floor([3.4, -3.0], [6.2, -4.0]);
   // where they ate
   g.top('electric_stove', 8.5, -5.95, 0, 0.88).top('painted_wooden_cabinet', 10.4, -5.97, 0, 1.2).top('WoodenTable_01', 8.46, -3.4, Q, 0.57, 2).put('painted_wooden_chair_01', 9.3, -3.0, -Q).put('painted_wooden_chair_01', 9.3, -3.9, -Q - 0.2).floor([10.2, -4.4]);
@@ -812,7 +818,8 @@ export function policeCellsPlan(): Blueprint {
   // ---------------------------------------------------------------- above: where the men slept
   const u = new Floor();
   for (const [k, z] of [-4.6, -1.6, 1.5, 4.4].entries()) u.bed(-4.4, z, 0, k % 2 === 0);
-  u.put('med_cabinet', -1.68, -1.2, -Q).put('med_cabinet', -1.68, 4.7, -Q).put('painted_wooden_chair_01', -2.6, -5.0, 1.2).floor([-2.8, -3.6], [-2.8, 1.6]);
+  // (their lockers: two of the hospital's cabinets until 2026-10-13, each where a locker stands now)
+  u.put('steel_locker', -1.68, -1.2, -Q).put('steel_locker', -1.68, 4.7, -Q).put('painted_wooden_chair_01', -2.6, -5.0, 1.2).floor([-2.8, -3.6], [-2.8, 1.6]);
   // where they sat: a table, the set
   u.top('WoodenTable_01', 3.2, -3.4, 0, 0.57, 2).put('painted_wooden_chair_01', 2.6, -2.7, PI).put('painted_wooden_chair_01', 3.8, -4.1, 0).top('painted_wooden_cabinet', 3.2, -0.43, PI, 1.2).put('Television_01', 3.2, -0.45, PI, 1.18).floor([2.2, -1.8]);
   // where they washed

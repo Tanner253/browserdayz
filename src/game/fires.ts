@@ -5,15 +5,25 @@
 import * as THREE from 'three';
 import { assets } from '../core/assets';
 import { audio } from '../core/audio';
+import { extractParts, groundParts, joinByPaint } from '../core/gltf-utils';
+import { physics } from '../core/physics';
 import { FIRE, fireSpots } from '../sim/fires';
 import type { Atmosphere } from '../world/atmosphere';
-import type { World } from '../world/worldgen';
+import { foliagePatch, setLodFade } from '../world/foliage';
+import { heightAt, type World } from '../world/worldgen';
 import type { Effects } from './effects';
 
 /** how far off a fire's flames are drawn, and its smoke, metres (the smoke is what is seen of it from across the map) */
 const SEEN = { flames: 70, smoke: 420 };
-/** the wood laid in each ring: which model it is, and how wide and how high it lies, metres */
-const WOOD = { model: 'dry_branches_medium_01', across: 0.78, high: 0.3 };
+/**
+ * What is drawn at each fireplace (2026-10-13: "the assets I brought in look better than our hand made ones"): a
+ * ring of stones with wood stood in it, cold while it is out, and the same with its embers painted in while it
+ * burns. Where it stands is the map's own fireplace (FIRE.kind: the server counts those, and what stops a body
+ * there is that prop's), which is not drawn any more: this is, at the same place and as wide. `seen`: how far off
+ * it is drawn, as anything stood about the map is. `logs`: how wide and how high the wood stands in the middle of
+ * it, which is solid too, so that nobody stands in it.
+ */
+const RING = { cold: 'campfire_ring_cold', lit: 'campfire_ring', seen: [128, 140] as [number, number], reach: 0.6, logs: { r: 0.3, h: 0.8 } };
 /** the light of a fire: its colour, how strong, and how far it reaches, metres */
 const GLOW = { color: 0xff8f3a, strength: 7, reach: 9, from: 48 };
 
@@ -26,26 +36,51 @@ export class Fires {
   private light: THREE.PointLight;
   private heardT = 0;
   private clock = 0;
+  /** the ring at each fireplace as it is drawn: cold, and alight (one of the two is shown) */
+  private rings: { cold: THREE.Object3D; lit: THREE.Object3D }[] = [];
 
   constructor(world: World, scene: THREE.Scene, private effects: Effects, atmo: Atmosphere) {
     this.spots = fireSpots(world.props).map((p) => new THREE.Vector3(p.x, p.y, p.z));
-    // wood laid ready in every ring: a fireplace that can be lit looks like one
-    void assets.model(WOOD.model).then((tpl) => {
-      const box = new THREE.Box3().setFromObject(tpl), size = box.getSize(new THREE.Vector3()), mid = box.getCenter(new THREE.Vector3());
-      const k = WOOD.across / Math.max(size.x, size.z, 1e-3);
-      this.spots.forEach((s, i) => {
-        const wood = tpl.clone();
-        const pile = new THREE.Group();
-        wood.position.set(-mid.x, -box.min.y, -mid.z);
-        pile.add(wood);
-        pile.scale.set(k, Math.min(k * 1.4, WOOD.high / Math.max(size.y, 1e-3)), k);
-        pile.position.set(s.x, s.y + 0.04, s.z);
-        pile.rotation.y = i * 1.9;
-        pile.traverse((o) => {
-          o.castShadow = o.receiveShadow = true;
+    // the ring at every fireplace, with its wood laid ready: a fireplace that can be lit looks like one
+    void Promise.all([assets.model(RING.cold), assets.model(RING.lit)]).then((models) => {
+      // (each of the two is one shape and one paint, whatever number of fireplaces there are: the paint fades it out with distance as it does everything stood about the map)
+      const [cold, lit] = models.map((model) => {
+        const parts = joinByPaint(extractParts(model));
+        groundParts(parts);
+        return parts.map((p) => {
+          const paint = (p.material as THREE.MeshStandardMaterial).clone();
+          const fp = foliagePatch({});
+          setLodFade(fp.lod, null, RING.seen);
+          atmo.register(paint, fp.patch, 'prop');
+          return { geometry: p.geometry, paint };
         });
-        atmo.registerObject(pile);
-        scene.add(pile);
+      });
+      const stand = (parts: typeof cold, s: THREE.Vector3, y: number, turn: number) => {
+        const ring = new THREE.Group();
+        for (const p of parts) {
+          const mesh = new THREE.Mesh(p.geometry, p.paint);
+          mesh.castShadow = mesh.receiveShadow = true;
+          mesh.matrixAutoUpdate = false;
+          ring.add(mesh);
+        }
+        ring.position.set(s.x, y, s.z);
+        ring.rotation.y = turn;
+        ring.matrixAutoUpdate = false;
+        ring.updateMatrix();
+        scene.add(ring);
+        return ring;
+      };
+      this.rings = this.spots.map((s, i) => {
+        // It stands on the lowest of the ground under it: on a slope its uphill stones are a little in the bank,
+        // and no side of it hangs in the air. (The fireplace itself, for whoever lights it and for the flames, is
+        // where it always was.)
+        let y = s.y;
+        for (let k = 0; k < 8; k++) y = Math.min(y, heightAt(world.heights, s.x + Math.cos((k * Math.PI) / 4) * RING.reach, s.z + Math.sin((k * Math.PI) / 4) * RING.reach));
+        const ring = { cold: stand(cold, s, y, i * 1.9), lit: stand(lit, s, y, i * 1.9) };
+        ring.lit.visible = false;
+        // the wood stood in the middle of it stops a body, as the stones round it do already
+        if (physics.world) physics.addStatic(physics.R.ColliderDesc.cylinder(RING.logs.h / 2, RING.logs.r), 'wood', { x: s.x, y: y + RING.logs.h / 2, z: s.z });
+        return ring;
       });
     });
     this.left = this.spots.map(() => 0);
@@ -93,10 +128,18 @@ export class Fires {
     this.clock += dt;
     let near = -1, nd = Infinity;
     for (let i = 0; i < this.spots.length; i++) {
-      if (this.left[i] <= 0) continue;
-      this.left[i] = Math.max(0, this.left[i] - dt);
       const s = this.spots[i];
       const d = Math.hypot(s.x - eye.x, s.y - eye.y, s.z - eye.z);
+      // The ring as it is now: alight from the moment it is lit to the moment it is out, cold otherwise, and
+      // neither from further off than it could be seen.
+      const ring = this.rings[i];
+      if (ring) {
+        const seen = d < RING.seen[1], alight = this.left[i] > 0;
+        ring.cold.visible = seen && !alight;
+        ring.lit.visible = seen && alight;
+      }
+      if (this.left[i] <= 0) continue;
+      this.left[i] = Math.max(0, this.left[i] - dt);
       if (d < nd) {
         nd = d;
         near = i;

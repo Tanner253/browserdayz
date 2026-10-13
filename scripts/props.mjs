@@ -215,7 +215,8 @@ export async function processProp(id, cfg, { io, SRC, OUT, FORCE, exists, countT
         if (!scene.listChildren().includes(stood[i])) return;
         scene.removeChild(stood[i]);
         transformMesh(meshes[i], move(-at[0], -at[1], -at[2]));
-        hinge.addChild(stood[i].setName(`${id}_${h.name}_${k}`));
+        // (its shape is called by the same name: what reads the file tells its pieces apart by either)
+        hinge.addChild(stood[i].setName(`${id}_${h.name}_${k}`).setMesh(meshes[i].setName(`${id}_${h.name}`)));
       });
     }
     const inUse =new Set(meshes.flatMap((mesh) => mesh.listPrimitives().map((p) => p.getMaterial())));

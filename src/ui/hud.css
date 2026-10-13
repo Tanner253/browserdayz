@@ -1969,9 +1969,12 @@ body.touch .hm-tiers, body.touch .hm-show, body.touch .hm-zoom { gap: 3px; }
    these same numbers (they are read from here: see InventoryUI.figureBox), so the hole is not seen. If the veil's
    colours, its blur or the middle of its gradient are changed in `.inv` above, they are to be changed here; and
    the middle of the gradient in doll.ts as well (MID). */
-.inv { --veil-in: 12, 15, 13, 0.78; --veil-out: 4, 5, 5, 0.94; --veil-blur: 7; --veil-sat: 0.65; }
+.inv { --veil-in: 12, 15, 13, 0.78; --veil-out: 4, 5, 5, 0.94; --veil-blur: 7; --veil-sat: 0.65; --veil-band: 20; --veil-ramp: 8; }
+@supports not (mask-composite: exclude) {
+  .inv { --veil-band: 0; }
+}
 /* (where a blur has not been seen to keep to a cut shape: a plain veil, and darker, for there is no blur to quiet what is behind it) */
-.inv.veil-plain { --veil-in: 12, 15, 13, 0.9; --veil-out: 4, 5, 5, 0.97; --veil-blur: 0; --veil-sat: 1; }
+.inv.veil-plain { --veil-in: 12, 15, 13, 0.9; --veil-out: 4, 5, 5, 0.97; --veil-blur: 0; --veil-sat: 1; --veil-band: 0; }
 .inv.fig-live { background: none; backdrop-filter: none; }
 .inv.fig-live::before {
   content: '';
@@ -1984,6 +1987,31 @@ body.touch .hm-tiers, body.touch .hm-show, body.touch .hm-zoom { gap: 3px; }
   clip-path: polygon(evenodd, 0 0, 100% 0, 100% 100%, 0 100%, 0 0, var(--fig-l) var(--fig-t), var(--fig-l) var(--fig-b), var(--fig-r) var(--fig-b), var(--fig-r) var(--fig-t), var(--fig-l) var(--fig-t));
 }
 .inv.fig-live.veil-plain::before { backdrop-filter: none; }
+/* The veil's blur reaches past its own edge into the hole, and what it finds there, drawn as dark as the veil makes
+   it, it spreads outward as a dark line round the hole. So round the inside of the hole's edge (`--veil-band` wide:
+   as far as the blur reaches) the veil's dark is laid by the page, with no blur, on a layer of its own, and what is
+   drawn under it is left as bright as the world is: the blur finds what it finds everywhere else. Inward the band
+   thins to nothing over `--veil-ramp` (a soft edge: the picture under it is made to meet it, and a hard one would
+   show wherever the two were a part of a pixel out). It is the same gradient, laid out over the whole page. */
+.inv.fig-live::after {
+  --b: calc(var(--veil-band) * 1px);
+  --r: calc((var(--veil-band) + var(--veil-ramp)) * 1px);
+  content: '';
+  position: absolute;
+  left: var(--fig-l);
+  top: var(--fig-t);
+  width: calc(var(--fig-r) - var(--fig-l));
+  height: calc(var(--fig-b) - var(--fig-t));
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 35%, rgba(var(--veil-in)), rgba(var(--veil-out))) calc(-1 * var(--fig-l)) calc(-1 * var(--fig-t)) / var(--fig-pw) var(--fig-ph) no-repeat;
+  mask-image: linear-gradient(#000, #000), linear-gradient(to right, transparent var(--b), #000 var(--r), #000 calc(100% - var(--r)), transparent calc(100% - var(--b))), linear-gradient(to bottom, transparent var(--b), #000 var(--r), #000 calc(100% - var(--r)), transparent calc(100% - var(--b)));
+  mask-composite: exclude, intersect;
+}
+.inv.fig-live.veil-plain::after { display: none; }
+@supports not (mask-composite: exclude) {
+  .inv.fig-live::after { display: none; }
+}
 /* the still picture is put away wherever the live one is to be had; and the figure is a thing to take hold of */
 .inv.fig-ready .doll-fig { background-image: none !important; filter: none; }
 .inv.fig-live .doll-fig { cursor: grab; touch-action: pan-y; }

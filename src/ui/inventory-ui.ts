@@ -345,17 +345,19 @@ export class InventoryUI {
       const f = fig.getBoundingClientRect(), d = row.getBoundingClientRect(), c = col.getBoundingClientRect();
       // (the column's own inside: within its border, and clear of its scroll bar)
       const left = c.left + col.clientLeft * z, top = c.top + col.clientTop * z;
-      // The hole is the whole row the figure stands in, the places for what is worn with it, and a little over:
+      // The hole is the whole row the figure stands in, the places for what is worn with it, and some way over:
       // what is in the figure's hands reaches behind those places when it is turned, and is not cut off at the
-      // figure's own box. (The places lie over the hole as they lie over the veil.)
-      const l = Math.ceil(Math.max(d.left - 8 * z, left)), t = Math.ceil(Math.max(d.top - 12 * z, top));
-      const r = Math.floor(Math.min(d.right + 8 * z, left + col.clientWidth * z)), b = Math.floor(Math.min(d.bottom + 12 * z, top + col.clientHeight * z));
+      // figure's own box. (The places lie over the hole as they lie over the veil. Over and under the row it is
+      // wider than at its sides: the band the veil is laid in round its edge is not to lie over the figure's head
+      // or its feet.)
+      const l = Math.ceil(Math.max(d.left - 8 * z, left)), t = Math.ceil(Math.max(d.top - 28 * z, top));
+      const r = Math.floor(Math.min(d.right + 8 * z, left + col.clientWidth * z)), b = Math.floor(Math.min(d.bottom + 28 * z, top + col.clientHeight * z));
       if (f.width >= 16 && f.height >= 16 && r - l >= 16 && b - t >= 16) {
-        // (the veil, as the stylesheet has it for the figure: its colours, its blur and what colour it leaves, each a number there)
+        // (the veil, as the stylesheet has it for the figure: its colours, its blur, what colour it leaves and the band round the hole, each a number there)
         const css = getComputedStyle(this.root), said = (k: string) => css.getPropertyValue(k).split(',').map(Number);
-        const from = said('--veil-in'), to = said('--veil-out'), blur = said('--veil-blur')[0], sat = said('--veil-sat')[0];
-        if ([...from, ...to, blur, sat].every(Number.isFinite) && from.length === 4 && to.length === 4) {
-          box = { x: f.left, y: f.top, w: f.width, h: f.height, cx: l, cy: t, cw: r - l, ch: b - t, veil: { x: page.left, y: page.top, w: page.width, h: page.height, from, to, blur: blur * z, sat } };
+        const from = said('--veil-in'), to = said('--veil-out'), [blur, sat, band, thins] = ['--veil-blur', '--veil-sat', '--veil-band', '--veil-ramp'].map((k) => said(k)[0]);
+        if ([...from, ...to, blur, sat, band, thins].every(Number.isFinite) && from.length === 4 && to.length === 4) {
+          box = { x: f.left, y: f.top, w: f.width, h: f.height, cx: l, cy: t, cw: r - l, ch: b - t, veil: { x: page.left, y: page.top, w: page.width, h: page.height, from, to, blur: blur * z, sat, band: band * z, thins: thins * z } };
         }
       }
     }
@@ -369,6 +371,9 @@ export class InventoryUI {
     s.setProperty('--fig-t', box ? at(box.cy, page.top) : '0px');
     s.setProperty('--fig-r', box ? at(box.cx + box.cw, page.left) : '0px');
     s.setProperty('--fig-b', box ? at(box.cy + box.ch, page.top) : '0px');
+    // (and how big the page is: the band round the hole is a piece of the veil's own gradient, laid out over the whole page)
+    s.setProperty('--fig-pw', at(page.right, page.left));
+    s.setProperty('--fig-ph', at(page.bottom, page.top));
     return box;
   }
 

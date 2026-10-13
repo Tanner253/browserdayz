@@ -69,6 +69,7 @@ import { GAS, underGas, bunkerUnder } from '../sim/gas';
 import { DAY, hourAt, phaseOf } from '../sim/daynight';
 import { FIRE, Hearths } from '../sim/fires';
 import { Fires } from './fires';
+import { Lockers } from './lockers';
 import { breaksOnHit } from '../sim/injury';
 import { MenuScenes } from './menu-scenes';
 import { Traders } from './trader';
@@ -175,6 +176,8 @@ export class Game {
   private menuOn = true;
   /** the fireplaces: which are alight, and the look and sound of them */
   fires!: Fires;
+  /** the doors of the lockers that have them: swung open while one is searched, by anybody (see ./lockers.ts) */
+  lockers!: Lockers;
   /** the bunker: what is built of it, its door and its lamps */
   bunker!: BunkerSite;
   /** playing alone: seconds since this game was last inside it with its door open */
@@ -431,6 +434,9 @@ export class Game {
       st.adopt(c.collider);
       this.loot.crates.push(st);
     }
+    // (and the doors of those of them that have doors, hung where their cases stand)
+    this.lockers = new Lockers(world, r.scene, atmo);
+    await this.lockers.load();
     // and what is searched in the bunker that is no crate: its lockers, racks, cabinets and desks
     // (each is solid already: what stands for it here is a grain of steel in the middle of it)
     const under = bunkerPlace(world);
@@ -1458,6 +1464,9 @@ export class Game {
     for (const b of this.s.veg.barrels) b?.setThere(!w.barrels?.includes(b.i));
     this.fires.clear();
     for (const [i, left] of w.fires ?? []) this.fires.set(i, left);
+    // the lockers somebody is searching at the moment: their doors stand open
+    this.lockers.clear();
+    for (const cid of w.ajar ?? []) this.lockers.set(cid, true);
     this.bunker.setOpen(!!w.bunker, true);
     for (const p of w.players) void this.addRemote(p);
     this.garage.clear();
@@ -1600,6 +1609,7 @@ export class Game {
       this.openStash = null;
       if (this.invUI.isOpen) this.invUI.refresh(this.around(), null);
     });
+    net.on('cdoor', (m) => this.lockers.set(m.cid, m.open));
     net.on('stash+', (m) => void this.addRemoteStash(m.s));
     net.on('stash-', (m) => {
       const st = this.loot.stashes.find((s) => s.uid === m.uid);
@@ -4541,6 +4551,8 @@ export class Game {
     this.lightStep(dt, playing && !uiOpen && !typing);
     // the fires: the infected hear one crackle, and whoever is beside one mends
     for (const at of this.fires.update(dt, this.s.r.camera.position)) this.horde.noise(at.x, at.z, FIRE.heard);
+    // the lockers' doors: open while one is searched, by this player or (the server says) by anybody
+    this.lockers.update(dt, this.s.r.camera.position, this.openStash?.uid ?? null);
     // a broken leg, said for as long as it is one
     const lame = this.started && !p.dead && !!p.vitals.broken;
     if (lame !== this.legTag.classList.contains('on')) this.legTag.classList.toggle('on', lame);

@@ -936,6 +936,21 @@ export class AudioEngine {
   }
 
   /**
+   * A steel locker's doors: pulled open, or swung to and shut (src/game/lockers.ts). The recordings of the steel
+   * door there are, played quicker for a door a tenth of that one's weight, and quietly: a thing of the room it is
+   * in, as a house's door is. Shut, the sound is of the leaves meeting the frame, which is when the swing ends.
+   * (Until the recordings have come, a house's door.)
+   * @param swing how long the leaves take to swing, seconds
+   */
+  locker(opening: boolean, pos: V3, distance = 0, swing = 0.5) {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    const out = this.out(pos, 1.6, 2.4, distance * 6);
+    if (opening ? this.rec('gate_open', out, t, 0.5, 1.5) : this.rec('gate_slam', out, t + swing * 0.85, 0.42, 1.6)) return;
+    this.door(opening, pos, distance);
+  }
+
+  /**
    * A blow landing on a body: a fist, or something heavier swung. A recording of one; until they have come, the
    * thud a round makes in flesh.
    */

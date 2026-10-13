@@ -4679,7 +4679,7 @@
    "tags": [
     "furniture"
    ],
-   "bytes": 465676,
+   "bytes": 465688,
    "srcTris": 484,
    "tris": 484,
    "min": [
@@ -4694,7 +4694,7 @@
    ],
    "lods": [],
    "hi": "assets/models/hi/steel_locker.glb",
-   "hiBytes": 3912156,
+   "hiBytes": 3912168,
    "hiCard": 192
   },
   "fuel_station": {

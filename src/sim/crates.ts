@@ -78,6 +78,17 @@ const IN_POLICE: Table = [
   ['soft_vest', 0.9], ['patrol_cap', 0.9], ['flashlight', 0.9], ['bandage', 1.4], ['stim', 0.5], ['stim_stamina', 0.3], ['gun_light', 0.3], ['suppressor_9', 0.2], ['thermos', 0.5], ['cigarettes', 0.5],
   ['ammo_762', 0.8], ['ammo_739', 0.7], ['ammo_556', 0.7], ['ammo_12', 0.4], ['ammo_50', 0.3], ['mpa', 0.45], ['mag_mpa', 0.8],
 ];
+/**
+ * A soldier's locker, in a barracks or a long hut (2026-10-13, with the steel lockers the owner brought in): what a
+ * man kept by his bed, which is his clothes, something to eat and to smoke, a dressing, a torch, and a handful of
+ * what his pistol fired. A pistol itself seldom: those are in the cases. Of the second step of the map, as a case is,
+ * and a good deal poorer than one.
+ */
+const IN_BARRACKS: Table = [
+  ['patrol_cap', 1.6], ['rubber_boots', 1.4], ['work_gloves', 1.4], ['soft_vest', 0.5], ['chest_rig', 0.5], ['sack_pack', 0.5],
+  ['condensed', 1.8], ['sardines', 1.2], ['thermos', 1], ['flask', 1], ['cigarettes', 1.8], ['bandage', 1.6], ['splint', 0.4], ['flashlight', 1], ['compass', 0.4], ['knife', 0.5],
+  ['ammo_9mm', 1.6], ['ammo_45', 0.8], ['mag_m9', 0.5], ['mag_colt', 0.4], ['m9', 0.15], ['colt', 0.15],
+];
 
 export interface CrateSpec {
   label: string;
@@ -98,6 +109,10 @@ export const CRATE_SPECS: Record<string, CrateSpec> = {
   med_cabinet: { label: 'Locker', w: 4, h: 6, table: IN_MEDICINE, count: [2, 4] },
   hospital_cabinet: { label: 'Locker', w: 4, h: 6, table: IN_HOSPITAL, count: [2, 4] },
   police_locker: { label: 'Locker', w: 4, h: 6, table: IN_POLICE, count: [1, 3] },
+  // The steel locker with two doors (see HUNG). Where it stands in a police building it is a constable's, and in the
+  // hospital it is filled as a clinic's cabinet is: the server knows which by where it stands, as with the cabinet.
+  // Anywhere else it is the army's, and this.
+  steel_locker: { label: 'Locker', w: 4, h: 6, table: IN_BARRACKS, count: [1, 3] },
   // what is searched in the bunker and is no crate (see bunkerCrates): some of them are empty
   // ("abundant supplies in the T5": a rack is never bare, and a locker seldom)
   locker: { label: 'Locker', w: 4, h: 6, table: IN_BUNKER, count: [0, 3] },
@@ -108,7 +123,19 @@ export const CRATE_SPECS: Record<string, CrateSpec> = {
 /** the kinds that are the bunker's own furniture: what they hold is theirs whatever is said of where they stand */
 const OF_BUNKER = new Set(['locker', 'gun_rack', 'bunker_cabinet', 'bunker_desk']);
 /** and the kinds that hold what is theirs wherever they stand (a cabinet under the gas would else be a crate of rifles) */
-const OWN_TABLE = new Set([...OF_BUNKER, 'med_cabinet', 'hospital_cabinet', 'police_locker']);
+const OWN_TABLE = new Set([...OF_BUNKER, 'med_cabinet', 'hospital_cabinet', 'police_locker', 'steel_locker']);
+
+/**
+ * The containers whose doors are hung on hinges and swing (2026-10-13: "lockers for example when opened should have
+ * their door crack open, and other people on the server could see that"). By the model that stands there: which of
+ * its pieces are leaves (each a piece of the file whose own origin is on the line of its hinges: `hung` in
+ * scripts/props.mjs), how far they swing open (radians, about that line, the free edge coming out toward the front)
+ * and how long the swing takes, seconds. The leaves are left out of what is drawn standing still
+ * (src/world/vegetation.ts) and drawn by src/game/lockers.ts, shut until somebody has the thing open.
+ */
+export const HUNG: Record<string, { leaf: RegExp; open: number; time: number }> = {
+  steel_locker: { leaf: /_door_[lr]/, open: 1.68, time: 0.5 },
+};
 
 /** seconds an emptied crate stays empty before it refills (only while nobody is near): five minutes, it was twenty */
 export const CRATE_RESTOCK = 300;

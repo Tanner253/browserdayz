@@ -56,9 +56,11 @@ export interface DollBox {
   /**
    * The veil itself, to be made again in the hole: the box it covers; its two colours, at its middle and at its
    * far corner (red, green, blue to 255, and how much of it there is, 0..1); how far it blurs what is behind it
-   * (the page's pixels; 0: it does not) and how much of that colour it leaves.
+   * (the page's pixels; 0: it does not) and how much of that colour it leaves. And the band of it the page lays
+   * round the inside of the hole's edge with no blur (see `laying`): how wide it is whole, and over how much more
+   * it thins to nothing, in the page's pixels (0: the page lays none).
    */
-  veil: { x: number; y: number; w: number; h: number; from: number[]; to: number[]; blur: number; sat: number };
+  veil: { x: number; y: number; w: number; h: number; from: number[]; to: number[]; blur: number; sat: number; band: number; thins: number };
 }
 
 /** what the game tells it, asked each frame it is shown (and now and then while it is not, so that it is right the moment it is) */
@@ -384,6 +386,12 @@ export class Doll {
    * colour thinned and the veil's dark over it, by the page's own rule: a round gradient from the veil's middle to
    * its far corner), a little light on the wall behind the figure, and the figure. The lamps' glints are rolled off
    * toward white here, and the figure is written as a screen shows it.
+   *
+   * Round the hole's edge the page lays the veil's dark itself, on a band with no blur to it (hud.css), and what is
+   * drawn under that band is the blurred world with no dark on it. That is for the veil outside the hole: its blur
+   * reaches into the hole, and what it found there, drawn dark, it spread outward as a dark line all round the
+   * hole's edge. It finds the world as bright as it is everywhere else, and there is no line. Where the band thins
+   * out toward the middle, what is drawn is whatever the band laid over it comes to the veil.
    */
   private laying() {
     const v4 = () => ({ value: new THREE.Vector4() });
@@ -391,44 +399,54 @@ export class Doll {
       depthTest: false,
       depthWrite: false,
       toneMapped: false,
-      uniforms: { tFig: { value: this.target.texture }, tWorld: { value: null }, uDrawn: v4(), uSeen: v4(), uFig: v4(), uPage: v4(), uFrom: v4(), uTo: v4(), uSat: { value: 1 } },
+      uniforms: { tFig: { value: this.target.texture }, tWorld: { value: null }, uDrawn: v4(), uSeen: v4(), uHole: v4(), uFig: v4(), uPage: v4(), uFrom: v4(), uTo: v4(), uSat: { value: 1 }, uBand: { value: new THREE.Vector2() } },
       vertexShader: SHEET,
       fragmentShader: /* glsl */ `
         uniform sampler2D tFig;
         uniform sampler2D tWorld;
         uniform vec4 uDrawn;
         uniform vec4 uSeen;
+        uniform vec4 uHole;
         uniform vec4 uFig;
         uniform vec4 uPage;
         uniform vec4 uFrom;
         uniform vec4 uTo;
         uniform float uSat;
+        // (the page's band: how wide it is all of the veil's dark, and over how much more it thins to none)
+        uniform vec2 uBand;
         varying vec2 vUv;
         // (where the veil's gradient has its middle, as a share of its box: "at 50% 35%" in hud.css)
         const vec2 MID = vec2( 0.5, 0.35 );
         void main() {
           vec2 page = uDrawn.xy + vec2( vUv.x, 1.0 - vUv.y ) * uDrawn.zw;
           vec2 at = ( page - uSeen.xy ) / uSeen.zw;
-          vec3 col = texture2D( tWorld, vec2( at.x, 1.0 - at.y ) ).rgb;
-          col = mix( vec3( dot( col, vec3( 0.213, 0.715, 0.072 ) ) ), col, uSat );
+          vec3 behind = texture2D( tWorld, vec2( at.x, 1.0 - at.y ) ).rgb;
+          behind = mix( vec3( dot( behind, vec3( 0.213, 0.715, 0.072 ) ) ), behind, uSat );
           // (the gradient reaches its far corner, and is as much wider than tall as its box is on its longer sides)
           vec2 reach = uPage.zw * max( MID, 1.0 - MID ) * 1.41421356;
           float t = clamp( length( ( page - uPage.xy - uPage.zw * MID ) / reach ), 0.0, 1.0 );
           vec4 veil = mix( vec4( uFrom.rgb * uFrom.a, uFrom.a ), vec4( uTo.rgb * uTo.a, uTo.a ), t );
-          col = col * ( 1.0 - veil.a ) + veil.rgb;
+          vec3 col = behind * ( 1.0 - veil.a ) + veil.rgb;
+          // how far in from the hole's edge, across and down; and how much of the page's band lies over this point
+          vec2 inside = min( page - uHole.xy, uHole.xy + uHole.zw - page );
+          float band = 0.0;
+          if ( uBand.x > 0.0 ) {
+            vec2 clear = clamp( ( inside - uBand.x ) / uBand.y, 0.0, 1.0 );
+            band = 1.0 - clear.x * clear.y;
+          }
+          // (the figure, and the light behind it, are not begun until the band has ended: they come in over a few pixels past it)
+          float shown = smoothstep( 0.0, 12.0, min( inside.x, inside.y ) - uBand.x - uBand.y );
           vec2 q = ( page - uFig.xy - uFig.zw * vec2( 0.5, 0.42 ) ) / uFig.w;
-          col += vec3( 0.058, 0.068, 0.063 ) * exp( - dot( q, q ) / 0.07 );
-          // (the figure's picture ends where what is drawn ends: what of it reaches that far fades out before it)
-          vec2 px = vUv * uDrawn.zw;
-          vec4 fig = texture2D( tFig, vUv ) * smoothstep( 1.0, 14.0, min( min( px.x, uDrawn.z - px.x ), min( px.y, uDrawn.w - px.y ) ) );
+          col += vec3( 0.058, 0.068, 0.063 ) * exp( - dot( q, q ) / 0.07 ) * shown;
+          vec4 fig = texture2D( tFig, vUv ) * shown;
           vec3 lit = fig.a > 0.0005 ? fig.rgb / fig.a : vec3( 0.0 );
           // (as it is up to three quarters of white, and from there bent over so that it comes to white and never past it)
           lit = mix( lit, 0.75 + 0.25 * tanh( ( lit - 0.75 ) / 0.25 ), step( vec3( 0.75 ), lit ) );
           lit = mix( lit * 12.92, 1.055 * pow( max( lit, vec3( 0.0 ) ), vec3( 1.0 / 2.4 ) ) - 0.055, step( vec3( 0.0031308 ), lit ) );
           col = col * ( 1.0 - fig.a ) + lit * fig.a;
           // (a grain of noise: the dark is a slow slope from one shade to the next, and shows its steps without)
-          float grain = ( fract( sin( dot( gl_FragCoord.xy, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 ) - 0.5 ) / 255.0;
-          gl_FragColor = vec4( col + grain, 1.0 );
+          col += ( fract( sin( dot( gl_FragCoord.xy, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 ) - 0.5 ) / 255.0;
+          gl_FragColor = vec4( ( col - band * veil.rgb ) / ( 1.0 - band * veil.a ), 1.0 );
         }`,
     }));
   }
@@ -729,6 +747,8 @@ export class Doll {
     u.uFrom.value.set(v.from[0] / 255, v.from[1] / 255, v.from[2] / 255, v.from[3]);
     u.uTo.value.set(v.to[0] / 255, v.to[1] / 255, v.to[2] / 255, v.to[3]);
     u.uSat.value = v.sat;
+    u.uHole.value.set(box.cx, box.cy, box.cw, box.ch);
+    u.uBand.value.set(v.band, v.band > 0 ? Math.max(1, v.thins) : 0);
     u.tWorld.value = sigma > 0 ? this.soft[0].texture : this.world;
     return { x, y, w, h, sx, sy, sw, sh, sigma, k, high: H, pr };
   }

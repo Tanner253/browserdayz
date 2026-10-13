@@ -52,8 +52,12 @@ export const CRATE_KINDS = new Set(['wooden_crate_01', 'wooden_military_crate', 
  * medical station should be lootable and have inventories"): the steel cabinet with two doors that stands in the
  * headquarters and the hospital. Kept apart from the crates: a crate has no place for a thing on it, and these
  * are asked nothing of where places are, so that not one place on the map is other than it was.
+ * (2026-10-13: and the steel locker the owner brought in, two lockers in one case, whose doors swing open while it
+ * is searched: see HUNG in src/sim/crates.ts. It stands where the men's lockers were cabinets, in the headquarters
+ * and over its cells, and where a locker belongs and there was none: a police station's hall, a barracks, a long
+ * hut, the rooms the hospital's own people sat in.)
  */
-export const SEARCHED_KINDS = new Set(['med_cabinet']);
+export const SEARCHED_KINDS = new Set(['med_cabinet', 'steel_locker']);
 
 /**
  * Walls and doors are drawn before anything that grows or lies about (trees, grass and props
@@ -77,6 +81,23 @@ const SHELF_LEVELS: Record<string, number[]> = {
   Shelf_01: [0.14, 0.38, 0.66, 0.94, 1.22, 1.51, 1.79],
   wooden_bookshelf_worn: [0.11, 0.39, 0.67, 0.96, 1.28, 1.66],
   steel_frame_shelves_01: [0.13, 0.64, 1.15, 1.65],
+};
+/**
+ * The two racks of angle iron and boards (2026-10-13, the owner's: "have we thoroughly gone through all the props
+ * objects and made sure we used them to their fullest extent"), and where on each a thing can lie, measured on the
+ * models by rays (assets-src/_wf/me/boards.mjs). `boards`: the top of each board over the rack's foot, lowest
+ * first. `mid`, `half`: the middle of the part of a board that is clear, and how far that part reaches either way,
+ * along the rack and into it (the narrow one is not stood about its frame's middle, a coil of rope lying at one
+ * foot of it; and a brace crosses the back of both, so that the back third of a board is left alone). `clear`: the
+ * room over a board before the next. `places`: how many things lie side by side on one board.
+ *
+ * A rack is stood in a building as anything is (Furn), and says which of its boards hold a thing (`on`). Those
+ * places are not made where the building's others are: they come after every other place on the map (see
+ * `racked`), since a place is known by its number and a new one anywhere else would renumber all that follow it.
+ */
+const RACKS: Record<string, { boards: number[]; mid: [number, number]; half: [number, number]; clear: number; places: number }> = {
+  rack_small: { boards: [0.187, 0.724, 1.265, 1.824], mid: [0.08, 0.06], half: [0.42, 0.2], clear: 0.46, places: 1 },
+  rack_wide: { boards: [0.183, 0.728, 1.256, 1.828], mid: [0, 0.06], half: [0.84, 0.2], clear: 0.46, places: 2 },
 };
 /** how high a bed's springs are over its feet, and how thick the mattress on them is: what is kept on a bed lies on that */
 const BED = { springs: 0.49, mattress: 0.1 };
@@ -291,6 +312,8 @@ export interface Furn {
   rot: number;
   scale?: number;
   y?: number;
+  /** a rack (see RACKS): the boards of it that a thing is kept on, counted from the lowest (0) */
+  on?: number[];
 }
 
 /** A floor above the ground one: its own walls, what stands in it and what is found there (heights from its own floor). */
@@ -523,6 +546,8 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
           { id: 'barrel_03', x: 4.3, z: 3.2, rot: 1.2 },
           { id: 'old_tyre', x: 5.0, z: -0.6, rot: 0, y: 0.08 },
           ...(rng.chance(0.45) ? [{ id: 'covered_car', x: 0.2, z: 0.4, rot: 0.04 }] : []),
+          // (2026-10-13: a long rack against the back wall, under the high windows, with what was stored on it)
+          { id: 'rack_wide', x: -1.6, z: -3.47, rot: 0, on: [1] },
         ],
         loot: [
           [-4.2, 0.14, -3.5], [-4.2, 0.74, -3.5], [-4.2, 1.34, -3.5], [4.2, 0.14, -3.5], [4.2, 0.74, -3.5], [4.2, 1.34, -3.5],
@@ -652,6 +677,8 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
           // the store room
           { id: 'steel_frame_shelves_01', x: 6.29, z: 1.64, rot: -Math.PI / 2, scale: 0.1 },
           { id: 'wooden_crate_01', x: 5.3, z: 1.95, rot: 0 },
+          // (2026-10-13: a locker, on the pier between the third window and the fourth)
+          { id: 'steel_locker', x: 1.16, z: 1.98, rot: Math.PI },
         ],
         loot: [
           [-5.95, 0.48, -0.85], [-4.35, 0.48, -0.85], [-2.75, 0.48, -0.85], [-1.15, 0.48, -0.85], [0.45, 0.48, -0.85], [2.05, 0.48, -0.85],
@@ -675,6 +702,8 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
         furniture: [
           { id: 'Shelf_01', x: -0.9, z: -1.32, rot: 0 },
           { id: 'wooden_crate_01', x: 1.15, z: -1.0, rot: 0.25 },
+          // (2026-10-13: a rack down the wall that has no window in it)
+          { id: 'rack_small', x: -1.47, z: 0.35, rot: Math.PI / 2, on: [2] },
         ],
         loot: [[-0.9, 0.44, -1.36], [-0.9, 1.24, -1.36], [1.15, 0.37, -1.0], [0.6, 0.02, 0.6]],
         usage: ['Farm', 'Industrial'],
@@ -744,6 +773,9 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
           // holding cell
           { id: 'old_bed_frame', x: -6.25, z: -3.2, rot: 0 },
           { id: 'painted_wooden_chair_01', x: -4.0, z: 3.2, rot: 2.4 },
+          // (2026-10-13: the men's lockers, in the hall against the armoury's wall)
+          { id: 'steel_locker', x: 2.6, z: 1.6, rot: -Math.PI / 2 },
+          { id: 'steel_locker', x: 2.6, z: 2.75, rot: -Math.PI / 2 },
         ],
         loot: [
           [-0.7, 0.81, -1.0], [0.3, 0.81, -1.0],
@@ -833,6 +865,10 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
           { id: 'wooden_crate_01', x: -1.3, z: -2.95, rot: -0.15 },
           { id: 'cardboard_box_01', x: -0.3, z: -2.9, rot: 0.2 },
           { id: 'cardboard_box_01', x: -4.4, z: -1.9, rot: 1.4 },
+          // (2026-10-13: a rack in the shop, in the corner by the window, and a long one in the stock room against
+          // the wall the shop's shelves are the other side of, each with goods on it)
+          { id: 'rack_small', x: 4.47, z: 2.62, rot: -Math.PI / 2, on: [1, 2] },
+          { id: 'rack_wide', x: -2.3, z: -1.63, rot: Math.PI, on: [1] },
         ],
         loot: [
           [-2.4, 0.81, 0.3], [-1.4, 0.81, 0.3], [-0.35, 0.81, 0.3], [0.65, 0.81, 0.3],
@@ -877,6 +913,9 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
           { id: 'SchoolChair_01', x: 5.0, z: 1.45, rot: 0 },
           { id: 'weapons_case', x: 4.7, z: -2.75, rot: 0 },
           { id: 'weapons_case', x: 4.0, z: -1.1, rot: Math.PI / 2 },
+          // (2026-10-13: the men's lockers, at the end of the room of beds, against the wall of the arms room)
+          { id: 'steel_locker', x: 3.2, z: -0.6, rot: -Math.PI / 2 },
+          { id: 'steel_locker', x: 3.2, z: -1.75, rot: -Math.PI / 2 },
         ],
         loot: [
           [5.0, 0.02, 0.3], [4.9, 0.02, -1.6],
@@ -911,6 +950,8 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
           { id: 'old_tyre', x: 3.82, z: 2.78, rot: 1.5, y: 0.24 },
           { id: 'wooden_crate_01', x: 0.3, z: 2.6, rot: 0.2 },
           { id: 'wooden_ladder', x: -4.05, z: -2.2, rot: Math.PI / 2 },
+          // (2026-10-13: a rack of parts at the back of the bay, between the window and the fuse box)
+          { id: 'rack_small', x: -0.9, z: -2.97, rot: 0, on: [1, 2] },
         ],
         loot: [
           [2.7, 0.81, -2.8], [3.7, 0.81, -2.8],
@@ -1347,6 +1388,8 @@ export class Door {
 
 export class Buildings {
   lootPoints: LootPoint[] = [];
+  /** the places on the boards of racks (see RACKS), kept by until every other place has been made: they go last */
+  private racked: LootPoint[] = [];
   doors: Door[] = [];
   /** interior volumes (world space OBB as center, half extents, rotation) for indoor lighting */
   interiors: { x: number; z: number; hw: number; hd: number; rot: number; y0: number; y1: number }[] = [];
@@ -1369,18 +1412,22 @@ export class Buildings {
     this.planSiteProps();
     // what is kept under the gas is marked so: there are things that lie nowhere else (see the economy)
     const gas = gasZone(this.world.pois, (x, z) => heightAt(this.world.heights, x, z));
-    for (const p of this.lootPoints) if (gasDepth(gas, p.x, p.y, p.z) > GAS.breathe) p.usage = [...p.usage, 'Gas'];
-    // and what is kept in Kamenka, the town in the east, is marked so too: it is stocked on its own (see `east` in the economy)
-    for (const p of this.lootPoints) if (Math.hypot(p.x - TOWN.x, p.z - TOWN.z) < TOWN.stocked) p.usage = [...p.usage, 'East'];
-    // And every place for a thing is told which step of the map it is on (src/sim/tiers.ts): the economy keeps each
-    // sort of thing on the steps it belongs to. The second step is the village, the checkpoint, and the army's and
-    // the trader's places; whatever is none of those, nor in Kamenka, nor under the gas, is the outskirts.
-    const second = [
-      { x: this.world.pois[0].x, z: this.world.pois[0].z, r: 125 },
-      ...this.world.pois.filter((q) => /checkpoint/i.test(q.name)).map((q) => ({ x: q.x, z: q.z, r: 70 })),
-      ...this.world.sites.filter((st) => st.kind === 'depot' || st.kind === 'market' || st.kind === 'tents').map((st) => ({ x: st.x, z: st.z, r: 60 })),
-    ];
-    for (const p of this.lootPoints) p.tier = p.usage.includes('Gas') ? 4 : p.usage.includes('East') ? 3 : second.some((q) => Math.hypot(p.x - q.x, p.z - q.z) < q.r) ? 2 : 1;
+    /** (said of the places every building has made, here; and of the racks' places, which come last of all, below) */
+    const mark = (points: LootPoint[]) => {
+      for (const p of points) if (gasDepth(gas, p.x, p.y, p.z) > GAS.breathe) p.usage = [...p.usage, 'Gas'];
+      // and what is kept in Kamenka, the town in the east, is marked so too: it is stocked on its own (see `east` in the economy)
+      for (const p of points) if (Math.hypot(p.x - TOWN.x, p.z - TOWN.z) < TOWN.stocked) p.usage = [...p.usage, 'East'];
+      // And every place for a thing is told which step of the map it is on (src/sim/tiers.ts): the economy keeps each
+      // sort of thing on the steps it belongs to. The second step is the village, the checkpoint, and the army's and
+      // the trader's places; whatever is none of those, nor in Kamenka, nor under the gas, is the outskirts.
+      const second = [
+        { x: this.world.pois[0].x, z: this.world.pois[0].z, r: 125 },
+        ...this.world.pois.filter((q) => /checkpoint/i.test(q.name)).map((q) => ({ x: q.x, z: q.z, r: 70 })),
+        ...this.world.sites.filter((st) => st.kind === 'depot' || st.kind === 'market' || st.kind === 'tents').map((st) => ({ x: st.x, z: st.z, r: 60 })),
+      ];
+      for (const p of points) p.tier = p.usage.includes('Gas') ? 4 : p.usage.includes('East') ? 3 : second.some((q) => Math.hypot(p.x - q.x, p.z - q.z) < q.r) ? 2 : 1;
+    };
+    mark(this.lootPoints);
     // The bunker: what stands in its rooms, and its places for things. After every other, so
     // that none of those is renumbered. Its places are of no kind of building: only what is
     // said to be kept in the bunker lies there.
@@ -1418,6 +1465,11 @@ export class Buildings {
       }
       for (const sp of plan.spots) point(sp.r, sp.f, sp.y, sp.floor);
     }
+    // And the places on the boards of the racks (RACKS): after every other place on the map, the bunker's too, so
+    // that not one of those is renumbered. Each is of the kind its building is, and on the step of the map that
+    // building stands on, as that building's other places are.
+    mark(this.racked);
+    this.lootPoints.push(...this.racked);
     // The leaves of the containers, one at each end: after every other door, so that none of those is renumbered.
     const lot = new RNG(4471);
     this.containers.forEach((it, n) => {
@@ -2417,6 +2469,21 @@ export class Buildings {
         if (f.id !== 'old_bed_frame') continue;
         const M = new THREE.Matrix4().makeRotationY(f.rot).setPosition(f.x, (f.y ?? 0) + y0, f.z).premultiply(B);
         this.push('mattress', boxGeo(-0.38, 0.38, BED.springs, BED.springs + BED.mattress, -0.9, 0.9, this.tile('mattress'), M));
+      }
+      // A rack: a place (or two, side by side) on each of its boards that is said to hold a thing, on the clear
+      // part of the board. Kept by: they are let into the list after every other place on the map. (None at the
+      // trading post, where nothing is left lying: see `his`.)
+      for (const f of furniture) {
+        const rack = RACKS[f.id];
+        if (!rack || !f.on || his) continue;
+        const c = Math.cos(f.rot), s = Math.sin(f.rot), seg = rack.half[0] / rack.places;
+        for (const b of f.on) {
+          for (let k = 0; k < rack.places; k++) {
+            const ox = rack.mid[0] - rack.half[0] + (2 * k + 1) * seg, oz = rack.mid[1];
+            const p = new THREE.Vector3(f.x + ox * c + oz * s, rack.boards[b] + 0.003 + (f.y ?? 0) + y0, f.z - ox * s + oz * c).applyMatrix4(B);
+            this.racked.push({ x: p.x, y: p.y, z: p.z, usage, building: plot.id, floor: false, surf: { x: p.x, z: p.z, rot: f.rot + plot.rot, hx: seg, hz: rack.half[1], clear: rack.clear } });
+          }
+        }
       }
 
       // loot points: on the floor, or on the furniture surface underneath

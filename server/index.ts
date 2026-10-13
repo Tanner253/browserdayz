@@ -231,7 +231,9 @@ function loadWorld() {
     // (a steel cabinet is filled with what its building kept: in a police building a constable's locker, in the
     // hospital a hospital's, which is kits before dressings, and elsewhere a clinic's medicine cabinet)
     const stands = (kind: string, within: number) => world.buildings.some((q) => q.type.startsWith(kind) && Math.hypot(q.x - c.x, q.z - c.z) < within);
-    const kind = c.kind !== 'med_cabinet' ? c.kind : stands('police', 17) ? 'police_locker' : stands('hospital', 22) ? 'hospital_cabinet' : c.kind;
+    // (the steel locker with two doors likewise: a constable's in a police building; in the hospital, where it is the
+    // staff's own, a clinic's cabinet and not a hospital's; anywhere else what it is by itself, a soldier's)
+    const kind = c.kind !== 'med_cabinet' && c.kind !== 'steel_locker' ? c.kind : stands('police', 17) ? 'police_locker' : stands('hospital', 22) ? (c.kind === 'steel_locker' ? 'med_cabinet' : 'hospital_cabinet') : c.kind;
     boxes.set(c.cid, { cid: c.cid, kind: 'crate', w: spec.w, h: spec.h, items: [], x: c.x, y: c.y, z: c.z, rot: 0, crate: kind, emptiedAt: -1 });
   }
   let saved: {
@@ -2646,8 +2648,22 @@ function cleanInventory(raw: unknown): SerializedInventory | null {
 // ------------------------------------------------------------------ gameplay
 
 function releaseLock(c: Client) {
-  if (c.openCid && locks.get(c.openCid) === c.id) locks.delete(c.openCid);
+  if (c.openCid && locks.get(c.openCid) === c.id) {
+    locks.delete(c.openCid);
+    ajar(c.openCid, false);
+  }
   c.openCid = null;
+}
+
+/**
+ * One of the map's containers is being searched, or no longer is: everybody is told, and whoever is near one that
+ * has doors sees them swing open, stand open and shut again (a locker: src/game/lockers.ts). Only of what is part of
+ * the map: a body, a drop and a stash have no doors. And nothing is said of what a vanished admin opens: a door
+ * that opens by itself is somebody.
+ */
+function ajar(cid: string, open: boolean, by?: Client) {
+  if (boxes.get(cid)?.kind !== 'crate' || (open && by?.power.hidden)) return;
+  broadcast({ t: 'cdoor', cid, open });
 }
 
 /** The short public mark of a key, as a player's own game stamps it on their tag (publicId in src/net/client.ts: the same sum). */
@@ -3222,9 +3238,12 @@ function handle(c: Client, m: C2S) {
         send(c, { t: 'cbusy', cid: m.cid });
         return;
       }
-      releaseLock(c);
+      // (asked again for what they already have open, they are told what is in it and nothing is said of its doors)
+      const again = c.openCid === m.cid && holder === c.id;
+      if (!again) releaseLock(c);
       locks.set(m.cid, c.id);
       c.openCid = m.cid;
+      if (!again) ajar(m.cid, true, c);
       touched(b);
       send(c, { t: 'cdata', cid: m.cid, items: b.items });
       return;
@@ -3624,6 +3643,8 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
     barrels: [...barrelsGone.keys()],
     fires: hearths.alight(Date.now() / 1000),
     bunker: bunkerDoor.open,
+    // (the map's containers that somebody has open at this moment: a locker among them is seen standing open)
+    ajar: [...locks.keys()].filter((cid) => boxes.get(cid)?.kind === 'crate'),
     vehicles: [...vehicles.values()].map(vehInfo),
     infected: horde.list(),
     // (the hour is the wall clock's: every game on the server is at the same one, and a restart does not put it back)
