@@ -568,13 +568,16 @@ if (process.argv.includes('--server')) {
     assert.ok(called, `a call on a radio sent no helicopter:\n${logged.slice(-400)}`);
     assert.equal(called.f.by, ben.id);
     near(called.f.x, 120, 1e-6, 'where a called drop is for');
-    near(called.f.z, 80 - CALL.ahead, 1e-6, 'where a called drop is for');
+    // (in front of whoever called, and far enough off to be seen coming down: the furthest of the places tried that is open ground)
+    const off = 80 - called.f.z;
+    assert.ok([...CALL.out, CALL.ahead].some((d) => Math.abs(off - d) < 1e-6), `a called drop is for ${off.toFixed(2)} m in front of whoever called`);
+    if (off > CALL.ahead + 1e-6) near(called.f.y, ground(120, called.f.z), 1e-3, 'a called drop is for the ground, where it is not at the caller\'s feet');
     assert.ok(onEdge(called.f.fx, called.f.fz));
     // (one aircraft: a second call is not answered)
     ann.send({ t: 'radio' });
     for (let i = 0; i < 40 && !ann.all('radio-').length; i++) await sleep(50);
     assert.ok(ann.all('radio-').length === 1 && ann.all('heli+').length === 2, 'a second call was answered');
-    held(`a drop called on a radio comes the same way: from the ${comesFrom(called.f)}, down in ${flightTimes(called.f).land.toFixed(1)} s, three paces in front of whoever called`);
+    held(`a drop called on a radio comes the same way: from the ${comesFrom(called.f)}, down in ${flightTimes(called.f).land.toFixed(1)} s, ${off.toFixed(0)} m in front of whoever called`);
     // ---- an admin sends one now, to a place by its numbers; somebody who is not an admin cannot
     ben.send({ t: 'chat', text: '/airdrop 100 -200' });
     await sleep(600);

@@ -50,7 +50,7 @@ import { Minimap } from '../ui/minimap';
 import { BigMap, type MapPerson } from '../ui/bigmap';
 import { BURY, noBurying } from '../sim/stash';
 import { AdminUI, type AdminLook, type AdminPlayer, type AdminSelf } from '../ui/admin-ui';
-import { CALL, CRASH, DROP, describeSpot, fillCrash, fillDrop, pickDropSite, type DropInfo } from '../sim/drops';
+import { callSite, CRASH, DROP, describeSpot, fillCrash, fillDrop, pickDropSite, type DropInfo } from '../sim/drops';
 import { comesFrom, flightTimes, planFlight, restAt, type Flight } from '../sim/airdrop';
 import { Airdrops } from './airdrop';
 import { WELL, stage, wellSpots, type Well } from '../sim/wells';
@@ -4064,11 +4064,8 @@ export class Game {
       return;
     }
     // (playing alone: there is nobody to refuse it, and the game sets the crate down itself)
-    const p = this.player.pos.clone();
-    p.x -= Math.sin(this.player.yaw) * CALL.ahead;
-    p.z -= Math.cos(this.player.yaw) * CALL.ahead;
-    p.y = heightAt(this.s.world.heights, p.x, p.z);
-    this.flightBegun(planFlight((x, z) => heightAt(this.s.world.heights, x, z), { x: p.x, y: p.y, z: p.z }, `drop-call-${newUid()}`), false, true);
+    const p = callSite(this.s.world, this.player.pos.x, this.player.pos.y, this.player.pos.z, this.player.yaw);
+    this.flightBegun(planFlight((x, z) => heightAt(this.s.world.heights, x, z), p, `drop-call-${newUid()}`), false, true);
   }
 
   /**
@@ -4091,7 +4088,12 @@ export class Game {
       this.radio = null;
       this.inventoryChanged();
     }
-    if (mine) this.hud.note(`Drop called in: a helicopter is coming from the ${way}. The crate is down in ${eta} s, three paces ahead, under the smoke. Everybody heard it`, 'good');
+    if (mine) this.hud.note(`Drop called in: a helicopter is coming from the ${way}. The crate is down in ${eta} s, ahead of you, under the smoke. Everybody heard it`, 'good');
+    // (and whoever is near enough to see it is told when it leaves the helicopter: it is ninety metres up, where nobody is looking)
+    const away = (flightTimes(f).release - f.age) * 1000;
+    if (away > 0) setTimeout(() => {
+      if (this.started && !this.player.dead && Math.hypot(this.player.pos.x - f.x, this.player.pos.z - f.z) < 160) this.hud.note('The crate is away, coming down under its parachute: look up', 'good');
+    }, away);
     else if (f.by !== undefined) this.hud.note(`Somebody has called a supply drop in ${where}: a helicopter is coming from the ${way}, down in ${eta} s`, 'warn');
     else if (late) this.hud.note(`A helicopter is in the air with a supply drop for ${where}: down in ${eta} s, marked on the map (M)`, 'good');
     else this.hud.note(`A helicopter is coming in from the ${way} with a supply drop for ${where}: down in ${eta} s, marked on the map (M)`, 'good');

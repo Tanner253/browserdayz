@@ -16,7 +16,41 @@ import { UNDER_GAS } from './crates';
  * edge, as every drop does, and is on the ground when the flight says: see `flightTimes` in ./airdrop.ts. From
  * forty seconds to seventy-five, by how far the helicopter has to come; it was 45 flat.)
  */
-export const CALL = { every: 300, /** metres in front of the caller it comes down */ ahead: 3 };
+export const CALL = {
+  every: 300,
+  /** metres in front of the caller it comes down, where there is nowhere better (see `callSite`) */
+  ahead: 3,
+  /** and where there is: this far in front, the furthest of these that is open ground of the caller's own height */
+  out: [14, 10, 6],
+};
+
+/**
+ * Where a drop called on a radio comes down: in front of whoever called it, far enough off to be SEEN coming.
+ * (It was three paces in front and nothing else. The crate is let go ninety metres up and comes straight down:
+ * three paces off that is over the caller's own head, out of sight until the last moment for anybody not looking
+ * at the sky. 2026-10-13: "users say they do not see a parachute or the airdrop slowly falling when they call
+ * radio".) The furthest of `CALL.out` that is open, level, out of doors and of the caller's own height; failing
+ * all of them, three paces in front at the height the caller stands at, as it was.
+ */
+export function callSite(world: World, x: number, y: number, z: number, yaw: number): { x: number; y: number; z: number } {
+  const H = world.heights;
+  for (const d of CALL.out) {
+    const px = x - Math.sin(yaw) * d, pz = z - Math.cos(yaw) * d, py = heightAt(H, px, pz);
+    // (not from a roof or a bridge down into a yard, nor up onto a bank)
+    if (Math.abs(py - y) > 3) continue;
+    let steep = 0;
+    for (const [dx, dz] of [[2.5, 0], [-2.5, 0], [0, 2.5], [0, -2.5]]) steep = Math.max(steep, Math.abs(heightAt(H, px + dx, pz + dz) - py));
+    if (steep > 1) continue;
+    if (world.buildings.some((b) => {
+      const [w, dd] = BUILDING_FOOTPRINT[b.type];
+      return Math.hypot(b.x - px, b.z - pz) < Math.hypot(w, dd) / 2 + 2;
+    })) continue;
+    if (world.trees.some((t) => Math.abs(t.x - px) < 2.5 && Math.abs(t.z - pz) < 2.5)) continue;
+    if (world.rocks.some((t) => Math.abs(t.x - px) < 2.5 && Math.abs(t.z - pz) < 2.5) || world.props.some((t) => Math.abs(t.x - px) < 2 && Math.abs(t.z - pz) < 2)) continue;
+    return { x: px, y: py, z: pz };
+  }
+  return { x: x - Math.sin(yaw) * CALL.ahead, y, z: z - Math.cos(yaw) * CALL.ahead };
+}
 
 /**
  * A helicopter comes down. Now and then, somewhere open on the map: its wreck, smoke that is seen from a long

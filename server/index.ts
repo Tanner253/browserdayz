@@ -3365,8 +3365,9 @@ function handle(c: Client, m: C2S) {
         return;
       }
       lastCall = economy.time;
-      // (three paces in front of the caller: where they stand is where they may still be standing when it lands)
-      const at = { x: c.pose[0] - Math.sin(c.pose[3]) * CALL.ahead, y: c.pose[1], z: c.pose[2] - Math.cos(c.pose[3]) * CALL.ahead };
+      // (in front of the caller, and far enough off to be seen coming down: see `callSite`. Where they stand is
+      // where they may still be standing when it lands.)
+      const at = world.callSite(c.pose[0], c.pose[1], c.pose[2], c.pose[3]);
       // (it comes by helicopter from the map's edge, as every drop does: the flight says who called it, and when it is down)
       sendDrop(at, c.id);
       log(`${c.name} called a supply drop to ${Math.round(at.x)}, ${Math.round(at.z)}`);

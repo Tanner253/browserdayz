@@ -8,7 +8,7 @@ import { BUNKER, bunkerAt, bunkerCrates, levelY } from '../src/sim/bunker';
 import { Buildings, CRATE_KINDS, SEARCHED_KINDS } from '../src/world/buildings';
 import { assets } from '../src/core/assets';
 import { crateId } from '../src/net/protocol';
-import { pickDropSite } from '../src/sim/drops';
+import { callSite, pickDropSite } from '../src/sim/drops';
 import { barrelSpots } from '../src/sim/barrels';
 import { JEEP, POLICE_CAR, jeepSpots, policeSpots } from '../src/sim/vehicles';
 import { homeSpot, infectedHomes, type Home } from '../src/sim/infected';
@@ -101,5 +101,7 @@ export function buildWorldData(root: string) {
     bridges: world.bridges,
     /** somewhere open and level to set a supply drop down */
     dropSite: (rnd?: () => number, inside = false, avoid: { x: number; z: number }[] = []) => pickDropSite(world, rnd, inside, avoid),
+    /** where a drop called on a radio comes down, for somebody standing at a place and facing a way */
+    callSite: (x: number, y: number, z: number, yaw: number) => callSite(world, x, y, z, yaw),
   };
 }
