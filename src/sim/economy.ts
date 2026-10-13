@@ -325,9 +325,12 @@ const UNSORTED = 4;
  * outskirts the bats and the crowbars came up a few short, which of them depending on the dice); and then what
  * each kind of building is FOR, so that a clinic's shelves hold dressings and an armoury's hold guns before
  * anything else that may lie there has taken them.
+ * (2026-10-13: the travelling suitcase and the stash case with them. Each lies only on a floor, and the houses of the
+ * outskirts have seventeen floors between them: on one throw of the dice in twenty, small things had taken them and
+ * two of the three suitcases had nowhere to lie.)
  */
 const FIRST = [
-  'gasmask', 'gasmask_white', 'gasmask_orange', 'benelli', 'mosin', 'ak', 'ar15', 'suppressor_12', 'suitcase', 'heavy_armor', 'life_vest', 'armor_vest', 'bat', 'crowbar', 'shovel', 'machete', 'hatchet',
+  'gasmask', 'gasmask_white', 'gasmask_orange', 'benelli', 'mosin', 'ak', 'ar15', 'suppressor_12', 'suitcase', 'heavy_armor', 'life_vest', 'armor_vest', 'bat', 'crowbar', 'shovel', 'machete', 'hatchet', 'old_suitcase', 'stash_kit',
   'mpa', 'colt', 'm9', 'mag_mpa', 'mag_colt', 'mag_m9', 'firstaid', 'aid_pouch', 'blood_bag', 'stim', 'stim_stamina', 'saline', 'bandage',
 ];
 

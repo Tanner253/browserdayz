@@ -198,7 +198,7 @@ ok('the gas masks are a policeman\'s, and the keycards are under the gas', () =>
     assert.ok(masks.every(({ p }) => kind(p, 'Police')), 'a mask that is not in a police station');
     assert.ok(masks.every(({ id, p }) => (id === 'gasmask') === (p.tier === 2)), 'a painted mask in the village, or a black one in Kamenka');
     assert.deepEqual(masks.filter(({ p }) => p.tier === 3).map(({ id }) => id).sort(), ['gasmask_orange', 'gasmask_white']);
-    assert.ok(on('gasmask_skull', 5) === 1 && on('gasmask_skull', 1) + on('gasmask_skull', 2) + on('gasmask_skull', 3) + on('gasmask_skull', 4) === 0, 'the skull mask is not the bunker's alone');
+    assert.ok(on('gasmask_skull', 5) === 1 && on('gasmask_skull', 1) + on('gasmask_skull', 2) + on('gasmask_skull', 3) + on('gasmask_skull', 4) === 0, 'the skull mask is kept somewhere other than the bunker');
     assert.ok(on('keycard', 4) >= 1 && on('keycard', 1) + on('keycard', 2) + on('keycard', 3) + on('keycard', 5) === 0);
   }
 });

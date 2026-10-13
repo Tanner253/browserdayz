@@ -340,5 +340,128 @@ ok('wood struck is a little under steel struck, and a car into a wall is as loud
   assert.ok(Math.abs(crash(0.2)[0] - crashWas(0.2)[0]) <= 2 && Math.abs(crash(1)[0] - crashWas(1)[0]) <= 2 && crash(1)[0] > crash(0.2)[0] + 1.5, 'a car into a wall is not as loud as it was');
 });
 
+// ---- The engine itself, asked as the game asks it, with nothing under it that makes a sound.
+//
+// A browser's sound is stood in for by things that take every call and do nothing, and the files are read off the
+// disk in place of being fetched: so the engine's own code runs here, and what it sets going is counted by its
+// `heard`. This is where it is shown which recording each thing the game asks for starts, how loud and how fast,
+// that no take is played twice running, and when the files are asked for. (It is not the game: that the game's own
+// feet and hands reach these calls is read in src/game/, and was not watched happening. See the hand-back of
+// 2026-10-13: the headless game's harness never starts the engine, and the run that was to watch it saw nothing.)
+
+const { AudioEngine, recordings } = await import('../src/core/audio');
+type Heard = { name: string; take: number; gain: number; rate: number };
+const G = globalThis as unknown as Record<string, unknown>;
+const param = () => ({ value: 0, setValueAtTime() {}, linearRampToValueAtTime() {}, exponentialRampToValueAtTime() {}, setTargetAtTime() {} });
+/** anything of a browser's sound: it is connected to whatever it is told, started and stopped, and any figure of it can be set */
+const thing = (): unknown => new Proxy({ connect: (to: unknown) => to, disconnect() {}, start() {}, stop() {} } as Record<string | symbol, unknown>, { get: (t, k) => (k in t ? t[k] : (t[k] = param())), set: (t, k, v) => ((t[k] = v), true) });
+const context = () => new Proxy({ currentTime: 0, sampleRate: SR, destination: thing(), listener: {}, resume: async () => {}, createBuffer: (_c: number, len: number) => ({ length: len, getChannelData: () => new Float32Array(len) }) } as Record<string | symbol, unknown>, { get: (t, k) => (k in t ? t[k] : thing) });
+/** what was asked for of the site, in the order it was asked, and how many were out at once */
+const asked: string[] = [];
+let out6 = 0, most = 0;
+G.fetch = async (url: string) => {
+  asked.push(url);
+  most = Math.max(most, ++out6);
+  await new Promise((r) => setTimeout(r, 1));
+  out6--;
+  const file = path.join(SOUNDS, path.basename(url));
+  return fs.existsSync(file) ? { status: 200, ok: true, arrayBuffer: async () => fs.readFileSync(file).buffer } : { status: 404, ok: false };
+};
+G.OfflineAudioContext = class { decodeAudioData = async (b: ArrayBuffer) => ({ length: b.byteLength }); };
+G.AudioContext = function () { return context(); };
+
+const engine = new AudioEngine();
+const nothingYet = asked.length;
+engine.start();
+await recordings();
+const heard: Heard[] = [];
+engine.heard = (name, take, gain, rate) => heard.push({ name, take, gain, rate });
+/** what the engine sets going when it is asked for something, so many times over */
+function sets(fn: (e: InstanceType<typeof AudioEngine>) => void, times = 1): Heard[] {
+  heard.length = 0;
+  for (let k = 0; k < times; k++) fn(engine);
+  return heard.slice();
+}
+const said = (what: string, got: Heard[]) => {
+  const names = [...new Set(got.map((h) => h.name))];
+  console.log(`      ${what.padEnd(46)} ${names.map((nm) => { const of = got.filter((h) => h.name === nm); return `${nm} ×${of.length} (level ${Math.min(...of.map((h) => h.gain)).toFixed(2)}..${Math.max(...of.map((h) => h.gain)).toFixed(2)}, speed ${Math.min(...of.map((h) => h.rate)).toFixed(2)}..${Math.max(...of.map((h) => h.rate)).toFixed(2)})`; }).join(' + ') || 'no recording: made up'}`);
+  return names;
+};
+const THERE = { x: 2, y: 0, z: -5.6 };
+
+ok('nothing is asked for until the sound is started; then the guns, and only when all of those are in what a body does all day, six at a time and the feet first', () => {
+  assert.equal(nothingYet, 0, 'a recording was fetched before the engine was started');
+  const everyday = (u: string) => Object.keys(EVERYDAY).some((nm) => new RegExp(`/${nm}(_\\d+)?\\.wav$`).test(u));
+  const first = asked.findIndex(everyday), files = Object.values(EVERYDAY).reduce((s, c) => s + c, 0);
+  assert.ok(first > 0 && asked.slice(first).every(everyday) && !asked.slice(0, first).some(everyday), 'the two sets are asked for mixed together');
+  assert.equal(asked.length - first, files, 'not every everyday recording was asked for, or one twice');
+  assert.ok(asked.slice(first, first + 5).every((u) => /step_grass/.test(u)), 'the feet are not first');
+  console.log(`      ${first} files first (the guns, the doors, the infected, the blows), all of them out at once; then ${files}, never more than 6 at once; ${most} was the most out at any moment`);
+});
+
+ok('a foot on each kind of ground starts the recording of that ground, never the same take twice running, each a little louder or quieter and higher or lower', () => {
+  for (const s of ['grass', 'dirt', 'gravel', 'rock', 'wood', 'metal', 'concrete', 'asphalt', 'snow']) {
+    const got = sets((e) => e.footstep(s as 'grass', RUN), 60);
+    const [name, , over] = STEPS[s];
+    assert.deepEqual(said(`60 running steps on ${s}`, got).sort(), [name, ...(over ? [over] : [])].sort());
+    for (const nm of [name, ...(over ? [over] : [])]) {
+      const of = got.filter((h) => h.name === nm);
+      assert.equal(of.length, 60);
+      assert.ok(of.every((h, i) => !i || h.take !== of[i - 1].take), `${nm}: the same take twice running`);
+      assert.equal(new Set(of.map((h) => h.take)).size, EVERYDAY[nm], `${nm}: not every take of it was played in 60 steps`);
+      const g0 = Math.min(...of.map((h) => h.gain)), g1 = Math.max(...of.map((h) => h.gain)), r0 = Math.min(...of.map((h) => h.rate)), r1 = Math.max(...of.map((h) => h.rate));
+      assert.ok(g1 / g0 > 1.05 && g1 / g0 < 1.14 && r1 / r0 > 1.03 && r1 / r0 < 1.07, `${nm}: levels ${g0.toFixed(3)}..${g1.toFixed(3)}, speeds ${r0.toFixed(3)}..${r1.toFixed(3)}`);
+    }
+  }
+  // (and somebody else's, from where they are: the same recording, as much louder as the made-up one was before the distance is taken off)
+  const own = sets((e) => e.footstep('grass', RUN), 40), theirs = sets((e) => e.footstep('grass', RUN, THERE), 40);
+  const mean = (hs: Heard[]) => hs.reduce((s, h) => s + h.gain, 0) / hs.length;
+  said('40 of somebody else’s steps on grass', theirs);
+  assert.ok(Math.abs(mean(theirs) / mean(own) - 5.5 / 3.2) < 0.06);
+});
+
+ok('everything else a body does starts what it should: a landing, a jump, a fall, a thing in the hand by what it is, a spade, a fire, a car', () => {
+  const is = (what: string, fn: (e: InstanceType<typeof AudioEngine>) => void, want: string[], times = 1) => assert.deepEqual(said(what, sets(fn, times)).sort(), [...want].sort(), what);
+  is('a jump off concrete', (e) => e.jump('concrete'), ['step_concrete']);
+  is('a landing from a height on wood', (e) => e.land('wood', 9), ['step_wood', 'thud']);
+  is('one’s own body going down', (e) => e.death(), ['thud', 'step_soft']);
+  is('somebody else’s, six metres off', (e) => e.bodyFall(THERE, 6), ['thud', 'step_soft']);
+  is('a leg breaking', (e) => e.snap(), ['snap']);
+  for (const [id, want] of [[undefined, ['take_any', 'step_soft']], ['beans', ['take_tin', 'step_soft']], ['ak', ['take_heavy', 'step_soft']], ['ammo_762', ['take_rounds', 'step_soft']], ['bat', ['take_wood', 'step_soft']], ['suppressor_556', ['take_metal', 'step_soft']], ['field_jacket', ['step_soft']]] as const) {
+    is(`taken up: ${id ?? 'not said what'}`, (e) => e.ui('pickup', undefined, id), [...want]);
+    is(`moved: ${id ?? 'not said what'}`, (e) => e.ui('move', undefined, id), [...want]);
+  }
+  is('put down: a rifle', (e) => e.ui('drop', undefined, 'ak'), ['drop_gun']);
+  is('put down: a tin', (e) => e.ui('drop', undefined, 'beans'), ['take_tin']);
+  is('put down: not said what', (e) => e.ui('drop'), ['take_any']);
+  is('a spade going in', (e) => e.dig(0), ['dig']);
+  is('a spade coming out', (e) => e.dig(1), ['step_snow']);
+  is('a fire two metres off, one beat of it', (e) => e.fire(1, 2), ['fire_crack']);
+  is('wood struck', (e) => e.impact('wood', THERE, 6), ['hit_wood']);
+  is('a car’s door', (e) => e.carDoor(THERE), ['latch', 'gate_slam']);
+  is('a car into something', (e) => e.crash(THERE, 0.6), ['crash_tin', 'thud', 'hit_metal']);
+  // (and what there is no recording of is still what it was: nothing recorded is started for it)
+  for (const kind of ['eat', 'drink', 'bandage', 'inject', 'smoke', 'unbox', 'open', 'close'] as const) is(`${kind} (made up still)`, (e) => e.ui(kind), []);
+});
+
+ok('with `asBefore` on, as the `?sounds` page sets it for "old", none of them is started and the guns still are', () => {
+  engine.asBefore = true;
+  const got = sets((e) => {
+    e.footstep('grass', RUN);
+    e.land('wood', 9);
+    e.death();
+    e.ui('pickup', undefined, 'ak');
+    e.ui('drop', undefined, 'ak');
+    e.dig(0);
+    e.snap();
+    e.impact('wood', THERE, 6);
+    e.crash(THERE, 0.6);
+    e.carDoor(THERE);
+    e.gunshot('rifle');
+  });
+  engine.asBefore = false;
+  assert.deepEqual(got.map((h) => h.name), ['shot_rifle']);
+});
+
 console.log(`${n} checks passed${failed.length ? `, ${failed.length} did not` : ''}`);
 if (failed.length) process.exit(1);

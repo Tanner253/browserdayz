@@ -200,6 +200,8 @@ export class Doll {
   /** the page's box it was last drawn for, and what was worked out for it */
   private box: DollBox | null = null;
   private plan: Plan | null = null;
+  /** the passes that lay the picture on have been drawn once ahead (see `layAhead`) */
+  private laidAhead = false;
 
   constructor(private r: Renderer, private atmo: Atmosphere, private models: ItemModels, private h: DollHost) {
     // The room. The sky's own picture is what steel and glass have to shine with, at a strength of this room's
@@ -761,6 +763,7 @@ export class Doll {
     this.box = box;
     if (!box || !this.plan) {
       this.showing = false;
+      if (!this.laidAhead) this.layAhead();
       if (now - this.askedAt > ASK_SHUT) {
         this.askedAt = now;
         this.ask();
@@ -794,6 +797,34 @@ export class Doll {
     }
     this.picture(this.plan, again);
     this.h.shown(true);
+  }
+
+  /**
+   * The passes that lay the figure's picture on the page are drawn once ahead as well, for the same reason as the
+   * figure's own pieces are (see `prime`): the blur into one of its own small pictures, and the last of them into
+   * one pixel in a corner of the game's picture. Once, on the first frame the figure is made and the inventory is
+   * shut: this is called when the game's frame has been drawn, and the next frame is drawn over that pixel.
+   */
+  private layAhead() {
+    this.laidAhead = true;
+    const R = this.r.renderer;
+    const prev = R.getRenderTarget(), auto = R.autoClear, cutting = R.getScissorTest();
+    R.getViewport(_view);
+    R.getScissor(_cut);
+    R.autoClear = false;
+    this.blur.u.tSrc.value = this.soft[0].texture;
+    R.setRenderTarget(this.soft[1]);
+    R.render(this.blur.scene, this.blur.camera);
+    R.setRenderTarget(null);
+    R.setViewport(0, 0, 1, 1);
+    R.setScissor(0, 0, 1, 1);
+    R.setScissorTest(true);
+    R.render(this.lay.scene, this.lay.camera);
+    R.autoClear = auto;
+    R.setScissorTest(cutting);
+    R.setScissor(_cut);
+    R.setViewport(_view);
+    R.setRenderTarget(prev);
   }
 
   /**

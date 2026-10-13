@@ -12,7 +12,7 @@ import { LEAN_REACH, MAX_STAMINA } from '../net/protocol';
 import { BLOOD, bloodBack, greyOf, mendsOn, withWound, woundOf } from '../sim/blood';
 import { LEG, breaksOnLanding } from '../sim/injury';
 import { paceOf, runCost } from '../sim/load';
-import { SLIDE, SLOPE, degOf, legs, riseOf, slideFall, slideGoesOn, slideJolt, slideOn, type Footing, type Legs } from '../sim/slopes';
+import { LEGS, SLIDE, SLOPE, degOf, legs, riseOf, slideFall, slideGoesOn, slideJolt, slideOn, type Footing, type Legs } from '../sim/slopes';
 
 const STAND_HALF = 0.56;
 const CROUCH_HALF = 0.26;
@@ -173,6 +173,8 @@ export class Player {
   handsBusy = false;
   /** a slide: how fast along the slope (m/s), how fast it is being worked sideways, when it was last going (this body's seconds), and how much of its fall the ground has lately taken off it at a blow (m/s: see `jolted`) */
   private slide = { v: 0, side: 0, at: -9, took: 0 };
+  /** came off a climb for want of breath, and has not half of it back yet: see `step` */
+  private spent = false;
   /** how fast the feet came down in the last step, m/s, on the ground (walking down a slope is coming down it) */
   private sink = 0;
   /** the controller's settings as they were last given it: see `slopes` */
@@ -245,6 +247,7 @@ export class Player {
     this.footing = 'firm';
     this.handsBusy = false;
     this.slide.v = this.slide.side = this.slide.took = 0;
+    this.spent = false;
   }
 
   /** Set down in the air by an admin: the landing that follows costs nothing. */
@@ -460,14 +463,22 @@ export class Player {
     const stands = on === under;
     // (how much of the way asked is up the fall line, and how fast the body is going down it now)
     const up = on ? -(wish.x * on.x + wish.z * on.z) : 0, downhill = on ? this.vel.x * on.x + this.vel.z * on.z : 0;
-    const lg = on ? legs(on.rise, up, { low: this.crouched || this.prone, broken: !!v.broken, kg: this.weightKg, winded: this.winded }) : FIRM;
+    // (Whoever has come off a climb for want of breath does not go at one again until half of it is back. With
+    // only the breath that ends being winded, a body held at a cliff went up it a yard and slid back every few
+    // seconds for as long as the key was down: to and fro on the spot, which is also what the server's check on
+    // bodies walked by a program looks for.)
+    if (this.spent && v.stamina >= MAX_STAMINA / 2) this.spent = false;
+    const lg = on ? legs(on.rise, up, { low: this.crouched || this.prone, broken: !!v.broken, kg: this.weightKg, winded: this.winded || this.spent }) : FIRM;
     // A slide ends where the ground eases, as a fall ends: at whatever speed it was coming down. It begins
     // where there is no footing: going down what is a scramble going up, carried onto such ground from above
     // already going, or out of breath on a climb.
     if (this.slide.took > 0) this.slide.took = Math.max(0, this.slide.took - SLIDE.absorb * h);
     if (this.footing === 'slide' && (!on || !slideGoesOn(this.slide.v, on.rise))) this.endSlide();
     // (at the pace it has along the slope already: what it has over the ground, and what it was coming down at)
-    else if (this.footing !== 'slide' && on && stands && degOf(on.rise) >= SLOPE.scramble && (lg.slides || downhill > SLIDE.begins)) this.beginSlide((downhill + Math.max(0, this.sink) * on.rise) / Math.hypot(1, on.rise), on.rise);
+    else if (this.footing !== 'slide' && on && stands && degOf(on.rise) >= SLOPE.scramble && (lg.slides || downhill > SLIDE.begins)) {
+      if (lg.slides && up >= LEGS.letGo) this.spent = true;
+      this.beginSlide((downhill + Math.max(0, this.sink) * on.rise) / Math.hypot(1, on.rise), on.rise);
+    }
     const sliding = this.footing === 'slide' && !!on;
 
     this.sprinting = wantsSprint && fit && lg.sprint && !sliding;
@@ -498,6 +509,8 @@ export class Player {
       // faster than it walks but never faster than it sprints on the level (nor than the server lets anybody go).
       if (lg.pace < speed) speed = lg.pace;
       else if (up < 0 && lg.carried > 1) speed = Math.min(speed * lg.carried, Math.max(speed, 6.2 * (this.emptyHanded ? HANDS_FREE : 1) * paceOf(this.weightKg)));
+      // (a climb there is no breath for is not begun: the body stands at the foot of it)
+      if (lg.slides && !stands) speed = 0;
       // (a scramble stops for the gun as a sprint does: the hands cannot do both. Not on a climb, where they cannot be spared.)
       if (lg.hands && lg.cling <= 0 && this.sprintLock > 0) speed = 0;
     }
@@ -714,10 +727,10 @@ export class Player {
     // and they are being used: going anywhere on a scramble, and even hanging still on a climb.
     const along = Math.hypot(mv.x, mv.y, mv.z) / h;
     this.sink = this.grounded ? -mv.y / h : 0;
-    // TEMP-SLOPE-DEBUG (to be taken out)
-    const dbg = (this as unknown as { dbg?: unknown[] }).dbg;
-    if (dbg) dbg.push({ on: on ? +degOf(on.rise).toFixed(1) : -1, st: stands, laid: +(laid * 60).toFixed(2), want: +(want * 60).toFixed(2), got: +(got * 60).toFixed(2), mh: +(Math.hypot(mv.x, mv.z) * 60).toFixed(2), my: +(mv.y * 60).toFixed(2), dy: +(desired.y * 60).toFixed(2), wg: wasGrounded, g: this.grounded, f: this.footing, sv: +this.slide.v.toFixed(2), vy: +this.vel.y.toFixed(2), nc: this.kcc.numComputedCollisions(), took: +this.slide.took.toFixed(2), lf: +this.lastFallSpeed.toFixed(2), un: under ? +degOf(under.rise).toFixed(0) : -1, hp: +v.health.toFixed(0) });
-    this.handsBusy = this.footing !== 'slide' && this.grounded && lg.hands && (lg.cling > 0 || (going && speed > 0));
+    // (Once on hands and feet a body stays on them until the ground is plainly easier: a face that is fifty degrees
+    // here and forty-eight there is not got up by standing and stooping at every yard of it.)
+    const hands = lg.hands || (this.handsBusy && !!on && degOf(on.rise) >= SLOPE.scramble - 4);
+    this.handsBusy = this.footing !== 'slide' && this.grounded && hands && (lg.cling > 0 || (going && speed > 0));
     if (this.footing !== 'slide') this.footing = this.handsBusy ? 'scramble' : 'firm';
     // What steep ground costs in breath: the climb, by how much of the pace it allows is being made; or the hanging on.
     const toil = this.footing === 'slide' || !this.grounded ? 0 : lg.cost > 0 && going && along > 0.15 ? lg.cost * Math.min(1, along / Math.max(lg.pace, 0.1)) : lg.cling;

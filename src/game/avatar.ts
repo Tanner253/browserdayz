@@ -183,7 +183,7 @@ function cut(geo: THREE.BufferGeometry, cuts: number[][]): THREE.BufferGeometry 
   };
   const out: number[] = [];
   for (let t = 0; t + 2 < count; t += 3) {
-    let poly = [0, 1, 2].map((j) => corner(index ? index.getX(t + j) : t + j));
+    let poly: Float32Array[] = [0, 1, 2].map((j) => corner(index ? index.getX(t + j) : t + j));
     for (const [nx, ny, nz, d] of cuts) {
       const off = (v: Float32Array) => nx * v[pos] + ny * v[pos + 1] + nz * v[pos + 2] - d;
       const next: Float32Array[] = [];

@@ -30,9 +30,9 @@ import { paceOf, runCost } from './load';
 export type Footing = 'firm' | 'scramble' | 'slide';
 
 const RAD = Math.PI / 180;
-/** the rise over run of a slope of so many degrees, and the degrees of one of so much rise over run */
+/** the rise over run of a slope of so many degrees, and the degrees of one of so much rise over run (to a billionth of one: so that sixty degrees, turned to a rise and back, is sixty and not a hair under it) */
 export const riseOf = (deg: number) => Math.tan(deg * RAD);
-export const degOf = (rise: number) => Math.atan(Math.max(0, rise)) / RAD;
+export const degOf = (rise: number) => Math.round((Math.atan(Math.max(0, rise)) / RAD) * 1e9) / 1e9;
 
 /** The lines between one kind of ground and the next, degrees. */
 export const SLOPE = {
