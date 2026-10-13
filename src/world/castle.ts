@@ -367,11 +367,19 @@ export class CastleSite {
     const P = this.place;
     if (castleUnder(P, eye.x, eye.y, eye.z, this.o.ground, this.o.loose)) return true;
     const [x, z, y] = castleLocal(P, eye.x, eye.y, eye.z), U = UNDER, D = U.cistern.drop, B = U.bay, h = Math.max(1.7, y);
-    const off = (x0: number, x1: number, z0: number, z1: number) => Math.hypot(Math.max(x0 - x, 0, x - x1), Math.max(z0 - z, 0, z - z1));
+    /**
+     * Down a hole in the terrace, which is a metre thick: a line of sight that comes to the hole's near edge from so
+     * far off and so high goes down by its height in that distance, and must go down a metre while it is over the
+     * hole. So the hole is seen into from no further than its width the way the eye looks, times the eye's height
+     * (and a pace and a half for a head put forward, or an eye that looks along the hole's corner to corner).
+     */
+    const down = (x0: number, x1: number, z0: number, z1: number) => {
+      const d = Math.hypot(Math.max(x0 - x, 0, x - x1), Math.max(z0 - z, 0, z - z1)), ux = (x0 + x1) / 2 - x, uz = (z0 + z1) / 2 - z, l = Math.hypot(ux, uz) || 1;
+      return d < 1.5 + Math.min((x1 - x0) / Math.max(1e-3, Math.abs(ux / l)), (z1 - z0) / Math.max(1e-3, Math.abs(uz / l))) * h;
+    };
     if (y > -1.2) {
-      if (off(D.x0, D.x1, D.z0, D.z1) < 3 + 2.6 * h || off(B.x0, B.x1, B.z0, B.z1) < 3 + 6.6 * h) return true;
-      if (off(U.stair.head, U.stair.open, U.stair.z - 0.5, U.stair.z + 0.5) < 3 + 4 * h) return true;
-      if (U.gratings.some(([gx, gz]) => Math.hypot(x - gx, z - gz) < 3 + 0.9 * h)) return true;
+      if (down(D.x0, D.x1, D.z0, D.z1) || down(B.x0, B.x1, B.z0, B.z1) || down(U.stair.head, U.stair.open, U.stair.z - 0.5, U.stair.z + 0.5)) return true;
+      if (U.gratings.some(([gx, gz]) => down(gx - 0.45, gx + 0.45, gz - 0.45, gz + 0.45))) return true;
     }
     // (the hollow tower: down its well, and through the door of its cellar)
     if (Math.hypot(x + CASTLE.hx, z + CASTLE.hz) < CASTLE.tower.r + 3) return true;
@@ -404,7 +412,8 @@ export class CastleSite {
         mesh.receiveShadow = true;
         mesh.matrixAutoUpdate = false;
         to.add(mesh);
-        if (to === this.near) cast.push(mesh.geometry);
+        // (iron throws no shadow: a cresset's bars and a rail's are thinner than one square of the sun's map)
+        if (to === this.near && s !== 'iron') cast.push(mesh.geometry);
         this.counts.draws++;
       }
     };
@@ -426,7 +435,8 @@ export class CastleSite {
     });
     for (const mesh of [...kit.meshes, ...door.meshes, ...rocks.meshes]) {
       this.near.add(mesh);
-      cast.push(mesh.geometry);
+      // (nor the door: it stands under the gatehouse, which shades it, and its fallen leaf lies flat on the paving)
+      if (!door.meshes.includes(mesh)) cast.push(mesh.geometry);
       this.sharp.push(mesh.material as THREE.Material);
       this.counts.draws++;
     }
