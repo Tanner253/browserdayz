@@ -21,6 +21,7 @@ import { BURY, noBurying } from '../src/sim/stash';
 /** how far from the middle anything may say it is: the edge of the ground, and a little (the walls stand 4 m inside it) */
 const EDGE = WORLD_SIZE / 2 + 8;
 import { CALL, CRASH, DROP, fillCrash, fillDrop, type DropInfo } from '../src/sim/drops';
+import { comesFrom, flightTimes, planFlight, restAt, type Flight } from '../src/sim/airdrop';
 import { STOCK } from '../src/sim/trade';
 import { VOICE } from '../src/sim/voice';
 import { CRATE_RESTOCK, CRATE_SPECS, fillCrate } from '../src/sim/crates';
@@ -1954,6 +1955,18 @@ async function command(c: Client, line: string) {
       }
       return void sys(c, 'Take away what? /del item, box, car or z, and its number. The Delete key does it for whatever you are looking at.');
     }
+    case 'airdrop': {
+      // The helicopter sent now by an admin, to look at it and to try it (2026-10-13): to a few steps in front of
+      // whoever asks, or to the map numbers given. From there on it is a drop like any other: everybody is told.
+      if (!admin) return need();
+      const n = rest.map(Number);
+      if ((n.length !== 0 && n.length !== 2) || n.some((v) => !Number.isFinite(v))) return void sys(c, 'After /airdrop: nothing (it comes to a few steps in front of you), or the map numbers x z.');
+      const x = n.length ? n[0] : c.pose[0] - Math.sin(c.pose[3]) * 6, z = n.length ? n[1] : c.pose[2] - Math.cos(c.pose[3]) * 6;
+      if (Math.abs(x) > WORLD_SIZE / 2 - 6 || Math.abs(z) > WORLD_SIZE / 2 - 6) return void sys(c, 'That is off the map.');
+      const f = sendDrop({ x, y: world.groundAt(x, z), z });
+      if (f) sys(c, `A helicopter is coming in from the ${comesFrom(f)}: the crate is down at ${Math.round(x)}, ${Math.round(z)} in ${Math.round(flightTimes(f).land)} s, and it is gone in ${Math.round(flightTimes(f).gone)}.`);
+      return;
+    }
     case 'spawn': {
       // Something stood in the world by an admin: a car of either kind, or the infected. (2026-10-13: "add more
       // admin tools that might be useful like spawn entities like cars and zombies and future entities would go
@@ -2512,7 +2525,7 @@ const UNDER = { deep: 1.1, grace: 3, void: 10, off: 8 };
 function underCheck(c: Client, now = Date.now()) {
   const [x, y, z] = c.pose;
   const b = world.bunker;
-  const down = c.alive && !c.seatAt && !c.power.clip && roleOf(c) !== 'admin' && now >= c.check.free && y < world.groundAt(x, z) - UNDER.deep && !(b && Math.hypot(x - b.x, z - b.z) < UNDER_BUNKER);
+  const down = c.alive && !c.seatAt && !c.power.clip && roleOf(c) !== 'admin' && now >= c.check.free && y < world.groundAt(x, z) - UNDER.deep && !(b && Math.hypot(x - b.x, z - b.z) < UNDER_BUNKER) && !world.castleUnder(x, y, z);
   if (!down) {
     c.underAt = 0;
     return;
@@ -3294,8 +3307,8 @@ function handle(c: Client, m: C2S) {
       lastCall = economy.time;
       // (three paces in front of the caller: where they stand is where they may still be standing when it lands)
       const at = { x: c.pose[0] - Math.sin(c.pose[3]) * CALL.ahead, y: c.pose[1], z: c.pose[2] - Math.cos(c.pose[3]) * CALL.ahead };
-      broadcast({ t: 'radio+', by: c.id, x: at.x, z: at.z, eta: CALL.eta });
-      setTimeout(() => spawnDrop(at), CALL.eta * 1000);
+      // (it comes by helicopter from the map's edge, as every drop does: the flight says who called it, and when it is down)
+      sendDrop(at, c.id);
       log(`${c.name} called a supply drop to ${Math.round(at.x)}, ${Math.round(at.z)}`);
       return;
     }
@@ -3738,6 +3751,8 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
     stashes: [...boxes.values()].filter((b) => b.kind === 'stash').map((b) => ({ uid: b.cid, x: b.x, y: b.y, z: b.z, rot: b.rot, ...(b.item ? { item: b.item } : {}), ...(b.buried ? { buried: true } : {}) })),
     corpses: [...boxes.values()].filter((b) => b.kind === 'corpse').map((b) => ({ uid: b.cid, x: b.x, y: b.y, z: b.z, rot: b.rot, name: b.name ?? 'Survivor', v: b.v ?? 0 })),
     drops: [...boxes.values()].filter((b) => b.kind === 'drop').map(dropInfo),
+    // (the helicopters in the air at this moment, each with how long it has been: this game puts it where everybody else's has it)
+    flights: [...flights.values()].map(flightNow),
     barrels: [...barrelsGone.keys()],
     fires: hearths.alight(Date.now() / 1000),
     bunker: bunkerDoor.open,
@@ -4007,18 +4022,57 @@ function dropInfo(b: Box): DropInfo {
 /** economy time of the last call answered on a field radio */
 let lastCall = -1e9;
 
-/** @param where set down here (called for on a radio) and not at a place of the map's choosing */
-function spawnDrop(where?: { x: number; y: number; z: number }, heli = false) {
+/**
+ * The helicopters in the air with a supply drop (src/sim/airdrop.ts): each flight as it was said, and the moment
+ * (the clock on the wall, ms) it appeared on the map's edge. Everything a game draws and hears of one follows from
+ * those two. Not kept over a restart: a flight the server forgets brings no crate, and the next comes by the clock.
+ */
+const flights = new Map<string, { f: Flight; at: number; landed: boolean }>();
+/** a flight as it is said to somebody now: with how long it has been in the air */
+const flightNow = (e: { f: Flight; at: number }): Flight => ({ ...e.f, age: Math.round((Date.now() - e.at) / 10) / 100 });
+
+/**
+ * A supply drop is sent: a helicopter appears on the map's edge, flies to the place, holds over it and lets the
+ * crate down under a canopy, stays a while and flies off the map another way. Everybody is told of the flight at
+ * once (`heli+`), and of the crate (`drop+`) only when it is on the ground: until then there is nothing in the
+ * world to open.
+ * @param where the place (called for on a radio, or an admin's), and not one of the map's choosing
+ * @param by whoever called it
+ * @returns the flight, or null if the map had nowhere to set a crate down
+ */
+function sendDrop(where?: { x: number; y: number; z: number }, by?: number): Flight | null {
+  // (out in the wild country, past the line, and not beside anybody: it is something to go to)
+  const at = where ?? world.dropSite(undefined, false, [...clients.values()].filter((c) => c.alive).map((c) => ({ x: c.pose[0], z: c.pose[2] })));
+  if (!at) return null;
+  const uid = `drop-${Math.round(economy.time)}-${Math.random().toString(36).slice(2, 7)}`;
+  const f = planFlight(world.groundAt, at, uid, Math.random, by);
+  const T = flightTimes(f), e = { f, at: Date.now(), landed: false };
+  flights.set(uid, e);
+  broadcast({ t: 'heli+', f });
+  setTimeout(() => {
+    e.landed = true;
+    spawnDrop(at, false, uid);
+  }, T.land * 1000);
+  setTimeout(() => flights.delete(uid), T.gone * 1000);
+  log(`helicopter in from the ${comesFrom(f)} with a supply drop for ${Math.round(at.x)}, ${Math.round(at.z)}: over it in ${T.arrive.toFixed(0)} s, down in ${T.land.toFixed(0)}, gone in ${T.gone.toFixed(0)}`);
+  return f;
+}
+
+/**
+ * @param where set down here (where the helicopter let it down) and not at a place of the map's choosing
+ * @param flown the number of the flight that brought it: the crate that stands there is the one that came down
+ */
+function spawnDrop(where?: { x: number; y: number; z: number }, heli = false, flown?: string) {
   // (a supply drop out in the wild country, past the line; a helicopter's cargo inside it)
   // (and not beside anybody: it is something to go to)
   const at = where ?? world.dropSite(undefined, heli, [...clients.values()].filter((c) => c.alive).map((c) => ({ x: c.pose[0], z: c.pose[2] })));
   if (!at) return;
-  const uid = `drop-${Math.round(economy.time)}-${Math.random().toString(36).slice(2, 7)}`;
+  const uid = flown ?? `drop-${Math.round(economy.time)}-${Math.random().toString(36).slice(2, 7)}`;
   const [w, h] = heli ? [CRASH.w, CRASH.h] : [DROP.w, DROP.h];
   const c = new Container(uid, heli ? CRASH.label : DROP.label, w, h, [], true);
   if (heli) fillCrash(c);
   else fillDrop(c);
-  const b: Box = { cid: uid, kind: 'drop', w, h, items: c.serialize().items, x: at.x, y: at.y, z: at.z, rot: Math.random() * Math.PI * 2, emptiedAt: -1, expires: economy.time + (heli ? CRASH.life : DROP_LIFE), ...(heli ? { heli: true } : {}) };
+  const b: Box = { cid: uid, kind: 'drop', w, h, items: c.serialize().items, x: at.x, y: at.y, z: at.z, rot: flown ? restAt(flown) : Math.random() * Math.PI * 2, emptiedAt: -1, expires: economy.time + (heli ? CRASH.life : DROP_LIFE), ...(heli ? { heli: true } : {}) };
   boxes.set(uid, b);
   for (const it of b.items) issue(it);
   broadcast({ t: 'drop+', d: dropInfo(b) });
@@ -4047,11 +4101,13 @@ function tickDrops(anyoneAlive: boolean) {
     nextCrash = economy.time + (Number(process.env.CRASH_EVERY_S) || CRASH.every);
     spawnDrop(undefined, true);
   }
+  // (one on its way down is one standing: there is one aircraft)
+  if ([...flights.values()].some((e) => !e.landed)) standing = true;
   // with nobody about the clock waits: the first one comes a minute and a half after somebody turns up
   if (nextDrop < 0 || !anyoneAlive) nextDrop = Math.max(nextDrop, economy.time + DROP_FIRST);
   else if (economy.time >= nextDrop && !standing) {
     nextDrop = economy.time + DROP_EVERY;
-    spawnDrop();
+    sendDrop();
   }
 }
 

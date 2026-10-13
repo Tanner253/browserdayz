@@ -11,10 +11,12 @@ import { gasEdge, gasZone } from './gas';
 import { UNDER_GAS } from './crates';
 
 /**
- * A drop called down with a field radio: how long it takes to come (everybody is told where, and has that long
- * to get there), and how long after one call before the next is answered, map-wide.
+ * A drop called down with a field radio: how long after one call before the next is answered, map-wide. (How long
+ * it takes to come has no number of seconds of its own any more, 2026-10-13: it comes by helicopter from the map's
+ * edge, as every drop does, and is on the ground when the flight says: see `flightTimes` in ./airdrop.ts. From
+ * forty seconds to seventy-five, by how far the helicopter has to come; it was 45 flat.)
  */
-export const CALL = { eta: 45, every: 300, /** metres in front of the caller it comes down */ ahead: 3 };
+export const CALL = { every: 300, /** metres in front of the caller it comes down */ ahead: 3 };
 
 /**
  * A helicopter comes down. Now and then, somewhere open on the map: its wreck, smoke that is seen from a long

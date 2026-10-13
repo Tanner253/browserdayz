@@ -11,6 +11,11 @@
 // set otherwise), and never less than a floor (0.02 SOL). A full treasury pays well; an
 // empty one pays the floor until it cannot, and then tags wait for the next rewards.
 //
+// That is how it was. From the second cut-over (RULES2_FROM, below) a tag pays the floor, flat,
+// whatever the treasury holds, and a wallet is paid only when five of its tags are due: all of
+// them in one transaction, which still makes a receipt for each. What was cashed in before
+// the cut-over is paid as it was promised, one at a time, without waiting for five.
+//
 // The one thing that must never happen is a tag paid twice, and it is the chain that sees to
 // it, not this code. Every payment begins by creating a small account whose address is made
 // from the treasury and the tag: the receipt. Creating an account that already exists fails,
@@ -66,6 +71,17 @@ export interface Config {
   rulesFrom: number;
   /** what a tag cashed in before `rulesFrom` pays at least */
   floorBefore: bigint;
+  /**
+   * The second cut-over (ms): the owner, 2026-10-13, "we will pay .01 per tag now, but we wont pay out till the user
+   * is due for 5 tags". For whatever is cashed in from this moment on, a tag pays `floor` and no more (the share of
+   * the treasury is not asked at all, so nothing set for it can make a full treasury pay more), and a wallet is paid
+   * only when `minTags` of its tags are due: see `dueOf`. What was cashed in before it is paid as it was promised.
+   * Which rules a tag is under is written on it when it is first put in the book (`rules` on its row), and holds
+   * from then on: moving this moment never changes what a tag already in the book was promised.
+   */
+  rules2From: number;
+  /** from `rules2From`: a wallet is paid when this many of its tags are due, and not before (1: each as it comes) */
+  minTags: number;
   /** rewards are collected when at least this much is waiting */
   claimAt: bigint;
   /** what is bid per unit of work, in millionths of a lamport: enough to be taken up promptly */
@@ -74,6 +90,12 @@ export interface Config {
 
 const DEFAULT_RPC = 'https://api.mainnet-beta.solana.com';
 const DEFAULT_MINT = 'GvfAzdPF466PJsPJMzXQeX3TSqmJm9YxAG8xBJ6ypump';
+/**
+ * THE MOMENT OF THE SECOND CUT-OVER, in UTC: a tag cashed in from now on pays 0.01 SOL flat, and its wallet is paid
+ * when five are due. TO BE SET BY WHOEVER DEPLOYS THIS (here, or as PAYOUT_RULES2_FROM), to a moment at or after
+ * the deploy: the payouts page says this moment to everybody.
+ */
+export const RULES2_FROM = '2026-10-14T00:00:00Z';
 
 const lamports = (sol: number) => BigInt(Math.round(sol * LAMPORTS));
 export const sol = (l: bigint | number) => Number(l) / LAMPORTS;
@@ -115,6 +137,8 @@ export function config(env: Record<string, string | undefined> = process.env): C
   }
   const floor = lamports(num(env.TAG_PAY_MIN_SOL, 0.01, 0.001, 10));
   const from = Date.parse(env.PAYOUT_RULES_FROM ?? '');
+  const rulesFrom = Number.isFinite(from) ? from : Date.parse('2026-10-13T04:30:00Z');
+  const from2 = Date.parse(env.PAYOUT_RULES2_FROM ?? '');
   return {
     mode,
     problem,
@@ -129,15 +153,23 @@ export function config(env: Record<string, string | undefined> = process.env): C
     keep: lamports(num(env.TREASURY_KEEP_SOL, 0.01, 0.002, 1000)),
     dayShare: num(env.PAYOUT_DAY_CAP_PERCENT, 75, 1, 100) / 100,
     walletDayTags: Math.round(num(env.PAYOUT_WALLET_DAY_TAGS, 3, 1, 1000)),
-    rulesFrom: Number.isFinite(from) ? from : Date.parse('2026-10-13T04:30:00Z'),
+    rulesFrom,
     floorBefore: lamports(num(env.TAG_PAY_MIN_SOL_BEFORE, 0.02, 0.001, 10)),
+    // (never before the rules of 2026-10-13, which it is built on)
+    rules2From: Math.max(rulesFrom, Number.isFinite(from2) ? from2 : Date.parse(RULES2_FROM)),
+    minTags: Math.round(num(env.PAYOUT_MIN_TAGS, 5, 1, 100)),
     claimAt: lamports(num(env.CLAIM_MIN_SOL, 0.05, 0.001, 1000)),
     bid: Math.round(num(env.PRIORITY_MICROLAMPORTS, 20_000, 0, 5_000_000)),
   };
 }
 
-/** The settings a tag is paid by: one cashed in before the rules of 2026-10-13 is paid at the least it was promised. */
-export function termsOf(cfg: Config, cashedAt: string): Config {
+/**
+ * The settings a tag is paid by: one cashed in before the rules of 2026-10-13 is paid at the least it was promised,
+ * and one under the rules of the second cut-over is paid the floor and nothing else, whatever the treasury holds.
+ * @param five the tag is under the rules of the second cut-over (as its row in the book says, once it has one)
+ */
+export function termsOf(cfg: Config, cashedAt: string, five = Date.parse(cashedAt) >= cfg.rules2From): Config {
+  if (five) return { ...cfg, share: 0, ceiling: cfg.floor };
   if (!(Date.parse(cashedAt) < cfg.rulesFrom) || cfg.floorBefore <= cfg.floor) return cfg;
   return { ...cfg, floor: cfg.floorBefore, ceiling: cfg.ceiling > cfg.floorBefore ? cfg.ceiling : cfg.floorBefore };
 }
@@ -201,15 +233,22 @@ export const tagOf = (e: Entry): Tag => ({ ref: refOf(e.id), at: e.at, name: e.n
  *          has been filled since, or the limit has been raised)
  *   setup  payouts are not set up to pay (a dry run, the wrong key): when they are
  *   hand   something a person has to look at: never by itself
+ *   five   its wallet has fewer tags due than it is paid for at once: when the book shows that many (told from the
+ *          book alone: nothing is asked of the chain or the file service while it waits, however long that is)
  */
-export type Hold = 'funds' | 'day' | 'setup' | 'hand';
+export type Hold = 'funds' | 'day' | 'setup' | 'hand' | 'five';
 
 export type Outcome =
   | { state: 'paid'; lamports: number; signature: string; at: string; receipt?: string }
   /** its attempt is written down, its place in the day's limits is taken, and its payment is on the way */
   | { state: 'sending'; lamports: number; signature: string }
-  /** will be paid when it can be: nothing more is needed from the player */
-  | { state: 'waiting'; why: string; hold?: Hold }
+  /**
+   * will be paid when it can be: nothing more is needed from the player.
+   * `have` of `need`: how many of its wallet's tags are due, of how many it is paid for at once (said when it is
+   * told, never written down: the count moves). `parked`: it was in the book already and still waits for the count,
+   * so there is nothing to ask about again: it is paid from the book when the count is reached (see api/cashin.ts).
+   */
+  | { state: 'waiting'; why: string; hold?: Hold; have?: number; need?: number; parked?: true }
   /** will not be paid, and why */
   | { state: 'skipped'; why: string }
   /** payouts were not switched on when it was cashed in: listed only */
@@ -244,6 +283,8 @@ export interface Row extends Tag {
   tries?: Try[];
   /** left open by the version before this one, whose payments left no receipt: never paid by the machine now */
   legacy?: boolean;
+  /** 2: under the rules of the second cut-over (flat pay, paid when its wallet has enough due). Written when the tag is first put in the book. */
+  rules?: 2;
 }
 
 export interface Claim {
@@ -283,8 +324,25 @@ const BOOK = 'ledger/book.json';
 const ROWS_KEPT = 500;
 const emptyBook = (): Book => ({ v: 1, since: null, rows: [], tags: 0, paid: 0, paidLamports: 0, claims: [], claimedLamports: 0, claimNote: '' });
 const open = (r: Row) => r.state === 'sending' || r.state === 'waiting';
-/** taken in, and kept waiting by this machine: for room under the day's limits, or for the treasury to fill */
-const owed = (r: Row | undefined) => r?.state === 'waiting' && (r.hold === 'day' || r.hold === 'funds');
+/** taken in, and kept waiting by this machine: for room under the day's limits, for the treasury to fill, or for its wallet to have enough due */
+const owed = (r: Row | undefined) => r?.state === 'waiting' && (r.hold === 'day' || r.hold === 'funds' || r.hold === 'five');
+
+/** Is a tag under the rules of the second cut-over? Its row says, once it has one; until then, when it was cashed in. */
+const fives = (cfg: Config, t: { at: string }, had?: Row | null) => (had ? had.rules === 2 : Date.parse(t.at) >= cfg.rules2From);
+const FIVE = (cfg: Config) => `paid when ${cfg.minTags} of this wallet's tags are due`;
+
+/**
+ * A wallet's tags that are DUE: under the rules of the second cut-over, to be paid by every other rule (one that
+ * is not to be paid is never left waiting: it is written down as not paid, and is not here), and not begun on.
+ * They wait for nothing but each other, for room under the day's limit, or for the treasury; and they are paid
+ * together, all of them, when there are `minTags` of them.
+ * @param but a tag to leave out (the one in hand, which may or may not be in the book yet)
+ */
+export function dueOf(book: Book, wallet: string, but?: string): Row[] {
+  return book.rows.filter((r) => r.rules === 2 && r.wallet === wallet && r.ref !== but && owed(r) && !r.tries?.length && !r.legacy);
+}
+/** the tags a waiting one is paid with: its wallet's, under the second cut-over; itself alone, before it */
+const lotOf = (book: Book, r: Row) => (r.rules === 2 ? dueOf(book, r.wallet) : [r]);
 
 /** (rows written before a tag had a reference carried its id: they are given their reference, and the id is dropped) */
 function tidy(book: Book): Book {
@@ -333,11 +391,15 @@ export async function editBook(w: Pick<World, 'store' | 'sleep' | 'random' | 'no
   }
 }
 
-/** Puts a tag and what became of it in the book (a tag already down as paid stays as it is). */
-export function enter(book: Book, t: Tag, o: Outcome, day: string): Row {
+/**
+ * Puts a tag and what became of it in the book (a tag already down as paid stays as it is).
+ * @param five it is under the rules of the second cut-over: written on it if this is where it is first put down
+ */
+export function enter(book: Book, t: Tag, o: Outcome, day: string, five = false): Row {
   let row = book.rows.find((r) => r.ref === t.ref);
   if (!row) {
     row = { ref: t.ref, at: t.at, name: t.name, owner: t.owner, wallet: t.wallet, state: 'off' };
+    if (five) row.rules = 2;
     book.rows.push(row);
     book.tags++;
   }
@@ -422,9 +484,27 @@ const DEAD_MARGIN = 20;
 const WATCH_MS = 18_000;
 /** fees, with room to spare */
 const FEE_ROOM = 20_000n;
-/** work allowed: a payment with its receipt and note uses about fifteen thousand units; a claim, about sixty thousand */
+/** work allowed: a payment with its receipt and note uses about fifteen thousand units (and as much again for each tag more that it pays); a claim, about sixty thousand */
 const PAY_UNITS = 40_000;
 const CLAIM_UNITS = 250_000;
+/**
+ * How many tags one transaction pays at most. A transaction may be 1232 bytes: with five receipts, the payment and
+ * the note naming all five it is 1205, and a sixth receipt does not fit. A wallet with more due is paid in several.
+ */
+export const LOT_MAX = 5;
+
+/**
+ * One payment, for one tag or for several of one wallet's: a receipt for each tag first (so that none of them can
+ * ever be paid again: if any one of the receipts is there already the whole transaction fails, and nothing moves),
+ * then the money for all of them in one transfer, and a note naming them. This is the only place a payment is put
+ * together, and what it sends is exactly the sum of what the tags it makes receipts for are paid: so a tag's money
+ * can leave the treasury only in a transaction that makes that tag's receipt, and that can happen once.
+ */
+export function payment(treasury: Bytes, to: Bytes, tags: { ref: string; lamports: bigint }[], bid: number): Instruction[] {
+  if (!tags.length || tags.length > LOT_MAX || new Set(tags.map((x) => x.ref)).size !== tags.length) throw new Error('not the tags of one payment');
+  const sum = tags.reduce((s, x) => s + x.lamports, 0n);
+  return [computeLimit(PAY_UNITS * tags.length), computePrice(bid), ...tags.map((x) => receipt(treasury, x.ref)), transfer(treasury, to, sum), memo(`ZONA dog tag ${tags.map((x) => x.ref).join(' ')}`)];
+}
 
 const landed = (s: Pick<Status, 'err' | 'confirmationStatus'> | null | undefined) => !!s && !s.err && (s.confirmationStatus === 'confirmed' || s.confirmationStatus === 'finalized');
 
@@ -460,6 +540,20 @@ async function watch(w: World, tx: Signed, forMs = WATCH_MS): Promise<boolean> {
   }
   return false;
 }
+/** the same for several sent together (a wallet with more due than one transaction carries): which of them arrived */
+async function watchAll(w: World, txs: Signed[]): Promise<boolean[]> {
+  if (txs.length === 1) return [await watch(w, txs[0])];
+  const done = txs.map(() => false), dead = txs.map(() => false);
+  for (let waited = 0; waited < WATCH_MS && done.some((d, i) => !d && !dead[i]); waited += 1200) {
+    await w.sleep(1200);
+    const seen = await w.rpc.statuses(txs.map((x) => x.signature)).catch(() => [] as (Status | null)[]);
+    txs.forEach((_, i) => {
+      if (landed(seen[i])) done[i] = true;
+      else if (seen[i]?.err && seen[i]!.confirmationStatus === 'finalized') dead[i] = true;
+    });
+  }
+  return done;
+}
 
 /** where the coin's rewards stand, asked of the chain at most four times a minute (and no staler than what the treasury is seen to hold: the page shows the two side by side) */
 const coin = (w: World) => cached(w, 'coin', 15_000, () => (w.coin ?? coinState)(w.rpc, w.cfg.mint));
@@ -489,13 +583,15 @@ async function roomToday(w: World, r: Row, book: Book): Promise<boolean> {
   const cfg = w.cfg, day = dayOf(w.now());
   if (!cfg.treasury) return false;
   const today = book.rows.filter((x) => x.ref !== r.ref && x.day === day && (x.state === 'paid' || x.state === 'sending'));
-  if (today.filter((x) => x.wallet === r.wallet).length >= cfg.walletDayTags) return false;
+  // (a wallet's tags under the second cut-over are held by its count of tags DUE, and by nothing about what it was paid today)
+  if (r.rules !== 2 && today.filter((x) => x.wallet === r.wallet).length >= cfg.walletDayTags) return false;
   if (!today.length) return true;
   const balance = await treasuryHolds(w);
   const most = Math.max(book.most?.day === day ? book.most.lamports : 0, Number(balance));
   const allowed = (BigInt(most) * BigInt(Math.round(cfg.dayShare * 1000))) / 1000n;
   const spent = today.reduce((s, x) => s + BigInt(x.lamports ?? 0), 0n);
-  return spent + price(balance, termsOf(cfg, r.at)) <= allowed;
+  // (all that it is paid with go together or not at all: the room has to be for all of them)
+  return spent + lotOf(book, r).reduce((s, x) => s + price(balance, termsOf(cfg, x.at, x.rules === 2)), 0n) <= allowed;
 }
 
 /**
@@ -505,62 +601,115 @@ async function roomToday(w: World, r: Row, book: Book): Promise<boolean> {
 async function due(w: World, r: Row, book: Book): Promise<boolean> {
   if (r.state === 'sending') return true;
   if (r.state !== 'waiting' || r.hold === 'hand') return false;
+  // (waiting for its wallet's count: the book alone says when, and until then nothing is asked of anybody)
+  if (r.hold === 'five') return r.rules !== 2 || dueOf(book, r.wallet).length >= w.cfg.minTags;
   if (r.hold === 'day') return r.heldOn !== dayOf(w.now()) || roomToday(w, r, book);
   if (r.hold === 'setup') return w.cfg.mode === 'on' && (await setup(w).catch(() => 'not known')) === null;
   if (r.hold === 'funds' && w.cfg.treasury) {
-    // (when the treasury, with whatever rewards could be collected into it, would cover a tag)
+    // (when the treasury, with whatever rewards could be collected into it, would cover a tag, or all the tags it is paid with)
     const has = await treasuryHolds(w);
     const s = w.cfg.mode === 'on' ? await coin(w).catch(() => null) : null;
     const more = s && s.creator && same(s.creator, w.cfg.treasury) && !s.unsupported ? s.curve + s.pool : 0n;
-    return has + more >= price(has + more, termsOf(w.cfg, r.at)) + EMPTY_ACCOUNT_RENT + FEE_ROOM + w.cfg.keep;
+    const lot = lotOf(book, r);
+    return has + more >= lot.reduce((sum, x) => sum + price(has + more, termsOf(w.cfg, x.at, x.rules === 2)) + EMPTY_ACCOUNT_RENT, 0n) + FEE_ROOM * BigInt(Math.ceil(lot.length / LOT_MAX)) + w.cfg.keep;
   }
   return true;
 }
 
-// ------------------------------------------------------------------ paying one tag
+// ------------------------------------------------------------------ paying a tag, or several of one wallet's
+
+/** what was found of a tag, and of every other tag that was seen to with it */
+type Said = { t: Tag; o: Outcome; five: boolean }[];
+/** one of the tags a payment is for */
+interface One {
+  t: Tag;
+  had: Row | undefined;
+  five: boolean;
+  tries: Try[];
+  /** the address of its receipt */
+  mine: string;
+  amount: bigint;
+}
+const tagOfRow = (r: Row): Tag => ({ ref: r.ref, at: r.at, name: r.name, owner: r.owner, wallet: r.wallet });
 
 /**
  * Pays a tag, or says why not, or finds that it has been paid already. Safe to call again
  * and again for the same tag, and from two places at once.
+ *
+ * Under the rules of the second cut-over a tag is not paid alone. It waits until its wallet has `minTags` due, and
+ * then all that are due are paid together: one transaction for every five of them (LOT_MAX), each making the
+ * receipt of every tag it pays. Whatever was written down as one attempt is for certain tags, and every attempt
+ * after it is for the same ones: but nothing rests on that. A tag's money is only ever in a transaction that
+ * makes that tag's receipt (see `payment`), so however the tags are put together, and whatever this code believes,
+ * the chain lets each of them be paid once; and a transaction happens whole or not at all, so nobody is ever paid
+ * for some of the tags of one and not the others.
  * @param at the book as last read; left holding the book as this last wrote it
+ * @returns what became of the tag, and of every other tag this saw to with it
  */
-async function settle(w: World, t: Tag, at: { held: Held }): Promise<Outcome> {
+async function settle(w: World, t: Tag, at: { held: Held }, again = false): Promise<Said> {
   const cfg = w.cfg;
-  if (cfg.mode === 'off' || !cfg.treasury) return { state: 'off' };
+  const book = at.held.book;
+  const had = book.rows.find((r) => r.ref === t.ref);
+  const five = fives(cfg, t, had);
+  const only = (o: Outcome): Said => [{ t, o, five }];
+  if (cfg.mode === 'off' || !cfg.treasury) return only({ state: 'off' });
   const treasury = cfg.treasury;
   const now = w.now();
-  const had = at.held.book.rows.find((r) => r.ref === t.ref);
   const tries = had?.tries ?? [];
 
   // begun by the version before this one, whose payments left no receipt to tell by: paid if
   // its payment is seen to have arrived, and otherwise for a person to settle, never the machine
   if (had?.legacy) {
     const [s] = had.signature ? await w.rpc.statuses([had.signature]) : [null];
-    if (landed(s)) return { state: 'paid', lamports: had.lamports ?? 0, signature: had.signature!, at: iso(now) };
-    return { state: 'skipped', why: 'left unfinished by an earlier version of this system: to be settled by hand' };
+    if (landed(s)) return only({ state: 'paid', lamports: had.lamports ?? 0, signature: had.signature!, at: iso(now) });
+    return only({ state: 'skipped', why: 'left unfinished by an earlier version of this system: to be settled by hand' });
   }
 
-  if (!t.wallet) return { state: 'skipped', why: 'no wallet given' };
+  if (!t.wallet) return only({ state: 'skipped', why: 'no wallet given' });
   let to: Bytes;
   try {
     to = address(t.wallet);
   } catch {
-    return { state: 'skipped', why: 'not a wallet address' };
+    return only({ state: 'skipped', why: 'not a wallet address' });
   }
-  if (same(to, treasury)) return { state: 'skipped', why: 'not a wallet that can be paid' };
+  if (same(to, treasury)) return only({ state: 'skipped', why: 'not a wallet that can be paid' });
 
-  // --- has it been paid? The chain says: its receipt is there, or it is not.
-  const mine = b58(seeded(treasury, t.ref));
-  for (const place of new Set([mine, ...tries.map((x) => x.receipt)])) {
-    if (!(await w.rpc.account(address(place)))) continue;
-    // an account where its receipt would go, and no attempt of ours on record: not ours. Nothing is sent.
-    const made = tries.filter((x) => x.receipt === place);
-    if (!made.length) return { state: 'waiting', why: 'the address of its receipt is already in use: this one needs looking at', hold: 'hand' };
-    // (which of the attempts it was, if the node remembers; the last of them if it does not)
-    const seen = await w.rpc.statuses(made.map((x) => x.signature)).catch(() => [] as (Status | null)[]);
-    const hit = made.find((_, i) => landed(seen[i])) ?? made[made.length - 1];
-    return { state: 'paid', lamports: had?.lamports ?? 0, signature: hit.signature, at: hit.at, receipt: place };
+  // --- the tags it goes with: those its last attempt was for, if it has been tried (before the second cut-over, itself alone)
+  const one = (x: Tag, row: Row | undefined): One => ({ t: x, had: row, five: fives(cfg, x, row), tries: row?.tries ?? [], mine: b58(seeded(treasury, x.ref)), amount: 0n });
+  let lot: One[] = [one(t, had)];
+  if (tries.length) {
+    const last = tries[tries.length - 1].signature;
+    for (const r of book.rows) if (r.ref !== t.ref && r.wallet === t.wallet && open(r) && r.tries?.length === tries.length && r.tries[tries.length - 1].signature === last) lot.push(one(tagOfRow(r), r));
   }
+  const said: Said = [];
+  const say = (m: One, o: Outcome) => void said.push({ t: m.t, o, five: m.five });
+
+  // --- has it been paid? The chain says: its receipt is there, or it is not. (Asked of each tag by itself.)
+  const receiptSays = async (m: One): Promise<Outcome | null> => {
+    for (const place of new Set([m.mine, ...m.tries.map((x) => x.receipt)])) {
+      if (!(await w.rpc.account(address(place)))) continue;
+      // an account where its receipt would go, and no attempt of ours on record: not ours. Nothing is sent.
+      const made = m.tries.filter((x) => x.receipt === place);
+      if (!made.length) return { state: 'waiting', why: 'the address of its receipt is already in use: this one needs looking at', hold: 'hand' };
+      // (which of the attempts it was, if the node remembers; the last of them if it does not)
+      const seen = await w.rpc.statuses(made.map((x) => x.signature)).catch(() => [] as (Status | null)[]);
+      const hit = made.find((_, i) => landed(seen[i])) ?? made[made.length - 1];
+      return { state: 'paid', lamports: m.had?.lamports ?? 0, signature: hit.signature, at: hit.at, receipt: place };
+    }
+    return null;
+  };
+  /** those of them the chain has no receipt for (what it says of the others is said) */
+  const unpaid = async (all: One[]) => {
+    const left: One[] = [];
+    for (const m of all) {
+      const o = await receiptSays(m);
+      if (o) say(m, o);
+      else left.push(m);
+    }
+    return left;
+  };
+  lot = await unpaid(lot);
+  if (!lot.length) return said;
 
   // --- attempts made before: is one of them still on its way?
   if (tries.length) {
@@ -569,72 +718,110 @@ async function settle(w: World, t: Tag, at: { held: Held }): Promise<Outcome> {
     const height = await node.blockHeight();
     const seen = await node.statuses(tries.map((x) => x.signature));
     const hit = tries.findIndex((_, i) => landed(seen[i]));
-    if (hit >= 0) return { state: 'paid', lamports: had?.lamports ?? 0, signature: tries[hit].signature, at: tries[hit].at, receipt: tries[hit].receipt };
+    if (hit >= 0) {
+      for (const m of lot) say(m, { state: 'paid', lamports: m.had?.lamports ?? 0, signature: tries[hit].signature, at: tries[hit].at, receipt: m.tries[hit].receipt });
+      return said;
+    }
     const gone = (x: Try, i: number) => (seen[i] ? !!seen[i]!.err && seen[i]!.confirmationStatus === 'finalized' : height > x.lastValid + DEAD_MARGIN);
     const alive = tries.filter((x, i) => !gone(x, i));
     if (alive.length) {
       const last = alive[alive.length - 1];
       // the very same transaction once more does no harm and may help it along
       await w.rpc.send({ wire: Uint8Array.from(Buffer.from(last.wire, 'base64')), signature: last.signature }).catch(() => {});
-      return { state: 'sending', lamports: had?.lamports ?? 0, signature: last.signature };
+      for (const m of lot) say(m, { state: 'sending', lamports: m.had?.lamports ?? 0, signature: last.signature });
+      return said;
     }
-    if (tries.length >= MAX_TRIES) return { state: 'waiting', why: `${MAX_TRIES} attempts did not go through: this one needs looking at`, hold: 'hand' };
+    if (tries.length >= MAX_TRIES) {
+      for (const m of lot) say(m, { state: 'waiting', why: `${MAX_TRIES} attempts did not go through: this one needs looking at`, hold: 'hand' });
+      return said;
+    }
   } else {
     // --- whether it is to be paid at all (asked afresh each time until its first attempt)
-    // (too old is said of a tag that comes late. One the book has had waiting, for room under the day's limits or
-    // for the treasury to fill, came in time: the wait since is this machine's own, and is not counted against it.
+    // (too old is said of a tag that comes late. One the book has had waiting, for room under the day's limits, for
+    // the treasury to fill, or for its wallet to have enough due, came in time: the wait since is this machine's
+    // own, and is not counted against it, however long it is.
     // Before 2026-10-12 it was, and a wallet with more tags than three days of its limit lost the rest.)
-    if (!owed(had) && !(now - Date.parse(t.at) < MAX_AGE_MS)) return { state: 'skipped', why: 'cashed in more than three days ago' };
-    const since = at.held.book.since;
-    if (since && Date.parse(t.at) < Date.parse(since)) return { state: 'skipped', why: 'cashed in before automatic payouts began' };
+    if (!owed(had) && !(now - Date.parse(t.at) < MAX_AGE_MS)) return only({ state: 'skipped', why: 'cashed in more than three days ago' });
+    const since = book.since;
+    if (since && Date.parse(t.at) < Date.parse(since)) return only({ state: 'skipped', why: 'cashed in before automatic payouts began' });
     // (asked of a tag when it first comes, and of none that the book has had waiting since before the rule)
-    if (!had && Date.parse(t.at) >= cfg.rulesFrom && traded(at.held.book, t)) return { state: 'skipped', why: `you and ${t.owner.slice(0, 16)} have cashed each other's tags inside a day: the second of the two is not paid` };
+    if (!had && Date.parse(t.at) >= cfg.rulesFrom && traded(book, t)) return only({ state: 'skipped', why: `you and ${t.owner.slice(0, 16)} have cashed each other's tags inside a day: the second of the two is not paid` });
     // (and one over its wallet's three for the day is told so at once, not told to wait for a treasury that will
     // not pay it when it fills: asked again where it is written down, below)
-    if (Date.parse(t.at) >= cfg.rulesFrom && overDay(at.held.book, t, cfg)) return { state: 'skipped', why: OVER_DAY(cfg) };
+    if (Date.parse(t.at) >= cfg.rulesFrom && overDay(book, t, cfg)) return only({ state: 'skipped', why: OVER_DAY(cfg) });
     const wrong = await setup(w);
-    if (wrong) return { state: 'waiting', why: wrong, hold: 'setup' };
+    if (wrong) return only({ state: 'waiting', why: wrong, hold: 'setup' });
     const there = await w.rpc.account(to);
-    if (there && !same(there.owner, SYSTEM_PROGRAM)) return { state: 'skipped', why: 'that address is not a wallet (it belongs to a program)' };
+    if (there && !same(there.owner, SYSTEM_PROGRAM)) return only({ state: 'skipped', why: 'that address is not a wallet (it belongs to a program)' });
     // an address nobody can hold the key to, and that has never been used: money sent there is gone
-    if (!there && !onCurve(to)) return { state: 'skipped', why: 'that address is not a wallet anybody holds the key to' };
+    if (!there && !onCurve(to)) return only({ state: 'skipped', why: 'that address is not a wallet anybody holds the key to' });
+
+    // --- under the second cut-over: has its wallet enough of them due? If not it waits, and nothing more is asked.
+    if (five) {
+      const mates = dueOf(book, t.wallet, t.ref);
+      if (mates.length + 1 < cfg.minTags) return only({ state: 'waiting', why: FIVE(cfg), hold: 'five' });
+      // (each of the others is asked of the chain as this one was: one with a receipt there already is not paid again)
+      lot = [...lot, ...(await unpaid(mates.map((r) => one(tagOfRow(r), r))))];
+      if (lot.length < cfg.minTags) return [...said, ...only({ state: 'waiting', why: FIVE(cfg), hold: 'five' })];
+      // whoever has waited longest first
+      lot.sort((a, b) => (a.t.at < b.t.at ? -1 : a.t.at > b.t.at ? 1 : a.t.ref < b.t.ref ? -1 : 1));
+    }
   }
 
   // --- how much (what the first attempt set out to pay is what every later one pays), and whether the treasury can cover it
   let balance = await w.rpc.balance(treasury);
-  const amount = tries.length && had?.lamports ? BigInt(had.lamports) : price(balance, termsOf(cfg, t.at));
-  const short = () => balance < amount + EMPTY_ACCOUNT_RENT + FEE_ROOM + cfg.keep;
+  for (const m of lot) m.amount = m.tries.length && m.had?.lamports ? BigInt(m.had.lamports) : price(balance, termsOf(cfg, m.t.at, m.five));
+  // (as many as one transaction carries in each)
+  const packs: One[][] = [];
+  for (let i = 0; i < lot.length; i += LOT_MAX) packs.push(lot.slice(i, i + LOT_MAX));
+  const total = lot.reduce((s, m) => s + m.amount, 0n);
+  const short = () => balance < total + EMPTY_ACCOUNT_RENT * BigInt(lot.length) + FEE_ROOM * BigInt(packs.length) + cfg.keep;
   if (short() && cfg.mode === 'on') {
     // bring the rewards home first, whatever there is of them
     await claim(w, true).catch(() => {});
     balance = await w.rpc.balance(treasury);
   }
-  if (short()) return { state: 'waiting', why: 'the treasury is too low: paid when the next creator rewards come in', hold: 'funds' };
-
-  // --- the payment: its receipt first (so it can only ever happen once), the money, and a note saying what it is for
-  const { blockhash, lastValidBlockHeight } = await w.rpc.latestBlockhash();
-  const todo = [computeLimit(PAY_UNITS), computePrice(cfg.bid), receipt(treasury, t.ref), transfer(treasury, to, amount), memo(`ZONA dog tag ${t.ref}`)];
-  if (cfg.mode === 'dry' || !cfg.key) {
-    // a dry run stops here: put together and tried on a node, and not sent
-    const sim = await w.rpc.simulate(unsigned(treasury, todo, blockhash));
-    return { state: 'waiting', why: `dry run: would pay ${sol(amount)} SOL (${sim.err ? 'and it would FAIL: ' + JSON.stringify(sim.err) : 'tried, and it would go through'})`, hold: 'setup' };
+  if (short()) {
+    for (const m of lot) say(m, { state: 'waiting', why: 'the treasury is too low: paid when the next creator rewards come in', hold: 'funds' });
+    return said;
   }
 
-  // --- sign it; write it in the book, and with it the tag's place in the day's limits; and only then send it
-  const tx = signed(cfg.key, todo, blockhash);
-  const attempt: Try = { signature: tx.signature, lastValid: lastValidBlockHeight, wire: Buffer.from(tx.wire).toString('base64'), at: iso(now), receipt: mine };
+  // --- the payment: the receipts first (so it can only ever happen once), the money, and a note saying what it is for
+  const { blockhash, lastValidBlockHeight } = await w.rpc.latestBlockhash();
+  const todo = packs.map((pack) => payment(treasury, to, pack.map((m) => ({ ref: m.t.ref, lamports: m.amount })), cfg.bid));
+  if (cfg.mode === 'dry' || !cfg.key) {
+    // a dry run stops here: put together and tried on a node, and not sent
+    for (const [i, pack] of packs.entries()) {
+      const sim = await w.rpc.simulate(unsigned(treasury, todo[i], blockhash));
+      for (const m of pack) say(m, { state: 'waiting', why: `dry run: would pay ${sol(m.amount)} SOL${pack.length > 1 ? `, with ${pack.length - 1} more in one transaction` : ''} (${sim.err ? 'and it would FAIL: ' + JSON.stringify(sim.err) : 'tried, and it would go through'})`, hold: 'setup' });
+    }
+    return said;
+  }
+
+  // --- sign; write the attempt in the book, and with it the tags' place in the day's limits; and only then send
+  const key = cfg.key;
+  const txs = todo.map((ixs) => signed(key, ixs, blockhash));
+  const attempt = new Map<string, Try>();
+  packs.forEach((pack, i) => pack.forEach((m) => attempt.set(m.t.ref, { signature: txs[i].signature, lastValid: lastValidBlockHeight, wire: Buffer.from(txs[i].wire).toString('base64'), at: iso(now), receipt: m.mine })));
   const day = dayOf(now);
-  const said: { wait: Outcome | null; theirs: boolean } = { wait: null, theirs: false };
+  const found: { wait: Said | null; theirs: boolean } = { wait: null, theirs: false };
   at.held = await editBook(
     w,
     (b) => {
-      said.wait = null;
-      said.theirs = false;
-      const row = b.rows.find((r) => r.ref === t.ref);
-      // somebody else has been at this tag since the book was read: it is theirs
-      if (row && (row.state === 'paid' || (row.tries?.length ?? 0) !== tries.length)) return !(said.theirs = true);
+      found.wait = null;
+      found.theirs = false;
+      const rows = new Map(lot.map((m) => [m.t.ref, b.rows.find((r) => r.ref === m.t.ref)]));
+      // somebody else has been at one of these since the book was read: it is theirs
+      const taken = (m: One) => {
+        const row = rows.get(m.t.ref);
+        if (m.t.ref === t.ref || m.tries.length) return !!row && (row.state === 'paid' || (row.tries?.length ?? 0) !== m.tries.length);
+        // (one that was waiting in the book for the others has to be waiting there still)
+        return !row || !owed(row) || !!row.tries?.length;
+      };
+      if (lot.some(taken)) return !(found.theirs = true);
       if (!tries.length) {
-        const today = b.rows.filter((r) => r.ref !== t.ref && r.day === day && (r.state === 'paid' || r.state === 'sending'));
+        const mine = new Set(lot.map((m) => m.t.ref));
+        const today = b.rows.filter((r) => !mine.has(r.ref) && r.day === day && (r.state === 'paid' || r.state === 'sending'));
         const spent = today.reduce((s, r) => s + BigInt(r.lamports ?? 0), 0n);
         // the day's limit is a share of the most the treasury has been seen to hold that day: kept in
         // the book, so that everybody goes by the same figure whenever each of them happened to look
@@ -642,33 +829,58 @@ async function settle(w: World, t: Tag, at: { held: Held }): Promise<Outcome> {
         b.most.lamports = Math.max(b.most.lamports, Number(balance));
         const allowed = (BigInt(b.most.lamports) * BigInt(Math.round(cfg.dayShare * 1000))) / 1000n;
         const full = today.filter((r) => r.wallet === t.wallet).length >= cfg.walletDayTags;
+        const wait: Said = [];
         // The wallet's limit, for what is cashed in under the rules of 2026-10-13: it is on what a wallet CASHES IN
         // in a day, and is asked of the tag by the day it was cashed in and its place among that day's, whenever
         // it comes to be paid. The first three of a day are paid, today or when the treasury can; a fourth is not.
         // (It was asked by what had been PAID on the day of the paying. A tag that was one of its day's three and
         // had been told to wait for the treasury was then refused for good, the day the treasury filled, if three
         // of the next day's had gone out before it: found on reading, 2026-10-13, before it happened to anybody.)
-        if (Date.parse(t.at) >= cfg.rulesFrom) {
-          if (overDay(b, t, cfg)) said.wait = { state: 'skipped', why: OVER_DAY(cfg) };
-        } else if (full) said.wait = { state: 'waiting', why: `this wallet has been paid for ${cfg.walletDayTags} tags today: the rest wait for tomorrow`, hold: 'day' };
-        // (the first of the day always goes: a limit smaller than one tag would stop everything)
-        if (!said.wait && today.length && spent + amount > allowed) said.wait = { state: 'waiting', why: "today's limit on what leaves the treasury has been reached: this one is paid when there is room again", hold: 'day' };
-        if (said.wait) return row && says(row, said.wait, day) ? false : enter(b, t, said.wait, day);
+        for (const m of lot) {
+          if (Date.parse(m.t.at) >= cfg.rulesFrom) {
+            if (overDay(b, m.t, cfg)) wait.push({ t: m.t, o: { state: 'skipped', why: OVER_DAY(cfg) }, five: m.five });
+          } else if (full) wait.push({ t: m.t, o: { state: 'waiting', why: `this wallet has been paid for ${cfg.walletDayTags} tags today: the rest wait for tomorrow`, hold: 'day' }, five: m.five });
+        }
+        // (one of several is not to be paid after all: what was signed is not sent, and the rest wait to be counted again)
+        if (wait.length && lot.length > 1) for (const m of lot) if (!wait.some((x) => x.t.ref === m.t.ref)) wait.push({ t: m.t, o: { state: 'waiting', why: FIVE(cfg), hold: 'five' }, five: m.five });
+        // (the first of the day always goes: a limit smaller than one tag would stop everything. And all of a
+        // wallet's that are due go together or wait together: there has to be room for all of them.)
+        if (!wait.length && today.length && spent + total > allowed) for (const m of lot) wait.push({ t: m.t, o: { state: 'waiting', why: "today's limit on what leaves the treasury has been reached: this one is paid when there is room again", hold: 'day' }, five: m.five });
+        if (wait.length) {
+          found.wait = wait;
+          let changed = false;
+          for (const x of wait) {
+            const row = rows.get(x.t.ref);
+            if (row && says(row, x.o, day)) continue;
+            enter(b, x.t, x.o, day, x.five);
+            changed = true;
+          }
+          return changed;
+        }
       }
-      enter(b, t, { state: 'sending', lamports: Number(amount), signature: attempt.signature }, day).tries = [...tries, attempt];
+      for (const m of lot) enter(b, m.t, { state: 'sending', lamports: Number(m.amount), signature: attempt.get(m.t.ref)!.signature }, day, m.five).tries = [...m.tries, attempt.get(m.t.ref)!];
     },
     at.held,
   );
-  if (said.theirs) {
-    const theirs = at.held.book.rows.find((r) => r.ref === t.ref);
-    return theirs ? told(theirs) : { state: 'waiting', why: 'being seen to' };
+  if (found.theirs) {
+    // (of several, put together from a reading that somebody has written over since: put together again, once, from the book as it is)
+    if (lot.length > 1 && !again) return settle(w, t, at, true);
+    for (const m of lot) {
+      const theirs = at.held.book.rows.find((r) => r.ref === m.t.ref);
+      if (theirs) say(m, told(theirs));
+      else if (m.t.ref === t.ref) say(m, { state: 'waiting', why: 'being seen to' });
+    }
+    return said;
   }
-  if (said.wait) return said.wait;
+  if (found.wait) return [...said, ...found.wait];
 
   // (a node that will not take it has not necessarily not passed it on: either way it is now an attempt, to be waited out)
-  await w.rpc.send(tx).catch(refused('a payment'));
-  if (await watch(w, tx)) return { state: 'paid', lamports: Number(amount), signature: attempt.signature, at: attempt.at, receipt: mine };
-  return { state: 'sending', lamports: Number(amount), signature: attempt.signature };
+  for (const tx of txs) await w.rpc.send(tx).catch(refused('a payment'));
+  const arrived = await watchAll(w, txs);
+  packs.forEach((pack, i) =>
+    pack.forEach((m) => say(m, arrived[i] ? { state: 'paid', lamports: Number(m.amount), signature: txs[i].signature, at: attempt.get(m.t.ref)!.at, receipt: m.mine } : { state: 'sending', lamports: Number(m.amount), signature: txs[i].signature })),
+  );
+  return said;
 }
 
 // ------------------------------------------------------------------ the creator rewards
@@ -794,55 +1006,96 @@ export function traded(book: Book, t: Tag): Row | null {
 }
 
 /**
- * A tag in hand (from the game server, or from the book): paid if it is to be, and the book
- * says what became of it.
- * @param from the book as the caller has just read it; left holding the book as this wrote it
+ * What is told of a tag. One that waits for its wallet to have enough due is told with the count as the book has
+ * it at this moment ("3 of 5: paid when 5 of this wallet's tags are due"): the count is never written on the tag,
+ * because it moves with every other tag of the wallet.
+ * @param known the tag was in the book before it was asked about this time
  */
-export async function handleTag(w: World, t: Tag, from?: Held): Promise<Outcome> {
-  const off = w.cfg.mode === 'off' || !w.cfg.treasury;
+function tell(cfg: Config, book: Book, t: Tag, o: Outcome, known = false): Outcome {
+  if (o.state !== 'waiting' || o.hold !== 'five') return o;
+  const have = dueOf(book, t.wallet).length;
+  return { ...o, why: `${have} of ${cfg.minTags}: ${o.why}`, have, need: cfg.minTags, ...(known && have < cfg.minTags ? { parked: true as const } : {}) };
+}
+
+/**
+ * A tag in hand (from the game server, or from the book): paid if it is to be, and the book
+ * says what became of it, and of whichever other tags of its wallet were paid with it.
+ * @param from the book as the caller has just read it; left holding the book as this wrote it
+ * @returns what became of the tag, and how many tags this call found paid (itself, and those paid with it)
+ */
+async function seeTo(w: World, t: Tag, from?: Held): Promise<{ outcome: Outcome; paid: number }> {
+  const cfg = w.cfg;
+  const off = cfg.mode === 'off' || !cfg.treasury;
   if (!from) {
     // a look that costs nothing first: most asking is about tags whose answer will not change
-    // (paid is paid), or cannot change yet (waiting for room under the day's limits)
+    // (paid is paid), or cannot change yet (waiting for room under the day's limits, or for its wallet's count)
     const glanced = await glanceBook(w.store);
     const seen = glanced.rows.find((r) => r.ref === t.ref);
-    if (seen && (settled(seen) || off || !(await due(w, seen, glanced)))) return told(seen);
+    if (seen && (settled(seen) || off || !(await due(w, seen, glanced)))) return { outcome: tell(cfg, glanced, seen, told(seen), true), paid: 0 };
   }
   const at = { held: from ?? (await freshBook(w.store)) };
   try {
     const had = at.held.book.rows.find((r) => r.ref === t.ref);
     // switched off, nothing already begun is touched: off is a stop, and what is in the book stays as it is
-    if (had && (settled(had) || off)) return told(had);
+    if (had && (settled(had) || off)) return { outcome: tell(cfg, at.held.book, had, told(had), true), paid: 0 };
     // (what was first written down of a tag is what holds, whatever is said of it later)
-    if (had) t = { ref: had.ref, at: had.at, name: had.name, owner: had.owner, wallet: had.wallet };
+    if (had) t = tagOfRow(had);
     // payouts begin with what was cashed in over the ten minutes before they first run
-    if (w.cfg.mode === 'on' && !at.held.book.since) at.held = await editBook(w, (b) => (b.since ? false : (b.since = iso(w.now() - 10 * 60_000))), at.held);
-    let outcome: Outcome;
-    let passing = false;
-    try {
-      outcome = await settle(w, t, at);
-    } catch (err) {
-      // not being able to ask is not a no: it is asked again, and whatever the book says of it meanwhile stands
-      const now = at.held.book.rows.find((r) => r.ref === t.ref);
-      if (now) return told(now);
-      outcome = { state: 'waiting', why: `could not be done just now (${plain(err)})` };
-      passing = true;
+    if (cfg.mode === 'on' && !at.held.book.since) at.held = await editBook(w, (b) => (b.since ? false : (b.since = iso(w.now() - 10 * 60_000))), at.held);
+    let paid = 0;
+    for (let pass = 0; ; pass++) {
+      let all: Said;
+      let passing = false;
+      try {
+        all = await settle(w, t, at);
+      } catch (err) {
+        // not being able to ask is not a no: it is asked again, and whatever the book says of it meanwhile stands
+        const now = at.held.book.rows.find((r) => r.ref === t.ref);
+        if (now) return { outcome: tell(cfg, at.held.book, now, told(now), !!had), paid };
+        all = [{ t, o: { state: 'waiting', why: `could not be done just now (${plain(err)})` }, five: fives(cfg, t) }];
+        passing = true;
+      }
+      // written only when there is something new to say: the service counts every write. And everything there is
+      // to say, of this tag and of those seen to with it, in one write.
+      const day = dayOf(w.now());
+      const wrote = new Map<string, Outcome>();
+      let newly = 0;
+      at.held = await editBook(
+        w,
+        (b) => {
+          wrote.clear();
+          newly = 0;
+          let changed = false;
+          for (const x of all) {
+            const row = b.rows.find((r) => r.ref === x.t.ref);
+            // (trouble that will pass is only written of a tag the book does not have yet: it changes nothing that is there)
+            if (row && (row.state === 'paid' || passing)) continue;
+            // (asked again where it is written down: of several cashed in at one moment, each was asked before the others were in the book)
+            const o: Outcome = x.o.state === 'waiting' && x.o.hold === 'five' && overDay(b, x.t, cfg) ? { state: 'skipped', why: OVER_DAY(cfg) } : x.o;
+            wrote.set(x.t.ref, o);
+            if (row && says(row, o, day)) continue;
+            enter(b, x.t, o, day, x.five);
+            if (o.state === 'paid') newly++;
+            changed = true;
+          }
+          // (and one cashed in later that day, but written down before this one, may be over the day's limit now that this one is here)
+          if (changed) for (const r of dueOf(b, t.wallet)) if (r.hold === 'five' && overDay(b, r, cfg)) enter(b, r, { state: 'skipped', why: OVER_DAY(cfg) }, day);
+          return changed;
+        },
+        at.held,
+      );
+      paid += newly;
+      const outcome = wrote.get(t.ref) ?? all.find((x) => x.t.ref === t.ref)?.o ?? { state: 'waiting', why: 'being seen to' };
+      // Several of one wallet's cashed in at the same moment were each counted before the others were written
+      // down, and each told to wait: whichever is written last finds that there are enough, and sees to them now.
+      if (pass === 0 && outcome.state === 'waiting' && outcome.hold === 'five' && dueOf(at.held.book, t.wallet).length >= cfg.minTags) continue;
+      return { outcome: tell(cfg, at.held.book, t, outcome, !!had), paid };
     }
-    // written only when there is something new to say: the service counts every write
-    const day = dayOf(w.now());
-    at.held = await editBook(
-      w,
-      (b) => {
-        const row = b.rows.find((r) => r.ref === t.ref);
-        // (trouble that will pass is only written of a tag the book does not have yet: it changes nothing that is there)
-        return row && (row.state === 'paid' || passing || says(row, outcome, day)) ? false : enter(b, t, outcome, day);
-      },
-      at.held,
-    );
-    return outcome;
   } finally {
     if (from) Object.assign(from, at.held);
   }
 }
+export const handleTag = async (w: World, t: Tag, from?: Held): Promise<Outcome> => (await seeTo(w, t, from)).outcome;
 
 /** A tag has been cashed in (or is being asked about again by the game server). */
 export const handle = (w: World, e: Entry) => handleTag(w, tagOf(e));
@@ -863,9 +1116,10 @@ export async function sweep(w: World, limit = 200): Promise<{ tried: number; pai
       for (const seen of waiting.reverse()) {
         if (tried >= limit || w.now() - began > 30_000) break;
         const r = held.book.rows.find((x) => x.ref === seen.ref);
+        // (settled meanwhile, or by the seeing to of another of its wallet's a moment ago)
         if (!r || !open(r)) continue;
         tried++;
-        if ((await handleTag(w, r, held)).state === 'paid') paid++;
+        paid += (await seeTo(w, r, held)).paid;
       }
     }
   }
@@ -895,11 +1149,20 @@ export interface Snapshot {
   due: boolean;
   dayShare: number;
   walletDayTags: number;
+  /** the second cut-over: when it is, and whether it has come (from then, `share` is 0 and `tagPays` is `flatPay` whatever the treasury holds) */
+  rules2From: string;
+  fives: boolean;
+  /** from the second cut-over: what a tag pays, and how many of a wallet's must be due before it is paid */
+  flatPay: number;
+  minTags: number;
 }
 
 export async function snapshot(w: World): Promise<Snapshot> {
-  const cfg = w.cfg;
-  const out: Snapshot = { mode: cfg.mode, problem: cfg.problem, treasury: cfg.treasury ? b58(cfg.treasury) : null, madeTheCoin: false, maker: null, balance: null, tagPays: null, share: cfg.share, floor: Number(cfg.floor), waiting: null, waitingNote: null, due: false, dayShare: cfg.dayShare, walletDayTags: cfg.walletDayTags };
+  const base = w.cfg;
+  // (what is said is what a tag cashed in at this moment is paid by)
+  const fives = w.now() >= base.rules2From;
+  const cfg = fives ? termsOf(base, iso(w.now()), true) : base;
+  const out: Snapshot = { mode: cfg.mode, problem: cfg.problem, treasury: cfg.treasury ? b58(cfg.treasury) : null, madeTheCoin: false, maker: null, balance: null, tagPays: null, share: cfg.share, floor: Number(cfg.floor), waiting: null, waitingNote: null, due: false, dayShare: cfg.dayShare, walletDayTags: cfg.walletDayTags, rules2From: iso(base.rules2From), fives, flatPay: Number(base.floor), minTags: base.minTags };
   try {
     const s = await coin(w);
     // with no key given yet, the treasury is taken to be the wallet that made the coin

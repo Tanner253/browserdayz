@@ -1046,6 +1046,51 @@ body.touch .inv-scroll, body.touch .inv-inspect { touch-action: pan-x pan-y; }
 .gfx-opts { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
 .gfx-opts button { padding: 4px 10px; font-size: 13px; letter-spacing: 0.08em; min-width: 54px; }
 .gfx-info { margin-top: 12px; font-family: var(--mono); font-size: 11px; color: var(--ink-faint); text-align: center; }
+/* (what a row sets, said small under its name where the name does not say it) */
+.gfx-row > span small { display: block; margin-top: 1px; font-size: 13px; letter-spacing: 0.01em; white-space: normal; color: rgba(233, 228, 216, 0.46); }
+
+/* --- The settings' pages (Game, Controls, Audio, Video), as a game has them: a strip of their names under the
+   sheet's title, the one that is shown lit as the menu's own are, and the keys that go from one to the next at
+   its ends. The strip stays where it is; the page under it scrolls by itself when it is longer than the sheet,
+   so nothing of it is ever off the screen. (2026-10-13: "tab the settings menu like a video game would be
+   tabbed".) */
+.hud-start.sheet .start-brief[data-tab='gfx'] { display: flex; flex-direction: column; overflow: hidden; }
+.start-brief[data-tab='gfx'] .sm-sheet-head { flex: none; }
+.start-brief[data-tab='gfx'] .pane-gfx { display: flex; flex: 1; flex-direction: column; min-height: 0; }
+.set-tabs { display: flex; flex: none; align-items: center; gap: 2px; margin-bottom: 10px; border-bottom: 1px solid var(--line); }
+.set-tabs button {
+  flex: 1;
+  max-width: 170px;
+  margin-bottom: -1px;
+  padding: 9px 8px 8px;
+  font-family: var(--font);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.17em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--ink-dim);
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.set-tabs button:hover { color: var(--ink); background: rgba(233, 228, 216, 0.04); }
+.set-tabs button.on { color: var(--ink); border-bottom-color: var(--brand); background: linear-gradient(0deg, rgba(255, 211, 90, 0.11), rgba(255, 211, 90, 0)); }
+.set-tabs button:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+.set-tabs .set-key { flex: none; min-width: 24px; height: 22px; margin: 0 6px 0 0; padding: 0 6px; font-size: 11px; color: var(--ink-dim); border-bottom-width: 2px; }
+.set-tabs .set-key:last-child { margin: 0 0 0 auto; }
+.set-body { flex: 1; min-height: 0; padding-right: 8px; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: rgba(233, 228, 216, 0.3) rgba(0, 0, 0, 0.25); }
+.set-page[hidden] { display: none; }
+.set-h { margin: 16px 0 4px; font-family: var(--mono); font-size: 11px; font-weight: 400; letter-spacing: 0.26em; text-transform: uppercase; color: var(--brand); }
+.set-h:first-child { margin-top: 4px; }
+.set-page .kbs-top { margin-top: 8px; }
+/* (a phone has no keys to put anything on, and none to turn the pages with) */
+body.touch .set-key, body.touch .set-keys, body.touch .set-page .kbs { display: none; }
+/* (and a finger is not a pointer: the names share the whole strip, and a slider is as tall as a thumb to take hold of) */
+body.touch .set-tabs button { max-width: none; padding: 12px 8px 11px; }
+body.touch .set-page .gfx-range { height: 30px; }
 
 /* ------------------------------------------------------------ carried dog tags */
 /* under the map, one below the other: the leaderboard, then the tags being carried */
@@ -1299,7 +1344,7 @@ body.touch .inv-scroll, body.touch .inv-inspect { touch-action: pan-x pan-y; }
 .sm-close { display: grid; place-items: center; width: 34px; height: 34px; padding: 0 0 3px; font-size: 24px; line-height: 1; color: var(--ink-dim); background: none; border: 1px solid var(--line); cursor: pointer; }
 .sm-close:hover { color: var(--ink); border-color: var(--ink-dim); }
 .start-pane { display: none; }
-.start-brief[data-tab='map'] .pane-map, .start-brief[data-tab='brief'] .pane-brief, .start-brief[data-tab='keys'] .pane-keys, .start-brief[data-tab='gfx'] .pane-gfx { display: block; }
+.start-brief[data-tab='map'] .pane-map, .start-brief[data-tab='brief'] .pane-brief { display: block; }
 
 /* the map: the game's own picture of it, and marks that say what they are */
 .mm { position: relative; width: min(100%, 580px, calc(100vh / var(--ui-zoom, 1) - 322px)); aspect-ratio: 1; margin: 0 auto; background: #1b1f17; border: 1px solid var(--line); }
@@ -1685,7 +1730,6 @@ body.touch .hud-notes { top: 70px; }
 body.touch .hud-chat { top: 150px; bottom: auto; left: calc(14px + env(safe-area-inset-left)); width: 380px; z-index: 8; }
 body.touch .chat-hint { display: none; }
 body.touch .hud-chat.open .chat-entry input { font-size: 16px; }
-body.touch .start-tabs [data-tab='keys'] { display: none; }
 body.touch .inv-item, body.touch .inv-ground-row { touch-action: none; }
 body.touch .hud-start, body.touch .rw, body.touch .inv-wrap, body.touch .inv-col { touch-action: pan-x pan-y; }
 @media (prefers-reduced-motion: reduce) {

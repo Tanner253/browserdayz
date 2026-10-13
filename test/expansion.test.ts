@@ -8,6 +8,7 @@ import { buildWorldData } from '../server/world';
 import { GAS, gasDepth, gasZone } from '../src/sim/gas';
 import { INFECTED, openGround } from '../src/sim/infected';
 import { deckWidth, onBridge, spanOf, wreckUnder } from '../src/sim/bridge';
+import { CASTLE, OUTCROP, castleAt, castleLocal } from '../src/sim/castle';
 
 let n = 0;
 const ok = (name: string, fn: () => void) => {
@@ -177,7 +178,8 @@ ok('the map as it was is still exactly there: its ground, its buildings, its sta
   assert.equal(hash(cars.flatMap((j: { x: number; z: number }) => [j.x, j.z])), WAS.jeepsHash);
   // (the old six, and one each at the three places built in the east country)
   // (and one where the lane crosses in the army's camp)
-  assert.equal(data.fires.length, WAS.fires + 4);
+  // (and two at the fort on the mountain, 2026-10-13: one in its keep, one in a ruined house on the way to it)
+  assert.equal(data.fires.length, WAS.fires + 4 + 2);
 });
 
 ok('it lies outside the ring the map used to end at, inside the ground there is, and the two are one place to play in', () => {
@@ -278,15 +280,19 @@ ok('the infected keep to it too, and nowhere else has fewer for it', () => {
   assert.ok(here && here.n >= 4, 'none at the works');
   assert.equal(homes.reduce((s, h) => s + h.n, 0), INFECTED.max);
   // (the valley held thirty-three before there was a works, or a bunker with its own shut in it)
-  const below = homes.filter((h) => h.inside);
+  // (the bunker's: the fort on the mountain has a dark of its own under its terrace, counted further down)
+  const atFort = (h: { x: number; z: number }) => Math.hypot(h.x - MOUNTAIN.castle.x, h.z - MOUNTAIN.castle.z) < 120;
+  const below = homes.filter((h) => h.inside && !atFort(h));
   assert.ok(below.length === 1 && below[0].n >= 4 && below[0].inside!.length >= below[0].n * 2, 'none in the bunker, or nowhere for them to stand');
   // (and those that walk the ground over it)
   const over = homes.filter((h) => !h.inside && Math.hypot(h.x - below[0].x, h.z - below[0].z) < 1);
   assert.ok(over.length === 1 && over[0].n >= 6, 'none over the bunker');
   // (and the fifteen of the east country since: ten in the town, two at the squat, three at the camp; and, since
   // 2026-10-13, the fifteen the outlying places of the old valley were owed and had never had: see INFECTED.max)
-  assert.equal(INFECTED.max - here!.n - below[0].n - over[0].n, 33 + 15 + 15);
-  const east = homes.filter((h) => Math.abs(h.x) > 512 || Math.abs(h.z) > 512);
+  // (and the fort's eight since: five about its ruined village, three under its terrace)
+  assert.equal(INFECTED.max - here!.n - below[0].n - over[0].n, 33 + 15 + 15 + 8);
+  assert.equal(homes.filter(atFort).reduce((a, h) => a + h.n, 0), 8, 'the fort has not its eight');
+  const east = homes.filter((h) => (Math.abs(h.x) > 512 || Math.abs(h.z) > 512) && !atFort(h));
   assert.equal(east.reduce((a, h) => a + h.n, 0), 15, 'the east country has not its fifteen');
 });
 
@@ -513,7 +519,19 @@ ok('the road is a loop: out of the far end of Kamenka, over the bridge, round by
   assert.ok(passLine.some(([x, z]) => Math.hypot(x - hp[0], z - hp[2]) < 3.5), 'the mountain road does not leave the pass road');
   for (let i = 0; i < hp.length; i += 3) assert.ok(Math.hypot(hp[i] - BUNKER_AT.x, hp[i + 2] - BUNKER_AT.z) > 250, 'the mountain road comes within 250 m of the bunker');
   assert.ok(world.gatehouse && Math.hypot(world.gatehouse.x - hp[hp.length - 3], world.gatehouse.z - hp[hp.length - 1]) < 0.01, 'no gatehouse at the end of the mountain road');
-  for (const list of [world.trees, world.rocks, world.props]) for (const t of list) assert.ok(Math.hypot(t.x - MOUNTAIN.castle.x, t.z - MOUNTAIN.castle.z) >= MOUNTAIN.castle.clear, `a ${t.kind} stands where the fort is to stand`);
+  for (const list of [world.trees, world.rocks, world.props]) for (const t of list) assert.ok(Math.hypot(t.x - MOUNTAIN.castle.x, t.z - MOUNTAIN.castle.z) >= MOUNTAIN.castle.clear, `a ${t.kind} stands where the fort stands`);
+  // The fort: where the map says, its terrace clear of the ground under it by what it asks at the least (the cellars'
+  // floor is 3.8 m under the terrace), its place named on the map, and the path from the gatehouse comes to the foot
+  // of the rock its ramp leaves from
+  const fort = world.castle!;
+  assert.ok(fort && fort.x === MOUNTAIN.castle.x && fort.z === MOUNTAIN.castle.z && fort.y === MOUNTAIN.castle.terrace, 'no fort where the mountain road leads');
+  for (let lx = -10; lx <= 10; lx += 2) for (let lz = -10; lz <= 10; lz += 2) {
+    const [wx, , wz] = castleAt(fort, lx, lz);
+    assert.ok(fort.y - ground(wx, wz) > 5.2, `the ground is ${(fort.y - ground(wx, wz)).toFixed(1)} m under the fort's terrace at ${lx}, ${lz}: its cellars are in it`);
+  }
+  assert.ok(world.pois.some((q) => q.name === CASTLE.name && q.x === fort.x && q.z === fort.z), 'the fort is not named on the map');
+  const pathEnd = MOUNTAIN.path.line[MOUNTAIN.path.line.length - 1], [ex, ez] = castleLocal(fort, pathEnd[0], 0, pathEnd[1]);
+  assert.ok(ex > OUTCROP.x1 && ex < OUTCROP.x1 + 10 && Math.abs(ez) < 6, `the path ends at ${ex.toFixed(0)}, ${ez.toFixed(0)} of the fort's own measure: not at the foot of its rock`);
   // The bridge: nothing is dropped from the sky under it (a supply drop is set down on level, clear ground: there is
   // none under the deck), and what lies about the wreck in the cleft are the last places for things there are
   const b = world.bridges[0], len = spanOf(b);
@@ -525,8 +543,10 @@ ok('the road is a loop: out of the far end of Kamenka, over the bridge, round by
     const stood = world.trees.some((t) => Math.abs(t.x - x) < 3.5 && Math.abs(t.z - z) < 3.5) || world.rocks.some((t) => Math.abs(t.x - x) < 3 && Math.abs(t.z - z) < 3) || world.props.some((t) => Math.abs(t.x - x) < 2.5 && Math.abs(t.z - z) < 2.5);
     assert.ok(steep > 0.5 || stood, `a supply drop could be set down under the bridge at ${x}, ${z}`);
   }
-  const wreck = wreckUnder(b), last = data.lootPoints.slice(-wreck.spots.length);
-  assert.ok(last.every((q: { building: string }) => q.building === 'wreck'), "the wreck's places for things are not the last there are");
+  // (the last there were until the fort was stood on the mountain: the fort's own come after them, and nothing else does)
+  const wreck = wreckUnder(b), end = data.lootPoints.findIndex((q: { building: string }) => q.building === 'castle'), last = data.lootPoints.slice(end - wreck.spots.length, end);
+  assert.ok(end > 0 && data.lootPoints.slice(end).every((q: { building: string }) => q.building === 'castle'), "the fort's places for things are not the last there are");
+  assert.ok(last.every((q: { building: string }) => q.building === 'wreck'), "the wreck's places for things are not the last before the fort's");
   for (const q of last) assert.ok(Math.abs(q.y - ground(q.x, q.z)) < 0.05 && LOOP.deck - q.y > 15, 'a place for a thing by the wreck is not on the ground of the cleft');
 });
 

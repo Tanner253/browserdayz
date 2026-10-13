@@ -16,6 +16,7 @@
 // terrace, which is the one level floor of the whole place and the height a `Place` gives.
 
 import type { Place } from './bunker';
+import { KIT_GATE, KIT_LEVELS, KIT_MERLON, KIT_TOWER, cutBox, cutRound, cutTurned, type Cut, type KitPiece } from './kit';
 
 export type { Place };
 
@@ -24,8 +25,8 @@ export const CASTLE = {
   /** from its middle to the middle line of the east and west walls, and of the north and south ones: the towers stand where they cross */
   hx: 9.9,
   hz: 10,
-  /** the wall under the terrace leans in: so many metres up for one metre in (75 degrees) */
-  lean: 3.75,
+  /** the wall under the terrace leans in: so many metres up for one metre in (the kit's walls: 0.94 m in 7.08, eighty-two degrees) */
+  lean: 7.53,
   /** how far under the terrace the walls and the towers are built: the ground hides what it does not need */
   deep: 13,
   /** the wall round the terrace: its thickness, the sill of its gaps and the top of its merlons, a merlon and a gap, how many merlons a side, and the square port under each */
@@ -38,8 +39,8 @@ export const CASTLE = {
   ramp: { len: 8, wide: 2.5, drop: 1.39 },
   /** the breach in the north parapet, along x (ours) */
   breach: { x0: -6.3, x1: -2.7 },
-  /** the towers: across at the top, the thickness of the wall, the lean under the terrace and where it eases, the fighting platform, and the inner edge of the stair */
-  tower: { r: 3.1, wall: 0.9, lean: 3.9, bend: -7.4, flare: 8, deck: 4.8, slots: 24, stairIn: 1.15 },
+  /** the towers: across at the top, the thickness of the wall, the lean under the terrace and where it eases, the fighting platform, the inner edge of the stair; and how big the kit's round tower is made to be the foot of each (its platform is then level with the terrace, and a ring of its parapet stands round the foot of the drum) */
+  tower: { r: 3.1, wall: 0.9, lean: 3.9, bend: -5.32, flare: 8, deck: 4.8, slots: 24, stairIn: 1.15, kit: 0.56 },
   /** the keep: its outside, the room inside its walls, its floors, its roof, the top of the wall round the roof, the shell that is left of the storey over that, and the south-east corner of the roof that has fallen in with the walls over it (from there to the room's corner) */
   keep: { x0: -6.1, x1: 5.2, z0: -5.5, z1: 5.5, room: { x0: -3.7, x1: 2.8, z0: -3.4, z1: 3.4 }, floors: [0, 3, 5.85], roof: 8.7, band: 9.54, skin: 0.6, fallen: { x0: 1.3, z0: 2 } },
   /** the ground at the foot of each wall, under the terrace: what the real one measures */
@@ -310,10 +311,13 @@ export function moundTop(kind: 'outcrop' | 'fan' | 'vault' | 'rent', x: number, 
 
 /** how far out a tower's wall is from its middle, at a height: plumb above the terrace, leaning under it, and nearly plumb again far down */
 export function towerRadius(y: number): number {
-  const T = CASTLE.tower;
+  const T = CASTLE.tower, K = KIT_TOWER, k = T.kit, foot = -K.top[0] * k;
   if (y >= 0) return T.r;
-  if (y >= T.bend) return T.r - y / T.lean;
-  return T.r - T.bend / T.lean + (T.bend - y) / T.flare;
+  // (the kit's own: spread at its foot for two metres of its own height, then leaning in to its platform)
+  const h = (y - foot) / k;
+  if (h <= 0) return K.foot * k;
+  if (h <= K.waist[0]) return (K.foot + ((K.waist[1] - K.foot) * h) / K.waist[0]) * k;
+  return (K.waist[1] + ((K.top[1] - K.waist[1]) * (h - K.waist[0])) / (K.top[0] - K.waist[0])) * k;
 }
 const norm = (a: number) => ((a % 360) + 360) % 360;
 /** how much of the way round a tower's platform is open over the head of its stair, degrees: from where the stair is two metres under the boards */
@@ -378,6 +382,112 @@ export function castleParts(): Part[] {
   return (made ??= layOut());
 }
 
+/** the kit's wall as the fort stands it: how far its foot stands out from the face of its parapet, how deep it is at the foot, and how far along a side one length of it reaches either way from the middle */
+const WALL = { out: 0.94, deep: 2.55, half: 7.41 };
+/** the gatehouse: the kit's gate, made this big, stood on the east wall's top over the head of the ramp */
+const GATEHOUSE = { scale: 0.63 };
+/** the door in it: the castle door made this big; where its threshold is (how far in from the middle of the east wall's parapet), how wide a leaf is then, and how far the leaf that still hangs is swung in from shut (radians) */
+const DOOR = { scale: 1.1, x: CASTLE.hx - 0.3, leaf: 1.1, swing: 0.95 };
+/**
+ * What is gone from the parapet of each side, along it (toward +x on the north and south walls, toward +z on the
+ * others): [from, to, whether it is one whole merlon (its stump is left on the parapet) or a length of the parapet
+ * itself, gone to the walk]. A merlon stands every 3.7 m, four to a side; the gatehouse stands where the east
+ * wall's third was. A ruin falls from the top down: the walls under them all stand.
+ */
+function gaps(side: 'n' | 's' | 'e' | 'w'): [number, number, boolean][] {
+  const M = KIT_MERLON;
+  /** the merlon that is `k` along the kit's own piece, as the piece is stood on this side: the north and east walls run toward less */
+  const merlon = (k: number): [number, number] => (side === 'n' || side === 'e' ? [WALL.half - M.from - k * M.every - M.long, WALL.half - M.from - k * M.every] : [-WALL.half + M.from + k * M.every, -WALL.half + M.from + k * M.every + M.long]);
+  const one = (k: number): [number, number, boolean] => [merlon(k)[0], merlon(k)[1], true];
+  if (side === 'n') return [[merlon(3)[0] - 0.02, merlon(2)[1] + 0.02, false], one(0)];
+  if (side === 's') return [one(0), one(1)];
+  if (side === 'e') return [one(3), [UNDER.rent.z1, merlon(0)[1] + 0.02, false]];
+  return [one(2)];
+}
+
+/**
+ * THE FORT'S STONE THAT IS THE KIT'S (2026-10-13): its four walls, the foot of each tower, and the gatehouse over
+ * the ramp, as a layout of the fort kit's pieces (src/sim/kit.ts), in the fort's own measure [x, y over the
+ * terrace, z]. Ruined with the kit: merlons and lengths of parapet broken out, the east wall broken out to the
+ * cellars' floor where it fell (the rent), and blocks of the same wall lying where they came down. Everything
+ * else of the fort is its own geometry (the keep, the drums of the towers, every floor and stair, the lower levels).
+ * What stops a body for these is `kitSolids` of this list, but for the towers' feet, which have the fort's own.
+ */
+export function castleKit(): KitPiece[] {
+  const C = CASTLE, U = UNDER, T = C.tower, ex = C.hx + C.parapet.thick / 2, ez = C.hz + C.parapet.thick / 2, xo = ex + WALL.out, zo = ez + WALL.out, y0 = -KIT_LEVELS.walk;
+  const out: KitPiece[] = [];
+  /** the parapet of a side, cut where it is gone: across the whole of its thickness, from the walk up (a merlon: from the parapet's top up) */
+  const top = (side: 'n' | 's' | 'e' | 'w'): Cut[] => gaps(side).map(([u0, u1, whole]) => {
+    const lo = whole ? KIT_LEVELS.parapet - KIT_LEVELS.walk - 0.02 : 0.004;
+    return side === 'n' ? cutBox(u0, u1, lo, 4, -ez - 0.2, -ez + 1.3) : side === 's' ? cutBox(u0, u1, lo, 4, ez - 1.3, ez + 0.2) : side === 'e' ? cutBox(ex - 1.3, ex + 0.2, lo, 4, u0, u1) : cutBox(-ex - 0.2, -ex + 1.3, lo, 4, u0, u1);
+  });
+  const wall = 'fort_wall_thin_straight_01', gh = GATEHOUSE.scale, gz = (C.gate.z0 + C.gate.z1) / 2, g0 = gz + ((KIT_GATE.z0 + KIT_GATE.z1) / 2) * gh;
+  out.push({ id: wall, name: 'north wall', at: [WALL.half, y0, -zo], turn: -Math.PI / 2, cut: top('n') });
+  out.push({ id: wall, name: 'south wall', at: [-WALL.half, y0, zo], turn: Math.PI / 2, cut: top('s') });
+  out.push({ id: wall, name: 'west wall', at: [-xo, y0, -WALL.half], turn: 0, cut: top('w') });
+  // (the east wall: its parapet is gone under the gatehouse, which stands in its place; and a length of it fell out to the cellars' floor)
+  out.push({ id: wall, name: 'east wall', at: [xo, y0, WALL.half], turn: Math.PI, cut: [...top('e'), cutBox(ex - 1.3, ex + 0.2, 0.004, 4, g0 - 7.41 * gh, g0), cutBox(U.x - 0.3, xo + 0.5, U.floor + 0.1, 4, U.rent.z0, U.rent.z1)] });
+  // the gatehouse: its foot is the east wall's top; the sill across its passage is taken out, and the ramp's boards run through
+  out.push({ id: 'fort_wall_thin_gate_01', name: 'gatehouse', at: [ex, 0, g0], turn: Math.PI, scale: gh, cut: [cutBox(ex - WALL.deep * gh - 0.1, ex + 0.2, -0.05, (KIT_GATE.sill + 0.06) * gh + 0.02, g0 - KIT_GATE.z1 * gh - 0.02, g0 - KIT_GATE.z0 * gh + 0.02)] });
+  // the foot of each tower: the kit's round tower, its platform level with the terrace. Taken out of it: its middle
+  // (the drum stands there, with its own floor), all of its top that is on the terrace's side of the walls, and,
+  // of the hollow one, a doorway from its cellar to the lower levels.
+  const px = ex + WALL.out - WALL.deep, pz = ez + WALL.out - WALL.deep;
+  for (const tw of castleParts()) {
+    if (tw.t !== 'tower') continue;
+    const cut = [cutRound(tw.cx, tw.cz, T.r - T.wall + 0.04, -0.06, 4), tw.cx > 0 ? cutBox(-60, px, -0.05, 4, -60, 60) : cutBox(-px, 60, -0.05, 4, -60, 60), tw.cz > 0 ? cutBox(-60, 60, -0.05, 4, -60, pz) : cutBox(-60, 60, -0.05, 4, -pz, 60)];
+    const d = (tw.door * Math.PI) / 180;
+    if (tw.hollow !== undefined) cut.push(cutTurned(tw.cx + Math.cos(d) * 3.3, tw.cz + Math.sin(d) * 3.3, Math.PI / 2 - d, 1.9, 0.58, tw.hollow - 0.03, tw.hollow + 2.2));
+    out.push({ id: 'fort_tower_round', name: tw.name, at: [tw.cx, -KIT_TOWER.top[0] * T.kit, tw.cz], scale: T.kit, turn: (tw.cx * 7 + tw.cz * 3) * 0.1, cut, body: false });
+  }
+  // blocks of the wall, lying where they came down: under the rent, and under the breach
+  const block = (x: number, z: number, y: number, turn: number, tilt: [number, number], scale: number) => void out.push({ id: 'fort_wall_thick_end_01', name: 'fallen wall', at: [x, y, z], turn, tilt, scale });
+  block(12.2, U.rent.z0 + 0.5, moundTop('rent', 12.6, U.rent.z0 + 0.9) - 0.25, 0.5, [1.25, 0.2], 0.17);
+  block(14.4, U.rent.z1 + 0.2, moundTop('rent', 14.6, U.rent.z1 - 0.3) - 0.3, 2.1, [-1.4, 0.35], 0.14);
+  block(-1.6, -ez - 3.4, moundTop('fan', -1.2, -ez - 3.2) - 0.3, 1.2, [1.35, -0.3], 0.16);
+  return out;
+}
+
+/** The door at the gate, as a layout of the castle door's own pieces: its frame in the passage, one leaf hung open inward against the passage's wall, one off its hinges and lying on the paving inside. */
+export function castleDoor(): KitPiece[] {
+  const C = CASTLE, s = DOOR.scale, gz = (C.gate.z0 + C.gate.z1) / 2, turn = Math.PI / 2;
+  return [
+    { id: 'large_castle_door_frame', at: [DOOR.x, 0, gz], turn, scale: s, body: false },
+    // (the leaf whose hinge is on the south side, swung in until it lies along that wall of the passage)
+    { id: 'large_castle_door_left', at: [DOOR.x, 1.165 * s, gz + 0.987 * s], turn: turn + DOOR.swing, scale: s, body: false },
+    { id: 'large_castle_door_right', at: [DOOR.x - 2.3, 0.07, gz + 0.5], turn: 0.5, tilt: [Math.PI / 2, 0], scale: s, body: false },
+  ];
+}
+
+/**
+ * Scanned rock, as a layout of the rock face's one piece: round the rock the ramp leaves from, and under the north
+ * and south walls where the hill falls away from their feet. Each is a sheet that leans back from its foot, its
+ * face toward where it is turned to: it is bedded against the made rock and the footings, which are what stop a
+ * body. `ground` is how high the ground is at a spot, over the terrace.
+ */
+export function castleRocks(ground: (x: number, z: number) => number = castleGround, rock = true): KitPiece[] {
+  const C = CASTLE, O = OUTCROP, out: KitPiece[] = [], zo = C.hz + C.parapet.thick / 2 + WALL.out;
+  /** one of them: where the middle of its foot is on the plan, which way it faces (degrees: 0 east, 90 south), how big, and how much steeper than it came it stands */
+  const face = (x0: number, z0: number, toward: number, scale: number, steep = 0.3, sink = 0.25, proud = 1.5) => {
+    // (it stands so far out from where it was asked for, the way it faces: it leans back, and what it leans on is behind its top, not its foot)
+    const a = (toward * Math.PI) / 180, turn = Math.atan2(Math.cos(a), Math.sin(a)), x = x0 + Math.cos(a) * proud, z = z0 + Math.sin(a) * proud;
+    // (its own origin is to one side of its middle: it is set so that its middle is where it was asked for)
+    const off = -0.35 * scale;
+    out.push({ id: 'rock_face_01', at: [x + Math.cos(turn) * off, ground(x, z) - sink * scale, z - Math.sin(turn) * off], turn, tilt: [steep, 0], scale, body: false });
+  };
+  if (rock) {
+    face((O.x0 + O.x1) / 2, O.z1 + 0.6, 90, 1.5, 0.42);
+    face((O.x0 + O.x1) / 2 + 0.6, O.z0 - 1.2, 270, 1.5, 0.42);
+    face(O.x1 + 1.6, O.z0 - 0.4, 310, 1.3, 0.35);
+    face(O.x1 + 1.6, O.z1 + 0.2, 50, 1.3, 0.35);
+  }
+  for (const x of [-4.4, 4.2]) {
+    face(x, -zo + 0.4, 270, 1.3, 0.5, 0.3, 1.9);
+    face(x + 0.8, zo - 0.4, 90, 1.3, 0.5, 0.3, 1.9);
+  }
+  return out;
+}
+
 function layOut(): Part[] {
   const C = CASTLE, P = C.parapet, K = C.keep, R = K.room, parts: Part[] = [];
   const box = (paint: Paint, x0: number, x1: number, y0: number, y1: number, z0: number, z1: number, o: Partial<Box> = {}) => void parts.push({ t: 'box', paint, x0: Math.min(x0, x1), x1: Math.max(x0, x1), y0, y1, z0: Math.min(z0, z1), z1: Math.max(z0, z1), ...o });
@@ -417,7 +527,9 @@ function layOut(): Part[] {
   };
   // (its holes: the fallen bay, the stair down from the store, the gratings, and the corner of it that is under the hole in the north-west tower's boards)
   const holes = [[U.x, ex, U.rent.z0, U.rent.z1], [U.bay.x0, U.bay.x1, U.bay.z0, U.bay.z1], [U.stair.head, U.stair.open, R.z0, R.z0 + 1], ...U.gratings.map(([x, z]) => [x - 0.45, x + 0.45, z - 0.45, z + 0.45]), [-ex, -8.8, -ez, -8.9]];
-  for (const [x0, x1, z0, z1] of tiles(-ex, ex, -ez, ez, holes)) box('paving', x0, x1, U.roof, 0, z0, z1, { name: 'terrace', at: 'both' });
+  // (as far as the inner face of the kit's walls: their own tops, level with it, are the rest)
+  const px = ex + WALL.out - WALL.deep + 0.02, pz = ez + WALL.out - WALL.deep + 0.02;
+  for (const [x0, x1, z0, z1] of tiles(-px, px, -pz, pz, holes)) box('paving', x0, x1, U.roof, 0, z0, z1, { name: 'terrace', at: 'both' });
   // a grating: bars a hand apart. A body goes over it; a shot goes through
   for (const [x, z] of U.gratings) {
     for (let k = -2; k <= 2; k++) beam([x - 0.47, -0.035, z + k * 0.19], [x + 0.47, -0.035, z + k * 0.19], 0.035, 0.05, { paint: 'iron', name: 'grating' });
@@ -491,15 +603,9 @@ function layOut(): Part[] {
   // under the hole in the north-west tower's boards: what fell through, lying clear of the way from under the hole to the cellar's doorway
   for (const [dx, dz, r] of [[-0.45, -0.35, 0.5], [-0.35, 0.65, 0.36], [0.6, -0.6, 0.33]]) lump(-C.hx + dx, UF + 0.16, -C.hz + dz, r, 0.16, r * 0.8, 520 + Math.round(r * 100), { paint: 'timber', blocky: true, name: 'fallen boards', low: true });
 
-  // ---- the leaning walls under it, tower to tower
-  // (the two that meet at the hollow tower stop in the thickness of its wall: they do not go on through its cellar)
-  const low = -C.deep, shy = 2.5;
-  parts.push({ t: 'curtain', paint: 'base', at: 'both', name: 'north curtain', a: [-C.hx + shy, -ez], b: [C.hx, -ez], y0: low, lean: C.lean });
-  parts.push({ t: 'curtain', paint: 'base', at: 'both', name: 'east curtain', a: [ex, -C.hz], b: [ex, C.hz], y0: low, lean: C.lean, sag: [UNDER.rent.z0 + C.hz, UNDER.rent.z1 + C.hz, UNDER.floor + 0.1] });
-  parts.push({ t: 'curtain', paint: 'base', at: 'both', name: 'south curtain', a: [C.hx, ez], b: [-C.hx, ez], y0: low, lean: C.lean });
-  parts.push({ t: 'curtain', paint: 'base', at: 'both', name: 'west curtain', a: [-ex, C.hz], b: [-ex, -C.hz + shy], y0: low, lean: C.lean });
-
-  // ---- the parapet: a wall to the sill, a square port under every merlon, and the firing step along the inside of it
+  // ---- THE WALLS ARE THE KIT'S (see `castleKit`): a length of its thin wall on each side, tower to tower, its
+  // walk level with the paving and its low thick parapet and merlons along the outside. What is made here is what
+  // a ruin adds to them: the core of the wall where a merlon or a length of parapet has gone, and the stone that came down.
   type Side = 'n' | 's' | 'e' | 'w';
   /** a block said by how far along a wall it is (toward +x on the north and south walls, toward +z on the others), and how far out from the wall's middle line */
   const along = (side: Side, paint: Paint, u0: number, u1: number, v0: number, v1: number, y0: number, y1: number, o: Partial<Box> = {}) => {
@@ -508,70 +614,36 @@ function layOut(): Part[] {
     else if (side === 'e') box(paint, C.hx + v0, C.hx + v1, y0, y1, u0, u1, o);
     else box(paint, -C.hx - v1, -C.hx - v0, y0, y1, u0, u1, o);
   };
-  const T = C.tower, half = P.thick / 2, S = C.step;
-  const first = -(P.n * P.merlon + (P.n - 1) * P.gap) / 2;
-  /** what is left out of each wall: the gate and its two piers, the breach */
-  const cuts: Record<Side, [number, number][]> = { n: [[C.breach.x0, C.breach.x1]], s: [], e: [[C.gate.z0 - 0.6, C.gate.z1 + 0.6], [UNDER.rent.z0, UNDER.rent.z1]], w: [] };
-  /** where the firing step runs (not through the gate, the breach, or the foot of the scaffold) */
-  const steps: Record<Side, [number, number][]> = { n: [[C.breach.x1 + 0.3, 6.4]], s: [[-0.2, 6.4]], e: [[-6.4, C.gate.z0 - 0.9], [C.gate.z1 + 0.9, UNDER.rent.z0 - 0.25]], w: [[-6.4, 6.4]] };
-  // What is left of it. The real one's merlons are all there; ours is a ruin, and a ruin falls from the top down:
-  // of every merlon, about half stand, a fifth are stumps and the rest are gone to the sill; and whole lengths of
-  // the wall are down to a man's knee, where its stone lies on the paving under it and down the slope outside.
-  // (Each length that is down opens a view out and a shot in: nobody behind it is covered standing.)
-  /** the lengths of each wall's parapet that are down: [from, to along it, how low in the middle] */
-  const DOWN: Record<Side, [number, number, number][]> = { n: [[C.breach.x1 - 0.2, 2.6, 0.4]], s: [[-6.4, -2.4, 0.8]], e: [[0.4, UNDER.rent.z0, 0.3], [UNDER.rent.z1, 7, 0.45]], w: [[-0.6, 5.5, 0.3]] };
-  /** two merlons of each wall that do stand, whatever the rest have come to: no side of it is bare */
-  const STANDS: Record<Side, number[]> = { n: [2, 6], s: [3, 5], e: [0, 4], w: [0, 1] };
+  const half = P.thick / 2, faceIn = half - (KIT_MERLON.x1 - KIT_MERLON.x0), sill = KIT_LEVELS.parapet - KIT_LEVELS.walk;
+  // (the kit's wall is seven metres from its walk to its foot, and on the north and the south the hill is lower than that: under each wall a footing of rough stone, a hand proud of the wall's foot, down into the ground)
+  for (const side of ['n', 's', 'e', 'w'] as Side[]) along(side, 'base', -WALL.half, WALL.half, half + WALL.out - WALL.deep, half + WALL.out + 0.12, -C.deep, -KIT_LEVELS.walk + 0.04, { name: 'footing', tone: 0.8, at: 'both' });
   for (const side of ['n', 's', 'e', 'w'] as Side[]) {
-    // (it runs a hand's breadth into the towers at each end)
-    const end = (side === 'n' || side === 's' ? C.hx : C.hz) - T.r + 0.2, cut = cuts[side], seed = { n: 201, s: 202, e: 203, w: 204 }[side];
-    const CELL = 0.25;
-    /** how high it stands at a place along the wall */
-    const topAt = (u: number, i: number) => {
-      const k = Math.floor((u - first) / (P.merlon + P.gap)), merlon = k >= 0 && k < P.n && u - first - k * (P.merlon + P.gap) < P.merlon, fate = STANDS[side].includes(k) ? 0 : hash(k, seed, 1);
-      let top = !merlon || fate > 0.72 ? P.sill : fate > 0.5 ? P.sill + 0.25 + hash(k, seed, 2) * 0.5 : P.top;
-      for (const [a, b, lowTo] of DOWN[side]) {
-        if (u <= a || u >= b) continue;
-        const into = Math.min(1, (Math.min(u - a, b - u) / ((b - a) / 2)) * 1.7);
-        top = Math.min(top, P.sill + 0.2 - (P.sill + 0.2 - lowTo) * into + (hash(i, seed, 3) - 0.5) * 0.3);
+    const seed = { n: 201, s: 202, e: 203, w: 204 }[side];
+    for (const [u0, u1, whole] of gaps(side)) {
+      // (where a merlon stood there is no top to the parapet under it: what shows is the wall's core, a course or two of it left)
+      if (whole) {
+        along(side, 'base', u0 + 0.02, u1 - 0.02, faceIn + 0.02, half - 0.02, sill - 0.3, sill + 0.04 + hash(Math.round(u0 * 7), seed, 1) * 0.22, { name: 'merlon stump', tone: 0.85, body: 'none' });
+        continue;
       }
-      return Math.max(0.2, Math.round(top * 100) / 100);
-    };
-    const ports: [number, number][] = [];
-    for (let k = 0; k < P.n; k++) ports.push([first + k * (P.merlon + P.gap) + P.merlon / 2 - P.port.w / 2, first + k * (P.merlon + P.gap) + P.merlon / 2 + P.port.w / 2]);
-    for (const [a, b] of spans(-end, end, cut)) {
-      // (said the way a wall is said: along it with the outside on the left. On the south and the west that is backward.)
-      const back = side === 's' || side === 'w', i0 = Math.round((a + end) / CELL), i1 = Math.round((b + end) / CELL);
-      const tops = Array.from({ length: i1 - i0 }, (_, i) => topAt(-end + (i0 + i + 0.5) * CELL, i0 + i));
-      const at = (u: number): [number, number] => (side === 'n' ? [u, -C.hz] : side === 's' ? [u, C.hz] : side === 'e' ? [C.hx, u] : [-C.hx, u]);
-      const openings = ports.filter(([p, q]) => p > a + 0.1 && q < b - 0.1).map(([p, q]) => ({ u0: back ? b - q : p - a, u1: back ? b - p : q - a, y0: P.port.y0, y1: P.port.y1 }));
-      parts.push({ t: 'wall', paint: 'stone', at: 'both', name: `${side} parapet`, a: at(back ? b : a), b: at(back ? a : b), y0: 0, top: back ? tops.reverse() : tops, thick: P.thick, openings });
+      // (a length of parapet gone to the walk: a broken end of it either side)
+      for (const [a, b] of [[u0 - 0.28, u0 + 0.02], [u1 - 0.02, u1 + 0.28]]) if (!(side === 'e' && a > UNDER.rent.z0 - 0.4)) along(side, 'base', a, b, faceIn + 0.01, half - 0.01, 0, sill - 0.04 - hash(Math.round(a * 9), seed, 2) * 0.2, { name: 'broken parapet', tone: 0.85 });
     }
-    for (const [a, b] of steps[side]) {
-      along(side, 'stone', a, b, -half - S.top, -half, 0, S.h, { name: `${side} firing step`, tone: 0.92 });
-      along(side, 'stone', a, b, -half - S.top - S.tread, -half - S.top, 0, S.h / 2, { name: `${side} firing step`, tone: 0.92 });
-      // what is walked on going up to it: one slope from the paving to its edge, as under any stair
-      const lip = half + S.top, toe = lip + 2 * S.tread;
-      const at = (u: number, v: number, y: number): V3 => (side === 'n' ? [u, y, -C.hz + v] : side === 's' ? [u, y, C.hz - v] : side === 'e' ? [C.hx - v, y, u] : [-C.hx + v, y, u]);
-      parts.push({ t: 'slab', paint: 'stone', hidden: true, body: 'feet', name: `${side} firing step`, p: [at(a, toe, 0), at(b, toe, 0), at(b, lip, S.h), at(a, lip, S.h)], thick: 0.08 });
-    }
-    // the stone of each length that is down: flat on the paving inside (low enough to be walked over), and tumbled outside
-    for (const [a, b] of DOWN[side]) for (let k = 0; k < 5; k++) {
-      const u = a + ((k + 0.5) / 5) * (b - a) + (hash(k, seed, 5) - 0.5) * 0.4, inside = k % 2 === 0, v = inside ? -(half + S.top + 2 * S.tread + 0.5 + hash(k, seed, 6) * 0.9) : half + 0.5 + hash(k, seed, 6) * 1.6;
+    // the stone of what is gone: flat on the paving inside (low enough to be walked over), and tumbled outside
+    for (const [a, b, whole] of gaps(side)) for (let k = 0; k < (whole ? 2 : 5); k++) {
+      const u = a + ((k + 0.5) / (whole ? 2 : 5)) * (b - a) + (hash(k, seed, 5) - 0.5) * 0.4, inside = k % 2 === 0, v = inside ? faceIn - 0.6 - hash(k, seed, 6) * 1.2 : half + WALL.out + 0.5 + hash(k, seed, 6) * 1.6;
       const [x, z] = side === 'n' ? [u, -C.hz - v] : side === 's' ? [u, C.hz + v] : side === 'e' ? [C.hx + v, u] : [-C.hx - v, u];
-      // (none inside along the west wall, where the vault fell in; and none in the way to a tower's door)
-      if (inside && (side === 'w' || Math.abs(u) > 5.5)) continue;
+      // (none inside along the west wall, where the vault fell in; none in the way to a tower's door, or to the gate)
+      if (inside && (side === 'w' || Math.abs(u) > 5.5 || (side === 'e' && u > C.gate.z0 - 1.2 && u < C.gate.z1 + 1.2))) continue;
       if (inside) lump(x, 0.11, z, 0.3 + hash(k, seed, 7) * 0.22, 0.11, 0.22 + hash(k, seed, 8) * 0.14, 400 + seed + k, { paint: 'stone', blocky: true, name: 'fallen stone' });
       else lump(x, 0.25, z, 0.45 + hash(k, seed, 7) * 0.45, 0.36, 0.36 + hash(k, seed, 8) * 0.3, 400 + seed + k, { paint: 'stone', blocky: true, sits: [x, z], name: 'fallen stone', body: 'none' });
     }
   }
-  // the gate: a pier each side of it, a head taller than the merlons
-  for (const [a, b] of [[C.gate.z0 - 0.6, C.gate.z0], [C.gate.z1, C.gate.z1 + 0.6]]) along('e', 'stone', a, b, -half - 0.1, half + 0.1, 0, P.top + 0.4, { name: 'gate pier', at: 'both' });
-  // and one leaf of the gate that hung there, pushed back against the wall inside and left
-  beam([C.hx - 0.5, 1.02, C.gate.z1 + 0.75], [C.hx - 0.5, 1.02, C.gate.z1 + 2.95], 0.09, 2.0, { name: 'gate leaf', body: 'all' });
-  // the breach: the stumps of the wall at each end of it
-  along('n', 'stone', C.breach.x0, C.breach.x0 + 0.35, -half, half, 0, 1.0, { name: 'breach stump' });
-  along('n', 'stone', C.breach.x1 - 0.3, C.breach.x1, -half, half, 0, 0.75, { name: 'breach stump' });
+  // one leaf of the gate hangs open against the passage's wall inside: what stops a body there (the leaf itself is the door's own model: see `castleDoor`)
+  {
+    // (half open: from its hinge on the south side of the passage it stands in toward the terrace, and the way past it is a pace and a half wide)
+    const swing = DOOR.swing, hz = (C.gate.z0 + C.gate.z1) / 2 + 0.987 * DOOR.scale, cx = DOOR.x - Math.sin(swing) * DOOR.leaf * 0.48, cz = hz - Math.cos(swing) * DOOR.leaf * 0.48;
+    box('timber', cx - DOOR.leaf * 0.48, cx + DOOR.leaf * 0.48, 0, 3, cz - 0.07, cz + 0.07, { name: 'gate leaf', hidden: true, yaw: swing - Math.PI / 2 });
+  }
 
   // ---- the four towers. Each has a door to the terrace, a stair round the inside of its wall to a platform under
   // its rim, a window along each of the two walls it guards and one out over the ridge.

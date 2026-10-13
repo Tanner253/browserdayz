@@ -28,6 +28,12 @@ export async function record(request: Request, w: World = live(), game = GAME): 
     wallet: String(e.wallet ?? '').slice(0, 44),
   };
   const payout = await handle(w, entry);
+  // A tag that waits for its wallet to have enough due (see dueOf in _lib/payouts.ts) is in the book, and is paid
+  // from the book when the count is reached: there is nothing for the game server to ask about again. It was told
+  // "3 of 5: ..." the first time. Asked again, it is answered with no payout at all, at which the game server
+  // stops asking (it asks about a tag that is waiting every five minutes for a day: under the rule of five nearly
+  // every tag waits, and that would be some three hundred calls for each of them).
+  if (payout.state === 'waiting' && payout.parked) return Response.json({ ok: true, parked: payout }, { headers: { 'cache-control': 'no-store' } });
   return Response.json({ ok: true, payout }, { headers: { 'cache-control': 'no-store' } });
 }
 

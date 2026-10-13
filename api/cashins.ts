@@ -13,7 +13,7 @@
 // the page (and the game, from the status) calls the housekeeping, api/tick.ts.
 
 import { live } from './_lib/live.js';
-import { cached, editBook, freshBook, glanceBook, refOf, snapshot, sol, type Book, type Entry, type Row, type Snapshot, type World } from './_lib/payouts.js';
+import { cached, dueOf, editBook, freshBook, glanceBook, refOf, snapshot, sol, type Book, type Entry, type Row, type Snapshot, type World } from './_lib/payouts.js';
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 /** an amount of SOL, to as many places as it needs and no more than four */
@@ -58,6 +58,48 @@ function outcome(r: Row): string {
   return '<i>listed (payouts were not on)</i>';
 }
 
+/**
+ * A wallet whose tags wait to be paid together (the rule of the second cut-over: see dueOf in _lib/payouts.ts).
+ * The owner, 2026-10-13: "we can reender the 3/5 progress on payout for .05 once per wallet/player UNTIL the payout
+ * is sent so we dont have a huge list of pending payouts on the screen". So such a wallet is ONE line of the ledger,
+ * however many of its tags wait: how many it has of how many it is paid at, and what it is paid then. When the
+ * payment is sent the line is gone, and each tag is listed with its transaction as paid tags always were.
+ */
+interface Waits {
+  wallet: string;
+  /** the name the latest of them was cashed in under, and when */
+  name: string;
+  at: string;
+  /** how many of its tags are due, of how many it is paid at */
+  have: number;
+  need: number;
+  /** lamports: what it is paid when it is paid (for `need` of them while it has fewer; for all it has, once it has more) */
+  pays: number;
+  /** why it is not paid yet */
+  why: string;
+  hold: Row['hold'];
+}
+
+/** The ledger's lines, newest first: a tag each, but one for all of a wallet's tags that wait to be paid together (where the latest of them would be). */
+function lines(book: Book, s: Snapshot): (Row | Waits)[] {
+  const out: (Row | Waits)[] = [];
+  const done = new Set<string>(), lots = new Map<string, Row[]>();
+  for (const r of book.rows) {
+    if (r.rules === 2 && !lots.has(r.wallet)) lots.set(r.wallet, dueOf(book, r.wallet));
+    const lot = (r.rules === 2 && lots.get(r.wallet)) || [];
+    if (!lot.includes(r)) out.push(r);
+    else if (!done.has(r.wallet)) {
+      done.add(r.wallet);
+      const have = lot.length, need = s.minTags;
+      // (enough are due, and they are not paid: held by the treasury or the day's limit, which one of them says; or about to be)
+      const held = lot.find((x) => x.hold !== 'five');
+      out.push({ wallet: r.wallet, name: r.name, at: r.at, have, need, pays: Math.max(have, need) * s.flatPay, why: have < need ? `paid when ${need} are due` : held?.why ?? 'being paid', hold: have < need ? 'five' : held?.hold ?? 'five' });
+    }
+  }
+  return out;
+}
+const isWaits = (x: Row | Waits): x is Waits => 'have' in x;
+
 /** where the game is played, and where it is talked about (the same as the menu's own links: src/ui/hud.ts) */
 const SITE = { x: 'https://x.com/zonaSOL_', changelog: '/changelog' };
 
@@ -73,26 +115,44 @@ function page(book: Book, s: Snapshot, now: number): string {
   const dayName = (day: string) => `${Number(day.slice(8, 10))} ${MONTHS[Number(day.slice(5, 7)) - 1] ?? ''}`;
   const paidRows = book.rows.filter((r) => r.state === 'paid');
   const wallets = new Set(paidRows.map((r) => r.wallet)).size;
+  // (every tag that is on its way or waiting is counted, though a wallet whose tags wait to be paid together is one line)
   const open = book.rows.filter((r) => r.state === 'sending' || r.state === 'waiting').length;
+  const listed = lines(book, s);
+  const waits = listed.filter(isWaits);
+  const waitTags = waits.reduce((n, x) => n + x.have, 0);
   const pct = Math.round(s.share * 1000) / 10;
+  // ---- the second cut-over, said from the settings: when, what a tag pays from then, and how many are paid at once
+  const N = s.minTags, flat = amount(s.flatPay), lot = amount(N * s.flatPay);
+  const cut = `${Number(s.rules2From.slice(8, 10))} ${['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][Number(s.rules2From.slice(5, 7)) - 1] ?? ''} ${s.rules2From.slice(0, 4)}`;
   const state =
     s.mode === 'on' && s.problem
       ? ['bad', 'Automatic payouts are held', `Nothing is paid as things stand: ${s.problem}.`]
       : s.mode === 'on'
-      ? ['on', 'Automatic payouts are on', 'A tag cashed in is paid within a minute or so, straight from the treasury to the wallet the player gave.']
+      ? ['on', 'Automatic payouts are on', s.fives && N > 1 ? `A wallet is paid when ${N} of its tags are due, all ${N} at once, straight from the treasury to the wallet the player gave.` : 'A tag cashed in is paid within a minute or so, straight from the treasury to the wallet the player gave.']
       : s.mode === 'dry'
         ? ['dry', 'Automatic payouts are on trial', 'Each payment is worked out and tried, and not sent.']
         : s.problem
           ? ['bad', 'Automatic payouts are off', `They were asked for and could not start: ${s.problem}.`]
           : ['off', 'Automatic payouts are off', 'Tags are listed here as they are cashed in, and not paid by the machine.'];
   const chip = (r: Row) => (r.state === 'paid' ? '<em class="c paid">Paid</em>' : r.state === 'sending' ? '<em class="c go">Sending</em>' : r.state === 'waiting' ? '<em class="c go">Waiting</em>' : r.state === 'skipped' ? '<em class="c no">Not paid</em>' : '<em class="c no">Listed</em>');
-  const rows = book.rows
-    .map(
-      (r) => `<tr class="${r.state}" data-s="${r.state === 'paid' ? 'paid' : r.state === 'sending' || r.state === 'waiting' ? 'open' : 'none'}">
+  const account = (wallet: string) => `<a href="https://solscan.io/account/${esc(wallet)}" target="_blank" rel="noopener"><code>${esc(short(wallet))}</code></a>`;
+  const rows = listed
+    .map((r) =>
+      isWaits(r)
+        ? // (one line for all of a wallet's tags that wait to be paid together: how far it has got, and what it is paid then)
+          `<tr class="waiting" data-s="open">
+        <td>${when(r.at)}</td>
+        <td><b>${esc(r.name)}</b></td>
+        <td>${r.have} ${r.have === 1 ? 'tag' : 'tags'}</td>
+        <td class="w">${account(r.wallet)}</td>
+        <td><em class="c go">${r.have < r.need ? `${r.have} of ${r.need}` : `${r.have} due`}</em></td>
+        <td>${r.have < r.need ? `<span class="track five"><i style="width:${Math.round((r.have / r.need) * 100)}%"></i></span> <b class="go">${amount(r.pays)} SOL</b> <i>when ${r.need} are due</i>` : `<b class="go">${amount(r.pays)} SOL</b> <i>for ${r.have} tags: ${esc(r.why)}</i>`}</td>
+      </tr>`
+        : `<tr class="${r.state}" data-s="${r.state === 'paid' ? 'paid' : r.state === 'sending' || r.state === 'waiting' ? 'open' : 'none'}">
         <td>${when(r.at)}</td>
         <td><b>${esc(r.name)}</b></td>
         <td>${esc(r.owner)}</td>
-        <td class="w">${r.wallet ? `<a href="https://solscan.io/account/${esc(r.wallet)}" target="_blank" rel="noopener"><code>${esc(short(r.wallet))}</code></a>` : '<i>none given</i>'}</td>
+        <td class="w">${r.wallet ? account(r.wallet) : '<i>none given</i>'}</td>
         <td>${chip(r)}</td>
         <td>${outcome(r)}</td>
       </tr>`,
@@ -196,6 +256,8 @@ function page(book: Book, s: Snapshot, now: number): string {
   .board li::before { content: counter(n); font: 700 14px/1 var(--cond); color: var(--faint); }
   .track { display: block; height: 8px; background: rgba(255, 255, 255, 0.07); }
   .track i { display: block; height: 100%; background: var(--gold); }
+  .track.five { display: inline-block; width: 84px; margin-right: 8px; vertical-align: middle; }
+  b.go { font-variant-numeric: tabular-nums; }
   .board small { font: 11px/1 var(--mono); color: var(--faint); text-align: right; }
   .none { margin: 0; padding: 22px 16px; background: var(--panel); border: 1px solid var(--line); color: var(--faint); }
   .filters { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 10px; }
@@ -265,10 +327,10 @@ function page(book: Book, s: Snapshot, now: number): string {
       ${book.claimNote ? `<div class="note"><b>Collecting creator rewards did not work the last time it was tried</b>${esc(book.claimNote)}</div>` : ''}
     </div>
     <div class="tiles">
-      ${tile(s.tagPays === null ? '?' : `${amount(s.tagPays)} SOL`, 'a tag pays right now', `${pct}% of the treasury, ${amount(s.floor)} at least`)}
+      ${tile(s.tagPays === null ? '?' : `${amount(s.tagPays)} SOL`, 'a tag pays right now', s.fives ? `flat, whatever the treasury holds${N > 1 ? `: paid when a wallet has ${N} due` : ''}` : `${pct}% of the treasury, ${amount(s.floor)} at least`)}
       ${tile(s.balance === null ? '?' : `${amount(s.balance)} SOL`, 'in the treasury', s.treasury ? `<a href="https://solscan.io/account/${esc(s.treasury)}" target="_blank" rel="noopener">${esc(short(s.treasury))}</a>${s.madeTheCoin ? ', the wallet that made the coin' : ''}` : '')}
       ${tile(`${amount(book.claimedLamports)} SOL`, 'creator rewards collected', (s.waiting !== null ? `${amount(s.waiting)} waiting to be collected` : '') + (s.waitingNote ? `${s.waiting !== null ? '. ' : ''}${esc(s.waitingNote)}` : ''))}
-      ${tile(String(open), open === 1 ? 'tag on its way or waiting' : 'tags on their way or waiting', open ? 'Each is paid as soon as it can be' : 'Everything owed has been paid')}
+      ${tile(String(open), open === 1 ? 'tag on its way or waiting' : 'tags on their way or waiting', waitTags ? `${waitTags} of them, ${amount(waitTags * s.flatPay)} SOL, owed to ${waits.length} ${waits.length === 1 ? 'wallet that is' : 'wallets that are'} paid at ${N} due` : open ? 'Each is paid as soon as it can be' : 'Everything owed has been paid')}
     </div>
   </div>
 
@@ -277,8 +339,8 @@ function page(book: Book, s: Snapshot, now: number): string {
     <div class="flow">
       ${step('1', 'The coin is traded', 'Creator rewards', 'Every trade of the ZONA coin on pump.fun leaves a little for the wallet that made it.')}
       ${step('2', 'Collected by the machine', `${amount(book.claimedLamports)} SOL so far`, `Into one treasury wallet, automatically${s.balance === null ? '' : `. It holds ${amount(s.balance)} SOL now`}.`)}
-      ${step('3', 'You cash a tag in', `${s.tagPays === null ? `${pct}%` : `${amount(s.tagPays)} SOL`} a tag`, `Kill a player, take their tag, hold it fifteen minutes. A tag pays ${pct}% of the treasury, never less than ${amount(s.floor)} SOL.`)}
-      ${step('4', 'Straight to your wallet', `${amount(book.paidLamports)} SOL paid`, 'Within a minute or so, with a receipt left on the chain: no tag is ever paid twice.')}
+      ${step('3', 'You cash a tag in', `${s.tagPays === null ? (s.fives ? flat + ' SOL' : `${pct}%`) : `${amount(s.tagPays)} SOL`} a tag`, `Kill a player, take their tag, hold it fifteen minutes. ${s.fives ? `A tag pays ${flat} SOL, whatever the treasury holds.` : `A tag pays ${pct}% of the treasury, never less than ${amount(s.floor)} SOL.`}`)}
+      ${step('4', 'Straight to your wallet', `${amount(book.paidLamports)} SOL paid`, s.fives && N > 1 ? `When ${N} of your tags are due: ${lot} SOL at once, with a receipt for each tag left on the chain. No tag is ever paid twice.` : 'Within a minute or so, with a receipt left on the chain: no tag is ever paid twice.')}
     </div>
   </section>
 
@@ -323,12 +385,18 @@ function page(book: Book, s: Snapshot, now: number): string {
   <section>
     <h2>The rules the machine pays by</h2>
     <div class="rules">
-      <div class="rule"><h3>What a tag pays</h3><p>${pct}% of what the treasury holds at the moment it is paid, and never less than ${amount(s.floor)} SOL. The treasury is filled by the coin's creator rewards on pump.fun, collected automatically.</p></div>
+      <div class="rule"><h3>What a tag pays</h3><p>${s.fives ? `${flat} SOL, flat: the same whatever the treasury holds.` : `${pct}% of what the treasury holds at the moment it is paid, and never less than ${amount(s.floor)} SOL.`} The treasury is filled by the coin's creator rewards on pump.fun, collected automatically.</p></div>${
+        s.fives && N > 1
+          ? `
+      <div class="rule"><h3>Paid when ${N} are due</h3><p>A wallet is paid when ${N} of its tags are due, and then for all that are due at once: ${lot} SOL for ${N}, in one transaction that leaves a receipt for each tag. Fewer than ${N} wait, counted, on one line of the ledger ("3 of ${N}"), for as long as it takes: no tag is lost for waiting. A tag that is not paid (over the ${s.walletDayTags} a day, or traded) does not count toward the ${N}.</p></div>`
+          : ''
+      }
       <div class="rule"><h3>${s.walletDayTags} tags a wallet, a day</h3><p>One wallet is paid for the first ${s.walletDayTags} tags it cashes in on a day (days are counted in UTC). One cashed in after those, that day, is listed and not paid: it does not wait for tomorrow. And no more than ${Math.round(s.dayShare * 100)}% of the treasury leaves it in one day: a tag over that waits, and is paid when there is room.</p></div>
       <div class="rule"><h3>Trading tags is not paid</h3><p>When two players cash each other's tags inside a day, the first of the two is paid and the second is not. Killing a friend and being killed back earns one tag between you, not two.</p></div>
       <div class="rule"><h3>Paid once, and the chain sees to it</h3><p>Each payment leaves a receipt, an account of its own, and a second payment for the same tag cannot be made while that receipt stands. Each payment also carries a note, "ZONA dog tag" and the reference shown beside it here.</p></div>
       <div class="rule"><h3>No wallet, no payment</h3><p>A tag cashed in with no wallet given is listed and not paid. The wallet is asked for in the game, on the rewards window: add it before you cash a tag in.</p></div>
       <div class="rule"><h3>What changed on 13 October 2026</h3><p>The treasury was paying out half as much again as came in. From 04:30 UTC a tag pays ${amount(s.floor)} SOL at least (it was 0.02), the limit of ${s.walletDayTags} a day is a limit and not a queue, and traded tags are not paid. Everything cashed in before then is paid as it was promised.</p></div>
+      <div class="rule"><h3>What ${s.fives ? 'changed' : 'changes'} on ${cut}</h3><p>From ${s.rules2From.slice(11, 16)} UTC a tag pays ${flat} SOL flat, and no longer a share of the treasury${N > 1 ? `; and a wallet is paid when ${N} of its tags are due, for all of them at once (${lot} SOL for ${N}), not tag by tag. Until then its tags wait, counted, and none is lost for waiting` : ''}. Everything cashed in before then is paid as it was promised${N > 1 ? `, without waiting for ${N}` : ''}.</p></div>
     </div>
   </section>
 </main>
@@ -346,7 +414,7 @@ function page(book: Book, s: Snapshot, now: number): string {
     for (const b of buttons) b.onclick = () => { kind = b.dataset.f; for (const o of buttons) o.classList.toggle('on', o === b); show(); };
     find.oninput = show;
   })();
-  ${s.due || open ? "fetch('/api/tick').catch(() => {});" : ''}
+  ${s.due || open > waits.reduce((n, x) => n + (x.have < x.need ? x.have : 0), 0) ? "fetch('/api/tick').catch(() => {});" : ''}
 </script>
 </body>
 </html>`;
@@ -357,14 +425,27 @@ export async function show(request: Request, w: World = live()): Promise<Respons
   const s = await cached(w, 'snapshot', 20_000, () => snapshot(w));
   if (format === 'status') {
     // (due: enough rewards are waiting to be collected; whoever is told so calls api/tick, which collects them)
-    return Response.json({ on: s.mode === 'on' && !s.problem, tagPays: s.tagPays === null ? null : sol(s.tagPays), share: s.share, floor: sol(s.floor), treasury: s.treasury, due: s.due }, { headers: { 'cache-control': 'public, s-maxage=30, stale-while-revalidate=120' } });
+    // (what was there before the second cut-over is there still, and means what it meant: from the cut-over `share` is 0
+    // and `tagPays` is the flat figure. New: `minTags`, how many of a wallet's tags must be due before it is paid, 1
+    // until the cut-over; and `next`, what is to change and when, while that is still to come.)
+    const next = s.fives ? null : { from: s.rules2From, tagPays: sol(s.flatPay), minTags: s.minTags };
+    return Response.json({ on: s.mode === 'on' && !s.problem, tagPays: s.tagPays === null ? null : sol(s.tagPays), share: s.share, floor: sol(s.floor), treasury: s.treasury, due: s.due, minTags: s.fives ? s.minTags : 1, next }, { headers: { 'cache-control': 'public, s-maxage=30, stale-while-revalidate=120' } });
   }
   const book = await cached(w, 'book', 20_000, async () => withOldEntries(w, await glanceBook(w.store)));
   const cache = { 'cache-control': 'public, s-maxage=20, stale-while-revalidate=60' };
   if (format === 'json') {
-    // (a tag not paid yet goes by no name here: its reference is where the receipt of its payment will be)
-    const rows = book.rows.map(({ tries: _tries, ...r }) => (r.state === 'paid' ? r : { ...r, ref: undefined }));
-    return Response.json({ status: s, since: book.since, tags: book.tags, paid: book.paid, paidSol: sol(book.paidLamports), claimedSol: sol(book.claimedLamports), rows, claims: book.claims }, { headers: cache });
+    // (a tag not paid yet goes by no name here: its reference is where the receipt of its payment will be. And a
+    // wallet whose tags wait to be paid together is one row here as it is one line of the page: a row like any other
+    // that is waiting, with `tags` (how many of its tags the row stands for), `have` of `need`, and `pays`, in
+    // lamports, what it is paid when it is paid. `owed` counts every one of those tags.)
+    const listed = lines(book, s);
+    const rows = listed.map((x) => {
+      if (isWaits(x)) return { at: x.at, name: x.name, owner: '', wallet: x.wallet, state: 'waiting', why: `${x.have} of ${x.need}: ${x.why}`, hold: x.hold, rules: 2, tags: x.have, have: x.have, need: x.need, pays: x.pays };
+      const { tries: _tries, ...r } = x;
+      return r.state === 'paid' ? r : { ...r, ref: undefined };
+    });
+    const waits = listed.filter(isWaits), owedTags = waits.reduce((n, x) => n + x.have, 0);
+    return Response.json({ status: s, since: book.since, tags: book.tags, paid: book.paid, paidSol: sol(book.paidLamports), claimedSol: sol(book.claimedLamports), owed: { tags: owedTags, wallets: waits.length, sol: sol(owedTags * s.flatPay) }, rows, claims: book.claims }, { headers: cache });
   }
   return new Response(page(book, s, w.now()), { headers: { 'content-type': 'text/html; charset=utf-8', ...cache } });
 }

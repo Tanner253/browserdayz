@@ -35,6 +35,28 @@ export const BUS = {
 export const madeUp = (c: { threshold: number; ratio: number }) => Math.pow(10, (-c.threshold * (1 - 1 / c.ratio) * 0.6) / 20);
 
 /**
+ * The four groups a player turns up and down by themselves (Settings, Audio; 2026-10-13: "we need to add volume
+ * controls to the settings menu"), all of them under the one volume that turns everything. A group is a gain of
+ * its own between its sounds and `master`, so the squeeze and the ceiling after it still hold whatever is made of
+ * them. At 1, as all four are until a player moves one, such a gain changes nothing: the game sounds as it did
+ * before there were any (test/mix.test.ts walks the engine's wiring and holds it to that).
+ *   fx        Effects: everything of the world. Guns and what comes back of them from the hills and the walls,
+ *             blasts, steps, bodies, doors, cars, the helicopter, the infected, one's own breath and heart.
+ *             A NEW SOUND OF THE WORLD IS EFFECTS BY DOING NOTHING: `this.sfx` is the group itself, and
+ *             `this.out(pos)` ends in it.
+ *   voice     other players talking (src/game/voice.ts, by `voiceBus`), and the calls said aloud (`speak`)
+ *   ambience  the wind, the leaves, the insects, birds and crows, a fire burning near by, breath through a gas
+ *             mask, the bunker's hum and the noises it makes off in the dark
+ *   ui        Interface: one's own hands in the pockets (`ui`), and the tick of a shot landing (`hitTick`)
+ */
+export const GROUPS = ['fx', 'voice', 'ambience', 'ui'] as const;
+export type Group = (typeof GROUPS)[number];
+export type Mix = Record<Group, number>;
+export const MIX: Mix = { fx: 1, voice: 1, ambience: 1, ui: 1 };
+/** what a slider at `v` turns its group by: the share itself, 0..1, as the one volume has always been */
+export const share = (v: number) => (Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 1);
+
+/**
  * A shot through a suppressor (2026-10-13: "suprressed shots are too quiet ... we want it to be more realistic").
  * Each pair is [a round slower than sound, a rifle's round]: see `gunshot` for why they differ.
  *
@@ -109,6 +131,17 @@ export interface EngineVoice {
    * @param inside heard from the seats, not from the verge
    */
   set(pos: V3, rpm: number, load: number, speed: number, slide: number, road: boolean, inside: boolean): void;
+  stop(): void;
+}
+
+/**
+ * A helicopter's rotor, turning (src/game/airdrop.ts): told every frame where it is and how it is to be heard, until
+ * it is stopped. How loud it is at what distance, how fast it is played and how much of its top comes through are
+ * said by whoever holds it (ROTOR in src/sim/airdrop.ts), not worked out here.
+ */
+export interface RotorVoice {
+  /** @param gain how loud  @param rate how fast the recording is played  @param cutoff nothing of it above this many Hz */
+  set(pos: V3, gain: number, rate: number, cutoff: number): void;
   stop(): void;
 }
 
@@ -229,16 +262,57 @@ export function recordings(): Promise<void> {
   })());
 }
 
+let rotorAsked: Promise<void> | null = null;
+/**
+ * Fetches the rotor of the helicopter that brings a supply drop, once: when one is first in the air (`rotor` asks),
+ * not with the rest. It is a quarter of a megabyte that no game needs in its first minute and a half, and the
+ * helicopter is a kilometre off when it is first wanted.
+ */
+export function rotorRecording(): Promise<void> {
+  return (rotorAsked ??= (async () => {
+    const dec = new OfflineAudioContext(1, 1, 44100);
+    for (let go = 0; go < 3 && !bank.has('rotor'); go++) {
+      try {
+        const res = await fetch('assets/sounds/rotor.wav');
+        if (!res.ok) throw new Error(String(res.status));
+        const buf = await dec.decodeAudioData(await res.arrayBuffer());
+        takeOf.set(buf, 0);
+        bank.set('rotor', [buf]);
+      } catch {
+        // not there, or a bad line: again in a while (and after the third time, the helicopter is silent)
+        await new Promise((r) => setTimeout(r, 1500 * (go + 1)));
+      }
+    }
+  })());
+}
+
 export class AudioEngine {
   ctx!: AudioContext;
   private master!: GainNode;
+  /** Effects (see GROUPS): where every sound of the world goes, straight or from a place (`out`). A new one hangs here. */
   private sfx!: GainNode;
+  /** the four groups' own gains (`fx` is `sfx` itself) */
+  private bus!: Record<Group, GainNode>;
+  /**
+   * Every gain a group's slider turns: its own, and for Effects and Ambience their ways in to what comes back from
+   * the hills and the walls as well (that is one thing shared between them, and comes back under `master`: so it
+   * is what is sent to it that is turned).
+   */
+  private faders!: Record<Group, GainNode[]>;
+  private mix: Mix = { ...MIX };
+  /** where a sound made in the ears, and not at a place, goes: Effects, but for what is made within `of` */
+  private ears!: GainNode;
   private reverb!: ConvolverNode;
+  /** Effects' way in to what comes back from the hills (turned with Effects), and Ambience's (a crow, the bunker); `tail` is how much of either comes back, out of doors and in */
   private reverbSend!: GainNode;
-  private echo!: DelayNode;
+  private ambSend!: GainNode;
+  private tail!: GainNode;
+  /** Effects' way in to the valley's one slap back (turned with Effects) */
+  private echo!: GainNode;
   private echoGain!: GainNode;
-  /** small-room reverb: what a shot sounds like under a roof */
+  /** small-room reverb: what a shot sounds like under a roof (Effects' way in, turned with Effects; `roomLevel` is how much of a room there is) */
   private roomSend!: GainNode;
+  private roomLevel!: GainNode;
   /** everything that is "the outdoors": dulled and turned down when you step inside */
   private amb!: GainNode;
   private ambLP!: BiquadFilterNode;
@@ -288,6 +362,14 @@ export class AudioEngine {
     this.master.connect(comp).connect(trim).connect(top).connect(ctx.destination);
     this.sfx = ctx.createGain();
     this.sfx.connect(this.master);
+    // the groups (see GROUPS): Effects is `sfx` itself, as it has always been; the other three are gains beside it
+    const group = () => {
+      const g = ctx.createGain();
+      g.connect(this.master);
+      return g;
+    };
+    this.bus = { fx: this.sfx, voice: group(), ambience: group(), ui: group() };
+    this.ears = this.sfx;
 
     // white noise source buffer (2 s)
     this.noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
@@ -307,21 +389,26 @@ export class AudioEngine {
     }
     this.reverb.buffer = ir;
     this.reverbSend = ctx.createGain();
-    this.reverbSend.gain.value = WET.tail[0];
+    this.ambSend = ctx.createGain();
+    this.tail = ctx.createGain();
+    this.tail.gain.value = WET.tail[0];
     const revLP = ctx.createBiquadFilter();
     revLP.type = 'lowpass';
     revLP.frequency.value = 2400;
-    this.reverbSend.connect(this.reverb).connect(revLP).connect(this.master);
+    this.reverbSend.connect(this.tail);
+    this.ambSend.connect(this.tail);
+    this.tail.connect(this.reverb).connect(revLP).connect(this.master);
 
     // valley slap-back echo for gunshots
-    this.echo = ctx.createDelay(2);
-    this.echo.delayTime.value = 0.62;
+    this.echo = ctx.createGain();
+    const delay = ctx.createDelay(2);
+    delay.delayTime.value = 0.62;
     const echoGain = (this.echoGain = ctx.createGain());
     echoGain.gain.value = WET.slap[0];
     const echoLP = ctx.createBiquadFilter();
     echoLP.type = 'lowpass';
     echoLP.frequency.value = 900;
-    this.echo.connect(echoLP).connect(echoGain).connect(this.reverbSend);
+    this.echo.connect(delay).connect(echoLP).connect(echoGain).connect(this.tail);
     echoGain.connect(this.master);
 
     // a room: short, bright, close reflections. Silent until you are under a roof.
@@ -341,12 +428,16 @@ export class AudioEngine {
     }
     room.buffer = rir;
     this.roomSend = ctx.createGain();
-    this.roomSend.gain.value = WET.room[0];
-    this.roomSend.connect(room).connect(this.master);
+    this.roomLevel = ctx.createGain();
+    this.roomLevel.gain.value = WET.room[0];
+    this.roomSend.connect(this.roomLevel).connect(room).connect(this.master);
 
     this.amb = ctx.createGain();
     this.ambLP = this.filter('lowpass', 18000, 0.5);
-    this.amb.connect(this.ambLP).connect(this.master);
+    this.amb.connect(this.ambLP).connect(this.bus.ambience);
+
+    this.faders = { fx: [this.sfx, this.reverbSend, this.echo, this.roomSend], voice: [this.bus.voice], ambience: [this.bus.ambience, this.ambSend], ui: [this.bus.ui] };
+    for (const g of GROUPS) for (const f of this.faders[g]) f.gain.value = this.mix[g];
 
     this.startAmbience();
     this.ready = true;
@@ -358,6 +449,27 @@ export class AudioEngine {
     if (this.ready) this.master.gain.setTargetAtTime(BUS.master * this.volume, this.ctx.currentTime, 0.05);
   }
 
+  /** the four groups, each 0..1 (Settings, Audio): heard at once, eased as the one volume is. One that is where it was is not touched. */
+  setMix(m: Partial<Mix>) {
+    for (const g of GROUPS) {
+      const v = m[g];
+      if (v === undefined || share(v) === this.mix[g]) continue;
+      this.mix[g] = share(v);
+      if (this.ready) for (const f of this.faders[g]) f.gain.setTargetAtTime(this.mix[g], this.ctx.currentTime, 0.05);
+    }
+  }
+
+  /** What `make` makes in the ears is that group's, and not Effects' (the pockets' sounds are made of the same clicks a gun's are). */
+  private of(group: Group, make: () => void) {
+    const was = this.ears;
+    this.ears = this.bus[group];
+    try {
+      make();
+    } finally {
+      this.ears = was;
+    }
+  }
+
   /**
    * Under a roof or out in the open. Indoors a shot is a hard, close slap with no valley
    * echo, and the wind and the birds are on the other side of a wall.
@@ -367,8 +479,8 @@ export class AudioEngine {
     this.indoors = indoors;
     const t = this.ctx.currentTime;
     const i = indoors ? 1 : 0;
-    this.roomSend.gain.setTargetAtTime(WET.room[i], t, 0.25);
-    this.reverbSend.gain.setTargetAtTime(WET.tail[i], t, 0.25);
+    this.roomLevel.gain.setTargetAtTime(WET.room[i], t, 0.25);
+    this.tail.gain.setTargetAtTime(WET.tail[i], t, 0.25);
     this.echoGain.gain.setTargetAtTime(WET.slap[i], t, 0.25);
     this.ambLP.frequency.setTargetAtTime(indoors ? 900 : 18000, t, 0.4);
     this.amb.gain.setTargetAtTime(indoors ? 0.45 : 1, t, 0.4);
@@ -416,9 +528,9 @@ export class AudioEngine {
     return f;
   }
 
-  /** Output node: positional (HRTF) or direct. Distance also dulls the high end. */
-  private out(pos?: V3, refDist = 4, rolloff = 1.2, distance = 0) {
-    if (!pos) return this.sfx as AudioNode;
+  /** Output node: positional (HRTF) or direct. Distance also dulls the high end. @param to the group it is of: Effects, unless said */
+  private out(pos?: V3, refDist = 4, rolloff = 1.2, distance = 0, to: AudioNode = this.sfx) {
+    if (!pos) return to;
     const p = this.ctx.createPanner();
     p.panningModel = 'HRTF';
     p.distanceModel = 'inverse';
@@ -429,7 +541,7 @@ export class AudioEngine {
     p.positionY.value = pos.y;
     p.positionZ.value = pos.z;
     const lp = this.filter('lowpass', Math.max(700, 18000 - distance * 40));
-    lp.connect(p).connect(this.sfx);
+    lp.connect(p).connect(to);
     return lp as AudioNode;
   }
 
@@ -709,7 +821,7 @@ export class AudioEngine {
     if (!this.ready) return;
     const t = this.ctx.currentTime + delay;
     // somebody else's weapon: the same sound, from where they are
-    const to = pos ? this.out(pos, 3, 1.2) : this.sfx;
+    const to = pos ? this.out(pos, 3, 1.2) : this.ears;
     if (pos) vol *= 1.6;
     const n = this.noise(t, dur + 0.03);
     const f = this.filter('bandpass', freq * (0.9 + Math.random() * 0.2), 6);
@@ -831,7 +943,10 @@ export class AudioEngine {
 
   /** your shot landed on somebody (a dry tick), or killed them (a heavier double) */
   hitTick(kill: boolean, head = false) {
-    if (!this.ready) return;
+    // (it is no sound of the world: the interface's, with the click that is part of it)
+    if (this.ready) this.of('ui', () => this.landed(kill, head));
+  }
+  private landed(kill: boolean, head: boolean) {
     if (!kill) {
       // a dry tick you can pick out under your own gunfire
       const t0 = this.ctx.currentTime;
@@ -842,7 +957,7 @@ export class AudioEngine {
       const tg = this.ctx.createGain();
       tg.gain.setValueAtTime(0.85, t0);
       tg.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.07);
-      tick.connect(tg).connect(this.sfx);
+      tick.connect(tg).connect(this.ears);
       tick.start(t0);
       tick.stop(t0 + 0.09);
       this.click(2600, 0.5, 0.012);
@@ -855,7 +970,7 @@ export class AudioEngine {
         const g = this.ctx.createGain();
         g.gain.setValueAtTime(0.5, t);
         g.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
-        o.connect(g).connect(this.sfx);
+        o.connect(g).connect(this.ears);
         o.start(t);
         o.stop(t + 0.24);
       }
@@ -869,7 +984,7 @@ export class AudioEngine {
     o.frequency.exponentialRampToValueAtTime(80, t + 0.2);
     const g = this.ctx.createGain();
     this.env(g, t + 0.03, 0.4, 0.004, 0.2);
-    o.connect(g).connect(this.sfx);
+    o.connect(g).connect(this.ears);
     o.start(t + 0.03);
     o.stop(t + 0.3);
   }
@@ -1328,8 +1443,13 @@ export class AudioEngine {
    */
   ui(kind: 'pickup' | 'drop' | 'open' | 'close' | 'eat' | 'drink' | 'bandage' | 'inject' | 'move' | 'smoke' | 'unbox' | 'round' | 'mag', pos?: V3, what?: string) {
     if (!this.ready) return;
+    // (one's own hands are the interface's to turn down; somebody else's, heard from where they stand, are the world's)
+    if (pos) this.hands(kind, pos, what);
+    else this.of('ui', () => this.hands(kind, undefined, what));
+  }
+  private hands(kind: Parameters<AudioEngine['ui']>[0], pos?: V3, what?: string) {
     const t = this.ctx.currentTime;
-    const to = pos ? this.out(pos, 1.2, 2.2) : (this.sfx as AudioNode);
+    const to = pos ? this.out(pos, 1.2, 2.2) : (this.ears as AudioNode);
     if (kind === 'pickup' || kind === 'drop' || kind === 'move') {
       // Recordings, where they have come: the thing itself by what it is made of (see HANDLED), and with it the
       // hand on cloth: closing on it as it is taken, or the pocket it is moved to. Put down, it is lower and a
@@ -1469,7 +1589,7 @@ export class AudioEngine {
       g.gain.setValueAtTime(0.0001, t);
       g.gain.linearRampToValueAtTime(0.034 * near, t + 0.45);
       g.gain.linearRampToValueAtTime(0.0001, t + 1.45);
-      src.connect(f).connect(g).connect(this.sfx);
+      src.connect(f).connect(g).connect(this.bus.ambience);
     }
     this.crackT -= dt;
     if (this.crackT <= 0) {
@@ -1477,12 +1597,12 @@ export class AudioEngine {
       this.crackT = 0.07 + Math.random() * Math.random() * 0.9;
       // (a recording of wood cracking, each a good deal higher or lower than the last: no two logs split alike.
       // Until they have come, the made-up tick. The hiss under them is made up still: there is no recording of a fire.)
-      if (this.rec('fire_crack', this.sfx, t, (EVERY.crack[0] + Math.random() * EVERY.crack[1]) * near, 0.7 + Math.random() * 0.7, false, true)) return;
+      if (this.rec('fire_crack', this.bus.ambience, t, (EVERY.crack[0] + Math.random() * EVERY.crack[1]) * near, 0.7 + Math.random() * 0.7, false, true)) return;
       const src = this.noise(t, 0.03);
       const f = this.filter('highpass', 1700 + Math.random() * 2200, 0.9);
       const g = ctx.createGain();
       this.env(g, t, (0.05 + Math.random() * 0.13) * near, 0.002, 0.018 + Math.random() * 0.03);
-      src.connect(f).connect(g).connect(this.sfx);
+      src.connect(f).connect(g).connect(this.bus.ambience);
     }
   }
 
@@ -1526,7 +1646,7 @@ export class AudioEngine {
     g.gain.setValueAtTime(0.0001, t);
     g.gain.linearRampToValueAtTime(inhale ? 0.05 : 0.07, t + dur * (inhale ? 0.6 : 0.18));
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    src.connect(f).connect(g).connect(this.sfx);
+    src.connect(f).connect(g).connect(this.bus.ambience);
   }
 
   hurt(pos?: V3, distance = 0) {
@@ -1604,15 +1724,15 @@ export class AudioEngine {
    * @returns whether it will be said: not where there is no such voice, nor while one call is already waiting
    *   behind another (three people shouting at once are not said one after the other, long after)
    */
-  /** where a player's voice goes (src/game/voice.ts): with everything else that is heard, under the one volume */
+  /** where a player's voice goes (src/game/voice.ts): the Voice group (see GROUPS), and so with everything else that is heard, under the one volume */
   voiceBus(): AudioNode | null {
-    return this.ready ? this.master : null;
+    return this.ready ? this.bus.voice : null;
   }
 
   private speak(words: string, distance: number, voice: number): boolean {
     const synth = typeof speechSynthesis === 'undefined' ? null : speechSynthesis;
     // (not while a film's soundtrack is being made from the list of what was heard: that is not this machine's to say aloud)
-    if (!words || !synth || typeof SpeechSynthesisUtterance === 'undefined' || !(this.ctx instanceof AudioContext) || this.volume <= 0 || synth.pending) return false;
+    if (!words || !synth || typeof SpeechSynthesisUtterance === 'undefined' || !(this.ctx instanceof AudioContext) || this.volume <= 0 || this.mix.voice <= 0 || synth.pending) return false;
     const voices = synth.getVoices().filter((v) => /^en/i.test(v.lang));
     if (!voices.length) return false;
     const u = new SpeechSynthesisUtterance(words);
@@ -1622,7 +1742,8 @@ export class AudioEngine {
     u.rate = 1.25;
     // (Somebody else's call is as loud as this voice goes until they are a good way off: at twelve metres it was
     // half, and nobody near heard it over anything. The browser's voice has no more to give than all of it.)
-    u.volume = Math.max(0.08, Math.min(1, this.volume * 1.8 * (distance > 0 ? 1 / (1 + distance / 45) : 0.6)));
+    // (It is not sound of this engine's and passes through no gain of it: the Voice group's share is taken off it here.)
+    u.volume = Math.max(0.08, Math.min(1, this.volume * 1.8 * (distance > 0 ? 1 / (1 + distance / 45) : 0.6))) * this.mix.voice;
     setTimeout(() => synth.speak(u), Math.min(400, (distance / 343) * 1000));
     return true;
   }
@@ -1717,10 +1838,10 @@ export class AudioEngine {
     const a = Math.random() * Math.PI * 2;
     const r = 60 + Math.random() * 90;
     const pos = { x: listener.x + Math.cos(a) * r, y: listener.y + 14 + Math.random() * 12, z: listener.z + Math.sin(a) * r };
-    const out = this.out(pos, 14, 1, r);
+    const out = this.out(pos, 14, 1, r, this.bus.ambience);
     const tail = this.ctx.createGain();
     tail.gain.value = 0.5;
-    out.connect(tail).connect(this.reverbSend);
+    out.connect(tail).connect(this.ambSend);
     const t0 = this.ctx.currentTime;
     const caws = 2 + Math.floor(Math.random() * 3);
     const pitch = 400 + Math.random() * 90;
@@ -1837,6 +1958,70 @@ export class AudioEngine {
     };
   }
 
+  /**
+   * A helicopter's rotor: the recording of one, played round and round (it is made to join its own beginning), from a
+   * place in the world. The panner says only which side it is on: how loud it is from how far is said every frame by
+   * whoever holds the voice. It hangs on `sfx`, where every sound of the world goes (a gun, a jeep, a step): so it is
+   * under the same volume as they are, and goes out through the same squeeze and the same ceiling, which is what
+   * keeps as loud a thing as this from breaking the sound up.
+   * @returns nothing until the sound is started and the recording has come (it is sent for when first asked): ask again
+   */
+  rotor(): RotorVoice | null {
+    const buf = bank.get('rotor')?.[0];
+    if (this.ready && !buf) void rotorRecording();
+    if (!this.ready || !buf) return null;
+    const ctx = this.ctx;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.loop = true;
+    const lp = this.filter('lowpass', 12000, 0.5);
+    const out = ctx.createGain();
+    out.gain.value = 0;
+    const pan = ctx.createPanner();
+    pan.panningModel = 'equalpower';
+    // (as loud at any distance, as far as the panner goes)
+    pan.distanceModel = 'inverse';
+    pan.rolloffFactor = 0;
+    // (it comes up from nothing over a third of a second, however near it is when it is first heard: one ramp, set once)
+    const come = ctx.createGain();
+    come.gain.setValueAtTime(0, ctx.currentTime);
+    come.gain.linearRampToValueAtTime(1, ctx.currentTime + 0.35);
+    src.connect(lp).connect(out).connect(come).connect(pan).connect(this.sfx);
+    // (anywhere in its round: two of them in the air at once are not one sound twice as loud)
+    src.start(0, Math.random() * buf.duration);
+    this.heard?.('rotor', 0, 1, 1);
+    let live = true;
+    // (Eased here, by the clock, and written plainly: a level set afresh every frame is a staircase and is heard as
+    // one, and an automation event on three params every frame piles up in the audio engine, as the listener's did.)
+    let level = 0, rate = 1, top = 12000, was = ctx.currentTime, first = true;
+    return {
+      set: (pos, gain, speed, cutoff) => {
+        if (!live) return;
+        const k = first ? 1 : 1 - Math.exp(-Math.max(0, ctx.currentTime - was) / 0.09);
+        was = ctx.currentTime;
+        pan.positionX.value = pos.x;
+        pan.positionY.value = pos.y;
+        pan.positionZ.value = pos.z;
+        level += (gain - level) * k;
+        rate += (speed - rate) * k;
+        top += (cutoff - top) * k;
+        first = false;
+        out.gain.value = level;
+        src.playbackRate.value = rate;
+        lp.frequency.value = top;
+      },
+      stop: () => {
+        if (!live) return;
+        live = false;
+        const t = ctx.currentTime;
+        come.gain.cancelScheduledValues(t);
+        come.gain.setTargetAtTime(0, t, 0.25);
+        src.stop(t + 1.5);
+        setTimeout(() => pan.disconnect(), 1800);
+      },
+    };
+  }
+
   /** A jeep running into something: tin, and the weight behind it. @param k how hard, 0..1 */
   crash(pos: V3, k: number) {
     if (!this.ready) return;
@@ -1925,8 +2110,8 @@ export class AudioEngine {
       lvl.gain.value = 0.5;
       air.connect(this.filter('lowpass', 150, 0.6)).connect(lvl).connect(bed);
       air.start();
-      bed.connect(this.sfx);
-      this.bunkerAir = { bed, on: false, nextT: 5, wind: this.ambience.wind?.gain.value ?? 0 };
+      bed.connect(this.bus.ambience);
+      this.bunkerAir ={ bed, on: false, nextT: 5, wind: this.ambience.wind?.gain.value ?? 0 };
     }
     const B = this.bunkerAir;
     if (on !== B.on) {
@@ -1945,10 +2130,10 @@ export class AudioEngine {
     const a = Math.random() * Math.PI * 2, r = 7 + Math.random() * 16;
     const pos = { x: listener.x + Math.cos(a) * r, y: listener.y + Math.random() * 1.5, z: listener.z + Math.sin(a) * r };
     const bus = ctx.createGain();
-    bus.connect(this.out(pos, 6, 0.9, r));
+    bus.connect(this.out(pos, 6, 0.9, r, this.bus.ambience));
     const tail = ctx.createGain();
     tail.gain.value = 0.7;
-    bus.connect(tail).connect(this.reverbSend);
+    bus.connect(tail).connect(this.ambSend);
     const t0 = t + 0.05, k = Math.random();
     if (k < 0.42) {
       // steel taking the strain: a low rasp that climbs and falls back, rung through what it is fixed to
@@ -2045,7 +2230,7 @@ export class AudioEngine {
     const a = Math.random() * Math.PI * 2;
     const r = 20 + Math.random() * 50;
     const pos = { x: listener.x + Math.cos(a) * r, y: listener.y + 8 + Math.random() * 10, z: listener.z + Math.sin(a) * r };
-    const out = this.out(pos, 6, 1, r);
+    const out = this.out(pos, 6, 1, r, this.bus.ambience);
     const t0 = this.ctx.currentTime;
     const notes = 2 + Math.floor(Math.random() * 5);
     const base = 2400 + Math.random() * 2400;

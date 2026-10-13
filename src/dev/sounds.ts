@@ -14,7 +14,8 @@
 // The verdicts are kept in this browser, and `Copy the verdicts` puts them on the clipboard as words.
 // Never part of the built site: src/main.ts asks for this file only on a development build.
 
-import { AudioEngine, EVERYDAY, audio, recordings } from '../core/audio';
+import { AudioEngine, EVERYDAY, audio, recordings, rotorRecording } from '../core/audio';
+import { AIRDROP, ROTOR, rotorAt } from '../sim/airdrop';
 
 type Play = (a: AudioEngine) => void;
 interface Row {
@@ -45,7 +46,36 @@ const FROM: Record<string, string[]> = {
   drop_gun: [c('metal_falling_01')[0], `${c('wood_falling_03')[0]} + ${c('metal_hit_03')[0]}`, `${c('wood_falling_01')[0]} + ${c('metal_sheet_05')[0]}`],
   hit_wood: c('wood_hit_03', 'wood_hit_04', 'wood_hit_07', 'wood_hit_08', 'wood_hit_01'), dig: k5('impactMining'), fire_crack: c('wood_cracking_01', 'wood_cracking_02', 'wood_cracking_03', 'wood_cracking_04'),
   snap: c('wood_breaking_01', 'wood_breaking_02'), latch: c('lock_open_01'), crash_tin: c('metal_sheet_03', 'metal_sheet_06', 'metal_sheet_01'),
+  // (it lies in assets-src itself, not under sounds/)
+  rotor: ['../854493__qubodup__uh60-black-hawk-helicopter-hover-loop-1.wav'],
 };
+
+/**
+ * The rotor of the helicopter that brings a supply drop (2026-10-13), as the game plays it from so far off: how
+ * loud, how fast and how dull are ROTOR's in src/sim/airdrop.ts, and nobody who set them could hear it.
+ * @param at seconds into what is heard -> [metres off, m/s it and the ear are coming together, metres to the right of the ear]
+ */
+const heli = (secs: number, at: (t: number) => [number, number, number]): Play => (a) => {
+  const v = a.rotor();
+  if (!v) return;
+  const began = performance.now();
+  const put = () => {
+    const t = (performance.now() - began) / 1000, [dist, closing, right] = at(t), r = rotorAt(dist, closing);
+    // (ahead of the ear and above it, and to one side by as much as is said)
+    const flat = Math.sqrt(Math.max(0, dist * dist - right * right)) * 0.7;
+    v.set({ x: right, y: flat, z: -flat }, r.gain, r.rate, r.cutoff);
+    return t < secs;
+  };
+  put();
+  const tick = () => (put() ? void requestAnimationFrame(tick) : v.stop());
+  requestAnimationFrame(tick);
+};
+const heliAt = (dist: number, closing = 0) => heli(6, () => [dist, closing, dist * 0.3]);
+/** a whole pass: in a straight line from 800 m off on the left, 90 m over the ear, and away to the right */
+const PASS = heli(40, (t) => {
+  const along = AIRDROP.speed * (t - 20), dist = Math.hypot(along, ROTOR.near);
+  return [dist, -(AIRDROP.speed * along) / dist, along];
+});
 
 const WALK = 1.8, RUN = 5.5, CROUCH = WALK * 0.4;
 const feet = (ground: string, recs: string[], was: string): Row[] =>
@@ -104,6 +134,14 @@ const ROWS: Row[] = [
   { group: 'A car', name: 'a door, as somebody gets in or out, three metres off', recs: ['latch', 'gate_slam'], was: '', play: (a) => a.carDoor(NEAR) },
   { group: 'A car', name: 'into something, gently, six metres off', recs: ['crash_tin', 'thud', 'hit_metal'], was: 'a made-up thud and rattle', play: (a) => a.crash(THERE, 0.2) },
   { group: 'A car', name: 'into something, hard, six metres off', recs: ['crash_tin', 'thud', 'hit_metal'], was: 'a made-up thud and rattle', play: (a) => a.crash(THERE, 1) },
+  // (six seconds of each; it is LOUD under it, as was asked. The last is forty seconds: all of a pass, the pitch falling as it goes over)
+  { group: 'The helicopter that brings a supply drop', name: 'holding right overhead, 90 m up', recs: ['rotor'], was: '', play: heliAt(ROTOR.near) },
+  { group: 'The helicopter that brings a supply drop', name: 'holding, 150 m off', recs: ['rotor'], was: '', play: heliAt(150) },
+  { group: 'The helicopter that brings a supply drop', name: '400 m off, coming at 40 m/s', recs: ['rotor'], was: '', play: heliAt(400, AIRDROP.speed) },
+  { group: 'The helicopter that brings a supply drop', name: '400 m off, going away at 40 m/s', recs: ['rotor'], was: '', play: heliAt(400, -AIRDROP.speed) },
+  { group: 'The helicopter that brings a supply drop', name: '800 m off, coming', recs: ['rotor'], was: '', play: heliAt(800, AIRDROP.speed) },
+  { group: 'The helicopter that brings a supply drop', name: '1500 m off: the far side of the map', recs: ['rotor'], was: '', play: heliAt(1500) },
+  { group: 'The helicopter that brings a supply drop', name: 'a whole pass: from 800 m, 90 m over the ear, and away (40 s)', recs: ['rotor'], was: '', play: PASS },
 ];
 
 /** what is still made up, for want of a recording: heard here as the game makes it */
@@ -199,6 +237,7 @@ const MARKS: [string, Play][] = [
 export interface Measured { group: string; name: string; now: { peak: number; loud: number; used: string[] }; before: { peak: number; loud: number } | null }
 async function measure(times = 3, say?: (done: number, of: number) => void): Promise<Measured[]> {
   await recordings();
+  await rotorRecording();
   const out: Measured[] = [];
   const all: [string, string, Play, boolean][] = [...MARKS.map(([n, p]) => ['Set against', n, p, false] as [string, string, Play, boolean]), ...ROWS.map((r) => [r.group, r.name, r.play, !!r.was] as [string, string, Play, boolean])];
   for (const [group, name, play, was] of all) {
@@ -274,6 +313,7 @@ export async function soundsPage() {
     audio.heard = (name, take, gain, rate) => say(`${name}${take ? `_${take + 1}` : ''}.wav   level ${gain.toFixed(2)}   speed ${rate.toFixed(2)}`);
     state.textContent = ' fetching the recordings…';
     await recordings();
+    await rotorRecording();
     state.textContent = ` ${Object.values(EVERYDAY).reduce((s, n) => s + n, 0)} recordings of everyday things are here. The wind and the insects you hear are the game's own, made up.`;
     startB.textContent = 'The sound is on';
   };
@@ -431,5 +471,5 @@ export async function soundsPage() {
     draw();
   }
 
-  (window as unknown as Record<string, unknown>).SOUNDS = { measure, render, rows: ROWS, audio, recordings };
+  (window as unknown as Record<string, unknown>).SOUNDS = { measure, render, rows: ROWS, audio, recordings: () => recordings().then(rotorRecording) };
 }

@@ -57,6 +57,7 @@ export const ORDERS: Order[] = [
   { name: 'say', args: ['words'], does: 'Say something across everybody’s screen, and in the chat' },
   { name: 'del', args: ['what', 'number'], does: 'Take a thing out of the world: item, box (a body, a drop, a buried stash), car or z (one of the infected), by its number. The Delete key does it for whatever you are looking at', admin: true },
   { name: 'spawn', args: ['entity', '[count]', '[x z]'], does: 'Stand something in the world: jeep, police (a police car) or infected. A few steps in front of you, or (after how many) at those map numbers', admin: true },
+  { name: 'airdrop', args: ['[x z]'], does: 'Send the helicopter with a supply drop now: to a few steps in front of you, or to those map numbers. It comes from the map’s edge as any drop does, and everybody is told', admin: true },
   { name: 'delcar', args: ['[number]'], does: 'Take a car out of the world: the one nearest you, or the one of that number', admin: true },
   { name: 'wrecks', args: [], does: 'Clear away every burned-out car now', admin: true },
   { name: 'delz', args: ['[metres]'], does: 'Put down every one of the infected within so many metres of you (60 if not said)', admin: true },

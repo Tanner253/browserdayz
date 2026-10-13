@@ -8,14 +8,31 @@ import { bleedLevel } from './status';
 import { StatusView, figuresWanted, symbol, wantFigures } from './status-view';
 import { BACK_SHORT, BACK_WHY, mountUpdates } from './updates';
 import { MAX_STAMINA, type ChatChannel } from '../net/protocol';
-import { ACTIONS, KEY_GROUPS, SENS, bind, bindable, controls, keyName, keyOf, relabel, setControls, shown, type Controls } from '../core/keys';
+import { ACTIONS, AIM, KEY_GROUPS, SENS, bind, bindable, controls, keyName, keyOf, relabel, setControls, shown, type Controls } from '../core/keys';
+import { GROUPS, type Group, type Mix } from '../core/audio';
 import { TOUCH } from '../core/device';
 import { EMOTES } from '../sim/emotes';
 import { TIERS, type Tier } from '../sim/tiers';
 import { ITEMS, TAG_FRESH, TAG_HOLD_MIN } from '../sim/items';
 import { INFECTED } from '../sim/infected';
 import { GAS } from '../sim/gas';
-import { AO_MODES, DEFAULT_GRAPHICS, FPS_LIMITS, LEVELS, MSAA, PRESETS, SCALES, VOLUMES, presetOf, saveGraphics, type Graphics, type PresetName } from '../core/settings';
+import { AO_MODES, DEFAULT_GRAPHICS, FPS_LIMITS, LEVELS, MSAA, PRESETS, SCALES, loadMix, presetOf, saveGraphics, saveMix, type Graphics, type PresetName } from '../core/settings';
+
+/**
+ * The settings, a page at a time, as a game has them (2026-10-13: "tab the settings menu like a video game would be
+ * tabbed"): what each page is called. The first is the one shown when the settings are opened, and that is the
+ * controls: the mouse's sensitivity is at the head of them, where it was at the head of the settings before they had
+ * pages, and is the first thing anybody opening them sees. (Game has one thing on it yet, and is last.)
+ */
+const SET_TABS = [['controls', 'Controls'], ['audio', 'Audio'], ['video', 'Video'], ['game', 'Game']] as const;
+type SetTab = (typeof SET_TABS)[number][0];
+/** the four groups of sound under the one volume (src/core/audio.ts, GROUPS): what each is called, and what it turns */
+const MIX_ROWS: Record<Group, [name: string, turns: string]> = {
+  fx: ['Effects', 'Guns, blasts, footsteps, vehicles, doors'],
+  voice: ['Voice', 'Other players talking, and the calls said aloud'],
+  ambience: ['Ambience', 'Wind, birds, fires, the bunker'],
+  ui: ['Interface', 'Your pockets, and the tick of a shot landing'],
+};
 
 const CHANNELS: ChatChannel[] = ['global', 'near'];
 const CHANNEL_LABEL: Record<ChatChannel | 'system' | 'pm', string> = { global: 'Global', near: 'Proximity', staff: 'Staff', system: '', pm: 'To you' };
@@ -213,7 +230,6 @@ export class HUD {
             <button type="button" data-tab="play" class="on">Play</button>
             <button type="button" data-tab="map">Map</button>
             <button type="button" data-tab="brief">How to play</button>
-            <button type="button" data-tab="keys">Controls</button>
             <button type="button" data-tab="gfx">Settings</button>
             <button type="button" data-tab="rewards" hidden>Rewards</button>
             <a class="sm-out" href="/changelog/" target="_blank" rel="noopener">Changelog</a>
@@ -277,10 +293,19 @@ export class HUD {
                 <div><b>The bunker</b><span>Under the hills across the map from the works: dark, and shut. A keycard from the gas opens its door, loudly: it stays open while anybody is inside. The shotgun is kept there and nowhere else.</span></div>
               </div>
             </div>
-            <div class="start-pane pane-keys">
-              <div class="kbs"></div>
+            <div class="start-pane pane-gfx start-gfx">
+              <div class="set-tabs" role="tablist" aria-label="Settings">
+                <kbd class="set-key" aria-hidden="true">Q</kbd>
+                ${SET_TABS.map(([id, name]) => `<button type="button" role="tab" data-set="${id}">${name}</button>`).join('')}
+                <kbd class="set-key" aria-hidden="true">E</kbd>
+              </div>
+              <div class="set-body">
+                <div class="set-page" role="tabpanel" data-set="controls"><div class="set-rows"></div><h4 class="set-h set-keys">Keys</h4><div class="kbs"></div></div>
+                <div class="set-page" role="tabpanel" data-set="audio"></div>
+                <div class="set-page" role="tabpanel" data-set="video"></div>
+                <div class="set-page" role="tabpanel" data-set="game"></div>
+              </div>
             </div>
-            <div class="start-pane pane-gfx start-gfx"></div>
           </aside>
         </div>
         <footer class="sm-foot start-links">
@@ -422,15 +447,45 @@ export class HUD {
     const gfx = this.root.querySelector('.start-gfx') as HTMLElement;
     gfx.addEventListener('click', (e) => {
       const b = (e.target as HTMLElement).closest('button');
-      if (b?.dataset.k) this.setGraphic(b.dataset.k, b.dataset.v ?? '');
+      if (b?.dataset.set) this.setTab(b.dataset.set as SetTab);
+      else if (b?.dataset.k) this.setGraphic(b.dataset.k, b.dataset.v ?? '');
     });
+    // (a slider is heard, or felt, as it is dragged: nothing is drawn afresh under the hand that is dragging it)
     gfx.addEventListener('input', (e) => {
       const r = e.target as HTMLInputElement;
       if (!r.classList?.contains('gfx-range')) return;
-      const c = { ...controls(), sens: Number(r.value) };
-      setControls(c);
-      this.keysChanged(c);
-      (r.nextElementSibling as HTMLElement).textContent = `${c.sens.toFixed(2)}×`;
+      const v = Number(r.value), said = r.nextElementSibling as HTMLElement, what = r.dataset.s ?? '';
+      if (what === 'sens' || what === 'aim') {
+        const c = { ...controls(), [what]: v };
+        setControls(c);
+        this.keysChanged(c);
+        said.textContent = `${v.toFixed(2)}×`;
+      } else if (what === 'volume' || GROUPS.includes(what as Group)) {
+        // (the one volume is kept with the picture's settings, where it has always been; the four groups by themselves)
+        if (what === 'volume') {
+          this.gfx.volume = v / 100;
+          saveGraphics(this.gfx);
+        } else {
+          this.mix[what as Group] = v / 100;
+          saveMix(this.mix);
+        }
+        this.soundChanged(this.gfx.volume, { ...this.mix });
+        said.textContent = `${v}%`;
+      }
+    });
+    // The settings' pages by the keyboard, as a game has them: Q and E, or left and right, go to the page before and
+    // the page after. (Not while a slider has the keyboard, whose own left and right are; nor while a thing waits
+    // for a key, which is that thing's key and no page's.)
+    window.addEventListener('keydown', (e) => {
+      if (!this.el.start.classList.contains('show') || (this.root.querySelector('.start-brief') as HTMLElement).dataset.tab !== 'gfx') return;
+      if (this.binding || e.ctrlKey || e.altKey || e.metaKey) return;
+      const at = e.target as HTMLElement | null, typing = at?.tagName === 'INPUT' || at?.tagName === 'TEXTAREA';
+      const arrow = e.code === 'ArrowLeft' ? -1 : e.code === 'ArrowRight' ? 1 : 0;
+      const step = arrow && !typing ? arrow : typing && (at as HTMLInputElement).type !== 'range' ? 0 : e.code === 'KeyQ' ? -1 : e.code === 'KeyE' ? 1 : 0;
+      if (!step) return;
+      e.preventDefault();
+      const order = SET_TABS.map(([id]) => id);
+      this.setTab(order[(order.indexOf(this.tab) + step + order.length) % order.length]);
     });
     // ---- the controls: click a thing, press the key for it
     const kbs = this.root.querySelector('.kbs') as HTMLElement;
@@ -641,8 +696,9 @@ export class HUD {
     card.dataset.tab = tab;
     this.toggle(this.el.start, 'sheet', tab !== 'play');
     for (const b of this.root.querySelectorAll<HTMLButtonElement>('.start-tabs button')) b.classList.toggle('on', b.dataset.tab === tab);
-    (card.querySelector('h2') as HTMLElement).textContent = { map: 'The map', brief: 'How to play', keys: 'Controls', gfx: 'Settings' }[tab] ?? '';
-    if (tab === 'gfx') this.renderGraphics();
+    (card.querySelector('h2') as HTMLElement).textContent = { map: 'The map', brief: 'How to play', gfx: 'Settings' }[tab] ?? '';
+    // (the settings open on their first page; the page chosen is kept for as long as they stay open)
+    if (tab === 'gfx') this.setTab(SET_TABS[0][0]);
     (this.root.querySelector('.mm-tip') as HTMLElement).classList.remove('on');
   }
 
@@ -1095,25 +1151,72 @@ export class HUD {
     this.renderGraphics();
   }
 
+  /** which page of the settings is shown */
+  private tab: SetTab = SET_TABS[0][0];
+  /** the four groups of sound, as they are kept (the one volume over them is `gfx.volume`, where it has always been) */
+  private mix: Mix = loadMix();
+  private soundChanged: (volume: number, mix: Mix) => void = () => {};
+
+  /** what to do when the player moves the volume, or one of the four groups under it: told as it is dragged */
+  onSound(changed: (volume: number, mix: Mix) => void) {
+    this.soundChanged = changed;
+  }
+
+  private setTab(tab: SetTab) {
+    // (a thing left waiting for a key is not left waiting on a page that is not shown)
+    if (this.binding) {
+      this.binding = null;
+      this.renderKeys();
+    }
+    this.tab = tab;
+    this.renderGraphics();
+    (this.root.querySelector('.set-body') as HTMLElement).scrollTop = 0;
+  }
+
+  /** The settings, all four pages of them (the keys are their own: see renderKeys), and which is shown. */
   private renderGraphics() {
-    const g = this.gfx;
-    const row = (label: string, key: string, current: string | number | null, options: [string | number, string][]) =>
-      `<div class="gfx-row"><span>${label}</span><div class="gfx-opts">${options.map(([v, t]) => `<button data-k="${key}" data-v="${v}"${v === current ? ' class="on"' : ''}>${t}</button>`).join('')}</div></div>`;
+    const g = this.gfx, pane = this.root.querySelector('.start-gfx') as HTMLElement;
+    const named = (label: string, hint = '') => `<span>${label}${hint ? `<small>${hint}</small>` : ''}</span>`;
+    const row = (label: string, key: string, current: string | number | null, options: [string | number, string][], hint = '') =>
+      `<div class="gfx-row">${named(label, hint)}<div class="gfx-opts">${options.map(([v, t]) => `<button data-k="${key}" data-v="${v}"${v === current ? ' class="on"' : ''}>${t}</button>`).join('')}</div></div>`;
+    /** a slider and the number it is at. @param s what it sets (read where it is dragged, in the constructor) */
+    const slide = (label: string, s: string, v: number, [least, most, step]: number[], said: string, hint = '') =>
+      `<div class="gfx-row">${named(label, hint)}<div class="gfx-sens"><input type="range" class="gfx-range" data-s="${s}" min="${least}" max="${most}" step="${step}" value="${v}" aria-label="${label}"><b>${said}</b></div></div>`;
+    const loud = (label: string, s: string, v: number, hint: string) => slide(label, s, Math.round(v * 100), [0, 100, 1], `${Math.round(v * 100)}%`, hint);
     const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
-    const sens = controls().sens;
-    (this.root.querySelector('.start-gfx') as HTMLElement).innerHTML =
-      `<div class="gfx-row"><span>Mouse sensitivity</span><div class="gfx-sens"><input type="range" class="gfx-range" min="${SENS.least}" max="${SENS.most}" step="${SENS.step}" value="${sens}" aria-label="Mouse sensitivity"><b>${sens.toFixed(2)}×</b></div></div>` +
-      row('Preset', 'preset', presetOf(g), (Object.keys(PRESETS) as PresetName[]).map((p) => [p, cap(p)])) +
-      row('Resolution', 'scale', g.scale, SCALES.map((s) => [s, `${Math.round(s * 100)}%`])) +
-      row('Anti-aliasing', 'msaa', g.msaa, MSAA.map((m) => [m, m ? `${m}×` : 'Off'])) +
-      row('Ambient occlusion', 'ao', g.ao, AO_MODES.map((a) => [a, a === 'off' ? 'Off' : a === 'half' ? 'Standard' : 'High'])) +
-      row('Shadows', 'shadows', g.shadows, LEVELS.map((l) => [l, cap(l)])) +
-      row('Foliage', 'foliage', g.foliage, LEVELS.map((l) => [l, cap(l)])) +
-      row('Frame limit', 'fpsLimit', g.fpsLimit, FPS_LIMITS.map((f) => [f, f ? String(f) : 'Off'])) +
-      row('Volume', 'volume', g.volume, VOLUMES.map((v) => [v, v ? `${v * 100}%` : 'Off'])) +
+    const c = controls();
+    const pages: Record<SetTab, string> = {
       // (health, blood, food and water are symbols: whoever wants the numbers as well asks for them here)
-      row('Status: exact figures', 'figures', figuresWanted() ? 1 : 0, [[0, 'Off'], [1, 'On']]) +
-      `<div class="gfx-info">${this.gfxInfo()}</div>`;
+      game: row('Status: exact figures', 'figures', figuresWanted() ? 1 : 0, [[0, 'Off'], [1, 'On']], 'The numbers beside health, blood, food and water'),
+      controls:
+        `<h4 class="set-h">${TOUCH ? 'Look' : 'Mouse'}</h4>` +
+        slide(TOUCH ? 'Look sensitivity' : 'Mouse sensitivity', 'sens', c.sens, [SENS.least, SENS.most, SENS.step], `${c.sens.toFixed(2)}×`) +
+        slide('Sensitivity while aiming', 'aim', c.aim, [AIM.least, AIM.most, AIM.step], `${c.aim.toFixed(2)}×`, 'Through sights, a scope or binoculars: a multiple of the first'),
+      audio:
+        loud('Master', 'volume', g.volume, 'Everything') +
+        `<h4 class="set-h">Mix</h4>` +
+        GROUPS.map((id) => loud(MIX_ROWS[id][0], id, this.mix[id], MIX_ROWS[id][1])).join(''),
+      video:
+        row('Preset', 'preset', presetOf(g), (Object.keys(PRESETS) as PresetName[]).map((p) => [p, cap(p)])) +
+        row('Resolution', 'scale', g.scale, SCALES.map((s) => [s, `${Math.round(s * 100)}%`])) +
+        row('Anti-aliasing', 'msaa', g.msaa, MSAA.map((m) => [m, m ? `${m}×` : 'Off'])) +
+        row('Ambient occlusion', 'ao', g.ao, AO_MODES.map((a) => [a, a === 'off' ? 'Off' : a === 'half' ? 'Standard' : 'High'])) +
+        row('Shadows', 'shadows', g.shadows, LEVELS.map((l) => [l, cap(l)])) +
+        row('Foliage', 'foliage', g.foliage, LEVELS.map((l) => [l, cap(l)])) +
+        row('Frame limit', 'fpsLimit', g.fpsLimit, FPS_LIMITS.map((f) => [f, f ? String(f) : 'Off'])) +
+        `<div class="gfx-info">${this.gfxInfo()}</div>`,
+    };
+    for (const page of pane.querySelectorAll<HTMLElement>('.set-page')) {
+      const id = page.dataset.set as SetTab;
+      // (the keys are drawn into the controls' page by renderKeys, under its sliders: only the sliders are drawn here)
+      ((id === 'controls' ? page.querySelector('.set-rows') : page) as HTMLElement).innerHTML = pages[id];
+      page.hidden = id !== this.tab;
+    }
+    for (const b of pane.querySelectorAll<HTMLButtonElement>('.set-tabs button')) {
+      const on = b.dataset.set === this.tab;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-selected', String(on));
+    }
   }
 
   // ---------------------------------------------------------------- chat

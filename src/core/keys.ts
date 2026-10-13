@@ -51,8 +51,11 @@ export const KEY_GROUPS: KeyGroup[] = ['Move', 'Fight', 'Gear', 'Talk'];
 
 /** how fast the mouse turns the head, as a share of what the game was made with */
 export const SENS = { least: 0.2, most: 3, step: 0.05 };
+/** and how fast while aiming, as a multiple of what the game slows it to there by itself (sights, a scope, binoculars): 1 is the game as it was made */
+export const AIM = { least: 0.2, most: 2, step: 0.05 };
 export interface Controls {
   sens: number;
+  aim: number;
   /** what has been put on another key: the name it is asked for by, to the key that answers to it now */
   keys: Record<string, string>;
 }
@@ -61,7 +64,7 @@ const KEPT = /^(Escape|F\d+|Backquote|MetaLeft|MetaRight|ContextMenu|PrintScreen
 export const bindable = (key: string) => !KEPT.test(key);
 
 const STORE = 'zona.controls.v1';
-const DEFAULTS = (): Controls => ({ sens: 1, keys: {} });
+const DEFAULTS = (): Controls => ({ sens: 1, aim: 1, keys: {} });
 
 export function loadControls(): Controls {
   const c = DEFAULTS();
@@ -69,6 +72,7 @@ export function loadControls(): Controls {
     const raw = JSON.parse(localStorage.getItem(STORE) ?? 'null') as Partial<Controls> | null;
     if (raw && typeof raw === 'object') {
       if (typeof raw.sens === 'number' && raw.sens >= SENS.least && raw.sens <= SENS.most) c.sens = raw.sens;
+      if (typeof raw.aim === 'number' && raw.aim >= AIM.least && raw.aim <= AIM.most) c.aim = raw.aim;
       for (const a of ACTIONS) {
         const key = raw.keys?.[a.code];
         if (typeof key === 'string' && key && key !== a.code && bindable(key)) c.keys[a.code] = key;

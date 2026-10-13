@@ -3,6 +3,8 @@
 // what lies in it lies somewhere a hand can reach. `npx tsx test/castle.test.ts`.
 
 import assert from 'node:assert/strict';
+import { KIT_LEVELS, KIT_MERLON, cutBox, inCut, kitMatrix, kitPoint, kitSolids } from '../src/sim/kit';
+import { castleDoor, castleKit } from '../src/sim/castle';
 import { CASTLE, CASTLE_TIERS, FURNITURE, LOOSE, OUTCROP, POSTERN, UNDER, castleAt, castleCuts, castleDark, castleGround, castleHomes, castleLamps, castleLocal, castleLoose, castleLoot, castleParts, castleProps, castleUnder, hatchLine, inCastle, looseLocal, looseParts, moundTop, squareTouches, stairShare, towerRadius, type Flight, type Place, type Tower, type V3 } from '../src/sim/castle';
 import { PAINTS, PICTURES, SHEETS, STUFF, castleShape, type Sheet, type Skin, type Solid } from '../src/world/castle-shape';
 
@@ -36,11 +38,12 @@ ok('it is the size the real one was measured to be', () => {
     const d = Math.hypot(a.cx - b.cx, a.cz - b.cz);
     if (d > 0 && d < 25) within(d, 19.4, 21.9, 'tower to tower');
   }
-  // the towers: ten metres across where the ground meets them, 5.4 to 6.3 across at the top, leaning at about 75 degrees under the terrace
+  // the towers: 5.4 to 6.3 across at the top; their feet are the kit's round tower, nine metres across at the ground
+  // and seven where the drum stands on it; the walls are the kit's, leaning at eighty-two degrees
   within(towerRadius(0) * 2, 5.4, 6.3, 'a tower across at the top');
-  within(towerRadius(C.foot.south) * 2, 9.6, 10.6, 'a tower across at the ground');
-  within((Math.atan(T.lean) * 180) / Math.PI, 74, 76.5, "the lean of a tower's wall");
-  within((Math.atan(C.lean) * 180) / Math.PI, 74, 76, 'the lean of the curtain');
+  within(towerRadius(C.foot.south) * 2, 8.6, 9.2, 'a tower across at the ground');
+  within(towerRadius(-0.01) * 2, 6.9, 7.3, "a tower's foot across at the terrace");
+  within((Math.atan(C.lean) * 180) / Math.PI, 81, 83.5, 'the lean of the walls');
   for (const tw of towers) {
     // (one of them is a stump: it came down on a slant, and stands a third lower than the others)
     if (stump(tw)) within(Math.max(...tw.rim), 4.4, 5.9, "the top of the stump's rim");
@@ -57,30 +60,40 @@ ok('it is the size the real one was measured to be', () => {
   within(K.room.x1 - K.room.x0, 6, 6.8, 'the roof east to west');
   within(K.room.z1 - K.room.z0, 6, 6.8, 'the roof north to south');
   within(K.x1 - K.skin - K.room.x1, 1.7, 2.6, 'the wall at the roof, less its shell');
-  // the parapet: sill 1.8, merlons to 2.9, seven a side each 1.1 wide with 0.9 between; the walk 3.4 to 4.3 wide
-  assert.deepEqual([C.parapet.sill, C.parapet.top, C.parapet.merlon, C.parapet.gap, C.parapet.n, C.parapet.thick], [1.8, 2.9, 1.1, 0.9, 7, 0.7]);
-  // (it is a ruin: of each side's seven merlons some stand to their full height, some are gone, and a length of every wall is down)
-  for (const side of ['n', 's', 'e', 'w']) {
-    const tops = parts.flatMap((p) => (p.t === 'wall' && p.name === `${side} parapet` && typeof p.top !== 'number' ? p.top : []));
-    const whole = tops.filter((t, i) => t === C.parapet.top && tops[i - 1] !== C.parapet.top).length;
-    assert.ok(whole >= 2 && whole <= 6, `${side}: ${whole} merlons stand`);
-    assert.ok(Math.max(...tops) === C.parapet.top && Math.min(...tops) < 1 && tops.filter((t) => t === C.parapet.sill).length > 6, `${side}: its parapet is not a ruin's`);
+  // the walls are the kit's: one length of its wall to a side, its walk level with the paving, a parapet a pace
+  // thick and knee high with merlons a man's chest high on it; the paving between it and the keep 2.4 to 3.4 m wide
+  const kit = castleKit(), walls = kit.filter((p) => / wall$/.test(p.name ?? '') && p.id === 'fort_wall_thin_straight_01');
+  assert.equal(walls.length, 4);
+  for (const w of walls) {
+    assert.ok(Math.abs(w.at[1] + KIT_LEVELS.walk) < 1e-9, `${w.name}: its walk is not level with the paving`);
+    // (its two ends are in the feet of the towers it runs between)
+    const m = kitMatrix(w);
+    for (const end of [kitPoint(m, [1.3, KIT_LEVELS.walk, 0]), kitPoint(m, [1.3, KIT_LEVELS.walk, 14.82])]) assert.ok(towers.some((tw) => Math.hypot(end[0] - tw.cx, end[2] - tw.cz) < towerRadius(-0.01) - 0.3), `${w.name}: an end of it is not in a tower`);
+    // (it is a ruin: something is broken out of its top, and at least one of its four merlons still stands whole)
+    assert.ok((w.cut ?? []).length >= 1, `${w.name}: nothing is gone from it`);
+    let stand = 0;
+    for (let k = 0; k < 4; k++) if (!(w.cut ?? []).some((c) => [0.2, 1.1, 2.1].some((d) => inCut(c, kitPoint(m, [1.5, KIT_LEVELS.merlon - 0.3, KIT_MERLON.from + k * KIT_MERLON.every + d]))))) stand++;
+    assert.ok(stand >= 1 && stand <= 3, `${w.name}: ${stand} of its merlons stand`);
   }
-  for (const walk of [C.hx - C.parapet.thick / 2 - K.x1, K.x0 + C.hx - C.parapet.thick / 2, C.hz - C.parapet.thick / 2 - K.z1]) within(walk, 3.4, 4.4, 'the terrace walk');
+  for (const walk of [C.hx + C.parapet.thick / 2 - 1.06 - K.x1, K.x0 + C.hx + C.parapet.thick / 2 - 1.06, C.hz + C.parapet.thick / 2 - 1.06 - K.z1]) within(walk, 2.4, 4.4, 'the terrace walk');
+  // the gatehouse stands on the east wall over the head of the ramp, and the door is in it
+  const gate = kit.find((p) => p.id === 'fort_wall_thin_gate_01')!;
+  assert.ok(gate && gate.at[1] === 0 && castleDoor().length === 3);
   // the ramp: eight metres long, two and a half wide, ten degrees, to a gap of two and a half metres
   assert.equal(C.ramp.len, 8);
   within((Math.asin(C.ramp.drop / C.ramp.len) * 180) / Math.PI, 9.5, 10.5, 'the slope of the ramp');
   within(C.gate.z1 - C.gate.z0, 2.4, 2.6, 'the gate');
+  // (the kit can be cut: a block of a wall with a piece broken out of it is in pieces that are still inside it, and none of them in the cut)
+  const cutWall = kitSolids([{ id: 'fort_wall_thin_straight_01', at: [0, 0, 0], cut: [cutBox(-1, 4, 2, 9, 5, 8)] }]), whole = kitSolids([{ id: 'fort_wall_thin_straight_01', at: [0, 0, 0] }]);
+  assert.ok(cutWall.length > whole.length && cutWall.every((q) => q.t === 'box' && !(q.c[1] > 2.3 && q.c[2] > 5.3 && q.c[2] < 7.7)), `${cutWall.length} blocks of a cut wall, ${whole.length} of a whole one`);
   // the ground at the foot of each wall, under the terrace
   assert.deepEqual(C.foot, { east: -5.8, west: -6.1, north: -7.3, south: -8 });
 });
 
-ok('whoever holds the parapet can fight from it: over the sill from the step, through the ports from the paving', () => {
-  const eye = { stood: 1.6, crouched: 1.05 }, S = C.step, port = C.parapet.port;
-  // from the paving the sill is over a man's eyes; from the step he sees over it and is under the merlons' tops; crouched on the step he is hidden
-  assert.ok(eye.stood < C.parapet.sill && S.h + eye.stood > C.parapet.sill + 0.25 && S.h + eye.stood < C.parapet.top && S.h + eye.crouched < C.parapet.sill);
-  // and a port is at the eye of a man standing on the paving
-  assert.ok(port.y0 < eye.stood - 0.2 && port.y1 > eye.stood + 0.05);
+ok('whoever holds the wall can fight from it: standing he sees over the parapet, crouched behind a merlon he is hidden', () => {
+  const eye = { stood: 1.6, crouched: 1.05 }, sill = KIT_LEVELS.parapet - KIT_LEVELS.walk, top = KIT_LEVELS.merlon - KIT_LEVELS.walk;
+  // (the kit's parapet is knee high between its merlons, and a merlon is to a man's chest: he shoots over the one and kneels behind the other)
+  assert.ok(sill < eye.crouched - 0.2 && top > eye.crouched + 0.3 && top < eye.stood + 0.1);
   // every tower's platform is whole on the side of the field: the stair comes up on the side of the door
   for (const tw of towers) {
     const out = (Math.atan2(tw.cz, tw.cx) * 180) / Math.PI, sg = Math.sign(tw.stair.sweep), inWell = (a: number) => ((((a - tw.well[0]) * sg) % 360) + 360) % 360 < Math.abs(tw.well[1] - tw.well[0]);

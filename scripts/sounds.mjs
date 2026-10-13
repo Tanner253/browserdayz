@@ -14,6 +14,8 @@
 //   decoded/            the two above come as Ogg, and nothing on this machine reads Ogg but a
 //                       browser: the ones used were decoded in one and written out as they are
 //                       (k-impact<Kind>-<n>.wav, q-punch-<n>.wav), and are read from here
+//   (in assets-src/ itself) "UH60 Black Hawk helicopter hover loop 1" by qubodup (freesound.org/s/854493), CC0:
+//                       the rotor of the helicopter that brings a supply drop
 //
 // Each is cut to begin on the sound itself (a shot that starts a tenth of a second into its
 // file is a shot that is late), let die away at its end, made one channel, brought to the
@@ -56,6 +58,9 @@ const ZED = { groan: [16, 20, 1, 23], growl: [17, 18, 21, 15], alert: [8, 10, 12
  *   press – how hard the loudest of it is pressed down, so that the rest of it comes up (0: not at all)
  *   from  – seconds of the recording passed over before the sound is looked for (the second thing in it, not the first)
  *   fade  – seconds it dies away over at its end (0.18, if not given: too long for a footstep a tenth of a second long)
+ *   loop  – it is played round and round, and was made to join its own beginning: all of it is kept as it lies,
+ *           neither cut to where it begins nor let die away at its end (give it the rate it came at: put to another,
+ *           its end no longer meets its beginning)
  */
 const SOUNDS = {
   shot_rifle: { src: snake('Full Sound/7.62x54R/WAV/762x54r Single WAV.wav'), rate: 44100, gain: 1 },
@@ -184,6 +189,10 @@ SOUNDS.latch = { src: door('lock_open_01'), from: 0.4, rate: 44100, gain: 0.9, l
 several('crash_tin', ['c-metal_sheet_03', 'c-metal_sheet_06', 'c-metal_sheet_01'], { rate: 44100, gain: 0.9, fade: 0.12 });
 // A round or a blow on wood, as steel has had: five real pieces of wood struck.
 several('hit_wood', ['c-wood_hit_03', 'c-wood_hit_04', 'c-wood_hit_07', 'c-wood_hit_08', 'c-wood_hit_01'], { rate: 44100, gain: 0.9, len: 0.26, fade: 0.1 });
+// The rotor of the helicopter that brings a supply drop (2026-10-13; src/sim/airdrop.ts says how it is heard): a Black
+// Hawk holding still, 2.6 seconds that join their own beginning, one channel at 48000 as it came. How loud it is
+// played, and how its pitch and its top change with distance, is ROTOR there.
+SOUNDS.rotor = { src: path.join(ROOT, 'assets-src', '854493__qubodup__uh60-black-hawk-helicopter-hover-loop-1.wav'), loop: true, rate: 48000, gain: 1 };
 
 /** a .wav as one channel of numbers between -1 and 1: one of its channels, or all of them together */
 async function readWav(file, side) {
@@ -303,7 +312,7 @@ for (const [name, cfg] of Object.entries(SOUNDS)) {
   const whole = await readWav(cfg.src, cfg.side);
   // (what comes before `from` is as if it were not in the recording)
   const rate = whole.rate, x = cfg.from ? whole.x.subarray(Math.round(cfg.from * rate)) : whole.x;
-  const starts = onsets(x, rate, (cfg.takes ?? 1) > 1).slice(0, cfg.takes ?? 1);
+  const starts = cfg.loop ? [0] : onsets(x, rate, (cfg.takes ?? 1) > 1).slice(0, cfg.takes ?? 1);
   if (!starts.length) throw new Error(`${name}: nothing loud in ${cfg.src}`);
   const under = [];
   for (const l of cfg.with ?? []) {
@@ -338,7 +347,7 @@ for (const [name, cfg] of Object.entries(SOUNDS)) {
     if (cfg.press) cut = cut.map((v) => Math.tanh(v * cfg.press));
     let peak = 0;
     for (const v of cut) peak = Math.max(peak, Math.abs(v));
-    const fade = Math.min(cut.length, Math.round(cfg.rate * (cfg.fade ?? 0.18)));
+    const fade = cfg.loop ? 0 : Math.min(cut.length, Math.round(cfg.rate * (cfg.fade ?? 0.18)));
     cut = cut.map((v, i) => (v / (peak || 1)) * 0.92 * cfg.gain * (i > cut.length - fade ? (cut.length - i) / fade : 1));
     const file = `${name}${k ? `_${k + 1}` : ''}.wav`;
     await writeWav(path.join(OUT, file), cut, cfg.rate);

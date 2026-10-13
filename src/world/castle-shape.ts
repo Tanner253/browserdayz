@@ -12,7 +12,8 @@
 // courses tall, each with the number of turns that fits its own girth. A stone at the foot is the size of a stone
 // at the top, to within a twelfth.
 
-import { CASTLE, LOOSE, POSTERN, UNDER, castleGround, castleParts, hatchLine, looseParts, moundTop, rough, towerRadius, type Apron, type Beam, type Body, type Box, type Curtain, type Flight, type Loose, type Lump, type Mound, type Opening, type Paint, type Part, type Rail, type Slab, type Tower, type V3, type Wall } from '../sim/castle';
+import { inCut, kitBlocks, kitMatrix, kitPoint, kitSolids, KIT_TOWER } from '../sim/kit';
+import { CASTLE, LOOSE, POSTERN, UNDER, castleGround, castleKit, castleParts, hatchLine, looseParts, moundTop, rough, towerRadius, type Apron, type Beam, type Body, type Box, type Curtain, type Flight, type Loose, type Lump, type Mound, type Opening, type Paint, type Part, type Rail, type Slab, type Tower, type V3, type Wall } from '../sim/castle';
 
 export type Quat = [number, number, number, number];
 /** what a thing sounds like underfoot and when it is hit */
@@ -56,11 +57,11 @@ export const SHEETS: Sheet[] = ['stone', 'base', 'timber', 'iron', 'rock', 'eart
  * world's ground is drawn with, handed in by whoever stands the fort (and `rocks_ground_02` where nobody has).
  */
 export const PICTURES: Record<Sheet, { tex: string | null; keep: number; lift: number; own: V3; even: number; stones: [number, number] }> = {
-  stone: { tex: 'castle_wall_slates', keep: 0.75, lift: 1.12, own: [0.4, 0.385, 0.35], even: 0.18, stones: [7, 30] },
+  stone: { tex: 'castle_wall_slates', keep: 0.42, lift: 0.8, own: [0.33, 0.33, 0.33], even: 0.12, stones: [7, 30] },
   base: { tex: 'defense_wall', keep: 0.8, lift: 1.5, own: [0.3, 0.3, 0.28], even: 0.12, stones: [0, 0] },
   timber: { tex: 'weathered_planks', keep: 0.8, lift: 1.7, own: [0.3, 0.24, 0.18], even: 0.3, stones: [8, 0] },
   iron: { tex: null, keep: 1, lift: 1, own: [0, 0, 0], even: 0, stones: [0, 0] },
-  rock: { tex: 'aerial_rocks_02', keep: 0.12, lift: 1.25, own: [0.52, 0.52, 0.51], even: 0.35, stones: [0, 0] },
+  rock: { tex: 'aerial_rocks_02', keep: 0.3, lift: 0.8, own: [0.33, 0.33, 0.34], even: 0.3, stones: [0, 0] },
   earth: { tex: 'rocks_ground_02', keep: 1, lift: 1, own: [0.4, 0.36, 0.26], even: 0, stones: [0, 0] },
 };
 /**
@@ -70,8 +71,8 @@ export const PICTURES: Record<Sheet, { tex: string | null; keep: number; lift: n
  * at arm's length.)
  */
 export const STUFF: Record<Paint, { sheet: Sheet; tile: number; tint: V3 }> = {
-  stone: { sheet: 'stone', tile: 2.6, tint: [1, 1, 1] },
-  ashlar: { sheet: 'stone', tile: 3.4, tint: [1.14, 1.12, 1.07] },
+  stone: { sheet: 'stone', tile: 1.9, tint: [1, 1, 1] },
+  ashlar: { sheet: 'stone', tile: 2.5, tint: [1.1, 1.09, 1.07] },
   base: { sheet: 'base', tile: 2.4, tint: [1, 1, 1] },
   paving: { sheet: 'base', tile: 1.9, tint: [1.22, 1.2, 1.14] },
   scree: { sheet: 'base', tile: 3.2, tint: [1.3, 1.27, 1.2] },
@@ -179,7 +180,7 @@ function warp(p: V3, by: number): V3 {
   return [p[0] + a * 2.6 * by, p[1], p[2] + b * 2.6 * by];
 }
 /** how far, for each stuff, metres (none for what is sawn or forged, or is ground already) */
-const WARP: Record<Paint, number> = { stone: 0.09, ashlar: 0.08, base: 0.1, paving: 0, timber: 0, iron: 0, rock: 0, scree: 0, earth: 0 };
+const WARP: Record<Paint, number> = { stone: 0.09, ashlar: 0.09, base: 0.1, paving: 0, timber: 0, iron: 0, rock: 0, scree: 0, earth: 0 };
 
 let towers: Tower[] | null = null;
 /**
@@ -204,6 +205,9 @@ function sky(p: V3, n: V3): number {
   return 1;
 }
 
+/** Whether the sky is over a place (see `sky`): for whoever lays snow on something of the fort that is not made here (the kit's walls). */
+export const castleSky = (p: V3, n: V3): number => sky(p, n);
+
 /**
  * How far a place on the terrace or on the keep's roof is from the nearest thing that stands on it (the parapet,
  * the keep, a tower; the wall round the roof), metres: snow lies deep against a wall and is blown and trodden thin
@@ -215,7 +219,8 @@ function fromWall(p: V3): number {
   if (Math.abs(y) > 0.05 || Math.abs(x) > C.hx || Math.abs(z) > C.hz) return 9;
   const keep = Math.hypot(Math.max(K.x0 - x, 0, x - K.x1), Math.max(K.z0 - z, 0, z - K.z1));
   const tower = Math.hypot(Math.abs(x) - C.hx, Math.abs(z) - C.hz) - C.tower.r;
-  return Math.max(0, Math.min(C.hx - C.parapet.thick / 2 - Math.abs(x), C.hz - C.parapet.thick / 2 - Math.abs(z), keep, tower));
+  // (the parapet is the kit's: a metre thick, its outer face where the fort's own was)
+  return Math.max(0, Math.min(C.hx + C.parapet.thick / 2 - 1.06 - Math.abs(x), C.hz + C.parapet.thick / 2 - 1.06 - Math.abs(z), keep, tower));
 }
 
 type UV = [number, number];
@@ -697,12 +702,15 @@ function towerPart(tw: Tower, stone: Out, wood: Out, dark: Out, put: Put, lod: n
 
   // ---- under the terrace: a cone in bands, each with as many turns of the picture as fit its girth, and the
   // builders' holes in it as far down as the hill lets them be seen
-  const seen = -9.4, ys = sorted([...levels(0, T.bend, lod ? 99 : 2.5), ...levels(T.bend, tw.foot, lod ? 99 : 3.3).slice(1), ...(lod ? [] : [seen]), ...(hollow !== undefined && !lod ? [hollow, hollow + DOOR] : [])], 0.05).reverse();
+  const kitFoot = -KIT_TOWER.top[0] * T.kit, seen = -9.4, ys = sorted([...levels(0, T.bend, lod ? 99 : 2.5), ...levels(T.bend, tw.foot, lod ? 99 : 3.3).slice(1), ...(lod ? [] : [seen, kitFoot + 0.05]), ...(hollow !== undefined && !lod ? [hollow, hollow + DOOR] : [])], 0.05).reverse();
   const leanAt = (y: number) => (y > T.bend ? 1 / T.lean : 1 / T.flare), cols = (k: number) => Array.from({ length: k + 1 }, (_, j) => (j * 360) / k);
   const pits: [number, number][] = [];
   if (!lod) for (let y = -1.3, r = 0; y > seen + 0.3; y -= 1.75, r++) for (let a = (r % 2) * 22.5; a < 359; a += 45) if (hollow === undefined || apart(a, tw.door) > 12 || y > hollow + DOOR + 0.3) pits.push([a, y]);
+  // (from near the foot of a tower is the kit's round tower: see `castleKit`. This is what stands for it from far off.)
   let s0 = 0;
+  // (and, from near, what is under the kit tower's own foot: the hill is lower than that on three sides)
   for (let i = 0; i + 1 < ys.length; i++) {
+    if (!lod && ys[i] > kitFoot + 0.06) continue;
     const y0 = ys[i], y1 = ys[i + 1], r0 = towerRadius(y0), r1 = towerRadius(y1), s1 = s0 - Math.hypot(y0 - y1, r1 - r0), turns = Math.max(1, Math.round((Math.PI * (r0 + r1)) / TILE.base)), from = s0;
     // (the doorway in a hollow foot is left out of the band it is in)
     const door = hollow !== undefined && !lod && y1 >= hollow - 0.01 && y0 <= hollow + DOOR + 0.01, us = lod ? cols(n) : y0 <= seen + 0.01 ? cols(24) : cols(48);
@@ -797,7 +805,12 @@ function towerPart(tw: Tower, stone: Out, wood: Out, dark: Out, put: Put, lod: n
   // three rings of it is the cone); over it, the wall in lengths, left out where its openings are.
   // (A hollow foot is its wall in short lengths down to its cellar's floor, left out at the doorway, and the cone under that.)
   const hull: number[] = [];
-  for (const y of [hollow ?? 0, T.bend, tw.foot]) for (let k = 0; k < 16; k++) hull.push(...P(k * 22.5, towerRadius(y) / Math.cos(rad(11.25)), y));
+  for (const y of [hollow ?? 0, T.bend, -KIT_TOWER.top[0] * T.kit, tw.foot]) for (let k = 0; k < 16; k++) hull.push(...P(k * 22.5, towerRadius(Math.min(y, -0.001)) / Math.cos(rad(11.25)), y));
+  // (and the low ring of the kit's parapet that stands round the foot of the drum, outside the walls)
+  if (!lod) for (let k = 0; k < 16; k++) {
+    const a = (k + 0.5) * 22.5, c = P(a, (T.r + KIT_TOWER.ring.r1 * T.kit) / 2, 0.36);
+    if (Math.abs(c[0]) > CASTLE.hx + CASTLE.parapet.thick / 2 - 1.5 || Math.abs(c[2]) > CASTLE.hz + CASTLE.parapet.thick / 2 - 1.5) put(boxSolid(c, [out(a), UP, cross(out(a), UP)], [(KIT_TOWER.ring.r1 * T.kit - T.r) / 2, 0.36, 0.75], false, 'concrete', tw.name ?? 'tower'));
+  }
   put({ t: 'hull', pts: hull, feet: false, surface: 'concrete', name: tw.name ?? 'tower' });
   if (hollow !== undefined) {
     for (let k = 0; k < 32; k++) {
@@ -951,12 +964,28 @@ function emit(p: Part, of: (paint: Paint) => Out, solids: Solid[] | null, lod: n
   const body: Body = p.body ?? 'all';
   const put: Put = (s) => void (solids && body !== 'none' && solids.push(s));
   const o = p.hidden ? VOID : of(p.paint);
-  o.base = p.t === 'box' || p.t === 'wall' ? p.y0 : p.t === 'tower' ? 0 : p.t === 'lump' ? p.y - p.ry : p.t === 'flight' ? p.foot[1] : null;
+  // (a wall that stands on another wall has no floor at its foot for snow to drift against: the upper shell of the keep)
+  o.base = p.t === 'wall' && p.y0 > 0.1 && /^keep .* face$/.test(p.name ?? '') ? null : p.t === 'box' || p.t === 'wall' ? p.y0 : p.t === 'tower' ? 0 : p.t === 'lump' ? p.y - p.ry : p.t === 'flight' ? p.foot[1] : null;
   o.ground = !!p.sits || p.t === 'apron';
   o.roofed = !!p.roofed;
   o.walked = p.paint === 'paving';
   if (p.t === 'tower') of('timber').base = of('base').base = null;
   if (p.t === 'wall' && p.paint === 'stone') Object.assign(of('base'), { base: o.base, ground: o.ground, roofed: o.roofed });
+  if (p.t === 'box' && p.name === 'footing') {
+    // (the footing under a wall gives way to a hatch's passage where one goes through it, under the ground: it is
+    // made in pieces round the passage)
+    const through = gaps.filter((g) => g.x > p.x0 - 0.2 && g.x < p.x1 + 0.2 && g.z > p.z0 - 0.2 && g.z < p.z1 + 0.2);
+    if (through.length) {
+      const alongZ = p.z1 - p.z0 > p.x1 - p.x0, at = (g: Gap) => (alongZ ? g.z : g.x), lo = Math.min(...through.map(at)) - 1.1, hi = Math.max(...through.map(at)) + 1.1;
+      const piece = (a: number, b: number, ya: number, yb: number) => void (b - a > 0.05 && yb - ya > 0.05 && boxPart(alongZ ? { ...p, z0: a, z1: b, y0: ya, y1: yb } : { ...p, x0: a, x1: b, y0: ya, y1: yb }, o, put));
+      const [u0, u1] = alongZ ? [p.z0, p.z1] : [p.x0, p.x1];
+      piece(u0, lo, p.y0, p.y1);
+      piece(hi, u1, p.y0, p.y1);
+      piece(lo, hi, through[0].y1, p.y1);
+      piece(lo, hi, p.y0, through[0].y0);
+      return;
+    }
+  }
   switch (p.t) {
     case 'box': return boxPart(p, o, put);
     case 'slab': return slabPart(p, o, put);
@@ -994,6 +1023,20 @@ export function castleShape(ground: (x: number, z: number) => number = castleGro
     const p = raw.sits ? lifted(raw, ground(raw.sits[0], raw.sits[1])) : raw;
     if (p.at !== 'far') emit(p, (paint) => (p.low ? unders : nears)[paint], solids, 0, ground, gaps, ways);
     if (p.at) emit(p, (paint) => fars[paint], null, 1, ground, gaps, ways);
+  }
+  // ---- the kit's pieces (the walls, the gatehouse, blocks of fallen wall): what stops a body, as the kit says; and
+  // from far off a block for each block of theirs, less what has been broken out
+  for (const k of kitSolids(castleKit())) solids.push(k.t === 'box' ? { ...k, feet: false, surface: 'concrete' } : { t: 'hull', pts: k.pts, feet: false, surface: 'concrete', name: k.name });
+  for (const p of castleKit()) {
+    const m = kitMatrix(p), sc = typeof p.scale === 'number' ? [p.scale, p.scale, p.scale] : p.scale ?? [1, 1, 1];
+    if (sc[0] < 0.3) continue;
+    const ax = [0, 1, 2].map((k) => unit([m[k * 4], m[k * 4 + 1], m[k * 4 + 2]]));
+    for (const b of kitBlocks(p.id) ?? []) {
+      const c = kitPoint(m, [(b[0] + b[1]) / 2, (b[2] + b[3]) / 2, (b[4] + b[5]) / 2]);
+      if ((p.cut ?? []).some((k) => inCut(k, c))) continue;
+      fars.stone.base = null;
+      block(fars.stone, c, ax, [((b[1] - b[0]) / 2) * sc[0], ((b[3] - b[2]) / 2) * sc[1], ((b[5] - b[4]) / 2) * sc[2]], 0.9);
+    }
   }
   return { near, under, far, solids };
 }

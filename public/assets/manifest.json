@@ -5443,6 +5443,29 @@
     }
    }
   },
+  "parachute": {
+   "url": "assets/models/parachute.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 354752,
+   "srcTris": 17790,
+   "tris": 17790,
+   "min": [
+    -4.0465,
+    0,
+    -4.0465
+   ],
+   "max": [
+    4.0465,
+    12,
+    4.0465
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/parachute.glb",
+   "hiBytes": 4503000,
+   "hiCard": 256
+  },
   "saline_bag": {
    "url": "assets/models/saline_bag.glb",
    "tags": [

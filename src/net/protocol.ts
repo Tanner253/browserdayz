@@ -11,6 +11,7 @@ import type { SerializedInventory } from '../sim/inventory';
 import type { WorldLoot } from '../sim/economy';
 import type { HitZone } from '../sim/combat';
 import type { DropInfo } from '../sim/drops';
+import type { Flight } from '../sim/airdrop';
 import type { VehicleInfo, VState } from '../sim/vehicles';
 import type { IState, InfectedInfo } from '../sim/infected';
 
@@ -222,6 +223,8 @@ export type S2C =
       me: { inv: SerializedInventory; vitals: Vitals } | null;
       /** supply drops standing in the world now */
       drops?: DropInfo[];
+      /** the helicopters in the air with a supply drop at this moment, and how long each has been (see src/sim/airdrop.ts) */
+      flights?: Flight[];
       /** fuel drums that have gone up and not been stood up again yet */
       barrels?: number[];
       /** the fireplaces that are alight: [which, seconds left] */
@@ -309,8 +312,14 @@ export type S2C =
   /** a supply drop has been set down (see src/sim/drops.ts), and one has been cleared away */
   | { t: 'drop+'; d: DropInfo }
   | { t: 'drop-'; uid: string }
-  /** a drop has been called down (by whom, where, and in how many seconds), or the call was not answered */
-  | { t: 'radio+'; by: number; x: number; z: number; eta: number }
+  /**
+   * A helicopter has appeared on the map's edge with a supply drop (src/sim/airdrop.ts): the whole of its flight,
+   * from which every game works out where it and its crate are from then on. `f.by` is whoever called it on a
+   * radio, if anybody did. The crate is told of (`drop+`) only once it is on the ground. (Until 2026-10-13 a call
+   * was said as `radio+`, with a place and a number of seconds, and the crate simply appeared.)
+   */
+  | { t: 'heli+'; f: Flight }
+  /** a call on a field radio was not answered */
   | { t: 'radio-'; why: string }
   /** where everyone carrying a tag they took is standing right now: [player id, x, z]. Sent to all, every half minute. */
   | { t: 'tags'; p: [number, number, number][] }

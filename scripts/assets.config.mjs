@@ -701,6 +701,15 @@ export const LOCAL_MODELS = {
   // the glow of the fire painted into it.)
   campfire_ring: { dir: 'campfire', only: /Campfire_MAT/, size: 1.45, tex: 1024, tags: ['prop'], changes: 'Its stones, logs and scorched ground: scaled to metres and stood on the ground about its own middle; textures re-encoded as WebP at the size they came; geometry compressed. While it burns, its colour picture is darkened to charred wood as it is drawn, and only the orange parts of it give light. Its flames and their animation are used as well, for the campfire and, larger, for a burning vehicle: the sheet of flame pictures re-encoded as WebP at the size it came, with its colour carried outward under its clear parts; its twenty-nine cards and every key of their movement written out as data, in metres. As they are played, each card runs over the frames in which it is to be seen, on its own time and two or three times over, fading in and out at the ends of its run (the animation as it came swelled once a loop, and jumped where the loop turned over); the cards turn to face the eye; their pictures are laid on by their own alpha, pushed about by a pattern that climbs, and coloured anew from the photograph\'s brightness and hue; the small flames are let go lower than the animation carries them, and the smoke is painted pale.' },
   campfire_ring_cold: { dir: 'campfire', only: /Campfire_MAT/, size: 1.45, tex: 1024, dye: { saturation: 0.15, brightness: 0.7 }, tags: ['prop'], changes: 'The same again with its colour picture greyed and darkened, for a fire that is not lit.' },
+  // (The canopy a supply drop comes down under: src/game/airdrop.ts. Unpack assets-src/army_parachute.zip into
+  // assets-src/models/army_parachute/. It came to be drawn half clear, by blending: its cloth is 53 to 80 parts in
+  // a hundred solid in its colour picture and its lines wholly so, and nothing of it is cut out by that picture (the
+  // lines are shapes of their own, from the rim to where they meet). So it is made SOLID: drawn as a thing that is
+  // not seen through, both faces of its cloth, the clearness thrown out of its colour picture. Twelve metres from
+  // where the lines meet to the top of the canopy, which is 8.1 m across; it stands on the point where its lines
+  // meet, and that point is what the crate hangs from. Its fourth picture, for light of its own, is black all over
+  // (every pixel of it nought): the game does not put it on the card.)
+  parachute: { dir: 'army_parachute', solid: true, both: true, size: 12, tex: 4096, tags: ['prop'], changes: 'Made solid: drawn as a thing that is not seen through, where it came half clear, with the clearness taken out of its colour picture, and both faces of its cloth drawn; scaled to metres (twelve from where its lines meet to the top of the canopy) and stood on the point where its lines meet; textures re-encoded as WebP at the size they came; geometry compressed. In the game it is drawn narrow as it opens and laid over as it settles.' },
 };
 
 /**

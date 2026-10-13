@@ -190,6 +190,10 @@ export async function castlePage() {
       const i = r.renderer.info.render, m = r.renderer.info.memory;
       return { state: site.state, calls: i.calls, triangles: i.triangles, textures: m.textures, geometries: m.geometries, ...site.counts };
     },
+    /** the kit's and the door's pictures at the size they came, as the game gives them to whoever is close (it is the game's own to do: src/game/near.ts; this page has none of that) */
+    sharp() {
+      return assets.sharpen(site.sharp);
+    },
     /** waits until the fort's own shapes are in the world (its pictures have come and it has been got ready) */
     async near(secs = 60) {
       for (let t = 0; t < secs * 20 && site.state !== 'near'; t++) {

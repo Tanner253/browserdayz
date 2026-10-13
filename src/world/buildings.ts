@@ -15,6 +15,7 @@ import type { Tier } from '../sim/tiers';
 import { BUILDING_FOOTPRINT, CELL, TOWN, WORLD_RES, WORLD_SIZE, bunkerPlace, heightAt, idx, type BuildingPlot, type Instance, type SiteKind, type World } from './worldgen';
 import { bunkerAt, bunkerPlan, levelY } from '../sim/bunker';
 import { wreckUnder } from '../sim/bridge';
+import { castleLoot, castleProps } from '../sim/castle';
 import { flatsPlan, hospitalLobbyPlan, hospitalPlan, hospitalWingPlan, policeCellsPlan, policeGaragePlan, policeHqPlan } from './big-buildings';
 
 /** (`Gas` is not a kind of building: it is whatever stands under the gas, whatever else it is. See src/sim/gas.ts.) */
@@ -1487,6 +1488,23 @@ export class Buildings {
     // things on the ground of the cleft, after every other place on the map, so that none of those is renumbered.
     // What an army's jeep carried, on the step of the map the town beside it is on.
     for (const b of this.world.bridges) for (const [x, z] of wreckUnder(b).spots) this.lootPoints.push({ x, y: heightAt(this.world.heights, x, z) + 0.02, z, usage: ['Military', 'Hunting'], building: 'wreck', floor: true, tier: 3 });
+    // And the fort on the mountain (src/sim/castle.ts): its places for things, on the steps of the map it says, and
+    // what stands in it off the shelf. The last lot of all: nothing else on the map is renumbered for it.
+    const fort = this.world.castle;
+    if (fort) {
+      // (the ground as it is seen: over the hatch's stairwell that is the height it had before it was let down)
+      const ground = (x: number, z: number) => heightAt(this.world.surface, x, z);
+      for (const q of castleLoot(fort, ground)) this.lootPoints.push(q);
+      // (Two crates of its store stand one on the other. What is searched is told by where it stands over the ground
+      // and not by how high: the upper of two such is set a hand's breadth askew, and is a box of its own.)
+      const stood = new Set<string>();
+      for (const q of castleProps(fort, ground)) {
+        const searched = CRATE_KINDS.has(q.kind.split(/[#@]/)[0]) || SEARCHED_KINDS.has(q.kind.split(/[#@]/)[0]);
+        while (searched && stood.has(`${Math.round(q.x * 10)}_${Math.round(q.z * 10)}`)) q.x += 0.11;
+        stood.add(`${Math.round(q.x * 10)}_${Math.round(q.z * 10)}`);
+        this.world.props.push(q);
+      }
+    }
   }
 
   /**

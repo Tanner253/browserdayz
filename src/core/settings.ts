@@ -1,6 +1,7 @@
 // Graphics and sound options (Esc menu, Settings tab). The player picks them and they are kept in this browser;
 // nothing here changes by itself while playing.
 
+import { GROUPS, MIX, type Mix } from './audio';
 import { LEAN, TOUCH } from './device';
 
 export type AoMode = 'off' | 'half' | 'full';
@@ -34,7 +35,6 @@ export const MSAA = [0, 2, 4];
 export const AO_MODES: AoMode[] = ['off', 'half', 'full'];
 export const LEVELS: Level[] = ['low', 'medium', 'high'];
 export const FPS_LIMITS = [30, 40, 60, 120, 0];
-export const VOLUMES = [0, 0.25, 0.5, 0.75, 1];
 
 /**
  * What a phone starts on. It started on Low, which draws half the pixels each way that the
@@ -69,7 +69,8 @@ export function loadGraphics(): Graphics {
       if (LEVELS.includes(raw.shadows as Level)) g.shadows = raw.shadows as Level;
       if (LEVELS.includes(raw.foliage as Level)) g.foliage = raw.foliage as Level;
       if (FPS_LIMITS.includes(raw.fpsLimit as number)) g.fpsLimit = raw.fpsLimit as number;
-      if (VOLUMES.includes(raw.volume as number)) g.volume = raw.volume as number;
+      // (it was one of five steps and is a slider now: whatever was kept of the five is still one of these)
+      if (typeof raw.volume === 'number' && raw.volume >= 0 && raw.volume <= 1) g.volume = raw.volume;
     }
   } catch {
     /* private mode or a damaged entry: defaults */
@@ -80,6 +81,35 @@ export function loadGraphics(): Graphics {
 export function saveGraphics(g: Graphics) {
   try {
     localStorage.setItem(STORE, JSON.stringify(g));
+  } catch {
+    /* private mode */
+  }
+}
+
+// ---- The four groups of sound under the one volume (src/core/audio.ts, GROUPS). Kept by themselves: the one
+// volume stays where it has always been kept (`volume`, above), so what a player had set before there were groups
+// is read as it was.
+const MIX_STORE = 'zona.mix';
+
+export function loadMix(): Mix {
+  const m = { ...MIX };
+  try {
+    const raw = JSON.parse(localStorage.getItem(MIX_STORE) ?? 'null') as Partial<Mix> | null;
+    if (raw && typeof raw === 'object') {
+      for (const g of GROUPS) {
+        const v = raw[g];
+        if (typeof v === 'number' && v >= 0 && v <= 1) m[g] = v;
+      }
+    }
+  } catch {
+    /* private mode or a damaged entry: all of them at full, as the game was made */
+  }
+  return m;
+}
+
+export function saveMix(m: Mix) {
+  try {
+    localStorage.setItem(MIX_STORE, JSON.stringify(m));
   } catch {
     /* private mode */
   }

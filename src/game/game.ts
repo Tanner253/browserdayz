@@ -51,6 +51,8 @@ import { BigMap, type MapPerson } from '../ui/bigmap';
 import { BURY, noBurying } from '../sim/stash';
 import { AdminUI, type AdminLook, type AdminPlayer, type AdminSelf } from '../ui/admin-ui';
 import { CALL, CRASH, DROP, describeSpot, fillCrash, fillDrop, pickDropSite, type DropInfo } from '../sim/drops';
+import { comesFrom, flightTimes, planFlight, restAt, type Flight } from '../sim/airdrop';
+import { Airdrops } from './airdrop';
 import { WELL, stage, wellSpots, type Well } from '../sim/wells';
 import { Voice } from './voice';
 import { TIERS, type Tier } from '../sim/tiers';
@@ -59,7 +61,7 @@ import { askPerson } from '../ui/person';
 import { BotCheck } from './botcheck';
 import { Near } from './near';
 import { Perf } from '../core/perf';
-import { loadGraphics, type Graphics } from '../core/settings';
+import { loadGraphics, loadMix, type Graphics } from '../core/settings';
 import { Horde, Infected } from './infected';
 import { INFECTED, guarded } from '../sim/infected';
 import { TOUCH } from '../core/device';
@@ -81,6 +83,8 @@ import type { MenuSpot } from '../ui/hud';
 import { Lamps } from './lamps';
 import { BunkerSite, spotKey } from '../world/bunker';
 import { BUNKER, bunkerCrates, bunkerDark, inBunker } from '../sim/bunker';
+import { CRESSET, CastleSite } from '../world/castle';
+import { castleDark, castleUnder } from '../sim/castle';
 
 const _gasHead = new THREE.Vector3();
 /** how much of the view is left when aiming through a holographic sight (the plain sights leave 0.8 of it): nearer by a third again */
@@ -181,6 +185,8 @@ export class Game {
   lockers!: Lockers;
   /** the bunker: what is built of it, its door and its lamps */
   bunker!: BunkerSite;
+  /** the fort on the mountain (src/world/castle.ts): none, in a world that has no place for one */
+  castle: CastleSite | null = null;
   /** playing alone: seconds since this game was last inside it with its door open */
   private bunkerEmpty = 0;
   /** every lit lamp: carried, driven behind, standing in the street */
@@ -255,6 +261,8 @@ export class Game {
   private drops = new Map<string, { stash: Stash; until: number; at: THREE.Vector3; smoke: { owed: number }; wreck?: { obj: THREE.Object3D; solid: unknown[] } }>();
   /** playing alone: game time the next one is due (-1 until the clock is first read) */
   private nextDrop = -1;
+  /** the helicopters in the air with a supply drop, and the crates coming down (src/game/airdrop.ts) */
+  airdrops!: Airdrops;
   /** the page's own title: the tab shows the place in the line, and "your turn", over it */
   private title = document.title;
   /** times at which the open inventory should look again at what lies on the ground (see drop) */
@@ -354,6 +362,8 @@ export class Game {
     // (whatever is got ready after the game has loaded is got ready for the lamps lit and for the lamps out)
     r.lighting = { lit: () => this.lamps.pool.visible, as: (lit) => this.lamps.as(lit) };
     this.bunker = new BunkerSite(world, atmo, r.scene, this.s.terrain.lid);
+    // (the fort: stood where the map says, on the ground as the map has it; the earth round its hatch is drawn as the ground is)
+    if (world.castle) this.castle = new CastleSite(world.castle, atmo, r.scene, { ground: (x, z) => heightAt(world.surface, x, z), earth: this.s.terrain.lid ?? undefined });
     // Its door is loud: heard by everybody on the map, wherever they are, and from where it is. (It was heard
     // within two hundred and seventy metres and by nobody else.) Far off it is as late and as dull as a far
     // sound is, and is brought no nearer to the ear than a hundred and ten metres along the line to it: the
@@ -371,6 +381,17 @@ export class Game {
     this.hearths = new Hearths(this.fires.spots);
     progress('loading loot');
     this.loot = new LootManager(r.scene, atmo, buildings.lootPoints);
+    this.airdrops = new Airdrops(r.scene, {
+      // (the crate that comes down is the crate that stands there after: the same model, as big)
+      crate: async () => {
+        const o = (await this.loot.models.get('stash_kit')).group.clone();
+        o.scale.setScalar(ITEMS.stash_kit.place ?? 1);
+        return o;
+      },
+      canopy: async () => (await assets.model('parachute')).clone(),
+      register: (o) => atmo.registerObject(o),
+      landed: (f) => this.dropLanded(f),
+    });
     this.near = new Near(r.scene);
     // (no model of a thing is fetched here any more: each is, when a thing of its kind is first near. See LootManager.spawn.)
     // (never waited on for long: a card that will not say its shaders are made is not what keeps a thing out of the world)
@@ -653,6 +674,12 @@ export class Game {
     };
     applyControls(controls());
     this.hud.onControls(applyControls);
+    // the four groups of sound under the one volume (Settings, Audio): as they were kept, and as they are dragged
+    audio.setMix(loadMix());
+    this.hud.onSound((volume, mix) => {
+      audio.setVolume(volume);
+      audio.setMix(mix);
+    });
     this.hud.onPass = (pw) => {
       if (this.online) this.net.send({ t: 'admin', pw });
       else this.hud.chatLine('system', '', 'You are playing offline: there is no server to be an admin of.');
@@ -1481,6 +1508,8 @@ export class Game {
     for (const s of w.stashes) await this.addRemoteStash(s);
     for (const c of w.corpses) void this.addCorpse(c);
     for (const d of w.drops ?? []) void this.addDrop(d);
+    // (a helicopter in the air when this game came in: it is where everybody else's game has it)
+    for (const f of w.flights ?? []) this.flightBegun(f, true);
     // the fuel drums that are gone at the moment
     this.fuses.length = this.drumsBack.length = 0;
     for (const b of this.s.veg.barrels) b?.setThere(!w.barrels?.includes(b.i));
@@ -1646,7 +1675,7 @@ export class Game {
     net.on('corpse-', (m) => this.removeCorpse(m.uid));
     net.on('board', (m) => this.hud.setBoard(m.rows, m.me, m.mine, playerName()));
     net.on('drop+', (m) => void this.addDrop(m.d));
-    net.on('radio+', (m) => this.dropCalled(m.by === net.id, m.x, m.z, m.eta));
+    net.on('heli+', (m) => this.flightBegun(m.f, false, m.f.by === net.id));
     net.on('radio-', (m) => {
       this.radio = null;
       this.hud.note(m.why, 'warn');
@@ -2081,6 +2110,7 @@ export class Game {
     // came after a `return` in the helicopter's case, and there was a wreck, smoke, a mark on the map and
     // nothing to open.)
     await this.loot.addDrop(stash);
+    this.airdrops.stood(d.uid);
     // (cleared away while its crate was still being fetched)
     if (this.drops.get(d.uid)?.stash !== stash) this.loot.removeStash(stash);
   }
@@ -2144,10 +2174,10 @@ export class Game {
       if (done && this.openStash !== s) this.removeDrop(uid);
     }
     if (this.nextDrop < 0) this.nextDrop = t + DROP.first;
-    else if (t >= this.nextDrop && !this.drops.size) {
+    else if (t >= this.nextDrop && !this.drops.size && !this.airdrops.list().some((l) => l.t < l.T.land)) {
       this.nextDrop = t + DROP.every;
       const at = pickDropSite(this.s.world);
-      if (at) void this.addDrop({ uid: `drop-${newUid()}`, ...at, rot: Math.random() * Math.PI * 2, left: DROP.life }, true);
+      if (at) this.flightBegun(planFlight((x, z) => heightAt(this.s.world.heights, x, z), at, `drop-${newUid()}`));
     }
   }
 
@@ -2463,7 +2493,9 @@ export class Game {
     // the bunker: its door, its lamps, and the dark of it (no daylight comes down the stair)
     this.bunker.update(dt, cam.position, (pos, burn) => this.lamps.glow(pos, BUNKER_LAMP, burn * 0.5, 8));
     // (an admin's night vision sees down here as well: "night vision makes bunker darkness go away too", 2026-10-13)
-    const under = this.nightSight ? 0 : bunkerDark(this.bunker.place, cam.position.x, cam.position.y, cam.position.z);
+    // the fort: what of it is drawn for where the eye is, its cressets, and the dark under its terrace
+    this.castle?.update(dt, cam.position, atmo.night, (pos, burn) => this.lamps.glow(pos, CRESSET.colour, burn, CRESSET.reach));
+    const under = this.nightSight ? 0 : Math.max(bunkerDark(this.bunker.place, cam.position.x, cam.position.y, cam.position.z), castleDark(this.s.world.castle, cam.position.x, cam.position.y, cam.position.z, (x, z) => heightAt(this.s.world.surface, x, z)));
     atmo.cover.ground = { sun: 1 - under, sky: 1 - 0.994 * under };
     this.lamps.update(cam, dt);
     this.weapons.lampSpill.copy(this.lamps.spill);
@@ -2611,7 +2643,7 @@ export class Game {
   private unbury(dt: number, riding: boolean) {
     const p = this.player, at = p.pos;
     const b = this.bunker.place;
-    const down = this.started && !p.dead && !riding && !p.fly && at.y < heightAt(this.s.world.heights, at.x, at.z) - 1.1 && !(b && Math.hypot(at.x - b.x, at.z - b.z) < 48);
+    const down = this.started && !p.dead && !riding && !p.fly && at.y < heightAt(this.s.world.heights, at.x, at.z) - 1.1 && !(b && Math.hypot(at.x - b.x, at.z - b.z) < 48) && !castleUnder(this.s.world.castle, at.x, at.y, at.z, (x, z) => heightAt(this.s.world.surface, x, z));
     this.buriedT = down ? this.buriedT + dt : 0;
     if (this.buriedT < 2) return;
     this.buriedT = 0;
@@ -3989,22 +4021,42 @@ export class Game {
     p.x -= Math.sin(this.player.yaw) * CALL.ahead;
     p.z -= Math.cos(this.player.yaw) * CALL.ahead;
     p.y = heightAt(this.s.world.heights, p.x, p.z);
-    this.dropCalled(true, p.x, p.z, CALL.eta);
-    setTimeout(() => void this.addDrop({ uid: `drop-call-${Math.round(performance.now())}`, x: p.x, y: p.y, z: p.z, rot: Math.random() * Math.PI * 2, left: DROP.life }, true), CALL.eta * 1000);
+    this.flightBegun(planFlight((x, z) => heightAt(this.s.world.heights, x, z), { x: p.x, y: p.y, z: p.z }, `drop-call-${newUid()}`), false, true);
   }
 
-  /** a drop has been called down: by this player (whose set is spent) or by somebody else (who has just told the map where they are) */
-  private dropCalled(mine: boolean, x: number, z: number, eta: number) {
-    const where = describeSpot(this.s.world, x, z);
-    this.calls.push({ at: new THREE.Vector3(x, heightAt(this.s.world.heights, x, z), z), until: performance.now() + eta * 1000, smoke: { owed: 0 } });
+  /**
+   * A helicopter has appeared on the map's edge with a supply drop (the server says so; playing alone, this game
+   * does): it is set flying, the place is marked on the map and under smoke until the crate is down, and whoever
+   * plays is told where it is for, which way it is coming from, and when it will be on the ground.
+   * @param late it was in the air already when this game came in
+   * @param mine this player called it on a radio (whose set is spent)
+   */
+  private flightBegun(f: Flight, late = false, mine = false) {
+    this.airdrops.begin(f);
+    const left = flightTimes(f).land - f.age;
+    // (down already: its crate is told of as a drop standing, and only the helicopter is left to see)
+    if (left <= 0) return;
+    const where = describeSpot(this.s.world, f.x, f.z), way = comesFrom(f), eta = Math.max(1, Math.round(left));
+    this.calls.push({ at: new THREE.Vector3(f.x, f.y, f.z), until: performance.now() + left * 1000, smoke: { owed: 0 } });
     this.markDrops();
     if (mine && this.radio) {
       this.inv.remove(this.radio);
       this.radio = null;
       this.inventoryChanged();
     }
-    this.hud.note(mine ? `Drop called in: down in ${eta} s, three paces ahead, under the smoke. Everybody heard it` : `Somebody has called a supply drop in ${where}: down in ${eta} s`, mine ? 'good' : 'warn');
-    this.hud.feed(`Supply drop called in ${where}`);
+    if (mine) this.hud.note(`Drop called in: a helicopter is coming from the ${way}. The crate is down in ${eta} s, three paces ahead, under the smoke. Everybody heard it`, 'good');
+    else if (f.by !== undefined) this.hud.note(`Somebody has called a supply drop in ${where}: a helicopter is coming from the ${way}, down in ${eta} s`, 'warn');
+    else if (late) this.hud.note(`A helicopter is in the air with a supply drop for ${where}: down in ${eta} s, marked on the map (M)`, 'good');
+    else this.hud.note(`A helicopter is coming in from the ${way} with a supply drop for ${where}: down in ${eta} s, marked on the map (M)`, 'good');
+    this.hud.feed(f.by !== undefined ? `Supply drop called in ${where}: helicopter from the ${way}` : `Helicopter from the ${way}: supply drop for ${where}`);
+    if (!late && f.by === undefined) this.hud.chatLine('system', '', `A helicopter is coming in from the ${way} with a supply drop for ${where}.`);
+  }
+
+  /** the crate of a flight has touched the ground: it is heard, and (playing alone, with nobody else to set it down) the crate that stays is stood there */
+  private dropLanded(f: Flight) {
+    const at = new THREE.Vector3(f.x, f.y, f.z);
+    audio.bodyFall(at, at.distanceTo(this.s.r.camera.position));
+    if (!this.online) void this.addDrop({ uid: f.uid, x: f.x, y: f.y, z: f.z, rot: restAt(f.uid), left: DROP.life }, true);
   }
 
   /** today's page of the trader's work for this player (a new day is a clean page) */
@@ -4505,7 +4557,9 @@ export class Game {
       }
     }
     this.weapons.stowed = !!this.hold || this.armsUntil > now || !!ride || !!this.glass;
-    const sens = this.glass ? 0.22 : this.weapons.scoped ? 0.28 : this.weapons.aiming ? 0.7 : 1;
+    // (slower while aiming, by what the game was made with and by the player's own multiple of that: Settings, Controls)
+    const aimed = this.glass ? 0.22 : this.weapons.scoped ? 0.28 : this.weapons.aiming ? 0.7 : 1;
+    const sens = aimed < 1 ? aimed * controls().aim : 1;
     if (!uiOpen && playing && !this.wheelOn) p.look(input, sens);
     // (kept with whoever it is watching: it goes as they go, and is flown about them)
     if (this.freecam && this.watching) {
@@ -4867,6 +4921,8 @@ export class Game {
       this.inForest = this.s.terrain.surfaceAt(p.pos.x, p.pos.z) === 'dirt';
     }
     audio.updateAmbience(dt, cam.position, this.indoors, this.inForest, bunkerDark(this.bunker.place, cam.position.x, cam.position.y, cam.position.z));
+    // (the helicopter and its crate: put where the flight's clock has them, and the rotor heard from where it is)
+    this.airdrops.update(dt, cam.position, seen.light, this.indoors, bunkerDark(this.bunker.place, cam.position.x, cam.position.y, cam.position.z));
     // breathing follows how much of the reserve is left, as a percentage
     if (this.started) audio.body(dt, (v.stamina / MAX_STAMINA) * 100, v.health, !p.dead, v.bleeding);
 

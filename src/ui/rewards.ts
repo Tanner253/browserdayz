@@ -65,7 +65,8 @@ const RUN_MS = 5600;
  * (api/tick.ts) is called, and does it.
  */
 async function siteStatus() {
-  const s = (await (await fetch('/api/cashins?format=status')).json()) as { on?: boolean; tagPays?: number | null; share?: number; floor?: number; due?: boolean };
+  // (minTags: how many of a wallet's tags must be due before it is paid, when that is more than one; next: what is to change, and when)
+  const s = (await (await fetch('/api/cashins?format=status')).json()) as { on?: boolean; tagPays?: number | null; share?: number; floor?: number; due?: boolean; minTags?: number; next?: { from?: string; tagPays?: number; minTags?: number } | null };
   if (s.due) void fetch('/api/tick').catch(() => {});
   pays = s.on && typeof s.tagPays === 'number' ? s.tagPays : null;
   for (const f of told) f(pays);
@@ -197,7 +198,16 @@ export class RewardsModal {
       if (!s.on || typeof s.tagPays !== 'number' || typeof s.share !== 'number' || typeof s.floor !== 'number') return;
       const round = (n: number) => String(Math.round(n * 10_000) / 10_000);
       const p = this.root.querySelector('.rw-pay p') as HTMLElement;
-      p.innerHTML = `A tag you cash in pays <b>${round(s.tagPays)} SOL</b> right now: ${round(s.share * 100)}% of the reward treasury, ${round(s.floor)} SOL at least, sent to the wallet you enter here.<small>Every payment is listed at <a href="/payouts" target="_blank" rel="noopener">zonapvp.fun/payouts</a></small>`;
+      const listed = '<small>Every payment is listed at <a href="/payouts" target="_blank" rel="noopener">zonapvp.fun/payouts</a></small>';
+      // (the figures are the site's own: api/_lib/payouts.ts. A flat pay, and a wallet paid when so many of its tags are due.)
+      const n = typeof s.minTags === 'number' ? Math.round(s.minTags) : 1;
+      if (s.share === 0) {
+        p.innerHTML = `A tag you cash in pays <b>${round(s.tagPays)} SOL</b>${n > 1 ? `, sent to the wallet you enter here when ${n} of your tags are due: <b>${round(s.tagPays * n)} SOL</b> for the ${n}, at once. Until then they wait, counted, and none is lost.` : ', sent to the wallet you enter here.'}${listed}`;
+        return;
+      }
+      const next = s.next && typeof s.next.from === 'string' && /^\d{4}-\d\d-\d\dT\d\d:\d\d/.test(s.next.from) && typeof s.next.tagPays === 'number' && typeof s.next.minTags === 'number' ? s.next : null;
+      const soon = next ? ` From ${next.from!.slice(0, 16).replace('T', ' ')} UTC a tag pays ${round(next.tagPays!)} SOL flat${next.minTags! > 1 ? `, sent when ${Math.round(next.minTags!)} of your tags are due` : ''}.` : '';
+      p.innerHTML = `A tag you cash in pays <b>${round(s.tagPays)} SOL</b> right now: ${round(s.share * 100)}% of the reward treasury, ${round(s.floor)} SOL at least, sent to the wallet you enter here.${soon}${listed}`;
     } catch {
       /* no site behind this page (the game served from somewhere else, or playing offline) */
     }

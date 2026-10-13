@@ -15,6 +15,7 @@ import { homeSpot, infectedHomes, type Home } from '../src/sim/infected';
 import { fireSpots } from '../src/sim/fires';
 import { gasZone } from '../src/sim/gas';
 import { standAt } from '../src/sim/bridge';
+import { castleUnder, inCastle } from '../src/sim/castle';
 
 export interface CrateSpot {
   cid: string;
@@ -75,7 +76,16 @@ export function buildWorldData(root: string) {
      * one (see src/sim/bridge.ts). Asked wherever it is a question of somebody being in the air: `groundAt` is the
      * ground alone, and is what is asked of somebody who may be under it.
      */
-    standAt: (x: number, y: number, z: number) => standAt(world.bridges, heightAt(world.heights, x, z), x, y, z),
+    standAt: (x: number, y: number, z: number) => {
+      // (and in the fort a body is on its terrace, a floor of its keep, a tower or a wall: whoever is within its walls
+      // and no higher than its keep has something under them)
+      if (inCastle(world.castle, x, y, z)) return Math.max(heightAt(world.heights, x, z), y);
+      return standAt(world.bridges, heightAt(world.heights, x, z), x, y, z);
+    },
+    /** where the fort stands (null: the world has none) */
+    castle: world.castle,
+    /** whether a place is in the fort's lower levels or the passage out of them: under its terrace, and it may be under the ground, by right (as the bunker is) */
+    castleUnder: (x: number, y: number, z: number) => castleUnder(world.castle, x, y, z, (gx, gz) => heightAt(world.surface, gx, gz)),
     /** the bridges the road goes over */
     bridges: world.bridges,
     /** somewhere open and level to set a supply drop down */

@@ -19,6 +19,7 @@ import { BUILDING_FOOTPRINT, WORLD_SIZE, bunkerPlace, heightAt, type World } fro
 /** how far from the middle one may be said to be: the edge of the ground, and a little */
 const EDGE = WORLD_SIZE / 2 + 8;
 import { BUNKER, bunkerAt, bunkerPlan, levelY } from './bunker';
+import { castleHomes } from './castle';
 
 export const INFECTED = {
   /** as many as are ever alive at once, over the whole map */
@@ -26,7 +27,9 @@ export const INFECTED = {
   // (93 since 2026-10-13: at 78 the village, the checkpoint, the camp, the works and the bunker took all but ten,
   // and six of the outlying places, Sosnovka and the Motor Pool among them, were left with none at all though
   // each is said to keep its own. One that nobody is near costs nothing: nobody's game moves it.)
-  max: 93,
+  // (101 since the fort was stood on the mountain, 2026-10-13: its own eight, five in its ruined village and three
+  // in the dark under its terrace, over and above the ninety-three.)
+  max: 101,
   /** what each has to begin with: a rifle round anywhere, a pistol round in the head, three in the chest */
   hp: 90,
   /** how long a body lies there, and how long after that before another turns up about the same place, seconds */
@@ -222,12 +225,16 @@ export function infectedHomes(world: World): Home[] {
   if (bunker) homes.push({ x: bunker.x, z: bunker.z, r: 40, n: OVER_BUNKER });
   for (const s of world.sites) if (!EAST[s.kind]) homes.push({ x: s.x, z: s.z, r: 34, n: ABOUT[s.kind] ?? 1 });
   // (never more than the map is meant to hold: the places furthest down the list go short)
-  let left = INFECTED.max - EAST_ALL;
+  // (nor the fort's, which are its own: see below)
+  const fort = world.castle ? castleHomes(world.castle) : [];
+  let left = INFECTED.max - EAST_ALL - fort.reduce((a, h) => a + h.n, 0);
   for (const h of homes) {
     h.n = Math.min(h.n, left);
     left -= h.n;
   }
   for (const s of world.sites) if (EAST[s.kind]) homes.push({ x: s.x, z: s.z, r: EAST[s.kind][1], n: EAST[s.kind][0] });
+  // (and the fort's, last: about its ruined village, and in the dark under its terrace)
+  for (const h of fort) homes.push(h);
   return homes.filter((h) => h.n > 0);
 }
 
