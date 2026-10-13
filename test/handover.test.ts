@@ -8,7 +8,11 @@
 //   - when the address is handed over, the old one sees for itself that it has been replaced: without being told
 //     to stop (the host tells it a whole minute later) it says so to whoever is on, writes its last word and goes;
 //   - the new one then has everybody as they were at that last word, not as they were when the old one last
-//     happened to write.
+//     happened to write;
+//   - and when a server stops WITHOUT a last word (2026-10-13: it happened on the host, and everybody came back
+//     as they had been 68 minutes before), what the next one has is what was written when the deploy was
+//     announced to it, a moment before: told a deploy is coming by whoever can push, a server writes everything
+//     first; told so by anybody else, it writes nothing.
 // Two real game servers on this machine, a stand-in for the site (the real api/admin and api/keep over a store that
 // is a variable), a stand-in for the address the world reaches the server at, and one for where the code is
 // published. Nothing here touches the real site, its store, or the real host. About a minute and a half.
@@ -27,7 +31,7 @@ import type { Store } from '../api/_lib/store';
 import { PROTOCOL, type S2C } from '../src/net/protocol';
 import { generateWorld, heightAt } from '../src/world/worldgen';
 
-const A = 8171, B = 8172, SITE = 8173, PUB = 8174, GIT = 8175;
+const A = 8171, B = 8172, SITE = 8173, PUB = 8174, GIT = 8175, C = 8176;
 // (a password made up here, for this test's stand-in site and nothing else)
 const PASSWORD = `test-only-${Math.random().toString(36).slice(2)}`;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -77,9 +81,10 @@ const pub = http.createServer((req, res) => {
   req.pipe(to);
 });
 // ---- where the code is published: the newest commit, and the note that came with it
-let newest = 'aaaaaaa1';
+let newest = 'aaaaaaa1', deployingAt = '';
 const git = http.createServer((req, res) => {
   if (req.url === '/head') return void res.writeHead(200, { 'content-type': 'text/plain' }).end(newest);
+  if (req.url === '/branch/deploying') return void res.writeHead(deployingAt ? 200 : 404, { 'content-type': 'text/plain' }).end(deployingAt);
   if (req.url === `/note/bbbbbbb2`) return void res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ why: 'update: buildings' }));
   res.writeHead(404).end();
 });
@@ -147,7 +152,7 @@ const at: [number, number] = [-120, 300];
 const pose = (w: string | null = null) => ({ t: 's', p: [at[0], ground(...at), at[1], 1.25, 0, 0], w, m: [] });
 const me = (health: number, tins: number) => ({ t: 'me', inv: { slots: { primary: { uid: 'handover-test-rifle', id: 'ak', qty: 1, loaded: 0, mag: null } }, active: null, containers: [{ id: 'jacket', items: Array.from({ length: tins }, (_, k) => ({ uid: `handover-test-tin-${k}`, id: 'beans', qty: 1, x: k, y: 0, rot: false })) }] }, vitals: { health, energy: 50, water: 40, stamina: 300, bleeding: false } });
 const old = start(A, 'aaaaaaa1');
-let young: ReturnType<typeof start> | null = null;
+let young: ReturnType<typeof start> | null = null, third: ReturnType<typeof start> | null = null;
 try {
   await up(old);
   assert.ok(await ann.join(A), `nobody was let into the first server:\n${old.log.slice(-500)}`);
@@ -230,11 +235,64 @@ try {
   assert.deepEqual([news.entries[entry]?.hearts, news.entries[entry]?.mine, news.entries[entry]?.comments.map((c) => c.text)], [1, true, ['kept through the restart']], `the new server has not the changelog's hearts and comments: ${JSON.stringify(news.entries[entry])}`);
   checks++;
   console.log('  ok  the hearts and the comments under the changelog came through with the rest');
+
+  // ---- a deploy is announced to the server before it is made. She has played on since the server last wrote.
+  ann.send(pose());
+  ann.send(me(29, 4));
+  await sleep(400);
+  for (let k = 0; k < 100 && !/somebody is on: [0-9]+ characters/.test(young.log); k++) await sleep(100);
+  const written = () => files.get('zona/world.json')!.mark;
+  const tell = async (sha: string) => {
+    const r = await fetch(`http://127.0.0.1:${B}/deploying?sha=${sha}`);
+    return { status: r.status, ...((await r.json()) as { ok: boolean; again?: boolean; saved?: string; why?: string }) };
+  };
+  // (somebody who cannot push says so: the branch does not stand where they say, and nothing is written)
+  const marks = written(), stranger = 'e'.repeat(40), pushed = 'd'.repeat(40);
+  deployingAt = pushed;
+  const no = await tell(stranger);
+  assert.deepEqual([no.status, no.ok, written()], [403, false, marks], `a stranger made the server write: ${JSON.stringify(no)}`);
+  assert.equal((await tell('nonsense')).status, 400);
+  // (asked again at once, by anybody: not looked into for twenty seconds)
+  assert.equal((await tell(pushed)).status, 429, 'the branch was looked at twice in a moment');
+  await sleep(20_500);
+  const yes = await tell(pushed);
+  assert.deepEqual([yes.status, yes.ok], [200, true], `the server did not write when a deploy was announced: ${JSON.stringify(yes)}\n${young.log.slice(-500)}`);
+  assert.ok(/^[0-9]+ characters and 0 stashes written at .*a deploy is coming/.test(yes.saved ?? ''), `it does not say what it wrote: ${yes.saved}`);
+  assert.equal(written(), marks + 1, 'nothing new is on the site');
+  assert.equal(kept()?.final, false, 'what was written before a deploy was called a last word');
+  const h2 = (await (await fetch(`http://127.0.0.1:${B}/healthz`)).json()) as { saved?: string };
+  assert.equal(h2.saved, yes.saved, 'the server does not say on /healthz what it last wrote');
+  // (and the same commit announced again writes nothing more)
+  const twice = await tell(pushed);
+  assert.deepEqual([twice.ok, twice.again, written()], [true, true, marks + 1], 'one commit was written for twice');
+  checks++;
+  console.log('  ok  told a deploy is coming by whoever can push, a server writes everything first; told by anybody else, it writes nothing');
+
+  // ---- she plays a little longer, and the server is stopped dead: no last word. The next one has her as she was
+  // when the deploy was announced, not as she was when the server before it happened to write (33, three tins)
+  ann.send(me(21, 5));
+  await sleep(300);
+  young.server.kill();
+  for (let k = 0; k < 100 && young.server.exitCode === null && young.server.signalCode === null; k++) await sleep(100);
+  assert.equal(written(), marks + 1, 'a server stopped dead wrote something');
+  newest = 'ccccccc3';
+  reached = C;
+  third = start(C, 'ccccccc3');
+  await up(third);
+  assert.ok(await ann.join(C, 60_000), `she was not let into the third server:\n${third.log.slice(-700)}`);
+  const w3 = ann.last('welcome')!;
+  assert.equal(w3.me?.vitals.health, 29, `she is not as she was when the deploy was announced (health ${w3.me?.vitals.health}: 33 is the server before's own writing, 21 is from after the announcement)`);
+  assert.equal(JSON.stringify(w3.me?.inv).split('handover-test-tin-').length - 1, 4, 'she has not what she carried when the deploy was announced');
+  const h3 = (await (await fetch(`http://127.0.0.1:${C}/healthz`)).json()) as { kept?: string };
+  assert.ok(/not a last word/.test(h3.kept ?? ''), `the third server does not say that there was no last word: ${h3.kept}`);
+  checks++;
+  console.log('  ok  a server that stops dead, with no last word: the next has everybody as they were when the deploy was announced');
 } catch (e) {
   failed = e;
 } finally {
   old.server.kill();
   young?.server.kill();
+  third?.server.kill();
   for (const s of [site, pub, git]) s.close();
   await sleep(600);
   for (const d of dirs) {
@@ -246,7 +304,7 @@ try {
   }
 }
 if (failed) {
-  console.error('--- the old server\n' + old.log.slice(-1200) + '\n--- the new one\n' + (young?.log.slice(-1500) ?? ''));
+  console.error('--- the old server\n' + old.log.slice(-1200) + '\n--- the new one\n' + (young?.log.slice(-1500) ?? '') + '\n--- the third\n' + (third?.log.slice(-1500) ?? ''));
   throw failed;
 }
 console.log(`\n${checks} checks passed`);

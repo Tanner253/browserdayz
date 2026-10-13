@@ -17,6 +17,7 @@
     "film": "node scripts/film.mjs",
     "test:bunker": "tsx test/bunker.test.ts",
     "test:daynight": "tsx test/daynight.test.ts",
+    "deploy": "node scripts/deploy.mjs",
     "test:payouts": "tsx test/solana.test.ts && tsx test/payouts.test.ts && tsx test/api.test.ts",
     "test:infected": "tsx test/infected.test.ts",
     "test:gas": "tsx test/gas.test.ts",

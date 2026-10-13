@@ -1098,6 +1098,8 @@ function sayRestart(why: string, seconds: number) {
         sayRestart(why, RESTART.about);
         // (and to whoever comes in before it happens)
         RESTART.pending = why;
+        // (and everything kept is written now, while this server is certainly alive: see `keepBefore`)
+        void keepBefore('a newer server is being built');
       } catch {
         /* not answered: asked again in a while */
       }
@@ -1119,6 +1121,8 @@ const KEPT = {
   busy: false,
   /** what became of what was kept when this server started, in a line (it is on /healthz: a count and a time, nobody's anything) */
   how: 'not read yet',
+  /** what became of the last writing this server made, in a line (on /healthz as `saved`: whether a save was made is read there, not guessed) */
+  last: 'nothing written by this server yet',
 };
 keptListed = true;
 const pause = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));
@@ -1218,11 +1222,13 @@ async function keepNow(final: boolean, why: string): Promise<boolean> {
         KEPT.claimed = true;
         KEPT.dirty = clients.size > 0;
         KEPT.savedAt = Date.now();
+        KEPT.last = `${snap.chars.length} characters and ${snap.stashes.length + (snap.loose?.length ?? 0)} stashes written at ${new Date().toISOString()} (${why}${final ? ': the last word' : ''})`;
         log(`[keep] ${why}: ${snap.chars.length} characters and ${snap.stashes.length + (snap.loose?.length ?? 0)} stashes written to the site${final ? ' (the last word)' : ''}`);
         return true;
       }
       await pause(700);
     }
+    KEPT.last = `could NOT be written at ${new Date().toISOString()} (${why})`;
     log(`[keep] ${why}: it could NOT be written to the site`);
     return false;
   } finally {
@@ -1238,6 +1244,84 @@ function claim() {
 setInterval(() => {
   if (KEEP_EVERY_MS && KEPT.dirty && Date.now() - KEPT.savedAt >= KEEP_EVERY_MS) void keepNow(false, 'time has gone by');
 }, Math.max(1000, Math.min(60_000, KEEP_EVERY_MS || 60_000))).unref();
+
+/**
+ * Everything kept is written NOW, because this server is about to be replaced (2026-10-13, after a deploy at which
+ * the server before stopped without its last word and everybody came back as they had been 68 minutes earlier:
+ * "why do you not take a snapshot before running restart commands? ... cant you make a script ... to trigger a save
+ * before the restart is even told to render?"). A last word is the best there is and is still said; it is no longer
+ * the only thing between a deploy and an hours-old file. This is asked for three ways: by whoever is about to
+ * deploy (`deploying`, below: scripts/deploy.mjs will not push until it has been answered), by this server itself
+ * the moment it sees something newer has been published (the RESTART watch), and by an admin's `/save`.
+ * @returns whether what there is to keep is on the site as of now, and a line saying what was done
+ */
+async function keepBefore(why: string): Promise<{ ok: boolean; said: string }> {
+  if (!KEEP_ON) return { ok: true, said: 'nothing is kept by this server' };
+  if (!KEPT.ready || !KEPT.read) return { ok: false, said: 'what was kept has not been read yet: nothing is written over it' };
+  if (!KEPT.claimed && !KEPT.dirty) return { ok: true, said: 'nobody has been on since it was last written: the file says all there is' };
+  for (let waited = 0; KEPT.busy && waited < 15_000; waited += 250) await pause(250);
+  const ok = await keepNow(false, why);
+  return { ok, said: KEPT.last };
+}
+
+/** where a branch of the repository this server was built from stands now (null: it could not be told) */
+async function branchHead(branch: string): Promise<string | null> {
+  const at = process.env.WATCH_URL, slug = process.env.RENDER_GIT_REPO_SLUG;
+  try {
+    // (WATCH_URL: for a test of it, as for the RESTART watch)
+    if (at) {
+      const r = await fetch(`${at}/branch/${branch}`, { signal: AbortSignal.timeout(8000) });
+      return r.ok ? (await r.text()).trim() : null;
+    }
+    if (!slug) return null;
+    // (asked as git itself asks: every branch and where it stands, this instant. Not the API first: that answers an
+    // address sixty times an hour and no more, and the host's address is shared.)
+    const r = await fetch(`https://github.com/${slug}.git/info/refs?service=git-upload-pack`, { headers: { 'user-agent': 'git/2.40.0' }, signal: AbortSignal.timeout(8000) });
+    const m = r.ok ? new RegExp(`([0-9a-f]{40}) refs/heads/${branch}\n`).exec(await r.text()) : null;
+    if (m) return m[1];
+    const a = await fetch(`https://api.github.com/repos/${slug}/commits/${branch}`, { headers: { accept: 'application/vnd.github.sha', 'user-agent': 'zona-server' }, signal: AbortSignal.timeout(8000) });
+    const sha = a.ok ? (await a.text()).trim() : '';
+    return /^[0-9a-f]{40}$/.test(sha) ? sha : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * "A deploy is coming", said to this server over the web by whoever is about to make one: GET /deploying?sha=...
+ * It writes everything kept, and answers with what it wrote, before the host has been told anything at all.
+ *
+ * What is asked of whoever says so is a push, and nothing they must be trusted with: the commit they name has to
+ * be where the branch `deploying` of this server's own repository stands. Nobody who cannot push there can make
+ * this server write once (the store allows two thousand writes a month, and the payouts live on them); whoever
+ * can, could have deployed anyway. One commit is written for once, and the branch is looked at no oftener than
+ * every twenty seconds.
+ */
+const DEPLOY = { sha: '', lookedAt: 0, busy: false };
+async function deploying(url: URL, res: http.ServerResponse) {
+  const say = (code: number, body: unknown) => {
+    res.writeHead(code, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+    res.end(JSON.stringify(body));
+  };
+  const sha = url.searchParams.get('sha') ?? '';
+  if (!/^[0-9a-f]{40}$/.test(sha)) return say(400, { ok: false, why: 'which commit? ?sha= and its forty letters' });
+  if (sha === DEPLOY.sha) return say(200, { ok: true, again: true, saved: KEPT.last, boot: BOOT });
+  if (DEPLOY.busy || Date.now() - DEPLOY.lookedAt < 20_000) return say(429, { ok: false, why: 'asked a moment ago: again in twenty seconds' });
+  DEPLOY.busy = true;
+  DEPLOY.lookedAt = Date.now();
+  try {
+    const head = await branchHead('deploying');
+    if (head !== sha) return say(403, { ok: false, why: head ? 'that is not where the deploying branch stands' : 'the deploying branch could not be read' });
+    const r = await keepBefore('a deploy is coming');
+    if (r.ok) DEPLOY.sha = sha;
+    log(`[keep] told a deploy is coming (${sha.slice(0, 7)}): ${r.said}`);
+    say(r.ok ? 200 : 503, { ok: r.ok, saved: r.said, boot: BOOT });
+  } catch {
+    say(500, { ok: false, why: 'it went wrong here' });
+  } finally {
+    DEPLOY.busy = false;
+  }
+}
 
 /** What was kept is read, and the world is as it was left: then players are let in. */
 async function loadKept() {
@@ -1535,6 +1619,13 @@ async function command(c: Client, line: string) {
         return void sys(c, 'One of the infected is put down.');
       }
       return void sys(c, 'Take away what? /del item, box, car or z, and its number. The Delete key does it for whatever you are looking at.');
+    }
+    case 'save': {
+      // everybody and every stash written to the site now: before a restart made by hand, or whenever it is wanted
+      if (!admin) return need();
+      if (Date.now() - KEPT.savedAt < 60_000) return void sys(c, `It was written less than a minute ago: ${KEPT.last}.`);
+      void keepBefore('an admin asked').then((r) => sys(c, r.ok ? `Kept: ${r.said}.` : `It could NOT be kept: ${r.said}. Do not restart on the strength of it.`));
+      return;
     }
     case 'restart': {
       // (said, and no more: nothing is restarted by saying so. For a warning before somebody restarts it by hand.)
@@ -3565,9 +3656,11 @@ function serve(req: http.IncomingMessage, res: http.ServerResponse) {
     // readable from a client hosted somewhere else (e.g. Vercel) for the start-screen player count
     res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'no-store' });
     // (places: how many different addresses the players come from. One, with several players on, means the host is not passing addresses through.)
-    res.end(JSON.stringify({ ok: true, boot: BOOT, protocol: PROTOCOL, why: RESTART.why, kept: KEPT.how, players: [...clients.values()].filter((c) => !c.asleep).length, asleep: [...clients.values()].filter((c) => c.asleep).length, max: MAX_PLAYERS, queue: queue.length, uptime: Math.round(process.uptime()), checks: CHECKS, flagged, keptOff: BANS.temp.size, loot: economy.loot.size, places: new Set([...clients.values()].map((c) => c.ip)).size, unspoken: [...clients.values()].filter((c) => !c.spoke && !c.asleep).length, turned: TURNED, captcha: CAPTCHA_ON, ...(CAPTCHA_ON ? { captchaKey: CAPTCHA.site, captchaSays: SLIPS } : {}), botcheck: BOTCHECK.on, ...(BOTCHECK.on ? { ranges: RANGES } : {}) }));
+    res.end(JSON.stringify({ ok: true, boot: BOOT, protocol: PROTOCOL, why: RESTART.why, kept: KEPT.how, saved: KEPT.last, players: [...clients.values()].filter((c) => !c.asleep).length, asleep: [...clients.values()].filter((c) => c.asleep).length, max: MAX_PLAYERS, queue: queue.length, uptime: Math.round(process.uptime()), checks: CHECKS, flagged, keptOff: BANS.temp.size, loot: economy.loot.size, places: new Set([...clients.values()].map((c) => c.ip)).size, unspoken: [...clients.values()].filter((c) => !c.spoke && !c.asleep).length, turned: TURNED, captcha: CAPTCHA_ON, ...(CAPTCHA_ON ? { captchaKey: CAPTCHA.site, captchaSays: SLIPS } : {}), botcheck: BOTCHECK.on, ...(BOTCHECK.on ? { ranges: RANGES } : {}) }));
     return;
   }
+  // whoever is about to deploy says so here first, and everything kept is written (see `deploying`)
+  if (url.pathname === '/deploying') return void deploying(url, res);
   // the changelog page asks here for its hearts and comments, and gives them (see `news`)
   if (url.pathname === '/news' || url.pathname.startsWith('/news/')) return void newsHttp(req, res, url);
   // the website's function asks here what it has just been asked to do with the lists of admins and bans (see siteAdmin)
