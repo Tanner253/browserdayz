@@ -706,6 +706,19 @@ export function fitAtRandom(item: ItemInstance, rnd: () => number): ItemInstance
   return item;
 }
 
+/** the magazines that are the bunker's and nobody else's: the AK's drum and the AR-15's sixty */
+export const BUNKER_MAGS = new Set(['drum_ak', 'mag_ar_60']);
+/**
+ * A gun found outside the bunker has not one of the bunker's magazines in it, whatever the dice gave it: the
+ * one it was made with instead. (2026-10-13: one AK in twenty-five came with the drum and one AR-15 in twenty with
+ * the sixty, in a supply drop, under the gas, wherever a gun was put down: "the bunker's and nobody else's" was
+ * not so.)
+ */
+export function plainMag(item: ItemInstance): ItemInstance {
+  if (item.mag && BUNKER_MAGS.has(item.mag)) item.mag = ITEMS[item.id].weapon?.mag ?? null;
+  return item;
+}
+
 /** Is this fitted to it? (an attachment, or the magazine that is in it) */
 export function hasMod(it: ItemInstance | null | undefined, id: string) {
   return !!it?.mods?.includes(id) || (!!it?.mag && it.mag === id);

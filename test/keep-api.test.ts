@@ -37,7 +37,7 @@ const store: Store = {
 const ask = async (op: Record<string, unknown>, sign = true) => {
   const body = JSON.stringify(op), at = String(Date.now());
   const r = await keep(new Request('http://site.test/api/keep', { method: 'POST', headers: { 'x-zona-at': at, 'x-zona-auth': sign ? keepAuth(pepperOf(PASSWORD), at, body) : 'no' }, body }), store, env);
-  return { status: r.status, ...((await r.json()) as { ok?: boolean; stale?: boolean; newer?: boolean; save?: Kept | null; why?: string }) };
+  return { status: r.status, ...((await r.json()) as { ok?: boolean; stale?: boolean; newer?: boolean; save?: Kept | null; why?: string; mark?: string }) };
 };
 const held = () => JSON.parse(files.get('zona/world.json')!.text) as Kept;
 let n = 0;
@@ -73,6 +73,25 @@ assert.deepEqual([then.ok, held().z, held().boot], [true, 'R0hJ', 'bbbb']);
 const blind = await ask({ op: 'save', at: '2026-10-13T02:00:00.000Z', boot: 'cccc', final: false, z: 'SktM', seen: '' });
 assert.deepEqual([blind.ok, blind.newer, held().z], [false, true, 'R0hJ']);
 ok('nothing is written over a copy its writer has not seen: it is handed back to be taken in first');
+
+// ---- a server's own next writing does not wait on the store's cache: it says the mark its last writing was given
+{
+  const first = await ask({ op: 'save', at: '2026-10-13T03:00:00.000Z', boot: 'cccc', final: false, z: 'UVJT', seen: held().at });
+  assert.ok(first.ok && typeof first.mark === 'string' && first.mark, `a writing is not answered with its mark: ${JSON.stringify(first)}`);
+  old = true;
+  // (the last word, a moment later, with the store unreadable: written, because the file is still this server's own)
+  const last = await ask({ op: 'save', at: '2026-10-13T03:02:30.000Z', boot: 'cccc', final: true, z: 'VldY', seen: '2026-10-13T03:00:00.000Z', mark: first.mark });
+  assert.deepEqual([last.ok, held().z, held().final], [true, 'VldY', true], `the last word was not written while the store could not be read: ${JSON.stringify(last)}`);
+  // (and again on the mark that one was given)
+  assert.equal((await ask({ op: 'save', at: '2026-10-13T03:02:40.000Z', boot: 'cccc', final: true, z: 'WVpB', mark: last.mark })).ok, true);
+  // (another server, or the same with a mark that is no longer the file's: told it is stale, and nothing written)
+  const other = await ask({ op: 'save', at: '2026-10-13T03:03:00.000Z', boot: 'dddd', final: false, z: 'QkJC', seen: '', mark: first.mark });
+  assert.deepEqual([other.ok, other.stale, held().z], [false, true, 'WVpB']);
+  const none = await ask({ op: 'save', at: '2026-10-13T03:03:00.000Z', boot: 'dddd', final: false, z: 'QkJC', seen: '' });
+  assert.deepEqual([none.ok, none.stale, held().z], [false, true, 'WVpB']);
+  old = false;
+  ok('a server\'s own next writing is made on the mark of its last, though the store cannot be read; nobody else\'s is');
+}
 
 // ---- a server from before the rule says nothing of what it has seen, and is written as it always was
 assert.equal((await ask({ op: 'save', at: '2026-10-13T02:10:00.000Z', boot: 'dddd', final: true, z: 'TU5P' })).ok, true);

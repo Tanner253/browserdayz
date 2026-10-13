@@ -4,7 +4,7 @@
 // where people meet. Rules and data only: the server runs them in multiplayer, the game
 // itself when playing alone.
 
-import { ITEMS, fitAtRandom, loadGun, makeItem, makeMag } from './items';
+import { ITEMS, fitAtRandom, loadGun, makeItem, makeMag, plainMag } from './items';
 import type { Container } from './inventory';
 import { BUILDING_FOOTPRINT, WORLD_SIZE, heightAt, inPlay, type World } from '../world/worldgen';
 import { gasEdge, gasZone } from './gas';
@@ -43,7 +43,7 @@ export function fillCrash(c: Container, rnd: () => number = Math.random) {
     const def = ITEMS[id];
     const item = makeItem(id, def.fresh ?? def.stack ?? 1);
     if (def.weapon) {
-      fitAtRandom(item, rnd);
+      plainMag(fitAtRandom(item, rnd));
       loadGun(item, 999);
     }
     c.add(item);
@@ -119,7 +119,7 @@ export function fillDrop(c: Container, rnd: () => number = Math.random) {
     const def = ITEMS[id];
     const item = makeItem(id, qty ?? def.fresh ?? def.stack ?? 1);
     if (def.weapon) {
-      fitAtRandom(item, rnd);
+      plainMag(fitAtRandom(item, rnd));
       loadGun(item, 999);
     }
     c.add(item);
@@ -147,11 +147,14 @@ export function fillDrop(c: Container, rnd: () => number = Math.random) {
  * line on the map): the wild country round it, clear of buildings and trees, and not on the road. (It was inside,
  * anywhere from the village out to the ring of outlying places: `inside` is that, and is where a helicopter comes down.)
  */
-export function pickDropSite(world: World, rnd: () => number = Math.random, inside = false): { x: number; y: number; z: number } | null {
+/** a drop does not come down within this many metres of anybody: it is gone to, not stood beside (DayZ keeps a crash a kilometre from anybody; this map is a kilometre and a half across) */
+export const DROP_CLEAR = 150;
+/** @param avoid where everybody living stands: no drop within DROP_CLEAR of any of them, while there is anywhere else */
+export function pickDropSite(world: World, rnd: () => number = Math.random, inside = false, avoid: { x: number; z: number }[] = []): { x: number; y: number; z: number } | null {
   const H = world.heights;
   const road = world.road.points;
   const gas = gasZone(world.pois, (x, z) => heightAt(H, x, z));
-  for (let tries = 0; tries < 200; tries++) {
+  for (let tries = 0; tries < 300; tries++) {
     let x: number, z: number;
     if (inside) {
       // (a helicopter's cargo: inside the line, anywhere from the village out to the ring of outlying places, as a drop was)
@@ -166,6 +169,8 @@ export function pickDropSite(world: World, rnd: () => number = Math.random, insi
       z = (rnd() * 2 - 1) * edge;
       if (inPlay(x, z, -DROP.out[0]) || !inPlay(x, z, -DROP.out[1])) continue;
     }
+    // (for the first two hundred tries: after that, beside somebody is better than no drop at all)
+    if (tries < 200 && avoid.some((p) => Math.hypot(p.x - x, p.z - z) < DROP_CLEAR)) continue;
     const y = heightAt(H, x, z);
     // not into the gas: a drop is for whoever gets to it, not for whoever has a mask
     if (gas && gasEdge(gas, x, z) < 12) continue;

@@ -9,7 +9,7 @@
 
 import type { Usage, LootPoint } from '../world/buildings';
 import type { Tier } from './tiers';
-import { ITEMS, fitAtRandom, foundMag, makeItem, stockGun, type ItemInstance } from './items';
+import { ITEMS, fitAtRandom, foundMag, makeItem, plainMag, stockGun, type ItemInstance } from './items';
 import { fitsPoint } from './placement';
 import { RNG } from '../core/noise';
 
@@ -98,6 +98,8 @@ export const ARMS_RESTOCK = 180;
  * thing missing: it was back where it had lain at the next count, five seconds later.)
  */
 export const LOOTED_REST = 180, LOOTED_ABOUT = 6, SAME_AGAIN = 900;
+/** nothing is put down within this many metres of anybody living */
+export const NEAR_PLAYER = 50;
 /** seconds before a place that always keeps one named thing has it again (the rifle on the hospital roof, and its parts) */
 export const KEEPS_RESTOCK = 900;
 
@@ -390,6 +392,8 @@ export class Economy {
     this.points.forEach((p, i) => {
       // armed points are stocked on their own (see arm)
       if (p.arms || p.keeps || this.pointBusy.has(i) || this.tier[i] !== where) return;
+      // (not under anybody's nose)
+      if (this.crowded.has(i)) return;
       // (not where somebody has just looted, nor back where this same thing last lay)
       if (!this.rested(i)) return;
       if (!this.liesAt(id, rule, i, where)) return;
@@ -429,6 +433,8 @@ export class Economy {
     if (def.stack && rule.qty) item.qty = Math.max(1, Math.round(def.stack * this.rng.range(rule.qty[0], rule.qty[1])));
     if (def.weapon) {
       fitAtRandom(item, () => this.rng.next());
+      // (the drum and the long magazine are the bunker's and nobody else's: a rifle found anywhere else has its own)
+      if (where < 5) plainMag(item);
       // (what is left at an armed place is a gun that fires: it has its magazine, whatever the dice said)
       if (armed && def.weapon.mag && !item.mag) item.mag = def.weapon.mag;
       // (and on a step where it is a rare find, it is rarer still with its magazine in it)
@@ -453,6 +459,10 @@ export class Economy {
     return true;
   }
 
+  /** when each sort was first found short on each step, since it was last made up (see `restock`) */
+  private shortSince: Record<string, number> = {};
+  /** the spots with somebody living within NEAR_PLAYER metres of them, as of the last count: nothing is put down there */
+  private crowded = new Set<number>();
   /** when each spot was last looted, and what last lay at each (see LOOTED_REST) */
   private looted = new Map<number, number>();
   private lastAt = new Map<number, { id: string; at: number }>();
@@ -579,6 +589,11 @@ export class Economy {
   /** Periodic tick: lifetime cleanup (never in sight of a player) and restocking. */
   tick(dt: number, players: { x: number; z: number }[]) {
     this.time += dt;
+    // (Nothing appears within sight of anybody: DayZ keeps a hundred metres, and this map is small, so fifty. In
+    // a room that is full, under the gas or down the bunker, what a looter took came back onto its shelf three
+    // minutes later with the looter still standing there.)
+    this.crowded.clear();
+    if (players.length) this.points.forEach((p, i) => players.some((q) => Math.hypot(p.x - q.x, p.z - q.z) < NEAR_PLAYER) && this.crowded.add(i));
     const near = (l: WorldLoot) => players.some((p) => Math.hypot(l.x - p.x, l.z - p.z) < 60);
     const now = Date.now();
     for (const l of [...this.loot.values()]) {
@@ -607,9 +622,14 @@ export class Economy {
   /** Puts a sort back up to `want` on a step where fewer than `least` of it are left there, no oftener than `every` seconds. */
   private restock(id: string, where: Tier, want: number, least: number, every: number) {
     const n = this.held(id, where);
-    if (n >= least) return;
     const key = `${id}@${where}`;
-    if (this.time - (this.lastRestock[key] ?? -1e9) < every) return;
+    if (n >= least) return void delete this.shortSince[key];
+    // (The wait runs from when it was first found short, which is within a count of its being taken. It ran from
+    // when its sort was last PUT BACK: a thing that had lain an hour, or since the server started, was back five
+    // seconds after it was taken, however long its rule said. Kamenka's one AK, "three quarters of an hour"
+    // coming back, came straight back. Found on reading, twice over, 2026-10-13.)
+    const since = (this.shortSince[key] ??= this.time);
+    if (this.time - since < every) return;
     // (the clock of a sort starts again when some of it has been put back: with nowhere for it to go just now, a
     // looted spot resting and its only other place taken, it is tried again at the next count and not in seven minutes)
     let put = 0;
@@ -617,7 +637,11 @@ export class Economy {
       if (!this.spawnType(id, -1, where)) break;
       put++;
     }
-    if (put) this.lastRestock[key] = this.time;
+    if (put) {
+      this.lastRestock[key] = this.time;
+      // (made up: the next wait begins at the next loss. Still short, with nowhere to put the rest: tried again at every count.)
+      if (n + put >= least) delete this.shortSince[key];
+    }
   }
 
   serialize() {

@@ -304,11 +304,12 @@ ok('a looted spot, and the ground about it, is left alone for three minutes; and
     const spot = l.point, id = l.item.id;
     sorts.add(id);
     tried++;
-    const had = e.held(id, 3);
+    const had = e.held(id, 3), took = e.time;
     e.take(l.uid);
     for (let t = 0; t < 175; t += 5) {
       e.tick(5, nobody);
-      for (const q of all()) if (q.point >= 0 && q.spawnedAt > e.time - 5.01 && about(q.point, spot) < 6) near++;
+      // (put down since it was taken: what was laid beside it a moment before was laid beside a spot nobody had looted)
+      for (const q of all()) if (q.point >= 0 && q.spawnedAt > took && q.spawnedAt > e.time - 5.01 && about(q.point, spot) < 6) near++;
     }
     if (all().some((q) => q.point === spot)) early++;
     for (let t = 0; t < 600; t += 5) e.tick(5, nobody);

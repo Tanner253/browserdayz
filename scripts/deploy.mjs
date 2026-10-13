@@ -39,13 +39,31 @@ const health = async () => {
   }
 };
 const when = (line, word) => {
+  if (/could NOT/.test(line ?? '')) return NaN;
   const m = new RegExp(`${word} (\\d{4}-\\d\\d-\\d\\dT[0-9:.]+Z)`).exec(line ?? '');
   return m ? Date.parse(m[1]) : NaN;
+};
+/** can the server that is live be told a deploy is coming (one from before 2026-10-13 has no such page) */
+const canSave = async () => {
+  // (a commit that is on no branch: a server that knows of this refuses it by name, and one that does not has no such page)
+  const r = await fetch(`${SERVER}/deploying?sha=${'0'.repeat(40)}`, { signal: AbortSignal.timeout(20_000) }).catch(() => null);
+  return !!(await r?.json().then((j) => typeof j?.ok === 'boolean').catch(() => false));
 };
 
 const head = out('git rev-parse HEAD'), branch = out('git rev-parse --abbrev-ref HEAD');
 if (out('git status --porcelain --untracked-files=no')) throw new Error('there are changes not committed: what would go out is not what is in the repository');
+// (and a file nobody has added, where the site is built from: the site's upload takes whatever is in the folder)
+const stray = out('git status --porcelain --untracked-files=all -- public api src server scripts index.html vercel.json package.json');
+if (stray) throw new Error(`there are files here that are not in the repository, and the site would be built with them:\n${stray}`);
 say(`publishing ${head.slice(0, 7)} (${branch}), protocol ${PROTOCOL}${dry ? '  [dry: nothing is published]' : ''}`);
+
+// ---- whether the live server can be made to save is asked before anything is published: found afterwards, the new
+// site was already out, and whoever opened the page sat at "the server is being updated" until somebody came back
+let able = true;
+if (!siteOnly) {
+  able = await canSave();
+  if (!able && !unsaved) throw new Error(`the live server cannot be told a deploy is coming (it is from before 2026-10-13), so it cannot be made to save first.\nNothing has been published. Run again with --unsaved at a quiet moment, and say first that what is lost, if it leaves no last word, is everything since its last writing.`);
+}
 
 // ---- the site
 if (!serverOnly) {
@@ -94,10 +112,7 @@ for (let k = 0; k < 8 && !saved && !dry; k++) {
   }
 }
 if (dry) {
-  // (a commit that is on no branch yet: a server that knows of this refuses it, and one that does not has no such page)
-  const r = await fetch(`${SERVER}/deploying?sha=${head}`).catch(() => null);
-  const knows = await r?.json().then((j) => typeof j?.ok === 'boolean').catch(() => false);
-  say(`  (dry) the live server ${knows ? 'can be told a deploy is coming, and would save' : 'is from before this and CANNOT be made to save: a push at it rests on its last word alone'}`);
+  say(`  (dry) the live server ${able ? 'can be told a deploy is coming, and would save' : 'is from before this and CANNOT be made to save: a push at it rests on its last word alone'}`);
   process.exit(0);
 }
 let savedAt = NaN;
@@ -107,7 +122,9 @@ if (saved) {
   const after = await health();
   if (after?.boot !== before.boot) throw new Error('the server changed under this: somebody else is deploying');
   // (a save that is not of this minute is not the save that was asked for, unless there was nothing new to write)
-  if (Number.isFinite(savedAt) && Date.now() - savedAt > 120_000 && !saved.again) throw new Error(`what it says it wrote is ${Math.round((Date.now() - savedAt) / 1000)} s old: not pushing on that`);
+  // (said `again`, it is the save of an earlier try at this same commit: good for ten minutes, and no longer)
+  const old = Number.isFinite(savedAt) ? Date.now() - savedAt : 0;
+  if (old > (saved.again ? 600_000 : 120_000)) throw new Error(`what it says it wrote is ${Math.round(old / 1000)} s old: not pushing on that. Wait a minute and run this again.`);
 } else if (!unsaved) {
   throw new Error(`the live server could NOT be made to save (last written: ${before.saved ?? 'it does not say'}).\nNothing is pushed. If it is a server from before 2026-10-13 it has no way to be told: push with --unsaved at a quiet moment, and say first what may be lost.`);
 } else say(`  NOT SAVED, and going on because --unsaved was given: if the old server leaves no last word, everything since its last writing is lost`);
@@ -124,14 +141,24 @@ for (let k = 0; k < 150; k++) {
   if (now && now.boot !== before.boot) break;
 }
 if (!now || now.boot === before.boot) throw new Error('ten minutes on, the old server still answers: look at the host');
-for (let k = 0; k < 110 && now?.kept === 'not read yet'; k++) {
+// (the new server waits for the old one's last word, and then for the store to hand it over: thirteen minutes at the most)
+for (let k = 0; k < 170 && now?.kept === 'not read yet'; k++) {
   await sleep(5000);
   now = (await health()) ?? now;
 }
 say(`new: boot ${now.boot}, protocol ${now.protocol}\n  KEPT: ${now.kept}`);
 const keptAt = when(now.kept, 'kept at');
-if (!/not a last word/.test(now.kept)) say('\nEverything came through to the moment the old server stopped.');
-else if (Number.isFinite(savedAt) && keptAt >= savedAt - 1000) say(`\nThe old server left NO last word. What came through is the save made before the push (${new Date(keptAt).toISOString()}): what anybody did in the ${Math.round((Date.now() - keptAt) / 1000)} s after it, until the old server stopped, is lost. Say so.`);
+const read = /^\d+ characters and \d+ stashes as they were kept at /.test(now.kept ?? '');
+if (now.kept === 'not read yet') {
+  say('\nNOT KNOWN: a quarter of an hour on, the new server has still not read what was kept. Nobody is let in until it has. Look at /healthz again in a few minutes, and at the host.');
+  process.exit(1);
+} else if (/nothing has been kept yet/.test(now.kept) && !/\d+ characters/.test(before.kept ?? '')) say('\nThere was nothing kept before, and there is nothing now: as it should be.');
+else if (!read) {
+  say(`\nNOT READ: the new server did not take in what was kept ("${now.kept}"). Everybody on it begins afresh until this is put right, and it writes nothing over what is kept. Say so at once.`);
+  process.exit(1);
+} else if (!/not a last word/.test(now.kept)) say('\nEverything came through to the moment the old server stopped.');
+// (the save's line gives the time it was DONE and the file the time it was BEGUN: a minute between them is the same save)
+else if (Number.isFinite(savedAt) && keptAt >= savedAt - 60_000) say(`\nThe old server left NO last word. What came through is the save made before the push (${new Date(keptAt).toISOString()}): what anybody did in the ${Math.round((Date.now() - keptAt) / 1000)} s since is lost. The new server goes on looking for the last word for a quarter of an hour: read "kept" on /healthz again then.`);
 else {
   say(`\nLOST: the old server left no last word, and what the new one has is from ${Number.isFinite(keptAt) ? new Date(keptAt).toISOString() : 'an unknown time'}. Everything since then is gone. Say so at once.`);
   process.exit(1);

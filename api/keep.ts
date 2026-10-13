@@ -25,6 +25,11 @@
 //   - Nothing is written over a copy its writer has not seen: a save says the newest copy its server knows of
 //     (`seen`), and when what is held is another server's and newer than that, it is handed back instead of
 //     written over (`newer`), for the game server to take in first.
+//   - A server's own next writing does not wait on the store's cache. Every writing is answered with the store's
+//     mark for it, and the server says that mark with its next: when the store cannot be read but the file is
+//     still the very one this server wrote (the mark says so, and the store itself checks it as it writes), the
+//     server knows what it is writing over, and is written. (Without this, a save made as a deploy began left the
+//     store unreadable for the hundred seconds in which the same server then had to say its last word.)
 
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { pepperOf } from './admin.js';
@@ -59,29 +64,37 @@ export async function keep(request: Request, store: Store = blobStore, env: Reco
   if (body.length > 4_000_000) return Response.json({ error: 'too much to keep' }, { status: 413 });
   const at = request.headers.get('x-zona-at') ?? '', sig = request.headers.get('x-zona-auth') ?? '';
   if (!/^\d{13}$/.test(at) || Math.abs(Date.now() - Number(at)) > 5 * 60_000 || !same(sig, keepAuth(pepperOf(secret), at, body))) return Response.json({ error: 'not the game server' }, { status: 403 });
-  let op: { op?: string; at?: string; boot?: string; final?: boolean; z?: string; seen?: string };
+  let op: { op?: string; at?: string; boot?: string; final?: boolean; z?: string; seen?: string; mark?: string };
   try {
     op = JSON.parse(body);
   } catch {
     return Response.json({ error: 'not understood' }, { status: 400 });
   }
-  let held: { data: Kept; mark: string } | null;
+  const STALE = { ok: false, stale: true, why: 'a newer copy has been written and the store is not serving it yet: ask again' };
+  let held: { data: Kept; mark: string } | null = null, unread = false;
   try {
     held = await store.read<Kept>(FILE);
   } catch (e) {
-    // (a newer copy has been written, and the store is not serving it yet: said so, and asked again)
-    if (/old copy/.test(e instanceof Error ? e.message : '')) return Response.json({ ok: false, stale: true, why: 'a newer copy has been written and the store is not serving it yet: ask again' }, none);
-    throw e;
+    // (a newer copy has been written, and the store is not serving it yet)
+    if (!/old copy/.test(e instanceof Error ? e.message : '')) throw e;
+    unread = true;
   }
-  if (op.op === 'load') return Response.json({ ok: true, save: held?.data ?? null }, none);
+  if (op.op === 'load') return Response.json(unread ? STALE : { ok: true, save: held?.data ?? null }, none);
   if (op.op === 'save') {
     if (typeof op.z !== 'string' || !op.z || !/^[A-Za-z0-9+/=]+$/.test(op.z)) return Response.json({ error: 'nothing to keep' }, { status: 400 });
     const next: Kept = { at: text(op.at, 30), boot: text(op.boot, 32), final: !!op.final, z: op.z };
+    if (unread) {
+      // (It cannot be read: but if it is still the very file this server last wrote, the server knows what is
+      // there. The store checks the mark as it writes: somebody else's writing since, and this is refused.)
+      const own = typeof op.mark === 'string' && op.mark ? await store.swap(FILE, next, op.mark) : false;
+      return Response.json(own === false ? STALE : { ok: true, mark: own }, none);
+    }
     // (never over a copy its writer has not seen. A server from before this rule says nothing of what it has
     // seen, and is written as it always was.)
     if (typeof op.seen === 'string' && held && held.data.boot !== next.boot && held.data.at > op.seen) return Response.json({ ok: false, newer: true, save: held.data, why: 'what is kept is newer than anything this server has read: take it in first' }, none);
-    if ((await store.swap(FILE, next, held?.mark ?? null)) === false) return Response.json({ ok: false, why: 'it was being written by something else: try again' }, none);
-    return Response.json({ ok: true }, none);
+    const mark = await store.swap(FILE, next, held?.mark ?? null);
+    if (mark === false) return Response.json({ ok: false, why: 'it was being written by something else: try again' }, none);
+    return Response.json({ ok: true, mark }, none);
   }
   return Response.json({ error: 'no such thing to do' }, { status: 400 });
 }
