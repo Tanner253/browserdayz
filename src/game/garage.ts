@@ -10,7 +10,7 @@ import type { Input, MoveInput } from '../core/input';
 import { physics, SOLID_GROUPS } from '../core/physics';
 import type { Atmosphere, ShaderPatch } from '../world/atmosphere';
 import { WEAPON_RULES } from '../sim/combat';
-import { JEEP, POLICE_CAR, RIDE_HEIGHT, SEATS, crashDamage, jeepSpots, policeSpots, restState, type VehicleInfo, type VState } from '../sim/vehicles';
+import { JEEP, POLICE_CAR, RIDE_HEIGHT, SEATS, carDamage, crashDamage, jeepSpots, policeSpots, restState, type VehicleInfo, type VState } from '../sim/vehicles';
 import { gasEdge, gasZone, type GasZone } from '../sim/gas';
 import type { Net } from '../net/client';
 import { roadLift } from '../world/road';
@@ -602,7 +602,7 @@ export class Garage {
     if (this.h.online()) this.h.net.send({ t: 'vhit', i: j.i, w: weapon });
     else {
       const rule = WEAPON_RULES[weapon];
-      j.hp = Math.max(0, j.hp - (rule ? rule.damage * (rule.blast ? 2 : 1) : 0));
+      j.hp = Math.max(0, j.hp - (rule ? carDamage(rule) : 0));
     }
   }
 

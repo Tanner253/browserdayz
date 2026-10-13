@@ -10,6 +10,11 @@
 
 import { BUILDING_FOOTPRINT, PLAY_RADIUS, WORLD_SIZE, heightAt, type World } from '../world/worldgen';
 
+/** What one hit takes off a car: a bullet's own harm up to `JEEP.shot`, a blast's `JEEP.blast` times over. The server's rule and the game's own, alone. */
+export function carDamage(rule: { damage: number; blast?: number }): number {
+  return rule.blast ? rule.damage * JEEP.blast : Math.min(rule.damage, JEEP.shot);
+}
+
 export const JEEP = {
   /** the model it is drawn with (see scripts/assets.config.mjs): without it there are no jeeps */
   model: 'uaz_469',
@@ -24,10 +29,22 @@ export const JEEP = {
    */
   far: 5,
   /**
-   * What it takes before it burns: a rifle round takes 95 of it, a pistol round 34. (Three times what it was,
-   * 2026-10-11: "we need to triple the HP of cars they blow up too easily". It was 600.)
+   * What it takes before it burns. (Three times what it was, 2026-10-11: "we need to triple the HP of cars they blow
+   * up too easily": 600 to 1800. And three times that, 2026-10-13: "cars should have 3x more HP theyre too weak and
+   * easy to kill. it should take at least 100 bullets to explode a car with bullets ... heavy bullets".)
    */
-  hp: 1800,
+  hp: 5400,
+  /**
+   * The most one bullet takes off it: a hundredth of what there is between whole and alight (`fireAt`), so the
+   * heaviest round there is, the sniper's 95 or the Desert Eagle's 58, needs a hundred and one to set it burning,
+   * as the AK's does; the AR-15 needs 114 and a 9 mm 140. Without this the sniper's needed fifty.
+   */
+  shot: 47.5,
+  /**
+   * How many times what it does to a body a blast does to a car: a grenade takes a sixth of a whole car and a fuel
+   * drum a fifth, as they did before it was made three times as strong (it was twice, of a third as much).
+   */
+  blast: 6,
   /**
    * Left under the gas: one that has stood empty there this many seconds, with nobody within this many metres of
    * it, is stood back where it first stood, whole and fuelled as a new one is (2026-10-11: "cars left in the gas

@@ -147,6 +147,26 @@ const KIND = {
   },
 };
 
+/**
+ * A drum's blast and a car's are drawn so much bigger than the figures above (2026-10-13: "exploding barrels should
+ * have larger explosion SFX ... Cars should also have larger explosion SFX size (maybe 15% for each)"): everything
+ * that is a size or a reach, and how fast it throws itself out, so that it is the same blast, larger.
+ */
+const BIGGER = 1.15;
+for (const k of [KIND.drum, KIND.vehicle]) {
+  const by = (a: number[]) => a.forEach((v, i) => (a[i] = v * BIGGER));
+  by(k.flash);
+  by(k.fire.r);
+  k.fire.out *= BIGGER; k.fire.rise *= BIGGER; k.fire.lift *= BIGGER;
+  by(k.smoke.r); by(k.smoke.up);
+  k.smoke.out *= BIGGER; k.smoke.lift *= BIGGER;
+  if (k.column) { by(k.column.r); k.column.up *= BIGGER; k.column.from *= BIGGER; }
+  k.dust.reach *= BIGGER; by(k.dust.r);
+  k.ring *= BIGGER; k.shock[0] *= BIGGER;
+  k.thrown *= BIGGER; k.burn *= BIGGER;
+  k.light.reach *= BIGGER;
+}
+
 /** the dust a blast raises off each kind of ground, and what its spray of clods is the colour of (as light sent back: 1 is white) */
 const DUST: Record<Ground, [number, number]> = {
   grass: [0x6f6448, 0x2a2318], dirt: [0x6a5a44, 0x2a2016], rock: [0x8d877c, 0x4a4640], gravel: [0x8a8070, 0x46413a], asphalt: [0x5a5856, 0x1c1b1a],

@@ -31,7 +31,7 @@ import { BUNKER, bunkerDark, inBunker } from '../src/sim/bunker';
 import { phaseOf } from '../src/sim/daynight';
 import { WEAPON_RULES, hitDamage, type HitZone } from '../src/sim/combat';
 import { BARREL } from '../src/sim/barrels';
-import { JEEP, POLICE_CAR, SEATS, crashDamage, restState, type VehicleInfo, type VState } from '../src/sim/vehicles';
+import { JEEP, POLICE_CAR, SEATS, carDamage, crashDamage, restState, type VehicleInfo, type VState } from '../src/sim/vehicles';
 import { Director, INFECTED, guarded, infectedDrop } from '../src/sim/infected';
 import { EMOTE, EMOTE_GAP, SHOUT_RANGE } from '../src/sim/emotes';
 import { BLOOD, bleedOf, bloodOf, withWound, woundOf } from '../src/sim/blood';
@@ -3605,12 +3605,11 @@ function handle(c: Client, m: C2S) {
       const now = Date.now();
       const d = Math.hypot(c.pose[0] - v.s[0], c.pose[1] - v.s[1], c.pose[2] - v.s[2]);
       if (d > rule.range + 6) return;
-      let amount = rule.damage;
+      const amount = carDamage(rule);
       if (rule.blast) {
         // a grenade thrown or a drum set off in the last moments, near enough to reach it
         const recent = m.w === 'barrel' ? c.blasts.some((q) => now - q.at < 4000) : now - c.lastNade < 9000;
         if (!recent) return;
-        amount = rule.damage * 2;
       } else {
         if (c.w !== m.w || now - c.lastVHit < rule.interval * 700) return;
       }

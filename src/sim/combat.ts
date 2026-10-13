@@ -46,8 +46,10 @@ export const WEAPON_RULES: Record<string, WeaponRule> = {
   shovel: { damage: 36, melee: true, range: 3.9, interval: 0.55, falloff: 1 },
   knife: { damage: 27, melee: true, range: 3.3, interval: 0.3, falloff: 1 },
   grenade: { damage: 150, melee: false, range: 70, interval: 0, falloff: 1, blast: 9 },
-  // a fuel drum somebody shot (see src/sim/barrels.ts): whoever fired may be a rifle shot away
-  barrel: { damage: 140, melee: false, range: 900, interval: 0, falloff: 1, blast: 8 },
+  // a fuel drum somebody shot (see src/sim/barrels.ts): whoever fired may be a rifle shot away. (140 and 8 m until
+  // 2026-10-13: "exploding barrels should have larger explosion SFX and do more damage": more than a grenade's now,
+  // and as much further as its blast is drawn bigger.)
+  barrel: { damage: 180, melee: false, range: 900, interval: 0, falloff: 1, blast: 9.2 },
   // run down by a jeep (see src/sim/vehicles.ts): how much it hurts is how fast the jeep was going
   jeep: { damage: 0, melee: true, range: 8, interval: 0.4, falloff: 1 },
   // the arms of one of the infected (see src/sim/infected.ts): never a player's to hit with
