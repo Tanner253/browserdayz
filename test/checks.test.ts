@@ -167,6 +167,51 @@ await withServer('enforce', async (log) => {
   checks++;
   console.log('  ok  a run is a run; a jump across the map is refused, written down, and nobody else sees it');
 
+  // ---- a little too fast, every time, is too fast: what is let go is owed (it used to be forgotten, and twice the
+  // pace of a sprint could be held for as long as anybody liked with nothing written down)
+  const rex = new Player('Rex'), sam = new Player('Sam');
+  await rex.join();
+  await sam.join();
+  sam.say(4, -40);
+  rex.say(0, -40);
+  await sleep(2700);
+  // (20 m/s for six seconds, each step by itself inside what is let go at any one time)
+  const began = Date.now();
+  for (let k = 1; k <= 60; k++) {
+    rex.say(k * 2, -40);
+    sam.say(4, -40);
+    await sleep(100);
+  }
+  const took = (Date.now() - began) / 1000;
+  await sleep(300);
+  assert.ok(/\[check:enforce\] Rex moved/.test(log()), 'nothing was written down of somebody going twice as fast as a sprint for six seconds');
+  const got = sam.sees(rex.id);
+  // (as far as legs go in the time, with the two seconds saved, what is let go once, and what may be owed)
+  assert.ok(got && got[0] < 9.5 * took + 19 + 3 + 30 + 2 && got[0] > 40, `Sam sees Rex at ${got} after ${took.toFixed(1)} s: he said 120, and legs with every allowance go ${(9.5 * took + 52).toFixed(0)}`);
+  // and a line that was held up and lets go all at once is still believed: four seconds of a run, in one burst
+  const tia = new Player('Tia');
+  await tia.join();
+  tia.say(0, -80);
+  await sleep(2700);
+  for (let k = 1; k <= 10; k++) {
+    tia.say(k * 0.74, -80);
+    await sleep(100);
+  }
+  await sleep(4000);
+  for (let k = 11; k <= 50; k++) tia.say(k * 0.74, -80);
+  for (let k = 51; k <= 60; k++) {
+    tia.say(k * 0.74, -80);
+    sam.say(4, -40);
+    await sleep(100);
+  }
+  await sleep(300);
+  assert.ok(!/\[check:enforce\] Tia/.test(log()), `a check fired on a line that was held up:\n${log().split('\n').filter((l) => l.includes('Tia')).join('\n')}`);
+  const there = sam.sees(tia.id);
+  assert.ok(there && Math.abs(there[0] - 44.4) < 1, `Sam sees Tia at ${there}, and she ran to 44.4`);
+  for (const p of [rex, sam, tia]) p.ws.close();
+  checks++;
+  console.log('  ok  a little too fast every time is refused once it adds up; a line held up and let go at once is believed');
+
   // ---- a round does not go through a hill
   const cid = new Player('Cid'), dee = new Player('Dee'), eve = new Player('Eve'), fay = new Player('Fay');
   for (const p of [cid, dee, eve, fay]) await p.join();

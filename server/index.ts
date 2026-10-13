@@ -531,7 +531,8 @@ const CHECKS = (['off', 'watch', 'enforce'].includes(process.env.CHECKS ?? '') ?
  *   foot  – the fastest anybody is let go on their own legs, m/s along the ground (a sprint with empty hands is 7.4)
  *   seat  – and in a jeep (which is held to 60: see isVState)
  *   carry – seconds of going that fast that may be saved up: what a connection that was held up sends all at once
- *   grace – metres let go on top of that, every time
+ *   grace – metres let go on top of that at any one time, and
+ *   owe   – the most of it that may be owed at once: what is let go is paid back out of time left over, before any is saved
  *   free  – ms after being set down somewhere (a start, a seat taken or left) in which where they are is not questioned
  *   kick  – so many refusals inside a minute, and the connection is closed (when enforcing)
  *   hill  – how far the ground may stand over the line of a shot before the shot is through a hill, metres
@@ -542,7 +543,7 @@ const CHECKS = (['off', 'watch', 'enforce'].includes(process.env.CHECKS ?? '') ?
  *   down  – how many ms they are given to say so themselves, as every honest game does
  *   strikes, ban – put off the server so many times inside an hour, and they are kept off it for so many hours
  */
-const CHECK = { foot: 9.5, seat: 64, carry: 2, grace: 3, free: 2500, kick: Number(process.env.CHECK_KICK) || 12, hill: 1.5, high: [30, 4], reach: 8, heal: 10, over: 15, down: 1500, strikes: 2, ban: 6 };
+const CHECK = { foot: 9.5, seat: 64, carry: 2, grace: 3, owe: 30, free: 2500, kick: Number(process.env.CHECK_KICK) || 12, hill: 1.5, high: [30, 4], reach: 8, heal: 10, over: 15, down: 1500, strikes: 2, ban: 6 };
 let flagged = 0;
 
 /** Something a check fires on: counted, and written down (not more than once in five seconds for one player). @returns whether it is refused */
@@ -584,6 +585,7 @@ function moveCheck(c: Client, to: Pose, now: number): boolean {
   if (CHECKS === 'off' || !c.alive || now < k.free || c.power.clip || roleOf(c) === 'admin') {
     k.at = now;
     k.carry = 0;
+    k.owed = 0;
     k.high = 0;
     return true;
   }
@@ -603,14 +605,29 @@ function moveCheck(c: Client, to: Pose, now: number): boolean {
       return false;
     }
   } else if (!k.high) k.hovered = 0;
-  if (dist <= allow + CHECK.grace) {
+  // (What the grace lets go is owed, and is paid back out of whatever time is left over before any of that is
+  // saved. It used to be let go every time and forgotten: anybody could go a little too fast for ever, and at
+  // fifteen positions a second "a little" came to 45 m/s on top of a sprint; 11 m/s held for eighteen seconds was
+  // not written down once (found 2026-10-13, measuring the slides). Owing `owe`, nothing more is let go until
+  // some is paid. Thirty metres is what a line held up for six seconds and let go all at once would owe at a
+  // dead sprint, past the two seconds it has saved: an honest game owes nothing like it.)
+  const short = dist - allow;
+  if (short <= CHECK.grace && (short <= 0 || k.owed + short <= CHECK.owe)) {
     k.at = now;
-    k.carry = Math.min(most * CHECK.carry, Math.max(0, allow - dist));
+    if (short > 0) {
+      k.owed += short;
+      k.carry = 0;
+    } else {
+      const back = Math.min(k.owed, -short);
+      k.owed -= back;
+      k.carry = Math.min(most * CHECK.carry, -short - back);
+    }
     return true;
   }
-  if (!flag(c, `moved ${dist.toFixed(0)} m in ${dt.toFixed(2)} s ${c.seatAt ? 'in a jeep' : 'on foot'}, to ${to[0].toFixed(0)}, ${to[2].toFixed(0)}`)) {
+  if (!flag(c, `moved ${dist.toFixed(0)} m in ${dt.toFixed(2)} s ${c.seatAt ? 'in a jeep' : 'on foot'}, to ${to[0].toFixed(0)}, ${to[2].toFixed(0)}${short <= CHECK.grace ? `, ${k.owed.toFixed(0)} m ahead of their legs already` : ''}`)) {
     k.at = now;
     k.carry = 0;
+    k.owed = 0;
     return true;
   }
   k.refused = k.refused.filter((t) => now - t < 60000);
@@ -1686,6 +1703,7 @@ function place(t: Client, x: number, y: number | null, z: number, by: Client) {
   t.check.free = now + CHECK.free;
   t.check.at = now;
   t.check.carry = 0;
+  t.check.owed = 0;
   t.underAt = 0;
   send(t, { t: 'put', x, ...(y === null ? {} : { y }), z, ...(by === t ? {} : { by: by.name }) });
 }
@@ -2619,6 +2637,8 @@ interface Client {
    */
   check: {
     at: number; carry: number; free: number; high: number; hovered: number; flags: number; said: number; refused: number[];
+    /** metres the grace has let them go ahead of their legs, not yet paid back: see moveCheck */
+    owed: number;
     /** how they have been going about lately: see gaitCheck */
     gait?: { since: number; yaw: number; pitch: number; far: number; turns: number; dx: number; dz: number };
     /** the most health they can have (see `dealt`), when that was reckoned, and since when it has been less than none (0: it is not) */
@@ -3704,7 +3724,7 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
     heardAt: Date.now(), kept: false, asleep: 0, bled: 0, logoutAt: 0, logoutFrom: [0, 0],
     since: Date.now(), spoke: false, resumed: !!resume,
     inv: resume?.inv ?? null, vitals: resume?.vitals ?? null,
-    outAt: 0, underAt: 0, lastHit: 0, lastVHit: 0, seatAt: 0, lastNade: 0, nadeHits: 0, blasts: [], lastEmote: 0, lastChat: 0, lastHitBy: null, openCid: null, check: { at: Date.now(), carry: 0, free: Date.now() + CHECK.free, high: 0, hovered: 0, flags: 0, said: 0, refused: [], hp: Math.min(100, resume?.vitals?.health ?? 100), hpAt: Date.now(), downAt: 0, unknown: new Set() }, activeAt: Date.now(), joinedAt: Date.now(), ip: ipOf.get(ws) ?? '', lifeAt: Date.now(), msgCount: 0, msgWindow: Date.now(),
+    outAt: 0, underAt: 0, lastHit: 0, lastVHit: 0, seatAt: 0, lastNade: 0, nadeHits: 0, blasts: [], lastEmote: 0, lastChat: 0, lastHitBy: null, openCid: null, check: { at: Date.now(), carry: 0, owed: 0, free: Date.now() + CHECK.free, high: 0, hovered: 0, flags: 0, said: 0, refused: [], hp: Math.min(100, resume?.vitals?.health ?? 100), hpAt: Date.now(), downAt: 0, unknown: new Set() }, activeAt: Date.now(), joinedAt: Date.now(), ip: ipOf.get(ws) ?? '', lifeAt: Date.now(), msgCount: 0, msgWindow: Date.now(),
   };
   records.delete(key);
   KEPT.chars.delete(keyHash(key));
