@@ -23,7 +23,7 @@ import { GLASS_GROUPS, WORLD_GROUPS, physics } from '../core/physics';
 import { assets } from '../core/assets';
 import { breathe } from '../core/breathe';
 import { SHADOW_FRUSTA, type Atmosphere, type ShaderPatch } from './atmosphere';
-import { ARCADE, CASTLE, LAMPS, UNDER, castleAt, castleLocal, castleUnder, castleDoor, castleKit, castleLamps, castleLoose, castleRocks, looseLocal, type GroundAt, type Loose, type Place } from '../sim/castle';
+import { ARCADE, CASTLE, CASTLE_SCALE, LAMPS, UNDER, castleAt, castleLocal, castleUnder, castleDoor, castleKit, castleLamps, castleLoose, castleRocks, looseLocal, type GroundAt, type Loose, type Place } from '../sim/castle';
 import { PICTURES, SHEETS, castleShapeSteps, castleSky, type Shape, type Sheet, type Skin, type Solid } from './castle-shape';
 import { kitMeshes, stoneLook, type StoneLook } from './kit';
 import { PostSite } from './castle-post';
@@ -41,7 +41,7 @@ const FAR_HOLLOWS = 0.45;
 /** how far off the kit's far copy is sent for: until it comes, blocks stand for the kit's pieces from far off */
 const FAR_KIT = 900;
 /** how much snow lies on it where nobody has said: the mountain it is made for is over the snow line, and not at its top */
-export const SNOW_ON_THE_MOUNTAIN = 0.7;
+export const SNOW_ON_THE_MOUNTAIN = 0;
 /** a cresset's fire: the colour of its light, how far that carries, and how big its flames are beside a campfire's */
 export const CRESSET = { colour: new THREE.Color(1, 0.62, 0.3), reach: 11, size: 0.26 };
 
@@ -312,7 +312,7 @@ export class CastleSite {
     // (Here, as the game starts: only what is seen from far off, and the earth over the cut ground. The rest of it is
     // made afterwards a piece at a time, between frames: see `make`.)
     const steps = castleShapeSteps(
-      ground ? (x, z) => { const [wx, , wz] = castleAt(P, x, z); return ground(wx, wz) - P.y; } : undefined,
+      ground ? (x, z) => { const [wx, , wz] = castleAt(P, x, z); return (ground(wx, wz) - P.y) / CASTLE_SCALE; } : undefined,
       looseLocal(P, o.loose ?? castleLoose(P)),
       o.rock !== false,
     );
@@ -323,6 +323,8 @@ export class CastleSite {
     all.name = 'castle';
     all.position.set(P.x, P.y, P.z);
     all.rotation.y = P.rot;
+    // (the whole of it a fifth bigger than its own measure: see CASTLE_SCALE)
+    all.scale.setScalar(CASTLE_SCALE);
     all.updateMatrix();
     all.matrixAutoUpdate = false;
     // from far off: one shape, no picture, coloured corner by corner; aged and snowed on as the near one is, so it is the same fort
@@ -516,7 +518,7 @@ export class CastleSite {
     const door = await kitMeshes('large_castle_door', castleDoor(), { dress: (m, name) => this.atmo.register(m, undefined, `castle door ${name}`) });
     // scanned rock round the rock the ramp leaves from and under the walls: the far copy's few triangles, the model's own pictures
     const ground = this.o.ground, P = this.place;
-    const rocks = await kitMeshes('rock_face_01', castleRocks(ground ? (x, z) => { const [wx, , wz] = castleAt(P, x, z); return ground(wx, wz) - P.y; } : undefined, this.o.rock !== false), {
+    const rocks = await kitMeshes('rock_face_01', castleRocks(ground ? (x, z) => { const [wx, , wz] = castleAt(P, x, z); return (ground(wx, wz) - P.y) / CASTLE_SCALE; } : undefined, this.o.rock !== false), {
       shapes: 1,
       attr: { name: 'aSnow', of: () => [1, 9] },
       dress: (m, name) => this.atmo.register(m, stoneLook({ ...ROCK_STONE, snow: this.snowU, attr: 'aSnow' }), `castle rock ${name}`),
@@ -579,7 +581,7 @@ export class CastleSite {
     const P = this.place, R = physics.R, turn = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), P.rot);
     const at = (x: number, y: number, z: number) => { const [wx, wy, wz] = castleAt(P, x, z, y); return { x: wx, y: wy, z: wz }; };
     if (s.t === 'box') {
-      physics.addStaticQuat(R.ColliderDesc.cuboid(s.h[0], s.h[1], s.h[2]), s.surface, at(s.c[0], s.c[1], s.c[2]), turn.clone().multiply(new THREE.Quaternion(s.q[0], s.q[1], s.q[2], s.q[3])), undefined, s.feet ? GLASS_GROUPS : WORLD_GROUPS);
+      physics.addStaticQuat(R.ColliderDesc.cuboid(s.h[0] * CASTLE_SCALE, s.h[1] * CASTLE_SCALE, s.h[2] * CASTLE_SCALE), s.surface, at(s.c[0], s.c[1], s.c[2]), turn.clone().multiply(new THREE.Quaternion(s.q[0], s.q[1], s.q[2], s.q[3])), undefined, s.feet ? GLASS_GROUPS : WORLD_GROUPS);
     } else if (s.t === 'hull') {
       const pts = new Float32Array(s.pts.length);
       for (let i = 0; i < s.pts.length; i += 3) {
@@ -592,7 +594,7 @@ export class CastleSite {
       // (ground, given as the ground itself is: so that the legs' rule for steep ground holds on it, as on any hillside)
       const W = s.nx + 1, hcm = new Float32Array(W * (s.nz + 1));
       for (let ix = 0; ix <= s.nx; ix++) for (let iz = 0; iz <= s.nz; iz++) hcm[iz + ix * (s.nz + 1)] = s.heights[iz * W + ix];
-      physics.addStatic(R.ColliderDesc.heightfield(s.nz, s.nx, hcm, { x: s.nx * s.cell, y: 1, z: s.nz * s.cell }), s.surface, at(s.x0 + (s.nx * s.cell) / 2, 0, s.z0 + (s.nz * s.cell) / 2), P.rot);
+      physics.addStatic(R.ColliderDesc.heightfield(s.nz, s.nx, hcm, { x: s.nx * s.cell * CASTLE_SCALE, y: CASTLE_SCALE, z: s.nz * s.cell * CASTLE_SCALE }), s.surface, at(s.x0 + (s.nx * s.cell) / 2, 0, s.z0 + (s.nz * s.cell) / 2), P.rot);
     }
   }
 

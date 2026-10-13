@@ -18,7 +18,7 @@
 import type { Place } from './bunker';
 // (the post that holds the fort above ground is another file's: its things and the places things lie in it join the fort's own here. Its lamps do not: it lights them itself, and they are no fires.)
 import { postLoot, postProps } from './castle-post';
-import { KIT_GATE, KIT_LEVELS, KIT_MERLON, KIT_TOWER, cutBox, cutRound, cutTurned, type Cut, type KitPiece } from './kit';
+import { KIT_GATE, KIT_LEVELS, KIT_MERLON, KIT_TOWER, cutBox, type KitPiece } from './kit';
 
 export type { Place };
 
@@ -201,15 +201,23 @@ export type Part = Box | Slab | Beam | Rail | Flight | Wall | Curtain | Tower | 
 
 // ------------------------------------------------------------------ where it is
 
+/**
+ * How much bigger than its own measure the fort is built (the owner, 2026-10-13: "the castle is too small looking
+ * on the map, can we scale the whole model up by 20%?"). ONE scale for the whole of it: every length in this file
+ * and in the post's is in the fort's own measure, which is the kit's pieces at the size they were drawn, and all
+ * of it is set down in the world this much bigger: the kit, the door, the stone made here, the lower levels, and
+ * whatever stands in it. Not the hamlet's houses before its gate, which are houses and not the fort's.
+ */
+export const CASTLE_SCALE = 1.2;
 /** A spot in the fort's own measure, as a place in the world. */
 export function castleAt(p: Place, x: number, z: number, y = 0): V3 {
-  const c = Math.cos(p.rot), s = Math.sin(p.rot);
-  return [p.x + x * c + z * s, p.y + y, p.z - x * s + z * c];
+  const c = Math.cos(p.rot), s = Math.sin(p.rot), S = CASTLE_SCALE;
+  return [p.x + S * (x * c + z * s), p.y + S * y, p.z + S * (-x * s + z * c)];
 }
 /** A place in the world, in the fort's own measure: [x, z, above the terrace]. */
 export function castleLocal(p: Place, wx: number, wy: number, wz: number): V3 {
-  const dx = wx - p.x, dz = wz - p.z, c = Math.cos(p.rot), s = Math.sin(p.rot);
-  return [dx * c - dz * s, dx * s + dz * c, wy - p.y];
+  const dx = wx - p.x, dz = wz - p.z, c = Math.cos(p.rot), s = Math.sin(p.rot), S = CASTLE_SCALE;
+  return [(dx * c - dz * s) / S, (dx * s + dz * c) / S, (wy - p.y) / S];
 }
 /** Whether a point is in the fort itself: on its terrace, in its keep or in one of its towers. */
 export function inCastle(p: Place | null, wx: number, wy: number, wz: number): boolean {
@@ -229,12 +237,6 @@ const smooth = (a: number, b: number, v: number) => {
   const t = clamp01((v - a) / (b - a));
   return t * t * (3 - 2 * t);
 };
-/** a line through points [x, y], level beyond its ends */
-const through = (pts: [number, number][], x: number) => {
-  if (x <= pts[0][0]) return pts[0][1];
-  for (let k = 1; k < pts.length; k++) if (x <= pts[k][0]) return pts[k - 1][1] + ((pts[k][1] - pts[k - 1][1]) * (x - pts[k - 1][0])) / (pts[k][0] - pts[k - 1][0]);
-  return pts[pts.length - 1][1];
-};
 const hash = (i: number, j: number, s: number) => {
   let h = (Math.imul(i, 374761393) + Math.imul(j, 668265263) + Math.imul(s, 1442695041)) | 0;
   h = Math.imul(h ^ (h >>> 13), 1274126177);
@@ -248,10 +250,6 @@ export function rough(x: number, z: number, seed: number): number {
   return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
 }
 
-/** the top of the ridge along its length: how high it is under the terrace, by how far east */
-const CREST: [number, number][] = [[-150, -10], [-90, -5], [-50, -3], [-30, -4.5], [-13, -6.1], [0, -6.4], [13, -5.8], [30, -5.4], [42, -8], [60, -12], [90, -14.5], [120, -18], [210, -31]];
-/** how much of the fort's own shelf there is at a point along the ridge: all of it under the fort, none thirty metres off */
-const shelf = (x: number) => 1 - smooth(15, 34, Math.abs(x));
 
 /**
  * The ground the fort is made for, as a height over the terrace (so: a negative number): a knife-edge ridge
@@ -259,19 +257,10 @@ const shelf = (x: number) => 1 - smooth(15, 34, Math.abs(x));
  * steep one to the north, down to a shelf a footpath runs on. It is the brief for whoever shapes the mountain, and
  * the ground the fort is stood on when it is looked at by itself.
  */
-export function castleGround(x: number, z: number): number {
-  const k = shelf(x), top = through(CREST, x);
-  // (away from the fort the ridge's top lies a little north of the fort's own middle line, as the real one's does)
-  const dz = z + 3 * (1 - k);
-  if (dz < 0) {
-    // north: the foot of the wall is lower than the east one's; then thirty degrees, then forty, down to the path
-    const flat = 7 + 9 * k, out = Math.max(0, -dz - flat);
-    const fall = Math.min(out, 10) * 0.58 + Math.min(Math.max(out - 10, 0), 24) * 0.84 + Math.min(Math.max(out - 34, 0), 7) * 0.08 + Math.max(out - 41, 0) * 0.72;
-    return top - 0.9 * k * smooth(0, flat * 0.6, -dz) - fall;
-  }
-  // south: under the fort it falls at close on sixty degrees, and at thirty-six from there down
-  const flat = 6 + 6.6 * k, out = Math.max(0, dz - flat);
-  return top - 1.6 * k * smooth(0, flat * 0.6, dz) - Math.min(out, 6) * 1.6 - Math.max(out - 6, 0) * 0.72;
+export function castleGround(_x: number, _z: number): number {
+  // (THE FORT STANDS ON LEVEL GROUND NOW: on the bench of the valley's rim its yard is the ground's own height, and
+  // the ridge described above is the mountain it has left. Looked at by itself it stands on a plain.)
+  return 0;
 }
 
 /** the rock the ramp starts from: the level top of it, under the terrace, and where that top lies */
@@ -410,15 +399,151 @@ function tower(name: string, cx: number, cz: number, foot: number, rim: number, 
 let made: Part[] | null = null;
 /** Every piece of the fort, its ramp, the rock the ramp leaves from and the rubble under the breach. (Worked out once: it is the same every time. The loose pieces of its grounds are apart: see `looseParts`.) */
 export function castleParts(): Part[] {
-  return (made ??= layOut());
+  return (made ??= [...layOut().filter(stays), ...walled()]);
+}
+/**
+ * What of the fort as it stood on the mountain is NOT built on the rim. There it was a terrace eight metres over
+ * the ground: a parapet round it, a drum on each corner, a ramp of boards up to a gap in the parapet from a rock,
+ * the terrace's own walls going thirteen metres down as footings, a length of wall fallen out of them and a
+ * postern through them onto the slope. Here the terrace is the yard, at the ground's own height, and the kit's
+ * walls and towers stand round it (`walled`): all of that is gone, and the lower levels, which were a storey
+ * over the ground, are under it. The keep, its rooms, the lower levels and the way out of them by the hatch stay.
+ */
+function stays(p: Part): boolean {
+  const n = p.name ?? '';
+  if (p.t === 'tower' || p.t === 'curtain') return false;
+  if (p.t === 'mound') return p.kind === 'vault';
+  if (/^(footing|ramp|ramp rail|ramp trestle|rock on the outcrop|rock by the ramp head|fallen block|merlon stump|broken parapet|fallen merlon|fallen boards|gate leaf|broken wall end|postern (landing|sill|jamb|lintel|stair))$/.test(n)) return false;
+  // (stones that lay on the slopes about it, and whatever else lay outside its terrace)
+  if (p.t === 'lump' && (Math.abs(p.x) > CASTLE.hx - 0.4 || Math.abs(p.z) > CASTLE.hz - 0.4)) return false;
+  return true;
+}
+/**
+ * The fort's own stone about the kit's pieces (`castleKit`): what the kit does not have, and what closes every
+ * place the kit is cut or left open (a piece of the kit is a shell with no underside and, where it is cut, no
+ * side: "EVERY cut in a kit shell capped").
+ */
+function walled(): Part[] {
+  const F = FORT, W = F.wall, K = F.walkway, U = UNDER, C = CASTLE, parts: Part[] = [], D = W.deep / 2;
+  // (the keep's own stone, a shade darker: of what the fort has, the nearest to the kit's walls it stands against)
+  const stone = { paint: 'stone' as Paint, tone: 0.84, straight: true, at: 'both' as const };
+  const box = (name: string, x0: number, x1: number, y0: number, y1: number, z0: number, z1: number, o: Partial<Box> = {}) => void parts.push({ t: 'box', ...stone, name, x0: Math.min(x0, x1), x1: Math.max(x0, x1), y0, y1, z0: Math.min(z0, z1), z1: Math.max(z0, z1), ...o });
+  // THE BASE COURSE under each wall: from deep in the ground to the kit's foot, a hand proud of it outside and
+  // well inside its shell within, so that no face of it lies in the plane of a face of the kit's.
+  const course = (name: string, a: [number, number], b: [number, number]) => void parts.push({ t: 'wall', ...stone, tone: 0.78, name, a, b, y0: -F.base.deep, top: 0.02, thick: W.deep - 0.3 + F.base.proud });
+  const off = (F.base.proud - 0.3) / 2;
+  course('gate wall base', [LINE.gate + off, -F.tz], [LINE.gate + off, F.tz]);
+  course('back wall base', [LINE.back - off, F.tz], [LINE.back - off, -F.tz]);
+  course('valley wall base', [LINE.back, LINE.valley + off], [LINE.gate, LINE.valley + off]);
+  course('hill wall base', [LINE.gate, LINE.hill - off], [LINE.back, LINE.hill - off]);
+  // (and round each tower's foot: sixteen short lengths of it)
+  for (const [cx, cz] of [[LINE.gate, LINE.valley], [LINE.gate, LINE.hill], [LINE.back, LINE.hill], [LINE.back, LINE.valley]]) for (let k = 0; k < 16; k++) {
+    const r = F.tower.foot + F.base.proud - 0.5, a0 = (k / 16) * Math.PI * 2, a1 = ((k + 1) / 16) * Math.PI * 2, out = 1 / Math.cos(Math.PI / 16);
+    parts.push({ t: 'wall', ...stone, tone: 0.78, name: 'tower base', a: [cx + Math.cos(a0) * r * out, cz + Math.sin(a0) * r * out], b: [cx + Math.cos(a1) * r * out, cz + Math.sin(a1) * r * out], y0: -F.base.deep, top: 0.02, thick: 1 });
+  }
+  // THE YARD'S PAVING beyond the old terrace's, as far as the ground under it is let down for the lower levels and a
+  // pace over: the lower levels' roof is the paving, and the ground about them is cut in two-metre squares.
+  {
+    const x0 = -(U.x + 2.9), x1 = U.x + 2.9, z0 = -(U.z + 2.9), z1 = U.z + 2.9, ix = C.hx - 1.24, iz = C.hz - 1.24;
+    for (const [a, b, c, d] of [[x0, x1, z0, -iz], [x0, x1, iz, z1], [x0, -ix, -iz, iz], [ix, x1, -iz, iz]]) parts.push({ t: 'box', paint: 'paving', name: 'yard paving', x0: a, x1: b, y0: -1, y1: 0.03, z0: c, z1: d });
+    // (where a length of the old terrace's edge had fallen with the wall under it)
+    parts.push({ t: 'box', paint: 'paving', name: 'terrace', x0: U.x, x1: ix, y0: -1, y1: 0, z0: U.rent.z0, z1: 5.2 });
+    // (and over the bay of the lower levels whose vault came down: on the mountain it lay open to the sky; here the
+    // back wall's walk stands across it, and a piece of the kit has no underside to be looked up into)
+    parts.push({ t: 'box', paint: 'paving', name: 'terrace', x0: U.bay.x0, x1: U.bay.x1, y0: -1, y1: 0, z0: U.bay.z0, z1: U.bay.z1 });
+  }
+  // THE LOWER LEVELS' WALLS where the old fort left them open to the air: at the four corners, where a drum's foot
+  // closed each; where a length of the east wall had fallen out; and where the postern went through to the slope.
+  {
+    const lo = U.floor - 0.4, t = 0.6, x = U.x, z = U.z, o = { low: true, paint: 'stone' as Paint, straight: false };
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+      box('undercroft wall', sx * 7.05, sx * (x + t), lo, U.roof, sz * z, sz * (z + t), o);
+      box('undercroft wall', sx * x, sx * (x + t), lo, U.roof, sz * 7.05, sz * z, o);
+    }
+    box('undercroft wall', x, x + t, lo, U.roof, U.rent.z0, U.rent.z1, o);
+    box('undercroft wall', -(x + t), -x, lo, -1.75, U.goat.z0, U.goat.z1, o);
+  }
+  // THE WAY IN: through the gate wall and under its walk. The walk's two lengths end either side of it: their ends
+  // are closed with a wall each, which are the passage's sides, and a slab bridges the walk over it.
+  {
+    const x0 = LINE.gate - D - K.deep, x1 = LINE.gate - D + 0.02;
+    for (const sg of [-1, 1]) box('gate passage wall', x0 - 0.06, x1, 0, W.walk - 0.02, sg * F.pass, sg * (F.pass + 0.3));
+    box('walk over the gate', x0 - 0.06, x1, W.walk - 0.62, W.walk - 0.02, -F.pass, F.pass);
+    // (and earth up to the kit's sill, which stands a hand's breadth and a half over its own foot: no step at the gate)
+    const sill = KIT_GATE.sill + 0.012, zr = 1.74;
+    parts.push({ t: 'slab', paint: 'earth', name: 'earth to the sill', straight: true, p: [[LINE.gate + D + 0.1, sill, -zr], [LINE.gate + D + 2.3, 0.01, -zr], [LINE.gate + D + 2.3, 0.01, zr], [LINE.gate + D + 0.1, sill, zr]], thick: 0.5 });
+    parts.push({ t: 'slab', paint: 'earth', name: 'earth to the sill', straight: true, p: [[x0 - 2, 0.01, -zr], [LINE.gate - D - 0.02, sill, -zr], [LINE.gate - D - 0.02, sill, zr], [x0 - 2, 0.01, zr]], thick: 0.5 });
+  }
+  // THE POSTERN: through the valley wall and the walk behind it. Both are cut for it; its sides and its head are
+  // the fort's own stone, from a hand inside the yard to a hand beyond the wall's foot.
+  {
+    const P = F.postern, z0 = LINE.valley - D - K.deep - 0.08, z1 = LINE.valley + D + 0.1;
+    for (const sg of [-1, 1]) box('postern jamb', P.x + (sg * P.wide) / 2, P.x + sg * (P.wide / 2 + 0.3), 0, P.tall + 0.3, z0, z1);
+    box('postern lintel', P.x - P.wide / 2, P.x + P.wide / 2, P.tall, P.tall + 0.3, z0, z1);
+  }
+  // THE WALK ROUND THREE CORNERS, where a tower's round stands into it: a pier of the fort's own stone in the angle
+  // of the two walks, its top a finger under theirs, wide enough to pass the tower on. (At the fourth corner the
+  // kit's stair lands, and its landing is the way round.)
+  {
+    const gx = LINE.gate - D - K.deep, bx = LINE.back + D + K.deep, vz = LINE.valley - D - K.deep, hz = LINE.hill + D + K.deep;
+    box('walk pier', gx - 1.5, gx + 0.09, 0, W.walk - 0.02, vz - 1.5, vz + 0.09);
+    box('walk pier', bx - 0.09, bx + 1.5, 0, W.walk - 0.02, vz - 1.5, vz + 0.09);
+    box('walk pier', bx - 0.09, bx + 1.5, 0, W.walk - 0.02, hz - 0.09, hz + 1.5);
+    // THE SECOND WAY UP: a timber stair along the gate wall's walk from beside the passage to the pier in the
+    // valley corner, in sight of whoever comes in at the gate. (The first is the kit's own, on the hill side.)
+    parts.push({ t: 'flight', paint: 'timber', name: 'stair to the wall walk', body: 'feet', foot: [gx - 0.75, 0, F.pass + 0.75], head: [gx - 0.75, W.walk - 0.02, vz - 1.5], w: 1.3 });
+    parts.push({ t: 'rail', paint: 'timber', name: 'stair rail', body: 'feet', a: [gx - 1.4, 1, F.pass + 0.75], b: [gx - 1.4, W.walk + 0.98, vz - 1.5] });
+    // (three steps of the fort's own stone before the kit's stair, whose first tread stands 0.64 m over its own foot)
+    const S = F.stairs, sx = F.e - W.half + 1.3, z0 = hz + S.in, z1 = hz + S.out;
+    for (let k = 0; k < 3; k++) box('stair foot step', sx - (3 - k) * 0.3, sx + 0.02, 0, (k + 1) * S.rise, z0, z1);
+  }
+  return parts;
 }
 
 /** the kit's wall as the fort stands it: how far its foot stands out from the face of its parapet, how deep it is at the foot, and how far along a side one length of it reaches either way from the middle */
 const WALL = { out: 0.94, deep: 2.55, half: 7.41 };
-/** the gatehouse: the kit's gate, made this big, stood on the east wall's top over the head of the ramp */
-const GATEHOUSE = { scale: 0.63 };
+/**
+ * THE WALLS, AS THE KIT DRAWS A FORT (2026-10-13, the owner: "i dont like how the terraain and building are
+ * floating on a raise \"pad\""; and the model's evaluator: the old one stood the kit's pieces at five sizes, its
+ * walls as footings under a parapet and three things stacked for each tower). The yard is the ground's own height.
+ * Round it the kit's walls stand on that ground at the size they were drawn, their walk seven metres up and their
+ * merlons over it; one round tower of the kit on each corner, its moulded foot at the ground; the kit's gate in
+ * the wall that looks down the track, between two half lengths of wall: a WIDE FRONT. All in the fort's own
+ * measure, x toward the gate and z toward the valley:
+ *   e       – the middle of the walls is so far toward the gate from the middle of the keep's ground (this file's
+ *             nothing): an alley is left between the keep and the back wall's walk, where the scaffold up the keep's side begins, and the yard opens before the keep
+ *   tx, tz  – from that middle to the walls' lines, toward the gate and toward the valley: the towers stand where
+ *             they cross (a wall's end is 5.5 m short of a tower's middle: inside its shaft from the ground to
+ *             the merlons, so the last merlon of each wall dies into the tower)
+ *   wall    – the kit's wall: how deep at its foot (its outer face leans in from there, its inner is upright), a
+ *             whole length and a half one, its walk and the top of its merlons
+ *   walkway – the kit's walk behind a wall: how deep, and a length
+ *   stairs  – the kit's stair: how deep, how long, how high its first tread stands over its own foot (three
+ *             steps of the fort's own stone are laid before it), a rise of it, and where its landing begins
+ *   base    – the course of the fort's own stone the kit's walls stand on: how far under the yard it goes (the
+ *             ground hides what it does not need: inland a hand or two of it shows, on the brink two metres and
+ *             more: "where the natural ground falls away under a wall, the WALL goes down to meet it"), and how
+ *             far it stands proud of the wall's foot
+ *   pass    – the way in through the gate wall and under its walk: half its width
+ *   postern – the small door through the valley wall and its walk, onto the brink: where along the wall, how
+ *             wide, how tall. A way out: under it the bluff is too steep to be come up by
+ */
+export const FORT = {
+  e: 1.6,
+  tx: 12.91,
+  tz: 16.615,
+  wall: { deep: 2.55, long: 14.82, half: 7.41, walk: 7.08, merlon: 8.61 },
+  walkway: { deep: 3.12, long: 14.56 },
+  stairs: { deep: 3.54, long: 14.82, first: 0.64, rise: 0.16, landing: 9.74, in: 0.49, out: 3.05 },
+  tower: { foot: 7.93, walk: 6.81 },
+  base: { deep: 3.2, proud: 0.14 },
+  pass: 1.95,
+  postern: { x: 2.5, wide: 1.5, tall: 2.4 },
+};
+/** the walls' lines: the gate wall's, the back wall's, the valley wall's and the hill wall's (see FORT) */
+const LINE = { gate: FORT.e + FORT.tx, back: FORT.e - FORT.tx, valley: FORT.tz, hill: -FORT.tz };
 /** the door in it: the castle door made this big; where its threshold is (how far in from the middle of the east wall's parapet), how wide a leaf is then, and how far the leaf that still hangs is swung in from shut (radians) */
-const DOOR = { scale: 1.1, x: CASTLE.hx - 0.3, leaf: 1.1, swing: 0.95 };
+const DOOR = { scale: 1.74, x: FORT.e + FORT.tx + 0.35, leaf: 1.74, swing: 1.25 };
 /**
  * What is gone from the parapet of each side, along it (toward +x on the north and south walls, toward +z on the
  * others): [from, to, whether it is one whole merlon (its stump is left on the parapet) or a length of the parapet
@@ -445,54 +570,46 @@ function gaps(side: 'n' | 's' | 'e' | 'w'): [number, number, boolean][] {
  * What stops a body for these is `kitSolids` of this list, but for the towers' feet, which have the fort's own.
  */
 export function castleKit(): KitPiece[] {
-  const C = CASTLE, U = UNDER, T = C.tower, ex = C.hx + C.parapet.thick / 2, ez = C.hz + C.parapet.thick / 2, xo = ex + WALL.out, zo = ez + WALL.out, y0 = -KIT_LEVELS.walk;
-  const out: KitPiece[] = [];
-  /** the parapet of a side, cut where it is gone: across the whole of its thickness, from the walk up (a merlon: from the parapet's top up) */
-  const top = (side: 'n' | 's' | 'e' | 'w'): Cut[] => gaps(side).map(([u0, u1, whole]) => {
-    const lo = whole ? KIT_LEVELS.parapet - KIT_LEVELS.walk - 0.02 : 0.004;
-    return side === 'n' ? cutBox(u0, u1, lo, 4, -ez - 0.2, -ez + 1.3) : side === 's' ? cutBox(u0, u1, lo, 4, ez - 1.3, ez + 0.2) : side === 'e' ? cutBox(ex - 1.3, ex + 0.2, lo, 4, u0, u1) : cutBox(-ex - 0.2, -ex + 1.3, lo, 4, u0, u1);
-  });
-  const wall = 'fort_wall_thin_straight_01', gh = GATEHOUSE.scale, gz = (C.gate.z0 + C.gate.z1) / 2, g0 = gz + ((KIT_GATE.z0 + KIT_GATE.z1) / 2) * gh;
-  out.push({ id: wall, name: 'north wall', at: [WALL.half, y0, -zo], turn: -Math.PI / 2, cut: top('n') });
-  out.push({ id: wall, name: 'south wall', at: [-WALL.half, y0, zo], turn: Math.PI / 2, cut: top('s') });
-  out.push({ id: wall, name: 'west wall', at: [-xo, y0, -WALL.half], turn: 0, cut: [...top('w'), cutBox(-xo - 0.3, -U.x + 0.1, U.floor - 0.02, U.floor + 2.07, U.goat.z0, U.goat.z1)] });
-  // (the east wall: its parapet is gone under the gatehouse, which stands in its place; and a length of it fell out to the cellars' floor)
-  out.push({ id: wall, name: 'east wall', at: [xo, y0, WALL.half], turn: Math.PI, cut: [...top('e'), cutBox(ex - 1.3, ex + 0.2, 0.004, 4, g0 - 7.41 * gh, g0), cutBox(U.x - 0.3, xo + 0.5, U.floor + 0.1, 4, U.rent.z0, U.rent.z1)] });
-  // the gatehouse: its foot is the east wall's top; the sill across its passage is taken out, and the ramp's boards run through
-  out.push({ id: 'fort_wall_thin_gate_01', name: 'gatehouse', at: [ex, 0, g0], turn: Math.PI, scale: gh, cut: [cutBox(ex - WALL.deep * gh - 0.1, ex + 0.2, -0.05, (KIT_GATE.sill + 0.06) * gh + 0.02, g0 - KIT_GATE.z1 * gh - 0.02, g0 - KIT_GATE.z0 * gh + 0.02)] });
-  // the foot of each tower: the kit's round tower, its platform level with the terrace. Taken out of it: its middle
-  // (the drum stands there, with its own floor), all of its top that is on the terrace's side of the walls, and,
-  // of the hollow one, a doorway from its cellar to the lower levels.
-  const px = ex + WALL.out - WALL.deep, pz = ez + WALL.out - WALL.deep;
-  for (const tw of castleParts()) {
-    if (tw.t !== 'tower') continue;
-    const cut = [cutRound(tw.cx, tw.cz, T.r - T.wall + 0.04, -0.06, 4), tw.cx > 0 ? cutBox(-60, px, -0.05, 4, -60, 60) : cutBox(-px, 60, -0.05, 4, -60, 60), tw.cz > 0 ? cutBox(-60, 60, -0.05, 4, -60, pz) : cutBox(-60, 60, -0.05, 4, -pz, 60)];
-    const d = (tw.door * Math.PI) / 180;
-    if (tw.hollow !== undefined) cut.push(cutTurned(tw.cx + Math.cos(d) * 3.3, tw.cz + Math.sin(d) * 3.3, Math.PI / 2 - d, 1.9, 0.58, tw.hollow - 0.03, tw.hollow + 2.2));
-    out.push({ id: 'fort_tower_round', name: tw.name, at: [tw.cx, -KIT_TOWER.top[0] * T.kit, tw.cz], scale: T.kit, turn: (tw.cx * 7 + tw.cz * 3) * 0.1, cut, body: false });
-    // ITS FOOTING: the same tower again under that one's foot, a little bigger (`under`), with everything of it over
-    // that foot taken off: so its wall, at the size it has just under its platform, is where the upper one's foot is,
-    // and from there it leans out and down eight metres more. The real hill falls away under the two towers on the
-    // valley side to twelve metres under the terrace; a plain dark drum of the fort's own stood in the air there.
-    const kf = -KIT_TOWER.top[0] * T.kit;
-    out.push({ id: 'fort_tower_round', name: `${tw.name} footing`, at: [tw.cx, kf - KIT_TOWER.top[0] * T.under, tw.cz], scale: T.under, turn: (tw.cx * 3 - tw.cz * 5) * 0.1 + 1.3, cut: [cutBox(tw.cx - 9, tw.cx + 9, kf + 0.01, 8, tw.cz - 9, tw.cz + 9)], body: false });
-  }
-  // blocks of the wall, lying where they came down: under the rent, and under the breach
-  const block = (x: number, z: number, y: number, turn: number, tilt: [number, number], scale: number) => void out.push({ id: 'fort_wall_thick_end_01', name: 'fallen wall', at: [x, y, z], turn, tilt, scale });
-  block(12.6, U.rent.z1 + 1.5, moundTop('rent', 12.9, U.rent.z1 + 1.6) - 0.25, 0.5, [1.25, 0.2], 0.17);
-  block(15.3, U.rent.z1 + 2.3, moundTop('rent', 15.5, U.rent.z1 + 2.2) - 0.3, 2.1, [-1.4, 0.35], 0.14);
-  block(-1.6, -ez - 3.4, moundTop('fan', -1.2, -ez - 3.2) - 0.3, 1.2, [1.35, -0.3], 0.16);
+  const F = FORT, W = F.wall, K = F.walkway, D = W.deep / 2, P = F.postern, q = Math.PI / 2, out: KitPiece[] = [];
+  const far = F.tx - 5.5 + 0, side = F.tz - 5.5;
+  // (a piece of the kit's wall lies with its outer foot on its own first axis and runs along its third: turned so
+  // that its inner face looks into the yard, each begins at the corner said here)
+  // the gate wall: half a length, the gate, half a length
+  out.push({ id: 'fort_wall_thin_straight_04', name: 'gate wall', at: [LINE.gate + D, 0, side], turn: Math.PI });
+  out.push({ id: 'fort_wall_thin_gate_01', name: 'gate', at: [LINE.gate + D, 0, W.half / 2], turn: Math.PI });
+  out.push({ id: 'fort_wall_thin_straight_04', name: 'gate wall', at: [LINE.gate + D, 0, -W.half / 2], turn: Math.PI });
+  // the back wall: a whole length and a half
+  out.push({ id: 'fort_wall_thin_straight_01', name: 'back wall', at: [LINE.back - D, 0, -side], turn: 0 });
+  out.push({ id: 'fort_wall_thin_straight_04', name: 'back wall', at: [LINE.back - D, 0, -side + W.long], turn: 0 });
+  // the valley wall, with the postern through it; and the hill wall
+  out.push({ id: 'fort_wall_thin_straight_01', name: 'valley wall', at: [F.e - far, 0, LINE.valley + D], turn: q, cut: [cutBox(P.x - P.wide / 2, P.x + P.wide / 2, -0.05, P.tall, LINE.valley - D - 0.2, LINE.valley + D + 0.6)] });
+  out.push({ id: 'fort_wall_thin_straight_02', name: 'hill wall', at: [F.e + far, 0, LINE.hill - D], turn: -q });
+  // one round tower on each corner
+  for (const [cx, cz, turn] of [[LINE.gate, LINE.valley, 0.4], [LINE.gate, LINE.hill, 2.1], [LINE.back, LINE.hill, 3.5], [LINE.back, LINE.valley, 5.2]]) out.push({ id: 'fort_tower_round', name: 'tower', at: [cx, 0, cz], turn });
+  // THE WALK behind each wall: the kit's own walkway. Behind the valley and hill walls one length; behind the
+  // back wall two, end to end, their far ends inside the towers; behind the gate wall two, one either side of
+  // the way in, their far ends inside the towers.
+  out.push({ id: 'fort_wall_walkway_straight_02', name: 'valley walk', at: [F.e - K.long / 2, 0, LINE.valley - D], turn: q, cut: [cutBox(P.x - P.wide / 2, P.x + P.wide / 2, -0.05, P.tall, LINE.valley - D - K.deep - 0.2, LINE.valley - D + 0.2)] });
+  out.push({ id: 'fort_wall_walkway_straight_02', name: 'hill walk', at: [F.e + K.long / 2, 0, LINE.hill + D], turn: -q });
+  out.push({ id: 'fort_wall_walkway_straight_02', name: 'back walk', at: [LINE.back + D, 0, -K.long], turn: 0 });
+  out.push({ id: 'fort_wall_walkway_straight_02', name: 'back walk', at: [LINE.back + D, 0, 0], turn: 0 });
+  out.push({ id: 'fort_wall_walkway_straight_02', name: 'gate walk', at: [LINE.gate - D, 0, F.pass + 0.3 + K.long], turn: Math.PI });
+  out.push({ id: 'fort_wall_walkway_straight_02', name: 'gate walk', at: [LINE.gate - D, 0, -(F.pass + 0.3)], turn: Math.PI });
+  // THE KIT'S STAIR, on the hill side: before the hill wall's walk, climbing toward the gate, its landing in the
+  // corner of that walk and the gate wall's (and a finger's breadth into the latter, so that no end of it is seen)
+  out.push({ id: 'fort_wall_stairs_straight_01', name: 'stair', at: [F.e - W.half + 1.3, 0, LINE.hill + D + K.deep], turn: q });
   return out;
 }
 
 /** The door at the gate, as a layout of the castle door's own pieces: its frame in the passage, one leaf hung open inward against the passage's wall, one off its hinges and lying on the paving inside. */
 export function castleDoor(): KitPiece[] {
-  const C = CASTLE, s = DOOR.scale, gz = (C.gate.z0 + C.gate.z1) / 2, turn = Math.PI / 2;
+  const s = DOOR.scale, turn = Math.PI / 2, y = KIT_GATE.sill;
   return [
-    { id: 'large_castle_door_frame', at: [DOOR.x, 0, gz], turn, scale: s, body: false },
-    // (the leaf whose hinge is on the south side, swung in until it lies along that wall of the passage)
-    { id: 'large_castle_door_left', at: [DOOR.x, 1.165 * s, gz + 0.987 * s], turn: turn + DOOR.swing, scale: s, body: false },
-    { id: 'large_castle_door_right', at: [DOOR.x - 2.3, 0.07, gz + 0.5], turn: 0.5, tilt: [Math.PI / 2, 0], scale: s, body: false },
+    { id: 'large_castle_door_frame', at: [DOOR.x, y, 0], turn, scale: s, body: false },
+    // (the leaf whose hinge is on the valley's side, swung in until it lies along that side of the way in)
+    { id: 'large_castle_door_left', at: [DOOR.x, y + 1.165 * s, 0.987 * s], turn: turn + DOOR.swing, scale: s, body: false },
+    // (the other, off its hinges, flat on the ground inside)
+    { id: 'large_castle_door_right', at: [LINE.gate - WALL.deep / 2 - FORT.walkway.deep - 4.2, 0.09, -2.6], turn: 0.5, tilt: [Math.PI / 2, 0], scale: s, body: false },
   ];
 }
 
@@ -503,26 +620,11 @@ export function castleDoor(): KitPiece[] {
  * body. `ground` is how high the ground is at a spot, over the terrace.
  */
 export function castleRocks(ground: (x: number, z: number) => number = castleGround, rock = true): KitPiece[] {
-  const C = CASTLE, O = OUTCROP, out: KitPiece[] = [], zo = C.hz + C.parapet.thick / 2 + WALL.out;
-  /** one of them: where the middle of its foot is on the plan, which way it faces (degrees: 0 east, 90 south), how big, and how much steeper than it came it stands */
-  const face = (x0: number, z0: number, toward: number, scale: number, steep = 0.3, sink = 0.25, proud = 1.5) => {
-    // (it stands so far out from where it was asked for, the way it faces: it leans back, and what it leans on is behind its top, not its foot)
-    const a = (toward * Math.PI) / 180, turn = Math.atan2(Math.cos(a), Math.sin(a)), x = x0 + Math.cos(a) * proud, z = z0 + Math.sin(a) * proud;
-    // (not where the ground falls away before it: the world's own cliff is rock already, and a sheet stood at its lip hangs out over it in the air)
-    if (ground(x, z) - Math.min(ground(x + Math.cos(a) * 4, z + Math.sin(a) * 4), ground(x + Math.cos(a) * 6.5, z + Math.sin(a) * 6.5)) > 4) return;
-    // (its own origin is to one side of its middle: it is set so that its middle is where it was asked for)
-    const off = -0.35 * scale;
-    out.push({ id: 'rock_face_01', at: [x + Math.cos(turn) * off, ground(x, z) - sink * scale, z - Math.sin(turn) * off], turn, tilt: [steep, 0], scale, body: false });
-  };
-  if (rock) {
-    face((O.x0 + O.x1) / 2, O.z1 + 0.6, 90, 1.5, 0.42);
-    face((O.x0 + O.x1) / 2 + 0.6, O.z0 - 1.2, 270, 1.5, 0.42);
-    face(O.x1 + 1.6, O.z0 - 0.4, 310, 1.3, 0.35);
-    face(O.x1 + 1.6, O.z1 + 0.2, 50, 1.3, 0.35);
-  }
-  // (under the south wall only: under the north one the rubble of the breach lies along the whole of it, and that is walked)
-  for (const x of [-4.4, 4.2]) face(x + 0.8, zo - 0.4, 90, 1.3, 0.5, 0.3, 1.9);
-  return out;
+  // (NONE, on the rim: the owner, 2026-10-13: "get rid of the rocks near the front ... and make our own terrain".
+  // The sheets of scanned rock were bedded under walls that stood over a mountain's face; these stand on a bench.)
+  void ground;
+  void rock;
+  return [];
 }
 
 function layOut(): Part[] {
@@ -1042,11 +1144,12 @@ const passageLamps = (L: ReturnType<typeof hatchLine>): V3[] => (L.path.length >
 
 // ------------------------------------------------------------------ the loose pieces of its grounds
 //
-// Round the real fort: the roofless shells of a village along the crest, a curved wall by the rock the ramp leaves
-// from, a thin wall down the south slope, grey teeth of rock. None of them is part of the fort. Each is a thing by
-// itself that stands on whatever ground it is put on (its foot goes three metres into it, so it meets ground that
-// is not level), and whoever shapes the mountain sets each down where that ground suits: `LOOSE` is only where
-// they stand when nobody has said, on the ground the fort assumes.
+// Before the fort: the roofless shells of a hamlet along the track to its gate, and the hatch of its sally port
+// among them. None of them is part of the fort. Each is a thing by itself that stands on the ground where it is
+// put (its foot goes three metres into it, so it meets ground that is not level). (There were also a curved wall
+// by the rock the old ramp left from, a thin wall down a slope and twenty grey teeth of rock: all made for the
+// crest of the mountain the fort has left, and the owner's word for this place is "get rid of the rocks near the
+// front". The kinds are kept, for whoever sets one down again.)
 
 /**
  * A loose piece: which kind, which of its kind, where its middle is and how it is turned. (In the fort's own
@@ -1058,20 +1161,21 @@ export const HOUSES: { w: number; d: number; door: number }[] = [{ w: 9, d: 7, d
 /** how far into the ground a loose piece's foot goes */
 const FOOTING = 3;
 
+/** A place before the gate said in METRES of the world (out from the middle of the walls along the track, and to the valley's side of it), in the fort's own measure: the hamlet is laid out on the ground, by the ground. */
+const fromGate = (x: number, z: number) => ({ x: x / CASTLE_SCALE + FORT.e, z: z / CASTLE_SCALE });
 export const LOOSE: Loose[] = [
-  // what is left of the village, along the crest to the east
-  { kind: 'house', n: 0, x: 47, z: 2.5, rot: 0.14 }, { kind: 'house', n: 1, x: 60, z: -6.6, rot: -0.2 }, { kind: 'house', n: 2, x: 69, z: 3, rot: 0.1 }, { kind: 'house', n: 3, x: 80, z: -5, rot: -0.08 }, { kind: 'house', n: 4, x: 91, z: 2.5, rot: 0.22 },
-  // the curved wall by the rock: what held the path up, on the side the ground falls away; and the thin wall down the south slope
-  { kind: 'curved wall', n: 0, x: 20.5, z: -2, rot: 0 },
-  { kind: 'long wall', n: 0, x: 22.6, z: 23.4, rot: 0 },
-  // the storm-cellar hatch the sally port comes up at: in the old village, close behind the gable of its first
-  // house from the fort, where nobody on the keep's roof, its wall top or a tower sees who goes down it. Its steps
-  // go down northward, along the gable (the way it is turned: not turned, they go down toward the fort); the
-  // passage is made from their foot to the fort, wherever it is set.
-  // (a pace and a half from the first house's gable: at three quarters of a metre a body had no room to spare between that wall and the hatch's kerb)
-  { kind: 'hatch', n: 0, x: 54, z: 1.6, rot: Math.PI },
-  // grey teeth of rock, clear of the ways people go
-  ...([[27.5, -6.2], [30.5, 3.2], [34, -7.5], [37.5, 2.6], [40.5, -6.8], [44, -9.5], [52.5, 7.5], [63.5, -1.5], [74.5, 8.2], [85.5, 0.5], [97, -4], [16.5, -13.5], [15.8, 9.5], [-15.5, -12.5], [-16.5, 6.5], [-20, -4], [-24.5, -9], [-27, 2.5], [-32, -6.5], [-36.5, -1]] as [number, number][]).map(([x, z], n): Loose => ({ kind: 'rock', n, x, z, rot: n * 1.7 })),
+  // What is left of the hamlet, along the cart track up to the gate (in metres out from the middle of the fort's
+  // walls down the track, and to the valley's side of it). Three within seventy metres of the gate and one well
+  // down the track, the first thing come to; their long walls to the track and their doors on it; each where the ground under its four corners lies within half a metre of one height,
+  // so that its floor is the ground's own and no corner of it stands in the air (three of the five there were on
+  // the crest had a corner four metres and more over the ground). Not evenly spaced, and none nearer the brink
+  // than twelve metres.
+  ...([[0, 41.3, 9.3, 0.11], [1, 46.8, -9.1, -0.16], [2, 116.2, -14.6, 2.54], [3, 66.1, 9.8, 3.34]] as [number, number, number, number][]).map(([n, x, z, rot]): Loose => ({ kind: 'house', n, ...fromGate(x, z), rot })),
+  // the storm-cellar hatch the sally port comes up at: close behind the far gable of the nearest house on the
+  // valley's side, where nobody on the fort's wall top or a tower sees who goes down it. The passage is made from
+  // its steps' foot to the fort, wherever it is set.
+  // (a pace and a half from the gable: at three quarters of a metre a body had no room to spare between that wall and the hatch's kerb)
+  { kind: 'hatch', n: 0, ...fromGate(48.3, 8.4), rot: Math.PI },
 ];
 
 /** The pieces a loose piece is made of, where it stands (in the fort's own measure: each of them on the ground at its own spot). */
@@ -1245,7 +1349,7 @@ export function looseParts(l: Loose, g = castleGround(l.x, l.z)): Part[] {
   const at = (lx: number, lz: number): [number, number] => [l.x + lx * c + lz * s, l.z - lx * s + lz * c];
   const wall = (a: [number, number], b: [number, number], top: number[], thick: number, name: string, openings?: Opening[]) => void parts.push({ t: 'wall', paint: 'stone', tone: 0.88, at: 'both', name, a, b, y0: -FOOTING, top, thick, openings, sits: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] });
   if (l.kind === 'house') {
-    const k = l.n % HOUSES.length, sh = HOUSES[k], w = sh.w / 2, d = sh.d / 2, name = `ruined house ${k + 1}`;
+    const k = l.n % HOUSES.length, sh = HOUSES[k], w = sh.w / 2 / CASTLE_SCALE, d = sh.d / 2 / CASTLE_SCALE, name = `ruined house ${k + 1}`;
     /** a long wall's broken top, and a gable's: up to five metres in the middle of it, and never whole */
     const long = (seed: number) => Array.from({ length: 9 }, (_, i) => Math.round((0.7 + hash(i, seed, 21 + k) * 2.3) * 10) / 10);
     const gable = (seed: number) => Array.from({ length: 7 }, (_, i) => Math.round(Math.max(0.6, (2.4 + (1 - Math.abs(i - 3) / 3.5) * 2.6) * (hash(i, seed, 23 + k) < 0.25 ? 0.45 : 0.82 + hash(i, seed, 24 + k) * 0.18)) * 10) / 10);
@@ -1310,7 +1414,7 @@ export function castleUnder(p: Place | null, wx: number, wy: number, wz: number,
   if (y > U.floor - STEP && y < U.floor + 2.4 && x < -U.x + SIDE && x > -CASTLE.hx - CASTLE.parapet.thick / 2 - WALL.out - 1.25 - SIDE && z > U.goat.z0 - 0.1 - SIDE && z < U.goat.z1 + 0.1 + SIDE) return true;
   for (const l of looseLocal(p, loose ?? castleLoose(p))) {
     if (l.kind !== 'hatch') continue;
-    const [hx, , hz] = castleAt(p, l.x, l.z), g = (ground ? ground(hx, hz) : p.y + castleGround(l.x, l.z)) - p.y, L = hatchLine(l, g);
+    const [hx, , hz] = castleAt(p, l.x, l.z), g = (ground ? (ground(hx, hz) - p.y) / CASTLE_SCALE : castleGround(l.x, l.z)), L = hatchLine(l, g);
     // (on its steps: how far along them from their head, and how far off their line; from the steps' own slope up to the ground)
     const ax = x - L.head[0], az = z - L.head[2], along = ax * L.d[0] + az * L.d[1], off = Math.abs(ax * L.r[0] + az * L.r[1]);
     // (the stairwell is open as far as half a pace past their foot: see `looseParts`)
@@ -1373,11 +1477,13 @@ export function castleDark(p: Place | null, wx: number, wy: number, wz: number, 
  */
 export function castleCuts(p: Place, ground?: GroundAt, loose?: Loose[]): { well: [number, number][]; to: number }[] {
   const PS = UNDER.postern, to = (q: [number, number][]) => q.map(([x, z]): [number, number] => [castleAt(p, x, z)[0], castleAt(p, x, z)[2]]);
-  const out = [{ well: to(shaftWell()), to: p.y + PS.deep - 0.9 }];
+  const U = UNDER, S = CASTLE_SCALE, out = [{ well: to(shaftWell()), to: p.y + S * (PS.deep - 0.9) }];
+  // (the lower levels themselves: on the mountain they stood over the ground; here they are in it, under the yard's paving)
+  out.push({ well: to([[-(U.x + 0.7), -(U.z + 0.7)], [U.x + 0.7, -(U.z + 0.7)], [U.x + 0.7, U.z + 0.7], [-(U.x + 0.7), U.z + 0.7]]), to: p.y + S * (U.floor - 0.75) });
   for (const l of looseLocal(p, loose ?? castleLoose(p))) {
     if (l.kind !== 'hatch') continue;
-    const [hx, , hz] = castleAt(p, l.x, l.z), g = (ground ? ground(hx, hz) : p.y + castleGround(l.x, l.z)) - p.y;
-    for (const w of hatchWells(l, g)) out.push({ well: to(w.well), to: p.y + w.to });
+    const [hx, , hz] = castleAt(p, l.x, l.z), g = (ground ? (ground(hx, hz) - p.y) / CASTLE_SCALE : castleGround(l.x, l.z));
+    for (const w of hatchWells(l, g)) out.push({ well: to(w.well), to: p.y + S * w.to });
   }
   return out;
 }
@@ -1425,7 +1531,7 @@ export function looseLocal(p: Place, loose: Loose[]): Loose[] {
 //      the landing of the passage out): twelve places, most of them behind the longest way round; and at the very
 //      top, the rack in the upper room, which always has a gun on it, and the wall top over the roof.
 // Its crates and cases are searched as crates are anywhere.
-export const CASTLE_TIERS = { grounds: 2, fort: 3, high: 4 } as const;
+export const CASTLE_TIERS = { grounds: 2, fort: 4, high: 4 } as const;
 /** what is of the high step: whatever lies under the terrace; and above it, only what is said to be (the rack of guns, the wall top) */
 const high = (y: number, top = false) => (y < -0.5 || top ? CASTLE_TIERS.high : CASTLE_TIERS.fort);
 export type CastleUsage = 'Military' | 'Hunting' | 'Medic' | 'Hospital';
@@ -1443,7 +1549,7 @@ export interface CastleLoot {
 }
 
 /** where things lie, in the fort's own measure: [x, z, y, on the floor, what kind of place, on which piece of furniture (its place in FURNITURE)] */
-function lootSpots(loose: Loose[]): { x: number; z: number; y: number; floor: boolean; usage: CastleUsage[]; tier: 2 | 3 | 4; on?: number; arms?: 'guns'; sits?: [number, number] }[] {
+function lootSpots(loose: Loose[]): { x: number; z: number; y: number; floor: boolean; usage: CastleUsage[]; tier: 2 | 3 | 4; on?: number; arms?: 'guns'; sits?: [number, number]; /** it is the hamlet's, before the gate, and not the fort's */ hamlet?: boolean }[] {
   const C = CASTLE, T = C.tower, out: ReturnType<typeof lootSpots> = [];
   const army: CastleUsage[] = ['Military'], hunt: CastleUsage[] = ['Hunting'];
   // on the furniture: along the top of each table, on a rack's middle shelf, on a bunk's lower bed
@@ -1499,7 +1605,7 @@ function lootSpots(loose: Loose[]): { x: number; z: number; y: number; floor: bo
     const c = Math.cos(sh.rot), s = Math.sin(sh.rot);
     for (const [lx, lz] of k % 2 ? [[-2.4, 1.2]] : [[2.2, -1.1], [-2.6, 1.4]]) {
       const x = sh.x + lx * c + lz * s, z = sh.z - lx * s + lz * c;
-      out.push({ x, z, y: 0.02, floor: true, usage: hunt, tier: CASTLE_TIERS.grounds, sits: [x, z] });
+      out.push({ x, z, y: 0.02, floor: true, usage: hunt, tier: CASTLE_TIERS.grounds, sits: [x, z], hamlet: true });
     }
   });
   return out;
@@ -1539,7 +1645,7 @@ const houses = (loose: Loose[]) => loose.filter((l) => l.kind === 'house');
 export type GroundAt = (wx: number, wz: number) => number;
 const assumed = (p: Place): GroundAt => (wx, wz) => {
   const [x, z] = castleLocal(p, wx, 0, wz);
-  return p.y + castleGround(x, z);
+  return p.y + CASTLE_SCALE * castleGround(x, z);
 };
 
 /**
@@ -1554,9 +1660,10 @@ export function castleLoot(p: Place, ground: GroundAt = assumed(p), loose: Loose
     const f = s.on === undefined ? null : FURNITURE[s.on];
     [x, y, z] = [Math.round(x * 1000) / 1000, Math.round(y * 1000) / 1000, Math.round(z * 1000) / 1000];
     return {
-      x, y: y + (s.floor ? 0.02 : 0.003), z, usage: s.usage, building: 'castle', floor: s.floor, tier: s.tier,
+      x, y: y + (s.floor ? 0.02 : 0.003), z, usage: s.usage, building: s.hamlet ? 'hamlet' : 'castle', floor: s.floor, tier: s.tier,
       ...(s.arms ? { arms: s.arms } : {}),
-      ...(f ? { surf: { x: castleAt(p, f.x, f.z)[0], z: castleAt(p, f.x, f.z)[2], rot: p.rot + f.yaw, hx: f.w / 2 - 0.08, hz: f.d / 2 - 0.06, clear: f.kind === 'table' ? 10 : 0.5 } } : {}),
+      // (the board a thing lies on: the real top of the real thing, in the world, at the size the fort is built)
+      ...(f ? { surf: { x: castleAt(p, f.x, f.z)[0], z: castleAt(p, f.x, f.z)[2], rot: p.rot + f.yaw, hx: (f.w / 2) * CASTLE_SCALE, hz: (f.d / 2) * CASTLE_SCALE, clear: (f.kind === 'table' ? 10 : 0.5) * CASTLE_SCALE } } : {}),
     };
   });
   // (and the post's: each has a `room` the fort's own have not)
@@ -1585,7 +1692,7 @@ export function castleLamps(p: Place, ground?: GroundAt, loose?: Loose[]): V3[] 
   const out = LAMPS.map(([x, z, y]) => castleAt(p, x, z, y));
   for (const l of looseLocal(p, loose ?? castleLoose(p))) {
     if (l.kind !== 'hatch') continue;
-    const [hx, , hz] = castleAt(p, l.x, l.z), g = (ground ? ground(hx, hz) : p.y + castleGround(l.x, l.z)) - p.y;
+    const [hx, , hz] = castleAt(p, l.x, l.z), g = (ground ? (ground(hx, hz) - p.y) / CASTLE_SCALE : castleGround(l.x, l.z));
     for (const [x, z, y] of passageLamps(hatchLine(l, g))) out.push(castleAt(p, x, z, y));
   }
   return out;
@@ -1605,11 +1712,13 @@ export function castleLamps(p: Place, ground?: GroundAt, loose?: Loose[]): V3[] 
  * lower levels' doors as it was taught the bunker's (`bunkerLeg`); until then the dark is empty of them.
  */
 export function castleHomes(p: Place, loose: Loose[] = castleLoose(p)): { x: number; z: number; r: number; n: number; inside?: V3[] }[] {
-  const hs = houses(loose), [gx, , gz] = castleAt(p, 36, -1.5);
-  // (before the gate: clear of the rock the ramp leaves from, of the first house and of the hatch)
-  const gate = { x: gx, z: gz, r: 5.5, n: 4 };
+  const hs = houses(loose);
+  // (Not in a row before the gate, where four of them stood as a line-up (the look's evaluator, 2026-10-13):
+  // about the hamlet's ground, one to a place, each of them twenty-five metres and more from the next and from
+  // every house's own.)
+  const about = ([[30, 26], [56, -34], [84, 28], [96, -14]] as [number, number][]).map(([x, z]) => { const [wx, , wz] = castleAt(p, x / CASTLE_SCALE + FORT.e, z / CASTLE_SCALE); return { x: wx, z: wz, r: 6, n: 1 }; });
   // (the village's: one to each of its houses, as far as five, in it or close by its walls. As one round home as wide
   // as the village is long they were stood anywhere within thirty metres of its middle, and the saddle it stands on is
   // fifteen metres wide: two of the five were found on the valley face, seventeen metres under the street.)
-  return [...hs.slice(0, 5).map((h) => ({ x: h.x, z: h.z, r: 6.5, n: 1 })), gate];
+  return [...hs.slice(0, 5).map((h) => ({ x: h.x, z: h.z, r: 6.5, n: 1 })), ...about];
 }

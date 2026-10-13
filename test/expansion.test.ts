@@ -3,12 +3,12 @@
 // `npx tsx test/expansion.test.ts`.
 
 import assert from 'node:assert/strict';
-import { ARMY_CAMP, BUNKER_AT, CELL, KAMENKA, LOOP, MOUNTAIN, NO_START, OUTLYING, PASS, PLAY_FIRST, TOWN, TRADE_AT, kamenkaQ, loopFence, loopLine, EXPANSION as E, PLAY_AREAS, PLAY_RADIUS, WORLD_RES, WORLD_SIZE, generateWorld, heightAt, inPlay, playOutline, slopeAt, BUILDING_FOOTPRINT } from '../src/world/worldgen';
+import { ARMY_CAMP, BUNKER_AT, CELL, KAMENKA, LOOP, MOUNTAIN, NO_START, OUTLYING, PASS, PLAY_FIRST, TOWN, TRADE_AT, catmullRom, kamenkaQ, loopFence, loopLine, worldWithoutMountain, EXPANSION as E, PLAY_AREAS, PLAY_RADIUS, WORLD_RES, WORLD_SIZE, generateWorld, heightAt, inPlay, playOutline, slopeAt, BUILDING_FOOTPRINT } from '../src/world/worldgen';
 import { buildWorldData } from '../server/world';
 import { GAS, gasDepth, gasZone } from '../src/sim/gas';
 import { INFECTED, openGround } from '../src/sim/infected';
 import { deckWidth, onBridge, spanOf, wreckUnder } from '../src/sim/bridge';
-import { OUTCROP, castleAt, castleHomes, castleLocal } from '../src/sim/castle';
+import { CASTLE_SCALE, castleAt, castleHomes, castleLocal } from '../src/sim/castle';
 
 let n = 0;
 const ok = (name: string, fn: () => void) => {
@@ -49,7 +49,7 @@ import { JEEP } from '../src/sim/vehicles';
 // map as it was before any of that, with those fences up. They were: 160775 cells, 1846616272; 8100 trees,
 // 3268064997. What moved inside the new fences was counted cell by cell against the map before, and nothing
 // outside them had: the same four figures came off the map before and after.)
-const WAS = { cells: 133883, heights: 176932252, buildings: 72, away: 46, buildingsHash: 816271812, lastId: 'tower_71', spawns: 2697513077, trees: 6547, treesHash: 3799651930, lootPoints: 675, lootAway: 371, lootHash: 760462293, jeeps: 8, jeepsAway: 7, jeepsHash: 1649467612, fires: 6 };
+const WAS = { cells: 133104, heights: 343058320, buildings: 72, away: 46, buildingsHash: 816271812, lastId: 'tower_71', spawns: 2697513077, trees: 6499, treesHash: 2842937344, lootPoints: 675, lootAway: 371, lootHash: 760462293, jeeps: 8, jeepsAway: 7, jeepsHash: 1649467612, fires: 6 };
 const hash = (parts: number[]) => {
   let h = 2166136261 >>> 0;
   for (const v of parts) {
@@ -79,6 +79,15 @@ const SECOND = [{ type: 'clinic', x: 136.7, z: 23.5 }, { type: 'store', x: -63.1
 
 /** how far round the bunker the old ground may have been moved: its hollow, and the hillside cut back behind it */
 const BUNKER_FENCE = 190;
+/**
+ * The fort's place on the valley's east rim (2026-10-13: it was moved there off the mountain; MOUNTAIN.castle in the
+ * generator): the corner of the old map its yard, the feet of its walls, the last of its cart track, two of its
+ * hamlet's houses, the foot path under its valley wall and the wreck at that path's end stand on. Fenced off
+ * before any of it was built: the figures in WAS were taken with this fence up, off the map as it was before.
+ * (As far as it reaches, measured: ground moved from x 464 to the old map's edge and z -442 to -270; eight metres
+ * and more are allowed beyond, and to the west the bluff as far as the wreck, where only trees were taken away.)
+ */
+const FORT_FENCE = { x0: 438, z0: -452, z1: -262 };
 
 const world = generateWorld();
 /** the map as it was first made: 513 samples a side, 1024 m, in the middle of whatever the grid is now */
@@ -115,6 +124,8 @@ const touched = (x: number, z: number) => {
   // (and the bunker's hollow, on the far side of the map; and, since 2026-10-13, the hillside behind it, which was
   // cut back to a slope somebody can walk: "generally smooth out the landscape around the bunker a little bit")
   if (Math.hypot(x - BUNKER_AT.x, z - BUNKER_AT.z) < BUNKER_FENCE) return true;
+  // (and the fort's place on the rim)
+  if (x >= FORT_FENCE.x0 && z >= FORT_FENCE.z0 && z <= FORT_FENCE.z1) return true;
   // (and the way over to Kamenka, 2026-10-10: the hill cut down along the road's last climb and its foot banked up;
   // laid back further on 2026-10-13, which PASS.reach says)
   if (x > PASS.from - PASS.reach - 4 && passLine.some(([px, pz]) => Math.hypot(x - px, z - pz) < PASS.reach + 3)) return true;
@@ -283,7 +294,7 @@ ok('the infected keep to it too, and nowhere else has fewer for it', () => {
   assert.equal(homes.reduce((s, h) => s + h.n, 0), INFECTED.max + forts);
   // (the valley held thirty-three before there was a works, or a bunker with its own shut in it)
   // (the bunker's: the fort on the mountain has a dark of its own under its terrace, counted further down)
-  const atFort = (h: { x: number; z: number }) => Math.hypot(h.x - MOUNTAIN.castle.x, h.z - MOUNTAIN.castle.z) < 120;
+  const atFort = (h: { x: number; z: number }) => Math.hypot(h.x - MOUNTAIN.castle.x, h.z - MOUNTAIN.castle.z) < 160;
   const below = homes.filter((h) => h.inside && !atFort(h));
   assert.ok(below.length === 1 && below[0].n >= 4 && below[0].inside!.length >= below[0].n * 2, 'none in the bunker, or nowhere for them to stand');
   // (and those that walk the ground over it)
@@ -515,25 +526,66 @@ ok('the road is a loop: out of the far end of Kamenka, over the bridge, round by
   const near = (x: number, z: number) => Math.min(...[door, main, hill.points].map((p) => { let d = 1e9; for (let i = 0; i < p.length; i += 3) d = Math.min(d, Math.hypot(p[i] - x, p[i + 2] - z)); return d; }));
   for (const t of world.trees) if (Math.abs(t.x) > 380 || Math.abs(t.z) > 380) assert.ok(near(t.x, t.z) > 4.6, `a tree stands in the new road at ${t.x.toFixed(0)}, ${t.z.toFixed(0)}`);
   for (const sp of world.spawnRing) assert.ok(near(sp.x, sp.z) > 25, 'a start on the new road');
-  // The mountain road: off the pass by Kamenka's first door, never near the bunker, to the gatehouse; and the place
-  // kept for the fort above it is clear
+  // The mountain road: off the pass by Kamenka's first door, never near the bunker. It ends where the cart track to
+  // the fort begins, and no gatehouse stands across its end (the one there was stood under the mountain the fort has left)
   const hp = hill.points;
   assert.ok(passLine.some(([x, z]) => Math.hypot(x - hp[0], z - hp[2]) < 3.5), 'the mountain road does not leave the pass road');
   for (let i = 0; i < hp.length; i += 3) assert.ok(Math.hypot(hp[i] - BUNKER_AT.x, hp[i + 2] - BUNKER_AT.z) > 250, 'the mountain road comes within 250 m of the bunker');
-  assert.ok(world.gatehouse && Math.hypot(world.gatehouse.x - hp[hp.length - 3], world.gatehouse.z - hp[hp.length - 1]) < 0.01, 'no gatehouse at the end of the mountain road');
-  for (const list of [world.trees, world.rocks, world.props]) for (const t of list) assert.ok(Math.hypot(t.x - MOUNTAIN.castle.x, t.z - MOUNTAIN.castle.z) >= MOUNTAIN.castle.clear || t.x > MOUNTAIN.crest.hollow.brow, `a ${t.kind} stands where the fort stands (the hollow behind it is not that: beyond the brow of the cliff under its lee wall the ground is the world's)`);
-  // The fort: where the map says, its terrace clear of the ground under it by what it asks at the least (the cellars'
-  // floor is 3.8 m under the terrace), its place named on the map, and the path from the gatehouse comes to the foot
-  // of the rock its ramp leaves from
-  const fort = world.castle!;
-  assert.ok(fort && fort.x === MOUNTAIN.castle.x && fort.z === MOUNTAIN.castle.z && fort.y === MOUNTAIN.castle.terrace, 'no fort where the mountain road leads');
-  for (let lx = -10; lx <= 10; lx += 2) for (let lz = -10; lz <= 10; lz += 2) {
-    const [wx, , wz] = castleAt(fort, lx, lz);
-    assert.ok(fort.y - ground(wx, wz) > 5.2, `the ground is ${(fort.y - ground(wx, wz)).toFixed(1)} m under the fort's terrace at ${lx}, ${lz}: its cellars are in it`);
+  assert.equal(world.gatehouse, null, 'a gatehouse stands at the end of the mountain road again');
+  const track = world.paths[0], fort = world.castle!, F = MOUNTAIN.castle;
+  assert.ok(Math.hypot(track[0][0] - hp[hp.length - 3], track[0][1] - hp[hp.length - 1]) < 0.01, "the cart track does not begin at the road's end");
+  // The fort: where the map says, its yard at the height the map says, named on the map; and the track ends in its gate
+  assert.ok(fort && fort.x === F.x && fort.z === F.z && fort.y === F.yard && fort.rot === F.rot, 'no fort where the track leads');
+  assert.ok(world.pois.some((q) => q.name === F.name && q.x === fort.x && q.z === fort.z), 'the fort is not named on the map');
+  /** a place in metres from the middle of the fort's walls, toward its gate and toward the valley (its own measure is the kit's, a fifth smaller, and is told from the keep's middle) */
+  const inFort = (x: number, z: number): [number, number] => { const [a, b] = castleLocal(fort, x, 0, z); return [a * CASTLE_SCALE - F.off, b * CASTLE_SCALE]; };
+  const outX = F.wall[0] + F.thick / 2, outZ = F.wall[1] + F.thick / 2, [ex, ez] = inFort(track[track.length - 1][0], track[track.length - 1][1]);
+  assert.ok(ex > outX - 0.5 && ex < outX + 2 && Math.abs(ez) < 0.6, `the track ends at ${ex.toFixed(1)}, ${ez.toFixed(1)} of the fort's own measure: not at its gate`);
+  /** how far outside the fort's foot a place is (nothing or less: under a wall, a tower or the yard) */
+  const footOf = (x: number, z: number) => {
+    const [lx, lz] = inFort(x, z), ax = Math.abs(lx) - outX, az = Math.abs(lz) - outZ;
+    return Math.min(Math.hypot(Math.max(ax, 0), Math.max(az, 0)) + Math.min(Math.max(ax, az), 0), Math.hypot(Math.abs(lx) - F.wall[0], Math.abs(lz) - F.wall[1]) - F.tower);
+  };
+  const line = catmullRom(track, 1), offTrack = (x: number, z: number) => Math.min(...line.map((q) => Math.hypot(q[0] - x, q[1] - z)));
+  // nothing grows or lies on the track, in the yard or against the walls
+  for (const list of [world.trees, world.rocks, world.props]) for (const t of list) {
+    assert.ok(footOf(t.x, t.z) > 2, `a ${t.kind} stands in the fort or against its wall at ${t.x.toFixed(0)}, ${t.z.toFixed(0)}`);
+    if (Math.hypot(t.x - fort.x, t.z - fort.z) < 260) assert.ok(offTrack(t.x, t.z) > MOUNTAIN.track.bed[1] + 0.9, `a ${t.kind} stands on the track at ${t.x.toFixed(0)}, ${t.z.toFixed(0)}`);
   }
-  assert.ok(world.pois.some((q) => q.name === MOUNTAIN.castle.name && q.x === fort.x && q.z === fort.z), 'the fort is not named on the map');
-  const pathEnd = MOUNTAIN.path.line[MOUNTAIN.path.line.length - 1], [ex, ez] = castleLocal(fort, pathEnd[0], 0, pathEnd[1]);
-  assert.ok(ex > OUTCROP.x1 && ex < OUTCROP.x1 + 10 && Math.abs(ez) < 6, `the path ends at ${ex.toFixed(0)}, ${ez.toFixed(0)} of the fort's own measure: not at the foot of its rock`);
+  // NO PAD (the owner, 2026-10-13: "i dont like how the terraain and building are floating on a raise \"pad\""),
+  // and the mountain the fort has left is the mountain that was. Against the map made without the mountain road's
+  // step (the ground as every step before it leaves it):
+  const base = worldWithoutMountain();
+  // (the old crest, and the rim raised behind it along the map's north edge: every height the ground's own again)
+  for (let iz = 0; iz < WORLD_RES; iz++) for (let ix = 0; ix < WORLD_RES; ix++) {
+    const x = -half + ix * CELL, z = -half + iz * CELL, i = iz * WORLD_RES + ix;
+    if ((x >= 560 && z <= -400) || z <= -700) assert.ok(world.heights[i] === base.heights[i] && world.surface[i] === base.surface[i], `something of the old crest is left in the ground at ${x}, ${z}`);
+  }
+  // (about the fort: nothing banked up or shaved by more than 2.5 m outside its walls, nothing at all beyond forty
+  // metres from them but the track's own bed, and not a spot beyond the foot of the wall that looks over the valley)
+  for (let iz = 1; iz < WORLD_RES - 1; iz++) for (let ix = 1; ix < WORLD_RES - 1; ix++) {
+    const x = -half + ix * CELL, z = -half + iz * CELL;
+    if (Math.hypot(x - fort.x, z - fort.z) > 130) continue;
+    const i = iz * WORLD_RES + ix, d = world.surface[i] - base.surface[i], out = footOf(x, z), [lx, lz] = inFort(x, z);
+    if (out <= 0 || !d) continue;
+    // (the bluff's face under the valley wall, broken into ribs and a gully along its own fall: no pad, and held to three metres)
+    const brink = lz > outZ + F.brink.from - 0.5 && lz < outZ + F.brink.to + 0.5 && Math.abs(lx) < F.brink.along + 0.5;
+    assert.ok(Math.abs(d) <= (brink ? F.brink.most + 0.01 : 2.5), `the ground is moved by ${d.toFixed(1)} m at ${x}, ${z}: a pad`);
+    if (offTrack(x, z) > MOUNTAIN.track.reach + 4 && !brink) assert.ok(out <= 40, `the ground is moved ${out.toFixed(0)} m from the fort's walls, at ${x}, ${z}`);
+    assert.ok(!(lz > outZ + 0.5 && lz < outZ + F.brink.from - 0.2 && Math.abs(lx) < outX), `the ground at the valley wall's foot is moved, at ${x}, ${z}: the wall goes down to the ground there, not the ground up to the wall`);
+  }
+  // (the track is laid on the ground: nowhere a metre off the ground that was, the road's bank it comes down off
+  // apart; and nowhere steeper than one in six over four metres of it)
+  {
+    const run: number[] = [0];
+    for (let k = 1; k < line.length; k++) run.push(run[k - 1] + Math.hypot(line[k][0] - line[k - 1][0], line[k][1] - line[k - 1][1]));
+    const seen = (x: number, z: number) => heightAt(world.surface, x, z);
+    for (let k = 0; k < line.length; k++) {
+      const [x, z] = line[k], off = seen(x, z) - heightAt(base.surface, x, z);
+      if (run[k] > 4) assert.ok(Math.abs(off) < 1, `the track's bed is ${off.toFixed(2)} m off the ground that was, ${run[k].toFixed(0)} m along it`);
+      if (run[k] > 4 && k + 4 < line.length) assert.ok(Math.abs(seen(line[k + 4][0], line[k + 4][1]) - seen(x, z)) / (run[k + 4] - run[k]) < 1 / 6 + 0.006, `the track is steeper than one in six, ${run[k].toFixed(0)} m along it`);
+    }
+  }
   // The bridge: nothing is dropped from the sky under it (a supply drop is set down on level, clear ground: there is
   // none under the deck), and what lies about the wreck in the cleft are the last places for things there are
   const b = world.bridges[0], len = spanOf(b);
@@ -545,14 +597,28 @@ ok('the road is a loop: out of the far end of Kamenka, over the bridge, round by
     const stood = world.trees.some((t) => Math.abs(t.x - x) < 3.5 && Math.abs(t.z - z) < 3.5) || world.rocks.some((t) => Math.abs(t.x - x) < 3 && Math.abs(t.z - z) < 3) || world.props.some((t) => Math.abs(t.x - x) < 2.5 && Math.abs(t.z - z) < 2.5);
     assert.ok(steep > 0.5 || stood, `a supply drop could be set down under the bridge at ${x}, ${z}`);
   }
-  // (the last there were until the fort was stood on the mountain: the fort's own come after them, and nothing else does)
-  // (and, between the two, the five about the helicopter that came down behind the fort)
+  // (the last there were until the fort was built: the fort's own come after them, and nothing else does)
+  // (and, between the two, the five about the helicopter that came down under the fort)
   const HELI = 5, heli = world.wreck!;
-  const wreck = wreckUnder(b), end = data.lootPoints.findIndex((q: { building: string }) => q.building === 'castle'), last = data.lootPoints.slice(end - HELI - wreck.spots.length, end - HELI), about = data.lootPoints.slice(end - HELI, end);
-  assert.ok(end > 0 && data.lootPoints.slice(end).every((q: { building: string }) => q.building === 'castle'), "the fort's places for things are not the last there are");
+  const wreck = wreckUnder(b), ofFort = (q: { building: string }) => q.building === 'castle' || q.building === 'hamlet', end = data.lootPoints.findIndex(ofFort), last = data.lootPoints.slice(end - HELI - wreck.spots.length, end - HELI), about = data.lootPoints.slice(end - HELI, end);
+  // (the fort's own, and its hamlet's before the gate, which are a place of their own to the map: 'hamlet')
+  assert.ok(end > 0 && data.lootPoints.slice(end).every(ofFort), "the fort's places for things are not the last there are");
   assert.ok(last.every((q: { building: string }) => q.building === 'wreck'), "the wreck's places for things are not the last before the fort's");
   for (const q of last) assert.ok(Math.abs(q.y - ground(q.x, q.z)) < 0.05 && LOOP.deck - q.y > 15, 'a place for a thing by the wreck is not on the ground of the cleft');
-  assert.ok(heli && heli.x > MOUNTAIN.crest.hollow.brow && inPlay(heli.x, heli.z), 'no helicopter in the hollow behind the fort');
+  assert.ok(heli && inPlay(heli.x, heli.z, 15), 'no helicopter by the fort');
+  {
+    // (outside the walls, and in plain sight of the top of the back wall: from an eye there, no ground stands in the way of it)
+    assert.ok(footOf(heli.x, heli.z) > 12 && footOf(heli.x, heli.z) < 60, 'the helicopter is not on the bench outside the walls');
+    const [wx, wy, wz] = castleAt(fort, (F.off - (outX - 0.8)) / CASTLE_SCALE, (outZ * 0.4) / CASTLE_SCALE, 7.08 + 1.7 / CASTLE_SCALE);
+    for (let t = 0.04; t < 0.97; t += 0.01) {
+      const x = wx + (heli.x - wx) * t, z = wz + (heli.z - wz) * t;
+      if (footOf(x, z) > 0) assert.ok(ground(x, z) < wy + (heli.y + 1.2 - wy) * t, `the ground at ${x.toFixed(0)}, ${z.toFixed(0)} hides the helicopter from the back wall's top`);
+    }
+    // (and a body can walk to it and back: the ground about it is no hillside, and nothing of the way from the wall's foot is steeper than one is walked both ways)
+    for (let t = 0; t <= 1; t += 0.02) { const x = wx + (heli.x - wx) * t, z = wz + (heli.z - wz) * t; if (footOf(x, z) > 1) assert.ok(slopeAt(world.heights, x, z) < Math.tan((33 * Math.PI) / 180), `the way to the helicopter is a steep hillside at ${x.toFixed(0)}, ${z.toFixed(0)}`); }
+    // (no foot path is drawn down the bluff: none there can be walked both ways)
+    assert.equal(world.paths.length, 1, 'a path is drawn that is not the cart track');
+  }
   for (const q of about) assert.ok(q.building === 'wreck' && q.tier === 4 && Math.abs(q.y - ground(q.x, q.z)) < 0.05 && Math.hypot(q.x - heli.x, q.z - heli.z) < 9, 'a place for a thing by the helicopter is not on the ground beside it');
 });
 
@@ -567,30 +633,30 @@ ok('no two things that are searched are one thing to the server: every container
   }
 });
 
-ok('the fort is no trap for tags and no window on the end of the map: the line takes the mountain in, nobody starts by it, and its roof looks over no near edge', () => {
-  const fort = world.castle!, gate = world.gatehouse!;
-  // (a tag carried outside the line is void after fifteen seconds: the whole way up is inside it, and the ground round the fort)
+ok('the fort is no trap for tags and no window on the end of the map: the line takes it in with its track, its houses and the bluff under it, nobody starts by it, and its tower tops look over no near edge', () => {
+  const fort = world.castle!;
+  // (a tag carried outside the line is void after fifteen seconds: the whole way in is inside it, and the ground round the fort)
   const road = world.roads[world.roads.length - 1].points;
   for (let i = 0; i < road.length; i += 3) assert.ok(inPlay(road[i], road[i + 2]), `the mountain road leaves the Zona at ${road[i].toFixed(0)}, ${road[i + 2].toFixed(0)}`);
-  for (const [x, z] of world.paths.flat()) assert.ok(inPlay(x, z), `the foot path leaves the Zona at ${x}, ${z}`);
-  assert.ok(inPlay(gate.x, gate.z) && inPlay(fort.x, fort.z));
+  for (const [x, z] of world.paths.flat()) assert.ok(inPlay(x, z, 25), `a way to the fort leaves the Zona, or all but, at ${x}, ${z}`);
+  assert.ok(inPlay(fort.x, fort.z) && inPlay(world.wreck!.x, world.wreck!.z, 15));
   for (let a = 0; a < 16; a++) {
     const x = fort.x + Math.sin((a / 16) * 6.283) * 100, z = fort.z + Math.cos((a / 16) * 6.283) * 100;
-    assert.ok(Math.abs(x) > WORLD_SIZE / 2 || inPlay(x, z), `a hundred metres from the fort is outside the Zona: ${x.toFixed(0)}, ${z.toFixed(0)}`);
+    assert.ok(inPlay(x, z), `a hundred metres from the fort is outside the Zona: ${x.toFixed(0)}, ${z.toFixed(0)}`);
   }
-  // (the owner's rule for the bunker and the town holds here: nobody is set down near it)
-  for (const s of world.spawns) assert.ok(Math.hypot(s.x - gate.x, s.z - gate.z) > 400 && Math.hypot(s.x - fort.x, s.z - fort.z) > 400, 'somebody starts by the fort');
-  // (from the wall round the keep's roof, wherever an edge of the map is near, some ground on the way to it stands over the eye)
-  const R = MOUNTAIN.rim, eye = fort.y + R.eye, half = WORLD_SIZE / 2;
+  // (the owner's rule for such places holds here: nobody is set down within 250 m of it)
+  for (const s of world.spawns) assert.ok(Math.hypot(s.x - fort.x, s.z - fort.z) > 250, 'somebody starts by the fort');
+  // (from the top of a tower, wherever an edge of the map is near, some ground on the way to it stands over the eye)
+  const eye = fort.y + 13.5 * 1.2 + 2.3, near = 420, half = WORLD_SIZE / 2;
   for (let b = 0; b < 720; b++) {
     const ux = Math.sin((b / 720) * 6.283), uz = -Math.cos((b / 720) * 6.283);
     let top = -Infinity, s = 4;
-    for (; s < R.near - 30; s += 2) {
+    for (; s < near - 30; s += 2) {
       const x = fort.x + ux * s, z = fort.z + uz * s;
       if (Math.abs(x) > half - 1 || Math.abs(z) > half - 1) break;
       top = Math.max(top, heightAt(world.heights, x, z));
     }
-    if (s < R.near - 30) assert.ok(top > eye + 1, `from the keep's roof the map ends in sight on bearing ${b / 2}: the ground stands no higher than ${top.toFixed(1)} m against an eye at ${eye.toFixed(1)}`);
+    if (s < near - 30) assert.ok(top > eye + 1, `from a tower's top the map ends in sight on bearing ${b / 2}: the ground stands no higher than ${top.toFixed(1)} m against an eye at ${eye.toFixed(1)}`);
   }
 });
 

@@ -26,7 +26,7 @@
 // (Nothing at the top of this file reads the fort's own: src/sim/castle.ts may bring this file in, and each would
 // then be waiting on the other. Everything is worked out when it is asked for.)
 
-import { CASTLE, HOUSES, LOOSE, castleAt, castleGround, castleLoose, castleParts, looseLocal, type CastleLoot, type GroundAt, type Loose, type Place, type Tower, type V3 } from './castle';
+import { CASTLE, CASTLE_SCALE, HOUSES, LOOSE, castleAt, castleGround, castleLoose, castleParts, looseLocal, type CastleLoot, type GroundAt, type Loose, type Place, type Tower, type V3 } from './castle';
 
 export const POST = {
   name: 'Orlinoye',
@@ -251,13 +251,9 @@ function lay(loose: Loose[]): Plan {
     pole('gate', 'flagpole', fp, [fp[0], top, fp[2]], 0.045, 'steel');
     solids.push({ c: [fp[0], 1.3, fp[2]], h: [0.06, 1.3, 0.06], yaw: 0, surface: 'metal', name: 'flagpole', room: 'gate' });
     made.push({ t: 'sheet', stuff: 'flag', room: 'gate', name: 'flag', p: [[fp[0], top - 0.1, fp[2] + 0.05], [fp[0] - 0.25, top - 0.25, fp[2] + 0.95], [fp[0] - 0.3, top - 1.0, fp[2] + 0.8], [fp[0], top - 0.85, fp[2] + 0.05]], sag: 0.1 });
-    // the gate: a wing of sandbags either side of the way in, and bags on the parapet where its merlons came down
-    // (north of the gatehouse on the east wall, and by the fire on the north one), to fight from over the ramp
+    // the keep's door: a wing of sandbags either side of the way to it, across the yard from the gate
     bags('gate', 'gate sandbags', [[7.35, -3.28], [8.35, -3.28]], 0, 5);
     bags('gate', 'gate sandbags', [[8.15, 0.6], [8.15, 1.7]], 0, 4);
-    const ex = C.hx + C.parapet.thick / 2 - 0.5, ez = C.hz + C.parapet.thick / 2 - 0.5;
-    bags('gate', 'parapet sandbags', [[ex, -6.6], [ex, -4.5]], 0.72, 2);
-    bags('terrace', 'parapet sandbags', [[4.5, -ez], [6.6, -ez]], 0.72, 2);
   }
 
   // ------------------------------------------------------------------ the dump: crates under a net, in the lee of the keep's east wall
@@ -282,7 +278,10 @@ function lay(loose: Loose[]): Plan {
   }
 
   // ------------------------------------------------------------------ the towers
-  {
+  // (Of the fort as it stood on the mountain, whose towers were drums a body climbed inside. On the rim its towers
+  // are the kit's, which have no way up inside them: nothing is set on a tower nobody reaches, and what was on
+  // these three is not built until there is a way up.)
+  if (towers.length) {
     // NORTH-EAST, over the ramp and the north shelf: the sniper's nest, up on its platform. A low bench of boards with
     // the rifle on it, bags laid in three of the gaps of its rim, a net over the side of the field
     const ne = tower('north-east tower'), D = T.deck, rin = T.r - T.wall;
@@ -364,7 +363,7 @@ function lay(loose: Loose[]): Plan {
 let own: Plan | null = null;
 const plan = (loose?: Loose[]): Plan => (loose ? lay(loose) : (own ??= lay(LOOSE)));
 /** the ground of the world, said in the fort's own measure: over the terrace */
-const over = (p: Place, ground?: GroundAt) => (ground ? (x: number, z: number) => { const [wx, , wz] = castleAt(p, x, z); return ground(wx, wz) - p.y; } : undefined);
+const over = (p: Place, ground?: GroundAt) => (ground ? (x: number, z: number) => { const [wx, , wz] = castleAt(p, x, z); return (ground(wx, wz) - p.y) / CASTLE_SCALE; } : undefined);
 const local = (p: Place, loose?: Loose[]) => (loose ? looseLocal(p, loose) : undefined);
 
 /** What is made by hand, in the fort's own measure: for whoever draws it. */
@@ -398,7 +397,8 @@ export function postLoot(p: Place, _ground?: GroundAt, loose: Loose[] = castleLo
   const r3 = (v: number) => Math.round(v * 1000) / 1000;
   return plan(local(p, loose)).spots.map((s) => {
     const [x, y, z] = castleAt(p, s.x, s.z, s.y), [sx, , sz] = castleAt(p, s.surf.x, s.surf.z);
-    return { x: r3(x), y: r3(y) + 0.003, z: r3(z), usage: s.usage, building: 'castle', floor: false, tier: s.tier, room: s.room, ...(s.arms ? { arms: s.arms } : {}), surf: { x: sx, z: sz, rot: p.rot + s.surf.yaw, hx: s.surf.hx, hz: s.surf.hz, clear: s.surf.clear } };
+    // (every place inside the walls is of the fourth step: the owner, 2026-10-13: "castle is T4 loot"; what lies in the hamlet before the gate is the hamlet's)
+    return { x: r3(x), y: r3(y) + 0.003, z: r3(z), usage: s.usage, building: s.room === 'village' ? 'hamlet' : 'castle', floor: false, tier: s.room === 'village' ? s.tier : 4, room: s.room, ...(s.arms ? { arms: s.arms } : {}), surf: { x: sx, z: sz, rot: p.rot + s.surf.yaw, hx: s.surf.hx * CASTLE_SCALE, hz: s.surf.hz * CASTLE_SCALE, clear: s.surf.clear * CASTLE_SCALE } };
   });
 }
 

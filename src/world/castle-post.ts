@@ -13,7 +13,7 @@
 import * as THREE from 'three';
 import { GLASS_GROUPS, WORLD_GROUPS, physics, type Surface } from '../core/physics';
 import { SHADOW_FRUSTA, type Atmosphere } from './atmosphere';
-import { castleAt, castleGround, castleLoose, looseLocal, type GroundAt, type Loose, type Place } from '../sim/castle';
+import { CASTLE_SCALE, castleAt, castleGround, castleLoose, looseLocal, type GroundAt, type Loose, type Place } from '../sim/castle';
 import { POST, postLights, postMade, postSolids } from '../sim/castle-post';
 import { Skin, farMast, postShape } from './castle-post-shape';
 import { SNOW_ON_THE_MOUNTAIN } from './castle';
@@ -137,11 +137,13 @@ export class PostSite {
     const P = place, world = o.ground;
     this.snowU = o.snow ?? { value: SNOW_ON_THE_MOUNTAIN };
     this.loose = looseLocal(P, o.loose ?? castleLoose(P));
-    this.ground = world ? (x, z) => { const [wx, , wz] = castleAt(P, x, z); return world(wx, wz) - P.y; } : castleGround;
+    this.ground = world ? (x, z) => { const [wx, , wz] = castleAt(P, x, z); return (world(wx, wz) - P.y) / CASTLE_SCALE; } : castleGround;
     const all = this.group;
     all.name = 'castle post';
     all.position.set(P.x, P.y, P.z);
     all.rotation.y = P.rot;
+    // (a fifth bigger than its own measure, with the fort it stands in: see CASTLE_SCALE)
+    all.scale.setScalar(CASTLE_SCALE);
     all.updateMatrix();
     all.matrixAutoUpdate = false;
     this.hardPaint = atmo.register(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.78, metalness: 0.12 }), stoneLook({ snow: this.snowU, attr: 'aSnow' }), 'castle post hard');
@@ -171,7 +173,7 @@ export class PostSite {
     if (physics.world) for (const s of solids) {
       const y = s.sits ? this.ground(s.c[0], s.c[2]) : 0, [wx, wy, wz] = castleAt(P, s.c[0], s.c[2], s.c[1] + y);
       const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), P.rot + s.yaw);
-      physics.addStaticQuat(physics.R.ColliderDesc.cuboid(s.h[0], s.h[1], s.h[2]), s.surface as Surface, { x: wx, y: wy, z: wz }, q, undefined, s.feet ? GLASS_GROUPS : WORLD_GROUPS);
+      physics.addStaticQuat(physics.R.ColliderDesc.cuboid(s.h[0] * CASTLE_SCALE, s.h[1] * CASTLE_SCALE, s.h[2] * CASTLE_SCALE), s.surface as Surface, { x: wx, y: wy, z: wz }, q, undefined, s.feet ? GLASS_GROUPS : WORLD_GROUPS);
     }
     this.counts.solids = solids.length;
   }
