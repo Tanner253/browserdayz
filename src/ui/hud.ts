@@ -5,6 +5,7 @@ import { offer, type Offer, type Pick, type Role } from '../net/orders';
 import type { Vitals } from '../game/player';
 import { BACK_SHORT, BACK_WHY, mountUpdates } from './updates';
 import { MAX_STAMINA, type ChatChannel } from '../net/protocol';
+import { ACTIONS, KEY_GROUPS, SENS, bind, bindable, controls, keyName, keyOf, relabel, setControls, shown, type Controls } from '../core/keys';
 import { TOUCH } from '../core/device';
 import { EMOTES } from '../sim/emotes';
 import { TIERS, type Tier } from '../sim/tiers';
@@ -240,44 +241,7 @@ export class HUD {
               </div>
             </div>
             <div class="start-pane pane-keys">
-              <div class="kb">
-                <div class="kb-group">
-                  <h4>Move</h4>
-                  <div class="kb-wasd"><kbd>Q</kbd><kbd class="hot">W</kbd><kbd>E</kbd><kbd class="hot">A</kbd><kbd class="hot">S</kbd><kbd class="hot">D</kbd></div>
-                  <p><kbd>Q</kbd><kbd>E</kbd> lean</p>
-                  <p><kbd class="wide">Shift</kbd> sprint · hold breath</p>
-                  <p><kbd class="wide">Space</kbd> jump</p>
-                  <p><kbd>C</kbd> crouch <kbd>Z</kbd> lie down <kbd class="wide">Alt</kbd> walk</p>
-                  <p><kbd>V</kbd> hold to talk to whoever is near</p>
-                </div>
-                <div class="kb-group">
-                  <h4>Fight</h4>
-                  <svg class="kb-mouse" viewBox="0 0 120 150" aria-hidden="true">
-                    <rect x="30" y="8" width="60" height="100" rx="30" fill="none" stroke="currentColor" stroke-width="2"/>
-                    <path d="M60 8v38M30 46h60" stroke="currentColor" stroke-width="2" fill="none"/>
-                    <path class="m-l" d="M58 10C44 11 32 22 32 38v6h26z"/><path class="m-r" d="M62 10c14 1 26 12 26 28v6H62z"/>
-                    <rect x="56" y="20" width="8" height="16" rx="4" fill="currentColor"/>
-                    <text x="26" y="128" text-anchor="end">FIRE</text><text x="94" y="128">AIM</text><text x="60" y="146" text-anchor="middle">WHEEL · NEXT WEAPON</text>
-                    <path d="M40 46v62H28M80 46v62h12" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="2 3"/>
-                  </svg>
-                  <p><kbd>R</kbd> reload <kbd>X</kbd> empty hands</p>
-                  <p><kbd>I</kbd> look the gun over</p>
-                  <p><kbd>B</kbd> automatic · single shots</p>
-                  <p><kbd class="wide">PgUp</kbd><kbd class="wide">PgDn</kbd> set the range of the sights</p>
-                </div>
-                <div class="kb-group">
-                  <h4>Gear</h4>
-                  <div class="kb-row"><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><em>what is on your back · your holster</em></div>
-                  <div class="kb-row"><kbd>4</kbd><kbd>…</kbd><kbd>0</kbd><em>anything: drop it on a key in the inventory</em></div>
-                  <p>Hold the left button to use what is in your hands</p>
-                  <p><kbd>F</kbd> take · doors · search <kbd>G</kbd> hold: drop what you hold</p>
-                  <p><kbd>L</kbd> light: the one on your gun, or a flashlight you carry</p>
-                  <p><kbd class="wide">Tab</kbd> inventory <kbd>M</kbd> map</p>
-                  <p><kbd class="wide">Enter</kbd> chat <kbd>T</kbd> hold: call out · dance</p>
-                  <p><kbd class="wide">Esc</kbd> this menu</p>
-                  <p><kbd class="wide">F3</kbd> performance</p>
-                </div>
-              </div>
+              <div class="kbs"></div>
             </div>
             <div class="start-pane pane-gfx start-gfx"></div>
           </aside>
@@ -417,6 +381,45 @@ export class HUD {
       const b = (e.target as HTMLElement).closest('button');
       if (b?.dataset.k) this.setGraphic(b.dataset.k, b.dataset.v ?? '');
     });
+    gfx.addEventListener('input', (e) => {
+      const r = e.target as HTMLInputElement;
+      if (!r.classList?.contains('gfx-range')) return;
+      const c = { ...controls(), sens: Number(r.value) };
+      setControls(c);
+      this.keysChanged(c);
+      (r.nextElementSibling as HTMLElement).textContent = `${c.sens.toFixed(2)}×`;
+    });
+    // ---- the controls: click a thing, press the key for it
+    const kbs = this.root.querySelector('.kbs') as HTMLElement;
+    kbs.addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest('button');
+      if (!b) return;
+      if (b.classList.contains('kbs-reset')) {
+        this.binding = null;
+        return void this.setKeys({ ...controls(), keys: {} });
+      }
+      if (b.dataset.code) {
+        this.binding = this.binding === b.dataset.code ? null : b.dataset.code;
+        this.renderKeys();
+      }
+    });
+    // (the next key pressed while a thing waits for one is the key it is put on: taken here before anything else
+    // hears of it, the menu's own Escape and the game's keyboard among them)
+    const take = (key: string, e: Event) => {
+      if (!this.binding) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      const code = this.binding;
+      this.binding = null;
+      if (key !== 'Escape' && bindable(key)) this.setKeys(bind(controls(), code, key));
+      else this.renderKeys();
+    };
+    window.addEventListener('keydown', (e) => take(e.code, e), true);
+    // (and a mouse button, pressed on the strip that asks for one: anywhere else a click is a click)
+    kbs.addEventListener('mousedown', (e) => {
+      if ((e.target as HTMLElement).closest('.kbs-mouse')) take(`Mouse${e.button}`, e);
+    }, true);
+    kbs.addEventListener('contextmenu', (e) => e.preventDefault());
     this.mapTips();
     // scale the whole HUD with the window so it reads the same on a laptop and a 1440p monitor
     const fit = () => {
@@ -573,6 +576,11 @@ export class HUD {
 
   /** Which sheet is open beside the way in: the map, how to play, the controls, the settings; 'play' is none. */
   private sheet(tab: string) {
+    // (a thing left waiting for a key is not left waiting behind another sheet)
+    if (this.binding) {
+      this.binding = null;
+      this.renderKeys();
+    }
     const card = this.root.querySelector('.start-brief') as HTMLElement;
     if (card.dataset.tab === tab && tab !== 'play') tab = 'play';
     card.dataset.tab = tab;
@@ -799,6 +807,35 @@ export class HUD {
     this.hotbarTapped = cb;
   }
 
+  // ---------------------------------------------------------------- menu: the controls
+
+  private keysChanged: (c: Controls) => void = () => {};
+  /** the thing that is waiting for a key to be pressed for it */
+  private binding: string | null = null;
+
+  /** what to do when the player puts a thing on another key, or moves the sensitivity */
+  onControls(changed: (c: Controls) => void) {
+    this.keysChanged = changed;
+    this.renderKeys();
+    this.renderGraphics();
+  }
+
+  private setKeys(c: Controls) {
+    setControls(c);
+    this.keysChanged(c);
+    this.renderKeys();
+  }
+
+  private renderKeys() {
+    const c = controls(), pane = this.root.querySelector('.kbs') as HTMLElement;
+    const row = (a: (typeof ACTIONS)[number]) =>
+      `<button type="button" class="kbs-row${this.binding === a.code ? ' on' : ''}${c.keys[a.code] ? ' set' : ''}" data-code="${a.code}"><span>${a.does}</span><kbd${keyName(keyOf(c, a.code)).length > 2 ? ' class="wide"' : ''}>${this.binding === a.code ? '…' : keyName(keyOf(c, a.code))}</kbd></button>`;
+    pane.innerHTML =
+      `<div class="kbs-top">${this.binding ? '<span>Press the key for it. <b>Esc</b> leaves it as it is.</span><div class="kbs-mouse">or press a mouse button here</div>' : '<span>Click a thing to put it on another key. Two things that want one key change places.</span>'}<button type="button" class="kbs-reset"${Object.keys(c.keys).length ? '' : ' disabled'}>Reset all</button></div>` +
+      `<div class="kbs-cols">${KEY_GROUPS.map((name) => `<div class="kbs-group"><h4>${name}</h4>${ACTIONS.filter((a) => a.group === name).map(row).join('')}</div>`).join('')}</div>` +
+      `<div class="kbs-fixed"><kbd class="wide">Esc</kbd> this menu <kbd class="wide">F3</kbd> performance <span>The wheel is the next weapon. Hold the left button to use what is in your hands.</span></div>`;
+  }
+
   // ---------------------------------------------------------------- menu: graphics, rewards
 
   private gfx: Graphics = { ...DEFAULT_GRAPHICS };
@@ -836,7 +873,9 @@ export class HUD {
     const row = (label: string, key: string, current: string | number | null, options: [string | number, string][]) =>
       `<div class="gfx-row"><span>${label}</span><div class="gfx-opts">${options.map(([v, t]) => `<button data-k="${key}" data-v="${v}"${v === current ? ' class="on"' : ''}>${t}</button>`).join('')}</div></div>`;
     const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
+    const sens = controls().sens;
     (this.root.querySelector('.start-gfx') as HTMLElement).innerHTML =
+      `<div class="gfx-row"><span>Mouse sensitivity</span><div class="gfx-sens"><input type="range" class="gfx-range" min="${SENS.least}" max="${SENS.most}" step="${SENS.step}" value="${sens}" aria-label="Mouse sensitivity"><b>${sens.toFixed(2)}×</b></div></div>` +
       row('Preset', 'preset', presetOf(g), (Object.keys(PRESETS) as PresetName[]).map((p) => [p, cap(p)])) +
       row('Resolution', 'scale', g.scale, SCALES.map((s) => [s, `${Math.round(s * 100)}%`])) +
       row('Anti-aliasing', 'msaa', g.msaa, MSAA.map((m) => [m, m ? `${m}×` : 'Off'])) +
@@ -1269,16 +1308,18 @@ export class HUD {
       e.hotbar.innerHTML = s.hotbar
         .map((h, i) => {
           const icon = h.id && this.icons[h.id] ? `<i style="background-image:url(${this.icons[h.id]})"></i>` : '';
-          return `${i === 3 ? '<span class="hb-gap"></span>' : ''}<div class="hb${h.active ? ' on' : ''}${h.dim ? ' dim' : ''}${h.id ? '' : ' empty'}"><b>${h.key}</b>${icon}<em>${h.label}</em></div>`;
+          return `${i === 3 ? '<span class="hb-gap"></span>' : ''}<div class="hb${h.active ? ' on' : ''}${h.dim ? ' dim' : ''}${h.id ? '' : ' empty'}"><b>${/^\d$/.test(h.key) ? shown(`Digit${h.key}`) : h.key}</b>${icon}<em>${h.label}</em></div>`;
         })
         .join('');
     }
 
-    this.set('prompt', e.prompt, s.prompt ? s.prompt : '', 'html');
+    this.set('prompt', e.prompt, s.prompt ? relabel(s.prompt) : '', 'html');
     this.toggle(e.prompt, 'show', !!s.prompt);
     const acts = s.acts?.length ? s.acts : null;
     if (acts) {
-      const key = (a: HandAct) => (s.touch ? `<span class="act-key">${a.on === 'l' ? 'Fire' : a.on === 'w' ? 'Swap' : 'Aim'}</span>` : mouseSvg(a.on));
+      // (the mouse, drawn with the button that does it; or the key, if the player has put it on one)
+      const put = (a: HandAct) => (a.on === 'l' ? shown('Mouse0') : a.on === 'r' ? shown('Mouse2') : '');
+      const key = (a: HandAct) => (s.touch ? `<span class="act-key">${a.on === 'l' ? 'Fire' : a.on === 'w' ? 'Swap' : 'Aim'}</span>` : put(a) && !/^(LMB|RMB)$/.test(put(a)) ? `<kbd>${put(a)}</kbd>` : mouseSvg(a.on));
       this.set('acts', e.acts, acts.map((a) => `<div class="hud-act${a.hold ? ' hold' : ''}"><div class="hud-act-text"><b>${a.text}</b>${a.sub ? `<small>${a.sub}</small>` : ''}</div>${key(a)}</div>`).join(''), 'html');
     }
     this.toggle(e.acts, 'show', !!acts);

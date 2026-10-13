@@ -19,20 +19,34 @@ export class Input {
   /** set by UI screens that need the cursor (inventory, menus) */
   uiMode = false;
   onLockChange: (locked: boolean) => void = () => {};
+  /** keys the player has put things on: each to the name the game asks for that thing by ('' for a key that now does nothing). See src/core/keys.ts. */
+  private via = new Map<string, string>();
+  /** the keys as the player has set them (anything held is let go: it may not be the same thing any more) */
+  rebind(via: Map<string, string>) {
+    this.via = via;
+    this.releaseAll();
+  }
+  private named(key: string) {
+    const as = this.via.get(key);
+    return as === undefined ? key : as;
+  }
 
   constructor(private el: HTMLElement) {
     window.addEventListener('keydown', (e) => {
       // typing in a text field (player name) is not game input
       if ((e.target as HTMLElement | null)?.tagName === 'INPUT') return;
-      if (e.code === 'Tab' || e.code === 'Space' || e.code === 'Slash' || e.code.startsWith('Arrow') || (e.ctrlKey && e.code === 'KeyW')) e.preventDefault();
-      if (e.repeat) return;
-      this.down.add(e.code);
-      this.pressedSet.add(e.code);
-      this.fixedSet.add(e.code);
+      const k = this.named(e.code);
+      if (e.code === 'Tab' || e.code === 'Space' || e.code === 'Slash' || e.code.startsWith('Arrow') || k === 'Tab' || k === 'Space' || (e.ctrlKey && e.code === 'KeyW')) e.preventDefault();
+      if (e.repeat || !k) return;
+      this.down.add(k);
+      this.pressedSet.add(k);
+      this.fixedSet.add(k);
     });
     window.addEventListener('keyup', (e) => {
-      this.down.delete(e.code);
-      this.releasedSet.add(e.code);
+      const k = this.named(e.code);
+      if (!k) return;
+      this.down.delete(k);
+      this.releasedSet.add(k);
     });
     window.addEventListener('blur', () => {
       for (const k of this.down) this.releasedSet.add(k);
@@ -46,13 +60,17 @@ export class Input {
         this.lock();
         return;
       }
-      const k = `Mouse${e.button}`;
+      const k = this.named(`Mouse${e.button}`);
+      if (!k) return;
       this.down.add(k);
       this.pressedSet.add(k);
+      // (a mouse button that has been given a key's work: taken by whatever reads that key in a fixed step, too)
+      if (!k.startsWith('Mouse')) this.fixedSet.add(k);
     });
     window.addEventListener('mouseup', (e) => {
       if (this.touch) return;
-      const k = `Mouse${e.button}`;
+      const k = this.named(`Mouse${e.button}`);
+      if (!k) return;
       this.down.delete(k);
       this.releasedSet.add(k);
     });

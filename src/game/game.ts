@@ -8,6 +8,7 @@ import { physics, USE_GROUPS, SHOT_GROUPS, SOLID_GROUPS, SIGHT_GROUPS } from '..
 import { assets } from '../core/assets';
 import { audio } from '../core/audio';
 import { Input, NULL_INPUT } from '../core/input';
+import { controls, translation, type Controls } from '../core/keys';
 import type { Atmosphere } from '../world/atmosphere';
 import type { Terrain } from '../world/terrain';
 import { Barrel, type Vegetation } from '../world/vegetation';
@@ -618,6 +619,14 @@ export class Game {
     window.setInterval(() => {
       if (document.hidden && this.started && this.online && !this.player.dead) this.tickTags(this.tagReal());
     }, 1000);
+    // the keys as the player has set them, and how fast their mouse turns the head (src/core/keys.ts)
+    const turn = this.player.sensitivity;
+    const applyControls = (c: Controls) => {
+      this.input.rebind(translation(c));
+      this.player.sensitivity = turn * c.sens;
+    };
+    applyControls(controls());
+    this.hud.onControls(applyControls);
     this.hud.onPass = (pw) => {
       if (this.online) this.net.send({ t: 'admin', pw });
       else this.hud.chatLine('system', '', 'You are playing offline: there is no server to be an admin of.');
@@ -4091,7 +4100,7 @@ export class Game {
     }
     this.updateWheel(playing && !uiOpen && !typing && !TOUCH, now);
     // a dance, or hands that are up, ends with the first step, shot or anything else done
-    if (this.hold && (!playing || uiOpen || typing || !!this.use || !p.grounded || ['KeyW', 'KeyA', 'KeyS', 'KeyD'].some((k) => input.held(k)) || ['Space', 'KeyC', 'ControlLeft', 'Mouse0', 'Mouse2', 'KeyR', 'KeyG'].some((k) => input.pressed(k)))) this.setHold(null);
+    if (this.hold && (!playing || uiOpen || typing || !!this.use || !p.grounded || ['KeyW', 'KeyA', 'KeyS', 'KeyD'].some((k) => input.held(k)) || ['Space', 'KeyC', 'Mouse0', 'Mouse2', 'KeyR', 'KeyG'].some((k) => input.pressed(k)))) this.setHold(null);
     // and a wave with a trigger pulled or a sight raised
     if (this.armsUntil > now && (input.pressed('Mouse0') || input.pressed('Mouse2'))) {
       this.armsUntil = 0;

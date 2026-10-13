@@ -348,14 +348,15 @@ export class Player {
     // Z: down onto the belly, and up again. Lying down, C gets up as far as a crouch and Space all the way.
     let rose = false;
     if (input.pressedFixed('KeyZ') && this.grounded && !v.broken) this.setProne(!this.prone);
-    else if (this.prone && (input.pressedFixed('KeyC') || input.pressedFixed('ControlLeft'))) {
+    else if (this.prone && input.pressedFixed('KeyC')) {
       this.crouched = true;
       if (!this.setProne(false)) this.crouched = false;
     } else if (this.prone && input.pressedFixed('Space')) {
       this.crouched = false;
       // (Space gets up: it does not also jump)
       rose = this.setProne(false);
-    } else if (input.pressedFixed('KeyC') || input.pressedFixed('ControlLeft')) this.setCrouch(!this.crouched);
+    // (C, and only C: Ctrl with a key is the browser's, and a crouch on it was a tab shut by a sprint)
+    } else if (input.pressedFixed('KeyC')) this.setCrouch(!this.crouched);
 
     const fwd = (input.held('KeyW') ? 1 : 0) - (input.held('KeyS') ? 1 : 0);
     const str = (input.held('KeyD') ? 1 : 0) - (input.held('KeyA') ? 1 : 0);
