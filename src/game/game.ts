@@ -30,6 +30,7 @@ import { CARRY_LIMIT, Player, freshVitals } from './player';
 import { BLOOD, bleedOf, bleedsOutIn, bloodOf, greyOf, woundOf } from '../sim/blood';
 import { Avatar, AVATAR_LAYER, DEATH_REST, FP_BODY_LAYER, GEAR_SHOWN, type Hold, facepiece } from './avatar';
 import { lookFor } from './look';
+import { Doll } from './doll';
 import { roadLift } from '../world/road';
 import { Dummy } from './character';
 import { CorpseBody, RemotePlayer } from './remote';
@@ -589,6 +590,22 @@ export class Game {
     this.invUI.doll = doll;
     this.invUI.selfId = publicId();
     this.invUI.carryLimit = CARRY_LIMIT;
+    // (The survivor in the middle of it, alive: see doll.ts. It asks what is worn, what is in the hands and what is
+    // slung, and says when it has been drawn; until it is made, the still picture above is what is shown.)
+    this.doll = new Doll(r, atmo, this.loot.models, {
+      name: () => playerName(),
+      worn: () => GEAR_SLOTS.map((s) => this.inv.slots[s]?.id).filter((x): x is string => !!x && GEAR_SHOWN.has(x)),
+      hands: () => {
+        const it = this.inv.held() ?? this.inHand;
+        return it ? { id: it.id, mods: fittedOf(it) } : null;
+      },
+      held: (id, mods) => this.makeHeld(id, mods),
+      back: () => JSON.stringify(this.weapons.slung()),
+      slung: () => this.weapons.slungModel(),
+      box: () => this.invUI.figureBox(),
+      shown: (on) => this.invUI.figureShown(on),
+    });
+    this.invUI.figure = this.doll;
 
     // one physics step so placement queries see every collider
     physics.step(physics.fixedDt);
@@ -1925,6 +1942,8 @@ export class Game {
 
   /** The figure in the inventory window, drawn again as the player is now: their colours, and what they have on. */
   private portrait() {
+    // (where the figure is alive there is no still picture of it to draw again: see doll.ts)
+    if (this.doll?.alive) return;
     const { r, atmo } = this.s;
     const worn = this.gearKey && this.gearKey !== '\u0000' ? this.gearKey.split(',') : [];
     const mine = ++this.portraitN;
@@ -1936,6 +1955,8 @@ export class Game {
     });
   }
   private portraitN = 0;
+  /** the survivor in the inventory window, alive (null until the game has loaded that far) */
+  private doll: Doll | null = null;
   private gearKey = '';
 
   private async addRemoteStash(s: StashInfo) {
@@ -4866,6 +4887,8 @@ export class Game {
     });
     this.perf.beforeRender();
     r.render(dt);
+    // (the figure in the inventory, laid over the game's picture where the page shows it: nothing, while that is shut)
+    this.doll?.draw(dt);
     this.perf.afterRender();
     input.endFrame();
 

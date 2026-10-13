@@ -19,11 +19,12 @@
 // from a pace off names it in `close`, and one that wants smoke standing before it is cut to makes it in `early`.
 // `bury` is one set where the map is searched for a place, `ward` one set in a room, `bunker` one with a lamp.
 //
-// NEW SINCE THE LAST VISIT. A browser keeps which scenes it has been shown and when it was last here (`KEPT`). The
-// scenes it has not been shown are played first, the newest first, and "New" is said before the caption of each
-// that came to the game since that visit, or within the last fortnight; somebody who has seen them all has the
-// ordinary round and no "New" (see `menuOrder`, which is tested by test/menu-order.test.ts). So the menu changes
-// with the game: what an update adds is the first thing whoever comes back is shown.
+// NEW SINCE THE LAST VISIT. A browser keeps which scenes it has been shown and when it was last here. The scenes
+// it has not been shown are played first, the newest first, and "New" is said before the caption of each that
+// came to the game since that visit, or within the last fortnight; somebody who has seen them all has the ordinary
+// round and no "New". The rule and the remembering are ./menu-order.ts (`menuOrder`, `KEPT`), which has nothing of
+// the game in it and is tested by test/menu-order.test.ts. So the menu changes with the game: what an update adds
+// is the first thing whoever comes back is shown.
 //
 // FULL QUALITY. All of it is played live. (Three recorded films used to take turns with the scenes: beside the
 // game itself their compression showed, and they were taken out. 2026-10-13: "i want it to all be in game footage
@@ -51,12 +52,13 @@ import { ITEMS } from '../sim/items';
 import { BURY, noBurying } from '../sim/stash';
 import type { Atmosphere } from '../world/atmosphere';
 import { hospitalPlan } from '../world/big-buildings';
-import { CELL, WORLD_SIZE, bunkerPlace, heightAt, idx, type BuildingPlot, type BuildingType, type World } from '../world/worldgen';
+import { CELL, SNOW, WORLD_SIZE, bunkerPlace, heightAt, idx, type BuildingPlot, type BuildingType, type World } from '../world/worldgen';
 import { Avatar } from './avatar';
 import type { Effects } from './effects';
 import type { Grips } from './arms';
 import { ZOMBIES, lookFor } from './look';
 import type { Stash } from './loot';
+import { menuOrder, recall, remember, visit, type SceneRow } from './menu-order';
 
 export interface MenuHost {
   world: World;
@@ -73,63 +75,12 @@ export interface MenuHost {
   beam(pos: THREE.Vector3, dir: THREE.Vector3, power: number, wide: number): void;
 }
 
-// ------------------------------------------------------------ what a visitor has been shown
-
-/** one line of the table of scenes, as far as the order of showing is concerned */
-export interface SceneRow {
-  /** what it is known by, for good: it is what a browser remembers having been shown */
-  id: string;
-  /** the day what it shows came to the game (the changelog's date), as YYYY-MM-DD */
-  added: string;
-}
-
-/** how many days a scene is new for, to somebody it has not been shown to */
-export const FRESH_DAYS = 14;
-const DAY = 86_400_000;
-/** where a browser keeps what it has been shown, and when it was last here */
-const KEPT = { seen: 'zona.menu.seen', visit: 'zona.menu.visit' };
 /** a scene has been shown to somebody once it has been on for this long, seconds */
 const SHOWN_AFTER = 2;
 /** said before the caption of a scene that is new to whoever is looking (the menu lights the line of a caption that begins so: `menuScene` in src/ui/hud.ts) */
 const NEW = 'New · ';
 /** what a scene shows close is asked for this long before it is cut to, seconds: its pictures are on by the cut, and two scenes' worth are held no longer than this */
 const SHARP_AHEAD = 3.5;
-
-/**
- * The order one round of scenes is shown in, and which of them are said to be new.
- *
- * What this visitor has not been shown comes first, the newest first (two of one day in the table's order); then
- * what they have, in the table's order, which is the ordinary round. A scene is new if it has not been shown and
- * either came to the game within the last fortnight or has come since the visitor was last here. So somebody here
- * for the first time is not told that everything is new, only what lately is; somebody back after two months is
- * told of all that was added in them; and somebody who has seen it all is told of nothing.
- * @param seen the ids this browser has been shown  @param last when it was last here, ms (null: never, or it keeps nothing)
- */
-export function menuOrder(table: readonly SceneRow[], seen: ReadonlySet<string>, last: number | null, now: number): { id: string; fresh: boolean }[] {
-  const day = (r: SceneRow) => Date.parse(`${r.added}T00:00:00Z`);
-  // (a sort leaves what it cannot tell apart as it found it: two scenes of one day stay in the table's order)
-  const unseen = table.filter((r) => !seen.has(r.id)).sort((a, b) => day(b) - day(a));
-  // (the whole of the day it was added counts as after a visit made that day)
-  const fresh = (r: SceneRow) => now - day(r) < FRESH_DAYS * DAY || (last !== null && day(r) + DAY > last);
-  return [...unseen.map((r) => ({ id: r.id, fresh: fresh(r) })), ...table.filter((r) => seen.has(r.id)).map((r) => ({ id: r.id, fresh: false }))];
-}
-
-/** what this browser remembers of the menu (a browser that keeps nothing remembers nothing: every visit is a first one) */
-function recall(): { seen: Set<string>; last: number | null } {
-  try {
-    const ids = JSON.parse(localStorage.getItem(KEPT.seen) ?? '[]') as unknown, at = Number(localStorage.getItem(KEPT.visit));
-    return { seen: new Set(Array.isArray(ids) ? ids.filter((s): s is string => typeof s === 'string') : []), last: Number.isFinite(at) && at > 0 ? at : null };
-  } catch {
-    return { seen: new Set(), last: null };
-  }
-}
-function keep(key: string, value: string) {
-  try {
-    localStorage.setItem(key, value);
-  } catch {
-    /* not kept: the menu is then as it is on a first visit, every time */
-  }
-}
 
 // ------------------------------------------------------------ a scene
 
@@ -251,11 +202,6 @@ export class MenuScenes {
     for (let i = 0; i < this.rp.length / 3; i++) if (Math.hypot(this.rp[i * 3] - c.x, this.rp[i * 3 + 2] - c.z) < Math.hypot(this.rp[this.mid * 3] - c.x, this.rp[this.mid * 3 + 2] - c.z)) this.mid = i;
   }
 
-  /** every scene there is, as the table has it: what is tested, and what a development console lists */
-  static rows(): (SceneRow & { phone: boolean })[] {
-    return MenuScenes.TABLE.map(({ id, added, phone }) => ({ id, added, phone }));
-  }
-
   /** The cast is brought in (their bodies take a moment to arrive): until then the menu has the view from the air. */
   async load() {
     const { atmo, scene } = this.h;
@@ -332,7 +278,7 @@ export class MenuScenes {
     const kept = recall();
     this.seen = kept.seen;
     this.last = kept.last;
-    keep(KEPT.visit, String(Date.now()));
+    visit(Date.now());
     this.round();
     this.ready = this.rows.length > 0;
     if (import.meta.env.DEV) this.dev();
@@ -1401,6 +1347,104 @@ export class MenuScenes {
   }
 
   /**
+   * The snow on the high ground of the north-east: two of them coming up a white slope among the last of the
+   * pines, toward a lens that stands above them and looks back down the way they have come. The place is looked
+   * for where the game says snow lies whole (SNOW in src/world/worldgen.ts): high enough, a slope that can be
+   * walked, a few trees about and none in the way.
+   */
+  private snow(): Vignette | null {
+    const two = [this.men[1], this.men[3]];
+    let best: { at: THREE.Vector3; up: THREE.Vector3 } | null = null, top = -1e9;
+    for (let x = 240; x <= 740; x += 14) {
+      for (let z = -740; z <= -240; z += 14) {
+        const at = this.on(x, z);
+        if (at.y < SNOW.full + 4 || at.y > SNOW.thin || this.count(x, z, 3, true)) continue;
+        // (which way is up, and how steeply: a slope to be climbed at a walk, not a wall and not a field)
+        const up = V(this.ground(x + 4, z) - this.ground(x - 4, z), 0, this.ground(x, z + 4) - this.ground(x, z - 4)).multiplyScalar(1 / 8);
+        const steep = up.length(), wood = this.count(x, z, 30);
+        if (steep < 0.08 || steep > 0.36 || wood < 3 || wood > 18) continue;
+        up.normalize();
+        const side = V(-up.z, 0, up.x);
+        const eye = this.on(x + up.x * 9 + side.x * 4.5, z + up.z * 9 + side.z * 4.5);
+        const ways = [-1.1, 1.3].map((off) => [this.on(x - up.x * 8 + side.x * off, z - up.z * 8 + side.z * off), this.on(x + up.x * 5 + side.x * off, z + up.z * 5 + side.z * off)]);
+        if (this.count(eye.x, eye.z, 1.6, true) || ways.some(([a, b]) => !this.open(a, b, 1.2) || !this.open(eye, a, 0.8))) continue;
+        const score = at.y * 0.05 - wood * 0.2 - Math.abs(steep - 0.2) * 20 - this.count(eye.x, eye.z, 8, true);
+        if (score > top) {
+          top = score;
+          best = { at, up };
+        }
+      }
+    }
+    if (!best) return this.no('snow', 'no slope under snow was found that two can walk up');
+    const { at, up } = best, side = V(-up.z, 0, up.x);
+    const P = (high: number, right: number) => this.on(at.x + up.x * high + side.x * right, at.z + up.z * high + side.z * right);
+    const from = [P(-8, -1.1), P(-10.5, 1.3)], to = [P(5, -1.1), P(5, 1.3)];
+    const seconds = 9;
+    return {
+      caption: 'The north-east mountain · snow on the high ground',
+      seconds,
+      setup: () => {
+        two.forEach((m, k) => {
+          this.put(m, from[k].x, from[k].z, 0);
+          m.face(to[k].x, to[k].z);
+        });
+      },
+      tick: (_t, dt) => two.forEach((m, k) => this.go(m, to[k].x, to[k].z, 1.25, dt)),
+      view: (t) => {
+        // above them and off to one side, looking back down the slope: they come up toward it, and the country they have climbed out of is behind them
+        const k = Math.min(1, t / seconds), p = P(mix(9, 9.8, k), 4.5);
+        p.y += 1.7;
+        return this.lens(p, two[0].chest(new THREE.Vector3()).lerp(two[1].chest(_c), 0.5), 42, 0.22);
+      },
+    };
+  }
+
+  /**
+   * The gas over the bunker, from outside it: a green bank standing in the hollow, and a man with his mask on
+   * going into it at a run until it has him. The gas is the game's own, drawn as the works' is (Atmosphere.gases);
+   * what is looked for is a place outside it to stand the lens, with open ground between it and the bank.
+   */
+  private gasbank(): Vignette | null {
+    const P = bunkerPlace(this.h.world), man = this.men[2];
+    const g = P && this.h.atmo.gases.find((c) => Math.hypot(c.x - P.x, c.z - P.z) < c.r);
+    if (!P || !g) return null;
+    let best: { eye: THREE.Vector3; from: THREE.Vector3; to: THREE.Vector3 } | null = null, top = -1e9;
+    for (let a = 0; a < Math.PI * 2; a += 0.12) {
+      // (out from the middle of the gas along a line, and a little to one side of it: he goes in along the line, and the lens is further out and off it)
+      const out = V(Math.cos(a), 0, Math.sin(a)), side = V(-out.z, 0, out.x);
+      const from = this.on(g.x + out.x * (g.r + 15) + side.x * 2.5, g.z + out.z * (g.r + 15) + side.z * 2.5), to = this.on(g.x + out.x * (g.r - 17) + side.x * 2.5, g.z + out.z * (g.r - 17) + side.z * 2.5);
+      const eye = this.on(g.x + out.x * (g.r + 27) - side.x * 3, g.z + out.z * (g.r + 27) - side.z * 3);
+      if (Math.abs(from.y - to.y) > 7 || eye.y < to.y - 2 || this.count(eye.x, eye.z, 1.8, true) || !this.open(from, to, 1.3) || !this.open(eye, to, 0.9)) continue;
+      if (!this.clear(eye.clone().setY(eye.y + 1.9), from.clone().setY(from.y + 1.2)) || !this.clear(eye.clone().setY(eye.y + 1.9), to.clone().setY(to.y + 1.4))) continue;
+      // (open ground before the lens, and the lens a little above where he goes in: it looks at the bank and not at trunks)
+      const score = (eye.y - to.y) * 0.6 - this.count((eye.x + to.x) / 2, (eye.z + to.z) / 2, 22) - this.count(eye.x, eye.z, 9, true) * 1.5;
+      if (score > top) {
+        top = score;
+        best = { eye, from, to };
+      }
+    }
+    if (!best) return this.no('gasbank', 'no open way into the gas over the bunker was found');
+    const { eye, from, to } = best;
+    const seconds = 8.5;
+    return {
+      caption: 'Bunker 17 · gas stands over it, and hides whoever is in it',
+      seconds,
+      setup: () => {
+        this.put(man, from.x, from.z, 0);
+        man.face(to.x, to.z);
+        if (man.kits.has('ar15')) this.arm(man, 'ar15');
+      },
+      tick: (_t, dt) => this.go(man, to.x, to.z, 3.6, dt),
+      view: (t) => {
+        const k = Math.min(1, t / seconds);
+        const p = eye.clone().setY(eye.y + mix(1.9, 2.3, k));
+        // (what is looked at is the bank where he goes into it, and him on his way there)
+        return this.lens(p, man.chest(new THREE.Vector3()).lerp(to.clone().setY(to.y + 3), 0.45), 44, 0.2);
+      },
+    };
+  }
+
+  /**
    * The army's camp: up the lane between its four tents toward the watchtower at the end of it, with one of them
    * walking the lane ahead of the lens and one coming back down it from the tower.
    */
@@ -1511,7 +1555,11 @@ export class MenuScenes {
    * `added` is the day of the changelog's entry (public/changelog/index.html): first playable on the 1st of October
    * 2026; supply drops on the 6th; the infected on the 8th; the gas, the campfires, the bunker and its two guns on
    * the 9th; the army's camp on the 10th; the AK, the AR-15 and burying on the 11th; the hospital, the police
-   * headquarters and the village's streets on the 12th.
+   * headquarters and the village's streets on the 12th; the snow on the mountain and the gas over the bunker on
+   * the 13th.
+   *
+   * (Each row is written the one way, on a line of its own beginning `{ id: '…', added: '…', phone: …, make:`. The
+   * test reads the table as it is written, since this file cannot be run without the game: test/menu-order.test.ts.)
    */
   private static readonly TABLE: Row[] = [
     { id: 'chase', added: '2026-10-08', phone: true, make: (m) => m.chase() },
@@ -1519,12 +1567,14 @@ export class MenuScenes {
     { id: 'ak', added: '2026-10-11', phone: false, make: (m) => m.rifle(m.men[1], 'ak', 'The AK · thirty rounds, for as long as the trigger is held', -176, 4) },
     { id: 'bury', added: '2026-10-11', phone: true, make: (m) => m.bury() },
     { id: 'firefight', added: '2026-10-01', phone: true, make: (m) => m.firefight() },
+    { id: 'snow', added: '2026-10-13', phone: true, make: (m) => m.snow() },
     { id: 'cells', added: '2026-10-12', phone: false, make: (m) => m.cells() },
     { id: 'deagle', added: '2026-10-09', phone: true, make: (m) => m.sidearm() },
     { id: 'campfire', added: '2026-10-09', phone: true, make: (m) => m.campfire() },
     { id: 'stand', added: '2026-10-08', phone: true, make: (m) => m.stand() },
     { id: 'hospital', added: '2026-10-12', phone: false, make: (m) => m.hospital() },
     { id: 'ar15', added: '2026-10-11', phone: false, make: (m) => m.rifle(m.men[2], 'ar15', 'The AR-15 · holographic sight, foregrip and a light', 14, 2, true) },
+    { id: 'gasbank', added: '2026-10-13', phone: true, make: (m) => m.gasbank() },
     { id: 'ward', added: '2026-10-12', phone: false, make: (m) => m.ward() },
     { id: 'drop', added: '2026-10-06', phone: true, make: (m) => m.drop() },
     { id: 'benelli', added: '2026-10-09', phone: true, make: (m) => m.shotgun() },
@@ -1550,9 +1600,8 @@ export class MenuScenes {
   private note(id: string) {
     if (this.seen.has(id)) return;
     this.seen.add(id);
-    // (with whatever another window of the game has written since: both are this visitor's. What the table no longer has is forgotten.)
-    for (const s of recall().seen) this.seen.add(s);
-    keep(KEPT.seen, JSON.stringify([...this.seen].filter((s) => MenuScenes.TABLE.some((r) => r.id === s))));
+    // (and whatever another window of the game has written down since: both are this visitor's)
+    for (const s of remember(id, MenuScenes.TABLE)) this.seen.add(s);
   }
   /**
    * What the scene that comes next wants before it is cut to, with so long left of what is on now: whatever of its

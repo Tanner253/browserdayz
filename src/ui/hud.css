@@ -1959,3 +1959,27 @@ body.touch .hm-tiers, body.touch .hm-show, body.touch .hm-zoom { gap: 3px; }
 ::-webkit-scrollbar-thumb { background: rgba(255, 211, 90, 0.42); border: 2px solid transparent; background-clip: padding-box; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(255, 211, 90, 0.8); background-clip: padding-box; }
 ::-webkit-scrollbar-corner { background: transparent; }
+
+/* ---- the survivor in the inventory, alive (src/game/doll.ts) ----
+   It is drawn on the game's own picture, behind this page, where its box is: so the page's dark veil has a hole
+   there for as long as it is being drawn (`fig-live`, put on and taken off by whoever draws it). The veil is the
+   inventory's own, said again here on a layer of its own under everything in it: a hole cut in the inventory
+   itself would be cut in what lies over the figure too, the outline and the word shown while a thing is dragged,
+   and a thing dragged across. (If the veil's colours are changed above, they are to be changed here.) */
+.inv.fig-live { background: none; backdrop-filter: none; }
+.inv.fig-live::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 35%, rgba(12, 15, 13, 0.78), rgba(4, 5, 5, 0.94));
+  backdrop-filter: blur(7px) saturate(0.65);
+  clip-path: polygon(evenodd, 0 0, 100% 0, 100% 100%, 0 100%, 0 0, var(--fig-l) var(--fig-t), var(--fig-l) var(--fig-b), var(--fig-r) var(--fig-b), var(--fig-r) var(--fig-t), var(--fig-l) var(--fig-t));
+}
+/* (where a blur has not been seen to keep to a cut shape: a plain veil, and darker, for there is no blur to quiet what is behind it) */
+.inv.fig-live.veil-plain::before { background: radial-gradient(ellipse at 50% 35%, rgba(12, 15, 13, 0.9), rgba(4, 5, 5, 0.97)); backdrop-filter: none; }
+/* the still picture is put away wherever the live one is to be had; and the figure is a thing to take hold of */
+.inv.fig-ready .doll-fig { background-image: none !important; filter: none; }
+.inv.fig-live .doll-fig { cursor: grab; touch-action: pan-y; }
+.inv.fig-live.turning, .inv.fig-live.turning * { cursor: grabbing !important; }

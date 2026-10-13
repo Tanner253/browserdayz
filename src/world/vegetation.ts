@@ -305,9 +305,12 @@ class Impostors {
   material!: THREE.ShaderMaterial;
   /** how much of the day's light there is (the atmosphere's own figure, once the cards have been photographed) */
   private daylight: { value: number } = { value: 1 };
+  /** the seconds gone by, as the fog's own lines take them (see Atmosphere.seconds): the atmosphere's own number */
+  private seconds: { value: number } = { value: 0 };
 
   bake(renderer: THREE.WebGLRenderer, atmo: Atmosphere, kinds: { name: string; parts: MeshPart[]; entry: TreeEntry }[]) {
     this.daylight = atmo.daylight;
+    this.seconds = atmo.seconds;
     const rows = kinds.length;
     this.atlas = new THREE.WebGLRenderTarget(FRAME_W * FRAMES, FRAME_H * rows, {
       type: THREE.HalfFloatType,
@@ -412,7 +415,7 @@ class Impostors {
         uRows: { value: rows },
         uFade: { value: new THREE.Vector2(...HANDOVER) },
         fogColor: { value: fog.color },
-        fogDensity: { value: fog.density },
+        fogDensity: this.seconds,
         // (the cards were photographed by day: at night they are turned down with the rest)
         uDaylight: this.daylight,
       },

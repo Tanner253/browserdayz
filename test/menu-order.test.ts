@@ -1,11 +1,13 @@
-// The order the menu's scenes are shown in, and which of them are said to be new (src/game/menu-scenes.ts,
-// `menuOrder`): what a visitor has not been shown comes first, the newest first; "New" is for what came since they
-// were last here, or within the last fortnight; and somebody who has seen it all has the ordinary round. And the
-// table of scenes itself: every one has an id of its own and a day it was added. No game, no browser:
+// The order the menu's scenes are shown in, which of them are said to be new, and what a browser remembers of
+// having been shown them (src/game/menu-order.ts): what a visitor has not been shown comes first, the newest
+// first; "New" is for what came since they were last here, or within the last fortnight; and somebody who has seen
+// it all has the ordinary round. And the table of scenes itself (src/game/menu-scenes.ts), read as it is written:
+// every one has an id of its own and a day it was added. No game, no browser:
 //   npx tsx test/menu-order.test.ts
 
 import assert from 'node:assert/strict';
-import { FRESH_DAYS, MenuScenes, menuOrder, type SceneRow } from '../src/game/menu-scenes';
+import { readFileSync } from 'node:fs';
+import { FRESH_DAYS, KEPT, menuOrder, recall, remember, visit, type Keeper, type SceneRow } from '../src/game/menu-order';
 
 let n = 0;
 const ok = (name: string, fn: () => void) => {
@@ -29,6 +31,12 @@ const NOW = at('2026-10-13');
 const ids = (o: { id: string }[]) => o.map((x) => x.id);
 const fresh = (o: { id: string; fresh: boolean }[]) => o.filter((x) => x.fresh).map((x) => x.id);
 const none = new Set<string>();
+/** somewhere to keep things that is not a browser's: what is in it can be looked at */
+const box = (held: Record<string, string> = {}): Keeper & { held: Record<string, string> } => ({
+  held,
+  getItem: (k) => held[k] ?? null,
+  setItem: (k, v) => void (held[k] = v),
+});
 
 ok('somebody here for the first time is shown the newest first, and told only of what is lately new', () => {
   const o = menuOrder(TABLE, none, null, NOW);
@@ -91,9 +99,60 @@ ok('every scene is in a round once, whatever the browser remembers, and nothing 
   assert.deepEqual(fresh(menuOrder([{ id: 'tomorrow', added: '2026-10-14' }], none, null, NOW)), ['tomorrow']);
 });
 
+ok('what is shown is written down, with what another window wrote, and the next visit finds it', () => {
+  const b = box();
+  // (nothing kept yet: nobody has been here)
+  assert.deepEqual(recall(b), { seen: new Set(), last: null });
+  visit(NOW, b);
+  assert.deepEqual([...remember('ward', TABLE, b)], ['ward']);
+  // (another window of the game shows the gun meanwhile)
+  b.held[KEPT.seen] = JSON.stringify(['ward', 'gun']);
+  assert.deepEqual([...remember('bury', TABLE, b)].sort(), ['bury', 'gun', 'ward']);
+  const next = recall(b);
+  assert.deepEqual([...next.seen].sort(), ['bury', 'gun', 'ward']);
+  assert.equal(next.last, NOW);
+  // (and the round that visit is given: the three it has not seen first, newest first, then the three it has)
+  assert.deepEqual(ids(menuOrder(TABLE, next.seen, next.last, NOW + DAY)), ['morgue', 'fight', 'old', 'ward', 'gun', 'bury']);
+});
+
+ok('a scene the table no longer has is forgotten, and what is kept amiss is read as nothing', () => {
+  const b = box({ [KEPT.seen]: JSON.stringify(['ward', 'taken-out-of-the-game', 7, null]), [KEPT.visit]: 'yesterday' });
+  assert.deepEqual(recall(b), { seen: new Set(['ward', 'taken-out-of-the-game']), last: null });
+  assert.deepEqual([...remember('gun', TABLE, b)], ['ward', 'gun']);
+  assert.equal(b.held[KEPT.seen], JSON.stringify(['ward', 'gun']));
+  for (const bad of ['{not json', '"a word"', '{"seen":["ward"]}', '']) assert.deepEqual(recall(box({ [KEPT.seen]: bad })).seen, new Set(), `kept as ${bad}`);
+});
+
+ok('a browser that keeps nothing, or refuses to be asked, breaks nothing: every visit is a first one', () => {
+  const refuses: Keeper = {
+    getItem: () => {
+      throw new Error('storage is off');
+    },
+    setItem: () => {
+      throw new Error('storage is off');
+    },
+  };
+  for (const b of [null, refuses]) {
+    assert.deepEqual(recall(b), { seen: new Set(), last: null });
+    visit(NOW, b);
+    // (what has just been shown is all there is to say)
+    assert.deepEqual([...remember('ward', TABLE, b)], ['ward']);
+    assert.deepEqual(recall(b), { seen: new Set(), last: null });
+  }
+  // (and with nothing handed in, where there is no browser at all, which is here)
+  assert.deepEqual(recall(), { seen: new Set(), last: null });
+  visit(NOW);
+  assert.deepEqual([...remember('ward', TABLE)], ['ward']);
+});
+
 ok('the table of scenes: an id of its own and a day for each, and a phone has the shorter list', () => {
-  const rows = MenuScenes.rows();
-  assert.ok(rows.length >= 17, `only ${rows.length} scenes`);
+  // (read as it is written: the file itself brings the whole game with it, and is not to be run here)
+  const src = readFileSync(new URL('../src/game/menu-scenes.ts', import.meta.url), 'utf8');
+  const table = src.slice(src.indexOf('private static readonly TABLE'));
+  const rows = [...table.matchAll(/\{ id: '([^']*)', added: '([^']*)', phone: (true|false), make: /g)].map((m) => ({ id: m[1], added: m[2], phone: m[3] === 'true' }));
+  assert.ok(rows.length >= 17, `only ${rows.length} scenes were read out of the table`);
+  // (every row is written the one way: one that is not would be missed here, and is refused)
+  assert.equal(rows.length, [...table.matchAll(/\bmake: /g)].length, 'a row of the table is not written as the others are');
   assert.equal(new Set(rows.map((r) => r.id)).size, rows.length, 'two scenes have one id: a browser could not tell which it had shown');
   for (const r of rows) {
     assert.match(r.id, /^[a-z0-9-]+$/, `the id '${r.id}'`);

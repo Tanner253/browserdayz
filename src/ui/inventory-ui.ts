@@ -26,6 +26,7 @@ import { DOLL_SLOTS, GEAR_SLOTS, ITEMS, SLOT_KIND, SLOT_LABEL, TAG_HOLD_MIN, WEA
 import { Container, bagGrid, splitPile, swapPlaces, type PlayerInventory } from '../sim/inventory';
 import type { WorldItem, Stash } from '../game/loot';
 import type { Vitals } from '../game/player';
+import type { DollBox as FigureBox } from '../game/doll';
 
 const CELL = 46;
 
@@ -176,6 +177,20 @@ export class InventoryUI {
   icons: Record<string, string> = {};
   /** portrait of the survivor for the paper doll */
   doll = '';
+  /**
+   * The same survivor alive (src/game/doll.ts), where the game has made one: drawn each frame on the game's own
+   * picture, behind this page, and seen through a hole left for it in the page's dark veil (the end of hud.css).
+   * A drag on it turns it. Until it is made, and on any frame it is not drawn, the still picture above is shown.
+   */
+  figure: { alive: boolean; grab(): void; turn(by: number): void; drop(): void; front(): void } | null = null;
+  /** the drag that is turning the figure: which pointer it is, and where that last was */
+  private turning: { id: number; x: number } | null = null;
+  /** where the figure was last found on the page, when, and whether anything has happened since that may have moved it */
+  private figBox: FigureBox | null = null;
+  private figAt = 0;
+  private figMoved = true;
+  /** the figure was drawn on the last frame: the hole in the veil is open */
+  private figLive = false;
   /** this player's public id: tells their own dog tag from the ones they took */
   selfId = '';
   private vicinity: WorldItem[] = [];
@@ -267,6 +282,93 @@ export class InventoryUI {
     window.addEventListener('pointerdown', (e) => {
       if (this.menu && !this.menu.contains(e.target as Node)) this.closeMenu();
     });
+    // The figure of the survivor is turned by a drag on it: pressed on the figure itself and nowhere else. A thing
+    // in a place beside it is pressed on the thing, and that is a drag of the thing as it always was; and a thing
+    // let go over the figure is let go on the survivor as before (that asks what is under the pointer, which is
+    // the same as it was). A press twice turns it back to the front.
+    const onFigure = (e: Event) => this.figLive && !this.drag && !!(e.target as Element | null)?.classList?.contains('doll-fig');
+    this.root.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0 || !onFigure(e)) return;
+      e.preventDefault();
+      this.turning = { id: e.pointerId, x: e.clientX };
+      this.root.classList.add('turning');
+      this.figure?.grab();
+    });
+    window.addEventListener('pointermove', (e) => {
+      const t = this.turning;
+      if (!t || e.pointerId !== t.id) return;
+      this.figure?.turn((e.clientX - t.x) / this.z);
+      t.x = e.clientX;
+    });
+    const letGo = (e: PointerEvent) => {
+      if (this.turning && e.pointerId === this.turning.id) this.figureLetGo();
+    };
+    window.addEventListener('pointerup', letGo);
+    window.addEventListener('pointercancel', letGo);
+    this.root.addEventListener('dblclick', (e) => {
+      if (onFigure(e)) this.figure?.front();
+    });
+    // (where the figure stands on the page is found again when the window is another size, or the column it is in is scrolled)
+    window.addEventListener('resize', () => (this.figMoved = true));
+    this.root.addEventListener('scroll', () => (this.figMoved = true), true);
+    // (The hole is cut in a veil that blurs what is behind it. That the blur keeps to the veil's cut shape has been
+    // seen in Chrome and what is built on it; elsewhere it has not, and a blur that did not would lie over the
+    // figure. So elsewhere the veil is a plain dark one while the figure is shown, cut as any shape is cut.
+    // `?veil=blur` asks for the blurred one anyway, to look.)
+    const veil = new URLSearchParams(location.search).get('veil');
+    if (veil === 'plain' || (veil !== 'blur' && !/\bChrome\/\d/.test(navigator.userAgent))) this.root.classList.add('veil-plain');
+  }
+
+  private figureLetGo() {
+    if (!this.turning) return;
+    this.turning = null;
+    this.root.classList.remove('turning');
+    this.figure?.drop();
+  }
+
+  /**
+   * Where the figure stands on the page, and what of that is in sight (its column scrolls): asked by whoever draws
+   * it, each frame. Measured when something may have moved it, and now and then besides; the same answer is handed
+   * back until it has, so that nothing is worked out twice for a figure that has not moved. The hole in the veil
+   * is put where it is found.
+   */
+  figureBox(): FigureBox | null {
+    if (!this.isOpen) return null;
+    const now = performance.now();
+    if (!this.figMoved && now - this.figAt < 400) return this.figBox;
+    this.figMoved = false;
+    this.figAt = now;
+    const fig = this.root.querySelector<HTMLElement>('.doll-fig'), col = fig?.closest<HTMLElement>('.inv-col');
+    let box: FigureBox | null = null;
+    const page = this.root.getBoundingClientRect(), z = this.z;
+    if (fig && col) {
+      const f = fig.getBoundingClientRect(), c = col.getBoundingClientRect();
+      // (the column's own inside: within its border, and clear of its scroll bar)
+      const left = c.left + col.clientLeft * z, top = c.top + col.clientTop * z;
+      const l = Math.ceil(Math.max(f.left, left)), t = Math.ceil(Math.max(f.top, top));
+      const r = Math.floor(Math.min(f.right, left + col.clientWidth * z)), b = Math.floor(Math.min(f.bottom, top + col.clientHeight * z));
+      if (f.width >= 16 && f.height >= 16 && r - l >= 8 && b - t >= 8) box = { x: f.left, y: f.top, w: f.width, h: f.height, cx: l, cy: t, cw: r - l, ch: b - t, dim: this.root.classList.contains('veil-plain') ? 0.9 : 0.795 };
+    }
+    const was = this.figBox;
+    if (box && was && box.x === was.x && box.y === was.y && box.w === was.w && box.h === was.h && box.cx === was.cx && box.cy === was.cy && box.cw === was.cw && box.ch === was.ch) return was;
+    this.figBox = box;
+    // (said in the page's own measure, which is the screen's over the page's scale)
+    const at = (v: number, from: number) => `${((v - from) / z).toFixed(2)}px`;
+    const s = this.root.style;
+    s.setProperty('--fig-l', box ? at(box.cx, page.left) : '0px');
+    s.setProperty('--fig-t', box ? at(box.cy, page.top) : '0px');
+    s.setProperty('--fig-r', box ? at(box.cx + box.cw, page.left) : '0px');
+    s.setProperty('--fig-b', box ? at(box.cy + box.ch, page.top) : '0px');
+    return box;
+  }
+
+  /** Whether the figure was drawn this frame, said by whoever draws it: the hole in the veil is open for exactly as long as it is. */
+  figureShown(on: boolean) {
+    if (on === this.figLive) return;
+    this.figLive = on;
+    this.root.classList.toggle('fig-live', on);
+    if (on) this.root.classList.add('fig-ready');
+    else this.figureLetGo();
   }
 
   /** the whole screen is scaled with the window: on-screen pixels per inventory pixel */
@@ -309,6 +411,7 @@ export class InventoryUI {
     this.closeMenu();
     this.cancelDrag();
     this.hideCard();
+    this.figureLetGo();
     this.root.classList.remove('show');
   }
 
@@ -826,6 +929,9 @@ export class InventoryUI {
       e.scrollTop = was[i][0];
       e.scrollLeft = was[i][1];
     });
+    // (the figure's box was made afresh with the rest: where it is, is found again; and its still picture is put away where the live one is to be had)
+    this.figMoved = true;
+    r.classList.toggle('fig-ready', !!this.figure?.alive);
     r.appendChild(this.hoverOutline);
     r.appendChild(this.card);
     if (this.menu) r.appendChild(this.menu);

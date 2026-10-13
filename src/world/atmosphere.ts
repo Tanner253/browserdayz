@@ -32,6 +32,8 @@ async function halve(sky: THREE.DataTexture) {
   sky.needsUpdate = true;
 }
 
+/** how thick the air itself is, to look through: three.js's own measure of it (what `FogExp2` is made with) */
+const AIR = 0.0011;
 /** the colour of the gas where the light is in it (linear, before the picture is finished) */
 const GAS_COLOR = new THREE.Color(0.3, 0.36, 0.1);
 
@@ -106,6 +108,14 @@ export class Atmosphere {
   private stars: THREE.Points | null = null;
   /** Every gas the world has: said before init, which writes them into every shader that takes fog. Each is drawn by the same lines. */
   gases: GasCloud[] = [];
+  /**
+   * The seconds gone by, as every shader that takes fog is told them: the gas drifts by them. They ride in on the
+   * one number three.js hands to every such shader each frame by itself, the fog's `density`: the air's own
+   * thickness never changes, so that is written into the shaders as a figure (AIR) and the number is free to
+   * carry the time. A material that takes the fog's lines without being a fog material of three.js's own (the far
+   * trees' cards) is handed this same object. Nothing else may read `scene.fog.density` as a thickness.
+   */
+  readonly seconds = { value: 0 };
   /** the works' gas (the first of them), for what asks only about that one: its loot, a trailer's shot of it */
   get gas(): GasZone | null {
     return this.gases[0] ?? null;
@@ -180,7 +190,7 @@ export class Atmosphere {
     this.scene.environmentIntensity = 0.9;
     this.scene.background = this.background;
     this.scene.backgroundIntensity = 1.0;
-    this.scene.fog = new THREE.FogExp2(this.fogColor.getHex(), 0.0011);
+    this.scene.fog = new THREE.FogExp2(this.fogColor.getHex(), AIR);
     (this.scene.fog as THREE.FogExp2).color.copy(this.fogColor);
 
     this.installFogChunks();
@@ -340,7 +350,8 @@ export class Atmosphere {
   #define ATMO_FALLOFF 0.012
   float atmoFogAmount( vec3 ro, vec3 rd, float dist ) {
     #ifdef FOG_EXP2
-      float a = fogDensity;
+      // (not fogDensity: that number carries the seconds gone by, see Atmosphere.seconds)
+      float a = ${AIR.toFixed(6)};
     #else
       float a = 1.0 / max( fogFar, 1.0 );
     #endif
@@ -368,8 +379,8 @@ export class Atmosphere {
     gl_FragColor.rgb = mix( gl_FragColor.rgb, atmoFogColor( fogDir ), fogAmt );
     #ifdef GAS_ZONE
       // (what is seen through the gas is lost to it, by as much of it as lies in the way)
-      vec2 gasIs = gasAmount( cameraPosition, fogDir, fogDist );
-      gl_FragColor.rgb = mix( gl_FragColor.rgb, gasColor( fogDir, gasIs.y ), gasIs.x );
+      vec3 gasIs = gasAmount( cameraPosition, fogDir, fogDist );
+      gl_FragColor.rgb = mix( gl_FragColor.rgb, gasColor( fogDir, gasIs.y, gasIs.z ), gasIs.x );
     #endif
   }
 #endif`;
@@ -416,17 +427,35 @@ export class Atmosphere {
   #define GAS_COLOR ${vec3(GAS_COLOR.r, GAS_COLOR.g, GAS_COLOR.b)}
   #define GAS_SUN ${vec3(s.x, s.y, s.z)}
   #define GAS_DAY_AIR ${(this.fogColor.r + this.fogColor.g + this.fogColor.b).toFixed(5)}
+  // (the seconds gone by: see Atmosphere.seconds)
+  #define GAS_NOW fogDensity
+  // the way it drifts, metres a second
+  #define GAS_WIND vec3( 0.55, 0.03, 0.3 )
+  // A slow pattern fixed in the world: three waves, each bent by another, no two of them lined up, so that nothing
+  // in it repeats that an eye can find. About -1 to 1; its broadest swells are some 45 m across.
+  float gasNoise( vec3 w ) {
+    float n = sin( dot( w, vec3( 0.061, 0.113, 0.047 ) ) + 1.9 * sin( dot( w, vec3( -0.039, 0.021, 0.071 ) ) ) );
+    n += 0.6 * sin( dot( w, vec3( -0.127, 0.093, 0.149 ) ) + 1.5 * sin( dot( w, vec3( 0.083, -0.057, 0.031 ) ) ) + 2.1 );
+    n += 0.35 * sin( dot( w, vec3( 0.31, 0.19, -0.27 ) ) + 1.2 * sin( dot( w, vec3( -0.21, 0.13, 0.17 ) ) ) + 4.3 );
+    return n / 1.95;
+  }
   // how thick it is at a point: where in its dome (the middle 0, the edge 1 out), and where in the world
   float gasAt( vec3 p, vec3 w ) {
     float full = clamp( ( 1.0 - dot( p, p ) ) * GAS_FULL, 0.0, 1.0 );
-    float puff = 0.6 * sin( w.x * 0.071 + w.y * 0.13 + 1.7 ) * sin( w.z * 0.063 - w.y * 0.11 ) + 0.4 * sin( w.x * 0.19 - w.z * 0.17 + w.y * 0.23 );
-    float d = clamp( full * full + GAS_PUFFS * puff * ( 1.0 - full ) * min( full * 6.0, 1.0 ), 0.0, 1.0 );
-    return d * ( 1.0 - smoothstep( GAS_TOP, 1.0, p.y ) );
+    float d = full * full;
+    if ( full <= 0.0 ) return 0.0;
+    // (Only its skirt is broken into puffs, and only its top is ragged: low down, from where it is breathed in, it
+    // is whole, and costs nothing to know.)
+    bool whole = full > 0.999 && p.y < GAS_TOP - 0.3;
+    float n = whole ? 0.0 : gasNoise( w - GAS_WIND * GAS_NOW );
+    d = clamp( d + GAS_PUFFS * n * ( 1.0 - full ) * min( full * 6.0, 1.0 ), 0.0, 1.0 );
+    return d * ( 1.0 - smoothstep( GAS_TOP + 0.26 * n - 0.1, 1.0 + 0.12 * n, p.y ) );
   }
   // How much of one of them lies along a line of sight: the middle of it, one over its reach each way, and the
-  // height it has none under. Added to got.x in metres of it at its thickest, and to got.y the same weighed by how
-  // high in it each metre was (what it is shaded by).
-  void gasThrough( vec3 ro, vec3 rd, float dist, vec3 mid, vec3 inv, float low, inout vec2 got ) {
+  // height it has none under. Added to got: x, metres of it at its thickest; y, the same weighed by how high in
+  // it each metre was; z, how lit the face of it is that the line of sight comes to, weighed by w, how much of a
+  // face there is (none, to an eye that sees through it).
+  void gasThrough( vec3 ro, vec3 rd, float dist, vec3 mid, vec3 inv, float low, inout vec4 got ) {
     vec3 q = ( ro - mid ) * inv;
     vec3 d = rd * inv;
     float a = dot( d, d ), b = dot( q, d ), c = dot( q, q ) - 1.0;
@@ -440,30 +469,51 @@ export class Atmosphere {
       if ( rd.y > 0.0 ) t1 = max( t1, tp ); else t2 = min( t2, tp );
     } else if ( over < 0.0 ) return;
     if ( t2 <= t1 ) return;
+    // (how far in the eye is: nothing outside it, one from where it is breathed. An eye that is in it sees through it.)
+    float thin = mix( 1.0, GAS_WITHIN, smoothstep( 0.15, 0.75, clamp( -c * GAS_FULL, 0.0, 1.0 ) ) );
     float dt = ( t2 - t1 ) / float( GAS_STEPS );
     float t = t1 + dt * fract( 52.9829189 * fract( dot( gl_FragCoord.xy, vec2( 0.06711056, 0.00583715 ) ) ) );
     vec2 sum = vec2( 0.0 );
+    // where the line of sight is stopped by it: each step's place, weighed by how much is first lost there
+    vec3 face = vec3( 0.0 );
+    float faces = 0.0, seen = 1.0;
     for ( int i = 0; i < GAS_STEPS; i++ ) {
-      vec3 p = q + d * t;
-      float k = gasAt( p, ro + rd * t );
+      vec3 p = q + d * t, w = ro + rd * t;
+      float k = gasAt( p, w );
+      float lost = seen * ( 1.0 - exp( -GAS_THICK * k * dt * thin ) );
+      face += lost * w;
+      faces += lost;
+      seen -= lost;
       sum += vec2( k, k * p.y );
       t += dt;
     }
-    // (how far in the eye is, by the same measure: nothing outside it, one from where it is breathed)
-    float eye = clamp( -c * GAS_FULL, 0.0, 1.0 );
-    got += sum * dt * mix( 1.0, GAS_WITHIN, smoothstep( 0.15, 0.75, eye ) );
+    got.xy += sum * dt * thin;
+    if ( faces > 1e-4 ) {
+      // How lit that face is: by how much of the gas lies between it and the sun (a few metres toward the sun
+      // from it: in the open there, it is a lit crest; deep in it there, a shaded hollow), and by a finer run of
+      // the same pattern, drifting with it, which is the billows on it.
+      vec3 at = face / faces, sunward = at + GAS_SUN * 9.0;
+      float shaded = gasAt( ( sunward - mid ) * inv, sunward );
+      float billow = gasNoise( ( at - GAS_WIND * GAS_NOW ) * 2.6 );
+      got.z += faces * exp( -1.4 * shaded ) * ( 1.0 + 0.38 * billow );
+      got.w += faces;
+    }
   }
-  // how much of what is seen along a line of sight is lost to the gas (x), and how high in it, on the whole, the gas on that line was (y: 0 its foot, 1 its top)
-  vec2 gasAmount( vec3 ro, vec3 rd, float dist ) {
-    vec2 got = vec2( 0.0 );
+  // what the gas does to a line of sight: x, how much of what is seen along it is lost; y, how high in it, on the
+  // whole, the gas on that line was (0 its foot, 1 its top); z, how lit its face is there (about 0.2 to 1.2)
+  vec3 gasAmount( vec3 ro, vec3 rd, float dist ) {
+    vec4 got = vec4( 0.0 );
     ${through}
-    return vec2( 1.0 - exp( -GAS_THICK * got.x ), got.y / max( got.x, 1e-4 ) );
+    return vec3( 1.0 - exp( -GAS_THICK * got.x ), got.y / max( got.x, 1e-4 ), got.w > 1e-4 ? got.z / got.w : 1.0 );
   }
-  vec3 gasColor( vec3 rd, float high ) {
-    // a little lit through, looking toward the sun; no brighter than the air is at this hour; and darker at its
-    // foot than toward its top, as a bank of anything is that the light comes down into
+  vec3 gasColor( vec3 rd, float high, float light ) {
+    // A little lit through, looking toward the sun; no brighter than the air is at this hour; darker at its foot
+    // than toward its top; and its face lit and shaded as a bank of anything is that stands in the sun, paler
+    // where it is lit: so that it is seen as a thing with depth to it and not as a colour laid over the view.
     float lit = clamp( dot( fogColor, vec3( 1.0 ) ) / GAS_DAY_AIR, 0.0, 1.0 );
-    return GAS_COLOR * lit * ( 1.0 + 0.45 * pow( max( dot( rd, GAS_SUN ), 0.0 ), 4.0 ) ) * mix( 0.72, 1.22, smoothstep( 0.0, 0.5, high ) );
+    vec3 col = GAS_COLOR * ( 1.0 + 0.45 * pow( max( dot( rd, GAS_SUN ), 0.0 ), 4.0 ) ) * mix( 0.78, 1.15, smoothstep( 0.0, 0.5, high ) ) * mix( 0.42, 1.36, light );
+    col = mix( col, vec3( dot( col, vec3( 0.36 ) ) ) * 1.08, 0.3 * smoothstep( 0.55, 1.15, light ) );
+    return col * lit;
   }`;
   }
 
@@ -483,7 +533,7 @@ export class Atmosphere {
       depthWrite: false,
       fog: false,
       // (the air's colour, which the gas is no brighter than: the same object the fog has, so it is the hour's)
-      uniforms: { fogColor: { value: (this.scene.fog as THREE.FogExp2).color } },
+      uniforms: { fogColor: { value: (this.scene.fog as THREE.FogExp2).color }, fogDensity: this.seconds },
       vertexShader: /* glsl */ `
         varying vec3 vWorld;
         void main() {
@@ -493,14 +543,15 @@ export class Atmosphere {
         }`,
       fragmentShader: /* glsl */ `
         uniform vec3 fogColor;
+        uniform float fogDensity;
         varying vec3 vWorld;
         ${this.gasGlsl(i)}
         void main() {
           vec3 ray = vWorld - cameraPosition;
           float dist = length( ray );
           vec3 rd = ray / max( dist, 1e-4 );
-          vec2 gasIs = gasAmount( cameraPosition, rd, dist + 1.0 );
-          gl_FragColor = vec4( gasColor( rd, gasIs.y ), gasIs.x );
+          vec3 gasIs = gasAmount( cameraPosition, rd, dist + 1.0 );
+          gl_FragColor = vec4( gasColor( rd, gasIs.y, gasIs.z ), gasIs.x );
         }`,
     });
     const dome = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 24), mat);
@@ -664,6 +715,8 @@ export class Atmosphere {
 
   update() {
     this.applyLight();
+    this.seconds.value = performance.now() / 1000;
+    (this.scene.fog as THREE.FogExp2).density = this.seconds.value;
     // The cascades are cut from the shape of the view, and were cut once, when the game
     // started. Resize the window or go full screen and they went on covering the old shape:
     // on a screen that had become wider, nothing off to the sides was shadowed. (And started

@@ -39,7 +39,7 @@ export const GAS = {
   thick: 0.18,
   skirt: 0.3,
   top: 0.4,
-  puffs: 0.4,
+  puffs: 0.7,
   within: 0.02,
   /** how deep in (0 at the rim, 1 at the middle) it is thick enough to be breathed */
   breathe: 0.08,

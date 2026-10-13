@@ -25,7 +25,13 @@ const WISP = { far: 34, near: [1.6, 6] as [number, number], size: [5, 11] as [nu
 /** how much of the daylight, and of the light of the sky, is lost at the eye in the thick of it */
 const DIM = { sun: 0.42, sky: 0.3 };
 /** the warning boards round it: how many, how far outside the rim they stand, and how big each is (across, up, and the height of its post), metres */
-const SIGNS = { n: 12, out: 5, board: [0.86, 0.6] as [number, number], post: 1.95 };
+/**
+ * The boards. Round each gas, `out` metres beyond the furthest it is seen and one to every `every` metres of the
+ * way round (never fewer than `n`); and beside every road that leads to it, from `lead` metres off, one to every
+ * `along` metres of road (2026-10-13: "I like those signs ... we should have those around the gas perimeter and
+ * leading up to the gas here and there on the paths to them").
+ */
+const SIGNS = { n: 12, out: 5, every: 42, lead: 230, along: 58, board: [0.86, 0.6] as [number, number], post: 1.95 };
 
 /** the board itself, painted: what is on every one of them */
 function signPaint(): THREE.CanvasTexture {
@@ -167,25 +173,54 @@ export class Gas {
     const [bw, bh] = SIGNS.board;
     const post = new THREE.BoxGeometry(0.07, SIGNS.post, 0.07), board = new THREE.BoxGeometry(bw, bh, 0.025);
     const near = (list: { x: number; z: number }[], x: number, zz: number, r: number) => list.some((o) => Math.abs(o.x - x) < r && Math.abs(o.z - zz) < r);
-    for (let k = 0; k < SIGNS.n; k++) {
-      const a = (k / SIGNS.n) * Math.PI * 2 + 0.2;
-      const x = z.x + Math.sin(a) * (z.r + SIGNS.out), zz = z.z + Math.cos(a) * (z.r + SIGNS.out);
+    let made = 0;
+    /** one of them stood at a place, its face turned the way `a` says (0 looks south, down +z): left out where something stands there already, or the ground falls away */
+    const stand = (x: number, zz: number, a: number, clear = 9) => {
+      const k = made++;
       const y = this.ground(x, zz);
-      if (near(world.trees, x, zz, 1.6) || near(world.rocks, x, zz, 2.2) || near(world.props, x, zz, 1.6) || near(world.buildings, x, zz, 9)) continue;
-      if (Math.abs(this.ground(x + 1, zz) - y) + Math.abs(this.ground(x, zz + 1) - y) > 0.7) continue;
+      if (near(world.trees, x, zz, 1.6) || near(world.rocks, x, zz, 2.2) || near(world.props, x, zz, 1.6) || near(world.buildings, x, zz, clear)) return;
+      if (Math.abs(this.ground(x + 1, zz) - y) + Math.abs(this.ground(x, zz + 1) - y) > 0.7) return;
       const sign = new THREE.Group();
       const p = new THREE.Mesh(post, wood);
       p.position.y = SIGNS.post / 2 - 0.25;
       const b = new THREE.Mesh(board, [back, back, back, back, face, back]);
       b.position.set(0, SIGNS.post - 0.25 - bh / 2 - 0.04, 0.05);
       sign.add(p, b);
-      // (out, away from the gas, and none of them quite straight)
+      // (none of them quite straight)
       sign.position.set(x, y, zz);
       sign.rotation.set(Math.sin(k * 7.3) * 0.035, a + Math.sin(k * 3.1) * 0.12, Math.cos(k * 5.7) * 0.045, 'YXZ');
       sign.traverse((o) => {
         o.castShadow = o.receiveShadow = true;
       });
       this.scene.add(sign);
+    };
+    // round it, beyond the furthest it is seen, and facing out
+    const edge = z.r * (1 + GAS.skirt), ring = edge + SIGNS.out;
+    const n = Math.max(SIGNS.n, Math.round((2 * Math.PI * ring) / SIGNS.every));
+    for (let k = 0; k < n; k++) {
+      const a = (k / n) * Math.PI * 2 + 0.2;
+      stand(z.x + Math.sin(a) * ring, z.z + Math.cos(a) * ring, a);
+    }
+    // beside every road on the way to it: on one side and then the other, each turned to whoever is coming
+    for (const road of [world.road, ...world.roads]) {
+      const pts = road.points;
+      let since = SIGNS.along * 0.6, side = 1;
+      for (let i = 1; i < pts.length / 3; i++) {
+        const x = pts[i * 3], zz = pts[i * 3 + 2], px = pts[i * 3 - 3], pz = pts[i * 3 - 1];
+        const step = Math.hypot(x - px, zz - pz), off = Math.hypot(x - z.x, zz - z.z) - edge;
+        if (off < 14 || off > SIGNS.lead || step < 1e-3) {
+          since = Math.min(since + step, SIGNS.along);
+          continue;
+        }
+        since += step;
+        if (since < SIGNS.along) continue;
+        since = 0;
+        // (off the asphalt by a stride, and facing away from the gas along the road: toward whoever walks in)
+        const nx = -(zz - pz) / step, nz = (x - px) / step, w = road.width / 2 + 1.5;
+        const sx = x + nx * w * side, sz = zz + nz * w * side;
+        stand(sx, sz, Math.atan2(sx - z.x, sz - z.z), 5);
+        side = -side;
+      }
     }
   }
 
