@@ -104,6 +104,8 @@ canvas.addEventListener('webglcontextlost', () => {
 async function boot() {
   // (`?sounds` on a development build is not the game: it is the page its sounds are heard on, old beside new)
   if (import.meta.env.DEV && new URLSearchParams(location.search).has('sounds')) return (await import('./dev/sounds')).soundsPage();
+  // (`?castle`: the fort on the mountain by itself, on a plain ridge, to be looked at and walked)
+  if (import.meta.env.DEV && new URLSearchParams(location.search).has('castle')) return (await import('./dev/castle')).castlePage();
   stage('renderer');
   const r = new Renderer(canvas);
   try {
@@ -126,6 +128,9 @@ async function boot() {
   await frame();
   const t0 = performance.now();
   const world = generateWorld();
+  // (`?ruins`: the ruined town stood on a plain of its own in a corner of the map, to be looked at and walked in the game as it is)
+  const ruins = import.meta.env.DEV && new URLSearchParams(location.search).has('ruins') ? await import('./dev/ruins') : null;
+  ruins?.lay(world);
   console.log(`worldgen ${(performance.now() - t0).toFixed(0)}ms, trees ${world.trees.length}, buildings ${world.buildings.length}`);
 
   stage('sky');
@@ -140,6 +145,7 @@ async function boot() {
   const buildings = new Buildings(world, atmo);
   buildings.plan();
   buildings.build(r.scene);
+  ruins?.stand(world, atmo, r, terrain, buildings);
   buildRoad(world, atmo, r.scene);
   buildWorks(world, atmo, r.scene);
   buildWells(wellSpots(world), atmo, r.scene);
