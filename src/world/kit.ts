@@ -148,6 +148,13 @@ export async function kitMeshes(model: string, layout: KitPiece[], o: KitOptions
 }
 
 export interface StoneLook {
+  /**
+   * Of the sky's light, how much a stuff takes that is drawn with no picture: a picture of stone has its joints and
+   * hollows in it, into which the sky does not see (the fort's own comes to 0.45 of it, taken all over); one flat
+   * colour has none, and in shade it was twice as pale as the same wall with its picture on. The sun's own light is
+   * not touched, as it is not by a picture's hollows. Unsaid: all of it.
+   */
+  hollows?: number;
   /** how much of the picture's own colour is kept (0 grey, 1 as it came), and what it is multiplied by after */
   keep?: number;
   tint?: [number, number, number];
@@ -243,10 +250,10 @@ float stoneCloud( vec2 p ) { vec2 i = floor( p ), u = fract( p ); u = u * u * ( 
 }`,
     );
   // (under cover the light of the sky, and what the sky throws back, come to so much and no more: the light of the fires is not touched)
-  if (o.attr) shader.fragmentShader = shader.fragmentShader.replace('#include <aomap_fragment>', `#include <aomap_fragment>
+  if (o.attr || o.hollows !== undefined) shader.fragmentShader = shader.fragmentShader.replace('#include <aomap_fragment>', `#include <aomap_fragment>
 {
   // (what comes in at a hole is thrown about by pale stone: near the hole there is more of it than its share of the sky alone)
-  float stoneDay = mix( 0.05, 1.0, clamp( vStoneAt.x * 1.5, 0.0, 1.0 ) );
+  float stoneDay = ${o.attr ? 'mix( 0.05, 1.0, clamp( vStoneAt.x * 1.5, 0.0, 1.0 ) )' : '1.0'} * ${f(o.hollows ?? 1)};
   reflectedLight.indirectDiffuse *= stoneDay;
   reflectedLight.indirectSpecular *= stoneDay;
 }`);

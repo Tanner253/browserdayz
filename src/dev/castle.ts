@@ -94,6 +94,8 @@ export async function castlePage() {
   // getting a thing ready ahead, and the game's own flames for its cressets)
   const site = new CastleSite(P, atmo, r.scene, { earth, ready: (o) => r.ready(o), fire: (at, size) => flames.add(at, { size, smoke: 0.12 }) });
   groundSnow.value = site.snow;
+  // (this page stands its survivor on the fort's ramp from the first: all of it is made before that)
+  site.finish();
   for (const it of castleProps(P)) {
     void assets.model(it.kind).then((model) => {
       // (stood by a holder of its own: a model's own turn is whatever its maker left it, and turning that about one

@@ -623,4 +623,59 @@ ok('the passage out is under the ground all its length: nothing of it stands out
   }
 });
 
+ok('under the fort a body is excused only where there is a place to be: in a room, on a stair, in the passage; never in the earth beside one', () => {
+  const at = (x: number, z: number, y: number) => castleUnder(P, ...castleAt(P, x, z, y));
+  const U = UNDER, CF = UF - CI.deep, hatch = LOOSE.find((l) => l.kind === 'hatch')!, g = castleGround(hatch.x, hatch.z), L = hatchLine(hatch, g);
+  // ---- it is: wherever a body can stand on the lower levels' floor (in the cistern its feet are on the cistern's), feet and head
+  let stood = 0;
+  for (let i = Math.round(-14 / CELL); i <= Math.round(10 / CELL); i++) for (let j = Math.round(-14 / CELL); j <= Math.round(10 / CELL); j++) {
+    if (!stands(i, j, true)) continue;
+    // (inside the walls, or inside the round of the hollow tower's cellar: `stands` asks only what stops a body, and outside the tower's foot nothing does)
+    if (!(Math.abs(i * CELL) < U.x + 0.3 && Math.abs(j * CELL) < U.z + 0.3) && !towers.some((tw) => tw.hollow !== undefined && Math.hypot(i * CELL - tw.cx, j * CELL - tw.cz) < T.r - T.wall)) continue;
+    stood++;
+    const x = i * CELL, z = j * CELL, floor = x < CI.x1 && z < CI.z1 && Math.abs(x) < U.x && Math.abs(z) < U.z ? CF : UF;
+    assert.ok(at(x, z, floor + 0.02) && at(x, z, floor + 1.1), `a body standing at ${x.toFixed(2)}, ${z.toFixed(2)} is not excused`);
+  }
+  assert.ok(stood > 3000, `only ${stood} squares of floor were asked about`);
+  for (const [name, [x, z]] of [...Object.entries(ROOMS), ...Object.entries(ENDS)]) assert.ok(at(x, z, UF + 0.02), `${name} is not a place`);
+  // (on the stair from the store to the cistern's door, from a step under the terrace down: nearer the terrace than that a body is over the ground, and nobody asks)
+  for (let t = 0.2; t <= 1; t += 0.1) {
+    const x = U.stair.head + (U.stair.foot - U.stair.head) * t, y = UF * t;
+    assert.ok(y > -0.6 || at(x, U.stair.z, y + 0.02), `on the stair from the store, ${(-y).toFixed(1)} m down`);
+  }
+  // (down the stair to the sally port, on its landing, and through the doorway to the passage)
+  for (let z = PS.head; z <= PS.end; z += 0.25) {
+    const y = z < PS.foot ? UF + ((PS.deep - UF) * (z - PS.head)) / (PS.foot - PS.head) : PS.deep;
+    for (const x of [PS.x0 + 0.3, (PS.x0 + PS.x1) / 2, PS.x1 - 0.3]) assert.ok(at(x, z, y + 0.02) && at(x, z, y + 1.1), `on the stair to the sally port at z ${z.toFixed(2)}`);
+  }
+  assert.ok(at(POSTERN.x, POSTERN.z, POSTERN.y + 0.02) && at(POSTERN.x - 0.4, POSTERN.z, POSTERN.y + 0.02), 'in the sally port\'s doorway');
+  // (all along the passage, on its floor, at its walls and standing; and down the hatch's steps)
+  for (let k = 0; k + 1 < L.path.length; k++) for (let t = 0; t <= 1; t += 0.05) {
+    const a = L.path[k], b = L.path[k + 1], len = Math.hypot(b[0] - a[0], b[2] - a[2]), e = [(b[0] - a[0]) / len, (b[2] - a[2]) / len], y = a[1] + (b[1] - a[1]) * t;
+    for (const side of [-0.34, 0, 0.34]) assert.ok(at(a[0] + (b[0] - a[0]) * t + e[1] * side, a[2] + (b[2] - a[2]) * t - e[0] * side, y + 0.02) && at(a[0] + (b[0] - a[0]) * t, a[2] + (b[2] - a[2]) * t, y + 1.1), `in the passage, length ${k + 1}, ${(t * 100).toFixed(0)} % along`);
+  }
+  for (let t = 0.4; t <= 1; t += 0.1) for (const side of [-0.34, 0, 0.34]) assert.ok(at(L.head[0] + (L.foot[0] - L.head[0]) * t + L.r[0] * side, L.head[2] + (L.foot[2] - L.head[2]) * t + L.r[1] * side, g - U.hatch.drop * t + 0.02), `on the hatch's steps, ${(t * 100).toFixed(0)} % down`);
+  assert.ok(at(-U.x - 0.3, (U.goat.z0 + U.goat.z1) / 2, UF + 0.02) && at(-C.hx - 1.6, (U.goat.z0 + U.goat.z1) / 2, UF + 0.02), 'in the postern\'s doorway, and on its landing');
+  // ---- it is not: in the earth. Under each floor, by a metre and by three
+  for (const [name, [x, z]] of [...Object.entries(ROOMS), ...Object.entries(ENDS)]) for (const d of [1.2, 3, 5.5]) assert.ok(!at(x, z, (name === 'the cistern' ? CF : UF) - d), `${d} m under the floor of ${name} is excused`);
+  // (under the landing of the stair down, and under its steps; beside its slot at the landing's depth, which is the earth between the slot and the cistern's side)
+  assert.ok(!at((PS.x0 + PS.x1) / 2, PS.end - 0.3, PS.deep - 1.2) && !at((PS.x0 + PS.x1) / 2, PS.head + 1, UF - 2.5), 'under the stair to the sally port');
+  assert.ok(!at(PS.x0 - 1.2, 0, PS.deep + 0.5) && !at(0, 0, PS.deep + 0.5) && !at(-5, 6, PS.deep + 0.5) && !at(4, -7, PS.deep + 0.5), 'in the earth under the lower levels, at the depth of the sally port');
+  // (and outside the walls: between the fort and the hatch, anywhere that is not the passage: beside it, over its roof, under its floor)
+  for (let k = 0; k + 1 < L.path.length; k++) {
+    const a = L.path[k], b = L.path[k + 1], len = Math.hypot(b[0] - a[0], b[2] - a[2]), e = [(b[0] - a[0]) / len, (b[2] - a[2]) / len], y = (a[1] + b[1]) / 2, mx = (a[0] + b[0]) / 2, mz = (a[2] + b[2]) / 2;
+    // (the last length runs in under the fort itself: beside it there is the fort's own lower level, which is a place)
+    const out = Math.abs(mx) > C.hx + 3 || Math.abs(mz) > C.hz + 3;
+    if (len > 3 && out) for (const side of [-1.5, 1.5, -3, 3]) assert.ok(!at(mx + e[1] * side, mz - e[0] * side, y + 0.5), `${Math.abs(side)} m to the side of the passage's length ${k + 1} is excused`);
+    // (its first length is a pace of level floor at the foot of the steps, half of it under the open stairwell: over that there is no roof)
+    if (out && len > 3) assert.ok(!at(mx, mz, y + U.hatch.tall + 0.9), `over the roof of the passage's length ${k + 1}`);
+    if (out) assert.ok(!at(mx, mz, y - 1.2), `under the floor of the passage's length ${k + 1}`);
+  }
+  // (nor anywhere else about the place: under the terrace's paving outside the walls' plan, under the village, at any depth)
+  for (const [x, z] of [[14, 0], [0, 14], [-14, 5], [30, -8], [47, 2.5], [60, -6.6], [54, 12]]) for (const y of [-4, -8, -12, -16]) assert.ok(!at(x, z, y), `in the earth at ${x}, ${z}, ${-y} m under the terrace`);
+  // (and it is the same however the ground is asked for, and with no hatch there is no passage to be in)
+  assert.ok(castleUnder(P, ...castleAt(P, L.path[2][0], L.path[2][2], L.path[2][1] + 0.5)) && !castleUnder(P, ...castleAt(P, L.path[2][0], L.path[2][2], L.path[2][1] + 0.5), undefined, []), 'the passage is a place with no hatch set down');
+  assert.ok(!castleUnder(null, 0, 0, 0));
+});
+
 console.log(`castle: ${n} checks passed`);

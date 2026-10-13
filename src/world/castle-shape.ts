@@ -838,7 +838,17 @@ function vaultPart(v: Vault, o: Out) {
 /** the boards a tower's floor is laid with stand this far over the paving (they lie on it, and are heard underfoot) */
 export const TOWER_FLOOR = 0.06;
 
+/**
+ * A tower is the biggest single piece of the fort to make (a fortieth of a second each): so it is made in sections,
+ * stopping between them, for whoever makes the fort a piece at a time (see `castleShapeSteps`).
+ */
 function towerPart(tw: Tower, stone: Out, wood: Out, dark: Out, put: Put, lod: number) {
+  const sections = towerSteps(tw, stone, wood, dark, put, lod);
+  while (!sections.next().done);
+}
+/** set while a shape is being made a piece at a time: a tower is then not made where it is asked for, but handed over here in its sections */
+const towerLater: { on: boolean; sections: Generator<undefined, void, void> | null } = { on: false, sections: null };
+function* towerSteps(tw: Tower, stone: Out, wood: Out, dark: Out, put: Put, lod: number): Generator<undefined, void, void> {
   const T = CASTLE.tower, n = lod ? 20 : 48, rin = T.r - T.wall, tone = tw.tone ?? 1, tile = TILE.stone, seed = Math.round(tw.cx * 7 + tw.cz * 13);
   /** it is hollow under its boards, down to here (see `hollow`): a doorway is left in its foot, under its door, so high */
   const hollow = tw.hollow, DOOR = 2.2, doorHalf = (r: number) => (Math.asin(0.55 / r) * 180) / Math.PI;
@@ -860,7 +870,8 @@ function towerPart(tw: Tower, stone: Out, wood: Out, dark: Out, put: Put, lod: n
   let s0 = 0;
   // (and, from near, what is under the kit tower's own foot: the hill is lower than that on three sides)
   for (let i = 0; i + 1 < ys.length; i++) {
-    if (!lod && ys[i] > kitFoot + 0.06) continue;
+    // (nor from far off: the kit's own far copy is there, and a plain round in the very place of it was seen through it, paler. What stands for the kit until its far copy has come is made with the blocks: see `castleShapeSteps`.)
+    if (lod || ys[i] > kitFoot + 0.06) continue;
     const y0 = ys[i], y1 = ys[i + 1], r0 = towerRadius(y0), r1 = towerRadius(y1), s1 = s0 - Math.hypot(y0 - y1, r1 - r0), turns = Math.max(1, Math.round((Math.PI * (r0 + r1)) / TILE.base)), from = s0;
     // (the doorway in a hollow foot is left out of the band it is in)
     const door = hollow !== undefined && !lod && y1 >= hollow - 0.01 && y0 <= hollow + DOOR + 0.01, us = lod ? cols(n) : y0 <= seen + 0.01 ? cols(24) : cols(48);
@@ -894,6 +905,7 @@ function towerPart(tw: Tower, stone: Out, wood: Out, dark: Out, put: Put, lod: n
     dark.quad(sill, sill.map((p): UV => [p[0], p[2]]), UP, tone * 0.8);
   }
 
+  yield;
   // ---- over it: a drum, open to the sky, with a door to the terrace and windows; its top is what is left of a battlement
   type Hole = { a: number; w: number; y0: number; y1: number; arch: boolean; round?: boolean };
   const holes: Hole[] = lod ? [] : [{ a: tw.door, w: TOWER_DOOR.w, y0: 0, y1: TOWER_DOOR.h, arch: true }, ...tw.slits.map((s) => ({ a: s.a, w: SLIT_WIDE, y0: s.y0, y1: s.y1, arch: true })), ...(tw.lost ?? []).map((s) => ({ a: s.a, w: LOST_WIDE, y0: s.y0, y1: s.y1, arch: true, round: true }))];
@@ -925,6 +937,7 @@ function towerPart(tw: Tower, stone: Out, wood: Out, dark: Out, put: Put, lod: n
       }
       for (const [b0, b1, t0, t1] of spans) stone.quad([P(a0, r, b0), P(a1, r, b1), P(a1, r, t1), P(a0, r, t0)], [[u(a0), b0], [u(a1), b1], [u(a1), t1], [u(a0), t0]], mul(out(mid), s), tone * (s > 0 ? 1 : 0.86), [a0, a1, a1, a0].map((a) => mul(out(a), s)));
     }
+    yield;
   }
   // the top of the wall, and the faces of its stubs
   for (let j = 0; j < n; j++) {
@@ -951,6 +964,7 @@ function towerPart(tw: Tower, stone: Out, wood: Out, dark: Out, put: Put, lod: n
   }
   if (lod) return;
 
+  yield;
   // ---- what stops a body. Under the terrace, the cone itself (it bulges nowhere, so a shape drawn tight round
   // three rings of it is the cone); over it, the wall in lengths, left out where its openings are.
   // (A hollow foot is its wall in short lengths down to its cellar's floor, left out at the doorway, and the cone under that.)
@@ -981,6 +995,7 @@ function towerPart(tw: Tower, stone: Out, wood: Out, dark: Out, put: Put, lod: n
     }
   });
 
+  yield;
   // ---- its floor: boards laid on the paving, with a riser where the door comes in
   const ring = (y: number, r0: number, r1: number, a0: number, a1: number, face: V3, k = 1) => {
     const pts = r0 > 0 ? [P(a0, r0, y), P(a1, r0, y), P(a1, r1, y), P(a0, r1, y)] : [P(0, 0, y), P(a1, r1, y), P(a0, r1, y)];
@@ -1012,6 +1027,7 @@ function towerPart(tw: Tower, stone: Out, wood: Out, dark: Out, put: Put, lod: n
   }
   if (!hole) disc('tower floor', -0.2, TOWER_FLOOR, rin);
 
+  yield;
   // ---- the stair round the inside of the wall, and the rail on its open side
   const S = tw.stair, sg = Math.sign(S.sweep), N = Math.round(T.deck / 0.2), da = S.sweep / N, rise = T.deck / N, ri = T.stairIn, ro = rin - 0.02, mid = (ri + ro) / 2;
   /** whether the wall still stands at a place round it, to bear a tread at this height */
@@ -1045,6 +1061,7 @@ function towerPart(tw: Tower, stone: Out, wood: Out, dark: Out, put: Put, lod: n
     put(boxSolid(sub(P(am, mid, y), mul(yy, SLOPE_HALF)), [x, yy, z], [(rin - ri) / 2, SLOPE_HALF, rin * Math.tan(rad(Math.abs(da) / 4)) + 0.03], true, 'wood', 'tower stair'));
   }
 
+  yield;
   // ---- the platform under the rim: all of the round but the well the stair comes up in
   const D = T.deck, well0 = tw.well[0], wide = Math.abs(tw.well[1] - tw.well[0]), inWell = (a: number) => norm360((a - well0) * sg) < wide;
   // (a tower that has lost its wall has lost its platform: the head of its stair is all there is up there)
@@ -1144,7 +1161,9 @@ function emit(p: Part, of: (paint: Paint) => Out, solids: Solid[] | null, lod: n
     case 'flight': return flightPart(p, o, put);
     case 'wall': return wallPart(p, o, p.hidden || p.paint !== 'stone' ? o : of('base'), put, lod);
     case 'curtain': return curtainPart(p, o, put, lod, gaps);
-    case 'tower': return towerPart(p, o, of('timber'), of('base'), put, lod);
+    case 'tower':
+      if (towerLater.on && !lod) return void (towerLater.sections = towerSteps(p, o, of('timber'), of('base'), put, lod));
+      return towerPart(p, o, of('timber'), of('base'), put, lod);
     case 'mound': return moundPart(p, o, put, lod, ground, ways);
     case 'lump': return lumpPart(p, o, put, lod);
     case 'apron': return apronPart(p, o, put, ground);
@@ -1159,6 +1178,22 @@ function emit(p: Part, of: (paint: Paint) => Out, solids: Solid[] | null, lod: n
  * @param rock whether the rock the ramp leaves from is made (not where the mountain itself comes up to the ramp's foot)
  */
 export function castleShape(ground: (x: number, z: number) => number = castleGround, loose: Loose[] = LOOSE, rock = true, tally?: Record<string, number>): Shape {
+  const steps = castleShapeSteps(ground, loose, rock, tally);
+  for (;;) {
+    const r = steps.next();
+    if (r.done) return r.value;
+  }
+}
+
+/**
+ * THE SAME, A PIECE AT A TIME, for whoever cannot stop for it (the game, as it starts: all of it at once was three
+ * quarters of a second in which nothing was drawn, for a fort nobody starts near). What is seen from far off is
+ * made FIRST, with the earth laid over what the world cut for it (which is seen from the first, or the cut would
+ * be): then it stops and hands over the shape as far as it has got, whose `far`, `farOwn` and `near.earth` are
+ * finished. After that it stops after every piece, handing over nothing; and at the end it hands over the whole.
+ * The shape it makes is the one `castleShape` makes, to the last number.
+ */
+export function* castleShapeSteps(ground: (x: number, z: number) => number = castleGround, loose: Loose[] = LOOSE, rock = true, tally?: Record<string, number>): Generator<Shape | undefined, Shape, void> {
   const sheets = () => Object.fromEntries(SHEETS.map((p) => [p, skin()])) as Record<Sheet, Skin>;
   const near = sheets(), under = sheets(), far = skin(), solids: Solid[] = [];
   const all = [...castleParts().filter((p) => rock || !/outcrop|ramp head/.test(p.name ?? '')), ...loose.flatMap((l) => looseParts(l, ground(l.x, l.z)))].map((raw) => (raw.sits ? lifted(raw, ground(raw.sits[0], raw.sits[1])) : raw));
@@ -1178,20 +1213,35 @@ export function castleShape(ground: (x: number, z: number) => number = castleGro
     return out;
   });
   const ways: Way[] = loose.filter((l) => l.kind === 'hatch').map((l) => ({ L: hatchLine(l, ground(l.x, l.z)), g: ground(l.x, l.z) }));
-  for (const p of all) {
+  const shape: Shape = { near, under, far, farOwn: 0, solids };
+  /** a piece as it is from near: drawn, and what of it stops a body */
+  const close = (p: Part) => {
     // (`tally`, for whoever asks what it costs: how many triangles each kind of piece is drawn with from near, by its name)
     const to = p.low ? under : near, was = tally ? SHEETS.reduce((t, s) => t + to[s].pos.length, 0) : 0;
-    if (p.at !== 'far') emit(p, (paint) => (p.low ? unders : nears)[paint], solids, 0, ground, gaps, ways);
+    emit(p, (paint) => (p.low ? unders : nears)[paint], solids, 0, ground, gaps, ways);
     if (tally) {
       const key = `${p.low ? 'under' : 'near'} ${p.t} ${p.name ?? ''}`;
       tally[key] = (tally[key] ?? 0) + (SHEETS.reduce((t, s) => t + to[s].pos.length, 0) - was) / 9;
     }
+  };
+  // ---- FIRST: what is seen from far off, and the earth laid over the cut ground
+  for (const p of all) {
     if (p.at) emit(p, (paint) => fars[paint], null, 1, ground, gaps, ways);
+    if (p.t === 'apron') close(p);
   }
-  // ---- the kit's pieces (the walls, the gatehouse, blocks of fallen wall): what stops a body, as the kit says; and
-  // from far off a block for each block of theirs, less what has been broken out
-  const farOwn = far.pos.length / 9;
-  for (const k of kitSolids(castleKit())) solids.push(k.t === 'box' ? { ...k, feet: false, surface: 'concrete' } : { t: 'hull', pts: k.pts, feet: false, surface: 'concrete', name: k.name });
+  // (from far off a block for each block of the kit's pieces, less what has been broken out; and a plain round for
+  // each tower's foot, which is the kit's round tower: all of it stands only until the kit's own far copy has come)
+  shape.farOwn = far.pos.length / 9;
+  for (const tw of all) {
+    if (tw.t !== 'tower') continue;
+    const foot = -KIT_TOWER.top[0] * CASTLE.tower.kit, ys = [-0.01, foot + KIT_TOWER.waist[0] * CASTLE.tower.kit, foot, tw.foot], N = 16;
+    const at = (a: number, y: number): V3 => [tw.cx + Math.cos(a) * towerRadius(y), y, tw.cz + Math.sin(a) * towerRadius(y)];
+    fars.base.base = null;
+    for (let i = 0; i + 1 < ys.length; i++) for (let k = 0; k < N; k++) {
+      const a0 = (k * 2 * Math.PI) / N, a1 = ((k + 1) * 2 * Math.PI) / N, am = (a0 + a1) / 2;
+      fars.base.quad([at(a0, ys[i]), at(a1, ys[i]), at(a1, ys[i + 1]), at(a0, ys[i + 1])], [[a0 * 4, ys[i]], [a1 * 4, ys[i]], [a1 * 4, ys[i + 1]], [a0 * 4, ys[i + 1]]], [Math.cos(am), 0, Math.sin(am)], 0.9);
+    }
+  }
   for (const p of castleKit()) {
     const m = kitMatrix(p), sc = typeof p.scale === 'number' ? [p.scale, p.scale, p.scale] : p.scale ?? [1, 1, 1];
     if (sc[0] < 0.3) continue;
@@ -1203,6 +1253,21 @@ export function castleShape(ground: (x: number, z: number) => number = castleGro
       block(fars.stone, c, ax, [((b[1] - b[0]) / 2) * sc[0], ((b[3] - b[2]) / 2) * sc[1], ((b[5] - b[4]) / 2) * sc[2]], 0.9);
     }
   }
+  yield shape;
+  // ---- THEN the rest of it, a piece at a time
+  for (const p of all) {
+    if (p.at === 'far' || p.t === 'apron') continue;
+    // (a tower in its sections: but not for whoever is counting what each piece comes to, who wants it whole)
+    towerLater.on = p.t === 'tower' && !tally;
+    close(p);
+    towerLater.on = false;
+    const sections = towerLater.sections;
+    towerLater.sections = null;
+    if (sections) while (!sections.next().done) yield undefined;
+    yield undefined;
+  }
+  // (the kit's pieces, the walls, the gatehouse, blocks of fallen wall: what stops a body, as the kit says)
+  for (const k of kitSolids(castleKit())) solids.push(k.t === 'box' ? { ...k, feet: false, surface: 'concrete' } : { t: 'hull', pts: k.pts, feet: false, surface: 'concrete', name: k.name });
   if (tally) tally['left out, never seen'] = hides.count;
-  return { near, under, far, farOwn, solids };
+  return shape;
 }

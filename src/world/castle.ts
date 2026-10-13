@@ -24,7 +24,7 @@ import { assets } from '../core/assets';
 import { breathe } from '../core/breathe';
 import { SHADOW_FRUSTA, type Atmosphere, type ShaderPatch } from './atmosphere';
 import { ARCADE, CASTLE, LAMPS, UNDER, castleAt, castleLocal, castleUnder, castleDoor, castleKit, castleLamps, castleLoose, castleRocks, looseLocal, type GroundAt, type Loose, type Place } from '../sim/castle';
-import { PICTURES, SHEETS, castleShape, castleSky, type Sheet, type Skin, type Solid } from './castle-shape';
+import { PICTURES, SHEETS, castleShapeSteps, castleSky, type Shape, type Sheet, type Skin, type Solid } from './castle-shape';
 import { kitMeshes, stoneLook, type StoneLook } from './kit';
 import { PostSite } from './castle-post';
 
@@ -34,6 +34,10 @@ const NEAR = 330;
 const ASK = 380;
 /** how near its middle an eye must be for what is under the terrace to be drawn at all (and then only if it is in it, or where it can be seen into: see `seesUnder`) */
 const UNDER_SEEN = 90;
+/** how near an eye may come before all of it must be made (it is made between frames from the start of the game: this is for an eye that begins near it) */
+const MADE_BY = 460;
+/** the far shape is flat colour: so much of the sky's light it takes, as the stone's picture does with its hollows (the occlusion of `castle_wall_slates`, taken all over: see `hollows` in kit.ts) */
+const FAR_HOLLOWS = 0.45;
 /** how far off the kit's far copy is sent for: until it comes, blocks stand for the kit's pieces from far off */
 const FAR_KIT = 900;
 /** how much snow lies on it where nobody has said: the mountain it is made for is over the snow line, and not at its top */
@@ -259,6 +263,9 @@ export interface CastleOptions {
 export class CastleSite {
   /** how much of it there is to draw and to run into: for whoever asks what it costs */
   readonly counts = { near: 0, under: 0, far: 0, kit: 0, draws: 0, farDraws: 2, solids: 0 };
+  /** what making it cost, in thousandths of a second: as the game started (`boot`); after that, between frames, in all (`after`) and in how many goes; the longest of those goes; and how long after the start the last of it was made (0: not yet) */
+  readonly timing = { boot: 0, after: 0, goes: 0, longest: 0, madeAt: 0 };
+  private born = performance.now();
   /** 'far': only its far shape is made; 'asked': its pictures are on their way; 'near': all of it is on the card */
   state: 'far' | 'asked' | 'near' = 'far';
   /** everything of it that is drawn */
@@ -271,7 +278,9 @@ export class CastleSite {
   /** what stands for the kit's pieces from far off: blocks, and then the kit's own far copy when that has come */
   private farKit = new THREE.Group();
   private farAsked = false;
-  private skins: { near: Record<Sheet, Packed>; under: Record<Sheet, Packed> } | null;
+  private skins: { near: Record<Sheet, Packed>; under: Record<Sheet, Packed> } | null = null;
+  /** the rest of it being made, a piece at a time, after what is seen from far (null: it is all made). See `make`. */
+  private making: Generator<void, void, void> | null = null;
   private sets: (ReturnType<typeof assets.pbr> | null)[] = [];
   private fires: THREE.Vector3[];
   private flames: { strength: number }[] = [];
@@ -300,17 +309,14 @@ export class CastleSite {
   constructor(readonly place: Place, private atmo: Atmosphere, scene: THREE.Scene, private o: CastleOptions = {}) {
     const P = place, ground = o.ground;
     if (o.snow !== undefined) this.snow = o.snow;
-    const shape = castleShape(
+    // (Here, as the game starts: only what is seen from far off, and the earth over the cut ground. The rest of it is
+    // made afterwards a piece at a time, between frames: see `make`.)
+    const steps = castleShapeSteps(
       ground ? (x, z) => { const [wx, , wz] = castleAt(P, x, z); return ground(wx, wz) - P.y; } : undefined,
       looseLocal(P, o.loose ?? castleLoose(P)),
       o.rock !== false,
     );
-    const each = (of: Record<Sheet, Skin>) => Object.fromEntries(SHEETS.map((s) => [s, pack(of[s])])) as Record<Sheet, Packed>;
-    this.skins = { near: each(shape.near), under: each(shape.under) };
-    for (const s of SHEETS) {
-      this.counts.near += shape.near[s].pos.length / 9;
-      this.counts.under += shape.under[s].pos.length / 9;
-    }
+    const shape = steps.next().value as Shape;
     this.counts.far = shape.far.pos.length / 9;
 
     const all = this.group;
@@ -320,7 +326,7 @@ export class CastleSite {
     all.updateMatrix();
     all.matrixAutoUpdate = false;
     // from far off: one shape, no picture, coloured corner by corner; aged and snowed on as the near one is, so it is the same fort
-    const plain = atmo.register(new THREE.MeshStandardMaterial({ roughness: 1, metalness: 0, vertexColors: true }), stoneLook({ snow: this.snowU, attr: 'aSnow' }), 'castle far');
+    const plain = atmo.register(new THREE.MeshStandardMaterial({ roughness: 1, metalness: 0, vertexColors: true }), stoneLook({ snow: this.snowU, attr: 'aSnow', hollows: FAR_HOLLOWS }), 'castle far');
     const far = pack(shape.far), cut = (from: number, to: number): Packed => ({ pos: far.pos.subarray(from * 9, to * 9), nrm: far.nrm.subarray(from * 9, to * 9), uv: far.uv.subarray(from * 6, to * 6), col: far.col.subarray(from * 9, to * 9), snow: far.snow.subarray(from * 6, to * 6) });
     this.far = new THREE.Mesh(geometry(cut(0, shape.farOwn)), plain);
     this.far.name = 'castle:far';
@@ -345,10 +351,65 @@ export class CastleSite {
     scene.add(all);
     all.updateMatrixWorld(true);
 
-    // ---- what stops a body and a shot
-    if (physics.world) for (const s of shape.solids) this.solid(s);
-    this.counts.solids = shape.solids.length;
     this.post = new PostSite(place, atmo, scene, { ground: o.ground, loose: o.loose, snow: this.snowU, ready: o.ready });
+    this.making = this.make(steps, shape);
+    this.timing.boot = performance.now() - this.born;
+    void this.makeBetweenFrames();
+  }
+
+  /**
+   * THE REST OF IT, made a piece at a time: its own shapes from near and under the terrace, each sheet of them put
+   * in rows of plain numbers for the card, and everything of it that stops a body and a shot. It stops after each
+   * piece (a part of the fort; a sheet; forty blocks), so that whoever turns it can stop when a frame has had its share.
+   */
+  private *make(steps: Generator<Shape | undefined, Shape, void>, shape: Shape): Generator<void, void, void> {
+    for (let r = steps.next(); !r.done; r = steps.next()) yield;
+    const near = {} as Record<Sheet, Packed>, under = {} as Record<Sheet, Packed>;
+    for (const s of SHEETS) {
+      near[s] = pack(shape.near[s]);
+      under[s] = pack(shape.under[s]);
+      this.counts.near += shape.near[s].pos.length / 9;
+      this.counts.under += shape.under[s].pos.length / 9;
+      yield;
+    }
+    // ---- what stops a body and a shot
+    if (physics.world) for (let i = 0; i < shape.solids.length; i++) {
+      this.solid(shape.solids[i]);
+      if (i % 40 === 39) yield;
+    }
+    this.counts.solids = shape.solids.length;
+    this.skins = { near, under };
+    this.making = null;
+  }
+
+  /** It is made between frames, a couple of thousandths of a second of it at a time (see `breathe`): begun as the game starts, done long before anybody has walked to the mountain. */
+  private async makeBetweenFrames() {
+    while (this.making) {
+      await breathe();
+      const m = this.making, t0 = performance.now();
+      while (m && performance.now() - t0 < 2) if (m.next().done) break;
+      this.went(performance.now() - t0);
+    }
+  }
+
+  /**
+   * All that is left of it is made now, in one go. For whoever cannot wait: somebody set down by the fort before it
+   * was made (a player who left the game there and has come back to it; an admin's leap), who must have its floors
+   * under him at once; and a page that stands a body in it from the first.
+   */
+  finish() {
+    const m = this.making, t0 = performance.now();
+    if (!m) return;
+    while (!m.next().done);
+    this.went(performance.now() - t0);
+  }
+  /** a go at making it took so long */
+  private went(ms: number) {
+    const t = this.timing;
+    t.after += ms;
+    t.goes++;
+    t.longest = Math.max(t.longest, ms);
+    if (!this.making && !t.madeAt) t.madeAt = performance.now() - this.born;
   }
 
   /** Its pictures are sent for. (Nothing waits on them: they come when they come.) */
@@ -543,6 +604,8 @@ export class CastleSite {
   update(dt: number, eye: THREE.Vector3, night: number, lit: (pos: THREE.Vector3, burn: number, colour?: THREE.Color, reach?: number) => void) {
     this.post.update(dt, eye, night, lit);
     const P = this.place, off = Math.hypot(eye.x - P.x, eye.z - P.z);
+    // (somebody is near and it is not all made yet: it is made now, one long frame of it, which is better than a body through its floor)
+    if (this.making && off < MADE_BY) this.finish();
     if (this.state === 'far' && off < ASK) this.ask();
     if (this.state === 'asked' && this.skins && this.come()) void this.build();
     const near = this.state === 'near' && off < NEAR;

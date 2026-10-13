@@ -1227,25 +1227,43 @@ const inCellar = (x: number, y: number, z: number) => y < -0.6 && castleParts().
  * Whether a place is in the fort's lower levels, or in the passage out of them to a hatch: where a body is under
  * the terrace, and may be under the ground, by right. (The server's rule against being under the ground excuses
  * it, as it excuses the bunker: see `underCheck` in server/index.ts.)
+ *
+ * ONLY WHERE THERE IS A PLACE TO BE (2026-10-13). It is asked of where a body's feet are, and it says yes only in
+ * what was built to be stood in: between a floor and the roof over it, inside the walls of it, with half a pace
+ * and a step's height to spare and no more. It said yes anywhere under the fort's plan down to a metre under the
+ * deepest floor, and a body sunk in the earth under the armoury, where nothing can reach it, was excused with the
+ * rest. The places are: the lower levels themselves from their floor up (the cistern's is a knee lower); the slot of
+ * the stair down to the sally port, from the stair's own slope up; the cellar in the hollow tower; the postern's
+ * doorway and its landing; each hatch's steps, from their own slope up to the ground; and each straight length of
+ * its passage, from its own floor (which climbs) to its roof.
  * @param ground the height of the world's ground at a spot, as it was before anything was cut for the fort (the passage is made to the hatch's depth)
  */
 export function castleUnder(p: Place | null, wx: number, wy: number, wz: number, ground?: GroundAt, loose?: Loose[]): boolean {
   if (!p) return false;
-  const [x, z, y] = castleLocal(p, wx, wy, wz), U = UNDER, H = U.hatch;
-  if (y < -0.6 && y > U.postern.deep - 1 && Math.abs(x) < U.x + 0.7 && Math.abs(z) < U.z + 0.7) return true;
+  const [x, z, y] = castleLocal(p, wx, wy, wz), U = UNDER, H = U.hatch, PS = U.postern, CI = U.cistern;
+  /** half a pace beyond a wall's face (every wall of it is thicker than that), and a step's height under a floor */
+  const SIDE = 0.45, STEP = 0.6;
+  if (y < -0.6 && Math.abs(x) < U.x + SIDE && Math.abs(z) < U.z + SIDE) {
+    // (what is underfoot there: the slope of the stair down and its landing, in their slot; the cistern's floor; the floor)
+    let floor = U.floor;
+    if (x > PS.x0 - SIDE && z > PS.head - SIDE && z < PS.end + 0.25 + SIDE) floor = U.floor + (PS.deep - U.floor) * clamp01((z + SIDE - PS.head) / (PS.foot - PS.head));
+    else if (x < CI.x1 + SIDE && z < CI.z1 + SIDE) floor = U.floor - CI.deep;
+    if (y > floor - STEP) return true;
+  }
   if (inCellar(x, y, z)) return true;
-  // (the postern's doorway through the west wall's foot)
-  if (y < -0.6 && y > U.floor - 1 && x < 0 && x > -CASTLE.hx - 2 && z > U.goat.z0 - 0.5 && z < U.goat.z1 + 0.5) return true;
+  // (the postern's doorway through the west wall's foot, and the landing outside it)
+  if (y > U.floor - STEP && y < U.floor + 2.4 && x < -U.x + SIDE && x > -CASTLE.hx - CASTLE.parapet.thick / 2 - WALL.out - 1.25 - SIDE && z > U.goat.z0 - 0.1 - SIDE && z < U.goat.z1 + 0.1 + SIDE) return true;
   for (const l of looseLocal(p, loose ?? castleLoose(p))) {
     if (l.kind !== 'hatch') continue;
     const [hx, , hz] = castleAt(p, l.x, l.z), g = (ground ? ground(hx, hz) : p.y + castleGround(l.x, l.z)) - p.y, L = hatchLine(l, g);
-    // (on its steps: how far along them from their head, and how far off their line)
+    // (on its steps: how far along them from their head, and how far off their line; from the steps' own slope up to the ground)
     const ax = x - L.head[0], az = z - L.head[2], along = ax * L.d[0] + az * L.d[1], off = Math.abs(ax * L.r[0] + az * L.r[1]);
-    if (along > -0.5 && along < H.run + 1.2 && off < H.wide / 2 + 0.9 && y < g + 0.6 && y > L.foot[1] - 1) return true;
-    // (in its passage: within its width of one of its straight lengths, between its floor and its roof)
+    // (the stairwell is open as far as half a pace past their foot: see `looseParts`)
+    if (along > -0.5 && along < H.run + 0.5 + SIDE && off < H.wide / 2 + SIDE && y < g + 0.6 && y > g - H.drop * clamp01((along + SIDE) / H.run) - STEP) return true;
+    // (in its passage: within its width of one of its straight lengths, between its floor there and its roof)
     for (let k = 0; k + 1 < L.path.length; k++) {
-      const a = L.path[k], b = L.path[k + 1], ex = b[0] - a[0], ez = b[2] - a[2], t = clamp01(((x - a[0]) * ex + (z - a[2]) * ez) / (ex * ex + ez * ez));
-      if (Math.hypot(x - a[0] - ex * t, z - a[2] - ez * t) < H.wide / 2 + 0.9 && y > Math.min(a[1], b[1]) - 1 && y < Math.max(a[1], b[1]) + H.tall + 1) return true;
+      const a = L.path[k], b = L.path[k + 1], ex = b[0] - a[0], ez = b[2] - a[2], t = clamp01(((x - a[0]) * ex + (z - a[2]) * ez) / (ex * ex + ez * ez)), floor = a[1] + (b[1] - a[1]) * t;
+      if (Math.hypot(x - a[0] - ex * t, z - a[2] - ez * t) < H.wide / 2 + SIDE && y > floor - STEP && y < floor + H.tall + 0.4) return true;
     }
   }
   return false;
