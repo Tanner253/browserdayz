@@ -1026,7 +1026,9 @@ export class Game {
     const ranged = !!this.botCheck;
     this.botCheck?.end();
     this.botCheck = null;
-    this.player.god = false;
+    // (Whoever was on the range and is welcomed cannot be hurt until they have been stood in the world: the range's
+    // floor has just gone from under them. See the stashes in `enterOnline`.)
+    if (!(ranged && welcome)) this.player.god = false;
     if (ranged && !welcome) {
       // not passed, or the line dropped: back at the way in, and not into the game alone
       this.joining = false;
@@ -1074,6 +1076,8 @@ export class Game {
     document.title = this.title;
     if (welcome) {
       await this.enterOnline(welcome);
+      // (stood in the world now: as anybody is. An admin's own is said again by the server as it comes in.)
+      if (ranged) this.player.god = false;
       if (waited) {
         // their turn, quite possibly while they were looking at something else
         audio.ui('open');
@@ -1512,7 +1516,14 @@ export class Game {
     }
     for (const l of w.loot) this.economy.inject(l);
     for (const [i, open, swing] of w.doors) buildings.doors[i]?.setOpen(open, swing);
-    for (const s of w.stashes) await this.addRemoteStash(s);
+    // (NOT waited for. It was, and a stash's model is fetched when first wanted: so for as long as that took,
+    // seconds on a slow line, this game had been welcomed and had not yet done anything below. Whoever had just
+    // shot the bot check's range was still where the range had been, four hundred metres up, with its floor
+    // gone: falling, and telling the server so, and dead of the fall with everything they carried if the wait was
+    // long enough. 2026-10-13: "user complans they spawned 400m in the air ... and lost all their loot". After a
+    // restart everybody shoots the range again, so it was everybody's risk. A stash's model comes when it comes,
+    // as a body's and a drop's do.)
+    for (const s of w.stashes) void this.addRemoteStash(s);
     for (const c of w.corpses) void this.addCorpse(c);
     for (const d of w.drops ?? []) void this.addDrop(d);
     // (a helicopter in the air when this game came in: it is where everybody else's game has it)
@@ -1670,10 +1681,14 @@ export class Game {
     net.on('cdoor', (m) => this.lockers.set(m.cid, m.open));
     net.on('stash+', (m) => void this.addRemoteStash(m.s));
     net.on('stash-', (m) => {
+      // (one whose model is still coming is not stood when it has: see addRemoteStash)
+      this.stashComing.delete(m.uid);
       const st = this.loot.stashes.find((s) => s.uid === m.uid);
       if (st) this.loot.removeStash(st);
     });
     net.on('stash~', (m) => {
+      const coming = this.stashComing.get(m.uid);
+      if (coming) coming.buried = m.buried;
       const st = this.loot.stashes.find((s) => s.uid === m.uid);
       if (!st) return;
       if (this.openStash === st) this.toggleInventory(false);
@@ -2044,9 +2059,20 @@ export class Game {
   private gearKey = '';
 
   private async addRemoteStash(s: StashInfo) {
-    if (this.loot.stashes.some((x) => x.uid === s.uid)) return;
-    await this.loot.addStash(this.newStash(s));
+    if (this.loot.stashes.some((x) => x.uid === s.uid) || this.stashComing.has(s.uid)) return;
+    const st = this.newStash(s);
+    this.stashComing.set(s.uid, st);
+    try {
+      await this.loot.addStash(st);
+    } finally {
+      // (taken up while its model was still on its way: it is not stood in the world after all)
+      if (this.stashComing.get(s.uid) !== st) {
+        if (this.loot.stashes.includes(st)) this.loot.removeStash(st);
+      } else this.stashComing.delete(s.uid);
+    }
   }
+  /** the stashes whose models are still on their way, by their number: what is said of one meanwhile is not lost */
+  private stashComing = new Map<string, Stash>();
 
   private async addCorpse(c: CorpseInfo) {
     if (this.corpses.has(c.uid)) return;
