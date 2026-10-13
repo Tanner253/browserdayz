@@ -35,7 +35,8 @@ export type Solid =
  */
 export interface Skin { pos: number[]; nrm: number[]; uv: number[]; col: number[]; snow: number[] }
 /** (`under`: what is of the lower levels, drawn only while somebody is near enough to see into them) */
-export interface Shape { near: Record<Sheet, Skin>; under: Record<Sheet, Skin>; far: Skin; solids: Solid[] }
+/** (`farOwn`: how many of the far shape's triangles, from its first, are the fort's own: those after them are blocks that stand for the kit's pieces, until the kit's own far copy has come) */
+export interface Shape { near: Record<Sheet, Skin>; under: Record<Sheet, Skin>; far: Skin; farOwn: number; solids: Solid[] }
 
 export const PAINTS: Paint[] = ['stone', 'ashlar', 'base', 'paving', 'timber', 'iron', 'rock', 'scree', 'earth', 'water'];
 /** the things it is drawn in from near: every stuff that is of one picture is in one sheet, and a sheet is one thing to draw */
@@ -207,13 +208,14 @@ function sky(p: V3, n: V3): number {
     return y < U.floor - 1 ? 0 : day;
   }
   if (x > K.x0 + 0.3 && x < K.x1 - 0.3 && z > K.z0 + 0.3 && z < K.z1 - 0.3 && y < K.roof - 0.2) {
-    return x > K.fallen.x0 && z > K.fallen.z0 && y > K.floors[2] - 0.25 ? 1 : 0;
+    // (a room with windows and a door has some of the day in it; the upper room, whose corner is open to the sky, more)
+    return x > K.fallen.x0 && z > K.fallen.z0 && y > K.floors[2] - 0.25 ? 1 : y > K.floors[2] - 0.25 ? 0.36 : 0.28;
   }
   for (const tw of towers) {
     const dx = x - tw.cx, dz = z - tw.cz;
     if (dx * dx + dz * dz > (T.r - T.wall + 0.03) ** 2 || y > T.deck - 0.03 || y < -0.3) continue;
     const a = norm360((Math.atan2(dz, dx) * 180) / Math.PI), inWell = norm360((a - tw.well[0]) * Math.sign(tw.stair.sweep)) < Math.abs(tw.well[1] - tw.well[0]);
-    return inWell || tw.rim[Math.floor(a / (360 / T.slots)) % T.slots] < T.deck ? 1 : 0;
+    return inWell || tw.rim[Math.floor(a / (360 / T.slots)) % T.slots] < T.deck ? 1 : 0.25;
   }
   return 1;
 }
@@ -1140,6 +1142,7 @@ export function castleShape(ground: (x: number, z: number) => number = castleGro
   }
   // ---- the kit's pieces (the walls, the gatehouse, blocks of fallen wall): what stops a body, as the kit says; and
   // from far off a block for each block of theirs, less what has been broken out
+  const farOwn = far.pos.length / 9;
   for (const k of kitSolids(castleKit())) solids.push(k.t === 'box' ? { ...k, feet: false, surface: 'concrete' } : { t: 'hull', pts: k.pts, feet: false, surface: 'concrete', name: k.name });
   for (const p of castleKit()) {
     const m = kitMatrix(p), sc = typeof p.scale === 'number' ? [p.scale, p.scale, p.scale] : p.scale ?? [1, 1, 1];
@@ -1153,5 +1156,5 @@ export function castleShape(ground: (x: number, z: number) => number = castleGro
     }
   }
   if (tally) tally['left out, never seen'] = hides.count;
-  return { near, under, far, solids };
+  return { near, under, far, farOwn, solids };
 }

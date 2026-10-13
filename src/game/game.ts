@@ -2496,7 +2496,8 @@ export class Game {
     this.bunker.update(dt, cam.position, (pos, burn) => this.lamps.glow(pos, BUNKER_LAMP, burn * 0.5, 8));
     // (an admin's night vision sees down here as well: "night vision makes bunker darkness go away too", 2026-10-13)
     // the fort: what of it is drawn for where the eye is, its cressets, and the dark under its terrace
-    this.castle?.update(dt, cam.position, atmo.night, (pos, burn) => this.lamps.glow(pos, CRESSET.colour, burn, CRESSET.reach));
+    // (a fire basket's light unless the fort says otherwise: its floodlights are white, the wash under its mast red)
+    this.castle?.update(dt, cam.position, atmo.night, (pos, burn, colour = CRESSET.colour, reach = CRESSET.reach) => this.lamps.glow(pos, colour, burn, reach));
     const under = this.nightSight ? 0 : Math.max(bunkerDark(this.bunker.place, cam.position.x, cam.position.y, cam.position.z), castleDark(this.s.world.castle, cam.position.x, cam.position.y, cam.position.z, (x, z) => heightAt(this.s.world.surface, x, z)));
     atmo.cover.ground = { sun: 1 - under, sky: 1 - 0.994 * under };
     this.lamps.update(cam, dt);

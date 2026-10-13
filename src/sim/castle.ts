@@ -16,6 +16,8 @@
 // terrace, which is the one level floor of the whole place and the height a `Place` gives.
 
 import type { Place } from './bunker';
+// (the post that holds the fort above ground is another file's: its things and the places things lie in it join the fort's own here. Its lamps do not: it lights them itself, and they are no fires.)
+import { postLoot, postProps } from './castle-post';
 import { KIT_GATE, KIT_LEVELS, KIT_MERLON, KIT_TOWER, cutBox, cutRound, cutTurned, type Cut, type KitPiece } from './kit';
 
 export type { Place };
@@ -955,7 +957,7 @@ function cresset(x: number, z: number, y: number, post: number, low = false): Pa
 // ------------------------------------------------------------------ what stands in it
 
 /** what is made of boards for the rooms: where its middle is on the floor, which way it is turned, and its size */
-export const FURNITURE: { kind: 'table' | 'bench' | 'bunk' | 'rack'; x: number; z: number; y: number; yaw: number; w: number; d: number; /** a rack that always has a gun on it */ arms?: boolean }[] = [
+export const FURNITURE: { kind: 'table' | 'bench' | 'bunk' | 'rack'; x: number; z: number; y: number; yaw: number; w: number; d: number; /** a rack that always has a gun on it */ arms?: boolean; /** it is the aid post's: what lies on it is a dressing station's */ medic?: boolean }[] = [
   // the hall: a long table and its benches, a rack by the door
   { kind: 'table', x: 0.3, z: -0.4, y: 3, yaw: 0, w: 2.4, d: 0.9 },
   { kind: 'bench', x: 0.3, z: -1.25, y: 3, yaw: 0, w: 2.2, d: 0.32 },
@@ -972,6 +974,9 @@ export const FURNITURE: { kind: 'table' | 'bench' | 'bunk' | 'rack'; x: number; 
   { kind: 'rack', x: 0.9, z: -1.92, y: UNDER.floor, yaw: 0, w: 1.7, d: 0.45, arms: true },
   { kind: 'rack', x: 2.92, z: 1.6, y: UNDER.floor, yaw: Math.PI / 2, w: 1.7, d: 0.45, arms: true },
   { kind: 'table', x: 1.4, z: -0.4, y: UNDER.floor, yaw: 0, w: 1.4, d: 0.8 },
+  // the aid post: a dressing table in the ward, and one in the dispensary at the west end by the cabinet
+  { kind: 'table', x: 7.75, z: 6.45, y: UNDER.floor, yaw: Math.PI / 2, w: 1.2, d: 0.7, medic: true },
+  { kind: 'table', x: -6.6, z: 7.9, y: UNDER.floor, yaw: 0, w: 1.6, d: 0.7, medic: true },
   // the store under the hall
   { kind: 'rack', x: 2.52, z: -1.3, y: 0, yaw: Math.PI / 2, w: 1.5, d: 0.45 },
   { kind: 'table', x: 0.6, z: 2.75, y: 0, yaw: 0, w: 1.8, d: 0.8 },
@@ -1356,7 +1361,7 @@ function lootSpots(loose: Loose[]): { x: number; z: number; y: number; floor: bo
   // on the furniture: along the top of each table, on a rack's middle shelf, on a bunk's lower bed
   FURNITURE.forEach((f, on) => {
     const c = Math.cos(f.yaw), s = Math.sin(f.yaw);
-    const put = (lx: number, y: number, o: { arms?: 'guns' } = {}) => out.push({ x: f.x + lx * c, z: f.z - lx * s, y: f.y + y, floor: false, usage: army, tier: high(f.y, !!o.arms || (f.kind === 'rack' && f.y > 5)), on, ...o });
+    const put = (lx: number, y: number, o: { arms?: 'guns' } = {}) => out.push({ x: f.x + lx * c, z: f.z - lx * s, y: f.y + y, floor: false, usage: f.medic ? ['Medic', 'Hospital'] : army, tier: high(f.y, !!o.arms || (f.kind === 'rack' && f.y > 5)), on, ...o });
     if (f.kind === 'table') for (const lx of f.w > 2 ? [-0.75, 0, 0.75] : [-0.45, 0.45]) put(lx, 0.8);
     else if (f.kind === 'rack') {
       put(-0.4, 0.995, f.arms || f.y > 5 ? { arms: 'guns' } : {});
@@ -1425,7 +1430,7 @@ const STOOD: [string, number, number, number, number][] = [
   // the aid post: a cot in each cell and one in the ward, a cabinet, a box of dressings, a lamp on a stand
   // (a bed is 0.91 by 2.0: along the back wall of each cell, and of the ward; the cabinet is in the nook at the west end)
   ['old_bed_frame', -2.1, 7.82, UNDER.floor, Math.PI / 2], ['old_bed_frame', 0.3, 7.82, UNDER.floor, Math.PI / 2], ['old_bed_frame', 2.7, 7.82, UNDER.floor, Math.PI / 2], ['old_bed_frame', 5.05, 7.8, UNDER.floor, Math.PI / 2],
-  ['med_cabinet', -7.9, 6.2, UNDER.floor, Math.PI / 2], ['medical_box', -1.35, 7.2, UNDER.floor, 0.4], ['medical_box', 5.7, 6.95, UNDER.floor, -0.3], ['medical_light', 6.25, 7.05, UNDER.floor, 0.6],
+  ['med_cabinet', -7.9, 6.2, UNDER.floor, Math.PI / 2], ['medical_box', -1.35, 7.2, UNDER.floor, 0.4], ['medical_box', 5.7, 6.95, UNDER.floor, -0.3], ['medical_light', 6.1, 6.95, UNDER.floor, 0.6],
   // the upper room
   ['weapons_case', 0.2, -1.0, 5.85, 0.1],
   // the hall: a long case against its north wall
@@ -1455,7 +1460,7 @@ const assumed = (p: Place): GroundAt => (wx, wz) => {
  */
 export function castleLoot(p: Place, ground: GroundAt = assumed(p), loose: Loose[] = castleLoose(p)): CastleLoot[] {
   // (what lies down there is found by a torch: 'Military' still, and of the high step)
-  return lootSpots(looseLocal(p, loose)).map((s) => {
+  const own = lootSpots(looseLocal(p, loose)).map((s): CastleLoot => {
     let [x, y, z] = castleAt(p, s.x, s.z, s.y);
     if (s.sits) y = ground(x, z) + s.y;
     const f = s.on === undefined ? null : FURNITURE[s.on];
@@ -1466,6 +1471,8 @@ export function castleLoot(p: Place, ground: GroundAt = assumed(p), loose: Loose
       ...(f ? { surf: { x: castleAt(p, f.x, f.z)[0], z: castleAt(p, f.x, f.z)[2], rot: p.rot + f.yaw, hx: f.w / 2 - 0.08, hz: f.d / 2 - 0.06, clear: f.kind === 'table' ? 10 : 0.5 } } : {}),
     };
   });
+  // (and the post's: each has a `room` the fort's own have not)
+  return [...own, ...postLoot(p, ground, loose)];
 }
 
 /** What stands in it off the shelf, as the world's own list of such things has them. */
@@ -1481,6 +1488,7 @@ export function castleProps(p: Place, ground: GroundAt = assumed(p), loose: Loos
     const x = h.x + lx * Math.cos(h.rot) + lz * Math.sin(h.rot), z = h.z - lx * Math.sin(h.rot) + lz * Math.cos(h.rot);
     out.push({ kind, x, y: ground(x, z) + (kind === 'stone_fire_pit' ? 0.19 : 0), z, rot: h.rot + rot, scale: 1, far: 140 });
   }
+  out.push(...postProps(p, ground, loose));
   return out;
 }
 

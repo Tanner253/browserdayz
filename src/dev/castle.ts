@@ -10,6 +10,9 @@
 //   C.walk([[x, z], ...], { sprint })   it walks to each spot in turn; what comes back says how far it got and how fast
 //   C.hour(light)                       1 noon, 0 night;  C.frame(n) draws n frames;  C.cost() what a frame draws
 //   C.snow(v)                           how much snow lies, 0 none to 1 deep winter
+//   C.eye([x, y, z] | null)             where the fort is told the eye is, apart from where the picture is taken from (null: the same).
+//                                       `?castle&far` starts with it two kilometres off: nothing of the fort is sent for until a script
+//                                       brings it nearer, so that what its arrival costs can be timed
 
 import * as THREE from 'three';
 import { Renderer } from '../core/renderer';
@@ -130,10 +133,12 @@ export async function castlePage() {
   const input = new Input(canvas);
   canvas.addEventListener('click', () => input.lock());
   let manual = false, eyes = true, last = performance.now();
+  /** where the fort is told the eye is, when that is not where the picture is taken from (see C.eye) */
+  let told: THREE.Vector3 | null = new URLSearchParams(location.search).has('far') ? new THREE.Vector3(P.x + 2000, P.y, P.z) : null;
   const draw = (dt: number) => {
     const cam = r.camera;
     if (eyes) player.updateCamera(cam, dt, 1);
-    site.update(dt, cam.position, atmo.night, (pos, burn) => lamps.glow(pos, CRESSET.colour, burn * 0.8, CRESSET.reach));
+    site.update(dt, told ?? cam.position, atmo.night, (pos, burn, colour = CRESSET.colour, reach = CRESSET.reach) => lamps.glow(pos, colour, burn * 0.8, reach));
     lamps.update(cam, dt);
     flames.update(dt, cam.position);
     // (under the terrace it is dark, as it is down the bunker: so much of the sun and the sky put out for an eye that is there)
@@ -165,6 +170,7 @@ export async function castlePage() {
   const C = {
     P, site, player, atmo, marks, r,
     script() { manual = true; },
+    eye(at: [number, number, number] | null) { told = at ? new THREE.Vector3(...castleAt(P, at[0], at[2], at[1])) : null; },
     eyes() { eyes = true; },
     cam(eye: [number, number, number], at: [number, number, number], fov = 70) {
       eyes = false;

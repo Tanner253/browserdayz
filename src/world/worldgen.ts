@@ -6,7 +6,7 @@
 import { RNG, Simplex, hash2, clamp, lerp, smoothstep } from '../core/noise';
 import { BUNKER, bunkerAt, type Place } from '../sim/bunker';
 import { wreckUnder, type Bridge } from '../sim/bridge';
-import { castleCuts, castleGround, castleLocal, squareTouches } from '../sim/castle';
+import { castleAt, castleCuts, castleGround, castleLocal, castleLoose, hatchLine, looseLocal, moundTop, squareTouches } from '../sim/castle';
 
 export const WORLD_SEED = 1337;
 /**
@@ -205,7 +205,7 @@ export const MOUNTAIN = {
   turn: { x: 626, z: -561, r: 15 },
   yard: { ahead: 15, long: 30, wide: 20 },
   path: {
-    line: [[638.6, -436.7], [638.4, -432.2], [642.4, -432.3], [645.6, -434.7], [647.7, -442.4], [651.3, -449.3], [654.7, -456.2], [658.7, -463], [663.3, -469.4], [664.9, -473.1], [667.4, -470], [669.5, -462.4], [669.5, -454.4], [669.6, -446.4], [671.2, -438.7], [670.7, -434.7], [677, -447], [684, -458], [692, -463.5], [698, -466.5], [702.5, -470], [707, -471], [709.6, -474.4], [710.6, -476.2], [712.2, -478.4], [712.2, -482], [711.2, -490], [710.2, -497], [709.6, -502.5]] as [number, number][],
+    line: [[638.6, -436.7], [638.4, -432.2], [642.4, -432.3], [645.6, -434.7], [647.7, -442.4], [651.3, -449.3], [654.7, -456.2], [658.7, -463], [663.3, -469.4], [664.9, -473.1], [667.4, -470], [669.5, -462.4], [669.5, -454.4], [669.6, -446.4], [671.2, -438.7], [670.7, -434.7], [675.6, -437.6], [680.2, -446], [685.6, -456], [692, -463.5], [698, -466.5], [702.5, -470], [707, -471], [709.8, -474.6], [711.9, -476.95], [713, -479.6], [712.5, -484], [711.2, -490], [710.2, -497], [709.6, -502.5]] as [number, number][],
     half: 1.3,
     steep: 0.5,
   },
@@ -240,14 +240,19 @@ export const MOUNTAIN = {
    *                cut down to that with a bank `bank` metres wide all round it, which under the fort's lee wall is
    *                a cliff of eleven metres. The wall's foot is level out to the cliff's brow, twelve metres from
    *                the towers: whoever stands at the cliff's foot is under the brow from both of them.
-   *   `lee`        the way round by the back: from the crossroads over the saddle's lee edge behind the shells,
-   *                down into the hollow, along the cliff's foot past the breach, and up out of the hollow's mouth
-   *                to the postern's stair in the foot of the wall that looks north.
+   *   `cross`      the crossroads: where the foot path's third leg tops out among the shells, at the saddle's own
+   *                height (left to the ground it came in four metres under it, in a pit of its own cutting).
+   *   `lee`        the way round by the back: from the street where it passes the hatch, round the gable of the
+   *                second shell and over the saddle's lee edge behind it, down into the hollow, along the cliff's
+   *                foot past the breach, and up out of the hollow's mouth to the postern's stair in the foot of
+   *                the wall that looks north. (Not by the gap between the second shell and the third: a tooth of
+   *                the fort's own rock stands in that.)
    *   `goat`       the goat path: from the first turn of the foot path, half way up, across the valley face in
    *                plain sight of the whole valley, and up the nose to the same stair.
    *   `wreck`      the helicopter that did not make it, in the hollow under the two lee towers: the middle of
    *                it, and which way it lies. Five places for things lie about it (src/world/buildings.ts).
-   *   `walls`      low dry-stone walls [from x, z, to x, z] about the street: cover to somebody crouched.
+   *   `walls`      low dry-stone walls [from x, z, to x, z] about the street: cover to somebody crouched. None
+   *                of them across a way that is walked: the first of them were, and stopped the walker.
    *   `talus`      fallen rock at the foot of the cliffs, each [x, z, how many pieces]: boulders and broken stone,
    *                the biggest nearest the cliff. (The scanned rock FACES are not stood here: each is a sheet, and
    *                against a cliff somebody can walk beside it and see that it is. The ground's own paint draws
@@ -255,12 +260,15 @@ export const MOUNTAIN = {
    *   `seen`       where the fort is looked at from as somebody arrives: no tree stands in the way from there.
    */
   crest: {
+    cross: [707, -471] as [number, number],
     hollow: { line: [[724, -583, 5, 204.5], [734, -571, 8, 206], [740.5, -553, 9, 206.5], [740.8, -531, 9.3, 207], [740.3, -509, 8.8, 207.5], [736.5, -491, 6.5, 208], [731.5, -475, 4.5, 208.5]] as [number, number, number, number][], bank: 3, brow: 728.4 },
-    lee: [[707, -471], [710, -466.5], [716, -465.2], [722, -467], [728, -473], [731.5, -485], [733.2, -498], [733.4, -512], [733.4, -530], [733.4, -548], [733.6, -561], [729, -571.5], [722, -571], [715.5, -566], [711, -559], [711.5, -548.5]] as [number, number][],
-    goat: [[664.9, -473.1], [666, -486], [668, -500], [672, -516], [676, -532], [678, -548], [681, -562], [688, -572], [697, -573], [704, -567], [709, -558], [711.5, -548.5]] as [number, number][],
+    lee: [[711.9, -476.95], [714.8, -477.6], [718.6, -476.8], [722.5, -474.8], [727.5, -475.5], [731.5, -485], [733.2, -498], [733.4, -512], [733.4, -530], [733.4, -548], [733.6, -561], [729, -571.5], [722, -571], [715.5, -566], [710.4, -560.5], [709.7, -554], [711.3, -548.5]] as [number, number][],
+    goat: [[664.9, -473.1], [666, -486], [668, -500], [672, -516], [676, -532], [678, -548], [681, -562], [688, -572], [697, -573], [704, -567], [708.6, -559.5], [709.7, -554], [711.3, -548.5]] as [number, number][],
     steep: 0.5,
+    /** level ground at the head of the hatch's steps, for whoever goes down them: so far behind the head its middle, so far out all of it, and none of it beyond that (the hatch stands on the saddle's lip, and its head had a pace of ground before the fall) */
+    apron: { back: 2.4, full: 2.6, none: 4.8 },
     wreck: { x: 740, z: -545, rot: 0.3 },
-    walls: [[707.4, -491.8, 707.8, -499], [713.9, -483, 714.1, -489.4], [711.8, -486, 715.6, -486], [705.8, -494.6, 709, -494.4], [711.6, -498.6, 714.8, -498.4], [703.4, -474.4, 703.2, -468.6], [718.6, -466, 718.8, -458.6], [702.8, -434.6, 712.4, -434.4], [716.5, -477.8, 720, -478.2]] as [number, number, number, number][],
+    walls: [[707.4, -491.8, 707.8, -499], [714.3, -482.6, 714.5, -489.4], [714.4, -486, 717.6, -486.2], [705.4, -493.6, 708.4, -493.4], [712.2, -498.6, 715.4, -498.4], [703.4, -476.8, 703.3, -473], [703.2, -468.2, 703.1, -465], [718.7, -463.4, 718.9, -456.8], [702.8, -434.6, 712.4, -434.4]] as [number, number, number, number][],
     talus: [
       // the foot of the rim's wall, across the hollow
       [747.4, -562, 5], [747.8, -551, 4], [748, -538, 5], [747.8, -526, 4], [747.4, -513, 5], [745, -500, 4],
@@ -3021,6 +3029,20 @@ export function generateWorld(seed = WORLD_SEED): World {
             fortW[i] = Math.max(fortW[i], 0.001);
           }
       }
+      // Ground to stand on at the head of the hatch's steps (see `crest.apron`), wherever the fort's own file has the hatch.
+      {
+        const hatch = castleLoose(fort).find((l) => l.kind === 'hatch');
+        if (hatch) {
+          const [hl] = looseLocal(fort, [hatch]), way = hatchLine(hl, 0).d, [qx, , qz] = castleAt(fort, hl.x + way[0], hl.z + way[1]);
+          const ux = qx - hatch.x, uz = qz - hatch.z, cx = hatch.x - ux * X.apron.back, cz = hatch.z - uz * X.apron.back, y = heightAt(heights, hatch.x + ux * 0.6, hatch.z + uz * 0.6);
+          for (let iz = Math.floor((cz - X.apron.none + half) / CELL); iz <= Math.ceil((cz + X.apron.none + half) / CELL); iz++)
+            for (let ix = Math.floor((cx - X.apron.none + half) / CELL); ix <= Math.ceil((cx + X.apron.none + half) / CELL); ix++) {
+              const i = idx(ix, iz), d = Math.hypot(-half + ix * CELL - cx, -half + iz * CELL - cz);
+              if (heights[i] < y) heights[i] = lerp(heights[i], y, 1 - smoothstep(X.apron.full, X.apron.none, d));
+              fortW[i] = Math.max(fortW[i], 0.001);
+            }
+        }
+      }
       // The rim behind it, where the map's edge would be seen over it (see MOUNTAIN.rim).
       {
         const R = M.rim, eye = F.terrace + R.eye, need = new Float32Array(4 * N);
@@ -3070,7 +3092,14 @@ export function generateWorld(seed = WORLD_SEED): World {
       const path = catmullRom(M.path.line, 3), pathDist = new Float32Array(N * N).fill(1e9), pathH = new Float32Array(N * N);
       const leeWay = catmullRom(X.lee, 3), goatWay = catmullRom(X.goat, 3);
       {
-        const py = laid(path, M.path.steep, endY + 0.08);
+        // (It ends on the tongue of rock that is the way up to the ramp, at the height the tongue has there. Left to
+        // the ground it came in a pace and more under it, and the tongue's toe stood across the path as a step.)
+        const top = M.path.line[M.path.line.length - 1], [tlx, tlz] = castleLocal(fort, top[0], 0, top[1]);
+        // (And it is at the saddle's own height where it tops out at the crossroads: laid in two lengths, to there and from there.)
+        const [clx, clz] = castleLocal(fort, X.cross[0], 0, X.cross[1]), crossY = F.terrace + castleGround(clx, clz) - 0.3;
+        let kc = 0;
+        for (let k = 1; k < path.length; k++) if (Math.hypot(path[k][0] - X.cross[0], path[k][1] - X.cross[1]) < Math.hypot(path[kc][0] - X.cross[0], path[kc][1] - X.cross[1])) kc = k;
+        const py = [...laid(path.slice(0, kc + 1), M.path.steep, endY + 0.08, crossY), ...laid(path.slice(kc), M.path.steep, crossY, F.terrace + Math.max(castleGround(tlx, tlz), moundTop('outcrop', tlx, tlz))).slice(1)];
         /** how high the foot path is where it passes nearest a spot */
         const onPath = (x: number, z: number) => {
           let best = 0;

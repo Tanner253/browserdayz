@@ -22,16 +22,19 @@ import * as THREE from 'three';
 import { GLASS_GROUPS, WORLD_GROUPS, physics } from '../core/physics';
 import { assets } from '../core/assets';
 import { SHADOW_FRUSTA, type Atmosphere, type ShaderPatch } from './atmosphere';
-import { ARCADE, UNDER, castleAt, castleDoor, castleKit, castleLamps, castleLoose, castleRocks, looseLocal, type GroundAt, type Loose, type Place } from '../sim/castle';
+import { ARCADE, CASTLE, UNDER, castleAt, castleLocal, castleUnder, castleDoor, castleKit, castleLamps, castleLoose, castleRocks, looseLocal, type GroundAt, type Loose, type Place } from '../sim/castle';
 import { PICTURES, SHEETS, castleShape, castleSky, type Sheet, type Skin, type Solid } from './castle-shape';
 import { kitMeshes, stoneLook, type StoneLook } from './kit';
+import { PostSite } from './castle-post';
 
 /** how far from its middle the eye may be, over the ground, for the fort's own shapes to be drawn: beyond, the lighter ones */
 const NEAR = 330;
 /** and how far off its pictures are sent for: they have the time it takes to walk from here to NEAR to come */
 const ASK = 380;
-/** how near its middle an eye must be for what is under the terrace to be drawn (on it, in it, or at the foot of its walls) */
-const UNDER_SEEN = 32;
+/** how near its middle an eye must be for what is under the terrace to be drawn at all (and then only if it is in it, or where it can be seen into: see `seesUnder`) */
+const UNDER_SEEN = 90;
+/** how far off the kit's far copy is sent for: until it comes, blocks stand for the kit's pieces from far off */
+const FAR_KIT = 900;
 /** how much snow lies on it where nobody has said: the mountain it is made for is over the snow line, and not at its top */
 export const SNOW_ON_THE_MOUNTAIN = 0.7;
 /** a cresset's fire: the colour of its light, how far that carries, and how big its flames are beside a campfire's */
@@ -233,14 +236,19 @@ export interface CastleOptions {
 
 export class CastleSite {
   /** how much of it there is to draw and to run into: for whoever asks what it costs */
-  readonly counts = { near: 0, under: 0, far: 0, kit: 0, draws: 0, solids: 0 };
+  readonly counts = { near: 0, under: 0, far: 0, kit: 0, draws: 0, farDraws: 2, solids: 0 };
   /** 'far': only its far shape is made; 'asked': its pictures are on their way; 'near': all of it is on the card */
   state: 'far' | 'asked' | 'near' = 'far';
   /** everything of it that is drawn */
   readonly group = new THREE.Group();
+  /** the army's post in it and on it, which is made and drawn by its own file */
+  readonly post: PostSite;
   private near = new THREE.Group();
   private under = new THREE.Group();
   private far: THREE.Mesh;
+  /** what stands for the kit's pieces from far off: blocks, and then the kit's own far copy when that has come */
+  private farKit = new THREE.Group();
+  private farAsked = false;
   private skins: { near: Record<Sheet, Packed>; under: Record<Sheet, Packed> } | null;
   private sets: (ReturnType<typeof assets.pbr> | null)[] = [];
   private fires: THREE.Vector3[];
@@ -289,10 +297,16 @@ export class CastleSite {
     all.matrixAutoUpdate = false;
     // from far off: one shape, no picture, coloured corner by corner; aged and snowed on as the near one is, so it is the same fort
     const plain = atmo.register(new THREE.MeshStandardMaterial({ roughness: 1, metalness: 0, vertexColors: true }), stoneLook({ snow: this.snowU, attr: 'aSnow' }), 'castle far');
-    this.far = new THREE.Mesh(geometry(pack(shape.far)), plain);
+    const far = pack(shape.far), cut = (from: number, to: number): Packed => ({ pos: far.pos.subarray(from * 9, to * 9), nrm: far.nrm.subarray(from * 9, to * 9), uv: far.uv.subarray(from * 6, to * 6), col: far.col.subarray(from * 9, to * 9), snow: far.snow.subarray(from * 6, to * 6) });
+    this.far = new THREE.Mesh(geometry(cut(0, shape.farOwn)), plain);
     this.far.name = 'castle:far';
     this.far.matrixAutoUpdate = false;
-    all.add(this.far);
+    const blocks = new THREE.Mesh(geometry(cut(shape.farOwn, this.counts.far)), plain);
+    blocks.name = 'castle:far blocks';
+    blocks.matrixAutoUpdate = false;
+    this.farKit.add(blocks);
+    this.farKit.matrixAutoUpdate = false;
+    all.add(this.far, this.farKit);
     if (o.earth && shape.near.earth.pos.length) {
       // (the earth laid over what the world cut for the sally port: it is drawn from the first and from any distance, with the ground's own paint, or the cut would be seen)
       const lid = new THREE.Mesh(geometry(pack(shape.near.earth)), o.earth);
@@ -310,6 +324,7 @@ export class CastleSite {
     // ---- what stops a body and a shot
     if (physics.world) for (const s of shape.solids) this.solid(s);
     this.counts.solids = shape.solids.length;
+    this.post = new PostSite(place, atmo, scene, { ground: o.ground, loose: o.loose, snow: this.snowU, ready: o.ready });
   }
 
   /** Its pictures are sent for. (Nothing waits on them: they come when they come.) */
@@ -317,6 +332,51 @@ export class CastleSite {
     this.state = 'asked';
     this.sets = SHEETS.map((s) => (PICTURES[s].tex && !(s === 'earth' && this.o.earth) ? assets.pbr(PICTURES[s].tex!) : null));
     void Promise.all([assets.model('fort_kit'), assets.model('large_castle_door'), assets.model('rock_face_01'), assets.model('rock_face_01', 1)]).then(() => void (this.kitHere = true));
+  }
+
+  /** The kit's far copy is sent for, and stood in place of the blocks when it has come: from far off the fort then has the kit's own outline, merlons and all. */
+  private async askFar() {
+    this.farAsked = true;
+    const kit = await kitMeshes('fort_kit', castleKit().filter((p) => (typeof p.scale === 'number' ? p.scale : 1) >= 0.3), {
+      lod: 1,
+      attr: { name: 'aSnow', of: (p, n) => [castleSky(p, n), 9] },
+      dress: (m, name) => this.atmo.register(m, stoneLook({ ...(KIT_STONE[name] ?? {}), snow: this.snowU, attr: 'aSnow' }), `castle far kit ${name}`),
+    }).catch(() => null);
+    if (!kit) return;
+    const hold = new THREE.Group();
+    hold.applyMatrix4(this.group.matrixWorld);
+    hold.add(...kit.meshes);
+    hold.updateMatrixWorld(true);
+    await this.o.ready?.(hold).catch(() => {});
+    for (const b of [...this.farKit.children]) {
+      this.farKit.remove(b);
+      (b as THREE.Mesh).geometry.dispose();
+    }
+    this.farKit.add(...kit.meshes);
+    this.farKit.updateMatrixWorld(true);
+    this.counts.far = this.far.geometry.getAttribute('position').count / 3 + kit.triangles;
+    this.counts.farDraws = 1 + kit.meshes.length;
+  }
+
+  /**
+   * Whether an eye can see anything of the lower levels: it is in them (or in the passage out), or it is where it
+   * can look down a hole in the terrace (the nearer the hole the lower the eye may be: from the keep's roof the
+   * water is seen from thirty metres), or it is outside before the rent in the east wall or before the postern.
+   */
+  private seesUnder(eye: THREE.Vector3): boolean {
+    const P = this.place;
+    if (castleUnder(P, eye.x, eye.y, eye.z, this.o.ground, this.o.loose)) return true;
+    const [x, z, y] = castleLocal(P, eye.x, eye.y, eye.z), U = UNDER, D = U.cistern.drop, B = U.bay, h = Math.max(1.7, y);
+    const off = (x0: number, x1: number, z0: number, z1: number) => Math.hypot(Math.max(x0 - x, 0, x - x1), Math.max(z0 - z, 0, z - z1));
+    if (y > -1.2) {
+      if (off(D.x0, D.x1, D.z0, D.z1) < 3 + 2.6 * h || off(B.x0, B.x1, B.z0, B.z1) < 3 + 6.6 * h) return true;
+      if (off(U.stair.head, U.stair.open, U.stair.z - 0.5, U.stair.z + 0.5) < 3 + 4 * h) return true;
+      if (U.gratings.some(([gx, gz]) => Math.hypot(x - gx, z - gz) < 3 + 0.9 * h)) return true;
+    }
+    // (the hollow tower: down its well, and through the door of its cellar)
+    if (Math.hypot(x + CASTLE.hx, z + CASTLE.hz) < CASTLE.tower.r + 3) return true;
+    if (x > U.x - 1 && Math.abs(z - (U.rent.z0 + U.rent.z1) / 2) < 2.5 + 0.8 * (x - U.x)) return true;
+    return x < -U.x + 1 && Math.abs(z - (U.goat.z0 + U.goat.z1) / 2) < 2 + 0.7 * (-x - U.x);
   }
 
   /** Whether every picture sent for has come. */
@@ -427,26 +487,30 @@ export class CastleSite {
   /**
    * Each frame: which shapes of it are drawn, and its fires.
    * @param night how dark it is, 0 by day to 1 at night
-   * @param lit told of each fire that is alight now, and how brightly (0..1)
+   * @param lit told of each fire that is alight now, and how brightly (0..1); the post's lamps say their colour and reach as well, a fire leaves them to the caller (CRESSET)
    */
-  update(dt: number, eye: THREE.Vector3, night: number, lit: (pos: THREE.Vector3, burn: number) => void) {
+  update(dt: number, eye: THREE.Vector3, night: number, lit: (pos: THREE.Vector3, burn: number, colour?: THREE.Color, reach?: number) => void) {
+    this.post.update(dt, eye, night, lit);
     const P = this.place, off = Math.hypot(eye.x - P.x, eye.z - P.z);
     if (this.state === 'far' && off < ASK) this.ask();
     if (this.state === 'asked' && this.skins && this.come()) void this.build();
     const near = this.state === 'near' && off < NEAR;
     this.near.visible = near;
-    this.far.visible = !near;
-    this.under.visible = near && off < UNDER_SEEN;
+    if (!this.farAsked && off < FAR_KIT) void this.askFar();
+    this.far.visible = this.farKit.visible = !near;
+    const under = near && off < UNDER_SEEN && this.seesUnder(eye);
+    this.under.visible = under;
     this.clock += dt;
     this.time.value = this.clock;
     // the day under the terrace: where the sun is by the fort's own measure, what of it comes down a hole (all of
     // it that the eye's cover has put out: what the cover leaves is the sun's own, shadows and all), and how much the
     // sky's light is to be turned up again on stone that knows its own cover
-    const cover = this.atmo.cover.castle, sun = this.atmo.sunDir, cs = Math.cos(P.rot), sn = Math.sin(P.rot), D = this.day;
+    // (the eye's cover is kept under the fort's own name by a page that has only the fort, and with the bunker's under `ground` by the game)
+    const cover = this.atmo.cover.castle ?? this.atmo.cover.ground, sun = this.atmo.sunDir, cs = Math.cos(P.rot), sn = Math.sin(P.rot), D = this.day;
     D.sunW.value.copy(sun);
     D.sunL.value.set(sun.x * cs - sun.z * sn, sun.y, sun.x * sn + sun.z * cs);
     D.sun.value.copy(this.atmo.sunTint).multiplyScalar(this.atmo.sunIntensity * this.atmo.daylight.value * (1 - (cover?.sun ?? 1)));
-    D.eye.value = 1 / Math.max(0.01, cover?.sky ?? 1);
+    D.eye.value = 1 / Math.max(0.005, cover?.sky ?? 1);
     D.sky.value = this.atmo.daylight.value;
     // (the shafts of day are as bright as the day is, lean as the sun does, and are gone when it is low)
     const up = D.sunL.value.y, kx = up > 0.2 ? D.sunL.value.x / up : 0, kz = up > 0.2 ? D.sunL.value.z / up : 0, from = -0.5;
@@ -456,7 +520,8 @@ export class CastleSite {
     // (its fires are lit as the light goes; and those under the terrace burn by day as well: it is always night there)
     const dusk = Math.min(1, Math.max(0, (night - 0.3) / 0.3));
     this.fires.forEach((pos, k) => {
-      const low = pos.y < P.y - 0.5, burn = near ? (low ? 1 : dusk) : 0;
+      // (and those are not lit for an eye that cannot see into the place: a light costs every stone it reaches)
+      const low = pos.y < P.y - 0.5, burn = near ? (low ? (under ? 1 : 0) : dusk) : 0;
       if (this.flames[k]) this.flames[k].strength = burn;
       // (under a vault a fire is a pace from the stone it lights: it is told at little more than half, or the stone by it is white)
       if (burn > 0 && off < 90) lit(pos, burn * (low ? 0.5 : 1) * (0.8 + 0.2 * Math.sin(this.clock * 9 + k * 2.1)));

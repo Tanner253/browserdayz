@@ -37,9 +37,12 @@ const mine: Block[] = [
   ...postSolids().filter((s) => !s.sits && s.name !== 'stove').map((s): Block => ({ x: s.c[0], z: s.c[2], hx: s.h[0], hz: s.h[2], yaw: s.yaw, y0: s.c[1] - s.h[1], y1: s.c[1] + s.h[1], name: s.name, room: s.room, mine: true })),
 ];
 /** and the fort's own things: its furniture, and what it stood off the shelf */
+// (the fort's own: since the post was joined to the fort, what the fort gives holds the post's things too, and they are left out)
+const spot = (q: { kind: string; x: number; y: number; z: number }) => `${q.kind} ${q.x.toFixed(2)} ${q.y.toFixed(2)} ${q.z.toFixed(2)}`;
+const ownProps = new Set(postProps(O).map(spot));
 const theirs: Block[] = [
   ...FURNITURE.map((f): Block => ({ x: f.x, z: f.z, hx: f.w / 2, hz: f.d / 2, yaw: f.yaw, y0: f.y, y1: f.y + (f.kind === 'table' ? 0.8 : f.kind === 'bench' ? 0.45 : f.kind === 'bunk' ? 1.75 : 1.9), name: `the fort's ${f.kind}`, mine: false })),
-  ...castleProps(O).filter((q) => inCastle(O, q.x, q.y + 0.3, q.z)).map((q) => stoodBlock(q, `the fort's ${q.kind}`, false)),
+  ...castleProps(O).filter((q) => !ownProps.has(spot(q)) && inCastle(O, q.x, q.y + 0.3, q.z)).map((q) => stoodBlock(q, `the fort's ${q.kind}`, false)),
 ];
 /** how far a spot of the plan is from a block (0: in it) */
 const off = (b: Block, x: number, z: number) => {
@@ -227,7 +230,7 @@ ok('what lies in it lies ON something, at that thing\'s height, on the step of t
   assert.deepEqual(loot.filter((l) => l.arms).map((l) => [l.room, l.arms]), [["sniper's nest", 'guns']]);
   assert.ok(loot.every((l) => l.usage.includes('Military')));
   // no two in one place, the fort's own among them; and none in what stops a body (but the thing it lies on)
-  const all = [...loot, ...castleLoot(O)];
+  const all = [...loot, ...castleLoot(O).filter((l) => !('room' in l))];
   for (let i = 0; i < loot.length; i++) for (let j = i + 1; j < all.length; j++) assert.ok(Math.hypot(all[i].x - all[j].x, all[i].y - all[j].y, all[i].z - all[j].z) > 0.3, `two things in one place in the ${loot[i].room}`);
   for (const l of loot) for (const b of mine) if (b.y1 > l.y + 0.1 && b.y0 < l.y + 0.1) assert.ok(off(b, l.x, l.z) > 0.02 || /desk|bench|table|Shelf/.test(b.name), `a thing of the ${l.room} lies in the ${b.name}`);
   // what is searched: the commander's locker, the two crates of the dump, the crate at the picket

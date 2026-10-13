@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { KIT_LEVELS, KIT_MERLON, cutBox, inCut, kitMatrix, kitPoint, kitSolids } from '../src/sim/kit';
 import { castleDoor, castleKit } from '../src/sim/castle';
 import { CASTLE, CASTLE_TIERS, FURNITURE, LOOSE, OUTCROP, POSTERN, UNDER, castleAt, castleCuts, castleDark, castleGround, castleHomes, castleLamps, castleLocal, castleLoose, castleLoot, castleParts, castleProps, castleUnder, hatchLine, inCastle, looseLocal, looseParts, moundTop, squareTouches, stairShare, towerRadius, type Flight, type Place, type Tower, type V3 } from '../src/sim/castle';
+import { postProps } from '../src/sim/castle-post';
 import { PAINTS, PICTURES, SHEETS, STUFF, castleShape, type Sheet, type Skin, type Solid } from '../src/world/castle-shape';
 
 let n = 0;
@@ -327,7 +328,9 @@ ok('the ways in are open: the gate from the ramp, the two doors of the keep, the
 // ---- what is in it
 
 ok('what lies in it lies where a hand can reach: on a floor, on a table, on a shelf, never in a wall', () => {
-  const loot = castleLoot(P), inside = loot.filter((l) => inCastle(P, l.x, l.y, l.z));
+  // (the fort's own: the post's places, which have a `room`, are its own file's to check)
+  const loot = castleLoot(P).filter((l) => !('room' in l)), inside = loot.filter((l) => inCastle(P, l.x, l.y, l.z));
+  assert.ok(castleLoot(P).length > loot.length && castleLoot(P).every((l) => l.building === 'castle'), 'the places of the post are not among the fort’s');
   assert.ok(inside.length >= 36 && loot.length - inside.length >= 5, `${inside.length} in the fort, ${loot.length - inside.length} in its grounds`);
   assert.ok(loot.every((l) => l.building === 'castle' && l.usage.length > 0));
   // three steps of the map in one place, and the way from the first to the last is up: the houses, the fort, what is high in it
@@ -341,7 +344,7 @@ ok('what lies in it lies where a hand can reach: on a floor, on a table, on a sh
   const high = loot.filter((l) => l.tier === CASTLE_TIERS.high), deep = high.filter((l) => l.y < P.y - 0.5);
   // (the vaults are the richest of it: the armoury, whose five racks always have a gun on them, and the aid post, which has what a dressing station had)
   const arms = loot.filter((l) => l.arms === 'guns'), medic = loot.filter((l) => l.usage.includes('Medic'));
-  assert.ok(high.length >= 26 && high.length <= 34 && deep.length >= 23 && arms.length === 6 && arms.filter((l) => l.y < P.y - 0.5).length === 5 && medic.length === 6, `${high.length} places of the high step, ${deep.length} of them under the terrace; ${arms.length} that always hold a gun; ${medic.length} of the aid post's`);
+  assert.ok(high.length >= 30 && high.length <= 38 && deep.length >= 27 && arms.length === 6 && arms.filter((l) => l.y < P.y - 0.5).length === 5 && medic.length === 10, `${high.length} places of the high step, ${deep.length} of them under the terrace; ${arms.length} that always hold a gun; ${medic.length} of the aid post's`);
   assert.ok(deep.every((l) => castleUnder(P, l.x, l.y + 0.5, l.z)) && medic.every((l) => l.y < P.y - 0.5 && castleLocal(P, l.x, l.y, l.z)[1] > 5.5));
   assert.ok(inside.every((l) => l.usage.includes('Military') || l.usage.includes('Medic')) && loot.filter((l) => !inCastle(P, l.x, l.y, l.z)).every((l) => l.usage.includes('Hunting')));
   for (const l of inside) {
@@ -360,15 +363,17 @@ ok('its loose pieces go where they are put, and what is theirs goes with them', 
   assert.equal(loose.filter((l) => l.kind === 'house').length, 5);
   // the houses moved a long way off, on ground of the world's own: their things and their dead go with them
   const moved = loose.map((l) => (l.kind === 'house' ? { ...l, x: l.x + 400, z: l.z - 250 } : l)), flat = () => 77;
-  const far = castleLoot(P, flat, moved).filter((l) => l.usage.includes('Hunting'));
-  assert.ok(far.length >= 5 && far.every((l) => Math.abs(l.y - 77.04) < 0.01 && Math.hypot(l.x - P.x, l.z - P.z) > 300));
-  assert.ok(castleProps(P, flat, moved).filter((p) => Math.hypot(p.x - P.x, p.z - P.z) > 300).length === 2);
+  const far = castleLoot(P, flat, moved).filter((l) => !('room' in l) && l.usage.includes('Hunting'));
+  assert.ok(far.length >= 5 && far.every((l) => Math.abs(l.y - 77.04) < 0.01 && Math.hypot(l.x - P.x, l.z - P.z) > 300), 'what lies in the houses did not go with them');
+  // (two things of the fort's own stand in the houses; what the post stood by them goes with them as well, and is its own file's to count)
+  const gone = (list: { x: number; z: number }[]) => list.filter((p) => Math.hypot(p.x - P.x, p.z - P.z) > 300).length;
+  assert.ok(gone(castleProps(P, flat, moved)) - gone(postProps(P, flat, moved)) === 2, `${gone(castleProps(P, flat, moved)) - gone(postProps(P, flat, moved))} things of the fort's own went with the houses`);
   const homes = castleHomes(P, moved);
   // (the infected of the fort itself have the dark under the terrace, and nothing over it)
-  assert.ok(homes.length === 2 && Math.hypot(homes[0].x - P.x, homes[0].z - P.z) > 300 && homes[1].n === 4 && homes[1].inside!.every((s) => inCastle(P, ...s) && castleUnder(P, s[0], s[1] + 0.9, s[2])));
+  assert.ok(homes.length === 2 && Math.hypot(homes[0].x - P.x, homes[0].z - P.z) > 300 && homes[1].n === 4 && homes[1].inside!.every((s) => inCastle(P, ...s) && castleUnder(P, s[0], s[1] + 0.9, s[2])), 'the dead of the fort are not where they belong');
   // with no houses there is still the fort
   assert.equal(castleHomes(P, []).length, 1);
-  assert.ok(castleLoot(P, flat, []).every((l) => inCastle(P, l.x, l.y, l.z)));
+  assert.ok(castleLoot(P, flat, []).every((l) => inCastle(P, l.x, l.y, l.z)), 'with no houses a thing still lies outside the fort');
   // and the shapes follow: nothing of a house where the houses were, when there are none
   const bare = castleShape(castleGround, []);
   assert.ok(Math.max(...bare.near.stone.pos.filter((_, i) => i % 3 === 0)) < 30);
@@ -381,8 +386,11 @@ ok('its fires and what stands in it are in it', () => {
   const lamps = castleLamps(P);
   // (its own, in it; and one at each bend of the passage out, which are under the ground on the way to the hatch)
   assert.ok(lamps.length >= 9 && lamps.every((l) => inCastle(P, ...l) || castleUnder(P, l[0], l[1] - 0.5, l[2])) && lamps.filter((l) => !inCastle(P, ...l)).length === 2, `${lamps.length} fires`);
-  const props = castleProps(P).filter((p) => inCastle(P, p.x, p.y + 0.3, p.z));
-  assert.ok(props.length >= 14);
+  // (the fort's own: what the post stood is its own file's to check)
+  const posts = new Set(postProps(P).map((q) => `${q.kind} ${q.x.toFixed(2)} ${q.y.toFixed(2)} ${q.z.toFixed(2)}`));
+  assert.ok(posts.size > 0 && castleProps(P).length > posts.size, 'what the post stood is not among the fort’s things');
+  const props = castleProps(P).filter((p) => !posts.has(`${p.kind} ${p.x.toFixed(2)} ${p.y.toFixed(2)} ${p.z.toFixed(2)}`) && inCastle(P, p.x, p.y + 0.3, p.z));
+  assert.ok(props.length >= 14, 'too few things stand in the fort');
   for (const p of props) {
     const [x, z, y] = castleLocal(P, p.x, p.y, p.z);
     for (const s of boxes) if (!s.feet && !/terrace|floor|roof/.test(s.name)) assert.ok(clear(s, [x, y + 0.3, z]) > 0.05, `the ${p.kind} at ${x.toFixed(1)}, ${z.toFixed(1)} stands in the ${s.name}`);

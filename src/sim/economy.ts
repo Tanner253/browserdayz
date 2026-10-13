@@ -588,9 +588,10 @@ export class Economy {
     return long <= Math.max(s.hx, s.hz) + 0.03 && thin <= Math.min(s.hx, s.hz) + 0.03;
   }
 
-  private arm(now = false) {
+  private arm(now = false, which: 'all' | 'map' | 'apart' = 'all') {
     this.points.forEach((p, i) => {
       if (!p.arms && !p.keeps) return;
+      if (which !== 'all' && (this.apart[i] !== null) !== (which === 'apart')) return;
       if (this.pointBusy.has(i)) {
         this.bare.delete(i);
         return;
@@ -645,7 +646,10 @@ export class Economy {
   }
 
   populate() {
-    this.arm(true);
+    // (The map's own first, all of it, and only then the places apart: so that what a place apart has, or whether
+    // there is one at all, never changes a throw of the dice for the map. Stocked in one pass, a rack more in the
+    // fort gave Kamenka's clinic three bandages where it had had five.)
+    this.arm(true, 'map');
     this.calibres();
     // (what the whole map hangs on is put down first, while its few places are still free)
     for (const id of FIRST) for (const t of STEPS) while (this.held(id, t) < TYPES[id].at[t - 1] && this.spawnType(id, -1, t));
@@ -657,6 +661,7 @@ export class Economy {
       for (const id of ids) for (const t of STEPS) if (this.held(id, t) < TYPES[id].at[t - 1] && this.spawnType(id, -1, t)) progress = true;
     }
     // (and each place apart, to its own counts, out of its own places)
+    this.arm(true, 'apart');
     for (const place of this.places) {
       progress = true;
       while (progress) {
