@@ -535,4 +535,32 @@ export function installHarness(g: Game) {
       T.kit();
     }, 300);
   }
+  // (`?at=fort`, or `?at=x,z`: the local game begins there, for whoever is looking a place over. At the fort it is
+  // the way in from the road: half way between the fort and the nearest of the road, facing the gate. And `?admin`:
+  // an admin's own tools that need no server, the free camera and the night sight, in a game played alone.)
+  const Q = new URLSearchParams(location.search), at = Q.get('at');
+  if (at || Q.has('admin')) {
+    const wait = setInterval(() => {
+      if (!anyG.started || anyG.joining || g.player.dead) return;
+      clearInterval(wait);
+      if (Q.has('admin') && !anyG.online) {
+        anyG.role = 'admin';
+        g.hud.role = 'admin';
+      }
+      if (!at) return;
+      const world = anyG.s.world, C = world.castle;
+      if (at === 'fort' && C) {
+        let best = Infinity, rx = C.x + 60, rz = C.z;
+        for (const r of [world.road, ...world.roads]) for (let i = 0; i < r.points.length; i += 3) {
+          const d = Math.hypot(r.points[i] - C.x, r.points[i + 2] - C.z);
+          if (d < best) { best = d; rx = r.points[i]; rz = r.points[i + 2]; }
+        }
+        const x = C.x + (rx - C.x) * 0.55, z = C.z + (rz - C.z) * 0.55;
+        T.tp(x, z, Math.atan2(x - C.x, z - C.z));
+      } else {
+        const [x, z] = at.split(',').map(Number);
+        if (Number.isFinite(x) && Number.isFinite(z)) T.tp(x, z, 0);
+      }
+    }, 300);
+  }
 }
