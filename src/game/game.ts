@@ -1146,7 +1146,46 @@ export class Game {
     this.autoHot();
     this.inventoryChanged();
     this.meDirty = true;
+    // (a kit of nothing is an admin's "empty everything")
+    if (!m.name) return void (m.by && this.hud.note(`${m.by}, an admin, has emptied what you carried`, 'warn'));
     if (m.by || over.length) this.hud.note(`${m.by ? `${m.by}, an admin, has given you the ${m.name} kit` : `The ${m.name} kit`}${over.length ? `: ${over.length} of its things found no room and lie at your feet` : ''}`, 'good');
+  }
+
+  /** Things an admin has taken out of what is carried (the panel's trash): gone, from wherever they were. */
+  private trashed(uids: string[], by?: string) {
+    const inv = this.inv, gone = new Set(uids);
+    let n = 0;
+    const strip = (it: ItemInstance | null | undefined) => {
+      if (!it?.cargo) return;
+      const kept = it.cargo.filter((p) => !gone.has(p.item.uid));
+      n += it.cargo.length - kept.length;
+      // (in place: a bag that is open is looked into through this very list)
+      it.cargo.splice(0, it.cargo.length, ...kept);
+      for (const p of it.cargo) strip(p.item);
+    };
+    if (this.inHand && gone.has(this.inHand.uid)) this.emptyHands();
+    if (this.loose && gone.has(this.loose.uid)) this.loose = null;
+    for (const [slot, it] of Object.entries(inv.slots) as [keyof typeof inv.slots, ItemInstance | null][]) {
+      if (it && gone.has(it.uid)) {
+        if (inv.held() === it) this.weapons.take(null);
+        inv.slots[slot] = null;
+        n++;
+      } else strip(it);
+    }
+    for (const c of inv.containers) {
+      for (const q of [...c.items]) {
+        if (gone.has(q.item.uid)) {
+          c.remove(q.item);
+          n++;
+        } else strip(q.item);
+      }
+    }
+    if (!n) return;
+    this.weapons.validate();
+    this.autoHot();
+    this.inventoryChanged();
+    this.meDirty = true;
+    if (by) this.hud.note(`${by}, an admin, has taken ${n > 1 ? `${n} things` : 'a thing'} out of what you carry`, 'warn');
   }
 
   /** Every survivor wears a dog tag stamped with their own name, round their neck (see PlayerInventory.neck). */
@@ -1574,6 +1613,8 @@ export class Game {
       this.meDirty = true;
     });
     net.on('kit', (m) => this.kitUp(m));
+    net.on('trash', (m) => this.trashed(m.uids, m.by));
+    net.on('inv', (m) => this.adminUI.setPockets(m));
     // (this game was not answering, and the server kept this life meanwhile: what it makes of it is what it is)
     net.on('hp', (m) => {
       const p = this.player;
@@ -2402,13 +2443,14 @@ export class Game {
   private tint: string | null = (() => {
     try {
       const c = localStorage.getItem('zona.adminTint');
-      return c && /^#[0-9a-f]{6}$/i.test(c) ? c : null;
+      return c && /^(off|#[0-9a-f]{6})$/i.test(c) ? c : null;
     } catch {
       return null;
     }
   })();
   private setTint(color: string | null) {
-    this.tint = color && /^#[0-9a-f]{6}$/i.test(color) ? color.toLowerCase() : null;
+    // ('off': no tag before the name at all)
+    this.tint = color && /^(off|#[0-9a-f]{6})$/i.test(color) ? color.toLowerCase() : null;
     try {
       if (this.tint) localStorage.setItem('zona.adminTint', this.tint);
       else localStorage.removeItem('zona.adminTint');

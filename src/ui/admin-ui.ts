@@ -20,6 +20,8 @@ import type { AdminLists } from '../net/protocol';
 import type { Role } from '../net/orders';
 import { ITEMS } from '../sim/items';
 import { KITS } from '../sim/kits';
+import type { S2C } from '../net/protocol';
+import type { ItemInstance } from '../sim/items';
 import './admin.css';
 
 export interface AdminActions {
@@ -35,7 +37,7 @@ export interface AdminActions {
   watch(id: number): void;
   /** night made day, in this game alone */
   night(on: boolean): void;
-  /** the colour of the word ADMIN before this admin's name in the chat (null: the rainbow) */
+  /** the colour of the word ADMIN before this admin's name in the chat (null: the rainbow; 'off': no tag at all) */
   tint(color: string | null): void;
   close(): void;
 }
@@ -60,7 +62,11 @@ export interface AdminSelf {
 
 type Player = AdminLists['players'][number];
 type View = 'who' | 'server' | 'bans' | 'roles';
-type Sub = 'actions' | 'items' | 'kits';
+type Sub = 'actions' | 'items' | 'kits' | 'pockets';
+/** what somebody carries, as the server last had it from their game (`/pockets`) */
+type Pockets = Extract<S2C, { t: 'inv' }>;
+const SLOT_NAME: Record<string, string> = { primary: 'On the back', secondary: 'On the back', holster: 'Holster', head: 'Head', face: 'Face', vest: 'Vest', back: 'Pack', hands: 'Hands', feet: 'Feet', neck: 'Round the neck', melee: 'Belt' };
+const POCKET_NAME: Record<string, string> = { tags: 'Tag pouch', jacket: 'Jacket', pants: 'Trousers' };
 const KIND: Record<string, string> = { weapon: 'Guns', magazine: 'Magazines', ammo: 'Ammunition', attachment: 'Attachments', melee: 'Melee', clothing: 'Clothing', medical: 'Medical', food: 'Food', drink: 'Drink', tool: 'Tools', stash: 'Containers', misc: 'Other' };
 const KINDS = [...new Set(Object.values(KIND))];
 
@@ -200,6 +206,14 @@ export class AdminUI {
     this.self = self;
     if (this.isOpen && !same) this.draw();
   }
+
+  /** what somebody carries has come from the server (asked for with `/pockets`) */
+  setPockets(m: Pockets) {
+    this.pockets = m;
+    if (this.isOpen && this.sub === 'pockets') this.draw(true);
+  }
+  private pockets: Pockets | null = null;
+  private pocketsAsked = 0;
 
   setLists(l: AdminLists) {
     this.lists = l;
@@ -352,6 +366,7 @@ export class AdminUI {
     if (this.view === 'roles') return `${base}|${JSON.stringify(this.lists.roles)}`;
     if (this.sub === 'items') return `${base}|${this.kind}|${this.count}|${this.fed}|${Object.keys(this.pictures).length}`;
     if (this.sub === 'kits') return base;
+    if (this.sub === 'pockets') return `${base}|${this.pockets?.id}|${JSON.stringify(this.pockets?.inv ?? null).length}|${Object.keys(this.pictures).length}`;
     return `${base}|${p ? [p.role, p.muted, p.god, p.hidden, p.clip, p.voidInv, p.voidTag, p.alive].join() : ''}|${this.mine ? [s.god, s.hidden, s.clip, s.voidInv, s.voidTag, s.night, s.freecam, s.tint].join() : ''}`;
   }
 
@@ -367,8 +382,8 @@ export class AdminUI {
       this.draw(true);
     }, `sub${this.sub === id ? ' on' : ''}`, ic);
     tabs.append(tab('actions', this.mine ? 'Powers and travel' : 'Actions', this.mine ? 'bolt' : 'user'));
-    if (this.admin) tabs.append(tab('items', 'Give items', 'box'), tab('kits', 'Kits', 'pack'));
-    const part = this.sub === 'items' && this.admin ? this.items(p) : this.sub === 'kits' && this.admin ? this.kits(p) : this.mine ? this.me() : this.actions(p);
+    if (this.admin) tabs.append(tab('pockets', 'Inventory', 'pack'), tab('items', 'Give items', 'box'), tab('kits', 'Kits', 'pack'));
+    const part = this.sub === 'items' && this.admin ? this.items(p) : this.sub === 'kits' && this.admin ? this.kits(p) : this.sub === 'pockets' && this.admin ? this.carried(p) : this.mine ? this.me() : this.actions(p);
     return [tabs, ...part];
   }
 
@@ -649,20 +664,22 @@ export class AdminUI {
     ));
     // the colour of the word ADMIN before this admin's name in the chat: the rainbow, or one of their own
     const tag = el('div', 'adm-line');
-    const sample = el('span', `adm-tag${s.tint ? '' : ' rgb'}`, '[ADMIN]');
-    if (s.tint) sample.style.color = s.tint;
+    const off = s.tint === 'off';
+    const sample = el('span', `adm-tag${s.tint ? '' : ' rgb'}${off ? ' off' : ''}`, '[ADMIN]');
+    if (s.tint && !off) sample.style.color = s.tint;
     const colour = el('input', 'adm-colour');
     colour.type = 'color';
-    colour.value = s.tint ?? '#c8a8ff';
+    colour.value = s.tint && !off ? s.tint : '#c8a8ff';
     colour.onchange = () => this.act.tint(colour.value);
-    tag.append(sample, this.button('RGB', () => this.act.tint(null), s.tint ? '' : 'on'),
+    // (no tag at all: read as anybody is where everybody talks; the staff channel still says who is who)
+    tag.append(sample, this.button('No tag', () => this.act.tint(off ? null : 'off'), off ? 'on' : '', 'x'), this.button('RGB', () => this.act.tint(null), s.tint ? '' : 'on'),
       ...['#ff5a4d', '#ffb02e', '#ffe45c', '#5fe36b', '#35d6ff', '#6f8cff', '#c97bff', '#ffffff'].map((c) => {
         const b = this.button('', () => this.act.tint(c), `swatch${s.tint === c ? ' on' : ''}`);
         b.style.background = c;
         b.title = c;
         return b;
       }), colour);
-    grid.append(this.card('Your tag in the chat', 'star', tag, el('div', 'dim', 'The colour of the word ADMIN before your name.')));
+    grid.append(this.card('Your tag in the chat', 'star', tag, el('div', 'dim', 'The colour of the word ADMIN before your name, or no tag at all. In the staff channel (Tab, in the chat box) you are always named as what you are.')));
     return [grid];
   }
 
@@ -746,8 +763,7 @@ export class AdminUI {
   }
 
   private kits(p: Player): HTMLElement[] {
-    const grid = el('div', 'adm-kits');
-    for (const k of KITS) {
+    const kit = (k: (typeof KITS)[number]) => {
       const c = el('div', 'adm-kit');
       const strip = el('div', 'adm-strip');
       for (const id of [...new Set(k.things.map((t) => t.id))].slice(0, 12)) {
@@ -760,11 +776,83 @@ export class AdminUI {
         img.draggable = false;
         strip.append(img);
       }
-      const b = this.button(`Give ${k.name} to ${this.mine ? 'me' : p.name}`, () => this.send(`/kit ${k.id}${this.ref}`), 'good wide', 'pack');
-      c.append(el('b', '', k.name), el('small', k.adds ? 'adds' : '', k.adds ? 'Added to what is carried' : 'Takes the place of what is carried'), el('p', '', k.does), strip, b);
-      grid.append(c);
+      const b = this.button(`${k.adds ? 'Add' : 'Give'} ${k.name} to ${this.mine ? 'me' : p.name}`, () => this.send(`/kit ${k.id}${this.ref}`), 'good wide', 'pack');
+      c.append(el('b', '', k.name), el('small', k.adds ? 'adds' : '', k.adds ? 'Added to what is carried' : 'Takes the place of everything carried and worn'), el('p', '', k.does), strip, b);
+      return c;
+    };
+    // (Those that take the place of everything, and apart from them what is only added: one click on "Supplies" after a
+    // kit left both in the pockets, and read as a kit that had not taken the last one's place.)
+    const sets = el('div', 'adm-kits'), adds = el('div', 'adm-kits');
+    sets.append(...KITS.filter((k) => !k.adds).map(kit));
+    adds.append(...KITS.filter((k) => k.adds).map(kit));
+    const none = this.line(this.grave('clear', `Empty everything ${this.mine ? 'I carry' : `${p.name} carries`}`, () => this.send(`/clear${this.ref}`), 'trash'), el('span', 'dim', 'Pockets, packs, what is worn and what is held: all of it gone. Dog tags are kept.'));
+    return [this.forWhom(p, 'A kit, in one click, for'), el('div', 'adm-h', 'Sets: each takes the place of everything carried and worn'), sets, el('div', 'dim', 'Clicked again, it is the same kit made new. Dog tags are kept. What finds no room is put at the feet.'),
+      el('div', 'adm-h', 'Added to what is carried'), adds, el('div', 'adm-h', 'Nothing at all'), none];
+  }
+
+  // ---------------------------------------------------------------- what somebody carries
+
+  /** Everything somebody has on them, thing by thing, as the server last had it from their game: worn, slung, in each pocket, and in whatever is in those. A thing hovered over has a bin on it. */
+  private carried(p: Player): HTMLElement[] {
+    const who = this.target, m = this.pockets?.id === who ? this.pockets : null;
+    // (asked for when the tab is opened on somebody, and again whenever it is opened on them after a few seconds)
+    if (!m || Date.now() - this.pocketsAsked > 4000) {
+      this.pocketsAsked = Date.now();
+      this.act.order(`/pockets${this.ref}`);
     }
-    return [this.forWhom(p, 'A kit, in one click, for'), grid, el('div', 'dim', 'A kit takes the place of what is carried (dog tags are kept), and clicked again it is the same kit made new. What finds no room is put at the feet.')];
+    const head = this.line(this.button('Look again', () => {
+      this.pocketsAsked = Date.now();
+      this.act.order(`/pockets${this.ref}`);
+    }, '', 'eye'), this.grave('clear', 'Empty everything', () => {
+      this.send(`/clear${this.ref}`);
+      window.setTimeout(() => this.act.order(`/pockets${this.ref}`), 900);
+    }, 'trash'), el('span', 'dim', 'What their game last told the server. Point at a thing and press the bin to take it away for good.'));
+    if (!m) return [this.forWhom(p, 'Everything carried by'), head, el('div', 'adm-empty', 'Asking the server…')];
+    if (!m.inv) return [this.forWhom(p, 'Everything carried by'), head, el('div', 'adm-empty', 'The server has not been told what they carry yet.')];
+    const tile = (it: ItemInstance, where: string) => {
+      const d = ITEMS[it.id], t = el('div', 'adm-item adm-held');
+      const count = d?.stack && it.qty > 1 ? `×${it.qty}` : it.loaded !== undefined ? `${it.loaded} in it` : it.rounds !== undefined ? `${it.rounds} rounds` : '';
+      t.title = `${d?.name ?? it.id}${count ? `  ·  ${count}` : ''}${it.mods?.length ? `  ·  ${it.mods.map((x) => ITEMS[x]?.name ?? x).join(', ')}` : ''}  ·  ${where}`;
+      const pic = this.pictures[it.id];
+      if (pic) {
+        const img = el('img');
+        img.draggable = false;
+        img.src = pic;
+        img.alt = '';
+        t.append(img);
+      } else t.append(icon('box', 'huge'));
+      t.append(el('span', '', d?.name ?? it.id));
+      if (count) t.append(el('i', 'adm-qty', count));
+      const bin = el('button', 'adm-bin');
+      bin.title = `Take the ${d?.name ?? it.id} away`;
+      bin.append(icon('trash'));
+      bin.onclick = () => {
+        t.classList.add('going');
+        this.act.order(`/trash #${who} ${it.uid}`);
+      };
+      t.append(bin);
+      return t;
+    };
+    /** a thing, and under it whatever is in it */
+    const out: HTMLElement[] = [];
+    const group = (title: string, items: ItemInstance[], note = '') => {
+      if (!items.length) return;
+      const g = el('div', 'adm-pocket'), grid = el('div', 'adm-grid held');
+      g.append(el('div', 'adm-h', `${title}  ·  ${items.length}${note ? `  ·  ${note}` : ''}`), grid);
+      for (const it of items) grid.append(tile(it, title));
+      out.push(g);
+    };
+    const slots = Object.entries(m.inv.slots).filter(([, it]) => it) as [string, ItemInstance][];
+    group('Worn, slung and held', slots.map(([, it]) => it), slots.map(([k]) => SLOT_NAME[k] ?? k).filter((v, i, all) => all.indexOf(v) === i).join(', '));
+    for (const [, it] of slots) if (it.cargo?.length) group(`In the ${(ITEMS[it.id]?.name ?? it.id).toLowerCase()}`, it.cargo.map((q) => q.item));
+    for (const c of m.inv.containers) {
+      group(POCKET_NAME[String(c.id)] ?? String(c.id), c.items);
+      for (const it of c.items) if (it.cargo?.length) group(`In the ${(ITEMS[it.id]?.name ?? it.id).toLowerCase()}`, it.cargo.map((q) => q.item));
+    }
+    if (!out.length) out.push(el('div', 'adm-empty', 'Nothing at all.'));
+    const list = el('div', 'adm-pockets');
+    list.append(...out);
+    return [this.forWhom(p, 'Everything carried by'), head, list];
   }
 
   // ---------------------------------------------------------------- the server's own pages

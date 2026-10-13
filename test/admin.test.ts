@@ -363,6 +363,37 @@ await withServer(async () => {
   checks++;
   console.log('  ok  what is said to everybody reaches everybody; a private word reaches one; two orders at once are two orders');
 
+  // ---- the staff channel, the tag put off, a kit of nothing, and a thing taken out of somebody's pockets
+  {
+    const from = { late: late.got.length, fay: fay.got.length, ann: ann.got.length };
+    ann.send({ t: 'chat', ch: 'staff', text: 'for staff only' });
+    late.send({ t: 'chat', ch: 'staff', text: 'let me in' });
+    await sleep(600);
+    assert.ok(fay.got.slice(from.fay).some((m) => m.t === 'chat' && m.ch === 'staff' && m.text === 'for staff only' && m.role === 'admin'), 'what one of the staff said to the staff did not reach another of them');
+    assert.ok(!late.got.slice(from.late).some((m) => m.t === 'chat' && m.ch === 'staff'), 'somebody with no role heard the staff');
+    assert.ok(!fay.got.slice(from.fay).some((m) => m.t === 'chat' && m.text === 'let me in'), 'somebody with no role spoke on the staff channel');
+    ann.send({ t: 'tint', color: 'off' });
+    await sleep(900);
+    ann.send({ t: 'chat', ch: 'global', text: 'said as anybody' });
+    await sleep(600);
+    const plain = late.got.slice(from.late).find((m) => m.t === 'chat' && m.text === 'said as anybody') as { role?: string } | undefined;
+    assert.ok(plain && plain.role === undefined, 'an admin who put their tag off was still said to be one');
+    ann.send({ t: 'tint', color: null });
+    await sleep(900);
+    ann.send({ t: 'chat', ch: 'global', text: 'said as an admin' });
+    await sleep(600);
+    assert.ok(late.got.slice(from.late).some((m) => m.t === 'chat' && m.text === 'said as an admin' && m.role === 'admin'), 'the tag did not come back');
+    assert.match(await ann.order(`/clear #${late.id}`), /carries nothing now/);
+    const kit = late.got.slice(from.late).filter((m) => m.t === 'kit').pop() as { name: string; items: unknown[]; adds?: true } | undefined;
+    assert.ok(kit && kit.name === '' && kit.items.length === 0 && !kit.adds, 'emptying somebody was not a kit of nothing in place of what they carry');
+    assert.match(await late.order('/clear'), /Only an admin|not a thing you can do/);
+    assert.match(await ann.order(`/trash #${late.id} no-such-thing`), /does not carry that/);
+    await ann.order(`/pockets #${late.id}`);
+    assert.ok(ann.got.slice(from.ann).some((m) => m.t === 'inv' && m.id === late.id), 'what somebody carries was not sent to the admin who asked');
+    checks++;
+    console.log('  ok  the staff channel is the staff’s alone; a tag put off is off; everything emptied is a kit of nothing; pockets are sent to the admin who asks');
+  }
+
   // ---- taken out of the world by an admin: a thing on the ground; and a restart said to everybody
   const at = ann.got.filter((m) => m.t === 'welcome').pop() as unknown as { spawn: { x: number; z: number } };
   // (she has been about: she says where she stands, and puts it down there)

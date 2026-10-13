@@ -36,6 +36,7 @@ export const ORDERS: Order[] = [
   { name: 'tp', args: ['x', 'z'], does: 'Go to a place by its numbers (or right-click the map)', admin: true },
   { name: 'give', args: ['item', '[count]', '[who]'], does: 'Put a thing at your feet, or at somebody’s', admin: true },
   { name: 'kit', args: ['kit', '[who]'], does: 'A whole set of the best there is, in place of what is carried', admin: true },
+  { name: 'clear', args: ['[who]'], does: 'Empty everything you carry and wear, or somebody else’s (dog tags are kept)', admin: true },
   { name: 'heal', args: ['[who]'], does: 'Whole, fed and watered: you, or somebody', admin: true },
   { name: 'slay', args: ['who'], does: 'Kill somebody where they stand', admin: true },
   { name: 'die', args: [], does: 'Kill yourself where you stand', admin: true },

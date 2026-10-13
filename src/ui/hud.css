@@ -401,6 +401,10 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 .chat-ch { font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; }
 .chat-ch[data-ch='global'] { color: #7fb4ee; }
 .chat-ch[data-ch='near'] { color: #e9d98a; }
+.chat-ch[data-ch='staff'] { color: #c8a8ff; }
+.chat-line[data-ch='staff'] i, .chat-line[data-ch='staff'] b { color: #c8a8ff; }
+.chat-line[data-ch='staff'] span { color: #ece2ff; }
+.chat-entry:has(.chat-ch[data-ch='staff']) { border-left-color: #c8a8ff; }
 .chat-entry:has(.chat-ch[data-ch='global']) { border-left-color: #7fb4ee; }
 .chat-entry:has(.chat-ch[data-ch='near']) { border-left-color: #e9d98a; }
 .chat-input { flex: 1; min-width: 0; font-family: var(--font); font-size: 15px; color: var(--ink); background: transparent; border: 0; outline: none; }

@@ -161,6 +161,23 @@ function* things(inv: SerializedInventory | null): Generator<ItemInstance> {
   for (const cont of inv.containers) for (const it of cont.items) yield* walk(it);
 }
 const invented = (it: ItemInstance) => GUARDED.has(it.id) && !issued.has(it.uid);
+/** Things taken out of a set of pockets, wherever in them they are: worn, in a pocket, or in something that is. */
+function takeOut(inv: SerializedInventory | null, gone: Set<string>) {
+  if (!inv) return;
+  const strip = (it: ItemInstance | null | undefined) => {
+    if (!it?.cargo) return;
+    it.cargo = it.cargo.filter((p) => !gone.has(p.item.uid));
+    for (const p of it.cargo) strip(p.item);
+  };
+  for (const [slot, it] of Object.entries(inv.slots)) {
+    if (it && gone.has(it.uid)) (inv.slots as Record<string, ItemInstance | null>)[slot] = null;
+    else strip(it);
+  }
+  for (const cont of inv.containers) {
+    cont.items = cont.items.filter((it) => !gone.has(it.uid));
+    for (const it of cont.items) strip(it);
+  }
+}
 
 /** (what is kept is listed further down: until that list is made, nothing has changed that it does not know of) */
 let keptListed = false;
@@ -1731,6 +1748,36 @@ async function command(c: Client, line: string) {
       send(t, { t: 'kit', name: kit.name, items, ...(kit.adds ? { adds: true as const } : {}), ...(t === c ? {} : { by: c.name }) });
       return void sys(c, `${t === c ? 'You have' : `${t.name} has`} the ${kit.name} kit.`);
     }
+    case 'clear': {
+      if (!admin) return need();
+      const t = rest[0] ? whoIs(rest[0]) : c;
+      if (!t) return void sys(c, `Nobody online is "${rest[0]}" (or more than one is): see /players.`);
+      if (!t.alive) return void sys(c, `${t === c ? 'You are' : `${t.name} is`} dead: there is nothing on them to empty.`);
+      // (a kit of nothing: what is carried and worn goes, as it does for any kit, and nothing comes in its place)
+      log(`[admin] ${c.name} emptied what ${t === c ? 'they' : t.name} carried`);
+      send(t, { t: 'kit', name: '', items: [], ...(t === c ? {} : { by: c.name }) });
+      return void sys(c, `${t === c ? 'You carry' : `${t.name} carries`} nothing now (dog tags are kept).`);
+    }
+    case 'pockets': {
+      // (the panel's own order: what somebody carries, thing by thing, for its Inventory tab. /inv says it in words.)
+      if (!admin) return need();
+      const t = rest[0] ? whoIs(rest[0]) : c;
+      if (!t) return void sys(c, `Nobody online is "${rest[0]}" (or more than one is): see /players.`);
+      return void send(c, { t: 'inv', id: t.id, name: t.name, inv: t.inv });
+    }
+    case 'trash': {
+      // (the panel's own order: a thing, by its number, taken out of what somebody carries)
+      if (!admin) return need();
+      const t = rest[1] ? whoIs(rest[0]) : c, uid = rest[1] ?? rest[0] ?? '';
+      if (!t || !uid) return void sys(c, 'Whose, and which thing: /trash who thing (the panel writes this for you).');
+      const had = [...things(t.inv)].find((it) => it.uid === uid);
+      if (!had) return void sys(c, `${t === c ? 'You do' : `${t.name} does`} not carry that any more.`);
+      takeOut(t.inv, new Set([uid]));
+      log(`[admin] ${c.name} took ${ITEMS[had.id]?.name ?? had.id} out of what ${t === c ? 'they' : t.name} carried`);
+      send(t, { t: 'trash', uids: [uid], ...(t === c ? {} : { by: c.name }) });
+      send(c, { t: 'inv', id: t.id, name: t.name, inv: t.inv });
+      return void sys(c, `${ITEMS[had.id]?.name ?? had.id}: gone from what ${t === c ? 'you carry' : `${t.name} carries`}.`);
+    }
     case 'heal': {
       if (!admin) return need();
       const t = who ? whoIs(who) : c;
@@ -2813,20 +2860,31 @@ function handle(c: Client, m: C2S) {
       if (text.startsWith('/')) return void command(c, text).catch((e) => log('[admin] an order failed:', e instanceof Error ? e.message : e));
       const quiet = ADMIN.muted.get(c.key) ?? 0;
       if (quiet > now) return void sys(c, `You are muted for ${Math.ceil((quiet - now) / 60000)} more minutes: what you type and say reaches nobody.`);
+      // (the word before a name: their role, in the colour they chose; or nothing, for an admin who has put the tag off)
+      const worn = ADMIN.tints.get(c.id), badge = worn === 'off' ? {} : { role: roleOf(c) ?? undefined, tint: worn };
+      if (m.ch === 'staff') {
+        // those with a role, to one another, wherever they are: nobody else is sent it, or told that anything was said
+        if (!roleOf(c)) return;
+        const out: S2C = { t: 'chat', ch: 'staff', from: c.name, text, role: roleOf(c) ?? undefined, ...(worn && worn !== 'off' ? { tint: worn } : {}) };
+        for (const o of clients.values()) if (roleOf(o)) send(o, out);
+        return;
+      }
       if (m.ch === 'near') {
         // proximity: only players standing within earshot get it (the speaker included)
-        const out: S2C = { t: 'chat', ch: 'near', from: c.name, text, role: roleOf(c) ?? undefined, tint: ADMIN.tints.get(c.id) };
+        const out: S2C = { t: 'chat', ch: 'near', from: c.name, text, ...badge };
         for (const o of clients.values()) {
           if (Math.hypot(o.pose[0] - c.pose[0], o.pose[1] - c.pose[1], o.pose[2] - c.pose[2]) <= CHAT_RANGE) send(o, out);
         }
-      } else broadcast({ t: 'chat', ch: 'global', from: c.name, text, role: roleOf(c) ?? undefined, tint: ADMIN.tints.get(c.id) });
+      } else broadcast({ t: 'chat', ch: 'global', from: c.name, text, ...badge });
       return;
     }
     case 'admin':
       return void login(c, m.pw).catch(() => sys(c, 'The site did not answer: try again in a minute.'));
     case 'tint': {
       if (roleOf(c) !== 'admin') return;
-      if (typeof m.color === 'string' && /^#[0-9a-f]{6}$/i.test(m.color)) ADMIN.tints.set(c.id, m.color.toLowerCase());
+      // ('off': no tag at all before their name where everybody talks: they are read as anybody is)
+      if (m.color === 'off') ADMIN.tints.set(c.id, 'off');
+      else if (typeof m.color === 'string' && /^#[0-9a-f]{6}$/i.test(m.color)) ADMIN.tints.set(c.id, m.color.toLowerCase());
       else ADMIN.tints.delete(c.id);
       return;
     }

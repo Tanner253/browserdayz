@@ -17,7 +17,8 @@ import type { IState, InfectedInfo } from '../sim/infected';
 export const PROTOCOL = 33;
 
 /** chat channels: everyone on the server, or only players standing near the speaker */
-export type ChatChannel = 'global' | 'near';
+/** `staff`: those with a role, to one another, wherever they are: nobody else is sent it */
+export type ChatChannel = 'global' | 'near' | 'staff';
 /** how far proximity chat carries, metres */
 export const CHAT_RANGE = 50;
 
@@ -276,6 +277,10 @@ export type S2C =
   | { t: 'cashed'; id: number; name: string; owner: string }
   /** these tags of yours are void: you carried them out of the Zona (see TAG_OUT) */
   | { t: 'void'; uids: string[] }
+  /** to an admin who asked: what somebody carries, as the server last had it from their game */
+  | { t: 'inv'; id: number; name: string; inv: SerializedInventory | null }
+  /** an admin has taken these things out of what this player carries: they are gone */
+  | { t: 'trash'; uids: string[]; by?: string }
   /**
    * The leaderboard: the top five since the server started, as [name, kills, tags cashed in],
    * where this player stands in the whole list (-1 = not on it yet) and their own two counts.

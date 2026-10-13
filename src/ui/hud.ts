@@ -15,7 +15,7 @@ import { GAS } from '../sim/gas';
 import { AO_MODES, DEFAULT_GRAPHICS, FPS_LIMITS, LEVELS, MSAA, PRESETS, SCALES, VOLUMES, presetOf, saveGraphics, type Graphics, type PresetName } from '../core/settings';
 
 const CHANNELS: ChatChannel[] = ['global', 'near'];
-const CHANNEL_LABEL: Record<ChatChannel | 'system' | 'pm', string> = { global: 'Global', near: 'Proximity', system: '', pm: 'To you' };
+const CHANNEL_LABEL: Record<ChatChannel | 'system' | 'pm', string> = { global: 'Global', near: 'Proximity', staff: 'Staff', system: '', pm: 'To you' };
 
 const ICONS = {
   health: '<path d="M12 21s-7-4.5-9.5-9A5.5 5.5 0 0 1 12 6a5.5 5.5 0 0 1 9.5 6C19 16.5 12 21 12 21z"/>',
@@ -281,7 +281,11 @@ export class HUD {
         e.preventDefault();
         // an order being typed: the one that is lit is written out. Talk: same box, different audience
         if (picks.length) this.take(picks[this.lit]);
-        else if (!this.offered) this.setChannel(CHANNELS[(CHANNELS.indexOf(this.channel) + (e.shiftKey ? CHANNELS.length - 1 : 1)) % CHANNELS.length]);
+        else if (!this.offered) {
+          // (Tab goes round them; whoever has a role has a third, heard by nobody without one)
+          const all: ChatChannel[] = this.role ? [...CHANNELS, 'staff'] : CHANNELS;
+          this.setChannel(all[(Math.max(0, all.indexOf(this.channel)) + (e.shiftKey ? all.length - 1 : 1)) % all.length]);
+        }
       } else if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && picks.length) {
         e.preventDefault();
         this.lit = (this.lit + (e.key === 'ArrowDown' ? 1 : picks.length - 1)) % picks.length;
