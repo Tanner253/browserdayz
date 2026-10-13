@@ -67,7 +67,20 @@ const RUN_MS = 5600;
 async function siteStatus() {
   const s = (await (await fetch('/api/cashins?format=status')).json()) as { on?: boolean; tagPays?: number | null; share?: number; floor?: number; due?: boolean };
   if (s.due) void fetch('/api/tick').catch(() => {});
+  pays = s.on && typeof s.tagPays === 'number' ? s.tagPays : null;
+  for (const f of told) f(pays);
   return s;
+}
+/**
+ * What a tag pays at this moment, in SOL, told to whoever wants it each time the site is asked (and at once, with
+ * what was last heard): the Payouts button of the main menu says it. Nothing more is asked of the site for this
+ * than was asked already. null: the site is not paying, or there is none behind this page.
+ */
+let pays: number | null = null;
+const told: ((sol: number | null) => void)[] = [];
+export function onTagPay(f: (sol: number | null) => void) {
+  told.push(f);
+  f(pays);
 }
 // (asked when the game is opened, and every ten minutes while it stays open)
 void siteStatus().catch(() => {});

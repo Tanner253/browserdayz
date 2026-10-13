@@ -706,7 +706,7 @@ async function step(i: number) {
 
 let muxer: Muxer<ArrayBufferTarget> | null = null;
 let venc: VideoEncoder | null = null;
-let take = { first: 0, last: 0, width: 1920, height: 1080 };
+let take: { first: number; last: number; width: number; height: number; audio?: number } = { first: 0, last: 0, width: 1920, height: 1080 };
 let pieces: string[] = [];
 
 tr.info = () => {
@@ -715,7 +715,7 @@ tr.info = () => {
   return { gpu: ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : 'unknown', seconds, shots: shots.map((s) => [s.name, s.start, s.end]) };
 };
 
-tr.begin = async (o: { fps: number; first: number; last: number; width: number; height: number; video: boolean; bitrate?: number }) => {
+tr.begin = async (o: { fps: number; first: number; last: number; width: number; height: number; video: boolean; bitrate?: number; audio?: number }) => {
   fps = o.fps;
   take = o;
   soundLog.length = 0;
@@ -798,7 +798,7 @@ tr.finish = async () => {
   const buf = await renderSound();
   const SR = 48000;
   const aenc = new AudioEncoder({ output: (chunk, meta) => muxer!.addAudioChunk(chunk, meta), error: (e) => console.error('[tr] audio encoder', e.message) });
-  aenc.configure({ codec: 'mp4a.40.2', sampleRate: SR, numberOfChannels: 2, bitrate: 192_000 });
+  aenc.configure({ codec: 'mp4a.40.2', sampleRate: SR, numberOfChannels: 2, bitrate: take.audio ?? 192_000 });
   const a = Math.round((take.first / fps) * SR), b = Math.min(buf.length, Math.round((take.last / fps) * SR));
   const L = buf.getChannelData(0), R = buf.getChannelData(1);
   for (let i = a; i < b; i += 4800) {

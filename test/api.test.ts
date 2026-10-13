@@ -105,7 +105,7 @@ await test('the page, the data behind it, and what the game is told', async () =
   w.chain.rewards = SOL(0.03);
   const html = await (await show(new Request('https://site.test/payouts'), w)).text();
   if (process.argv[2]) writeFileSync(process.argv[2], html);
-  for (const want of ['Automatic payouts are on', 'SOL in the treasury', `${TREASURY.address.slice(0, 4)}…${TREASURY.address.slice(-4)}`, 'Sable', 'Brick', '0.2 SOL', 'https://solscan.io/tx/', 'none given', 'not paid: no wallet given', 'listed (payouts were not on)', '0.03 waiting to be collected', 'receipt</a>']) assert.ok(html.includes(want), `the page does not say "${want}"`);
+  for (const want of ['Automatic payouts are on', 'in the treasury', 'How the money moves', 'href="/"', `${TREASURY.address.slice(0, 4)}…${TREASURY.address.slice(-4)}`, 'Sable', 'Brick', '0.2 SOL', 'https://solscan.io/tx/', 'none given', 'not paid: no wallet given', 'listed (payouts were not on)', '0.03 waiting to be collected', 'receipt</a>']) assert.ok(html.includes(want), `the page does not say "${want}"`);
   // (nothing a player typed gets onto the page as markup, and no id or key is on it)
   const evil = tag(w, 3, { name: '<img src=x onerror=1>', owner: '"><script>' });
   known.set(evil.id, evil);
@@ -142,7 +142,7 @@ await test('looking is what sets the collecting off; and however many look, it i
   assert.equal(w.chain.rewards, 0n);
   w.memo = undefined;
   const html = await (await show(new Request('https://site.test/payouts'), w)).text();
-  assert.ok(html.includes('SOL of creator rewards collected') && html.includes('bonding curve') && !html.includes("fetch('/api/tick')"));
+  assert.ok(html.includes('creator rewards collected') && html.includes('bonding curve') && !html.includes("fetch('/api/tick')"));
   assert.equal((await readBook(w.store)).claims.length, 1);
 });
 

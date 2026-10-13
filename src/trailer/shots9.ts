@@ -68,6 +68,16 @@ const MEASURED: { what: string; unit: string; was: number; now: number; d: numbe
   { what: 'FETCHED BEFORE THE MENU', unit: 'MB', was: 133, now: 73, d: 0 },
 ];
 
+/**
+ * Two other cuts of it, by the address (scripts/film.mjs --web, --menu):
+ *   web   the whole film as the site shows it, smaller and lighter: with no grain laid over it (grain is what a
+ *         small file has least room for);
+ *   menu  the pictures the main menu plays between its own scenes (public/menu/story.mp4): eight shots of it with
+ *         none of its words, bands, cards or flashes, and no sound that anybody hears.
+ */
+const ASKED = typeof location !== 'undefined' ? new URLSearchParams(location.search) : new URLSearchParams();
+const WEB = ASKED.has('web'), MENU = ASKED.has('menu');
+const MENU_SHOTS = ['bunker-out', 'wood', 'bury-far', 'bury-near', 'dance', 'hospital', 'roof', 'hq'];
 const ease = (x: number) => { const t = Math.min(1, Math.max(0, x)); return t * t * (3 - 2 * t); };
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 const wrap = (x: number) => Math.atan2(Math.sin(x), Math.cos(x));
@@ -90,6 +100,8 @@ export function buildShots(S: Stage): Shot[] {
   const clock = (window as Any).__clock;
   const wait = (ms: number) => new Promise<void>((r) => clock.real.setTimeout(r, ms));
   document.body.classList.add('tr-cut8', 'tr-cut9');
+  if (WEB) document.body.classList.add('tr-web');
+  if (MENU) document.body.classList.add('tr-menu9');
   const scene = g.s.r.scene as THREE.Scene, camera = g.s.r.camera as THREE.PerspectiveCamera;
   const P = (x: number, z: number, up = 0) => S.at(x, z, up);
   const say = (...a: unknown[]) => console.log('[tr] cut 9:', ...a);
@@ -594,7 +606,9 @@ export function buildShots(S: Stage): Shot[] {
       },
       after: (t, st) => {
         after?.(t, st);
-        look(t, L, s);
+        look(t, L, MENU ? { m: s.m, grid: 0 } : s);
+        // (the menu's cut is its pictures and nothing else)
+        if (MENU) return;
         if (s.chip) {
           show(chip, t);
           show(mark, t);
@@ -1803,6 +1817,28 @@ export function buildShots(S: Stage): Shot[] {
     after: (t) => show(end, t),
     fadeOut: 0.5,
   });
+
+  if (MENU) {
+    // the menu's cut: those shots and no others, one after another from nothing
+    const picked = MENU_SHOTS.map((name) => {
+      const shot = shots.find((q) => q.name === name);
+      if (!shot) throw new Error(`the menu's cut wants a shot called ${name}, and there is none`);
+      return shot;
+    });
+    let t = 0;
+    for (const shot of picked) {
+      const len = shot.end - shot.start;
+      shot.start = t;
+      shot.end = t + len;
+      shot.bars = false;
+      shot.titles = [];
+      t += len;
+    }
+    seconds9 = t;
+    ROWS = Array.from({ length: Math.round(t / BAR9) }, (): Row9 => ({ kind: 'card' }));
+    say(`for the menu: ${picked.length} shots, ${t.toFixed(1)} s (${picked.map((q) => `${q.name} from ${q.start}`).join(', ')})`);
+    return picked;
+  }
 
   // ------------------------------------------------------------ the score, from the shots
   if (!Number.isInteger(cur)) throw new Error(`the film is ${cur} bars long: the score wants a whole number`);

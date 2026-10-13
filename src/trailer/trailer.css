@@ -534,3 +534,7 @@ body.tr-cut9 .tr-title.gold { top: 30%; font-size: 17vh; font-weight: 800; lette
 .n9-kick { padding: 0.4em 1em 0.4em 1.4em; font-size: 2.2vh; font-weight: 700; letter-spacing: 0.5em; color: #14110b; background: #ffd35a; white-space: nowrap; }
 .n9-line { padding-left: 0.5em; border-left: 0.14em solid #ffd35a; font-size: 6.2vh; line-height: 1.05; font-weight: 800; font-stretch: condensed; letter-spacing: 0.1em; color: #f3efe6; white-space: nowrap;
   opacity: var(--in, 0); transform: translateX(calc((1 - var(--in, 0)) * -2vw)); }
+
+/* (the ninth film as the site shows it: no grain, which a small file has least room for; and as the menu plays it: its pictures, with nothing of the film's own laid over them) */
+body.tr-web .tr-grain4 { display: none; }
+body.tr-menu9 .tr-gfx, body.tr-menu9 .tr-title, body.tr-menu9 .x8-grid, body.tr-menu9 .tr-grain4, body.tr-menu9 .tr-vig4, body.tr-menu9 .tr-black4, body.tr-menu9 .tr-flash4 { display: none !important; }
