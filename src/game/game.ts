@@ -101,7 +101,8 @@ export interface WorldSystems {
 /** seconds with a shovel to put a stash under the ground, or to bring one up */
 const DIG_SECONDS = BURY.seconds;
 /** how far off an admin's free camera shows a name over a head at its full strength, metres: further off it is there still, and faint */
-const ESP_RANGE = 220;
+// (an admin's far sight: lettering this big within ESP_NEAR metres, shrinking to this small at ESP_FAR and beyond)
+const ESP_SIZE = [15, 9.5], ESP_NEAR = 20, ESP_FAR = 500;
 
 interface TimedAction {
   label: string;
@@ -744,7 +745,18 @@ export class Game {
       this.map.onClose = () => this.toggleMap(false);
       document.getElementById('ui')!.appendChild(this.map.root);
       // the panel of whoever has a role (shut and empty for everybody else)
-      this.adminUI = new AdminUI(spots.filter((s) => s.kind !== 'well').map((s) => ({ name: s.name, x: s.x, z: s.z })), {
+      // (the starts are all "A start" on the map: in the panel each is told by the side of the valley it is on and
+      // the nearest place with a name. 2026-10-13: "we need to rename the starts locations theyre all A start".)
+      const SIDES = ['North', 'North-east', 'East', 'South-east', 'South', 'South-west', 'West', 'North-west'];
+      const named = spots.filter((s) => s.kind !== 'well' && s.kind !== 'spawn');
+      const seen = new Map<string, number>();
+      const starts = spots.filter((s) => s.kind === 'spawn').map((s) => {
+        const by = named.reduce((a, b) => (Math.hypot(b.x - s.x, b.z - s.z) < Math.hypot(a.x - s.x, a.z - s.z) ? b : a));
+        const name = `${SIDES[(Math.round((Math.atan2(s.x, -s.z) / (Math.PI * 2)) * 8) + 8) % 8]} edge, by ${by.name}`;
+        seen.set(name, (seen.get(name) ?? 0) + 1);
+        return { name: seen.get(name)! > 1 ? `${name} (${seen.get(name)})` : name, x: s.x, z: s.z, kind: 'spawn' };
+      }).sort((a, b) => a.name.localeCompare(b.name));
+      this.adminUI = new AdminUI([...named.map((s) => ({ name: s.name, x: s.x, z: s.z, kind: s.kind as string })), ...starts], {
         order: (line) => this.order(line),
         ask: () => {
           if (this.online && this.role) this.net.send({ t: 'adm' });
@@ -1363,6 +1375,17 @@ export class Game {
     const { world, buildings } = this.s;
     // the server's hour, from which this game's clock runs on
     if (typeof w.hour === 'number') this.hourBase = { phase: w.hour, at: performance.now() };
+    // Nothing of this game's own making is in a server's world: whatever it laid out or packed by itself is taken
+    // up before the server's is put down. (Picked up, a thing the server had never heard of was refused, and
+    // vanished from the hands: "when i shift click from vicinity into my inventory sometimes the item
+    // disappears". And if it was a gun or armour, the player was written down as carrying what "the server never
+    // put in the world": nobody had cheated.)
+    for (const uid of [...this.economy.loot.keys()]) this.economy.take(uid);
+    for (const c of this.loot.crates) {
+      c.container.load({ items: [] } as never);
+      c.known = false;
+      c.emptiedAt = -1;
+    }
     for (const l of w.loot) this.economy.inject(l);
     for (const [i, open, swing] of w.doors) buildings.doors[i]?.setOpen(open, swing);
     for (const s of w.stashes) await this.addRemoteStash(s);
@@ -1454,7 +1477,10 @@ export class Game {
     net.on('barrel+', (m) => this.s.veg.barrels[m.i]?.setThere(true));
     net.on('fire', (m) => this.fires.set(m.i, m.left));
     net.on('bunker', (m) => this.bunker.setOpen(m.open));
-    net.on('gear', (m) => this.remotes.get(m.id) && void this.wear(this.remotes.get(m.id)!.avatar, m.g));
+    net.on('gear', (m) => {
+      this.gearOf.set(m.id, m.g);
+      if (this.remotes.get(m.id)) void this.wear(this.remotes.get(m.id)!.avatar, m.g);
+    });
     net.on('back', (m) => this.remotes.get(m.id)?.avatar.setSlung(this.weapons.slungOf(m.b)));
     net.onVoice = (packet) => this.voice.hear(packet);
     net.on('dmg', (m) => this.takeHit(m));
@@ -1495,7 +1521,7 @@ export class Game {
       this.pendingTakes.delete(m.uid);
       if (this.inv.find((i) => i === t.item)) this.inv.remove(t.item);
       else this.inv.take(t.id, t.qty);
-      this.hud.note('Someone else took it first', 'warn');
+      this.hud.note('That could not be taken: somebody else has it, or it is out of reach', 'warn');
       this.inventoryChanged();
       if (this.invUI.isOpen) this.invUI.render();
     });
@@ -1589,7 +1615,9 @@ export class Game {
       this.adminUI.say(m.text);
     });
     net.on('adm', (m) => {
+      this.admPlayers = new Map(m.players.map((q) => [q.id, q]));
       this.adminUI.setLists(m);
+      void this.drawHeads(m.players);
       // (and an admin's map shows where everybody is)
       if (this.role === 'admin') this.map.setPeople(m.players.filter((q) => q.id !== net.id).map((q) => ({ x: q.x, z: q.z, name: q.name, dead: !q.alive, faint: !!q.hidden || !!q.asleep, staff: !!q.role })));
     });
@@ -1761,6 +1789,7 @@ export class Game {
     await r.load(this.s.atmo, this.s.r.scene, p.pose);
     r.setWeapon(p.w, p.m);
     void this.wear(r.avatar, p.g ?? []);
+    this.gearOf.set(p.id, p.g ?? []);
     r.setGhost(!!p.hidden);
     r.avatar.setSlung(this.weapons.slungOf(p.b ?? []));
     r.setAlive(p.alive);
@@ -1806,6 +1835,41 @@ export class Game {
     void this.wear(this.avatar, ids);
     this.net.send({ t: 'gear', g: ids });
     this.portrait();
+  }
+
+  /** what each player has on that shows, as the server last said: their picture in the panel wears it */
+  private gearOf = new Map<number, string[]>();
+  /** the lists the panel last had: how much blood each player has is said beside their name in the far view */
+  private admPlayers = new Map<number, { hp?: number; flags: number }>();
+  /** a head drawn, for each name and each set of things worn */
+  private heads = new Map<string, string>();
+  private headsBusy = false;
+  /**
+   * The panel's pictures of who is who: each player's own head, in their own colours, with what they have on it
+   * (2026-10-13: "can we render the players head as profile picture on the left hand screen"). Drawn as the
+   * figure in the inventory is, a few at a time while the panel is open, and none twice.
+   */
+  private async drawHeads(players: { id: number; name: string }[]) {
+    if (this.headsBusy || !this.adminUI?.isOpen) return;
+    this.headsBusy = true;
+    try {
+      const { r, atmo } = this.s, out: Record<number, string> = {};
+      let fresh = 0;
+      for (const q of players) {
+        const mine = q.id === this.net.id;
+        const worn = mine ? (this.gearKey && this.gearKey !== '\u0000' ? this.gearKey.split(',') : []) : this.gearOf.get(q.id) ?? [];
+        const name = mine ? playerName() : q.name, key = `${name}|${worn.join(',')}`;
+        if (!this.heads.has(key) && fresh < 3) {
+          fresh++;
+          this.heads.set(key, await renderDoll(r.renderer, atmo.envMap, lookFor(name), worn, this.loot.models, true).catch(() => ''));
+        }
+        const url = this.heads.get(key);
+        if (url) out[q.id] = url;
+      }
+      this.adminUI.setHeads(out);
+    } finally {
+      this.headsBusy = false;
+    }
   }
 
   /** The figure in the inventory window, drawn again as the player is now: their colours, and what they have on. */
@@ -2565,30 +2629,51 @@ export class Game {
   }
 
   /**
-   * Names over heads, for an admin whose view has left their body: everybody, however far, through whatever is in
-   * the way, with how far off they are (faint past ESP_RANGE). (Asked for 2026-10-12: "when im in freecam or
-   * spectate i should see everyone names in text above their heads once i get close to them"; and the same day,
-   * "i want to see everyone name from the sky from a distance ... like a cheat menu would so i can easily find
-   * people manually": so no distance is too far.)
+   * An admin's far sight: everybody's name where they stand on the screen, through whatever is in the way, however
+   * far off, with how far that is and how much blood they have, and a frame round the body. In the free camera,
+   * and while flying (noclip).
+   *
+   * Asked for four times before it was ever seen (2026-10-12: "when im in freecam or spectate i should see
+   * everyone names"; "i want to see everyone name from the sky from a distance ... like a cheat menu would";
+   * 2026-10-13: "ive asked this like 4x ... when im in freecam or when im no clipping, i want to see the names of
+   * players, from far away ... scale their names to be smaller the farther away from them i am, and limit how big
+   * they get when i get close, think like a cheat engine with wallhacks"). It was drawn from the first day, and
+   * nobody saw it: the HUD is put out of sight while the view is away from the body, and this was a part of the
+   * HUD. (It is left in sight now: see `#hud.hidden` in hud.css.) And it was never on while flying.
    */
   private drawNames(cam: THREE.PerspectiveCamera) {
-    if (!this.freecam || this.role !== 'admin') {
+    if (this.role !== 'admin' || !this.started || !(this.freecam || this.powers.clip)) {
       if (this.namesOn) this.hud.esp([]);
       this.namesOn = false;
       return;
     }
     this.namesOn = true;
-    const out: { x: number; y: number; text: string; faint?: boolean }[] = [], v = new THREE.Vector3();
-    const label = (name: string, at: THREE.Vector3, up: number, more: string, faint: boolean) => {
+    // (blood and flags come with the panel's lists: asked for every three seconds while this is up)
+    const now = performance.now();
+    if (this.online && now - this.espAsked > 3000) {
+      this.espAsked = now;
+      this.net.send({ t: 'adm' });
+    }
+    const out: Parameters<HUD['esp']>[0] = [], v = new THREE.Vector3();
+    const label = (name: string, at: THREE.Vector3, up: number, kind: '' | 'dead' | 'ghost' | 'me', more: string) => {
       const d = at.distanceTo(cam.position);
       v.set(at.x, at.y + up, at.z).project(cam);
       if (v.z < -1 || v.z > 1 || Math.abs(v.x) > 1.05 || Math.abs(v.y) > 1.05) return;
-      out.push({ x: (v.x * 0.5 + 0.5) * 100, y: (-v.y * 0.5 + 0.5) * 100, text: `${name} · ${Math.round(d)} m${more}`, faint: faint || d > ESP_RANGE });
+      const x = (v.x * 0.5 + 0.5) * 100, y = (-v.y * 0.5 + 0.5) * 100;
+      v.set(at.x, at.y, at.z).project(cam);
+      // (the farther off, the smaller the lettering, down to what can still be read; and no bigger than this, however near)
+      const size = ESP_SIZE[0] - (ESP_SIZE[0] - ESP_SIZE[1]) * THREE.MathUtils.clamp(Math.log(Math.max(d, 1) / ESP_NEAR) / Math.log(ESP_FAR / ESP_NEAR), 0, 1);
+      out.push({ x, y, name, sub: `${Math.round(d)} m${more}`, size, h: Math.abs((-v.y * 0.5 + 0.5) * 100 - y) / 100, kind });
     };
-    for (const r of this.remotes.values()) label(r.name, r.pos, r.alive ? 1.95 : 0.5, `${r.alive ? '' : ' · dead'}${r.ghost ? ' · vanished' : ''}`, !r.alive);
-    label('you', this.player.pos, 1.95, '', true);
+    for (const r of this.remotes.values()) {
+      const q = this.admPlayers.get(r.id);
+      label(r.name, r.pos, r.alive ? 1.95 : 0.5, !r.alive ? 'dead' : r.ghost ? 'ghost' : '', `${r.alive ? (q?.hp !== undefined ? ` · ${Math.round(q.hp)} hp` : '') : ' · dead'}${r.ghost ? ' · vanished' : ''}${q?.flags ? ` · ${q.flags} flags` : ''}`);
+    }
+    // (their own body, when the view has left it)
+    if (this.freecam) label('your body', this.player.pos, 1.95, 'me', '');
     this.hud.esp(out);
   }
+  private espAsked = 0;
   private namesOn = false;
   private freeView = (cam: THREE.PerspectiveCamera) => {
     const f = this.freecam;
@@ -4441,7 +4526,10 @@ export class Game {
     // world simulation ticks (the server does this when online)
     this.econT += dt;
     if (this.econT > 5) {
-      if (!this.online && this.started) {
+      // (Alone, and not on the way in to a server. On the bot check's range the game is started and not yet on any
+      // server: until 2026-10-13 its own loot clock ran there, and laid out the whole map's loot, some fourteen
+      // hundred things of its own making, which then lay about among the server's. See `enterOnline`.)
+      if (!this.online && this.started && !this.joining) {
         this.economy.tick(this.econT, [p.pos]);
         this.tickCrates();
         this.tickDrops();

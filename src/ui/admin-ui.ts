@@ -106,6 +106,8 @@ const ICON: Record<string, string> = {
   moon: '<path d="M19 14.5A8 8 0 0 1 9.5 5a8 8 0 1 0 9.5 9.5z"/>',
   flag: '<path d="M6 21V4M6 5h11l-2 4 2 4H6"/>',
   keys: '<path d="M4 7h16v10H4z"/><path d="M7 10.5h1M10.5 10.5h1M14 10.5h1M7.5 14h9"/>',
+  down: '<path d="M6 9l6 6 6-6"/>',
+  right: '<path d="M9 6l6 6-6 6"/>',
 };
 const icon = (name: string, cls = '') => {
   const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -144,7 +146,13 @@ export class AdminUI {
   private where = ['', ''];
   /** a button that has to be pressed twice (a ban, a killing): which, and until when the second press counts */
   private sure: { key: string; until: number } | null = null;
-  private said: string[] = [];
+  private said: { at: number; text: string }[] = [];
+  /** why the server is to restart, for the banner: a box of its own */
+  private restartWhy = '';
+  /** which groups of places to travel to are open */
+  private openPlaces = new Set(['places']);
+  /** each player's head, drawn by the game (see `setHeads`): by their number */
+  private heads: Record<number, string> = {};
   private timer = 0;
   private side = el('div', 'adm-side');
   private head = el('div', 'adm-head');
@@ -155,7 +163,7 @@ export class AdminUI {
   private drawn = '';
   private held = false;
 
-  constructor(private places: { name: string; x: number; z: number }[], private act: AdminActions, private pictures: Record<string, string> = {}) {
+  constructor(private places: { name: string; x: number; z: number; kind?: string }[], private act: AdminActions, private pictures: Record<string, string> = {}) {
     const main = el('div', 'adm-main');
     main.append(this.head, this.body);
     const mid = el('div', 'adm-mid');
@@ -222,9 +230,18 @@ export class AdminUI {
     if (this.isOpen) this.draw();
   }
 
+  /** everybody's head, as the game has drawn them: shown in place of the letter in the round badge */
+  setHeads(heads: Record<number, string>) {
+    const same = Object.keys(heads).length === Object.keys(this.heads).length && Object.entries(heads).every(([id, url]) => this.heads[Number(id)] === url);
+    this.heads = heads;
+    if (!this.isOpen || same) return;
+    if (!this.typing(this.side)) this.drawSide();
+    this.drawHead();
+  }
+
   /** a line the server said back: shown along the bottom */
   say(text: string) {
-    this.said.push(text);
+    this.said.push({ at: Date.now(), text });
     if (this.said.length > 60) this.said.shift();
     if (this.isOpen) this.drawLog();
   }
@@ -302,7 +319,12 @@ export class AdminUI {
     i.autocomplete = 'off';
     i.maxLength = 120;
     i.oninput = () => set(i.value);
-    if (enter) i.onkeydown = (e) => e.key === 'Enter' && enter();
+    // (A handler set as `onkeydown` that answers false stops the key. Written `e.key === 'Enter' && enter()`, this
+    // answered false to every key but Enter: nothing could be typed in any box that sends on Enter. 2026-10-13: "i
+    // am unable to type into the a word for everybody panel ... when i click into the box and type nothing happens".)
+    if (enter) i.onkeydown = (e) => {
+      if (e.key === 'Enter') enter();
+    };
     return i;
   }
 
@@ -323,6 +345,15 @@ export class AdminUI {
   /** who somebody is, in a round badge: their first letter, in the colour of what they are */
   private face(p: Player, big = false) {
     const f = el('span', `adm-face${big ? ' big' : ''}${p.role ? ` ${p.role}` : ''}${p.alive ? '' : ' dead'}`, (p.name === 'You' ? 'Y' : p.name.trim().charAt(0) || '?').toUpperCase());
+    const head = this.heads[p.id];
+    if (head) {
+      const img = el('img');
+      img.src = head;
+      img.alt = '';
+      img.draggable = false;
+      f.classList.add('pic');
+      f.replaceChildren(img);
+    }
     return f;
   }
 
@@ -423,8 +454,10 @@ export class AdminUI {
       if (p.role && !you) name.append(el('em', p.role, p.role === 'admin' ? 'A' : 'M'));
       const under = el('span', 'adm-p-sub');
       const state = !p.alive ? 'dead' : p.asleep ? 'gone, body left' : p.away ? 'tabbed out' : `${p.hp ?? '?'} hp`;
-      under.append(el('span', '', you ? p.name === 'You' ? `#${p.id}` : `${p.name} · #${p.id}` : `#${p.id} · ${state}`));
+      const far = Math.round(Math.hypot(p.x - this.self.x, p.z - this.self.z));
+      under.append(el('span', '', you ? p.name === 'You' ? `#${p.id}` : `${p.name} · #${p.id}` : `#${p.id} · ${state} · ${far} m`));
       text.append(name, under);
+      if (!you) text.append(this.bar01(p.alive ? p.hp ?? 100 : 0, 'thin'));
       r.append(this.face(p), text);
       const marks = el('span', 'adm-marks');
       const mark = (on: boolean | undefined, ic: string, tip: string) => {
@@ -526,6 +559,7 @@ export class AdminUI {
     };
     fact('user', `#${p.id}`);
     fact('pin', `${p.x}, ${p.z}`);
+    if (!this.mine) fact('goto', `${Math.round(Math.hypot(p.x - this.self.x, p.z - this.self.z))} m from you`);
     if (p.mins) fact('clock', `on ${p.mins} min`);
     if (p.kills) fact('skull', `${p.kills} kill${p.kills === 1 ? '' : 's'}`);
     if (p.tags) fact('star', `${p.tags} tag${p.tags === 1 ? '' : 's'} cashed`);
@@ -553,11 +587,19 @@ export class AdminUI {
   }
 
   private drawLog() {
+    // (The last few things said, the newest lowest and the older the fainter. There is no list to scroll: 2026-10-13,
+    // "when the notifications feed at the bottom fills up a scroll wheel appears im not a fan of that".)
     const big = this.view === 'server';
-    const lines = this.said.slice(big ? -12 : -3);
+    const lines = this.said.slice(big ? -8 : -3);
     this.log.classList.toggle('big', big);
-    this.log.replaceChildren(icon('megaphone'), ...(lines.length ? lines.map((t, k) => el('div', k === lines.length - 1 ? 'last' : '', t)) : [el('div', 'dim', 'What an order did is said here, and in the chat.')]));
-    this.log.scrollTop = this.log.scrollHeight;
+    const clock = (at: number) => new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+    this.log.replaceChildren(icon('megaphone'), ...(lines.length ? lines.map((l, k) => {
+      const row = el('div', k === lines.length - 1 ? 'last' : '');
+      row.append(el('time', '', clock(l.at)), el('span', '', l.text));
+      row.title = l.text;
+      row.style.opacity = String(Math.max(0.4, 1 - (lines.length - 1 - k) * 0.1));
+      return row;
+    }) : [el('div', 'dim', 'What an order did is said here, and in the chat.')]));
   }
 
   // ---------------------------------------------------------------- somebody else
@@ -582,7 +624,7 @@ export class AdminUI {
       this.draw(true);
     };
     grid.append(this.card('Say something to them', 'mail',
-      this.input(this.words, `A message for ${p.name} alone`, (v) => (this.words = v), 'wide', talk),
+      this.input(this.words, `A message for ${p.name} alone. Enter sends it`, (v) => (this.words = v), 'wide', talk),
       this.line(
         this.button('Send as a message', talk, '', 'mail'),
         this.button('Send as a warning', () => {
@@ -641,7 +683,7 @@ export class AdminUI {
         this.act.close();
       }, 'camera', 'K'),
       this.flip('Night vision', 'It is day, for you alone', s.night, () => this.act.night(!s.night), 'sun'),
-      el('div', 'dim', 'Flying, and in the free camera: W A S D, Space up, Ctrl down, Shift fast, Alt slow. No tag is cashed in while god mode, vanish or noclip is on.'),
+      el('div', 'dim', 'Flying, and in the free camera: W A S D, Space up, Ctrl down, Shift fast, Alt slow, and everybody’s name is shown where they are, however far and through anything. No tag is cashed in while god mode, vanish or noclip is on.'),
     ));
     const coords = el('div', 'adm-line');
     const jump = () => {
@@ -649,8 +691,24 @@ export class AdminUI {
       if (this.where.every((v) => v.trim() !== '') && Number.isFinite(x) && Number.isFinite(z)) this.send(`/tp ${x} ${z}`);
     };
     coords.append(el('span', 'adm-label', 'To'), this.input(this.where[0], 'x', (v) => (this.where[0] = v), 'num', jump), this.input(this.where[1], 'z', (v) => (this.where[1] = v), 'num', jump), this.button('Go', jump, '', 'goto'));
-    const places = el('div', 'adm-places');
-    for (const p of this.places) places.append(this.button(p.name, () => this.send(`/tp ${Math.round(p.x)} ${Math.round(p.z)}`), 'place', 'pin'));
+    const places = el('div', 'adm-travel');
+    const group = (id: string, title: string, list: typeof this.places, ic: string) => {
+      if (!list.length) return;
+      const open = this.openPlaces.has(id);
+      const head = this.button(title, () => {
+        if (open) this.openPlaces.delete(id);
+        else this.openPlaces.add(id);
+        this.draw(true);
+      }, `fold${open ? ' on' : ''}`, open ? 'down' : 'right');
+      head.append(el('em', '', String(list.length)));
+      places.append(head);
+      if (!open) return;
+      const g = el('div', 'adm-places');
+      for (const p of list) g.append(this.button(p.name, () => this.send(`/tp ${Math.round(p.x)} ${Math.round(p.z)}`), 'place', ic));
+      places.append(g);
+    };
+    group('places', 'Places', this.places.filter((p) => p.kind !== 'spawn'), 'pin');
+    group('starts', 'Starts: where new survivors drop in', this.places.filter((p) => p.kind === 'spawn'), 'flag');
     grid.append(this.card(`Travel   (you are at ${Math.round(s.x)}, ${Math.round(s.z)})`, 'map',
       this.button('Open the map, and right-click where to go', () => this.act.map(), 'wide', 'map'),
       places,
@@ -868,14 +926,15 @@ export class AdminUI {
     const grid = el('div', 'adm-cards');
     if (this.admin) {
       grid.append(this.card('A word to everybody', 'megaphone',
-        this.input(this.toAll, 'Shown across everybody’s screen, and in the chat', (v) => (this.toAll = v), 'wide', tell),
+        this.input(this.toAll, 'Shown across everybody’s screen, and in the chat. Enter sends it', (v) => (this.toAll = v), 'wide', tell),
         this.line(this.button('Say it to everybody', tell, 'good', 'megaphone')),
         el('div', 'dim', 'A word to one player alone: pick them on the left.'),
       ));
-      const warn = (secs: number) => this.button(`${secs < 120 ? `${secs} s` : `${secs / 60} min`}`, () => this.send(`/restart ${secs}${this.toAll.trim() ? ` ${this.toAll.trim()}` : ''}`), 'bad', 'clock');
+      const warn = (secs: number) => this.button(`${secs < 120 ? `${secs} s` : `${secs / 60} min`}`, () => this.send(`/restart ${secs}${this.restartWhy.trim() ? ` ${this.restartWhy.trim()}` : ''}`), 'bad', 'clock');
       grid.append(this.card('Warn of a restart', 'warn',
+        this.input(this.restartWhy, 'Why (it is the second line of the banner)', (v) => (this.restartWhy = v), 'wide'),
         this.line('Restarting in', warn(30), warn(60), warn(300)),
-        el('div', 'dim', 'A banner across everybody’s screen, counting down, with what is written in the box above as the reason. It only says so: nothing is restarted by it. (An update that restarts the server says so by itself.)'),
+        el('div', 'dim', 'A banner across everybody’s screen, counting down. It only says so: nothing is restarted by it. (An update that restarts the server says so by itself.)'),
       ));
     }
     const tiles = el('div', 'adm-tiles');
@@ -910,6 +969,7 @@ export class AdminUI {
       key('H', 'In the free camera: bring your body to the view');
       key('Del', 'Take away the thing you are looking at: a thing on the ground, a body, a buried stash, a car, one of the infected');
       key('M', 'The map: right-click a place to go there');
+      key('N, K', 'While flying or in the free camera: everybody’s name where they are, through anything, however far');
     }
     grid.append(this.card('Keys', 'keys', keys));
     return [grid];
