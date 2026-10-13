@@ -206,6 +206,8 @@ export class AdminUI {
   private target = 0;
   /** what is typed in the boxes: kept while the lists are drawn again */
   private find = '';
+  /** what is typed to find somebody among the banned and the kept off */
+  private findBan = '';
   private why = '';
   private words = '';
   private toAll = '';
@@ -1409,12 +1411,36 @@ export class AdminUI {
   }
 
   private bans(): HTMLElement[] {
+    // (found by a name, or by anything else its line says: who did it, why, when. 2026-10-13: "need searchbar for
+    // users and banned users in admin panel".)
+    const find = el('div', 'adm-find for-bans');
     const list = el('div', 'adm-table bans');
+    const sift = () => {
+      const f = this.findBan.toLowerCase().trim();
+      let shown = 0;
+      for (const r of list.querySelectorAll<HTMLElement>('.adm-tr[data-find]')) {
+        const on = !f || (r.dataset.find ?? '').includes(f);
+        r.style.display = on ? '' : 'none';
+        if (on) shown++;
+      }
+      list.querySelector<HTMLElement>('.adm-none.sift')?.remove();
+      if (f && !shown && this.lists.bans.length) list.append(el('div', 'adm-none sift', `Nobody banned or kept off is "${this.findBan.trim()}".`));
+    };
+    find.append(icon('search'), this.input(this.findBan, 'Find somebody banned or kept off', (v) => {
+      this.findBan = v;
+      sift();
+    }, '', undefined, 'find-ban'));
     const head = el('div', 'adm-tr head');
     for (const h of ['', 'Name', 'By', 'On', 'Why', '']) head.append(el('span', '', h));
     list.append(head);
     for (const b of this.lists.bans) {
       const r = el('div', 'adm-tr');
+      // (Somebody the checks put off twice in an hour, or an admin timed out, is kept off for a while and is in this
+      // list with the banned: lifted the same way. Marked, so that it is seen which they are: "people in this
+      // state should show in the bans list so i can remove their suspension or timeout".)
+      const off = b.by === 'the checks' || b.by === 'a timeout';
+      if (off) r.classList.add('off');
+      r.dataset.find = `${b.name} ${b.by} ${b.at} ${b.why} ${b.id ?? ''} ${off ? 'kept off suspended timeout' : 'banned'}`.toLowerCase();
       for (const c of [`${b.n}.`, b.name, b.by, b.at, b.why]) {
         const cell = el('span', '', c);
         cell.title = c;
@@ -1424,14 +1450,20 @@ export class AdminUI {
       // by its place in the list, a press on a list two seconds old could lift somebody else's. A server from before
       // the ids says none, and is sent the place as before.)
       const ref = b.id ?? String(b.n);
-      const un = this.grave(`unban:${ref}`, 'Unban', () => this.send(`/unban ${ref}`), 'check');
+      const un = this.grave(`unban:${ref}`, off ? 'Let back in' : 'Unban', () => this.send(`/unban ${ref}`), 'check');
       un.classList.add('small');
       un.title = `Lift this one: ${b.name}${b.id ? ` (${b.id})` : ''}. Asks once more before it is done`;
       r.append(un);
       list.append(r);
     }
-    if (!this.lists.bans.length) list.append(el('div', 'adm-none', 'Nobody is banned.'));
-    return [list, el('div', 'dim', 'To ban somebody: pick them on the left (somebody who has just left is at the foot of that list).')];
+    if (!this.lists.bans.length) list.append(el('div', 'adm-none', 'Nobody is banned, and nobody is kept off by the checks or a timeout.'));
+    sift();
+    return [
+      find,
+      list,
+      el('div', 'dim', 'Kept off: the checks put somebody off twice in an hour (six hours), or an admin timed them out. It is in the server’s memory only: a restart lets everybody kept off back in. A ban is written down and stays.'),
+      el('div', 'dim', 'To ban somebody: pick them on the left (somebody who has just left is at the foot of that list).'),
+    ];
   }
 
   private roles(): HTMLElement[] {
