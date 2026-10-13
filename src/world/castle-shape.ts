@@ -12,7 +12,7 @@
 // courses tall, each with the number of turns that fits its own girth. A stone at the foot is the size of a stone
 // at the top, to within a twelfth.
 
-import { CASTLE, castleGround, castleParts, moundTop, rough, towerRadius, type Beam, type Body, type Box, type Curtain, type Flight, type Lump, type Mound, type Opening, type Paint, type Part, type Rail, type Slab, type Tower, type V3, type Wall } from '../sim/castle';
+import { CASTLE, LOOSE, castleGround, castleParts, looseParts, moundTop, rough, towerRadius, type Beam, type Body, type Box, type Curtain, type Flight, type Loose, type Lump, type Mound, type Opening, type Paint, type Part, type Rail, type Slab, type Tower, type V3, type Wall } from '../sim/castle';
 
 export type Quat = [number, number, number, number];
 /** what a thing sounds like underfoot and when it is hit */
@@ -93,15 +93,39 @@ export function quatOf(x: V3, y: V3, z: V3): Quat {
 /** how much lighter the stone is toward the top of a wall: the foot of it is the weather side of a mountain */
 const weather = (y: number) => 0.78 + 0.2 * Math.min(1, Math.max(0, 1 + y / 9));
 
+/**
+ * A slow unevenness through the air, 0..1, the same wherever it is asked: what makes one stretch of a wall a little
+ * darker than the next, whichever way the wall faces. (A wall is one picture laid over and over; this is what
+ * keeps the eye from finding where it comes round. It is put into the lightness of each corner, so a big flat
+ * face is cut into pieces a pace or so across for it to show: see `quad`.)
+ */
+function clouds(p: V3): number {
+  const at = (k: number, seed: number) => {
+    const x = p[0] * k, y = p[1] * k, z = p[2] * k, i = Math.floor(x), j = Math.floor(y), l = Math.floor(z);
+    const u = x - i, v = y - j, w = z - l, a = u * u * (3 - 2 * u), b = v * v * (3 - 2 * v), c = w * w * (3 - 2 * w);
+    const h = (di: number, dj: number, dl: number) => hash(i + di, (j + dj) * 57 + (l + dl) * 131, seed);
+    const lo = (h(0, 0, 0) * (1 - a) + h(1, 0, 0) * a) * (1 - b) + (h(0, 1, 0) * (1 - a) + h(1, 1, 0) * a) * b;
+    const hi = (h(0, 0, 1) * (1 - a) + h(1, 0, 1) * a) * (1 - b) + (h(0, 1, 1) * (1 - a) + h(1, 1, 1) * a) * b;
+    return lo * (1 - c) + hi * c;
+  };
+  return at(0.42, 91) * 0.62 + at(1.15, 92) * 0.38;
+}
+/** how much of that there is on each stuff (the lightest of it over the darkest, less one) */
+const MOTTLE: Record<Paint, number> = { stone: 0.26, ashlar: 0.36, paving: 0.34, timber: 0.18, iron: 0, rock: 0.2, scree: 0.2 };
+/** a flat face is cut for it until no piece is longer than this: finely where the picture is plain (dressed blocks, paving), coarsely where it is busy; 0: not at all */
+const PIECE: Record<Paint, number> = { stone: 2.3, ashlar: 1.1, paving: 1.3, timber: 0, iron: 0, rock: 0, scree: 0 };
+
 type UV = [number, number];
 /** Where triangles are put, for one stuff: it knows the size of that stuff's picture. */
 class Out {
-  constructor(private s: Skin, private tile: number, private tint: V3) {}
+  /** @param mottle how much the tone wanders over it; @param cut big faces are cut into pieces no longer than this for that to show (0: they are not) */
+  constructor(private s: Skin, private tile: number, private tint: V3, private mottle = 0, private cut = 0) {}
   private put(p: V3, n: V3, t: UV, tone: number) {
+    const k = tone * (this.mottle ? 1 - this.mottle / 2 + this.mottle * clouds(p) : 1);
     this.s.pos.push(p[0], p[1], p[2]);
     this.s.nrm.push(n[0], n[1], n[2]);
     this.s.uv.push(t[0] / this.tile, t[1] / this.tile);
-    this.s.col.push(this.tint[0] * tone, this.tint[1] * tone, this.tint[2] * tone);
+    this.s.col.push(this.tint[0] * k, this.tint[1] * k, this.tint[2] * k);
   }
   /**
    * A triangle, turned to face `out` whichever way round its corners were said. `t`: where each corner is on the
@@ -121,7 +145,18 @@ class Out {
     for (const k of order) this.put(p[k], smooth ? smooth[k] : n, t[k], typeof tone === 'number' ? tone : tone[k]);
   }
   /** Four corners, in order round it. */
-  quad(p: V3[], t: UV[], out: V3, tone: number | number[] = 1, smooth?: V3[]) {
+  quad(p: V3[], t: UV[], out: V3, tone: number | number[] = 1, smooth?: V3[], deep = 0): void {
+    const e = len(sub(p[1], p[0])), f = len(sub(p[2], p[1]));
+    if (this.cut && deep < 6 && Math.max(e, f) > this.cut) {
+      // (in two across its longer way, and each half asked again)
+      const [i0, i1, i2, i3] = e >= f ? [0, 1, 2, 3] : [1, 2, 3, 0], tones = typeof tone === 'number' ? [tone, tone, tone, tone] : tone;
+      const mid = <T extends number[]>(a: T, b: T) => a.map((v, k) => (v + b[k]) / 2) as T, half = (a: number, b: number) => (a + b) / 2;
+      const pa = mid(p[i0], p[i1]), pb = mid(p[i3], p[i2]), ta = mid(t[i0], t[i1]), tb = mid(t[i3], t[i2]);
+      const na = smooth && unit(mid(smooth[i0], smooth[i1])), nb = smooth && unit(mid(smooth[i3], smooth[i2]));
+      this.quad([p[i0], pa, pb, p[i3]], [t[i0], ta, tb, t[i3]], out, [tones[i0], half(tones[i0], tones[i1]), half(tones[i3], tones[i2]), tones[i3]], smooth && [smooth[i0], na!, nb!, smooth[i3]], deep + 1);
+      this.quad([pa, p[i1], p[i2], pb], [ta, t[i1], t[i2], tb], out, [half(tones[i0], tones[i1]), tones[i1], tones[i2], half(tones[i3], tones[i2])], smooth && [na!, smooth[i1], smooth[i2], nb!], deep + 1);
+      return;
+    }
     for (const [a, b, c] of [[0, 1, 2], [0, 2, 3]]) this.tri([p[a], p[b], p[c]], [t[a], t[b], t[c]], out, typeof tone === 'number' ? tone : [tone[a], tone[b], tone[c]], smooth && [smooth[a], smooth[b], smooth[c]]);
   }
 }
@@ -192,7 +227,12 @@ function beamPart(p: Beam, o: Out, put: Put) {
 
 /** how high a rail's top bar is over what it stands on, and how much higher than its line what stops a body goes */
 const RAIL = { top: 0.93, mid: 0.5, over: 1.05 };
-/** posts and two bars from `a` to `b`; what stops a body stands straight up from the line of it, whatever the slope */
+/**
+ * Posts and two bars from `a` to `b`. What stops a body stands straight up from the line of it, whatever the
+ * slope; and up a slope it is in short lengths, each no taller than the rail is there. (As one piece from the foot
+ * of a flight to a pace over its head, the rail of the stair below stood as a wall nobody could see across the
+ * floor above, where that floor lies over the stair's foot: found by walking it, not by looking.)
+ */
 function railRun(o: Out, put: Put, a: V3, b: V3, tone = 1, name = 'rail', under = 0) {
   const flat = Math.hypot(b[0] - a[0], b[2] - a[2]);
   if (flat < 0.05) return;
@@ -204,8 +244,12 @@ function railRun(o: Out, put: Put, a: V3, b: V3, tone = 1, name = 'rail', under 
     const p = add(a, mul(sub(b, a), k / posts));
     block(o, lift(p, RAIL.top / 2), ax, [0.03, RAIL.top / 2, 0.03], tone, 1);
   }
-  const lo = Math.min(a[1], b[1]) - under, tall = Math.abs(b[1] - a[1]) + RAIL.over + under;
-  put(boxSolid([(a[0] + b[0]) / 2, lo + tall / 2, (a[2] + b[2]) / 2], ax, [flat / 2, tall / 2, 0.03], true, 'wood', name));
+  const n = Math.max(1, Math.ceil(Math.abs(b[1] - a[1]) / 0.4));
+  for (let k = 0; k < n; k++) {
+    const p = add(a, mul(sub(b, a), k / n)), q = add(a, mul(sub(b, a), (k + 1) / n));
+    const lo = Math.min(p[1], q[1]) - under, tall = Math.abs(q[1] - p[1]) + RAIL.over + under;
+    put(boxSolid([(p[0] + q[0]) / 2, lo + tall / 2, (p[2] + q[2]) / 2], ax, [flat / n / 2 + 0.01, tall / 2, 0.03], true, 'wood', name));
+  }
 }
 
 /** how thick the slope is that is walked on under a flight of steps: it lies along the fronts of the treads */
@@ -249,7 +293,8 @@ function wallPart(w: Wall, o: Out, put: Put, lod: number) {
   const at = (u: number, y: number, s: number): V3 => [ax + d[0] * u + out[0] * s * half, y, az + d[2] * u + out[2] * s * half];
   // (the picture goes along it by where it stands: two lengths of one wall carry on from each other)
   const base = ax * d[0] + az * d[2], seed = Math.round(ax * 31 + az * 17 + L * 7);
-  const opAt = (u: number) => ops.find((p) => u > p.u0 && u < p.u1);
+  /** the openings there are at a place along it, lowest first: a door may have a doorway over it */
+  const opsAt = (u: number) => ops.filter((p) => u > p.u0 && u < p.u1).sort((p, q) => p.y0 - q.y0);
   const head = (p: Opening, u: number) => headAt(p.y0, p.y1, (p.u1 - p.u0) / 2, p.arch, (u - (p.u0 + p.u1) / 2) / ((p.u1 - p.u0) / 2));
 
   // ---- what is seen. It is cut along its length wherever its top or an opening changes, and a broken top is cut
@@ -262,7 +307,7 @@ function wallPart(w: Wall, o: Out, put: Put, lod: number) {
   us[us.length - 1] = L;
   /** what stands in each length: [its foot at the near end, its foot at the far end, its top] for each piece, lowest first */
   const cols = us.slice(0, -1).map((u0, i) => {
-    const u1 = us[i + 1], mid = (u0 + u1) / 2, p = opAt(mid);
+    const u1 = us[i + 1], mid = (u0 + u1) / 2;
     // (a broken top comes down from one height to the next a course at a time, where the two are not far apart: a
     // wall falls in slopes, and stands in steps only where a length of it has gone altogether)
     let top = topAt(mid);
@@ -272,12 +317,13 @@ function wallPart(w: Wall, o: Out, put: Put, lod: number) {
       top = Math.round((top - hash(i, seed, 3) * 0.2) / COURSE) * COURSE;
     }
     const spans: [number, number, number][] = [];
-    if (!p) spans.push([w.y0, w.y0, top]);
-    else {
-      if (p.y0 > w.y0 + 0.01) spans.push([w.y0, w.y0, Math.min(p.y0, top)]);
-      const h0 = head(p, u0), h1 = head(p, u1);
-      if (top > Math.max(h0, h1) + 0.02) spans.push([h0, h1, top]);
+    let b0 = w.y0, b1 = w.y0;
+    for (const p of opsAt(mid)) {
+      if (Math.min(p.y0, top) > Math.max(b0, b1) + 0.01) spans.push([b0, b1, Math.min(p.y0, top)]);
+      b0 = head(p, u0);
+      b1 = head(p, u1);
     }
+    if (top > Math.max(b0, b1) + 0.02) spans.push([b0, b1, top]);
     return { u0, u1, spans };
   });
   for (const c of cols) {
@@ -307,11 +353,17 @@ function wallPart(w: Wall, o: Out, put: Put, lod: number) {
   for (const p of ops) hard.add(p.u0).add(p.u1);
   const hs = sorted(hard, 0.01);
   for (let i = 0; i + 1 < hs.length; i++) {
-    const u0 = hs[i], u1 = hs[i + 1], mid = (u0 + u1) / 2, p = opAt(mid);
+    const u0 = hs[i], u1 = hs[i + 1], mid = (u0 + u1) / 2;
     // (over a length whose top is all at about one height: the highest of it)
     let top = -Infinity;
     for (let k = 0; k < tops.length; k++) if (((k + 1) * L) / tops.length > u0 + 0.01 && (k * L) / tops.length < u1 - 0.01) top = Math.max(top, tops[k]);
-    const spans: [number, number][] = p ? [[w.y0, p.y0], [squareHead(p, (p.u1 - p.u0) / 2), top]] : [[w.y0, top]];
+    const spans: [number, number][] = [];
+    let lo0 = w.y0;
+    for (const p of opsAt(mid)) {
+      spans.push([lo0, p.y0]);
+      lo0 = squareHead(p, (p.u1 - p.u0) / 2);
+    }
+    spans.push([lo0, top]);
     for (const [lo, hi] of spans) if (hi - lo > 0.05) put(boxSolid(at(mid, (lo + hi) / 2, 0), [d, UP, cross(d, UP)], [(u1 - u0) / 2, (hi - lo) / 2, half], false, SURF[w.paint], w.name ?? 'wall'));
   }
 }
@@ -517,7 +569,7 @@ function towerPart(tw: Tower, stone: Out, wood: Out, put: Put, lod: number) {
     wood.quad(top, uv, UP, tone);
     wood.quad(top.map((p): V3 => [p[0], p[1] - 0.05, p[2]]), uv, [0, -1, 0], tone * 0.8);
     for (const [a, face] of [[a0 - lap, -sg], [a1, sg]] as [number, number][]) wood.quad([P(a, ri, y - 0.05), P(a, ro, y - 0.05), P(a, ro, y), P(a, ri, y)], [[ri, 0], [ro, 0], [ro, 0.05], [ri, 0.05]], mul(round(a), face), tone * 0.85);
-    wood.quad([P(a0 - lap, ri, y - 0.05), P(a1, ri, y - 0.05), P(a1, ri, y), P(a0 - lap, ri, y)], [[0, 0], [0.4, 0], [0.4, 0.05], [0, 0.05]], mul(out((a0 + a1) / 2), -1), tone * 0.85);
+    wood.quad([P(a0 - lap, ri, y - 0.05), P(a1, ri, y - 0.05), P(a1, ri, y), P(a0 - lap, ri, y)], [[0, 0], [0.26, 0], [0.26, 0.05], [0, 0.05]], mul(out((a0 + a1) / 2), -1), tone * 0.85);
     // the string under its open edge
     timber(wood, P(a0, ri + 0.05, y - rise - 0.15), P(a1, ri + 0.05, y - 0.15), 0.06, 0.2, tone * 0.9);
   }
@@ -540,7 +592,7 @@ function towerPart(tw: Tower, stone: Out, wood: Out, put: Put, lod: number) {
     const a0 = j * 7.5, a1 = a0 + 7.5;
     if (inWell(a0 + 3.75)) {
       // (the edge of the boards, round the well)
-      wood.quad([P(a0, ri, D - 0.1), P(a1, ri, D - 0.1), P(a1, ri, D), P(a0, ri, D)], [[0, 0], [0.3, 0], [0.3, 0.1], [0, 0.1]], out(a0 + 3.75), tone * 0.8);
+      wood.quad([P(a0, ri, D - 0.1), P(a1, ri, D - 0.1), P(a1, ri, D), P(a0, ri, D)], [[0, 0], [0.15, 0], [0.15, 0.1], [0, 0.1]], out(a0 + 3.75), tone * 0.8);
       continue;
     }
     ring(D, ri, rin, a0, a1, UP);
@@ -605,14 +657,16 @@ function emit(p: Part, of: (paint: Paint) => Out, solids: Solid[] | null, lod: n
 }
 
 /**
- * The whole fort and its grounds as shapes.
- * @param ground how high the ground is at a spot, over the terrace (the ruined houses and the rocks stand on it)
+ * The fort as shapes, and the loose pieces of its grounds with it.
+ * @param ground how high the ground is at a spot, over the terrace (the loose pieces stand on it)
+ * @param loose the loose pieces, in the fort's own measure: where nobody has said, where the real ones stand
+ * @param rock whether the rock the ramp leaves from is made (not where the mountain itself comes up to the ramp's foot)
  */
-export function castleShape(ground: (x: number, z: number) => number = castleGround): Shape {
+export function castleShape(ground: (x: number, z: number) => number = castleGround, loose: Loose[] = LOOSE, rock = true): Shape {
   const near = Object.fromEntries(PAINTS.map((p) => [p, skin()])) as Record<Paint, Skin>, far = skin(), solids: Solid[] = [];
-  const nears = Object.fromEntries(PAINTS.map((p) => [p, new Out(near[p], TILE[p], [1, 1, 1])])) as Record<Paint, Out>;
-  const fars = Object.fromEntries(PAINTS.map((p) => [p, new Out(far, TILE.stone, FAR_TINT[p])])) as Record<Paint, Out>;
-  for (const raw of castleParts()) {
+  const nears = Object.fromEntries(PAINTS.map((p) => [p, new Out(near[p], TILE[p], [1, 1, 1], MOTTLE[p], PIECE[p])])) as Record<Paint, Out>;
+  const fars = Object.fromEntries(PAINTS.map((p) => [p, new Out(far, TILE.stone, FAR_TINT[p], MOTTLE[p])])) as Record<Paint, Out>;
+  for (const raw of [...castleParts().filter((p) => rock || !/outcrop|ramp head/.test(p.name ?? '')), ...loose.flatMap(looseParts)]) {
     const p = raw.sits ? lifted(raw, ground(raw.sits[0], raw.sits[1])) : raw;
     if (p.at !== 'far') emit(p, (paint) => nears[paint], solids, 0, ground);
     if (p.at) emit(p, (paint) => fars[paint], null, 1, ground);

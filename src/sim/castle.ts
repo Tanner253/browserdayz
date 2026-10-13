@@ -263,7 +263,7 @@ function tower(name: string, cx: number, cz: number, foot: number, rim: number, 
 // ------------------------------------------------------------------ the whole of it, piece by piece
 
 let made: Part[] | null = null;
-/** Every piece of the fort and of its grounds. (Worked out once: it is the same every time.) */
+/** Every piece of the fort, its ramp, the rock the ramp leaves from and the rubble under the breach. (Worked out once: it is the same every time. The loose pieces of its grounds are apart: see `looseParts`.) */
 export function castleParts(): Part[] {
   return (made ??= layOut());
 }
@@ -400,28 +400,32 @@ function layOut(): Part[] {
   // (A floor is open over a stair from where a head would meet it: from where the stair is two metres under the
   // floor's own underside. Reckoned, and not judged by eye: a hole a pace too short is a stair nobody gets up.)
   const opens = (L: number, up: number, under: number) => Math.max(0, ((under - 2) * L) / up - L / Math.round(up / 0.2));
-  const hall = 2.6 - opens(3.75, F1, F1 - 0.2), upper = -2.2 + opens(3.6, F2 - F1, F2 - F1 - 0.2), hatch = -1.7 + opens(3.6, K.roof - F2, K.roof - F2 - 0.35);
-  floor('timber', F1, 0.2, [R.x0, R.x0 + 1, -1.15, hall], 'keep first floor');
+  const hall = 2.3 - opens(3.75, F1, F1 - 0.2), upper = -2.2 + opens(3.6, F2 - F1, F2 - F1 - 0.2), hatch = -1.7 + opens(3.6, K.roof - F2, K.roof - F2 - 0.35);
+  floor('timber', F1, 0.2, [R.x0, R.x0 + 1, -1.45, hall], 'keep first floor');
   floor('timber', F2, 0.2, [upper, 1.4, R.z1 - 1, R.z1], 'keep second floor');
   floor('paving', K.roof, 0.35, [hatch, 1.9, R.z0, R.z0 + 1], 'keep roof');
+  // the timbers each floor lies on, from wall to wall, clear of the well of its stair; and the roof's slab on its own
+  for (let x = R.x0 + 1.25; x < R.x1 - 0.3; x += 1.05) beam([x, F1 - 0.31, R.z0], [x, F1 - 0.31, R.z1], 0.16, 0.22, { name: 'joist', tone: 0.85 });
+  for (const z of [-2.9, -1.85, -0.8, 0.25, 1.3, 2.3]) beam([R.x0, F2 - 0.31, z], [R.x1, F2 - 0.31, z], 0.16, 0.22, { name: 'joist', tone: 0.85 });
+  for (const z of [-2.25, -1.2, -0.15, 0.9, 1.95, 3]) beam([R.x0, K.roof - 0.46, z], [R.x1, K.roof - 0.46, z], 0.18, 0.22, { name: 'joist', tone: 0.85 });
   // the three flights, one to a storey, each along a different wall: nobody on one floor has the next stair at his back
-  flight([R.x0 + 0.5, 0, 2.6], [R.x0 + 0.5, F1, -1.15], 1, { name: 'keep stair to the hall' });
+  flight([R.x0 + 0.5, 0, 2.3], [R.x0 + 0.5, F1, -1.45], 1, { name: 'keep stair to the hall' });
   flight([-2.2, F1, R.z1 - 0.5], [1.4, F2, R.z1 - 0.5], 1, { name: 'keep stair to the upper room' });
   flight([-1.7, F2, R.z0 + 0.5], [1.9, K.roof, R.z0 + 0.5], 1, { name: 'keep stair to the roof' });
   // a rail round each hole, on the floor it is a hole in, as far along it as the stair's own rail has not yet come up
   // through the floor; and one up the open side of each flight
-  rail([R.x0 + 1, F1, 0], [R.x0 + 1, F1, hall]);
+  rail([R.x0 + 1, F1, -0.3], [R.x0 + 1, F1, hall]);
   rail([R.x0 + 1, F1, hall], [R.x0, F1, hall]);
   rail([upper, F2, R.z1 - 1], [0.5, F2, R.z1 - 1]);
   rail([upper, F2, R.z1 - 1], [upper, F2, R.z1]);
   rail([hatch, K.roof, R.z0 + 1], [1, K.roof, R.z0 + 1]);
   rail([hatch, K.roof, R.z0 + 1], [hatch, K.roof, R.z0]);
-  rail([R.x0 + 1, 0, 2.6], [R.x0 + 1, F1, -1.15]);
+  rail([R.x0 + 1, 0, 2.3], [R.x0 + 1, F1, -1.45]);
   rail([-2.2, F1, R.z1 - 1], [1.4, F2, R.z1 - 1]);
   rail([-1.7, F2, R.z0 + 1], [1.9, K.roof, R.z0 + 1]);
   // the roof: the slab between the walls, and the walls' own tops a pace higher all round it, with stone steps up to them
-  flight([1.9, K.roof, 1.9], [R.x1, B, 1.9], 1.3, { paint: 'stone', name: 'roof steps east' });
-  flight([-0.5, K.roof, 2.5], [-0.5, B, R.z1], 1.3, { paint: 'stone', name: 'roof steps south' });
+  flight([1.6, K.roof, 1.9], [R.x1, B, 1.9], 1.3, { paint: 'stone', name: 'roof steps east' });
+  flight([-0.5, K.roof, 2.2], [-0.5, B, R.z1], 1.3, { paint: 'stone', name: 'roof steps south' });
 
   // the timber stair to the doorway, along the entrance face, and its landing over the small door
   const lx = K.x1;
@@ -488,6 +492,10 @@ function layOut(): Part[] {
     lump(x, moundTop('fan', x, z) + 0.12, z, 0.3 + hash(k, 1, 7) * 0.3, 0.22 + hash(k, 2, 7) * 0.16, 0.3 + hash(k, 4, 7) * 0.25, 60 + k, { paint: 'stone', blocky: true, name: 'fallen block' });
   }
 
+  // and two lengths of it that came down inside: something to kneel behind, either side of the way in
+  lump(C.breach.x1 + 0.9, 0.36, -8.1, 0.62, 0.36, 0.4, 71, { paint: 'stone', blocky: true, name: 'fallen merlon' });
+  lump(C.breach.x0 - 0.6, 0.33, -9.0, 0.55, 0.33, 0.42, 72, { paint: 'stone', blocky: true, name: 'fallen merlon' });
+
   // ---- what stands in the rooms, made of boards: tables, benches, a rack, bunks. (What is kept on each is in `castleLoot`.)
   for (const f of FURNITURE) {
     const c = Math.cos(f.yaw), s = Math.sin(f.yaw), at = (lx: number, lz: number): [number, number] => [f.x + lx * c + lz * s, f.z - lx * s + lz * c];
@@ -522,39 +530,6 @@ function layOut(): Part[] {
     if (post) beam([x, y - post, z], [x, y - 0.28, z], 0.09, 0.09, { name: 'cresset post', body: 'all' });
   }
 
-  // ---- the grounds: what is left of the village along the crest to the east, a wall by the rock, one down the south slope, and the rock's teeth
-  for (const [k, sh] of SHELLS.entries()) {
-    const c = Math.cos(sh.yaw), s = Math.sin(sh.yaw), w = sh.w / 2, d = sh.d / 2;
-    const at = (lx: number, lz: number): [number, number] => [sh.x + lx * c + lz * s, sh.z - lx * s + lz * c];
-    const sits: [number, number] = [sh.x, sh.z], name = `ruined house ${k + 1}`, o = { paint: 'stone' as Paint, tone: 0.9, sits, name, thick: 0.6, y0: -2.2, at: 'both' as const };
-    /** a long wall's broken top, and a gable's: up to five metres in the middle of it, and never whole */
-    const long = (seed: number) => Array.from({ length: 9 }, (_, i) => Math.round((0.7 + hash(i, seed, 21 + k) * 2.3) * 10) / 10);
-    const gable = (seed: number) => Array.from({ length: 7 }, (_, i) => Math.round(Math.max(0.6, (2.4 + (1 - Math.abs(i - 3) / 3.5) * 2.6) * (hash(i, seed, 23 + k) < 0.25 ? 0.45 : 0.82 + hash(i, seed, 24 + k) * 0.18)) * 10) / 10);
-    const door = { u0: sh.w * 0.4, u1: sh.w * 0.4 + 1.2, y0: -2.3, y1: 9 };
-    parts.push({ t: 'wall', ...o, a: at(-w, -d + 0.3), b: at(w, -d + 0.3), top: long(1), openings: sh.door < 0 ? [door] : [{ u0: 2, u1: 2.9, y0: 0.9, y1: 2, arch: false }] });
-    parts.push({ t: 'wall', ...o, a: at(w, d - 0.3), b: at(-w, d - 0.3), top: long(2), openings: sh.door > 0 ? [door] : [{ u0: 5.6, u1: 6.5, y0: 0.9, y1: 2, arch: false }] });
-    parts.push({ t: 'wall', ...o, a: at(w - 0.3, -d + 0.6), b: at(w - 0.3, d - 0.6), top: gable(3) });
-    parts.push({ t: 'wall', ...o, a: at(-w + 0.3, d - 0.6), b: at(-w + 0.3, -d + 0.6), top: gable(4) });
-    // (stones of it, lying inside)
-    for (let i = 0; i < 3; i++) {
-      const [px, pz] = at((hash(i, k, 31) - 0.5) * (sh.w - 3), (hash(i, k, 32) - 0.5) * (sh.d - 3));
-      lump(px, 0.12, pz, 0.28 + hash(i, k, 33) * 0.25, 0.2, 0.3, 80 + k * 5 + i, { paint: 'stone', blocky: true, sits: [px, pz], name: 'fallen block' });
-    }
-  }
-  // the curved wall by the rock: what held the path up, on the side the ground falls away
-  for (let k = 0; k < 4; k++) {
-    const pt = (a: number): [number, number] => [20.5 + Math.cos((a * Math.PI) / 180) * 9.4, -2 + Math.sin((a * Math.PI) / 180) * 9.4];
-    const a = pt(98 - k * 21), b = pt(98 - (k + 1) * 21);
-    parts.push({ t: 'wall', paint: 'stone', tone: 0.85, at: 'both', name: 'curved wall', a, b, y0: -2, top: [1.1 + hash(k, 1, 41) * 1.3, 0.7 + hash(k, 2, 41) * 1.6, 1.2 + hash(k, 3, 41) * 1.1], thick: 0.7, sits: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] });
-  }
-  // the thin wall down the south slope, sixteen metres of it, in lengths that step down with the ground
-  for (let k = 0; k < 7; k++) {
-    const z0 = 15 + k * 2.4, z1 = z0 + 2.4;
-    if (k === 3) continue;
-    parts.push({ t: 'wall', paint: 'stone', tone: 0.85, at: 'both', name: 'wall down the slope', a: [22.6, z1], b: [22.6, z0], y0: -2.5, top: [1.2 + hash(k, 1, 43) * 1.4, 1.6 + hash(k, 2, 43) * 1.2], thick: 0.55, sits: [22.6, (z0 + z1) / 2] });
-  }
-  // grey teeth of rock along the crest, clear of the ways people go
-  for (const [x, z, r, h] of TEETH) lump(x, h * 0.25, z, r, h, r * (0.7 + hash(Math.round(x), Math.round(z), 51) * 0.5), Math.round(x * 7 + z * 13), { sits: [x, z], at: 'both', name: 'rock tooth' });
   return parts;
 }
 
@@ -568,7 +543,7 @@ export const FURNITURE: { kind: 'table' | 'bench' | 'bunk' | 'rack'; x: number; 
   { kind: 'bench', x: 0.3, z: 0.45, y: 3, yaw: 0, w: 2.2, d: 0.32 },
   { kind: 'rack', x: 2.52, z: 2.2, y: 3, yaw: Math.PI / 2, w: 1.5, d: 0.45 },
   // the upper room: where they slept, and where the guns were kept
-  { kind: 'bunk', x: -3.2, z: -2.3, y: 5.85, yaw: Math.PI / 2, w: 1.95, d: 0.9 },
+  { kind: 'bunk', x: -3.2, z: -1.6, y: 5.85, yaw: Math.PI / 2, w: 1.95, d: 0.9 },
   { kind: 'bunk', x: -3.2, z: 2.2, y: 5.85, yaw: Math.PI / 2, w: 1.95, d: 0.9 },
   { kind: 'rack', x: 2.52, z: -0.6, y: 5.85, yaw: Math.PI / 2, w: 1.7, d: 0.45 },
   { kind: 'table', x: 0.4, z: 0.3, y: 5.85, yaw: Math.PI / 2, w: 1.6, d: 0.8 },
@@ -589,30 +564,108 @@ export const LAMPS: [number, number, number, number][] = [
   // the hall, and the store under it
   [-0.4, 0.3, 5.3, 0],
   [-0.6, -3.1, 2.3, 0],
-  // by the fire on the north side of the terrace, and at the foot of the scaffold
+  // by the fire on the north side of the terrace, and in the nook between the west wall and the south-west tower
   [5.6, -8.2, 2.3, 2.3],
-  [-7.4, 8, 2.3, 2.3],
+  [-9.1, 7, 2.3, 2.3],
 ];
 
-/** what is left of the village: where each house stood along the crest, how it is turned, its size, and which long side its door was on */
-export const SHELLS: { x: number; z: number; yaw: number; w: number; d: number; door: number }[] = [
-  { x: 47, z: 2.5, yaw: 0.14, w: 9, d: 7, door: -1 },
-  { x: 58.5, z: -5.5, yaw: -0.2, w: 8.4, d: 6.6, door: 1 },
-  { x: 69, z: 3, yaw: 0.1, w: 9.2, d: 7, door: -1 },
-  { x: 80, z: -5, yaw: -0.08, w: 9, d: 7.2, door: 1 },
-  { x: 91, z: 2.5, yaw: 0.22, w: 8.6, d: 6.8, door: -1 },
+// ------------------------------------------------------------------ the loose pieces of its grounds
+//
+// Round the real fort: the roofless shells of a village along the crest, a curved wall by the rock the ramp leaves
+// from, a thin wall down the south slope, grey teeth of rock. None of them is part of the fort. Each is a thing by
+// itself that stands on whatever ground it is put on (its foot goes three metres into it, so it meets ground that
+// is not level), and whoever shapes the mountain sets each down where that ground suits: `LOOSE` is only where
+// they stand when nobody has said, on the ground the fort assumes.
+
+/**
+ * A loose piece: which kind, which of its kind, where its middle is and how it is turned. (In the fort's own
+ * measure here; `castleLoose` gives the same as places in the world, which is how the world's own list has them.)
+ */
+export interface Loose { kind: 'house' | 'curved wall' | 'long wall' | 'rock'; n: number; x: number; z: number; rot: number }
+/** the houses there are to choose from: how long, how deep, and which long side the door was on */
+export const HOUSES: { w: number; d: number; door: number }[] = [{ w: 9, d: 7, door: -1 }, { w: 8.4, d: 6.6, door: 1 }, { w: 9.2, d: 7, door: -1 }, { w: 9, d: 7.2, door: 1 }, { w: 8.6, d: 6.8, door: -1 }];
+/** how far into the ground a loose piece's foot goes */
+const FOOTING = 3;
+
+export const LOOSE: Loose[] = [
+  // what is left of the village, along the crest to the east
+  { kind: 'house', n: 0, x: 47, z: 2.5, rot: 0.14 }, { kind: 'house', n: 1, x: 58.5, z: -5.5, rot: -0.2 }, { kind: 'house', n: 2, x: 69, z: 3, rot: 0.1 }, { kind: 'house', n: 3, x: 80, z: -5, rot: -0.08 }, { kind: 'house', n: 4, x: 91, z: 2.5, rot: 0.22 },
+  // the curved wall by the rock: what held the path up, on the side the ground falls away; and the thin wall down the south slope
+  { kind: 'curved wall', n: 0, x: 20.5, z: -2, rot: 0 },
+  { kind: 'long wall', n: 0, x: 22.6, z: 23.4, rot: 0 },
+  // grey teeth of rock, clear of the ways people go
+  ...([[27.5, -6.2], [30.5, 3.2], [34, -7.5], [37.5, 2.6], [40.5, -6.8], [44, -9.5], [52.5, 7.5], [63.5, -1.5], [74.5, 8.2], [85.5, 0.5], [97, -4], [16.5, -13.5], [15.8, 9.5], [-15.5, -12.5], [-16.5, 6.5], [-20, -4], [-24.5, -9], [-27, 2.5], [-32, -6.5], [-36.5, -1]] as [number, number][]).map(([x, z], n): Loose => ({ kind: 'rock', n, x, z, rot: n * 1.7 })),
 ];
 
-/** the rocks along the crest: [x, z, half its width, its height] */
-export const TEETH: [number, number, number, number][] = [
-  [27.5, -6.2, 1.1, 1.5], [30.5, 3.2, 1.4, 1.2], [34, -7.5, 0.9, 1.1], [37.5, 2.6, 1.2, 1.6], [40.5, -6.8, 1.5, 1.3], [44, -9.5, 1.0, 0.9],
-  [52.5, 7.5, 1.3, 1.2], [63.5, -1.5, 0.9, 1.0], [74.5, 8.2, 1.2, 1.4], [85.5, 0.5, 1.0, 0.9], [97, -4, 1.4, 1.3],
-  [16.5, -13.5, 1.2, 1.3], [15.8, 9.5, 1.0, 1.4], [-15.5, -12.5, 1.3, 1.5], [-16.5, 6.5, 1.1, 1.2], [-20, -4, 1.5, 1.8], [-24.5, -9, 1.0, 1.1],
-  [-27, 2.5, 1.3, 1.0], [-32, -6.5, 1.6, 1.9], [-36.5, -1, 0.9, 1.0], [-41, -9.5, 1.2, 1.4], [-46, -3.5, 1.4, 1.2], [-52, -8, 1.0, 1.5], [-58, -2.5, 1.5, 1.3],
-];
+/** The pieces a loose piece is made of, where it stands (in the fort's own measure: each of them on the ground at its own spot). */
+export function looseParts(l: Loose): Part[] {
+  const parts: Part[] = [], c = Math.cos(l.rot), s = Math.sin(l.rot);
+  const at = (lx: number, lz: number): [number, number] => [l.x + lx * c + lz * s, l.z - lx * s + lz * c];
+  const wall = (a: [number, number], b: [number, number], top: number[], thick: number, name: string, openings?: Opening[]) => void parts.push({ t: 'wall', paint: 'stone', tone: 0.88, at: 'both', name, a, b, y0: -FOOTING, top, thick, openings, sits: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] });
+  if (l.kind === 'house') {
+    const k = l.n % HOUSES.length, sh = HOUSES[k], w = sh.w / 2, d = sh.d / 2, name = `ruined house ${k + 1}`;
+    /** a long wall's broken top, and a gable's: up to five metres in the middle of it, and never whole */
+    const long = (seed: number) => Array.from({ length: 9 }, (_, i) => Math.round((0.7 + hash(i, seed, 21 + k) * 2.3) * 10) / 10);
+    const gable = (seed: number) => Array.from({ length: 7 }, (_, i) => Math.round(Math.max(0.6, (2.4 + (1 - Math.abs(i - 3) / 3.5) * 2.6) * (hash(i, seed, 23 + k) < 0.25 ? 0.45 : 0.82 + hash(i, seed, 24 + k) * 0.18)) * 10) / 10);
+    // (the whole house stands at the height of the ground under its middle: its floor is level, as a house's is)
+    const o = { t: 'wall' as const, paint: 'stone' as Paint, tone: 0.9, at: 'both' as const, name, thick: 0.6, y0: -FOOTING, sits: [l.x, l.z] as [number, number] };
+    const door = { u0: sh.w * 0.4, u1: sh.w * 0.4 + 1.2, y0: -FOOTING - 0.1, y1: 9 };
+    parts.push({ ...o, a: at(-w, -d + 0.3), b: at(w, -d + 0.3), top: long(1), openings: sh.door < 0 ? [door] : [{ u0: 2, u1: 2.9, y0: 0.9, y1: 2, arch: false }] });
+    parts.push({ ...o, a: at(w, d - 0.3), b: at(-w, d - 0.3), top: long(2), openings: sh.door > 0 ? [door] : [{ u0: 5.6, u1: 6.5, y0: 0.9, y1: 2, arch: false }] });
+    parts.push({ ...o, a: at(w - 0.3, -d + 0.6), b: at(w - 0.3, d - 0.6), top: gable(3) });
+    parts.push({ ...o, a: at(-w + 0.3, d - 0.6), b: at(-w + 0.3, -d + 0.6), top: gable(4) });
+    // (stones of it, lying inside)
+    for (let i = 0; i < 3; i++) {
+      const [px, pz] = at((hash(i, k, 31) - 0.5) * (sh.w - 3), (hash(i, k, 32) - 0.5) * (sh.d - 3));
+      parts.push({ t: 'lump', paint: 'stone', x: px, y: 0.12, z: pz, rx: 0.28 + hash(i, k, 33) * 0.25, ry: 0.2, rz: 0.3, seed: 80 + k * 5 + i, blocky: true, sits: [px, pz], name: 'fallen block' });
+    }
+  } else if (l.kind === 'curved wall') {
+    // four lengths of a round, nine metres out from its middle
+    const pt = (a: number) => at(Math.cos((a * Math.PI) / 180) * 9.4, Math.sin((a * Math.PI) / 180) * 9.4);
+    for (let k = 0; k < 4; k++) wall(pt(98 - k * 21), pt(98 - (k + 1) * 21), [1.1 + hash(k, 1, 41) * 1.3, 0.7 + hash(k, 2, 41) * 1.6, 1.2 + hash(k, 3, 41) * 1.1], 0.7, 'curved wall');
+  } else if (l.kind === 'long wall') {
+    // sixteen metres of it, in lengths that each stand at the height of the ground where they are, one of them gone
+    for (let k = 0; k < 7; k++) if (k !== 3) wall(at(0, -8.4 + (k + 1) * 2.4), at(0, -8.4 + k * 2.4), [1.2 + hash(k, 1, 43) * 1.4, 1.6 + hash(k, 2, 43) * 1.2], 0.55, 'wall down the slope');
+  } else {
+    const r = 0.9 + hash(l.n, 1, 51) * 0.7, h = 0.9 + hash(l.n, 2, 51) * 1;
+    parts.push({ t: 'lump', paint: 'rock', x: l.x, y: h * 0.25, z: l.z, rx: r, ry: h, rz: r * (0.7 + hash(l.n, 3, 51) * 0.5), seed: 300 + l.n * 7, sits: [l.x, l.z], at: 'both', name: 'rock tooth' });
+  }
+  return parts;
+}
 
-/** what is found in the fort and its grounds is of the map's fourth step: a rifleman's place, hard to come at and seen from everywhere */
-export const CASTLE_TIER = 4;
+/** The loose pieces as the world has them: where each stands in the world, when nobody has said otherwise. */
+export function castleLoose(p: Place): Loose[] {
+  return LOOSE.map((l) => {
+    const [x, , z] = castleAt(p, l.x, l.z);
+    return { ...l, x, z, rot: l.rot + p.rot };
+  });
+}
+/** Loose pieces said by where they stand in the world, in the fort's own measure. */
+export function looseLocal(p: Place, loose: Loose[]): Loose[] {
+  return loose.map((l) => {
+    const [x, z] = castleLocal(p, l.x, 0, l.z);
+    return { ...l, x, z, rot: l.rot - p.rot };
+  });
+}
+
+// WHAT IS KEPT HERE, AND ON WHICH STEP OF THE MAP. (The owner, asked: "refer to dayz and use common sense". The
+// rules are over TYPES in src/sim/economy.ts: a thing has a kind of building it is kept in and a step it belongs to.)
+//
+// In DayZ a castle is no armoury: it is a hunter's and a wanderer's place, worth going to for where it stands, with
+// a little of what is good in it. The army's stores and the gas are where the best is. So this is not a second
+// Chemical Works: that would be the rifles' own step with no mask asked for, and nobody would go under the gas
+// again. It is three steps in one place, and the way from the first to the last is up:
+//   2  the ruined houses on the way to it: a hunter's leavings (Hunting). What a body can use on the climb.
+//   3  the fort itself, from the gate to the hall: the terrace, the store under the hall, the hall, the floors of
+//      the towers. What whoever held it lived on and fought with (Military): Kamenka's step, a submachine gun and
+//      a vest, and far from Kamenka.
+//   4  what is high: the upper room where they slept and kept their guns, the roof, the platform of each tower.
+//      A rifleman's place, and a rifleman's things (Military): the rifles' own step, fifteen places of it, each one
+//      at the top of a stair that somebody may be holding. One rack in the upper room always has a gun on it.
+// Its crates and cases are searched as crates are anywhere.
+export const CASTLE_TIERS = { grounds: 2, fort: 3, high: 4 } as const;
+/** how high over the terrace a thing lies for it to be of the high step */
+const HIGH = 4.5;
 export type CastleUsage = 'Military' | 'Hunting';
 export interface CastleLoot {
   x: number;
@@ -621,27 +674,27 @@ export interface CastleLoot {
   usage: CastleUsage[];
   building: string;
   floor: boolean;
-  tier: typeof CASTLE_TIER;
+  tier: 2 | 3 | 4;
   /** kept stocked with a gun (the rack in the upper room) */
   arms?: 'guns';
   surf?: { x: number; z: number; rot: number; hx: number; hz: number; clear: number };
 }
 
 /** where things lie, in the fort's own measure: [x, z, y, on the floor, what kind of place, on which piece of furniture (its place in FURNITURE)] */
-function lootSpots(): { x: number; z: number; y: number; floor: boolean; usage: CastleUsage[]; on?: number; arms?: 'guns'; sits?: [number, number] }[] {
+function lootSpots(loose: Loose[]): { x: number; z: number; y: number; floor: boolean; usage: CastleUsage[]; tier: 2 | 3 | 4; on?: number; arms?: 'guns'; sits?: [number, number] }[] {
   const C = CASTLE, T = C.tower, out: ReturnType<typeof lootSpots> = [];
   const army: CastleUsage[] = ['Military'], hunt: CastleUsage[] = ['Hunting'];
   // on the furniture: along the top of each table, on a rack's middle shelf, on a bunk's lower bed
   FURNITURE.forEach((f, on) => {
     const c = Math.cos(f.yaw), s = Math.sin(f.yaw);
-    const put = (lx: number, y: number, o: { arms?: 'guns' } = {}) => out.push({ x: f.x + lx * c, z: f.z - lx * s, y: f.y + y, floor: false, usage: army, on, ...o });
+    const put = (lx: number, y: number, o: { arms?: 'guns' } = {}) => out.push({ x: f.x + lx * c, z: f.z - lx * s, y: f.y + y, floor: false, usage: army, tier: f.y >= HIGH ? CASTLE_TIERS.high : CASTLE_TIERS.fort, on, ...o });
     if (f.kind === 'table') for (const lx of f.w > 2 ? [-0.75, 0, 0.75] : [-0.45, 0.45]) put(lx, 0.8);
     else if (f.kind === 'rack') {
       put(-0.4, 0.995, f.y > 5 ? { arms: 'guns' } : {});
       put(0.4, 0.995);
     } else if (f.kind === 'bunk') put(0, 0.46);
   });
-  const fl = (x: number, z: number, y: number, usage = army) => out.push({ x, z, y, floor: true, usage });
+  const fl = (x: number, z: number, y: number) => out.push({ x, z, y, floor: true, usage: army, tier: y >= HIGH ? CASTLE_TIERS.high : CASTLE_TIERS.fort });
   // the store, the hall, the upper room and the roof: on the boards and the paving
   fl(-1.5, -2.6, 0);
   fl(1.4, 0.4, 0);
@@ -665,11 +718,11 @@ function lootSpots(): { x: number; z: number; y: number; floor: boolean; usage: 
   fl(-7.6, 3.4, 0);
   fl(7.6, 4.2, 0);
   // the ruined houses: a hunter's leavings, one or two to a house
-  SHELLS.forEach((sh, k) => {
-    const c = Math.cos(sh.yaw), s = Math.sin(sh.yaw);
+  houses(loose).forEach((sh, k) => {
+    const c = Math.cos(sh.rot), s = Math.sin(sh.rot);
     for (const [lx, lz] of k % 2 ? [[-2.4, 1.2]] : [[2.2, -1.1], [-2.6, 1.4]]) {
       const x = sh.x + lx * c + lz * s, z = sh.z - lx * s + lz * c;
-      out.push({ x, z, y: 0.02, floor: true, usage: hunt, sits: [x, z] });
+      out.push({ x, z, y: 0.02, floor: true, usage: hunt, tier: CASTLE_TIERS.grounds, sits: [x, z] });
     }
   });
   return out;
@@ -678,19 +731,23 @@ function lootSpots(): { x: number; z: number; y: number; floor: boolean; usage: 
 /** where a thing off the shelf stands: [what, x, z, y, which way it is turned]. Crates and cases are searched, as they are anywhere. */
 const STOOD: [string, number, number, number, number][] = [
   // the store: what an army left, and what was put by since
-  ['wooden_military_crate', -3.05, -2.5, 0, Math.PI / 2], ['wooden_military_crate', -1.6, 3.05, 0, 0], ['wooden_crate_01', 2.3, 2.9, 0, 0.3], ['wooden_crate_01', 2.25, 2.85, 0.35, -0.2],
-  ['Barrel_01', -0.4, -3, 0, 0], ['Barrel_01', 0.3, -3.02, 0, 1], ['barrel_03', 2.35, 0.9, 0, 2],
+  ['wooden_military_crate', -1.9, -2.75, 0, Math.PI / 2], ['wooden_military_crate', 1.6, -2.9, 0, 0], ['wooden_crate_01', 2.3, 2.9, 0, 0.3], ['wooden_crate_01', 2.25, 2.85, 0.35, -0.2],
+  ['barrel_03', -0.4, -3, 0, 0], ['barrel_03', 0.3, -3.02, 0, 1], ['barrel_03', 2.35, 0.9, 0, 2],
   // the upper room
-  ['weapons_case', 0.2, -2, 5.85, 0.1], ['old_military_crate', 2.1, 2.2, 5.85, Math.PI / 2],
+  ['weapons_case', 0.2, -1.0, 5.85, 0.1],
+  // the hall: a long case against its north wall
+  ['old_military_crate', 1.75, -2.85, 3, 0],
   // the roof: something to kneel behind
-  ['wooden_crate_01', -2.9, -0.4, CASTLE.keep.roof, 1.4], ['Barrel_01', 2.3, 0.6, CASTLE.keep.roof, 0],
-  // inside the gate: what was dragged across it, and did not stop anybody
-  ['Barrel_01', 8.2, -4.4, 0, 0], ['Barrel_01', 8.75, -4.1, 0, 2], ['wooden_crate_01', 8.3, 0.9, 0, 0.5], ['crate_big', 7.9, 2.1, 0, 0.2],
+  ['wooden_crate_01', -2.9, -0.4, CASTLE.keep.roof, 1.4], ['wooden_crate_01', 2.3, 0.2, CASTLE.keep.roof, 0.4],
+  // inside the gate: drums of fuel dragged across it, which did not stop anybody (and which a shot sets off: whoever
+  // comes in by the gate comes in past them), and what else was to hand
+  ['Barrel_01', 7.75, -4.6, 0, 0], ['Barrel_01', 8.1, -4.0, 0, 2], ['wooden_crate_01', 8.0, 0.2, 0, 0.3], ['crate_big', 7.9, 3.1, 0, 0.1],
   // a fire on the north side of the terrace, out of the wind off the gate
-  ['stone_fire_pit', 4.3, -7.4, 0.19, 0],
+  ['stone_fire_pit', 4.6, -7.75, 0.19, 0],
 ];
-/** and out on the grounds, each on the ground where it is: a fire in the second house, a crate in the fourth */
-const STOOD_OUT: [string, number, number, number][] = [['stone_fire_pit', SHELLS[1].x - 0.6, SHELLS[1].z + 0.3, 0], ['wooden_crate_01', SHELLS[3].x + 2.2, SHELLS[3].z - 1.6, 0.8]];
+/** and in the ruined houses, each on the ground where it is: a fire in the second there is, a crate in the fourth: [what, which house, across it, along it, turned] */
+const STOOD_OUT: [string, number, number, number, number][] = [['stone_fire_pit', 1, -0.6, 0.3, 0], ['wooden_crate_01', 3, 2.2, -1.6, 0.8]];
+const houses = (loose: Loose[]) => loose.filter((l) => l.kind === 'house');
 
 /** the ground at a spot of the world, for whoever stands a thing on it: the world's own, where there is one; else what the fort assumes */
 export type GroundAt = (wx: number, wz: number) => number;
@@ -703,14 +760,14 @@ const assumed = (p: Place): GroundAt => (wx, wz) => {
  * Every place a thing can lie, as places in the world. The same on the server and in every game: it is all in
  * the plan. @param ground the height of the world's ground at a spot (the ruined houses stand on it as it is)
  */
-export function castleLoot(p: Place, ground: GroundAt = assumed(p)): CastleLoot[] {
-  return lootSpots().map((s) => {
+export function castleLoot(p: Place, ground: GroundAt = assumed(p), loose: Loose[] = castleLoose(p)): CastleLoot[] {
+  return lootSpots(looseLocal(p, loose)).map((s) => {
     let [x, y, z] = castleAt(p, s.x, s.z, s.y);
     if (s.sits) y = ground(x, z) + s.y;
     const f = s.on === undefined ? null : FURNITURE[s.on];
     [x, y, z] = [Math.round(x * 1000) / 1000, Math.round(y * 1000) / 1000, Math.round(z * 1000) / 1000];
     return {
-      x, y: y + (s.floor ? 0.02 : 0.003), z, usage: s.usage, building: 'castle', floor: s.floor, tier: CASTLE_TIER,
+      x, y: y + (s.floor ? 0.02 : 0.003), z, usage: s.usage, building: 'castle', floor: s.floor, tier: s.tier,
       ...(s.arms ? { arms: s.arms } : {}),
       ...(f ? { surf: { x: castleAt(p, f.x, f.z)[0], z: castleAt(p, f.x, f.z)[2], rot: p.rot + f.yaw, hx: f.w / 2 - 0.08, hz: f.d / 2 - 0.06, clear: f.kind === 'table' ? 10 : 0.5 } } : {}),
     };
@@ -718,14 +775,17 @@ export function castleLoot(p: Place, ground: GroundAt = assumed(p)): CastleLoot[
 }
 
 /** What stands in it off the shelf, as the world's own list of such things has them. */
-export function castleProps(p: Place, ground: GroundAt = assumed(p)): { kind: string; x: number; y: number; z: number; rot: number; scale: number; far?: number }[] {
+export function castleProps(p: Place, ground: GroundAt = assumed(p), loose: Loose[] = castleLoose(p)): { kind: string; x: number; y: number; z: number; rot: number; scale: number; far?: number }[] {
   const out = STOOD.map(([kind, lx, lz, ly, rot]) => {
     const [x, y, z] = castleAt(p, lx, lz, ly);
     return { kind, x, y, z, rot: p.rot + rot, scale: 1, far: kind === 'stone_fire_pit' ? 140 : 90 };
   });
-  for (const [kind, lx, lz, rot] of STOOD_OUT) {
-    const [x, , z] = castleAt(p, lx, lz);
-    out.push({ kind, x, y: ground(x, z) + (kind === 'stone_fire_pit' ? 0.19 : 0), z, rot: p.rot + rot, scale: 1, far: 140 });
+  const hs = houses(loose);
+  for (const [kind, k, lx, lz, rot] of STOOD_OUT) {
+    const h = hs[k];
+    if (!h) continue;
+    const x = h.x + lx * Math.cos(h.rot) + lz * Math.sin(h.rot), z = h.z - lx * Math.sin(h.rot) + lz * Math.cos(h.rot);
+    out.push({ kind, x, y: ground(x, z) + (kind === 'stone_fire_pit' ? 0.19 : 0), z, rot: h.rot + rot, scale: 1, far: 140 });
   }
   return out;
 }
@@ -740,7 +800,9 @@ export function castleLamps(p: Place): V3[] {
  * the store under the hall, where it is dark; they do not have the terrace, the towers or the roof, which are for
  * whoever holds the fort and whoever comes to take it.
  */
-export function castleHomes(p: Place): { x: number; z: number; r: number; n: number; inside?: V3[] }[] {
-  const [vx, , vz] = castleAt(p, 68, -1);
-  return [{ x: vx, z: vz, r: 30, n: 5 }, { x: p.x, z: p.z, r: 6, n: 2, inside: [castleAt(p, -1.2, 0.6, 0), castleAt(p, 1.3, -1.6, 0), castleAt(p, -0.4, 2, 0)] }];
+export function castleHomes(p: Place, loose: Loose[] = castleLoose(p)): { x: number; z: number; r: number; n: number; inside?: V3[] }[] {
+  const hs = houses(loose), store = { x: p.x, z: p.z, r: 6, n: 2, inside: [castleAt(p, -1.2, 0.6, 0), castleAt(p, 1.3, -1.6, 0), castleAt(p, -0.4, 2, 0)] };
+  if (!hs.length) return [store];
+  const vx = hs.reduce((t, h) => t + h.x, 0) / hs.length, vz = hs.reduce((t, h) => t + h.z, 0) / hs.length;
+  return [{ x: vx, z: vz, r: Math.max(12, ...hs.map((h) => Math.hypot(h.x - vx, h.z - vz) + 8)), n: Math.min(5, hs.length) }, store];
 }
