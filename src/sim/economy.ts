@@ -403,7 +403,7 @@ const APART_LEAST: Record<string, Record<string, number>> = {
  * The kind of spot a sort lies at in a place apart, where it has no kind of its own (under the gas such a thing
  * lies anywhere, and a place apart is sorted on every step: so it lay nowhere in one).
  */
-export const APART_KIND: Record<string, string[]> = { suppressor_762: ['Military'], suppressor_739: ['Military'] };
+export const APART_KIND: Record<string, Usage[]> = { suppressor_762: ['Military'], suppressor_739: ['Military'] };
 
 export class Economy {
   loot = new Map<string, WorldLoot>();
