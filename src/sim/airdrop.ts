@@ -38,7 +38,8 @@ export const AIRDROP = {
   /** the crate falls free for this long, the canopy takes this long to open, and then it comes down at this many m/s */
   free: 1.2,
   open: 0.9,
-  fall: 5.5,
+  // (5.5 until 2026-10-13: "airdrops should spawn in sky and slowly fall with parachute". Some twenty-one seconds from ninety metres.)
+  fall: 4.2,
   gravity: 9.81,
   /** seconds the helicopter stays over the place after the crate has left it */
   stay: 30,
