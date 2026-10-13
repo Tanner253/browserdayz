@@ -507,6 +507,33 @@ export class BigMap {
       const [w, d] = BUILDING_FOOTPRINT[b.type];
       this.held.push({ name: CALLED[b.type] ?? 'Building', x: b.x, z: b.z, rot: b.rot, w, d, tier: most(list.map((q) => q.tier ?? 1))[0], kinds: kinds(list), gas: list.some((q) => q.usage.includes('Gas')) });
     }
+    // (The fort is no building of the sheet's either, and was marked with the bunker: seventy places of it counted
+    // into the bunker's box, and nothing on the map where the fort stands. It is its own mark, and of the fourth
+    // step whatever each room of it is: 2026-10-13, "castle is T4 loot and needs to render that color on the map".
+    // As wide as its places within the walls lie.)
+    const fort = inside.get('castle');
+    if (fort?.length && world.castle) {
+      inside.delete('castle');
+      const C = world.castle, off = fort.filter((q) => (q.tier ?? 1) >= 3).map((q) => Math.hypot(q.x - C.x, q.z - C.z)).sort((m, n) => m - n);
+      const wide = Math.min(90, Math.max(30, 2 * (off[Math.floor(off.length * 0.9)] ?? 15) + 6));
+      const named = spots.find((q) => q.x === C.x && q.z === C.z)?.name ?? 'The fort';
+      this.held.push({ name: named, x: C.x, z: C.z, rot: C.rot, w: wide, d: wide, tier: 4, kinds: kinds(fort), gas: false });
+    }
+    // (and a wreck with things about it: each where it lies)
+    const wrecks = inside.get('wreck');
+    if (wrecks?.length) {
+      inside.delete('wreck');
+      const groups: (typeof points)[] = [];
+      for (const q of wrecks) {
+        const g = groups.find((list) => Math.hypot(list[0].x - q.x, list[0].z - q.z) < 40);
+        if (g) g.push(q);
+        else groups.push([q]);
+      }
+      for (const g of groups) {
+        const x = g.reduce((m, q) => m + q.x, 0) / g.length, z = g.reduce((m, q) => m + q.z, 0) / g.length;
+        this.held.push({ name: 'A wreck', x, z, rot: 0, w: 9, d: 9, tier: most(g.map((q) => q.tier ?? 1))[0], kinds: kinds(g), gas: false });
+      }
+    }
     // (and what is in no building on the sheet, which is the bunker under its hill: marked where its way in is)
     const rest = [...inside.values()].flat();
     if (rest.length) {
