@@ -82,6 +82,10 @@ export const ORDERS: Order[] = [
   { name: 'noclip', args: ['[who]'], does: 'You fly, and through anything; or another admin does (again, to walk)', admin: true },
   { name: 'voidinv', args: ['[who]'], does: 'Dying, an admin leaves nothing they carried on their body (again, to leave it)', admin: true },
   { name: 'voidtag', args: ['[who]'], does: 'Dying, an admin leaves no dog tag of their own (again, to leave one)', admin: true },
+  // (what is carried, and what is fired, 2026-10-13: src/sim/powers.ts. `on` or `off` says which; said neither, it is turned over)
+  { name: 'weightless', args: ['[on|off]', '[who]'], does: 'What you carry weighs nothing: however much it is, it never slows you. Or another admin’s (with neither word, it is turned over)', admin: true },
+  { name: 'ammo', args: ['[on|off]', '[who]'], does: 'Endless ammunition: firing takes no round out of your gun. Or another admin’s (with neither word, it is turned over)', admin: true },
+  { name: 'refill', args: ['[who]'], does: 'Every magazine and every gun you carry is filled, or somebody else’s', admin: true },
   { name: 'ban', args: ['who', '[why]'], does: 'Ban for good: their game and their address', admin: true },
   { name: 'bans', args: [], does: 'Who is banned, numbered for /unban', admin: true },
   { name: 'unban', args: ['id-number-or-name'], does: 'Lift a ban: by its id or its number from /bans, or by the name if only one ban has it', admin: true },
@@ -115,6 +119,7 @@ export interface Offer {
 
 const MINUTES = ['5', '10', '30', '60'];
 const METRES = ['30', '60', '120', '250'];
+const SWITCH = ['on', 'off'];
 
 /**
  * What to offer under a line being typed. @returns null when the line is talk, or whoever types has no role.
@@ -165,6 +170,16 @@ export function offer(text: string, role: Role | null, here: { id: number; name:
     picks = ENTITIES.filter((e) => e.id.startsWith(p) || e.name.toLowerCase().startsWith(p) || !!e.also?.some((a) => a === p)).map((e) => ({ label: e.id, note: `${e.name}: ${e.does}`, fill: `${stem}${e.id} `, whole: false }));
   } else if (kind === 'metres') {
     picks = METRES.filter((m) => m.startsWith(p) && m !== p).map((m) => ({ label: m, note: 'metres', fill: `${stem}${m} `, whole: false }));
+  }
+  // A switch (`[on|off]`, then `[who]`). The word and the player may be said in either order, as the server reads
+  // them: whichever is still to be said is what is offered. With nothing typed, the two words; with a name or a
+  // number begun where the word would be, the players; with both said, nothing more.
+  if (order.args[0] === '[on|off]') {
+    const before = words.slice(1, -1).map((w) => w.toLowerCase());
+    const switched = before.some((w) => SWITCH.includes(w)), named = before.some((w) => !SWITCH.includes(w));
+    const word = switched ? [] : SWITCH.filter((w) => w.startsWith(p) && w !== p).map((w) => ({ label: w, note: w === 'on' ? 'put it on' : 'put it off', fill: `${stem}${w} `, whole: false }));
+    const who = named || (!switched && (!p || SWITCH.some((w) => w.startsWith(p)))) ? [] : here.filter((o) => !p || o.name.toLowerCase().includes(p) || `#${o.id}`.startsWith(p)).map((o) => ({ label: `#${o.id}  ${o.name}`, note: 'online', fill: `${stem}#${o.id} `, whole: false }));
+    picks = [...word, ...who];
   }
   return { order, at, picks };
 }

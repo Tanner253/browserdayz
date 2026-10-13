@@ -371,7 +371,13 @@ export type S2C =
    * Which of an admin's powers this player has on: nothing hurts them, nobody sees them, they fly through things.
    * And what they have chosen for their own death: nothing they carried is left on the body, no tag of theirs is.
    */
-  | { t: 'powers'; god: boolean; hidden: boolean; clip: boolean; voidInv: boolean; voidTag: boolean }
+  | { t: 'powers'; god: boolean; hidden: boolean; clip: boolean; voidInv: boolean; voidTag: boolean; /** what they carry weighs nothing; firing takes no round out of their gun (src/sim/powers.ts). Not said by a server from before 2026-10-13: not said is off */ weightless?: boolean; endless?: boolean }
+  /**
+   * An admin's refill (`/refill`): every magazine and every gun this player carries is to be full. Their own game
+   * fills them (`refill` in src/sim/powers.ts: it alone knows what is carried at this moment) and says what it
+   * carries afterwards, as it does of anything. `by`: the admin who did it, when it was not themselves.
+   */
+  | { t: 'refill'; by?: string }
   /** the lists the panel shows (see AdminLists) */
   | ({ t: 'adm' } & AdminLists)
   /** the server is about to be restarted (in so many seconds: 0, it is stopping now), and why, if that was said */
@@ -383,7 +389,7 @@ export type S2C =
 /** What the panel of somebody with a role is shown. The last two are an admin's alone. */
 export interface AdminLists {
   /** everybody online: where they are, how long they have been on (minutes), how often the checks have fired on them */
-  players: { id: number; name: string; role: 'admin' | 'mod' | null; x: number; z: number; /** the way they face, radians (0 looks north, down -z): the admin's map points each dot that way. Not said by a server from before 2026-10-13 */ yaw?: number; alive: boolean; flags: number; mins: number; /** health as their game last said it, kills and tags cashed since the server started */ hp: number; kills: number; tags: number; hidden?: true; god?: true; clip?: true; muted?: true; seat?: true; voidInv?: true; voidTag?: true; /** gone without logging out: the body is still here */ asleep?: true; /** their game is not answering (a hidden tab): the server keeps their life */ away?: true }[];
+  players: { id: number; name: string; role: 'admin' | 'mod' | null; x: number; z: number; /** the way they face, radians (0 looks north, down -z): the admin's map points each dot that way. Not said by a server from before 2026-10-13 */ yaw?: number; alive: boolean; flags: number; mins: number; /** health as their game last said it, kills and tags cashed since the server started */ hp: number; kills: number; tags: number; hidden?: true; god?: true; clip?: true; muted?: true; seat?: true; voidInv?: true; voidTag?: true; /** an admin's: what they carry weighs nothing, and their gun spends no rounds */ weightless?: true; endless?: true; /** gone without logging out: the body is still here */ asleep?: true; /** their game is not answering (a hidden tab): the server keeps their life */ away?: true }[];
   /** who left lately, newest first */
   gone: { id: number; name: string; mins: number }[];
   /**
