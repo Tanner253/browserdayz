@@ -270,7 +270,7 @@ await test('from 13 October: a tag pays 0.01 at least, and a wallet\'s three a d
   const fourth = tag(w, 80);
   const o = await handle(w, fourth);
   assert.equal(o.state, 'skipped');
-  assert.match(o.state === 'skipped' ? o.why : '', /paid for 3 tags today: no more are paid to it until tomorrow/);
+  assert.match(o.state === 'skipped' ? o.why : '', /had cashed in 3 tags already that day: no more are paid to it for that day/);
   // somebody else is not held up by it
   assert.equal((await handle(w, tag(w, 81))).state, 'paid');
   // and tomorrow that wallet is paid again, for what is cashed in tomorrow: the one that was over is not paid then
@@ -281,6 +281,33 @@ await test('from 13 October: a tag pays 0.01 at least, and a wallet\'s three a d
   assert.equal(got(w, 80), SOL(0.04));
   const rows = (await readBook(w.store)).rows.filter((r) => r.wallet === wallet(80));
   assert.deepEqual([rows.filter((r) => r.state === 'paid').length, rows.filter((r) => r.state === 'skipped').length], [4, 1]);
+});
+
+await test('from 13 October: a tag that was one of its day\'s three, and waited for the treasury, is paid when it fills, whatever has gone out since', async () => {
+  // (Found on reading, 2026-10-13. Day one: three tags, the treasury good for one. Day two: three more, and then
+  // the treasury fills. All six were among their own day's three: all six are paid. Two were refused for good.)
+  // (0.025: one tag at the least, and what the treasury keeps back)
+  const w = world(0.025, RULES);
+  const first = [tag(w, 90), tag(w, 90), tag(w, 90)];
+  const one = [];
+  for (const t of first) one.push((await handle(w, t)).state);
+  assert.deepEqual(one, ['paid', 'waiting', 'waiting'], 'the treasury was good for one of the three');
+  // (and a fourth, that same day, is over the limit whether or not the three have been paid yet)
+  const over = tag(w, 90);
+  assert.equal((await handle(w, over)).state, 'skipped');
+  w.skip(13 * 3600 * 1000);
+  const second = [tag(w, 90), tag(w, 90), tag(w, 90)];
+  w.chain.balances.set(TREASURY.address, got(w, TREASURY.address) + SOL(2));
+  for (const t of second) assert.equal((await handle(w, t)).state, 'paid');
+  // (the two of yesterday that waited: paid at the next look, though three have gone to this wallet today)
+  w.skip(60_000);
+  await sweep(w);
+  for (const t of first) assert.equal((await handle(w, t)).state, 'paid', 'one of the first day\'s three was not paid when the treasury filled');
+  assert.equal((await handle(w, over)).state, 'skipped');
+  const rows = (await readBook(w.store)).rows.filter((r) => r.wallet === wallet(90));
+  assert.deepEqual([rows.filter((r) => r.state === 'paid').length, rows.filter((r) => r.state === 'skipped').length, rows.filter((r) => r.state === 'waiting').length], [6, 1, 0]);
+  // (and a fourth of the second day is over that day's limit)
+  assert.equal((await handle(w, tag(w, 90))).state, 'skipped');
 });
 
 await test('from 13 October: two who cash each other\'s tags inside a day are paid for the first and not the second', async () => {

@@ -149,6 +149,18 @@ export function price(balance: bigint, cfg: Pick<Config, 'share' | 'floor' | 'ce
   return part < cfg.floor ? cfg.floor : part > cfg.ceiling ? cfg.ceiling : part;
 }
 
+const OVER_DAY = (cfg: Config) => `this wallet had cashed in ${cfg.walletDayTags} tags already that day: no more are paid to it for that day (the day is counted in UTC)`;
+/**
+ * Is this tag over its wallet's limit for the day it was cashed in: are there already so many of that wallet's,
+ * cashed in earlier that same day (UTC), that are paid or to be paid? Asked by when a tag was CASHED IN and not by
+ * when it comes to be paid, so that the answer is the same whenever it is asked.
+ */
+export function overDay(book: Book, t: Tag, cfg: Config): boolean {
+  const cashed = Date.parse(t.at), day = dayOf(cashed);
+  const before = (r: Row) => Date.parse(r.at) < cashed || (r.at === t.at && r.ref < t.ref);
+  return book.rows.filter((r) => r.ref !== t.ref && r.wallet === t.wallet && dayOf(Date.parse(r.at)) === day && before(r) && (r.state === 'paid' || r.state === 'sending' || r.state === 'waiting')).length >= cfg.walletDayTags;
+}
+
 /** how long after one player has cashed another's tag the other's cashing of theirs is not paid */
 export const TRADE_MS = 24 * 3600 * 1000;
 
@@ -577,6 +589,9 @@ async function settle(w: World, t: Tag, at: { held: Held }): Promise<Outcome> {
     if (since && Date.parse(t.at) < Date.parse(since)) return { state: 'skipped', why: 'cashed in before automatic payouts began' };
     // (asked of a tag when it first comes, and of none that the book has had waiting since before the rule)
     if (!had && Date.parse(t.at) >= cfg.rulesFrom && traded(at.held.book, t)) return { state: 'skipped', why: `you and ${t.owner.slice(0, 16)} have cashed each other's tags inside a day: the second of the two is not paid` };
+    // (and one over its wallet's three for the day is told so at once, not told to wait for a treasury that will
+    // not pay it when it fills: asked again where it is written down, below)
+    if (Date.parse(t.at) >= cfg.rulesFrom && overDay(at.held.book, t, cfg)) return { state: 'skipped', why: OVER_DAY(cfg) };
     const wrong = await setup(w);
     if (wrong) return { state: 'waiting', why: wrong, hold: 'setup' };
     const there = await w.rpc.account(to);
@@ -627,10 +642,17 @@ async function settle(w: World, t: Tag, at: { held: Held }): Promise<Outcome> {
         b.most.lamports = Math.max(b.most.lamports, Number(balance));
         const allowed = (BigInt(b.most.lamports) * BigInt(Math.round(cfg.dayShare * 1000))) / 1000n;
         const full = today.filter((r) => r.wallet === t.wallet).length >= cfg.walletDayTags;
-        if (full && Date.parse(t.at) >= cfg.rulesFrom) said.wait = { state: 'skipped', why: `this wallet has been paid for ${cfg.walletDayTags} tags today: no more are paid to it until tomorrow (the day is counted in UTC)` };
-        else if (full) said.wait = { state: 'waiting', why: `this wallet has been paid for ${cfg.walletDayTags} tags today: the rest wait for tomorrow`, hold: 'day' };
+        // The wallet's limit, for what is cashed in under the rules of 2026-10-13: it is on what a wallet CASHES IN
+        // in a day, and is asked of the tag by the day it was cashed in and its place among that day's, whenever
+        // it comes to be paid. The first three of a day are paid, today or when the treasury can; a fourth is not.
+        // (It was asked by what had been PAID on the day of the paying. A tag that was one of its day's three and
+        // had been told to wait for the treasury was then refused for good, the day the treasury filled, if three
+        // of the next day's had gone out before it: found on reading, 2026-10-13, before it happened to anybody.)
+        if (Date.parse(t.at) >= cfg.rulesFrom) {
+          if (overDay(b, t, cfg)) said.wait = { state: 'skipped', why: OVER_DAY(cfg) };
+        } else if (full) said.wait = { state: 'waiting', why: `this wallet has been paid for ${cfg.walletDayTags} tags today: the rest wait for tomorrow`, hold: 'day' };
         // (the first of the day always goes: a limit smaller than one tag would stop everything)
-        else if (today.length && spent + amount > allowed) said.wait = { state: 'waiting', why: "today's limit on what leaves the treasury has been reached: this one is paid when there is room again", hold: 'day' };
+        if (!said.wait && today.length && spent + amount > allowed) said.wait = { state: 'waiting', why: "today's limit on what leaves the treasury has been reached: this one is paid when there is room again", hold: 'day' };
         if (said.wait) return row && says(row, said.wait, day) ? false : enter(b, t, said.wait, day);
       }
       enter(b, t, { state: 'sending', lamports: Number(amount), signature: attempt.signature }, day).tries = [...tries, attempt];
