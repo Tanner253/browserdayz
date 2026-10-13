@@ -544,8 +544,14 @@ const CHECKS = (['off', 'watch', 'enforce'].includes(process.env.CHECKS ?? '') ?
  *   over  – how far past none the health the server allows somebody may go before they ought to be dead, and
  *   down  – how many ms they are given to say so themselves, as every honest game does
  *   strikes, ban – put off the server so many times inside an hour, and they are kept off it for so many hours
+ *   fresh – ms after somebody is let in OFF THE BOT CHECK'S RANGE in which nothing their game says of where they
+ *     are is weighed. The range stands four hundred metres up, and a game that had passed it went on saying it
+ *     was there (or falling from there) until it had put its world together: held in the air for twelve
+ *     seconds, put off; put off, the range again, and the same again; twice in an hour, kept off for six. Nobody
+ *     had cheated. 2026-10-13: "this person was wrongfully banned". The game no longer waits up there; this is
+ *     for a game that does all the same.
  */
-const CHECK = { foot: 9.5, seat: 64, carry: 2, lag: 12, lagFor: 5000, grace: 3, owe: 30, free: 2500, kick: Number(process.env.CHECK_KICK) || 12, hill: 1.5, high: [30, 4], reach: 8, heal: 10, over: 15, down: 1500, strikes: 2, ban: 6 };
+const CHECK = { foot: 9.5, seat: 64, carry: 2, lag: 12, lagFor: 5000, grace: 3, owe: 30, free: 2500, fresh: 30_000, kick: Number(process.env.CHECK_KICK) || 12, hill: 1.5, high: [30, 4], reach: 8, heal: 10, over: 15, down: 1500, strikes: 2, ban: 6 };
 let flagged = 0;
 
 /** Something a check fires on: counted, and written down (not more than once in five seconds for one player). @returns whether it is refused */
@@ -4454,13 +4460,18 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
   /** what this connection's browser has said of itself on the range */
   let browser: { wd: boolean; gl: string } | null = null;
   /** into the world, or into the line for it */
-  const letIn = (h: Extract<C2S, { t: 'hello' }>) => {
+  /** @param ranged they have this moment passed the bot check's range: see CHECK.fresh */
+  const letIn = (h: Extract<C2S, { t: 'hello' }>, ranged = false) => {
+    const fresh = (client: Client | null) => {
+      if (client && ranged) client.check.free = Date.now() + CHECK.fresh;
+      return client;
+    };
     if (mustWait(h)) {
       waiting = !!enqueue(ws, h, (client) => {
         waiting = false;
-        c = client;
+        c = fresh(client);
       });
-    } else c = join(ws, h);
+    } else c = fresh(join(ws, h));
   };
   let ranging: ReturnType<typeof setInterval> | null = null;
   const offRange = () => {
@@ -4526,7 +4537,7 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
           if (key && BOTCHECK.ms) shooters.set(`${keyHash(key)}|${ipOf.get(ws) ?? ''}`, now + BOTCHECK.ms);
           if (shooters.size > 20000) for (const [k, until] of shooters) if (until < now) shooters.delete(k);
           ws.send(JSON.stringify({ t: 'rpass' } satisfies S2C));
-          letIn(h);
+          letIn(h, true);
         }
       }
       return;

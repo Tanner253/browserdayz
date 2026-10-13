@@ -70,8 +70,8 @@ class Conn {
   asked() {
     return (this.got.find((m) => m.t === 'kick') as { captcha?: string } | undefined)?.captcha ?? '';
   }
-  say(x = 20, z = 0) {
-    if (this.ws.readyState === 1) this.ws.send(JSON.stringify({ t: 's', p: [x, heightAt(world.heights, x, z), z, 0, 0, 8], w: null, m: [], n: Math.round(performance.now()) }));
+  say(x = 20, z = 0, y = heightAt(world.heights, x, z)) {
+    if (this.ws.readyState === 1) this.ws.send(JSON.stringify({ t: 's', p: [x, y, z, 0, 0, 8], w: null, m: [], n: Math.round(performance.now()) }));
   }
   /**
    * Plays the range it has been dealt, as somebody honest does (test/range-player.ts), in real time over the wire.
@@ -290,6 +290,27 @@ try {
     assert.equal(await blind.hello(), 'range');
     assert.ok(!(await blind.shoot({ wd: false, gl: 'ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero)), SwiftShader driver)' })), 'a browser with no graphics card was let in');
     ok('the bot check: nobody in the world until its range is shot; who shoots it is in, and not asked again; not a browser a program drives');
+  }
+
+  // ---- and whoever has just passed it is not put off for still being where the range was (2026-10-13: "this person
+  // was wrongfully banned". The range is four hundred metres up, and a game went on saying it was there while it put
+  // its world together: held in the air twelve seconds, put off, the range again, the same again, kept off six hours.)
+  {
+    const F = 8168;
+    const f = await server(F, { BOTCHECK: 'on', CHECKS: 'enforce' });
+    const zoe = new Conn(F, 'Zoe', '8.8.9.1');
+    assert.equal(await zoe.hello(), 'range');
+    assert.ok(await zoe.shoot(), `somebody who played the range honestly was not let in: ${zoe.why()}`);
+    // sixteen seconds of saying she is where the range was: longer than the twelve that put somebody off
+    for (const t0 = Date.now(); Date.now() - t0 < 16_000; ) {
+      zoe.say(0, 0, 410);
+      await sleep(100);
+    }
+    await sleep(300);
+    assert.ok(!zoe.closed && !zoe.got.some((m) => m.t === 'kick'), `somebody who had just passed the range was put off for being where it was: ${zoe.why()}`);
+    assert.ok(!/\[check[^\n]*Zoe/.test(f.log()), `she was written down for it:\n${f.log().split('\n').filter((l) => l.includes('Zoe')).join('\n')}`);
+    zoe.leave();
+    ok('whoever has just passed the range is not written down, or put off, for saying they are still where it stood: sixteen seconds of it');
   }
 
   // ---- where the check that somebody is a person is set up (the one asked is a stand-in here, and says yes to one slip)
