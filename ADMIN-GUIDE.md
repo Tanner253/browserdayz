@@ -29,7 +29,7 @@ Flying (noclip and free camera): W A S D, **Space** up, **Ctrl** down, **Shift**
 ## The panel
 
 - **Players**: everyone online with their number, place, time on and how often the cheat checks fired on them. Click a player, then: Go to them, Bring them here, Heal, Kill, Warn, Mute, Kick, Timeout (5/10/30/60 min), Ban, Make a mod, Make an admin, Take their role. People who just left are listed underneath and can still be banned. Ban, Kill and Make an admin ask "Sure?" and need a second click.
-- **Me**: God mode, Vanish, Noclip, Free camera, Heal me. Teleport by place name, by numbers, or by right-clicking the map. "Say to all" puts a line across everyone's screen. Two settings for your own death: **Void inventory** (nothing you carried is left on your body) and **Void dog tag** (no tag of yours is left to cash in).
+- **Me**: God mode, Vanish, Noclip, Free camera, Heal me. Teleport by place name, by numbers, or by right-clicking the map. "Say to all" puts a line across everyone's screen. Two settings for your own death: **Void inventory** (nothing you carried is left on your body) and **Void dog tag** (no tag of yours is left to cash in). **Carry and ammunition**: Weightless, Endless ammunition and Refill my magazines (see below).
 - **Spawn**: five one-click kits, and every item in the game with a search box, a kind filter and a count. If a player is picked in Players, kits and items go to them instead of you.
 - **Entities**: spawn a jeep, a police car or infected, and take cars and infected out of the world (see "Added on 13 October" below).
 - **Bans**: the list, with Unban.
@@ -79,6 +79,9 @@ Admins only:
 | `/noclip` | Fly through anything |
 | `/voidinv` | Your body is left empty when you die |
 | `/voidtag` | No dog tag of yours is left when you die |
+| `/weightless` | What you carry weighs nothing: however much it is, it takes nothing off your sprint and never slows you. `/weightless on`, `/weightless off`; with neither word it is turned over |
+| `/ammo` | Endless ammunition: firing takes no round out of your gun. `/ammo on`, `/ammo off`; with neither word it is turned over. An empty gun is still empty: `/refill` fills it |
+| `/refill [who]` | Fills every magazine and every gun you carry (or they carry), wherever it is. A gun with no magazine in it is given its own |
 
 "who" is a name, part of a name, or `#number` from `/players`. The suggestions fill in the number for you.
 
@@ -87,7 +90,7 @@ Admins only:
 - A dog tag can never be spawned.
 - No tag is cashed in while god mode, vanish or noclip is on.
 - A mod cannot kick, time out or mute an admin.
-- Bans and roles are kept on the site and outlast server restarts. Mutes, timeouts and the two death settings last until the server restarts.
+- Bans and roles are kept on the site and outlast server restarts. Mutes, timeouts, the two death settings, weightless and endless ammunition last until the server restarts.
 - One player per internet address. To allow more, set `PER_ADDRESS` on Render (for example `2`).
 - The cheat checks only watch at the moment. To have the server refuse impossible movement and health, set `CHECKS=enforce` on Render.
 
@@ -164,6 +167,15 @@ Admins only:
   - A car you spawn that later burns is followed, three minutes on, by a new car at the nearest parking place of its kind, as any car is.
   - At most 4 cars or 25 infected in one press, and no more than 30 cars or 80 infected over what the map starts with.
 - The **Delete** key still takes away whatever you are looking at while you play.
+
+### Carry and ammunition (in the panel, on your own page under Powers)
+
+- **Weightless**: what you carry weighs nothing. The inventory says "weightless" where the weight was.
+- **Endless ammunition**: firing takes no round out of the gun in your hands. Everything else about the shot is as it was.
+- **Refill my magazines**: one press fills every magazine and every gun you carry. The same button is on the Kits page.
+- Pick a player on the left to refill theirs. Pick an admin to put their two switches on and off (or type `/weightless #number on`, `/ammo #number off`).
+- The top of your screen says WEIGHTLESS and ENDLESS AMMO while they are on. Both stay on when you die, and are on again when you come back in, until the server restarts.
+- A mod cannot use any of the three.
 
 ### Bans
 

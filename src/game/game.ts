@@ -17,6 +17,7 @@ import { Door, type Buildings } from '../world/buildings';
 import { WORLD_SIZE, bunkerPlace, heightAt, inPlay, type SiteKind, type World } from '../world/worldgen';
 import { GEAR_SLOTS, ITEMS, WEAPON_SLOTS, itemName, TAG_HOLD, TAG_HOLD_MIN, TAG_OUT, capacityOf, chambered, fillMag, fittedOf, magRoom, makeItem, newUid, swapMag, tagClock, tagOwner, type ItemInstance, quietOf, makeMag } from '../sim/items';
 import { BODY_GRID, PlayerInventory, SLOT_ORDER, type Container } from '../sim/inventory';
+import { refill, refilledWords, weightFelt } from '../sim/powers';
 import { Economy, type WorldLoot } from '../sim/economy';
 import { CRATE_RESTOCK, CRATE_SPECS, fillCrate } from '../sim/crates';
 import { WEAPON_RULES } from '../sim/combat';
@@ -1263,6 +1264,31 @@ export class Game {
     if (by) this.hud.note(`${by}, an admin, has taken ${n > 1 ? `${n} things` : 'a thing'} out of what you carry`, 'warn');
   }
 
+  /**
+   * An admin's refill (`/refill`, on the server's word and never without it): every magazine and every gun carried
+   * is full, wherever it is, and what the hands hold loose with them. The rule is `refill` in src/sim/powers.ts,
+   * the same the server fills its own copy by; what is carried is said to it again straight after.
+   */
+  private refilled(by?: string) {
+    if (this.player.dead) return;
+    // (whatever the hands were at with a magazine or a gun stops there: a change half made is not finished on top of this)
+    if (this.use) this.breakOff();
+    else this.weapons.abortReload();
+    const r = refill([...this.inv.topLevel(), this.loose]), did = refilledWords(r);
+    if (did) this.inventoryChanged();
+    if (this.invUI.isOpen) this.invUI.render();
+    this.hud.note(did ? `${by ? `${by}, an admin, has filled what you carry: ` : ''}${did}` : `${by ? `${by}, an admin, went to fill what you carry: ` : ''}${r.of ? 'every magazine and gun you carry is full already' : 'you carry no magazine and no gun'}`, did ? 'good' : 'info');
+  }
+
+  /** The two of an admin's powers that are about what is carried (src/sim/powers.ts): said to what fires a gun and to the screen that weighs the pockets. */
+  private carryPowers() {
+    this.weapons.endless = this.powers.endless;
+    this.invUI.weightless = this.powers.weightless;
+    // (and the legs are told on the next frame)
+    this.slowT = 1;
+    if (this.invUI.isOpen) this.invUI.render();
+  }
+
   /** Every survivor wears a dog tag stamped with their own name, round their neck (see PlayerInventory.neck). */
   private makeTag(): ItemInstance {
     const it = makeItem('dogtag');
@@ -1701,9 +1727,10 @@ export class Game {
       this.hud.note(`${m.role === 'admin' ? 'An admin' : 'A mod'} (${m.from}) to you: ${m.text}`, 'warn');
     });
     net.on('powers', (m) => {
-      this.powers = { god: m.god, hidden: m.hidden, clip: m.clip, voidInv: m.voidInv, voidTag: m.voidTag };
+      this.powers = { god: m.god, hidden: m.hidden, clip: m.clip, voidInv: m.voidInv, voidTag: m.voidTag, weightless: !!m.weightless, endless: !!m.endless };
       this.player.god = m.god;
       this.player.setFly(m.clip);
+      this.carryPowers();
       this.showPowers();
     });
     net.on('mend', () => {
@@ -1712,6 +1739,7 @@ export class Game {
     });
     net.on('kit', (m) => this.kitUp(m));
     net.on('trash', (m) => this.trashed(m.uids, m.by));
+    net.on('refill', (m) => this.refilled(m.by));
     net.on('inv', (m) => this.adminUI.setPockets(m));
     // (this game was not answering, and the server kept this life meanwhile: what it makes of it is what it is)
     net.on('hp', (m) => {
@@ -2657,7 +2685,7 @@ export class Game {
   }
   /** an admin's night vision: it is day in this game alone, whatever the hour (the hour itself goes on as it does) */
   private nightSight = false;
-  private powers = { god: false, hidden: false, clip: false, voidInv: false, voidTag: false };
+  private powers = { god: false, hidden: false, clip: false, voidInv: false, voidTag: false, weightless: false, endless: false };
   /** the view has left the body: where it is, and which way it looks */
   private freecam: { pos: THREE.Vector3; yaw: number; pitch: number } | null = null;
   /** how fast the free camera flies, metres a second (the wheel changes it) */
@@ -2675,7 +2703,7 @@ export class Game {
 
   private showPowers() {
     const seen = this.watching ? this.remotes.get(this.watching.id)?.name : '';
-    const on = [this.powers.god && 'GOD MODE', this.powers.hidden && 'VANISHED', this.powers.clip && 'NOCLIP', this.freecam && `${seen ? `WATCHING ${seen.toUpperCase()}` : 'FREE CAMERA'}  ·  ${Math.round(this.freeSpeed)} M/S (WHEEL)  ·  H: BODY HERE  ·  K: BACK`].filter(Boolean);
+    const on = [this.powers.god && 'GOD MODE', this.powers.hidden && 'VANISHED', this.powers.clip && 'NOCLIP', this.powers.weightless && 'WEIGHTLESS', this.powers.endless && 'ENDLESS AMMO', this.freecam && `${seen ? `WATCHING ${seen.toUpperCase()}` : 'FREE CAMERA'}  ·  ${Math.round(this.freeSpeed)} M/S (WHEEL)  ·  H: BODY HERE  ·  K: BACK`].filter(Boolean);
     this.hud.setPowers(on.join('  ·  '));
     this.adminUI?.setSelf(this.adminSelf());
   }
@@ -4522,7 +4550,7 @@ export class Game {
     this.slowT += dt;
     if (this.slowT > 0.2) {
       this.slowT = 0;
-      p.weightKg = this.inv.weight();
+      p.weightKg = weightFelt(this.inv.weight(), this.powers.weightless);
       p.fallMult = this.inv.wear('fall').reduce((a, b) => a * b, 1);
       p.thirstMult = this.inv.wear('thirst').reduce((a, b) => a * b, 1);
       this.hasCompass = !!this.inv.find((i) => i.id === 'compass');

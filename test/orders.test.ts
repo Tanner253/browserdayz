@@ -80,4 +80,40 @@ assert.deepEqual(offer('/delca', 'admin', here)!.picks.map((p) => [p.fill, p.who
 assert.deepEqual(offer('/wre', 'admin', here)!.picks.map((p) => [p.fill, p.whole]), [['/wrecks', true]]);
 checks++;
 
+// ---- what an admin carries, and fires (2026-10-13): weightless, endless ammunition, and the refill. An admin's
+// alone, offered by their names, and each given whole by Enter (a switch with no word after it is turned over; a
+// refill with nobody named is one's own)
+for (const o of ['weightless', 'ammo', 'refill']) {
+  assert.ok(ORDERS.find((x) => x.name === o)?.admin, `/${o} is not an admin's alone`);
+  assert.equal(offer(`/${o} `, 'mod', here), null, `a mod was offered /${o}`);
+  assert.ok(!mod.picks.some((p) => p.fill.trim() === `/${o}`), `a mod was offered /${o}`);
+  assert.ok(admin.picks.some((p) => p.fill === `/${o}` && p.whole), `/${o} is not offered to an admin, or is not given whole by Enter`);
+}
+assert.deepEqual(offer('/wei', 'admin', here)!.picks.map((p) => [p.fill, p.whole]), [['/weightless', true]]);
+assert.deepEqual(offer('/am', 'admin', here)!.picks.map((p) => [p.fill, p.whole]), [['/ammo', true]]);
+assert.deepEqual(offer('/ref', 'admin', here)!.picks.map((p) => [p.fill, p.whole]), [['/refill', true]]);
+assert.deepEqual(offer('/refill ', 'admin', here)!.picks.map((p) => p.fill), ['/refill #4 ', '/refill #12 ', '/refill #31 ']);
+checks++;
+
+// ---- a switch: its two words are offered first, then whose it is; and the other way about, a name or a number
+// begun where the word would be is taken for who, and then the words are offered. With both said, nothing more.
+const sw = offer('/ammo ', 'admin', here)!;
+assert.equal(sw.order?.name, 'ammo');
+assert.equal(sw.at, 0);
+assert.deepEqual(sw.picks.map((p) => [p.fill, p.note]), [['/ammo on ', 'put it on'], ['/ammo off ', 'put it off']]);
+assert.deepEqual(offer('/ammo o', 'admin', here)!.picks.map((p) => p.label), ['on', 'off']);
+assert.deepEqual(offer('/weightless of', 'admin', here)!.picks.map((p) => p.fill), ['/weightless off ']);
+assert.equal(offer('/ammo on', 'admin', here)!.picks.length, 0);
+assert.deepEqual(offer('/ammo on ', 'admin', here)!.picks.map((p) => p.fill), ['/ammo on #4 ', '/ammo on #12 ', '/ammo on #31 ']);
+assert.deepEqual(offer('/ammo on bo', 'admin', here)!.picks.map((p) => p.fill), ['/ammo on #4 ']);
+assert.deepEqual(offer('/weightless bo', 'admin', here)!.picks.map((p) => p.fill), ['/weightless #4 ']);
+assert.deepEqual(offer('/weightless #1', 'admin', here)!.picks.map((p) => p.fill), ['/weightless #12 ']);
+assert.deepEqual(offer('/weightless #4 ', 'admin', here)!.picks.map((p) => p.fill), ['/weightless #4 on ', '/weightless #4 off ']);
+assert.deepEqual(offer('/weightless #4 of', 'admin', here)!.picks.map((p) => p.fill), ['/weightless #4 off ']);
+assert.equal(offer('/weightless #4 off ', 'admin', here)!.picks.length, 0);
+assert.equal(offer('/weightless off #4 ', 'admin', here)!.picks.length, 0);
+// (the powers that were there before are offered as they were: whose, and nothing else)
+assert.deepEqual(offer('/god ', 'admin', here)!.picks.map((p) => p.fill), ['/god #4 ', '/god #12 ', '/god #31 ']);
+checks++;
+
 console.log(`${checks} checks passed`);

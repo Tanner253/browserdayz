@@ -23,6 +23,7 @@ import { GRAVITY, GUNS, QUIETED, SOUND, anywhereIn, coneOf, cooled, crackOf, dam
 import type { ItemModels } from './loot';
 
 import { ownHit } from '../sim/combat';
+import { roundsSpent } from '../sim/powers';
 export type HitZone = 'head' | 'torso' | 'legs' | 'arms';
 /** damage multiplier per hit zone: bullets / melee */
 const ZONE_MULT: Record<HitZone, [number, number]> = { head: [3.2, 1.6], torso: [1, 1], legs: [0.6, 0.7], arms: [0.6, 0.7] };
@@ -1034,6 +1035,8 @@ export class Weapons {
   private lowerT = 0;
   /** the hands are busy with something that is not a weapon (a wave, a dance): it is let down out of the way */
   stowed = false;
+  /** an admin's power (src/sim/powers.ts): a shot takes no round out of the gun. The game's to say, on the server's word */
+  endless = false;
   /** lets the game resolve a collider owner to a damageable entity */
   resolveTarget: (owner: unknown) => Damageable | null = () => null;
   onSlungChange: (objs: THREE.Object3D[]) => void = () => {};
@@ -2208,7 +2211,7 @@ export class Weapons {
       this.fireCooldown = 0.25;
       return;
     }
-    item.loaded = (item.loaded ?? 0) - 1;
+    item.loaded = (item.loaded ?? 0) - roundsSpent(this.endless);
     const kind = def.weapon.kind;
     // (what it fires and how it kicks: see src/sim/gunplay.ts)
     const gun = GUNS[item.id];

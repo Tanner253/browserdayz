@@ -180,7 +180,8 @@ export class InventoryUI {
   /**
    * The same survivor alive (src/game/doll.ts), where the game has made one: drawn each frame on the game's own
    * picture, behind this page, and seen through a hole left for it in the page's dark veil (the end of hud.css).
-   * A drag on it turns it. Until it is made, and on any frame it is not drawn, the still picture above is shown.
+   * A drag on it turns it. Until it is made, and where it is never made (it failed, or the phone has too little
+   * to spare), the still picture above is what is shown.
    */
   figure: { alive: boolean; grab(): void; turn(by: number): void; drop(): void; front(): void } | null = null;
   /** the drag that is turning the figure: which pointer it is, and where that last was */
@@ -239,6 +240,11 @@ export class InventoryUI {
   carryLimit: number | null = null;
   /** the survivor's state, the row of symbols the game has in its corner: the HUD's element (HUD.statusPanel), shown at the foot of what is carried */
   status: HTMLElement | null = null;
+  /**
+   * An admin's power (src/sim/powers.ts): what is carried weighs nothing, and never slows them. The game's to
+   * say; with it on, the head of the carried side says so in place of a weight.
+   */
+  weightless = false;
 
   constructor(private inv: PlayerInventory, private actions: InvActions) {
     this.root = document.createElement('div');
@@ -904,6 +910,8 @@ export class InventoryUI {
     // src/sim/load.ts. In red past the weight that slows the feet as well.)
     const kg = inv.weight(), told = this.carryLimit !== null;
     cargo.innerHTML = `<h3>Carried <span${told ? `${paceOf(kg) < 1 ? ' class="over"' : ''} title="The first ${LOAD.free} kg cost nothing. Every kilogram after that takes ${+(LOAD.perKg * 100).toFixed(2)}% off how far you can sprint. It never takes more than ${Math.round((1 - LOAD.least) * 100)}% (from ${Math.round(heavy())} kg). Over ${LOAD.slowsFrom} kg you are slower on your feet as well."` : ''}>${kg.toFixed(1)} kg${told ? ` · sprint ${Math.round(breathOf(kg) * 100)}%` : ''}</span></h3>`;
+    // (an admin's power: it weighs nothing to them, and the head says that and no weight)
+    if (this.weightless) cargo.innerHTML = `<h3>Carried <span class="free" title="An admin's power is on: the ${kg.toFixed(1)} kg you carry weighs nothing: it takes nothing off your sprint and never slows you. /weightless off puts it off">weightless</span></h3>`;
     const scroll = document.createElement('div');
     scroll.className = 'inv-scroll';
     const grids = document.createElement('div');
