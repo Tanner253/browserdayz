@@ -24,7 +24,7 @@ import assert from 'node:assert/strict';
 import { buildWorldData } from '../server/world';
 import { RNG } from '../src/core/noise';
 import { CRATE_SPECS, fillCrate } from '../src/sim/crates';
-import { APART, Economy, TYPES } from '../src/sim/economy';
+import { APART, APART_KIND, Economy, TYPES } from '../src/sim/economy';
 import { ITEMS } from '../src/sim/items';
 import { TIERS, type Tier } from '../src/sim/tiers';
 import { ARMY_CAMP } from '../src/world/worldgen';
@@ -354,7 +354,10 @@ ok('the fort on the mountain is stocked on top of the map: the army\'s things in
     const top = loose.filter(({ p }) => p.tier === 4);
     assert.ok(top.length >= 10, `${top.length} things of the fourth step in the fort`);
     // (each thing lies in a spot of a kind it is kept in, on every step: no rifle on a cot, no blood in the armoury)
-    for (const { id, p } of loose) assert.ok(TYPES[id].usage.some((u) => p.usage.includes(u)) || (TYPES[id].on?.[p.tier!]?.usage ?? []).some((u) => p.usage.includes(u)), `${id} in the fort's ${p.usage.join(' and ')}`);
+    for (const { id, p } of loose) assert.ok((APART_KIND[id] ?? []).some((u) => p.usage.includes(u)) || TYPES[id].usage.some((u) => p.usage.includes(u)) || (TYPES[id].on?.[p.tier!]?.usage ?? []).some((u) => p.usage.includes(u)), `${id} in the fort's ${p.usage.join(' and ')}`);
+    // (and it is a garrison's store, 2026-10-13: a magazine for each rifle of its racks, a scope, and what a wound needs)
+    const has = (id: string) => loose.filter((l) => l.id === id).length;
+    for (const [id, n] of [['mag_ak', 2], ['mag_ar', 2], ['mag_sniper', 1], ['pu_scope', 1], ['stim_combat', 2], ['blood_bag', 2], ['firstaid', 2], ['grenade', 2]] as const) assert.ok(has(id) >= n, `${has(id)} of ${id} in the fort, and ${n} are always there`);
     // (its guns are on its racks, a rifle among them; what lies loose is what goes with them, and a dressing station's things)
     const guns = fort.filter(({ id, p }) => p.tier === 4 && ITEMS[id].weapon), med = top.filter(({ id }) => ITEMS[id].category === 'medical').length;
     assert.ok(guns.length >= 4 && med >= 2, `${guns.length} guns and ${med} medical things in the fort's fourth step`);

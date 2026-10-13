@@ -75,8 +75,12 @@ const IN_SHEDS: TypeRule['on'] = { 2: { usage: SHEDS }, 3: { usage: SHEDS } };
 const ARMS: [string, number][] = [['colt', 2.4], ['m9', 1.8], ['hatchet', 1.6], ['bat', 1.6], ['crowbar', 1.4], ['machete', 1.4], ['shovel', 1.4], ['knife', 1]];
 /** and from Kamenka on, where guns were kept: the submachine gun before a pistol ("tier 3 should be submachine guns heavy") */
 const ARMS_TOWN: [string, number][] = [['mpa', 2.4], ['m9', 1.6], ['colt', 1]];
-/** and on the racks of a place apart on the fourth step, the fort's armoury: the army's rifles, with the submachine gun still the likeliest */
-const ARMS_FORT: [string, number][] = [['mpa', 2.5], ['mosin', 1.5], ['ak', 1.2], ['ar15', 1.2], ['m9', 1]];
+/**
+ * And on the racks of a place apart on the fourth step, the fort's armoury: the army's rifles. (The submachine gun
+ * was the likeliest of them until the owner had climbed to it, 2026-10-13: "the loot in the castle should be a bit
+ * better i think". A rack at the top of a mountain holds a rifle two times in three.)
+ */
+const ARMS_FORT: [string, number][] = [['ak', 2], ['ar15', 2], ['mosin', 1.6], ['mpa', 1.6], ['m9', 0.6]];
 /** seconds such a rack stays bare once its gun has been taken: the best part of half an hour, where a village's is three minutes (six racks of rifles filled every three minutes would be a well of them) */
 const APART_ARMS_RESTOCK = 1500;
 /** seconds an armed point stays bare once its weapon has been taken */
@@ -376,6 +380,30 @@ export const APART = new Set(['castle', 'wreck']);
 const APART_FILL = 0.85;
 /** and how many times its fair share it is stocked to, up to that: a place apart is somewhere worth the going to */
 const APART_RICH = 1.5;
+/**
+ * How a place apart's share leans, sort by sort (times its share; a sort not named, 1). 2026-10-13, after the owner
+ * had played the fort: "the loot in the castle should be a bit better i think". It was stocked exactly as its step
+ * of the map is, and so it held what a step holds: three loose submachine guns and their magazines, cigarettes and
+ * hats, and not one magazine for the rifles on its own racks. A garrison's store leans to what a rifle needs and
+ * what a wound needs, and has less of what lies in any village. (Still never more of a sort than the whole step
+ * has, and nothing that is the bunker's alone: the drum, the long magazine, the K6-3.)
+ */
+const APART_LEAN: Record<string, number> = {
+  ak: 3, ar15: 3, mosin: 2.5,
+  mag_ak: 6, mag_ar: 6, mag_sniper: 5, box_762: 2.5, box_739: 3, box_556: 4, ammo_762: 1.5, ammo_739: 1.5, ammo_556: 1.5, ammo_50: 3,
+  pu_scope: 2.5, red_dot: 4, gun_light: 3, suppressor_762: 4, suppressor_739: 3, binoculars: 2,
+  armor_vest: 2.5, grenade: 2, stim_combat: 2.5, blood_bag: 2.5, saline: 4, firstaid: 2, aid_pouch: 2.5,
+  mpa: 0.4, mag_mpa: 0.5, ammo_9mm: 0.4, box_9mm: 0.6, m9: 0.5, mag_m9: 0.5, cigarettes: 0.3, boonie_hat: 0.4, jerrycan: 0.5, bandage: 0.6, soft_vest: 0.6,
+};
+/** what a named place apart never has less of on its fourth step, whatever its shares come to (where it has a spot of the kind): a magazine for each rifle of its racks, and a dressing station's own */
+const APART_LEAST: Record<string, Record<string, number>> = {
+  castle: { mag_ak: 2, mag_ar: 2, mag_sniper: 1, pu_scope: 1, suppressor_762: 1, grenade: 2, armor_vest: 1, stim_combat: 2, blood_bag: 2, saline: 1, firstaid: 2 },
+};
+/**
+ * The kind of spot a sort lies at in a place apart, where it has no kind of its own (under the gas such a thing
+ * lies anywhere, and a place apart is sorted on every step: so it lay nowhere in one).
+ */
+export const APART_KIND: Record<string, string[]> = { suppressor_762: ['Military'], suppressor_739: ['Military'] };
 
 export class Economy {
   loot = new Map<string, WorldLoot>();
@@ -423,18 +451,26 @@ export class Economy {
       if (!at) continue;
       const sum = (list: number[]) => list.reduce((a, i) => a + (this.liesAt(id, rule, i, t) ? this.pull(rule, i, t) : 0), 0);
       const mine = sum(here), theirs = sum(there);
-      if (mine > 0) fair.push([id, Math.min(at, (theirs > 0 ? (at * mine) / theirs : at) * APART_RICH)]);
+      if (mine > 0) fair.push([id, Math.min(at, (theirs > 0 ? (at * mine) / theirs : at) * APART_RICH * (APART_LEAN[id] ?? 1))]);
     }
-    const all = fair.reduce((a, [, e]) => a + e, 0), most = here.length * APART_FILL, k = all > most ? most / all : 1;
+    // (What it is never without is taken out of the room there is first: `sure` of each sort. What each sort's share
+    // comes to over that is its `spare`, and the spares fill what room is left, cut down alike if there is not
+    // enough of it.)
+    const least = t === 4 ? APART_LEAST[place] ?? {} : {};
+    const base = fair.map(([id, e]) => {
+      const sure = Math.min(least[id] ?? 0, TYPES[id].at[t - 1]);
+      return { id, sure, spare: Math.max(0, e - sure) };
+    });
+    const kept = base.reduce((a, s) => a + s.sure, 0), all = base.reduce((a, s) => a + s.spare, 0), most = Math.max(0, here.length * APART_FILL - kept), k = all > most ? most / all : 1;
     let left = Math.round(all * k);
-    const whole = fair.map(([id, e]) => ({ id, n: Math.floor(e * k), rest: e * k - Math.floor(e * k) }));
+    const whole = base.map((s) => ({ id: s.id, sure: s.sure, n: Math.floor(s.spare * k), rest: s.spare * k - Math.floor(s.spare * k) }));
     left -= whole.reduce((a, w) => a + w.n, 0);
     for (const w of [...whole].sort((a, b) => b.rest - a.rest || (a.id < b.id ? -1 : 1))) {
       if (left <= 0) break;
       w.n++;
       left--;
     }
-    for (const w of whole) if (w.n > 0) this.wants.set(`${place}|${w.id}@${t}`, w.n);
+    for (const w of whole) if (w.sure + w.n > 0) this.wants.set(`${place}|${w.id}@${t}`, w.sure + w.n);
   }
 
   /** how many of a sort a place apart is stocked to on a step */
@@ -465,9 +501,10 @@ export class Economy {
   /** can a sort lie at this spot on this step: is the spot of a kind it is kept in, and is there room on it */
   private liesAt(id: string, rule: TypeRule, i: number, where: Tier): boolean {
     const p = this.points[i];
-    const kinds = rule.on?.[where]?.usage ?? rule.usage;
     // (A place apart is sorted on every step: its spots were each said to be of a kind on purpose, an armoury's and
-    // a dressing station's, where under the gas and down the bunker anything lies anywhere.)
+    // a dressing station's, where under the gas and down the bunker anything lies anywhere. A sort with no kind of
+    // its own has one there: see APART_KIND.)
+    const kinds = (this.apart[i] !== null ? APART_KIND[id] : undefined) ?? rule.on?.[where]?.usage ?? rule.usage;
     if ((where < UNSORTED || this.apart[i] !== null) && !p.usage.some((u) => kinds.includes(u))) return false;
     // a rifle never spawns on a narrow shelf, a jerrycan never on a barrel
     return this.fits(id, p);
