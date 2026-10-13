@@ -377,8 +377,11 @@ export class Terrain {
     } else {
       const kinds: Kind[] = KIND_NAMES.map((k) => KINDS[k]);
       const made = await buildGround(kinds, kinds.map((k) => t[k.tex]));
-      const weights = this.ground.weights.map((w) => {
-        const tex = new THREE.DataTexture(w, N, N, THREE.RGBAFormat);
+      if (kinds.length !== 13) throw new Error('the paint reads thirteen kinds of ground: four to a picture of weights, and one by itself');
+      const weights = this.ground.weights.map((w, k) => {
+        // (the last picture of weights holds one kind: it is sent as one number a point, not four)
+        const lone = k === 3 ? Uint8Array.from({ length: N * N }, (_, i) => w[i * 4]) : null;
+        const tex = lone ? new THREE.DataTexture(lone, N, N, THREE.RedFormat) : new THREE.DataTexture(w, N, N, THREE.RGBAFormat);
         tex.magFilter = tex.minFilter = THREE.LinearFilter;
         tex.needsUpdate = true;
         return tex;
@@ -391,6 +394,7 @@ export class Terrain {
         tKindsA: { value: weights[0] },
         tKindsB: { value: weights[1] },
         tKindsC: { value: weights[2] },
+        tKindsD: { value: weights[3] },
         tMacro: { value: this.macroTex },
         tSnow: { value: null },
         uSnowIs: { value: snowIs },
@@ -609,6 +613,7 @@ uniform sampler2DArray tReliefQuiet;
 uniform sampler2D tKindsA;
 uniform sampler2D tKindsB;
 uniform sampler2D tKindsC;
+uniform sampler2D tKindsD;
 uniform sampler2D tMacro;
 uniform sampler2D tSnow;
 // (snow: its colour from far off; and whether its picture has come, which it does when somebody first goes near any)
@@ -731,6 +736,7 @@ vec2 jitter = (macro2.rg - 0.5) * (2.6 / uWorld.x);
 vec4 wA = texture2D(tKindsA, splatUv + jitter);
 vec4 wB = texture2D(tKindsB, splatUv + jitter);
 vec4 wC = texture2D(tKindsC, splatUv + jitter);
+float wD = texture2D(tKindsD, splatUv + jitter).r;
 
 float camDist = length(vTerrainPos - cameraPosition);
 vec3 dP3x = dFdx(vTerrainPos);
@@ -750,12 +756,13 @@ vec3 side = pow(abs(gN), vec3(6.0));
 side = max(side / (side.x + side.y + side.z) - 0.1, 0.0);
 side /= side.x + side.y + side.z;
 
-// There are a dozen kinds of ground and a pixel is of one, two or three of them: the three there is most of are
+// There are thirteen kinds of ground and a pixel is of one, two or three of them: the three there is most of are
 // looked at (the second if there is any of it to speak of, the third only if there is a good deal), the rest not.
 float kindW[GROUND_LAYERS];
 kindW[0] = wA.r; kindW[1] = wA.g; kindW[2] = wA.b; kindW[3] = wA.a;
 kindW[4] = wB.r; kindW[5] = wB.g; kindW[6] = wB.b; kindW[7] = wB.a;
 kindW[8] = wC.r; kindW[9] = wC.g; kindW[10] = wC.b; kindW[11] = wC.a;
+kindW[12] = wD;
 int pick[3];
 float layerW[3];
 pick[0] = 0; pick[1] = 0; pick[2] = 0;

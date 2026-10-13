@@ -10,8 +10,8 @@ const world = generateWorld();
 const t0 = performance.now();
 const ground = layGround(world);
 console.log(`the ground laid in ${(performance.now() - t0).toFixed(0)} ms`);
-assert.equal(KIND_NAMES.length, 12, 'the paint holds twelve kinds, four to a picture of weights');
-assert.equal(ground.weights.length, 3);
+assert.equal(KIND_NAMES.length, 13, 'the paint reads thirteen kinds: four to a picture of weights, and one by itself');
+assert.equal(ground.weights.length, 4);
 
 const share = new Float64Array(KIND_NAMES.length);
 let worst = 0;
@@ -46,7 +46,7 @@ for (let iz = 1; iz < N - 1; iz++) for (let ix = 1; ix < N - 1; ix++) {
   const slope = Math.hypot(H[i + 1] - H[i - 1], H[i + N] - H[i - N]) / (2 * CELL);
   if (world.splat[i * 4 + 2] === 255 && slope > 1.5) {
     face++;
-    if (ground.top[i] === KIND_AT.rock) rock++;
+    if (ground.top[i] === KIND_AT.rock || ground.top[i] === KIND_AT.crag) rock++;
   }
 }
 assert.ok(wood > 1000 && floor / wood > 0.9, `a pine wood's floor is forest floor (${floor} of ${wood} points)`);

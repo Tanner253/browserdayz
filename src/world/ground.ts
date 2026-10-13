@@ -4,9 +4,10 @@
 //
 // Nothing here is said by the world's generator, and nothing here changes it. The generator says four things of a
 // point (grass, forest floor, rock, bare: `world.splat`), where every tree stands and of what kind, where the roads
-// run and how high the ground is. This reads those and says twelve things: which grass, which forest floor under
-// which trees, earth trodden bare or the gravel of a road's shoulder, stony ground or rock. So a new kind of ground
-// is a line in KINDS and a rule in layGround, and the map is not touched.
+// run and how high the ground is. This reads those and says thirteen things: which grass, which forest floor under
+// which trees, earth trodden bare or the gravel of a road's shoulder, stony ground, bare rock or the mossy rock of a
+// wood. So a new kind of ground is a line in KINDS and a rule in layGround, and the map is not touched. (The paint
+// reads the kinds four to a picture of weights and the thirteenth by itself: a fourteenth is a line there as well.)
 //
 // The pictures are Poly Haven's (scripts/assets.config.mjs TEXTURES); how they are drawn is src/world/terrain.ts.
 
@@ -59,6 +60,10 @@ export const KINDS = {
   // the rock of a steep face (a rock face photographed square on: the air photograph of fifty metres that was laid
   // here six metres wide smeared down every face it was on)
   rock: { tex: 'rock_face_03', size: 2.7, tint: [0.8, 0.98, 1.2], sound: 'rock', sided: true, far: 0.09 },
+  // the mossy rock of a wood: what breaks through the turf and litter of a low bank where it is steepest, under and
+  // near trees and on the damp side of a hill (2026-10-13: such banks are all over the valley where people walk,
+  // and bare pale rock made quarries of them)
+  crag: { tex: 'mossy_rock', size: 3.0, tint: [0.66, 0.78, 0.64], sound: 'rock', sided: true, far: 0.2 },
 } satisfies Record<string, Kind>;
 
 /**
@@ -164,22 +169,30 @@ export function layGround(world: World): Ground {
   }
   // (the floor of the works is half hard standing: lorries, and whatever leaked)
   const works = world.sites.find((s) => s.kind === 'works');
-  // --- where there is a rock face, and so where what comes down off one lies: within a few metres of a face
-  const faces = new Float32Array(n);
+  // (the sun stands in the south-east of the sky all day: a slope that falls away from it is the damp side of a hill)
+  const sunX = 0.8, sunZ = 0.6;
+  // --- Which rock is where. The world says "rock" of every slope over about thirty degrees, a bank in a wood and
+  // a scarp on the mountain alike. Under and near trees and on the damp side of a hill it is the mossy outcrop of a
+  // wood (`mossyAt`: how much so), which breaks through the turf and litter where the bank is steepest; high up and
+  // in the open it is bare face. What comes down off a bare face lies under it (`nearFace`), and nowhere else is
+  // there scree; the foot of a mossy bank (`nearCrag`) is dark and damp.
+  const mossyAt = new Float32Array(n), faces = new Float32Array(n), crags = new Float32Array(n);
   for (let iz = 1; iz < N - 1; iz++) for (let ix = 1; ix < N - 1; ix++) {
-    const i = iz * N + ix, gx = (H[i + 1] - H[i - 1]) / (2 * CELL), gz = (H[i + N] - H[i - N]) / (2 * CELL);
-    faces[i] = (S[i * 4 + 2] / 255) * smooth(0.7, 1.0, Math.sqrt(gx * gx + gz * gz));
+    const i = iz * N + ix, gx = (H[i + 1] - H[i - 1]) / (2 * CELL), gz = (H[i + N] - H[i - N]) / (2 * CELL), slope = Math.sqrt(gx * gx + gz * gz);
+    const shade = Math.min(1, Math.max(0, (gx * sunX + gz * sunZ) * 2.2)), wooded = smooth(0.04, 0.25, pineWood[i] + broadWood[i]);
+    const m = Math.min(1, Math.max(wooded, shade * 0.8)) * (1 - smooth(SNOW.from - 70, SNOW.from - 25, H[i]));
+    mossyAt[i] = m;
+    faces[i] = (S[i * 4 + 2] / 255) * (1 - m) * smooth(0.9, 1.3, slope);
+    crags[i] = (S[i * 4 + 2] / 255) * m * smooth(0.55, 0.9, slope);
   }
-  const nearFace = evened(faces, 2);
+  const nearFace = evened(faces, 2), nearCrag = evened(crags, 2);
 
   const n1 = new Simplex(7001), n2 = new Simplex(7002), n3 = new Simplex(7003);
   // (slow patterns, each some tens of metres to a hundred across: which grass, and where the moss is)
   const wide = slow((x, z) => n1.fbm(x * 0.011, z * 0.011, 3));
   const mid = slow((x, z) => n2.noise(x * 0.027, z * 0.027));
   const patch = slow((x, z) => n3.noise(x * 0.021, z * 0.021) * 0.5 + 0.5);
-  // (the sun stands in the south-east of the sky all day: a slope that falls away from it is the damp side of a hill)
-  const sunX = 0.8, sunZ = 0.6;
-  const weights = [new Uint8Array(n * 4), new Uint8Array(n * 4), new Uint8Array(n * 4)], top = new Uint8Array(n);
+  const weights = Array.from({ length: Math.ceil(KIND_NAMES.length / 4) }, () => new Uint8Array(n * 4)), top = new Uint8Array(n);
   const K = KIND_AT, w = new Float32Array(KIND_NAMES.length);
   for (let iz = 0; iz < N; iz++) {
     for (let ix = 0; ix < N; ix++) {
@@ -248,23 +261,34 @@ export function layGround(world: World): Ground {
       w[K.needle] += floor * (1 - dark - mossy) * pineShare;
       w[K.leaf] += floor * (1 - dark - mossy) * (1 - pineShare);
 
-      // rock: a face where it is steeper than a man walks up, stony ground below that; and at the foot of a face
-      // (near one, and lower than the ground about it) what would be grass or litter is half scree
-      const face = smooth(0.7, 1.0, slope);
-      const scree = smooth(0.05, 0.3, nearFace[i]) * smooth(-0.2, 0.9, mean[i] - h) * (1 - face) * 0.7;
-      if (scree > 0.01) {
-        for (let k = 0; k <= K.earth; k++) {
+      // ROCK (see `mossyAt` above for which rock is where).
+      const face = smooth(0.7, 1.0, slope), breaks = smooth(0.55, 0.9, slope), below = smooth(0, 0.9, mean[i] - h);
+      // Right under a bare face, and nowhere else, what would be grass or litter is part scree. At the foot of a
+      // mossy bank it is dark damp earth.
+      const scree = smooth(0.12, 0.4, nearFace[i]) * below * (1 - face) * 0.5;
+      const foot = smooth(0.06, 0.3, nearCrag[i]) * below * (1 - breaks) * 0.6;
+      if (scree > 0.01 || foot > 0.01) {
+        for (let k = 0; k < K.earth; k++) {
           w[K.stony] += w[k] * scree;
-          w[k] *= 1 - scree;
+          w[K.earth] += w[k] * foot;
+          w[k] *= 1 - scree - foot;
         }
       }
-      // (and a face that is not sheer is not bare: grass has a hold on its ledges in patches, moss on its shaded side)
-      // (and in a wood, where it is damp and still, moss has most of a low outcrop)
-      const wooded = smooth(0.05, 0.3, wood);
-      const ledge = (1 - smooth(0.95, 1.35, slope)) * Math.max(smooth(0.05, 0.5, m1 * 0.6 + m2 * 0.5) * 0.55, wooded * smooth(-0.35, 0.3, m3 - 0.5 + m2 * 0.5) * 0.7);
-      w[K.rock] += r * face * (1 - ledge);
-      w[shade > 0.4 || wooded > 0.5 ? K.moss : K.dry] += r * face * ledge;
-      w[K.stony] += r * (1 - face);
+      // In the open and on the mountain: bare rock where it is a face (a face that is not sheer has grass on its
+      // ledges, in patches), stony ground where it is not.
+      const bareRock = r * (1 - mossyAt[i]);
+      const ledge = (1 - smooth(0.95, 1.35, slope)) * smooth(0.05, 0.5, m1 * 0.6 + m2 * 0.5) * 0.55;
+      w[K.rock] += bareRock * face * (1 - ledge);
+      w[K.dry] += bareRock * face * ledge;
+      w[K.stony] += bareRock * (1 - face);
+      // In a wood and on the damp side of a hill: a bank is turf and litter on top, with moss, and mossy rock breaks
+      // through it where it is steepest. Not a quarry: no stones lie about it.
+      const bank = r * mossyAt[i], wooded = smooth(0.04, 0.25, wood), mossOn = 0.25 + 0.3 * m3;
+      w[K.crag] += bank * breaks;
+      w[K.moss] += bank * (1 - breaks) * mossOn;
+      w[K.needle] += bank * (1 - breaks) * (1 - mossOn) * wooded * pineShare;
+      w[K.leaf] += bank * (1 - breaks) * (1 - mossOn) * wooded * (1 - pineShare);
+      w[K.turf] += bank * (1 - breaks) * (1 - mossOn) * (1 - wooded);
 
       let sum = 0, best = 0;
       for (let k = 0; k < w.length; k++) {
