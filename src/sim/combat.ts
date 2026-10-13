@@ -19,6 +19,8 @@ export interface WeaponRule {
   drag?: number;
   /** an explosion: the damage falls to nothing this many metres from where it went off */
   blast?: number;
+  /** an explosion: the share of a whole car it takes, whatever it does to a body (see `carDamage` in vehicles.ts) */
+  car?: number;
   /** a shotgun: `damage` is one pellet's, and no shot is believed to land more than this many */
   pellets?: number;
 }
@@ -45,12 +47,15 @@ export const WEAPON_RULES: Record<string, WeaponRule> = {
   bat: { damage: 30, melee: true, range: 3.9, interval: 0.5, falloff: 1 },
   shovel: { damage: 36, melee: true, range: 3.9, interval: 0.55, falloff: 1 },
   knife: { damage: 27, melee: true, range: 3.3, interval: 0.3, falloff: 1 },
-  grenade: { damage: 150, melee: false, range: 70, interval: 0, falloff: 1, blast: 9 },
+  // (What they do to a car, 2026-10-13: "2 stick grenades or 1 frag grenade blows up a car".)
+  grenade: { damage: 150, melee: false, range: 70, interval: 0, falloff: 1, blast: 9, car: 0.5 },
+  // the frag grenade (2026-10-13: "does more damage as the stick grenade"): a third more at its middle, a metre further
+  frag: { damage: 200, melee: false, range: 70, interval: 0, falloff: 1, blast: 10, car: 1 },
   // a fuel drum somebody shot (see src/sim/barrels.ts): whoever fired may be a rifle shot away. (140 and 8 m until
   // 2026-10-13: "exploding barrels should have larger explosion SFX and do more damage", then "barrell blast radius
   // should be larger with damage gradient": more than a grenade's at its middle, and reaching half as far again,
   // less with every metre as every blast is (see `hitDamage`): 132 at 3 m, 73 at 7, 35 at 10, 5 at 13, none at 14.)
-  barrel: { damage: 180, melee: false, range: 900, interval: 0, falloff: 1, blast: 14 },
+  barrel: { damage: 180, melee: false, range: 900, interval: 0, falloff: 1, blast: 14, car: 0.2 },
   // run down by a jeep (see src/sim/vehicles.ts): how much it hurts is how fast the jeep was going
   jeep: { damage: 0, melee: true, range: 8, interval: 0.4, falloff: 1 },
   // the arms of one of the infected (see src/sim/infected.ts): never a player's to hit with

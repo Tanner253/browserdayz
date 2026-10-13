@@ -11,7 +11,8 @@
 import { BUILDING_FOOTPRINT, PLAY_RADIUS, WORLD_SIZE, heightAt, type World } from '../world/worldgen';
 
 /** What one hit takes off a car: a bullet's own harm up to `JEEP.shot`, a blast's `JEEP.blast` times over. The server's rule and the game's own, alone. */
-export function carDamage(rule: { damage: number; blast?: number }): number {
+export function carDamage(rule: { damage: number; blast?: number; car?: number }): number {
+  if (rule.car !== undefined) return JEEP.hp * rule.car;
   return rule.blast ? rule.damage * JEEP.blast : Math.min(rule.damage, JEEP.shot);
 }
 
@@ -41,8 +42,8 @@ export const JEEP = {
    */
   shot: 47.5,
   /**
-   * How many times what it does to a body a blast does to a car: a grenade takes a sixth of a whole car and a fuel
-   * drum a fifth, as they did before it was made three times as strong (it was twice, of a third as much).
+   * How many times what it does to a body a blast does to a car, where the blast does not say for itself (each
+   * does now: `car` in WEAPON_RULES: two stick grenades or one frag grenade for a whole car, five fuel drums).
    */
   blast: 6,
   /**
