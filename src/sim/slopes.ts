@@ -152,8 +152,8 @@ export function legs(rise: number, up: number, body: Body = {}): Legs {
   let pace = up >= 0 ? Math.min(along(UP, way), along(SIDE, face)) : along(SIDE, face) / Math.max(across, 1e-3);
   if (pace < 7.5) pace *= fit;
   if (scramble && body.winded) pace *= LEGS.spent;
-  const moving = up >= 0 || scramble;
-  // (on a scramble every way but down costs what the face costs: going across it is no rest)
+  const moving = (up >= 0 || scramble) && !slides;
+  // (on a scramble every way but down costs what the face costs: going across it is no rest; and a slide costs nothing)
   const cost = moving && !body.winded ? along(COST, scramble ? Math.max(way, face) : way) * toil : 0;
   return {
     pace: pace >= 7.5 ? Infinity : pace,
@@ -182,7 +182,8 @@ export function paceUp(rise: number): number {
  * rubbing on it: more of that down on the heels (crouched), which is how a slide is ridden. However long the
  * face and whatever ground it comes onto, it does not get over the ground faster than somebody running down an
  * ordinary hill does: where the ground eases under it, what that takes off its fall is a jolt (`slideJolt`).
- *   grip, dug  – how hard the ground rubs: standing, and crouched (what part of the weight on it)
+ *   grip, dug  – how hard the ground rubs: standing, and crouched (what part of the weight on it). Dug in, a slide
+ *                is brought to a stop on anything a body can stand on, which is anything under fifty degrees
  *   level      – the fastest a slide gets over the ground, metres a second (a sprint is 6.2)
  *   most       – and the fastest it goes along the slope, which is what it hits things at
  *   low        – how much of those a crouched slide comes to; ease – how quickly heels dug in slow it to that, a second
@@ -194,7 +195,7 @@ export function paceUp(rise: number): number {
  *                way of two short banks is not three harmless bumps, and ground that eases over a long run-out
  *                costs nothing however fast the slide came onto it
  */
-export const SLIDE = { grip: 0.62, dug: 1, level: 6, most: 16, low: 0.55, ease: 3, steer: 2.5, turn: 4, begins: 1.6, stops: 0.6, absorb: 10 };
+export const SLIDE = { grip: 0.62, dug: 1.25, level: 6, most: 16, low: 0.55, ease: 3, steer: 2.5, turn: 4, begins: 1.6, stops: 0.6, absorb: 10 };
 
 /** The fastest a slide goes on ground so steep, metres a second along the slope: `level` over the ground, and never more than `most`. */
 export function slideTop(rise: number, low = false): number {
