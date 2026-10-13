@@ -74,7 +74,9 @@ class Player {
     }
   }
   carry(tags: object[]) {
-    this.send({ t: 'me', inv: { slots: Object.fromEntries(tags.map((t, i) => [`s${i}`, t])), active: null, containers: [] }, vitals: { health: 100, energy: 80, water: 80, stamina: 300, bleeding: false } });
+    // (in the tag pouch, where a game carries them. They were said to be in places a body has not got, `s0`, `s1`: the
+    // server keeps only the places a body has since 2026-10-13, so it saw no tag at all and this test saw no rule.)
+    this.send({ t: 'me', inv: { slots: {}, active: null, containers: [{ id: 'tags', items: tags.map((t, i) => ({ ...t, x: i, y: 0, rot: false })) }] }, vitals: { health: 100, energy: 80, water: 80, stamina: 300, bleeding: false } });
   }
 }
 
