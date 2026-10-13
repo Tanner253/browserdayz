@@ -14,17 +14,23 @@
 // What is kept: every card, its picture, and its own movement (where it goes, how it swells and shrinks, how it
 // turns), frame for frame. What is mended:
 //   - each card is played over its own RUN only (the frames in which it is there to be seen) and round again,
-//     on its own time, and most of them twice over, half a run apart: as one of the pair fades the other is at
-//     its fullest, so the fire as a whole burns level, and no two cards keep step for long;
+//     on its own time, and more than once over: the big flames three times, a third of a run apart, the small
+//     ones and the runs along the logs twice. As one of them fades another is at its fullest, so the fire as a
+//     whole burns level (how much flame there is to see keeps within a fifth of its mean, where the download's
+//     went from a third of its mean to nearly twice it), and no two cards keep step for long;
 //   - each fades in at the start of its run and out at the end of it, so nothing is seen to jump back;
 //   - the pictures are laid on softly by their own alpha, a body that hides what is behind it with a little
 //     light added over it (a flame that only ADDS its light is a pale mist on sunlit grass), and nothing of a
 //     card is drawn below the foot of its fire;
-//   - a flame turns about its own upright to face the eye, and leans over toward it when it is looked down on,
-//     so it is never seen edge on; the runs of flame along the logs lie as the download laid them.
+//   - a flame turns about its own upright to face the eye, and is leant back when it is looked down on from
+//     nearly overhead, so it is never seen edge on; the runs of flame along the logs lie as the download laid
+//     them, and are let go to nothing as they turn edge on;
+//   - the small flames are let go a little over the big ones (the download carries them two metres up), and
+//     the smoke is painted pale and thin.
 // What is added, because a photograph slid upward is still a photograph: the place each point of a card reads
 // its picture from is pushed about by a pattern that climbs (the flame's own shapes run up through it, held at
-// the foot and free at the tip), and the top of each card sways a little.
+// the foot and free at the tip), and the top of each card sways a little. And its colour is made anew from the
+// photograph's heat and its yellow, for the curve this game's picture is finished by (see LOOK).
 //
 // Any number of fires, each a place, a size (1 is the campfire's own, in its ring 1.45 m across), a strength and
 // a lean; every card of every fire in sight is one draw. A fire that is out, or too far off, costs nothing.
@@ -70,13 +76,18 @@ const KIND_OF = (i: number): Kind => (i <= 6 ? 'flame' : i <= 10 ? 'tongue' : i 
  *   gone   – it is let go between these two heights, metres over the foot of a fire of size 1 (the small flames
  *            are carried by the download two metres and more over the wood, shrinking as they go: a flame the
  *            size of a hand hanging in the air over a fire is not a flame that broke off it)
+ *   born   – it comes to be seen between these two heights, metres over the foot (the download starts its smoke
+ *            at the ground, at its largest: pale threads of it down among the logs were tufts of grey fluff on the wood)
+ *   big    – it is drawn this many times the size the download gives it (its wisps of smoke are small sharp curls,
+ *            and shrink as they climb: one of them alone against a dark wall was a white scribble hung in the air.
+ *            Larger, softer and fainter, they are a haze that thins)
  */
-const PLAY: Record<Kind, { twice: number; slow: number; rise: number; fall: number; turned: boolean; smoke: boolean; seen: number; sway: number; gone?: [number, number] }> = {
+const PLAY: Record<Kind, { twice: number; slow: number; rise: number; fall: number; turned: boolean; smoke: boolean; seen: number; sway: number; gone?: [number, number]; born?: [number, number]; big?: number }> = {
   flame: { twice: 3, slow: 1.35, rise: 0.5, fall: 0.5, turned: true, smoke: false, seen: 190, sway: 0.05 },
   tongue: { twice: 2, slow: 1.15, rise: 0.18, fall: 0.72, turned: true, smoke: false, seen: 90, sway: 0.08, gone: [0.8, 1.3] },
   lick: { twice: 2, slow: 1.0, rise: 0.5, fall: 0.5, turned: false, smoke: false, seen: 60, sway: 0.03 },
-  wisp: { twice: 1, slow: 1.5, rise: 0.25, fall: 0.5, turned: true, smoke: true, seen: 45, sway: 0.1 },
-  curl: { twice: 2, slow: 1.7, rise: 0.35, fall: 0.5, turned: true, smoke: true, seen: 60, sway: 0.06 },
+  wisp: { twice: 1, slow: 1.5, rise: 0.25, fall: 0.5, turned: true, smoke: true, seen: 45, sway: 0.1, born: [0.5, 0.95], big: 1.8 },
+  curl: { twice: 2, slow: 1.7, rise: 0.35, fall: 0.5, turned: true, smoke: true, seen: 60, sway: 0.06, born: [0.3, 0.8], big: 1.3 },
 };
 /** a card is there to be seen in a frame when it is at least this share of its own greatest size, and its top is this far above the ground, metres */
 const THERE = { size: 0.2, above: 0.03 };
@@ -217,6 +228,7 @@ export interface Fire {
   readonly own: number;
   /** set when it has been taken away: whoever still holds it must ask for another */
   gone: boolean;
+  /** (Flames' own: it was said to burn this frame, and whether it is kept without being said) */
   fed: boolean;
   kept: boolean;
 }
@@ -242,10 +254,12 @@ export function burning(p: Plan, clock: number, fire: { strength: number; smoke:
     const x = c.from + u * (c.to - c.from), k = Math.min(p.frames - 2, Math.floor(x)), w = x - k, o = k * 9;
     for (let e = 0; e < 9; e++) pose[e] = c.poses[o + e] + (c.poses[o + 9 + e] - c.poses[o + e]) * w;
     if (how.gone && (shows *= 1 - smooth(how.gone[0], how.gone[1], pose[1])) <= 0.004) continue;
+    if (how.born && (shows *= smooth(how.born[0], how.born[1], pose[1])) <= 0.004) continue;
     if (!how.smoke) {
       pose[1] *= tall;
       pose[6] *= tall; pose[7] *= tall; pose[8] *= tall;
     }
+    if (how.big) for (let e = 3; e < 9; e++) pose[e] *= how.big;
     card(part, pose, shows);
   }
 }
@@ -287,8 +301,9 @@ export function ripple(size = 64): Uint8Array {
 }
 
 /**
- * How a card is drawn. The same numbers are used by whatever draws one away from the game (the check that the
- * fire burns level reads the same plan; the picture of it is the game's own).
+ * How a card is drawn. (Said here, and not in the shaders alone, for whatever reckons a fire away from the game:
+ * `plan`, `burning` and `ripple` need no graphics card, and a check that the fire burns level, or a picture of
+ * it made on the processor, is made from them and these.)
  *   flow   – the pattern the picture is pushed about by: how many times it repeats in a metre, how fast it climbs
  *            (repeats a second), and how far it pushes, metres; coarse, then fine
  *   foot   – a card fades in over this many metres above the foot of its fire (times the fire's size)
@@ -304,7 +319,7 @@ export function ripple(size = 64): Uint8Array {
  *            numbers that can be below nothing until that curve, and whatever shows behind a flame is added in
  *            the ordinary way.
  */
-export const LOOK = { flow: [[0.62, 0.5, 0.2], [1.7, 0.95, 0.07]], foot: 0.09, glow: 0.1, edge: 0.1, steep: 0.82, red: [0.55, 2.3], green: 0.8, blue: -0.11 };
+export const LOOK = { flow: [[0.62, 0.5, 0.2], [1.7, 0.95, 0.07]], foot: 0.09, glow: 0.1, edge: 0.1, steep: 0.88, red: [0.55, 2.3], green: 0.8, blue: -0.11 };
 
 const VERT = /* glsl */ `
   attribute vec3 iMid;
@@ -336,7 +351,7 @@ const VERT = /* glsl */ `
       float along = dot( stand, eye );
       if ( abs( along ) > STEEP ) {
         float way = iLook.z * 31.4;
-        vec3 across = stand - eye * along + vec3( cos( way ), 0.0, sin( way ) ) * 0.03;
+        vec3 across = stand - eye * along + vec3( cos( way ), 0.0, sin( way ) ) * 0.25;
         across = normalize( across - eye * dot( across, eye ) );
         stand = eye * ( sign( along ) * STEEP ) + across * sqrt( 1.0 - STEEP * STEEP );
       }
@@ -382,16 +397,19 @@ const FRAG = /* glsl */ `
     vec2 push = ( a * uFlowA.z + b * uFlowB.z ) * ( 0.2 + 0.8 * on.y );
     vec2 from = on + push / ( 2.0 * vHalf );
     float edge = smoothstep( 0.0, uSoft.x, from.x ) * smoothstep( 0.0, uSoft.x, 1.0 - from.x ) * smoothstep( 0.0, uSoft.x, 1.0 - from.y ) * smoothstep( 0.0, uSoft.x * 0.5, from.y );
-    vec4 t = texture2D( tSheet, mix( vRect.xy, vRect.zw, clamp( from, 0.0, 1.0 ) ) );
+    // (smoke is read a little out of focus: its pictures are sharp curls, and smoke close to has no edges)
+    vec4 t = texture2D( tSheet, mix( vRect.xy, vRect.zw, clamp( from, 0.0, 1.0 ) ), smoke * 1.2 );
     float alpha = t.a * edge * vLook.x * smoothstep( 0.0, vFire.w, vFire.x );
     if ( alpha < 0.004 ) discard;
     vec3 colour;
     float light = 0.0;
     if ( smoke > 0.5 ) {
-      // smoke has no light of its own: it is as bright as the hour, and near the fire by night a little of the fire's colour
+      // Smoke has no light of its own: it is as bright as the hour, and near the fire by night a little of the
+      // fire's colour. (Pale and thin: wood smoke close to is a blue-white haze, and these are a few threads of
+      // it. Painted a mid grey they were black scribbles against a sunlit wall.)
       float pale = ( t.r + t.g + t.b ) / 3.0;
-      colour = vec3( 0.5, 0.49, 0.47 ) * ( 0.35 + 0.65 * pale ) * uDaylight + vec3( 0.55, 0.2, 0.04 ) * exp( -vFire.x * 1.3 ) * ( 1.0 - uDaylight ) * 0.6;
-      alpha *= 0.55;
+      colour = vec3( 0.74, 0.74, 0.76 ) * ( 0.5 + 0.5 * pale ) * uDaylight + vec3( 0.55, 0.2, 0.04 ) * exp( -vFire.x * 1.3 ) * ( 1.0 - uDaylight ) * 0.6;
+      alpha *= 0.32;
     } else {
       // A flame photographed against black is dark at its thin edges, where a flame is only thin: there its
       // alpha is taken down, and its colour is not left a brown rim. What the photograph gives is how HOT each
@@ -524,6 +542,20 @@ export class Flames {
     return f;
   }
 
+  /** The fire burning nearest a place, of those within `reach` of it, and how far off it is: for whoever lights the ground from it. */
+  nearest(from: THREE.Vector3, reach: number): { fire: Fire; far: number } | null {
+    let best: Fire | null = null, far = reach;
+    for (const f of this.fires) {
+      if (f.strength <= 0.02) continue;
+      const d = f.at.distanceTo(from);
+      if (d < far) {
+        far = d;
+        best = f;
+      }
+    }
+    return best ? { fire: best, far } : null;
+  }
+
   /** @param eye where the picture is drawn from */
   update(dt: number, eye: THREE.Vector3) {
     this.clock += dt;
@@ -580,18 +612,20 @@ export class Flames {
       if (n >= MOST) return;
       const how = PLAY[part.card.kind];
       const a = n * 3, b = n * 4;
-      // sized, turned as its fire is turned, and stood at its fire's foot
+      // sized, turned as its fire is turned, and stood at its fire's foot; pushed over as far as it is high
+      // (smoke further than flame: the wind that only bends a flame carries its smoke off)
+      const lx = f.lean.x * (how.smoke ? 2.5 : 1), lz = f.lean.z * (how.smoke ? 2.5 : 1);
       const y = pose[1] * s;
-      mid[a] = f.at.x + (pose[0] * cos + pose[2] * sin) * s + f.lean.x * y;
+      mid[a] = f.at.x + (pose[0] * cos + pose[2] * sin) * s + lx * y;
       mid[a + 1] = f.at.y + y;
-      mid[a + 2] = f.at.z + (-pose[0] * sin + pose[2] * cos) * s + f.lean.z * y;
+      mid[a + 2] = f.at.z + (-pose[0] * sin + pose[2] * cos) * s + lz * y;
       right[a] = (pose[3] * cos + pose[5] * sin) * s;
       right[a + 1] = pose[4] * s;
       right[a + 2] = (-pose[3] * sin + pose[5] * cos) * s;
       const rise = pose[7] * s;
-      up[a] = (pose[6] * cos + pose[8] * sin) * s + f.lean.x * rise;
+      up[a] = (pose[6] * cos + pose[8] * sin) * s + lx * rise;
       up[a + 1] = rise;
-      up[a + 2] = (-pose[6] * sin + pose[8] * cos) * s + f.lean.z * rise;
+      up[a + 2] = (-pose[6] * sin + pose[8] * cos) * s + lz * rise;
       rect.set(part.card.rect, b);
       look[b] = shows * thin;
       look[b + 1] = how.turned ? 1 : 0;

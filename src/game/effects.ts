@@ -253,13 +253,13 @@ const WIND = { x: 0.45, z: 0.28, lean: 0.14 };
  * the flames, where the wisps that rise through them thin out (the column and they are one smoke: it began at
  * the tops of the logs, as round grey puffs in among the flames). `soft`: seconds a puff takes to be seen.
  */
-const COLUMN = { from: 1.25, soft: 1.6 };
+const COLUMN = { from: 1.1, soft: 1.0 };
 /**
  * A car on fire. `engine`: how big its flames are while it is alight and not yet gone up (1 is a campfire's),
  * and `wreck`: after it has. `full`, `burns`: a wreck burns at its fiercest for this many seconds after it
  * blows, and is down to smoke by this many.
  */
-const CAR = { engine: 1.25, wreck: 2.1, full: 14, burns: 55 };
+const CAR = { engine: 1.25, wreck: 2.1, full: 18, burns: 70 };
 
 const SURF_DUST: Partial<Record<Surface | 'dirt' | 'gravel', number>> = {
   grass: 0x6f6448, dirt: 0x6a5a44, gravel: 0x8a8070, rock: 0x8d877c, concrete: 0xa09a90, plaster: 0xb8b0a0,

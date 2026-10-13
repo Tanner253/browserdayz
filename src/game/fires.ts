@@ -16,6 +16,7 @@ import type { Atmosphere, ShaderPatch } from '../world/atmosphere';
 import { foliagePatch, setLodFade } from '../world/foliage';
 import { heightAt, type World } from '../world/worldgen';
 import type { Effects } from './effects';
+import type { Fire } from './flames';
 
 /**
  * How far off a fire's flames are drawn, and its smoke, metres (the smoke is what is seen of it from across the
@@ -47,7 +48,7 @@ const RING = { cold: 'campfire_ring_cold', lit: 'campfire_ring', seen: [128, 140
  * and how dark it is). `embers`: how bright the hot parts are by night; `byDay`: the share of that at noon;
  * `breath`: how much they rise and fall with the flicker of the fire's lamp.
  */
-const BURNS = { lamp: 1.5, catches: 3, embers: 1.15, byDay: 0.62, breath: 0.6, hot: [0.2, 0.55], char: [0.2, 0.22] };
+const BURNS = { lamp: 1.5, catches: 3, embers: 1.15, byDay: 0.45, breath: 0.6, hot: [0.27, 0.66], char: [0.2, 0.22] };
 /** the light of a fire: its colour, how strong, and how far it reaches, metres */
 const GLOW = { color: 0xff8f3a, strength: 9, reach: 9, from: 48 };
 
@@ -56,7 +57,8 @@ export class Fires {
   readonly spots: THREE.Vector3[];
   /** seconds each has left to burn (0 = out) */
   readonly left: number[];
-  private owed: { flame: number; smoke: number }[];
+  /** what each is owed of smoke and of sparks, and the flames it has while it is near enough to be seen burning */
+  private owed: { flame: number; smoke: number; fire?: Fire }[];
   /** seconds each has been alight (a fire catches: see BURNS) */
   private lit: number[];
   private light: THREE.PointLight;
@@ -112,9 +114,9 @@ export class Fires {
   emberHot = smoothstep( ${BURNS.hot[0].toFixed(3)}, ${BURNS.hot[1].toFixed(3)}, over );
   vec3 charred = mix( vec3( dot( own, vec3( 0.3, 0.5, 0.2 ) ) ), own, ${BURNS.char[0].toFixed(3)} ) * ${BURNS.char[1].toFixed(3)};
   // (what is hot is an ember, and an ember is dark but for its own light)
-  diffuseColor.rgb = mix( own, mix( charred, own * 0.3, emberHot ), uEmber.x );
+  diffuseColor.rgb = mix( own, mix( charred, own * 0.14, emberHot ), uEmber.x );
   // (and what is only warm, the red cracks in the scorched ground, glows a little)
-  emberHot += 0.2 * smoothstep( 0.06, 0.26, over ) * ( 1.0 - emberHot );
+  emberHot += 0.12 * smoothstep( 0.06, 0.26, over ) * ( 1.0 - emberHot );
 }`,
               )
               .replace(
@@ -158,8 +160,8 @@ export class Fires {
     this.left = this.spots.map(() => 0);
     this.lit = this.spots.map(() => 0);
     this.owed = this.spots.map(() => ({ flame: 0, smoke: 0 }));
-    // (one lamp, moved to whichever fire is nearest the eye: it is always in the scene, lit or
-    // not, so that lighting a fire never changes how many lights the world is drawn with)
+    // (one lamp, moved to whichever fire is nearest the eye, a campfire or anything else alight: it is always in
+    // the scene, lit or not, so that lighting a fire never changes how many lights the world is drawn with)
     this.light = new THREE.PointLight(GLOW.color, 0, GLOW.reach, 1.7);
     scene.add(this.light);
   }
@@ -169,7 +171,7 @@ export class Fires {
     return i * 1.9;
   }
 
-  /** how bright a fire is at a moment, about 0.78: never still (two slow swells and a quick shiver), and no two fires together */
+  /** how bright a fire is at a moment, about 0.78: never still (two slow swells and a quick shiver), and no two fires together (`i`: any number of its own) */
   private flick(i: number) {
     const t = this.clock + i * 3.1;
     return 0.78 + 0.14 * Math.sin(t * 7.3) + 0.08 * Math.sin(t * 13.1 + 1.7) + 0.06 * Math.sin(t * 31 + 0.4);
@@ -213,17 +215,20 @@ export class Fires {
    */
   update(dt: number, eye: THREE.Vector3): THREE.Vector3[] {
     this.clock += dt;
-    let near = -1, nd = Infinity;
+    let near = -1, nd = Infinity, glowing = -1;
     for (let i = 0; i < this.spots.length; i++) {
       const s = this.spots[i];
       const d = Math.hypot(s.x - eye.x, s.y - eye.y, s.z - eye.z);
       // The ring as it is now: alight from the moment it is lit to the moment it is out, cold otherwise, and
-      // neither from further off than it could be seen.
+      // neither from further off than it could be seen. (And alight while flames stand in it that nobody lit: the
+      // main menu's scene of a fire lights none, so that a game then starting finds none alight, and stood its
+      // flames in cold grey wood.)
       const ring = this.rings[i];
       if (ring) {
-        const seen = d < RING.seen[1], alight = this.left[i] > 0;
+        const seen = d < RING.seen[1], alight = this.left[i] > 0 || (seen && !!this.effects.fire.nearest(s, 0.8));
         ring.cold.visible = seen && !alight;
         ring.lit.visible = seen && alight;
+        if (seen && alight && glowing < 0) glowing = i;
       }
       if (this.left[i] <= 0) continue;
       this.left[i] = Math.max(0, this.left[i] - dt);
@@ -238,17 +243,25 @@ export class Fires {
       if (d < SEEN.smoke) this.effects.campfire(this.feet[i], this.owed[i], dt, life, d < SEEN.flames, this.turn(i), 1 + 0.45 * (this.flick(i) - 0.78));
     }
     const on = near >= 0 && nd < GLOW.from;
-    if (near >= 0) {
-      // The embers breathe with the nearest fire's flicker (every burning ring is painted with the one paint, so
-      // they all do), and are brightest when the day is darkest.
+    if (glowing >= 0) {
+      // The embers breathe with a fire's flicker (the nearest one's, where one is lit: every burning ring is
+      // painted with the one paint, so they all do), and are brightest when the day is darkest.
       const day = this.atmo.daylight.value;
       this.ember.value.y = this.clock % 1000;
-      for (const paint of this.burning) paint.emissiveIntensity = BURNS.embers * (1 + BURNS.breath * (this.flick(near) - 0.78)) * (1 - (1 - BURNS.byDay) * day);
+      for (const paint of this.burning) paint.emissiveIntensity = BURNS.embers * (1 + BURNS.breath * (this.flick(near >= 0 ? near : glowing) - 0.78)) * (1 - (1 - BURNS.byDay) * day);
     }
-    if (on) {
-      const s = this.spots[near], t = this.clock;
-      this.light.position.set(s.x + Math.sin(t * 5.1) * 0.05, s.y + BURNS.lamp, s.z + Math.cos(t * 4.3) * 0.05);
-      this.light.intensity = GLOW.strength * this.flick(near) * Math.min(1, this.left[near] / 30) * Math.min(1, 0.12 + this.lit[near] / BURNS.catches) * (1 - THREE.MathUtils.smoothstep(nd, GLOW.from * 0.7, GLOW.from));
+    // The lamp is at whatever burns nearest the eye: a campfire, or anything else that has been given the same
+    // flames (a car alight, a wreck burning out). It is as strong as that fire is, and as big.
+    const by = this.effects.fire.nearest(eye, GLOW.from);
+    if (by) {
+      const f = by.fire, t = this.clock, big = Math.min(f.size, 1.6);
+      const mine = this.owed.findIndex((o) => o.fire === f);
+      const flick = this.flick(mine >= 0 ? mine : 20 + f.own * 9);
+      // (a fire that is not a campfire is told how bright it is here, as the campfires are above)
+      if (mine < 0) f.glow = 1 + 0.45 * (flick - 0.78);
+      this.light.position.set(f.at.x + Math.sin(t * 5.1) * 0.05, f.at.y + BURNS.lamp * big, f.at.z + Math.cos(t * 4.3) * 0.05);
+      this.light.distance = GLOW.reach * big;
+      this.light.intensity = GLOW.strength * flick * f.strength * big * (1 - THREE.MathUtils.smoothstep(by.far, GLOW.from * 0.7, GLOW.from));
     } else this.light.intensity = 0;
     audio.fire(dt, on ? nd : -1);
     const heard: THREE.Vector3[] = [];
