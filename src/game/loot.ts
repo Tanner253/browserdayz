@@ -889,7 +889,8 @@ export class LootManager {
     const fitB = hz <= s.hx + over && hx <= s.hz + over;
     let rot = s.rot;
     let ax = hx, az = hz; // footprint half extents along the surface's own axes
-    if ((!fitA && fitB) || (fitA && fitB && r0 < 0.35)) {
+    // (what fits neither way lies along the board, long side to long side, and overhangs its two ends alike)
+    if ((!fitA && fitB) || (fitA && fitB && r0 < 0.35) || (!fitA && !fitB && hx > hz !== s.hx >= s.hz)) {
       rot = s.rot + Math.PI / 2;
       ax = hz;
       az = hx;
@@ -900,8 +901,18 @@ export class LootManager {
       rot = r0 * Math.PI * 2;
       ax = az = diag;
     } else {
+      // (A little askew, where there is room for it askew: the room is reckoned of the thing AS TURNED. It was
+      // reckoned of it square, and a rifle turned on a narrow shelf had its two ends off the edge: "they hang off
+      // the sides in an ugly way", 2026-10-13.)
       const slack = Math.min(s.hx - ax, s.hz - az);
-      if (slack > 0.02) rot += (r1 - 0.5) * Math.min(0.5, slack * 4);
+      const turn = slack > 0.02 ? (r1 - 0.5) * Math.min(0.5, slack * 4) : 0;
+      const ct = Math.abs(Math.cos(turn)), st = Math.abs(Math.sin(turn));
+      const tx = ax * ct + az * st, tz = ax * st + az * ct;
+      if (turn && tx <= s.hx && tz <= s.hz) {
+        rot += turn;
+        ax = tx;
+        az = tz;
+      }
     }
     const lx = Math.max(0, s.hx - ax), lz = Math.max(0, s.hz - az);
     const ox = (r1 * 2 - 1) * lx * 0.8, oz = (r2 * 2 - 1) * lz * 0.8;
