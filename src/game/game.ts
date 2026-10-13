@@ -391,6 +391,7 @@ export class Game {
       },
       canopy: async () => (await assets.model('parachute')).clone(),
       register: (o) => atmo.registerObject(o),
+      ready: (o) => r.ready(o),
       landed: (f) => this.dropLanded(f),
     });
     this.near = new Near(r.scene);
@@ -2547,6 +2548,8 @@ export class Game {
     void this.s.r.lookOverAll();
     this.s.atmo.afterBoot();
     void this.menu.load();
+    // (and whatever of the world was put off because nobody starts by it)
+    assets.up();
   }
 
   start() {

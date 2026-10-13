@@ -159,6 +159,8 @@ export interface AirdropHost {
   canopy: () => Promise<THREE.Object3D>;
   /** a thing that is lit is made known to the sky and the shadows before it is drawn */
   register: (o: THREE.Object3D) => void;
+  /** things got ready to be drawn before they are seen: their shaders made, their pictures on the card (the renderer's `ready`) */
+  ready?: (o: THREE.Object3D[]) => Promise<unknown>;
   /** the crate of a flight has touched the ground (once for each flight; not for one that had landed before this game heard of it) */
   landed: (f: Flight) => void;
 }
@@ -195,7 +197,12 @@ export class Airdrops {
     this.scene.add(heli.root);
     // (one that had landed before this game heard of it: the crate is told of apart, as a drop standing)
     const was = f.age >= T.land;
-    this.live.push({ f, T, t0: performance.now() - f.age * 1000, heli, voice: null, hung: null, asked: false, touched: was, stood: was });
+    const l: Live = { f, T, t0: performance.now() - f.age * 1000, heli, voice: null, hung: null, asked: false, touched: was, stood: was };
+    this.live.push(l);
+    // (The canopy and the crate are fetched and got ready NOW, while the helicopter is still on its way: they were
+    // fetched at the moment the crate was let go, and their shaders made in the frame they were first drawn in, with
+    // everybody looking at the sky. Found by an independent reading, 2026-10-13.)
+    if (!was) void this.hang(l).catch(() => {});
   }
 
   /** the flights in the air, and where each has got to: for the map, and for looking */
@@ -234,6 +241,9 @@ export class Airdrops {
     });
     this.host.register(canopy);
     this.host.register(crate);
+    // (never waited on for long: a card that will not say its shaders are made does not keep the crate out of the sky)
+    if (this.host.ready) await Promise.race([this.host.ready([canopy, crate]), new Promise<void>((done) => setTimeout(done, 6000))]).catch(() => {});
+    if (!this.live.includes(l)) return;
     pivot.add(canopy, crate);
     pivot.visible = false;
     this.scene.add(pivot);

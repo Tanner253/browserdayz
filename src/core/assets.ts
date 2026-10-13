@@ -328,6 +328,25 @@ export class Assets {
     });
   }
 
+  /** what is sent for when the game is up, and not before (see `later`); null once it is up */
+  private putOff: (() => void)[] | null = [];
+
+  /**
+   * A thing nobody needs at the loading screen, because it stands where nobody starts, is sent for when the game is
+   * up (at once, if it is up already): so the loading screen neither waits for it nor shares the line with it.
+   */
+  later(job: () => void) {
+    if (this.putOff) this.putOff.push(job);
+    else job();
+  }
+
+  /** The game is up: what was put off is sent for now. */
+  up() {
+    const jobs = this.putOff ?? [];
+    this.putOff = null;
+    for (const job of jobs) job();
+  }
+
   /** Resolves once every request issued so far has finished. */
   idle(): Promise<void> {
     if (this.done === this.pending) return Promise.resolve();

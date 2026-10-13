@@ -359,6 +359,9 @@ export class Terrain {
     this.ground = layGround(this.world);
     let uniforms: Record<string, THREE.IUniform>;
     if (OLD_PAINT) {
+      // (the old paint draws with none of the pictures of weights: seven megabytes a phone has no room to keep. What
+      // lies uppermost is kept, for the footsteps.)
+      this.ground = { weights: [], top: this.ground.top };
       const [albedo, normals, arm] = await Promise.all([
         buildArray(LAYERS.map((l) => t[l].diff), true),
         buildArray(LAYERS.map((l) => t[l].nor), false),

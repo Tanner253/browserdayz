@@ -19,12 +19,16 @@ export function wreckLie(world: Pick<World, 'heights'>, w: { x: number; z: numbe
   return { y: (heightAt(H, w.x, w.z) + nose + tail) / 3 - 0.12, nose: Math.atan2(nose - tail, 10) };
 }
 
-/** The wreck stood in the world: drawn when its model has come, solid at once. */
+/**
+ * The wreck stood in the world: drawn when its model has come, solid at once. Its model is sent for when the game is
+ * up and not at the loading screen (1.4 MB that everybody waited for, of a thing in a hollow on a mountain where
+ * nobody starts: found by an independent reading, 2026-10-13).
+ */
 export function buildWreck(world: World, scene: THREE.Scene): void {
   const w = world.wreck;
   if (!w) return;
   const { y, nose } = wreckLie(world, w), ax = Math.sin(w.rot), az = Math.cos(w.rot);
-  void assets.model('heli_wreck').then((got) => {
+  assets.later(() => void assets.model('heli_wreck').then((got) => {
     const model = got.clone();
     model.position.set(w.x, y, w.z);
     model.rotation.set(-nose, w.rot, 0, 'YXZ');
@@ -40,7 +44,7 @@ export function buildWreck(world: World, scene: THREE.Scene): void {
     });
     model.name = 'crest:wreck';
     scene.add(model);
-  }, (e) => console.warn('the wreck on the crest', e));
+  }, (e) => console.warn('the wreck on the crest', e)));
   if (!physics.world) return; // planning only: no collision world
   for (const [hx, hy, hz, along, up] of WRECK_BOXES) physics.addStatic(physics.R.ColliderDesc.cuboid(hx, hy, hz), 'metal', { x: w.x + ax * along, y: y + up, z: w.z + az * along }, w.rot);
 }
