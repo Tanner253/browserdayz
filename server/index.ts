@@ -1108,7 +1108,14 @@ const keyHash = (key: string) => createHash('sha256').update(`zona key ${key}`).
 /** Is this an address out in the world? (Not this machine's own, nor one of a private network: those are whatever stands in front of the server, and are everybody's.) */
 const publicIp = (ip: string) => !!ip && !/^(::1$|0:0:0:0::|::ffff:127\.|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|f[cd][0-9a-f]{2}:|fe80:)/i.test(ip);
 const ipHash = (ip: string) => (publicIp(ip) && ADMIN.pepper ? createHash('sha256').update(`${ADMIN.pepper} ${ip}`).digest('hex').slice(0, 40) : '');
-const roleOf = (c: Client): Role | null => ADMIN.state.roles[keyHash(c.key)]?.role ?? null;
+/**
+ * A server on somebody's own machine makes whoever plays on it an admin (LOCAL_ADMIN=1), so that what an admin has
+ * can be tried there without the site's password: "i should have admin panel locally", 2026-10-13. Never where the
+ * host is Render, and never on a server that answers to a site anywhere but this machine.
+ */
+const LOCAL_ADMIN = process.env.LOCAL_ADMIN === '1' && !process.env.RENDER && /^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])([:/]|$)/.test(SITE_URL);
+if (LOCAL_ADMIN) console.log('[admin] LOCAL_ADMIN: everybody on this server is an admin');
+const roleOf = (c: Client): Role | null => (LOCAL_ADMIN ? 'admin' : ADMIN.state.roles[keyHash(c.key)]?.role ?? null);
 function adminBan(key: string, ip: string): boolean {
   const k = keyHash(key), a = ipHash(ip);
   // (Somebody with a role is never kept off by an address: an address is a household's, a café's, a whole
