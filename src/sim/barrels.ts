@@ -16,8 +16,8 @@ export const BARREL = {
   respawn: 300,
   /** and not while anybody is standing this close to the spot, metres */
   clear: 5,
-  /** one sets off another within this much of its own reach... */
-  chainReach: 0.65,
+  /** one sets off another within this much of its own reach: 5.2 m, as it was when the reach was 8 m and this 0.65... */
+  chainReach: 0.37,
   /** ...this many seconds later */
   chainDelay: 0.22,
   /** where on it the blast is counted from, metres above its foot */

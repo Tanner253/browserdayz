@@ -47,9 +47,10 @@ export const WEAPON_RULES: Record<string, WeaponRule> = {
   knife: { damage: 27, melee: true, range: 3.3, interval: 0.3, falloff: 1 },
   grenade: { damage: 150, melee: false, range: 70, interval: 0, falloff: 1, blast: 9 },
   // a fuel drum somebody shot (see src/sim/barrels.ts): whoever fired may be a rifle shot away. (140 and 8 m until
-  // 2026-10-13: "exploding barrels should have larger explosion SFX and do more damage": more than a grenade's now,
-  // and as much further as its blast is drawn bigger.)
-  barrel: { damage: 180, melee: false, range: 900, interval: 0, falloff: 1, blast: 9.2 },
+  // 2026-10-13: "exploding barrels should have larger explosion SFX and do more damage", then "barrell blast radius
+  // should be larger with damage gradient": more than a grenade's at its middle, and reaching half as far again,
+  // less with every metre as every blast is (see `hitDamage`): 132 at 3 m, 73 at 7, 35 at 10, 5 at 13, none at 14.)
+  barrel: { damage: 180, melee: false, range: 900, interval: 0, falloff: 1, blast: 14 },
   // run down by a jeep (see src/sim/vehicles.ts): how much it hurts is how fast the jeep was going
   jeep: { damage: 0, melee: true, range: 8, interval: 0.4, falloff: 1 },
   // the arms of one of the infected (see src/sim/infected.ts): never a player's to hit with
