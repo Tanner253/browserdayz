@@ -61,5 +61,8 @@
       "path": "/api/tick",
       "schedule": "17 5 * * *"
     }
-  ]
+  ],
+  "git": {
+    "deploymentEnabled": false
+  }
 }
