@@ -56,9 +56,14 @@ const run = async (expression) => {
 
 await cdp('Page.enable');
 await cdp('Runtime.enable');
+// (The dev server's word that a file has changed is not heard by this page: with the tree being edited while this
+// runs, a page told of every save starts loading afresh and never comes up. And when every picture is stale the game
+// makes them all as it starts, which is the long way round: it is given ten minutes.)
+const still = path.join(ROOT, 'assets-src', '_wf', 'me', 'still.js');
+if (fs.existsSync(still)) await cdp('Page.addScriptToEvaluateOnNewDocument', { source: fs.readFileSync(still, 'utf8') });
 await cdp('Page.navigate', { url: address });
 let up = false;
-for (let i = 0; i < 480 && !up; i++) {
+for (let i = 0; i < 1200 && !up; i++) {
   await sleep(500);
   up = await run(`!!window.T && !!window.__game && !document.querySelector('#loading:not(.done)')`).catch(() => false);
 }

@@ -23,6 +23,13 @@
 //            a bag of blood, and the same bag with salt water in it
 //   bare   – of its pictures only its colour and its relief are kept: the game paints it with those two and nothing else
 //            (a building hung whole: see `whole:` in src/world/buildings.ts), so the others are so many megabytes nobody sees
+//   solid  – a material of it that came to be drawn see-through (BLEND) and is not glass to be seen through. `true`: it is
+//            drawn solid, and the alpha of its colour picture is thrown away (a mask whose eyepieces are nine parts in ten
+//            solid as they came). A number: it is cut out where that alpha is under it and solid everywhere else (a sight
+//            whose one material is also the clear lid over its fibre: the lid goes, the lens stays)
+//   flat   – materials whose names match have their relief map left out (a download that gave its colour picture as its relief)
+//   pivot  – a piece of the download (a node, by name) whose own origin is put at x = 0, z = 0 in place of the model's middle:
+//            a door, which is then turned about its hinge by turning the model about y
 // A piece on a skeleton is taken as the skeleton holds it when nothing is moving.
 
 import fs from 'node:fs/promises';
@@ -89,7 +96,7 @@ export async function processProp(id, cfg, { io, SRC, OUT, FORCE, exists, countT
   const credit = { id, ...(await creditOf(dir)), changes: cfg.changes };
   if (!credit.line) throw new Error(`${id}: its licence asks for no credit line this script knows how to read (${credit.licence}): look at ${path.join(dir, 'license.txt')}`);
   const dest = path.join(OUT, 'models', `${id}.glb`);
-  const stamp = JSON.stringify({ ...cfg, only: cfg.only?.source, small: cfg.small?.source, cut: cfg.cut ? `${cfg.cut.tall}: ${cfg.cut.keep} ${cfg.cut.drop}` : undefined, v: 6 });
+  const stamp = JSON.stringify({ ...cfg, only: cfg.only?.source, small: cfg.small?.source, flat: cfg.flat?.source, pivot: cfg.pivot?.source, cut: cfg.cut ? `${cfg.cut.tall}: ${cfg.cut.keep} ${cfg.cut.drop}` : undefined, v: 6 });
   const metaPath = path.join(dir, `_meta_${id}.json`);
   let meta;
   if (!FORCE && (await exists(dest)) && (await exists(metaPath))) {
@@ -107,6 +114,10 @@ export async function processProp(id, cfg, { io, SRC, OUT, FORCE, exists, countT
     const label = (n) => `${n.getName()} ${n.getMesh().getName()} ${n.getMesh().listPrimitives().map((p) => p.getMaterial()?.getName() ?? '').join(' ')}`;
     const drawn = root.listNodes().filter((n) => n.getMesh() && (!cfg.only || cfg.only.test(label(n))));
     if (!drawn.length) throw new Error(`${id}: nothing it draws matches ${cfg.only}`);
+    // (where the piece it is to turn about stands, read before anything is moved)
+    const hinge = cfg.pivot && root.listNodes().find((n) => cfg.pivot.test(n.getName()));
+    if (cfg.pivot && !hinge) throw new Error(`${id}: no piece of it is named ${cfg.pivot}`);
+    let pivot = hinge?.getWorldTranslation();
     const meshes = [];
     for (const n of drawn) {
       const mesh = n.getMesh();
@@ -174,11 +185,31 @@ export async function processProp(id, cfg, { io, SRC, OUT, FORCE, exists, countT
     const [rx, ry, rz] = cfg.rot ?? [0, 0, 0];
     const R = mul(about.z(rz), mul(about.y(ry), about.x(rx)));
     for (const mesh of meshes) transformMesh(mesh, R);
+    if (pivot) pivot = [0, 1, 2].map((r) => R[r] * pivot[0] + R[4 + r] * pivot[1] + R[8 + r] * pivot[2]);
     const b = getBounds(scene);
     const s = cfg.scale ?? cfg.size / Math.max(...b.max.map((v, k) => v - b.min[k]));
-    const M = mul(scaleBy(s), move(-(b.min[0] + b.max[0]) / 2, -b.min[1], -(b.min[2] + b.max[2]) / 2));
+    const M = mul(scaleBy(s), move(-(pivot?.[0] ?? (b.min[0] + b.max[0]) / 2), -b.min[1], -(pivot?.[2] ?? (b.min[2] + b.max[2]) / 2)));
     for (const mesh of meshes) transformMesh(mesh, M);
+    const inUse = new Set(meshes.flatMap((mesh) => mesh.listPrimitives().map((p) => p.getMaterial())));
+    // (What a material that is left out was painted with goes with it. A material's extensions are things of their own
+    // in the file: one left behind when its material is cleared away kept its pictures in the file, the glint of a
+    // door in the file of the stove it was taken off, where nothing drew them and the card's budget counted them.)
     for (const m of root.listMaterials()) {
+      if (inUse.has(m)) continue;
+      for (const e of m.listExtensions()) if (e.listParents().every((p) => p.propertyType !== 'Material' || !inUse.has(p))) e.dispose();
+    }
+    for (const m of root.listMaterials()) {
+      if (cfg.flat?.test(m.getName())) m.setNormalTexture(null);
+      if (cfg.solid !== undefined && inUse.has(m) && m.getAlphaMode() === 'BLEND') {
+        if (cfg.solid === true) {
+          m.setAlphaMode('OPAQUE').setBaseColorFactor(m.getBaseColorFactor().map((v, k) => (k < 3 ? v : 1)));
+          const t = m.getBaseColorTexture();
+          if (t && !t.getExtras().solid) {
+            t.setImage(new Uint8Array(await sharp(Buffer.from(t.getImage())).removeAlpha().png().toBuffer())).setMimeType('image/png');
+            t.setExtras({ ...t.getExtras(), solid: true });
+          }
+        } else m.setAlphaMode('MASK').setAlphaCutoff(cfg.solid);
+      }
       if (cfg.both) m.setDoubleSided(true);
       if (cfg.plain || cfg.bare) m.setMetallicRoughnessTexture(null);
       if (cfg.bare) {

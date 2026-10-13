@@ -21,6 +21,8 @@ Your role is tied to your browser's saved game, not to the password. You never t
 | **K** | Free camera on and off |
 | **H** (in the free camera) | Brings your body to where the camera is |
 | Right-click on the map (**M**) | Teleports you there |
+| Click a player's dot on the map | Picks them, and opens a short list of what can be done |
+| **Del** | Takes away whatever you are looking at: a thing on the ground, a body, a stash, a car, one of the infected |
 
 Flying (noclip and free camera): W A S D, **Space** up, **Ctrl** down, **Shift** fast, **Alt** slow.
 
@@ -29,6 +31,7 @@ Flying (noclip and free camera): W A S D, **Space** up, **Ctrl** down, **Shift**
 - **Players**: everyone online with their number, place, time on and how often the cheat checks fired on them. Click a player, then: Go to them, Bring them here, Heal, Kill, Warn, Mute, Kick, Timeout (5/10/30/60 min), Ban, Make a mod, Make an admin, Take their role. People who just left are listed underneath and can still be banned. Ban, Kill and Make an admin ask "Sure?" and need a second click.
 - **Me**: God mode, Vanish, Noclip, Free camera, Heal me. Teleport by place name, by numbers, or by right-clicking the map. "Say to all" puts a line across everyone's screen. Two settings for your own death: **Void inventory** (nothing you carried is left on your body) and **Void dog tag** (no tag of yours is left to cash in).
 - **Spawn**: five one-click kits, and every item in the game with a search box, a kind filter and a count. If a player is picked in Players, kits and items go to them instead of you.
+- **Entities**: spawn a jeep, a police car or infected, and take cars and infected out of the world (see "Added on 13 October" below).
 - **Bans**: the list, with Unban.
 - **Roles**: who is an admin or a mod.
 
@@ -54,8 +57,12 @@ Admins only:
 | Command | What it does |
 | --- | --- |
 | `/ban who [why]` | For good: their saved game and their internet address |
-| `/bans` | The list, numbered |
-| `/unban number-or-name` | Lifts a ban |
+| `/bans` | The list, numbered, each with its id in brackets |
+| `/unban id-number-or-name` | Lifts a ban: by its id (`a:1f3c9a2b`), by its number straight after `/bans`, or by name if only one ban has that name |
+| `/spawn what [count] [x z]` | Puts something in the world: `jeep`, `police` or `infected`. A few steps in front of you (`/spawn infected 5`), or at map numbers, with how many first (`/spawn jeep 1 120 -40`) |
+| `/delcar [number]` | Takes a car out of the world: the nearest to you, or the one of that number |
+| `/wrecks` | Clears away every burned-out car now |
+| `/delz [metres]` | Puts down the infected within so many metres of you (60 if you give no number) |
 | `/admin who` | Makes them an admin |
 | `/mod who` | Makes them a mod |
 | `/demote who` | Takes their role |
@@ -120,6 +127,48 @@ Admins only:
 - **Kill me** (Me tab, or `/die`).
 - **Tag colour** (Me tab): the colour of the word ADMIN before your name in the chat. RGB is the default and the RGB button goes back to it. Your name itself is no longer rainbow.
 - The Players tab also shows health, kills and tags cashed, and the top line shows server uptime, stashes standing and characters kept.
+
+## Added on 13 October: the bigger window, the live map, Entities
+
+### The window
+
+- The panel opens over most of the screen (about 86% of its width and 84% of its height).
+- **Move it**: drag the title bar. **Resize it**: drag any edge or corner, or the grip in the bottom right corner.
+- It opens where you left it, at the size you left it, in this browser. **Reset layout** in the title bar (or a double click on the bar) puts it back.
+- Everything in it can be reached with the keyboard: **Tab** goes from one button to the next, **Enter** presses it, **`** shuts the window.
+- Kick, the timeouts and Take their role now ask once more, as Ban and Kill do: press the button again within four seconds.
+
+### The map (M) is live
+
+- Every player is a dot that moves as they move, with a point showing the way they face. Blue is a player, violet is staff, amber is tabbed out, a hollow dot is a body left behind, a grey cross is dead, faint is vanished.
+- **Point at a dot** to read who it is, their health, how far they are from you and their map numbers.
+- **Click a dot**: that player is picked (in the panel too) and a short list opens: Go to them, Bring them here, Watch them, Message them, Open in the panel.
+- **Admin view**, the box in the top left of the map, is yours alone and is kept by this browser:
+  - Find a player: the map goes to them.
+  - Switches: Players, Names, Facing, Health, Cheat flags, The dead, Bodies left and tabbed out, Trail (where each has been in the last minute).
+  - Name colour, Name size, Dot size.
+  - Range ring: a ring of 50, 100, 200 or 500 m round you, and round whoever is picked.
+  - The map numbers under the pointer are written at the foot of the box: they are what `/tp` and `/spawn` take.
+  - Reset puts every one of these back. Click the box's title to fold it away.
+- Right-click on the map still teleports you there.
+
+### Entities (in the panel, bottom left)
+
+- **Where a new thing is put**: a few steps in front of you, or where you are looking. "Where you are looking" is whatever is in the middle of your view behind the window: shut the panel, look, open it again (or press Look again).
+- **Spawn**: a tile each for the Jeep, the Police car and the Infected. Choose how many, press Spawn. Everybody sees it at once.
+- **Take out of the world**: Delete the car I am looking at, Delete the car nearest me, Clear every burned-out car, and Put down the infected within 30, 60, 120 or 250 m of me. Each asks once more.
+- The numbers at the foot say how many cars stand, how many are burned out and how many infected are on their feet.
+- Things to know:
+  - Nobody can be sitting in a car that is deleted.
+  - Infected you spawn do not come back when they are dead. Infected that lived there do, in their time, as always.
+  - A car you spawn that later burns is followed, three minutes on, by a new car at the nearest parking place of its kind, as any car is.
+  - At most 4 cars or 25 infected in one press, and no more than 30 cars or 80 infected over what the map starts with.
+- The **Delete** key still takes away whatever you are looking at while you play.
+
+### Bans
+
+- Every ban and every time off has an id of its own (`a:…` for a ban, `t:…` for a time off). The panel's Unban uses it, so it always lifts the one you clicked, whatever else was banned or lifted in the meantime.
+- `/unban Name` lifts nothing if more than one ban has that name: it lists them with their ids, and you give the id.
 
 ## Stashes left standing
 

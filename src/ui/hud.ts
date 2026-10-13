@@ -91,8 +91,43 @@ function wheelSvg() {
   return `<svg viewBox="-160 -160 320 320" aria-hidden="true">${wedges.join('')}</svg>`;
 }
 
-/** the menu's films are told apart by the second asked for: each has this many seconds of the count to itself */
-export const REEL = 100;
+/** an entry of the game's own changelog, as the menu's Updates panel lists it */
+interface LogEntry {
+  id: string;
+  title: string;
+  /** its day, as the page says it */
+  when: string;
+  /** the sentence or two under its title */
+  lead: string;
+}
+/** how many of them the panel lists */
+const LOG_SHOWN = 4;
+/** kept in the browser: whether the Updates panel was left open, and the newest of each kind that was in it when it last was */
+const NEWS_OPEN = 'zona.updates.open', NEWS_SEEN = 'zona.updates.seen';
+
+/**
+ * The entries of the changelog, newest first, read off the page the site serves (public/changelog/index.html: each
+ * is an <article class="entry"> with an id, a day and a title). It is the page itself that is asked for, so what the
+ * menu lists is whatever was last published with the front end, and nothing is kept in step by hand. None, if the
+ * page cannot be had.
+ */
+async function changelog(): Promise<LogEntry[]> {
+  try {
+    const r = await fetch('/changelog/index.html', { cache: 'no-cache' });
+    if (!r.ok) return [];
+    const page = new DOMParser().parseFromString(await r.text(), 'text/html');
+    const out: LogEntry[] = [];
+    for (const a of page.querySelectorAll('article.entry[id]')) {
+      const title = a.querySelector('h2')?.textContent?.trim();
+      // (its id goes into a link: letters, figures and hyphens, or the entry is left out)
+      if (!title || !/^[\w-]+$/.test(a.id)) continue;
+      out.push({ id: a.id, title, when: a.querySelector('time')?.textContent?.trim() ?? '', lead: a.querySelector('.lead')?.textContent?.trim() ?? '' });
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
 
 /** everything there is to be given (never a tag: one is only ever taken from somebody) */
 const THINGS = Object.values(ITEMS).filter((d) => d.id !== 'dogtag').map((d) => ({ id: d.id, name: d.name }));
@@ -184,9 +219,6 @@ export class HUD {
       <div class="hud-fatal"><div class="fatal-title">Disconnected</div><div class="fatal-sub"></div><button class="dead-btn fatal-btn">Reconnect</button></div>
       <div class="hud-dead"><div class="dead-title">You are dead</div><div class="dead-sub"></div><button class="dead-btn">Respawn <small>Space</small></button><a class="dead-back" data-back><b>Back ZONA on X</b><span>Like, reply, repost. ${BACK_SHORT}</span></a></div>
       <div class="hud-start">
-        <video class="sm-film" muted playsinline preload="none" data-src="/menu/map-pan.mp4"></video>
-        <video class="sm-film" muted playsinline preload="none" data-src="/menu/armoury.mp4"></video>
-        <video class="sm-film" muted playsinline preload="none" data-src="/menu/story.mp4"></video>
         <div class="sm-cut"></div>
         <header class="sm-top">
           <div class="sm-brand"><img src="/brand/zona-mark-plain.svg" alt=""><b>ZONA</b></div>
@@ -198,10 +230,9 @@ export class HUD {
             <button type="button" data-tab="gfx">Settings</button>
             <button type="button" data-tab="rewards" hidden>Rewards</button>
             <a class="sm-out" href="/changelog/" target="_blank" rel="noopener">Changelog</a>
+            <a class="sm-out sm-pay" href="/payouts" target="_blank" rel="noopener" title="Every payment made to players, each with its transaction"><span>Payouts</span><em></em></a>
           </nav>
           <div class="sm-status">
-            <span class="start-online"></span>
-            <a class="sm-pay" href="/payouts" target="_blank" rel="noopener" title="Every payment made to players, each with its transaction"><i aria-hidden="true"></i><b>Payouts</b><em>Paid in SOL, on chain</em></a>
             <a class="sm-discord" href="${DISCORD}" target="_blank" rel="noopener noreferrer"><b>Discord</b><em>Join</em></a>
           </div>
         </header>
@@ -222,11 +253,11 @@ export class HUD {
               <button class="start-out" type="button">Log out</button>
             </div>
             <div class="start-queue"><div class="sq-pos"></div><div class="sq-sub"></div><button class="sq-leave" type="button">Play on your own instead</button></div>
+            <div class="start-online"></div>
             <ol class="sm-loop" aria-label="How a life goes">
               <li><i>1</i>Drop in</li><li><i>2</i>Loot</li><li><i>3</i>Take a tag</li><li><i>4</i>Hold ${TAG_HOLD_MIN}:00</li><li><i>5</i>Cash in</li>
             </ol>
             <button class="sm-wallet" type="button" hidden><b></b><span></span></button>
-            <a class="sm-back" data-back><b>Back ZONA on X</b><span>${BACK_WHY}</span><em>Like · Reply · Repost</em></a>
           </section>
           <aside class="sm-sheet start-brief" data-tab="play">
             <div class="sm-sheet-head"><h2></h2><button class="sm-close" type="button" aria-label="Close">&times;</button></div>
@@ -267,8 +298,8 @@ export class HUD {
         </div>
         <footer class="sm-foot start-links">
           <button class="sl-ca" type="button" title="Copy the contract address"><b>CA</b><code>${CONTRACT}</code><em>Copy</em></button>
-          <a class="sl-x sl-pay" href="/payouts" target="_blank" rel="noopener">Payouts: who was paid, and what</a>
           <a class="sl-x" href="https://x.com/${X_HANDLE}" target="_blank" rel="noopener noreferrer">@${X_HANDLE}</a>
+          <a class="sm-back" data-back title="${BACK_WHY}"><b>Back ZONA on X</b><em>Like · Reply · Repost</em></a>
           <div class="sm-live"><i></i><span></span></div>
         </footer>
       </div>
@@ -280,8 +311,9 @@ export class HUD {
     this.notes = this.root.querySelector('.hud-notes') as HTMLDivElement;
     for (const [k, sel] of [['wheel', '.hud-wheel'], ['wheelDot', '.wheel-dot'], ['wheelB', '.wheel-mid b'], ['wheelS', '.wheel-mid span'], ['says', '.hud-says']]) this.el[k] = this.root.querySelector(sel) as HTMLElement;
     this.buildCompass();
-    // (the game's news, in a corner of the way in: it comes when it comes, and the menu does not wait for it)
-    void mountUpdates(this.el.start, X_HANDLE);
+    // (the game's news, in a corner of the way in: it comes when it comes, and the menu does not wait for it. What X
+    // gave is shut into a pill the moment it is there, and the changelog is put over it: see `mountNews`.)
+    void mountUpdates(this.el.start, X_HANDLE).then(() => this.mountNews()).catch(() => {});
     // And said again in the chat, to whoever is in the game and not at a menu: ten minutes in, and every twenty after.
     // (A line among the others, not a thing over the view: nobody is shot for reading it.)
     const remind = () => {
@@ -631,49 +663,135 @@ export class HUD {
    * the next (see src/game/menu-scenes.ts).
    * @param fade how far the picture is faded out, 0..1
    */
-  menuScene(caption: string, fade: number, film = -1) {
+  menuScene(caption: string, fade: number) {
     const live = this.root.querySelector('.sm-live') as HTMLElement;
     this.toggle(live, 'on', !!caption);
     if (caption) this.set('scene', live.lastElementChild as HTMLElement, caption);
+    // (a scene that is new to whoever is looking has "New" said before its caption, by menu-scenes.ts: its line and its dot are lit for it)
+    if (caption) this.toggle(live, 'new', caption.startsWith('New · '));
     const v = fade <= 0.004 ? '0' : fade.toFixed(2);
     if (this.last.cut !== v) {
       this.last.cut = v;
       (this.root.querySelector('.sm-cut') as HTMLElement).style.opacity = v;
     }
-    // a film, when it is its turn: played from the second asked for, and kept to it. (There are two: the map on
-    // its table, and the new guns with their parts going on. Which of them, and where in it, is one number: the
-    // second reel's seconds are counted from REEL.)
-    this.root.querySelectorAll<HTMLVideoElement>('.sm-film').forEach((reel, k) => {
-      const on = film >= 0 && Math.floor(film / REEL) === k, at = film - k * REEL;
-      if (on !== reel.classList.contains('on')) {
-        reel.classList.toggle('on', on);
-        if (on) {
-          reel.currentTime = at;
-          void reel.play().catch(() => {});
-        } else reel.pause();
-      } else if (on && Math.abs(reel.currentTime - at) > 0.4) reel.currentTime = at;
-    });
+    // (Nothing else: three films used to be played over the world in turn with its scenes, and the menu has none
+    // now. 2026-10-13: "i want it to all be in game footage high quality".)
   }
 
   /**
-   * The menu's films are sent for: once the game is up, and not before. (Thirteen megabytes that nothing waits
-   * on: named in the page, they came down beside what the game does wait on. Until one has come the menu shows
-   * the scenes that are played live: see `filmReady`.)
+   * The Updates panel, bottom right of the way in (2026-10-13: "the main menu updates panel needs to be collapsable
+   * and collapsed by default and updated regularly with the front end"). Shut, which it is until somebody opens it,
+   * it is a pill that says Updates and how many of them are new since it was last open (a dot and no number for
+   * somebody who never opened it). Open, it lists the newest entries of the game's own changelog and, under them,
+   * the asking and the posts from X that src/ui/updates.ts put there. Either may be missing; with neither there is
+   * no panel. Which way it was left is kept in the browser.
    */
-  fetchFilms() {
-    this.root.querySelectorAll<HTMLVideoElement>('.sm-film').forEach((reel) => {
-      const src = reel.dataset.src;
-      if (!src || reel.getAttribute('src')) return;
-      reel.preload = 'auto';
-      reel.src = src;
-      reel.load();
+  private async mountNews() {
+    const start = this.el.start;
+    const kept = (k: string) => {
+      try {
+        return localStorage.getItem(k);
+      } catch {
+        return null;
+      }
+    };
+    const keep = (k: string, v: string) => {
+      try {
+        localStorage.setItem(k, v);
+      } catch {
+        /* not kept: the next time it is shut, and everything in it is new */
+      }
+    };
+    const mk = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', text = '') => {
+      const e = document.createElement(tag);
+      if (cls) e.className = cls;
+      if (text) e.textContent = text;
+      return e;
+    };
+    const link = (a: HTMLAnchorElement, href: string) => {
+      a.href = href;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      return a;
+    };
+    /** the newest entry and the newest post that were in the panel when it was last open (null: it never was) */
+    let seen: { log: string; x: number } | null = null;
+    try {
+      const s = JSON.parse(kept(NEWS_SEEN) ?? 'null') as { log?: unknown; x?: unknown } | null;
+      if (s) seen = { log: typeof s.log === 'string' ? s.log : '', x: Number(s.x) || 0 };
+    } catch {
+      /* what was kept cannot be read: as if it never was */
+    }
+    const was = seen;
+    const log: LogEntry[] = [];
+    /** how many entries are newer than the one named (all that are shown, if it is not among them) */
+    const newer = (id: string) => {
+      const k = log.findIndex((e) => e.id === id);
+      return Math.min(k < 0 ? log.length : k, LOG_SHOWN);
+    };
+    /** The panel is given the handle it is opened and shut by, and one body that scrolls, and is put as it was left. */
+    const dress = (panel: HTMLElement) => {
+      const head = panel.querySelector('header') as HTMLElement;
+      const tab = mk('button', 'sm-news-tab');
+      tab.type = 'button';
+      const badge = mk('i');
+      tab.append(mk('b', '', 'Updates'), badge, mk('span'));
+      const word = head.querySelector(':scope > b');
+      if (word) word.replaceWith(tab);
+      else head.prepend(tab);
+      const body = mk('div', 'sm-news-body');
+      body.append(...[...panel.children].filter((c) => c !== head));
+      panel.append(body);
+      if (body.firstElementChild) body.prepend(mk('h3', 'sm-news-h', 'On X'));
+      /** when each post from X was made */
+      const posted = () => [...panel.querySelectorAll<HTMLTimeElement>('.sn-post time')].map((t) => Date.parse(t.dateTime) || 0);
+      const set = (open: boolean, byHand = false) => {
+        panel.classList.toggle('shut', !open);
+        tab.setAttribute('aria-expanded', String(open));
+        tab.title = open ? 'Hide the updates' : 'Show the updates: what changed in the game, and its posts on X';
+        if (byHand) keep(NEWS_OPEN, open ? '1' : '0');
+        if (open) {
+          // (what is in it now has been seen: the next count is of what comes after)
+          seen = { log: log[0]?.id ?? seen?.log ?? '', x: Math.max(seen?.x ?? 0, ...posted()) };
+          keep(NEWS_SEEN, JSON.stringify(seen));
+        }
+        const last = seen;
+        const n = open ? 0 : last ? newer(last.log) + posted().filter((t) => t > last.x).length : -1;
+        badge.textContent = n > 0 ? String(n) : '';
+        badge.classList.toggle('on', n !== 0);
+      };
+      tab.onclick = () => set(panel.classList.contains('shut'), true);
+      set(kept(NEWS_OPEN) === '1');
+      return { body, again: () => set(!panel.classList.contains('shut')) };
+    };
+    // (the panel X's posts came in is shut at once: none of it is seen open while the changelog is sent for)
+    const made = start.querySelector<HTMLElement>('.sm-news');
+    let ui = made ? dress(made) : null;
+    log.push(...(await changelog()));
+    if (!log.length) return;
+    if (!ui) {
+      // (X did not answer: the panel is the changelog's alone)
+      const panel = mk('aside', 'sm-news');
+      const head = mk('header');
+      head.append(mk('b', '', 'Updates'), link(mk('a', '', `@${X_HANDLE}`), `https://x.com/${X_HANDLE}`));
+      panel.append(head);
+      start.append(panel);
+      ui = dress(panel);
+    }
+    const list = mk('section', 'sm-log');
+    const h = mk('h3', 'sm-news-h', 'In the game');
+    h.append(link(mk('a', '', 'All updates'), '/changelog/'));
+    list.append(h);
+    // (an entry that was not there when the panel was last open says so, for as long as this page is up)
+    const unseen = was ? newer(was.log) : 0;
+    log.slice(0, LOG_SHOWN).forEach((e, k) => {
+      const a = link(mk('a', k < unseen ? 'sm-log-item new' : 'sm-log-item'), `/changelog/#${e.id}`);
+      a.append(mk('time', '', e.when), mk('b', '', e.title));
+      if (e.lead) a.append(mk('span', '', e.lead));
+      list.append(a);
     });
-  }
-
-  /** the film that has this second in it has come and can be played */
-  filmReady(film = 0) {
-    const reel = this.root.querySelectorAll<HTMLVideoElement>('.sm-film')[Math.floor(film / REEL)];
-    return !!reel && reel.readyState >= 3;
+    ui.body.prepend(list);
+    ui.again();
   }
 
   /** The line about being paid, under the way in: whether a wallet is given yet. Pressing it opens the rewards window. */
@@ -687,13 +805,14 @@ export class HUD {
   }
 
   /**
-   * The Payouts button, top right of the way in (2026-10-12: "make the payouts button on the main menu more POPPing
-   * its easy to miss it and payouts are special thing we offer so people should know about it"): what a tag pays at
-   * this moment, when the site says. null: it is not paying, or did not answer, and the button says what is always so.
+   * Payouts, in the row along the top beside Changelog and said as that is: what a tag pays at this moment goes
+   * small beside the word, when the site says. null: it is not paying, or did not answer, and there is the word
+   * alone. (It was a gold button at the top right for a day, made to be noticed. 2026-10-13: "the payouts thing in
+   * the top right corner is ugly i dont like it".)
    */
   setPay(sol: number | null) {
     const em = this.root.querySelector('.sm-pay em');
-    if (em) em.textContent = sol === null ? 'Paid in SOL, on chain' : `A tag pays ${Math.round(sol * 10_000) / 10_000} SOL now`;
+    if (em) em.textContent = sol === null ? '' : `${Math.round(sol * 10_000) / 10_000} SOL a tag`;
   }
 
   /** The loading screen is lifting: play the entrance (title, panels) once. */
@@ -707,12 +826,12 @@ export class HUD {
    * @param picture the whole map, drawn once (see Minimap.poster)
    * @param size how many metres across it is
    */
-  setMenuMap(picture: HTMLCanvasElement, size: number, spots: MenuSpot[], gas: { x: number; z: number; r: number } | null) {
+  setMenuMap(picture: HTMLCanvasElement, size: number, spots: MenuSpot[], gases: { x: number; z: number; r: number }[]) {
     const c = this.root.querySelector('.mm canvas') as HTMLCanvasElement;
     const g = c.getContext('2d')!, W = c.width, k = W / size;
     g.imageSmoothingEnabled = true;
     g.drawImage(picture, 0, 0, picture.width, picture.height, 0, 0, W, W);
-    if (gas) {
+    for (const gas of gases) {
       g.beginPath();
       g.arc((gas.x + size / 2) * k, (gas.z + size / 2) * k, gas.r * k, 0, Math.PI * 2);
       g.fillStyle = 'rgba(178, 198, 52, 0.26)';

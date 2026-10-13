@@ -107,8 +107,42 @@ export function shotOf(id: string): { muzzleVel: number; drag: number; damage: n
   return { muzzleVel: c.vel * g.barrel, drag: c.drag, damage: c.damage, pellets: c.pellets ?? 1, cone: c.cone ?? 0 };
 }
 
+/**
+ * What a suppressor leaves of a round's speed. Whoever fires flies their round at this, and so must everybody
+ * else's copy of it: flown at its full speed in the other games, a quieted 9 mm was faster than sound there, and
+ * cracked past a head it went by in silence where it was fired, and landed higher.
+ */
+export const QUIETED = 0.9;
+
+/** the speed of sound, m/s */
+export const SOUND = 343;
+/**
+ * How much of a crack a round makes that is going this fast: 0 (slower than sound: none) .. 1 (a rifle's). It is
+ * what a suppressor does nothing about, and most of how loud a quieted gun still is: see `gunshot` in
+ * src/core/audio.ts. (A 9 mm from a pistol is under the speed of sound once it is quieted, and has none.)
+ */
+export const crackOf = (speed: number) => Math.min(1, Math.max(0, (speed / SOUND - 1) / 0.3));
+
 /** seconds from one shot to the next at its fastest */
 export const intervalOf = (id: string) => 60 / (GUNS[id]?.rpm ?? 460);
+
+/**
+ * The wait before a gun can fire again, a frame of `dt` seconds later: at nought or under, it can. When the shot
+ * goes its interval is added to this (`wait += intervalOf(id)`), not put in its place.
+ *
+ * A gun comes ready part of the way through a frame, and what was left of that frame is the little this goes
+ * under nought by. It was thrown away, so every shot waited for the next whole frame and a gun's rate was its
+ * rate rounded down to a number of frames: at sixty frames a second the AR-15's 700 a minute was the AK's 600,
+ * and the submachine gun's 780 was 720. Kept, the next shot comes that much sooner and the rate is the gun's
+ * own at any frame rate. Only that one frame's worth is ever kept: a gun that was ready and was not fired owes
+ * nothing, or one left alone for a second would fire its next ten rounds in ten frames.
+ */
+export function cooled(wait: number, dt: number): number {
+  if (wait <= 0) return 0;
+  const left = wait - dt;
+  // (a rate that is a whole number of frames comes out a hair either side of nought: it is nought)
+  return Math.abs(left) < 1e-9 ? 0 : left;
+}
 
 /**
  * What a round still does when it has lost speed. It hurts by its energy, which goes by the square of its speed;
@@ -268,12 +302,33 @@ export interface Stance {
  * The cone a shot can land in, radians across. At the eye and still it is the gun's own; moving opens it, being
  * off the ground opens it wide, a knee or the ground closes the hip's; and an automatic held open warms into a
  * wider one (the barrel is not where the last shot left it).
+ *
+ * The two rifles with a string of their own (PATTERNS) warm by a quarter of what the others do. A string is
+ * there to be learnt and pulled against, and a cone that grew to seven times the AK's own on top of it (twelve
+ * times the AR-15's) put the round somewhere else however well it was pulled. (Rust, whose pattern theirs is
+ * drawn to the shape of, took more than four fifths off its cone when it gave its guns patterns.)
  */
 export function coneOf(id: string, s: Stance): number {
   const g = GUNS[id];
   if (!g) return 0.03;
   const hip = rad(g.hip) * (1 + s.moving * 1.3) * (s.prone ? 0.6 : s.crouched ? 0.75 : 1) + (s.air ? 0.035 : 0);
   const eye = g.moa * MOA + s.moving * 0.007 + (s.air ? 0.02 : 0);
-  const warm = g.auto ? Math.min(Math.max(0, s.heat - 1), 6) * 0.0011 : 0;
+  const warm = g.auto ? Math.min(Math.max(0, s.heat - 1), 6) * (PATTERNS[id] ? 0.0003 : 0.0011) : 0;
   return lerp(hip, eye, s.aimed) + warm;
+}
+
+/**
+ * How far off the middle of a cone `across` radians wide something lands that is as likely to be in any part of
+ * it as in any other of the same size: most of it out toward the edge, there being more edge than middle.
+ * @param u a number from 0 to 1 (a throw of the dice)
+ */
+export const anywhereIn = (across: number, u: number) => (across / 2) * Math.sqrt(u);
+
+/**
+ * How far off the middle of its cone a gun's shot goes, radians, by two throws of the dice (each 0 to 1).
+ * Anywhere across it, for most guns. The two rifles with a string of their own are drawn in toward the middle:
+ * half their shots land inside half the cone's width, where a quarter would, and none at its very edge.
+ */
+export function scatterOf(id: string, across: number, u: number, v: number): number {
+  return PATTERNS[id] ? (across / 2) * ((u + v) / 2) : anywhereIn(across, u);
 }

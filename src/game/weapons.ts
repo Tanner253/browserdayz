@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { assets } from '../core/assets';
 import { physics, SHOT_GROUPS, type Surface } from '../core/physics';
-import { audio } from '../core/audio';
+import { CRACK, audio } from '../core/audio';
 import type { Input } from '../core/input';
 import { extractParts, type MeshPart } from '../core/gltf-utils';
 import { ITEMS, capacityOf, chambered, fittedOf, handlingOf, hasMod, magFits, magRoom, nextMag, pieceShown, swapMag, type ItemInstance, type Slot, quietOf } from '../sim/items';
@@ -19,7 +19,7 @@ import { WeaponRig, liftPack } from './rig';
 import { type Curl, FPArms, type Grips, type HandGrip, mixCurl } from './arms';
 import type { Look } from './look';
 import { MAX_STAMINA } from '../net/protocol';
-import { GRAVITY, GUNS, coneOf, damageKept, elevationFor, intervalOf, kickOf, shotOf, zeroOf } from '../sim/gunplay';
+import { GRAVITY, GUNS, QUIETED, SOUND, anywhereIn, coneOf, cooled, crackOf, damageKept, elevationFor, intervalOf, kickOf, scatterOf, shotOf, zeroOf } from '../sim/gunplay';
 import type { ItemModels } from './loot';
 
 import { ownHit } from '../sim/combat';
@@ -142,6 +142,22 @@ interface Bullet {
 
 const _toCam = new THREE.Vector3();
 const _cardV = new THREE.Vector3();
+
+/**
+ * A shell's pellet: the line of its shot (one long), thrown somewhere in a round cone `across` radians wide
+ * about that line, as likely in any part of it as in any other. (Each was thrown into a box, three numbers each
+ * its own way: a pattern with corners to it, wider from corner to corner than from side to side, and not the
+ * same shape fired north as fired north-east.)
+ */
+function strewn(line: THREE.Vector3, across: number): THREE.Vector3 {
+  // (two ways square to the line and to each other: any two, a cone being round)
+  const side = new THREE.Vector3(0, 1, 0);
+  if (Math.abs(line.y) > 0.9) side.set(1, 0, 0);
+  side.cross(line).normalize();
+  const over = new THREE.Vector3().crossVectors(line, side);
+  const off = Math.tan(anywhereIn(across, Math.random())), round = Math.random() * Math.PI * 2;
+  return line.clone().addScaledVector(side, Math.cos(round) * off).addScaledVector(over, Math.sin(round) * off).normalize();
+}
 
 /** critically-damped-ish spring for procedural motion */
 class Spring {
@@ -679,6 +695,14 @@ const HELD_RIFLE = 0.9;
 const SPRINT_OUT = { up: 0.22, keep: 0.45, lock: 0.4 };
 /** shots no further apart than this are one string: the kick of each goes by which shot of the string it is. Seconds. */
 const STRING_GAP = 0.28;
+/** how far up the sights are (`adsT`) before they steady a shot: at the eye, as near as makes no difference (a scope is looked through from here too) */
+const SIGHTS_UP = 0.9;
+/**
+ * How fast the part of a kick that stays is given to the view, 1/s: most of it within a twentieth of a second.
+ * (All of it went in on the frame of the shot: the picture jumped most of a degree at an AK's first round, where
+ * a muzzle is thrown up fast and is still seen to go.)
+ */
+const RISE = 40;
 
 /**
  * Where a gun that rides in another pack's hands sits in them, from where the fitting of the
@@ -829,6 +853,8 @@ export class Weapons {
   private aimRecoil = new Spring(90, 13);
   /** how the aim comes back from a shot: a spring this near to dead-beat, which a push of v gets `RECOIL.peak` v / w out of before it turns (w its own rate) */
   private static RECOIL = { damp: 0.68, peak: 0.466 };
+  /** what of the kicks so far stays and has not yet been given to the view, radians (x across to the right, y up): see RISE */
+  private rise = new THREE.Vector2();
   private adsT = 0;
   private sprintT = 0;
   /** seconds for which a trigger pulled on the run is remembered: the shot goes when the gun has come up */
@@ -2007,7 +2033,8 @@ export class Weapons {
     }
     this.time += dt;
     this.selectorT = Math.max(0, this.selectorT - dt);
-    this.fireCooldown = Math.max(0, this.fireCooldown - dt);
+    // (what is left of the frame a gun comes ready in is kept for its next shot: see `cooled`)
+    this.fireCooldown = cooled(this.fireCooldown, dt);
     this.hitMarker = Math.max(0, this.hitMarker - dt);
     this.updateBullets(dt);
     this.updateBrass(dt);
@@ -2132,6 +2159,15 @@ export class Weapons {
     const breathSway = new THREE.Vector2(Math.sin(t * 0.9) * 0.7 + Math.sin(t * 2.1) * 0.3, Math.sin(t * 1.3 + 1) * 0.6 + Math.cos(t * 0.7) * 0.4).multiplyScalar(swayAmp);
     const rec = this.aimRecoil.step(dt);
     p.aimOffset.set(breathSway.x + rec.x, breathSway.y + rec.y);
+    // The part of the kick that stays, given to the view a share at a time: all of it gets there, the last
+    // hair of it in one piece. (Whoever has died has no view to be thrown.)
+    if (p.dead) this.rise.set(0, 0);
+    else if (this.rise.x !== 0 || this.rise.y !== 0) {
+      const share = this.rise.lengthSq() < 1e-10 ? 1 : 1 - Math.exp(-RISE * dt);
+      p.pitch += this.rise.y * share;
+      p.yaw -= this.rise.x * share;
+      this.rise.multiplyScalar(1 - share);
+    }
 
     this.animate(dt, input, camera);
   }
@@ -2169,22 +2205,28 @@ export class Weapons {
     this.burst++;
     this.sinceShot = 0;
     const suppressed = quietOf(item);
-    const v0 = b.muzzleVel * (suppressed ? 0.9 : 1);
+    const v0 = b.muzzleVel * (suppressed ? QUIETED : 1);
     // From the eye, along the way the gun is pointing (on the eye's own line unless it is still catching up with a
     // turn), and lifted by what brings the round back down onto that line at the range its sights are set for.
     const dir = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(this.lag.y, this.lag.x, 0, 'YXZ')).applyQuaternion(camera.quaternion);
     const up = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion), right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
-    dir.addScaledVector(up, elevationFor(v0, b.drag, zeroOf(item.id, item.zero))).normalize();
+    // Lifted toward the sky, not toward the top of the picture: leaning, the eye is rolled over, and lifted its
+    // own way a round went up and to one side (a rifle set for 600 m landed most of a metre off at a full lean).
+    // A round falls straight down, and what is set against that is straight up from the line of the shot.
+    const lift = new THREE.Vector3(0, 1, 0).addScaledVector(dir, -dir.y);
+    // (pointing straight up or down there is no such way: the eye's own, as it was)
+    if (lift.lengthSq() < 1e-6) lift.copy(up);
+    dir.addScaledVector(lift.normalize(), elevationFor(v0, b.drag, zeroOf(item.id, item.zero))).normalize();
     // Somewhere in the cone it can land in: anywhere across it, as likely near the edge as the middle of a ring
-    // of the same width (so most land a little way off the middle, few on it and few at the edge).
+    // of the same width (so most land a little way off the middle, few on it and few at the edge). The two rifles
+    // with a string to learn are drawn in toward its middle: see `scatterOf`.
     const spread = this.spreadNow(item.id);
-    const off = (spread / 2) * Math.sqrt(Math.random()), round = Math.random() * Math.PI * 2;
+    const off = scatterOf(item.id, spread, Math.random(), Math.random()), round = Math.random() * Math.PI * 2;
     dir.addScaledVector(right, Math.cos(round) * off).addScaledVector(up, Math.sin(round) * off).normalize();
     this.onShot({ origin: camera.position.clone(), dir: dir.clone(), weapon: item.id, suppressed });
     // (a shell's pellets go out round the line of the shot, each its own way)
     for (let k = 0; k < b.pellets; k++) {
-      const d = dir.clone();
-      if (b.cone) d.add(new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(b.cone)).normalize();
+      const d = b.cone ? strewn(dir, b.cone) : dir.clone();
       this.bullets.push({ pos: camera.position.clone(), vel: d.multiplyScalar(v0), drag: b.drag, damage: b.damage * (suppressed ? 0.9 : 1), v0, life: 4, travelled: 0, weapon: item.id, quiet: suppressed });
     }
 
@@ -2193,13 +2235,15 @@ export class Weapons {
     // back by itself, part of it stays and has to be pulled down. What is seen of the gun jumping is beside that.
     const big = !!gun?.heavy;
     const feel = handlingOf(item) ?? { ergo: 80, weight: 0.5, recoil: 1 };
-    const kick = kickOf(item.id, { shot: this.burst, crouched: this.player.crouched, prone: this.player.prone, aimed: this.aiming, arms: this.armStamina, ergo: feel.ergo, fitted: feel.recoil }, Math.random);
+    // (steadied by the sights when they are at the eye, not from the moment their button goes down: it was the button)
+    const kick = kickOf(item.id, { shot: this.burst, crouched: this.player.crouched, prone: this.player.prone, aimed: this.adsT > SIGHTS_UP, arms: this.armStamina, ergo: feel.ergo, fitted: feel.recoil }, Math.random);
     this.aimRecoil.k = kick.back * kick.back;
     this.aimRecoil.d = 2 * Weapons.RECOIL.damp * kick.back;
     this.aimRecoil.v.y += (kick.up * kick.back) / Weapons.RECOIL.peak;
     this.aimRecoil.v.x -= (kick.across * kick.back) / Weapons.RECOIL.peak;
-    this.player.pitch += kick.stayUp;
-    this.player.yaw -= kick.stayAcross;
+    // (the part that stays is owed to the view, and paid over the next twentieth of a second: see `rise`)
+    this.rise.x += kick.stayAcross;
+    this.rise.y += kick.stayUp;
     // (a pack's hands take the shot themselves: on top of that, half the kick the game gives a still model)
     const own = m.rig ? 0.5 : 1;
     this.kick.v.z += (gun?.jump ?? 1.6) * own;
@@ -2221,7 +2265,7 @@ export class Weapons {
     const ahead = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
     const thin = gun?.auto && this.burst > 2 && this.burst % 2 === 0 ? 0 : (suppressed ? 0.3 : 0.8) * (gun?.auto ? 0.4 : 1) * THREE.MathUtils.lerp(1, 0.5, this.adsT);
     this.fx.muzzle(suppressed ? muzzleWorld.addScaledVector(ahead, kind === 'pistol' ? 0.13 : 0.19) : muzzleWorld, ahead, big || kind === 'auto', suppressed, 0, thin);
-    audio.gunshot(kind === 'auto' ? 'rifle' : kind, undefined, 0, kind === 'auto', suppressed, VOICE[item.id]);
+    audio.gunshot(kind === 'auto' ? 'rifle' : kind, undefined, 0, kind === 'auto', suppressed, VOICE[item.id], crackOf(v0));
 
     m.shotT = 0;
     m.shotClip = m.rig?.has('fireLast') && (item.loaded ?? 0) === 0 ? 'fireLast' : 'fire';
@@ -2232,7 +2276,8 @@ export class Weapons {
         if (this.current === m && !this.action) this.cycleBolt(m);
       }, m.rig ? 300 : 260);
     } else {
-      this.fireCooldown = interval;
+      // (added to what was left of this frame, which is nought or a little under: see `cooled`)
+      this.fireCooldown += interval;
       this.slideKick = 1;
       // (a pack throws its own case)
       if (!m.rig || m.brass) this.eject(m, kind === 'rifle');
@@ -2682,10 +2727,12 @@ export class Weapons {
     // their own feet, was hit by their own shot in everybody else's game: the blood was on them, and none on
     // whoever they had hit. "blood splatter is rendering at the player who is inflicting damage", 2026-10-12.)
     const out = dir.clone().normalize();
+    // (as fast as it left where it was fired, which through a suppressor is slower: it lands where it landed
+    // there, and a 9 mm that went by without a crack there goes by without one here)
+    const v0 = b.muzzleVel * (suppressed ? QUIETED : 1);
     for (let k = 0; k < b.pellets; k++) {
-      const d = out.clone();
-      if (b.cone) d.add(new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(b.cone)).normalize();
-      this.bullets.push({ pos: origin.clone().addScaledVector(out, 0.35), vel: d.multiplyScalar(b.muzzleVel), drag: b.drag, damage: 0, v0: b.muzzleVel, life: 4, travelled: 0.35, weapon: weaponId, ghost: true, from: shooter });
+      const d = b.cone ? strewn(out, b.cone) : out.clone();
+      this.bullets.push({ pos: origin.clone().addScaledVector(out, 0.35), vel: d.multiplyScalar(v0), drag: b.drag, damage: 0, v0, life: 4, travelled: 0.35, weapon: weaponId, ghost: true, from: shooter });
     }
     const d = this.mainCam ? origin.distanceTo(this.mainCam.position) : 0;
     // The flash is at the end of their barrel. (It was put three fifths of a metre out from
@@ -2695,7 +2742,7 @@ export class Weapons {
     const seen = from && from.pos.distanceTo(origin) < 2.5 ? from : null;
     const at = seen ? seen.pos : origin.clone().addScaledVector(out, kind === 'pistol' ? 0.6 : 1).add(new THREE.Vector3(0, kind === 'pistol' ? 0 : -0.05, 0));
     this.fx.muzzle(at, seen ? seen.dir : out, kind !== 'pistol', suppressed, FLAME[kind]);
-    audio.gunshot(kind === 'auto' ? 'rifle' : kind, origin, d, false, suppressed, VOICE[weaponId]);
+    audio.gunshot(kind === 'auto' ? 'rifle' : kind, origin, d, false, suppressed, VOICE[weaponId], crackOf(v0));
   }
 
   /**
@@ -2739,9 +2786,13 @@ export class Weapons {
     this.kick.v.y -= 0.7 * k;
   }
 
+  /**
+   * We were hit: what is held jolts, and the aim is thrown, by half of what it was. (A hit of the ordinary kind
+   * threw it two and a half degrees: whoever was hit first could not answer.)
+   */
   flinch(k: number) {
-    this.aimRecoil.v.y += 0.9 * k;
-    this.aimRecoil.v.x += (Math.random() - 0.5) * 1.4 * k;
+    this.aimRecoil.v.y += 0.45 * k;
+    this.aimRecoil.v.x += (Math.random() - 0.5) * 0.7 * k;
     this.kickRot.v.z += (Math.random() - 0.5) * 7 * k;
     this.kick.v.y -= 0.5 * k;
   }
@@ -2883,10 +2934,21 @@ export class Weapons {
           const toCam = _toCam.copy(this.mainCam.position).sub(b.pos);
           const along = toCam.dot(dir);
           if (along <= len) {
-            // the nearest point of this step's path
+            // the nearest point of its path: in this step, or behind it already (a round fired from a few metres
+            // off is past before it is first looked at)
             b.heard = true;
-            const miss = toCam.addScaledVector(dir, -Math.max(0, along)).length();
-            if (miss < 5) audio.whiz(_toCam.copy(b.pos).addScaledVector(dir, Math.max(0, along)), miss, 0, speed > 343);
+            const miss = toCam.addScaledVector(dir, -along).length();
+            // A round faster than sound here drags its crack behind it in a cone, whatever it was fired through,
+            // and that is heard further off than the zip of a slow one. It gets to the ear a moment after the
+            // round is level with it (never later than sound takes to cross the gap, and sooner the nearer the
+            // round is to the speed of sound), and from back along the path: from where the round was when it
+            // made the part of the wave that gets there first.
+            const mach = speed / SOUND, cone = mach > 1 ? Math.sqrt(mach * mach - 1) : 0;
+            const back = cone ? Math.min(miss / cone, miss * 3) : 0;
+            // (And before the muzzle there was no round to make it: level with whoever fires, or behind them,
+            // nothing goes by. What is heard there is the shot. Without this, now that a crack is heard nine
+            // metres off, every shot fired by somebody alongside would crack as well.)
+            if (miss < (cone ? CRACK.far : 5) && b.travelled + along - back > 1) audio.whiz(_toCam.copy(b.pos).addScaledVector(dir, along - back), miss, cone ? (miss / SOUND) * (cone / mach) : 0, cone > 0);
           }
         }
         b.pos.add(step);

@@ -9,7 +9,7 @@ import { assets, type TreeEntry } from '../core/assets';
 import { physics, type Surface } from '../core/physics';
 import { extractParts, groundParts, joinByPaint, type MeshPart } from '../core/gltf-utils';
 import { antiFirefly, SHADOW_FRUSTA, type Atmosphere } from './atmosphere';
-import { foliagePatch, setLodFade, wind } from './foliage';
+import { foliagePatch, setLodFade, wind, SNOW_LIES, SNOW_PAINT } from './foliage';
 import { heightAt, type Instance, type World } from './worldgen';
 import { BARREL } from '../sim/barrels';
 
@@ -479,10 +479,13 @@ varying vec2 vUv;
 varying float vFrame;
 varying float vRow;
 varying float vDist;
+varying float vSnow;
 varying vec3 vFogWorldPos;
+${SNOW_LIES}
 void main() {
   vec4 info = uInfo[int(iVar + 0.5)];
   vec3 base = iPos.xyz;
+  vSnow = snowLies(base);
   vec3 toCam = cameraPosition - base;
   vec3 flatDir = normalize(vec3(toCam.x, 0.0, toCam.z) + vec3(1e-5, 0.0, 0.0));
   vec3 right = vec3(flatDir.z, 0.0, -flatDir.x);
@@ -507,6 +510,7 @@ varying vec2 vUv;
 varying float vFrame;
 varying float vRow;
 varying float vDist;
+varying float vSnow;
 #include <fog_pars_fragment>
 vec4 frameSample(float f) {
   float fi = mod(floor(f), ${FRAMES}.0);
@@ -523,6 +527,11 @@ void main() {
   // the model dissolves over the same stretch by the same pattern (see foliagePatch): the card
   // takes just the pixels it gives up, so the two never leave a hole or draw twice
   if (c.a < 0.45 || (fade < 0.999 && ign < 1.0 - fade)) discard;
+  // (Snow on it, as on the tree it is a picture of. The picture is of a lit tree, so the snow is lit as the tree
+  // was: as bright as the picture is there, by as much as snow is paler than a pine's needles, and the trunk and
+  // the dark under the boughs are left dark.)
+  float lit = dot(c.rgb, vec3(0.3, 0.59, 0.11));
+  c.rgb = mix(c.rgb, ${SNOW_PAINT} * min(lit * 4.2, 1.5), vSnow * 0.72 * smoothstep(0.02, 0.12, lit));
   gl_FragColor = vec4(c.rgb * uDaylight, 1.0);
   #include <fog_fragment>
 }`;
@@ -589,10 +598,11 @@ export class Vegetation {
       metalness: 0,
       alphaToCoverage: true,
     });
-    const barkP = foliagePatch({ height: entry.height, sway: sway * 0.6 });
+    const barkP = foliagePatch({ height: entry.height, sway: sway * 0.6, snow: 'solid' });
     const leafP = foliagePatch({
       height: entry.height,
       sway,
+      snow: 'leaf',
       flutter: entry.leaf === 'pine' ? 0.012 : 0.03,
       translucency: 0.32,
       sunDir: this.atmo.sunDir,
@@ -732,9 +742,11 @@ export class Vegetation {
                 m.side = THREE.DoubleSide;
                 m.alphaToCoverage = true;
               }
-              const fp = foliagePatch(isFern ? { height: 1, sway: 0.05, flutter: 0.01, translucency: 0.25, sunDir: this.atmo.sunDir, sunColor: this.atmo.sunColor } : {});
+              // (snow lies on a fern and on a rock that stand above the snow line. Not on the other things stood about
+              // the world: many of those are indoors, and a bed is not snowed on.)
+              const fp = foliagePatch(isFern ? { height: 1, sway: 0.05, flutter: 0.01, translucency: 0.25, sunDir: this.atmo.sunDir, sunColor: this.atmo.sunColor, snow: 'leaf' } : isRock ? { snow: 'solid' } : {});
               setLodFade(fp.lod, fadeIn, fadeOut);
-              this.atmo.register(m, fp.patch, `${isFern ? 'fern' : 'prop'}`);
+              this.atmo.register(m, fp.patch, `${isFern ? 'fern' : isRock ? 'rock' : 'prop'}`);
               return { geometry: p.geometry, material: m as THREE.Material };
             });
           // Full detail up close, the far version (a few hundred triangles) beyond. How soon

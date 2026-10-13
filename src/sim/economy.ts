@@ -251,6 +251,9 @@ export const TYPES: Record<string, TypeRule> = {
   // ------------------------------------------------------------ what is worn and carried
   patrol_cap: { at: [0, 11, 3, 0, 0], lifetime: 3600, restock: 600, usage: ARMY },
   fishermans_hat: { at: [6, 6, 4, 0, 0], lifetime: 3600, restock: 600, usage: [...HOMES, 'Farm', 'Hunting'] },
+  // (The Field Jacket and the Field Trousers have no rule: everybody is dressed in them from the start and only one
+  // of each is worn, so a spare is room for nothing. They come off the dead. The places for clothes on the first
+  // step are full as it is: two more kinds there, and the bags that are wanted went short.)
   garden_gloves: { at: [6, 5, 4, 0, 0], lifetime: 3600, restock: 600, usage: ['Village', 'Farm', 'Industrial'] },
   // (a workman's: sheds and yards before barracks)
   work_gloves: { at: [3, 8, 3, 0, 0], lifetime: 3600, restock: 900, usage: ['Industrial', 'Farm', 'Military'], favour: { Industrial: 2 } },

@@ -5,7 +5,7 @@ import { assets } from './core/assets';
 import { Strips } from './core/strips';
 import { physics } from './core/physics';
 import { DEATHS, DIED_AT, LEAN, TOUCH, bootDone, bootStage } from './core/device';
-import { generateWorld, heightAt } from './world/worldgen';
+import { generateWorld } from './world/worldgen';
 import { Atmosphere } from './world/atmosphere';
 import { Terrain } from './world/terrain';
 import { Vegetation } from './world/vegetation';
@@ -14,7 +14,7 @@ import { Buildings } from './world/buildings';
 import { buildRoad } from './world/road';
 import { Game } from './game/game';
 import { initRotatePrompt } from './ui/rotate';
-import { gasZone } from './sim/gas';
+import { gasClouds } from './sim/gas';
 import { buildWorks } from './world/works';
 import { buildWells } from './world/wells';
 import { wellSpots } from './sim/wells';
@@ -129,7 +129,7 @@ async function boot() {
   stage('sky');
   const atmo = new Atmosphere(r.renderer, r.scene, r.camera);
   // (`?nogas` on a development build leaves it out of the shaders, to measure what it costs)
-  atmo.gas = import.meta.env.DEV && new URLSearchParams(location.search).has('nogas') ? null : gasZone(world.pois, (x, z) => heightAt(world.heights, x, z));
+  atmo.gases = import.meta.env.DEV && new URLSearchParams(location.search).has('nogas') ? [] : gasClouds(world);
   await atmo.init();
   stage('ground');
   const terrain = new Terrain(world, atmo);

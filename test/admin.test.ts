@@ -1,6 +1,6 @@
 // Admins, and who they have banned (server/index.ts `command`, api/admin.ts). The real game server is started on
 // a port of its own, twice, with a stand-in for the site on this machine: the real api/admin code over a store
-// that is a variable. Nothing here touches the real site or its store. About half a minute.
+// that is a variable. Nothing here touches the real site or its store. A little over two minutes.
 //   npx tsx test/admin.test.ts
 
 import assert from 'node:assert/strict';
@@ -416,6 +416,132 @@ await withServer(async () => {
   assert.ok(said && said.why === 'update: buildings' && said.in === 45, 'a restart an admin warned of was not said to everybody');
   checks++;
   console.log('  ok  an admin takes a thing out of the world, and nobody else does; a restart warned of is said to everybody, with why');
+
+  // ---- stood in the world by an admin, and taken out of it: cars of both kinds, the infected. Nobody else can.
+  {
+    const orders = ['/spawn jeep', '/spawn infected 3', '/delcar', '/wrecks', '/delz'];
+    for (const o of orders) assert.match(await late.order(o), /not a thing you can do/, `somebody with no role gave ${o}`);
+    assert.match(await ann.order(`/mod #${late.id}`), /Gus is a mod/);
+    await sleep(300);
+    const mark = late.got.length;
+    for (const o of orders) assert.match(await late.order(o), /Only an admin/, `a mod gave ${o}`);
+    assert.ok(!late.got.slice(mark).some((m) => m.t === 'v+' || m.t === 'v-' || m.t === 'i+' || m.t === 'ihp'), 'a mod put something in the world, or took something out of it');
+
+    // a jeep a few steps in front of her; a police car at the map numbers given
+    assert.match(await ann.order('/tp 200 200'), /You are at 200, 200/);
+    assert.match(await ann.order('/spawn jeep'), /^Jeep at -?\d+, -?\d+ \(number \d+\)/);
+    const jeep = late.got.slice(mark).filter((m) => m.t === 'v+').pop() as Extract<S2C, { t: 'v+' }> | undefined;
+    assert.ok(jeep && Math.hypot(jeep.v.s[0] - 200, jeep.v.s[2] - 200) < 10 && jeep.v.k === undefined && jeep.v.hp > 0 && jeep.v.seats.every((s) => s === null), 'a jeep an admin stood is not there for everybody, a few steps in front of the admin');
+    assert.match(await ann.order('/spawn police 1 230 215'), /^Police car at 230, 215/);
+    const cop = late.got.slice(mark).filter((m) => m.t === 'v+').pop() as Extract<S2C, { t: 'v+' }> | undefined;
+    assert.ok(cop && cop.v.i !== jeep.v.i && cop.v.k === 1 && Math.abs(cop.v.s[0] - 230) < 0.01 && Math.abs(cop.v.s[2] - 215) < 0.01, 'a police car was not stood at the map numbers given');
+    assert.match(await ann.order('/spawn dragon'), /Stand what\? One of: jeep, police, infected/);
+    assert.match(await ann.order('/spawn jeep 1 99999 0'), /off the map/);
+    assert.match(await ann.order('/spawn jeep two'), /how many/);
+    // (two numbers could be how many and half a place, or a place: nothing is stood, and it is asked again)
+    assert.match(await ann.order('/spawn jeep 230 215'), /how many \(up to 4\), and then/);
+    assert.equal(late.got.slice(mark).filter((m) => m.t === 'v+').length, 2, 'an order that could not be read stood something');
+    // (somebody who comes in afterwards is shown them, as any car)
+    ann.send({ t: 'adm' });
+    await sleep(700);
+    const cars = last(ann, 'adm')!.stats?.cars ?? 0;
+    assert.ok(cars >= 2 && last(ann, 'adm')!.stats?.wrecks === 0, 'the lists do not say how many cars stand');
+
+    // taken away by its number, and the nearest with no number
+    assert.match(await ann.order(`/delcar ${cop.v.i}`), /Taken away: the police car, number/);
+    assert.ok(late.got.slice(mark).some((m) => m.t === 'v-' && m.i === cop.v.i), 'a car an admin took away by its number is still there for everybody else');
+    assert.match(await ann.order('/delcar 99999'), /No car of that number/);
+    assert.match(await ann.order('/delcar soon'), /takes away the car nearest you/);
+
+    // burned out (her own grenades: she is proof against them), and the wreck cleared away
+    assert.match(await ann.order('/wrecks'), /No car is burned out/);
+    ann.send({ t: 'nade', o: [200, 1, 200], v: [0, 2, -6] });
+    await sleep(100);
+    for (let k = 0; k < 7; k++) ann.send({ t: 'vhit', i: jeep.v.i, w: 'grenade' });
+    await sleep(500);
+    assert.ok(late.got.slice(mark).some((m) => m.t === 'vboom' && m.i === jeep.v.i), 'the jeep did not burn: there is no wreck to try the order on');
+    ann.send({ t: 'adm' });
+    await sleep(700);
+    assert.equal(last(ann, 'adm')!.stats?.wrecks, 1, 'the lists do not count a burned-out car');
+    assert.match(await ann.order('/wrecks'), /Cleared away: 1 burned-out car\./);
+    assert.ok(late.got.slice(mark).some((m) => m.t === 'v-' && m.i === jeep.v.i), 'a wreck an admin cleared away is still there for everybody else');
+    assert.match(await ann.order('/spawn jeep'), /^Jeep at/);
+    const near = late.got.slice(mark).filter((m) => m.t === 'v+').pop() as Extract<S2C, { t: 'v+' }>;
+    assert.match(await ann.order('/delcar'), /Taken away: the jeep, number/);
+    assert.ok(late.got.slice(mark).some((m) => m.t === 'v-' && m.i === near.v.i), 'the car nearest an admin was not the one taken away');
+    ann.send({ t: 'adm' });
+    await sleep(700);
+    assert.equal(last(ann, 'adm')!.stats?.cars, cars - 2, 'what was taken away is still counted');
+
+    // the infected: as many as asked for, each a pace from the next, where she is; no more than the most at once; and put down
+    assert.match(await ann.order('/delz'), /None of the infected is on its feet within 60 metres/);
+    assert.match(await ann.order('/spawn infected 3'), /^3 of the infected at/);
+    const stood = late.got.slice(mark).filter((m) => m.t === 'i+') as Extract<S2C, { t: 'i+' }>[];
+    assert.equal(stood.length, 3, 'the infected an admin stood are not there for everybody');
+    assert.ok(stood.every((m) => Math.hypot(m.b.s[0] - 200, m.b.s[2] - 195) < 6 && m.b.hp > 0 && m.b.own === null), 'the infected were not stood a few steps in front of the admin');
+    assert.ok(stood.every((a) => stood.every((b) => a === b || Math.hypot(a.b.s[0] - b.b.s[0], a.b.s[2] - b.b.s[2]) > 1.5)), 'two of the infected were stood in one place');
+    assert.match(await ann.order('/spawn zombie 999 260 260'), /^25 of the infected at 260, 260/);
+    ann.send({ t: 'adm' });
+    await sleep(700);
+    assert.equal(last(ann, 'adm')!.stats?.infected, 28);
+    assert.match(await ann.order('/delz 30'), /Put down: 3 of the infected within 30 metres/);
+    const down = late.got.slice(mark).filter((m) => m.t === 'ihp' && m.dead).map((m) => (m as Extract<S2C, { t: 'ihp' }>).i).sort();
+    assert.deepEqual(down, stood.map((m) => m.b.i).sort(), 'the infected an admin put down did not fall for everybody, or others fell with them');
+    assert.match(await ann.order('/delz 400'), /Put down: 25 of the infected/);
+    // (and the server's clock has gone round with them there: it still answers)
+    await sleep(1200);
+    assert.match(await ann.order('/delz 400'), /None of the infected/);
+    checks++;
+    console.log('  ok  an admin stands a jeep, a police car and the infected in the world and takes them out of it, for everybody; a mod and a player cannot');
+  }
+
+  // ---- a ban is lifted by its own id: two bans of one name, a list that has moved since it was read, and a name that means more than one
+  {
+    const sam = new Player('Sam'), other = new Player('Sam');
+    assert.ok(await sam.join(), 'Sam was not let in');
+    assert.ok(await other.join(), 'the other Sam was not let in');
+    assert.match(await ann.order(`/ban #${sam.id} the first of them`), /Sam is banned/);
+    assert.match(await ann.order(`/ban #${other.id} the second of them`), /Sam is banned/);
+    ann.send({ t: 'adm' });
+    await sleep(700);
+    const listed = last(ann, 'adm')!.bans, rows = listed.filter((b) => b.name === 'Sam');
+    assert.equal(rows.length, 2);
+    assert.ok(listed.every((b) => /^a:[0-9a-f]{8}$/.test(b.id ?? '')) && new Set(listed.map((b) => b.id)).size === listed.length, 'a ban in the lists has no id of its own');
+    assert.ok(!JSON.stringify(listed).includes(sam.key) && !JSON.stringify(listed).includes(sam.ip), 'the lists say whose key or address a ban is of');
+    const read = await ann.order('/bans');
+    assert.ok(rows.every((b) => read.includes(`[${b.id}]`)), '/bans does not print the ids');
+    // the name alone means both: neither is lifted, and both are read out with their ids
+    const both = await ann.order('/unban Sam');
+    assert.match(both, /More than one ban is "Sam", and none of them is lifted/);
+    assert.ok(rows.every((b) => both.includes(`/unban ${b.id} `)), 'the bans a name could mean were not read out with their ids');
+    assert.equal(kept().bans.filter((b) => b.name === 'Sam').length, 2, 'a name that two bans have lifted one of them');
+    // the list moves under the panel (another ban above them is lifted): the id still lifts the one it was read for
+    assert.ok(listed.length > rows.length && listed[0].name !== 'Sam', 'there is no older ban to lift: the list cannot be made to move');
+    assert.match(await ann.order('/unban 1'), new RegExp(`${listed[0].name} is no longer banned`));
+    assert.match(await ann.order(`/unban ${rows[1].id}`), /Sam is no longer banned/);
+    assert.equal(kept().bans.filter((b) => b.name === 'Sam').length, 1);
+    assert.ok(await other.join(), 'the ban lifted by its id was not the one that was meant');
+    assert.ok(!(await sam.join()), 'a ban lifted by its id lifted another of the same name');
+    assert.match(await ann.order(`/unban ${rows[1].id}`), /No ban is/);
+    // one banned and one kept off for a while, of the same name: the name means both, across the two lists
+    assert.match(await ann.order(`/timeout #${other.id} 5 cooling off`), /off the server for 5 minutes/);
+    ann.send({ t: 'adm' });
+    await sleep(700);
+    const off = last(ann, 'adm')!.bans.filter((b) => b.name === 'Sam');
+    assert.deepEqual(off.map((b) => b.id?.slice(0, 2)).sort(), ['a:', 't:'], 'somebody kept off for a while has no id of their own in the lists');
+    const mixed = await ann.order('/unban sam');
+    assert.match(mixed, /More than one ban is "sam"/);
+    assert.ok(off.every((b) => mixed.includes(`/unban ${b.id} `)));
+    assert.ok(!(await other.join()), 'a name that a ban and a time off both have lifted the time off');
+    assert.match(await ann.order(`/unban ${off.find((b) => b.id?.startsWith('t:'))!.id}`), /Sam is no longer kept off/);
+    assert.ok(await other.join(), 'a time off lifted by its id still keeps them off');
+    assert.ok(!(await sam.join()), 'lifting a time off lifted a ban of the same name');
+    // (and the one ban of that name left is lifted by the name, as ever)
+    assert.match(await ann.order('/unban Sam'), /Sam is no longer banned/);
+    assert.ok(await sam.join(), 'the last ban of a name was not lifted by the name');
+    checks++;
+    console.log('  ok  a ban has an id of its own, and is lifted by it whatever the list has become; a name that more than one ban has lifts none, and they are read out');
+  }
 });
 
 site.close();

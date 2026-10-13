@@ -944,6 +944,99 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 .inv-help { margin-top: 14px; font-size: 12.5px; color: var(--ink-faint); line-height: 1.6; }
 .inv-help b { color: var(--ink-dim); font-family: var(--mono); font-size: 11px; font-weight: 400; }
 
+/* ---- The inventory, 2026-10-13: "we should also upgrade the user inventory ensuring all items are properly bright
+   and seeable in the inventory and that the UX of the inventory and how all the inventory management works is
+   intuitive". Everything from here to the next heading is that pass. Where it changes a rule above, the rule is
+   written again here and left alone above: other hands are in this file. */
+
+/* Each thing's cell is lifted off the dark of its grid (a black pack on the old cell was not there at all), and
+   tinted faintly by what kind of thing it is, so that kinds are told apart before a picture is read: guns and things
+   to hit with a warm tan, rounds and magazines brass, gun parts violet, medical red, food and drink green, clothing
+   teal, tools steel blue; anything else the plain pale of the page. */
+.inv-wrap { inset: 18px 30px 70px; }
+.inv-grid { background-color: rgba(0, 0, 0, 0.2); }
+.inv-item { --tint: 233, 228, 216; background: linear-gradient(165deg, rgba(var(--tint), 0.21), rgba(var(--tint), 0.11)); border-color: rgba(var(--tint), 0.3); }
+.inv-item:hover:where(:not(.mini, .in-slot, .sel)) { background: linear-gradient(165deg, rgba(var(--tint), 0.31), rgba(var(--tint), 0.18)); border-color: rgba(var(--tint), 0.62); }
+.inv-item.cat-weapon, .inv-item.cat-melee, [data-kind='weapon'], [data-kind='melee'] { --tint: 214, 190, 132; }
+.inv-item.cat-ammo, .inv-item.cat-magazine, [data-kind='ammo'], [data-kind='magazine'] { --tint: 198, 144, 80; }
+.inv-item.cat-attachment, [data-kind='attachment'] { --tint: 164, 144, 216; }
+.inv-item.cat-medical, [data-kind='medical'] { --tint: 216, 98, 78; }
+.inv-item.cat-food, .inv-item.cat-drink, [data-kind='food'], [data-kind='drink'] { --tint: 138, 182, 114; }
+.inv-item.cat-clothing, [data-kind='clothing'] { --tint: 98, 178, 178; }
+.inv-item.cat-tool, [data-kind='tool'] { --tint: 126, 162, 208; }
+.inv-item.cat-magazine { box-shadow: inset 2px 0 0 #b98c55; }
+.inv-item.cat-melee { box-shadow: inset 2px 0 0 #c9b27c; }
+.inv-item.cat-tool { box-shadow: inset 2px 0 0 #7ea2d0; }
+/* (what is chosen keeps its ring whatever kind it is: the stripe of its kind was drawn in the ring's place) */
+.inv-item.sel:where(:not(.in-slot)) { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.inv-ground-row .inv-item.mini { background: rgba(var(--tint), 0.17); }
+/* A thin light edge round every picture: what parts a dark thing from a dark cell, whatever its picture is. (It is
+   drawn here, round what the picture shows of the thing, and not in the pictures: it is the screen's, and the same
+   pictures stand on the game's own bar over daylight.) */
+.inv-item-img { filter: drop-shadow(0 0 0.7px rgba(240, 236, 226, 0.6)); }
+/* (the pictures are made to one brightness now: see TONE in src/ui/icons.ts. One laid on its side in the list was made half as bright again to be seen at all) */
+.inv-item.mini .inv-item-img.fit.lying { filter: brightness(1.2) drop-shadow(0 0 0.7px rgba(240, 236, 226, 0.6)); }
+/* a place with a thing in it, on the body, on a gun, on a key: lifted as a cell is (`:where`, so that what lights a place while a thing is dragged still does) */
+.inv-slot:where(:not(.empty)), .inv-part:where(:not(.empty)), .inv-hotkey:where(:not(.empty)) { background: linear-gradient(165deg, rgba(233, 228, 216, 0.15), rgba(233, 228, 216, 0.07)); border-color: rgba(233, 228, 216, 0.24); }
+.ins-img { background-color: rgba(233, 228, 216, 0.08); }
+/* an empty place on the body: the pale shadow of a thing that goes there, under its name */
+.slot-ghost { position: absolute; inset: 15px 8px 4px; background: center / contain no-repeat; filter: brightness(0) invert(1); opacity: 0.09; pointer-events: none; }
+.inv-slot.drop-hint .slot-ghost { opacity: 0.24; }
+
+/* The card by the pointer: what a thing is, at once. (And, red, the line that says why a thing dragged will not go where it is held.) */
+.inv-card { position: fixed; display: none; z-index: 25; width: 290px; padding: 10px 12px 9px; pointer-events: none; color: var(--ink); background: rgba(14, 17, 15, 0.97); border: 1px solid rgba(233, 228, 216, 0.28); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7); }
+.inv-card.hint { width: auto; max-width: 310px; padding: 6px 10px 7px; font-size: 14px; line-height: 1.3; color: #ffd9d2; border-color: rgba(196, 82, 61, 0.95); }
+.card-head { display: grid; grid-template-columns: 56px 1fr; gap: 10px; align-items: center; }
+.card-img { height: 46px; background: rgba(233, 228, 216, 0.1) center / contain no-repeat; }
+.card-head small { display: block; font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent); }
+.card-head b { display: block; font-size: 19px; font-weight: 600; line-height: 1.1; }
+.inv-card p { margin: 7px 0 0; font-size: 14px; line-height: 1.32; }
+.inv-card .card-desc { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; color: var(--ink-dim); }
+.inv-card .card-note { font-size: 13px; color: var(--accent); }
+.card-rows { margin-top: 7px; }
+.card-rows div { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0; font-size: 13.5px; border-top: 1px solid rgba(255, 255, 255, 0.06); }
+.card-rows span { color: var(--ink-faint); white-space: nowrap; }
+.card-rows b { font-weight: 500; text-align: right; }
+.card-keys { display: flex; flex-direction: column; gap: 1px; margin-top: 7px; padding-top: 6px; font-size: 13.5px; color: var(--ink-dim); border-top: 1px solid var(--line); }
+.card-keys b { display: inline-block; min-width: 92px; font-family: var(--mono); font-size: 10px; font-weight: 400; letter-spacing: 0.04em; color: var(--ink-faint); }
+
+/* What is carried: the grids scroll by themselves, and the inspector and the body's state stay in sight under them.
+   (The inspector stood under every grid, and with a pack on it was off the foot of the screen.) Should the screen be
+   too low for all three, the whole side scrolls as it did. */
+.inv-cargo > .inv-scroll { flex: 1 1 0; min-height: 150px; margin-right: -8px; padding-right: 8px; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: rgba(233, 228, 216, 0.3) rgba(0, 0, 0, 0.25); }
+.inv-scroll::-webkit-scrollbar, .inv-inspect::-webkit-scrollbar { width: 9px; height: 9px; }
+.inv-scroll::-webkit-scrollbar-track, .inv-inspect::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.28); border-left: 1px solid var(--line); }
+.inv-scroll::-webkit-scrollbar-thumb, .inv-inspect::-webkit-scrollbar-thumb { background: rgba(233, 228, 216, 0.24); border: 2px solid transparent; background-clip: padding-box; }
+.inv-scroll.pockets-over { outline: 1px dashed var(--accent); outline-offset: -1px; }
+.inv-cargo > .inv-inspect { margin-top: 10px; max-height: calc(32vh / var(--inv-zoom, var(--ui-zoom, 1))); overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: rgba(233, 228, 216, 0.3) rgba(0, 0, 0, 0.25); }
+.inv-cargo > .inv-inspect.empty { margin-top: 6px; }
+.ins-head { grid-template-columns: 96px 1fr; }
+.ins-img { height: 62px; }
+.ins-name { font-size: 20px; }
+.ins-actions { margin-top: 9px; }
+.ins-desc { margin: 9px 0 6px; font-size: 14px; }
+/* the body's state, two to a row: half the height it took */
+.inv-status { display: grid; grid-template-columns: 1fr 1fr; gap: 0 20px; padding-top: 10px; }
+.inv-status h3, .inv-status .bleeding { grid-column: 1 / -1; }
+.inv-cargo .inv-status h3 { margin: 0 0 3px; }
+.inv-col h3 span.over { color: #ff6a55; }
+/* over each grid of what is worn, after its name: the place it is worn in (it gives way first where the bar is short) */
+.inv-gridbox h4 small { flex: 0 1 auto; min-width: 0; margin-left: 8px; overflow: hidden; text-overflow: ellipsis; font-size: 9px; font-weight: 400; letter-spacing: 0.14em; color: var(--ink-faint); }
+
+/* The survivor's side holds eleven places for what is worn now: what stands under the figure is closed up, so that
+   the tags at its foot are not pushed further off the screen than they were. */
+.inv-gear .inv-neck { margin: 6px 0; padding: 3px 10px; }
+.inv-gear .inv-neck .inv-item-img { width: 28px; height: 28px; }
+.inv-slots { margin-top: 8px; }
+.inv-slots .inv-slot { height: 64px; }
+.inv-gear > .inv-gridbox { margin-top: 14px; }
+
+/* What each click does, along the foot of the screen either side of the hot keys: in sight always, and out of the way of the grids. */
+.inv > .inv-help { position: absolute; left: 30px; bottom: 4px; z-index: 2; width: calc(50% - 312px); max-height: 62px; margin: 0; overflow: hidden; font-size: 12px; line-height: 1.28; }
+.inv > .inv-help.right { left: auto; right: 30px; text-align: right; }
+.inv > .inv-help b { font-size: 10px; }
+body.touch .inv-scroll, body.touch .inv-inspect { touch-action: pan-x pan-y; }
+
 /* ------------------------------------------------------------ F3 performance overlay */
 .perf {
   position: fixed;
@@ -1012,26 +1105,28 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 .inv-item .tagclock { position: absolute; left: 2px; right: 2px; bottom: 1px; font-family: var(--mono); font-size: 10px; font-weight: 600; text-align: center; color: var(--accent); text-shadow: 0 1px 2px #000; font-variant-numeric: tabular-nums; pointer-events: none; }
 
 /* ------------------------------------------------------------ the way in, and the pause */
-/* A bar along the top (the mark, the menu, who is online), the way in at the lower left (what
-   the game is, a name, the button), and a sheet that opens at the right for the map, how to
-   play, the controls and the settings. Behind it all the Zone is going on (menu-scenes.ts):
-   the picture is left clear where that is, and darkened where the words are. */
+/* A bar along the top (the mark, the menu, the ways out to the changelog, the payouts and the
+   Discord), the way in at the lower left (what the game is, a name, the button), and a sheet
+   that opens at the right for the map, how to play, the controls and the settings. Behind it
+   all the Zone is going on (menu-scenes.ts): the picture is left clear where that is, and
+   darkened where the words are.
+   One thing on it is filled in, and that is Deploy; the name plate is beside it. Everything
+   else is words: 2026-10-13, "if we can rework the main menu at all and make it cleaner". */
 .hud-start {
   --brand: #ffd35a;
   grid-template-rows: auto minmax(0, 1fr) auto;
   place-items: stretch;
   overflow: hidden;
+  /* (The dark at the left is as wide as the words need and no wider: on a screen of sixteen to nine it is what it
+     was, and on a wider one it stops where it stops there. It was a share of the width, and on a very wide screen
+     lay over the middle of the picture, which is where the scenes keep what they show.) */
   background:
-    linear-gradient(90deg, rgba(5, 7, 6, 0.9) 0%, rgba(5, 7, 6, 0.66) 24%, rgba(5, 7, 6, 0.16) 50%, rgba(5, 7, 6, 0) 68%),
+    linear-gradient(90deg, rgba(5, 7, 6, 0.9) 0, rgba(5, 7, 6, 0.66) min(24%, 366px), rgba(5, 7, 6, 0.16) min(50%, 762px), rgba(5, 7, 6, 0) min(68%, 1036px)),
     linear-gradient(180deg, rgba(5, 7, 6, 0.72) 0%, rgba(5, 7, 6, 0) 15%),
     linear-gradient(0deg, rgba(5, 7, 6, 0.84) 0%, rgba(5, 7, 6, 0) 20%);
 }
 /* the cut from one scene behind it to the next */
 .sm-cut { position: absolute; inset: 0; z-index: 0; opacity: 0; background: #050706; pointer-events: none; }
-/* the film of the squad's map, between the scenes: over the world, under the cut and the menu */
-.sm-film { position: absolute; inset: 0; z-index: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; pointer-events: none; }
-.sm-film.on { opacity: 1; }
-.hud-start.paused .sm-film { display: none; }
 .sm-top, .sm-main, .sm-foot { position: relative; z-index: 1; }
 
 /* --- the bar along the top */
@@ -1055,14 +1150,32 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
   transition: color 0.15s, border-color 0.15s;
 }
 .sm-nav button:hover { color: var(--ink); }
-/* (a way out of the menu to a page of its own: said as the others are, and marked as leaving) */
-.sm-nav .sm-out { align-self: center; margin-left: 8px; padding: 5px 10px 6px; font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; white-space: nowrap; text-decoration: none; color: var(--ink-dim); border: 1px solid var(--line); }
+/* (The ways out of the menu to pages of their own, the changelog and the payouts: small, in one type, each marked
+   as leaving, and set off from the sheets by a line. They are words, and neither is a box.) */
+.sm-nav .sm-out { align-self: center; flex: none; margin-left: 22px; padding: 6px 0 7px; font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; white-space: nowrap; text-decoration: none; color: var(--ink-dim); transition: color 0.15s; }
+.sm-nav button + .sm-out { margin-left: 12px; padding-left: 18px; border-left: 1px solid var(--line); }
 .sm-nav .sm-out::after { content: ' \2197'; color: var(--brand); }
-.sm-nav .sm-out:hover { color: var(--ink); border-color: var(--ink-dim); }
+.sm-nav .sm-out:hover { color: var(--ink); }
+.sm-nav .sm-out:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+/* (Payouts is one of them: it was a gold button at the top right, with a light crossing it, and was not liked.
+   What a tag pays now is said small beside the word, when it is known.) */
+.sm-nav .sm-pay { display: inline-flex; align-items: baseline; gap: 9px; }
+.sm-nav .sm-pay::after { content: none; }
+.sm-pay span::after { content: ' \2197'; color: var(--brand); }
+.sm-pay em { font-size: 11px; font-style: normal; letter-spacing: 0.06em; color: var(--ink); }
+.sm-pay em:empty { display: none; }
+@media (max-width: 760px), (max-height: 520px) { .sm-pay em { display: none; } }
 .sm-nav button.on { color: var(--ink); border-bottom-color: var(--brand); }
 .sm-nav button:focus-visible, .sm-close:focus-visible, .sm-wallet:focus-visible, .mm-spot:focus-visible, .hud-start .start-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
-.sm-status { display: flex; align-items: center; gap: 16px; margin-left: auto; }
-.start-online { display: none; font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; white-space: nowrap; color: var(--ok); }
+/* (a window too narrow for the whole row: it is slid along, and does not run into what is at its right) */
+@media (max-width: 1000px) {
+  .sm-nav { overflow-x: auto; scrollbar-width: none; }
+  .sm-nav::-webkit-scrollbar { display: none; }
+}
+.sm-status { display: flex; flex: none; align-items: center; gap: 16px; margin-left: auto; }
+/* who is online: said under the name and the button, where it bears on pressing it (a full server says so there,
+   and that there is a line). It was at the top right, and ran into the menu when it had much to say. */
+.start-online { display: none; margin-top: 16px; font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; color: var(--ok); text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8); }
 .start-online.show { display: block; }
 .start-online.show::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 6px var(--ok); vertical-align: 1px; animation: live-dot 2.4s ease-in-out infinite; }
 .start-online.full { color: var(--brand); }
@@ -1073,29 +1186,46 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 .sm-discord:hover { border-color: var(--brand); background: rgba(255, 211, 90, 0.08); }
 .sm-discord:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 .hud-start.paused .sm-discord { cursor: pointer; }
-/* (Payouts: the one thing on this bar that is filled in. Gold, a light that crosses it now and then, and a ring that goes out from it: it was a line of small print in the footer, and was missed.) */
-.sm-pay { position: relative; display: inline-flex; align-items: center; gap: 10px; padding: 7px 13px 8px 11px; overflow: hidden; font-family: var(--mono); white-space: nowrap; text-decoration: none; color: #14110b; background: linear-gradient(180deg, #ffe596, var(--brand) 60%, #f0b93a); border: 1px solid #fff0bd; box-shadow: 0 0 0 0 rgba(255, 211, 90, 0.5), 0 0 22px rgba(255, 211, 90, 0.28); animation: pay-ring 2.8s ease-out infinite; transition: filter 0.15s, transform 0.15s; }
-.sm-pay i { width: 8px; height: 8px; border-radius: 50%; background: #1d6b2c; box-shadow: 0 0 0 3px rgba(29, 107, 44, 0.25); animation: live-dot 2.4s ease-in-out infinite; }
-.sm-pay b { font-size: 12px; font-weight: 700; letter-spacing: 0.22em; text-transform: uppercase; }
-.sm-pay em { padding-left: 10px; font-size: 10px; font-weight: 600; font-style: normal; letter-spacing: 0.13em; text-transform: uppercase; color: rgba(20, 17, 11, 0.78); border-left: 1px solid rgba(20, 17, 11, 0.3); }
-.sm-pay em::after { content: ' \2197'; }
-.sm-pay::after { content: ''; position: absolute; inset: 0; background: linear-gradient(105deg, transparent 38%, rgba(255, 255, 255, 0.7) 50%, transparent 62%); transform: translateX(-130%); animation: pay-sheen 4.2s ease-in-out infinite; pointer-events: none; }
-.sm-pay:hover { filter: brightness(1.08); transform: translateY(-1px); }
-.sm-pay:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
-.hud-start.paused .sm-pay { cursor: pointer; }
-@keyframes pay-ring { 0% { box-shadow: 0 0 0 0 rgba(255, 211, 90, 0.55), 0 0 22px rgba(255, 211, 90, 0.28); } 70%, 100% { box-shadow: 0 0 0 13px rgba(255, 211, 90, 0), 0 0 22px rgba(255, 211, 90, 0.28); } }
-@keyframes pay-sheen { 0%, 58% { transform: translateX(-130%); } 88%, 100% { transform: translateX(130%); } }
-@media (prefers-reduced-motion: reduce) { .sm-pay, .sm-pay i, .sm-pay::after { animation: none; } }
-@media (max-width: 760px), (max-height: 520px) { .sm-pay { padding: 6px 11px 7px 9px; } .sm-pay em { display: none; } }
 .start-online.full::before { background: var(--brand); box-shadow: 0 0 6px var(--brand); }
 @keyframes live-dot { 50% { opacity: 0.35; } }
 
-/* --- the game's news, in the bottom right of the way in: on a desk's screen only, and never over an open sheet */
-.sm-news { position: absolute; z-index: 1; right: 40px; bottom: 54px; display: flex; flex-direction: column; width: 332px; max-height: min(62vh, 640px); background: rgba(8, 10, 9, 0.76); border: 1px solid var(--line); backdrop-filter: blur(6px); }
-.sm-news header { display: flex; align-items: baseline; justify-content: space-between; padding: 10px 14px 9px; border-bottom: 1px solid var(--line); }
+/* --- the game's news, in the bottom right of the way in: on a desk's screen only, and never over an open sheet.
+   Shut, which is how it starts, it is a pill that says Updates, with how many are new. Open, it is the newest
+   entries of the changelog and under them the posts from X, in one body that scrolls. (2026-10-13: "the main menu
+   updates panel needs to be collapsable and collapsed by default". See `mountNews` in hud.ts.) */
+.sm-news { position: absolute; z-index: 1; right: 40px; bottom: 54px; display: flex; flex-direction: column; width: 332px; max-height: min(660px, calc(100vh / var(--ui-zoom, 1) - 170px)); background: rgba(8, 10, 9, 0.84); border: 1px solid var(--line); backdrop-filter: blur(6px); transition: border-color 0.15s; }
+.sm-news header { display: flex; flex: none; align-items: center; justify-content: space-between; padding-right: 14px; border-bottom: 1px solid var(--line); }
 .sm-news header b { font-family: var(--mono); font-size: 11px; font-weight: 600; letter-spacing: 0.22em; text-transform: uppercase; color: var(--ink); }
+.sm-news header > b { padding: 10px 14px; }
 .sm-news header a { font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; text-decoration: none; color: var(--brand); }
 .sm-news header a:hover { text-decoration: underline; }
+/* the word it is opened and shut by, what is new beside it, and which way it will go */
+.sm-news-tab { display: inline-flex; align-items: center; gap: 9px; padding: 10px 14px; font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+.sm-news-tab:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+.sm-news-tab i { display: none; box-sizing: border-box; min-width: 17px; height: 15px; padding: 0 4px; font-family: var(--mono); font-size: 10px; font-style: normal; font-weight: 600; line-height: 15px; text-align: center; color: #14110b; background: var(--brand); border-radius: 8px; }
+.sm-news-tab i.on { display: inline-block; }
+.sm-news-tab i.on:empty { min-width: 0; width: 7px; height: 7px; padding: 0; border-radius: 50%; }
+.sm-news-tab span { width: 6px; height: 6px; margin: -3px 2px 0 3px; border: solid var(--ink-dim); border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); }
+.sm-news-tab:hover span { border-color: var(--ink); }
+.sm-news.shut { width: auto; background: rgba(8, 10, 9, 0.62); }
+.sm-news.shut:hover { border-color: var(--ink-dim); }
+.sm-news.shut header { padding-right: 0; border-bottom: 0; }
+.sm-news.shut header a, .sm-news.shut .sm-news-body { display: none; }
+.sm-news.shut .sm-news-tab span { margin-top: 3px; transform: rotate(-135deg); }
+.sm-news-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: rgba(233, 228, 216, 0.25) transparent; }
+/* what each part of it is: the game's own changelog, and X */
+.sm-news-h { display: flex; align-items: baseline; justify-content: space-between; margin: 0; padding: 11px 14px 5px; font-family: var(--mono); font-size: 10px; font-weight: 400; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-dim); }
+.sm-news-h a { letter-spacing: 0.08em; text-decoration: none; color: var(--brand); }
+.sm-news-h a::after { content: ' \2197'; }
+.sm-news-h a:hover { text-decoration: underline; }
+/* an entry of the changelog: its day, its title, and two lines of what it says. It opens the entry itself. */
+.sm-log { padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+.sm-log-item { display: block; padding: 7px 14px 8px 12px; text-decoration: none; color: var(--ink-dim); border-left: 2px solid transparent; }
+.sm-log-item:hover { background: rgba(233, 228, 216, 0.05); border-left-color: var(--brand); }
+.sm-log-item time { display: block; font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-dim); }
+.sm-log-item.new time::after { content: ' \00b7 new'; color: var(--brand); }
+.sm-log-item b { display: block; margin-top: 2px; font-size: 16px; font-weight: 600; line-height: 1.2; letter-spacing: 0.03em; color: var(--ink); }
+.sm-log-item span { display: -webkit-box; margin-top: 3px; overflow: hidden; font-size: 13px; line-height: 1.35; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .sn-list { overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: rgba(233, 228, 216, 0.25) transparent; }
 .sn-post { padding: 11px 14px 12px; border-bottom: 1px solid var(--line); }
 .sn-post:last-child { border-bottom: 0; }
@@ -1121,35 +1251,33 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 @media (max-width: 1180px), (max-height: 660px), (pointer: coarse) {
   .sm-news { display: none; }
 }
-/* the same asking under the way in, wherever the news is not: a phone, a small window, the pause, and X not answering */
-.sm-back { display: none; align-items: center; gap: 14px; width: fit-content; max-width: 600px; margin-top: 14px; padding: 9px 12px 10px; text-align: left; text-decoration: none; color: var(--ink-dim); background: rgba(10, 12, 11, 0.62); border: 1px solid rgba(255, 211, 90, 0.4); border-left: 2px solid var(--brand); backdrop-filter: blur(6px); cursor: pointer; }
-.sm-back b { font-family: var(--mono); font-size: 11px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; white-space: nowrap; color: var(--brand); }
-.sm-back span { font-size: 12.5px; line-height: 1.35; }
-.sm-back em { padding: 5px 9px 6px; font-family: var(--mono); font-size: 10px; font-style: normal; letter-spacing: 0.12em; text-transform: uppercase; white-space: nowrap; color: #121413; background: var(--brand); }
-.sm-back:hover { border-color: var(--brand); }
-.sm-back:hover em { filter: brightness(1.1); }
-.hud-start:not(.has-news) .sm-back, .hud-start.paused .sm-back, body.touch .sm-back { display: flex; }
-@media (max-width: 1180px), (max-height: 660px), (pointer: coarse) {
-  .sm-back { display: flex; }
+/* The same asking wherever the menu is, the pause and a phone too: a line of the strip along the bottom, beside the
+   game's name on X, and said as that is. (It was a box with a gold button under the way in, wherever the news was
+   not; the news is shut now until it is opened, so this is always there. The whole of it, with the reason, is in
+   the Updates panel, and the reason is what this says when it is pointed at.) */
+.sm-back { display: inline-flex; flex: none; align-items: baseline; gap: 10px; font-family: var(--mono); white-space: nowrap; text-decoration: none; color: var(--ink-dim); cursor: pointer; }
+.sm-back b { font-size: 12px; font-weight: 400; letter-spacing: 0.08em; color: var(--ink); }
+.sm-back b::after { content: ' \2197'; color: var(--brand); }
+.sm-back em { font-size: 11px; font-style: normal; letter-spacing: 0.06em; }
+.sm-back:hover b { color: var(--brand); }
+.sm-back:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+@media (max-width: 760px), (max-height: 520px) {
+  .sm-back em { display: none; }
 }
-/* (a phone has no room for the reason: what to do, and the button) */
-body.touch .sm-back span { display: none; }
-@media (max-height: 560px) {
-  .sm-back span { display: none; }
-}
-.hud-start.enter:not(.paused) .sm-back { animation: enter-fade 0.8s ease both 1.4s; }
 
 /* --- the way in */
 .sm-main { display: grid; grid-template-columns: minmax(0, 1fr); align-items: end; min-height: 0; padding: 0 40px; }
 .hud-start.sheet .sm-main { grid-template-columns: minmax(560px, 1fr) minmax(0, 780px); gap: 32px; }
 .sm-hero { align-self: end; min-width: 0; max-width: 620px; padding-bottom: 22px; text-align: left; }
 .start-kicker { display: flex; align-items: center; gap: 12px; font-size: 15px; font-weight: 600; letter-spacing: 0.3em; text-transform: uppercase; white-space: nowrap; color: var(--brand); }
-.start-kicker em { padding: 3px 9px 3px 12px; font-style: normal; font-weight: 700; letter-spacing: 0.22em; color: #14110b; background: var(--brand); }
+/* (what kind of game, and that it pays: two things said in one line, the second in the plain ink. It was a filled gold label.) */
+.start-kicker em { font-style: normal; color: var(--ink-dim); }
+.start-kicker em::before { content: '/'; margin-right: 12px; color: var(--ink-faint); }
 .start-title { margin: 10px 0 8px -6px; font-size: 136px; font-weight: 700; line-height: 0.86; letter-spacing: 0.14em; white-space: nowrap; text-shadow: 0 8px 40px rgba(0, 0, 0, 0.6); }
 .start-title span { display: inline-block; }
 .start-sub { margin: 0; font-size: 27px; font-weight: 500; letter-spacing: 0.02em; color: var(--ink); text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7); }
-.start-sub2 { max-width: 470px; margin: 5px 0 0; font-size: 18px; line-height: 1.3; color: var(--ink-dim); text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7); }
-.sm-enter { display: flex; align-items: center; gap: 22px; margin-top: 30px; }
+.start-sub2 { max-width: 470px; margin: 6px 0 0; font-size: 18px; line-height: 1.3; color: var(--ink-dim); text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7); }
+.sm-enter { display: flex; align-items: center; gap: 22px; margin-top: 28px; }
 /* the callsign is stamped into a dog tag: the plate, the hole the chain goes through, the chain */
 .sm-name { position: relative; display: block; flex: none; width: 312px; padding: 12px 18px 10px 48px; border-radius: 15px; transform: rotate(-1.6deg); cursor: text; color: #8d8b80; background: linear-gradient(158deg, #b4b2a7 0%, #8f8d83 42%, #6c6a62 100%); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), inset 0 -2px 3px rgba(0, 0, 0, 0.35), 0 12px 26px rgba(0, 0, 0, 0.55); }
 .sm-name:focus-within { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), inset 0 -2px 3px rgba(0, 0, 0, 0.35), 0 12px 26px rgba(0, 0, 0, 0.55), 0 0 0 2px var(--brand); }
@@ -1172,17 +1300,18 @@ body.touch .sm-back span { display: none; }
 @keyframes sm-busy { 0% { left: -34%; } 100% { left: 100%; } }
 .hud-start.busy .start-btn { overflow: hidden; }
 .hud-start.busy .sm-name { opacity: 0.5; pointer-events: none; }
-/* how a life goes, in five words */
-.sm-loop { display: flex; flex-wrap: wrap; gap: 6px 0; margin: 22px 0 0; padding: 0; list-style: none; font-size: 14px; font-weight: 500; letter-spacing: 0.15em; text-transform: uppercase; color: var(--ink-dim); text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8); }
-.sm-loop li { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+/* how a life goes, in five words: a line of them under the way in, each with its number and no box round it */
+.sm-loop { display: flex; flex-wrap: wrap; gap: 6px 0; margin: 20px 0 0; padding: 0; list-style: none; font-size: 14px; font-weight: 500; letter-spacing: 0.15em; text-transform: uppercase; color: var(--ink-dim); text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8); }
+.sm-loop li { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
 .sm-loop li:not(:last-child)::after { content: ''; width: 16px; height: 1px; margin: 0 10px 0 4px; background: var(--ink-faint); }
-.sm-loop i { display: grid; place-items: center; width: 20px; height: 20px; font-family: var(--mono); font-size: 11px; font-style: normal; font-weight: 600; color: var(--brand); border: 1px solid rgba(255, 211, 90, 0.5); }
-/* being paid: whether a wallet has been given */
-.sm-wallet { display: inline-flex; align-items: baseline; gap: 12px; max-width: 100%; margin-top: 16px; padding: 8px 14px 9px 12px; font-family: var(--font); font-size: 15px; text-align: left; color: var(--ink-dim); background: rgba(10, 12, 11, 0.62); border: 1px solid var(--line); border-left: 2px solid var(--brand); cursor: pointer; backdrop-filter: blur(6px); }
+.sm-loop i { font-family: var(--mono); font-size: 12px; font-style: normal; font-weight: 600; letter-spacing: 0; color: var(--brand); }
+/* being paid: whether a wallet has been given. A line under the five, in their type, underlined where it is pressed (it was a box). */
+.sm-wallet { display: flex; align-items: baseline; gap: 12px; width: fit-content; max-width: 100%; margin-top: 8px; padding: 4px 0; font-family: var(--font); font-size: 15px; text-align: left; color: var(--ink-dim); background: none; border: 0; cursor: pointer; text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8); }
 .sm-wallet[hidden] { display: none; }
-.sm-wallet:hover { color: var(--ink); border-color: var(--ink-dim); border-left-color: var(--brand); }
-.sm-wallet b { font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; white-space: nowrap; color: var(--brand); }
-.sm-wallet.set { border-left-color: var(--ok); }
+.sm-wallet span { border-bottom: 1px solid rgba(233, 228, 216, 0.24); }
+.sm-wallet:hover { color: var(--ink); }
+.sm-wallet:hover span { border-bottom-color: var(--brand); }
+.sm-wallet b { font-size: 14px; font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; white-space: nowrap; color: var(--brand); }
 .sm-wallet.set b { color: var(--ok); }
 /* waiting in line for a full server */
 .start-queue { display: none; margin-top: 14px; }
@@ -1284,9 +1413,9 @@ kbd.hot { color: #121413; background: linear-gradient(#d8c594, #b89f66); border-
 .kb-mouse text { fill: var(--ink-dim); font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em; }
 .start-gfx { text-align: left; }
 
-/* --- the strip along the bottom */
+/* --- the strip along the bottom: the coin's address, the game on X and the asking, and at the right what is being shown behind */
 .sm-foot { display: flex; align-items: center; gap: 22px; min-width: 0; padding: 0 40px 15px; }
-.sl-ca { display: inline-flex; align-items: center; gap: 10px; min-width: 0; padding: 6px 11px 7px; font-family: var(--mono); color: var(--ink-dim); background: rgba(10, 12, 11, 0.6); border: 1px solid var(--line); cursor: pointer; }
+.sl-ca { display: inline-flex; align-items: center; gap: 10px; min-width: 0; padding: 6px 11px 7px; font-family: var(--mono); color: var(--ink-dim); background: none; border: 1px solid var(--line); cursor: pointer; }
 .sl-ca:hover { border-color: var(--ink-dim); }
 .sl-ca b { font-size: 10px; font-weight: 600; letter-spacing: 0.2em; color: var(--ink-faint); }
 .sl-ca code { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-family: var(--mono); font-size: 11px; white-space: nowrap; color: var(--ink); user-select: all; }
@@ -1294,17 +1423,20 @@ kbd.hot { color: #121413; background: linear-gradient(#d8c594, #b89f66); border-
 .sl-ca.done em { color: var(--ok); }
 .sl-x { font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; white-space: nowrap; color: var(--ink-dim); text-decoration: none; }
 .sl-x:hover { color: var(--brand); }
-.sl-x.sl-pay { color: var(--brand); border-bottom: 1px solid rgba(255, 211, 90, 0.45); }
-.sl-x.sl-pay:hover { color: #ffe596; border-bottom-color: var(--brand); }
 .sm-live { display: flex; align-items: center; gap: 9px; min-width: 0; margin-left: auto; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-dim); opacity: 0; transition: opacity 0.5s; }
 .sm-live.on { opacity: 1; }
 .sm-live i { flex: none; width: 7px; height: 7px; border-radius: 50%; background: #ff5a44; box-shadow: 0 0 7px #ff5a44; animation: live-dot 2.4s ease-in-out infinite; }
 .sm-live span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* (a scene that is new to whoever is looking, which its caption begins by saying: the line is lit, and its dot is the menu's own yellow) */
+.sm-live.new { color: var(--ink); }
+.sm-live.new i { background: var(--brand); box-shadow: 0 0 7px var(--brand); }
 
 /* --- paused: the game is what is behind it, dimmed */
 .hud-start.paused { cursor: pointer; background: rgba(6, 8, 7, 0.76); backdrop-filter: blur(5px); }
 .hud-start.paused .sm-top, .hud-start.paused .sm-hero > *, .hud-start.paused .sm-sheet, .hud-start.paused .sm-foot > * { cursor: default; }
 .hud-start.paused .start-btn, .hud-start.paused button, .hud-start.paused a { cursor: pointer; }
+/* (what can be pressed in the strip along the bottom and under the way in says so in the pause as well: each is named, or the line above wins) */
+.hud-start.paused .sm-foot a, .hud-start.paused .sm-foot button, .hud-start.paused .sm-hero > button { cursor: pointer; }
 .hud-start.paused .sm-cut, .hud-start.paused .sm-live, .hud-start.paused .start-kicker em, .hud-start.paused .start-sub2, .hud-start.paused .sm-loop, .hud-start.paused .sm-name { display: none; }
 .hud-start.paused .sm-main { align-items: center; }
 .hud-start.paused .sm-hero { align-self: center; padding-bottom: 60px; }

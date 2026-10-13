@@ -7,7 +7,7 @@
 // server, which flies nothing, as in the game, which flies the bullet.
 
 import assert from 'node:assert/strict';
-import { CARTRIDGES, GRAVITY, GUNS, MOA, coneOf, damageKept, elevationFor, fly, intervalOf, kickOf, shotOf, speedAt, zeroOf, type Hold } from '../src/sim/gunplay';
+import { CARTRIDGES, GRAVITY, GUNS, MOA, PATTERNS, QUIETED, SOUND, anywhereIn, coneOf, cooled, crackOf, damageKept, elevationFor, fly, intervalOf, kickOf, scatterOf, shotOf, speedAt, zeroOf, type Hold } from '../src/sim/gunplay';
 import { RIFLE_HITS, WEAPON_RULES, hitDamage } from '../src/sim/combat';
 import { ITEMS, sanitizeItem, makeItem } from '../src/sim/items';
 
@@ -191,6 +191,114 @@ ok('how wide a shot can go: the gun\'s own at the eye, and wider every other way
   }
   // (the sniper rifle puts five rounds inside a hand's width at two hundred metres; the AK inside a dinner plate)
   assert.ok(coneOf('mosin', still) * 200 < 0.1 && coneOf('ak', still) * 200 < 0.25 && coneOf('ar15', still) < coneOf('ak', still));
+  // ---- the two rifles with a string to learn warm a quarter as much as the rest, and their rounds are drawn in
+  // toward the middle of the cone: a string pulled against rightly lands (2026-10-13)
+  for (const [id, g] of Object.entries(GUNS)) {
+    if (!g.auto) continue;
+    const warmed = coneOf(id, { ...still, heat: 30 }) - coneOf(id, still);
+    assert.ok(Math.abs(warmed - (PATTERNS[id] ? 0.0018 : 0.0066)) < 1e-9, `${id} held open warms by ${warmed.toFixed(4)}`);
+  }
+  assert.ok(coneOf('ak', { ...still, heat: 30 }) < 0.003 && coneOf('ar15', { ...still, heat: 30 }) < 0.0025, 'a rifle with a string is thrown about by chance as well');
+  {
+    const N = 400, grid = Array.from({ length: N }, (_, i) => (i + 0.5) / N), coarse = Array.from({ length: 50 }, (_, i) => (i + 0.5) / 50);
+    const mean = (r: number[]) => r.reduce((a, b) => a + b, 0) / r.length, within = (r: number[], of: number) => r.filter((v) => v <= of).length / r.length;
+    // (anywhere in the cone is as likely as anywhere else: a quarter of them inside half its width, and two thirds of the way out on the whole)
+    const flat = grid.map((u) => anywhereIn(0.01, u));
+    assert.ok(Math.max(...flat) <= 0.005 && Math.abs(mean(flat) - 0.005 * (2 / 3)) < 1e-5 && Math.abs(within(flat, 0.0025) - 0.25) < 0.01);
+    for (const id of Object.keys(GUNS)) {
+      const r = grid.flatMap((u) => coarse.map((v) => scatterOf(id, 0.01, u, v)));
+      assert.ok(Math.max(...r) <= 0.005 + 1e-12, `${id}: a shot lands outside its cone`);
+      if (PATTERNS[id]) assert.ok(Math.abs(mean(r) - 0.0025) < 1e-5 && Math.abs(within(r, 0.0025) - 0.5) < 0.01 && within(r, 0.0045) > 0.97, `${id}: its shots are not drawn in to the middle`);
+      else assert.ok(Math.abs(mean(r) - 0.005 * (2 / 3)) < 1e-5 && Math.abs(within(r, 0.0025) - 0.25) < 0.01, `${id}: its shots are not anywhere in its cone`);
+    }
+  }
+});
+
+ok('a gun fires at its own rate, however fast the frames come', () => {
+  /** the trigger held for so many seconds at so many frames a second, the game's own sum each frame: when each shot went */
+  const held = (id: string, fps: number, seconds: number, wait = 0) => {
+    const dt = 1 / fps, shots: number[] = [];
+    for (let f = 0; f < Math.round(fps * seconds); f++) {
+      wait = cooled(wait, dt);
+      if (wait > 0) continue;
+      wait += intervalOf(id);
+      shots.push(f * dt);
+    }
+    return shots;
+  };
+  const autos = Object.keys(GUNS).filter((id) => GUNS[id].auto);
+  assert.deepEqual(autos.sort(), ['ak', 'ar15', 'mpa']);
+  for (const id of autos) {
+    for (const fps of [30, 60, 144, 240]) {
+      const shots = held(id, fps, 10), rpm = GUNS[id].rpm;
+      const rate = ((shots.length - 1) / (shots[shots.length - 1] - shots[0])) * 60;
+      assert.ok(Math.abs(rate - rpm) / rpm < 0.01, `${id} at ${fps} frames a second fires ${rate.toFixed(0)} a minute, and is a ${rpm}`);
+      assert.ok(Math.abs(shots.length - (10 * rpm) / 60) <= 1, `${id} at ${fps} frames a second: ${shots.length} shots in ten seconds`);
+      // (and never two nearer together than its interval, less the one frame a shot can be late by)
+      for (let i = 1; i < shots.length; i++) assert.ok(shots[i] - shots[i - 1] > intervalOf(id) - 1 / fps - 1e-9, `${id} at ${fps}: two shots ${(shots[i] - shots[i - 1]).toFixed(4)} s apart`);
+    }
+  }
+  // (What it was: every shot waited for the next whole frame, so at sixty frames a second the AR-15 fired 600 a
+  // minute, which is the AK's rate, and the submachine gun 720. The AK itself, whose interval is six frames to
+  // a hair, fired every six or every seven as the hair fell: here, every seven.)
+  const was = (id: string, fps: number) => {
+    let wait = 0, shots = 0;
+    for (let f = 0; f < fps * 10; f++) {
+      wait = Math.max(0, wait - 1 / fps);
+      if (wait > 0) continue;
+      wait = intervalOf(id);
+      shots++;
+    }
+    return shots * 6;
+  };
+  assert.ok(was('ar15', 60) === 600 && was('mpa', 60) === 720 && was('ak', 60) <= 600, `it was not as it was said to be: ${was('ar15', 60)}, ${was('ak', 60)}, ${was('mpa', 60)}`);
+  assert.ok(held('ar15', 60, 10).length > held('ak', 60, 10).length * 1.15, 'at sixty frames a second the AR-15 is still an AK');
+  // (nor do the frames have to come evenly: anywhere from fifty to a hundred and twenty a second, no two alike)
+  for (const id of autos) {
+    let seed = 11, wait = 0, t = 0, shots = 0, first = -1, last = 0;
+    const dice = () => ((seed = (seed * 16807) % 2147483647) % 10000) / 10000;
+    while (t < 10) {
+      const dt = 1 / (50 + dice() * 70);
+      wait = cooled(wait, dt);
+      if (wait <= 0) {
+        wait += intervalOf(id);
+        shots++;
+        if (first < 0) first = t;
+        last = t;
+      }
+      t += dt;
+    }
+    const rate = ((shots - 1) / (last - first)) * 60;
+    assert.ok(Math.abs(rate - GUNS[id].rpm) / GUNS[id].rpm < 0.01, `${id} with uneven frames fires ${rate.toFixed(0)} a minute`);
+  }
+  // (a gun left alone owes nothing: after five seconds with the trigger up its first two shots are a whole interval apart, not a frame)
+  for (const fps of [60, 144]) {
+    let wait = intervalOf('ak');
+    for (let f = 0; f < fps * 5; f++) wait = cooled(wait, 1 / fps);
+    assert.equal(wait, 0, 'time with the trigger up is kept');
+    const shots = held('ak', fps, 1, wait);
+    assert.ok(shots[0] === 0 && shots[1] - shots[0] > intervalOf('ak') - 1e-9);
+  }
+  // (and a frame that takes a second owes one frame's worth and no more: one shot the sooner, not ten)
+  {
+    let wait = cooled(0.05, 1);
+    wait += intervalOf('ak');
+    assert.ok(wait <= 0, 'what was left of a long frame was not kept');
+    wait = cooled(wait, 1 / 60);
+    assert.equal(wait, 0);
+    wait += intervalOf('ak');
+    assert.ok(Math.abs(wait - 0.1) < 1e-12);
+  }
+});
+
+ok('through a suppressor a round is slower, for whoever fired it and for everybody else; and a slow round has no crack', () => {
+  // (a 9 mm from a pistol leaves faster than sound and, quieted, slower: it goes by without a crack. A rifle's round cracks either way.)
+  assert.ok(shotOf('m9').muzzleVel > SOUND && shotOf('m9').muzzleVel * QUIETED < SOUND);
+  assert.ok(shotOf('colt').muzzleVel < SOUND);
+  assert.equal(crackOf(shotOf('m9').muzzleVel * QUIETED), 0);
+  assert.equal(crackOf(shotOf('colt').muzzleVel), 0);
+  for (const id of ['mosin', 'ak', 'ar15']) assert.equal(crackOf(shotOf(id).muzzleVel * QUIETED), 1, `${id}: quieted, its round does not crack as a rifle's`);
+  assert.ok(crackOf(SOUND) === 0 && crackOf(SOUND * 1.15) > 0.49 && crackOf(SOUND * 1.15) < 0.51 && crackOf(2000) === 1);
 });
 
 ok('what a hit does at a distance is the same on the server as in the game', () => {

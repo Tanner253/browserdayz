@@ -64,7 +64,8 @@ ok('every place for a thing is on a step, and every step has places: the camp, t
 });
 
 ok('every sort of thing has a rule, and gets what its rule says on every step it is kept on', () => {
-  for (const id of Object.keys(ITEMS)) if (!['dogtag', 'watch'].includes(id)) assert.ok(TYPES[id], `${id} is kept nowhere`);
+  // (the jacket and the trousers everybody starts in lie nowhere: a spare of either is room for nothing)
+  for (const id of Object.keys(ITEMS)) if (!['dogtag', 'watch', 'field_jacket', 'field_trousers'].includes(id)) assert.ok(TYPES[id], `${id} is kept nowhere`);
   for (const id of Object.keys(TYPES)) assert.ok(ITEMS[id], `a rule for ${id}, which there is no such thing as`);
   const { ruled: on } = worlds[0];
   for (const [id, rule] of Object.entries(TYPES)) for (const t of STEPS) {

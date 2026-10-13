@@ -9,21 +9,32 @@ export type Category = 'weapon' | 'ammo' | 'magazine' | 'food' | 'drink' | 'medi
  * body has places for (2026-10-10, as DayZ has it: there was a place for a melee weapon, and there is not). A
  * knife or a hatchet goes in a pocket like anything else. What is in the hands is whatever was taken into them:
  * see `hold` on the inventory, and the hot keys, which are bound to things and not to places.
+ *
+ * What is worn has the places DayZ has (2026-10-13: "look up how dayz handles their equip slots, they have more than
+ * we do ... we will need to make our player character equip more robust. like dayz, once again"): head, face, eyes,
+ * top, vest, belt, legs, back, gloves, feet, armband. DayZ has no socks and no shirt under a jacket: its Top is one
+ * place, and so is this. The jacket and the trousers a survivor stands in are things in `top` and `legs` now, and
+ * their pockets are those things' own. (`hands` is the place for gloves, and keeps its name: every save says it.)
+ * Nothing is made yet for `eyes`, `belt` or `armband`: the places are there, and empty.
  */
-export type Slot = 'primary' | 'secondary' | 'holster' | 'head' | 'face' | 'vest' | 'back' | 'hands' | 'feet';
+export type Slot = 'primary' | 'secondary' | 'holster' | 'head' | 'face' | 'eyes' | 'top' | 'vest' | 'belt' | 'legs' | 'back' | 'hands' | 'feet' | 'armband';
 /** what kind of slot an item fits: long things fit either place on the back, gear fits its own slot */
-export type SlotKind = 'long' | 'holster' | 'head' | 'face' | 'vest' | 'back' | 'hands' | 'feet';
+export type SlotKind = 'long' | 'holster' | 'head' | 'face' | 'eyes' | 'top' | 'vest' | 'belt' | 'legs' | 'back' | 'hands' | 'feet' | 'armband';
 export const SLOT_KIND: Record<Slot, SlotKind> = {
   primary: 'long', secondary: 'long', holster: 'holster',
-  head: 'head', face: 'face', vest: 'vest', back: 'back', hands: 'hands', feet: 'feet',
+  head: 'head', face: 'face', eyes: 'eyes', top: 'top', vest: 'vest', belt: 'belt', legs: 'legs', back: 'back', hands: 'hands', feet: 'feet', armband: 'armband',
 };
 export const WEAPON_SLOTS: Slot[] = ['primary', 'secondary', 'holster'];
-export const GEAR_SLOTS: Slot[] = ['head', 'face', 'vest', 'back', 'hands', 'feet'];
+export const GEAR_SLOTS: Slot[] = ['head', 'face', 'eyes', 'top', 'vest', 'belt', 'legs', 'back', 'hands', 'feet', 'armband'];
 export const ALL_SLOTS: Slot[] = [...WEAPON_SLOTS, ...GEAR_SLOTS];
 export const SLOT_LABEL: Record<Slot, string> = {
   primary: 'On the back', secondary: 'On the back', holster: 'Holster',
-  head: 'Head', face: 'Face', vest: 'Vest', back: 'Back', hands: 'Hands', feet: 'Feet',
+  head: 'Head', face: 'Face', eyes: 'Eyes', top: 'Top', vest: 'Vest', belt: 'Belt', legs: 'Legs', back: 'Back', hands: 'Gloves', feet: 'Feet', armband: 'Armband',
 };
+/** the places for what is worn as the inventory stands them either side of the survivor, each column from the top down */
+export const DOLL_SLOTS: [Slot[], Slot[]] = [['head', 'face', 'eyes', 'top', 'vest', 'belt'], ['back', 'armband', 'hands', 'legs', 'feet']];
+/** what every survivor stands in to begin with: its place on them, and the thing */
+export const CLOTHES: [Slot, string][] = [['top', 'field_jacket'], ['legs', 'field_trousers']];
 
 export type AttachSlot = 'optic' | 'muzzle' | 'magazine' | 'wrap' | 'light' | 'grip';
 
@@ -380,6 +391,20 @@ const D: ItemDef[] = [
   { id: 'firstaid', name: 'First Aid Kit', model: 'medical_box', w: 3, h: 2, weight: 0.9, category: 'medical', desc: 'Dressings, antiseptic and a splint. Treats wounds properly, and sets a broken leg.', use: { verb: 'Treat wounds', time: 6, stopBleed: true, health: 45, splint: true, sound: 'bandage' } },
   { id: 'splint', name: 'Splint Tape', model: 'medical_tape', tint: 0xd9a55c, w: 1, h: 1, weight: 0.12, category: 'medical', desc: 'A roll of tan strapping tape. Bound round a broken leg with whatever is to hand, it lets you run on it again.', use: { verb: 'Splint your leg with', time: 5, splint: true, sound: 'bandage' } },
   // ---------------------------------------------------------------- clothing & bags
+  // The jacket and the trousers every survivor stands in (2026-10-13: "we should make the jacket and pants the user
+  // spawns in with (the default inventory slots) clothing items"). They were two grids of the body's own, and could
+  // not be taken off; they are things now, worn in `top` and `legs`, and their pockets are the same size as those
+  // grids were (4x4 and 4x3), so that nothing anybody carried in them has to move. Taken off, dropped or left on a
+  // body, each keeps what is in its pockets. (There is no model of either: on the ground and in a pocket each is the
+  // hospital's folded blanket, dyed. Proper art is wanted.)
+  {
+    id: 'field_jacket', name: 'Field Jacket', model: 'folded_blanket', tint: 0x7d8a58, scale: 1.1, w: 3, h: 3, weight: 0.6, category: 'clothing', slot: 'top',
+    desc: 'The padded jacket every survivor starts in. 16 slots in its pockets. Take it off and what is in them goes with it: with nothing on your top, you have no pockets there.', wear: { cargo: [4, 4] },
+  },
+  {
+    id: 'field_trousers', name: 'Field Trousers', model: 'folded_blanket', tint: 0x5a5f6e, scale: 0.85, w: 3, h: 2, weight: 0.4, category: 'clothing', slot: 'legs',
+    desc: 'The hard-wearing trousers every survivor starts in. 12 slots in their pockets. Take them off and what is in them goes with them.', wear: { cargo: [4, 3] },
+  },
   {
     // (still `boonie_hat`, so that what is carried and what is kept in the world still means it: a helmet now)
     id: 'boonie_hat', name: 'Combat Helmet', model: 'combat_helmet', w: 2, h: 2, weight: 1.4, category: 'clothing', slot: 'head',

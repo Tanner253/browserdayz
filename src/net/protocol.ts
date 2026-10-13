@@ -14,7 +14,9 @@ import type { DropInfo } from '../sim/drops';
 import type { VehicleInfo, VState } from '../sim/vehicles';
 import type { IState, InfectedInfo } from '../sim/infected';
 
-export const PROTOCOL = 35;
+// (36, 2026-10-13: the jacket and the trousers are things worn in `top` and `legs`, with the pockets inside them. A
+// page from before would say "nothing in my pockets" of a character that has them full, and the server would keep it.)
+export const PROTOCOL = 36;
 
 /** chat channels: everyone on the server, or only players standing near the speaker */
 /** `staff`: those with a role, to one another, wherever they are: nobody else is sent it */
@@ -372,15 +374,22 @@ export type S2C =
 /** What the panel of somebody with a role is shown. The last two are an admin's alone. */
 export interface AdminLists {
   /** everybody online: where they are, how long they have been on (minutes), how often the checks have fired on them */
-  players: { id: number; name: string; role: 'admin' | 'mod' | null; x: number; z: number; alive: boolean; flags: number; mins: number; /** health as their game last said it, kills and tags cashed since the server started */ hp: number; kills: number; tags: number; hidden?: true; god?: true; clip?: true; muted?: true; seat?: true; voidInv?: true; voidTag?: true; /** gone without logging out: the body is still here */ asleep?: true; /** their game is not answering (a hidden tab): the server keeps their life */ away?: true }[];
+  players: { id: number; name: string; role: 'admin' | 'mod' | null; x: number; z: number; /** the way they face, radians (0 looks north, down -z): the admin's map points each dot that way. Not said by a server from before 2026-10-13 */ yaw?: number; alive: boolean; flags: number; mins: number; /** health as their game last said it, kills and tags cashed since the server started */ hp: number; kills: number; tags: number; hidden?: true; god?: true; clip?: true; muted?: true; seat?: true; voidInv?: true; voidTag?: true; /** gone without logging out: the body is still here */ asleep?: true; /** their game is not answering (a hidden tab): the server keeps their life */ away?: true }[];
   /** who left lately, newest first */
   gone: { id: number; name: string; mins: number }[];
-  bans: { n: number; name: string; why: string; by: string; at: string }[];
+  /**
+   * `n` is where it stands in the list now (what `/unban 3` takes straight after `/bans`). `id` is its own, and is
+   * the same whatever else is banned or lifted meanwhile: `a:` and the start of the hash of the key an admin
+   * banned, `t:` and a hash of what a time off the server is kept by. The panel's Unban sends the id. (Not said by a
+   * server from before 2026-10-13.)
+   */
+  bans: { n: number; id?: string; name: string; why: string; by: string; at: string }[];
   roles: { name: string; role: 'admin' | 'mod'; by: string; at: string }[];
   /** what the server's own checks are set to */
   checks: string;
   /** the server itself: minutes it has been up, things lying loose, stashes standing, characters kept for players who are away */
-  stats?: { up: number; loot: number; stashes: number; kept: number; asleep: number };
+  /** (and, for the Entities page: cars standing, how many of those are burned out, and the infected on their feet) */
+  stats?: { up: number; loot: number; stashes: number; kept: number; asleep: number; cars?: number; wrecks?: number; infected?: number };
 }
 
 /** deterministic id of a crate that is part of the map (same on every client and the server) */

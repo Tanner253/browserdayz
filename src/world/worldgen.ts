@@ -67,6 +67,28 @@ export function eastRoad(): [number, number][] {
  *   reach – how far from the road any of this goes
  */
 export const PASS = { from: 245, bed: 5.5, side: 0.62, reach: 150 };
+/**
+ * One mountain (2026-10-13: "i want high elevation mountains to be snowcapped, and the surrounding area
+ * snowcapped"). The edge of the map stood at the same height all the way round, 130 to 180 m: a wall, and nothing
+ * to steer by. In the north-east, behind the bunker, it stands `lift` times as high over its shelf, and its slope
+ * begins at the old map's edge and not 70 m beyond it: about 280 m at its top, a hundred over anything else, in
+ * plain sight from the village, the checkpoint and the works. The best of everything is under the highest ground,
+ * as in DayZ the richest place is the furthest hill; and whoever is lost looks for the white one.
+ *
+ * Between `from` and `to`, degrees as Math.atan2(z, x) gives them (north is -z, so these are north-east), and
+ * fading out over `soft` either side. It is all on the ground the map was grown by: nothing of the old map moves.
+ * (The Logging Camp, at -65 degrees, is just outside it.)
+ */
+export const PEAK = { from: -54, to: -22, soft: 9, lift: 2.4, run: 250 };
+const peakOf = (x: number, z: number) => {
+  const a = (Math.atan2(z, x) * 180) / Math.PI;
+  return smoothstep(PEAK.from - PEAK.soft, PEAK.from, a) * (1 - smoothstep(PEAK.to, PEAK.to + PEAK.soft, a));
+};
+/**
+ * Where snow lies, metres up: none below `from`, all of the ground white above `full`, and none on ground steeper
+ * than `slope` (it does not lie on a cliff). The trees thin out from `thin` and stop at `bare`.
+ */
+export const SNOW = { from: 132, full: 150, slope: 0.9, thin: 190, bare: 215 };
 /** And two places far out in that country, outside the Zona: nothing is earned at them, and nobody is looking. */
 export const OUTLYING: { name: string; kind: 'squat' | 'camp'; x: number; z: number; rot: number }[] = [
   { name: "Squatters' House", kind: 'squat', x: -100, z: 640, rot: Math.PI },
@@ -476,11 +498,12 @@ export function generateWorld(seed = WORLD_SEED): World {
   /** how much of a mountain a spot of that country is: nothing 185 m in from the new edge, all of one at it, and nothing at all on the old ground */
   const edgeOf = (x: number, z: number) => {
     const e = Math.max(Math.abs(x), Math.abs(z));
-    return e <= OLD_HALF ? 0 : (1 - smoothstep(10, 185, half - e)) * smoothstep(0, 64, e - OLD_HALF);
+    // (in the north-east the slope begins at the old edge itself: all of the new ground there is the mountain's)
+    return e <= OLD_HALF ? 0 : (1 - smoothstep(10, lerp(185, PEAK.run, peakOf(x, z)), half - e)) * smoothstep(0, 64, e - OLD_HALF);
   };
   const ringShape = (x: number, z: number) => {
     const m = edgeOf(x, z);
-    return m <= 0 ? 0 : Math.pow(m, 1.15) * (48 + 26 * (0.5 + 0.5 * n1.noise(x * 0.012 + 5, z * 0.012 - 9)));
+    return m <= 0 ? 0 : Math.pow(m, 1.15) * (48 + 26 * (0.5 + 0.5 * n1.noise(x * 0.012 + 5, z * 0.012 - 9))) * lerp(1, PEAK.lift, peakOf(x, z));
   };
   const heights = new Float32Array(N * N);
   for (let iz = 0; iz < N; iz++) {
@@ -912,6 +935,8 @@ export function generateWorld(seed = WORLD_SEED): World {
       if (roadDist[i] < ROAD_W / 2 + 0.6) g = 0;
       if (insideBuilding(x, z, 0.4)) g = 0;
       g *= 0.75 + 0.25 * n1.noise(x * 0.08, z * 0.08);
+      // (no grass through the snow: it thins as the snow begins and is gone where the ground is white)
+      g *= 1 - smoothstep(SNOW.from - 10, SNOW.from + 8, heights[i]);
       grass[i] = Math.round(clamp(g, 0, 1) * 255);
     }
   };
@@ -970,15 +995,20 @@ export function generateWorld(seed = WORLD_SEED): World {
       const i = idx(Math.round((x + half) / CELL), Math.round((z + half) / CELL));
       if (roadDist[i] < ROAD_W / 2 + 4 || slopeAt(heights, x, z) > 1.05) continue;
       const y = heightAt(heights, x, z);
+      // (the tree line: where the snow lies nothing grows but pine, the wood thins as it climbs, and the top is bare)
+      const high = y > SNOW.from - 6;
+      if (y > SNOW.bare || (y > SNOW.thin && hv > 0.62 * (1 - smoothstep(SNOW.thin, SNOW.bare, y)) * 0.6)) continue;
       if (f > 0.08) {
         const edge = f < 0.2;
         // (two trees in three of what the old rule would plant: there is a third again as much ground out here)
         if (hv > smoothstep(0.08, 0.3, f) * 0.62) continue;
         let kind: string;
-        if (edge && hv < 0.3) kind = hv < 0.12 ? 'bush_a' : hv < 0.2 ? 'bush_b' : 'birch_a';
-        else if (hv < 0.08) kind = 'birch_b';
+        if (!high && edge && hv < 0.3) kind = hv < 0.12 ? 'bush_a' : hv < 0.2 ? 'bush_b' : 'birch_a';
+        else if (!high && hv < 0.08) kind = 'birch_b';
         else kind = pines[Math.floor(hash2(Math.round(x), Math.round(z), 5) * pines.length)];
         trees.push({ kind, x, y, z, rot: hx * Math.PI * 2, scale: 0.85 + hz * 0.35 });
+      } else if (high) {
+        // (no oak, ash, birch or bush up where the snow lies)
       } else if (f > -0.25 && hv < 0.025) {
         trees.push({ kind: hv < 0.01 ? 'oak_a' : hv < 0.018 ? 'ash_a' : 'birch_a', x, y, z, rot: hx * Math.PI * 2, scale: 0.9 + hz * 0.3 });
       } else if (f > -0.15 && hv > 0.97) {
@@ -1411,6 +1441,46 @@ export function generateWorld(seed = WORLD_SEED): World {
         heights[i] = lerp(heights[i], level + (heights[i] - level) * 0.12 * t, w);
       }
     }
+    // And the hillside behind is cut back to a slope (see `side` and `reach` in src/sim/bunker.ts): wherever the
+    // ground stands above a cone that rises from the edge of the level floor, it is brought down to it, rounded
+    // into the hill where the two meet, and let go again toward the far edge of the reach. Nothing is raised.
+    {
+      const soft = (a: number, b: number, k: number) => {
+        const h = clamp(0.5 + (0.5 * (b - a)) / k, 0, 1);
+        return lerp(b, a, h) - k * h * (1 - h);
+      };
+      const X = B.reach;
+      for (let iz = Math.max(0, Math.floor((bz - X + half) / CELL)); iz <= Math.min(N - 1, Math.ceil((bz + X + half) / CELL)); iz++) {
+        for (let ix = Math.max(0, Math.floor((bx - X + half) / CELL)); ix <= Math.min(N - 1, Math.ceil((bx + X + half) / CELL)); ix++) {
+          const x = -half + ix * CELL, z = -half + iz * CELL;
+          const d = Math.hypot(x - bx, z - bz);
+          if (d <= B.floor || d >= X) continue;
+          const i = idx(ix, iz);
+          // (not ruled: a little steeper here, a little less there, as a hillside is)
+          const cone = floorY + (d - B.floor) * B.side * (0.88 + 0.24 * (0.5 + 0.5 * n1.noise(x * 0.019 + 3, z * 0.019 - 7))) + 1.6 * n3.fbm(x * 0.05, z * 0.05 + 9, 3);
+          if (heights[i] <= cone - 4) continue;
+          const y = Math.min(heights[i], soft(heights[i], cone, 4));
+          heights[i] = lerp(y, heights[i], smoothstep(X - 28, X, d));
+        }
+      }
+      // (And what is left steeper than a hillside holds, where the cut meets the hill as it stood and along the
+      // old wall's flanks, is let slump: a cell that stands over its neighbours by more than a walkable slope
+      // comes down toward them. Down only, and only here.)
+      for (let pass = 0; pass < 60; pass++) {
+        for (let iz = Math.max(1, Math.floor((bz - X + half) / CELL)); iz <= Math.min(N - 2, Math.ceil((bz + X + half) / CELL)); iz++) {
+          for (let ix = Math.max(1, Math.floor((bx - X + half) / CELL)); ix <= Math.min(N - 2, Math.ceil((bx + X + half) / CELL)); ix++) {
+            const x = -half + ix * CELL, z = -half + iz * CELL;
+            const d = Math.hypot(x - bx, z - bz);
+            if (d <= B.floor + 4 || d >= X - 2) continue;
+            const i = idx(ix, iz), h = heights[i];
+            const lo = Math.min(heights[i - 1], heights[i + 1], heights[i - N], heights[i + N]);
+            // (less and less toward the far edge of the reach, and nothing at it: the hill beyond is not moved, and
+            // ground let down beside ground that is not would be a step)
+            if (h - lo > 0.9 * CELL) heights[i] = lerp(h, lo + 0.9 * CELL, 0.5 * (1 - smoothstep(X - 70, X - 12, d)));
+          }
+        }
+      }
+    }
     sites.push({ name: B.name, kind: 'bunker', x: bx, z: bz, rot, later: true });
     pois.push({ name: B.name, x: bx, z: bz, radius: 40 });
     const local = (x: number, z: number): [number, number] => {
@@ -1424,7 +1494,7 @@ export function generateWorld(seed = WORLD_SEED): World {
       for (let k = list.length - 1; k >= 0; k--) {
         const t = list[k];
         const d = Math.hypot(t.x - bx, t.z - bz);
-        if (d > R + 2) continue;
+        if (d > Math.max(R + 2, B.reach)) continue;
         const [r, f] = local(t.x, t.z);
         if ((Math.abs(r) < 6.5 && f > 7.5 && f < 23) || slopeAt(heights, t.x, t.z) > 1.05) list.splice(k, 1);
         else t.y += heightAt(heights, t.x, t.z) - heightAt(before, t.x, t.z);
@@ -1432,8 +1502,11 @@ export function generateWorld(seed = WORLD_SEED): World {
     }
     // The ground is painted again where any of this reaches, as the hillside about it is painted: grass, and the
     // floor of a wood. Grass grows on all of it but the house's own floor and its yard.
-    for (let iz = Math.max(0, Math.floor((bz - R - 6 + half) / CELL)); iz <= Math.min(N - 1, Math.ceil((bz + R + 6 + half) / CELL)); iz++)
-      for (let ix = Math.max(0, Math.floor((bx - R - 6 + half) / CELL)); ix <= Math.min(N - 1, Math.ceil((bx + R + 6 + half) / CELL)); ix++) {
+    const P = Math.max(R, B.reach) + 6;
+    for (let iz = Math.max(0, Math.floor((bz - P + half) / CELL)); iz <= Math.min(N - 1, Math.ceil((bz + P + half) / CELL)); iz++)
+      for (let ix = Math.max(0, Math.floor((bx - P + half) / CELL)); ix <= Math.min(N - 1, Math.ceil((bx + P + half) / CELL)); ix++) {
+        // (where the ground was moved, and a little about it: the rest is as it was painted)
+        if (Math.hypot(-half + ix * CELL - bx, -half + iz * CELL - bz) > R + 6 && Math.abs(heights[idx(ix, iz)] - before[idx(ix, iz)]) < 0.02) continue;
         paint(ix, iz);
         const [r, f] = local(-half + ix * CELL, -half + iz * CELL);
         if (Math.abs(r) <= 3.8 && f >= B.hut.back - 1 && f <= B.court.front + 0.8) grass[idx(ix, iz)] = 0;

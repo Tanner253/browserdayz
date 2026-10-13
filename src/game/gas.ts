@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { audio } from '../core/audio';
 import { TOUCH } from '../core/device';
-import { GAS, breathe, freshLungs, gasDepth, gasEdge, type GasZone } from '../sim/gas';
+import { GAS, breathe, cloudDepth, cloudEdge, freshLungs, type GasCloud, type GasZone } from '../sim/gas';
 import type { Atmosphere } from '../world/atmosphere';
 import { heightAt, type World } from '../world/worldgen';
 
@@ -83,8 +83,12 @@ export class Gas {
   private clock = 0;
   private ground: (x: number, z: number) => number;
 
+  /**
+   * @param zones every gas the world has (`gasClouds`): each has its boards round it, its wisps, its dimmed day and
+   * its warning, and is breathed, by the same lines
+   */
   constructor(
-    private zone: GasZone | null,
+    private zones: GasCloud[],
     private atmo: Atmosphere,
     private scene: THREE.Scene,
     private host: GasHost,
@@ -92,7 +96,7 @@ export class Gas {
     world: World,
   ) {
     this.ground = (x, z) => heightAt(world.heights, x, z);
-    if (zone) this.signs(zone, world);
+    for (const zone of zones) this.signs(zone, world);
     this.veil = document.createElement('div');
     this.veil.className = 'hud-gas';
     this.tag = document.createElement('div');
@@ -101,10 +105,10 @@ export class Gas {
     this.lens.className = 'hud-mask';
     hud.prepend(this.lens);
     hud.append(this.veil, this.tag);
-    const n = zone ? (TOUCH ? 14 : 40) : 0;
+    const n = zones.length ? (TOUCH ? 14 : 40) : 0;
     this.at = new Float32Array(n * 4);
     this.fade = new Float32Array(n);
-    if (!zone || !n) return;
+    if (!n) return;
     // (the film's dice are not wanted here, nor anybody's: where the wisps are is nobody's business but the eye's)
     let s = 9173;
     const rnd = () => ((s = (Math.imul(s, 1664525) + 1013904223) | 0) >>> 0) / 4294967296;
@@ -190,20 +194,24 @@ export class Gas {
    * @param head where the survivor's own head is (in a jeep's chase view the two are not one place)
    * @param alive false once dead, and before the game has begun: nothing is breathed then
    */
-  /** another gas than the one that is drawn: how deep in it a point is, and how far along the ground from its edge (the bunker's) */
-  also: ((x: number, y: number, z: number) => number) | null = null;
-  alsoEdge: ((x: number, z: number) => number) | null = null;
+  /** gas that is breathed and not seen: how deep in it a point is (under the ground in the bunker, where it is all through the place) */
+  under: ((x: number, y: number, z: number) => number) | null = null;
 
   update(dt: number, eye: THREE.Vector3, head: THREE.Vector3, alive: boolean) {
-    const z = this.zone;
-    if (!z) return;
+    const zones = this.zones;
+    if (!zones.length) return;
     this.clock += dt;
-    this.depth = gasDepth(z, eye.x, eye.y, eye.z);
-    // (the bunker's is seen as a faint dulling of the day and no more)
-    const faint = this.also ? this.also(eye.x, eye.y, eye.z) : 0;
+    this.depth = cloudDepth(zones, eye.x, eye.y, eye.z);
+    // (what is breathed and not seen is a faint dulling and no more: under the ground, what lights the place is its own lamps)
+    const faint = this.under ? this.under(eye.x, eye.y, eye.z) : 0;
+    // (Behind a mask the gas is all but out of the way: the cloud itself thins for an eye that is in it, in the fog
+    // every shader has, and what is the eye's own, the day dimmed under it and the wisps going by, is turned down
+    // with it. 2026-10-13: "once inside the gas and not dying bc of equipped gas mask the fog should go away".)
+    const masked = this.host.masked();
+    const clear = masked ? 0.3 : 1;
 
     // --- the daylight, under it
-    const dim = Math.min(1, this.depth * 1.6 + faint * 0.14);
+    const dim = Math.min(1, this.depth * 1.6 * clear + faint * 0.14);
     if (Math.abs(dim - this.dimmed) > 0.002 || (dim === 0 && this.dimmed !== 0)) {
       this.dimmed = dim;
       this.atmo.cover.gas = { sun: 1 - DIM.sun * dim, sky: 1 - DIM.sky * dim };
@@ -212,8 +220,7 @@ export class Gas {
     // --- the wisps of it near the eye
     const m = this.mesh;
     if (m) {
-      const reach = gasEdge(z, eye.x, eye.z);
-      m.visible = reach < WISP.far;
+      m.visible = cloudEdge(zones, eye.x, eye.z) < WISP.far;
       if (m.visible) {
         const span = WISP.far * 2;
         for (let i = 0; i < this.seeds.length; i++) {
@@ -224,7 +231,7 @@ export class Gas {
           const zz = eye.z + ((((wz - eye.z) % span) + span) % span) - WISP.far;
           const y = this.ground(x, zz) + w.up + w.size * 0.3;
           const d = Math.hypot(x - eye.x, y - eye.y, zz - eye.z);
-          const thick = Math.min(1, gasDepth(z, x, y, zz) * 3);
+          const thick = Math.min(1, cloudDepth(zones, x, y, zz) * 3) * clear;
           const near = THREE.MathUtils.smoothstep(d, WISP.near[0], WISP.near[1]), far = 1 - THREE.MathUtils.smoothstep(d, WISP.far * 0.6, WISP.far);
           this.at[i * 4] = x;
           this.at[i * 4 + 1] = y;
@@ -238,8 +245,7 @@ export class Gas {
     }
 
     // --- the breathing of it
-    const deep = alive ? Math.max(gasDepth(z, head.x, head.y, head.z), this.also ? this.also(head.x, head.y, head.z) : 0) : 0;
-    const masked = this.host.masked();
+    const deep = alive ? Math.max(cloudDepth(zones, head.x, head.y, head.z), this.under ? this.under(head.x, head.y, head.z) : 0) : 0;
     const breathing = deep >= GAS.breathe;
     if (alive) {
       const r = breathe(this.lungs, deep, masked, dt);
@@ -263,7 +269,7 @@ export class Gas {
     if (alive && !breathing && this.wasIn && !masked) this.host.note('Clean air', 'good');
     this.wasIn = breathing;
     this.wasMasked = masked;
-    const off = Math.min(gasEdge(z, head.x, head.z), this.alsoEdge ? this.alsoEdge(head.x, head.z) : Infinity);
+    const off = cloudEdge(zones, head.x, head.z);
     if (alive && !masked && !breathing && off < 22 && !this.warned) {
       this.warned = true;
       this.host.note('Gas ahead: do not go in without a gas mask', 'warn');

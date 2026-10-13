@@ -18,6 +18,8 @@ const CROUCH_HALF = 0.26;
 const PRONE_HALF = 0.03;
 /** and at a crawl, metres a second */
 const CRAWL = 1.05;
+/** kilograms carried before every one more slows the legs (the inventory screen shows it beside what is carried) */
+export const CARRY_LIMIT = 18;
 const RADIUS = 0.3;
 const EYE_STAND = 1.64;
 /** how far under a ceiling the eye is kept (the picture is drawn from eight centimetres in front of it, in every direction it may be turned) */
@@ -387,7 +389,7 @@ export class Player {
     // It takes breath as a sprint does (less of it), and the trigger stops it as it stops one.
     this.scurrying = this.crouched && !this.prone && input.held('ShiftLeft') && fwd > 0 && !this.aiming && fit;
 
-    const enc = Math.max(0, this.weightKg - 18) * 0.012; // encumbrance
+    const enc = Math.max(0, this.weightKg - CARRY_LIMIT) * 0.012; // encumbrance
     let speed = this.prone ? CRAWL : this.crouched ? (this.scurrying ? CROUCH_RUN : 1.9) : walk ? 1.7 : 4.0;
     // (parched, nobody runs flat out)
     if (this.sprinting) speed = 6.2 * (stage(v.water) === 2 ? NEED.slow : 1);

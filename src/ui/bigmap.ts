@@ -58,17 +58,410 @@ interface Held { name: string; x: number; z: number; rot: number; w: number; d: 
 
 interface Shown { tiers: Tier[]; names: boolean; wells: boolean; cars: boolean; grid: boolean }
 
+/** somebody on the server, as an admin's map shows them: where, which way they face, and how they are */
+export interface MapPerson { id?: number; x: number; z: number; name: string; yaw?: number; dead?: boolean; faint?: boolean; staff?: boolean; asleep?: boolean; away?: boolean; seat?: boolean; hp?: number; flags?: number }
+/** what can be done to somebody from the map: the list that opens when their dot is clicked (`select` is the click itself) */
+export type PersonAct = 'select' | 'goto' | 'bring' | 'watch' | 'message' | 'panel';
+/**
+ * How an admin has their map show people: kept by the browser (2026-10-13: "allow admin map customization controls
+ * to change the players name color and other helpful things").
+ */
+interface AdminShown {
+  /** everybody's dot, at all */
+  on: boolean;
+  names: boolean;
+  /** the colour of the names, and their size and the dots' (CSS pixels) */
+  colour: string;
+  size: number;
+  dot: number;
+  facing: boolean;
+  hp: boolean;
+  flags: boolean;
+  dead: boolean;
+  /** bodies left behind, and those whose game is not answering */
+  asleep: boolean;
+  /** where each has been in the last minute */
+  trail: boolean;
+  /** a ring of so many metres round the admin and round whoever is picked (0: none) */
+  ring: number;
+  /** the box of these settings is unfolded */
+  open: boolean;
+}
+const ADMIN_KEPT = 'zona.map.admin';
+// (on a phone the box opens folded: the sheet is small there)
+const ADMIN_SHOWN: AdminShown = { on: true, names: true, colour: '#1d1b16', size: 12, dot: 4.5, facing: true, hp: false, flags: true, dead: true, asleep: true, trail: false, ring: 0, open: !TOUCH };
+/** a trail is this long, seconds, and has a point for every so many metres gone */
+const TRAIL_S = 60, TRAIL_STEP = 3;
+const DOT = { player: '#1f5fd0', staff: '#7a3fd0', away: '#c98a1e', asleep: '#7d8a99', dead: '#6b6b63' };
+
 export class BigMap {
   root: HTMLDivElement;
   open = false;
   /** asked to be shut (its X, or a tap outside it) */
   onClose: () => void = () => {};
   /** everybody on the server, where they stand (an admin's map alone): each a dot with their name by it */
-  private people: { x: number; z: number; name: string; dead?: boolean; faint?: boolean; staff?: boolean }[] = [];
-  setPeople(list: BigMap['people']) {
+  private people: MapPerson[] = [];
+  /**
+   * Told again and again while an admin has the map open (twice a second: see `feedMap` in game.ts), so that the
+   * dots move as people do. 2026-10-13: "the admin map needs to have LIVE updates and i want to see a dot where
+   * the player is". Nothing is laid out here but the list of names to pick from, and that only when who is on changes.
+   */
+  setPeople(list: MapPerson[]) {
     if (!list.length && !this.people.length) return;
     this.people = list;
     this.dirty = true;
+    const now = performance.now() / 1000;
+    if (this.adm.trail) {
+      for (const q of list) {
+        if (q.id === undefined || q.dead) continue;
+        const t = this.trails.get(q.id) ?? [], last = t[t.length - 1];
+        if (!last || Math.hypot(last.x - q.x, last.z - q.z) >= TRAIL_STEP) t.push({ x: q.x, z: q.z, at: now });
+        while (t.length && now - t[0].at > TRAIL_S) t.shift();
+        this.trails.set(q.id, t);
+      }
+      for (const id of this.trails.keys()) if (!list.some((q) => q.id === id)) this.trails.delete(id);
+    } else if (this.trails.size) this.trails.clear();
+    if (this.sel && !list.some((q) => q.id === this.sel)) this.pick(0);
+    const key = list.map((q) => `${q.id}:${q.name}`).join('|');
+    if (key !== this.peopleKey) {
+      this.peopleKey = key;
+      this.listPeople();
+    }
+  }
+  /** what an admin does to somebody from the map (see PersonAct): null, and a dot is only a dot */
+  onPerson: ((id: number, what: PersonAct) => void) | null = null;
+  private admin = false;
+  private adm: AdminShown = { ...ADMIN_SHOWN };
+  /** the box of an admin's settings on the map, and the short list that opens on a dot that is clicked */
+  private admBox = document.createElement('div');
+  private whoBox = document.createElement('div');
+  /** whoever is picked (their number; 0, nobody) */
+  private sel = 0;
+  private trails = new Map<number, { x: number; z: number; at: number }[]>();
+  private peopleKey = '';
+
+  /** The map is an admin's, or is not: the settings box is theirs alone, and so are the dots. */
+  setAdmin(on: boolean) {
+    if (on === this.admin) return;
+    this.admin = on;
+    this.admBox.hidden = !on;
+    if (!on) {
+      this.people = [];
+      this.trails.clear();
+      this.pick(0);
+    }
+    this.dirty = true;
+  }
+
+  /** Whoever is picked on the map (from the panel too): ringed, and the range ring is round them. */
+  pick(id: number) {
+    this.sel = id;
+    this.whoBox.hidden = true;
+    const find = this.admBox.querySelector<HTMLSelectElement>('[data-adm="find"]');
+    if (find) find.value = id ? String(id) : '';
+    this.dirty = true;
+  }
+
+  /** the admin's box, made once: every switch in it changes how the dots are drawn and is kept by the browser */
+  private buildAdmin(view: HTMLElement) {
+    try {
+      const was = JSON.parse(localStorage.getItem(ADMIN_KEPT) ?? 'null') as Partial<AdminShown> | null;
+      if (was && typeof was === 'object') {
+        for (const k of Object.keys(ADMIN_SHOWN) as (keyof AdminShown)[]) if (typeof was[k] === typeof ADMIN_SHOWN[k]) (this.adm as unknown as Record<string, unknown>)[k] = was[k];
+        if (!/^#[0-9a-f]{6}$/i.test(this.adm.colour)) this.adm.colour = ADMIN_SHOWN.colour;
+        this.adm.size = Math.min(22, Math.max(9, this.adm.size));
+        this.adm.dot = Math.min(10, Math.max(3, this.adm.dot));
+        this.adm.ring = Math.min(500, Math.max(0, this.adm.ring));
+      }
+    } catch {
+      /* nothing kept: as it is made */
+    }
+    const check = (k: keyof AdminShown, label: string, tip: string) => `<label title="${tip}"><input type="checkbox" data-adm="${k}"><span>${label}</span></label>`;
+    const b = this.admBox;
+    b.className = 'hm-adm';
+    b.hidden = true;
+    b.innerHTML = `
+      <button type="button" class="hm-adm-t" data-adm="open" title="Fold this box away, or open it"><b>Admin view</b><span class="hm-adm-n"></span><i></i></button>
+      <div class="hm-adm-b">
+        <label class="hm-adm-row"><span>Find a player</span><select data-adm="find" title="The map goes to them, and they are picked"></select></label>
+        <div class="hm-adm-checks">
+          ${check('on', 'Players', 'Everybody’s dot, on or off')}
+          ${check('names', 'Names', 'Each name beside its dot')}
+          ${check('facing', 'Facing', 'A point on each dot, the way they face')}
+          ${check('hp', 'Health', 'Health after the name')}
+          ${check('flags', 'Cheat flags', 'How often the cheat checks fired on them, after the name')}
+          ${check('dead', 'The dead', 'Those who are dead: a grey cross')}
+          ${check('asleep', 'Bodies left, tabbed out', 'Those who left a body behind (a hollow dot), and those whose game is not answering (amber)')}
+          ${check('trail', 'Trail, last minute', 'A line where each has been in the last minute')}
+        </div>
+        <label class="hm-adm-row"><span>Name colour</span><input type="color" data-adm="colour" title="The colour of the names"></label>
+        <label class="hm-adm-row"><span>Name size</span><input type="range" min="9" max="22" step="1" data-adm="size" title="How big the names are"></label>
+        <label class="hm-adm-row"><span>Dot size</span><input type="range" min="3" max="10" step="0.5" data-adm="dot" title="How big the dots are"></label>
+        <label class="hm-adm-row"><span>Range ring</span><select data-adm="ring" title="A ring round you, and round whoever is picked"><option value="0">Off</option><option value="50">50 m</option><option value="100">100 m</option><option value="200">200 m</option><option value="500">500 m</option></select></label>
+        <div class="hm-adm-key"><i style="background:${DOT.player}"></i>player<i style="background:${DOT.staff}"></i>staff<i style="background:${DOT.away}"></i>tabbed out<i class="hollow" style="border-color:${DOT.asleep}"></i>body left<i class="cross" style="color:${DOT.dead}">×</i>dead</div>
+        <div class="hm-adm-foot"><span class="hm-adm-at" title="The map numbers under the pointer: what /tp and /spawn take"></span><button type="button" data-adm="reset" title="Every setting in this box as it was made">Reset</button></div>
+        <p class="hm-adm-hint">Click a dot for what can be done. Right-click the map to go there.</p>
+      </div>`;
+    const w = this.whoBox;
+    w.className = 'hm-who';
+    w.hidden = true;
+    w.innerHTML = `<b></b><small></small>
+      <button type="button" data-who="goto">Go to them</button>
+      <button type="button" data-who="bring">Bring them here</button>
+      <button type="button" data-who="watch">Watch them</button>
+      <button type="button" data-who="message">Message them</button>
+      <button type="button" data-who="panel">Open in the panel</button>`;
+    view.append(b, w);
+    const set = () => {
+      const A = this.adm as unknown as Record<string, unknown>;
+      for (const i of b.querySelectorAll<HTMLInputElement | HTMLSelectElement>('input[data-adm], select[data-adm]')) {
+        const k = i.dataset.adm!;
+        if (k === 'find') continue;
+        if (i instanceof HTMLInputElement && i.type === 'checkbox') i.checked = !!A[k];
+        else i.value = String(A[k]);
+      }
+      b.classList.toggle('shut', !this.adm.open);
+      b.querySelector('.hm-adm-t')!.setAttribute('aria-expanded', String(this.adm.open));
+    };
+    const keep = () => {
+      try {
+        localStorage.setItem(ADMIN_KEPT, JSON.stringify(this.adm));
+      } catch {
+        /* a browser that keeps nothing: it lasts as long as the page does */
+      }
+      this.dirty = true;
+    };
+    set();
+    const changed = (e: Event) => {
+      const i = e.target as HTMLInputElement | HTMLSelectElement, k = i.dataset?.adm as keyof AdminShown | 'find' | undefined;
+      if (!k || k === 'open') return;
+      if (k === 'find') {
+        const q = this.people.find((p) => p.id === Number(i.value));
+        if (!q) return void this.pick(0);
+        this.pick(q.id ?? 0);
+        this.at = { x: q.x, z: q.z };
+        if (this.zoom < 3) this.zoom = 3;
+        this.clamp();
+        this.onPerson?.(q.id ?? 0, 'select');
+        return;
+      }
+      const A = this.adm as unknown as Record<string, unknown>;
+      if (i instanceof HTMLInputElement && i.type === 'checkbox') A[k] = i.checked;
+      else if (k === 'colour') A[k] = /^#[0-9a-f]{6}$/i.test(i.value) ? i.value : ADMIN_SHOWN.colour;
+      else A[k] = Number(i.value) || 0;
+      // (trails switched off are forgotten there and then: switched on again, they start from where people are)
+      if (!this.adm.trail) this.trails.clear();
+      keep();
+    };
+    b.addEventListener('input', changed);
+    b.addEventListener('change', changed);
+    b.addEventListener('click', (e) => {
+      const t = (e.target as HTMLElement).closest<HTMLElement>('button[data-adm]');
+      if (!t) return;
+      if (t.dataset.adm === 'open') this.adm.open = !this.adm.open;
+      else this.adm = { ...ADMIN_SHOWN, open: this.adm.open };
+      set();
+      keep();
+    });
+    // (a key pressed in the box is the box's: an arrow on a slider does not walk the admin off)
+    b.addEventListener('keydown', (e) => {
+      if (e.code !== 'Escape' && e.code !== 'KeyM') e.stopPropagation();
+    });
+    w.addEventListener('click', (e) => {
+      const what = (e.target as HTMLElement).closest<HTMLElement>('button[data-who]')?.dataset.who as PersonAct | undefined, id = this.sel;
+      if (!what || !id) return;
+      w.hidden = true;
+      this.onPerson?.(id, what);
+    });
+  }
+
+  /** the names to pick from in the admin's box, and how many there are: made again when who is on changes */
+  private listPeople() {
+    const find = this.admBox.querySelector<HTMLSelectElement>('[data-adm="find"]'), n = this.admBox.querySelector('.hm-adm-n');
+    if (!find || !n) return;
+    n.textContent = `${this.people.length} other${this.people.length === 1 ? '' : 's'} on`;
+    const first = new Option(this.people.length ? 'Pick one…' : 'Nobody else is on', '');
+    find.replaceChildren(first, ...[...this.people].filter((q) => q.id !== undefined).sort((a, b) => a.name.localeCompare(b.name)).map((q) => new Option(`${q.name}  #${q.id}`, String(q.id))));
+    find.value = this.sel ? String(this.sel) : '';
+  }
+
+  /** whether somebody is drawn, as the admin's switches stand */
+  private seen(q: MapPerson) {
+    return this.admin && this.adm.on && (this.adm.dead || !q.dead) && (this.adm.asleep || !(q.asleep || q.away));
+  }
+
+  /** whoever's dot is nearest a place on the sheet, within `reach` metres of it */
+  private personAt(wx: number, wz: number, reach: number): MapPerson | null {
+    let best: MapPerson | null = null, far = reach;
+    for (const q of this.people) {
+      if (!this.seen(q)) continue;
+      const d = Math.hypot(q.x - wx, q.z - wz);
+      if (d < far) {
+        far = d;
+        best = q;
+      }
+    }
+    return best;
+  }
+
+  /** the map numbers under the pointer, written in the admin's box (what `/tp` and `/spawn` take) */
+  private sayAt(u: number, w: number) {
+    const k = this.perMetre(), at = this.admBox.querySelector('.hm-adm-at');
+    if (at) at.textContent = `Pointer: ${Math.round(this.at.x + ((u - 0.5) * this.view.width) / k)}, ${Math.round(this.at.z + ((w - 0.5) * this.view.height) / k)}`;
+  }
+
+  /** how somebody is, in a few words */
+  private stateOf(q: MapPerson) {
+    return [q.dead ? 'dead' : q.asleep ? 'gone: body left behind' : q.away ? 'not answering (tabbed out)' : q.hp !== undefined ? `${Math.round(q.hp)} health` : '', q.seat ? 'in a car' : '', q.faint && !q.asleep ? 'vanished' : '', q.staff ? 'staff' : '', q.flags ? `${q.flags} cheat flag${q.flags === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · ');
+  }
+
+  /**
+   * A click on the sheet, to an admin: on a dot, that player is picked and the short list of what can be done opens
+   * beside them; anywhere else, nobody is. @returns whether it was on a dot
+   */
+  private clickPerson(u: number, w: number, left: number, top: number): boolean {
+    if (!this.admin || !this.adm.on) return false;
+    const W = this.view.width, H = this.view.height, k = this.perMetre();
+    const q = this.personAt(this.at.x + ((u - 0.5) * W) / k, this.at.z + ((w - 0.5) * H) / k, ((TOUCH ? 26 : 16) * (W / Math.max(1, this.view.clientWidth))) / k);
+    if (!q || q.id === undefined) {
+      if (this.sel) this.pick(0);
+      this.whoBox.hidden = true;
+      return false;
+    }
+    this.pick(q.id);
+    this.whoBox.querySelector('b')!.textContent = q.name;
+    this.whoBox.querySelector('small')!.textContent = `#${q.id} · ${Math.round(q.x)}, ${Math.round(q.z)} · ${Math.round(Math.hypot(q.x - this.me.x, q.z - this.me.z))} m from you${this.stateOf(q) ? ` · ${this.stateOf(q)}` : ''}`;
+    // (the dead and the gone are not brought or watched)
+    for (const b of this.whoBox.querySelectorAll<HTMLButtonElement>('button[data-who]')) b.disabled = (b.dataset.who === 'bring' || b.dataset.who === 'watch') && (!!q.dead || !!q.asleep);
+    this.whoBox.hidden = false;
+    const box = this.view.getBoundingClientRect();
+    this.whoBox.style.left = `${Math.min(Math.max(8, box.width - 232), Math.max(8, left + 14))}px`;
+    this.whoBox.style.top = `${Math.min(Math.max(8, box.height - 230), Math.max(8, top + 10))}px`;
+    this.tip.hidden = true;
+    this.onPerson?.(q.id, 'select');
+    return true;
+  }
+
+  /** Everybody else, to an admin: a dot each that points the way they face, their name, and (asked for) their trail and a ring. */
+  private drawPeople(g: CanvasRenderingContext2D, sx: (wx: number) => number, sy: (wz: number) => number, W: number, Hh: number, u: number, k: number) {
+    const A = this.adm, r = A.dot * u, now = performance.now() / 1000;
+    const on = (px: number, py: number, m: number) => px > -m && py > -m && px < W + m && py < Hh + m;
+    const picked = this.sel ? this.people.find((q) => q.id === this.sel && this.seen(q)) : undefined;
+    // a ring of so many metres: round the admin, and round whoever is picked
+    if (A.ring) {
+      g.lineWidth = 1.6 * u;
+      g.setLineDash([6 * u, 5 * u]);
+      for (const c of [this.me, ...(picked ? [picked] : [])]) {
+        const px = sx(c.x), py = sy(c.z), rr = A.ring * k;
+        if (!on(px, py, rr)) continue;
+        g.strokeStyle = c === this.me ? 'rgba(170, 40, 24, 0.85)' : 'rgba(31, 95, 208, 0.9)';
+        g.beginPath();
+        g.arc(px, py, rr, 0, Math.PI * 2);
+        g.stroke();
+      }
+      g.setLineDash([]);
+    }
+    // where each has been in the last minute: a line that fades toward its old end
+    if (A.trail) {
+      g.lineCap = g.lineJoin = 'round';
+      g.lineWidth = Math.max(1.5 * u, r * 0.5);
+      for (const q of this.people) {
+        const t = q.id === undefined || !this.seen(q) ? undefined : this.trails.get(q.id);
+        if (!t || t.length < 1) continue;
+        const pts = [...t, { x: q.x, z: q.z, at: now }];
+        for (let i = 1; i < pts.length; i++) {
+          const age = (now - pts[i].at) / TRAIL_S;
+          g.strokeStyle = `rgba(${q.staff ? '122, 63, 208' : '31, 95, 208'}, ${(0.75 * (1 - Math.min(1, age))).toFixed(2)})`;
+          g.beginPath();
+          g.moveTo(sx(pts[i - 1].x), sy(pts[i - 1].z));
+          g.lineTo(sx(pts[i].x), sy(pts[i].z));
+          g.stroke();
+        }
+      }
+    }
+    // (a pale name wants a dark edge to be read on paper, and a dark one a pale edge)
+    const ink = A.colour, light = (parseInt(ink.slice(1, 3), 16) * 0.299 + parseInt(ink.slice(3, 5), 16) * 0.587 + parseInt(ink.slice(5, 7), 16) * 0.114) / 255 > 0.6;
+    g.font = `600 ${Math.round(A.size * u)}px 'Barlow Condensed', 'Bahnschrift', sans-serif`;
+    g.textAlign = 'left';
+    g.lineJoin = 'round';
+    for (const q of this.people) {
+      if (!this.seen(q)) continue;
+      const px = sx(q.x), py = sy(q.z);
+      if (!on(px, py, 80 * u)) continue;
+      g.globalAlpha = q.faint && !q.asleep ? 0.6 : 1;
+      const colour = q.dead ? DOT.dead : q.asleep ? DOT.asleep : q.away ? DOT.away : q.staff ? DOT.staff : DOT.player;
+      if (q.id !== undefined && q.id === this.sel) {
+        g.beginPath();
+        g.arc(px, py, r + 5 * u, 0, Math.PI * 2);
+        g.lineWidth = 2.5 * u;
+        g.strokeStyle = '#ffd24a';
+        g.stroke();
+        g.lineWidth = 1 * u;
+        g.strokeStyle = INK;
+        g.stroke();
+      }
+      if (q.dead) {
+        // the dead: a cross where they lie
+        for (const [w, s] of [[4.2 * u, '#fff8e0'], [2 * u, colour]] as [number, string][]) {
+          g.lineWidth = w;
+          g.strokeStyle = s;
+          g.lineCap = 'round';
+          g.beginPath();
+          g.moveTo(px - r, py - r);
+          g.lineTo(px + r, py + r);
+          g.moveTo(px + r, py - r);
+          g.lineTo(px - r, py + r);
+          g.stroke();
+        }
+      } else {
+        if (A.facing && q.yaw !== undefined && !q.asleep) {
+          // the way they face: a point on the dot (the same turn as the admin's own arrow)
+          g.save();
+          g.translate(px, py);
+          g.rotate(-q.yaw);
+          g.beginPath();
+          g.moveTo(0, -r * 2.3);
+          g.lineTo(r * 0.85, -r * 0.5);
+          g.lineTo(-r * 0.85, -r * 0.5);
+          g.closePath();
+          g.lineWidth = 2 * u;
+          g.strokeStyle = '#fff8e0';
+          g.stroke();
+          g.fillStyle = colour;
+          g.fill();
+          g.restore();
+        }
+        g.beginPath();
+        g.arc(px, py, r, 0, Math.PI * 2);
+        if (q.asleep) {
+          // a body left behind: a hollow dot (pale within, its colour round it, and a pale edge to be seen on a dark ground)
+          g.fillStyle = '#fff8e0';
+          g.fill();
+          g.lineWidth = 4.4 * u;
+          g.strokeStyle = '#fff8e0';
+          g.stroke();
+          g.lineWidth = 2 * u;
+          g.strokeStyle = colour;
+          g.stroke();
+        } else {
+          g.lineWidth = 2.4 * u;
+          g.strokeStyle = '#fff8e0';
+          g.stroke();
+          g.fillStyle = colour;
+          g.fill();
+        }
+      }
+      if (A.names) {
+        const more = `${q.dead ? ' (dead)' : q.asleep ? ' (body left)' : q.away ? ' (tabbed out)' : ''}${A.hp && !q.dead && q.hp !== undefined ? `  ${Math.round(q.hp)}` : ''}${A.flags && q.flags ? `  ${q.flags} flag${q.flags === 1 ? '' : 's'}` : ''}`;
+        const tx = px + r + 4 * u, ty = py + A.size * u * 0.34;
+        g.lineWidth = Math.max(2, A.size * u * 0.26);
+        g.strokeStyle = light ? 'rgba(20, 18, 12, 0.9)' : 'rgba(226, 221, 200, 0.92)';
+        g.strokeText(q.name + more, tx, ty);
+        g.fillStyle = q.dead || q.asleep ? (light ? '#c9c6ba' : '#55554e') : ink;
+        g.fillText(q.name + more, tx, ty);
+      }
+      g.globalAlpha = 1;
+    }
   }
   /** a place on the sheet right-clicked (an admin goes there): null, and a right-click is nothing */
   onPick: ((x: number, z: number) => void) | null = null;
@@ -95,7 +488,7 @@ export class BigMap {
     private world: World,
     points: { x: number; z: number; tier?: Tier; usage: string[]; building: string }[],
     private spots: MenuSpot[],
-    private gas: GasZone | null,
+    private gases: GasZone[],
     private live: () => MapLive,
   ) {
     // every building, with the step its places are on (most of them) and the kinds of thing they are for
@@ -156,6 +549,7 @@ export class BigMap {
     this.key = this.root.querySelector('.hm-key')!;
     this.say(null);
     this.marks();
+    this.buildAdmin(this.root.querySelector<HTMLElement>('.hm-view')!);
 
     this.root.querySelector('.hm-x')!.addEventListener('click', () => this.onClose());
     // (a press on the dark round the sheet is a way out too)
@@ -209,6 +603,7 @@ export class BigMap {
     });
     v.addEventListener('pointermove', (e) => {
       const was = this.down.get(e.pointerId), r = v.getBoundingClientRect();
+      if (this.admin && this.adm.open) this.sayAt((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height);
       if (!was) return void this.point((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height, e.clientX - r.left, e.clientY - r.top);
       const k = this.perMetre() * (r.width / v.width);
       if (this.down.size === 1) {
@@ -216,6 +611,8 @@ export class BigMap {
         this.at.x -= (e.clientX - was.x) / k;
         this.at.z -= (e.clientY - was.y) / k;
         this.dragged += Math.abs(e.clientX - was.x) + Math.abs(e.clientY - was.y);
+        // (and the short list that was open on a dot is put away: the dot is no longer under it)
+        if (this.dragged >= 6) this.whoBox.hidden = true;
       }
       was.x = e.clientX;
       was.y = e.clientY;
@@ -234,7 +631,10 @@ export class BigMap {
       this.pinch = 0;
       // (a tap, on a phone: what is tapped says what it is, as a thing pointed at does)
       const r = v.getBoundingClientRect();
-      if (this.dragged < 6 && e.type === 'pointerup') this.point((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height, e.clientX - r.left, e.clientY - r.top);
+      if (this.dragged >= 6 || e.type !== 'pointerup') return;
+      // (to an admin, a click on somebody's dot picks them: see `clickPerson`)
+      if (e.button === 0 && this.clickPerson((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height, e.clientX - r.left, e.clientY - r.top)) return;
+      this.point((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height, e.clientX - r.left, e.clientY - r.top);
     };
     v.addEventListener('pointerup', up);
     v.addEventListener('pointercancel', up);
@@ -260,6 +660,7 @@ export class BigMap {
     this.at = { x: 0, z: 0 };
     this.down.clear();
     this.tip.hidden = true;
+    this.whoBox.hidden = true;
     this.sheet ??= this.print();
     this.press = null;
     this.dirty = true;
@@ -306,6 +707,7 @@ export class BigMap {
     const W = this.view.width, H = this.view.height, k0 = this.perMetre();
     const wx = this.at.x + ((u - 0.5) * W) / k0, wz = this.at.z + ((w - 0.5) * H) / k0;
     this.zoom = Math.min(NEAREST, Math.max(1, this.zoom * by));
+    this.whoBox.hidden = true;
     const k = this.perMetre();
     this.at.x = wx - ((u - 0.5) * W) / k;
     this.at.z = wz - ((w - 0.5) * H) / k;
@@ -337,7 +739,16 @@ export class BigMap {
         house = h;
       }
     }
-    if (house) {
+    // (to an admin, somebody's dot before anything under it: who they are, and how they are)
+    const who = this.personAt(wx, wz, reach);
+    if (who) {
+      const b = document.createElement('b'), i = document.createElement('i'), p = document.createElement('p');
+      b.textContent = who.name;
+      i.textContent = `${who.id !== undefined ? `#${who.id} · ` : ''}${Math.round(who.x)}, ${Math.round(who.z)} · ${Math.round(Math.hypot(who.x - this.me.x, who.z - this.me.z))} m from you`;
+      i.style.color = who.dead ? '#9a9a90' : who.staff ? '#c8a8ff' : '#8fb4ff';
+      p.textContent = `${this.stateOf(who) || 'alive'}. Click for what can be done.`;
+      this.tip.replaceChildren(b, i, p);
+    } else if (house) {
       const T = TIERS[house.tier];
       this.tip.innerHTML = `<b>${house.name}</b><i style="color:${T.colour}">${T.name}</i><p class="finds">${house.kinds.join(' · ') || 'Odds and ends'}</p>${house.gas ? '<p>Under the gas: a mask is needed.</p>' : ''}`;
     } else {
@@ -572,8 +983,8 @@ export class BigMap {
     };
 
     // the gas: the ground it lies on, hatched round
-    if (this.gas) {
-      const qx = sx(this.gas.x), qz = sy(this.gas.z), qr = this.gas.r * k;
+    for (const gas of this.gases) {
+      const qx = sx(gas.x), qz = sy(gas.z), qr = gas.r * k;
       if (on(qx, qz, qr)) {
         g.beginPath();
         g.arc(qx, qz, qr, 0, Math.PI * 2);
@@ -764,20 +1175,11 @@ export class BigMap {
       text('N', nx, ny + 17 * u, 12);
     }
 
-    // everybody else, to an admin: a dot each, and their name
-    for (const q of this.people) {
-      const px = sx(q.x), py = sy(q.z);
-      if (!on(px, py, 60 * u)) continue;
-      g.globalAlpha = q.faint ? 0.6 : 1;
-      g.beginPath();
-      g.arc(px, py, 4.5 * u, 0, Math.PI * 2);
-      g.lineWidth = 2.4 * u;
-      g.strokeStyle = '#fff8e0';
-      g.stroke();
-      g.fillStyle = q.dead ? '#6b6b63' : q.staff ? '#7a3fd0' : '#1f5fd0';
-      g.fill();
-      text(q.name + (q.dead ? ' (dead)' : ''), px + 8 * u, py + 4 * u, 12, q.dead ? '#55554e' : INK, 600);
-      g.globalAlpha = 1;
+    // everybody else, to an admin: a dot each, and their name (how, is the admin's to choose: see `drawPeople`)
+    if (this.admin && ((this.adm.on && this.people.length) || this.adm.ring)) {
+      g.save();
+      this.drawPeople(g, sx, sy, W, Hh, u, k);
+      g.restore();
     }
 
     // you: an arrow pointing the way you face

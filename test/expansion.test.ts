@@ -39,7 +39,9 @@ const ok = (name: string, fn: () => void) => {
 import { JEEP } from '../src/sim/vehicles';
 // (2026-10-12, with the village fenced off (see VILLAGE_FENCE), off the map as it was live that day. They were: 190604
 // cells, 3515396887; all 72 buildings, 2448790248; 9494 trees, 1630127803; all 675 loot points, 2826555666.)
-const WAS = { cells: 181893, heights: 1379160507, buildings: 72, away: 46, buildingsHash: 192416693, lastId: 'tower_71', spawns: 2697513077, trees: 9454, treesHash: 3496676067, lootPoints: 675, lootAway: 371, lootHash: 4064289616, jeeps: 8, jeepsAway: 7, jeepsHash: 1649467612, fires: 6 };
+// (2026-10-13, with the hillside behind the bunker fenced off as well (BUNKER_FENCE), off the map as it was live that
+// day. They were: 181893 cells, 1379160507; 9454 trees, 3496676067.)
+const WAS = { cells: 160775, heights: 1846616272, buildings: 72, away: 46, buildingsHash: 192416693, lastId: 'tower_71', spawns: 2697513077, trees: 8100, treesHash: 3268064997, lootPoints: 675, lootAway: 371, lootHash: 4064289616, jeeps: 8, jeepsAway: 7, jeepsHash: 1649467612, fires: 6 };
 const hash = (parts: number[]) => {
   let h = 2166136261 >>> 0;
   for (const v of parts) {
@@ -66,6 +68,9 @@ const VILLAGE_FENCE = { x0: -92, x1: 154, z0: -72, z1: 136 };
 const inVillage = (x: number, z: number) => x >= VILLAGE_FENCE.x0 && x <= VILLAGE_FENCE.x1 && z >= VILLAGE_FENCE.z0 && z <= VILLAGE_FENCE.z1;
 /** the village's second clinic and second shop (2026-10-11), at the two ends of its street: the ground fenced off for each */
 const SECOND = [{ type: 'clinic', x: 136.7, z: 23.5 }, { type: 'store', x: -63.1, z: -17.6 }];
+
+/** how far round the bunker the old ground may have been moved: its hollow, and the hillside cut back behind it */
+const BUNKER_FENCE = 190;
 
 const world = generateWorld();
 /** the map as it was first made: 513 samples a side, 1024 m, in the middle of whatever the grid is now */
@@ -99,8 +104,9 @@ const touched = (x: number, z: number) => {
   if (SECOND.some((q) => Math.hypot(x - q.x, z - q.z) < 30)) return true;
   // (and Kamenka's valley, 2026-10-10: its rim stands on the old map's ground west and north of the town)
   if (kamenkaQ(x, z) < KAMENKA.foot + 0.1) return true;
-  // (and the bunker's hollow, on the far side of the map)
-  if (Math.hypot(x - BUNKER_AT.x, z - BUNKER_AT.z) < 96) return true;
+  // (and the bunker's hollow, on the far side of the map; and, since 2026-10-13, the hillside behind it, which was
+  // cut back to a slope somebody can walk: "generally smooth out the landscape around the bunker a little bit")
+  if (Math.hypot(x - BUNKER_AT.x, z - BUNKER_AT.z) < BUNKER_FENCE) return true;
   // (and the way over to Kamenka, 2026-10-10: the hill cut down along the road's last climb and its foot banked up)
   if (x > PASS.from - PASS.reach - 4 && passLine.some(([px, pz]) => Math.hypot(x - px, z - pz) < PASS.reach + 3)) return true;
   const dx = E.x - camp.x, dz = E.z - camp.z, l2 = dx * dx + dz * dz;
@@ -259,8 +265,9 @@ ok('the infected keep to it too, and nowhere else has fewer for it', () => {
   // (and those that walk the ground over it)
   const over = homes.filter((h) => !h.inside && Math.hypot(h.x - below[0].x, h.z - below[0].z) < 1);
   assert.ok(over.length === 1 && over[0].n >= 6, 'none over the bunker');
-  // (and the fifteen of the east country since: ten in the town, two at the squat, three at the camp)
-  assert.equal(INFECTED.max - here!.n - below[0].n - over[0].n, 33 + 15);
+  // (and the fifteen of the east country since: ten in the town, two at the squat, three at the camp; and, since
+  // 2026-10-13, the fifteen the outlying places of the old valley were owed and had never had: see INFECTED.max)
+  assert.equal(INFECTED.max - here!.n - below[0].n - over[0].n, 33 + 15 + 15);
   const east = homes.filter((h) => Math.abs(h.x) > 512 || Math.abs(h.z) > 512);
   assert.equal(east.reduce((a, h) => a + h.n, 0), 15, 'the east country has not its fifteen');
 });

@@ -23,7 +23,10 @@ import { BUNKER, bunkerAt, bunkerPlan, levelY } from './bunker';
 export const INFECTED = {
   /** as many as are ever alive at once, over the whole map */
   // (63, and the fifteen of the town and the two places built in the east country, 2026-10-10)
-  max: 78,
+  // (93 since 2026-10-13: at 78 the village, the checkpoint, the camp, the works and the bunker took all but ten,
+  // and six of the outlying places, Sosnovka and the Motor Pool among them, were left with none at all though
+  // each is said to keep its own. One that nobody is near costs nothing: nobody's game moves it.)
+  max: 93,
   /** what each has to begin with: a rifle round anywhere, a pistol round in the head, three in the chest */
   hp: 90,
   /** how long a body lies there, and how long after that before another turns up about the same place, seconds */
@@ -303,6 +306,21 @@ export class Director {
     return b;
   }
 
+  /** how many have been stood by an admin (see `place`) */
+  private strays = 0;
+
+  /**
+   * One stood where it is asked for, by an admin (`/spawn infected`), whoever is watching. It lives nowhere (its
+   * home is -1): where it was put is where it goes back to, and when it is dead and cleared away nothing is owed in
+   * its place (see `tick`).
+   */
+  place(x: number, y: number, z: number, now: number): Body {
+    const b: Body = { i: this.next++, s: [x, y, z, this.rnd() * Math.PI * 2, I_IDLE, 0], hp: INFECTED.hp, own: null, h: [Math.round(x * 10) / 10, Math.round(z * 10) / 10], home: -1, diedAt: 0, heard: now, struck: 0 };
+    this.bodies.set(b.i, b);
+    this.strays++;
+    return b;
+  }
+
   /**
    * Once a second or so. `living` is everybody alive, with where they stand.
    * @param now milliseconds
@@ -319,6 +337,8 @@ export class Director {
         this.due.push({ home: b.home, at: now + INFECTED.respawn * 1000 });
       }
     }
+    // (one an admin stood somewhere lived nowhere, and no home is owed another for it: see `place`)
+    if (this.strays) this.due = this.due.filter((d) => d.home >= 0);
     // The ones that are owed. (It is the spot that has to be clear of the living, not the
     // whole place: somebody is nearly always somewhere in the village, and it would never
     // fill again.)

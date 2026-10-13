@@ -13,7 +13,7 @@ import { made, programsOf } from '../core/renderer';
 const PX = 64; // pixels per grid cell
 
 /** changed whenever the way a picture is made here changes: every picture kept from before is then made again (see `iconSig`) */
-const ICONS_REV = 2;
+const ICONS_REV = 3;
 
 /**
  * Things whose picture is turned head over heels from how the rules below stand them. A tool is stood with its
@@ -25,8 +25,66 @@ const HEAD_UP = new Set(['hatchet']);
 /** a gun, a magazine, or a part that is fitted to a gun: its picture is lit up (see where the pictures are made), by this much where it is painted with a picture and where it is a bare colour */
 const LIT = (d: (typeof ITEMS)[string]) => !!(d.weapon || d.mag || d.attach);
 const LIFT = [1.5, 1.3, 0.006];
-/** the lamps a picture is taken by, and how much of the sky is on the thing: for anything, and for a gun */
-const LAMPS = { plain: [1.8, 0.9, 0.75], gun: [3.6, 1.9, 1.7] };
+/**
+ * The lamps a picture is taken by: the one in front, the one behind and to one side (which is what picks the edge of
+ * a dark thing out of a dark cell), and how much of the sky is on the thing. They are set by what kind of thing it
+ * is. Only guns and their parts had the bright ones, and a black pack, a helmet or the gas mask was a hole in its
+ * cell. (2026-10-13: "we should also upgrade the user inventory ensuring all items are properly bright and seeable
+ * in the inventory".) What is worn or is a bag (`worn`), and tools, things to hit with and oddments (`kit`), are
+ * mostly dark cloth, rubber and steel: more light, and more of it from behind. What is eaten, drunk or is a
+ * dressing (`plain`) is mostly pale and keeps the lamps it had: more would wash a bandage or a tin out.
+ */
+const LAMPS = { plain: [1.8, 0.9, 0.75], gun: [3.6, 1.9, 1.7], worn: [2.6, 2.0, 1.2], kit: [2.4, 1.6, 1.1] };
+const lampsOf = (d: (typeof ITEMS)[string]): keyof typeof LAMPS =>
+  LIT(d) ? 'gun' : d.category === 'clothing' || d.category === 'stash' ? 'worn' : d.category === 'tool' || d.category === 'melee' || d.category === 'misc' ? 'kit' : 'plain';
+
+/**
+ * How bright a picture is to be when it is done, whatever it is of: the mean of what is seen of the thing, as the
+ * screen has it (0 to 255). A thing painted black stays near black under any lamp, so the lamps cannot do this by
+ * themselves: a picture darker than `floor` is opened up, as a photograph of a black thing is printed lighter
+ * (never by more than `least`, so that a black pack is still the darkest thing in a pocket), and one paler than
+ * `ceil` is brought down to it (never by more than `most`). Between the two a picture is left as the lamps made it.
+ */
+const TONE = { floor: 72, ceil: 150, least: 0.5, most: 1.4 };
+
+/** A picture's pixels (four numbers each, as a canvas has them) brought to the brightness above, where they stand. */
+function tone(px: Uint8ClampedArray) {
+  // (At its edge a pixel is part thing and part nothing, and is kept as the colour times how much of it is thing: it
+  // is counted, and changed, as the colour it is of.)
+  const seen = new Float64Array(256);
+  let n = 0;
+  for (let i = 0; i < px.length; i += 4) {
+    const a = px[i + 3];
+    if (a < 128) continue;
+    seen[Math.min(255, Math.round(((0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2]) * 255) / a))]++;
+    n++;
+  }
+  if (!n) return;
+  const meanAt = (g: number) => {
+    let s = 0;
+    for (let v = 1; v < 256; v++) s += seen[v] * 255 * Math.pow(v / 255, g);
+    return s / n;
+  };
+  /** the curve between these two that leaves the mean at `want` (the mean falls as the curve's number rises) */
+  const solve = (lo: number, hi: number, want: number) => {
+    for (let i = 0; i < 24; i++) {
+      const mid = (lo + hi) / 2;
+      if (meanAt(mid) > want) lo = mid;
+      else hi = mid;
+    }
+    return (lo + hi) / 2;
+  };
+  const mean = meanAt(1);
+  const g = mean < TONE.floor ? (meanAt(TONE.least) < TONE.floor ? TONE.least : solve(TONE.least, 1, TONE.floor)) : mean > TONE.ceil ? (meanAt(TONE.most) > TONE.ceil ? TONE.most : solve(1, TONE.most, TONE.ceil)) : 1;
+  if (g === 1) return;
+  const curve = new Uint8Array(256);
+  for (let v = 0; v < 256; v++) curve[v] = Math.round(255 * Math.pow(v / 255, g));
+  for (let i = 0; i < px.length; i += 4) {
+    const a = px[i + 3];
+    if (!a) continue;
+    for (let c = 0; c < 3; c++) px[i + c] = a === 255 ? curve[px[i + c]] : Math.round((curve[Math.min(255, Math.round((px[i + c] * 255) / a))] * a) / 255);
+  }
+}
 
 /** whether a thing has a second picture, for the place on the body it is worn in (kept as `slot:<id>`) */
 export const hasSlotIcon = (id: string): boolean => ITEMS[id]?.category === 'clothing' && !!ITEMS[id].slot;
@@ -45,7 +103,7 @@ export function iconSig(id: string): string {
     return [d.model, file || Math.random(), d.node ?? '', d.nodeRe ?? '', d.tint ?? '', d.paint ?? '', d.scale ?? '', d.w, d.h, d.category, d.pile ?? '', !!d.mag, d.stack ? 1 : 0, d.weapon ? [d.weapon.mag ?? '', d.weapon.shows ?? '', (d.weapon as { hides?: unknown }).hides ?? '', d.weapon.never ?? ''] : ''];
   };
   const d = ITEMS[id];
-  const text = JSON.stringify([ICONS_REV, of(d), of(d.weapon?.mag ? ITEMS[d.weapon.mag] : undefined), ...(HEAD_UP.has(id) ? ['head up'] : []), ...(LIT(d) ? ['lit', ...LIFT, ...LAMPS.gun] : [])]);
+  const text = JSON.stringify([ICONS_REV, of(d), of(d.weapon?.mag ? ITEMS[d.weapon.mag] : undefined), ...(HEAD_UP.has(id) ? ['head up'] : []), 'lamps', ...LAMPS[lampsOf(d)], ...(LIT(d) ? ['lit', ...LIFT] : []), 'tone', TONE.floor, TONE.ceil, TONE.least, TONE.most]);
   let h = 2166136261 >>> 0;
   for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619) >>> 0;
   return h.toString(36);
@@ -76,7 +134,7 @@ export async function renderIcons(renderer: THREE.WebGLRenderer, models: ItemMod
     if (only && !only.includes(id)) continue;
     // (a gun fed by a magazine is drawn with its own in it: without, it is a gun with a hole in it)
     const tpl = await models.get(id, def.weapon?.mag ? [def.weapon.mag] : []);
-    [key.intensity, rim.intensity, scene.environmentIntensity] = LIT(def) ? LAMPS.gun : LAMPS.plain;
+    [key.intensity, rim.intensity, scene.environmentIntensity] = LAMPS[lampsOf(def)];
     const w = def.w * PX, h = def.h * PX;
     const rt = new THREE.WebGLRenderTarget(w * 2, h * 2, { samples: 4, colorSpace: THREE.SRGBColorSpace });
     const obj = tpl.group.clone();
@@ -199,6 +257,8 @@ export async function renderIcons(renderer: THREE.WebGLRenderer, models: ItemMod
       const img = ctx.createImageData(pw, ph);
       // flip rows (GL origin is bottom-left)
       for (let y = 0; y < ph; y++) img.data.set(buf.subarray((ph - 1 - y) * pw * 4, (ph - y) * pw * 4), y * pw * 4);
+      // (and brought to the brightness every picture is to have: see TONE)
+      tone(img.data);
       ctx.putImageData(img, 0, 0);
       return canvas.toDataURL('image/png');
     };

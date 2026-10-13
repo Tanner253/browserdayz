@@ -1,0 +1,962 @@
+{
+ "slots": {
+  "primary": null,
+  "secondary": null,
+  "holster": null,
+  "head": null,
+  "face": null,
+  "vest": {
+   "uid": "mv6an6dj-33-ptcu",
+   "id": "life_vest",
+   "qty": 1,
+   "cargo": [
+    {
+     "item": {
+      "uid": "mv6an6dk-53-hnut",
+      "id": "apple",
+      "qty": 1
+     },
+     "x": 0,
+     "y": 0,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-54-sdtb",
+      "id": "sprats",
+      "qty": 1
+     },
+     "x": 1,
+     "y": 0,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-55-2hem",
+      "id": "mag_m9",
+      "qty": 1,
+      "rounds": 9
+     },
+     "x": 2,
+     "y": 0,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-56-utc0",
+      "id": "mag_colt",
+      "qty": 1,
+      "rounds": 2
+     },
+     "x": 3,
+     "y": 0,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-57-obem",
+      "id": "compass",
+      "qty": 1
+     },
+     "x": 0,
+     "y": 1,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-58-dsni",
+      "id": "watch",
+      "qty": 1
+     },
+     "x": 1,
+     "y": 1,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-59-a1zc",
+      "id": "gun_light",
+      "qty": 1
+     },
+     "x": 2,
+     "y": 1,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-5a-fpax",
+      "id": "splint",
+      "qty": 1
+     },
+     "x": 3,
+     "y": 1,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-5b-tk6h",
+      "id": "keycard",
+      "qty": 1
+     },
+     "x": 0,
+     "y": 2,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-5c-0c1b",
+      "id": "cigarettes",
+      "qty": 5
+     },
+     "x": 1,
+     "y": 2,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-5d-pw64",
+      "id": "bandage",
+      "qty": 5
+     },
+     "x": 2,
+     "y": 2,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-5e-rk11",
+      "id": "stim",
+      "qty": 3
+     },
+     "x": 3,
+     "y": 2,
+     "rot": false
+    }
+   ]
+  },
+  "back": {
+   "uid": "mv6an6dj-32-90t9",
+   "id": "suitcase",
+   "qty": 1,
+   "cargo": [
+    {
+     "item": {
+      "uid": "mv6an6dk-35-iaes",
+      "id": "bandage",
+      "qty": 5
+     },
+     "x": 0,
+     "y": 0,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-36-v233",
+      "id": "stim",
+      "qty": 3
+     },
+     "x": 1,
+     "y": 0,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-37-xl25",
+      "id": "ammo_9mm",
+      "qty": 30
+     },
+     "x": 2,
+     "y": 0,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-38-e9wk",
+      "id": "ammo_45",
+      "qty": 30
+     },
+     "x": 3,
+     "y": 0,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-39-wel5",
+      "id": "ammo_762",
+      "qty": 30
+     },
+     "x": 4,
+     "y": 0,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-3a-3rop",
+      "id": "box_556",
+      "qty": 1
+     },
+     "x": 5,
+     "y": 0,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-3b-zevv",
+      "id": "apple",
+      "qty": 1
+     },
+     "x": 6,
+     "y": 0,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-3c-0ly3",
+      "id": "sprats",
+      "qty": 1
+     },
+     "x": 0,
+     "y": 1,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-3d-jduy",
+      "id": "mag_m9",
+      "qty": 1,
+      "rounds": 9
+     },
+     "x": 1,
+     "y": 1,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-3e-bpl1",
+      "id": "mag_colt",
+      "qty": 1,
+      "rounds": 2
+     },
+     "x": 2,
+     "y": 1,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-3f-wodv",
+      "id": "compass",
+      "qty": 1
+     },
+     "x": 3,
+     "y": 1,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-3g-80c1",
+      "id": "watch",
+      "qty": 1
+     },
+     "x": 4,
+     "y": 1,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-3h-izxm",
+      "id": "gun_light",
+      "qty": 1
+     },
+     "x": 5,
+     "y": 1,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-3i-sb6t",
+      "id": "splint",
+      "qty": 1
+     },
+     "x": 6,
+     "y": 1,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-3j-ymgu",
+      "id": "keycard",
+      "qty": 1
+     },
+     "x": 0,
+     "y": 2,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-3k-t1hz",
+      "id": "cigarettes",
+      "qty": 5
+     },
+     "x": 1,
+     "y": 2,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-3l-h0fh",
+      "id": "bandage",
+      "qty": 5
+     },
+     "x": 2,
+     "y": 2,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-3m-i9v3",
+      "id": "stim",
+      "qty": 3
+     },
+     "x": 3,
+     "y": 2,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-3n-8rvo",
+      "id": "ammo_9mm",
+      "qty": 30
+     },
+     "x": 4,
+     "y": 2,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-3o-fgu6",
+      "id": "ammo_45",
+      "qty": 30
+     },
+     "x": 5,
+     "y": 2,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-3p-anaf",
+      "id": "ammo_762",
+      "qty": 30
+     },
+     "x": 6,
+     "y": 2,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-3q-dda4",
+      "id": "box_556",
+      "qty": 1
+     },
+     "x": 0,
+     "y": 3,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-3r-5lyz",
+      "id": "apple",
+      "qty": 1
+     },
+     "x": 1,
+     "y": 3,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-3s-sure",
+      "id": "sprats",
+      "qty": 1
+     },
+     "x": 2,
+     "y": 3,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-3t-9ngw",
+      "id": "mag_m9",
+      "qty": 1,
+      "rounds": 9
+     },
+     "x": 3,
+     "y": 3,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-3u-7t3o",
+      "id": "mag_colt",
+      "qty": 1,
+      "rounds": 2
+     },
+     "x": 4,
+     "y": 3,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-3v-ypgb",
+      "id": "compass",
+      "qty": 1
+     },
+     "x": 5,
+     "y": 3,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-3w-2o6o",
+      "id": "watch",
+      "qty": 1
+     },
+     "x": 6,
+     "y": 3,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-3x-vtaj",
+      "id": "gun_light",
+      "qty": 1
+     },
+     "x": 0,
+     "y": 4,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-3y-0qlm",
+      "id": "splint",
+      "qty": 1
+     },
+     "x": 1,
+     "y": 4,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-3z-sl64",
+      "id": "keycard",
+      "qty": 1
+     },
+     "x": 2,
+     "y": 4,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-40-jdch",
+      "id": "cigarettes",
+      "qty": 5
+     },
+     "x": 3,
+     "y": 4,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-41-v2xd",
+      "id": "bandage",
+      "qty": 5
+     },
+     "x": 4,
+     "y": 4,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-42-58b9",
+      "id": "stim",
+      "qty": 3
+     },
+     "x": 5,
+     "y": 4,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-43-otjr",
+      "id": "ammo_9mm",
+      "qty": 30
+     },
+     "x": 6,
+     "y": 4,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-44-e723",
+      "id": "ammo_45",
+      "qty": 30
+     },
+     "x": 0,
+     "y": 5,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-45-49tm",
+      "id": "ammo_762",
+      "qty": 30
+     },
+     "x": 1,
+     "y": 5,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-46-6uhm",
+      "id": "box_556",
+      "qty": 1
+     },
+     "x": 2,
+     "y": 5,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-47-j0h3",
+      "id": "apple",
+      "qty": 1
+     },
+     "x": 3,
+     "y": 5,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-48-bank",
+      "id": "sprats",
+      "qty": 1
+     },
+     "x": 4,
+     "y": 5,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-49-odsk",
+      "id": "mag_m9",
+      "qty": 1,
+      "rounds": 9
+     },
+     "x": 5,
+     "y": 5,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6dk-4a-il1a",
+      "id": "mag_colt",
+      "qty": 1,
+      "rounds": 2
+     },
+     "x": 6,
+     "y": 5,
+     "rot": false
+    }
+   ]
+  },
+  "hands": null,
+  "feet": null,
+  "neck": {
+   "uid": "mv6an6dj-34-jn1t",
+   "id": "dogtag",
+   "qty": 1,
+   "owner": "Percy",
+   "pid": "pid-percy"
+  }
+ },
+ "active": null,
+ "containers": [
+  {
+   "id": "tags",
+   "items": [
+    {
+     "uid": "mv6an6dk-5f-y080",
+     "id": "dogtag",
+     "qty": 1,
+     "owner": "T0",
+     "pid": "pid-t0",
+     "holder": "pid-percy",
+     "held": 0,
+     "x": 0,
+     "y": 0,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6dk-5g-jf7n",
+     "id": "dogtag",
+     "qty": 1,
+     "owner": "T1",
+     "pid": "pid-t1",
+     "holder": "pid-percy",
+     "held": 60,
+     "x": 1,
+     "y": 0,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6dk-5h-dnqm",
+     "id": "dogtag",
+     "qty": 1,
+     "owner": "T2",
+     "pid": "pid-t2",
+     "holder": "pid-percy",
+     "held": 120,
+     "x": 2,
+     "y": 0,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6dk-5i-d2iy",
+     "id": "dogtag",
+     "qty": 1,
+     "owner": "T3",
+     "pid": "pid-t3",
+     "holder": "pid-percy",
+     "held": 180,
+     "x": 3,
+     "y": 0,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6dk-5j-tb2g",
+     "id": "dogtag",
+     "qty": 1,
+     "owner": "T4",
+     "pid": "pid-t4",
+     "holder": "pid-percy",
+     "held": 240,
+     "x": 4,
+     "y": 0,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6dk-5k-yja1",
+     "id": "dogtag",
+     "qty": 1,
+     "owner": "T5",
+     "pid": "pid-t5",
+     "holder": "pid-percy",
+     "held": 300,
+     "x": 0,
+     "y": 1,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6dk-5l-adbs",
+     "id": "dogtag",
+     "qty": 1,
+     "owner": "T6",
+     "pid": "pid-t6",
+     "holder": "pid-percy",
+     "held": 360,
+     "x": 1,
+     "y": 1,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6dk-5m-ifhr",
+     "id": "dogtag",
+     "qty": 1,
+     "owner": "T7",
+     "pid": "pid-t7",
+     "holder": "pid-percy",
+     "held": 420,
+     "x": 2,
+     "y": 1,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6dk-5n-rp45",
+     "id": "dogtag",
+     "qty": 1,
+     "owner": "T8",
+     "pid": "pid-t8",
+     "holder": "pid-percy",
+     "held": 480,
+     "x": 3,
+     "y": 1,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6dk-5o-trqi",
+     "id": "dogtag",
+     "qty": 1,
+     "owner": "T9",
+     "pid": "pid-t9",
+     "holder": "pid-percy",
+     "held": 540,
+     "x": 4,
+     "y": 1,
+     "rot": false
+    }
+   ]
+  },
+  {
+   "id": "jacket",
+   "items": [
+    {
+     "uid": "mv6an6dk-4b-0k1w",
+     "id": "compass",
+     "qty": 1,
+     "x": 0,
+     "y": 0,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6dk-4c-ln19",
+     "id": "watch",
+     "qty": 1,
+     "x": 1,
+     "y": 0,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6dk-4d-vyuo",
+     "id": "gun_light",
+     "qty": 1,
+     "x": 2,
+     "y": 0,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6dk-4e-ropd",
+     "id": "splint",
+     "qty": 1,
+     "x": 3,
+     "y": 0,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6dk-4f-ilok",
+     "id": "keycard",
+     "qty": 1,
+     "x": 0,
+     "y": 1,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6dk-4g-bo8u",
+     "id": "cigarettes",
+     "qty": 5,
+     "x": 1,
+     "y": 1,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6dk-4h-8cfc",
+     "id": "bandage",
+     "qty": 5,
+     "x": 2,
+     "y": 1,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6dk-4i-sxqf",
+     "id": "stim",
+     "qty": 3,
+     "x": 3,
+     "y": 1,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6dk-4j-1hv4",
+     "id": "ammo_9mm",
+     "qty": 30,
+     "x": 0,
+     "y": 2,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6dk-4k-lp4j",
+     "id": "ammo_45",
+     "qty": 30,
+     "x": 1,
+     "y": 2,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6dk-4l-bvol",
+     "id": "ammo_762",
+     "qty": 30,
+     "x": 2,
+     "y": 2,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6dk-4m-hmdv",
+     "id": "box_556",
+     "qty": 1,
+     "x": 3,
+     "y": 2,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6dk-4n-tjym",
+     "id": "apple",
+     "qty": 1,
+     "x": 0,
+     "y": 3,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6dk-4o-j6g4",
+     "id": "sprats",
+     "qty": 1,
+     "x": 1,
+     "y": 3,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6dk-4p-wt6h",
+     "id": "mag_m9",
+     "qty": 1,
+     "rounds": 9,
+     "x": 2,
+     "y": 3,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6dk-4q-eoqu",
+     "id": "mag_colt",
+     "qty": 1,
+     "rounds": 2,
+     "x": 3,
+     "y": 3,
+     "rot": false
+    }
+   ]
+  },
+  {
+   "id": "pants",
+   "items": [
+    {
+     "uid": "mv6an6dk-4r-o3oc",
+     "id": "compass",
+     "qty": 1,
+     "x": 0,
+     "y": 0,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6dk-4s-08lm",
+     "id": "watch",
+     "qty": 1,
+     "x": 1,
+     "y": 0,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6dk-4t-qm49",
+     "id": "gun_light",
+     "qty": 1,
+     "x": 2,
+     "y": 0,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6dk-4u-ynjk",
+     "id": "splint",
+     "qty": 1,
+     "x": 3,
+     "y": 0,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6dk-4v-qln7",
+     "id": "keycard",
+     "qty": 1,
+     "x": 0,
+     "y": 1,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6dk-4w-78y6",
+     "id": "cigarettes",
+     "qty": 5,
+     "x": 1,
+     "y": 1,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6dk-4x-jp8k",
+     "id": "bandage",
+     "qty": 5,
+     "x": 2,
+     "y": 1,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6dk-4y-z3rh",
+     "id": "stim",
+     "qty": 3,
+     "x": 3,
+     "y": 1,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6dk-4z-z8ua",
+     "id": "ammo_9mm",
+     "qty": 30,
+     "x": 0,
+     "y": 2,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6dk-50-v1r5",
+     "id": "ammo_45",
+     "qty": 30,
+     "x": 1,
+     "y": 2,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6dk-51-4oh1",
+     "id": "ammo_762",
+     "qty": 30,
+     "x": 2,
+     "y": 2,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6dk-52-hdaw",
+     "id": "box_556",
+     "qty": 1,
+     "x": 3,
+     "y": 2,
+     "rot": false
+    }
+   ]
+  }
+ ],
+ "hot": [
+  {
+   "uid": "mv6an6dk-4b-0k1w",
+   "id": "compass"
+  },
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  {
+   "uid": "mv6an6dk-52-hdaw",
+   "id": "box_556"
+  }
+ ]
+}

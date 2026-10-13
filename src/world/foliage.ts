@@ -5,6 +5,7 @@
 
 import * as THREE from 'three';
 import type { ShaderPatch } from './atmosphere';
+import { SNOW } from './worldgen';
 
 export const wind = {
   uTime: { value: 0 },
@@ -23,7 +24,22 @@ export interface FoliageOpts {
   translucency?: number;
   sunDir?: THREE.Vector3;
   sunColor?: THREE.Color;
+  /**
+   * Snow on it, where it stands above the snow line (SNOW in the world's generator; 2026-10-13: "snowcapped, with
+   * snowy rocks and snowy tees"). 'leaf': boughs and fronds, laden nearly all over, the more the flatter they lie.
+   * 'solid': bark and stone, on what faces the sky and not on what stands upright.
+   */
+  snow?: 'leaf' | 'solid';
 }
+
+/** where snow lies on what stands at `o` (a place in the world): the line is ragged over the ground, not level */
+export const SNOW_LIES = /* glsl */ `
+float snowLies(vec3 o) {
+  float ragged = sin(o.x * 0.043) * 6.0 + sin(o.z * 0.057 + 1.3) * 6.0;
+  return smoothstep(${SNOW.from.toFixed(1)}, ${SNOW.full.toFixed(1)}, o.y + ragged);
+}`;
+/** snow, as paint: what the ground's own is (src/world/terrain.ts) */
+export const SNOW_PAINT = 'vec3(0.80, 0.83, 0.88)';
 
 /** Returns per-material LOD fade uniform plus the shader patch. */
 export function foliagePatch(opts: FoliageOpts): { patch: ShaderPatch; lod: { value: THREE.Vector4 } } {
@@ -46,7 +62,8 @@ uniform float uTime;
 uniform vec3 uWindDir;
 uniform float uWindStrength;
 varying float vLodDist;
-varying vec3 vFolWorld;`,
+varying vec3 vFolWorld;
+varying vec3 vFolOrigin;`,
       )
       .replace(
         '#include <begin_vertex>',
@@ -59,6 +76,7 @@ varying vec3 vFolWorld;`,
     rot = mat3(instanceMatrix);
   #endif
   vec3 origin = (modelMatrix * vec4(instO, 1.0)).xyz;
+  vFolOrigin = origin;
   vLodDist = distance(origin, cameraPosition);
   float phase = dot(origin.xz, vec2(0.071, 0.113));
   float h = clamp(position.y / ${f(height)}, 0.0, 1.5);
@@ -81,7 +99,8 @@ varying vec3 vFolWorld;`,
         /* glsl */ `#include <common>
 uniform vec4 uLod;
 varying float vLodDist;
-varying vec3 vFolWorld;`,
+varying vec3 vFolWorld;
+varying vec3 vFolOrigin;${opts.snow ? SNOW_LIES : ''}`,
       )
       .replace(
         '#include <clipping_planes_fragment>',
@@ -92,6 +111,27 @@ varying vec3 vFolWorld;`,
   if (vis < 0.999 && vis <= ign) discard;
 }`,
       );
+    if (opts.snow) {
+      // (after its own colour, its roughness and its metal have been read: snow is laid over all three. A pass that
+      // draws depth alone has no such line, and is left as it is.)
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <metalnessmap_fragment>',
+        /* glsl */ `#include <metalnessmap_fragment>
+{
+  float lies = snowLies(vFolOrigin);
+  if (lies > 0.0) {
+    float up = dot(normalize(vNormal), normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz));
+    ${opts.snow === 'leaf' ? `
+    float patchy = 0.5 + 0.5 * sin(vFolWorld.x * 3.1 + vFolWorld.y * 5.3) * sin(vFolWorld.z * 2.7 - vFolWorld.y * 4.1);
+    float laid = lies * mix(0.5, 0.92, patchy) * (0.65 + 0.35 * abs(up));` : `
+    float laid = lies * smoothstep(0.3, 0.7, up);`}
+    diffuseColor.rgb = mix(diffuseColor.rgb, ${SNOW_PAINT}, laid);
+    roughnessFactor = mix(roughnessFactor, 0.65, laid);
+    metalnessFactor *= 1.0 - laid;
+  }
+}`,
+      );
+    }
     if (trans > 0) {
       shader.fragmentShader = shader.fragmentShader.replace(
         '#include <lights_fragment_end>',

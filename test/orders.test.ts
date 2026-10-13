@@ -3,7 +3,7 @@
 //   npx tsx test/orders.test.ts
 
 import assert from 'node:assert/strict';
-import { ORDERS, offer, ordersOf } from '../src/net/orders';
+import { ENTITIES, ORDERS, entityBy, offer, ordersOf } from '../src/net/orders';
 
 const here = [{ id: 4, name: 'Bob' }, { id: 12, name: 'Big Bad Wolf' }, { id: 31, name: 'cat' }];
 let checks = 0;
@@ -55,6 +55,29 @@ const ban = offer('/ban ', 'admin', here, ['Old Tom', 'Zed', 'Bob', 'x'])!;
 assert.deepEqual(ban.picks.map((p) => p.fill), ['/ban #4 ', '/ban #12 ', '/ban #31 ', '/ban Zed ', '/ban Old ']);
 assert.deepEqual(offer('/ban to', 'admin', here, ['Old Tom', 'Zed'])!.picks.map((p) => p.label), ['Old Tom']);
 assert.ok(!offer('/kick ', 'admin', here, ['Zed'])!.picks.some((p) => p.label === 'Zed'), 'somebody who has left was offered to be kicked');
+checks++;
+
+// ---- what can be stood in the world: every row of the one list is offered after /spawn, by its word or its name;
+// the orders that put things in the world and take them out are an admin's alone
+const sp = offer('/spawn ', 'admin', here)!;
+assert.equal(sp.order?.name, 'spawn');
+assert.deepEqual(sp.picks.map((p) => p.fill), ENTITIES.map((e) => `/spawn ${e.id} `));
+assert.deepEqual(offer('/spawn po', 'admin', here)!.picks.map((p) => p.label), ['police']);
+assert.deepEqual(offer('/spawn zombie', 'admin', here)!.picks.map((p) => p.label), ['infected']);
+assert.equal(offer('/spawn jeep 2', 'admin', here)!.picks.length, 0);
+assert.equal(entityBy('Zombie')?.id, 'infected');
+assert.equal(entityBy('car')?.kind, 'car');
+assert.equal(entityBy('helicopter'), null);
+assert.equal(new Set(ENTITIES.flatMap((e) => [e.id, ...(e.also ?? [])])).size, ENTITIES.flatMap((e) => [e.id, ...(e.also ?? [])]).length, 'two things answer to one word');
+for (const o of ['spawn', 'delcar', 'wrecks', 'delz']) {
+  assert.ok(ORDERS.find((x) => x.name === o)?.admin, `/${o} is not an admin's alone`);
+  assert.equal(offer(`/${o} `, 'mod', here), null, `a mod was offered /${o}`);
+  assert.ok(!mod.picks.some((p) => p.fill.trim() === `/${o}`), `a mod was offered /${o}`);
+}
+assert.deepEqual(offer('/delz ', 'admin', here)!.picks.map((p) => p.label), ['30', '60', '120', '250']);
+// (an order all of whose words can be left out is given whole by Enter: the nearest car, every wreck, the infected about)
+assert.deepEqual(offer('/delca', 'admin', here)!.picks.map((p) => [p.fill, p.whole]), [['/delcar', true]]);
+assert.deepEqual(offer('/wre', 'admin', here)!.picks.map((p) => [p.fill, p.whole]), [['/wrecks', true]]);
 checks++;
 
 console.log(`${checks} checks passed`);

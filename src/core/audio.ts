@@ -14,6 +14,89 @@ type V3 = { x: number; y: number; z: number };
  */
 const WET = { tail: [0.15, 0.04], slap: [0.075, 0.01], room: [0, 0.4] } as const;
 
+/**
+ * The last of the way out: everything heard is turned down by `master`, pressed by `squeeze` when it is loud, and
+ * then held under `ceiling`. (Kept here in figures so that how loud the guns come out can be worked out without
+ * hearing them: test/gunsound.test.ts does.)
+ *
+ * The ceiling was not there. A shot of one's own goes into the squeeze well over as loud as a loudspeaker can
+ * be asked to go, and what the squeeze let through of the biggest was still over it: the very top of the
+ * shotgun's shot was cut off flat, and so was a shot's with anything else loud at the same moment, which a crack
+ * close by now is. Nothing that came out under 0.9 of as loud as can be is touched by the ceiling (a footstep, a
+ * voice, a door); what is over that is held there, a little under as loud as can be, whatever is heard at once.
+ */
+export const BUS = {
+  master: 0.8,
+  squeeze: { threshold: -10, knee: 12, ratio: 4, attack: 0.002, release: 0.25 },
+  ceiling: { threshold: -2, ratio: 20, attack: 0.002, release: 0.06 },
+};
+/** what a squeeze with no knee to it adds back by itself, as browsers make them: the 0.6th power of what it takes off the loudest there can be */
+export const madeUp = (c: { threshold: number; ratio: number }) => Math.pow(10, (-c.threshold * (1 - 1 / c.ratio) * 0.6) / 20);
+
+/**
+ * A shot through a suppressor (2026-10-13: "suprressed shots are too quiet ... we want it to be more realistic").
+ * Each pair is [a round slower than sound, a rifle's round]: see `gunshot` for why they differ.
+ *
+ * A suppressor takes some thirty decibels off the blast at the muzzle, which leaves a rifle as loud as a
+ * hammer on steel at arm's length, and does nothing to the round. It was played a quarter as loud as an open
+ * shot at the ears of whoever fired (12 dB under it and more, over its first tenth of a second), with nothing
+ * coming back from round about; and to anybody else it fell away faster than an open shot does and had lost
+ * all its top by 150 m. Now it is between a third and a half as loud as the open shot (it cannot be as far under
+ * it as it is in life: the loudest and the quietest thing here are not a hundred decibels apart); a little of it
+ * comes back from the hills and the walls; there is the thump of the gas under it; and from somebody else's gun
+ * it falls away as an open shot does and no faster, from two fifths of an open shot's level. A quieted rifle
+ * 150 m off is as loud as an open one 400 m off, with half its top still on it; a quieted 9 mm is a third less
+ * at any distance, and is a thud past 220 m, where the rifle is one past 290.
+ * (All of this is worked out and none of it heard: test/gunsound.test.ts has the sums.)
+ */
+export const QUIET = {
+  /** how loud its recording is played at the ears of whoever fired; and from somebody else's gun, before the distance is taken off */
+  own: [1.5, 1.75],
+  far: [1.65, 2.4],
+  /** the recording slowed: a rifle's is deeper */
+  rate: [1, 0.86],
+  /** the thump under it, as a share of the recording's level */
+  thump: 0.26,
+  /** how much goes to the hills and the walls (an open rifle's is 0.9) */
+  send: [0.18, 0.35],
+  /** how it falls away from somebody else's gun (see `out`: an open rifle's is 12 and 1), and how fast it loses its top next to an open shot */
+  ref: 6,
+  rolloff: 1,
+  dull: [2, 1.5],
+};
+
+/**
+ * The crack of a round going by faster than sound (2026-10-13: "bullet snaps are not loud enough near the player
+ * when being shot at from a silence and unsilenced gun").
+ *
+ * It is the round's own shock wave, made all the way down its flight, and a suppressor does nothing to it: a
+ * yard from a rifle bullet's path it is some 150 decibels, not far under what the shot is to whoever fired it,
+ * and far louder than the report that comes after it from a hundred metres off. It falls away slowly, by the
+ * three-quarter power of the distance. In life it is still heard a hundred metres off the path; here it is let
+ * die by nine, so that a crack says a round came close.
+ */
+export const CRACK = {
+  /** within this of the ear it is as loud as it gets, and by this it is gone: metres */
+  near: 1.5,
+  far: 9,
+  /** how loud at its loudest (a sniper rifle's shot at the ears of whoever fired is 2.3) */
+  peak: 2,
+  /** when it is at its loudest, when it has fallen to half, and when it is gone: seconds from its start */
+  shape: [0.0004, 0.008, 0.12],
+  /** the same wave off the ground, a moment after: how much of it comes back, and how high the ear is, metres */
+  ground: 0.6,
+  ear: 1.6,
+  /** how much goes to the hills and the walls */
+  send: 0.3,
+};
+/** how loud the crack of a round is that came within `miss` metres of the ear */
+export function crackLevel(miss: number): number {
+  if (!(miss < CRACK.far)) return 0;
+  const spread = Math.min(1, Math.pow(CRACK.near / Math.max(miss, 1e-3), 0.75));
+  const s = Math.max(0, (miss - CRACK.far / 2) / (CRACK.far / 2));
+  return CRACK.peak * spread * (1 - s * s * (3 - 2 * s));
+}
+
 /** A jeep's engine, running: told every frame where it is and what it is doing, until it is stopped. */
 export interface EngineVoice {
   /**
@@ -104,14 +187,25 @@ export class AudioEngine {
     const ctx = this.ctx;
     void recordings();
     const comp = ctx.createDynamicsCompressor();
-    comp.threshold.value = -10;
-    comp.knee.value = 12;
-    comp.ratio.value = 4;
-    comp.attack.value = 0.002;
-    comp.release.value = 0.25;
+    comp.threshold.value = BUS.squeeze.threshold;
+    comp.knee.value = BUS.squeeze.knee;
+    comp.ratio.value = BUS.squeeze.ratio;
+    comp.attack.value = BUS.squeeze.attack;
+    comp.release.value = BUS.squeeze.release;
+    // the ceiling: a second squeeze, as hard as they are made, that only the very loudest reaches (see BUS)
+    const top = ctx.createDynamicsCompressor();
+    top.threshold.value = BUS.ceiling.threshold;
+    top.knee.value = 0;
+    top.ratio.value = BUS.ceiling.ratio;
+    top.attack.value = BUS.ceiling.attack;
+    top.release.value = BUS.ceiling.release;
+    // (a squeeze turns everything up by itself to make good what it takes off: this one's is taken back before
+    // it, so that what never reaches it comes out as loud as it went in)
+    const trim = ctx.createGain();
+    trim.gain.value = 1 / madeUp(BUS.ceiling);
     this.master = ctx.createGain();
-    this.master.gain.value = 0.8 * this.volume;
-    this.master.connect(comp).connect(ctx.destination);
+    this.master.gain.value = BUS.master * this.volume;
+    this.master.connect(comp).connect(trim).connect(top).connect(ctx.destination);
     this.sfx = ctx.createGain();
     this.sfx.connect(this.master);
 
@@ -181,7 +275,7 @@ export class AudioEngine {
   /** player setting, 0..1 */
   setVolume(v: number) {
     this.volume = Math.max(0, Math.min(1, v));
-    if (this.ready) this.master.gain.setTargetAtTime(0.8 * this.volume, this.ctx.currentTime, 0.05);
+    if (this.ready) this.master.gain.setTargetAtTime(BUS.master * this.volume, this.ctx.currentTime, 0.05);
   }
 
   /**
@@ -309,28 +403,52 @@ export class AudioEngine {
 
   // ------------------------------------------------------------ weapons
 
-  /** @param voice a gun that is deeper and louder than its kind: its recording played that much slower and that much louder */
-  gunshot(kind: 'rifle' | 'pistol', pos?: V3, distance = 0, intermediate = false, suppressed = false, voice?: { rate: number; gain: number; rec?: string }) {
+  /**
+   * @param voice a gun that is deeper and louder than its kind: its recording played that much slower and that much louder
+   * @param sonic through a suppressor: how much of a crack its round makes, 0 (slower than sound when it leaves: none) .. 1 (a rifle's)
+   */
+  gunshot(kind: 'rifle' | 'pistol', pos?: V3, distance = 0, intermediate = false, suppressed = false, voice?: { rate: number; gain: number; rec?: string }, sonic = kind === 'rifle' ? 1 : 0) {
     if (!this.ready) return;
     const ctx = this.ctx;
     const t = ctx.currentTime + (distance > 0 ? distance / 343 : 0);
     if (suppressed) {
-      // suppressed: a flat, dull snap and the action cycling; carries a fraction of the distance
-      const o2 = this.out(pos, 5, 1.6, distance * 3);
-      if (this.rec('shot_quiet', o2, t, pos ? 1.6 : 1.1)) return;
+      // Through a suppressor: a hard flat crack with a thump under it, and still a shot (see QUIET). What the
+      // suppressor cannot quiet is the round, and one faster than sound cracks all the way down its flight: that
+      // is most of what is heard of a quieted rifle, by whoever fires it and more by anybody to one side, so it is
+      // louder, deeper and carries further than a 9 mm, which quieted is slower than sound and has no crack at all.
+      const mix = (a: number[]) => a[0] + (a[1] - a[0]) * Math.min(1, Math.max(0, sonic));
+      let o2 = this.out(pos, QUIET.ref, QUIET.rolloff, distance * mix(QUIET.dull));
+      if (!pos) {
+        // (a node of its own, as an open shot has below: what goes to the hills is tapped from it and from nothing else)
+        const own = ctx.createGain();
+        own.connect(this.sfx);
+        o2 = own;
+      }
+      // (a little of it comes back from the hills and the walls: it had none, and was a sound in no place at all)
+      const back = ctx.createGain();
+      back.gain.value = mix(QUIET.send) * (pos ? Math.pow(QUIET.ref / (QUIET.ref + Math.max(0, distance - QUIET.ref)), 0.75) : 1);
+      o2.connect(back);
+      back.connect(this.reverbSend);
+      back.connect(this.echo);
+      back.connect(this.roomSend);
+      const level = mix(pos ? QUIET.far : QUIET.own);
+      // The thump: the gas, let out slowly. It comes up a hundredth of a second behind the crack, as it does, so
+      // the two are never at their loudest together.
+      const th = ctx.createOscillator();
+      th.frequency.setValueAtTime(150, t);
+      th.frequency.exponentialRampToValueAtTime(55, t + 0.1);
+      const tg = ctx.createGain();
+      this.env(tg, t, level * QUIET.thump, 0.01, 0.17);
+      th.connect(tg).connect(o2);
+      th.start(t);
+      th.stop(t + 0.26);
+      if (this.rec('shot_quiet', o2, t, level, mix(QUIET.rate))) return;
+      // (until the recording has come: a made-up snap in its place)
       const n = this.noise(t, 0.12);
       const f = this.filter('bandpass', 1300, 0.8);
       const g = ctx.createGain();
-      this.env(g, t, 0.55, 0.002, 0.07);
+      this.env(g, t, 0.5 * level, 0.002, 0.07);
       n.connect(f).connect(g).connect(o2);
-      const th = ctx.createOscillator();
-      th.frequency.setValueAtTime(180, t);
-      th.frequency.exponentialRampToValueAtTime(70, t + 0.08);
-      const tg = ctx.createGain();
-      this.env(tg, t, 0.35, 0.002, 0.08);
-      th.connect(tg).connect(o2);
-      th.start(t);
-      th.stop(t + 0.2);
       return;
     }
     const big = kind === 'rifle';
@@ -540,27 +658,52 @@ export class AudioEngine {
   }
 
   /**
-   * A bullet going past your head: the crack of a supersonic round and the zip of air
-   * behind it. `pos` is the nearest point of its path, `miss` how close it came (metres).
+   * A bullet going past your head: the crack of a round faster than sound, and the zip of air behind any round
+   * that comes close. `pos` is where on its path it is heard from, `miss` how close it came (metres).
+   *
+   * The crack (see CRACK) was a tick: five thousandths of a second of hiss with nothing in it under 3 kHz, half
+   * as loud as a shot at its loudest, and nothing at all past five metres. It is the whole of a crack now, from
+   * 1 kHz up, as loud at its loudest as a rifle is to whoever fires it; it rings on for a few hundredths of a
+   * second, as it does over open ground, and comes a second time off the ground. A slow round has none of this:
+   * its zip is as it was.
    */
   whiz(pos: V3, miss: number, delay = 0, supersonic = true) {
     if (!this.ready) return;
-    const t = this.ctx.currentTime + delay;
-    const near = Math.max(0, 1 - miss / 5);
-    const out = this.out(pos, 2, 1);
-    if (supersonic) {
-      const c = this.noise(t, 0.03);
-      const hp = this.filter('highpass', 3200);
-      const cg = this.ctx.createGain();
-      this.env(cg, t, 0.5 + near * 0.9, 0.0006, 0.02);
-      c.connect(hp).connect(cg).connect(out);
+    const ctx = this.ctx;
+    const t = ctx.currentTime + delay;
+    // (placed, and no more than placed: how loud each part of it is at this distance is said here, by `miss`)
+    const out = this.out(pos, 30, 1);
+    const level = supersonic ? crackLevel(miss) : 0;
+    if (level > 0) {
+      const back = ctx.createGain();
+      back.gain.value = CRACK.send;
+      out.connect(back);
+      back.connect(this.reverbSend);
+      back.connect(this.roomSend);
+      const bounce = Math.hypot(miss, 2 * CRACK.ear);
+      const waves: [after: number, peak: number][] = [[0, level], [(bounce - miss) / 343, level * CRACK.ground * Math.pow(miss / bounce, 0.75)]];
+      for (const [after, peak] of waves) {
+        if (peak < 0.01) continue;
+        const c = this.noise(t + after, CRACK.shape[2]);
+        const hp = this.filter('highpass', 1000);
+        const cg = ctx.createGain();
+        // up at once, half of the way down in eight thousandths of a second, and the rest of it over the next tenth
+        cg.gain.setValueAtTime(0.0001, t + after);
+        cg.gain.exponentialRampToValueAtTime(peak, t + after + CRACK.shape[0]);
+        cg.gain.exponentialRampToValueAtTime(peak * 0.5, t + after + CRACK.shape[1]);
+        cg.gain.exponentialRampToValueAtTime(0.0001, t + after + CRACK.shape[2]);
+        c.connect(hp).connect(cg).connect(out);
+      }
     }
+    // the zip: heard within five metres, and as loud as it was (it fell away from two metres, by the placing of it)
+    const near = Math.max(0, 1 - miss / 5);
+    if (near <= 0) return;
     const n = this.noise(t, 0.2);
     const f = this.filter('bandpass', 4200, 5);
     f.frequency.setValueAtTime(4600, t);
     f.frequency.exponentialRampToValueAtTime(700, t + 0.16);
-    const g = this.ctx.createGain();
-    this.env(g, t, 0.18 + near * 0.35, 0.004, 0.15);
+    const g = ctx.createGain();
+    this.env(g, t, (0.18 + near * 0.35) * Math.min(1, 2 / Math.max(miss, 1e-3)), 0.004, 0.15);
     n.connect(f).connect(g).connect(out);
   }
 

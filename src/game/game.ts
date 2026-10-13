@@ -15,8 +15,8 @@ import { Barrel, type Vegetation } from '../world/vegetation';
 import type { Grass } from '../world/grass';
 import { Door, type Buildings } from '../world/buildings';
 import { WORLD_SIZE, bunkerPlace, heightAt, inPlay, type SiteKind, type World } from '../world/worldgen';
-import { ITEMS, WEAPON_SLOTS, itemName, TAG_HOLD, TAG_HOLD_MIN, TAG_OUT, capacityOf, chambered, fillMag, fittedOf, magRoom, makeItem, newUid, swapMag, tagClock, tagOwner, type ItemInstance, quietOf, makeMag } from '../sim/items';
-import { PlayerInventory, SLOT_ORDER, type Container } from '../sim/inventory';
+import { GEAR_SLOTS, ITEMS, WEAPON_SLOTS, itemName, TAG_HOLD, TAG_HOLD_MIN, TAG_OUT, capacityOf, chambered, fillMag, fittedOf, magRoom, makeItem, newUid, swapMag, tagClock, tagOwner, type ItemInstance, quietOf, makeMag } from '../sim/items';
+import { BODY_GRID, PlayerInventory, SLOT_ORDER, type Container } from '../sim/inventory';
 import { Economy, type WorldLoot } from '../sim/economy';
 import { CRATE_RESTOCK, CRATE_SPECS, fillCrate } from '../sim/crates';
 import { WEAPON_RULES } from '../sim/combat';
@@ -26,7 +26,7 @@ import { EMOTE, EMOTES, EMOTE_GAP, SAY_RANGE, SAY_TIME, voiceOf } from '../sim/e
 import { loadSave, writeSave, type SaveData } from '../sim/save';
 import { Net, playerName, publicId, remoteServer, serverStatus, setPlayerName, personKey } from '../net/client';
 import { F_AIM, F_BLEED, F_CROUCH, F_DANCE, F_DEAD, F_GROUND, F_GUARD, F_LEAN_L, F_LEAN_R, F_LIMP, F_LIGHT, F_PRONE, F_SEAT, F_SIT, F_SPRINT, F_SURRENDER, MAX_STAMINA, PROTOCOL, crateId, type Act, type CorpseInfo, type PlayerInfo, type Pose, type StoredItem, type S2C, type StashInfo } from '../net/protocol';
-import { Player, freshVitals } from './player';
+import { CARRY_LIMIT, Player, freshVitals } from './player';
 import { BLOOD, bleedOf, bleedsOutIn, bloodOf, greyOf, woundOf } from '../sim/blood';
 import { Avatar, AVATAR_LAYER, DEATH_REST, FP_BODY_LAYER, GEAR_SHOWN, type Hold, facepiece } from './avatar';
 import { lookFor } from './look';
@@ -45,9 +45,9 @@ import { HUD, type HandAct, type HotbarEntry } from '../ui/hud';
 import { BACK_SHORT } from '../ui/updates';
 import { InventoryUI } from '../ui/inventory-ui';
 import { Minimap } from '../ui/minimap';
-import { BigMap } from '../ui/bigmap';
+import { BigMap, type MapPerson } from '../ui/bigmap';
 import { BURY, noBurying } from '../sim/stash';
-import { AdminUI, type AdminSelf } from '../ui/admin-ui';
+import { AdminUI, type AdminLook, type AdminPlayer, type AdminSelf } from '../ui/admin-ui';
 import { CALL, CRASH, DROP, describeSpot, fillCrash, fillDrop, pickDropSite, type DropInfo } from '../sim/drops';
 import { WELL, stage, wellSpots, type Well } from '../sim/wells';
 import { Voice } from './voice';
@@ -64,7 +64,7 @@ import { TOUCH } from '../core/device';
 import { TouchControls } from '../ui/touch';
 import { REWARDS_UI, RewardsModal, addCashedTag, cashedTags, onTagPay, walletAddress } from '../ui/rewards';
 import { Gas } from './gas';
-import { GAS, underGas, bunkerGas, bunkerGasEdge } from '../sim/gas';
+import { GAS, underGas, bunkerUnder } from '../sim/gas';
 import { DAY, hourAt, phaseOf } from '../sim/daynight';
 import { FIRE, Hearths } from '../sim/fires';
 import { Fires } from './fires';
@@ -542,7 +542,7 @@ export class Game {
     this.minimap = new Minimap(world);
     this.hud.root.insertBefore(this.minimap.root, this.hud.root.firstChild);
     this.hud.root.append(this.fireTag, this.legTag);
-    this.gas = new Gas(atmo.gas, atmo, r.scene, {
+    this.gas = new Gas(atmo.gases, atmo, r.scene, {
       masked: () => this.inv.wear('gas').length > 0,
       // (nothing hurts an admin in god mode, and the gas is no exception: 2026-10-13, "god mode make admin immune to gas")
       hurt: (amount) => void (this.powers.god || this.player.sicken(amount, 'the gas')),
@@ -582,12 +582,13 @@ export class Game {
       sound: (k) => audio.ui(k),
       note: (text) => this.hud.note(text, 'info'),
     });
-    // (the bunker's own gas: over the ground above it and all through it, breathed like the works' and hardly seen)
-    this.gas.also = (x, y, z) => bunkerGas(this.bunker.place, x, y, z);
-    this.gas.alsoEdge = (x, z) => bunkerGasEdge(this.bunker.place, x, z);
+    // (Over the ground the bunker's gas is one of the world's clouds, as the works' is: the same lines draw it and
+    // breathe it. This is the rest of it: it is all through the place under the ground, where none is drawn.)
+    this.gas.under = (x, y, z) => bunkerUnder(this.bunker.place, x, y, z);
     this.invUI.icons = icons;
     this.invUI.doll = doll;
     this.invUI.selfId = publicId();
+    this.invUI.carryLimit = CARRY_LIMIT;
 
     // one physics step so placement queries see every collider
     physics.step(physics.fixedDt);
@@ -740,9 +741,9 @@ export class Game {
       }
       for (const b of world.buildings) if (b.type === 'hospital') spots.push(at({ x: b.x, z: b.z, name: 'Hospital' }, 'Kamenka\'s district hospital: three floors and the roof. Casualty and the dispensary below, the wards above them, the theatres and the laboratory at the top. A stair at each end and steel stairs outside each end, from the roof down; a balcony over the doors; a wing behind with a stair of its own and a terrace on its roof.', 'clinic', 3, 'More dressings, stims and first aid kits than anywhere. On the roof somebody left a rifle, its scope and its suppressor.'));
       for (const w of wellSpots(world)) spots.push({ x: w.x, z: w.z, name: 'Well', tip: 'Drink your fill, and fill every bottle you carry.', kind: 'well' });
-      this.hud.setMenuMap(this.minimap.poster(), WORLD_SIZE, spots, atmo.gas);
+      this.hud.setMenuMap(this.minimap.poster(), WORLD_SIZE, spots, atmo.gases);
       // (and the map opened in the game says the same of the same places)
-      this.map = new BigMap(world, buildings.lootPoints, spots, atmo.gas, () => this.minimap.live);
+      this.map = new BigMap(world, buildings.lootPoints, spots, atmo.gases, () => this.minimap.live);
       this.map.ahead();
       this.map.onClose = () => this.toggleMap(false);
       document.getElementById('ui')!.appendChild(this.map.root);
@@ -788,11 +789,24 @@ export class Game {
           }
           this.adminUI.setSelf(this.adminSelf());
         },
+        look: () => this.adminLook(),
+        // (whoever is picked in the panel is ringed on the map as well)
+        picked: (id) => this.map.pick(id === this.net?.id ? 0 : id),
         close: () => this.toggleAdmin(false),
       }, icons);
       document.getElementById('ui')!.appendChild(this.adminUI.root);
     }
-    this.menu = new MenuScenes({ world, atmo, scene: r.scene, effects: this.effects, held: (id, mods) => this.makeHeld(id, mods), wear: (body, ids) => this.wear(body, ids), filmReady: (film) => this.hud.filmReady(film) });
+    this.menu = new MenuScenes({
+      world, atmo, scene: r.scene, effects: this.effects, held: (id, mods) => this.makeHeld(id, mods), wear: (body, ids) => this.wear(body, ids),
+      // (a case stood in the world for a scene, as one a player drops is stood, and nobody's: it is not among the stashes that are kept, and the menu takes it away)
+      stash: async (item, x, z, rot) => {
+        const st = this.newStash({ uid: `menu_${item}_${Math.round(x)}_${Math.round(z)}`, x, y: heightAt(world.heights, x, z), z, rot, item });
+        st.spawn(await this.loot.models.get(st.item), r.scene);
+        return st;
+      },
+      // (the lamp of somebody in a scene: said as another player's is, with no disc of light at it)
+      beam: (pos, dir, power, wide) => this.lamps.beam(pos, dir, power, wide, 0),
+    });
     // (its cast is sent for when the game is up: see `afterBoot`)
     // The ground ends at the edge of the square, and there was nothing there to stop anybody walking or
     // driving off it. Four walls that cannot be seen, a few paces in from the edge: the wild country round
@@ -1134,6 +1148,7 @@ export class Game {
 
   /** A new life: bare hands, one thing to eat and one thing to drink. Everything else is out there. */
   private freshKit() {
+    // (`clear` leaves them in a new Field Jacket and Field Trousers, which are things now and have the pockets: 2026-10-13)
     this.inv.clear();
     const pick = (ids: string[]) => ids[Math.floor(Math.random() * ids.length)];
     this.inv.add(makeItem(pick(['sprats', 'beans', 'sardines', 'tomatoes'])));
@@ -1173,6 +1188,7 @@ export class Game {
       const me = publicId();
       inv.sortTags((tag) => tag.pid === me);
       const neck = inv.neck, pouch = inv.tags.items.map((q) => q.item);
+      // (a kit replaces everything: the jacket and the trousers that were on go too, with what was in them, and `clear` leaves new ones on)
       inv.clear();
       inv.neck = neck ?? this.makeTag();
       for (const tag of pouch) inv.tags.add(tag);
@@ -1629,6 +1645,9 @@ export class Game {
         this.toggleMap(false);
       } : null;
       if (m.role === 'admin' && this.tint) this.net.send({ t: 'tint', color: this.tint });
+      // (and the map is an admin's: everybody's dot on it, the box of settings for them, and what a click on one does)
+      this.map.setAdmin(m.role === 'admin');
+      this.map.onPerson = m.role === 'admin' ? (id, what) => this.mapPerson(id, what) : null;
       if (m.role !== 'admin') {
         this.toggleFreecam(false);
         this.nightSight = false;
@@ -1646,7 +1665,7 @@ export class Game {
       this.adminUI.setLists(m);
       void this.drawHeads(m.players);
       // (and an admin's map shows where everybody is)
-      if (this.role === 'admin') this.map.setPeople(m.players.filter((q) => q.id !== net.id).map((q) => ({ x: q.x, z: q.z, name: q.name, dead: !q.alive, faint: !!q.hidden || !!q.asleep, staff: !!q.role })));
+      this.feedMap();
     });
     net.on('ghost', (m) => this.remotes.get(m.id)?.setGhost(m.on));
     net.on('announce', (m) => {
@@ -1858,7 +1877,9 @@ export class Game {
 
   /** what this player wears that shows, kept in step with the inventory (and told to the server when it changes) */
   private syncGear() {
-    const ids = (['head', 'face', 'vest', 'back'] as const).map((s) => this.inv.slots[s]?.id).filter((x): x is string => !!x);
+    // (every place a thing is worn in, and of what is worn there whatever has a model for the body: head, face, vest
+    // and back today, as it was when those four were named here; a thing made for any other place is sent the day it is)
+    const ids = GEAR_SLOTS.map((s) => this.inv.slots[s]?.id).filter((x): x is string => !!x && GEAR_SHOWN.has(x));
     const key = ids.join(',');
     if (key === this.gearKey) return;
     this.gearKey = key;
@@ -1870,7 +1891,7 @@ export class Game {
   /** what each player has on that shows, as the server last said: their picture in the panel wears it */
   private gearOf = new Map<number, string[]>();
   /** the lists the panel last had: how much blood each player has is said beside their name in the far view */
-  private admPlayers = new Map<number, { hp?: number; flags: number }>();
+  private admPlayers = new Map<number, AdminPlayer>();
   /** a head drawn, for each name and each set of things worn */
   private heads = new Map<string, string>();
   private headsBusy = false;
@@ -1930,7 +1951,7 @@ export class Game {
     const under = physics.raycast({ x: c.x, y: c.y + 0.5, z: c.z }, { x: 0, y: -1, z: 0 }, 150, SOLID_GROUPS);
     const slope = under && under.toi > 0.02 ? new THREE.Vector3(under.normal.x, under.normal.y, under.normal.z) : undefined;
     if (under && under.toi > 0.02) c = { ...c, y: under.point.y };
-    const stash = new Stash(c.uid, c.x, c.y, c.z, c.rot, 8, 10, `${c.name}'s body`);
+    const stash = new Stash(c.uid, c.x, c.y, c.z, c.rot, BODY_GRID[0], BODY_GRID[1], `${c.name}'s body`);
     stash.corpse = true;
     // the box to search is where the body lies: behind where they stood if they went over
     // backwards, ahead if they went down on their face, beside it if they folded up
@@ -2415,15 +2436,15 @@ export class Game {
   }
 
   /**
-   * The game is up, and what nobody was made to wait for is sent for now: the sharp sky, the menu's two films and
-   * the cast of its scenes (three of the infected among them). Forty megabytes, a third of what used to come down
-   * before the menu was seen. Until each has come the menu has what it has: the soft sky, and the view from the air.
+   * The game is up, and what nobody was made to wait for is sent for now: the sharp sky, and the cast of the menu's
+   * scenes (three of the infected among them). Until each has come the menu has what it has: the soft sky, and the
+   * view from the air. (The menu's films were sent for here too, twenty-four megabytes of them. It has none now:
+   * everything behind it is played live. See src/game/menu-scenes.ts.)
    */
   afterBoot() {
     // (the shaders written while the game loaded, for the lamps lit and for the lamps out, are looked over now, behind the menu: see Renderer.lookOver)
     void this.s.r.lookOverAll();
     this.s.atmo.afterBoot();
-    this.hud.fetchFilms();
     void this.menu.load();
   }
 
@@ -2544,6 +2565,45 @@ export class Game {
 
   private adminUI!: AdminUI;
   private mapAskT = 0;
+  private mapFeedT = 0;
+
+  /**
+   * An admin's map told where everybody is: who is on and how they are from the server's last list, and each one's
+   * place and facing from this game's own picture of them, which is fresher (it is what they are drawn by).
+   */
+  private feedMap() {
+    if (this.role !== 'admin' || !this.map.open) return;
+    const out: MapPerson[] = [];
+    for (const q of this.admPlayers.values()) {
+      if (q.id === this.net.id) continue;
+      const r = q.alive ? this.remotes.get(q.id) : undefined;
+      out.push({ id: q.id, name: q.name, x: r ? r.pos.x : q.x, z: r ? r.pos.z : q.z, yaw: r ? r.yaw : q.yaw, dead: !q.alive, faint: !!q.hidden, staff: !!q.role, asleep: !!q.asleep, away: !!q.away, seat: !!q.seat, hp: q.hp, flags: q.flags });
+    }
+    this.map.setPeople(out);
+  }
+
+  /** What an admin did to somebody's dot on the map: picked them, or chose from the short list that opens on it. */
+  private mapPerson(id: number, what: 'select' | 'goto' | 'bring' | 'watch' | 'message' | 'panel') {
+    if (this.role !== 'admin') return;
+    // (picked on the map is picked in the panel: it opens on them)
+    this.adminUI.select(id);
+    if (what === 'select') return;
+    if (what === 'bring') return void this.order(`/bring #${id}`);
+    if (what === 'goto') {
+      this.order(`/goto #${id}`);
+      return void this.toggleMap(false);
+    }
+    if (what === 'watch') {
+      this.toggleMap(false);
+      return void this.watch(id);
+    }
+    // (the panel, from the map: the mouse stays free from the one to the other)
+    this.map.hide();
+    this.toggleAdmin(true);
+    // (the panel would not open: the map is put back, and not a free mouse with nothing under it)
+    if (!this.adminUI.isOpen) return void this.map.show(this.player.pos.x, this.player.pos.z);
+    if (what === 'message') this.adminUI.select(id, true);
+  }
   /**
    * The colour this admin has chosen for the word ADMIN before their name in the chat (null: the rainbow it is by
    * default). Kept by this browser, and said to the server whenever it says this player is an admin.
@@ -2653,6 +2713,24 @@ export class Game {
     else if (o instanceof RemotePlayer) return void this.hud.note(`That is ${o.name}: a player is kicked from the panel, not taken away`, 'warn');
     if (!line) return void this.hud.note('Nothing there to take away: a thing on the ground, a body, a drop, a buried stash, a car or one of the infected', 'info');
     this.order(line);
+  }
+
+  /**
+   * What the middle of the view is on, for the panel's Entities page ("where I am looking", "the car I am looking
+   * at"): from the eyes, or from the free camera, as far as three hundred metres. Null: nothing that near.
+   */
+  private adminLook(): AdminLook | null {
+    const cam = this.s.r.camera, dir = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
+    const hit = physics.raycast(cam.position, dir, 300, SHOT_GROUPS, this.freecam ? undefined : this.player.collider);
+    if (!hit) return null;
+    const o = hit.tag?.owner, body = o instanceof Jeep || o instanceof Infected || o instanceof RemotePlayer;
+    // (level enough to stand a thing on, and not somebody or something that moves; if not, a pace and a half short of it)
+    const flat = !body && hit.normal.y > 0.7, back = flat ? 0 : 1.5;
+    return {
+      x: hit.point.x - dir.x * back, y: hit.point.y, z: hit.point.z - dir.z * back, dist: hit.toi, flat,
+      what: o instanceof Jeep ? `car number ${o.i}` : o instanceof Infected ? 'one of the infected' : o instanceof RemotePlayer ? o.name : flat ? 'the ground' : 'a wall or a slope',
+      ...(o instanceof Jeep ? { car: o.i } : {}),
+    };
   }
 
   /** whoever the free camera is kept with as they go: their number, and where they last were */
@@ -4366,10 +4444,18 @@ export class Game {
       }
     }
     if (this.freecam && !panels && playing && !typing) this.flyCamera(dt, input);
-    // an admin's map: where everybody is, asked of the server while it is open
-    if (this.map.open && this.role === 'admin' && this.online && (this.mapAskT -= dt) <= 0) {
-      this.mapAskT = 1.5;
-      this.net.send({ t: 'adm' });
+    // An admin's map, live while it is open (2026-10-13: "the admin map needs to have LIVE updates"): who is on
+    // and how they are is asked of the server once a second, and twice a second every dot is put where this game
+    // has that player now. (Not every frame: the sheet is drawn again each time.)
+    if (this.map.open && this.role === 'admin' && this.online) {
+      if ((this.mapAskT -= dt) <= 0) {
+        this.mapAskT = 1;
+        this.net.send({ t: 'adm' });
+      }
+      if ((this.mapFeedT -= dt) <= 0) {
+        this.mapFeedT = 0.5;
+        this.feedMap();
+      }
     }
 
     // (The legs are free while the inventory is open: it is walked about with, to see what lies near, as in DayZ.
@@ -4548,14 +4634,14 @@ export class Game {
     if (!this.started) {
       this.menuOn = true;
       if (!this.menu.update(dt, cam)) this.menuCamera(now);
-      this.hud.menuScene(this.menu.caption, this.menu.fade, this.menu.film);
+      this.hud.menuScene(this.menu.caption, this.menu.fade);
       // (a long lens brings the far wood near: its trees are drawn as trees as far as the lens makes them large)
       this.s.veg.setReach(THREE.MathUtils.clamp(Math.tan((62 * Math.PI) / 360) / Math.tan((cam.fov * Math.PI) / 360), 1, 2.6));
     }
     else if (this.menuOn) {
-      // a game has begun: the film off, the trees as they are in play
+      // a game has begun: the caption and the cut off, the trees as they are in play
       this.menuOn = false;
-      this.hud.menuScene('', 0, -1);
+      this.hud.menuScene('', 0);
       this.s.veg.setReach(1);
     }
     const fpView = this.started && this.director.viewmodelVisible && !p.dead && !this.garage.ride;

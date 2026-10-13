@@ -35,4 +35,36 @@ for (const kit of KITS) {
   if (!kit.adds) assert.deepEqual(over, [], `${kit.id}: these found no room on a body that carried nothing: ${over.join(', ')}`);
   console.log(`  ok  ${kit.id}: ${kit.things.length} things, all of them real, fitted and carried`);
 }
+
+// A kit "replaces everything" a player carries, and leaves them a jacket and trousers (2026-10-13, when the two
+// became things that can be taken off): new ones, with nothing of the old pockets in them. As kitUp in
+// src/game/game.ts does it: the tags are kept, `clear`, and then each thing of the kit is put on or away.
+for (const kit of [...KITS, { id: 'nothing', name: '', does: 'what /clear sends: a kit of nothing', things: [] }]) {
+  for (const th of kit.things) assert.ok(!['top', 'legs'].includes(ITEMS[th.id].slot ?? ''), `${kit.id}: lists ${th.id}, which is worn where the jacket or the trousers are: whoever is given a kit has those on already, and it would be a spare in a pocket`);
+  const inv = new PlayerInventory();
+  const jacket = inv.slots.top!, trousers = inv.slots.legs!, tin = makeItem('beans'), tag = Object.assign(makeItem('dogtag'), { owner: 'Ann', pid: 'pid-ann' });
+  inv.add(tin);
+  inv.tags.add(tag);
+  inv.slots.vest = makeItem('chest_rig');
+  assert.equal(jacket.cargo![0].item, tin);
+  if (!('adds' in kit && kit.adds)) {
+    const pouch = inv.tags.items.map((q) => q.item);
+    inv.clear();
+    for (const t of pouch) inv.tags.add(t);
+  }
+  const over = kit.things.filter((th) => inv.add(makeItem(th.id, th.qty)));
+  assert.equal(inv.slots.top?.id, 'field_jacket', `${kit.id}: left them with no jacket`);
+  assert.equal(inv.slots.legs?.id, 'field_trousers', `${kit.id}: left them with no trousers`);
+  assert.deepEqual(inv.tags.items.map((q) => q.item), [tag], `${kit.id}: the tags they had taken are gone`);
+  if ('adds' in kit && kit.adds) {
+    // (a bag of supplies: nothing is taken away, and what does not fit is theirs to pick up)
+    assert.ok(inv.slots.top === jacket && inv.slots.legs === trousers && jacket.cargo!.some((p) => p.item === tin) && inv.slots.vest?.id === 'chest_rig', `${kit.id}: adds, and took something away`);
+  } else {
+    assert.deepEqual(over, [], `${kit.id}: these found no room`);
+    assert.ok(inv.slots.top !== jacket && inv.slots.legs !== trousers, `${kit.id}: the jacket or the trousers that were on are still on`);
+    assert.ok(!inv.find((it) => it === tin), `${kit.id}: what was in the old pockets is still carried`);
+    if (!kit.things.length) assert.deepEqual([inv.jacket.items.length, inv.pants.items.length, inv.slots.vest], [0, 0, null]);
+  }
+  console.log(`  ok  ${kit.id}: whoever is given it stands in a jacket and trousers${'adds' in kit && kit.adds ? ', their own' : ', new ones, with nothing of what they carried'}`);
+}
 console.log(`\n${KITS.length} kits passed`);

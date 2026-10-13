@@ -1,9 +1,10 @@
 // Checks of the grids things are carried in (src/sim/inventory.ts): piles, two things changing places, a pile
-// halved. No network: `npx tsx test/inventory.test.ts`.
+// halved, and what goes into what. No network: `npx tsx test/inventory.test.ts`.
+// (The clothes themselves, and what becomes of an inventory kept from before they were things: test/clothes.test.ts.)
 
 import assert from 'node:assert/strict';
-import { ITEMS, makeItem } from '../src/sim/items';
-import { Container, PlayerInventory, splitPile, swapPlaces } from '../src/sim/inventory';
+import { ITEMS, makeItem, type ItemInstance } from '../src/sim/items';
+import { BODY_GRID, Container, PlayerInventory, bagGrid, splitPile, swapPlaces } from '../src/sim/inventory';
 
 let n = 0;
 const ok = (name: string, fn: () => void) => {
@@ -94,6 +95,195 @@ ok('a pile is halved, the smaller half laid beside it as a thing of its own; wit
   const tin = makeItem('beans'), e = new Container('e', 'e', 2, 2);
   e.place(tin, 0, 0, false);
   assert.equal(splitPile(e, tin, makeItem), null);
+});
+
+// ------------------------------------------------------------------ what goes into what (2026-10-13, "like dayz")
+//
+// A thing with something in it is worn, held, put on the ground, or laid in a body, a crate or a stash, and is not
+// put inside another thing that is worn or carried. Things are put INTO a thing only while it is worn or lies in a
+// body, a crate or a stash: never while it is itself in a pocket or a pack. Stash cases keep the rule they had.
+
+/** somebody with a jacket and trousers on (as everybody has), a plate carrier and the big rucksack; and a crate and a body beside them */
+const dressed = () => {
+  const inv = new PlayerInventory();
+  inv.slots.vest = makeItem('life_vest');
+  inv.slots.back = makeItem('suitcase');
+  const [jacket, trousers, vest, pack] = (['top', 'legs', 'vest', 'back'] as const).map((s) => inv.cargoOf(inv.slots[s]!)!);
+  return { inv, jacket, trousers, vest, pack, worn: [jacket, trousers, vest, pack], crate: new Container('crate', 'Crate', 8, 6, [], true), body: new Container('corpse', 'Body', ...BODY_GRID, [], true) };
+};
+/** a thing with one thing in it */
+const withThing = (id: string, inside: ItemInstance = makeItem('bandage')): ItemInstance => Object.assign(makeItem(id), { cargo: [{ item: inside, x: 0, y: 0, rot: false }] });
+const HOLDERS = ['sack_pack', 'camping_pack', 'suitcase', 'chest_rig', 'soft_vest', 'life_vest', 'field_jacket', 'field_trousers'];
+
+ok('a pack, a vest, a jacket or trousers with nothing in it goes anywhere it has room; with a thing in it, into nothing that is worn or carried', () => {
+  const { worn, pack, jacket, crate, body } = dressed();
+  for (const id of HOLDERS) {
+    // empty (and one that has been looked into, and has an empty list for its inside)
+    for (const it of [makeItem(id), Object.assign(makeItem(id), { cargo: [] })]) {
+      assert.ok(pack.accepts(it) && pack.findSpace(it), `the rucksack did not take an empty ${id}`);
+      assert.ok(crate.accepts(it) && body.accepts(it));
+    }
+    assert.ok(jacket.accepts(makeItem(id)));
+    // with a thing in it
+    const it = withThing(id);
+    for (const c of worn) {
+      assert.ok(!c.accepts(it), `${c.name} took a ${id} with a thing in it`);
+      assert.equal(c.findSpace(it), null);
+      assert.ok(!c.hasRoom(it) && !c.fits(it, 0, 0, false) && !c.place(it, 0, 0, false));
+      assert.equal(c.add(it), it);
+      assert.match(c.refusal(it)!, /has things in it: empty it first, or wear it, or put it on the ground/);
+      assert.equal(c.items.length, 0);
+    }
+    // ... but onto a body, into a crate: yes, with what is in it
+    for (const c of [crate, body]) {
+      assert.equal(c.refusal(it), null);
+      assert.equal(c.add(it), null, `${c.name} did not take a ${id} with a thing in it`);
+      assert.equal(c.items.at(-1)!.item.cargo!.length, 1);
+    }
+    // ... and not into a pack that lies in a crate: that is the inside of another thing
+    const lying = makeItem('suitcase');
+    crate.add(lying);
+    assert.ok(!bagGrid(lying, crate.depth + 1)!.accepts(withThing(id)), `a rucksack lying in a crate took a ${id} with a thing in it`);
+    crate.items.length = body.items.length = 0;
+  }
+});
+
+ok('a thing with things in it goes in its own place on the body, or stays in the hands for the ground: it is never put away', () => {
+  const { inv } = dressed();
+  const mine = inv.slots.back!, found = withThing('camping_pack');
+  // (the back is taken: nowhere to put it, and it is handed back as it came)
+  assert.equal(inv.freeSlotFor(found), null);
+  assert.ok(!inv.hasRoom(found));
+  assert.equal(inv.add(found), found);
+  assert.equal(found.cargo!.length, 1);
+  // (the back is free: it is slung, with what is in it)
+  inv.remove(mine);
+  assert.equal(inv.add(found), null);
+  assert.equal(inv.slots.back, found);
+  assert.equal(inv.cargoOf(found)!.items.length, 1);
+  // the jacket with something in its pocket comes off: no pocket of another thing takes it; emptied, the pack does
+  const jacket = inv.slots.top!, tin = makeItem('beans');
+  inv.add(tin);
+  assert.equal(jacket.cargo![0].item, tin);
+  inv.remove(jacket);
+  assert.ok(inv.containers.length === 4 && inv.containers.every((c) => !c.accepts(jacket)), 'a jacket with a tin in its pocket was put away in something');
+  assert.equal(inv.freeSlotFor(jacket), 'top', 'it does not go back on, either');
+  jacket.cargo!.length = 0;
+  assert.ok(inv.cargoOf(found)!.hasRoom(jacket));
+  // two things do not change places if that puts a thing with things in it into a pack
+  const { pack: p2, crate } = dressed();
+  const dressing = makeItem('bandage'), full = withThing('sack_pack');
+  p2.place(dressing, 0, 0, false);
+  crate.place(full, 0, 0, false);
+  assert.ok(!swapPlaces(full, crate, p2, dressing, { x: 0, y: 0, rot: false }));
+  assert.ok(crate.has(full) && p2.has(dressing) && p2.items.length === 1 && crate.items.length === 1);
+  // (nor dragged the other way, the dressing let go on a rig with things in it in the crate: the rig would go into the pack)
+  const other = withThing('chest_rig');
+  crate.place(other, 4, 0, false);
+  assert.ok(!swapPlaces(dressing, p2, crate, other, { x: 4, y: 0, rot: false }), 'a vest with things in it went into a worn pack by changing places');
+  assert.ok(crate.has(other) && p2.has(dressing));
+  // (two such things in a crate change places with one another: both stay in the crate's own grid)
+  assert.ok(swapPlaces(full, crate, crate, other, { x: 4, y: 0, rot: false }));
+});
+
+ok('things are put into a thing while it is worn, or lies in a body or a crate; not while it is in a pocket or a pack, though they are taken out of it there', () => {
+  const { worn, pack, jacket, crate, body } = dressed();
+  const dressing = () => makeItem('bandage');
+  // worn: all four take things
+  for (const c of worn) assert.equal(c.add(dressing()), null, `${c.name}, worn, took nothing`);
+  // lying in a crate, and on a body: opened where it lies, it takes things
+  for (const c of [crate, body]) {
+    const lying = makeItem('sack_pack');
+    c.add(lying);
+    const open = bagGrid(lying, c.depth + 1)!;
+    assert.equal(open.depth, 1);
+    assert.equal(open.add(dressing()), null, `a pack lying in a ${c.name} took nothing`);
+    assert.ok(open.place(makeItem('beans'), 3, 0, false));
+    // ... and a bag inside that pack does not: it is in a pack
+    const inner = makeItem('chest_rig');
+    assert.equal(open.add(inner), null);
+    const shut = bagGrid(inner, open.depth + 1)!;
+    assert.ok(!shut.accepts(dressing()), `a rig in a pack in a ${c.name} took a thing`);
+  }
+  // in a worn pack, and in a pocket
+  for (const [c, id] of [[pack, 'sack_pack'], [jacket, 'chest_rig']] as [Container, string][]) {
+    const bag = makeItem(id);
+    assert.equal(c.add(bag), null);
+    const shut = bagGrid(bag, c.depth + 1)!;
+    assert.equal(shut.depth, 2);
+    const thing = dressing();
+    assert.ok(!shut.accepts(thing) && !shut.hasRoom(thing) && !shut.fits(thing, 0, 0, false) && !shut.place(thing, 0, 0, false), `a ${id} in the ${c.name} took a thing`);
+    assert.equal(shut.findSpace(thing), null);
+    assert.equal(shut.add(thing), thing);
+    assert.match(shut.refusal(thing)!, /nothing is put into it while it is in a pocket or a pack/);
+    assert.equal(bag.cargo!.length, 0);
+    // (one kept with things in it, from before: they are there, they come out, and nothing goes onto them)
+    const pile = makeItem('bandage', 2), tin = makeItem('beans');
+    assert.ok(shut.restore(pile, 0, 0, false) && shut.restore(tin, 1, 0, false));
+    const more = makeItem('bandage', 1);
+    assert.equal(shut.add(more), more, 'a dressing was added to a pile in a bag that is in a pack');
+    assert.deepEqual([pile.qty, more.qty], [2, 1]);
+    assert.ok(!shut.joinable(more, c) && !shut.joinable(more, null), 'a thing from outside may be let go on a pile in it');
+    assert.ok(shut.joinable(pile, shut), 'what is in it may not even be put together with what is in it');
+    assert.equal(splitPile(shut, pile, makeItem), null);
+    shut.remove(tin);
+    assert.equal(c.add(tin), null);
+    assert.deepEqual(bag.cargo!.map((p) => p.item), [pile]);
+    assert.equal(shut.take('bandage', 2), 2);
+    assert.equal(bag.cargo!.length, 0);
+  }
+});
+
+ok('stash cases keep the rule they had: one with things in it goes into a worn pack and into a pack in a crate, and single things go into one that is in a pack', () => {
+  /** the whole rule as it was before 2026-10-13, word for word (Container.accepts of that day, but for a thing going into itself) */
+  const was = (c: Container, item: ItemInstance) => !(c.only && item.id !== c.only) && !(item.cargo?.length && (!c.holdsBags || c.depth >= 2 || (c.depth >= 1 && item.cargo.some((p) => p.item.cargo?.length))));
+  const { worn, crate, body, inv } = dressed();
+  const cases = ['stash_kit', 'old_suitcase', 'black_bag'];
+  const lyingIn = (id: string, depth: number) => bagGrid(makeItem(id), depth)!;
+  const grids: [string, Container][] = [
+    ...worn.map((c): [string, Container] => [`${c.name}, worn`, c]), ['a crate', crate], ['a body', body], ['the tag pouch', inv.tags],
+    ['a rucksack lying in a crate', lyingIn('suitcase', 1)], ['a plate carrier lying in a crate', lyingIn('life_vest', 1)],
+    ...cases.flatMap((id): [string, Container][] => [[`a ${id} lying in a crate`, lyingIn(id, 1)], [`a ${id} in a worn pack`, lyingIn(id, 2)]]),
+  ];
+  const things: [string, () => ItemInstance][] = [
+    ...cases.flatMap((id): [string, () => ItemInstance][] => [[`an empty ${id}`, () => makeItem(id)], [`a ${id} with a thing in it`, () => withThing(id)], [`a ${id} with a bag in it that has a thing in it`, () => withThing(id, withThing('sack_pack'))]]),
+  ];
+  let tried = 0;
+  // a case, wherever it is put
+  for (const [where, c] of grids) for (const [what, make] of things) {
+    const it = make();
+    assert.equal(c.accepts(it), was(c, it), `${what} into ${where}: it was ${was(c, it) ? 'taken' : 'refused'}, and is not now`);
+    tried++;
+  }
+  // and whatever is put into a case
+  for (const [where, c] of grids.filter(([, g]) => g.of && ITEMS[g.of].stash)) {
+    for (const [what, make] of [['a dressing', () => makeItem('bandage')], ['an empty day pack', () => makeItem('sack_pack')], ['a day pack with a thing in it', () => withThing('sack_pack')], ['a rucksack with a bag in it that has a thing in it', () => withThing('suitcase', withThing('chest_rig'))]] as [string, () => ItemInstance][]) {
+      const it = make();
+      assert.equal(c.accepts(it), was(c, it), `${what} into ${where}: it was ${was(c, it) ? 'taken' : 'refused'}, and is not now`);
+      tried++;
+    }
+  }
+  assert.ok(tried > 100);
+  // (said in so many words, so that the table above is not all there is to read)
+  const [, , , pack] = worn;
+  assert.ok(pack.accepts(withThing('stash_kit')) && !worn[0].accepts(withThing('stash_kit')) && !worn[2].accepts(withThing('stash_kit')));
+  assert.ok(!pack.accepts(withThing('stash_kit', withThing('sack_pack'))) && crate.accepts(withThing('stash_kit', withThing('sack_pack'))));
+  assert.ok(lyingIn('stash_kit', 2).accepts(makeItem('bandage')) && !lyingIn('stash_kit', 2).accepts(withThing('sack_pack')));
+});
+
+ok('a thing does not go inside itself, nor inside a thing that is inside it', () => {
+  const { pack, inv } = dressed();
+  const rucksack = inv.slots.back!, day = makeItem('sack_pack');
+  assert.ok(!pack.accepts(rucksack));
+  assert.match(pack.refusal(rucksack)!, /does not go inside itself/);
+  pack.add(day);
+  const inDay = bagGrid(day, pack.depth + 1)!;
+  assert.ok(!inDay.accepts(rucksack) && !inDay.accepts(day));
+  // (nor a crate's pack into the bag that lies in that pack)
+  const crate = new Container('crate', 'Crate', 8, 6, [], true), outer = makeItem('camping_pack'), inner = makeItem('sack_pack');
+  crate.add(outer);
+  bagGrid(outer, 1)!.add(inner);
+  assert.match(bagGrid(inner, 2)!.refusal(outer)!, /is inside the camping backpack|in a pocket or a pack/);
 });
 
 console.log(`\n${n} checks passed`);

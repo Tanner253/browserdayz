@@ -4,8 +4,8 @@
 // seconds, every half minute (see ping). M opens the sheet itself, large: that is another thing (bigmap.ts).
 
 import { playEdge } from '../world/outline';
-import { BUILDING_FOOTPRINT, WORLD_RES, WORLD_SIZE, heightAt, type World } from '../world/worldgen';
-import { gasZone, type GasZone } from '../sim/gas';
+import { BUILDING_FOOTPRINT, WORLD_RES, WORLD_SIZE, type World } from '../world/worldgen';
+import { gasClouds, type GasZone } from '../sim/gas';
 
 /** pixels of the drawn map per metre of world */
 const SCALE = 1;
@@ -33,12 +33,12 @@ export class Minimap {
   /** jeeps standing empty */
   private jeeps: { x: number; z: number }[] = [];
   private jeepKey = '';
-  /** where the gas lies */
-  private gas: GasZone | null = null;
+  /** where gas lies: every place under it */
+  private gases: GasZone[] = [];
 
   constructor(world: World) {
     this.world = world;
-    this.gas = gasZone(world.pois, (x, z) => heightAt(world.heights, x, z));
+    this.gases = gasClouds(world);
     this.base = this.draw(world);
     this.root = document.createElement('div');
     this.root.className = 'hud-minimap';
@@ -232,8 +232,8 @@ export class Minimap {
     g.drawImage(this.base, sx, sz, span * SCALE, span * SCALE, 0, 0, W, W);
     const px = (x - cx + span / 2) * k, pz = (z - cz + span / 2) * k;
     // the gas: the ground it lies on, hatched round
-    if (this.gas) {
-      const qx = (this.gas.x - cx + span / 2) * k, qz = (this.gas.z - cz + span / 2) * k, qr = this.gas.r * k;
+    for (const gas of this.gases) {
+      const qx = (gas.x - cx + span / 2) * k, qz = (gas.z - cz + span / 2) * k, qr = gas.r * k;
       if (qx > -qr && qz > -qr && qx < W + qr && qz < W + qr) {
         g.save();
         g.beginPath();

@@ -1,0 +1,73 @@
+{
+ "slots": {
+  "primary": null,
+  "secondary": null,
+  "holster": null,
+  "head": null,
+  "face": null,
+  "vest": null,
+  "back": null,
+  "hands": null,
+  "feet": null,
+  "neck": {
+   "uid": "mv6an6dd-3-ir9j",
+   "id": "dogtag",
+   "qty": 1,
+   "owner": "Percy",
+   "pid": "pid-percy"
+  }
+ },
+ "active": null,
+ "containers": [
+  {
+   "id": "tags",
+   "items": []
+  },
+  {
+   "id": "jacket",
+   "items": [
+    {
+     "uid": "mv6an6dc-0-afhg",
+     "id": "beans",
+     "qty": 1,
+     "x": 0,
+     "y": 0,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6dd-1-56sv",
+     "id": "thermos",
+     "qty": 1,
+     "left": 2,
+     "x": 1,
+     "y": 0,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6dd-2-qo79",
+     "id": "bandage",
+     "qty": 1,
+     "x": 2,
+     "y": 0,
+     "rot": false
+    }
+   ]
+  },
+  {
+   "id": "pants",
+   "items": []
+  }
+ ],
+ "hot": [
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null
+ ]
+}

@@ -3,7 +3,7 @@ import { assets } from '../core/assets';
 import { physics } from '../core/physics';
 import { Simplex } from '../core/noise';
 import type { Atmosphere } from './atmosphere';
-import { CELL, WORLD_RES, WORLD_SIZE, idx, type World } from './worldgen';
+import { CELL, SNOW, WORLD_RES, WORLD_SIZE, idx, type World } from './worldgen';
 
 // layer order matches the splat channels: grass, forest floor, rock, gravel
 const LAYERS = ['leafy_grass', 'brown_mud_leaves_01', 'aerial_rocks_02', 'rocks_ground_02'];
@@ -243,6 +243,10 @@ uniform vec2 uWorld;
 uniform vec3 uTint[4];
 varying vec3 vTerrainPos;
 varying vec3 vTerrainNormal;
+#define SNOW_FROM ${SNOW.from.toFixed(1)}
+#define SNOW_FULL ${SNOW.full.toFixed(1)}
+// (the upward part of the ground's normal on the steepest slope snow lies on)
+#define SNOW_STEEP ${(1 / Math.hypot(1, SNOW.slope)).toFixed(3)}
 
 // rotate uv by a per-cell random angle; two overlapping cells are blended to kill tiling
 vec2 tRot(vec2 uv, float a) { float c = cos(a), s = sin(a); return mat2(c, -s, s, c) * uv; }
@@ -324,6 +328,22 @@ tAlb.rgb *= mix(1.0, 0.92 + 0.16 * macro2.b, 0.7);
 diffuseColor.rgb *= tAlb.rgb;
 float tRough = clamp(tArmV.g * 1.05, 0.35, 1.0);
 float tAO = tArmV.r;
+// Snow, where the ground is high enough for it to lie and level enough to hold it (SNOW in the world's generator;
+// 2026-10-13: "i want high elevation mountains to be snowcapped, and the surrounding area snowcapped"). Laid over
+// whatever the ground is, after its own colour has been reckoned and held down: held down with it, snow is grey.
+// Its line is ragged by the same slow pattern the grass is patched by, the stones still show through it a little
+// where it begins, and its own small relief is flattened as it thickens: a drift has none.
+{
+  float up = normalize(vTerrainNormal).y;
+  float ragged = (macro.r - 0.5) * 16.0 + (macro2.b - 0.5) * 5.0;
+  float lies = smoothstep(SNOW_FROM, SNOW_FULL, vTerrainPos.y + ragged) * smoothstep(SNOW_STEEP - 0.07, SNOW_STEEP + 0.05, up);
+  float thin = lies * (0.82 + 0.18 * smoothstep(0.0, 0.5, lies) * (1.0 - 0.5 * tArmV.r * (1.0 - lies)));
+  vec3 snow = vec3(0.80, 0.83, 0.88) * (0.94 + 0.08 * macro2.g);
+  diffuseColor.rgb = mix(diffuseColor.rgb, snow, thin);
+  tNrm = mix(tNrm, vec3(0.0, 0.0, 1.0), thin * 0.8);
+  tRough = mix(tRough, 0.62, thin);
+  tAO = mix(tAO, 1.0, thin * 0.6);
+}
 `;
 
 // planar mapping: tangent = +X, bitangent = image-up = -Z (see notes in terrain.ts)

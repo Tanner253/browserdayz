@@ -588,6 +588,58 @@ export const LOCAL_MODELS = {
   // (the door came as one shape standing half open: scripts/split-door.mjs makes its frame and its leaf two, the leaf shut)
   bunker_gate_frame: { dir: 'bunker_door_split', only: /Frame/, scale: 0.009, tex: 2048, tags: ['prop'], changes: 'Its frame, taken apart from its leaf; scaled to the doorway and stood on the ground; textures re-encoded as WebP; geometry compressed.' },
   bunker_gate_leaf: { dir: 'bunker_door_split', only: /Leaf/, scale: 0.009, tex: 2048, tags: ['prop'], changes: 'Its leaf, taken apart from its frame and turned shut; scaled to the doorway and stood on the ground; textures re-encoded as WebP; geometry compressed.' },
+  // The packs of 2026-10-13: ten downloads, every triangle of each and its pictures at the size they came ("i want
+  // full first person model quality, do not degrade model quality unless its too large and expensive"). What is
+  // worn faces -z, the way a body does and the K6-3 helmet does; what stands against a wall has its front to +z,
+  // as the furniture from Poly Haven has; what goes on a gun looks along +x.
+  // (The pouch leans six degrees in its file: it is stood straight. The red cross is on its +z face.)
+  aid_pouch: { dir: 'tactical_first_aid_kit', rot: [0.1013, -0.0337, -0.0034], size: 0.2, tex: 2048, tags: ['loot'], changes: 'Stood straight on the ground about its own middle and scaled to a pouch twenty centimetres tall; textures re-encoded as WebP at the size they came; geometry compressed.' },
+  // (The ACOG: life size, 14.3 cm. Its objective is toward -x as it comes, the end its fibre lies along: turned
+  // round. It is one shape with one material, drawn see-through: the picture's alpha is 22 in 255 on the clear lid
+  // over the fibre, 224 on the objective's glass and 255 everywhere else. Cut at a half, the lid is gone and the red
+  // fibre shows as it does through a clear lid; the glass is solid and dark. Drawn solid whole, the lid hid the fibre.)
+  acog_sight: { dir: 'acog_scope', rot: [0, Math.PI, 0], scale: 1, tex: 4096, solid: 0.5, tags: ['loot', 'attachment'], changes: 'Turned to look along +x and stood on the ground about its own middle, at the size it came; its one material, which came see-through, is cut out where its colour picture is clear (the lid over its fibre) and drawn solid everywhere else; textures re-encoded as WebP at the size they came; geometry compressed.' },
+  // (Four masks in one file, two by two, each a facepiece, the brace of straps behind it and a hood for the back
+  // of the head. A mask here is its facepiece and its brace. The four braces are one shape under one name and are
+  // told apart by where they stand: all four are taken with the one facepiece, and `cut` keeps the brace that is
+  // on that facepiece's side of the file and at its height. The facepiece came see-through and its visor is 94
+  // parts in a hundred solid: drawn solid. Life size as they come: 29 cm across the two filters, 17.5 across the brace.)
+  gas_mask_black: { dir: 'gas_masks', only: / (Brace|material)$/, cut: { tall: 0.562, keep: (x, y) => x < 0.05 && y < 0.3 }, rot: [0, Math.PI, 0], scale: 1, tex: 2048, solid: true, tags: ['loot'], changes: 'The black mask of the four, its facepiece and its brace without its hood: turned to face -z and stood on the ground about its own middle, at the size it came; the facepiece, which came see-through, drawn solid; textures re-encoded as WebP at the size they came; geometry compressed.' },
+  gas_mask_white: { dir: 'gas_masks', only: / (Brace|material_5)$/, cut: { tall: 0.562, keep: (x, y) => x > -0.05 && y < 0.3 }, rot: [0, Math.PI, 0], scale: 1, tex: 2048, solid: true, tags: ['loot'], changes: 'The white mask, made the same way.' },
+  gas_mask_orange: { dir: 'gas_masks', only: / (Brace|material_4)$/, cut: { tall: 0.4892, keep: (x, y) => x < 0.05 && y > 0.2 }, rot: [0, Math.PI, 0], scale: 1, tex: 2048, solid: true, tags: ['loot'], changes: 'The mask with the orange nose, made the same way.' },
+  gas_mask_skull: { dir: 'gas_masks', only: / (Brace|material_3)$/, cut: { tall: 0.4934, keep: (x, y) => x > -0.05 && y > 0.2 }, rot: [0, Math.PI, 0], scale: 1, tex: 2048, solid: true, tags: ['loot'], changes: 'The mask with the skull painted on it, made the same way.' },
+  // (The M1: its shell, the band round it and the four cartridges tucked into the band; its chin straps and their
+  // buckle hang a hand below the rim and are left off, as nothing holds them to a chin. Its brow is toward +z as it
+  // comes: turned round. Its biggest picture is 1024.)
+  helmet_m1: { dir: 'm1_helmet', only: / (Helm|Helmband|Patrone)$/, rot: [0, Math.PI, 0], scale: 1, tex: 1024, tags: ['loot', 'gear'], changes: 'Its shell, its band and the cartridges in the band, without its chin straps: turned to face -z and stood on the ground about its own middle, at the size it came; its materials put from specular and gloss into metal and roughness; textures re-encoded as WebP at the size they came; geometry compressed.' },
+  // (Two racks of angle iron and boards, in metres already. The narrow one has a coil of rope lying at its foot.)
+  rack_small: { dir: 'shelf', only: /^Shelf_02_A/, scale: 1, tex: 4096, tags: ['furniture'], changes: 'Its narrow rack: stood on the ground about its own middle, at the size it came; textures re-encoded as WebP at the size they came; geometry compressed.' },
+  rack_wide: { dir: 'shelf', only: /^Shelf_02_B/, scale: 1, tex: 4096, tags: ['furniture'], changes: 'Its wide rack, made the same way.' },
+  // (A steel cupboard of two doors, two metres tall as it comes. Its glint map says bare steel nearly all over, and
+  // steel that mirrors is a black shape in a room, where there is no sky to mirror: as with the morgue's lockers,
+  // the map is left out and it is said to be dull painted steel.)
+  steel_locker: { dir: 'metal_cabinet_low_poly', scale: 1, tex: 2048, plain: true, metal: 0.35, rough: 0.5, tags: ['furniture'], changes: 'Stood on the ground about its own middle, at the size it came; its glint map left out and its surface said to be dull steel; textures re-encoded as WebP at the size they came; geometry compressed.' },
+  // (The canopy, its pillar, the island with its pump, bin and posts, and the cracked pad they stand on: the pad
+  // made ten metres long. The plain slab drawn under the pad is left out. The island's material gave its colour
+  // picture as its relief map as well: that is left out.)
+  fuel_station: { dir: 'gas_station', only: /\.0(13|27|28|29)$/, flat: /^\.028$/, size: 10, tex: 2048, tags: ['prop'], changes: 'Without the plain slab under its pad: scaled to a pad ten metres long and stood on the ground about its own middle; the relief map of its pump island, which was its colour picture given a second time, left out; textures re-encoded as WebP at the size they came; geometry compressed.' },
+  // (The rod stands at forty degrees in its file, as its skeleton holds it: it is stood upright on its butt, tip up,
+  // the way the shovel and the bat stand. A spinning rod of six feet: its spool comes out 4.7 cm across.)
+  // (Tagged as gear and not as loot, though it is a thing found lying about: what is tagged loot and is heavy is
+  // given a far lighter copy by scripts/lods.mjs, which lets a shape go as far from itself as seven parts in a
+  // hundred of its length. That is 12 cm of a rod a centimetre thick: the copy it made was a reel, four rings and
+  // a butt cap hanging in the air with no rod between them. Gear is carried too, and is drawn as it is.)
+  fishing_rod: { dir: 'fishing_rod_rigged_and_animated', rot: [0, 0, -0.8755], size: 1.8, tex: 4096, tags: ['gear'], changes: 'Taken off its skeleton as it is held at rest, stood upright on its handle about its own middle and scaled to metres: its animation is left out. Textures re-encoded as WebP at the size they came; geometry compressed.' },
+  // (The stove in two: its body with the flue, and its door alone, which is hung on the body by the game and turned
+  // about y to open. Both at one scale, which makes body and flue 1.35 m; both turned a quarter so the door is on
+  // the +z face. The door's own origin is on the line of its hinge pin, at the height of its lower edge.)
+  wood_stove: { dir: 'stove', only: /^(StoveLow|FlueLow)/, rot: [0, -Math.PI / 2, 0], scale: 0.0034826, tex: 2048, tags: ['furniture'], changes: 'Its body and its flue, without its door: turned so the door is to the front, scaled to metres and stood on the ground about its own middle; its materials put from specular and gloss into metal and roughness; textures re-encoded as WebP at the size they came; geometry compressed; its animation is left out.' },
+  wood_stove_door: { dir: 'stove', only: /^Door1Low/, pivot: /^Door1Low$/, rot: [0, -Math.PI / 2, 0], scale: 0.0034826, tex: 2048, tags: ['furniture'], changes: 'Its door alone, at the same scale and turned the same way, standing on the ground about the line of its hinge.' },
+  // (The stones, the logs and the scorched ground under them, without the twenty-nine cards its flames are drawn on:
+  // the game makes its own fire. And the same ring with its colour greyed, for a fire that is out: the picture has
+  // the glow of the fire painted into it.)
+  campfire_ring: { dir: 'campfire', only: /Campfire_MAT/, size: 1.45, tex: 1024, tags: ['prop'], changes: 'Its stones, logs and scorched ground, without its flames: scaled to metres and stood on the ground about its own middle; textures re-encoded as WebP at the size they came; geometry compressed; its animation is left out.' },
+  campfire_ring_cold: { dir: 'campfire', only: /Campfire_MAT/, size: 1.45, tex: 1024, dye: { saturation: 0.15, brightness: 0.7 }, tags: ['prop'], changes: 'The same again with its colour picture greyed and darkened, for a fire that is not lit.' },
 };
 
 /**

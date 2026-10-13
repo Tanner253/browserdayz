@@ -4419,6 +4419,416 @@
    ],
    "lods": []
   },
+  "aid_pouch": {
+   "url": "assets/models/aid_pouch.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 360856,
+   "srcTris": 3632,
+   "tris": 3632,
+   "min": [
+    -0.0721,
+    0,
+    -0.0672
+   ],
+   "max": [
+    0.0721,
+    0.2,
+    0.0672
+   ],
+   "lods": [
+    {
+     "url": "assets/models/aid_pouch_lod1.glb",
+     "tris": 2182,
+     "far": 2,
+     "of": "360856:1791873930670"
+    }
+   ],
+   "hi": "assets/models/hi/aid_pouch.glb",
+   "hiBytes": 3241588,
+   "hiCard": 64
+  },
+  "acog_sight": {
+   "url": "assets/models/acog_sight.glb",
+   "tags": [
+    "loot",
+    "attachment"
+   ],
+   "bytes": 821824,
+   "srcTris": 71178,
+   "tris": 71178,
+   "min": [
+    -0.0716,
+    0,
+    -0.0242
+   ],
+   "max": [
+    0.0716,
+    0.0671,
+    0.0242
+   ],
+   "lods": [
+    {
+     "url": "assets/models/acog_sight_lod1.glb",
+     "tris": 1671,
+     "far": 2,
+     "of": "821824:1791873931002"
+    }
+   ],
+   "hi": "assets/models/hi/acog_sight.glb",
+   "hiBytes": 1751364,
+   "hiCard": 256
+  },
+  "gas_mask_black": {
+   "url": "assets/models/gas_mask_black.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 137848,
+   "srcTris": 16168,
+   "tris": 3090,
+   "min": [
+    -0.1445,
+    0,
+    -0.0822
+   ],
+   "max": [
+    0.1445,
+    0.2526,
+    0.0822
+   ],
+   "lods": [
+    {
+     "url": "assets/models/gas_mask_black_lod1.glb",
+     "tris": 1699,
+     "far": 2,
+     "of": "137848:1791873999945"
+    }
+   ],
+   "hi": "assets/models/hi/gas_mask_black.glb",
+   "hiBytes": 524344,
+   "hiCard": 65
+  },
+  "gas_mask_white": {
+   "url": "assets/models/gas_mask_white.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 165920,
+   "srcTris": 16168,
+   "tris": 3090,
+   "min": [
+    -0.1445,
+    0,
+    -0.0822
+   ],
+   "max": [
+    0.1445,
+    0.2526,
+    0.0822
+   ],
+   "lods": [
+    {
+     "url": "assets/models/gas_mask_white_lod1.glb",
+     "tris": 1699,
+     "far": 2,
+     "of": "165920:1791874000124"
+    }
+   ],
+   "hi": "assets/models/hi/gas_mask_white.glb",
+   "hiBytes": 588868,
+   "hiCard": 65
+  },
+  "gas_mask_orange": {
+   "url": "assets/models/gas_mask_orange.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 140212,
+   "srcTris": 16168,
+   "tris": 3090,
+   "min": [
+    -0.1445,
+    0,
+    -0.0822
+   ],
+   "max": [
+    0.1445,
+    0.2526,
+    0.0822
+   ],
+   "lods": [
+    {
+     "url": "assets/models/gas_mask_orange_lod1.glb",
+     "tris": 1697,
+     "far": 2,
+     "of": "140212:1791874000316"
+    }
+   ],
+   "hi": "assets/models/hi/gas_mask_orange.glb",
+   "hiBytes": 531304,
+   "hiCard": 65
+  },
+  "gas_mask_skull": {
+   "url": "assets/models/gas_mask_skull.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 148476,
+   "srcTris": 16168,
+   "tris": 3090,
+   "min": [
+    -0.1445,
+    0,
+    -0.0822
+   ],
+   "max": [
+    0.1445,
+    0.2526,
+    0.0822
+   ],
+   "lods": [
+    {
+     "url": "assets/models/gas_mask_skull_lod1.glb",
+     "tris": 1699,
+     "far": 2,
+     "of": "148476:1791874000486"
+    }
+   ],
+   "hi": "assets/models/hi/gas_mask_skull.glb",
+   "hiBytes": 578308,
+   "hiCard": 65
+  },
+  "helmet_m1": {
+   "url": "assets/models/helmet_m1.glb",
+   "tags": [
+    "loot",
+    "gear"
+   ],
+   "bytes": 648608,
+   "srcTris": 3416,
+   "tris": 3164,
+   "min": [
+    -0.1151,
+    0,
+    -0.1378
+   ],
+   "max": [
+    0.1151,
+    0.1694,
+    0.1378
+   ],
+   "lods": [
+    {
+     "url": "assets/models/helmet_m1_lod1.glb",
+     "tris": 1910,
+     "far": 2,
+     "of": "648608:1791874377562"
+    }
+   ]
+  },
+  "rack_small": {
+   "url": "assets/models/rack_small.glb",
+   "tags": [
+    "furniture"
+   ],
+   "bytes": 542828,
+   "srcTris": 25132,
+   "tris": 13108,
+   "min": [
+    -0.5955,
+    0,
+    -0.3112
+   ],
+   "max": [
+    0.5955,
+    1.8819,
+    0.3112
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/rack_small.glb",
+   "hiBytes": 8658548,
+   "hiCard": 256
+  },
+  "rack_wide": {
+   "url": "assets/models/rack_wide.glb",
+   "tags": [
+    "furniture"
+   ],
+   "bytes": 519600,
+   "srcTris": 25132,
+   "tris": 12024,
+   "min": [
+    -0.9058,
+    0,
+    -0.3064
+   ],
+   "max": [
+    0.9058,
+    1.878,
+    0.3064
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/rack_wide.glb",
+   "hiBytes": 8635316,
+   "hiCard": 256
+  },
+  "steel_locker": {
+   "url": "assets/models/steel_locker.glb",
+   "tags": [
+    "furniture"
+   ],
+   "bytes": 462164,
+   "srcTris": 484,
+   "tris": 484,
+   "min": [
+    -0.5393,
+    0,
+    -0.3034
+   ],
+   "max": [
+    0.5393,
+    2,
+    0.3034
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/steel_locker.glb",
+   "hiBytes": 3908636,
+   "hiCard": 192
+  },
+  "fuel_station": {
+   "url": "assets/models/fuel_station.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 716684,
+   "srcTris": 19623,
+   "tris": 19613,
+   "min": [
+    -2.8911,
+    0,
+    -5
+   ],
+   "max": [
+    2.8911,
+    5.2955,
+    5
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/fuel_station.glb",
+   "hiBytes": 3525440,
+   "hiCard": 64
+  },
+  "fishing_rod": {
+   "url": "assets/models/fishing_rod.glb",
+   "tags": [
+    "gear"
+   ],
+   "bytes": 496520,
+   "srcTris": 23276,
+   "tris": 23276,
+   "min": [
+    -0.0834,
+    0,
+    -0.0488
+   ],
+   "max": [
+    0.0834,
+    1.8,
+    0.0488
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/fishing_rod.glb",
+   "hiBytes": 4448692,
+   "hiCard": 256
+  },
+  "wood_stove": {
+   "url": "assets/models/wood_stove.glb",
+   "tags": [
+    "furniture"
+   ],
+   "bytes": 97268,
+   "srcTris": 4982,
+   "tris": 2526,
+   "min": [
+    -0.3369,
+    0,
+    -0.2706
+   ],
+   "max": [
+    0.3369,
+    1.35,
+    0.2706
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/wood_stove.glb",
+   "hiBytes": 353676,
+   "hiCard": 171
+  },
+  "wood_stove_door": {
+   "url": "assets/models/wood_stove_door.glb",
+   "tags": [
+    "furniture"
+   ],
+   "bytes": 71908,
+   "srcTris": 4982,
+   "tris": 2456,
+   "min": [
+    -0.4781,
+    0,
+    -0.0164
+   ],
+   "max": [
+    0.0176,
+    0.3393,
+    0.0379
+   ],
+   "lods": [],
+   "hi": "assets/models/hi/wood_stove_door.glb",
+   "hiBytes": 275792,
+   "hiCard": 85
+  },
+  "campfire_ring": {
+   "url": "assets/models/campfire_ring.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 632408,
+   "srcTris": 3004,
+   "tris": 2946,
+   "min": [
+    -0.725,
+    0,
+    -0.6958
+   ],
+   "max": [
+    0.725,
+    0.8895,
+    0.6958
+   ],
+   "lods": []
+  },
+  "campfire_ring_cold": {
+   "url": "assets/models/campfire_ring_cold.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 588464,
+   "srcTris": 3004,
+   "tris": 2946,
+   "min": [
+    -0.725,
+    0,
+    -0.6958
+   ],
+   "max": [
+    0.725,
+    0.8895,
+    0.6958
+   ],
+   "lods": []
+  },
   "saline_bag": {
    "url": "assets/models/saline_bag.glb",
    "tags": [

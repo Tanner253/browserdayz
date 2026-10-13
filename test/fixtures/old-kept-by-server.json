@@ -1,0 +1,526 @@
+{
+ "slots": {
+  "primary": {
+   "uid": "mv6an6di-1l-3f6v",
+   "id": "ak",
+   "qty": 1,
+   "loaded": 31,
+   "mag": "mag_ak",
+   "mods": [
+    "red_dot",
+    "suppressor_739"
+   ],
+   "zero": 200
+  },
+  "secondary": {
+   "uid": "mv6an6di-1m-xifg",
+   "id": "mosin",
+   "qty": 1,
+   "loaded": 4,
+   "mag": "mag_sniper",
+   "mods": [
+    "pu_scope",
+    "rifle_wrap"
+   ],
+   "zero": 200
+  },
+  "holster": {
+   "uid": "mv6an6di-1n-4mpf",
+   "id": "m9",
+   "qty": 1,
+   "loaded": 21,
+   "mag": "mag_m9_ext",
+   "mods": [
+    "suppressor_9",
+    "gun_light"
+   ]
+  },
+  "head": {
+   "uid": "mv6an6di-1o-ki14",
+   "id": "helmet_k63",
+   "qty": 1
+  },
+  "face": {
+   "uid": "mv6an6di-1p-u8xv",
+   "id": "gasmask",
+   "qty": 1
+  },
+  "vest": {
+   "uid": "mv6an6di-1q-s61f",
+   "id": "life_vest",
+   "qty": 1,
+   "cargo": [
+    {
+     "item": {
+      "uid": "mv6an6di-2e-7bpw",
+      "id": "mag_ar",
+      "qty": 1,
+      "rounds": 17
+     },
+     "x": 0,
+     "y": 0,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6di-2f-hy5v",
+      "id": "mag_ak",
+      "qty": 1,
+      "rounds": 30
+     },
+     "x": 1,
+     "y": 0,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6di-2g-eg8p",
+      "id": "mag_ak",
+      "qty": 1,
+      "rounds": 8
+     },
+     "x": 2,
+     "y": 0,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6di-2h-tvyg",
+      "id": "mag_sniper",
+      "qty": 1,
+      "rounds": 5
+     },
+     "x": 3,
+     "y": 0,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6di-2i-wp7e",
+      "id": "ammo_762",
+      "qty": 23
+     },
+     "x": 3,
+     "y": 1,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6di-2j-foon",
+      "id": "dogtag",
+      "qty": 1,
+      "owner": "Dee",
+      "pid": "pid-dee",
+      "holder": "pid-percy",
+      "held": 40
+     },
+     "x": 3,
+     "y": 2,
+     "rot": false
+    }
+   ]
+  },
+  "back": {
+   "uid": "mv6an6di-1r-ej6b",
+   "id": "suitcase",
+   "qty": 1,
+   "cargo": [
+    {
+     "item": {
+      "uid": "mv6an6di-2k-f1vs",
+      "id": "sack_pack",
+      "qty": 1,
+      "cargo": [
+       {
+        "item": {
+         "uid": "mv6an6di-2m-vqdk",
+         "id": "water_jug",
+         "qty": 1,
+         "left": 4
+        },
+        "x": 0,
+        "y": 0,
+        "rot": false
+       },
+       {
+        "item": {
+         "uid": "mv6an6di-2n-incz",
+         "id": "blood_bag",
+         "qty": 1
+        },
+        "x": 2,
+        "y": 0,
+        "rot": false
+       },
+       {
+        "item": {
+         "uid": "mv6an6di-2o-luzb",
+         "id": "saline",
+         "qty": 1
+        },
+        "x": 2,
+        "y": 1,
+        "rot": false
+       },
+       {
+        "item": {
+         "uid": "mv6an6di-2p-oi1s",
+         "id": "ammo_556",
+         "qty": 30
+        },
+        "x": 3,
+        "y": 1,
+        "rot": false
+       },
+       {
+        "item": {
+         "uid": "mv6an6di-2q-1fk9",
+         "id": "mag_colt",
+         "qty": 1,
+         "rounds": 7
+        },
+        "x": 3,
+        "y": 2,
+        "rot": false
+       },
+       {
+        "item": {
+         "uid": "mv6an6di-2r-34ig",
+         "id": "garden_gloves",
+         "qty": 1
+        },
+        "x": 0,
+        "y": 3,
+        "rot": false
+       }
+      ]
+     },
+     "x": 0,
+     "y": 0,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6di-2l-y2y9",
+      "id": "black_bag",
+      "qty": 1,
+      "cargo": [
+       {
+        "item": {
+         "uid": "mv6an6di-2s-9e23",
+         "id": "colt",
+         "qty": 1,
+         "loaded": 8,
+         "mag": "mag_colt"
+        },
+        "x": 0,
+        "y": 0,
+        "rot": false
+       },
+       {
+        "item": {
+         "uid": "mv6an6di-2t-yivj",
+         "id": "box_45",
+         "qty": 1
+        },
+        "x": 3,
+        "y": 0,
+        "rot": false
+       },
+       {
+        "item": {
+         "uid": "mv6an6di-2u-f3uf",
+         "id": "splint",
+         "qty": 1
+        },
+        "x": 4,
+        "y": 0,
+        "rot": false
+       },
+       {
+        "item": {
+         "uid": "mv6an6di-2v-z4b8",
+         "id": "patrol_cap",
+         "qty": 1
+        },
+        "x": 0,
+        "y": 2,
+        "rot": false
+       }
+      ]
+     },
+     "x": 3,
+     "y": 0,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6di-2w-fwi6",
+      "id": "drum_ak",
+      "qty": 1,
+      "rounds": 75
+     },
+     "x": 5,
+     "y": 0,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6di-2x-qq9n",
+      "id": "radio",
+      "qty": 1
+     },
+     "x": 0,
+     "y": 3,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6di-2y-45nn",
+      "id": "binoculars",
+      "qty": 1
+     },
+     "x": 4,
+     "y": 3,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6di-2z-le4k",
+      "id": "flashlight",
+      "qty": 1
+     },
+     "x": 6,
+     "y": 3,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6di-30-341w",
+      "id": "suppressor_9",
+      "qty": 1
+     },
+     "x": 4,
+     "y": 5,
+     "rot": false
+    },
+    {
+     "item": {
+      "uid": "mv6an6di-31-nsus",
+      "id": "ammo_739",
+      "qty": 30
+     },
+     "x": 6,
+     "y": 5,
+     "rot": false
+    }
+   ]
+  },
+  "hands": {
+   "uid": "mv6an6di-1s-02fa",
+   "id": "work_gloves",
+   "qty": 1
+  },
+  "feet": {
+   "uid": "mv6an6di-1t-lek1",
+   "id": "rubber_boots",
+   "qty": 1
+  },
+  "neck": {
+   "uid": "mv6an6di-1u-pko9",
+   "id": "dogtag",
+   "qty": 1,
+   "owner": "Percy",
+   "pid": "pid-percy"
+  }
+ },
+ "active": null,
+ "containers": [
+  {
+   "id": "tags",
+   "items": [
+    {
+     "uid": "mv6an6di-1v-f7mj",
+     "id": "dogtag",
+     "qty": 1,
+     "owner": "Ann",
+     "pid": "pid-ann",
+     "holder": "pid-percy",
+     "held": 0,
+     "x": 0,
+     "y": 0,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6di-1w-5269",
+     "id": "dogtag",
+     "qty": 1,
+     "owner": "Bob",
+     "pid": "pid-bob",
+     "holder": "pid-percy",
+     "held": 312.5,
+     "x": 1,
+     "y": 0,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6di-1x-htyi",
+     "id": "dogtag",
+     "qty": 1,
+     "owner": "Cy",
+     "pid": "pid-cy",
+     "holder": "pid-percy",
+     "held": 899,
+     "x": 2,
+     "y": 0,
+     "rot": false
+    }
+   ]
+  },
+  {
+   "id": "jacket",
+   "items": [
+    {
+     "uid": "mv6an6di-20-dw7g",
+     "id": "mag_ak",
+     "qty": 1,
+     "rounds": 30,
+     "x": 0,
+     "y": 0,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6di-1z-x0e3",
+     "id": "knife",
+     "qty": 1,
+     "x": 1,
+     "y": 0,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6di-21-nyhl",
+     "id": "flask",
+     "qty": 1,
+     "left": 1,
+     "x": 2,
+     "y": 0,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6di-22-jq67",
+     "id": "sardines",
+     "qty": 1,
+     "x": 1,
+     "y": 2,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6di-1y-gbyc",
+     "id": "bandage",
+     "qty": 5,
+     "x": 3,
+     "y": 2,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6di-23-z6x3",
+     "id": "ammo_9mm",
+     "qty": 30,
+     "x": 0,
+     "y": 3,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6di-24-gpb9",
+     "id": "mag_m9_ext",
+     "qty": 1,
+     "rounds": 13,
+     "x": 1,
+     "y": 3,
+     "rot": true
+    },
+    {
+     "uid": "mv6an6di-25-nall",
+     "id": "compass",
+     "qty": 1,
+     "x": 3,
+     "y": 3,
+     "rot": false
+    }
+   ]
+  },
+  {
+   "id": "pants",
+   "items": [
+    {
+     "uid": "mv6an6di-27-y4mr",
+     "id": "grenade",
+     "qty": 1,
+     "x": 0,
+     "y": 0,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6di-28-9wc1",
+     "id": "beans",
+     "qty": 1,
+     "x": 1,
+     "y": 0,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6di-29-2yn2",
+     "id": "red_dot",
+     "qty": 1,
+     "x": 2,
+     "y": 0,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6di-26-aug5",
+     "id": "stim",
+     "qty": 3,
+     "x": 2,
+     "y": 1,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6di-2a-efid",
+     "id": "stim_stamina",
+     "qty": 2,
+     "x": 3,
+     "y": 1,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6di-2b-qs2g",
+     "id": "cigarettes",
+     "qty": 4,
+     "x": 1,
+     "y": 2,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6di-2c-nl3p",
+     "id": "keycard",
+     "qty": 1,
+     "x": 2,
+     "y": 2,
+     "rot": false
+    },
+    {
+     "uid": "mv6an6di-2d-koba",
+     "id": "dogtag",
+     "qty": 1,
+     "owner": "Eve",
+     "pid": "pid-eve",
+     "holder": "pid-percy",
+     "held": 5,
+     "x": 3,
+     "y": 2,
+     "rot": false
+    }
+   ]
+  }
+ ]
+}

@@ -23,6 +23,15 @@ export const BUNKER = {
   /** the hollow it lies in: the level ground round it, and how far the hillside is cut back beyond that */
   floor: 40,
   wall: 44,
+  /**
+   * The hillside behind it (2026-10-13: "generally smooth out the landscape around the bunker a little bit"). It
+   * climbed 93 m in the 44 of `wall`, between 62 and 75 degrees, and anybody on it slid. Past the level floor the
+   * hill is cut back to a slope that rises `side` for every metre out, as far as `reach` from the bunker's middle
+   * (it meets the hill as it stood at about 175): thirty-five degrees, which can be walked and stood on, and from
+   * the top of which the door is in plain sight. Cut, and never filled: the mouth on the valley is as it was.
+   */
+  side: 0.7,
+  reach: 180,
   /** how far the first level's floor is under the pad */
   depth: 5.2,
   /** how high its rooms are */

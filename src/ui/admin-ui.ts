@@ -13,11 +13,24 @@
 //   - WHAT is on the right, and is all about whoever is picked: their card across the top, and under it what can be
 //     done to them, the things that can be given to them (as pictures), and the kits. Every button says who it is for.
 //   - The server's own pages (a word to everybody, the bans, the roles) are reached from the foot of the left side.
+//     So is Entities: what can be stood in the world and taken out of it (cars, the infected), drawn row by row
+//     from the one list of them in src/net/orders.ts.
 // Every name is set as text and never as markup; the only markup made here is the drawings of the icons, which are
 // written out below.
+//
+// The window (2026-10-13: "We can make the admin panel take up more of the screen so theres more space to work
+// with and less scrolling, not 100% of the screen but maybe more. maybe make the window resizable, that would be
+// best"). It opens at most of the screen, is moved by its title bar and resized by any edge or corner, and where
+// it was left is kept by the browser (`zona.admin.window`); "Reset layout" in the title bar, or a double click on
+// the bar, puts it back. Nothing in it is laid out to a size in pixels of the window: every page is a grid that
+// takes as many columns as there is room for.
+//
+// What is drawn again, and when. The lists come every two seconds while it is open. Each part (the bar, the left
+// side, the head, the body, the foot) is made again only when what it shows has changed, and whatever in it had
+// the keyboard is given the keyboard back (`swap`): the panel can be worked with Tab and Enter alone.
 
 import type { AdminLists } from '../net/protocol';
-import type { Role } from '../net/orders';
+import { ENTITIES, type Entity, type Role } from '../net/orders';
 import { ITEMS } from '../sim/items';
 import { KITS } from '../sim/kits';
 import type { S2C } from '../net/protocol';
@@ -41,8 +54,28 @@ export interface AdminActions {
   tint(color: string | null): void;
   /** everybody's name shown where they are, through anything: put on or off */
   names(on: boolean): void;
+  /** what the middle of the game's view is on, behind the window (null: nothing within reach) */
+  look(): AdminLook | null;
+  /** somebody has been picked on the left (0: nobody): the admin's map rings them too */
+  picked(id: number): void;
   close(): void;
 }
+
+/** what the middle of the view is on: where, how far off, and what it is */
+export interface AdminLook {
+  x: number;
+  y: number;
+  z: number;
+  dist: number;
+  /** level ground, or a floor: a thing can be stood on it at that height */
+  flat: boolean;
+  /** what it is, in a few words: "the ground", "car number 7" */
+  what: string;
+  /** a car: its number */
+  car?: number;
+}
+/** one of those online, as the lists have them */
+export type AdminPlayer = AdminLists['players'][number];
 
 /** what the panel is told of whoever has it open */
 export interface AdminSelf {
@@ -64,15 +97,38 @@ export interface AdminSelf {
   z: number;
 }
 
-type Player = AdminLists['players'][number];
-type View = 'who' | 'server' | 'bans' | 'roles';
+type Player = AdminPlayer;
+type View = 'who' | 'entities' | 'server' | 'bans' | 'roles';
 type Sub = 'actions' | 'items' | 'kits' | 'pockets';
+/** where the window stands and how big it is, in pixels of the screen */
+type Box = { x: number; y: number; w: number; h: number };
+const WINDOW_KEPT = 'zona.admin.window';
+/** the least the window is made, the most it opens at when nothing is kept, and how near the edge of the screen it goes */
+const MIN_W = 720, MIN_H = 440, OPEN_W = 1760, OPEN_H = 1120, GAP = 8;
+/** the edges and corners it is resized by */
+const EDGES = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'] as const;
+/** how many of a thing one press of Spawn can stand: these, as far as its row in ENTITIES allows */
+const COUNTS = [1, 2, 3, 5, 10, 25];
+/** how far about the admin the infected are put down, metres */
+const CULL = [30, 60, 120, 250];
+/** the drawing each kind of thing goes by on the Entities page (a new kind in ENTITIES is asked for one here) */
+const ENTITY_ICON: Record<Entity['kind'], string> = { car: 'car', infected: 'infected' };
 /** what somebody carries, as the server last had it from their game (`/pockets`) */
 type Pockets = Extract<S2C, { t: 'inv' }>;
 const SLOT_NAME: Record<string, string> = { primary: 'On the back', secondary: 'On the back', holster: 'Holster', head: 'Head', face: 'Face', vest: 'Vest', back: 'Pack', hands: 'Hands', feet: 'Feet', neck: 'Round the neck', melee: 'Belt' };
 const POCKET_NAME: Record<string, string> = { tags: 'Tag pouch', jacket: 'Jacket', pants: 'Trousers' };
 const KIND: Record<string, string> = { weapon: 'Guns', magazine: 'Magazines', ammo: 'Ammunition', attachment: 'Attachments', melee: 'Melee', clothing: 'Clothing', medical: 'Medical', food: 'Food', drink: 'Drink', tool: 'Tools', stash: 'Containers', misc: 'Other' };
 const KINDS = [...new Set(Object.values(KIND))];
+/** everything there is to give, in the order the grid shows it, and how many there are of each kind: worked out once, the first time the grid is drawn (it was sorted and counted over at every drawing) */
+let GIVEN: { all: (typeof ITEMS)[string][]; count: Record<string, number> } | null = null;
+const given = () => {
+  if (GIVEN) return GIVEN;
+  const kindOf = (d: (typeof ITEMS)[string]) => KIND[d.category] ?? 'Other';
+  const all = Object.values(ITEMS).filter((d) => d.id !== 'dogtag').sort((a, b) => KINDS.indexOf(kindOf(a)) - KINDS.indexOf(kindOf(b)) || a.name.localeCompare(b.name));
+  const count: Record<string, number> = {};
+  for (const d of all) count[kindOf(d)] = (count[kindOf(d)] ?? 0) + 1;
+  return (GIVEN = { all, count });
+};
 
 /** The icons: each a few strokes on a square of 24. Drawn here; nothing is fetched. */
 const ICON: Record<string, string> = {
@@ -112,6 +168,10 @@ const ICON: Record<string, string> = {
   keys: '<path d="M4 7h16v10H4z"/><path d="M7 10.5h1M10.5 10.5h1M14 10.5h1M7.5 14h9"/>',
   down: '<path d="M6 9l6 6 6-6"/>',
   right: '<path d="M9 6l6 6-6 6"/>',
+  infected: '<circle cx="9" cy="5.5" r="2.4"/><path d="M9 8v7.5M9 10.5h8.5M9 13h7.5M9 15.5l-3 5M9 15.5l3 5"/>',
+  target: '<circle cx="12" cy="12" r="6.5"/><path d="M12 2.5v5M12 16.5v5M2.5 12h5M16.5 12h5"/>',
+  window: '<path d="M4 5.5h16v13H4z"/><path d="M4 9h16"/><path d="M10 12.5l-2 2 2 2M8 14.5h6.5"/>',
+  grip: '<path d="M20 9L9 20M20 14l-6 6M20 19l-1 1"/>',
 };
 const icon = (name: string, cls = '') => {
   const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -165,7 +225,22 @@ export class AdminUI {
   private bar = el('div', 'adm-bar');
   /** what the body was last drawn as: it is not drawn again for a list that says the same */
   private drawn = '';
+  /** and the same for the bar, the left side, the head and the foot */
+  private drawnBar = '';
+  private drawnSide = '';
+  private drawnHead = '';
+  private drawnLog = '';
+  /** counted up whenever the heads change, and whenever the server says something: the parts that show them are made again */
+  private headsN = 0;
+  private saidN = 0;
   private held = false;
+  /** where the window was left by whoever moved or resized it (null: where it opens), and where it stands now */
+  private box: Box | null = null;
+  private shown: Box = { x: 0, y: 0, w: 0, h: 0 };
+  /** the Entities page: where a new thing is put, how many of each, and what the view was on when it was last asked */
+  private spawnAt: 'front' | 'look' = 'front';
+  private spawnN: Record<string, number> = {};
+  private looked: AdminLook | null = null;
 
   constructor(private places: { name: string; x: number; z: number; kind?: string }[], private act: AdminActions, private pictures: Record<string, string> = {}) {
     const main = el('div', 'adm-main');
@@ -173,13 +248,43 @@ export class AdminUI {
     const mid = el('div', 'adm-mid');
     mid.append(this.side, main);
     this.root.append(this.bar, mid, this.log);
+    // The window: moved by its bar, resized by any edge or corner, and kept where it was left.
+    try {
+      const b = JSON.parse(localStorage.getItem(WINDOW_KEPT) ?? 'null') as Partial<Box> | null;
+      if (b && [b.x, b.y, b.w, b.h].every((v) => typeof v === 'number' && Number.isFinite(v))) this.box = { x: b.x!, y: b.y!, w: b.w!, h: b.h! };
+    } catch {
+      /* nothing kept: it opens where it is made */
+    }
+    for (const edge of EDGES) {
+      const h = el('div', `adm-edge ${edge}`);
+      h.addEventListener('pointerdown', (e) => this.grab(e, edge));
+      this.root.append(h);
+    }
+    const grip = el('div', 'adm-grip');
+    grip.title = 'Drag to resize the window';
+    grip.append(icon('grip'));
+    grip.addEventListener('pointerdown', (e) => this.grab(e, 'se'));
+    this.root.append(grip);
+    this.bar.title = 'Drag to move the window. Double-click to put it back where it opens.';
+    this.bar.addEventListener('pointerdown', (e) => {
+      if (!(e.target as HTMLElement).closest('button, input, kbd')) this.grab(e, 'move');
+    });
+    this.bar.addEventListener('dblclick', (e) => {
+      if (!(e.target as HTMLElement).closest('button, input')) this.resetLayout();
+    });
+    window.addEventListener('resize', () => this.isOpen && this.fit());
+    // (the window can be given the keyboard itself, so that Tab starts inside it and ` shuts it)
+    this.root.tabIndex = -1;
+    this.root.setAttribute('role', 'dialog');
+    this.root.setAttribute('aria-label', 'Admin panel');
     // (a key pressed in the panel is the panel's: nothing of it reaches the game, but the two that shut it)
     this.root.addEventListener('keydown', (e) => {
       if (e.code === 'Escape') return;
       e.stopPropagation();
       if (e.code === 'Backquote') {
         e.preventDefault();
-        this.act.close();
+        // (not a key held down: the window has the keyboard from the moment it opens, and the key that opened it is still down)
+        if (!e.repeat) this.act.close();
       }
     });
     this.root.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -197,12 +302,122 @@ export class AdminUI {
     this.self = self;
     this.isOpen = true;
     this.root.classList.add('open');
+    this.fit();
     if (!this.target || (self.role !== 'admin' && this.target === self.id)) this.target = self.role === 'admin' ? self.id : 0;
-    if (self.role !== 'admin') this.sub = 'actions';
+    if (self.role !== 'admin') {
+      this.sub = 'actions';
+      if (this.view === 'entities' || this.view === 'bans' || this.view === 'roles') this.view = 'who';
+    }
+    // (what the view is on, behind the window: asked now, while it is still what the admin was looking at)
+    this.looked = self.role === 'admin' ? this.act.look() : null;
     this.draw(true);
     this.act.ask();
     window.clearInterval(this.timer);
     this.timer = window.setInterval(() => this.isOpen && this.act.ask(), 2000);
+    this.root.focus({ preventScroll: true });
+  }
+
+  // ---------------------------------------------------------------- the window: where it stands, and how big
+
+  /** where it opens when nothing is kept: most of the screen, in the middle of it, and no bigger than is any use on a very large one */
+  private home(): Box {
+    const W = window.innerWidth, H = window.innerHeight, w = Math.min(Math.round(W * 0.86), OPEN_W), h = Math.min(Math.round(H * 0.84), OPEN_H);
+    return { x: Math.round((W - w) / 2), y: Math.round((H - h) / 2), w, h };
+  }
+
+  /** the least it may be made on this screen */
+  private least() {
+    return { w: Math.min(MIN_W, Math.max(280, window.innerWidth - GAP * 2)), h: Math.min(MIN_H, Math.max(220, window.innerHeight - GAP * 2)) };
+  }
+
+  /** The window put where it was left (or where it opens): never bigger than the screen, and never off it. */
+  private fit() {
+    const W = window.innerWidth, H = window.innerHeight, b = this.box ?? this.home(), min = this.least();
+    const w = Math.max(min.w, Math.min(b.w, W - GAP * 2)), h = Math.max(min.h, Math.min(b.h, H - GAP * 2));
+    const x = Math.max(GAP, Math.min(b.x, W - GAP - w)), y = Math.max(GAP, Math.min(b.y, H - GAP - h));
+    this.shown = { x, y, w, h };
+    const s = this.root.style;
+    s.left = `${x}px`;
+    s.top = `${y}px`;
+    s.width = `${w}px`;
+    s.height = `${h}px`;
+    // (how its pages are laid out goes by its own width, not the screen's)
+    this.root.classList.toggle('narrow', w < 900);
+  }
+
+  /** an edge, a corner or the bar taken hold of: the window goes with the pointer until it is let go, and is kept there */
+  private grab(e: PointerEvent, edge: 'move' | (typeof EDGES)[number]) {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const at = e.currentTarget as HTMLElement, from = { ...this.shown }, x0 = e.clientX, y0 = e.clientY, min = this.least();
+    try {
+      at.setPointerCapture(e.pointerId);
+    } catch {
+      /* a pointer that is already gone */
+    }
+    const move = (m: PointerEvent) => {
+      const W = window.innerWidth, H = window.innerHeight, dx = m.clientX - x0, dy = m.clientY - y0, b = { ...from };
+      if (edge === 'move') {
+        b.x = from.x + dx;
+        b.y = from.y + dy;
+      } else {
+        if (edge.includes('e')) b.w = Math.max(min.w, Math.min(from.w + dx, W - GAP - from.x));
+        if (edge.includes('s')) b.h = Math.max(min.h, Math.min(from.h + dy, H - GAP - from.y));
+        if (edge.includes('w')) {
+          b.x = Math.max(GAP, Math.min(from.x + dx, from.x + from.w - min.w));
+          b.w = from.x + from.w - b.x;
+        }
+        if (edge.includes('n')) {
+          b.y = Math.max(GAP, Math.min(from.y + dy, from.y + from.h - min.h));
+          b.h = from.y + from.h - b.y;
+        }
+      }
+      this.box = b;
+      this.fit();
+    };
+    const up = () => {
+      at.removeEventListener('pointermove', move);
+      at.removeEventListener('pointerup', up);
+      at.removeEventListener('pointercancel', up);
+      this.root.classList.remove('moving');
+      // (kept as it stands on the screen, not as far as the pointer was dragged past the edge of it)
+      if (this.box) this.box = { ...this.shown };
+      this.keepBox();
+    };
+    at.addEventListener('pointermove', move);
+    at.addEventListener('pointerup', up);
+    at.addEventListener('pointercancel', up);
+    this.root.classList.add('moving');
+  }
+
+  private keepBox() {
+    try {
+      if (this.box) localStorage.setItem(WINDOW_KEPT, JSON.stringify(this.box));
+      else localStorage.removeItem(WINDOW_KEPT);
+    } catch {
+      /* a browser that keeps nothing: it lasts as long as the page does */
+    }
+  }
+
+  /** the window back where it opens, at the size it opens */
+  private resetLayout() {
+    this.box = null;
+    this.keepBox();
+    this.fit();
+  }
+
+  /**
+   * Somebody picked from outside the panel (their dot on the admin's map): everything on the right is about them.
+   * @param message the box that writes to them is given the keyboard
+   */
+  select(id: number, message = false) {
+    if (id !== this.self.id && !this.lists.players.some((p) => p.id === id)) return;
+    this.target = id;
+    this.view = 'who';
+    if (message || !this.admin) this.sub = 'actions';
+    if (!this.isOpen) return;
+    this.draw(true);
+    if (message) this.body.querySelector<HTMLInputElement>('input[data-k="i:message"]')?.focus();
   }
 
   close() {
@@ -216,6 +431,8 @@ export class AdminUI {
   setSelf(self: AdminSelf) {
     const same = (Object.keys(self) as (keyof AdminSelf)[]).every((k) => k === 'x' || k === 'z' || self[k] === this.self[k]);
     this.self = self;
+    // (no longer an admin: the pages that are an admin's alone are left)
+    if (self.role !== 'admin' && (this.view === 'entities' || this.view === 'bans' || this.view === 'roles')) this.view = 'who';
     if (this.isOpen && !same) this.draw();
   }
 
@@ -238,7 +455,9 @@ export class AdminUI {
   setHeads(heads: Record<number, string>) {
     const same = Object.keys(heads).length === Object.keys(this.heads).length && Object.entries(heads).every(([id, url]) => this.heads[Number(id)] === url);
     this.heads = heads;
-    if (!this.isOpen || same) return;
+    if (same) return;
+    this.headsN++;
+    if (!this.isOpen) return;
     if (!this.typing(this.side)) this.drawSide();
     this.drawHead();
   }
@@ -246,6 +465,7 @@ export class AdminUI {
   /** a line the server said back: shown along the bottom */
   say(text: string) {
     this.said.push({ at: Date.now(), text });
+    this.saidN++;
     if (this.said.length > 60) this.said.shift();
     if (this.isOpen) this.drawLog();
   }
@@ -283,29 +503,62 @@ export class AdminUI {
 
   // ---------------------------------------------------------------- the pieces
 
+  /**
+   * Children put in place of what a part of the window held. Whatever in it had the keyboard has it again, by the
+   * name it goes by (`data-k`): the lists come every two seconds, and somebody working the panel with Tab and
+   * Enter was put back at its start every time they did.
+   */
+  private swap(host: HTMLElement, kids: (HTMLElement | SVGElement)[]) {
+    const a = document.activeElement as HTMLElement | null, had = !!a && a !== host && host.contains(a), k = had ? a!.dataset.k : undefined;
+    host.replaceChildren(...kids);
+    if (!had) return;
+    const again = k ? [...host.querySelectorAll<HTMLElement>('[data-k]')].find((n) => n.dataset.k === k && !(n as HTMLButtonElement).disabled) : undefined;
+    // (what it stood for is gone: the window keeps the keyboard, so that ` still shuts it)
+    (again ?? this.root).focus({ preventScroll: true });
+    if (again instanceof HTMLInputElement && again.type === 'text') again.setSelectionRange(again.value.length, again.value.length);
+  }
+
   private button(label: string, on: () => void, cls = '', ic = '') {
     const b = el('button', `adm-b ${cls}`.trim());
+    b.type = 'button';
     if (ic) b.append(icon(ic));
     if (label) b.append(el('span', '', label));
+    b.dataset.k = `${ic}|${label}`;
     b.onclick = on;
+    return b;
+  }
+
+  /** a button for something that cannot be had here and now: it is shown, greyed, with why */
+  private off(label: string, why: string, ic = '') {
+    const b = this.button(label, () => {}, '', ic);
+    b.disabled = true;
+    b.title = why;
     return b;
   }
 
   /** a button that asks once more before it does it */
   private grave(key: string, label: string, on: () => void, ic = '') {
     const armed = this.sure?.key === key && this.sure.until > Date.now();
-    return this.button(armed ? 'Click again to confirm' : label, () => {
+    const b = this.button(armed ? 'Click again to confirm' : label, () => {
       if (armed) {
         this.sure = null;
         on();
       } else this.sure = { key, until: Date.now() + 4000 };
       this.draw(true);
     }, armed ? 'bad armed' : 'bad', armed ? 'warn' : ic);
+    // (the same button before and after it is armed: the keyboard stays on it for the second press)
+    b.dataset.k = `sure:${key}`;
+    if (!armed) b.title = 'Asks once more before it is done';
+    return b;
   }
 
   /** a switch: on or off, with what it is, what it does, and the key for it if it has one */
   private flip(label: string, does: string, on: boolean | undefined, toggle: () => void, ic: string, key = '') {
     const b = el('button', `adm-sw${on ? ' on' : ''}`);
+    b.type = 'button';
+    b.dataset.k = `sw:${label}`;
+    b.setAttribute('role', 'switch');
+    b.setAttribute('aria-checked', String(!!on));
     const text = el('span', 'adm-sw-text');
     text.append(el('b', '', label), el('small', '', does));
     b.append(icon(ic), text);
@@ -315,10 +568,13 @@ export class AdminUI {
     return b;
   }
 
-  private input(value: string, hint: string, set: (v: string) => void, cls = '', enter?: () => void) {
+  /** @param k the name it goes by, when what it says in its box changes with who is picked */
+  private input(value: string, hint: string, set: (v: string) => void, cls = '', enter?: () => void, k = hint) {
     const i = el('input', `adm-i ${cls}`.trim());
     i.value = value;
     i.placeholder = hint;
+    i.setAttribute('aria-label', hint);
+    i.dataset.k = `i:${k}`;
     i.spellcheck = false;
     i.autocomplete = 'off';
     i.maxLength = 120;
@@ -387,7 +643,7 @@ export class AdminUI {
       // admin panel it scrolls my view back to the top", 2026-10-13.)
       const SCROLLS = '.adm-pockets, .adm-table, .adm-grid:not(.held)';
       const keep = this.body.scrollTop, inner = [...this.body.querySelectorAll(SCROLLS)].map((e) => e.scrollTop);
-      this.body.replaceChildren(...this.bodyOf());
+      this.swap(this.body, this.bodyOf());
       this.body.scrollTop = keep;
       this.body.querySelectorAll(SCROLLS).forEach((e, k) => (e.scrollTop = inner[k] ?? 0));
       this.drawn = key;
@@ -399,6 +655,7 @@ export class AdminUI {
   private bodyKey() {
     const p = this.pick(), s = this.self;
     const base = `${this.view}|${this.sub}|${this.target}|${s.role}|${this.sure?.key ?? ''}`;
+    if (this.view === 'entities') return `${base}|${this.spawnAt}|${JSON.stringify(this.spawnN)}|${JSON.stringify(this.looked ? [this.looked.what, Math.round(this.looked.x), Math.round(this.looked.z), Math.round(this.looked.dist)] : null)}|${JSON.stringify(this.lists.stats ?? {})}`;
     if (this.view === 'server') return `${base}|${JSON.stringify(this.lists.stats ?? {})}|${this.lists.checks}|${this.lists.players.length}`;
     if (this.view === 'bans') return `${base}|${JSON.stringify(this.lists.bans)}`;
     if (this.view === 'roles') return `${base}|${JSON.stringify(this.lists.roles)}`;
@@ -409,6 +666,7 @@ export class AdminUI {
   }
 
   private bodyOf(): HTMLElement[] {
+    if (this.view === 'entities' && this.admin) return this.entities();
     if (this.view === 'server') return this.server();
     if (this.view === 'bans') return this.bans();
     if (this.view === 'roles') return this.roles();
@@ -427,6 +685,9 @@ export class AdminUI {
 
   private drawBar() {
     const st = this.lists.stats;
+    const key = `${this.admin}|${this.lists.players.length}|${st?.asleep ?? ''}|${st?.up ?? ''}|${this.lists.checks}`;
+    if (key === this.drawnBar) return;
+    this.drawnBar = key;
     const title = el('div', 'adm-title');
     title.append(icon('shield'), el('span', '', this.admin ? 'ADMIN PANEL' : 'MOD PANEL'));
     const chips = el('div', 'adm-chips');
@@ -440,13 +701,20 @@ export class AdminUI {
     if (st?.asleep) chips.append(chip('moon', `${st.asleep} left a body`, 'Closed the game without logging out: their body is still there'));
     if (st) chips.append(chip('clock', `up ${st.up < 120 ? `${st.up} min` : `${Math.round(st.up / 60)} h`}`, 'How long the server has been running'));
     chips.append(chip('flag', `checks: ${this.lists.checks || '?'}`, 'What the server does about cheating: watch (write it down) or enforce (refuse it)'));
+    const reset = this.button('Reset layout', () => this.resetLayout(), 'ghostly', 'window');
+    reset.title = 'Put this window back where it opens, at the size it opens. (Drag the bar to move it, any edge or corner to resize it.)';
     const x = this.button('Close', () => this.act.close(), 'ghostly', 'x');
     x.append(el('kbd', '', '`'));
-    this.bar.replaceChildren(title, chips, x);
+    this.swap(this.bar, [title, chips, reset, x]);
   }
 
   private drawSide() {
-    const f = this.find.toLowerCase().trim();
+    const f = this.find.toLowerCase().trim(), s = this.self;
+    // (made again only when something it shows has changed: who is on and how they are, who is picked, a head drawn)
+    const key = JSON.stringify([this.view, this.target, s.role, s.id, s.god, s.hidden, s.clip, s.x, s.z, this.headsN, this.sure?.key ?? '', this.lists.bans.length, this.lists.gone.slice(0, 10),
+      this.lists.players.map((p) => [p.id, p.name, p.role, p.x, p.z, p.alive, p.hp, p.flags, p.asleep, p.away, p.god, p.hidden, p.clip, p.muted, p.seat])]);
+    if (key === this.drawnSide) return;
+    this.drawnSide = key;
     const top = el('div', 'adm-find');
     top.append(icon('search'), this.input(this.find, 'Find a player', (v) => {
       this.find = v;
@@ -455,6 +723,8 @@ export class AdminUI {
     const list = el('div', 'adm-who');
     const row = (p: Player, you = false) => {
       const r = el('button', `adm-p${this.view === 'who' && p.id === this.target ? ' on' : ''}${p.flags > 20 ? ' hot' : ''}`);
+      r.type = 'button';
+      r.dataset.k = `p${p.id}`;
       r.dataset.find = `${p.name} #${p.id}`.toLowerCase();
       const text = el('span', 'adm-p-text');
       const name = el('span', 'adm-p-name', you ? 'You' : p.name);
@@ -490,6 +760,7 @@ export class AdminUI {
         this.target = p.id;
         this.view = 'who';
         if (!this.admin) this.sub = 'actions';
+        this.act.picked(p.id);
         this.draw(true);
       };
       return r;
@@ -519,18 +790,22 @@ export class AdminUI {
       }
     }
     const nav = el('div', 'adm-nav');
-    const go = (v: View, label: string, ic: string, n = '') => {
+    const go = (v: View, label: string, ic: string, tip: string, n = '') => {
       const b = this.button(label, () => {
         this.view = v;
+        // (what the view is on is asked again as the page that uses it is opened)
+        if (v === 'entities') this.looked = this.act.look();
         this.draw(true);
       }, `nav${this.view === v ? ' on' : ''}`, ic);
+      b.title = tip;
       if (n) b.append(el('em', '', n));
       return b;
     };
-    nav.append(go('server', 'Server', 'megaphone'));
-    if (this.admin) nav.append(go('bans', 'Bans', 'ban', this.lists.bans.length ? String(this.lists.bans.length) : ''), go('roles', 'Roles', 'star'));
+    if (this.admin) nav.append(go('entities', 'Entities', 'car', 'Cars and the infected: put them in the world, and take them out of it'));
+    nav.append(go('server', 'Server', 'megaphone', 'A word to everybody, what the server is doing, and the keys'));
+    if (this.admin) nav.append(go('bans', 'Bans', 'ban', 'Who is banned or kept off, and lifting it', this.lists.bans.length ? String(this.lists.bans.length) : ''), go('roles', 'Roles', 'star', 'Who is an admin or a mod'));
     const keep = this.side.querySelector('.adm-who')?.scrollTop ?? 0;
-    this.side.replaceChildren(top, list, nav);
+    this.swap(this.side, [top, list, nav]);
     list.scrollTop = keep;
     if (f) this.filterSide();
   }
@@ -543,17 +818,21 @@ export class AdminUI {
 
   /** across the top of the right side: who all of it is about */
   private drawHead() {
+    const p = this.view === 'who' ? this.pick() : null;
+    const key = JSON.stringify([this.view, this.target, this.self.role, this.self.id, this.self.x, this.self.z, this.headsN, p]);
+    if (key === this.drawnHead) return;
+    this.drawnHead = key;
     if (this.view !== 'who') {
       const t = el('div', 'adm-head-t');
-      const [ic, title, sub] = this.view === 'server' ? ['megaphone', 'The server', 'A word to everybody, what the server is doing, and the keys.'] : this.view === 'bans' ? ['ban', 'Bans', 'A ban is of the game that was played and of the connection it was played from. It outlasts the server’s restarts.'] : ['star', 'Roles', 'A mod can warn, mute, kick and time out. An admin can do everything here.'];
+      const [ic, title, sub] = this.view === 'entities' ? ['car', 'Entities', 'Cars and the infected: put them in the world, and take them out of it. Everybody sees what is done here.']
+        : this.view === 'server' ? ['megaphone', 'The server', 'A word to everybody, what the server is doing, and the keys.'] : this.view === 'bans' ? ['ban', 'Bans', 'A ban is of the game that was played and of the connection it was played from. It outlasts the server’s restarts.'] : ['star', 'Roles', 'A mod can warn, mute, kick and time out. An admin can do everything here.'];
       const text = el('div', 'adm-head-text');
       text.append(el('b', '', title), el('small', '', sub));
       t.append(icon(ic, 'huge'), text);
-      this.head.replaceChildren(t);
+      this.swap(this.head, [t]);
       return;
     }
-    const p = this.pick();
-    if (!p) return void this.head.replaceChildren(el('div', 'adm-head-t'));
+    if (!p) return void this.swap(this.head, [el('div', 'adm-head-t')]);
     const t = el('div', 'adm-head-t');
     const text = el('div', 'adm-head-text');
     const name = el('b', '', this.mine ? (p.name === 'You' ? 'You' : `${p.name}  (you)`) : p.name);
@@ -590,7 +869,7 @@ export class AdminUI {
     } else if (this.admin) {
       quick.append(this.button('Map', () => this.act.map(), 'tall', 'map'), this.button('Heal', () => this.send('/heal'), 'tall good', 'heart'));
     }
-    this.head.replaceChildren(t, quick);
+    this.swap(this.head, [t, quick]);
   }
 
   private drawLog() {
@@ -598,6 +877,9 @@ export class AdminUI {
     // "when the notifications feed at the bottom fills up a scroll wheel appears im not a fan of that".)
     const big = this.view === 'server';
     const lines = this.said.slice(big ? -8 : -3);
+    const key = `${big}|${this.saidN}`;
+    if (key === this.drawnLog) return;
+    this.drawnLog = key;
     this.log.classList.toggle('big', big);
     const clock = (at: number) => new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
     this.log.replaceChildren(icon('megaphone'), ...(lines.length ? lines.map((l, k) => {
@@ -631,7 +913,7 @@ export class AdminUI {
       this.draw(true);
     };
     grid.append(this.card('Say something to them', 'mail',
-      this.input(this.words, `A message for ${p.name} alone. Enter sends it`, (v) => (this.words = v), 'wide', talk),
+      this.input(this.words, `A message for ${p.name} alone. Enter sends it`, (v) => (this.words = v), 'wide', talk, 'message'),
       this.line(
         this.button('Send as a message', talk, '', 'mail'),
         this.button('Send as a warning', () => {
@@ -648,8 +930,9 @@ export class AdminUI {
         p.muted ? this.button('Unmute', () => this.send(`/unmute ${who}`), 'good', 'sound') : this.button('10 min', () => this.send(`/mute ${who} 10`), '', 'mute'),
         ...(p.muted ? [] : [this.button('60 min', () => this.send(`/mute ${who} 60`), '', 'mute')]),
       ),
-      this.line('Kick', this.button('Kick off the server', () => this.send(`/kick ${who}${why()}`), 'bad', 'kick')),
-      this.line('Keep off', ...[5, 10, 30, 60].map((m) => this.button(`${m} min`, () => this.send(`/timeout ${who} ${m}${why()}`), 'bad', 'clock'))),
+      // (putting somebody off the server asks once more, as a ban does: a slip of the hand is somebody's evening)
+      this.line('Kick', this.grave(`kick${p.id}`, 'Kick off the server', () => this.send(`/kick ${who}${why()}`), 'kick')),
+      this.line('Keep off', ...[5, 10, 30, 60].map((m) => this.grave(`out${m}_${p.id}`, `${m} min`, () => this.send(`/timeout ${who} ${m}${why()}`), 'clock'))),
       ...(admin ? [this.line('For good', this.grave(`ban${p.id}`, 'Ban: their game and their address', () => this.send(`/ban ${who}${why()}`), 'ban'))] : []),
     ));
     if (admin) {
@@ -657,20 +940,22 @@ export class AdminUI {
         this.line(
           this.button('Make a mod', () => this.send(`/mod ${who}`), '', 'star'),
           this.grave(`adm${p.id}`, 'Make an admin', () => this.send(`/admin ${who}`), 'shield'),
-          this.button('Take their role', () => this.send(`/demote ${who}`), 'bad', 'x'),
+          ...(p.role ? [this.grave(`demote${p.id}`, 'Take their role', () => this.send(`/demote ${who}`), 'x')] : []),
         ),
         el('div', 'dim', p.role ? `${p.name} is ${p.role === 'admin' ? 'an admin' : 'a mod'}.` : `${p.name} has no role.`),
       ));
       // (an admin's powers are another admin's to put on and off)
       if (p.role === 'admin') {
         const sw = (label: string, does: string, order: string, on: boolean | undefined, ic: string) => this.flip(label, does, on, () => this.send(`/${order} ${who} ${on ? 'off' : 'on'}`), ic);
-        grid.append(this.card(`${p.name}'s powers`, 'bolt',
+        const theirs = el('div', 'adm-sws');
+        theirs.append(
           sw('God mode', 'Nothing hurts them', 'god', p.god, 'shield'),
           sw('Vanish', 'Nobody but an admin sees them', 'vanish', p.hidden, 'ghost'),
           sw('Noclip', 'They fly, through anything', 'noclip', p.clip, 'fly'),
           sw('Void inventory', 'Nothing they carried is left on their body', 'voidinv', p.voidInv, 'trash'),
           sw('Void dog tag', 'No tag of theirs is left to cash in', 'voidtag', p.voidTag, 'trash'),
-        ));
+        );
+        grid.append(this.card(`${p.name}'s powers`, 'bolt', theirs));
       }
     }
     return [grid];
@@ -681,7 +966,9 @@ export class AdminUI {
   private me(): HTMLElement[] {
     const s = this.self;
     const grid = el('div', 'adm-cards');
-    grid.append(this.card('Powers', 'bolt',
+    // (the switches side by side where the card is wide enough for two of them)
+    const powers = el('div', 'adm-sws');
+    powers.append(
       this.flip('God mode', 'Nothing hurts you', s.god, () => this.send(`/god ${s.god ? 'off' : 'on'}`), 'shield'),
       this.flip('Vanish', 'Nobody but an admin sees you; the infected ignore you', s.hidden, () => this.send(`/vanish ${s.hidden ? 'off' : 'on'}`), 'ghost'),
       this.flip('Noclip', 'Fly, through anything', s.clip, () => this.send(`/noclip ${s.clip ? 'off' : 'on'}`), 'fly', 'N'),
@@ -691,6 +978,8 @@ export class AdminUI {
       }, 'camera', 'K'),
       this.flip('Night vision', 'It is day, for you alone, in the bunker too', s.night, () => this.act.night(!s.night), 'sun'),
       this.flip('Names of players', 'Everybody’s name where they are, however far, through anything', s.names, () => this.act.names(!s.names), 'eye'),
+    );
+    grid.append(this.card('Powers', 'bolt', powers,
       el('div', 'dim', 'Flying, and in the free camera: W A S D, Space up, Ctrl down, Shift fast, Alt slow. No tag is cashed in while god mode, vanish or noclip is on. God mode is proof against the gas as well.'),
     ));
     const coords = el('div', 'adm-line');
@@ -736,6 +1025,9 @@ export class AdminUI {
     const colour = el('input', 'adm-colour');
     colour.type = 'color';
     colour.value = s.tint && !off ? s.tint : '#c8a8ff';
+    colour.title = 'Any other colour';
+    colour.setAttribute('aria-label', 'Any other colour for the tag');
+    colour.dataset.k = 'i:tag colour';
     colour.onchange = () => this.act.tint(colour.value);
     // (no tag at all: read as anybody is where everybody talks; the staff channel still says who is who)
     tag.append(sample, this.button('No tag', () => this.act.tint(off ? null : 'off'), off ? 'on' : '', 'x'), this.button('RGB', () => this.act.tint(null), s.tint ? '' : 'on'),
@@ -743,6 +1035,8 @@ export class AdminUI {
         const b = this.button('', () => this.act.tint(c), `swatch${s.tint === c ? ' on' : ''}`);
         b.style.background = c;
         b.title = c;
+        b.setAttribute('aria-label', `Tag colour ${c}`);
+        b.dataset.k = `swatch:${c}`;
         return b;
       }), colour);
     grid.append(this.card('Your tag in the chat', 'star', tag, el('div', 'dim', 'The colour of the word ADMIN before your name, or no tag at all. In the staff channel (Tab, in the chat box) you are always named as what you are.')));
@@ -759,7 +1053,7 @@ export class AdminUI {
   }
 
   private items(p: Player): HTMLElement[] {
-    const all = Object.values(ITEMS).filter((d) => d.id !== 'dogtag');
+    const { all, count: counts } = given();
     const tools = el('div', 'adm-tools');
     const find = el('div', 'adm-find wide');
     find.append(icon('search'), this.input(this.thing, 'Find a thing by its name', (v) => {
@@ -773,6 +1067,9 @@ export class AdminUI {
       this.draw(true);
     }, this.count === n ? 'on' : ''));
     const fed = el('button', `adm-check${this.fed ? ' on' : ''}`);
+    fed.type = 'button';
+    fed.dataset.k = 'fed';
+    fed.setAttribute('aria-pressed', String(this.fed));
     fed.append(icon(this.fed ? 'check' : 'x'), el('span', '', 'A gun comes with magazines and rounds'));
     fed.onclick = () => {
       this.fed = !this.fed;
@@ -780,7 +1077,7 @@ export class AdminUI {
     };
     tools.append(find, amount, fed);
     const kinds = el('div', 'adm-kinds');
-    const count = (k: string) => all.filter((d) => (KIND[d.category] ?? 'Other') === k).length;
+    const count = (k: string) => counts[k] ?? 0;
     kinds.append(this.button(`All  ${all.length}`, () => {
       this.kind = '';
       this.draw(true);
@@ -789,10 +1086,12 @@ export class AdminUI {
       this.draw(true);
     }, this.kind === k ? 'on' : '')));
     const grid = el('div', 'adm-grid');
-    for (const d of all.sort((a, b) => KINDS.indexOf(KIND[a.category] ?? 'Other') - KINDS.indexOf(KIND[b.category] ?? 'Other') || a.name.localeCompare(b.name))) {
+    for (const d of all) {
       const kind = KIND[d.category] ?? 'Other';
       if (this.kind && kind !== this.kind) continue;
       const t = el('button', 'adm-item');
+      t.type = 'button';
+      t.dataset.k = `give:${d.id}`;
       t.dataset.find = `${d.name} ${d.id} ${kind}`.toLowerCase();
       t.title = `${d.name}  (${d.id})${d.stack ? `  ·  piles of ${d.stack}` : ''}`;
       const pic = this.pictures[d.id];
@@ -890,6 +1189,9 @@ export class AdminUI {
       t.append(el('span', '', d?.name ?? it.id));
       if (count) t.append(el('i', 'adm-qty', count));
       const bin = el('button', 'adm-bin');
+      bin.type = 'button';
+      bin.dataset.k = `bin:${it.uid}`;
+      bin.setAttribute('aria-label', `Take the ${d?.name ?? it.id} away`);
       bin.title = `Take the ${d?.name ?? it.id} away`;
       bin.append(icon('trash'));
       bin.onclick = () => {
@@ -919,6 +1221,94 @@ export class AdminUI {
     const list = el('div', 'adm-pockets');
     list.append(...out);
     return [this.forWhom(p, 'Everything carried by'), head, list];
+  }
+
+  // ---------------------------------------------------------------- what stands in the world
+
+  /**
+   * Cars and the infected: put in the world, and taken out of it (2026-10-13: "add more admin tools that might be
+   * useful like spawn entities like cars and zombies and future entities would go here etc, make sure delete car is
+   * on there"). A tile for every row of ENTITIES in src/net/orders.ts: a kind of thing added there is here by itself.
+   */
+  private entities(): HTMLElement[] {
+    const st = this.lists.stats, look = this.looked, there = this.spawnAt === 'look' && !!look;
+    const num = (v: number) => (Math.round(v * 10) / 10).toString();
+    // (at what the view is on: with its height where that is level, and without it a pace short of a wall or a slope)
+    const at = there && look ? (look.flat ? ` ${num(look.x)} ${num(look.y)} ${num(look.z)}` : ` ${num(look.x)} ${num(look.z)}`) : '';
+
+    const where = el('div', 'adm-choice');
+    const choose =(id: 'front' | 'look', label: string, ic: string) => this.button(label, () => {
+      this.spawnAt = id;
+      if (id === 'look') this.looked = this.act.look();
+      this.draw(true);
+    }, this.spawnAt === id ? 'on' : '', ic);
+    where.append(choose('front', 'A few steps in front of me', 'user'), choose('look', 'Where I am looking', 'target'));
+    const seen = el('div', 'adm-look');
+    seen.append(icon('eye'), el('span', '', look ? `You are looking at ${look.what}, ${Math.round(look.dist)} m away, at ${Math.round(look.x)}, ${Math.round(look.z)}.` : 'Nothing within 300 metres is in the middle of your view.'));
+    const again = this.button('Look again', () => {
+      this.looked = this.act.look();
+      this.draw(true);
+    }, 'small', 'eye');
+    again.title = 'Ask again what is in the middle of your view';
+    seen.append(again);
+    const placing = this.card('Where a new thing is put', 'pin', where, seen,
+      el('div', 'dim', this.spawnAt === 'look' && !look ? 'Nothing is in the middle of your view: a new thing is put in front of you instead.' : 'What you are looking at is whatever is in the middle of your view, behind this window: shut it, look, and open it again to change that.'));
+
+    const tiles = el('div', 'adm-ents');
+    for (const e of ENTITIES) {
+      const n = Math.min(this.spawnN[e.id] ?? 1, e.most), t = el('div', 'adm-ent');
+      const text = el('div', 'adm-ent-text');
+      text.append(el('b', '', e.name), el('small', '', e.does));
+      const many = el('div', 'adm-seg');
+      many.append(el('span', 'adm-label', 'How many'));
+      for (const c of [...new Set([...COUNTS.filter((v) => v < e.most), e.most])]) {
+        const b = this.button(String(c), () => {
+          this.spawnN[e.id] = c;
+          this.draw(true);
+        }, n === c ? 'on' : '');
+        b.dataset.k = `n:${e.id}:${c}`;
+        many.append(b);
+      }
+      const go = this.button(`Spawn ${n > 1 ? `${n} ` : ''}${there ? 'where I am looking' : 'in front of me'}`, () => this.send(`/spawn ${e.id} ${n}${at}`), 'good wide', ENTITY_ICON[e.kind]);
+      go.dataset.k = `spawn:${e.id}`;
+      t.append(icon(ENTITY_ICON[e.kind], 'huge'), text, many, go);
+      tiles.append(t);
+    }
+
+    const car = look?.car;
+    const away = this.card('Take out of the world', 'trash',
+      this.line('Cars',
+        car !== undefined ? this.grave(`delcar${car}`, `Delete the car I am looking at  (number ${car})`, () => {
+          this.send(`/delcar ${car}`);
+          // (and what is behind it is looked at, once it has gone)
+          window.setTimeout(() => {
+            this.looked = this.act.look();
+            if (this.isOpen) this.draw();
+          }, 900);
+        }, 'target') : this.off('The car I am looking at', 'You are not looking at a car. Shut this window, look at one, and open it again', 'target'),
+        this.grave('delcar', 'Delete the car nearest me', () => this.send('/delcar'), 'car'),
+        this.grave('wrecks', `Clear every burned-out car${st?.wrecks ? `  (${st.wrecks})` : ''}`, () => this.send('/wrecks'), 'trash'),
+      ),
+      this.line('Infected', el('span', '', 'Put down those within'), ...CULL.map((m) => this.grave(`delz${m}`, `${m} m`, () => this.send(`/delz ${m}`), 'infected')), el('span', '', 'of me')),
+      el('div', 'dim', 'Nobody can be sitting in a car that is deleted. The infected lie where they fall, as any do, and those that lived there come back in their time. While you play, the Delete key takes away whatever you are looking at: a thing on the ground, a body, a stash, a car, one of the infected.'),
+    );
+
+    const counts = el('div', 'adm-tiles');
+    const tile = (v: string | number, label: string, ic: string) => {
+      const t = el('div', 'adm-tile');
+      t.append(icon(ic), el('b', '', String(v)), el('span', '', label));
+      counts.append(t);
+    };
+    if (st?.cars !== undefined) {
+      tile(st.cars - (st.wrecks ?? 0), 'cars standing', 'car');
+      tile(st.wrecks ?? 0, 'burned out', 'trash');
+    }
+    if (st?.infected !== undefined) tile(st.infected, 'infected on their feet', 'infected');
+    if (st) tile(st.loot, 'things lying', 'box');
+    const grid = el('div', 'adm-cards');
+    grid.append(away);
+    if (counts.childElementCount) grid.append(this.card('What stands in the world now', 'server', counts));
+    return [placing, el('div', 'adm-h', 'Spawn: one press puts it in the world, for everybody'), tiles, grid];
   }
 
   // ---------------------------------------------------------------- the server's own pages
@@ -976,8 +1366,9 @@ export class AdminUI {
       key('K', 'The free camera, on and off');
       key('H', 'In the free camera: bring your body to the view');
       key('Del', 'Take away the thing you are looking at: a thing on the ground, a body, a buried stash, a car, one of the infected');
-      key('M', 'The map: right-click a place to go there');
+      key('M', 'The map: everybody is a dot on it, moving as they move. Click a dot for what can be done, right-click a place to go there');
     }
+    key('Tab', 'In this window: from one button to the next (Shift and Tab, back). Enter presses it');
     grid.append(this.card('Keys', 'keys', keys));
     return [grid];
   }
@@ -989,9 +1380,18 @@ export class AdminUI {
     list.append(head);
     for (const b of this.lists.bans) {
       const r = el('div', 'adm-tr');
-      for (const c of [`${b.n}.`, b.name, b.by, b.at, b.why]) r.append(el('span', '', c));
-      const un = this.grave(`unban${b.n}${b.name}`, 'Unban', () => this.send(`/unban ${b.n}`), 'check');
+      for (const c of [`${b.n}.`, b.name, b.by, b.at, b.why]) {
+        const cell = el('span', '', c);
+        cell.title = c;
+        r.append(cell);
+      }
+      // (lifted by its own id, which is the same whatever else has been banned or lifted since this list was sent:
+      // by its place in the list, a press on a list two seconds old could lift somebody else's. A server from before
+      // the ids says none, and is sent the place as before.)
+      const ref = b.id ?? String(b.n);
+      const un = this.grave(`unban:${ref}`, 'Unban', () => this.send(`/unban ${ref}`), 'check');
       un.classList.add('small');
+      un.title = `Lift this one: ${b.name}${b.id ? ` (${b.id})` : ''}. Asks once more before it is done`;
       r.append(un);
       list.append(r);
     }

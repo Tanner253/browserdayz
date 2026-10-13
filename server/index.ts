@@ -13,8 +13,8 @@ import zlib from 'node:zlib';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { buildWorldData } from './world';
 import { Economy, type WorldLoot } from '../src/sim/economy';
-import { Container, type SerializedInventory } from '../src/sim/inventory';
-import { ITEMS, TAG_FRESH, TAG_HOLD, TAG_OUT, holds, magFits, makeItem, sanitizeItem, type ItemInstance } from '../src/sim/items';
+import { BODY_GRID, Container, cleanInventory as cleanCarried, cleanItem as cleanThing, layOnBody, type SerializedInventory } from '../src/sim/inventory';
+import { GEAR_SLOTS, ITEMS, TAG_FRESH, TAG_HOLD, TAG_OUT, holds, magFits, makeItem, sanitizeItem, type ItemInstance } from '../src/sim/items';
 import { WORLD_SIZE, inPlay } from '../src/world/worldgen';
 import { BURY, noBurying } from '../src/sim/stash';
 
@@ -36,7 +36,7 @@ import { Director, INFECTED, guarded, infectedDrop } from '../src/sim/infected';
 import { EMOTE, EMOTE_GAP, SHOUT_RANGE } from '../src/sim/emotes';
 import { BLOOD, bleedOf, bloodOf, withWound, woundOf } from '../src/sim/blood';
 import { ACTS, CHAT_RANGE, F_BLEED, F_DEAD, F_GROUND, F_GUARD, F_SIT, MAX_STAMINA, PROTOCOL, type C2S, type CorpseInfo, type KillInfo, type PlayerInfo, type Pose, type S2C, type Slung, type StashInfo, type StoredItem, type Vitals } from '../src/net/protocol';
-import { ORDERS, written } from '../src/net/orders';
+import { ENTITIES, ORDERS, entityBy, written } from '../src/net/orders';
 import { KITS } from '../src/sim/kits';
 import { FIRE, Hearths } from '../src/sim/fires';
 
@@ -52,7 +52,7 @@ const CORPSE_LIFETIME = 600; // seconds
     // half an hour.)
 const RECORD_LIFETIME = 400 * 24 * 3600 * 1000; // a logged-out character is remembered this long
 /** bump when loot points change: world loot from an older save is re-rolled */
-const WORLD_REV = 22;
+const WORLD_REV = 23;
 
 const log = (...a: unknown[]) => console.log(new Date().toISOString().slice(11, 19), ...a);
 
@@ -83,6 +83,8 @@ interface Box {
   /** a stash: when somebody last had anything to do with it (put it down, opened it, changed what is in it, dug it up) */
   touchedAt?: number;
   emptiedAt: number;
+  /** a crate: when (economy time) somebody last changed what is in it, since it was last filled (unset: nobody has) */
+  pickedAt?: number;
   /** corpse and supply drop: expiry (economy time). Corpse: owner name, how it fell */
   name?: string;
   expires?: number;
@@ -219,6 +221,7 @@ function fillBox(b: Box) {
   b.items = c.serialize().items;
   for (const it of b.items) issue(it);
   b.emptiedAt = -1;
+  b.pickedAt = undefined;
 }
 
 function loadWorld() {
@@ -456,6 +459,32 @@ function carries(inv: SerializedInventory | null, id: string): boolean {
   for (const cont of inv.containers) for (const it of cont.items) walk(it);
   return found;
 }
+
+/**
+ * When each shooter last hit each body. A hit is believed no oftener than the gun fires, of any ONE body: a shell
+ * that lands on two is two hits a moment apart, and the second was thrown away with the first's clock until
+ * 2026-10-13 (one clock a shooter). No more than three bodies inside one gap: what a spread of shot could reach.
+ * @param target who or what was hit, in a word of its own ('p' + a player's id, 'i' + an infected's)
+ */
+const hitsBy = new Map<number, Map<string, number>>();
+function mayHit(c: Client, target: string, now: number, gap: number): boolean {
+  let m = hitsBy.get(c.id);
+  if (!m) hitsBy.set(c.id, (m = new Map()));
+  if (now - (m.get(target) ?? 0) < gap) return false;
+  let lately = 0;
+  for (const [k, t] of m) {
+    if (now - t > 5000) m.delete(k);
+    else if (now - t < gap) lately++;
+  }
+  if (lately >= 3) return false;
+  m.set(target, now);
+  return true;
+}
+/** what a game says without anybody at it doing anything (see `handle`) */
+const SAID_BY_ITSELF = new Set<string>(['s', 'me', 'ping', 'gear', 'back', 'is', 'iatk', 'v', 'vrest']);
+/** when each connection was last seen to carry a keycard, and how long after that it may still put one in the reader */
+const cardSeen = new Map<number, number>();
+const CARD_GRACE_MS = 20_000;
 
 /**
  * The bunker's door. A keycard opens it; it stays open while anybody is inside (or stands in
@@ -1154,7 +1183,7 @@ function sayRestart(why: string, seconds: number) {
         // (and to whoever comes in before it happens)
         RESTART.pending = why;
         // (and everything kept is written now, while this server is certainly alive: see `keepBefore`)
-        void keepBefore('a newer server is being built');
+        void keepBefore('a newer server is being built', 5 * 60_000);
       } catch {
         /* not answered: asked again in a while */
       }
@@ -1173,6 +1202,8 @@ const KEPT = {
   read: false,
   /** when the newest copy this server has read was written ('': there was none). The site writes nothing of this server's over a newer one. */
   seen: '',
+  /** the store's mark for what this server last wrote: said with its next writing, which is then made though the store cannot be read (see api/keep.ts) */
+  mark: '',
   dirty: false,
   savedAt: 0,
   busy: false,
@@ -1210,13 +1241,13 @@ function unseal(z: string): unknown {
 }
 
 /** Something asked of the site about what is kept: signed with the secret the two share (see api/keep.ts). */
-async function siteKeep(op: Record<string, unknown>): Promise<{ ok?: boolean; why?: string; save?: KeptFile | null; stale?: boolean; newer?: boolean } | null> {
+async function siteKeep(op: Record<string, unknown>): Promise<{ ok?: boolean; why?: string; save?: KeptFile | null; stale?: boolean; newer?: boolean; mark?: string } | null> {
   if (!ADMIN.pepper) return null;
   const body = JSON.stringify(op), at = String(Date.now());
   const sig = createHmac('sha256', `zona keep ${ADMIN.pepper}`).update(`${at}.${createHash('sha256').update(body).digest('hex')}`).digest('hex');
   try {
     const r = await fetch(`${SITE_URL}/api/keep`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-zona-at': at, 'x-zona-auth': sig }, body, signal: AbortSignal.timeout(20_000) });
-    return r.ok ? ((await r.json()) as { ok?: boolean; why?: string; save?: KeptFile | null; stale?: boolean; newer?: boolean }) : null;
+    return r.ok ? ((await r.json()) as { ok?: boolean; why?: string; save?: KeptFile | null; stale?: boolean; newer?: boolean; mark?: string }) : null;
   } catch {
     return null;
   }
@@ -1266,6 +1297,9 @@ function snapshot(): Snapshot {
 
 /** What is kept is written to the site. @param final this server's last word @returns whether it was */
 async function keepNow(final: boolean, why: string): Promise<boolean> {
+  // (a last word waits its turn behind a writing already under way: it used to give up at once, and the server
+  // then stopped with what that other writing had happened to say)
+  if (final) for (let waited = 0; KEPT.busy && waited < 8000; waited += 200) await pause(200);
   // (a server that never read what was kept does not write over it: what it holds is not what there is)
   if (!KEEP_ON || !KEPT.ready || !KEPT.read || !ADMIN.pepper || KEPT.busy) return false;
   // (a server nobody came to has nothing to say that the file does not say already)
@@ -1274,7 +1308,7 @@ async function keepNow(final: boolean, why: string): Promise<boolean> {
   try {
     let snap = snapshot();
     for (let tries = 0; tries < 3; tries++) {
-      const r = await siteKeep({ op: 'save', at: new Date().toISOString(), boot: BOOT, final, z: seal(snap), seen: KEPT.seen });
+      const r = await siteKeep({ op: 'save', at: new Date().toISOString(), boot: BOOT, final, z: seal(snap), seen: KEPT.seen, ...(KEPT.mark ? { mark: KEPT.mark } : {}) });
       // (What is kept is newer than anything this server has read: the server before it said its last word after
       // this one had stopped waiting for it. It is taken in, for everybody who has not come back yet, and then
       // this server's writing is of both.)
@@ -1287,6 +1321,7 @@ async function keepNow(final: boolean, why: string): Promise<boolean> {
         KEPT.claimed = true;
         KEPT.dirty = clients.size > 0;
         KEPT.savedAt = Date.now();
+        KEPT.mark = typeof r.mark === 'string' ? r.mark : '';
         KEPT.last = `${snap.chars.length} characters and ${snap.stashes.length + (snap.loose?.length ?? 0)} stashes written at ${new Date().toISOString()} (${why}${final ? ': the last word' : ''})`;
         log(`[keep] ${why}: ${snap.chars.length} characters and ${snap.stashes.length + (snap.loose?.length ?? 0)} stashes written to the site${final ? ' (the last word)' : ''}`);
         return true;
@@ -1318,6 +1353,8 @@ function takeInLate(save: KeptFile) {
   if ((snap.wipe ?? '') !== WIPE) return void log(`[keep] a newer copy (${save.at}) is of another world, and is written over`);
   const moved = snap.rev !== WORLD_REV, now = Date.now();
   const back = new Set([...[...clients.values()].map((c) => keyHash(c.key)), ...[...records.keys()].map((k) => keyHash(k))]);
+  const carried = new Set<string>();
+  for (const c of clients.values()) for (const it of things(c.inv)) carried.add(it.uid);
   let chars = 0, stashes = 0;
   for (const [k, r] of snap.chars ?? []) {
     try {
@@ -1333,17 +1370,55 @@ function takeInLate(save: KeptFile) {
     }
   }
   for (const b of snap.stashes ?? []) {
-    if (b?.kind !== 'stash' || !b.buried || typeof b.cid !== 'string' || boxes.has(b.cid) || ![b.x, b.y, b.z, b.rot].every(num)) continue;
+    // (not one that is in this world already: under the ground, lying on it, or in somebody's hands who is back)
+    if (b?.kind !== 'stash' || !b.buried || typeof b.cid !== 'string' || boxes.has(b.cid) || economy.loot.has(b.cid) || carried.has(b.cid) || ![b.x, b.y, b.z, b.rot].every(num)) continue;
     const items = (Array.isArray(b.items) ? b.items : []).flatMap((s) => {
       const it = cleanItem(s);
       return it ? [{ ...it, x: s.x, y: s.y, rot: !!s.rot }] : [];
     });
     for (const it of items) issue(it);
-    boxes.set(b.cid, { ...b, items, y: moved ? world.groundAt(b.x, b.z) : b.y, emptiedAt: -1, touchedAt: num(b.touchedAt) ? b.touchedAt : now });
+    const box: Box = { ...b, items, y: moved ? world.groundAt(b.x, b.z) : b.y, emptiedAt: -1, touchedAt: num(b.touchedAt) ? b.touchedAt : now };
+    boxes.set(b.cid, box);
+    // (and everybody on is shown it, as they are shown one that is buried while they watch)
+    broadcast({ t: 'stash+', s: { uid: box.cid, x: box.x, y: box.y, z: box.z, rot: box.rot, ...(box.item ? { item: box.item } : {}), buried: true } });
     stashes++;
   }
-  KEPT.how += `; and the last word of the server before, written at ${save.at}, came after: ${chars} characters and ${stashes} stashes were taken from it`;
+  // (Whoever this server had from the older copy and the later one has not: they died, or their time ran out,
+  // before the last word. Not back, they are not kept alive by a copy that was out of date.)
+  const late = new Set((snap.chars ?? []).map(([k]) => k));
+  let gone = 0;
+  for (const k of [...KEPT.chars.keys()]) if (!late.has(k) && !back.has(k)) (KEPT.chars.delete(k), gone++);
+  KEPT.how += `; and the last word of the server before, written at ${save.at}, came after: ${chars} characters and ${stashes} stashes were taken from it${gone ? `, and ${gone} who had died before it are no longer kept` : ''}`;
   log(`[keep] a newer copy (${save.at}${save.final ? ', a last word' : ''}) turned up after this server had opened: ${chars} characters who have not come back yet, and ${stashes} stashes, are as it has them`);
+}
+
+/**
+ * This server opened without the last word of the one before it (it never came while this one waited, or the
+ * site could not be read at all). It goes on being looked for, every twenty seconds for a quarter of an hour, and
+ * is taken in the moment it can be read: not left until this server's next writing happens to be refused, which
+ * may be three hours off, with everybody who comes back meanwhile given what was out of date.
+ */
+let lateWatching = false;
+function lateWatch() {
+  if (lateWatching || !KEEP_ON) return;
+  lateWatching = true;
+  const began = Date.now();
+  const look = async () => {
+    const r = await siteKeep({ op: 'load' });
+    if (r?.ok) {
+      const save = r.save ?? null;
+      // (never read until now: from here on this server may write, and knows what it writes over)
+      if (!KEPT.read) {
+        KEPT.read = true;
+        if (!save) KEPT.seen = '';
+      }
+      if (save && save.boot !== BOOT && save.at > KEPT.seen) return void takeInLate(save);
+      // (the file is this server's own by now, or a last word it has already: nothing more is coming)
+      if (save && (save.boot === BOOT || save.final)) return;
+    }
+    if (Date.now() - began < 15 * 60_000) setTimeout(() => void look(), 20_000).unref();
+  };
+  setTimeout(() => void look(), 20_000).unref();
 }
 
 /** The first player of this run has come in: the file is made to say a server is alive, with more to say. */
@@ -1365,9 +1440,12 @@ setInterval(() => {
  * the moment it sees something newer has been published (the RESTART watch), and by an admin's `/save`.
  * @returns whether what there is to keep is on the site as of now, and a line saying what was done
  */
-async function keepBefore(why: string): Promise<{ ok: boolean; said: string }> {
+async function keepBefore(why: string, fresh = 0): Promise<{ ok: boolean; said: string }> {
   if (!KEEP_ON) return { ok: true, said: 'nothing is kept by this server' };
   if (!KEPT.ready || !KEPT.read) return { ok: false, said: 'what was kept has not been read yet: nothing is written over it' };
+  // (written within `fresh` ms, by whoever announced the deploy: not written again. Every writing leaves the store
+  // unreadable for a minute or two, and the last word is coming.)
+  if (fresh && KEPT.savedAt && Date.now() - KEPT.savedAt < fresh) return { ok: true, said: KEPT.last };
   if (!KEPT.claimed && !KEPT.dirty) return { ok: true, said: 'nobody has been on since it was last written: the file says all there is' };
   for (let waited = 0; KEPT.busy && waited < 15_000; waited += 250) await pause(250);
   const ok = await keepNow(false, why);
@@ -1491,10 +1569,17 @@ async function loadKept() {
       if ((mine && Date.now() - mine >= KEEP_WAIT_MS) || Date.now() - began >= KEEP_MAX_MS) break;
       await pause(2500);
     }
-    if (!read) return open('what is kept could NOT be read: the site did not answer. Everybody begins afresh, and nothing is written over what is kept');
+    if (!read) {
+      // (and it goes on being asked for: see `lateWatch`)
+      lateWatch();
+      return open('what is kept could NOT be read: the site did not answer. Everybody begins afresh, and nothing is written over what is kept');
+    }
     KEPT.read = true;
     KEPT.seen = save?.at ?? '';
-    if (save && !save.final && save.boot !== BOOT) log(`[keep] the server before this one never said its last word: what it wrote at ${save.at} is all there is`);
+    if (save && !save.final && save.boot !== BOOT) {
+      log(`[keep] the server before this one never said its last word: what it wrote at ${save.at} is all there is`);
+      lateWatch();
+    }
     if (!save) return open('nothing has been kept yet: everybody begins afresh');
     // (from here on something goes wrong only by what is in the file)
     let snap: Snapshot;
@@ -1676,6 +1761,46 @@ function sweepKeptOff(but?: Client): string[] {
   }
   return out;
 }
+/** A car taken out of the world by an admin (`/del car`, `/delcar`). @returns what the admin is told of it */
+function takeCar(c: Client, v: Veh): string {
+  if (v.seats.some((s) => s !== null)) return 'Somebody is in it: they get out first.';
+  vehicles.delete(v.i);
+  broadcast({ t: 'v-', i: v.i });
+  log(`[admin] ${c.name} took away car ${v.i}${v.goneAt ? ' (burned out)' : ''} at ${v.s[0].toFixed(0)}, ${v.s[2].toFixed(0)}`);
+  return `Taken away: ${v.goneAt ? 'the burned-out car' : v.k === POLICE_CAR.kind ? 'the police car' : 'the jeep'}, number ${v.i}. (The cars of the map are back when the server next starts.)`;
+}
+/**
+ * A car stood somewhere by an admin (`/spawn`). It is made as every car is (`standJeep`), on the books of the park
+ * of its own kind nearest to where it is put, and then set down where it was asked for. Everything that happens to
+ * a car afterwards goes by its park (burned, driven off the edge of the world, left under the gas), and so finds
+ * one: a car of an admin's that burns is followed in its time by a new one at that park, as any car is.
+ */
+function standCarAt(k: number, x: number, ground: number, z: number, yaw: number): Veh | null {
+  let home = -1, best = Infinity;
+  PARKS.forEach((p, i) => {
+    const d = Math.hypot(p.x - x, p.z - z) + (p.k === k ? 0 : 1e6);
+    if (d < best) {
+      best = d;
+      home = i;
+    }
+  });
+  if (home < 0) return null;
+  const v = standJeep(home);
+  v.s = restState(x, ground, z, yaw);
+  if (k) v.k = k;
+  else delete v.k;
+  return v;
+}
+/**
+ * A ban's own name in the lists, the same whatever else is banned or lifted meanwhile: an admin's ban by the start
+ * of the hash it is kept under, a time off the server by a hash of the first thing it is kept off by (a key or an
+ * address: neither is shown). Until 2026-10-13 a ban was lifted by where it stood in the list, which moves when
+ * another admin bans somebody or a time off runs out: `/unban 3`, or the panel's button pressed on a list two
+ * seconds old, could lift somebody else's.
+ */
+const banId = (b: { key: string }) => `a:${b.key.slice(0, 8)}`;
+// (made with the site's secret, as the hash of an address is: nothing of the key or the address can be had back from it)
+const offId = (b: { keys: string[] }) => `t:${createHash('sha256').update(`${ADMIN.pepper} kept off ${b.keys[0]}`).digest('hex').slice(0, 8)}`;
 /**
  * An order typed where talk is typed. @returns nothing: whoever gave it is told what came of it.
  * Mods: players, recent, flagged, kick, timeout, say. Admins: those, and ban, unban, bans, admin, mod, demote, roles.
@@ -1727,11 +1852,7 @@ async function command(c: Client, line: string) {
       if (what === 'car') {
         const v = vehicles.get(Number(id));
         if (!v) return void sys(c, 'No car of that number.');
-        if (v.seats.some((s) => s !== null)) return void sys(c, 'Somebody is in it: they get out first.');
-        vehicles.delete(v.i);
-        broadcast({ t: 'v-', i: v.i });
-        log(`[admin] ${c.name} took away car ${v.i}`);
-        return void sys(c, 'Taken away: the car. (It is back when the server next starts.)');
+        return void sys(c, takeCar(c, v));
       }
       if (what === 'z') {
         const i = Number(id), r = Number.isInteger(i) ? horde.hurt(i, 1e6, Date.now()) : null;
@@ -1740,6 +1861,102 @@ async function command(c: Client, line: string) {
         return void sys(c, 'One of the infected is put down.');
       }
       return void sys(c, 'Take away what? /del item, box, car or z, and its number. The Delete key does it for whatever you are looking at.');
+    }
+    case 'spawn': {
+      // Something stood in the world by an admin: a car of either kind, or the infected. (2026-10-13: "add more
+      // admin tools that might be useful like spawn entities like cars and zombies and future entities would go
+      // here".) What there is to stand is ENTITIES in src/net/orders.ts: one more kind of thing is one more row
+      // there, and one more `kind` here if it is made in a way of its own. Where: a few steps in front of whoever
+      // asks, or at the map numbers given (the panel gives those of what the admin is looking at):
+      // `/spawn what [count] [x z]`, or with a height, `/spawn what count x y z`.
+      if (!admin) return need();
+      const e = entityBy(rest[0] ?? '');
+      if (!e) return void sys(c, `Stand what? One of: ${ENTITIES.map((x) => x.id).join(', ')}. As in /spawn jeep, or /spawn infected 5.`);
+      const n = rest.slice(1).map(Number);
+      // (one number is how many; three are how many and a place; four are how many, and a place with its height.
+      // Two could be either, and are asked again.)
+      if (n.length > 4 || n.length === 2 || n.some((v) => !Number.isFinite(v))) return void sys(c, `After /spawn ${e.id}: how many (up to ${e.most}), and then, if it is not to be in front of you, the map numbers x z. As in /spawn ${e.id} 1 120 -40.`);
+      const count = Math.max(1, Math.min(e.most, Math.round(n[0] ?? 1)));
+      const yaw = c.pose[3], ahead = e.kind === 'car' ? 6 : 5;
+      const x = n.length >= 3 ? n[1] : c.pose[0] - Math.sin(yaw) * ahead;
+      const z = n.length >= 3 ? n[n.length - 1] : c.pose[2] - Math.cos(yaw) * ahead;
+      const y = n.length === 4 ? n[2] : null;
+      if (Math.abs(x) > WORLD_SIZE / 2 - 6 || Math.abs(z) > WORLD_SIZE / 2 - 6 || (y !== null && Math.abs(y) > 400)) return void sys(c, 'That is off the map.');
+      if (e.kind === 'car') {
+        const standing = [...vehicles.values()].filter((v) => !v.goneAt).length;
+        if (standing + count > PARKS.length + 30) return void sys(c, `There are ${standing} cars standing already: take some away first (/delcar).`);
+        const made: Veh[] = [];
+        for (let k = 0; k < count; k++) {
+          // (more than one: side by side, across the way the admin faces)
+          const off = (k - (count - 1) / 2) * 4.5, cx = x + Math.cos(yaw) * off, cz = z - Math.sin(yaw) * off;
+          const v = standCarAt(e.k ?? 0, cx, y ?? world.groundAt(cx, cz), cz, yaw);
+          if (!v) break;
+          made.push(v);
+          broadcast({ t: 'v+', v: vehInfo(v) });
+        }
+        if (!made.length) return void sys(c, 'No car is kept anywhere in this world: none can be stood.');
+        const which = `number ${made.map((v) => v.i).join(', ')}`;
+        log(`[admin] ${c.name} stood ${made.length} × ${e.name.toLowerCase()} at ${x.toFixed(0)}, ${z.toFixed(0)} (${which})`);
+        return void sys(c, `${made.length > 1 ? `${made.length} × ` : ''}${e.name} at ${x.toFixed(0)}, ${z.toFixed(0)} (${which}). /delcar takes the nearest car away.`);
+      }
+      const afoot = [...horde.bodies.values()].filter((b) => !b.diedAt).length;
+      if (afoot + count > INFECTED.max + 80) return void sys(c, `There are ${afoot} of the infected on their feet already: put some down first (/delz).`);
+      const now = Date.now();
+      for (let k = 0; k < count; k++) {
+        // (the first where it was asked for, the rest spread round it a good pace apart: two in one place can neither of them move)
+        const r = 1.7 * Math.sqrt(k), a = k * 2.39996, bx = x + Math.cos(a) * r, bz = z + Math.sin(a) * r;
+        const b = horde.place(bx, y ?? world.groundAt(bx, bz), bz, now);
+        broadcast({ t: 'i+', b: { i: b.i, s: b.s, hp: b.hp, own: b.own, h: b.h } });
+      }
+      log(`[admin] ${c.name} stood ${count} of the infected at ${x.toFixed(0)}, ${z.toFixed(0)}`);
+      return void sys(c, `${count} of the infected at ${x.toFixed(0)}, ${z.toFixed(0)}. /delz puts down those near you.`);
+    }
+    case 'delcar': {
+      // (the car nearest whoever asks, or the one of the number given: the panel gives the number of the one looked at)
+      if (!admin) return need();
+      let v: Veh | undefined;
+      if (/^#?\d+$/.test(who)) v = vehicles.get(Number(who.replace('#', '')));
+      else if (!who || who.toLowerCase() === 'nearest') {
+        let best = 150;
+        for (const o of vehicles.values()) {
+          const d = Math.hypot(o.s[0] - c.pose[0], o.s[2] - c.pose[2]);
+          if (d < best) {
+            best = d;
+            v = o;
+          }
+        }
+        if (!v) return void sys(c, 'No car stands within 150 metres of you.');
+      } else return void sys(c, '/delcar takes away the car nearest you; /delcar 7 takes away car number 7.');
+      if (!v) return void sys(c, 'No car of that number.');
+      return void sys(c, takeCar(c, v));
+    }
+    case 'wrecks': {
+      // (every burned-out car, now: each is cleared away by itself two minutes after it burns)
+      if (!admin) return need();
+      const gone = [...vehicles.values()].filter((v) => v.goneAt && v.seats.every((s) => s === null));
+      for (const v of gone) {
+        vehicles.delete(v.i);
+        broadcast({ t: 'v-', i: v.i });
+      }
+      if (gone.length) log(`[admin] ${c.name} cleared away ${gone.length} burned-out car${gone.length > 1 ? 's' : ''}`);
+      return void sys(c, gone.length ? `Cleared away: ${gone.length} burned-out car${gone.length > 1 ? 's' : ''}. A new car is stood for each in its own time, as ever.` : 'No car is burned out just now.');
+    }
+    case 'delz': {
+      // (the infected about whoever asks, put down as `/del z` puts one down: they lie where they fall, and those
+      // that lived there are owed again in their time)
+      if (!admin) return need();
+      if (rest[0] && !(Number(rest[0]) > 0)) return void sys(c, '/delz puts down the infected within 60 metres of you; /delz 120, those within 120 (up to 400).');
+      const within = Math.min(400, Math.max(5, Number(rest[0]) || 60)), now = Date.now();
+      let down = 0;
+      for (const b of [...horde.bodies.values()]) {
+        if (b.diedAt || Math.hypot(b.s[0] - c.pose[0], b.s[2] - c.pose[2]) > within) continue;
+        const r = horde.hurt(b.i, 1e6, now);
+        if (!r) continue;
+        down++;
+        broadcast({ t: 'ihp', i: b.i, hp: r.hp, dead: r.dead, by: c.id, zone: 'torso', dir: [0, 1], melee: false });
+      }
+      if (down) log(`[admin] ${c.name} put down ${down} of the infected within ${within} m of ${c.pose[0].toFixed(0)}, ${c.pose[2].toFixed(0)}`);
+      return void sys(c, down ? `Put down: ${down} of the infected within ${within} metres of you.` : `None of the infected is on its feet within ${within} metres of you.`);
     }
     case 'save': {
       // everybody and every stash written to the site now: before a restart made by hand, or whenever it is wanted
@@ -1836,21 +2053,29 @@ async function command(c: Client, line: string) {
       const off = keptOffNow();
       return void sys(
         c,
-        ADMIN.state.bans.length ? 'Banned (the number is what /unban takes):' : 'Nobody is banned.',
-        ...ADMIN.state.bans.map((b, i) => `${i + 1}. ${b.name}  by ${b.by}, ${b.at.slice(0, 10)}${b.why ? `: ${b.why}` : ''}`),
+        ADMIN.state.bans.length ? 'Banned (/unban takes the id in brackets, or the number straight after this list):' : 'Nobody is banned.',
+        ...ADMIN.state.bans.map((b, i) => `${i + 1}. ${b.name}  [${banId(b)}]  by ${b.by}, ${b.at.slice(0, 10)}${b.why ? `: ${b.why}` : ''}`),
         ...(off.length ? ['Kept off for a while (by the checks, or timed out):'] : []),
-        ...off.map((b, i) => `${ADMIN.state.bans.length + i + 1}. ${b.name}  for ${Math.ceil((b.until - Date.now()) / 60000)} more minutes: ${b.why}`),
+        ...off.map((b, i) => `${ADMIN.state.bans.length + i + 1}. ${b.name}  [${offId(b)}]  for ${Math.ceil((b.until - Date.now()) / 60000)} more minutes: ${b.why}`),
       );
     }
     case 'unban': {
       if (!admin) return need();
-      const i = /^\d+$/.test(who) ? Number(who) - 1 : ADMIN.state.bans.findIndex((b) => b.name.toLowerCase() === who.toLowerCase());
-      const b = ADMIN.state.bans[i];
+      // Which ban is meant. By its own id first (what the panel's button sends, and what /bans prints in brackets);
+      // then by where it stands in /bans, for `/unban 3` typed straight after it; then by name. A name that more
+      // than one ban has, across those an admin wrote down and those kept off for a while, lifts nothing: they are
+      // read out with their ids. ("Survivor" is the name of everybody who never chose one.)
+      const said = rest.join(' ').trim(), w = said.toLowerCase(), off = keptOffNow();
+      const held = [...ADMIN.state.bans.map((b) => ({ id: banId(b), name: b.name, ban: b, off: null })), ...off.map((t) => ({ id: offId(t), name: t.name, ban: null, off: t }))];
+      const found = /^[at]:[0-9a-f]+$/.test(w) ? held.filter((x) => x.id === w) : /^\d+$/.test(w) ? held.slice(Number(w) - 1, Number(w)) : held.filter((x) => x.name.toLowerCase() === w);
+      if (!found.length) return void sys(c, `No ban is "${said}": see /bans.`);
+      if (found.length > 1) {
+        return void sys(c, `More than one ban is "${said}", and none of them is lifted. Give the id of the one you mean:`, ...found.map((x) => `/unban ${x.id}   ${x.name}, ${x.ban ? `banned by ${x.ban.by} on ${x.ban.at.slice(0, 10)}${x.ban.why ? `: ${x.ban.why}` : ''}` : `kept off for ${Math.ceil((x.off!.until - Date.now()) / 60000)} more minutes: ${x.off!.why}`}`));
+      }
+      const b = found[0].ban;
       if (!b) {
         // (not one an admin wrote down: one of those kept off for a while, by the checks or by a timeout)
-        const off = keptOffNow();
-        const t = /^\d+$/.test(who) ? off[Number(who) - 1 - ADMIN.state.bans.length] : off.find((x) => x.name.toLowerCase() === who.toLowerCase());
-        if (!t) return void sys(c, `No ban is "${who}": see /bans.`);
+        const t = found[0].off!;
         for (const k of t.keys) {
           BANS.temp.delete(k);
           BANS.strikes.delete(k);
@@ -2351,19 +2576,34 @@ const info = (c: Client): PlayerInfo => ({ id: c.id, name: c.name, pose: c.pose,
 /** is somebody shown to this player: everybody is, but a vanished admin, whom only admins see */
 const shown = (who: Client, to: Client) => !who.power.hidden || roleOf(to) === 'admin';
 
-/** a spawn point on the edge of the map, as far from everyone else as possible */
-function pickSpawn() {
-  const others = [...clients.values()].filter((c) => c.alive);
-  let best = world.spawns[Math.floor(Math.random() * world.spawns.length)];
-  let bestD = -1;
-  for (let k = 0; k < 8; k++) {
-    const s = world.spawns[Math.floor(Math.random() * world.spawns.length)];
-    const d = others.length ? Math.min(...others.map((o) => Math.hypot(o.pose[0] - s.x, o.pose[2] - s.z))) : 1e9;
-    if (d > bestD) {
-      bestD = d;
-      best = s;
-    }
-  }
+/**
+ * A start on the edge of the map: one with nobody near it. Every start is looked at (it was eight drawn at random
+ * of the seventeen, so the best was passed over six times in ten, and nothing was ever ruled out). A start is
+ * good with nobody living within 120 m of it, no infected within 40 (they see 34), and, for somebody coming back
+ * from a death, not within 250 m of where they died: DayZ rules a fresh start out within 65 m of a player and 30
+ * of an infected, on a map a hundred times the size. Of the good ones, one of the three furthest from anybody,
+ * so that where the next arrival appears cannot be told beforehand. With none good, the rules are let go one at
+ * a time, the last first.
+ * @param died where whoever is asking has just died
+ */
+function pickSpawn(died?: { x: number; z: number }) {
+  const others = [...clients.values()].filter((c) => c.alive && !c.power.hidden);
+  const walking = [...horde.bodies.values()].filter((b) => !b.diedAt);
+  const far = (list: { x: number; z: number }[], s: { x: number; z: number }) => list.reduce((d, o) => Math.min(d, Math.hypot(o.x - s.x, o.z - s.z)), 1e9);
+  const starts = world.spawns.map((s) => ({
+    s,
+    d: far(others.map((o) => ({ x: o.pose[0], z: o.pose[2] })), s),
+    i: far(walking.map((b) => ({ x: b.s[0], z: b.s[2] })), s),
+    own: died ? Math.hypot(died.x - s.x, died.z - s.z) : 1e9,
+  }));
+  const good = [
+    starts.filter((q) => q.d >= 120 && q.i >= 40 && q.own >= 250),
+    starts.filter((q) => q.d >= 120 && q.i >= 40),
+    starts.filter((q) => q.d >= 60),
+    starts,
+  ].find((list) => list.length)!;
+  good.sort((a, b) => b.d - a.d);
+  const best = good[Math.floor(Math.random() * Math.min(3, good.length))].s;
   // a few metres of scatter so two people never spawn inside each other
   const a = Math.random() * Math.PI * 2;
   return { x: best.x + Math.cos(a) * 3, z: best.z + Math.sin(a) * 3, yaw: best.yaw };
@@ -2377,38 +2617,11 @@ const isPose = (v: unknown): v is Pose => Array.isArray(v) && v.length === 6 && 
 const cleanName = (s: unknown) => (typeof s === 'string' ? s : '').replace(/[^\p{L}\p{N} _\-.]/gu, '').trim().slice(0, 16) || 'Survivor';
 const round2 = (v: number) => Math.round(v * 100) / 100;
 
+// (What makes a thing, and a whole inventory, out of what a game says is in src/sim/inventory.ts since 2026-10-13,
+// where it is tried without a server: test/clothes.test.ts. A thing's cargo is read to as many things as it has
+// cells, where it was forty; three deep, where it was two; and the hot keys are kept.)
 function cleanItem(raw: unknown, depth = 0): ItemInstance | null {
-  if (!raw || typeof raw !== 'object' || depth > 2) return null;
-  const r = raw as ItemInstance;
-  const def = ITEMS[r.id];
-  if (!def || typeof r.uid !== 'string' || r.uid.length > 64) return null;
-  const it: ItemInstance = { uid: r.uid, id: r.id, qty: def.stack ? Math.max(1, Math.min(def.stack, Math.floor(Number(r.qty) || 1))) : 1 };
-  if (def.weapon) {
-    // (how many it may really have in it is said by what feeds it: sanitizeItem holds it to that)
-    it.loaded = Math.max(0, Math.min(200, Math.floor(Number(r.loaded) || 0)));
-    if (Array.isArray(r.mods)) it.mods = r.mods.filter((m) => typeof m === 'string').slice(0, 6);
-    // (its magazine: one it takes, or none; said by nobody, it is a gun from before magazines, and is given its own)
-    if (def.weapon.mag && r.mag !== undefined) it.mag = typeof r.mag === 'string' && magFits(r.mag, r.id) ? r.mag : null;
-    // (the range its sights are set for: sanitizeItem holds it to one that gun has)
-    if (num(r.zero)) it.zero = r.zero;
-  }
-  if (def.mag) it.rounds = Math.max(0, Math.min(def.mag.capacity, Math.floor(Number(r.rounds) || 0)));
-  if (def.use?.sips) it.left = Number.isFinite(Number(r.left)) ? Number(r.left) : def.use.sips;
-  if (r.id === 'dogtag') {
-    const short = (v: unknown) => (typeof v === 'string' ? v.slice(0, 24) : undefined);
-    it.owner = cleanName(r.owner);
-    it.pid = short(r.pid);
-    it.holder = short(r.holder);
-    it.held = Math.max(0, Math.min(TAG_HOLD, Number(r.held) || 0));
-  }
-  if (holds(def.id) && Array.isArray(r.cargo)) {
-    it.cargo = [];
-    for (const p of r.cargo.slice(0, 40)) {
-      const inner = cleanItem(p?.item, depth + 1);
-      if (inner && num(p.x) && num(p.y)) it.cargo.push({ item: inner, x: p.x, y: p.y, rot: !!p.rot });
-    }
-  }
-  return sanitizeItem(it);
+  return cleanThing(raw, cleanName, depth);
 }
 
 function cleanStored(list: unknown): StoredItem[] {
@@ -2421,13 +2634,13 @@ function cleanStored(list: unknown): StoredItem[] {
   return out;
 }
 
+/**
+ * What a game says it carries, or what was kept of a character, made safe and made of today's shape: a character
+ * kept from before the jacket and the trousers were things has them on after this, with what was in its pockets in
+ * theirs (upgradeInventory in src/sim/inventory.ts, the same the game itself reads a save with).
+ */
 function cleanInventory(raw: unknown): SerializedInventory | null {
-  if (!raw || typeof raw !== 'object') return null;
-  const r = raw as SerializedInventory;
-  const slots: Record<string, ItemInstance | null> = {};
-  for (const [k, v] of Object.entries(r.slots ?? {})) if (k.length < 16) slots[k] = v ? cleanItem(v) : null;
-  const containers = (Array.isArray(r.containers) ? r.containers : []).slice(0, 4).map((c) => ({ id: String(c.id).slice(0, 16), items: cleanStored(c.items) }));
-  return { slots, active: null, containers };
+  return cleanCarried(raw, cleanName);
 }
 
 // ------------------------------------------------------------------ gameplay
@@ -2593,14 +2806,24 @@ function blowJeep(v: Veh, byId: number) {
   log(`jeep #${v.i} burned out${by ? ` (${by.name})` : ''}`);
 }
 
-/** everything a character carried goes into a body that can be searched for a while */
+/**
+ * everything a character carried goes into a body that can be searched for a while
+ *
+ * What was worn lies in the body's grid as the thing it is, with what was in it still in it: the jacket with what
+ * was in its pockets and the trousers with theirs, as a pack always did (2026-10-13: "When i kill someone and i
+ * loot their body and i pick up their backpack it should bring all the loot with it ... it should be the same for
+ * all inventories"). The grid is BODY_GRID, which holds all a person can have on at once: it was 8x10, and pocket
+ * loot and taken tags that found no room were thrown on the ground round the body.
+ */
 function makeCorpse(c: Client, v: number): CorpseInfo | null {
   const inv = c.inv;
   const [x, , z, yaw] = c.pose;
   const y = c.pose[1];
   const uid = `corpse_${c.id}_${Date.now().toString(36)}`;
-  const box = new Container(uid, 'Body', 8, 10, [], true);
+  const box = new Container(uid, 'Body', BODY_GRID[0], BODY_GRID[1], [], true);
   const spill: ItemInstance[] = [];
+  /** what is to lie in the grid: laid all at once, the biggest first, so that the small things fill what is left */
+  const laid: ItemInstance[] = [];
   // Their own tag (one, however many they claim to carry): on the body to be taken and cashed in, unless they had
   // only just arrived. Somebody alive less than TAG_FRESH leaves no tag of their own at all: not the one round
   // their neck, and not an older one of theirs that they took back off their last body. (That one was left on
@@ -2625,16 +2848,24 @@ function makeCorpse(c: Client, v: number): CorpseInfo | null {
     if (lootedTags.delete(it.uid)) older++;
     return true;
   };
+  /** their own tags out of a thing, and out of whatever is in it: a pocket is inside the jacket now, one further in than it was */
+  const shed = (it: ItemInstance) => {
+    if (!it.cargo) return;
+    it.cargo = it.cargo.filter((p) => !theirs(p.item));
+    for (const p of it.cargo) shed(p.item);
+  };
   const put = (it: ItemInstance | null) => {
-    if (!it || (noTag && theirs(it)) || (bare && it.id !== 'dogtag')) return;
-    if (noTag && it.cargo) it.cargo = it.cargo.filter((p) => !theirs(p.item));
+    if (!it || (noTag && theirs(it))) return;
+    // (an admin who leaves nothing leaves the tags all the same, out of whatever they were carried in: the pockets were gone through thing by thing when they were the body's own)
+    if (bare && it.id !== 'dogtag') return void (it.cargo ?? []).forEach((p) => put(p.item));
+    if (noTag) shed(it);
     stopTagClocks(it);
-    const left = box.add(it);
-    if (left) spill.push(left);
+    laid.push(it);
   };
   if (inv) {
     for (const it of Object.values(inv.slots)) put(it);
     for (const cont of inv.containers) for (const s of cont.items) put(cleanItem(s));
+    spill.push(...layOnBody(box, laid));
     if (own && !noTag) lootedTags.set(own.uid, { owner: c.name, ownerKey: c.key, ownerIp: c.ip, livedMs: lived });
     else if (own || older) {
       log(`${c.name} left no dog tag: ${fresh ? `alive ${Math.round(lived / 1000)} s` : 'an admin, who chose so'}${older ? ` (nor ${older} older of their own, taken back)` : ''}`);
@@ -2650,7 +2881,7 @@ function makeCorpse(c: Client, v: number): CorpseInfo | null {
   if (!box.items.length) return null;
   // (what is on a body is in the world from now on, whatever it was before: it is whoever carried it that was asked)
   for (const p of box.items) issue(p.item);
-  boxes.set(uid, { cid: uid, kind: 'corpse', w: 8, h: 10, items: box.serialize().items, x, y, z, rot: yaw, emptiedAt: -1, name: c.name, expires: economy.time + CORPSE_LIFETIME, v });
+  boxes.set(uid, { cid: uid, kind: 'corpse', w: BODY_GRID[0], h: BODY_GRID[1], items: box.serialize().items, x, y, z, rot: yaw, emptiedAt: -1, name: c.name, expires: economy.time + CORPSE_LIFETIME, v });
   return { uid, x, y, z, rot: yaw, name: c.name, v };
 }
 
@@ -2683,7 +2914,11 @@ function kill(c: Client, cause: string, v = 0) {
 
 function handle(c: Client, m: C2S) {
   // anything a person does counts as being there; what the game reports on its own does not
-  if (m.t !== 's' && m.t !== 'me' && m.t !== 'ping' && m.t !== 'gear' && m.t !== 'back') {
+  // (What the game reports on its own: where it stands, what it carries and wears, a ping; and, for whichever game
+  // moves them, where the infected and the jeeps near it are. Those last were counted as something a person did
+  // until 2026-10-13: anybody within reach of an infected was never away, however long their hands were off the
+  // keys, and was never looked at by the check below.)
+  if (!SAID_BY_ITSELF.has(m.t)) {
     c.activeAt = Date.now();
     // (and whoever is doing things is not a body being walked up and down: see gaitCheck)
     c.check.gait = undefined;
@@ -2740,6 +2975,13 @@ function handle(c: Client, m: C2S) {
       // a keycard at the door, by somebody standing at it (the card is theirs to use up: what they carry is their own game's to say)
       const d = world.bunkerDoor;
       if (!c.alive || !d || Math.hypot(c.pose[0] - d[0], c.pose[1] - d[1], c.pose[2] - d[2]) > 6) return;
+      // (And they have a card, or had one a moment ago: their game takes it out of their pockets as it says this,
+      // and which of the two reaches here first is not certain. Until 2026-10-13 nothing was asked: anybody who
+      // sent this from the doorway had the bunker open, card or no card, and sent again each minute it stayed
+      // open for good, which now would also keep its infected from ever coming back.)
+      const had = cardSeen.get(c.id) ?? 0;
+      if (!carries(c.inv, 'keycard') && Date.now() - had > CARD_GRACE_MS) return void flag(c, 'opened the bunker with no keycard', false);
+      cardSeen.delete(c.id);
       bunkerDoor.emptyAt = Date.now();
       if (bunkerDoor.open) return;
       bunkerDoor.open = true;
@@ -2784,8 +3026,9 @@ function handle(c: Client, m: C2S) {
       return;
     }
     case 'gear': {
-      // only things that are worn, and only as many as there are places to wear them
-      c.g = (Array.isArray(m.g) ? m.g : []).filter((x) => typeof x === 'string' && !!ITEMS[x]?.wear).slice(0, 6);
+      // only things that are worn, and only as many as there are places to wear them (there were six places, and
+      // the list was cut to six: there are eleven now, and whatever is drawn of any of them has room in it)
+      c.g = (Array.isArray(m.g) ? m.g : []).filter((x) => typeof x === 'string' && !!ITEMS[x]?.wear).slice(0, GEAR_SLOTS.length);
       broadcast({ t: 'gear', id: c.id, g: c.g }, c);
       return;
     }
@@ -2843,7 +3086,7 @@ function handle(c: Client, m: C2S) {
       } else {
         // you can only hit with what you are holding (fists are always there)
         if (m.w !== 'fists' && c.w !== m.w) return;
-        if (now - c.lastHit < rule.interval * 700) return;
+        if (!mayHit(c, `p${target.id}`, now, rule.interval * 700)) return;
         // (and what is held has to be in the pockets the server knows of: an invented gun is in nobody's)
         if (m.w !== 'fists' && CHECKS !== 'off' && c.inv && !carries(c.inv, m.w) && flag(c, `hit ${target.name} with ${ITEMS[m.w]?.name ?? m.w}, which is not in their pockets`)) return;
         // (a round does not go through a hill)
@@ -2890,7 +3133,7 @@ function handle(c: Client, m: C2S) {
         m.zone = 'torso';
       } else {
         if (m.w !== 'fists' && c.w !== m.w) return;
-        if (now - c.lastHit < rule.interval * 700) return;
+        if (!mayHit(c, `i${m.i}`, now, rule.interval * 700)) return;
         c.lastHit = now;
         amount = hitDamage(m.w, m.zone, d, !!m.sup, num(m.bonus) ? m.bonus : 0, num(m.n) ? m.n : 1);
       }
@@ -2997,6 +3240,7 @@ function handle(c: Client, m: C2S) {
         for (const it of b.items) issue(it);
       }
       if (b.kind === 'crate' || b.kind === 'drop') b.emptiedAt = b.items.length ? -1 : b.emptiedAt < 0 ? economy.time : b.emptiedAt;
+      if (b.kind === 'crate') b.pickedAt = economy.time;
       touched(b);
       return;
     }
@@ -3048,6 +3292,8 @@ function handle(c: Client, m: C2S) {
       if (!c.alive) return;
       c.inv = cleanInventory(m.inv);
       pockets(c);
+      // (somebody with a keycard: remembered a moment, for when they put it in the bunker's reader)
+      if (carries(c.inv, 'keycard')) cardSeen.set(c.id, Date.now());
       // the clock on a looted tag starts the first time the server sees it in somebody else's pockets
       for (const t of carriedTags(c.inv)) {
         const from = lootedTags.get(t.uid);
@@ -3085,7 +3331,7 @@ function handle(c: Client, m: C2S) {
         log(`${c.name} asks to come back while alive here and dead by their own game: taken as a death`);
         kill(c, 'injuries');
       }
-      const sp = pickSpawn();
+      const sp = pickSpawn({ x: c.pose[0], z: c.pose[2] });
       c.alive = true;
       c.lifeAt = Date.now();
       c.inv = null;
@@ -3151,7 +3397,7 @@ function handle(c: Client, m: C2S) {
       return void send(c, {
         t: 'adm',
         players: [...clients.values()].map((o) => ({
-          id: o.id, name: o.name, role: roleOf(o), x: Math.round(o.pose[0]), z: Math.round(o.pose[2]), alive: o.alive, flags: o.check.flags, mins: Math.round((now - o.joinedAt) / 60000),
+          id: o.id, name: o.name, role: roleOf(o), x: Math.round(o.pose[0]), z: Math.round(o.pose[2]), yaw: Math.round(o.pose[3] * 100) / 100, alive: o.alive, flags: o.check.flags, mins: Math.round((now - o.joinedAt) / 60000),
           hp: Math.round(o.vitals?.health ?? 100), kills: scores.get(o.key)?.kills ?? 0, tags: scores.get(o.key)?.tags ?? 0,
           ...(o.power.hidden ? { hidden: true as const } : {}), ...(o.power.god ? { god: true as const } : {}), ...(o.power.clip ? { clip: true as const } : {}),
           ...((ADMIN.muted.get(o.key) ?? 0) > now ? { muted: true as const } : {}), ...(o.seatAt ? { seat: true as const } : {}),
@@ -3161,14 +3407,14 @@ function handle(c: Client, m: C2S) {
         gone: ADMIN.gone.slice(-20).reverse().map((g) => ({ id: g.id, name: g.name, mins: Math.round((now - g.at) / 60000) })),
         bans: admin
           ? [
-              ...ADMIN.state.bans.map((b, i) => ({ n: i + 1, name: b.name, why: b.why, by: b.by, at: b.at.slice(0, 10) })),
+              ...ADMIN.state.bans.map((b, i) => ({ n: i + 1, id: banId(b), name: b.name, why: b.why, by: b.by, at: b.at.slice(0, 10) })),
               // (and whoever is kept off for a while: lifted the same way)
-              ...keptOffNow(now).map((b, i) => ({ n: ADMIN.state.bans.length + i + 1, name: b.name, why: `${b.why} (for ${Math.ceil((b.until - now) / 60000)} more minutes)`, by: b.why.startsWith('timed out') ? 'a timeout' : 'the checks', at: new Date(b.until).toISOString().slice(11, 16) + ' UTC' })),
+              ...keptOffNow(now).map((b, i) => ({ n: ADMIN.state.bans.length + i + 1, id: offId(b), name: b.name, why: `${b.why} (for ${Math.ceil((b.until - now) / 60000)} more minutes)`, by: b.why.startsWith('timed out') ? 'a timeout' : 'the checks', at: new Date(b.until).toISOString().slice(11, 16) + ' UTC' })),
             ]
           : [],
         roles: admin ? Object.values(ADMIN.state.roles).map((r) => ({ name: r.name, role: r.role, by: r.by, at: r.at.slice(0, 10) })) : [],
         checks: CHECKS,
-        stats: { up: Math.round(process.uptime() / 60), loot: economy.loot.size, stashes: [...boxes.values()].filter((b) => b.kind === 'stash').length + [...economy.loot.values()].filter((l) => l.keptAt !== undefined).length, kept: KEPT.chars.size + records.size, asleep: [...clients.values()].filter((o) => o.asleep).length },
+        stats: { up: Math.round(process.uptime() / 60), loot: economy.loot.size, stashes: [...boxes.values()].filter((b) => b.kind === 'stash').length + [...economy.loot.values()].filter((l) => l.keptAt !== undefined).length, kept: KEPT.chars.size + records.size, asleep: [...clients.values()].filter((o) => o.asleep).length, cars: vehicles.size, wrecks: [...vehicles.values()].filter((v) => v.goneAt).length, infected: [...horde.bodies.values()].filter((b) => !b.diedAt).length },
       });
     }
     case 'vin': {
@@ -3404,6 +3650,8 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
 
 function drop(c: Client) {
   if (!clients.delete(c.id)) return;
+  hitsBy.delete(c.id);
+  cardSeen.delete(c.id);
   ADMIN.gone.push({ id: c.id, name: c.name, key: c.key, ip: c.ip, at: Date.now() });
   ADMIN.asked.delete(c.id);
   ADMIN.tints.delete(c.id);
@@ -3643,7 +3891,8 @@ let lastCall = -1e9;
 /** @param where set down here (called for on a radio) and not at a place of the map's choosing */
 function spawnDrop(where?: { x: number; y: number; z: number }, heli = false) {
   // (a supply drop out in the wild country, past the line; a helicopter's cargo inside it)
-  const at = where ?? world.dropSite(undefined, heli);
+  // (and not beside anybody: it is something to go to)
+  const at = where ?? world.dropSite(undefined, heli, [...clients.values()].filter((c) => c.alive).map((c) => ({ x: c.pose[0], z: c.pose[2] })));
   if (!at) return;
   const uid = `drop-${Math.round(economy.time)}-${Math.random().toString(36).slice(2, 7)}`;
   const [w, h] = heli ? [CRASH.w, CRASH.h] : [DROP.w, DROP.h];
@@ -3708,9 +3957,15 @@ setInterval(() => {
   economy.tick(dt, alive);
   for (const b of [...boxes.values()]) {
     if (b.kind === 'crate') {
-      if (b.items.length) b.emptiedAt = -1;
-      else if (b.emptiedAt < 0) b.emptiedAt = economy.time;
-      else if (economy.time - b.emptiedAt > CRATE_RESTOCK && !locks.has(b.cid) && !alive.some((p) => Math.hypot(p.x - b.x, p.z - b.z) < 60)) fillBox(b);
+      // (Emptied, it is filled again five minutes on. Gone through and not emptied, a quarter of an hour after
+      // anybody last had a hand in it: until 2026-10-13 it was filled only when wholly empty, and one tin left
+      // in a weapons case kept that case from ever being filled again.)
+      const quiet = !locks.has(b.cid) && !alive.some((p) => Math.hypot(p.x - b.x, p.z - b.z) < 60);
+      if (b.items.length) {
+        b.emptiedAt = -1;
+        if (b.pickedAt !== undefined && economy.time - b.pickedAt > CRATE_RESTOCK * 3 && quiet) fillBox(b);
+      } else if (b.emptiedAt < 0) b.emptiedAt = economy.time;
+      else if (economy.time - b.emptiedAt > CRATE_RESTOCK && quiet) fillBox(b);
     } else if (b.kind === 'corpse' && economy.time > (b.expires ?? 0) && !locks.has(b.cid)) {
       boxes.delete(b.cid);
       broadcast({ t: 'corpse-', uid: b.cid });

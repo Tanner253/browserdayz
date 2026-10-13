@@ -4,6 +4,12 @@
 // magazines beside it full; the best there is to wear. The server makes every one of them (so each is a thing it
 // knows it put in the world) and hands the list to whoever it is for, whose game puts them on and away. What was
 // carried before goes, but for the dog tags; what finds no room is put at the feet.
+//
+// A kit "replaces everything", and that is the jacket and the trousers that were on as well, with what was in
+// their pockets (they are things since 2026-10-13). Nobody is left without: whoever is given a kit stands in a new
+// Field Jacket and new Field Trousers before the first thing of it is put away (PlayerInventory.clear), and every
+// kit is counted to fit with those on. So no kit lists a jacket or trousers of its own: one would only be a spare
+// in a pocket. (test/kits.test.ts holds both of these.)
 
 export interface KitThing {
   id: string;

@@ -4,8 +4,40 @@
 // typed. What each one does is `command` in server/index.ts: a line added here does nothing until it is added there.
 
 import { KITS } from '../sim/kits';
+import { POLICE_CAR } from '../sim/vehicles';
 
 export type Role = 'admin' | 'mod';
+
+/**
+ * What an admin can stand in the world with `/spawn` (2026-10-13: "add more admin tools that might be useful like
+ * spawn entities like cars and zombies and future entities would go here"). One list for both ends, as the orders
+ * are: the panel's Entities page is drawn from it row by row, the chat box offers from it, and the server reads it
+ * to know what is meant. A new kind of thing is one more row here, and (if it is made in a way of its own) one
+ * more `kind` for `/spawn` in server/index.ts to make.
+ */
+export interface Entity {
+  /** the word it is asked for by */
+  id: string;
+  name: string;
+  /** how the server makes it: a car (`k` says which car), or one of the infected */
+  kind: 'car' | 'infected';
+  k?: number;
+  /** the most of them one order stands */
+  most: number;
+  does: string;
+  /** other words it answers to */
+  also?: string[];
+}
+export const ENTITIES: Entity[] = [
+  { id: 'jeep', name: 'Jeep', kind: 'car', k: 0, most: 4, does: 'The off-road car: four seats, fuel in the tank', also: ['uaz', 'car'] },
+  { id: 'police', name: 'Police car', kind: 'car', k: POLICE_CAR.kind, most: 4, does: 'The road car: quicker than the jeep on a road, slower off it', also: ['policecar', 'cop'] },
+  { id: 'infected', name: 'Infected', kind: 'infected', most: 25, does: 'They stand where they are put, and go for whoever is near. Nothing comes back in their place when they are dead', also: ['zombie', 'zombies', 'z'] },
+];
+/** the thing meant by a word typed after `/spawn` */
+export const entityBy = (word: string): Entity | null => {
+  const w = word.toLowerCase();
+  return ENTITIES.find((e) => e.id === w || e.also?.includes(w)) ?? null;
+};
 
 export interface Order {
   name: string;
@@ -24,6 +56,10 @@ export const ORDERS: Order[] = [
   { name: 'timeout', args: ['who', 'minutes', '[why]'], does: 'Keep somebody off for up to 60 minutes' },
   { name: 'say', args: ['words'], does: 'Say something across everybody’s screen, and in the chat' },
   { name: 'del', args: ['what', 'number'], does: 'Take a thing out of the world: item, box (a body, a drop, a buried stash), car or z (one of the infected), by its number. The Delete key does it for whatever you are looking at', admin: true },
+  { name: 'spawn', args: ['entity', '[count]', '[x z]'], does: 'Stand something in the world: jeep, police (a police car) or infected. A few steps in front of you, or (after how many) at those map numbers', admin: true },
+  { name: 'delcar', args: ['[number]'], does: 'Take a car out of the world: the one nearest you, or the one of that number', admin: true },
+  { name: 'wrecks', args: [], does: 'Clear away every burned-out car now', admin: true },
+  { name: 'delz', args: ['[metres]'], does: 'Put down every one of the infected within so many metres of you (60 if not said)', admin: true },
   { name: 'restart', args: ['[seconds]', '[why]'], does: 'Tell everybody the server is about to restart (it only says so)', admin: true },
   { name: 'save', args: [], does: 'Write everybody and every stash to the site now (a deploy does it by itself; this is for a restart made by hand)', admin: true },
   { name: 'delc', args: ['[number]'], does: 'Take a comment off the changelog by its number; with no number, the newest are read out', admin: true },
@@ -48,7 +84,7 @@ export const ORDERS: Order[] = [
   { name: 'voidtag', args: ['[who]'], does: 'Dying, an admin leaves no dog tag of their own (again, to leave one)', admin: true },
   { name: 'ban', args: ['who', '[why]'], does: 'Ban for good: their game and their address', admin: true },
   { name: 'bans', args: [], does: 'Who is banned, numbered for /unban', admin: true },
-  { name: 'unban', args: ['number-or-name'], does: 'Lift a ban (the number is from /bans)', admin: true },
+  { name: 'unban', args: ['id-number-or-name'], does: 'Lift a ban: by its id or its number from /bans, or by the name if only one ban has it', admin: true },
   { name: 'admin', args: ['who'], does: 'Make somebody an admin', admin: true },
   { name: 'mod', args: ['who'], does: 'Make somebody a mod: kick, timeout and say', admin: true },
   { name: 'demote', args: ['who'], does: 'Take somebody’s role away', admin: true },
@@ -78,6 +114,7 @@ export interface Offer {
 }
 
 const MINUTES = ['5', '10', '30', '60'];
+const METRES = ['30', '60', '120', '250'];
 
 /**
  * What to offer under a line being typed. @returns null when the line is talk, or whoever types has no role.
@@ -124,6 +161,10 @@ export function offer(text: string, role: Role | null, here: { id: number; name:
     picks = KITS.filter((o) => o.id.startsWith(p)).map((o) => ({ label: o.id, note: o.does, fill: `${stem}${o.id} `, whole: false }));
   } else if (kind === 'minutes') {
     picks = MINUTES.filter((m) => m.startsWith(p) && m !== p).map((m) => ({ label: m, note: 'minutes', fill: `${stem}${m} `, whole: false }));
+  } else if (kind === 'entity') {
+    picks = ENTITIES.filter((e) => e.id.startsWith(p) || e.name.toLowerCase().startsWith(p) || !!e.also?.some((a) => a === p)).map((e) => ({ label: e.id, note: `${e.name}: ${e.does}`, fill: `${stem}${e.id} `, whole: false }));
+  } else if (kind === 'metres') {
+    picks = METRES.filter((m) => m.startsWith(p) && m !== p).map((m) => ({ label: m, note: 'metres', fill: `${stem}${m} `, whole: false }));
   }
   return { order, at, picks };
 }

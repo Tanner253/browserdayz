@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import { CSM } from 'three/addons/csm/CSM.js';
 import { assets } from '../core/assets';
 import { LEAN, TOUCH } from '../core/device';
-import { GAS, type GasZone } from '../sim/gas';
+import { GAS, type GasCloud, type GasZone } from '../sim/gas';
 
 /**
  * A sky picture made half the size each way: every four of its points made one, their light averaged. A few rows
@@ -104,8 +104,12 @@ export class Atmosphere {
   private low = 0;
   private glow: THREE.Mesh | null = null;
   private stars: THREE.Points | null = null;
-  /** Where the gas lies, if the world has any: said before init, which writes it into every shader that takes fog. */
-  gas: GasZone | null = null;
+  /** Every gas the world has: said before init, which writes them into every shader that takes fog. Each is drawn by the same lines. */
+  gases: GasCloud[] = [];
+  /** the works' gas (the first of them), for what asks only about that one: its loot, a trailer's shot of it */
+  get gas(): GasZone | null {
+    return this.gases[0] ?? null;
+  }
   /** the gas seen against the sky, where there is nothing behind it to be dimmed by it */
   gasDome: THREE.Mesh | null = null;
   envMap!: THREE.Texture;
@@ -364,49 +368,102 @@ export class Atmosphere {
     gl_FragColor.rgb = mix( gl_FragColor.rgb, atmoFogColor( fogDir ), fogAmt );
     #ifdef GAS_ZONE
       // (what is seen through the gas is lost to it, by as much of it as lies in the way)
-      gl_FragColor.rgb = mix( gl_FragColor.rgb, gasColor( fogDir ), gasAmount( cameraPosition, fogDir, fogDist ) );
+      vec2 gasIs = gasAmount( cameraPosition, fogDir, fogDist );
+      gl_FragColor.rgb = mix( gl_FragColor.rgb, gasColor( fogDir, gasIs.y ), gasIs.x );
     #endif
   }
 #endif`;
   }
 
   /**
-   * The gas, as the shaders know it: a low dome over one place, thickest at the middle and
-   * thinning to nothing at the rim. How much of it lies along a line of sight has an exact
-   * answer (the thickness is 1 - r squared, r being how far out toward the rim a point is),
-   * so it costs each pixel a square root and is right from outside, from inside and across
-   * the rim alike. Empty when the world has none.
+   * The gas, as the shaders know it: a bank of it over a place. It is one thing wherever it lies, with one set of
+   * figures (GAS in src/sim/gas.ts, where the user's words on how it should look are): every gas in `gases` is
+   * drawn by these lines and no others.
+   *
+   * Each is a low dome of it, reaching GAS.skirt further than it is breathed. How thick it is at a point: nothing
+   * at the dome's edge, rising (slowly, then fast) to its thickest where the breathing begins and the same from
+   * there in; thinned away above GAS.top of its height; and in the skirt broken into puffs and gaps by a slow
+   * pattern fixed in the world. How much of it lies along a line of sight is counted in ten steps along the part
+   * of the line that is in the dome, each line starting its steps a different fraction of a step along (by where
+   * its pixel is), so that ten steps show as a fine grain and not as bands. Only a pixel that is looking through
+   * a dome pays for it.
+   *
+   * Seen from outside it is a thick bank with a soft, broken edge, and whoever is in it is hidden by a few metres
+   * of it. To an eye that is in it, it is all but gone (GAS.within of it is left), over the way in through the
+   * skirt. The shader knows where the eye is and not what is on the face under it: an eye with no mask sees the
+   * air clear as well, for the seconds it lasts, through the green that closes in from the edges of the screen as
+   * the lungs fill (src/game/gas.ts).
+   *
+   * @param only one of them alone, by its number (what its own dome against the sky is drawn with)
    */
-  private gasGlsl() {
-    const g = this.gas;
-    if (!g) return '';
-    const s = this.sunDir;
+  private gasGlsl(only = -1) {
+    const all = this.gases;
+    if (!all.length) return '';
+    const s = this.sunDir, out = 1 + GAS.skirt;
     const vec3 = (x: number, y: number, z: number) => `vec3(${x.toFixed(5)}, ${y.toFixed(5)}, ${z.toFixed(5)})`;
+    const through = all
+      .map((g, i) => (only >= 0 && i !== only ? '' : `gasThrough( ro, rd, dist, ${vec3(g.x, g.y, g.z)}, ${vec3(1 / (g.r * out), 1 / (g.h * out), 1 / (g.r * out))}, ${g.floor.toFixed(2)}, got );`))
+      .join('\n    ');
     return /* glsl */ `
   #define GAS_ZONE
-  #define GAS_C ${vec3(g.x, g.y, g.z)}
-  #define GAS_INV ${vec3(1 / g.r, 1 / g.h, 1 / g.r)}
+  #define GAS_STEPS 10
   #define GAS_THICK ${GAS.thick.toFixed(5)}
+  // (one over how deep in the edge of what is breathed lies, depth being 0 at the dome's edge and 1 at its middle)
+  #define GAS_FULL ${(1 / (1 - 1 / (out * out))).toFixed(5)}
+  #define GAS_TOP ${GAS.top.toFixed(5)}
+  #define GAS_PUFFS ${GAS.puffs.toFixed(5)}
+  #define GAS_WITHIN ${GAS.within.toFixed(5)}
   #define GAS_COLOR ${vec3(GAS_COLOR.r, GAS_COLOR.g, GAS_COLOR.b)}
   #define GAS_SUN ${vec3(s.x, s.y, s.z)}
   #define GAS_DAY_AIR ${(this.fogColor.r + this.fogColor.g + this.fogColor.b).toFixed(5)}
-  float gasAmount( vec3 ro, vec3 rd, float dist ) {
-    vec3 q = ( ro - GAS_C ) * GAS_INV;
-    vec3 d = rd * GAS_INV;
+  // how thick it is at a point: where in its dome (the middle 0, the edge 1 out), and where in the world
+  float gasAt( vec3 p, vec3 w ) {
+    float full = clamp( ( 1.0 - dot( p, p ) ) * GAS_FULL, 0.0, 1.0 );
+    float puff = 0.6 * sin( w.x * 0.071 + w.y * 0.13 + 1.7 ) * sin( w.z * 0.063 - w.y * 0.11 ) + 0.4 * sin( w.x * 0.19 - w.z * 0.17 + w.y * 0.23 );
+    float d = clamp( full * full + GAS_PUFFS * puff * ( 1.0 - full ) * min( full * 6.0, 1.0 ), 0.0, 1.0 );
+    return d * ( 1.0 - smoothstep( GAS_TOP, 1.0, p.y ) );
+  }
+  // How much of one of them lies along a line of sight: the middle of it, one over its reach each way, and the
+  // height it has none under. Added to got.x in metres of it at its thickest, and to got.y the same weighed by how
+  // high in it each metre was (what it is shaded by).
+  void gasThrough( vec3 ro, vec3 rd, float dist, vec3 mid, vec3 inv, float low, inout vec2 got ) {
+    vec3 q = ( ro - mid ) * inv;
+    vec3 d = rd * inv;
     float a = dot( d, d ), b = dot( q, d ), c = dot( q, q ) - 1.0;
     float h = b * b - a * c;
-    if ( h <= 0.0 ) return 0.0;
+    if ( h <= 0.0 ) return;
     h = sqrt( h );
     float t1 = max( ( -b - h ) / a, 0.0 ), t2 = min( ( -b + h ) / a, dist );
-    if ( t2 <= t1 ) return 0.0;
-    float i1 = c * t1 + b * t1 * t1 + a * t1 * t1 * t1 / 3.0;
-    float i2 = c * t2 + b * t2 * t2 + a * t2 * t2 * t2 / 3.0;
-    return 1.0 - exp( -GAS_THICK * max( i1 - i2, 0.0 ) );
+    float over = ro.y - low;
+    if ( abs( rd.y ) > 1e-5 ) {
+      float tp = -over / rd.y;
+      if ( rd.y > 0.0 ) t1 = max( t1, tp ); else t2 = min( t2, tp );
+    } else if ( over < 0.0 ) return;
+    if ( t2 <= t1 ) return;
+    float dt = ( t2 - t1 ) / float( GAS_STEPS );
+    float t = t1 + dt * fract( 52.9829189 * fract( dot( gl_FragCoord.xy, vec2( 0.06711056, 0.00583715 ) ) ) );
+    vec2 sum = vec2( 0.0 );
+    for ( int i = 0; i < GAS_STEPS; i++ ) {
+      vec3 p = q + d * t;
+      float k = gasAt( p, ro + rd * t );
+      sum += vec2( k, k * p.y );
+      t += dt;
+    }
+    // (how far in the eye is, by the same measure: nothing outside it, one from where it is breathed)
+    float eye = clamp( -c * GAS_FULL, 0.0, 1.0 );
+    got += sum * dt * mix( 1.0, GAS_WITHIN, smoothstep( 0.15, 0.75, eye ) );
   }
-  vec3 gasColor( vec3 rd ) {
-    // a little lit through, looking toward the sun; and no brighter than the air is at this hour
+  // how much of what is seen along a line of sight is lost to the gas (x), and how high in it, on the whole, the gas on that line was (y: 0 its foot, 1 its top)
+  vec2 gasAmount( vec3 ro, vec3 rd, float dist ) {
+    vec2 got = vec2( 0.0 );
+    ${through}
+    return vec2( 1.0 - exp( -GAS_THICK * got.x ), got.y / max( got.x, 1e-4 ) );
+  }
+  vec3 gasColor( vec3 rd, float high ) {
+    // a little lit through, looking toward the sun; no brighter than the air is at this hour; and darker at its
+    // foot than toward its top, as a bank of anything is that the light comes down into
     float lit = clamp( dot( fogColor, vec3( 1.0 ) ) / GAS_DAY_AIR, 0.0, 1.0 );
-    return GAS_COLOR * lit * ( 1.0 + 0.45 * pow( max( dot( rd, GAS_SUN ), 0.0 ), 4.0 ) );
+    return GAS_COLOR * lit * ( 1.0 + 0.45 * pow( max( dot( rd, GAS_SUN ), 0.0 ), 4.0 ) ) * mix( 0.72, 1.22, smoothstep( 0.0, 0.5, high ) );
   }`;
   }
 
@@ -416,8 +473,10 @@ export class Atmosphere {
    * coloured by as much gas as lies between the eye and it.
    */
   private buildGasDome() {
-    const g = this.gas;
-    if (!g) return;
+    this.gases.forEach((g, i) => this.gasDomeOf(g, i));
+  }
+
+  private gasDomeOf(g: GasCloud, i: number) {
     const mat = new THREE.ShaderMaterial({
       side: THREE.BackSide,
       transparent: true,
@@ -435,16 +494,17 @@ export class Atmosphere {
       fragmentShader: /* glsl */ `
         uniform vec3 fogColor;
         varying vec3 vWorld;
-        ${this.gasGlsl()}
+        ${this.gasGlsl(i)}
         void main() {
           vec3 ray = vWorld - cameraPosition;
           float dist = length( ray );
           vec3 rd = ray / max( dist, 1e-4 );
-          gl_FragColor = vec4( gasColor( rd ), gasAmount( cameraPosition, rd, dist + 1.0 ) );
+          vec2 gasIs = gasAmount( cameraPosition, rd, dist + 1.0 );
+          gl_FragColor = vec4( gasColor( rd, gasIs.y ), gasIs.x );
         }`,
     });
     const dome = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 24), mat);
-    dome.scale.set(g.r, g.h, g.r);
+    dome.scale.set(g.r, g.h, g.r).multiplyScalar(1 + GAS.skirt + 0.02);
     dome.position.set(g.x, g.y, g.z);
     dome.frustumCulled = false;
     // (before anything else that is seen through: smoke and glass inside it are drawn over it)
@@ -452,7 +512,7 @@ export class Atmosphere {
     dome.matrixAutoUpdate = false;
     dome.updateMatrix();
     this.scene.add(dome);
-    this.gasDome = dome;
+    this.gasDome ??= dome;
   }
 
   /**
