@@ -605,4 +605,20 @@ ok('the ways down and the ways out: a body has room down each of them, and all t
   }
 });
 
+ok('the passage out is under the ground all its length: nothing of it stands out of the hill between the walls and the hatch', () => {
+  // (its second length climbs two metres: walls level with its upper end from end to end stood a metre out of the
+  // ground behind the hatch, and a walker was held by them, 2026-10-13)
+  for (const q of boxes) {
+    if (!/^passage (wall|roof|floor)$/.test(q.name)) continue;
+    const [qx, qy, qz, qw] = q.q;
+    for (let i = -1; i <= 1; i += 0.25) for (let k = -1; k <= 1; k += 0.25) {
+      const v = [i * q.h[0], q.h[1], k * q.h[2]], t = [2 * (qy * v[2] - qz * v[1]), 2 * (qz * v[0] - qx * v[2]), 2 * (qx * v[1] - qy * v[0])];
+      const p = [q.c[0] + v[0] + qw * t[0] + qy * t[2] - qz * t[1], q.c[1] + v[1] + qw * t[1] + qz * t[0] - qx * t[2], q.c[2] + v[2] + qw * t[2] + qx * t[1] - qy * t[0]];
+      // (under the fort itself it is under the terrace, not under the hill)
+      if (Math.abs(p[0]) < C.hx + 1.6 && Math.abs(p[2]) < C.hz + 1.6) continue;
+      assert.ok(p[1] < castleGround(p[0], p[2]) - 0.2, `the ${q.name} at ${p[0].toFixed(1)}, ${p[2].toFixed(1)} stands ${(p[1] - castleGround(p[0], p[2])).toFixed(2)} m over the ground`);
+    }
+  }
+});
+
 console.log(`castle: ${n} checks passed`);

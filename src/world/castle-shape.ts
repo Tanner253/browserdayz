@@ -209,7 +209,7 @@ function sky(p: V3, n: V3): number {
   }
   if (x > K.x0 + 0.3 && x < K.x1 - 0.3 && z > K.z0 + 0.3 && z < K.z1 - 0.3 && y < K.roof - 0.2) {
     // (a room with windows and a door has some of the day in it; the upper room, whose corner is open to the sky, more)
-    return x > K.fallen.x0 && z > K.fallen.z0 && y > K.floors[2] - 0.25 ? 1 : y > K.floors[2] - 0.25 ? 0.36 : 0.28;
+    return x > K.fallen.x0 && z > K.fallen.z0 && y > K.floors[2] - 0.25 ? 1 : y > K.floors[2] - 0.25 ? 0.4 : 0.32;
   }
   for (const tw of towers) {
     const dx = x - tw.cx, dz = z - tw.cz;
@@ -737,8 +737,15 @@ function apronPart(p: Apron, o: Out, put: Put, ground: (x: number, z: number) =>
     if (!p.wells.some((w) => off(w, x + CELL / 2, z + CELL / 2) < p.reach)) continue;
     for (const piece of clipOut([[x, 0, z], [x + CELL, 0, z], [x + CELL, 0, z + CELL], [x, 0, z + CELL]], hole)) {
       const pts = piece.map((v): V3 => [v[0], ground(v[0], v[2]) + 0.03, v[2]]);
-      for (let k = 1; k + 1 < pts.length; k++) o.tri([pts[0], pts[k], pts[k + 1]], [pts[0], pts[k], pts[k + 1]].map((v): UV => [v[0], v[2]]), UP, p.tone ?? 1);
       put({ t: 'hull', pts: [...pts, ...pts.map((v): V3 => [v[0], v[1] - 0.5, v[2]])].flat(), feet: false, surface: 'rock', name: p.name ?? 'apron' });
+    }
+    // What is seen of it: in squares of a metre, so that it lies as the ground lies between the corners of a square
+    // of two; and each corner faces as the ground faces there (the ground's own paint asks every corner how steep it
+    // is, for where snow lies and where rock shows: a lid of flat squares was seen as slabs, green where it was steep)
+    const lean = (qx: number, qz: number): V3 => unit([ground(qx - 2, qz) - ground(qx + 2, qz), 4, ground(qx, qz - 2) - ground(qx, qz + 2)]);
+    for (const [sx, sz] of [[x, z], [x + CELL / 2, z], [x, z + CELL / 2], [x + CELL / 2, z + CELL / 2]]) for (const piece of clipOut([[sx, 0, sz], [sx + CELL / 2, 0, sz], [sx + CELL / 2, 0, sz + CELL / 2], [sx, 0, sz + CELL / 2]], hole)) {
+      const pts = piece.map((v): V3 => [v[0], ground(v[0], v[2]) + 0.03, v[2]]), faces = pts.map((v) => lean(v[0], v[2]));
+      for (let k = 1; k + 1 < pts.length; k++) o.tri([pts[0], pts[k], pts[k + 1]], [pts[0], pts[k], pts[k + 1]].map((v): UV => [v[0], v[2]]), UP, p.tone ?? 1, [faces[0], faces[k], faces[k + 1]]);
     }
   }
 }

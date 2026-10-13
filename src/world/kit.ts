@@ -16,6 +16,7 @@
 
 import * as THREE from 'three';
 import { assets } from '../core/assets';
+import { breathe } from '../core/breathe';
 import { clipOut, kitMatrix, type KitPiece, type V3 } from '../sim/kit';
 import type { ShaderPatch } from './atmosphere';
 import { SNOW_GROUND } from './ground';
@@ -70,6 +71,8 @@ export async function kitMeshes(model: string, layout: KitPiece[], o: KitOptions
   const rows = new Map<string, { mat: THREE.MeshStandardMaterial; pos: number[]; nrm: number[]; uv: number[]; extra: number[] }>();
   const full = new THREE.Matrix4(), turnOnly = new THREE.Matrix3(), v = new THREE.Vector3(), n = new THREE.Vector3();
   for (const p of layout) {
+    // (a piece to a helping: a layout of a dozen pieces is a tenth of a second of sums, and nothing is drawn the while if it is done in one go)
+    await breathe();
     const stand = new THREE.Matrix4().fromArray(kitMatrix(p));
     for (const part of partsOf(root, p.id)) {
       const name = part.mat.name || 'stone';

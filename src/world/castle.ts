@@ -21,6 +21,7 @@
 import * as THREE from 'three';
 import { GLASS_GROUPS, WORLD_GROUPS, physics } from '../core/physics';
 import { assets } from '../core/assets';
+import { breathe } from '../core/breathe';
 import { SHADOW_FRUSTA, type Atmosphere, type ShaderPatch } from './atmosphere';
 import { ARCADE, CASTLE, UNDER, castleAt, castleLocal, castleUnder, castleDoor, castleKit, castleLamps, castleLoose, castleRocks, looseLocal, type GroundAt, type Loose, type Place } from '../sim/castle';
 import { PICTURES, SHEETS, castleShape, castleSky, type Sheet, type Skin, type Solid } from './castle-shape';
@@ -417,7 +418,10 @@ export class CastleSite {
         this.counts.draws++;
       }
     };
+    // (made a part at a time, between frames: see `breathe`)
+    await breathe();
     stand(this.near, 'castle', k.near);
+    await breathe();
     stand(this.under, 'castle under', k.under);
     this.under.add(this.shafts);
     // the kit's pieces, each material of them one thing to draw; the snow lies on them as on the rest (each corner is asked whether the sky is over it)
@@ -441,6 +445,7 @@ export class CastleSite {
       this.counts.draws++;
     }
     this.counts.kit = kit.triangles + door.triangles + rocks.triangles;
+    await breathe();
     // One shape for the sun's shadow maps, as the buildings have: a shadow map takes no notice of stuff, and six
     // things drawn again into each of three maps is eighteen where three will do.
     {

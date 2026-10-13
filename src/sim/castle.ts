@@ -500,6 +500,8 @@ export function castleRocks(ground: (x: number, z: number) => number = castleGro
   const face = (x0: number, z0: number, toward: number, scale: number, steep = 0.3, sink = 0.25, proud = 1.5) => {
     // (it stands so far out from where it was asked for, the way it faces: it leans back, and what it leans on is behind its top, not its foot)
     const a = (toward * Math.PI) / 180, turn = Math.atan2(Math.cos(a), Math.sin(a)), x = x0 + Math.cos(a) * proud, z = z0 + Math.sin(a) * proud;
+    // (not where the ground falls away before it: the world's own cliff is rock already, and a sheet stood at its lip hangs out over it in the air)
+    if (ground(x, z) - Math.min(ground(x + Math.cos(a) * 4, z + Math.sin(a) * 4), ground(x + Math.cos(a) * 6.5, z + Math.sin(a) * 6.5)) > 4) return;
     // (its own origin is to one side of its middle: it is set so that its middle is where it was asked for)
     const off = -0.35 * scale;
     out.push({ id: 'rock_face_01', at: [x + Math.cos(turn) * off, ground(x, z) - sink * scale, z - Math.sin(turn) * off], turn, tilt: [steep, 0], scale, body: false });
@@ -1036,7 +1038,8 @@ export const LOOSE: Loose[] = [
   // house from the fort, where nobody on the keep's roof, its wall top or a tower sees who goes down it. Its steps
   // go down northward, along the gable (the way it is turned: not turned, they go down toward the fort); the
   // passage is made from their foot to the fort, wherever it is set.
-  { kind: 'hatch', n: 0, x: 53.2, z: 1.6, rot: Math.PI },
+  // (a pace and a half from the first house's gable: at three quarters of a metre a body had no room to spare between that wall and the hatch's kerb)
+  { kind: 'hatch', n: 0, x: 54, z: 1.6, rot: Math.PI },
   // grey teeth of rock, clear of the ways people go
   ...([[27.5, -6.2], [30.5, 3.2], [34, -7.5], [37.5, 2.6], [40.5, -6.8], [44, -9.5], [52.5, 7.5], [63.5, -1.5], [74.5, 8.2], [85.5, 0.5], [97, -4], [16.5, -13.5], [15.8, 9.5], [-15.5, -12.5], [-16.5, 6.5], [-20, -4], [-24.5, -9], [-27, 2.5], [-32, -6.5], [-36.5, -1]] as [number, number][]).map(([x, z], n): Loose => ({ kind: 'rock', n, x, z, rot: n * 1.7 })),
 ];
@@ -1153,10 +1156,14 @@ export function looseParts(l: Loose, g = castleGround(l.x, l.z)): Part[] {
         const down = Math.hypot((a0[0] + b0[0]) / 2 - m[0], (a0[2] + b0[2]) / 2 - m[2]);
         parts.push({ t: 'vault', ...o, tone: 0.72, name: 'passage vault', a: [m[0], m[2]], b: [b[0], b[2]], wide: 2 * w, spring: m[1] + H.tall - 0.62, crown: m[1] + H.tall - 0.01, lift: b[1] - m[1], gone: L.path.length > 3 && k === 2 ? [[down - 1.25, down + 1.25]] : undefined });
       }
-      const lo = Math.min(a[1], b[1]) - 0.3, hi = Math.max(a[1], b[1]) + H.tall + 0.3;
       for (const sgn of [-1, 1]) {
         const from = on(a0, k === 0 ? -0.2 : -mitre(k - 1, sgn)), to = on(b0, last ? 0.1 : mitre(k, sgn));
-        parts.push({ t: 'wall', ...o, name: 'passage wall', a: plan(sgn > 0 ? from : to, sgn * (w + 0.125)), b: plan(sgn > 0 ? to : from, sgn * (w + 0.125)), y0: lo, top: hi, thick: 0.25 });
+        // (in pieces of three metres, each as high as its own roof and no higher: a length that climbs two metres had walls level with its upper end from end to end, and at its lower end they stood a metre out of the ground behind the hatch, where a walker was held by them)
+        const n = Math.max(1, Math.ceil(Math.hypot(to[0] - from[0], to[2] - from[2]) / 3)), at = (t: number): V3 => [from[0] + (to[0] - from[0]) * t, from[1] + (to[1] - from[1]) * t, from[2] + (to[2] - from[2]) * t];
+        for (let i = 0; i < n; i++) {
+          const p0 = at(i / n), p1 = at((i + 1) / n);
+          parts.push({ t: 'wall', ...o, name: 'passage wall', a: plan(sgn > 0 ? p0 : p1, sgn * (w + 0.125)), b: plan(sgn > 0 ? p1 : p0, sgn * (w + 0.125)), y0: Math.min(p0[1], p1[1]) - 0.3, top: Math.max(p0[1], p1[1]) + H.tall + 0.3, thick: 0.25 });
+        }
       }
       if (L.path.length > 3 && k === 2) {
         // half way along its middle length the roof has come down: a slab of it lies across the passage at a man's
