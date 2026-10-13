@@ -5,6 +5,9 @@ import * as THREE from 'three';
 import { assets } from '../core/assets';
 import type { Atmosphere } from './atmosphere';
 import { heightAt, type World } from './worldgen';
+import { buildBridges } from './bridge';
+import { buildGatehouse } from './gatehouse';
+import { SNOW_LIES, SNOW_PAINT } from './foliage';
 
 /** the asphalt is a ribbon laid just above the ground, so the two never fight for the same pixels */
 const ROAD_LIFT = 0.035;
@@ -31,6 +34,8 @@ export function buildRoad(world: World, atmo: Atmosphere, scene: THREE.Scene) {
   let mat: THREE.MeshStandardMaterial | null = null;
   let firstMesh: THREE.Mesh | null = null;
   for (const road of [world.road, ...world.roads]) {
+  // (the road over a bridge is the bridge's own to draw: there is no ground under it to lay asphalt on)
+  if ((road as { bridge?: boolean }).bridge) continue;
   const pts = road.points;
   const n = pts.length / 3;
   const W = road.width - 0.6;
@@ -95,10 +100,10 @@ export function buildRoad(world: World, atmo: Atmosphere, scene: THREE.Scene) {
     mat,
     (shader) => {
       shader.vertexShader = shader.vertexShader
-        .replace('#include <common>', '#include <common>\nattribute float aEdge;\nvarying float vEdge;\nvarying vec2 vRoadW;')
-        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvEdge = aEdge;\nvRoadW = position.xz;');
+        .replace('#include <common>', '#include <common>\nattribute float aEdge;\nvarying float vEdge;\nvarying vec2 vRoadW;\nvarying vec3 vRoadP;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvEdge = aEdge;\nvRoadW = position.xz;\nvRoadP = position;');
       shader.fragmentShader = shader.fragmentShader
-        .replace('#include <common>', '#include <common>\nvarying float vEdge;\nvarying vec2 vRoadW;\nfloat rh(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233))) * 43758.5453); }\nfloat rn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(rh(i),rh(i+vec2(1,0)),f.x), mix(rh(i+vec2(0,1)),rh(i+vec2(1,1)),f.x), f.y); }')
+        .replace('#include <common>', '#include <common>\nvarying float vEdge;\nvarying vec2 vRoadW;\nvarying vec3 vRoadP;' + SNOW_LIES + '\nfloat rh(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233))) * 43758.5453); }\nfloat rn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(rh(i),rh(i+vec2(1,0)),f.x), mix(rh(i+vec2(0,1)),rh(i+vec2(1,1)),f.x), f.y); }')
         .replace(
           '#include <alphatest_fragment>',
           `{
@@ -107,6 +112,14 @@ export function buildRoad(world: World, atmo: Atmosphere, scene: THREE.Scene) {
   if (keep < 0.5) discard;
   // dusty, faded edges
   diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 1.02, 0.92), smoothstep(0.55, 0.9, vEdge));
+  // Snow lies on it where it lies on the ground beside it (the mountain road climbs over the snow line): all over
+  // its edges, and thinner in the two tracks wheels have kept open, where the asphalt shows dark and wet.
+  float lies = snowLies(vRoadP);
+  if (lies > 0.0) {
+    float track = 1.0 - smoothstep(0.07, 0.2, abs(vEdge - 0.38) + (crumble - 0.5) * 0.08);
+    float laid = lies * (1.0 - 0.72 * track * (1.0 - 0.6 * smoothstep(0.75, 1.0, lies)));
+    diffuseColor.rgb = mix(diffuseColor.rgb * mix(1.0, 0.72, lies * track), ${SNOW_PAINT}, laid);
+  }
 }`,
         );
     },
@@ -120,5 +133,9 @@ export function buildRoad(world: World, atmo: Atmosphere, scene: THREE.Scene) {
   scene.add(mesh);
   firstMesh ??= mesh;
   }
+  // and the bridges the road goes over: their decks, piers and railings, and what is solid of them
+  buildBridges(world, atmo, scene);
+  // and the ruined gatehouse the mountain road stops at
+  if (world.gatehouse) buildGatehouse(world.gatehouse, atmo, scene);
   return firstMesh!;
 }

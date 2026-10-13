@@ -5,6 +5,7 @@
 
 import { RNG, Simplex, hash2, clamp, lerp, smoothstep } from '../core/noise';
 import { BUNKER, bunkerAt, type Place } from '../sim/bunker';
+import { wreckUnder, type Bridge } from '../sim/bridge';
 
 export const WORLD_SEED = 1337;
 /**
@@ -65,8 +66,201 @@ export function eastRoad(): [number, number][] {
  *   bed   – half the width that is level across, the road and its verges
  *   side  – how steeply the sides of the cutting and of the bank stand (rise over run)
  *   reach – how far from the road any of this goes
+ *
+ * Laid back (2026-10-13: "people complain that the chokepoint to kamenka is too restrictive and tight making it easy
+ * to gatekeep the loot"). The cutting was a trench: its sides stood at thirty-two degrees from the verge up, with the
+ * old hill's own cliffs over them, and for 320 m there were not fifteen metres of ground beside the road that
+ * anybody could stand on. One squad at the top held it. The road keeps its line and its height, and the hill is
+ * taken back from it: for `open` metres either side the ground rises only `bench` in one (a wood, with rocks in it,
+ * that is gone up through to left or right of the road), and beyond that at `lay`, which is still a hillside to
+ * walk and not to scramble, until it meets the hill. So the top can be come at from the side. Only what stood OVER
+ * the road is taken down: the bank that carries the road up from the old valley's floor is as it was. And the
+ * mountains of the map's edge are not laid back at all: where they begin, the hill is taken back only `keep` metres
+ * and stands over that at `wall`.
  */
-export const PASS = { from: 245, bed: 5.5, side: 0.62, reach: 150 };
+export const PASS = { from: 245, bed: 5.5, side: 0.62, reach: 190, open: 75, bench: 0.2, lay: 0.55, keep: 16, wall: 1 };
+/**
+ * The road made a loop (2026-10-12: "can we make the road that travels to the east town pass through and loop
+ * around, i think its time we make a full loop with the road. we will need to taper out some of the mountains
+ * around the east town and run the road through the wilderness"; "people complain that the chokepoint to kamenka is
+ * too restrictive and tight ... make the road pass through kamenka and loop back around to the main road, so that
+ * you can get to kamenka from multiple directions"; "the road should follow the natural geography of the land.
+ * perhaps we even make a bridge over a valley").
+ *
+ * It was one road with a dead end at each end. Now it goes on out of the far end of Kamenka's street, through a
+ * second door in the town's rim, over a gorge on a bridge, west along the high ground south of the old valley,
+ * round behind the Chemical Works and north along the high ground west of the valley, and comes down into the
+ * valley again by a second pass, onto the old road's west end. Village, pass, Kamenka, bridge, round and home.
+ *
+ *   door   – on from the end of the street: round to the south-west and out through the rim, to the bridge's north
+ *            end. The rim is let down into a saddle about it, as it was about the first door.
+ *   bridge – (see src/sim/bridge.ts) from the door's last point to this one
+ *   shelf  – on from the bridge's south end, round the foot of the south mountains and west along the shelf, behind
+ *            the works, and north to the head of the west pass
+ *   west   – the head of the west pass: round and down to the old road's first point. From there the old road is
+ *            the way, on its own line, as far down as `foot` (x, metres): the last of it that was level enough to
+ *            leave as it was. Everything east of that is as it was.
+ */
+export const LOOP = {
+  door: [[661, 470], [658, 497], [646, 527], [628, 556], [610, 583], [590, 598], [572, 602], [555, 602]] as [number, number][],
+  /** the bridge's far end, and how high its deck lies (the road's surface on it): level from bank to bank */
+  bridge: [489, 602] as [number, number],
+  deck: 102.5,
+  shelf: [
+    [474, 602], [452, 600.5], [430, 598], [408, 596], [385, 596], [350, 596], [300, 592], [240, 590], [180, 588], [120, 586], [60, 584], [0, 580], [-50, 575],
+    [-100, 571], [-150, 574], [-200, 580], [-250, 582], [-310, 580], [-370, 574], [-425, 556], [-464, 526], [-488, 490], [-499, 451], [-532, 406], [-566, 350],
+    [-582, 280], [-586, 200], [-584, 120], [-590, 50],
+  ] as [number, number][],
+  west: [[-600, 8], [-612, -38], [-617, -84], [-605, -124], [-578, -148]] as [number, number][],
+  foot: -357,
+  /** the most the new road climbs, rise over run: out of the town, and along the shelf (the west pass is one even climb, as the east one is) */
+  steep: { door: 0.13, shelf: 0.1 },
+  /**
+   * The ground beside it. Out of the town and along the shelf: level across for the road and its verges, then
+   * `bench` in one for `open` metres where the ground stands over the road, `lay` beyond, and `side` where the road
+   * is banked up over it; nothing further off than `reach`. The west pass is laid back as the east one is (PASS).
+   */
+  banks: { door: { reach: 120, open: 45, bench: 0.2, lay: 0.5, side: 0.5 }, shelf: { reach: 46, open: 14, bench: 0.3, lay: 0.5, side: 0.5 } },
+  /**
+   * The cleft the bridge is over. Between Kamenka's rim and the south mountains the ground was a hollow with no
+   * way out of it; it is cut down into a cleft from the foot of the one hill to the foot of the other, and the road
+   * goes over. Nobody drives round it: its ends are the two hills. Anybody can walk round the bridge through it.
+   *   line  – down its bed, north to south: [x, z, how high the bed is]
+   *   ways  – the two gullies that run down into it, which are the ways into it on foot: one from the saddle on
+   *           the town's side of the bridge, one from the open ground on the far side. Each from the cleft's bed
+   *           up to where it comes out onto the ground, a third of a metre up in every metre
+   *   bed   – half the width of a bed
+   *   side  – how steeply the sides stand (a steep bank, not a scramble); `under` – and under the bridge, between
+   *           the banks it springs from; `near` – how far up or down the cleft from the bridge's own line that
+   *           goes on, and by how far it has eased
+   */
+  cleft: {
+    line: [[533, 560, 97], [528, 570, 86], [524, 580, 81.5], [521.5, 602, 80], [518.5, 624, 81.5], [514, 634, 86], [508, 644, 97]] as [number, number, number][],
+    ways: [
+      [[524, 580, 81.5], [533, 570, 84], [544, 562, 88], [558, 557, 93], [572, 555, 98], [584, 556, 101.5]],
+      [[521, 588, 81], [510, 580, 84], [498, 574, 88.5], [486, 570, 93], [474, 567, 97], [462, 564, 100]],
+    ] as [number, number, number][][],
+    bed: 4,
+    side: 0.76,
+    under: 0.84,
+    near: [10, 24] as [number, number],
+    reach: 78,
+  },
+  /**
+   * A lay-by on the lip of the Chemical Works: a level place beside the road on the side toward the works, out to
+   * the very lip, from which all of the works is seen from above. `at`: the place on the road it is beside; `off`:
+   * how far its middle is from the middle of the road; how long it is along the road, and how wide.
+   */
+  layby: { at: [-499, 451] as [number, number], off: 9.5, long: 30, wide: 12 },
+  /**
+   * The Zona along it (see PLAY_AREAS): rounds of `zona` metres strung along the new road every `every` metres,
+   * each with its middle `inward` metres to the valley's side of the road, so that the ground between the road and
+   * the valley is all the Zona's and there are ninety metres of wood outside the road to fight in. Near a place
+   * that is to stay outside the line (OUTLYING) a round is only as big as leaves that place `clear` metres outside.
+   */
+  zona: 140,
+  inward: 50,
+  every: 48,
+  clear: 36,
+};
+/**
+ * The mountain road (2026-10-13; chosen by the owner of three ideas for the north: "for the castle I'd build a
+ * mountain road to a ruined gatehouse under it"). A dead end. It leaves the first pass just outside Kamenka's first
+ * door, goes north over the shoulder of the town's rim and along the high ground east of the old valley, through
+ * the pines, slants up the foot of the mountain, turns back on itself on the north end of the bench where the
+ * snow begins, and stops in the yard of a ruined gatehouse on that bench (src/world/gatehouse.ts). The fort on the
+ * brow above is reached on foot, by a path that goes up the face in three slants and along the crest.
+ *
+ *   road    – the points it is drawn through: the first is on the pass road
+ *   wide    – it is a lesser road than the loop: narrower, and its asphalt breaks up where it stops
+ *   steep   – the most it climbs, rise over run (the passes are steeper)
+ *   banks   – the ground beside it (as LOOP.banks); `climb` – and beside it from the foot of the climb on, where it
+ *             is a road on a mountainside: a bank a few metres wide, and the face left standing over it as rock stands
+ *   foot    – the point of `road` at the foot of the climb. The stretch about it is straight and nearly level:
+ *             the north ring, when it is built, leaves the mountain road here
+ *   turn    – the hairpin: its middle, and how far round it the ground is level with the road (room to swing a jeep)
+ *   yard    – the gatehouse's yard, on from the road's end: how far ahead of the end its middle is, how long it is
+ *             the way the road comes in, and how wide
+ *   path    – the way up on foot from the yard to the brow: the points it is drawn through, and half its width
+ *   castle  – where the fort is to stand (another lane's, set down in a later job): the middle of the crown of
+ *             the brow. Nothing grows or lies within `clear` metres of it, and the ground there is as it was: the
+ *             fort brings its own rock and its own levels (CASTLE.foot in src/sim/castle.ts)
+ */
+export const MOUNTAIN = {
+  road: [
+    [552, 235], [556, 214], [560, 190], [562, 160], [562, 130], [566, 100], [578, 72], [592, 40], [598, 0], [600, -40], [597, -80], [590, -115], [578, -150],
+    [575, -200], [576, -250], [577, -300], [576, -350], [577, -396], [575, -430], [575, -462], [585, -495], [601, -527], [610, -553], [616, -569], [626, -577],
+    [635, -570], [638, -556], [637, -540], [634, -515], [632, -488], [631, -466],
+  ] as [number, number][],
+  wide: 5.5,
+  steep: 0.16,
+  banks: { reach: 60, open: 18, bench: 0.25, lay: 0.55, side: 0.55 },
+  climb: { reach: 28, open: 4, bench: 0.3, lay: 1.3, side: 0.9, keep: 4, wall: 1.5 },
+  foot: 16,
+  turn: { x: 626, z: -561, r: 15 },
+  yard: { ahead: 15, long: 30, wide: 20 },
+  path: {
+    line: [[638.6, -436.7], [638.4, -432.2], [642.4, -432.3], [645.6, -434.7], [647.7, -442.4], [651.3, -449.3], [654.7, -456.2], [658.7, -463], [663.3, -469.4], [664.9, -473.1], [667.4, -470], [669.5, -462.4], [669.5, -454.4], [669.6, -446.4], [671.2, -438.7], [670.7, -434.7], [680, -452], [690, -468], [699, -483], [710, -494], [719, -510], [722, -526]] as [number, number][],
+    half: 1.3,
+    steep: 0.5,
+  },
+  castle: { x: 708, z: -532, clear: 45 },
+};
+/** The mountain road as a line over the ground, told off every four metres. */
+export function mountainLine(): [number, number][] {
+  return catmullRom(MOUNTAIN.road, 4);
+}
+/**
+ * The first road's line: the points it was drawn through, west to east. (Its points are told off from these, four
+ * metres apart: jeeps and street lamps go by their numbers, and the west pass by where the first of them lie.)
+ */
+const OLD_ROAD: [number, number][] = [[-540, -150], [-380, -110], [-250, -70], [-130, -25], [-40, 4], [30, 12], [110, 30], [190, 70], [300, 140], [420, 190], [540, 230]];
+/** the line the new road takes out of Kamenka: from the end of its street (the last point of `eastRoad`) to the bridge's near end */
+export function doorRoad(): [number, number][] {
+  return [eastRoad()[eastRoad().length - 1], ...LOOP.door];
+}
+let loopKept: { door: [number, number][]; main: [number, number][]; west: number; old: number } | null = null;
+/**
+ * The new road as lines over the ground, each told off every four metres: `door`, from the end of Kamenka's
+ * street to the bridge; and `main`, from the bridge's far end along the shelf and down the west pass to its foot
+ * on the old road. In `main` the west pass begins at point `west`, and from point `old` on its points are the old
+ * road's own first points, each where it was.
+ */
+export function loopLine() {
+  if (loopKept) return loopKept;
+  const door = catmullRom(doorRoad(), 4);
+  const shelf = catmullRom([LOOP.bridge, ...LOOP.shelf], 4);
+  const head = catmullRom([LOOP.shelf[LOOP.shelf.length - 1], ...LOOP.west, OLD_ROAD[0]], 4);
+  const first = catmullRom(OLD_ROAD, 4);
+  // (the old road's own points, from its first to the last of them that lies west of the foot)
+  const down: [number, number][] = [];
+  for (let i = 1; i < first.length && first[i][0] <= LOOP.foot; i++) down.push(first[i]);
+  return (loopKept = { door, main: [...shelf, ...head.slice(1), ...down], west: shelf.length - 1, old: shelf.length + head.length - 2 });
+}
+/** how far a spot is from a line of points, metres */
+function offLine(line: [number, number][], x: number, z: number, from = 0, to = line.length - 1): number {
+  let best = 1e9;
+  for (let k = from; k < to; k++) {
+    const [ax, az] = line[k], dx = line[k + 1][0] - ax, dz = line[k + 1][1] - az;
+    const t = clamp(((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz || 1), 0, 1);
+    best = Math.min(best, Math.hypot(x - ax - dx * t, z - az - dz * t));
+  }
+  return best;
+}
+/**
+ * The ground the loop was allowed to move, for whoever asks that nothing else has (test/expansion.test.ts): as
+ * far from the new road as its banks reach, the west pass as far as it was laid back, and the lay-by.
+ */
+export function loopFence(x: number, z: number): boolean {
+  const L = loopLine();
+  if (Math.hypot(x - LOOP.layby.at[0], z - LOOP.layby.at[1]) < LOOP.layby.long + LOOP.layby.off) return true;
+  if (offLine(L.door, x, z) < LOOP.banks.door.reach + 3) return true;
+  if (offLine(L.main, x, z, 0, L.west) < LOOP.banks.shelf.reach + 3) return true;
+  // (the west pass, and where the shelf road widens into it: as far down as its foot, and nothing beyond the line
+  // drawn across the road there)
+  const n = L.main.length, [bx, bz] = L.main[n - 1], ox = bx - L.main[n - 2][0], oz = bz - L.main[n - 2][1];
+  return ((x - bx) * ox + (z - bz) * oz) / Math.hypot(ox, oz) < 3 && offLine(L.main, x, z, Math.max(0, L.west - 20)) < PASS.reach + 3;
+}
 /**
  * One mountain (2026-10-13: "i want high elevation mountains to be snowcapped, and the surrounding area
  * snowcapped"). The edge of the map stood at the same height all the way round, 130 to 180 m: a wall, and nothing
@@ -96,13 +290,41 @@ export const OUTLYING: { name: string; kind: 'squat' | 'camp'; x: number; z: num
 ];
 /** how near the bunker, the way out to the town and the town itself nobody is set down when they start (metres) */
 export const NO_START = { bunker: 190, gate: 200, town: 320 };
+/** the rounds of the Zona there were before the road was made a loop: the valley, the works, the bunker, the way over to the town, the town */
+export const PLAY_FIRST = 5;
 export const PLAY_AREAS: { x: number; z: number; r: number }[] = [
   { x: 0, z: 0, r: PLAY_RADIUS },
   { x: EXPANSION.x, z: EXPANSION.z, r: EXPANSION.floor + EXPANSION.wall },
   { x: BUNKER_AT.x, z: BUNKER_AT.z, r: BUNKER.floor + BUNKER.wall },
   TOWN.gate,
   { x: TOWN.x, z: TOWN.z, r: TOWN.r },
+  ...loopRounds(),
 ];
+/**
+ * The Zona grown to take the loop in (2026-10-12: "run the road through the wilderness (expanding the zona where
+ * tags can be redeemed)"): rounds strung along the new road (see LOOP.zona), after the five there were. With the
+ * valley's own round they are one piece of ground with no hole in it: the road, the woods outside it, and
+ * everything between the road and the valley.
+ */
+function loopRounds(): { x: number; z: number; r: number }[] {
+  const L = loopLine(), out: { x: number; z: number; r: number }[] = [];
+  const along = (line: [number, number][]) => {
+    for (let i = 0; i < line.length; i += LOOP.every / 4) {
+      const [x, z] = line[i], d = Math.hypot(x, z) || 1;
+      // (its middle toward the middle of the map, where the valley is)
+      const cx = x - (x / d) * LOOP.inward, cz = z - (z / d) * LOOP.inward;
+      const r = Math.min(LOOP.zona, ...OUTLYING.map((o) => Math.hypot(cx - o.x, cz - o.z) - LOOP.clear));
+      if (r > 20) out.push({ x: Math.round(cx), z: Math.round(cz), r: Math.round(r) });
+      // (and where the road lies so far out that such a round does not reach the valley's own, one more between the
+      // two: nothing inside the loop is left outside the line)
+      const gap = d - LOOP.inward - LOOP.zona - PLAY_RADIUS;
+      if (gap > -30) out.push({ x: Math.round((x / d) * (PLAY_RADIUS + gap / 2)), z: Math.round((z / d) * (PLAY_RADIUS + gap / 2)), r: Math.round(gap / 2 + 55) });
+    }
+  };
+  along(L.door);
+  along(L.main);
+  return out;
+}
 
 /** Where the bunker stands in a world, and which way it faces: its pad's own level, not the hole under it. Null in a world that has none. */
 export function bunkerPlace(world: Pick<World, 'sites' | 'heights'>): Place | null {
@@ -124,28 +346,41 @@ export function inPlay(x: number, z: number, margin = 0): boolean {
  */
 export function playOutline(): { x: number; z: number; r: number; from: number; to: number }[] {
   const out: { x: number; z: number; r: number; from: number; to: number }[] = [];
-  for (const a of PLAY_AREAS) {
-    // the parts of this round that lie inside another: [toward the other, how far either side of that]
-    const cuts: [number, number][] = [];
-    for (const b of PLAY_AREAS) {
+  const TAU = Math.PI * 2, turn = (t: number) => ((t % TAU) + TAU) % TAU;
+  // (a round wholly inside another has no edge of its own: of two the same, the first is kept)
+  const within = (a: (typeof PLAY_AREAS)[number], b: (typeof PLAY_AREAS)[number]) => Math.hypot(b.x - a.x, b.z - a.z) + a.r <= b.r;
+  const rounds = PLAY_AREAS.filter((a, i) => !PLAY_AREAS.some((b, j) => j !== i && within(a, b) && (!within(b, a) || j < i)));
+  for (const a of rounds) {
+    // where its edge goes into another round, or comes out of one
+    let marks: number[] = [];
+    for (const b of rounds) {
       if (a === b) continue;
       const d = Math.hypot(b.x - a.x, b.z - a.z);
       if (d >= a.r + b.r || d <= Math.abs(a.r - b.r)) continue;
-      cuts.push([Math.atan2(b.z - a.z, b.x - a.x), Math.acos((a.r * a.r + d * d - b.r * b.r) / (2 * a.r * d))]);
+      const mid = Math.atan2(b.z - a.z, b.x - a.x), half = Math.acos((a.r * a.r + d * d - b.r * b.r) / (2 * a.r * d));
+      marks.push(turn(mid - half), turn(mid + half));
     }
-    if (!cuts.length) {
-      out.push({ ...a, from: 0, to: Math.PI * 2 });
+    if (!marks.length) {
+      out.push({ ...a, from: 0, to: TAU });
       continue;
     }
-    // what is left: from the end of each cut, round to the start of the next
-    cuts.sort((p, q) => p[0] - q[0]);
-    cuts.forEach(([mid, half], k) => {
-      const next = cuts[(k + 1) % cuts.length];
-      const from = mid + half;
-      let to = next[0] - next[1];
-      while (to <= from) to += Math.PI * 2;
-      out.push({ ...a, from, to });
+    marks.sort((p, q) => p - q);
+    marks = marks.filter((m, k) => k === 0 || m - marks[k - 1] > 1e-9);
+    // (Between one mark and the next the edge is all inside another round or all outside every one: its middle says
+    // which. With five rounds, none of which lay over two others at one place, the end of each cut was the start of
+    // an arc; with rounds strung along a road, three and four deep, it is not.)
+    const free = marks.map((m, k) => {
+      const t = (m + (k + 1 < marks.length ? marks[k + 1] : marks[0] + TAU)) / 2, x = a.x + Math.cos(t) * a.r, z = a.z + Math.sin(t) * a.r;
+      return !rounds.some((b) => b !== a && Math.hypot(x - b.x, z - b.z) < b.r - 1e-9);
     });
+    for (let k = 0; k < marks.length; k++) {
+      if (!free[k] || free[(k + marks.length - 1) % marks.length]) continue;
+      let last = k;
+      while (free[(last + 1) % marks.length] && last - k < marks.length) last++;
+      let to = marks[(last + 1) % marks.length];
+      while (to <= marks[k]) to += TAU;
+      out.push({ ...a, from: marks[k], to });
+    }
   }
   return out;
 }
@@ -393,7 +628,11 @@ export interface World {
   grass: Uint8Array;
   road: { points: Float32Array; width: number };
   /** roads laid since: each a line of its own. (Never added to the first one's points: jeeps and street lamps are told off along those by number.) */
-  roads: { points: Float32Array; width: number; /** a side street: its asphalt lies just under the road's where it leaves it, and breaks up at its far end */ side?: boolean }[];
+  roads: { points: Float32Array; width: number; /** a side street: its asphalt lies just under the road's where it leaves it, and breaks up at its far end */ side?: boolean; /** the road over a bridge: its two ends, on the deck. No asphalt is laid on the ground for it (see `bridges`) */ bridge?: boolean }[];
+  /** the bridges the road goes over (see src/sim/bridge.ts): each is also a line of `roads` */
+  bridges: Bridge[];
+  /** the ruined gatehouse at the end of the mountain road (see MOUNTAIN, src/world/gatehouse.ts): the road's end, on its surface, and which way the road was running there (about Y: at 0 it runs toward +z). Null in a world that has none. */
+  gatehouse: { x: number; y: number; z: number; rot: number } | null;
   buildings: BuildingPlot[];
   trees: Instance[];
   rocks: Instance[];
@@ -461,6 +700,44 @@ function catmullRom(pts: [number, number][], step: number): [number, number][] {
   return out;
 }
 
+/**
+ * A field of the grid evened out over the cells about each (`reach` cells either way, along and then across, twice
+ * over), counting only the cells `has` says it is known on. A new field: the same as the old wherever it is not known.
+ */
+function evenOut(field: Float32Array, has: (i: number) => boolean, reach: number): Float32Array {
+  const N = WORLD_RES, known = new Uint8Array(N * N);
+  let x0 = N, x1 = -1, z0 = N, z1 = -1;
+  for (let i = 0; i < N * N; i++) {
+    if (!has(i)) continue;
+    known[i] = 1;
+    const ix = i % N, iz = (i - ix) / N;
+    x0 = Math.min(x0, ix);
+    x1 = Math.max(x1, ix);
+    z0 = Math.min(z0, iz);
+    z1 = Math.max(z1, iz);
+  }
+  let cur = field.slice();
+  for (let pass = 0; pass < 4; pass++) {
+    const next = cur.slice(), along = pass % 2 === 0;
+    for (let iz = z0; iz <= z1; iz++) {
+      for (let ix = x0; ix <= x1; ix++) {
+        const i = iz * N + ix;
+        if (!known[i]) continue;
+        let sum = 0, n = 0;
+        for (let k = -reach; k <= reach; k++) {
+          const jx = along ? ix + k : ix, jz = along ? iz : iz + k;
+          if (jx < x0 || jx > x1 || jz < z0 || jz > z1 || !known[jz * N + jx]) continue;
+          sum += cur[jz * N + jx];
+          n++;
+        }
+        next[i] = sum / n;
+      }
+    }
+    cur = next;
+  }
+  return cur;
+}
+
 // ------------------------------------------------------------------ generation
 
 export function generateWorld(seed = WORLD_SEED): World {
@@ -513,11 +790,7 @@ export function generateWorld(seed = WORLD_SEED): World {
   }
 
   // --- road: its line is needed early, so nothing else is put in its way
-  const ctrl: [number, number][] = [
-    [-540, -150], [-380, -110], [-250, -70], [-130, -25], [-40, 4], [VILLAGE.x, 12],
-    [110, 30], [190, 70], [300, 140], [420, 190], [540, 230],
-  ];
-  const path2 = catmullRom(ctrl, 4);
+  const path2 = catmullRom(OLD_ROAD, 4);
   const roadGap = (x: number, z: number) => {
     let best = 1e9;
     for (const [px, pz] of path2) best = Math.min(best, Math.hypot(px - x, pz - z));
@@ -1541,6 +1814,10 @@ export function generateWorld(seed = WORLD_SEED): World {
     // comes over from the old valley, wide enough that its sides are slopes and not walls. And its floor is level.
     valley = true;
     const through: [number, number][] = [...path2.filter(([x]) => x > 360), ...eastRoad()];
+    // (And a second way is left through it where the road goes on out of the far end of the street: see LOOP. A
+    // narrower one: sixty metres to either side, and the rim stands whole beyond. East of the street's end the rim
+    // is all there is between the town and the edge of the ground.)
+    const doorWay = catmullRom(doorRoad(), 4);
     const fromRoad = (x: number, z: number) => {
       let best = 1e9;
       for (let k = 0; k < through.length - 1; k++) {
@@ -1562,7 +1839,7 @@ export function generateWorld(seed = WORLD_SEED): World {
         // (Inside the valley the rim is the only hill there is: the mountains of the edge begin again at its crest.
         // Left standing under it, they came down to the very edge of the floor east of the town, as a bare wall.)
         const edge = ringShape(x, z);
-        heights[i] += Math.max(rimOf(q) * crest * smoothstep(18, 115, fromRoad(x, z)), edge * smoothstep(1.7, KAMENKA.crest, q)) - edge;
+        heights[i] += Math.max(rimOf(q) * crest * smoothstep(18, 115, fromRoad(x, z)) * smoothstep(14, 62, offLine(doorWay, x, z)), edge * smoothstep(1.7, KAMENKA.crest, q)) - edge;
         const level = 1 - smoothstep(1.0, 1.32, q);
         if (level > 0) heights[i] = lerp(heights[i], floorY + 0.3 * n3.fbm(x * 0.02, z * 0.02, 3), level);
       }
@@ -1631,6 +1908,11 @@ export function generateWorld(seed = WORLD_SEED): World {
       return lerp(b, a, h) - k * h * (1 - h);
     };
     const back = [way[1][0] - way[0][0], way[1][1] - way[0][1]];
+    // (How high the road is, for the laying back of the hill: not the height of the nearest of it, which is one thing
+    // on one side of a line and another on the other wherever the road bends. Inside the bend above the town that was
+    // a step of thirteen metres, a hundred metres from the road. Far from the road it is that height evened out over
+    // the ground about.)
+    const ws = evenOut(wh, (i) => wd[i] < PASS.reach, 15);
     for (let i = 0; i < N * N; i++) {
       const d = wd[i];
       if (d >= PASS.reach) continue;
@@ -1638,9 +1920,18 @@ export function generateWorld(seed = WORLD_SEED): World {
       // (nothing behind where it begins: the road there is the old road, at its own height)
       if ((x - way[0][0]) * back[0] + (z - way[0][1]) * back[1] < 0) continue;
       // (the sides are not ruled: a little steeper here, a little less there)
-      const off = Math.max(0, d - PASS.bed) * PASS.side * (0.86 + 0.28 * (0.5 + 0.5 * n1.noise(x * 0.021 + 11, z * 0.021 - 5)));
+      const uneven = 0.86 + 0.28 * (0.5 + 0.5 * n1.noise(x * 0.021 + 11, z * 0.021 - 5));
+      const off = Math.max(0, d - PASS.bed) * PASS.side * uneven;
+      // (The cutting, laid back: see PASS. A gentle rise for `open` metres and a hillside beyond; and the ground of it
+      // heaves a little, as a wood's floor does, so that there is something to lie behind.)
+      const out = Math.max(0, d - PASS.bed);
+      // (Not the mountains of the map's edge: where those begin the hill is taken back no further than a verge's
+      // width, and stands over it as steeply as a mountain does. Laid back, they were let down to a bank at the very
+      // edge of the ground.)
+      const lay = lerp(Math.min(out, PASS.open) * PASS.bench + Math.max(0, out - PASS.open) * PASS.lay, Math.min(out, PASS.keep) * PASS.bench + Math.max(0, out - PASS.keep) * PASS.wall, smoothstep(0.05, 0.3, edgeOf(x, z))) * uneven + 2.4 * n2.fbm(x * 0.027 - 4, z * 0.027 + 8, 3) * smoothstep(PASS.bed + 6, 42, d);
       const bed = wh[i] - 0.08, round = Math.min(3, off * 0.5) + 1e-6;
-      let y = least(heights[i], bed + off, round);
+      // (and never less than it was taken back before it was laid back at all)
+      let y = least(heights[i], Math.min(bed + off, lerp(wh[i], ws[i], smoothstep(12, 50, d)) - 0.08 + lay), Math.min(3, Math.max(0, lay) * 0.5) + 1e-6);
       y = -least(-y, off - bed, round);
       // (the verges, as along every road)
       y = lerp(y, bed, 1 - smoothstep(ROAD_W * 0.5 + 0.5, 16, d));
@@ -2252,6 +2543,401 @@ export function generateWorld(seed = WORLD_SEED): World {
       }
   }
 
+  // --- the fourth expansion (2026-10-13): the road made a loop (see LOOP). On out of the far end of Kamenka's
+  // street, over a cleft on a bridge, west along the high ground south of the valley, round behind the works and
+  // north along the high ground west of it, and down into the valley again by a second pass, onto the old road's
+  // west end. By the rule of the others: its own dice, after everything, nothing renumbered. Of the old map it
+  // moves the ground the west pass is cut through (the old road's first points keep their places and are given new
+  // heights, as its last were for the first pass) and the ground under the road where it rounds the works; and
+  // nothing else (see `loopFence`).
+  const bridges: Bridge[] = [];
+  let gatehouse: World['gatehouse'] = null;
+  {
+    const before = heights.slice();
+    const rng8 = new RNG(seed + 9393);
+    const cell = (x: number, z: number) => idx(clamp(Math.round((x + half) / CELL), 0, N - 1), clamp(Math.round((z + half) / CELL), 0, N - 1));
+    const L = loopLine(), K = LOOP;
+    const least = (a: number, b: number, k: number) => {
+      const h = clamp(0.5 + (0.5 * (b - a)) / k, 0, 1);
+      return lerp(b, a, h) - k * h * (1 - h);
+    };
+    /** how far along a line each of its points is */
+    const runOf = (line: [number, number][]) => {
+      const run = [0];
+      for (let k = 1; k < line.length; k++) run.push(run[k - 1] + Math.hypot(line[k][0] - line[k - 1][0], line[k][1] - line[k - 1][1]));
+      return run;
+    };
+    /**
+     * How high a road lies along a line: the ground's own height, evened out along it (a road is cut a little and
+     * banked a little: fifty metres of it at a time), from the height it begins at, and at its end too where that is
+     * said; nowhere steeper than `most`.
+     */
+    const laid = (line: [number, number][], most: number, first: number, last?: number) => {
+      const raw = line.map(([x, z]) => heightAt(heights, x, z));
+      const ys = raw.map((_, i) => {
+        let sum = 0, c = 0;
+        for (let k = -12; k <= 12; k++) {
+          const w = 1 - Math.abs(k) / 13;
+          sum += raw[clamp(i + k, 0, raw.length - 1)] * w;
+          c += w;
+        }
+        return sum / c;
+      });
+      ys[0] = first;
+      if (last !== undefined) ys[ys.length - 1] = last;
+      for (let pass = 0; pass < 3; pass++) {
+        for (let i = 1; i < ys.length - (last !== undefined ? 1 : 0); i++) {
+          const m = most * Math.hypot(line[i][0] - line[i - 1][0], line[i][1] - line[i - 1][1]);
+          ys[i] = clamp(ys[i], ys[i - 1] - m, ys[i - 1] + m);
+        }
+        for (let i = ys.length - 2; i > 0; i--) {
+          const m = most * Math.hypot(line[i][0] - line[i + 1][0], line[i][1] - line[i + 1][1]);
+          ys[i] = clamp(ys[i], ys[i + 1] - m, ys[i + 1] + m);
+        }
+      }
+      return ys;
+    };
+
+    // 1. How high the road lies. Out of the town it climbs from the street's own height to the bridge's; along the
+    // shelf it rises and falls with the land; and the west pass is one even fall, from the shelf to where the old
+    // road comes onto the valley's floor.
+    const street = roads[0].points, doorY = laid(L.door, K.steep.door, street[street.length - 2], K.deck);
+    const shelfY = laid(L.main.slice(0, L.west + 1), K.steep.shelf, K.deck);
+    const run = runOf(L.main), footI = L.main.length - 1 - L.old;
+    const top = shelfY[L.west], whole = run[run.length - 1] - run[L.west];
+    // (it eases into the fall at its head over a tenth of its length; at its foot the old road is already falling as fast)
+    const ease = (t: number) => {
+      const e = 0.1, v = 1 / (1 - e / 2);
+      return t < e ? (v * t * t) / (2 * e) : v * (t - e / 2);
+    };
+    const mainY = L.main.map((_, i) => (i <= L.west ? shelfY[i] : lerp(top, smooth[footI], ease((run[i] - run[L.west]) / whole))));
+    // (the old road's first points: each where it was, at its new height)
+    for (let k = 0; k < footI; k++) {
+      smooth[k] = mainY[L.old + k];
+      roadPts[k * 3 + 1] = mainY[L.old + k];
+    }
+
+    // 2. The ground brought to it. Level across for the road and its verges; where the ground stands over the road
+    // it is taken back from it, gently and then as a hillside (`banks`, by how far along the line a spot is); where
+    // it lies under the road it is banked up. And nothing behind where a line begins, or beyond where it ends, where
+    // it is said to stop there (`stops`): at the end of Kamenka's street, and where the old road comes onto the
+    // valley's floor, the ground beyond is as it was. (At the bridge the banks are rounded off about the road's end.)
+    type Banks = { reach: number; open: number; bench: number; lay: number; side: number; /** on the mountains of the map's edge: how far the hill is taken back, and how steeply it stands over that (unsaid: as the passes have it) */ keep?: number; wall?: number };
+    // (the mountains of the map's edge are not laid back: see PASS)
+    const lay = (line: [number, number][], ys: number[], banks: (run: number) => Banks, most: number, stops: [boolean, boolean], leave?: (i: number) => number) => {
+      const dist = new Float32Array(N * N).fill(1e9), hh = new Float32Array(N * N), rr = new Float32Array(N * N), runs = runOf(line), whole = runs[runs.length - 1];
+      rasterLine(line, ys, most, dist, hh);
+      rasterLine(line, runs, most, new Float32Array(N * N).fill(1e9), rr);
+      // (the road's height far from it is that evened out over the ground about: see the first pass)
+      const soft = evenOut(hh, (i) => dist[i] < most, 15);
+      const a = line[0], b = line[line.length - 1], fwd = [line[1][0] - a[0], line[1][1] - a[1]], on = [b[0] - line[line.length - 2][0], b[1] - line[line.length - 2][1]];
+      for (let i = 0; i < N * N; i++) {
+        const d = dist[i];
+        if (d >= most) continue;
+        const x = -half + (i % N) * CELL, z = -half + Math.floor(i / N) * CELL;
+        // (and toward a place it stops at, less and less of the ground beside it is moved: none at the line drawn
+        // across the road there, where moved ground would stand against ground that is not as a step)
+        const ahead = ((x - a[0]) * fwd[0] + (z - a[1]) * fwd[1]) / Math.hypot(fwd[0], fwd[1]), short = ((b[0] - x) * on[0] + (b[1] - z) * on[1]) / Math.hypot(on[0], on[1]);
+        // (asked only of the ground about that end of it: a line that comes round on itself has ground far along it
+        // that lies behind where it began)
+        const first = stops[0] && rr[i] < 70, last = stops[1] && rr[i] > whole - 70;
+        if ((first && ahead < 0) || (last && short < 0)) continue;
+        const all = (first ? smoothstep(0, 40, ahead) : 1) * (last ? smoothstep(0, 40, short) : 1);
+        const B = banks(rr[i]);
+        if (d >= B.reach) continue;
+        const uneven = 0.86 + 0.28 * (0.5 + 0.5 * n1.noise(x * 0.021 + 11, z * 0.021 - 5));
+        const out = Math.max(0, d - PASS.bed);
+        const keep = B.keep ?? PASS.keep, wall = B.wall ?? PASS.wall;
+        const cut = lerp(Math.min(out, B.open) * B.bench + Math.max(0, out - B.open) * B.lay, Math.min(out, keep) * B.bench + Math.max(0, out - keep) * wall, smoothstep(0.05, 0.3, edgeOf(x, z))) * uneven + 2.4 * n2.fbm(x * 0.027 - 4, z * 0.027 + 8, 3) * smoothstep(PASS.bed + 6, 42, d);
+        const off = out * B.side * uneven, bed = hh[i] - 0.08;
+        let y = least(heights[i], lerp(hh[i], soft[i], smoothstep(12, 50, d)) - 0.08 + cut, Math.min(3, Math.max(0, cut) * 0.5) + 1e-6);
+        y = -least(-y, off - bed, Math.min(3, off * 0.5) + 1e-6);
+        y = lerp(y, bed, 1 - smoothstep(ROAD_W * 0.5 + 0.5, 16, d));
+        // (and nothing of it inside the bowl of the works, whose wall is the works' own: the road passes along its lip)
+        const bowl = smoothstep(EXPANSION.floor + EXPANSION.wall - 4, EXPANSION.floor + EXPANSION.wall + 8, Math.hypot(x - EXPANSION.x, z - EXPANSION.z));
+        // (nor of whatever it is told to leave alone: the bed of a road it leaves, which is that road's)
+        heights[i] = lerp(heights[i], lerp(y, heights[i], smoothstep(B.reach - 20, B.reach, d)), Math.max(all, 1 - smoothstep(ROAD_W * 0.5 + 0.5, 16, d)) * bowl * (leave ? leave(i) : 1));
+        if (d < 16 && d <= roadDist[i] + 0.01) {
+          roadDist[i] = d;
+          roadH[i] = hh[i];
+        }
+      }
+      return dist;
+    };
+    const doorDist = lay(L.door, doorY, () => K.banks.door, K.banks.door.reach, [true, false]);
+    // (the shelf road widens into the pass over a hundred metres about its head)
+    const pass: Banks = { reach: PASS.reach, open: PASS.open, bench: PASS.bench, lay: PASS.lay, side: PASS.side };
+    const mix = (w: number): Banks => ({ reach: lerp(K.banks.shelf.reach, pass.reach, w), open: lerp(K.banks.shelf.open, pass.open, w), bench: lerp(K.banks.shelf.bench, pass.bench, w), lay: lerp(K.banks.shelf.lay, pass.lay, w), side: lerp(K.banks.shelf.side, pass.side, w) });
+    const mainDist = lay(L.main, mainY, (r) => mix(smoothstep(run[L.west] - 60, run[L.west] + 40, r)), PASS.reach, [false, true]);
+
+    // 3. The cleft (see LOOP.cleft): the ground cut down to a bed that falls from the foot of each hill to the
+    // bridge, its sides a bank that is walked down everywhere but under the bridge itself, where they stand steeper
+    // between the two banks the bridge springs from.
+    const A = L.door[L.door.length - 1], Bz = K.bridge, span = Math.hypot(Bz[0] - A[0], Bz[1] - A[1]), bux = (Bz[0] - A[0]) / span, buz = (Bz[1] - A[1]) / span;
+    const C = K.cleft, cleftLines: [number, number][][] = [];
+    const cleftDist = new Float32Array(N * N).fill(1e9), cleftH = new Float32Array(N * N);
+    {
+      for (const way of [C.line, ...C.ways]) {
+        // (the bed's height along it: between the heights said, by how far along it a point is)
+        const xz = way.map(([x, z]) => [x, z] as [number, number]), line = catmullRom(xz, 4);
+        const at = runOf(xz), cr = runOf(line), scale = at[at.length - 1] / cr[cr.length - 1];
+        const bedY = cr.map((r) => {
+          const q = r * scale;
+          let k = 1;
+          while (k < at.length - 1 && at[k] < q) k++;
+          return lerp(way[k - 1][2], way[k][2], clamp((q - at[k - 1]) / (at[k] - at[k - 1] || 1), 0, 1));
+        });
+        rasterLine(line, bedY, C.reach, cleftDist, cleftH);
+        cleftLines.push(line);
+      }
+      // (far from a bed its height is evened out over the ground about, as a road's is: between the cleft's head and
+      // a gully beside it the nearer of the two was one height on one side of a line and another on the other)
+      const soft = evenOut(cleftH, (i) => cleftDist[i] < C.reach, 9);
+      for (let i = 0; i < N * N; i++) {
+        const d = cleftDist[i];
+        if (d >= C.reach) continue;
+        const x = -half + (i % N) * CELL, z = -half + Math.floor(i / N) * CELL;
+        // how far up or down the cleft from the bridge's own line this is
+        const under = 1 - smoothstep(C.near[0], C.near[1], Math.abs((x - A[0]) * -buz + (z - A[1]) * bux));
+        const uneven = lerp(0.9 + 0.2 * (0.5 + 0.5 * n1.noise(x * 0.031 - 3, z * 0.031 + 17)), 1, under);
+        // (its bed is the bed of something that ran here: stones and hollows, a hand or two deep)
+        const cap = lerp(cleftH[i], soft[i], smoothstep(5, 26, d) * (1 - under)) + Math.max(0, d - C.bed) * lerp(C.side, C.under, under) * uneven + 0.4 * n3.fbm(x * 0.09, z * 0.09 + 4, 3) * (1 - under * 0.5);
+        if (heights[i] <= cap - 2.5) continue;
+        heights[i] = lerp(least(heights[i], cap, lerp(2.5, 0.6, under)), heights[i], smoothstep(C.reach - 10, C.reach, d));
+      }
+    }
+
+    // 4. The lay-by (see LOOP.layby): the ground beside the road, toward the works, level with the road.
+    const layDist = new Float32Array(N * N).fill(1e9);
+    /** where it is: its middle, and which way the road runs beside it (a unit) */
+    const layAt = (() => {
+      const Y = K.layby;
+      let near = 1;
+      for (let k = 1; k < L.main.length - 1; k++) if (Math.hypot(L.main[k][0] - Y.at[0], L.main[k][1] - Y.at[1]) < Math.hypot(L.main[near][0] - Y.at[0], L.main[near][1] - Y.at[1])) near = k;
+      const tx = L.main[near + 1][0] - L.main[near - 1][0], tz = L.main[near + 1][1] - L.main[near - 1][1], tl = Math.hypot(tx, tz);
+      // (to the side of the road the works is on)
+      const side = Math.sign((EXPANSION.x - L.main[near][0]) * (-tz / tl) + (EXPANSION.z - L.main[near][1]) * (tx / tl)) || 1;
+      return { x: L.main[near][0] + (-tz / tl) * side * Y.off, z: L.main[near][1] + (tx / tl) * side * Y.off, tx: tx / tl, tz: tz / tl, side, y: mainY[near] - 0.08 };
+    })();
+    {
+      const Y = K.layby, R = Y.long;
+      for (let iz = Math.max(0, Math.floor((layAt.z - R + half) / CELL)); iz <= Math.min(N - 1, Math.ceil((layAt.z + R + half) / CELL)); iz++)
+        for (let ix = Math.max(0, Math.floor((layAt.x - R + half) / CELL)); ix <= Math.min(N - 1, Math.ceil((layAt.x + R + half) / CELL)); ix++) {
+          const x = -half + ix * CELL - layAt.x, z = -half + iz * CELL - layAt.z, i = idx(ix, iz);
+          const e = Math.hypot(Math.max(0, Math.abs(x * layAt.tx + z * layAt.tz) - Y.long / 2), Math.max(0, Math.abs(x * -layAt.tz + z * layAt.tx) - Y.wide / 2));
+          layDist[i] = e;
+          // (not the road's own bed; and not the wall of the works, which begins at its far edge)
+          if (e < 6) heights[i] = lerp(heights[i], layAt.y, (1 - smoothstep(0.5, 6, e)) * smoothstep(ROAD_W / 2 - 0.4, ROAD_W / 2 + 1.2, mainDist[i]) * smoothstep(EXPANSION.floor + EXPANSION.wall - 2, EXPANSION.floor + EXPANSION.wall + 6, Math.hypot(x + layAt.x - EXPANSION.x, z + layAt.z - EXPANSION.z)));
+          // (worn bare, as a place cars pull off onto is: painted as a track)
+          if (e < 1.5 && e < trackDist[i]) trackDist[i] = e;
+        }
+    }
+
+    // 5. What grew or lay there. Gone from the road, from the lay-by and from under the bridge, and from any face
+    // of the cleft too steep to hold it; everything else stands on the ground as it is now.
+    const underDeck = (x: number, z: number, margin: number) => {
+      const along = (x - A[0]) * bux + (z - A[1]) * buz;
+      return along > -margin && along < span + margin && Math.abs((x - A[0]) * -buz + (z - A[1]) * bux) < ROAD_W / 2 + margin;
+    };
+    for (const list of [trees, rocks, props]) {
+      const clear = list === trees ? ROAD_W / 2 + 4 : ROAD_W / 2 + 2;
+      for (let k = list.length - 1; k >= 0; k--) {
+        const t = list[k], i = cell(t.x, t.z);
+        // (and no tree between the lay-by and the works: it is there for what is seen from it)
+        const view = list === trees && Math.hypot(t.x - layAt.x, t.z - layAt.z) < 34 && (t.x - layAt.x) * (EXPANSION.x - layAt.x) + (t.z - layAt.z) * (EXPANSION.z - layAt.z) > 0;
+        if (doorDist[i] < clear || mainDist[i] < clear || layDist[i] < 2 || view || underDeck(t.x, t.z, list === trees ? 5 : 2) || (cleftDist[i] < C.reach && slopeAt(heights, t.x, t.z) > 1.05)) list.splice(k, 1);
+        else {
+          const moved = heightAt(heights, t.x, t.z) - heightAt(before, t.x, t.z);
+          if (moved) t.y += moved;
+        }
+      }
+    }
+
+    // 6. Rocks: on the hillsides the two passes and the door were laid back into, and in the cleft. (Trees are cover
+    // that is walked through; a rock is cover that stops a round.) After every rock there was.
+    const kinds = ['rock_moss_set_01', 'rock_moss_set_02'];
+    const strew = (line: [number, number][], from: number, to: number, n: number, near: number, far: number, big: number) => {
+      for (let k = 0; k < n; k++) {
+        const j = rng8.int(from, to), [px, pz] = line[j], [qx, qz] = line[Math.min(line.length - 1, j + 1)], l = Math.hypot(qx - px, qz - pz) || 1;
+        const out = (rng8.chance(0.5) ? 1 : -1) * rng8.range(near, far), turn = rng8.range(0, 6.28), size = rng8.next(), which = rng8.int(0, 5), set = rng8.pick(kinds), boulder = rng8.chance(big);
+        const x = px - ((qz - pz) / l) * out, z = pz + ((qx - px) / l) * out, i = cell(x, z);
+        if (Math.abs(x) > half - 12 || Math.abs(z) > half - 12 || roadDist[i] < ROAD_W / 2 + 2.5 || trackDist[i] < 3 || layDist[i] < 3 || insideBuilding(x, z, 3) || underDeck(x, z, 1.5)) continue;
+        if (slopeAt(heights, x, z) > 0.9 || rocks.some((q) => Math.hypot(q.x - x, q.z - z) < 4)) continue;
+        const y = heightAt(heights, x, z);
+        rocks.push(boulder ? { kind: 'boulder_01', x, y: y - 0.3, z, rot: turn, scale: 1.2 + size * 1.3 } : { kind: `${set}#${which}`, x, y: y - 0.2, z, rot: turn, scale: 0.8 + size * 0.9 });
+      }
+    };
+    // the first pass, where it is a cutting (its bank up from the valley's floor is as it was)
+    const way1: [number, number][] = [...path2.filter(([x]) => x >= 400), ...catmullRom(eastRoad(), 4).slice(1, 14)];
+    strew(way1, 0, way1.length - 2, 110, 9, PASS.open + 25, 0.35);
+    strew(L.door, 4, L.door.length - 6, 46, 9, 70, 0.35);
+    strew(L.main, L.west, L.main.length - 6, 120, 9, PASS.open + 25, 0.35);
+    strew(cleftLines[0], 2, cleftLines[0].length - 3, 40, 0, 30, 0.5);
+    // (And four stones in the bed right under the bridge: something to wait behind there, and a supply drop is not
+    // set down from the sky on ground with a stone on it, as it would be on the one level place the deck is over.)
+    for (const [dx, dz, size, turn] of [[-1.8, -2.4, 1.5, 0.4], [2.4, -2.1, 1.9, 2.1], [-2.2, 2.5, 2.1, 4.0], [2.6, 2.3, 1.4, 5.2]]) {
+      const x = C.line[3][0] + dx, z = C.line[3][1] + dz;
+      rocks.push({ kind: 'boulder_01', x, y: heightAt(heights, x, z) - 0.3, z, rot: turn, scale: size });
+    }
+
+    // 7. And the ground is painted again wherever any of this reaches (and is the ground that is seen, there).
+    for (let i = 0; i < N * N; i++) {
+      if (!(doorDist[i] < K.banks.door.reach + 4 || mainDist[i] < PASS.reach + 4 || cleftDist[i] < C.reach + 4 || layDist[i] < 10)) continue;
+      // (where the ground was moved, where the road or its verge is, and a little about: the rest is as it was painted)
+      if (Math.abs(heights[i] - before[i]) < 0.02 && doorDist[i] > 22 && mainDist[i] > 22 && layDist[i] > 10) continue;
+      paint(i % N, Math.floor(i / N));
+      if (surface) surface[i] = heights[i];
+    }
+
+    // 8. The road itself: a line out of the town to the bridge, the bridge, and a line from the bridge to the old
+    // road's first point (from which the old road is the way, as it always was).
+    const points = (line: [number, number][], ys: number[], n: number) => {
+      const pts = new Float32Array(n * 3);
+      for (let i = 0; i < n; i++) pts.set([line[i][0], ys[i], line[i][1]], i * 3);
+      return pts;
+    };
+    roads.push({ points: points(L.door, doorY, L.door.length), width: ROAD_W });
+    roads.push({ points: new Float32Array([A[0], K.deck, A[1], Bz[0], K.deck, Bz[1]]), width: ROAD_W, bridge: true });
+    roads.push({ points: points(L.main, mainY, L.old + 1), width: ROAD_W });
+    bridges.push({ ax: A[0], ay: K.deck, az: A[1], bx: Bz[0], by: K.deck, bz: Bz[1] });
+
+    // 9. What was left along it, of the things the game has: blocks either side of the road before each end of the
+    // bridge, where it was once shut; the lay-by's own blocks along its lip, a car pulled off into it and a tyre; a
+    // car run onto the verge where the shelf road comes round behind the works; and in the cleft, under the gap in
+    // the bridge's railing, the jeep that made it, on its roof (what it carried lies about it: see `wreckUnder`, and
+    // the places for things that Buildings.plan() adds after every other). After every thing there was.
+    const stand = (kind: string, x: number, z: number, rot: number, lean?: [number, number, number]) => props.push({ kind, x, y: heightAt(heights, x, z), z, rot, scale: 1, ...(lean ? { lean: [lean[0], lean[1], heightAt(heights, x, z) + lean[2]] as [number, number, number] } : {}) });
+    /** a spot beside the road: so far along a line (its point's number), so far to its right, and which way the road runs there */
+    const beside = (line: [number, number][], i: number, right: number): [number, number, number] => {
+      const [px, pz] = line[clamp(i - 1, 0, line.length - 1)], [qx, qz] = line[clamp(i + 1, 0, line.length - 1)], l = Math.hypot(qx - px, qz - pz) || 1;
+      return [line[i][0] - ((qz - pz) / l) * right, line[i][1] + ((qx - px) / l) * right, Math.atan2(qx - px, qz - pz)];
+    };
+    for (const [line, i] of [[L.door, L.door.length - 5], [L.main, 4]] as [[number, number][], number][]) {
+      for (const [right, turn] of [[5.1, 0.5], [-5.3, -0.35]]) {
+        const [x, z, way] = beside(line, i, right);
+        stand('concrete_road_barrier', x, z, way + Math.PI / 2 + turn);
+      }
+    }
+    {
+      const Y = K.layby, way = Math.atan2(layAt.tx, layAt.tz);
+      // (along the road, and out toward the works)
+      const at = (along: number, out: number): [number, number] => [layAt.x + layAt.tx * along - layAt.tz * layAt.side * out, layAt.z + layAt.tz * along + layAt.tx * layAt.side * out];
+      for (const along of [-10.5, -3.5, 3.5, 10.5]) stand('concrete_road_barrier', ...at(along, Y.wide / 2 - 0.9), way + (along > 9 ? 0.25 : along < -9 ? -0.2 : 0.04));
+      stand('covered_car', ...at(-7, -1.5), way + 0.12);
+      props.push({ kind: 'old_tyre', x: at(5.5, 1.2)[0], y: heightAt(heights, ...at(5.5, 1.2)) + 0.08, z: at(5.5, 1.2)[1], rot: 1.1, scale: 1 });
+    }
+    {
+      const [x, z, way] = beside(L.main, Math.round(L.west * 0.585), 5.4);
+      stand('covered_car', x, z, way + 0.3);
+    }
+    for (const b of bridges) {
+      const w = wreckUnder(b);
+      stand('uaz_469', w.x, w.z, w.rot, [0.16, 2.62, 2.05]);
+      props.push({ kind: 'old_tyre', x: w.x + 2.9, y: heightAt(heights, w.x + 2.9, w.z - 0.8) + 0.08, z: w.z - 0.8, rot: 0.4, scale: 1 });
+    }
+
+    // 10. The mountain road (see MOUNTAIN). After everything above, and by the same rules; all of it on ground
+    // the old map did not have.
+    {
+      const M = MOUNTAIN, was = heights.slice(), roadWas = roadDist.slice();
+      // where it leaves the pass: its first point is on the pass road, and it begins beside that road's asphalt, at
+      // that road's own height there
+      let from = { d: 1e9, x: 0, y: 0, z: 0, tx: 1, tz: 0 };
+      for (const pts of [roadPts, roads[0].points]) for (let i = 0; i < pts.length / 3 - 1; i++) {
+        const d = Math.hypot(pts[i * 3] - M.road[0][0], pts[i * 3 + 2] - M.road[0][1]);
+        if (d < from.d) from = { d, x: pts[i * 3], y: pts[i * 3 + 1], z: pts[i * 3 + 2], tx: pts[i * 3 + 3] - pts[i * 3], tz: pts[i * 3 + 5] - pts[i * 3 + 2] };
+      }
+      const tl = Math.hypot(from.tx, from.tz), sideOf = Math.sign((M.road[1][0] - from.x) * (-from.tz / tl) + (M.road[1][1] - from.z) * (from.tx / tl)) || 1;
+      const begin: [number, number] = [from.x + (-from.tz / tl) * sideOf * (ROAD_W / 2 - 1.1), from.z + (from.tx / tl) * sideOf * (ROAD_W / 2 - 1.1)];
+      const line = catmullRom([begin, ...M.road.slice(1)], 4), ys = laid(line, M.steep, from.y);
+      // (level with the pass road for its first paces: it is that road's verge it crosses)
+      for (let i = 1; i < 4; i++) ys[i] = Math.min(ys[i], from.y + 0.02 * i);
+      for (let i = 4; i < ys.length; i++) {
+        const most = M.steep * Math.hypot(line[i][0] - line[i - 1][0], line[i][1] - line[i - 1][1]);
+        ys[i] = clamp(ys[i], ys[i - 1] - most, ys[i - 1] + most);
+      }
+      // (the foot of the climb, as far along the line as its point of that number is)
+      const mtRun = runOf(line);
+      let footAt = 0;
+      for (let i = 1; i < line.length; i++) if (Math.hypot(line[i][0] - M.road[M.foot][0], line[i][1] - M.road[M.foot][1]) < Math.hypot(line[footAt][0] - M.road[M.foot][0], line[footAt][1] - M.road[M.foot][1])) footAt = i;
+      const onHill = (r: number): Banks => {
+        const w = smoothstep(mtRun[footAt] + 10, mtRun[footAt] + 90, r), a = M.banks, b = M.climb;
+        return { reach: lerp(a.reach, b.reach, w), open: lerp(a.open, b.open, w), bench: lerp(a.bench, b.bench, w), lay: lerp(a.lay, b.lay, w), side: lerp(a.side, b.side, w), keep: lerp(PASS.keep, b.keep, w), wall: lerp(PASS.wall, b.wall, w) };
+      };
+      const mtDist = lay(line, ys, onHill, M.banks.reach, [true, false], (i) => smoothstep(ROAD_W / 2 + 1, 14, roadWas[i]));
+      /** the road's height at the point of it nearest a place */
+      const roadAt = (x: number, z: number) => {
+        let best = 0;
+        for (let i = 1; i < line.length; i++) if (Math.hypot(line[i][0] - x, line[i][1] - z) < Math.hypot(line[best][0] - x, line[best][1] - z)) best = i;
+        return { i: best, y: ys[best] };
+      };
+      // the hairpin: the ground inside the bend and about it is level with the road, so that a jeep has room to come round
+      const padDist = new Float32Array(N * N).fill(1e9);
+      const level = (cx: number, cz: number, R: number, y: number, e: (x: number, z: number) => number, ease: number) => {
+        for (let iz = Math.max(0, Math.floor((cz - R + half) / CELL)); iz <= Math.min(N - 1, Math.ceil((cz + R + half) / CELL)); iz++)
+          for (let ix = Math.max(0, Math.floor((cx - R + half) / CELL)); ix <= Math.min(N - 1, Math.ceil((cx + R + half) / CELL)); ix++) {
+            const i = idx(ix, iz), d = e(-half + ix * CELL - cx, -half + iz * CELL - cz);
+            padDist[i] = Math.min(padDist[i], d);
+            // (not the road's own bed, which climbs through it)
+            if (d < ease) heights[i] = lerp(heights[i], y, (1 - smoothstep(0, ease, d)) * smoothstep(ROAD_W / 2 + 0.5, ROAD_W / 2 + 5, mtDist[i]));
+          }
+      };
+      level(M.turn.x, M.turn.z, M.turn.r + 12, roadAt(M.turn.x, M.turn.z - M.turn.r + 4).y - 0.08, (x, z) => Math.max(0, Math.hypot(x, z) - M.turn.r), 9);
+      // the gatehouse's yard, at the road's end: level with it
+      const end = line[line.length - 1], endY = ys[ys.length - 1] - 0.08;
+      const ex = end[0] - line[line.length - 3][0], ez = end[1] - line[line.length - 3][1], el = Math.hypot(ex, ez);
+      level(end[0] + (ex / el) * M.yard.ahead, end[1] + (ez / el) * M.yard.ahead, M.yard.long, endY, (x, z) => Math.hypot(Math.max(0, Math.abs((x * ex + z * ez) / el) - M.yard.long / 2), Math.max(0, Math.abs((x * -ez + z * ex) / el) - M.yard.wide / 2)), 8);
+      // The path up to the brow: a ledge a body wide, trodden bare, nowhere steeper than a hillside is walked.
+      const path = catmullRom(M.path.line, 3), pathDist = new Float32Array(N * N).fill(1e9), pathH = new Float32Array(N * N);
+      {
+        const py = laid(path, M.path.steep, endY + 0.08);
+        rasterLine(path, py, 8, pathDist, pathH);
+        for (let i = 0; i < N * N; i++) {
+          const d = pathDist[i];
+          if (d >= 6) continue;
+          // (not the yard, which it leaves; and within `clear` of the fort's place only the ledge itself)
+          heights[i] = lerp(heights[i], pathH[i], (1 - smoothstep(M.path.half, M.path.half + 3.2, d)) * smoothstep(0, 3, padDist[i]));
+          if (d < M.path.half + 0.4 && d < trackDist[i]) trackDist[i] = d;
+        }
+      }
+      // (What is left standing steeper than rock stands, between the two legs of the climb and over the yard, is let
+      // slump as the cut behind the bunker was: down only, and never the road's bed, the yard or the path.)
+      for (let pass = 0; pass < 40; pass++) {
+        for (let i = N + 1; i < N * N - N - 1; i++) {
+          // (close to the road, where it was cut: less and less further off, and nothing of the mountain's own face)
+          if (mtDist[i] < 7 || mtDist[i] >= 30 || padDist[i] < 1.5 || pathDist[i] < 3.5 || Math.abs(heights[i] - was[i]) < 0.3) continue;
+          const h = heights[i], lo = Math.min(heights[i - 1], heights[i + 1], heights[i - N], heights[i + N]);
+          if (h - lo > 1.2 * CELL) heights[i] = lerp(h, lo + 1.2 * CELL, 0.5 * (1 - smoothstep(16, 30, mtDist[i])));
+        }
+      }
+      // What grew or lay there: gone from the road, the hairpin, the yard and the path, and from the fort's place;
+      // the rest stands on the ground as it is now.
+      for (const list of [trees, rocks, props]) {
+        const clear = list === trees ? ROAD_W / 2 + 3.5 : ROAD_W / 2 + 2;
+        for (let k = list.length - 1; k >= 0; k--) {
+          const t = list[k], i = cell(t.x, t.z);
+          if (mtDist[i] < clear || padDist[i] < 2 || pathDist[i] < M.path.half + (list === trees ? 2 : 1) || Math.hypot(t.x - M.castle.x, t.z - M.castle.z) < M.castle.clear) list.splice(k, 1);
+          else {
+            const moved = heightAt(heights, t.x, t.z) - heightAt(was, t.x, t.z);
+            if (moved) t.y += moved;
+          }
+        }
+      }
+      // (and rocks beside it where it climbs: fallen from the face it is cut into)
+      strew(line, Math.round(line.length * 0.62), line.length - 8, 46, 6, 26, 0.45);
+      for (let i = 0; i < N * N; i++) {
+        if (!(mtDist[i] < M.banks.reach + 4 || padDist[i] < 12 || pathDist[i] < 9)) continue;
+        if (Math.abs(heights[i] - was[i]) < 0.02 && mtDist[i] > 22 && padDist[i] > 10 && pathDist[i] > 5) continue;
+        paint(i % N, Math.floor(i / N));
+        if (surface) surface[i] = heights[i];
+      }
+      // (a lesser road: a street's asphalt, which lies under the edge of the pass road's where it leaves it and breaks up where it stops)
+      roads.push({ points: points(line, ys, line.length), width: M.wide, side: true });
+      // (where the gatehouse stands: the road's end, and the way the road was going there)
+      gatehouse = { x: end[0], y: ys[ys.length - 1], z: end[1], rot: Math.atan2(ex, ez) };
+    }
+  }
+
   // Where anybody starts. The ring of starts was laid before there was a bunker, or a town in the east: nobody
   // is now set down by the bunker (the last place on the map and the best), nor between the valley and the town.
   // The ring itself is kept as it was first made (`spawnRing`), for whatever tells the old map by it.
@@ -2264,6 +2950,8 @@ export function generateWorld(seed = WORLD_SEED): World {
     grass,
     road: { points: roadPts, width: ROAD_W },
     roads,
+    bridges,
+    gatehouse,
     buildings,
     trees,
     rocks,

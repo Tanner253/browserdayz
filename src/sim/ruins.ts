@@ -28,8 +28,8 @@ export type V3 = [number, number, number];
 export type Piece = 'alcazar' | 'curtain' | 'gate' | 'honeycomb' | 'spur' | 'north' | 'stubA' | 'stubB' | 'stump';
 export const PIECE_NAMES: Piece[] = ['alcazar', 'curtain', 'gate', 'honeycomb', 'spur', 'north', 'stubA', 'stubB', 'stump'];
 
-/** what a part is made of: rubble limestone in mortar, the rammed earth of a wall's heart (seen where it is broken), trodden earth, paving, old timber */
-export type Paint = 'stone' | 'core' | 'earth' | 'paving' | 'timber';
+/** what a part is made of: rubble limestone in mortar; the rammed earth and stones of a wall's heart (seen where it is broken); fallen stone and earth; sand, blown in and trodden; what is walked on along a wall and through a gate; old timber */
+export type Paint = 'stone' | 'core' | 'earth' | 'sand' | 'paving' | 'timber';
 /** what a part stops: everything; a body and nothing else (a rail, a timber stair: a shot goes through); nothing */
 export type Body = 'all' | 'feet' | 'none';
 
@@ -341,17 +341,19 @@ export const ALCAZAR = {
   /** the two walls that leave its west front: the south one over the moat, in the palace's own measure, and how it is turned from the front */
   south: { z: 51.5, turn: 0.21405 },
   /** the floors of its courts, over the town's top: the upper court, the middle and east courts, the lower ward (which is the ground itself) */
-  upper: -4.5,
-  middle: -7,
-  lower: -11,
+  upper: -1.5,
+  middle: -4,
+  lower: -8,
   /** what the ground under its floors must be dug to: nothing of it may stand higher */
-  dug: -12.5,
+  dug: -9.2,
+  /** the top of the keep's wall: sixteen metres and more over the ditch at its foot */
+  keep: 14.6,
   /** its corners, along the middle lines of its outer walls: the north end of the front, the south end, the two towers of the point, the two corners of the lower ward */
   A: [0, 0] as V2, B: [0, 51.5] as V2, C: [71.4, 36.3] as V2, D: [74.9, 23.6] as V2, N2: [38.8, -4.5] as V2, N1: [21, -22.4] as V2,
   /** the great arch: where it is along the front, how wide, where it springs and how high its crown is */
   arch: { z0: 19, z1: 23.5, crown: 6.85 },
   /** the way in from the arch: level through the gate, then down to the upper court */
-  ramp: { level: 3.3, foot: 21.5 },
+  ramp: { level: 3.3, foot: 12 },
   /** the walks: along the top of the west wall and over the arch, and along the south wall */
   walk: { west: 9, south: SILL },
   /** where the west wall is breached: from where to where along the front, and how high the sill of the gap is left */
@@ -385,14 +387,15 @@ function alcazar(): Part[] {
 
   // ---- the keep at the north end of the front: the tallest thing there is, its foot in the ditch
   {
-    const w = wall(rect(-0.6, -3.6, 6.6, 3.6), 1.8, -15, 11.6, { closed: true, ruin: { seed: 11, bite: 0.9, floor: 10.9 }, name: 'keep' });
+    const w = wall(rect(-0.6, -3.6, 6.6, 3.6), 1.8, -15, A.keep, { closed: true, ruin: { seed: 11, bite: 0.9, floor: A.keep - 0.7 }, batter: 0.4, name: 'keep' });
     opening(w, 3, 3.6, 1.1, SILL, 2.2);
     opening(w, 3, 3.6, 1.0, 7.1, 9.2);
-    for (const [x, z] of [[-0.6, 0], [3, -3.6], [6.6, 0]] as V2[]) for (const y of [4.7, 8.2]) opening(w, x, z, 0.5, y, y + 1.3);
-    for (const [x, z] of [[-0.6, 1.8], [-0.6, -1.8], [1.2, -3.6], [4.8, -3.6], [6.6, -1.8], [6.6, 1.8], [1.2, 3.6], [4.8, 3.6]] as V2[]) opening(w, x, z, 0.9, 11.0, 99);
-    fallen(w, [3.8, -3.6], [6.6, 1.4], 8.6, 2.6);
-    add(w, ...towerFloors(0.3, -2.7, 5.7, 2.7, [SILL, 3.6, 7.1, 10.1], 'keep', [undefined, undefined, undefined, [[0.3, -2.7], [3.3, -2.7], [5.7, 0.5], [5.7, 2.7], [0.3, 2.7]]]));
-    add(heap(9.6, -6.4, L, 4.2, 3.6, 2.1, 281, 0.6), ...strewn(10.5, -7.5, L, 12, 5, 283), { ...beam([8.2, L + 1.9, -5.2], [12.4, L + 0.25, -8.6], 0.2, 0.22), near: true });
+    for (const [x, z] of [[-0.6, 0], [3, -3.6], [6.6, 0]] as V2[]) for (const y of [4.7, 8.2, 11.6]) opening(w, x, z, 0.5, y, y + 1.3);
+    for (const [x, z] of [[-0.6, 1.8], [-0.6, -1.8], [1.2, -3.6], [4.8, -3.6], [6.6, -1.8], [6.6, 1.8], [1.2, 3.6], [4.8, 3.6]] as V2[]) opening(w, x, z, 0.9, A.keep - 0.6, 99);
+    // (its corner toward the town has gone from the top, and lies before it)
+    fallen(w, [2.2, 3.6], [-0.6, 1], A.keep - 3, 2.6);
+    add(w, ...towerFloors(0.3, -2.7, 5.7, 2.7, [SILL, 3.6, 7.1, 10.6, 13.1], 'keep', [undefined, undefined, undefined, undefined, [[0.3, -2.7], [5.7, -2.7], [5.7, 2.7], [2.6, 2.7], [0.3, 0.4]]]));
+    add(heap(-3.4, 5.6, 0, 3.4, 3, 1.5, 281, 0.6), ...strewn(-4.5, 4.5, 0, 12, 5, 283), ...strewn(9.5, -6.5, L, 8, 4, 285));
   }
   // ---- the block beside it: a hall on the ground, a roof to fight from, the way through to the keep
   {
@@ -500,23 +503,23 @@ function alcazar(): Part[] {
   }
   // ---- the church along the south wall: its long walls, the round end, the gable, a gallery, what is left of a roof
   {
-    const south = wall([S(20.6, -3.6), S(47, -3.6)], 1.2, U - 3.5, 4, { ruin: { seed: 73, bite: 4.4, floor: -0.6 }, name: 'church south wall' });
+    const south = wall([S(20.6, -3.6), S(47, -3.6)], 1.2, U - 3.5, U + 8.5, { ruin: { seed: 73, bite: 4.4, floor: U + 3.9 }, name: 'church south wall' });
     opening(south, ...S(40, -3.6), 1.1, U, U + 2.2);
-    for (const x of [26, 33]) opening(south, ...S(x, -3.6), 0.8, -0.5, 1.7, true);
-    const apse = wall(arc(47, -8.5, 4.9, 90, -90, 12, S), 1.2, M - 4, 2.6, { ruin: { seed: 79, bite: 1.5, floor: 0.6 }, name: 'apse' });
-    for (const a of [45, 0, -45]) opening(apse, ...S(47 + 4.9 * Math.cos((a * Math.PI) / 180), -8.5 + 4.9 * Math.sin((a * Math.PI) / 180)), 0.55, -3.1, -1.3);
-    const north = wall([S(47, -13.4), S(20.6, -13.4)], 1.2, U - 3.5, 3, { ruin: { seed: 83, bite: 5, floor: -2.4 }, gaps: [[12.2, 15.4, -3.6]], name: 'church north wall' });
+    for (const x of [26, 33]) opening(south, ...S(x, -3.6), 0.8, U + 4, U + 6.2, true);
+    const apse = wall(arc(47, -8.5, 4.9, 90, -90, 12, S), 1.2, M - 4, U + 7.1, { ruin: { seed: 79, bite: 1.5, floor: U + 5.1 }, name: 'apse' });
+    for (const a of [45, 0, -45]) opening(apse, ...S(47 + 4.9 * Math.cos((a * Math.PI) / 180), -8.5 + 4.9 * Math.sin((a * Math.PI) / 180)), 0.55, U + 1.4, U + 3.2);
+    const north = wall([S(47, -13.4), S(20.6, -13.4)], 1.2, U - 3.5, U + 7.5, { ruin: { seed: 83, bite: 5, floor: U + 2.1 }, gaps: [[12.2, 15.4, U + 0.9]], name: 'church north wall' });
     opening(north, ...S(36, -13.4), 1.8, U, U + 2.6, true);
-    opening(north, ...S(28, -13.4), 0.8, -0.5, 1.7, true);
-    const gable = wall([S(20.6, -14), S(20.6, -3)], 1.2, U - 3.5, [[0, 3], [5.5, 6.6], [11, 3]], { ruin: { seed: 89, bite: 2.2, floor: 0.2 }, name: 'church gable' });
+    opening(north, ...S(28, -13.4), 0.8, U + 4, U + 6.2, true);
+    const gable = wall([S(20.6, -14), S(20.6, -3)], 1.2, U - 3.5, [[0, U + 7.5], [5.5, U + 11.1], [11, U + 7.5]], { ruin: { seed: 89, bite: 2.2, floor: U + 4.7 }, name: 'church gable' });
     opening(gable, ...S(20.6, -8.5), 2.2, U, U + 3.1, true);
-    gable.gaps = [[6.6, 7.6, 0.4, 1.4]];
+    gable.gaps = [[6.6, 7.6, U + 4.9, 1.4]];
     add(south, apse, north, gable, floor([S(20, -14), S(47, -14), ...arc(47, -8.5, 5.5, -90, 90, 10, S).slice(1, -1), S(47, -3), S(20, -3)], U + 0.04, 'paving', { name: 'church floor', body: 'none' }));
-    const porch = wall([S(20, -12.6), S(15.4, -12.6), S(15.4, -4.4), S(20, -4.4)], 0.8, U - 3.5, -2.2, { ruin: { seed: 97, bite: 2, floor: U + 0.35 }, name: 'porch' });
+    const porch = wall([S(20, -12.6), S(15.4, -12.6), S(15.4, -4.4), S(20, -4.4)], 0.8, U - 3.5, U + 2.3, { ruin: { seed: 97, bite: 2, floor: U + 0.35 }, name: 'porch' });
     opening(porch, ...S(15.4, -8.5), 2, U, 99);
     add(porch);
     // the stumps of its piers, and the altar
-    [[27, -11, -1.4], [33.5, -11, 0.6], [40, -11, -3], [27, -6, 2.4], [33.5, -6, -2.2], [40, -6, -0.6]].forEach(([x, z, top], k) => add(wall([S(x - 0.45, z), S(x + 0.45, z)], 0.9, U - 1, top, { ruin: { seed: 101 + k, bite: 0.5, floor: U + 0.5 }, name: 'pier' })));
+    [[27, -11, -1.4], [33.5, -11, 0.6], [40, -11, -3], [27, -6, 2.4], [33.5, -6, -2.2], [40, -6, -0.6]].forEach(([x, z, top], k) => add(wall([S(x - 0.45, z), S(x + 0.45, z)], 0.9, U - 1, U + 4.5 + top, { ruin: { seed: 101 + k, bite: 0.5, floor: U + 0.5 }, name: 'pier' })));
     add(wall([S(44.2, -9.7), S(44.2, -7.3)], 1.1, U - 1, U + 1, { cap: 'stone', name: 'altar' }));
     // the gallery over the west door, on posts, and the stair up to it
     const gy = U + 3.3;
@@ -535,8 +538,8 @@ function alcazar(): Part[] {
   {
     const edge = (x: number) => A.south.z - Math.tan(A.south.turn) * x - 0.5;
     const c2 = rect(29.6, 20.2, 37.4, 25), c1 = rect(10.1, 5.1, 14.9, 13.9), c3 = arc(62, 27, 2.85, 0, 330, 11);
-    add(floor([[5, 18.6], [52.4, 18.6], [52.4, edge(52.4)], [5, edge(5)]], U, 'earth', { holes: [c2], name: 'upper court' }));
-    add(floor([[6.5, 2.2], [47.4, 2.2], [A.D[0], A.D[1]], [A.C[0], A.C[1]], [52.4, edge(52.4) + 0.5], [52.4, 18.6], [6.5, 18.6]], M, 'earth', { holes: [c1, c3], name: 'middle court' }));
+    add(floor([[5, 18.6], [52.4, 18.6], [52.4, edge(52.4)], [5, edge(5)]], U, 'sand', { holes: [c2], name: 'upper court' }));
+    add(floor([[6.5, 2.2], [47.4, 2.2], [A.D[0], A.D[1]], [A.C[0], A.C[1]], [52.4, edge(52.4) + 0.5], [52.4, 18.6], [6.5, 18.6]], M, 'sand', { holes: [c1, c3], name: 'middle court' }));
     // the wall the upper court ends in on the east, and the broad steps down through it
     const east = wall([[52.4, 19], [52.4, edge(52.4) + 0.4]], 0.7, -13.5, U + 1, { ruin: { seed: 103, bite: 0.8, floor: U + 0.1 }, name: 'east court wall' });
     opening(east, 52.4, 22.5, 3, U, 99);
@@ -555,20 +558,20 @@ function alcazar(): Part[] {
     const kerb = (pts: V2[], top: number, foot: number, seed: number, name: string) => wall(pts, 0.5, foot, top + 0.25, { closed: true, ruin: { seed, bite: 0.3, floor: top + 0.05 }, name });
     const k1 = kerb(rect(10.25, 5.25, 14.75, 13.75), M, -11.5, 109, 'long cistern');
     opening(k1, 14.75, 6.75, 1.2, M, 99);
-    add(k1, floor(rect(10.5, 5.5, 14.5, 13.5), M - 3.5, 'earth'), wall([[14, 6.15], [14, 7.35]], 1, M - 4, M, { cap: 'paving' }), flight([14, M - 3.5, 12.95], [14, M, 7.35], 0.95, 'stone', M - 4));
+    add(k1, floor(rect(10.5, 5.5, 14.5, 13.5), M - 3.5, 'sand'), wall([[14, 6.15], [14, 7.35]], 1, M - 4, M, { cap: 'paving' }), flight([14, M - 3.5, 12.95], [14, M, 7.35], 0.95, 'stone', M - 4));
     const k2 = kerb(rect(29.75, 20.35, 37.25, 24.85), U, U - 4, 113, 'court cistern');
     opening(k2, 37.25, 23.9, 1.2, U, 99);
-    add(k2, floor(rect(30, 20.6, 37, 24.6), U - 3.5, 'earth'), flight([33.1, U - 3.5, 23.9], [37, U, 23.9], 0.95, 'timber'), heap(30.8, 21.4, U - 3.5, 1.1, 1, 0.9, 229));
+    add(k2, floor(rect(30, 20.6, 37, 24.6), U - 3.5, 'sand'), flight([33.1, U - 3.5, 23.9], [37, U, 23.9], 0.95, 'timber'), heap(30.8, 21.4, U - 3.5, 1.1, 1, 0.9, 229));
     const k3 = kerb(arc(62, 27, 2.65, 0, 330, 11), M, -11.5, 127, 'round cistern');
     opening(k3, 64.65, 27, 1.2, M, 99);
-    add(k3, floor(arc(62, 27, 2.45, 0, 330, 11), M - 3.5, 'earth'), flight([61, M - 3.5, 27], [64.4, M, 27], 0.95, 'timber'), heap(62.7, 25.3, M - 3.5, 1, 0.9, 0.8, 233));
+    add(k3, floor(arc(62, 27, 2.45, 0, 330, 11), M - 3.5, 'sand'), flight([61, M - 3.5, 27], [64.4, M, 27], 0.95, 'timber'), heap(62.7, 25.3, M - 3.5, 1, 0.9, 0.8, 233));
   }
   // ---- the outer walls of the north side: round the lower ward, breached, and on to the north tower of the point
   {
-    const ward = wall([[2.5, -4.5], A.N1, A.N2], 1.8, -15.5, [[0, -3.5], [25.7, -4], [25.8, -5.5], [51, -5.5]], { ruin: { seed: 131, bite: 3.2, floor: -9.7 }, gaps: [[35.2, 40.2, L + 0.3]], name: 'ward walls' });
+    const ward = wall([[2.5, -4.5], A.N1, A.N2], 1.8, -15.5, [[0, L + 7.5], [25.7, L + 7], [25.8, L + 5.5], [51, L + 5.5]], { ruin: { seed: 131, bite: 3.2, floor: L + 1.3 }, gaps: [[35.2, 40.2, L + 0.3]], name: 'ward walls' });
     const breach = 25.74 + 12, t = breach - 25.74, bx = A.N1[0] + ((A.N2[0] - A.N1[0]) * t) / 25.24, bz = A.N1[1] + ((A.N2[1] - A.N1[1]) * t) / 25.24;
     add(ward, heap(bx, bz, L - 0.5, 4.6, 3.4, 1.15, 239, -0.78), ...strewn(bx + 2, bz + 3, L, 10, 4.5, 241), ...strewn(bx - 2.5, bz - 3.5, L - 0.5, 8, 4, 251));
-    add(wall([A.N2, [A.D[0] - 2.4, A.D[1] - 1.9]], 1.8, -14.5, -1.5, { ruin: { seed: 137, bite: 3.6, floor: M + 1.4 }, name: 'north-east wall' }));
+    add(wall([A.N2, [A.D[0] - 2.4, A.D[1] - 1.9]], 1.8, -14.5, M + 5.5, { ruin: { seed: 137, bite: 3.6, floor: M + 1.4 }, name: 'north-east wall' }));
   }
   // ---- what is left of rooms: in the middle court along the ward wall, in the east court, and stubs in the upper
   {
@@ -593,7 +596,7 @@ function alcazar(): Part[] {
 /** the best stretch of the town's wall: sixty-six metres, two towers proud of it, a prow under them, and what is left of it going on east */
 export const CURTAIN = { len: 66.2, walk: 4, breach: [44.2, 48.6, 1.3] as [number, number, number], on: 91.6, turn: -6.6, t1: [14.15, 20.65] as V2, t2: [50.9, 56.5] as V2, prow: [32, 42] as V2, postern: 37, stair: [23, 29.4] as V2 };
 /** the ground it is built for, across it: level inside, a fall of earth against its foot, a berm, the scarp, the moat, and the far lip */
-const CURTAIN_GROUND: [number, number][] = [[0.9, 0], [1.2, -0.8], [6, -3.5], [13, -4.5], [23, -11], [31.5, -11], [36, -8]];
+const CURTAIN_GROUND: [number, number][] = [[0.9, 0], [7, -3.5], [13.5, -4.4], [24, -10.4], [46, -10.4], [61, -8.8]];
 
 function curtain(): Part[] {
   const C = CURTAIN, out: Part[] = [], W = C.walk;
@@ -642,7 +645,7 @@ function curtain(): Part[] {
   {
     const pts: V2[] = [[C.prow[0], 0.9], [C.prow[0], 9], [(C.prow[0] + C.prow[1]) / 2, 14], [C.prow[1], 9], [C.prow[1], 0.9]];
     const p = wall(pts, 1, -9.5, 1.3, { ruin: { seed: 347, bite: 1, floor: SILL + 0.25 }, gaps: [[25, 29.5, SILL - 0.3]], name: 'prow' });
-    add(p, floor([[C.prow[0] + 0.3, 0.9], [C.prow[0] + 0.3, 8.8], [(C.prow[0] + C.prow[1]) / 2, 13.4], [C.prow[1] - 0.3, 8.8], [C.prow[1] - 0.3, 0.9]], SILL, 'earth', { name: 'prow platform' }));
+    add(p, floor([[C.prow[0] + 0.3, 0.9], [C.prow[0] + 0.3, 8.8], [(C.prow[0] + C.prow[1]) / 2, 13.4], [C.prow[1] - 0.3, 8.8], [C.prow[1] - 0.3, 0.9]], SILL, 'sand', { name: 'prow platform' }));
     add(heap(C.prow[1] + 0.6, 6.2, -3.9, 6.8, 4.6, 4.15, 349), ...strewn(C.prow[1] + 4, 6.5, -3.6, 12, 4.5, 353));
   }
   // where the curtain is broken off at its west end, and what is left of it on toward the palace
@@ -658,7 +661,7 @@ function curtain(): Part[] {
  */
 export const GATE = {
   /** the causeway: from where to where across, how far it runs out, how high its top is */
-  causeway: { x0: 3, x1: 9, z0: 10, z1: 24.5, y: -8 },
+  causeway: { x0: 3, x1: 9, z0: 10, z1: 27, y: -8 },
   /** the passage: the landing inside the outer gate, the corridor west, the landing at the turn, and the ramp north to the town's top */
   floor: { low: -8, turn: -3.8, top: SILL },
   out: { x0: -21, x1: 15, z0: -7, z1: 10 },
@@ -675,7 +678,7 @@ function gate(): Part[] {
   add(slab(3, 3, 10, 10.2, F.low, F.low, true, 'outer landing'), slab(-11, 3, 3, 7.5, F.turn, F.low, true, 'corridor'), slab(-15, 3, -11, 7.5, F.turn, F.turn, true, 'turn'), slab(-15, GATE.sill, -11, 3, F.top, F.turn, false, 'inner ramp'));
   add(slab(-15, -8.2, -11, GATE.sill, F.top, F.top, true, 'inner sill'), apron([-15, -8.2], [-11, -8.2], [0, -1], F.top));
   // ---- the platforms that look down on it, level with the town
-  add(floor([[-11, -7], [15, -7], [15, 10], [10, 10], [10, 3], [-11, 3]], SILL, 'earth', { name: 'gate platform' }), floor(rect(-21, -7, -15, 10), SILL, 'earth', { name: 'west platform' }));
+  add(floor([[-11, -7], [15, -7], [15, 10], [10, 10], [10, 3], [-11, 3]], SILL, 'sand', { name: 'gate platform' }), floor(rect(-21, -7, -15, 10), SILL, 'sand', { name: 'west platform' }));
   // ---- the walls: the outside, deep-footed, and the faces of the platforms over the passage (each rises a parapet's height over its platform)
   const P = { ruin: (seed: number) => ({ seed, bite: 1.1, floor: SILL + 0.1 }) };
   const south = wall([[-21, 9], [15, 9]], 2, -15.5, [[0, 1.2], [5.9, 1.2], [6, -2], [23.9, -2], [24, 2.6], [29.9, 2.6], [30, 1.2], [36, 1.2]], { ruin: { seed: 409, bite: 1.4, floor: -3.4 }, name: 'gate south wall' });
@@ -749,9 +752,9 @@ function honeycomb(): Part[] {
 }
 
 /** the wall to the river: seventy-five metres out from the town, a way along its top, small towers on one side, a tower at its end */
-export const SPUR = { len: 72, wide: 4.5, top: -4.7, plain: -8, stair: [3, 18] as V2, turrets: [26, 43, 60], breach: [34.3, 36.7] as V2, end: { x0: 72, x1: 78, half: 3 } };
+export const SPUR = { len: 72, wide: 4.5, top: -8.4, plain: -11.7, stair: [3, 24] as V2, turrets: [26, 43, 60], breach: [34.3, 36.7] as V2, end: { x0: 72, x1: 78, half: 3 } };
 /** the ground it is built for, along it: the town's top, the scarp, the moat it crosses, and the plain it runs out on */
-const SPUR_GROUND: [number, number][] = [[1, 0], [17, -11], [25.5, -11], [30, -8]];
+const SPUR_GROUND: [number, number][] = [[1, 0], [19.5, -11.7]];
 function spur(): Part[] {
   const P = SPUR, out: Part[] = [], T = P.top;
   const add = (...p: Part[]) => void out.push(...p);
@@ -778,7 +781,7 @@ function spur(): Part[] {
   add(heap(bm, 0, P.plain, 5.4, 6.2, T - P.plain + 0.4, 631), ...strewn(bm, 3.5, P.plain, 10, 4, 641), ...strewn(bm, -3.5, P.plain, 8, 4, 643));
   // the tower at its end: a room on the plain with a door to the river, a platform level with the walk, a stair between
   {
-    const E = P.end, w = wall(rect(E.x0 + 0.5, -E.half + 0.5, E.x1 - 0.5, E.half - 0.5), 1, -12, T + 1.6, { closed: true, ruin: { seed: 647, bite: 1.1, floor: T + 0.4 }, name: 'end tower' });
+    const E = P.end, w = wall(rect(E.x0 + 0.5, -E.half + 0.5, E.x1 - 0.5, E.half - 0.5), 1, P.plain - 3, T + 1.6, { closed: true, ruin: { seed: 647, bite: 1.1, floor: T + 0.4 }, name: 'end tower' });
     opening(w, E.x1 - 0.5, 0.9, 1.1, P.plain + SILL, P.plain + 2.3);
     fallen(w, [E.x1 - 2.2, -E.half + 0.5], [E.x1 - 0.5, -0.6], T + 0.2, 1.4);
     add(heap(E.x1 + 1.2, -E.half - 0.6, P.plain, 3, 2.6, 1.3, 651), ...strewn(E.x1 + 2, -E.half - 1.5, P.plain, 8, 3.5, 653));
@@ -832,7 +835,8 @@ export function ruinParts(piece: Piece): Part[] {
  * mind, and this is only what was assumed (its footings go four metres under it).
  */
 export type Hold = 0 | 1 | 2;
-export type GroundKind = 'top' | 'court' | 'dug' | 'scarp' | 'moat' | 'berm' | 'plain';
+/** what the ground is at a spot, for whoever paints it: the town's trodden top; a court of the palace; ground dug away under a floor (never seen); a bank's or a ditch's side; a moat's floor; a shelf under a wall; the open plain; a worn way; the river's flats; its dry bed */
+export type GroundKind = 'top' | 'court' | 'dug' | 'scarp' | 'moat' | 'berm' | 'plain' | 'path' | 'flats' | 'river';
 export interface Ground { y: number; hold: Hold; kind: GroundKind }
 
 /** the outline a piece is the middle of: how far its ground is its own */
@@ -850,20 +854,20 @@ const FOOT: Record<Piece, V2[]> = {
 export const ruinFoot = (piece: Piece): V2[] => FOOT[piece];
 
 /**
- * The palace's outer walls, each with the height of the ground at its foot outside, and how that ground goes on
- * away from it: the front stands on the town's top; the ward's west wall in a ditch that climbs to the top; the
- * rest over the moat. The last is no outer wall: it is the foot of the wall between the middle court and the
- * lower ward, which the ground inside is as low as.
+ * The palace's outer walls, each with the height of the ground at its foot outside, how low that ground has got
+ * by so many metres out, and what it is: the front stands on the level of its own gate; the ward's west wall in a
+ * ditch that climbs to that level; the rest over the moat and the river's flats. The last is no outer wall: it is
+ * the foot of the wall between the middle court and the lower ward, which the ground inside is as low as.
  */
-const ALCAZAR_SIDES: [V2, V2, number, 'top' | 'ditch' | 'moat' | 'ward'][] = [
-  [[0, -4.5], [0, 56.5], 0, 'top'],
-  [[2.5, -4.5], ALCAZAR.N1, -10, 'ditch'],
-  [ALCAZAR.N1, ALCAZAR.N2, -11.5, 'moat'],
-  [ALCAZAR.N2, ALCAZAR.D, -8, 'moat'],
-  [ALCAZAR.D, ALCAZAR.C, -8.3, 'moat'],
-  [ALCAZAR.C, [50, 40.87], -8.3, 'moat'],
-  [[44, 42.15], [-1.5, 51.8], -5.5, 'moat'],
-  [[7.5, 2.2], [47.4, 2.2], -11, 'ward'],
+const ALCAZAR_SIDES: [V2, V2, number, number, number, 'top' | 'ditch' | 'moat' | 'ward'][] = [
+  [[0, -4.5], [0, 56.5], 0, 0, 1, 'top'],
+  [[2.5, -4.5], ALCAZAR.N1, ALCAZAR.lower + 1, 0, 20, 'ditch'],
+  [ALCAZAR.N1, ALCAZAR.N2, ALCAZAR.lower - 0.5, -14, 13, 'moat'],
+  [ALCAZAR.N2, ALCAZAR.D, ALCAZAR.middle - 1, -12.5, 17, 'moat'],
+  [ALCAZAR.D, ALCAZAR.C, ALCAZAR.middle - 1.3, -9.5, 10, 'moat'],
+  [ALCAZAR.C, [50, 40.87], ALCAZAR.middle - 1.3, -8, 7, 'moat'],
+  [[44, 42.15], [-1.5, 51.8], ALCAZAR.upper - 1, -8, 13, 'moat'],
+  [[7.5, 2.2], [47.4, 2.2], ALCAZAR.lower, 0, 1, 'ward'],
 ];
 const ALCAZAR_WALLS: V2[] = [[0, -4.5], [2.5, -4.5], ALCAZAR.N1, ALCAZAR.N2, ALCAZAR.D, ALCAZAR.C, [0, 51.5]];
 const LOWER_WARD: V2[] = [[2.5, -4.5], ALCAZAR.N1, ALCAZAR.N2, [47.4, 2.2], [7.5, 2.2], [7.5, -4.5]];
@@ -886,38 +890,39 @@ export function ruinGround(piece: Piece, x: number, z: number): Ground {
     // walls it falls away from that as the wall's side of the place does; inside them it stays at it.
     const within = inside(x, z, ALCAZAR_WALLS);
     let sum = 0, weight = 0, near = Infinity;
-    for (const [a, b, foot, how] of ALCAZAR_SIDES) {
+    for (const [a, b, foot, far, run, how] of ALCAZAR_SIDES) {
       if (how === 'ward' && !within) continue;
       const [d, t] = toSegment(x, z, a, b), k = 1 / (d + 0.5) ** 4;
       // (the ditch is shallow where it begins, under the keep, and at its full depth a dozen metres on)
-      const at = how === 'ditch' ? -4.5 + (foot + 4.5) * smooth(0, 0.45, t) : foot;
-      const y = within || how === 'top' ? at : how === 'ditch' ? at * (1 - smooth(4, 15, d)) : -11 + (foot + 11) * (1 - smooth(0.5, 8, d));
+      const at = how === 'ditch' ? -3 + (foot + 3) * smooth(0, 0.45, t) : foot;
+      const y = within || how === 'top' ? at : how === 'ditch' ? at * (1 - smooth(3, run, d)) : far + (foot - far) * (1 - smooth(0.5, run, d));
       sum += y * k;
       weight += k;
       near = Math.min(near, d);
     }
     const y = sum / weight;
-    return { y, hold: within ? 2 : near < 6 ? 1 : 0, kind: within ? 'dug' : y > -0.5 ? 'top' : y < -10.5 ? 'moat' : 'scarp' };
+    return { y, hold: within ? 2 : near < 6 ? 1 : 0, kind: within ? 'dug' : y > -0.5 ? 'top' : 'scarp' };
   }
   if (piece === 'curtain') {
     const y = through(CURTAIN_GROUND, z);
-    return { y, hold: z < 14 && x > -6 && x < 98 ? 1 : 0, kind: z < 1 ? 'top' : z < 6 ? 'scarp' : z < 13 ? 'berm' : z < 23 ? 'scarp' : z < 31.5 ? 'moat' : 'plain' };
+    return { y, hold: z < 14 && x > -6 && x < 98 ? 1 : 0, kind: z < 1 ? 'top' : z < 7 ? 'scarp' : z < 13.5 ? 'berm' : z < 24 ? 'scarp' : z < 46 ? 'moat' : 'plain' };
   }
   if (piece === 'gate') {
     const G = GATE, O = G.out;
     // (dug out under the sunk passage and on under the platforms that overlook it, as far as hides the cut: see CUT_IN)
     const sunk = (x > -15 - CUT_IN + 0.2 && x < 10 + CUT_IN - 0.9 && z > 3 - CUT_IN + 0.2 && z < 9) || (x > -15 - CUT_IN + 0.2 && x < -11 + CUT_IN - 0.2 && z > G.sill && z <= 3);
     if (sunk) return { y: -12.5, hold: 2, kind: 'dug' };
-    const y = through([[-5, 0], [11, -11], [19.5, -11], [G.causeway.z1, -8]], z);
-    return { y, hold: x > O.x0 - 4 && x < O.x1 + 4 && z < 14 ? 1 : 0, kind: z < -5 ? 'top' : z < 11 ? 'scarp' : z < 19.5 ? 'moat' : 'plain' };
+    const y = through([[-5, 0], [12, -11.2], [21, -11.2], [G.causeway.z1, -8]], z);
+    return { y, hold: x > O.x0 - 4 && x < O.x1 + 4 && z < 14 ? 1 : 0, kind: z < -5 ? 'top' : z < 12 ? 'scarp' : z < 21 ? 'moat' : z < G.causeway.z1 ? 'scarp' : 'plain' };
   }
   if (piece === 'spur') {
     const y = through(SPUR_GROUND, x);
-    return { y, hold: Math.abs(z) < 9 ? 1 : 0, kind: x < 1 ? 'top' : x < 17 ? 'scarp' : x < 25.5 ? 'moat' : 'plain' };
+    return { y, hold: Math.abs(z) < 9 ? 1 : 0, kind: x < 1 ? 'top' : x < 19.5 ? 'scarp' : 'flats' };
   }
   if (piece === 'north') {
-    const y = through([[2.5, 0], [18.5, -11], [27, -11], [31.5, -8]], z);
-    return { y, hold: z < 7 ? 1 : 0, kind: z < 2.5 ? 'top' : z < 18.5 ? 'scarp' : z < 27 ? 'moat' : 'plain' };
+    // (no moat on this side: a bank down to a shelf, the shelf, and a second bank down to the river's flats)
+    const y = through([[2.5, 0], [11, -4.4], [33, -5.4], [45, -8.7]], z);
+    return { y, hold: z < 7 ? 1 : 0, kind: z < 2.5 ? 'top' : z < 11 ? 'scarp' : z < 33 ? 'berm' : z < 45 ? 'scarp' : 'flats' };
   }
   return { y: 0, hold: piece === 'honeycomb' ? 1 : 0, kind: 'top' };
 }
@@ -941,61 +946,159 @@ export function ruinBase(piece: Piece, x: number, z: number, under: number): num
 
 /** the edge of the town's top, as it was measured: clockwise from the west tip (x east, z south, from the survey's own beginning) */
 export const OUTLINE: V2[] = [[-195, 56], [-180, 32], [-151, -1], [-121, -34], [-91, -68], [-68, -88], [-31, -89], [8, -89], [47, -85], [71, -78], [93, -64], [113, -52], [158, -37], [161, -28], [137, -10], [104, 11], [81, 29], [59, 48], [30, 66], [-1, 86], [-13, 93], [-34, 104], [-79, 108], [-121, 105], [-191, 80]];
-/** the moat round it: how far the scarp runs, how deep its floor is, how wide, where the far lip is and how high */
-export const MOAT = { run: 16, floor: -11, wide: 8.5, lip: 4.5, plain: -8, bank: 1.6 };
+/** the levels of the land round it, over the town's top: the plain to the west and south, a moat's floor, the river's flats to the north, and how far under them its dry bed lies */
+export const LAND = { plain: -8, moat: -11, flats: -17.3, bed: 1.7 };
 /** the paths on the top: from the palace's arch west to a fork, one arm to the north corner, one to the south gate */
 export const PATHS: V2[][] = [[[78, -11], [20, -8], [-40, -5]], [[-40, -5], [-56, -50], [-69, -84]], [[-40, -5], [-34, 50], [-28, 90]]];
+/** the track that comes to the gate over the fields, from the foot of its causeway */
+export const TRACK: V2[] = [[-9, 127], [-16, 150], [-44, 196], [-96, 250]];
+/** the middle of the river's dry bed, north of the town: it passes the end of the spur, which was built out to reach it */
+export const RIVER: V2[] = [[-300, -150], [-170, -174], [-80, -182], [-20, -152], [40, -131], [100, -125], [170, -111], [270, -92]];
+/**
+ * The land round the edge of the top, side by side: for each side of the outline (in its order), what a line
+ * run straight out from the middle of it does. [how high the rampart's bank stands over the edge; how far out the
+ * foot of the scarp is; the level there; how wide that floor is; how far on the far side climbs or falls; the
+ * level it comes to; the level twenty metres beyond; and sixty beyond that.] Measured at intake from the survey
+ * of the real town (a line every thirty metres or so round it) and rounded to rules: on the west and the south a
+ * ditch with a far bank; on the south-west and south-east a broad flat floor that rises slowly to the fields; on
+ * the north no moat at all, but a shelf and then the river's flats; and the scarp never asked steeper than a net
+ * of two metres can carry without a stretched face (about thirty-four degrees).
+ */
+const RIM: number[][] = [
+  [1.2, 15, -9.1, 11, 6, -7.2, -7.4, -8], [1.7, 15, -9, 9, 6, -7.4, -7.6, -9.3], [1.7, 16, -9.9, 10, 6, -8, -8.3, -9.6], [1.4, 17, -12.5, 10, 8, -8.6, -8.9, -10.2], [1, 16, -15.1, 10, 9, -10.6, -10.9, -15.1],
+  [0, 17, -16.9, 30, 6, -17.2, -17.3, -17.3], [0, 16, -17.3, 30, 6, -17.3, -17.3, -17.3], [0, 9, -13.4, 18, 9, -17.6, -17.6, -17.3], [0, 8, -14.2, 24, 8, -17.5, -17.4, -17.3], [0, 9, -13.6, 14, 8, -16.8, -17, -17.3],
+  [0, 13, -15, 26, 6, -15.4, -16, -17.3], [0, 14, -14.8, 26, 6, -15, -15.8, -17], [0, 13, -14, 24, 6, -13.8, -13.7, -15], [0, 13, -12.1, 7, 6, -9.2, -9.5, -10], [0, 15, -10.3, 22, 14, -8.6, -8.5, -8.8],
+  [0, 15, -10.3, 22, 14, -8.7, -8.6, -8.9], [0.4, 16, -10.4, 22, 14, -8.8, -8.8, -9], [0.5, 16, -10.5, 22, 14, -8.8, -8.8, -9], [0.5, 17, -11, 10, 6, -8.9, -9, -9.3], [0.8, 17, -11.2, 9, 8, -8, -8.1, -8.5],
+  [0.6, 17, -10.9, 9, 7, -7.9, -8.1, -8.5], [1.2, 17, -11.3, 16, 10, -9.1, -9.4, -9.6], [1.4, 17, -10.8, 26, 12, -9.6, -9.8, -10], [1.5, 17, -10.9, 28, 12, -9.5, -9.6, -10.3], [1.8, 16, -9.5, 14, 8, -6.9, -6.7, -7.5],
+];
+/** the steepest the land is asked to be where it is seen, rise over run */
+export const GENTLE = 0.67;
 
-export interface Stood { piece: Piece; x: number; z: number; yaw: number }
-/** Where each piece stood in the real town, in the town's measure. */
+/**
+ * Where a piece stood in the real town, in the town's measure, and how high its own level is over the town's
+ * (the palace stands on the low ground at the point, three metres under the top; the houses on the fall toward
+ * it; the north wall and the spur where the top has tilted down to the river; a remnant of the bank's wall on
+ * the bank's crest).
+ */
+export interface Stood { piece: Piece; x: number; z: number; yaw: number; y: number }
+/** Where each piece stood in the real town. */
+let laid: Stood[] | null = null;
 export function ruinsLayout(): Stood[] {
+  if (laid) return laid;
   const out: Stood[] = [
-    { piece: 'alcazar', x: 80, z: -31, yaw: Math.atan2(0.408, 0.913) },
-    { piece: 'curtain', x: 20, z: 72, yaw: Math.atan2(0.483, 0.876) },
-    { piece: 'gate', x: -15, z: 100, yaw: 0 },
-    { piece: 'honeycomb', x: 48.2, z: 15.4, yaw: Math.atan2(0.483, 0.876) },
-    { piece: 'spur', x: -70, z: -90, yaw: Math.atan2(75, 7) },
-    { piece: 'north', x: 62, z: -82, yaw: Math.PI - 0.0461 },
+    { piece: 'alcazar', x: 80, z: -31, yaw: Math.atan2(0.408, 0.913), y: -3 },
+    { piece: 'curtain', x: 20, z: 72, yaw: Math.atan2(0.483, 0.876), y: 0 },
+    { piece: 'gate', x: -15, z: 100, yaw: 0, y: 0 },
+    { piece: 'honeycomb', x: 48.2, z: 15.4, yaw: Math.atan2(0.483, 0.876), y: -2.2 },
+    { piece: 'spur', x: -70, z: -90, yaw: Math.atan2(75, 7), y: -5.6 },
+    { piece: 'north', x: 62, z: -82, yaw: Math.PI - 0.0461, y: -8.6 },
   ];
   // what is left of the wall along the west and south banks: a remnant on each long side of the outline, set back from its edge
   const kinds: Piece[] = ['stubB', 'stubA', 'stump', 'stubA', 'stubB', 'stubA'];
   [0, 1, 2, 3, 4, 21, 22, 23, 24].forEach((e, k) => {
     const a = OUTLINE[e], b = OUTLINE[(e + 1) % OUTLINE.length], l = Math.hypot(b[0] - a[0], b[1] - a[1]), d: V2 = [(b[0] - a[0]) / l, (b[1] - a[1]) / l], t = 0.3 + 0.4 * hash(e, 1, 9);
     // (the outline runs clockwise, so its inside is on the right of somebody walking it)
-    out.push({ piece: kinds[k % kinds.length], x: a[0] + (b[0] - a[0]) * t - d[1] * 4, z: a[1] + (b[1] - a[1]) * t + d[0] * 4, yaw: Math.atan2(-d[1], d[0]) });
+    const x = a[0] + (b[0] - a[0]) * t - d[1] * 4, z = a[1] + (b[1] - a[1]) * t + d[0] * 4;
+    out.push({ piece: kinds[k % kinds.length], x, z, yaw: Math.atan2(-d[1], d[0]), y: Math.round(land(x, z).y * 10) / 10 - 0.2 });
   });
-  return out;
+  return (laid = out);
 }
 /** Where each piece stands in the world, for a town set down at a place as it really stood. */
 export function ruinsPlan(site: Place): { piece: Piece; place: Place }[] {
-  return ruinsLayout().map(({ piece, x, z, yaw }) => {
-    const [wx, wy, wz] = ruinAt(site, x, z);
+  return ruinsLayout().map(({ piece, x, z, yaw, y }) => {
+    const [wx, wy, wz] = ruinAt(site, x, z, y);
     return { piece, place: { x: wx, y: wy, z: wz, rot: site.rot + yaw } };
   });
 }
 
+/** how far a spot is from a line of points */
+function toLine(x: number, z: number, pts: V2[]): number {
+  let d = Infinity;
+  for (let i = 0; i + 1 < pts.length; i++) d = Math.min(d, toSegment(x, z, pts[i], pts[i + 1])[0]);
+  return d;
+}
+/** the town's top at a spot: a low dome, tilting down to the river in its north third, and falling east to the palace's gate */
+function topLevel(x: number, z: number, d: number): number {
+  const dome = 1.2 * smooth(0, 60, -d), north = -0.07 * Math.max(0, -z - 22) ** 1.15 * (1 + 0.25 * smooth(-60, 60, x)), east = -4.3 * smooth(40, 75, x) * (1 - 0.75 * smooth(5, 35, z));
+  return dome + north + east;
+}
+const rimMade: { start: number[]; len: number[]; total: number } = { start: [], len: [], total: 0 };
 /**
- * The ground of the whole town as it stood, in the town's measure: a level top, a bank and a scarp round it down
- * to a moat, a plain beyond, and each piece's own ground where a piece stands. It is the plain the town is looked
- * at on by itself, and a brief for whoever shapes the real ground: nothing more.
+ * The land without the pieces: the top, the bank inside its edge, and outside it whatever that side of the town
+ * has (see RIM), with the river's bed across the flats, a slow roll in the open ground, and the worn ways.
+ */
+function land(x: number, z: number): Ground {
+  const O = OUTLINE, n = O.length;
+  if (!rimMade.total) for (let e = 0; e < n; e++) {
+    rimMade.start.push(rimMade.total);
+    rimMade.len.push(Math.hypot(O[(e + 1) % n][0] - O[e][0], O[(e + 1) % n][1] - O[e][1]));
+    rimMade.total += rimMade.len[e];
+  }
+  // the nearest point of the edge, and how far round the edge it is
+  let near = Infinity, arc = 0, px = 0, pz = 0;
+  for (let e = 0; e < n; e++) {
+    const a = O[e], b = O[(e + 1) % n], [dist, t] = toSegment(x, z, a, b);
+    if (dist < near) {
+      near = dist;
+      arc = rimMade.start[e] + t * rimMade.len[e];
+      px = a[0] + (b[0] - a[0]) * t;
+      pz = a[1] + (b[1] - a[1]) * t;
+    }
+  }
+  const d = inside(x, z, O) ? -near : near;
+  // that side's measures: between the middle of the side the point is nearest and the middle of the next (or the last)
+  let e = 0;
+  while (e + 1 < n && rimMade.start[e + 1] <= arc) e++;
+  const half = arc - rimMade.start[e] < rimMade.len[e] / 2, e0 = half ? (e + n - 1) % n : e, e1 = half ? e : (e + 1) % n;
+  const m0 = rimMade.start[e0] + rimMade.len[e0] / 2, m1 = rimMade.start[e1] + rimMade.len[e1] / 2;
+  const span = (m1 - m0 + rimMade.total) % rimMade.total || 1, t = smooth(0, 1, ((arc - m0 + rimMade.total) % rimMade.total) / span);
+  const R = RIM[e0].map((v, k) => v + (RIM[e1][k] - v) * t), [crest, , floor, wide, , lip, far, deep] = R;
+  if (d <= 0) {
+    // inside: the top, the bank near its edge, a slow unevenness away from the edge, and the paths worn into it
+    const worn = Math.min(...PATHS.map((p) => toLine(x, z, p)));
+    const y = topLevel(x, z, d) + crest * smooth(-9, -4.5, d) * (1 - 0.4 * smooth(-2.5, 0, d)) + (rough(x * 0.05, z * 0.05, 19) - 0.5) * 0.4 * smooth(10, 28, -d) - 0.14 * (1 - smooth(1.2, 2.6, worn));
+    return { y, hold: 0, kind: worn < 2 ? 'path' : 'top' };
+  }
+  // outside: down the scarp to that side's floor, across it, up or down the far side, and on
+  const edge = topLevel(px, pz, 0) + crest * 0.6, run = Math.max(R[1], (edge - floor) / GENTLE), on = Math.max(R[4], Math.abs(lip - floor) / (GENTLE * 0.9));
+  const a1 = run + wide, a2 = a1 + on, bank = lip > floor + 1.5 ? 0.35 : 0;
+  let y = through([[0, edge], [run, floor], [a1, floor], [a2, lip + bank], [a2 + 7, lip], [a2 + 20, far], [a2 + 80, deep]], d);
+  let kind: GroundKind = d < run ? 'scarp' : d < a1 ? (floor < -15.5 ? 'flats' : 'moat') : d < a2 ? (lip < -15.5 ? 'flats' : 'scarp') : far < -15.5 ? 'flats' : 'plain';
+  // (the road that follows the far lip of the ditch, and the track to the gate)
+  if ((bank && Math.abs(d - a2 - 3.5) < 2.2) || toLine(x, z, TRACK) < 2.2) kind = 'path';
+  // the open ground rolls a little: nothing in a desert is laid with a level
+  y += (rough(x * 0.033, z * 0.033, 17) - 0.5) * 0.9 * smooth(a2 + 6, a2 + 40, d);
+  // the river's dry bed, across the flats
+  if (y < -14.5) {
+    const r = toLine(x, z, RIVER), in_ = (1 - smooth(9, 19, r)) * smooth(-14.5, -16.5, y);
+    y -= LAND.bed * in_;
+    if (r < 12 && in_ > 0.5) kind = 'river';
+  }
+  return { y, hold: 0, kind };
+}
+
+/**
+ * The ground of the whole town as it stood, in the town's measure: the land (see `land`) with each piece's own
+ * ground where a piece stands. It is what the town is stood on to be looked at by itself, and it is the brief for
+ * whoever shapes the real ground: the heights to give the map's net, how much each spot matters, and what kind of
+ * ground it is. Nowhere that is seen is it steeper than GENTLE; what is steeper than that in the real place (the
+ * foot of a wall, a fall of stone) is built, not asked of the ground.
  */
 export function ruinsGround(x: number, z: number): Ground {
-  const Mo = MOAT, d = outside(x, z, OUTLINE);
-  // the simple shape: a low bank inside the edge, then the scarp, the moat's floor, the far lip, the plain
-  let y = d <= 0 ? Mo.bank * smooth(-9, -5, d) * (1 - smooth(-1.5, 0, d) * 0.3) : through([[0, Mo.bank * 0.7], [Mo.run, Mo.floor], [Mo.run + Mo.wide, Mo.floor], [Mo.run + Mo.wide + Mo.lip, Mo.plain]], d);
-  let kind: GroundKind = d <= 0 ? 'top' : d < Mo.run ? 'scarp' : d < Mo.run + Mo.wide ? 'moat' : 'plain';
+  const base = land(x, z);
+  let { y, kind } = base;
   let hold: Hold = 0, most = 0, sum = 0, weight = 0;
   for (const st of ruinsLayout()) {
     const c = Math.cos(st.yaw), s = Math.sin(st.yaw), dx = x - st.x, dz = z - st.z, lx = dx * c - dz * s, lz = dx * s + dz * c;
     const off = outside(lx, lz, FOOT[st.piece]);
-    if (off > 12) continue;
-    const g = ruinGround(st.piece, lx, lz), w = g.hold === 2 ? 1e6 : (1 - smooth(0, 12, off)) * (st.piece.startsWith('stu') ? 0 : 1);
+    if (off > 14) continue;
+    const g = ruinGround(st.piece, lx, lz), w = g.hold === 2 ? 1e6 : (1 - smooth(0, 14, off)) * (st.piece.startsWith('stu') ? 0 : 1);
     if (w <= 0) continue;
-    sum += g.y * w;
+    sum += (g.y + st.y) * w;
     weight += w;
     if (w > most) {
       most = Math.min(1, w);
-      kind = g.kind;
+      if (most > 0.5 && !(base.kind === 'path' && g.kind === 'top')) kind = g.kind;
       hold = g.hold;
     }
   }
@@ -1044,7 +1147,7 @@ function lootSpots(piece: Piece): Spot[] {
     const S = frame(0, A.south.z, A.south.turn), s = (x: number, z: number, y: number, u: RuinUsage[], arms?: 'guns' | 'any'): Spot => [...S(x, z), y, u, arms];
     return [
       // the nests: the keep's top and its rooms, the block's hall and roof, the south tower
-      [2.6, 1.6, 10.1, NEST, 'guns'], [4.4, 1.2, 10.1, NEST], [3, 0.4, 7.1, NEST], [3.4, -1, 3.6, NEST], [3, 0.5, SILL, CAMP],
+      [3.6, -1.4, 13.1, NEST, 'guns'], [3.9, 2, 13.1, NEST], [2.5, -0.6, 10.6, NEST], [3, 0.4, 7.1, NEST], [3.4, -1, 3.6, NEST], [3, 0.5, SILL, CAMP],
       [3.2, 6.5, SILL, NEST], [4.6, 11, SILL, NEST], [3, 15.4, SILL, CAMP], [3.4, 9, 7.1, NEST, 'guns'], [5.2, 6, 7.1, NEST],
       [3, 52, SILL, CAMP], [3.6, 53, 4.6, NEST], [2.6, 51.4, 9.1, NEST, 'guns'],
       // the walks and the terrace
@@ -1106,7 +1209,7 @@ function stood(piece: Piece): [string, number, number, number | null, number][] 
       // the hall of the block: what was carried in and stacked
       ['wooden_military_crate', 2.6, 5.6, SILL, 0], ['wooden_crate_01', 4.2, 5.3, SILL, 0.3], ['crate_big', 5.2, 16.2, SILL, 1.5],
       // the block's roof and the keep's top: something to kneel behind
-      ['wooden_crate_01', 2.6, 8, 7.1, 1.3], ['old_military_crate', 5, 12, 7.1, 0.2], ['weapons_case', 4.6, -1.2, 10.1, 0.4], ['wooden_crate_01', 4.9, 2.1, 10.1, 0.9],
+      ['wooden_crate_01', 2.6, 8, 7.1, 1.3], ['old_military_crate', 5, 12, 7.1, 0.2], ['weapons_case', 3.2, -1.9, 13.1, 0.4], ['wooden_crate_01', 2.2, -0.6, 13.1, 0.9],
       // the camp in the church, out of the wind, and the one under the wall of the lower ward
       ['stone_fire_pit', ...S(31.5, -8.2), U + 0.19, 0], ['wooden_crate_01', ...S(29.4, -6.6), U, 0.8], ['wooden_crate_01', ...S(23, -10), U + 3.3, 0.4],
       ['stone_fire_pit', 15.5, -4, null, 0], ['wooden_crate_01', 13, -6.4, null, 1.1], ['shovel', 29, -3, null, 0.6],

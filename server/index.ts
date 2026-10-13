@@ -592,10 +592,11 @@ function moveCheck(c: Client, to: Pose, now: number): boolean {
   const dt = Math.min(600, Math.max(0, (now - k.at) / 1000)), most = c.seatAt ? CHECK.seat : CHECK.foot;
   const dist = Math.hypot(to[0] - c.pose[0], to[2] - c.pose[2]), allow = most * dt + k.carry;
   // (in the air: written down and never refused. There are towers and roofs, and there is falling off things.)
-  k.high = !c.seatAt && to[1] - world.groundAt(to[0], to[2]) > CHECK.high[0] ? k.high + Math.min(dt, 1) : 0;
+  // (Over what there is to stand on, which on a bridge is its deck and not the ground far under it: `standAt`.)
+  k.high = !c.seatAt && to[1] - world.standAt(to[0], to[1], to[2]) > CHECK.high[0] ? k.high + Math.min(dt, 1) : 0;
   if (k.high > CHECK.high[1]) {
     k.high = 0;
-    flag(c, `is ${(to[1] - world.groundAt(to[0], to[2])).toFixed(0)} m over the ground at ${to[0].toFixed(0)}, ${to[2].toFixed(0)}`, false);
+    flag(c, `is ${(to[1] - world.standAt(to[0], to[1], to[2])).toFixed(0)} m over the ground at ${to[0].toFixed(0)}, ${to[2].toFixed(0)}`, false);
     // (Once is a fall off the highest thing there is. Three times running, twelve seconds and more held thirty
     // metres up with nothing under them, is nothing anybody playing does: enforcing, they are put off.)
     if (++k.hovered >= 3 && CHECKS === 'enforce') {

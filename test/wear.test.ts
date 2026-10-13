@@ -4,7 +4,7 @@
 //
 //   - there is one gas mask, the GP-5, and it is built without the hose and the filter can it came with
 //   - whatever asks whether a mask is on asks for `wear.gas`, never for a name
-//   - the K6-3 is built with its visor down, and with the way back to where it was (for when a mask is under it)
+//   - the K6-3 is built with its visor down, and it stays down: nothing in the model puts it up again
 //   - the steel helmet is the weakest thing that is a helmet: between a cap and the Combat Helmet, and the army's
 //   - a stim, the pouch and the kit each do something neither of the others does
 //   - nothing new lies on a step in more places than what it stands in for gave up
@@ -80,7 +80,7 @@ ok('the masks are a policeman\'s: three in the village and two in Kamenka, as th
   assert.ok(STOCK.includes('gasmask') && worth('gasmask') > worth('boonie_hat'));
 });
 
-ok('the K6-3 is built with its visor down, its glass apart from its steel, and the way back to where the visor was', () => {
+ok('the K6-3 is built with its visor down and its glass apart from its steel, and nothing in it puts the visor up again', () => {
   const m = models.helmet_k63;
   // (with its visor raised it stood 28 cm tall and 37.7 cm from the visor's edge to the nape: down, the visor's
   // lower edge is what it stands on, and it is no longer than its shell and the visor's frame)
@@ -92,8 +92,8 @@ ok('the K6-3 is built with its visor down, its glass apart from its steel, and t
     // (two paints of the one picture: the panes of the visor are seen through, and nothing else of it is)
     assert.deepEqual(file.materials.map((mat) => mat.alphaMode ?? 'OPAQUE').sort(), ['BLEND', 'OPAQUE'], url);
     assert.equal(prims.length, 2, url);
-    // (every shape of it says how its points go back: see `asItCame` in src/game/avatar.ts)
-    for (const prim of prims) assert.ok('_UNDO' in prim.attributes && '_UNDO_N' in prim.attributes, `${url}: a shape of the K6-3 does not say where its visor was`);
+    // (the visor is down for good, "keep the visor down": no shape of it carries the way back to where it was)
+    for (const prim of prims) assert.deepEqual(Object.keys(prim.attributes).filter((name) => name.startsWith('_')), [], `${url}: a shape of the K6-3 still says where its visor was`);
   }
 });
 

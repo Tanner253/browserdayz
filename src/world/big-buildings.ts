@@ -252,7 +252,9 @@ export function hospitalPlan(): Blueprint {
   const s = new Floor();
   // the big theatre
   s.put('autopsy_table', -18.0, 4.8, 0).put('surgical_lamp', -18.0, 4.8, 0.2, 2.3).put('ventilator', -19.7, 4.2, Q).top('surgical_trolley', -16.4, 5.7, 0.2, 0.9).put('instrument_tray', -16.4, 5.7, 0.4, 0.9).top('surgical_trolley', -17.2, 3.3, -0.3, 0.9);
-  s.put('medical_light', -19.6, 6.4, 0.8).put('xray_viewer', -18.1, 7.67, PI, 1.2).put('med_cabinet', -13.2, 2.9, -Q).put('computer_cart', -21.9, 2.4, Q).put('ceiling_arm', -15.2, 6.3, 0.6, 0.45).floor([-20.6, 3.0], [-15.0, 2.6]);
+  // (The cabinet: 0.4 m nearer the passage than the one that stands under it on the ground floor. What is searched is
+  // told by where it stands over the ground and not by how high (`crateId`), and the two were one box to the server.)
+  s.put('medical_light', -19.6, 6.4, 0.8).put('xray_viewer', -18.1, 7.67, PI, 1.2).put('med_cabinet', -13.2, 2.5, -Q).put('computer_cart', -21.9, 2.4, Q).put('ceiling_arm', -15.2, 6.3, 0.6, 0.45).floor([-20.6, 3.0], [-15.0, 2.6]);
   // the scrub room between them
   s.put('med_sink', -12.0, 7.44, PI).put('med_sink', -10.6, 7.44, PI).shelves(-10.0, 2.9, -Q, [0, 1]).put('folded_blanket', -10.0, 2.9, -Q, 1.17).put('folded_blanket', -10.0, 3.1, -Q, 1.67).put('mop_bucket', -12.2, 3.3, 1.0).floor([-11.2, 5.8]);
   // the small theatre: whoever was on the table is on it still

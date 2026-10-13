@@ -110,7 +110,7 @@ What is not CC0 is listed first, with the credit its licence asks for.
 - "animated pistol" (https://skfb.ly/ooPqJ) by DJMaesen is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
   Changes made: Its one long animation cut into the movements the game plays; a copy of the pistol alone, standing still, made for the ground and for other players; textures re-encoded as WebP; geometry compressed.
 - This work is based on "knife Animated" (https://sketchfab.com/3d-models/knife-animated-f3140db917cc43389c14b5b2536c1dc8) by DJMaesen (https://sketchfab.com/bumstrum) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
-  Changes made: Scaled to metres; its one long animation cut into the movements the game plays; a copy of the knife alone, lying flat and still and made the length of a real one (30.5 cm), for the ground and for other players; its arms drawn with the pictures of the same maker's sniper pack, their own left out; textures re-encoded as WebP at the size they came; geometry compressed.
+  Changes made: Scaled to metres; its one long animation cut into the movements the game plays; a copy of the knife alone, standing still and made the length of a real one (30.5 cm), for the ground and for other players; its arms drawn with the pictures of the same maker's sniper pack, their own left out; textures re-encoded as WebP at the size they came; geometry compressed.
 - This work is based on "FPS AK-74m animations" (https://sketchfab.com/3d-models/fps-ak-74m-animations-94be8385c402474cacd39bc096c6ca14) by Cransh (https://sketchfab.com/ccransh) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
   Changes made: Scaled to metres; its eight animations laid end to end as the one the game plays; a copy of the rifle alone, taken off its skeleton and standing still, in two pieces (the rifle and its magazine), made for the ground and for other players; textures re-encoded as WebP at the size they came; geometry compressed.
 - This work is based on "SMG FPS Animations" (https://sketchfab.com/3d-models/smg-fps-animations-ca37ea9148dc4fcc9cc632175d311b23) by Cransh (https://sketchfab.com/ccransh) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
@@ -239,7 +239,14 @@ Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees ar
 | texture | [Damaged Plaster](https://polyhaven.com/a/damaged_plaster) | Amal Kumar |
 | texture | [Defense Wall](https://polyhaven.com/a/defense_wall) | Rob Tuytel |
 | texture | [Dirty Concrete](https://polyhaven.com/a/dirty_concrete) | Rob Tuytel |
+| texture | [Dry Decay Leaves](https://polyhaven.com/a/dry_decay_leaves) | Amal Kumar |
+| texture | [Dry Mud Field 001](https://polyhaven.com/a/dry_mud_field_001) | Rob Tuytel, Rico Cilliers |
+| texture | [Forest Ground 01](https://polyhaven.com/a/forrest_ground_01) | Rob Tuytel |
+| texture | [Forest Ground 03](https://polyhaven.com/a/forrest_ground_03) | Rob Tuytel |
+| texture | [Forest Ground 06](https://polyhaven.com/a/forest_ground_06) | Charlotte Baglioni |
+| texture | [Forest Leaves 02](https://polyhaven.com/a/forest_leaves_02) | Rob Tuytel |
 | texture | [Garage Floor](https://polyhaven.com/a/garage_floor) | Jenelle van Heerden |
+| texture | [Grass Ground](https://polyhaven.com/a/grass_ground) | Charlotte Baglioni |
 | texture | [Grey Plaster 02](https://polyhaven.com/a/grey_plaster_02) | Rob Tuytel |
 | texture | [Grey Roof Tiles 02](https://polyhaven.com/a/grey_roof_tiles_02) | Rob Tuytel |
 | texture | [Leafy Grass](https://polyhaven.com/a/leafy_grass) | Charlotte Baglioni |
@@ -252,7 +259,9 @@ Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees ar
 | texture | [Plaster Brick 01](https://polyhaven.com/a/plaster_brick_01) | Rob Tuytel |
 | texture | [Red Brick 03](https://polyhaven.com/a/red_brick_03) | Rob Tuytel |
 | texture | [Red Brick Plaster Patch 02](https://polyhaven.com/a/red_brick_plaster_patch_02) | Rob Tuytel |
+| texture | [Rock Face 03](https://polyhaven.com/a/rock_face_03) | Dario Barresi, Rico Cilliers |
 | texture | [Rocks Ground 02](https://polyhaven.com/a/rocks_ground_02) | Rob Tuytel |
+| texture | [Rocky Trail](https://polyhaven.com/a/rocky_trail) | Amal Kumar |
 | texture | [Rough Plaster Brick 02](https://polyhaven.com/a/rough_plaster_brick_02) | Rob Tuytel |
 | texture | [Rusty Corrugated Iron](https://polyhaven.com/a/rusty_corrugated_iron) | Charlotte Baglioni |
 | texture | [Sand 01](https://polyhaven.com/a/sand_01) | Rob Tuytel |
@@ -261,5 +270,6 @@ Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees ar
 | texture | [Weathered Plank Siding](https://polyhaven.com/a/weathered_plank_siding) | Dimitrios Savva |
 | texture | [Weathered Planks](https://polyhaven.com/a/weathered_planks) | Dario Barresi, Dimitrios Savva |
 | texture | [White Bricks](https://polyhaven.com/a/white_bricks) | Rob Tuytel |
+| texture | [Withered Grass](https://polyhaven.com/a/withered_grass) | Charlotte Baglioni |
 | texture | [Wood Floor Worn](https://polyhaven.com/a/wood_floor_worn) | Dimitrios Savva |
 | texture | [Worn Mossy Plasterwall](https://polyhaven.com/a/worn_mossy_plasterwall) | Amal Kumar |

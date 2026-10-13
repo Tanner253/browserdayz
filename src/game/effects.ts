@@ -1,10 +1,14 @@
 // Impact / weapon effects: billboard particle pool (dust, debris, sparks, blood),
 // bullet-hole decals, muzzle flash light. Smoke and dust are puffs out of Kenney's Particle Pack (see
-// scripts/fx.mjs); the rest of the textures are made here.
+// scripts/fx.mjs); the rest of the textures are made here. A blast is not made here any more: see blast.ts.
 
 import * as THREE from 'three';
+import { assets } from '../core/assets';
 import { physics, SOLID_GROUPS, type Surface } from '../core/physics';
 import type { Atmosphere } from '../world/atmosphere';
+import { roadLift } from '../world/road';
+import { SNOW, type World } from '../world/worldgen';
+import { AIR_AT, airGlsl, Blasts, type BlastKind } from './blast';
 import { Flames, type Fire } from './flames';
 import { MuzzleFlash, muzzleArt } from './muzzle';
 
@@ -283,8 +287,19 @@ export class Effects {
   private bloodIdx = 0;
   /** where the player is looking from: far-off blood is drawn bigger so a hit still reads */
   eye = new THREE.Vector3();
+  /**
+   * The one lamp for whatever flashes: a shot, and a blast. The brighter of the two has it (see `update`): it was
+   * whoever asked last, so a shot fired as a drum went up put the drum's light out, and a blast's light was full
+   * on for a tenth of a second and then gone between one frame and the next.
+   */
   flashLight: THREE.PointLight;
   private flashT = 0;
+  /** who has the lamp */
+  private lampIs: 'shot' | 'blast' | null = null;
+  /** grenades, drums of fuel and cars going up: everything of a blast (see blast.ts) */
+  readonly blasts: Blasts;
+  /** when a car was last said to have gone up (see `wrecked`): the blast that comes with that word is the car's */
+  private carWent = -1e9;
   /** the flames at other people's muzzles: a few, used in turn */
   private flames: MuzzleFlash[] = [];
   private flame = 0;
@@ -296,6 +311,7 @@ export class Effects {
 
   constructor(scene: THREE.Scene, atmo: Atmosphere) {
     this.fire = new Flames(scene, atmo);
+    this.blasts = new Blasts(scene, atmo, this.fire);
     for (let i = 0; i < MAX_P; i++) {
       this.particles.push({ alive: false, p: new THREE.Vector3(), v: new THREE.Vector3(), life: 0, max: 1, size: 1, grow: 0, color: new THREE.Color(), alpha: 1, gravity: 0, drag: 0, additive: false, cell: 3, rot: 0, spin: 0, soft: 0 });
     }
@@ -303,21 +319,29 @@ export class Effects {
     // What everything is drawn with until the sheet of puffs has come (and for good, if it never does): the
     // made-up blob. Then the sheet: two tiles by two, a particle's own tile, turned its own way.
     const smoke = { value: smokeTexture() as THREE.Texture }, sheet = { value: 0 };
-    new THREE.TextureLoader().load('assets/fx/smoke.webp', (t) => {
+    // (by its address with its version in it, as every other file is asked for: asked for bare, a new sheet was never fetched by anybody who had the old one)
+    new THREE.TextureLoader().load(assets.url('assets/fx/smoke.webp'), (t) => {
       t.colorSpace = THREE.NoColorSpace;
       smoke.value = t;
       sheet.value = 1;
     }, undefined, () => {});
+    const fog = scene.fog as THREE.FogExp2 | null;
     const mk = (additive: boolean) => {
       const mat = new THREE.ShaderMaterial({
         // (smoke and dust have no light of their own: they are as bright as the hour. Flame and sparks are their own light.)
-        uniforms: { tMap: smoke, uSheet: sheet, uLight: additive ? { value: 1 } : atmo.daylight },
+        // (And the air between has them, as it has everything else: a column of smoke across the valley stood as
+        // sharp and as dark as one at arm's length, and one in the gas was drawn as if the gas were not there.
+        // Reckoned at each puff's middle: see `airGlsl` in blast.ts.)
+        uniforms: { tMap: smoke, uSheet: sheet, uLight: additive ? { value: 1 } : atmo.daylight, fogColor: { value: fog ? fog.color : new THREE.Color() }, fogDensity: atmo.seconds },
+        defines: fog ? { USE_FOG: '', FOG_EXP2: '' } : {},
         vertexShader: /* glsl */ `
           attribute vec4 iColor;
           attribute vec2 iLook;
           uniform float uSheet;
           varying vec4 vColor;
           varying vec2 vUv;
+          varying vec4 vAir;
+          ${airGlsl()}
           void main() {
             // (the sheet is laid out from its top; a picture is read from its foot)
             vUv = mix(uv, (uv + vec2(mod(iLook.x, 2.0), 1.0 - floor(iLook.x * 0.5))) * 0.5, uSheet);
@@ -327,6 +351,8 @@ export class Effects {
             vec4 mv = viewMatrix * vec4(c, 1.0);
             float co = cos(iLook.y), si = sin(iLook.y);
             mv.xy += vec2(position.x * co - position.y * si, position.x * si + position.y * co) * s;
+            vec3 world = c;
+            ${AIR_AT}
             gl_Position = projectionMatrix * mv;
           }`,
         fragmentShader: /* glsl */ `
@@ -335,11 +361,12 @@ export class Effects {
           uniform float uSheet;
           varying vec4 vColor;
           varying vec2 vUv;
+          varying vec4 vAir;
           void main() {
             vec4 t = texture2D(tMap, vUv);
             float a = mix(t.a, t.r, uSheet) * vColor.a;
             if (a < 0.01) discard;
-            gl_FragColor = vec4(vColor.rgb * uLight, a);
+            gl_FragColor = vec4(vColor.rgb * uLight * vAir.a${additive ? '' : ' + vAir.rgb'}, a);
           }`,
         transparent: true,
         depthWrite: false,
@@ -431,7 +458,18 @@ export class Effects {
   }
 
   private spawn(o: Partial<Particle> & { p: THREE.Vector3 }) {
-    const pt = this.particles.find((x) => !x.alive);
+    let pt = this.particles.find((x) => !x.alive);
+    if (!pt) {
+      // (None left: the one nearest its end, which is all but faded out, gives up its place. A thing asked for
+      // while every place was taken was simply not made, and nothing said so.)
+      let least = Infinity;
+      for (const x of this.particles) {
+        if (x.life < least) {
+          least = x.life;
+          pt = x;
+        }
+      }
+    }
     if (!pt) return;
     pt.alive = true;
     pt.p.copy(o.p);
@@ -533,60 +571,33 @@ export class Effects {
     }
   }
 
-  /** A grenade: a flash, a ball of fire that is smoke a moment later, earth thrown up, and the ground left black. */
-  /** @param fuel a drum of petrol rather than a grenade: more fire, and it burns on where it stood */
-  explode(at: THREE.Vector3, fuel = false) {
-    this.flashLight.position.copy(at).setY(at.y + 0.6);
-    this.flashLight.color.setRGB(1, fuel ? 0.62 : 0.72, fuel ? 0.3 : 0.4);
-    this.flashLight.intensity = fuel ? 420 : 260;
-    this.flashLight.distance = fuel ? 42 : 30;
-    this.flashT = fuel ? 0.17 : 0.11;
-    const far = THREE.MathUtils.clamp(at.distanceTo(this.eye) / 40, 1, 2.5);
-    const rand = () => new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5);
-    // the fire: a moment, but long enough to see
-    for (let i = 0; i < 22; i++) {
-      this.spawn({ p: at.clone().add(rand().multiplyScalar(0.7)), v: rand().multiplyScalar(6).setY(1.5 + Math.random() * 5), max: 0.34 + Math.random() * 0.3, size: 1.0 * far, grow: 3.4, color: new THREE.Color(5, 2.4, 0.6), alpha: 0.95, gravity: -1.5, drag: 2.6, additive: true });
-    }
-    if (fuel) {
-      // the ball of fire rolling up off it, and what is left burning on the ground
-      for (let i = 0; i < 26; i++) {
-        this.spawn({ p: at.clone().add(rand().multiplyScalar(0.9)).setY(at.y + Math.random() * 0.8), v: rand().multiplyScalar(3.4).setY(3.5 + Math.random() * 5.5), max: 0.55 + Math.random() * 0.5, size: 1.3 * far, grow: 4.2, color: new THREE.Color(3.4, 1.15, 0.18), alpha: 0.95, gravity: -2.4, drag: 1.9, additive: true });
-      }
-      for (let i = 0; i < 14; i++) {
-        this.spawn({ p: at.clone().add(rand().multiplyScalar(1.5)).setY(at.y - 0.3 + Math.random() * 0.25), v: new THREE.Vector3((Math.random() - 0.5) * 0.5, 0.9 + Math.random() * 1.3, (Math.random() - 0.5) * 0.5), max: 1.6 + Math.random() * 2.2, size: 0.5 * far, grow: 0.9, color: new THREE.Color(2.8, 0.95, 0.15), alpha: 0.85, gravity: -0.6, drag: 1.2, additive: true });
-      }
-    }
-    // the smoke it turns into: dark, tall, and there for a while
-    for (let i = 0; i < 44; i++) {
-      const out = rand().multiplyScalar(6);
-      out.y = Math.abs(out.y) * 1.3 + 1.2;
-      const k = 0.07 + Math.random() * 0.1;
-      this.spawn({ p: at.clone().add(rand().multiplyScalar(0.9)), v: out, max: 3 + Math.random() * 3.2, size: 1.2, grow: 4.5 + Math.random() * 2.6, color: new THREE.Color(k, k, k * 0.95), alpha: 0.82, gravity: -0.7, drag: 2 });
-    }
-    // dust rolling out along the ground
-    for (let i = 0; i < 24; i++) {
-      const a2 = (i / 24) * Math.PI * 2 + Math.random() * 0.3;
-      this.spawn({ p: at.clone(), v: new THREE.Vector3(Math.cos(a2) * (7 + Math.random() * 4), 0.6 + Math.random(), Math.sin(a2) * (7 + Math.random() * 4)), max: 1.6 + Math.random() * 1.2, size: 0.8, grow: 3.2, color: new THREE.Color(0.42, 0.36, 0.28), alpha: 0.5, gravity: 0, drag: 2.8 });
-    }
-    for (let i = 0; i < 46; i++) {
-      const out = rand().multiplyScalar(15);
-      out.y = Math.abs(out.y) + 2.5;
-      this.spawn({ p: at.clone(), v: out, max: 0.9 + Math.random() * 0.9, size: 0.045 + Math.random() * 0.05, grow: 0, color: new THREE.Color(0.2, 0.16, 0.11), alpha: 1, gravity: 9.8, drag: 0.35 });
-    }
-    for (let i = 0; i < 26; i++) {
-      this.spawn({ p: at.clone(), v: rand().multiplyScalar(22).setY(Math.random() * 11), max: 0.25 + Math.random() * 0.3, size: 0.03, color: new THREE.Color(4, 2.2, 0.8), alpha: 1, gravity: 9.8, drag: 0.6, additive: true });
-    }
-    // the ground it leaves behind
-    // (Each patch of it on the ground under itself, and lying the way that ground lies. They were all put at the
-    // height of the middle and turned as the middle was: on a slope the ones downhill hung in the air. "the
-    // residue from exploding barrells" hovers, 2026-10-12.)
-    for (let i = 0; i < 5; i++) {
-      const g = physics.raycast({ x: at.x + (Math.random() - 0.5) * 1.4, y: at.y + 0.8, z: at.z + (Math.random() - 0.5) * 1.4 }, _DOWN, 4, SOLID_GROUPS);
-      if (!g || g.toi <= 0.02) continue;
-      // (smaller on a slope: a wide flat patch on ground that curves lifts off it at the edges)
-      const n = new THREE.Vector3(g.normal.x, g.normal.y, g.normal.z);
-      this.decal(new THREE.Vector3(g.point.x, g.point.y, g.point.z), n, 'soil', undefined, (5 + Math.random() * 4) * (n.y > 0.97 ? 1 : 0.6));
-    }
+  /**
+   * Something has gone off: a grenade, a drum of fuel, a car. All of it is made in blast.ts.
+   * @param what which; or, as it used to be asked, whether it was fuel (true: a drum, or a car if one has just
+   *   been said to have gone up: see `wrecked`)
+   */
+  explode(at: THREE.Vector3, what: boolean | BlastKind = false) {
+    const kind: BlastKind = typeof what === 'string' ? what : !what ? 'grenade' : performance.now() - this.carWent < 150 ? 'vehicle' : 'drum';
+    this.carWent = -1e9;
+    this.blasts.go(at, kind, this.eye);
+  }
+
+  /**
+   * Told once, by whoever made the world: what the ground is anywhere on it. A blast throws the ground it is on
+   * and raises its dust, and what stops a body knows the open ground only as one thing: the road, the four
+   * grounds the land is painted with and the snow on the heights are the world's to say (the same way a footstep
+   * and a tyre are told: the road first, then the land's own).
+   */
+  world(terrain: { surfaceAt(x: number, z: number): 'grass' | 'dirt' | 'rock' | 'gravel' }, world: World) {
+    const snowUp = 1 / Math.hypot(1, SNOW.slope);
+    this.blasts.groundAt = (x, y, z, up) => (roadLift(world, x, z) > 0 ? 'asphalt' : y > (SNOW.from + SNOW.full) / 2 && up > snowUp ? 'snow' : terrain.surfaceAt(x, z));
+    // (and how far the road's own surface stands over the ground that stops a body under it)
+    this.blasts.liftAt = (x, z) => roadLift(world, x, z);
+  }
+
+  /** how far the view is thrown off by blasts just now (radians), for whoever holds the camera: see Blasts.shake */
+  get shake() {
+    return this.blasts.shake;
   }
 
   /**
@@ -639,6 +650,7 @@ export class Effects {
   /** A car has just gone up, and was seen to: its wreck burns from now (see `engineSmoke`). One found already burned out is cold. */
   wrecked(state: { owed: number; blown?: number }) {
     state.blown = performance.now();
+    this.carWent = state.blown;
   }
 
   /**
@@ -829,12 +841,14 @@ export class Effects {
       f.root.rotateY(Math.PI);
       f.fire(flame);
     }
-    if (!suppressed) {
+    // (the lamp, unless a blast brighter than a shot has it)
+    if (!suppressed && this.blasts.glow.strength < (big ? 45 : 25)) {
       this.flashLight.position.copy(worldPos);
       this.flashLight.color.set(0xffb060);
       this.flashLight.distance = 14;
       this.flashLight.intensity = big ? 45 : 25;
       this.flashT = 0.055;
+      this.lampIs = 'shot';
     }
     // a little smoke drifting from the muzzle
     // (thinner: fewer puffs, fainter, shorter lived, and thrown further and faster from the barrel, up out of its line)
@@ -849,15 +863,25 @@ export class Effects {
   }
 
   update(dt: number) {
+    this.blasts.update(dt, this.eye);
     this.fire.update(dt, this.eye);
     for (const f of this.flames) f.update(dt);
-    if (this.flashT > 0) {
-      this.flashT -= dt;
-      if (this.flashT <= 0) {
-        this.flashLight.intensity = 0;
-        this.flashLight.distance = 14;
-        this.flashLight.color.set(0xffb060);
-      }
+    // The lamp. A shot has it for a twentieth of a second; a blast for as long as it is brighter than a shot is,
+    // dying away as the blast says, and no shot takes it from a blast that is brighter than the shot.
+    const glow = this.blasts.glow, lamp = this.flashLight;
+    if (this.flashT > 0 && (this.flashT -= dt) <= 0 && this.lampIs === 'shot') this.lampIs = null;
+    if (glow.strength > (this.lampIs === 'shot' ? lamp.intensity : 0)) {
+      this.lampIs = 'blast';
+      this.flashT = 0;
+      lamp.position.copy(glow.at);
+      lamp.color.copy(glow.color);
+      lamp.distance = glow.reach;
+      lamp.intensity = glow.strength;
+    } else if (this.lampIs === 'blast') this.lampIs = null;
+    if (!this.lampIs && lamp.intensity !== 0) {
+      lamp.intensity = 0;
+      lamp.distance = 14;
+      lamp.color.set(0xffb060);
     }
     let n = 0, na = 0;
     const ca = this.colorAttr.array as Float32Array;

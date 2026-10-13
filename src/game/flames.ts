@@ -44,7 +44,8 @@ import * as THREE from 'three';
 import { assets } from '../core/assets';
 import type { Atmosphere } from '../world/atmosphere';
 
-const ART = { sheet: 'assets/fx/flames.webp', cards: 'assets/fx/flames.json' };
+/** (said aloud: a blast's ball of fire is drawn from the same sheet, and takes it from here: src/game/blast.ts) */
+export const ART = { sheet: 'assets/fx/flames.webp', cards: 'assets/fx/flames.json' };
 /** cards drawn at once, of all fires together (one campfire is about fifty) */
 const MOST = 640;
 

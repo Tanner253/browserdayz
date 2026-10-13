@@ -51,6 +51,8 @@ const SOLID: Record<string, [Surface, number]> = {
   metal_trash_can: ['metal', 0.9],
   utility_box_01: ['metal', 0.95],
   covered_car: ['metal', 0.92],
+  // (the jeep that lies on its roof in the cleft under the bridge: see LOOP in the generator)
+  uaz_469: ['metal', 0.86],
   concrete_road_barrier: ['concrete', 0.95],
   crate_big: ['wood', 0.98],
   wooden_military_crate: ['wood', 0.95],

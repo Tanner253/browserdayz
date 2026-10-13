@@ -1,11 +1,13 @@
-// `?ruins` on a development build: the ruined town (src/sim/ruins.ts) stood by itself on a plain of its own, in
-// the game as it is, to be walked and looked at before it has a place on the map. Never loaded in a built site.
+// `?ruins` on a development build: the ruined town (src/sim/ruins.ts) stood by itself on land of its own, in the
+// game as it is, to be walked and looked at before it has a place on the map. Never loaded in a built site.
 //
-// A corner of the map nothing stands in (the north-west, 640 m by 512) is levelled and shaped to the ground the
-// town assumes (`ruinsGround`), its trees and rocks taken away, and the town set down on it as it really stood
-// (`ruinsPlan`). The ground is the game's own net of two metres, so what is seen here of ground against masonry
-// is what the map will show. `?ruins=30` turns the whole town thirty degrees, to see that nothing depends on
-// which way it faces.
+// A corner of the map nothing stands in (the north-west, 640 m by 512) is shaped to the land the town really
+// stands on (`ruinsGround`: its top, its banks and moat, the river's flats and dry bed), its trees and rocks taken
+// away, and the town set down on it as it stood (`ruinsPlan`). The ground is the game's own net of two metres, so
+// what is seen here of ground against masonry is what the map will show. It is painted by what kind of ground
+// each spot is (`GROUNDS` in src/world/ruins-shape.ts: sand, desert gravel, cracked silt), by this page's own
+// paint: the map's ground is the terrain's to paint, and this is the brief for it. `?ruins=30` turns the whole
+// town thirty degrees, to see that nothing depends on which way it faces.
 //
 // For whoever drives it by script: `window.RU` has the town's place, each piece's place, and the modules.
 
@@ -22,22 +24,22 @@ import * as sim from '../sim/ruins';
 
 /** the corner that is given over to it: whole tiles of the ground (128 m each), so that they can be painted as desert */
 const PATCH = { x0: -768, x1: -128, z0: -768, z1: -256, edge: 44 };
-/** the colours of the ground by what it is, as the sun shows them */
-const TINT: Record<sim.GroundKind | 'path', [number, number, number]> = {
-  top: [0.74, 0.68, 0.57], court: [0.66, 0.6, 0.5], dug: [0.6, 0.55, 0.46], scarp: [0.7, 0.62, 0.48], berm: [0.72, 0.65, 0.52], moat: [0.62, 0.57, 0.47], plain: [0.83, 0.74, 0.56], path: [0.8, 0.77, 0.7],
-};
+/** the three pictures the ground is painted with here, in the order their shares are kept in */
+const PICTURES = ['sand_01', 'sandy_gravel_02', 'mud_cracked_dry_riverbed_002'] as const;
+/** a kind's colour is kept in bytes: this is what the brightest byte stands for */
+const BRIGHT = 1.6;
 
 let site: sim.Place = { x: -420, y: 0, z: -495, rot: 0 };
 let plan: { piece: sim.Piece; place: sim.Place }[] = [];
-/** the ground's colour at every point of the net across the patch */
-let tint: Uint8Array | null = null;
+/** at every point of the net across the patch: how much of each picture the ground is there, and the colour it is washed with */
+let shares: Uint8Array | null = null, washes: Uint8Array | null = null;
 
 const smooth = (a: number, b: number, v: number) => {
   const t = Math.min(1, Math.max(0, (v - a) / (b - a)));
   return t * t * (3 - 2 * t);
 };
 
-/** The corner of the world made into the town's plain: its heights, what it is painted with, and what stood on it. Before anything is built from the world. */
+/** The corner of the world made into the town's land: its heights, what it is painted with, and what stood on it. Before anything is built from the world. */
 export function lay(world: World) {
   const turn = Number(new URLSearchParams(location.search).get('ruins') || 0);
   const half = WORLD_SIZE / 2, i0 = (PATCH.x0 + half) / CELL, i1 = (PATCH.x1 + half) / CELL, j0 = (PATCH.z0 + half) / CELL, j1 = (PATCH.z1 + half) / CELL;
@@ -45,21 +47,20 @@ export function lay(world: World) {
   const was: number[] = [];
   for (let j = j0; j <= j1; j += 8) for (let i = i0; i <= i1; i += 8) was.push(world.heights[idx(i, j)]);
   was.sort((a, b) => a - b);
-  site = { x: -420, y: Math.round(was[was.length >> 1]) - sim.MOAT.plain, z: -495, rot: (turn * Math.PI) / 180 };
+  site = { x: -420, y: Math.round(was[was.length >> 1]) - sim.LAND.plain, z: -495, rot: (turn * Math.PI) / 180 };
   plan = sim.ruinsPlan(site);
   const w = i1 - i0 + 1, h = j1 - j0 + 1;
-  tint = new Uint8Array(w * h * 4);
+  shares = new Uint8Array(w * h * 4);
+  washes = new Uint8Array(w * h * 4);
   for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
     const x = -half + i * CELL, z = -half + j * CELL, [lx, lz] = sim.ruinLocal(site, x, 0, z), g = sim.ruinsGround(lx, lz);
     const k = idx(i, j), mix = smooth(0, PATCH.edge, Math.min(x - PATCH.x0, PATCH.x1 - x, z - PATCH.z0, PATCH.z1 - z));
-    // (a little unevenness, off the masonry: nothing in a desert is laid with a level)
-    const wild = g.hold ? 0 : (sim.rough(x * 0.07, z * 0.07, 5) - 0.5) * 0.7 + (sim.rough(x * 0.31, z * 0.31, 6) - 0.5) * 0.16;
-    world.heights[k] = world.surface[k] = world.heights[k] * (1 - mix) + (site.y + g.y + wild) * mix;
+    world.heights[k] = world.surface[k] = world.heights[k] * (1 - mix) + (site.y + g.y) * mix;
     world.splat.set([0, 0, 0, 255], k * 4);
     world.grass[k] = 0;
-    const onPath = g.kind === 'top' && sim.PATHS.some((p) => p.some((a, n) => n + 1 < p.length && toLine(lx, lz, a, p[n + 1]) < 1.9));
-    const c = TINT[onPath ? 'path' : g.kind], v = 0.9 + 0.2 * sim.rough(x * 0.045, z * 0.045, 7);
-    tint.set([c[0] * v * 255, c[1] * v * 255, c[2] * v * 255, 255], ((j - j0) * w + (i - i0)) * 4);
+    const G = shape.GROUNDS[g.kind], n = ((j - j0) * w + (i - i0)) * 4, which = PICTURES.indexOf(G.tex);
+    shares.set([which === 0 ? 255 : 0, which === 1 ? 255 : 0, which === 2 ? 255 : 0, 255], n);
+    washes.set([Math.min(255, (G.tint[0] / BRIGHT) * 255), Math.min(255, (G.tint[1] / BRIGHT) * 255), Math.min(255, (G.tint[2] / BRIGHT) * 255), 255], n);
   }
   // nothing grows or lies on it; and the forest round it is thinned (this is looked at with the machine's card busy elsewhere)
   const off = (q: { x: number; z: number }) => q.x < PATCH.x0 - 6 || q.x > PATCH.x1 + 6 || q.z < PATCH.z0 - 6 || q.z > PATCH.z1 + 6;
@@ -69,39 +70,74 @@ export function lay(world: World) {
   const ground: sim.GroundAt = (x, z) => heightAt(world.heights, x, z);
   for (const { piece, place } of plan) world.props.push(...sim.ruinProps(piece, place, ground));
 }
-function toLine(x: number, z: number, a: sim.V2, b: sim.V2) {
-  const dx = b[0] - a[0], dz = b[1] - a[1], t = Math.min(1, Math.max(0, ((x - a[0]) * dx + (z - a[1]) * dz) / (dx * dx + dz * dz)));
-  return Math.hypot(x - a[0] - dx * t, z - a[1] - dz * t);
-}
 
-/** The town stood on its plain, the plain painted as desert, and the places things lie added to the world's. After the ground and the buildings are built, before the game is. */
+/** The town stood on its land, the land painted as desert, and the places things lie added to the world's. After the ground and the buildings are built, before the game is. */
 export function stand(world: World, atmo: Atmosphere, r: Renderer, terrain: Terrain, buildings: Buildings) {
   // (got ready as the game gets anything ready that comes while it is played: off the picture, in the spare of frames)
   const ruins = new Ruins(atmo, r.scene, plan, (o) => r.ready(o).then(() => r.send(o)));
   const ground: sim.GroundAt = (x, z) => heightAt(world.heights, x, z);
   for (const { piece, place } of plan) buildings.lootPoints.push(...sim.ruinLoot(piece, place, ground));
 
-  // the plain's own paint: stony ground, washed with the colour of what it is (sand, bare earth, the gravel of a path)
-  const t = assets.pbr('rocks_ground_02'), w = (PATCH.x1 - PATCH.x0) / CELL + 1, h = (PATCH.z1 - PATCH.z0) / CELL + 1;
-  const kinds = new THREE.DataTexture(tint!, w, h, THREE.RGBAFormat);
-  kinds.magFilter = kinds.minFilter = THREE.LinearFilter;
-  kinds.colorSpace = THREE.SRGBColorSpace;
-  kinds.needsUpdate = true;
+  // the land's own paint: three pictures, each laid by whichever way the ground faces (so that a bank is not a
+  // smear), as much of each as the kind of ground at a spot says, washed with that kind's colour
+  const w = (PATCH.x1 - PATCH.x0) / CELL + 1, h = (PATCH.z1 - PATCH.z0) / CELL + 1;
+  const data = (bytes: Uint8Array) => {
+    const t = new THREE.DataTexture(bytes, w, h, THREE.RGBAFormat);
+    t.magFilter = t.minFilter = THREE.LinearFilter;
+    t.needsUpdate = true;
+    return t;
+  };
+  const pictures = PICTURES.map((id) => assets.texture(assets.manifest.textures[id].diff, { srgb: true, repeat: true }));
+  const tiles = PICTURES.map((id) => Object.values(shape.GROUNDS).find((q) => q.tex === id)!.tile);
   const desert = new THREE.MeshStandardMaterial({ roughness: 1, metalness: 0 });
   atmo.register(desert, (shader) => {
-    Object.assign(shader.uniforms, { tStones: { value: t.map }, tKinds: { value: kinds }, uPatch: { value: new THREE.Vector4(PATCH.x0 - CELL / 2, PATCH.z0 - CELL / 2, 1 / (w * CELL), 1 / (h * CELL)) } });
-    shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vDesert;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvDesert = (modelMatrix * vec4(position, 1.0)).xyz;');
+    Object.assign(shader.uniforms, {
+      tSand: { value: pictures[0] }, tGravel: { value: pictures[1] }, tSilt: { value: pictures[2] }, tShares: { value: data(shares!) }, tWashes: { value: data(washes!) },
+      uPatch: { value: new THREE.Vector4(PATCH.x0 - CELL / 2, PATCH.z0 - CELL / 2, 1 / (w * CELL), 1 / (h * CELL)) }, uTiles: { value: new THREE.Vector3(...tiles) },
+    });
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vDesert;\nvarying vec3 vDesertN;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvDesert = (modelMatrix * vec4(position, 1.0)).xyz;\nvDesertN = normal;');
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying vec3 vDesert;\nuniform sampler2D tStones;\nuniform sampler2D tKinds;\nuniform vec4 uPatch;')
+      .replace(
+        '#include <common>',
+        `#include <common>
+varying vec3 vDesert;
+varying vec3 vDesertN;
+uniform sampler2D tSand;
+uniform sampler2D tGravel;
+uniform sampler2D tSilt;
+uniform sampler2D tShares;
+uniform sampler2D tWashes;
+uniform vec4 uPatch;
+uniform vec3 uTiles;
+float desertHash( vec3 p ) { return fract( sin( dot( p, vec3( 12.9898, 78.233, 37.719 ) ) ) * 43758.5453 ); }
+float desertNoise( vec3 p ) {
+  vec3 i = floor( p ), f = fract( p );
+  f = f * f * ( 3.0 - 2.0 * f );
+  return mix(
+    mix( mix( desertHash( i ), desertHash( i + vec3( 1.0, 0.0, 0.0 ) ), f.x ), mix( desertHash( i + vec3( 0.0, 1.0, 0.0 ) ), desertHash( i + vec3( 1.0, 1.0, 0.0 ) ), f.x ), f.y ),
+    mix( mix( desertHash( i + vec3( 0.0, 0.0, 1.0 ) ), desertHash( i + vec3( 1.0, 0.0, 1.0 ) ), f.x ), mix( desertHash( i + vec3( 0.0, 1.0, 1.0 ) ), desertHash( i + vec3( 1.0, 1.0, 1.0 ) ), f.x ), f.y ),
+    f.z );
+}
+// a picture laid three ways, most of whichever way the ground faces
+vec3 desertLaid( sampler2D t, float tile, vec3 by ) {
+  return texture2D( t, vDesert.xz / tile ).rgb * by.y + texture2D( t, vDesert.zy / tile ).rgb * by.x + texture2D( t, vDesert.xy / tile ).rgb * by.z;
+}`,
+      )
       .replace(
         '#include <map_fragment>',
         `{
-  // (from far off the stones are too small to see, and their picture laid over and over is all that is: there it gives way to itself laid large)
-  vec3 near = texture2D(tStones, vDesert.xz / 2.8).rgb, far = texture2D(tStones, vDesert.xz / 37.0).rgb;
-  vec3 stones = mix(near, far, 0.3 + 0.62 * smoothstep(25.0, 140.0, distance(vDesert, cameraPosition)));
-  // (half its own colour kept: sand is not brown gravel, but it is not paint either)
-  stones = mix(vec3(dot(stones, vec3(0.3, 0.59, 0.11))), stones, 0.5) * 2.6;
-  diffuseColor.rgb *= stones * texture2D(tKinds, (vDesert.xz - uPatch.xy) * uPatch.zw).rgb;
+  vec2 at = ( vDesert.xz - uPatch.xy ) * uPatch.zw;
+  vec3 share = texture2D( tShares, at ).rgb;
+  share /= share.r + share.g + share.b + 0.0001;
+  vec3 by = pow( abs( normalize( vDesertN ) ), vec3( 6.0 ) );
+  by /= by.x + by.y + by.z;
+  vec3 laid = desertLaid( tSand, uTiles.x, by ) * share.r + desertLaid( tGravel, uTiles.y, by ) * share.g + desertLaid( tSilt, uTiles.z, by ) * share.b;
+  // (a slow change of tone over the whole of it, and long pale streaks the way the wind goes: no stretch of sand is one colour)
+  float slow = 0.84 + 0.3 * ( desertNoise( vDesert * 0.019 ) * 0.6 + desertNoise( vDesert * 0.083 + 5.0 ) * 0.4 );
+  float drift = 0.94 + 0.12 * desertNoise( vec3( vDesert.x * 0.035 + vDesert.z * 0.012, 3.0, vDesert.z * 0.31 - vDesert.x * 0.11 ) );
+  diffuseColor.rgb *= laid * texture2D( tWashes, at ).rgb * ${BRIGHT.toFixed(1)} * slow * drift;
 }`,
       );
   }, 'ruins-desert');

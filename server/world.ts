@@ -14,6 +14,7 @@ import { JEEP, POLICE_CAR, jeepSpots, policeSpots } from '../src/sim/vehicles';
 import { homeSpot, infectedHomes, type Home } from '../src/sim/infected';
 import { fireSpots } from '../src/sim/fires';
 import { gasZone } from '../src/sim/gas';
+import { standAt } from '../src/sim/bridge';
 
 export interface CrateSpot {
   cid: string;
@@ -69,6 +70,14 @@ export function buildWorldData(root: string) {
     homeSpot: (h: Home) => homeSpot(world, h, Math.random),
     doorCount: buildings.doorSpecs.length,
     groundAt: (x: number, z: number) => heightAt(world.heights, x, z),
+    /**
+     * What somebody at a place has under them to stand on: the ground, or the deck of a bridge for whoever is on
+     * one (see src/sim/bridge.ts). Asked wherever it is a question of somebody being in the air: `groundAt` is the
+     * ground alone, and is what is asked of somebody who may be under it.
+     */
+    standAt: (x: number, y: number, z: number) => standAt(world.bridges, heightAt(world.heights, x, z), x, y, z),
+    /** the bridges the road goes over */
+    bridges: world.bridges,
     /** somewhere open and level to set a supply drop down */
     dropSite: (rnd?: () => number, inside = false, avoid: { x: number; z: number }[] = []) => pickDropSite(world, rnd, inside, avoid),
   };

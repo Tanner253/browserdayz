@@ -3,10 +3,11 @@
 // `npx tsx test/expansion.test.ts`.
 
 import assert from 'node:assert/strict';
-import { ARMY_CAMP, BUNKER_AT, CELL, KAMENKA, NO_START, OUTLYING, PASS, TOWN, TRADE_AT, kamenkaQ, EXPANSION as E, PLAY_AREAS, PLAY_RADIUS, WORLD_RES, WORLD_SIZE, generateWorld, heightAt, inPlay, playOutline, slopeAt, BUILDING_FOOTPRINT } from '../src/world/worldgen';
+import { ARMY_CAMP, BUNKER_AT, CELL, KAMENKA, LOOP, MOUNTAIN, NO_START, OUTLYING, PASS, PLAY_FIRST, TOWN, TRADE_AT, kamenkaQ, loopFence, loopLine, EXPANSION as E, PLAY_AREAS, PLAY_RADIUS, WORLD_RES, WORLD_SIZE, generateWorld, heightAt, inPlay, playOutline, slopeAt, BUILDING_FOOTPRINT } from '../src/world/worldgen';
 import { buildWorldData } from '../server/world';
 import { GAS, gasDepth, gasZone } from '../src/sim/gas';
 import { INFECTED, openGround } from '../src/sim/infected';
+import { deckWidth, onBridge, spanOf, wreckUnder } from '../src/sim/bridge';
 
 let n = 0;
 const ok = (name: string, fn: () => void) => {
@@ -41,7 +42,13 @@ import { JEEP } from '../src/sim/vehicles';
 // cells, 3515396887; all 72 buildings, 2448790248; 9494 trees, 1630127803; all 675 loot points, 2826555666.)
 // (2026-10-13, with the hillside behind the bunker fenced off as well (BUNKER_FENCE), off the map as it was live that
 // day. They were: 181893 cells, 1379160507; 9454 trees, 3496676067.)
-const WAS = { cells: 160775, heights: 1846616272, buildings: 72, away: 46, buildingsHash: 192416693, lastId: 'tower_71', spawns: 2697513077, trees: 8100, treesHash: 3268064997, lootPoints: 675, lootAway: 371, lootHash: 4064289616, jeeps: 8, jeepsAway: 7, jeepsHash: 1649467612, fires: 6 };
+// (2026-10-13 again, when the road was made a loop (LOOP in the generator): the first pass laid back to 190 m from
+// the road (PASS.reach, which the fence follows: it was 150), and fenced off besides, by `loopFence`, the ground the
+// second pass was cut through at the old road's west end and the strip the new road rounds the works on. Off the
+// map as it was before any of that, with those fences up. They were: 160775 cells, 1846616272; 8100 trees,
+// 3268064997. What moved inside the new fences was counted cell by cell against the map before, and nothing
+// outside them had: the same four figures came off the map before and after.)
+const WAS = { cells: 133883, heights: 3984432879, buildings: 72, away: 46, buildingsHash: 192416693, lastId: 'tower_71', spawns: 2697513077, trees: 6547, treesHash: 1745976524, lootPoints: 675, lootAway: 371, lootHash: 4064289616, jeeps: 8, jeepsAway: 7, jeepsHash: 1649467612, fires: 6 };
 const hash = (parts: number[]) => {
   let h = 2166136261 >>> 0;
   for (const v of parts) {
@@ -107,8 +114,12 @@ const touched = (x: number, z: number) => {
   // (and the bunker's hollow, on the far side of the map; and, since 2026-10-13, the hillside behind it, which was
   // cut back to a slope somebody can walk: "generally smooth out the landscape around the bunker a little bit")
   if (Math.hypot(x - BUNKER_AT.x, z - BUNKER_AT.z) < BUNKER_FENCE) return true;
-  // (and the way over to Kamenka, 2026-10-10: the hill cut down along the road's last climb and its foot banked up)
+  // (and the way over to Kamenka, 2026-10-10: the hill cut down along the road's last climb and its foot banked up;
+  // laid back further on 2026-10-13, which PASS.reach says)
   if (x > PASS.from - PASS.reach - 4 && passLine.some(([px, pz]) => Math.hypot(x - px, z - pz) < PASS.reach + 3)) return true;
+  // (and the ground of the loop, 2026-10-13: the second pass, at the old road's west end, and the new road's bed
+  // and banks where it comes onto the old map behind the works)
+  if (loopFence(x, z)) return true;
   const dx = E.x - camp.x, dz = E.z - camp.z, l2 = dx * dx + dz * dz;
   const t = Math.max(0, Math.min(1, ((x - camp.x) * dx + (z - camp.z) * dz) / l2));
   return Math.hypot(x - (camp.x + dx * t), z - (camp.z + dz * t)) < 34 && Math.hypot(x - camp.x, z - camp.z) > 16;
@@ -173,10 +184,17 @@ ok('it lies outside the ring the map used to end at, inside the ground there is,
   assert.ok(Math.hypot(E.x, E.z) - E.floor > PLAY_RADIUS, 'its floor reaches into the old map');
   const R = E.floor + E.wall;
   assert.ok(Math.abs(E.x) + R < half && Math.abs(E.z) + R < half, 'it runs off the edge of the ground');
-  // (the valley, the works, the bunker; and since, the town in the east and the round over the road to it)
-  assert.equal(PLAY_AREAS.length, 5);
+  // (the valley, the works, the bunker; and since, the town in the east and the round over the road to it: the five
+  // there were are the first five still, and the rounds strung along the loop come after them)
+  assert.equal(PLAY_FIRST, 5);
+  assert.deepEqual(PLAY_AREAS.slice(0, PLAY_FIRST).map((a) => [a.x, a.z]), [[0, 0], [E.x, E.z], [BUNKER_AT.x, BUNKER_AT.z], [TOWN.gate.x, TOWN.gate.z], [TOWN.x, TOWN.z]]);
+  assert.deepEqual([PLAY_AREAS[0].r, PLAY_AREAS[1].r, PLAY_AREAS[3].r, PLAY_AREAS[4].r], [PLAY_RADIUS, E.floor + E.wall, TOWN.gate.r, TOWN.r]);
+  assert.ok(PLAY_AREAS.length > PLAY_FIRST, 'the Zona has not grown along the loop');
   assert.ok(inPlay(0, 0) && inPlay(E.x, E.z) && inPlay(camp.x, camp.z) && inPlay(BUNKER_AT.x, BUNKER_AT.z));
-  assert.ok(!inPlay(E.x, -E.z) && !inPlay(-E.x, E.z), 'the other corners of the map are not played in');
+  // (the corner across the valley from the works is not played in; the one across the road from it is, since
+  // 2026-10-13: it lies inside the loop of the road, and everything inside the loop is the Zona's)
+  assert.ok(!inPlay(E.x, -E.z) && !inPlay(E.x * 1.5, -E.z * 1.5), 'the north-west corner of the map is played in');
+  assert.ok(inPlay(-E.x, E.z), 'the ground inside the loop of the road is not played in');
   // one line round the whole: every arc ends where another begins (the valley's round is in two pieces, between the two places added to it)
   const arcs = playOutline();
   assert.ok(arcs.length >= 6, `${arcs.length} arcs`);
@@ -382,9 +400,10 @@ ok('the east country: a town out of the valley by the road, two places far out, 
   }
   // the road: a second line, picked up where the first ran out, down the town's street, and never a point added to the first
   assert.equal(world.road.points.length, 295 * 3, 'the old road has been lengthened: jeeps and lamps are told off along it by number');
-  // (one road; what has been laid since is streets: the village's, and the hospital's drive)
-  assert.ok(!world.roads[0].side && world.roads.slice(1).every((r) => r.side), 'a second road that is not a street');
-  assert.equal(world.roads.length, 5);
+  // (one road; what was laid after it is streets, the village's and the hospital's drive; and after those, the loop:
+  // see the last check)
+  assert.ok(!world.roads[0].side && world.roads.slice(1, 5).every((r) => r.side), 'a second road that is not a street');
+  assert.equal(world.roads.length, 5 + 4);
   const p = world.roads[0].points, n = p.length / 3, last = world.road.points.length - 3;
   assert.ok(Math.hypot(p[0] - world.road.points[last], p[2] - world.road.points[last + 2]) < 0.01 && Math.abs(p[1] - world.road.points[last + 1]) < 0.01, 'the new road does not begin where the old one ends');
   let nearest = 1e9, steep = 0;
@@ -420,6 +439,106 @@ ok('the east country: a town out of the valley by the road, two places far out, 
   // loot: the new buildings have places for things, all after every place there was
   const fresh = data.lootPoints.slice(WAS.lootPoints).filter((q: { x: number; z: number }) => !inOld(q.x, q.z));
   assert.ok(fresh.length >= 150, `${fresh.length} places for things out there`);
+});
+
+ok('the road is a loop: out of the far end of Kamenka, over the bridge, round by the high ground and down a second pass onto the old road; and a road up the mountain', () => {
+  const R = world.roads, door = R[5].points, over = R[6], main = R[7].points, hill = R[8];
+  assert.ok(!R[5].side && !R[5].bridge && over.bridge && !R[7].side && hill.side, 'the lines of the new road are not the door, the bridge, the shelf and the mountain road, in that order');
+  // each begins where the one before it ends, from the end of Kamenka's street round to the old road's first point
+  const street = R[0].points, meet = (a: Float32Array, i: number, b: Float32Array, j: number, what: string) => assert.ok(Math.hypot(a[i] - b[j], a[i + 2] - b[j + 2]) < 0.01 && Math.abs(a[i + 1] - b[j + 1]) < 0.01, what);
+  meet(door, 0, street, street.length - 3, "the new road does not begin at the end of Kamenka's street");
+  meet(over.points, 0, door, door.length - 3, 'the bridge does not begin where the road out of the town ends');
+  meet(main, 0, over.points, 3, 'the road does not go on from the bridge');
+  meet(main, main.length - 3, world.road.points, 0, "the new road does not end on the old road's first point");
+  assert.equal(world.bridges.length, 1);
+  // It can be driven: the ground under every stretch of it (the old road's west end too, which was a wall of 78 in
+  // a hundred) climbs less than a quarter, is level across, and is the road's own height. As the wheels find it.
+  // (the old road's points that were given new heights: as far down as the foot of the second pass. And the mountain
+  // road from where it is clear of the pass road, whose verge it crosses first: that slopes as the pass does.)
+  const foot = loopLine().main.length - loopLine().old;
+  const lines: [string, Float32Array, number][] = [['the road out of the town', door, 2], ['the shelf road and the west pass', main, 2], ["the old road's west end", world.road.points.slice(0, foot * 3), 2], ['the mountain road', hill.points, 6]];
+  for (const [name, p, from] of lines) {
+    let steep = 0, tilt = 0, off = 0;
+    for (let i = from; i < p.length / 3 - 2; i++) {
+      const x = p[i * 3], y = p[i * 3 + 1], z = p[i * 3 + 2], dx = p[i * 3 + 3] - p[i * 3 - 3], dz = p[i * 3 + 5] - p[i * 3 - 1], l = Math.hypot(dx, dz);
+      if (l < 0.5) continue;
+      const tx = dx / l, tz = dz / l;
+      steep = Math.max(steep, Math.abs(ground(x + tx * 4, z + tz * 4) - ground(x - tx * 4, z - tz * 4)) / 8);
+      tilt = Math.max(tilt, Math.abs(ground(x - tz * 2.2, z + tx * 2.2) - ground(x + tz * 2.2, z - tx * 2.2)) / 4.4);
+      off = Math.max(off, Math.abs(ground(x, z) - y));
+    }
+    assert.ok(steep < 0.25, `${name} climbs ${(steep * 100).toFixed(0)} in a hundred somewhere`);
+    assert.ok(tilt < 0.12, `${name} leans ${(tilt * 100).toFixed(0)} in a hundred across somewhere`);
+    assert.ok(off < 0.35, `the ground is ${off.toFixed(2)} m off ${name} somewhere`);
+  }
+  // the old road keeps every point it had where it had it: only the height of its first is new (see the first check for the count)
+  assert.ok(world.road.points[1] < 60, `the old road's first point is still ${world.road.points[1].toFixed(0)} m up, at the top of a wall`);
+  // The second pass and the first are hillsides, not trenches: of the ground from twelve to seventy metres either
+  // side of the road where it is cut through the hill, four fifths can be walked (under 33 degrees: src/sim/slopes.ts).
+  for (const [name, pts] of [['the first pass', passLine.filter(([x]) => x > 410)], ['the second pass', loopLine().main.slice(loopLine().old).filter(([x]) => x < -380)]] as [string, [number, number][]][]) {
+    let all = 0, steep = 0;
+    for (let i = 1; i < pts.length - 1; i++) {
+      const dx = pts[i + 1][0] - pts[i - 1][0], dz = pts[i + 1][1] - pts[i - 1][1], l = Math.hypot(dx, dz) || 1;
+      for (let k = 12; k <= 70; k += 6) for (const sgn of [1, -1]) {
+        all++;
+        if (slopeAt(world.heights, pts[i][0] - (dz / l) * k * sgn, pts[i][1] + (dx / l) * k * sgn) > Math.tan((33 * Math.PI) / 180)) steep++;
+      }
+    }
+    assert.ok(steep < all * 0.2, `${((steep / all) * 100).toFixed(0)}% of the ground beside ${name} is too steep to walk`);
+  }
+  // the Zona takes the loop in, all of it, with ground to fight on either side; the two far places stay outside it;
+  // and it is one piece with no hole in it (nothing inside the loop is outside the line)
+  for (const line of [loopLine().door, loopLine().main]) for (const [x, z] of line) {
+    assert.ok(inPlay(x, z), `the new road leaves the Zona at ${x.toFixed(0)}, ${z.toFixed(0)}`);
+    for (let a = 0; a < 6.28; a += 0.785) assert.ok(inPlay(x + Math.cos(a) * 30, z + Math.sin(a) * 30), `there are not thirty metres of the Zona beside the new road at ${x.toFixed(0)}, ${z.toFixed(0)}`);
+  }
+  for (const o of OUTLYING) assert.ok(!inPlay(o.x, o.z, -LOOP.clear + 6), `${o.name} is in the Zona, or all but`);
+  {
+    const S = 8, M = Math.floor(WORLD_SIZE / S) + 1, out = new Uint8Array(M * M), stack: number[] = [];
+    const inZona = (k: number) => inPlay(-half + (k % M) * S, -half + Math.floor(k / M) * S);
+    for (let i = 0; i < M; i++) for (const k of [i, (M - 1) * M + i, i * M, i * M + M - 1]) if (!out[k] && !inZona(k)) (out[k] = 1), stack.push(k);
+    while (stack.length) {
+      const k = stack.pop()!;
+      for (const m of [k - 1, k + 1, k - M, k + M]) if (m >= 0 && m < M * M && Math.abs((m % M) - (k % M)) <= 1 && !out[m] && !inZona(m)) (out[m] = 1), stack.push(m);
+    }
+    for (let k = 0; k < M * M; k++) assert.ok(out[k] || inZona(k), `a hole in the Zona at ${-half + (k % M) * S}, ${-half + Math.floor(k / M) * S}`);
+  }
+  // nobody starts on it or beside it, and no tree stands in it
+  const near = (x: number, z: number) => Math.min(...[door, main, hill.points].map((p) => { let d = 1e9; for (let i = 0; i < p.length; i += 3) d = Math.min(d, Math.hypot(p[i] - x, p[i + 2] - z)); return d; }));
+  for (const t of world.trees) if (Math.abs(t.x) > 380 || Math.abs(t.z) > 380) assert.ok(near(t.x, t.z) > 4.6, `a tree stands in the new road at ${t.x.toFixed(0)}, ${t.z.toFixed(0)}`);
+  for (const sp of world.spawnRing) assert.ok(near(sp.x, sp.z) > 25, 'a start on the new road');
+  // The mountain road: off the pass by Kamenka's first door, never near the bunker, to the gatehouse; and the place
+  // kept for the fort above it is clear
+  const hp = hill.points;
+  assert.ok(passLine.some(([x, z]) => Math.hypot(x - hp[0], z - hp[2]) < 3.5), 'the mountain road does not leave the pass road');
+  for (let i = 0; i < hp.length; i += 3) assert.ok(Math.hypot(hp[i] - BUNKER_AT.x, hp[i + 2] - BUNKER_AT.z) > 250, 'the mountain road comes within 250 m of the bunker');
+  assert.ok(world.gatehouse && Math.hypot(world.gatehouse.x - hp[hp.length - 3], world.gatehouse.z - hp[hp.length - 1]) < 0.01, 'no gatehouse at the end of the mountain road');
+  for (const list of [world.trees, world.rocks, world.props]) for (const t of list) assert.ok(Math.hypot(t.x - MOUNTAIN.castle.x, t.z - MOUNTAIN.castle.z) >= MOUNTAIN.castle.clear, `a ${t.kind} stands where the fort is to stand`);
+  // The bridge: nothing is dropped from the sky under it (a supply drop is set down on level, clear ground: there is
+  // none under the deck), and what lies about the wreck in the cleft are the last places for things there are
+  const b = world.bridges[0], len = spanOf(b);
+  for (let x = Math.min(b.ax, b.bx) - 2; x <= Math.max(b.ax, b.bx) + 2; x += 2) for (let z = Math.min(b.az, b.bz) - deckWidth() / 2; z <= Math.max(b.az, b.bz) + deckWidth() / 2; z += 2) {
+    const p = onBridge(b, x, z);
+    // (under it: where the ground has fallen away from the deck. At its two ends the ground is the road.)
+    if (p.along < 0 || p.along > len || Math.abs(p.side) > deckWidth() / 2 || LOOP.deck - ground(x, z) < 2) continue;
+    const y = ground(x, z), steep = Math.max(...[[2.5, 0], [-2.5, 0], [0, 2.5], [0, -2.5]].map(([dx, dz]) => Math.abs(ground(x + dx, z + dz) - y)));
+    const stood = world.trees.some((t) => Math.abs(t.x - x) < 3.5 && Math.abs(t.z - z) < 3.5) || world.rocks.some((t) => Math.abs(t.x - x) < 3 && Math.abs(t.z - z) < 3) || world.props.some((t) => Math.abs(t.x - x) < 2.5 && Math.abs(t.z - z) < 2.5);
+    assert.ok(steep > 0.5 || stood, `a supply drop could be set down under the bridge at ${x}, ${z}`);
+  }
+  const wreck = wreckUnder(b), last = data.lootPoints.slice(-wreck.spots.length);
+  assert.ok(last.every((q: { building: string }) => q.building === 'wreck'), "the wreck's places for things are not the last there are");
+  for (const q of last) assert.ok(Math.abs(q.y - ground(q.x, q.z)) < 0.05 && LOOP.deck - q.y > 15, 'a place for a thing by the wreck is not on the ground of the cleft');
+});
+
+ok('no two things that are searched are one thing to the server: every container has a number of its own', () => {
+  // (2026-10-13: two cabinets of the hospital stood one over the other on two floors, and a container is told by
+  // where it stands over the ground: they were one box. The upper one stands 0.4 m along its wall now.)
+  const seen = new Map<string, { kind: string; y: number }>();
+  for (const c of data.crates) {
+    const was = seen.get(c.cid);
+    assert.ok(!was, `${c.cid} is two containers: a ${was?.kind} at ${was?.y.toFixed(1)} m and a ${c.kind} at ${c.y.toFixed(1)} m`);
+    seen.set(c.cid, c);
+  }
 });
 
 console.log(`\n${n} checks passed`);

@@ -204,6 +204,56 @@
    "diff": "assets/tex/snow_02_diff.webp",
    "nor": "assets/tex/snow_02_nor.webp",
    "arm": "assets/tex/snow_02_arm.webp"
+  },
+  "grass_ground": {
+   "diff": "assets/tex/grass_ground_diff.webp",
+   "nor": "assets/tex/grass_ground_nor.webp",
+   "arm": "assets/tex/grass_ground_arm.webp"
+  },
+  "withered_grass": {
+   "diff": "assets/tex/withered_grass_diff.webp",
+   "nor": "assets/tex/withered_grass_nor.webp",
+   "arm": "assets/tex/withered_grass_arm.webp"
+  },
+  "forrest_ground_01": {
+   "diff": "assets/tex/forrest_ground_01_diff.webp",
+   "nor": "assets/tex/forrest_ground_01_nor.webp",
+   "arm": "assets/tex/forrest_ground_01_arm.webp"
+  },
+  "forrest_ground_03": {
+   "diff": "assets/tex/forrest_ground_03_diff.webp",
+   "nor": "assets/tex/forrest_ground_03_nor.webp",
+   "arm": "assets/tex/forrest_ground_03_arm.webp"
+  },
+  "dry_decay_leaves": {
+   "diff": "assets/tex/dry_decay_leaves_diff.webp",
+   "nor": "assets/tex/dry_decay_leaves_nor.webp",
+   "arm": "assets/tex/dry_decay_leaves_arm.webp"
+  },
+  "forest_leaves_02": {
+   "diff": "assets/tex/forest_leaves_02_diff.webp",
+   "nor": "assets/tex/forest_leaves_02_nor.webp",
+   "arm": "assets/tex/forest_leaves_02_arm.webp"
+  },
+  "forest_ground_06": {
+   "diff": "assets/tex/forest_ground_06_diff.webp",
+   "nor": "assets/tex/forest_ground_06_nor.webp",
+   "arm": "assets/tex/forest_ground_06_arm.webp"
+  },
+  "dry_mud_field_001": {
+   "diff": "assets/tex/dry_mud_field_001_diff.webp",
+   "nor": "assets/tex/dry_mud_field_001_nor.webp",
+   "arm": "assets/tex/dry_mud_field_001_arm.webp"
+  },
+  "rocky_trail": {
+   "diff": "assets/tex/rocky_trail_diff.webp",
+   "nor": "assets/tex/rocky_trail_nor.webp",
+   "arm": "assets/tex/rocky_trail_arm.webp"
+  },
+  "rock_face_03": {
+   "diff": "assets/tex/rock_face_03_diff.webp",
+   "nor": "assets/tex/rock_face_03_nor.webp",
+   "arm": "assets/tex/rock_face_03_arm.webp"
   }
  },
  "models": {
@@ -2578,7 +2628,7 @@
     "loot",
     "gear"
    ],
-   "bytes": 302364,
+   "bytes": 289320,
    "srcTris": 4242,
    "tris": 4242,
    "min": [
@@ -2594,13 +2644,13 @@
    "lods": [
     {
      "url": "assets/models/helmet_k63_lod1.glb",
-     "tris": 2155,
+     "tris": 2131,
      "far": 2,
-     "of": "302364:1791890256713"
+     "of": "289320:1791892818147"
     }
    ],
    "hi": "assets/models/hi/helmet_k63.glb",
-   "hiBytes": 1447160,
+   "hiBytes": 1434108,
    "hiCard": 64
   },
   "vest_t0": {
@@ -4749,17 +4799,17 @@
    "tags": [
     "weapon"
    ],
-   "bytes": 205456,
+   "bytes": 208292,
    "srcTris": 2846,
    "tris": 2846,
    "min": [
-    -0.0659,
     -0.0163,
+    -0.0659,
     -0.0358
    ],
    "max": [
-    0.2391,
     0.0163,
+    0.2391,
     0.042
    ],
    "lods": [
@@ -4767,23 +4817,23 @@
      "url": "assets/models/knife_lod1.glb",
      "tris": 1600,
      "far": 2,
-     "of": "205456:1791890889299"
+     "of": "208292:1791893707048"
     }
    ],
    "holds": {
     "right": [
+     0.01459,
      -0.00394,
-     -0.01459,
      0.0759
     ],
     "left": [
+     -0.15993,
      0.29192,
-     0.15993,
      0.05851
     ]
    },
    "hi": "assets/models/hi/knife.glb",
-   "hiBytes": 827208,
+   "hiBytes": 830040,
    "hiCard": 64
   },
   "knife_fp": {
@@ -4791,17 +4841,17 @@
    "tags": [
     "viewmodel"
    ],
-   "bytes": 317088,
+   "bytes": 382668,
    "srcTris": 16546,
    "tris": 16546,
    "min": [
-    -0.0659,
     -0.0163,
+    -0.0659,
     -0.0358
    ],
    "max": [
-    0.2391,
     0.0163,
+    0.2391,
     0.042
    ],
    "lods": [],
@@ -4856,26 +4906,26 @@
      1
     ],
     "frame": [
+     -0.0032569,
      0.0081517,
-     0.0032569,
      -0.0012152,
      0,
+     0.0081971,
      0.003068,
-     -0.0081971,
      -0.001389,
      0,
+     -0.000857,
      -0.0016345,
-     0.000857,
      -0.0086677,
      0,
+     -0.0831416,
      0.1530296,
-     0.0831416,
      0.1645319,
      1
     ]
    },
    "hi": "assets/models/hi/knife_fp.glb",
-   "hiBytes": 937100,
+   "hiBytes": 1002680,
    "hiCard": 64
   },
   "saline_bag": {

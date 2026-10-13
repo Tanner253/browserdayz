@@ -14,6 +14,7 @@ import { GAS, gasDepth, gasZone } from '../sim/gas';
 import type { Tier } from '../sim/tiers';
 import { BUILDING_FOOTPRINT, CELL, TOWN, WORLD_RES, WORLD_SIZE, bunkerPlace, heightAt, idx, type BuildingPlot, type Instance, type SiteKind, type World } from './worldgen';
 import { bunkerAt, bunkerPlan, levelY } from '../sim/bunker';
+import { wreckUnder } from '../sim/bridge';
 import { flatsPlan, hospitalLobbyPlan, hospitalPlan, hospitalWingPlan, policeCellsPlan, policeGaragePlan, policeHqPlan } from './big-buildings';
 
 /** (`Gas` is not a kind of building: it is whatever stands under the gas, whatever else it is. See src/sim/gas.ts.) */
@@ -1482,6 +1483,10 @@ export class Buildings {
     this.planGrounds();
     // (and the fences of the village's back yards: shapes only, after everything)
     this.planYards();
+    // And what lies about the jeep that went off the bridge (see `wreckUnder` in src/sim/bridge.ts): places for
+    // things on the ground of the cleft, after every other place on the map, so that none of those is renumbered.
+    // What an army's jeep carried, on the step of the map the town beside it is on.
+    for (const b of this.world.bridges) for (const [x, z] of wreckUnder(b).spots) this.lootPoints.push({ x, y: heightAt(this.world.heights, x, z) + 0.02, z, usage: ['Military', 'Hunting'], building: 'wreck', floor: true, tier: 3 });
   }
 
   /**
@@ -1812,11 +1817,13 @@ export class Buildings {
       bunker: [],
       // the army's camp: a fire where the lane crosses, cases and drums about it, blocks across the way in past the tower
       tents: [['stone_fire_pit', 0, 0], ['weapons_case', 2.4, -1.6], ['wooden_military_crate', -2.6, 1.4], ['old_military_crate@0', 2.2, 14.5], ['Barrel_01', -3.2, -14], ['barrel_03', -4.1, -13.1], ['crate_big', 3.4, -15], ['concrete_road_barrier', -5, 31], ['concrete_road_barrier', 0, 32], ['concrete_road_barrier', 5, 31], ['old_tyre', -4, 13], ['dry_branches_medium_01', 4.5, 3]],
-      // Kamenka: cars left in the street, what a shop and a workshop put out, the way out of town shut with blocks,
-      // and two containers in the yard behind the workshop
+      // Kamenka: cars left in the street, what a shop and a workshop put out, and two containers in the yard behind
+      // the workshop. (The way out of the town was shut with two blocks across the end of its street, where the road
+      // stopped. The road goes on from there now (LOOP in the generator), and the blocks lie where they were dragged
+      // to, either side of it.)
       town: [
         ['covered_car', 5.3, -36], ['covered_car', -5.4, 30], ['covered_car', 5.2, 78], ['covered_car', -5.3, -70],
-        ['concrete_road_barrier', -2.2, 93.5, 0], ['concrete_road_barrier', 2.4, 94.5, 0],
+        ['concrete_road_barrier', -6.3, 96.5, 0], ['concrete_road_barrier', 6.6, 99, 0],
         ['wooden_crate_01', 17, -51], ['cardboard_box_01', 16.2, -38.5], ['Barrel_01', 17.2, -37.5], ['metal_trash_can@1', 5.6, -6], ['trashbag', 5.9, -7.2],
         ['old_tyre', 17.5, 61], ['Barrel_01', 17.8, 72], ['barrel_03', 18.9, 73], ['weapons_case', 18.5, 22],
         [CONTAINER.orange, 27, 80, 0.15], [CONTAINER.blue, 24, -74, Math.PI / 2], ['crate_big', 22, 76], ['crate_big', 23.2, 77],

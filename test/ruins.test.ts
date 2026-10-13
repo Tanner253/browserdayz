@@ -2,7 +2,7 @@
 // ground each is built for, what is solid, where things lie. `npx tsx test/ruins.test.ts`.
 
 import assert from 'node:assert/strict';
-import { ALCAZAR, CURTAIN, GATE, MOAT, OUTLINE, PIECE_NAMES, RUIN_TIER, SPUR, inside, outside, rampY, rampYGate, ruinAt, ruinFires, ruinFoot, ruinGround, ruinHomes, ruinLocal, ruinLoot, ruinParts, ruinProps, ruinsGround, ruinsLayout, ruinsPlan, wallLength, wallLengths, wallTop, type Flight, type Floor, type Part, type Piece, type Place, type Slab, type V2, type Wall } from '../src/sim/ruins';
+import { ALCAZAR, CURTAIN, GATE, GENTLE, LAND, OUTLINE, PIECE_NAMES, RUIN_TIER, SPUR, inside, outside, rampY, rampYGate, ruinAt, ruinFires, ruinFoot, ruinGround, ruinHomes, ruinLocal, ruinLoot, ruinParts, ruinProps, ruinsGround, ruinsLayout, ruinsPlan, wallLength, wallLengths, wallTop, type Flight, type Floor, type Part, type Piece, type Place, type Slab, type V2, type Wall } from '../src/sim/ruins';
 import { TILE, ruinShape } from '../src/world/ruins-shape';
 
 let n = 0;
@@ -76,11 +76,12 @@ ok('the town as it stood: the palace at the east point, the best wall on the sou
 
 ok('the highest masonry is eleven and a half metres over the town, the keep sixteen tall from its foot in the ditch, the great arch four and a half wide', () => {
   const keep = walls('alcazar').find((w) => w.name === 'keep')!;
-  assert.equal(keep.top, 11.6);
+  assert.equal(keep.top, ALCAZAR.keep);
+  // (each piece stands at its own level in the town: the palace three metres under the top, so its keep comes to the same height over it)
   let highest = -99;
-  for (const piece of PIECE_NAMES) for (const w of walls(piece)) for (const l of wallLengths(w)) for (const s of l.solids) highest = Math.max(highest, s[2]);
-  want(highest <= 11.6 && highest > 11, `highest ${highest}`);
-  want(11.5 - ruinGround('alcazar', 3, -6.5).y > 15, 'the keep is not tall from the ditch on its north side');
+  for (const st of ruinsLayout()) for (const w of walls(st.piece)) for (const l of wallLengths(w)) for (const s of l.solids) highest = Math.max(highest, s[2] + st.y);
+  want(highest <= 11.61 && highest > 11, `highest ${highest}`);
+  want(ALCAZAR.keep - ruinGround('alcazar', 3, -6.5).y > 15, 'the keep is not tall from the ditch on its north side');
   const arch = walls('alcazar').find((w) => w.name === 'the great arch')!.openings![0];
   want(arch.arch && Math.abs(arch.w - 4.5) < 0.01 && arch.y1 - arch.w / 2 > 4);
   // and under it a body walks through upright all the way across
@@ -265,25 +266,29 @@ ok('and no cut in the ground shows outside the wall that hides it: against every
 
 ok('the way in from the great arch is level through the gate and then one slope down to the upper court; the gate\'s passage climbs eight metres in two turns', () => {
   want(Math.abs(rampY(0) - rampY(3)) < 1e-9 && Math.abs(rampY(ALCAZAR.ramp.foot) - ALCAZAR.upper) < 1e-9);
-  const deg = (Math.atan2(rampY(4) - rampY(20), 16) * 180) / Math.PI;
+  // (measured over the slope itself: the upper court is a metre and a half under the gate now, not four and a half)
+  const deg = (Math.atan2(rampY(ALCAZAR.ramp.level) - rampY(ALCAZAR.ramp.foot), ALCAZAR.ramp.foot - ALCAZAR.ramp.level) * 180) / Math.PI;
   want(deg > 8 && deg < 20, `the ramp is ${deg.toFixed(1)} degrees`);
   want(Math.abs(rampYGate(3) - GATE.floor.turn) < 1e-9 && rampYGate(-7) === GATE.floor.top);
   want(GATE.floor.top - GATE.causeway.y > 8);
   // the causeway stands three metres over the moat's floor, level with the far lip
-  assert.equal(GATE.causeway.y, MOAT.plain);
-  want(Math.abs(GATE.causeway.y - MOAT.floor - 3) < 0.01);
+  assert.equal(GATE.causeway.y, LAND.plain);
+  want(Math.abs(GATE.causeway.y - LAND.moat - 3) < 0.01);
 });
 
-ok('the moat as the town assumes it: twelve metres down in sixteen from the bank, a floor eight or nine wide, a lip three metres up', () => {
-  // (across the south-west side, where nothing stands: from well inside the edge to well beyond the moat)
+ok('the land as the town stood on it: a top, a ditch on the south-west with a far bank lower than the top, and nothing asked of the net steeper than it can carry', () => {
+  // (across the south-west side, where nothing stands: from well inside the edge to well beyond the ditch)
   const a = OUTLINE[22], b = OUTLINE[23], mx = (a[0] + b[0]) / 2, mz = (a[1] + b[1]) / 2, l = Math.hypot(b[0] - a[0], b[1] - a[1]), out: V2 = [(b[1] - a[1]) / l, -(b[0] - a[0]) / l];
   const y = (d: number) => ruinsGround(mx + out[0] * d, mz + out[1] * d).y;
-  want(y(-30) > -0.1 && y(-30) < 0.3, `the top is at ${y(-30)}`);
-  want(y(-3.5) > 1 && y(-3.5) < 2.1, `the bank is ${y(-3.5)} high`);
-  want(Math.abs(y(MOAT.run + 1) - MOAT.floor) < 0.05 && Math.abs(y(MOAT.run + MOAT.wide - 1) - MOAT.floor) < 0.05);
-  want(Math.abs(y(MOAT.run + MOAT.wide + MOAT.lip + 2) - MOAT.plain) < 0.05);
-  const steep = (Math.atan2(y(2) - y(14), 12) * 180) / Math.PI;
-  want(steep > 33 && steep < 40, `the scarp is ${steep.toFixed(1)} degrees`);
+  want(y(-40) > -2.5 && y(-40) < 1.5, `the top is at ${y(-40)}`);
+  let floor = 99, steepest = 0;
+  for (let d = -30; d <= 90; d += 0.5) {
+    if (d > 4 && d < 60) floor = Math.min(floor, y(d));
+    steepest = Math.max(steepest, Math.abs(y(d + 0.5) - y(d)) / 0.5);
+  }
+  want(floor < -10 && floor > -12.5, `the ditch's floor is at ${floor.toFixed(2)}`);
+  want(y(85) > floor + 0.5 && y(85) < -6, `the fields beyond are at ${y(85).toFixed(2)}`);
+  want(steepest <= GENTLE * 1.08, `the steepest of it is ${steepest.toFixed(2)} (rise over run)`);
 });
 
 ok('what is found there: on the third step in the town and the fourth in the palace, a camp and a dig and three nests, each on something', () => {
@@ -336,8 +341,8 @@ ok('what is drawn of it: under a hundred and twenty thousand triangles for every
       const P = d.geometry.getAttribute('position'), U = d.geometry.getAttribute('uv'), N = d.geometry.getAttribute('normal'), C = d.geometry.getAttribute('color');
       want(!d.geometry.getIndex() && P.count === d.tris * 3, `${piece}: its points are not three to a face`);
       for (let t = 0; t < P.count; t += 3) {
-        // (which picture a face is laid with is in the fourth part of its colour: stone, or earth)
-        const [a, b, c] = [t, t + 1, t + 2], tile = d.stuff === 'timber' ? TILE.timber : C.getW(a) > 0.5 ? TILE.earth : TILE.stone;
+        // (which picture a face is laid with is in the fourth part of its colour: stone, gravel or sand)
+        const [a, b, c] = [t, t + 1, t + 2], tile = d.stuff === 'timber' ? TILE.timber : C.getW(a) > 0.75 ? TILE.sand : C.getW(a) > 0.25 ? TILE.earth : TILE.stone;
         const e1 = [P.getX(b) - P.getX(a), P.getY(b) - P.getY(a), P.getZ(b) - P.getZ(a)], e2 = [P.getX(c) - P.getX(a), P.getY(c) - P.getY(a), P.getZ(c) - P.getZ(a)];
         const nx = e1[1] * e2[2] - e1[2] * e2[1], ny = e1[2] * e2[0] - e1[0] * e2[2], nz = e1[0] * e2[1] - e1[1] * e2[0], area = Math.hypot(nx, ny, nz) / 2;
         want(area > 1e-7, `${piece}: a face of nothing`);

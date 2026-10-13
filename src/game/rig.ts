@@ -74,6 +74,13 @@ export function liftPack<T extends THREE.Material>(mat: T): T {
     // the submachine gun is painted a mid olive, with its wear and its markings in the paint: lifted like the dark
     // ones it was a flat pale shape with nothing on it. As it came.
     c.envMapIntensity = 1.1;
+  } else if (/^knife$/.test(mat.name)) {
+    // The combat knife is pale bare steel on a black grip, one paint for both. Bare steel with nothing about it to
+    // mirror is a black shape this close to the eye (as the axe's head was): its blade takes the light as worn
+    // metal does. Its colour is left as it came: lifted as the dark guns are, pale steel is a white shape.
+    c.metalness = Math.min(c.metalness, 0.45);
+    c.roughness = Math.max(c.roughness, 0.5);
+    c.envMapIntensity = 1.2;
   } else if (/^B_M3_/.test(mat.name)) {
     // and the shotgun is painted blacker than any of them: lifted further, or it is a cut-out
     c.metalness = Math.min(c.metalness, LOOK.shotgun.metal);

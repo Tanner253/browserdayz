@@ -45,6 +45,21 @@ export const TEXTURES = {
   mud_cracked_dry_riverbed_002: { res: '2k', tex: 1024 },
   // the mountain's snow, close to (2026-10-13): smooth powdery snowfield. What lies on the ground far off is still colour alone.
   snow_02: { res: '2k', tex: 1024 },
+  // the country's ground by what it is (2026-10-13: "spare no expense with textures so that it doesnt look like shit is
+  // copy and pasted like our dirt texture is ... different forest floor textures"). See KINDS in src/world/ground.ts.
+  // meadow turf, dry grass, and the thin grass and twigs of a wood's edge
+  grass_ground: { res: '2k', tex: 1024 },
+  withered_grass: { res: '2k', tex: 1024 },
+  forrest_ground_01: { res: '2k', tex: 1024 },
+  // forest floors: needles under pine, leaves under birch and oak, moss in the damp, dark earth in the hollows
+  forrest_ground_03: { res: '2k', tex: 1024 },
+  dry_decay_leaves: { res: '2k', tex: 1024 },
+  forest_leaves_02: { res: '2k', tex: 1024 },
+  forest_ground_06: { res: '2k', tex: 1024 },
+  // the trodden earth of a track or a yard, stony ground at the foot of a bank, and the rock of a steep face
+  dry_mud_field_001: { res: '2k', tex: 1024 },
+  rocky_trail: { res: '2k', tex: 1024 },
+  rock_face_03: { res: '2k', tex: 1024 },
   painted_brick: { res: '2k', tex: 1024 },
   plaster_brick_01: { res: '2k', tex: 1024 },
   rough_plaster_brick_02: { res: '2k', tex: 1024 },
@@ -423,14 +438,13 @@ export const LOCAL_MODELS = {
   // The loose end of its chin strap, a strap and the tongue of its buckle, stood out forward and to the right, where
   // the lowered visor is: it is turned back about the ring it is threaded through until it lies along the inside of
   // the right cheek, a centimetre higher, where it meets nothing.
-  // (`undo`: with a gas mask on, the visor is worn as it came. See `asItCame` in src/game/avatar.ts.)
+  // (It is down always, a gas mask under it or not: see OVER_MASK in src/game/avatar.ts for how the two sit.)
   // Its glass. The whole helmet came as one see-through material, for the sake of the visor's two panes (a fifth
   // solid in its picture; everything else in it is wholly solid): the panes keep it, the rest is drawn solid.
   helmet_k63: {
     dir: 'helmet_k63',
     isles: {
       tall: 0.2799,
-      undo: true,
       glass: (lo, hi) => hi[0] < 0.13 && lo[1] > 0.1 && lo[2] < -0.15,
       swing: [
         {
@@ -447,13 +461,12 @@ export const LOCAL_MODELS = {
           axis: [0, 1, 0],
           angle: (-130 * Math.PI) / 180,
           move: [0, 0.0112, 0.02],
-          stay: true,
         },
         // (The chin strap, its cup and the short strap with the other half of the buckle hang where a face is. The
         // helmet sits 2 cm further forward on the head than it did, see GEAR in src/game/avatar.ts, and they came
         // with it: the cup stood out through the cheeks. They are 2 cm further back in the helmet, which is where
         // they were on the head.)
-        { pick: (lo, hi) => hi[1] < 0.075 && lo[2] > -0.095 && hi[2] < 0.045 && lo[0] > -0.13 && hi[0] < 0.125, move: [0, 0, 0.02], stay: true },
+        { pick: (lo, hi) => hi[1] < 0.075 && lo[2] > -0.095 && hi[2] < 0.045 && lo[0] > -0.13 && hi[0] < 0.125, move: [0, 0, 0.02] },
       ],
     },
     scale: 0.00279,
@@ -759,8 +772,10 @@ export const WEAPON_PACKS = {
   // it came, with one animation of 146 frames that has every movement in it: held, a cut each way, a stab down with
   // the blade turned under the fist, a thrust, put away and drawn. Every triangle and every picture as it came.
   // It is held ACROSS the picture, not along it. `forward` and `up` are how the knife itself lies on the first
-  // frame (which way its point is, and the flat it is laid on: the knife alone lies flat along x, its edge to -z);
-  // `look` is which way whoever holds it faces. Its arms are the sniper's arms with another paint on them: the
+  // frame, said so that the knife alone STANDS as everything else to hit with stands (the hands of a body seen from
+  // outside are laid on a thing that does: lying along x, the fist was on it crossways and the blade out of the
+  // wrong end): `up` is the way its point is, `forward` is through its flat, and so its spine is +z and its edge
+  // -z, away from whoever holds it. `look` is which way whoever holds it faces. Its arms are the sniper's arms with another paint on them: the
   // game draws them in the sniper's (one pair of gloves whatever is held), so this pack's own arm pictures are not
   // kept in it.
   // Its size: in the hands it is as it came, drawn for those arms, which are a seventh over life as the sniper's
@@ -772,13 +787,13 @@ export const WEAPON_PACKS = {
     tex: 2048,
     scale: 0.01,
     aloneLength: 0.305,
-    forward: [0.919853, 0.346196, -0.18444],
-    up: [0.367514, -0.924977, 0.0967],
+    forward: [-0.367514, 0.924977, -0.0967],
+    up: [0.919853, 0.346196, -0.18444],
     look: { forward: [0, 0, 1], up: [0, 1, 0] },
     parts: { knife: 'knife' },
     wrists: { right: 'R_wrist_027', left: 'L_wrist_04' },
     // (the knife alone is set down by its own middle line, inside its grip: that far from the wrist)
-    origin: [0.004444, 0.016468, -0.085641],
+    origin: [-0.016468, 0.004444, -0.085641],
     fpBare: 'arms',
     fps: 30,
     clips: { idle: [0, 40], cutA: [41, 60], cutB: [61, 80], stab: [81, 102], thrust: [103, 124], stow: [125, 135], draw: [135, 145] },
@@ -787,7 +802,7 @@ export const WEAPON_PACKS = {
       url: 'https://sketchfab.com/3d-models/knife-animated-f3140db917cc43389c14b5b2536c1dc8',
       author: 'DJMaesen',
       line: 'This work is based on "knife Animated" (https://sketchfab.com/3d-models/knife-animated-f3140db917cc43389c14b5b2536c1dc8) by DJMaesen (https://sketchfab.com/bumstrum) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)',
-      changes: 'Scaled to metres; its one long animation cut into the movements the game plays; a copy of the knife alone, lying flat and still and made the length of a real one (30.5 cm), for the ground and for other players; its arms drawn with the pictures of the same maker\'s sniper pack, their own left out; textures re-encoded as WebP at the size they came; geometry compressed.',
+      changes: 'Scaled to metres; its one long animation cut into the movements the game plays; a copy of the knife alone, standing still and made the length of a real one (30.5 cm), for the ground and for other players; its arms drawn with the pictures of the same maker\'s sniper pack, their own left out; textures re-encoded as WebP at the size they came; geometry compressed.',
     },
   },
   // The AK (2026-10-10): a rifle on a skeleton with the arms that hold it, and a movement to an animation: an

@@ -9,6 +9,7 @@
 //   C.put(x, z, y, yaw)                 the survivor set down there; C.eyes() looks out of its head
 //   C.walk([[x, z], ...], { sprint })   it walks to each spot in turn; what comes back says how far it got and how fast
 //   C.hour(light)                       1 noon, 0 night;  C.frame(n) draws n frames;  C.cost() what a frame draws
+//   C.snow(v)                           how much snow lies, 0 none to 1 deep winter
 
 import * as THREE from 'three';
 import { Renderer } from '../core/renderer';
@@ -20,8 +21,9 @@ import { Atmosphere } from '../world/atmosphere';
 import type { Terrain } from '../world/terrain';
 import { Player } from '../game/player';
 import { Lamps } from '../game/lamps';
+import { Flames } from '../game/flames';
 import { CRESSET, CastleSite } from '../world/castle';
-import { castleAt, castleGround, castleLocal, castleLoot, castleProps, type Place } from '../sim/castle';
+import { castleAt, castleCuts, castleDark, castleGround, castleLocal, castleLoot, castleProps, squareTouches, type Place } from '../sim/castle';
 
 /** where the fort stands on this page: turned a little, so that nothing in it is right only because it is square to the world */
 const P: Place = { x: 40, y: 120, z: -30, rot: 0.35 };
@@ -38,11 +40,21 @@ export async function castlePage() {
   atmo.gases = [];
   await atmo.init();
 
+  const groundSnow = { value: 0 };
+  let earth: THREE.Material | undefined;
+  const flames = new Flames(r.scene, atmo);
   // ---- the ridge: the ground the fort assumes, drawn and made solid as the world's ground is
   const N = (HALF * 2) / CELL + 1, heights = new Float32Array(N * N);
   const world = (i: number, j: number) => castleAt(P, -HALF + i * CELL, -HALF + j * CELL);
   // (laid out square to the fort, not to the world: the page's own ground, turned with it)
   for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) heights[j * N + i] = castleGround(-HALF + i * CELL, -HALF + j * CELL);
+  // (what the world would do to its ground for the hatch: every corner of every square its stairwell touches is lowered, and nothing else: see `castleCuts`)
+  for (const cut of castleCuts(P)) for (let j = 0; j + 1 < N; j++) for (let i = 0; i + 1 < N; i++) {
+    // (this page's ground is turned with the fort: its squares are asked about in the fort's own measure)
+    const well = cut.well.map(([x, z]): [number, number] => [castleLocal(P, x, 0, z)[0], castleLocal(P, x, 0, z)[1]]);
+    if (!squareTouches(well, -HALF + i * CELL, -HALF + j * CELL, CELL)) continue;
+    for (const k of [j * N + i, j * N + i + 1, (j + 1) * N + i, (j + 1) * N + i + 1]) heights[k] = Math.min(heights[k], cut.to - P.y);
+  }
   {
     const pos = new Float32Array(N * N * 3), uv = new Float32Array(N * N * 2), index: number[] = [];
     for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
@@ -58,7 +70,14 @@ export async function castlePage() {
     geo.setIndex(index);
     geo.computeVertexNormals();
     const t = assets.pbr('rocks_ground_02');
-    const ground = new THREE.Mesh(geo, atmo.register(new THREE.MeshStandardMaterial({ map: t.map, normalMap: t.normalMap, roughnessMap: t.armMap, roughness: 1, color: 0xd9c690 })));
+    // (snow on it as on the fort, so that a white fort is not photographed on a brown hill: the world's own ground has its own)
+    earth = atmo.register(new THREE.MeshStandardMaterial({ map: t.map, normalMap: t.normalMap, roughnessMap: t.armMap, roughness: 1, color: 0xd9c690 }), (shader) => {
+      shader.uniforms.uSnow = groundSnow;
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', '#include <common>\nuniform float uSnow;')
+        .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\ndiffuseColor.rgb = mix( diffuseColor.rgb, vec3( 0.80, 0.83, 0.88 ), uSnow * smoothstep( 0.45, 0.8, dot( normalize( vNormal ), normalize( ( viewMatrix * vec4( 0.0, 1.0, 0.0, 0.0 ) ).xyz ) ) ) );');
+    }, 'castle page ground');
+    const ground = new THREE.Mesh(geo, earth);
     ground.receiveShadow = true;
     r.scene.add(ground);
     const hcm = new Float32Array(N * N);
@@ -68,10 +87,16 @@ export async function castlePage() {
   }
 
   // ---- the fort, and what stands in it off the shelf
-  const site = new CastleSite(P, atmo, r.scene);
+  // (as the game would stand it: the ground's own paint for the earth round the hatch, the renderer's way of
+  // getting a thing ready ahead, and the game's own flames for its cressets)
+  const site = new CastleSite(P, atmo, r.scene, { earth, ready: (o) => r.ready(o), fire: (at, size) => flames.add(at, { size, smoke: 0.12 }) });
+  groundSnow.value = site.snow;
   for (const it of castleProps(P)) {
     void assets.model(it.kind).then((model) => {
-      const m = model.clone();
+      // (stood by a holder of its own: a model's own turn is whatever its maker left it, and turning that about one
+      // way of three leaves a crate tilted in the air)
+      const m = new THREE.Group();
+      m.add(model.clone());
       m.position.set(it.x, it.y, it.z);
       m.rotation.y = it.rot;
       m.traverse((o) => void ((o as THREE.Mesh).isMesh && (o.castShadow = o.receiveShadow = true)));
@@ -110,6 +135,10 @@ export async function castlePage() {
     if (eyes) player.updateCamera(cam, dt, 1);
     site.update(dt, cam.position, atmo.night, (pos, burn) => lamps.glow(pos, CRESSET.colour, burn * 0.8, CRESSET.reach));
     lamps.update(cam, dt);
+    flames.update(dt, cam.position);
+    // (under the terrace it is dark, as it is down the bunker: so much of the sun and the sky put out for an eye that is there)
+    const dark = castleDark(P, cam.position.x, cam.position.y, cam.position.z);
+    atmo.cover.castle = { sun: 1 - dark, sky: 1 - 0.99 * dark };
     atmo.update();
     r.render(dt);
   };
@@ -146,6 +175,8 @@ export async function castlePage() {
       cam.lookAt(new THREE.Vector3(...castleAt(P, at[0], at[2], at[1])));
     },
     hour(light: number, low = 0) { atmo.setHour(light, low); },
+    /** how much snow lies: 0 none, 1 deep winter (on the fort, and on this page's hill with it) */
+    snow(v: number) { site.snow = v; groundSnow.value = site.snow; },
     frame(n = 1) { for (let i = 0; i < n; i++) draw(1 / 60); },
     /** everything that is still on its way has come, and is drawn */
     async settle() {
@@ -156,8 +187,42 @@ export async function castlePage() {
     },
     cost() {
       C.frame(1);
-      const i = r.renderer.info.render;
-      return { calls: i.calls, triangles: i.triangles, ...site.counts };
+      const i = r.renderer.info.render, m = r.renderer.info.memory;
+      return { state: site.state, calls: i.calls, triangles: i.triangles, textures: m.textures, geometries: m.geometries, ...site.counts };
+    },
+    /** waits until the fort's own shapes are in the world (its pictures have come and it has been got ready) */
+    async near(secs = 60) {
+      for (let t = 0; t < secs * 20 && site.state !== 'near'; t++) {
+        C.frame(1);
+        await new Promise((res) => setTimeout(res, 50));
+      }
+      return site.state;
+    },
+    /**
+     * What a frame costs with the fort and without it, from where the eye is: `n` pairs of frames, the fort drawn
+     * in one of each pair and hidden in the other, turn about. Milliseconds: the middle one of each, and the
+     * spread of the pairs' differences (which is the noise).
+     */
+    bench(n = 60) {
+      const gl = r.renderer.getContext(), time = (on: boolean) => {
+        site.group.visible = on;
+        const t0 = performance.now();
+        draw(1 / 60);
+        gl.finish();
+        return performance.now() - t0;
+      };
+      const withIt: number[] = [], without: number[] = [], diff: number[] = [];
+      for (let k = 0; k < 6; k++) time(k % 2 === 0);
+      for (let k = 0; k < n; k++) {
+        const a = k % 2 ? time(false) : time(true), b = k % 2 ? time(true) : time(false), on = k % 2 ? b : a, off = k % 2 ? a : b;
+        withIt.push(on);
+        without.push(off);
+        diff.push(on - off);
+      }
+      site.group.visible = true;
+      const mid = (v: number[]) => [...v].sort((p, q) => p - q)[Math.floor(v.length / 2)], round = (v: number) => Math.round(v * 100) / 100;
+      const sorted = [...diff].sort((p, q) => p - q);
+      return { with: round(mid(withIt)), without: round(mid(without)), adds: round(mid(diff)), noise: round((sorted[Math.floor(n * 0.84)] - sorted[Math.floor(n * 0.16)]) / 2) };
     },
     put,
     /** stands still so long, for a body to come to rest */
@@ -202,6 +267,9 @@ export async function castlePage() {
   const w = window as unknown as Record<string, unknown>;
   w.C = w.T = C;
   w.__game = C;
+  // (the fort's own shapes come when its pictures have: the page waits for them, as nobody playing would have to)
+  draw(1 / 60);
+  await C.near();
   await assets.idle();
   r.precompile(r.scene, r.camera);
   draw(1 / 60);

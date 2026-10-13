@@ -78,7 +78,9 @@ class Player {
   }
 }
 
-const IN: [number, number] = [0, 0], OUT: [number, number] = [470, 470];
+// (Outside: the north-west corner. It was 470, 470 until 2026-10-13: that is inside the loop of the road now, and
+// everything inside the loop is the Zona's.)
+const IN: [number, number] = [0, 0], OUT: [number, number] = [-470, -470];
 let failed: unknown = null;
 try {
   assert.ok(inPlay(...IN) && !inPlay(...OUT), 'the two places of this test are not one inside the Zona and one outside');

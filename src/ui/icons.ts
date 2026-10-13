@@ -307,7 +307,7 @@ export async function renderDoll(renderer: THREE.WebGLRenderer, env: THREE.Textu
       holder.matrixAutoUpdate = false;
       // (GEAR is written for a body in the world: turned to face the way the game faces, and at the game's size. This one is as its file has it.)
       // (Put as a body in the world is dressed, with what else is worn: a mask cut under a helmet, the helmet where
-      // it rides over a mask, its visor raised. By GEAR alone, the portrait had a hood through its helmet.)
+      // it rides over a mask. By GEAR alone, the portrait had a hood through its helmet.)
       const thing = (await models.get(id)).group.clone();
       const place = placeWorn(id, thing, worn);
       if (!place) continue;

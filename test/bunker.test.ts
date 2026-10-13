@@ -106,7 +106,9 @@ ok('the server knows it as the game does: its places for things come after every
   // So: the bunker's are one unbroken run, and nothing follows it but what lies on a rack's board.)
   const first = data.lootPoints.findIndex((p) => p.usage.includes('Bunker'));
   assert.ok(data.lootPoints.slice(first, first + mine.length).every((p) => p.usage.includes('Bunker')), 'a place of the bunker among the others');
-  assert.ok(data.lootPoints.slice(first + mine.length).every((p) => !p.floor && !!p.surf && p.surf.clear < 1), 'a place after the bunker\'s that is not on a rack');
+  // (And after the racks' again, since the road was made a loop that day: the places about the jeep that lies in the
+  // cleft under the bridge, `wreck`. The last lot of all, by the same rule.)
+  assert.ok(data.lootPoints.slice(first + mine.length).every((p) => (!p.floor && !!p.surf && p.surf.clear < 1) || p.building === 'wreck'), 'a place after the bunker\'s that is not on a rack');
   for (const p of mine) assert.ok(inBunker(P, p.x, p.y + 0.3, p.z), 'a place for things that is not in the bunker');
   assert.ok(mine.filter((p) => p.floor).length >= 12 && mine.filter((p) => p.surf).length >= 40);
   const d = data.bunkerDoor!;

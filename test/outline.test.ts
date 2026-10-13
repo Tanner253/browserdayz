@@ -122,7 +122,8 @@ ok('the Zona: one closed line, on its true edge but at the notches, never far fr
   assert.equal(rings.length, 1, `${rings.length} lines round a Zona that is all one piece`);
   const runs = held(PLAY_AREAS, rings);
   // (the works, the bunker and the way to Kamenka each join the valley at two notches, and Kamenka joins the way to it at two)
-  assert.equal(runs.length, 8);
+  // (and, since the road was made a loop, each round strung along it joins the next at a notch: see LOOP.zona in the generator)
+  assert.ok(runs.length >= 8, `${runs.length} notches`);
   // and against the rule itself: no point of the line is in the Zona, and none is further out of it than the promise
   for (const p of rings[0]) {
     assert.ok(!inPlay(p.x, p.z, 1e-6), `the line is inside the rule at ${p.x.toFixed(0)}, ${p.z.toFixed(0)}`);
@@ -139,7 +140,7 @@ ok('all of the edge is in it once: as long as the arcs it was drawn as, less wha
   const drawn = arcs.reduce((s, a) => s + a.r * (a.to - a.from), 0);
   // what a fillet cuts: the true edge from where the line leaves it, into the notch and out to where the line is
   // back on it, less the way the line goes instead
-  let cut = 0;
+  let cut = 0, full = 0;
   for (const run of runs) {
     const a = ring[run.from], b = ring[run.to];
     const round = (p: Pt) => PLAY_AREAS.find((c) => Math.abs(gap(p, c) - c.r) < 1e-6)!;
@@ -155,8 +156,13 @@ ok('all of the edge is in it once: as long as the arcs it was drawn as, less wha
     // and it is the fillet that was asked for (no notch of the Zona is too sharp for it): the round through its two ends and its middle
     const m = ring[(run.from + run.to) >> 1], ab = gap(a, b), bm = gap(b, m), ma = gap(m, a);
     const radius = (ab * bm * ma) / (2 * Math.abs((b.x - a.x) * (m.z - a.z) - (b.z - a.z) * (m.x - a.x)));
-    assert.ok(Math.abs(radius - FILLET) < 0.01, `a fillet of ${radius.toFixed(2)} m`);
+    // (Of the notches there were before the road was made a loop. A round strung along the new road may show only a
+    // few metres of its edge between its neighbours, and the fillets at the two ends of such a stretch are as small
+    // as will fit on it: never bigger than was asked.)
+    assert.ok(radius < FILLET + 0.01, `a fillet of ${radius.toFixed(2)} m`);
+    if (Math.abs(radius - FILLET) < 0.01) full++;
   }
+  assert.ok(full >= 8, `only ${full} fillets of the ${FILLET} m asked for`);
   const length = lengthOf(ring);
   assert.ok(Math.abs(length - (drawn - cut)) <= 0.03 * (drawn - cut), `${length.toFixed(0)} m of line for ${drawn.toFixed(0)} m of arcs less ${cut.toFixed(0)} m`);
   console.log(`        (${length.toFixed(1)} m of line; ${drawn.toFixed(1)} m of arcs less ${cut.toFixed(1)} m cut at ${runs.length} notches is ${(drawn - cut).toFixed(1)} m)`);

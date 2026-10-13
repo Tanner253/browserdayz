@@ -609,6 +609,8 @@ const MELEE_STYLE: Record<string, MeleeStyle> = (() => {
  *            tenth of a second and is through the middle of the picture by 0.13 s, which is when the game counts
  *            a blow as landed (0.35 of the way through a swing of the knife's 0.42 s); each then carries on and
  *            comes home after the swing is over, and the next blow of a run sets out from wherever that had got to.
+ *   skip   – seconds of a blow's drawing back that are left out, so that it lands when the game counts it: the
+ *            thrust is drawn a thirtieth of a second longer in the drawing back than the cuts are
  *   join   – seconds over which one movement gives way to the next, where the next begins from another place
  *   breath – held: how much of the pack's own drift out and back is played (it is drawn as a straight line each
  *            way), and how many seconds to a breath
@@ -618,6 +620,7 @@ const MELEE_STYLE: Record<string, MeleeStyle> = (() => {
  */
 const BLADE = {
   blows: ['cutA', 'cutB', 'thrust'],
+  skip: { thrust: 1 / 30 } as Record<string, number>,
   join: 0.06,
   breath: 0.7,
   every: 3.6,
@@ -3476,7 +3479,8 @@ export class Weapons {
     if (a && a.name === 'swing' && a !== this.bladeOf) {
       this.bladeOf = a;
       m.shotClip = BLADE.blows[(a.data?.stroke ?? 0) % BLADE.blows.length];
-      m.shotT = 0;
+      // (as far into it as the swing is, less what of its drawing back is left out)
+      m.shotT = a.t + (BLADE.skip[m.shotClip] ?? 0);
       this.bladeFrom = { ...this.bladeNow, t: 0 };
     }
     const blow = m.shotClip && rig.has(m.shotClip) && m.shotT < rig.seconds(m.shotClip) ? m.shotClip : null;

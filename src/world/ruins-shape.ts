@@ -9,7 +9,7 @@
 // and no length shows as a slab.
 
 import * as THREE from 'three';
-import { hash, rough, ruinBase, ruinParts, wallLengths, type Beam, type Body, type Flight, type Floor, type Heap, type Length, type Lump, type Paint, type Part, type Piece, type Rail, type Slab, type V2, type V3, type Wall } from '../sim/ruins';
+import { hash, rough, ruinBase, ruinParts, wallLengths, type Beam, type Body, type Flight, type Floor, type GroundKind, type Heap, type Length, type Lump, type Paint, type Part, type Piece, type Rail, type Slab, type V2, type V3, type Wall } from '../sim/ruins';
 
 /** what a thing sounds and marks like when it is trodden on or hit */
 export type Ground = 'rock' | 'dirt' | 'gravel' | 'wood';
@@ -24,31 +24,59 @@ export interface Drawn { stuff: Stuff; near: boolean; geometry: THREE.BufferGeom
 export interface Shape { drawn: Drawn[]; solids: Solid[] }
 
 /**
- * What each paint is: THE ONE PLACE the town's pictures are chosen. A picture of the game's, the colour it is
- * washed with (more than 1 lightens it), how many metres of wall or floor one repeat of it covers, and the colour
- * the picture comes to taken all together (what the town is painted with from far off, where it has no pictures).
- *   stone  – rubble limestone in pale mortar: `medieval_blocks_06` (Poly Haven, CC0), warm pitted stones in heavy
- *            mortar, washed half way to the grey of stone the sun has bleached.
- *   core   – the heart of a wall, on its broken top and ends: earth rammed with stones, tan. `rocks_ground_02`,
- *            which the ground of the map is already made of.
- *   earth  – trodden ground with stones in it: floors of courts, heaps of fallen stone, sand against a wall.
- *   paving – what is walked on along a wall's top and through a gate: the same, paler.
+ * What each paint is: THE ONE PLACE the pictures of the town's own surfaces are chosen. A picture of the game's,
+ * the colour it is washed with (more than 1 lightens it), how many metres of wall or floor one repeat of it
+ * covers, and the colour the picture comes to taken all together (what the town is painted with from far off,
+ * where it has no pictures). All Poly Haven, CC0.
+ *   stone  – rubble limestone in pale mortar: `medieval_blocks_06`, warm pitted stones in heavy mortar. Laid small
+ *            (a stone is a hand to a forearm across, as rubble is) and at two sizes and turns mixed in patches
+ *            (src/world/ruins.ts), so that a long wall does not show the picture come round again.
+ *   core   – the heart of a wall, on its broken top and ends: earth rammed with stones. `sandy_gravel_02`.
+ *   earth  – fallen stone and earth: heaps, falls at a breach. The same gravel, darker.
+ *   sand   – blown in and trodden: the floors of courts and cisterns, drifts against a wall. `sand_01`.
+ *   paving – what is walked on along a wall's top and through a gate: the same sand, greyer, as on stone.
  *   timber – old boards: `weathered_planks`, which every house of the map has loaded already.
  * (Tried and taken out: plain tan for the heart of a wall, which read as boxes nobody had painted; stained plaster
- * for floors, which read as a screed laid last year; render with brick showing for the stone, which was dark.)
+ * for floors, which read as a screed laid last year; render with brick showing for the stone, which was dark;
+ * `rocks_ground_02` for all the earth, which read as brown dirt and not as desert.)
  */
 export const PAINTS: Record<Paint, { tex: string; tint: V3; tile: number; mean: V3 }> = {
-  stone: { tex: 'medieval_blocks_06', tint: [1.3, 1.36, 1.44], tile: 2.3, mean: [0.297, 0.191, 0.114] },
-  core: { tex: 'rocks_ground_02', tint: [1.75, 1.5, 1.14], tile: 2.4, mean: [0.154, 0.111, 0.058] },
-  earth: { tex: 'rocks_ground_02', tint: [1.5, 1.38, 1.16], tile: 2.4, mean: [0.154, 0.111, 0.058] },
-  paving: { tex: 'rocks_ground_02', tint: [1.62, 1.5, 1.3], tile: 2.4, mean: [0.154, 0.111, 0.058] },
+  stone: { tex: 'medieval_blocks_06', tint: [1.3, 1.3, 1.26], tile: 1.35, mean: [0.298, 0.19, 0.113] },
+  core: { tex: 'sandy_gravel_02', tint: [1.02, 1.42, 1.8], tile: 2.2, mean: [0.329, 0.174, 0.082] },
+  earth: { tex: 'sandy_gravel_02', tint: [0.86, 1.14, 1.4], tile: 2.2, mean: [0.329, 0.174, 0.082] },
+  sand: { tex: 'sand_01', tint: [1.04, 1.04, 1.04], tile: 2.6, mean: [0.384, 0.309, 0.16] },
+  paving: { tex: 'sand_01', tint: [0.9, 0.94, 1.02], tile: 2.6, mean: [0.384, 0.309, 0.16] },
   timber: { tex: 'weathered_planks', tint: [1.25, 1.12, 0.95], tile: 1.7, mean: [0.08, 0.056, 0.043] },
+};
+/** which of the three pictures of stone and ground a paint is laid with: kept with every point, in the fourth part of its colour */
+export const LAYER: Record<Paint, number> = { stone: 0, timber: 0, core: 0.5, earth: 0.5, sand: 1, paving: 1 };
+/**
+ * What each KIND of ground is painted with: THE ONE PLACE for the land. It is what this town is painted with where
+ * it is looked at by itself (src/dev/ruins.ts), and it is the brief for the map's own ground, which the terrain
+ * paints: wherever `ruinsGround` says a kind, this is the picture and the colour meant.
+ *   plain – pale wind-blown sand.              top   – the town's top: trodden desert gravel, pale.
+ *   path  – worn ways: the same gravel, bleached.   scarp – banks and ditch sides: the gravel, darker and stony.
+ *   berm  – a shelf under a wall: gravel.      moat  – a ditch's floor: dry cracked silt.
+ *   flats – the river's flats: sand, greyer.   river – its dry bed: cracked silt, pale.
+ *   court – a court of the palace: sand.       dug   – under a floor: never seen.
+ */
+export const GROUNDS: Record<GroundKind, { tex: 'sand_01' | 'sandy_gravel_02' | 'mud_cracked_dry_riverbed_002'; tint: V3; tile: number }> = {
+  plain: { tex: 'sand_01', tint: [1.08, 1.06, 1.02], tile: 3.1 },
+  flats: { tex: 'sand_01', tint: [0.9, 0.9, 0.88], tile: 3.1 },
+  court: { tex: 'sand_01', tint: [1, 1, 1], tile: 3.1 },
+  dug: { tex: 'sand_01', tint: [0.8, 0.8, 0.8], tile: 3.1 },
+  top: { tex: 'sandy_gravel_02', tint: [0.98, 1.3, 1.6], tile: 2.6 },
+  path: { tex: 'sandy_gravel_02', tint: [1.12, 1.52, 1.6], tile: 2.6 },
+  scarp: { tex: 'sandy_gravel_02', tint: [0.8, 1.02, 1.22], tile: 2.6 },
+  berm: { tex: 'sandy_gravel_02', tint: [0.9, 1.18, 1.44], tile: 2.6 },
+  moat: { tex: 'mud_cracked_dry_riverbed_002', tint: [0.96, 1, 1.02], tile: 3.4 },
+  river: { tex: 'mud_cracked_dry_riverbed_002', tint: [1.1, 1.14, 1.16], tile: 3.4 },
 };
 /** metres of wall or floor to one repeat of each picture */
 export const TILE = Object.fromEntries(Object.entries(PAINTS).map(([k, v]) => [k, v.tile])) as Record<Paint, number>;
 /** a point's colour is kept in a byte for each of red, green and blue: this is what the brightest byte stands for (the material it is drawn with is made that much brighter) */
 export const BRIGHT = 2.9;
-const GROUND: Record<Paint, Ground> = { stone: 'rock', core: 'rock', earth: 'dirt', paving: 'rock', timber: 'wood' };
+const GROUND: Record<Paint, Ground> = { stone: 'rock', core: 'rock', earth: 'gravel', sand: 'dirt', paving: 'dirt', timber: 'wood' };
 /** how far apart the lines are, up a wall, at which its face is pushed in or out */
 const ROW = 1.25;
 /** a colour a point is washed with: one for a whole face, or one for each of its corners */
@@ -69,7 +97,7 @@ class Store {
   constructor(readonly dry: boolean) {}
   /**
    * Kept small, for there are a hundred thousand faces of it: a point's normal in four bytes, its colour in three
-   * and which of the two pictures it is painted with (stone, or earth) in a fourth; no list of which points make
+   * and which of the three pictures it is painted with (stone, gravel or sand) in a fourth; no list of which points make
    * which face (they are in order). Twenty-eight bytes a point.
    */
   geometry(): THREE.BufferGeometry {
@@ -96,7 +124,7 @@ class Buf {
   constructor(private store: Store, paint: Paint) {
     this.tint = PAINTS[paint].tint;
     this.tile = PAINTS[paint].tile;
-    this.layer = paint === 'stone' || paint === 'timber' ? 0 : 1;
+    this.layer = LAYER[paint];
   }
   /** a point of the face, lit or shaded a little by where it is: no two stretches of a wall are one tone */
   private put(p: V3, n: V3, u: number, v: number, lift: number | V3 = 1) {
@@ -264,7 +292,7 @@ function wallShape(piece: Piece, w: Wall, B: Bufs, solids: Solid[]) {
             if (h0 + h1 > 0.02) {
               const [ox0, oz0] = outward(len, 0, side), [ox1, oz1] = outward(len, 1, side), q0 = P(len, 0, side, b0 + h0), q1 = P(len, 1, side, b1 + h1);
               const r0: V3 = [q0[0] + ox0 * (0.45 + h0 * 2.4), b0 - 0.3, q0[2] + oz0 * (0.45 + h0 * 2.4)], r1: V3 = [q1[0] + ox1 * (0.45 + h1 * 2.4), b1 - 0.3, q1[2] + oz1 * (0.45 + h1 * 2.4)];
-              const sandy = B.get('earth', true);
+              const sandy = B.get('sand', true);
               if (side < 0) sandy.quad(q0, r0, r1, q1, undefined, SAND);
               else sandy.quad(q0, q1, r1, r0, undefined, SAND);
             }

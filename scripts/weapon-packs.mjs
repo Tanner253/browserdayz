@@ -315,11 +315,11 @@ export async function processWeaponPack(id, cfg, { io, SRC, OUT, FORCE, exists, 
     } else at = point(B, wristR).map((v, k) => v + cfg.origin[k]);
     // (A thing drawn over life-size, for a pack's hands that are over life-size too, is in those hands as it was
     // drawn. Alone, where it lies on the ground and is held in a fist of true size, it is made as long as such a
-    // thing is: `aloneLength`, metres along the way it points.)
+    // thing is: `aloneLength`, metres along its longest side.)
     let own = 1;
     if (cfg.aloneLength) {
       const all = [...pieceBox.values()];
-      own = cfg.aloneLength / (Math.max(...all.map((b) => b.max[0])) - Math.min(...all.map((b) => b.min[0])));
+      own = cfg.aloneLength / Math.max(...[0, 1, 2].map((k) => Math.max(...all.map((b) => b.max[k])) - Math.min(...all.map((b) => b.min[k]))));
     }
     const A = mul(scaleBy(own), mul(move(-at[0], -at[1], -at[2]), B));
     holds ??= { right: point(A, wristR).map((v) => round(v)), left: point(A, wristL).map((v) => round(v)) };
@@ -422,7 +422,8 @@ export async function processWeaponPack(id, cfg, { io, SRC, OUT, FORCE, exists, 
       await whole.transform(
         dedup(),
         resample(),
-        prune(),
+        // (arms left with no pictures of their own keep where each picture goes on them: it is another pack's that is drawn there)
+        prune(cfg.fpBare ? { keepAttributes: true } : {}),
         ...(cfg.armsTex ? [textureCompress({ encoder: sharp, targetFormat: 'webp', pattern: /arms/i, resize: [cfg.armsTex, cfg.armsTex], quality: 86 })] : []),
         textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [cfg.tex, cfg.tex], quality: 88 }),
         meshopt({ encoder: MeshoptEncoder, level: 'medium' }),
