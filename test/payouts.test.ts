@@ -895,6 +895,9 @@ await test('the second cut-over, settings: 0.01 flat whatever the treasury holds
   assert.equal(config({}).rules2From, Number.isFinite(named) ? Math.max(config({}).rulesFrom, named) : Infinity);
   const never = config({ PAYOUT_RULES2_FROM: 'never' });
   assert.equal(never.rules2From, Infinity);
+  // (and nothing that is not a moment written in full begins anything: a figure, a year, a day without its hour, a word)
+  for (const said of ['1', '0', '2026', '2026-10-20', '2026-10-20 00:00', '2026-10-20T00:00:00', 'yes', 'on', 'now', 'Oct 20 2026']) assert.equal(config({ PAYOUT_RULES2_FROM: said }).rules2From, Infinity, `"${said}" was taken for a moment`);
+  assert.equal(config({ PAYOUT_RULES2_FROM: ' 2026-10-20T00:00:00+02:00 ' }).rules2From, Date.parse('2026-10-19T22:00:00Z'));
   assert.equal(price(SOL(100.01), termsOf(never, '2030-01-01T00:00:00.000Z')), SOL(2));
   const after = new Date(c.rules2From).toISOString(), before = new Date(c.rules2From - 1).toISOString();
   for (const holds of [0, 0.44, 1.01, 100.01, 1000, 1_000_000]) assert.equal(price(SOL(holds), termsOf(c, after)), SOL(0.01));

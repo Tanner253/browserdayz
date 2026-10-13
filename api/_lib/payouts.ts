@@ -144,8 +144,12 @@ export function config(env: Record<string, string | undefined> = process.env): C
   const floor = lamports(num(env.TAG_PAY_MIN_SOL, 0.01, 0.001, 10));
   const from = Date.parse(env.PAYOUT_RULES_FROM ?? '');
   const rulesFrom = Number.isFinite(from) ? from : Date.parse('2026-10-13T04:30:00Z');
-  // (what is set outside is asked first, and "never" there holds it off whatever is written here; then RULES2_FROM)
-  const from2 = Date.parse(env.PAYOUT_RULES2_FROM?.trim() ? env.PAYOUT_RULES2_FROM : RULES2_FROM);
+  // (what is set outside is asked first, and "never" there holds it off whatever is written here; then RULES2_FROM.
+  // It must be a moment written in full, a day, a time and a zone: `Date.parse` takes "1" for the first of January
+  // 2001 and "2026" for the first of this year, and either typed by mistake would have begun the new rules at once,
+  // for every tag since the rules of 2026-10-13. Anything else is no moment, and nothing begins.)
+  const said2 = (env.PAYOUT_RULES2_FROM?.trim() ? env.PAYOUT_RULES2_FROM : RULES2_FROM).trim();
+  const from2 = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/.test(said2) ? Date.parse(said2) : NaN;
   return {
     mode,
     problem,
