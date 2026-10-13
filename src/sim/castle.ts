@@ -42,7 +42,7 @@ export const CASTLE = {
   /** the breach in the north parapet, along x (ours) */
   breach: { x0: -6.3, x1: -2.7 },
   /** the towers: across at the top, the thickness of the wall, the lean under the terrace and where it eases, the fighting platform, the inner edge of the stair; and how big the kit's round tower is made to be the foot of each (its platform is then level with the terrace, and a ring of its parapet stands round the foot of the drum) */
-  tower: { r: 3.1, wall: 0.9, lean: 3.9, bend: -5.32, flare: 8, deck: 4.8, slots: 24, stairIn: 1.15, kit: 0.56 },
+  tower: { r: 3.1, wall: 0.9, lean: 3.9, bend: -5.32, flare: 8, deck: 4.8, slots: 24, stairIn: 1.15, kit: 0.56, under: 0.7 },
   /** the keep: its outside, the room inside its walls, its floors, its roof, the top of the wall round the roof, the shell that is left of the storey over that, and the south-east corner of the roof that has fallen in with the walls over it (from there to the room's corner) */
   keep: { x0: -6.1, x1: 5.2, z0: -5.5, z1: 5.5, room: { x0: -3.7, x1: 2.8, z0: -3.4, z1: 3.4 }, floors: [0, 3, 5.85], roof: 8.7, band: 9.54, skin: 0.6, fallen: { x0: 1.3, z0: 2 } },
   /** the ground at the foot of each wall, under the terrace: what the real one measures */
@@ -103,8 +103,8 @@ export const UNDER = {
   rent: { z0: 3.3, z1: 5.7, in: 7.1 },
   /** gratings in the paving, each 0.9 m square: over the head of the sally port's stair, over the cistern, and in the store's floor over the armoury */
   gratings: [[7.2, -6], [1.9, -7.2], [0.3, 1.2]] as [number, number][],
-  /** the hatch: how far its steps go down, over what length, how wide they and the passage are, how tall the passage, and how far from what is cut for them the earth laid over the cut ground reaches (as far as lowering the squares they touch can disturb ground of two-metre squares: twice a square's corner to corner) */
-  hatch: { drop: 3.2, run: 4.2, wide: 1.3, tall: 2.1, lid: 5.7 },
+  /** the hatch: how far its steps go down, over what length, how wide they and the passage are, how tall the passage, and how far from what is cut for them the earth laid over the cut ground reaches. (As far as lowering the squares they touch can disturb ground of two-metre squares, and that is not only where it is lowered: a corner next to a lowered one faces the hole and is painted as a cliff, and so is every square it is a corner of. Three squares out along each way of the grid, so five metres to the middle of the furthest square each way, and seven corner to corner.) */
+  hatch: { drop: 3.2, run: 4.2, wide: 1.3, tall: 2.1, lid: 7.2 },
 };
 /** the cistern's arcade: the line it stands on, how thick it is, and each arch of it by how far along it is from the west wall (what is between two arches is a pier: the water's edge is drawn round each) */
 export const ARCADE = { z: -6.25, thick: 0.5, arches: [[0.25, 1.95], [2.45, 4.35], [4.85, 6.75], [7.25, 9.15], [9.65, 11.55], [12.05, 13.15]] as [number, number][] };
@@ -468,6 +468,12 @@ export function castleKit(): KitPiece[] {
     const d = (tw.door * Math.PI) / 180;
     if (tw.hollow !== undefined) cut.push(cutTurned(tw.cx + Math.cos(d) * 3.3, tw.cz + Math.sin(d) * 3.3, Math.PI / 2 - d, 1.9, 0.58, tw.hollow - 0.03, tw.hollow + 2.2));
     out.push({ id: 'fort_tower_round', name: tw.name, at: [tw.cx, -KIT_TOWER.top[0] * T.kit, tw.cz], scale: T.kit, turn: (tw.cx * 7 + tw.cz * 3) * 0.1, cut, body: false });
+    // ITS FOOTING: the same tower again under that one's foot, a little bigger (`under`), with everything of it over
+    // that foot taken off: so its wall, at the size it has just under its platform, is where the upper one's foot is,
+    // and from there it leans out and down eight metres more. The real hill falls away under the two towers on the
+    // valley side to twelve metres under the terrace; a plain dark drum of the fort's own stood in the air there.
+    const kf = -KIT_TOWER.top[0] * T.kit;
+    out.push({ id: 'fort_tower_round', name: `${tw.name} footing`, at: [tw.cx, kf - KIT_TOWER.top[0] * T.under, tw.cz], scale: T.under, turn: (tw.cx * 3 - tw.cz * 5) * 0.1 + 1.3, cut: [cutBox(tw.cx - 9, tw.cx + 9, kf + 0.01, 8, tw.cz - 9, tw.cz + 9)], body: false });
   }
   // blocks of the wall, lying where they came down: under the rent, and under the breach
   const block = (x: number, z: number, y: number, turn: number, tilt: [number, number], scale: number) => void out.push({ id: 'fort_wall_thick_end_01', name: 'fallen wall', at: [x, y, z], turn, tilt, scale });
@@ -970,11 +976,13 @@ export const FURNITURE: { kind: 'table' | 'bench' | 'bunk' | 'rack'; x: number; 
   { kind: 'rack', x: 2.52, z: -0.6, y: 5.85, yaw: Math.PI / 2, w: 1.7, d: 0.45 },
   { kind: 'table', x: 0.4, z: 0.3, y: 5.85, yaw: Math.PI / 2, w: 1.6, d: 0.8 },
   // the armoury: racks of arms along three of its walls (each always has a gun on it), and a table of rounds
-  { kind: 'rack', x: -3.42, z: 0.35, y: UNDER.floor, yaw: Math.PI / 2, w: 1.7, d: 0.45, arms: true },
-  { kind: 'rack', x: -3.42, z: 2.4, y: UNDER.floor, yaw: Math.PI / 2, w: 1.7, d: 0.45, arms: true },
-  { kind: 'rack', x: -1.6, z: -1.92, y: UNDER.floor, yaw: 0, w: 1.7, d: 0.45, arms: true },
-  { kind: 'rack', x: 0.9, z: -1.92, y: UNDER.floor, yaw: 0, w: 1.7, d: 0.45, arms: true },
-  { kind: 'rack', x: 2.92, z: 1.6, y: UNDER.floor, yaw: Math.PI / 2, w: 1.7, d: 0.45, arms: true },
+  // (deeper than a store's racks, by a hand: a rifle with a sight on it lies on its side along the shelf, and on a
+  // shelf of 0.45 its butt hung over the front edge. Their backs are where they were, a hand from the wall.)
+  { kind: 'rack', x: -3.36, z: 0.35, y: UNDER.floor, yaw: Math.PI / 2, w: 1.7, d: 0.57, arms: true },
+  { kind: 'rack', x: -3.36, z: 2.4, y: UNDER.floor, yaw: Math.PI / 2, w: 1.7, d: 0.57, arms: true },
+  { kind: 'rack', x: -1.6, z: -1.86, y: UNDER.floor, yaw: 0, w: 1.7, d: 0.57, arms: true },
+  { kind: 'rack', x: 0.9, z: -1.86, y: UNDER.floor, yaw: 0, w: 1.7, d: 0.57, arms: true },
+  { kind: 'rack', x: 2.86, z: 1.6, y: UNDER.floor, yaw: Math.PI / 2, w: 1.7, d: 0.57, arms: true },
   { kind: 'table', x: 1.4, z: -0.4, y: UNDER.floor, yaw: 0, w: 1.4, d: 0.8 },
   // the aid post: a dressing table in the ward, and one in the dispensary at the west end by the cabinet
   { kind: 'table', x: 7.75, z: 6.45, y: UNDER.floor, yaw: Math.PI / 2, w: 1.2, d: 0.7, medic: true },
@@ -1518,7 +1526,8 @@ export function castleLamps(p: Place, ground?: GroundAt, loose?: Loose[]): V3[] 
 export function castleHomes(p: Place, loose: Loose[] = castleLoose(p)): { x: number; z: number; r: number; n: number; inside?: V3[] }[] {
   // (the garrison's wounded: in the aid post, where they were laid, and wandered as far as the sally port and the west side)
   const UF = UNDER.floor, hs = houses(loose), store = { x: p.x, z: p.z, r: 9, n: 4, inside: [castleAt(p, 0.8, 6.0, UF), castleAt(p, -2.2, 6.0, UF), castleAt(p, 5.6, 6.2, UF), castleAt(p, 6.2, 0.8, UF), castleAt(p, -7.2, -2.0, UF)] };
-  if (!hs.length) return [store];
-  const vx = hs.reduce((t, h) => t + h.x, 0) / hs.length, vz = hs.reduce((t, h) => t + h.z, 0) / hs.length;
-  return [{ x: vx, z: vz, r: Math.max(12, ...hs.map((h) => Math.hypot(h.x - vx, h.z - vz) + 8)), n: Math.min(5, hs.length) }, store];
+  // (the village's: one to each of its houses, as far as five, in it or close by its walls. As one round home as wide
+  // as the village is long they were stood anywhere within thirty metres of its middle, and the saddle it stands on is
+  // fifteen metres wide: two of the five were found on the valley face, seventeen metres under the street.)
+  return [...hs.slice(0, 5).map((h) => ({ x: h.x, z: h.z, r: 6.5, n: 1 })), store];
 }

@@ -23,7 +23,7 @@ import { GLASS_GROUPS, WORLD_GROUPS, physics } from '../core/physics';
 import { assets } from '../core/assets';
 import { breathe } from '../core/breathe';
 import { SHADOW_FRUSTA, type Atmosphere, type ShaderPatch } from './atmosphere';
-import { ARCADE, CASTLE, UNDER, castleAt, castleLocal, castleUnder, castleDoor, castleKit, castleLamps, castleLoose, castleRocks, looseLocal, type GroundAt, type Loose, type Place } from '../sim/castle';
+import { ARCADE, CASTLE, LAMPS, UNDER, castleAt, castleLocal, castleUnder, castleDoor, castleKit, castleLamps, castleLoose, castleRocks, looseLocal, type GroundAt, type Loose, type Place } from '../sim/castle';
 import { PICTURES, SHEETS, castleShape, castleSky, type Sheet, type Skin, type Solid } from './castle-shape';
 import { kitMeshes, stoneLook, type StoneLook } from './kit';
 import { PostSite } from './castle-post';
@@ -87,7 +87,21 @@ float castleShaft( vec3 p ) {
   vec3 s = uCastleSunL;
   if ( s.y < 0.08 || p.y > ${f3(U.roof - 0.02)} ) return 0.0;
   vec2 a = p.xz + s.xz * ( ( ${f3(U.roof)} - p.y ) / s.y ), b = p.xz - s.xz * ( p.y / s.y );
-  return max( castleIn( a, castleHole ) * castleIn( b, castleHole ), castleIn( a, castleBay ) * castleIn( b, castleBay ) );
+  // (the hole in the walk lights the cistern and nothing beyond its walls; and what a pier of its arcade stands
+  // between and the sun is in that pier's shadow: the line to the sun must cross the arcade's line under one of its arches)
+  float hole = castleIn( a, castleHole ) * castleIn( b, castleHole ) * step( p.z, ${f3(U.cistern.z1 + 0.3)} ) * step( p.x, ${f3(U.cistern.x1 + 0.3)} );
+  if ( hole > 0.0 && abs( s.z ) > 0.0001 ) {
+    float t = ( ${f3(ARCADE.z)} - p.z ) / s.z;
+    vec3 q = p + s * t;
+    if ( t > 0.0 && q.y < ${f3(U.roof)} ) {
+      float open = 0.0;
+${ARCADE.arches.map(([u0, u1]) => `      open = max( open, step( ${f3(u0 - U.x)}, q.x ) * step( q.x, ${f3(u1 - U.x)} ) );`).join('\n')}
+      hole *= open * step( q.y, ${f3(U.floor + 2.05)} );
+    }
+  }
+  // (the bay of the west vault that fell lights the west side under it, and no further)
+  float bay = castleIn( a, castleBay ) * castleIn( b, castleBay ) * step( p.x, ${f3(CASTLE.keep.x0 + 0.2)} );
+  return max( hole, bay );
 }`;
 })();
 
@@ -151,16 +165,22 @@ vec2 waterTilt = waterLean( waterAt );
 normal = normalize( ( viewMatrix * vec4( waterTilt.x, 1.0, waterTilt.y, 0.0 ) ).xyz );`)
     .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
 {
-  vec3 toEye = normalize( cameraPosition - vWaterW ), up = normalize( vec3( waterTilt.x, 1.0, waterTilt.y ) ), back = reflect( -toEye, up );
-  // (what it shows is the roof over it, a pace or two further on: the sky, where that is the hole in the walk)
-  vec2 over = waterAt + castleTurn( back.xz ) * ( ${f3(U.roof - level)} / max( back.y, 0.05 ) );
-  float off = length( max( max( castleHole.xy - over, over - castleHole.zw ), 0.0 ) );
+  // (what it shows is found with a third of its ripples: at all of them the hole in the walk came back as a pale shape
+  // like spilt milk, which nobody could read as a hole)
+  vec3 toEye = normalize( cameraPosition - vWaterW ), up = normalize( vec3( waterTilt.x, 1.0, waterTilt.y ) ), back = reflect( -toEye, normalize( vec3( waterTilt.x * 0.3, 1.0, waterTilt.y * 0.3 ) ) );
+  // (what it shows is the roof over it, a pace or two further on. Where that is the hole in the walk: the sides of
+  // the hole, a metre of stone with the day on it; and the sky only where the line goes out of the top of the hole as well)
+  vec2 along = castleTurn( back.xz ) / max( back.y, 0.05 );
+  vec2 over = waterAt + along * ${f3(U.roof - level)}, out2 = waterAt + along * ${f3(-level)};
+  float off = length( max( max( castleHole.xy - over, over - castleHole.zw ), 0.0 ) ), off2 = length( max( max( castleHole.xy - out2, out2 - castleHole.zw ), 0.0 ) );
   vec3 stone = vec3( 0.21, 0.2, 0.19 ) * ( 0.02 + 0.55 * pow( max( 0.0, 1.0 - off / 9.0 ), 1.6 ) );
-  vec3 seen = mix( stone, vec3( 0.8, 0.9, 1.05 ) * 1.5, 1.0 - smoothstep( 0.0, 0.3, off ) ) * uWaterSky;
+  float mouth = 1.0 - smoothstep( 0.0, 0.45, off );
+  vec3 seen = mix( stone, vec3( 0.3, 0.31, 0.33 ), mouth );
+  seen = mix( seen, vec3( 0.8, 0.9, 1.05 ) * 0.75, mouth * ( 1.0 - smoothstep( 0.0, 0.45, off2 ) ) ) * uWaterSky;
   float glance = 0.03 + 0.97 * pow( 1.0 - saturate( dot( toEye, up ) ), 5.0 );
   totalEmissiveRadiance += seen * glance;
   // (the sun down the hole: the water is not clear, and what is in it is lit)
-  totalEmissiveRadiance += castleShaft( vec3( waterAt.x, ${f3(level)}, waterAt.y ) ) * uCastleSun * vec3( 0.016, 0.024, 0.02 );
+  totalEmissiveRadiance += castleShaft( vec3( waterAt.x, ${f3(level)}, waterAt.y ) ) * uCastleSun * vec3( 0.007, 0.011, 0.009 );
   // (the scum along the stone, and how far it is seen into: least where the eye looks along it)
   float scum = 1.0 - smoothstep( 0.0, 0.16, waterShore( waterAt ) + 0.03 * sin( waterAt.x * 9.0 + waterAt.y * 7.0 ) );
   reflectedLight.directDiffuse *= 1.0 + 2.5 * scum;
@@ -175,21 +195,22 @@ normal = normalize( ( viewMatrix * vec4( waterTilt.x, 1.0, waterTilt.y, 0.0 ) ).
  * fort's own measure, made standing straight.
  */
 function shaftsOf(): THREE.Mesh {
-  const pos: number[] = [], col: number[] = [], U = UNDER, D = U.cistern.drop, water = U.floor + U.cistern.water + 0.015;
+  const pos: number[] = [], col: number[] = [], U = UNDER, D = U.cistern.drop;
   const quad = (p: number[][], c: number[]) => { for (const k of [0, 1, 2, 0, 2, 3]) { pos.push(...p[k]); col.push(c[k], c[k], c[k]); } };
   /** the beam: the four sides of a shaft from the hole down to what it lights, brighter at its top */
   const beam = (x0: number, x1: number, z0: number, z1: number, top: number, foot: number, most: number) => {
-    const a = [[x0, z0], [x1, z0], [x1, z1], [x0, z1]], spread = 0.35;
+    const a = [[x0, z0], [x1, z0], [x1, z1], [x0, z1]], spread = 0.12;
     for (let k = 0; k < 4; k++) {
       const [px, pz] = a[k], [qx, qz] = a[(k + 1) % 4], mx = (x0 + x1) / 2, mz = (z0 + z1) / 2, out = (v: number, m: number) => v + Math.sign(v - m) * spread;
-      quad([[px, top, pz], [qx, top, qz], [out(qx, mx), foot, out(qz, mz)], [out(px, mx), foot, out(pz, mz)]], [most, most, most * 0.15, most * 0.15]);
+      quad([[px, top, pz], [qx, top, qz], [out(qx, mx), foot, out(qz, mz)], [out(px, mx), foot, out(pz, mz)]], [most, most, 0, 0]);
     }
   };
   // (each in five, one inside another: it is thickest in its middle, and has no one edge)
   for (const k of [0, 0.18, 0.36, 0.54, 0.72]) {
-    beam(D.x0 + k, D.x1 - k, D.z0 + k, D.z1 - k, U.roof, water - 0.4, 0.016);
+    // (a pace and a half of it under the mouth of the hole, dying away: the light it becomes is on the stone and the water, where the sun's own sum puts it)
+    beam(D.x0 + k, D.x1 - k, D.z0 + k, D.z1 - k, U.roof + 0.9, U.roof - 1.5, 0.01);
     // (the fallen vault: down its length)
-    beam(U.bay.x0 + k * 0.6, U.crawl - k * 0.6, U.bay.z0 + 2.4 + k, U.bay.z1 - k, U.roof, U.floor + 0.6, 0.011);
+    beam(U.bay.x0 + k * 0.6, U.crawl - k * 0.6, U.bay.z0 + 2.4 + k, U.bay.z1 - k, U.roof + 0.9, U.roof - 1.5, 0.007);
   }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
@@ -254,6 +275,8 @@ export class CastleSite {
   private sets: (ReturnType<typeof assets.pbr> | null)[] = [];
   private fires: THREE.Vector3[];
   private flames: { strength: number }[] = [];
+  /** the fort's own flame in each lantern, where whoever stands the fort gives it none of the game's (see CastleOptions.fire): a small bright shape, enough to say the lantern is lit */
+  private own: THREE.Mesh[] = [];
   private clock = 0;
   /** seconds, for the water's slow ripples */
   private time = { value: 0 };
@@ -475,6 +498,19 @@ export class CastleSite {
     this.group.add(this.near, this.under);
     this.group.updateMatrixWorld(true);
     if (this.o.fire) this.flames = this.fires.map((at) => Object.assign(this.o.fire!(at, CRESSET.size), { strength: 0 }));
+    else {
+      // (brighter than white: it is the one thing in a vault that is a light, and the glare round it comes of that)
+      const shape = new THREE.ConeGeometry(0.05, 0.19, 7), paint = new THREE.MeshBasicMaterial({ color: new THREE.Color(3.2, 1.5, 0.38) });
+      shape.translate(0, 0.02, 0);
+      this.own = this.fires.map((at, k) => {
+        const flame = new THREE.Mesh(shape, paint), low = k < LAMPS.length ? LAMPS[k][2] < -0.5 : true;
+        flame.position.copy(this.group.worldToLocal(at.clone()));
+        flame.visible = false;
+        flame.name = 'castle:flame';
+        (low ? this.under : this.near).add(flame);
+        return flame;
+      });
+    }
     this.state = 'near';
   }
 
@@ -538,6 +574,10 @@ export class CastleSite {
       // (and those are not lit for an eye that cannot see into the place: a light costs every stone it reaches)
       const low = pos.y < P.y - 0.5, burn = near ? (low ? (under ? 1 : 0) : dusk) : 0;
       if (this.flames[k]) this.flames[k].strength = burn;
+      if (this.own[k]) {
+        this.own[k].visible = burn > 0.02;
+        this.own[k].scale.set(0.8 + 0.2 * burn, (0.75 + 0.35 * Math.sin(this.clock * 11 + k * 1.7) ** 2) * burn, 0.8 + 0.2 * burn);
+      }
       // (under a vault a fire is a pace from the stone it lights: it is told at little more than half, or the stone by it is white)
       if (burn > 0 && off < 90) lit(pos, burn * (low ? 0.5 : 1) * (0.8 + 0.2 * Math.sin(this.clock * 9 + k * 2.1)));
     });

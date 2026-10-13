@@ -88,7 +88,7 @@ export const STUFF: Record<Paint, { sheet: Sheet; tile: number; tint: V3 }> = {
 /** metres to one turn of each picture */
 export const TILE = Object.fromEntries(PAINTS.map((p) => [p, STUFF[p].tile])) as Record<Paint, number>;
 /** from far off it is drawn with no picture at all (none is fetched for a fort nobody is near): the colour each stuff comes to */
-const FAR_TINT: Record<Paint, V3> = { stone: [0.4, 0.385, 0.36], ashlar: [0.45, 0.43, 0.39], base: [0.26, 0.26, 0.245], paving: [0.31, 0.3, 0.28], timber: [0.2, 0.165, 0.13], iron: [0.05, 0.05, 0.05], rock: [0.4, 0.4, 0.4], scree: [0.33, 0.32, 0.3], earth: [0.4, 0.36, 0.26], water: [0.05, 0.06, 0.07] };
+const FAR_TINT: Record<Paint, V3> = { stone: [0.2, 0.198, 0.195], ashlar: [0.225, 0.22, 0.215], base: [0.15, 0.15, 0.146], paving: [0.195, 0.19, 0.188], timber: [0.2, 0.165, 0.13], iron: [0.05, 0.05, 0.05], rock: [0.4, 0.4, 0.4], scree: [0.33, 0.32, 0.3], earth: [0.4, 0.36, 0.26], water: [0.05, 0.06, 0.07] };
 const SURF: Record<Paint, Surf> = { stone: 'concrete', ashlar: 'concrete', base: 'concrete', paving: 'concrete', timber: 'wood', iron: 'metal', rock: 'rock', scree: 'rock', earth: 'rock', water: 'rock' };
 
 // ------------------------------------------------------------------ small sums
@@ -690,11 +690,44 @@ function moundPart(m: Mound, o: Out, put: Put, lod: number, ground: (x: number, 
     return unit([-(D[iz * W + x1] - D[iz * W + x0]) / ((x1 - x0) * m.cell), 1, -(D[z1 * W + ix] - D[z0 * W + ix]) / ((z1 - z0) * m.cell)]);
   };
   const tone = (p: V3) => (m.tone ?? 1) * (0.84 + 0.32 * rough(p[0] * 0.35, p[2] * 0.35, 3));
+  // ONE HEAP WITH ITS TOP. A heap's foot goes on down under the hill, by its own slope; where the hill itself falls
+  // away further out (the world's cliff, twelve metres from the wall), that foot would come out of the cliff's face
+  // again, a sheet of rubble hung in the air (it was seen from the hollow as a white arch). So only what is joined to
+  // the heap's top by rubble that shows is made: square by square from the top outward, and no further than the
+  // first place the hill has it covered.
+  const shows = (ix: number, iz: number) => {
+    const c = [P(ix, iz), P(ix + 1, iz), P(ix, iz + 1), P(ix + 1, iz + 1)];
+    return !(Math.max(...c.map((p) => p[1] - ground(p[0], p[2]))) < -0.4 || Math.max(...c.map((p) => p[1])) < -20);
+  };
+  const one = new Uint8Array(nx * nz);
+  {
+    let top = 0;
+    for (let i = 1; i < H.length; i++) if (H[i] > H[top]) top = i;
+    const todo: [number, number][] = [[Math.min(nx - 1, top % W), Math.min(nz - 1, Math.floor(top / W))]];
+    while (todo.length) {
+      const [ix, iz] = todo.pop()!;
+      if (ix < 0 || iz < 0 || ix >= nx || iz >= nz || one[iz * nx + ix] || !shows(ix, iz)) continue;
+      one[iz * nx + ix] = 1;
+      todo.push([ix + 1, iz], [ix - 1, iz], [ix, iz + 1], [ix, iz - 1]);
+    }
+    // (a heap whose very top the hill covers: all of it that shows, as before)
+    if (!one.some((v) => v)) for (let iz = 0; iz < nz; iz++) for (let ix = 0; ix < nx; ix++) one[iz * nx + ix] = shows(ix, iz) ? 1 : 0;
+    // (and what is left out is nothing to stand on either: it is put under the hill)
+    const part = (ix: number, iz: number) => ix >= 0 && iz >= 0 && ix < nx && iz < nz && one[iz * nx + ix] === 1;
+    for (let iz = 0; iz <= nz; iz++) for (let ix = 0; ix <= nx; ix++) {
+      if (part(ix, iz) || part(ix - 1, iz) || part(ix, iz - 1) || part(ix - 1, iz - 1) || H[iz * W + ix] < -20) continue;
+      const g = ground(m.x0 + ix * m.cell, m.z0 + iz * m.cell);
+      if (H[iz * W + ix] > g - 0.6) H[iz * W + ix] = g - 0.6;
+    }
+  }
   for (let iz = 0; iz + step <= nz; iz += step) {
     for (let ix = 0; ix + step <= nx; ix += step) {
       const q: [number, number][] = [[ix, iz], [ix + step, iz], [ix, iz + step], [ix + step, iz + step]], c = q.map(([i, j]) => P(i, j));
       // (nothing of it is drawn where the hill has it covered, or where it is said to be under a floor: see `moundTop`)
       if (Math.max(...c.map((p) => p[1] - ground(p[0], p[2]))) < -0.4 || Math.max(...c.map((p) => p[1])) < -20) continue;
+      let joined = false;
+      for (let jz = iz; jz < iz + step && !joined; jz++) for (let jx = ix; jx < ix + step; jx++) if (one[jz * nx + jx]) { joined = true; break; }
+      if (!joined) continue;
       // (cut the way the ground itself is cut, corner to corner: what is stood on is what is seen)
       for (const [a, b, e] of [[0, 2, 1], [1, 2, 3]]) {
         const g = cross(sub(c[b], c[a]), sub(c[e], c[a]));
@@ -739,11 +772,18 @@ function apronPart(p: Apron, o: Out, put: Put, ground: (x: number, z: number) =>
       const pts = piece.map((v): V3 => [v[0], ground(v[0], v[2]) + 0.03, v[2]]);
       put({ t: 'hull', pts: [...pts, ...pts.map((v): V3 => [v[0], v[1] - 0.5, v[2]])].flat(), feet: false, surface: 'rock', name: p.name ?? 'apron' });
     }
-    // What is seen of it: in squares of a metre, so that it lies as the ground lies between the corners of a square
-    // of two; and each corner faces as the ground faces there (the ground's own paint asks every corner how steep it
-    // is, for where snow lies and where rock shows: a lid of flat squares was seen as slabs, green where it was steep)
-    const lean = (qx: number, qz: number): V3 => unit([ground(qx - 2, qz) - ground(qx + 2, qz), 4, ground(qx, qz - 2) - ground(qx, qz + 2)]);
-    for (const [sx, sz] of [[x, z], [x + CELL / 2, z], [x, z + CELL / 2], [x + CELL / 2, z + CELL / 2]]) for (const piece of clipOut([[sx, 0, sz], [sx + CELL / 2, 0, sz], [sx + CELL / 2, 0, sz + CELL / 2], [sx, 0, sz + CELL / 2]], hole)) {
+    // WHAT IS SEEN OF IT IS THE GROUND AS IT WOULD HAVE BEEN, square for square: the ground is squares of two metres,
+    // each cut corner to corner into two triangles, and every corner faces by the heights of the four corners next
+    // to it (the ground's own paint asks each corner how steep it is, for where snow lies and where rock shows). So
+    // the lid is the same squares, cut along whichever of the two ways the ground between the corners lies on, and
+    // each of its corners faces by the same sum over the ground as it was. Where the fort stands square on the
+    // ground's own grid it is then the ground itself, and there is nothing to see. (Why it must be: a corner beside
+    // one that was lowered faces the hole, and is painted as a cliff: green and brown facets two squares out from
+    // everything that was cut, which the lid covers.)
+    const lean = (qx: number, qz: number): V3 => unit([ground(qx - CELL, qz) - ground(qx + CELL, qz), 2 * CELL, ground(qx, qz - CELL) - ground(qx, qz + CELL)]);
+    const c: V3[] = [[x, 0, z], [x + CELL, 0, z], [x + CELL, 0, z + CELL], [x, 0, z + CELL]].map((v): V3 => [v[0], ground(v[0], v[2]), v[2]]), mid = ground(x + CELL / 2, z + CELL / 2);
+    const across = Math.abs((c[0][1] + c[2][1]) / 2 - mid) <= Math.abs((c[1][1] + c[3][1]) / 2 - mid) ? [[0, 1, 2], [0, 2, 3]] : [[1, 2, 3], [1, 3, 0]];
+    for (const tri of across) for (const piece of clipOut(tri.map((k): V3 => [c[k][0], 0, c[k][2]]), hole)) {
       const pts = piece.map((v): V3 => [v[0], ground(v[0], v[2]) + 0.03, v[2]]), faces = pts.map((v) => lean(v[0], v[2]));
       for (let k = 1; k + 1 < pts.length; k++) o.tri([pts[0], pts[k], pts[k + 1]], [pts[0], pts[k], pts[k + 1]].map((v): UV => [v[0], v[2]]), UP, p.tone ?? 1, [faces[0], faces[k], faces[k + 1]]);
     }
@@ -811,7 +851,8 @@ function towerPart(tw: Tower, stone: Out, wood: Out, dark: Out, put: Put, lod: n
 
   // ---- under the terrace: a cone in bands, each with as many turns of the picture as fit its girth, and the
   // builders' holes in it as far down as the hill lets them be seen
-  const kitFoot = -KIT_TOWER.top[0] * T.kit, seen = -9.4, ys = sorted([...levels(0, T.bend, lod ? 99 : 2.5), ...levels(T.bend, tw.foot, lod ? 99 : 3.3).slice(1), ...(lod ? [] : [seen, kitFoot + 0.05]), ...(hollow !== undefined && !lod ? [hollow, hollow + DOOR] : [])], 0.05).reverse();
+  // (the kit's tower stands for all of it down to the foot of its footing: see `castleKit`)
+  const kitFoot = -KIT_TOWER.top[0] * (T.kit + T.under), seen = -9.4, ys = sorted([...levels(0, T.bend, lod ? 99 : 2.5), ...levels(T.bend, tw.foot, lod ? 99 : 3.3).slice(1), ...(lod ? [] : [seen, kitFoot + 0.05]), ...(hollow !== undefined && !lod ? [hollow, hollow + DOOR] : [])], 0.05).reverse();
   const leanAt = (y: number) => (y > T.bend ? 1 / T.lean : 1 / T.flare), cols = (k: number) => Array.from({ length: k + 1 }, (_, j) => (j * 360) / k);
   const pits: [number, number][] = [];
   if (!lod) for (let y = -1.3, r = 0; y > seen + 0.3; y -= 1.75, r++) for (let a = (r % 2) * 22.5; a < 359; a += 45) if (hollow === undefined || apart(a, tw.door) > 12 || y > hollow + DOOR + 0.3) pits.push([a, y]);

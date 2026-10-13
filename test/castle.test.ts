@@ -370,7 +370,9 @@ ok('its loose pieces go where they are put, and what is theirs goes with them', 
   assert.ok(gone(castleProps(P, flat, moved)) - gone(postProps(P, flat, moved)) === 2, `${gone(castleProps(P, flat, moved)) - gone(postProps(P, flat, moved))} things of the fort's own went with the houses`);
   const homes = castleHomes(P, moved);
   // (the infected of the fort itself have the dark under the terrace, and nothing over it)
-  assert.ok(homes.length === 2 && Math.hypot(homes[0].x - P.x, homes[0].z - P.z) > 300 && homes[1].n === 4 && homes[1].inside!.every((s) => inCastle(P, ...s) && castleUnder(P, s[0], s[1] + 0.9, s[2])), 'the dead of the fort are not where they belong');
+  // (one of the village's to each house, and with the house wherever it is put; the fort's own are four, in the dark)
+  const fortHome = homes[homes.length - 1], village = homes.slice(0, -1);
+  assert.ok(village.length === 5 && village.every((h) => h.n === 1 && h.r < 8 && Math.hypot(h.x - P.x, h.z - P.z) > 300) && fortHome.n === 4 && fortHome.inside!.every((s) => inCastle(P, ...s) && castleUnder(P, s[0], s[1] + 0.9, s[2])), 'the dead of the fort are not where they belong');
   // with no houses there is still the fort
   assert.equal(castleHomes(P, []).length, 1);
   assert.ok(castleLoot(P, flat, []).every((l) => inCastle(P, l.x, l.y, l.z)), 'with no houses a thing still lies outside the fort');
