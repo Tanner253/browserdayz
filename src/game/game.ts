@@ -27,7 +27,7 @@ import { loadSave, writeSave, type SaveData } from '../sim/save';
 import { Net, playerName, publicId, remoteServer, serverStatus, setPlayerName, personKey } from '../net/client';
 import { F_AIM, F_BLEED, F_CROUCH, F_DANCE, F_DEAD, F_GROUND, F_GUARD, F_LEAN_L, F_LEAN_R, F_LIMP, F_LIGHT, F_PRONE, F_SEAT, F_SIT, F_SPRINT, F_SURRENDER, MAX_STAMINA, PROTOCOL, crateId, type Act, type CorpseInfo, type PlayerInfo, type Pose, type StoredItem, type S2C, type StashInfo } from '../net/protocol';
 import { Player, freshVitals } from './player';
-import { BLOOD, bleedOf, bloodOf, greyOf, woundOf } from '../sim/blood';
+import { BLOOD, bleedOf, bleedsOutIn, bloodOf, greyOf, woundOf } from '../sim/blood';
 import { Avatar, AVATAR_LAYER, DEATH_REST, FP_BODY_LAYER, GEAR_SHOWN, type Hold, facepiece } from './avatar';
 import { lookFor } from './look';
 import { roadLift } from '../world/road';
@@ -1284,7 +1284,7 @@ export class Game {
     this.hud.zone(null, 0);
     if (!n) return;
     this.inventoryChanged();
-    const text = `${n === 1 ? 'Your dog tag is' : `Your ${n} dog tags are`} void: carried out of the Zona. Tags are earned inside the dotted line on the map.`;
+    const text = `${n === 1 ? 'Your dog tag is' : `Your ${n} dog tags are`} void: carried out of the Zona. Tags are earned inside the red line on the map.`;
     this.hud.note(text, 'warn');
     this.hud.chatLine('system', '', text);
   }
@@ -4195,6 +4195,29 @@ export class Game {
     this.bloodSaid = at;
   }
 
+  /** little blood and no wound: what puts it back, of what is carried, with the key to it */
+  private bloodHint(): string {
+    if (this.player.drip.left > 0) return 'A bag is running in';
+    const gives = (it: ItemInstance | null | undefined) => !!it && !!ITEMS[it.id].use?.blood;
+    const i = this.inv.hot.findIndex((_, k) => gives(this.inv.hotItem(k)));
+    if (i >= 0) return this.touch ? `Tap the ${ITEMS[this.inv.hotItem(i)!.id].name} below` : `<kbd>${(i + 1) % 10}</kbd>${ITEMS[this.inv.hotItem(i)!.id].name}`;
+    const carried = this.inv.find((it) => gives(it));
+    if (carried) return `${this.touch ? 'Open your pack' : '<kbd>Tab</kbd>'} and use the ${ITEMS[carried.id].name}`;
+    return 'A blood bag or saline puts it back. Food, water and time do it slowly';
+  }
+
+  /** seconds to the next catch of the breath over an open wound */
+  private winceT = 0;
+  /** An open wound is felt: every few seconds what is held dips, oftener and harder the faster it bleeds. */
+  private wince(dt: number) {
+    const p = this.player, v = p.vitals;
+    if (!v.bleeding || p.dead || !this.started) return void (this.winceT = 1.5);
+    if ((this.winceT -= dt) > 0) return;
+    const bad = Math.min(1, v.bleed / BLOOD.most);
+    this.winceT = (5.2 - 3.2 * bad) * (0.8 + Math.random() * 0.4);
+    this.weapons.wince(0.5 + 0.7 * bad);
+  }
+
   private bleedHint(): string {
     if (this.use?.sound === 'bandage' || (this.use?.sound === 'inject' && !/Adrenaline/.test(this.use.label))) return 'Treating the wound…';
     const held = this.inHand && ITEMS[this.inHand.id].use?.stopBleed ? this.inHand : null;
@@ -4704,6 +4727,7 @@ export class Game {
     r.grade.saturation = -0.08 - grey * 0.82;
     r.vignette.darkness = 0.42 + (this.weapons.aiming ? 0.12 : 0) + (v.health < 25 ? 0.25 : 0) + (p.faint ? 0.3 + 0.14 * Math.sin(now / 520) : grey * 0.1);
     this.sayBlood();
+    this.wince(dt);
 
     const hasCompass = this.hasCompass;
     const heading = THREE.MathUtils.radToDeg(-p.yaw);
@@ -4729,7 +4753,8 @@ export class Game {
       kill: this.weapons.killMarker,
       head: this.weapons.headMarker,
       hurt,
-      bleed: v.bleeding && !p.dead ? this.bleedHint() : null,
+      bleed: v.bleeding && !p.dead ? { rate: v.bleed, left: bleedsOutIn(v.blood, v.bleed), hint: this.bleedHint() } : null,
+      lowBlood: !v.bleeding && !p.dead && this.started && v.blood < BLOOD.grey[0] - 200 ? this.bloodHint() : null,
       drip: p.drip.left > 0,
       heading: !uiOpen ? heading : null,
       bearing: hasCompass,

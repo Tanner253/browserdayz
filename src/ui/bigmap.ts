@@ -22,7 +22,8 @@ import { breathe } from '../core/breathe';
 import { TOUCH } from '../core/device';
 import type { GasZone } from '../sim/gas';
 import { TIERS, type Tier } from '../sim/tiers';
-import { BUILDING_FOOTPRINT, WORLD_RES, WORLD_SIZE, playOutline, type World } from '../world/worldgen';
+import { playEdge } from '../world/outline';
+import { BUILDING_FOOTPRINT, WORLD_RES, WORLD_SIZE, type World } from '../world/worldgen';
 import type { MenuSpot } from './hud';
 
 type Pt = { x: number; z: number };
@@ -504,16 +505,29 @@ export class BigMap {
       g.arc(X(s.x), Y(s.z), Math.max(1.2, s.r) * S, 0, Math.PI * 2);
       g.fill();
     }
-    // the line round the Zona: tags are earned inside it
-    g.strokeStyle = 'rgba(150, 38, 28, 0.85)';
-    g.lineWidth = 1.6 * S;
-    g.setLineDash([9 * S, 6 * S]);
-    for (const a of playOutline()) {
-      g.beginPath();
-      g.arc(X(a.x), Y(a.z), a.r * S, a.from, a.to);
+    yield;
+    // The line round the Zona: tags are earned inside it. It is drawn as a boundary is printed: one thin line
+    // the whole way round, and a band of its colour laid along the inside of it, fading inward, which says at
+    // any point of it which side is the Zona. (It was a dashed arc for each round the Zona is made of, and read
+    // as a row of circles: "i dont like the segmented circles".)
+    g.beginPath();
+    for (const ring of playEdge()) {
+      g.moveTo(X(ring[0].x), Y(ring[0].z));
+      for (let i = 1; i < ring.length - 1; i++) g.lineTo(X(ring[i].x), Y(ring[i].z));
+      g.closePath();
+    }
+    // (the band: the same line stroked wider and wider, faintly, with all of it that falls outside cut away)
+    g.save();
+    g.clip('evenodd');
+    g.strokeStyle = 'rgba(150, 38, 28, 0.024)';
+    for (let k = 1; k <= 12; k++) {
+      g.lineWidth = k * 3 * S;
       g.stroke();
     }
-    g.setLineDash([]);
+    g.restore();
+    g.strokeStyle = 'rgba(150, 38, 28, 0.9)';
+    g.lineWidth = 1.4 * S;
+    g.stroke();
     return c;
   }
 

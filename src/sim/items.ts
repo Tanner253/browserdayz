@@ -521,7 +521,7 @@ export interface ItemInstance {
  */
 export const TAG_HOLD = 15 * 60;
 /**
- * The Zona is the played part of the map, the dotted line on it (PLAY_AREAS in the world's generator): tags are
+ * The Zona is the played part of the map, the red line round it (PLAY_AREAS in the world's generator): tags are
  * earned inside it. The country outside is for stashes and for building. A tag taken off somebody and carried
  * over that line is void after this many seconds out there: no sitting out its fifteen minutes in the hills.
  */

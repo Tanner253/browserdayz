@@ -9,7 +9,7 @@ import type { Input, MoveInput } from '../core/input';
 import { audio } from '../core/audio';
 import type { Terrain } from '../world/terrain';
 import { LEAN_REACH, MAX_STAMINA } from '../net/protocol';
-import { BLOOD, bloodBack, mendsOn, withWound, woundOf } from '../sim/blood';
+import { BLOOD, bloodBack, greyOf, mendsOn, withWound, woundOf } from '../sim/blood';
 import { LEG, breaksOnLanding } from '../sim/injury';
 
 const STAND_HALF = 0.56;
@@ -561,7 +561,9 @@ export class Player {
 
   /** how much more a gun wanders in these hands for want of food (1: not at all) */
   get shake() {
-    return NEED.shake[stage(this.vitals.energy)];
+    // (an empty stomach, and little blood: by 3500 ml the hands are half as unsteady again, and below what a head
+    // can work on, twice)
+    return NEED.shake[stage(this.vitals.energy)] * (1 + greyOf(this.vitals.blood) * 0.5 + (this.faint ? 0.5 : 0));
   }
 
   /** too spent to sprint (the stamina bar says so) */

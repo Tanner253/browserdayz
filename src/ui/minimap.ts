@@ -3,7 +3,8 @@
 // it, with one exception: whoever carries a tag they took is shown to everyone for a few
 // seconds, every half minute (see ping). M opens the sheet itself, large: that is another thing (bigmap.ts).
 
-import { BUILDING_FOOTPRINT, WORLD_RES, WORLD_SIZE, heightAt, playOutline, type World } from '../world/worldgen';
+import { playEdge } from '../world/outline';
+import { BUILDING_FOOTPRINT, WORLD_RES, WORLD_SIZE, heightAt, type World } from '../world/worldgen';
 import { gasZone, type GasZone } from '../sim/gas';
 
 /** pixels of the drawn map per metre of world */
@@ -125,17 +126,26 @@ export class Minimap {
       g.fillRect((-w / 2) * SCALE, (-d / 2) * SCALE, w * SCALE, d * SCALE);
       g.restore();
     }
-    // where the map ends
-    g.strokeStyle = 'rgba(240, 220, 160, 0.55)';
-    g.lineWidth = 2;
-    g.setLineDash([10, 8]);
-    // (the valley, and the cirque that has been added to it: one line round the two)
-    for (const a of playOutline()) {
-      g.beginPath();
-      g.arc(X(a.x), Y(a.z), a.r * SCALE, a.from, a.to);
+    // where the map ends: one line round the valley and all that has been added to it, and a glow of its colour
+    // along the inside of it, so that the little of it the corner shows still says which side is in. (It was a
+    // dashed arc for each round: "i dont like the segmented circles". The sheet opened large draws the same line.)
+    g.beginPath();
+    for (const ring of playEdge()) {
+      g.moveTo(X(ring[0].x), Y(ring[0].z));
+      for (let i = 1; i < ring.length - 1; i++) g.lineTo(X(ring[i].x), Y(ring[i].z));
+      g.closePath();
+    }
+    g.save();
+    g.clip('evenodd');
+    g.strokeStyle = 'rgba(240, 220, 160, 0.04)';
+    for (let k = 1; k <= 6; k++) {
+      g.lineWidth = k * 4 * SCALE;
       g.stroke();
     }
-    g.setLineDash([]);
+    g.restore();
+    g.strokeStyle = 'rgba(240, 220, 160, 0.75)';
+    g.lineWidth = 1.5 * SCALE;
+    g.stroke();
     // the chimney and the tanks of the works
     g.fillStyle = '#8f8a7c';
     for (const s of world.solids) {

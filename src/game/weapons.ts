@@ -2732,6 +2732,13 @@ export class Weapons {
     this.aimRecoil.v.y += 0.2;
   }
 
+  /** A wound that goes on hurting: what is held dips and rolls, as hands do when their owner catches a breath. The aim is not moved. */
+  wince(k: number) {
+    this.kickRot.v.z += (Math.random() - 0.5) * 9 * k;
+    this.kickRot.v.x += 3.5 * k;
+    this.kick.v.y -= 0.7 * k;
+  }
+
   flinch(k: number) {
     this.aimRecoil.v.y += 0.9 * k;
     this.aimRecoil.v.x += (Math.random() - 0.5) * 1.4 * k;

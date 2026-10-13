@@ -21,7 +21,8 @@
 import * as THREE from 'three';
 import { assets } from '../core/assets';
 import { proceduralParts } from '../game/procedural';
-import { BUILDING_FOOTPRINT, WORLD_SIZE, generateWorld, heightAt, playOutline, type World } from '../world/worldgen';
+import { playEdge } from '../world/outline';
+import { BUILDING_FOOTPRINT, WORLD_SIZE, generateWorld, heightAt, type World } from '../world/worldgen';
 
 const q = new URLSearchParams(location.search);
 const W = +(q.get('w') ?? 1920), H = +(q.get('h') ?? 1080);
@@ -152,16 +153,25 @@ function printSheet(world: World): HTMLCanvasElement {
     g.lineTo(OX + N, Y(p));
     g.stroke();
   }
-  // ---- where the valley was shut: the line nobody crosses
-  g.strokeStyle = 'rgba(160, 36, 28, 0.85)';
-  g.lineWidth = 6;
-  g.setLineDash([30, 14, 6, 14]);
-  for (const a of playOutline()) {
-    g.beginPath();
-    g.arc(X(a.x), Y(a.z), a.r * S, a.from, a.to);
+  // ---- where the valley was shut: the line nobody crosses, printed as the map in the game prints it (one line
+  // the whole way round, a band of its red along the inside of it, fading inward)
+  g.beginPath();
+  for (const ring of playEdge()) {
+    g.moveTo(X(ring[0].x), Y(ring[0].z));
+    for (let i = 1; i < ring.length - 1; i++) g.lineTo(X(ring[i].x), Y(ring[i].z));
+    g.closePath();
+  }
+  g.save();
+  g.clip('evenodd');
+  g.strokeStyle = 'rgba(160, 36, 28, 0.024)';
+  for (let k = 1; k <= 12; k++) {
+    g.lineWidth = k * 3 * S;
     g.stroke();
   }
-  g.setLineDash([]);
+  g.restore();
+  g.strokeStyle = 'rgba(160, 36, 28, 0.9)';
+  g.lineWidth = 2.6 * S;
+  g.stroke();
   g.restore();
   // ---- the frame and what is printed round it
   g.strokeStyle = INK;

@@ -97,6 +97,20 @@ export const REEL = 100;
 /** everything there is to be given (never a tag: one is only ever taken from somebody) */
 const THINGS = Object.values(ITEMS).filter((d) => d.id !== 'dogtag').map((d) => ({ id: d.id, name: d.name }));
 
+/**
+ * Blood on the glass: three splashes, each a pool with what flew off it and the run below, drawn as a picture the
+ * browser makes once (a rough edge from noise, and the pool and its drops run together where they touch).
+ */
+const splash = (seed: number, pool: string, flecks: string, run: string) =>
+  `url("data:image/svg+xml,${encodeURIComponent(
+    `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 150'><defs><filter id='f' x='-30%' y='-30%' width='160%' height='160%'><feTurbulence type='fractalNoise' baseFrequency='0.05' numOctaves='2' seed='${seed}' result='n'/><feDisplacementMap in='SourceGraphic' in2='n' scale='18'/><feGaussianBlur stdDeviation='1.7' result='b'/><feColorMatrix in='b' values='1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 15 -5.5'/></filter><radialGradient id='g' cx='42%' cy='26%' r='80%'><stop offset='0' stop-color='#8e0e09'/><stop offset='.5' stop-color='#5e0402'/><stop offset='1' stop-color='#330100'/></radialGradient></defs><g filter='url(#f)' fill='url(#g)' opacity='.88'>${pool}${flecks}${run}</g></svg>`,
+  )}")`;
+const SPLASHES = [
+  splash(3, "<ellipse cx='50' cy='42' rx='27' ry='23'/>", "<circle cx='18' cy='24' r='5'/><circle cx='86' cy='52' r='4.5'/><circle cx='72' cy='12' r='3.5'/><circle cx='12' cy='58' r='3'/><circle cx='88' cy='22' r='2.5'/>", "<path d='M45 56 Q47 104 49 136 Q50 142 52 136 Q54 104 56 56 Z'/>"),
+  splash(11, "<ellipse cx='48' cy='38' rx='22' ry='27'/>", "<circle cx='80' cy='30' r='6'/><circle cx='16' cy='40' r='4'/><circle cx='30' cy='8' r='3'/><circle cx='84' cy='64' r='3'/>", "<path d='M40 58 Q41 88 42 110 Q43 115 45 110 Q46 88 47 58 Z'/><path d='M54 56 Q56 76 57 92 Q58 96 60 92 Q60 76 61 56 Z'/>"),
+  splash(27, "<ellipse cx='52' cy='40' rx='32' ry='18'/>", "<circle cx='14' cy='30' r='4.5'/><circle cx='90' cy='44' r='3.5'/><circle cx='62' cy='10' r='4'/><circle cx='26' cy='62' r='3'/><circle cx='78' cy='66' r='2.5'/>", "<path d='M58 52 Q60 92 61 122 Q62 128 64 122 Q64 92 66 52 Z'/>"),
+];
+
 export class HUD {
   root: HTMLDivElement;
   private el: Record<string, HTMLElement> = {};
@@ -159,7 +173,8 @@ export class HUD {
       </div>
       <div class="hud-damage"></div>
       <div class="hud-bleedfx"></div>
-      <div class="hud-bleed">${svg(ICONS.blood)}<b>Bleeding</b><span></span></div>
+      <div class="hud-blooddrops"></div>
+      <div class="hud-bleed">${svg(ICONS.blood)}<div class="hb-what"><b>Bleeding</b><i></i></div><span></span></div>
       <div class="hud-hitdir"><i></i></div>
       <div class="hud-fps"></div>
       <div class="hud-online"><i></i><b></b><span></span></div>
@@ -259,7 +274,7 @@ export class HUD {
       </div>
     `;
     document.getElementById('ui')!.appendChild(this.root);
-    for (const k of ['cross', 'hit', 'prompt', 'acts', 'mark', 'progress', 'compass', 'bearing', 'area', 'weapon', 'vitals', 'stamina', 'arms', 'ride', 'hotbar', 'chat', 'scope', 'damage', 'bleedfx', 'bleed', 'hitdir', 'fps', 'online', 'net', 'feed', 'board', 'tags', 'fatal', 'dead', 'start']) {
+    for (const k of ['cross', 'hit', 'prompt', 'acts', 'mark', 'progress', 'compass', 'bearing', 'area', 'weapon', 'vitals', 'stamina', 'arms', 'ride', 'hotbar', 'chat', 'scope', 'damage', 'bleedfx', 'blooddrops', 'bleed', 'hitdir', 'fps', 'online', 'net', 'feed', 'board', 'tags', 'fatal', 'dead', 'start']) {
       this.el[k] = this.root.querySelector(`.hud-${k}`) as HTMLElement;
     }
     this.notes = this.root.querySelector('.hud-notes') as HTMLDivElement;
@@ -537,7 +552,7 @@ export class HUD {
     if (!this.zoneEl) {
       this.zoneEl = document.createElement('div');
       this.zoneEl.className = 'zone-warn';
-      this.zoneEl.innerHTML = '<b>You are leaving the Zona</b><span></span><i></i><em>Turn back: tags are earned inside the dotted line on the map (M)</em>';
+      this.zoneEl.innerHTML = '<b>You are leaving the Zona</b><span></span><i></i><em>Turn back: tags are earned inside the red line on the map (M)</em>';
       this.root.appendChild(this.zoneEl);
     }
     const s = Math.ceil(left);
@@ -796,6 +811,54 @@ export class HUD {
     this.toggle(e, 'show', true);
     (e.querySelector('b') as HTMLElement).textContent = 'OFFLINE';
     (e.querySelector('span') as HTMLElement).textContent = ' · alone, nothing here is kept · reload to connect';
+  }
+
+  /** the drops there are to put on the glass, which is next, when the next is due, and how fast it was bleeding a frame ago */
+  private drops: HTMLElement[] = [];
+  private dropAt = 0;
+  private dropDue = 0;
+  private bledAt = 0;
+  /**
+   * Blood on the glass while a wound is open: a drop lands somewhere toward the edge of the view, and runs. The
+   * faster the bleeding, the oftener; a new wound lands several at once. (As DayZ shows it. They are a dozen
+   * elements moved by the browser's own animation: nothing is drawn by the game.)
+   */
+  private bloodOnGlass(rate: number) {
+    const host = this.el.blooddrops, now = performance.now();
+    if (!this.drops.length) {
+      for (let k = 0; k < 14; k++) {
+        const d = host.appendChild(document.createElement('i'));
+        // (each its own splash, its own size and its own way up, for good: the browser draws each once and keeps it)
+        const size = 46 + ((k * 37) % 5) * 16;
+        d.style.width = `${size}px`;
+        d.style.height = `${Math.round(size * 1.5)}px`;
+        d.style.backgroundImage = SPLASHES[k % SPLASHES.length];
+        d.style.setProperty('--turn', `${((k * 53) % 9) * 5 - 20}deg`);
+        d.style.setProperty('--flip', k % 2 ? '-1' : '1');
+        this.drops.push(d);
+      }
+    }
+    const land = () => {
+      const d = this.drops[this.dropAt++ % this.drops.length];
+      // (toward the edges: the middle of the view is what somebody is aiming with)
+      const side = Math.random();
+      const x = side < 0.42 ? 1 + Math.random() * 20 : side < 0.84 ? 74 + Math.random() * 20 : 22 + Math.random() * 52;
+      const y = side < 0.84 ? 2 + Math.random() * 64 : Math.random() < 0.6 ? 1 + Math.random() * 9 : 58 + Math.random() * 12;
+      d.style.left = `${x.toFixed(1)}%`;
+      d.style.top = `${y.toFixed(1)}%`;
+      d.style.setProperty('--run', `${(18 + Math.random() * 46).toFixed(0)}px`);
+      d.style.setProperty('--life', `${(3 + Math.random() * 2).toFixed(2)}s`);
+      d.classList.remove('on');
+      void d.offsetWidth;
+      d.classList.add('on');
+    };
+    if (rate > this.bledAt + 0.5) for (let k = 0; k < 4; k++) land();
+    this.bledAt = rate;
+    if (rate <= 0) return;
+    if (now < this.dropDue) return;
+    // (one wound in a limb: a drop every second and a half; as fast as anybody bleeds: three a second)
+    this.dropDue = now + (1500 - 1150 * Math.min(1, rate / 18)) * (0.7 + Math.random() * 0.6);
+    land();
   }
 
   /** players connected to the server right now (null = playing offline) */
@@ -1330,7 +1393,10 @@ export class HUD {
     head: boolean;
     hurt: number;
     /** an open wound: what to do about it (html), or null when not bleeding */
-    bleed: string | null;
+    /** a wound is open: what it costs (ml a second), about how many seconds are left if nothing is done (Infinity: it will close first), and what to do about it, in words with the key */
+    bleed: { rate: number; left: number; hint: string } | null;
+    /** no wound, and little blood: what puts it back */
+    lowBlood: string | null;
     heading: number | null;
     /** carrying a compass: the heading is also given in degrees */
     bearing: boolean;
@@ -1417,9 +1483,25 @@ export class HUD {
     this.toggle(blood, 'losing', v.bleeding);
     this.toggle(blood, 'gaining', !v.bleeding && s.drip);
     // and said in words, with the key to press: an icon in the corner is easy to bleed out under
-    this.toggle(e.bleed, 'show', s.bleed !== null);
+    // A wound: said in words with the key to press, how bad it is and about how long there is; and seen, as blood
+    // on the glass (2026-10-13: "the ui for bleeding and what to do when bleeding needs to be reworked, we need
+    // some sort of blood on the screen when bleeding like dayz has"). The same line, in another colour, says what
+    // puts blood back when there is no wound and little of it.
+    const card = s.bleed ?? (s.lowBlood !== null ? { rate: 0, left: Infinity, hint: s.lowBlood } : null);
+    this.toggle(e.bleed, 'show', card !== null);
+    this.toggle(e.bleed, 'low', s.bleed === null && card !== null);
     this.toggle(e.bleedfx, 'show', s.bleed !== null);
-    if (s.bleed !== null) this.set('bleed', e.bleed.lastElementChild as HTMLElement, s.bleed, 'html');
+    if (card) {
+      const lvl = card.rate >= 12 ? 3 : card.rate >= 5 ? 2 : 1;
+      const mins = card.left === Infinity ? '' : card.left < 50 ? ' · UNDER A MINUTE' : ` · ABOUT ${Math.max(1, Math.round(card.left / 60))} MIN`;
+      const [title, how] = [...e.bleed.querySelectorAll<HTMLElement>('.hb-what > *')];
+      this.set('bleed title', title, s.bleed ? 'Bleeding' : 'Low blood');
+      this.set('bleed how', how, s.bleed ? `${['LIGHT', 'HEAVY', 'SEVERE'][lvl - 1]}${mins}` : 'NO OPEN WOUND');
+      e.bleed.dataset.lvl = String(lvl);
+      e.bleedfx.dataset.lvl = String(lvl);
+      this.set('bleed', e.bleed.lastElementChild as HTMLElement, card.hint, 'html');
+    }
+    this.bloodOnGlass(s.bleed?.rate ?? 0);
     const reserve = (v.stamina / MAX_STAMINA) * 100;
     (e.stamina.firstElementChild as HTMLElement).style.width = `${reserve}%`;
     this.toggle(e.stamina, 'show', reserve < 99.5 || s.boost > 0);

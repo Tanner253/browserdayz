@@ -473,39 +473,70 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
   opacity: 0;
   background: radial-gradient(ellipse at center, transparent 45%, rgba(120, 0, 0, 0.55) 100%);
 }
-/* an open wound: the edges of the view beat red, and a line says what to press */
+/* An open wound. Blood lands on the glass and runs; the edges of the view beat, faintly for a wound in a limb and
+   plainly for three in the body; and a card over the hotbar says how bad it is, about how long there is, and what
+   to press. (It was a line across the middle of the view, where the sights are.) */
 .hud-bleedfx {
   position: absolute;
   inset: 0;
   opacity: 0;
   transition: opacity 0.5s;
   background:
-    radial-gradient(ellipse at 50% 50%, transparent 56%, rgba(120, 0, 0, 0.42) 100%),
-    radial-gradient(circle at 0% 100%, rgba(100, 0, 0, 0.5), transparent 34%),
-    radial-gradient(circle at 100% 100%, rgba(100, 0, 0, 0.5), transparent 34%);
+    radial-gradient(ellipse at 50% 50%, transparent 62%, rgba(120, 0, 0, 0.36) 100%),
+    radial-gradient(circle at 0% 100%, rgba(100, 0, 0, 0.4), transparent 30%),
+    radial-gradient(circle at 100% 100%, rgba(100, 0, 0, 0.4), transparent 30%);
 }
 .hud-bleedfx.show { animation: bleedfx 1.15s ease-in-out infinite; }
-@keyframes bleedfx { 0%, 100% { opacity: 0.45; } 10% { opacity: 1; } 26% { opacity: 0.6; } 38% { opacity: 0.92; } 60% { opacity: 0.45; } }
+.hud-bleedfx.show[data-lvl="1"] { animation-name: bleedfx1; animation-duration: 1.5s; }
+.hud-bleedfx.show[data-lvl="3"] { animation-duration: 0.85s; }
+@keyframes bleedfx { 0%, 100% { opacity: 0.3; } 10% { opacity: 0.85; } 26% { opacity: 0.45; } 38% { opacity: 0.75; } 60% { opacity: 0.3; } }
+@keyframes bleedfx1 { 0%, 100% { opacity: 0.12; } 12% { opacity: 0.42; } 40% { opacity: 0.2; } }
+.hud-blooddrops { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.hud-blooddrops i {
+  position: absolute;
+  opacity: 0;
+  background: center / contain no-repeat;
+  transform: rotate(var(--turn)) scaleX(var(--flip));
+  will-change: transform, opacity;
+}
+.hud-blooddrops i.on { animation: blooddrop var(--life) cubic-bezier(0.25, 0, 0.6, 1) forwards; }
+/* (it lands, spreads a little, hangs, and runs down the glass as it thins) */
+@keyframes blooddrop {
+  0% { opacity: 0; transform: translateY(0) rotate(var(--turn)) scale(calc(0.4 * var(--flip)), 0.4); }
+  4% { opacity: 0.95; transform: translateY(0) rotate(var(--turn)) scale(calc(1.06 * var(--flip)), 1.06); }
+  10% { transform: translateY(0) rotate(var(--turn)) scale(var(--flip), 1); }
+  55% { opacity: 0.88; }
+  100% { opacity: 0; transform: translateY(var(--run)) rotate(var(--turn)) scale(calc(0.97 * var(--flip)), 1.12); }
+}
 .hud-bleed {
   position: absolute;
   left: 50%;
-  top: calc(50% + 118px);
+  bottom: 118px;
   transform: translateX(-50%);
   display: none;
   align-items: center;
-  gap: 10px;
-  padding: 7px 16px 7px 11px;
+  gap: 12px;
+  padding: 8px 16px 8px 12px;
   white-space: nowrap;
   font-size: 15px;
   color: #ffdcd5;
-  background: rgba(58, 6, 4, 0.78);
+  background: rgba(46, 5, 3, 0.82);
   border-left: 3px solid #ff4a3a;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
   animation: bleedline 1.15s ease-in-out infinite;
 }
 .hud-bleed.show { display: flex; }
-.hud-bleed svg { width: 19px; height: 19px; color: #ff5a44; flex: none; }
-.hud-bleed b { font-family: var(--mono); font-size: 12px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: #ff6f5c; }
+.hud-bleed svg { width: 22px; height: 22px; color: #ff5a44; flex: none; animation: pulse 0.9s infinite; }
+.hud-bleed .hb-what { display: grid; gap: 3px; padding-right: 12px; border-right: 1px solid rgba(255, 120, 100, 0.28); }
+.hud-bleed b { font-family: var(--mono); font-size: 12px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: #ff6f5c; line-height: 1; }
+.hud-bleed .hb-what i { font-family: var(--mono); font-style: normal; font-size: 10px; letter-spacing: 0.12em; color: #ffb3a6; line-height: 1; }
+.hud-bleed[data-lvl="3"] { border-left-width: 5px; }
+.hud-bleed[data-lvl="3"] .hb-what i { color: #fff; }
+/* little blood and no wound: the same card, calmer, in the colour of the bar */
+.hud-bleed.low { animation: none; background: rgba(20, 16, 14, 0.8); border-left-color: #d8584a; color: #e9e4d8; }
+.hud-bleed.low svg { animation: none; color: #d8584a; }
+.hud-bleed.low b { color: #e08a7e; }
+.hud-bleed.low .hb-what i { color: #b9b2a4; }
 .hud-bleed kbd {
   display: inline-block;
   min-width: 20px;
@@ -518,7 +549,7 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
   background: #ffb9ad;
   border-radius: 3px;
 }
-@keyframes bleedline { 0%, 100% { background: rgba(58, 6, 4, 0.78); } 10% { background: rgba(120, 12, 8, 0.86); } 38% { background: rgba(100, 10, 6, 0.84); } }
+@keyframes bleedline { 0%, 100% { background: rgba(46, 5, 3, 0.82); } 10% { background: rgba(112, 12, 8, 0.88); } 38% { background: rgba(92, 10, 6, 0.86); } }
 .hud-fps { position: absolute; top: 10px; right: 14px; font-family: var(--mono); font-size: 11px; color: var(--ink-faint); }
 .hud-online {
   position: absolute;
