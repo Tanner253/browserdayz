@@ -369,13 +369,21 @@ export const POSE = {
      *   front:   how far in front of the body's own upright line the chest's front is where the butt then rests, by
      *            the collar bone (in the resting frame, as the upper back carries it), and `slope`: how much
      *            further forward it is for each metre lower the butt rests;
-     *   tilt, nod, shift: the head tipped toward the stock and down (radians), and the neck craned to it (right, up, back: metres);
+     *   tilt, nod: the head laid over toward the stock, and nodded (radians);
+     *   crane, drop: the neck craned to the gun (toward it, and forward: metres), and DOWN by whatever brings the
+     *            eye level with the gun's sights, `drop` at the most. The gun is not carried up to an upright head: it
+     *            stays at the height the shoulder holds it at, its comb about level with the chin of somebody
+     *            standing straight, and the head comes down and over to it;
+     *   shrug:   the firing shoulder hunched up to the butt, radians;
+     *   body:    how much of that tilt is the upper chest's, the rest the neck's and the head's: it is the body that
+     *            leans into the gun, not a head bent over on a stiff neck (the user's, 2026-10-13: "the head is not
+     *            tilted enough it doesnt look like the model is aiming down sights");
      *   lean:    the chest leant in to the gun, radians;
      *   visored: how much of the head's part is done under a visor that is down. A stock cannot be laid on a
      *            cheek that is behind a steel plate: it goes under the plate's lower edge and the sights stand in
      *            front of the plate, as high as that lets them (see `faceGear`).
      */
-    cheek: { eye: [0.032, 1.64, -0.075] as [number, number, number], x: 0.005, jaw: 0.09, plate: 0.12, beside: 0.025, front: 0.09, slope: 0.5, tilt: 0.22, nod: 0.08, shift: [0.035, -0.012, -0.02] as [number, number, number], lean: 0.06, visored: 0.4 },
+    cheek: { eye: [0.032, 1.64, -0.075] as [number, number, number], x: 0, jaw: 0.05, plate: 0.1, beside: 0.025, front: 0.09, slope: 0.5, tilt: 0.35, body: 0.3, nod: 0.12, crane: [0.03, 0.04] as [number, number], drop: 0.07, shrug: 0.18, lean: 0.09, visored: 0.4 },
     /** aimed, the chest is turned this far off the aim (less than at the ready: the right shoulder comes round to the gun), the left shoulder comes this far forward, and the right this far */
     bladeAim: 0.6,
     reachAim: 0.75,
@@ -1949,18 +1957,33 @@ export class Avatar {
       // Aiming a long gun, the head goes to the gun: the chest leant in, the neck craned toward the stock, the
       // head tipped to it and down, as somebody lining up sights. Less of it under a visor that is down.
       const welded = weld * hold * (1 - carry) * alive;
-      if (welded > 0.002 && this.neck.length) {
-        const c = POSE.hold.cheek, k = welded * (this.faceGear().under !== null ? c.visored : 1), neck = this.neck[0];
+      if (welded > 0.002 && this.neck.length && held && this.armR) {
+        const c = POSE.hold.cheek, g = this.faceGear(), k = welded * (g.under !== null ? c.visored : 1), neck = this.neck[0];
+        // The upper body leans into the gun: the chest in and over toward it, the firing shoulder rolled forward
+        // and hunched up to the butt.
         if (this.chest) this.turn(this.chest, _right, -c.lean * welded);
-        if (neck.parent) {
-          neck.getWorldPosition(_k6).addScaledVector(_right, c.shift[0] * k).addScaledVector(UP, c.shift[1] * k).addScaledVector(_fwd, -c.shift[2] * k);
+        this.turn(this.spine[this.spine.length - 1], _fwd, c.tilt * k * c.body);
+        if (this.collarR) {
+          this.turn(this.collarR, UP, POSE.hold.reachRight * welded);
+          this.turn(this.collarR, _fwd, -c.shrug * welded);
+        }
+        // The head is laid over onto the stock and nodded,
+        for (const b of this.neck) this.turn(b, _fwd, (c.tilt * k * (1 - c.body)) / this.neck.length);
+        this.turn(this.neck[this.neck.length - 1], _right, -c.nod * k);
+        // and the neck is craned to the gun: toward it, forward, and down until the eye is level with the sights
+        // (the butt is where the shoulder will hold it: see the hold, below).
+        const chest = this.gearRest.get('spine_03'), face = this.gearRest.get('Head');
+        if (neck.parent && chest && face) {
+          const up = _k7.set(0, 1, 0).applyQuaternion(this.heldPivot.getWorldQuaternion(_kr)), a = POSE.hold.butt.aim;
+          const butt = this.armR.arm.getWorldPosition(_k8).add(_k6.set(a[0], a[1], a[2]).applyQuaternion(_kr.setFromRotationMatrix(_m1.multiplyMatrices(chest.bone.matrixWorld, chest.inv))));
+          _m1.multiplyMatrices(face.bone.matrixWorld, face.inv);
+          let over = _k6.set(c.eye[0], c.eye[1], c.eye[2]).applyMatrix4(_m1).sub(butt).dot(up) - held.sight[1];
+          // (under a visor that is down, only until its lower edge is on the top of the stock)
+          if (g.under !== null) over = Math.min(over, _k6.set(c.plate, g.under, -0.1).applyMatrix4(_m1).sub(butt).dot(up) - held.sight[0] - 0.006);
+          neck.getWorldPosition(_k6).addScaledVector(_right, c.crane[0] * k).addScaledVector(_fwd, c.crane[1] * k).addScaledVector(up, -THREE.MathUtils.clamp(over, 0, c.drop) * welded);
           neck.position.copy(neck.parent.worldToLocal(_k6));
           neck.updateMatrixWorld(true);
         }
-        for (const b of this.neck) this.turn(b, _fwd, (c.tilt * k) / this.neck.length);
-        this.turn(this.neck[this.neck.length - 1], _right, -c.nod * k);
-        // (and the firing shoulder is rolled forward to the butt)
-        if (this.collarR) this.turn(this.collarR, UP, POSE.hold.reachRight * welded);
       }
       if (pr > 0.003) {
         // lying: the chest a little up on the elbows and the head up off the ground, the eyes on what is ahead;
@@ -2021,17 +2044,19 @@ export class Avatar {
           put(set.aim, POSE.hold.butt.aim, _k4);
           const face = butt && chest && wAim > 0.001 && pr < 0.999 ? this.gearRest.get('Head') : undefined;
           if (face && chest) {
-            // Aimed, the gun is put by the eye: the line of its butt runs under the right eye by as much as its
-            // sights stand over its butt (or as high as a stock passes under what is worn in front of the cheek),
-            // just outside the eye, and back along the aim to the chest's front, where the butt is.
+            // Aimed, the gun is put under the eye: its butt at the height the shoulder holds it at (or as high as
+            // a stock passes under what is worn in front of the cheek, if that is lower), in line with the right
+            // eye, which the head has been brought down and over to it for, and back along the aim to the chest's
+            // front, where the butt rests.
             // (Worked in the aim's own frame, the pivot's: x to the aim's right, y up, z back. The gun stands
             // upright in that; the head is tipped in it.)
             const c = POSE.hold.cheek, g = this.faceGear(), [half, rise] = held.sight;
             _m1.multiplyMatrices(face.bone.matrixWorld, face.inv);
             const eye = this.heldPivot.worldToLocal(_k6.set(c.eye[0], c.eye[1], c.eye[2]).applyMatrix4(_m1));
+            const a = POSE.hold.butt.aim, high = this.heldPivot.worldToLocal(_k7.set(a[0], a[1], a[2]).applyQuaternion(_kq).add(_k1)).y;
             const mid = this.heldPivot.worldToLocal(face.bone.getWorldPosition(_k7));
             const out = Math.max(g.under !== null ? c.plate : c.jaw, g.cheek ? g.cheek + c.beside : 0);
-            const line = _k8.set(Math.max(eye.x + c.x, mid.x + out), eye.y - rise, eye.z), eyeY = eye.y;
+            const line = _k8.set(Math.max(eye.x + c.x, mid.x + out), Math.min(high, eye.y - rise), eye.z), eyeY = eye.y;
             // (under a visor: no higher than its lower edge lets the top of the butt pass, where the gun's line is)
             if (g.under !== null) line.y = Math.min(line.y, this.heldPivot.worldToLocal(_k6.set(line.x - mid.x, g.under, -0.1).applyMatrix4(_m1)).y - half - 0.006);
             // and back along the aim to the chest's front, where the butt rests
