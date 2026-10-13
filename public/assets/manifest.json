@@ -4928,6 +4928,521 @@
    "hiBytes": 1002680,
    "hiCard": 64
   },
+  "fort_kit": {
+   "url": "assets/models/fort_kit.glb",
+   "tags": [
+    "building",
+    "kit"
+   ],
+   "bytes": 2101456,
+   "srcTris": 28218,
+   "tris": 28218,
+   "min": [
+    -7.9196,
+    -0.1693,
+    -7.9186
+   ],
+   "max": [
+    7.9188,
+    13.4982,
+    14.8194
+   ],
+   "lods": [
+    {
+     "url": "assets/models/fort_kit_lod1.glb",
+     "tris": 12902
+    }
+   ],
+   "hi": "assets/models/hi/fort_kit.glb",
+   "hiBytes": 17488812,
+   "hiCard": 240,
+   "pieces": {
+    "fort_wall_thick_corner_02": {
+     "min": [
+      0,
+      0,
+      -0.002
+     ],
+     "max": [
+      7.073,
+      8.526,
+      5.719
+     ],
+     "tris": 836,
+     "far": 338
+    },
+    "fort_tower_round": {
+     "min": [
+      -7.92,
+      0,
+      -7.919
+     ],
+     "max": [
+      7.919,
+      13.498,
+      7.92
+     ],
+     "tris": 4772,
+     "far": 2054
+    },
+    "fort_wall_thick_straight_01": {
+     "min": [
+      0,
+      0,
+      0
+     ],
+     "max": [
+      4.172,
+      8.526,
+      14.563
+     ],
+     "tris": 2340,
+     "far": 934
+    },
+    "fort_wall_thick_end_02": {
+     "min": [
+      0,
+      0,
+      0
+     ],
+     "max": [
+      4.172,
+      8.526,
+      4.849
+     ],
+     "tris": 642,
+     "far": 554
+    },
+    "fort_wall_thick_corner_01": {
+     "min": [
+      0,
+      0,
+      0
+     ],
+     "max": [
+      5.838,
+      8.526,
+      5.838
+     ],
+     "tris": 816,
+     "far": 334
+    },
+    "fort_wall_thick_thin_transition_01": {
+     "min": [
+      0,
+      0,
+      0
+     ],
+     "max": [
+      4.172,
+      8.567,
+      3.557
+     ],
+     "tris": 434,
+     "far": 180
+    },
+    "fort_wall_thin_straight_01": {
+     "min": [
+      0,
+      0,
+      -0.001
+     ],
+     "max": [
+      2.55,
+      8.606,
+      14.819
+     ],
+     "tris": 1076,
+     "far": 436
+    },
+    "fort_wall_thin_corner_01": {
+     "min": [
+      0,
+      0,
+      -2.55
+     ],
+     "max": [
+      4.563,
+      8.605,
+      2.008
+     ],
+     "tris": 654,
+     "far": 272
+    },
+    "fort_wall_thin_corner_02": {
+     "min": [
+      0,
+      0,
+      -0.001
+     ],
+     "max": [
+      5.335,
+      8.606,
+      5.335
+     ],
+     "tris": 708,
+     "far": 292
+    },
+    "fort_wall_thin_straight_02": {
+     "min": [
+      0,
+      0,
+      0
+     ],
+     "max": [
+      2.55,
+      8.608,
+      14.819
+     ],
+     "tris": 2376,
+     "far": 1038
+    },
+    "fort_wall_thin_straight_04": {
+     "min": [
+      0,
+      0,
+      -0.001
+     ],
+     "max": [
+      2.55,
+      8.606,
+      7.41
+     ],
+     "tris": 622,
+     "far": 252
+    },
+    "fort_wall_thick_end_01": {
+     "min": [
+      0,
+      0,
+      0
+     ],
+     "max": [
+      4.172,
+      7.794,
+      4.849
+     ],
+     "tris": 442,
+     "far": 180
+    },
+    "fort_wall_thin_gate_01": {
+     "min": [
+      -0.122,
+      -0.011,
+      -0.001
+     ],
+     "max": [
+      2.55,
+      8.606,
+      7.41
+     ],
+     "tris": 1368,
+     "far": 592
+    },
+    "fort_wall_thin_corner_03": {
+     "min": [
+      0,
+      0,
+      -4.99
+     ],
+     "max": [
+      6.456,
+      8.606,
+      0
+     ],
+     "tris": 494,
+     "far": 208
+    },
+    "fort_wall_thin_straight_03": {
+     "min": [
+      0,
+      0,
+      -0.001
+     ],
+     "max": [
+      2.55,
+      7.794,
+      7.41
+     ],
+     "tris": 406,
+     "far": 166
+    },
+    "fort_wall_walkway_straight_01": {
+     "min": [
+      0,
+      -0.169,
+      0
+     ],
+     "max": [
+      3.366,
+      7.533,
+      14.563
+     ],
+     "tris": 2654,
+     "far": 1770
+    },
+    "fort_wall_walkway_corner_01": {
+     "min": [
+      0,
+      0,
+      -3.12
+     ],
+     "max": [
+      7.683,
+      7.533,
+      4.557
+     ],
+     "tris": 140,
+     "far": 90
+    },
+    "fort_wall_stairs_straight_01": {
+     "min": [
+      0,
+      0,
+      0
+     ],
+     "max": [
+      3.539,
+      7.533,
+      14.819
+     ],
+     "tris": 1196,
+     "far": 670
+    },
+    "fort_wall_walkway_corner_02": {
+     "min": [
+      0,
+      0,
+      0
+     ],
+     "max": [
+      2.785,
+      7.085,
+      2.785
+     ],
+     "tris": 94,
+     "far": 44
+    },
+    "fort_wall_thick_straight_02": {
+     "min": [
+      0,
+      0,
+      0
+     ],
+     "max": [
+      4.228,
+      8.521,
+      14.563
+     ],
+     "tris": 5996,
+     "far": 2398
+    },
+    "fort_wall_walkway_straight_02": {
+     "min": [
+      0,
+      0,
+      0
+     ],
+     "max": [
+      3.12,
+      7.533,
+      14.563
+     ],
+     "tris": 76,
+     "far": 46
+    },
+    "fort_wall_walkway_end_01": {
+     "min": [
+      0,
+      0,
+      0
+     ],
+     "max": [
+      3.12,
+      7.533,
+      4.849
+     ],
+     "tris": 76,
+     "far": 54
+    }
+   }
+  },
+  "large_castle_door": {
+   "url": "assets/models/large_castle_door.glb",
+   "tags": [
+    "building",
+    "door"
+   ],
+   "bytes": 546248,
+   "srcTris": 12640,
+   "tris": 12640,
+   "min": [
+    -1.0503,
+    -0.0297,
+    -0.1101
+   ],
+   "max": [
+    0.9618,
+    2.9351,
+    0.0461
+   ],
+   "lods": [
+    {
+     "url": "assets/models/large_castle_door_lod1.glb",
+     "tris": 2326
+    }
+   ],
+   "hi": "assets/models/hi/large_castle_door.glb",
+   "hiBytes": 3895636,
+   "hiCard": 64,
+   "pieces": {
+    "large_castle_door_frame": {
+     "min": [
+      -1.05,
+      -0.03,
+      -0.085
+     ],
+     "max": [
+      0.962,
+      2.935,
+      0.044
+     ],
+     "tris": 880,
+     "at": [
+      0,
+      0,
+      0
+     ],
+     "far": 268
+    },
+    "large_castle_door_right": {
+     "min": [
+      -0.961,
+      -1.127,
+      -0.089
+     ],
+     "max": [
+      0.022,
+      1.668,
+      0.022
+     ],
+     "tris": 6321,
+     "at": [
+      0.896,
+      1.164,
+      0.021
+     ],
+     "far": 1037
+    },
+    "large_castle_door_left": {
+     "min": [
+      -0.022,
+      -1.127,
+      -0.132
+     ],
+     "max": [
+      0.935,
+      1.667,
+      0.024
+     ],
+     "tris": 5439,
+     "at": [
+      -0.987,
+      1.165,
+      0.022
+     ],
+     "far": 1021
+    }
+   }
+  },
+  "rock_face_01": {
+   "url": "assets/models/rock_face_01.glb",
+   "tags": [
+    "nature"
+   ],
+   "bytes": 595460,
+   "srcTris": 20174,
+   "tris": 20174,
+   "min": [
+    -2.1336,
+    -0.0344,
+    -3.466
+   ],
+   "max": [
+    2.8199,
+    3.5297,
+    0.3613
+   ],
+   "lods": [
+    {
+     "url": "assets/models/rock_face_01_lod1.glb",
+     "tris": 2521
+    }
+   ],
+   "hi": "assets/models/hi/rock_face_01.glb",
+   "hiBytes": 5882900,
+   "hiCard": 128,
+   "pieces": {
+    "rock_face_01": {
+     "min": [
+      -2.134,
+      -0.034,
+      -3.466
+     ],
+     "max": [
+      2.82,
+      3.53,
+      0.361
+     ],
+     "tris": 20174,
+     "far": 2521
+    }
+   }
+  },
+  "rock_face_02": {
+   "url": "assets/models/rock_face_02.glb",
+   "tags": [
+    "nature"
+   ],
+   "bytes": 736096,
+   "srcTris": 29566,
+   "tris": 29566,
+   "min": [
+    -2.2611,
+    -0.1396,
+    -1.1882
+   ],
+   "max": [
+    0.4501,
+    2.3323,
+    0.9385
+   ],
+   "lods": [
+    {
+     "url": "assets/models/rock_face_02_lod1.glb",
+     "tris": 2954
+    }
+   ],
+   "hi": "assets/models/hi/rock_face_02.glb",
+   "hiBytes": 6412060,
+   "hiCard": 128,
+   "pieces": {
+    "rock_face_02": {
+     "min": [
+      -2.261,
+      -0.14,
+      -1.188
+     ],
+     "max": [
+      0.45,
+      2.332,
+      0.939
+     ],
+     "tris": 29566,
+     "far": 2954
+    }
+   }
+  },
   "saline_bag": {
    "url": "assets/models/saline_bag.glb",
    "tags": [

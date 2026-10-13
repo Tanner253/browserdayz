@@ -1057,3 +1057,43 @@ export const MODELS = {
   fern_02: { res: '1k', tex: 1024, budget: 3000, far: 300, tags: ['nature'] },
   dry_branches_medium_01: { res: '1k', tex: 1024, budget: 4000, far: 500, tags: ['nature'] },
 };
+
+/**
+ * Poly Haven models that are made into a file of NAMED PIECES (2026-10-13), which `scripts/fetch-assets.mjs` does
+ * not know how to do: a kit whose pieces share one set of pictures (the fort), a door whose leaves turn, and a
+ * rock whose near copy keeps its colour picture whole and the rest at half. In the file each piece is an empty
+ * node at the top, named by its id and nowhere in particular; its shapes hang under it, one to a material, said
+ * from the piece's own origin. One file, so one copy of the pictures however many pieces are stood.
+ * Three files each: `<id>.glb` (the world's copy: colour 1024, the rest 512), `hi/<id>.glb` (near), `<id>_lod1.glb`
+ * (far). The manifest entry has `pieces`: each piece's box from its origin and its triangles.
+ *   src   – its Poly Haven id (the folder under assets-src/models/)
+ *   name  – a piece's id, from the name its node came with;  mat – the same for a material
+ *   shut  – its pieces keep the places they came in and lose their turn (a door's leaves, which came ajar)
+ *   hi    – the near copy: the longest side of each material's [colour, relief, the rest]
+ *   far   – the far copy: the share of its triangles kept, how far from its shape it may go (of its size), `open`
+ *           if its open edges may move (a rock; a kit's must not, or neighbours part), and its pictures' sizes
+ * Why these sizes: progress/intake/CATALOGUE.md and the two picture sheets beside it. NOT built by `npm run
+ * assets` (which would also drop them from the manifest): by the intake lane's `kit.mjs`, a copy of which is
+ * kept in progress/intake/tools/.
+ */
+export const HAVEN_KITS = {
+  fort_kit: {
+    src: 'modular_fort_01',
+    name: (n) => n.replace('modular_fort_01_', 'fort_'),
+    mat: (n) => n.replace('modular_fort_01_', 'fort_').replace(/_1$/, ''),
+    hi: { fort_wall: [4096, 2048, 2048], fort_trim: [2048, 2048, 2048], fort_plaster: [2048, 2048, 1024] },
+    far: { ratio: 0.4, error: 0.004, colour: 512, other: 256 },
+    tags: ['building', 'kit'],
+  },
+  large_castle_door: {
+    src: 'large_castle_door',
+    name: (n) => n,
+    mat: (n) => n,
+    shut: true,
+    hi: { large_castle_door: [2048, 2048, 2048] },
+    far: { ratio: 0.12, error: 0.01, colour: 512, other: 256 },
+    tags: ['building', 'door'],
+  },
+  rock_face_01: { src: 'rock_face_01', name: (n) => n, mat: (n) => n, hi: { rock_face_01: [4096, 2048, 2048] }, far: { ratio: 0.125, error: 0.02, open: true, colour: 512, other: 256 }, tags: ['nature'] },
+  rock_face_02: { src: 'rock_face_02', name: (n) => n, mat: (n) => n, hi: { rock_face_02: [4096, 2048, 2048] }, far: { ratio: 0.1, error: 0.02, open: true, colour: 512, other: 256 }, tags: ['nature'] },
+};

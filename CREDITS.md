@@ -181,6 +181,7 @@ Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees ar
 | model | [Food Apple 01](https://polyhaven.com/a/food_apple_01) | Oliver Harries |
 | model | [Garden Gloves 01](https://polyhaven.com/a/garden_gloves_01) | Satyaki Mandal |
 | model | [Hatchet](https://polyhaven.com/a/hatchet) | James Ray Cock, Ulan Cabanilla |
+| model | [Large Castle Door](https://polyhaven.com/a/large_castle_door) | Tina |
 | model | [Life Jacket](https://polyhaven.com/a/life_jacket) | PierreB3D |
 | model | [Long Life Food](https://polyhaven.com/a/long_life_food) | Mia Pecina Zorko |
 | model | [Machete](https://polyhaven.com/a/machete) | Ulan Cabanilla |
@@ -189,6 +190,7 @@ Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees ar
 | model | [Metal Jerrycan Green](https://polyhaven.com/a/metal_jerrycan_green) | Ulan Cabanilla |
 | model | [Metal Office Desk](https://polyhaven.com/a/metal_office_desk) | Ulan Cabanilla |
 | model | [Metal Trash Can](https://polyhaven.com/a/metal_trash_can) | GurJas Studios |
+| model | [Modular Fort 01](https://polyhaven.com/a/modular_fort_01) | Rico Cilliers |
 | model | [Old Bed Frame](https://polyhaven.com/a/old_bed_frame) | Luca B |
 | model | [Old Gas Mask](https://polyhaven.com/a/old_gas_mask) | Michał Wiśniewski |
 | model | [Old Military Crate](https://polyhaven.com/a/old_military_crate) | Jack Mava |
@@ -198,6 +200,8 @@ Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees ar
 | model | [Painted Wooden Table](https://polyhaven.com/a/painted_wooden_table) | Kirill Sannikov |
 | model | [Plastic Bottle Gallon](https://polyhaven.com/a/plastic_bottle_gallon) | Rahul Chaudhary |
 | model | [Plastic Thermos](https://polyhaven.com/a/plastic_thermos) | PierreB3D |
+| model | [Rock Face 01](https://polyhaven.com/a/rock_face_01) | Dario Barresi |
+| model | [Rock Face 02](https://polyhaven.com/a/rock_face_02) | Dario Barresi, Rico Cilliers |
 | model | [Rock Moss Set 01](https://polyhaven.com/a/rock_moss_set_01) | Kless Gyzen |
 | model | [Rock Moss Set 02](https://polyhaven.com/a/rock_moss_set_02) | Kless Gyzen |
 | model | [Rubber Boots](https://polyhaven.com/a/rubber_boots) | L |
