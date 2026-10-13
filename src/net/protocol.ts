@@ -14,7 +14,7 @@ import type { DropInfo } from '../sim/drops';
 import type { VehicleInfo, VState } from '../sim/vehicles';
 import type { IState, InfectedInfo } from '../sim/infected';
 
-export const PROTOCOL = 34;
+export const PROTOCOL = 35;
 
 /** chat channels: everyone on the server, or only players standing near the speaker */
 /** `staff`: those with a role, to one another, wherever they are: nobody else is sent it */

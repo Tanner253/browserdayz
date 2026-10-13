@@ -67,8 +67,10 @@ export const ARMS_RESTOCK = 180;
  * locations (unless by chance) thats why we have tiers and categories of loot").
  *
  * Nothing is put down within LOOTED_ABOUT metres of a looted spot for LOOTED_REST seconds. And what lay at a spot
- * does not come back to that same spot for SAME_AGAIN seconds: it is put wherever else its kind is kept, at
- * random (Kamenka has some 240 spots free at any time), or it waits. What a spot gets next is whichever sort is
+ * does not come back to that same spot for SAME_AGAIN seconds while there is anywhere else for it: it is put
+ * wherever else its kind is kept, at random (Kamenka has some 240 spots free at any time). Only where there is
+ * nowhere else at all (under the gas and down the bunker, where every place is spoken for) does it go back to
+ * where it lay, once that spot has rested. What a spot gets next is whichever sort is
  * next wanted and happens on it: a roll among everything its step and its kind of place keep.
  *
  * (Tried and taken out: giving a looted spot something rolled at once when it had rested. The sort that was taken
@@ -188,7 +190,10 @@ export const TYPES: Record<string, TypeRule> = {
   // (2026-10-11, asked: "stims should be common in mid tier loot and in hospitals". Three times as many in the
   // village and the army's places, half as many again in Kamenka and under the gas, in the houses there as well
   // as where they were, and a clinic's shelf twice as likely to have one as it was. Still none on the outskirts.)
-  stim: { at: [0, 15, 58, 8, 6], lifetime: 3000, restock: 360, usage: ['Medic', 'Military', 'Police', 'Shop', ...HOMES], favour: { Medic: 10, Military: 3, Police: 2 } },
+  // (2026-10-13: the stim is two things now, one for a wound and one for the breath: see items.ts. The yellow one
+  // is kept where the white one is and with the army before anywhere, about a third as many.)
+  stim: { at: [0, 15, 44, 6, 4], lifetime: 3000, restock: 360, usage: ['Medic', 'Military', 'Police', 'Shop', ...HOMES], favour: { Medic: 10, Military: 3, Police: 2 } },
+  stim_stamina: { at: [0, 6, 16, 2, 2], lifetime: 3000, restock: 360, usage: ['Medic', 'Military', 'Police'], favour: { Medic: 8, Military: 5 } },
   firstaid: { at: [0, 9, 30, 3, 3], lifetime: 3600, restock: 600, usage: ['Medic', 'Military', 'Police'], favour: { Medic: 12 } },
   // (what sets a broken leg and does nothing else: commoner than the kit, and where there are ladders and lofts to fall off)
   splint: { at: [5, 10, 30, 1, 2], lifetime: 3600, restock: 420, usage: ['Medic', 'Shop', ...HOMES, 'Farm', 'Hunting', 'Industrial', 'Police'], favour: { Medic: 5, Shop: 2 } },
@@ -385,23 +390,33 @@ export class Economy {
 
   private pickPoint(id: string, rule: TypeRule, where: Tier): number {
     const sorted = where < UNSORTED;
-    const candidates: number[] = [];
+    let candidates: number[] = [];
     const weights: number[] = [];
     let total = 0;
+    /** spots it could lie at but for having lain there last: where it goes when there is nowhere else at all */
+    const again: number[] = [];
     this.points.forEach((p, i) => {
       // armed points are stocked on their own (see arm)
       if (p.arms || p.keeps || this.pointBusy.has(i) || this.tier[i] !== where) return;
       // (not where somebody has just looted, nor back where this same thing last lay)
       if (!this.rested(i)) return;
-      const was = this.lastAt.get(i);
-      if (was && was.id === id && this.time - was.at < SAME_AGAIN) return;
       if (!this.liesAt(id, rule, i, where)) return;
+      const was = this.lastAt.get(i);
+      if (was && was.id === id && this.time - was.at < SAME_AGAIN) return void again.push(i);
       let w = 1;
       if (sorted && rule.favour) for (const u of p.usage) w = Math.max(w, rule.favour[u] ?? 1);
       candidates.push(i);
       weights.push(w);
       total += w;
     });
+    // (Where every place is spoken for, under the gas and down the bunker, the spot a thing was taken from is the
+    // one spot there is: it goes back there once the spot has rested, and is not kept out of the world for a
+    // quarter of an hour. "The same loot shouldnt spawn in the same locations (unless by chance)": or need.)
+    if (!candidates.length && again.length) {
+      candidates = again;
+      for (const _ of again) weights.push(1);
+      total = again.length;
+    }
     if (!candidates.length) return -1;
     let r = this.rng.next() * total;
     for (let k = 0; k < candidates.length; k++) {

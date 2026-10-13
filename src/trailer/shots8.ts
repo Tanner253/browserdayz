@@ -760,7 +760,7 @@ export function buildShots(S: Stage): Shot[] {
   /** something mended with: the picture opens `into` seconds into the using of it (0: as it is begun) */
   const heal = (name: string, id: string, from: number, into: number, first: boolean) => {
     const use = ITEMS[id].use!;
-    const el = counter(`${ITEMS[id].name.toUpperCase()} &nbsp;·&nbsp; +${use.health}`, id === 'stim' ? `BREATH FILLED · ${use.boost} SECONDS OF RUNNING FOR NOTHING` : 'BOUND ON BY HAND · THE BLEEDING STOPPED', 'HEALTH', '100');
+    const el = counter(`${ITEMS[id].name.toUpperCase()} &nbsp;·&nbsp; +${use.health}`, id === 'stim' ? `BREATH FILLED · ${ITEMS.stim_stamina.use!.boost} SECONDS OF RUNNING FOR NOTHING` : 'BOUND ON BY HAND · THE BLEEDING STOPPED', 'HEALTH', '100');
     add(4, {
       name,
       flash: 0.5,

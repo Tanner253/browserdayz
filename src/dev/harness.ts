@@ -149,7 +149,7 @@ export function installHarness(g: Game) {
       for (const [id, rounds] of [['mag_ak', 8], ['mag_ak', 30], ['mag_ak', 30], ['drum_ak', 75], ['mag_ar', 30], ['mag_ar', 30], ['mag_ar', 30], ['mag_ar_60', 60], ['mag_m9', 15], ['mag_m9', 15]] as [string, number][]) one(id, (it) => (it.rounds = rounds));
       one('ammo_739', undefined, 30);
       one('ammo_556', undefined, 30);
-      for (const id of ['box_739', 'box_739', 'box_556', 'box_556', 'red_dot', 'suppressor_739', 'bandage', 'bandage', 'stim', 'beans', 'flask']) one(id);
+      for (const id of ['box_739', 'box_739', 'box_556', 'box_556', 'red_dot', 'suppressor_739', 'bandage', 'bandage', 'stim', 'stim_stamina', 'beans', 'flask']) one(id);
       inv.hot = [];
       anyG.autoHot?.();
       const first = (id: string) => got.find((it) => it.id === id) ?? null;

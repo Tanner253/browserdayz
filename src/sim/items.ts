@@ -358,14 +358,20 @@ const D: ItemDef[] = [
   // ---------------------------------------------------------------- medical
   // Two things for a wound, and the kit (2026-10-10, as asked): a bandage, common from the outskirts on, stops
   // bleeding and gives back 10; a stim, found in the village and common from Kamenka on, stops bleeding and gives
-  // back 35, and is the adrenaline it always was. (`bandage` was an injector for two days, and a roll of tape
+  // back 35 (and was adrenaline as well, until the two were parted: see below). (`bandage` was an injector for two days, and a roll of tape
   // before that: it is a bandage again, in every loot table and every pocket.)
   // (2026-10-11, asked: "stims should be common in mid tier loot and in hospitals and should stack, bandages stack
   // to 5, stims stack to 3". Each is still found, given and sold one at a time: `fresh`. Five in one place of a
   // pocket, and one is used off the pile.)
   { id: 'bandage', name: 'Bandage', model: 'medical_tape', w: 1, h: 1, weight: 0.06, category: 'medical', stack: 5, fresh: 1, desc: 'A rolled field dressing. Bound on, it stops bleeding and gives back 10 health.', use: { verb: 'Apply', time: 3.2, stopBleed: true, health: 10, sound: 'bandage' } },
-  // (an injector with a yellow barrel)
-  { id: 'stim', name: 'Stim', model: 'syringe', paint: 0xf0bd12, w: 1, h: 1, weight: 0.06, category: 'medical', stack: 3, fresh: 1, desc: 'Clotting agent, a painkiller and adrenaline in one spring-loaded shot, its barrel yellow. Stops bleeding and gives back 35 health; fills your stamina, and for ten seconds after it nothing you do costs any.', use: { verb: 'Use', time: 2.4, stopBleed: true, health: 35, stamina: 100, boost: 10, hold: true, sound: 'inject' } },
+  // Two injectors, told apart by the barrel (2026-10-13: "currently the stims give you health and stamina, they
+  // should be 2 seperate items. the yellow one is stamina, the white one (default is HP). i think something got
+  // confused and you mixed the effect for the yellow stim"). The white one, the model as it came, is for a wound:
+  // it stops bleeding and gives back 35. The yellow one is adrenaline and nothing else: it fills your breath, and
+  // for ten seconds nothing costs any. (`stim` was both, with a yellow barrel, from 2026-10-10: whoever had one
+  // has the white one now.)
+  { id: 'stim', name: 'Health Stim', model: 'syringe', w: 1, h: 1, weight: 0.06, category: 'medical', stack: 3, fresh: 1, desc: 'Clotting agent and a painkiller in one spring-loaded shot, its barrel white. Stops bleeding and gives back 35 health.', use: { verb: 'Use', time: 2.4, stopBleed: true, health: 35, hold: true, sound: 'inject' } },
+  { id: 'stim_stamina', name: 'Stamina Stim', model: 'syringe', paint: 0xf0bd12, w: 1, h: 1, weight: 0.06, category: 'medical', stack: 3, fresh: 1, desc: 'Adrenaline in a spring-loaded shot, its barrel yellow. Fills your stamina, and for ten seconds after it nothing you do costs any. It does nothing for a wound.', use: { verb: 'Use', time: 2.4, stamina: 100, boost: 10, hold: true, sound: 'inject' } },
   { id: 'firstaid', name: 'First Aid Kit', model: 'medical_box', w: 3, h: 2, weight: 0.9, category: 'medical', desc: 'Dressings, antiseptic and a splint. Treats wounds properly, and sets a broken leg.', use: { verb: 'Treat wounds', time: 6, stopBleed: true, health: 45, splint: true, sound: 'bandage' } },
   { id: 'splint', name: 'Splint Tape', model: 'medical_tape', tint: 0xd9a55c, w: 1, h: 1, weight: 0.12, category: 'medical', desc: 'A roll of tan strapping tape. Bound round a broken leg with whatever is to hand, it lets you run on it again.', use: { verb: 'Splint your leg with', time: 5, splint: true, sound: 'bandage' } },
   // ---------------------------------------------------------------- clothing & bags

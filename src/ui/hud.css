@@ -529,6 +529,10 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
   border-right: 2px solid var(--ok);
 }
 .hud-online.show { display: flex; }
+/* playing with no server: the same place, and not to be missed */
+.hud-online.off i { background: #ff7a52; box-shadow: 0 0 6px #ff7a52; }
+.hud-online.off b { color: #ffb59c; letter-spacing: 0.08em; }
+.hud-online.off span { color: #ffd9d0; }
 .hud-online i { align-self: center; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 6px var(--ok); }
 .hud-online b { font-size: 17px; font-weight: 600; color: var(--ink); }
 .hud-net { position: absolute; top: 60px; right: 14px; font-family: var(--mono); font-size: 10px; color: var(--ink-faint); }

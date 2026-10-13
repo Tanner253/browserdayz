@@ -306,8 +306,11 @@ export class Director {
   /**
    * Once a second or so. `living` is everybody alive, with where they stand.
    * @param now milliseconds
+   * @param wait a home whose dead are not to be put back yet, however long they have been owed (the bunker's,
+   *   while its door stands open: 2026-10-13, "the zombies should not respawn at bunker until the door is shut
+   *   again". Whoever has fought their way down has the place cleared for as long as they hold it.)
    */
-  tick(now: number, living: Somebody[]): Turn {
+  tick(now: number, living: Somebody[], wait?: (home: Home) => boolean): Turn {
     const turn: Turn = { added: [], gone: [], owned: [] };
     for (const b of [...this.bodies.values()]) {
       if (b.diedAt && now - b.diedAt > INFECTED.linger * 1000) {
@@ -320,7 +323,7 @@ export class Director {
     // whole place: somebody is nearly always somewhere in the village, and it would never
     // fill again.)
     for (const d of [...this.due]) {
-      if (now < d.at) continue;
+      if (now < d.at || wait?.(this.homes[d.home])) continue;
       const b = this.stand(d.home, now, living);
       if (!b) continue;
       this.due.splice(this.due.indexOf(d), 1);

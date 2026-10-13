@@ -898,7 +898,40 @@ const listOf = (v: string | undefined) => (v ?? '').split(',').map((x) => x.trim
  * kept off for CHECK.ban hours, by the key their game gives and (where addresses can be told apart) by address.
  * This last is forgotten when the server restarts.
  */
-const BANS = { keys: new Set(listOf(process.env.BAN_KEYS)), ips: new Set(listOf(process.env.BAN_IPS)), temp: new Map<string, { until: number; why: string }>(), strikes: new Map<string, number[]>() };
+const BANS = { keys: new Set(listOf(process.env.BAN_KEYS)), ips: new Set(listOf(process.env.BAN_IPS)), temp: new Map<string, { until: number; why: string; name?: string }>(), strikes: new Map<string, number[]>() };
+/**
+ * Whoever is kept off for a while (by the checks, or timed out by an admin), one line for each player and not one
+ * for each of the two things they are kept off by (their game's key and their address).
+ * 2026-10-13: a player was kept off for six hours by a check that was wrong about them ("he says hes in offline
+ * mode and cant play"), and there was nowhere it could be seen and no way to lift it short of a restart.
+ */
+function keptOffNow(now = Date.now()): { name: string; why: string; until: number; keys: string[] }[] {
+  const out: { name: string; why: string; until: number; keys: string[] }[] = [];
+  for (const [k, b] of BANS.temp) {
+    if (b.until <= now) {
+      BANS.temp.delete(k);
+      continue;
+    }
+    const same = out.find((o) => o.name === (b.name ?? k) && o.why === b.why && Math.abs(o.until - b.until) < 2000);
+    if (same) same.keys.push(k);
+    else out.push({ name: b.name ?? k, why: b.why, until: b.until, keys: [k] });
+  }
+  return out.sort((a, b) => a.until - b.until);
+}
+/** what somebody turned away at the door is told: that they are kept off, for about how long, and what to do if it is wrong */
+function doorWords(key: string, ip: string, off: string): string {
+  if (off === 'banned') {
+    const k = keyHash(key);
+    const b = ADMIN.state.bans.find((x) => x.key === k) ?? ADMIN.state.bans.find((x) => !!ip && x.ip === ip);
+    return `You are banned from this server${b?.why ? `: ${b.why}` : '.'}`;
+  }
+  const now = Date.now();
+  const b = [key, ...(ip ? [`ip:${ip}`] : [])].map((n) => BANS.temp.get(n)).find((x) => x && x.until > now);
+  if (!b) return 'You are kept off this server for now.';
+  const mins = Math.max(1, Math.ceil((b.until - now) / 60000));
+  const long = mins >= 90 ? `${Math.round(mins / 60)} hours` : `${mins} minute${mins === 1 ? '' : 's'}`;
+  return off.startsWith('timed out') ? `You are kept off this server for about ${long} more (${off}).` : `You are kept off this server for about ${long} more: its checks put you off it more than once. If you were only playing, tell an admin on the Discord and they can lift it.`;
+}
 function bannedFor(key: string, ip: string): string | null {
   if (BANS.keys.has(key) || (!!ip && BANS.ips.has(ip))) return 'kept off by name';
   if (adminBan(key, ip)) return 'banned';
@@ -1686,7 +1719,7 @@ async function command(c: Client, line: string) {
       if (!t) return void sys(c, `Nobody online is "${who}" (or more than one is): see /players.`);
       if (roleOf(t) === 'admin' && !admin) return need();
       const reason = rest.slice(2).join(' ').slice(0, 120);
-      for (const n of namesOf(t.key, t.ip)) BANS.temp.set(n, { until: Date.now() + mins * 60000, why: `timed out by ${c.name}${reason ? `: ${reason}` : ''}` });
+      for (const n of namesOf(t.key, t.ip)) BANS.temp.set(n, { until: Date.now() + mins * 60000, why: `timed out by ${c.name}${reason ? `: ${reason}` : ''}`, name: t.name });
       log(`[admin] ${c.name} timed ${t.name} out for ${mins} minutes${reason ? `: ${reason}` : ''}`);
       eject(t, `You are kept off the server for ${mins} minutes${reason ? `: ${reason}` : '.'}`);
       const more = sweepKeptOff(c);
@@ -1711,12 +1744,32 @@ async function command(c: Client, line: string) {
     }
     case 'bans':
       if (!admin) return need();
-      return void sys(c, ADMIN.state.bans.length ? 'Banned (the number is what /unban takes):' : 'Nobody is banned.', ...ADMIN.state.bans.map((b, i) => `${i + 1}. ${b.name}  by ${b.by}, ${b.at.slice(0, 10)}${b.why ? `: ${b.why}` : ''}`));
+    {
+      const off = keptOffNow();
+      return void sys(
+        c,
+        ADMIN.state.bans.length ? 'Banned (the number is what /unban takes):' : 'Nobody is banned.',
+        ...ADMIN.state.bans.map((b, i) => `${i + 1}. ${b.name}  by ${b.by}, ${b.at.slice(0, 10)}${b.why ? `: ${b.why}` : ''}`),
+        ...(off.length ? ['Kept off for a while (by the checks, or timed out):'] : []),
+        ...off.map((b, i) => `${ADMIN.state.bans.length + i + 1}. ${b.name}  for ${Math.ceil((b.until - Date.now()) / 60000)} more minutes: ${b.why}`),
+      );
+    }
     case 'unban': {
       if (!admin) return need();
       const i = /^\d+$/.test(who) ? Number(who) - 1 : ADMIN.state.bans.findIndex((b) => b.name.toLowerCase() === who.toLowerCase());
       const b = ADMIN.state.bans[i];
-      if (!b) return void sys(c, `No ban is "${who}": see /bans.`);
+      if (!b) {
+        // (not one an admin wrote down: one of those kept off for a while, by the checks or by a timeout)
+        const off = keptOffNow();
+        const t = /^\d+$/.test(who) ? off[Number(who) - 1 - ADMIN.state.bans.length] : off.find((x) => x.name.toLowerCase() === who.toLowerCase());
+        if (!t) return void sys(c, `No ban is "${who}": see /bans.`);
+        for (const k of t.keys) {
+          BANS.temp.delete(k);
+          BANS.strikes.delete(k);
+        }
+        log(`[admin] ${c.name} let ${t.name} back in (they were kept off: ${t.why})`);
+        return void sys(c, `${t.name} is no longer kept off, and may come straight back in.`);
+      }
       log(`[admin] ${c.name} unbanned ${b.name}`);
       const kept = await saveAdmin({ roles: ADMIN.state.roles, bans: ADMIN.state.bans.filter((x) => x !== b) });
       return void sys(c, `${b.name} is no longer banned.${kept ? '' : ' It could NOT be written to the site: give the order again in a minute.'}`);
@@ -1961,7 +2014,7 @@ function putOff(c: Client, why: string) {
     times.push(now);
     BANS.strikes.set(n, times);
     if (times.length >= CHECK.strikes) {
-      BANS.temp.set(n, { until: now + CHECK.ban * 3600000, why });
+      BANS.temp.set(n, { until: now + CHECK.ban * 3600000, why, name: c.name });
       kept = true;
     }
   }
@@ -2069,7 +2122,14 @@ function underCheck(c: Client, now = Date.now()) {
  * players?"). Somebody who goes about has their eyes on where they go: the turn and the tilt of their head change
  * with every twitch of the hand. A program that walks a body up and down to seem alive turns it about without
  * the head moving at all. Four turns back the way it came and twenty metres covered, in half a minute in which
- * the head did not move by a hair: written down, and (enforcing) put off.
+ * the head did not move by a hair: written down.
+ *
+ * (It put them off the server at once, until 2026-10-13, and it was wrong about people: "user is complaining that
+ * they get disconnected when they kill someone". With their pockets open the mouse is free and the head is not
+ * steered, and somebody going through a body's pockets steps round it: to and fro, head still. Twice inside an
+ * hour, and they were kept off for six. Now it is a mark against them like any other, FLAGS_OUT of which put
+ * somebody off; nobody is put off for this alone; and the half minute begins again whenever they DO anything, which
+ * a body walked by a program does not: see `handle`.)
  */
 const GAIT = { ms: 30_000, turns: 4, far: 20 };
 function gaitCheck(c: Client, was: Pose, now = Date.now()) {
@@ -2084,7 +2144,7 @@ function gaitCheck(c: Client, was: Pose, now = Date.now()) {
   g.dz = dz;
   if (g.turns < GAIT.turns || g.far < GAIT.far) return;
   k.gait = undefined;
-  if (flag(c, `went to and fro ${GAIT.turns} times over ${g.far.toFixed(0)} m without their head once turning`)) putOff(c, 'they walked to and fro without their head once turning, as a program walks a body');
+  flag(c, `went to and fro ${GAIT.turns} times over ${g.far.toFixed(0)} m without their head once turning`, false);
 }
 /** how far round the bunker's middle the ground is not asked about: its rooms and its stair are under it */
 const UNDER_BUNKER = 48;
@@ -2535,7 +2595,11 @@ function kill(c: Client, cause: string, v = 0) {
 
 function handle(c: Client, m: C2S) {
   // anything a person does counts as being there; what the game reports on its own does not
-  if (m.t !== 's' && m.t !== 'me' && m.t !== 'ping' && m.t !== 'gear' && m.t !== 'back') c.activeAt = Date.now();
+  if (m.t !== 's' && m.t !== 'me' && m.t !== 'ping' && m.t !== 'gear' && m.t !== 'back') {
+    c.activeAt = Date.now();
+    // (and whoever is doing things is not a body being walked up and down: see gaitCheck)
+    c.check.gait = undefined;
+  }
   switch (m.t) {
     case 's': {
       if (!isPose(m.p)) return;
@@ -3002,7 +3066,13 @@ function handle(c: Client, m: C2S) {
           ...(o.asleep ? { asleep: true as const } : away(o, now) && o.alive ? { away: true as const } : {}),
         })),
         gone: ADMIN.gone.slice(-20).reverse().map((g) => ({ id: g.id, name: g.name, mins: Math.round((now - g.at) / 60000) })),
-        bans: admin ? ADMIN.state.bans.map((b, i) => ({ n: i + 1, name: b.name, why: b.why, by: b.by, at: b.at.slice(0, 10) })) : [],
+        bans: admin
+          ? [
+              ...ADMIN.state.bans.map((b, i) => ({ n: i + 1, name: b.name, why: b.why, by: b.by, at: b.at.slice(0, 10) })),
+              // (and whoever is kept off for a while: lifted the same way)
+              ...keptOffNow(now).map((b, i) => ({ n: ADMIN.state.bans.length + i + 1, name: b.name, why: `${b.why} (for ${Math.ceil((b.until - now) / 60000)} more minutes)`, by: b.why.startsWith('timed out') ? 'a timeout' : 'the checks', at: new Date(b.until).toISOString().slice(11, 16) + ' UTC' })),
+            ]
+          : [],
         roles: admin ? Object.values(ADMIN.state.roles).map((r) => ({ name: r.name, role: r.role, by: r.by, at: r.at.slice(0, 10) })) : [],
         checks: CHECKS,
         stats: { up: Math.round(process.uptime() / 60), loot: economy.loot.size, stashes: [...boxes.values()].filter((b) => b.kind === 'stash').length + [...economy.loot.values()].filter((l) => l.keptAt !== undefined).length, kept: KEPT.chars.size + records.size, asleep: [...clients.values()].filter((o) => o.asleep).length },
@@ -3157,7 +3227,7 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
   const off = bannedFor(key, ipOf.get(ws) ?? '');
   if (off) {
     log(`${cleanName(m.name)} is not let in: ${off}`);
-    ws.send(JSON.stringify({ t: 'kick', reason: off === 'banned' ? 'You are banned from this server.' : off.startsWith('timed out') ? 'You are kept off this server for a while yet.' : 'You are kept off this server for now.' } satisfies S2C));
+    ws.send(JSON.stringify({ t: 'kick', reason: doorWords(key, ipOf.get(ws) ?? '', off) } satisfies S2C));
     ws.close();
     return null;
   }
@@ -3309,7 +3379,8 @@ setInterval(() => {
     }
   }
   // the infected: new ones where nobody is looking, the dead cleared away, and whose game moves each
-  const turn = horde.tick(now, [...clients.values()].filter((c) => c.alive && !away(c) && !c.power.hidden).map((c) => ({ id: c.id, x: c.pose[0], z: c.pose[2] })));
+  // (the bunker's are not put back while its door stands open: the home that is no open ground is the bunker)
+  const turn = horde.tick(now, [...clients.values()].filter((c) => c.alive && !away(c) && !c.power.hidden).map((c) => ({ id: c.id, x: c.pose[0], z: c.pose[2] })), (home) => !!home.inside && bunkerDoor.open);
   for (const i of turn.gone) broadcast({ t: 'i-', i });
   for (const b of turn.added) broadcast({ t: 'i+', b: { i: b.i, s: b.s, hp: b.hp, own: b.own, h: b.h } });
   for (const [i, to] of turn.owned) broadcast({ t: 'iown', i, to });

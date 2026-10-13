@@ -123,6 +123,29 @@ ok('hit enough it dies, lies a while, is cleared away, and another comes when no
   assert.equal(d.bodies.size, 5);
 });
 
+ok('the dead of a home that is told to wait are not put back until it no longer is (the bunker, while its door stands open)', () => {
+  const d = make();
+  d.tick(1000, []);
+  const mine = [...d.bodies.values()].filter((b) => b.home === 0);
+  assert.equal(mine.length, 3);
+  for (const b of mine) d.hurt(b.i, 500, 2000);
+  const cleared = 2000 + INFECTED.linger * 1000 + 500;
+  assert.equal(d.tick(cleared, []).gone.length, 3);
+  // long past their time, with nobody anywhere near: and the door is open still
+  const open = (h: Home) => h === homes[0];
+  const late = cleared + INFECTED.respawn * 1000 * 5;
+  assert.equal(d.tick(late, [], open).added.length, 0);
+  assert.equal(d.tick(late + 60000, [], open).added.length, 0);
+  // (the other home is nobody's to hold: one killed there comes back as it always did)
+  const far = [...d.bodies.values()].find((b) => b.home === 1)!;
+  d.hurt(far.i, 500, late);
+  d.tick(late + INFECTED.linger * 1000 + 500, [], open);
+  assert.equal(d.tick(late + (INFECTED.linger + INFECTED.respawn) * 1000 + 2000, [], open).added.length, 1);
+  // the door shuts: all three are back
+  assert.equal(d.tick(late + (INFECTED.linger + INFECTED.respawn) * 1000 + 3000, [], () => false).added.length, 3);
+  assert.equal(d.bodies.size, 5);
+});
+
 ok('what one has on it is a real thing, a sensible number of them, and there about as often as is said', () => {
   let seed = 12345;
   const rnd = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296;

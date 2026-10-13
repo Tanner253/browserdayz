@@ -782,9 +782,25 @@ export class HUD {
     }));
   }
 
+  /**
+   * Playing with no server: said where the number of players is said, for as long as it is so. (Somebody the
+   * server could not be reached for, or who left the line, was told once, in a note that goes after four seconds,
+   * and then had a world with nobody in it and nothing to say why.)
+   */
+  setOffline(on: boolean) {
+    const e = this.el.online;
+    this.toggle(e, 'off', on);
+    if (!on) return;
+    this.toggle(e, 'show', true);
+    (e.querySelector('b') as HTMLElement).textContent = 'OFFLINE';
+    (e.querySelector('span') as HTMLElement).textContent = ' · alone, nothing here is kept · reload to connect';
+  }
+
   /** players connected to the server right now (null = playing offline) */
   setOnline(count: number | null, max = 0) {
     const e = this.el.online;
+    if (e.classList.contains('off') && count === null) return;
+    this.toggle(e, 'off', false);
     this.toggle(e, 'show', count !== null);
     if (count === null) return;
     (e.querySelector('b') as HTMLElement).textContent = String(count);

@@ -1015,15 +1015,15 @@ export class Game {
         // Kept off, or banned: said on the way in where it stays said, and not into a game alone as if nothing
         // had happened. (It was a note that went after four seconds, and then a world with nobody in it.
         // 2026-10-13: "when a user is banned or kicked we tell them right? at the menu or when rejected?")
-        if (/banned|kept off|put off/i.test(this.net.refused)) {
-          this.joining = false;
-          this.input.unlock();
-          this.hud.showStart(true);
-          this.hud.refused(this.net.refused);
-          return;
-        }
-        this.hud.note(this.net.refused, 'warn');
-      } else if (remoteServer()) this.hud.note('The server could not be reached: playing offline', 'warn');
+        // (And whatever else the server turned them away for: somebody already playing from their connection,
+        // a page that is out of date. 2026-10-13: "he says hes in offline mode and cant play": he had been turned
+        // away, was told so for four seconds, and was then walking about a world with nobody in it.)
+        this.joining = false;
+        this.input.unlock();
+        this.hud.showStart(true);
+        this.hud.refused(this.net.refused);
+        return;
+      } else if (remoteServer()) this.hud.note('The server could not be reached: you are playing OFFLINE, alone. Reload the page to try again.', 'warn');
       await this.enterOffline();
     }
     this.joining = false;
@@ -1101,6 +1101,8 @@ export class Game {
   }
 
   private async enterOffline() {
+    // (said for as long as it is so: nobody else is here, and nothing done here is kept)
+    this.hud.setOffline(!!remoteServer());
     const save = loadSave();
     if (save) await this.restore(save);
     else this.fresh();
@@ -4167,7 +4169,7 @@ export class Game {
     }
     const carried = this.inv.find((it) => !!ITEMS[it.id].use?.stopBleed);
     if (carried) return `${this.touch ? 'Open your pack' : '<kbd>Tab</kbd>'} and use the ${ITEMS[carried.id].name}`;
-    return 'Find a bandage, a stim or a first aid kit';
+    return 'Find a bandage, a health stim or a first aid kit';
   }
 
   private dripT = 0;
