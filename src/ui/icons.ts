@@ -22,6 +22,14 @@ const ICONS_REV = 3;
  */
 const HEAD_UP = new Set(['hatchet']);
 /**
+ * And every gun. A gun on the ground has lain on its thinnest side since 2026-10-13 (with what is fitted to it: see
+ * `lay` in src/game/loot.ts), and the pictures made after that had every gun on its back: magazine and grip
+ * uppermost, muzzle to the left. They went out so. ("the pictures you sent in chat all the models are upside
+ * donw?": they were, and so were the game's.) Turned right over in the plane of the picture, it is the gun as it
+ * was drawn before: muzzle to the right, magazine down.
+ */
+const headUp = (id: string) => HEAD_UP.has(id) || !!ITEMS[id]?.weapon;
+/**
  * What is built lying on its back, its face to the sky, and is stood up to look out of its picture. (The gas mask's
  * hood, since it lost its hose and was laid down, 2026-10-13: drawn as it lay it was seen from the side, one
  * eyepiece and the valve, and read as a flask.)
@@ -109,7 +117,7 @@ export function iconSig(id: string): string {
     return [d.model, file || Math.random(), d.node ?? '', d.nodeRe ?? '', d.tint ?? '', d.paint ?? '', d.scale ?? '', d.w, d.h, d.category, d.pile ?? '', !!d.mag, d.stack ? 1 : 0, d.weapon ? [d.weapon.mag ?? '', d.weapon.shows ?? '', (d.weapon as { hides?: unknown }).hides ?? '', d.weapon.never ?? ''] : ''];
   };
   const d = ITEMS[id];
-  const text = JSON.stringify([ICONS_REV, of(d), of(d.weapon?.mag ? ITEMS[d.weapon.mag] : undefined), ...(HEAD_UP.has(id) ? ['head up'] : []), 'lamps', ...LAMPS[lampsOf(d)], ...(LIT(d) ? ['lit', ...LIFT] : []), 'tone', TONE.floor, TONE.ceil, TONE.least, TONE.most]);
+  const text = JSON.stringify([ICONS_REV, of(d), of(d.weapon?.mag ? ITEMS[d.weapon.mag] : undefined), ...(headUp(id) ? ['head up'] : []), 'lamps', ...LAMPS[lampsOf(d)], ...(LIT(d) ? ['lit', ...LIFT] : []), 'tone', TONE.floor, TONE.ceil, TONE.least, TONE.most]);
   let h = 2166136261 >>> 0;
   for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619) >>> 0;
   return h.toString(36);
@@ -240,7 +248,7 @@ export async function renderIcons(renderer: THREE.WebGLRenderer, models: ItemMod
       s2 = b2.getSize(new THREE.Vector3());
     }
     // (and one that reads upside down as it then stands is turned right over, in the plane of the picture)
-    if (HEAD_UP.has(id)) frame.rotation.z += Math.PI;
+    if (headUp(id)) frame.rotation.z += Math.PI;
     /** the thing as it stands in the scene, drawn to fill a picture of this many pixels each way */
     const shoot = (pw: number, ph: number, target: THREE.WebGLRenderTarget): string => {
       frame.updateMatrixWorld(true);
