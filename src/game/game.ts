@@ -1731,6 +1731,14 @@ export class Game {
     net.on('powers', (m) => {
       this.powers = { god: m.god, hidden: m.hidden, clip: m.clip, voidInv: m.voidInv, voidTag: m.voidTag, weightless: !!m.weightless, endless: !!m.endless };
       this.player.god = m.god;
+      // (God mode is proof against every state a body can be in, not only against dying of it: 2026-10-13, an
+      // admin with it on: "i am still being choked out by the gas, i should be immune to all status efects in
+      // godmode". The gas is not breathed (see the frame loop); and what had hold already when it is switched on,
+      // a wound, a broken leg, lets go.)
+      if (m.god) {
+        this.player.staunch();
+        this.player.setLeg(true);
+      }
       this.player.setFly(m.clip);
       this.carryPowers();
       this.showPowers();
@@ -4581,7 +4589,7 @@ export class Game {
       buildings.update(h, this.player.pos);
     });
     if (this.started) p.tickVitals(dt);
-    this.gas.update(dt, this.s.r.camera.position, _gasHead.set(p.pos.x, p.pos.y + (p.crouched ? 1.0 : 1.6), p.pos.z), this.started && !p.dead);
+    this.gas.update(dt, this.s.r.camera.position, _gasHead.set(p.pos.x, p.pos.y + (p.crouched ? 1.0 : 1.6), p.pos.z), this.started && !p.dead && !this.powers.god);
     this.lightStep(dt, playing && !uiOpen && !typing);
     // the fires: the infected hear one crackle, and whoever is beside one mends
     for (const at of this.fires.update(dt, this.s.r.camera.position)) this.horde.noise(at.x, at.z, FIRE.heard);

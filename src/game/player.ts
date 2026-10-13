@@ -1091,7 +1091,8 @@ export class Player {
 
   /** a leg breaks (nothing happens to one already broken, or to the dead) */
   breakLeg() {
-    if (this.dead || this.vitals.broken) return;
+    // (nor to an admin in god mode: nothing takes hold of one)
+    if (this.dead || this.vitals.broken || this.god) return;
     this.vitals.broken = true;
     this.brokenT = 0;
     this.sprinting = false;
