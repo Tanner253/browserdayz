@@ -129,6 +129,20 @@ export class Net {
   ping = 0;
   private ws: WebSocket | null = null;
   private handlers = new Map<string, ((m: S2C) => void)[]>();
+  /**
+   * What the server has said since it let this game in, kept until the game says it is listening (`listen`).
+   *
+   * A game takes its welcome, puts the world the welcome describes together, and only then says what it does with
+   * each kind of message. Putting it together WAITS, for one thing on the model of every stash in the world, and
+   * since models are fetched when first wanted (2026-10-11) that is a wait on the network of up to some seconds.
+   * Everything the server said meanwhile fell on nobody and was gone: "you are an admin" and an admin's powers,
+   * said in the same breath as the welcome ("my admin status is not loading properly and i have to reenter my
+   * admin password every time", 2026-10-13); and for everybody the board, whoever came in or left, whatever was
+   * picked up, put down, opened or shut in those seconds: a world a little out of step with everybody else's
+   * until something put it right. Null: nothing is being kept, and a message goes straight to whoever listens.
+   */
+  private held: S2C[] | null = null;
+  private heldTill: ReturnType<typeof setTimeout> | null = null;
   private kicked = '';
   private kickedV: number | undefined;
   private proofKey = '';
@@ -255,6 +269,11 @@ export class Net {
           this.online = true;
           this.id = m.you;
           setInterval(() => this.send({ t: 'ping', n: performance.now() }), 4000);
+          // (from this word on, what is said is kept for the game until it listens)
+          this.held = [];
+          if (this.heldTill) clearTimeout(this.heldTill);
+          // (never for ever: a game that has not said so in half a minute is handed what there is, as it used to be)
+          this.heldTill = setTimeout(() => this.listen(), 30_000);
           done(m);
           return;
         }
@@ -275,10 +294,24 @@ export class Net {
           this.ping = Math.round(performance.now() - m.n);
           return;
         }
-        const hs = this.handlers.get(m.t);
-        if (hs) for (const h of hs) h(m);
+        if (this.held) return void this.held.push(m);
+        this.hand(m);
       };
     });
+  }
+
+  private hand(m: S2C) {
+    const hs = this.handlers.get(m.t);
+    if (hs) for (const h of hs) h(m);
+  }
+
+  /** The game is listening: everything the server has said since the welcome is handed over, in the order it was said. See `held`. */
+  listen() {
+    if (this.heldTill) clearTimeout(this.heldTill);
+    this.heldTill = null;
+    const held = this.held;
+    this.held = null;
+    if (held) for (const m of held) this.hand(m);
   }
 
   send(m: C2S) {

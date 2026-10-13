@@ -92,6 +92,12 @@ export class Atmosphere {
   /** how far into the night it is: 0 by day, 1 at night */
   night = 0;
   /**
+   * A light from nowhere, on everything alike and out unless something turns it up: an admin's night sight indoors
+   * (see Game). It is no part of the hour's light and nothing that dims the hour dims it. (An ambient light is not
+   * counted among the lights a shader is written for: turning it up makes no shader anew.)
+   */
+  readonly fill = new THREE.AmbientLight(0xffffff, 0);
+  /**
    * What is left of the hour's light where the eye is, by what is over it: the gas, the
    * ground. Each that dims sets its own entry (1 and 1 when it does not).
    */
@@ -196,6 +202,7 @@ export class Atmosphere {
     this.installFogChunks();
     this.buildGasDome();
     this.buildStars();
+    this.scene.add(this.fill);
     this.setHour(1, 0);
 
     this.csm = new CSM({

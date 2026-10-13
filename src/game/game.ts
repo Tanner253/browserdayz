@@ -152,6 +152,9 @@ const SEND_HZ = 15;
 const _drip = new THREE.Vector3();
 const _still = new THREE.Vector3();
 
+/** An admin's night sight: how strong the light from nowhere is under a roof (where the day does not reach) and under the sky (where it does, and little is wanted). */
+const NIGHT_SIGHT = { indoors: 2.6, outdoors: 0.35 };
+
 export class Game {
   input: Input;
   player: Player;
@@ -1863,6 +1866,8 @@ export class Game {
     this.hud.setLive(true);
     this.hud.setNet('Online');
     this.updateOnline();
+    // (every kind of message has somebody to hear it now: what was said since the welcome is heard, in its order)
+    net.listen();
   }
 
   private maxPlayers = 0;
@@ -2502,6 +2507,11 @@ export class Game {
     this.castle?.update(dt, cam.position, atmo.night, (pos, burn, colour = CRESSET.colour, reach = CRESSET.reach) => this.lamps.glow(pos, colour, burn, reach));
     const under = this.nightSight ? 0 : Math.max(bunkerDark(this.bunker.place, cam.position.x, cam.position.y, cam.position.z), castleDark(this.s.world.castle, cam.position.x, cam.position.y, cam.position.z, (x, z) => heightAt(this.s.world.surface, x, z)));
     atmo.cover.ground = { sun: 1 - under, sky: 1 - 0.994 * under };
+    // (And it sees indoors as it sees out of doors: "admin night vision should make it day time in buildings as
+    // well so i can see in the dark without flashlight", 2026-10-13. Under a roof the day's light is the little
+    // that comes in at the windows: a light from nowhere is added there, eased in and out at the door.)
+    const fill = this.nightSight && this.started ? (this.indoors ? NIGHT_SIGHT.indoors : NIGHT_SIGHT.outdoors) : 0;
+    atmo.fill.intensity += (fill - atmo.fill.intensity) * Math.min(1, dt * 6);
     this.lamps.update(cam, dt);
     this.weapons.lampSpill.copy(this.lamps.spill);
   }
