@@ -79,17 +79,20 @@ export interface SeatPose {
 }
 export const CAR_SIT: { front: SeatPose; back: SeatPose } = { front: { legs: 0.85, knees: 0, back: 0.2 }, back: { legs: 0, knees: 0.43, back: 0.87 } };
 
+/** where a thing that is worn sits on the body (see GEAR) */
+type Worn = { bone: 'Head' | 'spine_03'; p: [number, number, number]; r: [number, number, number]; s: [number, number, number]; pack?: boolean };
+/** the respirator on the face: one mask in four paints, and one place for all of them */
+const MASK: Worn = { bone: 'Head', p: [0, 1.557, -0.1], r: [0, 0, 0], s: [1, 1, 1] };
 /**
  * Worn things that are drawn on the body. `p`, `r`, `s` place the item's model on the body
  * as it stands at rest (x to its right, y up, z behind it); the bone then carries it.
  */
-export const GEAR: Record<string, { bone: 'Head' | 'spine_03'; p: [number, number, number]; r: [number, number, number]; s: [number, number, number]; pack?: boolean }> = {
+export const GEAR: Record<string, Worn> = {
   // (the one backpack at two sizes: its straps are toward the body as its model comes, so it is not turned)
   // (the day pack is the camping pack made small: higher on the back, and nearer it)
   sack_pack: { bone: 'spine_03', p: [0, 1.0, 0.137], r: [0.05, 0, 0], s: [1, 1, 1], pack: true },
   camping_pack: { bone: 'spine_03', p: [0, 0.9, 0.2], r: [0.05, 0, 0], s: [1, 1, 1], pack: true },
   suitcase: { bone: 'spine_03', p: [0, 0.87, 0.215], r: [0.05, 0, 0], s: [1, 1, 1], pack: true },
-  // (the hood of it alone: see `facepiece`. As its model lies, the crown is toward -x and the eyepieces look along +z)
   // (the helmet: its brow is toward +x as its model stands, so it is turned a quarter round)
   boonie_hat: { bone: 'Head', p: [0, 1.593, 0.035], r: [0, Math.PI / 2, 0], s: [1, 1, 1] },
   // (the K6-3: its brow is toward -z as its model stands, the way a body faces. It comes down over the ears and the nape.)
@@ -105,33 +108,21 @@ export const GEAR: Record<string, { bone: 'Head' | 'spine_03'; p: [number, numbe
   // (the cap and the soft hat: their bands at the brow. The cap's peak is toward +z as its model lies, so it is turned round.)
   patrol_cap: { bone: 'Head', p: [0, 1.64, 0.01], r: [0, Math.PI, 0], s: [1, 1, 1] },
   fishermans_hat: { bone: 'Head', p: [0, 1.66, 0.0], r: [0, 0, 0], s: [1, 1, 1] },
-  // (a hood over the whole head, a little larger than life so the head and what is on it are inside it)
-  gasmask: { bone: 'Head', p: [0.1155, 1.141, -0.04], r: [0, Math.PI, -Math.PI / 2], s: [1.1, 1.1, 1.1] },
+  // (the steel pot: its brow is toward -z, as the K6-3's is. It is a smaller helmet than the other two, as it was made.)
+  helmet_m1: { bone: 'Head', p: [0, 1.69, -0.015], r: [0, 0, 0], s: [1, 1, 1] },
+  // (the respirator, in each of its four paints: its visor is toward -z as its model stands, the way a body faces)
+  gasmask: MASK,
+  gasmask_white: MASK,
+  gasmask_orange: MASK,
+  gasmask_skull: MASK,
 };
 
-/** how far along the gas mask's model (its own x, metres) the hood and its valve end and the hose begins */
-const MASK_HOSE = -0.215;
 /**
- * A gas mask as it is worn: the hood and its valve. The hose and the filter can it lies with
- * on a table are left off: they are one stiff piece with it, and on a head that turns they
- * would stand out of it like a handle.
+ * A gas mask as it is worn. The GP-5 this was written for lay on a table with its hose and its filter can, one
+ * stiff piece with it, and they were cut off here; the respirator that is the gas mask now is worn as it lies and
+ * nothing is cut. (Kept because the game and the figure in the inventory both ask for it by name.)
  */
 export function facepiece(obj: THREE.Object3D) {
-  obj.updateMatrixWorld(true);
-  const v = new THREE.Vector3();
-  obj.traverse((o) => {
-    const mesh = o as THREE.Mesh;
-    if (!mesh.isMesh) return;
-    const g = mesh.geometry.clone();
-    const P = g.getAttribute('position');
-    const keep = new Uint8Array(P.count);
-    for (let i = 0; i < P.count; i++) keep[i] = v.fromBufferAttribute(P, i).applyMatrix4(mesh.matrixWorld).x < MASK_HOSE ? 1 : 0;
-    const index = g.index ? Array.from(g.index.array) : Array.from({ length: P.count }, (_, i) => i);
-    const kept: number[] = [];
-    for (let i = 0; i + 2 < index.length; i += 3) if (keep[index[i]] && keep[index[i + 1]] && keep[index[i + 2]]) kept.push(index[i], index[i + 1], index[i + 2]);
-    g.setIndex(kept);
-    mesh.geometry = g;
-  });
   return obj;
 }
 /**

@@ -12,8 +12,14 @@
 // its own (smoothed edges, and room over white for the lamps' glints), and that is laid onto the game's picture
 // where the figure stands on the page, after the game's frame is done. The page's dark veil has a hole in it just
 // there (the end of ../ui/hud.css), so the game's picture is what is seen in it; everything else of the page, the
-// outline and the word shown while a thing is dragged, a thing dragged across, lies over it as it did. Nothing is
-// read back from the card, and nothing is drawn while the inventory is shut.
+// places beside the figure, the outline and the word shown while a thing is dragged, a thing dragged across, lies
+// over it as it did. Nothing is read back from the card, and nothing is drawn while the inventory is shut.
+//
+// What is seen in the hole has to be what the veil would have shown there, or the hole is a box on the page. So
+// the veil is made again in it: what of the world lies behind is copied (on the card) out of the game's finished
+// picture, blurred as the veil blurs it and thinned of colour as the veil thins it, and the veil's own dark laid
+// over it by the same rule the page lays it. The figure is put on that. With no figure in it the hole would not be
+// seen at all: there is no box, only the survivor standing on the page.
 //
 // What it is painted with. Every lit material in the game is written for the sun's shadow maps and the hour
 // (Atmosphere.register), and a body dropped into another room would be shaded by the world's shadows at wherever
@@ -35,18 +41,24 @@ import type { ItemModels } from './loot';
 /** a thing as it is seen in somebody's hands */
 type Held = { obj: THREE.Object3D; grips: Grips; kind: 'rifle' | 'pistol' | 'auto' | 'melee' };
 
-/** where the figure stands on the page, in the page's own pixels from its top left; and what of that is in sight (the column it is in scrolls) */
+/** Where things are on the page, in the page's own pixels from its top left (asked of the inventory each frame). */
 export interface DollBox {
+  /** the figure's own place: it is stood in the middle of this, as tall as this */
   x: number;
   y: number;
   w: number;
   h: number;
+  /** the hole in the veil: the figure's place and the places beside it, as much of them as is in sight (their column scrolls) */
   cx: number;
   cy: number;
   cw: number;
   ch: number;
-  /** how much of the page's dark veil there is round it, 0..1: the floor it stands on fades to that at its edges */
-  dim: number;
+  /**
+   * The veil itself, to be made again in the hole: the box it covers; its two colours, at its middle and at its
+   * far corner (red, green, blue to 255, and how much of it there is, 0..1); how far it blurs what is behind it
+   * (the page's pixels; 0: it does not) and how much of that colour it leaves.
+   */
+  veil: { x: number; y: number; w: number; h: number; from: number[]; to: number[]; blur: number; sat: number };
 }
 
 /** what the game tells it, asked each frame it is shown (and now and then while it is not, so that it is right the moment it is) */
@@ -68,8 +80,8 @@ export interface DollHost {
   shown(on: boolean): void;
 }
 
-/** how much of the room the picture takes in: this tall and at least this wide, metres, about a point this high */
-const FRAME = { tall: 2.06, wide: 0.98, mid: 0.9 };
+/** how much of the room the figure's own place takes in: this tall and at least this wide, metres, about a point this high */
+const FRAME = { tall: 2.04, wide: 0.94, mid: 0.9 };
 /** the lens: a long one from well back, so the figure is not bent by it, set a little over its middle and looking down at it */
 const LENS = { fov: 17, lift: 0.34 };
 /** where it is seen from at rest: a little to its right, where what is in its hands is seen along its side and not end on (radians round it) */
@@ -78,16 +90,52 @@ const REST = 0.52;
 const TURN = 0.0125, GLIDE = 0.32, SPIN_MOST = 11;
 /** shut, what it wears and holds is asked after this often, ms */
 const ASK_SHUT = 300;
-/** the page's dark veil where the figure stands (the middle of the gradient in .inv, hud.css) */
-const VEIL = [12 / 255, 15 / 255, 13 / 255];
+/** a blur wider than this many of the game's own pixels is worked at half size (it is the same blur to the eye, at a quarter of the work) */
+const BLUR_WHOLE = 9;
 /** the pictures a paint may have, each kept the same as the game's own */
 const MAPS = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap', 'alphaMap'] as const;
 type Painted = THREE.Material & Partial<Record<(typeof MAPS)[number], THREE.Texture | null>>;
 
 const ORIGIN = new THREE.Vector3(), STILL = new THREE.Vector3();
-const _eye = new THREE.Vector3(), _size = new THREE.Vector2(), _clear = new THREE.Color();
+const _eye = new THREE.Vector3(), _size = new THREE.Vector2(), _at = new THREE.Vector2(), _clear = new THREE.Color();
 const _view = new THREE.Vector4(), _cut = new THREE.Vector4();
 const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
+/** a flat sheet over the whole of whatever is drawn into: every pass here that is not the room itself is one */
+const SHEET = /* glsl */ `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = vec4( position.xy, 0.0, 1.0 );
+  }`;
+
+/** one such pass: its sheet, and the lens that three asks for and the sheet does not use */
+function pass(mat: THREE.ShaderMaterial) {
+  const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat);
+  quad.frustumCulled = false;
+  const scene = new THREE.Scene();
+  scene.add(quad);
+  return { scene, camera: new THREE.Camera(), u: mat.uniforms };
+}
+
+/** where on the game's picture things are, for one box of the page: worked out when the page says the box has moved */
+interface Plan {
+  /** what is drawn over, in the game's own pixels: from its left, from its top, across, down */
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** what of the game's picture is copied to be blurred: the same, and as far past it as the blur reaches */
+  sx: number;
+  sy: number;
+  sw: number;
+  sh: number;
+  /** how far the veil blurs, in the game's own pixels (0: not at all), and the size it is worked at (1, or half: 2) */
+  sigma: number;
+  k: number;
+  /** how tall the game's picture is, in its own pixels and in the renderer's measure */
+  high: number;
+  pr: number;
+}
 
 export class Doll {
   /** made, and fit to be drawn: until then, and if making it fails, the page keeps its still picture */
@@ -99,10 +147,14 @@ export class Doll {
   private readonly body = new Avatar();
   private readonly uniforms = lookUniforms();
   private hair: THREE.MeshStandardMaterial[] = [];
+  private readonly ground: THREE.Mesh;
   /** the figure's own picture: half-float, so a glint off a barrel is rolled off toward white and not cut at it */
   private readonly target = new THREE.WebGLRenderTarget(64, 128, { samples: 4, type: THREE.HalfFloatType, depthBuffer: true });
-  private readonly lay: { scene: THREE.Scene; camera: THREE.Camera; size: THREE.Vector2; veil: THREE.Vector4 };
-  private readonly ground: THREE.Mesh;
+  /** what of the game's picture lies behind the hole, copied from it each frame; and the two small pictures it is blurred through, across and then down */
+  private world: THREE.FramebufferTexture | null = null;
+  private readonly soft = [0, 1].map(() => new THREE.WebGLRenderTarget(8, 8, { depthBuffer: false, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter }));
+  private readonly blur: ReturnType<typeof pass>;
+  private readonly lay: ReturnType<typeof pass>;
   /** this game's paint for each of the game's own, and the same pairs as a list to go down each frame */
   private paints = new Map<THREE.Material, THREE.Material>();
   private pairs: [Painted, Painted][] = [];
@@ -127,9 +179,9 @@ export class Doll {
   private goal: number | null = null;
   /** seconds until a gun newly in the hands is looked over (-1: none is waiting to be) */
   private lookOver = -1;
-  /** the page's box it was last drawn for, and where the game's picture is on the page */
+  /** the page's box it was last drawn for, and what was worked out for it */
   private box: DollBox | null = null;
-  private canvas = { x: 0, y: 0, sx: 1, sy: 1 };
+  private plan: Plan | null = null;
 
   constructor(private r: Renderer, private atmo: Atmosphere, private models: ItemModels, private h: DollHost) {
     // The room. The sky's own picture is what steel and glass have to shine with, at a strength of this room's
@@ -147,7 +199,8 @@ export class Doll {
     this.rig.add(this.camera, key, fill, rim);
     this.ground = this.floor();
     this.scene.add(this.rig, this.ground);
-    this.lay = this.layer();
+    this.blur = this.blurring();
+    this.lay = this.laying();
     // (a phone the game has already failed to start on is given nothing more to hold: it keeps the still picture)
     if (!LEAN) void this.make();
   }
@@ -168,12 +221,14 @@ export class Doll {
       this.scene.add(this.body.root);
       this.stand(0.05);
       await this.warm([this.body.root, this.ground]);
-      // (and what lays its picture onto the game's, which is drawn onto the screen itself)
-      const R = this.r.renderer, prev = R.getRenderTarget();
-      R.setRenderTarget(null);
-      const laying = programsOf(R, R.compile(this.lay.scene, this.lay.camera) as unknown as Set<THREE.Material>);
+      // (and the passes that lay its picture onto the game's, each written for what it is drawn into)
+      const R = this.r.renderer, prev = R.getRenderTarget(), flat = new Set<ReturnType<typeof programsOf>[number]>();
+      for (const [p, into] of [[this.blur, this.soft[0]], [this.lay, null]] as const) {
+        R.setRenderTarget(into);
+        for (const q of programsOf(R, R.compile(p.scene, p.camera) as unknown as Set<THREE.Material>)) flat.add(q);
+      }
       R.setRenderTarget(prev);
-      await made(laying);
+      await made(flat);
       // (dressed, and with its hands full, before it is ever shown: it is not seen bare first)
       await Promise.all(this.ask());
       this.alive = true;
@@ -190,7 +245,7 @@ export class Doll {
     this.body.root.traverse((o) => {
       const m = o as THREE.SkinnedMesh;
       if (!m.isMesh) return;
-      const src = m.material as THREE.MeshStandardMaterial, c = this.plain(src);
+      const c = this.plain(m.material as THREE.MeshStandardMaterial);
       if (suit && m.isSkinnedMesh) {
         c.onBeforeCompile = (shader) => suitPatch(shader, this.uniforms);
         c.customProgramCacheKey = () => 'doll-suit';
@@ -286,7 +341,7 @@ export class Doll {
         void main() {
           float d2 = dot( vAt, vAt );
           float shade = 0.66 * exp( -d2 / 0.115 );
-          float pool = 0.085 * exp( -d2 / 0.95 );
+          float pool = 0.085 * exp( -d2 / 0.8 );
           gl_FragColor = vec4( vec3( 0.62, 0.66, 0.64 ) * pool * ( 1.0 - shade ), shade + pool * ( 1.0 - shade ) );
         }`,
     });
@@ -297,56 +352,85 @@ export class Doll {
     return floor;
   }
 
-  /**
-   * What lays the figure's picture onto the game's: the dark it stands in (as much of it at the edges as the page's
-   * own veil, so that the two meet without a line, and all of it within), a little light on the wall behind, and
-   * the figure over that. The lamps' glints are rolled off toward white here, and the whole is written as a screen
-   * shows it.
-   */
-  private layer() {
-    const size = new THREE.Vector2(1, 1), veil = new THREE.Vector4(VEIL[0], VEIL[1], VEIL[2], 0.8);
-    const mat = new THREE.ShaderMaterial({
-      transparent: true,
-      premultipliedAlpha: true,
+  /** The blur of the page's veil, one way at a time: so many steps either side, each weighed by how far off it is. */
+  private blurring() {
+    return pass(new THREE.ShaderMaterial({
       depthTest: false,
       depthWrite: false,
       toneMapped: false,
-      uniforms: { tFig: { value: this.target.texture }, uSize: { value: size }, uVeil: { value: veil } },
-      vertexShader: /* glsl */ `
+      uniforms: { tSrc: { value: null }, uStep: { value: new THREE.Vector2() }, uSigma: { value: 1 } },
+      vertexShader: SHEET,
+      fragmentShader: /* glsl */ `
+        uniform sampler2D tSrc;
+        uniform vec2 uStep;
+        uniform float uSigma;
         varying vec2 vUv;
         void main() {
-          vUv = uv;
-          gl_Position = vec4( position.xy, 0.0, 1.0 );
+          vec3 sum = vec3( 0.0 );
+          float all = 0.0;
+          int reach = int( ceil( uSigma * 2.6 ) );
+          for ( int i = - reach; i <= reach; i ++ ) {
+            float w = exp( - float( i * i ) / ( 2.0 * uSigma * uSigma ) );
+            sum += texture2D( tSrc, vUv + uStep * float( i ) ).rgb * w;
+            all += w;
+          }
+          gl_FragColor = vec4( sum / all, 1.0 );
         }`,
+    }));
+  }
+
+  /**
+   * What is drawn into the hole: the veil made again (what of the world is behind, blurred already, with its
+   * colour thinned and the veil's dark over it, by the page's own rule: a round gradient from the veil's middle to
+   * its far corner), a little light on the wall behind the figure, and the figure. The lamps' glints are rolled off
+   * toward white here, and the figure is written as a screen shows it.
+   */
+  private laying() {
+    const v4 = () => ({ value: new THREE.Vector4() });
+    return pass(new THREE.ShaderMaterial({
+      depthTest: false,
+      depthWrite: false,
+      toneMapped: false,
+      uniforms: { tFig: { value: this.target.texture }, tWorld: { value: null }, uDrawn: v4(), uSeen: v4(), uFig: v4(), uPage: v4(), uFrom: v4(), uTo: v4(), uSat: { value: 1 } },
+      vertexShader: SHEET,
       fragmentShader: /* glsl */ `
         uniform sampler2D tFig;
-        uniform vec2 uSize;
-        uniform vec4 uVeil;
+        uniform sampler2D tWorld;
+        uniform vec4 uDrawn;
+        uniform vec4 uSeen;
+        uniform vec4 uFig;
+        uniform vec4 uPage;
+        uniform vec4 uFrom;
+        uniform vec4 uTo;
+        uniform float uSat;
         varying vec2 vUv;
+        // (where the veil's gradient has its middle, as a share of its box: "at 50% 35%" in hud.css)
+        const vec2 MID = vec2( 0.5, 0.35 );
         void main() {
-          vec4 fig = texture2D( tFig, vUv );
+          vec2 page = uDrawn.xy + vec2( vUv.x, 1.0 - vUv.y ) * uDrawn.zw;
+          vec2 at = ( page - uSeen.xy ) / uSeen.zw;
+          vec3 col = texture2D( tWorld, vec2( at.x, 1.0 - at.y ) ).rgb;
+          col = mix( vec3( dot( col, vec3( 0.213, 0.715, 0.072 ) ) ), col, uSat );
+          // (the gradient reaches its far corner, and is as much wider than tall as its box is on its longer sides)
+          vec2 reach = uPage.zw * max( MID, 1.0 - MID ) * 1.41421356;
+          float t = clamp( length( ( page - uPage.xy - uPage.zw * MID ) / reach ), 0.0, 1.0 );
+          vec4 veil = mix( vec4( uFrom.rgb * uFrom.a, uFrom.a ), vec4( uTo.rgb * uTo.a, uTo.a ), t );
+          col = col * ( 1.0 - veil.a ) + veil.rgb;
+          vec2 q = ( page - uFig.xy - uFig.zw * vec2( 0.5, 0.42 ) ) / uFig.w;
+          col += vec3( 0.058, 0.068, 0.063 ) * exp( - dot( q, q ) / 0.07 );
+          // (the figure's picture ends where what is drawn ends: what of it reaches that far fades out before it)
+          vec2 px = vUv * uDrawn.zw;
+          vec4 fig = texture2D( tFig, vUv ) * smoothstep( 1.0, 14.0, min( min( px.x, uDrawn.z - px.x ), min( px.y, uDrawn.w - px.y ) ) );
           vec3 lit = fig.a > 0.0005 ? fig.rgb / fig.a : vec3( 0.0 );
           // (as it is up to three quarters of white, and from there bent over so that it comes to white and never past it)
-          vec3 over = 0.75 + 0.25 * tanh( ( lit - 0.75 ) / 0.25 );
-          lit = mix( lit, over, step( vec3( 0.75 ), lit ) );
-          vec3 col = mix( lit * 12.92, 1.055 * pow( max( lit, vec3( 0.0 ) ), vec3( 1.0 / 2.4 ) ) - 0.055, step( vec3( 0.0031308 ), lit ) );
-          vec2 px = vUv * uSize;
-          float edge = min( min( px.x, uSize.x - px.x ), min( px.y, uSize.y - px.y ) );
-          float within = smoothstep( 0.0, 16.0, edge );
-          vec2 q = ( vUv - vec2( 0.5, 0.6 ) ) * vec2( uSize.x / uSize.y, 1.0 );
-          float glow = exp( -dot( q, q ) / 0.075 ) * within;
-          vec3 back = uVeil.rgb + vec3( 0.07, 0.082, 0.076 ) * glow;
-          float dark = mix( uVeil.a, 1.0, within );
+          lit = mix( lit, 0.75 + 0.25 * tanh( ( lit - 0.75 ) / 0.25 ), step( vec3( 0.75 ), lit ) );
+          lit = mix( lit * 12.92, 1.055 * pow( max( lit, vec3( 0.0 ) ), vec3( 1.0 / 2.4 ) ) - 0.055, step( vec3( 0.0031308 ), lit ) );
+          col = col * ( 1.0 - fig.a ) + lit * fig.a;
           // (a grain of noise: the dark is a slow slope from one shade to the next, and shows its steps without)
           float grain = ( fract( sin( dot( gl_FragCoord.xy, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 ) - 0.5 ) / 255.0;
-          gl_FragColor = vec4( col * fig.a + back * dark * ( 1.0 - fig.a ) + grain, fig.a + dark * ( 1.0 - fig.a ) );
+          gl_FragColor = vec4( col + grain, 1.0 );
         }`,
-    });
-    const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat);
-    quad.frustumCulled = false;
-    const scene = new THREE.Scene();
-    scene.add(quad);
-    return { scene, camera: new THREE.Camera(), size, veil };
+    }));
   }
 
   // ------------------------------------------------------------ what it wears and holds
@@ -451,37 +535,33 @@ export class Doll {
     model.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(model);
     if (box.isEmpty()) return null;
-    const size = box.getSize(new THREE.Vector3()).toArray(), mid = box.getCenter(new THREE.Vector3());
-    model.position.sub(mid);
+    const size = box.getSize(new THREE.Vector3()).toArray();
+    model.position.sub(box.getCenter(new THREE.Vector3()));
     // (the hand's own frame, as a club's is said: the handle along y, the fingers toward -z, the palm facing -x)
-    const order = [0, 1, 2].sort((a, b) => size[b] - size[a]);
-    const thick = size[order[2]];
     const turned = new THREE.Group();
     turned.add(model);
-    const to: THREE.Vector3[] = [];
-    const lay = (long: number, across: number, through: number) => {
-      to[long] = new THREE.Vector3(0, 1, 0);
-      to[through] = new THREE.Vector3(1, 0, 0);
-      to[across] = new THREE.Vector3(0, 0, 1);
-      // (turned, not turned inside out)
+    /** the thing's own three ways are laid along the hand's: `along` the handle, `through` the fist, `across` the fingers */
+    const lay = (along: number, across: number, through: number, up: THREE.Vector3, out: THREE.Vector3) => {
+      const to: THREE.Vector3[] = [];
+      to[along] = up;
+      to[through] = out;
+      to[across] = up.clone().cross(out);
+      // (turned, and not turned inside out)
       if (to[0].clone().cross(to[1]).dot(to[2]) < 0) to[across].negate();
       turned.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(to[0], to[1], to[2]));
     };
     const obj = new THREE.Group();
     obj.add(turned);
-    const fist =(x: number, curl: number) => ({ pos: new THREE.Vector3(x, 0, 0.05), fingers: new THREE.Vector3(-0.2, -0.3, -1), palm: new THREE.Vector3(-1, 0, 0), curl: [curl, curl + 0.04, curl + 0.08, curl + 0.1] as [number, number, number, number], thumb: 0.9, tuck: 0.8 });
+    const fist = (x: number, curl: number) => ({ pos: new THREE.Vector3(x, 0, 0.05), fingers: new THREE.Vector3(-0.2, -0.3, -1), palm: new THREE.Vector3(-1, 0, 0), curl: [curl, curl + 0.04, curl + 0.08, curl + 0.1] as [number, number, number, number], thumb: 0.9, tuck: 0.8 });
+    const order = [0, 1, 2].sort((a, b) => size[b] - size[a]), thick = size[order[2]];
     if (thick <= 0.095) {
-      lay(order[0], order[1], order[2]);
+      lay(order[0], order[1], order[2], new THREE.Vector3(0, 1, 0), new THREE.Vector3(1, 0, 0));
       return { obj, grips: { right: fist(0.012 + thick / 2, THREE.MathUtils.clamp(1.2 - (thick - 0.03) * 9, 0.6, 1.3)), left: null }, kind: 'melee' };
     }
-    // (Its own top toward the wrist, the longer of its other two sides along the fist; it hangs under the fingers
+    // (Its own top toward the wrist, the longer of its other two sides along the fist: it hangs under the fingers,
     // and stands out from the leg by as much of it as would have been inside the leg.)
     const [a, b] = size[0] >= size[2] ? [0, 2] : [2, 0];
-    to[1] = new THREE.Vector3(0, 0, 1);
-    to[a] = new THREE.Vector3(0, 1, 0);
-    to[b] = new THREE.Vector3(1, 0, 0);
-    if (to[0].clone().cross(to[1]).dot(to[2]) < 0) to[b].negate();
-    turned.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(to[0], to[1], to[2]));
+    lay(a, 1, b, new THREE.Vector3(0, 1, 0), new THREE.Vector3(1, 0, 0));
     turned.position.set(Math.max(0, size[b] / 2 - 0.06), 0, -(size[1] / 2 + 0.012));
     return { obj, grips: { right: fist(0.03, 1.12), left: null }, kind: 'melee' };
   }
@@ -566,7 +646,9 @@ export class Doll {
   draw(dt: number) {
     if (!this.alive) return this.h.shown(false);
     const box = this.h.box(), now = performance.now();
-    if (!box) {
+    if (box && box !== this.box) this.plan = this.layOut(box);
+    this.box = box;
+    if (!box || !this.plan) {
       this.showing = false;
       if (now - this.askedAt > ASK_SHUT) {
         this.askedAt = now;
@@ -586,47 +668,106 @@ export class Doll {
     this.follow();
     this.spin(dt);
     this.stand(Math.min(dt, 0.1));
-    this.picture(box);
+    this.picture(this.plan);
     this.h.shown(true);
   }
 
-  private picture(box: DollBox) {
-    const R = this.r.renderer, cv = R.domElement;
-    R.getSize(_size);
-    if (box !== this.box) {
-      // (the page has measured again: where the game's picture is on it, and how the lens is to take the room in)
-      this.box = box;
-      const at = cv.getBoundingClientRect();
-      this.canvas = { x: at.left, y: at.top, sx: at.width ? _size.x / at.width : 1, sy: at.height ? _size.y / at.height : 1 };
-      const pr = R.getPixelRatio(), w = Math.max(2, Math.round(box.w * this.canvas.sx * pr)), h = Math.max(2, Math.round(box.h * this.canvas.sy * pr));
-      if (this.target.width !== w || this.target.height !== h) this.target.setSize(w, h);
-      const aspect = box.w / box.h, tall = Math.max(FRAME.tall, FRAME.wide / aspect);
-      const back = tall / 2 / Math.tan(THREE.MathUtils.degToRad(LENS.fov / 2));
-      this.camera.aspect = aspect;
-      this.camera.position.set(0, FRAME.mid + LENS.lift, -back);
-      this.camera.rotation.set(-Math.atan2(LENS.lift, back), Math.PI, 0);
-      this.camera.updateProjectionMatrix();
-      this.lay.size.set(box.w, box.h);
-      this.lay.veil.w = box.dim;
+  /**
+   * The page has measured again: where its hole is on the game's picture, in that picture's own pixels; how the
+   * lens is to take the room in; how big each of the small pictures is to be; and what the passes are told.
+   */
+  private layOut(box: DollBox): Plan | null {
+    const R = this.r.renderer, on = R.domElement.getBoundingClientRect(), pr = R.getPixelRatio();
+    R.getDrawingBufferSize(_size);
+    const W = _size.x, H = _size.y;
+    if (!on.width || !on.height || !W || !H) return null;
+    // (the game's own pixels to one of the page's)
+    const kx = W / on.width, ky = H / on.height;
+    // (the hole, and a pixel past its edge all round: under the veil, a gap would be a line of the bare world)
+    const x = Math.max(0, Math.floor((box.cx - 1 - on.left) * kx)), x1 = Math.min(W, Math.ceil((box.cx + box.cw + 1 - on.left) * kx));
+    const y = Math.max(0, Math.floor((box.cy - 1 - on.top) * ky)), y1 = Math.min(H, Math.ceil((box.cy + box.ch + 1 - on.top) * ky));
+    const w = x1 - x, h = y1 - y;
+    if (w < 8 || h < 8) return null;
+    const sigma = box.veil.blur * (kx + ky) * 0.5, k = sigma > BLUR_WHOLE ? 2 : 1;
+    // (what is copied to be blurred reaches as far past the hole as the blur does; worked at half size, it is an even number of pixels each way)
+    const past = sigma > 0 ? Math.ceil(sigma * 2.6) + 2 : 0;
+    let sx = Math.max(0, x - past), sx1 = Math.min(W, x1 + past), sy = Math.max(0, y - past), sy1 = Math.min(H, y1 + past);
+    if (k === 2) {
+      if ((sx1 - sx) % 2) {
+        if (sx1 < W) sx1++;
+        else sx++;
+      }
+      if ((sy1 - sy) % 2) {
+        if (sy1 < H) sy1++;
+        else sy++;
+      }
     }
+    const sw = sx1 - sx, sh = sy1 - sy;
+    if (this.target.width !== w || this.target.height !== h) this.target.setSize(w, h);
+    if (!this.world || this.world.image.width !== sw || this.world.image.height !== sh) {
+      this.world?.dispose();
+      // (The game's picture has no see-through to it, and a copy of it may not be asked to have one. Read between
+      // its pixels: the blur at half size takes four of them at each step.)
+      this.world = new THREE.FramebufferTexture(sw, sh);
+      this.world.format = THREE.RGBFormat;
+      this.world.internalFormat = 'RGB8';
+      this.world.minFilter = this.world.magFilter = THREE.LinearFilter;
+    }
+    for (const t of this.soft) if (sigma > 0 && (t.width !== sw / k || t.height !== sh / k)) t.setSize(sw / k, sh / k);
+    // the lens: the figure's own place is the whole of what it takes in, and what is drawn is that and more, to either side
+    const fw = box.w * kx, fh = box.h * ky, aspect = fw / fh, tall = Math.max(FRAME.tall, FRAME.wide / aspect);
+    const back = tall / 2 / Math.tan(THREE.MathUtils.degToRad(LENS.fov / 2));
+    this.camera.aspect = aspect;
+    this.camera.position.set(0, FRAME.mid + LENS.lift, -back);
+    this.camera.rotation.set(-Math.atan2(LENS.lift, back), Math.PI, 0);
+    this.camera.setViewOffset(fw, fh, x - (box.x - on.left) * kx, y - (box.y - on.top) * ky, w, h);
+    const u = this.lay.u, v = box.veil;
+    u.uDrawn.value.set(on.left + x / kx, on.top + y / ky, w / kx, h / ky);
+    u.uSeen.value.set(on.left + sx / kx, on.top + sy / ky, sw / kx, sh / ky);
+    u.uFig.value.set(box.x, box.y, box.w, box.h);
+    u.uPage.value.set(v.x, v.y, v.w, v.h);
+    u.uFrom.value.set(v.from[0] / 255, v.from[1] / 255, v.from[2] / 255, v.from[3]);
+    u.uTo.value.set(v.to[0] / 255, v.to[1] / 255, v.to[2] / 255, v.to[3]);
+    u.uSat.value = v.sat;
+    u.tWorld.value = sigma > 0 ? this.soft[0].texture : this.world;
+    return { x, y, w, h, sx, sy, sw, sh, sigma, k, high: H, pr };
+  }
+
+  private picture(p: Plan) {
+    const R = this.r.renderer, world = this.world!;
     this.rig.rotation.y = -this.angle;
     // (what shines in steel goes round with the lamps: the figure is what is being turned, not the room)
     this.scene.environmentRotation.y = -this.angle;
-    const c = this.canvas;
     const prev = R.getRenderTarget(), auto = R.autoClear, alpha = R.getClearAlpha(), cutting = R.getScissorTest();
     R.getClearColor(_clear);
     R.getViewport(_view);
     R.getScissor(_cut);
+    R.autoClear = false;
+    // the figure, in its room
     R.setRenderTarget(this.target);
     R.setClearColor(0x000000, 0);
     R.clear(true, true, false);
     R.render(this.scene, this.camera);
+    // what of the game's picture is behind the hole, copied on the card; and blurred as the veil blurs it, across and then down
     R.setRenderTarget(null);
-    // (laid onto the game's picture where the page has its hole, and a little past the hole's edge all round: under the veil, a gap would be a line of the world)
-    R.setViewport((box.x - c.x) * c.sx, _size.y - (box.y + box.h - c.y) * c.sy, box.w * c.sx, box.h * c.sy);
-    R.setScissor((box.cx - c.x) * c.sx - 2, _size.y - (box.cy + box.ch - c.y) * c.sy - 2, box.cw * c.sx + 4, box.ch * c.sy + 4);
+    R.copyFramebufferToTexture(world, _at.set(p.sx, p.high - p.sy - p.sh));
+    if (p.sigma > 0) {
+      const b = this.blur.u;
+      b.uSigma.value = p.sigma / p.k;
+      b.tSrc.value = world;
+      b.uStep.value.set(p.k / p.sw, 0);
+      R.setRenderTarget(this.soft[1]);
+      R.render(this.blur.scene, this.blur.camera);
+      b.tSrc.value = this.soft[1].texture;
+      b.uStep.value.set(0, p.k / p.sh);
+      R.setRenderTarget(this.soft[0]);
+      R.render(this.blur.scene, this.blur.camera);
+      R.setRenderTarget(null);
+    }
+    // and all of it into the hole
+    R.setViewport(p.x / p.pr, (p.high - p.y - p.h) / p.pr, p.w / p.pr, p.h / p.pr);
+    R.setScissor(p.x / p.pr, (p.high - p.y - p.h) / p.pr, p.w / p.pr, p.h / p.pr);
     R.setScissorTest(true);
-    R.autoClear = false;
     R.render(this.lay.scene, this.lay.camera);
     R.autoClear = auto;
     R.setScissorTest(cutting);

@@ -453,6 +453,8 @@ export class Game {
     await this.weapons.load();
     this.weapons.mainCam = r.camera;
     this.weapons.itemModels = this.loot.models;
+    // (a gun on the ground lies there with what is fitted to it: the copy of it that is seen in the hands)
+    this.loot.models.dressed = (id, mods) => this.weapons.lyingModel(id, mods);
     this.weapons.onSlungChange = (obj) => {
       this.avatar.setSlung(obj);
       this.syncBack();

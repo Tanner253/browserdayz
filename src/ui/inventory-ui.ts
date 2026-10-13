@@ -316,7 +316,7 @@ export class InventoryUI {
     // figure. So elsewhere the veil is a plain dark one while the figure is shown, cut as any shape is cut.
     // `?veil=blur` asks for the blurred one anyway, to look.)
     const veil = new URLSearchParams(location.search).get('veil');
-    if (veil === 'plain' || (veil !== 'blur' && !/\bChrome\/\d/.test(navigator.userAgent))) this.root.classList.add('veil-plain');
+    if (veil === 'plain' || (veil !== 'blur' && !/Chrome\/\d/.test(navigator.userAgent))) this.root.classList.add('veil-plain');
   }
 
   private figureLetGo() {
@@ -338,19 +338,29 @@ export class InventoryUI {
     if (!this.figMoved && now - this.figAt < 400) return this.figBox;
     this.figMoved = false;
     this.figAt = now;
-    const fig = this.root.querySelector<HTMLElement>('.doll-fig'), col = fig?.closest<HTMLElement>('.inv-col');
+    const fig = this.root.querySelector<HTMLElement>('.doll-fig'), row = fig?.parentElement, col = fig?.closest<HTMLElement>('.inv-col');
     let box: FigureBox | null = null;
     const page = this.root.getBoundingClientRect(), z = this.z;
-    if (fig && col) {
-      const f = fig.getBoundingClientRect(), c = col.getBoundingClientRect();
+    if (fig && row && col) {
+      const f = fig.getBoundingClientRect(), d = row.getBoundingClientRect(), c = col.getBoundingClientRect();
       // (the column's own inside: within its border, and clear of its scroll bar)
       const left = c.left + col.clientLeft * z, top = c.top + col.clientTop * z;
-      const l = Math.ceil(Math.max(f.left, left)), t = Math.ceil(Math.max(f.top, top));
-      const r = Math.floor(Math.min(f.right, left + col.clientWidth * z)), b = Math.floor(Math.min(f.bottom, top + col.clientHeight * z));
-      if (f.width >= 16 && f.height >= 16 && r - l >= 8 && b - t >= 8) box = { x: f.left, y: f.top, w: f.width, h: f.height, cx: l, cy: t, cw: r - l, ch: b - t, dim: this.root.classList.contains('veil-plain') ? 0.9 : 0.795 };
+      // The hole is the whole row the figure stands in, the places for what is worn with it, and a little over:
+      // what is in the figure's hands reaches behind those places when it is turned, and is not cut off at the
+      // figure's own box. (The places lie over the hole as they lie over the veil.)
+      const l = Math.ceil(Math.max(d.left - 8 * z, left)), t = Math.ceil(Math.max(d.top - 12 * z, top));
+      const r = Math.floor(Math.min(d.right + 8 * z, left + col.clientWidth * z)), b = Math.floor(Math.min(d.bottom + 12 * z, top + col.clientHeight * z));
+      if (f.width >= 16 && f.height >= 16 && r - l >= 16 && b - t >= 16) {
+        // (the veil, as the stylesheet has it for the figure: its colours, its blur and what colour it leaves, each a number there)
+        const css = getComputedStyle(this.root), said = (k: string) => css.getPropertyValue(k).split(',').map(Number);
+        const from = said('--veil-in'), to = said('--veil-out'), blur = said('--veil-blur')[0], sat = said('--veil-sat')[0];
+        if ([...from, ...to, blur, sat].every(Number.isFinite) && from.length === 4 && to.length === 4) {
+          box = { x: f.left, y: f.top, w: f.width, h: f.height, cx: l, cy: t, cw: r - l, ch: b - t, veil: { x: page.left, y: page.top, w: page.width, h: page.height, from, to, blur: blur * z, sat } };
+        }
+      }
     }
     const was = this.figBox;
-    if (box && was && box.x === was.x && box.y === was.y && box.w === was.w && box.h === was.h && box.cx === was.cx && box.cy === was.cy && box.cw === was.cw && box.ch === was.ch) return was;
+    if (box && was && JSON.stringify(box) === JSON.stringify(was)) return was;
     this.figBox = box;
     // (said in the page's own measure, which is the screen's over the page's scale)
     const at = (v: number, from: number) => `${((v - from) / z).toFixed(2)}px`;

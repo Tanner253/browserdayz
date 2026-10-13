@@ -30,6 +30,11 @@
 //   flat   – materials whose names match have their relief map left out (a download that gave its colour picture as its relief)
 //   pivot  – a piece of the download (a node, by name) whose own origin is put at x = 0, z = 0 in place of the model's middle:
 //            a door, which is then turned about its hinge by turning the model about y
+//   hung   – pieces of it that the game turns on their hinges while the rest of it stands still (a locker's doors):
+//            `{ door_l: /^DoorL/, ... }`, each a name and the pieces of the download (nodes, by name) that are that
+//            piece. Each comes out as a piece of the file called `<id>_<name>`, whose own origin is where the
+//            download's piece had its own (the line of its hinges, at its foot), with its shapes under it; what is
+//            not hung is stood as ever. One file, so that the doors are painted with the case's own pictures
 // A piece on a skeleton is taken as the skeleton holds it when nothing is moving.
 
 import fs from 'node:fs/promises';
@@ -96,7 +101,7 @@ export async function processProp(id, cfg, { io, SRC, OUT, FORCE, exists, countT
   const credit = { id, ...(await creditOf(dir)), changes: cfg.changes };
   if (!credit.line) throw new Error(`${id}: its licence asks for no credit line this script knows how to read (${credit.licence}): look at ${path.join(dir, 'license.txt')}`);
   const dest = path.join(OUT, 'models', `${id}.glb`);
-  const stamp = JSON.stringify({ ...cfg, only: cfg.only?.source, small: cfg.small?.source, flat: cfg.flat?.source, pivot: cfg.pivot?.source, cut: cfg.cut ? `${cfg.cut.tall}: ${cfg.cut.keep} ${cfg.cut.drop}` : undefined, v: 6 });
+  const stamp = JSON.stringify({ ...cfg, only: cfg.only?.source, small: cfg.small?.source, flat: cfg.flat?.source, pivot: cfg.pivot?.source, hung: cfg.hung && Object.entries(cfg.hung).map(([name, re]) => `${name}: ${re.source}`).join(), cut: cfg.cut ? `${cfg.cut.tall}: ${cfg.cut.keep} ${cfg.cut.drop}` : undefined, v: 6 });
   const metaPath = path.join(dir, `_meta_${id}.json`);
   let meta;
   if (!FORCE && (await exists(dest)) && (await exists(metaPath))) {
@@ -118,6 +123,12 @@ export async function processProp(id, cfg, { io, SRC, OUT, FORCE, exists, countT
     const hinge = cfg.pivot && root.listNodes().find((n) => cfg.pivot.test(n.getName()));
     if (cfg.pivot && !hinge) throw new Error(`${id}: no piece of it is named ${cfg.pivot}`);
     let pivot = hinge?.getWorldTranslation();
+    // (and of what is hung: which of the pieces drawn each is, and where the origin of the first of them stands)
+    const hung = Object.entries(cfg.hung ?? {}).map(([name, re]) => {
+      const mine = drawn.map((n, i) => (re.test(n.getName()) ? i : -1)).filter((i) => i >= 0);
+      if (!mine.length) throw new Error(`${id}: no piece of it is named ${re}`);
+      return { name, mine, at: drawn[mine[0]].getWorldTranslation() };
+    });
     const meshes = [];
     for (const n of drawn) {
       const mesh = n.getMesh();
@@ -141,7 +152,8 @@ export async function processProp(id, cfg, { io, SRC, OUT, FORCE, exists, countT
       a.dispose();
     }
     for (const s of root.listSkins()) s.dispose();
-    meshes.forEach((mesh, i) => scene.addChild(doc.createNode(meshes.length > 1 ? `${id}_${i}` : id).setMesh(mesh.setName(id))));
+    const stood = meshes.map((mesh, i) => doc.createNode(meshes.length > 1 ? `${id}_${i}` : id).setMesh(mesh.setName(id)));
+    for (const node of stood) scene.addChild(node);
     if (cfg.cut) {
       // the whole of it stood so many metres tall about its own middle: the rule is said in those metres
       const b0 = getBounds(scene);
@@ -190,7 +202,23 @@ export async function processProp(id, cfg, { io, SRC, OUT, FORCE, exists, countT
     const s = cfg.scale ?? cfg.size / Math.max(...b.max.map((v, k) => v - b.min[k]));
     const M = mul(scaleBy(s), move(-(pivot?.[0] ?? (b.min[0] + b.max[0]) / 2), -b.min[1], -(pivot?.[2] ?? (b.min[2] + b.max[2]) / 2)));
     for (const mesh of meshes) transformMesh(mesh, M);
-    const inUse = new Set(meshes.flatMap((mesh) => mesh.listPrimitives().map((p) => p.getMaterial())));
+    // What is hung is put under a piece of its own, whose origin is where its hinges are now that the whole has been
+    // turned, sized and stood: its shapes are said from there. (A piece with a shape is given a measure of its own
+    // when the file is packed, and its origin with it: so the hinge is a piece with no shape, and the shapes are
+    // pieces under it.)
+    for (const h of hung) {
+      const p = [0, 1, 2].map((r) => R[r] * h.at[0] + R[4 + r] * h.at[1] + R[8 + r] * h.at[2]);
+      const at = [0, 1, 2].map((r) => M[r] * p[0] + M[4 + r] * p[1] + M[8 + r] * p[2] + M[12 + r]);
+      const hinge = doc.createNode(`${id}_${h.name}`).setTranslation(at);
+      scene.addChild(hinge);
+      h.mine.forEach((i, k) => {
+        if (!scene.listChildren().includes(stood[i])) return;
+        scene.removeChild(stood[i]);
+        transformMesh(meshes[i], move(-at[0], -at[1], -at[2]));
+        hinge.addChild(stood[i].setName(`${id}_${h.name}_${k}`));
+      });
+    }
+    const inUse =new Set(meshes.flatMap((mesh) => mesh.listPrimitives().map((p) => p.getMaterial())));
     // (What a material that is left out was painted with goes with it. A material's extensions are things of their own
     // in the file: one left behind when its material is cleared away kept its pictures in the file, the glint of a
     // door in the file of the stove it was taken off, where nothing drew them and the card's budget counted them.)

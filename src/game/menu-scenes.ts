@@ -1347,99 +1347,71 @@ export class MenuScenes {
   }
 
   /**
-   * The snow on the high ground of the north-east: two of them coming up a white slope among the last of the
-   * pines, toward a lens that stands above them and looks back down the way they have come. The place is looked
-   * for where the game says snow lies whole (SNOW in src/world/worldgen.ts): high enough, a slope that can be
-   * walked, a few trees about and none in the way.
+   * The snow on the mountain in the north-east, as it is seen from the village: the lens rises over the roofs and
+   * goes a little way toward it, with nobody about. (A place, as the hospital up its drive is. The snow itself
+   * lies on ground too steep to stand a scene on: of the wooded ground it lies whole on, four fifths climbs more
+   * than one in two. What is shown is what the mountain is for, which is to be seen from everywhere and steered by.)
    */
   private snow(): Vignette | null {
-    const two = [this.men[1], this.men[3]];
-    let best: { at: THREE.Vector3; up: THREE.Vector3 } | null = null, top = -1e9;
-    for (let x = 240; x <= 740; x += 14) {
-      for (let z = -740; z <= -240; z += 14) {
-        const at = this.on(x, z);
-        if (at.y < SNOW.full + 4 || at.y > SNOW.thin || this.count(x, z, 3, true)) continue;
-        // (which way is up, and how steeply: a slope to be climbed at a walk, not a wall and not a field)
-        const up = V(this.ground(x + 4, z) - this.ground(x - 4, z), 0, this.ground(x, z + 4) - this.ground(x, z - 4)).multiplyScalar(1 / 8);
-        const steep = up.length(), wood = this.count(x, z, 30);
-        if (steep < 0.08 || steep > 0.36 || wood < 3 || wood > 18) continue;
-        up.normalize();
-        const side = V(-up.z, 0, up.x);
-        const eye = this.on(x + up.x * 9 + side.x * 4.5, z + up.z * 9 + side.z * 4.5);
-        const ways = [-1.1, 1.3].map((off) => [this.on(x - up.x * 8 + side.x * off, z - up.z * 8 + side.z * off), this.on(x + up.x * 5 + side.x * off, z + up.z * 5 + side.z * off)]);
-        if (this.count(eye.x, eye.z, 1.6, true) || ways.some(([a, b]) => !this.open(a, b, 1.2) || !this.open(eye, a, 0.8))) continue;
-        const score = at.y * 0.05 - wood * 0.2 - Math.abs(steep - 0.2) * 20 - this.count(eye.x, eye.z, 8, true);
-        if (score > top) {
-          top = score;
-          best = { at, up };
-        }
+    const c = this.h.world.pois[0];
+    // the top of it: the highest ground of that quarter of the map, where the snow is
+    const peak = V(0, -1e9, 0);
+    for (let x = 240; x <= 752; x += 16) {
+      for (let z = -752; z <= -240; z += 16) {
+        const y = this.ground(x, z);
+        if (y > peak.y) peak.set(x, y, z);
       }
     }
-    if (!best) return this.no('snow', 'no slope under snow was found that two can walk up');
-    const { at, up } = best, side = V(-up.z, 0, up.x);
-    const P = (high: number, right: number) => this.on(at.x + up.x * high + side.x * right, at.z + up.z * high + side.z * right);
-    const from = [P(-8, -1.1), P(-10.5, 1.3)], to = [P(5, -1.1), P(5, 1.3)];
+    if (peak.y < SNOW.full + 20) return this.no('snow', 'no ground in the north-east stands far enough above the snow line');
+    const to = V(peak.x - c.x, 0, peak.z - c.z).normalize();
+    // (above anything that stands in the village: its roofs are ten metres up and its pines twenty-five)
+    const P = (far: number, up: number) => V(c.x + to.x * far, this.ground(c.x, c.z) + up, c.z + to.z * far);
     const seconds = 9;
     return {
       caption: 'The north-east mountain · snow on the high ground',
       seconds,
-      setup: () => {
-        two.forEach((m, k) => {
-          this.put(m, from[k].x, from[k].z, 0);
-          m.face(to[k].x, to[k].z);
-        });
-      },
-      tick: (_t, dt) => two.forEach((m, k) => this.go(m, to[k].x, to[k].z, 1.25, dt)),
+      setup: () => {},
+      tick: () => {},
       view: (t) => {
-        // above them and off to one side, looking back down the slope: they come up toward it, and the country they have climbed out of is behind them
-        const k = Math.min(1, t / seconds), p = P(mix(9, 9.8, k), 4.5);
-        p.y += 1.7;
-        return this.lens(p, two[0].chest(new THREE.Vector3()).lerp(two[1].chest(_c), 0.5), 42, 0.22);
+        const k = Math.min(1, t / seconds);
+        return this.lens(P(mix(0, 16, k), mix(27, 32, k)), peak.clone().setY(peak.y - 45), 38, 0.2);
       },
     };
   }
 
   /**
-   * The gas over the bunker, from outside it: a green bank standing in the hollow, and a man with his mask on
-   * going into it at a run until it has him. The gas is the game's own, drawn as the works' is (Atmosphere.gases);
-   * what is looked for is a place outside it to stand the lens, with open ground between it and the bank.
+   * The gas over the bunker, from the air on the side its way out is: a green bank lying in the hollow among the
+   * pines, the lens coming slowly down toward it, and a man with his mask on going into it at a run until it has
+   * him. The gas is the game's own, drawn as the works' is (Atmosphere.gases). (From the ground beside it there is
+   * nothing to be seen of it but green: it is a bank only from above, or from far off.)
    */
   private gasbank(): Vignette | null {
     const P = bunkerPlace(this.h.world), man = this.men[2];
     const g = P && this.h.atmo.gases.find((c) => Math.hypot(c.x - P.x, c.z - P.z) < c.r);
     if (!P || !g) return null;
-    let best: { eye: THREE.Vector3; from: THREE.Vector3; to: THREE.Vector3 } | null = null, top = -1e9;
-    for (let a = 0; a < Math.PI * 2; a += 0.12) {
-      // (out from the middle of the gas along a line, and a little to one side of it: he goes in along the line, and the lens is further out and off it)
-      const out = V(Math.cos(a), 0, Math.sin(a)), side = V(-out.z, 0, out.x);
-      const from = this.on(g.x + out.x * (g.r + 15) + side.x * 2.5, g.z + out.z * (g.r + 15) + side.z * 2.5), to = this.on(g.x + out.x * (g.r - 17) + side.x * 2.5, g.z + out.z * (g.r - 17) + side.z * 2.5);
-      const eye = this.on(g.x + out.x * (g.r + 27) - side.x * 3, g.z + out.z * (g.r + 27) - side.z * 3);
-      if (Math.abs(from.y - to.y) > 7 || eye.y < to.y - 2 || this.count(eye.x, eye.z, 1.8, true) || !this.open(from, to, 1.3) || !this.open(eye, to, 0.9)) continue;
-      if (!this.clear(eye.clone().setY(eye.y + 1.9), from.clone().setY(from.y + 1.2)) || !this.clear(eye.clone().setY(eye.y + 1.9), to.clone().setY(to.y + 1.4))) continue;
-      // (open ground before the lens, and the lens a little above where he goes in: it looks at the bank and not at trunks)
-      const score = (eye.y - to.y) * 0.6 - this.count((eye.x + to.x) / 2, (eye.z + to.z) / 2, 22) - this.count(eye.x, eye.z, 9, true) * 1.5;
-      if (score > top) {
-        top = score;
-        best = { eye, from, to };
-      }
-    }
-    if (!best) return this.no('gasbank', 'no open way into the gas over the bunker was found');
-    const { eye, from, to } = best;
-    const seconds = 8.5;
+    // (the way out of the bunker, along the ground, and what is to the right of somebody looking back in along it)
+    const out = V(Math.sin(P.rot), 0, Math.cos(P.rot)), side = V(out.z, 0, -out.x);
+    // his way in: the first line, of a few either side of the way out, that no tree stands on
+    const way = [3, -4, 9, -11, 16, -18].map((off) => [g.r + 20, g.r - 16].map((far) => this.on(g.x + out.x * far + side.x * off, g.z + out.z * far + side.z * off))).find(([a, b]) => this.open(a, b, 1.3) && Math.abs(a.y - b.y) < 8) ?? null;
+    const eye = (far: number, up: number) => {
+      const p = V(g.x + out.x * far - side.x * 12, 0, g.z + out.z * far - side.z * 12);
+      // (well over the trees between it and the bank)
+      return p.setY(Math.max(g.y + up, this.ground(p.x, p.z) + 28));
+    };
+    const seconds = 9;
     return {
       caption: 'Bunker 17 · gas stands over it, and hides whoever is in it',
       seconds,
       setup: () => {
-        this.put(man, from.x, from.z, 0);
-        man.face(to.x, to.z);
-        if (man.kits.has('ar15')) this.arm(man, 'ar15');
+        if (!way) return;
+        this.put(man, way[0].x, way[0].z, 0);
+        man.face(way[1].x, way[1].z);
       },
-      tick: (_t, dt) => this.go(man, to.x, to.z, 3.6, dt),
+      tick: (_t, dt) => way && this.go(man, way[1].x, way[1].z, 4, dt),
       view: (t) => {
+        // (what is looked at is the near side of the bank, where he goes into it: looked at in its middle, he is at the foot of the picture)
         const k = Math.min(1, t / seconds);
-        const p = eye.clone().setY(eye.y + mix(1.9, 2.3, k));
-        // (what is looked at is the bank where he goes into it, and him on his way there)
-        return this.lens(p, man.chest(new THREE.Vector3()).lerp(to.clone().setY(to.y + 3), 0.45), 44, 0.2);
+        return this.lens(eye(mix(126, 108, k), mix(46, 38, k)), V(g.x + out.x * 26, g.y + 5, g.z + out.z * 26), 40, 0.16);
       },
     };
   }
@@ -1567,14 +1539,14 @@ export class MenuScenes {
     { id: 'ak', added: '2026-10-11', phone: false, make: (m) => m.rifle(m.men[1], 'ak', 'The AK · thirty rounds, for as long as the trigger is held', -176, 4) },
     { id: 'bury', added: '2026-10-11', phone: true, make: (m) => m.bury() },
     { id: 'firefight', added: '2026-10-01', phone: true, make: (m) => m.firefight() },
-    { id: 'snow', added: '2026-10-13', phone: true, make: (m) => m.snow() },
+    { id: 'snow', added: '2026-10-13', phone: false, make: (m) => m.snow() },
     { id: 'cells', added: '2026-10-12', phone: false, make: (m) => m.cells() },
     { id: 'deagle', added: '2026-10-09', phone: true, make: (m) => m.sidearm() },
     { id: 'campfire', added: '2026-10-09', phone: true, make: (m) => m.campfire() },
     { id: 'stand', added: '2026-10-08', phone: true, make: (m) => m.stand() },
     { id: 'hospital', added: '2026-10-12', phone: false, make: (m) => m.hospital() },
     { id: 'ar15', added: '2026-10-11', phone: false, make: (m) => m.rifle(m.men[2], 'ar15', 'The AR-15 · holographic sight, foregrip and a light', 14, 2, true) },
-    { id: 'gasbank', added: '2026-10-13', phone: true, make: (m) => m.gasbank() },
+    { id: 'gasbank', added: '2026-10-13', phone: false, make: (m) => m.gasbank() },
     { id: 'ward', added: '2026-10-12', phone: false, make: (m) => m.ward() },
     { id: 'drop', added: '2026-10-06', phone: true, make: (m) => m.drop() },
     { id: 'benelli', added: '2026-10-09', phone: true, make: (m) => m.shotgun() },

@@ -618,7 +618,10 @@ export const LOCAL_MODELS = {
   // (A steel cupboard of two doors, two metres tall as it comes. Its glint map says bare steel nearly all over, and
   // steel that mirrors is a black shape in a room, where there is no sky to mirror: as with the morgue's lockers,
   // the map is left out and it is said to be dull painted steel.)
-  steel_locker: { dir: 'metal_cabinet_low_poly', scale: 1, tex: 2048, plain: true, metal: 0.35, rough: 0.5, tags: ['furniture'], changes: 'Stood on the ground about its own middle, at the size it came; its glint map left out and its surface said to be dull steel; textures re-encoded as WebP at the size they came; geometry compressed.' },
+  // (It is two lockers side by side, each with its own door, and the doors came as one shape, the right-hand one a
+  // hand's breadth open. `node scripts/split-locker.mjs` makes of the download a case and two doors, both shut, each
+  // door a piece hung on the line of its own hinges: built from that, so that the game can swing them. See `hung`.)
+  steel_locker: { dir: 'metal_cabinet_split', scale: 1, tex: 2048, plain: true, metal: 0.35, rough: 0.5, hung: { door_l: /^DoorL/, door_r: /^DoorR/ }, tags: ['furniture'], changes: 'Its two doors, which came as one shape, made two, each with its own handle and each a piece of its own hung on the line of its hinges; the right-hand door, which came standing a little open, turned shut; stood on the ground about its own middle, at the size it came; its glint map left out and its surface said to be dull steel; textures re-encoded as WebP at the size they came; geometry compressed.' },
   // (The canopy, its pillar, the island with its pump, bin and posts, and the cracked pad they stand on: the pad
   // made ten metres long. The plain slab drawn under the pad is left out. The island's material gave its colour
   // picture as its relief map as well: that is left out.)

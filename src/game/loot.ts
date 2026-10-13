@@ -9,7 +9,7 @@ import { assets } from '../core/assets';
 import { physics, G_TRIGGER, groups, WORLD_GROUPS, SOLID_GROUPS } from '../core/physics';
 import { extractPartsSlowly, groundPartsSlowly, restWhileHidden, type MeshPart } from '../core/gltf-utils';
 import { breathe, Line } from '../core/breathe';
-import { ITEMS, type ItemInstance, pieceShown } from '../sim/items';
+import { ITEMS, type ItemInstance, fittedOf, pieceShown } from '../sim/items';
 import { liftPack } from './rig';
 import { fitsPoint } from '../sim/placement';
 import { proceduralParts } from './procedural';
@@ -94,8 +94,42 @@ function hash01(s: string, salt: number) {
   return ((h ^ (h >>> 15)) >>> 0) / 4294967296;
 }
 
+/** every piece of a thing that is there to be seen, each with its place in the thing written into its points */
+function seenParts(root: THREE.Object3D): MeshPart[] {
+  root.updateMatrixWorld(true);
+  const out: MeshPart[] = [];
+  const walk = (o: THREE.Object3D) => {
+    if (!o.visible) return;
+    const m = o as THREE.Mesh;
+    if (m.isMesh && !Array.isArray(m.material)) out.push({ name: m.name, geometry: m.geometry.clone().applyMatrix4(m.matrixWorld), material: m.material });
+    for (const c of o.children) walk(c);
+  };
+  walk(root);
+  return out;
+}
+
+/** how long a thing is, along whichever way it is longest */
+function lengthOf(parts: MeshPart[]): number {
+  const box = new THREE.Box3();
+  for (const p of parts) {
+    p.geometry.computeBoundingBox();
+    box.union(p.geometry.boundingBox!);
+  }
+  const s = box.getSize(new THREE.Vector3());
+  return Math.max(s.x, s.y, s.z);
+}
+
 export class ItemModels {
   private cache = new Map<string, Promise<ItemTemplate>>();
+  /**
+   * A gun as it is seen in somebody's hands, with everything that is fitted to it on it: the sight, the
+   * suppressor, the light, the grip, the magazine that is in it (the game's own: `Weapons.lyingModel`). A gun with
+   * anything fitted lies on the ground as that, and not as the bare gun its item's model is: a magazine, a drum or
+   * a sight out of another model is no piece of the gun's own, so the ground knew nothing of it, and a rifle put
+   * down with all its parts on lay there stripped (2026-10-13: "Gun models laying on the ground dont properly
+   * render what attachments or magazines they have in them if any"). Null where it has no such copy of the gun.
+   */
+  dressed: ((id: string, mods: string[]) => THREE.Object3D | null) | null = null;
   /** footprint of every item once preloaded (metres, scaled) */
   sizes = new Map<string, THREE.Vector3>();
   constructor(private atmo: Atmosphere) {}
@@ -103,7 +137,8 @@ export class ItemModels {
   /** @param far its lighter copy, where it has one (see getFar): the model itself otherwise */
   get(id: string, mods: string[] = [], far = false): Promise<ItemTemplate> {
     const def = ITEMS[id];
-    far &&= !def.model.startsWith('@') && !!assets.manifest.models[def.model]?.lods?.[0]?.far;
+    // (a gun with parts on it has no lighter copy of itself: it is the one model, near and far)
+    far &&= !def.model.startsWith('@') && !!assets.manifest.models[def.model]?.lods?.[0]?.far && !(def.weapon && mods.length);
     const key = (mods.length ? `${id}+${[...mods].sort().join('+')}` : id) + (far ? '~far' : '');
     let p = this.cache.get(key);
     if (!p) {
@@ -133,14 +168,14 @@ export class ItemModels {
   }
   private done: ItemTemplate[] = [];
 
-  /** the model for a specific item: a scoped, wrapped rifle looks the part on the ground too */
+  /** the model for a specific item: a gun lies there with whatever is fitted to it, and the magazine that is in it */
   getFor(item: ItemInstance): Promise<ItemTemplate> {
-    return this.get(item.id, (item.mods ?? []).filter((m) => m === 'pu_scope' || m === 'rifle_wrap'));
+    return this.get(item.id, ITEMS[item.id]?.weapon ? fittedOf(item) : []);
   }
 
   /** The model a thing is laid on the ground with: its lighter copy where there is one (its `whole` gets the model itself). */
   getFar(item: ItemInstance): Promise<ItemTemplate> {
-    return this.get(item.id, (item.mods ?? []).filter((m) => m === 'pu_scope' || m === 'rifle_wrap'), true);
+    return this.get(item.id, ITEMS[item.id]?.weapon ? fittedOf(item) : [], true);
   }
 
   /** one model is shaped at a time, the whole model of a thing (which is asked for when the thing is near) before the lighter copies of others: see `shape` */
@@ -149,7 +184,17 @@ export class ItemModels {
   private async build(id: string, mods: string[], far = false): Promise<ItemTemplate> {
     const def = ITEMS[id];
     const scene = def.model.startsWith('@') ? null : await assets.model(def.model, far ? 1 : 0);
-    return this.shaping.take(!far, () => this.shape(id, mods, far, scene));
+    // (A gun with something fitted: as it is in the hands, where there is such a copy of it. It is brought to the
+    // length the bare gun lies at, so that a rifle is the one size on the ground with its parts on and off.)
+    let worn: { parts: MeshPart[]; scale: number } | null = null;
+    if (def.weapon && mods.length && !far && this.dressed) {
+      const dressed = this.dressed(id, mods), bare = dressed && this.dressed(id, []);
+      if (dressed && bare) {
+        const lying = (await this.get(id)).size, long = lengthOf(seenParts(bare));
+        if (long > 1e-4) worn = { parts: seenParts(dressed), scale: Math.max(lying.x, lying.y, lying.z) / long };
+      }
+    }
+    return this.shaping.take(!far, () => this.shape(id, mods, far, scene, worn));
   }
 
   /**
@@ -157,10 +202,11 @@ export class ItemModels {
    * its pieces joined. A little of it in each frame (see ../core/breathe.ts): done in one go it was fifty
    * milliseconds for a rifle, with nothing drawn the while, the first time one came near.
    */
-  private async shape(id: string, mods: string[], far: boolean, scene: THREE.Group | null): Promise<ItemTemplate> {
+  private async shape(id: string, mods: string[], far: boolean, scene: THREE.Group | null, worn: { parts: MeshPart[]; scale: number } | null = null): Promise<ItemTemplate> {
     const def = ITEMS[id];
     let parts: MeshPart[];
-    if (!scene) parts = proceduralParts(def.model);
+    if (worn) parts = worn.parts;
+    else if (!scene) parts = proceduralParts(def.model);
     else {
       const re = def.nodeRe ? new RegExp(def.nodeRe) : null;
       parts = await (re ? extractPartsSlowly(scene, (n) => re.test(n)) : def.node ? extractPartsSlowly(scene, (n) => n === def.node) : extractPartsSlowly(scene));
@@ -194,7 +240,18 @@ export class ItemModels {
     }
     // guns rest on their side when dropped, not balanced on the magazine
     if (def.category === 'weapon') {
-      const lay = new THREE.Matrix4().makeRotationX(-Math.PI / 2);
+      let lay = new THREE.Matrix4().makeRotationX(-Math.PI / 2);
+      if (worn) {
+        // (the copy out of the hands is not turned the way the item's model is: it is laid on whichever of its
+        // sides is its thinnest, which is a gun's side whichever way it points)
+        const box = new THREE.Box3();
+        for (const p of parts) {
+          p.geometry.computeBoundingBox();
+          box.union(p.geometry.boundingBox!);
+        }
+        const sz = box.getSize(new THREE.Vector3());
+        lay = sz.y <= sz.x && sz.y <= sz.z ? new THREE.Matrix4() : sz.x <= sz.z ? new THREE.Matrix4().makeRotationZ(Math.PI / 2) : lay;
+      }
       for (const p of parts) {
         await breathe();
         p.geometry = p.geometry.clone().applyMatrix4(lay);
@@ -206,7 +263,7 @@ export class ItemModels {
     // Cans, bottles, boxes and boots stay standing.
     {
       const sz = box.getSize(new THREE.Vector3());
-      const k = def.scale ?? 1;
+      const k = worn?.scale ?? def.scale ?? 1;
       const minH = Math.min(sz.x, sz.z);
       const stick = sz.y > Math.max(sz.x, sz.z) * 2 && (sz.y * k > 0.34 || !!def.pile);
       const onEdge = sz.y > minH * 1.5 && (minH * k < 0.05 || (sz.y / minH > 4 && sz.y * k > 0.34));
@@ -267,7 +324,7 @@ export class ItemModels {
       this.atmo.register(p.material);
       group.add(mesh);
     }
-    const s = def.scale ?? 1;
+    const s = worn?.scale ?? def.scale ?? 1;
     group.scale.setScalar(s);
     const size = box.getSize(new THREE.Vector3()).multiplyScalar(s);
     if (!mods.length && !far) this.sizes.set(id, size);

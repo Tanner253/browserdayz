@@ -389,6 +389,21 @@ const D: ItemDef[] = [
   { id: 'saline', name: 'Saline Bag (IV)', model: 'saline_bag', w: 1, h: 2, weight: 0.55, category: 'medical', desc: 'Half a litre of salt water and the line to run it into your arm. Gives back 750 ml of blood over a minute and a half. It closes no wound: stop the bleeding first.', use: { verb: 'Run in the', time: 5, blood: 750, over: 90, sound: 'bandage' } },
   { id: 'blood_bag', name: 'Blood Bag (IV)', model: 'blood_bag', w: 2, h: 1, weight: 0.6, category: 'medical', desc: 'A unit of blood and the line to run it into your arm. Gives back 1500 ml of blood in twenty seconds: most of what a bad wound takes. It closes no wound: stop the bleeding first.', use: { verb: 'Run in the', time: 6, blood: 1500, over: 20, sound: 'bandage' } },
   { id: 'firstaid', name: 'First Aid Kit', model: 'medical_box', w: 3, h: 2, weight: 0.9, category: 'medical', desc: 'Dressings, antiseptic and a splint. Treats wounds properly, and sets a broken leg.', use: { verb: 'Treat wounds', time: 6, stopBleed: true, health: 45, splint: true, sound: 'bandage' } },
+  // The pouch between the stim and the kit (2026-10-13: "the medikit which is betrween a stim and a medkit its like
+  // a small meddkit 2x2"), a soldier's own, out of the packs the user brought in. What each of the three is for, now
+  // that blood is not health (src/sim/blood.ts):
+  //   the stim           one place, 2.4 s. Closes the wound and gives back 35: the most health for its size and
+  //                      its time, and nothing for blood. The one for the middle of a fight.
+  //   this pouch         four places, 4 s. Closes the wound, gives back 20, and runs in 500 ml of blood over a
+  //                      minute (the small bag of saline in it). The one thing that both stops the bleeding and
+  //                      puts back some of what was bled: for when the fight is over and the world has gone grey.
+  //   the First Aid Kit  six places, 6 s. Closes the wound, gives back 45, the most at one go, and sets a broken
+  //                      leg. Nothing for blood.
+  // So none stands in for another: a stim does nothing for somebody bled white, the pouch gives little more than
+  // half a stim's health and sets no leg, and the kit puts no blood back. (By health alone it could not have had a
+  // place: twelve stims go where one pouch does. And the bags are still what blood comes back by: a bag of saline
+  // is half its size and gives half as much again, a bag of blood three times as much.)
+  { id: 'aid_pouch', name: 'First Aid Pouch', model: 'aid_pouch', w: 2, h: 2, weight: 0.45, category: 'medical', desc: 'A soldier\'s own pouch: a pressure dressing, and a small bag of saline with its line. Stops bleeding, gives back 20 health, and gives back 500 ml of blood over a minute.', use: { verb: 'Open the', time: 4, stopBleed: true, health: 20, blood: 500, over: 60, sound: 'bandage' } },
   { id: 'splint', name: 'Splint Tape', model: 'medical_tape', tint: 0xd9a55c, w: 1, h: 1, weight: 0.12, category: 'medical', desc: 'A roll of tan strapping tape. Bound round a broken leg with whatever is to hand, it lets you run on it again.', use: { verb: 'Splint your leg with', time: 5, splint: true, sound: 'bandage' } },
   // ---------------------------------------------------------------- clothing & bags
   // The jacket and the trousers every survivor stands in (2026-10-13: "we should make the jacket and pants the user
@@ -415,6 +430,14 @@ const D: ItemDef[] = [
     id: 'helmet_k63', name: 'K6-3 Helmet', model: 'helmet_k63', w: 3, h: 3, weight: 3.6, category: 'clothing', slot: 'head',
     desc: 'A titanium assault helmet with a steel visor: the heaviest there is, and kept in the bunker and nowhere else. Takes two thirds off anything that hits your head. A sniper round there leaves you standing, barely.', wear: { head: 0.32 },
   },
+  {
+    // (2026-10-13: an old steel pot under a camouflage cover, out of the packs the user brought in. The weakest
+    // thing that is a helmet, between a cap and the Combat Helmet: a 9 mm to the head at the muzzle leaves 13 of a
+    // hundred where a cap leaves 2, and a .45 or any rifle's round there is the end, as it is bare. With a mask on
+    // as well, 0.64 of a hit gets through: nearly a Combat Helmet's 0.7.)
+    id: 'helmet_m1', name: 'Steel Helmet', model: 'helmet_m1', w: 2, h: 2, weight: 1.3, category: 'clothing', slot: 'head',
+    desc: 'An old steel pot under a camouflage cover, a clip of cartridges tucked in its band. A fifth off anything that hits your head: twice what a cap takes, and short of a Combat Helmet.', wear: { head: 0.8 },
+  },
   // (cloth on the head: the tier under the helmet. Both were in the game's files and in nobody's hands.)
   {
     id: 'patrol_cap', name: 'Patrol Cap', model: 'patrol_cap', w: 2, h: 1, weight: 0.1, category: 'clothing', slot: 'head',
@@ -429,8 +452,26 @@ const D: ItemDef[] = [
     desc: 'Canvas gloves from somebody\'s shed. Your punches land a little harder.', wear: { fist: 2 },
   },
   {
-    id: 'gasmask', name: 'Gas Mask', model: 'old_gas_mask', w: 2, h: 2, weight: 0.7, category: 'clothing', slot: 'face',
-    desc: 'GP-5 pattern mask. Worn on the face, it lets you breathe in the gas. Thick rubber and glass, too: a fifth less damage from anything that hits your head.', wear: { head: 0.8, gas: 1 },
+    // (2026-10-13: the respirator the user brought in, a filter at each cheek and no hood, in place of the GP-5
+    // and its hose: "Replacing our own props like the gas mask ... The assets I brought in look better than our
+    // hand made ones". Still `gasmask`, so that what is carried and what is kept in the world still means it.)
+    id: 'gasmask', name: 'Gas Mask', model: 'gas_mask_black', w: 2, h: 2, weight: 0.7, category: 'clothing', slot: 'face',
+    desc: 'A black respirator with a wide visor and a filter at each cheek. Worn on the face, it lets you breathe in the gas. Thick rubber and glass, too: a fifth less damage from anything that hits your head.', wear: { head: 0.8, gas: 1 },
+  },
+  // The same respirator in the three other paints it came in. Each is a mask as the black one is: it keeps the gas
+  // out and takes the same fifth off a hit to the head (whatever asks whether a mask is on asks for `wear.gas`, and
+  // never for a name). They are told apart by their faces and by nothing else.
+  {
+    id: 'gasmask_white', name: 'White Gas Mask', model: 'gas_mask_white', w: 2, h: 2, weight: 0.7, category: 'clothing', slot: 'face',
+    desc: 'The respirator in white, edged in red. Worn on the face, it lets you breathe in the gas, and takes a fifth off anything that hits your head. It is seen a long way off.', wear: { head: 0.8, gas: 1 },
+  },
+  {
+    id: 'gasmask_orange', name: 'Orange Gas Mask', model: 'gas_mask_orange', w: 2, h: 2, weight: 0.7, category: 'clothing', slot: 'face',
+    desc: 'The black respirator with an orange bridge down its nose. Worn on the face, it lets you breathe in the gas, and takes a fifth off anything that hits your head.', wear: { head: 0.8, gas: 1 },
+  },
+  {
+    id: 'gasmask_skull', name: 'Skull Gas Mask', model: 'gas_mask_skull', w: 2, h: 2, weight: 0.7, category: 'clothing', slot: 'face',
+    desc: 'The black respirator with a skull\'s nose and teeth painted on it. Worn on the face, it lets you breathe in the gas, and takes a fifth off anything that hits your head.', wear: { head: 0.8, gas: 1 },
   },
   // Armour for the body in four weights, and a rig that is only for carrying. Each takes more off a hit to the
   // body than the one before it, weighs more, and is harder to come by.

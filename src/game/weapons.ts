@@ -1842,6 +1842,16 @@ export class Weapons {
     return c;
   }
 
+  /**
+   * A gun with everything that is fitted to it, as it is seen in somebody's hands, for laying on the ground (see
+   * `ItemModels.dressed`). Null for a gun that has no such copy of itself: an old one, whose own model shows what
+   * it has on it.
+   */
+  lyingModel(id: string, mods: string[] = []): THREE.Object3D | null {
+    const m = this.models.get(id);
+    return m?.world ? this.dressed(m, id, mods) : null;
+  }
+
   /** grip points of a weapon model (same ones the first-person arms use) */
   gripsOf(id: string): Grips | null {
     return this.models.get(id)?.grips ?? null;
