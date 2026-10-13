@@ -123,7 +123,8 @@ function page(book: Book, s: Snapshot, now: number): string {
   const pct = Math.round(s.share * 1000) / 10;
   // ---- the second cut-over, said from the settings: when, what a tag pays from then, and how many are paid at once
   const N = s.minTags, flat = amount(s.flatPay), lot = amount(N * s.flatPay);
-  const cut = `${Number(s.rules2From.slice(8, 10))} ${['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][Number(s.rules2From.slice(5, 7)) - 1] ?? ''} ${s.rules2From.slice(0, 4)}`;
+  const from2 = s.rules2From ?? '';
+  const cut = `${Number(from2.slice(8, 10))} ${['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][Number(from2.slice(5, 7)) - 1] ?? ''} ${from2.slice(0, 4)}`;
   const state =
     s.mode === 'on' && s.problem
       ? ['bad', 'Automatic payouts are held', `Nothing is paid as things stand: ${s.problem}.`]
@@ -395,8 +396,12 @@ function page(book: Book, s: Snapshot, now: number): string {
       <div class="rule"><h3>Trading tags is not paid</h3><p>When two players cash each other's tags inside a day, the first of the two is paid and the second is not. Killing a friend and being killed back earns one tag between you, not two.</p></div>
       <div class="rule"><h3>Paid once, and the chain sees to it</h3><p>Each payment leaves a receipt, an account of its own, and a second payment for the same tag cannot be made while that receipt stands. Each payment also carries a note, "ZONA dog tag" and the reference shown beside it here.</p></div>
       <div class="rule"><h3>No wallet, no payment</h3><p>A tag cashed in with no wallet given is listed and not paid. The wallet is asked for in the game, on the rewards window: add it before you cash a tag in.</p></div>
-      <div class="rule"><h3>What changed on 13 October 2026</h3><p>The treasury was paying out half as much again as came in. From 04:30 UTC a tag pays ${amount(s.floor)} SOL at least (it was 0.02), the limit of ${s.walletDayTags} a day is a limit and not a queue, and traded tags are not paid. Everything cashed in before then is paid as it was promised.</p></div>
-      <div class="rule"><h3>What ${s.fives ? 'changed' : 'changes'} on ${cut}</h3><p>From ${s.rules2From.slice(11, 16)} UTC a tag pays ${flat} SOL flat, and no longer a share of the treasury${N > 1 ? `; and a wallet is paid when ${N} of its tags are due, for all of them at once (${lot} SOL for ${N}), not tag by tag. Until then its tags wait, counted, and none is lost for waiting` : ''}. Everything cashed in before then is paid as it was promised${N > 1 ? `, without waiting for ${N}` : ''}.</p></div>
+      <div class="rule"><h3>What changed on 13 October 2026</h3><p>The treasury was paying out half as much again as came in. From 04:30 UTC a tag pays ${amount(s.floor)} SOL at least (it was 0.02), the limit of ${s.walletDayTags} a day is a limit and not a queue, and traded tags are not paid. Everything cashed in before then is paid as it was promised.</p></div>${
+        !from2
+          ? ''
+          : `
+      <div class="rule"><h3>What ${s.fives ? 'changed' : 'changes'} on ${cut}</h3><p>From ${from2.slice(11, 16)} UTC a tag pays ${flat} SOL flat, and no longer a share of the treasury${N > 1 ? `; and a wallet is paid when ${N} of its tags are due, for all of them at once (${lot} SOL for ${N}), not tag by tag. Until then its tags wait, counted, and none is lost for waiting` : ''}. Everything cashed in before then is paid as it was promised${N > 1 ? `, without waiting for ${N}` : ''}.</p></div>`
+      }
     </div>
   </section>
 </main>
@@ -428,7 +433,7 @@ export async function show(request: Request, w: World = live()): Promise<Respons
     // (what was there before the second cut-over is there still, and means what it meant: from the cut-over `share` is 0
     // and `tagPays` is the flat figure. New: `minTags`, how many of a wallet's tags must be due before it is paid, 1
     // until the cut-over; and `next`, what is to change and when, while that is still to come.)
-    const next = s.fives ? null : { from: s.rules2From, tagPays: sol(s.flatPay), minTags: s.minTags };
+    const next = s.fives || !s.rules2From ? null : { from: s.rules2From, tagPays: sol(s.flatPay), minTags: s.minTags };
     return Response.json({ on: s.mode === 'on' && !s.problem, tagPays: s.tagPays === null ? null : sol(s.tagPays), share: s.share, floor: sol(s.floor), treasury: s.treasury, due: s.due, minTags: s.fives ? s.minTags : 1, next }, { headers: { 'cache-control': 'public, s-maxage=30, stale-while-revalidate=120' } });
   }
   const book = await cached(w, 'book', 20_000, async () => withOldEntries(w, await glanceBook(w.store)));

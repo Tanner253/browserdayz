@@ -776,6 +776,8 @@ export class Game {
         if (site?.kind === 'bunker') spots.push(at(q, 'Under the ground, in the dark: a dozen rooms off two passages. Its door opens to a keycard, and the keycards are under the gas.', 'army', 5, undefined, true));
         else if (q.name === GAS.place) spots.push(at(q, 'Under gas: you need a gas mask on to breathe here, and the masks are at the police station in the village.', 'gas', 4, undefined, true));
         else if (site?.kind === 'town') spots.push(at(q, SITE.town[0], 'town', 3, undefined, true));
+        // (the fort on the mountain: named on the map, as the bunker and the works are)
+        else if (world.castle && q.x === world.castle.x && q.z === world.castle.z) spots.push(at(q, 'A ruined fort on the brow of the snow mountain. The road stops at the gatehouse under it: from there it is a climb on foot. Its lower levels are dark.', 'site', 3, 'What whoever held it lived on and fought with; the best of it under the terrace, in the dark.', true));
         else if (site) spots.push(at(q, SITE[site.kind][0], site.kind === 'market' ? 'trader' : site.kind === 'depot' || site.kind === 'post' || site.kind === 'tents' ? 'army' : 'site', SITE[site.kind][1], SITE[site.kind][2], site.kind === 'tents'));
         else if (/checkpoint/i.test(q.name)) spots.push(at(q, 'Guard posts, a barracks and a watchtower. The track to the works starts here.', 'army', 2, 'Pistols and 9 mm, soft vests, grenades, the army\'s cases. Now and then an armoured vest or a helmet.', true));
         else spots.push(at(q, 'A cabin in the hills, with a fire ring to rest by. Something to fight with is always left here.', 'site', 1));

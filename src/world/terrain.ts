@@ -705,6 +705,8 @@ void groundKind(int i, vec3 P, vec3 dx, vec3 dy, vec3 N, vec3 side, float nearKe
       float wide = lay.x * lay.y;
       vec4 fc; vec3 fr;
       groundTap(i, tRot(uv * wide, 0.9), tRot(gx * wide, 0.9), tRot(gy * wide, 0.9), false, fc, fr);
+      // (a face from across the valley is its crags: what is laid by the face has the large copy's light and dark drawn out)
+      fc.rgb = max(uMean[i] + (fc.rgb - uMean[i]) * (1.0 + 0.8 * step(0.5, mod(lay.z, 2.0))), 0.0);
       c = mix(c, fc, farShare);
     }
     vec2 n = r.xy * 2.0 - 1.0;

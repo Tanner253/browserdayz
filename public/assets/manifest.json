@@ -254,6 +254,11 @@
    "diff": "assets/tex/rock_face_03_diff.webp",
    "nor": "assets/tex/rock_face_03_nor.webp",
    "arm": "assets/tex/rock_face_03_arm.webp"
+  },
+  "mossy_rock": {
+   "diff": "assets/tex/mossy_rock_diff.webp",
+   "nor": "assets/tex/mossy_rock_nor.webp",
+   "arm": "assets/tex/mossy_rock_arm.webp"
   }
  },
  "models": {

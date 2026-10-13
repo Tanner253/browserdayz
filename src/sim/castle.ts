@@ -481,10 +481,8 @@ export function castleRocks(ground: (x: number, z: number) => number = castleGro
     face(O.x1 + 1.6, O.z0 - 0.4, 310, 1.3, 0.35);
     face(O.x1 + 1.6, O.z1 + 0.2, 50, 1.3, 0.35);
   }
-  for (const x of [-4.4, 4.2]) {
-    face(x, -zo + 0.4, 270, 1.3, 0.5, 0.3, 1.9);
-    face(x + 0.8, zo - 0.4, 90, 1.3, 0.5, 0.3, 1.9);
-  }
+  // (under the south wall only: under the north one the rubble of the breach lies along the whole of it, and that is walked)
+  for (const x of [-4.4, 4.2]) face(x + 0.8, zo - 0.4, 90, 1.3, 0.5, 0.3, 1.9);
   return out;
 }
 

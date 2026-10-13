@@ -58,7 +58,7 @@ export const KINDS = {
   stony: { tex: 'rocky_trail', size: 2.0, tint: [0.56, 0.59, 0.6], sound: 'gravel', sided: true, far: 0.13 },
   // the rock of a steep face (a rock face photographed square on: the air photograph of fifty metres that was laid
   // here six metres wide smeared down every face it was on)
-  rock: { tex: 'rock_face_03', size: 2.7, tint: [0.72, 1.0, 1.42], sound: 'rock', sided: true, far: 0.09 },
+  rock: { tex: 'rock_face_03', size: 2.7, tint: [0.8, 0.98, 1.2], sound: 'rock', sided: true, far: 0.09 },
 } satisfies Record<string, Kind>;
 
 /**
@@ -258,7 +258,12 @@ export function layGround(world: World): Ground {
           w[k] *= 1 - scree;
         }
       }
-      w[K.rock] += r * face;
+      // (and a face that is not sheer is not bare: grass has a hold on its ledges in patches, moss on its shaded side)
+      // (and in a wood, where it is damp and still, moss has most of a low outcrop)
+      const wooded = smooth(0.05, 0.3, wood);
+      const ledge = (1 - smooth(0.95, 1.35, slope)) * Math.max(smooth(0.05, 0.5, m1 * 0.6 + m2 * 0.5) * 0.55, wooded * smooth(-0.35, 0.3, m3 - 0.5 + m2 * 0.5) * 0.7);
+      w[K.rock] += r * face * (1 - ledge);
+      w[shade > 0.4 || wooded > 0.5 ? K.moss : K.dry] += r * face * ledge;
       w[K.stony] += r * (1 - face);
 
       let sum = 0, best = 0;

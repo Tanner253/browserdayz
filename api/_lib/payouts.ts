@@ -78,6 +78,7 @@ export interface Config {
    * only when `minTags` of its tags are due: see `dueOf`. What was cashed in before it is paid as it was promised.
    * Which rules a tag is under is written on it when it is first put in the book (`rules` on its row), and holds
    * from then on: moving this moment never changes what a tag already in the book was promised.
+   * Infinity: no moment is set for it (see RULES2_FROM), and there is no second cut-over.
    */
   rules2From: number;
   /** from `rules2From`: a wallet is paid when this many of its tags are due, and not before (1: each as it comes) */
@@ -91,11 +92,16 @@ export interface Config {
 const DEFAULT_RPC = 'https://api.mainnet-beta.solana.com';
 const DEFAULT_MINT = 'GvfAzdPF466PJsPJMzXQeX3TSqmJm9YxAG8xBJ6ypump';
 /**
- * THE MOMENT OF THE SECOND CUT-OVER, in UTC: a tag cashed in from now on pays 0.01 SOL flat, and its wallet is paid
- * when five are due. TO BE SET BY WHOEVER DEPLOYS THIS (here, or as PAYOUT_RULES2_FROM), to a moment at or after
- * the deploy: the payouts page says this moment to everybody.
+ * THE MOMENT OF THE SECOND CUT-OVER, in UTC, written like '2026-10-14T18:00:00Z': a tag cashed in from that moment
+ * on pays 0.01 SOL flat, and its wallet is paid when five are due. TO BE SET BY WHOEVER DEPLOYS THIS, here (or as
+ * PAYOUT_RULES2_FROM, which is asked first), to a moment at or after the deploy: the payouts page says this moment
+ * to everybody, before it comes and after.
+ *
+ * While it is '' (or anything that is not a moment) there is no second cut-over: every tag is paid as it is today,
+ * and nothing anywhere says otherwise, however and whenever this code is deployed. That is how it is left, on
+ * purpose: the change is the owner's to begin, and it begins when a moment is written here.
  */
-export const RULES2_FROM = '2026-10-14T00:00:00Z';
+export const RULES2_FROM = '';
 
 const lamports = (sol: number) => BigInt(Math.round(sol * LAMPORTS));
 export const sol = (l: bigint | number) => Number(l) / LAMPORTS;
@@ -138,7 +144,8 @@ export function config(env: Record<string, string | undefined> = process.env): C
   const floor = lamports(num(env.TAG_PAY_MIN_SOL, 0.01, 0.001, 10));
   const from = Date.parse(env.PAYOUT_RULES_FROM ?? '');
   const rulesFrom = Number.isFinite(from) ? from : Date.parse('2026-10-13T04:30:00Z');
-  const from2 = Date.parse(env.PAYOUT_RULES2_FROM ?? '');
+  // (what is set outside is asked first, and "never" there holds it off whatever is written here; then RULES2_FROM)
+  const from2 = Date.parse(env.PAYOUT_RULES2_FROM?.trim() ? env.PAYOUT_RULES2_FROM : RULES2_FROM);
   return {
     mode,
     problem,
@@ -155,8 +162,8 @@ export function config(env: Record<string, string | undefined> = process.env): C
     walletDayTags: Math.round(num(env.PAYOUT_WALLET_DAY_TAGS, 3, 1, 1000)),
     rulesFrom,
     floorBefore: lamports(num(env.TAG_PAY_MIN_SOL_BEFORE, 0.02, 0.001, 10)),
-    // (never before the rules of 2026-10-13, which it is built on)
-    rules2From: Math.max(rulesFrom, Number.isFinite(from2) ? from2 : Date.parse(RULES2_FROM)),
+    // (not set: never. And never before the rules of 2026-10-13, which it is built on.)
+    rules2From: Number.isFinite(from2) ? Math.max(rulesFrom, from2) : Infinity,
     minTags: Math.round(num(env.PAYOUT_MIN_TAGS, 5, 1, 100)),
     claimAt: lamports(num(env.CLAIM_MIN_SOL, 0.05, 0.001, 1000)),
     bid: Math.round(num(env.PRIORITY_MICROLAMPORTS, 20_000, 0, 5_000_000)),
@@ -485,7 +492,7 @@ const WATCH_MS = 18_000;
 /** fees, with room to spare */
 const FEE_ROOM = 20_000n;
 /** work allowed: a payment with its receipt and note uses about fifteen thousand units (and as much again for each tag more that it pays); a claim, about sixty thousand */
-const PAY_UNITS = 40_000;
+export const PAY_UNITS = 40_000;
 const CLAIM_UNITS = 250_000;
 /**
  * How many tags one transaction pays at most. A transaction may be 1232 bytes: with five receipts, the payment and
@@ -1149,8 +1156,8 @@ export interface Snapshot {
   due: boolean;
   dayShare: number;
   walletDayTags: number;
-  /** the second cut-over: when it is, and whether it has come (from then, `share` is 0 and `tagPays` is `flatPay` whatever the treasury holds) */
-  rules2From: string;
+  /** the second cut-over: when it is (null: no moment is set for it), and whether it has come (from then, `share` is 0 and `tagPays` is `flatPay` whatever the treasury holds) */
+  rules2From: string | null;
   fives: boolean;
   /** from the second cut-over: what a tag pays, and how many of a wallet's must be due before it is paid */
   flatPay: number;
@@ -1162,7 +1169,7 @@ export async function snapshot(w: World): Promise<Snapshot> {
   // (what is said is what a tag cashed in at this moment is paid by)
   const fives = w.now() >= base.rules2From;
   const cfg = fives ? termsOf(base, iso(w.now()), true) : base;
-  const out: Snapshot = { mode: cfg.mode, problem: cfg.problem, treasury: cfg.treasury ? b58(cfg.treasury) : null, madeTheCoin: false, maker: null, balance: null, tagPays: null, share: cfg.share, floor: Number(cfg.floor), waiting: null, waitingNote: null, due: false, dayShare: cfg.dayShare, walletDayTags: cfg.walletDayTags, rules2From: iso(base.rules2From), fives, flatPay: Number(base.floor), minTags: base.minTags };
+  const out: Snapshot = { mode: cfg.mode, problem: cfg.problem, treasury: cfg.treasury ? b58(cfg.treasury) : null, madeTheCoin: false, maker: null, balance: null, tagPays: null, share: cfg.share, floor: Number(cfg.floor), waiting: null, waitingNote: null, due: false, dayShare: cfg.dayShare, walletDayTags: cfg.walletDayTags, rules2From: Number.isFinite(base.rules2From) ? iso(base.rules2From) : null, fives, flatPay: Number(base.floor), minTags: base.minTags };
   try {
     const s = await coin(w);
     // with no key given yet, the treasury is taken to be the wallet that made the coin

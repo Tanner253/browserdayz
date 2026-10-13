@@ -4,9 +4,9 @@
 //
 //   npx tsx scripts/treasury.ts [mint] [rpc url]
 
-import { Rpc, address, b58, closeTokenAccount, computeLimit, computePrice, memo, receipt, seeded, tokenAccount, transfer, unsigned, LAMPORTS, WRAPPED_SOL } from '../api/_lib/solana';
+import { Rpc, address, b58, closeTokenAccount, computeLimit, tokenAccount, unsigned, LAMPORTS, WRAPPED_SOL } from '../api/_lib/solana';
 import { claimCurve, claimPool, state } from '../api/_lib/pump';
-import { config, price } from '../api/_lib/payouts';
+import { LOT_MAX, PAY_UNITS, config, payment, price, termsOf } from '../api/_lib/payouts';
 
 const MINT = process.argv[2] ?? 'GvfAzdPF466PJsPJMzXQeX3TSqmJm9YxAG8xBJ6ypump';
 const rpc = new Rpc(process.argv[3] ?? process.env.SOLANA_RPC_URL ?? 'https://api.mainnet-beta.solana.com', 20000);
@@ -49,14 +49,25 @@ if (!s.unsupported) {
   }
 }
 
-// and a payout: what a tag would pay now, tried (not sent) to a wallet that exists and to one that does not yet
+// and a payout: what a tag cashed in now would pay, tried (not sent) to a wallet that exists and to one that does not
+// yet; and five of one wallet's in one transaction, as they are paid from the second cut-over: how big it is, and
+// how much work it takes of what it is allowed (the one figure the made-up chain of the tests cannot give)
 const cfg = config({});
-const pays = price(balance, cfg);
-console.log(`a tag cashed in now would pay ${sol(pays)} (${cfg.share * 100}% of the treasury, ${sol(cfg.floor)} at least)`);
+const now = new Date().toISOString();
+const five = Date.parse(now) >= cfg.rules2From;
+const pays = price(balance, termsOf(cfg, now));
+const flat = price(balance, termsOf(cfg, now, true));
+console.log(
+  five
+    ? `a tag cashed in now pays ${sol(pays)}, flat, and its wallet is paid when ${cfg.minTags} of its tags are due`
+    : `a tag cashed in now would pay ${sol(pays)} (${cfg.share * 100}% of the treasury, ${sol(cfg.floor)} at least); ${Number.isFinite(cfg.rules2From) ? `from ${new Date(cfg.rules2From).toISOString()}` : 'from the second cut-over, for which no moment is set yet,'} it pays ${sol(flat)}, flat, and its wallet is paid when ${cfg.minTags} are due`,
+);
+const lot = Array.from({ length: LOT_MAX }, (_, i) => ({ ref: `test${i}`.padEnd(24, '0'), lamports: flat }));
 for (const [what, to] of [['a wallet in use', 'C8C2LwicsKUzaJse5gN9hnMRinDV5rNy2EmGqFyA8NaY'], ['a wallet never used', b58(Uint8Array.from({ length: 32 }, (_, i) => (i * 37 + 11) & 255))]] as const) {
-  const todo = [computeLimit(40_000), computePrice(cfg.bid), receipt(creator, 'test00000000000000000000'), transfer(creator, address(to), pays), memo('ZONA dog tag test00000000000000000000')];
-  void seeded;
-  const sim = await rpc.simulate(unsigned(creator, todo, hash), [creator, address(to)]);
-  console.log(`  to ${what}, tried without sending: ${sim.err ? 'WOULD FAIL ' + JSON.stringify(sim.err) : 'would go through'}, ${sim.units} units of work, treasury ${sim.lamports[0] !== null ? '-' + sol(balance - sim.lamports[0]) : '?'}, they would hold ${sim.lamports[1] != null ? sol(sim.lamports[1]) : '?'}`);
-  if (sim.err) for (const l of sim.logs.slice(-6)) console.log('      ' + l);
+  for (const tags of [[{ ref: lot[0].ref, lamports: pays }], lot]) {
+    const wire = unsigned(creator, payment(creator, address(to), tags, cfg.bid), hash);
+    const sim = await rpc.simulate(wire, [creator, address(to)]);
+    console.log(`  ${tags.length === 1 ? 'one tag' : `${tags.length} tags in one transaction`} to ${what} (${wire.length} of the 1232 bytes a transaction may be), tried without sending: ${sim.err ? 'WOULD FAIL ' + JSON.stringify(sim.err) : 'would go through'}, ${sim.units} units of work of the ${PAY_UNITS * tags.length} it is allowed, treasury ${sim.lamports[0] !== null ? '-' + sol(balance - sim.lamports[0]) : '?'}, they would hold ${sim.lamports[1] != null ? sol(sim.lamports[1]) : '?'}`);
+    if (sim.err) for (const l of sim.logs.slice(-6)) console.log('      ' + l);
+  }
 }

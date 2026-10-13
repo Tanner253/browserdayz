@@ -60,6 +60,8 @@ export const TEXTURES = {
   dry_mud_field_001: { res: '2k', tex: 1024 },
   rocky_trail: { res: '2k', tex: 1024 },
   rock_face_03: { res: '2k', tex: 1024 },
+  // (the low wooded banks: rock with moss on it, where the bare rock face read as a quarry)
+  mossy_rock: { res: '2k', tex: 1024 },
   painted_brick: { res: '2k', tex: 1024 },
   plaster_brick_01: { res: '2k', tex: 1024 },
   rough_plaster_brick_02: { res: '2k', tex: 1024 },
