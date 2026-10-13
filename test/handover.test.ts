@@ -40,8 +40,13 @@ const ground = (x: number, z: number) => heightAt(world.heights, x, z);
 
 // ---- the site
 const files = new Map<string, { text: string; mark: number }>();
+// (The real store, for a while after a file is written, cannot be read at all: it knows the file has changed and
+// its cache serves the copy before. On 2026-10-13 that was a hundred seconds, right after the last word was
+// written, and the new server gave up. Here: so many ms after every writing, while `lag` is set.)
+let lag = 0, wroteAt = 0;
 const store: Store = {
   async read<T>(p: string) {
+    if (lag && p === 'zona/world.json' && Date.now() - wroteAt < lag) throw new Error('the file store is serving an old copy');
     const f = files.get(p);
     return f ? { data: JSON.parse(f.text) as T, mark: String(f.mark) } : null;
   },
@@ -53,6 +58,7 @@ const store: Store = {
     const f = files.get(p);
     if ((f ? String(f.mark) : null) !== mark) return false;
     files.set(p, { text: JSON.stringify(data), mark: (f?.mark ?? 0) + 1 });
+    if (p === 'zona/world.json') wroteAt = Date.now();
     return String((f?.mark ?? 0) + 1);
   },
   async list() {
@@ -207,18 +213,25 @@ try {
   ann.send(me(33, 3));
   await sleep(400);
   const before = ann.got.filter((m) => m.t === 'restart').length;
+  // (and from here the store is as it was that night: once the last word is written it cannot be read for nine
+  // seconds, three times as long as the new server waits for anything else)
+  lag = 9000;
   reached = B;
   for (let k = 0; k < 200 && old.server.exitCode === null; k++) await sleep(100);
   assert.notEqual(old.server.exitCode, null, `the old server did not go when it had been replaced:\n${old.log.slice(-500)}`);
   assert.ok(ann.got.filter((m) => m.t === 'restart').length > before && ann.last('restart')!.in === 0, 'whoever was on was not told the server was stopping');
   assert.ok(/another server has taken over: \d+ characters .*\(the last word\)/.test(old.log), `the old server did not say its last word:\n${old.log.slice(-500)}`);
   assert.ok(kept()?.final, 'the site does not hold a last word');
+  const lastWord = kept()!.at;
   checks++;
   console.log('  ok  replaced, the old server sees it for itself: it says so to whoever is on, writes its last word and goes');
 
   // ---- the new server reads that, and everybody is as they were at the last moment
   assert.ok(await waiting, `whoever was waiting was never let in:\n${young.log.slice(-700)}`);
   assert.ok(/\[keep\] 1 characters and 0 stashes as they were kept/.test(young.log), `the new server did not read the last word:\n${young.log.slice(-700)}`);
+  assert.ok(/a newer copy has been written and the site cannot hand it over yet: waiting for it/.test(young.log), `the new server was not told the store had a newer copy it could not yet read:\n${young.log.slice(-700)}`);
+  assert.ok(new RegExp(`as they were kept at ${lastWord.replace(/[.]/g, '\\.')}`).test(young.log) && !/not a last word/.test(young.log), `the new server went on with something other than the last word:\n${young.log.slice(-700)}`);
+  lag = 0;
   assert.ok(await ann.join(B), 'she was not let into the new server');
   const w = ann.last('welcome')!;
   assert.equal(w.me?.vitals.health, 33, `she is not as she was at the last moment (health ${w.me?.vitals.health}: 64 is the first writing, 41 and 37 are from before it stopped)`);

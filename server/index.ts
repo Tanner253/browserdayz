@@ -1062,6 +1062,12 @@ const KEEP_WAIT_MS = (process.env.KEEP_WAIT_S === undefined ? 100 : Math.max(0, 
 /** however long the server before this one goes on answering, it is not waited for longer than this */
 const KEEP_MAX_MS = (process.env.KEEP_MAX_S === undefined ? 420 : Math.max(0, Number(process.env.KEEP_MAX_S) || 0)) * 1000;
 /**
+ * And a copy the site says has been written but cannot be read yet is waited for this long from when it first said
+ * so (2026-10-13 01:44 UTC: the last word was written, the store would not be read for the hundred seconds after
+ * it, this server gave up and went on with what it had read before, 68 minutes old: see api/keep.ts).
+ */
+const KEEP_STALE_MS = (process.env.KEEP_STALE_S === undefined ? 360 : Math.max(0, Number(process.env.KEEP_STALE_S) || 0)) * 1000;
+/**
  * Where the world reaches this server from outside (Render says: RENDER_EXTERNAL_URL). At a deploy the server
  * before this one goes on answering there until this one is ready, and only then is told to stop: asked there who
  * it is, a server knows whether it is the one being reached yet. (OTHER_URL: for a test of that, with two on one
@@ -1149,6 +1155,8 @@ const KEPT = {
   claimed: false,
   /** what was kept has been read and taken in (or there was nothing): only then is anything written over it */
   read: false,
+  /** when the newest copy this server has read was written ('': there was none). The site writes nothing of this server's over a newer one. */
+  seen: '',
   dirty: false,
   savedAt: 0,
   busy: false,
@@ -1186,13 +1194,13 @@ function unseal(z: string): unknown {
 }
 
 /** Something asked of the site about what is kept: signed with the secret the two share (see api/keep.ts). */
-async function siteKeep(op: Record<string, unknown>): Promise<{ ok?: boolean; why?: string; save?: KeptFile | null } | null> {
+async function siteKeep(op: Record<string, unknown>): Promise<{ ok?: boolean; why?: string; save?: KeptFile | null; stale?: boolean; newer?: boolean } | null> {
   if (!ADMIN.pepper) return null;
   const body = JSON.stringify(op), at = String(Date.now());
   const sig = createHmac('sha256', `zona keep ${ADMIN.pepper}`).update(`${at}.${createHash('sha256').update(body).digest('hex')}`).digest('hex');
   try {
     const r = await fetch(`${SITE_URL}/api/keep`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-zona-at': at, 'x-zona-auth': sig }, body, signal: AbortSignal.timeout(20_000) });
-    return r.ok ? ((await r.json()) as { ok?: boolean; why?: string; save?: KeptFile | null }) : null;
+    return r.ok ? ((await r.json()) as { ok?: boolean; why?: string; save?: KeptFile | null; stale?: boolean; newer?: boolean }) : null;
   } catch {
     return null;
   }
@@ -1248,9 +1256,17 @@ async function keepNow(final: boolean, why: string): Promise<boolean> {
   if (!KEPT.claimed && !KEPT.dirty) return false;
   KEPT.busy = true;
   try {
-    const snap = snapshot();
+    let snap = snapshot();
     for (let tries = 0; tries < 3; tries++) {
-      const r = await siteKeep({ op: 'save', at: new Date().toISOString(), boot: BOOT, final, z: seal(snap) });
+      const r = await siteKeep({ op: 'save', at: new Date().toISOString(), boot: BOOT, final, z: seal(snap), seen: KEPT.seen });
+      // (What is kept is newer than anything this server has read: the server before it said its last word after
+      // this one had stopped waiting for it. It is taken in, for everybody who has not come back yet, and then
+      // this server's writing is of both.)
+      if (r?.newer && r.save) {
+        takeInLate(r.save);
+        snap = snapshot();
+        continue;
+      }
       if (r?.ok) {
         KEPT.claimed = true;
         KEPT.dirty = clients.size > 0;
@@ -1267,6 +1283,51 @@ async function keepNow(final: boolean, why: string): Promise<boolean> {
   } finally {
     KEPT.busy = false;
   }
+}
+
+/**
+ * A copy that turned up after this server had opened: the last word of the server before it, written (or readable)
+ * only once this one had stopped waiting. Whoever has not come back since this server started is as that copy
+ * has them; whoever has is left as they are, with what they have been doing since. Stashes it has that this
+ * server has not are put where they were.
+ */
+function takeInLate(save: KeptFile) {
+  KEPT.seen = save.at;
+  let snap: Snapshot;
+  try {
+    snap = unseal(save.z) as Snapshot;
+  } catch (e) {
+    return void log(`[keep] a newer copy (${save.at}) could not be opened, and is written over: ${e instanceof Error ? e.message : e}`);
+  }
+  if ((snap.wipe ?? '') !== WIPE) return void log(`[keep] a newer copy (${save.at}) is of another world, and is written over`);
+  const moved = snap.rev !== WORLD_REV, now = Date.now();
+  const back = new Set([...[...clients.values()].map((c) => keyHash(c.key)), ...[...records.keys()].map((k) => keyHash(k))]);
+  let chars = 0, stashes = 0;
+  for (const [k, r] of snap.chars ?? []) {
+    try {
+      if (back.has(k) || !r?.inv || !r.alive || now - r.leftAt > RECORD_LIFETIME || !isPose(r.pose)) continue;
+      const had = KEPT.chars.get(k);
+      if (had && had.leftAt >= r.leftAt) continue;
+      const inv = cleanInventory(r.inv);
+      for (const it of things(inv)) issue(it);
+      KEPT.chars.set(k, { pose: r.pose, inv, vitals: r.vitals, alive: true, leftAt: r.leftAt, ...(moved ? { afresh: true } : {}) });
+      chars++;
+    } catch {
+      /* one that cannot be made sense of is left as this server had them */
+    }
+  }
+  for (const b of snap.stashes ?? []) {
+    if (b?.kind !== 'stash' || !b.buried || typeof b.cid !== 'string' || boxes.has(b.cid) || ![b.x, b.y, b.z, b.rot].every(num)) continue;
+    const items = (Array.isArray(b.items) ? b.items : []).flatMap((s) => {
+      const it = cleanItem(s);
+      return it ? [{ ...it, x: s.x, y: s.y, rot: !!s.rot }] : [];
+    });
+    for (const it of items) issue(it);
+    boxes.set(b.cid, { ...b, items, y: moved ? world.groundAt(b.x, b.z) : b.y, emptiedAt: -1, touchedAt: num(b.touchedAt) ? b.touchedAt : now });
+    stashes++;
+  }
+  KEPT.how += `; and the last word of the server before, written at ${save.at}, came after: ${chars} characters and ${stashes} stashes were taken from it`;
+  log(`[keep] a newer copy (${save.at}${save.final ? ', a last word' : ''}) turned up after this server had opened: ${chars} characters who have not come back yet, and ${stashes} stashes, are as it has them`);
 }
 
 /** The first player of this run has come in: the file is made to say a server is alive, with more to say. */
@@ -1391,13 +1452,23 @@ async function loadKept() {
     // start, whatever the other was doing: on the night of 2026-10-11 the other was told to stop a few seconds
     // after that, and everybody came back as they had been two hours before.)
     let read = false;
-    for (let mine = 0; ; ) {
+    for (let mine = 0, stale = 0; ; ) {
       const r = await siteKeep({ op: 'load' });
       if (r?.ok) {
         save = r.save ?? null;
         read = true;
+        stale = 0;
       }
       if (r?.ok && (!save || save.final || save.boot === BOOT)) break;
+      // (The site says a newer copy has been written and cannot be read yet: that is the last word, on its way.
+      // It is waited for, for as long as the site goes on saying so, and not given up on with the others.)
+      if (r?.stale) {
+        if (!stale) log('[keep] a newer copy has been written and the site cannot hand it over yet: waiting for it');
+        stale ||= Date.now();
+        if (Date.now() - stale >= KEEP_STALE_MS) break;
+        await pause(2500);
+        continue;
+      }
       const here = await reachedHere();
       if (here === false) mine = 0;
       else if (!mine) mine = Date.now();
@@ -1406,6 +1477,7 @@ async function loadKept() {
     }
     if (!read) return open('what is kept could NOT be read: the site did not answer. Everybody begins afresh, and nothing is written over what is kept');
     KEPT.read = true;
+    KEPT.seen = save?.at ?? '';
     if (save && !save.final && save.boot !== BOOT) log(`[keep] the server before this one never said its last word: what it wrote at ${save.at} is all there is`);
     if (!save) return open('nothing has been kept yet: everybody begins afresh');
     // (from here on something goes wrong only by what is in the file)

@@ -13,6 +13,18 @@
 //
 // Written when a server with players on it starts keeping, every few hours while it runs, and as it stops: a few
 // writes a day. (The store allows two thousand a month, and the payouts need them: see _lib/store.ts.)
+//
+// What went wrong on 2026-10-13 at 01:44 UTC, and is why two things below are as they are. The old game server
+// wrote its last word. For the hundred seconds after that the store would not be read at all: it knew a newer
+// copy had been written and its cache was still serving the one before, so every reading failed (as it is meant
+// to: an old copy is never handed out as the current one). The new game server took those failures for no answer,
+// gave up waiting, went on with the copy it had read BEFORE the last word was written, 68 minutes old, and then
+// wrote that over the last word.
+//   - A reading that fails that way is answered as what it is: `stale`, a newer copy is on its way. The game
+//     server waits for it.
+//   - Nothing is written over a copy its writer has not seen: a save says the newest copy its server knows of
+//     (`seen`), and when what is held is another server's and newer than that, it is handed back instead of
+//     written over (`newer`), for the game server to take in first.
 
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { pepperOf } from './admin.js';
@@ -47,17 +59,27 @@ export async function keep(request: Request, store: Store = blobStore, env: Reco
   if (body.length > 4_000_000) return Response.json({ error: 'too much to keep' }, { status: 413 });
   const at = request.headers.get('x-zona-at') ?? '', sig = request.headers.get('x-zona-auth') ?? '';
   if (!/^\d{13}$/.test(at) || Math.abs(Date.now() - Number(at)) > 5 * 60_000 || !same(sig, keepAuth(pepperOf(secret), at, body))) return Response.json({ error: 'not the game server' }, { status: 403 });
-  let op: { op?: string; at?: string; boot?: string; final?: boolean; z?: string };
+  let op: { op?: string; at?: string; boot?: string; final?: boolean; z?: string; seen?: string };
   try {
     op = JSON.parse(body);
   } catch {
     return Response.json({ error: 'not understood' }, { status: 400 });
   }
-  const held = await store.read<Kept>(FILE);
+  let held: { data: Kept; mark: string } | null;
+  try {
+    held = await store.read<Kept>(FILE);
+  } catch (e) {
+    // (a newer copy has been written, and the store is not serving it yet: said so, and asked again)
+    if (/old copy/.test(e instanceof Error ? e.message : '')) return Response.json({ ok: false, stale: true, why: 'a newer copy has been written and the store is not serving it yet: ask again' }, none);
+    throw e;
+  }
   if (op.op === 'load') return Response.json({ ok: true, save: held?.data ?? null }, none);
   if (op.op === 'save') {
     if (typeof op.z !== 'string' || !op.z || !/^[A-Za-z0-9+/=]+$/.test(op.z)) return Response.json({ error: 'nothing to keep' }, { status: 400 });
     const next: Kept = { at: text(op.at, 30), boot: text(op.boot, 32), final: !!op.final, z: op.z };
+    // (never over a copy its writer has not seen. A server from before this rule says nothing of what it has
+    // seen, and is written as it always was.)
+    if (typeof op.seen === 'string' && held && held.data.boot !== next.boot && held.data.at > op.seen) return Response.json({ ok: false, newer: true, save: held.data, why: 'what is kept is newer than anything this server has read: take it in first' }, none);
     if ((await store.swap(FILE, next, held?.mark ?? null)) === false) return Response.json({ ok: false, why: 'it was being written by something else: try again' }, none);
     return Response.json({ ok: true }, none);
   }
