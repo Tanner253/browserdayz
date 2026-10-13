@@ -168,6 +168,7 @@ export class HUD {
       <div class="hud-start">
         <video class="sm-film" muted playsinline preload="none" data-src="/menu/map-pan.mp4"></video>
         <video class="sm-film" muted playsinline preload="none" data-src="/menu/armoury.mp4"></video>
+        <video class="sm-film" muted playsinline preload="none" data-src="/menu/story.mp4"></video>
         <div class="sm-cut"></div>
         <header class="sm-top">
           <div class="sm-brand"><img src="/brand/zona-mark-plain.svg" alt=""><b>ZONA</b></div>
@@ -182,6 +183,7 @@ export class HUD {
           </nav>
           <div class="sm-status">
             <span class="start-online"></span>
+            <a class="sm-pay" href="/payouts" target="_blank" rel="noopener" title="Every payment made to players, each with its transaction"><i aria-hidden="true"></i><b>Payouts</b><em>Paid in SOL, on chain</em></a>
             <a class="sm-discord" href="${DISCORD}" target="_blank" rel="noopener noreferrer"><b>Discord</b><em>Join</em></a>
           </div>
         </header>
@@ -284,7 +286,7 @@ export class HUD {
         </div>
         <footer class="sm-foot start-links">
           <button class="sl-ca" type="button" title="Copy the contract address"><b>CA</b><code>${CONTRACT}</code><em>Copy</em></button>
-          <a class="sl-x" href="/payouts" target="_blank" rel="noopener">Payouts</a>
+          <a class="sl-x sl-pay" href="/payouts" target="_blank" rel="noopener">Payouts: who was paid, and what</a>
           <a class="sl-x" href="https://x.com/${X_HANDLE}" target="_blank" rel="noopener noreferrer">@${X_HANDLE}</a>
           <div class="sm-live"><i></i><span></span></div>
         </footer>
@@ -641,6 +643,16 @@ export class HUD {
     b.classList.toggle('set', !!address);
     (b.firstElementChild as HTMLElement).textContent = address ? 'Payout wallet set' : 'Play to earn';
     (b.lastElementChild as HTMLElement).textContent = address ? `${address.slice(0, 4)}…${address.slice(-4)} · change` : 'Add a wallet to be paid for the tags you cash in';
+  }
+
+  /**
+   * The Payouts button, top right of the way in (2026-10-12: "make the payouts button on the main menu more POPPing
+   * its easy to miss it and payouts are special thing we offer so people should know about it"): what a tag pays at
+   * this moment, when the site says. null: it is not paying, or did not answer, and the button says what is always so.
+   */
+  setPay(sol: number | null) {
+    const em = this.root.querySelector('.sm-pay em');
+    if (em) em.textContent = sol === null ? 'Paid in SOL, on chain' : `A tag pays ${Math.round(sol * 10_000) / 10_000} SOL now`;
   }
 
   /** The loading screen is lifting: play the entrance (title, panels) once. */

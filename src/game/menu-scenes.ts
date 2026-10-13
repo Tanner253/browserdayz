@@ -158,19 +158,30 @@ export class MenuScenes {
     // them, src/trailer/shots8.ts, which was cut for this with the gun at the right of the picture. The second
     // reel: its seconds are counted from GUNS.)
     const GUNS = 100;
+    // (And out of the ninth film, "Nothing stays buried", cut for this with none of its words on it: src/trailer/shots9.ts,
+    // `node scripts/film.mjs --cut 9 --menu`. The third reel: its seconds are counted from STORY. Its shots are told in
+    // their order, a scene or two of the menu's own between each and the next.)
+    const STORY = 200;
     this.list = [
+      map('Nothing stays buried · out of Bunker 17, alive and rich', STORY + 0.3, STORY + 5.8),
       this.chase(),
+      map('Nothing stays buried · and somebody behind him, all the way through the wood', STORY + 6.2, STORY + 9.8),
       map('The armoury · the AK, and what goes on it', GUNS + 0.15, GUNS + 4.85),
       map('The squad’s map · what they are going on', 0.2, 3.75),
+      map('New · a case, a shovel, five seconds: buried', STORY + 14.2, STORY + 19.8),
       this.firefight(),
       map('The armoury · the AR-15: sight, suppressor, grip, light, sixty rounds', GUNS + 5.15, GUNS + 9.85),
+      map('Finders keepers · anybody with a shovel can dig it up', STORY + 20.3, STORY + 25.8),
       map('The squad’s map · the keycard is in the gas', 3.95, 7.5),
       this.sidearm(),
+      map('New · Kamenka · the hospital: three floors and a roof', STORY + 26.5, STORY + 29.8),
       map('The armoury · the Colt 1911', GUNS + 12.65, GUNS + 14.85),
       map('The squad’s map · Bunker 17', 7.7, 11.25),
       this.stand(),
+      map('The hospital roof · a rifle is kept up here', STORY + 30.2, STORY + 33.8),
       this.shotgun(),
       map('The armoury · the MPA30', GUNS + 10.15, GUNS + 12.35),
+      map('New · Zelenaya Dolina · the police headquarters, round its yard', STORY + 34.2, STORY + 39.8),
       map('The squad’s map · trust nobody at the door', 11.4, 13.1),
       this.works(),
     ].filter((v): v is Vignette => !!v);

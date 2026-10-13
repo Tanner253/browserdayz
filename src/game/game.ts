@@ -60,7 +60,7 @@ import { Horde, Infected } from './infected';
 import { INFECTED, guarded } from '../sim/infected';
 import { TOUCH } from '../core/device';
 import { TouchControls } from '../ui/touch';
-import { REWARDS_UI, RewardsModal, addCashedTag, cashedTags, walletAddress } from '../ui/rewards';
+import { REWARDS_UI, RewardsModal, addCashedTag, cashedTags, onTagPay, walletAddress } from '../ui/rewards';
 import { Gas } from './gas';
 import { GAS, underGas, bunkerGas, bunkerGasEdge } from '../sim/gas';
 import { DAY, hourAt, phaseOf } from '../sim/daynight';
@@ -684,6 +684,7 @@ export class Game {
       const modal = new RewardsModal(document.getElementById('ui')!, () => this.hud.nameValue(), () => this.hud.setWallet(walletAddress()));
       this.hud.onRewards(() => modal.open());
       this.hud.setWallet(walletAddress());
+      onTagPay((sol) => this.hud.setPay(sol));
     }
     // the menu's map: the game's own, and what is said of each place on it
     {

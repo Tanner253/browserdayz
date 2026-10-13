@@ -11,6 +11,8 @@
 //   node scripts/film.mjs --motion            how much each frame differs from the one before it: a frame photographed twice (a stutter) shows as one that hardly differs
 //   node scripts/film.mjs --cut 2             the second trailer (src/trailer/shots2.ts) -> zona-trailer-2.mp4
 //   node scripts/film.mjs --cut 8 --menu      the cut of a film that the main menu plays: 1280x720 at 30 fps, a light file -> zona-trailer-8-menu.mp4
+//   node scripts/film.mjs --cut 9 --web       the whole film as the site shows it: 1280x720 at 30 fps, about 2 Mbit a second -> zona-trailer-9-web.mp4
+//   node scripts/film.mjs --bitrate 2200000   the picture's bits a second, said outright
 //
 // The dev server must not reload during a take: do not edit game source while this runs.
 
@@ -29,8 +31,10 @@ const arg = (name, fallback) => {
 };
 const draft = !!arg('draft', false);
 const menu = !!arg('menu', false);
-const fps = draft || menu ? 30 : 60;
-const scale = draft ? 0.75 : menu ? 1 : 1.5; // the page is laid out at 1280x720 and drawn denser (or sparser)
+const web = !!arg('web', false);
+const bits = arg('bitrate', null) === null ? null : Number(arg('bitrate'));
+const fps = draft || menu || web ? 30 : 60;
+const scale = draft ? 0.75 : menu || web ? 1 : 1.5; // the page is laid out at 1280x720 and drawn denser (or sparser)
 const from = Number(arg('from', 0));
 const to = arg('to', null) === null ? null : Number(arg('to'));
 const stills = Number(arg('stills', 0));
@@ -39,8 +43,8 @@ const big = !!arg('big', false);
 const twice = !!arg('twice', false);
 const motion = !!arg('motion', false);
 const cut = String(arg('cut', '1'));
-const name = String(arg('out', (draft ? 'draft' : 'zona-trailer') + (cut === '1' ? '' : `-${cut}`) + (menu ? '-menu' : '')));
-const URL_ = String(arg('url', `http://localhost:5173/trailer.html?cut=${cut}${menu ? '&menu=1' : ''}`));
+const name = String(arg('out', (draft ? 'draft' : 'zona-trailer') + (cut === '1' ? '' : `-${cut}`) + (menu ? '-menu' : '') + (web ? '-web' : '')));
+const URL_ = String(arg('url', `http://localhost:5173/trailer.html?cut=${cut}${menu ? '&menu=1' : ''}${web ? '&web=1' : ''}`));
 const PORT = 9333;
 const CHROME = ['C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'].find((p) => fs.existsSync(p));
 if (!CHROME) throw new Error('no Chrome or Edge found');
@@ -110,7 +114,7 @@ console.log(`${name}: ${(first / fps).toFixed(2)}s to ${(last / fps).toFixed(2)}
 const kept = [];
 async function take(pass) {
   const hashes = [];
-  await run(`window.tr.begin(${JSON.stringify({ fps, first, last, width: Math.round(1280 * scale), height: Math.round(720 * scale), video: !noVideo && pass === 0, ...(menu ? { bitrate: 3_000_000 } : {}) })})`);
+  await run(`window.tr.begin(${JSON.stringify({ fps, first, last, width: Math.round(1280 * scale), height: Math.round(720 * scale), video: !noVideo && pass === 0, ...(bits ? { bitrate: bits } : menu ? { bitrate: 3_000_000 } : web ? { bitrate: 2_100_000 } : {}), ...(web || menu ? { audio: 128_000 } : {}) })})`);
   const t0 = Date.now();
   for (let i = first; i < last; i++) {
     await run(`window.tr.step(${i})`);

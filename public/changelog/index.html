@@ -20,7 +20,8 @@
       out of a finished trailer by scripts/clip.mjs. The roadmap at the top is marketing/roadmap.html: tick there what ships. A film is a <video data-src> with a poster: it is
       fetched and played when it comes into view, and stopped when it leaves. Everything said here is of what
       shipped; the films in the older entries are cut from the trailers made at the time, and show the game as it
-      was then.
+      was then. A whole trailer, with its sound, is a <figure class="wide own"> holding a <video src controls>: it
+      is fetched and played when somebody presses play, and is not opened large by a click.
     -->
     <style>
       :root { --bg: #0d100c; --ink: #e9e4d8; --dim: rgba(233, 228, 216, 0.66); --faint: rgba(233, 228, 216, 0.34); --line: rgba(233, 228, 216, 0.14); --brand: #ffd35a; --ok: #8fae6b; --font: 'Barlow Condensed', system-ui, sans-serif; --mono: 'JetBrains Mono', ui-monospace, monospace; }
@@ -56,6 +57,8 @@
       figure img, figure video { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; transition: transform 0.5s ease; }
       figure.tall img { aspect-ratio: auto; }
       figure:hover img, figure:hover video { transform: scale(1.02); }
+      figure.own { cursor: default; border-color: var(--brand); }
+      figure.own:hover video { transform: none; }
       figure .film { position: absolute; left: 10px; top: 10px; padding: 2px 7px 3px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink); background: rgba(8, 10, 8, 0.72); border: 1px solid var(--line); }
       figcaption { padding: 9px 12px 10px; font-size: 16px; line-height: 1.3; color: var(--dim); border-top: 1px solid var(--line); background: rgba(8, 10, 8, 0.6); }
       figcaption b { font-weight: 600; color: var(--ink); }
@@ -121,6 +124,7 @@
         <p>Every update to the Zone, newest first, with pictures and film of what changed. The films in the older entries were made at the time and show the game as it was then.</p>
         <div class="jump">
           <a href="#roadmap">Roadmap</a>
+          <a href="#nothing-stays-buried">The new trailer</a>
           <a href="#hospital-hq-streets">A hospital, a headquarters, streets</a>
           <a href="#tiers">Five tiers, an army camp, a police car</a>
           <a href="#voices">Voices, water, lying low</a>
@@ -141,18 +145,44 @@
       </section>
 
       <section class="entry" id="roadmap">
-        <div class="when"><time datetime="2026-10-11">Roadmap</time><span class="tag">Phase 3</span></div>
+        <div class="when"><time datetime="2026-10-12">Roadmap</time><span class="tag">Phase 3</span></div>
         <div>
           <h2>Where the Zone is going</h2>
-          <p class="lead">Two phases are done and the third is under way. What is ticked is in the game today. The rest is the plan, and plans change.</p>
+          <p class="lead">Two phases are done and the third is all but done: fifteen of sixteen. What is ticked is in the game today. The rest is the plan, and plans change.</p>
           <div class="media">
-            <figure class="wide"><img src="/changelog/media/roadmap.jpg" alt="The roadmap in five phases. Phase 1, The Zone opens, complete: the first valley, loot, PvP gunplay, dog tags, automatic payouts, supply drops, the call wheel, leaderboard, queue, phones. Phase 2, Survival, complete: the infected, the gas zone, day and night, Bunker 17, the jeep, campfires, broken legs, melee, new guns and sights, the soldier body. Phase 3, A living world, in progress, twelve of fifteen: Kamenka and its road, the trader, body armour, helicopter crashes and the adrenaline injector, wells and bottles, lying prone, proximity voice, the server's anti-cheat, five loot tiers said on the map, an army camp of tents, a police car, and the AK, AR-15 and MPA30 with magazines filled by hand are in; kicks and bans, keeping the new guns to the bunker and a military base are next. Phase 4, Settling in, planned: base building, locks, a shovel to bury a stash, tents, attics and basements, animals, hunting, fishing, crafting, weather. Phase 5, And more, planned: raiding, sickness, guns that wear, suppressors and night vision, cars that break down, more vehicles, more map, events." /><figcaption><b>Five phases.</b> The first two are every entry on this page from the bottom up to the bunker. The third is the three newest and what comes next. The fourth and fifth are what is meant to follow: everything DayZ does, and then what it does not.</figcaption></figure>
+            <figure class="wide"><img src="/changelog/media/roadmap.jpg?v=1012" alt="The roadmap in five phases. Phase 1, The Zone opens, complete: the first valley, loot, PvP gunplay, dog tags, automatic payouts, supply drops, the call wheel, leaderboard, queue, phones. Phase 2, Survival, complete: the infected, the gas zone, day and night, Bunker 17, the jeep, campfires, broken legs, melee, new guns and sights, the soldier body. Phase 3, A living world, in progress, fifteen of sixteen: Kamenka and its road, the trader, body armour, helicopter crashes and the adrenaline injector, wells and bottles, lying prone, proximity voice, anti-cheat that watches, kicks and bans, five loot tiers said on the map, an army camp of tents, a police car, the AK, AR-15 and MPA30 with magazines filled by hand, a hospital, a police headquarters and village streets, stashes buried with a shovel and kept, and a bot check at the door are in; keeping the new guns to the bunker is next. Phase 4, Settling in, planned: the industrial zone, four times Kamenka; ladders and a radio tower to climb; a military base; the road all the way round, and a bridge; base building, locks, tents and crates that stay, attics and basements, animals, hunting, fishing, crafting, weather. Phase 5, And more, planned: raiding, sickness, guns that wear, suppressors and night vision, cars that break down, more vehicles, more map, events." /><figcaption><b>Five phases.</b> The first two are every entry on this page from the bottom up to the bunker. The third is all but done: one line is left. The fourth now begins with the industrial zone, and the military base has moved into it. The fourth and fifth are what is meant to follow: everything DayZ does, and then what it does not.</figcaption></figure>
           </div>
         </div>
       </section>
 
-      <article class="entry" id="no-long-stops">
+      <article class="entry" id="nothing-stays-buried">
         <div class="when"><time datetime="2026-10-12">12 Oct 2026</time><span class="tag">Latest</span></div>
+        <div>
+          <h2>Nothing stays buried: the new trailer</h2>
+          <p class="lead">Two minutes and twenty-four seconds, filmed in the game as it is, with a score written for it. A man comes out of Bunker 17 with a case and buries it in the wood. Somebody watched him do it. Then everything added since the last film, at walking pace, and what has been paid.</p>
+          <div class="media">
+            <figure class="wide own"><video src="/changelog/media/nothing-stays-buried.mp4" poster="/changelog/media/nothing-stays-buried.jpg" controls playsinline preload="none"></video><figcaption><b>Nothing stays buried.</b> The whole film, 2:24, with its sound: press play.</figcaption></figure>
+            <figure><img loading="lazy" src="/changelog/media/nsb-watched.jpg" alt="Seen through a round glass from a long way off: a man with a pack coming out of the concrete door of a bunker in long grass, and the words: and somebody watched him do it" /><figcaption><b>Somebody watched him do it.</b> He comes out of Bunker 17 alive, with the best loot in the Zone on his back, and does not look behind him.</figcaption></figure>
+            <figure><img loading="lazy" src="/changelog/media/nsb-bury.jpg" alt="A man with a pack standing over a green case on the ground among pines, and a board: Bury it. What: a case, a suitcase or a bag. How: 5 seconds with a shovel. Where: out in the country, away from walls. Kept: through every restart of the server" /><figcaption><b>Bury it.</b> A case, a suitcase or a bag; five seconds with a shovel; out in the country, away from walls. It is kept through every restart of the server.</figcaption></figure>
+            <figure><img loading="lazy" src="/changelog/media/nsb-dig.jpg" alt="Looking down at a patch of turned earth in the grass with a bar filling over it, and the words: what one shovel buries, another digs up" /><figcaption><b>What one shovel buries, another digs up.</b> Anybody who saw where, and has a shovel of their own. Everything in the story is a rule of the game.</figcaption></figure>
+            <figure><img loading="lazy" src="/changelog/media/nsb-levels.jpg" alt="The end of the hospital from the air: steel stairs up its end wall with a door at each floor, the yard and the street below, and a board: one building, four levels. The roof, 9.8 m up. The balcony, over the doors. The steel stairs, a door onto them from every floor. The ground, where you are seen from all of them" /><figcaption><b>One building, four levels.</b> The hospital, walked slowly: the wards, the morgue, the roof 9.8 m up, the steel stairs with a door from every floor. Then the police headquarters, and the place under its stairs.</figcaption></figure>
+            <figure><img loading="lazy" src="/changelog/media/nsb-botcheck.jpg" alt="A rifle with a red dot sight held up in a yard of concrete walls, a figure walking between two of them, and a board: the bot check. Who: everybody, before they are let in. What: 4 figures behind walls, 30 seconds. Judged: by the server, shot by shot. The range: a different one every time" /><figcaption><b>The bot check.</b> Everybody shoots their way in: four figures that walk behind walls, thirty seconds, judged by the server shot by shot, and a different range every time.</figcaption></figure>
+            <figure><img loading="lazy" src="/changelog/media/nsb-paid.jpg" alt="A board: 240 dollars paid to players. 2.245 SOL, at 107 dollars a SOL, as of 12 October 2026. 111 dog tags paid for, 23 wallets paid, 2 dollars 14 a tag, 26 dollars to the best-paid wallet so far, and a chart of what was paid each day from 8 to 12 October, rising" /><figcaption><b>Paid.</b> 2.245 SOL for 111 dog tags, to 23 wallets, as it stood on 12 October: $240 with SOL at $107. Every payment is on the chain, and listed at <a href="/payouts">zonapvp.fun/payouts</a>.</figcaption></figure>
+          </div>
+          <ul>
+            <li><b>The film</b> is in three parts: the story of a buried case; the hospital, the police headquarters and the village walked through slowly; and boards of what was measured and what was paid. It ends on what is being built and is not in the game yet.</li>
+            <li><b>The bot check,</b> which is at the door since 12 October: before the server lets anybody in, they shoot a range. All four figures in thirty seconds, and a shot counts only if the sights were on the figure when it was fired. The server lays the range out and judges every shot. Passed, it is not asked again for some hours.</li>
+            <li><b>Shots of the film play in the main menu,</b> without its words, between the menu's own scenes.</li>
+            <li><b>The payouts page is laid out again:</b> how the money moves from the coin to your wallet, what was paid each day, the best-paid wallets, and the ledger of every tag with its transaction, which can be narrowed to paid, waiting or not paid, or to one player or wallet. It has a way back to the game at the top.</li>
+            <li><b>Payouts has a button of its own in the menu,</b> top right, and it says what a tag pays at that moment.</li>
+            <li><b>The roadmap is brought up to date:</b> the third phase stands at fifteen of sixteen. The military base moves to the fourth, which now begins with the industrial zone, ladders and a radio tower, and the road all the way round.</li>
+            <li>The figures on the film's boards are the ones on this page: the stops and the loading are measured on one laptop, in the entries of 11 and 12 October, and yours will differ.</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="entry" id="no-long-stops">
+        <div class="when"><time datetime="2026-10-12">12 Oct 2026</time></div>
         <div>
           <h2>The long stops are gone, and nobody jumps about</h2>
           <p class="lead">Nothing looks different. The game no longer stands still when a lamp is first lit or night falls, and other players are drawn where they were when they moved, not where the news of it happened to find them.</p>
@@ -756,7 +786,7 @@
         box.replaceChildren();
       };
       document.querySelectorAll('figure').forEach((f) => f.addEventListener('click', (e) => {
-        if (e.target.closest('a')) return;
+        if (e.target.closest('a') || f.classList.contains('own')) return;
         const from = f.querySelector('img, video');
         let big;
         if (from.tagName === 'VIDEO') {

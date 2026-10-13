@@ -1028,6 +1028,20 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 .sm-discord:hover { border-color: var(--brand); background: rgba(255, 211, 90, 0.08); }
 .sm-discord:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 .hud-start.paused .sm-discord { cursor: pointer; }
+/* (Payouts: the one thing on this bar that is filled in. Gold, a light that crosses it now and then, and a ring that goes out from it: it was a line of small print in the footer, and was missed.) */
+.sm-pay { position: relative; display: inline-flex; align-items: center; gap: 10px; padding: 7px 13px 8px 11px; overflow: hidden; font-family: var(--mono); white-space: nowrap; text-decoration: none; color: #14110b; background: linear-gradient(180deg, #ffe596, var(--brand) 60%, #f0b93a); border: 1px solid #fff0bd; box-shadow: 0 0 0 0 rgba(255, 211, 90, 0.5), 0 0 22px rgba(255, 211, 90, 0.28); animation: pay-ring 2.8s ease-out infinite; transition: filter 0.15s, transform 0.15s; }
+.sm-pay i { width: 8px; height: 8px; border-radius: 50%; background: #1d6b2c; box-shadow: 0 0 0 3px rgba(29, 107, 44, 0.25); animation: live-dot 2.4s ease-in-out infinite; }
+.sm-pay b { font-size: 12px; font-weight: 700; letter-spacing: 0.22em; text-transform: uppercase; }
+.sm-pay em { padding-left: 10px; font-size: 10px; font-weight: 600; font-style: normal; letter-spacing: 0.13em; text-transform: uppercase; color: rgba(20, 17, 11, 0.78); border-left: 1px solid rgba(20, 17, 11, 0.3); }
+.sm-pay em::after { content: ' \2197'; }
+.sm-pay::after { content: ''; position: absolute; inset: 0; background: linear-gradient(105deg, transparent 38%, rgba(255, 255, 255, 0.7) 50%, transparent 62%); transform: translateX(-130%); animation: pay-sheen 4.2s ease-in-out infinite; pointer-events: none; }
+.sm-pay:hover { filter: brightness(1.08); transform: translateY(-1px); }
+.sm-pay:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.hud-start.paused .sm-pay { cursor: pointer; }
+@keyframes pay-ring { 0% { box-shadow: 0 0 0 0 rgba(255, 211, 90, 0.55), 0 0 22px rgba(255, 211, 90, 0.28); } 70%, 100% { box-shadow: 0 0 0 13px rgba(255, 211, 90, 0), 0 0 22px rgba(255, 211, 90, 0.28); } }
+@keyframes pay-sheen { 0%, 58% { transform: translateX(-130%); } 88%, 100% { transform: translateX(130%); } }
+@media (prefers-reduced-motion: reduce) { .sm-pay, .sm-pay i, .sm-pay::after { animation: none; } }
+@media (max-width: 760px), (max-height: 520px) { .sm-pay { padding: 6px 11px 7px 9px; } .sm-pay em { display: none; } }
 .start-online.full::before { background: var(--brand); box-shadow: 0 0 6px var(--brand); }
 @keyframes live-dot { 50% { opacity: 0.35; } }
 
@@ -1232,6 +1246,8 @@ kbd.hot { color: #121413; background: linear-gradient(#d8c594, #b89f66); border-
 .sl-ca.done em { color: var(--ok); }
 .sl-x { font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; white-space: nowrap; color: var(--ink-dim); text-decoration: none; }
 .sl-x:hover { color: var(--brand); }
+.sl-x.sl-pay { color: var(--brand); border-bottom: 1px solid rgba(255, 211, 90, 0.45); }
+.sl-x.sl-pay:hover { color: #ffe596; border-bottom-color: var(--brand); }
 .sm-live { display: flex; align-items: center; gap: 9px; min-width: 0; margin-left: auto; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-dim); opacity: 0; transition: opacity 0.5s; }
 .sm-live.on { opacity: 1; }
 .sm-live i { flex: none; width: 7px; height: 7px; border-radius: 50%; background: #ff5a44; box-shadow: 0 0 7px #ff5a44; animation: live-dot 2.4s ease-in-out infinite; }
