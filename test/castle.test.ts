@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { KIT_LEVELS, KIT_MERLON, cutBox, inCut, kitMatrix, kitPoint, kitSolids } from '../src/sim/kit';
 import { castleDoor, castleKit } from '../src/sim/castle';
-import { CASTLE, CASTLE_TIERS, FURNITURE, LOOSE, OUTCROP, POSTERN, UNDER, castleAt, castleCuts, castleDark, castleGround, castleHomes, castleLamps, castleLocal, castleLoose, castleLoot, castleParts, castleProps, castleUnder, hatchLine, inCastle, looseLocal, looseParts, moundTop, squareTouches, stairShare, towerRadius, type Flight, type Place, type Tower, type V3 } from '../src/sim/castle';
+import { CASTLE, CASTLE_TIERS, FURNITURE, LOOSE, OUTCROP, POSTERN, UNDER, castleAt, castleCuts, castleDark, castleGround, castleHomes, castleLamps, castleLocal, castleLoose, castleLoot, castleParts, castleProps, castleUnder, hatchLine, hatchWell, inCastle, looseLocal, looseParts, moundTop, squareTouches, stairShare, towerRadius, type Flight, type Place, type Tower, type V3 } from '../src/sim/castle';
 import { postProps } from '../src/sim/castle-post';
 import { PAINTS, PICTURES, SHEETS, STUFF, castleShape, type Sheet, type Skin, type Solid } from '../src/world/castle-shape';
 
@@ -370,11 +370,20 @@ ok('its loose pieces go where they are put, and what is theirs goes with them', 
   assert.ok(gone(castleProps(P, flat, moved)) - gone(postProps(P, flat, moved)) === 2, `${gone(castleProps(P, flat, moved)) - gone(postProps(P, flat, moved))} things of the fort's own went with the houses`);
   const homes = castleHomes(P, moved);
   // (the infected of the fort itself have the dark under the terrace, and nothing over it)
-  // (one of the village's to each house, and with the house wherever it is put; the fort's own are four, in the dark)
-  const fortHome = homes[homes.length - 1], village = homes.slice(0, -1);
-  assert.ok(village.length === 5 && village.every((h) => h.n === 1 && h.r < 8 && Math.hypot(h.x - P.x, h.z - P.z) > 300) && fortHome.n === 4 && fortHome.inside!.every((s) => inCastle(P, ...s) && castleUnder(P, s[0], s[1] + 0.9, s[2])), 'the dead of the fort are not where they belong');
+  // (one of the village's to each house, and with the house wherever it is put; the garrison's are four, on the open ground
+  // before the gate. None of them is given a place under the fort or in it: there they walked into walls. See `castleHomes`.)
+  const gateHome = homes[homes.length - 1], village = homes.slice(0, -1);
+  assert.ok(village.length === 5 && village.every((h) => h.n === 1 && h.r < 8 && Math.hypot(h.x - P.x, h.z - P.z) > 300) && gateHome.n === 4, 'the dead of the fort are not where they belong');
+  assert.ok(homes.every((h) => !h.inside), 'one of the infected is given a place indoors');
+  for (const h of castleHomes(P)) for (let a = 0; a < 16; a++) for (const r of [0, h.r * 0.5, h.r]) {
+    // (wherever one of them is stood there is open ground: not in the fort, not under it, and no stone of the fort over the spot at a body's height)
+    const x = h.x + Math.cos(a * 0.3927) * r, z = h.z + Math.sin(a * 0.3927) * r, [lx, lz] = castleLocal(P, x, 0, z), y = P.y + castleGround(lx, lz);
+    // (but at the head of the hatch's steps, which is open ground with a way down in it: the first house's are by it)
+    const hatch = LOOSE.find((l) => l.kind === 'hatch')!, byHatch = Math.hypot(lx - hatch.x, lz - hatch.z) < 4;
+    assert.ok(!inCastle(P, x, y + 0.9, z) && (byHatch || !castleUnder(P, x, y + 0.2, z)), `one of the infected would be stood in the fort or under it, at ${lx.toFixed(1)}, ${lz.toFixed(1)}`);
+  }
   // with no houses there is still the fort
-  assert.equal(castleHomes(P, []).length, 1);
+  assert.equal(castleHomes(P, []).length, 1, 'with no houses there are still the four before the gate');
   assert.ok(castleLoot(P, flat, []).every((l) => inCastle(P, l.x, l.y, l.z)), 'with no houses a thing still lies outside the fort');
   // and the shapes follow: nothing of a house where the houses were, when there are none
   const bare = castleShape(castleGround, []);
@@ -676,6 +685,86 @@ ok('under the fort a body is excused only where there is a place to be: in a roo
   // (and it is the same however the ground is asked for, and with no hatch there is no passage to be in)
   assert.ok(castleUnder(P, ...castleAt(P, L.path[2][0], L.path[2][2], L.path[2][1] + 0.5)) && !castleUnder(P, ...castleAt(P, L.path[2][0], L.path[2][2], L.path[2][1] + 0.5), undefined, []), 'the passage is a place with no hatch set down');
   assert.ok(!castleUnder(null, 0, 0, 0));
+});
+
+ok('the way underground is closed: from no place in the passage, at the foot of the hatch\'s steps or on the stair down is anything seen but its own floor, walls and roof', () => {
+  // (2026-10-13: "the path underground at the base of the stairs is bugged with panels and textures missing". What
+  // would have caught it: an eye is put every pace along the way, and looks every way. Each line of sight must end
+  // on the FACE of something of the fort's, near by. One that ends on nothing has gone out through a hole; one
+  // that ends on the back of a face is looking at a thing from inside it, or through where a panel should be.
+  // Where the way is open by design, a lid is laid for the looking: over the hatch's well at the ground, across
+  // the doorway between the passage and the stair's slot, and over the slot at the floor of the lower levels.)
+  const hatch = LOOSE.find((l) => l.kind === 'hatch')!, g = castleGround(hatch.x, hatch.z), L = hatchLine(hatch, g), H = UNDER.hatch;
+  type T3 = [V3, V3, V3];
+  const tris: T3[] = [], lids: T3[] = [];
+  const box = { x0: Math.min(...L.path.map((q) => q[0])) - 5, x1: Math.max(...L.path.map((q) => q[0])) + 5, z0: Math.min(...L.path.map((q) => q[2]), PS.head) - 5, z1: Math.max(...L.path.map((q) => q[2]), PS.end, hatch.z) + 5 };
+  for (const skins of [shape.near, shape.under]) for (const p of SHEETS) {
+    const k = skins[p];
+    for (let i = 0; i + 8 < k.pos.length; i += 9) {
+      const t: T3 = [[k.pos[i], k.pos[i + 1], k.pos[i + 2]], [k.pos[i + 3], k.pos[i + 4], k.pos[i + 5]], [k.pos[i + 6], k.pos[i + 7], k.pos[i + 8]]];
+      if (t.every((q) => q[0] < box.x0 || q[0] > box.x1 || q[2] < box.z0 || q[2] > box.z1 || q[1] > 0.5)) continue;
+      // (only what is about the way itself: within five metres of its line, on the plan, or about the stair's slot)
+      if (!t.some((q) => (q[0] > PS.x0 - 3 && q[0] < PS.x1 + 3 && q[2] > PS.head - 3 && q[2] < PS.end + 3) || L.path.some((a, k) => {
+        const b = L.path[k + 1] ?? [L.head[0], 0, L.head[2]], ex = b[0] - a[0], ez = b[2] - a[2], u = Math.min(1, Math.max(0, ((q[0] - a[0]) * ex + (q[2] - a[2]) * ez) / (ex * ex + ez * ez || 1)));
+        return Math.hypot(q[0] - a[0] - ex * u, q[2] - a[2] - ez * u) < 5;
+      }))) continue;
+      // (the earth laid over the cut ground is not of the passage: it is the lid of the world, and the well is open through it)
+      if (p !== 'earth') tris.push(t);
+    }
+  }
+  const quad = (q: V3[]) => void lids.push([q[0], q[1], q[2]], [q[0], q[2], q[3]]);
+  quad(hatchWell(hatch, g).map(([x, z]): V3 => [x, g + 0.02, z]));
+  quad([[PS.x1 + 0.12, PS.deep - 0.2, POSTERN.z - 1], [PS.x1 + 0.12, PS.deep - 0.2, POSTERN.z + 1], [PS.x1 + 0.12, PS.deep + H.tall + 0.4, POSTERN.z + 1], [PS.x1 + 0.12, PS.deep + H.tall + 0.4, POSTERN.z - 1]]);
+  quad([[PS.x0 - 0.4, UF - 0.02, PS.head - 0.6], [PS.x1 + 0.4, UF - 0.02, PS.head - 0.6], [PS.x1 + 0.4, UF - 0.02, PS.end + 0.4], [PS.x0 - 0.4, UF - 0.02, PS.end + 0.4]]);
+  /** where a line of sight ends: how far off, and whether on the face of what it meets (a lid counts as a face from either side) */
+  const look = (o: V3, d: V3, list: T3[], lid: boolean) => {
+    let best = Infinity, front = false;
+    for (const [a, b, c] of list) {
+      const e1: V3 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], e2: V3 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+      const px = d[1] * e2[2] - d[2] * e2[1], py = d[2] * e2[0] - d[0] * e2[2], pz = d[0] * e2[1] - d[1] * e2[0], det = e1[0] * px + e1[1] * py + e1[2] * pz;
+      if (Math.abs(det) < 1e-12) continue;
+      const tx = o[0] - a[0], ty = o[1] - a[1], tz = o[2] - a[2], u = (tx * px + ty * py + tz * pz) / det;
+      if (u < -1e-6 || u > 1 + 1e-6) continue;
+      const qx = ty * e1[2] - tz * e1[1], qy = tz * e1[0] - tx * e1[2], qz = tx * e1[1] - ty * e1[0], v = (d[0] * qx + d[1] * qy + d[2] * qz) / det;
+      if (v < -1e-6 || u + v > 1 + 1e-6) continue;
+      const t = (e2[0] * qx + e2[1] * qy + e2[2] * qz) / det;
+      if (t > 1e-4 && t < best) (best = t), (front = lid || det > 0);
+    }
+    return { far: best, front };
+  };
+  const dirs: V3[] = Array.from({ length: 180 }, (_, k) => {
+    const y = 1 - (2 * (k + 0.5)) / 180, r = Math.sqrt(1 - y * y), a = k * 2.399963;
+    return [Math.cos(a) * r, y, Math.sin(a) * r];
+  });
+  const eyes: [string, V3][] = [];
+  for (let k = 0; k + 1 < L.path.length; k++) {
+    const a = L.path[k], b = L.path[k + 1], len = Math.hypot(b[0] - a[0], b[2] - a[2]);
+    for (let u = k === 0 ? 0.3 : 0; u <= len; u += 0.75) for (const up of [0.45, 1.5]) {
+      // (not under the slab of the roof that has come down, which is gone under crouched: an eye a man's height up there is in the slab)
+      if (up > 1 && L.path.length > 3 && k === 2 && Math.abs(u - len / 2) < 1.6) continue;
+      eyes.push([`the passage, length ${k + 1}, ${u.toFixed(1)} m along, ${up} m up`, [a[0] + ((b[0] - a[0]) * u) / len, a[1] + ((b[1] - a[1]) * u) / len + up, a[2] + ((b[2] - a[2]) * u) / len]]);
+    }
+  }
+  // (at the foot of the hatch's steps and on them; and down the stair to the sally port and on its landing)
+  // (from where a head is under the ground: higher up the steps it is in the open)
+  for (const t of [0.6, 0.8, 0.98]) eyes.push([`the hatch's steps, ${(t * 100).toFixed(0)} % down`, [L.head[0] + (L.foot[0] - L.head[0]) * t, g - H.drop * t + 1.5, L.head[2] + (L.foot[2] - L.head[2]) * t]]);
+  // (from where a head is under the lower levels' floor: higher up the stair it is in the east side's own room)
+  for (let z = PS.head + 2.2; z <= PS.end - 0.3; z += 0.75) eyes.push([`the stair to the sally port at z ${z.toFixed(1)}`, [(PS.x0 + PS.x1) / 2, (z < PS.foot ? UF + ((PS.deep - UF) * (z - PS.head)) / (PS.foot - PS.head) : PS.deep) + 1.5, z]]);
+  let seen = 0;
+  for (const [where, o] of eyes) {
+    // (what is near enough to matter, once for each eye)
+    const near = tris;
+    for (const d of dirs) {
+      const lid = look(o, d, lids, true), hit = look(o, d, near, false);
+      seen++;
+      if (lid.far < hit.far) continue;
+      assert.ok(hit.far < 60, `from ${where} a line of sight toward ${d.map((v) => v.toFixed(2))} ends on nothing: a hole`);
+      assert.ok(hit.front, `from ${where} a line of sight toward ${d.map((v) => v.toFixed(2))} ends, ${hit.far.toFixed(2)} m off, on the back of a face: a panel is missing, or it is seen from inside`);
+    }
+  }
+  assert.ok(eyes.length > 120 && seen > 20000, `only ${eyes.length} eyes looked`);
+  // (and every face made has a picture: every sheet but the iron and the water)
+  for (const p of SHEETS) assert.ok(p === 'iron' || p === 'water' || !!PICTURES[p].tex, `the ${p} sheet has no picture`);
 });
 
 console.log(`castle: ${n} checks passed`);
