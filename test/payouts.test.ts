@@ -1400,6 +1400,8 @@ await test('what people are told: the page before and after the moment, one line
   const low = world(0.02, FIVES);
   await cash(low, 442, 7);
   says(await (await show(new Request('https://site.test/payouts'), low)).text(), ['>7 due</em>', '0.07 SOL</b> <i>for 7 tags: the treasury is too low', '<b>7</b><span>tags on their way or waiting</span>']);
+  const held = ((await (await show(new Request('https://site.test/payouts?format=json'), low)).json()) as { rows: Record<string, unknown>[] }).rows;
+  assert.deepEqual(held.map((r) => [r.tags, r.pays, r.hold, String(r.why).slice(0, 31)]), [[7, 70_000_000, 'funds', '7 due: the treasury is too low:']]);
 });
 
 console.log(`${n} checks passed`);

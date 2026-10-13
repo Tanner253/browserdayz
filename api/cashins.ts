@@ -445,7 +445,7 @@ export async function show(request: Request, w: World = live()): Promise<Respons
     // lamports, what it is paid when it is paid. `owed` counts every one of those tags.)
     const listed = lines(book, s);
     const rows = listed.map((x) => {
-      if (isWaits(x)) return { at: x.at, name: x.name, owner: '', wallet: x.wallet, state: 'waiting', why: `${x.have} of ${x.need}: ${x.why}`, hold: x.hold, rules: 2, tags: x.have, have: x.have, need: x.need, pays: x.pays };
+      if (isWaits(x)) return { at: x.at, name: x.name, owner: '', wallet: x.wallet, state: 'waiting', why: `${x.have < x.need ? `${x.have} of ${x.need}` : `${x.have} due`}: ${x.why}`, hold: x.hold, rules: 2, tags: x.have, have: x.have, need: x.need, pays: x.pays };
       const { tries: _tries, ...r } = x;
       return r.state === 'paid' ? r : { ...r, ref: undefined };
     });
