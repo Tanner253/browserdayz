@@ -140,6 +140,15 @@ export class CastleSite {
     this.far.name = 'castle:far';
     this.far.matrixAutoUpdate = false;
     all.add(this.far);
+    if (o.earth && shape.near.earth.pos.length) {
+      // (the earth laid over what the world cut for the sally port: it is drawn from the first and from any distance, with the ground's own paint, or the cut would be seen)
+      const lid = new THREE.Mesh(geometry(pack(shape.near.earth)), o.earth);
+      lid.name = 'castle:earth';
+      lid.receiveShadow = true;
+      lid.matrixAutoUpdate = false;
+      all.add(lid);
+      this.counts.draws++;
+    }
     this.near.visible = this.under.visible = false;
     this.fires = LAMPS.map(([x, z, y]) => new THREE.Vector3(...castleAt(P, x, z, y - 0.26)));
     scene.add(all);
@@ -175,7 +184,7 @@ export class CastleSite {
     const cast: THREE.BufferGeometry[] = [];
     const stand = (to: THREE.Group, name: string, of: Record<Sheet, Packed>) => {
       for (const s of SHEETS) {
-        if (!of[s].pos.length) continue;
+        if (!of[s].pos.length || (s === 'earth' && this.o.earth)) continue;
         const mesh = new THREE.Mesh(geometry(of[s]), mats[s]);
         mesh.name = `${name}:${s}`;
         mesh.receiveShadow = true;

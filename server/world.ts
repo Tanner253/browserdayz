@@ -77,10 +77,14 @@ export function buildWorldData(root: string) {
      * ground alone, and is what is asked of somebody who may be under it.
      */
     standAt: (x: number, y: number, z: number) => {
+      // (Over the fort's passage out to its hatch the ground is cut down and the fort lays earth back over it at the
+      // height the ground had, as the bunker's lid lies over its pit: whoever walks there has the ground AS IT IS
+      // SEEN under them, which is `surface`. Everywhere else the two are one.)
+      const ground = Math.max(heightAt(world.heights, x, z), heightAt(world.surface, x, z));
       // (and in the fort a body is on its terrace, a floor of its keep, a tower or a wall: whoever is within its walls
       // and no higher than its keep has something under them)
-      if (inCastle(world.castle, x, y, z)) return Math.max(heightAt(world.heights, x, z), y);
-      return standAt(world.bridges, heightAt(world.heights, x, z), x, y, z);
+      if (inCastle(world.castle, x, y, z)) return Math.max(ground, y);
+      return standAt(world.bridges, ground, x, y, z);
     },
     /** where the fort stands (null: the world has none) */
     castle: world.castle,

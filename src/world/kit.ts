@@ -18,6 +18,7 @@ import * as THREE from 'three';
 import { assets } from '../core/assets';
 import { clipOut, kitMatrix, type KitPiece, type V3 } from '../sim/kit';
 import type { ShaderPatch } from './atmosphere';
+import { SNOW_GROUND } from './ground';
 
 export interface KitOptions {
   /** 1: the kit's far copy (fewer triangles, small pictures); unsaid, the kit as the world draws it */
@@ -160,8 +161,8 @@ export interface StoneLook {
   thin?: number;
 }
 
-/** snow, as paint: near what the ground's own is (src/world/terrain.ts), and never quite white */
-const SNOW_PAINT = 'vec3( 0.76, 0.80, 0.86 )';
+/** snow, as paint: the ground's own (src/world/ground.ts: its one place), so that what lies on a wall and what lies at its foot are one snow */
+const SNOW_PAINT = `vec3( ${SNOW_GROUND.colour.map((c) => c.toFixed(3)).join(', ')} )`;
 
 /**
  * The look of stone, for any standard material. Colour only: nothing here moves a corner or reads a picture more.

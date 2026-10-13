@@ -8,7 +8,7 @@ import { buildWorldData } from '../server/world';
 import { GAS, gasDepth, gasZone } from '../src/sim/gas';
 import { INFECTED, openGround } from '../src/sim/infected';
 import { deckWidth, onBridge, spanOf, wreckUnder } from '../src/sim/bridge';
-import { CASTLE, OUTCROP, castleAt, castleLocal } from '../src/sim/castle';
+import { CASTLE, OUTCROP, castleAt, castleHomes, castleLocal } from '../src/sim/castle';
 
 let n = 0;
 const ok = (name: string, fn: () => void) => {
@@ -278,7 +278,9 @@ ok('the infected keep to it too, and nowhere else has fewer for it', () => {
   const homes = data.homes as { x: number; z: number; n: number; inside?: unknown[] }[];
   const here = homes.find((h) => Math.hypot(h.x - E.x, h.z - E.z) < 1);
   assert.ok(here && here.n >= 4, 'none at the works');
-  assert.equal(homes.reduce((s, h) => s + h.n, 0), INFECTED.max);
+  // (the fort's are its own, over and above the map's: as many as its own file says)
+  const forts = castleHomes(world.castle!).reduce((a, h) => a + h.n, 0);
+  assert.equal(homes.reduce((s, h) => s + h.n, 0), INFECTED.max + forts);
   // (the valley held thirty-three before there was a works, or a bunker with its own shut in it)
   // (the bunker's: the fort on the mountain has a dark of its own under its terrace, counted further down)
   const atFort = (h: { x: number; z: number }) => Math.hypot(h.x - MOUNTAIN.castle.x, h.z - MOUNTAIN.castle.z) < 120;
@@ -289,9 +291,9 @@ ok('the infected keep to it too, and nowhere else has fewer for it', () => {
   assert.ok(over.length === 1 && over[0].n >= 6, 'none over the bunker');
   // (and the fifteen of the east country since: ten in the town, two at the squat, three at the camp; and, since
   // 2026-10-13, the fifteen the outlying places of the old valley were owed and had never had: see INFECTED.max)
-  // (and the fort's eight since: five about its ruined village, three under its terrace)
-  assert.equal(INFECTED.max - here!.n - below[0].n - over[0].n, 33 + 15 + 15 + 8);
-  assert.equal(homes.filter(atFort).reduce((a, h) => a + h.n, 0), 8, 'the fort has not its eight');
+  assert.equal(INFECTED.max - here!.n - below[0].n - over[0].n, 33 + 15 + 15);
+  // (and the fort's own since: about its ruined village and in the dark under its terrace)
+  assert.ok(forts >= 8 && homes.filter(atFort).reduce((a, h) => a + h.n, 0) === forts, 'the fort has not its own');
   const east = homes.filter((h) => (Math.abs(h.x) > 512 || Math.abs(h.z) > 512) && !atFort(h));
   assert.equal(east.reduce((a, h) => a + h.n, 0), 15, 'the east country has not its fifteen');
 });
@@ -529,7 +531,7 @@ ok('the road is a loop: out of the far end of Kamenka, over the bridge, round by
     const [wx, , wz] = castleAt(fort, lx, lz);
     assert.ok(fort.y - ground(wx, wz) > 5.2, `the ground is ${(fort.y - ground(wx, wz)).toFixed(1)} m under the fort's terrace at ${lx}, ${lz}: its cellars are in it`);
   }
-  assert.ok(world.pois.some((q) => q.name === CASTLE.name && q.x === fort.x && q.z === fort.z), 'the fort is not named on the map');
+  assert.ok(world.pois.some((q) => q.name === MOUNTAIN.castle.name && q.x === fort.x && q.z === fort.z), 'the fort is not named on the map');
   const pathEnd = MOUNTAIN.path.line[MOUNTAIN.path.line.length - 1], [ex, ez] = castleLocal(fort, pathEnd[0], 0, pathEnd[1]);
   assert.ok(ex > OUTCROP.x1 && ex < OUTCROP.x1 + 10 && Math.abs(ez) < 6, `the path ends at ${ex.toFixed(0)}, ${ez.toFixed(0)} of the fort's own measure: not at the foot of its rock`);
   // The bridge: nothing is dropped from the sky under it (a supply drop is set down on level, clear ground: there is
@@ -558,6 +560,33 @@ ok('no two things that are searched are one thing to the server: every container
     const was = seen.get(c.cid);
     assert.ok(!was, `${c.cid} is two containers: a ${was?.kind} at ${was?.y.toFixed(1)} m and a ${c.kind} at ${c.y.toFixed(1)} m`);
     seen.set(c.cid, c);
+  }
+});
+
+ok('the fort is no trap for tags and no window on the end of the map: the line takes the mountain in, nobody starts by it, and its roof looks over no near edge', () => {
+  const fort = world.castle!, gate = world.gatehouse!;
+  // (a tag carried outside the line is void after fifteen seconds: the whole way up is inside it, and the ground round the fort)
+  const road = world.roads[world.roads.length - 1].points;
+  for (let i = 0; i < road.length; i += 3) assert.ok(inPlay(road[i], road[i + 2]), `the mountain road leaves the Zona at ${road[i].toFixed(0)}, ${road[i + 2].toFixed(0)}`);
+  for (const [x, z] of world.paths.flat()) assert.ok(inPlay(x, z), `the foot path leaves the Zona at ${x}, ${z}`);
+  assert.ok(inPlay(gate.x, gate.z) && inPlay(fort.x, fort.z));
+  for (let a = 0; a < 16; a++) {
+    const x = fort.x + Math.sin((a / 16) * 6.283) * 100, z = fort.z + Math.cos((a / 16) * 6.283) * 100;
+    assert.ok(Math.abs(x) > WORLD_SIZE / 2 || inPlay(x, z), `a hundred metres from the fort is outside the Zona: ${x.toFixed(0)}, ${z.toFixed(0)}`);
+  }
+  // (the owner's rule for the bunker and the town holds here: nobody is set down near it)
+  for (const s of world.spawns) assert.ok(Math.hypot(s.x - gate.x, s.z - gate.z) > 400 && Math.hypot(s.x - fort.x, s.z - fort.z) > 400, 'somebody starts by the fort');
+  // (from the wall round the keep's roof, wherever an edge of the map is near, some ground on the way to it stands over the eye)
+  const R = MOUNTAIN.rim, eye = fort.y + R.eye, half = WORLD_SIZE / 2;
+  for (let b = 0; b < 720; b++) {
+    const ux = Math.sin((b / 720) * 6.283), uz = -Math.cos((b / 720) * 6.283);
+    let top = -Infinity, s = 4;
+    for (; s < R.near - 30; s += 2) {
+      const x = fort.x + ux * s, z = fort.z + uz * s;
+      if (Math.abs(x) > half - 1 || Math.abs(z) > half - 1) break;
+      top = Math.max(top, heightAt(world.heights, x, z));
+    }
+    if (s < R.near - 30) assert.ok(top > eye + 1, `from the keep's roof the map ends in sight on bearing ${b / 2}: the ground stands no higher than ${top.toFixed(1)} m against an eye at ${eye.toFixed(1)}`);
   }
 });
 

@@ -900,6 +900,16 @@ export class BigMap {
         g.stroke();
       }
     }
+    // the foot paths: a broken line, as a map draws a way that is walked and not driven
+    g.strokeStyle = INK;
+    g.lineWidth = 1.6 * S;
+    g.setLineDash([4 * S, 3 * S]);
+    for (const path of world.paths) {
+      g.beginPath();
+      path.forEach(([x, z], i) => (i ? g.lineTo(X(x), Y(z)) : g.moveTo(X(x), Y(z))));
+      g.stroke();
+    }
+    g.setLineDash([]);
     yield;
     // every building, by its own footprint
     g.fillStyle = INK;

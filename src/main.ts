@@ -106,6 +106,8 @@ async function boot() {
   if (import.meta.env.DEV && new URLSearchParams(location.search).has('sounds')) return (await import('./dev/sounds')).soundsPage();
   // (`?castle`: the fort on the mountain by itself, on a plain ridge, to be looked at and walked)
   if (import.meta.env.DEV && new URLSearchParams(location.search).has('castle')) return (await import('./dev/castle')).castlePage();
+  // (`?post`: the same fort with the army's signals post stood on it, to be looked at)
+  if (import.meta.env.DEV && new URLSearchParams(location.search).has('post')) return (await import('./dev/castle-post')).postPage();
   stage('renderer');
   const r = new Renderer(canvas);
   try {

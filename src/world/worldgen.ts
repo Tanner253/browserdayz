@@ -6,7 +6,7 @@
 import { RNG, Simplex, hash2, clamp, lerp, smoothstep } from '../core/noise';
 import { BUNKER, bunkerAt, type Place } from '../sim/bunker';
 import { wreckUnder, type Bridge } from '../sim/bridge';
-import { CASTLE, castleCuts, castleGround, castleLocal, squareTouches } from '../sim/castle';
+import { castleCuts, castleGround, castleLocal, squareTouches } from '../sim/castle';
 
 export const WORLD_SEED = 1337;
 /**
@@ -209,7 +209,25 @@ export const MOUNTAIN = {
     half: 1.3,
     steep: 0.5,
   },
-  castle: { x: 708, z: -532, rot: -Math.PI / 2, terrace: 226, clear: 45, along: { gate: [34, 62], back: [24, 46] } as { gate: [number, number]; back: [number, number] }, across: [20, 36] as [number, number] },
+  /**
+   * The Zona along it (2026-10-13: "THE ZONA'S LINE must take in the mountain road, the gatehouse, the crest and the
+   * fort ... the place is a fourth-tier destination and must not be a trap for tags"): rounds strung along the road
+   * as they are along the loop, and one round the crest that takes in the fort, the hollow behind it and the ground
+   * to the north of it.
+   */
+  zona: { x: 692, z: -520, r: 185 },
+  /**
+   * The rim behind the fort (2026-10-13: "the map's edge is never seen ... Stand on the keep roof and every tower
+   * top and look east, north and south"). The fort stands sixty metres from the east edge of the map, and the
+   * mountain's rim there was lower than the roof of its keep: from the roof the eye went over it and saw the
+   * ground end. Wherever an edge of the map is nearer than `near` and no ground along the way to it stands `over`
+   * metres above the eye of somebody on the wall round the keep's roof (`eye`, over the terrace: the wall, a body
+   * and a jump), the last `foot` metres of ground before the edge are raised to that, all of it within `crest` of
+   * the edge and none of it at `foot`; so much rougher than level, and eased in along the edge over `ease` metres.
+   * No higher than it must be: from the valley the fort's parapets, keep and towers still stand over it, on the sky.
+   */
+  rim: { near: 420, eye: 12.3, over: 3, foot: 24, crest: 9, rough: 3.5, ease: 26 },
+  castle: { name: 'Orlinoye', x: 708, z: -532, rot: -Math.PI / 2, terrace: 226, clear: 45, along: { gate: [34, 62], back: [24, 46] } as { gate: [number, number]; back: [number, number] }, across: [20, 36] as [number, number] },
 };
 /** The mountain road as a line over the ground, told off every four metres. */
 export function mountainLine(): [number, number][] {
@@ -328,6 +346,9 @@ function loopRounds(): { x: number; z: number; r: number }[] {
   };
   along(L.door);
   along(L.main);
+  // (and up the mountain road to the gatehouse, with one round the crest the fort stands on: see MOUNTAIN.zona)
+  along(mountainLine());
+  out.push({ ...MOUNTAIN.zona });
   return out;
 }
 
@@ -636,6 +657,8 @@ export interface World {
   roads: { points: Float32Array; width: number; /** a side street: its asphalt lies just under the road's where it leaves it, and breaks up at its far end */ side?: boolean; /** the road over a bridge: its two ends, on the deck. No asphalt is laid on the ground for it (see `bridges`) */ bridge?: boolean }[];
   /** the bridges the road goes over (see src/sim/bridge.ts): each is also a line of `roads` */
   bridges: Bridge[];
+  /** foot paths: trodden ledges nothing drives on, each a line of [x, z] over the ground. The maps draw them; nothing else reads them. */
+  paths: [number, number][][];
   /** the fort on the mountain (see MOUNTAIN.castle): its middle, the height of its terrace, and how it is turned, as src/sim/castle.ts wants a place said. Null in a world that has none. */
   castle: { x: number; y: number; z: number; rot: number } | null;
   /** the ruined gatehouse at the end of the mountain road (see MOUNTAIN, src/world/gatehouse.ts): the road's end, on its surface, and which way the road was running there (about Y: at 0 it runs toward +z). Null in a world that has none. */
@@ -2560,6 +2583,7 @@ export function generateWorld(seed = WORLD_SEED): World {
   const bridges: Bridge[] = [];
   let gatehouse: World['gatehouse'] = null;
   let castle: World['castle'] = null;
+  const paths: World['paths'] = [];
   {
     const before = heights.slice();
     const rng8 = new RNG(seed + 9393);
@@ -2897,8 +2921,8 @@ export function generateWorld(seed = WORLD_SEED): World {
       level(end[0] + (ex / el) * M.yard.ahead, end[1] + (ez / el) * M.yard.ahead, M.yard.long, endY, (x, z) => Math.hypot(Math.max(0, Math.abs((x * ex + z * ez) / el) - M.yard.long / 2), Math.max(0, Math.abs((x * -ez + z * ex) / el) - M.yard.wide / 2)), 8);
       // The fort's place (see MOUNTAIN.castle). The crown of the brow is made the ridge the fort is built for: a shelf
       // under it, the foot of each wall as deep under the terrace as the fort says, the crest falling away toward
-      // the gate; and less and less of that further off, to the mountain as it is. Then the one thing the fort asks
-      // to be cut: the ground let down out of the stairwell of its storm-cellar hatch (`castleCuts`).
+      // the gate; and less and less of that further off, to the mountain as it is. (What the fort asks to be cut
+      // is cut further down, after the path and the rim.)
       const F = M.castle, fort = { x: F.x, y: F.terrace, z: F.z, rot: F.rot };
       const fortW = new Float32Array(N * N);
       /** the ground as it was where it was let down out of the hatch's stairwell: what is seen there is the earth the hatch lays over the hole, at that height */
@@ -2913,21 +2937,51 @@ export function generateWorld(seed = WORLD_SEED): World {
             fortW[i] = w;
             heights[i] = lerp(heights[i], F.terrace + castleGround(lx, lz), w);
           }
-        const asItIs = heights.slice();
-        for (const cut of castleCuts(fort, (x, z) => heightAt(asItIs, x, z))) {
-          const xs = cut.well.map((q) => q[0]), zs = cut.well.map((q) => q[1]);
-          for (let iz = Math.floor((Math.min(...zs) + half) / CELL); iz <= Math.floor((Math.max(...zs) + half) / CELL); iz++)
-            for (let ix = Math.floor((Math.min(...xs) + half) / CELL); ix <= Math.floor((Math.max(...xs) + half) / CELL); ix++) {
-              if (!squareTouches(cut.well, -half + ix * CELL, -half + iz * CELL, CELL)) continue;
-              for (const i of [idx(ix, iz), idx(ix + 1, iz), idx(ix, iz + 1), idx(ix + 1, iz + 1)]) {
-                if (heights[i] > cut.to) lidded.set(i, asItIs[i]);
-                heights[i] = Math.min(heights[i], cut.to);
-                fortW[i] = Math.max(fortW[i], 0.001);
-              }
-            }
-        }
         castle = fort;
-        pois.push({ name: CASTLE.name, x: F.x, z: F.z, radius: 40 });
+        // (named on the map by the name the place has in the valley: the fort's own file has the name of the fort it was measured from)
+        pois.push({ name: F.name, x: F.x, z: F.z, radius: 40 });
+      }
+      // The rim behind it, where the map's edge would be seen over it (see MOUNTAIN.rim).
+      {
+        const R = M.rim, eye = F.terrace + R.eye, need = new Float32Array(4 * N);
+        /** where along the map's edge a point of it is: the north edge, the east, the south, the west, each a row of N */
+        const along = (x: number, z: number) => (z <= -half + 1 ? Math.round((x + half) / CELL) : x >= half - 1 ? N + Math.round((z + half) / CELL) : z >= half - 1 ? 2 * N + Math.round((x + half) / CELL) : 3 * N + Math.round((z + half) / CELL));
+        for (let b = 0; b < 1440; b++) {
+          const a = (b / 1440) * Math.PI * 2, ux = Math.sin(a), uz = -Math.cos(a);
+          let top = -Infinity, s = 4;
+          for (; s < R.near; s += CELL) {
+            const x = F.x + ux * s, z = F.z + uz * s;
+            if (Math.abs(x) > half - 1 || Math.abs(z) > half - 1) break;
+            top = Math.max(top, heightAt(heights, x, z));
+          }
+          if (s >= R.near || top >= eye + R.over) continue;
+          const k = along(Math.max(-half, Math.min(half, F.x + ux * s)), Math.max(-half, Math.min(half, F.z + uz * s)));
+          need[k] = Math.max(need[k], eye + R.over);
+        }
+        // (eased in along the edge: a rim that rises to it and falls from it, not a wall with ends)
+        const eased = new Float32Array(4 * N), span = Math.round(R.ease / CELL);
+        for (let side = 0; side < 4; side++)
+          for (let k = 0; k < N; k++) {
+            let most = 0;
+            for (let d = -span; d <= span; d++) {
+              const q = k + d;
+              if (q >= 0 && q < N && need[side * N + q] > 0) most = Math.max(most, 1 - Math.abs(d) / (span + 1));
+            }
+            eased[side * N + k] = most;
+          }
+        for (let iz = 0; iz < N; iz++)
+          for (let ix = 0; ix < N; ix++) {
+            const x = -half + ix * CELL, z = -half + iz * CELL;
+            const e = Math.min(half - Math.abs(x), half - Math.abs(z));
+            if (e > R.foot) continue;
+            const k = half - Math.abs(x) < half - Math.abs(z) ? (x > 0 ? N + iz : 3 * N + iz) : z < 0 ? ix : 2 * N + ix;
+            if (eased[k] <= 0) continue;
+            const i = idx(ix, iz), to = eye + R.over + R.rough * (0.5 + 0.5 * n1.noise(x * 0.09 + 3, z * 0.09 - 7));
+            if (to <= heights[i]) continue;
+            heights[i] = lerp(heights[i], to, smoothstep(0, 1, eased[k]) * (1 - smoothstep(R.crest, R.foot, e)));
+            // (painted and settled with the fort's own ground, below)
+            fortW[i] = Math.max(fortW[i], 0.001);
+          }
       }
       // The path up to the brow: a ledge a body wide, trodden bare, nowhere steeper than a hillside is walked.
       const path = catmullRom(M.path.line, 3), pathDist = new Float32Array(N * N).fill(1e9), pathH = new Float32Array(N * N);
@@ -2950,6 +3004,25 @@ export function generateWorld(seed = WORLD_SEED): World {
           if (mtDist[i] < 7 || mtDist[i] >= 30 || padDist[i] < 1.5 || pathDist[i] < 3.5 || Math.abs(heights[i] - was[i]) < 0.3) continue;
           const h = heights[i], lo = Math.min(heights[i - 1], heights[i + 1], heights[i - N], heights[i + N]);
           if (h - lo > 1.2 * CELL) heights[i] = lerp(h, lo + 1.2 * CELL, 0.5 * (1 - smoothstep(16, 30, mtDist[i])));
+        }
+      }
+      // What the fort asks to be cut (`castleCuts`): the ground let down out of the stair slot of its sally port, the
+      // stairwell of its hatch and a strip along the whole passage between them. LAST of everything that shapes this
+      // ground, the path's ledge and the rim among it: nothing laid after it can fill it in again, and the ground the
+      // fort is told of (`surface`, where the lid lies) is the ground as all of that left it.
+      {
+        const asItIs = heights.slice();
+        for (const cut of castleCuts(fort, (x, z) => heightAt(asItIs, x, z))) {
+          const xs = cut.well.map((q) => q[0]), zs = cut.well.map((q) => q[1]);
+          for (let iz = Math.floor((Math.min(...zs) + half) / CELL); iz <= Math.floor((Math.max(...zs) + half) / CELL); iz++)
+            for (let ix = Math.floor((Math.min(...xs) + half) / CELL); ix <= Math.floor((Math.max(...xs) + half) / CELL); ix++) {
+              if (!squareTouches(cut.well, -half + ix * CELL, -half + iz * CELL, CELL)) continue;
+              for (const i of [idx(ix, iz), idx(ix + 1, iz), idx(ix, iz + 1), idx(ix + 1, iz + 1)]) {
+                if (heights[i] > cut.to) lidded.set(i, asItIs[i]);
+                heights[i] = Math.min(heights[i], cut.to);
+                fortW[i] = Math.max(fortW[i], 0.001);
+              }
+            }
         }
       }
       // What grew or lay there: gone from the road, the hairpin, the yard and the path, and from the fort's place;
@@ -2976,6 +3049,7 @@ export function generateWorld(seed = WORLD_SEED): World {
       }
       // (a lesser road: a street's asphalt, which lies under the edge of the pass road's where it leaves it and breaks up where it stops)
       roads.push({ points: points(line, ys, line.length), width: M.wide, side: true });
+      paths.push(M.path.line);
       // (where the gatehouse stands: the road's end, and the way the road was going there)
       gatehouse = { x: end[0], y: ys[ys.length - 1], z: end[1], rot: Math.atan2(ex, ez) };
     }
@@ -2994,6 +3068,7 @@ export function generateWorld(seed = WORLD_SEED): World {
     road: { points: roadPts, width: ROAD_W },
     roads,
     bridges,
+    paths,
     gatehouse,
     castle,
     buildings,

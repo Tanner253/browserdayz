@@ -219,7 +219,7 @@ export function jeepSpots(world: World, count = JEEP.count, outlying = JEEP.outl
   // (Not at the works, where it would stand under the gas, nor over the bunker. The two places out in the wild
   // country, outside the line, are places like any other: a car out there is the way back.)
   // (Nor at the fort, which is reached on foot.)
-  const NOT_AT = ['Chemical Works', 'Bunker 17', 'The Rocca'];
+  const NOT_AT = ['Chemical Works', 'Bunker 17', 'Orlinoye'];
   const places = [...world.sites.map((st) => ({ x: st.x, z: st.z, rot: st.rot })), ...world.pois.filter((q) => !NOT_AT.includes(q.name) && !world.sites.some((st) => Math.hypot(st.x - q.x, st.z - q.z) < 30)).map((q) => ({ x: q.x, z: q.z, rot: Math.atan2(q.x, q.z) }))].filter((st) => !world.pois.some((q) => NOT_AT.includes(q.name) && Math.hypot(q.x - st.x, q.z - st.z) < 150));
   for (let k = 0; k < more; k++) {
     const alone = (st: { x: number; z: number }) => Math.min(...[...out, ...stations].map((o) => Math.hypot(o.x - st.x, o.z - st.z)));

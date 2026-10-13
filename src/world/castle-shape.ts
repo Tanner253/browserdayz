@@ -12,8 +12,8 @@
 // courses tall, each with the number of turns that fits its own girth. A stone at the foot is the size of a stone
 // at the top, to within a twelfth.
 
-import { inCut, kitBlocks, kitMatrix, kitPoint, kitSolids, KIT_TOWER } from '../sim/kit';
-import { CASTLE, LOOSE, POSTERN, UNDER, castleGround, castleKit, castleParts, hatchLine, looseParts, moundTop, rough, towerRadius, type Apron, type Beam, type Body, type Box, type Curtain, type Flight, type Loose, type Lump, type Mound, type Opening, type Paint, type Part, type Rail, type Slab, type Tower, type V3, type Wall } from '../sim/castle';
+import { clipOut, cutPoly, inCut, kitBlocks, kitMatrix, kitPoint, kitSolids, KIT_TOWER } from '../sim/kit';
+import { CASTLE, LOOSE, UNDER, castleGround, castleKit, castleParts, hatchLine, looseParts, moundTop, rough, towerRadius, type Apron, type Beam, type Body, type Box, type Curtain, type Flight, type Loose, type Lump, type Mound, type Opening, type Paint, type Part, type Rail, type Slab, type Tower, type V3, type Wall } from '../sim/castle';
 
 export type Quat = [number, number, number, number];
 /** what a thing sounds like underfoot and when it is hit */
@@ -192,7 +192,7 @@ function sky(p: V3, n: V3): number {
   const x = p[0] + n[0] * 0.06, y = p[1] + n[1] * 0.06, z = p[2] + n[2] * 0.06, C = CASTLE, K = C.keep, T = C.tower;
   towers ??= castleParts().filter((q): q is Tower => q.t === 'tower');
   // (under the terrace, and in the foot of a tower: only where the vault fell in, and at the rent in the east wall)
-  if (y < -0.04 && ((Math.abs(x) < C.hx + 0.3 && Math.abs(z) < C.hz + 0.3) || towers.some((tw) => Math.hypot(x - tw.cx, z - tw.cz) < towerRadius(y) - 0.02))) return (x > UNDER.bay.x0 - 0.2 && x < UNDER.bay.x1 + 0.1 && z > UNDER.bay.z0 && z < UNDER.bay.z1) || (x > UNDER.x - 0.6 && z > UNDER.rent.z0 && z < UNDER.rent.z1) ? 1 : 0;
+  if (y < -0.04 && ((Math.abs(x) < C.hx + 0.3 && Math.abs(z) < C.hz + 0.3) || towers.some((tw) => Math.hypot(x - tw.cx, z - tw.cz) < towerRadius(y) - 0.02))) return (x > UNDER.bay.x0 - 0.2 && x < UNDER.bay.x1 + 0.1 && z > UNDER.bay.z0 && z < UNDER.bay.z1) || (x > UNDER.cistern.drop.x0 && x < UNDER.cistern.drop.x1 && z > UNDER.cistern.drop.z0 && z < UNDER.cistern.drop.z1) || (x > UNDER.x - 0.6 && z > UNDER.rent.z0 && z < UNDER.rent.z1) ? 1 : 0;
   if (x > K.x0 + 0.3 && x < K.x1 - 0.3 && z > K.z0 + 0.3 && z < K.z1 - 0.3 && y < K.roof - 0.2) {
     return x > K.fallen.x0 && z > K.fallen.z0 && y > K.floors[2] - 0.25 ? 1 : 0;
   }
@@ -575,8 +575,12 @@ function wayAt(ways: Way[], x: number, z: number, by: number): { floor: number; 
   const H = UNDER.hatch;
   for (const { L, g } of ways) {
     const ax = x - L.head[0], az = z - L.head[2], along = ax * L.d[0] + az * L.d[1], off = Math.abs(ax * L.r[0] + az * L.r[1]);
-    if (along < -0.4 - by || along > H.run + L.long + 0.3 || off > H.wide / 2 + 0.45 + by) continue;
-    return along < H.run + 0.65 + by ? { floor: g - H.drop, open: true } : { floor: Math.min(L.foot[1], L.end[1]), open: false };
+    if (along > -0.4 - by && along < H.run + 0.65 + by && off < H.wide / 2 + 0.45 + by) return { floor: g - H.drop, open: true };
+    for (let k = 0; k + 1 < L.path.length; k++) {
+      const a = L.path[k], b = L.path[k + 1], ex = b[0] - a[0], ez = b[2] - a[2], t = Math.min(1, Math.max(0, ((x - a[0]) * ex + (z - a[2]) * ez) / (ex * ex + ez * ez)));
+      // (its floor where it is nearest: a passage falls along its length, and what is clear over one end of it is in the other)
+      if (Math.hypot(x - a[0] - ex * t, z - a[2] - ez * t) < H.wide / 2 + 0.45 + by) return { floor: a[1] + (b[1] - a[1]) * t - 0.1, open: false };
+    }
   }
   return null;
 }
@@ -586,9 +590,11 @@ function moundPart(m: Mound, o: Out, put: Put, lod: number, ground: (x: number, 
   const H = new Float32Array(W * (nz + 1));
   for (let iz = 0; iz <= nz; iz++) for (let ix = 0; ix <= nx; ix++) {
     let y = moundTop(m.kind, m.x0 + ix * m.cell, m.z0 + iz * m.cell);
-    // (made ground gives way to a hatch: it is not in its stairwell, and not in its passage unless it lies clear over the passage's roof)
+    // (made ground gives way to a hatch: it is not in its stairwell; and over its passage it lies over the passage's
+    // roof and nowhere lower. Not let down under the floor in the places where it would be in the way: a place let
+    // down beside one that is not is a wall across the passage, which was found by walking into it.)
     const way = ways.length ? wayAt(ways, m.x0 + ix * m.cell, m.z0 + iz * m.cell, m.cell) : null;
-    if (way && (way.open || y < way.floor + UNDER.hatch.tall + 0.7)) y = Math.min(y, way.floor - 0.7);
+    if (way) y = way.open ? Math.min(y, way.floor - 0.7) : Math.max(y, way.floor + UNDER.hatch.tall + 0.85);
     H[iz * W + ix] = y;
   }
   // (what is drawn: the same heights, but where the ground is said to be far under everything, which is how it is
@@ -630,37 +636,35 @@ function moundPart(m: Mound, o: Out, put: Put, lod: number, ground: (x: number, 
 }
 
 /**
- * Earth round a hole in the ground: level at the hole's edge, and at its rim wherever the ground is. In two bands,
- * cut along each side and at each corner; what stops a body is a thin shape under each piece of it.
+ * The ground's own earth, laid over ground that has been cut away for something under it: in squares of two
+ * metres, each corner at the height the ground has there (the ground as it was: see `castleCuts`), wherever a
+ * square's middle is within reach of one of the pieces that were cut; none of it under the fort itself, which
+ * hides what is cut there, and none over the hole that is left open. What stops a body is a thin shape under each square.
  */
 function apronPart(p: Apron, o: Out, put: Put, ground: (x: number, z: number) => number) {
-  const g = p.inner[0][1], mid = mul(add(add(p.inner[0], p.inner[1]), add(p.inner[2], p.inner[3])), 0.25), CUT = 3;
-  // (round the hole: so many places along each side, each with the place straight out from it; and at a corner, the place out from it both ways)
-  const ring: { a: V3; out: V3 }[] = [];
-  for (let k = 0; k < 4; k++) {
-    const a = p.inner[k], b = p.inner[(k + 1) % 4], prev = p.inner[(k + 3) % 4], along = unit(sub(b, a));
-    let n: V3 = [along[2], 0, -along[0]];
-    if (dot(n, sub(a, mid)) < 0) n = mul(n, -1);
-    const before = unit(sub(a, prev));
-    let m: V3 = [before[2], 0, -before[0]];
-    if (dot(m, sub(a, mid)) < 0) m = mul(m, -1);
-    ring.push({ a, out: add(a, mul(add(n, m), p.reach)) });
-    for (let i = 0; i <= CUT; i++) {
-      const q = add(a, mul(sub(b, a), i / CUT));
-      ring.push({ a: q, out: add(q, mul(n, p.reach)) });
+  const CELL = 2, C = CASTLE, fx = C.hx + C.parapet.thick / 2 + 0.9, fz = C.hz + C.parapet.thick / 2 + 0.9, all = p.wells.flat();
+  const lo = (k: number) => Math.floor((Math.min(...all.map((q) => q[k])) - p.reach) / CELL) * CELL, hi = (k: number) => Math.ceil((Math.max(...all.map((q) => q[k])) + p.reach) / CELL) * CELL;
+  const hole = cutPoly(p.hole, -1e3, 1e3);
+  /** how far a spot is from a piece of the plan (0: in it) */
+  const off = (poly: [number, number][], x: number, z: number) => {
+    let inside = true, best = Infinity, sign = 0;
+    for (let k = 0; k < poly.length; k++) {
+      const [ax, az] = poly[k], [bx, bz] = poly[(k + 1) % poly.length], ex = bx - ax, ez = bz - az, turn = ex * (z - az) - ez * (x - ax);
+      if (sign === 0) sign = Math.sign(turn);
+      else if (turn * sign < 0) inside = false;
+      const t = Math.min(1, Math.max(0, ((x - ax) * ex + (z - az) * ez) / (ex * ex + ez * ez)));
+      best = Math.min(best, Math.hypot(x - ax - ex * t, z - az - ez * t));
     }
-  }
-  const at = (k: number, t: number): V3 => {
-    const { a, out } = ring[k % ring.length], rim = ground(out[0], out[2]) + 0.03;
-    // (level for the first of the way out, then to the ground's own height by the rim)
-    const s = Math.min(1, Math.max(0, (t - 0.25) / 0.75)), e = s * s * (3 - 2 * s);
-    return [a[0] + (out[0] - a[0]) * t, g + (rim - g) * e, a[2] + (out[2] - a[2]) * t];
+    return inside ? 0 : best;
   };
-  for (let k = 0; k < ring.length; k++) for (const [t0, t1] of [[0, 0.5], [0.5, 1]]) {
-    const q = [at(k, t0), at(k + 1, t0), at(k + 1, t1), at(k, t1)];
-    if (len(sub(q[1], q[0])) < 1e-6 && len(sub(q[2], q[3])) < 1e-6) continue;
-    o.quad(q, q.map((v): UV => [v[0], v[2]]), UP, p.tone ?? 1);
-    put({ t: 'hull', pts: [...q, ...q.map((v): V3 => [v[0], v[1] - 0.5, v[2]])].flat(), feet: false, surface: 'rock', name: p.name ?? 'apron' });
+  for (let x = lo(0); x < hi(0); x += CELL) for (let z = lo(1); z < hi(1); z += CELL) {
+    if (Math.max(Math.abs(x), Math.abs(x + CELL)) < fx && Math.max(Math.abs(z), Math.abs(z + CELL)) < fz) continue;
+    if (!p.wells.some((w) => off(w, x + CELL / 2, z + CELL / 2) < p.reach)) continue;
+    for (const piece of clipOut([[x, 0, z], [x + CELL, 0, z], [x + CELL, 0, z + CELL], [x, 0, z + CELL]], hole)) {
+      const pts = piece.map((v): V3 => [v[0], ground(v[0], v[2]) + 0.03, v[2]]);
+      for (let k = 1; k + 1 < pts.length; k++) o.tri([pts[0], pts[k], pts[k + 1]], [pts[0], pts[k], pts[k + 1]].map((v): UV => [v[0], v[2]]), UP, p.tone ?? 1);
+      put({ t: 'hull', pts: [...pts, ...pts.map((v): V3 => [v[0], v[1] - 0.5, v[2]])].flat(), feet: false, surface: 'rock', name: p.name ?? 'apron' });
+    }
   }
 }
 
@@ -1015,8 +1019,13 @@ export function castleShape(ground: (x: number, z: number) => number = castleGro
   const fars = Object.fromEntries(PAINTS.map((p) => [p, new Out(far, 1, FAR_TINT[p], MOTTLE[p], 0, WARP[p])])) as Record<Paint, Out>;
   // (where each hatch's passage goes through the foot of a wall, half way between its ends)
   const gaps: Gap[] = loose.filter((l) => l.kind === 'hatch').flatMap((l) => {
-    const L = hatchLine(l, ground(l.x, l.z)), lo = Math.min(L.foot[1], L.end[1]);
-    return [0.04, 0.12, 0.2, 0.28, 0.36, 0.44].map((t) => ({ x: POSTERN.x + (L.foot[0] - POSTERN.x) * t, z: POSTERN.z + (L.foot[2] - POSTERN.z) * t, y0: lo - 0.6, y1: lo + UNDER.hatch.tall + 0.7 }));
+    // (along the last eight metres of its passage, by the fort)
+    const L = hatchLine(l, ground(l.x, l.z)), b = L.path[L.path.length - 1], a = L.path[L.path.length - 2], len = Math.hypot(a[0] - b[0], a[2] - b[2]), out: Gap[] = [];
+    for (let d = 0.3; d <= Math.min(len, 8); d += 0.7) {
+      const y = b[1] + ((a[1] - b[1]) * d) / len;
+      out.push({ x: b[0] + ((a[0] - b[0]) * d) / len, z: b[2] + ((a[2] - b[2]) * d) / len, y0: y - 0.6, y1: y + UNDER.hatch.tall + 0.7 });
+    }
+    return out;
   });
   const ways: Way[] = loose.filter((l) => l.kind === 'hatch').map((l) => ({ L: hatchLine(l, ground(l.x, l.z)), g: ground(l.x, l.z) }));
   for (const raw of [...castleParts().filter((p) => rock || !/outcrop|ramp head/.test(p.name ?? '')), ...loose.flatMap((l) => looseParts(l, ground(l.x, l.z)))]) {

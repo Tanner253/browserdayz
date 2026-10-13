@@ -15,7 +15,7 @@ import os from 'node:os';
 import path from 'node:path';
 import WebSocket from 'ws';
 import { PROTOCOL, type S2C } from '../src/net/protocol';
-import { CASTLE, UNDER, castleAt, castleUnder, inCastle } from '../src/sim/castle';
+import { CASTLE, UNDER, castleAt, castleLoose, castleUnder, hatchLine, inCastle, looseLocal } from '../src/sim/castle';
 import { generateWorld, heightAt } from '../src/world/worldgen';
 
 const PORT = 8147;
@@ -38,15 +38,22 @@ const ok = (name: string, fn: () => void) => {
 const terrace: [number, number, number][] = [[7.6, -7.5, 0], [7.6, 7.5, 0], [-7.6, 7.5, 0], [-7.6, -7.5, 0]];
 const roof: [number, number, number][] = [[-3, -2, CASTLE.keep.roof], [1, -2, CASTLE.keep.roof], [1, 1, CASTLE.keep.roof], [-3, 1, CASTLE.keep.roof]];
 const dark: [number, number, number][] = [[0.8, -6.1, UNDER.floor], [-5, -6.1, UNDER.floor], [5, -6.1, UNDER.floor]];
-// the passage: every place the fort says is its own that is truly under the ground, outside its walls, taken from its far end to its near
+// the passage: the sally port's own line (`hatchLine`), from the foot of the hatch's steps in the old village to where
+// it leaves the fort. The ground over it is cut down for it and the fort lays earth back over the cut at the height
+// the ground had: so whoever walks it is under the ground as it is SEEN, and that is what is asked here.
+const hatch = castleLoose(P).find((l) => l.kind === 'hatch')!;
+const way = hatchLine(looseLocal(P, [hatch])[0], seen(hatch.x, hatch.z) - P.y).path as [number, number, number][];
 const passage: [number, number, number][] = [];
-for (let x = 24; x >= 9; x -= 0.5) for (let z = -3; z <= 9; z += 0.5) for (const y of [UNDER.postern.deep + 0.2, UNDER.postern.deep + 1.2, UNDER.postern.deep + 2.2]) {
-  const [wx, wy, wz] = castleAt(P, x, z, y);
-  if (castleUnder(P, wx, wy, wz, seen) && wy < ground(wx, wz) - 1.6 && !passage.some((q) => Math.hypot(q[0] - x, q[1] - z) < 1.5)) passage.push([x, z, y]);
+for (let k = 0; k + 1 < way.length; k++) {
+  const a = way[k], b = way[k + 1], n = Math.max(1, Math.round(Math.hypot(b[0] - a[0], b[2] - a[2]) / 1.5));
+  for (let j = 0; j <= n; j++) {
+    const x = a[0] + ((b[0] - a[0]) * j) / n, y = a[1] + ((b[1] - a[1]) * j) / n + 0.05, z = a[2] + ((b[2] - a[2]) * j) / n;
+    const [wx, wy, wz] = castleAt(P, x, z, y);
+    if (wy < seen(wx, wz) - 1.6 && !passage.some((q) => Math.hypot(q[0] - x, q[1] - z) < 1)) passage.push([x, z, y]);
+  }
 }
-// (walked there and back between its two ends, by way of the places between that lie nearest the straight line)
-const ends: [[number, number, number], [number, number, number]] = [passage[0], passage[passage.length - 1]];
-const line = passage.filter((q) => Math.abs((q[0] - ends[0][0]) * (ends[1][1] - ends[0][1]) - (q[1] - ends[0][1]) * (ends[1][0] - ends[0][0])) / (Math.hypot(ends[1][0] - ends[0][0], ends[1][1] - ends[0][1]) || 1) < 1.2).sort((p, q) => q[0] - p[0]);
+// (walked there and back, from its one end to its other)
+const line = passage;
 
 ok('the fort stands where the map says, and what is asked of the server is really asked: a terrace over a fall, a passage under the ground', () => {
   for (const [x, z, y] of [...terrace, ...roof]) assert.ok(inCastle(P, ...castleAt(P, x, z, y)), `a place on the terrace or the roof that is not in the fort: ${x}, ${z}`);
@@ -54,7 +61,8 @@ ok('the fort stands where the map says, and what is asked of the server is reall
   const [rx, ry, rz] = castleAt(P, ...roof[0]);
   assert.ok(ry - ground(rx, rz) > 12, `the keep's roof is only ${(ry - ground(rx, rz)).toFixed(1)} m over the ground`);
   for (const [x, z, y] of dark) assert.ok(castleUnder(P, ...castleAt(P, x, z, y), seen), `a place under the terrace that the fort does not own: ${x}, ${z}`);
-  assert.ok(passage.length >= 4 && line.length >= 2, `only ${passage.length} places of the passage are under the ground`);
+  assert.ok(passage.length >= 8, `only ${passage.length} places of the passage are under the ground`);
+  for (const [x, z, y] of passage) assert.ok(castleUnder(P, ...castleAt(P, x, z, y + 0.9), seen), `a place in the passage that the fort does not own: ${x.toFixed(1)}, ${z.toFixed(1)}`);
 });
 
 class Player {

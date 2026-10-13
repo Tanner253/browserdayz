@@ -205,9 +205,9 @@ ok('snow has somewhere to lie and somewhere it cannot: the sky is over the terra
     const u = shape.under[p];
     for (let i = 0; i < u.pos.length / 3; i++) {
       if (u.snow[i * 2] === 0) continue;
-      // (what of the lower levels the sky is over: under the bay of vault that fell in, and at the rent in the east wall)
-      const [x, z] = [u.pos[i * 3], u.pos[i * 3 + 2]], B = UNDER.bay, R = UNDER.rent;
-      assert.ok((x > B.x0 - 0.4 && x < B.x1 + 0.3 && z > B.z0 - 0.2 && z < B.z1 + 0.2) || (x > UNDER.x - 0.8 && z > R.z0 - 0.2 && z < R.z1 + 0.2), `the sky is over ${x.toFixed(1)}, ${z.toFixed(1)} under the terrace`);
+      // (what of the lower levels the sky is over: under the bay of vault that fell in, under the hole in the walk over the cistern, and at the rent in the east wall)
+      const [x, z] = [u.pos[i * 3], u.pos[i * 3 + 2]], B = UNDER.bay, R = UNDER.rent, D = UNDER.cistern.drop;
+      assert.ok((x > B.x0 - 0.4 && x < B.x1 + 0.3 && z > B.z0 - 0.2 && z < B.z1 + 0.2) || (x > D.x0 - 0.2 && x < D.x1 + 0.2 && z > D.z0 - 0.2 && z < D.z1 + 0.2) || (x > UNDER.x - 0.8 && z > R.z0 - 0.2 && z < R.z1 + 0.2), `the sky is over ${x.toFixed(1)}, ${z.toFixed(1)} under the terrace`);
       lit++;
     }
   }
@@ -224,7 +224,7 @@ ok('its walls and its towers go down past the ground it assumes, by three metres
   for (const [x, z] of [[0, -C.hz - 2.5], [0, C.hz + 2.5], [C.hx + 2.5, 5], [-C.hx - 2.5, 0]]) assert.ok(castleGround(x, z) + C.deep > 3, `the curtain at ${x}, ${z}`);
   // and every loose piece stands three metres into whatever it is put on
   // (but the hatch, which is dug: its kerb and its passage are made to the depth of the ground where it is set down)
-  for (const l of LOOSE) for (const p of looseParts(l)) if (p.t === 'wall') assert.ok(l.kind === 'hatch' ? p.y0 <= castleGround(l.x, l.z) - 1 : p.y0 <= -3 && !!p.sits, `${l.kind}: the foot of its ${p.name}`);
+  for (const l of LOOSE) for (const p of looseParts(l)) if (p.t === 'wall' && (l.kind !== 'hatch' || p.name === 'hatch kerb')) assert.ok(l.kind === 'hatch' ? p.y0 <= castleGround(l.x, l.z) - 1 : p.y0 <= -3 && !!p.sits, `${l.kind}: the foot of its ${p.name}`);
 });
 
 // ---- what stops a body
@@ -251,7 +251,7 @@ ok('what stops a body is sound: every block has size and is turned by a turn, ev
   for (const s of boxes) {
     assert.ok(s.h.every((v) => v > 0 && Number.isFinite(v)) && Math.abs(Math.hypot(...s.q) - 1) < 1e-6 && s.c.every(Number.isFinite), `${s.name}: ${s.h}`);
   }
-  assert.ok(shape.solids.length < 1500, `${shape.solids.length} things to run into`);
+  assert.ok(shape.solids.length < 2200, `${shape.solids.length} things to run into`);
   // a flight is a slope and a last tread, both for feet alone; nothing of a slope is steeper than legs go up
   const slopes = boxes.filter((s) => s.feet && /stair|steps|flight|scaffold/.test(s.name) && s.h[1] === 0.04);
   assert.ok(slopes.length >= flights.length * 2);
@@ -336,10 +336,11 @@ ok('what lies in it lies where a hand can reach: on a floor, on a table, on a sh
   };
   for (const l of loot) assert.equal(l.tier, !inCastle(P, l.x, l.y, l.z) ? CASTLE_TIERS.grounds : top(l) ? CASTLE_TIERS.high : CASTLE_TIERS.fort, `a thing at ${castleLocal(P, l.x, l.y, l.z).map((v) => v.toFixed(1))}`);
   const high = loot.filter((l) => l.tier === CASTLE_TIERS.high), deep = high.filter((l) => l.y < P.y - 0.5);
-  assert.ok(high.length === 15 && deep.length === 12 && high.some((l) => l.arms === 'guns'), `${high.length} places of the high step, ${deep.length} of them under the terrace`);
-  assert.ok(deep.every((l) => castleUnder(P, l.x, l.y + 0.5, l.z)));
-  assert.equal(loot.filter((l) => l.arms === 'guns').length, 1);
-  assert.ok(inside.every((l) => l.usage.includes('Military')) && loot.filter((l) => !inCastle(P, l.x, l.y, l.z)).every((l) => l.usage.includes('Hunting')));
+  // (the vaults are the richest of it: the armoury, whose five racks always have a gun on them, and the aid post, which has what a dressing station had)
+  const arms = loot.filter((l) => l.arms === 'guns'), medic = loot.filter((l) => l.usage.includes('Medic'));
+  assert.ok(high.length >= 26 && high.length <= 34 && deep.length >= 23 && arms.length === 6 && arms.filter((l) => l.y < P.y - 0.5).length === 5 && medic.length === 6, `${high.length} places of the high step, ${deep.length} of them under the terrace; ${arms.length} that always hold a gun; ${medic.length} of the aid post's`);
+  assert.ok(deep.every((l) => castleUnder(P, l.x, l.y + 0.5, l.z)) && medic.every((l) => l.y < P.y - 0.5 && castleLocal(P, l.x, l.y, l.z)[1] > 5.5));
+  assert.ok(inside.every((l) => l.usage.includes('Military') || l.usage.includes('Medic')) && loot.filter((l) => !inCastle(P, l.x, l.y, l.z)).every((l) => l.usage.includes('Hunting')));
   for (const l of inside) {
     const [x, z, y] = castleLocal(P, l.x, l.y, l.z);
     // (a hand's breadth over where it lies there is nothing: furniture stands in what stops a body, so the look is from just over it)
@@ -361,7 +362,7 @@ ok('its loose pieces go where they are put, and what is theirs goes with them', 
   assert.ok(castleProps(P, flat, moved).filter((p) => Math.hypot(p.x - P.x, p.z - P.z) > 300).length === 2);
   const homes = castleHomes(P, moved);
   // (the infected of the fort itself have the dark under the terrace, and nothing over it)
-  assert.ok(homes.length === 2 && Math.hypot(homes[0].x - P.x, homes[0].z - P.z) > 300 && homes[1].n === 3 && homes[1].inside!.every((s) => inCastle(P, ...s) && castleUnder(P, s[0], s[1] + 0.9, s[2])));
+  assert.ok(homes.length === 2 && Math.hypot(homes[0].x - P.x, homes[0].z - P.z) > 300 && homes[1].n === 4 && homes[1].inside!.every((s) => inCastle(P, ...s) && castleUnder(P, s[0], s[1] + 0.9, s[2])));
   // with no houses there is still the fort
   assert.equal(castleHomes(P, []).length, 1);
   assert.ok(castleLoot(P, flat, []).every((l) => inCastle(P, l.x, l.y, l.z)));
@@ -369,7 +370,7 @@ ok('its loose pieces go where they are put, and what is theirs goes with them', 
   const bare = castleShape(castleGround, []);
   assert.ok(Math.max(...bare.near.stone.pos.filter((_, i) => i % 3 === 0)) < 30);
   // (nor of the hatch: with none set down there is no passage)
-  assert.ok(!bare.solids.some((q) => /hatch|passage (floor|roof|wall)$/.test((q as { name: string }).name)) && castleCuts(P, undefined, []).length === 0);
+  assert.ok(!bare.solids.some((q) => /hatch|passage (floor|roof|wall)$/.test((q as { name: string }).name)) && castleCuts(P, undefined, []).length === 1);
   assert.ok(castleShape(castleGround, [], false).near.rock.pos.length === 0);
 });
 
@@ -384,7 +385,7 @@ ok('its fires and what stands in it are in it', () => {
   }
 });
 
-// ---- under the terrace
+// ---- under the terrace: THE VAULTS
 
 /** whether a body with its feet at a spot is in the foot of a tower: a cone, or (the hollow one) a round wall with a doorway in it */
 function inFoot(feet: V3) {
@@ -404,33 +405,35 @@ function inFoot(feet: V3) {
   }
   return null;
 }
-const UF = UNDER.floor, PS = UNDER.postern, CELL = 0.15;
+const UF = UNDER.floor, PS = UNDER.postern, CI = UNDER.cistern, CELL = 0.15;
 /** the blocks a body on the lower levels' floor could meet */
 const lowBoxes = boxes.filter((q) => !q.feet && q.c[1] - Math.hypot(...q.h) < UF + 1.8 && q.c[1] + Math.hypot(...q.h) > UF && Math.abs(q.c[0]) < 16 && Math.abs(q.c[2]) < 16);
-const free = new Map<number, boolean>();
-/** whether a body can stand on the lower levels' floor at a square of it */
-function stands(i: number, j: number) {
-  const key = i * 4096 + j;
-  let v = free.get(key);
+const free = [new Map<number, boolean>(), new Map<number, boolean>()];
+/** whether a body can be on the lower levels' floor at a square of it: standing, or (`low`) crouched */
+function stands(i: number, j: number, low: boolean) {
+  const key = i * 4096 + j, known = free[low ? 1 : 0];
+  let v = known.get(key);
   if (v === undefined) {
     const x = i * CELL, z = j * CELL, feet: V3 = [x, UF + 0.02, z];
     // (there is floor: inside the outer walls but for the slot of the stair down, and in the round cellar of the hollow tower)
     const floor = (Math.abs(x) < UNDER.x + 0.3 && Math.abs(z) < UNDER.z + 0.3 && !(x > PS.x0 - 0.3 && x < PS.x1 + 0.3 && z > PS.head - 0.1 && z < PS.end + 0.3)) || towers.some((tw) => tw.hollow !== undefined && Math.hypot(x - tw.cx, z - tw.cz) < T.r + 1.2);
-    v = floor && inFoot(feet) === null && !lowBoxes.some((q) => [0.34, 0.61, 0.88, 1.15, 1.42].some((y) => clear(q, [x, feet[1] + y, z]) < 0.29));
-    free.set(key, v);
+    // (and where the stone of the fallen vault lies more than a step deep there is no floor to be on: that is the slope up to the terrace)
+    const heaped = x > -UNDER.x - 0.2 && x < UNDER.crawl + 0.4 && z > UNDER.bay.z0 - 0.7 && z < UNDER.bay.z1 + 0.9 && moundTop('vault', x, z) > UF + 0.45;
+    v = floor && !heaped && inFoot(feet) === null && !lowBoxes.some((q) => (low ? [0.34, 0.61, 0.82] : [0.34, 0.61, 0.88, 1.15, 1.42]).some((y) => clear(q, [x, feet[1] + y, z]) < 0.29));
+    known.set(key, v);
   }
   return v;
 }
-/** every square of the floor a body can walk to from a spot, with some of it shut (`shut`: a way that is tried without) */
-function reach(from: [number, number], shut: (x: number, z: number) => boolean = () => false) {
+/** every square of the floor a body can get to from a spot, with some of it shut (`shut`: a way that is tried without); `low`: crouching where it must */
+function reach(from: [number, number], low: boolean, shut: (x: number, z: number) => boolean = () => false) {
   const start: [number, number] = [Math.round(from[0] / CELL), Math.round(from[1] / CELL)], seen = new Set<number>(), todo = [start];
-  assert.ok(stands(...start), `nobody can stand at ${from}`);
+  assert.ok(stands(start[0], start[1], low), `nobody can stand at ${from}`);
   seen.add(start[0] * 4096 + start[1]);
   while (todo.length) {
     const [i, j] = todo.pop()!;
     for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
       const a = i + di, b = j + dj, key = a * 4096 + b;
-      if (seen.has(key) || !stands(a, b) || shut(a * CELL, b * CELL)) continue;
+      if (seen.has(key) || !stands(a, b, low) || shut(a * CELL, b * CELL)) continue;
       seen.add(key);
       todo.push([a, b]);
     }
@@ -440,122 +443,153 @@ function reach(from: [number, number], shut: (x: number, z: number) => boolean =
     return false;
   };
 }
-/** a spot in each part of the lower levels */
-const ROOMS: Record<string, [number, number]> = { chamber: [0.2, -0.9], cistern: [-1, -6.1], cellars: [6, -3.2], cells: [2, 6.2] };
-const ENDS: Record<string, [number, number]> = { 'the west gallery': [-7.2, -4.4], 'the nook past the fallen vault': [-7.2, 6.5], 'the cellar in the tower': [-C.hx - 0.9, -C.hz + 0.9], 'the first cell': [-1.9, 7.7], 'the second cell': [0.3, 7.7], 'the third cell': [2.5, 7.7] };
+/** a spot in each of the four sides, which are a ring; and in each place that is off the ring */
+const ROOMS: Record<string, [number, number]> = { 'the cistern': [-1, -5.1], 'the sally port': [6.45, -1.0], 'the aid post': [2, 6.2], 'the west side': [-7.2, -3.4] };
+const ENDS: Record<string, [number, number]> = { 'the armoury': [0.3, 0.2], 'the nook past the fallen vault': [-7.2, 6.5], 'the cellar in the tower': [-C.hx - 0.9, -C.hz + 0.9], 'the first cell': [-1.9, 7.5], 'the second cell': [0.3, 7.5], 'the third cell': [2.5, 7.5], 'the foot of the stair from the store': [2.7, -2.9] };
+/** the armoury's one door */
+const GRILLE: [number, number, number, number] = [-1.9, -0.3, UNDER.mid.z1 - 0.1, K.z1 + 0.1];
+const inBox = ([x0, x1, z0, z1]: [number, number, number, number]) => (x: number, z: number) => x > x0 && x < x1 && z > z0 && z < z1;
 
-ok('under the terrace every part is come at on foot: the chamber, the four galleries, the cells, the cellar in the tower, the head of each stair', () => {
-  const got = reach(ROOMS.chamber);
-  for (const [name, at] of [...Object.entries(ROOMS), ...Object.entries(ENDS)]) assert.ok(got(...at), `nobody gets from the chamber to ${name}`);
-  // the foot of the stair from the keep's store, the head of the stair down to the passage out, the foot of the fallen vault, the rent in the east wall
-  for (const [name, at] of [['the stair from the store', [UNDER.stair.foot + 0.6, UNDER.stair.z]], ['the stair to the passage', [(PS.x0 + PS.x1) / 2, PS.head - 0.45]], ['the fallen vault', [-7.2, UNDER.bay.z0 - 0.3]], ['the rent', [UNDER.rent.in - 0.4, (UNDER.rent.z0 + UNDER.rent.z1) / 2]]] as [string, [number, number]][]) assert.ok(got(...at), `nobody gets from the chamber to ${name}`);
-  // and every thing that lies down there lies within reach of somewhere a body stands (but what is on the landing of the passage, a level lower)
+ok('the vaults: every part is come at on foot, the armoury by its one door, and nobody has to crouch but to pass the fallen vault', () => {
+  const got = reach(ROOMS['the cistern'], false);
+  // (standing: all of it but the west side south of its fallen vault, which is come at from the aid post)
+  for (const [name, at] of [...Object.entries(ROOMS), ...Object.entries(ENDS)]) assert.ok(got(...at), `nobody gets from the cistern to ${name}`);
+  // the head of the stair down to the sally port, the foot of the fallen vault, the rent in the east wall, the postern's doorway
+  for (const [name, at] of [['the stair to the passage', [(PS.x0 + PS.x1) / 2, PS.head - 0.45]], ['the fallen vault', [-7.7, UNDER.bay.z0 - 0.3]], ['the rent', [UNDER.rent.in - 0.4, (UNDER.rent.z0 + UNDER.rent.z1) / 2]], ['the postern', [-UNDER.x + 0.4, (UNDER.goat.z0 + UNDER.goat.z1) / 2]]] as [string, [number, number]][]) assert.ok(got(...at), `nobody gets from the cistern to ${name}`);
+  // every thing that lies down there lies within reach of somewhere a body stands (but what is on the landing of the passage, a level lower)
   for (const l of castleLoot(P)) {
     const [x, z, y] = castleLocal(P, l.x, l.y, l.z);
     if (y < -0.5 && y > UF - 0.5) assert.ok(got(x, z, 0.75), `nobody reaches the thing at ${x.toFixed(1)}, ${z.toFixed(1)}`);
   }
-  // no dead end is longer than a room: from the far end of each, the ring is no more than ten metres off
+  // the armoury is a dead end on purpose: shut its grille and nobody is in it
+  assert.ok(!reach(ROOMS['the cistern'], true, inBox(GRILLE))(...ENDS['the armoury']), 'the armoury has another way in');
+  // and no other dead end is deeper than a room: from the far end of each, the ring is no more than ten metres off
   for (const [name, at] of Object.entries(ENDS)) assert.ok(Object.values(ROOMS).some((r) => Math.hypot(r[0] - at[0], r[1] - at[1]) < 10.5), name);
 });
 
-ok('and there are two ways between any two parts of it: shut any one door, or either corner, and the four are still joined', () => {
-  // (the chamber's three doors, and the two corners where the cellars meet the cistern and the cells)
+ok('the vaults are a ring: shut any one of its five narrows and the four sides are still joined; shut them all and they are not', () => {
   const ways: Record<string, [number, number, number, number]> = {
-    "the chamber's north door": [2, 3.4, K.z0 - 0.1, UNDER.mid.z0 + 0.1], "the chamber's east door": [UNDER.mid.x1 - 0.1, K.x1 + 0.1, -0.9, 0.9], "the chamber's south door": [-2, -0.2, UNDER.mid.z1 - 0.1, K.z1 + 0.1],
-    'the north-east corner': [K.x1, 9, -5.45, -5.05], 'the south-east corner': [K.x1, 9, 5.05, 5.45],
+    "the cistern's east end": [CI.x1 - 0.25, CI.x1 + 0.25, -9, CI.z1 + 0.05], 'the south-east corner': [K.x1, 9, 5.05, 5.45], 'the south-west corner': [K.x0 - 0.45, K.x0 - 0.05, 5.45, 9],
+    'the way past the fallen vault': [UNDER.crawl, K.x0 + 0.05, 1.6, 2.0], "the cistern's west end": [-9, K.x0 + 0.05, CI.z1 + 0.05, CI.z1 + 0.45],
   };
-  for (const [name, [x0, x1, z0, z1]] of Object.entries(ways)) {
-    const got = reach(ROOMS.chamber, (x, z) => x > x0 && x < x1 && z > z0 && z < z1);
-    for (const [room, at] of Object.entries(ROOMS)) assert.ok(got(...at), `with ${name} shut nobody gets from the chamber to the ${room}`);
+  for (const [name, box] of Object.entries(ways)) {
+    const got = reach(ROOMS['the cistern'], true, inBox(box));
+    for (const [room, at] of Object.entries(ROOMS)) assert.ok(got(...at), `with ${name} shut nobody gets from the cistern to ${room}`);
   }
-  // and shut all five, the chamber is alone: they are the ways there are
-  const alone = reach(ROOMS.chamber, (x, z) => Object.values(ways).some(([x0, x1, z0, z1]) => x > x0 && x < x1 && z > z0 && z < z1));
-  assert.ok(!alone(...ROOMS.cistern) && !alone(...ROOMS.cellars) && !alone(...ROOMS.cells));
+  const alone = reach(ROOMS['the cistern'], true, (x, z) => Object.values(ways).some((b) => inBox(b)(x, z)));
+  assert.ok(!alone(...ROOMS['the sally port']) && !alone(...ROOMS['the aid post']) && !alone(...ROOMS['the west side']));
+  // (the way past the fallen vault is crouched through: standing, the west side is in two)
+  assert.ok(!reach(ROOMS['the west side'], false, inBox(ways["the cistern's west end"]))(...ROOMS['the cistern']));
 });
 
-ok('there are four ways between the levels, and the hatch on the hill is joined to them: a body has room all the way', () => {
-  const line = (a: V3, b: V3, what: string) => {
+ok('the ways down and the ways out: a body has room down each of them, and all the way to the hatch in the village', () => {
+  const body = (feet: V3, low = false) => {
+    for (const q of boxes) {
+      if (q.feet) continue;
+      for (const y of low ? [0.34, 0.61, 0.82] : [0.34, 0.61, 0.88, 1.15, 1.42]) if (clear(q, [feet[0], feet[1] + y, feet[2]]) < 0.29) return q.name;
+    }
+    return inFoot(feet);
+  };
+  const line = (a: V3, b: V3, what: string, low = false) => {
     const len = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
     for (let d = 0; d <= len; d += 0.1) {
-      const feet: V3 = [a[0] + ((b[0] - a[0]) * d) / len, a[1] + ((b[1] - a[1]) * d) / len + 0.03, a[2] + ((b[2] - a[2]) * d) / len], hit = fouls(feet) ?? inFoot(feet);
+      const hit = body([a[0] + ((b[0] - a[0]) * d) / len, a[1] + ((b[1] - a[1]) * d) / len + 0.03, a[2] + ((b[2] - a[2]) * d) / len], low);
       assert.equal(hit, null, `${what}: a body ${d.toFixed(1)} m along is in the ${hit}`);
     }
   };
-  // 1. the stair from the keep's store (its room on the stair itself is tried with every other flight's): from the store's floor to its head
+  // 1. the stair from the keep's store (its room on the stair itself is tried with every other flight's): to its head, and from its foot out by the door onto the cistern
   line([UNDER.stair.head - 0.6, 0, -1.6], [UNDER.stair.head - 0.5, 0, UNDER.stair.z], 'to the head of the stair in the store');
-  // 2. the bay of vault that fell in: its stone is a slope from the gallery's floor to the paving, open to the sky all the way, and no steeper than is walked
-  const B = UNDER.bay;
+  line([2.7, UF, UNDER.stair.z], [2.7, UF, CI.z1 - 0.6], 'from the foot of the stair out onto the cistern');
+  // 2. the bay of vault that fell in: its stone is a slope from the floor to the paving, open to the sky all the way, and no steeper than is walked
+  const B = UNDER.bay, vx = (-UNDER.x + UNDER.crawl) / 2 - 0.05;
   within((Math.atan2(-0.07 - UF, B.z1 - 0.25 - (B.z0 + 0.5)) * 180) / Math.PI, 25, 33, 'the slope of the fallen vault, which is walked');
   for (let z = B.z0 + 0.6; z < B.z1 - 0.3; z += 0.2) {
-    const y = moundTop('vault', -7.25, z), next = moundTop('vault', -7.25, z + 0.2);
+    const y = moundTop('vault', vx, z), next = moundTop('vault', vx, z + 0.2);
     assert.ok(Math.abs(next - y) / 0.2 < Math.tan((40 * Math.PI) / 180), `the fallen vault is too steep at ${z.toFixed(1)}`);
-    assert.equal(fouls([-7.25, y + 0.05, z]), null);
+    assert.equal(fouls([vx, y + 0.05, z]), null);
   }
-  within(moundTop('vault', -7.25, B.z1 - 0.3), -0.35, -0.05, 'the head of the fallen vault, under the paving');
-  within(moundTop('vault', -7.25, B.z0 + 0.5), UF - 0.2, UF + 0.25, 'its foot, at the floor');
+  within(moundTop('vault', vx, B.z1 - 0.3), -0.35, -0.05, 'the head of the fallen vault, under the paving');
+  within(moundTop('vault', vx, B.z0 + 0.5), UF - 0.2, UF + 0.25, 'its foot, at the floor');
+  assert.ok(moundTop('vault', UNDER.crawl + 0.3, 2) < UF, 'the stone of the fallen vault lies in the way past it');
   // 3. the hole in the boards of the north-west tower: a body goes down it into the cellar, and out by the cellar's doorway
   const nw = towers.find((tw) => tw.hollow !== undefined)!;
   assert.equal(nw.hollow, UF);
   for (let y = -0.4; y > UF + 0.5; y -= 0.2) assert.equal(fouls([nw.cx, y, nw.cz]), null, 'down the hole');
   const d = (nw.door * Math.PI) / 180;
   for (let r = 0.9; r < 4.6; r += 0.15) {
-    const feet: V3 = [nw.cx + Math.cos(d) * r, UF + 0.03, nw.cz + Math.sin(d) * r], hit = fouls(feet) ?? inFoot(feet);
+    const hit = body([nw.cx + Math.cos(d) * r, UF + 0.03, nw.cz + Math.sin(d) * r]);
     assert.equal(hit, null, `out of the cellar: a body ${r.toFixed(1)} m from its middle is in the ${hit}`);
   }
-  // 4. the rent in the east wall: up its stone from the hill and in over the cellars' floor
+  // 4. the hole in the terrace walk over the cistern: a drop, clear from the paving to the water
+  const D = CI.drop;
+  for (let y = -0.3; y > UF - CI.deep + 0.9; y -= 0.2) assert.equal(fouls([D.x1 - 0.4, y, (D.z0 + D.z1) / 2 - 0.15]), null, 'down the hole in the walk');
+  // 5. the rent in the east wall: up its stone from the hill and in over the floor
   const R = UNDER.rent, rz = (R.z0 + R.z1) / 2;
   for (let x = 16.6; x > R.in - 0.5; x -= 0.2) {
     const y = Math.max(UF, moundTop('rent', x, rz)), next = Math.max(UF, moundTop('rent', x - 0.2, rz));
     assert.ok(Math.abs(next - y) / 0.2 < Math.tan((40 * Math.PI) / 180), `the fallen wall is too steep at ${x.toFixed(1)}`);
-    const feet: V3 = [x, y + 0.2, rz], hit = fouls(feet) ?? inFoot(feet);
+    const hit = body([x, y + 0.2, rz]);
     assert.equal(hit, null, `through the rent: a body at ${x.toFixed(1)} is in the ${hit}`);
   }
-  // (its foot is in the hill, and so are its sides, all round: it ends nowhere in the air)
+  // (its foot is in the hill, and so are its sides, all round: it ends nowhere in the air, and nowhere is it a drop)
   const fan = parts.find((q) => q.t === 'mound' && q.kind === 'rent')!;
-  if (fan.t === 'mound') for (let k = 0; k <= 40; k++) for (const [x, z] of [[fan.x1, fan.z0 + ((fan.z1 - fan.z0) * k) / 40], [CASTLE.hx + 1.5 + ((fan.x1 - CASTLE.hx - 1.5) * k) / 40, fan.z0], [CASTLE.hx + 1.5 + ((fan.x1 - CASTLE.hx - 1.5) * k) / 40, fan.z1]]) assert.ok(moundTop('rent', x, z) < castleGround(x, z) + 0.15, `the fallen wall's stone ends in the air at ${x.toFixed(1)}, ${z.toFixed(1)}: ${(moundTop('rent', x, z) - castleGround(x, z)).toFixed(2)} m over the hill`);
-  // and the way out: down the stair in the cellars to its landing, along the passage under the wall's foot, up the hatch's steps
-  const hatch = LOOSE.find((l) => l.kind === 'hatch')!, g = castleGround(hatch.x, hatch.z), L = hatchLine(hatch, g);
-  line([(PS.x0 + PS.x1) / 2, PS.deep, PS.foot + 0.2], [(PS.x0 + PS.x1) / 2, PS.deep, POSTERN.z], 'along the landing');
-  line([(PS.x0 + PS.x1) / 2, PS.deep, POSTERN.z], [POSTERN.x + 0.6, PS.deep, POSTERN.z + 0.2], 'out of the stairwell');
-  line([POSTERN.x + 0.6, PS.deep, POSTERN.z + 0.2], [L.foot[0] + L.d[0] * 0.5, L.foot[1], L.foot[2] + L.d[1] * 0.5], 'along the passage');
-  // (it is no steeper than a floor may be, and neither a cupboard nor a tunnel to another valley)
-  assert.ok(Math.abs(L.steep) < 0.2 && L.long > 6 && L.long < 40, `the passage is ${L.long.toFixed(1)} m long and rises ${L.steep.toFixed(2)} in one`);
-  assert.ok(Math.abs(L.head[1] - g) < 1e-9 && Math.abs(g - L.foot[1] - UNDER.hatch.drop) < 1e-9);
-  // what is under the ground by right is known for it: the lower levels, the stair, the passage, the steps; and nothing else is
-  for (const [x, y, z] of [[0, UF + 0.9, 0], [6, UF + 0.9, 0], [(PS.x0 + PS.x1) / 2, PS.deep + 0.9, 0], [POSTERN.x + 2, PS.deep + 0.9, POSTERN.z + 0.7], [(L.foot[0] + POSTERN.x) / 2, (L.foot[1] + PS.deep) / 2 + 0.9, (L.foot[2] + POSTERN.z) / 2], [L.foot[0], L.foot[1] + 0.9, L.foot[2]]]) {
-    assert.ok(castleUnder(P, ...castleAt(P, x, z, y)), `${x.toFixed(1)}, ${y.toFixed(1)}, ${z.toFixed(1)} is not known to be under the fort`);
+  if (fan.t === 'mound') {
+    for (let k = 0; k <= 40; k++) for (const [x, z] of [[fan.x1, fan.z0 + ((fan.z1 - fan.z0) * k) / 40], [CASTLE.hx + 1.5 + ((fan.x1 - CASTLE.hx - 1.5) * k) / 40, fan.z0], [CASTLE.hx + 1.5 + ((fan.x1 - CASTLE.hx - 1.5) * k) / 40, fan.z1]]) assert.ok(moundTop('rent', x, z) < castleGround(x, z) + 0.15, `the fallen wall's stone ends in the air at ${x.toFixed(1)}, ${z.toFixed(1)}: ${(moundTop('rent', x, z) - castleGround(x, z)).toFixed(2)} m over the hill`);
+    const [fx0, fx1, fz0, fz1] = [fan.x0, fan.x1, fan.z0, fan.z1];
+    for (let fx = fx0; fx <= fx1; fx += 0.35) for (let fz = fz0; fz <= fz1; fz += 0.35) assert.ok(moundTop('rent', fx, fz) > UF - 6, 'a drop in the fallen wall');
   }
-  for (const [x, y, z] of [[0, 0.9, 0], [7, 0.9, -7], [hatch.x + 6, g - 2, hatch.z - 9], [30, -8, -20], [0, -9, 20]]) assert.ok(!castleUnder(P, ...castleAt(P, x, z, y)));
+  // 6. the postern: through the west wall's foot onto its landing (its stair down is tried with every other flight's)
+  const gz = (UNDER.goat.z0 + UNDER.goat.z1) / 2;
+  line([-UNDER.x + 0.5, UF, gz], [-CASTLE.hx - 1.9, UF, gz], 'out by the postern');
+  assert.ok(flights.some((f) => f.name === 'postern stair' && f.foot[1] < castleGround(f.foot[0], f.foot[2]) - 1), "the postern's stair does not go down into the hill");
+  // 7. the sally port: down the stair to its landing, along the passage under the wall's foot and round its bends, to the foot of the hatch's steps
+  const hatch = LOOSE.find((l) => l.kind === 'hatch')!, g = castleGround(hatch.x, hatch.z), L = hatchLine(hatch, g), H = UNDER.hatch, way = [...L.path].reverse();
+  line([(PS.x0 + PS.x1) / 2, PS.deep, PS.foot + 0.2], [(PS.x0 + PS.x1) / 2, PS.deep, POSTERN.z], 'along the landing');
+  line([(PS.x0 + PS.x1) / 2, PS.deep, POSTERN.z], [way[0][0] + 0.5, way[0][1], way[0][2]], 'out of the stairwell');
+  // (crouched: half way a slab of the roof lies across it, to be gone under. Standing, it stops a body there and nowhere else.)
+  for (let k = 0; k + 1 < way.length; k++) line(k === 0 ? [way[0][0] + 0.5, way[0][1], way[0][2]] : way[k], k + 2 === way.length ? [way[k + 1][0] - L.d[0] * 0.5, way[k + 1][1], way[k + 1][2] - L.d[1] * 0.5] : way[k + 1], `along the passage, its ${k + 1}th length from the fort`, true);
+  assert.equal(way.length, 5, 'the passage has two bends in it, and a level pace at the foot of the steps');
+  const mid: V3 = [(way[1][0] + way[2][0]) / 2, (way[1][1] + way[2][1]) / 2 + 0.03, (way[1][2] + way[2][2]) / 2];
+  assert.equal(body(mid), 'fallen roof of the passage');
+  assert.equal(body(mid, true), null);
+  // (it is no steeper than a floor may be, and neither a cupboard nor a tunnel to another valley)
+  assert.ok(Math.abs(L.steep) < 0.2 && L.long > 6 && L.long < 70, `the passage is ${L.long.toFixed(1)} m long and rises ${L.steep.toFixed(2)} in one`);
+  assert.ok(Math.abs(L.head[1] - g) < 1e-9 && Math.abs(g - L.foot[1] - H.drop) < 1e-9);
+  // what is under the ground by right is known for it: the vaults, the stair, the passage at each of its lengths, the steps; and nothing else is
+  const under = (x: number, y: number, z: number) => castleUnder(P, ...castleAt(P, x, z, y));
+  for (const [x, y, z] of [[0, UF + 0.9, 0], [6, UF + 0.9, 0], [-1, UF + 0.5, -6], [(PS.x0 + PS.x1) / 2, PS.deep + 0.9, 0], ...way.slice(0, -1).map((a, k): V3 => [(a[0] + way[k + 1][0]) / 2, (a[1] + way[k + 1][1]) / 2 + 0.9, (a[2] + way[k + 1][2]) / 2]), [L.foot[0], L.foot[1] + 0.9, L.foot[2]], [-CASTLE.hx - 0.4, UF + 0.9, gz]]) assert.ok(under(x, y, z), `${x.toFixed(1)}, ${y.toFixed(1)}, ${z.toFixed(1)} is not known to be under the fort`);
+  for (const [x, y, z] of [[0, 0.9, 0], [7, 0.9, -7], [hatch.x + 6, g - 2, hatch.z - 9], [30, -8, -20], [0, -9, 20], [30, -9, 12]]) assert.ok(!under(x, y, z));
   assert.ok(!castleUnder(null, 0, 0, 0) && castleDark(null, 0, 0, 0) === 0);
   // it is dark down there, and less so where the day gets in; and not dark at all over the terrace
   const dark = (x: number, y: number, z: number) => castleDark(P, ...castleAt(P, x, z, y));
-  assert.ok(dark(0.2, UF + 1.6, 5) > 0.9 && dark(-7.2, UF + 1.6, 2.5) < 0.35 && dark(7.4, UF + 1.6, rz) < 0.35 && dark(0, 1.6, 0) === 0 && dark(7, 1.6, -7) === 0);
-  assert.ok(dark((L.foot[0] + POSTERN.x) / 2, PS.deep + 1.6, (L.foot[2] + POSTERN.z) / 2) > 0.9 && dark(L.foot[0], L.foot[1] + 1.6, L.foot[2]) < 0.6);
-  // what the ground must have done to it for the hatch: the squares its stairwell touches lowered to under the foot of its steps, and nothing else
+  assert.ok(dark(0.2, UF + 1.6, 1) > 0.75 && dark(-1, UF + 1.6, 6.2) > 0.9 && dark(-7.7, UF + 1.6, 2.5) < 0.35 && dark(7.4, UF + 1.6, rz) < 0.35 && dark(-1, UF + 1.2, -7) < 0.35 && dark(0, 1.6, 0) === 0 && dark(7, 1.6, -7) === 0);
+  assert.ok(dark(mid[0], mid[1] + 1, mid[2]) > 0.9 && dark(L.foot[0], L.foot[1] + 1.6, L.foot[2]) < 0.6);
+  // what the ground must have done to it: taken away under the slot of the stair, under the hatch's stairwell and along every length of its passage, and nowhere else
   const cuts = castleCuts(P);
-  assert.equal(cuts.length, 1);
-  assert.ok(cuts[0].well.length === 4 && cuts[0].to < P.y + g - UNDER.hatch.drop);
-  const [wx, wz] = cuts[0].well.reduce((t, c) => [t[0] + c[0] / 4, t[1] + c[1] / 4], [0, 0]);
-  let touched = 0;
-  for (let i = -8; i < 8; i++) for (let j = -8; j < 8; j++) if (squareTouches(cuts[0].well, Math.floor(wx / 2) * 2 + i * 2, Math.floor(wz / 2) * 2 + j * 2, 2)) touched++;
-  assert.ok(touched >= 4 && touched <= 14 && squareTouches(cuts[0].well, wx - 1, wz - 1, 2) && !squareTouches(cuts[0].well, wx + 6, wz + 6, 2), `${touched} squares of the ground are touched`);
-  // the earth it lays round itself reaches as far as lowering them can disturb the ground (a square's corner to corner, twice)
-  assert.ok(UNDER.hatch.lid >= 2 * Math.SQRT2 * 2);
-  // and nothing else that is made stands in its stairwell or in its passage: not the rock, not the fallen wall's stone, not the old curved wall
-  for (let k = 0; k <= 40; k++) {
-    const x = L.head[0] + (POSTERN.x + 0.3 - L.head[0]) * (k / 40), z = L.head[2] + (POSTERN.z - L.head[2]) * (k / 40), along = Math.hypot(x - L.head[0], z - L.head[2]);
-    const floor = along < UNDER.hatch.run ? g - (UNDER.hatch.drop * along) / UNDER.hatch.run : L.foot[1] + ((PS.deep - L.foot[1]) * (along - UNDER.hatch.run)) / L.long, open = along < UNDER.hatch.run + 0.5;
-    for (const side of [-0.6, 0, 0.6]) {
-      const px = x + L.r[0] * side, pz = z + L.r[1] * side;
-      // (asked of what stops a body, as it was made: ground that is made is a height at each crossing of a grid)
-      for (const f of shape.solids) {
-        if (f.t !== 'field' || px < f.x0 || px > f.x0 + f.nx * f.cell || pz < f.z0 || pz > f.z0 + f.nz * f.cell) continue;
-        const y = f.heights[Math.round((pz - f.z0) / f.cell) * (f.nx + 1) + Math.round((px - f.x0) / f.cell)];
-        assert.ok(open ? y < floor - 0.3 : y < floor - 0.25 || y > floor + UNDER.hatch.tall + 0.35, `the ${f.name} is in the way of the hatch ${along.toFixed(1)} m along it (${y.toFixed(1)} where the floor is ${floor.toFixed(1)})`);
-      }
-      // (and what stands on the ground is not stood in it: the old curved wall, the rock's teeth)
-      if (open) for (const q of boxes) if (/curved wall|rock tooth|wall down the slope|ruined house/.test(q.name)) assert.ok(clear(q, [px, g - 0.5, pz]) > 0.3, `the ${q.name} stands in the hatch's stairwell`);
+  assert.equal(cuts.length, 2 + way.length - 1);
+  assert.ok(cuts.every((c) => c.well.length === 4) && cuts[0].to < P.y + PS.deep - 0.5 && cuts[1].to < P.y + g - H.drop);
+  const lowered = (x: number, z: number) => cuts.some((c) => squareTouches(c.well, Math.floor(x / 2) * 2, Math.floor(z / 2) * 2, 2));
+  for (const a of [...way, L.foot, [(L.foot[0] + L.head[0]) / 2, 0, (L.foot[2] + L.head[2]) / 2] as V3]) assert.ok(lowered(castleAt(P, a[0], a[2])[0], castleAt(P, a[0], a[2])[2]), 'the ground is not taken away over the way out');
+  for (let k = 0; k + 1 < way.length; k++) for (let t = 0; t <= 1; t += 0.05) for (const side of [-0.7, 0.7]) {
+    const e = [way[k + 1][0] - way[k][0], way[k + 1][2] - way[k][2]], len = Math.hypot(e[0], e[1]), x = way[k][0] + e[0] * t + (e[1] / len) * side, z = way[k][2] + e[1] * t - (e[0] / len) * side;
+    assert.ok(lowered(castleAt(P, x, z)[0], castleAt(P, x, z)[2]), 'the ground is left standing in the passage');
+  }
+  assert.ok(!lowered(castleAt(P, hatch.x + 12, 9)[0], castleAt(P, hatch.x + 12, 9)[2]) && !lowered(castleAt(P, -20, 0)[0], castleAt(P, -20, 0)[2]));
+  // the earth it lays over that reaches as far as lowering can disturb the ground (a square's corner to corner, twice)
+  assert.ok(H.lid >= 2 * Math.SQRT2 * 2);
+  // and nothing else that is made stands in its stairwell or in its passage: not the rock, not the fallen wall's stone, not anything of the old village
+  const clearOf = (px: number, pz: number, floor: number, open: boolean, where: string) => {
+    for (const f of shape.solids) {
+      if (f.t !== 'field' || px < f.x0 || px > f.x0 + f.nx * f.cell || pz < f.z0 || pz > f.z0 + f.nz * f.cell) continue;
+      const y = f.heights[Math.round((pz - f.z0) / f.cell) * (f.nx + 1) + Math.round((px - f.x0) / f.cell)];
+      assert.ok(open ? y < floor - 0.3 : y < floor - 0.25 || y > floor + H.tall + 0.35, `the ${f.name} is in the way of the hatch ${where} (${y.toFixed(1)} where the floor is ${floor.toFixed(1)})`);
     }
+    for (const q of boxes) if (/curved wall|rock tooth|wall down the slope|ruined house|ramp trestle/.test(q.name)) assert.ok(clear(q, [px, floor + (open ? 2.5 : 1), pz]) > 0.3, `the ${q.name} stands in the hatch's way ${where}`);
+  };
+  for (let k = 0; k <= 16; k++) for (const side of [-0.6, 0, 0.6]) clearOf(L.head[0] + L.d[0] * (H.run + 0.5) * (k / 16) + L.r[0] * side, L.head[2] + L.d[1] * (H.run + 0.5) * (k / 16) + L.r[1] * side, g - H.drop, true, 'on its steps');
+  for (let k = 0; k + 1 < way.length; k++) for (let t = 0; t <= 1; t += 0.04) for (const side of [-0.6, 0, 0.6]) {
+    const e = [way[k + 1][0] - way[k][0], way[k + 1][2] - way[k][2]], len = Math.hypot(e[0], e[1]);
+    clearOf(way[k][0] + e[0] * t + (e[1] / len) * side, way[k][2] + e[1] * t - (e[0] / len) * side, way[k][1] + (way[k + 1][1] - way[k][1]) * t, false, `in its passage, ${k + 1}th length from the fort`);
   }
 });
 

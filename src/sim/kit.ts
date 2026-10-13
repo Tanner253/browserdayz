@@ -72,6 +72,20 @@ export function cutRound(cx: number, cz: number, r: number, y0: number, y1: numb
   }
   return { planes, ...ball(pts) };
 }
+/** A piece of the plan cut out, upright: its corners [x, z] in order round it (no dent in it), and from how high to how high. */
+export function cutPoly(poly: [number, number][], y0: number, y1: number): Cut {
+  const planes: Cut['planes'] = [[0, 1, 0, y1], [0, -1, 0, -y0]], pts: V3[] = [];
+  const mx = poly.reduce((t, q) => t + q[0], 0) / poly.length, mz = poly.reduce((t, q) => t + q[1], 0) / poly.length;
+  for (let k = 0; k < poly.length; k++) {
+    const [ax, az] = poly[k], [bx, bz] = poly[(k + 1) % poly.length], l = Math.hypot(bx - ax, bz - az) || 1;
+    let nx = (bz - az) / l, nz = (ax - bx) / l;
+    // (each side faces away from the middle)
+    if (nx * (mx - ax) + nz * (mz - az) > 0) [nx, nz] = [-nx, -nz];
+    planes.push([nx, 0, nz, nx * ax + nz * az]);
+    for (const y of [y0, y1]) pts.push([ax, y, az]);
+  }
+  return { planes, ...ball(pts) };
+}
 /** Whether a point is in what was cut out. */
 export function inCut(c: Cut, p: V3): boolean {
   for (const [nx, ny, nz, d] of c.planes) if (nx * p[0] + ny * p[1] + nz * p[2] > d) return false;

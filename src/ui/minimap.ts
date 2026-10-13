@@ -225,7 +225,9 @@ export class Minimap {
     const k = W / span;
     // the middle of the picture: you, or (opened large) the middle of the map
     const cx = this.big ? 0 : x, cz = this.big ? 0 : z;
-    g.fillStyle = '#1b1f17';
+    // (what is beyond the map's edge: the grey of the mountains that close it, not black. The fort stands sixty
+    // metres from the east edge, and half of this was a black hole there.)
+    g.fillStyle = '#6b685d';
     g.fillRect(0, 0, W, W);
     const sx = (cx - span / 2 + WORLD_SIZE / 2) * SCALE, sz = (cz - span / 2 + WORLD_SIZE / 2) * SCALE;
     g.imageSmoothingEnabled = true;

@@ -27,9 +27,9 @@ export const INFECTED = {
   // (93 since 2026-10-13: at 78 the village, the checkpoint, the camp, the works and the bunker took all but ten,
   // and six of the outlying places, Sosnovka and the Motor Pool among them, were left with none at all though
   // each is said to keep its own. One that nobody is near costs nothing: nobody's game moves it.)
-  // (101 since the fort was stood on the mountain, 2026-10-13: its own eight, five in its ruined village and three
-  // in the dark under its terrace, over and above the ninety-three.)
-  max: 101,
+  // (The fort on the mountain has its own over and above these, as many as its own file says, `castleHomes`: it
+  // was written as 101 here while the fort had eight, and when the fort was given a ninth the valley lost one.)
+  max: 93,
   /** what each has to begin with: a rifle round anywhere, a pistol round in the head, three in the chest */
   hp: 90,
   /** how long a body lies there, and how long after that before another turns up about the same place, seconds */
@@ -227,7 +227,7 @@ export function infectedHomes(world: World): Home[] {
   // (never more than the map is meant to hold: the places furthest down the list go short)
   // (nor the fort's, which are its own: see below)
   const fort = world.castle ? castleHomes(world.castle) : [];
-  let left = INFECTED.max - EAST_ALL - fort.reduce((a, h) => a + h.n, 0);
+  let left = INFECTED.max - EAST_ALL;
   for (const h of homes) {
     h.n = Math.min(h.n, left);
     left -= h.n;
