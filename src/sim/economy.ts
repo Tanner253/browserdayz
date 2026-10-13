@@ -10,7 +10,7 @@
 import type { Usage, LootPoint } from '../world/buildings';
 import type { Tier } from './tiers';
 import { ITEMS, fitAtRandom, foundMag, makeItem, plainMag, stockGun, type ItemInstance } from './items';
-import { fitsPoint } from './placement';
+import { ITEM_SIZES, fitsPoint } from './placement';
 import { RNG } from '../core/noise';
 
 export interface TypeRule {
@@ -75,6 +75,10 @@ const IN_SHEDS: TypeRule['on'] = { 2: { usage: SHEDS }, 3: { usage: SHEDS } };
 const ARMS: [string, number][] = [['colt', 2.4], ['m9', 1.8], ['hatchet', 1.6], ['bat', 1.6], ['crowbar', 1.4], ['machete', 1.4], ['shovel', 1.4], ['knife', 1]];
 /** and from Kamenka on, where guns were kept: the submachine gun before a pistol ("tier 3 should be submachine guns heavy") */
 const ARMS_TOWN: [string, number][] = [['mpa', 2.4], ['m9', 1.6], ['colt', 1]];
+/** and on the racks of a place apart on the fourth step, the fort's armoury: the army's rifles, with the submachine gun still the likeliest */
+const ARMS_FORT: [string, number][] = [['mpa', 2.5], ['mosin', 1.5], ['ak', 1.2], ['ar15', 1.2], ['m9', 1]];
+/** seconds such a rack stays bare once its gun has been taken: the best part of half an hour, where a village's is three minutes (six racks of rifles filled every three minutes would be a well of them) */
+const APART_ARMS_RESTOCK = 1500;
 /** seconds an armed point stays bare once its weapon has been taken */
 export const ARMS_RESTOCK = 180;
 /**
@@ -357,6 +361,22 @@ export interface EconomyEvents {
   despawn(l: WorldLoot): void;
 }
 
+/**
+ * Places that are stocked APART from the rest of the map, by the name their loot points carry as their building
+ * (2026-10-13: the fort on the mountain, seventy places; and the wreck in the cleft under the bridge, five, which
+ * being floor took three of the gas's five AKs). Every step of the map is stocked to counts (`at`), so a
+ * new place on a step took its things out of the places that were there: with the fort part of the third step
+ * Kamenka had two armoured vests where it had five, and the Chemical Works shared its rifles with the fort's
+ * vaults. A place apart is stocked ON TOP of the map, which keeps all of its own: of each sort, as many as its
+ * places would have drawn had they been part of their step (by the same kinds of place and the same leanings),
+ * never more of a sort than the whole step has, and never more things than `APART_FILL` of its places.
+ */
+export const APART = new Set(['castle', 'wreck']);
+/** the most of a place apart's free places that are ever filled: a room with something on every surface is a shop */
+const APART_FILL = 0.85;
+/** and how many times its fair share it is stocked to, up to that: a place apart is somewhere worth the going to */
+const APART_RICH = 1.5;
+
 export class Economy {
   loot = new Map<string, WorldLoot>();
   private pointBusy = new Set<number>();
@@ -366,6 +386,11 @@ export class Economy {
 
   /** which step of the map each loot point is on (see src/sim/tiers.ts): each step is stocked to counts of its own */
   private tier: Tier[];
+  /** the place apart each loot point belongs to, if it belongs to one (see APART): null for the map's own */
+  private apart: (string | null)[];
+  /** the places apart there are, and how many of each sort each is stocked to on each step (`place|sort@step`) */
+  private places: string[];
+  private wants = new Map<string, number>();
 
   constructor(
     private points: LootPoint[],
@@ -374,6 +399,47 @@ export class Economy {
     private fits: (id: string, p: LootPoint) => boolean = fitsPoint,
   ) {
     this.tier = points.map((p) => p.tier ?? (p.usage.includes('Bunker') ? 5 : p.usage.includes('Gas') ? 4 : p.usage.includes('East') ? 3 : 1));
+    this.apart = points.map((p) => (APART.has(p.building) ? p.building : null));
+    this.places = [...new Set(this.apart.filter((a): a is string => a !== null))];
+    for (const place of this.places) for (const t of STEPS) this.share(place, t);
+  }
+
+  /** how strongly a spot draws a sort on a step: as `pickPoint` weighs it */
+  private pull(rule: TypeRule, i: number, where: Tier): number {
+    const favour = where < UNSORTED || this.apart[i] !== null ? (rule.on?.[where]?.favour ?? rule.favour) : undefined;
+    let w = 1;
+    if (favour) for (const u of this.points[i].usage) w = Math.max(w, favour[u] ?? 1);
+    return w;
+  }
+
+  /** What a place apart is stocked to on one step: see APART. Whole numbers, the same every time (the biggest remainders are rounded up). */
+  private share(place: string, t: Tier) {
+    const free = (pool: string | null) => this.points.map((_, i) => i).filter((i) => this.apart[i] === pool && this.tier[i] === t && !this.points[i].arms && !this.points[i].keeps);
+    const here = free(place), there = free(null);
+    if (!here.length) return;
+    const fair: [string, number][] = [];
+    for (const [id, rule] of Object.entries(TYPES)) {
+      const at = rule.at[t - 1];
+      if (!at) continue;
+      const sum = (list: number[]) => list.reduce((a, i) => a + (this.liesAt(id, rule, i, t) ? this.pull(rule, i, t) : 0), 0);
+      const mine = sum(here), theirs = sum(there);
+      if (mine > 0) fair.push([id, Math.min(at, (theirs > 0 ? (at * mine) / theirs : at) * APART_RICH)]);
+    }
+    const all = fair.reduce((a, [, e]) => a + e, 0), most = here.length * APART_FILL, k = all > most ? most / all : 1;
+    let left = Math.round(all * k);
+    const whole = fair.map(([id, e]) => ({ id, n: Math.floor(e * k), rest: e * k - Math.floor(e * k) }));
+    left -= whole.reduce((a, w) => a + w.n, 0);
+    for (const w of [...whole].sort((a, b) => b.rest - a.rest || (a.id < b.id ? -1 : 1))) {
+      if (left <= 0) break;
+      w.n++;
+      left--;
+    }
+    for (const w of whole) if (w.n > 0) this.wants.set(`${place}|${w.id}@${t}`, w.n);
+  }
+
+  /** how many of a sort a place apart is stocked to on a step */
+  wanted(place: string, id: string, t: Tier): number {
+    return this.wants.get(`${place}|${id}@${t}`) ?? 0;
   }
 
   /** Count of a type currently in the world (on the ground). */
@@ -387,11 +453,12 @@ export class Economy {
    * How many of a sort lie on one step of the map (what a player has put down is on none). The old names still
    * mean what they did: true is under the gas, 'bunker' the bunker, 'east' Kamenka; false is the first two together.
    */
-  held(id: string, where: Tier | boolean | 'bunker' | 'east'): number {
-    if (where === false) return this.held(id, 1) + this.held(id, 2);
+  held(id: string, where: Tier | boolean | 'bunker' | 'east', place: string | null = null): number {
+    if (where === false) return this.held(id, 1, place) + this.held(id, 2, place);
     const t: Tier = where === true ? 4 : where === 'bunker' ? 5 : where === 'east' ? 3 : where;
     let n = 0;
-    for (const l of this.loot.values()) if (l.item.id === id && l.point >= 0 && this.tier[l.point] === t) n++;
+    // (the map's own, unless a place apart is named: what lies in one is not counted to the map, nor the other way)
+    for (const l of this.loot.values()) if (l.item.id === id && l.point >= 0 && this.tier[l.point] === t && this.apart[l.point] === place) n++;
     return n;
   }
 
@@ -399,13 +466,16 @@ export class Economy {
   private liesAt(id: string, rule: TypeRule, i: number, where: Tier): boolean {
     const p = this.points[i];
     const kinds = rule.on?.[where]?.usage ?? rule.usage;
-    if (where < UNSORTED && !p.usage.some((u) => kinds.includes(u))) return false;
+    // (A place apart is sorted on every step: its spots were each said to be of a kind on purpose, an armoury's and
+    // a dressing station's, where under the gas and down the bunker anything lies anywhere.)
+    if ((where < UNSORTED || this.apart[i] !== null) && !p.usage.some((u) => kinds.includes(u))) return false;
     // a rifle never spawns on a narrow shelf, a jerrycan never on a barrel
     return this.fits(id, p);
   }
 
-  private pickPoint(id: string, rule: TypeRule, where: Tier): number {
-    const sorted = where < UNSORTED, favour = rule.on?.[where]?.favour ?? rule.favour;
+  private pickPoint(id: string, rule: TypeRule, where: Tier, place: string | null = null): number {
+    // (a place apart is sorted on every step: see `liesAt`)
+    const sorted = where < UNSORTED || place !== null, favour = rule.on?.[where]?.favour ?? rule.favour;
     let candidates: number[] = [];
     const weights: number[] = [];
     let total = 0;
@@ -413,7 +483,7 @@ export class Economy {
     const again: number[] = [];
     this.points.forEach((p, i) => {
       // armed points are stocked on their own (see arm)
-      if (p.arms || p.keeps || this.pointBusy.has(i) || this.tier[i] !== where) return;
+      if (p.arms || p.keeps || this.pointBusy.has(i) || this.tier[i] !== where || this.apart[i] !== place) return;
       // (not under anybody's nose)
       if (this.crowded.has(i)) return;
       // (not where somebody has just looted, nor back where this same thing last lay)
@@ -445,10 +515,10 @@ export class Economy {
   }
 
   /** @param armed the spot is one that always holds a weapon (see `arm`): what is put there is a gun that fires */
-  private spawnType(id: string, at = -1, where: Tier = 1, armed = at >= 0): boolean {
+  private spawnType(id: string, at = -1, where: Tier = 1, armed = at >= 0, place: string | null = null): boolean {
     const rule = TYPES[id];
     const def = ITEMS[id];
-    const pi = at >= 0 ? at : this.pickPoint(id, rule, where);
+    const pi = at >= 0 ? at : this.pickPoint(id, rule, where, place);
     if (pi < 0) return false;
     const p = this.points[pi];
     const item = makeItem(id);
@@ -506,6 +576,18 @@ export class Economy {
   private bare = new Map<number, number>();
 
   /** Puts a weapon at every armed point that has been bare long enough (at once, when `now`). */
+  /**
+   * A rack of a place apart takes a long gun laid along it, if its top is long enough by the gun's own measure.
+   * (Everywhere else a long thing lies on a floor and nowhere else: see fitsPoint. An armoury whose racks could
+   * hold nothing longer than a pistol held six pistols.)
+   */
+  private onRack(id: string, i: number): boolean {
+    const p = this.points[i], size = ITEM_SIZES[id], s = p.surf;
+    if (this.apart[i] === null || !p.arms || !s || !size || size[1] > s.clear) return false;
+    const long = Math.max(size[0], size[2]) / 2, thin = Math.min(size[0], size[2]) / 2;
+    return long <= Math.max(s.hx, s.hz) + 0.03 && thin <= Math.min(s.hx, s.hz) + 0.03;
+  }
+
   private arm(now = false) {
     this.points.forEach((p, i) => {
       if (!p.arms && !p.keeps) return;
@@ -515,7 +597,7 @@ export class Economy {
       }
       if (!now) {
         if (!this.bare.has(i)) this.bare.set(i, this.time);
-        if (this.time - this.bare.get(i)! < (p.keeps ? KEEPS_RESTOCK : ARMS_RESTOCK)) return;
+        if (this.time - this.bare.get(i)! < (p.keeps ? KEEPS_RESTOCK : this.apart[i] !== null ? APART_ARMS_RESTOCK : ARMS_RESTOCK)) return;
         if (!this.rested(i)) return;
       }
       // (a place that keeps one named thing: that thing, and nothing in its stead)
@@ -526,27 +608,45 @@ export class Economy {
       }
       // a few tries: a rifle will not lie on a shelf
       // (on the outskirts, something to hit with and never a gun; further in, a pistol where guns were kept)
-      const table = this.tier[i] <= 1 ? ARMS.filter(([id]) => !ITEMS[id].weapon) : p.arms === 'guns' ? (this.tier[i] >= 3 ? ARMS_TOWN : ARMS.filter(([id]) => ITEMS[id].weapon)) : ARMS;
-      const total = table.reduce((s, [, w]) => s + w, 0);
-      for (let tries = 0; tries < 6; tries++) {
-        let r = this.rng.next() * total;
-        let id = table[0][0];
-        for (const [tid, w] of table) {
-          r -= w;
-          if (r <= 0) {
-            id = tid;
-            break;
-          }
+      const table = this.tier[i] <= 1 ? ARMS.filter(([id]) => !ITEMS[id].weapon) : p.arms === 'guns' ? (this.apart[i] !== null && this.tier[i] >= 4 ? ARMS_FORT : this.tier[i] >= 3 ? ARMS_TOWN : ARMS.filter(([id]) => ITEMS[id].weapon)) : ARMS;
+      // (Each sort is tried once at most, by its weight. Thrown for afresh every time, the one sort that would not
+      // lie there could come up six times running, and the place was left bare: one rack in fifty.)
+      const left = [...table];
+      while (left.length) {
+        const total = left.reduce((s, [, w]) => s + w, 0);
+        let r = this.rng.next() * total, k = 0;
+        for (; k < left.length - 1; k++) {
+          r -= left[k][1];
+          if (r <= 0) break;
         }
-        if (this.fits(id, p) && this.spawnType(id, i)) break;
+        const [id] = left.splice(k, 1)[0];
+        if ((this.fits(id, p) || this.onRack(id, i)) && this.spawnType(id, i)) break;
       }
       this.bare.delete(i);
     });
   }
 
   /** Initial fill up to nominal. */
+  /**
+   * One handful of every calibre where the police and the army were, in the village and in Kamenka, put down before
+   * anything else ("i am only finding low tier ammo in the big police when i should find all ammo there", "the small
+   * police station has low caliber weapons and all ammos"). Left to the order things were laid in, whether a place
+   * was still free there for the last calibres hung on the dice: on some stockings Kamenka's police had no 9 mm.
+   */
+  private calibres() {
+    for (const t of [2, 3] as Tier[]) for (const [id, rule] of Object.entries(TYPES)) {
+      if (!id.startsWith('ammo_') || !rule.at[t - 1]) continue;
+      const free: number[] = [];
+      this.points.forEach((p, i) => {
+        if (this.tier[i] === t && this.apart[i] === null && !p.arms && !p.keeps && !this.pointBusy.has(i) && (p.usage.includes('Police') || p.usage.includes('Military')) && this.liesAt(id, rule, i, t)) free.push(i);
+      });
+      if (free.length) this.spawnType(id, free[this.rng.int(0, free.length - 1)], t, false);
+    }
+  }
+
   populate() {
     this.arm(true);
+    this.calibres();
     // (what the whole map hangs on is put down first, while its few places are still free)
     for (const id of FIRST) for (const t of STEPS) while (this.held(id, t) < TYPES[id].at[t - 1] && this.spawnType(id, -1, t));
     // interleave types so scarce ones still find free points
@@ -555,6 +655,14 @@ export class Economy {
     while (progress) {
       progress = false;
       for (const id of ids) for (const t of STEPS) if (this.held(id, t) < TYPES[id].at[t - 1] && this.spawnType(id, -1, t)) progress = true;
+    }
+    // (and each place apart, to its own counts, out of its own places)
+    for (const place of this.places) {
+      progress = true;
+      while (progress) {
+        progress = false;
+        for (const id of ids) for (const t of STEPS) if (this.held(id, t, place) < this.wanted(place, id, t) && this.spawnType(id, -1, t, false, place)) progress = true;
+      }
     }
   }
 
@@ -638,13 +746,18 @@ export class Economy {
         if (t >= 3) this.restock(id, t, want, want, every ?? Math.min(rule.restock, GAS_RESTOCK));
         else this.restock(id, t, want, Math.max(1, Math.ceil(want * (rule.keep ?? 0.6))), every ?? rule.restock);
       }
+      // (a place apart: every one that is gone is put back, as from Kamenka up)
+      for (const place of this.places) for (const t of STEPS) {
+        const want = this.wanted(place, id, t);
+        if (want) this.restock(id, t, want, want, rule.on?.[t]?.restock ?? Math.min(rule.restock, GAS_RESTOCK), place);
+      }
     }
   }
 
   /** Puts a sort back up to `want` on a step where fewer than `least` of it are left there, no oftener than `every` seconds. */
-  private restock(id: string, where: Tier, want: number, least: number, every: number) {
-    const n = this.held(id, where);
-    const key = `${id}@${where}`;
+  private restock(id: string, where: Tier, want: number, least: number, every: number, place: string | null = null) {
+    const n = this.held(id, where, place);
+    const key = place ? `${place}|${id}@${where}` : `${id}@${where}`;
     if (n >= least) return void delete this.shortSince[key];
     // (The wait runs from when it was first found short, which is within a count of its being taken. It ran from
     // when its sort was last PUT BACK: a thing that had lain an hour, or since the server started, was back five
@@ -656,7 +769,7 @@ export class Economy {
     // looted spot resting and its only other place taken, it is tried again at the next count and not in seven minutes)
     let put = 0;
     for (let k = n; k < want; k++) {
-      if (!this.spawnType(id, -1, where)) break;
+      if (!this.spawnType(id, -1, where, false, place)) break;
       put++;
     }
     if (put) {

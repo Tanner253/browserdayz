@@ -42,7 +42,7 @@ const dark: [number, number, number][] = [[0.8, -6.1, UNDER.floor], [-5, -6.1, U
 // it leaves the fort. The ground over it is cut down for it and the fort lays earth back over the cut at the height
 // the ground had: so whoever walks it is under the ground as it is SEEN, and that is what is asked here.
 const hatch = castleLoose(P).find((l) => l.kind === 'hatch')!;
-const way = hatchLine(looseLocal(P, [hatch])[0], seen(hatch.x, hatch.z) - P.y).path as [number, number, number][];
+const sally = hatchLine(looseLocal(P, [hatch])[0], seen(hatch.x, hatch.z) - P.y), way = sally.path as [number, number, number][];
 const passage: [number, number, number][] = [];
 for (let k = 0; k + 1 < way.length; k++) {
   const a = way[k], b = way[k + 1], n = Math.max(1, Math.round(Math.hypot(b[0] - a[0], b[2] - a[2]) / 1.5));
@@ -52,8 +52,8 @@ for (let k = 0; k + 1 < way.length; k++) {
     if (wy < seen(wx, wz) - 1.6 && !passage.some((q) => Math.hypot(q[0] - x, q[1] - z) < 1)) passage.push([x, z, y]);
   }
 }
-// (walked there and back, from its one end to its other)
-const line = passage;
+// (walked there and back, from its one end to its other; and at the hatch's end up its steps and out onto the ground)
+const line: [number, number, number][] = [[sally.head[0], sally.head[2], sally.head[1] + 0.05], ...passage];
 
 ok('the fort stands where the map says, and what is asked of the server is really asked: a terrace over a fall, a passage under the ground', () => {
   for (const [x, z, y] of [...terrace, ...roof]) assert.ok(inCastle(P, ...castleAt(P, x, z, y)), `a place on the terrace or the roof that is not in the fort: ${x}, ${z}`);

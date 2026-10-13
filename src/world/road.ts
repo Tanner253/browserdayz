@@ -6,7 +6,8 @@ import { assets } from '../core/assets';
 import type { Atmosphere } from './atmosphere';
 import { heightAt, type World } from './worldgen';
 import { buildBridges } from './bridge';
-import { buildGatehouse } from './gatehouse';
+import { buildWreck } from './crest';
+import { buildDrystone, buildGatehouse } from './gatehouse';
 import { SNOW_LIES, SNOW_PAINT } from './foliage';
 
 /** the asphalt is a ribbon laid just above the ground, so the two never fight for the same pixels */
@@ -137,5 +138,8 @@ export function buildRoad(world: World, atmo: Atmosphere, scene: THREE.Scene) {
   buildBridges(world, atmo, scene);
   // and the ruined gatehouse the mountain road stops at
   if (world.gatehouse) buildGatehouse(world.gatehouse, atmo, scene);
+  // and what stands on the crest over it: the old village's low walls, and the helicopter behind the fort
+  buildDrystone(world.walls, atmo, scene);
+  buildWreck(world, scene);
   return firstMesh!;
 }

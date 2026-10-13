@@ -164,7 +164,7 @@ ok('its shapes are sound: every triangle has size, faces the way it says, and is
   assert.deepEqual([f.bad, f.turned, f.small], [0, 0, 0]);
   // every stuff is on a sheet, and every sheet but iron has a picture
   assert.ok(PAINTS.every((p) => SHEETS.includes(STUFF[p].sheet)));
-  assert.deepEqual(SHEETS.filter((p) => !PICTURES[p].tex), ['iron']);
+  assert.deepEqual(SHEETS.filter((p) => !PICTURES[p].tex), ['iron', 'water']);
 });
 
 ok('the stone is not stretched: a course is as tall, and a stone as long, at the foot of a leaning tower as at its top', () => {
@@ -177,7 +177,8 @@ ok('the stone is not stretched: a course is as tall, and a stone as long, at the
 
 ok('it is cheap to draw: six things from near, as many again under the terrace while somebody is there, one from far', () => {
   const near = SHEETS.reduce((t, p) => t + tris(shape.near[p]), 0), under = SHEETS.reduce((t, p) => t + tris(shape.under[p]), 0);
-  assert.ok(SHEETS.length <= 6 && SHEETS.every((p) => tris(shape.near[p]) > 0));
+  // (seven sheets: six of them from near, and the water with the rest of what is under the terrace)
+  assert.ok(SHEETS.length <= 7 && SHEETS.every((p) => tris(shape.near[p]) > 0 || p === 'water') && tris(shape.under.water) > 0 && tris(shape.near.water) === 0);
   assert.ok(near < 70000, `${near} triangles from near`);
   assert.ok(under > 1500 && under < 9000, `${under} triangles under the terrace`);
   assert.ok(tris(shape.far) < 9000 && tris(shape.far) > 1500, `${tris(shape.far)} triangles from far`);
@@ -194,7 +195,7 @@ ok('it is cheap to draw: six things from near, as many again under the terrace w
 ok('snow has somewhere to lie and somewhere it cannot: the sky is over the terrace and the wall tops, and not over anything under them', () => {
   // (the first of the two numbers each corner carries: 1 where the sky is over it)
   let open = 0, shut = 0, lit = 0;
-  const k = shape.near.base;
+  const k = shape.near.stone;
   for (let i = 0; i < k.pos.length / 3; i++) {
     const [x, y, z] = [k.pos[i * 3], k.pos[i * 3 + 1], k.pos[i * 3 + 2]];
     // the paving of the terrace, out in the open walk
@@ -204,7 +205,9 @@ ok('snow has somewhere to lie and somewhere it cannot: the sky is over the terra
   for (const p of SHEETS) {
     const u = shape.under[p];
     for (let i = 0; i < u.pos.length / 3; i++) {
-      if (u.snow[i * 2] === 0) continue;
+      // (under cover a corner is told how much of the day reaches it, never as much as half: only what is under the sky is told 1)
+      assert.ok(u.snow[i * 2] === 1 || u.snow[i * 2] < 0.5, 'a corner under cover is told too much of the day');
+      if (u.snow[i * 2] < 0.9) continue;
       // (what of the lower levels the sky is over: under the bay of vault that fell in, under the hole in the walk over the cistern, and at the rent in the east wall)
       const [x, z] = [u.pos[i * 3], u.pos[i * 3 + 2]], B = UNDER.bay, R = UNDER.rent, D = UNDER.cistern.drop;
       assert.ok((x > B.x0 - 0.4 && x < B.x1 + 0.3 && z > B.z0 - 0.2 && z < B.z1 + 0.2) || (x > D.x0 - 0.2 && x < D.x1 + 0.2 && z > D.z0 - 0.2 && z < D.z1 + 0.2) || (x > UNDER.x - 0.8 && z > R.z0 - 0.2 && z < R.z1 + 0.2), `the sky is over ${x.toFixed(1)}, ${z.toFixed(1)} under the terrace`);
@@ -376,7 +379,8 @@ ok('its loose pieces go where they are put, and what is theirs goes with them', 
 
 ok('its fires and what stands in it are in it', () => {
   const lamps = castleLamps(P);
-  assert.ok(lamps.length >= 5 && lamps.every((l) => inCastle(P, ...l)));
+  // (its own, in it; and one at each bend of the passage out, which are under the ground on the way to the hatch)
+  assert.ok(lamps.length >= 9 && lamps.every((l) => inCastle(P, ...l) || castleUnder(P, l[0], l[1] - 0.5, l[2])) && lamps.filter((l) => !inCastle(P, ...l)).length === 2, `${lamps.length} fires`);
   const props = castleProps(P).filter((p) => inCastle(P, p.x, p.y + 0.3, p.z));
   assert.ok(props.length >= 14);
   for (const p of props) {
@@ -444,8 +448,8 @@ function reach(from: [number, number], low: boolean, shut: (x: number, z: number
   };
 }
 /** a spot in each of the four sides, which are a ring; and in each place that is off the ring */
-const ROOMS: Record<string, [number, number]> = { 'the cistern': [-1, -5.1], 'the sally port': [6.45, -1.0], 'the aid post': [2, 6.2], 'the west side': [-7.2, -3.4] };
-const ENDS: Record<string, [number, number]> = { 'the armoury': [0.3, 0.2], 'the nook past the fallen vault': [-7.2, 6.5], 'the cellar in the tower': [-C.hx - 0.9, -C.hz + 0.9], 'the first cell': [-1.9, 7.5], 'the second cell': [0.3, 7.5], 'the third cell': [2.5, 7.5], 'the foot of the stair from the store': [2.7, -2.9] };
+const ROOMS: Record<string, [number, number]> = { 'the cistern': [-1, -5.1], 'the sally port': [6.45, -1.0], 'the aid post': [2, 5.95], 'the west side': [-7.2, -3.4] };
+const ENDS: Record<string, [number, number]> = { 'the armoury': [0.3, 0.2], 'the nook past the fallen vault': [-7.2, 6.5], 'the cellar in the tower': [-C.hx - 0.9, -C.hz + 0.9], 'the first cell': [-2.1, 7.25], 'the second cell': [0.3, 7.25], 'the third cell': [2.7, 7.25], 'the foot of the stair from the store': [2.7, -2.9] };
 /** the armoury's one door */
 const GRILLE: [number, number, number, number] = [-1.9, -0.3, UNDER.mid.z1 - 0.1, K.z1 + 0.1];
 const inBox = ([x0, x1, z0, z1]: [number, number, number, number]) => (x: number, z: number) => x > x0 && x < x1 && z > z0 && z < z1;

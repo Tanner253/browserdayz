@@ -196,6 +196,10 @@ function lay(loose: Loose[]): Plan {
     solids.push({ c: [s.x, F1 + b[1], s.z], h: b, yaw: 0, surface: 'metal', name: 'stove', room: 'mess' });
     made.push({ t: 'cable', room: 'mess', name: 'flue', pts: [[s.x, F1 + 1.3, s.z - 0.05], [s.x, F1 + 2.25, s.z - 0.05], [s.x, F1 + 2.33, R.z0 - 0.1]], r: 0.065 });
     made.push({ t: 'logs', room: 'mess', name: 'firewood', at: [-2.55, F1, R.z0 + 0.26], yaw: 0, wide: 2, high: 5 });
+    made.push({ t: 'bulb', room: 'mess', name: 'bulb', at: [1.05, F1 + 1.9, -0.4], drop: 0.45 });
+    lights.push({ at: [1.05, F1 + 1.9, -0.4], kind: 'bulb', room: 'mess' });
+    // mess tins and mugs left on the fort's long table
+    for (const [x, z, r, h] of [[-0.1, -0.64, 0.1, 0.11], [0.7, -0.18, 0.045, 0.085], [-0.75, -0.2, 0.045, 0.085], [0.62, -0.66, 0.075, 0.06], [-0.3, -0.12, 0.045, 0.085]]) made.push({ t: 'pot', room: 'mess', name: 'mess tin', at: [x, F1 + 0.8, z], r, h });
     // a pot, on the long case by the wall; and stores on a shelf under the stair to the upper room
     made.push({ t: 'pot', room: 'mess', name: 'pot', at: [2.3, F1 + 0.301, -2.9], r: 0.17, h: 0.24 });
     const shelf = { x: 1.75, z: R.z1 - 0.01 };
@@ -211,9 +215,9 @@ function lay(loose: Loose[]): Plan {
     made.push({ t: 'generator', room: 'store', name: 'generator', at: gen, yaw: 0 });
     solids.push({ c: [gen[0], 0.36, gen[2]], h: [0.52, 0.36, 0.3], yaw: 0, surface: 'metal', name: 'generator', room: 'store' });
     // its fuel: three drums in the corner over the foot of the stair down (a grenade down that stair is a decision), and jerrycans by it
-    put('store', 'Barrel_01', 1.85, -3.02, 0, 0.3);
-    put('store', 'Barrel_01', 2.45, -3.02, 0, 1.7);
-    put('store', 'Barrel_01', 2.15, -2.5, 0, 2.6);
+    put('store', 'Barrel_01', 1.8, -3.05, 0, 0);
+    put('store', 'Barrel_01', 2.45, -3.05, 0, Math.PI / 2);
+    put('store', 'Barrel_01', 2.12, -2.42, 0, Math.PI);
     put('store', 'metal_jerrycan_green', -1.95, 1.08, 0, 0.5);
     put('store', 'metal_jerrycan_green', -1.58, 1.2, 0, -0.3);
     // the switch box on the east wall, and the cables: to it, and out by the small door
@@ -243,14 +247,14 @@ function lay(loose: Loose[]): Plan {
     solids.push({ c: [f1[0], 0.6, f1[2]], h: [0.1, 0.6, 0.1], yaw: 0, feet: true, surface: 'metal', name: 'floodlight', room: 'terrace' });
     lights.push({ at: f1, kind: 'flood', room: 'terrace' });
     // the flagpole, inside the gate; what is left of the flag
-    const fp: V3 = [7.95, 0, 1.3], top = 6.4;
+    const fp: V3 = [7.7, 0, 1.5], top = 6.4;
     pole('gate', 'flagpole', fp, [fp[0], top, fp[2]], 0.045, 'steel');
     solids.push({ c: [fp[0], 1.3, fp[2]], h: [0.06, 1.3, 0.06], yaw: 0, surface: 'metal', name: 'flagpole', room: 'gate' });
     made.push({ t: 'sheet', stuff: 'flag', room: 'gate', name: 'flag', p: [[fp[0], top - 0.1, fp[2] + 0.05], [fp[0] - 0.25, top - 0.25, fp[2] + 0.95], [fp[0] - 0.3, top - 1.0, fp[2] + 0.8], [fp[0], top - 0.85, fp[2] + 0.05]], sag: 0.1 });
     // the gate: a wing of sandbags either side of the way in, and bags on the parapet where its merlons came down
     // (north of the gatehouse on the east wall, and by the fire on the north one), to fight from over the ramp
     bags('gate', 'gate sandbags', [[7.35, -3.28], [8.35, -3.28]], 0, 5);
-    bags('gate', 'gate sandbags', [[7.45, 0.77], [8.35, 0.77]], 0, 4);
+    bags('gate', 'gate sandbags', [[8.15, 0.6], [8.15, 1.7]], 0, 4);
     const ex = C.hx + C.parapet.thick / 2 - 0.5, ez = C.hz + C.parapet.thick / 2 - 0.5;
     bags('gate', 'parapet sandbags', [[ex, -6.6], [ex, -4.5]], 0.72, 2);
     bags('terrace', 'parapet sandbags', [[4.5, -ez], [6.6, -ez]], 0.72, 2);
@@ -262,8 +266,8 @@ function lay(loose: Loose[]): Plan {
     put('dump', 'wooden_military_crate', 5.62, 3.5, 0, Math.PI / 2, { far: 140 });
     put('dump', 'cardboard_box_01', 5.6, 2.05, 0.465, 0.3, { far: 140 });
     put('dump', 'cardboard_box_01', 5.66, 3.75, 0.465, -0.2, { far: 140 });
-    put('dump', 'cardboard_box_01', 6.06, 2.0, 0, 1.2, { far: 140 });
-    put('dump', 'barrel_03', 5.62, 4.52, 0, 0.6, { far: 140 });
+    put('dump', 'cardboard_box_01', 6.12, 1.95, 0, 0, { far: 140 });
+    put('dump', 'barrel_03', 5.62, 4.52, 0, 0, { far: 140 });
     made.push({ t: 'tins', room: 'dump', name: 'ammunition tins', at: [6.08, 0, 3.05], yaw: Math.PI / 2 + 0.2, n: 6 });
     // the net: from the keep's wall down to three poles; the tallest of them carries the floodlight that looks at the gate
     const z0 = 1.5, z1 = 5, xw = K.x1 + 0.04, xp = 6.5, f2: V3 = [xp, 2.6, z0];
@@ -295,9 +299,9 @@ function lay(loose: Loose[]): Plan {
       const a = (slot + 0.5) * (360 / T.slots), y = ne.rim[slot], [ax, az] = round(ne, a - 5.5, rin + 0.45), [cx, cz] = round(ne, a + 5.5, rin + 0.45);
       made.push({ t: 'bags', room: "sniper's nest", name: 'bags in the rim', pts: [[ax, az], [cx, cz]], y, courses: 1 });
     }
-    const top = Math.max(...ne.rim) - 0.25, at = (a: number, r: number, y: number): V3 => [round(ne, a, r)[0], y, round(ne, a, r)[1]];
-    made.push({ t: 'sheet', stuff: 'net', room: "sniper's nest", name: 'net over the nest', p: [at(252, rin + 0.3, top + 0.3), at(352, rin + 0.3, top + 0.3), at(15, 0.75, top + 0.5), at(230, 0.75, top + 0.5)], sag: 0.2 });
-    for (const a of [15, 230]) pole("sniper's nest", 'net pole', at(a, 0.75, D), at(a, 0.75, top + 0.55));
+    const at = (a: number, r: number, y: number): V3 => [round(ne, a, r)[0], y, round(ne, a, r)[1]], stub = (a: number) => ne.rim[Math.floor(a / (360 / T.slots)) % T.slots] + 0.04, top = Math.max(stub(247), stub(338)) + 0.2;
+    made.push({ t: 'sheet', stuff: 'net', room: "sniper's nest", name: 'net over the nest', p: [at(247, rin + 0.35, stub(247)), at(338, rin + 0.35, stub(338)), at(15, 0.75, top), at(230, 0.75, top)], sag: 0.2 });
+    for (const a of [15, 230]) pole("sniper's nest", 'net pole', at(a, 0.75, D), at(a, 0.75, top + 0.05));
 
     // SOUTH-WEST, whose wall has fallen to the field: the bunk room, on its floor. Canvas hung across the gap on poles
     // (it hides whoever is on the stair and stops nothing), a bedroll under the high part of the stair, a bulb
@@ -307,8 +311,8 @@ function lay(loose: Loose[]): Plan {
     const [rx, rz] = round(sw, 250, 1.65), ryaw = -rad(250 + 90);
     made.push({ t: 'bedroll', room: 'bunk room', name: 'bedroll', at: [rx, 0.06, rz], yaw: ryaw });
     lies('bunk room', 3, { x: rx, z: rz, yaw: ryaw, hx: 0.85, hz: 0.26, clear: 0.6 }, 0.17, 0.5);
-    const [fx, fz] = round(sw, 232, 1.5);
-    put('bunk room', 'folded_blanket', fx, fz, 0.17, ryaw + 0.3);
+    const [fx, fz] = round(sw, 214, 1.6);
+    put('bunk room', 'folded_blanket', fx, fz, 0.06, ryaw + 0.5);
     const lamp = swAt(285, rin - 0.25, 2.1);
     made.push({ t: 'bulb', room: 'bunk room', name: 'bulb', at: lamp, drop: 0.3 });
     lights.push({ at: lamp, kind: 'bulb', room: 'bunk room' });
@@ -320,10 +324,10 @@ function lay(loose: Loose[]): Plan {
     void nwAt;
     made.push({ t: 'table', room: 'signals tower', name: 'signals table', at: [sx, D, sz], yaw: syaw, w: 0.95, d: 0.45, h: 0.74 });
     solids.push({ c: [sx, D + 0.37, sz], h: [0.475, 0.37, 0.225], yaw: syaw, surface: 'wood', name: 'signals table', room: 'signals tower' });
-    made.push({ t: 'set', kind: 'radio', room: 'signals tower', name: 'wireless set', at: [sx + 0.26 * Math.cos(syaw), D + 0.74, sz - 0.26 * Math.sin(syaw)], yaw: syaw });
+    made.push({ t: 'set', kind: 'radio', room: 'signals tower', name: 'wireless set', at: [sx + 0.26 * Math.cos(syaw), D + 0.74, sz - 0.26 * Math.sin(syaw)], yaw: syaw + Math.PI });
     const ssurf = { x: sx, z: sz, yaw: syaw, hx: 0.42, hz: 0.18, clear: 1 };
-    lies('signals tower', 3, ssurf, D + 0.74, -0.3);
-    lies('signals tower', 3, ssurf, D + 0.74, -0.05);
+    lies('signals tower', 3, ssurf, D + 0.74, -0.37);
+    lies('signals tower', 3, ssurf, D + 0.74, -0.03);
     made.push({ t: 'whip', room: 'signals tower', name: 'aerial', at: nwAt(222, rin + 0.45, rim), h: 4.2 });
     const rimAt = (a: number) => nw.rim[Math.floor(a / (360 / T.slots)) % T.slots] + 0.04;
     made.push({ t: 'cable', room: 'signals tower', name: 'wire to the keep', pts: [[sx, D + 0.78, sz], nwAt(210, rin - 0.05, D + 0.04), nwAt(170, rin - 0.05, D + 0.04), nwAt(128, rin - 0.05, D + 0.04), nwAt(126, rin + 0.05, rimAt(126)), nwAt(126, rin + 0.4, rimAt(126)), nwAt(100, rin + 0.45, rimAt(100)), nwAt(80, rin + 0.45, rimAt(80)), nwAt(62, rin + 0.5, rimAt(62)), [K.x0 - 0.04, B + 0.2, K.z0 + 0.6]], sag: 0.5 });
@@ -338,11 +342,11 @@ function lay(loose: Loose[]): Plan {
       // (a grave's cross is at the end of it that is toward the fort: see GRAVE)
       const side = Math.sign(-(near.x * c - near.z * s)) || -1, turn = near.rot + (side > 0 ? Math.PI : 0);
       for (let k = 0; k < 6; k++) {
-        const lx = side * (sh.w / 2 + 2.2 + Math.floor(k / 3) * 2.5), lz = -1.5 + (k % 3) * 1.5, x = near.x + lx * c + lz * s, z = near.z - lx * s + lz * c;
+        const lx = side * (sh.w / 2 + 2.2 + Math.floor(k / 3) * 2.5), lz = -6 + (k % 3) * 1.5, x = near.x + lx * c + lz * s, z = near.z - lx * s + lz * c;
         made.push({ t: 'grave', room: 'village', name: 'grave', at: [x, 0, z], yaw: turn + (k ? ((k * 0.37) % 0.3) - 0.15 : 0), sits: true, ...(k ? {} : { plumb: true }) });
       }
       // (a helmet on the first of them)
-      const hl = side * (sh.w / 2 + 2.2 + GRAVE.cross), [hx, hz] = [near.x + hl * c - 1.5 * s, near.z - hl * s - 1.5 * c];
+      const hl = side * (sh.w / 2 + 2.2 + GRAVE.cross), [hx, hz] = [near.x + hl * c - 6 * s, near.z - hl * s - 6 * c];
       put('village', 'helmet_m1', hx, hz, GRAVE.high - 0.03, near.rot + 1.2, { sits: true, far: 60 });
       // the picket: past the house furthest from the fort, where the path comes up: a half round of sandbags open to the fort, a fire ring, a crate
       const last = hs.reduce((a, b) => (Math.hypot(a.x, a.z) > Math.hypot(b.x, b.z) ? a : b)), lh = HOUSES[last.n % HOUSES.length], lc = Math.cos(last.rot), ls = Math.sin(last.rot);
@@ -381,11 +385,11 @@ export function postRooms(loose?: Loose[]): { room: Room; kind: string; x: numbe
 }
 
 /** What stands in the post off the shelf, as the world's own list of such things has them. @param ground the height of the world's ground at a spot (what is in the village stands on it) */
-export function postProps(p: Place, ground?: GroundAt, loose: Loose[] = castleLoose(p)): { kind: string; x: number; y: number; z: number; rot: number; scale: number; far?: number }[] {
+export function postProps(p: Place, ground?: GroundAt, loose: Loose[] = castleLoose(p)): { kind: string; x: number; y: number; z: number; rot: number; scale: number; far: number }[] {
   const g = over(p, ground) ?? castleGround;
   return plan(local(p, loose)).stood.map((s) => {
     const [x, y, z] = castleAt(p, s.x, s.z, s.sits ? g(s.x, s.z) + s.y : s.y);
-    return { kind: s.kind, x, y, z, rot: p.rot + s.rot, scale: 1, far: s.far };
+    return { kind: s.kind, x, y, z, rot: p.rot + s.rot, scale: 1, far: s.far ?? 90 };
   });
 }
 

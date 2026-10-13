@@ -590,3 +590,38 @@ export function buildGatehouse(p: GatePlace, atmo: Atmosphere, scene: THREE.Scen
     physics.addStaticQuat(physics.R.ColliderDesc.cuboid(b.hx, b.hy, b.hz), b.surface, { x: b.x, y: b.y, z: b.z }, { x: 0, y: Math.sin(b.yaw / 2), z: 0, w: Math.cos(b.yaw / 2) });
   }
 }
+
+/**
+ * A length of low dry-stone wall out in the world (`World.walls`: see MOUNTAIN.crest in the generator): the middle
+ * of it at its foot, which way it runs, how long, how high and how thick.
+ */
+export interface WallPiece { x: number; y: number; z: number; yaw: number; long: number; high: number; thick: number }
+
+/** What stops a body of such walls: a level box to each length, founded as deep under the ground as the gatehouse is under its yard. */
+export function drystoneBoxes(walls: WallPiece[]): { x: number; y: number; z: number; hx: number; hy: number; hz: number; yaw: number }[] {
+  return walls.map((w) => ({ x: w.x, y: w.y + (w.high - FOOT) / 2, z: w.z, hx: w.long / 2, hy: (w.high + FOOT) / 2, hz: w.thick / 2, yaw: w.yaw }));
+}
+
+/**
+ * The low walls of the old village on the crest, stood in the world: the gatehouse's stone, block by block as its
+ * own walls are (no two quite in line, each top the heart of a wall that broke there), all of them one shape to
+ * draw, and a box to each for what stops a body. They are cover to somebody crouched and no more.
+ */
+export function buildDrystone(walls: WallPiece[], atmo: Atmosphere, scene: THREE.Scene): void {
+  if (!walls.length) return;
+  const shapes = walls.map((w, k) => {
+    const b: Block = { stuff: 'wall', c: [0, (w.high - FOOT) / 2 - DROP, 0], h: [w.long / 2 + 0.06, (w.high + FOOT) / 2, w.thick / 2], yaw: (hash(k, 11, 5) - 0.5) * 0.08, lean: (hash(k, 13, 5) - 0.5) * 0.06, tip: 0, tone: 0.88 + 0.2 * hash(k, 17, 5), open: true, cap: true, loose: true };
+    return shape(b, 1000 + k, new THREE.Matrix4().makeRotationY(w.yaw).setPosition(w.x, w.y + DROP, w.z));
+  });
+  const geo = mergeGeometries(shapes, false);
+  if (!geo) return;
+  geo.computeBoundingSphere();
+  const set = STONE.find((id) => assets.manifest.textures[id]) ?? STONE[STONE.length - 1], t = assets.pbr(set);
+  const mesh = new THREE.Mesh(geo, atmo.register(new THREE.MeshStandardMaterial({ map: t.map, normalMap: t.normalMap, roughnessMap: t.armMap, aoMap: t.armMap, roughness: 1, metalness: 0, vertexColors: true }), weathered(GRADE[set], true), `gatehouse ${set}`));
+  mesh.name = 'crest:walls';
+  mesh.castShadow = mesh.receiveShadow = true;
+  mesh.matrixAutoUpdate = false;
+  scene.add(mesh);
+  if (!physics.world) return; // planning only: no collision world
+  for (const b of drystoneBoxes(walls)) physics.addStaticQuat(physics.R.ColliderDesc.cuboid(b.hx, b.hy, b.hz), 'rock', { x: b.x, y: b.y, z: b.z }, { x: 0, y: Math.sin(b.yaw / 2), z: 0, w: Math.cos(b.yaw / 2) });
+}

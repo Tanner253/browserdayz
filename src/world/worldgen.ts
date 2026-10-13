@@ -205,7 +205,7 @@ export const MOUNTAIN = {
   turn: { x: 626, z: -561, r: 15 },
   yard: { ahead: 15, long: 30, wide: 20 },
   path: {
-    line: [[638.6, -436.7], [638.4, -432.2], [642.4, -432.3], [645.6, -434.7], [647.7, -442.4], [651.3, -449.3], [654.7, -456.2], [658.7, -463], [663.3, -469.4], [664.9, -473.1], [667.4, -470], [669.5, -462.4], [669.5, -454.4], [669.6, -446.4], [671.2, -438.7], [670.7, -434.7], [680, -452], [689, -468], [697, -484], [702, -493], [707, -499], [709.6, -502.5]] as [number, number][],
+    line: [[638.6, -436.7], [638.4, -432.2], [642.4, -432.3], [645.6, -434.7], [647.7, -442.4], [651.3, -449.3], [654.7, -456.2], [658.7, -463], [663.3, -469.4], [664.9, -473.1], [667.4, -470], [669.5, -462.4], [669.5, -454.4], [669.6, -446.4], [671.2, -438.7], [670.7, -434.7], [677, -447], [684, -458], [692, -463.5], [698, -466.5], [702.5, -470], [707, -471], [709.6, -474.4], [710.6, -476.2], [712.2, -478.4], [712.2, -482], [711.2, -490], [710.2, -497], [709.6, -502.5]] as [number, number][],
     half: 1.3,
     steep: 0.5,
   },
@@ -227,8 +227,56 @@ export const MOUNTAIN = {
    * No higher than it must be: from the valley the fort's parapets, keep and towers still stand over it, on the sky.
    */
   rim: { near: 420, eye: 12.3, over: 3, foot: 24, crest: 9, rough: 3.5, ease: 26 },
-  castle: { name: 'Orlinoye', x: 708, z: -532, rot: -Math.PI / 2, terrace: 226, clear: 45, along: { gate: [34, 62], back: [24, 46] } as { gate: [number, number]; back: [number, number] }, across: [20, 36] as [number, number] },
+  /**
+   * THE CREST the fort stands on (2026-10-13: "Castle looks great, the geography around it looks ass. Get creative
+   * with the dynamic gameplay around the castle with props that make sense and back doors and loops"; and of the
+   * plan drawn of this, progress/road/13: "Sounds good to me. Fire away."). In the world the fort's gate looks
+   * south, its breach east, its postern north; the valley is to the west, sheer, and the map's rim to the east.
+   *
+   *   the SADDLE   south of the gate: the col there filled into the crest the fort's own file asks for
+   *                (`castleGround`: see `castle.along.gate`), for the old village's shells. The foot path's third leg
+   *                tops out in the middle of it, at a crossroads, and its last length is the street to the gate.
+   *   the HOLLOW   behind the fort, between it and the rim: `hollow`, a line of [x, z, half its width, its floor],
+   *                cut down to that with a bank `bank` metres wide all round it, which under the fort's lee wall is
+   *                a cliff of eleven metres. The wall's foot is level out to the cliff's brow, twelve metres from
+   *                the towers: whoever stands at the cliff's foot is under the brow from both of them.
+   *   `lee`        the way round by the back: from the crossroads over the saddle's lee edge behind the shells,
+   *                down into the hollow, along the cliff's foot past the breach, and up out of the hollow's mouth
+   *                to the postern's stair in the foot of the wall that looks north.
+   *   `goat`       the goat path: from the first turn of the foot path, half way up, across the valley face in
+   *                plain sight of the whole valley, and up the nose to the same stair.
+   *   `wreck`      the helicopter that did not make it, in the hollow under the two lee towers: the middle of
+   *                it, and which way it lies. Five places for things lie about it (src/world/buildings.ts).
+   *   `walls`      low dry-stone walls [from x, z, to x, z] about the street: cover to somebody crouched.
+   *   `talus`      fallen rock at the foot of the cliffs, each [x, z, how many pieces]: boulders and broken stone,
+   *                the biggest nearest the cliff. (The scanned rock FACES are not stood here: each is a sheet, and
+   *                against a cliff somebody can walk beside it and see that it is. The ground's own paint draws
+   *                these faces as rock, and the fort's own file beds the scans under its walls, where nobody gets beside them.)
+   *   `seen`       where the fort is looked at from as somebody arrives: no tree stands in the way from there.
+   */
+  crest: {
+    hollow: { line: [[724, -583, 5, 204.5], [734, -571, 8, 206], [740.5, -553, 9, 206.5], [740.8, -531, 9.3, 207], [740.3, -509, 8.8, 207.5], [736.5, -491, 6.5, 208], [731.5, -475, 4.5, 208.5]] as [number, number, number, number][], bank: 3, brow: 728.4 },
+    lee: [[707, -471], [710, -466.5], [716, -465.2], [722, -467], [728, -473], [731.5, -485], [733.2, -498], [733.4, -512], [733.4, -530], [733.4, -548], [733.6, -561], [729, -571.5], [722, -571], [715.5, -566], [711, -559], [711.5, -548.5]] as [number, number][],
+    goat: [[664.9, -473.1], [666, -486], [668, -500], [672, -516], [676, -532], [678, -548], [681, -562], [688, -572], [697, -573], [704, -567], [709, -558], [711.5, -548.5]] as [number, number][],
+    steep: 0.5,
+    wreck: { x: 740, z: -545, rot: 0.3 },
+    walls: [[707.4, -491.8, 707.8, -499], [713.9, -483, 714.1, -489.4], [711.8, -486, 715.6, -486], [705.8, -494.6, 709, -494.4], [711.6, -498.6, 714.8, -498.4], [703.4, -474.4, 703.2, -468.6], [718.6, -466, 718.8, -458.6], [702.8, -434.6, 712.4, -434.4], [716.5, -477.8, 720, -478.2]] as [number, number, number, number][],
+    talus: [
+      // the foot of the rim's wall, across the hollow
+      [747.4, -562, 5], [747.8, -551, 4], [748, -538, 5], [747.8, -526, 4], [747.4, -513, 5], [745, -500, 4],
+      // the two ends of the cliff under the lee wall, where the way along its foot stands off from it
+      [731, -566, 4], [730.6, -494, 4], [727.5, -486, 3],
+      // the cliff the saddle ends under, behind the last of the shells
+      [703, -432, 3], [710, -431.5, 4], [716.5, -432, 3],
+      // and by the hollow's mouth
+      [720, -580, 4],
+    ] as [number, number, number][],
+    seen: [[622, -436], [584, -491], [608, -546]] as [number, number][],
+  },
+  castle: { name: 'Orlinoye', x: 708, z: -532, rot: -Math.PI / 2, terrace: 226, clear: 45, along: { gate: [96, 116], back: [24, 46] } as { gate: [number, number]; back: [number, number] }, across: [20, 36] as [number, number] },
 };
+/** how far from the fort's middle line, toward its breach, the ground its own file asks for is level (`castleGround`: the wall's foot, and seven metres out from it) */
+const CASTLE_SHELF = 15.5;
 /** The mountain road as a line over the ground, told off every four metres. */
 export function mountainLine(): [number, number][] {
   return catmullRom(MOUNTAIN.road, 4);
@@ -659,6 +707,10 @@ export interface World {
   bridges: Bridge[];
   /** foot paths: trodden ledges nothing drives on, each a line of [x, z] over the ground. The maps draw them; nothing else reads them. */
   paths: [number, number][][];
+  /** the helicopter that came down behind the fort (see MOUNTAIN.crest): the middle of it on the ground, and which way it lies. Null in a world that has none. */
+  wreck: { x: number; y: number; z: number; rot: number } | null;
+  /** lengths of low dry-stone wall (src/world/gatehouse.ts draws them): the middle of each at its foot, which way it runs (about Y), how long, how high and how thick */
+  walls: { x: number; y: number; z: number; yaw: number; long: number; high: number; thick: number }[];
   /** the fort on the mountain (see MOUNTAIN.castle): its middle, the height of its terrace, and how it is turned, as src/sim/castle.ts wants a place said. Null in a world that has none. */
   castle: { x: number; y: number; z: number; rot: number } | null;
   /** the ruined gatehouse at the end of the mountain road (see MOUNTAIN, src/world/gatehouse.ts): the road's end, on its surface, and which way the road was running there (about Y: at 0 it runs toward +z). Null in a world that has none. */
@@ -2584,6 +2636,8 @@ export function generateWorld(seed = WORLD_SEED): World {
   let gatehouse: World['gatehouse'] = null;
   let castle: World['castle'] = null;
   const paths: World['paths'] = [];
+  let wreck: World['wreck'] = null;
+  const walls: World['walls'] = [];
   {
     const before = heights.slice();
     const rng8 = new RNG(seed + 9393);
@@ -2925,8 +2979,6 @@ export function generateWorld(seed = WORLD_SEED): World {
       // is cut further down, after the path and the rim.)
       const F = M.castle, fort = { x: F.x, y: F.terrace, z: F.z, rot: F.rot };
       const fortW = new Float32Array(N * N);
-      /** the ground as it was where it was let down out of the hatch's stairwell: what is seen there is the earth the hatch lays over the hole, at that height */
-      const lidded = new Map<number, number>();
       {
         const R = F.along.gate[1] + 8;
         for (let iz = Math.max(0, Math.floor((F.z - R + half) / CELL)); iz <= Math.min(N - 1, Math.ceil((F.z + R + half) / CELL)); iz++)
@@ -2940,6 +2992,34 @@ export function generateWorld(seed = WORLD_SEED): World {
         castle = fort;
         // (named on the map by the name the place has in the valley: the fort's own file has the name of the fort it was measured from)
         pois.push({ name: F.name, x: F.x, z: F.z, radius: 40 });
+      }
+      // The hollow behind it (see MOUNTAIN.crest): cut down to its floor, and the fort's own shelf carried level out
+      // to the brow of the cliff that makes under its lee wall.
+      const X = M.crest, hollowDist = new Float32Array(N * N).fill(1e9);
+      {
+        const L = X.hollow.line;
+        for (let iz = Math.floor((-600 + half) / CELL); iz <= Math.ceil((-455 + half) / CELL); iz++)
+          for (let ix = Math.floor((700 + half) / CELL); ix < N; ix++) {
+            const x = -half + ix * CELL, z = -half + iz * CELL, i = idx(ix, iz);
+            // (how far outside the hollow a spot is, and the floor nearest it)
+            let out = 1e9, floor = 0;
+            for (let k = 0; k + 1 < L.length; k++) {
+              const [ax, az, aw, af] = L[k], [bx, bz, bw, bf] = L[k + 1], dx = bx - ax, dz = bz - az;
+              const t = clamp(((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz), 0, 1), d = Math.hypot(x - (ax + dx * t), z - (az + dz * t)) - lerp(aw, bw, t);
+              if (d < out) (out = d), (floor = lerp(af, bf, t));
+            }
+            hollowDist[i] = out;
+            // (the shelf under the lee wall: level with the wall's foot as far as the brow)
+            if (x < X.hollow.brow && x > F.x + CASTLE_SHELF && Math.abs(z - F.z) < 26 && fortW[i] > 0) {
+              const [lx] = castleLocal(fort, x, 0, z);
+              heights[i] = Math.max(heights[i], lerp(heights[i], F.terrace + castleGround(lx, -CASTLE_SHELF) - 0.25, 1 - smoothstep(20, 26, Math.abs(z - F.z))));
+            }
+            if (out >= X.hollow.bank) continue;
+            const to = floor + 0.25 * n1.noise(x * 0.11 + 9, z * 0.11 - 4);
+            if (to >= heights[i]) continue;
+            heights[i] = lerp(heights[i], to, 1 - smoothstep(0, X.hollow.bank, out));
+            fortW[i] = Math.max(fortW[i], 0.001);
+          }
       }
       // The rim behind it, where the map's edge would be seen over it (see MOUNTAIN.rim).
       {
@@ -2983,11 +3063,24 @@ export function generateWorld(seed = WORLD_SEED): World {
             fortW[i] = Math.max(fortW[i], 0.001);
           }
       }
-      // The path up to the brow: a ledge a body wide, trodden bare, nowhere steeper than a hillside is walked.
+      // The path up to the brow: a ledge a body wide, trodden bare, nowhere steeper than a hillside is walked. And
+      // the two ways round by the back, laid the same: the lee route and the goat path (see MOUNTAIN.crest). Each of
+      // those begins at the height the foot path has where it leaves it, and both end at the foot of the postern's
+      // stair, on the ground the fort has there.
       const path = catmullRom(M.path.line, 3), pathDist = new Float32Array(N * N).fill(1e9), pathH = new Float32Array(N * N);
+      const leeWay = catmullRom(X.lee, 3), goatWay = catmullRom(X.goat, 3);
       {
         const py = laid(path, M.path.steep, endY + 0.08);
+        /** how high the foot path is where it passes nearest a spot */
+        const onPath = (x: number, z: number) => {
+          let best = 0;
+          for (let k = 1; k < path.length; k++) if (Math.hypot(path[k][0] - x, path[k][1] - z) < Math.hypot(path[best][0] - x, path[best][1] - z)) best = k;
+          return py[best];
+        };
+        const stair = X.lee[X.lee.length - 1], stairY = heightAt(heights, stair[0], stair[1]);
         rasterLine(path, py, 8, pathDist, pathH);
+        rasterLine(leeWay, laid(leeWay, X.steep, onPath(X.lee[0][0], X.lee[0][1]), stairY), 8, pathDist, pathH);
+        rasterLine(goatWay, laid(goatWay, X.steep, onPath(X.goat[0][0], X.goat[0][1]), stairY), 8, pathDist, pathH);
         for (let i = 0; i < N * N; i++) {
           const d = pathDist[i];
           if (d >= 6) continue;
@@ -3006,32 +3099,18 @@ export function generateWorld(seed = WORLD_SEED): World {
           if (h - lo > 1.2 * CELL) heights[i] = lerp(h, lo + 1.2 * CELL, 0.5 * (1 - smoothstep(16, 30, mtDist[i])));
         }
       }
-      // What the fort asks to be cut (`castleCuts`): the ground let down out of the stair slot of its sally port, the
-      // stairwell of its hatch and a strip along the whole passage between them. LAST of everything that shapes this
-      // ground, the path's ledge and the rim among it: nothing laid after it can fill it in again, and the ground the
-      // fort is told of (`surface`, where the lid lies) is the ground as all of that left it.
-      {
-        const asItIs = heights.slice();
-        for (const cut of castleCuts(fort, (x, z) => heightAt(asItIs, x, z))) {
-          const xs = cut.well.map((q) => q[0]), zs = cut.well.map((q) => q[1]);
-          for (let iz = Math.floor((Math.min(...zs) + half) / CELL); iz <= Math.floor((Math.max(...zs) + half) / CELL); iz++)
-            for (let ix = Math.floor((Math.min(...xs) + half) / CELL); ix <= Math.floor((Math.max(...xs) + half) / CELL); ix++) {
-              if (!squareTouches(cut.well, -half + ix * CELL, -half + iz * CELL, CELL)) continue;
-              for (const i of [idx(ix, iz), idx(ix + 1, iz), idx(ix, iz + 1), idx(ix + 1, iz + 1)]) {
-                if (heights[i] > cut.to) lidded.set(i, asItIs[i]);
-                heights[i] = Math.min(heights[i], cut.to);
-                fortW[i] = Math.max(fortW[i], 0.001);
-              }
-            }
-        }
-      }
       // What grew or lay there: gone from the road, the hairpin, the yard and the path, and from the fort's place;
       // the rest stands on the ground as it is now.
       for (const list of [trees, rocks, props]) {
         const clear = list === trees ? ROAD_W / 2 + 3.5 : ROAD_W / 2 + 2;
         for (let k = list.length - 1; k >= 0; k--) {
-          const t = list[k], i = cell(t.x, t.z);
-          if (mtDist[i] < clear || padDist[i] < 2 || pathDist[i] < M.path.half + (list === trees ? 2 : 1) || fortW[i] > 0.5 || Math.hypot(t.x - M.castle.x, t.z - M.castle.z) < M.castle.clear) list.splice(k, 1);
+          const t = list[k], t0 = t, i = cell(t.x, t.z);
+          // (nor in the hollow; nor, a tree, in the way of the fort from where it is looked at as somebody arrives)
+          const hides = list === trees && X.seen.some(([ex, ez]) => {
+            const dx = F.x - ex, dz = F.z - ez, t = clamp(((t0.x - ex) * dx + (t0.z - ez) * dz) / (dx * dx + dz * dz), 0, 1);
+            return Math.hypot(t0.x - (ex + dx * t), t0.z - (ez + dz * t)) < 7 + 5 * t;
+          });
+          if (mtDist[i] < clear || padDist[i] < 2 || pathDist[i] < M.path.half + (list === trees ? 2 : 1) || fortW[i] > 0.5 || hollowDist[i] < 2 || hides || Math.hypot(t.x - M.castle.x, t.z - M.castle.z) < M.castle.clear) list.splice(k, 1);
           else {
             const moved = heightAt(heights, t.x, t.z) - heightAt(was, t.x, t.z);
             if (moved) t.y += moved;
@@ -3040,15 +3119,86 @@ export function generateWorld(seed = WORLD_SEED): World {
       }
       // (and rocks beside it where it climbs: fallen from the face it is cut into)
       strew(line, Math.round(line.length * 0.62), line.length - 8, 46, 6, 26, 0.45);
+      // What is set down on the crest (see MOUNTAIN.crest). A row of numbers of its own, the same every time: nothing
+      // else on the map is told off differently for it.
+      {
+        const rngC = new RNG(seed + 4411), H = (x: number, z: number) => heightAt(heights, x, z);
+        // Cover at the length of a sprint: a boulder beside each way, now one side and now the other; on the goat
+        // path the uphill side only, where one will lie.
+        const cover = (way: [number, number][], every: number, off: number, from: number, to: number, side = 0) => {
+          let run = 0, next = from, n = 0;
+          for (let k = 1; k < way.length; k++) {
+            const [ax, az] = way[k - 1], [bx, bz] = way[k], l = Math.hypot(bx - ax, bz - az);
+            run += l;
+            if (run < next || run > to) continue;
+            next = run + every * rngC.range(0.85, 1.15);
+            const s = side || (n++ % 2 ? 1 : -1), x = bx - ((bz - az) / l) * off * s, z = bz + ((bx - ax) / l) * off * s, i = cell(x, z);
+            // (not on the fort's own ground, which is its own file's to dress: the hollow is not that)
+            if (padDist[i] < 4 || insideBuilding(x, z, 2) || (Math.hypot(x - F.x, z - F.z) < F.clear + 1 && x < X.hollow.brow + 3)) continue;
+            rocks.push({ kind: 'boulder_01', x, y: H(x, z) - 0.35, z, rot: rngC.range(0, 6.28), scale: rngC.range(1.5, 2.1) });
+          }
+        };
+        cover(path, 24, 2.7, 14, 215);
+        cover(leeWay, 27, 3, 62, 1e9);
+        // (which side of the goat path is uphill: the one the ground is higher on)
+        cover(goatWay, 30, 2.4, 20, 120, H(goatWay[20][0] + 3, goatWay[20][1]) > H(goatWay[20][0] - 3, goatWay[20][1]) ? -1 : 1);
+        // Fallen rock at the feet of the cliffs: a heap to each place, its biggest piece in the middle.
+        for (const [tx, tz, n] of X.talus) {
+          for (let k = 0; k < n; k++) {
+            const a = rngC.range(0, 6.28), d = k ? rngC.range(1.6, 4.2) : 0, x = tx + Math.cos(a) * d, z = tz + Math.sin(a) * d * 1.6;
+            if (pathDist[cell(x, z)] < 2.6 || (Math.hypot(x - F.x, z - F.z) < F.clear + 1 && x < X.hollow.brow + 3)) continue;
+            rocks.push(k === 0 || rngC.chance(0.3) ? { kind: 'boulder_01', x, y: H(x, z) - 0.4, z, rot: rngC.range(0, 6.28), scale: k ? rngC.range(0.9, 1.5) : rngC.range(1.7, 2.4) } : { kind: `${kinds[rngC.int(0, kinds.length - 1)]}#${rngC.int(0, 5)}`, x, y: H(x, z) - 0.2, z, rot: rngC.range(0, 6.28), scale: rngC.range(0.9, 1.7) });
+          }
+        }
+        // The helicopter: where the hollow is widest, in the open under both of the lee towers.
+        wreck = { x: X.wreck.x, y: H(X.wreck.x, X.wreck.z), z: X.wreck.z, rot: X.wreck.rot };
+        // The dry-stone walls: told off in lengths of a pace or two, each on the ground at its own place and of its
+        // own height (a wall nobody has mended since: here it stands a metre and a quarter, there it is down to a course).
+        for (const [ax, az, bx, bz] of X.walls) {
+          const long = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.round(long / 1.7));
+          for (let k = 0; k < n; k++) {
+            const high = rngC.chance(0.12) ? 0.45 : rngC.range(0.85, 1.28), t = (k + 0.5) / n, x = lerp(ax, bx, t), z = lerp(az, bz, t);
+            const ends = [H(lerp(ax, bx, k / n), lerp(az, bz, k / n)), H(lerp(ax, bx, (k + 1) / n), lerp(az, bz, (k + 1) / n))];
+            walls.push({ x, y: Math.min(...ends, H(x, z)), z, yaw: Math.atan2(-(bz - az), bx - ax), long: long / n, high: high + Math.abs(ends[0] - ends[1]) / 2, thick: rngC.range(0.55, 0.7) });
+          }
+        }
+        // Pines that have not grown, on the saddle and about the hollow; and what is left of ones that died.
+        for (const [x, z] of [[719.5, -480], [700, -477], [719.6, -456], [701, -450], [715, -440], [734.5, -478], [737, -568], [745, -572], [704, -594], [716, -597], [692, -470], [722, -583]] as [number, number][])
+          if (pathDist[cell(x, z)] > 2.5) trees.push({ kind: pines[rngC.int(0, pines.length - 1)], x, y: H(x, z), z, rot: rngC.range(0, 6.28), scale: rngC.range(0.34, 0.52) });
+        for (const [x, z, kind] of [[703, -462.5, 'tree_stump_01'], [717, -470.5, 'dead_tree_trunk'], [736, -500, 'dead_tree_trunk'], [744, -563, 'tree_stump_01'], [709, -588, 'dead_tree_trunk'], [700.5, -440, 'tree_stump_01']] as [number, number, string][])
+          props.push({ kind, x, y: H(x, z), z, rot: rngC.range(0, 6.28), scale: rngC.range(0.9, 1.2) });
+      }
       for (let i = 0; i < N * N; i++) {
         if (!(mtDist[i] < M.banks.reach + 4 || padDist[i] < 12 || pathDist[i] < 9 || fortW[i] > 0)) continue;
         if (Math.abs(heights[i] - was[i]) < 0.02 && mtDist[i] > 22 && padDist[i] > 10 && pathDist[i] > 5) continue;
         paint(i % N, Math.floor(i / N));
-        // (the ground that is seen: as the ground is, but over the hatch's stairwell, where it is as it was: see `surface`)
-        if (surface) surface[i] = lidded.get(i) ?? heights[i];
+        // (the ground that is seen: as the ground is. Where the fort's cuts are made, below, it stays as it is here.)
+        if (surface) surface[i] = heights[i];
+      }
+      // What the fort asks to be cut (`castleCuts`): the ground let down out of the stair slot of its sally port, the
+      // stairwell of its hatch and a strip along the whole passage between them. LAST OF ALL: after everything that
+      // shapes this ground (nothing laid later can fill it in again), after the ground is painted (the fort lays earth
+      // back over the cut with the ground's own paint, and what is painted there must be the hillside that was, not
+      // the floor of a trench: it was, and the lid lay green in the snow), and after everything is set down (what
+      // stands over the passage stands on the ground that is seen, not in the cut). The ground the fort is told of
+      // (`surface`, where the lid lies) is the ground as all of that left it.
+      {
+        const asItIs = heights.slice();
+        for (const cut of castleCuts(fort, (x, z) => heightAt(asItIs, x, z))) {
+          const xs = cut.well.map((q) => q[0]), zs = cut.well.map((q) => q[1]);
+          for (let iz = Math.floor((Math.min(...zs) + half) / CELL); iz <= Math.floor((Math.max(...zs) + half) / CELL); iz++)
+            for (let ix = Math.floor((Math.min(...xs) + half) / CELL); ix <= Math.floor((Math.max(...xs) + half) / CELL); ix++) {
+              if (!squareTouches(cut.well, -half + ix * CELL, -half + iz * CELL, CELL)) continue;
+              for (const i of [idx(ix, iz), idx(ix + 1, iz), idx(ix, iz + 1), idx(ix + 1, iz + 1)]) {
+                if (heights[i] > cut.to && surface) surface[i] = asItIs[i];
+                heights[i] = Math.min(heights[i], cut.to);
+              }
+            }
+        }
       }
       // (a lesser road: a street's asphalt, which lies under the edge of the pass road's where it leaves it and breaks up where it stops)
       roads.push({ points: points(line, ys, line.length), width: M.wide, side: true });
+      // (the foot path only: the ways round by the back are for whoever finds them)
       paths.push(M.path.line);
       // (where the gatehouse stands: the road's end, and the way the road was going there)
       gatehouse = { x: end[0], y: ys[ys.length - 1], z: end[1], rot: Math.atan2(ex, ez) };
@@ -3069,6 +3219,8 @@ export function generateWorld(seed = WORLD_SEED): World {
     roads,
     bridges,
     paths,
+    wreck,
+    walls,
     gatehouse,
     castle,
     buildings,

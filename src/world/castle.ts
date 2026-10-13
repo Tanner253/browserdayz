@@ -21,8 +21,8 @@
 import * as THREE from 'three';
 import { GLASS_GROUPS, WORLD_GROUPS, physics } from '../core/physics';
 import { assets } from '../core/assets';
-import { SHADOW_FRUSTA, type Atmosphere } from './atmosphere';
-import { LAMPS, castleAt, castleDoor, castleKit, castleLoose, castleRocks, looseLocal, type GroundAt, type Loose, type Place } from '../sim/castle';
+import { SHADOW_FRUSTA, type Atmosphere, type ShaderPatch } from './atmosphere';
+import { ARCADE, UNDER, castleAt, castleDoor, castleKit, castleLamps, castleLoose, castleRocks, looseLocal, type GroundAt, type Loose, type Place } from '../sim/castle';
 import { PICTURES, SHEETS, castleShape, castleSky, type Sheet, type Skin, type Solid } from './castle-shape';
 import { kitMeshes, stoneLook, type StoneLook } from './kit';
 
@@ -52,6 +52,153 @@ export const KIT_STONE: Record<string, StoneLook> = {
 const ROCK_STONE: StoneLook = { keep: 0.45, tint: [0.92, 0.95, 1.0] };
 /** the fort's own sheets in the same look: the picture's colour kept so much, raised, and evened toward the stone's own (see PICTURES) */
 const own = (p: { keep: number; lift: number; own: [number, number, number]; even: number }): StoneLook => ({ keep: p.keep, tint: [p.lift, p.lift, p.lift], own: p.own, even: p.even, damp: 0.22 });
+
+/**
+ * What the stone and the water under the terrace are told, each frame, of the day over them: the way to the sun (in
+ * the fort's own measure, and in the world's), the sun's light as it comes down a hole in the terrace, how much the
+ * sky's light has been turned down for the eye (as a number to turn it up again by), and how bright the sky is.
+ */
+interface Day { sunL: { value: THREE.Vector3 }; sunW: { value: THREE.Vector3 }; sun: { value: THREE.Color }; eye: { value: number }; sky: { value: number } }
+
+const f3 = (v: number) => v.toFixed(3);
+/**
+ * THE SUN DOWN A HOLE, for a shader: whether the line from a place under the terrace to the sun goes out through
+ * the hole in the north walk or through the bay of the west vault that fell (through the terrace's whole thickness:
+ * it must pass the mouth at the top and the mouth underneath). One sum, no shadow map: the patch of sun moves over
+ * the wall and the water as the day goes, and is there whatever is drawn round it.
+ */
+const SHAFT = (() => {
+  const U = UNDER, D = U.cistern.drop, B = U.bay;
+  return `
+uniform vec3 uCastleSunL;
+uniform vec3 uCastleSunW;
+uniform vec3 uCastleSun;
+uniform float uCastleEye;
+const vec4 castleHole = vec4( ${f3(D.x0)}, ${f3(D.z0)}, ${f3(D.x1)}, ${f3(D.z1)} );
+const vec4 castleBay = vec4( ${f3(B.x0)}, ${f3(B.z0)}, ${f3(B.x1)}, ${f3(B.z1)} );
+float castleIn( vec2 q, vec4 b ) {
+  return smoothstep( b.x - 0.07, b.x + 0.07, q.x ) * ( 1.0 - smoothstep( b.z - 0.07, b.z + 0.07, q.x ) ) * smoothstep( b.y - 0.07, b.y + 0.07, q.y ) * ( 1.0 - smoothstep( b.w - 0.07, b.w + 0.07, q.y ) );
+}
+float castleShaft( vec3 p ) {
+  vec3 s = uCastleSunL;
+  if ( s.y < 0.08 || p.y > ${f3(U.roof - 0.02)} ) return 0.0;
+  vec2 a = p.xz + s.xz * ( ( ${f3(U.roof)} - p.y ) / s.y ), b = p.xz - s.xz * ( p.y / s.y );
+  return max( castleIn( a, castleHole ) * castleIn( b, castleHole ), castleIn( a, castleBay ) * castleIn( b, castleBay ) );
+}`;
+})();
+
+/**
+ * The fort's stone lit as it stands, not as the eye does. The sky's light is turned down for the whole picture
+ * when the eye goes under a roof (the atmosphere's `cover`); stone that knows its own cover, corner by corner (see
+ * `stoneLook`), is turned up again by as much, so a wall is as light or as dark from inside as from outside. And
+ * the sun that comes down a hole in the terrace lies on what it reaches (SHAFT).
+ */
+const underLight = (day: Day): ShaderPatch => (shader) => {
+  Object.assign(shader.uniforms, { uCastleSunL: day.sunL, uCastleSunW: day.sunW, uCastleSun: day.sun, uCastleEye: day.eye });
+  shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vCastleP;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvCastleP = position;');
+  shader.fragmentShader = shader.fragmentShader
+    .replace('#include <common>', `#include <common>\nvarying vec3 vCastleP;${SHAFT}`)
+    .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
+{
+  float shaft = castleShaft( vCastleP );
+  if ( shaft > 0.0 ) {
+    vec3 sunV = normalize( ( viewMatrix * vec4( uCastleSunW, 0.0 ) ).xyz );
+    reflectedLight.directDiffuse += shaft * saturate( dot( normal, sunV ) ) * uCastleSun * BRDF_Lambert( material.diffuseColor );
+  }
+}`)
+    .replace('#include <aomap_fragment>', `#include <aomap_fragment>
+reflectedLight.indirectDiffuse *= uCastleEye;
+reflectedLight.indirectSpecular *= uCastleEye;`);
+};
+const both = (a: ShaderPatch, b: ShaderPatch): ShaderPatch => (shader) => { a(shader); b(shader); };
+
+/**
+ * The cistern's water: a dark sheet, nearly still, a knee deep, and seen into a little from over it. It shows what
+ * is over it: the sky where that is the hole in the walk, the vault as the day finds it elsewhere; more of both the
+ * lower the eye looks along it. Slow ripples turn the way it faces a little, so that what it shows (and a fire's
+ * light on it) breaks and moves. Where the sun comes down the hole it lights what is in the water; and it is paler
+ * in a hand's breadth along every wall and pier, where the scum lies. (Colour and the way it faces only: one flat face.)
+ */
+const still = (time: { value: number }, place: Place, day: Day): ShaderPatch => (shader) => {
+  const U = UNDER, C = U.cistern, c = Math.cos(place.rot), s = Math.sin(place.rot), level = U.floor + C.water;
+  // (the piers of its arcade: what is left of that line between its arches)
+  const ends = [0, ...ARCADE.arches.flat(), C.x1 + U.x], piers = Array.from({ length: ends.length / 2 }, (_, k) => [ends[2 * k] - U.x, ends[2 * k + 1] - U.x]);
+  Object.assign(shader.uniforms, { uWaterT: time, uWaterSky: day.sky, uCastleSunL: day.sunL, uCastleSunW: day.sunW, uCastleSun: day.sun, uCastleEye: day.eye });
+  shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWaterW;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvWaterW = ( modelMatrix * vec4( position, 1.0 ) ).xyz;');
+  shader.fragmentShader = shader.fragmentShader
+    .replace('#include <common>', `#include <common>
+uniform float uWaterT;
+uniform float uWaterSky;
+varying vec3 vWaterW;${SHAFT}
+// (a way in the world, in the fort's own measure: the fort is turned)
+vec2 castleTurn( vec2 v ) { return vec2( v.x * ${f3(c)} - v.y * ${f3(s)}, v.x * ${f3(s)} + v.y * ${f3(c)} ); }
+vec2 waterLean( vec2 w ) {
+  float t = uWaterT;
+  return vec2( sin( w.x * 2.1 + t * 0.55 ) + 0.6 * sin( w.x * 5.3 - w.y * 3.1 + t * 0.9 ) + 0.35 * sin( w.x * 11.0 + w.y * 8.3 - t * 1.3 ), sin( w.y * 2.6 - t * 0.47 ) + 0.6 * sin( w.y * 4.7 + w.x * 2.9 + t * 0.8 ) + 0.35 * sin( w.y * 12.1 - w.x * 7.4 + t * 1.1 ) ) * 0.045;
+}
+float waterShore( vec2 w ) {
+  float d = min( min( w.x + ${f3(U.x)}, ${f3(C.x1)} - w.x ), min( w.y + ${f3(U.z)}, ${f3(C.z1)} - w.y ) );
+${piers.map(([x0, x1]) => `  d = min( d, length( max( abs( w - vec2( ${f3((x0 + x1) / 2)}, ${f3(ARCADE.z)} ) ) - vec2( ${f3((x1 - x0) / 2)}, ${f3(ARCADE.thick / 2)} ), 0.0 ) ) );`).join('\n')}
+  return d;
+}`)
+    .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+vec2 waterAt = castleTurn( vWaterW.xz - vec2( ${f3(place.x)}, ${f3(place.z)} ) );
+vec2 waterTilt = waterLean( waterAt );
+normal = normalize( ( viewMatrix * vec4( waterTilt.x, 1.0, waterTilt.y, 0.0 ) ).xyz );`)
+    .replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
+{
+  vec3 toEye = normalize( cameraPosition - vWaterW ), up = normalize( vec3( waterTilt.x, 1.0, waterTilt.y ) ), back = reflect( -toEye, up );
+  // (what it shows is the roof over it, a pace or two further on: the sky, where that is the hole in the walk)
+  vec2 over = waterAt + castleTurn( back.xz ) * ( ${f3(U.roof - level)} / max( back.y, 0.05 ) );
+  float off = length( max( max( castleHole.xy - over, over - castleHole.zw ), 0.0 ) );
+  vec3 stone = vec3( 0.21, 0.2, 0.19 ) * ( 0.02 + 0.55 * pow( max( 0.0, 1.0 - off / 9.0 ), 1.6 ) );
+  vec3 seen = mix( stone, vec3( 0.8, 0.9, 1.05 ) * 1.5, 1.0 - smoothstep( 0.0, 0.3, off ) ) * uWaterSky;
+  float glance = 0.03 + 0.97 * pow( 1.0 - saturate( dot( toEye, up ) ), 5.0 );
+  totalEmissiveRadiance += seen * glance;
+  // (the sun down the hole: the water is not clear, and what is in it is lit)
+  totalEmissiveRadiance += castleShaft( vec3( waterAt.x, ${f3(level)}, waterAt.y ) ) * uCastleSun * vec3( 0.016, 0.024, 0.02 );
+  // (the scum along the stone, and how far it is seen into: least where the eye looks along it)
+  float scum = 1.0 - smoothstep( 0.0, 0.16, waterShore( waterAt ) + 0.03 * sin( waterAt.x * 9.0 + waterAt.y * 7.0 ) );
+  reflectedLight.directDiffuse *= 1.0 + 2.5 * scum;
+  diffuseColor.a = mix( 0.85, 1.0, max( glance, scum * 0.6 ) );
+}`);
+};
+
+/**
+ * The day coming down through the holes in the terrace (over the cistern, and where the west vault fell in): a
+ * faint beam under each, in the dust of the place. Drawn over everything else and added to it, so it costs nothing
+ * of the light's own sums; it is as bright as the day and leans as the sun does (CastleSite sets both). In the
+ * fort's own measure, made standing straight.
+ */
+function shaftsOf(): THREE.Mesh {
+  const pos: number[] = [], col: number[] = [], U = UNDER, D = U.cistern.drop, water = U.floor + U.cistern.water + 0.015;
+  const quad = (p: number[][], c: number[]) => { for (const k of [0, 1, 2, 0, 2, 3]) { pos.push(...p[k]); col.push(c[k], c[k], c[k]); } };
+  /** the beam: the four sides of a shaft from the hole down to what it lights, brighter at its top */
+  const beam = (x0: number, x1: number, z0: number, z1: number, top: number, foot: number, most: number) => {
+    const a = [[x0, z0], [x1, z0], [x1, z1], [x0, z1]], spread = 0.35;
+    for (let k = 0; k < 4; k++) {
+      const [px, pz] = a[k], [qx, qz] = a[(k + 1) % 4], mx = (x0 + x1) / 2, mz = (z0 + z1) / 2, out = (v: number, m: number) => v + Math.sign(v - m) * spread;
+      quad([[px, top, pz], [qx, top, qz], [out(qx, mx), foot, out(qz, mz)], [out(px, mx), foot, out(pz, mz)]], [most, most, most * 0.15, most * 0.15]);
+    }
+  };
+  // (each in five, one inside another: it is thickest in its middle, and has no one edge)
+  for (const k of [0, 0.18, 0.36, 0.54, 0.72]) {
+    beam(D.x0 + k, D.x1 - k, D.z0 + k, D.z1 - k, U.roof, water - 0.4, 0.016);
+    // (the fallen vault: down its length)
+    beam(U.bay.x0 + k * 0.6, U.crawl - k * 0.6, U.bay.z0 + 2.4 + k, U.bay.z1 - k, U.roof, U.floor + 0.6, 0.011);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(col), 3));
+  geo.computeBoundingSphere();
+  const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: new THREE.Color(0.78, 0.86, 1.0), vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false, toneMapped: true }));
+  mesh.name = 'castle:shafts';
+  mesh.matrixAutoUpdate = false;
+  // (it leans with the sun: where it was made is not where it is drawn)
+  mesh.frustumCulled = false;
+  mesh.renderOrder = 3;
+  return mesh;
+}
 
 /** a skin as the card wants it: plain rows of numbers, and nothing kept that is not needed */
 interface Packed { pos: Float32Array; nrm: Float32Array; uv: Float32Array; col: Float32Array; snow: Float32Array }
@@ -99,6 +246,12 @@ export class CastleSite {
   private fires: THREE.Vector3[];
   private flames: { strength: number }[] = [];
   private clock = 0;
+  /** seconds, for the water's slow ripples */
+  private time = { value: 0 };
+  /** the day over what is under the terrace, as its stone and its water are told it each frame */
+  private day: Day = { sunL: { value: new THREE.Vector3(0, 1, 0) }, sunW: { value: new THREE.Vector3(0, 1, 0) }, sun: { value: new THREE.Color(0, 0, 0) }, eye: { value: 1 }, sky: { value: 1 } };
+  /** the day coming down the holes in the terrace: a lit patch under each and a faint beam, by day (see `shaftsOf`) */
+  private shafts = shaftsOf();
   /** whether the kit's two models have come */
   private kitHere = false;
   /** the materials of the kit's pieces and the door, once made: theirs are the pictures that are sharper close to (see src/game/near.ts) */
@@ -150,7 +303,7 @@ export class CastleSite {
       this.counts.draws++;
     }
     this.near.visible = this.under.visible = false;
-    this.fires = LAMPS.map(([x, z, y]) => new THREE.Vector3(...castleAt(P, x, z, y - 0.26)));
+    this.fires = castleLamps(P, ground, o.loose).map(([x, y, z]) => new THREE.Vector3(x, y - 0.26, z));
     scene.add(all);
     all.updateMatrixWorld(true);
 
@@ -178,8 +331,9 @@ export class CastleSite {
     SHEETS.forEach((s, i) => {
       const t = this.sets[i];
       if (s === 'earth' && this.o.earth) return void (mats[s] = this.o.earth);
+      if (s === 'water') return void (mats[s] = this.atmo.register(new THREE.MeshStandardMaterial({ color: 0x0c1418, roughness: 0.16, metalness: 0, envMapIntensity: 0, transparent: true, depthWrite: false }), still(this.time, this.place, this.day), 'castle water'));
       const m = new THREE.MeshStandardMaterial(t ? { map: t.map, normalMap: t.normalMap, roughnessMap: t.armMap, aoMap: t.armMap, roughness: 1, metalness: 0, vertexColors: true } : { color: 0x2a2826, roughness: 0.62, metalness: 0.6, vertexColors: true });
-      mats[s] = this.atmo.register(m, stoneLook({ ...(t ? own(PICTURES[s]) : {}), snow: this.snowU, attr: 'aSnow', thin: s === 'timber' ? 0.3 : 0 }), `castle ${s}`);
+      mats[s] = this.atmo.register(m, both(stoneLook({ ...(t ? own(PICTURES[s]) : {}), snow: this.snowU, attr: 'aSnow', thin: s === 'timber' ? 0.3 : 0 }), underLight(this.day)), `castle ${s}`);
     });
     const cast: THREE.BufferGeometry[] = [];
     const stand = (to: THREE.Group, name: string, of: Record<Sheet, Packed>) => {
@@ -196,10 +350,11 @@ export class CastleSite {
     };
     stand(this.near, 'castle', k.near);
     stand(this.under, 'castle under', k.under);
+    this.under.add(this.shafts);
     // the kit's pieces, each material of them one thing to draw; the snow lies on them as on the rest (each corner is asked whether the sky is over it)
     const kit = await kitMeshes('fort_kit', castleKit(), {
       attr: { name: 'aSnow', of: (p, n) => [castleSky(p, n), 9] },
-      dress: (m, name) => this.atmo.register(m, stoneLook({ ...(KIT_STONE[name] ?? {}), snow: this.snowU, attr: 'aSnow' }), `castle kit ${name}`),
+      dress: (m, name) => this.atmo.register(m, both(stoneLook({ ...(KIT_STONE[name] ?? {}), snow: this.snowU, attr: 'aSnow' }), underLight(this.day)), `castle kit ${name}`),
     });
     const door = await kitMeshes('large_castle_door', castleDoor(), { dress: (m, name) => this.atmo.register(m, undefined, `castle door ${name}`) });
     // scanned rock round the rock the ramp leaves from and under the walls: the far copy's few triangles, the model's own pictures
@@ -283,12 +438,28 @@ export class CastleSite {
     this.far.visible = !near;
     this.under.visible = near && off < UNDER_SEEN;
     this.clock += dt;
+    this.time.value = this.clock;
+    // the day under the terrace: where the sun is by the fort's own measure, what of it comes down a hole (all of
+    // it that the eye's cover has put out: what the cover leaves is the sun's own, shadows and all), and how much the
+    // sky's light is to be turned up again on stone that knows its own cover
+    const cover = this.atmo.cover.castle, sun = this.atmo.sunDir, cs = Math.cos(P.rot), sn = Math.sin(P.rot), D = this.day;
+    D.sunW.value.copy(sun);
+    D.sunL.value.set(sun.x * cs - sun.z * sn, sun.y, sun.x * sn + sun.z * cs);
+    D.sun.value.copy(this.atmo.sunTint).multiplyScalar(this.atmo.sunIntensity * this.atmo.daylight.value * (1 - (cover?.sun ?? 1)));
+    D.eye.value = 1 / Math.max(0.01, cover?.sky ?? 1);
+    D.sky.value = this.atmo.daylight.value;
+    // (the shafts of day are as bright as the day is, lean as the sun does, and are gone when it is low)
+    const up = D.sunL.value.y, kx = up > 0.2 ? D.sunL.value.x / up : 0, kz = up > 0.2 ? D.sunL.value.z / up : 0, from = -0.5;
+    (this.shafts.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 1 - night * 1.6) * Math.min(1, Math.max(0, (up - 0.25) / 0.2));
+    this.shafts.matrix.set(1, kx, 0, -kx * from, 0, 1, 0, 0, 0, kz, 1, -kz * from, 0, 0, 0, 1);
+    this.shafts.matrixWorldNeedsUpdate = true;
     // (its fires are lit as the light goes; and those under the terrace burn by day as well: it is always night there)
     const dusk = Math.min(1, Math.max(0, (night - 0.3) / 0.3));
     this.fires.forEach((pos, k) => {
-      const burn = near ? (pos.y < P.y - 0.5 ? 1 : dusk) : 0;
+      const low = pos.y < P.y - 0.5, burn = near ? (low ? 1 : dusk) : 0;
       if (this.flames[k]) this.flames[k].strength = burn;
-      if (burn > 0 && off < 90) lit(pos, burn * (0.8 + 0.2 * Math.sin(this.clock * 9 + k * 2.1)));
+      // (under a vault a fire is a pace from the stone it lights: it is told at little more than half, or the stone by it is white)
+      if (burn > 0 && off < 90) lit(pos, burn * (low ? 0.5 : 1) * (0.8 + 0.2 * Math.sin(this.clock * 9 + k * 2.1)));
     });
   }
 }

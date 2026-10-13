@@ -13,7 +13,7 @@
 // at the top, to within a twelfth.
 
 import { clipOut, cutPoly, inCut, kitBlocks, kitMatrix, kitPoint, kitSolids, KIT_TOWER } from '../sim/kit';
-import { CASTLE, LOOSE, UNDER, castleGround, castleKit, castleParts, hatchLine, looseParts, moundTop, rough, towerRadius, type Apron, type Beam, type Body, type Box, type Curtain, type Flight, type Loose, type Lump, type Mound, type Opening, type Paint, type Part, type Rail, type Slab, type Tower, type V3, type Wall } from '../sim/castle';
+import { CASTLE, LOOSE, UNDER, castleGround, castleKit, castleParts, hatchLine, looseParts, moundTop, rough, towerRadius, type Apron, type Beam, type Body, type Box, type Vault, type Curtain, type Flight, type Loose, type Lump, type Mound, type Opening, type Paint, type Part, type Rail, type Slab, type Tower, type V3, type Wall } from '../sim/castle';
 
 export type Quat = [number, number, number, number];
 /** what a thing sounds like underfoot and when it is hit */
@@ -37,10 +37,10 @@ export interface Skin { pos: number[]; nrm: number[]; uv: number[]; col: number[
 /** (`under`: what is of the lower levels, drawn only while somebody is near enough to see into them) */
 export interface Shape { near: Record<Sheet, Skin>; under: Record<Sheet, Skin>; far: Skin; solids: Solid[] }
 
-export const PAINTS: Paint[] = ['stone', 'ashlar', 'base', 'paving', 'timber', 'iron', 'rock', 'scree', 'earth'];
+export const PAINTS: Paint[] = ['stone', 'ashlar', 'base', 'paving', 'timber', 'iron', 'rock', 'scree', 'earth', 'water'];
 /** the things it is drawn in from near: every stuff that is of one picture is in one sheet, and a sheet is one thing to draw */
-export type Sheet = 'stone' | 'base' | 'timber' | 'iron' | 'rock' | 'earth';
-export const SHEETS: Sheet[] = ['stone', 'base', 'timber', 'iron', 'rock', 'earth'];
+export type Sheet = 'stone' | 'base' | 'timber' | 'iron' | 'rock' | 'earth' | 'water';
+export const SHEETS: Sheet[] = ['stone', 'base', 'timber', 'iron', 'rock', 'earth', 'water'];
 /**
  * THE PICTURES: the ONE place they are chosen. A sheet is a picture set (its name is the set's name in the
  * manifest, public/assets/tex) and what is done to it to make it this stone (see `aged` in castle.ts):
@@ -63,6 +63,8 @@ export const PICTURES: Record<Sheet, { tex: string | null; keep: number; lift: n
   iron: { tex: null, keep: 1, lift: 1, own: [0, 0, 0], even: 0, stones: [0, 0] },
   rock: { tex: 'aerial_rocks_02', keep: 0.3, lift: 0.8, own: [0.33, 0.33, 0.34], even: 0.3, stones: [0, 0] },
   earth: { tex: 'rocks_ground_02', keep: 1, lift: 1, own: [0.4, 0.36, 0.26], even: 0, stones: [0, 0] },
+  // (the cistern's water has no picture: it is a dark sheet that the fires and the day shine in: see castle.ts)
+  water: { tex: null, keep: 1, lift: 1, own: [0, 0, 0], even: 0, stones: [0, 0] },
 };
 /**
  * Each stuff: which sheet it is drawn in, how many metres one turn of the picture covers on it, and its own tone
@@ -74,18 +76,19 @@ export const STUFF: Record<Paint, { sheet: Sheet; tile: number; tint: V3 }> = {
   stone: { sheet: 'stone', tile: 1.9, tint: [1, 1, 1] },
   ashlar: { sheet: 'stone', tile: 2.5, tint: [1.1, 1.09, 1.07] },
   base: { sheet: 'base', tile: 2.4, tint: [1, 1, 1] },
-  paving: { sheet: 'base', tile: 1.9, tint: [1.22, 1.2, 1.14] },
+  paving: { sheet: 'stone', tile: 3.1, tint: [0.84, 0.84, 0.86] },
   scree: { sheet: 'base', tile: 3.2, tint: [1.3, 1.27, 1.2] },
   timber: { sheet: 'timber', tile: 1.6, tint: [1, 1, 1] },
   iron: { sheet: 'iron', tile: 1, tint: [1, 1, 1] },
   rock: { sheet: 'rock', tile: 4.5, tint: [1, 1, 1] },
   earth: { sheet: 'earth', tile: 5, tint: [1, 1, 1] },
+  water: { sheet: 'water', tile: 1, tint: [1, 1, 1] },
 };
 /** metres to one turn of each picture */
 export const TILE = Object.fromEntries(PAINTS.map((p) => [p, STUFF[p].tile])) as Record<Paint, number>;
 /** from far off it is drawn with no picture at all (none is fetched for a fort nobody is near): the colour each stuff comes to */
-const FAR_TINT: Record<Paint, V3> = { stone: [0.4, 0.385, 0.36], ashlar: [0.45, 0.43, 0.39], base: [0.26, 0.26, 0.245], paving: [0.31, 0.3, 0.28], timber: [0.2, 0.165, 0.13], iron: [0.05, 0.05, 0.05], rock: [0.4, 0.4, 0.4], scree: [0.33, 0.32, 0.3], earth: [0.4, 0.36, 0.26] };
-const SURF: Record<Paint, Surf> = { stone: 'concrete', ashlar: 'concrete', base: 'concrete', paving: 'concrete', timber: 'wood', iron: 'metal', rock: 'rock', scree: 'rock', earth: 'rock' };
+const FAR_TINT: Record<Paint, V3> = { stone: [0.4, 0.385, 0.36], ashlar: [0.45, 0.43, 0.39], base: [0.26, 0.26, 0.245], paving: [0.31, 0.3, 0.28], timber: [0.2, 0.165, 0.13], iron: [0.05, 0.05, 0.05], rock: [0.4, 0.4, 0.4], scree: [0.33, 0.32, 0.3], earth: [0.4, 0.36, 0.26], water: [0.05, 0.06, 0.07] };
+const SURF: Record<Paint, Surf> = { stone: 'concrete', ashlar: 'concrete', base: 'concrete', paving: 'concrete', timber: 'wood', iron: 'metal', rock: 'rock', scree: 'rock', earth: 'rock', water: 'rock' };
 
 // ------------------------------------------------------------------ small sums
 
@@ -161,9 +164,9 @@ function clouds(p: V3): number {
   return at(0.42, 91) * 0.62 + at(1.15, 92) * 0.38;
 }
 /** how much of that there is on each stuff (the lightest of it over the darkest, less one) */
-const MOTTLE: Record<Paint, number> = { stone: 0.36, ashlar: 0.36, base: 0.38, paving: 0.3, timber: 0.18, iron: 0, rock: 0.2, scree: 0.2, earth: 0 };
+const MOTTLE: Record<Paint, number> = { stone: 0.36, ashlar: 0.36, base: 0.38, paving: 0.3, timber: 0.18, iron: 0, rock: 0.2, scree: 0.2, earth: 0, water: 0 };
 /** a flat face is cut for it until no piece is longer than this: finely where the picture is plain (dressed blocks, paving), coarsely where it is busy; 0: not at all */
-const PIECE: Record<Paint, number> = { stone: 2.3, ashlar: 2.3, base: 2.6, paving: 1.25, timber: 0, iron: 0, rock: 0, scree: 0, earth: 0 };
+const PIECE: Record<Paint, number> = { stone: 2.3, ashlar: 2.3, base: 2.6, paving: 1.25, timber: 0, iron: 0, rock: 0, scree: 0, earth: 0, water: 0 };
 
 /**
  * How far a point of the masonry stands off where the plan has it: a few centimetres, sideways, by a slow pattern.
@@ -180,7 +183,7 @@ function warp(p: V3, by: number): V3 {
   return [p[0] + a * 2.6 * by, p[1], p[2] + b * 2.6 * by];
 }
 /** how far, for each stuff, metres (none for what is sawn or forged, or is ground already) */
-const WARP: Record<Paint, number> = { stone: 0.09, ashlar: 0.09, base: 0.1, paving: 0, timber: 0, iron: 0, rock: 0, scree: 0, earth: 0 };
+const WARP: Record<Paint, number> = { stone: 0.09, ashlar: 0.09, base: 0.1, paving: 0, timber: 0, iron: 0, rock: 0, scree: 0, earth: 0, water: 0 };
 
 let towers: Tower[] | null = null;
 /**
@@ -192,7 +195,17 @@ function sky(p: V3, n: V3): number {
   const x = p[0] + n[0] * 0.06, y = p[1] + n[1] * 0.06, z = p[2] + n[2] * 0.06, C = CASTLE, K = C.keep, T = C.tower;
   towers ??= castleParts().filter((q): q is Tower => q.t === 'tower');
   // (under the terrace, and in the foot of a tower: only where the vault fell in, and at the rent in the east wall)
-  if (y < -0.04 && ((Math.abs(x) < C.hx + 0.3 && Math.abs(z) < C.hz + 0.3) || towers.some((tw) => Math.hypot(x - tw.cx, z - tw.cz) < towerRadius(y) - 0.02))) return (x > UNDER.bay.x0 - 0.2 && x < UNDER.bay.x1 + 0.1 && z > UNDER.bay.z0 && z < UNDER.bay.z1) || (x > UNDER.cistern.drop.x0 && x < UNDER.cistern.drop.x1 && z > UNDER.cistern.drop.z0 && z < UNDER.cistern.drop.z1) || (x > UNDER.x - 0.6 && z > UNDER.rent.z0 && z < UNDER.rent.z1) ? 1 : 0;
+  if (y < -0.04 && ((Math.abs(x) < C.hx + 0.3 && Math.abs(z) < C.hz + 0.3) || towers.some((tw) => Math.hypot(x - tw.cx, z - tw.cz) < towerRadius(y) - 0.02))) {
+    const U = UNDER, D = U.cistern.drop, off = (x0: number, x1: number, z0: number, z1: number) => Math.hypot(Math.max(x0 - x, 0, x - x1), Math.max(z0 - z, 0, z - z1));
+    if ((x > U.bay.x0 - 0.2 && x < U.bay.x1 + 0.1 && z > U.bay.z0 && z < U.bay.z1) || (x > D.x0 && x < D.x1 && z > D.z0 && z < D.z1) || (x > U.x - 0.6 && z > U.rent.z0 && z < U.rent.z1)) return 1;
+    // (under cover: what of the day comes in at each opening and is thrown about by the stone, less with every pace
+    // from it: most under the holes in the terrace and at the rent, a little at the postern, the stair and the
+    // gratings. Never as much as half: the snow knows by that what is under a roof.)
+    const reach = (d: number, far: number, most: number) => most * Math.max(0, 1 - d / far) ** 1.6;
+    let day = Math.max(reach(off(D.x0, D.x1, D.z0, D.z1), 9, 0.46), reach(off(U.bay.x0, U.crawl, U.bay.z0, U.bay.z1), 7.5, 0.46), reach(off(U.x - 0.2, U.x + 2, U.rent.z0, U.rent.z1), 7, 0.42), reach(off(-U.x - 1, -U.x, U.goat.z0, U.goat.z1), 4, 0.25), reach(off(U.stair.head, U.stair.open, U.stair.z - 0.5, U.stair.z + 0.5), 3, 0.16));
+    for (const [gx, gz] of U.gratings) day = Math.max(day, reach(Math.hypot(x - gx, z - gz), 2.6, 0.2));
+    return y < U.floor - 1 ? 0 : day;
+  }
   if (x > K.x0 + 0.3 && x < K.x1 - 0.3 && z > K.z0 + 0.3 && z < K.z1 - 0.3 && y < K.roof - 0.2) {
     return x > K.fallen.x0 && z > K.fallen.z0 && y > K.floors[2] - 0.25 ? 1 : 0;
   }
@@ -224,10 +237,42 @@ function fromWall(p: V3): number {
 }
 
 type UV = [number, number];
+/**
+ * WHAT IS NEVER SEEN IS NOT DRAWN. The fort's own square blocks, as the rules say them (before the stone is bent):
+ * a triangle that lies against one or inside one, with stone before it all the way across (asked at its middle and
+ * toward each of its corners, a finger's breadth off its face), is left out: the end of a wall in another wall, the
+ * foot of a block on the block under it, two floors edge to edge. No eye is ever in a block, so what one hides is
+ * hidden from every eye. Two things are bent alike only if they are of stuffs bent by as much (see WARP): against
+ * a block of another stuff a face is left out only where it is deep in it, further than the bending moves either.
+ * `low`: the block is of the lower levels, which are not always drawn: it hides nothing that is drawn without them.
+ */
+interface Hide { x0: number; x1: number; y0: number; y1: number; z0: number; z1: number; by: number; low: boolean }
+interface Hides { list: Hide[]; grid: Map<number, number[]>; count: number }
+const HIDE_CELL = 2, hideKey = (x: number, z: number) => Math.floor(x / HIDE_CELL) * 4096 + Math.floor(z / HIDE_CELL);
+function hidesOf(list: Hide[]): Hides {
+  const grid = new Map<number, number[]>();
+  list.forEach((b, i) => {
+    for (let x = Math.floor(b.x0 / HIDE_CELL); x <= Math.floor(b.x1 / HIDE_CELL); x++) for (let z = Math.floor(b.z0 / HIDE_CELL); z <= Math.floor(b.z1 / HIDE_CELL); z++) {
+      const k = x * 4096 + z, at = grid.get(k);
+      if (at) at.push(i);
+      else grid.set(k, [i]);
+    }
+  });
+  return { list, grid, count: 0 };
+}
 /** Where triangles are put, for one stuff: it knows the size of that stuff's picture. */
 class Out {
   /** @param mottle how much the tone wanders over it; @param cut big faces are cut into pieces no longer than this for that to show (0: they are not) */
-  constructor(private s: Skin, private tile: number, private tint: V3, private mottle = 0, private cut = 0, private bent = 0) {}
+  constructor(private s: Skin, private tile: number, private tint: V3, private mottle = 0, private cut = 0, private bent = 0, private hides: Hides | null = null, private low = false) {}
+  /** whether a place has one of the fort's blocks all round it (see Hide) */
+  private hid(q: V3): boolean {
+    const H = this.hides!;
+    for (const i of H.grid.get(hideKey(q[0], q[2])) ?? []) {
+      const b = H.list[i], e = b.by === this.bent ? 0.004 : 0.26;
+      if ((!b.low || this.low) && q[0] > b.x0 + e && q[0] < b.x1 - e && q[2] > b.z0 + e && q[2] < b.z1 - e && q[1] > b.y0 + 0.004 && q[1] < b.y1 - 0.004) return true;
+    }
+    return false;
+  }
   /** the foot of what is being put now, if it stands on a floor or on the ground (null: it does not); and whether that is the ground */
   base: number | null = null;
   ground = false;
@@ -262,6 +307,10 @@ class Out {
       g = mul(g, -1);
     }
     const n = mul(g, 1 / twice);
+    if (this.hides) {
+      const mid: V3 = [(p[0][0] + p[1][0] + p[2][0]) / 3 + n[0] * 0.015, (p[0][1] + p[1][1] + p[2][1]) / 3 + n[1] * 0.015, (p[0][2] + p[1][2] + p[2][2]) / 3 + n[2] * 0.015];
+      if (this.hid(mid) && p.every((c) => this.hid([mid[0] + (c[0] - mid[0]) * 0.85 + n[0] * 0.002, mid[1] + (c[1] - mid[1]) * 0.85 + n[1] * 0.002, mid[2] + (c[2] - mid[2]) * 0.85 + n[2] * 0.002]))) return void this.hides.count++;
+    }
     for (const k of order) this.put(p[k], smooth ? smooth[k] : n, t[k], typeof tone === 'number' ? tone : tone[k]);
   }
   /** Four corners, in order round it. */
@@ -398,13 +447,15 @@ function flightPart(p: Flight, o: Out, put: Put) {
 /** how tall a course of the stone is: a broken top steps down by so much */
 const COURSE = 0.17;
 /** how high an opening's head is at a place across it: level, or an arch that springs from its jambs. `t`: -1 at one jamb, 1 at the other */
-const headAt = (y0: number, y1: number, halfWidth: number, arch: boolean | undefined, t: number) => {
+const headAt = (y0: number, y1: number, halfWidth: number, arch: boolean | undefined, t: number, rise?: number) => {
   if (!arch) return y1;
-  const rise = Math.min(halfWidth, (y1 - y0) * 0.5), k = Math.min(1, Math.abs(t));
-  return y1 - rise * (1 - Math.sqrt(1 - k * k));
+  const r = archRise(y0, y1, halfWidth, rise), k = Math.min(1, Math.abs(t));
+  return y1 - r * (1 - Math.sqrt(1 - k * k));
 };
+/** how high an arch stands from its springing to its crown: a half round, or as much of one as its height leaves room for, or what is said */
+const archRise = (y0: number, y1: number, halfWidth: number, rise?: number) => Math.min(rise ?? Infinity, halfWidth, (y1 - y0) * 0.5);
 /** as far up as a body is let through an arched opening: it is cut square, half way up the arch */
-const squareHead = (o: { y0: number; y1: number; arch?: boolean }, halfWidth: number) => (o.arch ? o.y1 - Math.min(halfWidth, (o.y1 - o.y0) * 0.5) / 2 : o.y1);
+const squareHead = (o: { y0: number; y1: number; arch?: boolean; rise?: number }, halfWidth: number) => (o.arch ? o.y1 - archRise(o.y0, o.y1, halfWidth, o.rise) / 2 : o.y1);
 /** how high an opening's foot is at a place across it: level, or (a hole where stones have gone) round as its head is */
 const sillAt = (y0: number, y1: number, halfWidth: number, round: boolean | undefined, t: number) => (round ? y0 + y1 - headAt(y0, y1, halfWidth, true, t) : y0);
 /** and as far down as a body is let through one that is round at the foot */
@@ -419,14 +470,20 @@ function wallPart(w: Wall, o: Out, core: Out, put: Put, lod: number) {
   const base = ax * d[0] + az * d[2], seed = Math.round(ax * 31 + az * 17 + L * 7);
   /** the openings there are at a place along it, lowest first: a door may have a doorway over it */
   const opsAt = (u: number) => ops.filter((p) => u > p.u0 && u < p.u1).sort((p, q) => p.y0 - q.y0);
-  const head = (p: Opening, u: number) => headAt(p.y0, p.y1, (p.u1 - p.u0) / 2, p.arch, (u - (p.u0 + p.u1) / 2) / ((p.u1 - p.u0) / 2));
+  const head = (p: Opening, u: number) => headAt(p.y0, p.y1, (p.u1 - p.u0) / 2, p.arch, (u - (p.u0 + p.u1) / 2) / ((p.u1 - p.u0) / 2), p.rise);
+  /** the way the underside of an opening's head faces at a place across it: down, and out along the wall as an arch comes down to its jamb */
+  const soffit = (p: Opening, u: number): V3 => {
+    if (!p.arch) return [0, -1, 0];
+    const hw = (p.u1 - p.u0) / 2, t = Math.min(0.97, Math.max(-0.97, (u - (p.u0 + p.u1) / 2) / hw)), slope = (-archRise(p.y0, p.y1, hw, p.rise) * t) / (hw * Math.sqrt(1 - t * t));
+    return unit([d[0] * slope, -1, d[2] * slope]);
+  };
   const sill = (p: Opening, u: number) => sillAt(p.y0, p.y1, (p.u1 - p.u0) / 2, p.round, (u - (p.u0 + p.u1) / 2) / ((p.u1 - p.u0) / 2));
 
   // ---- what is seen. It is cut along its length wherever its top or an opening changes, and a broken top is cut
   // again between: no two stones of a ruin's top are at one height.
   const cuts = new Set<number>([0, L]);
   for (let k = 1; k < tops.length; k++) cuts.add((k * L) / tops.length);
-  for (const p of ops) for (let k = 0, n = p.arch && !lod ? 6 : 1; k <= n; k++) cuts.add(p.u0 + ((p.u1 - p.u0) * k) / n);
+  for (const p of ops) for (let k = 0, n = p.arch && !lod ? 8 : 1; k <= n; k++) cuts.add(p.u0 + ((p.u1 - p.u0) * k) / n);
   if (broken) for (let k = 1, n = Math.round(L / 0.42); k < n; k++) cuts.add((k * L) / n);
   const us = sorted([...cuts].filter((u) => u >= 0 && u <= L), 0.03);
   us[us.length - 1] = L;
@@ -441,17 +498,27 @@ function wallPart(w: Wall, o: Out, core: Out, put: Put, lod: number) {
       if (Math.abs(tops[k + 1] - tops[k]) < 0.8) top = tops[k] + (tops[k + 1] - tops[k]) * t;
       top = Math.round((top - hash(i, seed, 3) * 0.2) / COURSE) * COURSE;
     }
-    const spans: [number, number, number, number][] = [];
-    let b0 = w.y0, b1 = w.y0;
+    const spans: [number, number, number, number][] = [], over: (Opening | null)[] = [];
+    let b0 = w.y0, b1 = w.y0, below: Opening | null = null;
     for (const p of opsAt(mid)) {
       const t0 = Math.min(sill(p, u0), top), t1 = Math.min(sill(p, u1), top);
-      if (Math.max(t0, t1) > Math.max(b0, b1) + 0.01) spans.push([b0, b1, Math.max(t0, b0), Math.max(t1, b1)]);
+      if (Math.max(t0, t1) > Math.max(b0, b1) + 0.01) {
+        spans.push([b0, b1, Math.max(t0, b0), Math.max(t1, b1)]);
+        over.push(below);
+      }
       b0 = head(p, u0);
       b1 = head(p, u1);
+      below = p;
     }
-    if (top > Math.max(b0, b1) + 0.02) spans.push([b0, b1, top, top]);
-    return { u0, u1, spans };
+    if (top > Math.max(b0, b1) + 0.02) {
+      spans.push([b0, b1, top, top]);
+      over.push(below);
+    }
+    // (`over`: the opening each piece stands over, if it stands over one)
+    return { u0, u1, spans, over };
   });
+  /** how far round the underside of each opening's head the lengths before this one have come: the picture is laid round an arch, not let fall on it from above (and turned: its courses lie across the arch, one to each stone of its ring) */
+  const round = new Map<Opening, number>();
   cols.forEach((c, ci) => {
     // (the rain runs off a sill and out of a gap between two merlons, and down the wall under it: darkest at the
     // top, and gone a man's height down. So a length of wall that stands lower than the length beside it is
@@ -475,7 +542,13 @@ function wallPart(w: Wall, o: Out, core: Out, put: Put, lod: number) {
       // (a broken top shows what the wall is filled with)
       if (broken && t0 === c.spans[c.spans.length - 1][2]) core.quad([at(c.u0, t0, -1), at(c.u1, t1, -1), at(c.u1, t1, 1), at(c.u0, t0, 1)], [[base + c.u0, -half], [base + c.u1, -half], [base + c.u1, half], [base + c.u0, half]], UP, tone * 0.95);
       else face(t0, t1, UP, 0.94);
-      if (b0 > w.y0 + 0.005 || b1 > w.y0 + 0.005) face(b0, b1, [0, -1, 0], 0.8);
+      const p = c.over[si];
+      // (from far off an arch is one flat length, and faces down)
+      if (p && p.arch && !lod) {
+        const s0 = round.get(p) ?? 0, s1 = s0 + Math.hypot(c.u1 - c.u0, b1 - b0), n0 = soffit(p, c.u0), n1 = soffit(p, c.u1);
+        round.set(p, s1);
+        o.quad([at(c.u0, b0, -1), at(c.u1, b1, -1), at(c.u1, b1, 1), at(c.u0, b0, 1)], [[-half, base + p.u0 + s0], [-half, base + p.u0 + s1], [half, base + p.u0 + s1], [half, base + p.u0 + s0]], soffit(p, (c.u0 + c.u1) / 2), tone * 0.8, [n0, n1, n1, n0]);
+      } else if (b0 > w.y0 + 0.005 || b1 > w.y0 + 0.005) face(b0, b1, [0, -1, 0], 0.8);
     }
   });
   // the ends of it, the jambs of its openings, and the steps of a broken top: wherever stone stands beside none
@@ -688,6 +761,29 @@ function lumpPart(l: Lump, o: Out, put: Put, lod: number) {
   }
   const k = l.blocky ? 1 : 0.78;
   put(boxSolid([l.x, l.y, l.z], l.blocky ? ax : [[1, 0, 0], UP, [0, 0, 1]], [l.rx * k, l.ry * (l.blocky ? 1 : 0.9), l.rz * k], false, 'rock', l.name ?? 'rock'));
+}
+
+/**
+ * The underside of a vault: half a round, in eight flat lengths from one wall to the other, cut along its length a
+ * pace and a half at a time; left out where it has fallen. Seen from under it, and it stops nothing.
+ */
+function vaultPart(v: Vault, o: Out) {
+  const [ax, az] = v.a, L = Math.hypot(v.b[0] - ax, v.b[1] - az), d: V3 = [(v.b[0] - ax) / L, 0, (v.b[1] - az) / L], side: V3 = [d[2], 0, -d[0]], half = v.wide / 2, rise = v.crown - v.spring, N = 8, tone = v.tone ?? 1;
+  const at = (u: number, t: number): V3 => [ax + d[0] * u - side[0] * half * Math.cos(t), v.spring + rise * Math.sin(t) + ((v.lift ?? 0) * u) / L, az + d[2] * u - side[2] * half * Math.cos(t)];
+  // (the way it faces at a place round it: in, and down)
+  const face = (t: number): V3 => unit([(side[0] * Math.cos(t)) / half, -Math.sin(t) / rise, (side[2] * Math.cos(t)) / half]);
+  const cuts = sorted([0, L, ...Array.from({ length: Math.ceil(L / 1.6) }, (_, k) => (L * k) / Math.ceil(L / 1.6)), ...(v.gone ?? []).flat()].filter((u) => u >= 0 && u <= L), 0.02);
+  // (how far round it a place is, for the picture: the same stone as the walls, its courses running along the vault)
+  const round: number[] = [0];
+  for (let k = 1; k <= N; k++) round.push(round[k - 1] + len(sub(at(0, (Math.PI * k) / N), at(0, (Math.PI * (k - 1)) / N))));
+  for (let i = 0; i + 1 < cuts.length; i++) {
+    const u0 = cuts[i], u1 = cuts[i + 1], um = (u0 + u1) / 2;
+    if ((v.gone ?? []).some(([g0, g1]) => um > g0 && um < g1)) continue;
+    for (let k = 0; k < N; k++) {
+      const t0 = (Math.PI * k) / N, t1 = (Math.PI * (k + 1)) / N;
+      o.quad([at(u0, t0), at(u1, t0), at(u1, t1), at(u0, t1)], [[u0, round[k]], [u1, round[k]], [u1, round[k + 1]], [u0, round[k + 1]]], face((t0 + t1) / 2), tone, [face(t0), face(t0), face(t1), face(t1)]);
+    }
+  }
 }
 
 /** the boards a tower's floor is laid with stand this far over the paving (they lie on it, and are heard underfoot) */
@@ -1002,6 +1098,7 @@ function emit(p: Part, of: (paint: Paint) => Out, solids: Solid[] | null, lod: n
     case 'mound': return moundPart(p, o, put, lod, ground, ways);
     case 'lump': return lumpPart(p, o, put, lod);
     case 'apron': return apronPart(p, o, put, ground);
+    case 'vault': return vaultPart(p, o);
   }
 }
 
@@ -1011,11 +1108,14 @@ function emit(p: Part, of: (paint: Paint) => Out, solids: Solid[] | null, lod: n
  * @param loose the loose pieces, in the fort's own measure: where nobody has said, where the real ones stand
  * @param rock whether the rock the ramp leaves from is made (not where the mountain itself comes up to the ramp's foot)
  */
-export function castleShape(ground: (x: number, z: number) => number = castleGround, loose: Loose[] = LOOSE, rock = true): Shape {
+export function castleShape(ground: (x: number, z: number) => number = castleGround, loose: Loose[] = LOOSE, rock = true, tally?: Record<string, number>): Shape {
   const sheets = () => Object.fromEntries(SHEETS.map((p) => [p, skin()])) as Record<Sheet, Skin>;
   const near = sheets(), under = sheets(), far = skin(), solids: Solid[] = [];
-  const outs = (to: Record<Sheet, Skin>) => Object.fromEntries(PAINTS.map((p) => [p, new Out(to[STUFF[p].sheet], TILE[p], STUFF[p].tint, MOTTLE[p], PIECE[p], WARP[p])])) as Record<Paint, Out>;
-  const nears = outs(near), unders = outs(under);
+  const all = [...castleParts().filter((p) => rock || !/outcrop|ramp head/.test(p.name ?? '')), ...loose.flatMap((l) => looseParts(l, ground(l.x, l.z)))].map((raw) => (raw.sits ? lifted(raw, ground(raw.sits[0], raw.sits[1])) : raw));
+  // (the blocks that hide what lies against them: those that are seen, stop everything, and stand square to the fort)
+  const hides = hidesOf(all.flatMap((p): Hide[] => (p.t === 'box' && !p.hidden && !p.yaw && p.paint !== 'water' && p.at !== 'far' && (p.body ?? 'all') === 'all' ? [{ x0: p.x0, x1: p.x1, y0: p.y0, y1: p.y1, z0: p.z0, z1: p.z1, by: WARP[p.paint], low: !!p.low }] : [])));
+  const outs = (to: Record<Sheet, Skin>, low: boolean) => Object.fromEntries(PAINTS.map((p) => [p, new Out(to[STUFF[p].sheet], TILE[p], STUFF[p].tint, MOTTLE[p], PIECE[p], WARP[p], hides, low)])) as Record<Paint, Out>;
+  const nears = outs(near, false), unders = outs(under, true);
   const fars = Object.fromEntries(PAINTS.map((p) => [p, new Out(far, 1, FAR_TINT[p], MOTTLE[p], 0, WARP[p])])) as Record<Paint, Out>;
   // (where each hatch's passage goes through the foot of a wall, half way between its ends)
   const gaps: Gap[] = loose.filter((l) => l.kind === 'hatch').flatMap((l) => {
@@ -1028,9 +1128,14 @@ export function castleShape(ground: (x: number, z: number) => number = castleGro
     return out;
   });
   const ways: Way[] = loose.filter((l) => l.kind === 'hatch').map((l) => ({ L: hatchLine(l, ground(l.x, l.z)), g: ground(l.x, l.z) }));
-  for (const raw of [...castleParts().filter((p) => rock || !/outcrop|ramp head/.test(p.name ?? '')), ...loose.flatMap((l) => looseParts(l, ground(l.x, l.z)))]) {
-    const p = raw.sits ? lifted(raw, ground(raw.sits[0], raw.sits[1])) : raw;
+  for (const p of all) {
+    // (`tally`, for whoever asks what it costs: how many triangles each kind of piece is drawn with from near, by its name)
+    const to = p.low ? under : near, was = tally ? SHEETS.reduce((t, s) => t + to[s].pos.length, 0) : 0;
     if (p.at !== 'far') emit(p, (paint) => (p.low ? unders : nears)[paint], solids, 0, ground, gaps, ways);
+    if (tally) {
+      const key = `${p.low ? 'under' : 'near'} ${p.t} ${p.name ?? ''}`;
+      tally[key] = (tally[key] ?? 0) + (SHEETS.reduce((t, s) => t + to[s].pos.length, 0) - was) / 9;
+    }
     if (p.at) emit(p, (paint) => fars[paint], null, 1, ground, gaps, ways);
   }
   // ---- the kit's pieces (the walls, the gatehouse, blocks of fallen wall): what stops a body, as the kit says; and
@@ -1047,5 +1152,6 @@ export function castleShape(ground: (x: number, z: number) => number = castleGro
       block(fars.stone, c, ax, [((b[1] - b[0]) / 2) * sc[0], ((b[3] - b[2]) / 2) * sc[1], ((b[5] - b[4]) / 2) * sc[2]], 0.9);
     }
   }
+  if (tally) tally['left out, never seen'] = hides.count;
   return { near, under, far, solids };
 }

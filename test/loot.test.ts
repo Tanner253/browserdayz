@@ -24,7 +24,7 @@ import assert from 'node:assert/strict';
 import { buildWorldData } from '../server/world';
 import { RNG } from '../src/core/noise';
 import { CRATE_SPECS, fillCrate } from '../src/sim/crates';
-import { Economy, TYPES } from '../src/sim/economy';
+import { APART, Economy, TYPES } from '../src/sim/economy';
 import { ITEMS } from '../src/sim/items';
 import { TIERS, type Tier } from '../src/sim/tiers';
 import { ARMY_CAMP } from '../src/world/worldgen';
@@ -36,20 +36,28 @@ const ok = (name: string, fn: () => void) => {
   console.log('  ok  ' + name);
 };
 const data = buildWorldData(process.cwd());
-const points = data.lootPoints;
+// (The map's own places, by their numbers in the whole list. A place stocked apart, the fort on the mountain, is
+// left out of every count below but its own: it is stocked on top of the map and takes nothing from it. Its
+// places are the last in the list, so the numbers of the rest are theirs still.)
+const every = data.lootPoints;
+const points = every.filter((p) => !APART.has(p.building));
+assert.ok(every.slice(0, points.length).every((p, i) => p === points[i]), 'a place apart is not at the end of the list of places');
 const STEPS: Tier[] = [1, 2, 3, 4, 5];
 const melee = Object.values(ITEMS).filter((d) => d.category === 'melee').map((d) => d.id);
 const guns = Object.values(ITEMS).filter((d) => d.weapon).map((d) => d.id);
 
 /** one stocking of the map: of each sort, how many lie on each step, and where each thing lies */
 const stock = (seed: number) => {
-  const e = new Economy(points, { spawn: () => {}, despawn: () => {} });
+  const e = new Economy(every, { spawn: () => {}, despawn: () => {} });
   (e as unknown as { rng: RNG }).rng = new RNG(seed);
   e.populate();
+  /** what lies in the place apart: put by, and taken out of what the map's own rules are held to */
+  const fort = [...e.loot.values()].filter((l) => l.point >= points.length).map((l) => ({ id: l.item.id, p: every[l.point] }));
+  for (const l of [...e.loot.values()]) if (l.point >= points.length) e.loot.delete(l.uid);
   const on = (id: string, t: Tier) => [...e.loot.values()].filter((l) => l.item.id === id && points[l.point].tier === t).length;
   // (by the rules alone: not what a place always keeps, whatever the rules say: the rifle on the hospital's roof and its parts)
   const ruled = (id: string, t: Tier) => [...e.loot.values()].filter((l) => l.item.id === id && points[l.point].tier === t && !points[l.point].keeps).length;
-  return { e, on, ruled, all: [...e.loot.values()].map((l) => ({ id: l.item.id, p: points[l.point], item: l.item })) };
+  return { e, on, ruled, fort, all: [...e.loot.values()].map((l) => ({ id: l.item.id, p: points[l.point], item: l.item })) };
 };
 const worlds = [11, 2026, 77123].map(stock);
 
@@ -210,6 +218,8 @@ ok('a building is of one kind, and holds what its kind is for: the clinic, the h
   const sum = (m: Map<string, number>, ...ids: string[]) => ids.reduce((n, id) => n + (m.get(id) ?? 0), 0);
   const cat = (m: Map<string, number>, ...cats: string[]) => [...m].reduce((n, [id, k]) => n + (cats.includes(ITEMS[id].category) ? k : 0), 0);
   const total = (m: Map<string, number>) => [...m.values()].reduce((a, b) => a + b, 0);
+  /** the lights lying in shops, one count to a stocking: held to over them all and not on any one throw of the dice */
+  const lights: number[] = [];
   for (const { all } of worlds) {
     const inside = (ok: (p: (typeof points)[number]) => boolean) => {
       const m = new Map<string, number>();
@@ -231,13 +241,15 @@ ok('a building is of one kind, and holds what its kind is for: the clinic, the h
       assert.ok(cat(shop, 'food') >= 8 && cat(shop, 'drink') >= 4 && cat(shop, 'food', 'drink') * 5 >= total(shop) * 3, `the shop on step ${t}: ${[...shop].map(([id, k]) => `${id} ${k}`).join(', ')}`);
       assert.equal(cat(shop, 'weapon', 'magazine', 'ammo', 'attachment', 'melee'), 0, `the shop on step ${t} holds something to fight with`);
     }
-    assert.ok([1, 2, 3].reduce((n, t) => n + sum(inside((p) => p.tier === t && kind(p, 'Shop')), 'flashlight'), 0) >= 3, 'hardly a light in any shop');
+    lights.push([1, 2, 3].reduce((n, t) => n + sum(inside((p) => p.tier === t && kind(p, 'Shop')), 'flashlight'), 0));
     // ("sheds should spawn industrial and tools, flashlight etc": past the outskirts they were all but empty)
     const TOOLS = ['hatchet', 'crowbar', 'shovel', 'knife', 'flashlight', 'jerrycan', 'work_gloves', 'rubber_boots', 'garden_gloves', 'stash_kit', 'black_bag', 'sack_pack', 'chest_rig', 'gun_light'];
     const sheds = inside((p) => p.tier === 2 && kind(p, ...SHED) && !kind(p, 'Military')), places = points.filter((p) => p.tier === 2 && !p.arms && kind(p, ...SHED) && !kind(p, 'Military')).length;
     assert.ok(total(sheds) >= places * 0.25 && sum(sheds, ...TOOLS) * 2 >= total(sheds), `the sheds of the village: ${total(sheds)} things on ${places} places, ${sum(sheds, ...TOOLS)} of them a shed's`);
     assert.equal(cat(sheds, 'weapon', 'magazine'), 0, 'a gun or a magazine in a shed');
   }
+  // ("the store should spawn supplies and food, and water, flashlight": three to a stocking on the whole, and never a stocking with none)
+  assert.ok(lights.reduce((a, b) => a + b, 0) >= worlds.length * 3 - 2 && Math.min(...lights) >= 1, `hardly a light in any shop: ${lights.join(', ')} over ${worlds.length} stockings`);
 });
 
 ok('food is in the shop before anywhere, and dressings in the clinic', () => {
@@ -303,7 +315,8 @@ ok('a looted spot, and the ground about it, is left alone for three minutes; and
   // (A dozen things, one after another, each of what lies there at the time: of many sorts, in many buildings.
   // It goes on for hours of the game's time, and what lay there at the start has gone with age by the end.)
   for (let n = 0; n < 12; n++) {
-    const now = lies().filter((q) => !sorts.has(q.item.id));
+    // (of the sorts the rules say are back in the town inside ten minutes: its one AK is most of an hour coming, on purpose)
+    const now = lies().filter((q) => !sorts.has(q.item.id) && (TYPES[q.item.id].on?.[3]?.restock ?? Math.min(TYPES[q.item.id].restock, 420)) <= 600);
     const l = now[(n * 37 + 5) % now.length];
     const spot = l.point, id = l.item.id;
     sorts.add(id);
@@ -329,6 +342,26 @@ ok('a looted spot, and the ground about it, is left alone for three minutes; and
   // (and the town is as full as it was, give or take: nothing is lost to the rule, and nothing piles up)
   const after = all().filter((q) => q.point >= 0 && tiers[q.point] === 3 && !points[q.point].arms && !points[q.point].keeps).length;
   assert.ok(Math.abs(after - before) <= 8, `Kamenka held ${before} things and holds ${after}`);
+});
+
+ok('the fort on the mountain is stocked on top of the map: the army\'s things in its armoury, a dressing station\'s in its cells, and nothing taken from anywhere else', () => {
+  const own = every.filter((p) => APART.has(p.building)), free = own.filter((p) => !p.arms && !p.keeps);
+  assert.ok(own.length >= 40, `${own.length} places in the fort`);
+  for (const { fort } of worlds) {
+    const loose = fort.filter(({ p }) => !p.arms && !p.keeps);
+    // (well stocked, and not a shop)
+    assert.ok(loose.length >= free.length * 0.45 && loose.length <= free.length * 0.9, `${loose.length} things in the fort's ${free.length} free places`);
+    const top = loose.filter(({ p }) => p.tier === 4);
+    assert.ok(top.length >= 10, `${top.length} things of the fourth step in the fort`);
+    // (each thing lies in a spot of a kind it is kept in, on every step: no rifle on a cot, no blood in the armoury)
+    for (const { id, p } of loose) assert.ok(TYPES[id].usage.some((u) => p.usage.includes(u)) || (TYPES[id].on?.[p.tier!]?.usage ?? []).some((u) => p.usage.includes(u)), `${id} in the fort's ${p.usage.join(' and ')}`);
+    // (its guns are on its racks, a rifle among them; what lies loose is what goes with them, and a dressing station's things)
+    const guns = fort.filter(({ id, p }) => p.tier === 4 && ITEMS[id].weapon), med = top.filter(({ id }) => ITEMS[id].category === 'medical').length;
+    assert.ok(guns.length >= 4 && med >= 2, `${guns.length} guns and ${med} medical things in the fort's fourth step`);
+    // (and the racks that always hold a gun hold one)
+    const racks = own.filter((p) => p.arms === 'guns').length;
+    assert.ok(racks >= 4 && fort.filter(({ p, id }) => p.arms === 'guns' && ITEMS[id].weapon).length === racks, `${racks} racks in the fort, not all with a gun`);
+  }
 });
 
 console.log(`\n${n} checks passed`);

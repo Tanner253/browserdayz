@@ -1488,6 +1488,16 @@ export class Buildings {
     // things on the ground of the cleft, after every other place on the map, so that none of those is renumbered.
     // What an army's jeep carried, on the step of the map the town beside it is on.
     for (const b of this.world.bridges) for (const [x, z] of wreckUnder(b).spots) this.lootPoints.push({ x, y: heightAt(this.world.heights, x, z) + 0.02, z, usage: ['Military', 'Hunting'], building: 'wreck', floor: true, tier: 3 });
+    // And about the helicopter that came down behind the fort (`World.wreck`: see MOUNTAIN.crest in the generator):
+    // five places on the ground round it, each so far along it and so far to one side. What it was bringing the
+    // garrison: an army's, of the fourth step, in the open under two of the fort's towers.
+    const heli = this.world.wreck;
+    if (heli) {
+      for (const [along, across] of [[4.9, 2.7], [1.4, -3.2], [-2.6, 2.9], [-5.6, -1.9], [7.3, -1.1]]) {
+        const x = heli.x + Math.sin(heli.rot) * along + Math.cos(heli.rot) * across, z = heli.z + Math.cos(heli.rot) * along - Math.sin(heli.rot) * across;
+        this.lootPoints.push({ x, y: heightAt(this.world.heights, x, z) + 0.02, z, usage: ['Military', 'Hunting'], building: 'wreck', floor: true, tier: 4 });
+      }
+    }
     // And the fort on the mountain (src/sim/castle.ts): its places for things, on the steps of the map it says, and
     // what stands in it off the shelf. The last lot of all: nothing else on the map is renumbered for it.
     const fort = this.world.castle;

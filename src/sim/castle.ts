@@ -104,12 +104,14 @@ export const UNDER = {
   /** the hatch: how far its steps go down, over what length, how wide they and the passage are, how tall the passage, and how far from what is cut for them the earth laid over the cut ground reaches (as far as lowering the squares they touch can disturb ground of two-metre squares: twice a square's corner to corner) */
   hatch: { drop: 3.2, run: 4.2, wide: 1.3, tall: 2.1, lid: 5.7 },
 };
+/** the cistern's arcade: the line it stands on, how thick it is, and each arch of it by how far along it is from the west wall (what is between two arches is a pier: the water's edge is drawn round each) */
+export const ARCADE = { z: -6.25, thick: 0.5, arches: [[0.25, 1.95], [2.45, 4.35], [4.85, 6.75], [7.25, 9.15], [9.65, 11.55], [12.05, 13.15]] as [number, number][] };
 /** where the passage to the hatch leaves the fort: [x, z] in the fort's own measure, its floor so far under the terrace */
 export const POSTERN = { x: UNDER.postern.x1 + 0.25, z: 1.5, y: UNDER.postern.deep };
 
 export type V3 = [number, number, number];
 /** what a part is made of: the walls' coursed stone, the keep's (the same stone, laid bigger), the dark small stone of the leaning bases, the wall cores and everything under the terrace, paving, old timber, iron, living rock, loose stone, and the ground's own earth (laid over a hole cut in the ground) */
-export type Paint = 'stone' | 'ashlar' | 'base' | 'paving' | 'timber' | 'iron' | 'rock' | 'scree' | 'earth';
+export type Paint = 'stone' | 'ashlar' | 'base' | 'paving' | 'timber' | 'iron' | 'rock' | 'scree' | 'earth' | 'water';
 /** what a part stops: everything; a body and nothing else (a rail, the slope under a stair: a shot goes through); nothing */
 export type Body = 'all' | 'feet' | 'none';
 
@@ -141,8 +143,8 @@ export interface Beam extends Common { t: 'beam'; a: V3; b: V3; w: number; h: nu
 export interface Rail extends Common { t: 'rail'; a: V3; b: V3 }
 /** a straight flight: the middle of its foot on the floor below, the middle of the far edge of its last tread (which is level with the floor above), and its width */
 export interface Flight extends Common { t: 'flight'; foot: V3; head: V3; w: number }
-/** (`round`: a hole where stones have gone, round at its foot as at its head, not an opening a mason made) */
-export interface Opening { u0: number; u1: number; y0: number; y1: number; arch?: boolean; round?: boolean }
+/** (`round`: a hole where stones have gone, round at its foot as at its head, not an opening a mason made; `rise`: how high an arch stands from where it springs to its crown: unsaid, a half round, or as much of one as its height leaves room for) */
+export interface Opening { u0: number; u1: number; y0: number; y1: number; arch?: boolean; round?: boolean; rise?: number }
 /**
  * A wall that stands straight: along the ground from `a` to `b` (its middle line; the outside is on the left of
  * somebody walking it), from `y0` up to `top` (one height, or one for each of so many equal lengths of it, which
@@ -176,6 +178,13 @@ export interface Tower extends Common {
 }
 /** ground that is made: the rock the ramp starts from, the rubble under the breach. Its height is `moundTop`. */
 export interface Mound extends Common { t: 'mound'; kind: 'outcrop' | 'fan' | 'vault' | 'rent'; x0: number; x1: number; z0: number; z1: number; cell: number }
+/**
+ * The underside of a round roof of stone over a length of floor: along the plan from `a` to `b` (the middle line
+ * of what it roofs), so wide; it springs from the walls either side at `spring` and its crown is at `crown`.
+ * It is seen and stops nothing (the floor over it does that). `gone`: lengths of it that have fallen, [from, to] along it.
+ * `lift`: how much higher it is at `b` than at `a` (over a passage that climbs).
+ */
+export interface Vault extends Common { t: 'vault'; a: [number, number]; b: [number, number]; wide: number; spring: number; crown: number; gone?: [number, number][]; lift?: number }
 /** a rock, or a fallen block: where its middle is, half its size each way, and the number it is shaped from */
 export interface Lump extends Common { t: 'lump'; x: number; y: number; z: number; rx: number; ry: number; rz: number; seed: number; blocky?: boolean }
 /**
@@ -184,7 +193,7 @@ export interface Lump extends Common { t: 'lump'; x: number; y: number; z: numbe
  * lying as the ground lay; and none of it over `hole`, which is open to the sky (a stairwell).
  */
 export interface Apron extends Common { t: 'apron'; wells: [number, number][][]; hole: [number, number][]; reach: number }
-export type Part = Box | Slab | Beam | Rail | Flight | Wall | Curtain | Tower | Mound | Lump | Apron;
+export type Part = Box | Slab | Beam | Rail | Flight | Wall | Curtain | Tower | Mound | Lump | Apron | Vault;
 
 // ------------------------------------------------------------------ where it is
 
@@ -557,9 +566,11 @@ function layOut(): Part[] {
   // ---- UNDER IT: THE VAULTS (see UNDER). All of it is `low`: drawn only while somebody is near enough to see into it.
   const lbox = (paint: Paint, x0: number, x1: number, y0: number, y1: number, z0: number, z1: number, o: Partial<Box> = {}) => box(paint, x0, x1, y0, y1, z0, z1, { low: true, ...o });
   const PS = U.postern, UF = U.floor, CI = U.cistern, CF = UF - CI.deep, G = U.goat, M = U.mid;
+  // (every vault springs from its walls at one height, and every arch that carries one has its crown there: an arch that stood higher would be cut by the vault it carries)
+  const SPRING = UF + 2.05;
   // its floors: the cistern's, a knee under the rest; and the rest (open over the stair down to the sally port)
-  for (const [x0, x1, z0, z1] of tiles(-U.x - 0.4, CI.x1, -U.z - 0.4, CI.z1, [])) lbox('base', x0, x1, CF - 0.5, CF, z0, z1, { name: 'cistern floor', tone: 0.7 });
-  for (const [x0, x1, z0, z1] of tiles(-U.x - 0.4, U.x + 0.4, -U.z - 0.4, U.z + 0.4, [[-U.x - 0.4, CI.x1, -U.z - 0.4, CI.z1], [PS.x0, PS.x1, PS.head, PS.end]])) lbox('base', x0, x1, UF - 0.5, UF, z0, z1, { name: 'undercroft floor', tone: 0.82 });
+  for (const [x0, x1, z0, z1] of tiles(-U.x - 0.4, CI.x1, -U.z - 0.4, CI.z1, [])) lbox('paving', x0, x1, CF - 0.5, CF, z0, z1, { name: 'cistern floor', tone: 0.7 });
+  for (const [x0, x1, z0, z1] of tiles(-U.x - 0.4, U.x + 0.4, -U.z - 0.4, U.z + 0.4, [[-U.x - 0.4, CI.x1, -U.z - 0.4, CI.z1], [PS.x0, PS.x1, PS.head, PS.end]])) lbox('paving', x0, x1, UF - 0.5, UF, z0, z1, { name: 'undercroft floor', tone: 0.82 });
   // its outer walls (each ends where the foot of a tower comes into the corner: that is the wall there). The west
   // one has the postern's doorway in it; the east one is gone where it fell out.
   const WE = 7.05;
@@ -573,8 +584,22 @@ function layOut(): Part[] {
 
   // THE CISTERN: its water, a row of pillars down the middle of it, and under the hole in the terrace walk the
   // stone that fell in, standing out of the water (somewhere to land, and to be seen landing)
-  lbox('iron', -U.x, CI.x1, CF + 0.02, UF + CI.water, -U.z, CI.z1, { name: 'water', body: 'none', tone: 0.5 });
-  for (const x of [-6, -3.6, -1.2, 1.2, 3.6]) lbox('stone', x - 0.25, x + 0.25, CF, U.roof, -6.5, -6.0, { name: 'cistern pillar' });
+  lbox('water', -U.x, CI.x1, CF + 0.02, UF + CI.water, -U.z, CI.z1, { name: 'water', body: 'none' });
+  // (an arcade down the middle of it: five piers and the arches between them, which its two vaults spring from)
+  parts.push({ t: 'wall', paint: 'stone', low: true, name: 'cistern arcade', a: [-U.x, ARCADE.z], b: [CI.x1, ARCADE.z], y0: CF, top: U.roof, thick: ARCADE.thick, openings: ARCADE.arches.map(([u0, u1]) => ({ u0, u1, y0: CF - 0.05, y1: SPRING, arch: true, rise: 0.55 })) });
+  // THE VAULTS' ROOFS: a round roof of stone over each side and each aisle, springing from the walls a man's height
+  // up; gone where the terrace over it has fallen in, and open under the gratings
+  const vault = (a: [number, number], b: [number, number], wide: number, gone?: [number, number][]) => void parts.push({ t: 'vault', paint: 'stone', low: true, tone: 0.78, name: 'vault', a, b, wide, spring: SPRING, crown: U.roof - 0.02, gone });
+  vault([-U.x, (-U.z - 6.5) / 2], [CI.x1, (-U.z - 6.5) / 2], U.z - 6.5, [[DR.x0 - 0.2 + U.x, DR.x1 + 0.2 + U.x], [1.9 - 0.5 + U.x, 1.9 + 0.5 + U.x]]);
+  vault([-U.x, (-6.0 + CI.z1) / 2], [CI.x1, (-6.0 + CI.z1) / 2], CI.z1 + 6.0);
+  vault([(CI.x1 + U.x) / 2, -U.z], [(CI.x1 + U.x) / 2, U.z], U.x - CI.x1, [[-6 - 0.5 + U.z, -6 + 0.5 + U.z]]);
+  vault([-U.x, (K.z1 + U.z) / 2], [CI.x1, (K.z1 + U.z) / 2], U.z - K.z1);
+  vault([(-U.x + K.x0) / 2, CI.z1], [(-U.x + K.x0) / 2, K.z1], K.x0 + U.x, [[U.bay.z0 - 0.15 - CI.z1, U.bay.z1 + 0.15 - CI.z1]]);
+  // (the armoury: three, side by side, on arches from its two piers to its walls)
+  vault([(M.x0 - 1.3) / 2, U.armoury.z0], [(M.x0 - 1.3) / 2, M.z1], -1.3 - M.x0);
+  vault([-0.1, U.armoury.z0], [-0.1, M.z1], 2.4, [[1.2 - 0.5 - U.armoury.z0, 1.2 + 0.5 - U.armoury.z0]]);
+  vault([(1.1 + M.x1) / 2, U.armoury.z0], [(1.1 + M.x1) / 2, M.z1], M.x1 - 1.1);
+  for (const x of [-1.3, 1.1]) parts.push({ t: 'wall', paint: 'stone', low: true, name: 'armoury arch', a: [x, U.armoury.z0], b: [x, M.z1], y0: UF, top: U.roof, thick: 0.4, openings: [[0, 1 - 0.34 - U.armoury.z0], [1 + 0.34 - U.armoury.z0, M.z1 - U.armoury.z0]].map(([u0, u1]) => ({ u0, u1, y0: UF - 0.05, y1: SPRING, arch: true, rise: 0.5 })) });
   // (out of the water: where its floor meets the rest there is a step half way up, and what is walked on is one slope over it, as under any stair: at the door of the stair, and across its east and west ends)
   for (const [x0, x1, z0, z1, way] of [[2.2, 3.2, CI.z1 - 0.75, CI.z1, 'z'], [CI.x1 - 0.75, CI.x1, -U.z, CI.z1, 'x'], [-U.x, K.x0, CI.z1 - 0.75, CI.z1, 'z']] as [number, number, number, number, 'x' | 'z'][]) {
     if (way === 'z') lbox('base', x0, x1, CF, CF + CI.deep / 2, z1 - 0.38, z1, { name: 'cistern step', tone: 0.75 });
@@ -630,12 +655,14 @@ function layOut(): Part[] {
   // THE SALLY PORT's pier, and an arch across each side here and there: each bay between two of them is a vault
   lbox('stone', 5.55 - 0.32, 5.55 + 0.32, UF, U.roof, -1.6 - 0.32, -1.6 + 0.32, { name: 'pier' });
   const rib = (a: [number, number], b: [number, number]) => void parts.push({ t: 'wall', paint: 'stone', low: true, name: 'vault rib', a, b, y0: UF, top: U.roof, thick: 0.45, openings: [{ u0: 0.28, u1: Math.hypot(b[0] - a[0], b[1] - a[1]) - 0.28, y0: UF - 0.1, y1: U.roof - 0.3, arch: true }] });
-  rib([-3.6, K.z1], [-3.6, U.z]);
-  rib([4.2, K.z1], [4.2, U.z]);
   rib([-U.x, -2.6], [K.x0, -2.6]);
-  // THE AID POST: three cells against the outer wall, each with its doorway, and the passage past them
-  parts.push({ t: 'wall', paint: 'stone', low: true, name: 'cells', a: [-3, 7], b: [3.6, 7], y0: UF, top: U.roof, thick: 0.3, openings: [0, 1, 2].map((k) => ({ u0: 0.65 + k * 2.2, u1: 1.55 + k * 2.2, y0: UF, y1: UF + 2 })) });
-  for (const x of [-3, -0.8, 1.4, 3.6]) lbox('base', x - 0.13, x + 0.13, UF, U.roof, 7.15, U.z, { name: 'cells' });
+  // THE AID POST: three cells against the outer wall, each open to the passage under its own arch (a cot is seen
+  // in each from the passage, and whoever is in one is seen), and the passage past them
+  parts.push({ t: 'wall', paint: 'stone', low: true, name: 'cells', a: [-3.3, 6.9], b: [3.9, 6.9], y0: UF, top: U.roof, thick: 0.3, openings: [0, 1, 2].map((k) => ({ u0: 0.32 + k * 2.4, u1: 2.08 + k * 2.4, y0: UF - 0.05, y1: UF + 2, arch: true, rise: 0.45 })) });
+  for (const x of [-3.3, -0.9, 1.5, 3.9]) lbox('stone', x - 0.13, x + 0.13, UF, U.roof, 7.05, U.z, { name: 'cells' });
+  // (and an arch across the south side west of them, and one across the east side south of the stair: the bays of two long vaults)
+  rib([-5.0, K.z1], [-5.0, U.z]);
+  rib([K.x1, 2.6], [U.x, 2.6]);
   // the west side: the stone of its fallen bay, lying against the outer wall as it fell (seen from the terrace
   // through the hole it left); and a slab of the vault across the way that is left past it, to be crouched under
   parts.push({ t: 'mound', paint: 'scree', name: 'fallen vault', kind: 'vault', x0: -U.x - 0.2, x1: U.crawl + 0.4, z0: U.bay.z0 - 0.7, z1: U.bay.z1 + 0.9, cell: 0.3 });
@@ -899,22 +926,30 @@ function layOut(): Part[] {
   // ---- a basket of iron for a fire at each place a light is kept, on a post or on a bracket from the wall
   // (six bars between a hoop at its lip and a smaller one at its foot, and a plate under the fire; on three legs
   // where it stands on a floor, and on a chain where it hangs. The fire in it is the game's own: see CastleSite.)
-  for (const [x, z, y, post] of LAMPS) {
-    const lip = y - 0.04, foot = y - 0.32, at = (k: number, r: number, h: number): V3 => [x + Math.cos((k * Math.PI) / 3) * r, h, z + Math.sin((k * Math.PI) / 3) * r];
-    const iron = { paint: 'iron' as Paint, name: 'cresset' };
-    for (let k = 0; k < 6; k++) {
-      beam(at(k, 0.1, foot), at(k, 0.17, lip), 0.022, 0.022, iron);
-      beam(at(k, 0.17, lip), at(k + 1, 0.17, lip), 0.022, 0.03, iron);
-      beam(at(k, 0.1, foot), at(k + 1, 0.1, foot), 0.02, 0.025, iron);
-    }
-    box('iron', x - 0.09, x + 0.09, foot - 0.015, foot, z - 0.09, z + 0.09, { name: 'cresset', body: 'none' });
-    if (post) {
-      for (const k of [0.5, 2.5, 4.5]) beam(at(k, 0.34, y - post), at(k, 0.07, foot), 0.035, 0.035, iron);
-      box('iron', x - 0.07, x + 0.07, y - post, foot, z - 0.07, z + 0.07, { hidden: true, name: 'cresset' });
-    } else beam([x, lip, z], [x, lip + 0.55, z], 0.015, 0.015, iron);
-  }
+  for (const [x, z, y, post] of LAMPS) parts.push(...cresset(x, z, y, post, y < -0.5));
 
   return parts;
+}
+
+/**
+ * A basket of iron for a fire: six bars between a hoop at its lip and a smaller one at its foot, and a plate under
+ * the fire; on three legs where it stands on a floor (`post`: how long), and on a chain where it hangs. The fire
+ * in it is the game's own: see CastleSite.
+ */
+function cresset(x: number, z: number, y: number, post: number, low = false): Part[] {
+  const out: Part[] = [], lip = y - 0.04, foot = y - 0.32, at = (k: number, r: number, h: number): V3 => [x + Math.cos((k * Math.PI) / 3) * r, h, z + Math.sin((k * Math.PI) / 3) * r];
+  const bar = (a: V3, b: V3, w: number, h: number) => void out.push({ t: 'beam', paint: 'iron', a, b, w, h, body: 'none', name: 'cresset', low });
+  for (let k = 0; k < 6; k++) {
+    bar(at(k, 0.1, foot), at(k, 0.17, lip), 0.022, 0.022);
+    bar(at(k, 0.17, lip), at(k + 1, 0.17, lip), 0.022, 0.03);
+    bar(at(k, 0.1, foot), at(k + 1, 0.1, foot), 0.02, 0.025);
+  }
+  out.push({ t: 'box', paint: 'iron', x0: x - 0.09, x1: x + 0.09, y0: foot - 0.015, y1: foot, z0: z - 0.09, z1: z + 0.09, name: 'cresset', body: 'none', low });
+  if (post) {
+    for (const k of [0.5, 2.5, 4.5]) bar(at(k, 0.34, y - post), at(k, 0.07, foot), 0.035, 0.035);
+    out.push({ t: 'box', paint: 'iron', x0: x - 0.07, x1: x + 0.07, y0: y - post, y1: foot, z0: z - 0.07, z1: z + 0.07, hidden: true, name: 'cresset', low });
+  } else bar([x, lip, z], [x, lip + 0.55, z], 0.015, 0.015);
+  return out;
 }
 
 // ------------------------------------------------------------------ what stands in it
@@ -957,10 +992,16 @@ export const LAMPS: [number, number, number, number][] = [
   // by the fire on the north side of the terrace, and in the nook between the west wall and the south-west tower
   [5.6, -8.2, 2.3, 2.3],
   [-9.1, 7, 2.3, 2.3],
-  // under the terrace: one in the chamber under the store, one where the east gallery meets the south. The rest of it is dark.
+  // under the terrace, where the garrison was: in the armoury; outside its grille and in the ward of the aid post;
+  // at the door of the stair from the store, on the cistern; at the foot of the stair down to the sally port. Dark between.
   [0, 2.1, UNDER.floor + 2.25, 0],
-  [6.6, 5.6, UNDER.floor + 2.2, 0],
+  [-2.9, 6.02, UNDER.floor + 2.25, 0],
+  [5.5, 6.3, UNDER.floor + 2.25, 0],
+  [3.95, -5.2, UNDER.floor + 2.2, 0],
+  [(UNDER.postern.x0 + UNDER.postern.x1) / 2, UNDER.postern.foot + 0.75, UNDER.postern.deep + 2.05, 0],
 ];
+/** where the lamps along a hatch's passage hang: at each of its bends, a head over its floor ([x, z, how high the fire is]) */
+const passageLamps = (L: ReturnType<typeof hatchLine>): V3[] => (L.path.length > 3 ? L.path.slice(2, -1).map((q): V3 => [q[0], q[2], q[1] + 1.85]) : []);
 
 // ------------------------------------------------------------------ the loose pieces of its grounds
 //
@@ -1076,6 +1117,7 @@ export function looseParts(l: Loose, g = castleGround(l.x, l.z)): Part[] {
     parts.push({ t: 'apron', paint: 'earth', name: 'hatch apron', wells: [shaftWell(), ...hatchWells(l, g).map((q) => q.well)], hole: hatchWell(l, g), reach: H.lid });
     // the passage: a floor, a roof and two walls to each straight length of it, from the foot of the steps to the stair under the fort
     const o = { paint: 'base' as Paint, roofed: true, tone: 0.8 };
+    for (const [x, z, y] of passageLamps(L)) parts.push(...cresset(x, z, y, 0).map((q) => ({ ...q, roofed: true })));
     const dirs = L.path.slice(0, -1).map((a0, k): [number, number] => {
       const b0 = L.path[k + 1], len = Math.hypot(b0[0] - a0[0], b0[2] - a0[2]);
       return [(b0[0] - a0[0]) / len, (b0[2] - a0[2]) / len];
@@ -1101,6 +1143,11 @@ export function looseParts(l: Loose, g = castleGround(l.x, l.z)): Part[] {
       parts.push({ t: 'slab', ...o, name: 'passage floor', p: [off(a, -w, -hair), off(b, -w, -hair), off(b, w, -hair), off(a, w, -hair)], thick: 0.3 });
       const m = k === 0 ? on(a0, 0.35) : a;
       parts.push({ t: 'slab', ...o, name: 'passage roof', p: [off(m, -w, H.tall + 0.3 + hair), off(b, -w, H.tall + 0.3 + hair), off(b, w, H.tall + 0.3 + hair), off(m, w, H.tall + 0.3 + hair)], thick: 0.3 });
+      {
+        // (what is seen of its roof: a round one of the same rough stone from wall to wall, under the slabs; gone where the slab came down)
+        const down = Math.hypot((a0[0] + b0[0]) / 2 - m[0], (a0[2] + b0[2]) / 2 - m[2]);
+        parts.push({ t: 'vault', ...o, tone: 0.72, name: 'passage vault', a: [m[0], m[2]], b: [b[0], b[2]], wide: 2 * w, spring: m[1] + H.tall - 0.62, crown: m[1] + H.tall - 0.01, lift: b[1] - m[1], gone: L.path.length > 3 && k === 2 ? [[down - 1.25, down + 1.25]] : undefined });
+      }
       const lo = Math.min(a[1], b[1]) - 0.3, hi = Math.max(a[1], b[1]) + H.tall + 0.3;
       for (const sgn of [-1, 1]) {
         const from = on(a0, k === 0 ? -0.2 : -mitre(k - 1, sgn)), to = on(b0, last ? 0.1 : mitre(k, sgn));
@@ -1324,10 +1371,10 @@ function lootSpots(loose: Loose[]): { x: number; z: number; y: number; floor: bo
   fl(2.3, -0.9, UF);
   fl(-0.3, -1.1, UF);
   // the aid post: by the cot in each cell, and in the ward: what a dressing station had
-  for (const x of [-2.5, -0.3, 1.9]) fl(x, 7.45, UF, false, medic);
-  fl(5.0, 6.6, UF, false, medic);
-  fl(4.6, 7.9, UF, false, medic);
-  fl(6.9, 7.6, UF, false, medic);
+  for (const x of [-2.1, 0.3, 2.7]) fl(x - 0.5, 7.2, UF, false, medic);
+  fl(5.0, 6.95, UF, false, medic);
+  fl(6.2, 6.4, UF, false, medic);
+  fl(-7.3, 6.5, UF, false, medic);
   // the cellar under the tower; by the head of the sally port's stair, and on its landing
   fl(-C.hx - 0.9, -C.hz + 0.9, UF);
   fl(6.3, -7.3, UF);
@@ -1372,10 +1419,13 @@ const STOOD: [string, number, number, number, number][] = [
   ['barrel_03', -0.7, -1.9, 0, 0], ['barrel_03', 0, -1.92, 0, 1], ['barrel_03', 2.35, 0.9, 0, 2],
   // the chamber under the store, and the cells: what was worth keeping under a stone roof
   // the armoury: cases of arms, and boxes of rounds on its table
-  ['weapons_case', -2.3, -0.75, UNDER.floor, 0.25], ['weapons_case', 0.1, 2.95, UNDER.floor, 0], ['old_military_crate', 2.3, -1.5, UNDER.floor, 0], ['wooden_military_crate', -0.5, -1.55, UNDER.floor, 0.1], ['ammo_box_762', 1.15, -0.45, UNDER.floor + 0.8, 0.3], ['ammo_box_556', 1.7, -0.3, UNDER.floor + 0.8, -0.2],
+  // (each stood by its measure in the manifest: a case is 1.26 by 0.52, a crate 1.24 by 0.52; the way in at the grille is left clear)
+  ['weapons_case', -2.3, -0.75, UNDER.floor, 0.25], ['weapons_case', 0.9, 2.98, UNDER.floor, 0], ['weapons_case', 0.95, 2.95, UNDER.floor + 0.43, 0.12], ['wooden_military_crate', -0.3, -1.15, UNDER.floor, 0.1], ['wooden_military_crate', 2.42, 2.98, UNDER.floor, 0], ['wooden_military_crate', 2.3, -1.3, UNDER.floor, Math.PI / 2],
+  ['ammo_box', 1.05, -0.5, UNDER.floor + 0.8, 0.3], ['ammo_box', 1.3, -0.3, UNDER.floor + 0.8, 1.2], ['ammo_box', 1.75, -0.45, UNDER.floor + 0.8, -0.2],
   // the aid post: a cot in each cell and one in the ward, a cabinet, a box of dressings, a lamp on a stand
-  ['old_bed_frame', -1.9, 7.85, UNDER.floor, Math.PI / 2], ['old_bed_frame', 0.3, 7.85, UNDER.floor, Math.PI / 2], ['old_bed_frame', 2.5, 7.85, UNDER.floor, Math.PI / 2], ['old_bed_frame', 5.6, 7.75, UNDER.floor, Math.PI / 2],
-  ['med_cabinet', 7.7, 6.6, UNDER.floor, -Math.PI / 2], ['medical_box', 4.5, 7.6, UNDER.floor, 0.4], ['medical_light', 6.6, 7.5, UNDER.floor, 0.6],
+  // (a bed is 0.91 by 2.0: along the back wall of each cell, and of the ward; the cabinet is in the nook at the west end)
+  ['old_bed_frame', -2.1, 7.82, UNDER.floor, Math.PI / 2], ['old_bed_frame', 0.3, 7.82, UNDER.floor, Math.PI / 2], ['old_bed_frame', 2.7, 7.82, UNDER.floor, Math.PI / 2], ['old_bed_frame', 5.05, 7.8, UNDER.floor, Math.PI / 2],
+  ['med_cabinet', -7.9, 6.2, UNDER.floor, Math.PI / 2], ['medical_box', -1.35, 7.2, UNDER.floor, 0.4], ['medical_box', 5.7, 6.95, UNDER.floor, -0.3], ['medical_light', 6.25, 7.05, UNDER.floor, 0.6],
   // the upper room
   ['weapons_case', 0.2, -1.0, 5.85, 0.1],
   // the hall: a long case against its north wall
@@ -1434,9 +1484,15 @@ export function castleProps(p: Place, ground: GroundAt = assumed(p), loose: Loos
   return out;
 }
 
-/** Where its lights are, as places in the world. */
-export function castleLamps(p: Place): V3[] {
-  return LAMPS.map(([x, z, y]) => castleAt(p, x, z, y));
+/** Where its lights are, as places in the world: its own, and one at each bend of a hatch's passage (`ground`, `loose`: as `castleLoot` has them). */
+export function castleLamps(p: Place, ground?: GroundAt, loose?: Loose[]): V3[] {
+  const out = LAMPS.map(([x, z, y]) => castleAt(p, x, z, y));
+  for (const l of looseLocal(p, loose ?? castleLoose(p))) {
+    if (l.kind !== 'hatch') continue;
+    const [hx, , hz] = castleAt(p, l.x, l.z), g = (ground ? ground(hx, hz) : p.y + castleGround(l.x, l.z)) - p.y;
+    for (const [x, z, y] of passageLamps(hatchLine(l, g))) out.push(castleAt(p, x, z, y));
+  }
+  return out;
 }
 
 /**
@@ -1446,7 +1502,7 @@ export function castleLamps(p: Place): V3[] {
  */
 export function castleHomes(p: Place, loose: Loose[] = castleLoose(p)): { x: number; z: number; r: number; n: number; inside?: V3[] }[] {
   // (the garrison's wounded: in the aid post, where they were laid, and wandered as far as the sally port and the west side)
-  const UF = UNDER.floor, hs = houses(loose), store = { x: p.x, z: p.z, r: 9, n: 4, inside: [castleAt(p, 0.8, 6.2, UF), castleAt(p, -2.2, 6.2, UF), castleAt(p, 5.6, 6.2, UF), castleAt(p, 6.2, 0.8, UF), castleAt(p, -7.2, -2.0, UF)] };
+  const UF = UNDER.floor, hs = houses(loose), store = { x: p.x, z: p.z, r: 9, n: 4, inside: [castleAt(p, 0.8, 6.0, UF), castleAt(p, -2.2, 6.0, UF), castleAt(p, 5.6, 6.2, UF), castleAt(p, 6.2, 0.8, UF), castleAt(p, -7.2, -2.0, UF)] };
   if (!hs.length) return [store];
   const vx = hs.reduce((t, h) => t + h.x, 0) / hs.length, vz = hs.reduce((t, h) => t + h.z, 0) / hs.length;
   return [{ x: vx, z: vz, r: Math.max(12, ...hs.map((h) => Math.hypot(h.x - vx, h.z - vz) + 8)), n: Math.min(5, hs.length) }, store];

@@ -153,7 +153,13 @@ export interface StoneLook {
   even?: number;
   /** how much snow lies: a number that may be changed at any time (0 none, 1 deep winter). Unsaid: none, and nothing of snow is in the shader */
   snow?: { value: number };
-  /** the name of two numbers kept with each corner, for the snow: whether the sky is over it (1, or 0), and how high it is over its foot (or, of a floor, how far from the nearest wall; 9: not said). Unsaid: the sky is over all of it */
+  /**
+   * The name of two numbers kept with each corner. The first: how much of the day reaches it: 1 under the sky, and
+   * under cover whatever comes in at the nearest opening (0 to about a half). Snow lies only where it is 1, and
+   * the light of the sky and what the sky throws back is dimmed by it, so that a place under a roof is dark, each
+   * place by itself and whoever is looking. The second: how high the corner is over its foot (or, of a floor, how
+   * far from the nearest wall; 9: not said). Unsaid: the sky is over all of it.
+   */
   attr?: string;
   /** rain has darkened the foot of what stands, by so much (needs `attr`) */
   damp?: number;
@@ -221,7 +227,7 @@ float stoneCloud( vec2 p ) { vec2 i = floor( p ), u = fract( p ); u = u * u * ( 
     float lies = smoothstep( 0.62 - 0.2 * uSnow, 0.95 - 0.1 * uSnow, stoneUp + ( wide - 0.5 ) * 0.3 + ( fine - 0.5 ) * 0.12 ) * smoothstep( 0.0, 0.4, deep + ( fine - 0.5 ) * 0.3 );
     // drifted against the foot of what stands in the open
     float drift = ( 1.0 - smoothstep( 0.0, ( 0.08 + 0.4 * uSnow ) * ( 0.4 + 1.2 * wide ), stoneAt.y ) ) * stoneStands * step( stoneAt.y, 8.5 );
-    float laid = clamp( max( lies, drift * smoothstep( 0.0, 0.2, uSnow ) ), 0.0, 1.0 ) * stoneAt.x;
+    float laid = clamp( max( lies, drift * smoothstep( 0.0, 0.2, uSnow ) ), 0.0, 1.0 ) * smoothstep( 0.7, 0.98, stoneAt.x );
     // the stone is wet and dark in a line along the edge of it
     float wet = smoothstep( 0.02, 0.22, laid ) * ( 1.0 - smoothstep( 0.22, 0.6, laid ) );
     diffuseColor.rgb *= 1.0 - 0.38 * wet;
@@ -233,4 +239,12 @@ float stoneCloud( vec2 p ) { vec2 i = floor( p ), u = fract( p ); u = u * u * ( 
   }` : ''}
 }`,
     );
+  // (under cover the light of the sky, and what the sky throws back, come to so much and no more: the light of the fires is not touched)
+  if (o.attr) shader.fragmentShader = shader.fragmentShader.replace('#include <aomap_fragment>', `#include <aomap_fragment>
+{
+  // (what comes in at a hole is thrown about by pale stone: near the hole there is more of it than its share of the sky alone)
+  float stoneDay = mix( 0.05, 1.0, clamp( vStoneAt.x * 1.5, 0.0, 1.0 ) );
+  reflectedLight.indirectDiffuse *= stoneDay;
+  reflectedLight.indirectSpecular *= stoneDay;
+}`);
 };
