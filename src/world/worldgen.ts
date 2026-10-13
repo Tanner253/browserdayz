@@ -20,6 +20,20 @@ export const OLD_HALF = 512;
 export const WORLD_SIZE = 1536; // metres, square, centred on the origin
 export const WORLD_RES = 769; // height samples per side
 export const CELL = WORLD_SIZE / (WORLD_RES - 1); // 2 m
+/**
+ * The ground smoothed, 2026-10-13 (the owner, of the map as it stood: "we will smooth out any terrain"; and of the
+ * knife ridges in its meadows, told they were as old as the map and that softening them moves ground everywhere a
+ * little: "sure").
+ *   EDGE_ROUND - metres either side of the lines from the old square's corners to the map's within which the
+ *                mountains of the edge turn the corner in a curve (see `edgeOf`)
+ *   SOFTEN     - the knife edges of the open ground rounded off (see `soften`): `from`..`full`, how sharp a spot is
+ *                (metres its height stands off the line between its neighbours 2 m either side) before it is
+ *                rounded at all, and when in full; `passes`, how many times over; `steep`, the lie of the land
+ *                about a spot (its fall in a metre, over some sixteen metres) above which it is a hillside's own
+ *                face and left alone; `high`, how much of an edge mountain it may be
+ */
+const EDGE_ROUND = 40;
+const SOFTEN = { from: 0.65, full: 1.2, passes: 8, steep: [0.45, 0.8], high: [0.35, 0.75] };
 export const PLAY_RADIUS = 400;
 /**
  * The map's first expansion. The valley the map began as is ringed by hills; behind the
@@ -828,6 +842,49 @@ function evenOut(field: Float32Array, has: (i: number) => boolean, reach: number
   return cur;
 }
 
+/**
+ * The knife edges of the open ground rounded off (2026-10-13). A ridge of the base ground is where an octave of its
+ * noise goes through nothing, and the ground there met itself in a crease as sharp as a roof's: thirty degrees up
+ * one side and thirty down the other with nothing between, and where two crossed in a meadow, an X of them forty
+ * metres long. Each spot that stands off the line between its neighbours by more than SOFTEN.from is brought
+ * toward the mean of them, more the sharper it is, a few times over: a ridge is still a ridge, with a round back.
+ * Nothing else is moved: not ground that is not creased, not a hillside's own face (told by the lie of the land
+ * about it, not by the crease), and not the mountains of the edge, which are meant to be sharp.
+ * @param high how much of an edge mountain a place is, 0 to 1
+ */
+function soften(heights: Float32Array, high: (x: number, z: number) => number): void {
+  const N = WORLD_RES, half = WORLD_SIZE / 2, R = 4;
+  // the lie of the land: the fall of the ground evened over nine points either way
+  const row = new Float32Array(N * N), even = new Float32Array(N * N);
+  for (let iz = 0; iz < N; iz++) for (let ix = 0; ix < N; ix++) {
+    let sum = 0, n = 0;
+    for (let k = Math.max(0, ix - R); k <= Math.min(N - 1, ix + R); k++, n++) sum += heights[iz * N + k];
+    row[iz * N + ix] = sum / n;
+  }
+  for (let iz = 0; iz < N; iz++) for (let ix = 0; ix < N; ix++) {
+    let sum = 0, n = 0;
+    for (let k = Math.max(0, iz - R); k <= Math.min(N - 1, iz + R); k++, n++) sum += row[k * N + ix];
+    even[iz * N + ix] = sum / n;
+  }
+  const may = new Float32Array(N * N);
+  for (let iz = 1; iz < N - 1; iz++) for (let ix = 1; ix < N - 1; ix++) {
+    const i = iz * N + ix, fall = Math.hypot((even[i + 1] - even[i - 1]) / (2 * CELL), (even[i + N] - even[i - N]) / (2 * CELL));
+    const open = 1 - smoothstep(SOFTEN.steep[0], SOFTEN.steep[1], fall);
+    may[i] = open <= 0 ? 0 : open * (1 - smoothstep(SOFTEN.high[0], SOFTEN.high[1], high(-half + ix * CELL, -half + iz * CELL)));
+  }
+  for (let pass = 0; pass < SOFTEN.passes; pass++) {
+    const was = heights.slice();
+    for (let iz = 1; iz < N - 1; iz++) for (let ix = 1; ix < N - 1; ix++) {
+      const i = iz * N + ix;
+      if (may[i] <= 0) continue;
+      const h = was[i], l = was[i - 1], r = was[i + 1], u = was[i - N], d = was[i + N];
+      const sharp = Math.max(Math.abs(l - 2 * h + r), Math.abs(u - 2 * h + d), Math.abs(was[i - N - 1] - 2 * h + was[i + N + 1]) / 2, Math.abs(was[i - N + 1] - 2 * h + was[i + N - 1]) / 2);
+      const w = may[i] * smoothstep(SOFTEN.from, SOFTEN.full, sharp);
+      if (w > 0) heights[i] = h + ((l + r + u + d) / 4 - h) * 0.6 * w;
+    }
+  }
+}
+
 // ------------------------------------------------------------------ generation
 
 export function generateWorld(seed = WORLD_SEED): World {
@@ -864,7 +921,13 @@ export function generateWorld(seed = WORLD_SEED): World {
   // old ground is the old ground. (The town has a valley of its own besides: see the east country, at the end.)
   /** how much of a mountain a spot of that country is: nothing 185 m in from the new edge, all of one at it, and nothing at all on the old ground */
   const edgeOf = (x: number, z: number) => {
-    const e = Math.max(Math.abs(x), Math.abs(z));
+    // (How far out, by whichever of the two it is further out by; and where the two are within EDGE_ROUND of each
+    // other, a little more, so that the one goes over into the other in a curve. It was the greater of the two and
+    // nothing else, which is a square: its corners ran out to the corners of the map as four dead straight creases,
+    // one of them a straight cliff behind the mountain road's hairpin. Nothing further than EDGE_ROUND from those
+    // lines is moved by it.)
+    const ax = Math.abs(x), az = Math.abs(z), apart = Math.abs(ax - az);
+    const e = Math.max(ax, az) + (apart < EDGE_ROUND ? ((EDGE_ROUND - apart) * (EDGE_ROUND - apart)) / (4 * EDGE_ROUND) : 0);
     // (in the north-east the slope begins at the old edge itself: all of the new ground there is the mountain's)
     return e <= OLD_HALF ? 0 : (1 - smoothstep(10, lerp(185, PEAK.run, peakOf(x, z)), half - e)) * smoothstep(0, 64, e - OLD_HALF);
   };
@@ -878,6 +941,7 @@ export function generateWorld(seed = WORLD_SEED): World {
       heights[idx(ix, iz)] = base(-half + ix * CELL, -half + iz * CELL) + ringShape(-half + ix * CELL, -half + iz * CELL);
     }
   }
+  soften(heights, edgeOf);
 
   // --- road: its line is needed early, so nothing else is put in its way
   const path2 = catmullRom(OLD_ROAD, 4);

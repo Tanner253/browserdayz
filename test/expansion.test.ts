@@ -49,7 +49,7 @@ import { JEEP } from '../src/sim/vehicles';
 // map as it was before any of that, with those fences up. They were: 160775 cells, 1846616272; 8100 trees,
 // 3268064997. What moved inside the new fences was counted cell by cell against the map before, and nothing
 // outside them had: the same four figures came off the map before and after.)
-const WAS = { cells: 133883, heights: 3984432879, buildings: 72, away: 46, buildingsHash: 192416693, lastId: 'tower_71', spawns: 2697513077, trees: 6547, treesHash: 1745976524, lootPoints: 675, lootAway: 371, lootHash: 4064289616, jeeps: 8, jeepsAway: 7, jeepsHash: 1649467612, fires: 6 };
+const WAS = { cells: 133883, heights: 176932252, buildings: 72, away: 46, buildingsHash: 816271812, lastId: 'tower_71', spawns: 2697513077, trees: 6547, treesHash: 3799651930, lootPoints: 675, lootAway: 371, lootHash: 760462293, jeeps: 8, jeepsAway: 7, jeepsHash: 1649467612, fires: 6 };
 const hash = (parts: number[]) => {
   let h = 2166136261 >>> 0;
   for (const v of parts) {
