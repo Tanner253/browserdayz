@@ -235,6 +235,11 @@ export class InventoryUI {
    * src/game/player.ts.
    */
   carryLimit: number | null = null;
+  /**
+   * An admin's power (src/sim/powers.ts): what is carried weighs nothing, and never slows them. The game's to
+   * say; with it on, the head of the carried side says so in place of a weight.
+   */
+  weightless = false;
 
   constructor(private inv: PlayerInventory, private actions: InvActions) {
     this.root = document.createElement('div');
@@ -895,6 +900,8 @@ export class InventoryUI {
     // (what is carried, over what can be before it slows the feet, where the game has said what that is)
     const kg = inv.weight(), most = this.carryLimit;
     cargo.innerHTML = `<h3>Carried <span${most !== null && kg > most ? ' class="over" title="Over this weight you are slower on your feet"' : ''}>${kg.toFixed(1)}${most !== null ? ` / ${most}` : ''} kg</span></h3>`;
+    // (an admin's power: it weighs nothing to them, and the head says that and no weight)
+    if (this.weightless) cargo.innerHTML = `<h3>Carried <span class="free" title="An admin's power is on: the ${kg.toFixed(1)} kg you carry weighs nothing and never slows you. /weightless off puts it off">weightless</span></h3>`;
     const scroll = document.createElement('div');
     scroll.className = 'inv-scroll';
     const grids = document.createElement('div');
