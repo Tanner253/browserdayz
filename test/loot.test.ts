@@ -12,6 +12,8 @@
 //   - food in the shop before anywhere; dressings in the clinic and the shop
 //   - the K6-3 leaves whoever wears it standing after a sniper's round to the head, barely
 //   - one of the army's cases holds no rifle, scope or plates; a wooden crate holds no gun
+//   - a looted spot, and the ground about it, is left alone for three minutes, and what lay there does not come
+//     straight back to it (2026-10-13)
 
 import assert from 'node:assert/strict';
 import { buildWorldData } from '../server/world';
@@ -162,6 +164,50 @@ ok('one of the army\'s cases holds pistols and kit, now and then a mask or somet
   const wood = open('wooden_crate_01', 600);
   for (const id of guns) assert.ok(!wood.has(id), `a ${id} in a wooden crate`);
   assert.ok(melee.some((id) => wood.has(id)));
+});
+
+ok('a looted spot, and the ground about it, is left alone for three minutes; and what lay there does not come straight back to it', () => {
+  const e = new Economy(points, { spawn: () => {}, despawn: () => {} });
+  (e as unknown as { rng: RNG }).rng = new RNG(11);
+  e.populate();
+  const nobody = [{ x: 9999, z: 9999 }];
+  // (some time goes by first: what was laid out at the start is not what is looked for as newly put down)
+  for (let t = 0; t < 60; t += 5) e.tick(5, nobody);
+  const tiers = (e as unknown as { tier: Tier[] }).tier;
+  const all = () => [...e.loot.values()];
+  const about = (a: number, b: number) => Math.hypot(points[a].x - points[b].x, points[a].y - points[b].y, points[a].z - points[b].z);
+  // (things lying in Kamenka, where whatever is gone is put back soonest, and where it came straight back)
+  const lying = all().filter((l) => l.point >= 0 && tiers[l.point] === 3 && !points[l.point].arms && !points[l.point].keeps);
+  assert.ok(lying.length > 25, `${lying.length} things lie in Kamenka`);
+  const before = lying.length;
+  // (one thing in nineteen of what lies there: of many sorts, in many buildings)
+  const taken = lying.filter((_, k) => k % 19 === 0).slice(0, 25);
+  let near = 0, same = 0, early = 0, back = 0, tried = 0;
+  for (const l of taken) {
+    const spot = l.point, id = l.item.id;
+    // (gone with age while the others were tried: this goes on for hours of the game's time)
+    if (!e.loot.has(l.uid)) continue;
+    tried++;
+    const had = e.held(id, 3);
+    e.take(l.uid);
+    for (let t = 0; t < 175; t += 5) {
+      e.tick(5, nobody);
+      for (const q of all()) if (q.point >= 0 && q.spawnedAt > e.time - 5.01 && about(q.point, spot) < 6) near++;
+    }
+    if (all().some((q) => q.point === spot)) early++;
+    for (let t = 0; t < 600; t += 5) e.tick(5, nobody);
+    if (all().some((q) => q.point === spot && q.item.id === id)) same++;
+    if (e.held(id, 3) >= had) back++;
+  }
+  assert.equal(near, 0, `${near} things were put down within 6 m of a spot looted less than three minutes before`);
+  assert.equal(early, 0, `${early} spots had something on them again inside three minutes`);
+  assert.equal(same, 0, `${same} things were back on the very spot they were taken from inside fifteen minutes`);
+  // (all but the few sorts kept in two or three spots and nowhere else, the police station's gas masks among them:
+  // theirs is the one spot free, and they wait for it)
+  assert.ok(tried >= 8 && back >= Math.ceil(tried * 0.8), `only ${back} of ${tried} sorts were made up again, somewhere else in the town, inside thirteen minutes`);
+  // (and the town is as full as it was, give or take: nothing is lost to the rule, and nothing piles up)
+  const after = all().filter((q) => q.point >= 0 && tiers[q.point] === 3 && !points[q.point].arms && !points[q.point].keeps).length;
+  assert.ok(Math.abs(after - before) <= 8, `Kamenka held ${before} things and holds ${after}`);
 });
 
 console.log(`\n${n} checks passed`);

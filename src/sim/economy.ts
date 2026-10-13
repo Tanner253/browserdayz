@@ -60,6 +60,25 @@ const SOON = 0.95;
 const ARMS: [string, number][] = [['colt', 2.4], ['m9', 1.8], ['hatchet', 1.6], ['bat', 1.6], ['crowbar', 1.4], ['machete', 1.4], ['shovel', 1.4], ['knife', 1]];
 /** seconds an armed point stays bare once its weapon has been taken */
 export const ARMS_RESTOCK = 180;
+/**
+ * A spot that has been looted is left alone, and so is the ground about it (2026-10-13: "loot is respawning
+ * instantly when it is looted. we shouldnt respawn or refresh or reroll the loot table for a location for 3 mins
+ * after its looted. and each loot spot SHOULD be a rolled loot chance, the same loot shouldnt spawn in the same
+ * locations (unless by chance) thats why we have tiers and categories of loot").
+ *
+ * Nothing is put down within LOOTED_ABOUT metres of a looted spot for LOOTED_REST seconds. And what lay at a spot
+ * does not come back to that same spot for SAME_AGAIN seconds: it is put wherever else its kind is kept, at
+ * random (Kamenka has some 240 spots free at any time), or it waits. What a spot gets next is whichever sort is
+ * next wanted and happens on it: a roll among everything its step and its kind of place keep.
+ *
+ * (Tried and taken out: giving a looted spot something rolled at once when it had rested. The sort that was taken
+ * had found another spot already, so every looting left the town one thing fuller, up to a quarter over.)
+ *
+ * (Why it came straight back: from Kamenka up, whatever is gone is put back as soon as it is missed. In a town
+ * that is full, the spot a thing was taken from is the one free spot there is, and the thing just taken is the one
+ * thing missing: it was back where it had lain at the next count, five seconds later.)
+ */
+export const LOOTED_REST = 180, LOOTED_ABOUT = 6, SAME_AGAIN = 900;
 /** seconds before a place that always keeps one named thing has it again (the rifle on the hospital roof, and its parts) */
 export const KEEPS_RESTOCK = 900;
 
@@ -354,6 +373,16 @@ export class Economy {
     return n;
   }
 
+  /** can a sort lie at this spot on this step: is the spot of a kind it is kept in, and is there room on it */
+  private liesAt(id: string, rule: TypeRule, i: number, where: Tier): boolean {
+    const p = this.points[i];
+    // (TEMPORARY, THE SHOWCASE: in Kamenka its things lie in the town's houses as well as where each was kept)
+    const kinds = where === 3 && id in SHOWCASE.kamenka && id !== 'gasmask' ? SHOWN_IN : rule.usage;
+    if (where < UNSORTED && !p.usage.some((u) => kinds.includes(u))) return false;
+    // a rifle never spawns on a narrow shelf, a jerrycan never on a barrel
+    return this.fits(id, p);
+  }
+
   private pickPoint(id: string, rule: TypeRule, where: Tier): number {
     const sorted = where < UNSORTED;
     const candidates: number[] = [];
@@ -362,11 +391,11 @@ export class Economy {
     this.points.forEach((p, i) => {
       // armed points are stocked on their own (see arm)
       if (p.arms || p.keeps || this.pointBusy.has(i) || this.tier[i] !== where) return;
-      // (TEMPORARY, THE SHOWCASE: in Kamenka its things lie in the town's houses as well as where each was kept)
-      const kinds = where === 3 && id in SHOWCASE.kamenka && id !== 'gasmask' ? SHOWN_IN : rule.usage;
-      if (sorted && !p.usage.some((u) => kinds.includes(u))) return;
-      // a rifle never spawns on a narrow shelf, a jerrycan never on a barrel
-      if (!this.fits(id, p)) return;
+      // (not where somebody has just looted, nor back where this same thing last lay)
+      if (!this.rested(i)) return;
+      const was = this.lastAt.get(i);
+      if (was && was.id === id && this.time - was.at < SAME_AGAIN) return;
+      if (!this.liesAt(id, rule, i, where)) return;
       let w = 1;
       if (sorted && rule.favour) for (const u of p.usage) w = Math.max(w, rule.favour[u] ?? 1);
       candidates.push(i);
@@ -382,7 +411,8 @@ export class Economy {
     return candidates[candidates.length - 1];
   }
 
-  private spawnType(id: string, at = -1, where: Tier = 1): boolean {
+  /** @param armed the spot is one that always holds a weapon (see `arm`): what is put there is a gun that fires */
+  private spawnType(id: string, at = -1, where: Tier = 1, armed = at >= 0): boolean {
     const rule = TYPES[id];
     const def = ITEMS[id];
     const pi = at >= 0 ? at : this.pickPoint(id, rule, where);
@@ -393,7 +423,7 @@ export class Economy {
     if (def.weapon) {
       fitAtRandom(item, () => this.rng.next());
       // (what is left at an armed place is a gun that fires: it has its magazine, whatever the dice said)
-      if (at >= 0 && def.weapon.mag && !item.mag) item.mag = def.weapon.mag;
+      if (armed && def.weapon.mag && !item.mag) item.mag = def.weapon.mag;
       if (rule.loaded) stockGun(item, this.rng.int(rule.loaded[0], Math.min(rule.loaded[1], def.weapon.capacity)));
     }
     if (def.mag) foundMag(item, () => this.rng.next());
@@ -413,6 +443,23 @@ export class Economy {
     return true;
   }
 
+  /** when each spot was last looted, and what last lay at each (see LOOTED_REST) */
+  private looted = new Map<number, number>();
+  private lastAt = new Map<number, { id: string; at: number }>();
+  /** nothing has been taken from this spot, or from close by it, in the last LOOTED_REST seconds */
+  private rested(i: number): boolean {
+    const p = this.points[i];
+    for (const [k, at] of this.looted) {
+      if (this.time - at >= LOOTED_REST) {
+        this.looted.delete(k);
+        continue;
+      }
+      const q = this.points[k];
+      if (k === i || Math.hypot(q.x - p.x, q.y - p.y, q.z - p.z) < LOOTED_ABOUT) return false;
+    }
+    return true;
+  }
+
   /** when each armed point was found bare */
   private bare = new Map<number, number>();
 
@@ -427,6 +474,7 @@ export class Economy {
       if (!now) {
         if (!this.bare.has(i)) this.bare.set(i, this.time);
         if (this.time - this.bare.get(i)! < (p.keeps ? KEEPS_RESTOCK : ARMS_RESTOCK)) return;
+        if (!this.rested(i)) return;
       }
       // (a place that keeps one named thing: that thing, and nothing in its stead)
       if (p.keeps) {
@@ -489,12 +537,19 @@ export class Economy {
     this.events.spawn(l);
   }
 
-  /** Player picked an item up (or it was destroyed). */
-  take(uid: string) {
+  /**
+   * Player picked an item up (or it was destroyed).
+   * @param looted taken by somebody (the spot is then left alone a while: see LOOTED_REST), not merely gone with age
+   */
+  take(uid: string, looted = true) {
     const l = this.loot.get(uid);
     if (!l) return null;
     this.loot.delete(uid);
-    if (l.point >= 0) this.pointBusy.delete(l.point);
+    if (l.point >= 0) {
+      this.pointBusy.delete(l.point);
+      this.lastAt.set(l.point, { id: l.item.id, at: this.time });
+      if (looted) this.looted.set(l.point, this.time);
+    }
     this.events.despawn(l);
     return l;
   }
@@ -519,12 +574,12 @@ export class Economy {
     for (const l of [...this.loot.values()]) {
       // (a container somebody dropped goes by the calendar, and not by how long this game has been running)
       if (l.keptAt !== undefined) {
-        if (now - l.keptAt > (l.item.cargo?.length ? this.containerLife.full : this.containerLife.empty) && !near(l)) this.take(l.uid);
+        if (now - l.keptAt > (l.item.cargo?.length ? this.containerLife.full : this.containerLife.empty) && !near(l)) this.take(l.uid, false);
         continue;
       }
       const rule = TYPES[l.item.id];
       const life = rule ? rule.lifetime : 3600;
-      if (this.time - l.spawnedAt > life && !near(l)) this.take(l.uid);
+      if (this.time - l.spawnedAt > life && !near(l)) this.take(l.uid, false);
     }
     this.arm();
     for (const [id, rule] of Object.entries(TYPES)) {
@@ -544,8 +599,14 @@ export class Economy {
     if (n >= least) return;
     const key = `${id}@${where}`;
     if (this.time - (this.lastRestock[key] ?? -1e9) < every) return;
-    this.lastRestock[key] = this.time;
-    for (let k = n; k < want; k++) if (!this.spawnType(id, -1, where)) break;
+    // (the clock of a sort starts again when some of it has been put back: with nowhere for it to go just now, a
+    // looted spot resting and its only other place taken, it is tried again at the next count and not in seven minutes)
+    let put = 0;
+    for (let k = n; k < want; k++) {
+      if (!this.spawnType(id, -1, where)) break;
+      put++;
+    }
+    if (put) this.lastRestock[key] = this.time;
   }
 
   serialize() {
