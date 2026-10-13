@@ -13,6 +13,9 @@ import WebSocket from 'ws';
 import { admin, type AdminState } from '../api/admin';
 import type { Store } from '../api/_lib/store';
 import { PROTOCOL, type S2C } from '../src/net/protocol';
+import { PlayerInventory, bagGrid, type SerializedInventory } from '../src/sim/inventory';
+import { ITEMS, makeItem, type ItemInstance } from '../src/sim/items';
+import { carriedOf, refill, refilledWords, roundsSpent, weightFelt } from '../src/sim/powers';
 
 const PORT = 8143, SITE = 8144;
 // (a password made up here, for this test's stand-in site and nothing else)
@@ -290,7 +293,8 @@ await withServer(async () => {
 
   assert.match(await ann.order('/god'), /Nothing hurts you/);
   // (the two choices for an admin's own death are made for them, until they make them otherwise)
-  assert.deepEqual({ ...last(ann, 'powers'), t: 0 }, { t: 0, god: true, hidden: false, clip: false, voidInv: true, voidTag: true });
+  // (and the two that are about what is carried are off until they are put on: see the last part of this file)
+  assert.deepEqual({ ...last(ann, 'powers'), t: 0 }, { t: 0, god: true, hidden: false, clip: false, voidInv: true, voidTag: true, weightless: false, endless: false });
   assert.match(await ann.order('/voidtag off'), /your dog tag is on your body/);
   assert.equal(last(ann, 'powers')?.voidTag, false, 'what an admin chose for their death was not said back');
   assert.match(await ann.order('/voidtag'), /no dog tag of your own/);
@@ -543,6 +547,309 @@ await withServer(async () => {
     console.log('  ok  a ban has an id of its own, and is lifted by it whatever the list has become; a name that more than one ban has lifts none, and they are read out');
   }
 });
+
+// ---- what an admin carries, and fires (2026-10-13): weightless, endless ammunition, and the refill (the rules of
+// them are src/sim/powers.ts, tried by themselves in test/powers.test.ts). On a server that ENFORCES its checks, as
+// the live one does: no check may fire on an admin who uses them, nor on anybody they are used on. And since no
+// check ever looks at an admin (`flag` in server/index.ts), what an admin's game says with the powers on is said
+// here by a plain player's too, whom every check does look at; and the checks are shown, last of all, to be awake.
+await withServer(async (log) => {
+  const ivy = new Player('Ivy'), moe = new Player('Moe'), ned = new Player('Ned');
+  for (const p of [ann, ivy, moe, ned]) assert.ok(await p.join(), `${p.name} was not let in`);
+  await sleep(400);
+  const last = <T extends S2C['t']>(p: Player, t: T) => p.got.filter((m) => m.t === t).pop() as Extract<S2C, { t: T }> | undefined;
+  const powers = (p: Player) => ({ ...last(p, 'powers'), t: 0 });
+  const lists = async () => {
+    ann.send({ t: 'adm' });
+    await sleep(700);
+    return last(ann, 'adm')!;
+  };
+  /** an order from somebody with a role (theirs are not held half a second apart, as talk is): what is said back, as soon as it is */
+  const tell = async (p: Player, text: string, until: S2C['t'] = 'sys') => {
+    const from = p.got.length;
+    p.send({ t: 'chat', ch: 'global', text });
+    for (let k = 0; k < 80 && !p.got.slice(from).some((m) => m.t === until); k++) await sleep(25);
+    await sleep(80);
+    return p.got.slice(from).filter((m) => m.t === 'sys').map((m) => (m as { text: string }).text).join('\n');
+  };
+  /**
+   * Waited for, a little at a time. Nothing that one player's game is to see of what another's did is taken on the
+   * strength of a sleep: two connections are read by the server in no order when it has been held up, and the
+   * machine this runs on can be held up for a second.
+   */
+  const until = async (good: () => boolean | Promise<boolean>, what: string, ms = 8000) => {
+    for (const end = Date.now() + ms; Date.now() < end; await sleep(100)) if (await good()) return;
+    assert.fail(`waited ${ms / 1000} s for it, and it never was so: ${what}`);
+  };
+  const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+  /** where the server has somebody: their own row of what it says of everybody, many times a second */
+  const row = (p: Player) => last(p, 'ps')!.s.find((r) => r[0] === p.id)!;
+  const apart = (a: Player, b: Player) => Math.hypot(row(a)[1] - row(b)[1], row(a)[3] - row(b)[3]);
+  /** their game says where it stands (there), and what is in its hands */
+  const stand = (p: Player, w: string | null = null) => {
+    const r = row(p);
+    p.send({ t: 's', p: [r[1], r[2], r[3], 0, 0, r[6]], w, m: [] });
+  };
+  /** and goes to and fro on the spot at the pace of somebody who carries nothing, head turning as it goes: 7.4 m/s, for two and a half seconds */
+  const run = async (p: Player, w: string) => {
+    const r = row(p);
+    for (let k = 1; k <= 26; k++) {
+      p.send({ t: 's', p: [r[1] + (k % 2) * 0.74, r[2], r[3], k * 0.2, 0, r[6]], w, m: [] });
+      await sleep(100);
+    }
+  };
+  /** what a game does with a kit (`kitUp` in src/game/game.ts): each thing put on or away */
+  const wear = (p: Player) => {
+    const inv = new PlayerInventory(), things = last(p, 'kit')!.items;
+    for (const it of things) assert.equal(inv.add(it), null, `${p.name}'s game found no room for ${it.id}`);
+    return { inv, pick: (id: string) => things.filter((it) => it.id === id) };
+  };
+  /** a game says what it carries, as it does after anything */
+  const say = (p: Player, inv: PlayerInventory) => p.send({ t: 'me', inv: inv.serialize(), vitals: { health: 100, energy: 80, water: 80, stamina: 300, bleeding: false } });
+  /** every gun and magazine in an inventory as it is kept and sent, wherever it is: which it is, and what is in it */
+  const within = (things: ItemInstance[]): ItemInstance[] => things.flatMap((it) => [it, ...within((it.cargo ?? []).map((q) => q.item))]);
+  const fed = (inv: SerializedInventory | null) => within(carriedOf(inv)).filter((it) => ITEMS[it.id].weapon || ITEMS[it.id].mag).map((it) => [it.uid, it.id, it.mag ?? null, it.loaded ?? null, it.rounds ?? null]).sort();
+  const sent = (inv: PlayerInventory) => JSON.parse(JSON.stringify(inv.serialize())) as SerializedInventory;
+  /** the server's own copy of what somebody carries (`/pockets`, the panel's Inventory page) */
+  const copy = async (of: Player) => {
+    await tell(ann, `/pockets #${of.id}`, 'inv');
+    return last(ann, 'inv')!.inv;
+  };
+  /**
+   * A game fires a gun at Ivy, a shot at a time at the AK's pace, saying what it carries as it goes. The round each
+   * shot takes out of the gun is what the game itself takes (`tryFire` in src/game/weapons.ts): one, or none with
+   * endless ammunition on. An empty gun does not fire. @returns how many shots went
+   */
+  const fire = async (p: Player, gun: ItemInstance, inv: PlayerInventory, shots: number, endless: boolean) => {
+    const r = row(p);
+    let fired = 0;
+    for (let k = 0; k < shots && (gun.loaded ?? 0) > 0; k++) {
+      gun.loaded = (gun.loaded ?? 0) - roundsSpent(endless);
+      p.send({ t: 'shot', o: [r[1], r[2] + 1.6, r[3]], d: [0, 0, -1], w: gun.id, sup: false });
+      p.send({ t: 'hit', to: ivy.id, zone: 'legs', w: gun.id, dist: 2, sup: false, bonus: 0 });
+      fired++;
+      if (k % 10 === 9) say(p, inv);
+      await sleep(100);
+    }
+    say(p, inv);
+    await sleep(200);
+    return fired;
+  };
+  await until(() => [ann, ivy, moe, ned].every((p) => !!last(p, 'ps')?.s.some((r) => r[0] === p.id)), 'everybody is told where they are');
+  for (const p of [ann, ivy, moe, ned]) stand(p);
+  assert.equal((await lists()).checks, 'enforce', 'this server is not enforcing its checks');
+
+  // ---- nobody but an admin: a player and a mod are refused all three, in the words every admin's order is refused in
+  const three = ['/weightless on', '/ammo on', '/refill'];
+  // (What somebody with no role types is not heard twice inside half a second, and a held-up machine can bring two
+  // lines that close together: one that got no answer at all is typed again, as anybody would.)
+  const typed = async (p: Player, text: string) => {
+    for (let k = 0; k < 3; k++) {
+      const back = await p.order(text);
+      if (back) return back;
+      await sleep(700);
+    }
+    return '';
+  };
+  for (const o of three) assert.equal(await typed(ned, o), 'That is not a thing you can do here.', `somebody with no role gave ${o}`);
+  assert.match(await tell(ann, `/mod #${moe.id}`), /Moe is a mod/);
+  await sleep(200);
+  assert.equal(await tell(moe, '/god'), 'Only an admin can do that.');
+  for (const o of [...three, '/weightless', '/ammo off', `/refill #${ned.id}`, `/ammo #${ann.id} on`]) assert.equal(await tell(moe, o), 'Only an admin can do that.', `a mod gave ${o}`);
+  assert.ok(![ann, moe, ned].some((p) => p.got.some((m) => m.t === 'refill')), 'an order that was refused filled something');
+  assert.ok(![moe, ned].some((p) => p.got.some((m) => m.t === 'powers')), 'somebody who is no admin was told of powers');
+  assert.deepEqual(powers(ann), { t: 0, god: false, hidden: false, clip: false, voidInv: true, voidTag: true, weightless: false, endless: false }, 'an order that was refused put a power on');
+  checks++;
+  console.log('  ok  a player and a mod are refused weightless, endless ammunition and the refill, in the words the other admin’s orders are refused in');
+
+  // ---- put on and off by their words, turned over with no word, said back in words and in the `powers` message
+  assert.equal(await tell(ann, '/weightless on'), 'What you carry weighs nothing now: however much it is, it never slows you.');
+  assert.deepEqual(powers(ann), { t: 0, god: false, hidden: false, clip: false, voidInv: true, voidTag: true, weightless: true, endless: false });
+  assert.equal(await tell(ann, '/weightless off'), 'What you carry weighs what it weighs again.');
+  assert.equal(last(ann, 'powers')?.weightless, false);
+  assert.match(await tell(ann, '/weightless'), /weighs nothing now/);
+  assert.match(await tell(ann, '/ammo on'), /^Firing takes no round out of your gun now: it never runs dry\./);
+  assert.equal(last(ann, 'powers')?.endless, true);
+  assert.equal(await tell(ann, '/ammo'), 'Your gun spends its rounds again.');
+  assert.equal(last(ann, 'powers')?.endless, false);
+  assert.match(await tell(ann, '/ammo on'), /takes no round/);
+  // (a word that says which way turns nothing over: on, and put on again, it is on)
+  assert.match(await tell(ann, '/ammo on'), /takes no round/);
+  assert.deepEqual(powers(ann), { t: 0, god: false, hidden: false, clip: false, voidInv: true, voidTag: true, weightless: true, endless: true });
+  const listed = (await lists()).players;
+  assert.ok(listed.find((p) => p.name === 'Ann')?.weightless && listed.find((p) => p.name === 'Ann')?.endless, 'the lists do not say which of the two an admin has on');
+  assert.ok(listed.filter((p) => p.name !== 'Ann').every((p) => !p.weightless && !p.endless), 'the lists say somebody else has them on');
+  checks++;
+  console.log('  ok  weightless and endless ammunition are put on and off, turned over with no word, and said back in words, in the powers message and in the lists');
+
+  // ---- another admin's are an admin's to put on and off, the word and the name in either order; nobody's who is not one
+  assert.match(await tell(ann, `/admin #${ivy.id}`), /Ivy is an admin/);
+  await sleep(200);
+  assert.equal(await tell(ann, `/ammo #${ivy.id} on`), 'Ivy: endless ammunition is on.');
+  assert.equal(await tell(ann, `/weightless on #${ivy.id}`), 'Ivy: weightless is on.');
+  await until(() => !!last(ivy, 'powers')?.weightless, 'Ivy is told of the power put on for her');
+  assert.deepEqual(powers(ivy), { t: 0, god: false, hidden: false, clip: false, voidInv: true, voidTag: true, weightless: true, endless: true }, 'another admin was not told the powers put on for them');
+  assert.ok(ivy.got.some((m) => m.t === 'sys' && m.text === 'Ann has put endless ammunition on for you.'), 'another admin was not told who put a power on for them');
+  assert.equal(await tell(ann, `/weightless #${ivy.id} off`), 'Ivy: weightless is off.');
+  await until(() => last(ivy, 'powers')?.weightless === false, 'Ivy is told of the power put off for her');
+  assert.equal(last(ivy, 'powers')?.endless, true, 'one power put off put the other off');
+  assert.equal(await tell(ann, `/ammo on #${ned.id}`), 'Ned is not an admin: these are an admin\'s.');
+  assert.equal(await tell(ann, `/weightless #${moe.id}`), 'Moe is not an admin: these are an admin\'s.');
+  assert.match(await tell(ann, '/ammo on #999'), /Nobody online is "#999"/);
+  assert.ok(![moe, ned].some((p) => p.got.some((m) => m.t === 'powers')), 'somebody who is no admin was given a power');
+  checks++;
+  console.log('  ok  an admin puts another admin’s two on and off, and they are told by whom; nobody who is not an admin has either');
+
+  // ---- kept: through her death, and when she goes and comes back in (until the server restarts, as what she chose for her death is)
+  assert.match(await tell(ann, '/die'), /You are dead/);
+  ann.send({ t: 'respawn' });
+  await sleep(400);
+  const back = (await lists()).players.find((p) => p.name === 'Ann')!;
+  assert.ok(back.alive && back.weightless && back.endless, 'an admin who died and came back to life has lost the two powers she had on');
+  ann.ws.close();
+  await sleep(500);
+  assert.ok(await ann.join(), 'the admin could not come back in');
+  await until(() => !!last(ann, 'powers') && !!last(ann, 'ps')?.s.some((r) => r[0] === ann.id), 'she is told what she is and where');
+  stand(ann);
+  assert.deepEqual(powers(ann), { t: 0, god: false, hidden: false, clip: false, voidInv: true, voidTag: true, weightless: true, endless: true }, 'an admin who went and came back in was not told she still has the two powers on');
+  checks++;
+  console.log('  ok  both are kept through an admin’s death, and are hers again, and said to her again, when she comes back in');
+
+  // ---- the refill: a known set of guns and magazines, part shot off, one of them in a bag in her pack
+  assert.match(await tell(ann, '/kit heavy', 'kit'), /You have the Heavy kit/);
+  const hers = wear(ann);
+  const [ak] = hers.pick('ak'), [deagle] = hers.pick('deagle'), [drum] = hers.pick('drum_ak'), aks = hers.pick('mag_ak'), [ext] = hers.pick('mag_deagle_ext');
+  assert.deepEqual([ak.mag, ak.loaded, deagle.mag, deagle.loaded, drum.rounds, aks.map((m) => m.rounds), ext.rounds], ['drum_ak', 76, 'mag_deagle_ext', 11, 75, [30, 30, 30], 10]);
+  ak.loaded = 12;
+  deagle.loaded = 0;
+  drum.rounds = 0;
+  aks[0].rounds = 7;
+  aks[1].rounds = 0;
+  ext.rounds = 3;
+  const bag = makeItem('black_bag');
+  hers.inv.remove(aks[1]);
+  assert.ok(bagGrid(bag)!.add(aks[1]) === null && hers.inv.cargoOf(hers.inv.slots.back!)!.add(bag) === null, 'the bag did not go into her pack');
+  say(ann, hers.inv);
+  await sleep(300);
+  assert.deepEqual(fed(await copy(ann)), fed(sent(hers.inv)), 'the server does not have what her game said it carries');
+  // (four magazines and two guns took rounds: the third AK magazine was full, and is not counted)
+  assert.equal(await tell(ann, '/refill'), '4 magazines and 2 guns filled.');
+  const told = last(ann, 'refill');
+  assert.ok(told && told.by === undefined, 'her game was not told to fill what it carries');
+  // the server's own copy, there and then, before her game has said a word
+  const theirs = fed(await copy(ann));
+  assert.deepEqual(theirs.map(([, id, mag, loaded, rounds]) => [id, mag, loaded, rounds]).sort(), [
+    ['ak', 'drum_ak', 76, null], ['deagle', 'mag_deagle_ext', 11, null], ['drum_ak', null, null, 75],
+    ['mag_ak', null, null, 30], ['mag_ak', null, null, 30], ['mag_ak', null, null, 30], ['mag_deagle_ext', null, null, 10],
+  ].sort(), 'the server’s copy of what she carries is not full after a refill');
+  // her game does as it was told, by the same rule, and says what it carries: the two agree, thing for thing
+  assert.equal(refilledWords(refill(hers.inv.topLevel())), '4 magazines and 2 guns filled');
+  assert.deepEqual(fed(sent(hers.inv)), theirs, 'her game and the server’s copy do not agree after a refill');
+  say(ann, hers.inv);
+  await sleep(300);
+  assert.deepEqual(fed(await copy(ann)), theirs, 'what her game said it carries after the refill is not what the server has');
+  assert.equal(await tell(ann, '/refill'), 'Every magazine and gun you carry is full already.');
+  checks++;
+  console.log('  ok  a refill fills every gun and magazine an admin carries, the one in a bag in her pack too, says how many, and the server’s own copy agrees with her game’s');
+
+  // ---- endless ammunition, weightless, and a very heavy kit: she fires more rounds than the drum holds at somebody
+  // nothing hurts, and goes about at the pace of somebody who carries nothing
+  const kg = hers.inv.weight();
+  // (a survivor carries 18 kg before it slows them: CARRY_LIMIT in src/game/player.ts)
+  assert.ok(kg > 2 * 18, `what she carries weighs ${kg.toFixed(1)} kg: not much of a weight to try this with`);
+  assert.equal(weightFelt(kg, !!last(ann, 'powers')?.weightless), 0, 'with the power on her legs are still told a weight');
+  assert.match(await tell(ann, `/goto #${ned.id}`), /You are with Ned/);
+  assert.match(await tell(ann, `/bring #${ivy.id}`), /Ivy is with you/);
+  assert.match(await tell(ann, `/god #${ivy.id} on`), /Ivy: god mode is on/);
+  await until(() => apart(ann, ned) < 5 && apart(ann, ivy) < 5 && apart(ned, ivy) < 5, 'the three of them are told they stand together');
+  stand(ann, 'ak');
+  await sleep(150);
+  assert.equal(await fire(ann, ak, hers.inv, 80, !!last(ann, 'powers')?.endless), 80, 'her gun ran dry with endless ammunition on');
+  assert.equal(ak.loaded, 76, 'a round was spent with endless ammunition on');
+  assert.deepEqual(fed(await copy(ann)), theirs, 'after eighty shots the server does not have her gun as full as it was');
+  await run(ann, 'ak');
+  // (and the server still takes her shots: Ivy can be hurt again, and one lands)
+  assert.match(await tell(ann, `/god #${ivy.id} off`), /Ivy: god mode is off/);
+  assert.equal(await fire(ann, ak, hers.inv, 1, true), 1);
+  await until(() => ann.got.some((m) => m.t === 'hitok' && m.to === ivy.id), 'after all that, a shot of hers is taken by the server');
+  assert.match(await tell(ann, `/god #${ivy.id} on`), /Ivy: god mode is on/);
+  checks++;
+  console.log(`  ok  an admin with endless ammunition fires eighty rounds from a drum of seventy-five and has it full; weightless, she goes about under ${kg.toFixed(0)} kg; and her shots still land`);
+
+  // ---- used on somebody who is no admin: Ned is a player like any other, and every check looks at him
+  assert.match(await tell(ann, `/kit breacher #${ned.id}`), /Ned has the Breacher kit/);
+  await until(() => !!last(ned, 'kit'), 'Ned is handed the kit');
+  const his = wear(ned);
+  const [shotgun] = his.pick('benelli'), [smg] = his.pick('mpa'), mpas = his.pick('mag_mpa');
+  assert.deepEqual([shotgun.mag ?? null, shotgun.loaded, smg.mag, smg.loaded, mpas.map((m) => m.rounds)], [null, 7, 'mag_mpa', 31, [30, 30, 30]]);
+  shotgun.loaded = 1;
+  smg.loaded = 0;
+  mpas[0].rounds = 5;
+  mpas[1].rounds = 0;
+  say(ned, his.inv);
+  await until(async () => same(fed(await copy(ned)), fed(sent(his.inv))), 'the server has what his game said it carries');
+  assert.equal(await tell(ann, `/refill #${ned.id}`), '2 magazines and 2 guns filled, for Ned.');
+  await until(() => !!last(ned, 'refill'), 'his game is told to fill what it carries');
+  assert.equal(last(ned, 'refill')?.by, 'Ann', 'his game was not told by whom');
+  const kept = fed(await copy(ned));
+  assert.deepEqual(kept.map(([, id, mag, loaded, rounds]) => [id, mag, loaded, rounds]).sort(), [['benelli', null, 7, null], ['mag_mpa', null, null, 30], ['mag_mpa', null, null, 30], ['mag_mpa', null, null, 30], ['mpa', 'mag_mpa', 31, null]].sort(), 'the server’s copy of what he carries is not full after a refill');
+  assert.equal(refilledWords(refill(his.inv.topLevel())), '2 magazines and 2 guns filled');
+  assert.deepEqual(fed(sent(his.inv)), kept, 'his game and the server\u2019s copy do not agree after a refill');
+  // (and when his game has said what it carries, the server's copy is that still)
+  say(ned, his.inv);
+  await sleep(500);
+  assert.deepEqual(fed(await copy(ned)), kept, 'what his game said it carries after the refill is not what the server has');
+  // he fires the shells he was given, and the tube is empty when it ought to be
+  stand(ned, 'benelli');
+  await sleep(150);
+  assert.equal(await fire(ned, shotgun, his.inv, 9, false), 7, 'a tube of seven did not fire seven');
+  await until(async () => same(fed(await copy(ned)), fed(sent(his.inv))), 'the server has his tube empty');
+  // Refilled again, his game is made to say what an admin's says with the two powers on: twelve shots from a tube of
+  // seven and seven still in it, and two and a half seconds at an unladen run under everything he carries. No check
+  // looks at an admin, so this is where it is seen that none of them counts a round or weighs a pack. (The day one
+  // does, this fails, and an admin with the power on has to be let past it there.)
+  assert.equal(await tell(ann, `/refill #${ned.id}`), '1 gun filled, for Ned.');
+  refill(his.inv.topLevel());
+  assert.equal(await fire(ned, shotgun, his.inv, 12, true), 12);
+  assert.equal(shotgun.loaded, 7);
+  assert.ok(his.inv.weight() > 2 * 18, `what he carries weighs ${his.inv.weight().toFixed(1)} kg`);
+  await run(ned, 'benelli');
+  // and he puts the gun that was refilled down: a thing put down is asked of the server's list of what it put in the world
+  his.inv.remove(smg);
+  ned.send({ t: 'drop', l: { item: smg, x: row(ned)[1], y: row(ned)[2], z: row(ned)[3], rot: 0 } });
+  say(ned, his.inv);
+  await until(() => ann.got.some((m) => m.t === 'loot+' && m.l.uid === smg.uid && m.l.item.loaded === 31), 'the gun that was refilled lies where he put it down, for everybody');
+  await until(async () => same(fed(await copy(ned)), fed(sent(his.inv))), 'the server has what he carries now');
+  checks++;
+  console.log('  ok  a refill an admin does for a player fills what they carry and is said to them; what an admin’s game says with the two powers on is said by a player’s');
+
+  // ---- and nobody was flagged, by a server that refuses what it flags
+  const now = await lists();
+  assert.deepEqual(now.players.map((p) => [p.name, p.flags]).sort(), [['Ann', 0], ['Ivy', 0], ['Moe', 0], ['Ned', 0]], 'a check fired on somebody');
+  assert.equal(await tell(ann, '/flagged'), 'Nobody online has been flagged.');
+  assert.ok(!log().includes('[check:'), `a check wrote something down:\n${log().split('\n').filter((l) => l.includes('[check:')).join('\n')}`);
+  assert.ok(![ann, ivy, moe, ned].some((p) => p.shut || p.kicked), 'somebody was put off the server');
+  // (the checks are awake: a gun the server never made, in the pockets of the player it has just looked at so long, is flagged and is taken out of its copy)
+  assert.equal(his.inv.add(makeItem('m9')), null);
+  say(ned, his.inv);
+  await until(async () => ((await lists()).players.find((p) => p.name === 'Ned')?.flags ?? 0) > 0, 'a gun the server never put in the world is flagged (if it is not, the checks were asleep all along)');
+  // (once, and nobody else at all: his game had said everything else of his before this, and none of that was flagged)
+  assert.deepEqual(last(ann, 'adm')!.players.map((p) => [p.name, p.flags]).sort(), [['Ann', 0], ['Ivy', 0], ['Moe', 0], ['Ned', 1]]);
+  assert.deepEqual(log().split('\n').filter((l) => l.includes('[check:')).map((l) => l.trim().replace(/^\S+ /, '').replace(/ \(\S+\),/, ',')), ['[check:enforce] Ned carries M9 Pistol, which the server never put in the world (1 so far)']);
+  assert.ok(!fed(await copy(ned)).some(([, id]) => id === 'm9'), 'an invented gun was left in the server’s copy of his pockets');
+  checks++;
+  console.log('  ok  with the checks enforcing, nobody was flagged by any of it; and a gun the server never made, in the same pockets, is');
+
+  // ---- no longer an admin, they have neither; and nothing is kept for if they are made one again
+  assert.match(await tell(ann, `/demote #${ivy.id}`), /Ivy is no longer either/);
+  await sleep(200);
+  assert.deepEqual(powers(ivy), { t: 0, god: false, hidden: false, clip: false, voidInv: false, voidTag: false, weightless: false, endless: false }, 'somebody who is no longer an admin still has a power');
+  assert.match(await tell(ann, `/admin #${ivy.id}`), /Ivy is an admin/);
+  await sleep(200);
+  assert.deepEqual(powers(ivy), { t: 0, god: false, hidden: false, clip: false, voidInv: true, voidTag: true, weightless: false, endless: false }, 'the powers somebody had as an admin were theirs again when they were made one again');
+  checks++;
+  console.log('  ok  whoever is no longer an admin has neither power, and has neither when made an admin again');
+}, { CHECKS: 'enforce' });
 
 site.close();
 console.log(`\n${checks} checks passed`);
