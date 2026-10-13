@@ -109,14 +109,15 @@ const DEFAULT_MINT = 'GvfAzdPF466PJsPJMzXQeX3TSqmJm9YxAG8xBJ6ypump';
  * While it is '' (or anything that is not a moment) there is no second cut-over: every tag is paid as it was before,
  * and nothing anywhere says otherwise, however and whenever this code is deployed. The change was the owner's to
  * begin, and the owner began it on 2026-10-13: "i want to cancel all current pending payouts and move forward
- * wihtour new payout tracking system". The moment below is a quarter of an hour after that deploy.
+ * wihtour new payout tracking system", and then "deploy the payout change with the next build". So it is written
+ * below AT THAT BUILD, as a moment about a quarter of an hour after the deploy, and is '' until then.
  *
  * It must be written in full, with its zone: '2026-10-14T18:00:00Z' or '2026-10-14T20:00:00+02:00'. Anything else
  * (a day without its hour, an hour without its zone) is no moment, and nothing begins: see `config`.
  * To go back after it has begun, nothing here is touched: PAYOUT_RULES2_FROM=never puts the rule off, and what is
  * owed under it is then paid out as it stands (see `rules2From` in Config, and `needOf`).
  */
-export const RULES2_FROM = '2026-10-13T23:45:00Z';
+export const RULES2_FROM = '';
 
 const lamports = (sol: number) => BigInt(Math.round(sol * LAMPORTS));
 export const sol = (l: bigint | number) => Number(l) / LAMPORTS;
