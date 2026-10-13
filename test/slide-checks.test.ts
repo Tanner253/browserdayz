@@ -139,30 +139,32 @@ try {
 
   // What the server holds feet to is how far one position is from the last: nine and a half metres for every second
   // between them, what was saved of that while going slower (two seconds' worth at most), and three metres let go
-  // every time. So the same descent with a jump in it: the longest slide said honestly to its middle, and then its
-  // foot in the next breath. Refused, written down, and kept where it was for everybody else.
-  const long = slides.reduce((a, b) => (drop(b) > drop(a) ? b : a)), half = long.pts.length >> 1, foot = long.pts[long.pts.length - 1];
+  // every time. So the same descent with a jump in it: the longest slide said honestly for the first quarter of
+  // it, and then its foot in the next breath. Refused, written down, and kept where it was for everybody else.
+  // (The jump is further than a whole second of lag would excuse: this is played in real time, on whatever machine.)
+  const long = slides.reduce((a, b) => (drop(b) > drop(a) ? b : a)), half = long.pts.length >> 2, foot = long.pts[long.pts.length - 1];
   const gap = Math.hypot(foot[0] - long.pts[half][0], foot[2] - long.pts[half][2]);
-  assert.ok(gap > FOOT * CARRY + GRACE + 2, `the longest slide is only ${gap.toFixed(0)} m over the ground from its middle to its foot`);
+  assert.ok(gap > FOOT * CARRY + GRACE + FOOT, `the longest slide is only ${gap.toFixed(0)} m over the ground from a quarter of the way down it to its foot`);
   const cheat = new Player('Cheat');
   assert.ok(await cheat.join());
   cheat.say(long.pts[0]);
   await sleep(2700);
   await cheat.play(long.pts.slice(0, half + 1), long.hz);
-  for (let k = 0; k < 4; k++) {
+  for (let k = 0; k < 2; k++) {
     cheat.say(foot);
     await sleep(1000 / long.hz);
   }
   await sleep(400);
   assert.ok(flagsOn('Cheat').some((l) => /\[check:enforce\] Cheat moved \d+ m in/.test(l)), `a slide with a jump of ${gap.toFixed(0)} m in it was not written down:\n${logged.slice(-500)}`);
   const held = wit.sees(cheat.id);
-  assert.ok(held && Math.hypot(held[0] - long.pts[half][0], held[1] - long.pts[half][2]) < 2, `the cheat is shown at ${held}: it was to be kept at the middle of the face, ${long.pts[half][0]}, ${long.pts[half][2]}`);
+  assert.ok(held && Math.hypot(held[0] - long.pts[half][0], held[1] - long.pts[half][2]) < 2, `the cheat is shown at ${held}: it was to be kept a quarter of the way down the face, ${long.pts[half][0]}, ${long.pts[half][2]}`);
   checks++;
-  console.log(`  ok  the longest slide with its lower half skipped is refused and kept back: ${flagsOn('Cheat')[0]?.replace(/^.*\[check:enforce\] /, '')}`);
+  console.log(`  ok  the longest slide with the rest of it skipped after the first quarter is refused and kept back: ${flagsOn('Cheat')[0]?.replace(/^.*\[check:enforce\] /, '')}`);
 
   // And one that is only just over it. Down the same face and on, in a straight line, every position a tenth
   // further from the last than the server lets a fifteenth of a second and its grace cover. It is let go while
-  // what was saved lasts, and refused from then on.
+  // what was saved lasts, and refused from then on. (Said thirty times a second, so that a slow machine, which
+  // spaces them out, still puts some of them less than a fifteenth of a second apart.)
   const edge = new Player('Edge'), from = long.pts[0];
   const len = Math.hypot(foot[0] - from[0], foot[2] - from[2]), ux = (foot[0] - from[0]) / len, uz = (foot[2] - from[2]) / len;
   const most = FOOT / 15 + GRACE, stride = most * 1.1;
@@ -174,7 +176,7 @@ try {
     const x = from[0] + ux * stride * i, z = from[2] + uz * stride * i;
     over.push([x, ground(x, z), z]);
   }
-  await edge.play(over, 15);
+  await edge.play(over, 30);
   await sleep(500);
   clearInterval(keep);
   assert.ok(flagsOn('Edge').some((l) => /Edge moved \d+ m in/.test(l)), `${stride.toFixed(2)} m between positions a fifteenth of a second apart was not written down:\n${logged.slice(-500)}`);

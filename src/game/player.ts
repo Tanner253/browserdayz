@@ -61,6 +61,8 @@ const AUTOSTEP: [number, number, boolean] = [0.42, 0.22, true];
 const STEEP_PRESS = 0.3;
 /** going down steep ground faster than this over the ground, a body is being carried by it (m/s) */
 const RUNS_ON = 0.8;
+/** coming down on a steep face faster than this (m/s: a drop of half a metre), a body has fallen onto it and does not keep its feet */
+const FELL = 4;
 /** a slide has hit something when it makes less than this share of a step; and it is felt when that takes this much of its pace (m/s) */
 const STRUCK = 0.5;
 const STRUCK_AT = 2.5;
@@ -171,8 +173,8 @@ export class Player {
   footing: Footing = 'firm';
   /** on hands and feet and using them: nothing is held up to aim, as nothing is at a sprint (the weapon reads it) */
   handsBusy = false;
-  /** a slide: how fast along the slope (m/s), how fast it is being worked sideways, when it was last going (this body's seconds), and how much of its fall the ground has lately taken off it at a blow (m/s: see `jolted`) */
-  private slide = { v: 0, side: 0, at: -9, took: 0 };
+  /** a slide: how fast along the slope (m/s), how fast it is being worked sideways, when it was last going (this body's seconds), how much of its fall the ground has lately taken off it at a blow (m/s: see `jolted`), and when it last struck something that stood in its way and how much of that blow is still to be felt */
+  private slide = { v: 0, side: 0, at: -9, took: 0, struck: -9, owed: 0 };
   /** came off a climb for want of breath, and has not half of it back yet: see `step` */
   private spent = false;
   /** the last step pressed down on something that is not the land itself: the body is not standing on open ground (see `step`) */
@@ -693,7 +695,10 @@ export class Player {
       // Coming down on open ground too steep to stand on is not the end of a fall. The slope takes what came
       // square at it, by the same rule as any landing, and the rest goes on down it as a slide.
       const face = this.built ? null : this.openGround(next.x, next.z, feet);
-      if (face && degOf(face.rise) >= SLOPE.scramble && -fall > SLIDE.begins) {
+      // (A fall, not a hop: a body climbing leaves the face by a centimetre now and then, where one face of the hill
+      // meets the next, and is back on it a step later at the pace it is pressed to the ground with. Taken for a
+      // fall, that threw a climber off the hill.)
+      if (face && degOf(face.rise) >= SLOPE.scramble && -fall > FELL) {
         const run = Math.hypot(1, face.rise), out = this.vel.x * face.x + this.vel.z * face.z;
         this.land(-Math.max(0, (-fall - out * face.rise) / run), drop);
         this.beginSlide((out - fall * face.rise) / run, face.rise);
@@ -716,9 +721,14 @@ export class Player {
         const run = Math.hypot(pace.x, pace.z), made = run > 1e-4 ? Math.max(0, mv.x * pace.x + mv.z * pace.z) / (run * run) : 1;
         // (a slide barely begun has nothing to lose, and a step of a millimetre says nothing either way)
         if (made < STRUCK && this.slide.v > 1) {
-          const lost = this.slide.v * (1 - made);
+          // (One blow, however many steps the body is held against the thing: no more is felt of it than the pace
+          // the slide had when it struck. Pinned on a trunk with the hill still pulling, it was paid for half as much again.)
+          if (this.clock - this.slide.struck > 0.5) this.slide.owed = this.slide.v;
+          this.slide.struck = this.clock;
+          const lost = this.slide.v * (1 - made), felt = Math.min(lost, this.slide.owed);
           this.slide.v -= lost;
-          this.jolted(lost);
+          this.slide.owed -= felt;
+          this.jolted(felt);
         }
       }
       // A slide is a fall that the ground is rubbing on. Should it end at an edge, or where the ground eases, it
@@ -1012,7 +1022,7 @@ export class Player {
     // from a height your legs take the fall before you can run on
     if (s > 6.5) this.stumble = Math.min(0.5, (s - 6.5) * 0.09);
     this.onLand(s);
-    if (s > 9.5 && s > had) {
+    if (s > 9.5 && (had <= 0 || s > had + 0.1)) {
       const dmg = (s - Math.max(9.5, had)) * 14 * this.fallMult;
       this.lastFall = { drop, speed: s };
       this.damage(dmg, 'fall');
