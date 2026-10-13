@@ -72,6 +72,13 @@ export function buildWorldData(root: string) {
     doorCount: buildings.doorSpecs.length,
     groundAt: (x: number, z: number) => heightAt(world.heights, x, z),
     /**
+     * The top of the earth at a place: the ground, or where the ground is cut down for the fort's passage and earth
+     * is laid back over it, that earth (`surface`). It is what somebody who may be UNDER the ground is asked about:
+     * by the ground alone, which there is the bottom of the cut, a body in the earth between the passage's roof and
+     * the lid was never under anything.
+     */
+    coverAt: (x: number, z: number) => Math.max(heightAt(world.heights, x, z), heightAt(world.surface, x, z)),
+    /**
      * What somebody at a place has under them to stand on: the ground, or the deck of a bridge for whoever is on
      * one (see src/sim/bridge.ts). Asked wherever it is a question of somebody being in the air: `groundAt` is the
      * ground alone, and is what is asked of somebody who may be under it.

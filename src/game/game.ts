@@ -2650,11 +2650,13 @@ export class Game {
   private unbury(dt: number, riding: boolean) {
     const p = this.player, at = p.pos;
     const b = this.bunker.place;
-    const down = this.started && !p.dead && !riding && !p.fly && at.y < heightAt(this.s.world.heights, at.x, at.z) - 1.1 && !(b && Math.hypot(at.x - b.x, at.z - b.z) < 48) && !castleUnder(this.s.world.castle, at.x, at.y, at.z, (x, z) => heightAt(this.s.world.surface, x, z));
+    // (the top of the earth: the ground, or the earth the fort lays back over its passage where the ground is cut down for it)
+    const top = Math.max(heightAt(this.s.world.heights, at.x, at.z), heightAt(this.s.world.surface, at.x, at.z));
+    const down = this.started && !p.dead && !riding && !p.fly && at.y < top - 1.1 && !(b && Math.hypot(at.x - b.x, at.z - b.z) < 48) && !castleUnder(this.s.world.castle, at.x, at.y, at.z, (x, z) => heightAt(this.s.world.surface, x, z));
     this.buriedT = down ? this.buriedT + dt : 0;
     if (this.buriedT < 2) return;
     this.buriedT = 0;
-    p.spawn(at.x, heightAt(this.s.world.heights, at.x, at.z) + 0.15, at.z, p.yaw);
+    p.spawn(at.x, top + 0.15, at.z, p.yaw);
     this.hud.note('You were under the ground: back on your feet', 'warn');
   }
   private buriedT = 0;

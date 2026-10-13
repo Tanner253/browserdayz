@@ -2571,7 +2571,7 @@ const UNDER = { deep: 1.1, grace: 3, void: 10, off: 8 };
 function underCheck(c: Client, now = Date.now()) {
   const [x, y, z] = c.pose;
   const b = world.bunker;
-  const down = c.alive && !c.seatAt && !c.power.clip && roleOf(c) !== 'admin' && now >= c.check.free && y < world.groundAt(x, z) - UNDER.deep && !(b && Math.hypot(x - b.x, z - b.z) < UNDER_BUNKER) && !world.castleUnder(x, y, z);
+  const down = c.alive && !c.seatAt && !c.power.clip && roleOf(c) !== 'admin' && now >= c.check.free && y < world.coverAt(x, z) - UNDER.deep && !(b && Math.hypot(x - b.x, z - b.z) < UNDER_BUNKER) && !world.castleUnder(x, y, z);
   if (!down) {
     c.underAt = 0;
     return;
@@ -2580,10 +2580,10 @@ function underCheck(c: Client, now = Date.now()) {
   // (2026-10-12: "player should never be able to go under the map". Wherever their game says they are under it,
   // they are on it for everybody else, from the first word: seen there, and hit there. The programs that came by
   // the dozen that day slid about the map at one height, metres under it, where nothing could touch them.)
-  if (CHECKS === 'enforce') c.pose[1] = world.groundAt(x, z);
+  if (CHECKS === 'enforce') c.pose[1] = world.coverAt(x, z);
   const secs = (now - c.underAt) / 1000;
   if (secs < UNDER.grace) return;
-  flag(c, `is ${(world.groundAt(x, z) - y).toFixed(1)} m under the ground at ${x.toFixed(0)}, ${z.toFixed(0)}, ${secs.toFixed(0)} s now`, false);
+  flag(c, `is ${(world.coverAt(x, z) - y).toFixed(1)} m under the ground at ${x.toFixed(0)}, ${z.toFixed(0)}, ${secs.toFixed(0)} s now`, false);
   if (secs >= UNDER.void) voidTags(c, 'under the ground');
   if (secs >= UNDER.off) putOff(c, `was under the ground for ${UNDER.off} seconds`);
 }
