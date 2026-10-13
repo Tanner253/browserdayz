@@ -21,6 +21,12 @@ const ICONS_REV = 3;
  * (2026-10-13: "the hatchet is updside down in inventory".)
  */
 const HEAD_UP = new Set(['hatchet']);
+/**
+ * What is built lying on its back, its face to the sky, and is stood up to look out of its picture. (The gas mask's
+ * hood, since it lost its hose and was laid down, 2026-10-13: drawn as it lay it was seen from the side, one
+ * eyepiece and the valve, and read as a flask.)
+ */
+const FACE_UP = new Set(['gasmask']);
 
 /** a gun, a magazine, or a part that is fitted to a gun: its picture is lit up (see where the pictures are made), by this much where it is painted with a picture and where it is a bare colour */
 const LIT = (d: (typeof ITEMS)[string]) => !!(d.weapon || d.mag || d.attach);
@@ -212,9 +218,11 @@ export async function renderIcons(renderer: THREE.WebGLRenderer, models: ItemMod
       const flat = size.y < Math.min(size.x, size.z) * 0.1;
       pivot.rotation.x += upright ? 0.15 : flat ? 1.15 : 0.55;
     }
+    if (FACE_UP.has(id)) pivot.rotation.set(Math.PI / 2 - 0.15, 0, 0);
     // (in a frame of its own, which is what is turned if the turns above left it across the picture)
     const frame = new THREE.Group();
     frame.add(pivot);
+    if (FACE_UP.has(id)) frame.rotation.y = 0.4;
     // (a magazine is looked at a little from one side and a little from above, as a thing stood on a table is)
     if (def.mag) frame.rotation.set(0.12, 0.45, 0);
     scene.add(frame);
