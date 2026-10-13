@@ -15,6 +15,13 @@ const PX = 64; // pixels per grid cell
 /** changed whenever the way a picture is made here changes: every picture kept from before is then made again (see `iconSig`) */
 const ICONS_REV = 2;
 
+/**
+ * Things whose picture is turned head over heels from how the rules below stand them. A tool is stood with its
+ * grip uppermost, which is right for a knife or a shovel and wrong for an axe: an axe is drawn head up.
+ * (2026-10-13: "the hatchet is updside down in inventory".)
+ */
+const HEAD_UP = new Set(['hatchet']);
+
 /** whether a thing has a second picture, for the place on the body it is worn in (kept as `slot:<id>`) */
 export const hasSlotIcon = (id: string): boolean => ITEMS[id]?.category === 'clothing' && !!ITEMS[id].slot;
 
@@ -32,7 +39,7 @@ export function iconSig(id: string): string {
     return [d.model, file || Math.random(), d.node ?? '', d.nodeRe ?? '', d.tint ?? '', d.paint ?? '', d.scale ?? '', d.w, d.h, d.category, d.pile ?? '', !!d.mag, d.stack ? 1 : 0, d.weapon ? [d.weapon.mag ?? '', d.weapon.shows ?? '', (d.weapon as { hides?: unknown }).hides ?? '', d.weapon.never ?? ''] : ''];
   };
   const d = ITEMS[id];
-  const text = JSON.stringify([ICONS_REV, of(d), of(d.weapon?.mag ? ITEMS[d.weapon.mag] : undefined)]);
+  const text = JSON.stringify([ICONS_REV, of(d), of(d.weapon?.mag ? ITEMS[d.weapon.mag] : undefined), ...(HEAD_UP.has(id) ? ['head up'] : [])]);
   let h = 2166136261 >>> 0;
   for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619) >>> 0;
   return h.toString(36);
@@ -149,6 +156,8 @@ export async function renderIcons(renderer: THREE.WebGLRenderer, models: ItemMod
       b2 = new THREE.Box3().setFromObject(frame);
       s2 = b2.getSize(new THREE.Vector3());
     }
+    // (and one that reads upside down as it then stands is turned right over, in the plane of the picture)
+    if (HEAD_UP.has(id)) frame.rotation.z += Math.PI;
     /** the thing as it stands in the scene, drawn to fill a picture of this many pixels each way */
     const shoot = (pw: number, ph: number, target: THREE.WebGLRenderTarget): string => {
       frame.updateMatrixWorld(true);
