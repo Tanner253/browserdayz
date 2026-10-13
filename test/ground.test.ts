@@ -10,8 +10,8 @@ const world = generateWorld();
 const t0 = performance.now();
 const ground = layGround(world);
 console.log(`the ground laid in ${(performance.now() - t0).toFixed(0)} ms`);
-assert.equal(KIND_NAMES.length, 13, 'the paint reads thirteen kinds: four to a picture of weights, and one by itself');
-assert.equal(ground.weights.length, 4);
+assert.equal(KIND_NAMES.length, 12, 'the paint reads twelve kinds, four to a picture of weights');
+assert.equal(ground.weights.length, 3);
 
 const share = new Float64Array(KIND_NAMES.length);
 let worst = 0;

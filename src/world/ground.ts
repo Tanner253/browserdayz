@@ -4,10 +4,10 @@
 //
 // Nothing here is said by the world's generator, and nothing here changes it. The generator says four things of a
 // point (grass, forest floor, rock, bare: `world.splat`), where every tree stands and of what kind, where the roads
-// run and how high the ground is. This reads those and says thirteen things: which grass, which forest floor under
-// which trees, earth trodden bare or the gravel of a road's shoulder, stony ground, bare rock or the mossy rock of a
-// wood. So a new kind of ground is a line in KINDS and a rule in layGround, and the map is not touched. (The paint
-// reads the kinds four to a picture of weights and the thirteenth by itself: a fourteenth is a line there as well.)
+// run and how high the ground is. This reads those and says twelve things: which grass, which forest floor under
+// which trees, earth trodden bare, stony ground, bare rock or the mossy slabs of a wood's bank. So a new kind of
+// ground is a line in KINDS and a rule in layGround, and the map is not touched. (The paint reads the kinds four to
+// a picture of weights, three pictures: a thirteenth kind is a fourth picture there.)
 //
 // The pictures are Poly Haven's (scripts/assets.config.mjs TEXTURES); how they are drawn is src/world/terrain.ts.
 
@@ -53,18 +53,28 @@ export const KINDS = {
   earth: { tex: 'forest_ground_06', size: 2.1, tint: [1.1, 1.1, 1.1], sound: 'dirt', quiet: true },
   // the trodden earth of a track, a yard, a camp (it answers as gravel did: a yard is not the forest)
   trodden: { tex: 'dry_mud_field_001', size: 3.0, tint: [1.5, 1.46, 1.38], sound: 'gravel' },
-  // the metalling along a road's edge
-  gravel: { tex: 'rocks_ground_02', size: 2.0, tint: [0.86, 0.84, 0.8], sound: 'gravel' },
-  // stony ground: slopes too steep for turf and not steep enough to be a face, and what has come down off a face to lie at its foot
+  // stony ground: slopes too steep for turf and not steep enough to be a face, what has come down off a face to lie
+  // at its foot, and the metalling along a road's edge (which had a picture of its own, the gravel with the white
+  // stones in it: given up, so that the bank's slabs and their moss could be held without the card holding more)
   stony: { tex: 'rocky_trail', size: 2.0, tint: [0.56, 0.59, 0.6], sound: 'gravel', sided: true, far: 0.13 },
   // the rock of a steep face (a rock face photographed square on: the air photograph of fifty metres that was laid
   // here six metres wide smeared down every face it was on)
   rock: { tex: 'rock_face_03', size: 2.7, tint: [0.8, 0.98, 1.2], sound: 'rock', sided: true, far: 0.09 },
-  // the mossy rock of a wood: what breaks through the turf and litter of a low bank where it is steepest, under and
-  // near trees and on the damp side of a hill (2026-10-13: such banks are all over the valley where people walk,
-  // and bare pale rock made quarries of them)
-  crag: { tex: 'mossy_rock', size: 3.0, tint: [0.66, 0.78, 0.64], sound: 'rock', sided: true, far: 0.2 },
+  // The slabs of a wood's bank: what breaks through the turf and litter of a low bank where it is steepest, under
+  // and near trees and on the damp side of a hill. Such banks are all over the valley where people walk. This is the
+  // air photograph the old paint had for all rock, at the size the old paint laid it (it is fifty metres in life; at
+  // six its ledges and cracks are the size of a bank's, and that is what gave the old banks their slabs). What was
+  // wrong with it was that it was laid from above and smeared down anything steep: it is laid by the face now.
+  // Moss grows on it: see CRAG_MOSS.
+  crag: { tex: 'aerial_rocks_02', size: 6.0, tint: [0.95, 0.97, 0.93], sound: 'rock', sided: true },
 } satisfies Record<string, Kind>;
+
+/**
+ * The moss on a bank's slabs: not a kind of ground with a place of its own, but a picture the paint lays over the
+ * crag where moss would grow (in the slabs' joints, on what of them faces up, more of it on the side of a hill the
+ * sun does not reach). A mossy, lichened rock photographed close: on the slabs it is the moss and not the rock.
+ */
+export const CRAG_MOSS: Kind = { tex: 'mossy_rock', size: 3.0, tint: [0.6, 0.78, 0.56], sound: 'rock', quiet: true };
 
 /**
  * SNOW ON THE GROUND, in one place, for whatever else snow lies on to match (the fort on the mountain, its rocks):
@@ -211,11 +221,11 @@ export function layGround(world: World): Ground {
       const m1 = wide(ix, iz), m2 = mid(ix, iz), m3 = patch(ix, iz);
       w.fill(0);
 
-      // bare ground: gravel along a road, trodden earth where it is wholly bare, and at its thin edges and in the
+      // bare ground: stones along a road, trodden earth where it is wholly bare, and at its thin edges and in the
       // meadow's bald patches no more than dry grass
       const shoulder = 1 - smooth(0.6, 3.4, road[i]);
       const bare = smooth(0.42, 0.7, v);
-      w[K.gravel] = v * shoulder;
+      w[K.stony] = v * shoulder;
       w[K.trodden] = v * (1 - shoulder) * bare;
       w[K.dry] = v * (1 - shoulder) * (1 - bare);
       if (w[K.trodden] > 0.01) {
@@ -229,7 +239,7 @@ export function layGround(world: World): Ground {
       }
       if (works && (x - works.x) * (x - works.x) + (z - works.z) * (z - works.z) < 10000) {
         const hard = smooth(-0.25, 0.35, n2.noise(x * 0.05 + 40, z * 0.05 - 17)) * 0.75;
-        w[K.gravel] += w[K.trodden] * hard;
+        w[K.stony] += w[K.trodden] * hard;
         w[K.trodden] *= 1 - hard;
       }
 

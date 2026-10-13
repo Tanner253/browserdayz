@@ -4,7 +4,7 @@ import { TOUCH } from '../core/device';
 import { physics } from '../core/physics';
 import { Simplex } from '../core/noise';
 import type { Atmosphere } from './atmosphere';
-import { KINDS, KIND_AT, KIND_NAMES, SNOW_GROUND, layGround, type Ground, type Kind } from './ground';
+import { CRAG_MOSS, KINDS, KIND_AT, KIND_NAMES, SNOW_GROUND, layGround, type Ground, type Kind } from './ground';
 import { CELL, SNOW, WORLD_RES, WORLD_SIZE, idx, type World } from './worldgen';
 
 // The paint as it was: four layers, in the order of the splat's channels (grass, forest floor, rock, gravel), and
@@ -375,13 +375,12 @@ export class Terrain {
         uTint: { value: tint },
       };
     } else {
-      const kinds: Kind[] = KIND_NAMES.map((k) => KINDS[k]);
+      // (the kinds of ground, and after them the one picture that is not a kind: the moss on the bank's slabs)
+      if (KIND_NAMES.length !== 12) throw new Error('the paint reads twelve kinds of ground, four to a picture of weights');
+      const kinds: Kind[] = [...KIND_NAMES.map((k) => KINDS[k]), CRAG_MOSS];
       const made = await buildGround(kinds, kinds.map((k) => t[k.tex]));
-      if (kinds.length !== 13) throw new Error('the paint reads thirteen kinds of ground: four to a picture of weights, and one by itself');
-      const weights = this.ground.weights.map((w, k) => {
-        // (the last picture of weights holds one kind: it is sent as one number a point, not four)
-        const lone = k === 3 ? Uint8Array.from({ length: N * N }, (_, i) => w[i * 4]) : null;
-        const tex = lone ? new THREE.DataTexture(lone, N, N, THREE.RedFormat) : new THREE.DataTexture(w, N, N, THREE.RGBAFormat);
+      const weights = this.ground.weights.map((w) => {
+        const tex = new THREE.DataTexture(w, N, N, THREE.RGBAFormat);
         tex.magFilter = tex.minFilter = THREE.LinearFilter;
         tex.needsUpdate = true;
         return tex;
@@ -394,7 +393,6 @@ export class Terrain {
         tKindsA: { value: weights[0] },
         tKindsB: { value: weights[1] },
         tKindsC: { value: weights[2] },
-        tKindsD: { value: weights[3] },
         tMacro: { value: this.macroTex },
         tSnow: { value: null },
         uSnowIs: { value: snowIs },
@@ -605,15 +603,18 @@ float tAO = tArmV.r;
 
 const GROUND_PARS = /* glsl */ `
 precision highp sampler2DArray;
-#define GROUND_LAYERS ${KIND_NAMES.length}
+// (the kinds of ground; and the pictures held, which are those and the moss on the bank's slabs after them)
+#define GROUND_KINDS ${KIND_NAMES.length}
+#define GROUND_LAYERS ${KIND_NAMES.length + 1}
 #define GROUND_TRODDEN ${KIND_AT.trodden}
+#define GROUND_CRAG ${KIND_AT.crag}
+#define GROUND_CRAG_MOSS ${KIND_NAMES.length}
 uniform sampler2DArray tColour;
 uniform sampler2DArray tRelief;
 uniform sampler2DArray tReliefQuiet;
 uniform sampler2D tKindsA;
 uniform sampler2D tKindsB;
 uniform sampler2D tKindsC;
-uniform sampler2D tKindsD;
 uniform sampler2D tMacro;
 uniform sampler2D tSnow;
 // (snow: its colour from far off; and whether its picture has come, which it does when somebody first goes near any)
@@ -715,6 +716,24 @@ void groundKind(int i, vec3 P, vec3 dx, vec3 dy, vec3 N, vec3 side, float nearKe
       c = mix(c, fc, farShare);
     }
     vec2 n = r.xy * 2.0 - 1.0;
+    if (i == GROUND_CRAG) {
+      // The slabs of a bank, and the moss grown on them. Their relief is given more than its due, so that a ledge
+      // catches the light as a ledge. Moss: in the joints (where the slabs' own picture is low), on what faces up
+      // (on a face, what the relief tips toward the sky: the tops of ledges), and more of it all over on the side of
+      // a hill the sun does not reach; its edge follows the moss picture's own lumps.
+      n *= 1.6;
+      float mt = uLay[GROUND_CRAG_MOSS].x;
+      // (far off the moss is its mean colour, as every picture is: it is not looked at there)
+      vec4 mc = vec4(uMean[GROUND_CRAG_MOSS], uFlat[GROUND_CRAG_MOSS].y); vec3 mr;
+      if (nearKeep > 0.0) { vec4 near; groundTap(GROUND_CRAG_MOSS, uv * mt, gx * mt, gy * mt, false, near, mr); mc = mix(mc, near, nearKeep); }
+      float joints = 1.0 - smoothstep(0.4, 0.8, c.a);
+      float up = clamp(N.y + (p == 0 ? 0.0 : n.y * 0.6), 0.0, 1.0);
+      float shaded = clamp(-(N.x * 0.8 + N.z * 0.6) * 1.6, 0.0, 1.0);
+      float grown = smoothstep(0.4, 0.6, joints * 0.8 + smoothstep(0.5, 0.92, up) * 0.4 + shaded * 0.22 + (mc.a - 0.5) * 0.35 - 0.1);
+      c.rgb = mix(c.rgb, mc.rgb * uTint[GROUND_CRAG_MOSS] / uTint[i], grown);
+      n *= 1.0 - 0.6 * grown;
+      r.z = mix(r.z, 0.96, grown);
+    }
     T -= N * dot(N, T);
     B -= N * dot(N, B);
     colour += c * k;
@@ -736,7 +755,6 @@ vec2 jitter = (macro2.rg - 0.5) * (2.6 / uWorld.x);
 vec4 wA = texture2D(tKindsA, splatUv + jitter);
 vec4 wB = texture2D(tKindsB, splatUv + jitter);
 vec4 wC = texture2D(tKindsC, splatUv + jitter);
-float wD = texture2D(tKindsD, splatUv + jitter).r;
 
 float camDist = length(vTerrainPos - cameraPosition);
 vec3 dP3x = dFdx(vTerrainPos);
@@ -756,18 +774,17 @@ vec3 side = pow(abs(gN), vec3(6.0));
 side = max(side / (side.x + side.y + side.z) - 0.1, 0.0);
 side /= side.x + side.y + side.z;
 
-// There are thirteen kinds of ground and a pixel is of one, two or three of them: the three there is most of are
+// There are a dozen kinds of ground and a pixel is of one, two or three of them: the three there is most of are
 // looked at (the second if there is any of it to speak of, the third only if there is a good deal), the rest not.
-float kindW[GROUND_LAYERS];
+float kindW[GROUND_KINDS];
 kindW[0] = wA.r; kindW[1] = wA.g; kindW[2] = wA.b; kindW[3] = wA.a;
 kindW[4] = wB.r; kindW[5] = wB.g; kindW[6] = wB.b; kindW[7] = wB.a;
 kindW[8] = wC.r; kindW[9] = wC.g; kindW[10] = wC.b; kindW[11] = wC.a;
-kindW[12] = wD;
 int pick[3];
 float layerW[3];
 pick[0] = 0; pick[1] = 0; pick[2] = 0;
 layerW[0] = -1.0; layerW[1] = -1.0; layerW[2] = -1.0;
-for (int k = 0; k < GROUND_LAYERS; k++) {
+for (int k = 0; k < GROUND_KINDS; k++) {
   float v = kindW[k];
   if (v > layerW[0]) { layerW[2] = layerW[1]; pick[2] = pick[1]; layerW[1] = layerW[0]; pick[1] = pick[0]; layerW[0] = v; pick[0] = k; }
   else if (v > layerW[1]) { layerW[2] = layerW[1]; pick[2] = pick[1]; layerW[1] = v; pick[1] = k; }
