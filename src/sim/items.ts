@@ -538,7 +538,10 @@ const D: ItemDef[] = [
   // ---------------------------------------------------------------- base building
   { id: 'stash_kit', name: 'Stash Case', model: 'weapons_case', w: 4, h: 3, weight: 6, category: 'stash', scale: 0.55, stash: [8, 6], desc: 'A hard case. Dropped, it lies where it lands and can be opened there: it stays in the world and keeps whatever you store in it. Out in the country, a shovel buries it.' },
   // (two more things to keep things in, 2026-10-12: smaller than the case, lighter, and found in houses)
-  { id: 'old_suitcase', name: 'Suitcase', model: 'vintage_suitcase', w: 4, h: 3, weight: 3, category: 'stash', scale: 0.3, place: 0.5, stash: [6, 5], desc: 'An old travelling case. Dropped, it lies where it lands and can be opened there: it keeps what you store in it. Out in the country, a shovel buries it.' },
+  // (ONE of the two cases the model is of: it comes as a pair side by side, and both were drawn wherever a suitcase
+  // was: on the ground, in the hands, in its picture. 2026-10-13: "the suitcase model is duplicated". The one is
+  // drawn as wide as the pair was, so that it lies wherever it lay; and stood down as a stash it is a suitcase's size.)
+  { id: 'old_suitcase', name: 'Suitcase', model: 'vintage_suitcase', nodeRe: '^vintage_suitcase_01', w: 4, h: 3, weight: 3, category: 'stash', scale: 0.7, place: 1, stash: [6, 5], desc: 'An old travelling case. Dropped, it lies where it lands and can be opened there: it keeps what you store in it. Out in the country, a shovel buries it.' },
   { id: 'black_bag', name: 'Black Bag', model: 'trashbag', w: 2, h: 3, weight: 0.3, category: 'stash', scale: 0.5, stash: [5, 4], desc: 'A heavy black sack. Dropped, it lies where it lands and can be opened there: it keeps what you store in it. Out in the country, a shovel buries it.' },
 ];
 
