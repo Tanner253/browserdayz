@@ -175,6 +175,8 @@ export class Player {
   private slide = { v: 0, side: 0, at: -9, took: 0 };
   /** came off a climb for want of breath, and has not half of it back yet: see `step` */
   private spent = false;
+  /** the last step pressed down on something that is not the land itself: the body is not standing on open ground (see `step`) */
+  private built = false;
   /** how fast the feet came down in the last step, m/s, on the ground (walking down a slope is coming down it) */
   private sink = 0;
   /** the controller's settings as they were last given it: see `slopes` */
@@ -248,6 +250,8 @@ export class Player {
     this.handsBusy = false;
     this.slide.v = this.slide.side = this.slide.took = 0;
     this.spent = false;
+    // (set down somewhere, it is not known to stand on open ground until a step has shown what it stands on)
+    this.built = true;
   }
 
   /** Set down in the air by an admin: the landing that follows costs nothing. */
@@ -451,7 +455,11 @@ export class Player {
     const wish = new THREE.Vector3(str, 0, -fwd);
     const going = wish.lengthSq() > 0;
     if (going) wish.normalize().applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yaw);
-    const under = this.grounded ? this.openGround(this.pos.x, this.pos.z, this.pos.y) : null;
+    // (Open ground, and stood on: a body whose last step pressed down on anything that is not the land is on that,
+    // whatever lies under its middle. At the head of the bunker's stair there is a slot between the pad and the top
+    // step, and what is first under a body astride it is the side of the pit a metre down, at seventy degrees: by
+    // that alone it was "sliding" on a floor, and took two seconds to get onto the stair.)
+    const under = this.grounded && !this.built ? this.openGround(this.pos.x, this.pos.z, this.pos.y) : null;
     let on = under && under.rise >= STEEP ? under : null;
     // (At the foot of a steep face the ground under the middle of the body is still the gentle ground it is
     // leaving, and a round foot is already against the face: so the face a body is walking up into counts from
@@ -523,6 +531,8 @@ export class Player {
       // at that speed is. Left its pace along the slope, it went over gentler ground half as fast again as anybody runs.)
       this.jolted(slideJolt(-this.lastFallSpeed, this.slide.v, on.rise));
       this.slide.v = slideOn(this.slide.v, on.rise, h, low, GRAVITY);
+      // (where the ground rubs too hard to carry a body, dug in on a face only just too steep to walk, it can still push itself down it)
+      if (going && up < LEGS.letGo && this.slide.v < SLIDE.push) this.slide.v = Math.min(SLIDE.push, this.slide.v + 6 * h);
       this.slide.side += ((wish.x * ax + wish.z * az) * SLIDE.steer * (low ? SLIDE.low : 1) - this.slide.side) * (1 - Math.exp(-SLIDE.turn * h));
       this.vel.x = (on.x * this.slide.v) / run + ax * this.slide.side;
       this.vel.z = (on.z * this.slide.v) / run + az * this.slide.side;
@@ -654,6 +664,13 @@ export class Player {
       }
       mv = kept;
     }
+    // What the body pressed down on in this step, for the next: anything that is not the land itself (a floor, a
+    // stair, a rock, a roof), and it is not standing on open ground.
+    this.built = false;
+    for (let i = 0; i < this.kcc.numComputedCollisions() && !this.built; i++) {
+      const c = this.kcc.computedCollision(i);
+      this.built = !!c && !!c.collider && c.normal1.y > 0.3 && c.collider.shapeType() !== physics.R.ShapeType.HeightField;
+    }
     const t = this.body.translation();
     const next = { x: t.x + mv.x, y: t.y + mv.y, z: t.z + mv.z };
     this.body.setNextKinematicTranslation(next);
@@ -671,7 +688,7 @@ export class Player {
       const drop = Math.max(0, this.fallTop - feet), fall = Math.max(this.lastFallSpeed, -(Math.sqrt(2 * GRAVITY * drop) + 1));
       // Coming down on open ground too steep to stand on is not the end of a fall. The slope takes what came
       // square at it, by the same rule as any landing, and the rest goes on down it as a slide.
-      const face = this.openGround(next.x, next.z, feet);
+      const face = this.built ? null : this.openGround(next.x, next.z, feet);
       if (face && degOf(face.rise) >= SLOPE.scramble && -fall > SLIDE.begins) {
         const run = Math.hypot(1, face.rise), out = this.vel.x * face.x + this.vel.z * face.z;
         this.land(-Math.max(0, (-fall - out * face.rise) / run), drop);

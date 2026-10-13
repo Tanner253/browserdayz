@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ZONA: read your body</title>
+<!-- A card, 1600x900: the key to the status symbols. Its symbols are drawn by the game's own code, bundled first:
+       npx esbuild marketing/status-key.ts --bundle --format=iife --loader:.css=text --outfile=marketing/status-key.js
+       node scripts/card.mjs status-key
+     The figures beside them are the rules in src/ui/status.ts (stepOf, PACE, bloodShows) and src/sim/blood.ts.
+     If a figure there changes, this card is wrong. -->
+<style>
+  :root { --gold: #ffd35a; --ink: #f3efe6; --dim: #d8cfb8; --faint: rgba(243, 239, 230, 0.42); --dark: #0c0d0b; --line: rgba(243, 239, 230, 0.2); --red: #ff4d3a;
+    --ink-dim: rgba(233, 228, 216, 0.62); --mono: ui-monospace, monospace; --font: 'Bahnschrift', sans-serif; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1600px; height: 900px; overflow: hidden; background: var(--dark); }
+  body { position: relative; font-family: 'Bahnschrift', 'Arial Narrow', 'Segoe UI', sans-serif; font-stretch: condensed; color: var(--ink); text-transform: uppercase;
+    background: radial-gradient(1200px 520px at 50% 0%, #1d2419 0%, #0c0d0b 70%); }
+  .frame { position: absolute; inset: 14px; border: 2px solid var(--line); pointer-events: none; }
+  .logo { position: absolute; left: 48px; top: 36px; font-size: 58px; font-weight: 700; line-height: 0.9; letter-spacing: 0.16em; }
+  .logo small { display: block; margin-top: 9px; font-size: 13px; font-weight: 500; letter-spacing: 0.4em; color: var(--dim); }
+  .title { position: absolute; right: 48px; top: 34px; text-align: right; }
+  .title h1 { font-size: 64px; font-weight: 700; letter-spacing: 0.08em; line-height: 1; }
+  .title p { margin-top: 8px; font-size: 19px; font-weight: 500; letter-spacing: 0.22em; color: var(--dim); }
+  .title p b { color: var(--gold); font-weight: 600; }
+
+  /* the game's symbols, each alone and twice the size they are in its corner; nothing on a card moves */
+  .hud-vitals { position: static !important; display: inline-flex !important; opacity: 1 !important; zoom: 2; }
+  .st-stat, .st-badge, .st-stat > *, .st-badge > *, .st-arrow { animation: none !important; }
+  .st-stat, .st-badge { margin: 0 !important; }
+  [data-only="health"] .st-stat:not([data-stat="health"]), [data-only="blood"] .st-stat:not([data-stat="blood"]),
+  [data-only="food"] .st-stat:not([data-stat="food"]), [data-only="water"] .st-stat:not([data-stat="water"]),
+  [data-only="health"] .st-badge, [data-only="blood"] .st-badge, [data-only="food"] .st-badge, [data-only="water"] .st-badge,
+  [data-only^="b:"] .st-stat,
+  [data-only="b:bleed"] .st-badge:not([data-id="bleed"]), [data-only="b:leg"] .st-badge:not([data-id="leg"]),
+  [data-only="b:gas"] .st-badge:not([data-id="gas"]), [data-only="b:fire"] .st-badge:not([data-id="fire"]) { display: none !important; }
+
+  h2 { font-size: 15px; font-weight: 600; letter-spacing: 0.3em; color: var(--gold); }
+  #looks { position: absolute; left: 48px; top: 168px; width: 968px; height: 652px; display: grid; grid-template-columns: 104px repeat(5, 1fr); grid-template-rows: 38px repeat(4, minmax(0, 1fr)); gap: 8px; }
+  #looks .look { align-self: end; padding-bottom: 6px; text-align: center; font-size: 15px; font-weight: 600; letter-spacing: 0.24em; color: var(--gold); }
+  #looks .stat { align-self: center; font-size: 25px; font-weight: 700; letter-spacing: 0.1em; }
+  .cell { overflow: hidden; padding: 12px 8px 8px; background: rgba(18, 20, 16, 0.92); border: 1px solid var(--line); display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 8px; text-align: center; }
+  .cell p { font-size: 16.5px; font-weight: 500; letter-spacing: 0.03em; line-height: 1.18; color: var(--dim); }
+  .cell .hud-vitals { zoom: 1.7; }
+  .cell.none { grid-column: span 2; justify-content: center; padding: 14px 34px; font-size: 19px; font-weight: 500; letter-spacing: 0.06em; line-height: 1.3; color: var(--faint); border-style: dashed; }
+  /* (a symbol has an empty place beside it for its arrows: not here, where it stands alone over its words) */
+  .cell .st-stat { grid-template-columns: 32px !important; }
+  .cell .st-arrows { display: none !important; }
+
+  .side { position: absolute; left: 1040px; right: 48px; top: 168px; height: 652px; display: flex; flex-direction: column; }
+  .side h2 { margin: 12px 0 8px; }
+  .side h2 + div { display: grid; gap: 6px; }
+  .side .gap { height: 14px; }
+  .r { display: grid; grid-template-columns: 96px 1fr; align-items: center; min-height: 52px; padding: 0 12px 0 4px; background: rgba(18, 20, 16, 0.92); border: 1px solid var(--line); }
+  .r .hud-vitals { zoom: 1.45; justify-self: center; }
+  .r p { font-size: 17px; font-weight: 500; letter-spacing: 0.04em; line-height: 1.18; color: var(--dim); }
+  .r p b { display: block; font-size: 18.5px; font-weight: 700; letter-spacing: 0.08em; color: var(--ink); }
+  .foot { position: absolute; left: 48px; right: 48px; bottom: 36px; display: flex; justify-content: space-between; font-size: 17px; font-weight: 500; letter-spacing: 0.2em; color: var(--dim); }
+  .foot b { color: var(--gold); font-weight: 600; }
+</style>
+</head>
+<body>
+  <div class="frame"></div>
+  <div class="logo">ZONA<small>PvP survival shooter · play to earn</small></div>
+  <div class="title"><h1>Read your body</h1><p>Four symbols in the corner. <b>Colour</b> says how bad, <b>arrows</b> say how fast.</p></div>
+  <div id="looks"></div>
+  <div class="side">
+    <h2>Arrows beside a symbol</h2>
+    <div id="arrows"></div>
+    <div class="gap"></div>
+    <h2>Badges, there only while true</h2>
+    <div id="badges"></div>
+  </div>
+  <div class="foot"><span>13 Oct 2026 · zonapvp.fun</span><span>The numbers too, if you want them: <b>Settings · Status: exact figures</b></span></div>
+  <script src="status-key.js"></script>
+</body>
+</html>

@@ -119,12 +119,16 @@ export class Pace {
 /** how bad a wound is, by what it costs: 1 light (a limb), 2 heavy (the body), 3 severe (two in the body, or more) */
 export const bleedLevel = (rate: number): 1 | 2 | 3 => (rate >= PACE.blood.down[2] ? 3 : rate >= PACE.blood.down[1] ? 2 : 1);
 
+/** the share of the blood there is to lose under which its symbol is shown */
+export const BLOOD_SHOWN = 0.8;
+
 /**
- * Whether blood is shown at all. Only when it matters: while it is being lost, while a bag is running in, and for
- * as long as there is little enough of it to change anything (under 4500 the colour goes and health mends slower).
- * Full, or nearly, and steady, its icon is not there.
+ * Whether blood is shown at all: only with less than four fifths of what there is to lose (2026-10-13, the user:
+ * "we only need to show the blood icon when its below 80%"). That is 4500 ml, which is also where losing it begins
+ * to do anything: the colour starts to go out of the world there, and health mends slower. Above it there is
+ * nothing for the symbol to say, wound or no wound: an open wound has a badge of its own.
  */
-export const bloodShows = (blood: number, arrows: number, bleeding: boolean, drip: boolean) => bleeding || drip || arrows < 0 || blood < BLOOD.grey[0];
+export const bloodShows = (blood: number) => bloodLeft(blood) < BLOOD_SHOWN;
 
 /** a survivor, as far as their state goes */
 export interface Body {
@@ -224,7 +228,7 @@ export function reading(b: Body, rates: Record<Stat, number>): Reading {
     const v = value[stat], step = stepOf(stat, v), arrows = arrowsOf(stat, rates[stat]);
     return {
       stat,
-      shown: stat !== 'blood' || bloodShows(v, arrows, b.bleed > 0, b.drip),
+      shown: stat !== 'blood' || bloodShows(v),
       step,
       fill: fillOf(stat, v),
       arrows,

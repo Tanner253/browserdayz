@@ -244,8 +244,10 @@ export const TYPES: Record<string, TypeRule> = {
   // (The pouch between a stim and the kit: see items.ts. A soldier's own, so it lies where soldiers and constables
   // were before it lies in a clinic. Its places are taken out of the bandages' and the kit's: three bandages on the
   // second step, three bandages and two kits on the third, a kit under the gas and one down the bunker. No more
-  // lies on any step than lay there before.)
-  aid_pouch: { at: [0, 3, 5, 1, 1], lifetime: 3600, restock: 480, usage: ['Military', 'Police', 'Medic', 'Hospital'], favour: { Military: 6, Police: 4 } },
+  // lies on any step than lay there before. In Kamenka the police station and the army's posts are full of what
+  // only they keep, and five pouches laid there left the pistols' rounds no shelf in them on half the throws of
+  // the dice: there it lies in the hospital and the clinic before an army post, and in no police station.)
+  aid_pouch: { at: [0, 3, 5, 1, 1], lifetime: 3600, restock: 480, usage: ['Military', 'Police', 'Medic', 'Hospital'], favour: { Military: 6, Police: 4 }, on: { 3: { usage: ['Hospital', 'Medic', 'Military'], favour: { Hospital: 3, Medic: 3, Military: 2 } } } },
   // What gives blood back (2026-10-13; src/sim/blood.ts): saline in a clinic and the hospital, and with the army's
   // medics; blood in the hospital before anywhere, a bag or two in a clinic's fridge, and where the best of
   // everything is. (Under the gas every place is spoken for: a stim and a dressing there have made way for them.)
@@ -325,13 +327,13 @@ const UNSORTED = 4;
  * outskirts the bats and the crowbars came up a few short, which of them depending on the dice); and then what
  * each kind of building is FOR, so that a clinic's shelves hold dressings and an armoury's hold guns before
  * anything else that may lie there has taken them.
- * (2026-10-13: the travelling suitcase and the stash case with them. Each lies only on a floor, and the houses of the
- * outskirts have seventeen floors between them: on one throw of the dice in twenty, small things had taken them and
- * two of the three suitcases had nowhere to lie.)
+ * (2026-10-13: and last of these, the travelling suitcase and the stash case. Each lies only on a floor, and the
+ * houses of the outskirts have seventeen floors between them: on one throw of the dice in twenty, small things had
+ * taken them and two of the three suitcases had nowhere to lie.)
  */
 const FIRST = [
-  'gasmask', 'gasmask_white', 'gasmask_orange', 'benelli', 'mosin', 'ak', 'ar15', 'suppressor_12', 'suitcase', 'heavy_armor', 'life_vest', 'armor_vest', 'bat', 'crowbar', 'shovel', 'machete', 'hatchet', 'old_suitcase', 'stash_kit',
-  'mpa', 'colt', 'm9', 'mag_mpa', 'mag_colt', 'mag_m9', 'firstaid', 'aid_pouch', 'blood_bag', 'stim', 'stim_stamina', 'saline', 'bandage',
+  'gasmask', 'gasmask_white', 'gasmask_orange', 'benelli', 'mosin', 'ak', 'ar15', 'suppressor_12', 'suitcase', 'heavy_armor', 'life_vest', 'armor_vest', 'bat', 'crowbar', 'shovel', 'machete', 'hatchet',
+  'mpa', 'colt', 'm9', 'mag_mpa', 'mag_colt', 'mag_m9', 'firstaid', 'aid_pouch', 'blood_bag', 'stim', 'stim_stamina', 'saline', 'bandage', 'old_suitcase', 'stash_kit',
 ];
 
 

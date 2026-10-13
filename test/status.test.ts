@@ -146,19 +146,19 @@ ok('how fast a thing is changing is told from what it was a few seconds ago', ()
   assert.equal(p.note(40, 31), 0);
 });
 
-ok('blood is shown only when it matters', () => {
-  assert.equal(bloodShows(BLOOD.full, 0, false, false), false);
-  assert.equal(bloodShows(BLOOD.grey[0], 0, false, false), false);
-  // (coming back by itself, above where anything is changed by it: still not shown)
-  assert.equal(bloodShows(4700, 1, false, false), false);
-  assert.equal(bloodShows(BLOOD.grey[0] - 1, 0, false, false), true);
-  assert.equal(bloodShows(BLOOD.full, 0, true, false), true);
-  assert.equal(bloodShows(BLOOD.full, 0, false, true), true);
-  assert.equal(bloodShows(4900, -1, false, false), true);
+ok('blood is shown only under four fifths of what there is to lose', () => {
+  assert.equal(bloodShows(BLOOD.full), false);
+  // (four fifths is 4500 ml: where the colour begins to go)
+  assert.equal(bloodShows(BLOOD.grey[0]), false);
+  assert.equal(bloodShows(BLOOD.grey[0] - 1), true);
+  assert.equal(bloodShows(BLOOD.dead + 1), true);
   assert.equal(stat(read({}), 'blood').shown, false);
-  assert.equal(stat(read({ bleed: 3.6, blood: 4990 }), 'blood').shown, true);
+  // (a wound above that has its badge, and a bag running in above that has nothing to say: the symbol is not shown)
+  assert.equal(stat(read({ bleed: 3.6, blood: 4990 }), 'blood').shown, false);
+  assert.equal(read({ bleed: 3.6, blood: 4990 }).badges.some((b) => b.id === 'bleed'), true);
+  assert.equal(stat(read({ drip: true }), 'blood').shown, false);
   assert.equal(stat(read({ blood: 4200 }), 'blood').shown, true);
-  assert.equal(stat(read({ drip: true }), 'blood').shown, true);
+  assert.equal(stat(read({ drip: true, blood: 4200 }), 'blood').shown, true);
   for (const s of ['health', 'food', 'water'] as Stat[]) assert.equal(stat(read({}), s).shown, true);
 });
 

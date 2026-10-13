@@ -2049,17 +2049,10 @@ body.touch .hud-vitals .st-arrows { width: 14px; height: 38px; }
 body.touch .hud-vitals .st-badge { grid-template-columns: 34px; margin: 0 14px 0 5px; }
 body.touch .hud-vitals .st-badge .st-ico { width: 34px; height: 34px; }
 body.touch .hud-vitals .st-fig { font-size: 12px; }
-/* in the inventory: the same symbols, each with what it means in words */
-.st-panel { display: grid; gap: 5px; }
-.st-panel .st-stat, .st-panel .st-badge { grid-template-columns: 24px 11px 1fr auto; align-items: center; margin: 0; animation: none; }
-.st-panel .st-ico, .st-panel .st-badge .st-ico { width: 24px; height: 24px; }
-.st-panel .st-arrows { width: 10px; height: 24px; margin: 0; }
-.st-panel p { grid-column: 3; grid-row: 1; margin: 0; padding-left: 7px; font-size: 13.5px; line-height: 1.22; color: var(--ink-dim); }
-/* (and the number, where numbers are asked for, at the end of its line) */
-.st-panel .st-fig { grid-column: 4; grid-row: 1; margin: 0 0 0 12px; font-size: 11px; }
-/* (blood is counted in millilitres and a wound in millilitres a second: said here, where there is room to) */
-.st-panel [data-stat="blood"] .st-fig::after { content: ' ml'; }
-.st-panel [data-id="bleed"] .st-fig::after { content: ' ml/s'; }
+/* in the inventory: the same row as in the corner of the game, at the foot of what is carried, and nothing beside
+   it (what each means is said to a pointer resting on it, and in the changelog) */
+.st-panel { display: flex; align-items: flex-start; justify-content: flex-end; }
+.st-panel .st-stat, .st-panel .st-badge { animation: none; cursor: help; }
 /* what to do about a wound, over the hotbar: one line, with the key (the card's other half, how bad and how long, is the badge now) */
 .hud-bleed i { display: flex; }
 .hud-bleed .hb-drop, .hud-bleed.low .hb-cut { display: none; }

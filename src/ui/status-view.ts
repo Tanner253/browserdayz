@@ -1,5 +1,5 @@
-// The survivor's state, drawn: a row of symbols in the corner of the game, and the same symbols with a line of
-// words each in the inventory. What each is to look like is reckoned in src/ui/status.ts; this is the drawing, and
+// The survivor's state, drawn: a row of symbols in the corner of the game, and the same
+// row again in the inventory. What each is to look like is reckoned in src/ui/status.ts; this is the drawing, and
 // the keeping of the page in step with it. The looks themselves (the colours, the blink, the sizes) are at the end
 // of src/ui/hud.css.
 //
@@ -89,17 +89,16 @@ class StatMark {
   private level: SVGRectElement;
   private arrows: Element;
   private fig: HTMLElement;
-  private words: HTMLElement | null;
   private was = { shown: '', step: '', y: '', arrows: 0, figure: '', line: '' };
 
-  constructor(private stat: Stat, words: boolean) {
+  /** @param told what it means is said, in words, to a pointer that rests on it (where there is a pointer: the inventory) */
+  constructor(private stat: Stat, private told: boolean) {
     this.el.className = 'st-stat';
     this.el.dataset.stat = stat;
-    this.el.innerHTML = `${symbolSvg(stat, `st-c${++made}`)}<svg class="st-arrows" viewBox="0 0 12 32" aria-hidden="true"></svg><b class="st-fig"></b>${words ? '<p></p>' : ''}`;
+    this.el.innerHTML = `${symbolSvg(stat, `st-c${++made}`)}<svg class="st-arrows" viewBox="0 0 12 32" aria-hidden="true"></svg><b class="st-fig"></b>`;
     this.level = this.el.querySelector('rect') as SVGRectElement;
     this.arrows = this.el.querySelector('.st-arrows') as Element;
     this.fig = this.el.querySelector('.st-fig') as HTMLElement;
-    this.words = this.el.querySelector('p');
   }
 
   apply(v: StatView) {
@@ -118,7 +117,7 @@ class StatMark {
       this.el.dataset.going = v.arrows > 0 ? 'up' : v.arrows < 0 ? 'down' : '';
     }
     if (w.figure !== v.figure) this.fig.textContent = w.figure = v.figure;
-    if (this.words && w.line !== v.line) this.words.textContent = w.line = v.line;
+    if (this.told && w.line !== v.line) this.el.title = w.line = v.line;
   }
 }
 
@@ -126,15 +125,13 @@ class StatMark {
 class BadgeMark {
   readonly el = document.createElement('div');
   private fig: HTMLElement;
-  private words: HTMLElement | null;
   private was = '';
 
-  constructor(readonly id: BadgeId, words: boolean) {
+  constructor(readonly id: BadgeId, private told: boolean) {
     this.el.className = 'st-badge off';
     this.el.dataset.id = id;
-    this.el.innerHTML = `${badgeSvg(id)}<b class="st-fig"></b>${words ? '<p></p>' : ''}`;
+    this.el.innerHTML = `${badgeSvg(id)}<b class="st-fig"></b>`;
     this.fig = this.el.querySelector('.st-fig') as HTMLElement;
-    this.words = this.el.querySelector('p');
   }
 
   apply(v: BadgeView | undefined) {
@@ -147,7 +144,7 @@ class BadgeMark {
     this.el.dataset.lv = String(v.level);
     this.el.classList.toggle('blink', v.blink);
     this.fig.textContent = v.figure;
-    if (this.words) this.words.textContent = v.line;
+    if (this.told) this.el.title = v.line;
   }
 }
 
@@ -173,8 +170,11 @@ export function wantFigures(on: boolean) {
 
 /**
  * The two places a survivor's state is drawn, kept as one: the row in the corner of the game (made in `host`), and
- * `panel`, the same with a line of words to each, which the inventory puts in its Status column whenever it is
- * drawn. Both are brought up to date ten times a second of the game's time, which is as fast as anything they show
+ * `panel`, the same row again, which the inventory puts at the foot of what is carried whenever it is drawn (the
+ * game's corner is under that screen). The panel had a line of words beside every symbol at first, a key to them;
+ * the user, 2026-10-13: "i dont think we should have the status effect key in the tab menu it will clutter the
+ * users screen. we can add it to the changelog". So the words are said only to a pointer that rests on a symbol,
+ * and the key is in the changelog (marketing/status-key.html). Both are brought up to date ten times a second of the game's time, which is as fast as anything they show
  * can change its look.
  */
 export class StatusView {
@@ -190,16 +190,15 @@ export class StatusView {
     this.panel.className = 'st-panel';
     for (const [el, words] of [[host, false], [this.panel, true]] as [HTMLElement, boolean][]) {
       const badges = BADGE_ORDER.map((id) => new BadgeMark(id, words)), stats = STATS.map((s) => new StatMark(s, words));
-      // (In the corner the badges are one group and the four another: side by side, the badges to the left, or on
-      // a phone the badges under the four. In the inventory they are one list, the four first.)
+      // (The badges are one group and the four another: side by side, the badges to the left, or on a phone the
+      // badges under the four. The inventory has the same row.)
       const group = (cls: string, marks: (StatMark | BadgeMark)[]) => {
         const g = document.createElement('div');
         g.className = cls;
         g.append(...marks.map((m) => m.el));
         return g;
       };
-      if (words) el.append(...[...stats, ...badges].map((m) => m.el));
-      else el.append(group('st-badges', badges), group('st-stats', stats));
+      el.append(group('st-badges', badges), group('st-stats', stats));
       this.drawn.push({ stats, badges });
     }
     this.figures = figuresWanted();

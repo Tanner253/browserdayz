@@ -190,12 +190,13 @@ export function paceUp(rise: number): number {
  *   steer      – how fast it can be worked sideways across the face, metres a second; turn – how quickly, a second
  *   begins     – going downhill this fast over the ground on a scramble, the feet have gone: it is a slide
  *   stops      – slower than this on ground that could be stood on, it is over
+ *   push       – the pace a body can push itself down a face at where the ground rubs too hard to carry it, m/s
  *   absorb     – how much of a fall a body takes up every second without being hurt by it, metres a second: jolts
  *                that come one on another faster than that add up to one blow, so a cliff that meets a floor by
  *                way of two short banks is not three harmless bumps, and ground that eases over a long run-out
  *                costs nothing however fast the slide came onto it
  */
-export const SLIDE = { grip: 0.62, dug: 1.25, level: 6, most: 16, low: 0.55, ease: 3, steer: 2.5, turn: 4, begins: 1.6, stops: 0.6, absorb: 10 };
+export const SLIDE = { grip: 0.62, dug: 1.25, level: 6, most: 16, low: 0.55, ease: 3, steer: 2.5, turn: 4, begins: 1.6, stops: 0.6, push: 1.2, absorb: 10 };
 
 /** The fastest a slide goes on ground so steep, metres a second along the slope: `level` over the ground, and never more than `most`. */
 export function slideTop(rise: number, low = false): number {

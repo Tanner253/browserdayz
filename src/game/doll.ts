@@ -241,7 +241,7 @@ export class Doll {
       this.repaint();
       this.scene.add(this.body.root);
       this.stand(0.05);
-      await this.warm([this.body.root, this.ground]);
+      await this.warm([this.body.root, this.ground], true);
       // (and the passes that lay its picture onto the game's, each written for what it is drawn into)
       const R = this.r.renderer, prev = R.getRenderTarget(), flat = new Set<ReturnType<typeof programsOf>[number]>();
       for (const [p, into] of [[this.blur, this.soft[0]], [this.lay, null]] as const) {
@@ -325,8 +325,9 @@ export class Doll {
    * sees it (see Renderer.ready, which does as much for what comes into the world, and why each is needed).
    * What is painted with nothing new (a thing worn or held before, or made of what such a thing is made of) has
    * nothing to be got ready: it is passed over without a frame's wait, and the figure has it on the next frame.
+   * @param whole what of these is out of sight is got ready as well (the body's own pieces that are there only when what they are is worn)
    */
-  private async warm(parts: THREE.Object3D[]) {
+  private async warm(parts: THREE.Object3D[], whole = false) {
     const paints = (o: THREE.Object3D) => {
       const all: THREE.Material[] = [];
       o.traverse((c) => {
@@ -357,9 +358,33 @@ export class Doll {
       p.getUniforms();
       p.getAttributes();
     }
-    for (const o of parts) await this.r.send(o);
-    await this.prime(parts);
+    for (const o of parts) await this.send(o, whole);
+    await this.prime(parts, whole);
     for (const o of parts) for (const m of paints(o)) this.met.add(m);
+  }
+
+  /**
+   * The pictures of what is to be seen of a thing are put on the card, one to a frame's spare time: those that are
+   * not there. (Not the pictures of what is put away on it: a gun has hung on it every part that can be fitted to
+   * it, and the sight that is not on it is not sent for the figure's sake.)
+   */
+  private async send(o: THREE.Object3D, whole = false) {
+    const R = this.r.renderer, pictures = new Set<THREE.Texture>();
+    const look = (c: THREE.Object3D) => {
+      const m = (c as THREE.Mesh).material as Painted | Painted[] | undefined;
+      for (const mat of m ? (Array.isArray(m) ? m : [m]) : []) {
+        for (const k of MAPS) {
+          const t = mat[k];
+          if (t && t.image && !t.isRenderTargetTexture && !R.properties.has(t)) pictures.add(t);
+        }
+      }
+    };
+    if (whole) o.traverse(look);
+    else o.traverseVisible(look);
+    for (const t of pictures) {
+      await breathe();
+      R.initTexture(t);
+    }
   }
 
   /**
@@ -369,18 +394,25 @@ export class Doll {
    * measured). Left to the first frame the figure was shown in, that frame was a second long: timed, 979 ms the
    * first time the inventory was opened, and 70 the first time a pistol was taken into the figure's hands.
    */
-  private async prime(parts: THREE.Object3D[]) {
+  private async prime(parts: THREE.Object3D[], whole = false) {
     const R = this.r.renderer;
     for (const part of parts) {
-      const seen: THREE.Mesh[] = [];
-      part.traverseVisible((o) => {
-        if ((o as THREE.Mesh).isMesh) seen.push(o as THREE.Mesh);
-      });
-      for (const m of seen) {
+      const pieces: THREE.Mesh[] = [];
+      const take = (o: THREE.Object3D) => {
+        if ((o as THREE.Mesh).isMesh) pieces.push(o as THREE.Mesh);
+      };
+      if (whole) part.traverse(take);
+      else part.traverseVisible(take);
+      for (const m of pieces) {
         await breathe();
-        // (what is not on the figure yet is stood in the room for the drawing, and taken out again)
+        // (what is not on the figure yet is stood in the room for the drawing, and taken out again; what is out of sight is shown for it, with all it hangs from)
+        const hidden: THREE.Object3D[] = [];
         let top: THREE.Object3D = m;
-        while (top.parent) top = top.parent;
+        for (let o: THREE.Object3D | null = m; o; o = o.parent) {
+          if (!o.visible) hidden.push(o);
+          top = o;
+        }
+        for (const o of hidden) o.visible = true;
         if (top !== this.scene) this.scene.add(top);
         const layers = m.layers.mask, culled = m.frustumCulled, lens = this.camera.layers.mask;
         m.layers.enable(AHEAD);
@@ -397,6 +429,7 @@ export class Doll {
           m.layers.mask = layers;
           m.frustumCulled = culled;
           if (top !== this.scene) this.scene.remove(top);
+          for (const o of hidden) o.visible = false;
         }
       }
     }

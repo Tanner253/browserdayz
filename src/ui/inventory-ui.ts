@@ -235,7 +235,7 @@ export class InventoryUI {
    * (It was the weight at which a load began to slow them, shown beside what was carried: the figure is no longer read.)
    */
   carryLimit: number | null = null;
-  /** the survivor's state, a symbol and a line of words to each: the HUD's element (HUD.statusPanel), shown in the Status column */
+  /** the survivor's state, the row of symbols the game has in its corner: the HUD's element (HUD.statusPanel), shown at the foot of what is carried */
   status: HTMLElement | null = null;
 
   constructor(private inv: PlayerInventory, private actions: InvActions) {
@@ -926,13 +926,13 @@ export class InventoryUI {
     // (The inspector stood under all the grids, and with a pack on it was scrolled out of sight. It, and the body's
     // state under it, are fixed at the foot of this side now: only the grids over them scroll.)
     cargo.appendChild(this.inspector());
-    // (The body's state is the symbols the game has in its corner, each with what it means in words. They were four
-    // bars, drawn when this was and stale until it was drawn again; this is one element of the HUD's own, which the
-    // HUD keeps up to date while this screen is open, and it is put here each time this is drawn.)
+    // (The body's state is the row of symbols the game has in its corner, which this screen covers: the same row,
+    // and no key to it beside it. They were four bars, drawn when this was and stale until it was drawn again; this
+    // is one element of the HUD's own, which the HUD keeps up to date while this screen is open, and it is put here
+    // each time this is drawn.)
     if (this.vitals && this.status) {
       const box = document.createElement('div');
       box.className = 'inv-status';
-      box.innerHTML = '<h3>Status</h3>';
       box.appendChild(this.status);
       cargo.appendChild(box);
     }

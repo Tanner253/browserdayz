@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { physics, SOLID_GROUPS, type Surface } from '../core/physics';
 import type { Atmosphere } from '../world/atmosphere';
+import { Flames, type Fire } from './flames';
 import { MuzzleFlash, muzzleArt } from './muzzle';
 
 const MAX_P = 600;
@@ -237,7 +238,27 @@ interface Particle {
   cell: number;
   rot: number;
   spin: number;
+  /** seconds it takes to come to its full strength (0: it is there at once). Smoke that gathers over a fire is not a puff that appears */
+  soft: number;
 }
+
+/**
+ * The wind a fire's smoke leans with (the signal smoke leans the same way), metres a second, and how far a
+ * flame a metre high is pushed over by it.
+ */
+const WIND = { x: 0.45, z: 0.28, lean: 0.14 };
+/**
+ * A campfire's smoke. `from`: how high over the foot of the fire the column gathers, metres: over the tops of
+ * the flames, where the wisps that rise through them thin out (the column and they are one smoke: it began at
+ * the tops of the logs, as round grey puffs in among the flames). `soft`: seconds a puff takes to be seen.
+ */
+const COLUMN = { from: 1.25, soft: 1.6 };
+/**
+ * A car on fire. `engine`: how big its flames are while it is alight and not yet gone up (1 is a campfire's),
+ * and `wreck`: after it has. `full`, `burns`: a wreck burns at its fiercest for this many seconds after it
+ * blows, and is down to smoke by this many.
+ */
+const CAR = { engine: 1.25, wreck: 2.1, full: 14, burns: 55 };
 
 const SURF_DUST: Partial<Record<Surface | 'dirt' | 'gravel', number>> = {
   grass: 0x6f6448, dirt: 0x6a5a44, gravel: 0x8a8070, rock: 0x8d877c, concrete: 0xa09a90, plaster: 0xb8b0a0,
@@ -266,13 +287,16 @@ export class Effects {
   /** the flames at other people's muzzles: a few, used in turn */
   private flames: MuzzleFlash[] = [];
   private flame = 0;
+  /** whatever is on fire: a campfire, a car (and whatever else is given flames: see Flames) */
+  readonly fire: Flames;
   private _m = new THREE.Matrix4();
   private _q = new THREE.Quaternion();
   private _s = new THREE.Vector3();
 
   constructor(scene: THREE.Scene, atmo: Atmosphere) {
+    this.fire = new Flames(scene, atmo);
     for (let i = 0; i < MAX_P; i++) {
-      this.particles.push({ alive: false, p: new THREE.Vector3(), v: new THREE.Vector3(), life: 0, max: 1, size: 1, grow: 0, color: new THREE.Color(), alpha: 1, gravity: 0, drag: 0, additive: false, cell: 3, rot: 0, spin: 0 });
+      this.particles.push({ alive: false, p: new THREE.Vector3(), v: new THREE.Vector3(), life: 0, max: 1, size: 1, grow: 0, color: new THREE.Color(), alpha: 1, gravity: 0, drag: 0, additive: false, cell: 3, rot: 0, spin: 0, soft: 0 });
     }
     const quad = new THREE.PlaneGeometry(1, 1);
     // What everything is drawn with until the sheet of puffs has come (and for good, if it never does): the
@@ -420,6 +444,7 @@ export class Effects {
     pt.gravity = o.gravity ?? 0;
     pt.drag = o.drag ?? 1;
     pt.additive = o.additive ?? false;
+    pt.soft = o.soft ?? 0;
     // What swells as it goes is smoke or dust, and is drawn as a puff, each its own and turned its own way; what
     // does not (a spark, a chip of stone, a drop) is a dot. A light that swells (a flash) is a dot as well.
     const puff = pt.grow > 0 && !pt.additive;
@@ -809,6 +834,7 @@ export class Effects {
   }
 
   update(dt: number) {
+    this.fire.update(dt, this.eye);
     for (const f of this.flames) f.update(dt);
     if (this.flashT > 0) {
       this.flashT -= dt;
@@ -836,7 +862,7 @@ export class Effects {
       const k = pt.life / pt.max;
       const size = pt.size + pt.grow * (1 - k);
       this._m.makeScale(size, size, size).setPosition(pt.p);
-      const fade = Math.min(1, k * 2.5) * pt.alpha;
+      const fade = Math.min(1, k * 2.5) * pt.alpha * (pt.soft > 0 ? Math.min(1, (pt.max - pt.life) / pt.soft) : 1);
       if (pt.additive) {
         this.addMesh.setMatrixAt(na, this._m);
         cb[na * 4] = pt.color.r; cb[na * 4 + 1] = pt.color.g; cb[na * 4 + 2] = pt.color.b; cb[na * 4 + 3] = fade;
