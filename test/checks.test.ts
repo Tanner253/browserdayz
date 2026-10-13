@@ -197,17 +197,20 @@ await withServer('enforce', async (log) => {
     tia.say(k * 0.74, -80);
     await sleep(100);
   }
-  await sleep(4000);
-  for (let k = 11; k <= 50; k++) tia.say(k * 0.74, -80);
-  for (let k = 51; k <= 60; k++) {
+  // (TEN seconds, and everything her game said in them let go at once: a hundred steps of a sprint. With two seconds
+  // saved and thirty metres owed she was refused from the sixty-sixth on, fifty times, and put off the server.)
+  await sleep(10000);
+  for (let k = 11; k <= 110; k++) tia.say(k * 0.74, -80);
+  for (let k = 111; k <= 130; k++) {
     tia.say(k * 0.74, -80);
     sam.say(4, -40);
     await sleep(100);
   }
   await sleep(300);
-  assert.ok(!/\[check:enforce\] Tia/.test(log()), `a check fired on a line that was held up:\n${log().split('\n').filter((l) => l.includes('Tia')).join('\n')}`);
+  assert.ok(!/\[check:enforce\] Tia/.test(log()) && !/Tia is put off/.test(log()), `a check fired on a line that was held up:\n${log().split('\n').filter((l) => l.includes('Tia')).join('\n')}`);
+  assert.ok(!tia.kicked && !tia.shut, 'somebody whose line was held up for ten seconds was put off the server');
   const there = sam.sees(tia.id);
-  assert.ok(there && Math.abs(there[0] - 44.4) < 1, `Sam sees Tia at ${there}, and she ran to 44.4`);
+  assert.ok(there && Math.abs(there[0] - 96.2) < 1.5, `Sam sees Tia at ${there}, and she ran to 96.2`);
   for (const p of [rex, sam, tia]) p.ws.close();
   checks++;
   console.log('  ok  a little too fast every time is refused once it adds up; a line held up and let go at once is believed');

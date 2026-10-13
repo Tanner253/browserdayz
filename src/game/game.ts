@@ -363,7 +363,8 @@ export class Game {
     r.lighting = { lit: () => this.lamps.pool.visible, as: (lit) => this.lamps.as(lit) };
     this.bunker = new BunkerSite(world, atmo, r.scene, this.s.terrain.lid);
     // (the fort: stood where the map says, on the ground as the map has it; the earth round its hatch is drawn as the ground is)
-    if (world.castle) this.castle = new CastleSite(world.castle, atmo, r.scene, { ground: (x, z) => heightAt(world.surface, x, z), earth: this.s.terrain.lid ?? undefined });
+    // (and what it draws is got ready before it is shown, as the bunker's is: a dozen kinds of surface made in the frame it first came into sight stood the game still on the way up to it)
+    if (world.castle) this.castle = new CastleSite(world.castle, atmo, r.scene, { ground: (x, z) => heightAt(world.surface, x, z), earth: this.s.terrain.lid ?? undefined, ready: (o) => r.ready(o) });
     // Its door is loud: heard by everybody on the map, wherever they are, and from where it is. (It was heard
     // within two hundred and seventy metres and by nobody else.) Far off it is as late and as dull as a far
     // sound is, and is brought no nearer to the ear than a hundred and ten metres along the line to it: the

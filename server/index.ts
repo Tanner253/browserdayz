@@ -531,7 +531,8 @@ const CHECKS = (['off', 'watch', 'enforce'].includes(process.env.CHECKS ?? '') ?
 /**
  *   foot  – the fastest anybody is let go on their own legs, m/s along the ground (a sprint with empty hands is 7.4)
  *   seat  – and in a jeep (which is held to 60: see isVState)
- *   carry – seconds of going that fast that may be saved up: what a connection that was held up sends all at once
+ *   carry – seconds of going that fast that may be saved up, by anybody, at any time
+ *   lag   – and how many more are saved out of a SILENCE (a line held up), good for `lagFor` ms after it ends: what that line then sends all at once
  *   grace – metres let go on top of that at any one time, and
  *   owe   – the most of it that may be owed at once: what is let go is paid back out of time left over, before any is saved
  *   free  – ms after being set down somewhere (a start, a seat taken or left) in which where they are is not questioned
@@ -544,7 +545,7 @@ const CHECKS = (['off', 'watch', 'enforce'].includes(process.env.CHECKS ?? '') ?
  *   down  – how many ms they are given to say so themselves, as every honest game does
  *   strikes, ban – put off the server so many times inside an hour, and they are kept off it for so many hours
  */
-const CHECK = { foot: 9.5, seat: 64, carry: 2, grace: 3, owe: 30, free: 2500, kick: Number(process.env.CHECK_KICK) || 12, hill: 1.5, high: [30, 4], reach: 8, heal: 10, over: 15, down: 1500, strikes: 2, ban: 6 };
+const CHECK = { foot: 9.5, seat: 64, carry: 2, lag: 12, lagFor: 5000, grace: 3, owe: 30, free: 2500, kick: Number(process.env.CHECK_KICK) || 12, hill: 1.5, high: [30, 4], reach: 8, heal: 10, over: 15, down: 1500, strikes: 2, ban: 6 };
 let flagged = 0;
 
 /** Something a check fires on: counted, and written down (not more than once in five seconds for one player). @returns whether it is refused */
@@ -585,13 +586,19 @@ function moveCheck(c: Client, to: Pose, now: number): boolean {
   const k = c.check;
   if (CHECKS === 'off' || !c.alive || now < k.free || c.power.clip || roleOf(c) === 'admin') {
     k.at = now;
+    k.heard = now;
     k.carry = 0;
+    k.lag = 0;
     k.owed = 0;
     k.high = 0;
     return true;
   }
+  // (how long nothing had been heard from them before this, and what is still good of a silence just ended)
+  const silent = (now - k.heard) / 1000;
+  k.heard = now;
+  if (now > k.lagTill) k.lag = 0;
   const dt = Math.min(600, Math.max(0, (now - k.at) / 1000)), most = c.seatAt ? CHECK.seat : CHECK.foot;
-  const dist = Math.hypot(to[0] - c.pose[0], to[2] - c.pose[2]), allow = most * dt + k.carry;
+  const dist = Math.hypot(to[0] - c.pose[0], to[2] - c.pose[2]), allow = most * dt + k.carry + k.lag;
   // (in the air: written down and never refused. There are towers and roofs, and there is falling off things.)
   // (Over what there is to stand on, which on a bridge is its deck and not the ground far under it: `standAt`.)
   k.high = !c.seatAt && to[1] - world.standAt(to[0], to[1], to[2]) > CHECK.high[0] ? k.high + Math.min(dt, 1) : 0;
@@ -611,24 +618,62 @@ function moveCheck(c: Client, to: Pose, now: number): boolean {
   // saved. It used to be let go every time and forgotten: anybody could go a little too fast for ever, and at
   // fifteen positions a second "a little" came to 45 m/s on top of a sprint; 11 m/s held for eighteen seconds was
   // not written down once (found 2026-10-13, measuring the slides). Owing `owe`, nothing more is let go until
-  // some is paid. Thirty metres is what a line held up for six seconds and let go all at once would owe at a
-  // dead sprint, past the two seconds it has saved: an honest game owes nothing like it.)
+  // some is paid.
+  //
+  // A LINE THAT IS HELD UP is not a cheat, and is not to be taken for one. A game says where it is fifteen times a
+  // second whatever its line does, so a line held up for ten seconds lets go a hundred and fifty steps at once,
+  // each the half metre of a run. With two seconds saved and thirty metres owed, forty-nine metres of that were
+  // believed and every step after it refused and counted: fifty counts, and an honest runner was put off the
+  // server, twice in the hour for six hours (found by an independent reading, with the real server, the same day
+  // the debt went in, before it was ever live). So what legs cover in a SILENCE is saved, up to twelve seconds of
+  // it (`lag`), and is good for the few seconds after the silence ends in which the burst comes; in one step as
+  // readily as in a hundred and fifty (of a burst that long this server takes the first messages and lets the
+  // rest fall, so what comes next is one step of twenty metres and more: a rule that no single message moves
+  // anybody further than two seconds' worth put the same runner off, was tried for an hour, and was taken out).
+  // It is saved out of silence and nothing else: saved by anybody at any time, twelve seconds would let whoever
+  // walks blink a hundred metres every half minute, and the recorded slide with a jump of 37 m in it went by.
+  // And whoever is refused only for being a little ahead of their legs, a step at a time, is held where they
+  // were and written down, and NOT counted toward being put off: over a long enough silence that is a bad line,
+  // and held back is all a cheat need be.
   const short = dist - allow;
   if (short <= CHECK.grace && (short <= 0 || k.owed + short <= CHECK.owe)) {
     k.at = now;
     if (short > 0) {
       k.owed += short;
       k.carry = 0;
+      k.lag = 0;
     } else {
       const back = Math.min(k.owed, -short);
       k.owed -= back;
-      k.carry = Math.min(most * CHECK.carry, -short - back);
+      const left = -short - back;
+      k.carry = Math.min(most * CHECK.carry, left);
+      // (what is over, out of a silence: kept for the burst that follows it, never added to by anything else)
+      if (silent > 1) {
+        k.lag = Math.min(most * CHECK.lag, left - k.carry);
+        k.lagTill = now + CHECK.lagFor;
+      } else k.lag = Math.min(k.lag, left - k.carry);
     }
     return true;
   }
-  if (!flag(c, `moved ${dist.toFixed(0)} m in ${dt.toFixed(2)} s ${c.seatAt ? 'in a jeep' : 'on foot'}, to ${to[0].toFixed(0)}, ${to[2].toFixed(0)}${short <= CHECK.grace ? `, ${k.owed.toFixed(0)} m ahead of their legs already` : ''}`)) {
+  const ahead = short <= CHECK.grace;
+  const what = `moved ${dist.toFixed(0)} m in ${dt.toFixed(2)} s ${c.seatAt ? 'in a jeep' : 'on foot'}, to ${to[0].toFixed(0)}, ${to[2].toFixed(0)}${ahead ? `, ${k.owed.toFixed(0)} m ahead of their legs already` : ''}`;
+  if (ahead) {
+    // (written down, no oftener than anything else is, and counted nowhere)
+    if (now - k.said > 5000 && roleOf(c) !== 'admin') {
+      k.said = now;
+      log(`[check:${CHECKS}] ${c.name} ${what} (held, not counted)`);
+    }
+    if (CHECKS === 'enforce') return false;
     k.at = now;
     k.carry = 0;
+    k.lag = 0;
+    k.owed = 0;
+    return true;
+  }
+  if (!flag(c, what)) {
+    k.at = now;
+    k.carry = 0;
+    k.lag = 0;
     k.owed = 0;
     return true;
   }
@@ -1705,6 +1750,7 @@ function place(t: Client, x: number, y: number | null, z: number, by: Client) {
   t.check.free = now + CHECK.free;
   t.check.at = now;
   t.check.carry = 0;
+  t.check.lag = 0;
   t.check.owed = 0;
   t.underAt = 0;
   send(t, { t: 'put', x, ...(y === null ? {} : { y }), z, ...(by === t ? {} : { by: by.name }) });
@@ -2653,6 +2699,8 @@ interface Client {
     at: number; carry: number; free: number; high: number; hovered: number; flags: number; said: number; refused: number[];
     /** metres the grace has let them go ahead of their legs, not yet paid back: see moveCheck */
     owed: number;
+    /** when they were last heard from at all; and what is saved out of a silence, good until `lagTill`: see moveCheck */
+    heard: number; lag: number; lagTill: number;
     /** how they have been going about lately: see gaitCheck */
     gait?: { since: number; yaw: number; pitch: number; far: number; turns: number; dx: number; dz: number };
     /** the most health they can have (see `dealt`), when that was reckoned, and since when it has been less than none (0: it is not) */
@@ -3737,7 +3785,7 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
     heardAt: Date.now(), kept: false, asleep: 0, bled: 0, logoutAt: 0, logoutFrom: [0, 0],
     since: Date.now(), spoke: false, resumed: !!resume,
     inv: resume?.inv ?? null, vitals: resume?.vitals ?? null,
-    outAt: 0, underAt: 0, lastHit: 0, lastVHit: 0, seatAt: 0, lastNade: 0, nadeHits: 0, blasts: [], lastEmote: 0, lastChat: 0, lastHitBy: null, openCid: null, check: { at: Date.now(), carry: 0, owed: 0, free: Date.now() + CHECK.free, high: 0, hovered: 0, flags: 0, said: 0, refused: [], hp: Math.min(100, resume?.vitals?.health ?? 100), hpAt: Date.now(), downAt: 0, unknown: new Set() }, activeAt: Date.now(), joinedAt: Date.now(), ip: ipOf.get(ws) ?? '', lifeAt: Date.now(), msgCount: 0, msgWindow: Date.now(),
+    outAt: 0, underAt: 0, lastHit: 0, lastVHit: 0, seatAt: 0, lastNade: 0, nadeHits: 0, blasts: [], lastEmote: 0, lastChat: 0, lastHitBy: null, openCid: null, check: { at: Date.now(), carry: 0, owed: 0, heard: Date.now(), lag: 0, lagTill: 0, free: Date.now() + CHECK.free, high: 0, hovered: 0, flags: 0, said: 0, refused: [], hp: Math.min(100, resume?.vitals?.health ?? 100), hpAt: Date.now(), downAt: 0, unknown: new Set() }, activeAt: Date.now(), joinedAt: Date.now(), ip: ipOf.get(ws) ?? '', lifeAt: Date.now(), msgCount: 0, msgWindow: Date.now(),
   };
   records.delete(key);
   KEPT.chars.delete(keyHash(key));
