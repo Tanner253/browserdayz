@@ -15,12 +15,16 @@
 // comes back faster by the same measure, so a loaded man who has run his shorter run is ready to run it again as
 // soon as a bare man is ready to run his: which is what DayZ's shorter bar does, being the sooner full.
 //
-// Two figures are ZONA's own, and both are kinder than DayZ at the heavy end. The user, 2026-10-13, of the first
-// figures tried (a fifth at the least, the legs slowed from 52 kg): "i think the sprint skew is too dramatic near
-// the top end. a player with no items is so fast they can easily catch up to a person fully geared."
-//  - The least a full breath is ever worth is HALF a bare one, not DayZ's twentieth. Nobody who has geared up is
-//    run down by a man with nothing merely because he has nothing: the geared man runs half as far, not a fifth.
-//  - Only a load far past anything a fighter carries slows the legs: from `slowsFrom`, a hundredth of the pace a
+// The shape is DayZ's and the figures are ZONA's own, every one of them kinder. The user tried DayZ's (six
+// kilograms free, 1.75% a kilogram) with a floor of a fifth, then of a half, and said each time that it was too
+// much, 2026-10-13: "i think the sprint skew is too dramatic near the top end. a player with no items is so fast
+// they can easily catch up to a person fully geared", and then "i think our weight and sprint penalty is a bit to
+// harsh". So:
+//  - eight kilograms are free, not six: a pistol, a day pack and a day's food and water cost nothing;
+//  - a kilogram past that takes 1.25% of a breath, not 1.75%;
+//  - the least a full breath is ever worth is 65% of a bare one, not DayZ's twentieth: somebody kitted to fight
+//    runs two thirds as far as somebody with nothing, and is not run down merely for having geared up;
+//  - only a load far past anything a fighter carries slows the legs: from `slowsFrom`, a hundredth of the pace a
 //    kilogram, and never below seven tenths of it. DayZ has no such rule, since its packs hold what they hold.
 //    Here a stash case goes into a rucksack with forty-eight places of its own inside it, and without this there
 //    would be no end to what one back could carry for nothing.
@@ -29,12 +33,12 @@
 // a run alike, down to 55%. A rifleman in plates jogged a tenth slower than a new arrival and sprinted as long.)
 
 export const LOAD = {
-  /** kilograms carried for nothing: the clothes stood in, a pistol, a day's food and water */
-  free: 6,
+  /** kilograms carried for nothing: the clothes stood in, a pistol, a day pack, a day's food and water */
+  free: 8,
   /** what each kilogram past that takes off how far a full breath runs, as a share of it */
-  perKg: 0.0175,
+  perKg: 0.0125,
   /** and the least of it that is ever left */
-  least: 0.5,
+  least: 0.65,
   /** the weight from which the legs slow as well: more than a rifleman's whole kit and a second rifle */
   slowsFrom: 60,
   /** what each kilogram past that takes off the pace, as a share of it */
@@ -43,7 +47,7 @@ export const LOAD = {
   slowest: 0.7,
 };
 
-/** the weight at which a breath is worth its least: 34.6 kg as the figures stand */
+/** the weight at which a breath is worth its least: 36 kg as the figures stand */
 export const heavy = () => LOAD.free + (1 - LOAD.least) / LOAD.perKg;
 
 /** kilograms past a mark: none under it, and none for a weight that is no number */
@@ -54,7 +58,7 @@ export function breathOf(kg: number): number {
   return Math.max(LOAD.least, 1 - over(kg, LOAD.free) * LOAD.perKg);
 }
 
-/** How many times the breath a second of running takes under this load, and how many times as fast it comes back: 1 bare, 2 at the most. */
+/** How many times the breath a second of running takes under this load, and how many times as fast it comes back: 1 bare, a little over one and a half at the most. */
 export function runCost(kg: number): number {
   return 1 / breathOf(kg);
 }

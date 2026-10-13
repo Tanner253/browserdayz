@@ -652,6 +652,9 @@ export class Garage {
     if (inside) this.out(false);
     j.seats = Array(SEATS).fill(null);
     this.char(j);
+    // (seen to go up, its wreck burns on for a while: one found already burned out is cold)
+    const x = this.extra.get(j);
+    if (x) this.h.effects.wrecked(x.smoke);
     this.h.boom(j.point(0, 0.3, -0.4, new THREE.Vector3()), mine);
     if (!this.h.online()) {
       if (inside) this.h.hurt(400, `a burning ${CALLED[j.kind]}`);
@@ -736,8 +739,8 @@ export class Garage {
       for (const m of x.lamps) m.emissiveIntensity = lit ? LAMPS : 0;
     }
     const left = j.hp / JEEP.hp;
-    if (!j.wreck && left < JEEP.smokeAt) fx.engineSmoke(j.point(...ENGINE_AT[j.kind], _a), x.smoke, dt, left < JEEP.fireAt, 1 - left / JEEP.smokeAt);
-    else if (j.wreck) fx.engineSmoke(j.point(0, 0.6, -0.4, _a), x.smoke, dt * 0.5, false, 0.6);
+    if (!j.wreck && left < JEEP.smokeAt) fx.engineSmoke(j.point(...ENGINE_AT[j.kind], _a), x.smoke, dt, left < JEEP.fireAt, 1 - left / JEEP.smokeAt, j.quat, j.vel);
+    else if (j.wreck) fx.engineSmoke(j.point(0, 0.6, -0.4, _a), x.smoke, dt * 0.5, false, 0.6, j.quat);
     // what the rear wheels throw up, off the road
     const fast = Math.abs(j.speed);
     if (j.grounded >= 2 && (fast > 5 || j.slide > 0.25) && j.ground !== 'rock') {

@@ -664,13 +664,17 @@ export class Player {
       }
       mv = kept;
     }
-    // What the body pressed down on in this step, for the next: anything that is not the land itself (a floor, a
-    // stair, a rock, a roof), and it is not standing on open ground.
-    this.built = false;
-    for (let i = 0; i < this.kcc.numComputedCollisions() && !this.built; i++) {
+    // What the body pressed down on in this step, for the next. On the land and on nothing else, it stands on
+    // open ground; on anything that is not the land itself (a floor, a stair, a rock, a roof), it does not; and a
+    // step that pressed on nothing at all leaves that as it was.
+    let land = false, other = false;
+    for (let i = 0; i < this.kcc.numComputedCollisions(); i++) {
       const c = this.kcc.computedCollision(i);
-      this.built = !!c && !!c.collider && c.normal1.y > 0.3 && c.collider.shapeType() !== physics.R.ShapeType.HeightField;
+      if (!c?.collider || c.normal1.y <= 0.1) continue;
+      if (c.collider.shapeType() === physics.R.ShapeType.HeightField) land = true;
+      else if (c.normal1.y > 0.3) other = true;
     }
+    if (land || other) this.built = other;
     const t = this.body.translation();
     const next = { x: t.x + mv.x, y: t.y + mv.y, z: t.z + mv.z };
     this.body.setNextKinematicTranslation(next);

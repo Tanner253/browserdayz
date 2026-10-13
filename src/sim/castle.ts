@@ -49,8 +49,8 @@ export const CASTLE = {
 };
 
 export type V3 = [number, number, number];
-/** what a part is made of: rubble limestone, the keep's squared blocks, paving, old timber, iron, living rock */
-export type Paint = 'stone' | 'ashlar' | 'paving' | 'timber' | 'iron' | 'rock';
+/** what a part is made of: rubble limestone, the keep's squared blocks, paving, old timber, iron, living rock, loose stone */
+export type Paint = 'stone' | 'ashlar' | 'paving' | 'timber' | 'iron' | 'rock' | 'scree';
 /** what a part stops: everything; a body and nothing else (a rail, the slope under a stair: a shot goes through); nothing */
 export type Body = 'all' | 'feet' | 'none';
 
@@ -212,7 +212,8 @@ export function moundTop(kind: 'outcrop' | 'fan', x: number, z: number): number 
   if (x > F.foot) y -= (x - F.foot) * 0.9;
   if (x < F.end) y -= (F.end - x) * 1.3;
   const edge = northFace(y) - F.wide, past = Math.max(0, edge - z);
-  return y - past * 1.05 + (rough(x * 1.7, z * 1.7, 9) - 0.5) * Math.min(0.5, 0.07 + past * 0.4);
+  // (never quite level with the terrace: its head is a step under the paving it leads onto)
+  return Math.min(-0.06, y - past * 1.05 + (rough(x * 1.7, z * 1.7, 9) - 0.5) * Math.min(0.5, 0.07 + past * 0.4));
 }
 
 // ------------------------------------------------------------------ the towers
@@ -241,7 +242,7 @@ function tower(name: string, cx: number, cz: number, foot: number, rim: number, 
     if (toDoor < 40) top = Math.min(top, T.deck + 0.75 + hash(k, seed, 4) * 0.5);
     tops.push(Math.round(top * 100) / 100);
   }
-  const tw: Tower = { t: 'tower', paint: 'stone', at: 'both', name, cx, cz, foot, rim: tops, door, slits: [], stair: { from, sweep }, well: [from + sweep - Math.sign(sweep) * 125, from + sweep] };
+  const tw: Tower = { t: 'tower', paint: 'stone', at: 'both', name, cx, cz, foot, rim: tops, door, slits: [], stair: { from, sweep }, well: [from + sweep - Math.sign(sweep) * 140, from + sweep] };
   for (const a of looks) {
     // (a window the stair passes low in front of is put up beside the stair, and is shot from there; one the stair
     // passes high over, or does not pass, is at the floor)
@@ -388,23 +389,28 @@ function layOut(): Part[] {
     for (const [x0, x1, z0, z1] of [[R.x0, R.x1, R.z0, hz0], [R.x0, R.x1, hz1, R.z1], [R.x0, hx0, hz0, hz1], [hx1, R.x1, hz0, hz1]]) if (x1 - x0 > 0.01 && z1 - z0 > 0.01) box(paint, x0, x1, y - thick, y, z0, z1, { name });
   };
   // the ground floor is the terrace's own paving. The first floor: the hall, come into by the doorway on the east.
-  floor('timber', F1, 0.2, [R.x0, R.x0 + 1, -1.15, 1.3], 'keep first floor');
-  floor('timber', F2, 0.2, [-1.3, 1.4, R.z1 - 1, R.z1], 'keep second floor');
-  floor('paving', K.roof, 0.35, [-0.8, 1.9, R.z0, R.z0 + 1], 'keep roof');
+  // (A floor is open over a stair from where a head would meet it: from where the stair is two metres under the
+  // floor's own underside. Reckoned, and not judged by eye: a hole a pace too short is a stair nobody gets up.)
+  const opens = (L: number, up: number, under: number) => Math.max(0, ((under - 2) * L) / up - L / Math.round(up / 0.2));
+  const hall = 2.6 - opens(3.75, F1, F1 - 0.2), upper = -2.2 + opens(3.6, F2 - F1, F2 - F1 - 0.2), hatch = -1.7 + opens(3.6, K.roof - F2, K.roof - F2 - 0.35);
+  floor('timber', F1, 0.2, [R.x0, R.x0 + 1, -1.15, hall], 'keep first floor');
+  floor('timber', F2, 0.2, [upper, 1.4, R.z1 - 1, R.z1], 'keep second floor');
+  floor('paving', K.roof, 0.35, [hatch, 1.9, R.z0, R.z0 + 1], 'keep roof');
   // the three flights, one to a storey, each along a different wall: nobody on one floor has the next stair at his back
   flight([R.x0 + 0.5, 0, 2.6], [R.x0 + 0.5, F1, -1.15], 1, { name: 'keep stair to the hall' });
   flight([-2.2, F1, R.z1 - 0.5], [1.4, F2, R.z1 - 0.5], 1, { name: 'keep stair to the upper room' });
   flight([-1.7, F2, R.z0 + 0.5], [1.9, K.roof, R.z0 + 0.5], 1, { name: 'keep stair to the roof' });
-  // a rail round each hole, on the floor it is a hole in; and one up the open side of each flight, as far as the floor over it lets it go
-  rail([R.x0 + 1, F1, -0.3], [R.x0 + 1, F1, 1.3]);
-  rail([R.x0 + 1, F1, 1.3], [R.x0, F1, 1.3]);
-  rail([-1.3, F2, R.z1 - 1], [0.5, F2, R.z1 - 1]);
-  rail([-1.3, F2, R.z1 - 1], [-1.3, F2, R.z1]);
-  rail([-0.8, K.roof, R.z0 + 1], [1, K.roof, R.z0 + 1]);
-  rail([-0.8, K.roof, R.z0 + 1], [-0.8, K.roof, R.z0]);
-  rail([R.x0 + 1, 0, 2.6], [R.x0 + 1, F1 * 0.56, 2.6 - 3.75 * 0.56]);
-  rail([-2.2, F1, R.z1 - 1], [-2.2 + 3.6 * 0.56, F1 + (F2 - F1) * 0.56, R.z1 - 1]);
-  rail([-1.7, F2, R.z0 + 1], [-1.7 + 3.6 * 0.56, F2 + (K.roof - F2) * 0.56, R.z0 + 1]);
+  // a rail round each hole, on the floor it is a hole in, as far along it as the stair's own rail has not yet come up
+  // through the floor; and one up the open side of each flight
+  rail([R.x0 + 1, F1, 0], [R.x0 + 1, F1, hall]);
+  rail([R.x0 + 1, F1, hall], [R.x0, F1, hall]);
+  rail([upper, F2, R.z1 - 1], [0.5, F2, R.z1 - 1]);
+  rail([upper, F2, R.z1 - 1], [upper, F2, R.z1]);
+  rail([hatch, K.roof, R.z0 + 1], [1, K.roof, R.z0 + 1]);
+  rail([hatch, K.roof, R.z0 + 1], [hatch, K.roof, R.z0]);
+  rail([R.x0 + 1, 0, 2.6], [R.x0 + 1, F1, -1.15]);
+  rail([-2.2, F1, R.z1 - 1], [1.4, F2, R.z1 - 1]);
+  rail([-1.7, F2, R.z0 + 1], [1.9, K.roof, R.z0 + 1]);
   // the roof: the slab between the walls, and the walls' own tops a pace higher all round it, with stone steps up to them
   flight([1.9, K.roof, 1.9], [R.x1, B, 1.9], 1.3, { paint: 'stone', name: 'roof steps east' });
   flight([-0.5, K.roof, 2.5], [-0.5, B, R.z1], 1.3, { paint: 'stone', name: 'roof steps south' });
@@ -468,7 +474,7 @@ function layOut(): Part[] {
 
   // ---- the rubble under the breach, and blocks of the wall that came down with it
   const F = FAN;
-  parts.push({ t: 'mound', paint: 'rock', tone: 1.25, name: 'rubble', kind: 'fan', x0: F.end - 3, x1: F.foot + 4, z0: -22, z1: -9.9, cell: 0.5 });
+  parts.push({ t: 'mound', paint: 'scree', name: 'rubble', kind: 'fan', x0: F.end - 3, x1: F.foot + 4, z0: -22, z1: -10, cell: 0.5 });
   for (let k = 0; k < 9; k++) {
     const x = F.foot + 2 - k * 1.5 + hash(k, 3, 7) * 0.8, z = northFace(moundTop('fan', x, -12)) - F.wide - 0.9 - hash(k, 5, 7) * 2.2;
     lump(x, moundTop('fan', x, z) + 0.12, z, 0.3 + hash(k, 1, 7) * 0.3, 0.22 + hash(k, 2, 7) * 0.16, 0.3 + hash(k, 4, 7) * 0.25, 60 + k, { paint: 'stone', blocky: true, name: 'fallen block' });

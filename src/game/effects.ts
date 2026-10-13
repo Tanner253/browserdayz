@@ -14,6 +14,7 @@ const MAX_BLOOD = 220;
 const _Z = new THREE.Vector3(0, 0, 1);
 const _DOWN = new THREE.Vector3(0, -1, 0);
 const _UP = new THREE.Vector3(0, 1, 0);
+const _UP_OF = new THREE.Vector3();
 
 function canvasTex(size: number, draw: (g: CanvasRenderingContext2D, s: number) => void, srgb = true) {
   const c = document.createElement('canvas');
@@ -590,15 +591,38 @@ export class Effects {
 
   /**
    * A jeep that has been shot up: smoke off the bonnet, thicker the less it has left, and
-   * flames in it once it is alight. Call every frame it should burn.
+   * flames in it once it is alight. Call every frame it should burn. A wreck that was seen to go up (see
+   * `wrecked`) burns on for a while where it stands, and dies down to the smoke of a wreck.
+   * @param fire it is alight, and about to go up
+   * @param tilt how the car lies: its flames lean the way it leans
+   * @param vel how it is moving: and trail behind it as it goes
    */
-  engineSmoke(at: THREE.Vector3, state: { owed: number }, dt: number, fire: boolean, amount: number) {
-    state.owed = Math.min(4, state.owed + dt * (4 + amount * 9));
+  engineSmoke(at: THREE.Vector3, state: { owed: number; fire?: Fire; blown?: number }, dt: number, fire: boolean, amount: number, tilt?: THREE.Quaternion, vel?: THREE.Vector3) {
+    const since = state.blown === undefined ? Infinity : (performance.now() - state.blown) / 1000;
+    // (how hard a wreck still burns: all of it at first, none of it in the end)
+    const wreck = fire || since >= CAR.burns ? 0 : 1 - THREE.MathUtils.smoothstep(since, CAR.full, CAR.burns);
+    if (fire || wreck > 0) {
+      const f = this.fire.feed(state, at);
+      // (alight, it burns the harder the nearer it is to going up; and whatever burns, catches over a second, not in a frame)
+      const want = fire ? 0.55 + 0.45 * THREE.MathUtils.clamp((amount - 0.7) / 0.3, 0, 1) : wreck;
+      f.strength = Math.min(want, f.strength + dt * 1.2);
+      f.size = fire ? CAR.engine : CAR.wreck;
+      // (the black smoke of it is made below: of the flames' own smoke, only the wisps among them)
+      f.smoke = 0.5;
+      const up = _UP_OF.set(0, 1, 0);
+      if (tilt) up.applyQuaternion(tilt);
+      f.lean.set(up.x * 0.6 + WIND.x * WIND.lean, 0, up.z * 0.6 + WIND.z * WIND.lean);
+      if (vel) f.lean.addScaledVector(vel, -0.06).setY(0);
+      f.lean.clampLength(0, 0.9);
+    }
+    const burning = fire || wreck > 0.05;
+    state.owed = Math.min(4, state.owed + dt * (4 + amount * 9) * (1 + wreck * 2));
     while (state.owed >= 1) {
       state.owed -= 1;
-      const k = fire ? 0.05 + Math.random() * 0.06 : 0.16 + Math.random() * 0.12 - amount * 0.08;
+      const k = burning ? 0.05 + Math.random() * 0.06 : 0.16 + Math.random() * 0.12 - amount * 0.08;
       this.spawn({
-        p: new THREE.Vector3(at.x + (Math.random() - 0.5) * 0.5, at.y, at.z + (Math.random() - 0.5) * 0.5),
+        // (over the flames, where there are flames: the smoke of a burning car comes off the top of the fire, not out of the middle of it)
+        p: new THREE.Vector3(at.x + (Math.random() - 0.5) * 0.5, at.y + (burning ? 0.5 + wreck * 0.7 : 0), at.z + (Math.random() - 0.5) * 0.5),
         v: new THREE.Vector3((Math.random() - 0.5) * 0.6 + 0.3, 1.2 + Math.random() * 0.8, (Math.random() - 0.5) * 0.6 + 0.2),
         max: 2 + Math.random() * 1.6 + amount * 1.5,
         size: 0.35,
@@ -607,76 +631,67 @@ export class Effects {
         alpha: 0.35 + amount * 0.35,
         gravity: -0.9,
         drag: 0.9,
+        soft: burning ? 0.5 : 0,
       });
-      if (fire) {
-        this.spawn({
-          p: new THREE.Vector3(at.x + (Math.random() - 0.5) * 0.7, at.y - 0.1, at.z + (Math.random() - 0.5) * 0.7),
-          v: new THREE.Vector3((Math.random() - 0.5) * 0.5, 1.4 + Math.random() * 1.4, (Math.random() - 0.5) * 0.5),
-          max: 0.35 + Math.random() * 0.35,
-          size: 0.45,
-          grow: 0.8,
-          color: new THREE.Color(3.2, 1.2, 0.2),
-          alpha: 0.9,
-          gravity: -1.2,
-          drag: 1.4,
-          additive: true,
-        });
-      }
     }
   }
 
+  /** A car has just gone up, and was seen to: its wreck burns from now (see `engineSmoke`). One found already burned out is cold. */
+  wrecked(state: { owed: number; blown?: number }) {
+    state.blown = performance.now();
+  }
+
   /**
-   * A campfire: flames in the ring, a spark now and then, and grey smoke standing over it to
-   * be seen from a long way off. Call every frame it burns.
-   * @param state the caller's own count of what is owed (each fire keeps its own pace)
-   * @param life 1 burning well, down to 0 as it sinks to ash
+   * A campfire: the flames that came with it, stood in the wood (see Flames); a spark now and then; and grey
+   * smoke standing over it to be seen from a long way off. Call every frame it burns.
+   * @param at the foot of the fire: the middle of its ring, at the ground
+   * @param state the caller's own count of what is owed (each fire keeps its own pace), and its flames
+   * @param life 1 burning well, down to 0 as it sinks to ash (or as it catches)
    * @param close near enough for its flames to be seen (far off, only its smoke is made)
+   * @param turn how its ring is turned, radians: the flames that run along the logs lie along them
+   * @param glow how bright it is at this moment, about 1 (whoever lights the ground from it says how its lamp flickers)
    */
-  campfire(at: THREE.Vector3, state: { flame: number; smoke: number }, dt: number, life: number, close: boolean) {
+  campfire(at: THREE.Vector3, state: { flame: number; smoke: number; fire?: Fire }, dt: number, life: number, close: boolean, turn = 0, glow = 1) {
     state.smoke = Math.min(3, state.smoke + dt * (1.6 + 3.2 * life));
     while (state.smoke >= 1) {
       state.smoke -= 1;
       const k = 0.1 + Math.random() * 0.08;
       this.spawn({
-        p: new THREE.Vector3(at.x + (Math.random() - 0.5) * 0.3, at.y + 0.8, at.z + (Math.random() - 0.5) * 0.3),
+        p: new THREE.Vector3(at.x + (Math.random() - 0.5) * 0.3, at.y + COLUMN.from + Math.random() * 0.3, at.z + (Math.random() - 0.5) * 0.3),
         // it climbs, and leans with the same wind the signal smoke leans with
-        v: new THREE.Vector3(0.45 + (Math.random() - 0.5) * 0.4, 1.3, 0.28 + (Math.random() - 0.5) * 0.4),
+        v: new THREE.Vector3(WIND.x + (Math.random() - 0.5) * 0.4, 1.3, WIND.z + (Math.random() - 0.5) * 0.4),
         max: 9 + Math.random() * 3,
-        size: 0.6,
+        size: 0.45,
         grow: 9,
         color: new THREE.Color(k, k, k * 1.05),
         alpha: 0.42 + 0.26 * life,
         gravity: -2.2,
         drag: 0.6,
+        soft: COLUMN.soft,
       });
     }
     if (!close) return;
-    state.flame = Math.min(5, state.flame + dt * (8 + 22 * life));
+    const f = this.fire.feed(state, at);
+    f.strength = life;
+    f.turn = turn;
+    f.glow = glow;
+    f.lean.set(WIND.x * WIND.lean, 0, WIND.z * WIND.lean);
+    // a spark now and then, thrown up out of the wood
+    state.flame = Math.min(2, state.flame + dt * 2.2 * life);
     while (state.flame >= 1) {
       state.flame -= 1;
       const a = Math.random() * Math.PI * 2, r = Math.random() * 0.2;
-      const hot = Math.random(), tall = 0.45 + 0.55 * life;
-      const p = new THREE.Vector3(at.x + Math.cos(a) * r, at.y + 0.14 + Math.random() * 0.1, at.z + Math.sin(a) * r);
-      const v = new THREE.Vector3((Math.random() - 0.5) * 0.35, (0.9 + Math.random() * 1.1) * tall, (Math.random() - 0.5) * 0.35);
-      // The body of the flame hides what is behind it: on sunlit grass a flame that only ADDS
-      // its light is a pale mist. (Kept short of dazzling: the brightest things in the picture
-      // are finished nearly white, and a fire is orange.)
-      this.spawn({ p, v, max: 0.32 + Math.random() * 0.3, size: 0.2 + Math.random() * 0.12, grow: 0.22, color: new THREE.Color(0.98 + hot * 0.3, 0.3 + hot * 0.3, 0.025 + hot * 0.035), alpha: 0.9, gravity: -1.0, drag: 1.3 });
-      // and the light in it, laid over that
-      if (Math.random() < 0.6) this.spawn({ p: p.clone(), v: v.clone().multiplyScalar(0.9), max: 0.25 + Math.random() * 0.25, size: 0.3, grow: 0.3, color: new THREE.Color(0.42, 0.14, 0.015), alpha: 0.55, gravity: -1.0, drag: 1.3, additive: true });
-      if (Math.random() < 0.07 * life) {
-        this.spawn({
-          p: new THREE.Vector3(p.x, at.y + 0.45, p.z),
-          v: new THREE.Vector3((Math.random() - 0.5) * 1.1, 1.8 + Math.random() * 1.8, (Math.random() - 0.5) * 1.1),
-          max: 0.7 + Math.random() * 0.8,
-          size: 0.022,
-          color: new THREE.Color(3, 1.4, 0.3),
-          alpha: 1,
-          gravity: 1.4,
-          drag: 0.7,
-          additive: true,
-        });
-      }
+      this.spawn({
+        p: new THREE.Vector3(at.x + Math.cos(a) * r, at.y + 0.5 + Math.random() * 0.4, at.z + Math.sin(a) * r),
+        v: new THREE.Vector3((Math.random() - 0.5) * 1.1, 1.8 + Math.random() * 1.8, (Math.random() - 0.5) * 1.1),
+        max: 0.7 + Math.random() * 0.8,
+        size: 0.022,
+        color: new THREE.Color(3, 1.4, 0.3),
+        alpha: 1,
+        gravity: 1.4,
+        drag: 0.7,
+        additive: true,
+      });
     }
   }
 

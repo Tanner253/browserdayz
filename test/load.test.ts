@@ -65,17 +65,18 @@ const MULE: KitThing[] = [
   ...many(6, { id: 'box_739' }), ...many(6, { id: 'box_556' }), ...many(2, { id: 'box_12' }), ...many(2, { id: 'box_762' }), ...many(2, { id: 'grenade' }), { id: 'bandage', qty: 5 }, { id: 'beans' },
 ];
 
-ok("the figures are DayZ's: six kilograms for nothing, then 1.75% of a breath for each one more", () => {
-  assert.equal(LOAD.free, 6);
-  assert.equal(LOAD.perKg, 0.0175);
-  for (const kg of [0, 2.3, 5.99, 6]) assert.equal(breathOf(kg), 1, `${kg} kg costs something`);
-  // (DayZ's own sum: 100 - (16 - 6) x 1.75 = 82.5; and at 30 kg, 58)
-  assert.ok(near(breathOf(16), 0.825));
-  assert.ok(near(breathOf(30), 0.58));
-  assert.ok(breathOf(6.5) < 1);
+ok("the shape is DayZ's and the figures are kinder: more kilograms for nothing, and less of a breath for each one more", () => {
+  // (DayZ's are 6 kg and 1.75%. They were tried, and the user found them too much: see the top of src/sim/load.ts.)
+  assert.ok(LOAD.free >= 6 && LOAD.free <= 10);
+  assert.ok(LOAD.perKg > 0.008 && LOAD.perKg <= 0.0175);
+  for (const kg of [0, 2.3, LOAD.free - 0.01, LOAD.free]) assert.equal(breathOf(kg), 1, `${kg} kg costs something`);
+  assert.ok(near(breathOf(LOAD.free + 10), 1 - 10 * LOAD.perKg));
+  assert.ok(breathOf(LOAD.free + 0.5) < 1);
+  // (a full fighting kit, 30 kg, still runs at least seven tenths as far as a bare man)
+  assert.ok(breathOf(30) >= 0.7, `30 kg leaves ${breathOf(30).toFixed(2)}`);
 });
 
-ok('more weight is never more breath or more pace; a breath is never worth less than half, and nobody is stood still', () => {
+ok('more weight is never more breath or more pace; a breath is never worth less than three fifths, and nobody is stood still', () => {
   let b = 1, p = 1;
   for (let kg = 0; kg <= 400; kg += 0.25) {
     assert.ok(breathOf(kg) <= b && paceOf(kg) <= p, `${kg} kg is lighter to carry than a little less`);
@@ -85,8 +86,9 @@ ok('more weight is never more breath or more pace; a breath is never worth less 
   }
   assert.equal(breathOf(400), LOAD.least);
   assert.equal(paceOf(400), LOAD.slowest);
-  // (2026-10-13, the user: "the sprint skew is too dramatic near the top end": the least is half, not a fifth)
-  assert.ok(LOAD.least >= 0.5 && LOAD.slowest >= 0.5, 'the least is too little to move on');
+  // (2026-10-13, the user: "the sprint skew is too dramatic near the top end", then "a bit to harsh": the least was a
+  // fifth, then a half, and is two thirds or thereabouts)
+  assert.ok(LOAD.least >= 0.6 && LOAD.slowest >= 0.5, 'the least is too little to move on');
   // (a weight that is no weight is nothing carried)
   for (const odd of [NaN, -5, -Infinity]) assert.deepEqual([breathOf(odd), paceOf(odd), runCost(odd)], [1, 1, 1]);
   assert.deepEqual([breathOf(Infinity), paceOf(Infinity)], [LOAD.least, LOAD.slowest]);
@@ -121,19 +123,19 @@ ok('a new arrival is unburdened, and has room under the free weight for what is 
 
 ok('each step of the map is a little shorter of breath: scavenger, fighter, rifleman', () => {
   const [scav, fight, rifle] = [SCAVENGER, FIGHTER, RIFLEMAN].map((l) => breathOf(carried(l)));
-  // (a day pack, a pistol and a hatchet: nothing anybody would notice)
-  assert.ok(scav >= 0.9, `a scavenger has ${scav.toFixed(2)} of a breath`);
-  // (a submachine gun, a soft vest and a steel helmet: a few seconds off a sprint)
-  assert.ok(fight >= 0.7 && fight <= 0.88 && fight < scav - 0.08, `a fighter has ${fight.toFixed(2)}`);
-  // (a rifle and six magazines, plates, helmet, pack: plainly shorter of breath, and well able to run)
-  assert.ok(rifle >= 0.45 && rifle <= 0.66 && rifle < fight - 0.12, `a rifleman has ${rifle.toFixed(2)}`);
+  // (a day pack, a pistol and a hatchet: nothing at all)
+  assert.ok(scav >= 0.97, `a scavenger has ${scav.toFixed(2)} of a breath`);
+  // (a submachine gun, a soft vest and a steel helmet: a second or three off a sprint)
+  assert.ok(fight >= 0.8 && fight <= 0.95 && fight < scav - 0.04, `a fighter has ${fight.toFixed(2)}`);
+  // (a rifle and six magazines, plates, helmet, pack: shorter of breath, and well able to run)
+  assert.ok(rifle >= 0.65 && rifle <= 0.85 && rifle < fight - 0.06, `a rifleman has ${rifle.toFixed(2)}`);
   for (const l of [SCAVENGER, FIGHTER, RIFLEMAN]) assert.equal(paceOf(carried(l)), 1, 'somebody kitted to fight is slowed at a walk');
 });
 
 ok('plates are a price: the same rifleman without his carrier and helmet runs a good deal further', () => {
   const light = RIFLEMAN.filter((t) => t.id !== 'life_vest' && t.id !== 'boonie_hat');
   const [bare, plated] = [breathOf(carried(light)), breathOf(carried(RIFLEMAN))];
-  assert.ok(bare - plated >= 0.1, `plates and a helmet cost ${(bare - plated).toFixed(2)} of a breath`);
+  assert.ok(bare - plated >= 0.06, `plates and a helmet cost ${(bare - plated).toFixed(2)} of a breath`);
 });
 
 ok('two rifles and a rucksack of ammunition: hardly a sprint left, slower on the feet, and still going', () => {
