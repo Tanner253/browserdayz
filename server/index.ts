@@ -1716,7 +1716,19 @@ async function loadKept() {
 /** The lists are read when the server starts, and again every little while until they have been (the site may be asleep). */
 function loadAdmin(tries = 0) {
   void siteAdmin({ op: 'load' }).then((r) => {
-    if (r?.ok) return void log(`[admin] lists read from the site: ${Object.keys(ADMIN.state.roles).length} with a role, ${ADMIN.state.bans.length} banned${r.set ? '' : ' (no ADMIN_PASSWORD is set there: nobody can become an admin)'}`);
+    if (r?.ok) {
+      log(`[admin] lists read from the site: ${Object.keys(ADMIN.state.roles).length} with a role, ${ADMIN.state.bans.length} banned${r.set ? '' : ' (no ADMIN_PASSWORD is set there: nobody can become an admin)'}`);
+      // (Whoever came in before the lists were read was let in as nobody in particular, and nothing told them
+      // otherwise afterwards: at a deploy the first tries are answered by the server before this one, so that is
+      // whoever was quickest back. They are told now.)
+      for (const c of clients.values()) {
+        const role = roleOf(c);
+        if (!role) continue;
+        send(c, { t: 'role', role });
+        if (role === 'admin') asAdmin(c, true);
+      }
+      return;
+    }
     // (often at first: at a deploy the site's call back reaches the server before this one until this one is the one being served)
     if (tries < 110) setTimeout(() => loadAdmin(tries + 1), tries < 90 ? 5_000 : 30_000).unref();
   });
