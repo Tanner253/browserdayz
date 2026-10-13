@@ -8,6 +8,7 @@
 //   node scripts/film.mjs --no-video          stills and contact sheets only (fastest way to look at a cut)
 //   node scripts/film.mjs --stills 6 --big    and each still kept as a file of its own, at the size it was filmed (to look closely at one)
 //   node scripts/film.mjs --twice             film the stretch twice and report how many frames differ
+//   node scripts/film.mjs --motion            how much each frame differs from the one before it: a frame photographed twice (a stutter) shows as one that hardly differs
 //   node scripts/film.mjs --cut 2             the second trailer (src/trailer/shots2.ts) -> zona-trailer-2.mp4
 //   node scripts/film.mjs --cut 8 --menu      the cut of a film that the main menu plays: 1280x720 at 30 fps, a light file -> zona-trailer-8-menu.mp4
 //
@@ -36,6 +37,7 @@ const stills = Number(arg('stills', 0));
 const noVideo = !!arg('no-video', false);
 const big = !!arg('big', false);
 const twice = !!arg('twice', false);
+const motion = !!arg('motion', false);
 const cut = String(arg('cut', '1'));
 const name = String(arg('out', (draft ? 'draft' : 'zona-trailer') + (cut === '1' ? '' : `-${cut}`) + (menu ? '-menu' : '')));
 const URL_ = String(arg('url', `http://localhost:5173/trailer.html?cut=${cut}${menu ? '&menu=1' : ''}`));
@@ -114,7 +116,7 @@ async function take(pass) {
     await run(`window.tr.step(${i})`);
     const shot = await cdp('Page.captureScreenshot', { format: 'jpeg', quality: 93 });
     // for the two-takes test: a small grey copy of the frame (film grain averages out of it, a body in a different place does not)
-    if (twice) hashes.push(await sharp(Buffer.from(shot.data, 'base64')).resize(96, 54).greyscale().raw().toBuffer());
+    if (twice || motion) hashes.push(await sharp(Buffer.from(shot.data, 'base64')).resize(192, 108).greyscale().raw().toBuffer());
     if (pass === 0) {
       if (i === first) fs.writeFileSync(path.join(OUT, `${name}-first-frame.jpg`), Buffer.from(shot.data, 'base64'));
       if (stills && (i - first) % stills === 0) {
@@ -136,6 +138,19 @@ async function take(pass) {
 
 const a = await take(0);
 console.log(`filmed in ${(a.seconds / 60).toFixed(1)} min`);
+if (motion) {
+  // how far each frame is from the one before it (mean difference of a small grey copy, of 255), and where that falls to
+  // a small part of what it is either side: the same picture photographed twice, and then two frames' worth of movement at once
+  const d = a.hashes.map((h, i) => { if (!i) return 0; let s = 0; const g = a.hashes[i - 1]; for (let k = 0; k < h.length; k++) s += Math.abs(h[k] - g[k]); return s / h.length; });
+  const med = (xs) => [...xs].sort((p, q) => p - q)[Math.floor(xs.length / 2)] ?? 0;
+  const stuck = [];
+  for (let i = 3; i < d.length - 3; i++) {
+    const near = med([d[i - 3], d[i - 2], d[i - 1], d[i + 1], d[i + 2], d[i + 3]]);
+    if (near > 0.6 && d[i] < near * 0.3) stuck.push(`${((first + i) / fps).toFixed(2)}s (${d[i].toFixed(2)} of ${near.toFixed(2)})`);
+  }
+  fs.writeFileSync(path.join(OUT, `${name}-motion.txt`), d.map((v, i) => `${((first + i) / fps).toFixed(3)} ${v.toFixed(3)}`).join(String.fromCharCode(10)));
+  console.log(`motion: ${d.length} frames, median difference ${med(d).toFixed(2)}; ${stuck.length} frames hardly differ from the one before while their neighbours do${stuck.length ? `: ${stuck.slice(0, 30).join(', ')}` : ''}`);
+}
 if (!noVideo) {
   process.stdout.write('rendering the soundtrack and closing the file...');
   const pieces = await run('window.tr.finish()');

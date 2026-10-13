@@ -139,8 +139,11 @@ export function hospitalPlan(): Blueprint {
   g.put('mop_bucket', -12.25, -2.6, 0.6).shelves(-12.43, -6.8, Q, [0, 3]).shelves(-12.43, -5.6, Q, [0, 3]).put('folded_blanket', -12.43, -6.8, Q, 0.66).put('folded_blanket', -12.43, -6.6, Q + 0.2, 1.17).put('folded_blanket', -12.43, -5.6, Q, 0.66).put('folded_blanket', -12.43, -5.8, Q + 0.1, 1.17);
   g.put('cardboard_box_01', -10.1, -6.5, 0.3).put('wooden_crate_01', -10.0, -3.8, Q).floor([-11.2, -4.6]);
   // the morgue: the cold chambers down the west wall, three tables, and the scales
-  g.put('body_lockers', -7.98, -4.65, Q).put('autopsy_table', -4.4, -5.0, Q).put('autopsy_table', -1.8, -5.0, Q).put('covered_body', -1.8, -5.0, Q, 0.9).put('autopsy_table', 0.8, -5.0, Q).put('surgical_lamp', -4.4, -5.0, 0, 2.5);
-  g.top('lab_counter', 1.7, -7.46, 0, 0.9).put('autopsy_scales', 2.4, -7.46, 0, 0.89).put('instrument_tray', 1.2, -7.46, 0.2, 0.9).put('med_sink', 2.73, -3.0, -Q).top('surgical_trolley', -5.6, -2.9, 0.2, 0.9).put('med_cabinet', -6.4, -7.5, 0);
+  // (The covered body is a sheet over a form, hanging to the floor all round: a trolley with somebody on it under a
+  // sheet, and its own height. Stood ON a table it was a blue tent in the air over the table, and let down onto one
+  // its skirts went through the table's top. It stands on the floor by the door, as a trolley is left.)
+  g.put('body_lockers', -7.98, -4.65, Q).put('autopsy_table', -4.4, -5.0, Q).put('autopsy_table', -1.8, -5.0, Q).put('autopsy_table', 0.8, -5.0, Q).put('surgical_lamp', -4.4, -5.0, 0, 2.5);
+  g.top('lab_counter', 1.7, -7.46, 0, 0.9).put('autopsy_scales', 2.4, -7.46, 0, 0.89).put('instrument_tray', 1.2, -7.46, 0.2, 0.9).put('med_sink', 2.73, -3.0, -Q).top('surgical_trolley', -5.6, -2.9, 0.2, 0.9).put('med_cabinet', -6.4, -7.5, 0).put('covered_body', -4.0, -2.3, 0);
   g.floor([-0.6, -2.6], [1.6, -2.8]);
   // the boiler room, and the door for the coal
   g.put('bunker_machine', 8.55, -4.3, -Q).put('bunker_pipes', 3.46, -4.6, Q).put('utility_box_01', 4.0, -7.5, 0).put('utility_box_01', 3.56, -2.4, Q).put('wooden_crate_01', 4.7, -5.9, 0.4);
@@ -251,7 +254,7 @@ export function hospitalPlan(): Blueprint {
   // the scrub room between them
   s.put('med_sink', -12.0, 7.44, PI).put('med_sink', -10.6, 7.44, PI).shelves(-10.0, 2.9, -Q, [0, 1]).put('folded_blanket', -10.0, 2.9, -Q, 1.17).put('folded_blanket', -10.0, 3.1, -Q, 1.67).put('mop_bucket', -12.2, 3.3, 1.0).floor([-11.2, 5.8]);
   // the small theatre: whoever was on the table is on it still
-  s.put('steel_table', -3.0, 4.9, Q).put('covered_body', -3.0, 4.9, 0, 0.8).put('surgical_lamp', -3.0, 4.9, -0.2, 2.3).put('ventilator', -5.2, 4.4, Q).top('surgical_trolley', -1.2, 3.4, 0.1, 0.9).put('instrument_tray', -1.2, 3.4, 0.2, 0.9);
+  s.put('steel_table', -3.0, 4.9, Q).put('surgical_lamp', -3.0, 4.9, -0.2, 2.3).put('ventilator', -5.2, 4.4, Q).top('surgical_trolley', -1.2, 3.4, 0.1, 0.9).put('instrument_tray', -1.2, 3.4, 0.2, 0.9);
   s.put('medical_light', -5.0, 6.6, 0.7).put('screen_curtain', 2.2, 5.8, 0).put('med_cabinet', -6.4, 7.5, PI).top('lab_counter', 1.2, 7.46, PI, 0.9, 2).floor([-5.6, 2.8], [0.6, 2.6]);
   // recovery: a bed under each window, each watched
   for (const x of [4.8, 8.0, 11.2]) s.bed(x, 6.75, PI);
@@ -425,7 +428,7 @@ export function hospitalWingPlan(): Blueprint {
   // before the stair
   g.top('hospital_bench', -5.87, 1.6, Q, 0.46).put('extinguisher_box', -4.6, 3.24, PI, 1.05).floor([-4.6, 0.2]);
   // the cold room: two tables, one of them in use
-  g.put('autopsy_table', 2.0, 6.2, 0).put('covered_body', 2.0, 6.2, 0, 0.9).put('autopsy_table', 2.2, 4.25, 0).put('med_cabinet', 4.9, 3.58, 0).floor([4.6, 5.4], [0.6, 3.9]);
+  g.put('autopsy_table', 2.0, 6.2, 0).put('autopsy_table', 2.2, 4.25, 0).put('med_cabinet', 4.9, 3.58, 0).floor([4.6, 5.4], [0.6, 3.9]);
   // the laboratory: benches under the windows, a table in the middle
   g.top('lab_counter', 5.88, 1.6, -Q, 0.9, 2).top('lab_counter', 5.88, -1.6, -Q, 0.9, 2).put('lab_table', 2.6, 0.2, 0).put('xray_viewer', 2.6, 2.97, PI, 1.2).put('med_cabinet', 3.2, -2.82, 0).put('computer_cart', 0.3, -2.6, Q).floor([4.2, 0], [1.2, 1.9]);
   // the bay: a cot nobody came back for, drums, boxes

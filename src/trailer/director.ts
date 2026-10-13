@@ -54,6 +54,13 @@ export interface Shot {
   /** puts the game in the state the shot needs */
   setup?: (S: Stage) => void | Promise<void>;
   cues?: { at: number; fn: (S: Stage) => void | Promise<void>; done?: boolean }[];
+  /**
+   * The frames nobody sees before a shot's first (the director runs two dozen, so that the first one filmed is
+   * fully dressed): what moves in them, at `t` seconds before the shot begins (a negative number). Without it
+   * everybody stands for that long, and whoever is running when the shot opens is seen to start from a standstill.
+   * A shot that has one is also asked for its camera at those times.
+   */
+  lead?: (t: number, S: Stage) => void;
   /** before the game moves, every frame (t = seconds into the shot, dt = seconds of game time this frame) */
   tick?: (t: number, S: Stage, dt: number) => void;
   /** after the game has moved, before the picture is taken */
@@ -98,6 +105,8 @@ export class Actor {
   /** what the body keeps up, as a player sets it from the wheel: told in the pose, as it is to a server */
   dance = false;
   surrender = false;
+  /** anything else the body is doing that a pose tells of (lying down, leaning: the F_ flags of src/net/protocol.ts) */
+  more = 0;
   private corpse: string | null = null;
   /** a clip from trailer/emotes.glb laid over whatever the game is playing on this body */
   private emoting: { act: THREE.AnimationAction; dur: number; t0: number; loop: boolean; speed: number; phase: number } | null = null;
@@ -153,6 +162,7 @@ export class Actor {
     this.yaw = yaw;
     this.pitch = 0;
     this.crouch = this.aim = this.sprint = this.bleeding = this.dance = this.surrender = false;
+    this.more = 0;
     this.alive = true;
     this.hp = 100;
     this.foe = null;
@@ -209,7 +219,7 @@ export class Actor {
       const t = ((performance.now() - e.t0) / 1000) * e.speed + e.phase * e.dur;
       e.act.time = e.loop ? t % e.dur : Math.min(e.dur - 1e-3, t);
     }
-    const f = (this.crouch ? F_CROUCH : 0) | (this.sprint ? F_SPRINT : 0) | (this.aim ? F_AIM : 0) | F_GROUND | (this.bleeding ? F_BLEED : 0) | (this.dance ? F_DANCE : 0) | (this.surrender ? F_SURRENDER : 0);
+    const f = (this.crouch ? F_CROUCH : 0) | (this.sprint ? F_SPRINT : 0) | (this.aim ? F_AIM : 0) | F_GROUND | (this.bleeding ? F_BLEED : 0) | (this.dance ? F_DANCE : 0) | (this.surrender ? F_SURRENDER : 0) | this.more;
     this.rp.push([this.pos.x, this.pos.y, this.pos.z, this.yaw, this.pitch, f], performance.now() + ago);
   }
   /** a shot at a point, off by up to `err` radians: a real bullet in the game's world, with everything that follows from it */
@@ -552,7 +562,13 @@ async function stage() {
   S.bullet.visible = S.trail.visible = false;
   g.s.r.scene.add(S.bullet, S.trail);
 
-  if (CUT === 8) {
+  if (CUT === 9) {
+    // (the ninth's score is written to its own shots: see music9.ts)
+    const cut = await import('./shots9');
+    shots = cut.buildShots(S);
+    seconds = cut.seconds9;
+    ownScore = cut.score;
+  } else if (CUT === 8) {
     // (the eighth brings its own score, as the third did: see music8.ts)
     const cut = await import('./shots8');
     shots = cut.buildShots(S);
@@ -647,7 +663,8 @@ async function enter(shot: Shot) {
   const was = logging;
   logging = false;
   for (let i = 0; i < 24; i++) {
-    if (shot.cam) S.cam = shot.cam(0, S);
+    shot.lead?.((i - 24) / 60, S);
+    if (shot.cam) S.cam = shot.cam(shot.lead ? (i - 24) / 60 : 0, S);
     for (const a of S.actors) a.push();
     clock.advance(1000 / 60);
     if (i % 6 === 5) await settle();
