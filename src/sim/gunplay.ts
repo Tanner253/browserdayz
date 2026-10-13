@@ -197,9 +197,14 @@ const lerp = (a: number, b: number, t: number) => a + (b - a) * Math.min(1, Math
  * The AR-15, a lighter round in a straight-line stock: two thirds of the climb, and its snake goes the other way
  * first (left, then right, then left) and half as wide.
  * Past the end of a table (a drum, a sixty-round magazine) its last twenty go round again.
+ *
+ * (2026-10-13: "the recoil on AR's is not dramatic enough, we need more vertical recoil per bullet, dont go crazy
+ * ... the recoil pattern that goes left and right is good but it doesnt go up enough". So the snake is as it was
+ * and every shot climbs more: `lift`. The AR-15 by four tenths, which brings a magazine of it to twenty-nine
+ * degrees, where it was twenty-one; the AK, which was the one that climbed, by an eighth, to thirty-six.)
  */
-const snake = (rows: [shots: number, up: number, upLast: number, across: number][]): [number, number][] =>
-  rows.flatMap(([n, u0, u1, a]) => Array.from({ length: n }, (_, i): [number, number] => [n > 1 ? u0 + ((u1 - u0) * i) / (n - 1) : u0, a]));
+const snake = (rows: [shots: number, up: number, upLast: number, across: number][], lift = 1): [number, number][] =>
+  rows.flatMap(([n, u0, u1, a]) => Array.from({ length: n }, (_, i): [number, number] => [(n > 1 ? u0 + ((u1 - u0) * i) / (n - 1) : u0) * lift, a]));
 export const PATTERNS: Record<string, [up: number, across: number][]> = {
   ak: snake([
     [1, 1.85, 1.85, 0.07], [3, 1.5, 1.4, 0.2],
@@ -207,13 +212,13 @@ export const PATTERNS: Record<string, [up: number, across: number][]> = {
     [1, 1.05, 1.05, -0.5], [9, 1.0, 0.9, -0.72], [1, 0.9, 0.9, -0.4],
     [1, 0.9, 0.9, 0.5], [6, 0.9, 0.9, 0.72], [1, 0.9, 0.9, 0.4],
     [2, 0.9, 0.9, -0.6],
-  ]),
+  ], 1.125),
   ar15: snake([
     [1, 1.15, 1.15, 0], [2, 1.0, 0.95, -0.07],
     [7, 0.85, 0.7, -0.34],
     [10, 0.65, 0.65, 0.32],
     [10, 0.6, 0.6, -0.27],
-  ]),
+  ], 1.4),
 };
 const TAIL = 20;
 

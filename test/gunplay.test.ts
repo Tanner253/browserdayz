@@ -122,8 +122,9 @@ ok('each gun kicks as itself', () => {
     return ((k.up + k.stayUp) * 180) / Math.PI;
   };
   // (a string's later shots, to set one gun beside another: not their first, which the AK's bolt makes its worst)
-  assert.ok(up('ak', { shot: 2 }) > up('ar15', { shot: 2 }) * 1.3, 'the AK does not kick harder than the AR-15');
-  assert.ok(up('mosin') > up('ak') * 1.5 && up('deagle') > up('m9') * 2, 'the big rounds do not kick hardest');
+  // (by a sixth and more: it was by half, until the AR-15 was made to climb, 2026-10-13: "it doesnt go up enough")
+  assert.ok(up('ak', { shot: 2 }) > up('ar15', { shot: 2 }) * 1.15, 'the AK does not kick harder than the AR-15');
+  assert.ok(up('mosin') > up('ak') * 1.3 && up('deagle') > up('m9') * 2, 'the big rounds do not kick hardest');
   assert.ok(up('ak', { shot: 1 }) > up('ak', { shot: 2 }) * 1.2, 'the first of an AK\'s string is not its worst');
   assert.ok(up('ak', { shot: 8 }) < up('ak', { shot: 2 }) * 0.85, 'a long string is not leaned into');
   assert.ok(up('ak', { shot: 20 }) > up('ak', { shot: 8 }) * 0.7 && up('ak', { shot: 60 }) === up('ak', { shot: 20 }), 'and it does not go on getting easier for ever');
@@ -142,8 +143,8 @@ ok('each gun kicks as itself', () => {
   assert.ok(across.slice(3).some((a) => a < 0) && across.slice(3).some((a) => a > 0), 'it never comes back across');
   // (thirty rounds held open, standing and aimed, with nothing done about it: the AK ends up pointing well over a man's head at fifty metres, the AR-15 a good deal less far)
   const climb = (id: string) => Array.from({ length: 30 }, (_, i) => kickOf(id, { ...standing, aimed: true, shot: i + 1 }, even).stayUp).reduce((a, b) => a + b, 0) * (180 / Math.PI);
-  assert.ok(climb('ak') > 10 && climb('ak') < 16, `an AK's magazine climbs ${climb('ak').toFixed(1)} degrees`);
-  assert.ok(climb('ar15') > 5.5 && climb('ar15') < climb('ak') * 0.75, `an AR-15's climbs ${climb('ar15').toFixed(1)}`);
+  assert.ok(climb('ak') > 11 && climb('ak') < 18, `an AK's magazine climbs ${climb('ak').toFixed(1)} degrees`);
+  assert.ok(climb('ar15') > 9 && climb('ar15') < climb('ak') * 0.9, `an AR-15's climbs ${climb('ar15').toFixed(1)}`);
   // ---- the string's own shape (2026-10-12: "google the AK recoil pattern on rust and use something similar"): up
   // hard and nearly straight, then across to the right, a long way back to the left, and right again
   {
@@ -159,9 +160,11 @@ ok('each gun kicks as itself', () => {
     const [x4, y4] = at('ak', 4), [x9] = at('ak', 9), [x20] = at('ak', 20), [x28, y30] = [at('ak', 28)[0], at('ak', 30)[1]];
     assert.ok(y4 > 5.5 && Math.abs(x4) < 1, `an AK's first four go ${y4.toFixed(1)} up and ${x4.toFixed(1)} across: not straight up, or not hard`);
     assert.ok(x9 > x4 + 3 && x20 < x9 - 5 && x28 > x20 + 3.5, `an AK's string does not snake: ${[x4, x9, x20, x28].map((v) => v.toFixed(1)).join(', ')}`);
-    assert.ok(y30 > 28 && y30 < 36, `an AK's magazine throws the muzzle ${y30.toFixed(1)} degrees up in all`);
+    assert.ok(y30 > 32 && y30 < 39, `an AK's magazine throws the muzzle ${y30.toFixed(1)} degrees up in all`);
     const [a3, a10, a20] = [at('ar15', 3)[0], at('ar15', 10)[0], at('ar15', 20)[0]];
-    assert.ok(a10 < a3 - 1.5 && a20 > a10 + 2.5 && at('ar15', 30)[1] < y30 * 0.72, 'the AR-15 does not go the other way first, or is no gentler');
+    // (a magazine of it climbs twenty-nine degrees, where it climbed twenty-one: 2026-10-13, "it doesnt go up enough")
+    const r30 = at('ar15', 30)[1];
+    assert.ok(a10 < a3 - 1.5 && a20 > a10 + 2.5 && r30 > 26 && r30 < y30 * 0.9, `the AR-15 does not go the other way first, or climbs ${r30.toFixed(1)} degrees to the AK's ${y30.toFixed(1)}`);
     // (the same string every time, give or take: two magazines never end more than a degree apart)
     let seed = 7;
     const dice = () => ((seed = (seed * 16807) % 2147483647) % 1000) / 1000;
