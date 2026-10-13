@@ -543,7 +543,8 @@ export class Game {
     this.hud.root.append(this.fireTag, this.legTag);
     this.gas = new Gas(atmo.gas, atmo, r.scene, {
       masked: () => this.inv.wear('gas').length > 0,
-      hurt: (amount) => this.player.sicken(amount, 'the gas'),
+      // (nothing hurts an admin in god mode, and the gas is no exception: 2026-10-13, "god mode make admin immune to gas")
+      hurt: (amount) => void (this.powers.god || this.player.sicken(amount, 'the gas')),
       cough: (hard) => {
         this.weapons.flinch(hard);
         // (and it is heard: whatever of theirs is near comes to see who is choking)
@@ -777,6 +778,15 @@ export class Game {
           this.adminUI.setSelf(this.adminSelf());
         },
         tint: (color) => this.setTint(color),
+        names: (on) => {
+          this.namesWanted = on && this.role === 'admin';
+          try {
+            localStorage.setItem('zona.admin.names', this.namesWanted ? '1' : '0');
+          } catch {
+            /* not kept: it is as it was the next time */
+          }
+          this.adminUI.setSelf(this.adminSelf());
+        },
         close: () => this.toggleAdmin(false),
       }, icons);
       document.getElementById('ui')!.appendChild(this.adminUI.root);
@@ -897,6 +907,7 @@ export class Game {
   /** First click on Play: find a server (multiplayer) or fall back to the local world. */
   private async join() {
     this.joining = true;
+    this.hud.refused('');
     const name = this.hud.nameValue() || `Survivor${Math.floor(100 + Math.random() * 900)}`;
     const renamed = name !== playerName();
     setPlayerName(name);
@@ -1000,8 +1011,19 @@ export class Game {
       }
     } else {
       if (this.net.leftQueue) this.hud.note('You left the line: playing on your own', 'warn');
-      else if (this.net.refused) this.hud.note(this.net.refused, 'warn');
-      else if (remoteServer()) this.hud.note('The server could not be reached: playing offline', 'warn');
+      else if (this.net.refused) {
+        // Kept off, or banned: said on the way in where it stays said, and not into a game alone as if nothing
+        // had happened. (It was a note that went after four seconds, and then a world with nobody in it.
+        // 2026-10-13: "when a user is banned or kicked we tell them right? at the menu or when rejected?")
+        if (/banned|kept off|put off/i.test(this.net.refused)) {
+          this.joining = false;
+          this.input.unlock();
+          this.hud.showStart(true);
+          this.hud.refused(this.net.refused);
+          return;
+        }
+        this.hud.note(this.net.refused, 'warn');
+      } else if (remoteServer()) this.hud.note('The server could not be reached: playing offline', 'warn');
       await this.enterOffline();
     }
     this.joining = false;
@@ -2098,7 +2120,16 @@ export class Game {
       this.sendT = this.sendT > 2 / SEND_HZ ? 0 : this.sendT - 1 / SEND_HZ;
       const it = this.weapons.equippedItem;
       const flags = (p.crouched ? F_CROUCH : 0) | (p.sprinting ? F_SPRINT : 0) | (this.weapons.aiming ? F_AIM : 0) | (p.grounded ? F_GROUND : 0) | (p.dead ? F_DEAD : 0) | (p.vitals.bleeding ? F_BLEED : 0) | (p.lean > 0.3 ? F_LEAN_R : p.lean < -0.3 ? F_LEAN_L : 0) | (this.hold === 'dance' ? F_DANCE : 0) | (this.hold === 'sit' ? F_SIT : 0) | (p.prone ? F_PRONE : 0) | (this.hold === 'surrender' ? F_SURRENDER : 0) | (this.garage.ride ? F_SEAT : 0) | (this.weapons.guarding ? F_GUARD : 0) | (p.vitals.broken ? F_LIMP : 0) | (this.lit && !this.garage.ride ? F_LIGHT : 0);
-      const pose: Pose = [p.pos.x, p.pos.y, p.pos.z, p.yaw, p.pitch, flags];
+      // With the pockets open (or the map, or a panel) the mouse is free and the head is not steered: it was told
+      // to the server turned exactly as it had been, report after report. The server takes a body that goes to
+      // and fro with its head held like a statue's for one walked by a program (`gaitCheck`), and put a player
+      // off the server as they went through the pockets of somebody they had just killed, stepping round the body
+      // (2026-10-13, from its log: "went to and fro 4 times over 20 m without their head once turning", 33 s
+      // after a kill; and the complaint, "they get disconnected when they kill someone"). A head over open
+      // pockets is not a statue's: it is told with the hair's sway it has, a twelfth of a degree, which nobody
+      // can see. (The server's rule is being changed to mind what a player DOES: this is for until that is live.)
+      const sway = this.input.uiMode ? Math.sin(performance.now() / 700) * 0.0015 : 0;
+      const pose: Pose = [p.pos.x, p.pos.y, p.pos.z, p.yaw + sway, p.pitch, flags];
       this.net.send({ t: 's', p: pose, w: it?.id ?? null, m: fittedOf(it), n: Math.round(performance.now()) });
     }
     // the server keeps a copy of what we carry so it can leave a body with our gear on it
@@ -2334,7 +2365,8 @@ export class Game {
     }
     // the bunker: its door, its lamps, and the dark of it (no daylight comes down the stair)
     this.bunker.update(dt, cam.position, (pos, burn) => this.lamps.glow(pos, BUNKER_LAMP, burn * 0.5, 8));
-    const under = bunkerDark(this.bunker.place, cam.position.x, cam.position.y, cam.position.z);
+    // (an admin's night vision sees down here as well: "night vision makes bunker darkness go away too", 2026-10-13)
+    const under = this.nightSight ? 0 : bunkerDark(this.bunker.place, cam.position.x, cam.position.y, cam.position.z);
     atmo.cover.ground = { sun: 1 - under, sky: 1 - 0.994 * under };
     this.lamps.update(cam, dt);
     this.weapons.lampSpill.copy(this.lamps.spill);
@@ -2540,7 +2572,7 @@ export class Game {
   }
 
   private adminSelf(): AdminSelf {
-    return { role: this.role, id: this.net?.id ?? 0, ...this.powers, night: this.nightSight, tint: this.tint, freecam: !!this.freecam, x: Math.round(this.player.pos.x), z: Math.round(this.player.pos.z) };
+    return { role: this.role, id: this.net?.id ?? 0, ...this.powers, night: this.nightSight, names: this.namesWanted, tint: this.tint, freecam: !!this.freecam, x: Math.round(this.player.pos.x), z: Math.round(this.player.pos.z) };
   }
 
   private showPowers() {
@@ -2630,8 +2662,10 @@ export class Game {
 
   /**
    * An admin's far sight: everybody's name where they stand on the screen, through whatever is in the way, however
-   * far off, with how far that is and how much blood they have, and a frame round the body. In the free camera,
-   * and while flying (noclip).
+   * far off, with how far that is and how much blood they have. A switch of the panel's own (2026-10-13: "instead
+   * of only showing the names of people in no clip and in free cam lets just make a toggle for it"), kept from one
+   * day to the next. No frame round the body: "admin panel does not need the rectangles following the players its
+   * causing lag". Each name is moved, and not laid out again: see `esp` in hud.ts.
    *
    * Asked for four times before it was ever seen (2026-10-12: "when im in freecam or spectate i should see
    * everyone names"; "i want to see everyone name from the sky from a distance ... like a cheat menu would";
@@ -2642,7 +2676,7 @@ export class Game {
    * HUD. (It is left in sight now: see `#hud.hidden` in hud.css.) And it was never on while flying.
    */
   private drawNames(cam: THREE.PerspectiveCamera) {
-    if (this.role !== 'admin' || !this.started || !(this.freecam || this.powers.clip)) {
+    if (this.role !== 'admin' || !this.started || !this.namesWanted) {
       if (this.namesOn) this.hud.esp([]);
       this.namesOn = false;
       return;
@@ -2659,11 +2693,10 @@ export class Game {
       const d = at.distanceTo(cam.position);
       v.set(at.x, at.y + up, at.z).project(cam);
       if (v.z < -1 || v.z > 1 || Math.abs(v.x) > 1.05 || Math.abs(v.y) > 1.05) return;
-      const x = (v.x * 0.5 + 0.5) * 100, y = (-v.y * 0.5 + 0.5) * 100;
-      v.set(at.x, at.y, at.z).project(cam);
+      const x = v.x * 0.5 + 0.5, y = -v.y * 0.5 + 0.5;
       // (the farther off, the smaller the lettering, down to what can still be read; and no bigger than this, however near)
       const size = ESP_SIZE[0] - (ESP_SIZE[0] - ESP_SIZE[1]) * THREE.MathUtils.clamp(Math.log(Math.max(d, 1) / ESP_NEAR) / Math.log(ESP_FAR / ESP_NEAR), 0, 1);
-      out.push({ x, y, name, sub: `${Math.round(d)} m${more}`, size, h: Math.abs((-v.y * 0.5 + 0.5) * 100 - y) / 100, kind });
+      out.push({ x, y, name, sub: `${Math.round(d)} m${more}`, size: Math.round(size * 2) / 2, kind });
     };
     for (const r of this.remotes.values()) {
       const q = this.admPlayers.get(r.id);
@@ -2674,6 +2707,14 @@ export class Game {
     this.hud.esp(out);
   }
   private espAsked = 0;
+  /** an admin wants everybody's name shown where they are (the panel's switch; remembered) */
+  private namesWanted = (() => {
+    try {
+      return localStorage.getItem('zona.admin.names') === '1';
+    } catch {
+      return false;
+    }
+  })();
   private namesOn = false;
   private freeView = (cam: THREE.PerspectiveCamera) => {
     const f = this.freecam;

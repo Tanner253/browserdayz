@@ -580,6 +580,18 @@ export class HUD {
     }
   }
 
+  /** Why the server will not have this player, said under the way in for as long as it is so ('' takes it away). */
+  refused(text: string) {
+    let n = this.root.querySelector('.start-refused') as HTMLElement | null;
+    if (!n) {
+      if (!text) return;
+      n = Object.assign(document.createElement('div'), { className: 'start-refused' });
+      this.root.querySelector('.sm-enter')?.after(n);
+    }
+    n.textContent = text;
+    n.hidden = !text;
+  }
+
   /** Which sheet is open beside the way in: the map, how to play, the controls, the settings; 'play' is none. */
   private sheet(tab: string) {
     // (a thing left waiting for a key is not left waiting behind another sheet)
@@ -1053,7 +1065,8 @@ export class HUD {
    * Names over heads, as an admin's free camera shows them: each where its head is on the screen (in hundredths
    * of the screen's width and height). An empty list takes them all away.
    */
-  esp(list: { x: number; y: number; name: string; sub: string; size: number; h: number; kind: '' | 'dead' | 'ghost' | 'me' }[]) {
+  /** @param list where each name goes, as parts of the screen across and down (0 to 1) */
+  esp(list: { x: number; y: number; name: string; sub: string; size: number; kind: '' | 'dead' | 'ghost' | 'me' }[]) {
     let box = this.root.querySelector('.hud-esp') as HTMLElement | null;
     if (!box) {
       if (!list.length) return;
@@ -1061,30 +1074,32 @@ export class HUD {
     }
     while (box.children.length < list.length) {
       const n = document.createElement('i');
-      n.append(document.createElement('b'), document.createElement('small'), document.createElement('u'));
+      n.append(document.createElement('b'), document.createElement('small'));
       box.appendChild(n);
     }
-    const tall = box.clientHeight || 1;
+    if (!list.length && !this.espShown) return;
+    this.espShown = list.length;
+    // (Each name is moved by a transform, which costs the page nothing but putting it somewhere else: set by its
+    // left and top, as it was at first, every name was a new laying out of the page sixty times a second, and with
+    // a frame round each body besides. "its causing lag", 2026-10-13.)
+    const wide = box.clientWidth, tall = box.clientHeight;
     for (let i = 0; i < box.children.length; i++) {
       const n = box.children[i] as HTMLElement, q = list[i];
       if (!q) {
-        n.style.display = 'none';
+        if (n.style.display !== 'none') n.style.display = 'none';
         continue;
       }
-      n.style.display = '';
-      n.style.left = `${q.x.toFixed(2)}%`;
-      n.style.top = `${q.y.toFixed(2)}%`;
-      n.style.fontSize = `${q.size.toFixed(1)}px`;
+      if (n.style.display) n.style.display = '';
+      n.style.transform = `translate3d(${Math.round(q.x * wide)}px, ${Math.round(q.y * tall)}px, 0) translate(-50%, -100%)`;
+      const size = `${q.size}px`;
+      if (n.style.fontSize !== size) n.style.fontSize = size;
       if (n.dataset.k !== q.kind) n.dataset.k = q.kind;
-      const [name, sub, frame] = n.children as unknown as HTMLElement[];
+      const [name, sub] = n.children as unknown as HTMLElement[];
       if (name.textContent !== q.name) name.textContent = q.name;
       if (sub.textContent !== q.sub) sub.textContent = q.sub;
-      // (the frame round the body: as tall as the body stands on the screen, and never too small to find)
-      const h = Math.max(6, q.h * tall);
-      frame.style.height = `${h.toFixed(1)}px`;
-      frame.style.width = `${Math.max(6, h * 0.42).toFixed(1)}px`;
     }
   }
+  private espShown = 0;
 
   /** which of an admin's powers are on, said at the top of the screen for as long as any is ('' for none) */
   setPowers(text: string) {

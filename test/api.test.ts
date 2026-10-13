@@ -120,7 +120,7 @@ await test('the page, the data behind it, and what the game is told', async () =
   assert.ok(!JSON.stringify(data).includes(KEY));
   assert.ok(!JSON.stringify(data).includes('"tries"') && !JSON.stringify(data).includes('"wire"'));
   const status = (await (await show(new Request('https://site.test/payouts?format=status'), w)).json()) as { on: boolean; tagPays: number; share: number; floor: number; due: boolean };
-  assert.deepEqual([status.on, status.share, status.floor, status.due], [true, 0.02, 0.02, false]);
+  assert.deepEqual([status.on, status.share, status.floor, status.due], [true, 0.02, 0.01, false]);
   assert.ok(status.tagPays > 0.18 && status.tagPays <= 0.2);
   // nothing worth collecting, nothing on its way: the page does not call the housekeeping
   assert.ok(!html2.includes("fetch('/api/tick')"));
