@@ -282,13 +282,15 @@ class Out {
   roofed = false;
   /** it is paving: a floor that is walked on */
   walked = false;
+  /** what is being put now is not bent with the rest of its stuff (see `straight` in the rules) */
+  straight = false;
   private put(q: V3, n: V3, t: UV, tone: number) {
     // (snow drifts against the foot of a thing only where there is a floor for it to lie on: not at the foot of the
     // parapet's outer face, which is the top of the wall under it)
     const floor = this.ground || (Math.abs(q[0] + n[0] * 0.4) < CASTLE.hx + CASTLE.parapet.thick / 2 - 0.05 && Math.abs(q[2] + n[2] * 0.4) < CASTLE.hz + CASTLE.parapet.thick / 2 - 0.05);
     // (the second number: of an upright face, how high over its foot; of a floor that is walked on, how far from the nearest wall)
     this.s.snow.push(this.roofed ? 0 : sky(q, n), n[1] > 0.9 && this.walked ? fromWall(q) : this.base === null || !floor ? 9 : Math.max(0, q[1] - this.base));
-    const k = tone * (this.mottle ? 1 - this.mottle / 2 + this.mottle * clouds(q) : 1), p = this.bent ? warp(q, this.bent) : q;
+    const k = tone * (this.mottle ? 1 - this.mottle / 2 + this.mottle * clouds(q) : 1), p = this.bent && !this.straight ? warp(q, this.bent) : q;
     this.s.pos.push(p[0], p[1], p[2]);
     this.s.nrm.push(n[0], n[1], n[2]);
     this.s.uv.push(t[0] / this.tile, t[1] / this.tile);
@@ -413,7 +415,9 @@ function railRun(o: Out, put: Put, a: V3, b: V3, tone = 1, name = 'rail', under 
   const posts = Math.max(1, Math.round(flat / 1.1)), dir: V3 = [(b[0] - a[0]) / flat, 0, (b[2] - a[2]) / flat], ax = [dir, UP, cross(dir, UP)];
   for (let k = 0; k <= posts; k++) {
     const p = add(a, mul(sub(b, a), k / posts));
-    block(o, lift(p, RAIL.top / 2), ax, [0.03, RAIL.top / 2, 0.03], tone, 1);
+    // (where two runs meet at a corner each has its post there, and the two were one block twice: the post of a run that goes north and south is a little the thinner and the shorter, and stands inside the other)
+    const thin = (Math.abs(dir[2]) > Math.abs(dir[0]) ? 0.004 : 0) + (k === 0 ? 0.002 : k === posts ? 0.001 : 0) + (dir[0] + dir[2] < 0 ? 0.0005 : 0);
+    block(o, lift(p, RAIL.top / 2 - thin), ax, [0.03 - thin, RAIL.top / 2 - thin, 0.03 - thin], tone, 1);
   }
   const n = Math.max(1, Math.ceil(Math.abs(b[1] - a[1]) / 0.4));
   for (let k = 0; k < n; k++) {
@@ -551,6 +555,8 @@ function wallPart(w: Wall, o: Out, core: Out, put: Put, lod: number) {
         round.set(p, s1);
         o.quad([at(c.u0, b0, -1), at(c.u1, b1, -1), at(c.u1, b1, 1), at(c.u0, b0, 1)], [[-half, base + p.u0 + s0], [-half, base + p.u0 + s1], [half, base + p.u0 + s1], [half, base + p.u0 + s0]], soffit(p, (c.u0 + c.u1) / 2), tone * 0.8, [n0, n1, n1, n0]);
       } else if (b0 > w.y0 + 0.005 || b1 > w.y0 + 0.005) face(b0, b1, [0, -1, 0], 0.8);
+      // (a wall whose foot is in the air, over a way: its underside. Left unmade, whoever stood at the foot of the hatch's steps and looked up saw into the wall across the back of its well, and through it.)
+      else if (w.soffit && si === 0) face(b0, b1, [0, -1, 0], 0.8);
     }
   });
   // the ends of it, the jambs of its openings, and the steps of a broken top: wherever stone stands beside none
@@ -792,7 +798,10 @@ function apronPart(p: Apron, o: Out, put: Put, ground: (x: number, z: number) =>
 
 function lumpPart(l: Lump, o: Out, put: Put, lod: number) {
   const tone = l.tone ?? 1, yaw = hash(l.seed, 1, 77) * Math.PI, cy = Math.cos(yaw), sy = Math.sin(yaw), ax: V3[] = [[cy, 0, -sy], UP, [sy, 0, cy]];
-  if (l.blocky || lod) block(o, [l.x, l.y, l.z], ax, [l.rx, l.ry, l.rz], tone * (0.9 + 0.2 * hash(l.seed, 2, 77)));
+  // (a block of a heap: each stands a little taller than it was said, by its own amount, on the foot it was given. Said
+  // at one height, the blocks of a heap that lie into one another had their tops in one plane.)
+  const more = l.blocky ? l.ry * 0.34 * hash(l.seed, 5, 77) : 0;
+  if (l.blocky || lod) block(o, [l.x, l.y + more, l.z], ax, [l.rx, l.ry + more, l.rz], tone * (0.9 + 0.2 * hash(l.seed, 2, 77)));
   else {
     // a rock: a ball of a few flat faces, each corner pushed in or out by its own amount
     const A = 7, B = 4, pt = (i: number, j: number): V3 => {
@@ -1136,6 +1145,7 @@ function emit(p: Part, of: (paint: Paint) => Out, solids: Solid[] | null, lod: n
   o.ground = !!p.sits || p.t === 'apron';
   o.roofed = !!p.roofed;
   o.walked = p.paint === 'paving';
+  o.straight = !!p.straight;
   if (p.t === 'tower') of('timber').base = of('base').base = null;
   if (p.t === 'wall' && p.paint === 'stone') Object.assign(of('base'), { base: o.base, ground: o.ground, roofed: o.roofed });
   if (p.t === 'box' && p.name === 'footing') {
@@ -1177,13 +1187,16 @@ function emit(p: Part, of: (paint: Paint) => Out, solids: Solid[] | null, lod: n
  * @param loose the loose pieces, in the fort's own measure: where nobody has said, where the real ones stand
  * @param rock whether the rock the ramp leaves from is made (not where the mountain itself comes up to the ramp's foot)
  */
-export function castleShape(ground: (x: number, z: number) => number = castleGround, loose: Loose[] = LOOSE, rock = true, tally?: Record<string, number>): Shape {
-  const steps = castleShapeSteps(ground, loose, rock, tally);
+export function castleShape(ground: (x: number, z: number) => number = castleGround, loose: Loose[] = LOOSE, rock = true, tally?: Record<string, number>, note?: Note): Shape {
+  const steps = castleShapeSteps(ground, loose, rock, tally, note);
   for (;;) {
     const r = steps.next();
     if (r.done) return r.value;
   }
 }
+
+/** For whoever looks the shape over piece by piece (which faces of two pieces lie in one plane): told of each piece as it is made from near, whether it is of the lower levels, and how long each sheet's row of corners was before it and after ([sheet by sheet, in SHEETS' order]) */
+export type Note = (part: Part, low: boolean, from: number[], to: number[]) => void;
 
 /**
  * THE SAME, A PIECE AT A TIME, for whoever cannot stop for it (the game, as it starts: all of it at once was three
@@ -1193,15 +1206,10 @@ export function castleShape(ground: (x: number, z: number) => number = castleGro
  * finished. After that it stops after every piece, handing over nothing; and at the end it hands over the whole.
  * The shape it makes is the one `castleShape` makes, to the last number.
  */
-export function* castleShapeSteps(ground: (x: number, z: number) => number = castleGround, loose: Loose[] = LOOSE, rock = true, tally?: Record<string, number>): Generator<Shape | undefined, Shape, void> {
+export function* castleShapeSteps(ground: (x: number, z: number) => number = castleGround, loose: Loose[] = LOOSE, rock = true, tally?: Record<string, number>, note?: Note): Generator<Shape | undefined, Shape, void> {
   const sheets = () => Object.fromEntries(SHEETS.map((p) => [p, skin()])) as Record<Sheet, Skin>;
   const near = sheets(), under = sheets(), far = skin(), solids: Solid[] = [];
   const all = [...castleParts().filter((p) => rock || !/outcrop|ramp head/.test(p.name ?? '')), ...loose.flatMap((l) => looseParts(l, ground(l.x, l.z)))].map((raw) => (raw.sits ? lifted(raw, ground(raw.sits[0], raw.sits[1])) : raw));
-  // (the blocks that hide what lies against them: those that are seen, stop everything, and stand square to the fort)
-  const hides = hidesOf(all.flatMap((p): Hide[] => (p.t === 'box' && !p.hidden && !p.yaw && p.paint !== 'water' && p.at !== 'far' && (p.body ?? 'all') === 'all' ? [{ x0: p.x0, x1: p.x1, y0: p.y0, y1: p.y1, z0: p.z0, z1: p.z1, by: WARP[p.paint], low: !!p.low }] : [])));
-  const outs = (to: Record<Sheet, Skin>, low: boolean) => Object.fromEntries(PAINTS.map((p) => [p, new Out(to[STUFF[p].sheet], TILE[p], STUFF[p].tint, MOTTLE[p], PIECE[p], WARP[p], hides, low)])) as Record<Paint, Out>;
-  const nears = outs(near, false), unders = outs(under, true);
-  const fars = Object.fromEntries(PAINTS.map((p) => [p, new Out(far, 1, FAR_TINT[p], MOTTLE[p], 0, WARP[p])])) as Record<Paint, Out>;
   // (where each hatch's passage goes through the foot of a wall, half way between its ends)
   const gaps: Gap[] = loose.filter((l) => l.kind === 'hatch').flatMap((l) => {
     // (along the last eight metres of its passage, by the fort)
@@ -1212,13 +1220,24 @@ export function* castleShapeSteps(ground: (x: number, z: number) => number = cas
     }
     return out;
   });
+  // (the blocks that hide what lies against them: those that are seen, stop everything, and stand square to the fort.
+  // NOT one that a hatch's passage goes through: it is said as a whole block and made with a way through it, and said
+  // to hide, it hid the passage: the last pace and a half of its floor, its walls and its roof were left unmade where
+  // it comes in under the wall's footing. 2026-10-13: "the path underground at the base of the stairs is bugged with
+  // panels and textures missing".)
+  const holed = (b: { x0: number; x1: number; y0: number; y1: number; z0: number; z1: number }) => gaps.some((q) => q.x > b.x0 - 0.9 && q.x < b.x1 + 0.9 && q.z > b.z0 - 0.9 && q.z < b.z1 + 0.9 && q.y1 > b.y0 && q.y0 < b.y1);
+  const hides = hidesOf(all.flatMap((p): Hide[] => (p.t === 'box' && !p.hidden && !p.yaw && p.paint !== 'water' && p.at !== 'far' && (p.body ?? 'all') === 'all' && !holed(p) ? [{ x0: p.x0, x1: p.x1, y0: p.y0, y1: p.y1, z0: p.z0, z1: p.z1, by: WARP[p.paint], low: !!p.low }] : [])));
+  const outs = (to: Record<Sheet, Skin>, low: boolean) => Object.fromEntries(PAINTS.map((p) => [p, new Out(to[STUFF[p].sheet], TILE[p], STUFF[p].tint, MOTTLE[p], PIECE[p], WARP[p], hides, low)])) as Record<Paint, Out>;
+  const nears = outs(near, false), unders = outs(under, true);
+  const fars = Object.fromEntries(PAINTS.map((p) => [p, new Out(far, 1, FAR_TINT[p], MOTTLE[p], 0, WARP[p])])) as Record<Paint, Out>;
   const ways: Way[] = loose.filter((l) => l.kind === 'hatch').map((l) => ({ L: hatchLine(l, ground(l.x, l.z)), g: ground(l.x, l.z) }));
   const shape: Shape = { near, under, far, farOwn: 0, solids };
   /** a piece as it is from near: drawn, and what of it stops a body */
   const close = (p: Part) => {
     // (`tally`, for whoever asks what it costs: how many triangles each kind of piece is drawn with from near, by its name)
-    const to = p.low ? under : near, was = tally ? SHEETS.reduce((t, s) => t + to[s].pos.length, 0) : 0;
+    const to = p.low ? under : near, was = tally ? SHEETS.reduce((t, s) => t + to[s].pos.length, 0) : 0, from = note ? SHEETS.map((s) => to[s].pos.length) : [];
     emit(p, (paint) => (p.low ? unders : nears)[paint], solids, 0, ground, gaps, ways);
+    note?.(p, !!p.low, from, SHEETS.map((s) => to[s].pos.length));
     if (tally) {
       const key = `${p.low ? 'under' : 'near'} ${p.t} ${p.name ?? ''}`;
       tally[key] = (tally[key] ?? 0) + (SHEETS.reduce((t, s) => t + to[s].pos.length, 0) - was) / 9;
@@ -1258,7 +1277,7 @@ export function* castleShapeSteps(ground: (x: number, z: number) => number = cas
   for (const p of all) {
     if (p.at === 'far' || p.t === 'apron') continue;
     // (a tower in its sections: but not for whoever is counting what each piece comes to, who wants it whole)
-    towerLater.on = p.t === 'tower' && !tally;
+    towerLater.on = p.t === 'tower' && !tally && !note;
     close(p);
     towerLater.on = false;
     const sections = towerLater.sections;

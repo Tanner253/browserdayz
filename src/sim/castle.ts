@@ -134,6 +134,8 @@ interface Common {
   low?: boolean;
   /** it has a roof of its own over it (a passage under the ground): no snow lies on it */
   roofed?: boolean;
+  /** it is not bent as the rest of its stuff is (hand-laid stone bellies a hand either way): what is set into a piece of the kit, which is straight, and would come out through its face */
+  straight?: boolean;
 }
 /** a block, its sides square to the fort (or turned `yaw` about its own middle) */
 export interface Box extends Common { t: 'box'; x0: number; x1: number; y0: number; y1: number; z0: number; z1: number; yaw?: number }
@@ -152,7 +154,7 @@ export interface Opening { u0: number; u1: number; y0: number; y1: number; arch?
  * somebody walking it), from `y0` up to `top` (one height, or one for each of so many equal lengths of it, which
  * is a broken top), with openings said by how far along it they are.
  */
-export interface Wall extends Common { t: 'wall'; a: [number, number]; b: [number, number]; y0: number; top: number | number[]; thick: number; openings?: Opening[] }
+export interface Wall extends Common { t: 'wall'; a: [number, number]; b: [number, number]; y0: number; top: number | number[]; thick: number; openings?: Opening[]; /** it stands over a way (its foot is in the air): its underside is seen, and is made. A wall that stands on something has none. */ soffit?: boolean }
 /** a wall that leans: its face only, from the line `a` to `b` at the terrace down to `y0`, out by a metre for every `lean` down */
 /** (`sag`: a length of it that has fallen out, from so far along it to so far, down to this height) */
 export interface Curtain extends Common { t: 'curtain'; a: [number, number]; b: [number, number]; y0: number; lean: number; sag?: [number, number, number] }
@@ -580,7 +582,11 @@ function layOut(): Part[] {
   const SPRING = UF + 2.05;
   // its floors: the cistern's, a knee under the rest; and the rest (open over the stair down to the sally port)
   for (const [x0, x1, z0, z1] of tiles(-U.x - 0.4, CI.x1, -U.z - 0.4, CI.z1, [])) lbox('paving', x0, x1, CF - 0.5, CF, z0, z1, { name: 'cistern floor', tone: 0.7 });
-  for (const [x0, x1, z0, z1] of tiles(-U.x - 0.4, U.x + 0.4, -U.z - 0.4, U.z + 0.4, [[-U.x - 0.4, CI.x1, -U.z - 0.4, CI.z1], [PS.x0, PS.x1, PS.head, PS.end]])) lbox('paving', x0, x1, UF - 0.5, UF, z0, z1, { name: 'undercroft floor', tone: 0.82 });
+  for (const [x0, x1, z0, z1] of tiles(-U.x - 0.4, U.x + 0.4, -U.z - 0.4, U.z + 0.4, [[-U.x - 0.4, CI.x1, -U.z - 0.4, CI.z1], [K.x0, CI.x1, CI.z1 - 0.01, CI.z1 + 0.1], [PS.x0, PS.x1, PS.head, PS.end]])) lbox('paving', x0, x1, UF - 0.5, UF, z0, z1, { name: 'undercroft floor', tone: 0.82 });
+  // (Its edge along the cistern is inside the thickness of the keep's north foundation, not in the plane of that wall's
+  // face; and no wall of the lower levels has a sill or a top in the plane of it: each either stands from under it
+  // with its doorways cut from its own foot, or has a threshold a finger proud. Two faces in one plane are drawn
+  // turn and turn about, and were seen to: 2026-10-13, "many textures are overlapping in the castle".)
   // its outer walls (each ends where the foot of a tower comes into the corner: that is the wall there). The west
   // one has the postern's doorway in it; the east one is gone where it fell out.
   const WE = 7.05;
@@ -631,7 +637,7 @@ function layOut(): Part[] {
 
   // THE RENT in the east wall: where a length of it fell out. What is left either side shows what a wall is filled
   // with; its stone lies in a slope from the floor down to the hill outside, and a little way in over that floor.
-  for (const [z, side] of [[U.rent.z0, -1], [U.rent.z1, 1]]) parts.push({ t: 'wall', paint: 'base', tone: 0.85, at: 'both', name: 'broken wall end', a: [U.x, z + side * 0.3], b: [ex + 0.9, z + side * 0.3], y0: UF - 0.5, top: [-0.05, -0.5, -1.3, -2.3, -3.2], thick: 0.6 });
+  for (const [z, side] of [[U.rent.z0, -1], [U.rent.z1, 1]]) parts.push({ t: 'wall', paint: 'base', tone: 0.85, at: 'both', name: 'broken wall end', a: [U.x + 0.6, z + side * 0.3], b: [ex + 0.9, z + side * 0.3], y0: UF - 0.5, top: [-0.05, -0.5, -1.3, -2.3, -3.2], thick: 0.6 });
   parts.push({ t: 'mound', paint: 'scree', at: 'both', name: 'fallen wall', kind: 'rent', x0: U.rent.in - 0.6, x1: 17.7, z0: PS.end + 0.35, z1: U.rent.z1 + 4.2, cell: 0.35 });
   for (let k = 0; k < 10; k++) {
     const x = 8.6 + hash(k, 1, 541) * 6.5, z = U.rent.z0 + 0.3 + hash(k, 2, 541) * (U.rent.z1 - U.rent.z0 - 0.6) + (hash(k, 6, 541) - 0.3) * Math.max(0, x - 11.5) * 0.5;
@@ -640,10 +646,12 @@ function layOut(): Part[] {
 
   // THE ARMOURY: the keep's foundations are its walls. One door, on the south; the wall on the north is thin (the
   // cistern runs in under the keep there) and has the door of the stair in it; a wall shuts the stair's slot off.
-  const arched = (u0: number, u1: number): Opening => ({ u0, u1, y0: UF, y1: UF + 2.15, arch: true });
-  const found = (a: [number, number], b: [number, number], thick: number, openings: Opening[]) => void parts.push({ t: 'wall', paint: 'stone', low: true, name: 'keep foundation', a, b, y0: CF, top: U.roof, thick, openings });
-  found([K.x0, (CI.z1 + M.z0) / 2], [K.x1, (CI.z1 + M.z0) / 2], M.z0 - CI.z1, [arched(2.25 - K.x0, 3.15 - K.x0)]);
-  found([K.x1, (K.z1 + M.z1) / 2], [K.x0, (K.z1 + M.z1) / 2], K.z1 - M.z1, [arched(K.x1 + 0.5, K.x1 + 1.7)]);
+  // (the north one stands in the cistern, from the cistern's floor: the door of the stair in it has a threshold, a finger
+  // proud of the floor. The other three stand from just under the floor, and the south one's door is cut from its foot.)
+  const arched = (u0: number, u1: number, y0: number): Opening => ({ u0, u1, y0, y1: UF + 2.15, arch: true });
+  const found = (a: [number, number], b: [number, number], thick: number, openings: Opening[], y0 = UF - 0.02) => void parts.push({ t: 'wall', paint: 'stone', low: true, name: 'keep foundation', a, b, y0, top: U.roof, thick, openings });
+  found([K.x0, (CI.z1 + M.z0) / 2], [K.x1, (CI.z1 + M.z0) / 2], M.z0 - CI.z1, [arched(2.25 - K.x0, 3.15 - K.x0, UF + 0.015)], CF);
+  found([K.x1, (K.z1 + M.z1) / 2], [K.x0, (K.z1 + M.z1) / 2], K.z1 - M.z1, [arched(K.x1 + 0.5, K.x1 + 1.7, UF - 0.02)]);
   found([(K.x0 + M.x0) / 2, M.z1], [(K.x0 + M.x0) / 2, M.z0], M.x0 - K.x0, []);
   found([(K.x1 + M.x1) / 2, M.z0], [(K.x1 + M.x1) / 2, M.z1], K.x1 - M.x1, []);
   parts.push({ t: 'wall', paint: 'stone', low: true, name: 'armoury wall', a: [M.x0, U.armoury.z0 - 0.1], b: [M.x1, U.armoury.z0 - 0.1], y0: UF, top: U.roof, thick: 0.2 });
@@ -683,12 +691,25 @@ function layOut(): Part[] {
   lbox('base', U.crawl + 0.15, K.x0, UF + 1.22, UF + 1.62, 0.9, 3.3, { name: 'fallen slab', tone: 0.9 });
   // the east side: the stair down to the passage out, in a slot along the outer wall, railed on the side's own side
   flight([(PS.x0 + PS.x1) / 2, PS.deep, PS.foot], [(PS.x0 + PS.x1) / 2, UF, PS.head], PS.x1 - PS.x0, { paint: 'base', name: 'stair to the passage out', low: true });
-  lbox('base', PS.x0 - 0.25, PS.x0, PS.deep - 0.3, UF - 0.5, PS.head, PS.end + 0.25, { name: 'passage stair wall' });
-  lbox('base', PS.x1, PS.x1 + 0.25, PS.deep - 0.3, UF, PS.head, POSTERN.z - 0.75, { name: 'passage stair wall' });
-  lbox('base', PS.x1, PS.x1 + 0.25, PS.deep - 0.3, UF, POSTERN.z + 0.75, PS.end + 0.25, { name: 'passage stair wall' });
-  lbox('base', PS.x1, PS.x1 + 0.25, PS.deep + U.hatch.tall, UF, POSTERN.z - 0.75, POSTERN.z + 0.75, { name: 'passage stair wall' });
-  lbox('base', PS.x0 - 0.25, PS.x1 + 0.25, PS.deep - 0.3, UF, PS.end, PS.end + 0.25, { name: 'passage stair wall' });
+  // (each of its walls stops at the underside of the floor, whose edge is the lip of the slot; and the two long ones stop at the end one)
+  lbox('base', PS.x0 - 0.25, PS.x0, PS.deep - 0.3, UF - 0.5, PS.head, PS.end, { name: 'passage stair wall' });
+  lbox('base', PS.x1, PS.x1 + 0.25, PS.deep - 0.3, UF - 0.5, PS.head, POSTERN.z - 0.75, { name: 'passage stair wall' });
+  lbox('base', PS.x1, PS.x1 + 0.25, PS.deep - 0.3, UF - 0.5, POSTERN.z + 0.75, PS.end, { name: 'passage stair wall' });
+  lbox('base', PS.x1, PS.x1 + 0.25, PS.deep + U.hatch.tall, UF - 0.5, POSTERN.z - 0.75, POSTERN.z + 0.75, { name: 'passage stair wall' });
+  lbox('base', PS.x0 - 0.25, PS.x1 + 0.25, PS.deep - 0.3, UF - 0.5, PS.end, PS.end + 0.25, { name: 'passage stair wall' });
   lbox('base', PS.x0, PS.x1, PS.deep - 0.3, PS.deep, PS.foot, PS.end, { name: 'passage landing' });
+  // THE DOORWAY'S CASE, on the passage's side of it: a sill, a head and two jambs of stone, square to the fort, a pace
+  // into the passage. The passage comes to this doorway at a slant (it is made to wherever the hatch is), and its
+  // floor, its roof and its walls end square to ITS line: between their ends and the wall of the slot there was a
+  // wedge open on one side, a hand to a foot wide, in the floor, the roof and the wall (2026-10-13: "the path
+  // underground at the base of the stairs is bugged with panels ... missing"). The case stands a finger behind
+  // the passage's own faces, and is what is seen wherever those stop short.
+  {
+    const x0 = PS.x1 - 0.02, x1 = PS.x1 + 0.25 + 0.75, z0 = POSTERN.z - 0.75, z1 = POSTERN.z + 0.75, tall = U.hatch.tall;
+    lbox('base', x0, x1, PS.deep - 0.3, PS.deep - 0.005, z0 - 0.3, z1 + 0.3, { name: 'sally port doorway', tone: 0.78 });
+    lbox('base', PS.x1 + 0.24, x1, PS.deep + tall + 0.008, PS.deep + tall + 0.32, z0 - 0.3, z1 + 0.3, { name: 'sally port doorway', tone: 0.78, body: 'none' });
+    for (const [a, b] of [[z0 - 0.3, z0 - 0.02], [z1 + 0.02, z1 + 0.3]]) lbox('base', PS.x1 + 0.24, x1, PS.deep - 0.3, PS.deep + tall + 0.32, a, b, { name: 'sally port doorway', tone: 0.78, body: 'none' });
+  }
   parts.push({ t: 'rail', paint: 'timber', body: 'feet', low: true, a: [PS.x0, UF, PS.head + 0.3], b: [PS.x0, UF, PS.end], name: 'passage stair rail' });
   parts.push({ t: 'rail', paint: 'timber', body: 'feet', low: true, a: [PS.x0, UF, PS.end], b: [PS.x1, UF, PS.end], name: 'passage stair rail' });
   // under the hole in the north-west tower's boards: what fell through, lying clear of the way from under the hole to the cellar's doorway
@@ -713,11 +734,12 @@ function layOut(): Part[] {
     for (const [u0, u1, whole] of gaps(side)) {
       // (where a merlon stood there is no top to the parapet under it: what shows is the wall's core, a course or two of it left)
       if (whole) {
-        along(side, 'base', u0 + 0.02, u1 - 0.02, faceIn + 0.02, half - 0.02, sill - 0.3, sill + 0.04 + hash(Math.round(u0 * 7), seed, 1) * 0.22, { name: 'merlon stump', tone: 0.85, body: 'none' });
+        // (set a hand inside the kit's parapet on both its faces, and straight as the kit is: laid two fingers inside it and bent as rough stone is, it came out through the parapet's face and lay in the plane of it by turns)
+        along(side, 'base', u0 + 0.04, u1 - 0.04, faceIn + 0.09, half - 0.09, sill - 0.3, sill + 0.04 + hash(Math.round(u0 * 7), seed, 1) * 0.22, { name: 'merlon stump', tone: 0.85, body: 'none', straight: true });
         continue;
       }
       // (a length of parapet gone to the walk: a broken end of it either side)
-      for (const [a, b] of [[u0 - 0.28, u0 + 0.02], [u1 - 0.02, u1 + 0.28]]) if (!(side === 'e' && a > UNDER.rent.z0 - 0.4)) along(side, 'base', a, b, faceIn + 0.01, half - 0.01, 0, sill - 0.04 - hash(Math.round(a * 9), seed, 2) * 0.2, { name: 'broken parapet', tone: 0.85 });
+      for (const [a, b] of [[u0 - 0.28, u0 + 0.02], [u1 - 0.02, u1 + 0.28]]) if (!(side === 'e' && a > UNDER.rent.z0 - 0.4)) along(side, 'base', a, b, faceIn + 0.05, half - 0.05, 0.03, sill - 0.04 - hash(Math.round(a * 9), seed, 2) * 0.2, { name: 'broken parapet', tone: 0.85, straight: true });
     }
     // the stone of what is gone: flat on the paving inside (low enough to be walked over), and tumbled outside
     for (const [a, b, whole] of gaps(side)) for (let k = 0; k < (whole ? 2 : 5); k++) {
@@ -1122,8 +1144,23 @@ export function looseParts(l: Loose, g = castleGround(l.x, l.z)): Part[] {
     const back: V3 = [L.foot[0] + L.d[0] * 0.5, g, L.foot[2] + L.d[1] * 0.5];
     parts.push({ t: 'flight', paint: 'base', foot: L.foot, head: L.head, w: H.wide, body: 'feet', name: 'hatch steps' });
     // its two cheeks, a hand over the ground at the head of the steps and knee high at the back, and the wall across the back
-    for (const side of [-1, 1]) parts.push({ t: 'wall', paint: 'stone', tone: 0.9, name: 'hatch kerb', a: flat(side > 0 ? L.head : back, side * (w + 0.15)), b: flat(side > 0 ? back : L.head, side * (w + 0.15)), y0: g - H.drop - 0.3, top: (side > 0 ? [0.14, 0.3, 0.46, 0.62, 0.78] : [0.78, 0.62, 0.46, 0.3, 0.14]).map((t) => g + t), thick: 0.3 });
-    parts.push({ t: 'wall', paint: 'stone', tone: 0.9, name: 'hatch kerb', a: flat(back, w + 0.3), b: flat(back, -w - 0.3), y0: g - H.drop + H.tall, top: g + 0.8, thick: 0.3 });
+    // (The cheeks run to the far face of the wall across the back, which stands between them; and the passage's own walls
+    // and its roof begin there. Run past each other, a cheek and a wall of the passage were two faces in one plane at
+    // the foot of the steps, and so were the back wall's ends and the cheeks outside: 2026-10-13, "the path underground
+    // at the base of the stairs is bugged with panels and textures".)
+    // (How far past the foot of the steps each cheek goes: to the far face of the back wall, 0.65; but on the inside of
+    // the passage's first bend no further than that bend's corner, where the next length's wall takes over.)
+    const reach = (side: number) => {
+      if (L.path.length < 3) return 0.65;
+      const p0 = L.path[0], p1 = L.path[1], p2 = L.path[2], l0 = Math.hypot(p1[0] - p0[0], p1[2] - p0[2]), l1 = Math.hypot(p2[0] - p1[0], p2[2] - p1[2]);
+      const e0 = [(p1[0] - p0[0]) / l0, (p1[2] - p0[2]) / l0], e1 = [(p2[0] - p1[0]) / l1, (p2[2] - p1[2]) / l1], turn = e0[0] * e1[1] - e0[1] * e1[0];
+      const corner = l0 + (turn < 0 ? -side : side) * Math.tan(Math.acos(Math.min(1, Math.max(-1, e0[0] * e1[0] + e0[1] * e1[1]))) / 2) * w;
+      return Math.max(0.2, Math.min(0.65, corner));
+    };
+    const far = (side: number): V3 => [L.foot[0] + L.d[0] * reach(side), g, L.foot[2] + L.d[1] * reach(side)];
+    // (of the passage's own rough stone, all of it: two stuffs are each bent their own way, and where a cheek of one met a wall of the other edge to edge a gap opened between them, a finger wide here and a hand there)
+    for (const side of [-1, 1]) parts.push({ t: 'wall', paint: 'base', tone: 0.92, name: 'hatch kerb', a: flat(side > 0 ? L.head : far(side), side * (w + 0.15)), b: flat(side > 0 ? far(side) : L.head, side * (w + 0.15)), y0: g - H.drop - 0.3, top: (side > 0 ? [0.14, 0.3, 0.46, 0.62, 0.78] : [0.78, 0.62, 0.46, 0.3, 0.14]).map((t) => g + t), thick: 0.3 });
+    parts.push({ t: 'wall', paint: 'base', tone: 0.92, name: 'hatch kerb', a: flat(back, w), b: flat(back, -w), y0: g - H.drop + H.tall, top: g + 0.8, thick: 0.3, soffit: true });
     // the leaf that was thrown back, lying on the ground beside it; and the one that fell in, on the steps
     const mid: V3 = [(L.head[0] + L.foot[0]) / 2, g, (L.head[2] + L.foot[2]) / 2];
     parts.push({ t: 'slab', paint: 'timber', tone: 0.8, body: 'none', name: 'hatch leaf', p: [at(L.head, w + 0.45, 0.1), at(back, w + 0.45, 0.16), at(back, w + 1.15, 0.07), at(L.head, w + 1.15, 0.05)], thick: 0.05 });
@@ -1142,30 +1179,48 @@ export function looseParts(l: Loose, g = castleGround(l.x, l.z)): Part[] {
      * At the bend after length `k`: how far past the bend the wall on one side (`sgn`) is carried to meet its fellow
      * of the next length. On the outside of the bend that is on past it; on the inside it is short of it, by as much:
      * so the two lengths meet at a corner with no gap outside it and nothing standing in the way inside it.
+     * (Measured to where the two walls' FACES ON THE PASSAGE meet. On the outside of a bend that is where their
+     * middle lines meet, less a little, and each wall's end is in the other. On the inside the walls stand round a
+     * corner of earth and the passage is on the outside of that corner: carried only to where their middle lines
+     * meet, the two left a notch open between their ends, a hand wide, at every inside corner of the passage, and
+     * through it the backs of both were seen. There each is carried to where their faces meet, which is further.)
      */
     const mitre = (k: number, sgn: number) => {
       if (k < 0 || k + 1 >= dirs.length) return 0;
-      const e0 = dirs[k], e1 = dirs[k + 1], turn = e0[0] * e1[1] - e0[1] * e1[0], half = Math.tan(Math.acos(Math.min(1, Math.max(-1, e0[0] * e1[0] + e0[1] * e1[1]))) / 2) * (w + 0.125);
       // (the side that is across at +1 is the inside of a bend that turns toward it, which is where `turn` is under nothing)
-      return (turn < 0 ? -sgn : sgn) * half;
+      const e0 = dirs[k], e1 = dirs[k + 1], turn = e0[0] * e1[1] - e0[1] * e1[0], out = turn < 0 ? -sgn : sgn;
+      return out * Math.tan(Math.acos(Math.min(1, Math.max(-1, e0[0] * e1[0] + e0[1] * e1[1]))) / 2) * (out < 0 ? w : w + 0.125);
     };
+    /** how far past a bend its floor and its roof go: as far as the wall on its outside */
+    const past = (k: number) => Math.max(Math.abs(mitre(k, 1)), Math.abs(mitre(k, -1)));
     for (let k = 0; k + 1 < L.path.length; k++) {
       const a0 = L.path[k], b0 = L.path[k + 1], len = Math.hypot(b0[0] - a0[0], b0[2] - a0[2]), e = dirs[k], last = k + 2 === L.path.length;
       // (a place so far along it from one of its ends, on the line of its floor: which climbs)
       const on = (p: V3, by: number): V3 => [p[0] + e[0] * by, p[1] + (by * (b0[1] - a0[1])) / len, p[2] + e[1] * by];
       // (its floor and its roof reach as far past each bend as the outer wall does: the corner is floored and roofed. One length's lie a hair under the next's, so that where they overlap one of them is seen and not both at once.)
-      const a = on(a0, k === 0 ? -0.2 : -Math.abs(mitre(k - 1, 1))), b = on(b0, last ? 0.1 : Math.abs(mitre(k, 1))), hair = (k % 2) * 0.004;
+      const a = on(a0, k === 0 ? -0.2 : -past(k - 1)), b = on(b0, last ? 0.1 : past(k)), hair = (k % 2) * 0.004;
       const off = (p: V3, across: number, up = 0): V3 => [p[0] + e[1] * across, p[1] + up, p[2] - e[0] * across], plan = (p: V3, across: number): [number, number] => [p[0] + e[1] * across, p[2] - e[0] * across];
       parts.push({ t: 'slab', ...o, name: 'passage floor', p: [off(a, -w, -hair), off(b, -w, -hair), off(b, w, -hair), off(a, w, -hair)], thick: 0.3 });
-      const m = k === 0 ? on(a0, 0.35) : a;
+      const m = k === 0 ? on(a0, 0.65) : a;
       parts.push({ t: 'slab', ...o, name: 'passage roof', p: [off(m, -w, H.tall + 0.3 + hair), off(b, -w, H.tall + 0.3 + hair), off(b, w, H.tall + 0.3 + hair), off(m, w, H.tall + 0.3 + hair)], thick: 0.3 });
       {
-        // (what is seen of its roof: a round one of the same rough stone from wall to wall, under the slabs; gone where the slab came down)
-        const down = Math.hypot((a0[0] + b0[0]) / 2 - m[0], (a0[2] + b0[2]) / 2 - m[2]);
-        parts.push({ t: 'vault', ...o, tone: 0.72, name: 'passage vault', a: [m[0], m[2]], b: [b[0], b[2]], wide: 2 * w, spring: m[1] + H.tall - 0.62, crown: m[1] + H.tall - 0.01, lift: b[1] - m[1], gone: L.path.length > 3 && k === 2 ? [[down - 1.25, down + 1.25]] : undefined });
+        // What is seen of its roof: a round one of the same rough stone from wall to wall, under the slabs; gone where
+        // the slab came down. It keeps to the straight of each length: it stops short of the square of each bend,
+        // which the flat slabs roof, and at each of its ends an arch of stone stands across the passage, the round's
+        // own shape, closing what is between the round and the slabs. (Run on through the bends, two rounds crossed,
+        // and each was seen from behind through the other; and at an end with no arch the hollow over the round was
+        // looked into from the bend. Found by the check that looks every way from every pace of it.)
+        const v0 = k === 0 ? 0.65 : past(k - 1) + w + 0.2, v1 = last ? len + 0.1 : len - past(k) - w - 0.2;
+        if (v1 - v0 > 1.6) {
+          const va = on(a0, v0), vb = on(a0, v1), down = len / 2 - v0;
+          parts.push({ t: 'vault', ...o, tone: 0.72, name: 'passage vault', a: [va[0], va[2]], b: [vb[0], vb[2]], wide: 2 * w, spring: va[1] + H.tall - 0.62, crown: va[1] + H.tall - 0.01, lift: vb[1] - va[1], gone: L.path.length > 3 && k === 2 ? [[down - 1.25, down + 1.25]] : undefined });
+          for (const p of last ? [va] : [va, vb]) parts.push({ t: 'wall', ...o, tone: 0.74, body: 'none', name: 'passage arch', a: plan(p, -w), b: plan(p, w), y0: p[1] - 0.05, top: p[1] + H.tall + 0.02, thick: 0.34, openings: [{ u0: 0, u1: 2 * w, y0: p[1] - 0.05, y1: p[1] + H.tall - 0.01, arch: true, rise: 0.61 }] });
+        }
       }
       for (const sgn of [-1, 1]) {
-        const from = on(a0, k === 0 ? -0.2 : -mitre(k - 1, sgn)), to = on(b0, last ? 0.1 : mitre(k, sgn));
+        const from = on(a0, k === 0 ? reach(sgn) : -mitre(k - 1, sgn)), to = on(b0, last ? 0.1 : mitre(k, sgn));
+        // (on the inside of the first bend the hatch's own cheek is the wall as far as the corner: there is none of the passage's to make)
+        if ((to[0] - from[0]) * e[0] + (to[2] - from[2]) * e[1] < 0.05) continue;
         // (in pieces of three metres, each as high as its own roof and no higher: a length that climbs two metres had walls level with its upper end from end to end, and at its lower end they stood a metre out of the ground behind the hatch, where a walker was held by them)
         const n = Math.max(1, Math.ceil(Math.hypot(to[0] - from[0], to[2] - from[2]) / 3)), at = (t: number): V3 => [from[0] + (to[0] - from[0]) * t, from[1] + (to[1] - from[1]) * t, from[2] + (to[2] - from[2]) * t];
         for (let i = 0; i < n; i++) {
@@ -1537,15 +1592,24 @@ export function castleLamps(p: Place, ground?: GroundAt, loose?: Loose[]): V3[] 
 }
 
 /**
- * Where the infected of the place live. They have the ruined village, and they have the lower levels, where it is
- * dark (three of them, in the galleries); they do not have the terrace, the keep, the towers or the roof, which are
- * for whoever holds the fort and whoever comes to take it.
+ * Where the infected of the place live: the ruined village, one to each of its houses; and four of the garrison's
+ * dead on the open ground before the gate, where the way up comes to the foot of the ramp. They do not have the
+ * terrace, the keep, the towers or the roof, which are for whoever holds the fort and whoever comes to take it.
+ *
+ * NOT THE LOWER LEVELS, for now (2026-10-13: "zombies spawn in the castle and get stuck and bugged in collision").
+ * Four were stood in the aid post and about the galleries. One of the infected drifts in a straight line toward a
+ * spot up to fifteen metres from the middle of where it lives, and gives up when it is stopped (src/game/infected.ts:
+ * it finds doors only in the valley's houses and down the bunker). Under the fort every room is a few paces across
+ * and the middle of their home was the fort's own middle, inside the keep's foundations: they walked into walls
+ * for three seconds in every ten, and stood in doorways. They are put back down there when the horde is taught the
+ * lower levels' doors as it was taught the bunker's (`bunkerLeg`); until then the dark is empty of them.
  */
 export function castleHomes(p: Place, loose: Loose[] = castleLoose(p)): { x: number; z: number; r: number; n: number; inside?: V3[] }[] {
-  // (the garrison's wounded: in the aid post, where they were laid, and wandered as far as the sally port and the west side)
-  const UF = UNDER.floor, hs = houses(loose), store = { x: p.x, z: p.z, r: 9, n: 4, inside: [castleAt(p, 0.8, 6.0, UF), castleAt(p, -2.2, 6.0, UF), castleAt(p, 5.6, 6.2, UF), castleAt(p, 6.2, 0.8, UF), castleAt(p, -7.2, -2.0, UF)] };
+  const hs = houses(loose), [gx, , gz] = castleAt(p, 36, -1.5);
+  // (before the gate: clear of the rock the ramp leaves from, of the first house and of the hatch)
+  const gate = { x: gx, z: gz, r: 5.5, n: 4 };
   // (the village's: one to each of its houses, as far as five, in it or close by its walls. As one round home as wide
   // as the village is long they were stood anywhere within thirty metres of its middle, and the saddle it stands on is
   // fifteen metres wide: two of the five were found on the valley face, seventeen metres under the street.)
-  return [...hs.slice(0, 5).map((h) => ({ x: h.x, z: h.z, r: 6.5, n: 1 })), store];
+  return [...hs.slice(0, 5).map((h) => ({ x: h.x, z: h.z, r: 6.5, n: 1 })), gate];
 }

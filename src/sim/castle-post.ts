@@ -172,7 +172,7 @@ function lay(loose: Loose[]): Plan {
     const surf = { x: desk.x, z: desk.z - 0.12, yaw: 0, hx: 0.9, hz: 0.26, clear: 1 };
     lies('command post', 4, surf, F2 + desk.top, 0.15);
     lies('command post', 4, surf, F2 + desk.top, 0.6);
-    made.push({ t: 'map', room: 'command post', name: 'map', at: [0.4, F2 + 0.803, 0.3], yaw: Math.PI / 2, w: 1.15, d: 0.7 });
+    made.push({ t: 'map', room: 'command post', name: 'map', at: [0.4, F2 + 0.808, 0.3], yaw: Math.PI / 2, w: 1.15, d: 0.7 });
     // the commander's locker, in the corner past the head of the stair to the roof
     put('command post', 'steel_locker', 2.52, -2, F2, -Math.PI / 2);
     // a bulb over the map, and a net over the corner of the roof that fell in: from the roof's edge down to the broken walls
