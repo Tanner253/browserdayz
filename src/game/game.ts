@@ -347,6 +347,8 @@ export class Game {
     for (const l of atmo.csm.lights) l.shadow.camera.layers.enable(AVATAR_LAYER);
 
     this.effects = new Effects(r.scene, atmo);
+    // (so a blast throws the ground it goes off on, and its marks lie on a road and not under it)
+    this.effects.world(this.s.terrain, world);
     this.fires = new Fires(world, r.scene, this.effects, atmo);
     this.lamps = new Lamps(r.scene);
     // (whatever is got ready after the game has loaded is got ready for the lamps lit and for the lamps out)
@@ -3522,7 +3524,7 @@ export class Game {
     const spec = drum ? { damage: WEAPON_RULES.barrel.damage, radius: WEAPON_RULES.barrel.blast! } : ITEMS.grenade.throw!;
     const p = this.player, cam = this.s.r.camera;
     const far = at.distanceTo(cam.position);
-    this.effects.explode(at, drum);
+    this.effects.explode(at, jeep ? 'vehicle' : drum ? 'drum' : 'grenade');
     audio.explosion(at, far, drum);
     if (far < 40) this.weapons.flinch(THREE.MathUtils.clamp(2.2 - far / 14, 0.2, 2));
     /** how much of the blast reaches a point: nothing through a wall, less with every metre */
@@ -4924,6 +4926,15 @@ export class Game {
       talking: this.voice.talking,
     });
     this.perf.beforeRender();
+    // (a blast near by throws the view off for a moment: laid on the eye last of all, so nothing aims by it)
+    const sh = this.effects.shake;
+    if (sh.pitch || sh.yaw || sh.roll) {
+      const eye = this.s.r.camera;
+      eye.rotateX(sh.pitch);
+      eye.rotateY(sh.yaw);
+      eye.rotateZ(sh.roll);
+      eye.updateMatrixWorld();
+    }
     r.render(dt);
     // (the figure in the inventory, laid over the game's picture where the page shows it: nothing, while that is shut)
     this.doll?.draw(dt);
