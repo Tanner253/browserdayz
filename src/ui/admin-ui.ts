@@ -33,6 +33,7 @@ import type { AdminLists } from '../net/protocol';
 import { ENTITIES, type Entity, type Role } from '../net/orders';
 import { ITEMS } from '../sim/items';
 import { KITS } from '../sim/kits';
+import { CARRY_POWERS, type CarryPower } from '../sim/powers';
 import type { S2C } from '../net/protocol';
 import type { ItemInstance } from '../sim/items';
 import './admin.css';
@@ -86,6 +87,9 @@ export interface AdminSelf {
   clip: boolean;
   voidInv: boolean;
   voidTag: boolean;
+  /** what they carry weighs nothing; firing takes no round out of their gun (src/sim/powers.ts) */
+  weightless: boolean;
+  endless: boolean;
   /** it is day in this game alone, whatever the hour */
   night: boolean;
   /** everybody's name is shown where they are */
@@ -172,6 +176,9 @@ const ICON: Record<string, string> = {
   target: '<circle cx="12" cy="12" r="6.5"/><path d="M12 2.5v5M12 16.5v5M2.5 12h5M16.5 12h5"/>',
   window: '<path d="M4 5.5h16v13H4z"/><path d="M4 9h16"/><path d="M10 12.5l-2 2 2 2M8 14.5h6.5"/>',
   grip: '<path d="M20 9L9 20M20 14l-6 6M20 19l-1 1"/>',
+  weight: '<path d="M9.5 8a2.5 2.5 0 1 1 5 0"/><path d="M7.5 8h9l2.5 11.5h-14z"/>',
+  rounds: '<path d="M5.5 20V10l1.5-4.5L8.5 10v10zM10.5 20V10L12 5.5l1.5 4.5v10zM15.5 20V10L17 5.5l1.5 4.5v10z"/>',
+  refill: '<path d="M6 4.5h7.5v15H6z"/><path d="M6 8.5h7.5M6 12.5h7.5"/><path d="M18 7v9M15.5 13.5L18 16l2.5-2.5"/>',
 };
 const icon = (name: string, cls = '') => {
   const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -193,7 +200,7 @@ export class AdminUI {
   isOpen = false;
   private view: View = 'who';
   private sub: Sub = 'actions';
-  private self: AdminSelf = { role: null, id: 0, god: false, hidden: false, clip: false, voidInv: false, voidTag: false, night: false, names: false, tint: null, freecam: false, x: 0, z: 0 };
+  private self: AdminSelf = { role: null, id: 0, god: false, hidden: false, clip: false, voidInv: false, voidTag: false, weightless: false, endless: false, night: false, names: false, tint: null, freecam: false, x: 0, z: 0 };
   private lists: AdminLists = { players: [], gone: [], bans: [], roles: [], checks: '' };
   /** who everything on the right is about: a player's number (the admin's own, when it is themselves) */
   private target = 0;
@@ -662,7 +669,7 @@ export class AdminUI {
     if (this.sub === 'items') return `${base}|${this.kind}|${this.count}|${this.fed}|${Object.keys(this.pictures).length}`;
     if (this.sub === 'kits') return base;
     if (this.sub === 'pockets') return `${base}|${this.pockets?.id}|${JSON.stringify(this.pockets?.inv ?? null).length}|${Object.keys(this.pictures).length}`;
-    return `${base}|${p ? [p.role, p.muted, p.god, p.hidden, p.clip, p.voidInv, p.voidTag, p.alive].join() : ''}|${this.mine ? [s.god, s.hidden, s.clip, s.voidInv, s.voidTag, s.night, s.names, s.freecam, s.tint].join() : ''}`;
+    return `${base}|${p ? [p.role, p.muted, p.god, p.hidden, p.clip, p.voidInv, p.voidTag, p.weightless, p.endless, p.alive].join() : ''}|${this.mine ? [s.god, s.hidden, s.clip, s.voidInv, s.voidTag, s.weightless, s.endless, s.night, s.names, s.freecam, s.tint].join() : ''}`;
   }
 
   private bodyOf(): HTMLElement[] {
@@ -905,6 +912,7 @@ export class AdminUI {
         ),
         el('div', 'dim', 'What they carry is listed along the bottom.'),
       ));
+      grid.append(this.carry(p));
     }
     const talk = () => {
       if (!this.words.trim()) return;
@@ -961,6 +969,29 @@ export class AdminUI {
     return [grid];
   }
 
+  // ---------------------------------------------------------------- what is carried, and fired
+
+  /**
+   * "Carry and ammunition" (2026-10-13: "admins should have infinite weight toggle", "reload mags button and no
+   * ammo consumtion otpion ... intuitive"): the two powers that are about what is carried and the refill, together
+   * in one card, each with what it does in a sentence. On one's own page, and on the page of whoever is picked: the
+   * two switches are an admin's (another admin's are an admin's to put on and off, as the other powers are), and
+   * the refill is for anybody. The words are the one list's (CARRY_POWERS), which the server answers in too.
+   * @param p whoever is picked (null: oneself)
+   */
+  private carry(p: Player | null): HTMLElement {
+    const s = this.self, who = p ? ` #${p.id}` : '';
+    const sw = (k: CarryPower, on: boolean | undefined, ic: string) => this.flip(CARRY_POWERS[k].label, p ? CARRY_POWERS[k].theirs : CARRY_POWERS[k].mine, on, () => this.send(`/${CARRY_POWERS[k].order}${who} ${on ? 'off' : 'on'}`), ic);
+    const sws = el('div', 'adm-sws');
+    if (!p || p.role === 'admin') sws.append(sw('weightless', p ? p.weightless : s.weightless, 'weight'), sw('endless', p ? p.endless : s.endless, 'rounds'));
+    const fill = this.button(p ? `Refill ${p.name}’s magazines` : 'Refill my magazines', () => this.send(`/refill${who}`), 'good', 'refill');
+    return this.card(p ? `${p.name}: carry and ammunition` : 'Carry and ammunition', 'rounds',
+      ...(sws.childElementCount ? [sws] : []),
+      this.line(fill),
+      el('div', 'dim', `Refill: every magazine and every gun ${p ? 'they carry' : 'you carry'} is filled at once, wherever it is: in the hands, on the back, in the holster, in a pocket, in a pack, in a bag in a pack. A gun with no magazine in it is given its own.${p && p.role !== 'admin' ? ' (Weightless and endless ammunition are an admin’s powers: they are not one.)' : ''}`),
+    );
+  }
+
   // ---------------------------------------------------------------- oneself
 
   private me(): HTMLElement[] {
@@ -982,6 +1013,8 @@ export class AdminUI {
     grid.append(this.card('Powers', 'bolt', powers,
       el('div', 'dim', 'Flying, and in the free camera: W A S D, Space up, Ctrl down, Shift fast, Alt slow. No tag is cashed in while god mode, vanish or noclip is on. God mode is proof against the gas as well.'),
     ));
+    // (under the powers, the ones that are about what is carried, and the refill)
+    if (this.admin) grid.append(this.carry(null));
     const coords = el('div', 'adm-line');
     const jump = () => {
       const [x, z] = this.where.map(Number);
@@ -1151,8 +1184,10 @@ export class AdminUI {
     sets.append(...KITS.filter((k) => !k.adds).map(kit));
     adds.append(...KITS.filter((k) => k.adds).map(kit));
     const none = this.line(this.grave('clear', `Empty everything ${this.mine ? 'I carry' : `${p.name} carries`}`, () => this.send(`/clear${this.ref}`), 'trash'), el('span', 'dim', 'Pockets, packs, what is worn and what is held: all of it gone. Dog tags are kept.'));
+    // (and beside the kits, what keeps one going: every magazine and gun of it full again)
+    const again = this.line(this.button(this.mine ? 'Refill my magazines' : `Refill ${p.name}’s magazines`, () => this.send(`/refill${this.ref}`), 'good', 'refill'), el('span', 'dim', 'Every magazine and every gun carried is filled, wherever it is. Nothing else is touched.'));
     return [this.forWhom(p, 'A kit, in one click, for'), el('div', 'adm-h', 'Sets: each takes the place of everything carried and worn'), sets, el('div', 'dim', 'Clicked again, it is the same kit made new. Dog tags are kept. What finds no room is put at the feet.'),
-      el('div', 'adm-h', 'Added to what is carried'), adds, el('div', 'adm-h', 'Nothing at all'), none];
+      el('div', 'adm-h', 'Added to what is carried'), adds, el('div', 'adm-h', 'Magazines and guns, filled'), again, el('div', 'adm-h', 'Nothing at all'), none];
   }
 
   // ---------------------------------------------------------------- what somebody carries
