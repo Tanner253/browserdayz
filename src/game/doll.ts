@@ -78,7 +78,7 @@ export interface DollHost {
   slung(): THREE.Object3D[];
   /** where it stands on the page (null: the inventory is shut, or the figure is scrolled out of sight) */
   box(): DollBox | null;
-  /** whether it was drawn this frame: the page shows the still picture when it was not */
+  /** whether it was drawn this frame: the hole in the page's veil is open for exactly as long as it is */
   shown(on: boolean): void;
 }
 
@@ -197,6 +197,9 @@ export class Doll {
   private lookOver = -1;
   /** what hangs from the hand just now and is kept upright (null: nothing does) */
   private plumb: THREE.Object3D | null = null;
+  /** what the figure has on that is hung on the body, and whether anything is in its hands (or on its way into them) */
+  private worn: { id: string; obj: THREE.Object3D }[] = [];
+  private holding = false;
   /** the page's box it was last drawn for, and what was worked out for it */
   private box: DollBox | null = null;
   private plan: Plan | null = null;
@@ -600,18 +603,29 @@ export class Doll {
   }
 
   /**
-   * Hat, mask, vest, pack. All of it is fetched, painted and got ready first, and then put on in one go: what was
-   * worn stays on until what is worn now is there to take its place, and the body is never seen bare between.
+   * Hat, mask, vest, pack. What is no longer worn comes off at once. What is newly worn is fetched, painted and got
+   * ready first, and then all of it is put on in one go: a thing that has been worn before, or has lain near, is
+   * ready already, and is on before the next frame is drawn, so that one hat changed for another is never a bare
+   * head between. (A thing whose model has never been made in this game, one handed out and not picked up, takes
+   * as long to come as its model does: the figure is without it until then, and is not left wearing what was taken
+   * off meanwhile. It was: a whole kit handed out at once left the old helmet and mask on the figure for eleven
+   * seconds, beside places that said otherwise.)
    */
   private async wear(ids: string[]) {
     const n = ++this.wearN;
     try {
+      const kept = this.worn.filter((i) => ids.includes(i.id));
+      if (kept.length !== this.worn.length) {
+        this.body.setGear((this.worn = kept));
+        this.livelyTill = performance.now() + LIVELY;
+      }
       const items: { id: string; obj: THREE.Object3D }[] = [];
       for (const id of ids) {
         if (!GEAR_SHOWN.has(id)) continue;
-        // (a thing that is a piece of the suit itself has no model to hang on the body: it is there or not)
-        if (!GEAR[id]) {
-          items.push({ id, obj: new THREE.Group() });
+        // (what is on already stays as it is; a thing that is a piece of the suit itself has no model to hang on the body: it is there or not)
+        const on = kept.find((i) => i.id === id);
+        if (on || !GEAR[id]) {
+          items.push(on ?? { id, obj: new THREE.Group() });
           continue;
         }
         const model = (await this.models.get(id)).group.clone();
@@ -621,27 +635,36 @@ export class Doll {
       }
       await this.warm(items.map((i) => i.obj));
       if (n !== this.wearN) return;
-      this.body.setGear(items);
+      this.body.setGear((this.worn = items));
       this.livelyTill = performance.now() + LIVELY;
     } catch {
-      /* a model that will not come: the figure stays as it was */
+      /* a model that will not come: the figure is without it */
     }
   }
 
-  /** What is in the hands. A gun or a thing to hit with is held as anybody is seen holding it; anything else, in the right fist. */
+  /**
+   * What is in the hands. A gun or a thing to hit with is held as anybody is seen holding it; anything else, in the
+   * right fist. What was in them is on its way out of them from the moment they change, however long what is to
+   * come is in coming (which is no time, for anything that has been held before).
+   */
   private async hold(hands: { id: string; mods: string[] } | null) {
     const n = ++this.holdN;
     try {
+      // (seen, one thing is lowered and the next brought up, as the game's bodies do it; unseen, it is simply there or gone)
+      if (this.holding) this.body.setHeld(null, null, 'rifle', !this.showing);
+      this.holding = false;
+      this.plumb = null;
+      this.lookOver = -1;
+      this.livelyTill = performance.now() + LIVELY;
       const held = hands ? (this.h.held(hands.id, hands.mods) ?? (await this.inFist(hands.id))) : null;
-      if (held) {
-        this.paint(held.obj);
-        await this.warm([held.obj]);
-      }
+      if (!held) return;
+      this.paint(held.obj);
+      await this.warm([held.obj]);
       if (n !== this.holdN) return;
-      // (seen, one thing is lowered and the next brought up, as the game's bodies do it; unseen, it is simply there)
-      this.body.setHeld(held?.obj ?? null, held?.grips ?? null, held?.kind, !this.showing);
-      this.plumb = held?.plumb ?? null;
-      this.lookOver = held && held.kind !== 'melee' && this.showing ? 0.55 : -1;
+      this.body.setHeld(held.obj, held.grips, held.kind, !this.showing);
+      this.holding = true;
+      this.plumb = held.plumb ?? null;
+      this.lookOver = held.kind !== 'melee' && this.showing ? 0.55 : -1;
       this.livelyTill = performance.now() + LIVELY;
     } catch {
       /* as above */
