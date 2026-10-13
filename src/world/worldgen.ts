@@ -2720,8 +2720,37 @@ export function generateWorld(seed = WORLD_SEED): World {
     // (the mountains of the map's edge are not laid back: see PASS)
     const lay = (line: [number, number][], ys: number[], banks: (run: number) => Banks, most: number, stops: [boolean, boolean], leave?: (i: number) => number) => {
       const dist = new Float32Array(N * N).fill(1e9), hh = new Float32Array(N * N), rr = new Float32Array(N * N), runs = runOf(line), whole = runs[runs.length - 1];
-      rasterLine(line, ys, most, dist, hh);
-      rasterLine(line, runs, most, new Float32Array(N * N).fill(1e9), rr);
+      // (How far each spot is from the line, and the line's height and how far along it the nearest point of it is:
+      // one walk of the ground for the three, and no distance worked out in full for a piece of the line that is
+      // plainly further off than one before it (told by the squares, with a millionth to spare). It was `rasterLine`
+      // twice over, and with the slumping below it was a third of the time the whole map takes to make, on every
+      // load and every start of the server: each spot within `most` of a line as long as these is asked about by
+      // forty of its pieces. Found by an independent reading, 2026-10-13. The ground it makes is the same to the
+      // last figure: what is nearest is told as it was, by the same sum in the same order.)
+      {
+        for (let s = 0; s < line.length - 1; s++) {
+          const [ax, az] = line[s], [bx, bz] = line[s + 1];
+          const ix0 = Math.max(0, Math.floor((Math.min(ax, bx) - most + half) / CELL)), ix1 = Math.min(N - 1, Math.ceil((Math.max(ax, bx) + most + half) / CELL));
+          const iz0 = Math.max(0, Math.floor((Math.min(az, bz) - most + half) / CELL)), iz1 = Math.min(N - 1, Math.ceil((Math.max(az, bz) + most + half) / CELL));
+          const dx = bx - ax, dz = bz - az, len2 = dx * dx + dz * dz || 1;
+          for (let iz = iz0; iz <= iz1; iz++) {
+            const z = -half + iz * CELL;
+            for (let ix = ix0; ix <= ix1; ix++) {
+              const x = -half + ix * CELL;
+              const t = clamp(((x - ax) * dx + (z - az) * dz) / len2, 0, 1);
+              const ex = x - (ax + dx * t), ez = z - (az + dz * t);
+              const i = idx(ix, iz), was = dist[i];
+              if (ex * ex + ez * ez > was * was * 1.000001) continue;
+              const d = Math.hypot(ex, ez);
+              if (d < was) {
+                dist[i] = d;
+                hh[i] = lerp(ys[s], ys[s + 1], t);
+                rr[i] = lerp(runs[s], runs[s + 1], t);
+              }
+            }
+          }
+        }
+      }
       // (the road's height far from it is that evened out over the ground about: see the first pass)
       const soft = evenOut(hh, (i) => dist[i] < most, 15);
       const a = line[0], b = line[line.length - 1], fwd = [line[1][0] - a[0], line[1][1] - a[1]], on = [b[0] - line[line.length - 2][0], b[1] - line[line.length - 2][1]];
@@ -3120,10 +3149,13 @@ export function generateWorld(seed = WORLD_SEED): World {
       }
       // (What is left standing steeper than rock stands, between the two legs of the climb and over the yard, is let
       // slump as the cut behind the bunker was: down only, and never the road's bed, the yard or the path.)
+      // (close to the road, where it was cut: less and less further off, and nothing of the mountain's own face.
+      // Which spots those are is the same on every pass: asked once, and not forty times of the whole map.)
+      const slump: number[] = [];
+      for (let i = N + 1; i < N * N - N - 1; i++) if (!(mtDist[i] < 7 || mtDist[i] >= 30 || padDist[i] < 1.5 || pathDist[i] < 3.5)) slump.push(i);
       for (let pass = 0; pass < 40; pass++) {
-        for (let i = N + 1; i < N * N - N - 1; i++) {
-          // (close to the road, where it was cut: less and less further off, and nothing of the mountain's own face)
-          if (mtDist[i] < 7 || mtDist[i] >= 30 || padDist[i] < 1.5 || pathDist[i] < 3.5 || Math.abs(heights[i] - was[i]) < 0.3) continue;
+        for (const i of slump) {
+          if (Math.abs(heights[i] - was[i]) < 0.3) continue;
           const h = heights[i], lo = Math.min(heights[i - 1], heights[i + 1], heights[i - N], heights[i + N]);
           if (h - lo > 1.2 * CELL) heights[i] = lerp(h, lo + 1.2 * CELL, 0.5 * (1 - smoothstep(16, 30, mtDist[i])));
         }
