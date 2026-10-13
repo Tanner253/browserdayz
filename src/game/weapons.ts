@@ -263,6 +263,8 @@ const HELD = {
   smg: new THREE.Vector3(0.05, -0.17, -0.12),
   // (a pistol in those hands: a little nearer the middle and higher, where a pistol is held out)
   smgPistol: new THREE.Vector3(0.035, -0.16, -0.12),
+  // (the knife's pack: the sniper's maker's, on the same arms, drawn for an eye a hand over the shoulders and a little ahead of them)
+  knife: new THREE.Vector3(0, -0.16, -0.34),
 };
 
 /**
@@ -587,7 +589,8 @@ const MELEE_STYLE: Record<string, MeleeStyle> = (() => {
     ],
     elbow: [0.32, -0.33, -0.2],
     two: false,
-    grip: 0.062,
+    // (the combat knife: three and a half centimetres of pommel, then eight of ribbed grip under the guard. The fist is on the middle of the grip.)
+    grip: 0.075,
   },
   };
   // The shovel is held and swung as the bat is: in both hands, the left on the grip at its foot and the right a
@@ -595,6 +598,32 @@ const MELEE_STYLE: Record<string, MeleeStyle> = (() => {
   styles.shovel = { ...styles.bat, grip: 0.2 };
   return styles;
 })();
+/**
+ * The knife in the hands of whoever holds it (2026-10-13): not a still model with the arms reached out to it, as
+ * everything else to hit with is, but its own pack's arms and its own movements (`knife` in WEAPON_PACKS: the
+ * sniper's maker's, the same arms as are on a hatchet), played as they were drawn and at the pace they were drawn.
+ * See `animateBlade`.
+ *   blows  – the blows of a run, one after another: a cut across from the left, the cut that answers it from the
+ *            right, and a thrust straight out. (The pack has a fourth, a stab down with the blade turned under the
+ *            fist, `stab`: kept for a second kind of attack, if there is ever to be one.) Each is drawn back in a
+ *            tenth of a second and is through the middle of the picture by 0.13 s, which is when the game counts
+ *            a blow as landed (0.35 of the way through a swing of the knife's 0.42 s); each then carries on and
+ *            comes home after the swing is over, and the next blow of a run sets out from wherever that had got to.
+ *   join   – seconds over which one movement gives way to the next, where the next begins from another place
+ *   breath – held: how much of the pack's own drift out and back is played (it is drawn as a straight line each
+ *            way), and how many seconds to a breath
+ *   guard  – put up to stop a blow: how far the hands are moved and turned from where they hold it (the eye's
+ *            space: right, up, back, metres; nose up, nose left, roll, radians). The pack has no drawing of it.
+ *   run    – and how they are let down at a run
+ */
+const BLADE = {
+  blows: ['cutA', 'cutB', 'thrust'],
+  join: 0.06,
+  breath: 0.7,
+  every: 3.6,
+  guard: { p: [-0.03, 0.09, 0.04] as [number, number, number], r: [0.05, 0.12, -0.4] as [number, number, number] },
+  run: { p: [0.03, -0.09, 0.02] as [number, number, number], r: [-0.35, 0.25, 0.3] as [number, number, number] },
+};
 const _sx = new THREE.Vector3(), _sy = new THREE.Vector3(), _sz = new THREE.Vector3(), _sm = new THREE.Matrix4();
 const _mp = new THREE.Vector3(), _mv = new THREE.Vector3(), _mel = new THREE.Vector3(), _mel2 = new THREE.Vector3(), _mq = new THREE.Quaternion(), _mq2 = new THREE.Quaternion(), _mq3 = new THREE.Quaternion(), _me = new THREE.Euler();
 /** a stance as a place and a turn: the thing's own up is toward its head, and its edge is on its far side (-z) */
@@ -1259,6 +1288,19 @@ export class Weapons {
         ads: new THREE.Vector3(MELEE.hip[0] - 0.05, MELEE.hip[1] + 0.025, MELEE.hip[2]),
         muzzle: new THREE.Vector3(),
       });
+    }
+    // ---- the knife, for whoever holds it: its own pack, hands and all, moved by its own animation (see BLADE).
+    // What was made of it just above is still what everybody else sees in its holder's fist. Its arms are the
+    // sniper's arms under another paint: they are drawn in the one pair of sleeves and gloves every gun of that
+    // maker's is drawn in, which are the ones on a hatchet too.
+    const blade = this.models.get('knife'), bladeFp = assets.manifest.models.knife_fp;
+    if (blade && bladeFp?.rig) {
+      const rig = new WeaponRig(await assets.gltfOf('knife_fp'), bladeFp.rig, packMaterial);
+      if (this.sleeves) rig.repaint(/arm/i, this.sleeves);
+      blade.root = new THREE.Group();
+      blade.root.add(rig.root);
+      blade.rig = rig;
+      blade.hip = HELD.knife;
     }
   }
 
@@ -3022,7 +3064,9 @@ export class Weapons {
     }
     if (m.melee) {
       this.lag.set(0, 0);
-      this.animateMelee(dt, m, m.melee);
+      // (the knife has hands and movements of its own)
+      if (m.rig) this.animateBlade(dt, m);
+      else this.animateMelee(dt, m, m.melee);
       return;
     }
 
@@ -3408,6 +3452,87 @@ export class Weapons {
       grips.right.elbow = m.body.worldToLocal((grips.right.elbow ?? new THREE.Vector3()).copy(elbow).applyMatrix4(this.vmCamera.matrixWorld));
     }
     this.arms.update(m.body ?? null, grips, this.vmCamera.quaternion, true, true);
+  }
+
+  /** the knife: the swing whose movement is being played, how long it has been simply held, and what it stood in last frame and is leaving (see `animateBlade`) */
+  private bladeOf: Action | null = null;
+  private bladeCalm = 9;
+  private bladeNow: { clip: string; k: number } = { clip: 'idle', k: 0 };
+  private bladeFrom: { clip: string; k: number; t: number } | null = null;
+
+  /**
+   * The knife (see BLADE): its pack's own hands and its own movements. Which movement it is in this frame and how
+   * far through, and where the pair of hands is held from the eye: the walk, a run, the guard and what a blow that
+   * landed sends back up the arm are laid over the pack's drawing by moving the whole of it, as a gun's are.
+   */
+  private animateBlade(dt: number, m: VmModel) {
+    const rig = m.rig!, p = this.player, a = this.action;
+    this.guardHold = Math.max(0, this.guardHold - dt);
+    const want = this.guardHold > 0 && !p.dead && !(a && a.name === 'swing') ? 1 : 0;
+    this.guardT += (want - this.guardT) * (1 - Math.exp(-(want ? 16 : 9) * dt));
+    const g = this.guardT;
+    // a blow begun: the next of the run, from its first frame
+    m.shotT = (m.shotT ?? 9) + dt;
+    if (a && a.name === 'swing' && a !== this.bladeOf) {
+      this.bladeOf = a;
+      m.shotClip = BLADE.blows[(a.data?.stroke ?? 0) % BLADE.blows.length];
+      m.shotT = 0;
+      this.bladeFrom = { ...this.bladeNow, t: 0 };
+    }
+    const blow = m.shotClip && rig.has(m.shotClip) && m.shotT < rig.seconds(m.shotClip) ? m.shotClip : null;
+    let clip: string, k: number;
+    if (a && (a.name === 'equip' || a.name === 'unequip')) {
+      // drawn, and put away: both hands come up from under the picture with it, and go down there
+      clip = a.name === 'equip' ? 'draw' : 'stow';
+      k = Math.min(1, a.t / a.dur);
+      m.shotT = 9;
+    } else if (blow) {
+      clip = blow;
+      k = m.shotT / rig.seconds(blow);
+    } else {
+      // Held: a slow breath. (The pack draws it as a straight line out and a straight line back in a second and a
+      // third; its first half is the way out, so a part of that, eased over a few seconds, is the same drift at a
+      // pace to live with. It begins from nothing after anything else, which all ends where this starts.)
+      clip = 'idle';
+      k = 0.5 * BLADE.breath * (0.5 - 0.5 * Math.cos((this.bladeCalm * Math.PI * 2) / BLADE.every)) * THREE.MathUtils.smoothstep(this.bladeCalm, 0, 0.6);
+    }
+    this.bladeCalm = clip === 'idle' ? this.bladeCalm + dt : 0;
+    // One movement cut short by another (a second blow before the first has come home, the knife put away in the
+    // middle of one) gives way to it over a moment: the next is not begun from where it was drawn to begin.
+    // (Drawn, it comes up from under the picture whatever it was last seen doing.)
+    if (clip !== this.bladeNow.clip) this.bladeFrom = clip === 'draw' ? null : { ...this.bladeNow, t: 0 };
+    if (this.bladeFrom) {
+      this.bladeFrom.t += dt;
+      if (this.bladeFrom.t >= BLADE.join) this.bladeFrom = null;
+    }
+    if (this.bladeFrom) {
+      rig.pose(this.bladeFrom.clip, this.bladeFrom.k);
+      rig.mix(clip, k, THREE.MathUtils.smoothstep(this.bladeFrom.t / BLADE.join, 0, 1));
+    } else rig.pose(clip, k);
+    this.bladeNow.clip = clip;
+    this.bladeNow.k = k;
+
+    // where the pair of hands is: the walk, a run with it carried low, the guard, what the arms have just taken
+    const busy = !!a || !!blow;
+    const amp = p.movingSmooth * (p.grounded ? 1 : 0) * (1 - g * 0.5);
+    const ph = p.bobPhase;
+    const sp = busy ? 0 : this.sprintT * (1 - g);
+    const kick = this.kick.step(dt);
+    const kr = this.kickRot.step(dt);
+    const G = BLADE.guard, R = BLADE.run;
+    m.root.position.set(
+      m.hip.x + Math.cos(ph) * 0.012 * amp + R.p[0] * sp + G.p[0] * g - p.strafe * 0.006,
+      m.hip.y - Math.abs(Math.sin(ph)) * 0.016 * amp + R.p[1] * sp + G.p[1] * g + kick.y * 0.02 - this.lowerT * 0.4,
+      m.hip.z + R.p[2] * sp + G.p[2] * g + kick.z * 0.06,
+    );
+    m.root.rotation.set(
+      R.r[0] * sp + G.r[0] * g + Math.cos(ph) * 0.02 * amp + kr.x * 0.012 - this.lowerT * 0.7,
+      R.r[1] * sp + G.r[1] * g,
+      R.r[2] * sp + G.r[2] * g + Math.cos(ph) * 0.025 * amp + kr.z * 0.01 - p.strafe * 0.03,
+    );
+    m.root.visible = true;
+    // (a pack brings its own arms)
+    this.arms.update(null, null, this.vmCamera.quaternion, false);
   }
 
   /**

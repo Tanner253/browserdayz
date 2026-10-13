@@ -54,7 +54,7 @@ What is not CC0 is listed first, with the credit its licence asks for.
 - This work is based on "Tent_Military" (https://sketchfab.com/3d-models/tent-military-e06d68ead08a4c44bfd5f826ecca4987) by Mehdi Shahsavan (https://sketchfab.com/ahmagh2e) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
   Changes made: Its guy ropes and pegs taken off, and the pole inside its doorway; stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.
 - This work is based on "Combat helmet K6-3" (https://sketchfab.com/3d-models/combat-helmet-k6-3-94701874d8b949718708b018c8d4f61d) by shamanoff (https://sketchfab.com/shamanoff) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
-  Changes made: Scaled to a head and stood on the ground about its own middle; textures re-encoded as WebP at the size they came; geometry compressed.
+  Changes made: Scaled to a head and stood on the ground about its own middle; its visor, which came raised, turned down in front of the face about its own hinge and brought up to the eyes, its chin strap set two centimetres further back and the loose end of it laid inside the cheek; its one see-through material kept for the two panes of the visor and made solid for everything else; textures re-encoded as WebP at the size they came; geometry compressed.
 - This work is based on "Vest Armor Holster LowPoly GameReady Pack" (https://sketchfab.com/3d-models/vest-armor-holster-lowpoly-gameready-pack-7c41d35e505c4057abe60f89537408bd) by 00amza (https://sketchfab.com/00amza) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
   Changes made: One vest of the pack: scaled to a body and stood on the ground; textures re-encoded as WebP; geometry compressed. One vest of the pack: scaled to a body and stood on the ground; textures re-encoded as WebP; geometry compressed. One vest of the pack: scaled to a body and stood on the ground; textures re-encoded as WebP; geometry compressed.
 - This work is based on "Tactical Body Armor- Pack1" (https://sketchfab.com/3d-models/tactical-body-armor-pack1-69316a2869c94c9ab5a3735c990478ac) by Neslihan Çakmak (https://sketchfab.com/neslihancakmak) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
@@ -91,8 +91,6 @@ What is not CC0 is listed first, with the credit its licence asks for.
   Changes made: Stood straight on the ground about its own middle and scaled to a pouch twenty centimetres tall; textures re-encoded as WebP at the size they came; geometry compressed.
 - This work is based on "ACOG Scope" (https://sketchfab.com/3d-models/acog-scope-286f48a9123c4f05be81147c85f8d0d7) by GC_3D_ART (https://sketchfab.com/GC_3D_ART) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
   Changes made: Turned to look along +x and stood on the ground about its own middle, at the size it came; its one material, which came see-through, is cut out where its colour picture is clear (the lid over its fibre) and drawn solid everywhere else; textures re-encoded as WebP at the size they came; geometry compressed.
-- This work is based on "Gas masks" (https://sketchfab.com/3d-models/gas-masks-8d4ac12671a0459b889a7ab631d9501e) by stayalivedudexxx (https://sketchfab.com/stayalivedudexxx) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
-  Changes made: The black mask of the four, its facepiece and its brace without its hood: turned to face -z and stood on the ground about its own middle, at the size it came; the facepiece, which came see-through, drawn solid; textures re-encoded as WebP at the size they came; geometry compressed. The white mask, made the same way. The mask with the orange nose, made the same way. The mask with the skull painted on it, made the same way.
 - This work is based on "M1 Helmet" (https://sketchfab.com/3d-models/m1-helmet-6d7929b10c994db0b6b39e35b379bfbd) by Melvin Stubbe (https://sketchfab.com/MelvinEbbuts) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
   Changes made: Its shell, its band and the cartridges in the band, without its chin straps: turned to face -z and stood on the ground about its own middle, at the size it came; its materials put from specular and gloss into metal and roughness; textures re-encoded as WebP at the size they came; geometry compressed.
 - This work is based on "Shelf" (https://sketchfab.com/3d-models/shelf-7f9d5022f23e409fa18d641acba9fa4e) by Dmitriy Mitroshin (https://sketchfab.com/LtxxwSibeRia) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
@@ -106,11 +104,13 @@ What is not CC0 is listed first, with the credit its licence asks for.
 - This work is based on "Stove" (https://sketchfab.com/3d-models/stove-a9b2ef77bcbb4901aa433d16ec099b1c) by spooneystone (https://sketchfab.com/spooneystone) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
   Changes made: Its body and its flue, without its door: turned so the door is to the front, scaled to metres and stood on the ground about its own middle; its materials put from specular and gloss into metal and roughness; textures re-encoded as WebP at the size they came; geometry compressed; its animation is left out. Its door alone, at the same scale and turned the same way, standing on the ground about the line of its hinge.
 - This work is based on "Campfire" (https://sketchfab.com/3d-models/campfire-fcb278e6a64c4a34ba84b2b1fce8c3c0) by Zelad (https://sketchfab.com/zelad3d) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
-  Changes made: Its stones, logs and scorched ground, without its flames: scaled to metres and stood on the ground about its own middle; textures re-encoded as WebP at the size they came; geometry compressed; its animation is left out. The same again with its colour picture greyed and darkened, for a fire that is not lit.
+  Changes made: Its stones, logs and scorched ground: scaled to metres and stood on the ground about its own middle; textures re-encoded as WebP at the size they came; geometry compressed. The same again with its colour picture greyed and darkened, for a fire that is not lit. While it burns, its colour picture is darkened to charred wood as it is drawn, and only the orange parts of it give light. Its flames and their animation are used as well, for the campfire and, larger, for a burning vehicle: the sheet of flame pictures re-encoded as WebP at the size it came, with its colour carried outward under its clear parts; its twenty-nine cards and every key of their movement written out as data, in metres. As they are played, each card runs over the frames in which it is to be seen, on its own time and two or three times over, fading in and out at the ends of its run (the animation as it came swelled once a loop, and jumped where the loop turned over); the cards turn to face the eye; their pictures are laid on by their own alpha, pushed about by a pattern that climbs, and coloured anew from the photograph's brightness and hue; the small flames are let go lower than the animation carries them, and the smoke is painted pale.
 - "sniper animated" (https://sketchfab.com/3d-models/sniper-animated-b48999a250b2433da59f705c371a49b2) by DJMaesen is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
   Changes made: Scaled to metres; its one long animation cut into the movements the game plays; a copy of the rifle alone, standing still, made for the ground and for other players; textures re-encoded as WebP; geometry compressed.
 - "animated pistol" (https://skfb.ly/ooPqJ) by DJMaesen is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
   Changes made: Its one long animation cut into the movements the game plays; a copy of the pistol alone, standing still, made for the ground and for other players; textures re-encoded as WebP; geometry compressed.
+- This work is based on "knife Animated" (https://sketchfab.com/3d-models/knife-animated-f3140db917cc43389c14b5b2536c1dc8) by DJMaesen (https://sketchfab.com/bumstrum) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Changes made: Scaled to metres; its one long animation cut into the movements the game plays; a copy of the knife alone, lying flat and still and made the length of a real one (30.5 cm), for the ground and for other players; its arms drawn with the pictures of the same maker's sniper pack, their own left out; textures re-encoded as WebP at the size they came; geometry compressed.
 - This work is based on "FPS AK-74m animations" (https://sketchfab.com/3d-models/fps-ak-74m-animations-94be8385c402474cacd39bc096c6ca14) by Cransh (https://sketchfab.com/ccransh) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
   Changes made: Scaled to metres; its eight animations laid end to end as the one the game plays; a copy of the rifle alone, taken off its skeleton and standing still, in two pieces (the rifle and its magazine), made for the ground and for other players; textures re-encoded as WebP at the size they came; geometry compressed.
 - This work is based on "SMG FPS Animations" (https://sketchfab.com/3d-models/smg-fps-animations-ca37ea9148dc4fcc9cc632175d311b23) by Cransh (https://sketchfab.com/ccransh) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
@@ -125,6 +125,8 @@ What is not CC0 is listed first, with the credit its licence asks for.
   Changes made: Set in rigid pieces (the gun, its fore-end, its sight, the can on its muzzle) and laid along the barrel; its shell is a model of its own. Textures re-encoded as WebP; geometry compressed.
 - This work is based on "Machine Gun Muzzle Flash Test effect" (https://sketchfab.com/3d-models/machine-gun-muzzle-flash-test-effect-b96c7578853a4fa98c7893aa8f777636) by maxi.ariani (https://sketchfab.com/maxi.ariani) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
   Changes made: Only its picture is used: the eighteen frames are cut out of it and set in an even grid; the planes it came on and their animation are not. Re-encoded as WebP.
+- This work is based on "Bomb Crack_Ground_00 (Free)" (https://sketchfab.com/3d-models/bomb-crack-ground-00-free-c5cb1a953d1747b0af697c004d74735d) by paulyang (https://sketchfab.com/PaulYang) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Changes made: Only the pieces of it that fly, and the way they move, are used: the pieces made one shape, their movement written out as a table (`scripts/blast.mjs`). The slab they break out of and the download's own pictures are not used: the pieces are painted with the ground the blast is on.
 
 ## Public domain (CC0)
 
@@ -134,6 +136,7 @@ Animation Library. What is seen of it (the suit, the head, the plate carrier, po
 headset) is the military tactical suit credited above, put onto that skeleton by `scripts/suit.mjs`.
 
 The flash at a muzzle, seen from the side, is out of the Particle Pack by [Kenney](https://kenney.nl) (CC0).
+The smoke, dust, clods, sparks and rings of a blast are out of the same Particle Pack by Kenney (CC0), set out as one sheet by `scripts/blast.mjs`.
 
 Gunshots, the bolt, magazines and the slide are recordings (cut and converted by `npm run sounds`): from
 [Snake's Authentic Gun Sounds](https://f8studios.itch.io/snakes-authentic-gun-sounds) by Snake (free to use,
@@ -226,6 +229,7 @@ Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees ar
 | texture | [Beige Wall 001](https://polyhaven.com/a/beige_wall_001) | Dimitrios Savva, Rico Cilliers |
 | texture | [Bitumen](https://polyhaven.com/a/bitumen) | Rob Tuytel |
 | texture | [Brown Mud Leaves 01](https://polyhaven.com/a/brown_mud_leaves_01) | Rob Tuytel |
+| texture | [Castle Wall Slates](https://polyhaven.com/a/castle_wall_slates) | Rob Tuytel |
 | texture | [Clay Roof Tiles 02](https://polyhaven.com/a/clay_roof_tiles_02) | Amal Kumar |
 | texture | [Concrete Block Wall 02](https://polyhaven.com/a/concrete_block_wall_02) | Charlotte Baglioni |
 | texture | [Concrete Floor Worn 001](https://polyhaven.com/a/concrete_floor_worn_001) | Dimitrios Savva, Rico Cilliers |
@@ -233,11 +237,13 @@ Everything else is from [Poly Haven](https://polyhaven.com). Procedural trees ar
 | texture | [Concrete Tiles 02](https://polyhaven.com/a/concrete_tiles_02) | Charlotte Baglioni |
 | texture | [Corrugated Iron](https://polyhaven.com/a/corrugated_iron) | Jenelle van Heerden, Dimitrios Savva |
 | texture | [Damaged Plaster](https://polyhaven.com/a/damaged_plaster) | Amal Kumar |
+| texture | [Defense Wall](https://polyhaven.com/a/defense_wall) | Rob Tuytel |
 | texture | [Dirty Concrete](https://polyhaven.com/a/dirty_concrete) | Rob Tuytel |
 | texture | [Garage Floor](https://polyhaven.com/a/garage_floor) | Jenelle van Heerden |
 | texture | [Grey Plaster 02](https://polyhaven.com/a/grey_plaster_02) | Rob Tuytel |
 | texture | [Grey Roof Tiles 02](https://polyhaven.com/a/grey_roof_tiles_02) | Rob Tuytel |
 | texture | [Leafy Grass](https://polyhaven.com/a/leafy_grass) | Charlotte Baglioni |
+| texture | [Medieval Blocks 06](https://polyhaven.com/a/medieval_blocks_06) | Rob Tuytel |
 | texture | [Old Linoleum Flooring 01](https://polyhaven.com/a/old_linoleum_flooring_01) | Charlotte Baglioni |
 | texture | [Painted Brick](https://polyhaven.com/a/painted_brick) | Amal Kumar |
 | texture | [Painted Plaster Wall](https://polyhaven.com/a/painted_plaster_wall) | Amal Kumar |

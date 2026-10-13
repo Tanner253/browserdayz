@@ -313,9 +313,17 @@ export async function processWeaponPack(id, cfg, { io, SRC, OUT, FORCE, exists, 
       at = mine.map((v, k) => v - theirs[k]);
       holds = other.holds;
     } else at = point(B, wristR).map((v, k) => v + cfg.origin[k]);
-    const A = mul(move(-at[0], -at[1], -at[2]), B);
+    // (A thing drawn over life-size, for a pack's hands that are over life-size too, is in those hands as it was
+    // drawn. Alone, where it lies on the ground and is held in a fist of true size, it is made as long as such a
+    // thing is: `aloneLength`, metres along the way it points.)
+    let own = 1;
+    if (cfg.aloneLength) {
+      const all = [...pieceBox.values()];
+      own = cfg.aloneLength / (Math.max(...all.map((b) => b.max[0])) - Math.min(...all.map((b) => b.min[0])));
+    }
+    const A = mul(scaleBy(own), mul(move(-at[0], -at[1], -at[2]), B));
     holds ??= { right: point(A, wristR).map((v) => round(v)), left: point(A, wristL).map((v) => round(v)) };
-    const set = Object.fromEntries([...pieceBox].map(([k, b]) => [k, { min: b.min.map((v, i) => round(v - at[i])), max: b.max.map((v, i) => round(v - at[i])) }]));
+    const set = Object.fromEntries([...pieceBox].map(([k, b]) => [k, { min: b.min.map((v, i) => round((v - at[i]) * own)), max: b.max.map((v, i) => round((v - at[i]) * own)) }]));
 
     const made = new Map();
     const put = (name, mesh) => {
@@ -400,6 +408,13 @@ export async function processWeaponPack(id, cfg, { io, SRC, OUT, FORCE, exists, 
       // instead, piece by piece: it was never drawn, and its pictures were fetched and unpacked all the same,
       // some hundreds of megabytes of them.)
       for (const name of cfg.fpDrop ?? []) named(whole, name)?.setMesh(null).setSkin(null);
+      // (Arms that the game paints with another pack's pictures, the one pair every pack of that maker's is drawn
+      // in: their own pictures would be fetched with the pack and never drawn, and are not kept in it.)
+      if (cfg.fpBare) {
+        for (const mat of whole.getRoot().listMaterials()) {
+          if (new RegExp(cfg.fpBare, 'i').test(mat.getName())) mat.setBaseColorTexture(null).setNormalTexture(null).setMetallicRoughnessTexture(null).setOcclusionTexture(null).setEmissiveTexture(null);
+        }
+      }
       const all = countTris(whole);
       // (movements said by the names of the pack's own animations: joined into the one the game plays, and said as frames of it)
       const byName = Object.values(cfg.clips).some((c) => typeof c === 'string');
@@ -414,7 +429,10 @@ export async function processWeaponPack(id, cfg, { io, SRC, OUT, FORCE, exists, 
       );
       await io.write(destFp, whole);
       // the pack's space -> the eye's: x to the right, y up, the muzzle away down -z, in metres
-      const view = mul(scaleBy(s), [r[0], u[0], -f[0], 0, r[1], u[1], -f[1], 0, r[2], u[2], -f[2], 0, 0, 0, 0, 1]);
+      // (A thing held across the picture, a knife: which way it points is not which way whoever holds it looks.
+      // `look` says the second by itself; `forward` and `up` are then only how the thing alone is laid.)
+      const vf = cfg.look?.forward ?? f, vu = cfg.look?.up ?? u, vr = cross(vf, vu);
+      const view = mul(scaleBy(s), [vr[0], vu[0], -vf[0], 0, vr[1], vu[1], -vf[1], 0, vr[2], vu[2], -vf[2], 0, 0, 0, 0, 1]);
       meta.rig = {
         tris: all,
         fps: cfg.fps,

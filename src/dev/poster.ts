@@ -1058,7 +1058,8 @@ add(await thing('can_rusted', [-0.74, 0.2], [0, 1, 0], { scale: 0.62 }));
 }
 const torch = await thing('vintage_flashlight', [num('fx', -0.7), num('fz', 0.02)], [0, num('ty', 1.75), 0]);
 add(torch);
-add(await thing('old_gas_mask', [num('mpx', 0.66), num('mpz', -0.34)], [num('mx', -Math.PI / 2), num('my', 2.4), num('mz', 0)], { scale: num('ms', 0.72) }));
+// (the mask's model lies on its back as it is built now, and has no hose: it was laid over here, a quarter turn about x)
+add(await thing('old_gas_mask', [num('mpx', 0.66), num('mpz', -0.34)], [num('mx', 0), num('my', 2.4), num('mz', 0)], { scale: num('ms', 0.72) }));
 add(await thing('desert_eagle', [0.68, 0.5], [Math.PI / 2, 2.9, 0]));
 add(await thing('ammo_box', [0.9, 0.3], [0, 0.4, 0]));
 {

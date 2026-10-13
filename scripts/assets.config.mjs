@@ -35,6 +35,10 @@ export const TEXTURES = {
   // walls
   red_brick_03: { res: '2k', tex: 1024 },
   white_bricks: { res: '2k', tex: 1024 },
+  // the mountain fort's stone (2026-10-13, fetched on the owner's yes): rough stacked blocks, dressed fortress blocks, an aged defence wall
+  castle_wall_slates: { res: '2k', tex: 1024 },
+  medieval_blocks_06: { res: '2k', tex: 1024 },
+  defense_wall: { res: '2k', tex: 1024 },
   painted_brick: { res: '2k', tex: 1024 },
   plaster_brick_01: { res: '2k', tex: 1024 },
   rough_plaster_brick_02: { res: '2k', tex: 1024 },
@@ -398,15 +402,59 @@ export const LOCAL_MODELS = {
     tags: ['prop'],
     changes: 'Its guy ropes and pegs taken off, and the pole inside its doorway; stood on the ground about its own middle; textures re-encoded as WebP; geometry compressed.',
   },
-  // The K6-3 (2026-10-10): the heaviest helmet there is, its visor up. Its brow is toward -z as it comes, which is
-  // the way a body faces. It came a hundred units wide: at this it is 29 cm, a size over the combat helmet.
+  // The K6-3 (2026-10-10): the heaviest helmet there is. Its brow is toward -z as it comes, which is the way a body
+  // faces. It came a hundred units wide: at this it is 29 cm, a size over the combat helmet.
+  // Its visor (2026-10-13). It came with its visor raised, standing out from the brow with its glass tipped 40
+  // degrees up from straight ahead, and it is wanted down: "it should be like a 90 degree angle on the face visor".
+  // The helmet is one mesh of thirty-five islands. The visor is eight of them: its plate with the two lugs it hangs
+  // by (the island that reaches furthest forward), the frame bolted on it with the maker's bear on its sides, the two
+  // panes of its glass, and four small bolts inside the frame. Its hinge is the line through the two bolts at the
+  // temples, level and across the head: 12.1 cm up from the helmet's foot and 3.8 cm behind its middle as it stands.
+  // Turned 40 degrees down about that line the glass stands upright, the plate's top edge is level with the brow, and
+  // the glass is at the wearer's nose: the eyes are behind the bar over it. So the visor is then raised 3.1 cm, which
+  // puts the eyes in the middle of the glass and its lower edge at the chin: in full forward of the temples, and not
+  // at all at the lugs, which stay on their bolts (the visor's sides slope by that much over 5.6 cm).
+  // The loose end of its chin strap, a strap and the tongue of its buckle, stood out forward and to the right, where
+  // the lowered visor is: it is turned back about the ring it is threaded through until it lies along the inside of
+  // the right cheek, a centimetre higher, where it meets nothing.
+  // (`undo`: with a gas mask on, the visor is worn as it came. See `asItCame` in src/game/avatar.ts.)
+  // Its glass. The whole helmet came as one see-through material, for the sake of the visor's two panes (a fifth
+  // solid in its picture; everything else in it is wholly solid): the panes keep it, the rest is drawn solid.
   helmet_k63: {
     dir: 'helmet_k63',
+    isles: {
+      tall: 0.2799,
+      undo: true,
+      glass: (lo, hi) => hi[0] < 0.13 && lo[1] > 0.1 && lo[2] < -0.15,
+      swing: [
+        {
+          pick: (lo, hi, tris) => (hi[1] > 0.1 && lo[2] < -0.14) || (tris < 20 && Math.min(Math.abs(lo[0]), Math.abs(hi[0])) > 0.1 && lo[1] > 0.08 && hi[1] < 0.16 && hi[2] < -0.035),
+          at: [0, 0.1214, 0.0378],
+          axis: [1, 0, 0],
+          angle: (-40 * Math.PI) / 180,
+          move: [0, 0.0307, 0],
+          ease: (_x, _y, z) => (0.0268 - z) / 0.0558,
+        },
+        {
+          pick: (lo, hi) => lo[0] > 0.06 && hi[1] < 0.03 && lo[2] < -0.1 && hi[2] < -0.05,
+          at: [0.0725, 0, -0.0597],
+          axis: [0, 1, 0],
+          angle: (-130 * Math.PI) / 180,
+          move: [0, 0.0112, 0.02],
+          stay: true,
+        },
+        // (The chin strap, its cup and the short strap with the other half of the buckle hang where a face is. The
+        // helmet sits 2 cm further forward on the head than it did, see GEAR in src/game/avatar.ts, and they came
+        // with it: the cup stood out through the cheeks. They are 2 cm further back in the helmet, which is where
+        // they were on the head.)
+        { pick: (lo, hi) => hi[1] < 0.075 && lo[2] > -0.095 && hi[2] < 0.045 && lo[0] > -0.13 && hi[0] < 0.125, move: [0, 0, 0.02], stay: true },
+      ],
+    },
     scale: 0.00279,
     // (as big as its pictures came)
     tex: 2048,
     tags: ['loot', 'gear'],
-    changes: 'Scaled to a head and stood on the ground about its own middle; textures re-encoded as WebP at the size they came; geometry compressed.',
+    changes: 'Scaled to a head and stood on the ground about its own middle; its visor, which came raised, turned down in front of the face about its own hinge and brought up to the eyes, its chin strap set two centimetres further back and the loose end of it laid inside the cheek; its one see-through material kept for the two panes of the visor and made solid for everything else; textures re-encoded as WebP at the size they came; geometry compressed.',
   },
   // Armour for the body, lightest to heaviest (the tiers are in src/sim/items.ts): three vests out of one pack, and
   // the collared vest out of another. And containers and a crate, a piece at a time.
@@ -599,15 +647,6 @@ export const LOCAL_MODELS = {
   // over the fibre, 224 on the objective's glass and 255 everywhere else. Cut at a half, the lid is gone and the red
   // fibre shows as it does through a clear lid; the glass is solid and dark. Drawn solid whole, the lid hid the fibre.)
   acog_sight: { dir: 'acog_scope', rot: [0, Math.PI, 0], scale: 1, tex: 4096, solid: 0.5, tags: ['loot', 'attachment'], changes: 'Turned to look along +x and stood on the ground about its own middle, at the size it came; its one material, which came see-through, is cut out where its colour picture is clear (the lid over its fibre) and drawn solid everywhere else; textures re-encoded as WebP at the size they came; geometry compressed.' },
-  // (Four masks in one file, two by two, each a facepiece, the brace of straps behind it and a hood for the back
-  // of the head. A mask here is its facepiece and its brace. The four braces are one shape under one name and are
-  // told apart by where they stand: all four are taken with the one facepiece, and `cut` keeps the brace that is
-  // on that facepiece's side of the file and at its height. The facepiece came see-through and its visor is 94
-  // parts in a hundred solid: drawn solid. Life size as they come: 29 cm across the two filters, 17.5 across the brace.)
-  gas_mask_black: { dir: 'gas_masks', only: / (Brace|material)$/, cut: { tall: 0.562, keep: (x, y) => x < 0.05 && y < 0.3 }, rot: [0, Math.PI, 0], scale: 1, tex: 2048, solid: true, tags: ['loot'], changes: 'The black mask of the four, its facepiece and its brace without its hood: turned to face -z and stood on the ground about its own middle, at the size it came; the facepiece, which came see-through, drawn solid; textures re-encoded as WebP at the size they came; geometry compressed.' },
-  gas_mask_white: { dir: 'gas_masks', only: / (Brace|material_5)$/, cut: { tall: 0.562, keep: (x, y) => x > -0.05 && y < 0.3 }, rot: [0, Math.PI, 0], scale: 1, tex: 2048, solid: true, tags: ['loot'], changes: 'The white mask, made the same way.' },
-  gas_mask_orange: { dir: 'gas_masks', only: / (Brace|material_4)$/, cut: { tall: 0.4892, keep: (x, y) => x < 0.05 && y > 0.2 }, rot: [0, Math.PI, 0], scale: 1, tex: 2048, solid: true, tags: ['loot'], changes: 'The mask with the orange nose, made the same way.' },
-  gas_mask_skull: { dir: 'gas_masks', only: / (Brace|material_3)$/, cut: { tall: 0.4934, keep: (x, y) => x > -0.05 && y > 0.2 }, rot: [0, Math.PI, 0], scale: 1, tex: 2048, solid: true, tags: ['loot'], changes: 'The mask with the skull painted on it, made the same way.' },
   // (The M1: its shell, the band round it and the four cartridges tucked into the band; its chin straps and their
   // buckle hang a hand below the rim and are left off, as nothing holds them to a chin. Its brow is toward +z as it
   // comes: turned round. Its biggest picture is 1024.)
@@ -641,7 +680,7 @@ export const LOCAL_MODELS = {
   // (The stones, the logs and the scorched ground under them, without the twenty-nine cards its flames are drawn on:
   // the game makes its own fire. And the same ring with its colour greyed, for a fire that is out: the picture has
   // the glow of the fire painted into it.)
-  campfire_ring: { dir: 'campfire', only: /Campfire_MAT/, size: 1.45, tex: 1024, tags: ['prop'], changes: 'Its stones, logs and scorched ground, without its flames: scaled to metres and stood on the ground about its own middle; textures re-encoded as WebP at the size they came; geometry compressed; its animation is left out.' },
+  campfire_ring: { dir: 'campfire', only: /Campfire_MAT/, size: 1.45, tex: 1024, tags: ['prop'], changes: 'Its stones, logs and scorched ground: scaled to metres and stood on the ground about its own middle; textures re-encoded as WebP at the size they came; geometry compressed. While it burns, its colour picture is darkened to charred wood as it is drawn, and only the orange parts of it give light. Its flames and their animation are used as well, for the campfire and, larger, for a burning vehicle: the sheet of flame pictures re-encoded as WebP at the size it came, with its colour carried outward under its clear parts; its twenty-nine cards and every key of their movement written out as data, in metres. As they are played, each card runs over the frames in which it is to be seen, on its own time and two or three times over, fading in and out at the ends of its run (the animation as it came swelled once a loop, and jumped where the loop turned over); the cards turn to face the eye; their pictures are laid on by their own alpha, pushed about by a pattern that climbs, and coloured anew from the photograph\'s brightness and hue; the small flames are let go lower than the animation carries them, and the smoke is painted pale.' },
   campfire_ring_cold: { dir: 'campfire', only: /Campfire_MAT/, size: 1.45, tex: 1024, dye: { saturation: 0.15, brightness: 0.7 }, tags: ['prop'], changes: 'The same again with its colour picture greyed and darkened, for a fire that is not lit.' },
 };
 
@@ -706,6 +745,43 @@ export const WEAPON_PACKS = {
       author: 'DJMaesen',
       line: '"animated pistol" (https://skfb.ly/ooPqJ) by DJMaesen is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).',
       changes: 'Its one long animation cut into the movements the game plays; a copy of the pistol alone, standing still, made for the ground and for other players; textures re-encoded as WebP; geometry compressed.',
+    },
+  },
+  // The knife (2026-10-13, in place of the Fish Knife: "a knife to replace our fish knife with animations"). By the
+  // maker of the sniper's pack, on the same arms and the same skeleton: an army bayonet-knife of the M9 kind (clip
+  // point, saw teeth on its spine, a cross guard, a round ribbed grip and a heavy pommel), 34.4 cm long at the size
+  // it came, with one animation of 146 frames that has every movement in it: held, a cut each way, a stab down with
+  // the blade turned under the fist, a thrust, put away and drawn. Every triangle and every picture as it came.
+  // It is held ACROSS the picture, not along it. `forward` and `up` are how the knife itself lies on the first
+  // frame (which way its point is, and the flat it is laid on: the knife alone lies flat along x, its edge to -z);
+  // `look` is which way whoever holds it faces. Its arms are the sniper's arms with another paint on them: the
+  // game draws them in the sniper's (one pair of gloves whatever is held), so this pack's own arm pictures are not
+  // kept in it.
+  // Its size: in the hands it is as it came, drawn for those arms, which are a seventh over life as the sniper's
+  // are (`scale`). Alone, on the ground, in the fist of a body seen from outside and in its picture, it is the
+  // length an M9 is: 30.5 cm (`aloneLength`).
+  knife: {
+    dir: 'knife_animated',
+    file: 'scene.gltf',
+    tex: 2048,
+    scale: 0.01,
+    aloneLength: 0.305,
+    forward: [0.919853, 0.346196, -0.18444],
+    up: [0.367514, -0.924977, 0.0967],
+    look: { forward: [0, 0, 1], up: [0, 1, 0] },
+    parts: { knife: 'knife' },
+    wrists: { right: 'R_wrist_027', left: 'L_wrist_04' },
+    // (the knife alone is set down by its own middle line, inside its grip: that far from the wrist)
+    origin: [0.004444, 0.016468, -0.085641],
+    fpBare: 'arms',
+    fps: 30,
+    clips: { idle: [0, 40], cutA: [41, 60], cutB: [61, 80], stab: [81, 102], thrust: [103, 124], stow: [125, 135], draw: [135, 145] },
+    credit: {
+      name: 'knife Animated',
+      url: 'https://sketchfab.com/3d-models/knife-animated-f3140db917cc43389c14b5b2536c1dc8',
+      author: 'DJMaesen',
+      line: 'This work is based on "knife Animated" (https://sketchfab.com/3d-models/knife-animated-f3140db917cc43389c14b5b2536c1dc8) by DJMaesen (https://sketchfab.com/bumstrum) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)',
+      changes: 'Scaled to metres; its one long animation cut into the movements the game plays; a copy of the knife alone, lying flat and still and made the length of a real one (30.5 cm), for the ground and for other players; its arms drawn with the pictures of the same maker\'s sniper pack, their own left out; textures re-encoded as WebP at the size they came; geometry compressed.',
     },
   },
   // The AK (2026-10-10): a rifle on a skeleton with the arms that hold it, and a movement to an animation: an
@@ -891,7 +967,16 @@ export const MODELS = {
   crowbar_01: { res: '1k', tex: 1024, tags: ['loot'] },
   machete: { res: '1k', tex: 1024, tags: ['loot'] },
   baseball_bat: { res: '1k', tex: 1024, tags: ['loot'] },
-  old_gas_mask: { res: '1k', tex: 1024, budget: 5000, tags: ['loot'] },
+  // The GP-5 alone (2026-10-13): "get rid of the long hose in the front and the box thats attached to the model so
+  // its just the mask and the protusion out the front". It came as nine islands of one mesh: the hood, its two
+  // eyepieces, the valve housing at the mouth with a small valve beside it and the knurled nut that closes the
+  // housing's end, and, below those, a metre of hose, the coupling at the hose's foot and the filter can. Those
+  // three, which are all that reaches more than 30 cm below the middle of the hood, are left out. The nut is a
+  // cap, closed across its end, so nothing is left open where the hose was. What is left is then laid on its
+  // back, eyepieces up, as a mask lies where it is put down (it came hanging upright from nothing, and would
+  // stand on the end of its valve). Every triangle of what is kept is kept: the five thousand it was brought down
+  // to were for the mask and the hose together.
+  old_gas_mask: { res: '1k', tex: 1024, tags: ['loot'], isles: { drop: (lo) => lo[1] < -0.3, swing: [{ pick: () => true, axis: [1, 0, 0], angle: -Math.PI / 2 }] } },
   vintage_flashlight: { res: '1k', tex: 1024, tags: ['loot'] },
   cigarette_pack: { res: '1k', tex: 1024, tags: ['loot'] },
   food_apple_01: { res: '1k', tex: 1024, tags: ['loot'] },

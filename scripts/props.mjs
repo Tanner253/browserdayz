@@ -35,6 +35,28 @@
 //            piece. Each comes out as a piece of the file called `<id>_<name>`, whose own origin is where the
 //            download's piece had its own (the line of its hinges, at its foot), with its shapes under it; what is
 //            not hung is stood as ever. One file, so that the doors are painted with the case's own pictures
+//   isles  – what is done to parts of it that are not pieces of their own but islands of the one mesh (triangles that
+//            share no point with the rest of it): `{ tall, drop, swing, undo, glass }`. With `tall`, the whole download
+//            is stood that many metres high about its own middle, feet on the ground, as for a cut, and everything is
+//            said in those metres; without it, in the file's own measures. An island is told to each rule as its box
+//            ([x, y, z] its least and its most, as it came) and how many triangles it has.
+//            `drop(lo, hi, tris)`: the islands it says yes to are left out (the hose and the filter can of a gas mask
+//            that is wanted alone).
+//            `swing`: parts that the download drew one way and are wanted another (a visor drawn raised that is
+//            wanted down, a strap left hanging out that is wanted tucked in), each `{ pick(lo, hi, tris), at, axis,
+//            angle, move, ease }`: the islands `pick` says yes to are turned `angle` radians about the line through
+//            `at` along `axis` (the way a screw goes in along it), and then moved by `move`: by all of it where
+//            `ease(x, y, z)` of a point as it stands once turned says 1, by none of it where it says 0, and in
+//            between by so much (a visor brought up to the eyes whose lugs stay on their bolts: its sides are sloped
+//            a little, and nothing is torn). With `undo`, every point also says how far it would have to go to be
+//            where the download had it, and its normal and its tangent likewise (the attributes _UNDO, _UNDO_N and
+//            _UNDO_T: nothing, where a point was not moved), so that the game can put the part back for as long as
+//            it is in the way of something (`asItCame` in src/game/avatar.ts: a visor, when a gas mask is under it).
+//            A part that says `stay` has no way back: it is where it is put, whatever is put back round it.
+//            `glass(lo, hi, tris)`: the islands that are to be seen through, of a thing whose one material came
+//            see-through (BLEND) for the sake of two panes: those keep the material, and every other triangle is
+//            given a copy of it that is drawn solid. (Left as it came, the whole of a helmet was drawn as glass is:
+//            after everything else, none of it hiding any other part of it, and its picture in a pocket was a ghost.)
 // A piece on a skeleton is taken as the skeleton holds it when nothing is moving.
 
 import fs from 'node:fs/promises';
@@ -93,6 +115,189 @@ function keepOf(doc, prim, keep, drop) {
   return out.length / 3;
 }
 
+/**
+ * The islands of a shape: its triangles gathered by which of them share a point (points that are in one place are
+ * one point here, whatever else is said of them: a seam in a picture is not a tear).
+ * @param to puts a point of the file into the measures the rules are said in
+ * @returns `P`, every point in those measures; `index`; `list`, the islands ({ lo, hi, tris }); `of(i)`, the island a point is of
+ */
+function islesOf(prim, to) {
+  const pos = prim.getAttribute('POSITION'), n = pos.getCount();
+  const idx = prim.getIndices();
+  const index = idx ? idx.getArray() : Uint32Array.from({ length: n }, (_, i) => i);
+  const P = new Float64Array(n * 3), v = [];
+  for (let i = 0; i < n; i++) P.set(to(pos.getElement(i, v)), i * 3);
+  let lo = Infinity, hi = -Infinity;
+  for (let i = 1; i < n * 3; i += 3) {
+    lo = Math.min(lo, P[i]);
+    hi = Math.max(hi, P[i]);
+  }
+  // (as near as a ten-thousandth of how tall it is, is the same place)
+  const TOL = Math.max(1e-9, (hi - lo) * 1e-4);
+  const place = new Map(), weld = new Int32Array(n);
+  for (let i = 0; i < n; i++) {
+    const key = `${Math.round(P[i * 3] / TOL)},${Math.round(P[i * 3 + 1] / TOL)},${Math.round(P[i * 3 + 2] / TOL)}`;
+    if (!place.has(key)) place.set(key, place.size);
+    weld[i] = place.get(key);
+  }
+  const parent = Int32Array.from({ length: place.size }, (_, i) => i);
+  const find = (a) => {
+    while (parent[a] !== a) a = parent[a] = parent[parent[a]];
+    return a;
+  };
+  for (let t = 0; t + 2 < index.length; t += 3) {
+    const a = find(weld[index[t]]);
+    parent[find(weld[index[t + 1]])] = a;
+    parent[find(weld[index[t + 2]])] = a;
+  }
+  const islands = new Map();
+  for (let t = 0; t + 2 < index.length; t += 3) {
+    const root = find(weld[index[t]]);
+    const isle = islands.get(root) ?? islands.set(root, { lo: [Infinity, Infinity, Infinity], hi: [-Infinity, -Infinity, -Infinity], tris: 0 }).get(root);
+    isle.tris++;
+    for (let k = 0; k < 3; k++) {
+      for (let e = 0; e < 3; e++) {
+        const q = P[index[t + k] * 3 + e];
+        isle.lo[e] = Math.min(isle.lo[e], q);
+        isle.hi[e] = Math.max(isle.hi[e], q);
+      }
+    }
+  }
+  return { P, index, list: [...islands.values()], of: (i) => islands.get(find(weld[i])) };
+}
+
+/**
+ * Keeps of a shape only the triangles `keep` says yes to (told which triangle it is, counting from 0), and of its
+ * points only those still used.
+ */
+function keepTris(doc, prim, keep) {
+  const n = prim.getAttribute('POSITION').getCount();
+  const idx = prim.getIndices();
+  const index = idx ? idx.getArray() : Uint32Array.from({ length: n }, (_, i) => i);
+  const map = new Int32Array(n).fill(-1), out = [];
+  let m = 0;
+  for (let t = 0; t + 2 < index.length; t += 3) {
+    if (!keep(t / 3)) continue;
+    for (const i of [index[t], index[t + 1], index[t + 2]]) {
+      if (map[i] < 0) map[i] = m++;
+      out.push(map[i]);
+    }
+  }
+  for (const sem of prim.listSemantics()) {
+    const acc = prim.getAttribute(sem), size = acc.getElementSize(), src = acc.getArray();
+    const dst = new src.constructor(m * size);
+    for (let i = 0; i < n; i++) if (map[i] >= 0) for (let e = 0; e < size; e++) dst[map[i] * size + e] = src[i * size + e];
+    prim.setAttribute(sem, acc.clone().setArray(dst));
+  }
+  prim.setIndices(doc.createAccessor().setType('SCALAR').setArray(m > 65535 ? new Uint32Array(out) : new Uint16Array(out)));
+}
+
+/**
+ * Turns and moves the islands of a shape that `parts` pick (see `isles` in the settings at the top of this file).
+ * @param land the shape's islands (see `islesOf`): each one picked is marked with the part that picked it
+ * @param undone whether each point is also to say its way back (see `undo`)
+ * @param back puts a point said in the rules' measures back into the file's
+ * @returns how many islands were moved
+ */
+function swingOf(doc, prim, land, parts, undone, back) {
+  const { P } = land;
+  let moved = 0;
+  for (const part of parts) {
+    let mine = 0;
+    for (const isle of land.list) {
+      if (isle.part || !part.pick(isle.lo, isle.hi, isle.tris)) continue;
+      isle.part = part;
+      mine++;
+    }
+    if (!mine) throw new Error(`a part to be swung picks no island: ${part.pick}`);
+    moved += mine;
+  }
+  const pos = prim.getAttribute('POSITION'), n = pos.getCount();
+  const nor = prim.getAttribute('NORMAL'), tan = prim.getAttribute('TANGENT');
+  const outP = Float32Array.from(pos.getArray()), outN = nor && Float32Array.from(nor.getArray()), outT = tan && Float32Array.from(tan.getArray());
+  const size = tan?.getElementSize() ?? 4;
+  const undo = undone ? [new Float32Array(n * 3), new Float32Array(n * 3), new Float32Array(n * 3)] : null;
+  for (let i = 0; i < n; i++) {
+    const part = land.of(i)?.part;
+    if (!part) continue;
+    // (a turn about a line: what is along the line stays, what is across it goes round)
+    const l = Math.hypot(...(part.axis ?? [1, 0, 0])), u = (part.axis ?? [1, 0, 0]).map((c) => c / l), c = Math.cos(part.angle ?? 0), s = Math.sin(part.angle ?? 0);
+    const turn = (q) => {
+      const d = u[0] * q[0] + u[1] * q[1] + u[2] * q[2];
+      return [q[0] * c + (u[1] * q[2] - u[2] * q[1]) * s + u[0] * d * (1 - c), q[1] * c + (u[2] * q[0] - u[0] * q[2]) * s + u[1] * d * (1 - c), q[2] * c + (u[0] * q[1] - u[1] * q[0]) * s + u[2] * d * (1 - c)];
+    };
+    const at = part.at ?? [0, 0, 0];
+    const p = turn([P[i * 3] - at[0], P[i * 3 + 1] - at[1], P[i * 3 + 2] - at[2]]).map((q, e) => q + at[e]);
+    const w = part.move ? (part.ease ? Math.max(0, Math.min(1, part.ease(p[0], p[1], p[2]))) : 1) : 0;
+    const now = back(p.map((q, e) => q + w * (part.move?.[e] ?? 0)));
+    for (let e = 0; e < 3; e++) {
+      if (undo && !part.stay) undo[0][i * 3 + e] = outP[i * 3 + e] - now[e];
+      outP[i * 3 + e] = now[e];
+    }
+    for (const [out, wide, k] of [[outN, 3, 1], [outT, size, 2]]) {
+      if (!out) continue;
+      const t = turn([out[i * wide], out[i * wide + 1], out[i * wide + 2]]);
+      for (let e = 0; e < 3; e++) {
+        if (undo && !part.stay) undo[k][i * 3 + e] = out[i * wide + e] - t[e];
+        out[i * wide + e] = t[e];
+      }
+    }
+  }
+  prim.setAttribute('POSITION', pos.clone().setArray(outP));
+  if (outN) prim.setAttribute('NORMAL', nor.clone().setArray(outN));
+  if (outT) prim.setAttribute('TANGENT', tan.clone().setArray(outT));
+  if (undo) ['_UNDO', '_UNDO_N', '_UNDO_T'].forEach((name, k) => (k === 0 || (k === 1 ? outN : outT)) && prim.setAttribute(name, doc.createAccessor().setType('VEC3').setArray(undo[k])));
+  return moved;
+}
+
+/**
+ * Does to the islands of every shape in a file what `isles` says (see the settings at the top of this file). The
+ * shapes are taken as they are in the file: where its pieces are moved or turned by their nodes, whoever calls
+ * this puts those moves into the shapes first (as `processProp` does).
+ * @returns how many islands were left out, swung, and kept as glass
+ */
+export function islesIn(doc, isles) {
+  let to = (v) => v, back = (v) => v;
+  if (isles.tall) {
+    const b0 = getBounds(doc.getRoot().listScenes()[0]);
+    const k = isles.tall / (b0.max[1] - b0.min[1]), cx = (b0.min[0] + b0.max[0]) / 2, cz = (b0.min[2] + b0.max[2]) / 2;
+    to = (v) => [(v[0] - cx) * k, (v[1] - b0.min[1]) * k, (v[2] - cz) * k];
+    back = (v) => [v[0] / k + cx, v[1] / k + b0.min[1], v[2] / k + cz];
+  }
+  const done = { dropped: 0, swung: 0, glass: 0 };
+  const solid = new Map();
+  for (const mesh of doc.getRoot().listMeshes()) {
+    for (const prim of mesh.listPrimitives()) {
+      let land = islesOf(prim, to);
+      if (isles.drop) {
+        const gone = new Set(land.list.filter((isle) => isles.drop(isle.lo, isle.hi, isle.tris)));
+        if (gone.size === land.list.length) throw new Error('every island of a shape would be left out');
+        if (gone.size) {
+          const { index, of } = land;
+          keepTris(doc, prim, (t) => !gone.has(of(index[t * 3])));
+          land = islesOf(prim, to);
+          done.dropped += gone.size;
+        }
+      }
+      // (which islands are glass is said of them as they came: asked before anything is moved)
+      const panes = new Set(isles.glass ? land.list.filter((isle) => isles.glass(isle.lo, isle.hi, isle.tris)) : []);
+      if (isles.swing) done.swung += swingOf(doc, prim, land, isles.swing, isles.undo, back);
+      if (panes.size && panes.size < land.list.length) {
+        const { index, of } = land;
+        const paint = prim.getMaterial();
+        if (!solid.has(paint)) solid.set(paint, paint.clone().setName(`${paint.getName()}_solid`).setAlphaMode('OPAQUE'));
+        const pane = prim.clone();
+        mesh.addPrimitive(pane);
+        keepTris(doc, pane, (t) => panes.has(of(index[t * 3])));
+        keepTris(doc, prim, (t) => !panes.has(of(index[t * 3])));
+        prim.setMaterial(solid.get(paint));
+        done.glass += panes.size;
+      }
+    }
+  }
+  return done;
+}
+
 /** @returns its manifest entry and its credit */
 export async function processProp(id, cfg, { io, SRC, OUT, FORCE, exists, countTris }) {
   const dir = path.join(SRC, 'models', cfg.dir ?? id);
@@ -101,7 +306,7 @@ export async function processProp(id, cfg, { io, SRC, OUT, FORCE, exists, countT
   const credit = { id, ...(await creditOf(dir)), changes: cfg.changes };
   if (!credit.line) throw new Error(`${id}: its licence asks for no credit line this script knows how to read (${credit.licence}): look at ${path.join(dir, 'license.txt')}`);
   const dest = path.join(OUT, 'models', `${id}.glb`);
-  const stamp = JSON.stringify({ ...cfg, only: cfg.only?.source, small: cfg.small?.source, flat: cfg.flat?.source, pivot: cfg.pivot?.source, hung: cfg.hung && Object.entries(cfg.hung).map(([name, re]) => `${name}: ${re.source}`).join(), cut: cfg.cut ? `${cfg.cut.tall}: ${cfg.cut.keep} ${cfg.cut.drop}` : undefined, v: 6 });
+  const stamp = JSON.stringify({ ...cfg, only: cfg.only?.source, small: cfg.small?.source, flat: cfg.flat?.source, pivot: cfg.pivot?.source, hung: cfg.hung && Object.entries(cfg.hung).map(([name, re]) => `${name}: ${re.source}`).join(), cut: cfg.cut ? `${cfg.cut.tall}: ${cfg.cut.keep} ${cfg.cut.drop}` : undefined, isles: cfg.isles ? JSON.stringify(cfg.isles, (_k, v) => (typeof v === 'function' ? String(v) : v)) : undefined, v: 6 });
   const metaPath = path.join(dir, `_meta_${id}.json`);
   let meta;
   if (!FORCE && (await exists(dest)) && (await exists(metaPath))) {
@@ -170,6 +375,10 @@ export async function processProp(id, cfg, { io, SRC, OUT, FORCE, exists, countT
       for (const node of scene.listChildren()) if (!node.getMesh().listPrimitives().length) scene.removeChild(node.setMesh(null));
       if (!left) throw new Error(`${id}: the cut keeps nothing`);
     }
+    if (cfg.isles) {
+      const done = islesIn(doc, cfg.isles);
+      console.log(`      ${id}: of its islands ${done.dropped} left out, ${done.swung} swung, ${done.glass} kept as glass`);
+    }
     if (cfg.pair) {
       // each half by which side of the middle it is on; moved in until a finger's width is left between them
       let left = Infinity, right = -Infinity;
@@ -202,6 +411,19 @@ export async function processProp(id, cfg, { io, SRC, OUT, FORCE, exists, countT
     const s = cfg.scale ?? cfg.size / Math.max(...b.max.map((v, k) => v - b.min[k]));
     const M = mul(scaleBy(s), move(-(pivot?.[0] ?? (b.min[0] + b.max[0]) / 2), -b.min[1], -(pivot?.[2] ?? (b.min[2] + b.max[2]) / 2)));
     for (const mesh of meshes) transformMesh(mesh, M);
+    // (What a swung point says of the way back was said in the file's own measures, before it was turned upright and
+    // brought to size: it is turned and sized as the points were. A way back is not a place: it is not moved.)
+    for (const mesh of meshes) {
+      for (const prim of mesh.listPrimitives()) {
+        for (const [name, by] of [['_UNDO', s], ['_UNDO_N', 1], ['_UNDO_T', 1]]) {
+          const acc = prim.getAttribute(name), v = [];
+          for (let i = 0; acc && i < acc.getCount(); i++) {
+            acc.getElement(i, v);
+            acc.setElement(i, [0, 1, 2].map((r) => (R[r] * v[0] + R[4 + r] * v[1] + R[8 + r] * v[2]) * by));
+          }
+        }
+      }
+    }
     // What is hung is put under a piece of its own, whose origin is where its hinges are now that the whole has been
     // turned, sized and stood: its shapes are said from there. (A piece with a shape is given a measure of its own
     // when the file is packed, and its origin with it: so the hinge is a piece with no shape, and the shapes are

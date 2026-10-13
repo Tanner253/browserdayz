@@ -69,6 +69,6 @@ export const KITS: Kit[] = [
   },
   {
     id: 'supplies', name: 'Supplies', does: 'Dressings, stims, first aid kits and pouches, bags of blood, splints, food and water: added to what is carried', adds: true,
-    things: [...many(2, { id: 'firstaid' }), ...many(2, { id: 'aid_pouch' }), ...many(2, { id: 'bandage', qty: 5 }), ...many(2, { id: 'stim', qty: 3 }), ...many(2, { id: 'stim_stamina', qty: 3 }), ...many(2, { id: 'blood_bag' }), ...many(2, { id: 'saline' }), ...many(2, { id: 'splint' }), { id: 'beans' }, { id: 'sardines' }, { id: 'condensed' }, { id: 'water_jug' }, { id: 'flask' }],
+    things: [...many(2, { id: 'firstaid' }), ...many(2, { id: 'aid_pouch' }), ...many(2, { id: 'bandage', qty: 5 }), ...many(2, { id: 'stim', qty: 3 }), ...many(2, { id: 'stim_stamina', qty: 3 }), { id: 'stim_combat', qty: 5 }, ...many(2, { id: 'blood_bag' }), ...many(2, { id: 'saline' }), ...many(2, { id: 'splint' }), { id: 'beans' }, { id: 'sardines' }, { id: 'condensed' }, { id: 'water_jug' }, { id: 'flask' }],
   },
 ];

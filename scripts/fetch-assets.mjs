@@ -16,7 +16,7 @@ import { tierModels } from './tiers.mjs';
 import sharp from 'sharp';
 import { HDRI, TEXTURES, MODELS, LOCAL_MODELS, WEAPON_PACKS } from './assets.config.mjs';
 import { processWeaponPack } from './weapon-packs.mjs';
-import { processProp } from './props.mjs';
+import { processProp, islesIn } from './props.mjs';
 import { buildFx } from './fx.mjs';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
@@ -198,7 +198,7 @@ async function processModel(id) {
   const dest = path.join(OUT, 'models', `${id}.glb`);
   const lodPath = path.join(OUT, 'models', `${id}_lod1.glb`);
   // reprocess when the settings for this model change, not only when files are missing
-  const stamp = JSON.stringify({ tex: cfg.tex, budget: cfg.budget ?? null, far: cfg.far ?? null, v: 2 });
+  const stamp = JSON.stringify({ tex: cfg.tex, budget: cfg.budget ?? null, far: cfg.far ?? null, isles: cfg.isles ? JSON.stringify(cfg.isles, (_k, v) => (typeof v === 'function' ? String(v) : v)) : undefined, v: 2 });
   let meta;
 
   const metaPath = path.join(SRC, 'models', id, '_meta.json');
@@ -207,15 +207,19 @@ async function processModel(id) {
     if (meta.stamp !== stamp) meta = undefined;
   }
   if (!meta) {
+    let srcTris = 0;
     const base = async () => {
       const doc = await io.read(gltfPath);
       await doc.transform(dedup(), prune(), weld());
+      srcTris = countTris(doc);
+      // (parts of it that are not wanted left out, or laid another way: see `isles` in scripts/props.mjs. A gas
+      // mask that came with a metre of hose and a filter can, and is wanted alone.)
+      if (cfg.isles) islesIn(doc, cfg.isles);
       return doc;
     };
 
     const doc = await base();
-    const srcTris = countTris(doc);
-    // the footprint comes from the untouched model, so it does not shift when the budget changes
+    // the footprint comes from the model before it is thinned, so it does not shift when the budget changes
     const bounds = getBounds(doc.getRoot().listScenes()[0]);
     if (cfg.budget) decimate(doc, cfg.budget);
     const tris = countTris(doc);

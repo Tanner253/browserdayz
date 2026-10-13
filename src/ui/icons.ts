@@ -7,7 +7,7 @@ import { ITEMS } from '../sim/items';
 import { assets } from '../core/assets';
 import type { ItemModels } from '../game/loot';
 import { BEARD, HAIR_STYLES, loadCharacter, lookPatch, lookUniforms, setLookUniforms, suitPatch, type Look } from '../game/look';
-import { BODY_SCALE, GEAR, WORN } from '../game/avatar';
+import { BODY_SCALE, GEAR, WORN, placeWorn } from '../game/avatar';
 import { made, programsOf } from '../core/renderer';
 
 const PX = 64; // pixels per grid cell
@@ -306,10 +306,14 @@ export async function renderDoll(renderer: THREE.WebGLRenderer, env: THREE.Textu
       const holder = new THREE.Group();
       holder.matrixAutoUpdate = false;
       // (GEAR is written for a body in the world: turned to face the way the game faces, and at the game's size. This one is as its file has it.)
-      const place = new THREE.Matrix4().compose(new THREE.Vector3(...g.p), new THREE.Quaternion().setFromEuler(new THREE.Euler(g.r[0], g.r[1], g.r[2], 'XYZ')), new THREE.Vector3(...g.s));
+      // (Put as a body in the world is dressed, with what else is worn: a mask cut under a helmet, the helmet where
+      // it rides over a mask, its visor raised. By GEAR alone, the portrait had a hood through its helmet.)
+      const thing = (await models.get(id)).group.clone();
+      const place = placeWorn(id, thing, worn);
+      if (!place) continue;
       const toFile = new THREE.Matrix4().makeScale(1 / BODY_SCALE, 1 / BODY_SCALE, 1 / BODY_SCALE).multiply(new THREE.Matrix4().makeRotationY(Math.PI));
       holder.matrix.copy(bone.matrixWorld).invert().multiply(toFile).multiply(place);
-      holder.add((await models.get(id)).group.clone());
+      holder.add(thing);
       bone.add(holder);
       carried.push(holder);
     }

@@ -82,14 +82,13 @@ export const CAR_SIT: { front: SeatPose; back: SeatPose } = { front: { legs: 0.8
 /** where a thing that is worn sits on the body (see GEAR) */
 type Worn = { bone: 'Head' | 'spine_03'; p: [number, number, number]; r: [number, number, number]; s: [number, number, number]; pack?: boolean };
 /**
- * The respirator on the face: one mask in four paints, and one place for all of them.
- * (Fitted by measure, 2026-10-13: tried in some thousands of places against the head as it is drawn, each judged by
- * how far the mask's rim stands off the skin, how much of the face comes through it, and where its visor is by the
- * eyes. It leans back with the face, a quarter of a radian: this head's mouth and chin stand as far forward as its
- * nose. It is a little under life size, and a centimetre higher than its visor would have it: at its own size, and
- * with the eyes dead centre, its filters hung four centimetres into the shoulders of every vest.)
+ * The gas mask on the head: the GP-5, a rubber hood over the whole of it, a little larger than life so that the
+ * head is inside it. Its model lies on its back, eyepieces up and crown toward -z (scripts/assets.config.mjs lays
+ * it so, and leaves out the hose and the filter can it came with): it is stood up and turned to face the way the
+ * body faces. (Where it sits is where it sat from the day it was first worn until 2026-10-13, to the millimetre:
+ * worked out again for the model as it is built now, by laying the old hood and the new one over each other.)
  */
-const MASK: Worn = { bone: 'Head', p: [0, 1.484, -0.12], r: [0.25, 0, 0], s: [0.94, 0.94, 0.94] };
+const MASK: Worn = { bone: 'Head', p: [0.0007, 1.5772, 0.1298], r: [-Math.PI / 2, Math.PI, 0], s: [1.1, 1.1, 1.1] };
 /**
  * Worn things that are drawn on the body. `p`, `r`, `s` place the item's model on the body
  * as it stands at rest (x to its right, y up, z behind it); the bone then carries it.
@@ -103,7 +102,13 @@ export const GEAR: Record<string, Worn> = {
   // (the helmet: its brow is toward +x as its model stands, so it is turned a quarter round)
   boonie_hat: { bone: 'Head', p: [0, 1.593, 0.035], r: [0, Math.PI / 2, 0], s: [1, 1, 1] },
   // (the K6-3: its brow is toward -z as its model stands, the way a body faces. It comes down over the ears and the nape.)
-  helmet_k63: { bone: 'Head', p: [0, 1.55, -0.01], r: [0, 0, 0], s: [1, 1, 1] },
+  // (2026-10-13, its visor down. The model stands 27 mm taller on its visor's lower edge and its middle is 19 mm
+  // further back, so the same place on the head is said otherwise; and the helmet is 2 cm further forward on the
+  // head than it was. It sat with the brow of its shell against the forehead and 5 cm of air behind the skull, and
+  // the face stood 3 cm proud of the brow: a visor let down in front of that brow went through the nose and the
+  // chin. Here there is a centimetre of air at the forehead and at the back of the skull alike, and a centimetre
+  // between the tip of the nose and the visor's plate.)
+  helmet_k63: { bone: 'Head', p: [0, 1.5229, -0.0107], r: [0, 0, 0], s: [1, 1, 1] },
   // (vests that are things of their own, hung on the chest: the plate carrier is not one of these, it is part of the suit)
   // (Fitted by measure, 2026-10-10: rays cast at the body and at each vest from front and from behind at eleven
   // heights, and the size, lean and place found that leave a finger or two of air on both sides and no more. As
@@ -117,46 +122,103 @@ export const GEAR: Record<string, Worn> = {
   fishermans_hat: { bone: 'Head', p: [0, 1.66, 0.0], r: [0, 0, 0], s: [1, 1, 1] },
   // (the steel pot: its brow is toward -z, as the K6-3's is. It is a smaller helmet than the other two, as it was made.)
   helmet_m1: { bone: 'Head', p: [0, 1.62, 0.012], r: [0, 0, 0], s: [1, 1, 1] },
-  // (the respirator, in each of its four paints: its visor is toward -z as its model stands, the way a body faces)
+  // (the gas mask: see MASK)
   gasmask: MASK,
-  gasmask_white: MASK,
-  gasmask_orange: MASK,
-  gasmask_skull: MASK,
 };
 
 /**
- * A gas mask as it is worn. The GP-5 this was written for lay on a table with its hose and its filter can, one
- * stiff piece with it, and they were cut off here; the respirator that is the gas mask now is worn as it lies and
- * nothing is cut. (Kept because the game and the figure in the inventory both ask for it by name.)
+ * A gas mask as it is worn. The GP-5 lay on a table with its hose and its filter can, one stiff piece with it, and
+ * they were cut off here each time it was put on; they are left out where the model is built now, so the mask is
+ * worn as it lies and nothing is cut. (Kept because the game and the figure in the inventory both ask for it by name.)
  */
 export function facepiece(obj: THREE.Object3D) {
   return obj;
 }
 
 /**
- * A helmet worn over a mask. The respirator comes up over the brow and back along the temples, and a helmet comes
- * down over both: left as they are the two pass through each other, the mask's frame standing out through the
- * helmet's front and its straps through the sides. A real one goes UNDER the helmet, so that is what is drawn:
- * what of the mask the helmet covers is left out, cut clean along a line a little way up inside the helmet's edge,
- * where the edge itself hides the cut. `keep` says what of a mask stays, as flat cuts in the body's resting frame
- * (the frame GEAR is written in): [nx, ny, nz, d], kept where nx x + ny y + nz z is no more than d. `nudge` moves
- * the helmet itself while a mask is under it, where it sits too close to the brow for anything to go under.
- * (Measured, 2026-10-13: each helmet's lower edge all round the head, and every point of the mask that had a
- * helmet between it and the middle of the head.)
+ * A helmet worn over the mask. The mask is a hood, a centimetre and more of rubber and air over the whole head, and
+ * a helmet is made to sit on a head: left as they are the two pass through each other, the hood standing out
+ * through the steel wherever the steel is nearer the head than the hood is. A real hood goes UNDER a helmet, and a
+ * helmet over one rides a little higher: that is what is drawn. `nudge` moves the helmet while a mask is under it.
+ * `keep` says what of the mask stays, as flat cuts in the body's resting frame (the frame GEAR is written in):
+ * [nx, ny, nz, d], kept where nx x + ny y + nz z is no more than d. What the helmet covers is left out, cut clean
+ * along a line the helmet's own edge hides.
+ * (Measured, 2026-10-13, against the head as the game stands it: every place where the surface of the one went
+ * through the surface of the other, and of those the ones that can be seen from outside.)
  */
 export const OVER_MASK: Record<string, { keep: [number, number, number, number][]; nudge?: [number, number, number] }> = {
-  // (The pot's edge is all but flat, four centimetres higher at the brow than at the nape, and stands well off the
-  // head: the mask goes up inside it. One cut, 5 mm up inside the edge: above that the mask's frame lay in the
-  // thickness of the steel, and showed through it in slivers.)
-  helmet_m1: { keep: [[0, 1, 0.147, 1.6485]] },
-  // (The Combat Helmet's brow is turned in until it all but touches the forehead, and its sides come forward over
-  // the temples: nothing goes under it where it sits. With a mask on it rides 12 mm forward, as a helmet does
-  // that has a mask's frame under its brow, and the mask is cut along the slant of the helmet's edge over the
-  // temple, where its corner and its upper strap would stand out through the helmet's side.)
-  boonie_hat: { keep: [[0, 1, 1.05, 1.583]], nudge: [0, 0, -0.012] },
-  // (The K6-3 stands four centimetres off the face all round and its visor further: the mask is inside it whole,
-  // its filters below the cheek plates. Nothing is cut and nothing moved.)
+  // (The steel pot is the smallest of the helmets and sits a finger off the head: the hood filled it and came
+  // through it all round, at 1,338 places that could be seen. With a mask under it it rides a centimetre higher,
+  // and the hood is cut along the pot's edge, which is all but flat and four centimetres higher at the brow than at
+  // the nape: 3 mm below the edge, in the shadow of the brim. Higher, the hood lay in the thickness of the steel
+  // at the brow. Nothing of either goes through the other.)
+  helmet_m1: { keep: [[0, 1, 0.147, 1.6505]], nudge: [0, 0.01, 0] },
+  // (The Combat Helmet's brow is turned in until it all but touches the forehead: the hood stood out through it
+  // above the eyepieces. With a mask under it it rides a centimetre higher and 12 mm forward, and the hood is
+  // inside it everywhere above its edge. Nothing is cut: the hood meets it only where its ear pieces and the
+  // rails at its temples press on the rubber.)
+  boonie_hat: { keep: [], nudge: [0, 0.01, -0.012] },
+  // (The K6-3 stands well off the head all round: the hood is inside its shell whole, and nothing is cut or moved.
+  // What meets the hood is the helmet's own chin strap and its buckle, which hang inside it at the jaw, where a
+  // bare head has them against the cheek. Its visor is another matter: see VISOR_UP.)
 };
+
+/**
+ * Helmets whose visor is down as their model is built, and is worn as the model came (raised) while a mask is on
+ * the face: the K6-3's visor stands a centimetre off the tip of the nose, and the valve of a gas mask six
+ * centimetres off the chin, so both cannot be there. A mask is the only thing it goes up for. It stays down
+ * standing, crouched, walking, running, lying and with any gun at the eye: "the visor seems to lift up when ADS
+ * with the rifle, this should not be the case" (2026-10-13; it was raised for a rifle at the eye for an hour, because
+ * the rifle as the body then held it, on the middle of the chest, went through it. That is the hold's to mend,
+ * not the visor's.) (See `asItCame`, and `undo` in scripts/props.mjs.)
+ */
+const VISOR_UP = new Set(['helmet_k63']);
+
+/** shapes with their moved parts put back (see `asItCame`): by the shape they were made from */
+const CAME = new Map<string, THREE.BufferGeometry>();
+
+/**
+ * A shape with every part the build moved put back where the download had it. The build leaves the way back in the
+ * shape itself: for each point how far it was moved (`_undo`, in the model's own metres), and how its normal and
+ * its tangent were turned with it (`_undo_n`, `_undo_t`); nothing, for a point that was left alone. A shape that
+ * says none of this is given back as it is.
+ */
+function asItCame(geo: THREE.BufferGeometry): THREE.BufferGeometry {
+  const back = geo.getAttribute('_undo');
+  if (!back) return geo;
+  const had = CAME.get(geo.uuid);
+  if (had) return had;
+  const made = geo.clone();
+  for (const [name, way] of [['position', '_undo'], ['normal', '_undo_n'], ['tangent', '_undo_t']]) {
+    const from = geo.getAttribute(name), by = geo.getAttribute(way);
+    if (!from || !by) continue;
+    // (a copy in plain numbers: the points of a model as it comes may be packed, and what is added to them is not)
+    const out = new Float32Array(from.count * from.itemSize);
+    for (let i = 0; i < from.count; i++) {
+      for (let c = 0; c < from.itemSize; c++) out[i * from.itemSize + c] = from.getComponent(i, c) + (c < 3 ? by.getComponent(i, c) : 0);
+    }
+    made.setAttribute(name, new THREE.BufferAttribute(out, from.itemSize));
+  }
+  for (const way of ['_undo', '_undo_n', '_undo_t']) made.deleteAttribute(way);
+  made.computeBoundingBox();
+  made.computeBoundingSphere();
+  CAME.set(geo.uuid, made);
+  return made;
+}
+
+/**
+ * A helmet as it is worn with these other things: its visor as its model came, if it is one of VISOR_UP and one of
+ * the other things is a mask. The helmet handed in is changed and handed back (its shapes are its own to change:
+ * it is a copy of the model, and the shapes it is given are kept apart from the model's).
+ */
+export function wornWith(id: string, obj: THREE.Object3D, ids: string[]): THREE.Object3D {
+  if (!VISOR_UP.has(id) || !ids.some((other) => GEAR[other] === MASK)) return obj;
+  obj.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (mesh.isMesh) mesh.geometry = asItCame(mesh.geometry);
+  });
+  return obj;
+}
 
 /** shapes already cut (see `under`): by the shape they were cut from and where */
 const CUTS = new Map<string, THREE.BufferGeometry>();
@@ -232,6 +294,24 @@ function under(mask: THREE.Object3D, place: THREE.Matrix4, keep: number[][]) {
     mesh.geometry = cut(mesh.geometry, keep.map(([nx, ny, nz, d]) => [nx * e[0] + ny * e[1] + nz * e[2], nx * e[4] + ny * e[5] + nz * e[6], nx * e[8] + ny * e[9] + nz * e[10], d - (nx * e[12] + ny * e[13] + nz * e[14])]));
   });
 }
+
+/**
+ * Where a worn thing is put on the body as it stands at rest, when these things are worn together (itself among
+ * them): what GEAR says of it as one turn and move, a helmet over a mask where OVER_MASK moves it. And the thing
+ * itself is made ready to be worn with the others: a mask cut under a helmet, a helmet's visor raised over a mask.
+ * Null for a thing that is not hung on the body. (`setGear` dresses a body with this; so does whoever dresses one
+ * by itself, the portrait in the inventory: a body dressed by GEAR alone had a hood through its helmet.)
+ */
+export function placeWorn(id: string, obj: THREE.Object3D, ids: string[], into = new THREE.Matrix4()): THREE.Matrix4 | null {
+  const g = GEAR[id];
+  if (!g) return null;
+  const helmet = ids.some((other) => GEAR[other] === MASK) ? ids.map((other) => OVER_MASK[other]).find((h) => !!h) : undefined;
+  const nudge = helmet && helmet === OVER_MASK[id] ? helmet.nudge : undefined;
+  wornWith(id, obj, ids);
+  into.compose(_a.set(g.p[0] + (nudge?.[0] ?? 0), g.p[1] + (nudge?.[1] ?? 0), g.p[2] + (nudge?.[2] ?? 0)), _q1.setFromEuler(_euler.set(g.r[0], g.r[1], g.r[2], 'XYZ')), _b.set(...g.s));
+  if (helmet && g === MASK && helmet.keep.length) under(obj, into, helmet.keep);
+  return into;
+}
 /**
  * Worn things that are part of the body itself: pieces of the suit (scripts/suit.mjs), on its
  * skeleton and cut to it, that are there or not. [what is worn]: the pieces it shows.
@@ -294,11 +374,29 @@ export const POSE = {
      *   aim:   sights up to the eye.
      *   carry: jogging or sprinting. A long gun goes across the chest, a pistol points at the ground.
      */
+    // (A long gun with a stock is not put by `p` at the ready or aimed, but by its butt: see `butt`. `p` is for one
+    // whose butt is not known. At the ready its muzzle is down 26 degrees, a low ready, and a little in toward the
+    // other hand; it was 9.)
     long: {
-      ready: { p: [0.065, -0.19, -0.65], r: [-0.16, 0, 0] },
+      ready: { p: [0.065, -0.19, -0.65], r: [-0.45, 0.06, 0] },
       aim: { p: [0.05, 0.1, -0.6], r: [0, 0, 0] },
       carry: { p: [-0.07, -0.07, -0.34], r: [0.656, 0.88, 0] },
     } as Stances,
+    /**
+     * A long gun with a stock is held by its butt, in the pocket of the firing shoulder. Where the middle of its
+     * butt goes from the right shoulder's joint, by the chest's own right, up and back (as the upper back carries
+     * them: a chest turned off the aim has its shoulder somewhere else than the aim's right), metres:
+     *   ready: in the pocket, where the chest's front meets the shoulder (the jacket there is 14 cm in front of the joint);
+     *   aim:   raised, the foot of the butt still in the pocket and the sights up toward the eye's line. The gun is
+     *          to the firing side of the head, not under the eye: a head in a helmet with its visor down is not laid on a stock;
+     *   prone: lying, the butt at the top of the shoulder, the gun out along the ground.
+     * (The gun's own origin was put, for every long gun alike, on the middle line of a chest turned 43 degrees off the
+     * aim. That stood an AK's butt 23 cm to the LEFT of the right shoulder, 9 cm inside the plate carrier, and a
+     * sniper rifle's 13 cm inside it, and the right arm went across the chest to the grip, nearly straight: 10 cm
+     * of the upper arm and of the forearm inside the vest. The user's, 2026-10-13: "the arm clips into the body",
+     * "in real life the stock would be against the shoulder".)
+     */
+    butt: { ready: [-0.018, -0.013, -0.143], aim: [-0.02, 0.08, -0.125], prone: [-0.02, 0.1, -0.07] } as Record<'ready' | 'aim' | 'prone', [number, number, number]>,
     // (A pistol at the ready and carried was a hand's width nearer the chest and off to the right: the left arm
     // went through the chest to get to it. In front of the middle of the body, at arm's length less a bend.)
     pistol: {
@@ -315,6 +413,8 @@ export const POSE = {
     eye: [0.146, -0.028] as [number, number],
     /** long guns: the chest turns this far off the aim, left shoulder leading, radians (at 0.5 the left hand could not reach a rifle's fore-end) */
     blade: 0.75,
+    /** and for a long gun with no stock, held out in both hands in front of the chest */
+    square: 0.75,
     /** and the left shoulder comes forward this much more */
     reach: 0.3,
     /** the most the left hand moves back along the stock toward the right when the grip is beyond its reach, metres */
@@ -431,7 +531,51 @@ const UP = new THREE.Vector3(0, 1, 0);
  * arm is inside the body now than of one hanging at its side: measured over the stand, the walk, the jog, the
  * sprint, the crouch and the aim, level, up and down, with each kind of gun. See T.arms in the dev harness.)
  */
-const GUN_ELBOW = { r: new THREE.Vector3(1.2, -0.75, -0.1), l: new THREE.Vector3(-1.3, -0.85, 0.05) };
+// (2026-10-13: said from how the chest stands, not from the aim: x out to the body's own right along the line of
+// its shoulders, y up, z behind it. Under a chest turned off the aim, "out to the aim's right" was forward of the
+// right ribs and across the left ones. `stockR` and `stockL` are for a gun whose butt is in the shoulder: the firing
+// elbow down and out from the ribs, the other under the gun and a little out. Measured WITH what is worn, by
+// `ST` in src/dev/stance.ts: the first measure was against the bare body, and a plate carrier is 3 cm thicker.)
+export const GUN_ELBOW = {
+  r: new THREE.Vector3(1.2, -0.75, -0.1), l: new THREE.Vector3(-1.3, -0.85, 0.05),
+  stockR: new THREE.Vector3(0.7, -0.75, 0), stockL: new THREE.Vector3(-0.5, -0.85, 0.05),
+};
+const _k1 = new THREE.Vector3(), _k2 = new THREE.Vector3(), _k3 = new THREE.Vector3(), _k4 = new THREE.Vector3(), _k5 = new THREE.Vector3();
+const _kq = new THREE.Quaternion(), _kr = new THREE.Quaternion();
+/** the middle of each kind of long gun's butt (see `buttOf`), by the biggest of the gun's shapes */
+const BUTTS = new WeakMap<THREE.BufferGeometry, THREE.Vector3>();
+/**
+ * The middle of the butt of a gun, in the gun's own space (it lies along its own x, muzzle at +x): the middle of
+ * the rearmost centimetre and a half of whatever of it is shown. Found once for each kind of gun.
+ */
+function buttOf(obj: THREE.Object3D): THREE.Vector3 | null {
+  obj.updateWorldMatrix(true, true);
+  const inv = new THREE.Matrix4().copy(obj.matrixWorld).invert();
+  const parts: [THREE.BufferAttribute, THREE.Matrix4][] = [];
+  const big = { shape: null as THREE.BufferGeometry | null, n: 0 };
+  obj.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (!m.isMesh) return;
+    for (let p: THREE.Object3D | null = o; p && p !== obj; p = p.parent) if (!p.visible) return;
+    const P = m.geometry.getAttribute('position') as THREE.BufferAttribute;
+    parts.push([P, new THREE.Matrix4().multiplyMatrices(inv, m.matrixWorld)]);
+    if (P.count > big.n) {
+      big.n = P.count;
+      big.shape = m.geometry;
+    }
+  });
+  const key = big.shape;
+  if (!key) return null;
+  const had = BUTTS.get(key);
+  if (had) return had;
+  let back = Infinity;
+  for (const [P, M] of parts) for (let i = 0; i < P.count; i++) back = Math.min(back, _k1.fromBufferAttribute(P, i).applyMatrix4(M).x);
+  const box = new THREE.Box3();
+  for (const [P, M] of parts) for (let i = 0; i < P.count; i++) if (_k1.fromBufferAttribute(P, i).applyMatrix4(M).x < back + 0.015) box.expandByPoint(_k1);
+  const butt = box.getCenter(new THREE.Vector3()).setX(back);
+  BUTTS.set(key, butt);
+  return butt;
+}
 /** how far under its ankle a body's sole is (in the foot's own measure), by the file it was made from and the side */
 const SOLE_UNDER = new Map<string, number>();
 
@@ -541,7 +685,7 @@ export class Avatar {
   private layerMask = 1;
   /** weapon in the hands: pivot (at the shoulders, pitches with the aim) > the model */
   private heldPivot = new THREE.Group();
-  private held: { obj: THREE.Object3D; grips: Grips; long: boolean; base: THREE.Quaternion } | null = null;
+  private held: { obj: THREE.Object3D; grips: Grips; long: boolean; base: THREE.Quaternion; butt: THREE.Vector3 | null } | null = null;
   /**
    * How much the hands are on the gun they hold, 0..1. They come off it to use something, to wave, to sit, and
    * when it is changed for another, and go back onto it, over a fifth of a second, the gun going down toward
@@ -889,8 +1033,7 @@ export class Avatar {
     this.gearObjs = [];
     this.packOut = 0;
     for (const p of this.pieces.values()) p.visible = false;
-    // (a helmet over a mask: the mask goes under it, and the helmet may sit a little otherwise for it: see OVER_MASK)
-    const helmet = items.some(({ id }) => GEAR[id] === MASK) ? items.map(({ id }) => OVER_MASK[id]).find((h) => !!h) : undefined;
+    const ids = items.map(({ id }) => id);
     for (const { id, obj } of items) {
       for (const name of WORN[id] ?? []) {
         const p = this.pieces.get(name);
@@ -907,9 +1050,9 @@ export class Avatar {
       const holder = new THREE.Group();
       holder.layers.mask = this.layerMask;
       holder.matrixAutoUpdate = false;
-      const nudge = helmet && helmet === OVER_MASK[id] ? helmet.nudge : undefined;
-      _m1.compose(_a.set(g.p[0] + (nudge?.[0] ?? 0), g.p[1] + (nudge?.[1] ?? 0), g.p[2] + (nudge?.[2] ?? 0)), _q1.setFromEuler(_euler.set(g.r[0], g.r[1], g.r[2], 'XYZ')), _b.set(...g.s));
-      if (helmet && g === MASK) under(obj, _m1, helmet.keep);
+      // (a helmet over a mask: the mask goes under it, cut where the helmet covers it, and the helmet may sit a
+      // little otherwise for it, its visor raised: see OVER_MASK and VISOR_UP)
+      placeWorn(id, obj, ids, _m1);
       holder.matrix.copy(rest.inv).multiply(_m1);
       holder.add(obj);
       rest.bone.add(holder);
@@ -990,7 +1133,8 @@ export class Avatar {
       return;
     }
     this.heldPivot.add(obj);
-    this.held = { obj, grips, long: kind !== 'pistol', base: obj.quaternion.clone() };
+    // (a long gun with a stock is held by its butt: one with a way of its own of being stood with has none, and is put as a pistol is)
+    this.held = { obj, grips, long: kind !== 'pistol', base: obj.quaternion.clone(), butt: kind !== 'pistol' && !grips.stand ? buttOf(obj) : null };
   }
 
   private setWorldQuat(bone: THREE.Object3D, world: THREE.Quaternion) {
@@ -1025,7 +1169,11 @@ export class Avatar {
       const reach = (r.la + r.lb) * 0.96;
       for (let moved = 0; moved < POSE.hold.slide && target.distanceTo(A) > reach; moved += 0.02) target.addScaledVector(slide, 0.02);
     }
-    this.reach(r, target, grip.fingers.clone().applyQuaternion(wq), grip.palm.clone().applyQuaternion(wq), grip.curl, aimQ, w, r === this.armR ? GUN_ELBOW.r : GUN_ELBOW.l);
+    // (which way the elbow goes: said by the chest's own right, the line of the shoulders, and handed on as `reach` takes it, by the aim)
+    const stock = !!this.held?.butt, e = r === this.armR ? (stock ? GUN_ELBOW.stockR : GUN_ELBOW.r) : stock ? GUN_ELBOW.stockL : GUN_ELBOW.l;
+    const out = this.armR && this.armL ? this.armR.arm.getWorldPosition(_k1).sub(this.armL.arm.getWorldPosition(_k2)).normalize() : _k1.set(1, 0, 0).applyQuaternion(aimQ);
+    const toward = _k3.crossVectors(out, UP).normalize().multiplyScalar(e.z).addScaledVector(out, e.x).addScaledVector(UP, e.y).applyQuaternion(_kq.copy(aimQ).invert());
+    this.reach(r, target, grip.fingers.clone().applyQuaternion(wq), grip.palm.clone().applyQuaternion(wq), grip.curl, aimQ, w, toward);
   }
 
   /**
@@ -1742,7 +1890,7 @@ export class Avatar {
       // a long gun is held across the body: chest turned off the aim, left shoulder leading,
       // the head still looking down the barrel
       // (and square again for a run, the gun carried across the chest)
-      const blade = held?.long ? POSE.hold.blade * (1 - carry) * hold : 0;
+      const blade = held?.long ? (held.butt ? POSE.hold.blade : POSE.hold.square) * (1 - carry) * hold : 0;
       // (the legs' turn and the blade are two turns of the one waist: together they are no more than it can turn.
       // Stepping one way with a long gun they came to 120 degrees.)
       const waist = THREE.MathUtils.clamp(-this.twist - blade, -POSE.maxTwist, POSE.maxTwist) * alive;
@@ -1792,14 +1940,29 @@ export class Avatar {
           const set = grips.stand ? { ...kind, ...grips.stand } : kind;
           const carried: Stance = grips.carry ?? set.carry;
           const wAim = this.aimT, wReady = 1 - wAim - carry;
-          obj.position.set(0, 0, 0);
-          for (const [s, w] of [[set.ready, wReady], [carried, carry], [set.aim, wAim]] as [Stance, number][]) {
-            obj.position.x += s.p[0] * w;
-            obj.position.y += s.p[1] * w;
-            obj.position.z += s.p[2] * w;
-          }
           const turned = (s: Stance, q: THREE.Quaternion) => q.setFromEuler(_euler.set(s.r[0], s.r[1], s.r[2], 'YXZ'));
-          turned(set.ready, _qa);
+          // A long gun with a stock is held by its butt (see POSE.hold.butt): in the pocket of the right shoulder,
+          // wherever the chest has taken that. Its muzzle is dipped at the ready; less the further down the eyes
+          // already are, and not at all lying down (it would be in the ground).
+          const butt = held.butt, chest = butt && this.gearRest.get('spine_03');
+          const level = (1 - pr) * THREE.MathUtils.clamp(1 + Math.min(0, pitch) / 0.8, 0, 1);
+          const ready: Stance = chest ? { p: set.ready.p, r: [set.ready.r[0] * level, set.ready.r[1] * level, set.ready.r[2]] } : set.ready;
+          if (butt && chest) {
+            this.heldPivot.updateWorldMatrix(false, false);
+            _kq.setFromRotationMatrix(_m1.multiplyMatrices(chest.bone.matrixWorld, chest.inv));
+            this.armR.arm.getWorldPosition(_k1);
+          }
+          /** where a stance puts the gun's own origin, from the pivot: by its butt if it has one, by `p` if not */
+          const put = (s: Stance, to: [number, number, number] | null, at: THREE.Vector3) => {
+            if (!butt || !chest || !to) return at.set(s.p[0], s.p[1], s.p[2]);
+            const lie = POSE.hold.butt.prone;
+            at.set(to[0] + (lie[0] - to[0]) * pr, to[1] + (lie[1] - to[1]) * pr, to[2] + (lie[2] - to[2]) * pr).applyQuaternion(_kq).add(_k1);
+            return this.heldPivot.worldToLocal(at).sub(_k2.copy(butt).multiply(obj.scale).applyQuaternion(turned(s, _kr).multiply(base)));
+          };
+          put(ready, POSE.hold.butt.ready, _k3);
+          put(set.aim, POSE.hold.butt.aim, _k4);
+          obj.position.set(0, 0, 0).addScaledVector(_k3, wReady).addScaledVector(_k5.set(carried.p[0], carried.p[1], carried.p[2]), carry).addScaledVector(_k4, wAim);
+          turned(ready, _qa);
           if (carry > 0.001) _qa.slerp(turned(carried, _qb), carry / Math.max(1e-4, 1 - wAim));
           if (wAim > 0.001) _qa.slerp(turned(set.aim, _qb), wAim);
           if (hold < 1) {

@@ -258,7 +258,7 @@ export function buildShots(S: Stage): Shot[] {
 
   // ============================================================ 4. the weapons (bars 8-10)
   {
-    const guns: [string, string][] = [['mosin', 'MOSIN 91/30'], ['colt', 'COLT 1911'], ['hatchet', 'HATCHET'], ['machete', 'MACHETE'], ['crowbar', 'CROWBAR'], ['bat', 'BASEBALL BAT'], ['knife', 'FISH KNIFE']];
+    const guns: [string, string][] = [['mosin', 'MOSIN 91/30'], ['colt', 'COLT 1911'], ['hatchet', 'HATCHET'], ['machete', 'MACHETE'], ['crowbar', 'CROWBAR'], ['bat', 'BASEBALL BAT'], ['knife', 'COMBAT KNIFE']];
     const each = b(2) / guns.length;
     const here = roadAt(0.45), ahead = roadAt(0.6);
     add(8, 2, {

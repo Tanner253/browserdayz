@@ -85,8 +85,15 @@ ok('a bag puts it back faster: saline slowly, blood quickly; neither closes a wo
   // (many times what comes back by itself)
   assert.ok(saline.blood! / saline.over! > BLOOD.back[0] * 5 && bag.blood! / bag.over! > (saline.blood! / saline.over!) * 5);
   assert.ok(!saline.stopBleed && !bag.stopBleed && !saline.health && !bag.health, 'a bag closes a wound, or mends');
-  // (and what closes a wound gives no blood: the two are two things)
-  for (const id of ['bandage', 'stim', 'firstaid']) assert.ok(ITEMS[id].use!.stopBleed && !ITEMS[id].use!.blood, id);
+  // (and what closes a wound in a moment gives no blood: the two are two things)
+  for (const id of ['bandage', 'stim', 'stim_combat']) assert.ok(ITEMS[id].use!.stopBleed && !ITEMS[id].use!.blood, id);
+  // (the kit and the pouch each run in a little, 2026-10-13: "medkit should recover some blood for the user but
+  // bloodbags are superiour source of blood": less than a bag of saline, and a bag of blood gives three times as
+  // much, many times as fast)
+  for (const id of ['firstaid', 'aid_pouch']) {
+    const u = ITEMS[id].use!;
+    assert.ok(u.stopBleed && u.blood! > 0 && u.blood! < saline.blood! && bag.blood! >= u.blood! * 3 && bag.blood! / bag.over! > (u.blood! / u.over!) * 5, id);
+  }
   for (const id of ['saline', 'blood_bag']) {
     assert.ok(TYPES[id], `${id} is kept nowhere`);
     assert.equal(TYPES[id].at[0], 0, `${id} on the outskirts`);

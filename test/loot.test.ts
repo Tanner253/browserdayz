@@ -130,6 +130,9 @@ ok('Kamenka is the submachine gun\'s; one AK and one AR-15 in the whole town, se
     for (const { id, p } of all) if ((id === 'ak' || id === 'ar15' || id === 'mosin') && p.tier === 3 && !p.keeps) assert.ok(kind(p, ...KEPT_GUNS), `a ${id} in ${p.building}`);
     // ("an even rarer chance of having a magazine": over many makings of the town)
     const eco = e as unknown as { rng: RNG; spawnType(id: string, at: number, where: Tier): boolean; loot: Map<string, { item: { id: string; mag?: string | null } }>; take(uid: string, looted: boolean): unknown };
+    // (The town's own two are taken up first, as they are in play before another is put down: of its thirty-one
+    // places for a rifle none or one is free after a stocking, by the dice, and with none nothing was counted.)
+    for (const l of [...e.loot.values()]) if ((l.item.id === 'ak' || l.item.id === 'ar15') && points[l.point].tier === 3 && !points[l.point].keeps) eco.take(l.uid, false);
     for (let k = 0; k < 200; k++) {
       const had = new Set(eco.loot.keys());
       if (!eco.spawnType(k % 2 ? 'ak' : 'ar15', -1, 3)) continue;
@@ -190,15 +193,9 @@ ok('every calibre where the police and the army were, from the village on: heavy
 
 ok('the gas masks are a policeman\'s, and the keycards are under the gas', () => {
   for (const { on, all } of worlds) {
-    // (What the map has to get into the gas with: five, as there were. The black mask is the ordinary one, and
-    // the village's three are all black; Kamenka's two are the white and the orange. The skull is down the bunker
-    // and nowhere else: 2026-10-13.)
-    const masks = all.filter(({ id }) => ['gasmask', 'gasmask_white', 'gasmask_orange'].includes(id));
+    const masks = all.filter(({ id }) => id === 'gasmask');
     assert.ok(masks.filter(({ p }) => p.tier === 2).length === 3 && masks.filter(({ p }) => p.tier === 3).length === 2 && masks.length === 5, `${masks.length} gas masks, on steps ${masks.map(({ p }) => p.tier)}`);
     assert.ok(masks.every(({ p }) => kind(p, 'Police')), 'a mask that is not in a police station');
-    assert.ok(masks.every(({ id, p }) => (id === 'gasmask') === (p.tier === 2)), 'a painted mask in the village, or a black one in Kamenka');
-    assert.deepEqual(masks.filter(({ p }) => p.tier === 3).map(({ id }) => id).sort(), ['gasmask_orange', 'gasmask_white']);
-    assert.ok(on('gasmask_skull', 5) === 1 && on('gasmask_skull', 1) + on('gasmask_skull', 2) + on('gasmask_skull', 3) + on('gasmask_skull', 4) === 0, 'the skull mask is kept somewhere other than the bunker');
     assert.ok(on('keycard', 4) >= 1 && on('keycard', 1) + on('keycard', 2) + on('keycard', 3) + on('keycard', 5) === 0);
   }
 });
@@ -277,7 +274,7 @@ ok('one of the army\'s cases holds pistols and kit, now and then a mask or somet
     const seen = open(kind, 600);
     for (const id of ['mosin', 'pu_scope', 'life_vest', 'suitcase', 'deagle', 'benelli', 'heavy_armor', 'helmet_k63', 'keycard', ...melee]) assert.ok(!seen.has(id), `a ${id} in a ${CRATE_SPECS[kind].label}`);
     assert.ok((seen.get('colt') ?? 0) + (seen.get('m9') ?? 0) > 60, 'hardly a pistol in the army\'s cases');
-    const mask = ['gasmask', 'gasmask_white', 'gasmask_orange', 'gasmask_skull'].reduce((n2, id) => n2 + (seen.get(id) ?? 0), 0) / 600;
+    const mask = (seen.get('gasmask') ?? 0) / 600;
     assert.ok(mask > 0.01 && mask < 0.12, `a gas mask in ${(mask * 100).toFixed(0)} cases of a hundred`);
     assert.ok((seen.get('armor_vest') ?? 0) + (seen.get('boonie_hat') ?? 0) > 0 && ((seen.get('armor_vest') ?? 0) + (seen.get('boonie_hat') ?? 0)) / 600 < 0.15, 'the third step\'s things are not rare in them');
   }

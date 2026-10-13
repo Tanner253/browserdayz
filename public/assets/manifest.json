@@ -169,6 +169,21 @@
    "diff": "assets/tex/concrete_tiles_02_diff.webp",
    "nor": "assets/tex/concrete_tiles_02_nor.webp",
    "arm": "assets/tex/concrete_tiles_02_arm.webp"
+  },
+  "castle_wall_slates": {
+   "diff": "assets/tex/castle_wall_slates_diff.webp",
+   "nor": "assets/tex/castle_wall_slates_nor.webp",
+   "arm": "assets/tex/castle_wall_slates_arm.webp"
+  },
+  "medieval_blocks_06": {
+   "diff": "assets/tex/medieval_blocks_06_diff.webp",
+   "nor": "assets/tex/medieval_blocks_06_nor.webp",
+   "arm": "assets/tex/medieval_blocks_06_arm.webp"
+  },
+  "defense_wall": {
+   "diff": "assets/tex/defense_wall_diff.webp",
+   "nor": "assets/tex/defense_wall_nor.webp",
+   "arm": "assets/tex/defense_wall_arm.webp"
   }
  },
  "models": {
@@ -500,25 +515,25 @@
    "tags": [
     "loot"
    ],
-   "bytes": 404984,
+   "bytes": 446072,
    "srcTris": 18900,
-   "tris": 4999,
+   "tris": 8896,
    "min": [
-    -0.1053,
-    -1.0047,
-    -0.1223
+    -0.0986,
+    -0.1223,
+    -0.121
    ],
    "max": [
-    0.1053,
-    0.121,
-    0.1864
+    0.0967,
+    0.1584,
+    0.2116
    ],
    "lods": [
     {
      "url": "assets/models/old_gas_mask_lod1.glb",
-     "tris": 1599,
+     "tris": 2423,
      "far": 2,
-     "of": "404984:1791630569390"
+     "of": "446072:1791888119014"
     }
    ]
   },
@@ -2543,29 +2558,29 @@
     "loot",
     "gear"
    ],
-   "bytes": 288352,
+   "bytes": 302364,
    "srcTris": 4242,
    "tris": 4242,
    "min": [
     -0.1452,
     0,
-    -0.1886
+    -0.1692
    ],
    "max": [
     0.1452,
-    0.2799,
-    0.1886
+    0.307,
+    0.1692
    ],
    "lods": [
     {
      "url": "assets/models/helmet_k63_lod1.glb",
-     "tris": 1945,
+     "tris": 2155,
      "far": 2,
-     "of": "288352:1791709099116"
+     "of": "302364:1791890256713"
     }
    ],
    "hi": "assets/models/hi/helmet_k63.glb",
-   "hiBytes": 1433136,
+   "hiBytes": 1447160,
    "hiCard": 64
   },
   "vest_t0": {
@@ -4480,126 +4495,6 @@
    "hiBytes": 1751364,
    "hiCard": 256
   },
-  "gas_mask_black": {
-   "url": "assets/models/gas_mask_black.glb",
-   "tags": [
-    "loot"
-   ],
-   "bytes": 137848,
-   "srcTris": 16168,
-   "tris": 3090,
-   "min": [
-    -0.1445,
-    0,
-    -0.0822
-   ],
-   "max": [
-    0.1445,
-    0.2526,
-    0.0822
-   ],
-   "lods": [
-    {
-     "url": "assets/models/gas_mask_black_lod1.glb",
-     "tris": 1699,
-     "far": 2,
-     "of": "137848:1791873999945"
-    }
-   ],
-   "hi": "assets/models/hi/gas_mask_black.glb",
-   "hiBytes": 524344,
-   "hiCard": 65
-  },
-  "gas_mask_white": {
-   "url": "assets/models/gas_mask_white.glb",
-   "tags": [
-    "loot"
-   ],
-   "bytes": 165920,
-   "srcTris": 16168,
-   "tris": 3090,
-   "min": [
-    -0.1445,
-    0,
-    -0.0822
-   ],
-   "max": [
-    0.1445,
-    0.2526,
-    0.0822
-   ],
-   "lods": [
-    {
-     "url": "assets/models/gas_mask_white_lod1.glb",
-     "tris": 1699,
-     "far": 2,
-     "of": "165920:1791874000124"
-    }
-   ],
-   "hi": "assets/models/hi/gas_mask_white.glb",
-   "hiBytes": 588868,
-   "hiCard": 65
-  },
-  "gas_mask_orange": {
-   "url": "assets/models/gas_mask_orange.glb",
-   "tags": [
-    "loot"
-   ],
-   "bytes": 140212,
-   "srcTris": 16168,
-   "tris": 3090,
-   "min": [
-    -0.1445,
-    0,
-    -0.0822
-   ],
-   "max": [
-    0.1445,
-    0.2526,
-    0.0822
-   ],
-   "lods": [
-    {
-     "url": "assets/models/gas_mask_orange_lod1.glb",
-     "tris": 1697,
-     "far": 2,
-     "of": "140212:1791874000316"
-    }
-   ],
-   "hi": "assets/models/hi/gas_mask_orange.glb",
-   "hiBytes": 531304,
-   "hiCard": 65
-  },
-  "gas_mask_skull": {
-   "url": "assets/models/gas_mask_skull.glb",
-   "tags": [
-    "loot"
-   ],
-   "bytes": 148476,
-   "srcTris": 16168,
-   "tris": 3090,
-   "min": [
-    -0.1445,
-    0,
-    -0.0822
-   ],
-   "max": [
-    0.1445,
-    0.2526,
-    0.0822
-   ],
-   "lods": [
-    {
-     "url": "assets/models/gas_mask_skull_lod1.glb",
-     "tris": 1699,
-     "far": 2,
-     "of": "148476:1791874000486"
-    }
-   ],
-   "hi": "assets/models/hi/gas_mask_skull.glb",
-   "hiBytes": 578308,
-   "hiCard": 65
-  },
   "helmet_m1": {
    "url": "assets/models/helmet_m1.glb",
    "tags": [
@@ -4828,6 +4723,140 @@
     0.6958
    ],
    "lods": []
+  },
+  "knife": {
+   "url": "assets/models/knife.glb",
+   "tags": [
+    "weapon"
+   ],
+   "bytes": 205456,
+   "srcTris": 2846,
+   "tris": 2846,
+   "min": [
+    -0.0659,
+    -0.0163,
+    -0.0358
+   ],
+   "max": [
+    0.2391,
+    0.0163,
+    0.042
+   ],
+   "lods": [
+    {
+     "url": "assets/models/knife_lod1.glb",
+     "tris": 1600,
+     "far": 2,
+     "of": "205456:1791890889299"
+    }
+   ],
+   "holds": {
+    "right": [
+     -0.00394,
+     -0.01459,
+     0.0759
+    ],
+    "left": [
+     0.29192,
+     0.15993,
+     0.05851
+    ]
+   },
+   "hi": "assets/models/hi/knife.glb",
+   "hiBytes": 827208,
+   "hiCard": 64
+  },
+  "knife_fp": {
+   "url": "assets/models/knife_fp.glb",
+   "tags": [
+    "viewmodel"
+   ],
+   "bytes": 317088,
+   "srcTris": 16546,
+   "tris": 16546,
+   "min": [
+    -0.0659,
+    -0.0163,
+    -0.0358
+   ],
+   "max": [
+    0.2391,
+    0.0163,
+    0.042
+   ],
+   "lods": [],
+   "rig": {
+    "fps": 30,
+    "clips": {
+     "idle": [
+      0,
+      40
+     ],
+     "cutA": [
+      41,
+      60
+     ],
+     "cutB": [
+      61,
+      80
+     ],
+     "stab": [
+      81,
+      102
+     ],
+     "thrust": [
+      103,
+      124
+     ],
+     "stow": [
+      125,
+      135
+     ],
+     "draw": [
+      135,
+      145
+     ]
+    },
+    "view": [
+     -0.01,
+     0,
+     0,
+     0,
+     0,
+     0.01,
+     0,
+     0,
+     0,
+     0,
+     -0.01,
+     0,
+     0,
+     0,
+     0,
+     1
+    ],
+    "frame": [
+     0.0081517,
+     0.0032569,
+     -0.0012152,
+     0,
+     0.003068,
+     -0.0081971,
+     -0.001389,
+     0,
+     -0.0016345,
+     0.000857,
+     -0.0086677,
+     0,
+     0.1530296,
+     0.0831416,
+     0.1645319,
+     1
+    ]
+   },
+   "hi": "assets/models/hi/knife_fp.glb",
+   "hiBytes": 937100,
+   "hiCard": 64
   },
   "saline_bag": {
    "url": "assets/models/saline_bag.glb",

@@ -240,6 +240,11 @@ export const TYPES: Record<string, TypeRule> = {
   stim: { at: [0, 20, 60, 3, 4], lifetime: 3000, restock: 360, usage: ['Medic', 'Hospital', 'Military', 'Police', ...HOMES], favour: { Medic: 16, Hospital: 6, Military: 3, Police: 2 } },
   // (the yellow one, for the breath: see items.ts. A soldier's thing as much as a nurse's.)
   stim_stamina: { at: [0, 8, 24, 1, 2], lifetime: 3000, restock: 360, usage: ['Medic', 'Hospital', 'Military', 'Police'], favour: { Medic: 10, Hospital: 5, Military: 4 } },
+  // (the pink one, both at once: see items.ts. 2026-10-13: "the new hybrid stim will be in loot areas T4 and
+  // higher", "medical and military": under the gas and down the bunker, where the army and its medics were, and on
+  // no step below. Six in the whole world where there are eighty-odd of the white, and a quarter of an hour
+  // coming back.)
+  stim_combat: { at: [0, 0, 0, 3, 3], lifetime: 3000, restock: 900, usage: ['Military', 'Medic', 'Hospital'], favour: { Military: 4, Medic: 4, Hospital: 4 } },
   firstaid: { at: [0, 5, 53, 2, 2], lifetime: 3600, restock: 600, usage: ['Hospital', 'Medic', 'Military', 'Police'], favour: { Hospital: 14, Medic: 3 } },
   // (The pouch between a stim and the kit: see items.ts. A soldier's own, so it lies where soldiers and constables
   // were before it lies in a clinic. Its places are taken out of the bandages' and the kit's: three bandages on the
@@ -269,23 +274,13 @@ export const TYPES: Record<string, TypeRule> = {
   // (a workman's: sheds and yards before barracks)
   work_gloves: { at: [3, 8, 3, 0, 0], lifetime: 3600, restock: 900, usage: ['Industrial', 'Farm', 'Military'], favour: { Industrial: 2 } },
   rubber_boots: { at: [3, 8, 3, 0, 0], lifetime: 3600, restock: 900, usage: ['Industrial', 'Farm', 'Military', 'Police'], favour: { Industrial: 2 } },
-  // (one of the bunker's four has made way for the painted mask that is kept there: see the masks below)
-  boonie_hat: { at: [0, 1, 2, 5, 3], lifetime: 3600, restock: 900, usage: ['Military'] },
+  boonie_hat: { at: [0, 1, 2, 5, 4], lifetime: 3600, restock: 900, usage: ['Military'] },
   // (the heaviest helmet there is: the bunker's)
   helmet_k63: { at: [0, 0, 0, 0, 2], lifetime: 7200, restock: 1800, usage: [] },
   // (The mask is what lets anybody into the gas, so it is not kept IN the gas: it is a policeman's, in the
   // police station of the village and in Kamenka's, and these are what the whole map has to share, bar what one
   // of the army's cases or a supply drop turns up.)
-  gasmask: { at: [0, 3, 0, 0, 0], lifetime: 3600, restock: 900, usage: ['Police'] },
-  // (The same mask in its three other paints: each keeps the gas out as the black one does. The black one is the
-  // ordinary one, the village's; a painted one is rarer and further in. The two that Kamenka's police station
-  // keeps are the white and the orange now, a quarter of an hour coming back where the black ones there took
-  // seven minutes: the map has as many masks to get into the gas with as it had, five. The skull is down the
-  // bunker, which is past the gas: nobody gets in with that one, it is brought out, and it is half an hour coming
-  // back. One of the bunker's Combat Helmets made way for it.)
-  gasmask_white: { at: [0, 0, 1, 0, 0], lifetime: 3600, restock: 900, usage: ['Police'], on: { 3: { restock: 900 } } },
-  gasmask_orange: { at: [0, 0, 1, 0, 0], lifetime: 3600, restock: 900, usage: ['Police'], on: { 3: { restock: 900 } } },
-  gasmask_skull: { at: [0, 0, 0, 0, 1], lifetime: 7200, restock: 1800, usage: [], on: { 5: { restock: 1800 } } },
+  gasmask: { at: [0, 3, 2, 0, 0], lifetime: 3600, restock: 900, usage: ['Police'] },
   // (armour by weight: the rig in sheds and houses, the soft vest where the police and the army were, the
   // armoured vest in Kamenka and one that got as far as the village, the plate carrier under the gas, the heavy
   // armour only down the bunker)
@@ -332,8 +327,8 @@ const UNSORTED = 4;
  * taken them and two of the three suitcases had nowhere to lie.)
  */
 const FIRST = [
-  'gasmask', 'gasmask_white', 'gasmask_orange', 'benelli', 'mosin', 'ak', 'ar15', 'suppressor_12', 'suitcase', 'heavy_armor', 'life_vest', 'armor_vest', 'bat', 'crowbar', 'shovel', 'machete', 'hatchet',
-  'mpa', 'colt', 'm9', 'mag_mpa', 'mag_colt', 'mag_m9', 'firstaid', 'aid_pouch', 'blood_bag', 'stim', 'stim_stamina', 'saline', 'bandage', 'old_suitcase', 'stash_kit',
+  'gasmask', 'benelli', 'mosin', 'ak', 'ar15', 'suppressor_12', 'suitcase', 'heavy_armor', 'life_vest', 'armor_vest', 'bat', 'crowbar', 'shovel', 'machete', 'hatchet',
+  'mpa', 'colt', 'm9', 'mag_mpa', 'mag_colt', 'mag_m9', 'firstaid', 'aid_pouch', 'blood_bag', 'stim', 'stim_stamina', 'stim_combat', 'saline', 'bandage', 'old_suitcase', 'stash_kit',
 ];
 
 

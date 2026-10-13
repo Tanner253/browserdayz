@@ -109,10 +109,7 @@ ok('a mask on the face keeps all of it out, and the gas mask is such a mask', ()
   assert.ok(ITEMS.gasmask.wear?.gas, 'the gas mask does not keep the gas out');
   assert.equal(ITEMS.gasmask.slot, 'face');
   // (nothing else worn does)
-  // (2026-10-13: the one mask in its four paints. Each keeps the gas out, and takes the same off a hit to the head.)
-  const masks = Object.values(ITEMS).filter((i) => i.wear?.gas);
-  assert.deepEqual(masks.map((i) => i.id), ['gasmask', 'gasmask_white', 'gasmask_orange', 'gasmask_skull']);
-  for (const m of masks) assert.deepEqual([m.slot, m.wear!.gas, m.wear!.head, m.w, m.h], ['face', 1, ITEMS.gasmask.wear!.head, 2, 2], m.id);
+  assert.deepEqual(Object.values(ITEMS).filter((i) => i.wear?.gas).map((i) => i.id), ['gasmask']);
 });
 
 ok('clean air clears the lungs: out for a while, the grace is there again', () => {
@@ -149,9 +146,7 @@ ok('what is kept under the gas is marked so, and the masks are kept out of it, i
   assert.ok(police.length >= 1, 'no police station on this map');
   const eco = new Economy(data.lootPoints, { spawn: () => {}, despawn: () => {} });
   eco.populate();
-  // (any of the four paints. One of them is down the bunker, which is past the gas: that one is brought out, and
-  // nobody gets in with it. What the map has to get in with is in the police stations, as it was.)
-  const masks = [...eco.loot.values()].filter((l) => ITEMS[l.item.id].wear?.gas && !(l.point >= 0 && data.lootPoints[l.point].usage.includes('Bunker')));
+  const masks = [...eco.loot.values()].filter((l) => l.item.id === 'gasmask');
   assert.ok(masks.length >= 2, `${masks.length} gas masks on the whole map`);
   for (const l of masks) {
     const at = data.lootPoints.find((q) => Math.hypot(q.x - l.x, q.z - l.z) < 0.6 && Math.abs(q.y - l.y) < 0.6);
@@ -221,7 +216,7 @@ ok('the gas is the richest place on the map; helmets, plates and scopes are of i
     assert.equal(o('suppressor_762'), 0);
     // the rest of the map: pistols and what they fire, something for a wound, and no rifle (see test/loot.test.ts)
     assert.ok(o('mosin') === 0 && o('colt') + o('m9') >= 24 && o('ammo_9mm') >= 36 && o('bandage') >= 22, 'the rest of the map has gone short');
-    for (const id of ['gasmask', 'gasmask_white', 'gasmask_orange', 'gasmask_skull']) assert.equal(g(id), 0, `${id} under the gas`);
+    assert.equal(g('gasmask'), 0);
   }
   // what is taken under the gas is put back, and soon; a scope taken from the rest of the map is not back so soon
   const { e } = tally(4242);

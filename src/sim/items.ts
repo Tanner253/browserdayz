@@ -354,7 +354,9 @@ const D: ItemDef[] = [
   { id: 'bat', name: 'Baseball Bat', model: 'baseball_bat', w: 1, h: 6, weight: 0.9, category: 'melee', slot: 'long', desc: 'Wooden bat.', melee: { damage: 30, range: 2.0, rate: 0.7 } },
   // (2026-10-10: swung as the bat is, in both hands; heavier, a little slower, and its edge bites)
   { id: 'shovel', name: 'Shovel', model: 'shovel', w: 2, h: 6, weight: 1.7, category: 'melee', slot: 'long', desc: 'A short-handled digging shovel with a steel blade. Swung in both hands like a bat: heavier, a little slower, and it hits harder.', melee: { damage: 36, range: 2.0, rate: 0.78 } },
-  { id: 'knife', name: 'Fish Knife', model: 'fish_knife', w: 1, h: 2, weight: 0.15, category: 'melee', desc: 'Thin filleting blade. Quick, short reach.', melee: { damage: 27, range: 1.45, rate: 0.42 } },
+  // (2026-10-13: the Fish Knife is gone and this is in its place, under the same id: an army bayonet-knife out of a
+  // pack with hands and movements of its own, see `knife` in WEAPON_PACKS. What it does is as it was.)
+  { id: 'knife', name: 'Combat Knife', model: 'knife', w: 1, h: 2, weight: 0.4, category: 'melee', desc: 'An army bayonet-knife with a saw-back: clip point, steel cross guard, ribbed grip. Quick, short reach.', melee: { damage: 27, range: 1.45, rate: 0.42 } },
   // ---------------------------------------------------------------- food & drink
   { id: 'sprats', name: 'Tinned Sprats', model: 'russian_food_cans_01', node: 'russian_food_cans_01_can_fish', scale: 2.2, w: 1, h: 1, weight: 0.24, category: 'food', desc: 'Smoked sprats in oil. Шпроты.', use: { verb: 'Eat', time: 2.5, energy: 28, water: -2, sound: 'eat' } },
   { id: 'condensed', name: 'Condensed Milk', model: 'russian_food_cans_01', node: 'russian_food_cans_01_can_cond', scale: 2, w: 1, h: 1, weight: 0.4, category: 'food', desc: 'Sweet, thick, calorie dense.', use: { verb: 'Eat', time: 2.5, energy: 34, water: 4, sound: 'eat' } },
@@ -383,12 +385,19 @@ const D: ItemDef[] = [
   // has the white one now.)
   { id: 'stim', name: 'Health Stim', model: 'syringe', w: 1, h: 1, weight: 0.06, category: 'medical', stack: 3, fresh: 1, desc: 'Clotting agent and a painkiller in one spring-loaded shot, its barrel white. Stops bleeding and gives back 35 health.', use: { verb: 'Use', time: 2.4, stopBleed: true, health: 35, hold: true, sound: 'inject' } },
   { id: 'stim_stamina', name: 'Stamina Stim', model: 'syringe', paint: 0xf0bd12, w: 1, h: 1, weight: 0.06, category: 'medical', stack: 3, fresh: 1, desc: 'Adrenaline in a spring-loaded shot, its barrel yellow. Fills your stamina, and for ten seconds after it nothing you do costs any. It does nothing for a wound.', use: { verb: 'Use', time: 2.4, stamina: 100, boost: 10, hold: true, sound: 'inject' } },
+  // The two in one (2026-10-13: "users want a new stim variant that gives both hp and stamina, basically the
+  // stamina one and the hp one combined, make it pink instead of yellow"). Everything the white one does and
+  // everything the yellow one does, at one press, its barrel pink. Where and how many, the same day: "the new
+  // hybrid stim will be in loot areas T4 and higher", "medical and military and can stack up to 5 instead of the
+  // normal": under the gas and down the bunker and nowhere else (economy.ts, crates.ts), five to a pile where the
+  // others are three. A supply drop brings one: what a drop brings is the fourth and fifth steps' already.
+  { id: 'stim_combat', name: 'Combat Stim', model: 'syringe', paint: 0xf2559d, w: 1, h: 1, weight: 0.06, category: 'medical', stack: 5, fresh: 1, desc: 'Clotting agent, a painkiller and adrenaline in one spring-loaded shot, its barrel pink. Stops bleeding, gives back 35 health, fills your stamina, and for ten seconds after it nothing you do costs any.', use: { verb: 'Use', time: 2.4, stopBleed: true, health: 35, stamina: 100, boost: 10, hold: true, sound: 'inject' } },
   // What gives blood back (2026-10-13: "we need blood bags with iv's now to recover blood faster"; src/sim/blood.ts).
   // Two bags of a drip, out of the "IV Supplies" the user brought in for the hospital: salt water, which is slow,
   // and blood, which is not. Neither closes a wound: a bag run into somebody still bleeding runs out again.
   { id: 'saline', name: 'Saline Bag (IV)', model: 'saline_bag', w: 1, h: 2, weight: 0.55, category: 'medical', desc: 'Half a litre of salt water and the line to run it into your arm. Gives back 750 ml of blood over a minute and a half. It closes no wound: stop the bleeding first.', use: { verb: 'Run in the', time: 5, blood: 750, over: 90, sound: 'bandage' } },
   { id: 'blood_bag', name: 'Blood Bag (IV)', model: 'blood_bag', w: 2, h: 1, weight: 0.6, category: 'medical', desc: 'A unit of blood and the line to run it into your arm. Gives back 1500 ml of blood in twenty seconds: most of what a bad wound takes. It closes no wound: stop the bleeding first.', use: { verb: 'Run in the', time: 6, blood: 1500, over: 20, sound: 'bandage' } },
-  { id: 'firstaid', name: 'First Aid Kit', model: 'medical_box', w: 3, h: 2, weight: 0.9, category: 'medical', desc: 'Dressings, antiseptic and a splint. Treats wounds properly, and sets a broken leg.', use: { verb: 'Treat wounds', time: 6, stopBleed: true, health: 45, splint: true, sound: 'bandage' } },
+  { id: 'firstaid', name: 'First Aid Kit', model: 'medical_box', w: 3, h: 2, weight: 0.9, category: 'medical', desc: 'Dressings, antiseptic, a splint and a small bag of saline with its line. Treats wounds properly, sets a broken leg, and gives back 500 ml of blood over a minute.', use: { verb: 'Treat wounds', time: 6, stopBleed: true, health: 45, splint: true, blood: 500, over: 60, sound: 'bandage' } },
   // The pouch between the stim and the kit (2026-10-13: "the medikit which is betrween a stim and a medkit its like
   // a small meddkit 2x2"), a soldier's own, out of the packs the user brought in. What each of the three is for, now
   // that blood is not health (src/sim/blood.ts):
@@ -397,12 +406,16 @@ const D: ItemDef[] = [
   //   this pouch         four places, 4 s. Closes the wound, gives back 20, and runs in 500 ml of blood over a
   //                      minute (the small bag of saline in it). The one thing that both stops the bleeding and
   //                      puts back some of what was bled: for when the fight is over and the world has gone grey.
-  //   the First Aid Kit  six places, 6 s. Closes the wound, gives back 45, the most at one go, and sets a broken
-  //                      leg. Nothing for blood.
-  // So none stands in for another: a stim does nothing for somebody bled white, the pouch gives little more than
-  // half a stim's health and sets no leg, and the kit puts no blood back. (By health alone it could not have had a
+  //   the First Aid Kit  six places, 6 s. Closes the wound, gives back 45, the most at one go, sets a broken
+  //                      leg, and runs in the same 500 ml over a minute as the pouch. (It gave no blood until
+  //                      2026-10-13: "medkit should recover some blood for the user but bloodbags are superiour
+  //                      source of blood".)
+  // So none stands in for another: a stim does nothing for somebody bled white; the pouch gives little more than
+  // half a stim's health and sets no leg, and is the small one of the two that give blood; the kit is the whole
+  // of it, at half as big again and half as long in the using. (By health alone the pouch could not have had a
   // place: twelve stims go where one pouch does. And the bags are still what blood comes back by: a bag of saline
-  // is half its size and gives half as much again, a bag of blood three times as much.)
+  // is half the pouch's size and gives half as much again, a bag of blood three times as much and three times as
+  // fast as either.)
   { id: 'aid_pouch', name: 'First Aid Pouch', model: 'aid_pouch', w: 2, h: 2, weight: 0.45, category: 'medical', desc: 'A soldier\'s own pouch: a pressure dressing, and a small bag of saline with its line. Stops bleeding, gives back 20 health, and gives back 500 ml of blood over a minute.', use: { verb: 'Open the', time: 4, stopBleed: true, health: 20, blood: 500, over: 60, sound: 'bandage' } },
   { id: 'splint', name: 'Splint Tape', model: 'medical_tape', tint: 0xd9a55c, w: 1, h: 1, weight: 0.12, category: 'medical', desc: 'A roll of tan strapping tape. Bound round a broken leg with whatever is to hand, it lets you run on it again.', use: { verb: 'Splint your leg with', time: 5, splint: true, sound: 'bandage' } },
   // ---------------------------------------------------------------- clothing & bags
@@ -452,26 +465,11 @@ const D: ItemDef[] = [
     desc: 'Canvas gloves from somebody\'s shed. Your punches land a little harder.', wear: { fist: 2 },
   },
   {
-    // (2026-10-13: the respirator the user brought in, a filter at each cheek and no hood, in place of the GP-5
-    // and its hose: "Replacing our own props like the gas mask ... The assets I brought in look better than our
-    // hand made ones". Still `gasmask`, so that what is carried and what is kept in the world still means it.)
-    id: 'gasmask', name: 'Gas Mask', model: 'gas_mask_black', w: 2, h: 2, weight: 0.7, category: 'clothing', slot: 'face',
-    desc: 'A black respirator with a wide visor and a filter at each cheek. Worn on the face, it lets you breathe in the gas. Thick rubber and glass, too: a fifth less damage from anything that hits your head.', wear: { head: 0.8, gas: 1 },
-  },
-  // The same respirator in the three other paints it came in. Each is a mask as the black one is: it keeps the gas
-  // out and takes the same fifth off a hit to the head (whatever asks whether a mask is on asks for `wear.gas`, and
-  // never for a name). They are told apart by their faces and by nothing else.
-  {
-    id: 'gasmask_white', name: 'White Gas Mask', model: 'gas_mask_white', w: 2, h: 2, weight: 0.7, category: 'clothing', slot: 'face',
-    desc: 'The respirator in white, edged in red. Worn on the face, it lets you breathe in the gas, and takes a fifth off anything that hits your head. It is seen a long way off.', wear: { head: 0.8, gas: 1 },
-  },
-  {
-    id: 'gasmask_orange', name: 'Orange Gas Mask', model: 'gas_mask_orange', w: 2, h: 2, weight: 0.7, category: 'clothing', slot: 'face',
-    desc: 'The black respirator with an orange bridge down its nose. Worn on the face, it lets you breathe in the gas, and takes a fifth off anything that hits your head.', wear: { head: 0.8, gas: 1 },
-  },
-  {
-    id: 'gasmask_skull', name: 'Skull Gas Mask', model: 'gas_mask_skull', w: 2, h: 2, weight: 0.7, category: 'clothing', slot: 'face',
-    desc: 'The black respirator with a skull\'s nose and teeth painted on it. Worn on the face, it lets you breathe in the gas, and takes a fifth off anything that hits your head.', wear: { head: 0.8, gas: 1 },
+    // (2026-10-13: the GP-5 again, without the hose and the filter can it came with. For a day it was a respirator
+    // out of a pack, in four paints: "the new gas masks dont look right ... lets just use the old gas mask we
+    // already have but i want to get rid of the long hose in the front and the box thats attached to the model".)
+    id: 'gasmask', name: 'Gas Mask', model: 'old_gas_mask', w: 2, h: 2, weight: 0.7, category: 'clothing', slot: 'face',
+    desc: 'GP-5 pattern mask. Worn on the face, it lets you breathe in the gas. Thick rubber and glass, too: a fifth less damage from anything that hits your head.', wear: { head: 0.8, gas: 1 },
   },
   // Armour for the body in four weights, and a rig that is only for carrying. Each takes more off a hit to the
   // body than the one before it, weighs more, and is harder to come by.

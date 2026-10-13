@@ -99,8 +99,8 @@ ok('no thing there was is worn anywhere else than it was', () => {
     mosin: 'long', benelli: 'long', mpa: 'long', ak: 'long', ar15: 'long', machete: 'long', crowbar: 'long', bat: 'long', shovel: 'long',
     colt: 'holster', m9: 'holster', deagle: 'holster',
     boonie_hat: 'head', helmet_k63: 'head', patrol_cap: 'head', fishermans_hat: 'head', gasmask: 'face',
-    // (and what has been made since is worn where its like is: the mask's three other paints, the steel helmet)
-    gasmask_white: 'face', gasmask_orange: 'face', gasmask_skull: 'face', helmet_m1: 'head',
+    // (and what has been made since is worn where its like is: the steel helmet)
+    helmet_m1: 'head',
     chest_rig: 'vest', soft_vest: 'vest', armor_vest: 'vest', heavy_armor: 'vest', life_vest: 'vest',
     sack_pack: 'back', camping_pack: 'back', suitcase: 'back', garden_gloves: 'hands', work_gloves: 'hands', rubber_boots: 'feet',
   };

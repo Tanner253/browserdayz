@@ -128,11 +128,11 @@ export function fillDrop(c: Container, rnd: () => number = Math.random) {
   for (const id of ['mosin', 'colt', 'box_762', 'box_45', 'firstaid', 'bandage', 'aid_pouch', 'pu_scope']) put(id);
   for (const id of ['mag_sniper', 'mag_colt']) c.add(makeMag(id, 999));
   put(pick([['suppressor_9', 3], ['mag_colt', 3], ['rifle_wrap', 2]], rnd));
-  const extras: [string, number][] = [['grenade', 3], ['grenade', 2], ['gasmask', 1.1], ['gasmask_white', 0.3], ['gasmask_orange', 0.3], ['gasmask_skull', 0.3], ['life_vest', 2], ['binoculars', 1.5], ['condensed', 1.5], ['thermos', 1.5], ['ammo_762', 2], ['ammo_45', 2]];
+  const extras: [string, number][] = [['grenade', 3], ['grenade', 2], ['gasmask', 2], ['life_vest', 2], ['binoculars', 1.5], ['condensed', 1.5], ['thermos', 1.5], ['ammo_762', 2], ['ammo_45', 2]];
   // (twice what it brought, 2026-10-11: it is a long way out now, and worth the walk)
   const n = 2 * (2 + Math.floor(rnd() * 2));
   for (let i = 0; i < n; i++) put(pick(extras, rnd));
-  for (const id of ['firstaid', 'stim', 'stim_stamina', 'blood_bag', 'box_762', 'keycard']) put(id);
+  for (const id of ['firstaid', 'stim', 'stim_stamina', 'stim_combat', 'blood_bag', 'box_762', 'keycard']) put(id);
   // one of the automatic guns, loaded, with its magazines, its rounds and two things to fit to it
   const show = BRINGS[Math.floor(rnd() * BRINGS.length)];
   put(show.gun);
