@@ -24,13 +24,13 @@ await test('settings: the price of a tag, and what is refused', async () => {
   const c = config({ PAYOUTS: 'on', TREASURY_SECRET_KEY: KEY });
   assert.equal(c.mode, 'on');
   assert.equal(b58(c.treasury!), TREASURY.address);
-  // two per cent of what can be spent, and never less than 0.02
-  assert.equal(price(SOL(0.44), c), SOL(0.02));
+  // two per cent of what can be spent, and never less than 0.01 (it was 0.02 until 2026-10-13)
+  assert.equal(price(SOL(0.44), c), SOL(0.01));
   assert.equal(price(SOL(1.01), c), SOL(0.02));
   assert.equal(price(SOL(10.01), c), SOL(0.2));
   assert.equal(price(SOL(100.01), c), SOL(2));
   assert.equal(price(SOL(1000), c), SOL(5));
-  assert.equal(price(0n, c), SOL(0.02));
+  assert.equal(price(0n, c), SOL(0.01));
   assert.equal(price(SOL(100.01), config({ TAG_PAY_PERCENT: '5', TAG_PAY_MIN_SOL: '0.1', TAG_PAY_MAX_SOL: '3' })), SOL(3));
   // on, with no key: off, and it says why. A key that is not the treasury's: the same.
   assert.match(config({ PAYOUTS: 'on' }).problem ?? '', /no TREASURY_SECRET_KEY/);
@@ -256,6 +256,59 @@ await test('one wallet, so many tags a day', async () => {
   assert.equal((await handle(w, fourth)).state, 'paid');
   assert.ok(got(w, 12) >= SOL(0.32) && got(w, 12) <= SOL(0.4));
   assert.equal((await readBook(w.store)).rows.filter((r) => r.wallet === wallet(12) && r.state === 'paid').length, 4);
+});
+
+// ---- the rules of 2026-10-13, for what is cashed in after they began (every world above stands before that day,
+// and is paid as it was promised: at 0.02 at least, with what is over a wallet's three waiting for tomorrow)
+const RULES = { PAYOUT_RULES_FROM: '2026-10-01T00:00:00Z' };
+
+await test('from 13 October: a tag pays 0.01 at least, and a wallet\'s three a day is a limit, not a queue', async () => {
+  const w = world(0.3, RULES);
+  // (two per cent of 0.3 is 0.006: the least is what is paid)
+  for (let i = 0; i < 3; i++) assert.equal((await handle(w, tag(w, 80))).state, 'paid');
+  assert.equal(got(w, 80), SOL(0.03));
+  const fourth = tag(w, 80);
+  const o = await handle(w, fourth);
+  assert.equal(o.state, 'skipped');
+  assert.match(o.state === 'skipped' ? o.why : '', /paid for 3 tags today: no more are paid to it until tomorrow/);
+  // somebody else is not held up by it
+  assert.equal((await handle(w, tag(w, 81))).state, 'paid');
+  // and tomorrow that wallet is paid again, for what is cashed in tomorrow: the one that was over is not paid then
+  w.skip(13 * 3600 * 1000);
+  assert.equal((await sweep(w)).tried, 0);
+  assert.equal((await handle(w, fourth)).state, 'skipped');
+  assert.equal((await handle(w, tag(w, 80))).state, 'paid');
+  assert.equal(got(w, 80), SOL(0.04));
+  const rows = (await readBook(w.store)).rows.filter((r) => r.wallet === wallet(80));
+  assert.deepEqual([rows.filter((r) => r.state === 'paid').length, rows.filter((r) => r.state === 'skipped').length], [4, 1]);
+});
+
+await test('from 13 October: two who cash each other\'s tags inside a day are paid for the first and not the second', async () => {
+  const w = world(2, RULES);
+  // Ann cashes Bob's tag: paid. Bob then cashes Ann's: not paid.
+  assert.equal((await handle(w, tag(w, 82, { name: 'Ann', owner: 'Bob' }))).state, 'paid');
+  const back = await handle(w, tag(w, 83, { name: 'Bob', owner: 'Ann' }));
+  assert.equal(back.state, 'skipped');
+  assert.match(back.state === 'skipped' ? back.why : '', /cashed each other's tags inside a day/);
+  assert.equal(got(w, 83), 0n);
+  // (somebody else's tag is Bob's to be paid for, and so is Ann's from somebody else)
+  assert.equal((await handle(w, tag(w, 83, { name: 'Bob', owner: 'Cy' }))).state, 'paid');
+  assert.equal((await handle(w, tag(w, 84, { name: 'Dee', owner: 'Ann' }))).state, 'paid');
+  // a name is whatever is typed: Bob under another name, to the same wallet, is Bob
+  const again = await handle(w, tag(w, 83, { name: 'Robert', owner: 'ann ' }));
+  assert.equal(again.state, 'skipped');
+  // and Ann under another name, to her own wallet, cashing the tag of whoever cashed one of hers
+  assert.equal((await handle(w, tag(w, 85, { name: 'Eve', owner: 'Fay' }))).state, 'paid');
+  assert.equal((await handle(w, tag(w, 86, { name: 'Fay', owner: 'Gus' }))).state, 'paid');
+  const renamed = await handle(w, tag(w, 86, { name: 'Somebody', owner: 'EVE' }));
+  assert.equal(renamed.state, 'skipped', 'whoever cashed as Fay, cashing Eve\'s tag under another name, was paid');
+  // a day later it is no trade
+  w.skip(25 * 3600 * 1000);
+  assert.equal((await handle(w, tag(w, 83, { name: 'Bob', owner: 'Ann' }))).state, 'paid');
+  // (and nothing of this is asked of a tag from before the rules: see the world of the test before last)
+  const old = world(2);
+  assert.equal((await handle(old, tag(old, 87, { name: 'Ann', owner: 'Bob' }))).state, 'paid');
+  assert.equal((await handle(old, tag(old, 88, { name: 'Bob', owner: 'Ann' }))).state, 'paid');
 });
 
 await test('a tag kept waiting by the day\'s limits is not too old when its turn comes', async () => {

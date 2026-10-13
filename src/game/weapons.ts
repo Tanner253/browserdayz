@@ -191,6 +191,8 @@ interface VmModel {
   suppressor?: THREE.Object3D;
   /** the lit marks of its sights: drawn only when the gun is at the eye */
   marks?: THREE.Object3D[];
+  /** the rounds drawn in the mouth of its magazine, and of the fresh one of a reload: there when the magazine has that many (see `roundsOf`) */
+  rounds?: { piece: THREE.Object3D; fresh: boolean; nth: number }[];
   /** everything on it that is only there with something fitted: [what is drawn, the attachment it goes with] */
   shown?: [THREE.Object3D, string][];
   /** aim position without an optic */
@@ -835,6 +837,41 @@ export class Weapons {
   private boltReady = true;
   /** the magazine a reload under way is putting in (which kind: the fresh one in the other hand is drawn as it) */
   private incoming: string | null = null;
+  /** how many rounds are in the magazine that is on its way into the gun */
+  private incomingRounds = 0;
+
+  /**
+   * The rounds drawn in the mouth of a magazine: the M9's top two, the row in the AR-15's. They are pieces of
+   * their own in the gun's file, and were always there, in a magazine with nothing in it: "when the pistol is out
+   * of empty and the slide is open i see bullets in the mag that do not exist" (2026-10-13). Found here by what
+   * they are (a piece of the magazine no longer than a round, or painted as bullets), and numbered from the top.
+   */
+  private roundsOf(root: THREE.Object3D): NonNullable<VmModel['rounds']> {
+    const found: { piece: THREE.Object3D; fresh: boolean; y: number }[] = [];
+    root.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh || !mesh.geometry) return;
+      let inMag = false, fresh = false;
+      for (let q: THREE.Object3D | null = mesh; q; q = q.parent) {
+        if (q.name === 'mag') inMag = true;
+        if (q.userData.fresh) fresh = true;
+      }
+      if (!inMag) return;
+      if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+      const box = mesh.geometry.boundingBox!, size = box.getSize(new THREE.Vector3());
+      const painted = /bullet|cartridge/i.test((mesh.material as THREE.Material | undefined)?.name ?? '');
+      if (!painted && Math.max(size.x, size.y, size.z) > 0.035) return;
+      found.push({ piece: mesh, fresh, y: Math.round(((box.max.y + box.min.y) / 2) * 400) });
+    });
+    const out: NonNullable<VmModel['rounds']> = [];
+    for (const fresh of [false, true]) {
+      const mine = found.filter((f) => f.fresh === fresh);
+      // (a round's case and its bullet are two pieces at one height: the uppermost height is the first round)
+      const heights = [...new Set(mine.map((f) => f.y))].sort((a, b) => b - a);
+      for (const f of mine) out.push({ piece: f.piece, fresh, nth: heights.indexOf(f.y) + 1 });
+    }
+    return out;
+  }
   /**
    * Guns that were shot dry and have not been fed since: a pistol's slide stays back, and its
    * next magazine ends with the slide being let go. Kept by the gun, not by whoever holds it:
@@ -2299,6 +2336,7 @@ export class Weapons {
     }
     const fed = !!def.weapon.mag;
     this.incoming = next?.id ?? null;
+    this.incomingRounds = next?.rounds ?? 0;
     /** what the hands have done when a magazine-fed gun's reload is over */
     const feed = () => {
       this.incoming = null;
@@ -2621,6 +2659,12 @@ export class Weapons {
     const fresh = this.action?.name === 'magswap' || this.action?.name === 'reload' ? this.incoming ?? it?.mag ?? null : null;
     for (const [obj, mod] of m.shown ?? []) obj.visible = obj.userData.fresh ? (mod === '*' ? !!fresh : mod === fresh) : mod.startsWith('!') ? !hasMod(it, mod.slice(1)) : hasMod(it, mod);
     for (const mark of m.marks ?? []) mark.visible = this.adsT > 0.75;
+    // (the rounds seen in a magazine's mouth are there when the magazine has them: what is in the gun less the one in its chamber)
+    if (m.rounds === undefined) m.rounds = m.rig ? this.roundsOf(m.root) : [];
+    if (m.rounds.length) {
+      const inMag = Math.max(0, (it?.loaded ?? 0) - (it && chambered(it) ? 1 : 0));
+      for (const r of m.rounds) r.piece.visible = (r.fresh ? this.incomingRounds : inMag) >= r.nth;
+    }
   }
 
   /**

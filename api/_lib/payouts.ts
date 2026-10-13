@@ -55,6 +55,17 @@ export interface Config {
   /** no more than this part of the treasury leaves it in one day (UTC), and no wallet is paid for more tags than this in one */
   dayShare: number;
   walletDayTags: number;
+  /**
+   * The rules of 2026-10-13 hold for whatever is cashed in from this moment on (ms). The treasury was paying out
+   * half as much again as came in, and the owner chose three things, all of them: the limit of a wallet's tags in
+   * a day is a limit and not a queue (a tag over it is not paid: it used to wait and be paid on the days after);
+   * two players who cash each other's tags inside a day are paid for the first of the two and not the second; and
+   * a tag pays 0.01 SOL at least, where it paid 0.02. What was cashed in before this is paid as it was promised:
+   * it waits its turn, and is paid at the old least.
+   */
+  rulesFrom: number;
+  /** what a tag cashed in before `rulesFrom` pays at least */
+  floorBefore: bigint;
   /** rewards are collected when at least this much is waiting */
   claimAt: bigint;
   /** what is bid per unit of work, in millionths of a lamport: enough to be taken up promptly */
@@ -102,7 +113,8 @@ export function config(env: Record<string, string | undefined> = process.env): C
     key = null;
     rpc = DEFAULT_RPC;
   }
-  const floor = lamports(num(env.TAG_PAY_MIN_SOL, 0.02, 0.001, 10));
+  const floor = lamports(num(env.TAG_PAY_MIN_SOL, 0.01, 0.001, 10));
+  const from = Date.parse(env.PAYOUT_RULES_FROM ?? '');
   return {
     mode,
     problem,
@@ -117,9 +129,17 @@ export function config(env: Record<string, string | undefined> = process.env): C
     keep: lamports(num(env.TREASURY_KEEP_SOL, 0.01, 0.002, 1000)),
     dayShare: num(env.PAYOUT_DAY_CAP_PERCENT, 75, 1, 100) / 100,
     walletDayTags: Math.round(num(env.PAYOUT_WALLET_DAY_TAGS, 3, 1, 1000)),
+    rulesFrom: Number.isFinite(from) ? from : Date.parse('2026-10-13T04:30:00Z'),
+    floorBefore: lamports(num(env.TAG_PAY_MIN_SOL_BEFORE, 0.02, 0.001, 10)),
     claimAt: lamports(num(env.CLAIM_MIN_SOL, 0.05, 0.001, 1000)),
     bid: Math.round(num(env.PRIORITY_MICROLAMPORTS, 20_000, 0, 5_000_000)),
   };
+}
+
+/** The settings a tag is paid by: one cashed in before the rules of 2026-10-13 is paid at the least it was promised. */
+export function termsOf(cfg: Config, cashedAt: string): Config {
+  if (!(Date.parse(cashedAt) < cfg.rulesFrom) || cfg.floorBefore <= cfg.floor) return cfg;
+  return { ...cfg, floor: cfg.floorBefore, ceiling: cfg.ceiling > cfg.floorBefore ? cfg.ceiling : cfg.floorBefore };
 }
 
 /** What one tag pays out of a treasury holding this much. */
@@ -128,6 +148,9 @@ export function price(balance: bigint, cfg: Pick<Config, 'share' | 'floor' | 'ce
   const part = (spendable * BigInt(Math.round(cfg.share * 1_000_000))) / 1_000_000n;
   return part < cfg.floor ? cfg.floor : part > cfg.ceiling ? cfg.ceiling : part;
 }
+
+/** how long after one player has cashed another's tag the other's cashing of theirs is not paid */
+export const TRADE_MS = 24 * 3600 * 1000;
 
 // ------------------------------------------------------------------ what is kept
 
@@ -460,7 +483,7 @@ async function roomToday(w: World, r: Row, book: Book): Promise<boolean> {
   const most = Math.max(book.most?.day === day ? book.most.lamports : 0, Number(balance));
   const allowed = (BigInt(most) * BigInt(Math.round(cfg.dayShare * 1000))) / 1000n;
   const spent = today.reduce((s, x) => s + BigInt(x.lamports ?? 0), 0n);
-  return spent + price(balance, cfg) <= allowed;
+  return spent + price(balance, termsOf(cfg, r.at)) <= allowed;
 }
 
 /**
@@ -477,7 +500,7 @@ async function due(w: World, r: Row, book: Book): Promise<boolean> {
     const has = await treasuryHolds(w);
     const s = w.cfg.mode === 'on' ? await coin(w).catch(() => null) : null;
     const more = s && s.creator && same(s.creator, w.cfg.treasury) && !s.unsupported ? s.curve + s.pool : 0n;
-    return has + more >= price(has + more, w.cfg) + EMPTY_ACCOUNT_RENT + FEE_ROOM + w.cfg.keep;
+    return has + more >= price(has + more, termsOf(w.cfg, r.at)) + EMPTY_ACCOUNT_RENT + FEE_ROOM + w.cfg.keep;
   }
   return true;
 }
@@ -552,6 +575,8 @@ async function settle(w: World, t: Tag, at: { held: Held }): Promise<Outcome> {
     if (!owed(had) && !(now - Date.parse(t.at) < MAX_AGE_MS)) return { state: 'skipped', why: 'cashed in more than three days ago' };
     const since = at.held.book.since;
     if (since && Date.parse(t.at) < Date.parse(since)) return { state: 'skipped', why: 'cashed in before automatic payouts began' };
+    // (asked of a tag when it first comes, and of none that the book has had waiting since before the rule)
+    if (!had && Date.parse(t.at) >= cfg.rulesFrom && traded(at.held.book, t)) return { state: 'skipped', why: `you and ${t.owner.slice(0, 16)} have cashed each other's tags inside a day: the second of the two is not paid` };
     const wrong = await setup(w);
     if (wrong) return { state: 'waiting', why: wrong, hold: 'setup' };
     const there = await w.rpc.account(to);
@@ -562,7 +587,7 @@ async function settle(w: World, t: Tag, at: { held: Held }): Promise<Outcome> {
 
   // --- how much (what the first attempt set out to pay is what every later one pays), and whether the treasury can cover it
   let balance = await w.rpc.balance(treasury);
-  const amount = tries.length && had?.lamports ? BigInt(had.lamports) : price(balance, cfg);
+  const amount = tries.length && had?.lamports ? BigInt(had.lamports) : price(balance, termsOf(cfg, t.at));
   const short = () => balance < amount + EMPTY_ACCOUNT_RENT + FEE_ROOM + cfg.keep;
   if (short() && cfg.mode === 'on') {
     // bring the rewards home first, whatever there is of them
@@ -601,7 +626,9 @@ async function settle(w: World, t: Tag, at: { held: Held }): Promise<Outcome> {
         if (b.most?.day !== day) b.most = { day, lamports: 0 };
         b.most.lamports = Math.max(b.most.lamports, Number(balance));
         const allowed = (BigInt(b.most.lamports) * BigInt(Math.round(cfg.dayShare * 1000))) / 1000n;
-        if (today.filter((r) => r.wallet === t.wallet).length >= cfg.walletDayTags) said.wait = { state: 'waiting', why: `this wallet has been paid for ${cfg.walletDayTags} tags today: the rest wait for tomorrow`, hold: 'day' };
+        const full = today.filter((r) => r.wallet === t.wallet).length >= cfg.walletDayTags;
+        if (full && Date.parse(t.at) >= cfg.rulesFrom) said.wait = { state: 'skipped', why: `this wallet has been paid for ${cfg.walletDayTags} tags today: no more are paid to it until tomorrow (the day is counted in UTC)` };
+        else if (full) said.wait = { state: 'waiting', why: `this wallet has been paid for ${cfg.walletDayTags} tags today: the rest wait for tomorrow`, hold: 'day' };
         // (the first of the day always goes: a limit smaller than one tag would stop everything)
         else if (today.length && spent + amount > allowed) said.wait = { state: 'waiting', why: "today's limit on what leaves the treasury has been reached: this one is paid when there is room again", hold: 'day' };
         if (said.wait) return row && says(row, said.wait, day) ? false : enter(b, t, said.wait, day);
@@ -714,6 +741,35 @@ export async function claimIfDue(w: World): Promise<string | null> {
 // ------------------------------------------------------------------ one tag, start to finish
 
 const settled = (r: Row) => r.state === 'paid' || r.state === 'skipped' || r.state === 'off';
+
+/**
+ * Two who cash each other's tags: the tag in hand is its owner's, and that owner has, inside the day before,
+ * cashed a tag of whoever is cashing this one. (A quarter of everything paid by 2026-10-13 was between two players
+ * who had each cashed the other: one lies down for the other, and then the other for the one.)
+ *
+ * A name is whatever somebody types, so both are told by more than the name: whoever has cashed to this wallet is
+ * the same hand as whoever cashes to it now, and whoever cashed under the owner's name cashed to the owner's wallet.
+ * @returns the other's cashing of this one's tag, if there is one that was or is to be paid
+ */
+export function traded(book: Book, t: Tag): Row | null {
+  const said = (v: string) => v.trim().toLowerCase(), at = Date.parse(t.at), owner = said(t.owner);
+  if (!owner || !t.wallet) return null;
+  const mine = new Set([said(t.name)]), theirs = new Set<string>();
+  for (const r of book.rows) {
+    if (r.wallet && r.wallet === t.wallet) mine.add(said(r.name));
+    if (r.wallet && said(r.name) === owner) theirs.add(r.wallet);
+  }
+  // (their own tag cashed to their own wallet under another name is not a trade: it is not anything)
+  theirs.delete(t.wallet);
+  return (
+    book.rows.find((r) => {
+      const when = Date.parse(r.at);
+      if (r.ref === t.ref || !(when <= at && at - when < TRADE_MS)) return false;
+      if (r.state !== 'paid' && r.state !== 'sending' && r.state !== 'waiting') return false;
+      return mine.has(said(r.owner)) && (said(r.name) === owner || theirs.has(r.wallet));
+    }) ?? null
+  );
+}
 
 /**
  * A tag in hand (from the game server, or from the book): paid if it is to be, and the book

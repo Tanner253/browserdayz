@@ -1145,6 +1145,9 @@ body.touch .sm-back span { display: none; }
 .sm-wallet.set b { color: var(--ok); }
 /* waiting in line for a full server */
 .start-queue { display: none; margin-top: 14px; }
+/* (turned away at the door: why, in words that stay) */
+.start-refused { max-width: 560px; margin-top: 14px; padding: 9px 13px 10px; font-size: 16px; line-height: 1.3; color: #ffd9d0; background: rgba(120, 28, 18, 0.5); border-left: 3px solid #e0604a; }
+.start-refused[hidden] { display: none; }
 .start-queue.show { display: block; }
 .hud-start.queued .start-online { display: none; }
 .sq-pos { font-size: 26px; font-weight: 600; letter-spacing: 0.06em; color: var(--ink); }
@@ -1280,19 +1283,15 @@ kbd.hot { color: #121413; background: linear-gradient(#d8c594, #b89f66); border-
 .hud-announce div { font-size: 26px; font-weight: 600; line-height: 1.2; color: var(--ink); overflow-wrap: anywhere; }
 @keyframes announce { 0% { opacity: 0; transform: translate(-50%, -8px); } 4%, 90% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; transform: translate(-50%, 0); } }
 /* names over heads, as an admin's free camera shows them */
-/* An admin's far sight: a name where each player stands, through whatever is in the way, with a frame round the
-   body. Not put out of sight with the rest of the HUD (see #hud.hidden): it is for when the view has left the body. */
-.hud-esp { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
-.hud-esp i { position: absolute; transform: translate(-50%, -100%); display: flex; flex-direction: column; align-items: center; padding-bottom: 3px; font-style: normal; font-family: var(--mono); font-size: 12px; line-height: 1.15; white-space: nowrap; text-shadow: 0 0 3px #000, 0 1px 2px #000, 0 0 7px rgba(0, 0, 0, 0.9); }
+/* An admin's far sight: a name where each player stands, through whatever is in the way. Not put out of sight with
+   the rest of the HUD (see #hud.hidden): it is for when the view has left the body, too. Each is moved, not laid out. */
+.hud-esp { position: absolute; inset: 0; pointer-events: none; overflow: hidden; contain: strict; }
+.hud-esp i { position: absolute; left: 0; top: 0; will-change: transform; display: flex; flex-direction: column; align-items: center; padding-bottom: 3px; font-style: normal; font-family: var(--mono); font-size: 12px; line-height: 1.15; white-space: nowrap; text-shadow: 0 1px 2px #000, 0 0 4px #000; }
 .hud-esp b { font-weight: 700; letter-spacing: 0.03em; color: #fff; }
 .hud-esp small { font-size: 0.82em; color: #d9c2ff; }
-.hud-esp u { position: absolute; left: 50%; top: 100%; transform: translateX(-50%); box-sizing: border-box; border: 1px solid #c8a8ff; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(0, 0, 0, 0.35); text-decoration: none; }
 .hud-esp i[data-k='dead'] b { color: #b9b4a8; }
-.hud-esp i[data-k='dead'] u { border-color: #8d897e; }
 .hud-esp i[data-k='ghost'] b { color: #9fd0ff; }
-.hud-esp i[data-k='ghost'] u { border-color: #9fd0ff; border-style: dashed; }
 .hud-esp i[data-k='me'] { opacity: 0.6; }
-.hud-esp i[data-k='me'] u { border-color: #9fe07a; }
 /* a line said to one player alone by an admin or a mod */
 .chat-line[data-ch='pm'] { color: #ffd58a; }
 .chat-line[data-ch='pm'] b { color: #ffd58a; }
@@ -1778,3 +1777,12 @@ body.touch .hm-tiers, body.touch .hm-show, body.touch .hm-zoom { gap: 3px; }
   .kbs-cols { grid-template-columns: minmax(0, 1fr); }
   .gfx-range { width: 150px; }
 }
+
+/* Scroll bars, wherever there is one in the game: narrow, dark, and gold where the hand is. (2026-10-13: "can we
+   customise the scrollbars for the site where we do use them i hate the default style".) */
+* { scrollbar-width: thin; scrollbar-color: rgba(255, 211, 90, 0.42) rgba(0, 0, 0, 0.28); }
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.28); }
+::-webkit-scrollbar-thumb { background: rgba(255, 211, 90, 0.42); border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255, 211, 90, 0.8); background-clip: padding-box; }
+::-webkit-scrollbar-corner { background: transparent; }

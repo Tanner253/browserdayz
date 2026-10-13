@@ -39,6 +39,8 @@ export interface AdminActions {
   night(on: boolean): void;
   /** the colour of the word ADMIN before this admin's name in the chat (null: the rainbow; 'off': no tag at all) */
   tint(color: string | null): void;
+  /** everybody's name shown where they are, through anything: put on or off */
+  names(on: boolean): void;
   close(): void;
 }
 
@@ -53,6 +55,8 @@ export interface AdminSelf {
   voidTag: boolean;
   /** it is day in this game alone, whatever the hour */
   night: boolean;
+  /** everybody's name is shown where they are */
+  names: boolean;
   /** the colour chosen for the word ADMIN in the chat (null: the rainbow) */
   tint: string | null;
   freecam: boolean;
@@ -129,7 +133,7 @@ export class AdminUI {
   isOpen = false;
   private view: View = 'who';
   private sub: Sub = 'actions';
-  private self: AdminSelf = { role: null, id: 0, god: false, hidden: false, clip: false, voidInv: false, voidTag: false, night: false, tint: null, freecam: false, x: 0, z: 0 };
+  private self: AdminSelf = { role: null, id: 0, god: false, hidden: false, clip: false, voidInv: false, voidTag: false, night: false, names: false, tint: null, freecam: false, x: 0, z: 0 };
   private lists: AdminLists = { players: [], gone: [], bans: [], roles: [], checks: '' };
   /** who everything on the right is about: a player's number (the admin's own, when it is themselves) */
   private target = 0;
@@ -378,11 +382,14 @@ export class AdminUI {
     // pressing on it: a grid of a hundred pictures is not made again every two seconds for nothing)
     const key = this.bodyKey();
     if (all || (key !== this.drawn && !this.typing(this.body) && !this.held)) {
-      const keep = this.body.scrollTop, inner = this.body.querySelector('.adm-grid, .adm-table')?.scrollTop ?? 0;
+      // (how far each part that scrolls was scrolled is kept, and given back to the part made in its place: a thing
+      // binned in somebody's pockets put the list back at its top. "when i deleted an item from inventory tab on
+      // admin panel it scrolls my view back to the top", 2026-10-13.)
+      const SCROLLS = '.adm-pockets, .adm-table, .adm-grid:not(.held)';
+      const keep = this.body.scrollTop, inner = [...this.body.querySelectorAll(SCROLLS)].map((e) => e.scrollTop);
       this.body.replaceChildren(...this.bodyOf());
       this.body.scrollTop = keep;
-      const g = this.body.querySelector('.adm-grid, .adm-table');
-      if (g) g.scrollTop = inner;
+      this.body.querySelectorAll(SCROLLS).forEach((e, k) => (e.scrollTop = inner[k] ?? 0));
       this.drawn = key;
     }
     this.drawLog();
@@ -398,7 +405,7 @@ export class AdminUI {
     if (this.sub === 'items') return `${base}|${this.kind}|${this.count}|${this.fed}|${Object.keys(this.pictures).length}`;
     if (this.sub === 'kits') return base;
     if (this.sub === 'pockets') return `${base}|${this.pockets?.id}|${JSON.stringify(this.pockets?.inv ?? null).length}|${Object.keys(this.pictures).length}`;
-    return `${base}|${p ? [p.role, p.muted, p.god, p.hidden, p.clip, p.voidInv, p.voidTag, p.alive].join() : ''}|${this.mine ? [s.god, s.hidden, s.clip, s.voidInv, s.voidTag, s.night, s.freecam, s.tint].join() : ''}`;
+    return `${base}|${p ? [p.role, p.muted, p.god, p.hidden, p.clip, p.voidInv, p.voidTag, p.alive].join() : ''}|${this.mine ? [s.god, s.hidden, s.clip, s.voidInv, s.voidTag, s.night, s.names, s.freecam, s.tint].join() : ''}`;
   }
 
   private bodyOf(): HTMLElement[] {
@@ -682,8 +689,9 @@ export class AdminUI {
         this.act.freecam(!s.freecam);
         this.act.close();
       }, 'camera', 'K'),
-      this.flip('Night vision', 'It is day, for you alone', s.night, () => this.act.night(!s.night), 'sun'),
-      el('div', 'dim', 'Flying, and in the free camera: W A S D, Space up, Ctrl down, Shift fast, Alt slow, and everybody’s name is shown where they are, however far and through anything. No tag is cashed in while god mode, vanish or noclip is on.'),
+      this.flip('Night vision', 'It is day, for you alone, in the bunker too', s.night, () => this.act.night(!s.night), 'sun'),
+      this.flip('Names of players', 'Everybody’s name where they are, however far, through anything', s.names, () => this.act.names(!s.names), 'eye'),
+      el('div', 'dim', 'Flying, and in the free camera: W A S D, Space up, Ctrl down, Shift fast, Alt slow. No tag is cashed in while god mode, vanish or noclip is on. God mode is proof against the gas as well.'),
     ));
     const coords = el('div', 'adm-line');
     const jump = () => {
@@ -969,7 +977,6 @@ export class AdminUI {
       key('H', 'In the free camera: bring your body to the view');
       key('Del', 'Take away the thing you are looking at: a thing on the ground, a body, a buried stash, a car, one of the infected');
       key('M', 'The map: right-click a place to go there');
-      key('N, K', 'While flying or in the free camera: everybody’s name where they are, through anything, however far');
     }
     grid.append(this.card('Keys', 'keys', keys));
     return [grid];

@@ -22,6 +22,12 @@ const ICONS_REV = 2;
  */
 const HEAD_UP = new Set(['hatchet']);
 
+/** a gun, a magazine, or a part that is fitted to a gun: its picture is lit up (see where the pictures are made), by this much where it is painted with a picture and where it is a bare colour */
+const LIT = (d: (typeof ITEMS)[string]) => !!(d.weapon || d.mag || d.attach);
+const LIFT = [1.5, 1.3, 0.006];
+/** the lamps a picture is taken by, and how much of the sky is on the thing: for anything, and for a gun */
+const LAMPS = { plain: [1.8, 0.9, 0.75], gun: [3.6, 1.9, 1.7] };
+
 /** whether a thing has a second picture, for the place on the body it is worn in (kept as `slot:<id>`) */
 export const hasSlotIcon = (id: string): boolean => ITEMS[id]?.category === 'clothing' && !!ITEMS[id].slot;
 
@@ -39,7 +45,7 @@ export function iconSig(id: string): string {
     return [d.model, file || Math.random(), d.node ?? '', d.nodeRe ?? '', d.tint ?? '', d.paint ?? '', d.scale ?? '', d.w, d.h, d.category, d.pile ?? '', !!d.mag, d.stack ? 1 : 0, d.weapon ? [d.weapon.mag ?? '', d.weapon.shows ?? '', (d.weapon as { hides?: unknown }).hides ?? '', d.weapon.never ?? ''] : ''];
   };
   const d = ITEMS[id];
-  const text = JSON.stringify([ICONS_REV, of(d), of(d.weapon?.mag ? ITEMS[d.weapon.mag] : undefined), ...(HEAD_UP.has(id) ? ['head up'] : [])]);
+  const text = JSON.stringify([ICONS_REV, of(d), of(d.weapon?.mag ? ITEMS[d.weapon.mag] : undefined), ...(HEAD_UP.has(id) ? ['head up'] : []), ...(LIT(d) ? ['lit', ...LIFT, ...LAMPS.gun] : [])]);
   let h = 2166136261 >>> 0;
   for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619) >>> 0;
   return h.toString(36);
@@ -70,6 +76,7 @@ export async function renderIcons(renderer: THREE.WebGLRenderer, models: ItemMod
     if (only && !only.includes(id)) continue;
     // (a gun fed by a magazine is drawn with its own in it: without, it is a gun with a hole in it)
     const tpl = await models.get(id, def.weapon?.mag ? [def.weapon.mag] : []);
+    [key.intensity, rim.intensity, scene.environmentIntensity] = LIT(def) ? LAMPS.gun : LAMPS.plain;
     const w = def.w * PX, h = def.h * PX;
     const rt = new THREE.WebGLRenderTarget(w * 2, h * 2, { samples: 4, colorSpace: THREE.SRGBColorSpace });
     const obj = tpl.group.clone();
@@ -96,6 +103,16 @@ export async function renderIcons(renderer: THREE.WebGLRenderer, models: ItemMod
         c.roughness = Math.max(c.roughness, 0.4);
         c.roughnessMap = null;
         c.envMapIntensity = 1.6;
+      }
+      // A gun is gunmetal, and gunmetal under this light is a black shape: its picture in a pocket could not be
+      // read. ("the inventory items for the guns seem way too dark", 2026-10-13.) In its picture a gun, and what
+      // is fitted to one, keeps less of the mirror and is lit up, as the guns in the hands are (see liftPack).
+      // (More light on it, as a photograph of a black thing is given more: see where each is drawn. Its steel is
+      // left steel, so that what shows its shape, the light along its edges, is brighter with the rest. And what
+      // is painted black stays black however it is lit: a very little light of its own, so that it is not a hole.)
+      if (LIT(def)) {
+        c.color.multiplyScalar(c.map ? LIFT[0] : LIFT[1]);
+        if (!c.emissiveMap) c.emissive.addScalar(LIFT[2]);
       }
       for (const t of [src.map, src.normalMap, src.roughnessMap, src.metalnessMap, src.aoMap, src.emissiveMap, src.alphaMap]) if (t) used.add(t);
       copies.push(c);
