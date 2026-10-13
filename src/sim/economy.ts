@@ -375,7 +375,9 @@ export interface EconomyEvents {
  * places would have drawn had they been part of their step (by the same kinds of place and the same leanings),
  * never more of a sort than the whole step has, and never more things than `APART_FILL` of its places.
  */
-export const APART = new Set(['castle', 'wreck']);
+// ('hamlet': the ruined houses along the track to the fort, 2026-10-13: named apart from the fort so that the map
+// marks the fort as wide as the fort)
+export const APART = new Set(['castle', 'hamlet', 'wreck']);
 /** the most of a place apart's free places that are ever filled: a room with something on every surface is a shop */
 const APART_FILL = 0.85;
 /** and how many times its fair share it is stocked to, up to that: a place apart is somewhere worth the going to */
