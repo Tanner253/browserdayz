@@ -740,7 +740,7 @@ export class Garage {
     }
     const left = j.hp / JEEP.hp;
     if (!j.wreck && left < JEEP.smokeAt) fx.engineSmoke(j.point(...ENGINE_AT[j.kind], _a), x.smoke, dt, left < JEEP.fireAt, 1 - left / JEEP.smokeAt, j.quat, j.vel);
-    else if (j.wreck) fx.engineSmoke(j.point(0, ENGINE_AT[j.kind][1] + 0.1, -0.4, _a), x.smoke, dt * 0.5, false, 0.6, j.quat);
+    else if (j.wreck) fx.engineSmoke(j.point(0, ENGINE_AT[j.kind][1] + 0.1, -0.4, _a), x.smoke, dt * 0.5, false, 0.6, j.quat, undefined, true);
     // what the rear wheels throw up, off the road
     const fast = Math.abs(j.speed);
     if (j.grounded >= 2 && (fast > 5 || j.slide > 0.25) && j.ground !== 'rock') {

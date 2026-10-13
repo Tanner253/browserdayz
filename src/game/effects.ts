@@ -261,9 +261,12 @@ const COLUMN = { from: 1.1, soft: 1.0 };
 /**
  * A car on fire. `engine`: how big its flames are while it is alight and not yet gone up (1 is a campfire's),
  * and `wreck`: after it has. `full`, `burns`: a wreck burns at its fiercest for this many seconds after it
- * blows, and is down to smoke by this many.
+ * blows, and has settled by this many to a steady fire, `steady` as hard and `low` as big, which it keeps for as
+ * long as it stands (2026-10-13: "when the car is burned and destroyed it should remain on fire like a campfire
+ * animation with black smoke until it despawns". It was down to grey smoke in seventy seconds, and one come upon
+ * after it had gone up was cold.)
  */
-const CAR = { engine: 1.25, wreck: 2.1, full: 18, burns: 70 };
+const CAR = { engine: 1.25, wreck: 2.1, full: 18, burns: 70, steady: 0.8, low: 1.35 };
 
 const SURF_DUST: Partial<Record<Surface | 'dirt' | 'gravel', number>> = {
   grass: 0x6f6448, dirt: 0x6a5a44, gravel: 0x8a8070, rock: 0x8d877c, concrete: 0xa09a90, plaster: 0xb8b0a0,
@@ -608,16 +611,18 @@ export class Effects {
    * @param tilt how the car lies: its flames lean the way it leans
    * @param vel how it is moving: and trail behind it as it goes
    */
-  engineSmoke(at: THREE.Vector3, state: { owed: number; fire?: Fire; blown?: number }, dt: number, fire: boolean, amount: number, tilt?: THREE.Quaternion, vel?: THREE.Vector3) {
+  engineSmoke(at: THREE.Vector3, state: { owed: number; fire?: Fire; blown?: number }, dt: number, fire: boolean, amount: number, tilt?: THREE.Quaternion, vel?: THREE.Vector3, burnt = false) {
     const since = state.blown === undefined ? Infinity : (performance.now() - state.blown) / 1000;
-    // (how hard a wreck still burns: all of it at first, none of it in the end)
-    const wreck = fire || since >= CAR.burns ? 0 : 1 - THREE.MathUtils.smoothstep(since, CAR.full, CAR.burns);
+    // (how far a wreck's fire has settled from its fiercest to the steady one it keeps: one found burned already has)
+    const settled = THREE.MathUtils.smoothstep(Math.min(since, CAR.burns), CAR.full, CAR.burns);
+    // (how hard a wreck burns: all of it at first, then steadily for as long as it stands)
+    const wreck = fire || !burnt ? 0 : THREE.MathUtils.lerp(1, CAR.steady, settled);
     if (fire || wreck > 0) {
       const f = this.fire.feed(state, at);
       // (alight, it burns the harder the nearer it is to going up; and whatever burns, catches over a second, not in a frame)
       const want = fire ? 0.55 + 0.45 * THREE.MathUtils.clamp((amount - 0.7) / 0.3, 0, 1) : wreck;
       f.strength = Math.min(want, f.strength + dt * 1.2);
-      f.size = fire ? CAR.engine : CAR.wreck;
+      f.size = fire ? CAR.engine : THREE.MathUtils.lerp(CAR.wreck, CAR.low, settled);
       // (the black smoke of it is made below: of the flames' own smoke, only the wisps among them)
       f.smoke = 0.5;
       const up = _UP_OF.set(0, 1, 0);
