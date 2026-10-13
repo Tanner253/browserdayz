@@ -1866,8 +1866,10 @@ export class Game {
     this.hud.setLive(true);
     this.hud.setNet('Online');
     this.updateOnline();
-    // (every kind of message has somebody to hear it now: what was said since the welcome is heard, in its order)
-    net.listen();
+    // (Every kind of message has somebody to hear it now: what was said since the welcome is heard, in its order.
+    // Not in this breath but the next: whoever called this has still to say the game has begun, and what hears a
+    // message has only ever heard one in a game that had. What is said meanwhile is kept with the rest.)
+    setTimeout(() => net.listen(), 0);
   }
 
   private maxPlayers = 0;
