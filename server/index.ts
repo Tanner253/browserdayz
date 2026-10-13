@@ -224,8 +224,10 @@ function loadWorld() {
   for (const c of world.crates) {
     const spec = CRATE_SPECS[c.kind];
     if (!spec) continue;
-    // (a steel cabinet is filled with what its building kept: in a police building a constable's locker, elsewhere a medicine cabinet)
-    const kind = c.kind === 'med_cabinet' && world.buildings.some((q) => q.type.startsWith('police') && Math.hypot(q.x - c.x, q.z - c.z) < 17) ? 'police_locker' : c.kind;
+    // (a steel cabinet is filled with what its building kept: in a police building a constable's locker, in the
+    // hospital a hospital's, which is kits before dressings, and elsewhere a clinic's medicine cabinet)
+    const stands = (kind: string, within: number) => world.buildings.some((q) => q.type.startsWith(kind) && Math.hypot(q.x - c.x, q.z - c.z) < within);
+    const kind = c.kind !== 'med_cabinet' ? c.kind : stands('police', 17) ? 'police_locker' : stands('hospital', 22) ? 'hospital_cabinet' : c.kind;
     boxes.set(c.cid, { cid: c.cid, kind: 'crate', w: spec.w, h: spec.h, items: [], x: c.x, y: c.y, z: c.z, rot: 0, crate: kind, emptiedAt: -1 });
   }
   let saved: {

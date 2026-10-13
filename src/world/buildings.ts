@@ -17,7 +17,12 @@ import { bunkerAt, bunkerPlan, levelY } from '../sim/bunker';
 import { flatsPlan, hospitalLobbyPlan, hospitalPlan, hospitalWingPlan, policeCellsPlan, policeGaragePlan, policeHqPlan } from './big-buildings';
 
 /** (`Gas` is not a kind of building: it is whatever stands under the gas, whatever else it is. See src/sim/gas.ts.) */
-export type Usage = 'Village' | 'Town' | 'Farm' | 'Industrial' | 'Military' | 'Hunting' | 'Medic' | 'Police' | 'Shop' | 'Gas' | 'Bunker' | 'East';
+// (2026-10-13: "a specific type of loot is in specific types of buildings". A building that is FOR something is of
+// that kind and no other: a clinic is not also a house, nor a shop, nor a shed a part of the village. They were,
+// and a clinic's shelves held hats and tins, the shop's held hatchets and Kamenka's hospital held rifles. And a
+// hospital is a kind of its own beside a clinic: "the small medical buildings should lean heavy on bandages and
+// stims and less medkits and the hospital should be medkit abundant and lots of stims".)
+export type Usage = 'Village' | 'Town' | 'Farm' | 'Industrial' | 'Military' | 'Hunting' | 'Medic' | 'Hospital' | 'Police' | 'Shop' | 'Gas' | 'Bunker' | 'East';
 
 export interface LootPoint {
   x: number;
@@ -589,7 +594,7 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
           // in the same turn, so that every place after them keeps its number.)
           [3.35, 2.982, -2.15], [-1.4, 2.982, 1.5],
         ],
-        usage: ['Hunting', 'Village', 'Industrial'],
+        usage: ['Hunting', 'Industrial'],
       };
     case 'tent':
       // The army's tent (a download: `tent_military`), all of it the model's: canvas on a frame, one room, six
@@ -672,7 +677,7 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
           { id: 'wooden_crate_01', x: 1.15, z: -1.0, rot: 0.25 },
         ],
         loot: [[-0.9, 0.44, -1.36], [-0.9, 1.24, -1.36], [1.15, 0.37, -1.0], [0.6, 0.02, 0.6]],
-        usage: ['Farm', 'Industrial', 'Village'],
+        usage: ['Farm', 'Industrial'],
       };
     case 'cabin':
       return {
@@ -794,7 +799,7 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
           [5.03, 0.14, -2.2], [5.03, 0.74, -2.2], [5.03, 1.34, -2.2],
           [3.2, 0.02, -2.0], [-3.4, 0.02, 1.2], [0.3, 0.02, 1.8], [0.2, 0.02, -1.8],
         ],
-        usage: ['Medic', 'Town'],
+        usage: ['Medic'],
       };
     case 'store':
       // The village shop: two wide windows and the door between them, the counter across the
@@ -839,7 +844,7 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
           [-3.0, 0.02, 1.8], [0.6, 0.02, 2.3], [3.5, 0.02, -2.2], [-3.0, 0.02, -2.3],
         ],
         // (a shop is its own kind of place as well: food, drink and dressings are kept here before anywhere)
-        usage: ['Shop', 'Town', 'Village'],
+        usage: ['Shop'],
       };
     case 'barracks':
       // One long room of beds with a table to eat at, and at the end of it, behind a door, the

@@ -9,15 +9,19 @@ import type { Container } from './inventory';
 type Table = [id: string, weight: number][];
 
 // (By the steps of the map, 2026-10-10. One of the army's cases is of the second step wherever it stands: pistols
-// and what they fire, the army's kit; now and then something of the third, an armoured vest or a helmet; and a
-// gas mask, if you are lucky. No rifle, no scope, no plates: those are under the gas. A wooden crate is of the
-// first: food, tools, something to hit with, and no gun.)
+// and what they fire, the army's kit; now and then something of the third, an armoured vest, a helmet or a
+// submachine gun; and a gas mask, if you are lucky. No rifle, no scope, no plates: those are under the gas. A
+// wooden crate is of the first: food, tools, something to hit with, and no gun.)
+// (2026-10-13: "ammo should be more abundant in polive stations and armories ... i should find all ammo there":
+// a case and a constable's locker hold a handful of every calibre now, the rifles' and the bunker's guns' among
+// them, a little of each.)
 const MILITARY: Table = [
   ['box_9mm', 3], ['ammo_9mm', 2.5], ['ammo_762', 1.2], ['bandage', 2], ['firstaid', 1], ['stim', 0.7], ['stim_stamina', 0.5],
   ['condensed', 1.5], ['thermos', 1], ['flask', 0.9], ['binoculars', 0.5], ['compass', 0.5], ['grenade', 0.6],
   ['colt', 1], ['m9', 1], ['box_45', 0.5], ['mag_m9_ext', 0.3], ['suppressor_9', 0.25], ['gun_light', 0.3],
   ['soft_vest', 0.6], ['patrol_cap', 0.6], ['rubber_boots', 0.4], ['work_gloves', 0.4], ['flashlight', 0.5], ['jerrycan', 0.4],
   ['armor_vest', 0.22], ['boonie_hat', 0.2], ['gasmask', 0.3],
+  ['ammo_45', 1.2], ['mag_m9', 0.6], ['mag_colt', 0.6], ['ammo_739', 0.6], ['ammo_556', 0.6], ['ammo_12', 0.3], ['ammo_50', 0.25], ['mpa', 0.22], ['mag_mpa', 0.35],
 ];
 const CIVILIAN: Table = [
   ['beans', 2], ['sardines', 2], ['sprats', 2], ['tomatoes', 1.5], ['apple', 1.5], ['milk', 1], ['thermos', 0.6], ['water_jug', 0.9], ['flask', 0.5],
@@ -54,23 +58,25 @@ const IN_BUNKER: Table = [
   ['ar15', 1.1], ['mag_ar', 1.4], ['mag_ar_60', 0.6], ['box_556', 1.8], ['ammo_556', 1.2], ['suppressor_556', 0.6], ['foregrip', 0.7],
   ['ak', 0.8], ['mag_ak', 1], ['drum_ak', 0.6], ['box_739', 1.4], ['ammo_739', 1], ['suppressor_739', 0.5], ['mag_deagle', 0.8], ['mag_sniper', 0.7],
 ];
-// TEMPORARY, THE SHOWCASE (2026-10-11; see SHOWCASE in economy.ts): the submachine gun, the Colt and what feeds
-// them down the bunker with the rest of the firepower. (The bunker is where they are to stay once Kamenka is no
-// longer given them: this part is kept when the showcase is taken away.)
+// (the submachine gun, the Colt and what feeds them, down the bunker with the rest of the firepower)
 IN_BUNKER.push(['mpa', 0.9], ['mag_mpa', 1.1], ['colt', 0.5], ['mag_colt', 0.6], ['box_45', 0.8], ['ammo_45', 0.6]);
 /** and on its racks, the long things */
 const ON_RACKS: Table = [['mpa', 1.5], ['benelli', 3], ['mosin', 2], ['ar15', 2], ['ak', 1.5], ['box_556', 1.2], ['box_739', 1], ['ammo_12', 2], ['box_12', 1.5], ['box_762', 1.5], ['suppressor_12', 0.8], ['suppressor_762', 0.8], ['pu_scope', 1.2], ['red_dot', 0.8], ['gun_light', 0.8]];
 
 /**
- * The steel cabinets of the hospital and of the police (2026-10-12: "the metal lockers found in the police station
- * and the medical station should be lootable and have inventories"). A hospital's holds what a hospital has, and
- * a great deal of it ("the hospital loot pool leans heavily into meds, lots of stims ... and medkits"); a
- * constable's holds what the village's police carried: a pistol now and then, what it fires, a vest.
+ * The steel cabinets of the hospital, of a clinic and of the police (2026-10-12: "the metal lockers found in the
+ * police station and the medical station should be lootable and have inventories"). A hospital's holds what a
+ * hospital has, and a great deal of it ("the hospital should be medkit abundant and lots of stims"); a clinic's
+ * leans on dressings and stims ("the small medical buildings should lean heavy on bandages and stims and less
+ * medkits"); a constable's holds what the police carried: a pistol now and then, a submachine gun more seldom,
+ * and what every gun fires.
  */
-const IN_MEDICINE: Table = [['bandage', 4], ['stim', 3.4], ['stim_stamina', 1.8], ['firstaid', 2.6], ['splint', 1.6], ['flask', 0.4], ['work_gloves', 0.3]];
+const IN_MEDICINE: Table = [['bandage', 4.5], ['stim', 3.6], ['stim_stamina', 1.6], ['firstaid', 0.9], ['splint', 1.4], ['flask', 0.4], ['work_gloves', 0.3]];
+const IN_HOSPITAL: Table = [['firstaid', 4], ['stim', 3.6], ['stim_stamina', 2], ['bandage', 2.2], ['splint', 1.6], ['flask', 0.3], ['work_gloves', 0.3]];
 const IN_POLICE: Table = [
   ['box_9mm', 3], ['ammo_9mm', 2.4], ['box_45', 1.2], ['ammo_45', 1.4], ['mag_m9', 1.6], ['mag_colt', 1.6], ['m9', 0.9], ['colt', 1],
   ['soft_vest', 0.9], ['patrol_cap', 0.9], ['flashlight', 0.9], ['bandage', 1.4], ['stim', 0.5], ['stim_stamina', 0.3], ['gun_light', 0.3], ['suppressor_9', 0.2], ['thermos', 0.5], ['cigarettes', 0.5],
+  ['ammo_762', 0.8], ['ammo_739', 0.7], ['ammo_556', 0.7], ['ammo_12', 0.4], ['ammo_50', 0.3], ['mpa', 0.45], ['mag_mpa', 0.8],
 ];
 
 export interface CrateSpec {
@@ -90,17 +96,19 @@ export const CRATE_SPECS: Record<string, CrateSpec> = {
   // a steel cabinet (see IN_MEDICINE). The same cabinet in a police building is filled as a constable's locker: the
   // server knows which it is by where it stands, and the game is told nothing but what is in it.
   med_cabinet: { label: 'Locker', w: 4, h: 6, table: IN_MEDICINE, count: [2, 4] },
+  hospital_cabinet: { label: 'Locker', w: 4, h: 6, table: IN_HOSPITAL, count: [2, 4] },
   police_locker: { label: 'Locker', w: 4, h: 6, table: IN_POLICE, count: [1, 3] },
   // what is searched in the bunker and is no crate (see bunkerCrates): some of them are empty
-  locker: { label: 'Locker', w: 4, h: 6, table: IN_BUNKER, count: [0, 2] },
-  gun_rack: { label: 'Weapon Rack', w: 8, h: 4, table: ON_RACKS, count: [1, 3] },
+  // ("abundant supplies in the T5": a rack is never bare, and a locker seldom)
+  locker: { label: 'Locker', w: 4, h: 6, table: IN_BUNKER, count: [0, 3] },
+  gun_rack: { label: 'Weapon Rack', w: 8, h: 4, table: ON_RACKS, count: [2, 4] },
   bunker_cabinet: { label: 'Cabinet', w: 6, h: 4, table: IN_BUNKER, count: [1, 2] },
   bunker_desk: { label: 'Desk', w: 6, h: 3, table: IN_BUNKER, count: [0, 2] },
 };
 /** the kinds that are the bunker's own furniture: what they hold is theirs whatever is said of where they stand */
 const OF_BUNKER = new Set(['locker', 'gun_rack', 'bunker_cabinet', 'bunker_desk']);
 /** and the kinds that hold what is theirs wherever they stand (a cabinet under the gas would else be a crate of rifles) */
-const OWN_TABLE = new Set([...OF_BUNKER, 'med_cabinet', 'police_locker']);
+const OWN_TABLE = new Set([...OF_BUNKER, 'med_cabinet', 'hospital_cabinet', 'police_locker']);
 
 /** seconds an emptied crate stays empty before it refills (only while nobody is near): five minutes, it was twenty */
 export const CRATE_RESTOCK = 300;

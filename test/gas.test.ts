@@ -141,8 +141,8 @@ ok('what is kept under the gas is marked so, and the masks are kept out of it, i
   assert.ok(under.length >= 8, `only ${under.length} places to find anything under the gas`);
   for (const p of data.lootPoints) assert.equal(p.usage.includes('Gas'), gasDepth(zone, p.x, p.y, p.z) > GAS.breathe);
   // stocked as a fresh server stocks it: every mask is in the police station, none under the gas
-  // (and in the headquarters, which is one)
-  const police = world.buildings.filter((b) => b.type === 'police' || b.type === 'police_hq').map((b) => b.id);
+  // (and in the headquarters, which is one: its cells and its garage are parts of it)
+  const police = world.buildings.filter((b) => b.type.startsWith('police')).map((b) => b.id);
   assert.ok(police.length >= 1, 'no police station on this map');
   const eco = new Economy(data.lootPoints, { spawn: () => {}, despawn: () => {} });
   eco.populate();
@@ -185,14 +185,14 @@ ok('the gas is the richest place on the map; helmets, plates and scopes are of i
     // (no more than half as many: three helmets are the town's and seven the gas's, and on some throws of the dice one
     // of the seven finds no place free and waits for the next restock)
     for (const id of ['boonie_hat', 'life_vest', 'pu_scope']) assert.ok(t(id) * 2 <= g(id), `${t(id)} of ${id} in the town, ${g(id)} under the gas`);
-    // TEMPORARY, THE SHOWCASE (2026-10-11; see SHOWCASE in src/sim/economy.ts): the shotgun, its shells and the
-    // keycards are in Kamenka as well for now. It was: none of these six in the town.
-    for (const id of ['heavy_armor', 'deagle', 'ammo_50']) assert.equal(t(id), 0, `${id} in the town`);
+    // (none of what the bunker and the gas are gone into for: the showcase that had the shotgun and the keycards in
+    // the town is gone, 2026-10-13. A handful of the bunker's guns' rounds is another matter: see test/loot.test.ts.)
+    for (const id of ['heavy_armor', 'deagle', 'benelli', 'box_12', 'box_50', 'keycard']) assert.equal(t(id), 0, `${id} in the town`);
     // the shotgun, its shells and its can are of the bunker and nowhere else; what opens the bunker is under the gas
     assert.ok(b('benelli') >= 2 && b('ammo_12') + b('box_12') >= 10, 'no shotgun, or nothing for it, in the bunker');
     // and the heaviest armour there is: the bunker's, and nowhere else's (the bunker is the last place, and the best)
     assert.ok(b('heavy_armor') >= 2 && g('heavy_armor') === 0 && o('heavy_armor') === 0, `heavy armour: ${b('heavy_armor')} in the bunker, ${g('heavy_armor')} under the gas, ${o('heavy_armor')} elsewhere`);
-    for (const id of ['benelli', 'ammo_12', 'box_12', 'suppressor_12']) assert.equal(g(id) + o(id), 0, `${id} outside the bunker`);
+    for (const id of ['benelli', 'suppressor_12']) assert.equal(g(id) + o(id) + t(id), 0, `${id} outside the bunker`);
     assert.ok(g('keycard') >= 1 && o('keycard') + b('keycard') === 0, 'the keycards are not under the gas, or not only there');
     // four places in five there have something lying in them (on the rest of the map it is three in five)
     assert.ok(gasThings / places >= 0.8, `only ${gasThings} things on the ${places} places under the gas`);
@@ -204,13 +204,14 @@ ok('the gas is the richest place on the map; helmets, plates and scopes are of i
     }
     // and everything else is to be had there: guns, a lot to fire from them, something for a wound, grenades
     // (the pistols made way there for the two assault rifles, 2026-10-10)
-    assert.ok(g('mosin') + g('colt') + g('m9') + g('ak') + g('ar15') >= 14 && g('mosin') >= 8, 'few guns under the gas');
+    // (2026-10-13: two of the sniper rifles made way for an AK and an AR-15 more, "more common in the T4")
+    assert.ok(g('mosin') + g('colt') + g('m9') + g('ak') + g('ar15') >= 14 && g('mosin') >= 6 && g('ak') + g('ar15') >= 7, 'few guns under the gas');
     // (rounds loose and boxed, and since 2026-10-10 the magazines they go into, which lie there in place of a few handfuls)
     assert.ok(g('box_762') + g('box_9mm') + g('ammo_762') + g('ammo_9mm') + g('box_50') + g('ammo_50') + g('mag_sniper') + g('mag_m9') + g('mag_colt') + g('box_739') + g('ammo_739') + g('mag_ak') + g('box_556') + g('ammo_556') + g('mag_ar') >= 24, 'little ammunition under the gas');
     assert.ok(g('firstaid') + g('bandage') >= 6 && g('grenade') >= 4);
     // the Desert Eagle and what it fires are of the bunker and nowhere else (they were the gas's own until 2026-10-10)
     assert.ok(b('deagle') >= 2 && b('ammo_50') + b('box_50') >= 6, 'no Desert Eagle, or nothing for it, in the bunker');
-    for (const id of ['deagle', 'ammo_50', 'box_50', 'mag_deagle_ext']) assert.equal(g(id) + o(id) + t(id), 0, `${id} outside the bunker`);
+    for (const id of ['deagle', 'box_50', 'mag_deagle', 'mag_deagle_ext']) assert.equal(g(id) + o(id) + t(id), 0, `${id} outside the bunker`);
     assert.equal(o('suppressor_762'), 0);
     // the rest of the map: pistols and what they fire, something for a wound, and no rifle (see test/loot.test.ts)
     assert.ok(o('mosin') === 0 && o('colt') + o('m9') >= 24 && o('ammo_9mm') >= 36 && o('bandage') >= 22, 'the rest of the map has gone short');

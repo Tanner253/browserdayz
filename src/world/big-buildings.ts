@@ -370,7 +370,7 @@ export function hospitalPlan(): Blueprint {
 
   const levels: Level[] = [
     { h: 3.0, int: 'ward_wall', floor: 'floor_lino', walls: ward, furniture: w.furniture, loot: w.loot },
-    { h: 3.0, int: 'tile_wall', floor: 'floor_lino', walls: surgery, furniture: s.furniture, loot: s.loot, usage: ['Medic', 'Town'] },
+    { h: 3.0, int: 'tile_wall', floor: 'floor_lino', walls: surgery, furniture: s.furniture, loot: s.loot, usage: ['Hospital'] },
   ];
   return {
     w: HW * 2, d: HD * 2, h: 3.2, ext: 'hosp_ext', int: 'int_painted', floor: 'floor_lino', roof: 'concrete', roofType: 'flat',
@@ -391,7 +391,7 @@ export function hospitalPlan(): Blueprint {
       piers: { front: [-22.74, -19.2, -12.8, -6.4, 6.4, 12.8, 19.2, 22.74], back: [-22.74, -19.2, 0, 6.4, 12.8, 19.2, 22.74], left: [2.3, 7.74], right: [2.3, 7.74], w: 0.44, key: 'trim_white' },
       dado: { ward_wall: 'ward_dado', office_wall: 'office_dado', tile_wall: 'tile_dado', int_painted: 'office_dado' },
     },
-    usage: ['Medic'],
+    usage: ['Hospital'],
   };
 }
 
@@ -494,7 +494,7 @@ export function hospitalWingPlan(): Blueprint {
     furniture: r.furniture,
     loot: r.loot,
     open: [{ side: 'back', a: 3.55, b: 5.25 }],
-    usage: ['Medic', 'Military'],
+    usage: ['Hospital', 'Military'],
   };
 
   return {
@@ -512,7 +512,7 @@ export function hospitalWingPlan(): Blueprint {
       piers: { back: [-6.18, 6.18], left: [-6.78, -3.2, 3.2], right: [-6.78, -3.3, 0, 3.2], w: 0.44, key: 'trim_white' },
       dado: { ward_wall: 'ward_dado', office_wall: 'office_dado', tile_wall: 'tile_dado', int_painted: 'office_dado' },
     },
-    usage: ['Medic'],
+    usage: ['Hospital'],
   };
 }
 
@@ -539,7 +539,7 @@ export function hospitalLobbyPlan(): Blueprint {
     ],
     furniture: g.furniture, loot: g.loot,
     levels: [], joined: ['back'],
-    deck: { parapet: 1.0, h: 2.5, walls: [], roofs: [], boxes: [], furniture: r.furniture, loot: r.loot, usage: ['Medic', 'Military'] },
+    deck: { parapet: 1.0, h: 2.5, walls: [], roofs: [], boxes: [], furniture: r.furniture, loot: r.loot, usage: ['Hospital', 'Military'] },
     fittings: [{
       level: 0,
       list: [
@@ -555,7 +555,7 @@ export function hospitalLobbyPlan(): Blueprint {
       piers: { front: [-6.18, -1.72, 1.72, 6.18], w: 0.44, key: 'trim_white' },
       dado: { ward_wall: 'ward_dado' },
     },
-    usage: ['Medic'],
+    usage: ['Hospital'],
   };
 }
 

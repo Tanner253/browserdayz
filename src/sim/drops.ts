@@ -76,16 +76,15 @@ export const DROP = {
 };
 
 /**
- * TEMPORARY, THE SHOWCASE (2026-10-11; see SHOWCASE in src/sim/economy.ts): a drop also brings one of the new guns
- * with two magazines for it, a box of what it fires and something to fit to it ("and include all the T3 loot we
- * discussed here"). When the showcase is taken away this goes with it, or is cut down to what the drops are then
- * meant to bring.
+ * A drop also brings one of the automatic guns, with two magazines for it, two boxes of what it fires and two
+ * things to fit to it. (It came in with the showcase of 2026-10-11, which strewed these guns through Kamenka; that
+ * is gone, 2026-10-13, and this is cut down to what a drop is: of the fourth step, the rifles' own. The shotgun,
+ * the drum and the long magazine are the bunker's and nobody else's, and are not dropped.)
  */
-const SHOWCASE: { gun: string; mags: string[]; box: string; fits: string[] }[] = [
-  { gun: 'ak', mags: ['mag_ak', 'mag_ak'], box: 'box_739', fits: ['suppressor_739', 'red_dot', 'drum_ak'] },
-  { gun: 'ar15', mags: ['mag_ar', 'mag_ar'], box: 'box_556', fits: ['suppressor_556', 'red_dot', 'foregrip', 'gun_light', 'mag_ar_60'] },
+const BRINGS: { gun: string; mags: string[]; box: string; fits: string[] }[] = [
+  { gun: 'ak', mags: ['mag_ak', 'mag_ak'], box: 'box_739', fits: ['suppressor_739', 'red_dot', 'gun_light'] },
+  { gun: 'ar15', mags: ['mag_ar', 'mag_ar'], box: 'box_556', fits: ['red_dot', 'foregrip', 'gun_light'] },
   { gun: 'mpa', mags: ['mag_mpa', 'mag_mpa'], box: 'box_9mm', fits: ['suppressor_9', 'red_dot'] },
-  { gun: 'benelli', mags: [], box: 'box_12', fits: ['suppressor_12', 'red_dot', 'gun_light'] },
 ];
 
 export interface DropInfo {
@@ -133,8 +132,8 @@ export function fillDrop(c: Container, rnd: () => number = Math.random) {
   const n = 2 * (2 + Math.floor(rnd() * 2));
   for (let i = 0; i < n; i++) put(pick(extras, rnd));
   for (const id of ['firstaid', 'stim', 'stim_stamina', 'box_762', 'keycard']) put(id);
-  // TEMPORARY, THE SHOWCASE: one of the new guns, loaded, with its magazines, its rounds and two things to fit to it
-  const show = SHOWCASE[Math.floor(rnd() * SHOWCASE.length)];
+  // one of the automatic guns, loaded, with its magazines, its rounds and two things to fit to it
+  const show = BRINGS[Math.floor(rnd() * BRINGS.length)];
   put(show.gun);
   for (const id of show.mags) c.add(makeMag(id, 999));
   put(show.box);

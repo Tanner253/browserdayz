@@ -30,6 +30,12 @@ export interface TypeRule {
   favour?: Partial<Record<Usage, number>>;
   /** it is put back when fewer than this share of them are left on a step (0.6 unless said; from Kamenka up, whenever one is gone) */
   keep?: number;
+  /**
+   * What is otherwise on one step of the map: the kinds of building it lies in there, how it leans among them, how
+   * many seconds before one that is taken is put back, and how often a gun put down there has its magazine in it
+   * (0..1; unsaid, as often as anywhere: six times in ten).
+   */
+  on?: Partial<Record<Tier, { usage?: Usage[]; favour?: Partial<Record<Usage, number>>; restock?: number; mag?: number }>>;
 }
 
 /**
@@ -39,17 +45,26 @@ export interface TypeRule {
  */
 export const GAS_RESTOCK = 420;
 
-/** every kind of building there is */
-const ANYWHERE: Usage[] = ['Village', 'Town', 'Farm', 'Industrial', 'Military', 'Hunting', 'Medic', 'Police', 'Shop'];
-/** where people lived, and where they worked out of doors */
+/** where people lived */
 const HOMES: Usage[] = ['Village', 'Town'];
-const SHEDS: Usage[] = ['Farm', 'Hunting', 'Industrial', 'Village'];
+/** sheds, barns, garages and yards, and a hunter's cabin: where the tools are */
+const SHEDS: Usage[] = ['Farm', 'Hunting', 'Industrial'];
 const ARMY: Usage[] = ['Military', 'Police'];
-/** guns were kept in the armoury and at the army's posts; food in the shop before anywhere; dressings in the clinic, and the shop until there is a hospital */
-const ARMOURY = { Police: 12, Military: 5 };
-const LARDER = { Shop: 5 };
+/** guns were kept in the armoury and at the army's posts; food in the shop before anywhere */
+const ARMOURY = { Police: 12, Military: 7 };
+/** loose rounds: where guns were kept before anywhere, a hunter's cabin next, and a handful in a house */
+const ROUNDS = { Police: 12, Military: 8, Hunting: 2 };
+const LARDER = { Shop: 6 };
 /** a gun or what it fires that is taken is put back at the next restock, not once the map is well short */
 const SOON = 0.95;
+/**
+ * Kamenka has one small police station and a few army posts, and they are full of what only they keep. So what the
+ * town is for, the pistols and the submachine gun and what feeds them, lies in its houses nearly as readily as
+ * where guns were kept: there, the town itself is the armoury.
+ */
+const IN_TOWN = { favour: { Police: 3, Military: 1.5 } };
+/** past the outskirts, a tool lies in a shed and nowhere else */
+const IN_SHEDS: TypeRule['on'] = { 2: { usage: SHEDS }, 3: { usage: SHEDS } };
 
 /**
  * What is left at an armed loot point (the first building of every outlying place, the guard posts, the police
@@ -58,6 +73,8 @@ const SOON = 0.95;
  * kept, and either elsewhere. [item, weight]
  */
 const ARMS: [string, number][] = [['colt', 2.4], ['m9', 1.8], ['hatchet', 1.6], ['bat', 1.6], ['crowbar', 1.4], ['machete', 1.4], ['shovel', 1.4], ['knife', 1]];
+/** and from Kamenka on, where guns were kept: the submachine gun before a pistol ("tier 3 should be submachine guns heavy") */
+const ARMS_TOWN: [string, number][] = [['mpa', 2.4], ['m9', 1.6], ['colt', 1]];
 /** seconds an armed point stays bare once its weapon has been taken */
 export const ARMS_RESTOCK = 180;
 /**
@@ -85,170 +102,187 @@ export const LOOTED_REST = 180, LOOTED_ABOUT = 6, SAME_AGAIN = 900;
 export const KEEPS_RESTOCK = 900;
 
 // How many of each, and where: `npx tsx scripts/loot-audit.ts` says what the rules come to on the map as it is,
-// and test/loot.test.ts holds them to what was asked (2026-10-10):
-//   - what you hit with is found on the outskirts and nowhere else; lights and tools mostly there too
-//   - pistols from the village on: the police station, the army's places, and now and then a house
-//   - the sniper rifle is rare in Kamenka and common under the gas (and in a helicopter's cargo and a supply drop)
-//   - the shotgun, the Desert Eagle, the heavy armour and the K6-3 helmet are the bunker's and nobody else's
-//   - the big rucksack is not found below the fourth step
-//   - what a gun fires is found everywhere, a little of it; boxes of it where guns were kept
-//   - food in the shop before anywhere, dressings in the clinic and the shop
-// The map has 338 places for things on the outskirts, 542 in the village and the army's places, 412 in Kamenka,
-// 124 under the gas and 145 down the bunker; about six in ten are full.
+// and test/loot.test.ts holds them to what was asked.
+//
+// THE RULES (2026-10-13, the user's, in two messages; they replace the rules of 2026-10-10 where they differ):
+//   "a specific type of loot is in specific types of buildings. the density and tier of the loot depends on its
+//   location on the map." "designate certain buildings with certain categories of loot, like sheds get tools and
+//   industrial, medical gets medical." "classify the loot by tier, what tier ammo is the gun for? T4? then it
+//   should spawn lighht in t3 military spawns and heavier in t4+ military spawns ... think like DAYZ."
+//
+// So a thing has a KIND OF BUILDING it is kept in (`usage`) and a STEP it belongs to (`at`): its own step and
+// above is where it is common, the step below is where there is a little of it, and below that there is none.
+//
+//   the kind of building     what is kept there
+//   police, army             guns, magazines, what they fire (every calibre: "the small police station has low
+//                            caliber weapons and all ammos", "i am only finding low tier ammo in the big police
+//                            when i should find all ammo there"), what goes on a gun, what a constable or a soldier wore
+//   clinic (Medic)           "lean heavy on bandages and stims and less medkits"
+//   hospital                 "medkit abundant and lots of stims"
+//   shed, barn, garage       "tools and industrial, flashlight": tools, lights, fuel, gloves, boots, sacks
+//   shop                     "supplies and food, and water, flashlight"
+//   houses                   food and drink, what people wore and carried; now and then a pistol and its rounds
+//   cabin                    a hunter's: a knife, a compass, a flask, rifle rounds
+//
+//   the step                 what it is for
+//   1 the outskirts          "t1 melee heavy": something to hit with, a light, food and water. No gun.
+//   2 the village, the camp  pistols, with the big police station the place for a submachine gun ("more sub
+//                            machine guns in the [two-]story police station"); every calibre, a little of the high ones
+//   3 Kamenka                "tier 3 should be submachine guns heavy". An AK and an AR-15 "rarely, and ... an even
+//                            rarer chance of having a magazine. you CAN get everything you need from T3 for AR's
+//                            but its very rare": one of each in the whole town, three quarters of an hour apart
+//   4 under the gas          the rifles' own step: "more common in the T4"
+//   5 the bunker             "abundant supplies in the T5": and the shotgun and the Desert Eagle, which are nowhere else
+//
+// (What went with this: the showcase of 2026-10-11, which strewed every new gun through Kamenka's houses "FOR
+// NOW ... then take it away", is taken away: "move the weapons out of kamenka and into their rightful places and
+// tiered spawn locations".)
+//
+// The map has about 324 places for things on the outskirts, 1090 in the village and the army's places, 739 in
+// Kamenka, 119 under the gas and 145 down the bunker. Under the gas and down the bunker every place is spoken
+// for: one more of anything there is one fewer of something else.
 export const TYPES: Record<string, TypeRule> = {
-  // ------------------------------------------------------------ guns, and what they fire
+  // ------------------------------------------------------------ guns
   // (Weapons and what they fire come back fast: a gun taken off a shelf is back somewhere on its step within
   // three minutes, rounds within two. At seven minutes for a rifle a busy server ran dry.)
-  mosin: { at: [0, 0, 2, 9, 2], lifetime: 7200, restock: 180, usage: ARMY, loaded: [1, 4], keep: SOON },
-  colt: { at: [0, 21, 6, 0, 0], lifetime: 7200, restock: 180, usage: ['Police', 'Military', 'Town'], favour: ARMOURY, loaded: [2, 6], keep: SOON },
-  // the service pistol, with nearly twice the magazine
-  m9: { at: [0, 16, 9, 1, 0], lifetime: 7200, restock: 180, usage: ['Police', 'Military', 'Town'], favour: ARMOURY, loaded: [3, 10], keep: SOON },
-  // loose rounds turn up in handfuls, everywhere; sealed boxes are the real find, and are where guns were kept
-  ammo_762: { at: [6, 12, 12, 5, 2], lifetime: 3600, restock: 120, usage: ANYWHERE, favour: ARMOURY, qty: [0.25, 0.6], keep: SOON },
-  ammo_9mm: { at: [12, 38, 16, 1, 1], lifetime: 3600, restock: 120, usage: ANYWHERE, favour: ARMOURY, qty: [0.25, 0.6], keep: SOON },
-  box_762: { at: [0, 3, 7, 8, 2], lifetime: 3600, restock: 180, usage: ARMY, keep: SOON },
-  box_9mm: { at: [0, 19, 9, 2, 2], lifetime: 3600, restock: 180, usage: ['Police', 'Military', 'Town'], favour: ARMOURY, keep: SOON },
-  // Magazines (2026-10-10): a gun is found with its own in it six times in ten, and they lie by themselves where
-  // the guns they fit are kept, about as many again as there are guns, a few rounds in some. A second one is
-  // what makes a gun worth keeping. (Under the gas every place is spoken for: the rifle's magazines there are in
-  // place of a few handfuls of loose rounds.)
-  mag_colt: { at: [0, 16, 5, 0, 0], lifetime: 7200, restock: 240, usage: ['Police', 'Military', 'Town'], favour: ARMOURY, keep: SOON },
-  mag_m9: { at: [0, 13, 7, 1, 0], lifetime: 7200, restock: 240, usage: ['Police', 'Military', 'Town'], favour: ARMOURY, keep: SOON },
-  mag_sniper: { at: [0, 0, 2, 4, 2], lifetime: 7200, restock: 300, usage: ARMY, keep: SOON },
-  // The two assault rifles (2026-10-10), and what goes with them. Nobody said where they are kept: they are put a
-  // step above the pistols and beside the sniper rifle. The AK now and then in Kamenka, under the gas and down
-  // the bunker; the AR-15 under the gas, seldom, and down the bunker. Their rounds are found from the village
-  // on, a few; their magazines where the rifles are; the drum and the long magazine down the bunker only.
-  // (Under the gas every place was spoken for: the pistols and their fittings have made way there.)
-  // (Down the bunker there are thirteen places on a floor, and a rifle lies nowhere else: the shotgun, the sniper
-  // rifle, the shotgun's can and the big rucksack have twelve of them. The rifles there are on its racks.)
-  ak: { at: [0, 0, 2, 4, 0], lifetime: 7200, restock: 300, usage: ARMY, loaded: [5, 20], keep: SOON },
-  ar15: { at: [0, 0, 0, 2, 1], lifetime: 7200, restock: 420, usage: ARMY, loaded: [5, 20], keep: SOON },
-  mag_ak: { at: [0, 0, 2, 3, 2], lifetime: 7200, restock: 300, usage: ARMY, keep: SOON },
-  mag_ar: { at: [0, 0, 1, 2, 3], lifetime: 7200, restock: 300, usage: ARMY, keep: SOON },
+  // The sniper rifle: the gas's. One in Kamenka (and the one the hospital's roof always keeps).
+  mosin: { at: [0, 0, 1, 7, 2], lifetime: 7200, restock: 180, usage: ARMY, loaded: [1, 4], keep: SOON, on: { 3: { restock: 1500 } } },
+  // Pistols: the village's. Where guns were kept, and now and then a house.
+  colt: { at: [0, 18, 4, 0, 0], lifetime: 7200, restock: 180, usage: [...ARMY, 'Town'], favour: ARMOURY, loaded: [2, 6], keep: SOON, on: { 3: IN_TOWN } },
+  m9: { at: [0, 16, 6, 0, 0], lifetime: 7200, restock: 180, usage: [...ARMY, 'Town'], favour: ARMOURY, loaded: [3, 10], keep: SOON, on: { 3: IN_TOWN } },
+  // The submachine gun: Kamenka's, and the big police station's before that.
+  // (in the village it is a policeman's and a soldier's, and not a householder's)
+  mpa: { at: [0, 12, 14, 0, 0], lifetime: 7200, restock: 240, usage: [...ARMY, 'Town'], favour: ARMOURY, loaded: [5, 20], keep: SOON, on: { 2: { usage: ARMY }, 3: IN_TOWN } },
+  // The two assault rifles: the gas's, and the bunker's racks and lockers (see crates.ts). In Kamenka one of each,
+  // where the army and the police kept things, seldom with a magazine in it, and a long time coming back.
+  ak: { at: [0, 0, 1, 5, 0], lifetime: 7200, restock: 300, usage: ARMY, loaded: [5, 20], keep: SOON, on: { 3: { restock: 2700, mag: 0.15 } } },
+  ar15: { at: [0, 0, 1, 3, 1], lifetime: 7200, restock: 420, usage: ARMY, loaded: [5, 20], keep: SOON, on: { 3: { restock: 3000, mag: 0.12 } } },
+  // The shotgun and the Desert Eagle: the bunker's, and nobody else's.
+  benelli: { at: [0, 0, 0, 0, 4], lifetime: 7200, restock: 600, usage: [], loaded: [3, 7] },
+  deagle: { at: [0, 0, 0, 0, 4], lifetime: 7200, restock: 600, usage: [], loaded: [2, 7] },
+  // ------------------------------------------------------------ what they fire: each on its gun's step and above, a little on the step below
+  // (loose rounds turn up in handfuls; sealed boxes are the real find, and are where guns were kept)
+  // 9 mm and .45: the pistols' and the submachine gun's. A handful in a house or a cabin as well.
+  ammo_9mm: { at: [10, 40, 30, 0, 1], lifetime: 3600, restock: 120, usage: [...ARMY, 'Hunting', ...HOMES], favour: ROUNDS, qty: [0.25, 0.6], keep: SOON, on: { 3: IN_TOWN } },
+  box_9mm: { at: [0, 18, 12, 1, 2], lifetime: 3600, restock: 180, usage: ARMY, favour: ARMOURY, keep: SOON, on: { 3: { usage: [...ARMY, 'Town'], ...IN_TOWN } } },
+  ammo_45: { at: [5, 18, 6, 0, 0], lifetime: 3600, restock: 120, usage: [...ARMY, 'Hunting', ...HOMES], favour: ROUNDS, qty: [0.25, 0.6], keep: SOON, on: { 3: IN_TOWN } },
+  box_45: { at: [0, 6, 2, 0, 0], lifetime: 3600, restock: 240, usage: ARMY, favour: ARMOURY, keep: SOON },
+  // 7.62: the sniper rifle's. A hunter has some.
+  ammo_762: { at: [2, 6, 5, 5, 2], lifetime: 3600, restock: 120, usage: [...ARMY, 'Hunting'], favour: ARMOURY, qty: [0.25, 0.6], keep: SOON },
+  box_762: { at: [0, 2, 3, 6, 2], lifetime: 3600, restock: 180, usage: ARMY, favour: ARMOURY, keep: SOON },
+  // 7.39 and 5.56: the rifles'. Light where the army and the police were below the gas, heavier from the gas up.
+  ammo_739: { at: [0, 4, 4, 5, 3], lifetime: 3600, restock: 180, usage: ARMY, favour: ARMOURY, qty: [0.25, 0.6], keep: SOON },
+  box_739: { at: [0, 1, 1, 3, 2], lifetime: 3600, restock: 240, usage: ARMY, favour: ARMOURY, keep: SOON },
+  ammo_556: { at: [0, 4, 4, 4, 4], lifetime: 3600, restock: 180, usage: ARMY, favour: ARMOURY, qty: [0.25, 0.6], keep: SOON },
+  box_556: { at: [0, 1, 1, 2, 3], lifetime: 3600, restock: 240, usage: ARMY, favour: ARMOURY, keep: SOON },
+  // 12 gauge and .50: the bunker's guns'. A handful where the police and the army were, for whoever is going
+  // down there ("you should be able to find high tier ammo in medium-high tier loot spots"); boxes from the gas up.
+  ammo_12: { at: [0, 2, 2, 2, 7], lifetime: 3600, restock: 300, usage: ARMY, favour: ARMOURY, qty: [0.3, 0.7] },
+  box_12: { at: [0, 0, 0, 1, 4], lifetime: 3600, restock: 420, usage: [] },
+  ammo_50: { at: [0, 2, 2, 1, 6], lifetime: 3600, restock: 300, usage: ARMY, favour: ARMOURY, qty: [0.3, 0.7] },
+  box_50: { at: [0, 0, 0, 0, 3], lifetime: 3600, restock: 420, usage: [] },
+  // ------------------------------------------------------------ magazines: where the guns they fit are kept, about as many as there are guns
+  mag_colt: { at: [0, 14, 4, 0, 0], lifetime: 7200, restock: 240, usage: [...ARMY, 'Town'], favour: ARMOURY, keep: SOON, on: { 3: IN_TOWN } },
+  mag_m9: { at: [0, 13, 6, 0, 0], lifetime: 7200, restock: 240, usage: [...ARMY, 'Town'], favour: ARMOURY, keep: SOON, on: { 3: IN_TOWN } },
+  mag_m9_ext: { at: [0, 2, 2, 0, 0], lifetime: 7200, restock: 1200, usage: ['Military'] },
+  mag_mpa: { at: [0, 12, 14, 0, 2], lifetime: 7200, restock: 300, usage: [...ARMY, 'Town'], favour: ARMOURY, keep: SOON, on: { 2: { usage: ARMY }, 3: IN_TOWN } },
+  mag_sniper: { at: [0, 0, 1, 4, 2], lifetime: 7200, restock: 300, usage: ARMY, keep: SOON, on: { 3: { restock: 1500 } } },
+  // (in Kamenka one of each, and as long coming back as the rifle: a rifle that fires is put together there
+  // from three finds, and it is a long evening's work)
+  mag_ak: { at: [0, 0, 1, 4, 2], lifetime: 7200, restock: 300, usage: ARMY, keep: SOON, on: { 3: { restock: 2400 } } },
+  mag_ar: { at: [0, 0, 1, 3, 3], lifetime: 7200, restock: 300, usage: ARMY, keep: SOON, on: { 3: { restock: 2700 } } },
   drum_ak: { at: [0, 0, 0, 0, 2], lifetime: 7200, restock: 1200, usage: [] },
   mag_ar_60: { at: [0, 0, 0, 0, 2], lifetime: 7200, restock: 1200, usage: [] },
-  ammo_739: { at: [0, 2, 4, 4, 3], lifetime: 3600, restock: 180, usage: ['Military', 'Police', 'Hunting'], qty: [0.25, 0.6], keep: SOON },
-  ammo_556: { at: [0, 2, 3, 2, 4], lifetime: 3600, restock: 180, usage: ['Military', 'Police'], qty: [0.25, 0.6], keep: SOON },
-  box_739: { at: [0, 0, 2, 3, 2], lifetime: 3600, restock: 240, usage: ARMY, keep: SOON },
-  box_556: { at: [0, 0, 0, 2, 3], lifetime: 3600, restock: 240, usage: ARMY, keep: SOON },
-  suppressor_739: { at: [0, 0, 0, 1, 1], lifetime: 7200, restock: 1800, usage: [] },
-  suppressor_556: { at: [0, 0, 0, 0, 2], lifetime: 7200, restock: 1800, usage: [] },
-  foregrip: { at: [0, 0, 1, 0, 2], lifetime: 7200, restock: 1200, usage: ARMY },
-  // The Desert Eagle and what it fires, the shotgun, its shells and the can for its muzzle: the bunker's, and
-  // nobody else's. (The Desert Eagle was the gas's own until 2026-10-10.)
-  deagle: { at: [0, 0, 0, 0, 4], lifetime: 7200, restock: 600, usage: [], loaded: [2, 7] },
-  ammo_50: { at: [0, 0, 0, 0, 6], lifetime: 3600, restock: 300, usage: [], qty: [0.4, 0.9] },
-  box_50: { at: [0, 0, 0, 0, 3], lifetime: 3600, restock: 420, usage: [] },
   mag_deagle: { at: [0, 0, 0, 0, 4], lifetime: 7200, restock: 600, usage: [] },
   mag_deagle_ext: { at: [0, 0, 0, 0, 2], lifetime: 7200, restock: 1200, usage: [] },
-  benelli: { at: [0, 0, 0, 0, 4], lifetime: 7200, restock: 600, usage: [], loaded: [3, 7] },
-  ammo_12: { at: [0, 0, 0, 0, 7], lifetime: 3600, restock: 300, usage: [], qty: [0.4, 0.9] },
-  box_12: { at: [0, 0, 0, 0, 4], lifetime: 3600, restock: 420, usage: [] },
-  suppressor_12: { at: [0, 0, 0, 0, 3], lifetime: 7200, restock: 1200, usage: [] },
-  // (and what opens the bunker is kept under the gas: the one place is the way into the other)
-  keycard: { at: [0, 0, 0, 2, 0], lifetime: 7200, restock: 600, usage: [] },
-  // what goes on a gun
-  suppressor_762: { at: [0, 0, 0, 3, 2], lifetime: 7200, restock: 1800, usage: [] },
-  red_dot: { at: [0, 1, 2, 3, 3], lifetime: 7200, restock: 1800, usage: ['Police'] },
-  // (not in the police station: its few shelves are where the gas masks are kept, and a mask that has nowhere to lie is a gas nobody can enter)
-  gun_light: { at: [0, 3, 3, 3, 3], lifetime: 3600, restock: 900, usage: ['Military', 'Industrial'] },
-  mag_m9_ext: { at: [0, 2, 2, 0, 0], lifetime: 7200, restock: 1200, usage: ['Military'] },
+  // ------------------------------------------------------------ what goes on a gun
+  suppressor_9: { at: [0, 2, 4, 0, 0], lifetime: 7200, restock: 1800, usage: ARMY, favour: { Police: 3 } },
+  red_dot: { at: [0, 1, 3, 3, 3], lifetime: 7200, restock: 1800, usage: ARMY },
+  // (not in the police station alone: its few shelves are where the gas masks are kept)
+  gun_light: { at: [0, 3, 3, 3, 3], lifetime: 3600, restock: 900, usage: ['Military', 'Industrial', 'Police'] },
+  foregrip: { at: [0, 0, 1, 0, 2], lifetime: 7200, restock: 1200, usage: ARMY },
   pu_scope: { at: [0, 0, 1, 6, 3], lifetime: 7200, restock: 1800, usage: ARMY },
   rifle_wrap: { at: [0, 0, 2, 3, 1], lifetime: 7200, restock: 1500, usage: ARMY },
-  suppressor_9: { at: [0, 2, 2, 0, 0], lifetime: 7200, restock: 1800, usage: ['Police'] },
-  box_45: { at: [0, 6, 2, 0, 0], lifetime: 3600, restock: 240, usage: ARMY },
-  // ------------------------------------------------------------ what you hit with: the outskirts, and nowhere else
-  hatchet: { at: [14, 0, 0, 0, 0], lifetime: 3600, restock: 180, usage: SHEDS, favour: { Farm: 2, Hunting: 2 } },
-  machete: { at: [12, 0, 0, 0, 0], lifetime: 3600, restock: 180, usage: SHEDS, favour: { Farm: 2 } },
-  crowbar: { at: [14, 0, 0, 0, 0], lifetime: 3600, restock: 180, usage: SHEDS, favour: { Industrial: 2 } },
+  suppressor_762: { at: [0, 0, 0, 3, 2], lifetime: 7200, restock: 1800, usage: [] },
+  suppressor_739: { at: [0, 0, 0, 1, 1], lifetime: 7200, restock: 1800, usage: [] },
+  suppressor_556: { at: [0, 0, 0, 0, 2], lifetime: 7200, restock: 1800, usage: [] },
+  suppressor_12: { at: [0, 0, 0, 0, 3], lifetime: 7200, restock: 1200, usage: [] },
+  // (what opens the bunker is kept under the gas: the one place is the way into the other)
+  keycard: { at: [0, 0, 0, 2, 0], lifetime: 7200, restock: 600, usage: [] },
+  // ------------------------------------------------------------ what you hit with: the outskirts'
+  // ("t1 melee heavy". Past the outskirts the tools of a shed are still in sheds, a few: a shed with nothing in
+  // it is a shed nobody opens twice. Nothing to hit with lies in a house, a shop or a barracks past the outskirts.)
+  hatchet: { at: [14, 3, 2, 0, 0], lifetime: 3600, restock: 180, usage: [...SHEDS, 'Village'], favour: { Farm: 2, Hunting: 2 }, on: IN_SHEDS },
+  machete: { at: [12, 0, 0, 0, 0], lifetime: 3600, restock: 180, usage: [...SHEDS, 'Village'], favour: { Farm: 2 } },
+  crowbar: { at: [14, 3, 2, 0, 0], lifetime: 3600, restock: 180, usage: [...SHEDS, 'Village'], favour: { Industrial: 2 }, on: IN_SHEDS },
   bat: { at: [13, 0, 0, 0, 0], lifetime: 3600, restock: 180, usage: [...HOMES, 'Farm'] },
   // (a tool of yards and sheds: it lies on a floor, being as long as a rifle is)
-  shovel: { at: [11, 0, 0, 0, 0], lifetime: 3600, restock: 180, usage: SHEDS, favour: { Farm: 2, Industrial: 2 } },
-  knife: { at: [16, 0, 0, 0, 0], lifetime: 3600, restock: 180, usage: [...HOMES, 'Farm', 'Hunting', 'Industrial'] },
-  // ------------------------------------------------------------ food and drink: the shop before anywhere
-  sprats: { at: [8, 10, 5, 0, 0], lifetime: 2400, restock: 300, usage: ['Shop', ...HOMES], favour: LARDER },
-  condensed: { at: [3, 7, 6, 1, 3], lifetime: 2400, restock: 300, usage: ['Shop', ...HOMES, 'Military'], favour: LARDER },
-  beans: { at: [9, 10, 8, 0, 1], lifetime: 2400, restock: 300, usage: ['Shop', ...HOMES, 'Farm'], favour: LARDER },
-  tomatoes: { at: [6, 6, 5, 0, 0], lifetime: 2400, restock: 300, usage: ['Shop', 'Village', 'Farm'], favour: LARDER },
-  sardines: { at: [7, 8, 7, 0, 1], lifetime: 2400, restock: 300, usage: ['Shop', ...HOMES, 'Hunting'], favour: LARDER },
-  apple: { at: [7, 5, 5, 0, 0], lifetime: 1200, restock: 300, usage: ['Shop', 'Village', 'Farm'], favour: LARDER },
-  milk: { at: [3, 5, 4, 0, 0], lifetime: 1800, restock: 300, usage: ['Shop', ...HOMES], favour: LARDER },
+  shovel: { at: [11, 3, 2, 0, 0], lifetime: 3600, restock: 180, usage: [...SHEDS, 'Village'], favour: { Farm: 2, Industrial: 2 }, on: IN_SHEDS },
+  knife: { at: [18, 4, 3, 0, 0], lifetime: 3600, restock: 180, usage: [...HOMES, ...SHEDS], on: IN_SHEDS },
+  // ------------------------------------------------------------ food and drink: the shop before anywhere, then kitchens
+  sprats: { at: [8, 16, 7, 0, 0], lifetime: 2400, restock: 300, usage: ['Shop', ...HOMES], favour: LARDER },
+  condensed: { at: [3, 10, 6, 1, 3], lifetime: 2400, restock: 300, usage: ['Shop', ...HOMES, 'Military'], favour: LARDER },
+  beans: { at: [9, 18, 9, 0, 1], lifetime: 2400, restock: 300, usage: ['Shop', ...HOMES, 'Farm'], favour: LARDER },
+  tomatoes: { at: [6, 10, 6, 0, 0], lifetime: 2400, restock: 300, usage: ['Shop', 'Village', 'Farm'], favour: LARDER },
+  sardines: { at: [7, 14, 8, 0, 1], lifetime: 2400, restock: 300, usage: ['Shop', ...HOMES, 'Hunting'], favour: LARDER },
+  apple: { at: [7, 9, 6, 0, 0], lifetime: 1200, restock: 300, usage: ['Shop', 'Village', 'Farm'], favour: LARDER },
+  milk: { at: [3, 9, 5, 0, 0], lifetime: 1800, restock: 300, usage: ['Shop', ...HOMES], favour: LARDER },
   // (there was a third as much to drink on the map as to eat, and thirst runs as fast as hunger)
-  water_jug: { at: [7, 9, 8, 1, 1], lifetime: 2400, restock: 300, usage: ['Shop', ...HOMES, 'Farm', 'Industrial'], favour: LARDER },
-  flask: { at: [4, 8, 6, 1, 3], lifetime: 2400, restock: 300, usage: ['Military', 'Hunting', 'Village', 'Farm'] },
-  thermos: { at: [4, 7, 5, 1, 1], lifetime: 2400, restock: 300, usage: ['Military', 'Hunting', 'Village', 'Police', 'Industrial', 'Shop'] },
-  // ------------------------------------------------------------ medical: the clinic, and the shop until there is a hospital
-  // (What stops bleeding is what a fight is lost for want of.)
-  // (2026-10-10: bandages common on the outskirts and in the village; stims found in the village, common from Kamenka on)
-  // (2026-10-12, two asks of what is kept where. "the hospital loot pool leans heavily into meds, lots of stims
-  // ... and medkits": the third step's dressings, stims, kits and splints, which lie nearly all in Kamenka's
-  // hospital, are four times what they were. "the police HQ felt like it was a little light on loot": the second
-  // step's pistols, what they fire and what a constable wore, by about a third. The steel cabinets of both are
-  // searched besides: see crates.ts.)
-  bandage: { at: [16, 30, 42, 3, 3], lifetime: 2400, restock: 240, usage: ['Medic', 'Shop', ...HOMES, 'Military', 'Police', 'Hunting', 'Farm'], favour: { Medic: 10, Shop: 6, Military: 2 } },
-  // (2026-10-11, asked: "stims should be common in mid tier loot and in hospitals". Three times as many in the
-  // village and the army's places, half as many again in Kamenka and under the gas, in the houses there as well
-  // as where they were, and a clinic's shelf twice as likely to have one as it was. Still none on the outskirts.)
-  // (2026-10-13: the stim is two things now, one for a wound and one for the breath: see items.ts. The yellow one
-  // is kept where the white one is and with the army before anywhere, about a third as many.)
-  stim: { at: [0, 15, 44, 6, 4], lifetime: 3000, restock: 360, usage: ['Medic', 'Military', 'Police', 'Shop', ...HOMES], favour: { Medic: 10, Military: 3, Police: 2 } },
-  stim_stamina: { at: [0, 6, 16, 2, 2], lifetime: 3000, restock: 360, usage: ['Medic', 'Military', 'Police'], favour: { Medic: 8, Military: 5 } },
-  firstaid: { at: [0, 9, 30, 3, 3], lifetime: 3600, restock: 600, usage: ['Medic', 'Military', 'Police'], favour: { Medic: 12 } },
-  // (what sets a broken leg and does nothing else: commoner than the kit, and where there are ladders and lofts to fall off)
-  splint: { at: [5, 10, 30, 1, 2], lifetime: 3600, restock: 420, usage: ['Medic', 'Shop', ...HOMES, 'Farm', 'Hunting', 'Industrial', 'Police'], favour: { Medic: 5, Shop: 2 } },
+  water_jug: { at: [8, 16, 10, 1, 1], lifetime: 2400, restock: 300, usage: ['Shop', ...HOMES, 'Farm', 'Industrial'], favour: { Shop: 9 } },
+  flask: { at: [4, 10, 6, 1, 3], lifetime: 2400, restock: 300, usage: ['Shop', 'Military', 'Hunting', 'Village', 'Farm'], favour: { Shop: 5 } },
+  thermos: { at: [4, 10, 5, 1, 1], lifetime: 2400, restock: 300, usage: ['Shop', 'Military', 'Hunting', 'Village', 'Police', 'Industrial'], favour: { Shop: 2 } },
+  // ------------------------------------------------------------ medical: the clinic and the hospital
+  // (What stops bleeding is what a fight is lost for want of: a bandage is in houses, shops and barracks too.)
+  // A clinic leans on bandages and stims, with a kit or two; the hospital is where the kits are, and stims by the shelf.
+  bandage: { at: [16, 34, 26, 3, 3], lifetime: 2400, restock: 240, usage: ['Medic', 'Hospital', 'Shop', ...HOMES, 'Military', 'Police', 'Hunting', 'Farm'], favour: { Medic: 26, Hospital: 2, Shop: 1.5, Military: 2 } },
+  stim: { at: [0, 20, 60, 4, 4], lifetime: 3000, restock: 360, usage: ['Medic', 'Hospital', 'Military', 'Police', ...HOMES], favour: { Medic: 16, Hospital: 6, Military: 3, Police: 2 } },
+  // (the yellow one, for the breath: see items.ts. A soldier's thing as much as a nurse's.)
+  stim_stamina: { at: [0, 8, 24, 2, 2], lifetime: 3000, restock: 360, usage: ['Medic', 'Hospital', 'Military', 'Police'], favour: { Medic: 10, Hospital: 5, Military: 4 } },
+  firstaid: { at: [0, 5, 55, 3, 3], lifetime: 3600, restock: 600, usage: ['Hospital', 'Medic', 'Military', 'Police'], favour: { Hospital: 14, Medic: 3 } },
+  // (what sets a broken leg and does nothing else: where there are ladders and lofts to fall off, too)
+  splint: { at: [5, 10, 24, 1, 2], lifetime: 3600, restock: 420, usage: ['Medic', 'Hospital', 'Shop', ...HOMES, 'Farm', 'Hunting', 'Industrial', 'Police'], favour: { Medic: 6, Hospital: 4, Shop: 2 } },
   // ------------------------------------------------------------ what is worn and carried
-  // (cloth on the head anywhere people lived or the army was; the helmet from Kamenka up, and one that got as far as the village)
-  patrol_cap: { at: [0, 11, 5, 0, 0], lifetime: 3600, restock: 600, usage: ARMY },
-  fishermans_hat: { at: [6, 3, 4, 0, 0], lifetime: 3600, restock: 600, usage: [...HOMES, 'Farm', 'Hunting'] },
-  garden_gloves: { at: [6, 3, 4, 0, 0], lifetime: 3600, restock: 600, usage: ['Village', 'Farm', 'Industrial'] },
-  boonie_hat: { at: [0, 1, 3, 7, 4], lifetime: 3600, restock: 900, usage: ['Military'] },
+  patrol_cap: { at: [0, 11, 3, 0, 0], lifetime: 3600, restock: 600, usage: ARMY },
+  fishermans_hat: { at: [6, 6, 4, 0, 0], lifetime: 3600, restock: 600, usage: [...HOMES, 'Farm', 'Hunting'] },
+  garden_gloves: { at: [6, 5, 4, 0, 0], lifetime: 3600, restock: 600, usage: ['Village', 'Farm', 'Industrial'] },
+  // (a workman's: sheds and yards before barracks)
+  work_gloves: { at: [3, 8, 3, 0, 0], lifetime: 3600, restock: 900, usage: ['Industrial', 'Farm', 'Military'], favour: { Industrial: 2 } },
+  rubber_boots: { at: [3, 8, 3, 0, 0], lifetime: 3600, restock: 900, usage: ['Industrial', 'Farm', 'Military', 'Police'], favour: { Industrial: 2 } },
+  boonie_hat: { at: [0, 1, 2, 5, 4], lifetime: 3600, restock: 900, usage: ['Military'] },
   // (the heaviest helmet there is: the bunker's)
   helmet_k63: { at: [0, 0, 0, 0, 2], lifetime: 7200, restock: 1800, usage: [] },
-  // (The mask is what lets anybody into the gas, so it is not kept IN the gas: it is in the police station of the
-  // village, and the three of them there are what the whole map has to share, bar what one of the army's cases
-  // or a supply drop turns up.)
-  gasmask: { at: [0, 3, 0, 0, 0], lifetime: 3600, restock: 900, usage: ['Police'] },
-  // (armour by weight: the rig on the outskirts and in houses, the soft vest where the police and the army were,
-  // the armoured vest in Kamenka and one that got as far as the village, the plate carrier under the gas, the
-  // heavy armour only down the bunker)
-  chest_rig: { at: [7, 5, 5, 0, 0], lifetime: 3600, restock: 600, usage: [...SHEDS, 'Town'] },
-  soft_vest: { at: [0, 10, 6, 0, 0], lifetime: 3600, restock: 900, usage: ARMY, favour: { Police: 4 } },
-  armor_vest: { at: [0, 1, 9, 1, 0], lifetime: 3600, restock: 1200, usage: ARMY, favour: { Military: 3 } },
-  life_vest: { at: [0, 0, 0, 8, 4], lifetime: 3600, restock: 900, usage: [] },
+  // (The mask is what lets anybody into the gas, so it is not kept IN the gas: it is a policeman's, in the
+  // police station of the village and in Kamenka's, and these are what the whole map has to share, bar what one
+  // of the army's cases or a supply drop turns up.)
+  gasmask: { at: [0, 3, 2, 0, 0], lifetime: 3600, restock: 900, usage: ['Police'] },
+  // (armour by weight: the rig in sheds and houses, the soft vest where the police and the army were, the
+  // armoured vest in Kamenka and one that got as far as the village, the plate carrier under the gas, the heavy
+  // armour only down the bunker)
+  chest_rig: { at: [7, 7, 5, 0, 0], lifetime: 3600, restock: 600, usage: [...SHEDS, 'Town'] },
+  soft_vest: { at: [0, 10, 4, 0, 0], lifetime: 3600, restock: 900, usage: ARMY, favour: { Police: 3 } },
+  armor_vest: { at: [0, 1, 6, 1, 0], lifetime: 3600, restock: 1200, usage: ARMY, favour: { Military: 3 } },
+  life_vest: { at: [0, 0, 0, 7, 4], lifetime: 3600, restock: 900, usage: [] },
   heavy_armor: { at: [0, 0, 0, 0, 3], lifetime: 7200, restock: 1800, usage: [] },
-  work_gloves: { at: [0, 6, 5, 0, 0], lifetime: 3600, restock: 900, usage: ARMY },
-  rubber_boots: { at: [0, 6, 5, 0, 0], lifetime: 3600, restock: 900, usage: ARMY },
   // (three packs: the day pack from the first step, the camping pack from the village on, and the army's
   // rucksack, the biggest, from the fourth step up and never below it)
-  sack_pack: { at: [8, 5, 3, 0, 0], lifetime: 3600, restock: 600, usage: [...SHEDS, 'Town'] },
-  camping_pack: { at: [0, 4, 5, 0, 0], lifetime: 3600, restock: 900, usage: [...HOMES, 'Hunting'] },
+  sack_pack: { at: [8, 7, 4, 0, 0], lifetime: 3600, restock: 600, usage: [...SHEDS, 'Town', 'Shop'] },
+  camping_pack: { at: [0, 6, 5, 0, 0], lifetime: 3600, restock: 900, usage: [...HOMES, 'Hunting', 'Shop'] },
   suitcase: { at: [0, 0, 0, 3, 3], lifetime: 3600, restock: 1200, usage: [] },
   // ------------------------------------------------------------ tools and odds and ends
-  // (a lantern is a thing of sheds, kitchens and lorries: most of them out where anybody starts, because the night is everybody's)
-  flashlight: { at: [13, 5, 6, 1, 2], lifetime: 3600, restock: 420, usage: [...SHEDS, 'Town'] },
-  binoculars: { at: [2, 2, 3, 1, 1], lifetime: 3600, restock: 1200, usage: ['Military', 'Hunting', 'Police'] },
-  compass: { at: [4, 2, 3, 0, 0], lifetime: 3600, restock: 1200, usage: ['Military', 'Hunting', 'Village'] },
-  cigarettes: { at: [4, 7, 7, 0, 1], lifetime: 2400, restock: 600, usage: [...HOMES, 'Military', 'Industrial', 'Shop'] },
-  grenade: { at: [0, 3, 4, 5, 4], lifetime: 3600, restock: 1200, usage: ['Military'] },
-  stash_kit: { at: [3, 0, 1, 0, 0], lifetime: 7200, restock: 1800, usage: ['Farm', 'Industrial', 'Hunting'] },
+  // (a lantern is a thing of sheds, yards and the shop's shelf: most of them out where anybody starts, because the night is everybody's)
+  flashlight: { at: [22, 12, 8, 1, 2], lifetime: 3600, restock: 420, usage: [...SHEDS, 'Shop', 'Town'], favour: { Shop: 8, Industrial: 3, Farm: 2 } },
+  binoculars: { at: [2, 2, 2, 1, 1], lifetime: 3600, restock: 1200, usage: ['Military', 'Hunting', 'Police'] },
+  compass: { at: [4, 4, 3, 0, 0], lifetime: 3600, restock: 1200, usage: ['Military', 'Hunting', 'Village', 'Shop'], favour: { Shop: 3 } },
+  cigarettes: { at: [4, 10, 7, 0, 1], lifetime: 2400, restock: 600, usage: [...HOMES, 'Military', 'Industrial', 'Shop'], favour: { Shop: 2 } },
+  grenade: { at: [0, 3, 3, 5, 4], lifetime: 3600, restock: 1200, usage: ['Military'] },
+  stash_kit: { at: [3, 3, 1, 0, 0], lifetime: 7200, restock: 1800, usage: ['Farm', 'Industrial', 'Hunting'] },
   // (a field radio: good for one supply drop called down where it is used. One at the army's; the trader sells them dear.)
   radio: { at: [0, 1, 1, 0, 0], lifetime: 7200, restock: 2400, usage: ['Military'] },
   // fuel for the jeeps (src/sim/vehicles.ts): where there are sheds, yards and soldiers
-  jerrycan: { at: [6, 5, 4, 1, 1], lifetime: 3600, restock: 600, usage: ['Farm', 'Industrial', 'Military', 'Village'] },
-  // (Said last, so that the dice fall for everything before it as they fell before it was there.)
-  // The submachine gun (2026-10-11): a 9 mm, and kept where the pistols are kept, a good deal seldomer: the police
-  // station and the army's places, and now and then in Kamenka. Its magazines with it. (Not under the gas, where
-  // every place is spoken for: there it is in the crates.)
-  mpa: { at: [0, 4, 3, 0, 0], lifetime: 7200, restock: 300, usage: ['Police', 'Military'], favour: ARMOURY, loaded: [5, 20], keep: SOON },
-  mag_mpa: { at: [0, 5, 3, 0, 0], lifetime: 7200, restock: 300, usage: ['Police', 'Military'], favour: ARMOURY, keep: SOON },
-  // What the Colt fires (2026-10-11): loose, a little of it wherever the 9 mm is, from the outskirts on; its sealed
-  // boxes where the army kept things (above, in the places the Pistol 43's long magazine had) and in the police station.
-  ammo_45: { at: [5, 16, 7, 0, 0], lifetime: 3600, restock: 120, usage: ANYWHERE, favour: ARMOURY, qty: [0.25, 0.6], keep: SOON },
-  // Two more things to keep things in (2026-10-12), beside the stash case: a black sack, which is in every shed and
-  // kitchen, and a suitcase, which is in houses. (Said last, like the others above, for the sake of the dice.)
-  black_bag: { at: [8, 5, 2, 0, 0], lifetime: 7200, restock: 1200, usage: [...SHEDS, 'Town'] },
-  old_suitcase: { at: [3, 4, 3, 0, 0], lifetime: 7200, restock: 1800, usage: HOMES },
+  jerrycan: { at: [6, 10, 5, 1, 1], lifetime: 3600, restock: 600, usage: ['Farm', 'Industrial', 'Military'], favour: { Industrial: 2 } },
+  // (two more things to keep things in, beside the stash case: a black sack, in every shed, and a suitcase, in houses)
+  black_bag: { at: [5, 8, 3, 0, 0], lifetime: 7200, restock: 1200, usage: [...SHEDS, 'Town'] },
+  old_suitcase: { at: [3, 6, 3, 0, 0], lifetime: 7200, restock: 1800, usage: HOMES },
 };
 
 const STEPS: Tier[] = [1, 2, 3, 4, 5];
@@ -257,62 +291,16 @@ const UNSORTED = 4;
 
 /**
  * What is put down before anything else when a world is stocked: the masks, which are what lets anybody into the
- * gas; and then the long things and the big ones, which lie only on a floor, while there are floors free (down the
+ * gas; then the long things and the big ones, which lie only on a floor, while there are floors free (down the
  * bunker there are thirteen, and with everything put down turn about half the shotguns had nowhere to lie; on the
- * outskirts the bats and the crowbars came up a few short, which of them depending on the dice).
+ * outskirts the bats and the crowbars came up a few short, which of them depending on the dice); and then what
+ * each kind of building is FOR, so that a clinic's shelves hold dressings and an armoury's hold guns before
+ * anything else that may lie there has taken them.
  */
-const FIRST = ['gasmask', 'benelli', 'mosin', 'ak', 'ar15', 'suppressor_12', 'suitcase', 'heavy_armor', 'life_vest', 'armor_vest', 'bat', 'crowbar', 'shovel', 'machete'];
-
-/**
- * ======================================================================================================
- * TEMPORARY: THE SHOWCASE (2026-10-11). To be taken away again: delete this block and SHOWCASE in crates.ts
- * and drops.ts, put the words of TIERS back (src/sim/tiers.ts), and the marked checks in test/gas.test.ts and
- * test/loot.test.ts back as they were (each says what it was).
- *
- * The user's, 2026-10-11: "we will make all these new guns and attachments common in T3 ... all the machine guns
- * are bunker weapons, maybe submachine gun T4 weapon, but all this should be in the bunker. FOR NOW we will make
- * it available in T3 so people have a reason to visit the new town, and try the new guns. we will give the
- * players a taste of the firepower then take it away hiding it in the bunker soon. in fact lets bring the
- * shotgun to the T3 as well, and the bunker keycard, and the gasmask." And: "make sure all this new firepower is
- * in the bunker of course."
- *
- * What it is NOT: the loot the game is meant to have. That is to be worked out as DayZ has it, where a gun that
- * fires is put together from a gun, a magazine and rounds found in three places ("think about dayz, how
- * difficult it can be to make a full weapon that actually shoots, we need to make the game feel gritty"), with
- * the automatic guns the bunker's and the submachine gun the gas's or the bunker's.
- *
- * What it does: how many of each of these are kept in Kamenka (the third step) while it lasts, and in the
- * bunker (the fifth) where there were none. Nothing else is changed: what was kept on a step is kept there still.
- * ======================================================================================================
- */
-export const SHOWCASE: { kamenka: Record<string, number>; bunker: Record<string, number> } = {
-  kamenka: {
-    // the guns
-    ak: 6, ar15: 5, mpa: 7, benelli: 4,
-    // what feeds them
-    mag_ak: 7, mag_ar: 6, mag_mpa: 7, drum_ak: 2, mag_ar_60: 2,
-    ammo_739: 6, ammo_556: 6, ammo_12: 6, box_739: 4, box_556: 4, box_12: 3,
-    // what goes on them
-    suppressor_739: 2, suppressor_556: 2, suppressor_12: 2, suppressor_9: 3, foregrip: 3, red_dot: 4, gun_light: 4,
-    // and the way into the two places past it
-    keycard: 3, gasmask: 3,
-  },
-  // (Down the bunker a long gun lies on its floor or its racks and nowhere else, and the floor is spoken for: the
-  // submachine gun is on the racks and in the crates there, with the Colt and what both fire: see crates.ts. Its
-  // magazines have a shelf.)
-  bunker: { mag_mpa: 2 },
-};
-/**
- * Where the showcase's things lie in Kamenka: in its houses and its shops, a great many places, and not where the
- * army and the police kept theirs, which are few and are for what the town always had. (On the steps below it,
- * each lies where it always did.)
- */
-const SHOWN_IN: Usage[] = ['Town'];
-for (const [id, n] of Object.entries(SHOWCASE.kamenka)) TYPES[id].at[2] = Math.max(TYPES[id].at[2], n);
-for (const [id, n] of Object.entries(SHOWCASE.bunker)) TYPES[id].at[4] = Math.max(TYPES[id].at[4], n);
-// (Kamenka's own things are put down ahead of the showcase's, so that what the town was for is still there to be
-// found: its dressings and its stims lie in the same houses the new guns are now strewn through.)
-FIRST.push('firstaid', 'stim', 'soft_vest');
+const FIRST = [
+  'gasmask', 'benelli', 'mosin', 'ak', 'ar15', 'suppressor_12', 'suitcase', 'heavy_armor', 'life_vest', 'armor_vest', 'bat', 'crowbar', 'shovel', 'machete', 'hatchet',
+  'mpa', 'colt', 'm9', 'mag_mpa', 'mag_colt', 'mag_m9', 'firstaid', 'stim', 'stim_stamina', 'bandage',
+];
 
 
 export interface WorldLoot {
@@ -381,15 +369,14 @@ export class Economy {
   /** can a sort lie at this spot on this step: is the spot of a kind it is kept in, and is there room on it */
   private liesAt(id: string, rule: TypeRule, i: number, where: Tier): boolean {
     const p = this.points[i];
-    // (TEMPORARY, THE SHOWCASE: in Kamenka its things lie in the town's houses as well as where each was kept)
-    const kinds = where === 3 && id in SHOWCASE.kamenka && id !== 'gasmask' ? SHOWN_IN : rule.usage;
+    const kinds = rule.on?.[where]?.usage ?? rule.usage;
     if (where < UNSORTED && !p.usage.some((u) => kinds.includes(u))) return false;
     // a rifle never spawns on a narrow shelf, a jerrycan never on a barrel
     return this.fits(id, p);
   }
 
   private pickPoint(id: string, rule: TypeRule, where: Tier): number {
-    const sorted = where < UNSORTED;
+    const sorted = where < UNSORTED, favour = rule.on?.[where]?.favour ?? rule.favour;
     let candidates: number[] = [];
     const weights: number[] = [];
     let total = 0;
@@ -404,7 +391,7 @@ export class Economy {
       const was = this.lastAt.get(i);
       if (was && was.id === id && this.time - was.at < SAME_AGAIN) return void again.push(i);
       let w = 1;
-      if (sorted && rule.favour) for (const u of p.usage) w = Math.max(w, rule.favour[u] ?? 1);
+      if (sorted && favour) for (const u of p.usage) w = Math.max(w, favour[u] ?? 1);
       candidates.push(i);
       weights.push(w);
       total += w;
@@ -439,6 +426,9 @@ export class Economy {
       fitAtRandom(item, () => this.rng.next());
       // (what is left at an armed place is a gun that fires: it has its magazine, whatever the dice said)
       if (armed && def.weapon.mag && !item.mag) item.mag = def.weapon.mag;
+      // (and on a step where it is a rare find, it is rarer still with its magazine in it)
+      const mag = armed ? undefined : rule.on?.[where]?.mag;
+      if (mag !== undefined && def.weapon.mag) item.mag = this.rng.next() < mag ? def.weapon.mag : null;
       if (rule.loaded) stockGun(item, this.rng.int(rule.loaded[0], Math.min(rule.loaded[1], def.weapon.capacity)));
     }
     if (def.mag) foundMag(item, () => this.rng.next());
@@ -499,7 +489,7 @@ export class Economy {
       }
       // a few tries: a rifle will not lie on a shelf
       // (on the outskirts, something to hit with and never a gun; further in, a pistol where guns were kept)
-      const table = this.tier[i] <= 1 ? ARMS.filter(([id]) => !ITEMS[id].weapon) : p.arms === 'guns' ? ARMS.filter(([id]) => ITEMS[id].weapon) : ARMS;
+      const table = this.tier[i] <= 1 ? ARMS.filter(([id]) => !ITEMS[id].weapon) : p.arms === 'guns' ? (this.tier[i] >= 3 ? ARMS_TOWN : ARMS.filter(([id]) => ITEMS[id].weapon)) : ARMS;
       const total = table.reduce((s, [, w]) => s + w, 0);
       for (let tries = 0; tries < 6; tries++) {
         let r = this.rng.next() * total;
@@ -602,8 +592,9 @@ export class Economy {
         const want = rule.at[t - 1];
         if (!want) continue;
         // (from Kamenka up every one that is gone is put back, and soon; below it, once a share of them is gone)
-        if (t >= 3) this.restock(id, t, want, want, Math.min(rule.restock, GAS_RESTOCK));
-        else this.restock(id, t, want, Math.max(1, Math.ceil(want * (rule.keep ?? 0.6))), rule.restock);
+        const every = rule.on?.[t]?.restock;
+        if (t >= 3) this.restock(id, t, want, want, every ?? Math.min(rule.restock, GAS_RESTOCK));
+        else this.restock(id, t, want, Math.max(1, Math.ceil(want * (rule.keep ?? 0.6))), every ?? rule.restock);
       }
     }
   }

@@ -50,7 +50,7 @@ const CALLED: Record<string, string> = {
   barn: 'Barn', shed: 'Shed', garage: 'Workshop', store: 'Shop', clinic: 'Clinic', police: 'Police station', police_hq: 'Police headquarters', hospital: 'Hospital', barracks: 'Barracks', guardpost: 'Guard post', tower: 'Watchtower', tent: 'Army tent',
 };
 /** the kinds of thing kept in a place, by what the place is said to be used for (what is not here says where a place is, not what is in it) */
-const KIND: Record<string, string> = { Village: 'Residential', Town: 'Residential', Farm: 'Farm', Industrial: 'Industrial', Military: 'Military', Hunting: 'Hunting', Medic: 'Medical', Police: 'Police', Shop: 'Food and supplies', Bunker: 'Military' };
+const KIND: Record<string, string> = { Village: 'Residential', Town: 'Residential', Farm: 'Farm', Industrial: 'Industrial', Military: 'Military', Hunting: 'Hunting', Medic: 'Medical', Hospital: 'Medical', Police: 'Police', Shop: 'Food and supplies', Bunker: 'Military' };
 
 /** a building with something in it: where it stands, its step of the map, and the kinds of thing kept there */
 interface Held { name: string; x: number; z: number; rot: number; w: number; d: number; tier: Tier; kinds: string[]; gas: boolean }
