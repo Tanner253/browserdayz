@@ -3760,8 +3760,11 @@ export class Game {
   // ------------------------------------------------------------ magazines
 
   /** seconds a round takes to push into a magazine */
-  // (0.42 s to 2026-10-11, when it was asked for slower: "the loading animation and time should be slower")
-  private static readonly ROUND_IN = 0.85;
+  // (0.42 s to 2026-10-11, when it was asked for slower: "the loading animation and time should be slower"; 0.85 s
+  // from then to 2026-10-13, when it was asked for a quarter faster: "can we speed up the loading animation by 25%
+  // from its current value for loading a magazine". The hands' movement is played over this time, so it is as much
+  // faster. Thirty rounds are 20 s, where they were 25.)
+  private static readonly ROUND_IN = 0.68;
   /** seconds to thumb one round out of a magazine (quicker than pushing one in) */
   private static readonly ROUND_OUT = 0.55;
   /**
