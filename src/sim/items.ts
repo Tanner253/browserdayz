@@ -421,17 +421,47 @@ const D: ItemDef[] = [
   // ---------------------------------------------------------------- clothing & bags
   // The jacket and the trousers every survivor stands in (2026-10-13: "we should make the jacket and pants the user
   // spawns in with (the default inventory slots) clothing items"). They were two grids of the body's own, and could
-  // not be taken off; they are things now, worn in `top` and `legs`, and their pockets are the same size as those
-  // grids were (4x4 and 4x3), so that nothing anybody carried in them has to move. Taken off, dropped or left on a
-  // body, each keeps what is in its pockets. (There is no model of either: on the ground and in a pocket each is the
-  // hospital's folded blanket, dyed. Proper art is wanted.)
+  // not be taken off; they are things now, worn in `top` and `legs`. Their pockets were the size those grids were
+  // (4x4 and 4x3) and are bigger since (see GRIDS below): never smaller either way, so that nothing anybody carried
+  // in them has to move. Taken off, dropped or left on a body, each keeps what is in its pockets. (There is no model
+  // of either: on the ground and in a pocket each is the hospital's folded blanket, dyed. Proper art is wanted.)
+  //
+  // GRIDS. How much each thing that is worn holds (2026-10-13: "i think we need to expand every equipable item with
+  // an inventory (lik ebackpacks and jackets) with more rows and colluns for example the largest backpack should b e
+  // able to hold 2 large primary weapons minimum to set the top end of the limit, look up how many inventory slots
+  // each dayz backpack has"). DayZ's own, from its wiki's Clothing page (the tables of game version 1.29.163451):
+  //   packs     Field / Long Haul 8x8 (64) the most · Tactical 8x7, Combat and Mountain 7x8 (56) · Hunter 7x6,
+  //             Drybag and Leather 6x7 (42) · Assault 6x6 (36) · Hiking 6x5 (30) · Canvas, Duffel 5x5 (25) · School
+  //             6x4 (24) · Sling 4x5 (20)
+  //   tops      OMK Jacket 6x5 (30) the most · Field, Patrol, Hunter, BDU jackets 6x4 (24) · police, suit 5x4 (20)
+  //             · hoodie 5x3 (15) · shirts 3x3 (9)
+  //   legs      cargo, BDU, hunter, patrol pants 5x4 (20) the most · combat 5x3 (15) · jeans 4x3 (12)
+  //   vests     Field and Tactical Vest 5x4 (20) the most · Assault, Ballistic, Hunter 4x4 (16) · a Plate Carrier
+  //             holds nothing itself, and 15 with its pouches on
+  // Ours, as they were and as they are. No class of thing holds more than DayZ's most of that class; each is where
+  // its like stands on DayZ's ladder, as near as a grid that grew BOTH ways allows; and none is smaller either way
+  // than it was, so that what was kept in one lies where it lay:
+  //   Field Rucksack    7x6 (42) -> 9x7 (63)   the biggest: two AKs (8x3 each) with a column and a row over, or
+  //                                            three Mosins (9x2) and a row; DayZ's biggest is 64
+  //   Camping Backpack  6x5 (30) -> 7x6 (42)   DayZ's middle packs (Hunter, Drybag); an AR-15 lies in it, an AK does not
+  //   Day Pack          4x4 (16) -> 5x5 (25)   DayZ's small bags (Canvas 25, School 24)
+  //   Field Jacket      4x4 (16) -> 5x5 (25)   DayZ's Field Jacket is 24
+  //   Field Trousers    4x3 (12) -> 5x4 (20)   DayZ's cargo and BDU pants
+  //   Plate Carrier     4x3 (12) -> 5x4 (20)   the vest that carries most, as DayZ's Field and Tactical Vests
+  //   Chest Rig         4x2 (8)  -> 5x3 (15)   DayZ's Assault Vest is 16
+  //   Armoured Vest     3x2 (6)  -> 4x3 (12)   DayZ's Ballistic Vest is 16
+  //   Heavy Armour      3x2 (6)  -> 4x3 (12)
+  //   Soft Armour Vest  2x2 (4)  -> 3x3 (9)
+  // Weights are as they were: what a load costs is its weight (src/sim/load.ts), as in DayZ, and a pack full of
+  // rifles is paid for in breath. What is not worn is not part of this: the cases, the body, an admin's hold.
+  // (test/inventory.test.ts holds the old sizes, and lays an inventory kept under them thing for thing.)
   {
     id: 'field_jacket', name: 'Field Jacket', model: 'folded_blanket', tint: 0x7d8a58, scale: 1.1, w: 3, h: 3, weight: 1.3, category: 'clothing', slot: 'top',
-    desc: 'The padded jacket every survivor starts in. 16 slots in its pockets. Take it off and what is in them goes with it: with nothing on your top, you have no pockets there.', wear: { cargo: [4, 4] },
+    desc: 'The padded jacket every survivor starts in. 25 slots in its pockets. Take it off and what is in them goes with it: with nothing on your top, you have no pockets there.', wear: { cargo: [5, 5] },
   },
   {
     id: 'field_trousers', name: 'Field Trousers', model: 'folded_blanket', tint: 0x5a5f6e, scale: 0.85, w: 3, h: 2, weight: 0.6, category: 'clothing', slot: 'legs',
-    desc: 'The hard-wearing trousers every survivor starts in. 12 slots in their pockets. Take them off and what is in them goes with them.', wear: { cargo: [4, 3] },
+    desc: 'The hard-wearing trousers every survivor starts in. 20 slots in their pockets. Take them off and what is in them goes with them.', wear: { cargo: [5, 4] },
   },
   {
     // (still `boonie_hat`, so that what is carried and what is kept in the world still means it: a helmet now)
@@ -475,24 +505,24 @@ const D: ItemDef[] = [
   // body than the one before it, weighs more, and is harder to come by.
   {
     id: 'chest_rig', name: 'Chest Rig', model: 'vest_t0', w: 3, h: 2, weight: 0.9, category: 'clothing', slot: 'vest',
-    desc: 'Webbing and a belt of pouches, with a pad behind them. A tenth off every hit to the body, 8 slots, and it weighs next to nothing.', wear: { cargo: [4, 2], armor: 0.9 },
+    desc: 'Webbing and a belt of pouches, with a pad behind them. A tenth off every hit to the body, 15 slots, and it weighs next to nothing.', wear: { cargo: [5, 3], armor: 0.9 },
   },
   {
     id: 'soft_vest', name: 'Soft Armour Vest', model: 'vest_t1', w: 3, h: 3, weight: 2.4, category: 'clothing', slot: 'vest',
-    desc: 'A policeman\'s soft vest. 15% less damage from every hit to the body, and 4 slots.', wear: { cargo: [2, 2], armor: 0.85 },
+    desc: 'A policeman\'s soft vest. 15% less damage from every hit to the body, and 9 slots.', wear: { cargo: [3, 3], armor: 0.85 },
   },
   {
     id: 'armor_vest', name: 'Armoured Vest', model: 'vest_t2', w: 3, h: 3, weight: 3.8, category: 'clothing', slot: 'vest',
-    desc: 'An army vest with plates sewn in. 28% less damage from every hit to the body, and 6 slots.', wear: { cargo: [3, 2], armor: 0.72 },
+    desc: 'An army vest with plates sewn in. 28% less damage from every hit to the body, and 12 slots.', wear: { cargo: [4, 3], armor: 0.72 },
   },
   {
     id: 'heavy_armor', name: 'Heavy Armour', model: 'heavy_armor', w: 3, h: 3, weight: 8.5, category: 'clothing', slot: 'vest',
-    desc: 'Plates front, back and sides, and a collar. Half the damage from every hit to the body. It weighs what it looks as if it weighs, and carries 6 slots.', wear: { cargo: [3, 2], armor: 0.5 },
+    desc: 'Plates front, back and sides, and a collar. Half the damage from every hit to the body. It weighs what it looks as if it weighs, and carries 12 slots.', wear: { cargo: [4, 3], armor: 0.5 },
   },
   {
     // (still `life_vest`, which is what was worn here before: it is a plate carrier now)
     id: 'life_vest', name: 'Plate Carrier', model: 'plate_carrier', w: 3, h: 3, weight: 5.2, category: 'clothing', slot: 'vest',
-    desc: 'Hard plates front and back, pouches all round. 12 more slots, and 40% less damage from every hit to the body.', wear: { cargo: [4, 3], armor: 0.6 },
+    desc: 'Hard plates front and back, pouches all round. 20 more slots, and 40% less damage from every hit to the body.', wear: { cargo: [5, 4], armor: 0.6 },
   },
   {
     // (still `work_gloves`)
@@ -509,16 +539,16 @@ const D: ItemDef[] = [
     // small, and was taken for the big one, which is not found below the fourth step of the map: it is the
     // camping pack's now, made small.)
     id: 'sack_pack', name: 'Day Pack', model: 'camping_backpack', scale: 0.72, w: 3, h: 3, weight: 0.8, category: 'clothing', slot: 'back',
-    desc: 'A small black day pack that sits close to the back. 16 slots.', wear: { cargo: [4, 4] },
+    desc: 'A small black day pack that sits close to the back. 25 slots.', wear: { cargo: [5, 5] },
   },
   {
     id: 'camping_pack', name: 'Camping Backpack', model: 'camping_backpack', w: 4, h: 3, weight: 1.5, category: 'clothing', slot: 'back',
-    desc: 'A tall black hiking pack with red lacing. 30 slots.', wear: { cargo: [6, 5] },
+    desc: 'A tall black hiking pack with red lacing. 42 slots.', wear: { cargo: [7, 6] },
   },
   {
     // (still `suitcase`: the largest)
     id: 'suitcase', name: 'Field Rucksack', model: 'military_backpack', scale: 1.22, w: 4, h: 3, weight: 2.2, category: 'clothing', slot: 'back',
-    desc: 'A full-size military backpack, the biggest there is: 42 slots.', wear: { cargo: [7, 6] },
+    desc: 'A full-size military backpack, the biggest there is: 63 slots, nine across. Two rifles lie in it with room over.', wear: { cargo: [9, 7] },
   },
   // ---------------------------------------------------------------- tools & misc
   { id: 'keycard', name: 'Bunker Keycard', model: '@keycard', w: 1, h: 1, weight: 0.02, category: 'misc', desc: 'Opens the door of Bunker 17, once: the reader keeps it. It goes on foot: no car will take you while you carry one.' },

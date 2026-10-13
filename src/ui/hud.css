@@ -987,11 +987,26 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 .inv-col h3 span.free { color: #c8a8ff; letter-spacing: 0.12em; text-transform: uppercase; }
 /* over each grid of what is worn, after its name: the place it is worn in (it gives way first where the bar is short) */
 .inv-gridbox h4 small { flex: 0 1 auto; min-width: 0; margin-left: 8px; overflow: hidden; text-overflow: ellipsis; font-size: 9px; font-weight: 400; letter-spacing: 0.14em; color: var(--ink-faint); }
+/* A grid nine cells across or more (a Field Rucksack, since the grids were made bigger on 2026-10-13; an admin's
+   hold) is as wide as the carried side has room for and wider than the left side has, where a pack is opened on a
+   body. Wherever it stands in less room than it is wide it scrolls sideways by itself, under its own name, so that
+   nothing in any grid is ever off the edge of the screen. (A pixel of room round it, for the ring a grid is given
+   while a thing is dragged, which lies just outside the grid and would be cut off.) */
+/* (And the left side is given a little of the right's width, 1 : 1.2 as it was and 1.1 : 1.2 as it is: on a screen
+   of 1920x1080 or 1366x768 a rucksack opened on a body then stands whole on the left, beside the bar that side
+   scrolls by, and on the right a jacket and a vest still stand side by side, and the rucksack and the hold whole.) */
+.inv-wrap { grid-template-columns: minmax(402px, 1.1fr) 408px minmax(420px, 1.2fr); }
+.inv-gridbox.wide { max-width: 100%; padding-right: 1px; padding-bottom: 1px; margin-right: -1px; margin-bottom: -1px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; scrollbar-color: rgba(233, 228, 216, 0.3) rgba(0, 0, 0, 0.25); }
+.inv-gridbox.wide:not(.inv-bag) { padding-left: 1px; margin-left: -1px; }
+/* (opened where it lies, it stands in from the edge by its mark down the left: that much less room) */
+.inv-gridbox.wide.inv-bag { max-width: calc(100% - 10px); }
+/* (and where it lies is said a word's width after how full it is: the two ran together, "43 / 63on the body") */
+.inv-gridbox.inv-bag h4 em { margin-left: 10px; }
+.inv-gridbox.wide h4 { position: sticky; left: 0; }
 /* An admin's hold, the inventory that never fills (2026-10-13): under everything that is worn, in the colour the
-   powers are said in. It is drawn as tall as what is in it and is scrolled to with the rest of this side; where
-   the side is narrower than its ten cells it scrolls sideways by itself, so nothing in it is off the edge. */
-.inv-gridbox.inv-hold { max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; scrollbar-color: rgba(200, 168, 255, 0.4) rgba(0, 0, 0, 0.25); }
-.inv-gridbox.inv-hold h4 { position: sticky; left: 0; border-color: rgba(200, 168, 255, 0.45); }
+   powers are said in. It is drawn as tall as what is in it and is scrolled to with the rest of this side. */
+.inv-gridbox.inv-hold { scrollbar-color: rgba(200, 168, 255, 0.4) rgba(0, 0, 0, 0.25); }
+.inv-gridbox.inv-hold h4 { border-color: rgba(200, 168, 255, 0.45); }
 .inv-gridbox.inv-hold h4 small { color: #c8a8ff; }
 .inv-gridbox.inv-hold .inv-grid { border-color: rgba(200, 168, 255, 0.45); }
 

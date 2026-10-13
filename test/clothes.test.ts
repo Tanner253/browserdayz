@@ -15,7 +15,7 @@
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { ALL_SLOTS, CLOTHES, DOLL_SLOTS, GEAR_SLOTS, ITEMS, SLOT_KIND, SLOT_LABEL, TAG_HOLD, WEAPON_SLOTS, makeItem, makeMag, type ItemInstance } from '../src/sim/items';
+import { ALL_SLOTS, CLOTHES, DOLL_SLOTS, GEAR_SLOTS, ITEMS, SLOT_KIND, SLOT_LABEL, TAG_HOLD, WEAPON_SLOTS, holds, makeItem, makeMag, type ItemInstance } from '../src/sim/items';
 import { BODY_GRID, Container, HOT_KEYS, KEPT_DEPTH, PlayerInventory, SPILL, bagGrid, cleanHot, cleanInventory, cleanItem, cleanStored, layOnBody, upgradeInventory, type SerializedInventory } from '../src/sim/inventory';
 import { PROTOCOL } from '../src/net/protocol';
 
@@ -108,10 +108,13 @@ ok('no thing there was is worn anywhere else than it was', () => {
   assert.deepEqual(now, was);
 });
 
-ok('the jacket and the trousers are things: worn on the top and the legs, with the pockets the body had (4x4 and 4x3), and a model the game ships', () => {
+ok('the jacket and the trousers are things: worn on the top and the legs, with pockets no smaller either way than the body had (4x4 and 4x3: they are 5x5 and 5x4), and a model the game ships', () => {
   const j = ITEMS.field_jacket, t = ITEMS.field_trousers;
-  assert.deepEqual([j.slot, j.w, j.h, j.wear?.cargo, j.category], ['top', 3, 3, [4, 4], 'clothing']);
-  assert.deepEqual([t.slot, t.w, t.h, t.wear?.cargo, t.category], ['legs', 3, 2, [4, 3], 'clothing']);
+  // (the pockets were the size the body's own grids were, so that nothing kept in them had to move; they were made
+  // bigger on 2026-10-13, both ways, and for the same reason are never made smaller either way: see GRIDS in src/sim/items.ts)
+  assert.deepEqual([j.slot, j.w, j.h, j.wear?.cargo, j.category], ['top', 3, 3, [5, 5], 'clothing']);
+  assert.deepEqual([t.slot, t.w, t.h, t.wear?.cargo, t.category], ['legs', 3, 2, [5, 4], 'clothing']);
+  assert.ok(j.wear!.cargo![0] >= 4 && j.wear!.cargo![1] >= 4 && t.wear!.cargo![0] >= 4 && t.wear!.cargo![1] >= 3, 'a pocket is smaller than the grid the body had: what was kept in it has no place');
   assert.deepEqual(CLOTHES, [['top', 'field_jacket'], ['legs', 'field_trousers']]);
   const models = JSON.parse(readFileSync('public/assets/manifest.json', 'utf8')).models as Record<string, unknown>;
   for (const d of [j, t]) {
@@ -148,7 +151,7 @@ ok('every new life stands in a jacket and trousers with nothing in them, and wha
   const check = () => {
     assert.equal(inv.slots.top?.id, 'field_jacket');
     assert.equal(inv.slots.legs?.id, 'field_trousers');
-    assert.deepEqual([inv.jacket.w, inv.jacket.h, inv.pants.w, inv.pants.h], [4, 4, 4, 3]);
+    assert.deepEqual([inv.jacket.w, inv.jacket.h, inv.pants.w, inv.pants.h], [5, 5, 5, 4]);
     assert.deepEqual([inv.jacket.items.length, inv.pants.items.length], [0, 0]);
     assert.deepEqual(inv.containers.map((c) => c.name), ['Dog tags', 'Field Jacket', 'Field Trousers']);
     assert.equal(inv.topLevel().length, 2);
@@ -325,7 +328,10 @@ ok('half-way (a jacket grid AND a jacket worn) loses nothing: what is in the str
   inv0.load(old('old-fresh-kit.json'));
   const base = copy(inv0.serialize());
   // (the new life's jacket: beans at 0,0, the thermos at 1,0, the bandage at 2,0)
-  const free = makeItem('compass'), taken = makeItem('apple'), big = makeItem('radio'), bigger = makeItem('radio'), small = makeItem('watch');
+  // (the pockets are 5x5 and 5x4 now. The compass at 3,3 still leaves no four-by-three in the jacket; a radio still
+  // leaves no room for another in the trousers, but no longer fills them: what comes out of the stray trousers grid
+  // is a pair of binoculars, two by two, which the column and the row left there cannot take)
+  const free = makeItem('compass'), taken = makeItem('apple'), big = makeItem('radio'), bigger = makeItem('radio'), small = makeItem('binoculars');
   const half = copy(base);
   half.containers.push({ id: 'jacket', items: [{ ...free, x: 3, y: 3, rot: false }, { ...taken, x: 0, y: 0, rot: false }, { ...big, x: 0, y: 0, rot: false }, { ...bigger, x: 0, y: 1, rot: false }] });
   half.containers.push({ id: 'pants', items: [{ ...small, x: 1, y: 1, rot: false }] });
@@ -344,7 +350,7 @@ ok('half-way (a jacket grid AND a jacket worn) loses nothing: what is in the str
   assert.deepEqual(at(free.uid), ['top', 3, 3], 'a thing whose place was free was moved');
   assert.deepEqual(at(taken.uid), ['top', 3, 0], 'a thing whose place was taken did not go to the first free one');
   assert.deepEqual(at(big.uid), ['legs', 0, 0], 'a thing too big for the jacket did not go into the trousers');
-  assert.equal(at(small.uid)?.[0], 'top', 'a thing out of the stray trousers grid, the trousers being full, did not go into the jacket');
+  assert.equal(at(small.uid)?.[0], 'top', 'a thing out of the stray trousers grid, the trousers having no room for it, did not go into the jacket');
 
   // the game: the one thing with no room comes back for the ground
   const inv = new PlayerInventory();
@@ -367,6 +373,9 @@ ok('half-way (a jacket grid AND a jacket worn) loses nothing: what is in the str
 ok('half-way with every grid already full: all of the stray things come back for the ground, and none is lost', () => {
   const inv0 = new PlayerInventory();
   inv0.load(old('old-packed-full.json'));
+  // (it was kept packed to the last cell of the grids as they were then: every cell they have since is filled as well)
+  for (const c of inv0.containers) while (c !== inv0.tags && c.add(makeItem('compass')) === null);
+  assert.ok(inv0.containers.every((c) => c.items.reduce((cells, p) => cells + ITEMS[p.item.id].w * ITEMS[p.item.id].h, 0) === c.w * c.h), 'a grid is not full');
   const half = copy(inv0.serialize());
   const strays = [makeItem('bandage', 5), makeMag('mag_m9', 9), makeItem('firstaid'), Object.assign(makeItem('dogtag'), { owner: 'Zed', pid: 'pid-zed', held: 77 })];
   half.containers.push({ id: 'jacket', items: strays.slice(0, 2).map((it, i) => ({ ...it, x: i, y: 0, rot: false })) });
@@ -383,18 +392,19 @@ ok('half-way with every grid already full: all of the stray things come back for
 });
 
 ok('a grid kept bigger than the pockets are, or with two things on one place: each thing is laid where there is room, or handed back', () => {
-  const a = makeItem('beans'), b = makeItem('beans'), c = makeItem('radio'), d = makeItem('radio'), e = makeItem('compass');
-  const odd = { slots: { primary: null }, active: null, containers: [{ id: 'jacket', items: [{ ...a, x: 0, y: 0, rot: false }, { ...b, x: 0, y: 0, rot: false }, { ...e, x: 7, y: 9, rot: false }, { ...c, x: 0, y: 1, rot: false }, { ...d, x: 0, y: 1, rot: false }] }, { id: 'pants', items: [] }] } as unknown as SerializedInventory;
+  const a = makeItem('beans'), b = makeItem('beans'), c = makeItem('radio'), d = makeItem('radio'), e = makeItem('compass'), f = makeItem('radio');
+  const odd = { slots: { primary: null }, active: null, containers: [{ id: 'jacket', items: [{ ...a, x: 0, y: 0, rot: false }, { ...b, x: 0, y: 0, rot: false }, { ...e, x: 7, y: 9, rot: false }, { ...c, x: 0, y: 1, rot: false }, { ...d, x: 0, y: 1, rot: false }, { ...f, x: 0, y: 1, rot: false }] }, { id: 'pants', items: [] }] } as unknown as SerializedInventory;
   const before = census(copy(odd));
   const inv = new PlayerInventory();
   const over = inv.load(copy(odd));
-  // (the second tin beside the first and the compass at the first free cell; a radio is four cells by three and has
-  // no room left in the jacket: the first goes into the trousers, which it fills, and the second comes back for the ground)
-  assert.deepEqual(over.map((it) => it.uid), [d.uid]);
+  // (the second tin beside the first and the compass at the first free cell; a radio is four cells by three: the
+  // first lies under the tins, where the jacket now has room for one and no more, the second goes into the
+  // trousers, which have room for one and no more, and the third comes back for the ground)
+  assert.deepEqual(over.map((it) => it.uid), [f.uid]);
   const now = copy(inv.serialize());
   assert.deepEqual(owns(butNewClothes(census(now, over), before)), owns(before));
-  assert.deepEqual(now.slots.top!.cargo!.map((p) => [p.item.uid, p.x, p.y]), [[a.uid, 0, 0], [b.uid, 1, 0], [e.uid, 2, 0]]);
-  assert.deepEqual(now.slots.legs!.cargo!.map((p) => [p.item.uid, p.x, p.y]), [[c.uid, 0, 0]]);
+  assert.deepEqual(now.slots.top!.cargo!.map((p) => [p.item.uid, p.x, p.y]), [[a.uid, 0, 0], [b.uid, 1, 0], [e.uid, 2, 0], [c.uid, 0, 2]]);
+  assert.deepEqual(now.slots.legs!.cargo!.map((p) => [p.item.uid, p.x, p.y]), [[d.uid, 0, 0]]);
 });
 
 ok('loading keeps what the rules of today would refuse: a bag with things in it stays in the pack it was kept in, and is not put back once it is out', () => {
@@ -420,13 +430,14 @@ ok('loading keeps what the rules of today would refuse: a bag with things in it 
 
 // ------------------------------------------------------------------ what the server makes of what it is told
 
-ok('a thing\'s cargo is read to as many things as it has cells: forty-two in a rucksack, forty-eight in a stash case (it was forty), and no more than that', () => {
+ok('a thing\'s cargo is read to as many things as it has cells: sixty-three in a rucksack, forty-eight in a stash case (it was forty), and no more than that', () => {
   const full = (id: string, n: number) => {
     const it = makeItem(id), [w] = ITEMS[id].wear?.cargo ?? ITEMS[id].stash!;
     it.cargo = Array.from({ length: n }, (_, k) => ({ item: makeItem('compass'), x: k % w, y: Math.floor(k / w), rot: false }));
     return it;
   };
-  for (const [id, cells] of [['suitcase', 42], ['stash_kit', 48], ['camping_pack', 30], ['field_jacket', 16], ['field_trousers', 12], ['old_suitcase', 30], ['black_bag', 20]] as [string, number][]) {
+  for (const [id, cells] of [['suitcase', 63], ['stash_kit', 48], ['camping_pack', 42], ['sack_pack', 25], ['field_jacket', 25], ['field_trousers', 20], ['life_vest', 20], ['old_suitcase', 30], ['black_bag', 20]] as [string, number][]) {
+    assert.equal(holds(id)![0] * holds(id)![1], cells, `${id} has ${holds(id)!.join('x')} cells`);
     const it = full(id, cells);
     const clean = cleanItem(copy(it), name)!;
     assert.equal(clean.cargo!.length, cells, `${id} came back with ${clean.cargo!.length} of its ${cells} things`);
@@ -434,7 +445,7 @@ ok('a thing\'s cargo is read to as many things as it has cells: forty-two in a r
     // (and one said to hold more than it has cells is cut to its cells: nobody is kept a bag bigger inside than it is)
     assert.equal(cleanItem(copy(full(id, cells + 25)), name)!.cargo!.length, cells);
   }
-  // the character packed to the last cell, as the server keeps it: all forty-two are in the rucksack
+  // the character packed to the last cell of the grids as they were, as the server keeps it: all forty-two are in the rucksack
   const kept = cleanInventory(old('old-packed-full.json'), name)!;
   assert.deepEqual([kept.slots.back!.cargo!.length, kept.slots.top!.cargo!.length, kept.slots.legs!.cargo!.length, kept.slots.vest!.cargo!.length, grid(kept, 'tags')!.items.length], [42, 16, 12, 12, 10]);
 });
@@ -530,7 +541,7 @@ ok('everything a geared character had on lies in the body\'s grid, nothing on th
   // (and a looter who has a jacket on can open this one where it lies and take from it: it lies in a body's grid)
   const second = body(cleanInventory(old('old-geared.json'), name)!).box;
   const theirs = bagGrid(second.items.find((p) => p.item.id === 'field_jacket')!.item, second.depth + 1)!;
-  assert.deepEqual([theirs.w, theirs.h, theirs.items.length], [4, 4, 8]);
+  assert.deepEqual([theirs.w, theirs.h, theirs.items.length], [5, 5, 8]);
   assert.ok(theirs.accepts(makeItem('bandage')));
 });
 

@@ -230,4 +230,25 @@ ok('more of what a thing is for is more weight: armour, helmets, packs, stashes'
   assert.ok(ITEMS.life_vest.weight <= 6 && ITEMS.heavy_armor.weight <= 9);
 });
 
+ok('the biggest pack takes two rifles since its grid grew (9x7, 2026-10-13), and they are paid for in breath: room is not what limits a load, weight is', () => {
+  // (a rifleman as he is found, with the Field Rucksack on his back in place of the camping pack)
+  const base = RIFLEMAN.map((t) => (t.id === 'camping_pack' ? { id: 'suitcase' } : t));
+  const AK: KitThing = { id: 'ak', mag: 'mag_ak', loaded: 31 };
+  // one rifle more fills the second place on his back; the two after that have nowhere but the pack, and find room there
+  const one = carried(base), two = carried([...base, AK]), four = carried([...base, AK, AK, AK]);
+  const rifle = itemWeight(Object.assign(makeItem('ak'), { mag: 'mag_ak', loaded: 31 }));
+  assert.ok(near(four - two, 2 * rifle, 1e-6), `two rifles in the pack weigh ${(four - two).toFixed(2)} kg more, and two loaded AKs weigh ${(2 * rifle).toFixed(2)}`);
+  assert.ok(breathOf(four) < breathOf(two) && breathOf(two) < breathOf(one), 'a rifle more costs no breath');
+  // (and nobody is slowed on their feet by it: that begins far above anything a pack of rifles comes to)
+  assert.equal(paceOf(four), 1);
+  // a pack of nothing but rifles, by itself: three Mosins across it
+  const pack = new PlayerInventory();
+  pack.add(makeItem('suitcase'));
+  for (let k = 0; k < 3; k++) assert.equal(pack.cargoOf(pack.slots.back!)!.add(loadGun(makeItem('mosin'), 999)), null);
+  const full = itemWeight(pack.slots.back!);
+  assert.ok(full > 12 && full > LOAD.free, `a rucksack of three Mosins weighs ${full.toFixed(1)} kg: it costs nothing`);
+  const pc = (kg: number) => `${kg.toFixed(1)} kg, a breath runs ${Math.round(breathOf(kg) * 100)}% as far`;
+  console.log(`      (a rifleman with the rucksack: ${pc(one)}; with a second rifle on his back: ${pc(two)}; with two more in the pack: ${pc(four)}; a rucksack of three Mosins by itself: ${full.toFixed(1)} kg)`);
+});
+
 console.log(`\n${n} checks passed`);

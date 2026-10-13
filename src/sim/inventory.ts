@@ -926,8 +926,10 @@ export function cleanItem(raw: unknown, name: (v: unknown) => string, depth = 0)
   const room = holds(def.id);
   if (room && Array.isArray(r.cargo)) {
     it.cargo = [];
-    // (As many things as it has cells, and no fewer. It was forty whatever the thing: a full rucksack is forty-two
-    // single things and a stash case forty-eight, and the last of them were dropped every time they were read.)
+    // (As many things as it has cells, and no fewer. It was forty whatever the thing: a full rucksack was forty-two
+    // single things then and a stash case forty-eight, and the last of them were dropped every time they were read.
+    // The most any one thing holds is sixty-three since 2026-10-13, the rucksack: still by its cells, and so never
+    // to be bounded by a count written here.)
     for (const p of r.cargo.slice(0, room[0] * room[1])) {
       const inner = cleanItem(p?.item, name, depth + 1);
       if (inner && num(p.x) && num(p.y)) it.cargo.push({ item: inner, x: p.x, y: p.y, rot: !!p.rot });

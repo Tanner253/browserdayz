@@ -640,7 +640,10 @@ export class InventoryUI {
     // how many things lie in it and whether it still takes any. It is drawn whole, as tall as what is in it and a
     // few rows more, and is scrolled to with everything else on this side; narrower than itself, it scrolls sideways.
     const hold = c === this.inv.theHold;
-    box.className = 'inv-gridbox' + (shut ? ' shut' : '') + (hold ? ' inv-hold' : '');
+    // (A grid nine across or more, a Field Rucksack since 2026-10-13 and the hold, is wider than the narrower side
+    // of this screen has room for when it is opened there, on a body: it is marked, and scrolls sideways by itself
+    // wherever it stands in less room than it is wide. Nothing is ever off the edge.)
+    box.className = 'inv-gridbox' + (shut ? ' shut' : '') + (hold ? ' inv-hold' : '') + (c.w >= 9 ? ' wide' : '');
     const said = hold ? `${c.items.length} thing${c.items.length === 1 ? '' : 's'} · ${this.inv.bottomless ? 'never fills' : 'shut'}` : c === this.inv.tags ? `${c.items.length} / ${c.w * c.h} · taken off others` : `${used} / ${c.w * c.h}`;
     const tip = hold ? (this.inv.bottomless ? 'An admin’s power is on: whatever finds no room in what you wear goes in here, and there is always room. /bottomless off puts it off. ' : 'The power is off: nothing more goes in here, and what is in it can be taken out. ') : '';
     box.innerHTML = `<h4 title="${tip}${shut ? 'Open it' : 'Fold it away'}"><i>${shut ? '▸' : '▾'}</i>${c.name}${where ? `<small>${where}</small>` : ''} <span>${said}</span></h4>`;
