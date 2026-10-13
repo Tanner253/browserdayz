@@ -94,8 +94,10 @@ for (let k = 0; k < 8 && !saved && !dry; k++) {
   }
 }
 if (dry) {
+  // (a commit that is on no branch yet: a server that knows of this refuses it, and one that does not has no such page)
   const r = await fetch(`${SERVER}/deploying?sha=${head}`).catch(() => null);
-  say(`  (dry) the live server answers ${r?.status ?? 'nothing'} when told a deploy is coming${r?.status === 404 ? ': it is from before this and cannot be made to save' : ''}`);
+  const knows = await r?.json().then((j) => typeof j?.ok === 'boolean').catch(() => false);
+  say(`  (dry) the live server ${knows ? 'can be told a deploy is coming, and would save' : 'is from before this and CANNOT be made to save: a push at it rests on its last word alone'}`);
   process.exit(0);
 }
 let savedAt = NaN;
