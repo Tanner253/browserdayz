@@ -3,8 +3,11 @@
 // No network, no real key, no money. `npx tsx test/payouts.test.ts`
 
 import assert from 'node:assert/strict';
-import { address, b58, seeded } from '../api/_lib/solana';
-import { claimIfDue, config, handle, price, readBook, refOf, snapshot, sweep, type Book, type Entry } from '../api/_lib/payouts';
+import http from 'node:http';
+import { address, b58, seeded, signed } from '../api/_lib/solana';
+import { LOT_MAX, RULES2_FROM, claimIfDue, config, dueOf, handle, payment, price, readBook, refOf, snapshot, sweep, termsOf, type Book, type Entry, type Outcome } from '../api/_lib/payouts';
+import { record } from '../api/cashin';
+import { show } from '../api/cashins';
 import { MemoryStore, check } from '../api/_lib/store';
 import { FEE, KEY, RENT, SEED, SOL, TREASURY, attempts, got, parse, tag, tries, wallet, world } from './fake';
 
