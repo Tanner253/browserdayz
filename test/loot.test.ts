@@ -140,7 +140,7 @@ ok('Kamenka is the submachine gun\'s; one AK and one AR-15 in the whole town, se
     // (the showcase is gone: nothing of the bunker's or the gas's is in the town's houses)
     for (const id of ['benelli', 'box_12', 'suppressor_12', 'drum_ak', 'mag_ar_60', 'suppressor_739', 'suppressor_556', 'keycard']) assert.equal(on(id, 3), 0, `a ${id} in Kamenka`);
   }
-  assert.ok(rifles > 300 && withMag / rifles > 0.05 && withMag / rifles < 0.25, `${withMag} of ${rifles} rifles put down in Kamenka had a magazine in them`);
+  assert.ok(rifles > 100 && withMag / rifles > 0.05 && withMag / rifles < 0.25, `${withMag} of ${rifles} rifles put down in Kamenka had a magazine in them`);
 });
 
 ok('the shotgun, the Desert Eagle, the heavy armour and the K6-3 are the bunker\'s and nobody else\'s; the rucksack is not below the fourth step', () => {

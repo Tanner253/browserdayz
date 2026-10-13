@@ -301,6 +301,12 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 .vital[data-band="low"] { color: #e09356; }
 .vital[data-band="crit"] { color: #ff5a44; }
 .vital[data-band="crit"] b, .vital[data-band="crit"] svg { animation: pulse 1s infinite; }
+/* blood: its own bar under health. Losing it, the drop beats; a bag running in, it is green */
+.vital[data-k="blood"] svg { color: #d8584a; }
+.vital[data-k="blood"].losing { color: #ff5a44; }
+.vital[data-k="blood"].losing svg { animation: pulse 0.8s infinite; }
+.vital[data-k="blood"].gaining { color: #8fd49a; }
+.vital[data-k="blood"].gaining svg { color: #8fd49a; }
 .vital.bleed { display: none; grid-template-columns: 17px 1fr; color: #ff4a3a; font-size: 12px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; }
 .vital.bleed svg { animation: pulse 0.8s infinite; }
 .vital.bleed.show { display: grid; }

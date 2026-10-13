@@ -4398,6 +4398,46 @@
    "hi": "assets/models/hi/lab_table.glb",
    "hiBytes": 5170604,
    "hiCard": 213
+  },
+  "blood_bag": {
+   "url": "assets/models/blood_bag.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 275556,
+   "srcTris": 11512,
+   "tris": 930,
+   "min": [
+    -0.12,
+    0,
+    -0.065
+   ],
+   "max": [
+    0.12,
+    0.0218,
+    0.065
+   ],
+   "lods": []
+  },
+  "saline_bag": {
+   "url": "assets/models/saline_bag.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 229844,
+   "srcTris": 11512,
+   "tris": 930,
+   "min": [
+    -0.12,
+    0,
+    -0.065
+   ],
+   "max": [
+    0.12,
+    0.0218,
+    0.065
+   ],
+   "lods": []
   }
  }
 }

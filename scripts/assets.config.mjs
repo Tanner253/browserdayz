@@ -486,6 +486,12 @@ export const LOCAL_MODELS = {
     tags: ['loot', 'gear'],
     changes: 'Scaled to metres and stood on the ground; brought down to about fourteen thousand triangles; textures re-encoded as WebP, the flat-coloured ones at a small size; geometry compressed.',
   },
+  // The two bags of a drip (2026-10-13: "we need blood bags with iv's now to recover blood faster"). Out of "IV
+  // Supplies", one of the downloads the user brought in for the hospital on 2026-10-11 and not used until now.
+  blood_bag: { dir: 'iv_supplies', only: /^Blood_Bag_flat/, size: 0.24, tex: 1024, tags: ['loot'], changes: 'Only the bag of blood lying flat is used, scaled to metres and stood on the ground; textures re-encoded as WebP; geometry compressed.' },
+  // (The pack's own bag of saline is clear plastic, drawn see-through: lying in a pocket or on a shelf it was a
+  // shadow. The saline here is the bag of blood with its colour turned from red to the pale blue of salt water.)
+  saline_bag: { dir: 'iv_supplies', only: /^Blood_Bag_flat/, size: 0.24, tex: 1024, dye: { hue: 205, saturation: 0.4, brightness: 2.3 }, tags: ['loot'], changes: 'Only the bag lying flat is used, scaled to metres and stood on the ground, and its colour turned from red to pale blue; textures re-encoded as WebP; geometry compressed.' },
   syringe: {
     dir: 'syringe',
     only: /Syringe/,

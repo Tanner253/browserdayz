@@ -3,6 +3,7 @@
 
 import { offer, type Offer, type Pick, type Role } from '../net/orders';
 import type { Vitals } from '../game/player';
+import { bloodLeft } from '../sim/blood';
 import { BACK_SHORT, BACK_WHY, mountUpdates } from './updates';
 import { MAX_STAMINA, type ChatChannel } from '../net/protocol';
 import { ACTIONS, KEY_GROUPS, SENS, bind, bindable, controls, keyName, keyOf, relabel, setControls, shown, type Controls } from '../core/keys';
@@ -122,6 +123,7 @@ export class HUD {
       <div class="hud-vitals">
         <div class="vital bleed" data-k="bleed">${svg(ICONS.blood)}<span>Bleeding</span></div>
         <div class="vital" data-k="health" title="Health">${svg(ICONS.health)}<div class="vital-bar"><i></i></div><b>100</b></div>
+        <div class="vital" data-k="blood" title="Blood: a wound takes this, not your health. Dead when it is gone">${svg(ICONS.blood)}<div class="vital-bar"><i></i></div><b>100</b></div>
         <div class="vital" data-k="energy" title="Food">${svg(ICONS.food)}<div class="vital-bar"><i></i></div><b>100</b></div>
         <div class="vital" data-k="water" title="Water">${svg(ICONS.water)}<div class="vital-bar"><i></i></div><b>100</b></div>
       </div>
@@ -1294,6 +1296,8 @@ export class HUD {
 
   update(s: {
     vitals: Vitals;
+    /** a bag of blood or saline is running in */
+    drip: boolean;
     /** out of breath: no sprinting until the bar has come back a way */
     winded: boolean;
     /** seconds of adrenaline left (0 = none) */
@@ -1395,7 +1399,8 @@ export class HUD {
     // three faint icons that only changed colour, and nobody could tell how much they had.)
     const v = s.vitals;
     const band = (x: number) => (x > 70 ? 'ok' : x > 40 ? 'mid' : x > 15 ? 'low' : 'crit');
-    for (const [k, val] of [['health', v.health], ['energy', v.energy], ['water', v.water]] as [string, number][]) {
+    // (blood as how much of what can be lost is left: five litres, and dead at half, is a hundred down to none)
+    for (const [k, val] of [['health', v.health], ['blood', bloodLeft(v.blood) * 100], ['energy', v.energy], ['water', v.water]] as [string, number][]) {
       // (never "0" on somebody still alive)
       const n = String(Math.max(0, Math.min(100, Math.ceil(val))));
       if (this.last[`vital ${k}`] === n) continue;
@@ -1407,6 +1412,10 @@ export class HUD {
     }
     const bleed = e.vitals.querySelector('[data-k="bleed"]') as HTMLElement;
     this.toggle(bleed, 'show', v.bleeding);
+    // (the bar of what is running out runs red while it does, and green while a bag runs in)
+    const blood = e.vitals.querySelector('[data-k="blood"]') as HTMLElement;
+    this.toggle(blood, 'losing', v.bleeding);
+    this.toggle(blood, 'gaining', !v.bleeding && s.drip);
     // and said in words, with the key to press: an icon in the corner is easy to bleed out under
     this.toggle(e.bleed, 'show', s.bleed !== null);
     this.toggle(e.bleedfx, 'show', s.bleed !== null);

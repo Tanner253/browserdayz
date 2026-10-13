@@ -18,6 +18,9 @@
 //            `{ tall, drop(a, b, c) }`: a triangle is taken out when `drop` says yes to its three corners ([x, y, z] each)
 //   plain  – its glint map is left out (a thing seen small, whose map is mostly of what was cut away): `metal`, `rough` say what it is instead
 //   both   – it is a shell, seen from inside as well as out
+//   dye    – its colour picture is turned to another colour: `{ hue, saturation, brightness }`, as sharp's `modulate`
+//            takes them (degrees round the wheel, and a multiple of each of the others). One download, two things:
+//            a bag of blood, and the same bag with salt water in it
 //   bare   – of its pictures only its colour and its relief are kept: the game paints it with those two and nothing else
 //            (a building hung whole: see `whole:` in src/world/buildings.ts), so the others are so many megabytes nobody sees
 // A piece on a skeleton is taken as the skeleton holds it when nothing is moving.
@@ -181,6 +184,13 @@ export async function processProp(id, cfg, { io, SRC, OUT, FORCE, exists, countT
       if (cfg.bare) {
         m.setOcclusionTexture(null);
         m.setEmissiveTexture(null);
+      }
+      if (cfg.dye) {
+        const t = m.getBaseColorTexture();
+        if (t && !t.getExtras().dyed) {
+          t.setImage(new Uint8Array(await sharp(Buffer.from(t.getImage())).modulate(cfg.dye).png().toBuffer())).setMimeType('image/png');
+          t.setExtras({ ...t.getExtras(), dyed: true });
+        }
       }
       // (a model that came as bare colour, lighter than the thing is: its colour darkened by this much)
       if (cfg.shade !== undefined) m.setBaseColorFactor(m.getBaseColorFactor().map((v, k) => (k < 3 ? v * cfg.shade : v)));

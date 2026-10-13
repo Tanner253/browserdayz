@@ -31,7 +31,7 @@ const many = (n: number, t: KitThing): KitThing[] => Array.from({ length: n }, (
 /** worn by every kit: the helmet and the plates that stop the most, a mask for the gas, the biggest pack, gloves and boots */
 const WORN: KitThing[] = ['helmet_k63', 'gasmask', 'heavy_armor', 'suitcase', 'work_gloves', 'rubber_boots'].map((id) => ({ id }));
 /** and carried by every kit: something to mend with, to eat and drink, to see and find the way with */
-const CARE: KitThing[] = [{ id: 'firstaid' }, { id: 'bandage', qty: 5 }, { id: 'stim', qty: 3 }, { id: 'stim_stamina', qty: 3 }, { id: 'splint' }, { id: 'beans' }, { id: 'flask' }, { id: 'binoculars' }, { id: 'compass' }, { id: 'radio' }, ...many(2, { id: 'grenade' })];
+const CARE: KitThing[] = [{ id: 'firstaid' }, { id: 'bandage', qty: 5 }, { id: 'stim', qty: 3 }, { id: 'stim_stamina', qty: 3 }, { id: 'blood_bag' }, { id: 'saline' }, { id: 'splint' }, { id: 'beans' }, { id: 'flask' }, { id: 'binoculars' }, { id: 'compass' }, { id: 'radio' }, ...many(2, { id: 'grenade' })];
 
 const M9: KitThing = { id: 'm9', mag: 'mag_m9_ext', loaded: 21, mods: ['red_dot', 'suppressor_9', 'gun_light'] };
 const MPA: KitThing = { id: 'mpa', mag: 'mag_mpa', loaded: 31, mods: ['red_dot', 'suppressor_9', 'gun_light'] };
@@ -63,6 +63,6 @@ export const KITS: Kit[] = [
   },
   {
     id: 'supplies', name: 'Supplies', does: 'Dressings, stims, first aid, splints, food and water: added to what is carried', adds: true,
-    things: [...many(2, { id: 'firstaid' }), ...many(2, { id: 'bandage', qty: 5 }), ...many(2, { id: 'stim', qty: 3 }), ...many(2, { id: 'stim_stamina', qty: 3 }), ...many(2, { id: 'splint' }), { id: 'beans' }, { id: 'sardines' }, { id: 'condensed' }, { id: 'water_jug' }, { id: 'flask' }],
+    things: [...many(2, { id: 'firstaid' }), ...many(2, { id: 'bandage', qty: 5 }), ...many(2, { id: 'stim', qty: 3 }), ...many(2, { id: 'stim_stamina', qty: 3 }), ...many(2, { id: 'blood_bag' }), ...many(2, { id: 'saline' }), ...many(2, { id: 'splint' }), { id: 'beans' }, { id: 'sardines' }, { id: 'condensed' }, { id: 'water_jug' }, { id: 'flask' }],
   },
 ];

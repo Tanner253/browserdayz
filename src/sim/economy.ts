@@ -234,11 +234,16 @@ export const TYPES: Record<string, TypeRule> = {
   // ------------------------------------------------------------ medical: the clinic and the hospital
   // (What stops bleeding is what a fight is lost for want of: a bandage is in houses, shops and barracks too.)
   // A clinic leans on bandages and stims, with a kit or two; the hospital is where the kits are, and stims by the shelf.
-  bandage: { at: [16, 34, 26, 3, 3], lifetime: 2400, restock: 240, usage: ['Medic', 'Hospital', 'Shop', ...HOMES, 'Military', 'Police', 'Hunting', 'Farm'], favour: { Medic: 26, Hospital: 2, Shop: 1.5, Military: 2 } },
-  stim: { at: [0, 20, 60, 4, 4], lifetime: 3000, restock: 360, usage: ['Medic', 'Hospital', 'Military', 'Police', ...HOMES], favour: { Medic: 16, Hospital: 6, Military: 3, Police: 2 } },
+  bandage: { at: [16, 34, 26, 2, 3], lifetime: 2400, restock: 240, usage: ['Medic', 'Hospital', 'Shop', ...HOMES, 'Military', 'Police', 'Hunting', 'Farm'], favour: { Medic: 26, Hospital: 2, Shop: 1.5, Military: 2 } },
+  stim: { at: [0, 20, 60, 3, 4], lifetime: 3000, restock: 360, usage: ['Medic', 'Hospital', 'Military', 'Police', ...HOMES], favour: { Medic: 16, Hospital: 6, Military: 3, Police: 2 } },
   // (the yellow one, for the breath: see items.ts. A soldier's thing as much as a nurse's.)
-  stim_stamina: { at: [0, 8, 24, 2, 2], lifetime: 3000, restock: 360, usage: ['Medic', 'Hospital', 'Military', 'Police'], favour: { Medic: 10, Hospital: 5, Military: 4 } },
+  stim_stamina: { at: [0, 8, 24, 1, 2], lifetime: 3000, restock: 360, usage: ['Medic', 'Hospital', 'Military', 'Police'], favour: { Medic: 10, Hospital: 5, Military: 4 } },
   firstaid: { at: [0, 5, 55, 3, 3], lifetime: 3600, restock: 600, usage: ['Hospital', 'Medic', 'Military', 'Police'], favour: { Hospital: 14, Medic: 3 } },
+  // What gives blood back (2026-10-13; src/sim/blood.ts): saline in a clinic and the hospital, and with the army's
+  // medics; blood in the hospital before anywhere, a bag or two in a clinic's fridge, and where the best of
+  // everything is. (Under the gas every place is spoken for: a stim and a dressing there have made way for them.)
+  saline: { at: [0, 6, 14, 1, 2], lifetime: 3600, restock: 420, usage: ['Medic', 'Hospital', 'Military'], favour: { Medic: 10, Hospital: 5 } },
+  blood_bag: { at: [0, 2, 12, 2, 3], lifetime: 3600, restock: 600, usage: ['Hospital', 'Medic', 'Military'], favour: { Hospital: 12, Medic: 4 } },
   // (what sets a broken leg and does nothing else: where there are ladders and lofts to fall off, too)
   splint: { at: [5, 10, 24, 1, 2], lifetime: 3600, restock: 420, usage: ['Medic', 'Hospital', 'Shop', ...HOMES, 'Farm', 'Hunting', 'Industrial', 'Police'], favour: { Medic: 6, Hospital: 4, Shop: 2 } },
   // ------------------------------------------------------------ what is worn and carried
@@ -299,7 +304,7 @@ const UNSORTED = 4;
  */
 const FIRST = [
   'gasmask', 'benelli', 'mosin', 'ak', 'ar15', 'suppressor_12', 'suitcase', 'heavy_armor', 'life_vest', 'armor_vest', 'bat', 'crowbar', 'shovel', 'machete', 'hatchet',
-  'mpa', 'colt', 'm9', 'mag_mpa', 'mag_colt', 'mag_m9', 'firstaid', 'stim', 'stim_stamina', 'bandage',
+  'mpa', 'colt', 'm9', 'mag_mpa', 'mag_colt', 'mag_m9', 'firstaid', 'blood_bag', 'stim', 'stim_stamina', 'saline', 'bandage',
 ];
 
 

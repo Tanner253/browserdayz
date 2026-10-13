@@ -131,7 +131,7 @@ export function fillDrop(c: Container, rnd: () => number = Math.random) {
   // (twice what it brought, 2026-10-11: it is a long way out now, and worth the walk)
   const n = 2 * (2 + Math.floor(rnd() * 2));
   for (let i = 0; i < n; i++) put(pick(extras, rnd));
-  for (const id of ['firstaid', 'stim', 'stim_stamina', 'box_762', 'keycard']) put(id);
+  for (const id of ['firstaid', 'stim', 'stim_stamina', 'blood_bag', 'box_762', 'keycard']) put(id);
   // one of the automatic guns, loaded, with its magazines, its rounds and two things to fit to it
   const show = BRINGS[Math.floor(rnd() * BRINGS.length)];
   put(show.gun);

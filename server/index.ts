@@ -34,6 +34,7 @@ import { BARREL } from '../src/sim/barrels';
 import { JEEP, POLICE_CAR, SEATS, crashDamage, restState, type VehicleInfo, type VState } from '../src/sim/vehicles';
 import { Director, INFECTED, guarded, infectedDrop } from '../src/sim/infected';
 import { EMOTE, EMOTE_GAP, SHOUT_RANGE } from '../src/sim/emotes';
+import { BLOOD, bleedOf, bloodOf, withWound, woundOf } from '../src/sim/blood';
 import { ACTS, CHAT_RANGE, F_BLEED, F_DEAD, F_GROUND, F_GUARD, F_SIT, MAX_STAMINA, PROTOCOL, type C2S, type CorpseInfo, type KillInfo, type PlayerInfo, type Pose, type S2C, type Slung, type StashInfo, type StoredItem, type Vitals } from '../src/net/protocol';
 import { ORDERS, written } from '../src/net/orders';
 import { KITS } from '../src/sim/kits';
@@ -642,7 +643,7 @@ const SILENT_MS = 1500;
 const LINGER_MS = (process.env.LINGER_S === undefined ? 300 : Math.max(0, Number(process.env.LINGER_S) || 0)) * 1000;
 const LOGOUT_MS = (process.env.LOGOUT_S === undefined ? 60 : Math.max(0, Number(process.env.LOGOUT_S) || 0)) * 1000;
 /** how far somebody waiting to leave may shift before the wait is off, metres; and how long an open wound runs by itself, seconds */
-const LOGOUT_STIR = 1.5, BLEED_S = 42;
+const LOGOUT_STIR = 1.5;
 
 const away = (c: Client, now = Date.now()) => c.asleep > 0 || now - c.heardAt > SILENT_MS;
 /** a life new to the world leaves no body behind if its connection goes this soon; and a connection whose game has said nothing of where it is by this long after it was let in is not a game, and goes (ms) */
@@ -781,15 +782,24 @@ const worn = (c: Client, k: 'armor' | 'head') => Object.values(c.inv?.slots ?? {
 /** Something has hit somebody whose game is not answering: it comes off the health the server holds for them. */
 function keep(c: Client, amount: number, zone: string, w: string) {
   if (!c.alive || !away(c)) return;
-  const v = (c.vitals ??= { health: 100, energy: 80, water: 80, stamina: MAX_STAMINA, bleeding: false });
+  const v = (c.vitals ??= { health: 100, energy: 80, water: 80, stamina: MAX_STAMINA, bleeding: false, blood: BLOOD.full, bleed: 0 });
   let a = amount;
   if (w !== 'crash') for (const m of zone === 'torso' ? worn(c, 'armor') : zone === 'head' ? worn(c, 'head') : []) a *= m;
   v.health = Math.max(0, v.health - a);
   c.kept = true;
-  // (a round nearly always opens a wound, the infected and a blade often, a blast or a blow seldom)
-  if (w !== 'crash' && Math.random() < (ITEMS[w]?.weapon ? (a > 12 ? 0.85 : 0.4) : w === 'infected' ? INFECTED.bleed : 0.25)) v.bleeding = true;
+  // (A hit takes health; a wound takes blood, which is another thing: src/sim/blood.ts. A round takes a hundred of
+  // it going in, and nearly always opens a wound, the infected and a blade often, a blast or a blow seldom; and a
+  // wound bleeds by what made it and where, beside whatever others are open.)
+  const gun = !!ITEMS[w]?.weapon, blast = w === 'grenade' || w === 'barrel' || w === 'fire';
+  if (gun) v.blood = Math.max(0, bloodOf(v) - BLOOD.shot);
+  if (w !== 'crash' && Math.random() < (gun ? (a > 12 ? 0.85 : 0.4) : w === 'infected' ? INFECTED.bleed : 0.25)) {
+    v.bleed = withWound(v.bleeding ? bleedOf(v) : 0, woundOf(gun ? 'shot' : w === 'infected' ? 'bite' : blast ? 'blast' : 'blunt', zone));
+    v.bleeding = true;
+    c.bled = 0;
+  }
   // (after whoever dealt it has been told it landed)
   if (v.health <= 0) setImmediate(() => kill(c, w === 'infected' ? 'the infected' : ITEMS[w]?.name ? 'wounds' : w));
+  else if (bloodOf(v) <= BLOOD.dead) setImmediate(() => kill(c, 'blood loss'));
 }
 
 /** Once a second: the wounds of those whose lives the server is keeping, the bodies left behind whose time is up, and the waits to leave that are over. */
@@ -818,13 +828,17 @@ function keeping(now: number) {
     if (!c.alive || !away(c, now)) continue;
     const v = c.vitals;
     if (!v?.bleeding) continue;
+    // (their wounds go on bleeding while their game says nothing: blood, by what the wounds cost, and it closes
+    // by itself in the end as it does for anybody. It took a health a second, and stopped after forty-two.)
     c.kept = true;
-    v.health = Math.max(0, v.health - 1);
-    if (++c.bled > BLEED_S) {
+    v.bleed = bleedOf(v);
+    v.blood = Math.max(0, bloodOf(v) - v.bleed);
+    if (++c.bled > BLOOD.clots) {
       v.bleeding = false;
+      v.bleed = 0;
       c.bled = 0;
     }
-    if (v.health <= 0) kill(c, 'blood loss');
+    if (v.blood <= BLOOD.dead) kill(c, 'blood loss');
   }
 }
 setInterval(() => keeping(Date.now()), 1000);
@@ -2685,7 +2699,7 @@ function handle(c: Client, m: C2S) {
       if (c.kept) {
         c.kept = false;
         c.bled = 0;
-        if (c.alive && c.vitals) send(c, { t: 'hp', health: c.vitals.health, bleeding: !!c.vitals.bleeding });
+        if (c.alive && c.vitals) send(c, { t: 'hp', health: c.vitals.health, bleeding: !!c.vitals.bleeding, blood: bloodOf(c.vitals), bleed: c.vitals.bleeding ? bleedOf(c.vitals) : 0 });
       }
       c.heardAt = Date.now();
       c.spoke = true;
@@ -3049,7 +3063,12 @@ function handle(c: Client, m: C2S) {
       if (v && num(v.health)) c.check.hp = Math.min(c.check.hp, Math.max(0, v.health) + 1);
       // (and while the server is keeping their life for them, what their game says puts no health back)
       const held = c.kept && c.vitals ? c.vitals : null;
-      if (v && num(v.health) && num(v.energy) && num(v.water)) c.vitals = { health: held ? Math.min(held.health, v.health) : v.health, energy: v.energy, water: v.water, stamina: num(v.stamina) ? v.stamina : MAX_STAMINA, bleeding: held ? held.bleeding || !!v.bleeding : !!v.bleeding, broken: !!v.broken };
+      if (v && num(v.health) && num(v.energy) && num(v.water)) {
+        // (nor any blood, and no wound of theirs is closed by it)
+        const bleeding = held ? held.bleeding || !!v.bleeding : !!v.bleeding;
+        const bleed = bleeding ? Math.max(held?.bleeding ? bleedOf(held) : 0, v.bleeding ? bleedOf(v) : 0) : 0;
+        c.vitals = { health: held ? Math.min(held.health, v.health) : v.health, energy: v.energy, water: v.water, stamina: num(v.stamina) ? v.stamina : MAX_STAMINA, bleeding, blood: held ? Math.min(bloodOf(held), bloodOf(v)) : bloodOf(v), bleed, broken: !!v.broken };
+      }
       return;
     }
     case 'died': {
@@ -3364,7 +3383,7 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
     // (the hour is the wall clock's: every game on the server is at the same one, and a restart does not put it back)
     hour: phaseOf(Date.now() / 1000),
     spawn: sp,
-    me: resume ? { inv: resume.inv!, vitals: resume.vitals ?? { health: 100, energy: 80, water: 80, stamina: MAX_STAMINA, bleeding: false } } : null,
+    me: resume ? { inv: resume.inv!, vitals: resume.vitals ?? { health: 100, energy: 80, water: 80, stamina: MAX_STAMINA, bleeding: false, blood: BLOOD.full, bleed: 0 } } : null,
     max: MAX_PLAYERS,
   });
   // (a restart is on its way: whoever comes in before it happens is told as the others were)

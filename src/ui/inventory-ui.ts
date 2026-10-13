@@ -10,6 +10,7 @@
 // equip, use or take it) and the ground (the whole left column). Over a grid the outline is where it will land,
 // which is the nearest free spot to the pointer, not only the cell under it.
 
+import { BLOOD, bloodLeft } from '../sim/blood';
 import { GEAR_SLOTS, ITEMS, SLOT_KIND, SLOT_LABEL, TAG_HOLD_MIN, WEAPON_SLOTS, makeItem, type AttachSlot, capacityOf, handlingOf, itemName, itemWeight, magRoom, tagClock, tagOwner, type ItemInstance, type Slot, holds } from '../sim/items';
 import { Container, splitPile, swapPlaces, type PlayerInventory } from '../sim/inventory';
 import type { WorldItem, Stash } from '../game/loot';
@@ -536,7 +537,7 @@ export class InventoryUI {
     if (this.vitals) {
       const v = this.vitals;
       const bar = (label: string, val: number, cls: string) => `<div class="vbar ${cls}"><span>${label}</span><div><i style="width:${Math.max(0, Math.min(100, val))}%"></i></div><b>${Math.round(val)}</b></div>`;
-      cargo.insertAdjacentHTML('beforeend', `<div class="inv-status"><h3>Status</h3>${bar('Health', v.health, v.health < 30 ? 'bad' : '')}${bar('Energy', v.energy, v.energy < 25 ? 'bad' : '')}${bar('Water', v.water, v.water < 25 ? 'bad' : '')}${v.bleeding ? '<div class="bleeding">Bleeding: use a bandage</div>' : ''}</div>`);
+      cargo.insertAdjacentHTML('beforeend', `<div class="inv-status"><h3>Status</h3>${bar('Health', v.health, v.health < 30 ? 'bad' : '')}${bar('Blood', bloodLeft(v.blood) * 100, v.bleeding || v.blood < BLOOD.faint ? 'bad' : '')}${bar('Energy', v.energy, v.energy < 25 ? 'bad' : '')}${bar('Water', v.water, v.water < 25 ? 'bad' : '')}${v.bleeding ? '<div class="bleeding">Bleeding: use a bandage</div>' : ''}</div>`);
     }
 
     wrap.append(vic, gear, cargo);

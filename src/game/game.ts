@@ -26,7 +26,8 @@ import { EMOTE, EMOTES, EMOTE_GAP, SAY_RANGE, SAY_TIME, voiceOf } from '../sim/e
 import { loadSave, writeSave, type SaveData } from '../sim/save';
 import { Net, playerName, publicId, remoteServer, serverStatus, setPlayerName, personKey } from '../net/client';
 import { F_AIM, F_BLEED, F_CROUCH, F_DANCE, F_DEAD, F_GROUND, F_GUARD, F_LEAN_L, F_LEAN_R, F_LIMP, F_LIGHT, F_PRONE, F_SEAT, F_SIT, F_SPRINT, F_SURRENDER, MAX_STAMINA, PROTOCOL, crateId, type Act, type CorpseInfo, type PlayerInfo, type Pose, type StoredItem, type S2C, type StashInfo } from '../net/protocol';
-import { Player } from './player';
+import { Player, freshVitals } from './player';
+import { BLOOD, bleedOf, bloodOf, greyOf, woundOf } from '../sim/blood';
 import { Avatar, AVATAR_LAYER, DEATH_REST, FP_BODY_LAYER, GEAR_SHOWN, type Hold, facepiece } from './avatar';
 import { lookFor } from './look';
 import { roadLift } from '../world/road';
@@ -1078,7 +1079,7 @@ export class Game {
       for (let k = 0; k < 2; k++) this.inv.add(makeMag('mag_ar', 30));
       this.weapons.validate();
       this.autoHot();
-      this.player.vitals = { health: 100, energy: 80, water: 80, stamina: MAX_STAMINA, bleeding: false };
+      this.player.vitals = freshVitals();
       this.player.god = true;
       this.started = true;
       this.menu.dispose();
@@ -1140,7 +1141,9 @@ export class Game {
     // one dressing: the first wound is survivable, the second is yours to deal with
     this.inv.add(makeItem('bandage'));
     this.inv.neck = this.makeTag();
-    this.player.vitals = { health: 100, energy: 80, water: 80, stamina: MAX_STAMINA, bleeding: false };
+    this.player.vitals = freshVitals();
+    this.player.drip.left = 0;
+    this.bloodSaid = 0;
     this.player.boost = 0;
     this.ready = null;
     this.inHand = null;
@@ -1359,7 +1362,7 @@ export class Game {
     const p = save.player;
     if (p && sameMap) {
       this.player.spawn(p.x, p.y + 0.05, p.z, p.yaw);
-      Object.assign(this.player.vitals, p.vitals);
+      this.takeVitals(p.vitals);
       // pockets are smaller than they used to be: whatever no longer fits lands at your feet
       for (const it of this.inv.load(p.inventory)) this.dropItem(it, this.player.pos, 0.8);
       // (a save from when keys 5 to 8 were for kinds of thing to use: each kind is on the same key still, as the thing itself)
@@ -1430,7 +1433,7 @@ export class Game {
     this.player.spawn(w.spawn.x, y + 0.05, w.spawn.z, w.spawn.yaw);
     if (w.me) {
       for (const it of this.inv.load(w.me.inv)) this.dropItem(it, this.player.pos, 0.8);
-      Object.assign(this.player.vitals, w.me.vitals);
+      this.takeVitals(w.me.vitals);
       this.ensureTag();
       this.weapons.validate();
       this.autoHot();
@@ -1673,7 +1676,10 @@ export class Game {
       const p = this.player;
       if (p.dead) return;
       p.vitals.health = Math.max(1, Math.min(100, m.health));
-      if (m.bleeding && !p.vitals.bleeding) p.bleed();
+      // (and the blood it made of it: no more than this game had, and whatever wounds it counted beyond this game's)
+      p.vitals.blood = Math.min(p.vitals.blood, bloodOf(m));
+      const more = (m.bleeding ? bleedOf(m) : 0) - p.vitals.bleed;
+      if (more > 0) p.bleed(more);
       this.meDirty = true;
     });
     net.on('logout', (m) => {
@@ -2082,7 +2088,10 @@ export class Game {
     this.setHold(null);
     // a bullet nearly always opens a wound, a blade often, a fist or a bat seldom
     const blade = m.w === 'knife' || m.w === 'machete' || m.w === 'hatchet';
-    if (!p.dead && Math.random() < (sick ? INFECTED.bleed : melee ? (blade ? 0.6 : amount > 25 ? 0.25 : 0) : amount > 12 ? 0.85 : 0.4)) p.bleed();
+    // (and it bleeds by what made it and where: a round in the body more than one in an arm, a bite less than a
+    // blade; and a round takes a hundred of blood as it goes in, wound or no wound: src/sim/blood.ts)
+    if (!melee && !blast) p.spill(BLOOD.shot);
+    if (!p.dead && Math.random() < (sick ? INFECTED.bleed : melee ? (blade ? 0.6 : amount > 25 ? 0.25 : 0) : amount > 12 ? 0.85 : 0.4)) p.bleed(woundOf(sick ? 'bite' : blast ? 'blast' : melee ? (blade ? 'cut' : 'blunt') : 'shot', m.zone));
     // in the legs, a bullet as often as not breaks one, and so now and then does something swung (not their hands, and not a blast)
     if (!blast && !sick && m.w !== 'fists' && m.w !== 'jeep' && breaksOnHit(m.zone, melee, Math.random())) p.breakLeg();
     this.weapons.flinch(melee ? 0.5 : 1);
@@ -3165,8 +3174,13 @@ export class Game {
         this.hud.note(`Adrenaline: nothing costs you breath for ${u.boost} seconds`, 'good');
       }
       if (u.stopBleed && v.bleeding) {
-        v.bleeding = false;
+        this.player.staunch();
         this.hud.note('The bleeding has stopped', 'good');
+        this.meDirty = true;
+      }
+      if (u.blood) {
+        this.player.transfuse(u.blood, u.over ?? 1);
+        this.hud.note(v.bleeding ? `The bag is running in, and you are still bleeding: it will run out of you again` : `The bag is running in: ${u.blood} ml of blood over ${u.over ?? 1} seconds`, v.bleeding ? 'warn' : 'good');
         this.meDirty = true;
       }
       if (u.splint) {
@@ -3387,7 +3401,7 @@ export class Game {
         let amount = spec.damage * k;
         for (const a of this.inv.wear('armor')) amount *= a;
         p.damage(amount, jeep ? 'a burning wreck' : drum ? 'a fuel drum you set off' : 'your own grenade');
-        if (amount > 12) p.bleed();
+        if (amount > 12) p.bleed(woundOf('blast'));
         this.hud.hitFrom(p.yaw - Math.atan2(p.pos.x - at.x, p.pos.z - at.z));
         this.meDirty = true;
       }
@@ -4158,6 +4172,29 @@ export class Game {
   }
 
   /** What to do about an open wound, in as few words as it takes: the key that holds a dressing, if there is one. */
+  /** blood read back from a save or from the server: one kept from before there was any has all of it, and one wound if it was bleeding */
+  private takeVitals(from: Partial<Player['vitals']>) {
+    const v = this.player.vitals;
+    Object.assign(v, from);
+    v.blood = bloodOf(from);
+    v.bleed = v.bleeding ? bleedOf(from) : 0;
+    v.bleeding = v.bleed > 0;
+  }
+
+  /** how far down the blood has been said to be: 0 not said, 1 the colour going, 2 the head swimming */
+  private bloodSaid = 0;
+  /** Said once on the way down, and once on the way back up: what the grey and the closing edges mean, and what to do. */
+  private sayBlood() {
+    const p = this.player, b = p.vitals.blood;
+    if (p.dead || !this.started) return;
+    const at = b < BLOOD.faint ? 2 : b < BLOOD.grey[0] - 200 ? 1 : b >= BLOOD.grey[0] ? 0 : this.bloodSaid;
+    if (at === this.bloodSaid) return;
+    if (at > this.bloodSaid) this.hud.note(at === 2 ? 'You have lost too much blood: your head swims and you cannot run. A blood bag or saline puts it back; food, water and time do it slowly' : 'You are losing blood: the colour is going out of things. Stop the bleeding', 'warn');
+    else if (at === 0) this.hud.note('Your blood is back: the colour has come back to things', 'good');
+    else if (at === 1) this.hud.note('Your head has cleared: you can run again', 'good');
+    this.bloodSaid = at;
+  }
+
   private bleedHint(): string {
     if (this.use?.sound === 'bandage' || (this.use?.sound === 'inject' && !/Adrenaline/.test(this.use.label))) return 'Treating the wound…';
     const held = this.inHand && ITEMS[this.inHand.id].use?.stopBleed ? this.inHand : null;
@@ -4661,7 +4698,12 @@ export class Game {
     // post-fx reacting to state
     const hurt = p.hurt;
     r.chroma.offset.set(hurt * 0.004 + (v.health < 25 ? 0.0015 : 0), hurt * 0.002);
-    r.vignette.darkness = 0.42 + (this.weapons.aiming ? 0.12 : 0) + (v.health < 25 ? 0.25 : 0);
+    // (and the blood: the colour goes out of the world as it is lost, and below what a head can work on the edges
+    // of the picture close in and open again, slowly, as a pulse does)
+    const grey = p.dead || !this.started ? 0 : greyOf(v.blood);
+    r.grade.saturation = -0.08 - grey * 0.82;
+    r.vignette.darkness = 0.42 + (this.weapons.aiming ? 0.12 : 0) + (v.health < 25 ? 0.25 : 0) + (p.faint ? 0.3 + 0.14 * Math.sin(now / 520) : grey * 0.1);
+    this.sayBlood();
 
     const hasCompass = this.hasCompass;
     const heading = THREE.MathUtils.radToDeg(-p.yaw);
@@ -4688,6 +4730,7 @@ export class Game {
       head: this.weapons.headMarker,
       hurt,
       bleed: v.bleeding && !p.dead ? this.bleedHint() : null,
+      drip: p.drip.left > 0,
       heading: !uiOpen ? heading : null,
       bearing: hasCompass,
       progress: this.use ? { label: this.use.label, t: this.use.t / this.use.dur } : this.ready ? { label: `${ITEMS[this.ready.item.id].name}: ${this.touch ? 'fire to use it' : 'hold the left button to use it · its key again puts it away'}`, t: -1 } : null,

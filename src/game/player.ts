@@ -9,6 +9,7 @@ import type { Input, MoveInput } from '../core/input';
 import { audio } from '../core/audio';
 import type { Terrain } from '../world/terrain';
 import { LEAN_REACH, MAX_STAMINA } from '../net/protocol';
+import { BLOOD, bloodBack, mendsOn, withWound, woundOf } from '../sim/blood';
 import { LEG, breaksOnLanding } from '../sim/injury';
 
 const STAND_HALF = 0.56;
@@ -26,8 +27,6 @@ const EYE_CROUCH = 1.02;
 const EYE_SAT = 0.86;
 /** lying down, the chin just off the ground */
 const EYE_PRONE = 0.36;
-/** how long an untreated wound bleeds, seconds */
-const BLEED_TIME = 42;
 /** the gap the character controller keeps from whatever it stands on or touches */
 const SKIN = 0.03;
 /** how hard the body is held to the ground, m/s: a fall starts from this too */
@@ -48,10 +47,18 @@ export interface Vitals {
   energy: number;
   water: number;
   stamina: number;
+  /** a wound is open (it is `bleed` that says how fast it runs: this is that being more than nothing) */
   bleeding: boolean;
+  /** blood, ml: five litres, and dead at half of it. It is not health: see src/sim/blood.ts */
+  blood: number;
+  /** what every open wound together is costing, ml a second */
+  bleed: number;
   /** a broken leg: no running and no jumping until it is set, or has knitted (see src/sim/injury.ts) */
   broken?: boolean;
 }
+
+/** somebody whole: what a new life starts with */
+export const freshVitals = (): Vitals => ({ health: 100, energy: 80, water: 80, stamina: MAX_STAMINA, bleeding: false, blood: BLOOD.full, bleed: 0 });
 
 /** metres a second hurrying in a crouch: creeping is 1.9, a jog upright 4, a sprint 6.2 */
 const CROUCH_RUN = 3.3;
@@ -82,7 +89,9 @@ export class Player {
   /** lying down (Z): low, slow, steady, and hard to see */
   prone = false;
   lean = 0;
-  vitals: Vitals = { health: 100, energy: 85, water: 85, stamina: MAX_STAMINA, bleeding: false };
+  vitals: Vitals = { ...freshVitals(), energy: 85, water: 85 };
+  /** blood on its way in from a bag: how much is left to come, ml, and how fast */
+  drip = { left: 0, rate: 0 };
   dead = false;
   /** sitting in a jeep: carried, not walking (see Garage) */
   seated = false;
@@ -371,7 +380,8 @@ export class Player {
     this.sprintLock = Math.max(0, this.sprintLock - h);
     // (A sprint is begun on the ground and is not lost by leaving it: whoever jumps at a run comes down at a run.
     // It was lost: with the feet off the ground the pace fell toward a jog, a quarter of it gone by the landing.)
-    const fit = !this.winded && !v.broken && this.sprintLock <= 0 && (this.grounded || this.sprinting);
+    // (and nobody runs on the blood of a head that swims: see src/sim/blood.ts)
+    const fit = !this.winded && !v.broken && !this.faint && this.sprintLock <= 0 && (this.grounded || this.sprinting);
     this.sprinting = wantsSprint && fit;
     // Shift while crouched: a hurried crouch, well short of a sprint and well over a creep.
     // It takes breath as a sprint does (less of it), and the trigger stops it as it stops one.
@@ -535,7 +545,7 @@ export class Player {
     } else {
       // (breath comes back slower to whoever wants food or water, and slower still to whoever is in a bad way for either)
       const regen = 11 * NEED.breath[Math.max(stage(v.energy), stage(v.water))] * (this.crouched ? 1.3 : 1);
-      v.stamina = Math.min(MAX_STAMINA, v.stamina + regen * h);
+      v.stamina = Math.min(MAX_STAMINA, v.stamina + regen * (this.faint ? 0.5 : 1) * h);
     }
 
     // leaning (Q/E), blocked by walls
@@ -634,7 +644,7 @@ export class Player {
       const dmg = (s - 9.5) * 14 * this.fallMult;
       this.lastFall = { drop, speed: s };
       this.damage(dmg, 'fall');
-      if (s > 13) this.bleed();
+      if (s > 13) this.bleed(woundOf('fall'));
       // (boots that take a fall take it off the leg as well)
       if (breaksOnLanding(9.5 + (s - 9.5) * this.fallMult, Math.random())) this.breakLeg();
     }
@@ -664,18 +674,31 @@ export class Player {
     const exertion = this.god ? 0 : this.sprinting ? 2.4 : this.scurrying ? 1.8 : this.moving > 0.1 ? 1.3 : 1;
     v.energy = Math.max(0, v.energy - 0.045 * exertion * dt);
     v.water = Math.max(0, v.water - 0.07 * exertion * this.thirstMult * dt);
-    // An open wound costs about one health a second. Left alone it closes in the end, at a
-    // price most of a bandage's worth of health; a bandage stops it there and then.
+    // An open wound costs blood, and no health: the two are two things (src/sim/blood.ts). Left alone it closes
+    // in the end, five minutes on; a dressing closes it there and then.
     if (v.bleeding) {
-      this.damageQuiet(1.0 * dt, 'blood loss');
+      if (!this.god) v.blood = Math.max(0, v.blood - v.bleed * dt);
       this.bleedT += dt;
-      if (this.bleedT > BLEED_TIME && !this.dead) {
-        v.bleeding = false;
+      if (this.bleedT > BLOOD.clots) {
+        this.staunch();
         this.onClot();
       }
     } else this.bleedT = 0;
+    if (v.blood <= BLOOD.dead && !this.god) {
+      this.lastCause = 'blood loss';
+      this.dead = true;
+      return;
+    }
+    // what a bag gives, as it runs in; and what comes back by itself to whoever is fed and watered
+    if (this.drip.left > 0) {
+      const got = Math.min(this.drip.left, this.drip.rate * dt);
+      this.drip.left -= got;
+      v.blood = Math.min(BLOOD.full, v.blood + got);
+    }
+    v.blood = Math.min(BLOOD.full, v.blood + bloodBack(v.energy, v.water, v.bleeding) * dt);
     if (v.energy <= 0 || v.water <= 0) this.damageQuiet(0.35 * dt, v.water <= 0 ? 'thirst' : 'hunger');
-    else if (v.energy > 60 && v.water > 60 && !v.bleeding && v.health < 100) v.health = Math.min(100, v.health + 0.12 * dt);
+    // (health mends on good blood, at half on poor, and not at all on bad)
+    else if (v.energy > 60 && v.water > 60 && !v.bleeding && v.health < 100) v.health = Math.min(100, v.health + 0.12 * mendsOn(v.blood) * dt);
     if (this.hurtTimer > 0) this.hurtTimer -= dt;
     // a broken leg knits by itself in the end: nobody is left a cripple for the want of a roll of tape
     if (v.broken) {
@@ -709,8 +732,9 @@ export class Player {
     v.energy = 100;
     v.water = 100;
     v.stamina = MAX_STAMINA;
-    v.bleeding = false;
-    this.bleedT = 0;
+    v.blood = BLOOD.full;
+    this.drip.left = 0;
+    this.staunch();
     this.setLeg(true);
   }
 
@@ -736,10 +760,42 @@ export class Player {
     }
   }
 
-  /** a fresh wound (or a second one): the clock on it starts again */
-  bleed() {
-    this.vitals.bleeding = true;
+  /**
+   * A fresh wound, beside whatever others there are: together they bleed faster, and the clock on their closing
+   * starts again.
+   * @param rate what this one costs, ml a second (src/sim/blood.ts: `woundOf`)
+   * @param spilt what it took as it was made (a round takes a hundred going in)
+   */
+  bleed(rate = BLOOD.wound.torso, spilt = 0) {
+    const v = this.vitals;
+    if (this.god) return;
+    v.bleed = withWound(v.bleed, rate);
+    v.bleeding = v.bleed > 0;
+    v.blood = Math.max(0, v.blood - spilt);
     this.bleedT = 0;
+  }
+
+  /** blood lost at a stroke, with or without a wound left open (a round takes a hundred going in) */
+  spill(ml: number) {
+    if (!this.god && !this.dead) this.vitals.blood = Math.max(0, this.vitals.blood - ml);
+  }
+
+  /** every wound closed (a dressing, or time) */
+  staunch() {
+    this.vitals.bleed = 0;
+    this.vitals.bleeding = false;
+    this.bleedT = 0;
+  }
+
+  /** a bag hung and running in: so much blood, over so many seconds (a second bag begun while one runs adds to it) */
+  transfuse(ml: number, over: number) {
+    this.drip.left += ml;
+    this.drip.rate = Math.max(this.drip.rate, ml / Math.max(1, over));
+  }
+
+  /** the head swims: too little blood to run on */
+  get faint() {
+    return !this.dead && this.vitals.blood < BLOOD.faint;
   }
 
   get hurt() {

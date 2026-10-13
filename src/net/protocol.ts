@@ -65,6 +65,9 @@ export interface Vitals {
   water: number;
   stamina: number;
   bleeding: boolean;
+  /** blood, ml, and what every open wound together costs of it a second (src/sim/blood.ts). Not said by a game or a save from before 2026-10-13: all of it, then, and one wound if `bleeding`. */
+  blood?: number;
+  bleed?: number;
   /** a broken leg (see src/sim/injury.ts) */
   broken?: boolean;
 }
@@ -348,7 +351,7 @@ export type S2C =
    * What this player's health is, and whether a wound is open: said when their game is heard from again after the
    * server has been keeping their life for them (a hidden tab, a frozen game). The server's figure is the figure.
    */
-  | { t: 'hp'; health: number; bleeding: boolean }
+  | { t: 'hp'; health: number; bleeding: boolean; blood?: number; bleed?: number }
   /** leaving the proper way: so many seconds of the wait are left; or (0, with why) it has been called off */
   | { t: 'logout'; left: number; why?: string }
   /** a whole set handed over by an admin (see src/sim/kits.ts): put on and away in place of what is carried, or (adds) beside it */

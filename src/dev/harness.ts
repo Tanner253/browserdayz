@@ -8,7 +8,7 @@ import { heightAt } from '../world/worldgen';
 import { makeItem, type ItemInstance } from '../sim/items';
 import { Avatar, POSE } from '../game/avatar';
 import { lookFor } from '../game/look';
-import { MAX_STAMINA } from '../net/protocol';
+import { freshVitals } from '../game/player';
 import { DRIVE } from '../game/vehicle';
 import type { Game } from '../game/game';
 import { installLook } from './look';
@@ -91,7 +91,7 @@ export function installHarness(g: Game) {
     },
     revive() {
       const p = g.player;
-      p.vitals = { health: 100, energy: 80, water: 80, stamina: MAX_STAMINA, bleeding: false };
+      p.vitals = freshVitals();
       p.dead = false;
       if (g.paused && anyG.started) anyG.unpause();
     },
@@ -157,7 +157,7 @@ export function installHarness(g: Game) {
       inv.bind(4, first('box_739'));
       inv.bind(5, first('bandage'));
       inv.bind(6, first('stim'));
-      g.player.vitals = { health: 100, energy: 100, water: 100, stamina: MAX_STAMINA, bleeding: false };
+      g.player.vitals = { ...freshVitals(), energy: 100, water: 100 };
       g.weapons.validate();
       anyG.inventoryChanged();
       return got.length;
