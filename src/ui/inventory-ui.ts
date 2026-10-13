@@ -191,6 +191,8 @@ export class InventoryUI {
   private figMoved = true;
   /** the figure was drawn on the last frame: the hole in the veil is open */
   private figLive = false;
+  /** the dark veil behind everything, as two layers with the figure's hole in them (see the end of hud.css): shown in place of the inventory's own while the figure is drawn */
+  private veil = [document.createElement('div'), document.createElement('div')];
   /** this player's public id: tells their own dog tag from the ones they took */
   selfId = '';
   private vicinity: WorldItem[] = [];
@@ -310,6 +312,8 @@ export class InventoryUI {
     this.root.addEventListener('dblclick', (e) => {
       if (onFigure(e)) this.figure?.front();
     });
+    this.veil[0].className = 'inv-veil';
+    this.veil[1].className = 'inv-veil inv-veil-band';
     // (where the figure stands on the page is found again when the window is another size, or the column it is in is scrolled)
     window.addEventListener('resize', () => (this.figMoved = true));
     this.root.addEventListener('scroll', () => (this.figMoved = true), true);
@@ -372,11 +376,12 @@ export class InventoryUI {
     this.figBox = box;
     // (said in the page's own measure, which is the screen's over the page's scale)
     const at = (v: number, from: number) => `${((v - from) / z).toFixed(4)}px`;
-    const s = this.root.style;
-    s.setProperty('--fig-l', box ? at(box.cx, page.left) : '0px');
-    s.setProperty('--fig-t', box ? at(box.cy, page.top) : '0px');
-    s.setProperty('--fig-r', box ? at(box.cx + box.cw, page.left) : '0px');
-    s.setProperty('--fig-b', box ? at(box.cy + box.ch, page.top) : '0px');
+    for (const { style } of this.veil) {
+      style.setProperty('--fig-l', box ? at(box.cx, page.left) : '0px');
+      style.setProperty('--fig-t', box ? at(box.cy, page.top) : '0px');
+      style.setProperty('--fig-r', box ? at(box.cx + box.cw, page.left) : '0px');
+      style.setProperty('--fig-b', box ? at(box.cy + box.ch, page.top) : '0px');
+    }
     return box;
   }
 
@@ -956,6 +961,7 @@ export class InventoryUI {
     // (the figure's box was made afresh with the rest: where it is, is found again; and its still picture is put away where the live one is to be had)
     this.figMoved = true;
     r.classList.toggle('fig-ready', !!this.figure?.alive);
+    r.append(...this.veil);
     r.appendChild(this.hoverOutline);
     r.appendChild(this.card);
     if (this.menu) r.appendChild(this.menu);

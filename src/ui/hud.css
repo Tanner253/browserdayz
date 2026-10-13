@@ -1915,12 +1915,14 @@ body.touch .hm-tiers, body.touch .hm-show, body.touch .hm-zoom { gap: 3px; }
 /* ---- the survivor in the inventory, alive (src/game/doll.ts) ----
    It is drawn on the game's own picture, behind this page: so the page's dark veil has a hole where it stands, for
    as long as it is being drawn (`fig-live`, put on and taken off by whoever draws it). The veil is the inventory's
-   own, said again here on a layer of its own under everything in it: a hole cut in the inventory itself would be
-   cut in what lies over the figure too, the places beside it, the outline and the word shown while a thing is
-   dragged, and a thing dragged across. What is drawn in the hole is the veil made again with the figure on it, by
-   these same numbers (they are read from here: see InventoryUI.figureBox), so the hole is not seen. If the veil's
-   colours, its blur or the middle of its gradient are changed in `.inv` above, they are to be changed here; and
-   the middle of the gradient in doll.ts as well (MID). */
+   own, said again here on a layer of its own under everything in it (`.inv-veil`, which the inventory puts in
+   itself): a hole cut in the inventory itself would be cut in what lies over the figure too, the places beside it,
+   the outline and the word shown while a thing is dragged, and a thing dragged across. What is drawn in the hole is
+   the veil made again with the figure on it, by these same numbers (they are read from here: see
+   InventoryUI.figureBox), so the hole is not seen. If the veil's colours, its blur or the middle of its gradient
+   are changed in `.inv` above, they are to be changed here; and the middle of the gradient in doll.ts as well (MID).
+   Where the hole is (`--fig-l` and the rest) is said on the two layers themselves and not on the inventory: said
+   there, everything in the inventory was looked over again each time the hole moved. */
 .inv { --veil-in: 12, 15, 13, 0.78; --veil-out: 4, 5, 5, 0.94; --veil-blur: 7; --veil-sat: 0.65; --veil-band: 20; --veil-ramp: 8; }
 @supports not (mask-composite: exclude) {
   .inv { --veil-band: 0; }
@@ -1928,18 +1930,14 @@ body.touch .hm-tiers, body.touch .hm-show, body.touch .hm-zoom { gap: 3px; }
 /* (where a blur has not been seen to keep to a cut shape: a plain veil, and darker, for there is no blur to quiet what is behind it) */
 .inv.veil-plain { --veil-in: 12, 15, 13, 0.9; --veil-out: 4, 5, 5, 0.97; --veil-blur: 0; --veil-sat: 1; }
 .inv.fig-live { background: none; backdrop-filter: none; }
-.inv.fig-live::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background: radial-gradient(ellipse at 50% 35%, rgba(var(--veil-in)), rgba(var(--veil-out)));
+.inv-veil { display: none; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(ellipse at 50% 35%, rgba(var(--veil-in)), rgba(var(--veil-out))); }
+.inv.fig-live > .inv-veil { display: block; }
+.inv-veil:not(.inv-veil-band) {
   backdrop-filter: blur(calc(var(--veil-blur) * 1px)) saturate(var(--veil-sat));
   /* (the whole box, and the hole in it: the line from the one to the other goes straight down to the hole's corner, where going and coming back it is the same line and leaves nothing) */
   clip-path: polygon(evenodd, var(--fig-l) 0, 100% 0, 100% 100%, 0 100%, 0 0, var(--fig-l) 0, var(--fig-l) var(--fig-t), var(--fig-l) var(--fig-b), var(--fig-r) var(--fig-b), var(--fig-r) var(--fig-t), var(--fig-l) var(--fig-t));
 }
-.inv.fig-live.veil-plain::before { backdrop-filter: none; }
+.inv.veil-plain > .inv-veil { backdrop-filter: none; }
 /* The veil's blur reaches past its own edge into the hole, and what it finds there, drawn as dark as the veil makes
    it, it spreads outward as a dark line round the hole. So round the inside of the hole's edge (`--veil-band` wide:
    as far as the blur reaches) the veil's dark is laid by the page, with no blur, on a layer of its own, and what is
@@ -1949,17 +1947,11 @@ body.touch .hm-tiers, body.touch .hm-show, body.touch .hm-zoom { gap: 3px; }
    gradient over the same box as the veil, cut to the hole by the same numbers as the hole is cut by, so that the
    two meet edge to edge: a box of its own, laid out where the hole is, came out a fiftieth of a pixel short of
    it, and a hair of the bare world showed down the hole's side. */
-.inv.fig-live::after {
+.inv-veil-band {
   --b: calc(var(--veil-band) * 1px);
   --r: calc((var(--veil-band) + var(--veil-ramp)) * 1px);
   --w: calc(var(--fig-r) - var(--fig-l));
   --h: calc(var(--fig-b) - var(--fig-t));
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background: radial-gradient(ellipse at 50% 35%, rgba(var(--veil-in)), rgba(var(--veil-out)));
   clip-path: polygon(var(--fig-l) var(--fig-t), var(--fig-l) var(--fig-b), var(--fig-r) var(--fig-b), var(--fig-r) var(--fig-t));
   /* (all of it, less the middle of the hole: the middle is what both of the other two leave, the one across and the one down) */
   mask-image: linear-gradient(#000, #000), linear-gradient(to right, transparent var(--b), #000 var(--r), #000 calc(100% - var(--r)), transparent calc(100% - var(--b))), linear-gradient(to bottom, transparent var(--b), #000 var(--r), #000 calc(100% - var(--r)), transparent calc(100% - var(--b)));
@@ -1969,12 +1961,14 @@ body.touch .hm-tiers, body.touch .hm-show, body.touch .hm-zoom { gap: 3px; }
   mask-composite: exclude, intersect;
 }
 @supports not (mask-composite: exclude) {
-  .inv.fig-live::after { display: none; }
+  .inv.fig-live > .inv-veil-band { display: none; }
 }
 /* the still picture is put away wherever the live one is to be had; and the figure is a thing to take hold of */
 .inv.fig-ready .doll-fig { background-image: none !important; filter: none; }
 .inv.fig-live .doll-fig { cursor: grab; touch-action: pan-y; }
-.inv.fig-live.turning, .inv.fig-live.turning * { cursor: grabbing !important; }
+/* (said of `turning` alone, which is put on only while a hand is on the figure: a rule for everything under the
+   inventory that hung on `fig-live` as well had the whole inventory looked over again each time it was opened) */
+.inv.turning, .inv.turning * { cursor: grabbing !important; }
 
 /* ------------------------------------------------------------ the survivor's state: symbols, not bars */
 /* As DayZ shows a survivor (2026-10-13: "dayz just does icons and symbols ... the internals of the icons are the

@@ -200,8 +200,12 @@ export class Doll {
   /** the page's box it was last drawn for, and what was worked out for it */
   private box: DollBox | null = null;
   private plan: Plan | null = null;
+  /** where the game's picture is on the page (null: to be measured: see `draw`) */
+  private on: DOMRect | null = null;
   /** the passes that lay the picture on have been drawn once ahead (see `layAhead`) */
   private laidAhead = false;
+  /** pictures are on their way back to the card (see `tend`) */
+  private tending = false;
 
   constructor(private r: Renderer, private atmo: Atmosphere, private models: ItemModels, private h: DollHost) {
     // The room. The sky's own picture is what steel and glass have to shine with, at a strength of this room's
@@ -222,6 +226,7 @@ export class Doll {
     this.scene.add(this.rig, this.ground);
     this.blur = this.blurring();
     this.lay = this.laying();
+    window.addEventListener('resize', () => (this.on = null));
     // (a phone the game has already failed to start on is given nothing more to hold: it keeps the still picture)
     if (!LEAN) void this.make();
   }
@@ -366,7 +371,8 @@ export class Doll {
   /**
    * The pictures of what is to be seen of a thing are put on the card, one to a frame's spare time: those that are
    * not there. (Not the pictures of what is put away on it: a gun has hung on it every part that can be fitted to
-   * it, and the sight that is not on it is not sent for the figure's sake.)
+   * it, and the sight that is not on it is not sent for the figure's sake. And only a picture the card has nothing
+   * of: one the game is itself sending there a strip at a time is the game's to finish.)
    */
   private async send(o: THREE.Object3D, whole = false) {
     const R = this.r.renderer, pictures = new Set<THREE.Texture>();
@@ -375,7 +381,7 @@ export class Doll {
       for (const mat of m ? (Array.isArray(m) ? m : [m]) : []) {
         for (const k of MAPS) {
           const t = mat[k];
-          if (t && t.image && !t.isRenderTargetTexture && !R.properties.has(t)) pictures.add(t);
+          if (t && t.image && !t.isRenderTargetTexture && (R.properties.get(t) as { __webglTexture?: unknown }).__webglTexture === undefined) pictures.add(t);
         }
       }
     };
@@ -770,6 +776,23 @@ export class Doll {
     if (hung?.parent) hung.quaternion.copy(hung.parent.getWorldQuaternion(_turn)).invert();
   }
 
+  /**
+   * The pictures of what is on the figure are kept on the card while the inventory is shut. The game takes the
+   * pictures of a sort of thing off the card when none of that sort has lain near for a quarter of a minute (see
+   * LootManager.update), which is so of everything a survivor has on a quarter of a minute after picking it up;
+   * and the figure's next frame, the first of the inventory opening, was all of them going back at once (sixteen
+   * of a kit's, 28 ms, timed). They go back one to a frame's spare time, here, when they are found gone. It is
+   * what is worn, held and slung, at the size the world is drawn with: some tens of megabytes at the most.
+   */
+  private tend() {
+    if (this.tending) return;
+    this.tending = true;
+    void this.send(this.body.root).then(
+      () => (this.tending = false),
+      () => (this.tending = false),
+    );
+  }
+
   /** Every paint here has the pictures the game's own has now (see the top of this file). */
   private follow() {
     for (const [src, c] of this.pairs) {
@@ -789,6 +812,10 @@ export class Doll {
    */
   draw(dt: number) {
     if (!this.alive) return this.h.shown(false);
+    // (Where the game's picture is on the page: measured before the inventory is asked where the figure is, and
+    // kept until the window is another size. The inventory's answer moves the hole, and a measuring after that
+    // had the page laid out a second time in the one frame: 120 ms the first time the inventory was opened.)
+    if (!this.on && this.alive) this.on = this.r.renderer.domElement.getBoundingClientRect();
     const box = this.h.box(), now = performance.now();
     // (worked out afresh when the page has measured again; and when the game's picture is another size under the same page, as when its sharpness is changed in the options)
     const size = this.r.renderer.getDrawingBufferSize(_size);
@@ -800,6 +827,7 @@ export class Doll {
       if (now - this.askedAt > ASK_SHUT) {
         this.askedAt = now;
         this.ask();
+        this.tend();
       }
       return this.h.shown(false);
     }
@@ -865,7 +893,7 @@ export class Doll {
    * lens is to take the room in; how big each of the small pictures is to be; and what the passes are told.
    */
   private layOut(box: DollBox): Plan | null {
-    const R = this.r.renderer, on = R.domElement.getBoundingClientRect(), pr = R.getPixelRatio();
+    const R = this.r.renderer, on = this.on ?? R.domElement.getBoundingClientRect(), pr = R.getPixelRatio();
     R.getDrawingBufferSize(_size);
     const W = _size.x, H = _size.y;
     if (!on.width || !on.height || !W || !H) return null;

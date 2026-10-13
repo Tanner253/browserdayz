@@ -67,10 +67,13 @@ const KIND_OF = (i: number): Kind => (i <= 6 ? 'flame' : i <= 10 ? 'tongue' : i 
  *   smoke  – it is smoke: lit by the hour and not by itself
  *   seen   – how far off it is still drawn, metres, for a fire of size 1
  *   sway   – how far its top swings to either side, of its own height
+ *   gone   – it is let go between these two heights, metres over the foot of a fire of size 1 (the small flames
+ *            are carried by the download two metres and more over the wood, shrinking as they go: a flame the
+ *            size of a hand hanging in the air over a fire is not a flame that broke off it)
  */
-const PLAY: Record<Kind, { twice: number; slow: number; rise: number; fall: number; turned: boolean; smoke: boolean; seen: number; sway: number }> = {
+const PLAY: Record<Kind, { twice: number; slow: number; rise: number; fall: number; turned: boolean; smoke: boolean; seen: number; sway: number; gone?: [number, number] }> = {
   flame: { twice: 3, slow: 1.35, rise: 0.5, fall: 0.5, turned: true, smoke: false, seen: 190, sway: 0.05 },
-  tongue: { twice: 2, slow: 1.15, rise: 0.18, fall: 0.72, turned: true, smoke: false, seen: 90, sway: 0.08 },
+  tongue: { twice: 2, slow: 1.15, rise: 0.18, fall: 0.72, turned: true, smoke: false, seen: 90, sway: 0.08, gone: [0.8, 1.3] },
   lick: { twice: 2, slow: 1.0, rise: 0.5, fall: 0.5, turned: false, smoke: false, seen: 60, sway: 0.03 },
   wisp: { twice: 1, slow: 1.5, rise: 0.25, fall: 0.5, turned: true, smoke: true, seen: 45, sway: 0.1 },
   curl: { twice: 2, slow: 1.7, rise: 0.35, fall: 0.5, turned: true, smoke: true, seen: 60, sway: 0.06 },
@@ -238,6 +241,7 @@ export function burning(p: Plan, clock: number, fire: { strength: number; smoke:
     if (shows <= 0.004) continue;
     const x = c.from + u * (c.to - c.from), k = Math.min(p.frames - 2, Math.floor(x)), w = x - k, o = k * 9;
     for (let e = 0; e < 9; e++) pose[e] = c.poses[o + e] + (c.poses[o + 9 + e] - c.poses[o + e]) * w;
+    if (how.gone && (shows *= 1 - smooth(how.gone[0], how.gone[1], pose[1])) <= 0.004) continue;
     if (!how.smoke) {
       pose[1] *= tall;
       pose[6] *= tall; pose[7] *= tall; pose[8] *= tall;
@@ -290,8 +294,17 @@ export function ripple(size = 64): Uint8Array {
  *   foot   – a card fades in over this many metres above the foot of its fire (times the fire's size)
  *   glow   – the light added over the body of a flame, of the flame's own colour
  *   edge   – the outermost share of a card that fades to nothing: the picture pushed sideways never shows the card's square
+ *   steep  – the steepest a flame is ever seen from, as how much of the look is along its upright (see the shader)
+ *   red    – how bright a flame's red is, where its photograph is darkest and where it is brightest
+ *   green  – how much of the photograph's own green (against its red) is kept: its yellow is its green
+ *   blue   – a flame's blue, of its red: LESS THAN NOTHING. The game's picture is finished by a curve (AgX) that
+ *            bleeds every colour into the others before it squeezes them: an orange as pure as a colour can be
+ *            said comes out salmon, and a bright one comes out cream (the tan fog this replaces was that). A
+ *            blue below nothing is what is left an orange once the bleeding is done. The picture is kept in
+ *            numbers that can be below nothing until that curve, and whatever shows behind a flame is added in
+ *            the ordinary way.
  */
-export const LOOK = { flow: [[0.62, 0.5, 0.2], [1.7, 0.95, 0.07]], foot: 0.09, glow: 0.1, edge: 0.1 };
+export const LOOK = { flow: [[0.62, 0.5, 0.2], [1.7, 0.95, 0.07]], foot: 0.09, glow: 0.1, edge: 0.1, steep: 0.82, red: [0.55, 2.3], green: 0.8, blue: -0.11 };
 
 const VERT = /* glsl */ `
   attribute vec3 iMid;
@@ -306,21 +319,27 @@ const VERT = /* glsl */ `
   varying vec4 vLook;
   varying vec4 vFire;
   varying vec2 vHalf;
+  const float STEEP = ${LOOK.steep.toFixed(3)};
   void main() {
     vec3 mid = iMid, right = iRight, up = iUp;
     float wide = length( right ), tall = length( up );
     vec3 eye = normalize( cameraPosition - mid );
     float seen = 1.0;
     if ( iLook.y > 0.5 ) {
-      // Turned about its own upright to face the eye. Looked down on (or up at) steeply, that alone would leave
-      // it edge on: so the steeper the look, the further it leans over to face the eye, each card a little its
-      // own way outward, about its foot. From right over a fire its flames lie out round it like petals.
+      // Turned about its own upright to face the eye: seen from the side it is square on, and looked down on it
+      // is as much shorter as a thing standing upright is. Looked down on (or up at) more steeply than STEEP,
+      // that would thin it to a line: from there on it is leant back about its foot, just far enough to be seen
+      // no more edge on than at STEEP. From right over a fire its flames are short tongues, each lying a little
+      // its own way.
       vec3 foot = mid - up;
       vec3 stand = up / tall;
       float along = dot( stand, eye );
-      float over = smoothstep( 0.4, 0.95, abs( along ) ) * 0.85;
-      float way = iLook.z * 31.4;
-      stand = normalize( stand - eye * along * over + vec3( cos( way ), 0.0, sin( way ) ) * over * 0.3 );
+      if ( abs( along ) > STEEP ) {
+        float way = iLook.z * 31.4;
+        vec3 across = stand - eye * along + vec3( cos( way ), 0.0, sin( way ) ) * 0.03;
+        across = normalize( across - eye * dot( across, eye ) );
+        stand = eye * ( sign( along ) * STEEP ) + across * sqrt( 1.0 - STEEP * STEEP );
+      }
       right = normalize( cross( stand, eye ) ) * wide;
       up = stand * tall;
       mid = foot + up;
@@ -374,17 +393,15 @@ const FRAG = /* glsl */ `
       colour = vec3( 0.5, 0.49, 0.47 ) * ( 0.35 + 0.65 * pale ) * uDaylight + vec3( 0.55, 0.2, 0.04 ) * exp( -vFire.x * 1.3 ) * ( 1.0 - uDaylight ) * 0.6;
       alpha *= 0.55;
     } else {
-      // A flame photographed against black is dark at its thin edges, where a flame is only thin. Its colour is
-      // brought up to full strength there and its alpha taken down instead: the edge of it is a clear orange,
-      // not a brown rim. (And kept short of dazzling: the brightest things in the picture are finished nearly
-      // white, and a fire is orange.)
+      // A flame photographed against black is dark at its thin edges, where a flame is only thin: there its
+      // alpha is taken down, and its colour is not left a brown rim. What the photograph gives is how HOT each
+      // point is (how bright it is there) and how yellow (how much green it has to its red: never white, which
+      // is its haze); the colour itself is made from those two, for the curve the picture is finished by (see LOOK).
       float hot = max( t.r, max( t.g, t.b ) );
       float body = smoothstep( 0.02, 0.5, hot );
-      colour = t.rgb / max( hot, 0.3 );
-      // (and what is white in the photograph, its hottest and its haze, is kept a yellow: white is what the finishing does to it anyway)
-      float white = smoothstep( 0.3, 0.85, min( colour.g, colour.b ) / max( colour.r, 0.001 ) );
-      colour.gb *= vec2( mix( 1.0, 0.82, white ), mix( 1.0, 0.4, white ) );
-      colour *= mix( 0.62, 1.12, body ) * vFire.y;
+      float heat = smoothstep( 0.03, 0.75, dot( t.rgb, vec3( 0.3, 0.6, 0.1 ) ) );
+      float red = mix( ${LOOK.red[0].toFixed(3)}, ${LOOK.red[1].toFixed(3)}, heat ) * vFire.y;
+      colour = vec3( red, red * min( t.g / max( t.r, 0.001 ), 0.62 ) * ${LOOK.green.toFixed(3)}, red * ${LOOK.blue.toFixed(3)} );
       // (the faintest of its alpha is the haze round a flame cut out of its photograph, a square of it: let go)
       alpha *= mix( 0.3, 1.0, body ) * smoothstep( 0.02, 0.24, t.a );
       light = uSoft.z;

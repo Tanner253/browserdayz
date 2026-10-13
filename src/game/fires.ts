@@ -33,9 +33,11 @@ const SEEN = { flames: 190, smoke: 420 };
  */
 const RING = { cold: 'campfire_ring_cold', lit: 'campfire_ring', seen: [128, 140] as [number, number], reach: 0.6, logs: { r: 0.3, h: 0.8 } };
 /**
- * The burning ring. `lamp`: how high over the ground the light of the fire is, metres: over the wood, where it
- * falls on the logs' own faces as well as on the ground. `catches`: seconds a fire takes to come to its full
- * height once it is lit.
+ * The burning ring. `lamp`: how high over the ground the light of the fire is, metres: in the flames over the
+ * wood, well clear of it. (It was a hand's breadth over the tops of the logs, to light their faces when the
+ * embers painted on them were black wherever it did not reach: so near, it lit the wood itself brighter than
+ * anything else in the picture, by day as well, and charred logs were terracotta.) `catches`: seconds a fire takes
+ * to come to its full height once it is lit.
  *
  * Its paint. The ring came with its glow painted into its colour picture, and the whole picture was given off as
  * light: by day the sun lit the same paint and the logs were salmon pink. Now the picture is read for what is HOT
@@ -45,9 +47,9 @@ const RING = { cold: 'campfire_ring_cold', lit: 'campfire_ring', seen: [128, 140
  * and how dark it is). `embers`: how bright the hot parts are by night; `byDay`: the share of that at noon;
  * `breath`: how much they rise and fall with the flicker of the fire's lamp.
  */
-const BURNS = { lamp: 1.0, catches: 3, embers: 1.15, byDay: 0.62, breath: 0.6, hot: [0.2, 0.55], char: [0.3, 0.4] };
+const BURNS = { lamp: 1.5, catches: 3, embers: 1.15, byDay: 0.62, breath: 0.6, hot: [0.2, 0.55], char: [0.2, 0.22] };
 /** the light of a fire: its colour, how strong, and how far it reaches, metres */
-const GLOW = { color: 0xff8f3a, strength: 7, reach: 9, from: 48 };
+const GLOW = { color: 0xff8f3a, strength: 9, reach: 9, from: 48 };
 
 export class Fires {
   /** where each fireplace is: the middle of its ring, at the ground */
@@ -120,7 +122,8 @@ export class Fires {
                 /* glsl */ `{
   // no two embers rise and fall together
   float breath = 0.84 + 0.16 * sin( uEmber.y * 2.3 + dot( vMapUv, vec2( 41.0, 67.0 ) ) );
-  totalEmissiveRadiance = emissive * mix( vec3( 0.85, 0.1, 0.01 ), vec3( 1.0, 0.45, 0.07 ), emberHot ) * emberHot * breath;
+  // (an ember's colours, from a dull red to an orange. Their blue is less than nothing: see LOOK in flames.ts)
+  totalEmissiveRadiance = emissive * mix( vec3( 0.7, 0.03, -0.07 ), vec3( 1.5, 0.28, -0.16 ), emberHot ) * emberHot * breath;
 }`,
               );
           };

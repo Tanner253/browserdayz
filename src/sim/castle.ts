@@ -187,7 +187,7 @@ export function castleGround(x: number, z: number): number {
 /** the rock the ramp starts from: the level top of it, under the terrace, and where that top lies */
 export const OUTCROP = { top: -CASTLE.ramp.drop - 0.01, x0: 17.3, x1: 24, z0: -4.7, z1: 1.5, path: -1.6 };
 /** the slope of rubble under the breach: where its foot and its head are along the wall, and how wide the way up it is */
-export const FAN = { foot: 6.5, head: -3.6, wide: 2.6, end: -6.6 };
+export const FAN = { foot: 5.2, head: -3.4, wide: 2.2, end: -6.4 };
 const northFace = (y: number) => -CASTLE.hz - CASTLE.parapet.thick / 2 + Math.min(0, y) / CASTLE.lean;
 
 /**
@@ -203,8 +203,10 @@ export function moundTop(kind: 'outcrop' | 'fan', x: number, z: number): number 
     // (the way up from the east: a tongue of rock three metres wide, thirty degrees; off it the rock falls away)
     const off = Math.max(0, Math.abs(z - O.path) - 1.6) * smooth(0, 2, east);
     const fell = west * 2.3 + side * 1.9 + east * 0.6 + off * 1.3;
-    const wild = (rough(x * 0.9, z * 0.9, 5) - 0.5) * Math.min(0.9, 0.08 + (west + side + off) * 0.5);
-    return O.top - fell + wild;
+    // (off its top and its way up it is broken rock: bedded in ledges half a pace deep, and no two alike)
+    const out = west + side + off, wild = (rough(x * 0.9, z * 0.9, 5) - 0.5) * Math.min(1.5, 0.08 + out * 0.7) + (rough(x * 2.3, z * 2.3, 6) - 0.5) * Math.min(0.5, out * 0.4);
+    const y = O.top - fell + wild, bed = Math.round(y / 0.55) * 0.55, k = Math.min(0.7, out * 0.8);
+    return y + (bed - y) * k;
   }
   const F = FAN, s = clamp01((F.foot - x) / (F.foot - F.head));
   let y = CASTLE.foot.north * (1 - s);
@@ -213,7 +215,7 @@ export function moundTop(kind: 'outcrop' | 'fan', x: number, z: number): number 
   if (x < F.end) y -= (F.end - x) * 1.3;
   const edge = northFace(y) - F.wide, past = Math.max(0, edge - z);
   // (never quite level with the terrace: its head is a step under the paving it leads onto)
-  return Math.min(-0.06, y - past * 1.05 + (rough(x * 1.7, z * 1.7, 9) - 0.5) * Math.min(0.5, 0.07 + past * 0.4));
+  return Math.min(-0.06, y - past * 1.25 + (rough(x * 1.7, z * 1.7, 9) - 0.5) * Math.min(0.7, 0.07 + past * 0.5));
 }
 
 // ------------------------------------------------------------------ the towers
@@ -226,14 +228,20 @@ export function towerRadius(y: number): number {
   return T.r - T.bend / T.lean + (T.bend - y) / T.flare;
 }
 const norm = (a: number) => ((a % 360) + 360) % 360;
+/** how much of the way round a tower's platform is open over the head of its stair, degrees: from where the stair is two metres under the boards */
+const WELL = 142.5;
 /** how far round its stair a direction is, 0..1 from the floor to the platform (null: the stair does not pass there) */
 export function stairShare(tw: Tower, a: number): number | null {
   const d = norm((a - tw.stair.from) * Math.sign(tw.stair.sweep));
   return d <= Math.abs(tw.stair.sweep) ? d / Math.abs(tw.stair.sweep) : null;
 }
 
-function tower(name: string, cx: number, cz: number, foot: number, rim: number, door: number, from: number, sweep: number, looks: number[], seed: number): Tower {
+function tower(name: string, cx: number, cz: number, foot: number, rim: number, door: number, sweep: number, looks: number[], seed: number): Tower {
   const T = CASTLE.tower, tops: number[] = [];
+  // The stair comes up on the side of the door. So the well it comes up in is over the door, on the side of the fort,
+  // and the platform is whole all round the side of the field, which is the side it is fought from; and whoever
+  // comes in at the door comes in under the head of the stair and crosses the floor to its foot.
+  const from = door + Math.sign(sweep) * (WELL / 2 + 360 - Math.abs(sweep) - 3.75);
   for (let k = 0; k < T.slots; k++) {
     const mid = (k + 0.5) * (360 / T.slots), toDoor = Math.abs(norm(mid - door + 180) - 180);
     // what is left of its battlement: a stub, a gap a rifle is laid in, a stub; and all of it lower on the side it has fallen in on
@@ -242,12 +250,12 @@ function tower(name: string, cx: number, cz: number, foot: number, rim: number, 
     if (toDoor < 40) top = Math.min(top, T.deck + 0.75 + hash(k, seed, 4) * 0.5);
     tops.push(Math.round(top * 100) / 100);
   }
-  const tw: Tower = { t: 'tower', paint: 'stone', at: 'both', name, cx, cz, foot, rim: tops, door, slits: [], stair: { from, sweep }, well: [from + sweep - Math.sign(sweep) * 140, from + sweep] };
+  const tw: Tower = { t: 'tower', paint: 'stone', at: 'both', name, cx, cz, foot, rim: tops, door, slits: [], stair: { from, sweep }, well: [from + sweep - Math.sign(sweep) * WELL, from + sweep] };
   for (const a of looks) {
     // (a window the stair passes low in front of is put up beside the stair, and is shot from there; one the stair
     // passes high over, or does not pass, is at the floor)
     const share = stairShare(tw, a), h = share === null ? 99 : share * T.deck;
-    tw.slits.push(h >= 2.6 ? { a, y0: 0.75, y1: 2.15 } : { a, y0: h + 0.8, y1: h + 2.2 });
+    tw.slits.push(h >= 2.4 ? { a, y0: 0.75, y1: 2.15 } : { a, y0: h + 0.8, y1: h + 2.2 });
   }
   return tw;
 }
@@ -340,10 +348,10 @@ function layOut(): Part[] {
 
   // ---- the four towers. Each has a door to the terrace, a stair round the inside of its wall to a platform under
   // its rim, a window along each of the two walls it guards and one out over the ridge.
-  parts.push(tower('north-east tower', C.hx, -C.hz, -17, 6.6, 135, 165, 300, [22.5, 67.5, 202.5], 11));
-  parts.push(tower('south-east tower', C.hx, C.hz, -20, 6.3, 225, 195, -300, [337.5, 292.5, 157.5], 12));
-  parts.push(tower('south-west tower', -C.hx, C.hz, -20, 7.2, 315, 345, 300, [22.5, 172.5, 247.5], 13));
-  parts.push(tower('north-west tower', -C.hx, -C.hz, -17, 6.9, 45, 15, -300, [337.5, 187.5, 112.5], 14));
+  parts.push(tower('north-east tower', C.hx, -C.hz, -17, 6.6, 135, 300, [22.5, 67.5, 202.5], 11));
+  parts.push(tower('south-east tower', C.hx, C.hz, -20, 6.3, 225, -300, [337.5, 292.5, 157.5], 12));
+  parts.push(tower('south-west tower', -C.hx, C.hz, -20, 7.2, 315, 300, [22.5, 172.5, 247.5], 13));
+  parts.push(tower('north-west tower', -C.hx, -C.hz, -17, 6.9, 45, -300, [337.5, 187.5, 112.5], 14));
 
   // ---- the keep. Its walls are over two metres thick: a shell of dressed stone outside, and the mass of the wall
   // behind it, with a deep recess at each window (a man stands in the recess to shoot from it).

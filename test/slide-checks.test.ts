@@ -137,42 +137,53 @@ try {
   checks++;
   console.log(`  ok  ${honest.length} honest descents and climbs, played to an enforcing server as their games would say them: none written down, none held back`);
 
-  // The same face, the longest on the map, come down three times as fast as it can be slid: further in the time
-  // than feet go, by more than the server lets pass for a held-up connection. Refused, and written down.
-  const long = slides.reduce((a, b) => (drop(b) > drop(a) ? b : a));
-  const run = (t: Track) => t.pts.slice(1).reduce((far, p, i) => far + Math.hypot(p[0] - t.pts[i][0], p[2] - t.pts[i][2]), 0);
-  const secs = long.pts.length / long.hz / 3;
-  assert.ok(run(long) > FOOT * secs + FOOT * CARRY + GRACE, `the longest slide, ${run(long).toFixed(0)} m over the ground, is not long enough to show a cheat in ${secs.toFixed(1)} s`);
+  // What the server holds feet to is how far one position is from the last: nine and a half metres for every second
+  // between them, what was saved of that while going slower (two seconds' worth at most), and three metres let go
+  // every time. So the same descent with a jump in it: the longest slide said honestly to its middle, and then its
+  // foot in the next breath. Refused, written down, and kept where it was for everybody else.
+  const long = slides.reduce((a, b) => (drop(b) > drop(a) ? b : a)), half = long.pts.length >> 1, foot = long.pts[long.pts.length - 1];
+  const gap = Math.hypot(foot[0] - long.pts[half][0], foot[2] - long.pts[half][2]);
+  assert.ok(gap > FOOT * CARRY + GRACE + 2, `the longest slide is only ${gap.toFixed(0)} m over the ground from its middle to its foot`);
   const cheat = new Player('Cheat');
   assert.ok(await cheat.join());
   cheat.say(long.pts[0]);
   await sleep(2700);
-  await cheat.play(long.pts, long.hz, 3);
-  await sleep(500);
-  assert.ok(flagsOn('Cheat').some((l) => /\[check:enforce\] Cheat moved \d+ m in/.test(l)), `a slide three times too fast was not written down:\n${logged.slice(-500)}`);
-  const end = long.pts[long.pts.length - 1], held = wit.sees(cheat.id);
-  assert.ok(held && Math.hypot(held[0] - end[0], held[1] - end[2]) > 3, `the cheat is shown at ${held}, where it said it was: it was to be kept back`);
+  await cheat.play(long.pts.slice(0, half + 1), long.hz);
+  for (let k = 0; k < 4; k++) {
+    cheat.say(foot);
+    await sleep(1000 / long.hz);
+  }
+  await sleep(400);
+  assert.ok(flagsOn('Cheat').some((l) => /\[check:enforce\] Cheat moved \d+ m in/.test(l)), `a slide with a jump of ${gap.toFixed(0)} m in it was not written down:\n${logged.slice(-500)}`);
+  const held = wit.sees(cheat.id);
+  assert.ok(held && Math.hypot(held[0] - long.pts[half][0], held[1] - long.pts[half][2]) < 2, `the cheat is shown at ${held}: it was to be kept at the middle of the face, ${long.pts[half][0]}, ${long.pts[half][2]}`);
   checks++;
-  console.log(`  ok  the longest face come down in a third of the time is refused: ${flagsOn('Cheat')[0]?.replace(/^.*\[check:enforce\] /, '')}`);
+  console.log(`  ok  the longest slide with its lower half skipped is refused and kept back: ${flagsOn('Cheat')[0]?.replace(/^.*\[check:enforce\] /, '')}`);
 
-  // And one that only just outruns feet: eleven metres a second, down the same face and on across the valley, for
-  // long enough to use up what the server saves for a held-up connection. Refused too.
-  const edge = new Player('Edge'), from = long.pts[0], to = long.pts[long.pts.length - 1];
-  const len = Math.hypot(to[0] - from[0], to[2] - from[2]), ux = (to[0] - from[0]) / len, uz = (to[2] - from[2]) / len;
+  // And one that is only just over it. Down the same face and on, in a straight line, every position a tenth
+  // further from the last than the server lets a fifteenth of a second and its grace cover. It is let go while
+  // what was saved lasts, and refused from then on.
+  const edge = new Player('Edge'), from = long.pts[0];
+  const len = Math.hypot(foot[0] - from[0], foot[2] - from[2]), ux = (foot[0] - from[0]) / len, uz = (foot[2] - from[2]) / len;
+  const most = FOOT / 15 + GRACE, stride = most * 1.1;
   assert.ok(await edge.join());
   edge.say(from);
   await sleep(2700);
-  const eleven: [number, number, number][] = [];
-  for (let i = 1; i <= 15 * 18; i++) {
-    const x = from[0] + ux * (11 / 15) * i, z = from[2] + uz * (11 / 15) * i;
-    eleven.push([x, ground(x, z), z]);
+  const over: [number, number, number][] = [];
+  for (let i = 1; i <= 24; i++) {
+    const x = from[0] + ux * stride * i, z = from[2] + uz * stride * i;
+    over.push([x, ground(x, z), z]);
   }
-  await edge.play(eleven, 15);
+  await edge.play(over, 15);
   await sleep(500);
   clearInterval(keep);
-  assert.ok(flagsOn('Edge').some((l) => /Edge moved \d+ m in/.test(l)), `eleven metres a second on foot for eighteen seconds was not written down:\n${logged.slice(-500)}`);
+  assert.ok(flagsOn('Edge').some((l) => /Edge moved \d+ m in/.test(l)), `${stride.toFixed(2)} m between positions a fifteenth of a second apart was not written down:\n${logged.slice(-500)}`);
+  const kept = wit.sees(edge.id), last = over[over.length - 1];
+  assert.ok(kept && Math.hypot(kept[0] - last[0], kept[1] - last[2]) > stride * 3, `Edge is shown at ${kept}, all but where it said it was`);
   checks++;
-  console.log('  ok  eleven metres a second kept up on foot is refused, as it always was');
+  // (the most an honest slide in the recording covers between two positions, beside what the server allows between two)
+  const honestMost = Math.max(...slides.map((s) => fastest(s, 1))) / 15;
+  console.log(`  ok  positions ${stride.toFixed(2)} m apart, a tenth over the ${most.toFixed(2)} m the server allows between two, are refused (the furthest apart an honest slide puts two is ${honestMost.toFixed(2)} m)`);
   for (const p of [wit, cheat, edge, ...honest.map((h) => h.p)]) p.ws.close();
 } catch (e) {
   failed = e;
