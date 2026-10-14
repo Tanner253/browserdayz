@@ -3,9 +3,11 @@ import './ui/hud.css';
 import { Renderer } from './core/renderer';
 import { assets } from './core/assets';
 import { Strips } from './core/strips';
-import { physics } from './core/physics';
+import { physics, GLASS_GROUPS } from './core/physics';
+import { arenaCorners, cutToArena, nearArena } from './sim/arena';
+import { wagerQuery } from './net/client';
 import { DEATHS, DIED_AT, LEAN, TOUCH, bootDone, bootStage } from './core/device';
-import { generateWorld } from './world/worldgen';
+import { generateWorld, heightAt } from './world/worldgen';
 import { Atmosphere } from './world/atmosphere';
 import { Terrain } from './world/terrain';
 import { Vegetation } from './world/vegetation';
@@ -133,24 +135,40 @@ async function boot() {
   // (`?ruins`: the ruined town stood on a plain of its own in a corner of the map, to be looked at and walked in the game as it is)
   const ruins = import.meta.env.DEV && new URLSearchParams(location.search).has('ruins') ? await import('./dev/ruins') : null;
   ruins?.lay(world);
-  console.log(`worldgen ${(performance.now() - t0).toFixed(0)}ms, trees ${world.trees.length}, buildings ${world.buildings.length}`);
+  // (a page for a wager builds the arena and what is seen over its wall, and nothing else: src/sim/arena.ts)
+  const arena = !!wagerQuery() && !!world.castle;
+  if (arena) cutToArena(world);
+  console.log(`worldgen ${(performance.now() - t0).toFixed(0)}ms, trees ${world.trees.length}, buildings ${world.buildings.length}${arena ? ' (cut to the arena)' : ''}`);
 
   stage('sky');
   const atmo = new Atmosphere(r.renderer, r.scene, r.camera);
   // (`?nogas` on a development build leaves it out of the shaders, to measure what it costs)
-  atmo.gases = import.meta.env.DEV && new URLSearchParams(location.search).has('nogas') ? [] : gasClouds(world);
+  // (and in a wager's arena there is none: the works are far off)
+  atmo.gases = arena || (import.meta.env.DEV && new URLSearchParams(location.search).has('nogas')) ? [] : gasClouds(world);
   await atmo.init();
   stage('ground');
   const terrain = new Terrain(world, atmo);
+  // (the ground's tiles about the arena, out to the hills round it: bare ground is cheap, and cut off at the wall it
+  // hung in the sky in pieces. A tile is kept if its middle is within 300 m and half its own breadth of the square.)
+  if (arena) terrain.only = (x0, z0, x1, z1) => nearArena(world, (x0 + x1) / 2, (z0 + z1) / 2, 300 + Math.hypot(x1 - x0, z1 - z0) / 2);
   await terrain.build(r.scene);
   stage('buildings');
   const buildings = new Buildings(world, atmo);
   buildings.plan();
   buildings.build(r.scene);
   ruins?.stand(world, atmo, r, terrain, buildings);
-  buildRoad(world, atmo, r.scene);
-  buildWorks(world, atmo, r.scene);
-  buildWells(wellSpots(world), atmo, r.scene);
+  // (the road and the works are far outside the fort's arena: not built for a wager)
+  if (!arena) buildRoad(world, atmo, r.scene);
+  if (!arena) buildWorks(world, atmo, r.scene);
+  buildWells(arena ? wellSpots(world).filter((w) => nearArena(world, w.x, w.z)) : wellSpots(world), atmo, r.scene);
+  if (arena) {
+    // what stops a body at the arena's edge, over its low wall: as a pane of glass does, a body and not a shot
+    const c = arenaCorners(world);
+    for (let k = 0; k < 4; k++) {
+      const [ax, az] = c[k], [bx, bz] = c[(k + 1) % 4], yaw = Math.atan2(-(bz - az), bx - ax), y = Math.max(...[[ax, az], [bx, bz]].map(([x, z]) => heightAt(world.heights, x, z)));
+      physics.addStaticQuat(physics.R.ColliderDesc.cuboid(Math.hypot(bx - ax, bz - az) / 2, 40, 0.3), 'concrete', { x: (ax + bx) / 2, y, z: (az + bz) / 2 }, { x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) }, undefined, GLASS_GROUPS);
+    }
+  }
   stage('forest', 'growing forest');
   await frame();
   const veg = new Vegetation(world, atmo);
@@ -161,6 +179,11 @@ async function boot() {
   stage('game');
   const game = new Game({ r, world, atmo, terrain, veg, grass, buildings });
   await game.init((l) => stage(l, l));
+  // (a wager's arena: its fort made whole now, not as somebody comes near it)
+  if (arena && game.castle) {
+    stage('fort', 'building the fort');
+    await game.castle.whole();
+  }
   stage('last files');
   await assets.idle();
   // warm up shader programs before revealing the world

@@ -265,6 +265,8 @@ const TILE_QUADS = 64;
 export class Terrain {
   /** the ground, as a group of tiles */
   mesh!: THREE.Group;
+  /** which tiles are drawn, by their corners in the world (null: all of them): a game cut down to a wager's arena draws only those within sight of it (src/sim/arena.ts, cutToArena) */
+  only: ((x0: number, z0: number, x1: number, z1: number) => boolean) | null = null;
   heightTex!: THREE.DataTexture;
   /** the ground's own paint, for a lid laid over a hole in the ground (see where it is made) */
   lid: THREE.MeshStandardMaterial | null = null;
@@ -326,6 +328,7 @@ export class Terrain {
     for (let tz = 0; tz < N - 1; tz += TILE_QUADS) {
       for (let tx = 0; tx < N - 1; tx += TILE_QUADS) {
         const x1 = Math.min(tx + TILE_QUADS, N - 1), z1 = Math.min(tz + TILE_QUADS, N - 1);
+        if (this.only && !this.only(-half + tx * CELL, -half + tz * CELL, -half + x1 * CELL, -half + z1 * CELL)) continue;
         const index = new Uint32Array((x1 - tx) * (z1 - tz) * 6);
         let k = 0;
         let lo = Infinity, hi = -Infinity, snowTop = -Infinity;

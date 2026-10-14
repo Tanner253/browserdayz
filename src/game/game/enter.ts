@@ -5,6 +5,7 @@
 import { audio } from '../../core/audio';
 import { wagerQuery } from '../../net/client';
 import { reloadPage } from '../../core/leave';
+import { CUT } from '../../sim/arena';
 import { heightAt, inPlay } from '../../world/worldgen';
 import { makeItem, makeMag, type ItemInstance, TAG_OUT, tagOwner, TAG_HOLD_MIN, TAG_HOLD, tagClock } from '../../sim/items';
 import { refill, refilledWords } from '../../sim/powers';
@@ -37,6 +38,8 @@ export const enterMethods = {
     // A full server puts us in line. The wait can be long: the mouse goes back to the player,
     // the screen says where they stand, and they can give it up and play on their own.
     let waited = false;
+    // (a page whose world was cut down to a wager's arena, the wager over: loaded again, whole, for the open world)
+    if (CUT.arena && !wagerQuery()) return void reloadPage();
     // (in a wager the server alone says when anybody dies: src/sim/arena.ts)
     this.player.keepAlive = !!wagerQuery();
     this.net.onQueue = (pos, of, max) => {

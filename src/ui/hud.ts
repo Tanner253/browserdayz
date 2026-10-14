@@ -1272,9 +1272,8 @@ export class HUD {
     const go = (q: Record<string, string>) => {
       const p = new URLSearchParams(location.search);
       for (const [k, v] of Object.entries(q)) p.set(k, v);
-      history.replaceState(null, '', `${location.pathname}?${p}${location.hash}`);
-      this.sheet('play');
-      (this.root.querySelector('.start-btn') as HTMLButtonElement).click();
+      // (loaded again for the wager: a page for one builds the arena alone, for its frames: src/sim/arena.ts, cutToArena)
+      location.assign(`${location.pathname}?${p}${location.hash}`);
     };
     pane.addEventListener('click', (e) => {
       const b = (e.target as HTMLElement).closest('button') as HTMLButtonElement | null;

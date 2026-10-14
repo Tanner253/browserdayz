@@ -419,6 +419,18 @@ export class CastleSite {
     while (!m.next().done);
     this.went(performance.now() - t0);
   }
+  /**
+   * All of it made, its pictures and its kit sent for and waited on, and stood from near: for a page that is a wager's
+   * arena, where the fort is the whole map and is to be there whole before anybody is let in (src/main.ts). (In the
+   * open world it is made as somebody comes near it; that took ten seconds, in which a wager's fort was grey blocks.)
+   */
+  async whole() {
+    if (this.state === 'far') this.ask();
+    this.finish();
+    for (let k = 0; k < 1200 && !(this.state === 'asked' && this.skins && this.come()); k++) await new Promise((r) => setTimeout(r, 50));
+    if (this.state === 'asked' && this.skins && this.come()) await this.build();
+  }
+
   /** a go at making it took so long */
   private went(ms: number) {
     const t = this.timing;

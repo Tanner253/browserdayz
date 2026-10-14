@@ -59,6 +59,58 @@ export function arenaEnds(world: World): { x: number; y: number; z: number; yaw:
   return at.map((p, i) => ({ x: p[0], y: heightAt(world.surface, p[0], p[2]), z: p[2], yaw: face(p, at[1 - i]) }));
 }
 
+/** whether this page's world was cut down to the arena (`cutToArena`): it is no world to go into the open one with */
+export const CUT = { arena: false };
+
+/** how far past the square's edge a game cut down to the arena still draws the world, metres (`cutToArena`): the edge's wall, and what is seen over it, then fog */
+export const ARENA_SEE = 40;
+
+/** whether a place is within `out` metres of the arena's square, each way */
+export function nearArena(world: World, x: number, z: number, out = ARENA_SEE): boolean {
+  const [lx, lz] = castleLocal(world.castle as FortPlace, x, 0, z);
+  return Math.abs(lx * CASTLE_SCALE) <= ARENA.half + out && Math.abs(lz * CASTLE_SCALE) <= ARENA.half + out;
+}
+
+/**
+ * The world cut down to the arena, for a game that is only to play a wager in it (the owner, 2026-10-14: "these new
+ * wager match maps wont need to render anything besides the playable area, fences around the outside and a very
+ * basic ground mesh like the old COD's"; for frames, as the old ones did it: a small playable space, a wall round
+ * it, and nothing built past what is seen over the wall). What stands within ARENA_SEE of the square is kept and
+ * the rest is not built at all (the ground's own tiles likewise: see Terrain.only); and a low dry-stone wall, the
+ * map's own, is laid round the square's edge, with what stops a body over it (src/main.ts).
+ */
+export function cutToArena(world: World): void {
+  CUT.arena = true;
+  // (what stands is kept only within the square, and a few metres past its wall: past that, the ground alone is seen,
+  // as an old map's backdrop is. The snow-laden pines were most of what was drawn: 3.2 million triangles a frame
+  // toward the fort with those of the margin kept, as against 6.3 million in the open world.)
+  const near = (o: { x: number; z: number }) => nearArena(world, o.x, o.z, 4);
+  world.trees = world.trees.filter(near);
+  world.rocks = world.rocks.filter(near);
+  world.props = world.props.filter(near);
+  world.buildings = world.buildings.filter(near);
+  world.walls = world.walls.filter(near);
+  // (the places and their names are kept: they are not drawn, and the buildings' plan looks some of them up by name)
+  // the edge: a dry-stone wall along each side, in lengths of about four metres lying to the ground
+  const P = world.castle as FortPlace, h = ARENA.half / CASTLE_SCALE;
+  const corners = [[h, h], [h, -h], [-h, -h], [-h, h]].map(([x, z]) => castleAt(P, x, z, 0));
+  const ground = (x: number, z: number) => heightAt(world.surface, x, z);
+  for (let k = 0; k < 4; k++) {
+    const a = corners[k], b = corners[(k + 1) % 4], len = Math.hypot(b[0] - a[0], b[2] - a[2]), n = Math.round(len / 4);
+    const dx = (b[0] - a[0]) / n, dz = (b[2] - a[2]) / n, yaw = Math.atan2(-dz, dx);
+    for (let i = 0; i < n; i++) {
+      const x0 = a[0] + dx * i, z0 = a[2] + dz * i, x1 = x0 + dx, z1 = z0 + dz, y0 = ground(x0, z0), y1 = ground(x1, z1);
+      world.walls.push({ x: (x0 + x1) / 2, y: (y0 + y1) / 2, z: (z0 + z1) / 2, yaw, long: len / n, high: 1.1, thick: 0.6, rise: y1 - y0 });
+    }
+  }
+}
+
+/** the arena's square in the world, its four corners going round (for what stops a body at its edge) */
+export function arenaCorners(world: World): [number, number][] {
+  const P = world.castle as FortPlace, h = ARENA.half / CASTLE_SCALE;
+  return [[h, h], [h, -h], [-h, -h], [-h, h]].map(([x, z]) => { const p = castleAt(P, x, z, 0); return [p[0], p[2]]; });
+}
+
 /** whether a place is in the arena: within ARENA.half of the fort's middle, each way, as the fort is turned */
 export function inArena(world: World, x: number, z: number): boolean {
   const [lx, lz] = castleLocal(world.castle as FortPlace, x, 0, z);
