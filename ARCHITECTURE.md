@@ -33,18 +33,18 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 
 | file | lines | what it is |
 |---|---:|---|
-| `acts.ts` | 320 | The server: what happens to players and things (locks, voice, carried things, seats, jeeps hurt and blown up, bodies, a kill). |
-| `admin.ts` | 789 | The server: what an admin can do that nobody else can (command: every slash command; login; putting a player off). |
+| `acts.ts` | 368 | The server: what happens to players and things (locks, voice, carried things, seats, jeeps hurt and blown up, bodies, a kill). |
+| `admin.ts` | 790 | The server: what an admin can do that nobody else can (command: every slash command; login; putting a player off). |
 | `checks.ts` | 364 | The server: its own checks on where players say they are and what they say they did (moves, hills between, the zone, under the ground, gait). |
 | `drops.ts` | 130 | The server: supply drops and the helicopter that brings them. |
 | `gate.ts` | 529 | The server: who is let in and kept on (a life kept by the server, the bot check, the check that this is a person, bans, admins and roles). |
-| `handle.ts` | 696 | The server: handle, every message a player sends, checked and acted on. |
-| `index.ts` | 1071 | ZONA game server. One process: serves the built client and runs the shared world over a WebSocket at /ws. |
+| `handle.ts` | 724 | The server: handle, every message a player sends, checked and acted on. |
+| `index.ts` | 1072 | ZONA game server. One process: serves the built client and runs the shared world over a WebSocket at /ws. |
 | `keep.ts` | 591 | The server: what is kept between restarts (the save, the last word before a restart, a life put back). |
 | `players.ts` | 319 | The server: its players (who is connected, what each is told of the others, where a fresh one starts), what they send cleaned, and joining and leaving. |
 | `queue.ts` | 142 | The server: the line to get in when it is full, and the leaderboard. |
 | `tags.ts` | 235 | The server: cashed-in dog tags, who looted whose, and what a tag must have lived through to pay. |
-| `world.ts` | 108 | The server builds the same world the clients do, from the same code and seed, so loot points, crates, doors and spawn points line up exactly without sending the map. |
+| `world.ts` | 113 | The server builds the same world the clients do, from the same code and seed, so loot points, crates, doors and spawn points line up exactly without sending the map. |
 
 ## src/core/
 
@@ -55,7 +55,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `breathe.ts` | 103 | Work that nobody is waiting on this very frame (a model being made ready for the ground, a body for one of the infected who has come near, pictures sent on ahead to the graphics card) is done a few milliseconds at a... |
 | `device.ts` | 69 | What kind of device this is. |
 | `gltf-utils.ts` | 178 |  |
-| `input.ts` | 178 | Keyboard + mouse with pointer lock. |
+| `input.ts` | 181 | Keyboard + mouse with pointer lock. |
 | `keys.ts` | 161 | Which key does what, and how fast the mouse turns the head: both the player's to set (2026-10-12: |
 | `noise.ts` | 131 | Deterministic noise + RNG. |
 | `perf.ts` | 202 | Frame profiler + F3 overlay. |
@@ -97,7 +97,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `effects.ts` | 944 | Impact / weapon effects: billboard particle pool (dust, debris, sparks, blood), bullet-hole decals, muzzle flash light. |
 | `fires.ts` | 297 | Campfires as the game has them (the rules are in src/sim/fires.ts): which fireplaces are alight and for how long yet, the ring of stones and wood that stands at each (cold, or burning), the flames and the smoke of... |
 | `flames.ts` | 645 | The flames of a fire: the ones that came with the campfire, moving the way they came, mended. |
-| `game.ts` | 1374 | The game: owns every system, runs the frame loop, and decides who is in charge of what. |
+| `game.ts` | 1377 | The game: owns every system, runs the frame loop, and decides who is in charge of what. |
 
 ## src/game/game/
 
@@ -105,7 +105,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 |---|---:|---|
 | `drops.ts` | 518 | The game: supply drops, targets when playing alone, and the flow of a life (death, respawn, pause). |
 | `enter.ts` | 586 | The game: entering the world (joining a server or playing alone, the bot check's range, dressing the player). |
-| `frame.ts` | 609 | The game: every frame (the main loop: input, the world, the camera, the sound, the HUD). |
+| `frame.ts` | 614 | The game: every frame (the main loop: input, the world, the camera, the sound, the HUD). |
 | `guns.ts` | 471 | The game: attachments and magazines. |
 | `hands.ts` | 546 | The game: inventory moves, the hot keys and the hands, and what an admin can do. |
 | `interact.ts` | 304 | The game: what is looked at and done with F (doors, containers, cars, fires, loot). |
@@ -116,9 +116,10 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 
 | file | lines | what it is |
 |---|---:|---|
-| `garage.ts` | 942 | Every jeep in this game, and the one the player is sitting in: getting in and out, the view from behind it, who it runs over, what it sounds like, how it burns, and keeping the server (and through it everybody else)... |
+| `garage.ts` | 1080 | Every jeep in this game, and the one the player is sitting in: getting in and out, the view from behind it, who it runs over, what it sounds like, how it burns, and keeping the server (and through it everybody else)... |
 | `gas.ts` | 318 | The gas as the game has it. |
 | `grenades.ts` | 105 | Thrown grenades. A grenade is a point flying under gravity that bounces off the world and goes off when its fuse runs out. Everyone is told where it left the hand and how fast (see the 'nade' message), and every game... |
+| `heli.ts` | 227 | The helicopter as it is in one game (2026-10-14): a Jeep (src/game/vehicle.ts) in everything but how it moves and what turns on it, so that getting in and out, the seats, the view, being told of it by the server and... |
 | `infected.ts` | 1013 | The infected, as this game draws and (for the ones near its own player) moves them. |
 | `lamps.ts` | 258 | Lamps: the lights people carry, the ones a jeep drives behind, and the ones that stand in the street. |
 | `lockers.ts` | 193 | The doors and lids of what is searched (the rule is in src/sim/crates.ts, HUNG): a locker's leaves and a crate's lid, hung on their hinges, shut until somebody has the thing open and swung wide for as long as they do. |
@@ -133,7 +134,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `remote.ts` | 469 | Other players. Each one is a body driven by the poses the server relays: interpolated a little in the past so movement is smooth, with hit zones your bullets and fists can land on, the weapon they are holding in... |
 | `rig.ts` | 495 | A weapon pack in the hands of whoever holds the gun: the pack's own arms and its own gun, moved by its own animation. |
 | `trader.ts` | 97 | The trader as he is seen: a body behind the counter of the shop at the trading post (see src/sim/trade.ts for what he pays and asks). |
-| `vehicle.ts` | 610 | The jeep as it is in one game: a body on four sprung wheels, driven here or shown as somebody else drives it. |
+| `vehicle.ts` | 613 | The jeep as it is in one game: a body on four sprung wheels, driven here or shown as somebody else drives it. |
 | `voice.ts` | 352 | Talking to whoever is near (hold V). |
 | `weapons.ts` | 3969 | Gunplay: viewmodel (own scene/camera), procedural animation (equip, bob, sway, recoil springs, bolt cycling, reloads), ballistics with gravity + drag simulated in sub-steps against the physics world, zeroing, scope +... |
 | `wreck-fire.ts` | 141 | The jeep that burns before the fort's gate, as the game has it (the rules are in src/sim/wreck-fire.ts, and where it stands is the fort's to say: src/sim/castle.ts). |
@@ -150,7 +151,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 |---|---:|---|
 | `client.ts` | 328 | Client side of the game connection. |
 | `orders.ts` | 205 | The orders an admin or a mod can give on the game server, typed where talk is typed (2026-10-11). |
-| `protocol.ts` | 437 | Wire protocol between the game client and the server. |
+| `protocol.ts` | 443 | Wire protocol between the game client and the server. |
 | `timeline.ts` | 122 | When a report of somebody else's player was TRUE, as against when it got here. |
 
 ## src/sim/
@@ -190,6 +191,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `gas.ts` | 154 | The gas. One place on the map is sunk in it (the Chemical Works, in the cirque behind the checkpoint: the map's first expansion). A low dome of it lies over the place, thickest at the middle and thinning to nothing... |
 | `grenades.ts` | 249 | Grenades: what is thrown, how its fuse runs, and what the server believes of one. |
 | `gunplay.ts` | 335 | How the guns shoot. One place for what each cartridge does in the air and what each gun does with it, read by the game (a bullet's flight, the kick, the cone a shot can land in, what its sights are set for) and by... |
+| `heli.ts` | 148 | The helicopter a player flies (2026-10-14), its rules shared by the game and the server: what it is, how it flies (src/game/heli.ts flies it by these numbers), and where it stands when the world is new. |
 | `infected.ts` | 440 | The infected: the people who lived here, and did not leave. |
 | `injury.ts` | 34 | A broken leg. A hard enough landing breaks one, and so, as often as not, does a bullet in the legs. On a broken leg nobody runs or jumps: it is a limp until it is set (a splint, or a first aid kit), or until it has... |
 | `inventory.ts` | 1020 | Grid inventory (DayZ / Tarkov style). |
@@ -240,7 +242,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 |---|---:|---|
 | `admin-ui.ts` | 1526 | The panel of somebody with a role (2026-10-11; laid out again 2026-10-12). |
 | `bigmap.ts` | 1247 | The map, opened large (M): a sheet as an army prints one. |
-| `hud.ts` | 1775 | A lean HUD: small vitals, a compass strip, a corner map (src/ui/minimap.ts), prompts only when relevant. |
+| `hud.ts` | 1779 | A lean HUD: small vitals, a compass strip, a corner map (src/ui/minimap.ts), prompts only when relevant. |
 | `icons.ts` | 467 | Inventory icons rendered from the real 3D models at startup (no hand-made sprites). |
 | `inventory-ui.ts` | 2117 | DayZ-style inventory. Three columns: Vicinity what is on the ground around you, and the crate / stash / body you opened Character the survivor with the places for what is worn either side of them (the rules' own... |
 | `minimap.ts` | 411 | A small map in the corner of the screen: the ground, the forest, the road, the buildings, and an arrow for where you are and which way you face. |
@@ -287,6 +289,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `gatehouse.ts` | 686 | The ruined gatehouse at the end of the mountain road (MOUNTAIN in src/world/worldgen.ts; 2026-10-13: |
 | `grass.ts` | 358 | GPU grass. The field is tiled into 4 m patches; every patch shares one geometry of ~1000 randomly ordered blades. Blades are placed on the exact terrain triangles in the vertex shader (height texture), culled by the... |
 | `ground.ts` | 320 | What the ground is, place by place: the kinds of ground there are, and how much of each lies at every point of the world's net. |
+| `helipad.ts` | 68 | The pads the helicopters stand on (src/sim/heli.ts: on the hospital's roof, and by the fort): a painted circle and an H, as every pad has. |
 | `kit.ts` | 270 | A layout of a kit's pieces (src/sim/kit.ts), as things to draw: every piece of the layout put into ONE shape for each of the kit's materials, so a whole fort of them is two or three things to draw however many pieces... |
 | `outline.ts` | 218 | The edge of the Zona as one line. |
 | `road.ts` | 154 | Asphalt ribbon draped over the terrain along the road spline. |
