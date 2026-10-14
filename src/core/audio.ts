@@ -134,6 +134,12 @@ export interface EngineVoice {
   stop(): void;
 }
 
+/** A car's horn and siren (Audio.horn): where the car is, and which of the two are sounding. */
+export interface HornVoice {
+  set(pos: V3, horn: boolean, siren: boolean): void;
+  stop(): void;
+}
+
 /**
  * A helicopter's rotor, turning (src/game/airdrop.ts): told every frame where it is and how it is to be heard, until
  * it is stopped. How loud it is at what distance, how fast it is played and how much of its top comes through are
@@ -1914,6 +1920,77 @@ export class AudioEngine {
    * Call each frame: occasional birdsong and crows from random directions.
    * @param forest among trees (leaves in the wind) rather than out in the open (insects in the grass)
    */
+  /**
+   * A car's horn, and a police car's siren (src/game/horns.ts): one voice to a car, told every frame where it is and
+   * which of the two are going. The horn is two notes a third apart, square and driven hard through a narrow mouth, as
+   * a car's is (the police car's higher); the siren a wail, up and down every four seconds. Both carry far.
+   */
+  horn(police: boolean): HornVoice | null {
+    if (!this.ready) return null;
+    const ctx = this.ctx;
+    const pan = ctx.createPanner();
+    pan.panningModel = 'HRTF';
+    pan.distanceModel = 'inverse';
+    pan.refDistance = 10;
+    pan.rolloffFactor = 0.9;
+    pan.maxDistance = 2000;
+    pan.connect(this.sfx);
+    const hornG = ctx.createGain(), sirenG = ctx.createGain();
+    hornG.gain.value = 0;
+    sirenG.gain.value = 0;
+    // the horn
+    const shape = ctx.createWaveShaper();
+    const curve = new Float32Array(257);
+    for (let i = 0; i < 257; i++) curve[i] = Math.tanh(((i - 128) / 128) * 3);
+    shape.curve = curve;
+    const mouth = this.filter('bandpass', police ? 1100 : 900, 1.3);
+    const oscs = (police ? [466, 587] : [392, 494]).map((f) => {
+      const o = ctx.createOscillator();
+      o.type = 'square';
+      o.frequency.value = f;
+      const g = ctx.createGain();
+      g.gain.value = 0.35;
+      o.connect(g).connect(shape);
+      o.start();
+      return o;
+    });
+    shape.connect(mouth).connect(hornG).connect(pan);
+    // the siren: one note swept up and down by a slow one
+    const wail = ctx.createOscillator();
+    wail.type = 'triangle';
+    wail.frequency.value = 1050;
+    const sweep = ctx.createOscillator();
+    sweep.frequency.value = 0.25;
+    const depth = ctx.createGain();
+    depth.gain.value = 450;
+    sweep.connect(depth).connect(wail.frequency);
+    const wailShape = this.filter('lowpass', 3200, 0.7);
+    wail.connect(wailShape).connect(sirenG).connect(pan);
+    wail.start();
+    sweep.start();
+    let live = true;
+    const ease = (g: GainNode, to: number) => g.gain.setTargetAtTime(to, ctx.currentTime, 0.012);
+    return {
+      set: (pos, horn, siren) => {
+        if (!live) return;
+        pan.positionX.value = pos.x;
+        pan.positionY.value = pos.y;
+        pan.positionZ.value = pos.z;
+        ease(hornG, horn ? 0.55 : 0);
+        ease(sirenG, siren ? 0.32 : 0);
+      },
+      stop: () => {
+        if (!live) return;
+        live = false;
+        ease(hornG, 0);
+        ease(sirenG, 0);
+        const end = ctx.currentTime + 0.15;
+        for (const o of [...oscs, wail, sweep]) o.stop(end);
+        setTimeout(() => pan.disconnect(), 300);
+      },
+    };
+  }
+
   /**
    * A jeep's engine. Four cylinders: two bangs to every turn of the crank, which is the note;
    * a rougher one an octave under it, which is the body; and the tyres and the wind, which

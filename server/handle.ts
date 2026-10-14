@@ -8,7 +8,7 @@ import { CALL } from '../src/sim/drops';
 import { WEAPON_RULES, hitDamage } from '../src/sim/combat';
 import { THROWN, pullPin, letGo, judge } from '../src/sim/grenades';
 import { BARREL } from '../src/sim/barrels';
-import { JEEP, SEATS, carDamage, crashDamage } from '../src/sim/vehicles';
+import { JEEP, POLICE_CAR, SEATS, carDamage, crashDamage } from '../src/sim/vehicles';
 import { HELI, heliCrash, seatsOf } from '../src/sim/heli';
 import { infectedDrop, INFECTED, guarded } from '../src/sim/infected';
 import { EMOTE, EMOTE_GAP, SHOUT_RANGE } from '../src/sim/emotes';
@@ -636,6 +636,19 @@ export function handle(c: Client, m: C2S) {
       tellSeats(v, true);
       return;
     }
+    case 'vhorn': {
+      // (the one at the wheel of a car, not a helicopter's; a siren only on a police car; a horn pressed no more often than ten times a second)
+      const v = vehicles.get(m.i);
+      if (!v || v.goneAt || v.seats[0] !== c.id || v.k === HELI.kind) return;
+      const now = Date.now();
+      if (m.horn === true && now - (hornAt.get(c) ?? 0) < 100) return;
+      if (m.horn !== undefined) hornAt.set(c, now);
+      const out: { t: 'vhorn'; i: number; horn?: boolean; siren?: boolean } = { t: 'vhorn', i: v.i };
+      if (typeof m.horn === 'boolean') out.horn = m.horn;
+      if (typeof m.siren === 'boolean' && v.k === POLICE_CAR.kind) out.siren = v.siren = m.siren;
+      if (out.horn !== undefined || out.siren !== undefined) broadcast(out, c);
+      return;
+    }
     case 'vflip': {
       const v = vehicles.get(m.i);
       if (!v || !c.alive || v.goneAt || v.sim !== null || v.seats.some((s) => s !== null)) return;
@@ -725,3 +738,5 @@ export function handle(c: Client, m: C2S) {
 
 /** economy time of the last call answered on a field radio */
 let lastCall = -1e9;
+/** when each driver last pressed or let go of their horn (see 'vhorn') */
+const hornAt = new WeakMap<Client, number>();

@@ -9,6 +9,7 @@ import { audio } from '../../core/audio';
 import { Door } from '../../world/buildings';
 import { ITEMS, magRoom, capacityOf, itemName, type ItemInstance, fittedOf } from '../../sim/items';
 import { CRATE_RESTOCK } from '../../sim/crates';
+import { POLICE_CAR } from '../../sim/vehicles';
 import type { Player } from '../player';
 import { bloodOf, bleedOf, BLOOD } from '../../sim/blood';
 import { WorldItem, Stash } from '../loot';
@@ -55,7 +56,7 @@ export const interactMethods = {
     // sat in a jeep there is one thing to do with F
     if (this.garage.ride) {
       if (this.input.pressed('KeyF') && !this.hud.chatOpen) this.garage.out();
-      else if (this.touch || performance.now() - this.rideAt < 7000) this.prompt = this.garage.ride.seat === 0 ? (this.garage.ride.jeep instanceof Heli ? '<kbd>F</kbd>Get out <small>Space up · C down · W S nose · A D turn · Q E lean</small>' : '<kbd>F</kbd>Get out <small>W A S D to drive · Space is the handbrake</small>') : '<kbd>F</kbd>Get out';
+      else if (this.touch || performance.now() - this.rideAt < 7000) this.prompt = this.garage.ride.seat === 0 ? (this.garage.ride.jeep instanceof Heli ? '<kbd>F</kbd>Get out <small>Space up · C down · W S nose · A D turn · Q E lean</small>' : (this.garage.ride.jeep.kind === POLICE_CAR.kind ? '<kbd>F</kbd>Get out <small>W A S D to drive · Space is the handbrake · H horn · J siren</small>' : '<kbd>F</kbd>Get out <small>W A S D to drive · Space is the handbrake · H horn</small>')) : '<kbd>F</kbd>Get out';
       return;
     }
     const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);

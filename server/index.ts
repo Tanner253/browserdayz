@@ -164,7 +164,7 @@ PARKS.forEach((_, k) => standJeep(k));
 /** the gas over the works: a car left under it is stood back home (see JEEP.gas) */
 const carsGas = world.gas;
 
-export const vehInfo = (v: Veh): VehicleInfo => ({ i: v.i, s: v.s, hp: v.goneAt ? 0 : v.hp, fuel: v.fuel, seats: v.seats, sim: v.sim, ...(v.k ? { k: v.k } : {}) });
+export const vehInfo = (v: Veh): VehicleInfo => ({ i: v.i, s: v.s, hp: v.goneAt ? 0 : v.hp, fuel: v.fuel, seats: v.seats, sim: v.sim, ...(v.k ? { k: v.k } : {}), ...(v.siren && !v.goneAt ? { siren: true } : {}) });
 
 export const tellSeats = (v: Veh, rest = false) => broadcast({ t: 'vseat', i: v.i, seats: v.seats, sim: v.sim, ...(rest ? { s: v.s } : {}) });
 

@@ -23,6 +23,7 @@ import type { Player } from './player';
 import type { RemotePlayer } from './remote';
 import { DRIVE, DRIVES, DRIVE_CAR, Jeep, groundOf, type Controls } from './vehicle';
 import { Heli } from './heli';
+import { Horns } from './horns';
 import { HELI, heliCrash, heliSpots, hpOf, seatsOf } from '../sim/heli';
 
 /**
@@ -157,7 +158,14 @@ export class Garage {
   private homes = new Map<number, number>();
   private nextId = 1;
 
-  constructor(private h: GarageHost) {}
+  /** horns and sirens (see horns.ts) */
+  readonly horns: Horns;
+
+  constructor(private h: GarageHost) {
+    this.horns = new Horns(this.jeeps, (m) => {
+      if (this.h.online()) this.h.net.send(m);
+    });
+  }
 
   /** The model, if the game has one. Without it there are no jeeps (in development a plain stand-in is drawn instead). */
   async load() {
@@ -260,6 +268,7 @@ export class Garage {
     const kind = v.k === HELI.kind ? HELI.kind : v.k === POLICE_CAR.kind && this.protoCar ? POLICE_CAR.kind : 0;
     const j = kind === HELI.kind ? new Heli(v.i, this.groundAt) : new Jeep(v.i, this.groundAt, DRIVES[kind], kind);
     const made = this.make(kind);
+    if (v.siren) this.horns.heard(v.i, undefined, true);
     j.build(this.h.scene, v.s, made);
     this.h.ready?.([made.body, ...made.wheels]);
     if (made.lod) this.lods.set(j, made.lod);
@@ -331,6 +340,7 @@ export class Garage {
       // (the one at the wheel counts it down themselves between the server's words on it)
       if (j && (this.ride?.jeep !== j || this.ride.seat !== 0 || Math.abs(j.fuel - m.fuel) > 1.5 || m.fuel <= 0)) j.fuel = m.fuel;
     });
+    net.on('vhorn', (m) => this.horns.heard(m.i, m.horn, m.siren));
     net.on('vboom', (m) => {
       const j = this.jeeps.get(m.i);
       if (j) this.blow(j, m.by === net.id);
@@ -560,10 +570,14 @@ export class Garage {
       }
       j.step(h, c);
     }
+    // (the horn at the wheel of a car: H held; and a police car's siren, J)
+    const driving = r && r.seat === 0 && !(r.jeep instanceof Heli) && !this.h.player.dead ? r.jeep : null;
+    this.horns.drive(driving, input.held('KeyH'), input.pressedFixed('KeyJ'));
   }
 
   frame(dt: number, now: number, alpha: number, listener: THREE.Vector3) {
     const h = this.h, p = h.player, online = h.online();
+    this.horns.frame(listener);
     if (this.flipDue?.mode === 'sim') {
       this.flipDue.flip();
       this.flipDue = null;

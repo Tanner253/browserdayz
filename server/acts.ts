@@ -214,6 +214,7 @@ export function blowJeep(v: Veh, byId: number) {
   v.hp = 0;
   v.burnAt = 0;
   v.goneAt = now + 120_000;
+  v.siren = false;
   jeepsDue.set(v.home, now + (Number(process.env.JEEP_RESPAWN_S) || JEEP.respawn) * 1000);
   const by = clients.get(byId);
   broadcast({ t: 'vboom', i: v.i, by: byId });

@@ -104,6 +104,8 @@ export interface VehicleInfo {
   sim: number | null;
   /** which car it is: 1 is the police car (see POLICE_CAR). The jeep says nothing. */
   k?: number;
+  /** a police car's siren is going (see src/game/horns.ts) */
+  siren?: boolean;
 }
 
 /**

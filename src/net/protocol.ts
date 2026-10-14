@@ -201,6 +201,8 @@ export type C2S =
   | { t: 'vrest'; i: number; s: VState }
   /** a jeep on its side that nobody is in: this game will stand it up */
   | { t: 'vflip'; i: number }
+  /** the driver's horn held down or let go (H), or a police car's siren turned on or off (J) */
+  | { t: 'vhorn'; i: number; horn?: boolean; siren?: boolean }
   /** a round of ours hit it (with this weapon), or it ran into something this hard while we were moving it (m/s) */
   | { t: 'vhit'; i: number; w: string }
   | { t: 'vcrash'; i: number; n: number }
@@ -358,6 +360,8 @@ export type S2C =
   | { t: 'vfuel'; i: number; fuel: number }
   /** it went up (set off by this player); it has been cleared away; a new one stands somewhere */
   | { t: 'vboom'; i: number; by: number }
+  /** somebody's horn, or a siren: as the driver said it (see horns.ts) */
+  | { t: 'vhorn'; i: number; horn?: boolean; siren?: boolean }
   | { t: 'v-'; i: number }
   | { t: 'v+'; v: VehicleInfo }
   /** one of the infected has turned up; one has been cleared away; whose game moves one from now on (null: nobody's) */
