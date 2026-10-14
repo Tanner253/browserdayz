@@ -507,6 +507,7 @@ export const frameMethods = {
     }
     atmo.update();
     veg.update(dt, cam);
+    this.s.terrain.update(cam);
     grass.update(cam, interp);
 
     // audio

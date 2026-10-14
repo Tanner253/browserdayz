@@ -3,7 +3,7 @@ import { assets } from '../core/assets';
 import { TOUCH } from '../core/device';
 import { physics } from '../core/physics';
 import { Simplex } from '../core/noise';
-import type { Atmosphere } from './atmosphere';
+import { SHADOW_FRUSTA, type Atmosphere } from './atmosphere';
 import { CRAG_MOSS, KINDS, KIND_AT, KIND_NAMES, SNOW_GROUND, layGround, type Ground, type Kind } from './ground';
 import { BELT, FORT_SNOW, RUTS, SNOW_LIFT, snowNet, snowOn, snowPicture, snowThinsGrass, snowUniforms, tellSnow } from './snow';
 import { CELL, SNOW, WORLD_RES, WORLD_SIZE, heightAt, idx, seenGround, slopeAt, type World } from './worldgen';
@@ -263,6 +263,14 @@ function macroNoiseTexture(): THREE.DataTexture {
 /** quads along one side of a ground tile */
 const TILE_QUADS = 64;
 
+/** tiles drawn at one go (see Terrain.update): the run's own mesh, its tiles, and the smaller runs inside it */
+interface Run {
+  mesh: THREE.Mesh;
+  of: THREE.Mesh[];
+  parts: Run[];
+}
+const _pv = new THREE.Matrix4(), _view = new THREE.Frustum();
+
 export class Terrain {
   /** the ground, as a group of tiles */
   mesh!: THREE.Group;
@@ -356,40 +364,49 @@ export class Terrain {
     const posAttr = new THREE.BufferAttribute(pos, 3);
     const nrmAttr = new THREE.BufferAttribute(nrm, 3);
     const tiles: THREE.BufferGeometry[] = [];
-    for (let tz = 0; tz < N - 1; tz += TILE_QUADS) {
-      for (let tx = 0; tx < N - 1; tx += TILE_QUADS) {
-        const x1 = Math.min(tx + TILE_QUADS, N - 1), z1 = Math.min(tz + TILE_QUADS, N - 1);
-        if (this.only && !this.only(-half + tx * CELL, -half + tz * CELL, -half + x1 * CELL, -half + z1 * CELL)) continue;
-        const index = new Uint32Array((x1 - tx) * (z1 - tz) * 6);
-        let k = 0;
-        let lo = Infinity, hi = -Infinity, snowTop = -Infinity;
-        for (let iz = tz; iz < z1; iz++) {
-          for (let ix = tx; ix < x1; ix++) {
-            const a = idx(ix, iz), b = idx(ix + 1, iz), c = idx(ix, iz + 1), d = idx(ix + 1, iz + 1);
-            lo = Math.min(lo, drawn[a], drawn[b], drawn[c], drawn[d]);
-            hi = Math.max(hi, drawn[a], drawn[b], drawn[c], drawn[d]);
-            if (lifted) snowTop = Math.max(snowTop, drawn[a] + lifted[a], drawn[d] + lifted[d]);
-            // (a square that is not the ground's to draw: see `seenGround`)
-            if (open && open[a]) continue;
-            // triangles (a, c, b) and (b, c, d): diagonal b-c, counter-clockwise from above
-            index[k++] = a; index[k++] = c; index[k++] = b;
-            index[k++] = b; index[k++] = c; index[k++] = d;
-          }
+    // (Every tile's triangles are in one list, laid so that each tile, each two by two of them and each four by four
+    // is a run of it: a run is drawn at one go wherever all of it is in sight (see `update`), with nothing kept twice.)
+    const side = Math.ceil((N - 1) / TILE_QUADS), laid: [number, number][] = [];
+    for (let bz = 0; bz < side; bz += 4) for (let bx = 0; bx < side; bx += 4)
+      for (let sz = bz; sz < Math.min(bz + 4, side); sz += 2) for (let sx = bx; sx < Math.min(bx + 4, side); sx += 2)
+        for (let tz = sz; tz < Math.min(sz + 2, side); tz++) for (let tx = sx; tx < Math.min(sx + 2, side); tx++) laid.push([tx, tz]);
+    const index = new Uint32Array((N - 1) * (N - 1) * 6);
+    let k = 0;
+    for (const [i, j] of laid) {
+      const tx = i * TILE_QUADS, tz = j * TILE_QUADS;
+      const x1 = Math.min(tx + TILE_QUADS, N - 1), z1 = Math.min(tz + TILE_QUADS, N - 1);
+      if (this.only && !this.only(-half + tx * CELL, -half + tz * CELL, -half + x1 * CELL, -half + z1 * CELL)) continue;
+      const from = k;
+      let lo = Infinity, hi = -Infinity, snowTop = -Infinity;
+      for (let iz = tz; iz < z1; iz++) {
+        for (let ix = tx; ix < x1; ix++) {
+          const a = idx(ix, iz), b = idx(ix + 1, iz), c = idx(ix, iz + 1), d = idx(ix + 1, iz + 1);
+          lo = Math.min(lo, drawn[a], drawn[b], drawn[c], drawn[d]);
+          hi = Math.max(hi, drawn[a], drawn[b], drawn[c], drawn[d]);
+          if (lifted) snowTop = Math.max(snowTop, drawn[a] + lifted[a], drawn[d] + lifted[d]);
+          // (a square that is not the ground's to draw: see `seenGround`)
+          if (open && open[a]) continue;
+          // triangles (a, c, b) and (b, c, d): diagonal b-c, counter-clockwise from above
+          index[k++] = a; index[k++] = c; index[k++] = b;
+          index[k++] = b; index[k++] = c; index[k++] = d;
         }
-        const geo = new THREE.BufferGeometry();
-        // (the highest the tile is reckoned to stand by the snow: its own top, or more where snow lies by place)
-        geo.userData.snowTop = Math.max(hi, snowTop);
-        geo.setAttribute('position', posAttr);
-        geo.setAttribute('normal', nrmAttr);
-        geo.setIndex(new THREE.BufferAttribute(k < index.length ? index.slice(0, k) : index, 1));
-        geo.boundingBox = new THREE.Box3(
-          new THREE.Vector3(-half + tx * CELL, lo, -half + tz * CELL),
-          new THREE.Vector3(-half + x1 * CELL, hi, -half + z1 * CELL),
-        );
-        geo.boundingSphere = geo.boundingBox.getBoundingSphere(new THREE.Sphere());
-        tiles.push(geo);
       }
+      const geo = new THREE.BufferGeometry();
+      // (the highest the tile is reckoned to stand by the snow: its own top, or more where snow lies by place)
+      geo.userData.snowTop = Math.max(hi, snowTop);
+      geo.userData.tile = [i, j];
+      geo.setAttribute('position', posAttr);
+      geo.setAttribute('normal', nrmAttr);
+      geo.setDrawRange(from, k - from);
+      geo.boundingBox = new THREE.Box3(
+        new THREE.Vector3(-half + tx * CELL, lo, -half + tz * CELL),
+        new THREE.Vector3(-half + x1 * CELL, hi, -half + z1 * CELL),
+      );
+      geo.boundingSphere = geo.boundingBox.getBoundingSphere(new THREE.Sphere());
+      tiles.push(geo);
     }
+    const shared = new THREE.BufferAttribute(k < index.length ? index.slice(0, k) : index, 1);
+    for (const geo of tiles) geo.setIndex(shared);
 
     // --- data textures shared with grass / vegetation shaders
     const hf = new Float32Array(N * N);
@@ -515,7 +532,8 @@ export class Terrain {
 
     this.mesh = new THREE.Group();
     this.mesh.name = 'terrain';
-    for (const geo of tiles) {
+    const at = new Map<string, THREE.Mesh>();
+    const piece = (geo: THREE.BufferGeometry) => {
       const tile = new THREE.Mesh(geo, mat);
       tile.receiveShadow = true;
       tile.castShadow = true;
@@ -526,6 +544,44 @@ export class Terrain {
       tile.renderOrder = 5;
       if (this.later) tile.onBeforeRender = (_r, _s, camera) => this.later?.(tile, camera);
       this.mesh.add(tile);
+      return tile;
+    };
+    for (const geo of tiles) {
+      const tile = piece(geo);
+      // (a tile drawn in a run is not drawn on its own in the view: the sun's shadow maps draw it as they did, see `update`)
+      tile.intersectsFrustum = (f) => (!tile.userData.inRun || SHADOW_FRUSTA.has(f)) && f.intersectsObject(tile);
+      at.set(String(geo.userData.tile), tile);
+    }
+    // the runs: four by four, and two by two inside each, where every tile of one is there to draw
+    const run = (i0: number, j0: number, n: number): Run | null => {
+      const of: THREE.Mesh[] = [];
+      for (let j = j0; j < j0 + n; j++) for (let i = i0; i < i0 + n; i++) {
+        const t = at.get(`${i},${j}`);
+        if (!t) return null;
+        of.push(t);
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', posAttr);
+      geo.setAttribute('normal', nrmAttr);
+      geo.setIndex(shared);
+      const starts = of.map((t) => t.geometry.drawRange.start), ends = of.map((t) => t.geometry.drawRange.start + t.geometry.drawRange.count);
+      geo.setDrawRange(Math.min(...starts), Math.max(...ends) - Math.min(...starts));
+      geo.boundingBox = new THREE.Box3();
+      for (const t of of) geo.boundingBox.union(t.geometry.boundingBox!);
+      geo.boundingSphere = geo.boundingBox.getBoundingSphere(new THREE.Sphere());
+      geo.userData.snowTop = Math.max(...of.map((t) => t.geometry.userData.snowTop as number));
+      const mesh = piece(geo);
+      mesh.castShadow = false;
+      mesh.visible = false;
+      return { mesh, of, parts: [] };
+    };
+    for (let bj = 0; bj < side; bj += 4) for (let bi = 0; bi < side; bi += 4) {
+      const big = run(bi, bj, 4);
+      for (let sj = bj; sj < bj + 4; sj += 2) for (let si = bi; si < bi + 4; si += 2) {
+        const small = run(si, sj, 2);
+        if (small) (big ? big.parts : this.runs).push(small);
+      }
+      if (big) this.runs.push(big);
     }
     scene.add(this.mesh);
 
@@ -535,6 +591,35 @@ export class Terrain {
     for (let ix = 0; ix < N; ix++) for (let iz = 0; iz < N; iz++) hcm[iz + ix * N] = heights[idx(ix, iz)];
     const desc = R.ColliderDesc.heightfield(N - 1, N - 1, hcm, { x: WORLD_SIZE, y: 1, z: WORLD_SIZE });
     physics.ground = physics.addStatic(desc, 'grass', { x: 0, y: 0, z: 0 });
+  }
+
+  /** runs of tiles drawn at one go (see `update`) */
+  private runs: Run[] = [];
+
+  /**
+   * The ground is a hundred and forty-four tiles, each its own thing to draw: seventy-seven of a frame's draws in the
+   * street. Where every tile of a run of them (two by two, four by four) is in sight, the run is drawn instead, at
+   * one go: the same triangles in the same paint, since a tile in sight is drawn whole either way. The sun's shadow
+   * maps go on drawing tile by tile. Not called (a page of its own that draws the world), the runs stay as they were
+   * last chosen: a run drawn where a tile of it is now out of sight draws nothing more that is seen.
+   */
+  update(camera: THREE.Camera) {
+    if (!this.runs.length) return;
+    _pv.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    _view.setFromProjectionMatrix(_pv);
+    for (const r of this.runs) this.choose(r);
+  }
+
+  /** whether every tile of a run is in sight: then it is drawn at one go (and its parts and tiles not), else each part is chosen for itself */
+  private choose(r: Run): boolean {
+    let all = true;
+    if (r.parts.length) {
+      for (const p of r.parts) if (!this.choose(p)) all = false;
+    } else for (const t of r.of) if (!_view.intersectsSphere(t.geometry.boundingSphere!)) all = false;
+    r.mesh.visible = all;
+    if (all) for (const p of r.parts) p.mesh.visible = false;
+    if (all || !r.parts.length) for (const t of r.of) t.userData.inRun = all;
+    return all;
   }
 
   /** dominant surface for footsteps / bullet impacts */
