@@ -43,6 +43,9 @@ export const LOGOUT_MS = (process.env.LOGOUT_S === undefined ? 60 : Math.max(0, 
 /** how far somebody waiting to leave may shift before the wait is off, metres; and how long an open wound runs by itself, seconds */
 export const LOGOUT_STIR = 1.5;
 
+/** how long a game may say nothing (a tab put behind another, a game frozen) before its player is taken off the server (0: never) */
+const TABBED_MS = (process.env.TABBED_S === undefined ? 60 : Math.max(0, Number(process.env.TABBED_S) || 0)) * 1000;
+
 export const away = (c: Client, now = Date.now()) => c.asleep > 0 || now - c.heardAt > SILENT_MS;
 
 /** a life new to the world leaves no body behind if its connection goes this soon; and a connection whose game has said nothing of where it is by this long after it was let in is not a game, and goes (ms) */
@@ -200,6 +203,7 @@ const worn = (c: Client, k: 'armor' | 'head') => Object.values(c.inv?.slots ?? {
 /** Something has hit somebody whose game is not answering: it comes off the health the server holds for them. */
 export function keep(c: Client, amount: number, zone: string, w: string) {
   if (!c.alive || !away(c)) return;
+  c.hitAway = Date.now();
   const v = (c.vitals ??= { health: 100, energy: 80, water: 80, stamina: MAX_STAMINA, bleeding: false, blood: BLOOD.full, bleed: 0 });
   let a = amount;
   if (w !== 'crash') for (const m of zone === 'torso' ? worn(c, 'armor') : zone === 'head' ? worn(c, 'head') : []) a *= m;
@@ -240,6 +244,16 @@ export function keeping(now: number) {
     if (c.logoutAt && now >= c.logoutAt && !c.asleep) {
       log(`${c.name} left the proper way`);
       send(c, { t: 'kick', reason: 'You have logged out. Your character is saved where you stood, with everything you carried.' });
+      drop(c);
+      c.ws.close();
+      continue;
+    }
+    // (2026-10-14, the owner: "players who are tabbed out for 60 seconds should get removed from the server". A
+    // minute of nothing from their game, and they go as with the proper leave, saved where they stood. A hit
+    // meanwhile starts the minute again, as a hit calls off the wait to leave: no tabbing out of a fight.)
+    if (TABBED_MS && c.spoke && !c.asleep && now - Math.max(c.heardAt, c.hitAway) >= TABBED_MS) {
+      log(`${c.name} (#${c.id}) has been tabbed out ${Math.round(TABBED_MS / 1000)} s: taken off the server${c.alive ? ', saved where they stood' : ''}`);
+      send(c, { t: 'kick', reason: `You were tabbed out for ${Math.round(TABBED_MS / 1000)} seconds, so you were taken off the server.${c.alive ? ' Your character is saved where you stood, with everything you carried.' : ''}` });
       drop(c);
       c.ws.close();
       continue;
