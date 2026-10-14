@@ -6,7 +6,7 @@ Read `CLAUDE.md` first. This file says what is live, what is waiting, and what i
 - `bb275b6`, deployed 2026-10-14 08:10 UTC: PROTOCOL 38, WORLD_REV 25, LOOT_REV 22. The helicopters (the Apache on the supply drop; two MD-500s to fly, on the hospital roof and below the fort), the fort turned to the road with the jeep burning at its gate, everything seated in the ground; the terrace's tents taken out (the owner: too small); a keycard no longer keeps anybody out of a vehicle (only a taken tag does); the leave-the-tab question and the full screen setting; and the split of the five giant files.
 - Payouts: the "rule of five" has been on since 2026-10-14 02:20 UTC (0.01 SOL a tag, a wallet paid when five are due). Check `/api/cashins?format=status`.
 
-## On `next`, not yet live (NOT deployed: on 2026-10-14 the owner said "we dont need to deploy either theres people on right now": ship it when they say, ideally when nobody is on)
+## The fort work of 2026-10-14 (LIVE since bb275b6; what is LEFT FOR THE FIRST ROUND AFTER THE SPLIT below is still open)
 - The fort TURNED where it stands so its drawbridge faces the road (its turn is in `MOUNTAIN` in `src/world/worldgen.ts`: -75 degrees), the hill's foot run out before the gate (`MOUNTAIN.shoulder` in worldgen), the cart track up it to the gate, a lane to the ruined houses.
 - A wrecked jeep burning for good before the gate (light by night, warmth like a campfire, burns to the touch): `castleJeep` in `src/sim/castle.ts`, `src/game/wreck-fire.ts`, `src/sim/wreck-fire.ts`.
 - Every tree, rock, stump and log seated in the ground (`src/world/seat.ts`; test `test/seat.test.ts`).
