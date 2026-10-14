@@ -65,6 +65,15 @@ import { sendDrop } from './drops';
 /** which of them each admin has on, by their key: theirs again when they come back, as what they chose for their death is (and, like that, until this server restarts) */
 export const CARRY_KEPT = new Map<string, Pick<Client['power'], CarryPower>>();
 
+/**
+ * Every power each admin has, by their key's hash, theirs again when they come back: across a server's restarts too,
+ * kept with the world (keep.ts). The owner, 2026-10-14: "admin state should be stored across server restart.
+ * currently when im flying around then leave then come back i fall and die as admin" (noclip, god and vanish were
+ * forgotten as soon as they left).
+ */
+export const POWERS_KEPT = new Map<string, Client['power']>();
+export const keepPowers = (c: Client) => void POWERS_KEPT.set(keyHash(c.key), { ...c.power });
+
 export function carryKept(c: Client) {
   if (c.power.weightless || c.power.endless || c.power.bottomless) CARRY_KEPT.set(c.key, { weightless: c.power.weightless, endless: c.power.endless, bottomless: c.power.bottomless });
   else CARRY_KEPT.delete(c.key);
@@ -526,6 +535,7 @@ export async function command(c: Client, line: string) {
       if (to !== 'admin') {
         for (const k of ['god', 'hidden', 'clip', 'voidInv', 'voidTag', 'weightless', 'endless', 'bottomless'] as const) setPower(t, k, false);
         ADMIN.voids.delete(t.key);
+        POWERS_KEPT.delete(keyHash(t.key));
         // (and whoever has vanished is gone from their game, as from anybody's)
         if (was) for (const o of clients.values()) if (o !== t && o.power.hidden) send(t, { t: 'leave', id: o.id });
       }

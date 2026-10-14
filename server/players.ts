@@ -81,6 +81,8 @@ export interface Client {
   /** where they connect from, and when the life they are living began (see notEarned) */
   ip: string;
   lifeAt: number;
+  /** the role they were last told they have (see tellRoles in keep.ts) */
+  roleTold?: string | null;
   msgCount: number;
   msgWindow: number;
   /**
@@ -296,6 +298,7 @@ export function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | n
   } else sendBoard(c);
   log(`+ ${c.name} (#${c.id})${resume ? ' resumed' : ''} — ${clients.size} online`);
   // (somebody with a role is told so as they come in: their game shows them what they may do)
+  c.roleTold = roleOf(c);
   if (roleOf(c)) send(c, { t: 'role', role: roleOf(c) });
   if (roleOf(c) === 'admin') asAdmin(c, false);
   // (and whoever comes in with an admin's hold and is none is told so: their game empties it)

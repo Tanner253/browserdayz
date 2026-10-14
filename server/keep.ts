@@ -11,7 +11,7 @@ import { BOOT, RECORD_LIFETIME, WORLD_REV, boxes, economy, issue, log, news, sta
 import { SITE_URL } from './tags';
 import { CHECK } from './checks';
 import { ADMIN, keyHash, roleOf, siteAdmin, type AdminState } from './gate';
-import { CARRY_KEPT, carryKeep, carryKept, noHold } from './admin';
+import { CARRY_KEPT, POWERS_KEPT, carryKeep, carryKept, keepPowers, noHold } from './admin';
 import { broadcast, cleanInventory, cleanItem, clients, info, isPose, num, records, send, type Client, type Record_ } from './players';
 import { fillFromQueue } from './queue';
 import { seen } from './seen';
@@ -98,6 +98,8 @@ interface Snapshot {
   news?: NewsKept;
   /** who has played in the last week, by key hash and when (see seen.ts) */
   seen?: [string, number][];
+  /** each admin's powers, by key hash (see POWERS_KEPT) */
+  powers?: [string, Client['power']][];
 }
 
 interface KeptFile { at: string; boot: string; final: boolean; z: string }
@@ -129,6 +131,17 @@ async function siteKeep(op: Record<string, unknown>): Promise<{ ok?: boolean; wh
   }
 }
 
+/** admins' powers kept with the world: each the one this server has, or else the kept one (by key hash, each power a yes or no) */
+function takePowers(list: unknown) {
+  if (!Array.isArray(list)) return;
+  for (const e of list) {
+    if (!Array.isArray(e) || typeof e[0] !== 'string' || !e[1] || typeof e[1] !== 'object' || POWERS_KEPT.has(e[0])) continue;
+    const p: Record<string, boolean> = {};
+    for (const [k, v] of Object.entries(e[1] as Record<string, unknown>)) if (typeof v === 'boolean') p[k] = v;
+    POWERS_KEPT.set(e[0], p as unknown as Client['power']);
+  }
+}
+
 /** everything that is kept, as it is this moment */
 function snapshot(): Snapshot {
   const now = Date.now(), chars = new Map<string, Record_>(KEPT.chars);
@@ -137,7 +150,7 @@ function snapshot(): Snapshot {
   // (no more of them than can be carried: the newest, if it ever came to that)
   const newest = [...chars].sort((a, b) => b[1].leftAt - a[1].leftAt).slice(0, 6000);
   const loose = [...economy.loot.values()].filter((l) => l.keptAt !== undefined).map((l) => ({ item: l.item, x: l.x, y: l.y, z: l.z, rot: l.rot, at: l.keptAt! }));
-  return { rev: WORLD_REV, wipe: WIPE, chars: newest, stashes: [...boxes.values()].filter((b) => b.kind === 'stash' && b.buried), loose, news: news.keep(), seen: seen.keep() };
+  return { rev: WORLD_REV, wipe: WIPE, chars: newest, stashes: [...boxes.values()].filter((b) => b.kind === 'stash' && b.buried), loose, news: news.keep(), seen: seen.keep(), powers: [...POWERS_KEPT] };
 }
 
 /** What is kept is written to the site. @param final this server's last word @returns whether it was */
@@ -197,6 +210,7 @@ function takeInLate(save: KeptFile) {
   }
   if ((snap.wipe ?? '') !== WIPE) return void log(`[keep] a newer copy (${save.at}) is of another world, and is written over`);
   seen.restore(snap.seen);
+  takePowers(snap.powers);
   const moved = snap.rev !== WORLD_REV, now = Date.now();
   const back = new Set([...[...clients.values()].map((c) => keyHash(c.key)), ...[...records.keys()].map((k) => keyHash(k))]);
   const carried = new Set<string>();
@@ -481,6 +495,7 @@ export async function loadKept() {
     // (what has been said under the changelog, and its hearts: kept with the rest, and no worse for a new map)
     news.restore(snap.news);
     seen.restore(snap.seen);
+    takePowers(snap.powers);
     open(`${KEPT.chars.size} characters and ${stashes} stashes as they were kept at ${save.at}${save.final ? '' : ' (not a last word: the server before this one stopped without one)'}${moved ? '; the map has been made again since, so everybody starts from the edge with what they had' : ''}`);
   } catch (e) {
     // (what could be taken in has been: it is not thrown away for the sake of what could not)
@@ -491,25 +506,38 @@ export async function loadKept() {
 
 /** The lists are read when the server starts, and again every little while until they have been (the site may be asleep). */
 export function loadAdmin(tries = 0) {
+  // (said here and not as the module is read: the two modules read one another, and the lists are not made yet then)
+  ADMIN.onState = tellRoles;
   void siteAdmin({ op: 'load' }).then((r) => {
     if (r?.ok) {
       log(`[admin] lists read from the site: ${Object.keys(ADMIN.state.roles).length} with a role, ${ADMIN.state.bans.length} banned${r.set ? '' : ' (no ADMIN_PASSWORD is set there: nobody can become an admin)'}`);
-      // (Whoever came in before the lists were read was let in as nobody in particular, and nothing told them
-      // otherwise afterwards: at a deploy the first tries are answered by the server before this one, so that is
-      // whoever was quickest back. They are told now.)
-      for (const c of clients.values()) {
-        const role = roleOf(c);
-        // (and whoever came in with an admin's hold is told it is not theirs, now that it is known who is an admin)
-        if (role !== 'admin') noHold(c);
-        if (!role) continue;
-        send(c, { t: 'role', role });
-        if (role === 'admin') asAdmin(c, true);
-      }
+      // (and whoever came in with an admin's hold is told it is not theirs, now that it is known who is an admin)
+      for (const c of clients.values()) if (roleOf(c) !== 'admin') noHold(c);
       return;
     }
-    // (often at first: at a deploy the site's call back reaches the server before this one until this one is the one being served)
-    if (tries < 110) setTimeout(() => loadAdmin(tries + 1), tries < 90 ? 5_000 : 30_000).unref();
+    // (Often at first: at a deploy the site's call back reaches the server before this one until this one is the one
+    // being served. It is asked again until it answers: it used to give up after some seventeen minutes, and then
+    // nobody had a role until the next restart. 2026-10-14: "my admins lost their roles even though they still are
+    // admin in the admin panel?")
+    setTimeout(() => loadAdmin(tries + 1), tries < 90 ? 5_000 : 30_000).unref();
   });
+}
+
+/**
+ * Whoever is on and has a role they have not been told is told it, whenever the lists come from the site and by
+ * whatever asked for them (the start's own reading, a password, a role given): whoever came in before the lists
+ * were read was let in as nobody in particular, and an admin who stayed on after a reading that was not the start's
+ * was never told they were one.
+ */
+export function tellRoles() {
+  for (const c of clients.values()) {
+    const role = roleOf(c) ?? null;
+    if (role === (c.roleTold ?? null)) continue;
+    c.roleTold = role;
+    if (!role) continue;
+    send(c, { t: 'role', role });
+    if (role === 'admin') asAdmin(c, true);
+  }
 }
 
 /** What an admin changed is written to the site. @returns whether it was */
@@ -556,7 +584,25 @@ export function place(t: Client, x: number, y: number | null, z: number, by: Cli
  * is paid for killing one at work). And they are shown whoever has vanished.
  */
 export function asAdmin(c: Client, fresh: boolean) {
-  Object.assign(c.power, ADMIN.voids.get(c.key) ?? { voidInv: true, voidTag: true });
+  // (every power they had on when they left, or before this server started: one who was flying is flying again, and
+  // does not fall out of the sky where they were kept)
+  const kept = POWERS_KEPT.get(keyHash(c.key));
+  if (kept) {
+    for (const k of Object.keys(c.power) as (keyof Client['power'])[]) if (typeof kept[k] === 'boolean') c.power[k] = kept[k];
+    const now = Date.now();
+    if (c.power.clip) {
+      c.check.free = now + CHECK.free;
+      c.underAt = 0;
+    }
+    if (c.power.god) {
+      c.check.hp = 100;
+      c.check.hpAt = now;
+      c.check.downAt = 0;
+    }
+    // (vanished when they left: everybody was told they had come, and is told now that they are gone)
+    if (c.power.hidden) for (const o of clients.values()) if (o !== c) send(o, roleOf(o) === 'admin' ? { t: 'ghost', id: c.id, on: true } : { t: 'leave', id: c.id });
+  }
+  Object.assign(c.power, ADMIN.voids.get(c.key) ?? (kept ? {} : { voidInv: true, voidTag: true }));
   Object.assign(c.power, CARRY_KEPT.get(c.key));
   // (An admin who comes in with things in their hold has the room they lie in. Which powers were on is forgotten
   // when this server restarts, and what is carried is not: without this, a restart put everything in an admin's
@@ -565,6 +611,7 @@ export function asAdmin(c: Client, fresh: boolean) {
     c.power.bottomless = true;
     carryKept(c);
   }
+  keepPowers(c);
   send(c, { t: 'powers', ...c.power });
   if (fresh) for (const o of clients.values()) if (o !== c && o.power.hidden) send(c, { t: 'join', p: info(o) });
 }
@@ -573,6 +620,7 @@ export function asAdmin(c: Client, fresh: boolean) {
 export function setPower(c: Client, k: keyof Client['power'], on: boolean) {
   if (c.power[k] === on) return;
   c.power[k] = on;
+  if (roleOf(c) === 'admin') keepPowers(c);
   if (k === 'voidInv' || k === 'voidTag') {
     ADMIN.voids.set(c.key, { voidInv: c.power.voidInv, voidTag: c.power.voidTag });
     return void send(c, { t: 'powers', ...c.power });

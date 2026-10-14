@@ -469,6 +469,8 @@ export const ADMIN = {
   pepper: '',
   /** read from the site at least once since this server started */
   ready: false,
+  /** told whenever the lists come from the site, by whatever asked for them: whoever is on and has a role they have not been told is told it (keep.ts, tellRoles) */
+  onState: null as (() => void) | null,
   /** what the site is about to ask this server to vouch for: a number, and what it stands for */
   ops: new Map<string, Record<string, unknown>>(),
   /** tries at the password: by key and by address, the times of them */
@@ -532,6 +534,7 @@ export async function siteAdmin(op: Record<string, unknown>): Promise<{ ok?: boo
       ADMIN.state = { roles: out.state.roles ?? {}, bans: out.state.bans ?? [] };
       if (out.pepper) ADMIN.pepper = out.pepper;
       ADMIN.ready = true;
+      ADMIN.onState?.();
     }
     return out;
   } catch {
