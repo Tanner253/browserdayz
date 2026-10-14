@@ -21,7 +21,9 @@ import type { IState, InfectedInfo } from '../sim/infected';
 // as a jeep, in the air. And `vswap`, from one seat to another.)
 // (39, 2026-10-14: the basements (src/sim/basements.ts): the server lays loot in them, and a page from before has no
 // rooms there, no open steps down and no loot places: it would see things lying in the earth under the houses.)
-export const PROTOCOL = 39;
+// (40, 2026-10-14: a body killed in a helicopter rides it down ('ride' on a corpse, 'corpse@' when it is laid on the
+// ground): a page from before would draw it where it died, in the air, and never see it come down.)
+export const PROTOCOL = 40;
 
 /** chat channels: everyone on the server, or only players standing near the speaker */
 /** `staff`: those with a role, to one another, wherever they are: nobody else is sent it */
@@ -117,6 +119,8 @@ export interface CorpseInfo extends StashInfo {
   name: string;
   /** how it fell, so it lies the same way for everyone: 0 on its back, 1 on its face, 2 on its side */
   v?: number;
+  /** still sat in a helicopter: which (its `i`) and which seat. It is drawn there until 'corpse@' lays it on the ground. */
+  ride?: { i: number; seat: number };
 }
 
 export interface KillInfo {
@@ -303,6 +307,8 @@ export type S2C =
   /** somebody this (admin's) game knows has vanished, or is seen by everybody again: they are drawn faintly, or as anybody is */
   | { t: 'ghost'; id: number; on: boolean }
   | { t: 'corpse-'; uid: string }
+  /** a body that rode down in a helicopter, laid on the ground beside it now that it is down: there to be searched */
+  | { t: 'corpse@'; corpse: CorpseInfo }
   | { t: 'door'; i: number; open: boolean; swing: number }
   | { t: 'spawn'; x: number; z: number; yaw: number }
   | { t: 'chat'; ch?: ChatChannel; from: string; text: string; role?: 'admin' | 'mod'; /** an admin's own colour for their tag (not said: the rainbow) */ tint?: string }

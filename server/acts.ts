@@ -9,7 +9,7 @@ import { fallen } from '../src/sim/grenades';
 import { JEEP, RIDE_HEIGHT, SEATS, restState, type VState } from '../src/sim/vehicles';
 import { HELI, heliCrash, hpOf } from '../src/sim/heli';
 import { type CorpseInfo, type KillInfo, F_DEAD } from '../src/net/protocol';
-import { CORPSE_LIFETIME, boxes, economy, issue, jeepsDue, locks, log, tellSeats, vehicles, world, type Veh } from './index';
+import { CORPSE_LIFETIME, boxes, economy, issue, jeepsDue, locks, log, tellSeats, vehicles, world, type Box, type Veh } from './index';
 import { TAG_FRESH_MS, carriedTags, lootedTags, tagSeen } from './tags';
 import { CHECK, dealt } from './checks';
 import { ADMIN, fellBlast } from './gate';
@@ -250,7 +250,7 @@ export function blowJeep(v: Veh, byId: number) {
  * all inventories"). The grid is BODY_GRID, which holds all a person can have on at once: it was 8x10, and pocket
  * loot and taken tags that found no room were thrown on the ground round the body.
  */
-function makeCorpse(c: Client, v: number): CorpseInfo | null {
+function makeCorpse(c: Client, v: number, ride?: Box['ride']): CorpseInfo | null {
   const inv = c.inv;
   const [x, , z, yaw] = c.pose;
   const y = c.pose[1];
@@ -327,8 +327,53 @@ function makeCorpse(c: Client, v: number): CorpseInfo | null {
   if (!box.items.length) return null;
   // (what is on a body is in the world from now on, whatever it was before: it is whoever carried it that was asked)
   for (const p of box.items) issue(p.item);
-  boxes.set(uid, { cid: uid, kind: 'corpse', w: BODY_GRID[0], h: BODY_GRID[1], items: box.serialize().items, x, y, z, rot: yaw, emptiedAt: -1, name: c.name, expires: economy.time + CORPSE_LIFETIME, v });
-  return { uid, x, y, z, rot: yaw, name: c.name, v };
+  boxes.set(uid, { cid: uid, kind: 'corpse', w: BODY_GRID[0], h: BODY_GRID[1], items: box.serialize().items, x, y, z, rot: yaw, emptiedAt: -1, name: c.name, expires: economy.time + CORPSE_LIFETIME, v, ...(ride ? { ride } : {}) });
+  if (ride) riders.add(uid);
+  return { uid, x, y, z, rot: yaw, name: c.name, v, ...(ride ? { ride } : {}) };
+}
+
+/**
+ * The dead who ride on (the owner, 2026-10-14: "when a player gets shot out of [the helicopter] their body should
+ * stay in the helicopter till it crashes then spawn on the ground with all the contents on the ground so they can be
+ * looted, currently the player just dies in the sky"). Somebody killed in a helicopter's seat stays sat in it, with
+ * all they carried, until it is down: at rest, wrecked, or gone. Then the body is laid on the ground beside their
+ * door ('corpse@'), to be searched there. (Laid where they died, it lay on the helicopter's own floor in the air,
+ * every game finding that under it, and stayed there as the helicopter flew on.) The bodies' uids.
+ */
+export const riders = new Set<string>();
+
+/** how far from the helicopter's middle, out of the side of its seat, a body that rode it down is laid (it is some two metres across) */
+const OUT_BESIDE = 2.4;
+
+/** each second: whatever helicopter a body rides that is down, the body is laid beside it */
+export function settleRiders() {
+  for (const uid of riders) {
+    const b = boxes.get(uid);
+    if (!b?.ride) {
+      riders.delete(uid);
+      continue;
+    }
+    const v = vehicles.get(b.ride.i);
+    if (v && !v.goneAt) {
+      // (down: barely moving, and on the ground or left to nobody's game; a helicopter hanging still in the air is not)
+      const [x, y, z] = v.s, still = Math.hypot(v.s[7], v.s[8], v.s[9]) < 0.6;
+      if (!still || (v.sim !== null && y - RIDE_HEIGHT - world.standAt(x, y, z) > 1)) continue;
+    }
+    // (beside the door of the seat they sat in: the pilot's on the left. Wrecked in the air, under where it went up.)
+    const s = v ? v.s : null, yaw = s ? yawOf(s) : b.rot, side = b.ride.seat === 0 ? -1 : 1;
+    const x = (s ? s[0] : b.x) + side * OUT_BESIDE * Math.cos(yaw), z = (s ? s[2] : b.z) - side * OUT_BESIDE * Math.sin(yaw);
+    // (as high as the helicopter's skids, or the ground there if that is higher: on the hospital's roof the roof, which
+    // the server does not know of; every game lays it on whatever is under that, as it does any body)
+    const ground = world.standAt(x, s ? s[1] : b.y, z);
+    b.x = x;
+    b.y = s && !v!.goneAt ? Math.max(ground, s[1] - RIDE_HEIGHT) : ground;
+    b.z = z;
+    b.rot = yaw;
+    delete b.ride;
+    riders.delete(uid);
+    broadcast({ t: 'corpse@', corpse: { uid, x: b.x, y: b.y, z: b.z, rot: b.rot, name: b.name ?? 'Survivor', v: b.v ?? 0 } });
+    log(`${b.name}'s body came down with the helicopter ${v ? v.i : '(gone)'}`);
+  }
 }
 
 export function kill(c: Client, cause: string, v = 0) {
@@ -346,11 +391,14 @@ export function kill(c: Client, cause: string, v = 0) {
   // (a body left behind has nobody to come back to it: it is out of the world once it has fallen)
   if (c.asleep) setTimeout(() => drop(c), 3000);
   releaseLock(c);
+  // (killed in a helicopter: the body stays in its seat until the helicopter is down, see `riders`)
+  const rode = seatOf(c);
+  const ride = rode && rode.v.k === HELI.kind && !rode.v.goneAt ? { i: rode.v.i, seat: rode.seat } : undefined;
   leaveSeat(c);
   const now = Date.now();
   const by = c.lastHitBy && now - c.lastHitBy.at < 15000 ? c.lastHitBy : null;
   const k: KillInfo = { id: c.id, name: c.name, by: by?.id ?? null, byName: by?.name ?? null, w: by?.w ?? cause, zone: by?.zone ?? null, dist: Math.round(by?.dist ?? 0), v };
-  const corpse = makeCorpse(c, v);
+  const corpse = makeCorpse(c, v, ride);
   for (const k of [...tagSeen.keys()]) if (k.startsWith(`${c.key}|`)) tagSeen.delete(k);
   c.inv = null;
   c.vitals = null;

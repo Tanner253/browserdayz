@@ -33,7 +33,7 @@ import { CHECK, CHECKS, flagged, takenTag } from './checks';
 import { ADMIN, BOTCHECK, CAPTCHA, CAPTCHA_ON, RANGES, SLIPS, TURNED, addressFull, away, bannedFor, dealAhead, flooding, gone, goodSlip, inHands, keeping, keyHash, knownPerson, knownShooter, listOf, nextRange, personOf, persons, roleOf, shooters, standing } from './gate';
 import { KEEP_EVERY_MS, KEPT, PUBLIC_URL, deploying, keepBefore, keepNow, loadAdmin, loadKept, pause, reachedHere, sayRestart } from './keep';
 import { broadcast, cleanName, clients, join, num, records, round2, type Client } from './players';
-import { blowJeep, voice } from './acts';
+import { blowJeep, settleRiders, voice } from './acts';
 import { handle } from './handle';
 import { enqueue, keyOf, kickIdle, leaveQueue, mustWait, queue, queueToldAt, tellQueue } from './queue';
 import { seen } from './seen';
@@ -106,6 +106,8 @@ export interface Box {
   name?: string;
   expires?: number;
   v?: number;
+  /** a corpse still sat in a helicopter's seat, until it is down (see `riders` in server/acts.ts): not to be searched until then */
+  ride?: { i: number; seat: number };
 }
 
 export const boxes = new Map<string, Box>();
@@ -559,6 +561,8 @@ setInterval(() => {
       broadcast({ t: 'bunker', open: false });
     }
   }
+  // the dead who rode a helicopter down, laid beside it once it is down
+  settleRiders();
   // a new one for each that burned, once its time has come and nobody is standing on the spot
   for (const [home, at] of jeepsDue) {
     const p = PARKS[home];

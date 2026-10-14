@@ -53,7 +53,7 @@ export const onlineMethods = {
     // restart everybody shoots the range again, so it was everybody's risk. A stash's model comes when it comes,
     // as a body's and a drop's do.)
     for (const s of w.stashes) void this.addRemoteStash(s);
-    for (const c of w.corpses) void this.addCorpse(c);
+    for (const c of w.corpses) void (c.ride ? this.riders.add(c) : this.addCorpse(c));
     for (const d of w.drops ?? []) void this.addDrop(d);
     // (a helicopter in the air when this game came in: it is where everybody else's game has it)
     for (const f of w.flights ?? []) this.flightBegun(f, true);
@@ -197,7 +197,11 @@ export const onlineMethods = {
       if (!me) this.remotes.get(k.id)?.avatar.setDeath(k.v ?? 0);
       if (me) this.deathInfo = k.by !== null ? `Killed by ${k.byName} with ${drum ? 'a fuel drum' : k.w === 'fire' ? 'a burning wreck' : jeep ? 'the car they were driving' : ITEMS[k.w]?.name ?? 'bare hands'}${zone}. Your body and gear are where you fell.` : `You died of ${k.w}. Your body and gear are where you fell.`;
       else this.remotes.get(k.id)?.setAlive(false);
-      if (m.corpse) void this.addCorpse(m.corpse);
+      // (killed in a helicopter: the body stays sat in it, and the one that fell where they were is not drawn)
+      if (m.corpse?.ride) {
+        if (!me) this.remotes.get(k.id)?.vanish();
+        void this.riders.add(m.corpse);
+      } else if (m.corpse) void this.addCorpse(m.corpse);
     });
     net.on('alive', (m) => this.remotes.get(m.id)?.setAlive(true));
     net.on('loot+', (m) => this.economy.inject(m.l));
@@ -245,7 +249,12 @@ export const onlineMethods = {
       if (this.openStash === st) this.toggleInventory(false);
       st.setBuried(m.buried);
     });
-    net.on('corpse-', (m) => this.removeCorpse(m.uid));
+    net.on('corpse-', (m) => {
+      this.riders.remove(m.uid);
+      this.removeCorpse(m.uid);
+    });
+    // (down with the helicopter: out of its seat and on the ground beside it, at once, there to be searched)
+    net.on('corpse@', (m) => void this.addCorpse(m.corpse, 0).then(() => this.riders.remove(m.corpse.uid)));
     net.on('board', (m) => this.hud.setBoard(m.rows, m.me, m.mine, playerName()));
     net.on('drop+', (m) => void this.addDrop(m.d));
     net.on('heli+', (m) => this.flightBegun(m.f, false, m.f.by === net.id));
@@ -597,7 +606,8 @@ export const onlineMethods = {
     }
   },
 
-  async addCorpse(this: Game, c: CorpseInfo) {
+  /** @param wait ms to let the fall animation of the player finish before the body appears (none for one that rode a helicopter down) */
+  async addCorpse(this: Game, c: CorpseInfo, wait = 1800) {
     if (this.corpses.has(c.uid)) return;
     // Where somebody died is where their feet were, and that can be in the air (a jump, a fall, a roof's edge): the
     // body lies on whatever is under that place, and along it if it slopes. ("dead bodies somtimes hover above the
@@ -615,8 +625,7 @@ export const onlineMethods = {
     else stash.trigger(0.48, 0.25, 0.85, -ahead * 0.56, left);
     const body = new CorpseBody();
     this.corpses.set(c.uid, { stash, body });
-    // let the fall animation of the player finish before the body appears
-    await new Promise((r) => setTimeout(r, 1800));
+    if (wait) await new Promise((r) => setTimeout(r, wait));
     if (!this.corpses.has(c.uid)) return;
     await body.load(this.s.atmo, this.s.r.scene, c.x, c.y, c.z, c.rot, c.name, v, slope);
     // and what has run out of it by then

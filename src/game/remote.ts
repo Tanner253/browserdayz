@@ -202,6 +202,12 @@ export class RemotePlayer implements Damageable {
     if (this.ready && this.alive && now - this.aliveAt > 1500) this.setAlive(false);
   }
 
+  /** out of sight at once, dead: their body is drawn elsewhere (sat in a helicopter: see riders.ts) */
+  vanish() {
+    this.fall = 4;
+    this.avatar.root.visible = false;
+  }
+
   setAlive(alive: boolean) {
     // (a body still being made here has nothing yet to stand up or lay down: what their positions say settles it when it is made)
     if (alive === this.alive || !this.ready) return;

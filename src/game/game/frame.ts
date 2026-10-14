@@ -363,6 +363,7 @@ export const frameMethods = {
     r.vmScene.visible = fpView && !this.glass;
     const interp = new THREE.Vector3().lerpVectors(p.prevPos, p.pos, physics.alpha);
     this.avatar.setLean(p.dead ? 0 : p.lean);
+    this.riders.update(dt);
     if (this.garage.ride) {
       this.avatar.update(dt, p.pos, _still, this.garage.ride.jeep.yaw, false, p.dead, true, 0, true, false);
       this.garage.seatBody();

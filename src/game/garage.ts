@@ -62,9 +62,9 @@ const SEAT_HELI: [number, number, number][] = [
   [0.36, -0.28, -0.75],
 ];
 /** how whoever sits in each seat sits: as the library drew it on a jeep's bench (see CAR_SIT) */
-const SIT_OF: (SeatPose | null)[][] = [[null, null, null, null], [CAR_SIT.front, CAR_SIT.front, CAR_SIT.back, CAR_SIT.back], [null, null, null, null]];
+export const SIT_OF: (SeatPose | null)[][] = [[null, null, null, null], [CAR_SIT.front, CAR_SIT.front, CAR_SIT.back, CAR_SIT.back], [null, null, null, null]];
 /** the seats of each kind of car (the `k` of a VehicleInfo), and where its engine is, for the smoke */
-const SEATS_OF = [SEAT_AT, SEAT_CAR, SEAT_HELI];
+export const SEATS_OF = [SEAT_AT, SEAT_CAR, SEAT_HELI];
 const ENGINE_AT: [number, number, number][] = [[0, 0.5, -1.45], [0, 0.22, -1.9], [0, 1.3, 0.9]];
 /** and what each is called, where a player is told what hurt them */
 const CALLED = ['jeep', 'police car', 'helicopter'];

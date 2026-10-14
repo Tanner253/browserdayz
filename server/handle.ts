@@ -345,8 +345,8 @@ export function handle(c: Client, m: C2S) {
     }
     case 'copen': {
       const b = boxes.get(m.cid);
-      // (a body, a crate, a stash, a drop: none of them is searched from a jeep's seat)
-      if (!b || !c.alive || c.seatAt || buried(c) || b.buried) return;
+      // (a body, a crate, a stash, a drop: none of them is searched from a jeep's seat; nor a body still in the air in one)
+      if (!b || !c.alive || c.seatAt || buried(c) || b.buried || b.ride) return;
       if (Math.hypot(b.x - c.pose[0], b.z - c.pose[2]) > 6) return;
       const holder = locks.get(m.cid);
       if (holder !== undefined && holder !== c.id && clients.has(holder)) {

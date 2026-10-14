@@ -131,13 +131,24 @@ export function heliSpots(world: World): { x: number; y: number; z: number; yaw:
     }
     // (its nose toward the fort)
     if (best) {
-      // (stood on the highest of the ground under its skids' ends, so that none of them is in the ground)
-      const yaw = Math.atan2(-(fort.x - best.x), -(fort.z - best.z)), c = Math.cos(yaw), s = Math.sin(yaw);
-      const y = Math.max(...[[-1, -1.5], [1, -1.5], [-1, 1.1], [1, 1.1]].map(([sx, sz]) => heightAt(H, best!.x + sx * c + sz * s, best!.z - sx * s + sz * c)));
-      out.push({ x: best.x, y, z: best.z, yaw });
+      const yaw = Math.atan2(-(fort.x - best.x), -(fort.z - best.z));
+      out.push({ x: best.x, y: skidGround((x, z) => heightAt(H, x, z), best.x, best.z, yaw), z: best.z, yaw });
     }
   }
   return out;
+}
+
+/** where its skids end, in its own frame (x to its right, z back) */
+const SKID_ENDS = [[-1, -1.5], [1, -1.5], [-1, 1.1], [1, 1.1]];
+
+/**
+ * The highest of the ground under its skids' ends, turned to `yaw`: stood on that, none of them is in the ground.
+ * (Stood on the ground under its middle, as the admin's /spawn first did, a helicopter on a slope had its skids in the
+ * hill and could not lift: the owner, 2026-10-14, "it clips into the ground and i cant fly ... uneven ground only".)
+ */
+export function skidGround(ground: (x: number, z: number) => number, x: number, z: number, yaw: number): number {
+  const c = Math.cos(yaw), s = Math.sin(yaw);
+  return Math.max(...SKID_ENDS.map(([sx, sz]) => ground(x + sx * c + sz * s, z - sx * s + sz * c)));
 }
 
 /** how many seats a vehicle of this kind (the `k` of a VehicleInfo) has: a helicopter two, a car SEATS */

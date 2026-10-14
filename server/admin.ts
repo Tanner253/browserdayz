@@ -7,7 +7,7 @@ import { ITEMS, type ItemInstance, makeItem } from '../src/sim/items';
 import { WORLD_SIZE } from '../src/world/worldgen';
 import { comesFrom, flightTimes } from '../src/sim/airdrop';
 import { POLICE_CAR, restState } from '../src/sim/vehicles';
-import { HELI } from '../src/sim/heli';
+import { HELI, skidGround } from '../src/sim/heli';
 import { INFECTED } from '../src/sim/infected';
 import type { S2C } from '../src/net/protocol';
 import { ORDERS, written, entityBy, ENTITIES, GROUND } from '../src/net/orders';
@@ -319,7 +319,9 @@ export async function command(c: Client, line: string) {
         for (let k = 0; k < count; k++) {
           // (more than one: side by side, across the way the admin faces)
           const off = (k - (count - 1) / 2) * 4.5, cx = x + Math.cos(yaw) * off, cz = z - Math.sin(yaw) * off;
-          const v = standCarAt(e.k ?? 0, cx, y ?? world.groundAt(cx, cz), cz, yaw);
+          // (a helicopter on the highest ground under its skids, as the parked ones are: see skidGround)
+          const ground = e.k === HELI.kind ? skidGround(world.coverAt, cx, cz, yaw) : world.groundAt(cx, cz);
+          const v = standCarAt(e.k ?? 0, cx, y ?? ground, cz, yaw);
           if (!v) break;
           made.push(v);
           broadcast({ t: 'v+', v: vehInfo(v) });

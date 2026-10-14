@@ -44,6 +44,7 @@ import { Weapons, type HitInfo } from './weapons';
 import { LootManager, Stash, WorldItem } from './loot';
 import { Grenades } from './grenades';
 import { Garage } from './garage';
+import { Riders } from './riders';
 import { Jeep } from './vehicle';
 import '../sim/vehicles';
 import { HUD } from '../ui/hud';
@@ -183,6 +184,8 @@ export class Game {
   grenades!: Grenades;
   /** the jeeps (see garage.ts) */
   garage!: Garage;
+  /** the dead still sat in a helicopter that is not down yet (see riders.ts) */
+  riders!: Riders;
   economy!: Economy;
   hud!: HUD;
   minimap!: Minimap;
@@ -475,6 +478,7 @@ export class Game {
       },
     });
     await this.garage.load();
+    this.riders = new Riders(atmo, r.scene, this.garage);
     this.loot.lift = (x, z) => roadLift(world, x, z);
     this.applyGraphics(this.gfx);
     this.economy = new Economy(buildings.lootPoints, {
