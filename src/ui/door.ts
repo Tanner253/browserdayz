@@ -6,6 +6,8 @@
 import './door.css';
 import { paidLine, platformPaid } from './platform';
 import { TAG_HOLD_MIN } from '../sim/items';
+import { arenaBase, serverStatus } from '../net/client';
+import type { LobbyInfo } from '../../arena/rules';
 
 export type Mode = 'zona' | 'arena';
 
@@ -32,7 +34,7 @@ export function openDoor(): Promise<Mode> {
         <button type="button" class="door-card zona${last === 'zona' ? ' last' : ''}" data-mode="zona">
           <i class="door-bg"></i>
           ${last === 'zona' ? '<span class="door-last">Last played</span>' : ''}
-          <span class="door-what">Open-world survival</span>
+          <span class="door-what">Open-world survival</span><span class="door-on" data-on="zona" hidden></span>
           <b>ZONA</b>
           <span class="door-say">Loot, survive, kill. Take a dog tag from a kill, hold it ${TAG_HOLD_MIN} minutes, and get paid in SOL.</span>
           <span class="door-go">Enter Zona</span>
@@ -40,7 +42,7 @@ export function openDoor(): Promise<Mode> {
         <button type="button" class="door-card arena${last === 'arena' ? ' last' : ''}" data-mode="arena">
           <i class="door-bg"></i>
           ${last === 'arena' ? '<span class="door-last">Last played</span>' : ''}
-          <span class="door-what">Team matches</span>
+          <span class="door-what">Team matches</span><span class="door-on" data-on="arena" hidden></span>
           <b>ARENA</b>
           <span class="door-say">Team against team at the fort, in rounds. Set loadouts, first to 3, 5 or 10. Watch any match being played.</span>
           <span class="door-go">Enter Arena</span>
@@ -55,6 +57,15 @@ export function openDoor(): Promise<Mode> {
     n.textContent = paidLine(p);
     n.hidden = false;
   });
+  // (how many are in each game now, as its own server says it; nothing said where it does not answer)
+  const on = (mode: Mode, n: number | null) => {
+    const t = el.querySelector(`[data-on="${mode}"]`) as HTMLElement;
+    if (n === null) return;
+    t.textContent = `${n} online`;
+    t.hidden = false;
+  };
+  void serverStatus(8000).then((st) => on('zona', st ? st.players : null));
+  void arenaOnline().then((n) => on('arena', n));
   return new Promise((done) => {
     el.addEventListener('click', (e) => {
       const b = (e.target as HTMLElement).closest('[data-mode]') as HTMLElement | null;
@@ -78,4 +89,16 @@ export function modeOf(wager: boolean): Mode | null {
   if (wager || path === '/arena') return 'arena';
   if (path === '/zona' || location.search.length > 1) return 'zona';
   return null;
+}
+
+/** how many are in the Arena now: its own count, or (an arena from before it said one) everybody in its matches and watching them */
+async function arenaOnline(): Promise<number | null> {
+  try {
+    const h = (await (await fetch(`${arenaBase()}/healthz`, { cache: 'no-store', signal: AbortSignal.timeout(20_000) })).json()) as { players?: number };
+    if (typeof h.players === 'number') return h.players;
+    const l = (await (await fetch(`${arenaBase()}/arena/lobbies`, { cache: 'no-store', signal: AbortSignal.timeout(8000) })).json()) as { lobbies: LobbyInfo[] };
+    return l.lobbies.reduce((n, x) => n + x.have + (x.watching ?? 0), 0);
+  } catch {
+    return null;
+  }
 }

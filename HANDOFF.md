@@ -17,6 +17,17 @@ Read `CLAUDE.md` first. This file says what is live, what is waiting, and what i
 
 ## Next, in this order (agreed with the owner)
 `next` ships whenever the owner says ("deploy"), never while people are on unless they say so.
+
+**THE MAIN GOAL NOW (the owner, 2026-10-14): Phase 4 of the roadmap, "Wilder ground" (`marketing/roadmap.html`), in this order:**
+1. **Attics and basements, basements first.** The owner: "I WANT TO GET BASEMENTS IN, not every building needs a basement but i think this is a dynamic way for us to expand our game easily." Their earlier words and the approach found are in the memory notes `hands-mags-overhaul.md` (the "Basements" lines: a door and a staircase down to loot containers; several floor plans, two layouts under the same house; "make the stairs go deeper ... elevate the ground"; the ground left alone and said where it is not) and `open-requests-2026-10-11.md` (item 29). Plan with a picture for their yes before building.
+2. Animals (deer, boar, wolves), then hunting, skinning and cooking meat.
+3. Weather: rain, cold, shelter.
+4. A desert, and the ruins in it (the held desert-canyon idea: memory note `desert-canyon-idea.md`).
+5. Crashed aircraft, and what they carried.
+6. Forests of different trees.
+7. The 100 fps performance pass (memory notes `perf-ask-2026-10-12.md`, `draw-calls-2026-10-12.md`).
+Alongside: the two films (a 10 s Arena hype trailer; a 30 s trailer of the new additions: the fort, the helicopters and the rest).
+Phase 6 of the card is the Arena's (its stakes, more maps, the fort finished): after Phase 4.
 1. **DONE 2026-10-14: the giant files are split** (commits 2520a75 to 0c2a259, then the chores after them): `src/world/castle-shape/`, `src/sim/castle/`, `src/world/worldgen/` (`generate.ts` kept as one function, its stages indexed at its head), `server/` beside `index.ts`, `src/game/game/` (Game's methods by feature). The old paths still export everything. Proved file by file: the world fingerprint byte-identical, tsc three ways, the whole suite, the server booting and taking two players, the game online in a browser with no page errors. The tools: `scripts/split/` (see CLAUDE.md, "Checking work").
 2. **LIVE since bb275b6: the flyable helicopter (MD-500)**, PROTOCOL 38. `src/game/heli.ts` (a Jeep subclass: a simple model of our own, the owner's "no parts"), `src/sim/heli.ts` (its numbers, its two spots: the hospital roof and a pad by the fort, `seatsOf`, `heliCrash`), `src/world/helipad.ts`. Keys: Space up, C down (the owner: "remove the ctrl key, use C like crouch"), W/S nose, A/D turn, Q/E lean; hands off it holds height and stops itself; never over 100 m above the ground (the owner, so it can be shot). Two seats; Ctrl+1-4 moves seat in any vehicle (Ctrl+1-2 in it), shown on a DayZ-style panel; its glass stops no shot; a fall wrecks it and kills those aboard; a pilot shot or gone leaves it to whoever is aboard, else to the nearest player within 600 m, else the server sets it down wrecked (`orphanHeli`, server/acts.ts). A parked vehicle another runs into takes up physics ('vtake'). Vehicles stay run by the driver's game, not the server: the owner chose that, 2026-10-14, after hearing the trade ("Lets not do server vehicles ... Youre saying this is how aaa games like gta do it then fine"). Test flight: `assets-src/_wf/me/heli-fly.js`; tests `test/heli.test.ts`, `test/heli-orphan.test.ts`. Not yet seen by the owner in play.
 3. The first round of fort fixes listed above ("LEFT FOR THE FIRST ROUND AFTER THE SPLIT").

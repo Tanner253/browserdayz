@@ -34,3 +34,6 @@
   .door-card b { font-size: 54px; }
   .door-say { font-size: 16px; }
 }
+/* how many are in each game now */
+.door-on { font: 600 12px 'JetBrains Mono', monospace; letter-spacing: 0.1em; text-transform: uppercase; color: #9fe08a; }
+.door-on::before { content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 7px; border-radius: 50%; background: #6fd35a; box-shadow: 0 0 8px #6fd35a; vertical-align: 0; }

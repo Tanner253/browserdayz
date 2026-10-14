@@ -357,6 +357,13 @@ function said(l: Lobby, f: Fighter, m: Record<string, unknown>) {
 }
 
 /** the lobbies, as the menu's list has them */
+/** how many are in the arena now, playing, waiting, practising or watching: said at the site's door (the owner: "show how many people online in each game mode") */
+export function arenaPlayers(): number {
+  let n = 0;
+  for (const l of lobbies.values()) n += audience(l).filter((f) => !f.gone && f.ws.readyState === 1).length;
+  return n;
+}
+
 export function arenaList(): LobbyInfo[] {
   const now = Date.now();
   return [...lobbies.values()].filter((l) => l.state !== 'over' && !l.practice).map((l) => ({ id: l.id, host: l.host, kills: l.kills, loadout: l.loadout, stake: l.stake, size: l.size, have: everyone(l).filter((f) => !f.gone).length, state: l.state === 'open' ? 'open' : 'match', age: Math.round((now - l.opened) / 1000), score: l.score, watching: l.watchers.length }));
