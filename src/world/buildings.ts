@@ -1289,6 +1289,14 @@ export class Door {
       // 0.9599999 the next, and those were two sizes of door.)
       this.size = [Math.round(width * 1000) / 1000, Math.round(height * 1000) / 1000];
     }
+    // (Still but while it swings: its place in the world is made again only then (see `apply`). Five hundred hinges,
+    // and what hangs on them, were each made again every frame, standing still: a third of all that was.)
+    this.pivot.matrixAutoUpdate = false;
+    this.pivot.updateMatrix();
+    if (leaf) leaf.mesh.traverse((o) => {
+      o.matrixAutoUpdate = false;
+      o.updateMatrix();
+    });
     const R = physics.R;
     this.body = physics.world.createRigidBody(
       R.RigidBodyDesc.kinematicPositionBased()
@@ -1366,6 +1374,7 @@ export class Door {
   private apply(teleport = false) {
     const q = this.baseQuat.clone().multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.angle));
     this.pivot.quaternion.copy(q);
+    this.pivot.updateMatrix();
     this.place();
     if (teleport) this.body.setRotation(q, true);
     else this.body.setNextKinematicRotation(q);

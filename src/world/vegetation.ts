@@ -12,6 +12,7 @@ import { antiFirefly, SHADOW_FRUSTA, type Atmosphere } from './atmosphere';
 import { foliagePatch, setLodFade, wind, snowUniforms, SNOW_LIES, SNOW_PAINT } from './foliage';
 import { SEAT, footOf, groundLine, seat, seatKind } from './seat';
 import { heightAt, type Instance, type World } from './worldgen';
+import { Cells, boxInside } from './cells';
 import { BARREL } from '../sim/barrels';
 import { HUNG } from '../sim/crates';
 import { FIRE } from '../sim/fires';
@@ -121,6 +122,8 @@ const _q = new THREE.Quaternion();
 const _s = new THREE.Vector3();
 const _p = new THREE.Vector3();
 const _sphere = new THREE.Sphere();
+const _box = new THREE.Box3();
+const _span = new Int32Array(4);
 const UP = new THREE.Vector3(0, 1, 0);
 
 /** One kind of object (tree variant, rock, prop) drawn as instanced LOD levels. */
@@ -208,7 +211,10 @@ class LodSet {
       this.pos.set([it.x, it.y, it.z], i * 3);
       this.scale[i] = it.scale;
     });
+    this.cells = new Cells(this.pos, this.n, 48, this.scale);
   }
+
+  private cells: Cells;
 
   addLevel(scene: THREE.Scene, parts: { geometry: THREE.BufferGeometry; material: THREE.Material }[], near: number, nearFull: number, farFull: number, far: number, castShadow: boolean, shadowOnly = false) {
     const meshes = parts.map((p) => {
@@ -247,25 +253,43 @@ class LodSet {
 
   update(cam: THREE.Vector3, frustum: THREE.Frustum) {
     const { cullRadius, shadowRadius } = this.opts;
-    const { order, dist, levels } = this;
+    const { order, dist, levels, cells } = this;
     let m = 0;
     let sig = 0;
-    for (let i = 0; i < this.n; i++) {
-      const x = this.pos[i * 3], y = this.pos[i * 3 + 1], z = this.pos[i * 3 + 2];
-      const dx = x - cam.x, dy = y - cam.y, dz = z - cam.z;
-      const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
-      if (d > this.far[i]) continue;
-      let mask = 0;
-      for (let l = 0; l < levels.length; l++) if (d >= levels[l].near && d <= levels[l].far) mask |= 1 << l;
-      if (!mask) continue;
-      if (d > shadowRadius) {
-        _sphere.center.set(x, y + cullRadius * this.scale[i] * 0.5, z);
-        _sphere.radius = cullRadius * this.scale[i];
-        if (!frustum.intersectsSphere(_sphere)) continue;
+    // (nothing beyond the farthest level is drawn: only the squares within it are looked into, see Cells)
+    let reach = 0;
+    for (const l of levels) reach = Math.max(reach, l.far);
+    cells.span(cam.x, cam.z, reach, _span);
+    for (let cz = _span[2]; cz <= _span[3]; cz++) for (let cx = _span[0]; cx <= _span[1]; cx++) {
+      const k = cz * cells.w + cx, e = cells.start[k + 1];
+      if (cells.start[k] === e) continue;
+      const near2 = cells.near2(k, cam.x, cam.z);
+      if (near2 > reach * reach) continue;
+      // (a square all of whose things are past the shadows' reach and out of view: each of them would fail the view's test below)
+      if (near2 > shadowRadius * shadowRadius) {
+        const b = k * 7, r = cullRadius * cells.box[b + 6];
+        _box.min.set(cells.box[b] - r, cells.box[b + 2] - r, cells.box[b + 4] - r);
+        _box.max.set(cells.box[b + 1] + r, cells.box[b + 3] + 1.5 * r, cells.box[b + 5] + r);
+        if (!frustum.intersectsBox(_box)) continue;
       }
-      dist[i] = d;
-      order[m++] = i;
-      sig = (Math.imul(sig, 31) + i * 8 + mask) | 0;
+      for (let j = cells.start[k]; j < e; j++) {
+        const i = cells.idx[j];
+        const x = this.pos[i * 3], y = this.pos[i * 3 + 1], z = this.pos[i * 3 + 2];
+        const dx = x - cam.x, dy = y - cam.y, dz = z - cam.z;
+        const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (d > this.far[i]) continue;
+        let mask = 0;
+        for (let l = 0; l < levels.length; l++) if (d >= levels[l].near && d <= levels[l].far) mask |= 1 << l;
+        if (!mask) continue;
+        if (d > shadowRadius) {
+          _sphere.center.set(x, y + cullRadius * this.scale[i] * 0.5, z);
+          _sphere.radius = cullRadius * this.scale[i];
+          if (!frustum.intersectsSphere(_sphere)) continue;
+        }
+        dist[i] = d;
+        order[m++] = i;
+        sig = (Math.imul(sig, 31) + i * 8 + mask) | 0;
+      }
     }
     // The same instances at the same detail levels as last time, and the camera has barely
     // moved: what is on the GPU is still right, so nothing is sorted, copied or uploaded.
@@ -443,6 +467,7 @@ class Impostors {
       // (the card stands where the tree it is a picture of is seated)
       this.all.push({ x: t.x, y: footY(t), z: t.z, s: t.scale, v: v.row, r: t.rot });
     }
+    this.cells = new Cells(this.all.flatMap((t) => [t.x, t.y, t.z]), this.all.length, 64, this.all.map((t) => t.s));
     const quad = new THREE.PlaneGeometry(1, 1);
     quad.translate(0, 0.5, 0);
     this.geo = new THREE.InstancedBufferGeometry();
@@ -487,6 +512,7 @@ class Impostors {
   }
 
   private sig = 0;
+  private cells!: Cells;
 
   /** from how far off the cards are drawn (they come in between the two) */
   reach(from: number, full: number) {
@@ -498,23 +524,40 @@ class Impostors {
     let sig = 0;
     const p = this.iPos.array as Float32Array;
     const v = this.iVar.array as Float32Array;
-    const all = this.all;
-    for (let i = 0; i < all.length; i++) {
-      const t = all[i];
-      // (the same measure the model fades by: from the eye to the foot of the tree)
-      const dx = t.x - cam.x, dy = t.y - cam.y, dz = t.z - cam.z;
-      const d2 = dx * dx + dy * dy + dz * dz;
-      if (d2 < near * near) continue;
-      _sphere.center.set(t.x, t.y + 8, t.z);
-      _sphere.radius = 14 * t.s;
-      if (!frustum.intersectsSphere(_sphere)) continue;
-      p[n * 4] = t.x;
-      p[n * 4 + 1] = t.y;
-      p[n * 4 + 2] = t.z;
-      p[n * 4 + 3] = t.s;
-      v[n] = t.v;
-      n++;
-      sig = (Math.imul(sig, 31) + i) | 0;
+    const { all, cells } = this;
+    if (!cells) return;
+    // (square by square, see Cells: a square wholly out of view is passed over, one wholly in it needs no tree's own
+    // test of the view, nor of the eye's nearness when the whole square is past it)
+    for (let k = 0; k < cells.w * cells.h; k++) {
+      const e = cells.start[k + 1];
+      if (cells.start[k] === e) continue;
+      const b = k * 7, r = 14 * cells.box[b + 6];
+      _box.min.set(cells.box[b] - r, cells.box[b + 2] + 8 - r, cells.box[b + 4] - r);
+      _box.max.set(cells.box[b + 1] + r, cells.box[b + 3] + 8 + r, cells.box[b + 5] + r);
+      if (!frustum.intersectsBox(_box)) continue;
+      const inView = boxInside(frustum, _box);
+      const dy = Math.max(cells.box[b + 2] - cam.y, 0, cam.y - cells.box[b + 3]);
+      const past = cells.near2(k, cam.x, cam.z) + dy * dy >= near * near;
+      for (let j = cells.start[k]; j < e; j++) {
+        const i = cells.idx[j], t = all[i];
+        // (the same measure the model fades by: from the eye to the foot of the tree)
+        if (!past) {
+          const dx = t.x - cam.x, dy = t.y - cam.y, dz = t.z - cam.z;
+          if (dx * dx + dy * dy + dz * dz < near * near) continue;
+        }
+        if (!inView) {
+          _sphere.center.set(t.x, t.y + 8, t.z);
+          _sphere.radius = 14 * t.s;
+          if (!frustum.intersectsSphere(_sphere)) continue;
+        }
+        p[n * 4] = t.x;
+        p[n * 4 + 1] = t.y;
+        p[n * 4 + 2] = t.z;
+        p[n * 4 + 3] = t.s;
+        v[n] = t.v;
+        n++;
+        sig = (Math.imul(sig, 31) + i) | 0;
+      }
     }
     // the same trees as last frame, in the same order: the buffers are already right
     if (sig === this.sig && n === this.geo.instanceCount) return;

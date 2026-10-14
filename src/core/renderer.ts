@@ -107,6 +107,11 @@ export class Renderer {
 
   constructor(canvas: HTMLCanvasElement, quality: Partial<QualitySettings> = {}) {
     this.quality = { renderScale: 1, msaa: 4, ao: true, aoHalfRes: false, ...quality };
+    // (Neither scene is ever moved. Each was made again every frame all the same, and a thing made again tells all it
+    // holds to make their places in the world again: three thousand things a frame, still or not, a tenth of the
+    // processor's time. Now only what moves makes its own again; whatever sets its own by hand says so as it does.)
+    this.scene.matrixAutoUpdate = false;
+    this.vmScene.matrixAutoUpdate = false;
     this.renderer = new THREE.WebGLRenderer({
       canvas,
       antialias: false,
