@@ -55,8 +55,13 @@ function shapeOf(o: THREE.Object3D): string {
 export function programsOf(renderer: THREE.WebGLRenderer, materials: Iterable<THREE.Material>): Program[] {
   const out: Program[] = [];
   for (const m of materials) {
-    const p = (renderer.properties.get(m) as { currentProgram?: Program }).currentProgram;
-    if (p) out.push(p);
+    // (Every shader the material has, not only the last made: a see-through thing seen from both sides has one for
+    // its back faces and one for its front, and only the front was waited for. Its back faces were then drawn ahead
+    // while the card was still making their shader, and the page stood still until it had: 250 to 400 ms, the
+    // holographic sight's glass, on coming into the street with one lying there.)
+    const props = renderer.properties.get(m) as { currentProgram?: Program; programs?: Map<string, Program> };
+    if (props.programs?.size) for (const p of props.programs.values()) out.push(p);
+    else if (props.currentProgram) out.push(props.currentProgram);
   }
   return out;
 }
@@ -627,19 +632,37 @@ export class Renderer {
   }
 
   render(dt: number) {
-    if (this.shadowsSorted-- <= 0) this.sortShadows();
+    if (!this.tendHeld) this.tend();
     this.renderer.info.reset();
     this.composer.render(dt);
   }
 
-  /** frames until what has come into the world since is looked at for SHADOW_OWN (a look is a twentieth of a millisecond: once a second) */
-  private shadowsSorted = 0;
-  private sortShadows() {
-    this.shadowsSorted = 60;
-    // (and what is seen through from both sides, drawn in one go: see src/core/one-draw.ts)
-    oneDraw(this.scene);
-    oneDraw(this.vmScene);
-    this.scene.traverse((o) => {
+  /** (for checking things: the look over the scene that `tend` does, held) */
+  tendHeld = false;
+  /** where in each scene's groups the look has got to */
+  private tendAt = [0, 0];
+  /**
+   * What has come into the world since is looked at, a little every frame: the scenes' groups in turn, the whole of
+   * each in about half a second. (All at once every second, it was two to six milliseconds of the one frame online,
+   * with every body's bones to go through.) Each thing: drawn in one go if it is seen through from both sides (see
+   * src/core/one-draw.ts), and given its shadow material (SHADOW_OWN).
+   */
+  private tend() {
+    [this.scene, this.vmScene].forEach((scene, s) => {
+      const kids = scene.children, n = kids.length;
+      if (!n) return;
+      const per = Math.ceil(n / 30);
+      for (let k = 0; k < per; k++) {
+        const o = kids[(this.tendAt[s] + k) % n];
+        oneDraw(o);
+        if (scene === this.scene) this.sortShadows(o);
+      }
+      this.tendAt[s] = (this.tendAt[s] + per) % n;
+    });
+  }
+
+  private sortShadows(root: THREE.Object3D) {
+    root.traverse((o) => {
       const m = o as THREE.Mesh;
       if (!m.isMesh || !m.castShadow) return;
       const had = m.customDepthMaterial;
