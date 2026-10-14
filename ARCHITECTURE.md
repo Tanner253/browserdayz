@@ -106,7 +106,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | file | lines | what it is |
 |---|---:|---|
 | `drops.ts` | 533 | The game: supply drops, targets when playing alone, and the flow of a life (death, respawn, pause). |
-| `enter.ts` | 645 | The game: entering the world (joining a server or playing alone, the bot check's range, dressing the player). |
+| `enter.ts` | 647 | The game: entering the world (joining a server or playing alone, the bot check's range, dressing the player). |
 | `frame.ts` | 621 | The game: every frame (the main loop: input, the world, the camera, the sound, the HUD). |
 | `guns.ts` | 475 | The game: attachments and magazines. |
 | `hands.ts` | 546 | The game: inventory moves, the hot keys and the hands, and what an admin can do. |
@@ -145,7 +145,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 
 | file | lines | what it is |
 |---|---:|---|
-| `main.ts` | 236 |  |
+| `main.ts` | 239 |  |
 
 ## src/net/
 
@@ -221,7 +221,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 
 | file | lines | what it is |
 |---|---:|---|
-| `director.ts` | 858 | The trailer's director. |
+| `director.ts` | 864 | The trailer's director. |
 | `music.ts` | 341 | The trailer's score, written as code: one row per bar (the chord, and how hard the band plays it), in D minor at 128 beats a minute, so a bar is 1.875 s and every cut in shots.ts lands on a bar line. |
 | `music10.ts` | 352 | The tenth film's score: an old fort in the snow, slow and grand. |
 | `music3.ts` | 533 | The third trailer's score. |
@@ -230,7 +230,8 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `shots.ts` | 843 | The trailer, shot by shot. |
 | `shots10.ts` | 896 | The tenth film: twenty seconds of the fort. |
 | `shots11.ts` | 781 | The eleventh film: ten seconds of the Arena (2026-10-14). |
-| `shots12.ts` | 951 | The twelfth film: thirty seconds of what is new (2026-10-14). |
+| `shots12.ts` | 968 | The twelfth film: thirty seconds of what is new (2026-10-14). |
+| `shots13.ts` | 936 | The thirteenth film: thirty seconds of the Arena, and the wagers coming to it (2026-10-14). |
 | `shots2.ts` | 1383 | The second trailer: what has changed in the Zone. |
 | `shots3.ts` | 1664 | The third trailer: a story, and then how the money works. |
 | `shots4.ts` | 1452 | The fourth trailer: the Zone has grown, and everything the other three were about. |
@@ -245,6 +246,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | file | lines | what it is |
 |---|---:|---|
 | `admin-ui.ts` | 1526 | The panel of somebody with a role (2026-10-11; laid out again 2026-10-12). |
+| `ads.ts` | 48 | Google Ads: its tag on the site, and one conversion when a visitor first goes into a game, the Zone or the Arena (the owner, 2026-10-14: |
 | `arena-hud.ts` | 172 | The arena's own screen (2026-10-14). |
 | `arena-menu.ts` | 216 | The Arena's own front (2026-10-14), its menu and the screens between matches. |
 | `bigmap.ts` | 1247 | The map, opened large (M): a sheet as an army prints one. |

@@ -23,6 +23,7 @@ import { addCashedTag, walletAddress, REWARDS_UI } from '../../ui/rewards';
 import { underGas } from '../../sim/gas';
 import { inBunker } from '../../sim/bunker';
 import { LOOT_REV, type Game } from '../game';
+import { playedAd } from '../../ui/ads';
 
 export const enterMethods = {
   // ------------------------------------------------------------ entering the world
@@ -171,6 +172,7 @@ export const enterMethods = {
     }
     this.joining = false;
     this.started = true;
+    playedAd();
     this.menu.dispose();
     this.hud.menuScene('', 0);
     // out of the aerial shot and down into the character's eyes (in a wager, straight in: a round starts in the eyes)

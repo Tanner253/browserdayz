@@ -7,6 +7,7 @@ import { physics, GLASS_GROUPS } from './core/physics';
 import { arenaCorners, cutToArena, nearArena } from '../arena/rules';
 import { wagerQuery } from './net/client';
 import { modeOf, openDoor } from './ui/door';
+import { startAds } from './ui/ads';
 import { ArenaMenu } from './ui/arena-menu';
 import { DEATHS, DIED_AT, LEAN, TOUCH, bootDone, bootStage } from './core/device';
 import { generateWorld, heightAt } from './world/worldgen';
@@ -112,6 +113,8 @@ async function boot() {
   if (import.meta.env.DEV && new URLSearchParams(location.search).has('castle')) return (await import('./dev/castle')).castlePage();
   // (`?post`: the same fort with the army's signals post stood on it, to be looked at)
   if (import.meta.env.DEV && new URLSearchParams(location.search).has('post')) return (await import('./dev/castle-post')).postPage();
+  // (Google Ads' tag, on the live site only: src/ui/ads.ts)
+  startAds();
   // the door: which game, asked before anything is built (src/ui/door.ts); an address that says goes straight in
   let mode = modeOf(!!wagerQuery());
   if (!mode) {
