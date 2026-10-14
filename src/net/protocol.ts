@@ -373,6 +373,15 @@ export type S2C =
   | { t: 'rpass' }
   /** something the server has to say to this player alone (what became of a tag they cashed in) */
   | { t: 'tell'; text: string; kind: 'good' | 'warn' | 'info' }
+  /**
+   * The arena only (arena/match.ts; the game server never sends it): the match as it stands, said from the hearer's
+   * own side (`us` first). `up`: how many of each side are standing; `phase`: a round being fought, the gap between
+   * rounds (`won`: whether the hearer's side took the last one), or the match over (`won`: the match). `sides`: the
+   * names on each; `board`: each player's kills and deaths; `watch`: the hearer only watches (seen from the host's side).
+   */
+  | { t: 'score'; round: number; us: number; them: number; first: number; up: [number, number]; phase: 'live' | 'gap' | 'over'; won?: boolean; sides: [string, string]; board: { name: string; ours: boolean; kills: number; deaths: number }[]; watch?: true }
+  /** the arena only: a kill, for the kill feed (`ours`: the killer is on the hearer's side; `me`: the hearer killed or was killed) */
+  | { t: 'kill'; by: string; who: string; w: string; head: boolean; ours: boolean; me: boolean }
   /** what this player may do on the server: nothing out of the way (null), keep order (mod), or everything (admin) */
   | { t: 'role'; role: 'admin' | 'mod' | null }
   /** a line from the server to this player alone, shown where talk is shown (what an order did, a list asked for) */

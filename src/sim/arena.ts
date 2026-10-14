@@ -1,4 +1,4 @@
-// Wager matches (2026-10-14), their rules shared by the game and the arena server (server/arena.ts). The owner: "a
+// Wager matches (2026-10-14), their rules shared by the game and the arena server (arena/match.ts). The owner: "a
 // new game mode called wagers ... run 1v1's like cs:go where after each kill the players restart the round. the
 // person making the wager can set the wager amount and the amount of kills to win"; and "i think we should use the
 // castle as its own wager map ... it has everything we need for a CODstyled map". Round 1 is the mode with no money;
@@ -18,14 +18,20 @@ export const ARENA = {
   roundGap: 3,
   /** seconds a player who drops may take to come back before the match is the other's */
   grace: 30,
+  /** seconds everybody stands about once the match is won, before each is let go with the result (arena/match.ts, matchOver) */
+  endFor: 12,
   /** seconds a lobby waits for a challenger before it is taken off the list */
   wait: 15 * 60,
-  /** the arena: a square this many metres from the fort's middle each way, turned as the fort is (the owner: "a small
-   * map, like 100m x 100m, the castle would be perfect. think like a COD multiplayer TDM match map"); out of it, a
-   * player is put back at their own end */
-  half: 50,
-  /** the two ends, metres out from the fort's middle: before its gate, on the apron at the foot of its ramp; and
-   * behind it, below its back wall, on open ground clear of trees (assets-src/_wf/me/arena-ring.ts measured them) */
+  /** the arena: a box about the fort, metres from its middle as the fort is turned (x toward the gate, z across).
+   * First a 100 m square; then the owner: "the map is far too big ... the boundaries of the map should be where the
+   * cliff is and the mountain is, and then some space in front and behind the castle for spawns of opposing teams..
+   * like a normal CS:GO map". So its sides are the land's (assets-src/_wf/me/arena-profile.ts): the shelf the fort
+   * stands on runs level to the cliff's edge, 60 m out, and the mountain stands up steeply from 38 m out the other
+   * way; and its ends leave room before the gate and behind the back wall. The ruined houses and the hatch (65 m
+   * out) are outside it. Out of it, a player is put back at their own end. */
+  box: { x0: -34, x1: 40, z0: -38, z1: 60 },
+  /** the two ends, metres out from the fort's middle along x: before its gate, on the flat apron past the burning
+   * jeep; and behind it, below its back wall, on flat ground clear of trees (arena-box.ts, arena-profile.ts) */
   ends: [34, -28] as [number, number],
   /** the most matches the server runs at once */
   most: 40,
@@ -46,6 +52,9 @@ export interface LobbyInfo {
   /** players a side, and how many are in so far */
   size: number;
   have: number;
+  /** a match being played: its score (the host's side first), and how many are watching it */
+  score?: [number, number];
+  watching?: number;
 }
 
 /**
@@ -62,13 +71,19 @@ export function arenaEnds(world: World): { x: number; y: number; z: number; yaw:
 /** whether this page's world was cut down to the arena (`cutToArena`): it is no world to go into the open one with */
 export const CUT = { arena: false };
 
-/** how far past the square's edge a game cut down to the arena still draws the world, metres (`cutToArena`): the edge's wall, and what is seen over it, then fog */
+/** how far past the box's edge a game cut down to the arena still draws the world, metres (`cutToArena`): the edge's wall, and what is seen over it, then fog */
 export const ARENA_SEE = 40;
 
-/** whether a place is within `out` metres of the arena's square, each way */
+/** whether a place is within `out` metres of the arena's box, each way */
 export function nearArena(world: World, x: number, z: number, out = ARENA_SEE): boolean {
-  const [lx, lz] = castleLocal(world.castle as FortPlace, x, 0, z);
-  return Math.abs(lx * CASTLE_SCALE) <= ARENA.half + out && Math.abs(lz * CASTLE_SCALE) <= ARENA.half + out;
+  const [lx, lz] = castleLocal(world.castle as FortPlace, x, 0, z), B = ARENA.box, mx = lx * CASTLE_SCALE, mz = lz * CASTLE_SCALE;
+  return mx >= B.x0 - out && mx <= B.x1 + out && mz >= B.z0 - out && mz <= B.z1 + out;
+}
+
+/** the arena's box in the world, its four corners going round */
+function corners(world: World): number[][] {
+  const P = world.castle as FortPlace, B = ARENA.box, s = 1 / CASTLE_SCALE;
+  return [[B.x1, B.z1], [B.x1, B.z0], [B.x0, B.z0], [B.x0, B.z1]].map(([x, z]) => castleAt(P, x * s, z * s, 0));
 }
 
 /**
@@ -92,11 +107,10 @@ export function cutToArena(world: World): void {
   world.walls = world.walls.filter(near);
   // (the places and their names are kept: they are not drawn, and the buildings' plan looks some of them up by name)
   // the edge: a dry-stone wall along each side, in lengths of about four metres lying to the ground
-  const P = world.castle as FortPlace, h = ARENA.half / CASTLE_SCALE;
-  const corners = [[h, h], [h, -h], [-h, -h], [-h, h]].map(([x, z]) => castleAt(P, x, z, 0));
+  const c = corners(world);
   const ground = (x: number, z: number) => heightAt(world.surface, x, z);
   for (let k = 0; k < 4; k++) {
-    const a = corners[k], b = corners[(k + 1) % 4], len = Math.hypot(b[0] - a[0], b[2] - a[2]), n = Math.round(len / 4);
+    const a = c[k], b = c[(k + 1) % 4], len = Math.hypot(b[0] - a[0], b[2] - a[2]), n = Math.round(len / 4);
     const dx = (b[0] - a[0]) / n, dz = (b[2] - a[2]) / n, yaw = Math.atan2(-dz, dx);
     for (let i = 0; i < n; i++) {
       const x0 = a[0] + dx * i, z0 = a[2] + dz * i, x1 = x0 + dx, z1 = z0 + dz, y0 = ground(x0, z0), y1 = ground(x1, z1);
@@ -105,16 +119,14 @@ export function cutToArena(world: World): void {
   }
 }
 
-/** the arena's square in the world, its four corners going round (for what stops a body at its edge) */
+/** the arena's box in the world, its four corners going round (for what stops a body at its edge) */
 export function arenaCorners(world: World): [number, number][] {
-  const P = world.castle as FortPlace, h = ARENA.half / CASTLE_SCALE;
-  return [[h, h], [h, -h], [-h, -h], [-h, h]].map(([x, z]) => { const p = castleAt(P, x, z, 0); return [p[0], p[2]]; });
+  return corners(world).map((p) => [p[0], p[2]]);
 }
 
-/** whether a place is in the arena: within ARENA.half of the fort's middle, each way, as the fort is turned */
+/** whether a place is in the arena's box */
 export function inArena(world: World, x: number, z: number): boolean {
-  const [lx, lz] = castleLocal(world.castle as FortPlace, x, 0, z);
-  return Math.abs(lx * CASTLE_SCALE) <= ARENA.half && Math.abs(lz * CASTLE_SCALE) <= ARENA.half;
+  return nearArena(world, x, z, 0);
 }
 
 /**

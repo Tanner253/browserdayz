@@ -46,6 +46,11 @@ interface Fighter {
   pingAt: number;
   /** when they dropped (0: they are here) */
   gone: number;
+  /** this match's kills and deaths, for the scoreboard */
+  kills: number;
+  deaths: number;
+  /** only watching (the owner: "we should allow anyone to spectate any live game"): never in a side, never hit */
+  watch?: boolean;
 }
 
 interface Lobby {
@@ -66,6 +71,8 @@ interface Lobby {
   ends: { x: number; y: number; z: number; yaw: number }[];
   /** the arena alone, to learn it and the guns: never listed, nobody else let in, and no round ends */
   practice?: boolean;
+  /** those watching it, flying and unseen */
+  watchers: Fighter[];
 }
 
 const lobbies = new Map<string, Lobby>();
@@ -77,7 +84,10 @@ const send = (f: Fighter, m: S2C) => {
   if (!f.gone && f.ws.readyState === 1) f.ws.send(JSON.stringify(m));
 };
 const everyone = (l: Lobby) => [...l.sides[0], ...l.sides[1]];
-const tellAll = (l: Lobby, text: string, kind: 'good' | 'warn' | 'info' = 'info') => everyone(l).forEach((f) => send(f, { t: 'tell', text, kind }));
+/** the players and those watching them */
+const audience = (l: Lobby) => [...everyone(l), ...l.watchers];
+const tellAll = (l: Lobby, text: string, kind: 'good' | 'warn' | 'info' = 'info') => audience(l).forEach((f) => send(f, { t: 'tell', text, kind }));
+const fighter = (ws: WebSocket, name: string, key: string, side: 0 | 1, pose: Pose): Fighter => ({ id: nextId++, ws, name, key, side, pose, hist: [], health: 100, alive: true, w: null, m: [], g: [], shots: [], rtt: 150, pingAt: 0, gone: 0, kills: 0, deaths: 0 });
 
 /** The fort's walls and the ground under and round it, for shots to meet: built once, in a world of their own. */
 async function buildWorld() {
@@ -185,31 +195,71 @@ function startMatch(l: Lobby) {
   }
   setDown(l);
   if (l.practice) return;
-  tellAll(l, `The wager is on: first to ${l.kills}. Round 1.`, 'good');
+  scoreTo(l, 'live');
   log(`${l.id}: ${everyone(l).map((f) => f.name).join(', ')} begin, first to ${l.kills}, ${l.loadout}`);
+}
+
+/**
+ * The match as it stands, to each player from their own side, for the game's score bar and banners (the owner,
+ * of the arena's screen: "this is gonna be more like CS:GO"). `won`: the side that took the last round, or the match.
+ */
+function scoreTo(l: Lobby, phase: 'live' | 'gap' | 'over', won?: 0 | 1, only?: Fighter) {
+  const up = (s: 0 | 1) => l.sides[s].filter((f) => f.alive && !f.gone).length;
+  const names = (s: 0 | 1) => l.sides[s].map((f) => f.name).join(' & ');
+  // (a watcher sees it from the host's side)
+  for (const f of only ? [only] : audience(l)) {
+    const mine = f.watch ? 0 : f.side, them = mine ? 0 : 1;
+    const board = everyone(l).map((o) => ({ name: o.name, ours: o.side === mine, kills: o.kills, deaths: o.deaths }));
+    send(f, { t: 'score', round: l.round, us: l.score[mine], them: l.score[them], first: l.kills, up: [up(mine), up(them)], phase, sides: [names(mine), names(them)], board, ...(f.watch ? { watch: true as const } : {}), ...(won === undefined ? {} : { won: won === mine }) });
+  }
+}
+
+/**
+ * The match is won. Not cut off there (the owner: "we should have some sort of end of game moment where players can
+ * move around and etc.. we dont want HARD abrupt transitions. think like the end of a cod match"): for ARENA.endFor
+ * seconds everybody stands, the fallen too, free to walk about and fire and hurt nobody, with the result and the
+ * scoreboard up; then each is let go with the result.
+ */
+function matchOver(l: Lobby, winner: 0 | 1) {
+  l.state = 'over';
+  l.between = false;
+  const names = (s: 0 | 1) => l.sides[s].map((f) => f.name).join(' & ');
+  log(`${l.id}: over, ${names(winner)} won ${l.score.join('-')}`);
+  for (const f of everyone(l)) {
+    if (!f.alive) {
+      // (the fallen stand again at their own end)
+      const e = l.ends[f.side];
+      f.alive = true;
+      f.pose = [e.x, e.y, e.z, e.yaw, 0, 0];
+      f.hist = [{ t: Date.now(), p: f.pose }];
+      send(f, { t: 'put', x: e.x, y: e.y, z: e.z });
+    }
+    f.health = 100;
+    send(f, { t: 'powers', god: true, hidden: false, clip: false, voidInv: false, voidTag: false, endless: true });
+    send(f, { t: 'hp', health: 100, bleeding: false });
+  }
+  scoreTo(l, 'over', winner);
+  setTimeout(() => {
+    const reason = `The wager is over: ${names(winner)} won ${l.score[winner]} to ${l.score[winner ? 0 : 1]}.`;
+    for (const f of audience(l)) if (f.ws.readyState === 1) {
+      f.ws.send(JSON.stringify({ t: 'kick', reason }));
+      f.ws.close();
+    }
+    lobbies.delete(l.id);
+  }, ARENA.endFor * 1000);
 }
 
 function roundOver(l: Lobby, winner: 0 | 1) {
   l.between = true;
   l.score[winner]++;
-  const names = (s: 0 | 1) => l.sides[s].map((f) => f.name).join(' & ');
-  if (l.score[winner] >= l.kills) {
-    l.state = 'over';
-    tellAll(l, `${names(winner)} won the wager, ${l.score[winner]} to ${l.score[winner ? 0 : 1]}.`, 'good');
-    log(`${l.id}: over, ${names(winner)} won ${l.score.join('-')}`);
-    setTimeout(() => {
-      for (const f of everyone(l)) if (f.ws.readyState === 1) f.ws.send(JSON.stringify({ t: 'kick', reason: `The wager is over: ${names(winner)} won ${l.score[winner]} to ${l.score[winner ? 0 : 1]}.` }));
-      lobbies.delete(l.id);
-    }, 4000);
-    return;
-  }
-  tellAll(l, `${names(winner)} take round ${l.round}. ${l.score[0]} to ${l.score[1]}.`, 'info');
+  if (l.score[winner] >= l.kills) return matchOver(l, winner);
+  scoreTo(l, 'gap', winner);
   setTimeout(() => {
     if (l.state !== 'match') return;
     l.round++;
     l.between = false;
     setDown(l);
-    tellAll(l, `Round ${l.round}.`, 'info');
+    scoreTo(l, 'live');
   }, ARENA.roundGap * 1000);
 }
 
@@ -220,7 +270,8 @@ function checkRound(l: Lobby) {
 }
 
 function shot(l: Lobby, me: Fighter, m: { o: unknown; d: unknown; w: unknown; sup?: unknown }) {
-  if (l.state !== 'match' || l.between || !me.alive || typeof m.w !== 'string') return;
+  // (when the match is won a shot is still seen and heard, and hurts nobody)
+  if ((l.state !== 'match' && l.state !== 'over') || l.between || !me.alive || typeof m.w !== 'string') return;
   const rule = WEAPON_RULES[m.w];
   const o = m.o as number[], d0 = m.d as number[];
   if (!rule || !carries(l, m.w) || !Array.isArray(o) || !Array.isArray(d0) || o.length !== 3 || d0.length !== 3 || ![...o, ...d0].every(Number.isFinite)) return;
@@ -234,7 +285,8 @@ function shot(l: Lobby, me: Fighter, m: { o: unknown; d: unknown; w: unknown; su
   const len = Math.hypot(d0[0], d0[1], d0[2]);
   if (len < 1e-6) return;
   const d = d0.map((v) => v / len);
-  for (const f of everyone(l)) if (f !== me) send(f, { t: 'shot', id: me.id, o: o as [number, number, number], d: d as [number, number, number], w: m.w, sup: !!m.sup });
+  for (const f of audience(l)) if (f !== me) send(f, { t: 'shot', id: me.id, o: o as [number, number, number], d: d as [number, number, number], w: m.w, sup: !!m.sup });
+  if (l.state !== 'match') return;
   const most = Math.max(rule.range * 2, 150);
   // (the others as they were drawn on the shooter's screen when they fired: their lag, and the 140 ms a game draws others behind)
   const back = now - Math.min(400, me.rtt / 2 + 140);
@@ -270,14 +322,17 @@ function shot(l: Lobby, me: Fighter, m: { o: unknown; d: unknown; w: unknown; su
   // dead for the rest of the round: lying where they fell to the others, and free to watch the rest of it, flying
   v.alive = false;
   v.pose = [v.pose[0], v.pose[1], v.pose[2], v.pose[3], v.pose[4], v.pose[5] | F_DEAD];
-  tellAll(l, `${me.name} killed ${v.name}${best.zone === 'head' ? ' (head)' : ''}.`, 'info');
+  me.kills++;
+  v.deaths++;
+  for (const f of audience(l)) send(f, { t: 'kill', by: me.name, who: v.name, w: m.w as string, head: best.zone === 'head', ours: me.side === (f.watch ? 0 : f.side), me: f === me || f === v });
   send(v, { t: 'powers', god: true, hidden: true, clip: true, voidInv: false, voidTag: false });
-  send(v, { t: 'tell', text: 'You are dead for this round: watch the rest of it.', kind: 'warn' });
+  if (!l.practice) scoreTo(l, 'live');
   checkRound(l);
 }
 
-/** what a game in the arena says */
+/** what a game in the arena says (a watcher's: only talk, and its ping) */
 function said(l: Lobby, f: Fighter, m: Record<string, unknown>) {
+  if (f.watch && m.t !== 'chat' && m.t !== 'ping') return;
   switch (m.t) {
     case 's': {
       const p = m.p as Pose;
@@ -303,10 +358,10 @@ function said(l: Lobby, f: Fighter, m: Record<string, unknown>) {
       return shot(l, f, m as { o: unknown; d: unknown; w: unknown; sup?: unknown });
     case 'gear':
       if (Array.isArray(m.g)) f.g = (m.g as unknown[]).filter((x): x is string => typeof x === 'string').slice(0, 8);
-      for (const o of everyone(l)) if (o !== f) send(o, { t: 'gear', id: f.id, g: f.g });
+      for (const o of audience(l)) if (o !== f) send(o, { t: 'gear', id: f.id, g: f.g });
       return;
     case 'chat':
-      if (typeof m.text === 'string' && m.text.trim()) for (const o of everyone(l)) send(o, { t: 'chat', from: f.name, text: m.text.slice(0, 200) });
+      if (typeof m.text === 'string' && m.text.trim()) for (const o of audience(l)) send(o, { t: 'chat', from: f.watch ? `${f.name} (watching)` : f.name, text: m.text.slice(0, 200) });
       return;
     case 'ping':
       return void (Number.isFinite(m.n) && send(f, { t: 'pong', n: m.n as number }));
@@ -316,7 +371,7 @@ function said(l: Lobby, f: Fighter, m: Record<string, unknown>) {
 /** the lobbies, as the menu's list has them */
 export function arenaList(): LobbyInfo[] {
   const now = Date.now();
-  return [...lobbies.values()].filter((l) => l.state !== 'over' && !l.practice).map((l) => ({ id: l.id, host: l.host, kills: l.kills, loadout: l.loadout, stake: l.stake, size: l.size, have: everyone(l).filter((f) => !f.gone).length, state: l.state === 'open' ? 'open' : 'match', age: Math.round((now - l.opened) / 1000) }));
+  return [...lobbies.values()].filter((l) => l.state !== 'over' && !l.practice).map((l) => ({ id: l.id, host: l.host, kills: l.kills, loadout: l.loadout, stake: l.stake, size: l.size, have: everyone(l).filter((f) => !f.gone).length, state: l.state === 'open' ? 'open' : 'match', age: Math.round((now - l.opened) / 1000), score: l.score, watching: l.watchers.length }));
 }
 
 const wss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024 });
@@ -352,15 +407,32 @@ export function arenaUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer)
         const e = ll.ends[ff.side];
         send(ff, { t: 'welcome', v: PROTOCOL, you: ff.id, players: everyone(ll).filter((o) => o !== ff).map(info), loot: [], doors: [], stashes: [], corpses: [], drops: [], flights: [], barrels: [], fires: [], bunker: false, ajar: [], vehicles: [], infected: [], hour: phaseOf(Date.now() / 1000), spawn: { x: e.x, z: e.z, yaw: e.yaw, y: e.y }, me: null, max: ll.size * 2 } as unknown as S2C);
         tellAll(ll, `${ff.name} is back.`, 'info');
+        scoreTo(ll, ll.between ? 'gap' : 'live');
+        return;
+      }
+      if (q.get('watch')) {
+        // watching a match being played: over the fort, flying and unseen, told the score as it goes
+        const ll = lobbies.get(w);
+        if (!ll || ll.practice || (ll.state !== 'match' && ll.state !== 'over')) return turn('That match is not being played now.');
+        const P = world.castle as FortPlace, e = ll.ends[0], [ox, oy, oz] = castleAt(P, 0, 0, 0);
+        const sx = ox + (e.x - ox) * 1.4, sz = oz + (e.z - oz) * 1.4, sy = oy + 24;
+        const me = { ...fighter(ws, name, key, 0, [sx, sy, sz, e.yaw, -0.35, 0]), watch: true, alive: false };
+        ll.watchers.push(me);
+        f = me;
+        l = ll;
+        send(me, { t: 'welcome', v: PROTOCOL, you: me.id, players: everyone(ll).filter((o) => !o.gone).map(info), loot: [], doors: [], stashes: [], corpses: [], drops: [], flights: [], barrels: [], fires: [], bunker: false, ajar: [], vehicles: [], infected: [], hour: phaseOf(Date.now() / 1000), spawn: { x: sx, z: sz, yaw: e.yaw, y: sy }, me: null, max: ll.size * 2 } as unknown as S2C);
+        send(me, { t: 'powers', god: true, hidden: true, clip: true, voidInv: false, voidTag: false });
+        scoreTo(ll, ll.state === 'over' ? 'over' : ll.between ? 'gap' : 'live', undefined, me);
+        log(`${ll.id}: ${name} watches`);
         return;
       }
       if (w === 'practice') {
         // the arena alone, at once: the map and the loadout to learn, nobody to wait for
         if (lobbies.size >= ARENA.most) return turn('Every arena is taken: try again in a while.');
         const lo = (ARENA.loadouts as readonly string[]).includes(q.get('loadout') ?? '') ? (q.get('loadout') as string) : ARENA.loadouts[0];
-        const ends = arenaEnds(world), pl: Lobby = { id: 'p' + Math.random().toString(36).slice(2, 8), host: name, hostKey: key, size: 1, kills: 0, loadout: lo, stake: 0, opened: Date.now(), state: 'open', sides: [[], []], score: [0, 0], round: 0, between: false, ends, practice: true };
+        const ends = arenaEnds(world), pl: Lobby = { id: 'p' + Math.random().toString(36).slice(2, 8), host: name, hostKey: key, size: 1, kills: 0, loadout: lo, stake: 0, opened: Date.now(), state: 'open', sides: [[], []], score: [0, 0], round: 0, between: false, ends, practice: true, watchers: [] };
         lobbies.set(pl.id, pl);
-        const me: Fighter = { id: nextId++, ws, name, key, side: 0, pose: [ends[0].x, ends[0].y, ends[0].z, ends[0].yaw, 0, 0], hist: [], health: 100, alive: true, w: null, m: [], g: [], shots: [], rtt: 150, pingAt: 0, gone: 0 };
+        const me = fighter(ws, name, key, 0, [ends[0].x, ends[0].y, ends[0].z, ends[0].yaw, 0, 0]);
         pl.sides[0].push(me);
         f = me;
         l = pl;
@@ -376,7 +448,7 @@ export function arenaUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer)
         const lo = (ARENA.loadouts as readonly string[]).includes(q.get('loadout') ?? '') ? (q.get('loadout') as string) : ARENA.loadouts[0];
         const stake = Math.min(ARENA.stake[1], Math.max(ARENA.stake[0], Number(q.get('stake')) || ARENA.stake[0]));
         const ends = arenaEnds(world);
-        l = { id: Math.random().toString(36).slice(2, 8), host: name, hostKey: key, size, kills, loadout: lo, stake, opened: Date.now(), state: 'open', sides: [[], []], score: [0, 0], round: 0, between: false, ends };
+        l = { id: Math.random().toString(36).slice(2, 8), host: name, hostKey: key, size, kills, loadout: lo, stake, opened: Date.now(), state: 'open', sides: [[], []], score: [0, 0], round: 0, between: false, ends, watchers: [] };
         lobbies.set(l.id, l);
         log(`${l.id}: ${name} opens a ${size}v${size} wager, first to ${kills}, ${lo}`);
       } else {
@@ -387,7 +459,7 @@ export function arenaUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer)
       // onto the side with room, the host's first
       const side: 0 | 1 = l.sides[0].length < l.size && (w === 'new' || l.sides[0].length <= l.sides[1].length) ? 0 : 1;
       if (l.sides[side].length >= l.size) return turn('That wager is full.');
-      f = { id: nextId++, ws, name, key, side, pose: [l.ends[side].x, l.ends[side].y, l.ends[side].z, l.ends[side].yaw, 0, 0], hist: [], health: 100, alive: true, w: null, m: [], g: [], shots: [], rtt: 150, pingAt: 0, gone: 0 };
+      f = fighter(ws, name, key, side, [l.ends[side].x, l.ends[side].y, l.ends[side].z, l.ends[side].yaw, 0, 0]);
       l.sides[side].push(f);
       if (everyone(l).length < l.size * 2) {
         // (waiting: the game waits as it waits in line for a full server, and is told how many are in)
@@ -402,6 +474,7 @@ export function arenaUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer)
     ws.on('close', () => {
       if (!f || !l) return;
       const me = f, lob = l;
+      if (me.watch) return void (lob.watchers = lob.watchers.filter((o) => o !== me));
       if (lob.practice) return void lobbies.delete(lob.id);
       if (lob.state === 'open') {
         lob.sides[me.side] = lob.sides[me.side].filter((o) => o !== me);
@@ -432,15 +505,15 @@ export async function startArena(w: World) {
   // where everybody in each match is, for the others, twenty times a second; and their lag measured now and then
   setInterval(() => {
     for (const l of lobbies.values()) {
-      if (l.state !== 'match') continue;
+      if (l.state !== 'match' && l.state !== 'over') continue;
       const s = everyone(l).filter((f) => !f.gone).map((f) => [f.id, f.pose[0], f.pose[1], f.pose[2], f.pose[3], f.pose[4], f.pose[5], f.w, f.m, null] as Extract<S2C, { t: 'ps' }>['s'][number]);
-      for (const f of everyone(l)) send(f, { t: 'ps', s: s.filter((r) => r[0] !== f.id) });
+      for (const f of audience(l)) send(f, { t: 'ps', s: s.filter((r) => r[0] !== f.id) });
     }
   }, 50).unref();
   setInterval(() => {
     const now = Date.now();
     for (const l of lobbies.values()) {
-      for (const f of everyone(l)) if (!f.gone && f.ws.readyState === 1) {
+      for (const f of audience(l)) if (!f.gone && f.ws.readyState === 1) {
         f.pingAt = now;
         f.ws.ping();
       }

@@ -85,6 +85,15 @@ try {
   assert.ok(((wh.spawn as { x: number }).x === ends[0].x) && ((wf.spawn as { x: number }).x === ends[1].x), 'not set down at their own ends');
   ok('a challenger joins: both are let in at their own ends, with the same loadout');
 
+  // somebody comes to watch: flying and unseen, told the score as it goes
+  const eye = new Fighter('Watcher');
+  await eye.open(`w=${lobby.id}&watch=1`);
+  await eye.until('welcome');
+  assert.ok(await eye.until('powers', 4000, (m) => !!m.hidden && !!m.clip), 'a watcher is not unseen and flying');
+  const seen0 = await eye.until('score');
+  assert.ok(seen0.watch && seen0.phase === 'live' && seen0.first === 3, `a watcher was not told the match: ${JSON.stringify(seen0)}`);
+  ok('anybody may watch a match being played: unseen, flying, told the score');
+
   // three rounds: the foe walks up to ten metres off the host's end, and the host shoots until they fall
   host.say(ends[0].x, ends[0].z);
   foe.say(ends[1].x, ends[1].z);
@@ -111,9 +120,23 @@ try {
     }
   }
   ok('the server judges the shots: struck, the foe loses health it holds, and falls; each round both are set down again');
-  const over = await host.until('kick', 8000);
+  // won: not cut off, but a while to stand about in, the fallen up again, and the result and scoreboard up
+  const end = await host.until('score', 4000, (m) => m.phase === 'over');
+  const board = end.board as { name: string; kills: number; deaths: number }[];
+  assert.ok(end.won === true && board.find((b) => b.name === 'Hosty')?.kills === 3 && board.find((b) => b.name === 'Foey')?.deaths === 3, `the result is not right: ${JSON.stringify(end)}`);
+  assert.ok((await foe.until('score', 2000, (m) => m.phase === 'over')).won === false, 'the loser was not told they lost');
+  await foe.until('powers', 2000, (m) => !!m.god && !m.hidden);
+  assert.ok(foe.got.slice(-8).some((m) => m.t === 'put'), 'the fallen did not stand again for the end of the match');
+  assert.equal(eye.got.filter((m) => m.t === 'kill').length, 3, 'the watcher did not see the three kills');
+  const t0 = Date.now();
+  await sleep(4000);
+  assert.ok(!host.got.some((m) => m.t === 'kick'), 'the match was cut off at once: there is no end to stand about in');
+  ok('the match won: the fallen stand again, nobody can be hurt, and everybody, watchers too, sees the result and the scoreboard');
+  const over = await host.until('kick', 20000);
   assert.match(String(over.reason), /Hosty won 3 to 0/);
-  ok('first to three: the match is over, and both are told who won');
+  assert.ok(Date.now() - t0 > 6000, 'the end of the match was too short');
+  assert.ok(await eye.until('kick', 3000), 'the watcher was not let go with the result');
+  ok('then each is let go with who won');
 
   // practice: the arena alone, let in at once, never listed
   const solo = new Fighter('Solo');
