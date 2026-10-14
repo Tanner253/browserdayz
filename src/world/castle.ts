@@ -40,8 +40,12 @@ const MADE_BY = 460;
 const FAR_HOLLOWS = 0.45;
 /** how far off the kit's far copy is sent for: until it comes, blocks stand for the kit's pieces from far off */
 const FAR_KIT = 900;
-/** how much snow lies on it where nobody has said: the mountain it is made for is over the snow line, and not at its top */
-export const SNOW_ON_THE_MOUNTAIN = 0;
+/**
+ * How much snow lies on it where nobody has said. It was made for a mountain over the snow line, and not at its
+ * top; on the valley's rim it stands in snow that lies by place (src/world/snow.ts), which the owner asked for:
+ * "the snow look on the castle was much nicer" (2026-10-13). So it is what it was on the mountain.
+ */
+export const SNOW_ON_THE_MOUNTAIN = 0.7;
 /** a cresset's fire: the colour of its light, how far that carries, and how big its flames are beside a campfire's */
 export const CRESSET = { colour: new THREE.Color(1, 0.62, 0.3), reach: 11, size: 0.26 };
 

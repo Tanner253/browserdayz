@@ -131,6 +131,12 @@ export class Player {
   thirstMult = 1;
   /** fall damage multiplier from footwear */
   fallMult = 1;
+  /**
+   * How a landing at this place is felt, as a share of the speed it came down at (1: as it is). The fort is built
+   * a fifth bigger than its plan, and what is sized to a body in it stays at a body's size: a drop inside it, down
+   * the grate into the cistern or off a wall walk, hurts as the plan's drop did and not a fifth more. Set by the game.
+   */
+  landsAs: (x: number, y: number, z: number) => number = () => 1;
   /** how the last damage was dealt (shown on the death screen, sent to the server) */
   lastCause = '';
   sensitivity = 0.0021;
@@ -1016,7 +1022,7 @@ export class Player {
       this.softLanding = false;
       vy = Math.max(vy, -2);
     }
-    const s = Math.max(0, -vy);
+    const s = Math.max(0, -vy) * this.landsAs(this.pos.x, this.pos.y, this.pos.z);
     this.landVel = -Math.min(s * 0.035, 0.22);
     if (s > 2.5) audio.land(this.surface() as Surface, s);
     // from a height your legs take the fall before you can run on

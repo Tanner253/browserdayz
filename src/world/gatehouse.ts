@@ -34,7 +34,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { assets } from '../core/assets';
 import { physics } from '../core/physics';
 import type { Atmosphere, ShaderPatch } from './atmosphere';
-import { SNOW_LIES, SNOW_PAINT } from './foliage';
+import { SNOW_LIES, SNOW_PAINT, snowUniforms } from './foliage';
 
 /**
  * Where it stands: the end of the road (the middle of it, on its surface) and the way the road was running there,
@@ -502,6 +502,8 @@ function shape(b: Block, k: number, to: THREE.Matrix4): THREE.BufferGeometry {
  * Each corner says how high it is over the yard (`aFoot`), and that is all the drift goes by.
  */
 const weathered = (grade: (typeof GRADE)[string] | undefined, stone: boolean): ShaderPatch => (shader) => {
+  // (snow lies by place as well as by height: see src/world/snow.ts)
+  Object.assign(shader.uniforms, snowUniforms);
   const f = (v: number) => v.toFixed(3);
   shader.vertexShader = shader.vertexShader
     .replace('#include <common>', '#include <common>\nattribute float aFoot;\nvarying vec3 vGateW;\nvarying vec3 vGateN;\nvarying float vGateFoot;')
