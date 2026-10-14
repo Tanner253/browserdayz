@@ -47,7 +47,7 @@ export function wagerQuery(): string | null {
 export function arenaBase(): string {
   const env = (import.meta as { env?: { VITE_ARENA_URL?: string; DEV?: boolean } }).env;
   const q = new URLSearchParams(location.search).get('arena');
-  return (q || env?.VITE_ARENA_URL || (env?.DEV ? '' : 'https://zona-arena.onrender.com')).trim().replace(/\/$/, '');
+  return (q || env?.VITE_ARENA_URL || (env?.DEV ? '' : 'https://zona-arena-1.onrender.com')).trim().replace(/\/$/, '');
 }
 
 /** the wager is over (or was never there to join): the page is the open world's again */

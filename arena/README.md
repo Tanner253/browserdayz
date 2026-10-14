@@ -12,7 +12,7 @@ to nothing but the games that come to it. No money moves yet: the stake is shown
 
 What both sides share is in `src/`: the rules (`src/sim/arena.ts`), the protocol (`src/net/protocol.ts`, the same
 `PROTOCOL` as the game server), and the map (`src/world/`). The game finds the arena at `?arena=` on the page,
-else `VITE_ARENA_URL` (set in Vercel, Production, and read when the site is built), else `https://zona-arena.onrender.com`.
+else `VITE_ARENA_URL` (set in Vercel, Production, and read when the site is built), else `https://zona-arena-1.onrender.com` (the service the owner made).
 
 ## Run it locally
 The launch entry `zona-arena-local` (port 8090), beside `zona-dev`: the dev page sends `/arena` to it. Open the menu's
