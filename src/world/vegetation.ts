@@ -295,6 +295,33 @@ class LodSet {
 const FRAMES = 8;
 const FRAME_W = 256;
 const FRAME_H = 384;
+/**
+ * SNOW ON A TREE'S CARD. A card is a picture of the tree in leaf, lit as it stood at noon; where snow lies the
+ * tree itself is white (foliagePatch lays snow on its boughs), and its card was left almost as green as it was
+ * photographed, so that a wood in the snow was green from far off and turned white tree by tree as somebody walked
+ * up to it. The ruling (2026-10-13): "A tree standing where snow lies shows snow from far as it does from near".
+ * So the card's snow is laid as the model's is and lit as the picture is lit:
+ *   laid  – on a leaf, the share of it the model lays (its own sum is the patches' 0.5 to 0.92, which the card
+ *           has too, times 0.65 to 1 by how a bough faces: this is the middle of that); none on the trunk
+ *   light – a point of the picture is as bright as the leaf there is in itself times the light that fell on it.
+ *           Snow is laid in that same light: so many times the picture's own brightness there (one over how
+ *           bright a leaf is in itself)
+ *   most  – and never reckoned brighter than this: a glint on a needle is not a floodlight on the snow
+ *   cold  – a picture's brightness says how much light fell and not of what colour. Half the light on a bough in
+ *           a wood is the sky's, and snow shows it where a green needle does not: the card's snow is this much
+ *           bluer than its paint (so much taken from the red, so much put on the blue)
+ * `light` and `cold` are MEASURED, not reckoned. At the fort, in three looks along its track, one frozen moment of
+ * each was drawn three ways: with no trees, with the handover pushed out so that the trees 68 to 125 m off were
+ * models, and pulled in so that the same trees were cards. On the 82,000 points of the screen where a tree stood
+ * in both and had changed hands, the models were (126, 131, 139) of 255 on the mean with 22% of their points
+ * pale; the cards as they had been, (62, 70, 61) and 2%. Of twenty-five pairs tried, light 28 and cold 0.12 came
+ * nearest: (124, 129, 135) and 19%. Measured again in two of those looks on the shader as it stands: the cards
+ * within 2 of 255 of the models on the mean, and 2 in a hundred fewer of their points pale. (What it does not
+ * match: the darkest tenth of a card's points are darker than the model's, 66 of 255 against 96. A bough in deep
+ * shade is lit by the sky, and the picture has it dark.)
+ * One number serves every kind of tree: it was measured on the pines and birches that stand there.
+ */
+const CARD_SNOW = { laid: 0.82, light: 28, most: 3, cold: 0.12 };
 
 interface ImpostorVariant {
   row: number;
@@ -428,6 +455,8 @@ class Impostors {
         uDaylight: this.daylight,
         // (where snow lies by place and not by height, src/world/snow.ts: a tree's card is told what the tree is)
         ...snowUniforms,
+        // (and how its snow is laid and lit: see CARD_SNOW)
+        uCardSnow: { value: new THREE.Vector4(CARD_SNOW.laid, CARD_SNOW.light, CARD_SNOW.most, CARD_SNOW.cold) },
       },
       defines: { NV: rows, USE_FOG: '', FOG_EXP2: '' },
       vertexShader: IMPOSTOR_VS,
@@ -493,12 +522,15 @@ varying float vFrame;
 varying float vRow;
 varying float vDist;
 varying float vSnow;
+varying vec3 vCard;
 varying vec3 vFogWorldPos;
 ${SNOW_LIES}
 void main() {
   vec4 info = uInfo[int(iVar + 0.5)];
   vec3 base = iPos.xyz;
   vSnow = snowLies(base);
+  // (where on the card a point is, metres across from its middle and up from its foot; and a number of the tree's own)
+  vCard = vec3(position.x * info.x * iPos.w, position.y * info.y * iPos.w, mod(dot(base.xz, vec2(0.71, 1.13)), 6.2831853));
   vec3 toCam = cameraPosition - base;
   vec3 flatDir = normalize(vec3(toCam.x, 0.0, toCam.z) + vec3(1e-5, 0.0, 0.0));
   vec3 right = vec3(flatDir.z, 0.0, -flatDir.x);
@@ -519,11 +551,14 @@ uniform sampler2D tAtlas;
 uniform float uRows;
 uniform vec2 uFade;
 uniform float uDaylight;
+// (a card's snow: how much of a leaf it is laid on, how many times the picture's own brightness it is lit by, the most that is reckoned, and how much bluer than that the light is)
+uniform vec4 uCardSnow;
 varying vec2 vUv;
 varying float vFrame;
 varying float vRow;
 varying float vDist;
 varying float vSnow;
+varying vec3 vCard;
 #include <fog_pars_fragment>
 vec4 frameSample(float f) {
   float fi = mod(floor(f), ${FRAMES}.0);
@@ -540,11 +575,19 @@ void main() {
   // the model dissolves over the same stretch by the same pattern (see foliagePatch): the card
   // takes just the pixels it gives up, so the two never leave a hole or draw twice
   if (c.a < 0.45 || (fade < 0.999 && ign < 1.0 - fade)) discard;
-  // (Snow on it, as on the tree it is a picture of. The picture is of a lit tree, so the snow is lit as the tree
-  // was: as bright as the picture is there, by as much as snow is paler than a pine's needles, and the trunk and
-  // the dark under the boughs are left dark.)
-  float lit = dot(c.rgb, vec3(0.3, 0.59, 0.11));
-  c.rgb = mix(c.rgb, ${SNOW_PAINT} * min(lit * 4.2, 1.5), vSnow * 0.72 * smoothstep(0.02, 0.12, lit));
+  // Snow on it, as on the tree it is a picture of (see CARD_SNOW): on its leaves, in patches of the grain the
+  // model's own snow lies in, and none on its trunk, which is told from a leaf by being redder than it is green.
+  // (The patches are fixed to the card, and each tree has its own: laid by where in the world a point of the card
+  // is, as the model's are, they would creep over the boughs as the card turned to face whoever walked past.) The
+  // picture is of a lit tree, so the snow is lit as the tree was: where a bough stood in the sun the snow on it is
+  // bright, and under the boughs it is in their shade. A card with no snow on it is the picture and nothing else.
+  if (vSnow > 0.0) {
+    float lit = dot(c.rgb, vec3(0.3, 0.59, 0.11));
+    float leaf = smoothstep(-0.04, 0.08, (c.g - c.r) / max(lit, 1e-4));
+    float patchy = 0.5 + 0.5 * sin(vCard.x * 3.1 + vCard.y * 5.3 + vCard.z) * sin(vCard.x * 2.7 - vCard.y * 4.1 + vCard.z * 1.7);
+    vec3 cold = vec3(1.0 - uCardSnow.w, 1.0 - 0.2 * uCardSnow.w, 1.0 + uCardSnow.w);
+    c.rgb = mix(c.rgb, ${SNOW_PAINT} * cold * min(lit * uCardSnow.y, uCardSnow.z), vSnow * mix(0.5, 0.92, patchy) * uCardSnow.x * leaf);
+  }
   gl_FragColor = vec4(c.rgb * uDaylight, 1.0);
   #include <fog_fragment>
 }`;
