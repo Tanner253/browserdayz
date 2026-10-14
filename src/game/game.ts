@@ -4,33 +4,34 @@
 
 import * as THREE from 'three';
 import type { Renderer } from '../core/renderer';
-import { physics, USE_GROUPS, SHOT_GROUPS, SOLID_GROUPS, SIGHT_GROUPS } from '../core/physics';
+import { physics } from '../core/physics';
 import { assets } from '../core/assets';
 import { audio } from '../core/audio';
-import { Input, NULL_INPUT } from '../core/input';
+import { Input } from '../core/input';
 import { controls, translation, type Controls } from '../core/keys';
 import type { Atmosphere } from '../world/atmosphere';
 import type { Terrain } from '../world/terrain';
 import { Barrel, type Vegetation } from '../world/vegetation';
 import type { Grass } from '../world/grass';
-import { Door, type Buildings } from '../world/buildings';
-import { WORLD_SIZE, bunkerPlace, heightAt, inPlay, type SiteKind, type World } from '../world/worldgen';
-import { GEAR_SLOTS, ITEMS, WEAPON_SLOTS, itemName, TAG_HOLD, TAG_HOLD_MIN, TAG_OUT, capacityOf, chambered, fillMag, fittedOf, magRoom, makeItem, newUid, swapMag, tagClock, tagOwner, type ItemInstance, quietOf, makeMag } from '../sim/items';
-import { BODY_GRID, PlayerInventory, SLOT_ORDER, type Container } from '../sim/inventory';
-import { refill, refilledWords, weightFelt } from '../sim/powers';
-import { Economy, type WorldLoot } from '../sim/economy';
-import { CRATE_RESTOCK, CRATE_SPECS, fillCrate } from '../sim/crates';
-import { WEAPON_RULES } from '../sim/combat';
-import { NADE, THROWN, fuseLeft, inHandDamage } from '../sim/grenades';
-import { shotOf } from '../sim/gunplay';
-import { BARREL } from '../sim/barrels';
-import { EMOTE, EMOTES, EMOTE_GAP, SAY_RANGE, SAY_TIME, voiceOf } from '../sim/emotes';
-import { loadSave, writeSave, type SaveData } from '../sim/save';
-import { Net, playerName, publicId, remoteServer, serverStatus, setPlayerName, personKey } from '../net/client';
-import { F_AIM, F_BLEED, F_CROUCH, F_DANCE, F_DEAD, F_GROUND, F_GUARD, F_LEAN_L, F_LEAN_R, F_LIMP, F_LIGHT, F_PRONE, F_SEAT, F_SIT, F_SPRINT, F_SURRENDER, MAX_STAMINA, PROTOCOL, crateId, type Act, type CorpseInfo, type PlayerInfo, type Pose, type StoredItem, type S2C, type StashInfo } from '../net/protocol';
-import { CARRY_LIMIT, Player, freshVitals } from './player';
-import { BLOOD, bleedOf, bleedsOutIn, bloodOf, greyOf, woundOf } from '../sim/blood';
-import { Avatar, AVATAR_LAYER, DEATH_REST, FP_BODY_LAYER, GEAR_SHOWN, type Hold, facepiece } from './avatar';
+import '../world/buildings';
+import type { Buildings } from '../world/buildings';
+import { WORLD_SIZE, bunkerPlace, heightAt, type SiteKind, type World } from '../world/worldgen';
+import { GEAR_SLOTS, ITEMS, WEAPON_SLOTS, fittedOf, makeItem, type ItemInstance } from '../sim/items';
+import { PlayerInventory } from '../sim/inventory';
+import '../sim/powers';
+import { Economy } from '../sim/economy';
+import { CRATE_SPECS } from '../sim/crates';
+import '../sim/combat';
+import '../sim/grenades';
+import '../sim/gunplay';
+import '../sim/barrels';
+import '../sim/emotes';
+import '../sim/save';
+import { Net, playerName, publicId, serverStatus } from '../net/client';
+import { crateId } from '../net/protocol';
+import { CARRY_LIMIT, Player } from './player';
+import '../sim/blood';
+import { Avatar, AVATAR_LAYER, GEAR_SHOWN, type Hold } from './avatar';
 import { lookFor } from './look';
 import { Doll } from './doll';
 import { roadLift } from '../world/road';
@@ -38,27 +39,27 @@ import { Dummy } from './character';
 import { CorpseBody, RemotePlayer } from './remote';
 import { CameraDirector } from './camera';
 import { Effects } from './effects';
-import { INJECT, Weapons, type HitInfo, type UseKind } from './weapons';
+import { Weapons, type HitInfo } from './weapons';
 import { LootManager, Stash, WorldItem } from './loot';
 import { Grenades } from './grenades';
 import { Garage } from './garage';
 import { Jeep } from './vehicle';
-import { JEEP } from '../sim/vehicles';
-import { HUD, type HandAct, type HotbarEntry } from '../ui/hud';
-import { BACK_SHORT } from '../ui/updates';
+import '../sim/vehicles';
+import { HUD } from '../ui/hud';
+import '../ui/updates';
 import { InventoryUI } from '../ui/inventory-ui';
 import { Minimap } from '../ui/minimap';
-import { BigMap, type MapPerson } from '../ui/bigmap';
-import { BURY, noBurying } from '../sim/stash';
-import { AdminUI, type AdminLook, type AdminPlayer, type AdminSelf } from '../ui/admin-ui';
-import { callSite, CRASH, DROP, describeSpot, fillCrash, fillDrop, pickDropSite, type DropInfo } from '../sim/drops';
-import { comesFrom, flightTimes, planFlight, restAt, type Flight } from '../sim/airdrop';
+import { BigMap } from '../ui/bigmap';
+import { BURY } from '../sim/stash';
+import { AdminUI, type AdminPlayer } from '../ui/admin-ui';
+import '../sim/drops';
+import '../sim/airdrop';
 import { Airdrops } from './airdrop';
-import { WELL, stage, wellSpots, type Well } from '../sim/wells';
+import { wellSpots, type Well } from '../sim/wells';
 import { Voice } from './voice';
 import { TIERS, type Tier } from '../sim/tiers';
 import { hasSlotIcon, iconSig, renderDoll, renderIcons } from '../ui/icons';
-import { askPerson } from '../ui/person';
+import '../ui/person';
 import { BotCheck } from './botcheck';
 import { Near } from './near';
 import { Perf } from '../core/perf';
@@ -67,36 +68,44 @@ import { Horde, Infected } from './infected';
 import { INFECTED, guarded } from '../sim/infected';
 import { TOUCH } from '../core/device';
 import { TouchControls } from '../ui/touch';
-import { REWARDS_UI, RewardsModal, addCashedTag, cashedTags, onTagPay, walletAddress } from '../ui/rewards';
+import { REWARDS_UI, RewardsModal, onTagPay, walletAddress } from '../ui/rewards';
 import { Gas } from './gas';
-import { GAS, underGas, bunkerUnder } from '../sim/gas';
-import { DAY, hourAt, phaseOf } from '../sim/daynight';
-import { FIRE, Hearths } from '../sim/fires';
+import { GAS, bunkerUnder } from '../sim/gas';
+import { DAY } from '../sim/daynight';
+import { Hearths } from '../sim/fires';
 import { Fires } from './fires';
 import { Lockers } from './lockers';
-import { breaksOnHit } from '../sim/injury';
+import '../sim/injury';
 import { MenuScenes } from './menu-scenes';
 import { Traders } from './trader';
 import { ShopUI } from '../ui/shop';
-import { KEPT_ON_DEATH, STOCK, aDay, asks, pays, sold } from '../sim/trade';
-import { bookFor, dayOf, jobsFor, progress as jobDone, type JobBook } from '../sim/jobs';
+import { STOCK, aDay, asks, pays, sold } from '../sim/trade';
+import { jobsFor, progress as jobDone } from '../sim/jobs';
 import type { MenuSpot } from '../ui/hud';
 import { Lamps } from './lamps';
 import { BunkerSite, spotKey } from '../world/bunker';
-import { BUNKER, bunkerCrates, bunkerDark, inBunker } from '../sim/bunker';
-import { CRESSET, CastleSite } from '../world/castle';
-import { CASTLE_SCALE, castleDark, castleUnder, inCastle } from '../sim/castle';
+import { BUNKER, bunkerCrates } from '../sim/bunker';
+import { CastleSite } from '../world/castle';
+import { CASTLE_SCALE, inCastle } from '../sim/castle';
 import { WreckFire } from './wreck-fire';
+import { enterMethods } from './game/enter';
+import { onlineMethods } from './game/online';
+import { dropsMethods } from './game/drops';
+import { handsMethods } from './game/hands';
+import { itemsMethods } from './game/items';
+import { gunsMethods } from './game/guns';
+import { interactMethods } from './game/interact';
+import { frameMethods } from './game/frame';
 
-const _gasHead = new THREE.Vector3();
+export const _gasHead = new THREE.Vector3();
 /** how much of the view is left when aiming through a holographic sight (the plain sights leave 0.8 of it): nearer by a third again */
-const HOLO_ZOOM = 0.6;
-const _lampPos = new THREE.Vector3(), _lampDir = new THREE.Vector3();
+export const HOLO_ZOOM = 0.6;
+export const _lampPos = new THREE.Vector3(), _lampDir = new THREE.Vector3();
 /** the colour of a street lamp's light (sodium: warm) */
-const STREET_LAMP = new THREE.Color(1, 0.72, 0.38);
+export const STREET_LAMP = new THREE.Color(1, 0.72, 0.38);
 /** and of a bunker's lamp (an old bulb in a cage) */
-const BUNKER_LAMP = new THREE.Color(1, 0.84, 0.58);
-const _sealed = new THREE.Vector3(), _sealedDir = new THREE.Vector3(), _sealedLook = new THREE.Vector3();
+export const BUNKER_LAMP = new THREE.Color(1, 0.84, 0.58);
+export const _sealed = new THREE.Vector3(), _sealedDir = new THREE.Vector3(), _sealedLook = new THREE.Vector3();
 
 export interface WorldSystems {
   r: Renderer;
@@ -109,12 +118,12 @@ export interface WorldSystems {
 }
 
 /** seconds with a shovel to put a stash under the ground, or to bring one up */
-const DIG_SECONDS = BURY.seconds;
+export const DIG_SECONDS = BURY.seconds;
 /** how far off an admin's free camera shows a name over a head at its full strength, metres: further off it is there still, and faint */
 // (an admin's far sight: lettering this big within ESP_NEAR metres, shrinking to this small at ESP_FAR and beyond)
-const ESP_SIZE = [15, 9.5], ESP_NEAR = 20, ESP_FAR = 500;
+export const ESP_SIZE = [15, 9.5], ESP_NEAR = 20, ESP_FAR = 500;
 
-interface TimedAction {
+export interface TimedAction {
   label: string;
   t: number;
   dur: number;
@@ -134,28 +143,28 @@ interface TimedAction {
 }
 
 /** bump when the map's loot points change: spawned loot from older saves is re-rolled */
-const LOOT_REV = 21;
+export const LOOT_REV = 21;
 /** where a jeep's headlamps are on it: so far either side of its middle, so far over its middle, so far forward (it is 2.08 m to its nose) */
-const HEADLAMP = { x: 0.5, y: 0.14, z: -2.12 };
+export const HEADLAMP = { x: 0.5, y: 0.14, z: -2.12 };
 /** and the police car's: wider apart, lower, and further forward (it is 2.58 m to its nose) */
-const HEADLAMP_CAR = { x: 0.68, y: -0.14, z: -2.6 };
+export const HEADLAMP_CAR = { x: 0.68, y: -0.14, z: -2.6 };
 /**
  * The hot keys, 1 to 9 and then 0. Each brings up whatever was put on it (PlayerInventory.hot): anything carried,
  * on any key. Pressed, the thing is taken into the hands; pressed again, it is put away. What is in the hands is
  * then used by holding the left button down for as long as the using takes (see `handFire`), which is how
  * everything is done: a tin is eaten, a box of rounds unwrapped, a magazine filled, a tank poured into.
  */
-const HOT_CODES = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0'];
+export const HOT_CODES = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0'];
 /** the first key a thing to eat, drink or dress a wound with takes by itself when it is first picked up (the ones before it are the back's and the holster's) */
-const HOT_FREE = 3;
+export const HOT_FREE = 3;
 /** the wheel: how far the mouse travels from its middle to its rim (pixels), and how far out an entry is picked */
-const WHEEL_REACH = 120, WHEEL_PICK = 0.35;
-const SEND_HZ = 15;
-const _drip = new THREE.Vector3();
-const _still = new THREE.Vector3();
+export const WHEEL_REACH = 120, WHEEL_PICK = 0.35;
+export const SEND_HZ = 15;
+export const _drip = new THREE.Vector3();
+export const _still = new THREE.Vector3();
 
 /** An admin's night sight: how strong the light from nowhere is under a roof (where the day does not reach) and under the sky (where it does, and little is wanted). */
-const NIGHT_SIGHT = { indoors: 2.6, outdoors: 0.35 };
+export const NIGHT_SIGHT = { indoors: 2.6, outdoors: 0.35 };
 
 export class Game {
   input: Input;
@@ -181,9 +190,9 @@ export class Game {
   /** the gas over the works: the breathing of it, and what is seen of it close to */
   gas!: Gas;
   /** what goes on behind the menu before a game is started */
-  private menu!: MenuScenes;
+  menu!: MenuScenes;
   /** the menu is (or was last frame) what is on the screen */
-  private menuOn = true;
+  menuOn = true;
   /** the fireplaces: which are alight, and the look and sound of them */
   fires!: Fires;
   /** the doors of the lockers that have them: swung open while one is searched, by anybody (see ./lockers.ts) */
@@ -195,16 +204,16 @@ export class Game {
   /** the jeep that burns before the fort's gate, for good (./wreck-fire.ts): none, in a world that has no fort */
   wreck: WreckFire | null = null;
   /** playing alone: seconds since this game was last inside it with its door open */
-  private bunkerEmpty = 0;
+  bunkerEmpty = 0;
   /** every lit lamp: carried, driven behind, standing in the street */
   lamps!: Lamps;
-  private streetLamps: THREE.Vector3[] = [];
+  streetLamps: THREE.Vector3[] = [];
   /** the player has a light switched on (the one on the gun, or the flashlight carried) */
   lit = false;
   /** which are alight, kept by this game when it is played alone (the server keeps it otherwise) */
-  private hearths!: Hearths;
+  hearths!: Hearths;
   /** resting by a fire that is alight: mending by it, or only warm (a wound is open, or nothing has been eaten). The HUD has a badge for it */
-  private byFire: 'mending' | 'warm' | null = null;
+  byFire: 'mending' | 'warm' | null = null;
   readonly horde: Horde = new Horde({
     atmo: () => this.s.atmo,
     scene: () => this.s.r.scene,
@@ -247,102 +256,102 @@ export class Game {
   remotes = new Map<number, RemotePlayer>();
   /** item ids on the quick-use keys 5-8 */
   quick: (string | null)[] = [null, null, null, null];
-  private corpses = new Map<string, { stash: Stash; body: CorpseBody }>();
-  private last = performance.now();
-  private fpsAcc = 0;
-  private fpsN = 0;
+  corpses = new Map<string, { stash: Stash; body: CorpseBody }>();
+  last = performance.now();
+  fpsAcc = 0;
+  fpsN = 0;
   fps = 0;
-  private started = false;
-  private joining = false;
-  private use: TimedAction | null = null;
-  private saveT = 0;
-  private econT = 0;
-  private poi: string | null = null;
-  private prompt: string | null = null;
+  started = false;
+  joining = false;
+  use: TimedAction | null = null;
+  saveT = 0;
+  econT = 0;
+  poi: string | null = null;
+  prompt: string | null = null;
   /** where on screen the thing the prompt is about sits (fractions of the screen) */
-  private mark: [number, number] | null = null;
+  mark: [number, number] | null = null;
   /**
    * Supply drops standing in the world (see src/sim/drops.ts): the crate, when it is due to
    * be cleared away (performance clock, ms), and its column of smoke.
    */
-  private drops = new Map<string, { stash: Stash; until: number; at: THREE.Vector3; smoke: { owed: number }; wreck?: { obj: THREE.Object3D; solid: unknown[] } }>();
+  drops = new Map<string, { stash: Stash; until: number; at: THREE.Vector3; smoke: { owed: number }; wreck?: { obj: THREE.Object3D; solid: unknown[] } }>();
   /** playing alone: game time the next one is due (-1 until the clock is first read) */
-  private nextDrop = -1;
+  nextDrop = -1;
   /** the helicopters in the air with a supply drop, and the crates coming down (src/game/airdrop.ts) */
   airdrops!: Airdrops;
   /** the page's own title: the tab shows the place in the line, and "your turn", over it */
-  private title = document.title;
+  title = document.title;
   /** times at which the open inventory should look again at what lies on the ground (see drop) */
-  private vicinityDue: number[] = [];
-  private vicinityT = 0;
-  private vicinitySig = '';
+  vicinityDue: number[] = [];
+  vicinityT = 0;
+  vicinitySig = '';
   /** the pockets were closed but the mouse is not the game's yet: one click and it is */
-  private awaitClick = false;
+  awaitClick = false;
   /** the bot check's range, while the server has this game on it (see ./botcheck.ts): not yet anybody in the world */
-  private botCheck: BotCheck | null = null;
-  private rangeHeard = false;
+  botCheck: BotCheck | null = null;
+  rangeHeard = false;
   /** the men behind the shops' counters, and the counter itself (see src/sim/trade.ts) */
-  private traders: Traders | null = null;
+  traders: Traders | null = null;
   /** talking to whoever is near: hold V (src/game/voice.ts) */
   readonly voice = new Voice(() => (audio.ready ? audio.ctx : null), () => audio.voiceBus(), (piece) => this.net.sendVoice(piece));
-  private voiceSaid = false;
+  voiceSaid = false;
   /** the wells of the two towns (src/sim/wells.ts) */
-  private wells: Well[] = [];
+  wells: Well[] = [];
   /** how hungry and how thirsty the player was last said to be: each is said once as it gets worse */
-  private wanting = [0, 0];
+  wanting = [0, 0];
   /** the radio a call has been made on and not yet answered */
-  private radio: ItemInstance | null = null;
+  radio: ItemInstance | null = null;
   /** drops called down and not yet landed: where, when they land, and the smoke that marks the place meanwhile */
-  private calls: { at: THREE.Vector3; until: number; smoke: { owed: number } }[] = [];
-  private shop!: ShopUI;
+  calls: { at: THREE.Vector3; until: number; smoke: { owed: number } }[] = [];
+  shop!: ShopUI;
   /** what is written against this player in the trader's book: kept by the browser */
-  private credit = Math.max(0, Math.floor(Number(localStorage.getItem('zona.credit')) || 0));
+  credit = Math.max(0, Math.floor(Number(localStorage.getItem('zona.credit')) || 0));
   /** seconds G has been held (drop what is in the hands), and whether that press has done its work */
-  private dropHeld = 0;
-  private dropDone = false;
-  private focus: unknown = null;
-  private sharpFocus: { of: WorldItem; drop: () => void } | null = null;
+  dropHeld = 0;
+  dropDone = false;
+  focus: unknown = null;
+  sharpFocus: { of: WorldItem; drop: () => void } | null = null;
   /** houses, cars and the like painted with their own pictures when the eye is near them (see near.ts) */
-  private near!: Near;
-  private openStash: Stash | null = null;
-  private indoors = false;
-  private inForest = false;
-  private deathInfo = '';
-  private deathSent = false;
-  private warned = { hunger: false, thirst: false };
-  private heldKey = '';
+  near!: Near;
+  openStash: Stash | null = null;
+  indoors = false;
+  inForest = false;
+  deathInfo = '';
+  deathSent = false;
+  warned = { hunger: false, thirst: false };
+  heldKey = '';
   // --- multiplayer bookkeeping
-  private sendT = 0;
-  private meT = 0;
-  private meDirty = false;
-  private pendingTakes = new Map<string, { item: ItemInstance; id: string; qty: number }>();
-  private localDrops = new Set<string>();
+  sendT = 0;
+  meT = 0;
+  meDirty = false;
+  pendingTakes = new Map<string, { item: ItemInstance; id: string; qty: number }>();
+  localDrops = new Set<string>();
 
   perf: Perf;
   /** graphics options the player picked in the Esc menu */
   gfx: Graphics = loadGraphics();
-  private tagT = 0;
+  tagT = 0;
   /** when a taken tag's time was last counted, by the clock on the wall (a hidden tab draws no frames: see `tagReal`) */
-  private tagWall = Date.now();
+  tagWall = Date.now();
   /**
    * Seconds since tags were last counted. By the clock, not by frames drawn: put behind another tab, the game
    * draws nothing, and a tag's ten minutes stopped for as long as it was there. (The server keeps its own clock
    * on every tag and pays by that one: this is the one the player is shown, and the one that cashes it in.)
    */
-  private tagReal() {
+  tagReal() {
     const now = Date.now(), s = Math.min(90, Math.max(0, (now - this.tagWall) / 1000));
     this.tagWall = now;
     return s;
   }
   /** when the player last got into a jeep (the keys are shown for a few seconds) */
-  private rideAt = -1e9;
+  rideAt = -1e9;
   /** phones and tablets: on-screen stick and buttons */
-  private touch: TouchControls | null = null;
+  touch: TouchControls | null = null;
   /** on a phone: the player put the weapon away themselves, so nothing is drawn for them until they pick one */
-  private handsFree = false;
+  handsFree = false;
   /** opens the rewards modal once the entrance has played */
-  private slowFor = 0;
-  private slowHinted = false;
+  slowFor = 0;
+  slowHinted = false;
 
   constructor(public s: WorldSystems) {
     this.perf = new Perf(s.r.renderer);
@@ -987,426 +996,7 @@ export class Game {
     this.director.update(0.016);
   }
 
-  // ------------------------------------------------------------ entering the world
-
-  /** First click on Play: find a server (multiplayer) or fall back to the local world. */
-  private async join() {
-    this.joining = true;
-    this.hud.refused('');
-    const name = this.hud.nameValue() || `Survivor${Math.floor(100 + Math.random() * 900)}`;
-    const renamed = name !== playerName();
-    setPlayerName(name);
-    this.dress(name, renamed);
-    this.hud.showStart(true, false, 'Connecting…');
-    // A full server puts us in line. The wait can be long: the mouse goes back to the player,
-    // the screen says where they stand, and they can give it up and play on their own.
-    let waited = false;
-    this.net.onQueue = (pos, of, max) => {
-      if (!waited) {
-        waited = true;
-        this.input.unlock();
-      }
-      this.hud.showStart(true, false, 'In line');
-      this.hud.setQueue({ pos, of, max }, () => this.net.leaveQueue());
-      document.title = `(${pos}) in line · ${this.title}`;
-    };
-    // The check that this is a person, where the server asks it: shown the moment Deploy is pressed, to everybody,
-    // before anything is asked of the server. Not passed, or given up: back at the way in, and not into the game.
-    const notAPerson = () => {
-      this.joining = false;
-      this.input.unlock();
-      this.hud.showStart(true);
-      this.hud.note('The check that you are a person was not passed: press Deploy to try again', 'warn');
-    };
-    // (The bot check: a range dealt, a figure counted down, the range passed. Listened for before anything is asked
-    // of the server: it deals the range in place of a welcome. See `onRange`.)
-    if (!this.rangeHeard) {
-      this.rangeHeard = true;
-      this.net.on('range', (m) => void this.onRange(m.seed, m.turn, m.go));
-      this.net.on('rhit', (m) => this.botCheck?.hit(m.i));
-      this.net.on('rpass', () => this.botCheck?.passed());
-    }
-    let slip = '';
-    const ask = await personKey();
-    if (ask) {
-      this.input.unlock();
-      this.hud.showStart(true, false, 'One check that you are a person');
-      slip = (await askPerson(ask)) ?? '';
-      if (!slip) return void notAPerson();
-      this.hud.showStart(true, false, 'Connecting…');
-    }
-    let welcome = await this.net.connect(name, (text) => this.hud.showStart(true, false, text), slip);
-    // (the bot check's range, if the server put this game on it, is over one way or the other: see `onRange`)
-    const ranged = !!this.botCheck;
-    this.botCheck?.end();
-    this.botCheck = null;
-    // (Whoever was on the range and is welcomed cannot be hurt until they have been stood in the world: the range's
-    // floor has just gone from under them. See the stashes in `enterOnline`.)
-    if (!(ranged && welcome)) this.player.god = false;
-    if (ranged && !welcome) {
-      // not passed, or the line dropped: back at the way in, and not into the game alone
-      this.joining = false;
-      this.started = false;
-      this.weapons.take(null);
-      this.inv.clear();
-      this.input.unlock();
-      this.hud.showStart(true);
-      this.hud.note(this.net.refused || 'The bot check was not finished: press Deploy to try again', 'warn');
-      return;
-    }
-    // Turned away for being of another version than the server. Which of the two is behind is told by the site as
-    // it is served this moment (version.json, made with the build). If that is not this page, this page is the old
-    // one and is loaded again. If it is, the server is the one behind: a new site goes out before its server does
-    // (2026-10-12: "why not just deploy the front end early so its ready for the server when it launches"), and it
-    // is waited for here, asked again every few seconds, for as long as ten minutes.
-    for (const began = performance.now(); !welcome && this.net.outdated && performance.now() - began < 600_000; ) {
-      const site = (await fetch(`/version.json?t=${Date.now()}`, { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).catch(() => null)) as { protocol?: number } | null;
-      if (site && typeof site.protocol === 'number' && site.protocol !== PROTOCOL) {
-        // (once in a while only: a page that came back the same is not asked for over and over)
-        const last = Number(sessionStorage.getItem('zona:reloaded') ?? 0);
-        if (Date.now() - last > 20_000) {
-          sessionStorage.setItem('zona:reloaded', String(Date.now()));
-          return void location.reload();
-        }
-      }
-      this.input.unlock();
-      this.hud.showStart(true, false, 'The server is being updated. You are let in as soon as it is up');
-      await new Promise((r) => setTimeout(r, 4000));
-      welcome = await this.net.connect(name);
-    }
-    // Turned away for want of the check that this is a person (the server asks it of whoever it has not lately had
-    // it from: see src/ui/person.ts). The check is shown, and the way in is asked for again with what it gave.
-    for (let tries = 0; !welcome && this.net.wantsProof && tries < 2; tries++) {
-      this.input.unlock();
-      this.hud.showStart(true, false, 'One check that you are a person');
-      const again = await askPerson(this.net.wantsProof);
-      if (!again) return void notAPerson();
-      this.hud.showStart(true, false, 'Connecting…');
-      welcome = await this.net.connect(name, (text) => this.hud.showStart(true, false, text), again);
-    }
-    // (asked twice and still turned away for it: not into the game)
-    if (!welcome && this.net.wantsProof) return void notAPerson();
-    this.hud.setQueue(null);
-    document.title = this.title;
-    if (welcome) {
-      await this.enterOnline(welcome);
-      // (stood in the world now: as anybody is. An admin's own is said again by the server as it comes in.)
-      if (ranged) this.player.god = false;
-      if (waited) {
-        // their turn, quite possibly while they were looking at something else
-        audio.ui('open');
-        document.title = `Your turn! · ${this.title}`;
-        this.hud.note('A place came free: you are in', 'good');
-      }
-    } else {
-      if (this.net.leftQueue) this.hud.note('You left the line: playing on your own', 'warn');
-      else if (this.net.refused) {
-        // Kept off, or banned: said on the way in where it stays said, and not into a game alone as if nothing
-        // had happened. (It was a note that went after four seconds, and then a world with nobody in it.
-        // 2026-10-13: "when a user is banned or kicked we tell them right? at the menu or when rejected?")
-        // (And whatever else the server turned them away for: somebody already playing from their connection,
-        // a page that is out of date. 2026-10-13: "he says hes in offline mode and cant play": he had been turned
-        // away, was told so for four seconds, and was then walking about a world with nobody in it.)
-        this.joining = false;
-        this.input.unlock();
-        this.hud.showStart(true);
-        this.hud.refused(this.net.refused);
-        return;
-      } else if (remoteServer()) this.hud.note('The server could not be reached: you are playing OFFLINE, alone. Reload the page to try again.', 'warn');
-      await this.enterOffline();
-    }
-    this.joining = false;
-    this.started = true;
-    this.menu.dispose();
-    this.hud.menuScene('', 0);
-    // out of the aerial shot and down into the character's eyes
-    this.director.flyIn();
-    if (!this.weapons.equippedItem) {
-      const slot = (['primary', 'secondary', 'holster'] as const).find((k) => this.inv.slots[k]);
-      if (slot) this.weapons.equip(slot);
-    }
-    if (this.input.locked) this.unpause();
-    else this.hud.showStart(true, true, waited && welcome ? 'You are in: click to play' : '');
-  }
-
-  /** What this player looks like follows from their name: body, first-person sleeves, inventory portrait. */
-  private dress(name: string, portrait: boolean) {
-    const look = lookFor(name);
-    this.avatar.setLook(look);
-    this.weapons.setLook(look);
-    if (portrait) this.portrait();
-  }
-
-  /**
-   * The server has dealt this game a range (the bot check: ./botcheck.ts, ../sim/range.ts) before it will let it
-   * in. The player is put on it alone, with a rifle: not in the world, and with nothing of their own. It ends in
-   * `join`, when the server either welcomes this game or turns it away.
-   */
-  private async onRange(seed: number, turn: number, go: number) {
-    const { r, atmo, world } = this.s;
-    if (!this.botCheck) {
-      let top = 0;
-      for (let i = 0; i < world.heights.length; i += 7) top = Math.max(top, world.heights[i]);
-      this.botCheck = new BotCheck({
-        scene: r.scene,
-        atmo,
-        camera: r.camera,
-        floor: Math.round(top + 140),
-        place: (x, y, z) => this.player.spawn(x, y, z, 0),
-        where: () => this.player.pos,
-        send: (m) => this.net.send(m),
-        ready: (o) => r.ready(o),
-        playing: () => this.input.locked || this.input.touch,
-      });
-      // a rifle with a sight on it, and more rounds than the range lets anybody fire
-      if (this.use) this.breakOff();
-      this.weapons.take(null);
-      this.inv.clear();
-      const gun = Object.assign(makeItem('ar15'), { mag: 'mag_ar', loaded: 31, mods: ['red_dot'] });
-      this.inv.add(gun);
-      for (let k = 0; k < 2; k++) this.inv.add(makeMag('mag_ar', 30));
-      this.weapons.validate();
-      this.autoHot();
-      this.player.vitals = freshVitals();
-      this.player.god = true;
-      this.started = true;
-      this.menu.dispose();
-      this.hud.menuScene('', 0);
-      this.hud.showStart(false);
-      await this.botCheck.deal(seed, turn, go);
-      // (straight to the eyes: the range's clock is running)
-      this.director.flyIn(0.5);
-      const slot = (['primary', 'secondary', 'holster'] as const).find((k) => this.inv.slots[k]);
-      if (slot && !this.weapons.equippedItem) this.weapons.equip(slot);
-      // (the mouse was let go for the check before this one: the next click on the game takes it again)
-      if (this.input.locked) this.unpause();
-      else this.awaitClick = true;
-      return;
-    }
-    // (another go: a fresh magazine with the fresh range)
-    const held = this.weapons.equippedItem;
-    if (held?.id === 'ar15') Object.assign(held, { mag: 'mag_ar', loaded: 31 });
-    await this.botCheck.deal(seed, turn, go);
-  }
-
-  private async enterOffline() {
-    // (said for as long as it is so: nobody else is here, and nothing done here is kept)
-    this.hud.setOffline(!!remoteServer());
-    const save = loadSave();
-    if (save) await this.restore(save);
-    else this.fresh();
-    await this.spawnDummies();
-    this.garage.startAlone();
-    this.horde.alone();
-    this.hud.setNet('Offline · single player');
-    this.hud.setOnline(null);
-  }
-
-  /** a crate of the map filled (one under the gas with the best of everything) */
-  private fillCrate(c: Stash) {
-    fillCrate(c.container, c.kind, Math.random, inBunker(this.bunker.place, c.x, c.y + 0.5, c.z) ? 'bunker' : underGas(this.s.atmo.gas, c.x, c.y, c.z));
-  }
-
-  private fresh() {
-    this.spawnAtEdge();
-    this.economy.populate();
-    for (const c of this.loot.crates) this.fillCrate(c);
-    this.freshKit();
-  }
-
-  private spawnAtEdge() {
-    const { world } = this.s;
-    const sp = world.spawns[Math.floor(Math.random() * world.spawns.length)] ?? world.spawn;
-    this.player.spawn(sp.x, heightAt(world.heights, sp.x, sp.z) + 0.05, sp.z, sp.yaw);
-  }
-
-  /** A new life: bare hands, one thing to eat and one thing to drink. Everything else is out there. */
-  private freshKit() {
-    // (`clear` leaves them in a new Field Jacket and Field Trousers, which are things now and have the pockets: 2026-10-13)
-    this.inv.clear();
-    const pick = (ids: string[]) => ids[Math.floor(Math.random() * ids.length)];
-    this.inv.add(makeItem(pick(['sprats', 'beans', 'sardines', 'tomatoes'])));
-    this.inv.add(makeItem(pick(['thermos', 'milk'])));
-    // one dressing: the first wound is survivable, the second is yours to deal with
-    this.inv.add(makeItem('bandage'));
-    this.inv.neck = this.makeTag();
-    this.player.vitals = freshVitals();
-    this.player.drip.left = 0;
-    this.bloodSaid = 0;
-    this.player.boost = 0;
-    this.ready = null;
-    this.inHand = null;
-    this.holding = false;
-    this.avatar.clearWounds();
-    this.weapons.validate();
-    this.autoHot();
-    // (and it is seen with nothing on: the helmet, the vest and the pack of the life before were still on the body,
-    // and on the figure in the inventory, until something was next picked up. "when i die and respawn my player
-    // model still has its old equipement shown", 2026-10-12.)
-    this.syncGear();
-  }
-
-  /**
-   * A whole set handed over by an admin (src/sim/kits.ts): what was carried goes, but for the dog tags, and the
-   * set is put on and away as things picked up are. What finds no room is put at the feet.
-   */
-  private kitUp(m: Extract<S2C, { t: 'kit' }>) {
-    const inv = this.inv;
-    if (this.player.dead) return;
-    if (!m.adds) {
-      // (whatever the hands were at is dropped: a kit asked for again is the same kit, whole, in place of what is left of the last)
-      if (this.use) this.breakOff();
-      if (this.invUI.isOpen) this.toggleInventory(false);
-      this.loose = null;
-      this.weapons.take(null);
-      const me = publicId();
-      inv.sortTags((tag) => tag.pid === me);
-      const neck = inv.neck, pouch = inv.tags.items.map((q) => q.item);
-      // (a kit replaces everything: the jacket and the trousers that were on go too, with what was in them, and `clear` leaves new ones on)
-      inv.clear();
-      inv.neck = neck ?? this.makeTag();
-      for (const tag of pouch) inv.tags.add(tag);
-      this.ready = null;
-      this.inHand = null;
-      this.holding = false;
-    }
-    // (with an admin's hold open, `add` has room for every one of them: PlayerInventory.containers)
-    const over = m.items.filter((it) => inv.add(it));
-    for (const it of over) this.dropItem(it);
-    this.weapons.validate();
-    this.autoHot();
-    this.inventoryChanged();
-    this.meDirty = true;
-    // (things given while the pockets are open are seen to arrive)
-    if (m.adds && this.invUI.isOpen) this.invUI.render();
-    // (a kit of nothing is an admin's "empty everything")
-    if (!m.name) return void (m.by && this.hud.note(`${m.by}, an admin, has emptied what you carried`, 'warn'));
-    // (things an admin has given, and no kit: said as what they are, and where they went. Each pile is one thing here.)
-    if (m.gift) {
-      const none = over.length === m.items.length, lies = none ? (over.length === 1 ? 'it found no room and lies at your feet' : 'none of it found room: it lies at your feet') : over.length === 1 ? 'one found no room and lies at your feet' : `${over.length} found no room and lie at your feet`;
-      if (m.by) return void this.hud.note(`${m.by}, an admin, has given you ${m.gift}${over.length ? `; ${lies}` : ''}`, 'good');
-      return void this.hud.note(`${m.gift}: ${over.length ? lies : 'in your inventory'}`, 'good');
-    }
-    if (m.by || over.length) this.hud.note(`${m.by ? `${m.by}, an admin, has given you the ${m.name} kit` : `The ${m.name} kit`}${over.length ? `: ${over.length} of its things found no room and lie at your feet` : ''}`, 'good');
-  }
-
-  /** Things an admin has taken out of what is carried (the panel's trash): gone, from wherever they were. */
-  private trashed(uids: string[], by?: string) {
-    const inv = this.inv, gone = new Set(uids);
-    let n = 0;
-    const strip = (it: ItemInstance | null | undefined) => {
-      if (!it?.cargo) return;
-      const kept = it.cargo.filter((p) => !gone.has(p.item.uid));
-      n += it.cargo.length - kept.length;
-      // (in place: a bag that is open is looked into through this very list)
-      it.cargo.splice(0, it.cargo.length, ...kept);
-      for (const p of it.cargo) strip(p.item);
-    };
-    if (this.inHand && gone.has(this.inHand.uid)) this.emptyHands();
-    if (this.loose && gone.has(this.loose.uid)) this.loose = null;
-    for (const [slot, it] of Object.entries(inv.slots) as [keyof typeof inv.slots, ItemInstance | null][]) {
-      if (it && gone.has(it.uid)) {
-        if (inv.held() === it) this.weapons.take(null);
-        inv.slots[slot] = null;
-        n++;
-      } else strip(it);
-    }
-    for (const c of inv.containers) {
-      for (const q of [...c.items]) {
-        if (gone.has(q.item.uid)) {
-          c.remove(q.item);
-          n++;
-        } else strip(q.item);
-      }
-    }
-    if (!n) return;
-    this.weapons.validate();
-    this.autoHot();
-    this.inventoryChanged();
-    this.meDirty = true;
-    if (by) this.hud.note(`${by}, an admin, has taken ${n > 1 ? `${n} things` : 'a thing'} out of what you carry`, 'warn');
-  }
-
-  /**
-   * An admin's refill (`/refill`, on the server's word and never without it): every magazine and every gun carried
-   * is full, wherever it is, and what the hands hold loose with them. The rule is `refill` in src/sim/powers.ts,
-   * the same the server fills its own copy by; what is carried is said to it again straight after.
-   */
-  private refilled(by?: string) {
-    if (this.player.dead) return;
-    // (whatever the hands were at with a magazine or a gun stops there: a change half made is not finished on top of this)
-    if (this.use) this.breakOff();
-    else this.weapons.abortReload();
-    const r = refill([...this.inv.topLevel(), this.loose]), did = refilledWords(r);
-    if (did) this.inventoryChanged();
-    if (this.invUI.isOpen) this.invUI.render();
-    this.hud.note(did ? `${by ? `${by}, an admin, has filled what you carry: ` : ''}${did}` : `${by ? `${by}, an admin, went to fill what you carry: ` : ''}${r.of ? 'every magazine and gun you carry is full already' : 'you carry no magazine and no gun'}`, did ? 'good' : 'info');
-  }
-
-  /** Those of an admin's powers that are about what is carried (src/sim/powers.ts): said to what fires a gun, to the screen that weighs the pockets, and to the inventory, whose hold is opened or emptied. */
-  private carryPowers() {
-    this.weapons.endless = this.powers.endless;
-    this.invUI.weightless = this.powers.weightless;
-    // The inventory that never fills. On: the hold is open, and whatever is put away finds room in it. Off (and it
-    // was on, or there are things in a hold that the server says is not to be had): what fits what is worn stays,
-    // and the rest goes to the feet.
-    if (this.powers.bottomless) {
-      window.clearTimeout(this.holdTimer);
-      this.holdTimer = 0;
-      this.inv.bottomless = true;
-      // (not while it is being emptied already: every word of any power comes through here)
-    } else if (this.inv.bottomless || (this.inv.theHold.items.length && !this.holdTimer)) this.emptyHold();
-    // (and the legs are told on the next frame)
-    this.slowT = 1;
-    if (this.invUI.isOpen) this.invUI.render();
-  }
-
-  private holdTimer = 0;
-  /**
-   * An admin's hold is shut (the power is off, or was never theirs): everything in it that finds a place on the
-   * body or room in what is worn is put there, at once; the rest is put at the feet and counted out loud. A few at
-   * a time: each thing put down is a message to the server, which takes no more than 120 a second from anybody
-   * and says nothing of the ones it lets fall, so forty rifles put down in one frame would be forty rifles that
-   * some of them nobody else could see or take. Until the last is down they are still in the hold, shut, and
-   * still said to the server as carried: nothing is anywhere it cannot be found.
-   */
-  private emptyHold() {
-    const inv = this.inv;
-    window.clearTimeout(this.holdTimer);
-    const had = inv.theHold.items.length, left = inv.shutHold();
-    if (had) this.inventoryChanged();
-    if (left) this.hud.note(`The bottomless inventory is off: ${left === 1 ? 'one thing finds' : `${left} things find`} no room in what you wear, and ${left === 1 ? 'is' : 'are'} put at your feet`, 'warn');
-    else if (had) this.hud.note('The bottomless inventory is off: everything that was in the hold is in what you wear', 'info');
-    const step = () => {
-      this.holdTimer = 0;
-      // (dead, or the power is back on: what is still in it stays where it is)
-      if (this.player.dead || inv.bottomless || !inv.theHold.items.length) return;
-      for (const p of inv.theHold.items.slice(0, 6)) {
-        inv.theHold.remove(p.item);
-        this.dropItem(p.item, this.player.pos, 1.1);
-      }
-      this.inventoryChanged();
-      if (this.invUI.isOpen) this.invUI.render();
-      if (inv.theHold.items.length) this.holdTimer = window.setTimeout(step, 250);
-    };
-    step();
-  }
-
-  /** Every survivor wears a dog tag stamped with their own name, round their neck (see PlayerInventory.neck). */
-  private makeTag(): ItemInstance {
-    const it = makeItem('dogtag');
-    it.owner = playerName() || 'Survivor';
-    it.pid = publicId();
-    return it;
-  }
-
-  /** characters from before dog tags existed get theirs now */
-  private ensureTag() {
-    const me = publicId();
-    // (and from before tags had places of their own: the one in the pocket goes round the neck, the taken ones into the pouch)
-    this.inv.sortTags((tag) => tag.pid === me);
-    this.inv.neck ??= this.makeTag();
-  }
+  holdTimer = 0;
 
   /**
    * Somebody else's tag in your pockets counts up while you are alive. After TAG_HOLD
@@ -1414,596 +1004,23 @@ export class Game {
    * carrying the tag: when it changes hands it starts again.
    */
   /** seconds this player has been outside the Zona carrying a tag they took (see TAG_OUT) */
-  private outFor = 0;
+  outFor = 0;
   /** the tags they carry that they took off somebody (as of the last look, a second ago at most) */
-  private takenTags: string[] = [];
+  takenTags: string[] = [];
 
-  /**
-   * Over the line round the Zona with a tag taken off somebody: it is said on the screen, with the seconds left
-   * to turn back in. Every frame, so that a step back over the line is answered at once. (Online it is the
-   * server that calls them void, a moment after this clock runs out.)
-   */
-  private tickZone(dt: number) {
-    const p = this.player;
-    if (this.started && !p.dead && this.takenTags.length && !inPlay(p.pos.x, p.pos.z)) {
-      this.outFor += dt;
-      this.hud.zone(Math.max(0, TAG_OUT - this.outFor), this.takenTags.length);
-      // (and two seconds after it, whatever the server says: a tag it does not know of was worth nothing already)
-      if (this.outFor >= TAG_OUT + (this.online ? 2 : 0)) this.voidTags(this.takenTags);
-    } else if (this.outFor) {
-      this.outFor = 0;
-      this.hud.zone(null, 0);
-    }
-  }
-
-  /** These tags were carried out of the Zona and are void: out of the pockets they go, and it is said why. */
-  private voidTags(uids: string[]) {
-    let n = 0;
-    for (let it = this.inv.find((i) => uids.includes(i.uid)); it; it = this.inv.find((i) => uids.includes(i.uid))) {
-      this.inv.remove(it);
-      n++;
-    }
-    this.outFor = 0;
-    this.takenTags = [];
-    this.hud.zone(null, 0);
-    if (!n) return;
-    this.inventoryChanged();
-    const text = `${n === 1 ? 'Your dog tag is' : `Your ${n} dog tags are`} void: carried out of the Zona. Tags are earned inside the red line on the map.`;
-    this.hud.note(text, 'warn');
-    this.hud.chatLine('system', '', text);
-  }
-
-  private tickTags(dt: number) {
-    const me = publicId();
-    const done: ItemInstance[] = [];
-    const carried: { name: string; clock: string }[] = [];
-    const taken: string[] = [];
-    this.inv.find((it) => {
-      if (it.id !== 'dogtag' || it.pid === me) return false;
-      taken.push(it.uid);
-      if (it.holder !== me) {
-        it.holder = me;
-        it.held = 0;
-        this.meDirty = true;
-        this.hud.note(`${tagOwner(it)}'s dog tag: stay alive for ${TAG_HOLD_MIN} minutes to cash it in`, 'good');
-      }
-      it.held = (it.held ?? 0) + dt;
-      if (it.held >= TAG_HOLD) done.push(it);
-      else carried.push({ name: tagOwner(it), clock: tagClock(it) });
-      return false;
-    });
-    this.takenTags = taken;
-    // the countdown is on screen the whole time, and on the tag itself in the inventory
-    this.hud.setTags(carried);
-    if (this.invUI.isOpen) this.invUI.tickTags();
-    if (!done.length) return;
-    // (the server is shown the tag with its time served before it is asked to cash it: asked from a hidden tab, its last sight of it may be minutes old)
-    if (this.online) this.net.send({ t: 'me', inv: this.inv.serialize(), vitals: { ...this.player.vitals } });
-    for (const it of done) {
-      this.inv.remove(it);
-      const n = addCashedTag();
-      const owner = tagOwner(it);
-      this.hud.note(`Dog tag cashed in: ${owner}`, 'good');
-      // online the server checks the tag and announces it to everyone; a payout would be issued there
-      // the address goes with it: the tag is listed for a reward under it
-      if (this.online) {
-        const wallet = walletAddress();
-        this.net.send({ t: 'cash', uid: it.uid, ...(wallet ? { wallet } : {}) });
-        if (!wallet && REWARDS_UI) this.hud.note('No wallet address saved: add one under Rewards in the menu', 'warn');
-      }
-      else {
-        this.hud.chatLine('system', '', `${playerName() || 'You'} cashed in ${owner}'s dog tag.`);
-        this.hud.chatLine('system', '', `That is ${n} cashed in so far.`);
-      }
-    }
-    audio.ui('pickup');
-    this.inventoryChanged();
-    if (this.invUI.isOpen) this.invUI.refresh(this.around(), this.openStash);
-  }
-
-  private async restore(save: SaveData) {
-    const e = save.economy;
-    const sameMap = e.rev === LOOT_REV;
-    this.economy.time = e.time;
-    this.economy.lastRestock = sameMap ? e.lastRestock : {};
-    this.economy.restore(e.loot, sameMap);
-    if (!sameMap) this.economy.populate();
-    for (const sd of save.stashes as (SaveData['stashes'][number] & { item?: string; buried?: boolean })[]) {
-      const st = this.newStash(sd);
-      st.container.load(sd.container as never);
-      // (one that stood on the ground, kept from before a stash was a thing to drop: it lies there as one now)
-      if (sd.buried) await this.loot.addStash(st);
-      else if (!this.economy.loot.has(st.uid)) this.economy.drop(this.stashItem(st), st.x, st.y, st.z, st.rot);
-    }
-    const saved = new Map((save.crates ?? []).map((c) => [c.uid, c]));
-    for (const c of this.loot.crates) {
-      const sc = saved.get(c.uid);
-      if (sc) {
-        c.container.load(sc.container as never);
-        c.emptiedAt = sc.emptiedAt;
-      } else this.fillCrate(c);
-    }
-    const p = save.player;
-    if (p && sameMap) {
-      this.player.spawn(p.x, p.y + 0.05, p.z, p.yaw);
-      this.takeVitals(p.vitals);
-      // pockets are smaller than they used to be: whatever no longer fits lands at your feet
-      for (const it of this.inv.load(p.inventory)) this.dropItem(it, this.player.pos, 0.8);
-      // (a save from when keys 5 to 8 were for kinds of thing to use: each kind is on the same key still, as the thing itself)
-      (p.quick ?? []).forEach((id, i) => {
-        const it = id && !this.inv.hot[4 + i] ? [...this.inv.carried()].find((x) => x.id === id) : null;
-        if (it && this.inv.hotOf(it) < 0) this.inv.bind(4 + i, it);
-      });
-      this.ensureTag();
-      this.autoHot();
-      this.weapons.validate();
-    } else {
-      // the map changed under the old character (or they were dead): a new life on the edge
-      this.spawnAtEdge();
-      this.freshKit();
-    }
-    // top the world back up if the save is sparse
-    this.economy.tick(0, [this.player.pos]);
-  }
-
-  /** Offline only: the server owns the world and your character when you play online. */
-  save() {
-    if (!this.economy || this.online || !this.started || this.botCheck?.active) return;
-    const p = this.player;
-    writeSave({
-      version: 1,
-      savedAt: Date.now(),
-      player: p.dead ? null : { x: p.pos.x, y: p.pos.y, z: p.pos.z, yaw: p.yaw, vitals: { ...p.vitals }, inventory: this.inv.serialize() },
-      economy: { ...this.economy.serialize(), rev: LOOT_REV },
-      stashes: this.loot.stashes.map((s) => s.serialize()),
-      crates: this.loot.crates.map((c) => ({ uid: c.uid, emptiedAt: c.emptiedAt, container: c.container.serialize() })),
-    });
-  }
-
-  // ------------------------------------------------------------ multiplayer
-
-  private async enterOnline(w: Extract<S2C, { t: 'welcome' }>) {
-    const { world, buildings } = this.s;
-    // the server's hour, from which this game's clock runs on
-    if (typeof w.hour === 'number') this.hourBase = { phase: w.hour, at: performance.now() };
-    // Nothing of this game's own making is in a server's world: whatever it laid out or packed by itself is taken
-    // up before the server's is put down. (Picked up, a thing the server had never heard of was refused, and
-    // vanished from the hands: "when i shift click from vicinity into my inventory sometimes the item
-    // disappears". And if it was a gun or armour, the player was written down as carrying what "the server never
-    // put in the world": nobody had cheated.)
-    for (const uid of [...this.economy.loot.keys()]) this.economy.take(uid);
-    for (const c of this.loot.crates) {
-      c.container.load({ items: [] } as never);
-      c.known = false;
-      c.emptiedAt = -1;
-    }
-    for (const l of w.loot) this.economy.inject(l);
-    for (const [i, open, swing] of w.doors) buildings.doors[i]?.setOpen(open, swing);
-    // (NOT waited for. It was, and a stash's model is fetched when first wanted: so for as long as that took,
-    // seconds on a slow line, this game had been welcomed and had not yet done anything below. Whoever had just
-    // shot the bot check's range was still where the range had been, four hundred metres up, with its floor
-    // gone: falling, and telling the server so, and dead of the fall with everything they carried if the wait was
-    // long enough. 2026-10-13: "user complans they spawned 400m in the air ... and lost all their loot". After a
-    // restart everybody shoots the range again, so it was everybody's risk. A stash's model comes when it comes,
-    // as a body's and a drop's do.)
-    for (const s of w.stashes) void this.addRemoteStash(s);
-    for (const c of w.corpses) void this.addCorpse(c);
-    for (const d of w.drops ?? []) void this.addDrop(d);
-    // (a helicopter in the air when this game came in: it is where everybody else's game has it)
-    for (const f of w.flights ?? []) this.flightBegun(f, true);
-    // the fuel drums that are gone at the moment
-    this.fuses.length = this.drumsBack.length = 0;
-    for (const b of this.s.veg.barrels) b?.setThere(!w.barrels?.includes(b.i));
-    this.fires.clear();
-    for (const [i, left] of w.fires ?? []) this.fires.set(i, left);
-    // the lockers somebody is searching at the moment: their doors stand open
-    this.lockers.clear();
-    for (const cid of w.ajar ?? []) this.lockers.set(cid, true);
-    this.bunker.setOpen(!!w.bunker, true);
-    for (const p of w.players) void this.addRemote(p);
-    this.garage.clear();
-    for (const v of w.vehicles ?? []) this.garage.add(v);
-    this.garage.bind();
-    this.horde.online(w.infected ?? [], w.spawn);
-    const y = w.spawn.y ?? heightAt(world.heights, w.spawn.x, w.spawn.z);
-    this.player.spawn(w.spawn.x, y + 0.05, w.spawn.z, w.spawn.yaw);
-    if (w.me) {
-      for (const it of this.inv.load(w.me.inv)) this.dropItem(it, this.player.pos, 0.8);
-      this.takeVitals(w.me.vitals);
-      this.ensureTag();
-      this.weapons.validate();
-      this.autoHot();
-    } else this.freshKit();
-    this.meDirty = true;
-    // the server has not heard what we are wearing yet
-    this.gearKey = '\u0000';
-    this.syncGear();
-    this.backKey = '\u0000';
-    this.syncBack();
-
-    const net = this.net;
-    const cam = () => this.s.r.camera;
-    net.on('join', (m) => {
-      void this.addRemote(m.p);
-      this.updateOnline();
-      this.hud.feed(`${m.p.name} joined`);
-      this.hud.chatLine('system', '', `${m.p.name} joined`);
-    });
-    net.on('leave', (m) => {
-      const r = this.remotes.get(m.id);
-      if (!r) return;
-      r.seat = null;
-      this.hud.feed(`${r.name} left`);
-      this.hud.chatLine('system', '', `${r.name} left`);
-      this.hud.gone = [...this.hud.gone.filter((n) => n !== r.name), r.name].slice(-15);
-      r.dispose();
-      this.remotes.delete(m.id);
-      this.updateOnline();
-    });
-    net.on('ps', (m) => {
-      const now = performance.now();
-      for (const s of m.s) {
-        const r = this.remotes.get(s[0]);
-        if (!r) continue;
-        r.push([s[1], s[2], s[3], s[4], s[5], s[6]], now, typeof s[9] === 'number' ? s[9] : undefined);
-        r.setWeapon(s[7], s[8]);
-        if (!(s[6] & F_DEAD)) r.seenAlive(now);
-        else r.seenDead(now);
-      }
-    });
-    net.on('i+', (m) => this.horde.add(m.b));
-    net.on('i-', (m) => this.horde.remove(m.i));
-    net.on('iown', (m) => this.horde.own(m.i, m.to));
-    net.on('is', (m) => this.horde.states(m.s, performance.now()));
-    net.on('ihp', (m) => this.horde.hp(m.i, m.dead, m.by, m.zone, m.dir, !!m.melee));
-    net.on('iblk', (m) => this.horde.blocked(m.i, m.to));
-    net.on('shot', (m) => {
-      this.weapons.remoteShot(new THREE.Vector3(...m.o), new THREE.Vector3(...m.d), m.w, m.sup, this.remotes.get(m.id)?.muzzle(), this.remotes.get(m.id));
-      this.horde.noise(m.o[0], m.o[2], m.sup ? INFECTED.hearQuiet : INFECTED.hearShot);
-      // (nobody shoots and waves at once)
-      this.remotes.get(m.id)?.avatar.emote(null);
-    });
-    net.on('swing', (m) => this.remotes.get(m.id)?.swing());
-    net.on('nade', (m) => {
-      // (which grenade, and what is left of its fuse, are the server's word: it heard the pin go, and counts from that)
-      const id = THROWN[m.w] ? m.w : 'grenade';
-      const left = typeof m.f === 'number' && Number.isFinite(m.f) ? THREE.MathUtils.clamp(m.f, 0, THROWN[id].fuse) : THROWN[id].fuse;
-      this.grenades.throw(new THREE.Vector3(...m.o), new THREE.Vector3(...m.v), left, false, id);
-      // the arm that threw it (one that went off in the hand was not thrown, nor was one that fell from a dead hand: neither is moving)
-      if (left > 0 && Math.hypot(...m.v) > 1) this.remotes.get(m.id)?.avatar.swing(true);
-    });
-    net.on('act', (m) => this.remotes.get(m.id)?.act(m.a, m.d, cam().position));
-    net.on('emote', (m) => {
-      const r = this.remotes.get(m.id), e = EMOTE[m.e];
-      if (!r?.alive || !e?.say) return;
-      r.call(e, cam().position);
-      this.said.set(m.id, { text: e.say, at: performance.now() });
-    });
-    net.on('boom', (m) => this.blowBarrel(m.i, false));
-    net.on('barrel+', (m) => this.s.veg.barrels[m.i]?.setThere(true));
-    net.on('fire', (m) => this.fires.set(m.i, m.left));
-    net.on('bunker', (m) => this.bunker.setOpen(m.open));
-    net.on('gear', (m) => {
-      this.gearOf.set(m.id, m.g);
-      if (this.remotes.get(m.id)) void this.wear(this.remotes.get(m.id)!.avatar, m.g);
-    });
-    net.on('back', (m) => this.remotes.get(m.id)?.avatar.setSlung(this.weapons.slungOf(m.b)));
-    net.onVoice = (packet) => this.voice.hear(packet);
-    net.on('dmg', (m) => this.takeHit(m));
-    net.on('death', (m) => {
-      const k = m.k;
-      const me = k.id === net.id;
-      // (The server says so, and this game had not: it is so. An honest game is always first, because it is the
-      // one that knows its own health; this is for the case that it was not, and for nothing else.)
-      if (me && !this.player.dead) {
-        this.player.vitals.health = 0;
-        this.player.lastCause ||= 'your wounds';
-        this.player.dead = true;
-      }
-      const zone = k.zone === 'head' ? ' · headshot' : '';
-      const drum = k.w === 'barrel';
-      const jeep = k.w === 'jeep' || k.w === 'fire';
-      const how = k.by !== null ? `${k.byName} killed ${k.name} · ${ITEMS[k.w]?.name ?? (drum ? 'fuel drum' : k.w === 'fire' ? 'burning wreck' : k.w === 'jeep' ? 'run down' : k.w)}${zone}${k.dist > 3 && !jeep ? ` · ${k.dist} m` : ''}` : `${k.name} died (${k.w})`;
-      this.hud.feed(how, k.by === net.id || me);
-      if (k.by === net.id) {
-        this.weapons.confirmKill();
-        this.hud.note(`You killed ${k.name}${zone}${k.dist > 3 ? ` · ${k.dist} m` : ''}`, 'good');
-      }
-      if (!me) this.remotes.get(k.id)?.avatar.setDeath(k.v ?? 0);
-      if (me) this.deathInfo = k.by !== null ? `Killed by ${k.byName} with ${drum ? 'a fuel drum' : k.w === 'fire' ? 'a burning wreck' : jeep ? 'the car they were driving' : ITEMS[k.w]?.name ?? 'bare hands'}${zone}. Your body and gear are where you fell.` : `You died of ${k.w}. Your body and gear are where you fell.`;
-      else this.remotes.get(k.id)?.setAlive(false);
-      if (m.corpse) void this.addCorpse(m.corpse);
-    });
-    net.on('alive', (m) => this.remotes.get(m.id)?.setAlive(true));
-    net.on('loot+', (m) => this.economy.inject(m.l));
-    net.on('loot-', (m) => {
-      this.economy.take(m.uid);
-      if (this.invUI.isOpen) this.invUI.refresh(this.around(), this.openStash);
-    });
-    net.on('denied', (m) => {
-      // someone got there first: hand it back
-      const t = this.pendingTakes.get(m.uid);
-      if (!t) return;
-      this.pendingTakes.delete(m.uid);
-      if (this.inv.find((i) => i === t.item)) this.inv.remove(t.item);
-      else this.inv.take(t.id, t.qty);
-      this.hud.note('That could not be taken: somebody else has it, or it is out of reach', 'warn');
-      this.inventoryChanged();
-      if (this.invUI.isOpen) this.invUI.render();
-    });
-    net.on('cdata', (m) => {
-      const st = this.findBox(m.cid);
-      if (!st) return;
-      st.container.load({ items: m.items });
-      st.known = true;
-      if (this.openStash === st) this.invUI.setStashState('');
-    });
-    net.on('cbusy', (m) => {
-      if (this.openStash?.uid !== m.cid) return;
-      this.hud.note('Someone else is searching that', 'warn');
-      this.openStash = null;
-      if (this.invUI.isOpen) this.invUI.refresh(this.around(), null);
-    });
-    net.on('cdoor', (m) => this.lockers.set(m.cid, m.open));
-    net.on('stash+', (m) => void this.addRemoteStash(m.s));
-    net.on('stash-', (m) => {
-      // (one whose model is still coming is not stood when it has: see addRemoteStash)
-      this.stashComing.delete(m.uid);
-      const st = this.loot.stashes.find((s) => s.uid === m.uid);
-      if (st) this.loot.removeStash(st);
-    });
-    net.on('stash~', (m) => {
-      const coming = this.stashComing.get(m.uid);
-      if (coming) coming.buried = m.buried;
-      const st = this.loot.stashes.find((s) => s.uid === m.uid);
-      if (!st) return;
-      if (this.openStash === st) this.toggleInventory(false);
-      st.setBuried(m.buried);
-    });
-    net.on('corpse-', (m) => this.removeCorpse(m.uid));
-    net.on('board', (m) => this.hud.setBoard(m.rows, m.me, m.mine, playerName()));
-    net.on('drop+', (m) => void this.addDrop(m.d));
-    net.on('heli+', (m) => this.flightBegun(m.f, false, m.f.by === net.id));
-    net.on('radio-', (m) => {
-      this.radio = null;
-      this.hud.note(m.why, 'warn');
-    });
-    net.on('drop-', (m) => this.removeDrop(m.uid));
-    net.on('door', (m) => {
-      const d = buildings.doors[m.i];
-      if (!d || d.open === m.open) return;
-      d.set(m.open, m.swing);
-      // (somebody else's door is heard across a yard, not across the map)
-      const far = d.pivot.position.distanceTo(cam().position);
-      if (far < 28) audio.door(m.open, d.pivot.position, far);
-    });
-    net.on('spawn', (m) => {
-      const p = this.player;
-      p.spawn(m.x, heightAt(world.heights, m.x, m.z) + 0.05, m.z, m.yaw);
-      this.freshKit();
-      this.deathSent = false;
-      this.deathInfo = '';
-      this.meDirty = true;
-      this.resume();
-    });
-    net.on('chat', (m) => this.hud.chatLine(m.ch ?? 'global', m.from, m.text, m.role, m.tint));
-    // everyone carrying a tag they took, shown on the map for a few seconds
-    net.on('tags', (m) => {
-      const me = m.p.some(([id]) => id === net.id);
-      const others = m.p.filter(([id]) => id !== net.id);
-      this.minimap.ping(others.map(([, x, z]) => ({ x, z })), me);
-      const now = performance.now();
-      if (me && now - this.markedSaid > 300_000) {
-        this.markedSaid = now;
-        this.hud.note('You carry a tag you took: every 30 seconds the map shows everyone where you are', 'warn');
-      } else if (others.length && now - this.pingSaid > 300_000) {
-        this.pingSaid = now;
-        this.hud.note('Someone is carrying a tag: they are marked on the map (M)', 'good');
-      }
-    });
-    // what became of a tag we cashed in (paid, on its way, why not)
-    // what the server says to this player alone: a role given or taken, and what came of an order (see `command` in server/index.ts)
-    net.on('role', (m) => {
-      this.role = m.role;
-      this.hud.role = m.role;
-      if (m.role) this.hud.chatLine('system', '', `You are ${m.role === 'admin' ? 'an admin' : 'a mod'} here. Press \` for your panel, or / for your orders: they are listed as you type.`);
-      // (a place right-clicked on the map is gone to: an admin's alone)
-      this.map.onPick = m.role === 'admin' ? (x, z) => {
-        this.order(`/tp ${x.toFixed(0)} ${z.toFixed(0)}`);
-        this.toggleMap(false);
-      } : null;
-      if (m.role === 'admin' && this.tint) this.net.send({ t: 'tint', color: this.tint });
-      // (and the map is an admin's: everybody's dot on it, the box of settings for them, and what a click on one does)
-      this.map.setAdmin(m.role === 'admin');
-      this.map.onPerson = m.role === 'admin' ? (id, what) => this.mapPerson(id, what) : null;
-      if (m.role !== 'admin') {
-        this.toggleFreecam(false);
-        this.nightSight = false;
-        this.map.setPeople([]);
-        if (!m.role) this.toggleAdmin(false);
-      }
-      this.adminUI.setSelf(this.adminSelf());
-    });
-    net.on('sys', (m) => {
-      this.hud.chatLine('system', '', m.text);
-      this.adminUI.say(m.text);
-    });
-    net.on('adm', (m) => {
-      this.admPlayers = new Map(m.players.map((q) => [q.id, q]));
-      this.adminUI.setLists(m);
-      void this.drawHeads(m.players);
-      // (and an admin's map shows where everybody is)
-      this.feedMap();
-    });
-    net.on('ghost', (m) => this.remotes.get(m.id)?.setGhost(m.on));
-    net.on('announce', (m) => {
-      this.hud.announce(m.text, m.by);
-      this.hud.chatLine('system', '', `${m.by}, to everybody: ${m.text}`);
-      this.adminUI.say(`${m.by}, to everybody: ${m.text}`);
-    });
-    net.on('pm', (m) => {
-      this.hud.chatLine('pm', m.from, m.text, m.role);
-      this.hud.note(`${m.role === 'admin' ? 'An admin' : 'A mod'} (${m.from}) to you: ${m.text}`, 'warn');
-    });
-    net.on('powers', (m) => {
-      this.powers = { god: m.god, hidden: m.hidden, clip: m.clip, voidInv: m.voidInv, voidTag: m.voidTag, weightless: !!m.weightless, endless: !!m.endless, bottomless: !!m.bottomless };
-      this.player.god = m.god;
-      // (God mode is proof against every state a body can be in, not only against dying of it: 2026-10-13, an
-      // admin with it on: "i am still being choked out by the gas, i should be immune to all status efects in
-      // godmode". The gas is not breathed (see the frame loop); and what had hold already when it is switched on,
-      // a wound, a broken leg, lets go.)
-      if (m.god) {
-        this.player.staunch();
-        this.player.setLeg(true);
-      }
-      this.player.setFly(m.clip);
-      this.carryPowers();
-      this.showPowers();
-    });
-    net.on('mend', () => {
-      this.player.mend();
-      this.meDirty = true;
-    });
-    net.on('kit', (m) => this.kitUp(m));
-    net.on('trash', (m) => this.trashed(m.uids, m.by));
-    net.on('refill', (m) => this.refilled(m.by));
-    net.on('inv', (m) => this.adminUI.setPockets(m));
-    // (this game was not answering, and the server kept this life meanwhile: what it makes of it is what it is)
-    net.on('hp', (m) => {
-      const p = this.player;
-      if (p.dead) return;
-      p.vitals.health = Math.max(1, Math.min(100, m.health));
-      // (and the blood it made of it: no more than this game had, and whatever wounds it counted beyond this game's)
-      p.vitals.blood = Math.min(p.vitals.blood, bloodOf(m));
-      const more = (m.bleeding ? bleedOf(m) : 0) - p.vitals.bleed;
-      if (more > 0) p.bleed(more);
-      this.meDirty = true;
-    });
-    net.on('logout', (m) => {
-      this.hud.setLogout(m.left);
-      if (m.left) this.hud.note(`Logging out in ${m.left} seconds: stay where you are`, 'info');
-      else if (m.why) this.hud.note(`You are staying in the game: ${m.why}`, 'warn');
-    });
-    // set down somewhere by an admin (by themselves, or by another): with no height given, on top of whatever is there
-    net.on('put', (m) => {
-      const p = this.player;
-      if (p.dead || this.garage.ride) return;
-      let y = m.y;
-      if (y === undefined) {
-        const ground = heightAt(world.heights, m.x, m.z);
-        const roof = physics.raycast({ x: m.x, y: ground + 90, z: m.z }, { x: 0, y: -1, z: 0 }, 90, SOLID_GROUPS);
-        y = Math.max(ground, roof ? roof.point.y : ground);
-      }
-      const pitch = p.pitch;
-      p.spawn(m.x, y + 0.1, m.z, p.yaw);
-      p.pitch = pitch;
-      p.landSoft();
-      this.buriedT = 0;
-      if (m.by) this.hud.note(`${m.by}, an admin, has moved you`, 'warn');
-    });
-    net.on('tell', (m) => {
-      this.hud.note(m.text, m.kind);
-      this.hud.chatLine('system', '', m.text);
-    });
-    net.on('void', (m) => this.voidTags(m.uids));
-    net.on('cashed', (m) => {
-      const text = `${m.name} cashed in ${m.owner}'s dog tag.`;
-      this.hud.chatLine('system', '', text);
-      this.hud.feed(text, m.id === net.id);
-      if (m.id === net.id) {
-        this.hud.chatLine('system', '', `That is ${cashedTags()} cashed in so far.`);
-        // (and the one moment the treasury is on a player's mind: what fills it, and what they can do for it)
-        this.hud.chatLine('system', '', `${BACK_SHORT} Like and repost ZONA on X: the link is on the menu.`);
-      }
-    });
-    // The server says it is about to restart (an update is going on, or it has been told to stop): said across the
-    // top, and when the connection then goes, the game waits for the server that comes after and loads itself
-    // again when that one answers. (Whoever was on is kept as they were: they have only to press Play.)
-    net.on('restart', (m) => {
-      this.restartSaid = { why: m.why || this.restartSaid?.why || '', at: performance.now() };
-      this.hud.restarting(this.restartSaid.why, m.in);
-    });
-    net.onClose = (reason) => {
-      this.paused = true;
-      this.input.unlock();
-      const said = this.restartSaid && performance.now() - this.restartSaid.at < 180_000 ? this.restartSaid : null;
-      if (!said || this.net.refused) return void this.hud.fatal(reason);
-      this.hud.fatal(`The server is restarting${said.why ? ` (${said.why})` : ''}. You are kept as you were. This page loads again by itself when the server is back.`);
-      const remote = remoteServer() ?? location.origin, began = performance.now();
-      const look = async () => {
-        // (a server that answers, and has not been running for long: the one that came after)
-        try {
-          const r = await fetch(`${remote}/healthz`, { cache: 'no-store' });
-          const j = r.ok ? ((await r.json()) as { uptime?: number }) : null;
-          if (j && typeof j.uptime === 'number' && (j.uptime < 240 || performance.now() - began > 150_000)) return void location.reload();
-        } catch {
-          /* not there yet */
-        }
-        if (performance.now() - began < 600_000) window.setTimeout(look, 4000);
-      };
-      window.setTimeout(look, 6000);
-    };
-    this.maxPlayers = w.max;
-    this.hud.setLive(true);
-    this.hud.setNet('Online');
-    this.updateOnline();
-    // (Every kind of message has somebody to hear it now: what was said since the welcome is heard, in its order.
-    // Not in this breath but the next: whoever called this has still to say the game has begun, and what hears a
-    // message has only ever heard one in a game that had. What is said meanwhile is kept with the rest.)
-    setTimeout(() => net.listen(), 0);
-  }
-
-  private maxPlayers = 0;
+  maxPlayers = 0;
   /** the server said it was about to restart: why, and when it said so (by this game's clock) */
-  private restartSaid: { why: string; at: number } | null = null;
+  restartSaid: { why: string; at: number } | null = null;
   /** carrying a tag taken off somebody (the one round their own neck does not count): no jeep takes them (see Garage.use) */
-  private get tagged() {
+  get tagged() {
     const me = publicId();
     return !!this.inv.find((it) => (it.id === 'dogtag' && it !== this.inv.neck && it.pid !== me) || it.id === 'keycard');
   }
 
-  /**
-   * What lies within reach on the ground, for the open pockets to show. From a jeep's seat
-   * that is nothing: whatever is wanted from the ground, a body or a crate is got out for.
-   */
-  private around() {
-    return this.garage.ride ? [] : this.loot.near(this.player.pos, 2.3);
-  }
   /** the jeep the view was last behind (so going in and out of one is a move of the view, not a cut) */
-  private rode: Jeep | null = null;
+  rode: Jeep | null = null;
 
-  /** playing alone: the training dummies a jeep driven here has just gone into */
-  private bumpDummies(at: THREE.Vector3, half: THREE.Vector3, quat: THREE.Quaternion, speed: number) {
-    const inv = quat.clone().invert();
-    const rel = new THREE.Vector3();
-    // the infected in the way of it (alone or not: on a server the server is told, and decides)
-    for (const b of this.horde.all.values()) {
-      if (b.dead || !b.ready) continue;
-      rel.copy(b.pos).sub(at).applyQuaternion(inv);
-      if (Math.abs(rel.x) > half.x || Math.abs(rel.z) > half.z || rel.y > 0.6 || rel.y < -2.6) continue;
-      const chest = new THREE.Vector3(b.pos.x, b.pos.y + 1.2, b.pos.z);
-      const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(quat);
-      this.effects.bleed(chest, dir, 0.8);
-      if (b.damage(Math.max(0, speed - JEEP.bumpFrom) * JEEP.bumpPer, chest, dir, 'torso')) this.hud.note('Infected down · run down', 'good');
-      if (this.online) this.net.send({ t: 'ihit', i: b.i, zone: 'torso', w: 'jeep', dist: Math.round(speed * 10) / 10, sup: false, bonus: 0 });
-    }
-    for (const d of this.dummies) {
-      if (d.dead) continue;
-      rel.copy(d.pos).sub(at).applyQuaternion(inv);
-      if (Math.abs(rel.x) > half.x || Math.abs(rel.z) > half.z || rel.y > 0.6 || rel.y < -2.6) continue;
-      const chest = new THREE.Vector3(d.pos.x, d.pos.y + 1.2, d.pos.z);
-      const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(quat);
-      this.effects.bleed(chest, dir, 0.8);
-      if (d.damage(Math.max(0, speed - JEEP.bumpFrom) * JEEP.bumpPer, chest, dir, 'torso')) this.hud.note('Training dummy down · run down', 'good');
-    }
-  }
-
-  /** everyone connected to the server, this player included */
-  private updateOnline() {
-    this.hud.setOnline(this.online ? this.remotes.size + 1 : null, this.maxPlayers);
-  }
-
-  private makeHeld = (id: string | null, mods: string[]) => {
+  makeHeld = (id: string | null, mods: string[]) => {
     if (!id) return null;
     const def = ITEMS[id];
     const obj = this.weapons.worldModel(id, mods);
@@ -2013,814 +1030,52 @@ export class Game {
     return def?.melee ? { obj, grips, kind: 'melee' as const } : null;
   };
 
-  private async addRemote(p: PlayerInfo) {
-    if (p.id === this.net.id || this.remotes.has(p.id)) return;
-    const r = new RemotePlayer(p.id, p.name, this.makeHeld);
-    this.remotes.set(p.id, r);
-    await r.load(this.s.atmo, this.s.r.scene, p.pose);
-    r.setWeapon(p.w, p.m);
-    void this.wear(r.avatar, p.g ?? []);
-    this.gearOf.set(p.id, p.g ?? []);
-    r.setGhost(!!p.hidden);
-    r.avatar.setSlung(this.weapons.slungOf(p.b ?? []));
-    r.setAlive(p.alive);
-    // (they may have been sitting in a jeep since before this game knew of them)
-    this.garage.reseat();
-  }
-
-  /** something the hands do that shows on the body: your own, and (through the server) the copy of you everyone else sees */
-  private act(a: Act, d = 1) {
-    if (a === 'stop') this.avatar.act(null);
-    else this.avatar.act(a === 'load' || a === 'unbox' ? 'open' : a, d);
-    this.net.send({ t: 'act', a, d });
-  }
-
-  /** hat, vest and pack as they sit on a body */
-  private async wear(body: Avatar, ids: string[]) {
-    const out: { id: string; obj: THREE.Object3D }[] = [];
-    for (const id of ids) {
-      if (!GEAR_SHOWN.has(id)) continue;
-      const model = (await this.loot.models.get(id)).group.clone();
-      out.push({ id, obj: id === 'gasmask' ? facepiece(model) : model });
-    }
-    body.setGear(out);
-  }
-
-  private backKey = '';
-  /** What is slung on this player's back, told to the server when it changes: everybody else draws it on the copy of them they see. */
-  private syncBack() {
-    if (!this.weapons) return;
-    const b = this.weapons.slung();
-    const key = JSON.stringify(b);
-    if (key === this.backKey) return;
-    this.backKey = key;
-    this.net.send({ t: 'back', b });
-  }
-
-  /** what this player wears that shows, kept in step with the inventory (and told to the server when it changes) */
-  private syncGear() {
-    // (every place a thing is worn in, and of what is worn there whatever has a model for the body: head, face, vest
-    // and back today, as it was when those four were named here; a thing made for any other place is sent the day it is)
-    const ids = GEAR_SLOTS.map((s) => this.inv.slots[s]?.id).filter((x): x is string => !!x && GEAR_SHOWN.has(x));
-    const key = ids.join(',');
-    if (key === this.gearKey) return;
-    this.gearKey = key;
-    void this.wear(this.avatar, ids);
-    this.net.send({ t: 'gear', g: ids });
-    this.portrait();
-  }
+  backKey = '';
 
   /** what each player has on that shows, as the server last said: their picture in the panel wears it */
-  private gearOf = new Map<number, string[]>();
+  gearOf = new Map<number, string[]>();
   /** the lists the panel last had: how much blood each player has is said beside their name in the far view */
-  private admPlayers = new Map<number, AdminPlayer>();
+  admPlayers = new Map<number, AdminPlayer>();
   /** a head drawn, for each name and each set of things worn */
-  private heads = new Map<string, string>();
-  private headsBusy = false;
-  /**
-   * The panel's pictures of who is who: each player's own head, in their own colours, with what they have on it
-   * (2026-10-13: "can we render the players head as profile picture on the left hand screen"). Drawn as the
-   * figure in the inventory is, a few at a time while the panel is open, and none twice.
-   */
-  private async drawHeads(players: { id: number; name: string }[]) {
-    if (this.headsBusy || !this.adminUI?.isOpen) return;
-    this.headsBusy = true;
-    try {
-      const { r, atmo } = this.s, out: Record<number, string> = {};
-      let fresh = 0;
-      for (const q of players) {
-        const mine = q.id === this.net.id;
-        const worn = mine ? (this.gearKey && this.gearKey !== '\u0000' ? this.gearKey.split(',') : []) : this.gearOf.get(q.id) ?? [];
-        const name = mine ? playerName() : q.name, key = `${name}|${worn.join(',')}`;
-        if (!this.heads.has(key) && fresh < 3) {
-          fresh++;
-          this.heads.set(key, await renderDoll(r.renderer, atmo.envMap, lookFor(name), worn, this.loot.models, true).catch(() => ''));
-        }
-        const url = this.heads.get(key);
-        if (url) out[q.id] = url;
-      }
-      this.adminUI.setHeads(out);
-    } finally {
-      this.headsBusy = false;
-    }
-  }
+  heads = new Map<string, string>();
+  headsBusy = false;
 
-  /** The figure in the inventory window, drawn again as the player is now: their colours, and what they have on. */
-  private portrait() {
-    // (where the figure is alive there is no still picture of it to draw again: see doll.ts)
-    if (this.doll?.alive) return;
-    const { r, atmo } = this.s;
-    const worn = this.gearKey && this.gearKey !== '\u0000' ? this.gearKey.split(',') : [];
-    const mine = ++this.portraitN;
-    void renderDoll(r.renderer, atmo.envMap, lookFor(playerName()), worn, this.loot.models).then((doll) => {
-      // (a later one may have been asked for while this was drawn)
-      if (mine !== this.portraitN || !this.invUI) return;
-      this.invUI.doll = doll;
-      this.invUI.redraw();
-    });
-  }
-  private portraitN = 0;
+  portraitN = 0;
   /** the survivor in the inventory window, alive (null until the game has loaded that far) */
-  private doll: Doll | null = null;
-  private gearKey = '';
+  doll: Doll | null = null;
+  gearKey = '';
 
-  private async addRemoteStash(s: StashInfo) {
-    if (this.loot.stashes.some((x) => x.uid === s.uid) || this.stashComing.has(s.uid)) return;
-    const st = this.newStash(s);
-    this.stashComing.set(s.uid, st);
-    try {
-      await this.loot.addStash(st);
-    } finally {
-      // (taken up while its model was still on its way: it is not stood in the world after all)
-      if (this.stashComing.get(s.uid) !== st) {
-        if (this.loot.stashes.includes(st)) this.loot.removeStash(st);
-      } else this.stashComing.delete(s.uid);
-    }
-  }
   /** the stashes whose models are still on their way, by their number: what is said of one meanwhile is not lost */
-  private stashComing = new Map<string, Stash>();
-
-  private async addCorpse(c: CorpseInfo) {
-    if (this.corpses.has(c.uid)) return;
-    // Where somebody died is where their feet were, and that can be in the air (a jump, a fall, a roof's edge): the
-    // body lies on whatever is under that place, and along it if it slopes. ("dead bodies somtimes hover above the
-    // ground", 2026-10-12. Every game works this out the same, from the same ground.)
-    const under = physics.raycast({ x: c.x, y: c.y + 0.5, z: c.z }, { x: 0, y: -1, z: 0 }, 150, SOLID_GROUPS);
-    const slope = under && under.toi > 0.02 ? new THREE.Vector3(under.normal.x, under.normal.y, under.normal.z) : undefined;
-    if (under && under.toi > 0.02) c = { ...c, y: under.point.y };
-    const stash = new Stash(c.uid, c.x, c.y, c.z, c.rot, BODY_GRID[0], BODY_GRID[1], `${c.name}'s body`);
-    stash.corpse = true;
-    // the box to search is where the body lies: behind where they stood if they went over
-    // backwards, ahead if they went down on their face, beside it if they folded up
-    const v = c.v ?? 0;
-    const [ahead, left] = DEATH_REST[v] ?? DEATH_REST[0];
-    if (v === 2) stash.trigger(0.6, 0.25, 0.6, -ahead, left);
-    else stash.trigger(0.48, 0.25, 0.85, -ahead * 0.56, left);
-    const body = new CorpseBody();
-    this.corpses.set(c.uid, { stash, body });
-    // let the fall animation of the player finish before the body appears
-    await new Promise((r) => setTimeout(r, 1800));
-    if (!this.corpses.has(c.uid)) return;
-    await body.load(this.s.atmo, this.s.r.scene, c.x, c.y, c.z, c.rot, c.name, v, slope);
-    // and what has run out of it by then
-    this.effects.pool(c.x - Math.sin(c.rot) * ahead * 0.75 - Math.cos(c.rot) * left, c.y, c.z - Math.cos(c.rot) * ahead * 0.75 + Math.sin(c.rot) * left);
-  }
-
-  private removeCorpse(uid: string) {
-    const c = this.corpses.get(uid);
-    if (!c) return;
-    if (this.openStash === c.stash) this.toggleInventory(false);
-    physics.tags.delete(c.stash.collider.handle);
-    physics.world.removeCollider(c.stash.collider, false);
-    c.body.dispose();
-    this.corpses.delete(uid);
-  }
-
-  /** any server-held container by id: map crate, stash or body */
-  private findBox(cid: string): Stash | undefined {
-    return this.loot.crates.find((c) => c.uid === cid) ?? this.loot.stashes.find((c) => c.uid === cid) ?? this.corpses.get(cid)?.stash ?? this.drops.get(cid)?.stash;
-  }
-
-  // ------------------------------------------------------------ supply drops
-
-  /**
-   * A supply drop has been set down: the crate, the smoke over it, the mark on the map, and
-   * word of where it is.
-   * @param fill playing alone: nobody else holds what is inside, so it is packed here
-   */
-  private async addDrop(d: DropInfo, fill = false) {
-    if (this.drops.has(d.uid)) return;
-    const stash = new Stash(d.uid, d.x, d.y, d.z, d.rot, d.heli ? CRASH.w : DROP.w, d.heli ? CRASH.h : DROP.h, d.heli ? CRASH.label : DROP.label);
-    if (fill) {
-      if (d.heli) fillCrash(stash.container);
-      else fillDrop(stash.container);
-      stash.known = true;
-    }
-    this.drops.set(d.uid, { stash, until: performance.now() + d.left * 1000, at: new THREE.Vector3(d.x, d.y, d.z), smoke: { owed: 0 } });
-    this.markDrops();
-    const where = describeSpot(this.s.world, d.x, d.z);
-    const mins = Math.max(1, Math.round(d.left / 60));
-    if (d.heli) {
-      void this.layWreck(d);
-      this.hud.note(`A helicopter has come down ${where}: its cargo is there for ${mins} min, marked on the map (M)`, 'good');
-      this.hud.feed(`Helicopter down ${where}`);
-    } else {
-      this.hud.note(`Supply drop ${where}: there for ${mins} min, marked on the map (M)`, 'good');
-      this.hud.feed(`Supply drop ${where}`);
-      this.hud.chatLine('system', '', `A supply drop has come down ${where}.`);
-    }
-    // (The cargo itself, beside the wreck as beside nothing: a wreck's was never set down at all. This line
-    // came after a `return` in the helicopter's case, and there was a wreck, smoke, a mark on the map and
-    // nothing to open.)
-    await this.loot.addDrop(stash);
-    this.airdrops.stood(d.uid);
-    // (cleared away while its crate was still being fetched)
-    if (this.drops.get(d.uid)?.stash !== stash) this.loot.removeStash(stash);
-  }
-
-  /** The wreck of the helicopter whose cargo a drop is: beside the cargo, lying to the ground, solid. */
-  private async layWreck(d: DropInfo) {
-    const model = (await assets.model('heli_wreck')).clone();
-    const entry = this.drops.get(d.uid);
-    if (!entry) return;
-    const H = this.s.world.heights;
-    const x = d.x + Math.cos(d.rot) * CRASH.beside, z = d.z - Math.sin(d.rot) * CRASH.beside;
-    // (laid to the ground along its length, and let a hand's depth into it: it came down hard)
-    const ax = Math.sin(d.rot), az = Math.cos(d.rot);
-    const nose = heightAt(H, x + ax * 5, z + az * 5), tail = heightAt(H, x - ax * 5, z - az * 5);
-    const y = (heightAt(H, x, z) + nose + tail) / 3 - 0.12;
-    model.position.set(x, y, z);
-    model.rotation.set(-Math.atan2(nose - tail, 10), d.rot, 0, 'YXZ');
-    model.traverse((o: THREE.Object3D) => {
-      const m = o as THREE.Mesh;
-      if (!m.isMesh) return;
-      m.castShadow = m.receiveShadow = true;
-      // (it is painted burnt black all over: lifted, so that it is a wreck and not a hole in the picture)
-      const paint = (m.material as THREE.MeshStandardMaterial).clone();
-      paint.color.multiplyScalar(2.6);
-      m.material = paint;
-    });
-    this.s.r.scene.add(model);
-    // its body, as two boxes: the cabin and the tail boom
-    const solid = [
-      physics.addStatic(physics.R.ColliderDesc.cuboid(1.35, 1.2, 3.2), 'metal', { x: x + ax * 1.6, y: y + 1.1, z: z + az * 1.6 }, d.rot),
-      physics.addStatic(physics.R.ColliderDesc.cuboid(0.5, 0.6, 3.4), 'metal', { x: x - ax * 4, y: y + 1.0, z: z - az * 4 }, d.rot),
-    ];
-    entry.wreck = { obj: model, solid };
-    // (its smoke stands over the wreck, not over the cargo beside it)
-    entry.at.set(x, y + 1.2, z);
-    this.markDrops();
-  }
-
-  private removeDrop(uid: string) {
-    const d = this.drops.get(uid);
-    if (!d) return;
-    this.drops.delete(uid);
-    if (d.wreck) {
-      d.wreck.obj.removeFromParent();
-      for (const c of d.wreck.solid) physics.world.removeCollider(c as never, false);
-    }
-    if (this.openStash === d.stash) this.toggleInventory(false);
-    if (d.stash.obj) this.loot.removeStash(d.stash);
-    this.markDrops();
-    this.hud.feed(d.wreck ? 'The wreck has been cleared away' : 'The supply drop is gone');
-  }
-
-  /** Playing alone: the same clock the server keeps (see tickDrops in server/index.ts). */
-  private tickDrops() {
-    const t = this.economy.time;
-    for (const [uid, d] of this.drops) {
-      const s = d.stash;
-      if (s.container.items.length) s.emptiedAt = -1;
-      else if (s.emptiedAt < 0) s.emptiedAt = t;
-      const done = performance.now() > d.until || (s.emptiedAt >= 0 && t - s.emptiedAt > DROP.linger);
-      if (done && this.openStash !== s) this.removeDrop(uid);
-    }
-    if (this.nextDrop < 0) this.nextDrop = t + DROP.first;
-    else if (t >= this.nextDrop && !this.drops.size && !this.airdrops.list().some((l) => l.t < l.T.land)) {
-      this.nextDrop = t + DROP.every;
-      const at = pickDropSite(this.s.world);
-      if (at) this.flightBegun(planFlight((x, z) => heightAt(this.s.world.heights, x, z), at, `drop-${newUid()}`));
-    }
-  }
-
-  /** the server says someone hit us */
-  private takeHit(m: Extract<S2C, { t: 'dmg' }>) {
-    const p = this.player;
-    if (p.dead) return;
-    let amount = m.amount;
-    if (m.zone === 'torso') for (const a of this.inv.wear('armor')) amount *= a;
-    if (m.zone === 'head') for (const a of this.inv.wear('head')) amount *= a;
-    // the jeep they are in ran into something: no wound, and nobody to look round for
-    if (m.w === 'crash') {
-      p.damage(m.amount, 'a crash');
-      this.weapons.flinch(1);
-      this.meDirty = true;
-      return;
-    }
-    // (a jeep that ran them down is 'jeep'; one that burned with them in it, or beside them, is 'fire')
-    const blast = !!WEAPON_RULES[m.w]?.blast || m.w === 'fire';
-    const melee = !blast && !ITEMS[m.w]?.weapon;
-    const sick = m.w === 'infected';
-    p.damage(amount, sick ? 'the infected' : m.w === 'fire' ? 'a burning wreck' : m.w === 'jeep' ? 'being run down' : blast ? 'an explosion' : melee ? 'a beating' : 'gunshot wounds');
-    this.glass = 0;
-    this.setHold(null);
-    // a bullet nearly always opens a wound, a blade often, a fist or a bat seldom
-    const blade = m.w === 'knife' || m.w === 'machete' || m.w === 'hatchet';
-    // (and it bleeds by what made it and where: a round in the body more than one in an arm, a bite less than a
-    // blade; and a round takes a hundred of blood as it goes in, wound or no wound: src/sim/blood.ts)
-    if (!melee && !blast) p.spill(BLOOD.shot);
-    if (!p.dead && Math.random() < (sick ? INFECTED.bleed : melee ? (blade ? 0.6 : amount > 25 ? 0.25 : 0) : amount > 12 ? 0.85 : 0.4)) p.bleed(woundOf(sick ? 'bite' : blast ? 'blast' : melee ? (blade ? 'cut' : 'blunt') : 'shot', m.zone));
-    // in the legs, a bullet as often as not breaks one, and so now and then does something swung (not their hands, and not a blast)
-    if (!blast && !sick && m.w !== 'fists' && m.w !== 'jeep' && breaksOnHit(m.zone, melee, Math.random())) p.breakLeg();
-    this.weapons.flinch(melee ? 0.5 : 1);
-    this.lastHit = { x: m.dir[0], z: m.dir[2], at: performance.now() };
-    // Bullets in this world pass through your own body (the server said you were hit, not
-    // this game): put the wound where the hit zone is, on the side it came from, so your own
-    // clothes carry it and the ground behind you is marked.
-    {
-      const dir = new THREE.Vector3(m.dir[0], 0, m.dir[2]).normalize();
-      const up = m.zone === 'head' ? (p.crouched ? 1.0 : 1.6) : m.zone === 'legs' ? (p.crouched ? 0.3 : 0.55) : p.crouched ? 0.72 : 1.22;
-      const at = new THREE.Vector3(p.pos.x, p.pos.y + up, p.pos.z).addScaledVector(dir, m.zone === 'head' ? -0.12 : -0.16);
-      const power = melee ? (m.w === 'fists' ? 0.2 : 0.55) : ITEMS[m.w]?.weapon?.kind === 'pistol' ? 0.6 : 1;
-      this.effects.bleed(at, dir, power, true);
-      if (power >= 0.4) this.avatar.wound(at, dir, 0.05 + power * 0.04, power > 0.58);
-    }
-    // Which side it came from, as an angle round from straight ahead (clockwise, as the arc is turned). `dir` is
-    // the way the round was going, from whoever fired it to here; ahead is (-sin yaw, -cos yaw). (It was worked
-    // out with the turn the wrong way about: right only for a shot from exactly the left or the right, and a shot
-    // from in front was shown as from behind.)
-    this.hud.hitFrom(p.yaw - Math.atan2(m.dir[0], m.dir[2]));
-    if (this.use) {
-      this.use = null;
-      this.weapons.endUse();
-      this.act('stop');
-      this.settle();
-    }
-    this.meDirty = true;
-  }
-
-  private sendState(dt: number) {
-    if (!this.online) return;
-    const p = this.player;
-    this.sendT += dt;
-    if (this.sendT >= 1 / SEND_HZ) {
-      // (what is over is kept: thrown away, sixty frames a second made thirteen reports of fifteen, and whoever
-      // was watching saw a runner stop for a tick now and then)
-      this.sendT = this.sendT > 2 / SEND_HZ ? 0 : this.sendT - 1 / SEND_HZ;
-      const it = this.weapons.equippedItem;
-      const flags = (p.crouched ? F_CROUCH : 0) | (p.sprinting ? F_SPRINT : 0) | (this.weapons.aiming ? F_AIM : 0) | (p.grounded ? F_GROUND : 0) | (p.dead ? F_DEAD : 0) | (p.vitals.bleeding ? F_BLEED : 0) | (p.lean > 0.3 ? F_LEAN_R : p.lean < -0.3 ? F_LEAN_L : 0) | (this.hold === 'dance' ? F_DANCE : 0) | (this.hold === 'sit' ? F_SIT : 0) | (p.prone ? F_PRONE : 0) | (this.hold === 'surrender' ? F_SURRENDER : 0) | (this.garage.ride ? F_SEAT : 0) | (this.weapons.guarding ? F_GUARD : 0) | (p.vitals.broken ? F_LIMP : 0) | (this.lit && !this.garage.ride ? F_LIGHT : 0);
-      // With the pockets open (or the map, or a panel) the mouse is free and the head is not steered: it was told
-      // to the server turned exactly as it had been, report after report. The server takes a body that goes to
-      // and fro with its head held like a statue's for one walked by a program (`gaitCheck`), and put a player
-      // off the server as they went through the pockets of somebody they had just killed, stepping round the body
-      // (2026-10-13, from its log: "went to and fro 4 times over 20 m without their head once turning", 33 s
-      // after a kill; and the complaint, "they get disconnected when they kill someone"). A head over open
-      // pockets is not a statue's: it is told with the hair's sway it has, a twelfth of a degree, which nobody
-      // can see. (The server's rule is being changed to mind what a player DOES: this is for until that is live.)
-      const sway = this.input.uiMode ? Math.sin(performance.now() / 700) * 0.0015 : 0;
-      const pose: Pose = [p.pos.x, p.pos.y, p.pos.z, p.yaw + sway, p.pitch, flags];
-      this.net.send({ t: 's', p: pose, w: it?.id ?? null, m: fittedOf(it), n: Math.round(performance.now()) });
-    }
-    // the server keeps a copy of what we carry so it can leave a body with our gear on it
-    this.meT += dt;
-    if (!p.dead && ((this.meDirty && this.meT > 0.6) || this.meT > 8)) {
-      this.meT = 0;
-      this.meDirty = false;
-      this.net.send({ t: 'me', inv: this.inv.serialize(), vitals: { ...p.vitals } });
-    }
-  }
-
-  /** an item finished settling: tell the server about the ones this player dropped */
-  private lootPlaced(l: WorldLoot) {
-    if (!this.localDrops.delete(l.uid)) return;
-    this.net.send({ t: 'drop', l });
-  }
-
-  private syncOpenBox() {
-    const st = this.openStash;
-    if (!this.online || !st || !st.known) return;
-    this.net.send({ t: 'cset', cid: st.uid, items: st.container.serialize().items });
-  }
-
-  // ------------------------------------------------------------ targets (offline)
-
-  /** Training dummies with real hit zones: something to shoot and punch when nobody else is around. */
-  private async spawnDummies() {
-    const { world, atmo, r } = this.s;
-    const camp = world.pois.find((q) => q.name === 'Military Checkpoint');
-    const village = world.pois.find((q) => q.name === 'Zelenaya Dolina');
-    const spots: [number, number][] = [];
-    if (village) spots.push([village.x - 22, village.z + 26], [village.x + 34, village.z - 20], [village.x - 48, village.z - 12]);
-    if (camp) spots.push([camp.x - 9, camp.z + 11], [camp.x - 15, camp.z + 17]);
-    for (const [sx, sz] of spots) {
-      // nudge off anything solid (trees, walls, props)
-      let x = sx, z = sz;
-      for (let k = 0; k < 24; k++) {
-        const y = heightAt(world.heights, x, z);
-        if (!physics.boxOverlaps({ x, y: y + 1.0, z }, 0, 0.4, 0.8, 0.4, SOLID_GROUPS)) break;
-        const a = k * 2.4;
-        x = sx + Math.cos(a) * (1 + k * 0.4);
-        z = sz + Math.sin(a) * (1 + k * 0.4);
-      }
-      const y = heightAt(world.heights, x, z);
-      const d = new Dummy(new THREE.Vector3(x, y, z), Math.random() * Math.PI * 2);
-      await d.load(atmo, r.scene);
-      this.dummies.push(d);
-    }
-  }
-
-  /** a blow came down on this player's guard: it costs wind, and jolts the arms */
-  private onGuarded() {
-    const v = this.player.vitals;
-    v.stamina = Math.max(0, v.stamina - INFECTED.guardCost);
-    this.weapons.jolt();
-    this.meDirty = true;
-  }
+  stashComing = new Map<string, Stash>();
 
   /** a shell's pellets that have landed on somebody and not been told to the server yet: [who, how many in each zone] */
-  private pellets = new Map<unknown, { h: HitInfo; zones: Record<string, number>; n: number }>();
-
-  private onHit(h: HitInfo) {
-    // A shotgun: nine hits in a few hundredths of a second. The server is told once for each
-    // body, a moment later: how many landed, and where most of them did.
-    if (!h.melee && shotOf(h.weapon).pellets > 1 && !this.pelletsOut && (h.victim instanceof Infected || h.victim instanceof RemotePlayer)) {
-      const got = this.pellets.get(h.victim) ?? { h, zones: {}, n: 0 };
-      got.zones[h.zone] = (got.zones[h.zone] ?? 0) + 1;
-      got.n++;
-      got.h = h.killed ? h : got.h;
-      if (!this.pellets.has(h.victim)) {
-        this.pellets.set(h.victim, got);
-        setTimeout(() => {
-          this.pellets.delete(h.victim);
-          const zone = Object.entries(got.zones).sort((a, b) => b[1] - a[1])[0][0] as HitInfo['zone'];
-          this.pelletsOut = got.n;
-          this.onHit({ ...got.h, zone });
-          this.pelletsOut = 0;
-        }, 90);
-      }
-      return;
-    }
-    const n = this.pelletsOut || 1;
-    if (h.victim instanceof Infected) {
-      // (stopped where it stands for a moment: at once if it is this game's to move, when the server says so if not)
-      h.victim.stagger(h.melee ? INFECTED.stopStruck : INFECTED.stopShot);
-      // (alone, this game has already decided what it did; on a server the server does)
-      if (this.online) this.net.send({ t: 'ihit', i: h.victim.i, zone: h.zone, w: h.weapon, dist: h.distance, sup: quietOf(this.weapons.equippedItem), n, bonus: h.weapon === 'fists' ? this.inv.wear('fist').reduce((a, b) => a + b, 0) : 0 });
-      else if (h.killed) this.hud.note(`Infected down${h.zone === 'head' ? ' · headshot' : ''}${h.melee || h.distance < 8 ? '' : ` · ${Math.round(h.distance)} m`}`, 'good');
-      return;
-    }
-    if (h.victim instanceof RemotePlayer) {
-      const it = this.weapons.equippedItem;
-      const bonus = this.inv.wear('fist').reduce((a, b) => a + b, 0);
-      this.net.send({ t: 'hit', to: h.victim.id, zone: h.zone, w: h.weapon, dist: h.distance, sup: quietOf(it), n, bonus: h.weapon === 'fists' ? bonus : 0 });
-      return;
-    }
-    if (!h.killed) return;
-    const how = h.melee ? '' : ` · ${Math.round(h.distance)} m`;
-    this.hud.note(`${h.target} down${h.zone === 'head' ? ' · headshot' : ''}${how}`, 'good');
-  }
+  pellets = new Map<unknown, { h: HitInfo; zones: Record<string, number>; n: number }>();
 
   // ------------------------------------------------------------ flow
 
   paused = true;
 
-  /** The next weapon carried, round and round (the mouse wheel, for a thumb: it never stops on empty hands). */
-  private nextWeapon() {
-    const have = SLOT_ORDER.filter((s) => this.inv.slots[s]);
-    if (!have.length || this.use || this.garage.ride) return;
-    const at = this.inv.active ? have.indexOf(this.inv.active) : -1;
-    this.handsFree = false;
-    this.stow();
-    this.weapons.equip(have[(at + 1) % have.length]);
-  }
-
-  private resume() {
-    // (on the bot check's range the game is still on its way in, and is being played all the same: Resume resumes)
-    if (this.joining && !this.botCheck?.active) return;
-    document.title = this.title;
-    // keys must reach the game, not the name field
-    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-    audio.start();
-    // a phone goes full screen and stays on its side, where the browser allows it
-    if (TOUCH && !document.fullscreenElement) {
-      const orient = screen.orientation as unknown as { lock?: (o: string) => Promise<void> } | undefined;
-      document.documentElement
-        .requestFullscreen?.({ navigationUI: 'hide' })
-        .then(() => orient?.lock?.('landscape'))
-        .catch(() => {});
-    }
-    // capture the mouse in the same click; play begins once we are in the world and locked
-    if (!this.input.locked) this.input.lock();
-    if (!this.started) {
-      void this.join();
-      return;
-    }
-    if (this.input.locked) this.unpause();
-  }
-
-  private unpause() {
-    this.paused = false;
-    this.hud.showStart(false);
-  }
-
-  private pause() {
-    this.paused = true;
-    this.save();
-    this.hud.showStart(true, true);
-    this.input.unlock();
-  }
-
-  private respawn() {
-    this.handsFree = false;
-    if (this.online) {
-      // the server picks the spawn and answers with 'spawn'
-      this.net.send({ t: 'respawn' });
-      return;
-    }
-    const p = this.player;
-    // everything you carried stays where you fell
-    for (const it of this.inv.topLevel()) this.dropItem(it, p.pos, 1.2);
-    // (and the trader writes off half of what he owed a dead man: credit is not a way to carry nothing and lose nothing)
-    if (this.credit > 0) this.setCredit(Math.floor(this.credit * KEPT_ON_DEATH));
-    this.spawnAtEdge();
-    this.freshKit();
-    this.deathInfo = '';
-    this.save();
-    this.resume();
-  }
-
-  /** Graphics options from the Esc menu: applied at once, nothing needs a reload. */
-  applyGraphics(g: Graphics) {
-    this.gfx = g;
-    const { r, atmo, veg, grass } = this.s;
-    r.applyQuality({ renderScale: g.scale, msaa: g.msaa, ao: g.ao !== 'off', aoHalfRes: g.ao === 'half' });
-    // shadow map size per cascade, and how far from the camera shadows are drawn
-    const [size, reach] = { low: [1024, 70], medium: [1024, 110], high: [2048, 160] }[g.shadows];
-    atmo.setShadows(size, reach);
-    this.loot.shadowDist = g.shadows === 'high' ? 26 : 18;
-    // reach of the full-detail trees, and blades of grass per patch
-    const [detail, density] = { low: [0.45, 0.4], medium: [0.7, 0.7], high: [1, 1] }[g.foliage];
-    veg.setDetail(detail);
-    grass.setDensity(density);
-    audio.setVolume(g.volume);
-  }
-
-  /**
-   * The lamps: L switches the player's own, and every lamp that is lit anywhere says so (see
-   * lamps.ts), by day as by night: a light is a light.
-   * @param free the player's hands and keys are their own (not typing, not in the inventory)
-   */
-  private lightStep(dt: number, free: boolean) {
-    const cam = this.s.r.camera, p = this.player, atmo = this.s.atmo;
-    const carried = this.weapons.hasLamp || this.inv.count('flashlight') > 0;
-    if (free && this.input.pressed('KeyL')) {
-      if (this.garage.ride) this.hud.note('It lights its own lamps while somebody drives', 'warn');
-      else if (!carried) this.hud.note('Nothing to light: find a flashlight, or a weapon light for your gun', 'warn');
-      else {
-        this.lit = !this.lit;
-        audio.click(2400, 0.25, 0.012);
-      }
-    }
-    if (!carried || p.dead || !this.started) this.lit = false;
-    if (this.lit && !this.garage.ride) {
-      if (this.weapons.hasLamp) this.lamps.beam(this.weapons.lampWorld(cam, _lampPos), _lampDir.set(0, 0, -1).applyQuaternion(cam.quaternion), 1.5, 0.85, 0);
-      // (the lantern: from the chest and tipped a little down, so that it lights the ground walked on; wide, and not far)
-      else this.lamps.beam(_lampPos.set(0.16, -0.3, -0.15).applyQuaternion(cam.quaternion).add(cam.position), _lampDir.set(0, -0.09, -1).applyQuaternion(cam.quaternion), 1, 1.3, 0);
-    }
-    for (const r of this.remotes.values()) {
-      const l = r.lamp(_lampPos, _lampDir);
-      if (l) this.lamps.beam(_lampPos, _lampDir, l.power, l.wide, 0);
-    }
-    const dark = atmo.night > 0.3;
-    // headlights: a jeep's lamps are on while it is driven, and after dark they light the road
-    if (dark) {
-      for (const j of this.garage.lit()) {
-        _lampDir.set(0, -0.07, -1).applyQuaternion(j.quat);
-        // One light, thrown from between the two lamps at the front of the car and at their height, with no
-        // disc of its own: each lens is a point of light to whoever is in front and some way off. (It was thrown
-        // from a metre over the middle of the car, with a white disc there: a ball of light sitting on the bonnet.)
-        const L = j.kind ? HEADLAMP_CAR : HEADLAMP;
-        this.lamps.beam(_lampPos.set(0, L.y, L.z).applyQuaternion(j.quat).add(j.pos), _lampDir, 2.4, 1.5, 0);
-        for (const side of [-1, 1]) this.lamps.flare(_lampPos.set(side * L.x, L.y, L.z + 0.06).applyQuaternion(j.quat).add(j.pos), _lampDir, 1);
-      }
-      // the street lamps of the village, from dusk
-      for (const at of this.streetLamps) if (at.distanceToSquared(cam.position) < 260 * 260) this.lamps.glow(at, STREET_LAMP, Math.min(1, (atmo.night - 0.3) / 0.3), 22);
-    }
-    // (alone, this game keeps the door as a server would: open while it is in there, shut a minute after it has gone)
-    if (!this.online && this.bunker.open) {
-      const p = this.player.pos;
-      this.bunkerEmpty = inBunker(this.bunker.place, p.x, p.y + 1, p.z, 2.5) && !this.player.dead ? 0 : this.bunkerEmpty + dt;
-      if (this.bunkerEmpty > BUNKER.door.shut) this.bunker.setOpen(false);
-    }
-    // the bunker: its door, its lamps, and the dark of it (no daylight comes down the stair)
-    this.bunker.update(dt, cam.position, (pos, burn) => this.lamps.glow(pos, BUNKER_LAMP, burn * 0.5, 8));
-    // (an admin's night vision sees down here as well: "night vision makes bunker darkness go away too", 2026-10-13)
-    // the fort: what of it is drawn for where the eye is, its cressets, and the dark under its terrace
-    // (a fire basket's light unless the fort says otherwise: its floodlights are white, the wash under its mast red)
-    this.castle?.update(dt, cam.position, atmo.night, (pos, burn, colour = CRESSET.colour, reach = CRESSET.reach) => this.lamps.glow(pos, colour, burn, reach));
-    // (and the jeep that burns before its gate: its flames and its smoke. Its light is the fires' own lamp: see `fires.always`.)
-    this.wreck?.update(dt, cam.position);
-    const under = this.nightSight ? 0 : Math.max(bunkerDark(this.bunker.place, cam.position.x, cam.position.y, cam.position.z), castleDark(this.s.world.castle, cam.position.x, cam.position.y, cam.position.z, (x, z) => heightAt(this.s.world.surface, x, z)));
-    atmo.cover.ground = { sun: 1 - under, sky: 1 - 0.994 * under };
-    // (And it sees indoors as it sees out of doors: "admin night vision should make it day time in buildings as
-    // well so i can see in the dark without flashlight", 2026-10-13. Under a roof the day's light is the little
-    // that comes in at the windows: a light from nowhere is added there, eased in and out at the door.)
-    const fill = this.nightSight && this.started ? (this.indoors ? NIGHT_SIGHT.indoors : NIGHT_SIGHT.outdoors) : 0;
-    atmo.fill.intensity += (fill - atmo.fill.intensity) * Math.min(1, dt * 6);
-    this.lamps.update(cam, dt);
-    this.weapons.lampSpill.copy(this.lamps.spill);
-  }
-
   /** the hour as it was at some moment (the server's, or mid morning when playing alone), from which the clock runs on */
   /** how many pellets the hit being told to the server now stands for (0: an ordinary hit) */
-  private pelletsOut = 0;
-  private hourBase = { phase: DAY.start, at: performance.now() };
+  pelletsOut = 0;
+  hourBase = { phase: DAY.start, at: performance.now() };
   /** the hour held still (for looking at a time of day: see T.hour in the harness), or null */
   hourHeld: number | null = null;
-  private wasNight: boolean | null = null;
-  /** which share of the day it is now */
-  hourNow() {
-    return this.hourHeld ?? phaseOf(this.hourBase.phase * DAY.length + (performance.now() - this.hourBase.at) / 1000);
-  }
+  wasNight: boolean | null = null;
 
-  /** A slow circuit above the village: what the entrance menu is laid over. */
-  private menuCamera(now: number) {
-    const { r, world } = this.s;
-    const cam = r.camera;
-    const c = world.pois[0];
-    const a = now * 0.000028 + 2.2;
-    const x = c.x + Math.cos(a) * 128;
-    const z = c.z + Math.sin(a) * 128;
-    const ground = heightAt(world.heights, c.x, c.z);
-    cam.position.set(x, Math.max(ground + 44, heightAt(world.heights, x, z) + 20), z);
-    // the menu covers the left of the screen: keep the village in the right half
-    const fx = c.x - x, fz = c.z - z;
-    const len = Math.hypot(fx, fz) || 1;
-    cam.lookAt(c.x + (fz / len) * 34, ground + 7, c.z - (fx / len) * 34);
-    cam.fov = 50;
-    cam.updateProjectionMatrix();
-    cam.updateMatrixWorld();
-  }
-
-  /**
-   * The game is up, and what nobody was made to wait for is sent for now: the sharp sky, and the cast of the menu's
-   * scenes (three of the infected among them). Until each has come the menu has what it has: the soft sky, and the
-   * view from the air. (The menu's films were sent for here too, twenty-four megabytes of them. It has none now:
-   * everything behind it is played live. See src/game/menu-scenes.ts.)
-   */
-  afterBoot() {
-    // (the shaders written while the game loaded, for the lamps lit and for the lamps out, are looked over now, behind the menu: see Renderer.lookOver)
-    void this.s.r.lookOverAll();
-    this.s.atmo.afterBoot();
-    void this.menu.load();
-    // (and whatever of the world was put off because nobody starts by it)
-    assets.up();
-  }
-
-  start() {
-    // the loading screen lifts: the way in arrives
-    setTimeout(() => this.hud.entrance(), 400);
-    let due = 0;
-    const loop = (t: number) => {
-      requestAnimationFrame(loop);
-      const limit = this.gfx.fpsLimit;
-      if (limit > 0) {
-        // frame limit: skip display refreshes until the next frame is due (1 ms of slack,
-        // so asking for 60 on a 60 Hz screen still shows every refresh)
-        const step = 1000 / limit;
-        if (t < due - 1) return;
-        due = Math.max(due + step, t - step);
-      }
-      this.frame(t);
-    };
-    requestAnimationFrame(loop);
-  }
-
-  // ------------------------------------------------------------ inventory ops
-
-  private takeWorldItem(w: WorldItem): ItemInstance | null {
-    const l = this.economy.take(w.loot.uid);
-    if (!l) return null;
-    if (this.online) {
-      this.pendingTakes.set(l.uid, { item: l.item, id: l.item.id, qty: l.item.qty });
-      setTimeout(() => this.pendingTakes.delete(l.uid), 5000);
-      this.net.send({ t: 'take', uid: l.uid });
-    }
-    return l.item;
-  }
-
-  dropItem(item: ItemInstance, at?: THREE.Vector3, spread = 0.5) {
-    // (A case, a suitcase or a bag is dropped like anything else and lies there as anything does, with what is in
-    // it: taken with F or dragged out of what lies about, like anything. Only a shovel makes anything else of it:
-    // see `dig`. "there should be no G key ... all interactions are unchanged with this object ... to drop a
-    // container to stash the player will just drop it from their inventory LIKE normal, to pick it up theyll use F
-    // LIKE NORMAL or drag from vicinity", 2026-10-12.)
-    const p = at ?? this.player.pos;
-    const a = Math.random() * Math.PI * 2;
-    const r = 0.35 + Math.random() * spread;
-    const fwd = new THREE.Vector3(-Math.sin(this.player.yaw), 0, -Math.cos(this.player.yaw));
-    const x = p.x + (at ? Math.cos(a) * r : fwd.x * 0.7 + Math.cos(a) * 0.2);
-    const z = p.z + (at ? Math.sin(a) * r : fwd.z * 0.7 + Math.sin(a) * 0.2);
-    const hit = physics.raycast({ x, y: p.y + 1.2, z }, { x: 0, y: -1, z: 0 }, 4, SOLID_GROUPS);
-    const y = hit && hit.toi > 1e-3 ? hit.point.y : p.y;
-    // the loot manager then slides it clear of walls and furniture and lays it on the surface
-    if (this.online) this.localDrops.add(item.uid);
-    // it falls from the hands (or from the body it was on) to where it comes to rest
-    this.loot.hands.set(item.uid, new THREE.Vector3(at ? p.x : p.x + fwd.x * 0.35, p.y + (at ? 0.9 : 1.15), at ? p.z : p.z + fwd.z * 0.35));
-    this.economy.drop(item, x, y + 0.005, z, Math.random() * Math.PI * 2);
-    this.weapons.validate();
-  }
-
-  private inventoryChanged() {
-    this.slowT = 1; // refresh carried weight on the next frame
-    this.weapons.validate();
-    this.syncGear();
-    this.autoHot();
-    this.meDirty = true;
-    this.syncOpenBox();
-    this.save();
-  }
-
-  // ------------------------------------------------------------ hot keys, and the hands
-
-  private assignHot(i: number, item: ItemInstance | null) {
-    this.inv.bind(i, item);
-    this.save();
-  }
-
-  /**
-   * What goes on the back or in the holster takes the key of its place, and a new kind of thing to eat, drink or
-   * dress a wound with takes the first free key after those, by itself: nobody has to open their pack under fire
-   * to find out which key the bandage they have just picked up is on. Everything else is put on a key by hand.
-   */
-  private autoHot() {
-    this.inv.autoBind();
-    for (const it of this.inv.carried()) {
-      if (!ITEMS[it.id].use || this.inv.hotOf(it) >= 0 || this.inv.hot.some((b) => b?.id === it.id)) continue;
-      for (let i = HOT_FREE; i < this.inv.hot.length; i++) {
-        if (this.inv.hot[i] && this.inv.hotItem(i)) continue;
-        this.inv.bind(i, it);
-        break;
-      }
-    }
-  }
-
-  /**
-   * Under the ground. A body that has got down into the earth (through a seam of it, off the edge of something,
-   * by whatever let it) is put back on its feet on the ground over it, two seconds after it is found there:
-   * nobody under the ground can be shot, and one such was found waiting out his tags' ten minutes there. The
-   * server holds the rule whatever a game does (see UNDER in server/index.ts); this is what keeps an honest player
-   * out of its way. The bunker is under the ground and is a place: round it the ground is not asked about.
-   */
-  private unbury(dt: number, riding: boolean) {
-    const p = this.player, at = p.pos;
-    const b = this.bunker.place;
-    // (the top of the earth: the ground, or the earth the fort lays back over its passage where the ground is cut down for it)
-    const top = Math.max(heightAt(this.s.world.heights, at.x, at.z), heightAt(this.s.world.surface, at.x, at.z));
-    const down = this.started && !p.dead && !riding && !p.fly && at.y < top - 1.1 && !(b && Math.hypot(at.x - b.x, at.z - b.z) < 48) && !castleUnder(this.s.world.castle, at.x, at.y, at.z, (x, z) => heightAt(this.s.world.surface, x, z));
-    this.buriedT = down ? this.buriedT + dt : 0;
-    if (this.buriedT < 2) return;
-    this.buriedT = 0;
-    p.spawn(at.x, top + 0.15, at.z, p.yaw);
-    this.hud.note('You were under the ground: back on your feet', 'warn');
-  }
-  private buriedT = 0;
+  buriedT = 0;
   /** when this player last died, by this game's clock (Space respawns, but not in the same breath) */
-  private diedAt = 0;
+  diedAt = 0;
 
-  // ---- what an admin can do that nobody else can (the server holds every one of them to having the role)
+  adminUI!: AdminUI;
+  mapAskT = 0;
+  mapFeedT = 0;
 
-  private *seenByInfected() {
-    for (const r of this.remotes.values()) if (!r.ghost) yield r;
-  }
-
-  private adminUI!: AdminUI;
-  private mapAskT = 0;
-  private mapFeedT = 0;
-
-  /**
-   * An admin's map told where everybody is: who is on and how they are from the server's last list, and each one's
-   * place and facing from this game's own picture of them, which is fresher (it is what they are drawn by).
-   */
-  private feedMap() {
-    if (this.role !== 'admin' || !this.map.open) return;
-    const out: MapPerson[] = [];
-    for (const q of this.admPlayers.values()) {
-      if (q.id === this.net.id) continue;
-      const r = q.alive ? this.remotes.get(q.id) : undefined;
-      out.push({ id: q.id, name: q.name, x: r ? r.pos.x : q.x, z: r ? r.pos.z : q.z, yaw: r ? r.yaw : q.yaw, dead: !q.alive, faint: !!q.hidden, staff: !!q.role, asleep: !!q.asleep, away: !!q.away, seat: !!q.seat, hp: q.hp, flags: q.flags });
-    }
-    this.map.setPeople(out);
-  }
-
-  /** What an admin did to somebody's dot on the map: picked them, or chose from the short list that opens on it. */
-  private mapPerson(id: number, what: 'select' | 'goto' | 'bring' | 'watch' | 'message' | 'panel') {
-    if (this.role !== 'admin') return;
-    // (picked on the map is picked in the panel: it opens on them)
-    this.adminUI.select(id);
-    if (what === 'select') return;
-    if (what === 'bring') return void this.order(`/bring #${id}`);
-    if (what === 'goto') {
-      this.order(`/goto #${id}`);
-      return void this.toggleMap(false);
-    }
-    if (what === 'watch') {
-      this.toggleMap(false);
-      return void this.watch(id);
-    }
-    // (the panel, from the map: the mouse stays free from the one to the other)
-    this.map.hide();
-    this.toggleAdmin(true);
-    // (the panel would not open: the map is put back, and not a free mouse with nothing under it)
-    if (!this.adminUI.isOpen) return void this.map.show(this.player.pos.x, this.player.pos.z);
-    if (what === 'message') this.adminUI.select(id, true);
-  }
   /**
    * The colour this admin has chosen for the word ADMIN before their name in the chat (null: the rainbow it is by
    * default). Kept by this browser, and said to the server whenever it says this player is an admin.
    */
-  private tint: string | null = (() => {
+  tint: string | null = (() => {
     try {
       const c = localStorage.getItem('zona.adminTint');
       return c && /^(off|#[0-9a-f]{6})$/i.test(c) ? c : null;
@@ -2828,696 +1083,67 @@ export class Game {
       return null;
     }
   })();
-  private setTint(color: string | null) {
-    // ('off': no tag before the name at all)
-    this.tint = color && /^(off|#[0-9a-f]{6})$/i.test(color) ? color.toLowerCase() : null;
-    try {
-      if (this.tint) localStorage.setItem('zona.adminTint', this.tint);
-      else localStorage.removeItem('zona.adminTint');
-    } catch {
-      /* a browser that keeps nothing: it lasts as long as the page does */
-    }
-    if (this.online && this.role === 'admin') this.net.send({ t: 'tint', color: this.tint });
-    this.adminUI.setSelf(this.adminSelf());
-  }
+
   /** an admin's night vision: it is day in this game alone, whatever the hour (the hour itself goes on as it does) */
-  private nightSight = false;
-  private powers = { god: false, hidden: false, clip: false, voidInv: false, voidTag: false, weightless: false, endless: false, bottomless: false };
+  nightSight = false;
+  powers = { god: false, hidden: false, clip: false, voidInv: false, voidTag: false, weightless: false, endless: false, bottomless: false };
   /** the view has left the body: where it is, and which way it looks */
-  private freecam: { pos: THREE.Vector3; yaw: number; pitch: number } | null = null;
+  freecam: { pos: THREE.Vector3; yaw: number; pitch: number } | null = null;
   /** how fast the free camera flies, metres a second (the wheel changes it) */
-  private freeSpeed = 14;
-
-  /** an order, sent as if it had been typed */
-  private order(line: string) {
-    if (this.online) this.net.send({ t: 'chat', ch: 'global', text: line });
-    else this.hud.chatLine('system', '', 'You are playing offline: there is no server to give orders on.');
-  }
-
-  private adminSelf(): AdminSelf {
-    return { role: this.role, id: this.net?.id ?? 0, ...this.powers, night: this.nightSight, names: this.namesWanted, tint: this.tint, freecam: !!this.freecam, x: Math.round(this.player.pos.x), z: Math.round(this.player.pos.z) };
-  }
-
-  private showPowers() {
-    const seen = this.watching ? this.remotes.get(this.watching.id)?.name : '';
-    const on = [this.powers.god && 'GOD MODE', this.powers.hidden && 'VANISHED', this.powers.clip && 'NOCLIP', this.powers.weightless && 'WEIGHTLESS', this.powers.endless && 'ENDLESS AMMO', this.powers.bottomless && 'BOTTOMLESS', this.freecam && `${seen ? `WATCHING ${seen.toUpperCase()}` : 'FREE CAMERA'}  ·  ${Math.round(this.freeSpeed)} M/S (WHEEL)  ·  H: BODY HERE  ·  K: BACK`].filter(Boolean);
-    this.hud.setPowers(on.join('  ·  '));
-    this.adminUI?.setSelf(this.adminSelf());
-  }
-
-  /** The panel (the ` key): opened over the game with the mouse free, as the map is. */
-  toggleAdmin(open?: boolean, byEscape = false) {
-    if (!this.adminUI) return;
-    const want = open ?? !this.adminUI.isOpen;
-    if (want === this.adminUI.isOpen) return;
-    if (want) {
-      if (!this.role || !this.online || !this.started || this.invUI.isOpen || this.shop.isOpen || this.map.open) return;
-      this.adminUI.open(this.adminSelf());
-      this.input.uiMode = true;
-      this.input.unlock();
-      return;
-    }
-    this.adminUI.close();
-    if (this.invUI.isOpen || this.shop.isOpen || this.map.open) return;
-    this.input.uiMode = false;
-    if (byEscape && !this.input.touch) this.awaitClick = true;
-    else if (this.started && !this.paused) this.input.lock();
-    // if the browser refuses the re-capture, the next click on the game takes it (see awaitClick)
-    setTimeout(() => {
-      if (this.started && !this.paused && !this.invUI.isOpen && !this.shop.isOpen && !this.map.open && !this.adminUI.isOpen && !this.input.locked && !this.player.dead) this.awaitClick = true;
-    }, 400);
-  }
-
-  /** The free camera (K): the view leaves the body where it stands and goes where it is flown. */
-  toggleFreecam(on = !this.freecam) {
-    if (on === !!this.freecam || (on && this.role !== 'admin')) return;
-    const cam = this.s.r.camera;
-    if (on) {
-      const e = new THREE.Euler().setFromQuaternion(cam.quaternion, 'YXZ');
-      this.freecam = { pos: cam.position.clone(), yaw: e.y, pitch: e.x };
-      this.director.third = this.freeView;
-    } else {
-      this.freecam = null;
-      this.watching = null;
-      this.director.third = this.garage.ride ? this.garage.view : null;
-    }
-    this.director.shift(0.25);
-    this.showPowers();
-  }
-
-  /**
-   * An admin's Delete key: whatever the middle of the view is on is taken out of the world, by the order that does
-   * it (`/del`), which says back what was taken. From the eyes, or from the free camera, as far as a hundred and
-   * twenty metres. A thing on the ground, a body, a supply drop, a place where something is buried, a car, one of
-   * the infected. Not a player (they are kicked, from the panel), and not the map itself: its buildings, its trees
-   * and its crates are the same in every game and are not anybody's to take away.
-   */
-  private deleteLooked() {
-    const cam = this.s.r.camera, dir = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
-    const hit = physics.raycast(cam.position, dir, 120, SHOT_GROUPS, this.freecam ? undefined : this.player.collider);
-    // (what the hands could reach is what is meant, when the eye is on something that small)
-    const o = (!this.freecam && (this.focus instanceof WorldItem || this.focus instanceof Stash) ? this.focus : null) ?? hit?.tag?.owner;
-    let line = '';
-    if (o instanceof WorldItem) line = `/del item ${o.loot.uid}`;
-    else if (o instanceof Stash) line = o.fixed && !o.corpse ? '' : `/del box ${o.uid}`;
-    else if (o instanceof Jeep) line = `/del car ${o.i}`;
-    else if (o instanceof Infected) line = `/del z ${o.i}`;
-    else if (o instanceof RemotePlayer) return void this.hud.note(`That is ${o.name}: a player is kicked from the panel, not taken away`, 'warn');
-    if (!line) return void this.hud.note('Nothing there to take away: a thing on the ground, a body, a drop, a buried stash, a car or one of the infected', 'info');
-    this.order(line);
-  }
-
-  /**
-   * What the middle of the view is on, for the panel's Entities page ("where I am looking", "the car I am looking
-   * at"): from the eyes, or from the free camera, as far as three hundred metres. Null: nothing that near.
-   */
-  private adminLook(): AdminLook | null {
-    const cam = this.s.r.camera, dir = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
-    const hit = physics.raycast(cam.position, dir, 300, SHOT_GROUPS, this.freecam ? undefined : this.player.collider);
-    if (!hit) return null;
-    const o = hit.tag?.owner, body = o instanceof Jeep || o instanceof Infected || o instanceof RemotePlayer;
-    // (level enough to stand a thing on, and not somebody or something that moves; if not, a pace and a half short of it)
-    const flat = !body && hit.normal.y > 0.7, back = flat ? 0 : 1.5;
-    return {
-      x: hit.point.x - dir.x * back, y: hit.point.y, z: hit.point.z - dir.z * back, dist: hit.toi, flat,
-      what: o instanceof Jeep ? `car number ${o.i}` : o instanceof Infected ? 'one of the infected' : o instanceof RemotePlayer ? o.name : flat ? 'the ground' : 'a wall or a slope',
-      ...(o instanceof Jeep ? { car: o.i } : {}),
-    };
-  }
+  freeSpeed = 14;
 
   /** whoever the free camera is kept with as they go: their number, and where they last were */
-  private watching: { id: number; last: THREE.Vector3 } | null = null;
+  watching: { id: number; last: THREE.Vector3 } | null = null;
 
-  /** The free camera set behind a player and a little over them, and carried along with them from then on (it is still flown). */
-  private watch(id: number) {
-    const r = this.remotes.get(id);
-    if (!r || this.role !== 'admin') return;
-    this.toggleFreecam(true);
-    if (!this.freecam) return;
-    this.freecam.pos.set(r.pos.x + Math.sin(r.yaw) * 4.5, r.pos.y + 2.6, r.pos.z + Math.cos(r.yaw) * 4.5);
-    this.freecam.yaw = r.yaw;
-    this.freecam.pitch = -0.22;
-    this.watching = { id, last: r.pos.clone() };
-    this.showPowers();
-  }
-
-  /**
-   * An admin's far sight: everybody's name where they stand on the screen, through whatever is in the way, however
-   * far off, with how far that is and how much blood they have. A switch of the panel's own (2026-10-13: "instead
-   * of only showing the names of people in no clip and in free cam lets just make a toggle for it"), kept from one
-   * day to the next. No frame round the body: "admin panel does not need the rectangles following the players its
-   * causing lag". Each name is moved, and not laid out again: see `esp` in hud.ts.
-   *
-   * Asked for four times before it was ever seen (2026-10-12: "when im in freecam or spectate i should see
-   * everyone names"; "i want to see everyone name from the sky from a distance ... like a cheat menu would";
-   * 2026-10-13: "ive asked this like 4x ... when im in freecam or when im no clipping, i want to see the names of
-   * players, from far away ... scale their names to be smaller the farther away from them i am, and limit how big
-   * they get when i get close, think like a cheat engine with wallhacks"). It was drawn from the first day, and
-   * nobody saw it: the HUD is put out of sight while the view is away from the body, and this was a part of the
-   * HUD. (It is left in sight now: see `#hud.hidden` in hud.css.) And it was never on while flying.
-   */
-  private drawNames(cam: THREE.PerspectiveCamera) {
-    if (this.role !== 'admin' || !this.started || !this.namesWanted) {
-      if (this.namesOn) this.hud.esp([]);
-      this.namesOn = false;
-      return;
-    }
-    this.namesOn = true;
-    // (blood and flags come with the panel's lists: asked for every three seconds while this is up)
-    const now = performance.now();
-    if (this.online && now - this.espAsked > 3000) {
-      this.espAsked = now;
-      this.net.send({ t: 'adm' });
-    }
-    const out: Parameters<HUD['esp']>[0] = [], v = new THREE.Vector3();
-    const label = (name: string, at: THREE.Vector3, up: number, kind: '' | 'dead' | 'ghost' | 'me', more: string) => {
-      const d = at.distanceTo(cam.position);
-      v.set(at.x, at.y + up, at.z).project(cam);
-      if (v.z < -1 || v.z > 1 || Math.abs(v.x) > 1.05 || Math.abs(v.y) > 1.05) return;
-      const x = v.x * 0.5 + 0.5, y = -v.y * 0.5 + 0.5;
-      // (the farther off, the smaller the lettering, down to what can still be read; and no bigger than this, however near)
-      const size = ESP_SIZE[0] - (ESP_SIZE[0] - ESP_SIZE[1]) * THREE.MathUtils.clamp(Math.log(Math.max(d, 1) / ESP_NEAR) / Math.log(ESP_FAR / ESP_NEAR), 0, 1);
-      out.push({ x, y, name, sub: `${Math.round(d)} m${more}`, size: Math.round(size * 2) / 2, kind });
-    };
-    for (const r of this.remotes.values()) {
-      const q = this.admPlayers.get(r.id);
-      label(r.name, r.pos, r.alive ? 1.95 : 0.5, !r.alive ? 'dead' : r.ghost ? 'ghost' : '', `${r.alive ? (q?.hp !== undefined ? ` · ${Math.round(q.hp)} hp` : '') : ' · dead'}${r.ghost ? ' · vanished' : ''}${q?.flags ? ` · ${q.flags} flags` : ''}`);
-    }
-    // (their own body, when the view has left it)
-    if (this.freecam) label('your body', this.player.pos, 1.95, 'me', '');
-    this.hud.esp(out);
-  }
-  private espAsked = 0;
+  espAsked = 0;
   /** an admin wants everybody's name shown where they are (the panel's switch; remembered) */
-  private namesWanted = (() => {
+  namesWanted = (() => {
     try {
       return localStorage.getItem('zona.admin.names') === '1';
     } catch {
       return false;
     }
   })();
-  private namesOn = false;
-  private freeView = (cam: THREE.PerspectiveCamera) => {
+  namesOn = false;
+  freeView = (cam: THREE.PerspectiveCamera) => {
     const f = this.freecam;
     if (!f) return;
     cam.position.copy(f.pos);
     cam.quaternion.setFromEuler(new THREE.Euler(f.pitch, f.yaw, 0, 'YXZ'));
   };
 
-  /** the free camera flown: as noclip is, but it is the view that goes and the body that stays */
-  private flyCamera(dt: number, input: Input) {
-    const f = this.freecam!, sens = this.player.sensitivity;
-    f.yaw -= input.mouseDX * sens;
-    f.pitch = THREE.MathUtils.clamp(f.pitch - input.mouseDY * sens, -1.55, 1.55);
-    const fwd = (input.held('KeyW') ? 1 : 0) - (input.held('KeyS') ? 1 : 0);
-    const str = (input.held('KeyD') ? 1 : 0) - (input.held('KeyA') ? 1 : 0);
-    const up = (input.held('Space') ? 1 : 0) - (input.held('ControlLeft') || input.held('KeyC') ? 1 : 0);
-    // (the wheel: how fast it flies, a third more or less a notch. 2026-10-12: "when im in freecam scrollwheel allows
-    // me to adjust my flight speed, so i can fly much faster, if i want". Shift is four times that, Alt a fifth.)
-    if (input.wheel !== 0) {
-      this.freeSpeed = THREE.MathUtils.clamp(this.freeSpeed * Math.pow(1.3, -input.wheel), 2, 400);
-      input.wheel = 0;
-      this.showPowers();
-    }
-    const speed = this.freeSpeed * (input.held('ShiftLeft') ? 4 : input.held('AltLeft') ? 0.2 : 1);
-    const cp = Math.cos(f.pitch), sy = Math.sin(f.yaw), cy = Math.cos(f.yaw);
-    const d = new THREE.Vector3(-sy * cp * fwd + cy * str, Math.sin(f.pitch) * fwd + up, -cy * cp * fwd - sy * str);
-    if (d.lengthSq() > 1) d.normalize();
-    f.pos.addScaledVector(d, speed * dt);
-    // H: the body is brought to where the view is
-    if (input.pressed('KeyH')) this.order(`/tp ${f.pos.x.toFixed(1)} ${(f.pos.y - 1.64).toFixed(1)} ${f.pos.z.toFixed(1)}`);
-  }
   /** what the server lets this player do out of the way: nothing (null), keep order, or everything */
   role: 'admin' | 'mod' | null = null;
 
-  /** A hot key is pressed: what is on it comes into the hands, or goes out of them if it is there already. */
-  private hot(i: number) {
-    const key = (i + 1) % 10, bound = this.inv.hot[i], item = this.inv.hotItem(i);
-    if (!item) {
-      this.hud.note(bound ? `No ${ITEMS[bound.id].name.toLowerCase()} left` : `Key ${key} has nothing on it: point at a thing in your inventory and press ${key}`, bound ? 'warn' : 'info');
-      return;
-    }
-    if (this.inv.held() === item || this.inHand === item) return this.emptyHands();
-    this.takeUp(item);
-  }
-
-  /** the hands are emptied: what was in them is put away where it is carried, and anything they were at is broken off */
-  private emptyHands() {
-    if (this.use) this.breakOff();
-    this.stow();
-    this.handsFree = true;
-    this.weapons.take(null);
-  }
-
-  /** a thing that is not a weapon, held: put away (it stays where it is carried), with nothing taken up in its place */
-  private stow() {
-    if (!this.inHand && !this.ready) return;
-    this.ready = null;
-    this.inHand = null;
-    this.holding = false;
-    this.weapons.endUse();
-    this.settle();
-  }
-
-  /**
-   * Something carried is taken into the hands: a gun or a thing to hit with comes up as it always did; anything
-   * else is held out in the right hand, waiting (see `ready`), and the left button then does with it what is done
-   * with such a thing (see `handFire`). Whatever was in the hands before goes back where it is carried.
-   */
-  private takeUp(item: ItemInstance, loose = false) {
-    const def = ITEMS[item.id];
-    if (this.player.dead || !def) return;
-    // (Nothing else is taken up by hands that are on a grenade's pin, or have a live one in them: see `cook`. A thing
-    // handed over that is carried nowhere is not lost for that: it goes into a pocket, or onto the ground.)
-    if (this.cook) {
-      if (loose) {
-        const left = this.inv.add(item);
-        if (left) this.dropItem(left);
-        this.inventoryChanged();
-      }
-      return;
-    }
-    if (this.use) this.breakOff();
-    this.stow();
-    // (Taken straight off the ground or out of a crate with no room for it anywhere: it is in the hands and nowhere
-    // else, as in DayZ, and is eaten, drunk or put on from there. Put away, it goes into the pockets if there is
-    // room by then and onto the ground if there is not: see `settle`. Asked for 2026-10-11: "drag things in the
-    // vicinity to their hands even if no room in inventory, so i can use a medkit or drink or eat something
-    // without it needing to go in my inventory". A gun or a thing to hit with needs a place on the body: not this.)
-    if (loose && !def.weapon && !def.melee) this.loose = item;
-    this.handsFree = false;
-    this.glass = 0;
-    this.weapons.take(item);
-    if (def.weapon || def.melee) return;
-    this.inHand = item;
-    this.magMode = null;
-    this.ready = { item, t: 0 };
-    this.weapons.beginUse(item.id, this.poseOf(item), def.use?.time ?? def.open?.time ?? 2, true);
-  }
-
-  /** how the hands hold a thing while they wait to use it, and work on it when they do */
-  private poseOf(item: ItemInstance): UseKind {
-    const def = ITEMS[item.id];
-    if (item.id === 'keycard') return 'swipe';
-    // (a magazine is held to be filled, a box of rounds to be torn open: each has its own way of being held and worked)
-    if (def.mag) return 'load';
-    if (def.open) return 'unbox';
-    if (def.throw || def.call || !def.use) return 'open';
-    return def.look ? 'drink' : def.use.sound;
-  }
-
-  /** how many uses of an item type are in the pockets (stack quantity, or number of items) */
-  private countOf(id: string) {
-    const stack = !!ITEMS[id].stack;
-    let n = 0;
-    for (const c of this.inv.containers) for (const p of c.items) if (p.item.id === id) n += stack ? p.item.qty : 1;
-    return n;
-  }
-
-  /**
-   * The left button, with a thing that is not a weapon in the hands: what is done with such a thing is begun, and
-   * goes on for as long as the button is held (`holding`: let go, it is broken off, and nothing is lost by it).
-   * What a thing does depends on what it is and, for some, on what is in front of the hands: a jerrycan at a car,
-   * a bottle at a well, a keycard at the bunker's reader. This is the one place that says which.
-   */
-  private handFire(item: ItemInstance) {
-    const def = ITEMS[item.id];
-    if (this.use || this.player.dead || this.weapons.working) return;
-    const well = def.use?.sips ? this.wellHere() : null;
-    if (def.mag) this.magWork(item) === 'empty' ? this.unloadMagazine(item) : this.fillMagazine(item);
-    else if (def.open) this.openBox(item);
-    else if (item.id === 'jerrycan') this.pourFuel(item);
-    else if (item.id === 'keycard') this.swipeCard();
-    else if (well && (item.left ?? 0) < def.use!.sips!) this.fillBottle(item, well);
-    else if (def.use) this.useItem(item, true);
-    // (a case or a bag is not "placed": it is dropped like anything else. What makes a stash of it is a shovel.)
-    else if (def.category === 'stash') this.hud.note(`Drop the ${def.name.toLowerCase()} like anything else. Where it lies, a shovel buries it.`);
-    else this.hud.note(def.category === 'ammo' ? 'Loose rounds go into a magazine: hold the magazine, and hold the button' : def.attach ? `The ${def.name.toLowerCase()} goes on a gun: drag it onto one in your inventory` : `Nothing to do with the ${def.name.toLowerCase()} here`, 'info');
-    // (it goes on for as long as the button is held; a thumb on a phone has only to tap)
-    this.holding = !!this.use && !this.touch;
-    if (this.use) this.ready = null;
-  }
-
   /** the left button is being held on what the hands are at: let go, it is broken off */
-  private holding = false;
+  holding = false;
   /** what the eye is on within arm's reach this frame (a door, a car, a crate, a thing on the ground), as `interact` found it */
-  private lookedAt: unknown = null;
+  lookedAt: unknown = null;
 
-  /** the well stood at, if there is one */
-  private wellHere(): Well | null {
-    const p = this.player.pos;
-    return this.wells.find((w) => Math.hypot(w.x - p.x, w.z - p.z) < WELL.reach && Math.abs(w.y - p.y) < 1.5) ?? null;
-  }
-
-  /** The keycard, held in the hands at the bunker's reader: held out to it and pushed home, and only then does anything move. */
-  private swipeCard() {
-    const at = this.bunker.open ? null : this.bunker.doorAt(_lampPos);
-    if (!at || at.distanceTo(this.s.r.camera.position) > 2.6) return void this.hud.note('The card opens the door of Bunker 17: stand at the reader beside it', 'info');
-    // (A card held loose in the hand goes into a pocket first. The server opens the door for a card it has seen
-    // carried, and what is held loose it is never told of: the reader kept such a card and the door stayed shut.)
-    if (this.loose?.id === 'keycard') {
-      if (this.inv.add(this.loose)) return void this.hud.note('Make room for the keycard in a pocket first: the reader takes it from there', 'info');
-      this.loose = null;
-      this.inventoryChanged();
-    }
-    const near = () => {
-      const d = this.bunker.open ? null : this.bunker.doorAt(_lampPos);
-      return !!d && d.distanceTo(this.s.r.camera.position) <= 3.1;
-    };
-    this.startUse('Putting the keycard in', 2.1, 'keycard', 'swipe', null, () => {
-      const held = this.loose?.id === 'keycard';
-      if (!near() || (!held && this.inv.count('keycard') < 1)) return;
-      if (held) this.loose = null;
-      else this.inv.take('keycard', 1);
-      this.inventoryChanged();
-      this.hud.note('The reader keeps the card. The door stays open while anybody is inside, and shuts a minute after', 'good');
-      if (this.online) this.net.send({ t: 'bunker' });
-      else {
-        this.bunkerEmpty = 0;
-        this.bunker.setOpen(true);
-      }
-    });
-    if (this.use) Object.assign(this.use, { valid: near, lost: 'You stepped away from the reader: the card is still yours' });
-  }
   /** the thing that is not a weapon that is in the hands, waiting or being used (null: none) */
-  private inHand: ItemInstance | null = null;
-
-  /** What the hands were at is over, done or broken off: a thing still carried is held as it was before; one used up leaves the hands empty. */
-  private rest() {
-    const item = this.inHand;
-    this.holding = false;
-    if (!item) return;
-    if (this.player.dead || !this.mine(item)) {
-      this.inHand = null;
-      this.ready = null;
-      this.inv.hold(null);
-      this.weapons.endUse();
-      this.settle();
-      return;
-    }
-    this.ready = { item, t: 0.3 };
-    this.weapons.beginUse(item.id, this.poseOf(item), ITEMS[item.id].use?.time ?? 2, true);
-  }
-
-  /** Ten litres out of a jerrycan held in the hands, into the tank of the car in front of them. */
-  private pourFuel(can: ItemInstance) {
-    const jeep = this.lookedAt instanceof Jeep ? this.lookedAt : null;
-    if (!jeep || jeep.wreck) return void this.hud.note('Stand at a jeep or a car and look at it to pour this in', 'info');
-    if (jeep.fuel >= JEEP.tank - 0.5) return void this.hud.note('Its tank is full', 'info');
-    const near = () => !jeep.wreck && jeep.pos.distanceTo(this.player.pos) <= JEEP.reach + 1;
-    this.startUse('Filling the tank', 4, 'jerrycan', 'open', null, () => {
-      if (!near() || !this.mine(can)) return;
-      if (this.loose === can) this.loose = null;
-      this.inv.remove(can);
-      this.garage.refuel(jeep);
-      audio.ui('drink');
-      this.hud.note(`${JEEP.can} litres into the tank`, 'good');
-      this.inventoryChanged();
-    });
-    if (this.use) Object.assign(this.use, { valid: near, lost: 'You walked off from it: the can is still full' });
-  }
-
-  /** A bottle held in the hands, filled at the well beside them. */
-  private fillBottle(bottle: ItemInstance, w: Well) {
-    const full = ITEMS[bottle.id].use!.sips!;
-    const near = () => Math.hypot(w.x - this.player.pos.x, w.z - this.player.pos.z) <= WELL.reach + 0.8;
-    this.startUse(`Filling the ${ITEMS[bottle.id].name.toLowerCase()}`, WELL.drink * 0.6, bottle.id, 'open', null, () => {
-      if (!near()) return;
-      bottle.left = full;
-      audio.ui('drink');
-      this.hud.note(`The ${ITEMS[bottle.id].name.toLowerCase()} is full`, 'good');
-      this.inventoryChanged();
-    });
-    if (this.use) Object.assign(this.use, { valid: near, lost: 'You walked off from the well' });
-  }
-
-  // ------------------------------------------------------------ item actions
-
-  /** @param seen what the people around are told the hands are doing, where that is not what `kind` says (see ACTS) */
-  private startUse(label: string, dur: number, itemId: string, kind: UseKind, sound: TimedAction['sound'], done: () => void, seen?: Act) {
-    this.toggleInventory(false);
-    this.use = { label, t: 0, dur, sound, soundT: 0, done };
-    this.weapons.beginUse(itemId, kind, dur);
-    // (what everybody else sees of an injection is the hands at work on a wound, as with a dressing)
-    this.act(seen ?? (kind === 'inject' ? 'bandage' : kind === 'smoke' ? 'eat' : kind === 'swipe' || kind === 'live' ? 'open' : kind === 'unload' ? 'load' : kind), dur);
-    // (a smoke is one sound from the lighter to the last breath of it, made once)
-    if (sound === 'smoke') audio.ui('smoke');
-  }
-
-  /** every bottle carried (see `sips` in src/sim/items.ts): in the pockets, and in what is worn */
-  private bottles(): ItemInstance[] {
-    return this.inv.containers.flatMap((c) => c.items).map((p) => p.item).filter((it) => !!ITEMS[it.id].use?.sips);
-  }
-
-  /** A few seconds at a well: thirst gone, and every bottle carried full again. */
-  private drinkAt(w: Well) {
-    this.putAway();
-    this.toggleInventory(false);
-    const near = () => Math.hypot(w.x - this.player.pos.x, w.z - this.player.pos.z) <= WELL.reach + 0.8;
-    // (Out of cupped hands. A bottle is filled by holding it here and holding the button: see fillBottle. Walk off
-    // and the drinking stops there: it was finished from across the yard, by having begun it at the well.)
-    this.use = { label: 'Drinking at the well', t: 0, dur: WELL.drink, sound: 'drink', soundT: 0, valid: near, lost: 'You walked off from the well', done: () => {
-      if (!near()) return;
-      this.player.vitals.water = 100;
-      this.meDirty = true;
-      this.hud.note('You drink your fill', 'good');
-    } };
-    this.act('drink', WELL.drink);
-  }
-
-  /** A few seconds of work at a fireplace, and it is alight: for everybody, once the server has been told. */
-  private lightFire(i: number) {
-    this.startUse('Lighting the fire', FIRE.lighting, 'cigarettes', 'open', null, () => {
-      const p = this.player.pos;
-      // (somebody else got it going first)
-      if (this.fires.at(p) !== i || this.fires.left[i] > 0) return;
-      if (this.online) this.net.send({ t: 'fire', i });
-      else if (this.hearths.light(i, p.x, p.z, performance.now() / 1000)) this.fires.set(i, FIRE.burns);
-      audio.ui('open');
-      this.hud.note('The fire is lit: its smoke can be seen a long way off', 'good');
-    });
-    // (walk off from it and the hands stop: a fire is not lit from across the yard)
-    if (this.use) Object.assign(this.use, { valid: () => this.fires.at(this.player.pos) === i, lost: 'You walked off from the fireplace' });
-  }
-
-  /** wherever the item currently is: player inventory or the open crate */
-  private consume(item: ItemInstance, from: Container | null) {
-    const def = ITEMS[item.id];
-    if (def.stack && item.qty > 1) {
-      item.qty--;
-      return;
-    }
-    if (this.loose === item) this.loose = null;
-    this.inv.remove(item);
-    from?.remove(item);
-  }
+  inHand: ItemInstance | null = null;
 
   /**
    * A thing being used straight off the ground. It is in the hands for as long as that takes
    * and nowhere else; whatever is left of it afterwards (all of it, if the use was broken
    * off) goes into the pockets, or is put down again when they are full.
    */
-  private loose: ItemInstance | null = null;
-
-  /** Eat, drink, apply or open a thing where it lies (the inventory's right-click on the ground list). */
-  private onGround(w: WorldItem, how: 'use' | 'open') {
-    const def = ITEMS[w.loot.item.id];
-    if (this.use || this.player.dead || !(how === 'use' ? def.use : def.open)) return;
-    const item = this.takeWorldItem(w);
-    if (!item) return;
-    // (binoculars are not used up: they are kept and held to the eyes, so they need a place first)
-    if (def.look) {
-      const left = this.inv.add(item);
-      if (left) return void this.dropItem(left);
-      this.inventoryChanged();
-      return this.useItem(item);
-    }
-    this.loose = item;
-    if (how === 'use') this.useItem(item);
-    else this.openBox(item);
-    if (!this.use && !this.ready) this.settle();
-  }
-
-  /** what was in the hands off the ground and is not used up: put away, or put down (a dead hand lets it fall) */
-  private settle() {
-    const item = this.loose;
-    this.loose = null;
-    if (!item) return;
-    const left = this.player.dead ? item : this.inv.add(item);
-    if (left) this.dropItem(left);
-    this.inventoryChanged();
-  }
-
-  /** Is this thing the survivor's: carried somewhere on them, or held in the hands and carried nowhere? */
-  private mine(item: ItemInstance) {
-    return this.loose === item || !!this.inv.find((i) => i === item);
-  }
-
-  /**
-   * The inventory screen takes a thing held loose out of the hands, to put it where it was let go (a pocket that
-   * has room now, a crate, the ground): the hands are emptied and the thing is the screen's to place.
-   */
-  private release(item: ItemInstance) {
-    if (this.loose !== item) return;
-    if (this.use) {
-      this.use = null;
-      this.act('stop');
-    }
-    // (a grenade whose pin the hands were still at: they stop. One whose pin is out is no longer a thing to be placed.)
-    if (this.cook?.item === item) {
-      this.cook = null;
-      this.act('stop');
-    }
-    this.loose = null;
-    this.ready = null;
-    this.inHand = null;
-    this.holding = false;
-    this.weapons.endUse();
-    this.inv.hold(null);
-    this.weapons.validate();
-  }
+  loose: ItemInstance | null = null;
 
   /**
    * An injector taken into the hand and not yet used. Its key (or Use, in the inventory) brings it out and a
    * click uses it; the wheel, the other button, its own key again, a weapon's key or the inventory puts it away.
    * `t` is how long it has been out: the click that chose Use in a menu is not the click that uses it.
    */
-  private ready: { item: ItemInstance; t: number } | null = null;
-
-  private putAway() {
-    if (!this.ready && !this.inHand) return;
-    this.stow();
-    this.inv.hold(null);
-    this.weapons.validate();
-  }
-
-  /**
-   * Whatever the hands are in the middle of is broken off, and nothing is lost by it: what was being eaten,
-   * drunk or put on is kept whole, an injector goes back where it was, a magazine is not counted out.
-   * (The wheel; on a phone, the weapon button.)
-   * @returns whether there was anything to break off
-   */
-  private breakOff(): boolean {
-    if (this.use) {
-      // (digging: the stroke in hand stops where it is)
-      if (this.use.dig !== undefined) this.weapons.endDig();
-      this.use = null;
-      this.act('stop');
-      if (!this.player.dead && !this.holding) this.hud.note('Cancelled', 'info');
-      // (a thing that was in the hands to begin with stays in them: only what the hands were doing with it stops)
-      if (this.inHand) this.rest();
-      else {
-        this.weapons.endUse();
-        this.settle();
-      }
-      return true;
-    }
-    if (this.ready) {
-      this.putAway();
-      return true;
-    }
-    return this.weapons.abortReload();
-  }
-
-  /** @param now an injector already in the hand: the click that uses it */
-  private useItem(item: ItemInstance, now = false) {
-    const def = ITEMS[item.id];
-    if (!def.use || this.use || this.cook || this.player.dead || this.weapons.working) return;
-    if (def.look && performance.now() - this.glassDown < 150) return;
-    const u = def.use;
-    // (an empty bottle is kept, and says where it is filled)
-    if (u.sips && (item.left ?? u.sips) <= 0) {
-      this.hud.note(`The ${def.name.toLowerCase()} is empty: a well fills it (marked on the map)`, 'info');
-      return;
-    }
-    // (something is in the hand already and this is another thing, asked for out of the inventory: that one is put away)
-    if (this.inHand && this.inHand !== item) this.putAway();
-    // (asked before it is taken out of anything: refused after, the radio was out of the crate and nowhere)
-    if (def.call && !this.openSky()) {
-      this.hud.note('No signal under a roof: take the radio out under open sky', 'warn');
-      return;
-    }
-    const from = this.openStash?.container.has(item) ? this.openStash.container : null;
-    if (from) {
-      // take it out of the crate first, so the crate can be closed while we eat
-      from.remove(item);
-      this.syncOpenBox();
-      // (It is in the hands and nowhere else until it is used up: broken off, it goes into the pockets, as a
-      // thing used off the ground does. It was lost: out of the crate, and never put anywhere again.)
-      if (!def.look && !def.call) this.loose = item;
-    }
-    // (what is used from the hand is taken into it first, and used by the button: see takeUp and handFire)
-    if (u.hold && !now) {
-      this.toggleInventory(false);
-      this.takeUp(item);
-      return;
-    }
-    // (A grenade is not used over a time as other things are: its pin is pulled, and from then it is live. With the
-    // button that began it still down, it is held; chosen out of the pockets, it is thrown the moment the pin is out.)
-    if (def.throw) return this.pullPin(item, now);
-    // how the hands hold it while it is used: a smoke goes to the mouth, a radio is worked with both
-    const kind: UseKind = def.call ? 'open' : def.look ? 'drink' : u.sound;
-    const sound: TimedAction['sound'] = def.look || def.call ? null : u.sound;
-    this.glass = 0;
-    this.startUse(def.look ? 'Binoculars' : def.call ? 'Calling a drop in' : `${u.verb} ${def.name}`, u.time, item.id, kind, sound, () => {
-      if (def.call) {
-        if (from) this.inv.add(item);
-        this.callDrop(item);
-        return;
-      }
-      if (def.look) {
-        // kept, and held up: see the frame loop for what puts them down again
-        if (from) this.inv.add(item);
-        this.glass = def.look;
-        return;
-      }
-      const v = this.player.vitals;
-      // (hot, beside a fire, what is eaten or drunk does more good)
-      const hot = (u.energy ?? 0) > 0 || (u.water ?? 0) > 0 ? (this.fires.warm(this.player.pos) ? FIRE.meal : 1) : 1;
-      if (u.energy) v.energy = THREE.MathUtils.clamp(v.energy + (u.energy > 0 ? Math.round(u.energy * hot) : u.energy), 0, 100);
-      if (u.water) v.water = THREE.MathUtils.clamp(v.water + (u.water > 0 ? Math.round(u.water * hot) : u.water), 0, 100);
-      if (u.health) v.health = Math.min(100, v.health + u.health);
-      if (u.stamina) v.stamina = Math.min(MAX_STAMINA, v.stamina + (MAX_STAMINA * u.stamina) / 100);
-      if (u.boost) {
-        this.player.boost = u.boost;
-        this.hud.note(`Adrenaline: nothing costs you breath for ${u.boost} seconds`, 'good');
-      }
-      if (u.stopBleed && v.bleeding) {
-        this.player.staunch();
-        this.hud.note('The bleeding has stopped', 'good');
-        this.meDirty = true;
-      }
-      if (u.blood) {
-        this.player.transfuse(u.blood, u.over ?? 1);
-        this.hud.note(v.bleeding ? `The bag is running in, and you are still bleeding: it will run out of you again` : `The bag is running in: ${u.blood} ml of blood over ${u.over ?? 1} seconds`, v.bleeding ? 'warn' : 'good');
-        this.meDirty = true;
-      }
-      if (u.splint) {
-        if (v.broken) this.player.setLeg(true);
-        else if (!u.stopBleed) this.hud.note('Nothing is broken: the tape is used up all the same', 'info');
-      }
-      const good = (n: number) => (n > 0 ? Math.round(n * hot) : n);
-      const gained = [u.energy ? `${u.energy > 0 ? '+' : ''}${good(u.energy)} energy` : '', u.water ? `${u.water > 0 ? '+' : ''}${good(u.water)} water` : '', u.health ? `+${u.health} health` : ''].filter(Boolean).join(' · ');
-      if (gained) this.hud.note(hot > 1 ? `${gained} · warmed by the fire` : gained, 'good');
-      if (u.sound === 'smoke') {
-        // what is left of it, in front of the face
-        const cam = this.s.r.camera;
-        this.effects.muzzle(cam.position.clone().add(new THREE.Vector3(0, -0.12, -0.35).applyQuaternion(cam.quaternion)), new THREE.Vector3(0, 0.3, -1).applyQuaternion(cam.quaternion), true, true);
-      }
-      // (a bottle is one drink the emptier, and is kept)
-      if (u.sips) item.left = Math.max(0, (item.left ?? u.sips) - 1);
-      else this.consume(item, null);
-      this.inventoryChanged();
-    });
-  }
+  ready: { item: ItemInstance; t: number } | null = null;
 
   /** binoculars at the eyes: how much of the field of view is left (0 = put away) */
-  private glass = 0;
+  glass = 0;
   /** when they were last put down: the same key press must not bring them straight back up */
-  private glassDown = 0;
+  glassDown = 0;
   // when the player was last told what the marks on the map mean (said once in a while, not every half minute)
-  private markedSaid = -1e9;
-  private pingSaid = -1e9;
+  markedSaid = -1e9;
+  pingSaid = -1e9;
 
   /**
    * A grenade in the hands that are getting its pin out, or with its pin out (2026-10-13: "rework the grenade
@@ -3531,503 +1157,28 @@ export class Game {
    *   button the button that began it is still down. Let go at any time, before the pin is out as well (a tap),
    *          or never down at all (Throw, chosen in the pockets): it is thrown the moment the pin is out.
    */
-  private cook: { item: ItemInstance; id: string; t: number; live: number; button: boolean } | null = null;
-
-  /** The hands begin on a grenade's pin (a stick grenade's cord). */
-  private pullPin(item: ItemInstance, button: boolean) {
-    const kind = THROWN[item.id];
-    if (!kind || this.cook || this.use || this.player.dead || this.weapons.working) return;
-    this.toggleInventory(false);
-    this.glass = 0;
-    this.ready = null;
-    this.holding = false;
-    this.cook = { item, id: item.id, t: 0, live: -1, button };
-    // (worked with both hands, as it was: the left has it, the right is at its pin; everybody near sees hands at work)
-    this.weapons.beginUse(item.id, 'open', kind.pull);
-    this.act('open', kind.pull);
-  }
-
-  /** Every frame there is a grenade in the hands being made live, or live: see `cook`. */
-  private cooking(dt: number, input: Input, uiOpen: boolean) {
-    const c = this.cook!, kind = THROWN[c.id], p = this.player;
-    c.t += dt;
-    if (c.button && (uiOpen || !input.held('Mouse0'))) c.button = false;
-    if (c.live < 0) {
-      const stop = (input.pressed('Mouse2') || input.wheel !== 0) && !uiOpen;
-      if (p.dead || stop || !this.mine(c.item)) {
-        if (stop) input.wheel = 0;
-        this.cook = null;
-        this.act('stop');
-        if (stop && !p.dead) this.hud.note('Cancelled', 'info');
-        // (a thing that was in the hands to begin with stays in them: only what the hands were doing with it stops)
-        if (this.inHand) this.rest();
-        else {
-          this.weapons.endUse();
-          this.settle();
-        }
-        return;
-      }
-      if (c.t < kind.pull) return;
-      // The pin is out. The fuse runs from here, by this game's count and by the server's from when it hears.
-      c.live = c.t - kind.pull;
-      this.consume(c.item, null);
-      this.inventoryChanged();
-      this.net.send({ t: 'pin', w: c.id });
-      // (in the one fist now, drawn back to throw: see 'live' in weapons.ts)
-      this.weapons.beginUse(c.id, 'live', kind.fuse);
-    } else c.live += dt;
-    const left = fuseLeft(c.id, c.live);
-    // Whoever dies with the pin out lets go of it: it falls where they fell, lies there, and goes off when its fuse
-    // ends, for whoever is in reach (the ruling of 2026-10-13: as in DayZ, it does not go with them). Online it is
-    // the server that says so to everybody else and reckons whom it reached (`fallen` in src/sim/grenades.ts): here
-    // it is only seen to fall, from the same place and as still, so that it lies where everybody else has it lying.
-    // Played alone, this game reckons it, as it does everything.
-    if (p.dead) {
-      this.emptyOfGrenade();
-      this.grenades.throw(new THREE.Vector3(p.pos.x, p.pos.y + NADE.hand, p.pos.z), new THREE.Vector3(), left, !this.online, c.id);
-      return;
-    }
-    if (left > 0 && c.button) return;
-    const cam = this.s.r.camera;
-    const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
-    // where the hand is: a little ahead of the eye, to the right and below it
-    const o = cam.position.clone().addScaledVector(dir, 0.5).add(new THREE.Vector3(0.18, -0.1, 0).applyQuaternion(cam.quaternion));
-    this.emptyOfGrenade();
-    if (left <= 0) {
-      // Held to the end of its fuse: it goes off in the hand. (Said to the server as a grenade that has left the
-      // hand and is not moving: it has counted the fuse itself, and knows what that means.)
-      this.net.send({ t: 'nade', o: o.toArray(), v: [0, 0, 0] });
-      this.explode(o, true, c.id === 'frag' ? 'frag' : 'grenade', undefined, true);
-      return;
-    }
-    // thrown, not dropped: forward and up, plus whatever the thrower was doing
-    const v = dir.multiplyScalar(NADE.speed).add(new THREE.Vector3(p.vel.x, NADE.lift + Math.max(0, p.vel.y), p.vel.z));
-    this.grenades.throw(o, v, left, true, c.id);
-    this.net.send({ t: 'nade', o: o.toArray(), v: v.toArray() });
-    this.avatar.swing(true);
-    audio.whoosh(0.5);
-  }
-
-  /**
-   * What the line under the crosshair says of a grenade in the hands: the pin coming out, as anything the hands
-   * are at is shown; and then the fuse, a bar that runs DOWN, in red, with the seconds left before its words and
-   * the biggest thing in them. (How long is left is the one thing whoever is cooking it has to know, and it is
-   * nowhere else: the grenade makes no sound. How it is drawn, to be read over grass and over snow: `.hot` in hud.css.)
-   */
-  private cookShown(): { label: string; t: number; hot?: boolean; figure?: string } {
-    const c = this.cook!, kind = THROWN[c.id];
-    if (c.live < 0) return { label: c.id === 'grenade' ? 'Pulling the cord' : 'Pulling the pin', t: c.t / kind.pull };
-    const left = fuseLeft(c.id, c.live);
-    return { label: `${ITEMS[c.id].name} live`, figure: left.toFixed(1), t: left / kind.fuse, hot: true };
-  }
-
-  /** the grenade is out of the hands, thrown or gone off or gone with them: they are empty */
-  private emptyOfGrenade() {
-    this.cook = null;
-    if (this.inHand) this.rest();
-    else {
-      this.weapons.endUse();
-      this.settle();
-    }
-  }
+  cook: { item: ItemInstance; id: string; t: number; live: number; button: boolean } | null = null;
 
   // --- the wheel (hold T, see src/sim/emotes.ts)
-  private wheelOn = false;
-  private wheelAt = new THREE.Vector2();
-  private wheelSince = 0;
+  wheelOn = false;
+  wheelAt = new THREE.Vector2();
+  wheelSince = 0;
   /** what a tap of T on its own repeats, and when we last called anything out */
-  private lastCall = 'hey';
-  private calledAt = -1e9;
+  lastCall = 'hey';
+  calledAt = -1e9;
   /** what the body is keeping up (a dance, hands up), and until when the arms are busy with a call */
-  private hold: Hold | null = null;
-  private armsUntil = 0;
+  hold: Hold | null = null;
+  armsUntil = 0;
   /** what the people near have just called out: who, the words, when */
-  private said = new Map<number, { text: string; at: number }>();
-
-  /** Where the gun is pointing, as pixels off the middle of the screen (see Weapons.lag). */
-  private lagPx(): [number, number] {
-    const cam = this.s.r.camera, lag = this.weapons.lag;
-    const k = innerHeight / 2 / Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2);
-    return [-Math.tan(lag.x) * k, -Math.tan(lag.y) * k];
-  }
-
-  /** From the wheel: call something out, or start (or stop) something the body keeps up. */
-  private emote(id: string) {
-    const e = EMOTE[id], p = this.player;
-    if (!e || p.dead || this.use) return;
-    if (e.hold) {
-      this.setHold(this.hold === e.hold ? null : e.hold);
-      return;
-    }
-    const now = performance.now();
-    if (now - this.calledAt < EMOTE_GAP * 1000) return;
-    this.calledAt = now;
-    this.lastCall = id;
-    // a dance stops for it; hands that are up stay up
-    if (this.hold === 'dance') this.setHold(null);
-    if (e.move && !this.hold) {
-      this.avatar.emote(e.move, e.dur);
-      this.armsUntil = now + (e.dur ?? 1.5) * 1000;
-    }
-    audio.shout(id, undefined, 0, voiceOf(playerName()));
-    this.hud.note('“' + e.say + '”');
-    this.net.send({ t: 'emote', e: id });
-  }
-
-  private setHold(h: Hold | null) {
-    if (h === this.hold) return;
-    const p = this.player;
-    // (nobody dances crouched, or in the air)
-    if (h && p.prone) return void this.hud.note('Get up first', 'warn');
-    if (h === 'sit' && p.crouched) p.setCrouch(false);
-    if (h && (!p.grounded || (h === 'dance' && p.crouched))) {
-      this.hud.note(p.grounded ? 'Stand up to dance' : 'Not in the air', 'warn');
-      return;
-    }
-    this.hold = h;
-    p.sat = h === 'sit';
-    this.avatar.setHold(h);
-    if (h) {
-      this.armsUntil = 0;
-      this.avatar.emote(null);
-      this.hud.note(h === 'dance' ? 'Dancing · move to stop' : h === 'sit' ? 'Sat down · move to get up' : 'Hands up · move to stop');
-    }
-  }
-
-  /** T held: the mouse picks from the wheel instead of turning the head, and letting go does it. */
-  private updateWheel(ok: boolean, now: number) {
-    const input = this.input;
-    if (ok && !this.wheelOn && input.pressed('KeyT')) {
-      this.wheelOn = true;
-      this.wheelAt.set(0, 0);
-      this.wheelSince = now;
-    }
-    if (!this.wheelOn) return;
-    const at = this.wheelAt;
-    at.x += input.mouseDX / WHEEL_REACH;
-    at.y += input.mouseDY / WHEEL_REACH;
-    if (at.length() > 1) at.normalize();
-    // the first entry is at the top, the rest follow clockwise
-    const n = EMOTES.length;
-    const pick = at.length() > WHEEL_PICK ? ((Math.round((Math.atan2(at.x, -at.y) / (Math.PI * 2)) * n) % n) + n) % n : -1;
-    if (!ok || !input.held('KeyT')) {
-      this.wheelOn = false;
-      // (a tap, the mouse left alone, is the last call again)
-      if (ok) {
-        if (pick >= 0) this.emote(EMOTES[pick].id);
-        else if (now - this.wheelSince < 220) this.emote(this.lastCall);
-      }
-    }
-    this.hud.wheel(this.wheelOn, pick, [at.x, at.y], this.hold, EMOTE[this.lastCall]?.say ?? '');
-  }
-
-  /** The words people near have called out, over their heads: for whoever is close and can see them. */
-  private updateSaid(now: number) {
-    if (!this.said.size) return;
-    const cam = this.s.r.camera;
-    const head = new THREE.Vector3(), dir = new THREE.Vector3();
-    for (const [id, s] of this.said) {
-      const r = this.remotes.get(id);
-      const age = (now - s.at) / 1000;
-      let at: [number, number] | null = null;
-      if (r?.alive && age < SAY_TIME) {
-        r.head(head).y += 0.36;
-        const d = dir.copy(head).sub(cam.position).length();
-        if (d < SAY_RANGE && !physics.raycast(cam.position, dir.divideScalar(d), Math.max(0, d - 0.7), SIGHT_GROUPS)) {
-          head.project(cam);
-          if (head.z < 1 && Math.abs(head.x) < 1.15 && Math.abs(head.y) < 1.15) at = [head.x * 0.5 + 0.5, 0.5 - head.y * 0.5];
-        }
-      } else this.said.delete(id);
-      this.hud.say(id, s.text, at, age);
-    }
-  }
+  said = new Map<number, { text: string; at: number }>();
 
   // fuel drums (see src/sim/barrels.ts): the ones a blast of ours has reached and that are about
   // to go up, and, playing alone, the ones that are gone and when each is stood up again
-  private fuses: { i: number; t: number }[] = [];
-  private drumsBack: { i: number; t: number }[] = [];
-
-  /**
-   * A fuel drum goes up.
-   * @param mine set off by this player (a bullet, or a blast of theirs that reached it), who
-   *   tells the server and answers for whoever it reaches
-   */
-  private blowBarrel(i: number, mine: boolean) {
-    const b = this.s.veg.barrels[i];
-    if (!b?.there) return;
-    b.setThere(false);
-    // (the server has to hear that it went up before it hears who was hurt)
-    if (mine) this.net.send({ t: 'barrel', i });
-    if (!this.online) this.drumsBack.push({ i, t: BARREL.respawn });
-    this.explode(new THREE.Vector3(b.x, b.y + BARREL.centre, b.z), mine, 'barrel', b.collider);
-  }
-
-  private updateBarrels(dt: number) {
-    for (let k = this.fuses.length - 1; k >= 0; k--) {
-      const f = this.fuses[k];
-      if ((f.t -= dt) > 0) continue;
-      this.fuses.splice(k, 1);
-      this.blowBarrel(f.i, true);
-    }
-    for (let k = this.drumsBack.length - 1; k >= 0; k--) {
-      const f = this.drumsBack[k];
-      const b = this.s.veg.barrels[f.i];
-      // (never stood up round somebody's legs)
-      if ((f.t -= dt) > 0 || Math.hypot(b.x - this.player.pos.x, b.z - this.player.pos.z) < BARREL.clear) continue;
-      this.drumsBack.splice(k, 1);
-      b.setThere(true);
-    }
-  }
-
-  /**
-   * Something has gone off somewhere in the world: a grenade (the stick grenade, or the frag), or a fuel drum.
-   * @param skip what went up, if it is still standing in the way of its own blast
-   * @param inHand a grenade of this player's own that was never thrown: it went off in the hand that held it
-   */
-  private explode(at: THREE.Vector3, mine: boolean, what: 'grenade' | 'frag' | 'barrel' | 'jeep' = 'grenade', skip?: Barrel['collider'], inHand = false) {
-    // (a jeep goes up as a drum of fuel does; online the server says who it reached)
-    const jeep = what === 'jeep';
-    const drum = what === 'barrel' || jeep;
-    // (what a blast does and how far is its rule's, by its name: the same figures the server reckons a hit by)
-    const rule = WEAPON_RULES[drum ? 'barrel' : what];
-    const spec = { damage: rule.damage, radius: rule.blast! };
-    const p = this.player, cam = this.s.r.camera;
-    const far = at.distanceTo(cam.position);
-    this.effects.explode(at, jeep ? 'vehicle' : drum ? 'drum' : 'grenade');
-    audio.explosion(at, far, drum);
-    if (far < 40) this.weapons.flinch(THREE.MathUtils.clamp(2.2 - far / 14, 0.2, 2));
-    /** how much of the blast reaches a point: nothing through a wall, less with every metre */
-    const reach = (to: THREE.Vector3, short = 0.3) => {
-      const d = to.distanceTo(at);
-      if (d > spec.radius) return 0;
-      const ray = to.clone().sub(at);
-      if (physics.raycast(at, ray.normalize(), Math.max(0, d - short), SOLID_GROUPS, skip)) return 0;
-      return Math.pow(1 - d / spec.radius, 1.3);
-    };
-    // your own body: this game decides it for your own grenade; another player's reaches you through the server
-    if (mine && !p.dead && this.started && !(jeep && this.online)) {
-      const chest = new THREE.Vector3(p.pos.x, p.pos.y + (p.crouched ? 0.6 : 1.1), p.pos.z);
-      // (in the hand: all of it, and no plate is between a hand and its owner. The server counts the same: `handBlast`.)
-      const k = inHand ? 1 : reach(chest);
-      if (k > 0) {
-        let amount = inHand ? inHandDamage(what) : spec.damage * k;
-        if (!inHand) for (const a of this.inv.wear('armor')) amount *= a;
-        p.damage(amount, inHand ? 'a grenade held too long' : jeep ? 'a burning wreck' : drum ? 'a fuel drum you set off' : 'your own grenade');
-        if (amount > 12) p.bleed(woundOf('blast'));
-        this.hud.hitFrom(p.yaw - Math.atan2(p.pos.x - at.x, p.pos.z - at.z));
-        this.meDirty = true;
-      }
-    }
-    if (!mine) return;
-    // the next drum along goes up a moment later
-    for (const b of this.s.veg.barrels) {
-      if (!b?.there || this.fuses.some((f) => f.i === b.i)) continue;
-      const c = new THREE.Vector3(b.x, b.y + BARREL.centre, b.z);
-      // (the look stops short of the drum's own sides, which are in the way of its middle)
-      if (c.distanceTo(at) < spec.radius * BARREL.chainReach && reach(c, 0.5) > 0) this.fuses.push({ i: b.i, t: BARREL.chainDelay + Math.random() * 0.15 });
-    }
-    // everyone else it reached: reported one by one, like any other hit
-    for (const rp of this.remotes.values()) {
-      if (!rp.alive || jeep) continue;
-      const chest = rp.chest(new THREE.Vector3());
-      const d = chest.distanceTo(at);
-      if (reach(chest) <= 0) continue;
-      const dir = chest.clone().sub(at).normalize();
-      rp.damage(0, chest, dir, 'torso');
-      this.effects.bleed(chest, dir, 0.8);
-      rp.avatar.wound(chest.clone().addScaledVector(dir, -0.2), dir, 0.09, false);
-      this.net.send({ t: 'hit', to: rp.id, zone: 'torso', w: what, dist: d, sup: false, bonus: 0 });
-    }
-    // the infected standing in it
-    for (const b of this.horde.all.values()) {
-      if (b.dead || !b.ready) continue;
-      const chest = new THREE.Vector3(b.pos.x, b.pos.y + 1.2, b.pos.z);
-      const k = reach(chest);
-      if (k <= 0) continue;
-      const dir = chest.clone().sub(at).normalize();
-      this.effects.bleed(chest, dir, 0.8);
-      b.avatar.wound(chest.clone().addScaledVector(dir, -0.2), dir, 0.09, false);
-      if (b.damage(spec.damage * k, chest, dir, 'torso')) this.hud.note(drum ? 'Infected down · fuel drum' : 'Infected down · grenade', 'good');
-      if (this.online && !jeep) this.net.send({ t: 'ihit', i: b.i, zone: 'torso', w: what, dist: chest.distanceTo(at), sup: false, bonus: 0 });
-    }
-    for (const d of this.dummies) {
-      const chest = new THREE.Vector3(d.pos.x, d.pos.y + 1.2, d.pos.z);
-      const k = reach(chest);
-      if (k <= 0 || d.dead) continue;
-      const dir = chest.clone().sub(at).normalize();
-      this.effects.bleed(chest, dir, 0.8);
-      d.avatar.wound(chest.clone().addScaledVector(dir, -0.2), dir, 0.09, false);
-      if (d.damage(spec.damage * k, chest, dir, 'torso')) this.hud.note(drum ? 'Training dummy down · fuel drum' : 'Training dummy down · grenade', 'good');
-    }
-    // and any jeep standing in it
-    if (!jeep) {
-      for (const j of this.garage.jeeps.values()) if (!j.wreck && j.pos.distanceTo(at) < spec.radius * 0.7 && reach(j.pos.clone().setY(j.pos.y + 0.9), 2.2) > 0) this.garage.struck(j, what);
-    }
-  }
-
-  /** Sealed ammo box -> a stack of loose rounds. */
-  private openBox(item: ItemInstance) {
-    const def = ITEMS[item.id];
-    if (!def.open || this.use || this.player.dead || this.weapons.working) return;
-    const o = def.open;
-    const from = this.openStash?.container.has(item) ? this.openStash.container : null;
-    if (from) {
-      from.remove(item);
-      this.syncOpenBox();
-    }
-    audio.ui('unbox');
-    this.startUse(`Unwrapping the ${def.name.toLowerCase()}`, o.time, item.id, 'unbox', null, () => {
-      if (this.loose === item) this.loose = null;
-      this.inv.remove(item);
-      const left = this.inv.add(makeItem(o.gives, o.qty));
-      if (left) this.dropItem(left);
-      audio.ui('pickup', undefined, o.gives);
-      this.hud.note(`${o.qty} × ${ITEMS[o.gives].name}`, 'good');
-      this.inventoryChanged();
-    }, 'unbox');
-  }
-
-  /**
-   * Take the rounds out of a weapon and put them back in the pockets. Out of a gun fed by a magazine that is its
-   * magazine, with what is in it, and the round out of its chamber.
-   */
-  private unloadWeapon(item: ItemInstance) {
-    const def = ITEMS[item.id];
-    if (!def.weapon) return;
-    if (!this.gunInHands(item, () => this.unloadWeapon(item)) || this.weapons.busy) return;
-    if (def.weapon.mag) {
-      if (!item.mag && !chambered(item)) return;
-      const back: ItemInstance[] = [];
-      const mag = swapMag(item, null);
-      if (mag) back.push(mag);
-      if (chambered(item)) back.push(makeItem(def.weapon.ammo, 1));
-      item.loaded = 0;
-      for (const it of back) {
-        const left = this.inv.add(it);
-        if (left) this.dropItem(left);
-      }
-      audio.click(2200, 0.4, 0.03);
-      audio.click(1500, 0.4, 0.04, 0.12);
-      this.hud.note(mag ? `The magazine is out of the ${def.name}${back.length > 1 ? ', and its chamber is clear' : ''}` : 'The chamber is clear', 'good');
-      this.inventoryChanged();
-      return;
-    }
-    const n = item.loaded ?? 0;
-    if (n <= 0) return;
-    item.loaded = 0;
-    const left = this.inv.add(makeItem(def.weapon.ammo, n));
-    if (left) this.dropItem(left);
-    audio.click(2200, 0.4, 0.03);
-    audio.click(1500, 0.4, 0.04, 0.12);
-    this.hud.note(`Unloaded ${n} × ${ITEMS[def.weapon.ammo].name}`, 'good');
-    this.inventoryChanged();
-  }
-
-  // ------------------------------------------------------------ attachments
-
-  /** weapons the player carries that this attachment can go on right now */
-  private attachTargets(att: ItemInstance): ItemInstance[] {
-    const a = ITEMS[att.id].attach;
-    if (!a) return [];
-    const out: ItemInstance[] = [];
-    const consider = (w: ItemInstance) => {
-      if (!a.fits.includes(w.id)) return;
-      // (a magazine goes into a gun that has one in it already: the two are changed over)
-      if (ITEMS[att.id].mag) return void out.push(w);
-      // one attachment per mount point
-      if ((w.mods ?? []).some((m) => ITEMS[m]?.attach?.slot === a.slot)) return;
-      out.push(w);
-    };
-    for (const it of this.inv.topLevel()) consider(it);
-    for (const c of this.inv.containers) for (const p of c.items) if (!out.includes(p.item)) consider(p.item);
-    return out;
-  }
+  fuses: { i: number; t: number }[] = [];
+  drumsBack: { i: number; t: number }[] = [];
 
   /** a change to a gun's parts that is waiting on the gun coming up into the hands */
-  private fitting: { gun: ItemInstance; run: () => void; t: number } | null = null;
-
-  /**
-   * A gun's parts and its magazine are changed with the gun in the hands, as in DayZ (asked for 2026-10-11: "a
-   * player cannot swap out attachments for a gun they are not holding in their hand"). Asked of one on the back
-   * or in a pocket, the gun is brought up first, and the change is made when it is there.
-   * @param run the change, to be made once the gun is up
-   * @returns whether it is in the hands now, and the change can be made at once
-   */
-  private gunInHands(gun: ItemInstance, run: () => void): boolean {
-    if (this.inv.held() === gun) return true;
-    if (!this.inv.find((i) => i === gun)) {
-      this.hud.note(`Take the ${ITEMS[gun.id].name} first: a gun's parts are changed with it in your hands`, 'warn');
-      return false;
-    }
-    if (this.player.dead || this.garage.ride) return false;
-    this.takeUp(gun);
-    this.fitting = { gun, run, t: 0 };
-    return false;
-  }
-
-  private attachMod(att: ItemInstance, weapon: ItemInstance) {
-    if (!this.attachTargets(att).includes(weapon)) return;
-    if (!this.gunInHands(weapon, () => this.attachMod(att, weapon)) || this.weapons.busy) return;
-    this.inv.remove(att);
-    this.openStash?.container.remove(att);
-    if (ITEMS[att.id].mag) {
-      // the one that was in it comes out, with what is left in it, and goes where there is room
-      const out = swapMag(weapon, att);
-      const left = out ? this.inv.add(out) : null;
-      if (left) this.dropItem(left);
-      // (heard by whoever is near as a magazine going in is, and seen as one)
-      audio.ui('mag');
-      this.act('reload', 0.9);
-      this.hud.note(`${ITEMS[att.id].name} in the ${ITEMS[weapon.id].name}: ${weapon.loaded ?? 0} round${weapon.loaded === 1 ? '' : 's'} in it`, 'good');
-      this.inventoryChanged();
-      return;
-    }
-    (weapon.mods ??= []).push(att.id);
-    audio.click(2600, 0.4, 0.03);
-    audio.click(1900, 0.45, 0.05, 0.14);
-    this.hud.note(`${ITEMS[att.id].name} fitted to ${ITEMS[weapon.id].name}`, 'good');
-    this.inventoryChanged();
-  }
-
-  /**
-   * A part comes off a gun.
-   * @param loose it is handed back to whoever asked (the inventory, which puts it where it was let go) and not put in a pocket
-   * @returns the part, when it was asked for loose
-   */
-  private detachMod(weapon: ItemInstance, mod: string, loose = false): ItemInstance | null {
-    // (off a gun that is not in the hands: it is brought up, and the part then goes to a pocket)
-    if (!this.gunInHands(weapon, () => void this.detachMod(weapon, mod)) || this.weapons.busy) return null;
-    if (weapon.mag === mod) {
-      // (its magazine: out with what is in it; the round in the chamber stays)
-      const out = swapMag(weapon, null);
-      audio.ui('mag');
-      if (loose) {
-        this.inventoryChanged();
-        return out;
-      }
-      const left = out ? this.inv.add(out) : null;
-      if (left) this.dropItem(left);
-      this.inventoryChanged();
-      return null;
-    }
-    if (!weapon.mods?.includes(mod)) return null;
-    weapon.mods = weapon.mods.filter((m) => m !== mod);
-    // rounds that no longer fit come back out
-    const extra = (weapon.loaded ?? 0) - capacityOf(weapon);
-    const part = makeItem(mod);
-    const back: ItemInstance[] = loose ? [] : [part];
-    if (extra > 0) {
-      weapon.loaded = capacityOf(weapon);
-      back.push(makeItem(ITEMS[weapon.id].weapon!.ammo, extra));
-    }
-    for (const it of back) {
-      const left = this.inv.add(it);
-      if (left) this.dropItem(left);
-    }
-    audio.click(1900, 0.45, 0.05);
-    this.inventoryChanged();
-    return loose ? part : null;
-  }
+  fitting: { gun: ItemInstance; run: () => void; t: number } | null = null;
 
   // ------------------------------------------------------------ magazines
 
@@ -4036,1233 +1187,187 @@ export class Game {
   // from then to 2026-10-13, when it was asked for a quarter faster: "can we speed up the loading animation by 25%
   // from its current value for loading a magazine". The hands' movement is played over this time, so it is as much
   // faster. Thirty rounds are 20 s, where they were 25.)
-  private static readonly ROUND_IN = 0.68;
+  static readonly ROUND_IN = 0.68;
   /** seconds to thumb one round out of a magazine (quicker than pushing one in) */
-  private static readonly ROUND_OUT = 0.55;
+  static readonly ROUND_OUT = 0.55;
   /**
    * What holding the button does with a magazine in the hands: rounds into it, or rounds out of it. The wheel
    * turns it over (as it turns over what a thing does in DayZ); on a phone, the button that changes weapons does.
    * Null: as it comes, which is whichever of the two can be done (filling, if both can).
    */
-  private magMode: 'fill' | 'empty' | null = null;
+  magMode: 'fill' | 'empty' | null = null;
 
-  /**
-   * What the hands can do with what is in them, for the corner of the picture: the button and the word. One place,
-   * beside `handFire` (which does it): a thing given a use there is given its word here.
-   */
-  private handActs(): HandAct[] | null {
-    if (this.player.dead || !this.started || this.invUI.isOpen || this.shop.isOpen || this.garage.ride) return null;
-    // (at it already: what stops it)
-    if (this.use) return this.holding ? [{ on: 'l', hold: true, text: 'Let go to stop' }] : [{ on: 'r', text: 'Stop' }];
-    // (a grenade: until its pin is out the other button stops the hands; once it is out, only letting go is left)
-    if (this.cook) return this.cook.live < 0 ? [{ on: 'r', text: 'Stop' }] : this.cook.button ? [{ on: 'l', hold: true, text: 'Let go to throw', sub: 'the pin is out' }] : null;
-    const item = this.inHand;
-    if (!item) return null;
-    const def = ITEMS[item.id];
-    const hold = !this.touch;
-    let act: HandAct | null = null, wheel = 'Put away';
-    if (def.throw) act = { on: 'l', hold: true, text: item.id === 'grenade' ? 'Pull the cord' : 'Pull the pin', sub: 'hold to cook it · let go to throw' };
-    else if (def.mag) {
-      const work = this.magWork(item);
-      act = { on: 'l', hold, text: work === 'fill' ? 'Fill magazine' : 'Empty magazine', sub: work === 'fill' ? `${item.rounds ?? 0}/${def.mag.capacity} · ${this.inv.count(def.mag.ammo)} loose` : `${item.rounds ?? 0} in it` };
-      wheel = work === 'fill' ? 'Empty it instead' : 'Fill it instead';
-    } else if (def.open) act = { on: 'l', hold, text: 'Open the box', sub: `${def.open.qty} rounds` };
-    else if (item.id === 'jerrycan') act = { on: 'l', hold, text: 'Pour it in', sub: this.lookedAt instanceof Jeep ? undefined : 'at a car' };
-    else if (item.id === 'keycard') act = { on: 'l', hold, text: 'Put the card in', sub: 'at the reader' };
-    else if (def.use?.sips && this.wellHere() && (item.left ?? 0) < def.use.sips) act = { on: 'l', hold, text: 'Fill it at the well' };
-    else if (def.use) {
-      const word = def.use.sound === 'eat' ? 'Eat' : def.use.sound === 'drink' ? 'Drink' : def.use.sound === 'bandage' ? 'Dress the wound' : def.use.sound === 'inject' ? 'Inject' : def.use.sound === 'smoke' ? 'Smoke' : 'Use';
-      act = { on: 'l', hold, text: word, sub: def.use.sips ? `${item.left ?? def.use.sips}/${def.use.sips} left` : undefined };
-    } else if (def.category === 'stash') act = { on: 'l', hold, text: 'Set it down' };
-    return act ? [act, { on: 'w', text: wheel }] : [{ on: 'w', text: wheel }];
-  }
-
-  /** which of the two it is for this magazine, as things stand */
-  private magWork(mag: ItemInstance): 'fill' | 'empty' {
-    const d = ITEMS[mag.id].mag!;
-    const canFill = (mag.rounds ?? 0) < d.capacity && this.inv.count(d.ammo) > 0, canEmpty = (mag.rounds ?? 0) > 0;
-    return this.magMode ?? (canFill || !canEmpty ? 'fill' : 'empty');
-  }
-
-  /** The wheel (or its button) with a magazine held: the other of the two. @returns whether there was a magazine to turn it over for */
-  private turnMagWork(): boolean {
-    const mag = this.inHand && ITEMS[this.inHand.id].mag ? this.inHand : null;
-    if (!mag || this.use) return false;
-    this.magMode = this.magWork(mag) === 'fill' ? 'empty' : 'fill';
-    audio.ui('move');
-    return true;
-  }
-
-  /**
-   * Rounds thumbed out of a magazine into the pockets, one at a time, until it is empty, there is no more room
-   * for them, or the hands are taken off it.
-   */
-  private unloadMagazine(mag: ItemInstance) {
-    const d = ITEMS[mag.id].mag;
-    if (!d || this.use || this.player.dead || this.weapons.working) return;
-    if ((mag.rounds ?? 0) <= 0) return void this.hud.note('It is empty', 'info');
-    if (!this.inv.hasRoom(makeItem(d.ammo, 1))) return void this.hud.note('No room in your pockets for loose rounds', 'warn');
-    this.startUse(`Emptying the magazine · ${mag.rounds ?? 0} in it`, Game.ROUND_OUT, mag.id, 'unload', null, () => {
-      if (!this.mine(mag) || (mag.rounds ?? 0) <= 0) return;
-      const round = makeItem(d.ammo, 1);
-      if (this.inv.add(round)) return void this.hud.note('No room in your pockets for loose rounds', 'warn');
-      mag.rounds = (mag.rounds ?? 0) - 1;
-      audio.ui('round');
-      this.inventoryChanged();
-      if ((mag.rounds ?? 0) > 0 && this.inv.hasRoom(makeItem(d.ammo, 1))) this.unloadMagazine(mag);
-      else this.hud.note((mag.rounds ?? 0) > 0 ? `${mag.rounds} left in it: no room for more loose rounds` : `The ${ITEMS[mag.id].name.toLowerCase()} is empty`, 'good');
-    }, 'load');
-  }
-
-  /**
-   * Rounds pushed into a magazine out of the loose ones carried, one at a time, until it is full, there are no
-   * more, or the hands are taken off it (anything that breaks an action off: what is in it by then stays in it).
-   */
-  private fillMagazine(mag: ItemInstance) {
-    const d = ITEMS[mag.id].mag;
-    if (!d || this.use || this.player.dead || this.weapons.working) return;
-    const room = d.capacity - (mag.rounds ?? 0);
-    if (room <= 0) return void this.hud.note('It is full', 'info');
-    if (this.inv.count(d.ammo) <= 0) return void this.hud.note(`No ${ITEMS[d.ammo].name.toLowerCase()} to put in it`, 'warn');
-    this.startUse(`Filling the magazine · ${mag.rounds ?? 0}/${d.capacity}`, Game.ROUND_IN, mag.id, 'load', null, () => {
-      // (put down, sold or fitted meanwhile)
-      if (!this.mine(mag)) return;
-      if (this.inv.take(d.ammo, 1) !== 1) return;
-      fillMag(mag, 1);
-      audio.ui('round');
-      this.inventoryChanged();
-      // (and the next, for as long as there is one and room for it)
-      if ((mag.rounds ?? 0) < d.capacity && this.inv.count(d.ammo) > 0) this.fillMagazine(mag);
-      else this.hud.note(`${mag.rounds} in the ${ITEMS[mag.id].name.toLowerCase()}`, 'good');
-    }, 'load');
-  }
-
-  /** The rounds out of a magazine and loose into the pockets (what there is no room for is put down). */
-  private emptyMagazine(mag: ItemInstance) {
-    const d = ITEMS[mag.id].mag, n = mag.rounds ?? 0;
-    if (!d || n <= 0 || this.weapons.busy) return;
-    mag.rounds = 0;
-    const left = this.inv.add(makeItem(d.ammo, n));
-    if (left) this.dropItem(left);
-    audio.click(2200, 0.4, 0.03);
-    audio.click(1500, 0.4, 0.04, 0.12);
-    this.hud.note(`${n} × ${ITEMS[d.ammo].name} out of it`, 'good');
-    this.inventoryChanged();
-  }
-
-  /** A stash as the game holds one: the case, the suitcase or the bag, as big inside as that thing is (see `stash` in src/sim/items.ts). */
-  private newStash(s: StashInfo): Stash {
-    const def = s.item && ITEMS[s.item]?.category === 'stash' ? ITEMS[s.item] : ITEMS.stash_kit;
-    const [w, h] = def.stash ?? [8, 6];
-    const st = new Stash(s.uid, s.x, s.y, s.z, s.rot, w, h, def.id === 'stash_kit' ? 'Stash Crate' : def.name);
-    st.item = def.id;
-    st.buried = !!s.buried;
-    return st;
-  }
-
-  /**
-   * A shovel put to a case, a suitcase or a bag lying on the ground, or to a place where one is buried, the left
-   * button held: so many seconds of digging, and it is under the ground with what is in it (or up out of it, lying
-   * there again). The spade goes in for as long as that takes; let go of the button, put the shovel away or walk
-   * off, and the digging stops there with nothing done.
-   */
-  private dig(what: WorldItem | Stash) {
-    const p = this.player;
-    const { world } = this.s;
-    const bury = what instanceof WorldItem;
-    const at = bury ? what.loot : what, uid = bury ? what.loot.uid : what.uid;
-    const no = bury ? noBurying(at.x, at.y, at.z, heightAt(world.heights, at.x, at.z), world.pois, world.buildings) : null;
-    if (no) return void this.hud.note(no, 'warn');
-    const there = () => (bury ? this.loot.items.get(uid) === what : this.loot.stashes.includes(what as Stash));
-    const still = () => this.input.held('Mouse0') && this.weapons.equippedItem?.id === 'shovel' && there() && Math.hypot(at.x - p.pos.x, at.z - p.pos.z) <= BURY.reach - 0.5;
-    this.use = { label: bury ? 'Burying it' : 'Digging it up', t: 0, dur: DIG_SECONDS, sound: null, soundT: 0, valid: still, lost: 'You stopped digging', dig: 0, done: () => {
-      if (!there()) return;
-      if (this.online) return void this.net.send({ t: 'bury', uid, on: bury });
-      // (playing alone: there is nobody to ask)
-      if (bury) {
-        const l = this.economy.take(uid);
-        if (!l) return;
-        const st = this.newStash({ uid, x: l.x, y: heightAt(world.heights, l.x, l.z), z: l.z, rot: l.rot, item: l.item.id, buried: true });
-        const items = (l.item.cargo ?? []).map((q) => ({ ...q.item, x: q.x, y: q.y, rot: q.rot }));
-        if (items.length) st.container.load({ items });
-        void this.loot.addStash(st).then(() => this.save());
-      } else {
-        const st = what as Stash;
-        this.loot.removeStash(st);
-        this.economy.drop(this.stashItem(st), st.x, st.y + 0.02, st.z, st.rot);
-        this.save();
-      }
-    } };
-  }
-
-  /** what is under the ground at a stash, as the thing it is when it lies on it: the case, the suitcase or the bag, with what is in it */
-  private stashItem(st: Stash): ItemInstance {
-    const it = makeItem(ITEMS[st.item]?.category === 'stash' ? st.item : 'stash_kit', 1);
-    it.uid = st.uid;
-    const items = st.container.serialize().items as StoredItem[];
-    if (items.length) it.cargo = items.map(({ x, y, rot, ...item }) => ({ item, x, y, rot }));
-    return it;
-  }
-
-  private nearbyStash(): Stash | null {
-    // (nothing is searched from a jeep's seat)
-    if (this.garage.ride) return null;
-    // (what is under the ground is not opened: it is dug up first)
-    if (this.focus instanceof Stash) return this.focus.buried ? null : this.focus;
-    const p = this.player.pos;
-    let best: Stash | null = null;
-    let bd = 2.2;
-    for (const s of [...this.loot.stashes.filter((q) => !q.buried), ...this.loot.crates, ...[...this.corpses.values()].map((c) => c.stash), ...[...this.drops.values()].map((d) => d.stash)]) {
-      const d = Math.hypot(s.x - p.x, s.z - p.z);
-      if (d < bd && Math.abs(s.y - p.y) < 1.5) {
-        bd = d;
-        best = s;
-      }
-    }
-    return best;
-  }
-
-  /**
-   * @param byEscape closed with Escape. A browser will not give the mouse back on that key
-   *   (only on a click), and sending the player to the pause menu for closing their pockets
-   *   was the wrong answer: the game carries on, and the next click takes the mouse.
-   */
-  /** where the map shows a drop: the ones standing, and the places one has been called to */
-  private markDrops() {
-    this.minimap.setDrops([...[...this.drops.values()].map((x) => x.at), ...this.calls.map((c) => c.at)]);
-  }
-
-  /** nothing between the player and the sky: a radio is heard from there, and a crate can come down there */
-  private openSky() {
-    const p = this.player.pos;
-    return physics.raycast({ x: p.x, y: p.y + 1.7, z: p.z }, { x: 0, y: 1, z: 0 }, 60, SIGHT_GROUPS) === null;
-  }
-
-  /** the radio keyed: the call goes out, and the set is good for the one call if it is answered */
-  private callDrop(item: ItemInstance) {
-    if (!this.openSky()) {
-      this.hud.note('No signal under a roof: take the radio out under open sky', 'warn');
-      return;
-    }
-    this.radio = item;
-    if (this.online) {
-      this.net.send({ t: 'radio' });
-      return;
-    }
-    // (playing alone: there is nobody to refuse it, and the game sets the crate down itself)
-    const p = callSite(this.s.world, this.player.pos.x, this.player.pos.y, this.player.pos.z, this.player.yaw);
-    this.flightBegun(planFlight((x, z) => heightAt(this.s.world.heights, x, z), p, `drop-call-${newUid()}`), false, true);
-  }
-
-  /**
-   * A helicopter has appeared on the map's edge with a supply drop (the server says so; playing alone, this game
-   * does): it is set flying, the place is marked on the map and under smoke until the crate is down, and whoever
-   * plays is told where it is for, which way it is coming from, and when it will be on the ground.
-   * @param late it was in the air already when this game came in
-   * @param mine this player called it on a radio (whose set is spent)
-   */
-  private flightBegun(f: Flight, late = false, mine = false) {
-    this.airdrops.begin(f);
-    const left = flightTimes(f).land - f.age;
-    // (down already: its crate is told of as a drop standing, and only the helicopter is left to see)
-    if (left <= 0) return;
-    const where = describeSpot(this.s.world, f.x, f.z), way = comesFrom(f), eta = Math.max(1, Math.round(left));
-    this.calls.push({ at: new THREE.Vector3(f.x, f.y, f.z), until: performance.now() + left * 1000, smoke: { owed: 0 } });
-    this.markDrops();
-    if (mine && this.radio) {
-      this.inv.remove(this.radio);
-      this.radio = null;
-      this.inventoryChanged();
-    }
-    if (mine) this.hud.note(`Drop called in: a helicopter is coming from the ${way}. The crate is down in ${eta} s, ahead of you, under the smoke. Everybody heard it`, 'good');
-    // (and whoever is near enough to see it is told when it leaves the helicopter: it is ninety metres up, where nobody is looking)
-    const away = (flightTimes(f).release - f.age) * 1000;
-    if (away > 0) setTimeout(() => {
-      if (this.started && !this.player.dead && Math.hypot(this.player.pos.x - f.x, this.player.pos.z - f.z) < 160) this.hud.note('The crate is away, coming down under its parachute: look up', 'good');
-    }, away);
-    else if (f.by !== undefined) this.hud.note(`Somebody has called a supply drop in ${where}: a helicopter is coming from the ${way}, down in ${eta} s`, 'warn');
-    else if (late) this.hud.note(`A helicopter is in the air with a supply drop for ${where}: down in ${eta} s, marked on the map (M)`, 'good');
-    else this.hud.note(`A helicopter is coming in from the ${way} with a supply drop for ${where}: down in ${eta} s, marked on the map (M)`, 'good');
-    this.hud.feed(f.by !== undefined ? `Supply drop called in ${where}: helicopter from the ${way}` : `Helicopter from the ${way}: supply drop for ${where}`);
-    if (!late && f.by === undefined) this.hud.chatLine('system', '', `A helicopter is coming in from the ${way} with a supply drop for ${where}.`);
-  }
-
-  /** the crate of a flight has touched the ground: it is heard, and (playing alone, with nobody else to set it down) the crate that stays is stood there */
-  private dropLanded(f: Flight) {
-    const at = new THREE.Vector3(f.x, f.y, f.z);
-    audio.bodyFall(at, at.distanceTo(this.s.r.camera.position));
-    if (!this.online) void this.addDrop({ uid: f.uid, x: f.x, y: f.y, z: f.z, rot: restAt(f.uid), left: DROP.life }, true);
-  }
-
-  /** today's page of the trader's work for this player (a new day is a clean page) */
-  private jobBook(): JobBook {
-    let kept: Partial<JobBook> | null = null;
-    try {
-      kept = JSON.parse(localStorage.getItem('zona.jobs') ?? 'null');
-    } catch {
-      // (nothing kept, or nothing that can be read: a clean page)
-    }
-    return bookFor(dayOf(Date.now()), kept);
-  }
-
-  private keepBook(book: JobBook) {
-    try {
-      localStorage.setItem('zona.jobs', JSON.stringify(book));
-    } catch {
-      // (a browser that keeps nothing)
-    }
-  }
-
-  private setCredit(n: number) {
-    this.credit = Math.max(0, Math.round(n));
-    try {
-      localStorage.setItem('zona.credit', String(this.credit));
-    } catch {
-      // (a browser that keeps nothing: the book is good until the page is shut)
-    }
-  }
-
-  private openShop() {
-    if (this.shop.isOpen || this.invUI.isOpen) return;
-    this.input.releaseAll();
-    this.shop.open();
-    this.input.uiMode = true;
-    this.input.unlock();
-    audio.ui('open');
-  }
-
-  /**
-   * The map, opened large or put away. Open, the mouse is let go (the sheet is pointed at, brought nearer, dragged
-   * about) and nothing is fired or looked round at; the feet still go where the keys send them, as with the
-   * inventory open.
-   */
-  toggleMap(open?: boolean, byEscape = false) {
-    const want = open ?? !this.map.open;
-    if (want === this.map.open) return;
-    if (want) {
-      this.map.show(this.player.pos.x, this.player.pos.z);
-      this.input.uiMode = true;
-      this.input.unlock();
-      audio.ui('open');
-      return;
-    }
-    this.map.hide();
-    // (shut because the inventory was opened over it: the mouse stays free, for that)
-    if (this.invUI.isOpen || this.shop.isOpen) return;
-    this.input.uiMode = false;
-    if (byEscape && !this.input.touch) this.awaitClick = true;
-    else if (this.started && !this.paused) this.input.lock();
-    // if the browser refuses the re-capture, the next click on the game takes it (see awaitClick)
-    setTimeout(() => {
-      if (this.started && !this.paused && !this.invUI.isOpen && !this.shop.isOpen && !this.map.open && !this.input.locked && !this.player.dead) this.awaitClick = true;
-    }, 400);
-    audio.ui('close');
-  }
-
-  toggleInventory(open?: boolean, byEscape = false) {
-    const want = open ?? !this.invUI.isOpen;
-    if (want === this.invUI.isOpen) return;
-    if (want) {
-      this.openStash = this.nearbyStash();
-      this.invUI.open(this.around(), this.openStash, this.player.vitals);
-      if (this.garage.ride && this.loot.near(this.player.pos, 2.3).length) this.hud.note('Nothing is picked up from a seat: get out for it', 'info');
-      if (this.online && this.openStash) {
-        // the server holds what is inside; show it once it answers
-        this.invUI.setStashState('Opening…');
-        this.net.send({ t: 'copen', cid: this.openStash.uid });
-      }
-      this.input.uiMode = true;
-      this.input.unlock();
-      audio.ui('open');
-    } else {
-      if (this.online && this.openStash) {
-        this.syncOpenBox();
-        this.net.send({ t: 'cclose', cid: this.openStash.uid });
-      }
-      this.invUI.close();
-      this.input.uiMode = false;
-      this.openStash = null;
-      if (byEscape && !this.input.touch) this.awaitClick = true;
-      else if (this.started) this.input.lock();
-      // if the browser refuses the re-capture, the next click on the game takes it (see awaitClick)
-      setTimeout(() => {
-        if (this.started && !this.paused && !this.invUI.isOpen && !this.input.locked && !this.player.dead) this.awaitClick = true;
-      }, 400);
-      audio.ui('close');
-      this.save();
-    }
-  }
-
-  // ------------------------------------------------------------ interaction
-
-  private updateInteraction(cam: THREE.PerspectiveCamera) {
-    this.prompt = null;
-    this.mark = null;
-    this.focus = null;
-    if (this.player.dead || this.invUI.isOpen || this.shop.isOpen || this.use) return;
-    // at a shop's counter, looking at the man behind it
-    if (this.started && !this.garage.ride && this.traders?.at(cam.position, _sealedLook.set(0, 0, -1).applyQuaternion(cam.quaternion))) {
-      const book = this.jobBook();
-      const owed = jobsFor(book.day).some((j) => !book.done.includes(j.id) && jobDone(j, book, (id) => this.countOf(id)) >= j.n);
-      this.prompt = `<kbd>F</kbd>Trade${owed ? ' <small>· he owes you for a job</small>' : ''}`;
-      if (this.input.pressed('KeyF') && !this.hud.chatOpen) this.openShop();
-      return;
-    }
-    // at the way down to the second level: it is not to be opened yet, and says so
-    {
-      const sealed = this.bunker.sealedAt(_sealed);
-      if (sealed && sealed.distanceTo(cam.position) < 3.2 && _sealedDir.copy(sealed).sub(cam.position).normalize().dot(_sealedLook.set(0, 0, -1).applyQuaternion(cam.quaternion)) > 0.75) {
-        this.prompt = '<small>Locked · requires a Level 2 keycard · coming soon</small>';
-        return;
-      }
-    }
-    // at the bunker's door, shut: a keycard is what F does there
-    const door = this.bunker.open ? null : this.bunker.doorAt(_lampPos);
-    if (door && door.distanceTo(cam.position) < 2.6 && !this.garage.ride) {
-      // (the card is used from the hands, like everything: F takes it into them, and the button puts it in)
-      const card = this.inv.find((i) => i.id === 'keycard');
-      const inHand = this.inHand?.id === 'keycard';
-      this.prompt = inHand ? null : card ? '<kbd>F</kbd>Take out the keycard' : '<small>Locked. A keycard opens it: they are kept under the gas</small>';
-      if (card && !inHand && this.input.pressed('KeyF') && !this.hud.chatOpen && !this.use) this.takeUp(card);
-      return;
-    }
-    // sat in a jeep there is one thing to do with F
-    if (this.garage.ride) {
-      if (this.input.pressed('KeyF') && !this.hud.chatOpen) this.garage.out();
-      else if (this.touch || performance.now() - this.rideAt < 7000) this.prompt = this.garage.ride.seat === 0 ? '<kbd>F</kbd>Get out <small>W A S D to drive · Space is the handbrake</small>' : '<kbd>F</kbd>Get out';
-      return;
-    }
-    const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
-    const range = 2.6;
-    const hit = physics.raycast(cam.position, dir, range, USE_GROUPS, this.player.collider);
-    const owner = hit?.tag?.owner ?? this.nearestLoose(cam, dir, range);
-    this.lookedAt = owner ?? null;
-    if (!owner) {
-      // nobody has a name floating over their head: you only learn it by looking right at them, up close
-      const c = new THREE.Vector3();
-      // a well stood at and looked at
-      const well = this.wells.find((w) => Math.hypot(w.x - this.player.pos.x, w.z - this.player.pos.z) < WELL.reach && Math.abs(w.y - this.player.pos.y) < 1.5);
-      if (well && c.set(well.x, well.y + 0.8, well.z).sub(cam.position).normalize().dot(dir) > 0.55) {
-        const bottles = this.bottles().filter((it) => (it.left ?? 0) < ITEMS[it.id].use!.sips!).length;
-        const dry = this.player.vitals.water < 99;
-        const held = this.inHand && ITEMS[this.inHand.id].use?.sips ? this.inHand : null;
-        const fill = held && (held.left ?? 0) < ITEMS[held.id].use!.sips! ? (this.touch ? 'Tap fire to fill it' : 'Hold the left button to fill it') : bottles ? 'Take a bottle into your hands to fill it here' : '';
-        if (!dry) this.prompt = `<small>The well · ${fill || 'you have drunk your fill, and your bottles are full'}</small>`;
-        else {
-          this.prompt = `<kbd>F</kbd>Drink${fill ? ` <small>${fill}</small>` : ''}`;
-          if (this.input.pressed('KeyF') && !this.use && !this.hud.chatOpen) this.drinkAt(well);
-        }
-        return;
-      }
-      // a fireplace stood beside and looked at
-      const fi = this.fires.at(this.player.pos);
-      if (fi >= 0) {
-        const s = this.fires.spots[fi];
-        if (c.set(s.x, s.y + 0.3, s.z).sub(cam.position).normalize().dot(dir) > 0.78) {
-          const left = this.fires.left[fi];
-          if (left > 0) this.prompt = `<small>Fire · ${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')} left · rest beside it to mend</small>`;
-          else {
-            this.prompt = '<kbd>F</kbd>Light the fire';
-            if (this.input.pressed('KeyF') && !this.use) this.lightFire(fi);
-          }
-          return;
-        }
-      }
-      for (const r of this.remotes.values()) {
-        if (!r.alive) continue;
-        r.chest(c).sub(cam.position);
-        const d = c.length();
-        // (and only with nothing in between: it used to be read straight through walls)
-        if (d < 18 && c.normalize().dot(dir) > 0.992 && !physics.raycast(cam.position, c, d - 0.5, SIGHT_GROUPS)) this.prompt = `<small>${r.name}</small>`;
-      }
-      return;
-    }
-    this.focus = owner;
-    const key = this.input.pressed('KeyF');
-    if (owner instanceof WorldItem) {
-      const item = owner.loot.item;
-      const d = ITEMS[item.id];
-      const qty = d.stack ? ` <small>×${item.qty}</small>` : d.weapon ? ` <small>${item.loaded ?? 0}/${d.weapon.mag ? (item.mag ? magRoom(item) : 'no mag') : capacityOf(item)}</small>` : d.mag ? ` <small>${item.rounds ?? 0}/${d.mag.capacity}</small>` : item.cargo?.length ? ` <small>${item.cargo.length} inside</small>` : '';
-      // (a case, a suitcase or a bag, and a shovel in the hands: the left button, held, buries it where it lies)
-      const spade = d.category === 'stash' && this.weapons.equippedItem?.id === 'shovel';
-      this.prompt = `<kbd>F</kbd>Take ${d.name}${qty}${spade ? ' <small>hold the left button to bury it</small>' : ''}`;
-      if (spade && !this.use && !this.invUI.isOpen && this.input.pressed('Mouse0')) this.dig(owner);
-      // four corners round it, so there is no doubt which thing that is
-      const at = new THREE.Vector3(owner.loot.x, owner.loot.y + 0.05, owner.loot.z).project(cam);
-      if (at.z < 1) this.mark = [at.x * 0.5 + 0.5, 0.5 - at.y * 0.5];
-      if (key) {
-        if (!this.inv.hasRoom(item)) {
-          // (No room for it. With the hands empty it is taken into them and carried nowhere, as in DayZ: eaten,
-          // drunk or put on from there. A gun, a blade or a thing to wear needs a place of its own.)
-          const free = !this.weapons.equippedItem && !this.inHand && !this.use && !this.cook;
-          if (d.slot || d.weapon || d.melee || !free) {
-            this.hud.note(d.slot ? `No free ${d.slot === 'long' ? 'weapon' : d.slot} slot and no room in your pockets` : 'No room: empty your hands (X) to pick it up in them, or find a vest or a bag', 'warn');
-            return;
-          }
-          if (!this.takeWorldItem(owner)) return;
-          this.takeUp(item, true);
-          audio.ui('pickup', undefined, item.id);
-          this.hud.note(`${d.name}: in your hands, there is no room to put it away`, 'info');
-          this.inventoryChanged();
-          return;
-        }
-        if (!this.takeWorldItem(owner)) return;
-        const left = this.inv.add(item);
-        if (left) this.dropItem(left);
-        audio.ui('pickup', undefined, item.id);
-        this.hud.note(`${d.name}${d.stack ? ` ×${item.qty}` : ''}`, 'good');
-        this.inventoryChanged();
-      }
-    } else if (owner instanceof Door) {
-      const door = owner;
-      this.prompt = `<kbd>F</kbd>${door.open ? 'Close' : 'Open'} door`;
-      if (key) {
-        door.toggle(this.player.pos);
-        audio.door(door.open, door.pivot.position, door.pivot.position.distanceTo(this.s.r.camera.position));
-        this.net.send({ t: 'door', i: this.s.buildings.doors.indexOf(door), open: door.open, swing: door.swingDir });
-      }
-    } else if (owner instanceof Jeep) {
-      const can = this.inv.find((i) => i.id === 'jerrycan');
-      const tagged = this.tagged;
-      this.prompt = this.garage.prompt(owner, !!can, tagged);
-      if (key) this.garage.use(owner, tagged);
-    } else if (owner instanceof Stash) {
-      // A crate of the map's, a body, a drop: searched. Or a place where somebody buried a case, a suitcase or a
-      // bag: with a shovel in the hands, dug up by holding the left button, and what was under it lies there again.
-      const shovel = !owner.fixed && owner.buried && this.weapons.equippedItem?.id === 'shovel';
-      this.prompt = owner.buried
-        ? shovel ? '<kbd>LMB</kbd>Hold to dig here' : 'Something is buried here <small>a shovel would dig it up</small>'
-        : `<kbd>F</kbd>${owner.fixed ? 'Search' : 'Open'} ${owner.label}`;
-      if (key && !owner.buried) this.toggleInventory(true);
-      if (shovel && !this.use && !this.invUI.isOpen && this.input.pressed('Mouse0')) this.dig(owner);
-    }
-  }
-
-  /**
-   * The loose item nearest the middle of the view, for when the eye is not dead on anything.
-   * A tin on a shelf is a few pixels across: nobody should have to thread the cross-hair onto
-   * it. Within reach, within a hand's spread of the cross-hair, and in plain sight.
-   */
-  private nearestLoose(cam: THREE.PerspectiveCamera, dir: THREE.Vector3, range: number): WorldItem | null {
-    let best: WorldItem | null = null;
-    // the widest it reaches: about 24 degrees off the cross-hair for something at arm's length
-    let score = 0.42;
-    const to = new THREE.Vector3();
-    for (const w of this.loot.near(this.player.pos, range)) {
-      to.set(w.loot.x, w.loot.y + 0.05, w.loot.z).sub(cam.position);
-      const d = to.length();
-      if (d > range || d < 0.05) continue;
-      to.divideScalar(d);
-      // nearest the cross-hair wins; of two as near to it, the one closer to hand
-      const s = Math.acos(Math.min(1, to.dot(dir))) + d * 0.04;
-      if (s >= score) continue;
-      // (a shelf or a wall in the way: it stops just short of the thing itself, which lies on a surface)
-      if (physics.raycast(cam.position, to, Math.max(0, d - 0.22), SIGHT_GROUPS)) continue;
-      score = s;
-      best = w;
-    }
-    return best;
-  }
-
-  /** G, held a moment: what is in the hands goes on the ground in front of you. */
-  private dropInHands() {
-    const item = this.inv.held() ?? this.inHand;
-    if (!item) {
-      this.hud.note('Nothing in your hands to drop', 'warn');
-      return;
-    }
-    if (this.use) this.breakOff();
-    if (this.loose === item) this.loose = null;
-    this.stow();
-    this.inv.remove(item);
-    this.dropItem(item);
-    audio.ui('drop', undefined, item.id);
-    this.hud.note(`Dropped ${itemName(item)}`);
-    this.inventoryChanged();
-  }
-
-  /** offline: emptied map crates refill after a while, once nobody is around to see it */
-  private tickCrates() {
-    const p = this.player.pos;
-    for (const c of this.loot.crates) {
-      if (c.container.items.length) {
-        c.emptiedAt = -1;
-        continue;
-      }
-      if (c.emptiedAt < 0) c.emptiedAt = this.economy.time;
-      else if (this.economy.time - c.emptiedAt > CRATE_RESTOCK && c !== this.openStash && Math.hypot(c.x - p.x, c.z - p.z) > 60) {
-        this.fillCrate(c);
-        c.emptiedAt = -1;
-      }
-    }
-  }
-
-  private slowT = 1;
-  private hasCompass = false;
-
-  private hotbar(): HotbarEntry[] {
-    // each key, the thing on it, and what there is of it: rounds in a gun or a magazine, drinks in a bottle, how many of a thing that is used up
-    const held = this.inv.held() ?? this.inHand;
-    return this.inv.hot.map((b, i) => {
-      const it = b ? this.inv.hotItem(i) : null;
-      const d = it ? ITEMS[it.id] : null;
-      const label = !it || !d ? '' : d.weapon ? String(it.loaded ?? 0) : d.mag ? String(it.rounds ?? 0) : d.use?.sips ? `${it.left ?? d.use.sips}/${d.use.sips}` : d.melee || d.slot ? '' : String(this.countOf(it.id));
-      return { key: String((i + 1) % 10), id: it?.id ?? b?.id ?? null, label, active: !!it && it === held, dim: !!b && !it };
-    });
-  }
-
-  /** What to do about an open wound, in as few words as it takes: the key that holds a dressing, if there is one. */
-  /** blood read back from a save or from the server: one kept from before there was any has all of it, and one wound if it was bleeding */
-  private takeVitals(from: Partial<Player['vitals']>) {
-    const v = this.player.vitals;
-    Object.assign(v, from);
-    v.blood = bloodOf(from);
-    v.bleed = v.bleeding ? bleedOf(from) : 0;
-    v.bleeding = v.bleed > 0;
-  }
+  slowT = 1;
+  hasCompass = false;
 
   /** how far down the blood has been said to be: 0 not said, 1 the colour going, 2 the head swimming */
-  private bloodSaid = 0;
-  /** Said once on the way down, and once on the way back up: what the grey and the closing edges mean, and what to do. */
-  private sayBlood() {
-    const p = this.player, b = p.vitals.blood;
-    if (p.dead || !this.started) return;
-    const at = b < BLOOD.faint ? 2 : b < BLOOD.grey[0] - 200 ? 1 : b >= BLOOD.grey[0] ? 0 : this.bloodSaid;
-    if (at === this.bloodSaid) return;
-    if (at > this.bloodSaid) this.hud.note(at === 2 ? 'You have lost too much blood: your head swims and you cannot run. A blood bag or saline puts it back; food, water and time do it slowly' : 'You are losing blood: the colour is going out of things. Stop the bleeding', 'warn');
-    else if (at === 0) this.hud.note('Your blood is back: the colour has come back to things', 'good');
-    else if (at === 1) this.hud.note('Your head has cleared: you can run again', 'good');
-    this.bloodSaid = at;
-  }
-
-  /** little blood and no wound: what puts it back, of what is carried, with the key to it */
-  private bloodHint(): string {
-    if (this.player.drip.left > 0) return 'A bag is running in';
-    const gives = (it: ItemInstance | null | undefined) => !!it && !!ITEMS[it.id].use?.blood;
-    const i = this.inv.hot.findIndex((_, k) => gives(this.inv.hotItem(k)));
-    if (i >= 0) return this.touch ? `Tap the ${ITEMS[this.inv.hotItem(i)!.id].name} below` : `<kbd>${(i + 1) % 10}</kbd>${ITEMS[this.inv.hotItem(i)!.id].name}`;
-    const carried = this.inv.find((it) => gives(it));
-    if (carried) return `${this.touch ? 'Open your pack' : '<kbd>Tab</kbd>'} and use the ${ITEMS[carried.id].name}`;
-    return 'A blood bag or saline puts it back. Food, water and time do it slowly';
-  }
+  bloodSaid = 0;
 
   /** seconds to the next catch of the breath over an open wound */
-  private winceT = 0;
-  /** An open wound is felt: every few seconds what is held dips, oftener and harder the faster it bleeds. */
-  private wince(dt: number) {
-    const p = this.player, v = p.vitals;
-    if (!v.bleeding || p.dead || !this.started) return void (this.winceT = 1.5);
-    if ((this.winceT -= dt) > 0) return;
-    const bad = Math.min(1, v.bleed / BLOOD.most);
-    this.winceT = (5.2 - 3.2 * bad) * (0.8 + Math.random() * 0.4);
-    this.weapons.wince(0.5 + 0.7 * bad);
-  }
+  winceT = 0;
 
-  private bleedHint(): string {
-    if (this.use?.sound === 'bandage' || (this.use?.sound === 'inject' && !/Adrenaline/.test(this.use.label))) return 'Treating the wound…';
-    const held = this.inHand && ITEMS[this.inHand.id].use?.stopBleed ? this.inHand : null;
-    if (held) return this.touch ? `Tap fire to use the ${ITEMS[held.id].name.toLowerCase()}` : `Hold the left button to use the ${ITEMS[held.id].name.toLowerCase()}`;
-    const i = this.inv.hot.findIndex((_, k) => !!ITEMS[this.inv.hotItem(k)?.id ?? '']?.use?.stopBleed);
-    if (i >= 0) {
-      const d = ITEMS[this.inv.hotItem(i)!.id];
-      return this.touch ? `Tap the ${d.name} below, then fire, to stop it` : `<kbd>${(i + 1) % 10}</kbd>${d.name}, then hold the left button`;
-    }
-    const carried = this.inv.find((it) => !!ITEMS[it.id].use?.stopBleed);
-    if (carried) return `${this.touch ? 'Open your pack' : '<kbd>Tab</kbd>'} and use the ${ITEMS[carried.id].name}`;
-    return 'Find a bandage, a health stim or a first aid kit';
-  }
-
-  private dripT = 0;
+  dripT = 0;
   /** the last hit taken: which way it was travelling, and when */
-  private lastHit: { x: number; z: number; at: number } | null = null;
+  lastHit: { x: number; z: number; at: number } | null = null;
+}
 
-  /** keep the body's hands in step with what is equipped */
-  private syncHeld() {
-    const it = this.weapons.equippedItem;
-    const key = it ? `${it.id}|${fittedOf(it).join(',')}` : '';
-    if (key === this.heldKey) return;
-    this.heldKey = key;
-    // (with what is fitted to it and the magazine in it, as everybody else is shown it)
-    const h = it ? this.makeHeld(it.id, fittedOf(it)) : null;
-    this.avatar.setHeld(h?.obj ?? null, h?.grips ?? null, h?.kind);
-  }
-
-  // ------------------------------------------------------------ frame
-
-  /** @param stamp when the display refresh this frame is for began (the browser's own stamp) */
-  private frame(stamp = performance.now()) {
-    const now = performance.now();
-    this.perf.begin(now);
-    // How far the world moves this frame is measured between refreshes, not between the moments
-    // the browser got round to calling us. Those wander by a millisecond or two with whatever
-    // else the page is doing, while the picture goes up on the even beat of the display: a
-    // step measured on the wandering clock and shown on the even one is motion that judders.
-    const dt = Math.min(Math.max(0, stamp - this.last) / 1000, 0.1);
-    this.last = stamp;
-    const { r, veg, grass, buildings, atmo, world } = this.s;
-    const input = this.input;
-    const p = this.player;
-    const cam = r.camera;
-    const playing = this.started && !this.paused && !p.dead;
-
-    if (input.pressed('Tab') && playing) this.toggleInventory();
-    if (this.awaitClick && (this.input.locked || !playing || this.invUI.isOpen)) this.awaitClick = false;
-    if (this.vicinityDue.length && now >= this.vicinityDue[0]) {
-      this.vicinityDue.shift();
-      if (this.invUI.isOpen) this.invUI.refresh(this.around(), this.openStash);
-    }
-    // the inventory open and the survivor on the move: what lies near comes into the list and goes out of it as they walk
-    if (this.invUI.isOpen && (this.vicinityT += dt) > 0.25) {
-      this.vicinityT = 0;
-      const near = this.around();
-      const sig = near.map((w) => w.loot.uid).join(',');
-      if (sig !== this.vicinitySig) {
-        this.vicinitySig = sig;
-        this.invUI.refresh(near, this.openStash);
-      }
-    }
-    // G held for a third of a second drops what is in the hands (a tap next to F does nothing;
-    // looking at an empty crate of your own, G packs it up instead: see updateInteraction)
-    if (playing && !this.invUI.isOpen && !this.hud.chatOpen && !this.use && input.held('KeyG') && !(this.focus instanceof Stash) && !(this.focus instanceof Jeep)) {
-      this.dropHeld += dt;
-      if (this.dropHeld > 0.33 && !this.dropDone) {
-        this.dropDone = true;
-        this.dropInHands();
-      }
-    } else {
-      this.dropHeld = 0;
-      this.dropDone = false;
-    }
-    // M: the map, large; any way out of play puts it away again
-    if (input.pressed('KeyM') && playing && !this.invUI.isOpen && !this.shop.isOpen && !this.hud.chatOpen) this.toggleMap();
-    else if (this.map.open && (!playing || this.invUI.isOpen || this.shop.isOpen)) this.toggleMap(false);
-    // ` : the panel of whoever has a role. And an admin's two keys: N flies (noclip), K sends the view off by itself.
-    if (this.role && this.online && this.started && !this.hud.chatOpen) {
-      if (input.pressed('Backquote')) this.toggleAdmin();
-      if (this.role === 'admin' && playing && !this.invUI.isOpen && !this.shop.isOpen && !this.map.open && !this.adminUI.isOpen) {
-        if (input.pressed('KeyN')) this.order('/noclip');
-        if (input.pressed('KeyK')) this.toggleFreecam();
-        if (input.pressed('Delete')) this.deleteLooked();
-      }
-    }
-    if (this.adminUI.isOpen && (!this.started || this.paused)) this.toggleAdmin(false);
-    const panels = this.invUI.isOpen || this.shop.isOpen || this.map.open || this.adminUI.isOpen;
-    // (with the view off by itself, the body does nothing: as with a panel open, but that talk can still be typed)
-    const uiOpen = panels || !!this.freecam;
-    // Enter opens the chat box, and / opens it with an order begun; while typing the character stands still and the gun stays quiet
-    const order = input.pressed('Slash') || input.pressed('NumpadDivide');
-    if ((order || input.pressed('Enter')) && playing && !panels && !this.hud.chatOpen) {
-      input.releaseAll();
-      this.hud.openChat(order ? '/' : '');
-    }
-    if (this.hud.chatOpen && (!playing || panels)) this.hud.closeChat();
-    const typing = this.hud.chatOpen;
-    // A phone has no row of number keys under the fingers: whatever is picked up to fight with
-    // comes into the hands by itself when they are empty, unless they were emptied on purpose.
-    if (this.touch && playing && !uiOpen && !this.use && !this.garage.ride && !this.handsFree && !this.weapons.equippedItem && !this.weapons.busy) {
-      const slot = this.inHand ? null : SLOT_ORDER.find((s) => this.inv.slots[s]);
-      if (slot) this.weapons.equip(slot);
-    }
-
-    // binoculars come down for anything else: a trigger, a sprint, the pockets, a hit
-    if (this.glass && (!playing || uiOpen || this.use || input.pressed('Mouse0') || input.pressed('Mouse2') || p.sprinting || HOT_CODES.some((k) => input.pressed(k)))) {
-      this.glass = 0;
-      this.glassDown = now;
-    }
-    this.updateWheel(playing && !uiOpen && !typing && !TOUCH, now);
-    // a dance, or hands that are up, ends with the first step, shot or anything else done
-    if (this.hold && (!playing || uiOpen || typing || !!this.use || !p.grounded || ['KeyW', 'KeyA', 'KeyS', 'KeyD'].some((k) => input.held(k)) || ['Space', 'KeyC', 'Mouse0', 'Mouse2', 'KeyR', 'KeyG'].some((k) => input.pressed(k)))) this.setHold(null);
-    // and a wave with a trigger pulled or a sight raised
-    if (this.armsUntil > now && (input.pressed('Mouse0') || input.pressed('Mouse2'))) {
-      this.armsUntil = 0;
-      this.avatar.emote(null);
-    }
-    // In a jeep: the view is from behind it, the hands are on the wheel (or in the lap), and
-    // getting in or out of one moves the view there rather than cutting to it.
-    const ride = this.garage.ride;
-    if ((ride?.jeep ?? null) !== this.rode) {
-      this.rode = ride?.jeep ?? null;
-      this.director.third = ride ? this.garage.view : null;
-      this.director.shift(ride ? 0.5 : 0.35);
-      if (ride) {
-        this.rideAt = now;
-        this.setHold(null);
-        this.glass = 0;
-        if (this.map.open) this.toggleMap(false);
-      }
-    }
-    this.weapons.stowed = !!this.hold || this.armsUntil > now || !!ride || !!this.glass;
-    // (slower while aiming, by what the game was made with and by the player's own multiple of that: Settings, Controls)
-    const aimed = this.glass ? 0.22 : this.weapons.scoped ? 0.28 : this.weapons.aiming ? 0.7 : 1;
-    const sens = aimed < 1 ? aimed * controls().aim : 1;
-    if (!uiOpen && playing && !this.wheelOn) p.look(input, sens);
-    // (kept with whoever it is watching: it goes as they go, and is flown about them)
-    if (this.freecam && this.watching) {
-      const r = this.remotes.get(this.watching.id);
-      if (!r) {
-        this.watching = null;
-        this.showPowers();
-      } else {
-        this.freecam.pos.add(r.pos).sub(this.watching.last);
-        this.watching.last.copy(r.pos);
-      }
-    }
-    if (this.freecam && !panels && playing && !typing) this.flyCamera(dt, input);
-    // An admin's map, live while it is open (2026-10-13: "the admin map needs to have LIVE updates"): who is on
-    // and how they are is asked of the server once a second, and twice a second every dot is put where this game
-    // has that player now. (Not every frame: the sheet is drawn again each time.)
-    if (this.map.open && this.role === 'admin' && this.online) {
-      if ((this.mapAskT -= dt) <= 0) {
-        this.mapAskT = 1;
-        this.net.send({ t: 'adm' });
-      }
-      if ((this.mapFeedT -= dt) <= 0) {
-        this.mapFeedT = 0.5;
-        this.feedMap();
-      }
-    }
-
-    // (The legs are free while the inventory is open: it is walked about with, to see what lies near, as in DayZ.
-    // What is nearby is read again as it changes: see `vicinityT`. The trader's counter is stood at.)
-    const canMove = (!uiOpen || ((this.invUI.isOpen || this.map.open) && !this.shop.isOpen)) && playing && !typing;
-    const moveInput = canMove ? input : NULL_INPUT;
-    // (are the hands empty: asked of what is in them, and every frame. It was asked five times a second, and of
-    // which slot the inventory said was out, which is not the same thing when what was out has been dropped.)
-    p.emptyHanded = this.weapons.handsEmpty && !this.use;
-    // talking: V held down (the first time it is, the browser asks whether this site may use the microphone)
-    if (this.online) {
-      if (playing && !typing && !uiOpen && input.pressed('KeyV')) {
-        void this.voice.talk().then((wrong) => {
-          if (wrong && !this.voiceSaid) this.hud.note(wrong, 'warn');
-          this.voiceSaid ||= !!wrong;
-        });
-      }
-      if (this.voice.talking && (!input.held('KeyV') || !playing)) this.voice.hush();
-      const speaking = this.voice.update((id) => this.remotes.get(id)?.pos ?? null, p.pos);
-      this.hud.voice(this.voice.talking, speaking.map((id) => this.remotes.get(id)?.name ?? '').filter(Boolean));
-    }
-    // hunger and thirst, said once each as they get worse (and what they do is said with them)
-    if (playing) {
-      const now2 = [stage(p.vitals.energy), stage(p.vitals.water)];
-      if (now2[0] > this.wanting[0]) this.hud.note(now2[0] === 2 ? 'You are starving: your hands shake, and your breath is slow to come back. Eat' : 'You are hungry: your aim is less steady. Eat something', 'warn');
-      if (now2[1] > this.wanting[1]) this.hud.note(now2[1] === 2 ? 'You are parched: you cannot run flat out. Drink, or find a well' : 'You are thirsty: your breath comes back slower. Drink, or find a well (on the map)', 'warn');
-      this.wanting = now2;
-    }
-    // carried weight and gear effects only change with the inventory: a few times a second is plenty
-    this.slowT += dt;
-    if (this.slowT > 0.2) {
-      this.slowT = 0;
-      p.weightKg = weightFelt(this.inv.weight(), this.powers.weightless);
-      p.fallMult = this.inv.wear('fall').reduce((a, b) => a * b, 1);
-      p.thirstMult = this.inv.wear('thirst').reduce((a, b) => a * b, 1);
-      this.hasCompass = !!this.inv.find((i) => i.id === 'compass');
-    }
-    this.tagT += dt;
-    if (this.tagT >= 1) {
-      this.minimap.setJeeps([...this.garage.jeeps.values()].filter((j) => !j.wreck && j.mode === 'parked' && j.seats.every((s) => s === null)).map((j) => ({ x: j.pos.x, z: j.pos.z })));
-      if (this.started && !p.dead) this.tickTags(this.tagReal());
-      else {
-        this.hud.setTags([]);
-        this.takenTags = [];
-        this.tagWall = Date.now();
-      }
-      this.tagT = 0;
-    }
-    this.tickZone(dt);
-    physics.step(dt, (h) => {
-      this.garage.step(h, moveInput);
-      p.step(h, moveInput);
-      // A key press belongs to one simulation step, however many of them this frame needs:
-      // seen by two, a single tap of C crouches and stands straight back up.
-      input.consumeFixed();
-      buildings.update(h, this.player.pos);
-    });
-    if (this.started) p.tickVitals(dt);
-    this.gas.update(dt, this.s.r.camera.position, _gasHead.set(p.pos.x, p.pos.y + (p.crouched ? 1.0 : 1.6), p.pos.z), this.started && !p.dead && !this.powers.god);
-    this.lightStep(dt, playing && !uiOpen && !typing);
-    // the fires: the infected hear one crackle, and whoever is beside one mends
-    for (const at of this.fires.update(dt, this.s.r.camera.position)) this.horde.noise(at.x, at.z, FIRE.heard);
-    // the lockers' doors: open while one is searched, by this player or (the server says) by anybody
-    this.lockers.update(dt, this.s.r.camera.position, this.openStash?.uid ?? null);
-    // (Resting by a fire, mending or only warm; a broken leg; the air breathed: each was a word at the top of the
-    // screen, and is a badge beside the survivor's health now, for as long as it is so. Why a fire is doing no good,
-    // when it is not, is said beside its badge in the inventory: src/ui/status.ts.)
-    this.byFire = this.started && !p.dead && this.fires.warm(p.pos) ? (p.rest(FIRE.heal * dt) ? 'mending' : 'warm') : null;
-    // (and whoever stands in the flames of the jeep that burns before the fort is burned: src/sim/wreck-fire.ts)
-    const scorched = this.wreck && this.started && !p.dead && !ride && !this.powers.god ? this.wreck.burn(dt, p.pos) : 0;
-    if (scorched > 0) {
-      p.damage(scorched, 'a burning wreck');
-      this.meDirty = true;
-    }
-
-    // a part waiting on its gun: fitted, or taken off, the moment the gun is up (and forgotten if something else was taken up instead)
-    if (this.fitting) {
-      const f = this.fitting;
-      f.t += dt;
-      if (this.inv.held() !== f.gun || f.t > 4 || p.dead) this.fitting = null;
-      else if (!this.weapons.busy) {
-        this.fitting = null;
-        f.run();
-      }
-    }
-
-    this.unbury(dt, !!ride);
-
-    // the hot keys: each brings up what is on it (and puts it away again); X empties the hands
-    // (not with a grenade's pin coming out, or out: those hands are spoken for until it has left them)
-    if (playing && !uiOpen && !typing && !p.dead && !this.cook) {
-      HOT_CODES.forEach((k, i) => {
-        if (input.pressed(k)) this.hot(i);
-      });
-      if (input.pressed('KeyX') && (this.inHand || this.use)) this.emptyHands();
-    }
-
-    // A thing in the hand that is not a weapon: holding the left button uses it. The wheel puts it away (and goes
-    // on to the next weapon); it is kept in the hand through everything else, the inventory included.
-    if (this.ready) {
-      const r = this.ready;
-      r.t += dt;
-      const kept = this.loose === r.item || this.inv.containers.some((c) => c.has(r.item));
-      // (a magazine: the wheel turns over what the button does with it, filling or emptying, and it stays in the hand)
-      if (kept && !p.dead && input.wheel !== 0 && !uiOpen && this.turnMagWork()) input.wheel = 0;
-      if (p.dead || !kept || (input.wheel !== 0 && !uiOpen)) this.putAway();
-      else if (playing && !uiOpen && !typing && r.t > 0.3 && (input.pressed('Mouse0') || (input.held('Mouse0') && r.t > 0.55))) this.handFire(r.item);
-    }
-
-    // a grenade: its pin coming out, and then live in the hand until the button is let go (see `cook`)
-    if (this.cook) this.cooking(dt, input, uiOpen);
-
-    // timed item use (eat, drink, bandage, open a box): shown in the hands; the wheel or the other button breaks it off
-    if (this.use) {
-      const u = this.use;
-      u.t += dt;
-      u.soundT += dt;
-      if (u.sound === 'inject') {
-        // one sound, a breath before the shot lands (weapons.ts, INJECT.hit)
-        if (u.soundT >= 0 && u.t > INJECT.hit - 0.04) {
-          u.soundT = -1e9;
-          audio.ui('inject');
-        }
-      } else if (u.sound && u.sound !== 'smoke' && u.soundT > 1.05 && u.t < u.dur - 0.4) {
-        u.soundT = 0;
-        audio.ui(u.sound);
-      }
-      if (u.dig !== undefined) {
-        // (a stroke, and the next when that one is done: each is heard going in, and coming out with what it lifted)
-        if (this.weapons.dig()) u.dig = 0;
-        const k = this.weapons.digStroke;
-        if (u.dig < 1 && k > 0.3) {
-          u.dig = 1;
-          audio.dig(0);
-        } else if (u.dig < 2 && k > 0.7) {
-          u.dig = 2;
-          audio.dig(1);
-        }
-      }
-      const gone = !!u.valid && !u.valid();
-      if (gone || p.dead || ((input.pressed('Mouse2') || input.wheel !== 0) && !uiOpen) || (this.holding && !uiOpen && !input.held('Mouse0'))) {
-        input.wheel = 0;
-        if (gone && u.lost && !p.dead) this.hud.note(u.lost, 'info');
-        this.breakOff();
-      } else if (u.t >= u.dur) {
-        this.use = null;
-        const hold = this.holding;
-        u.done();
-        // (what is done a round at a time has begun on the next one: the button is still what keeps it going)
-        if (this.use) this.holding = hold;
-        else if (this.inHand) this.rest();
-        else {
-          this.weapons.endUse();
-          this.settle();
-        }
-      }
-    }
-
-    // weapons + fov
-    const fpLive = this.director.blend > 0.9;
-    this.garage.frame(dt, now, physics.alpha, cam.position);
-    this.weapons.update(dt, input, cam, fpLive && !uiOpen && playing && !this.use && !this.ready && !this.cook && !typing && !this.glass && !this.wheelOn && !this.hold && !ride);
-    this.grenades.update(dt);
-    this.updateBarrels(dt);
-    const kind = this.weapons.equippedItem ? ITEMS[this.weapons.equippedItem.id].weapon?.kind : undefined;
-    // a sprint opens the view a touch: speed you can feel
-    this.director.fovMul = ride ? this.garage.fov : this.glass ? this.glass : this.weapons.scoped ? 0.3 : this.weapons.aiming ? (this.weapons.equippedItem?.mods?.includes('red_dot') ? HOLO_ZOOM : kind === 'rifle' ? 0.78 : 0.8) : p.sprinting && p.moving > 0.6 ? 1.055 : 1;
-    this.syncHeld();
-
-    this.director.update(dt);
-    this.drawNames(cam);
-    if (this.director.avatarVisible) cam.layers.enable(AVATAR_LAYER);
-    else cam.layers.disable(AVATAR_LAYER);
-    // your own body below the camera, first person only
-    // before you deploy: something going on in the Zone behind the menu, or (between those, and
-    // until their people have arrived) the middle of the map from the air
-    if (!this.started) {
-      this.menuOn = true;
-      if (!this.menu.update(dt, cam)) this.menuCamera(now);
-      this.hud.menuScene(this.menu.caption, this.menu.fade);
-      // (a long lens brings the far wood near: its trees are drawn as trees as far as the lens makes them large)
-      this.s.veg.setReach(THREE.MathUtils.clamp(Math.tan((62 * Math.PI) / 360) / Math.tan((cam.fov * Math.PI) / 360), 1, 2.6));
-    }
-    else if (this.menuOn) {
-      // a game has begun: the caption and the cut off, the trees as they are in play
-      this.menuOn = false;
-      this.hud.menuScene('', 0);
-      this.s.veg.setReach(1);
-    }
-    const fpView = this.started && this.director.viewmodelVisible && !p.dead && !this.garage.ride;
-    if (fpView) cam.layers.enable(FP_BODY_LAYER);
-    else cam.layers.disable(FP_BODY_LAYER);
-    r.vmScene.visible = fpView && !this.glass;
-    const interp = new THREE.Vector3().lerpVectors(p.prevPos, p.pos, physics.alpha);
-    this.avatar.setLean(p.dead ? 0 : p.lean);
-    if (this.garage.ride) {
-      this.avatar.update(dt, p.pos, _still, this.garage.ride.jeep.yaw, false, p.dead, true, 0, true, false);
-      this.garage.seatBody();
-    } else {
-      this.avatar.guarding = this.weapons.guarding;
-      this.avatar.limping = !!p.vitals.broken;
-      this.avatar.setProne(p.prone);
-      this.avatar.update(dt, interp, p.vel, p.yaw, p.crouched, p.dead, true, 0, p.grounded, this.weapons.aiming);
-    }
-    // the step you hear and the bob you see are the body's own
-    p.stride = this.avatar.stride;
-    if (this.avatar.footfall) p.footfall();
-    for (const d of this.dummies) {
-      if (Math.abs(d.pos.x - interp.x) + Math.abs(d.pos.z - interp.z) < 260) d.update(dt);
-    }
-    Avatar.eye.copy(cam.position);
-    Avatar.ground ??= (x, z) => heightAt(this.s.world.heights, x, z);
-    this.horde.update(dt, now, cam.position);
-    for (const rp of this.remotes.values()) {
-      rp.update(dt, now, cam.position);
-      if (rp.bleeding && rp.alive && (rp.dripT -= dt) <= 0) {
-        rp.dripT = 0.3 + Math.random() * 0.35;
-        if (rp.pos.distanceToSquared(cam.position) < 90 * 90) this.effects.drip(_drip.set(rp.pos.x, rp.pos.y + (rp.crouched ? 0.55 : 0.95), rp.pos.z));
-      }
-    }
-    // your own wound leaves the same trail: it is how you are followed
-    if (p.vitals.bleeding && !p.dead && this.started && (this.dripT -= dt) <= 0) {
-      this.dripT = 0.3 + Math.random() * 0.35;
-      this.effects.drip(_drip.set(interp.x, interp.y + (p.crouched ? 0.55 : 0.95), interp.z));
-    }
-
-    this.updateInteraction(cam);
-    this.traders?.update(dt, cam.position);
-    // (whoever walks off from the counter, or is killed at it, is done trading)
-    if (this.shop.isOpen && (p.dead || !this.traders?.by(p.pos))) this.shop.close();
-    this.minimap.update(interp.x, interp.z, p.yaw);
-    this.map.update(interp.x, interp.z, p.yaw);
-    this.effects.eye.copy(cam.position);
-    // the smoke over each supply drop (not from the far side of the map: nobody could see it)
-    // (and over each place one has been called to, until it lands)
-    if (this.calls.length) {
-      const nowMs = performance.now();
-      if (this.calls.some((c) => c.until < nowMs)) {
-        this.calls = this.calls.filter((c) => c.until >= nowMs);
-        this.markDrops();
-      }
-      for (const c of this.calls) if (c.at.distanceToSquared(cam.position) < 420 * 420) this.effects.signal(c.at, c.smoke, dt);
-    }
-    for (const d of this.drops.values()) if (d.at.distanceToSquared(cam.position) < 420 * 420) this.effects.signal(d.at, d.smoke, dt, !!d.wreck);
-    this.effects.update(dt);
-    this.loot.update(cam.position, dt, cam);
-    this.near.update(cam.position, dt);
-    // (The thing looked at, close enough to pick up: its pictures at the size they came, as if it were in the
-    // hands already. Everything further off is drawn with the world's copies, which at that distance are more
-    // than the screen has pixels for.)
-    const close = this.focus instanceof WorldItem ? this.focus : null;
-    if ((this.sharpFocus?.of ?? null) !== close) {
-      const was = this.sharpFocus;
-      this.sharpFocus = close ? { of: close, drop: assets.sharpen(close.paints(), true) } : null;
-      was?.drop();
-    }
-
-    // world simulation ticks (the server does this when online)
-    this.econT += dt;
-    if (this.econT > 5) {
-      // (Alone, and not on the way in to a server. On the bot check's range the game is started and not yet on any
-      // server: until 2026-10-13 its own loot clock ran there, and laid out the whole map's loot, some fourteen
-      // hundred things of its own making, which then lay about among the server's. See `enterOnline`.)
-      if (!this.online && this.started && !this.joining) {
-        this.economy.tick(this.econT, [p.pos]);
-        this.tickCrates();
-        this.tickDrops();
-      }
-      this.econT = 0;
-      if (this.invUI.isOpen) this.invUI.refresh(this.around(), this.openStash);
-    }
-    this.saveT += dt;
-    if (this.saveT > 20 && playing) {
-      this.saveT = 0;
-      this.save();
-    }
-    if (this.botCheck?.active) {
-      this.botCheck.update(dt);
-      // (nobody is kept on the range by an empty magazine)
-      const held = this.weapons.equippedItem;
-      if (held?.id === 'ar15' && (held.loaded ?? 0) < 4) Object.assign(held, { mag: 'mag_ar', loaded: 31 });
-    }
-    this.sendState(dt);
-
-    // points of interest
-    const here = world.pois.find((q) => Math.hypot(q.x - p.pos.x, q.z - p.pos.z) < q.radius);
-    if (here && here.name !== this.poi && this.started && !this.botCheck?.active) this.hud.area(here.name);
-    this.poi = here?.name ?? null;
-
-    // vitals warnings
-    const v = p.vitals;
-    if (v.energy < 25 && !this.warned.hunger) {
-      this.hud.note('You are hungry', 'warn');
-      this.warned.hunger = true;
-    } else if (v.energy > 35) this.warned.hunger = false;
-    if (v.water < 25 && !this.warned.thirst) {
-      this.hud.note('You are thirsty', 'warn');
-      this.warned.thirst = true;
-    } else if (v.water > 35) this.warned.thirst = false;
-    if (p.dead && !this.deathSent) {
-      this.deathSent = true;
-      this.diedAt = performance.now();
-      audio.death();
-      // Which way the body goes: away from what killed it. With nothing to throw it (blood
-      // loss, a fall, hunger) it folds up where it stands.
-      let variant = Math.random() < 0.5 ? 1 : 2;
-      if (this.lastHit && now - this.lastHit.at < 2500) {
-        const along = this.lastHit.x * -Math.sin(p.yaw) + this.lastHit.z * -Math.cos(p.yaw);
-        variant = along > 0.4 ? 1 : along < -0.4 ? 0 : 2;
-      }
-      this.avatar.setDeath(variant);
-      if (!this.deathInfo) this.deathInfo = `You died of ${p.lastCause === 'fall' ? `a fall of ${Math.round(p.lastFall.drop)} m` : p.lastCause || 'your injuries'}. Your gear lies where you fell.`;
-      if (this.invUI.isOpen) this.toggleInventory(false);
-      this.input.unlock();
-      if (this.online) {
-        // last word on what we were carrying, then the server leaves a body with it
-        this.net.send({ t: 'me', inv: this.inv.serialize(), vitals: { ...p.vitals } });
-        // (a fall says how far and how fast: it is what the server writes down, and what everybody reads)
-        this.net.send({ t: 'died', cause: p.lastCause === 'fall' ? `fall ${Math.round(p.lastFall.drop)}m ${Math.round(p.lastFall.speed)}m/s` : p.lastCause || 'injuries', v: variant });
-        this.inv.clear();
-        this.weapons.validate();
-      }
-    } else if (!p.dead) this.deathSent = false;
-
-    // the hour: before a game has begun it is always day behind the menu
-    const hour = hourAt(this.started ? this.hourNow() : DAY.menu);
-    // (an admin's night vision: what is seen is the day behind the menu; what hour it is, is as it was)
-    const seen = this.nightSight && this.started ? hourAt(DAY.menu) : hour;
-    atmo.setHour(seen.light, seen.low);
-    if (this.started && hour.night !== this.wasNight) {
-      if (this.wasNight !== null) this.hud.note(hour.night ? 'Night has fallen' : 'First light', hour.night ? 'warn' : 'good');
-      this.wasNight = hour.night;
-    }
-    atmo.update();
-    veg.update(dt, cam);
-    grass.update(cam, interp);
-
-    // audio
-    const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
-    audio.setListener(cam.position, fwd, new THREE.Vector3(0, 1, 0));
-    if (Math.random() < 0.1) {
-      this.indoors = physics.raycast(cam.position, { x: 0, y: 1, z: 0 }, 12, SHOT_GROUPS, p.collider) !== null;
-      // forest floor underfoot means trees overhead: leaves instead of open-field insects
-      this.inForest = this.s.terrain.surfaceAt(p.pos.x, p.pos.z) === 'dirt';
-    }
-    audio.updateAmbience(dt, cam.position, this.indoors, this.inForest, bunkerDark(this.bunker.place, cam.position.x, cam.position.y, cam.position.z));
-    // (the helicopter and its crate: put where the flight's clock has them, and the rotor heard from where it is)
-    this.airdrops.update(dt, cam.position, seen.light, this.indoors, bunkerDark(this.bunker.place, cam.position.x, cam.position.y, cam.position.z));
-    // breathing follows how much of the reserve is left, as a percentage
-    if (this.started) audio.body(dt, (v.stamina / MAX_STAMINA) * 100, v.health, !p.dead, v.bleeding);
-
-    // post-fx reacting to state
-    const hurt = p.hurt;
-    r.chroma.offset.set(hurt * 0.004 + (v.health < 25 ? 0.0015 : 0), hurt * 0.002);
-    // (and the blood: the colour goes out of the world as it is lost, and below what a head can work on the edges
-    // of the picture close in and open again, slowly, as a pulse does)
-    const grey = p.dead || !this.started ? 0 : greyOf(v.blood);
-    r.grade.saturation = -0.08 - grey * 0.82;
-    r.vignette.darkness = 0.42 + (this.weapons.aiming ? 0.12 : 0) + (v.health < 25 ? 0.25 : 0) + (p.faint ? 0.3 + 0.14 * Math.sin(now / 520) : grey * 0.1);
-    this.sayBlood();
-    this.wince(dt);
-
-    const hasCompass = this.hasCompass;
-    const heading = THREE.MathUtils.radToDeg(-p.yaw);
-    this.updateSaid(now);
-    this.hud.update({
-      dt,
-      vitals: v,
-      winded: p.outOfBreath,
-      // no keyboard on a phone: the Use button lights up instead of naming a key
-      prompt: this.awaitClick ? '<kbd>Click</kbd>to look around' : this.touch ? (this.prompt?.replace(/<kbd>F<\/kbd>/, '').replace(/ <small>G to [^<]*<\/small>/, '').replace('W A S D to drive · Space is the handbrake', 'the stick drives · the jump button is the handbrake') ?? null) : this.prompt,
-      mark: this.awaitClick ? null : this.mark,
-      acts: this.awaitClick ? null : this.handActs(),
-      touch: !!this.touch,
-      weapon: this.garage.ride ? null : this.weapons.status(),
-      aiming: this.weapons.aiming,
-      spread: this.weapons.spread,
-      lag: this.lagPx(),
-      arms: this.weapons.armStamina,
-      ride: this.garage.ride && !p.dead ? { kmh: Math.abs(this.garage.ride.jeep.speed) * 3.6, fuel: this.garage.ride.jeep.fuel / JEEP.tank, hp: this.garage.ride.jeep.hp / JEEP.hp, driver: this.garage.ride.seat === 0 } : null,
-      scoped: this.weapons.scoped,
-      sightless: this.weapons.sightless,
-      glass: !!this.glass,
-      hitMarker: this.weapons.hitMarker,
-      kill: this.weapons.killMarker,
-      head: this.weapons.headMarker,
-      hurt,
-      bleed: v.bleeding && !p.dead ? { rate: v.bleed, left: bleedsOutIn(v.blood, v.bleed), hint: this.bleedHint() } : null,
-      lowBlood: !v.bleeding && !p.dead && this.started && v.blood < BLOOD.grey[0] - 200 ? this.bloodHint() : null,
-      drip: p.drip.left > 0,
-      gas: this.gas.air,
-      fire: this.byFire,
-      heading: !uiOpen ? heading : null,
-      bearing: hasCompass,
-      progress: this.cook ? this.cookShown() : this.use ? { label: this.use.label, t: this.use.t / this.use.dur } : this.ready ? { label: `${ITEMS[this.ready.item.id].name}: ${ITEMS[this.ready.item.id].throw ? (this.touch ? 'hold fire to cook it, let go to throw' : 'hold the left button to cook it, let go to throw · its key again puts it away') : this.touch ? 'fire to use it' : 'hold the left button to use it · its key again puts it away'}`, t: -1 } : null,
-      boost: p.boost,
-      hotbar: this.hotbar(),
-      fps: this.fps,
-      ping: this.online ? this.net.ping : null,
-      dead: p.dead,
-      deadText: this.deathInfo,
-      hidden: uiOpen || !this.started,
-    });
-
-    // (what G would do here gets a button of its own beside Use)
-    // (the Close button it shows is the inventory's and the trader's: the map has its own way out)
-    this.touch?.update(playing && !uiOpen && !typing, this.invUI.isOpen || this.shop.isOpen, !!this.prompt?.includes('<kbd>F'), {
-      g: this.prompt?.includes('G to pour') ? 'Fuel' : this.prompt?.includes('G to pack up') ? 'Pack' : null,
-      aiming: this.weapons.aiming,
-      lamp: this.weapons.hasLamp || this.inv.count('flashlight') > 0,
-      lit: this.lit,
-      talk: this.online && this.voice.supported,
-      talking: this.voice.talking,
-    });
-    this.perf.beforeRender();
-    // (a blast near by throws the view off for a moment: laid on the eye last of all, so nothing aims by it)
-    const sh = this.effects.shake;
-    if (sh.pitch || sh.yaw || sh.roll) {
-      const eye = this.s.r.camera;
-      eye.rotateX(sh.pitch);
-      eye.rotateY(sh.yaw);
-      eye.rotateZ(sh.roll);
-      eye.updateMatrixWorld();
-    }
-    r.render(dt);
-    // (the figure in the inventory, laid over the game's picture where the page shows it: nothing, while that is shut)
-    this.doll?.draw(dt);
-    this.perf.afterRender();
-    input.endFrame();
-
-    this.fpsAcc += dt;
-    this.fpsN++;
-    if (this.fpsAcc > 0.5) {
-      this.fps = this.fpsN / this.fpsAcc;
-      // struggling for a while: point at the options once (the game never lowers them itself)
-      this.slowFor = playing && this.fps < 28 && !(this.gfx.fpsLimit && this.gfx.fpsLimit <= 30) ? this.slowFor + this.fpsAcc : 0;
-      if (this.slowFor > 8 && !this.slowHinted) {
-        this.slowHinted = true;
-        this.hud.note(TOUCH ? 'Low frame rate: open the menu, then Settings' : 'Low frame rate: press Esc and open Settings', 'warn');
-        this.hud.chatLine('system', '', `The frame rate is low. ${TOUCH ? 'Open the menu' : 'Press Esc'} and open Settings to turn the graphics down.`);
-      }
-      this.fpsAcc = 0;
-      this.fpsN = 0;
-    }
-  }
+// The methods that live in game/ (see each file there): TypeScript is told of them here, and they are put back on
+// the class as it had them, not enumerable. (Cut out on 2026-10-14 so that game.ts can be read in pieces.)
+type Methods<T> = { [K in keyof T]: T[K] extends (this: Game, ...a: infer A) => infer R ? (...a: A) => R : never };
+export interface Game {
+  join: Methods<typeof enterMethods>['join'];
+  dress: Methods<typeof enterMethods>['dress'];
+  onRange: Methods<typeof enterMethods>['onRange'];
+  enterOffline: Methods<typeof enterMethods>['enterOffline'];
+  fillCrate: Methods<typeof enterMethods>['fillCrate'];
+  fresh: Methods<typeof enterMethods>['fresh'];
+  spawnAtEdge: Methods<typeof enterMethods>['spawnAtEdge'];
+  freshKit: Methods<typeof enterMethods>['freshKit'];
+  kitUp: Methods<typeof enterMethods>['kitUp'];
+  trashed: Methods<typeof enterMethods>['trashed'];
+  refilled: Methods<typeof enterMethods>['refilled'];
+  carryPowers: Methods<typeof enterMethods>['carryPowers'];
+  emptyHold: Methods<typeof enterMethods>['emptyHold'];
+  makeTag: Methods<typeof enterMethods>['makeTag'];
+  ensureTag: Methods<typeof enterMethods>['ensureTag'];
+  tickZone: Methods<typeof enterMethods>['tickZone'];
+  voidTags: Methods<typeof enterMethods>['voidTags'];
+  tickTags: Methods<typeof enterMethods>['tickTags'];
+  restore: Methods<typeof enterMethods>['restore'];
+  save: Methods<typeof enterMethods>['save'];
+  enterOnline: Methods<typeof onlineMethods>['enterOnline'];
+  around: Methods<typeof onlineMethods>['around'];
+  bumpDummies: Methods<typeof onlineMethods>['bumpDummies'];
+  updateOnline: Methods<typeof onlineMethods>['updateOnline'];
+  addRemote: Methods<typeof onlineMethods>['addRemote'];
+  act: Methods<typeof onlineMethods>['act'];
+  wear: Methods<typeof onlineMethods>['wear'];
+  syncBack: Methods<typeof onlineMethods>['syncBack'];
+  syncGear: Methods<typeof onlineMethods>['syncGear'];
+  drawHeads: Methods<typeof onlineMethods>['drawHeads'];
+  portrait: Methods<typeof onlineMethods>['portrait'];
+  addRemoteStash: Methods<typeof onlineMethods>['addRemoteStash'];
+  addCorpse: Methods<typeof onlineMethods>['addCorpse'];
+  removeCorpse: Methods<typeof onlineMethods>['removeCorpse'];
+  findBox: Methods<typeof onlineMethods>['findBox'];
+  addDrop: Methods<typeof dropsMethods>['addDrop'];
+  layWreck: Methods<typeof dropsMethods>['layWreck'];
+  removeDrop: Methods<typeof dropsMethods>['removeDrop'];
+  tickDrops: Methods<typeof dropsMethods>['tickDrops'];
+  takeHit: Methods<typeof dropsMethods>['takeHit'];
+  sendState: Methods<typeof dropsMethods>['sendState'];
+  lootPlaced: Methods<typeof dropsMethods>['lootPlaced'];
+  syncOpenBox: Methods<typeof dropsMethods>['syncOpenBox'];
+  spawnDummies: Methods<typeof dropsMethods>['spawnDummies'];
+  onGuarded: Methods<typeof dropsMethods>['onGuarded'];
+  onHit: Methods<typeof dropsMethods>['onHit'];
+  nextWeapon: Methods<typeof dropsMethods>['nextWeapon'];
+  resume: Methods<typeof dropsMethods>['resume'];
+  unpause: Methods<typeof dropsMethods>['unpause'];
+  pause: Methods<typeof dropsMethods>['pause'];
+  respawn: Methods<typeof dropsMethods>['respawn'];
+  applyGraphics: Methods<typeof dropsMethods>['applyGraphics'];
+  lightStep: Methods<typeof dropsMethods>['lightStep'];
+  hourNow: Methods<typeof dropsMethods>['hourNow'];
+  menuCamera: Methods<typeof dropsMethods>['menuCamera'];
+  afterBoot: Methods<typeof dropsMethods>['afterBoot'];
+  start: Methods<typeof dropsMethods>['start'];
+  takeWorldItem: Methods<typeof handsMethods>['takeWorldItem'];
+  dropItem: Methods<typeof handsMethods>['dropItem'];
+  inventoryChanged: Methods<typeof handsMethods>['inventoryChanged'];
+  assignHot: Methods<typeof handsMethods>['assignHot'];
+  autoHot: Methods<typeof handsMethods>['autoHot'];
+  unbury: Methods<typeof handsMethods>['unbury'];
+  seenByInfected: Methods<typeof handsMethods>['seenByInfected'];
+  feedMap: Methods<typeof handsMethods>['feedMap'];
+  mapPerson: Methods<typeof handsMethods>['mapPerson'];
+  setTint: Methods<typeof handsMethods>['setTint'];
+  order: Methods<typeof handsMethods>['order'];
+  adminSelf: Methods<typeof handsMethods>['adminSelf'];
+  showPowers: Methods<typeof handsMethods>['showPowers'];
+  toggleAdmin: Methods<typeof handsMethods>['toggleAdmin'];
+  toggleFreecam: Methods<typeof handsMethods>['toggleFreecam'];
+  deleteLooked: Methods<typeof handsMethods>['deleteLooked'];
+  adminLook: Methods<typeof handsMethods>['adminLook'];
+  watch: Methods<typeof handsMethods>['watch'];
+  drawNames: Methods<typeof handsMethods>['drawNames'];
+  flyCamera: Methods<typeof handsMethods>['flyCamera'];
+  hot: Methods<typeof handsMethods>['hot'];
+  emptyHands: Methods<typeof handsMethods>['emptyHands'];
+  stow: Methods<typeof handsMethods>['stow'];
+  takeUp: Methods<typeof handsMethods>['takeUp'];
+  poseOf: Methods<typeof handsMethods>['poseOf'];
+  countOf: Methods<typeof handsMethods>['countOf'];
+  handFire: Methods<typeof handsMethods>['handFire'];
+  wellHere: Methods<typeof handsMethods>['wellHere'];
+  swipeCard: Methods<typeof handsMethods>['swipeCard'];
+  rest: Methods<typeof handsMethods>['rest'];
+  pourFuel: Methods<typeof handsMethods>['pourFuel'];
+  fillBottle: Methods<typeof handsMethods>['fillBottle'];
+  startUse: Methods<typeof itemsMethods>['startUse'];
+  bottles: Methods<typeof itemsMethods>['bottles'];
+  drinkAt: Methods<typeof itemsMethods>['drinkAt'];
+  lightFire: Methods<typeof itemsMethods>['lightFire'];
+  consume: Methods<typeof itemsMethods>['consume'];
+  onGround: Methods<typeof itemsMethods>['onGround'];
+  settle: Methods<typeof itemsMethods>['settle'];
+  mine: Methods<typeof itemsMethods>['mine'];
+  release: Methods<typeof itemsMethods>['release'];
+  putAway: Methods<typeof itemsMethods>['putAway'];
+  breakOff: Methods<typeof itemsMethods>['breakOff'];
+  useItem: Methods<typeof itemsMethods>['useItem'];
+  pullPin: Methods<typeof itemsMethods>['pullPin'];
+  cooking: Methods<typeof itemsMethods>['cooking'];
+  cookShown: Methods<typeof itemsMethods>['cookShown'];
+  emptyOfGrenade: Methods<typeof itemsMethods>['emptyOfGrenade'];
+  lagPx: Methods<typeof itemsMethods>['lagPx'];
+  emote: Methods<typeof itemsMethods>['emote'];
+  setHold: Methods<typeof itemsMethods>['setHold'];
+  updateWheel: Methods<typeof itemsMethods>['updateWheel'];
+  updateSaid: Methods<typeof itemsMethods>['updateSaid'];
+  blowBarrel: Methods<typeof itemsMethods>['blowBarrel'];
+  updateBarrels: Methods<typeof itemsMethods>['updateBarrels'];
+  explode: Methods<typeof itemsMethods>['explode'];
+  openBox: Methods<typeof itemsMethods>['openBox'];
+  unloadWeapon: Methods<typeof itemsMethods>['unloadWeapon'];
+  attachTargets: Methods<typeof gunsMethods>['attachTargets'];
+  gunInHands: Methods<typeof gunsMethods>['gunInHands'];
+  attachMod: Methods<typeof gunsMethods>['attachMod'];
+  detachMod: Methods<typeof gunsMethods>['detachMod'];
+  handActs: Methods<typeof gunsMethods>['handActs'];
+  magWork: Methods<typeof gunsMethods>['magWork'];
+  turnMagWork: Methods<typeof gunsMethods>['turnMagWork'];
+  unloadMagazine: Methods<typeof gunsMethods>['unloadMagazine'];
+  fillMagazine: Methods<typeof gunsMethods>['fillMagazine'];
+  emptyMagazine: Methods<typeof gunsMethods>['emptyMagazine'];
+  newStash: Methods<typeof gunsMethods>['newStash'];
+  dig: Methods<typeof gunsMethods>['dig'];
+  stashItem: Methods<typeof gunsMethods>['stashItem'];
+  nearbyStash: Methods<typeof gunsMethods>['nearbyStash'];
+  markDrops: Methods<typeof gunsMethods>['markDrops'];
+  openSky: Methods<typeof gunsMethods>['openSky'];
+  callDrop: Methods<typeof gunsMethods>['callDrop'];
+  flightBegun: Methods<typeof gunsMethods>['flightBegun'];
+  dropLanded: Methods<typeof gunsMethods>['dropLanded'];
+  jobBook: Methods<typeof gunsMethods>['jobBook'];
+  keepBook: Methods<typeof gunsMethods>['keepBook'];
+  setCredit: Methods<typeof gunsMethods>['setCredit'];
+  openShop: Methods<typeof gunsMethods>['openShop'];
+  toggleMap: Methods<typeof gunsMethods>['toggleMap'];
+  toggleInventory: Methods<typeof gunsMethods>['toggleInventory'];
+  updateInteraction: Methods<typeof interactMethods>['updateInteraction'];
+  nearestLoose: Methods<typeof interactMethods>['nearestLoose'];
+  dropInHands: Methods<typeof interactMethods>['dropInHands'];
+  tickCrates: Methods<typeof interactMethods>['tickCrates'];
+  hotbar: Methods<typeof interactMethods>['hotbar'];
+  takeVitals: Methods<typeof interactMethods>['takeVitals'];
+  sayBlood: Methods<typeof interactMethods>['sayBlood'];
+  bloodHint: Methods<typeof interactMethods>['bloodHint'];
+  wince: Methods<typeof interactMethods>['wince'];
+  bleedHint: Methods<typeof interactMethods>['bleedHint'];
+  syncHeld: Methods<typeof interactMethods>['syncHeld'];
+  frame: Methods<typeof frameMethods>['frame'];
+}
+for (const part of [enterMethods, onlineMethods, dropsMethods, handsMethods, itemsMethods, gunsMethods, interactMethods, frameMethods]) {
+  for (const [name, d] of Object.entries(Object.getOwnPropertyDescriptors(part))) Object.defineProperty(Game.prototype, name, { ...d, enumerable: false });
 }

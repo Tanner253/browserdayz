@@ -48,7 +48,7 @@ const ranges = ts.getLeadingCommentRanges(text, 0) ?? [];
 // (the header is the leading comment block of the file, up to the last comment that ends before a blank line or the first statement)
 const header = text.slice(0, firstStart).replace(/\s+$/, '');
 
-interface Imp { spec: string; kind: 'named' | 'default' | 'ns'; name: string; prop: string; type: boolean }
+interface Imp { decl: ts.ImportDeclaration; spec: string; kind: 'named' | 'default' | 'ns'; name: string; prop: string; type: boolean }
 const imports = new Map<ts.Symbol, Imp>();
 const importDecls: ts.ImportDeclaration[] = [];
 for (const s of stmts) {
@@ -58,10 +58,10 @@ for (const s of stmts) {
   const c = s.importClause;
   if (!c) continue;
   const allType = !!c.isTypeOnly;
-  if (c.name) imports.set(checker.getSymbolAtLocation(c.name)!, { spec, kind: 'default', name: c.name.text, prop: 'default', type: allType });
+  if (c.name) imports.set(checker.getSymbolAtLocation(c.name)!, { decl: s, spec, kind: 'default', name: c.name.text, prop: 'default', type: allType });
   const nb = c.namedBindings;
-  if (nb && ts.isNamespaceImport(nb)) imports.set(checker.getSymbolAtLocation(nb.name)!, { spec, kind: 'ns', name: nb.name.text, prop: '*', type: allType });
-  if (nb && ts.isNamedImports(nb)) for (const e of nb.elements) imports.set(checker.getSymbolAtLocation(e.name)!, { spec, kind: 'named', name: e.name.text, prop: (e.propertyName ?? e.name).text, type: allType || e.isTypeOnly });
+  if (nb && ts.isNamespaceImport(nb)) imports.set(checker.getSymbolAtLocation(nb.name)!, { decl: s, spec, kind: 'ns', name: nb.name.text, prop: '*', type: allType });
+  if (nb && ts.isNamedImports(nb)) for (const e of nb.elements) imports.set(checker.getSymbolAtLocation(e.name)!, { decl: s, spec, kind: 'named', name: e.name.text, prop: (e.propertyName ?? e.name).text, type: allType || e.isTypeOnly });
 }
 
 /** whether a statement does something as the module loads: calls anything but a builder of plain values, or is not a declaration at all */
@@ -201,7 +201,7 @@ const importLines = (mod: string) => {
   // the file's own imports, in their own order, as many of them as this module uses
   for (const d of importDecls) {
     const spec = (d.moduleSpecifier as ts.StringLiteral).text;
-    const mine = [...extNeeds.get(mod)!].map(([sym, value]) => ({ i: imports.get(sym)!, value })).filter((x) => x.i.spec === spec);
+    const mine = [...extNeeds.get(mod)!].map(([sym, value]) => ({ i: imports.get(sym)!, value })).filter((x) => x.i.decl === d);
     if (!mine.length) continue;
     const s = extSpec(mod, spec);
     const ns = mine.find((x) => x.i.kind === 'ns'), def = mine.find((x) => x.i.kind === 'default');

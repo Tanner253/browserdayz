@@ -33,7 +33,7 @@ const uniqMods = plan.modules.filter((m, i) => plan.modules.findIndex((q) => q.n
 const modOf = (line: number) => plan.modules.find((m) => line >= m.from && line <= m.to)?.name ?? '';
 
 // ---- the file's imports and top-level declarations: what a moved method may use
-interface Imp { spec: string; kind: 'named' | 'default' | 'ns'; name: string; prop: string; type: boolean }
+interface Imp { decl: ts.ImportDeclaration; spec: string; kind: 'named' | 'default' | 'ns'; name: string; prop: string; type: boolean }
 const imports = new Map<ts.Symbol, Imp>();
 const importDecls: ts.ImportDeclaration[] = [];
 const tops = new Map<ts.Symbol, { node: ts.Statement; name: string; typeOnly: boolean }>();
@@ -42,10 +42,10 @@ for (const s of sf.statements) {
     importDecls.push(s);
     const spec = (s.moduleSpecifier as ts.StringLiteral).text, c = s.importClause;
     if (!c) continue;
-    if (c.name) imports.set(checker.getSymbolAtLocation(c.name)!, { spec, kind: 'default', name: c.name.text, prop: 'default', type: !!c.isTypeOnly });
+    if (c.name) imports.set(checker.getSymbolAtLocation(c.name)!, { decl: s, spec, kind: 'default', name: c.name.text, prop: 'default', type: !!c.isTypeOnly });
     const nb = c.namedBindings;
-    if (nb && ts.isNamespaceImport(nb)) imports.set(checker.getSymbolAtLocation(nb.name)!, { spec, kind: 'ns', name: nb.name.text, prop: '*', type: !!c.isTypeOnly });
-    if (nb && ts.isNamedImports(nb)) for (const e of nb.elements) imports.set(checker.getSymbolAtLocation(e.name)!, { spec, kind: 'named', name: e.name.text, prop: (e.propertyName ?? e.name).text, type: !!c.isTypeOnly || e.isTypeOnly });
+    if (nb && ts.isNamespaceImport(nb)) imports.set(checker.getSymbolAtLocation(nb.name)!, { decl: s, spec, kind: 'ns', name: nb.name.text, prop: '*', type: !!c.isTypeOnly });
+    if (nb && ts.isNamedImports(nb)) for (const e of nb.elements) imports.set(checker.getSymbolAtLocation(e.name)!, { decl: s, spec, kind: 'named', name: e.name.text, prop: (e.propertyName ?? e.name).text, type: !!c.isTypeOnly || e.isTypeOnly });
     continue;
   }
   const add = (id: ts.Identifier, typeOnly: boolean) => tops.set(checker.getSymbolAtLocation(id)!, { node: s, name: id.text, typeOnly });
@@ -87,6 +87,7 @@ const extNeeds = new Map<string, Map<ts.Symbol, boolean>>();
 const topNeeds = new Map<string, Map<string, boolean>>();
 for (const x of uniqMods) { extNeeds.set(x.name, new Map()); topNeeds.set(x.name, new Map()); }
 const exportTop = new Set<ts.Statement>();
+const clsValue = new Set<string>();
 for (const x of moved) {
   const visit = (n: ts.Node, inType: boolean) => {
     if (ts.isIdentifier(n)) {
@@ -99,7 +100,8 @@ for (const x of moved) {
       if (imports.has(sym)) { const e = extNeeds.get(x.mod)!; e.set(sym, (e.get(sym) ?? false) || !inType); }
       else if (tops.has(sym)) {
         const t = tops.get(sym)!;
-        if (t.node === cls) return; // (the class itself: imported as a type below)
+        // (the class itself: imported below, as a value where a part uses it as one: its statics)
+        if (t.node === cls) { if (!inType) clsValue.add(x.mod); return; }
         exportTop.add(t.node);
         const e = topNeeds.get(x.mod)!;
         e.set(t.name, (e.get(t.name) ?? false) || (!inType && !t.typeOnly));
@@ -117,7 +119,7 @@ const relSpec = (spec: string) => {
   let r = path.relative(path.resolve(root, plan.dir), path.resolve(path.dirname(fileAbs), spec)).split(path.sep).join('/');
   return r.startsWith('.') ? r : './' + r;
 };
-const toFile = (() => { let r = path.relative(path.resolve(root, plan.dir), fileAbs.replace(/\.ts$/, '')).split(path.sep).join('/'); return r.startsWith('.') ? r : './' + r; })();
+const toFile = (() => { let r = path.relative(path.resolve(root, plan.dir), fileAbs).replace(/\.ts$/, '').split(path.sep).join('/'); return r.startsWith('.') ? r : './' + r; })();
 const objName = (mod: string) => mod.replace(/-(\w)/g, (_, c) => c.toUpperCase()) + 'Methods';
 const outputs = new Map<string, string>();
 const original = path.basename(plan.file);
@@ -125,7 +127,7 @@ for (const x of uniqMods) {
   const lines = [`// ${x.about ?? x.name}`, `// (Methods of ${plan.class} cut out of ${original} whole on 2026-10-14, so that they can be read and worked on alone: put back on`, `// ${plan.class}.prototype as the file loads. Nothing in them was changed but \`this: ${plan.class}\` said as the first parameter.)`, ''];
   for (const d of importDecls) {
     const spec = (d.moduleSpecifier as ts.StringLiteral).text;
-    const mine = [...extNeeds.get(x.name)!].map(([sym, value]) => ({ i: imports.get(sym)!, value })).filter((q) => q.i.spec === spec);
+    const mine = [...extNeeds.get(x.name)!].map(([sym, value]) => ({ i: imports.get(sym)!, value })).filter((q) => q.i.decl === d);
     if (!mine.length) continue;
     const s = relSpec(spec), ns = mine.find((q) => q.i.kind === 'ns'), def = mine.find((q) => q.i.kind === 'default'), named = mine.filter((q) => q.i.kind === 'named');
     if (ns) lines.push(`import ${ns.i.type || !ns.value ? 'type ' : ''}* as ${ns.i.name} from '${s}';`);
@@ -137,7 +139,8 @@ for (const x of uniqMods) {
   }
   const tn = [...topNeeds.get(x.name)!];
   const values = tn.filter(([, v]) => v).map(([n]) => n).sort(), types = tn.filter(([, v]) => !v).map(([n]) => n).sort();
-  lines.push(`import ${values.length ? '' : 'type '}{ ${[...values, ...types.map((n) => (values.length ? 'type ' : '') + n), (values.length ? 'type ' : '') + plan.class].join(', ')} } from '${toFile}';`);
+  const cv = clsValue.has(x.name), anyValue = values.length > 0 || cv;
+  lines.push(`import ${anyValue ? '' : 'type '}{ ${[...values, ...(cv ? [plan.class] : []), ...types.map((n) => (anyValue ? 'type ' : '') + n), ...(cv ? [] : [(anyValue ? 'type ' : '') + plan.class])].join(', ')} } from '${toFile}';`);
   lines.push('');
   lines.push(`export const ${objName(x.name)} = {`);
   const bodies: string[] = [];
@@ -177,6 +180,40 @@ for (const x of uniqMods) {
     const mods = ts.canHaveModifiers(s) ? ts.getModifiers(s) ?? [] : [];
     if (!mods.some((k) => k.kind === ts.SyntaxKind.ExportKeyword)) cuts.push([s.getStart(sf), s.getStart(sf), 'export ']);
   }
+  {
+    const movedSet = new Set<ts.Node>(moved.map((q) => q.m));
+    const fileUsed = new Set<ts.Symbol>();
+    const walkFile = (n: ts.Node) => {
+      if (movedSet.has(n)) return;
+      if (ts.isIdentifier(n)) {
+        let sym = checker.getSymbolAtLocation(n);
+        if (n.parent && ts.isShorthandPropertyAssignment(n.parent)) sym = checker.getShorthandAssignmentValueSymbol(n.parent);
+        if (sym && imports.has(sym)) fileUsed.add(sym);
+      }
+      n.forEachChild(walkFile);
+    };
+    for (const st of sf.statements) if (!ts.isImportDeclaration(st)) walkFile(st);
+    for (const d of importDecls) {
+      const c = d.importClause;
+      if (!c) continue;
+      const syms = [...imports].filter(([, i]) => i.decl === d);
+      if (syms.every(([sym]) => fileUsed.has(sym))) continue;
+      const keep = syms.filter(([sym]) => fileUsed.has(sym)).map(([, i]) => i);
+      const spec = d.moduleSpecifier.getText(sf);
+      const elems = c.namedBindings && ts.isNamedImports(c.namedBindings) ? c.namedBindings.elements : ts.factory.createNodeArray<ts.ImportSpecifier>([]);
+      // (a module this file loaded for a value is still loaded here, where it was, if nothing of it is left to name: the order modules load in is kept)
+      const hadValue = !c.isTypeOnly && syms.some(([, i]) => !i.type), keepsValue = !c.isTypeOnly && keep.some((i) => !i.type);
+      const ns = keep.find((i) => i.kind === 'ns'), def = keep.find((i) => i.kind === 'default'), named = keep.filter((i) => i.kind === 'named');
+      const list = named.map((i) => elems.find((e) => e.name.text === i.name)!.getText(sf));
+      let t = hadValue && !keepsValue ? `import ${spec};` : '';
+      if (keep.length) {
+        const typeOnly = c.isTypeOnly || (hadValue && !keepsValue);
+        const lst = typeOnly && !c.isTypeOnly ? list.map((x) => x.replace(/^type\s+/, '')) : list;
+        t += `${t ? eol : ''}import ${typeOnly ? 'type ' : ''}${def ? def.name : ''}${def && (ns || lst.length) ? ', ' : ''}${ns ? `* as ${ns.name}` : ''}${lst.length ? `{ ${lst.join(', ')} }` : ''} from ${spec};`;
+      }
+      cuts.push([d.getStart(sf), d.getEnd(), t]);
+    }
+  }
   // (the imports of the methods, after the file's own; and the interface and the putting back, after the class)
   const lastImport = importDecls[importDecls.length - 1].getEnd();
   const imps = uniqMods.map((x) => `import { ${objName(x.name)} } from './${path.basename(plan.dir)}/${x.name}';`).join(eol);
@@ -186,7 +223,10 @@ for (const x of uniqMods) {
     `// The methods that live in ${path.basename(plan.dir)}/ (see each file there): TypeScript is told of them here, and they are put back on`,
     `// the class as it had them, not enumerable. (Cut out on 2026-10-14 so that ${original} can be read in pieces.)`,
     `type Methods<T> = { [K in keyof T]: T[K] extends (this: ${plan.class}, ...a: infer A) => infer R ? (...a: A) => R : never };`,
-    `export interface ${plan.class} extends ${uniqMods.map((x) => `Methods<typeof ${objName(x.name)}>`).join(', ')} {}`,
+    // (each by name: an interface may not extend a type made of methods that themselves name the class)
+    `export interface ${plan.class} {`,
+    ...moved.map((q) => `  ${q.name}: Methods<typeof ${objName(q.mod)}>['${q.name}'];`),
+    `}`,
     `for (const part of [${uniqMods.map((x) => objName(x.name)).join(', ')}]) {`,
     `  for (const [name, d] of Object.entries(Object.getOwnPropertyDescriptors(part))) Object.defineProperty(${plan.class}.prototype, name, { ...d, enumerable: false });`,
     `}`,
