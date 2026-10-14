@@ -38,7 +38,7 @@ const COLD_AFTER = 15;
  * across. (2026-10-12: nineteen such boxes in sight were 1.7 million triangles a frame, and the first sight of
  * each sort of thing stopped the game while a hundred thousand triangles were laid out.)
  */
-const WHOLE_WITHIN = 9, WHOLE_UNTIL = 11;
+const WHOLE_WITHIN = 8, WHOLE_UNTIL = 10;
 
 const TRIGGER_GROUPS = groups(G_TRIGGER, 0xffff);
 const _frustum = new THREE.Frustum(), _pv = new THREE.Matrix4(), _inv = new THREE.Matrix4(), _ball = new THREE.Sphere();

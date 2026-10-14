@@ -394,7 +394,10 @@ export const dropsMethods = {
     // shadow map size per cascade, and how far from the camera shadows are drawn
     const [size, reach] = { low: [1024, 70], medium: [1024, 110], high: [2048, 160] }[g.shadows];
     atmo.setShadows(size, reach);
-    this.loot.shadowDist = g.shadows === 'high' ? 26 : 18;
+    // (a thing lying about casts a shadow only near the eye, on any setting: the owner, 2026-10-14, "loose loot more than
+    // about 8 m away drawn with its light model copy and no shadow". Its shadows were drawn into every one of the sun's
+    // maps out to 18 m, or 26 on high: more than the things themselves near the police station.)
+    this.loot.shadowDist = 8;
     // reach of the full-detail trees, and blades of grass per patch
     const [detail, density] = { low: [0.45, 0.4], medium: [0.7, 0.7], high: [1, 1] }[g.foliage];
     veg.setDetail(detail);
