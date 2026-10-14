@@ -17,7 +17,7 @@
 import * as THREE from 'three';
 import { assets } from '../core/assets';
 import { breathe } from '../core/breathe';
-import { backedOut, kitMatrix, standTriangles, type KitPiece, type V3 } from '../sim/kit';
+import { KitCaps, backedOut, kitMatrix, standTriangles, type KitPiece, type V3 } from '../sim/kit';
 import type { ShaderPatch } from './atmosphere';
 import { SNOW_GROUND } from './ground';
 
@@ -89,10 +89,18 @@ export async function kitMeshes(model: string, layout: KitPiece[], o: KitOptions
     // (a piece to a helping: a layout of a dozen pieces is a tenth of a second of sums, and nothing is drawn the while if it is done in one go)
     await breathe();
     const stand = new THREE.Matrix4().fromArray(kitMatrix(p));
+    // (what its cuts open is closed with stone: see `KitCaps`)
+    const caps = new KitCaps(p.cut ?? []);
+    const put = (name: string, q: number[]) => {
+      const to = rows.get(name)!;
+      to.pos.push(q[0], q[1], q[2]);
+      to.nrm.push(q[3], q[4], q[5]);
+      to.uv.push(q[6], q[7]);
+      if (o.attr) to.extra.push(...o.attr.of([q[0], q[1], q[2]], [q[3], q[4], q[5]]));
+    };
     for (const part of partsOf(root, p.id)) {
       const name = part.mat.name || 'stone';
-      let row = rows.get(name);
-      if (!row) rows.set(name, (row = { mat: paints.get(name) ?? part.mat, pos: [], nrm: [], uv: [], extra: [] }));
+      if (!rows.has(name)) rows.set(name, { mat: paints.get(name) ?? part.mat, pos: [], nrm: [], uv: [], extra: [] });
       const repeat = o.sets?.[name]?.repeat ?? 1;
       full.multiplyMatrices(stand, part.m);
       turnOnly.getNormalMatrix(full);
@@ -105,14 +113,11 @@ export async function kitMeshes(model: string, layout: KitPiece[], o: KitOptions
         corners.push([v.x, v.y, v.z, n.x, n.y, n.z, U ? U.getX(i) * repeat : 0, U ? U.getY(i) * repeat : 0]);
       }
       // (what is left of each triangle when the faces laid back to back in the piece and the layout's cuts are out of it)
-      const to = row;
-      standTriangles(corners, I ? (I.array as ArrayLike<number>) : null, p.cut ?? [], part.backs, (q) => {
-        to.pos.push(q[0], q[1], q[2]);
-        to.nrm.push(q[3], q[4], q[5]);
-        to.uv.push(q[6], q[7]);
-        if (o.attr) to.extra.push(...o.attr.of([q[0], q[1], q[2]], [q[3], q[4], q[5]]));
-      });
+      const index = I ? (I.array as ArrayLike<number>) : null;
+      if (caps.wanted) caps.take(corners, index, name);
+      standTriangles(corners, index, p.cut ?? [], part.backs, (q) => put(name, q));
     }
+    if (caps.wanted) caps.put(put);
   }
   const meshes: THREE.Mesh[] = [];
   let triangles = 0;

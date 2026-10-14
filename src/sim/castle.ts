@@ -476,7 +476,11 @@ export function castleKit(): KitPiece[] {
   /** the parapet of a side, cut where it is gone: across the whole of its thickness, from the walk up (a merlon: from the parapet's top up) */
   const top = (side: 'n' | 's' | 'e' | 'w'): Cut[] => gaps(side).map(([u0, u1, whole]) => {
     const lo = whole ? KIT_LEVELS.parapet - KIT_LEVELS.walk - 0.02 : gone;
-    return side === 'n' ? cutBox(u0, u1, lo, 4, -ez - 0.2, -ez + 1.3) : side === 's' ? cutBox(u0, u1, lo, 4, ez - 1.3, ez + 0.2) : side === 'e' ? cutBox(ex - 1.3, ex + 0.2, lo, 4, u0, u1) : cutBox(-ex - 0.2, -ex + 1.3, lo, 4, u0, u1);
+    const cut = side === 'n' ? cutBox(u0, u1, lo, 4, -ez - 0.2, -ez + 1.3) : side === 's' ? cutBox(u0, u1, lo, 4, ez - 1.3, ez + 0.2) : side === 'e' ? cutBox(ex - 1.3, ex + 0.2, lo, 4, u0, u1) : cutBox(-ex - 0.2, -ex + 1.3, lo, 4, u0, u1);
+    // WHAT IS BROKEN OFF LEAVES STONE, NOT A HOLE (see `KitCaps`). A merlon is one hollow skin with the parapet under
+    // it: broken off, the parapet was a trough a forearm deep with the walk at the bottom of it; it is closed level
+    // where it broke. A parapet gone to the walk has the walk under it: only its two broken ends are closed.
+    return { ...cut, cap: whole ? ('all' as const) : ('upright' as const) };
   });
   const wall = 'fort_wall_thin_straight_01', gh = GATEHOUSE.scale, gz = (C.gate.z0 + C.gate.z1) / 2, g0 = gz + ((KIT_GATE.z0 + KIT_GATE.z1) / 2) * gh;
   out.push({ id: wall, name: 'north wall', at: [WALL.half, y0, -zo], turn: -Math.PI / 2, cut: top('n') });
@@ -492,7 +496,9 @@ export function castleKit(): KitPiece[] {
   const px = ex + WALL.out - WALL.deep, pz = ez + WALL.out - WALL.deep;
   for (const tw of castleParts()) {
     if (tw.t !== 'tower') continue;
-    const cut = [cutRound(tw.cx, tw.cz, T.r - T.wall + 0.04, -0.06, 4), tw.cx > 0 ? cutBox(-60, px, -0.05, 4, -60, 60) : cutBox(-px, 60, -0.05, 4, -60, 60), tw.cz > 0 ? cutBox(-60, 60, -0.05, 4, -60, pz) : cutBox(-60, 60, -0.05, 4, -pz, 60)];
+    // (the two that take its top off on the terrace's side are closed with stone where they go through it: the broken
+    // ends of its ring of wall, and its top a hand under the terrace. Not the round one: the drum's own floor is there.)
+    const cut: Cut[] = [cutRound(tw.cx, tw.cz, T.r - T.wall + 0.04, -0.06, 4), { ...(tw.cx > 0 ? cutBox(-60, px, -0.05, 4, -60, 60) : cutBox(-px, 60, -0.05, 4, -60, 60)), cap: 'all' }, { ...(tw.cz > 0 ? cutBox(-60, 60, -0.05, 4, -60, pz) : cutBox(-60, 60, -0.05, 4, -pz, 60)), cap: 'all' }];
     const d = (tw.door * Math.PI) / 180;
     if (tw.hollow !== undefined) cut.push(cutTurned(tw.cx + Math.cos(d) * 3.3, tw.cz + Math.sin(d) * 3.3, Math.PI / 2 - d, 1.9, 0.58, tw.hollow - 0.03, tw.hollow + 2.2));
     out.push({ id: 'fort_tower_round', name: tw.name, at: [tw.cx, -KIT_TOWER.top[0] * T.kit, tw.cz], scale: T.kit, turn: (tw.cx * 7 + tw.cz * 3) * 0.1, cut, body: false });

@@ -13,7 +13,7 @@ import path from 'node:path';
 import { NodeIO, type Node } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { MeshoptDecoder } from 'meshoptimizer';
-import { backedOut, kitMatrix, kitPoint, standTriangles, type KitPiece } from '../src/sim/kit';
+import { KitCaps, backedOut, kitMatrix, kitPoint, standTriangles, type KitPiece } from '../src/sim/kit';
 import { CASTLE_SCALE, castleDoor, castleKit } from '../src/sim/castle';
 import { postMade } from '../src/sim/castle-post';
 import { SHEETS, castleShape } from '../src/world/castle-shape';
@@ -33,7 +33,7 @@ const mul4 = (a: number[], b: number[]) => {
   for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) o[c * 4 + r] += a[k * 4 + r] * b[c * 4 + k];
   return o;
 };
-let dropped = 0;
+let dropped = 0, laid = 0;
 async function kit(file: string, layout: KitPiece[]) {
   await MeshoptDecoder.ready;
   const doc = await new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.decoder': MeshoptDecoder }).read(path.join(process.cwd(), 'public/assets/models', file));
@@ -55,7 +55,10 @@ async function kit(file: string, layout: KitPiece[]) {
         const two = !!mat?.getDoubleSided(), backs = two ? backedOut(flat) : null, t = things.push({ name: `${p.name ?? p.id} [${mat?.getName() ?? ''}]`, post: false, two }) - 1;
         dropped += backs?.size ?? 0;
         let q: number[] = [];
-        standTriangles(pts.map((c) => kitPoint(m, [c[0], c[1], c[2]])), idx, p.cut ?? [], backs, (c) => {
+        // (a corner as the kit has it: where it is, and room for the way it faces and where it is on the picture, which nothing here asks)
+        const stood = pts.map((c) => [...kitPoint(m, [c[0], c[1], c[2]]), 0, 0, 0, 0, 0]);
+        if (caps.wanted) caps.take(stood, idx, 'stone');
+        standTriangles(stood, idx, p.cut ?? [], backs, (c) => {
           q.push(c[0], c[1], c[2]);
           if (q.length === 9) {
             tri(t, q);
@@ -65,7 +68,20 @@ async function kit(file: string, layout: KitPiece[]) {
       }
       for (const k of n.listChildren()) walk(k, mul4(own, k.getMatrix()));
     };
+    // (and what is laid across its cuts where they open it: drawn in the kit's own stuff, so from both sides)
+    const caps = new KitCaps(p.cut ?? []);
     walk(top, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+    if (!caps.wanted) continue;
+    const t = things.push({ name: `what closes the cuts of the ${p.name ?? p.id}`, post: false, two: true }) - 1;
+    let q: number[] = [];
+    caps.put((_, c) => {
+      q.push(c[0], c[1], c[2]);
+      if (q.length === 9) {
+        tri(t, q);
+        laid++;
+        q = [];
+      }
+    });
   }
 }
 await kit('fort_kit.glb', castleKit());
@@ -158,10 +174,13 @@ console.log(`  ${kitTriangles} triangles of the kit and the door (${dropped} of 
 
 assert.ok(dropped > 300, `the kit's parapets and tower rings lie back to back on what they stand on, and are to be cut back: ${dropped} were`);
 console.log('  ok  the faces of the kit that lay back to back on the walks, the platforms and the footings are cut back');
+// (what a cut opens is closed: the four broken merlons' troughs, the broken ends of the parapets and of the towers' rings)
+assert.ok(laid > 300, `stone is to be laid across the cuts that open the kit's pieces: ${laid} triangles were`);
+console.log(`  ok  stone is laid across the cuts that open the kit's pieces (${laid} triangles), and none of it in the plane of anything`);
 assert.equal(fort.length, 0, `${fort.length} places where two faces of the fort are in one plane:\n${fort.slice(0, 12).map(say).join('\n')}`);
 console.log("  ok  no two faces of the kit, the door or the fort's own are in one plane anywhere (inside a piece and back to back counted)");
 // (what the post makes by hand: two that nobody sees: the undersides of the duckboards and of a fallen merlon, both
 // on the terrace, and the edges of two groundsheets that meet. They are not to grow.)
 assert.ok(post.length <= 2, `${post.length} places where a face of the post is in one plane with another (two are known, and are not seen):\n${post.map(say).join('\n')}`);
 console.log(`  ok  of the post, no more than the two that are known and not seen (${post.length}${post.length ? ': ' + post.map(say).join('; ') : ''})`);
-console.log('3 passed');
+console.log('4 passed');

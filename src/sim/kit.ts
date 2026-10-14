@@ -18,7 +18,17 @@ export type Quat = [number, number, number, number];
  * is where so many flat sides all face inward (`planes`: [nx, ny, nz, d] each, a point being inside one when
  * n . p <= d). `mid` and `reach` are a ball that holds all of it, for telling quickly what it cannot touch.
  */
-export interface Cut { planes: [number, number, number, number][]; mid: V3; reach: number }
+export interface Cut {
+  planes: [number, number, number, number][];
+  mid: V3;
+  reach: number;
+  /**
+   * What it opens in a piece is closed with stone (see `KitCaps`): across all of its sides, or only across those
+   * that are upright (a parapet cut off at the walk has the walk under it already: only its broken ends are open).
+   * Unsaid: nothing is laid (whoever cuts has something of their own in the hole: a doorway's own jambs, a floor).
+   */
+  cap?: 'all' | 'upright';
+}
 
 /** One piece of a layout. All of it is said in the layout's own measure (metres; y up). */
 export interface KitPiece {
@@ -217,6 +227,153 @@ export function standTriangles(corners: number[][], index: ArrayLike<number> | n
       put(poly[0]);
       put(poly[k]);
       put(poly[k + 1]);
+    }
+  }
+}
+
+// ------------------------------------------------------------------ what a cut opens is closed
+
+interface CapSeg { p: number[]; q: number[]; tri: number[][]; big: number; tag: string }
+interface CapLine { id: number; s0: number; t0: number; s1: number; t1: number; sign: number; seg: CapSeg }
+
+/**
+ * WHAT A CUT OPENS IS CLOSED. A kit's piece is a skin with nothing in it, and a cut through it leaves the skin's
+ * edge standing round a hole: a parapet with its merlon broken off was a trough, and the end of a broken wall let
+ * the eye down inside it to its footing. So across each side of a cut that asks for it (`Cut.cap`), wherever the
+ * piece was SOLID there, stone is laid: the piece as it would look sawn through.
+ *
+ * Where it was solid is found from the piece itself. Every triangle that crosses the side leaves a line on it,
+ * which runs one way round what is solid (a triangle faces out of its piece). The side is then gone over in strips
+ * between the ends of those lines; in a strip the lines are in order across it, and going over them one by one a
+ * count is kept of how many solids one is in: where it is not nought, between two lines, there is stone. A strip
+ * whose lines do not close (a skin open at its foot) is left alone: a hole is not mended by guessing. What is laid
+ * has the picture of the bigger of the two faces it lies between, carried on over the break as if that face had
+ * been folded round its broken edge: so the courses of a wall run on round the corner of its broken end.
+ *
+ * Whoever stands a piece hands over ALL its triangles as they are stood, before anything is taken out of them
+ * (`take`, a shape of the piece at a time, each with a word for the stuff it is drawn in), and then asks for what is
+ * to be laid (`put`), which is given back by that word. What is laid inside another cut of the same piece is cut
+ * out of it like anything else.
+ */
+export class KitCaps {
+  private segs = new Map<number, CapSeg[]>();
+  constructor(private cuts: Cut[]) {}
+  /** whether any of the cuts asks to be closed */
+  get wanted(): boolean {
+    return this.cuts.some((c) => c.cap);
+  }
+  take(corners: number[][], index: ArrayLike<number> | null, tag: string): void {
+    const count = index ? index.length : corners.length;
+    for (let t = 0; t + 2 < count; t += 3) {
+      const tri = [corners[index ? index[t] : t], corners[index ? index[t + 1] : t + 1], corners[index ? index[t + 2] : t + 2]], [a, b, c] = tri;
+      const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+      const gx = uy * vz - uz * vy, gy = uz * vx - ux * vz, gz = ux * vy - uy * vx, twice = Math.hypot(gx, gy, gz);
+      if (twice < 1e-10) continue;
+      const mx = (a[0] + b[0] + c[0]) / 3, my = (a[1] + b[1] + c[1]) / 3, mz = (a[2] + b[2] + c[2]) / 3;
+      const reach = Math.max(Math.hypot(a[0] - mx, a[1] - my, a[2] - mz), Math.hypot(b[0] - mx, b[1] - my, b[2] - mz), Math.hypot(c[0] - mx, c[1] - my, c[2] - mz));
+      for (let ci = 0; ci < this.cuts.length; ci++) {
+        const cut = this.cuts[ci];
+        if (!cut.cap || Math.hypot(cut.mid[0] - mx, cut.mid[1] - my, cut.mid[2] - mz) > cut.reach + reach) continue;
+        for (let k = 0; k < cut.planes.length; k++) {
+          const [nx, ny, nz, d] = cut.planes[k];
+          if (cut.cap === 'upright' && Math.abs(ny) > 0.5) continue;
+          const side = tri.map((v) => nx * v[0] + ny * v[1] + nz * v[2] - d), out = side.map((v) => v > 0);
+          if (out[0] === out[1] && out[1] === out[2]) continue;
+          const ends: number[][] = [];
+          for (let e = 0; e < 3; e++) {
+            const j = (e + 1) % 3;
+            if (out[e] !== out[j]) ends.push(tri[e].map((v, i) => v + ((tri[j][i] - v) * side[e]) / (side[e] - side[j])));
+          }
+          let [p, q] = ends;
+          // (the line runs one way round what is solid: the way the triangle faces, crossed with the way the side does)
+          if ((q[0] - p[0]) * (gy * nz - gz * ny) + (q[1] - p[1]) * (gz * nx - gx * nz) + (q[2] - p[2]) * (gx * ny - gy * nx) < 0) [p, q] = [q, p];
+          // (and only as much of it as is on this side of the cut: within the cut's other sides)
+          let f0 = 0, f1 = 1;
+          for (let j = 0; j < cut.planes.length && f1 > f0; j++) {
+            if (j === k) continue;
+            const [ax, ay, az, ad] = cut.planes[j], sp = ax * p[0] + ay * p[1] + az * p[2] - ad, sq = ax * q[0] + ay * q[1] + az * q[2] - ad;
+            if (sp > 0 && sq > 0) f1 = -1;
+            else if (sp > 0) f0 = Math.max(f0, sp / (sp - sq));
+            else if (sq > 0) f1 = Math.min(f1, sp / (sp - sq));
+          }
+          if (f1 - f0 < 1e-9) continue;
+          const from = p, to = q, at = (f: number) => from.map((v, i) => v + (to[i] - v) * f), P = at(f0), Q = at(f1);
+          if (Math.hypot(Q[0] - P[0], Q[1] - P[1], Q[2] - P[2]) < 1e-6) continue;
+          const key = ci * 64 + k, list = this.segs.get(key);
+          if (list) list.push({ p: P, q: Q, tri, big: twice, tag });
+          else this.segs.set(key, [{ p: P, q: Q, tri, big: twice, tag }]);
+        }
+      }
+    }
+  }
+  put(emit: (tag: string, corner: number[]) => void): void {
+    for (const [key, segs] of this.segs) {
+      const ci = Math.floor(key / 64), n = this.cuts[ci].planes[key % 64];
+      // (the strips run along the longest of the lines: a wall sawn level is then two lines and one strip)
+      const long = segs.reduce((best, s) => (Math.hypot(s.q[0] - s.p[0], s.q[1] - s.p[1], s.q[2] - s.p[2]) > Math.hypot(best.q[0] - best.p[0], best.q[1] - best.p[1], best.q[2] - best.p[2]) ? s : best), segs[0]);
+      const ll = Math.hypot(long.q[0] - long.p[0], long.q[1] - long.p[1], long.q[2] - long.p[2]), e1 = [(long.q[0] - long.p[0]) / ll, (long.q[1] - long.p[1]) / ll, (long.q[2] - long.p[2]) / ll];
+      const e2 = [n[1] * e1[2] - n[2] * e1[1], n[2] * e1[0] - n[0] * e1[2], n[0] * e1[1] - n[1] * e1[0]], on = (v: number[], e: number[]) => v[0] * e[0] + v[1] * e[1] + v[2] * e[2];
+      const lines: CapLine[] = [];
+      for (const seg of segs) {
+        const sp = on(seg.p, e1), sq = on(seg.q, e1);
+        // (one that runs square across the strips is the end of a strip, not a line in it)
+        if (Math.abs(sq - sp) < 1e-6) continue;
+        lines.push(sp < sq ? { id: lines.length, s0: sp, t0: on(seg.p, e2), s1: sq, t1: on(seg.q, e2), sign: 1, seg } : { id: lines.length, s0: sq, t0: on(seg.q, e2), s1: sp, t1: on(seg.p, e2), sign: -1, seg });
+      }
+      const us = [...new Set(lines.flatMap((l) => [l.s0, l.s1]))].sort((p, q) => p - q).filter((u, i, all) => i === 0 || u - all[i - 1] > 1e-6);
+      let open = new Map<string, { lo: CapLine; hi: CapLine; from: number }>();
+      const lay = (o: { lo: CapLine; hi: CapLine; from: number }, to: number) => this.lay(ci, n, o.lo, o.hi, o.from, to, emit);
+      for (let i = 0; i + 1 < us.length; i++) {
+        const u0 = us[i], u1 = us[i + 1], um = (u0 + u1) / 2, now = new Map<string, { lo: CapLine; hi: CapLine; from: number }>();
+        const across = lines.filter((l) => l.s0 <= u0 + 1e-6 && l.s1 >= u1 - 1e-6).map((l) => ({ l, t: l.t0 + ((l.t1 - l.t0) * (um - l.s0)) / (l.s1 - l.s0) })).sort((p, q) => p.t - q.t);
+        if (across.reduce((s, x) => s + x.l.sign, 0) === 0) {
+          let inside = 0;
+          for (let j = 0; j + 1 < across.length; j++) {
+            inside += across[j].l.sign;
+            if (inside === 0 || across[j + 1].t - across[j].t < 1e-5) continue;
+            const id = `${across[j].l.id}:${across[j + 1].l.id}`;
+            now.set(id, open.get(id) ?? { lo: across[j].l, hi: across[j + 1].l, from: u0 });
+          }
+        }
+        for (const [id, o] of open) if (!now.has(id)) lay(o, u0);
+        open = now;
+      }
+      for (const o of open.values()) lay(o, us[us.length - 1]);
+    }
+  }
+  /** stone between two lines of a side, from so far along the strips to so far */
+  private lay(ci: number, n: number[], lo: CapLine, hi: CapLine, from: number, to: number, emit: (tag: string, corner: number[]) => void) {
+    const at = (l: CapLine, u: number): number[] => {
+      const f = Math.min(1, Math.max(0, (u - l.s0) / (l.s1 - l.s0))), [a, b] = l.sign > 0 ? [l.seg.p, l.seg.q] : [l.seg.q, l.seg.p];
+      return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f];
+    };
+    // THE PICTURE: the bigger face's own, carried on beyond its broken edge. Its corners are said by how far along
+    // the edge they are and how far into the face from it; a spot of the stone that is laid is so far along the edge
+    // and so far from it across the break, and has the picture the face would have had that far beyond its edge.
+    const src = lo.seg.big >= hi.seg.big ? lo.seg : hi.seg, [A, B, C] = src.tri, el = Math.hypot(src.q[0] - src.p[0], src.q[1] - src.p[1], src.q[2] - src.p[2]) || 1;
+    const along = [(src.q[0] - src.p[0]) / el, (src.q[1] - src.p[1]) / el, (src.q[2] - src.p[2]) / el];
+    const g = [(B[1] - A[1]) * (C[2] - A[2]) - (B[2] - A[2]) * (C[1] - A[1]), (B[2] - A[2]) * (C[0] - A[0]) - (B[0] - A[0]) * (C[2] - A[2]), (B[0] - A[0]) * (C[1] - A[1]) - (B[1] - A[1]) * (C[0] - A[0])], gl = Math.hypot(g[0], g[1], g[2]) || 1;
+    let beyond = [(g[1] * along[2] - g[2] * along[1]) / gl, (g[2] * along[0] - g[0] * along[2]) / gl, (g[0] * along[1] - g[1] * along[0]) / gl];
+    if (beyond[0] * n[0] + beyond[1] * n[1] + beyond[2] * n[2] > 0) beyond = beyond.map((v) => -v);
+    const across = [n[1] * along[2] - n[2] * along[1], n[2] * along[0] - n[0] * along[2], n[0] * along[1] - n[1] * along[0]];
+    const rel = (v: number[], e: number[]) => (v[0] - src.p[0]) * e[0] + (v[1] - src.p[1]) * e[1] + (v[2] - src.p[2]) * e[2];
+    const xa = rel(A, along), ya = rel(A, beyond), xb = rel(B, along) - xa, yb = rel(B, beyond) - ya, xc = rel(C, along) - xa, yc = rel(C, beyond) - ya, det = xb * yc - xc * yb || 1;
+    const corner = (v: number[]): number[] => {
+      const x = rel(v, along) - xa, y = Math.abs(rel(v, across)) - ya, wb = (x * yc - xc * y) / det, wc = (xb * y - x * yb) / det;
+      return [v[0], v[1], v[2], -n[0], -n[1], -n[2], A[6] + (B[6] - A[6]) * wb + (C[6] - A[6]) * wc, A[7] + (B[7] - A[7]) * wb + (C[7] - A[7]) * wc];
+    };
+    let polys: number[][][] = [[at(lo, from), at(lo, to), at(hi, to), at(hi, from)].map(corner)];
+    for (let j = 0; j < this.cuts.length; j++) if (j !== ci) polys = polys.flatMap((poly) => clipOut(poly, this.cuts[j]));
+    for (const poly of polys) for (let k = 1; k + 1 < poly.length; k++) {
+      const a = poly[0], b = poly[k], c = poly[k + 1];
+      const fx = (b[1] - a[1]) * (c[2] - a[2]) - (b[2] - a[2]) * (c[1] - a[1]), fy = (b[2] - a[2]) * (c[0] - a[0]) - (b[0] - a[0]) * (c[2] - a[2]), fz = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+      // (where the two lines meet at an end of the strip it is three corners and not four: one of the two is nothing)
+      if (Math.hypot(fx, fy, fz) < 2e-6) continue;
+      // (its corners go round the way it faces, which is into the cut: a face drawn from both sides is lit by the way its corners go round)
+      const round = fx * n[0] + fy * n[1] + fz * n[2] > 0;
+      emit(src.tag, a);
+      emit(src.tag, round ? c : b);
+      emit(src.tag, round ? b : c);
     }
   }
 }
