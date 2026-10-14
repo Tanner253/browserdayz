@@ -1,7 +1,9 @@
 # ZONA: what every agent working here must know
 
 Read this whole file before touching anything, then `HANDOFF.md` (where the work stands right now). The long history
-of decisions is in the memory notes (`MEMORY.md` and its files); read the ones that touch your task.
+of decisions is in the memory notes (`MEMORY.md` and its files); read the ones that touch your task. The notes are
+history: some are out of date. WHERE A NOTE DISAGREES WITH THIS FILE OR WITH `HANDOFF.md`, THESE TWO WIN (for example older
+notes describe other ways to deploy, one lane at a time, or publishing the site freely: all superseded).
 
 ## The project
 ZONA is a browser PvP survival shooter in the manner of DayZ, where a dog tag taken from a kill and held pays SOL.
@@ -18,17 +20,20 @@ ZONA is a browser PvP survival shooter in the manner of DayZ, where a dog tag ta
 - `assets-src/` (git-ignored, about 10 GB): downloaded packs and model sources. NEVER delete it; it exists only on this machine.
 
 ## Running it
-- Dev page: `npm run dev` (port 5173; launch entry `zona-dev`). Local game server: launch entry `zona-server-local` (port 8080; `.env.local-server` sets `LOCAL_ADMIN=1`, so everybody on it is an admin, and `SITE_URL` to nothing). The page's `/ws` is proxied to 8080. Restart the local server after any change to the ground or the server, or page and server disagree.
+- Dev page: `npm run dev` (port 5173; launch entry `zona-dev`). Local game server: launch entry `zona-server-local` ONLY (port 8080; `.env.local-server` sets `LOCAL_ADMIN=1`, so everybody on it is an admin, and `SITE_URL=http://127.0.0.1:9`, an address where nothing answers). The page's `/ws` is proxied to 8080. Restart the local server after any change to the ground or the server, or page and server disagree.
+- NEVER start a game server any other way on this machine (`npm run server`, `npm run dev:server`, `npm start`, `tsx server/index.ts` without that env file): with no `SITE_URL` it talks to the LIVE site and calls the live `/api/tick` within 30 seconds, which pays real SOL. Never empty or delete `SITE_URL` in `.env.local-server` either (an empty one also switches local admin off).
 - Dev switches on the page: `?at=fort`, `?at=x,z`, `?admin`, `?kit=guns`.
-- Headless game: `node assets-src/_wf/me/play.mjs <script.js> <out dir> [w h] [address]` with `PLAY_PORT` (Chrome's own debugging port: never 5173, one per lane) and `PLAY_PRE=assets-src/_wf/me/still.js` (stops the page reloading when files are saved).
+- Headless game: `node assets-src/_wf/me/play.mjs <script.js> <out dir> [w h] [address]` with `PLAY_PORT` (Chrome's own debugging port: never 5173, one per lane) and `PLAY_PRE=assets-src/_wf/me/still.js` (stops the page reloading when files are saved). It needs the dev page running on 5173. `PLAY_GL=swiftshader` draws on the processor instead of the card (slow, but it leaves the card alone). To play offline, pass the address `http://localhost:5173/?server=http://127.0.0.1:9`.
+- The owner may be playing on this machine at any time: `curl -s localhost:8080/healthz` (`players`) for the local server, and a busy card in `nvidia-smi` with no lane running means they are in a game.
 
 ## Checking work
 - Type-check three ways and READ THE EXIT CODE: `npx tsc --noEmit; echo $?`, `npx tsc --noEmit -p tsconfig.server.json; echo $?`, `npx tsc --noEmit -p tsconfig.api.json; echo $?`. (A `| head` once hid an error that broke a Vercel build.)
-- Tests: `npx tsx test/<name>.test.ts`, ONE AT A TIME (tests that start a server clash on ports).
+- Tests: `npx tsx test/<name>.test.ts`. Never run two tests that start a server at once (they clash on ports). The whole suite: `sh $TEMP/zp/review/suite.sh <repo>` runs four at a time and then runs whatever failed again alone (only the second result counts). NEVER run `test/devnet.test.ts` (it uses the public Solana devnet faucet and sends transactions).
 - Anything seen must be looked at in the real game before it is called done (stumps set on the ground and gaps at stair heads went live because nobody looked). Things set on the ground are judged where they meet it.
 
 ## Deploying (only when the owner says so; when they say so, do it at once)
-- ONLY `node scripts/deploy.mjs`: it publishes the site, tells the live server a deploy is coming and waits for it to save, then pushes `main`. `--site` for the site alone, `--dry` to rehearse. Never push `main` by hand.
+- ONLY `node scripts/deploy.mjs` (`npm run deploy` is the same): it publishes the site, tells the live server a deploy is coming and waits for it to save, then pushes `main`. `--site` for the site alone, `--server` for the server alone (after a site deploy that stopped half way), `--dry` to rehearse, `--unsaved` only with the owner's word. It publishes HEAD of the branch checked out. Never push `main` by hand. Site-only deploys too need the owner's word.
+- After a deploy, move the local markers yourself: `git branch -f main HEAD`, `git branch -f site-live HEAD`, `git branch -f hotfix HEAD` (the script moves only the remote `main`).
 - Before: the tree committed and type-checked; `git merge-base --is-ancestor main HEAD` (if not, merge `main` in first: a non-fast-forward stopped one release); `PROTOCOL` raised if the wire format changed; `WORLD_REV` (server/index.ts) and `LOOT_REV` (src/game/game.ts) raised if loot places or the ground changed (everybody is then set down afresh at the map's edge with their gear: tell the owner); `server/restart-note.json` (the reason players see); a changelog entry with pictures (every entry has them; every claim checkable).
 - After: `/healthz` (`protocol`, `kept`, `saved`), `/version.json`, and for payouts `/api/cashins?format=status`.
 - The app's own safety check may refuse a deploy command; then give the owner the command to run.
