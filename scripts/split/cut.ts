@@ -18,7 +18,17 @@ import { createRequire } from 'node:module';
 const ts = createRequire(import.meta.url)(process.env.TS_JS ?? 'C:/Users/perci/AppData/Roaming/npm/node_modules/vercel/node_modules/typescript') as typeof import('typescript');
 
 interface Mod { name: string; about?: string; from: number; to: number }
-interface Plan { file: string; dir: string; tsconfig?: string; modules: Mod[] }
+interface Plan {
+  file: string; dir: string; tsconfig?: string; modules: Mod[];
+  /** a statement that does something as the file loads (a call, a loop, a timer set) stays in the file, in its own order (the server) */
+  keepActing?: boolean;
+  /** false: the file is nobody's import (the server's entry), and says nothing again of what it gave out */
+  reexport?: boolean;
+  /** names that stay in the file whatever their line (a let that the file's own start-up assigns) */
+  keep?: string[];
+  /** names put in a module other than their line says: { name: module } (a let goes where it is assigned) */
+  place?: Record<string, string>;
+}
 const plan = JSON.parse(readFileSync(process.argv[2], 'utf8')) as Plan;
 const write = process.argv.includes('--write');
 const root = process.cwd();
@@ -54,6 +64,22 @@ for (const s of stmts) {
   if (nb && ts.isNamedImports(nb)) for (const e of nb.elements) imports.set(checker.getSymbolAtLocation(e.name)!, { spec, kind: 'named', name: e.name.text, prop: (e.propertyName ?? e.name).text, type: allType || e.isTypeOnly });
 }
 
+/** whether a statement does something as the module loads: calls anything but a builder of plain values, or is not a declaration at all */
+function acts(n: ts.Node): boolean {
+  if (!ts.isVariableStatement(n) && !ts.isClassDeclaration(n) && !ts.isInterfaceDeclaration(n) && !ts.isTypeAliasDeclaration(n) && !ts.isEnumDeclaration(n) && !ts.isFunctionDeclaration(n)) return true;
+  let found = false;
+  const walk = (c: ts.Node) => {
+    if (found || ts.isFunctionLike(c) || ts.isClassLike(c)) return;
+    if (ts.isCallExpression(c) || ts.isNewExpression(c) || ts.isTaggedTemplateExpression(c)) {
+      const t = (c as ts.CallExpression).expression?.getText(sf) ?? '';
+      if (!/^(Map|Set|WeakMap|WeakSet|Array|Object\.(freeze|fromEntries|entries|keys|values|assign)|Math\.\w+|Number|String|Boolean|RegExp|Symbol)$/.test(t) && !/\.(map|filter|flatMap|reduce|join|split|slice|concat|includes|some|every|find|findIndex|fill|sort|toFixed|trim|replace|toLowerCase|toUpperCase|padStart|padEnd|indexOf)$/.test(t)) found = true;
+    }
+    c.forEachChild(walk);
+  };
+  n.forEachChild(walk);
+  return found;
+}
+
 // ---- every other top-level statement: where it goes, what it declares, whether it is exported
 interface Piece { s: ts.Statement; mod: string; names: string[]; syms: ts.Symbol[]; exported: boolean; typeOnly: boolean; start: number; end: number }
 const modOf = (line: number) => plan.modules.find((m) => line >= m.from && line <= m.to)?.name ?? '';
@@ -75,9 +101,9 @@ for (const s of stmts) {
   const own = text.slice(prevEnd, s.getStart(sf));
   const lead = own.length - own.replace(/^\s*\n/, '').length;
   // (a list of names said again, `export { x }`, stays in the file: it is the file that says it; and anything that is not a declaration is reported)
-  const stays = ts.isExportDeclaration(s) || ts.isExportAssignment(s);
+  const stays = ts.isExportDeclaration(s) || ts.isExportAssignment(s) || (plan.keepActing && !ts.isFunctionDeclaration(s) && acts(s)) || names.some((n) => plan.keep?.includes(n.text));
   if (!names.length && !stays) console.log(`  NOTE: a statement that declares nothing, line ${lineOf(s.getStart(sf))}: ${s.getText(sf).slice(0, 80)}`);
-  const p: Piece = { s, mod: stays ? '' : modOf(lineOf(s.getStart(sf))), names: names.map((n) => n.text), syms: names.map((n) => checker.getSymbolAtLocation(n)!).filter(Boolean), exported, typeOnly, start: prevEnd + lead, end: s.getEnd() };
+  const p: Piece = { s, mod: stays ? '' : names.map((n) => plan.place?.[n.text]).find((m) => m !== undefined) ?? modOf(lineOf(s.getStart(sf))), names: names.map((n) => n.text), syms: names.map((n) => checker.getSymbolAtLocation(n)!).filter(Boolean), exported, typeOnly, start: prevEnd + lead, end: s.getEnd() };
   for (const sym of p.syms) declSym.set(sym, p);
   pieces.push(p);
   prevEnd = s.getEnd();
@@ -87,6 +113,7 @@ for (const p of pieces) for (const sym of p.syms) { const first = declSym.get(sy
 
 // ---- what each piece uses: symbols of the file's other pieces, and of its imports; and whether at load time
 interface Use { sym: ts.Symbol; eager: boolean; asType: boolean }
+const assignsAcross: string[] = [];
 const usesOf = (p: Piece): Use[] => {
   const out: Use[] = [];
   const visit = (n: ts.Node, lazy: boolean, inType: boolean) => {
@@ -98,6 +125,9 @@ const usesOf = (p: Piece): Use[] => {
       let sym = checker.getSymbolAtLocation(n);
       if (parent && ts.isShorthandPropertyAssignment(parent)) sym = checker.getShorthandAssignmentValueSymbol(parent);
       if (sym && (declSym.has(sym) || imports.has(sym))) out.push({ sym, eager: !lazy, asType: inType });
+      // (a top-level let assigned here: an import cannot be, so it is reported when it is another module's)
+      const isAssign = parent && ((ts.isBinaryExpression(parent) && parent.left === n && parent.operatorToken.kind >= ts.SyntaxKind.FirstAssignment && parent.operatorToken.kind <= ts.SyntaxKind.LastAssignment) || ((ts.isPrefixUnaryExpression(parent) || ts.isPostfixUnaryExpression(parent)) && (parent.operator === ts.SyntaxKind.PlusPlusToken || parent.operator === ts.SyntaxKind.MinusMinusToken)));
+      if (sym && isAssign && declSym.has(sym) && declSym.get(sym)!.mod !== p.mod) assignsAcross.push(sym.name + ' (of ' + (declSym.get(sym)!.mod || '(file)') + ') in ' + (p.mod || '(file)') + ' line ' + lineOf(n.getStart(sf)));
       return;
     }
     const fn = ts.isFunctionLike(n) && !ts.isTypeNode(n);
@@ -109,7 +139,9 @@ const usesOf = (p: Piece): Use[] => {
   return out;
 };
 
-const modNames = ['', ...plan.modules.map((m) => m.name)];
+// (a module may be given as several ranges: the same name more than once)
+const modNames = ['', ...new Set(plan.modules.map((m) => m.name))];
+const uniqMods = plan.modules.filter((m, i) => plan.modules.findIndex((q) => q.name === m.name) === i);
 const needs = new Map<string, Map<string, Set<string>>>(); // mod -> from-mod -> names
 const typeNeeds = new Map<string, Map<string, Set<string>>>();
 const extNeeds = new Map<string, Map<ts.Symbol, boolean>>(); // mod -> import symbol -> used as value
@@ -202,7 +234,7 @@ const body = (mod: string) => pieces.filter((p) => p.mod === mod).map((p) => {
 
 const outputs = new Map<string, string>();
 const original = path.basename(plan.file);
-for (const m of plan.modules) {
+for (const m of uniqMods) {
   const parts = [`// ${m.about ?? m.name}`, `// (One part of ${original}, cut out of it whole on 2026-10-14 so that it can be read and worked on alone: nothing in it was changed.)`, ''];
   const imps = importLines(m.name);
   if (imps.length) parts.push(...imps, '');
@@ -214,12 +246,13 @@ for (const m of plan.modules) {
   const parts = [header, ''];
   const imps = importLines('');
   if (imps.length) parts.push(...imps, '');
-  for (const m of plan.modules) {
+  for (const m of uniqMods) {
     const v = pieces.filter((p) => p.mod === m.name && p.exported && !p.typeOnly).flatMap((p) => p.names);
     const t = pieces.filter((p) => p.mod === m.name && p.exported && p.typeOnly).flatMap((p) => p.names);
     const uniq = (a: string[]) => [...new Set(a)];
-    if (v.length) parts.push(`export { ${uniq(v).join(', ')} } from './${path.basename(plan.dir)}/${m.name}';`);
-    if (t.length) parts.push(`export type { ${uniq(t).join(', ')} } from './${path.basename(plan.dir)}/${m.name}';`);
+    if (plan.reexport === false) continue;
+    if (v.length) parts.push(`export { ${uniq(v).join(', ')} } from '${rel('', m.name)}';`);
+    if (t.length) parts.push(`export type { ${uniq(t).join(', ')} } from '${rel('', m.name)}';`);
   }
   const kept = body('');
   if (kept.length) parts.push('', kept.join(eol + eol));
@@ -233,6 +266,7 @@ for (const [f, s] of outputs) console.log(`  ${String(lines(s)).padStart(5)}  ${
 for (const m of modNames) { const g = [...graph.get(m)!]; if (g.length) console.log(`  ${m || '(file)'} imports ${g.map((x) => x || '(file)').join(', ')}`); }
 console.log(cycles.length ? `  CYCLES: ${cycles.join('; ')}` : '  no cycles');
 console.log(hazards.length ? `  READ AT LOAD across modules (${hazards.length}):\n    ` + [...new Set(hazards)].slice(0, 40).join('\n    ') : '  nothing read across modules at load');
+console.log(assignsAcross.length ? '  LETS ASSIGNED FROM ANOTHER MODULE (' + assignsAcross.length + '):\n    ' + [...new Set(assignsAcross)].slice(0, 60).join('\n    ') : '  no let is assigned from another module');
 const total = [...outputs.values()].reduce((a, s) => a + lines(s), 0);
 console.log(`  ${total} lines in all (was ${lines(text)})`);
 void ranges;
