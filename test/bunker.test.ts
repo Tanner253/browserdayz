@@ -108,8 +108,11 @@ ok('the server knows it as the game does: its places for things come after every
   assert.ok(data.lootPoints.slice(first, first + mine.length).every((p) => p.usage.includes('Bunker')), 'a place of the bunker among the others');
   // (And after the racks' again, since the road was made a loop that day: the places about the jeep that lies in the
   // cleft under the bridge, `wreck`; and after those the fort's, `castle`, and those of the ruined houses on the track up
-  // to it, `hamlet`. Each lot last, by the same rule.)
-  assert.ok(data.lootPoints.slice(first + mine.length).every((p) => (!p.floor && !!p.surf && p.surf.clear < 1) || p.building === 'wreck' || p.building === 'castle' || p.building === 'hamlet'), 'a place after the bunker\'s that is not on a rack');
+  // to it, `hamlet`. And the basements', `cellar`, since 2026-10-14. Each lot last, by the same rule.)
+  assert.ok(data.lootPoints.slice(first + mine.length).every((p) => (!p.floor && !!p.surf && p.surf.clear < 1) || p.building === 'wreck' || p.building === 'castle' || p.building === 'hamlet' || p.building === 'cellar'), 'a place after the bunker\'s that is not on a rack');
+  // (and the basements' are the very last: nothing has come after them since)
+  const cellars = data.lootPoints.findIndex((p) => p.building === 'cellar');
+  assert.ok(cellars > first && data.lootPoints.slice(cellars).every((p) => p.building === 'cellar'), 'a place after the basements\' that is not one of theirs');
   for (const p of mine) assert.ok(inBunker(P, p.x, p.y + 0.3, p.z), 'a place for things that is not in the bunker');
   assert.ok(mine.filter((p) => p.floor).length >= 12 && mine.filter((p) => p.surf).length >= 40);
   const d = data.bunkerDoor!;

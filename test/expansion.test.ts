@@ -50,7 +50,10 @@ import { JEEP } from '../src/sim/vehicles';
 // map as it was before any of that, with those fences up. They were: 160775 cells, 1846616272; 8100 trees,
 // 3268064997. What moved inside the new fences was counted cell by cell against the map before, and nothing
 // outside them had: the same four figures came off the map before and after.)
-const WAS = { cells: 133104, heights: 343058320, buildings: 72, away: 46, buildingsHash: 816271812, lastId: 'tower_71', spawns: 2697513077, trees: 6499, treesHash: 2842937344, lootPoints: 675, lootAway: 371, lootHash: 760462293, jeeps: 8, jeepsAway: 7, jeepsHash: 1649467612, fires: 6 };
+// (lootHash taken again 2026-10-14: the white shelves of the sheds, shops, clinics and barracks were stood clear of
+// their walls (85b9505), and the 62 old places on them moved with them, by 12 cm at most; none renumbered, nothing
+// else of the old map moved: was 760462293)
+const WAS = { cells: 133104, heights: 343058320, buildings: 72, away: 46, buildingsHash: 816271812, lastId: 'tower_71', spawns: 2697513077, trees: 6499, treesHash: 2842937344, lootPoints: 675, lootAway: 371, lootHash: 2120685143, jeeps: 8, jeepsAway: 7, jeepsHash: 1649467612, fires: 6 };
 const hash = (parts: number[]) => {
   let h = 2166136261 >>> 0;
   for (const v of parts) {
@@ -283,7 +286,8 @@ ok('the gas lies over the works and nowhere else, and the checkpoint is clean ai
   assert.equal(gasDepth(gas, E.x + ux * (gas.r + 4), ground(E.x + ux * (gas.r + 4), E.z + uz * (gas.r + 4)) + 1.6, E.z + uz * (gas.r + 4)), 0);
   const under = data.lootPoints.filter((p) => p.usage.includes('Gas'));
   assert.ok(under.length >= 40, `only ${under.length} places to find anything in the works`);
-  for (const p of under) assert.ok(added.some((b) => b.id === p.building), 'something marked as under the gas is not in the works');
+  // (and the basements under the works' buildings, since 2026-10-14: their places are the cellar's, under the gas)
+  for (const p of under) assert.ok(added.some((b) => b.id === p.building) || (p.building === 'cellar' && Math.hypot(p.x - gas.x, p.z - gas.z) < gas.r), 'something marked as under the gas is not in the works');
 });
 
 ok('the infected keep to it too, and nowhere else has fewer for it', () => {
@@ -708,7 +712,10 @@ ok('the road is a loop: out of the far end of Kamenka, over the bridge, round by
   const HELI = 5, heli = world.wreck!;
   const wreck = wreckUnder(b), ofFort = (q: { building: string }) => q.building === 'castle' || q.building === 'hamlet', end = data.lootPoints.findIndex(ofFort), last = data.lootPoints.slice(end - HELI - wreck.spots.length, end - HELI), about = data.lootPoints.slice(end - HELI, end);
   // (the fort's own, and its hamlet's before the gate, which are a place of their own to the map: 'hamlet')
-  assert.ok(end > 0 && data.lootPoints.slice(end).every(ofFort), "the fort's places for things are not the last there are");
+  // (the basements' come after the fort's since 2026-10-14, the newest lot last: `cellar`)
+  assert.ok(end > 0 && data.lootPoints.slice(end).every((q) => ofFort(q) || q.building === 'cellar'), "the fort's places for things are not the last there are");
+  const cellarsAt = data.lootPoints.findIndex((q) => q.building === 'cellar');
+  assert.ok(cellarsAt > end && data.lootPoints.slice(cellarsAt).every((q) => q.building === 'cellar'), "something after the basements' places that is not theirs");
   assert.ok(last.every((q: { building: string }) => q.building === 'wreck'), "the wreck's places for things are not the last before the fort's");
   for (const q of last) assert.ok(Math.abs(q.y - ground(q.x, q.z)) < 0.05 && LOOP.deck - q.y > 15, 'a place for a thing by the wreck is not on the ground of the cleft');
   assert.ok(heli && inPlay(heli.x, heli.z, 15), 'no helicopter by the fort');

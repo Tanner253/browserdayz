@@ -310,7 +310,7 @@ export class Net {
           this.id = m.you;
           // (one a page: a second match in the Arena is a second connection, not a second clock)
           clearInterval(this.pingT);
-          this.pingT = window.setInterval(() => this.send({ t: 'ping', n: performance.now() }), 4000);
+          this.pingT = setInterval(() => this.send({ t: 'ping', n: performance.now() }), 4000) as unknown as number;
           // (from this word on, what is said is kept for the game until it listens)
           this.held = [];
           if (this.heldTill) clearTimeout(this.heldTill);
