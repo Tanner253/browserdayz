@@ -52,6 +52,9 @@ body.arena .hud-minimap { display: none !important; }
 .ah-gun { position: absolute; right: 22px; bottom: 18px; display: flex; flex-direction: column; align-items: flex-end; padding: 4px 12px 4px 18px; background: linear-gradient(270deg, rgba(8, 9, 9, 0.75), rgba(8, 9, 9, 0)); }
 .ah-gun small { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: #cfc9bc; }
 .ah-gun b { font-size: 40px; font-weight: 700; line-height: 1; }
+.ah-gun b em { font-style: normal; font-size: 22px; font-weight: 600; color: #b9b3a6; margin-left: 6px; }
+.arena-hud.lowmag .ah-mag { color: var(--them); }
+.arena-hud.nomag .ah-gun b { display: none; }
 .arena-hud.nogun .ah-gun, .arena-hud.spec .ah-hp, .arena-hud.spec .ah-gun { display: none; }
 
 .ah-board { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -46%); display: none; gap: 14px; }

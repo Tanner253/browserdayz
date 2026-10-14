@@ -10,7 +10,7 @@ import { NULL_INPUT } from '../../core/input';
 import { controls } from '../../core/keys';
 import { heightAt } from '../../world/worldgen';
 import { CUT } from '../../sim/arena';
-import { ITEMS } from '../../sim/items';
+import { ITEMS, capacityOf } from '../../sim/items';
 import { SLOT_ORDER } from '../../sim/inventory';
 import { weightFelt } from '../../sim/powers';
 import { MAX_STAMINA } from '../../net/protocol';
@@ -450,8 +450,11 @@ export const frameMethods = {
       if (held?.id === 'ar15' && (held.loaded ?? 0) < 4) Object.assign(held, { mag: 'mag_ar', loaded: 31 });
     }
     this.sendState(dt);
-    // (the arena's screen: health, the gun in hand, whether only looking on, and the scoreboard while Tab is held)
-    this.arenaHud?.tick(p.vitals.health, this.weapons.equippedItem?.id ?? null, this.powers.hidden, input.held('Tab'));
+    // (the arena's screen: health, the gun in hand and what is in it, whether only looking on, and the scoreboard while Tab is held)
+    if (this.arenaHud) {
+      const gun = this.weapons.equippedItem;
+      this.arenaHud.tick(p.vitals.health, gun?.id ?? null, gun?.loaded ?? 0, gun && ITEMS[gun.id]?.weapon ? capacityOf(gun) : 0, this.powers.hidden, input.held('Tab'));
+    }
 
     // points of interest
     const here = world.pois.find((q) => Math.hypot(q.x - p.pos.x, q.z - p.pos.z) < q.radius);

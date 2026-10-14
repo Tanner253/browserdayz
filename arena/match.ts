@@ -145,8 +145,8 @@ function loadout(l: Lobby) {
   return {
     name: kit.name,
     // (the guns and nothing else, loaded, with what is fitted to them: no magazines, rounds, armour or clothes to see to.
-    // The owner: "lets strip the mags and the bullets and gear. lets make a simple fps shooter". They never run dry:
-    // see `endless` in setDown)
+    // The owner: "lets strip the mags and the bullets and gear. lets make a simple fps shooter". They empty and are
+    // reloaded from a reserve that never ends: see setDown)
     items: kit.things.filter((th) => ITEMS[th.id]?.category === 'weapon').map((th) => {
       const it = makeItem(th.id, th.qty);
       if (th.mag !== undefined) it.mag = th.mag;
@@ -171,8 +171,8 @@ function setDown(l: Lobby) {
       f.health = 100;
       f.pose = [x, y, z, e.yaw, 0, 0];
       f.hist = [{ t: Date.now(), p: f.pose }];
-      // (endless: firing takes no round out of a gun, so nobody reloads: src/sim/powers.ts)
-      send(f, { t: 'powers', god: false, hidden: false, clip: false, voidInv: false, voidTag: false, endless: true });
+      // (guns empty and are reloaded as in CS:GO, from a reserve that never ends: the game's own, in a wager, src/game/weapons.ts freeReload)
+      send(f, { t: 'powers', god: false, hidden: false, clip: false, voidInv: false, voidTag: false });
       send(f, { t: 'put', x, y, z, yaw: e.yaw });
       send(f, { t: 'mend' });
       send(f, { t: 'kit', name: kit.name, items: kit.items });
@@ -235,7 +235,7 @@ function matchOver(l: Lobby, winner: 0 | 1) {
       send(f, { t: 'put', x: e.x, y: e.y, z: e.z, yaw: e.yaw });
     }
     f.health = 100;
-    send(f, { t: 'powers', god: true, hidden: false, clip: false, voidInv: false, voidTag: false, endless: true });
+    send(f, { t: 'powers', god: true, hidden: false, clip: false, voidInv: false, voidTag: false });
     send(f, { t: 'hp', health: 100, bleeding: false });
   }
   scoreTo(l, 'over', winner);

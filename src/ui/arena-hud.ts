@@ -18,7 +18,7 @@ export class ArenaHud {
   private q = <T extends HTMLElement>(s: string) => this.el.querySelector(s) as T;
   private last: Score | null = null;
   private bannerT = 0;
-  private shown = { hp: -1, gun: '', spec: false, board: false };
+  private shown = { hp: -1, gun: '', mag: '', spec: false, board: false };
   /** where to go once the match is over: the wagers again, or the menu */
   onGo: (again: boolean) => void = () => {};
 
@@ -39,7 +39,7 @@ export class ArenaHud {
       <div class="ah-banner"><b></b><small></small></div>
       <div class="ah-spec">${watch ? 'WATCHING' : 'SPECTATING'}<small>${watch ? 'fly with WASD, Space and C' : 'you are out for this round'}</small></div>
       <div class="ah-hp"><i>+</i><b>100</b></div>
-      <div class="ah-gun"><small></small><b>∞</b></div>
+      <div class="ah-gun"><small></small><b><span class="ah-mag"></span><em>/ ∞</em></b></div>
       <div class="ah-board"></div>
       <div class="ah-end"></div>`;
     hud.appendChild(this.el);
@@ -82,8 +82,16 @@ export class ArenaHud {
     while (feed.children.length > 5) feed.firstChild?.remove();
   }
 
-  /** once a frame: health, the gun in hand, whether this player is only looking on, and Tab held for the scoreboard */
-  tick(health: number, gun: string | null, out: boolean, board: boolean) {
+  /** once a frame: health, the gun in hand and the rounds in it out of how many (0: no magazine to it), whether this player is only looking on, and Tab held for the scoreboard */
+  tick(health: number, gun: string | null, loaded: number, cap: number, out: boolean, board: boolean) {
+    const mag = cap ? `${loaded}:${cap}` : '';
+    if (mag !== this.shown.mag) {
+      this.shown.mag = mag;
+      this.q<HTMLElement>('.ah-mag').textContent = cap ? String(loaded) : '';
+      this.el.classList.toggle('nomag', !cap);
+      // (red when a quarter or less is left, as CS:GO has it; and the key to say what to do about it)
+      this.el.classList.toggle('lowmag', !!cap && loaded <= cap / 4);
+    }
     const hp = Math.max(0, Math.round(health));
     if (hp !== this.shown.hp) {
       this.shown.hp = hp;

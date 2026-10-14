@@ -45,6 +45,7 @@ export const enterMethods = {
     this.player.keepAlive = !!wagerQuery();
     if (wagerQuery() && !this.arenaHud) {
       this.arenaHud = new ArenaHud(this.hud.root, watching(), new URLSearchParams(location.search).get('wager') === 'practice');
+      this.weapons.freeReload = true;
       // (over: back to the menu, the open world's page loaded again; to the wagers again, with their tab open)
       this.arenaHud.onGo = (again) => location.assign(location.pathname + (again ? '?tab=wagers' : ''));
     }

@@ -1102,6 +1102,12 @@ export class Weapons {
   stowed = false;
   /** an admin's power (src/sim/powers.ts): a shot takes no round out of the gun. The game's to say, on the server's word */
   endless = false;
+  /**
+   * The arena's: the gun empties and is reloaded, and the reload fills it from a reserve that never ends, with no
+   * magazine to carry or fill (the owner: "in arena you should have to reload ... but theres unlimited ammo and you
+   * dont haveto manually load your mags or inventory management, think lik eCOD or CS:GO"). An empty trigger reloads.
+   */
+  freeReload = false;
   /** lets the game resolve a collider owner to a damageable entity */
   resolveTarget: (owner: unknown) => Damageable | null = () => null;
   onSlungChange: (objs: THREE.Object3D[]) => void = () => {};
@@ -2285,6 +2291,8 @@ export class Weapons {
     const def = ITEMS[item.id];
     if (!def.weapon) return;
     if ((item.loaded ?? 0) <= 0 || !this.boltReady) {
+      // (in the arena an empty gun is reloaded at the trigger, as in CS:GO)
+      if (this.freeReload && (item.loaded ?? 0) <= 0) return this.reload(m, item);
       if (trigger) audio.dryFire();
       this.fireCooldown = 0.25;
       return;
@@ -2462,7 +2470,10 @@ export class Weapons {
     // not go into a gun: they go into a magazine, by hand. With no magazine to give it and nothing in its chamber,
     // one loose round is put there, which is one shot.
     let next: ItemInstance | null = null, single = false;
-    if (def.weapon.mag) {
+    // (the arena's: from a reserve that never ends, into the magazine that is in it; see freeReload)
+    const free = this.freeReload;
+    if (free && (item.loaded ?? 0) >= capacityOf(item)) return;
+    if (def.weapon.mag && !free) {
       const mags = this.magsFor(item);
       next = nextMag(item, mags);
       if (!next && item.mag && mags.some((mg) => (mg.rounds ?? 0) > 0)) return void this.onSay('The magazine in it is the fullest you have', 'info');
@@ -2473,19 +2484,22 @@ export class Weapons {
       }
     }
     const fed = !!def.weapon.mag;
-    this.incoming = next?.id ?? null;
-    this.incomingRounds = next?.rounds ?? 0;
+    this.incoming = free && fed ? item.mag ?? def.weapon.mag ?? null : next?.id ?? null;
+    this.incomingRounds = free ? capacityOf(item) : next?.rounds ?? 0;
     /** what the hands have done when a magazine-fed gun's reload is over */
     const feed = () => {
       this.incoming = null;
-      if (next) this.changeMag(item, next);
+      if (free) {
+        item.loaded = capacityOf(item);
+        this.onCarried();
+      } else if (next) this.changeMag(item, next);
       else if (single && !chambered(item) && this.inv.take(def.weapon!.ammo, 1) === 1) {
         item.loaded = 1;
         this.onCarried();
       }
     };
     const need = capacityOf(item) - (item.loaded ?? 0);
-    const have = this.inv.count(def.weapon.ammo);
+    const have = free ? need : this.inv.count(def.weapon.ammo);
     if (!fed && (need <= 0 || have <= 0)) return;
     if (m.rig && def.weapon.tube) {
       // A tube under the barrel is fed a shell at a time: the gun is turned over, each shell
@@ -2514,7 +2528,7 @@ export class Weapons {
       this.onAct('reload', dur);
       this.start('magswap', dur, () => {
         if (fed) feed();
-        else item.loaded = (item.loaded ?? 0) + this.inv.take(def.weapon!.ammo, capacityOf(item) - (item.loaded ?? 0));
+        else item.loaded = free ? capacityOf(item) : (item.loaded ?? 0) + this.inv.take(def.weapon!.ammo, capacityOf(item) - (item.loaded ?? 0));
         this.dry.delete(item);
         this.boltReady = true;
       }, { empty: empty ? 1 : 0 });
@@ -2540,7 +2554,7 @@ export class Weapons {
       this.onAct('reload', dur);
       this.start('magswap', dur, () => {
         if (fed) feed();
-        else item.loaded = (item.loaded ?? 0) + this.inv.take(def.weapon!.ammo, capacityOf(item) - (item.loaded ?? 0));
+        else item.loaded = free ? capacityOf(item) : (item.loaded ?? 0) + this.inv.take(def.weapon!.ammo, capacityOf(item) - (item.loaded ?? 0));
         this.dry.delete(item);
         this.boltReady = true;
       });
@@ -2734,7 +2748,7 @@ export class Weapons {
       // insert one round every 0.48 s after the bolt opens
       const due = Math.min(a.data.rounds, Math.max(0, Math.floor((a.t - 0.55) / 0.48) + 1));
       while (a.data.inserted < due && !a.data.stop) {
-        if (this.inv.take(def.weapon!.ammo, 1) === 1) {
+        if (this.freeReload || this.inv.take(def.weapon!.ammo, 1) === 1) {
           item.loaded = (item.loaded ?? 0) + 1;
         }
         a.data.inserted++;
