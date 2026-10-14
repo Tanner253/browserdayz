@@ -15,6 +15,7 @@ import {
 } from 'postprocessing';
 import { N8AOPostPass } from 'n8ao';
 import { breathe } from './breathe';
+import { oneDraw } from './one-draw';
 
 /** a shader as the library keeps it: whether the card has finished making it, and how many materials are drawn with it */
 interface Program { id: number; isReady(): boolean; usedTimes: number; getUniforms(): unknown; getAttributes(): unknown }
@@ -635,6 +636,9 @@ export class Renderer {
   private shadowsSorted = 0;
   private sortShadows() {
     this.shadowsSorted = 60;
+    // (and what is seen through from both sides, drawn in one go: see src/core/one-draw.ts)
+    oneDraw(this.scene);
+    oneDraw(this.vmScene);
     this.scene.traverse((o) => {
       const m = o as THREE.Mesh;
       if (!m.isMesh || !m.castShadow) return;
