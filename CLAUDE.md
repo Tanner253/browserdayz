@@ -56,7 +56,7 @@ ZONA is a browser PvP survival shooter in the manner of DayZ, where a dog tag ta
 - Short TL;DRs, not documents. Pictures of work as it goes (send them), and a plan picture before anything big is built: wait for their yes on a design, not on every step.
 - Do not over-test. When they say deploy, deploy.
 - Do not use Workflows unless they ask for one in that same message.
-- Several lanes (sub-agents) at once are fine when each owns separate files and one builder owns each area; brief each from a file under `%TEMP%/zp/briefs/`. A lane that has finished a round is near the end of its room: start the next round with a fresh one and the last one's notes.
+- NO sub-agents or lanes: do the work yourself, one thing at a time. The owner, 2026-10-14, watching the weekly token limit: "i would prefer that you do not run multiple lanes or agents at once and do everything yourself." Spend tokens with care: read only the parts of a file you need (grep first), do not re-read what you have, no long polling.
 - Keep what they loved: change only what was asked, and prove nothing else was lost.
 - When they ask for one change (turn it), make that change and solve what it costs; do not offer a different change because it is cheaper.
 - Real, downloaded models only, never shapes made by hand for real things; never lower a model's quality. Poly Haven (CC0) may be used freely; any other site needs their yes; nothing ripped or decompiled.
