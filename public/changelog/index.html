@@ -124,6 +124,10 @@
         <p>Every update to the Zone, newest first, with pictures and film of what changed. The films in the older entries were made at the time and show the game as it was then.</p>
         <div class="jump">
           <a href="#roadmap">Roadmap</a>
+          <a href="#smoother-frames">Smoother frames</a>
+          <a href="#basements">Basements</a>
+          <a href="#two-games">Two games, one door</a>
+          <a href="#arena">The Arena opens</a>
           <a href="#helicopters">Helicopters</a>
           <a href="#fort-to-the-road">The fort turns to the road</a>
           <a href="#winter-fort">The fort on the rim, and cooked grenades</a>
@@ -168,8 +172,30 @@
         </div>
       </section>
 
-      <article class="entry" id="basements">
+      <article class="entry" id="smoother-frames">
         <div class="when"><time datetime="2026-10-14">14 Oct 2026</time><span class="tag">Latest</span></div>
+        <div>
+          <h2>Smoother frames, the same picture</h2>
+          <p class="lead">The world is drawn in fewer pieces and worked out with less waste: the same picture, with less for your computer to do in every frame. And the basements are stocked as they were meant to be.</p>
+          <div class="media">
+            <figure class="wide"><img loading="lazy" src="/changelog/media/frames-card.jpg" alt="A chart of six measurements before and after: physics with another player near from 1.5 to 0.1 milliseconds a step, with the infected about from 1.9 to 0.3, trees and bushes from 1.09 to 0.46 milliseconds a frame, far trees from 0.47 to 0.16, bones from 0.46 to 0.24, things drawn in the hospital street from 619 to 351 a frame" /><figcaption><b>What changed,</b> each measured before and after on this update.</figcaption></figure>
+            <figure><img loading="lazy" src="/changelog/media/frames-sign.jpg" alt="A yellow gas warning sign on a post, seen twice side by side from the same place: the two pictures are the same" /><figcaption><b>A gas sign,</b> before and after: the 22 signs were 154 things to draw, and are 3.</figcaption></figure>
+            <figure><img loading="lazy" src="/changelog/media/frames-well.jpg" alt="The village well, brick with a rusted roof and a bucket, seen twice side by side from the same place: the two pictures are the same" /><figcaption><b>A well,</b> before and after: fifteen things to draw, now eight for both wells.</figcaption></figure>
+          </div>
+          <ul>
+            <li><b>Physics near other people:</b> another player's head and chest, and an infected's, were moved in a way that made every physics step cost about one and a half milliseconds. They are hit exactly where they were, standing, crouched and lying, for a tenth of the cost.</li>
+            <li><b>The ground</b> is drawn in large pieces where all of a piece is in sight, not tile by tile: 36 to 60 fewer things to draw in a frame, and not one pixel different.</li>
+            <li><b>Trees and bushes</b> are sorted for drawing by squares of the map: the same ones drawn, at less than half the cost.</li>
+            <li><b>Bodies:</b> fingers are curled four times faster, and each body's bones are worked out once a frame where three.js did it twice.</li>
+            <li><b>Doors, signs and wells:</b> 423 still door hinges no longer weigh on every frame; the gas signs, the wells and the bunker's roofs are drawn in fewer pieces.</li>
+            <li><b>Loose loot</b> more than about 8 metres away is drawn with its lighter copy, and casts no shadow.</li>
+            <li><b>Basements</b> are stocked as a place of their own, three times their share: they had been counted in with the houses above them and stood empty.</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="entry" id="basements">
+        <div class="when"><time datetime="2026-10-14">14 Oct 2026</time></div>
         <div>
           <h2>Basements</h2>
           <p class="lead">Some houses have a cellar door in the yard, and some barns a storm cellar beside them. The steps go down four metres to rooms under the earth, lit by a bulb or two, with loot in them: the further in and the deeper, the better it is.</p>
