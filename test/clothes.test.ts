@@ -601,8 +601,8 @@ ok('every set of things a person can have on at once, with their own tag and a f
 
 // ------------------------------------------------------------------ the two ends
 
-ok('the game and the server speak version 36: a page from before, which knows nothing of the jacket, is turned away', () => {
-  assert.equal(PROTOCOL, 36);
+ok('the game and the server speak version 37: a page from before, which knows nothing of the jacket (or of a grenade's pin), is turned away', () => {
+  assert.equal(PROTOCOL, 37);
 });
 
 console.log(`\n${n} checks passed`);
