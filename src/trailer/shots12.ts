@@ -19,6 +19,7 @@ import { HELI, heliSpots } from '../sim/heli';
 import { flightTimes, planFlight, type Flight } from '../sim/airdrop';
 import { F_AIM, F_LIGHT } from '../net/protocol';
 import { ArenaHud } from '../ui/arena-hud';
+import { WORLD_SIZE } from '../world/worldgen/places';
 
 /** how long the film is, seconds: said when its shots have been laid out */
 let total = 0;
@@ -540,7 +541,21 @@ export function buildShots(S: Stage): Shot[] {
   /** where it goes: up off the roof, nose round toward the mountain and on toward it, low over the town; as a state a game would be told of it (its rotor at full speed) */
   let flightPath: Rail | null = null, heading = 0;
   const makeFlight = () => {
-    const r = roof(), toFort = F(0, 0).sub(new THREE.Vector3(r.x, 0, r.z)).setY(0).normalize();
+    const r = roof();
+    // (the most open way off the roof: of sixteen, the one whose ground rises least over its first 250 m, inside the
+    // map; the draft's, toward the fort, flew into a wooded hill)
+    let best = 0, rise = Infinity;
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * Math.PI * 2, dx = Math.sin(a), dz = Math.cos(a);
+      if (Math.max(Math.abs(r.x + dx * 300), Math.abs(r.z + dz * 300)) > WORLD_SIZE / 2 - 40) continue;
+      let top = -Infinity;
+      for (let s = 20; s <= 250; s += 10) top = Math.max(top, S.ground(r.x + dx * s, r.z + dz * s) - r.y);
+      if (top < rise) {
+        rise = top;
+        best = a;
+      }
+    }
+    const toFort = new THREE.Vector3(Math.sin(best), 0, Math.cos(best));
     heading = Math.atan2(-toFort.x, -toFort.z);
     // (out of the roof's reach, never lower than so far over the ground under it: the draft's flew into a wooded hill)
     const at = (along: number, up: number, over = 0) => {
@@ -613,10 +628,10 @@ export function buildShots(S: Stage): Shot[] {
     },
     lead: (t) => void fly12(3 + t),
     tick: (t) => void fly12(3 + t),
-    // (behind it and a little over it, looking on past it to the mountain: the land under it and the snow ahead)
+    // (behind it and over it, looking on past it: the land going by under it, and the far hills)
     cam: (t) => {
       const p = fly12(3 + t), back = new THREE.Vector3(Math.sin(heading), 0, Math.cos(heading));
-      return hand({ p: p.clone().addScaledVector(back, 15).setY(p.y + 3), l: p.clone().addScaledVector(back, -80).setY(p.y - 6), fov: 52 }, t, 0.4);
+      return hand({ p: p.clone().addScaledVector(back, 16).setY(p.y + 5), l: p.clone().addScaledVector(back, -90).setY(p.y - 10), fov: 52 }, t, 0.4);
     },
   });
 
@@ -650,23 +665,44 @@ export function buildShots(S: Stage): Shot[] {
   add(4, {
     name: 'drop',
     hour: DAY,
-    stage: async () => {
+    // (planned before the lens is first asked where it is; begun once the shot is set)
+    setup: () => {
       const at = openGround();
       const f = planFlight((x, z) => S.ground(x, z), { x: at.x, y: at.y, z: at.z }, 'drop-film12', () => S.rnd());
-      const T = flightTimes(f);
       // (it is shown a second before the crate leaves the Apache, and the canopy opens two seconds after that)
-      f.age = Math.max(0, T.release - 1);
-      g.flightBegun(f);
+      f.age = Math.max(0, flightTimes(f).release - 1);
       flight = f;
       // (the lens beside it in the air, side on to its way in; of the two sides, the one from which it looks toward the fort and its mountain)
       const way = new THREE.Vector3(f.x - f.fx, 0, f.z - f.fz).normalize(), across = new THREE.Vector3(-way.z, 0, way.x), toFort = F(0, 0).sub(at).setY(0).normalize();
       side = across.dot(toFort) < 0 ? across : across.negate();
-      await run(30);
     },
-    // (from 50 m off, a little under the Apache: it, and the crate leaving it and its canopy opening, the land far under them)
+    stage: async () => {
+      // (The Apache's model is fetched and made ready a moment after a flight is said, and the draft's first frames
+      // went without it: a flight is said first and cleared once it has its model; the one filmed, said after it, has
+      // it at once. That one is begun a second early, and the second run unseen.)
+      const hung = () => (g.airdrops.list()[0]?.heli.mount.children.length ?? 0) > 3;
+      const until = async (most: number) => {
+        let n = 0;
+        for (; n < most && !hung(); n++) {
+          await run(1);
+          await wait(12);
+        }
+        return n;
+      };
+      g.airdrops.clear();
+      g.flightBegun({ ...flight!, uid: 'drop-film12-first' });
+      await until(240);
+      g.airdrops.clear();
+      flight!.age -= 1;
+      g.flightBegun(flight!);
+      const n = await until(60);
+      if (!hung()) say('drop: the Apache has no model yet as the shot opens');
+      await run(Math.max(0, 60 - n));
+    },
+    // (from 50 m off, a little under the Apache: it in the middle, the crate leaving it and its canopy opening, the land far under them)
     cam: (t) => {
       const f = flight!, a = side.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), 0.25 - t * 0.06);
-      return hand({ p: new THREE.Vector3(f.x + a.x * 50, f.hold - 7, f.z + a.z * 50), l: new THREE.Vector3(f.x, f.hold - 5 - t * 2.2, f.z), fov: 42 }, t, 0.3);
+      return hand({ p: new THREE.Vector3(f.x + a.x * 50, f.hold - 6, f.z + a.z * 50), l: new THREE.Vector3(f.x, f.hold - 1.5 - t * 2.4, f.z), fov: 42 }, t, 0.3);
     },
   });
 
