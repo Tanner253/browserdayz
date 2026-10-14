@@ -1658,8 +1658,8 @@ export class Game {
       const id = THROWN[m.w] ? m.w : 'grenade';
       const left = typeof m.f === 'number' && Number.isFinite(m.f) ? THREE.MathUtils.clamp(m.f, 0, THROWN[id].fuse) : THROWN[id].fuse;
       this.grenades.throw(new THREE.Vector3(...m.o), new THREE.Vector3(...m.v), left, false, id);
-      // the arm that threw it (one that went off in the hand was not thrown)
-      if (left > 0) this.remotes.get(m.id)?.avatar.swing(true);
+      // the arm that threw it (one that went off in the hand was not thrown, nor was one that fell from a dead hand: neither is moving)
+      if (left > 0 && Math.hypot(...m.v) > 1) this.remotes.get(m.id)?.avatar.swing(true);
     });
     net.on('act', (m) => this.remotes.get(m.id)?.act(m.a, m.d, cam().position));
     net.on('emote', (m) => {
@@ -3563,9 +3563,17 @@ export class Game {
       // (in the one fist now, drawn back to throw: see 'live' in weapons.ts)
       this.weapons.beginUse(c.id, 'live', kind.fuse);
     } else c.live += dt;
-    // (whoever dies with one in their hand takes it with them: the dead hurt nobody in this game, and the server says the same)
-    if (p.dead) return this.emptyOfGrenade();
     const left = fuseLeft(c.id, c.live);
+    // Whoever dies with the pin out lets go of it: it falls where they fell, lies there, and goes off when its fuse
+    // ends, for whoever is in reach (the ruling of 2026-10-13: as in DayZ, it does not go with them). Online it is
+    // the server that says so to everybody else and reckons whom it reached (`fallen` in src/sim/grenades.ts): here
+    // it is only seen to fall, from the same place and as still, so that it lies where everybody else has it lying.
+    // Played alone, this game reckons it, as it does everything.
+    if (p.dead) {
+      this.emptyOfGrenade();
+      this.grenades.throw(new THREE.Vector3(p.pos.x, p.pos.y + NADE.hand, p.pos.z), new THREE.Vector3(), left, !this.online, c.id);
+      return;
+    }
     if (left > 0 && c.button) return;
     const cam = this.s.r.camera;
     const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
@@ -3589,14 +3597,15 @@ export class Game {
 
   /**
    * What the line under the crosshair says of a grenade in the hands: the pin coming out, as anything the hands
-   * are at is shown; and then the fuse, a bar that runs DOWN, in red, with the seconds left beside it. (How long is
-   * left is the one thing whoever is cooking it has to know, and it is nowhere else: the grenade makes no sound.)
+   * are at is shown; and then the fuse, a bar that runs DOWN, in red, with the seconds left before its words and
+   * the biggest thing in them. (How long is left is the one thing whoever is cooking it has to know, and it is
+   * nowhere else: the grenade makes no sound. How it is drawn, to be read over grass and over snow: `.hot` in hud.css.)
    */
-  private cookShown(): { label: string; t: number; hot?: boolean } {
+  private cookShown(): { label: string; t: number; hot?: boolean; figure?: string } {
     const c = this.cook!, kind = THROWN[c.id];
     if (c.live < 0) return { label: c.id === 'grenade' ? 'Pulling the cord' : 'Pulling the pin', t: c.t / kind.pull };
     const left = fuseLeft(c.id, c.live);
-    return { label: `${ITEMS[c.id].name} live · ${left.toFixed(1)} s`, t: left / kind.fuse, hot: true };
+    return { label: `${ITEMS[c.id].name} live`, figure: left.toFixed(1), t: left / kind.fuse, hot: true };
   }
 
   /** the grenade is out of the hands, thrown or gone off or gone with them: they are empty */

@@ -168,9 +168,35 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 .hud-progress-bar { height: 3px; background: rgba(255, 255, 255, 0.12); }
 .hud-progress.idle .hud-progress-bar { display: none; }
 .hud-progress-bar div { height: 100%; background: var(--accent); }
-/* a fuse running down (a grenade with its pin out, in the hand): the bar and its words in the colour of a warning */
-.hud-progress.hot .hud-progress-bar div { background: var(--danger); }
-.hud-progress.hot .hud-progress-label { color: var(--danger); }
+/* A fuse running down (a grenade with its pin out, in the hand). It was thin red words on whatever was behind them,
+   and over grass could not be read, let alone over snow. It is the same line and nothing more on the screen, made
+   to be read at a glance on grass, snow or a dark wall: its words on a dark plate, the seconds left the biggest
+   thing in it and in a red that is bright on that plate, the bar under it thick and backed in the same dark. */
+.hud-progress.hot { width: 236px; }
+.hud-progress.hot .hud-progress-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 0;
+  padding: 5px 10px 4px;
+  background: rgba(10, 12, 11, 0.8);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.hud-progress.hot .hud-progress-label b {
+  font-family: var(--mono);
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0;
+  color: #ff6a4d;
+}
+.hud-progress.hot .hud-progress-label b i { margin-left: 3px; font-size: 14px; font-style: normal; text-transform: none; color: var(--ink); }
+.hud-progress.hot .hud-progress-bar { height: 6px; background: rgba(10, 12, 11, 0.8); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55); }
+.hud-progress.hot .hud-progress-bar div { background: #ff6a4d; }
 
 .hud-compass {
   position: absolute;

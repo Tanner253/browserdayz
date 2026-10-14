@@ -1629,8 +1629,12 @@ export class HUD {
     heading: number | null;
     /** carrying a compass: the heading is also given in degrees */
     bearing: boolean;
-    /** `hot`: it is a fuse running down and not a thing getting done (a grenade with its pin out): drawn as a warning */
-    progress: { label: string; t: number; hot?: boolean } | null;
+    /**
+     * `hot`: it is a fuse running down and not a thing getting done (a grenade with its pin out): drawn as a warning,
+     * on a dark plate, to be read at a glance over grass, snow or a wall. `figure`: the seconds left, which are then
+     * the biggest thing in the line, before its words.
+     */
+    progress: { label: string; t: number; hot?: boolean; figure?: string } | null;
     hotbar: HotbarEntry[];
     fps: number;
     ping: number | null;
@@ -1755,7 +1759,9 @@ export class HUD {
       // (nothing under way yet: words and no bar)
       this.toggle(e.progress, 'idle', s.progress.t < 0);
       this.toggle(e.progress, 'hot', !!s.progress.hot);
-      this.set('plabel', e.progress.firstElementChild as HTMLElement, s.progress.label);
+      // (a figure before the words: the seconds of a fuse, large. Both are the game's own words, never a player's.)
+      if (s.progress.figure !== undefined) this.set('plabel', e.progress.firstElementChild as HTMLElement, `<b>${s.progress.figure}<i>s</i></b><span>${s.progress.label}</span>`, 'html');
+      else this.set('plabel', e.progress.firstElementChild as HTMLElement, s.progress.label);
       ((e.progress.lastElementChild as HTMLElement).firstElementChild as HTMLElement).style.width = `${Math.min(100, s.progress.t * 100)}%`;
     } else this.toggle(e.progress, 'show', false);
 

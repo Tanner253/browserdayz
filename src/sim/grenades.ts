@@ -30,9 +30,12 @@
 //     where its holder stood: the server says so itself if their game does not (`overdue`), shows it to everybody
 //     else, and counts what it did to the holder among what they have taken (`dealt` in server/index.ts: whoever is
 //     still on their feet after it has taken more than a body can).
+//   - FROM A DEAD HAND. Whoever dies with the pin out lets go of it: it falls where they fell, lies there for
+//     everybody to see, and goes off when its fuse ends (`fallen`). Of this one nobody's game is asked anything:
+//     the server knows where its holder died and when the pin came out, and reckons whom it reaches itself.
 // What it still takes on a game's word is said where `judge` is.
 
-import { WEAPON_RULES } from './combat';
+import { WEAPON_RULES, hitDamage } from './combat';
 import { ITEMS } from './items';
 
 export const NADE = {
@@ -69,8 +72,9 @@ export const NADE = {
    * that game then says the blast reached is believed.
    */
   silent: 4000,
-  /** how far above the feet the hand is that it went off in, metres */
+  /** how far above the feet the hand is that it went off in, metres; and how far above the ground one that lies on it goes off */
   hand: 1.3,
+  lies: 0.15,
 } as const;
 
 /** a thing that is thrown: how long the hands take to get its pin out, and how long its fuse then runs, seconds */
@@ -182,6 +186,28 @@ export function overdue(t: Thrower, feet: Vec3, now: number): Flown | null {
   t.held = null;
   return { w: h.w, due, thrownAt: due, from: [feet[0], feet[1] + NADE.hand, feet[2]], speed: 0, hand: true, reached: new Set(), people: 0 };
 }
+
+/**
+ * Whoever had a pin out has died. The grenade does not go with them (the ruling of 2026-10-13, DayZ being the rule
+ * for what the owner has not said: "it falls where the holder fell and goes off when its fuse ends, for whoever is
+ * in reach, as any grenade on the ground would; others see it lying there"). The fuse is the one that was running:
+ * the server's count from the pin. Where it falls is where the server has its holder standing. So there is nothing
+ * here for any game to say, and none is asked: whom it reaches the server reckons itself when the fuse ends, by how
+ * far each stands from where it lies (`lyingBlast`; `fellBlast` in server/index.ts).
+ * @param feet where the holder died
+ * @returns what falls: which grenade; where it leaves the hand, for everybody to be shown it fall from there; where
+ *   it lies; how many seconds of its fuse are left (none: it goes off as they fall). Null if no pin was out.
+ */
+export function fallen(t: Thrower, feet: Vec3, now: number): { w: string; from: Vec3; lies: Vec3; left: number } | null {
+  const h = t.held;
+  if (!h) return null;
+  t.held = null;
+  const due = h.at + THROWN[h.w].fuse * 1000;
+  return { w: h.w, from: [feet[0], feet[1] + NADE.hand, feet[2]], lies: [feet[0], feet[1] + NADE.lies, feet[2]], left: Math.max(0, (due - now) / 1000) };
+}
+
+/** What a grenade that goes off where it lies does to a body whose chest is at `chest`, before anything worn: by how far that is from it, as any blast is reckoned. */
+export const lyingBlast = (w: string, lies: Vec3, chest: Vec3): number => (THROWN[w] ? hitDamage(w, 'torso', Math.hypot(chest[0] - lies[0], chest[1] - lies[1], chest[2] - lies[2])) : 0);
 
 /**
  * A game says a blast of its player's reached somebody or something. Is it believed, and from how far?

@@ -13,7 +13,7 @@ import path from 'node:path';
 import WebSocket from 'ws';
 import { PROTOCOL, type S2C } from '../src/net/protocol';
 import { WEAPON_RULES, hitDamage } from '../src/sim/combat';
-import { NADE, THROWN, fuseLeft, inHandDamage, judge, letGo, newThrower, overdue, pullPin, travel, type Vec3 } from '../src/sim/grenades';
+import { NADE, THROWN, fallen, fuseLeft, inHandDamage, judge, letGo, lyingBlast, newThrower, overdue, pullPin, travel, type Vec3 } from '../src/sim/grenades';
 import { ITEMS } from '../src/sim/items';
 import { TYPES } from '../src/sim/economy';
 import { STOCK, worth } from '../src/sim/trade';
@@ -253,6 +253,32 @@ ok('the server: a pin out and a fuse run down with nothing thrown is a grenade t
   assert.notEqual(judge(last, 'frag', 'p2', chest(8), 0, T0 + FUSE + 60), null);
 });
 
+ok('the server: whoever dies with the pin out lets go of it; it falls where they fell and goes off when its fuse ends, and no game is asked anything of it', () => {
+  const t = newThrower();
+  assert.equal(fallen(t, FEET, T0), null, 'something fell from a hand that held nothing live');
+  pullPin(t, 'frag', T0);
+  const fell = fallen(t, [5, 2, 9], T0 + 1500);
+  assert.ok(fell && fell.w === 'frag', 'a grenade with its pin out went with whoever held it');
+  near(fell.left, (FUSE - 1500) / 1000, 1e-9, 'the fuse it has left as it falls: the one that was running, by the server\'s count from the pin');
+  assert.deepEqual(fell.from, [5, 2 + NADE.hand, 9], 'it fell from somewhere other than the hand of whoever died');
+  assert.deepEqual(fell.lies, [5, 2 + NADE.lies, 9], 'it lies somewhere other than where they fell');
+  assert.equal(t.held, null);
+  // (it is nobody's any more: not to throw, not to say went off in the hand, not to say whom it reached)
+  assert.equal(letGo(t, [5, 3.5, 9], [10, 3, 0], [5, 2, 9], T0 + 1600), null, 'a dead hand threw it');
+  assert.equal(overdue(t, [5, 2, 9], T0 + FUSE + NADE.silent), null, 'it went off in the hand as well');
+  assert.equal(judge(t, 'frag', 'p2', [6, 3.1, 9], 0, T0 + FUSE), null, 'its dead holder\'s game was believed about whom it reached');
+  // whom it reaches is the server's to reckon: by how far each stands from where it lies, as any blast is
+  assert.equal(lyingBlast('frag', fell.lies, fell.lies), WEAPON_RULES.frag.damage);
+  near(lyingBlast('frag', fell.lies, [5 + 3, 2 + NADE.lies, 9 + 4]), hitDamage('frag', 'torso', 5), 1e-9, 'five metres from a frag grenade lying on the ground');
+  assert.equal(lyingBlast('frag', fell.lies, [5 + WEAPON_RULES.frag.blast!, 2 + NADE.lies, 9]), 0, 'it reached further than its blast does');
+  assert.ok(lyingBlast('grenade', fell.lies, [8, 3.1, 9]) < lyingBlast('frag', fell.lies, [8, 3.1, 9]));
+  assert.equal(lyingBlast('beans', fell.lies, fell.lies), 0);
+  // (died as the fuse ended, or after: it goes off as they fall)
+  const late = newThrower();
+  pullPin(late, 'grenade', T0);
+  assert.equal(fallen(late, FEET, T0 + THROWN.grenade.fuse * 1000 + 300)!.left, 0);
+});
+
 if (process.argv[2] === 'rules') {
   console.log(`\n${checks} checks passed`);
   process.exit(0);
@@ -483,6 +509,47 @@ try {
     assert.ok(died, `somebody whose game went quiet with a pin out did not die of it:\n${logged.slice(-400)}`);
     checks++;
     console.log('  ok  over the wire: a pin pulled and a game gone quiet: the grenade goes off in that hand, and they die of it');
+  }
+
+  // ---- a pin out, and its holder dies: the grenade falls where they fell and goes off when its fuse ends, for whoever is in reach
+  {
+    const gil = new Player('Gil'), hal = new Player('Hal');
+    all.push(gil, hal);
+    for (const p of [gil, hal]) assert.ok(await p.join());
+    gil.stand(40, 40);
+    hal.stand(45, 40);
+    await sleep(500);
+    const mark = hal.got.length, far = [ben, dee].map((p) => p.got.length);
+    const pin = Date.now();
+    gil.send({ t: 'pin', w: 'frag' });
+    await sleep(1000);
+    gil.send({ t: 'died', cause: 'the test' });
+    gil.quiet();
+    await sleep(400);
+    const seen = hal.nades(mark).filter((m) => m.id === gil.id);
+    assert.equal(seen.length, 1, 'a grenade that fell from a dead hand was not shown to everybody else, once');
+    assert.equal(seen[0].w, 'frag');
+    assert.deepEqual(seen[0].v, [0, 0, 0]);
+    near(seen[0].f, (fuse - 1000) / 1000, 0.25, 'the fuse a grenade has left as it falls from a dead hand');
+    near(Math.hypot(seen[0].o[0] - gil.x, seen[0].o[1] - (gil.feet()[1] + NADE.hand), seen[0].o[2] - gil.z), 0, 0.01, 'how far from where its holder died it fell');
+    assert.equal(hal.dmg(mark).length, 0, 'it went off before its fuse had run');
+    // (the dead say nothing that is believed: its holder's game is not asked whom it reached, and says so in vain)
+    gil.send({ t: 'hit', to: dee.id, zone: 'torso', w: 'frag', dist: 0, sup: false, bonus: 0 });
+    await sleep(Math.max(0, pin + fuse + 300 - Date.now()));
+    const took = hal.dmg(mark);
+    assert.equal(took.length, 1, `somebody five metres from a grenade a dead hand let fall was reached by it ${took.length} times`);
+    const d = Math.hypot(hal.x - gil.x, hal.chest()[1] - (gil.feet()[1] + NADE.lies), hal.z - gil.z);
+    near(took[0].amount, hitDamage('frag', 'torso', d), 0.01, 'what a frag grenade lying five metres off does, by the server\'s own reckoning');
+    assert.equal(took[0].w, 'frag');
+    assert.equal(took[0].from, gil.id, 'it was not the doing of whoever let it fall');
+    assert.deepEqual([ben, dee].map((p, k) => p.dmg(far[k]).length), [0, 0], 'it reached somebody fifty metres off');
+    // and whoever dies of it was killed by its dead holder
+    hal.send({ t: 'died', cause: 'wounds' });
+    await sleep(400);
+    const death = ben.got.find((m) => m.t === 'death' && m.k.id === hal.id) as Extract<S2C, { t: 'death' }> | undefined;
+    assert.ok(death && death.k.by === gil.id && death.k.w === 'frag', `whoever died of it was not said killed by its holder: ${JSON.stringify(death?.k)}`);
+    checks++;
+    console.log(`  ok  over the wire: a pin out and its holder dies: everybody is shown it fall there with ${seen[0].f.toFixed(2)} s left; it goes off when they have run, and the server reckons whom it reached (${took[0].amount.toFixed(0)} at 5 m) and whose doing it was`);
   }
 
   // ---- "2 stick grenades or 1 frag grenade blows up a car": and a car takes one grenade once, however often it is said

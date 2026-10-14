@@ -380,8 +380,30 @@ export const HOLD = {
  * (the line under the crosshair says it in figures).
  *   at, turn – where it is, and how it is turned
  *   shake    – how far it shakes when the pin has just come out, and at the end of the fuse, metres
+ *   stick    – a grenade on a handle, which is not held as a ball is. (It was: turned as the ball is, its head came
+ *              down toward the eye and filled the corner of the picture, the fist somewhere up its handle. Looked
+ *              at 2026-10-13.) It is stood up in the fist by the end of its handle, its head uppermost and leaning
+ *              back over the shoulder, as a thing is held that is about to be thrown overarm. `at`, `turn`: where
+ *              its middle is and how it is turned (it lies along its own z, its head toward +z). `grip`: how far
+ *              along it from its middle the fist is (toward the handle's end). `fingers`: which way they point
+ *              round the handle, in its own x and y. `fist`: how far behind the handle the wrist is, and how far
+ *              to the palm's side of it. `curl`, `thumb`, `tuck`: how the fist is closed on it.
  */
-export const LIVE = { at: [0.17, -0.075, -0.4] as [number, number, number], turn: [0.3, -0.35, -0.25] as [number, number, number], shake: [0.0012, 0.006] as [number, number] };
+export const LIVE = {
+  at: [0.17, -0.075, -0.4] as [number, number, number],
+  turn: [0.3, -0.35, -0.25] as [number, number, number],
+  shake: [0.0012, 0.006] as [number, number],
+  stick: {
+    at: [0.19, -0.045, -0.47] as [number, number, number],
+    turn: [-1.1, 0.12, -0.3] as [number, number, number],
+    grip: -0.1,
+    fingers: [-0.45, 0.89] as [number, number],
+    fist: [0.075, 0.03] as [number, number],
+    curl: [1.1, 1.15, 1.2, 1.25] as [number, number, number, number],
+    thumb: 0.8,
+    tuck: 0.3,
+  },
+};
 
 /**
  * A roll of dressing (the bandage, the splint tape), in the eye's space. It lies in the hollow of the left palm,
@@ -3792,8 +3814,10 @@ export class Weapons {
       // A grenade with its pin out: up on the right in the one fist, and shaking the more the less of its fuse is left.
       const k = THREE.MathUtils.clamp(t / Math.max(0.05, h.dur), 0, 1);
       const s = THREE.MathUtils.lerp(LIVE.shake[0], LIVE.shake[1], k * k);
-      pos.set(LIVE.at[0] + Math.sin(t * 37) * s, LIVE.at[1] + Math.sin(t * 29 + 1) * s, LIVE.at[2] + Math.sin(t * 23 + 2) * s * 0.5);
-      rot.set(LIVE.turn[0], LIVE.turn[1], LIVE.turn[2] + Math.sin(t * 31) * s * 6);
+      // (a grenade on a handle is stood up in the fist, head uppermost: see LIVE.stick)
+      const L = h.size.z > 0.2 ? LIVE.stick : LIVE;
+      pos.set(L.at[0] + Math.sin(t * 37) * s, L.at[1] + Math.sin(t * 29 + 1) * s, L.at[2] + Math.sin(t * 23 + 2) * s * 0.5);
+      rot.set(L.turn[0], L.turn[1], L.turn[2] + Math.sin(t * 31) * s * 6);
     } else {
       pos.set(H.work[0], H.work[1] + sy * H.workBy[0] + Math.sin(t * 9) * 0.004, H.work[2] + sy * H.workBy[1]);
       rot.set(0.45, 0.25 + Math.sin(t * 4.5) * 0.05, 0);
@@ -3930,6 +3954,14 @@ export class Weapons {
         curl: [0.5 + w * 0.3, 0.6 + w * 0.3, 0.9, 1.0],
         thumb: 0.4,
       };
+    }
+    if (h.kind === 'live' && h.size.z > 0.2) {
+      // A fist round the end of its handle, the thumb's side toward its head. The handle runs through the middle of
+      // the fist, so the wrist is set that far behind it and to the palm's side (as the fist round an injector is).
+      const S = LIVE.stick;
+      const up = new THREE.Vector3(0, 0, 1), fingers = new THREE.Vector3(S.fingers[0], S.fingers[1], 0).normalize();
+      const palm = new THREE.Vector3().crossVectors(up, fingers);
+      right = { pos: up.clone().multiplyScalar(S.grip).addScaledVector(fingers, -S.fist[0]).addScaledVector(palm, -S.fist[1]), fingers, palm, curl: S.curl, thumb: S.thumb, tuck: S.tuck };
     }
     this.arms.update(h.root, { right, left }, this.vmCamera.quaternion, true);
   }

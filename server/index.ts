@@ -31,7 +31,7 @@ import { RangeJudge, dealing, rangeOf, shotMisses, type RangeSpec } from '../src
 import { BUNKER, bunkerDark, inBunker } from '../src/sim/bunker';
 import { phaseOf } from '../src/sim/daynight';
 import { WEAPON_RULES, hitDamage, type HitZone } from '../src/sim/combat';
-import { THROWN, inHandDamage, judge, letGo, newThrower, overdue, pullPin, type Thrower, type Vec3 } from '../src/sim/grenades';
+import { THROWN, fallen, inHandDamage, judge, letGo, lyingBlast, newThrower, overdue, pullPin, type Thrower, type Vec3 } from '../src/sim/grenades';
 import { BARREL } from '../src/sim/barrels';
 import { JEEP, POLICE_CAR, SEATS, carDamage, crashDamage, restState, type VehicleInfo, type VState } from '../src/sim/vehicles';
 import { Director, INFECTED, guarded, infectedDrop } from '../src/sim/infected';
@@ -1011,6 +1011,40 @@ function inHands(now: number) {
   }
 }
 setInterval(() => inHands(Date.now()), 250);
+
+/**
+ * A grenade that fell from a dead hand has gone off where it lay (`fallen` in src/sim/grenades.ts: whoever dies
+ * with the pin out lets go of it, and it goes off when its fuse ends, "for whoever is in reach, as any grenade on
+ * the ground would"). Nobody's game is asked anything of it: where it lay and when it went off are the server's
+ * own, and so is whom it reached, by how far each stands from it, as a car that burns is reckoned. Whoever is in
+ * reach is hurt by it through what they wear, and it is the dead holder's doing; the infected in reach and a car
+ * in reach take it too. (There are no walls in the server's world: none stops it, as none stops a burning car's.)
+ */
+function fellBlast(by: Client, w: string, at: Vec3) {
+  const rule = WEAPON_RULES[w], now = Date.now();
+  for (const o of clients.values()) {
+    if (!o.alive || o.power.god) continue;
+    const amount = lyingBlast(w, at, [o.pose[0], o.pose[1] + 1.1, o.pose[2]]);
+    if (amount <= 0) continue;
+    const len = Math.max(0.001, Math.hypot(o.pose[0] - at[0], o.pose[2] - at[2]));
+    o.lastHitBy = { id: by.id, name: by.name, w, zone: 'torso', dist: Math.hypot(o.pose[0] - at[0], o.pose[1] - at[1], o.pose[2] - at[2]), at: now };
+    dealt(o, amount, 'torso', w);
+    send(o, { t: 'dmg', from: by.id, amount, zone: 'torso', w, dir: [(o.pose[0] - at[0]) / len, 0, (o.pose[2] - at[2]) / len] });
+  }
+  for (const [i, b] of horde.bodies) {
+    const r = b.diedAt ? null : horde.hurt(i, lyingBlast(w, at, [b.s[0], b.s[1] + 1.2, b.s[2]]), now);
+    if (!r) continue;
+    if (r.dead) {
+      // what it had on it falls where it does
+      const had = infectedDrop();
+      if (had) economy.drop(makeItem(had[0], had[1]), b.s[0] + (Math.random() - 0.5) * 0.8, b.s[1] + 0.03, b.s[2] + (Math.random() - 0.5) * 0.8, Math.random() * Math.PI * 2);
+    }
+    const len = Math.max(0.001, Math.hypot(b.s[0] - at[0], b.s[2] - at[2]));
+    broadcast({ t: 'ihp', i, hp: r.hp, dead: r.dead, by: by.id, zone: 'torso', dir: [(b.s[0] - at[0]) / len, (b.s[2] - at[2]) / len], melee: false });
+  }
+  // (a car is reached from seven tenths as far as a body, as it is by a grenade that was thrown)
+  for (const v of [...vehicles.values()]) if (!v.goneAt && Math.hypot(v.s[0] - at[0], v.s[1] - at[1], v.s[2] - at[2]) < rule.blast! * 0.7) hurtJeep(v, carDamage(rule), by);
+}
 
 /** What somebody says they carry, asked of the server's own list: an invented gun is written down once, and (enforcing) is not in the copy the server keeps of their pockets. */
 function pockets(c: Client) {
@@ -3181,8 +3215,14 @@ function kill(c: Client, cause: string, v = 0) {
   if (!c.alive) return;
   c.alive = false;
   c.logoutAt = 0;
-  // (a grenade with its pin out in their hand goes with them: nothing is said of it in their next life)
-  c.nades.held = null;
+  // A grenade with its pin out in their hand does not go with them: it falls where they fell, everybody else is
+  // shown it lying there with what is left of its fuse (their own game lets go of it by itself), and when that has
+  // run the server reckons whom it reached: see `fellBlast`. (It vanished, until the ruling of 2026-10-13.)
+  const fell = fallen(c.nades, [c.pose[0], c.pose[1], c.pose[2]], Date.now());
+  if (fell) {
+    broadcast({ t: 'nade', id: c.id, o: fell.from, v: [0, 0, 0], w: fell.w, f: fell.left }, c);
+    setTimeout(() => fellBlast(c, fell.w, fell.lies), fell.left * 1000);
+  }
   // (a body left behind has nobody to come back to it: it is out of the world once it has fallen)
   if (c.asleep) setTimeout(() => drop(c), 3000);
   releaseLock(c);
