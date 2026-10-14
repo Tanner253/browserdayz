@@ -3,6 +3,7 @@
 // Game.prototype as the file loads. Nothing in them was changed but `this: Game` said as the first parameter.)
 
 import { audio } from '../../core/audio';
+import { reloadPage } from '../../core/leave';
 import { heightAt, inPlay } from '../../world/worldgen';
 import { makeItem, makeMag, type ItemInstance, TAG_OUT, tagOwner, TAG_HOLD_MIN, TAG_HOLD, tagClock } from '../../sim/items';
 import { refill, refilledWords } from '../../sim/powers';
@@ -100,7 +101,7 @@ export const enterMethods = {
         const last = Number(sessionStorage.getItem('zona:reloaded') ?? 0);
         if (Date.now() - last > 20_000) {
           sessionStorage.setItem('zona:reloaded', String(Date.now()));
-          return void location.reload();
+          return void reloadPage();
         }
       }
       this.input.unlock();

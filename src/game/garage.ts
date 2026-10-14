@@ -550,11 +550,11 @@ export class Garage {
           steer: (input.held('KeyD') ? 1 : 0) - (input.held('KeyA') ? 1 : 0),
           hand: input.held('Space'),
         };
-        // (a helicopter's: Space up and Ctrl down, as the owner asked (2026-10-14: "spacebar is not giving me
-        // throttle/lift", "ctrl should reduce throttle"); Shift and Z as well, Z for whoever finds Ctrl and W shuts the
-        // browser's tab. Q and E lean it.)
+        // (a helicopter's: Space up and C down, as crouching is (the owner, 2026-10-14: "spacebar is not giving me
+        // throttle/lift"; "remove the ctrl key, use C like crouch now instead": Ctrl and W shuts the browser's tab).
+        // Q and E lean it.)
         if (j instanceof Heli) {
-          c.lift = (input.held('Space') || input.held('ShiftLeft') || input.held('ShiftRight') ? 1 : 0) - (input.held('ControlLeft') || input.held('ControlRight') || input.held('KeyZ') ? 1 : 0);
+          c.lift = (input.held('Space') ? 1 : 0) - (input.held('KeyC') ? 1 : 0);
           c.roll = (input.held('KeyE') ? 1 : 0) - (input.held('KeyQ') ? 1 : 0);
         }
       }

@@ -3,6 +3,7 @@
 // Game.prototype as the file loads. Nothing in them was changed but `this: Game` said as the first parameter.)
 
 import * as THREE from 'three';
+import { reloadPage } from '../../core/leave';
 import { physics, SOLID_GROUPS } from '../../core/physics';
 import { audio } from '../../core/audio';
 import { heightAt } from '../../world/worldgen';
@@ -400,7 +401,7 @@ export const onlineMethods = {
         try {
           const r = await fetch(`${remote}/healthz`, { cache: 'no-store' });
           const j = r.ok ? ((await r.json()) as { uptime?: number }) : null;
-          if (j && typeof j.uptime === 'number' && (j.uptime < 240 || performance.now() - began > 150_000)) return void location.reload();
+          if (j && typeof j.uptime === 'number' && (j.uptime < 240 || performance.now() - began > 150_000)) return void reloadPage();
         } catch {
           /* not there yet */
         }

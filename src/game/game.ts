@@ -3,6 +3,7 @@
 // Online, the server does, and this file mirrors it and reports what the player does.
 
 import * as THREE from 'three';
+import { keepKeysInFullScreen, leaving } from '../core/leave';
 import type { Renderer } from '../core/renderer';
 import { physics } from '../core/physics';
 import { assets } from '../core/assets';
@@ -974,7 +975,16 @@ export class Game {
         if (this.started) this.unpause();
       } else if (!this.invUI.isOpen && !this.map?.open && !this.adminUI?.isOpen && !this.player.dead && this.started) this.pause();
     };
-    window.addEventListener('beforeunload', () => this.save());
+    // (and whoever is alive in a life is asked before the tab goes: Ctrl and W, the browser's own, is a helicopter
+    // going down and forward. The game's own reloads are not asked about: src/core/leave.ts)
+    window.addEventListener('beforeunload', (e) => {
+      this.save();
+      if (this.started && !this.player.dead && !leaving.now) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    });
+    keepKeysInFullScreen();
     // Dead, Space is the Respawn button. (Not in the first second: whoever died with a thumb on it, jumping, is
     // shown what killed them before they are somewhere else.)
     window.addEventListener('keydown', (e) => {

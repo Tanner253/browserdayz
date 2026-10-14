@@ -2,6 +2,7 @@
 // only when relevant. Plain DOM; updated once per frame with cheap diffs.
 
 import { offer, type Offer, type Pick, type Role } from '../net/orders';
+import { reloadPage } from '../core/leave';
 import type { Vitals } from '../game/player';
 import { BLOOD } from '../sim/blood';
 import { bleedLevel } from './status';
@@ -336,7 +337,7 @@ export class HUD {
       remind();
       setInterval(remind, 20 * 60_000);
     }, 10 * 60_000);
-    (this.root.querySelector('.fatal-btn') as HTMLButtonElement).onclick = () => location.reload();
+    (this.root.querySelector('.fatal-btn') as HTMLButtonElement).onclick = () => reloadPage();
     const chat = this.root.querySelector('.chat-input') as HTMLInputElement;
     chat.addEventListener('keydown', (e) => {
       e.stopPropagation();
