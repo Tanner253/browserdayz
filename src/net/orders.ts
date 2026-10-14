@@ -5,6 +5,7 @@
 
 import { KITS } from '../sim/kits';
 import { POLICE_CAR } from '../sim/vehicles';
+import { HELI } from '../sim/heli';
 
 export type Role = 'admin' | 'mod';
 
@@ -31,6 +32,7 @@ export interface Entity {
 export const ENTITIES: Entity[] = [
   { id: 'jeep', name: 'Jeep', kind: 'car', k: 0, most: 4, does: 'The off-road car: four seats, fuel in the tank', also: ['uaz', 'car'] },
   { id: 'police', name: 'Police car', kind: 'car', k: POLICE_CAR.kind, most: 4, does: 'The road car: quicker than the jeep on a road, slower off it', also: ['policecar', 'cop'] },
+  { id: 'heli', name: 'Helicopter', kind: 'car', k: HELI.kind, most: 2, does: 'The MD-500: two seats; Space climbs, C drops (put it somewhere with room round it)', also: ['helicopter', 'md500', 'chopper'] },
   { id: 'infected', name: 'Infected', kind: 'infected', most: 25, does: 'They stand where they are put, and go for whoever is near. Nothing comes back in their place when they are dead', also: ['zombie', 'zombies', 'z'] },
 ];
 /** the thing meant by a word typed after `/spawn` */

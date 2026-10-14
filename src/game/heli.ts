@@ -157,8 +157,11 @@ export class Heli extends Jeep {
       // (standing on its skids and not asked up: no push, so that its whole weight is on them and it stays where it is put)
       if (down && liftIn <= 0) push = 0;
       else {
-        // (coming down, slower the nearer the ground: a quarter of the rate in the last few metres)
-        let climb = liftIn > 0 ? liftIn * F.climb : liftIn * F.sink * Math.min(1, Math.max(0.25, above / 12));
+        // (Coming down, never faster than the rotor can still stop it in what height there is left, with some to
+        // spare: from high up all but a fall, and set down on its skids at a walk however long C is held.)
+        const brake = F.stop * Math.max(0.5, most / F.mass - 9.81);
+        const stop = Math.max(1.5, Math.sqrt(2 * brake * Math.max(0, above - 2)));
+        let climb = liftIn > 0 ? liftIn * F.climb : -Math.min(-liftIn * F.sink, stop);
         // (never more than F.agl over what is under it, the ground rising and falling: over a cliff's edge it settles down to it again)
         climb = Math.max(-F.sink, Math.min(climb, Math.min(F.agl - above, F.ceiling - t.y) * 0.8));
         push = clamp((F.mass * (9.81 + F.hold * (climb - lv.y))) / Math.max(0.35, _u.y), 0, most);

@@ -7,7 +7,7 @@ import { VOICE } from '../src/sim/voice';
 import { WEAPON_RULES, hitDamage } from '../src/sim/combat';
 import { fallen } from '../src/sim/grenades';
 import { JEEP, RIDE_HEIGHT, SEATS, restState, type VState } from '../src/sim/vehicles';
-import { HELI, heliCrash } from '../src/sim/heli';
+import { HELI, heliCrash, hpOf } from '../src/sim/heli';
 import { type CorpseInfo, type KillInfo, F_DEAD } from '../src/net/protocol';
 import { CORPSE_LIFETIME, boxes, economy, issue, jeepsDue, locks, log, tellSeats, vehicles, world, type Veh } from './index';
 import { TAG_FRESH_MS, carriedTags, lootedTags, tagSeen } from './tags';
@@ -202,7 +202,7 @@ export function hurtJeep(v: Veh, amount: number, by: Client) {
   broadcast({ t: 'vhp', i: v.i, hp: Math.round(v.hp), by: by.id });
   if (v.hp <= 0) return blowJeep(v, by.id);
   // on fire: it goes up in a few seconds, and everybody in it knows it
-  if (v.hp <= JEEP.hp * JEEP.fireAt && !v.burnAt) {
+  if (v.hp <= hpOf(v.k) * JEEP.fireAt && !v.burnAt) {
     v.burnAt = Date.now() + JEEP.fuse * 1000;
     v.by = by.id;
   }

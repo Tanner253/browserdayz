@@ -20,6 +20,7 @@ import { INJECT } from '../weapons';
 import { Stash, WorldItem } from '../loot';
 import { Jeep } from '../vehicle';
 import { JEEP } from '../../sim/vehicles';
+import { hpOf } from '../../sim/heli';
 import { stage } from '../../sim/wells';
 import { TOUCH } from '../../core/device';
 import { hourAt, DAY } from '../../sim/daynight';
@@ -552,7 +553,7 @@ export const frameMethods = {
       spread: this.weapons.spread,
       lag: this.lagPx(),
       arms: this.weapons.armStamina,
-      ride: this.garage.ride && !p.dead ? { seats: this.garage.seatList(), kmh: Math.abs(this.garage.ride.jeep.speed) * 3.6, fuel: this.garage.ride.jeep.fuel / JEEP.tank, hp: this.garage.ride.jeep.hp / JEEP.hp, driver: this.garage.ride.seat === 0 } : null,
+      ride: this.garage.ride && !p.dead ? { seats: this.garage.seatList(), kmh: Math.abs(this.garage.ride.jeep.speed) * 3.6, fuel: this.garage.ride.jeep.fuel / JEEP.tank, hp: this.garage.ride.jeep.hp / hpOf(this.garage.ride.jeep.kind), driver: this.garage.ride.seat === 0 } : null,
       scoped: this.weapons.scoped,
       sightless: this.weapons.sightless,
       glass: !!this.glass,

@@ -18,16 +18,23 @@ export const HELI = {
   mass: 1100,
   /** how its weight is spread, as a multiple of a solid box's (it is mostly cabin, and long in the tail) */
   inertia: [1.6, 1.4, 1.9] as [number, number, number],
-  /** the most the rotor pushes, as a share of its weight: a climb with some to spare */
-  lift: 1.7,
+  /** the most the rotor pushes, as a share of its weight: a climb with plenty to spare, and a fall stopped short */
+  lift: 2.0,
   /** and a fifth more of that within a rotor's breadth of the ground (the air it pushes down has nowhere to go) */
   ground: 0.2,
   rotorD: 7.4,
-  /** m/s up with the climb key held, down with the descend key; with neither it holds its height */
-  climb: 7,
-  sink: 6,
+  /**
+   * m/s up with the climb key held, down with the descend key; with neither it holds its height. Down is all but a
+   * fall (the owner, 2026-10-14: "the throttle and descent is not fast enough, when i hold C and drop throttle i should
+   * almost fall out of the sky (keeping directional momentum)"): the rotor lets go until it is coming down that fast,
+   * and what way it was going it goes on going. Never faster than it can still be stopped before the ground (`stop`).
+   */
+  climb: 12,
+  sink: 30,
   /** how hard it is held to the climb asked for (1/s) */
-  hold: 1.8,
+  hold: 3,
+  /** of all the rotor has over its weight, the share a fall is reckoned to be stopped with before the ground (the rest is room for the pilot to be late) */
+  stop: 0.6,
   /** the most it tips its nose (forward or back) and leans (into a turn), radians: 24 and 29 degrees */
   pitch: 0.42,
   roll: 0.5,
@@ -55,6 +62,8 @@ export const HELI = {
   tailRate: 5.3,
   /** metres over the ground under which it is held level and pushed straight up (see `low` in src/game/heli.ts) */
   low: 1.5,
+  /** what it takes to wreck it: a quarter less than a car (the owner, 2026-10-14: "heli hp is a little too much can we reduce max heli hp by 25%") */
+  hp: Math.round(JEEP.hp * 0.75),
   /** m/s lost in one step that counts as a crash (a hard landing at four is not one) */
   crash: 6,
   /** a crash (m/s lost in one step) from which it is hurt, and from which it is wrecked and everybody in it killed (see heliCrash) */
@@ -134,6 +143,9 @@ export function heliSpots(world: World): { x: number; y: number; z: number; yaw:
 /** how many seats a vehicle of this kind (the `k` of a VehicleInfo) has: a helicopter two, a car SEATS */
 export const seatsOf = (k?: number) => (k === HELI.kind ? HELI.seats : SEATS);
 
+/** the most a vehicle of this kind takes before it is wrecked: a helicopter HELI.hp, a car JEEP.hp */
+export const hpOf = (k?: number) => (k === HELI.kind ? HELI.hp : JEEP.hp);
+
 /**
  * What a crash does to a helicopter and to everybody in it (a car's is crashDamage in src/sim/vehicles.ts): a hard
  * landing dents it and shakes them; from HELI.wreck[1] up it is wrecked (it burns) and nobody in it lives. A fall from
@@ -141,7 +153,7 @@ export const seatsOf = (k?: number) => (k === HELI.kind ? HELI.seats : SEATS);
  */
 export function heliCrash(hard: number): { jeep: number; people: number } {
   const [from, all] = HELI.wreck;
-  if (hard >= all) return { jeep: JEEP.hp, people: 500 };
+  if (hard >= all) return { jeep: HELI.hp, people: 500 };
   const k = Math.max(0, (hard - from) / (all - from));
-  return { jeep: Math.round(JEEP.hp * 0.6 * k), people: k > 0.3 ? Math.round(90 * k) : 0 };
+  return { jeep: Math.round(HELI.hp * 0.6 * k), people: k > 0.3 ? Math.round(90 * k) : 0 };
 }

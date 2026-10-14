@@ -24,7 +24,7 @@ import { RangeJudge, shotMisses } from '../src/sim/range';
 import { inBunker, BUNKER } from '../src/sim/bunker';
 import { BARREL } from '../src/sim/barrels';
 import { type VehicleInfo, POLICE_CAR, restState, JEEP, SEATS, type VState } from '../src/sim/vehicles';
-import { HELI } from '../src/sim/heli';
+import { HELI, hpOf } from '../src/sim/heli';
 import { Director } from '../src/sim/infected';
 import { type StoredItem, type S2C, PROTOCOL, type C2S } from '../src/net/protocol';
 import { Hearths } from '../src/sim/fires';
@@ -152,7 +152,7 @@ export const PARKS = [...world.jeeps.map((p) => ({ ...p, k: 0 })), ...world.cars
 
 export function standJeep(home: number): Veh {
   const p = PARKS[home];
-  const v: Veh = { i: nextVeh++, s: restState(p.x, p.y, p.z, p.yaw), hp: JEEP.hp, fuel: Math.round(JEEP.tank * (0.3 + Math.random() * 0.45)), seats: Array(SEATS).fill(null), sim: null, home, heard: 0, burnAt: 0, by: 0, goneAt: 0, ...(p.k ? { k: p.k } : {}) };
+  const v: Veh = { i: nextVeh++, s: restState(p.x, p.y, p.z, p.yaw), hp: hpOf(p.k), fuel: Math.round(JEEP.tank * (0.3 + Math.random() * 0.45)), seats: Array(SEATS).fill(null), sim: null, home, heard: 0, burnAt: 0, by: 0, goneAt: 0, ...(p.k ? { k: p.k } : {}) };
   vehicles.set(v.i, v);
   return v;
 }

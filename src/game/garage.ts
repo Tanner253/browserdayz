@@ -23,7 +23,7 @@ import type { Player } from './player';
 import type { RemotePlayer } from './remote';
 import { DRIVE, DRIVES, DRIVE_CAR, Jeep, groundOf, type Controls } from './vehicle';
 import { Heli } from './heli';
-import { HELI, heliCrash, heliSpots, seatsOf } from '../sim/heli';
+import { HELI, heliCrash, heliSpots, hpOf, seatsOf } from '../sim/heli';
 
 /**
  * Where whoever sits in each seat has their feet, in the jeep's own frame (x to its right,
@@ -311,7 +311,7 @@ export class Garage {
   private standAlone(p: { x: number; y: number; z: number; yaw: number; k: number }, home: number) {
     const i = this.nextId++;
     this.homes.set(i, home);
-    this.add({ i, s: restState(p.x, p.y, p.z, p.yaw), hp: JEEP.hp, fuel: Math.round(JEEP.tank * (0.3 + Math.random() * 0.45)), seats: Array(SEATS).fill(null), sim: null, ...(p.k ? { k: p.k } : {}) });
+    this.add({ i, s: restState(p.x, p.y, p.z, p.yaw), hp: hpOf(p.k), fuel: Math.round(JEEP.tank * (0.3 + Math.random() * 0.45)), seats: Array(SEATS).fill(null), sim: null, ...(p.k ? { k: p.k } : {}) });
   }
 
   /** what the server sends about them, wired to what is done about it here */
@@ -810,9 +810,10 @@ export class Garage {
       }
     }
     for (const j of this.jeeps.values()) {
-      if (j.wreck || j.hp > JEEP.hp * JEEP.fireAt) continue;
+      const most = hpOf(j.kind);
+      if (j.wreck || j.hp > most * JEEP.fireAt) continue;
       // alight: it goes up in a few seconds
-      j.hp = Math.max(0, j.hp - (JEEP.hp * JEEP.fireAt * dt) / JEEP.fuse);
+      j.hp = Math.max(0, j.hp - (most * JEEP.fireAt * dt) / JEEP.fuse);
     }
   }
 
@@ -826,7 +827,7 @@ export class Garage {
       x.lit = lit;
       for (const m of x.lamps) m.emissiveIntensity = lit ? LAMPS : 0;
     }
-    const left = j.hp / JEEP.hp;
+    const left = j.hp / hpOf(j.kind);
     if (!j.wreck && left < JEEP.smokeAt) fx.engineSmoke(j.point(...ENGINE_AT[j.kind], _a), x.smoke, dt, left < JEEP.fireAt, 1 - left / JEEP.smokeAt, j.quat, j.vel);
     else if (j.wreck) fx.engineSmoke(j.point(0, ENGINE_AT[j.kind][1] + 0.1, -0.4, _a), x.smoke, dt * 0.5, false, 0.6, j.quat, undefined, true);
     // what the rear wheels throw up, off the road
