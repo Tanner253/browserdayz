@@ -86,6 +86,7 @@ import { BunkerSite, spotKey } from '../world/bunker';
 import { BUNKER, bunkerCrates, bunkerDark, inBunker } from '../sim/bunker';
 import { CRESSET, CastleSite } from '../world/castle';
 import { CASTLE_SCALE, castleDark, castleUnder, inCastle } from '../sim/castle';
+import { WreckFire } from './wreck-fire';
 
 const _gasHead = new THREE.Vector3();
 /** how much of the view is left when aiming through a holographic sight (the plain sights leave 0.8 of it): nearer by a third again */
@@ -191,6 +192,8 @@ export class Game {
   bunker!: BunkerSite;
   /** the fort on the mountain (src/world/castle.ts): none, in a world that has no place for one */
   castle: CastleSite | null = null;
+  /** the jeep that burns before the fort's gate, for good (./wreck-fire.ts): none, in a world that has no fort */
+  wreck: WreckFire | null = null;
   /** playing alone: seconds since this game was last inside it with its door open */
   private bunkerEmpty = 0;
   /** every lit lamp: carried, driven behind, standing in the street */
@@ -369,6 +372,13 @@ export class Game {
     // (the fort: stood where the map says, on the ground as the map has it; the earth round its hatch is drawn as the ground is)
     // (and what it draws is got ready before it is shown, as the bunker's is: a dozen kinds of surface made in the frame it first came into sight stood the game still on the way up to it)
     if (world.castle) this.castle = new CastleSite(world.castle, atmo, r.scene, { ground: (x, z) => heightAt(world.surface, x, z), earth: this.s.terrain.lid ?? undefined, ready: (o) => r.ready(o) });
+    // (and the jeep that burns before its gate: where the fort's plan has it, on the ground as the map has it there.
+    // Whoever rests by it is warmed as by a fireplace that is alight, and after dark the fires' lamp is its own
+    // while it stands at it: its place and its lamp are told to the fires.)
+    if (world.castle) {
+      this.wreck = new WreckFire(world.castle, (x, z) => heightAt(world.surface, x, z), r.scene, atmo, this.effects, (o) => r.ready(o));
+      this.fires.always.push({ at: this.wreck.foot, lamp: this.wreck.lamp });
+    }
     // (a fall inside the fort is as long as its plan's: the speed of one a fifth shorter. See `landsAs`.)
     this.player.landsAs = (x, y, z) => (inCastle(world.castle ?? null, x, y, z) ? 1 / Math.sqrt(CASTLE_SCALE) : 1);
     // Its door is loud: heard by everybody on the map, wherever they are, and from where it is. (It was heard
@@ -2588,6 +2598,8 @@ export class Game {
     // the fort: what of it is drawn for where the eye is, its cressets, and the dark under its terrace
     // (a fire basket's light unless the fort says otherwise: its floodlights are white, the wash under its mast red)
     this.castle?.update(dt, cam.position, atmo.night, (pos, burn, colour = CRESSET.colour, reach = CRESSET.reach) => this.lamps.glow(pos, colour, burn, reach));
+    // (and the jeep that burns before its gate: its flames and its smoke. Its light is the fires' own lamp: see `fires.always`.)
+    this.wreck?.update(dt, cam.position);
     const under = this.nightSight ? 0 : Math.max(bunkerDark(this.bunker.place, cam.position.x, cam.position.y, cam.position.z), castleDark(this.s.world.castle, cam.position.x, cam.position.y, cam.position.z, (x, z) => heightAt(this.s.world.surface, x, z)));
     atmo.cover.ground = { sun: 1 - under, sky: 1 - 0.994 * under };
     // (And it sees indoors as it sees out of doors: "admin night vision should make it day time in buildings as
@@ -4875,6 +4887,12 @@ export class Game {
     // screen, and is a badge beside the survivor's health now, for as long as it is so. Why a fire is doing no good,
     // when it is not, is said beside its badge in the inventory: src/ui/status.ts.)
     this.byFire = this.started && !p.dead && this.fires.warm(p.pos) ? (p.rest(FIRE.heal * dt) ? 'mending' : 'warm') : null;
+    // (and whoever stands in the flames of the jeep that burns before the fort is burned: src/sim/wreck-fire.ts)
+    const scorched = this.wreck && this.started && !p.dead && !ride && !this.powers.god ? this.wreck.burn(dt, p.pos) : 0;
+    if (scorched > 0) {
+      p.damage(scorched, 'a burning wreck');
+      this.meDirty = true;
+    }
 
     // a part waiting on its gun: fitted, or taken off, the moment the gun is up (and forgotten if something else was taken up instead)
     if (this.fitting) {

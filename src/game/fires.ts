@@ -11,7 +11,7 @@ import { assets } from '../core/assets';
 import { audio } from '../core/audio';
 import { extractParts, groundParts, joinByPaint } from '../core/gltf-utils';
 import { physics } from '../core/physics';
-import { FIRE, fireSpots } from '../sim/fires';
+import { FIRE, fireSpots, restsBy } from '../sim/fires';
 import type { Atmosphere, ShaderPatch } from '../world/atmosphere';
 import { foliagePatch, setLodFade } from '../world/foliage';
 import { heightAt, type World } from '../world/worldgen';
@@ -57,6 +57,15 @@ export class Fires {
   readonly spots: THREE.Vector3[];
   /** seconds each has left to burn (0 = out) */
   readonly left: number[];
+  /**
+   * Fires that burn for good and are no fireplace (the jeep before the fort's gate: src/game/wreck-fire.ts, which
+   * draws it and feeds its flames): `at`, the middle of each, at the ground. Nobody lights one and no ring stands
+   * at it; whoever rests by one is warmed as by a fireplace that is alight, and it is heard as one is. `lamp`: after
+   * dark the fires' one lamp, while it stands at this fire, is this fire's own: where it hangs, how strong it is
+   * and how far it reaches (a campfire's: GLOW), from how dark (`dusk`: it begins, and it is so in full), and from
+   * how far off the eye may be for it to be lit at all, when nothing burns nearer the eye.
+   */
+  readonly always: { at: THREE.Vector3; lamp?: { at: THREE.Vector3; strength: number; reach: number; from: number; dusk: [number, number] } }[] = [];
   /** what each is owed of smoke and of sparks, and the flames it has while it is near enough to be seen burning */
   private owed: { flame: number; smoke: number; fire?: Fire }[];
   /** seconds each has been alight (a fire catches: see BURNS) */
@@ -207,7 +216,8 @@ export class Fires {
   /** is somebody at `pos` resting by a fire that is alight */
   warm(pos: THREE.Vector3): boolean {
     const i = this.at(pos, FIRE.warm);
-    return i >= 0 && this.left[i] > 0;
+    // (or by one that burns for good: the same reach, and no more through a floor than a fireplace's is)
+    return (i >= 0 && this.left[i] > 0) || this.always.some((s) => restsBy(s.at, pos.x, pos.y, pos.z));
   }
 
   /**
@@ -242,7 +252,9 @@ export class Fires {
       // (the flames are as bright as the lamp is at the moment: the light on the ground and the fire agree)
       if (d < SEEN.smoke) this.effects.campfire(this.feet[i], this.owed[i], dt, life, d < SEEN.flames, this.turn(i), 1 + 0.45 * (this.flick(i) - 0.78));
     }
-    const on = near >= 0 && nd < GLOW.from;
+    // (and what burns for good is heard as a fireplace that is alight is: the nearest of them all)
+    for (const s of this.always) nd = Math.min(nd, s.at.distanceTo(eye));
+    const on = nd < GLOW.from;
     if (glowing >= 0) {
       // The embers breathe with a fire's flicker (the nearest one's, where one is lit: every burning ring is
       // painted with the one paint, so they all do), and are brightest when the day is darkest.
@@ -252,16 +264,25 @@ export class Fires {
     }
     // The lamp is at whatever burns nearest the eye: a campfire, or anything else that has been given the same
     // flames (a car alight, a wreck burning out). It is as strong as that fire is, and as big.
-    const by = this.effects.fire.nearest(eye, GLOW.from);
+    let by = this.effects.fire.nearest(eye, GLOW.from);
+    // (One that burns for good and has a lamp of its own to say: the lamp is its own while it stands at it, and it
+    // is lit from further off than a campfire is, when nothing burns nearer the eye.)
+    let own = by ? this.always.find((a) => a.lamp && Math.hypot(a.at.x - by!.fire.at.x, a.at.z - by!.fire.at.z) < 4) : undefined;
+    if (!by) for (const a of this.always) {
+      const far = a.at.distanceTo(eye), flames = a.lamp && far < a.lamp.from ? this.effects.fire.nearest(a.at, 4) : null;
+      if (flames) [by, own] = [{ fire: flames.fire, far }, a];
+    }
     if (by) {
       const f = by.fire, t = this.clock, big = Math.min(f.size, 1.6);
       const mine = this.owed.findIndex((o) => o.fire === f);
       const flick = this.flick(mine >= 0 ? mine : 20 + f.own * 9);
       // (a fire that is not a campfire is told how bright it is here, as the campfires are above)
       if (mine < 0) f.glow = 1 + 0.45 * (flick - 0.78);
-      this.light.position.set(f.at.x + Math.sin(t * 5.1) * 0.05, f.at.y + BURNS.lamp * big, f.at.z + Math.cos(t * 4.3) * 0.05);
-      this.light.distance = GLOW.reach * big;
-      this.light.intensity = GLOW.strength * flick * f.strength * big * (1 - THREE.MathUtils.smoothstep(by.far, GLOW.from * 0.7, GLOW.from));
+      // (its own lamp comes on as the light goes: by day it is what any fire of its size has)
+      const L = own?.lamp, dark = L ? THREE.MathUtils.clamp((this.atmo.night - L.dusk[0]) / (L.dusk[1] - L.dusk[0]), 0, 1) : 0, from = L ? L.from : GLOW.from;
+      this.light.position.set((L ? L.at : f.at).x + Math.sin(t * 5.1) * 0.05, L ? L.at.y : f.at.y + BURNS.lamp * big, (L ? L.at : f.at).z + Math.cos(t * 4.3) * 0.05);
+      this.light.distance = THREE.MathUtils.lerp(GLOW.reach * big, L ? L.reach : 0, dark);
+      this.light.intensity = THREE.MathUtils.lerp(GLOW.strength * f.strength * big, L ? L.strength : 0, dark) * flick * (1 - THREE.MathUtils.smoothstep(by.far, from * 0.7, from));
     } else this.light.intensity = 0;
     audio.fire(dt, on ? nd : -1);
     const heard: THREE.Vector3[] = [];

@@ -4,7 +4,7 @@
 
 import assert from 'node:assert/strict';
 import { KIT_LEVELS, KIT_MERLON, cutBox, inCut, kitMatrix, kitPoint, kitSolids } from '../src/sim/kit';
-import { castleDoor, castleKit } from '../src/sim/castle';
+import { HOUSES, castleDoor, castleKit } from '../src/sim/castle';
 import { CASTLE, CASTLE_SCALE, CASTLE_TIERS, FURNITURE, LOOSE, OUTCROP, POSTERN, UNDER, castleAt, castleCuts, castleDark, castleGround, castleHomes, castleLamps, castleLocal, castleLoose, castleLoot, castleParts, castleProps, castleUnder, hatchLine, hatchWell, inCastle, looseLocal, looseParts, moundTop, squareTouches, stairShare, towerRadius, type Flight, type Place, type Tower, type V3 } from '../src/sim/castle';
 import { postProps } from '../src/sim/castle-post';
 import { PAINTS, PICTURES, SHEETS, STUFF, castleShape, type Sheet, type Skin, type Solid } from '../src/world/castle-shape';
@@ -255,7 +255,10 @@ ok('what stops a body is sound: every block has size and is turned by a turn, ev
   for (const s of boxes) {
     assert.ok(s.h.every((v) => v > 0 && Number.isFinite(v)) && Math.abs(Math.hypot(...s.q) - 1) < 1e-6 && s.c.every(Number.isFinite), `${s.name}: ${s.h}`);
   }
-  assert.ok(shape.solids.length < 2200, `${shape.solids.length} things to run into`);
+  // (a rock stops a body as the rock that is drawn, in pieces: 29 to a rock the fort makes, some 200 to a face of scanned
+  // rock. Here, with every rock of the plan and six faces of scanned rock, that is the half of the number; where a world
+  // has stood it, with its seven rocks and two faces, some 2,200 in all)
+  assert.ok(shape.solids.length < 3200 && shape.solids.filter((s) => !/^rock/.test(s.name)).length < 2200, `${shape.solids.length} things to run into`);
   // a flight is a slope and a last tread, both for feet alone; nothing of a slope is steeper than legs go up
   const slopes = boxes.filter((s) => s.feet && /stair|steps|flight|scaffold/.test(s.name) && s.h[1] === 0.04);
   assert.ok(slopes.length >= flights.length * 2);
@@ -534,7 +537,10 @@ ok('the ways down and the ways out: a body has room down each of them, and all t
   line([2.7, UF, UNDER.stair.z], [2.7, UF, CI.z1 - 0.6], 'from the foot of the stair out onto the cistern');
   // 2. the bay of vault that fell in: its stone is a slope from the floor to the paving, open to the sky all the way, and no steeper than is walked
   const B = UNDER.bay, vx = (-UNDER.x + UNDER.crawl) / 2 - 0.05;
-  within((Math.atan2(-0.07 - UF, B.z1 - 0.25 - (B.z0 + 0.5)) * 180) / Math.PI, 25, 33, 'the slope of the fallen vault, which is walked');
+  within((Math.atan2(-0.07 - UF, B.z1 - (B.z0 + 0.5)) * 180) / Math.PI, 25, 33, 'the slope of the fallen vault, which is walked');
+  // (its head is AT the south edge of the hole, a step under the paving, and it is gone from under the paving behind that: see the last check)
+  within(moundTop('vault', vx, B.z1), -0.071, -0.069, 'the head of the fallen vault, at the edge of the paving');
+  assert.ok(moundTop('vault', vx, B.z1 + 0.3) < UF, 'behind its head the fallen vault stands sheer');
   for (let z = B.z0 + 0.6; z < B.z1 - 0.3; z += 0.2) {
     const y = moundTop('vault', vx, z), next = moundTop('vault', vx, z + 0.2);
     assert.ok(Math.abs(next - y) / 0.2 < Math.tan((40 * Math.PI) / 180), `the fallen vault is too steep at ${z.toFixed(1)}`);
@@ -776,6 +782,143 @@ ok('the way underground is closed: from no place in the passage, at the foot of 
   assert.ok(eyes.length > 120 && seen > 20000, `only ${eyes.length} eyes looked`);
   // (and every face made has a picture: every sheet but the iron and the water)
   for (const p of SHEETS) assert.ok(p === 'iron' || p === 'water' || !!PICTURES[p].tex, `the ${p} sheet has no picture`);
+});
+
+// ---- where a way up meets the next level (2026-10-14, played: "gaps at the top of the ramps and stairs of the castle
+// where they dont meet flush with the next level"). Asked straight down, every centimetre, across each joint.
+const fields = shape.solids.filter((s): s is Extract<Solid, { t: 'field' }> => s.t === 'field');
+/** the top of what stops a body under a spot, no higher than `from`: blocks (rails left out) and made ground */
+function standsAt(x: number, z: number, from: number, deep = 0.9): number | null {
+  const near = boxes.filter((s) => !/rail/.test(s.name) && Math.hypot(s.c[0] - x, s.c[2] - z) < Math.hypot(...s.h) + 0.01);
+  let best: number | null = null;
+  for (let y = from; y > from - deep; y -= 0.004) if (near.some((s) => clear(s, [x, y, z]) === 0)) { best = y; break; }
+  for (const f of fields) {
+    const u = (x - f.x0) / f.cell, v = (z - f.z0) / f.cell, i = Math.floor(u), j = Math.floor(v);
+    if (i < 0 || j < 0 || i >= f.nx || j >= f.nz) continue;
+    // (cut corner to corner as it is drawn)
+    const H = (a: number, b: number) => f.heights[b * (f.nx + 1) + a], fu = u - i, fv = v - j;
+    const y = fu + fv <= 1 ? H(i, j) + (H(i + 1, j) - H(i, j)) * fu + (H(i, j + 1) - H(i, j)) * fv : H(i + 1, j + 1) + (H(i, j + 1) - H(i + 1, j + 1)) * (1 - fu) + (H(i + 1, j) - H(i + 1, j + 1)) * (1 - fv);
+    if (y <= from + 1e-6 && y > from - deep && (best === null || y > best)) best = y;
+  }
+  return best;
+}
+/** every face of the fort's own that looks up, by the half-metre square it is over */
+const lookingUp = new Map<number, number[][]>();
+for (const part of [shape.near, shape.under]) for (const s of SHEETS) {
+  if (s === 'water') continue;
+  const Q = part[s].pos;
+  for (let i = 0; i < Q.length; i += 9) {
+    const t = Q.slice(i, i + 9);
+    if ((t[5] - t[2]) * (t[6] - t[0]) - (t[3] - t[0]) * (t[8] - t[2]) <= 1e-9) continue;
+    for (let a = Math.floor(Math.min(t[0], t[3], t[6]) * 2); a <= Math.floor(Math.max(t[0], t[3], t[6]) * 2); a++) for (let b = Math.floor(Math.min(t[2], t[5], t[8]) * 2); b <= Math.floor(Math.max(t[2], t[5], t[8]) * 2); b++) {
+      const k = a * 4096 + b, at = lookingUp.get(k);
+      if (at) at.push(t);
+      else lookingUp.set(k, [t]);
+    }
+  }
+}
+/** the top of what is drawn under a spot, no higher than `from` */
+function drawnAt(x: number, z: number, from: number, deep = 0.9): number | null {
+  let best: number | null = null;
+  for (const t of lookingUp.get(Math.floor(x * 2) * 4096 + Math.floor(z * 2)) ?? []) {
+    const d = (t[5] - t[8]) * (t[0] - t[6]) + (t[6] - t[3]) * (t[2] - t[8]), u = ((t[5] - t[8]) * (x - t[6]) + (t[6] - t[3]) * (z - t[8])) / d, v = ((t[8] - t[2]) * (x - t[6]) + (t[0] - t[6]) * (z - t[8])) / d;
+    if (u < -1e-6 || v < -1e-6 || u + v > 1 + 1e-6) continue;
+    const y = u * t[1] + v * t[4] + (1 - u - v) * t[7];
+    if (y <= from + 1e-6 && y > from - deep && (best === null || y > best)) best = y;
+  }
+  return best;
+}
+ok('every way up meets the level it comes to: nothing is open where a tread, a deck or a slope ends, and there is no step there but the plan\'s', () => {
+  interface End { name: string; J: V3; dir: [number, number]; w: number; way: (t: number) => number; wayX: (t: number) => number; on?: (t: number) => number; tol: number; slack: number; drawn: boolean }
+  const ends: End[] = [];
+  for (const f of flights) {
+    const dx = f.head[0] - f.foot[0], dz = f.head[2] - f.foot[2], L = Math.hypot(dx, dz), up = f.head[1] - f.foot[1], k = Math.max(1, Math.round(up / 0.2)), rise = up / k, run = L / k, d: [number, number] = [dx / L, dz / L];
+    // (stone is bent a hand either way on the plan, and its treads' edges with it; boards are not)
+    const slack = f.paint === 'timber' ? 0.03 : 0.14, hatch = f.name === 'hatch steps';
+    // (the head of the hatch's steps is at the ground, which is the hill's and is asked where a world has it; a stair built down into the hill has no foot)
+    if (!hatch) ends.push({ name: `the head of the ${f.name}`, J: f.head, dir: d, w: f.w, way: (t) => -Math.floor(t / run) * rise, wayX: (t) => (t < run ? 0 : -((t - run) * rise) / run), tol: 0.02, slack, drawn: true });
+    if (castleGround(f.foot[0], f.foot[2]) < f.foot[1] + 0.25) ends.push({ name: `the foot of the ${f.name}`, J: f.foot, dir: [-d[0], -d[1]], w: f.w, way: (t) => (Math.floor(t / run) + 1) * rise, wayX: (t) => ((t + run) * rise) / run, on: (t) => Math.max(0, ((run - t) * rise) / run), tol: 0.02, slack, drawn: !hatch });
+  }
+  // the ramp: its head on the edge of the wall's top (the kit's: what stops a body there is asked, and the boards' own height against the walk's), its foot on the rock
+  const ramp = parts.find((p) => p.t === 'slab' && p.name === 'ramp') as unknown as { p: V3[] }, [ra, rb, , rd] = ramp.p, rl = Math.hypot(rb[0] - ra[0], rb[2] - ra[2]), rs = (ra[1] - rb[1]) / rl, rz = (ra[2] + rd[2]) / 2;
+  // (the kit's walk is at 7.08486 in the piece's own measure, and the piece is set down by `KIT_LEVELS.walk`)
+  within(ra[1] - (7.08486 - KIT_LEVELS.walk), 0, 0.008, 'the ramp\'s boards at their head, over the top of the wall they end on');
+  ends.push({ name: 'the head of the ramp', J: [ra[0], ra[1], rz], dir: [-1, 0], w: Math.abs(rd[2] - ra[2]), way: (t) => -t * rs, wayX: (t) => -t * rs, tol: 0.035, slack: 0.03, drawn: false });
+  ends.push({ name: 'the foot of the ramp', J: [rb[0], rb[1], rz], dir: [1, 0], w: Math.abs(rd[2] - ra[2]), way: (t) => t * rs, wayX: (t) => t * rs, tol: 0.03, slack: 0.03, drawn: true });
+  // the stone of the fallen vault: up it to the edge of the paving, a step under it
+  const B = UNDER.bay, vs = (-0.07 - UNDER.floor) / (B.z1 - B.z0 - 0.5);
+  ends.push({ name: 'the head of the fallen vault', J: [(B.x0 + UNDER.crawl) / 2 - 0.1, 0, B.z1], dir: [0, 1], w: (UNDER.crawl - B.x0) * 0.8, way: (t) => -0.07 - t * vs, wayX: (t) => -0.07 - t * vs, tol: 0.065, slack: 0.03, drawn: true });
+  let asked = 0;
+  for (const e of ends) for (const lat of [-0.3, 0, 0.3]) for (const [what, top, way, on] of [['drawn', drawnAt, e.way, () => 0], ['what stops a body', standsAt, e.wayX, e.on ?? (() => 0)]] as [string, typeof drawnAt, (t: number) => number, (t: number) => number][]) {
+    if (what === 'drawn' && !e.drawn) continue;
+    let open = 0, most = 0;
+    for (let i = -45; i <= 45; i++) {
+      const s = i / 100, x = e.J[0] + e.dir[0] * s + e.dir[1] * lat * e.w, z = e.J[2] + e.dir[1] * s - e.dir[0] * lat * e.w;
+      const wants = [s - e.slack, s - e.slack / 2, s, s + e.slack / 2, s + e.slack].map((q) => (q < 0 ? way(-q) : on(q)));
+      const y = top(x, z, e.J[1] + Math.max(...wants) + 0.4), off = y === null ? -9 : wants.map((w) => y - e.J[1] - w).sort((p, q) => Math.abs(p) - Math.abs(q))[0];
+      asked++;
+      if (off < -0.09) { open++; most = Math.max(most, open); } else { open = 0; assert.ok(Math.abs(off) <= e.tol + 1e-6, `${e.name}: ${what} is ${(off * 100).toFixed(1)} cm off where the plan has it, ${i} cm past its end`); }
+    }
+    assert.ok(most <= 1, `${e.name}: nothing is ${what === 'drawn' ? 'drawn' : 'there to stand on'} for ${most} cm across its end`);
+  }
+  // (twelve heads and ten feet of thirteen flights, the ramp's two ends, the fallen vault's head: 25 ends, each asked on three lines, drawn and stood on)
+  assert.ok(ends.length === 25 && asked > 12000, `${ends.length} ends, ${asked} places asked`);
+});
+
+ok('the dead of the place are stood where they can walk away: at places said, outside every house, a pace clear of every stone', () => {
+  // (2026-10-14, played: "zombies are getting stuck in the base of the building and surrounding buildings". Stood by a
+  // round of six metres about each house, on the world's word alone, and run by the game's own rules: of 144, 39 were
+  // IN stone and 57 inside a house's four walls; 38 never got a pace away. Stood at these places: none, none, none.)
+  const ground = (wx: number, wz: number) => { const [lx, lz] = castleLocal(P, wx, 0, wz); return P.y + CASTLE_SCALE * castleGround(lx, lz); };
+  const homes = castleHomes(P, undefined, ground), local = looseLocal(P, castleLoose(P)), rocks = local.filter((l) => l.kind === 'rock');
+  assert.equal(homes.length, 6);
+  assert.equal(homes.reduce((a, h) => a + h.n, 0), 9, 'as many of them as there were');
+  let places = 0;
+  for (const h of homes) {
+    // (on the knife-edge the fort assumes, a house on the ridge's own crest has few level places about it; where a world has stood it, eleven and more)
+    assert.ok(h.inside && h.inside.length >= 2, `a home of the fort's dead has ${h.inside?.length ?? 0} places said for it`);
+    for (const [wx, wy, wz] of h.inside!) {
+      const [lx, lz, ly] = castleLocal(P, wx, wy, wz);
+      places++;
+      assert.ok(Math.abs(ly - castleGround(lx, lz)) < 1e-6, 'one of them is stood off the ground');
+      // (within reach of its home: a house's are about that house, the gate's on the ground before the gate)
+      assert.ok(Math.hypot(wx - h.x, wz - h.z) < 11, 'one of them is stood away from where it lives');
+      assert.equal(fouls([lx, ly, lz]), null, `one of them is stood in stone, at ${lx.toFixed(1)}, ${lz.toFixed(1)}`);
+      // (nothing of the fort within a pace of it at a body's height, any way round: it can walk off whichever way it turns)
+      for (let a = 0; a < 8; a++) assert.equal(fouls([lx + Math.cos(a * 0.7854) * 0.8, ly, lz + Math.sin(a * 0.7854) * 0.8]), null, `one of them is stood against stone, at ${lx.toFixed(1)}, ${lz.toFixed(1)}`);
+      for (const l of local) {
+        const dx = lx - l.x, dz = lz - l.z, c = Math.cos(l.rot), s = Math.sin(l.rot), sh = HOUSES[l.n % HOUSES.length];
+        if (l.kind === 'house') assert.ok(Math.abs(dx * c - dz * s) > sh.w / 2 + 1 || Math.abs(dx * s + dz * c) > sh.d / 2 + 1, 'one of them is stood in a house, or against its wall');
+      }
+      assert.ok(rocks.every((r) => Math.hypot(lx - r.x, lz - r.z) > 3), 'one of them is stood against a rock');
+      assert.ok(!inCastle(P, wx, wy + 0.9, wz) && Math.abs(lx) > C.hx + 6 || Math.abs(lz) > C.hz + 6, 'one of them is stood at the fort\'s foot');
+    }
+  }
+  assert.ok(places >= 20, `${places} places in all`);
+  // (and with nobody to say how the ground lies, a home is the round it was: whoever only counts them asks so)
+  assert.ok(castleHomes(P).every((h) => !h.inside));
+});
+
+ok('a rock stops a body as the rock that is drawn: every face of it is a piece of what stops, and the scanned rock is not walked through', () => {
+  // (2026-10-14, played: "rocks outside the building dont clip right with collision": one block to a rock, 0.78 of its radii, whatever its corners)
+  const rocks = [...parts, ...LOOSE.flatMap((l) => looseParts(l))].filter((p) => p.t === 'lump' && !p.blocky && (p.body ?? 'all') !== 'none');
+  const hulls = shape.solids.filter((s): s is Extract<Solid, { t: 'hull' }> => s.t === 'hull');
+  assert.ok(rocks.length >= 10, `${rocks.length} rocks`);
+  for (const name of new Set(rocks.map((r) => r.name ?? 'rock'))) {
+    const mine = hulls.filter((h) => h.name === name), of = rocks.filter((r) => (r.name ?? 'rock') === name).length;
+    // (its foot in the ground as one piece; the band over that, seven faces of four corners; over its middle seven faces each drawn as two, each of the two a piece; seven at its top: 29 pieces, each some of its faces and its middle)
+    assert.equal(mine.length, of * 29, `${name}: ${mine.length} pieces for ${of} rocks`);
+    assert.ok(mine.every((h) => h.pts.length >= 12), `${name}: a piece is not a face and a middle`);
+    assert.equal(boxes.filter((b) => b.name === name).length, 0, `${name} still stops a body with a block`);
+  }
+  // the scanned rock: its face in pieces along it, each no bigger than a pace, for every face of it that stands
+  const faces = hulls.filter((h) => h.name === 'rock_face_01');
+  // (some two hundred pieces to a face; of the six places for one, those are made where the ground does not fall away before it)
+  assert.ok(faces.length >= 2 * 180 && faces.length <= 6 * 240 && faces.length % 206 === 0, `${faces.length} pieces of scanned rock`);
+  for (const h of faces) {
+    const xs = h.pts.filter((_, i) => i % 3 === 0), ys = h.pts.filter((_, i) => i % 3 === 1), zs = h.pts.filter((_, i) => i % 3 === 2);
+    assert.ok(Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys), Math.max(...zs) - Math.min(...zs)) < 2.2, 'a piece of scanned rock is bigger than its square');
+  }
 });
 
 console.log(`castle: ${n} checks passed`);

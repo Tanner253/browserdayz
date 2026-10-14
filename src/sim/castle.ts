@@ -327,14 +327,23 @@ export function moundTop(kind: 'outcrop' | 'fan' | 'vault' | 'rent', x: number, 
     // gallery's floor at the north end of the hole to the paving at the south end, and drops sheer behind that
     // under the vault that still stands. (The way down into the lower levels for whoever is on the terrace, and
     // the way up out of them.)
-    const B = UNDER.bay, from = B.z0 + 0.5, to = B.z1 - 0.25, t = clamp01((z - from) / (to - from));
+    // ITS HEAD IS AT THE EDGE OF THE PAVING, A STEP UNDER IT. (2026-10-14, played: "gaps at the top of the ramps and
+    // stairs of the castle where they dont meet flush with the next level (specifically above the serach locker
+    // where the broken path is to go up the next level". Its head was said a quarter of a metre short of the hole's
+    // south edge and it fell away behind that at once: and a heap is made of squares of 0.3, none of whose rows was
+    // at its head, so the row before it was the highest there was. Between that row and the paving lay a notch half
+    // a metre across and over a metre deep, with the room of the locker seen down it. Now it comes up to the edge
+    // itself (the heap's rows are counted from that edge: see where it is put), and its back is under the paving.)
+    const B = UNDER.bay, from = B.z0 + 0.5, to = B.z1, t = clamp01((z - from) / (to - from));
     let y = UNDER.floor + (-0.07 - UNDER.floor) * t;
-    if (z > to) y -= (z - to) * 5;
+    // (behind its head it stands as sheer as a row of it lets it, under the vault that still stands: its foot is clear of the locker there)
+    if (z > to + 1e-6) return UNDER.floor - 0.3;
     if (z < from) y -= (from - z) * 1.2;
     // (thirty-two degrees, and no rougher than a foot rides over: steeper, and whoever went down it would be carried)
     // (it lies against the outer wall: on the side of the keep's foundation a way is left past it, under the floor's own level there)
     if (x > UNDER.crawl) return UNDER.floor - 0.3;
-    return Math.min(-0.07, y + (rough(x * 1.6, z * 1.6, 13) - 0.5) * 0.1 * Math.min(1, t * 5) * (z > to ? 0 : 1));
+    // (its last half pace is as even as the paving it comes to: the edge of it is one height all the way across)
+    return Math.min(-0.07, y + (rough(x * 1.6, z * 1.6, 13) - 0.5) * 0.1 * Math.min(1, t * 5) * clamp01((to - z) / 0.6));
   }
   if (kind === 'outcrop') {
     const O = OUTCROP;
@@ -348,6 +357,9 @@ export function moundTop(kind: 'outcrop' | 'fan' | 'vault' | 'rent', x: number, 
     const y = O.top - fell + wild, bed = Math.round(y / 0.55) * 0.55, k = Math.min(0.7, out * 0.8);
     return y + (bed - y) * k;
   }
+  // (None of it is inside the north-west tower, which it runs out against: that tower's foot is hollow, and the
+  // heap came through the wall of its cellar as a mound a man high, seen and stood on. There it is under the cellar's floor.)
+  if (Math.hypot(x + CASTLE.hx, z + CASTLE.hz) < CASTLE.tower.r - 0.15) return UNDER.floor - 0.6;
   const F = FAN, s = clamp01((F.foot - x) / (F.foot - F.head));
   let y = CASTLE.foot.north * (1 - s);
   // (past its foot and past its head it runs out)
@@ -500,7 +512,10 @@ export function castleKit(): KitPiece[] {
     // ends of its ring of wall, and its top a hand under the terrace. Not the round one: the drum's own floor is there.)
     const cut: Cut[] = [cutRound(tw.cx, tw.cz, T.r - T.wall + 0.04, -0.06, 4), { ...(tw.cx > 0 ? cutBox(-60, px, -0.05, 4, -60, 60) : cutBox(-px, 60, -0.05, 4, -60, 60)), cap: 'all' }, { ...(tw.cz > 0 ? cutBox(-60, 60, -0.05, 4, -60, pz) : cutBox(-60, 60, -0.05, 4, -pz, 60)), cap: 'all' }];
     const d = (tw.door * Math.PI) / 180;
-    if (tw.hollow !== undefined) cut.push(cutTurned(tw.cx + Math.cos(d) * 3.3, tw.cz + Math.sin(d) * 3.3, Math.PI / 2 - d, 1.9, 0.58, tw.hollow - 0.03, tw.hollow + 2.2));
+    // (as wide as the doorway's own lining and a hair more, 0.55 either side: wider, and beside the lining the foot was looked into. See the cellar in `towerSteps`.)
+    if (tw.hollow !== undefined) cut.push(cutTurned(tw.cx + Math.cos(d) * 3.3, tw.cz + Math.sin(d) * 3.3, Math.PI / 2 - d, 1.9, 0.553, tw.hollow - 0.03, tw.hollow + 2.2));
+    // (and nothing of the kit's foot is in the cellar, or within a hand of its wall, which bellies: a block of it stood out of the wall over the doorway)
+    if (tw.hollow !== undefined) cut.push(cutRound(tw.cx, tw.cz, T.r - T.wall + 0.3, tw.hollow - 0.05, -0.055));
     out.push({ id: 'fort_tower_round', name: tw.name, at: [tw.cx, -KIT_TOWER.top[0] * T.kit, tw.cz], scale: T.kit, turn: (tw.cx * 7 + tw.cz * 3) * 0.1, cut, body: false });
     // ITS FOOTING: the same tower again under that one's foot, a little bigger (`under`), with everything of it over
     // that foot taken off: so its wall, at the size it has just under its platform, is where the upper one's foot is,
@@ -544,7 +559,8 @@ export function castleRocks(ground: (x: number, z: number) => number = castleGro
     if (ground(x, z) - Math.min(ground(x + Math.cos(a) * 4, z + Math.sin(a) * 4), ground(x + Math.cos(a) * 6.5, z + Math.sin(a) * 6.5)) > 4) return;
     // (its own origin is to one side of its middle: it is set so that its middle is where it was asked for)
     const off = -0.35 * scale;
-    out.push({ id: 'rock_face_01', at: [x + Math.cos(turn) * off, ground(x, z) - sink * scale, z - Math.sin(turn) * off], turn, tilt: [steep, 0], scale, body: false });
+    // (it stops a body as the rock it is: `KIT_ROCK` in the kit. It stopped nothing, and was walked through.)
+    out.push({ id: 'rock_face_01', at: [x + Math.cos(turn) * off, ground(x, z) - sink * scale, z - Math.sin(turn) * off], turn, tilt: [steep, 0], scale });
   };
   if (rock) {
     face((O.x0 + O.x1) / 2, O.z1 + 0.6, 90, 1.5, 0.42);
@@ -596,7 +612,13 @@ function layOut(): Part[] {
   };
   // (its holes: the fallen bay, the stair down from the store, the gratings, and the corner of it that is under the hole in the north-west tower's boards)
   const DR = U.cistern.drop;
-  const holes = [[DR.x0, DR.x1, DR.z0, DR.z1], [U.x, ex, U.rent.z0, U.rent.z1], [U.bay.x0, U.bay.x1, U.bay.z0, U.bay.z1], [U.stair.head, U.stair.open, R.z0, R.z0 + 1], ...U.gratings.map(([x, z]) => [x - 0.45, x + 0.45, z - 0.45, z + 0.45]), [-ex, -8.8, -ez, -8.9]];
+  // (THE CORNER UNDER THE NORTH-WEST TOWER: all of the paving that is inside the round of its cellar, and a hand more,
+  // for the cellar's wall bellies. The paving ends at the inner faces of the kit's walls, and one hole said from the
+  // walls' outer faces to 8.8 and 8.9 took nothing out of it: its corner stood in the cellar under the boards, a block
+  // of stone a metre deep hung over the doorway. Three pieces, stepped round the cellar; none of them reaches out from
+  // under the tower's own wall but at its door, where the tower's boards run on over them: see `towerSteps`.)
+  const nwx = -C.hx, nwz = -C.hz;
+  const holes = [[DR.x0, DR.x1, DR.z0, DR.z1], [U.x, ex, U.rent.z0, U.rent.z1], [U.bay.x0, U.bay.x1, U.bay.z0, U.bay.z1], [U.stair.head, U.stair.open, R.z0, R.z0 + 1], ...U.gratings.map(([x, z]) => [x - 0.45, x + 0.45, z - 0.45, z + 0.45]), [-ex, nwx + 1.94, -ez, nwz + 1.56], [-ex, nwx + 1.56, -ez, nwz + 1.94], [-ex, nwx + 1.76, -ez, nwz + 1.76]];
   // (as far as the inner face of the kit's walls: their own tops, level with it, are the rest)
   const px = ex + WALL.out - WALL.deep + 0.02, pz = ez + WALL.out - WALL.deep + 0.02;
   for (const [x0, x1, z0, z1] of tiles(-px, px, -pz, pz, holes)) box('paving', x0, x1, U.roof, 0, z0, z1, { name: 'terrace', at: 'both' });
@@ -715,7 +737,8 @@ function layOut(): Part[] {
   rib([K.x1, 2.6], [U.x, 2.6]);
   // the west side: the stone of its fallen bay, lying against the outer wall as it fell (seen from the terrace
   // through the hole it left); and a slab of the vault across the way that is left past it, to be crouched under
-  parts.push({ t: 'mound', paint: 'scree', name: 'fallen vault', kind: 'vault', x0: -U.x - 0.2, x1: U.crawl + 0.4, z0: U.bay.z0 - 0.7, z1: U.bay.z1 + 0.9, cell: 0.3 });
+  // (its rows are counted from the south edge of the hole, where its head is: one of them is on that edge. See `moundTop`.)
+  parts.push({ t: 'mound', paint: 'scree', name: 'fallen vault', kind: 'vault', x0: -U.x - 0.2, x1: U.crawl + 0.4, z0: U.bay.z1 - 24 * 0.3, z1: U.bay.z1 + 3 * 0.3, cell: 0.3 });
   for (let k = 0; k < 7; k++) {
     const x = -U.x + 0.3 + hash(k, 1, 501) * 0.7, z = U.bay.z0 + 0.9 + hash(k, 2, 501) * 3.6;
     lump(x, moundTop('vault', x, z) + 0.05, z, 0.24 + hash(k, 3, 501) * 0.2, 0.1, 0.2 + hash(k, 4, 501) * 0.16, 510 + k, { paint: 'stone', blocky: true, name: 'fallen stone', body: 'none' });
@@ -927,7 +950,13 @@ function layOut(): Part[] {
 
   // ---- the ramp: the one way in. A deck of boards on trestles from the rock to the gate, a rail each side.
   const gz0 = C.gate.z0 + 0.18, gz1 = C.gate.z1 - 0.18, run = Math.sqrt(C.ramp.len ** 2 - C.ramp.drop ** 2), rx = ex + run, ry = -C.ramp.drop;
-  parts.push({ t: 'slab', paint: 'timber', at: 'both', name: 'ramp', p: [[ex - 0.4, 0, gz0], [rx, ry, gz0], [rx, ry, gz1], [ex - 0.4, 0, gz1]], thick: 0.12 });
+  // ITS HEAD LIES ON THE EDGE OF THE WALL'S TOP, WHICH IS THE PASSAGE'S FLOOR. (2026-10-14, played: "gaps at the top of
+  // the ramps ... where they dont meet flush with the next level". Its boards ran on under the gate at the terrace's
+  // own height, 0.4 in from the wall's face; when the wall's top was left in the passage as its floor, that top lay
+  // over them, and where it ended there was a lip a hand high across the head of the ramp, and a hand and more for a
+  // foot. Now the boards end on the stone, where its level top ends, a finger over it.)
+  const rh: V3 = [ex - 0.02, 0.008, 0];
+  parts.push({ t: 'slab', paint: 'timber', at: 'both', name: 'ramp', p: [[rh[0], rh[1], gz0], [rx, ry, gz0], [rx, ry, gz1], [rh[0], rh[1], gz1]], thick: 0.12 });
   rail([ex, 0, gz0 + 0.05], [rx, ry, gz0 + 0.05], { name: 'ramp rail' });
   rail([ex, 0, gz1 - 0.05], [rx, ry, gz1 - 0.05], { name: 'ramp rail' });
   for (const s of [0.27, 0.52, 0.77]) {
@@ -1181,6 +1210,19 @@ export function looseParts(l: Loose, g = castleGround(l.x, l.z), ground?: (x: nu
     // (the stairwell is open to the sky as far as half a pace past the foot of the steps: whoever comes down them is on the level before his head is under stone)
     const back: V3 = [L.foot[0] + L.d[0] * 0.5, g, L.foot[2] + L.d[1] * 0.5];
     parts.push({ t: 'flight', paint: 'base', foot: L.foot, head: L.head, w: H.wide, body: 'feet', name: 'hatch steps' });
+    // WHERE THE HILL FALLS AWAY FROM THE HEAD OF ITS STEPS, STEPS COME UP TO IT. The head is as high as the ground at
+    // the hatch's own middle; set down on a hillside with its back to the rise (the world's is), the ground before the
+    // head was a knee lower, and the top step stood out of the hill with nothing up to it (2026-10-14, played: "gaps
+    // at the top of the ... stairs ... where they dont meet flush with the next level"). As many steps of its own
+    // rise and going, outward and down, as bring their foot to the ground at its lowest across them.
+    if (ground) {
+      const n = Math.round(H.drop / 0.2), rise = H.drop / n, run = H.run / n;
+      const out = (k: number): V3 => [L.head[0] - L.d[0] * k * run, g - k * rise, L.head[2] - L.d[1] * k * run];
+      const low = (k: number) => Math.min(...[-w, 0, w].map((a) => ground(...flat(out(k), a))));
+      let k = 0;
+      if (low(1) < g - 0.1) for (k = 1; k < 9 && low(k) < g - k * rise - 0.02; k++);
+      if (k > 0 && k < 9) parts.push({ t: 'flight', paint: 'base', foot: out(k), head: L.head, w: H.wide, body: 'feet', name: 'hatch stoop' });
+    }
     // its two cheeks, a hand over the ground at the head of the steps and knee high at the back, and the wall across the back
     // (The cheeks run to the far face of the wall across the back, which stands between them; and the passage's own walls
     // and its roof begin there. Run past each other, a cheek and a wall of the passage were two faces in one plane at
@@ -1699,6 +1741,32 @@ export function castleLoot(p: Place, ground: GroundAt = assumed(p), loose: Loose
   return [...own, ...postLoot(p, ground, loose)];
 }
 
+/**
+ * THE JEEP THAT BURNS BEFORE THE GATE, for good (the owner, 2026-10-14: "can we put a static burning jeep out front
+ * of the draw bridge that eluminates light as well for night time, and heat"; and, seeing it stood with its nose to
+ * the gate: "the car is rotated backwards, the front should be facing the road"). One of the garrison's own, hit as
+ * it left: off the way on the side of the hill, where the top of the shoulder is broad, its nose down the track
+ * toward the road and slewed a little off the track's line, as a car that stopped in a hurry. It is the game's own
+ * jeep, burned out (`kind`: what a car that is blown up is left as), and what its fire is worth is src/sim/wreck-fire.ts.
+ *
+ * In the fort's own measure, as everything here is, so that it turns and moves with the fort: `x`, `z` its middle
+ * (four metres of the world beyond the ramp's foot, and four and a half to the hill side of the middle line of the
+ * way in, which is the gate's: the nearest of it is over three metres from that line); `rot` how it is turned (its
+ * model's nose is toward its own -z: a quarter turn back, -PI / 2, puts that nose straight down the gate's line,
+ * away from the fort, and it is slewed 13 degrees off that, toward the hill).
+ * What is a car's own is in metres of the world, since a car is no bigger for the fort being a fifth bigger:
+ * `wheels`, where they stand from its middle [half its track, half its wheelbase], and `sunk`. It stands LEVEL on the
+ * lowest of the ground under its four wheels, as the world has that ground, and a hand in it.
+ */
+export const JEEP_WRECK = { kind: 'uaz_469', x: 21.5, z: -5.4, rot: -Math.PI / 2 + 0.227, wheels: [0.7, 1.27] as [number, number], sunk: 0.1 };
+/** Where the burning jeep stands in the world: its middle at the foot of its wheels, and how it is turned (as the world's list of things has a turn). */
+export function castleJeep(p: Place, ground: GroundAt = assumed(p)): { kind: string; x: number; y: number; z: number; rot: number } {
+  const J = JEEP_WRECK, [x, , z] = castleAt(p, J.x, J.z), rot = p.rot + J.rot, c = Math.cos(rot), s = Math.sin(rot);
+  let y = Infinity;
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) y = Math.min(y, ground(x + sx * J.wheels[0] * c + sz * J.wheels[1] * s, z - sx * J.wheels[0] * s + sz * J.wheels[1] * c));
+  return { kind: J.kind, x, y: y - J.sunk, z, rot };
+}
+
 /** What stands in it off the shelf, as the world's own list of such things has them. */
 export function castleProps(p: Place, ground: GroundAt = assumed(p), loose: Loose[] = castleLoose(p)): { kind: string; x: number; y: number; z: number; rot: number; scale: number; far?: number }[] {
   const out = STOOD.map(([kind, lx, lz, ly, rot]) => {
@@ -1713,6 +1781,10 @@ export function castleProps(p: Place, ground: GroundAt = assumed(p), loose: Loos
     out.push({ kind, x, y: ground(x, z) + (kind === 'stone_fire_pit' ? 0.19 : 0), z, rot: h.rot + rot, scale: 1, far: 140 });
   }
   out.push(...postProps(p, ground, loose));
+  // (And the jeep that burns before the gate, the last of all: no thing before it is renumbered. `far` nothing: it
+  // is in the world's list for where it is and for what stops a body and a shot there, as any car stood about the
+  // map is, and is drawn from no distance by whoever draws that list. It is drawn burnt, by src/game/wreck-fire.ts.)
+  out.push({ ...castleJeep(p, ground), scale: 1, far: 0 });
   return out;
 }
 
@@ -1740,7 +1812,20 @@ export function castleLamps(p: Place, ground?: GroundAt, loose?: Loose[]): V3[] 
  * for three seconds in every ten, and stood in doorways. They are put back down there when the horde is taught the
  * lower levels' doors as it was taught the bunker's (`bunkerLeg`); until then the dark is empty of them.
  */
-export function castleHomes(p: FortPlace, loose: Loose[] = castleLoose(p)): { x: number; z: number; r: number; n: number; inside?: V3[] }[] {
+/**
+ * @param ground the height of the world's ground at a spot, and @param open whether a spot of the world is open ground
+ *   by the world's own reckoning (its trees, its rocks, what it has built): given these, each home says the very
+ *   PLACES its dead are stood at (`inside`), and they are stood nowhere else.
+ *
+ * WHY (2026-10-14, played: "zombies are getting stuck in the base of the building and surrounding buildings"). A home
+ * was a round of six metres about a house's middle, and whoever stands them asks only the world whether a spot is
+ * open: the world does not know the fort's walls. Run by the game's own rules for eight minutes each, of 144 stood
+ * 39 were stood IN stone (in a house's wall, in a fallen block, in a rock: one of those can never move), 57 inside
+ * a house's four walls, whose one way out is a doorway their legs do not look for, and 38 never got a pace from
+ * where they were put. So: about each house, outside it, two paces off its walls; before the gate, on the open
+ * ground; each place a pace and more clear of every stone of the plan (`castleClear`), level, and open by the world.
+ */
+export function castleHomes(p: FortPlace, loose: Loose[] = castleLoose(p), ground?: GroundAt, open?: (wx: number, wz: number) => boolean): { x: number; z: number; r: number; n: number; inside?: V3[] }[] {
   // (the open ground before the gate: where the world says it is, on the ground the fort has; else where the plan has it)
   const hs = houses(loose), [gx, , gz] = p.before ? [p.before[0], 0, p.before[1]] : castleAt(p, 36, -1.5);
   // (before the gate: clear of the rock the ramp leaves from, of the first house and of the hatch)
@@ -1748,5 +1833,69 @@ export function castleHomes(p: FortPlace, loose: Loose[] = castleLoose(p)): { x:
   // (the village's: one to each of its houses, as far as five, in it or close by its walls. As one round home as wide
   // as the village is long they were stood anywhere within thirty metres of its middle, and the saddle it stands on is
   // fifteen metres wide: two of the five were found on the valley face, seventeen metres under the street.)
-  return [...hs.slice(0, 5).map((h) => ({ x: h.x, z: h.z, r: 6.5, n: 1 })), gate];
+  const homes: { x: number; z: number; r: number; n: number; inside?: V3[] }[] = [...hs.slice(0, 5).map((h) => ({ x: h.x, z: h.z, r: 6.5, n: 1 })), gate];
+  if (!ground) return homes;
+  const local = looseLocal(p, loose), mine = local.filter((l) => l.kind === 'house'), rock = p.rock !== false;
+  // (and clear of whatever stands on its grounds off the shelf: a crate by a house, a wreck before the gate)
+  const stood = castleProps(p, ground, loose);
+  const at = (x: number, z: number): V3 | null => {
+    if (!castleClear(local, x, z, rock)) return null;
+    const [wx, , wz] = castleAt(p, x, z), y = ground(wx, wz);
+    if (stood.some((q) => Math.hypot(q.x - wx, q.z - wz) < 3.4)) return null;
+    // (level enough to stand on and to walk off, as the world asks of open ground)
+    for (const [dx, dz] of [[2, 0], [-2, 0], [0, 2], [0, -2]]) if (Math.abs(ground(wx + dx, wz + dz) - y) > 0.9) return null;
+    return open && !open(wx, wz) ? null : [wx, y, wz];
+  };
+  return homes.map((h, k) => {
+    const spots: V3[] = [];
+    if (k < homes.length - 1) {
+      // about its house, outside it: two paces off the middle of each wall, off each corner, and between those
+      const l = mine[k], sh = HOUSES[l.n % HOUSES.length], c = Math.cos(l.rot), s = Math.sin(l.rot), a = sh.w / 2 + 2.1, b = sh.d / 2 + 2.1;
+      for (const [u, v] of [[a, 0], [-a, 0], [0, b], [0, -b], [a, b], [a, -b], [-a, b], [-a, -b], [a, b / 2], [a, -b / 2], [-a, b / 2], [-a, -b / 2], [a / 2, b], [-a / 2, b], [a / 2, -b], [-a / 2, -b]]) {
+        const spot = at(l.x + u * c + v * s, l.z - u * s + v * c);
+        if (spot) spots.push(spot);
+      }
+    } else {
+      const [lx, lz] = castleLocal(p, h.x, 0, h.z);
+      for (let u = -4; u <= 4.01; u += 1.6) for (let v = -4; v <= 4.01; v += 1.6) {
+        const spot = Math.hypot(u, v) < 4.6 ? at(lx + u, lz + v) : null;
+        if (spot) spots.push(spot);
+      }
+    }
+    // (a home with nowhere clear about it keeps its round: the world's own asking is all there is for it)
+    return spots.length >= 2 ? { ...h, inside: spots } : h;
+  });
+}
+
+/**
+ * Whether a spot of the fort's grounds, in its own measure, is clear of everything of the plan that stops a body, by a
+ * body and a pace (`by`): the fort and what lies against its foot, the ramp and its trestles, every house (all of it:
+ * its four walls and what is between them), every rock, wall and hatch of its grounds.
+ */
+export function castleClear(loose: Loose[], x: number, z: number, rock = true, by = 1.2): boolean {
+  const C = CASTLE, ex = C.hx + C.parapet.thick / 2;
+  // (the fort, its towers' feet, the stone fallen from it and the scanned rock under its walls)
+  if (Math.abs(x) < C.hx + 6.5 && Math.abs(z) < C.hz + 6.5) return false;
+  // (the ramp and what it stands on; and the rock it leaves from, where that is made, with the rocks on it)
+  if (x > ex - 1 && x < ex + C.ramp.len + 1.5 && z > C.gate.z0 - by - 0.6 && z < C.gate.z1 + by + 0.6) return false;
+  if (rock && x > 15.5 - by && x < 32 + by && z > -9.5 - by && z < 4 + by) return false;
+  for (const l of loose) {
+    const dx = x - l.x, dz = z - l.z, c = Math.cos(l.rot), s = Math.sin(l.rot), u = dx * c - dz * s, v = dx * s + dz * c;
+    if (l.kind === 'house') {
+      const sh = HOUSES[l.n % HOUSES.length];
+      if (Math.abs(u) < sh.w / 2 + by && Math.abs(v) < sh.d / 2 + by) return false;
+    } else if (l.kind === 'rock') {
+      // (a rock is at most 1.6 across at its middle, and a corner of it 1.24 of that)
+      if (Math.hypot(dx, dz) < 1.6 * 1.24 + by) return false;
+    } else if (l.kind === 'long wall') {
+      if (Math.abs(u) < 0.3 + by && Math.abs(v) < 8.4 + by) return false;
+    } else if (l.kind === 'curved wall') {
+      if (Math.abs(Math.hypot(dx, dz) - 9.4) < 0.4 + by) return false;
+    } else {
+      // (a hatch: its well and its kerb, along the way its steps go down, and the steps that come up to its head)
+      const L = hatchLine(l, 0), ax = x - L.head[0], az = z - L.head[2], along = ax * L.d[0] + az * L.d[1], across = ax * L.r[0] + az * L.r[1];
+      if (along > -2.6 - by && along < UNDER.hatch.run + 0.9 + by && Math.abs(across) < UNDER.hatch.wide / 2 + 0.45 + by) return false;
+    }
+  }
+  return true;
 }

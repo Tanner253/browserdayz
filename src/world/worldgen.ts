@@ -6,7 +6,7 @@
 import { RNG, Simplex, hash2, clamp, lerp, smoothstep } from '../core/noise';
 import { BUNKER, bunkerAt, type Place } from '../sim/bunker';
 import { wreckUnder, type Bridge } from '../sim/bridge';
-import { CASTLE, CASTLE_SCALE, HOUSES, castleAt, castleCuts, castleFoot, castleHides, castleLocal, castleLoose, castleOpen, squareTouches, type FortPlace, type Loose } from '../sim/castle';
+import { CASTLE, CASTLE_SCALE, HOUSES, castleAt, castleCuts, castleFoot, castleHides, castleJeep, castleLocal, castleLoose, castleOpen, squareTouches, type FortPlace, type Loose } from '../sim/castle';
 
 export const WORLD_SEED = 1337;
 /**
@@ -3500,6 +3500,11 @@ export function generateWorld(seed = WORLD_SEED): World {
           const [ax, , az] = castleAt(fort, x0 + A.out / CASTLE_SCALE, gz), [bx, , bz] = castleAt(fort, x0, gz), l = Math.hypot(ax - bx, az - bz) || 1;
           bare(ax, az, A.half[0], A.half[1], (ax - bx) / l, (az - bz) / l);
           worn.push({ line: [[ax, az]], r: (A.half[0] + A.half[1]) / 2, driven: false });
+        }
+        // (and round the jeep that burns before the gate the snow is melted to wet ground: see castleJeep)
+        {
+          const j = castleJeep(fort);
+          worn.push({ line: [[j.x, j.z]], r: 2.6, driven: false });
         }
       }
 

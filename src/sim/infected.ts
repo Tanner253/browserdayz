@@ -226,7 +226,9 @@ export function infectedHomes(world: World): Home[] {
   for (const s of world.sites) if (!EAST[s.kind]) homes.push({ x: s.x, z: s.z, r: 34, n: ABOUT[s.kind] ?? 1 });
   // (never more than the map is meant to hold: the places furthest down the list go short)
   // (nor the fort's, which are its own: see below)
-  const fort = world.castle ? castleHomes(world.castle) : [];
+  // (each of the fort's is stood at a place its own plan says is clear of its walls, on ground this world calls open:
+  // the world does not know the fort's stone, and by a round about a house one in four was stood in a wall. See `castleHomes`.)
+  const fort = world.castle ? castleHomes(world.castle, undefined, (x, z) => heightAt(world.surface, x, z), (x, z) => openGround(world, x, z)) : [];
   let left = INFECTED.max - EAST_ALL;
   for (const h of homes) {
     h.n = Math.min(h.n, left);

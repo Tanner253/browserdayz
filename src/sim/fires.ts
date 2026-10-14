@@ -29,6 +29,15 @@ export const FIRE = {
   crackle: 8,
 };
 
+/**
+ * Whether somebody standing at (x, y, z), their feet, is resting by a fire whose middle is `s`, at the ground: near
+ * enough (FIRE.warm), and not a floor above or below it. Asked of a fire that burns for good and is no fireplace
+ * (the jeep before the fort's gate: src/sim/wreck-fire.ts); a fireplace that is alight is asked the same of by the game.
+ */
+export function restsBy(s: { x: number; y: number; z: number }, x: number, y: number, z: number): boolean {
+  return Math.hypot(s.x - x, s.z - z) < FIRE.warm && Math.abs(s.y - y) < 2.5;
+}
+
 /** Every fireplace in the world, in the order the game and the server both count them. */
 export function fireSpots(props: Instance[]): Instance[] {
   return props.filter((p) => p.kind === FIRE.kind);
