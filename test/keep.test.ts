@@ -176,6 +176,9 @@ const before = writes;
 await withServer(async (log) => {
   assert.ok(await ann.join(), `she was not let in after the restart:\n${log().slice(-500)}`);
   assert.ok(/\[keep\] 1 characters and 2 stashes as they were kept/.test(log()), `what was kept was not read:\n${log().slice(-500)}`);
+  // (who played before it stopped is still counted on the door's "played today": kept with the rest, server/seen.ts)
+  const h = (await (await fetch(`http://127.0.0.1:${PORT}/healthz`)).json()) as { today?: number };
+  assert.equal(h.today, 1, 'who had played before the restart was forgotten by it');
   const w = ann.last('welcome')!;
   assert.ok(Math.hypot(w.spawn.x - at[0], w.spawn.z - at[1]) < 0.5 && Math.abs(w.spawn.yaw - 1.25) < 0.01, `she is not where she was: ${JSON.stringify(w.spawn)}`);
   assert.equal((w.me?.inv.slots as Record<string, { id: string } | null>).primary?.id, 'ak', 'she has not what she carried');

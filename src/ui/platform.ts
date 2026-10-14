@@ -6,6 +6,8 @@
 export interface PlatformPaid {
   /** SOL paid to players in all, and by each game */
   paidSol: number;
+  /** how many dog tags have been paid for */
+  paid: number;
   zona: number;
   arena: number;
   /** when the record begins (ISO) */

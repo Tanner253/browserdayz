@@ -31,6 +31,7 @@ export function openDoor(): Promise<Mode> {
       </header>
       <div class="door-pvp">Player <i>vs</i> Player</div>
       <div class="door-paid" hidden></div>
+      <div class="door-stats"><span data-s="tags" hidden></span><span data-s="today" hidden></span><span data-s="matches" hidden></span><span data-s="squad"></span></div>
       <div class="door-cards">
         <button type="button" class="door-card zona${last === 'zona' ? ' last' : ''}" data-mode="zona">
           <i class="door-bg"></i>
@@ -53,21 +54,40 @@ export function openDoor(): Promise<Mode> {
       <footer class="door-foot"><a href="/changelog/" target="_blank" rel="noopener">Changelog</a><a href="/payouts" target="_blank" rel="noopener">Payouts</a></footer>
     </div>`;
   document.body.appendChild(el);
+  // (true numbers, each from where it is kept, each left out where it cannot be had: the owner, offered these in
+  // place of fake players to fill the count, "do 1 2 and 3")
+  const stat = (s: string, text: string) => {
+    const t = el.querySelector(`[data-s="${s}"]`) as HTMLElement;
+    t.textContent = text;
+    t.hidden = false;
+  };
   void platformPaid().then((p) => {
     if (!p) return;
     const n = el.querySelector('.door-paid') as HTMLElement;
     n.textContent = paidLine(p);
     n.hidden = false;
+    if (p.paid > 0) stat('tags', `${p.paid} dog tags paid`);
   });
-  // (how many are in each game now, as its own server says it; nothing said where it does not answer)
+  // (how many are in each game now, as its own server says it; under a handful it says only that the game is up;
+  // nothing said where it does not answer)
   const on = (mode: Mode, n: number | null) => {
     const t = el.querySelector(`[data-on="${mode}"]`) as HTMLElement;
     if (n === null) return;
-    t.textContent = `${n} online`;
+    t.textContent = n >= LIVE_FROM ? `${n} online` : 'Live now';
     t.hidden = false;
   };
-  void serverStatus(8000).then((st) => on('zona', st ? st.players : null));
-  void arenaOnline().then((n) => on('arena', n));
+  void serverStatus(8000).then((st) => {
+    on('zona', st ? st.players : null);
+    if (st?.today) stat('today', `${st.today} played Zona today`);
+  });
+  void arenaOnline().then((a) => {
+    on('arena', a ? a.players : null);
+    if (a?.matches) stat('matches', `${a.matches} Arena ${a.matches === 1 ? 'match' : 'matches'} on now`);
+  });
+  // (squad hour: when everybody is asked to come at once, said in the visitor's own time)
+  const squad = () => stat('squad', squadLine(Date.now()));
+  squad();
+  const tick = setInterval(() => (el.isConnected ? squad() : clearInterval(tick)), 30_000);
   return new Promise((done) => {
     el.addEventListener('click', (e) => {
       const b = (e.target as HTMLElement).closest('[data-mode]') as HTMLElement | null;
@@ -93,14 +113,32 @@ export function modeOf(wager: boolean): Mode | null {
   return null;
 }
 
-/** how many are in the Arena now: its own count, or (an arena from before it said one) everybody in its matches and watching them */
-async function arenaOnline(): Promise<number | null> {
+/** how many are in the Arena now (its own count, or, from an arena older than that, everybody in its matches and watching them), and how many matches are being played */
+async function arenaOnline(): Promise<{ players: number; matches: number } | null> {
   try {
     const h = (await (await fetch(`${arenaBase()}/healthz`, { cache: 'no-store', signal: AbortSignal.timeout(20_000) })).json()) as { players?: number };
-    if (typeof h.players === 'number') return h.players;
     const l = (await (await fetch(`${arenaBase()}/arena/lobbies`, { cache: 'no-store', signal: AbortSignal.timeout(8000) })).json()) as { lobbies: LobbyInfo[] };
-    return l.lobbies.reduce((n, x) => n + x.have + (x.watching ?? 0), 0);
+    const matches = l.lobbies.filter((x) => x.score).length;
+    return { players: typeof h.players === 'number' ? h.players : l.lobbies.reduce((n, x) => n + x.have + (x.watching ?? 0), 0), matches };
   } catch {
     return null;
   }
+}
+
+/** under this many in a game, its card says it is live and not how many (the owner: "do 1"): a count that small says empty, not live */
+const LIVE_FROM = 5;
+
+/**
+ * Squad hour: one hour a day when everybody is asked to come, so the servers fill for real (the owner: "do 1 2 and
+ * 3"). 01:00 UTC: 9 PM on the US east coast, 6 PM on the west. Said in the visitor's own time.
+ */
+export const SQUAD_UTC = 1;
+
+/** "Squad hour: daily at 9:00 PM your time, in 3 h 12 m", or that it is on now */
+export function squadLine(now: number): string {
+  const d = new Date(now), start = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), SQUAD_UTC);
+  const today = now < start ? start - 24 * 3600_000 : start;
+  if (now - today < 3600_000) return `Squad hour is on now, till ${new Date(today + 3600_000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+  const next = today + 24 * 3600_000, left = Math.max(0, next - now), h = Math.floor(left / 3600_000), m = Math.floor((left % 3600_000) / 60_000);
+  return `Squad hour daily at ${new Date(next).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} your time, in ${h ? `${h} h ` : ''}${m} m`;
 }

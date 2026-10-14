@@ -38,11 +38,12 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `checks.ts` | 364 | The server: its own checks on where players say they are and what they say they did (moves, hills between, the zone, under the ground, gait). |
 | `drops.ts` | 130 | The server: supply drops and the helicopter that brings them. |
 | `gate.ts` | 543 | The server: who is let in and kept on (a life kept by the server, the bot check, the check that this is a person, bans, admins and roles). |
-| `handle.ts` | 725 | The server: handle, every message a player sends, checked and acted on. |
-| `index.ts` | 1072 | ZONA game server. One process: serves the built client and runs the shared world over a WebSocket at /ws. |
-| `keep.ts` | 591 | The server: what is kept between restarts (the save, the last word before a restart, a life put back). |
+| `handle.ts` | 728 | The server: handle, every message a player sends, checked and acted on. |
+| `index.ts` | 1073 | ZONA game server. One process: serves the built client and runs the shared world over a WebSocket at /ws. |
+| `keep.ts` | 596 | The server: what is kept between restarts (the save, the last word before a restart, a life put back). |
 | `players.ts` | 321 | The server: its players (who is connected, what each is told of the others, where a fresh one starts), what they send cleaned, and joining and leaving. |
 | `queue.ts` | 142 | The server: the line to get in when it is full, and the leaderboard. |
+| `seen.ts` | 40 | Who has played lately, for the door's "N played today" (the owner, offered a true number in place of fake players to fill the count: |
 | `tags.ts` | 235 | The server: cashed-in dog tags, who looted whose, and what a tag must have lived through to pay. |
 | `world.ts` | 113 | The server builds the same world the clients do, from the same code and seed, so loot points, crates, doors and spawn points line up exactly without sending the map. |
 
@@ -62,7 +63,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `perf.ts` | 202 | Frame profiler + F3 overlay. |
 | `physics.ts` | 130 | Rapier (Rust, compiled to WASM) physics. |
 | `renderer.ts` | 595 |  |
-| `settings.ts` | 117 | Graphics and sound options (Esc menu, Settings tab). |
+| `settings.ts` | 120 | Graphics and sound options (Esc menu, Settings tab). |
 | `strips.ts` | 153 |  |
 
 ## src/dev/
@@ -104,8 +105,8 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 
 | file | lines | what it is |
 |---|---:|---|
-| `drops.ts` | 531 | The game: supply drops, targets when playing alone, and the flow of a life (death, respawn, pause). |
-| `enter.ts` | 644 | The game: entering the world (joining a server or playing alone, the bot check's range, dressing the player). |
+| `drops.ts` | 533 | The game: supply drops, targets when playing alone, and the flow of a life (death, respawn, pause). |
+| `enter.ts` | 645 | The game: entering the world (joining a server or playing alone, the bot check's range, dressing the player). |
 | `frame.ts` | 621 | The game: every frame (the main loop: input, the world, the camera, the sound, the HUD). |
 | `guns.ts` | 475 | The game: attachments and magazines. |
 | `hands.ts` | 546 | The game: inventory moves, the hot keys and the hands, and what an admin can do. |
@@ -144,13 +145,13 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 
 | file | lines | what it is |
 |---|---:|---|
-| `main.ts` | 230 |  |
+| `main.ts` | 236 |  |
 
 ## src/net/
 
 | file | lines | what it is |
 |---|---:|---|
-| `client.ts` | 371 | Client side of the game connection. |
+| `client.ts` | 372 | Client side of the game connection. |
 | `orders.ts` | 205 | The orders an admin or a mod can give on the game server, typed where talk is typed (2026-10-11). |
 | `protocol.ts` | 453 | Wire protocol between the game client and the server. |
 | `timeline.ts` | 122 | When a report of somebody else's player was TRUE, as against when it got here. |
@@ -220,7 +221,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 
 | file | lines | what it is |
 |---|---:|---|
-| `director.ts` | 838 | The trailer's director. |
+| `director.ts` | 858 | The trailer's director. |
 | `music.ts` | 341 | The trailer's score, written as code: one row per bar (the chord, and how hard the band plays it), in D minor at 128 beats a minute, so a bar is 1.875 s and every cut in shots.ts lands on a bar line. |
 | `music10.ts` | 352 | The tenth film's score: an old fort in the snow, slow and grand. |
 | `music3.ts` | 533 | The third trailer's score. |
@@ -228,6 +229,8 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `music9.ts` | 630 | The ninth film's score, and none of the other three bands in it. |
 | `shots.ts` | 843 | The trailer, shot by shot. |
 | `shots10.ts` | 896 | The tenth film: twenty seconds of the fort. |
+| `shots11.ts` | 781 | The eleventh film: ten seconds of the Arena (2026-10-14). |
+| `shots12.ts` | 951 | The twelfth film: thirty seconds of what is new (2026-10-14). |
 | `shots2.ts` | 1383 | The second trailer: what has changed in the Zone. |
 | `shots3.ts` | 1664 | The third trailer: a story, and then how the money works. |
 | `shots4.ts` | 1452 | The fourth trailer: the Zone has grown, and everything the other three were about. |
@@ -242,16 +245,16 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | file | lines | what it is |
 |---|---:|---|
 | `admin-ui.ts` | 1526 | The panel of somebody with a role (2026-10-11; laid out again 2026-10-12). |
-| `arena-hud.ts` | 170 | The arena's own screen (2026-10-14). |
-| `arena-menu.ts` | 208 | The Arena's own front (2026-10-14), its menu and the screens between matches. |
+| `arena-hud.ts` | 172 | The arena's own screen (2026-10-14). |
+| `arena-menu.ts` | 216 | The Arena's own front (2026-10-14), its menu and the screens between matches. |
 | `bigmap.ts` | 1247 | The map, opened large (M): a sheet as an army prints one. |
-| `door.ts` | 82 | The door (2026-10-14): zonapvp.fun asks what the visitor came for before anything is built. |
+| `door.ts` | 145 | The door (2026-10-14): zonapvp.fun asks what the visitor came for before anything is built. |
 | `hud.ts` | 1839 | A lean HUD: small vitals, a compass strip, a corner map (src/ui/minimap.ts), prompts only when relevant. |
 | `icons.ts` | 467 | Inventory icons rendered from the real 3D models at startup (no hand-made sprites). |
 | `inventory-ui.ts` | 2117 | DayZ-style inventory. Three columns: Vicinity what is on the ground around you, and the crate / stash / body you opened Character the survivor with the places for what is worn either side of them (the rules' own... |
 | `minimap.ts` | 411 | A small map in the corner of the screen: the ground, the forest, the road, the buildings, and an arrow for where you are and which way you face. |
 | `person.ts` | 104 | The check that it is a person who is asking to play, and not a program (2026-10-12: connections made by a program came by the dozen, and stood in the world as players). |
-| `platform.ts` | 31 | ZONA PvP, the platform both games stand under (2026-10-14). |
+| `platform.ts` | 33 | ZONA PvP, the platform both games stand under (2026-10-14). |
 | `rewards.ts` | 263 | Dog tags and creator rewards: the illustrated explanation a player sees on entering the site, and the wallet address they give. |
 | `rotate.ts` | 34 | The screen a phone shows while it is held upright. |
 | `shop.ts` | 188 | The trader's counter: what you have that he will take, and what he has to sell. |

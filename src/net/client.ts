@@ -71,14 +71,15 @@ function wsUrl(): string {
 }
 
 /** How many people are on the server right now, how many it holds and how many are waiting to get in (for the start screen). Null if it can't be reached. */
-export async function serverStatus(timeout = 6000): Promise<{ players: number; max: number; queue: number } | null> {
+export async function serverStatus(timeout = 6000): Promise<{ players: number; max: number; queue: number; today: number | null } | null> {
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), timeout);
   try {
     const r = await fetch(`${remoteServer() ?? ''}/healthz`, { cache: 'no-store', signal: ctl.signal });
     if (!r.ok) return null;
-    const j = (await r.json()) as { players?: number; max?: number; queue?: number };
-    return typeof j.players === 'number' ? { players: j.players, max: j.max ?? 0, queue: j.queue ?? 0 } : null;
+    const j = (await r.json()) as { players?: number; max?: number; queue?: number; today?: number };
+    // (today: how many have played in the last 24 hours; null from a server older than its count)
+    return typeof j.players === 'number' ? { players: j.players, max: j.max ?? 0, queue: j.queue ?? 0, today: typeof j.today === 'number' ? j.today : null } : null;
   } catch {
     return null;
   } finally {

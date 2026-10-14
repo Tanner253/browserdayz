@@ -14,6 +14,7 @@ import { ADMIN, keyHash, roleOf, siteAdmin, type AdminState } from './gate';
 import { CARRY_KEPT, carryKeep, carryKept, noHold } from './admin';
 import { broadcast, cleanInventory, cleanItem, clients, info, isPose, num, records, send, type Client, type Record_ } from './players';
 import { fillFromQueue } from './queue';
+import { seen } from './seen';
 
 /** on the host it is kept; on somebody's own machine it is not, unless asked for (KEEP=on) */
 const KEEP_ON = process.env.KEEP ? process.env.KEEP !== 'off' : !!process.env.RENDER;
@@ -95,6 +96,8 @@ interface Snapshot {
   loose?: { item: ItemInstance; x: number; y: number; z: number; rot: number; at: number }[];
   /** the hearts and the comments under the changelog's entries (see src/sim/news.ts) */
   news?: NewsKept;
+  /** who has played in the last week, by key hash and when (see seen.ts) */
+  seen?: [string, number][];
 }
 
 interface KeptFile { at: string; boot: string; final: boolean; z: string }
@@ -134,7 +137,7 @@ function snapshot(): Snapshot {
   // (no more of them than can be carried: the newest, if it ever came to that)
   const newest = [...chars].sort((a, b) => b[1].leftAt - a[1].leftAt).slice(0, 6000);
   const loose = [...economy.loot.values()].filter((l) => l.keptAt !== undefined).map((l) => ({ item: l.item, x: l.x, y: l.y, z: l.z, rot: l.rot, at: l.keptAt! }));
-  return { rev: WORLD_REV, wipe: WIPE, chars: newest, stashes: [...boxes.values()].filter((b) => b.kind === 'stash' && b.buried), loose, news: news.keep() };
+  return { rev: WORLD_REV, wipe: WIPE, chars: newest, stashes: [...boxes.values()].filter((b) => b.kind === 'stash' && b.buried), loose, news: news.keep(), seen: seen.keep() };
 }
 
 /** What is kept is written to the site. @param final this server's last word @returns whether it was */
@@ -193,6 +196,7 @@ function takeInLate(save: KeptFile) {
     return void log(`[keep] a newer copy (${save.at}) could not be opened, and is written over: ${e instanceof Error ? e.message : e}`);
   }
   if ((snap.wipe ?? '') !== WIPE) return void log(`[keep] a newer copy (${save.at}) is of another world, and is written over`);
+  seen.restore(snap.seen);
   const moved = snap.rev !== WORLD_REV, now = Date.now();
   const back = new Set([...[...clients.values()].map((c) => keyHash(c.key)), ...[...records.keys()].map((k) => keyHash(k))]);
   const carried = new Set<string>();
@@ -476,6 +480,7 @@ export async function loadKept() {
     }
     // (what has been said under the changelog, and its hearts: kept with the rest, and no worse for a new map)
     news.restore(snap.news);
+    seen.restore(snap.seen);
     open(`${KEPT.chars.size} characters and ${stashes} stashes as they were kept at ${save.at}${save.final ? '' : ' (not a last word: the server before this one stopped without one)'}${moved ? '; the map has been made again since, so everybody starts from the edge with what they had' : ''}`);
   } catch (e) {
     // (what could be taken in has been: it is not thrown away for the sake of what could not)

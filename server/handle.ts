@@ -25,6 +25,7 @@ import { broadcast, cleanInventory, cleanItem, cleanStored, clients, isPose, isV
 import { ajar, findCarried, hurtJeep, kill, leaveSeat, releaseLock, seatOf } from './acts';
 import { scores } from './queue';
 import { sendDrop } from './drops';
+import { seen } from './seen';
 
 export function handle(c: Client, m: C2S) {
   // anything a person does counts as being there; what the game reports on its own does not
@@ -51,6 +52,8 @@ export function handle(c: Client, m: C2S) {
         if (c.alive && c.vitals) send(c, { t: 'hp', health: c.vitals.health, bleeding: !!c.vitals.bleeding, blood: bloodOf(c.vitals), bleed: c.vitals.bleeding ? bleedOf(c.vitals) : 0 });
       }
       c.heardAt = Date.now();
+      // (their first move in the world: they have played today, for the door's count)
+      if (!c.spoke) seen.mark(c.key);
       c.spoke = true;
       if (c.logoutAt && Math.hypot(m.p[0] - c.logoutFrom[0], m.p[2] - c.logoutFrom[1]) > LOGOUT_STIR) stayOn(c, 'you moved');
       c.pose = moveCheck(c, m.p, Date.now()) ? m.p : [was[0], was[1], was[2], m.p[3], m.p[4], m.p[5]];

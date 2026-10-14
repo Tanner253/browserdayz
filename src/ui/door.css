@@ -34,6 +34,9 @@
 /* the owner: "a wagers coming stamp on the arena main menu path head" */
 .door-stamp { position: absolute !important; top: 20px; left: 22px; transform: rotate(-7deg); display: flex; flex-direction: column; align-items: center; padding: 6px 14px 5px; border: 3px double #ff4a36; color: #ff4a36; background: rgba(10, 8, 8, 0.55); font: 800 22px 'JetBrains Mono', monospace; letter-spacing: 0.2em; line-height: 1; text-transform: uppercase; box-shadow: 0 0 0 1px rgba(255, 74, 54, 0.25); }
 .door-stamp small { margin-top: 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.28em; }
+/* true numbers under the paid line, each left out where it cannot be had; squad hour last */
+.door-stats { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 18px; font: 600 12px 'JetBrains Mono', monospace; letter-spacing: 0.08em; text-transform: uppercase; color: #cfcabe; }
+.door-stats span[data-s='squad'] { color: #ff8a7a; }
 .door-foot { display: flex; gap: 22px; margin-top: 4px; }
 .door-foot a { font: 12px 'JetBrains Mono', monospace; letter-spacing: 0.08em; text-transform: uppercase; color: #9a9588; text-decoration: none; }
 .door-foot a:hover { color: #e9e4d8; }
