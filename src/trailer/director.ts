@@ -472,8 +472,9 @@ async function stage() {
   }
   // a grenade's blast reaches the stand-in players as it would real ones: the game draws it, this keeps the score
   const explode = g.explode.bind(g);
-  g.grenades.onExplode = (at: THREE.Vector3, mine: boolean) => {
-    explode(at, mine);
+  g.grenades.onExplode = (at: THREE.Vector3, mine: boolean, id?: string) => {
+    // (which grenade it was is passed on, as the game passes it: a frag goes off as a frag. The films before the tenth threw only the stick grenade, which is what is meant when nothing is said.)
+    explode(at, mine, id === 'frag' ? 'frag' : 'grenade');
     for (const a of S.actors) {
       if (!a.alive) continue;
       const chest = a.chest(), d = chest.distanceTo(at);
@@ -562,7 +563,13 @@ async function stage() {
   S.bullet.visible = S.trail.visible = false;
   g.s.r.scene.add(S.bullet, S.trail);
 
-  if (CUT === 9) {
+  if (CUT === 10) {
+    // (the tenth is twenty seconds of the fort, scored from its own shots with the ninth's band: see shots10.ts)
+    const cut = await import('./shots10');
+    shots = cut.buildShots(S);
+    seconds = cut.seconds10();
+    ownScore = cut.score;
+  } else if (CUT === 9) {
     // (the ninth's score is written to its own shots: see music9.ts)
     const cut = await import('./shots9');
     shots = cut.buildShots(S);

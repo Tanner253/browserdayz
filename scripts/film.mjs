@@ -13,8 +13,13 @@
 //   node scripts/film.mjs --cut 8 --menu      the cut of a film that the main menu plays: 1280x720 at 30 fps, a light file -> zona-trailer-8-menu.mp4
 //   node scripts/film.mjs --cut 9 --web       the whole film as the site shows it: 1280x720 at 30 fps, about 2 Mbit a second -> zona-trailer-9-web.mp4
 //   node scripts/film.mjs --bitrate 2200000   the picture's bits a second, said outright
+//   node scripts/film.mjs --still             the page never hears the dev server say a file has changed (see below)
+//   node scripts/film.mjs --port 9334         Chrome's own debugging port, when another film or the headless game tool has 9333
 //
-// The dev server must not reload during a take: do not edit game source while this runs.
+// The dev server must not reload during a take: do not edit game source while this runs. When other hands are
+// saving files in the tree all the while, that cannot be promised: --still runs assets-src/_wf/me/still.js in the
+// page before anything of the game's, as the headless game tool does (PLAY_PRE), and a save then reloads nothing.
+// (What is filmed is the tree as it was when the page loaded.)
 
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -45,7 +50,8 @@ const motion = !!arg('motion', false);
 const cut = String(arg('cut', '1'));
 const name = String(arg('out', (draft ? 'draft' : 'zona-trailer') + (cut === '1' ? '' : `-${cut}`) + (menu ? '-menu' : '') + (web ? '-web' : '')));
 const URL_ = String(arg('url', `http://localhost:5173/trailer.html?cut=${cut}${menu ? '&menu=1' : ''}${web ? '&web=1' : ''}`));
-const PORT = 9333;
+const still = !!arg('still', false);
+const PORT = Number(arg('port', 9333));
 const CHROME = ['C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'].find((p) => fs.existsSync(p));
 if (!CHROME) throw new Error('no Chrome or Edge found');
 fs.mkdirSync(OUT, { recursive: true });
@@ -94,6 +100,8 @@ const run = async (expression) => {
 await cdp('Page.enable');
 await cdp('Runtime.enable');
 await cdp('Emulation.setDeviceMetricsOverride', { width: 1280, height: 720, deviceScaleFactor: scale, mobile: false });
+// (--still: the dev server's word that a file has changed is never heard by this page)
+if (still) await cdp('Page.addScriptToEvaluateOnNewDocument', { source: fs.readFileSync(path.join(ROOT, 'assets-src', '_wf', 'me', 'still.js'), 'utf8') });
 await cdp('Page.navigate', { url: URL_ });
 process.stdout.write('loading the game');
 for (let i = 0; ; i++) {

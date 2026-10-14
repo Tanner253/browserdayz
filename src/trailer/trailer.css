@@ -538,3 +538,20 @@ body.tr-cut9 .tr-title.gold { top: 30%; font-size: 17vh; font-weight: 800; lette
 /* (the ninth film as the site shows it: no grain, which a small file has least room for; and as the menu plays it: its pictures, with nothing of the film's own laid over them) */
 body.tr-web .tr-grain4 { display: none; }
 body.tr-menu9 .tr-gfx, body.tr-menu9 .tr-title, body.tr-menu9 .x8-grid, body.tr-menu9 .tr-grain4, body.tr-menu9 .tr-vig4, body.tr-menu9 .tr-black4, body.tr-menu9 .tr-flash4 { display: none !important; }
+
+/* ------------------------------------------------------------------------------------------------
+   The tenth film: twenty seconds of the fort. Its words are three things and no more: the fort's
+   name on the first frame, a plate at the foot of the picture where a part of it is named, and
+   the address over the last. */
+.x10-name { z-index: 3; display: flex; flex-direction: column; justify-content: center; padding-left: 6.6vw; text-transform: uppercase; opacity: var(--o, 1);
+  background: linear-gradient(90deg, rgba(6, 7, 6, 0.86) 0%, rgba(6, 7, 6, 0.66) 30%, rgba(6, 7, 6, 0) 60%); }
+.x10-name .n10-kick { font-size: 2.5vh; font-weight: 700; letter-spacing: 0.62em; color: #ffd35a; white-space: nowrap; }
+.x10-name .n10-name { margin-top: 0.8vh; font-size: 17vh; line-height: 0.9; font-weight: 800; font-stretch: condensed; letter-spacing: 0.1em; color: #fff3d6; white-space: nowrap; }
+.x10-name .n10-line { margin-top: 1.6vh; font-size: 4.6vh; font-weight: 800; font-stretch: condensed; letter-spacing: 0.42em; color: #f3efe6; white-space: nowrap; }
+.x10-plate { inset: auto 0 12.6vh 0; z-index: 3; text-align: center; opacity: var(--o, 0); }
+.x10-plate span { display: inline-block; padding: 0.5em 2.4em 0.5em 2.9em; font-size: 3.4vh; font-weight: 700; font-stretch: condensed; letter-spacing: 0.5em; text-transform: uppercase; white-space: nowrap; color: #f3efe6;
+  background: linear-gradient(90deg, transparent, rgba(6, 7, 6, 0.8) 18%, rgba(6, 7, 6, 0.8) 82%, transparent); text-shadow: 0 0.06em 0.4em #000; }
+/* (to one side, and with no shade laid over the picture: it is a night, and what burns in it is to be seen to the last frame) */
+.x10-end { z-index: 3; display: flex; flex-direction: column; align-items: flex-end; justify-content: flex-end; gap: 1vh; padding: 0 5.4vw 13.4vh 0; text-transform: uppercase; opacity: var(--o, 0); }
+.x10-end .e10-logo { font-size: 10vh; line-height: 0.9; font-weight: 800; font-stretch: condensed; letter-spacing: 0.2em; margin-right: -0.2em; color: #fff3d6; text-shadow: 0 0.04em 0.5em #000, 0 0 0.08em #000; }
+.x10-end .e10-url { padding: 0.32em 1.1em 0.32em 1.44em; font-size: 5.4vh; font-weight: 800; font-stretch: condensed; letter-spacing: 0.34em; color: #14110b; background: #ffd35a; box-shadow: 0 0.2em 1.6em rgba(0, 0, 0, 0.7); }
