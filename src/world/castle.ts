@@ -23,7 +23,7 @@ import { GLASS_GROUPS, WORLD_GROUPS, physics } from '../core/physics';
 import { assets } from '../core/assets';
 import { breathe } from '../core/breathe';
 import { SHADOW_FRUSTA, type Atmosphere, type ShaderPatch } from './atmosphere';
-import { ARCADE, CASTLE, CASTLE_SCALE, LAMPS, UNDER, castleAt, castleLocal, castleUnder, castleDoor, castleKit, castleLamps, castleLoose, castleRocks, looseLocal, type GroundAt, type Loose, type Place } from '../sim/castle';
+import { ARCADE, CASTLE, CASTLE_SCALE, LAMPS, UNDER, castleAt, castleLocal, castleUnder, castleDoor, castleKit, castleLamps, castleLoose, castleRocks, looseLocal, type FortPlace, type GroundAt, type Loose, type Place } from '../sim/castle';
 import { PICTURES, SHEETS, castleShapeSteps, castleSky, type Shape, type Sheet, type Skin, type Solid } from './castle-shape';
 import { kitMeshes, stoneLook, type StoneLook } from './kit';
 import { PostSite } from './castle-post';
@@ -306,8 +306,10 @@ export class CastleSite {
     this.snowU.value = Math.min(1, Math.max(0, v));
   }
 
-  constructor(readonly place: Place, private atmo: Atmosphere, scene: THREE.Scene, private o: CastleOptions = {}) {
+  constructor(readonly place: FortPlace, private atmo: Atmosphere, scene: THREE.Scene, private o: CastleOptions = {}) {
     const P = place, ground = o.ground;
+    // (whether the rock the ramp leaves from is made: as whoever stands the fort says; unsaid, as the world's own place says; unsaid there too, it is)
+    if (o.rock === undefined && place.rock !== undefined) this.o = o = { ...o, rock: place.rock };
     if (o.snow !== undefined) this.snow = o.snow;
     // (Here, as the game starts: only what is seen from far off, and the earth over the cut ground. The rest of it is
     // made afterwards a piece at a time, between frames: see `make`.)

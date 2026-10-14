@@ -26,7 +26,17 @@
 // (Nothing at the top of this file reads the fort's own: src/sim/castle.ts may bring this file in, and each would
 // then be waiting on the other. Everything is worked out when it is asked for.)
 
-import { CASTLE, CASTLE_SCALE, HOUSES, LOOSE, castleAt, castleGround, castleLoose, castleParts, looseLocal, type CastleLoot, type GroundAt, type Loose, type Place, type Tower, type V3 } from './castle';
+import { CASTLE, CASTLE_SCALE, HOUSES, LOOSE, body, castleAt, castleGround, castleLoose, castleParts, looseLocal, type CastleLoot, type GroundAt, type Loose, type Place, type Tower, type V3 } from './castle';
+
+// A BODY'S MEASURE (2026-10-13). The fort is built a fifth bigger than its own measure (`CASTLE_SCALE`), and the
+// post is in it: every PLACE here is the fort's, and a fifth further from its middle in the world. But a desk, a
+// tent, a sandbag, a stove and a grave are a body's, and are the size they were. So: whatever is off the shelf
+// comes at its own size (`scale: 1`); whatever is made by hand and is a body's (`BODILY`) is made the size it is
+// said here and set down that size in the world, about its own spot; and every height or reach that is OF such a
+// thing (the top of a desk, how far along it the wireless stands, how far before it the chair) is said
+// `body(metres)`. What is the place's stays the place's: the mast, a net from wall to poles, a cable's run.
+/** the kinds of thing made by hand that are a body's: each is made about its own spot at the size it is said, whatever the fort's scale */
+export const BODILY: ReadonlySet<string> = new Set(['tent', 'generator', 'scope', 'table', 'set', 'map', 'bedroll', 'grave', 'pot', 'tins', 'logs', 'board']);
 
 export const POST = {
   name: 'Orlinoye',
@@ -124,6 +134,8 @@ function lay(loose: Loose[]): Plan {
   const C = CASTLE, K = C.keep, R = K.room, [, F1, F2] = K.floors, ROOF = K.roof, B = K.band, T = C.tower, BG = POST.bag;
   const stood: Stood[] = [], made: Made[] = [], solids: PostSolid[] = [], spots: Spot[] = [], lights: PostLight[] = [];
   const put = (room: Room, kind: string, x: number, z: number, y: number, rot = 0, o: Partial<Stood> = {}) => void stood.push({ kind, room, x, z, y, rot, far: 90, ...o });
+  /** a body's measure, in the fort's own (see the head of this file); and half the size of a block that is a body's */
+  const b = body, bh = (h: V3): V3 => [b(h[0]), b(h[1]), b(h[2])];
   const towers = castleParts().filter((p): p is Tower => p.t === 'tower'), tower = (name: string) => towers.find((t) => t.name === name)!;
   /** a spot of a tower's round: so far round it (degrees: 0 toward the gate, 90 toward the steep side), so far out */
   const round = (tw: Tower, a: number, r: number): [number, number] => [tw.cx + Math.cos(rad(a)) * r, tw.cz + Math.sin(rad(a)) * r];
@@ -131,13 +143,14 @@ function lay(loose: Loose[]): Plan {
   const bags = (room: Room, name: string, pts: [number, number][], y: number, courses: number, sits = false) => {
     made.push({ t: 'bags', room, name, pts, y, courses, ...(sits ? { sits } : {}) });
     for (let k = 0; k + 1 < pts.length; k++) {
-      const [ax, az] = pts[k], [bx, bz] = pts[k + 1], long = Math.hypot(bx - ax, bz - az), h = (courses * BG.course) / 2;
-      solids.push({ c: [(ax + bx) / 2, y + h, (az + bz) / 2], h: [long / 2, h, BG.wide / 2 + 0.02], yaw: Math.atan2(-(bz - az), bx - ax), surface: 'cloth', name, room, ...(sits ? { sits } : {}) });
+      // (a bag is a body's: the wall is as long as its line, and as high and as thick as so many bags)
+      const [ax, az] = pts[k], [bx, bz] = pts[k + 1], long = Math.hypot(bx - ax, bz - az), h = b(courses * BG.course) / 2;
+      solids.push({ c: [(ax + bx) / 2, y + h, (az + bz) / 2], h: [long / 2, h, b(BG.wide / 2 + 0.02)], yaw: Math.atan2(-(bz - az), bx - ax), surface: 'cloth', name, room, ...(sits ? { sits } : {}) });
     }
   };
   const pole = (room: Room, name: string, a: V3, b: V3, r = 0.024, stuff: 'timber' | 'steel' = 'timber') => void made.push({ t: 'pole', room, name, a, b, r, stuff });
-  /** a place for a thing on a surface: `lx` along the surface from its middle */
-  const lies = (room: Room, tier: 3 | 4, surf: Spot['surf'], y: number, lx: number, o: Partial<Spot> = {}) => void spots.push({ room, tier, usage: ['Military'], x: surf.x + lx * Math.cos(surf.yaw), z: surf.z - lx * Math.sin(surf.yaw), y, surf, ...o });
+  /** a place for a thing on a surface: `lx` along the surface from its middle (in metres of the world, as the surface's own half sizes are: it is a body's) */
+  const lies = (room: Room, tier: 3 | 4, surf: Spot['surf'], y: number, lx: number, o: Partial<Spot> = {}) => void spots.push({ room, tier, usage: ['Military'], x: surf.x + b(lx) * Math.cos(surf.yaw), z: surf.z - b(lx) * Math.sin(surf.yaw), y, surf, ...o });
 
   // ------------------------------------------------------------------ the keep's roof
   {
@@ -151,28 +164,31 @@ function lay(loose: Loose[]): Plan {
     const row: [number, number][] = [[4.38, -0.4], [4.38, 2]];
     bags('roof', 'observation post', row, B, 3);
     made.push({ t: 'scope', room: 'roof', name: 'scope', at: [3.85, B, 1.55], aim: 0 });
-    lies('roof', 3, { x: 4.38, z: 0.8, yaw: -Math.PI / 2, hx: 1.05, hz: 0.12, clear: 1 }, B + 3 * BG.course, -0.75);
+    lies('roof', 3, { x: 4.38, z: 0.8, yaw: -Math.PI / 2, hx: 1.05, hz: 0.12, clear: 1 }, B + b(3 * BG.course), -0.75);
     // a tarpaulin on four poles in the south-west corner of the slab, sloped to the wall: somewhere out of the wind
     const t0: V3 = [-3.6, ROOF + 2, 1.85], t1: V3 = [-1.45, ROOF + 2, 1.85], t2: V3 = [-1.45, ROOF + 1.5, 3.3], t3: V3 = [-3.6, ROOF + 1.5, 3.3];
     made.push({ t: 'sheet', stuff: 'tarp', room: 'roof', name: 'tarpaulin', p: [t0, t1, t2, t3], sag: 0.14 });
     for (const t of [t0, t1, t2, t3]) pole('roof', 'tarpaulin pole', [t[0], ROOF, t[2]], [t[0], t[1] + 0.06, t[2]]);
     put('roof', 'folded_blanket', -3.3, 3.05, ROOF, 0.4);
     // the set's lead: from the foot of the mast across the slab, and down through the corner that fell in
-    made.push({ t: 'cable', room: 'roof', name: 'aerial lead', pts: [[foot[0] + 0.2, ROOF + 0.03, foot[2]], [1.15, ROOF + 0.03, 1.75], [1.5, ROOF + 0.02, 2.05], [1.6, F2 + 0.03, 2.2], [1.5, F2 + 0.03, 2.3], [-1.75, F2 + 0.03, 2.3], [-1.9, F2 + 0.03, 2.6], [-1.9, F2 + 0.8, 2.75]] });
+    // (it ends at the back of the desk in the room below: see `desk`, there)
+    made.push({ t: 'cable', room: 'roof', name: 'aerial lead', pts: [[foot[0] + 0.2, ROOF + 0.03, foot[2]], [1.15, ROOF + 0.03, 1.75], [1.5, ROOF + 0.02, 2.05], [1.6, F2 + 0.03, 2.2], [1.5, F2 + 0.03, 2.3], [-1.75, F2 + 0.03, 2.3], [-2.68 + b(0.78), F2 + 0.03, 2.92 - b(0.32)], [-2.68 + b(0.78), F2 + b(0.8), 2.92 - b(0.17)]] });
   }
 
   // ------------------------------------------------------------------ the upper room: the command post
   {
     // the signals desk in the nook by the head of the stair, the set on it and a telephone; the map on the fort's own table
-    const desk = { x: -2.68, z: 2.92, top: 0.7875 };
+    // (the desk is where it was in the room; what is on it and before it is as far from the desk's own middle as it was)
+    const desk = { x: -2.68, z: 2.92, top: b(0.7875) }, on = (dx: number, dz: number): [number, number] => [desk.x + b(dx), desk.z + b(dz)];
     put('command post', 'metal_office_desk', desk.x, desk.z, F2, Math.PI);
-    put('command post', 'SchoolChair_01', -2.7, 1.95, F2, 0.15);
-    put('command post', 'vintage_radio_transceiver', -3.12, 3.02, F2 + desk.top, Math.PI);
-    made.push({ t: 'set', kind: 'phone', room: 'command post', name: 'field telephone', at: [-1.95, F2 + desk.top, 3.2], yaw: 0.3 });
-    const surf = { x: desk.x, z: desk.z - 0.12, yaw: 0, hx: 0.9, hz: 0.26, clear: 1 };
+    put('command post', 'SchoolChair_01', ...on(-0.02, -0.97), F2, 0.15);
+    put('command post', 'vintage_radio_transceiver', ...on(-0.44, 0.1), F2 + desk.top, Math.PI);
+    made.push({ t: 'set', kind: 'phone', room: 'command post', name: 'field telephone', at: [on(0.73, 0.28)[0], F2 + desk.top, on(0.73, 0.28)[1]], yaw: 0.3 });
+    const surf = { x: desk.x, z: desk.z - b(0.12), yaw: 0, hx: 0.9, hz: 0.26, clear: 1 };
     lies('command post', 4, surf, F2 + desk.top, 0.15);
     lies('command post', 4, surf, F2 + desk.top, 0.6);
-    made.push({ t: 'map', room: 'command post', name: 'map', at: [0.4, F2 + 0.808, 0.3], yaw: Math.PI / 2, w: 1.15, d: 0.7 });
+    // (on the fort's own table, whose middle is at 0.4, 0.3 and whose top is 0.8 over the floor)
+    made.push({ t: 'map', room: 'command post', name: 'map', at: [0.4, F2 + b(0.808), 0.3], yaw: Math.PI / 2, w: 1.15, d: 0.7 });
     // the commander's locker, in the corner past the head of the stair to the roof
     put('command post', 'steel_locker', 2.52, -2, F2, -Math.PI / 2);
     // a bulb over the map, and a net over the corner of the roof that fell in: from the roof's edge down to the broken walls
@@ -181,39 +197,41 @@ function lay(loose: Loose[]): Plan {
     made.push({ t: 'sheet', stuff: 'net', room: 'command post', name: 'net over the fallen corner', p: [[1.15, ROOF + 0.06, 1.85], [3.1, B + 0.05, 1.9], [4.45, 8.5, 4.75], [1.2, B + 0.05, 4.2]], sag: 0.35 });
     pole('command post', 'net pole', [4.45, 6.6, 4.75], [4.45, 8.56, 4.75], 0.03);
     // what makes it a command post: a board of maps and orders on the wall over the desk, a second set, chairs at the map, tins of ammunition by the rack
-    made.push({ t: 'board', room: 'command post', name: 'map board', at: [-2.6, F2 + 1.65, R.z1 - 0.02], yaw: Math.PI, w: 1.5, h: 0.95 });
-    made.push({ t: 'set', kind: 'radio', room: 'command post', name: 'wireless set', at: [-2.45, F2 + desk.top, 3.12], yaw: 0 });
-    put('command post', 'painted_wooden_chair_01', 1.25, 0.1, F2, -Math.PI / 2 + 0.2);
-    put('command post', 'painted_wooden_chair_01', -0.45, 0.75, F2, Math.PI / 2 - 0.3);
+    made.push({ t: 'board', room: 'command post', name: 'map board', at: [on(0.08, 0)[0], F2 + b(1.65), R.z1 - b(0.02)], yaw: Math.PI, w: 1.5, h: 0.95 });
+    made.push({ t: 'set', kind: 'radio', room: 'command post', name: 'wireless set', at: [on(0.23, 0.2)[0], F2 + desk.top, on(0.23, 0.2)[1]], yaw: 0 });
+    // (the chairs at the map: as near the table as they were)
+    put('command post', 'painted_wooden_chair_01', 0.4 + b(0.85), 0.3 - b(0.2), F2, -Math.PI / 2 + 0.2);
+    put('command post', 'painted_wooden_chair_01', 0.4 - b(0.85), 0.3 + b(0.45), F2, Math.PI / 2 - 0.3);
     made.push({ t: 'tins', room: 'command post', name: 'ammunition tins', at: [2.5, F2, 0.75], yaw: Math.PI / 2, n: 5 });
   }
 
   // ------------------------------------------------------------------ the hall: the mess
   {
     // the stove against the north wall, between the head of the stair and the window; its flue goes out through the wall
-    const s = { x: -2.05, z: -3.08 }, b = BODY.wood_stove;
+    // (as near the wall as it was: its flue goes through it)
+    const s = { x: -2.05, z: R.z0 + b(0.32) }, sb = bh(BODY.wood_stove);
     put('mess', 'wood_stove', s.x, s.z, F1, 0);
-    solids.push({ c: [s.x, F1 + b[1], s.z], h: b, yaw: 0, surface: 'metal', name: 'stove', room: 'mess' });
-    made.push({ t: 'cable', room: 'mess', name: 'flue', pts: [[s.x, F1 + 1.3, s.z - 0.05], [s.x, F1 + 2.25, s.z - 0.05], [s.x, F1 + 2.33, R.z0 - 0.1]], r: 0.065 });
-    made.push({ t: 'logs', room: 'mess', name: 'firewood', at: [-2.55, F1, R.z0 + 0.26], yaw: 0, wide: 2, high: 5 });
+    solids.push({ c: [s.x, F1 + sb[1], s.z], h: sb, yaw: 0, surface: 'metal', name: 'stove', room: 'mess' });
+    made.push({ t: 'cable', room: 'mess', name: 'flue', pts: [[s.x, F1 + b(1.3), s.z - b(0.05)], [s.x, F1 + 2.25, s.z - b(0.05)], [s.x, F1 + 2.33, R.z0 - 0.1]], r: b(0.065) });
+    made.push({ t: 'logs', room: 'mess', name: 'firewood', at: [-2.55, F1, R.z0 + b(0.26)], yaw: 0, wide: 2, high: 5 });
     made.push({ t: 'bulb', room: 'mess', name: 'bulb', at: [1.05, F1 + 1.9, -0.4], drop: 0.45 });
     lights.push({ at: [1.05, F1 + 1.9, -0.4], kind: 'bulb', room: 'mess' });
-    // mess tins and mugs left on the fort's long table
-    for (const [x, z, r, h] of [[-0.1, -0.64, 0.1, 0.11], [0.7, -0.18, 0.045, 0.085], [-0.75, -0.2, 0.045, 0.085], [0.62, -0.66, 0.075, 0.06], [-0.3, -0.12, 0.045, 0.085]]) made.push({ t: 'pot', room: 'mess', name: 'mess tin', at: [x, F1 + 0.8, z], r, h });
-    // a pot, on the long case by the wall; and stores on a shelf under the stair to the upper room
-    made.push({ t: 'pot', room: 'mess', name: 'pot', at: [2.3, F1 + 0.301, -2.9], r: 0.17, h: 0.24 });
-    const shelf = { x: 1.75, z: R.z1 - 0.01 };
+    // mess tins and mugs left on the fort's long table (whose middle is at 0.3, -0.4, and whose top is 0.8 over the floor)
+    for (const [x, z, r, h] of [[-0.4, -0.24, 0.1, 0.11], [0.4, 0.22, 0.045, 0.085], [-1.05, 0.2, 0.045, 0.085], [0.32, -0.26, 0.075, 0.06], [-0.6, 0.28, 0.045, 0.085]]) made.push({ t: 'pot', room: 'mess', name: 'mess tin', at: [0.3 + b(x), F1 + b(0.8), -0.4 + b(z)], r, h });
+    // a pot, on the long case by the wall (which stands at 1.75, -2.85); and stores on a shelf under the stair to the upper room
+    made.push({ t: 'pot', room: 'mess', name: 'pot', at: [1.75 + b(0.55), F1 + b(0.301), -2.85 - b(0.05)], r: 0.17, h: 0.24 });
+    const shelf = { x: 1.75, z: R.z1 - b(0.01) };
     put('mess', 'Shelf_01', shelf.x, shelf.z, F1, Math.PI);
-    const surf = { x: shelf.x, z: shelf.z - 0.13, yaw: 0, hx: 0.43, hz: 0.09, clear: 0.24 };
-    lies('mess', 3, surf, F1 + 0.94, -0.2, { usage: ['Military', 'Hunting'] });
-    lies('mess', 3, surf, F1 + 1.22, 0.18, { usage: ['Military', 'Hunting'] });
+    const surf = { x: shelf.x, z: shelf.z - b(0.13), yaw: 0, hx: 0.43, hz: 0.09, clear: 0.24 };
+    lies('mess', 3, surf, F1 + b(0.94), -0.2, { usage: ['Military', 'Hunting'] });
+    lies('mess', 3, surf, F1 + b(1.22), 0.18, { usage: ['Military', 'Hunting'] });
   }
 
   // ------------------------------------------------------------------ the store: the generator and its fuel
   const gen: V3 = [-1.3, 0, 0.55], door: V3 = [K.x1 + 0.08, 0.03, 0.42];
   {
     made.push({ t: 'generator', room: 'store', name: 'generator', at: gen, yaw: 0 });
-    solids.push({ c: [gen[0], 0.36, gen[2]], h: [0.52, 0.36, 0.3], yaw: 0, surface: 'metal', name: 'generator', room: 'store' });
+    solids.push({ c: [gen[0], b(0.36), gen[2]], h: bh([0.52, 0.36, 0.3]), yaw: 0, surface: 'metal', name: 'generator', room: 'store' });
     // its fuel: three drums in the corner over the foot of the stair down (a grenade down that stair is a decision), and jerrycans by it
     put('store', 'Barrel_01', 1.8, -3.05, 0, 0);
     put('store', 'Barrel_01', 2.45, -3.05, 0, Math.PI / 2);
@@ -221,50 +239,60 @@ function lay(loose: Loose[]): Plan {
     put('store', 'metal_jerrycan_green', -1.95, 1.08, 0, 0.5);
     put('store', 'metal_jerrycan_green', -1.58, 1.2, 0, -0.3);
     // the switch box on the east wall, and the cables: to it, and out by the small door
-    put('store', 'utility_box_01', 2.57, 1.75, 0, -Math.PI / 2);
-    made.push({ t: 'cable', room: 'store', name: 'cable', pts: [[gen[0] + 0.5, 0.2, gen[2]], [gen[0] + 0.75, 0.03, gen[2]], [2.2, 0.03, 0.42], [2.3, 0.03, 1.6], [2.36, 0.7, 1.7]] });
+    // (on the wall, as near it as it was)
+    put('store', 'utility_box_01', R.x1 - b(0.23), 1.75, 0, -Math.PI / 2);
+    made.push({ t: 'cable', room: 'store', name: 'cable', pts: [[gen[0] + b(0.5), b(0.2), gen[2]], [gen[0] + b(0.75), 0.03, gen[2]], [2.2, 0.03, 0.42], [R.x1 - b(0.5), 0.03, 1.75 - b(0.15)], [R.x1 - b(0.44), b(0.7), 1.75 - b(0.05)]] });
     made.push({ t: 'cable', room: 'store', name: 'cable', pts: [[2.2, 0.03, 0.42], door] });
   }
 
   // ------------------------------------------------------------------ the terrace
   {
     // two ridge tents in the lee of the keep's north wall, their backs to it; a bedroll in each; duckboards before them
-    const TN = POST.tent, tz = K.z0 - 0.05 - TN.wide / 2;
+    // (each tent the size a tent is, its back as near the wall as it was; the two a fifth further apart)
+    const TN = POST.tent, tz = K.z0 - 0.05 - b(TN.wide / 2);
     for (const [x, open] of [[-0.4, 1], [-2.65, -1]] as [number, 1 | -1][]) {
       made.push({ t: 'tent', room: 'terrace', name: 'tent', at: [x, 0, tz], yaw: 0, open });
       // (canvas: it stops a body and not a shot; the mouth of it is left open for a hand)
-      solids.push({ c: [x - open * 0.3, 0.45, tz], h: [TN.long / 2 - 0.35, 0.45, TN.wide / 2 - 0.12], yaw: 0, feet: true, surface: 'cloth', name: 'tent', room: 'terrace' });
-      made.push({ t: 'bedroll', room: 'terrace', name: 'bedroll', at: [x + open * 0.12, 0, tz + 0.1], yaw: 0 });
-      lies('terrace', 3, { x: x + open * 0.12, z: tz + 0.1, yaw: 0, hx: 0.85, hz: 0.26, clear: 0.6 }, 0.11, open * 0.62);
+      solids.push({ c: [x - open * b(0.3), b(0.45), tz], h: bh([TN.long / 2 - 0.35, 0.45, TN.wide / 2 - 0.12]), yaw: 0, feet: true, surface: 'cloth', name: 'tent', room: 'terrace' });
+      made.push({ t: 'bedroll', room: 'terrace', name: 'bedroll', at: [x + open * b(0.12), 0, tz + b(0.1)], yaw: 0 });
+      lies('terrace', 3, { x: x + open * b(0.12), z: tz + b(0.1), yaw: 0, hx: 0.85, hz: 0.26, clear: 0.6 }, b(0.11), open * 0.62);
     }
-    made.push({ t: 'boards', room: 'terrace', name: 'duckboards', a: [-3.6, 0, -7.47], b: [1, 0, -7.47], w: 0.5 });
+    // (before their mouths: a hand off the tents' feet, as they were)
+    made.push({ t: 'boards', room: 'terrace', name: 'duckboards', a: [-3.6, 0, tz - b(TN.wide / 2 + 0.22)], b: [1, 0, tz - b(TN.wide / 2 + 0.22)], w: b(0.5) });
     // the cables from the store: out of the small door, along the foot of the keep's east wall both ways. North: under the
     // stair, round the corner (and up it to the roof and the mast) and along the north wall to the floodlight by the tents
-    const f1: V3 = [1.45, 2.25, -5.95], corner: V3 = [K.x1 + 0.06, 0.03, K.z0 - 0.06];
-    made.push({ t: 'cable', room: 'terrace', name: 'cable', pts: [door, [K.x1 + 0.06, 0.03, -0.45], corner, [1.6, 0.03, K.z0 - 0.06], [f1[0], 0.03, f1[2] + 0.1], [f1[0], 0.6, f1[2]]] });
+    // (a floodlight on legs of its own is as tall as it was: a body's)
+    const f1: V3 = [1.45, b(2.25), -5.95], corner: V3 = [K.x1 + 0.06, 0.03, K.z0 - 0.06];
+    made.push({ t: 'cable', room: 'terrace', name: 'cable', pts: [door, [K.x1 + 0.06, 0.03, -0.45], corner, [1.6, 0.03, K.z0 - 0.06], [f1[0], 0.03, f1[2] + 0.1], [f1[0], b(0.6), f1[2]]] });
     made.push({ t: 'cable', room: 'roof', name: 'cable up the keep', pts: [corner, [corner[0], B + 0.34, corner[2]], [4.2, B + 0.03, -4.4], [2.95, B + 0.03, -3.3], [2.7, ROOF + 0.03, -3.2], [1.2, ROOF + 0.03, -1.6], [-0.75, ROOF + 0.03, -0.5]] });
     made.push({ t: 'flood', room: 'terrace', name: 'floodlight', at: f1, aim: 207, foot: 0 });
-    solids.push({ c: [f1[0], 0.6, f1[2]], h: [0.1, 0.6, 0.1], yaw: 0, feet: true, surface: 'metal', name: 'floodlight', room: 'terrace' });
+    solids.push({ c: [f1[0], b(0.6), f1[2]], h: bh([0.1, 0.6, 0.1]), yaw: 0, feet: true, surface: 'metal', name: 'floodlight', room: 'terrace' });
     lights.push({ at: f1, kind: 'flood', room: 'terrace' });
     // the flagpole, inside the gate; what is left of the flag
     const fp: V3 = [7.7, 0, 1.5], top = 6.4;
     pole('gate', 'flagpole', fp, [fp[0], top, fp[2]], 0.045, 'steel');
     solids.push({ c: [fp[0], 1.3, fp[2]], h: [0.06, 1.3, 0.06], yaw: 0, surface: 'metal', name: 'flagpole', room: 'gate' });
     made.push({ t: 'sheet', stuff: 'flag', room: 'gate', name: 'flag', p: [[fp[0], top - 0.1, fp[2] + 0.05], [fp[0] - 0.25, top - 0.25, fp[2] + 0.95], [fp[0] - 0.3, top - 1.0, fp[2] + 0.8], [fp[0], top - 0.85, fp[2] + 0.05]], sag: 0.1 });
-    // the keep's door: a wing of sandbags either side of the way to it, across the yard from the gate
+    // the gate: a wing of sandbags either side of the way in, and bags on the parapet where its merlons came down
+    // (north of the gatehouse on the east wall, and by the fire on the north one), to fight from over the ramp
     bags('gate', 'gate sandbags', [[7.35, -3.28], [8.35, -3.28]], 0, 5);
     bags('gate', 'gate sandbags', [[8.15, 0.6], [8.15, 1.7]], 0, 4);
+    const ex = C.hx + C.parapet.thick / 2 - 0.5, ez = C.hz + C.parapet.thick / 2 - 0.5;
+    bags('gate', 'parapet sandbags', [[ex, -6.6], [ex, -4.5]], 0.72, 2);
+    bags('terrace', 'parapet sandbags', [[4.5, -ez], [6.6, -ez]], 0.72, 2);
   }
 
   // ------------------------------------------------------------------ the dump: crates under a net, in the lee of the keep's east wall
   {
-    put('dump', 'wooden_military_crate', 5.62, 2.2, 0, Math.PI / 2, { far: 140 });
-    put('dump', 'wooden_military_crate', 5.62, 3.5, 0, Math.PI / 2, { far: 140 });
-    put('dump', 'cardboard_box_01', 5.6, 2.05, 0.465, 0.3, { far: 140 });
-    put('dump', 'cardboard_box_01', 5.66, 3.75, 0.465, -0.2, { far: 140 });
-    put('dump', 'cardboard_box_01', 6.12, 1.95, 0, 0, { far: 140 });
-    put('dump', 'barrel_03', 5.62, 4.52, 0, 0, { far: 140 });
-    made.push({ t: 'tins', room: 'dump', name: 'ammunition tins', at: [6.08, 0, 3.05], yaw: Math.PI / 2 + 0.2, n: 6 });
+    // (a heap is as close as it was: each thing so far from the first crate, in a body's measure)
+    const dx = 5.62, dz = 2.2;
+    put('dump', 'wooden_military_crate', dx, dz, 0, Math.PI / 2, { far: 140 });
+    put('dump', 'wooden_military_crate', dx, dz + b(1.3), 0, Math.PI / 2, { far: 140 });
+    put('dump', 'cardboard_box_01', dx - b(0.02), dz - b(0.15), b(0.465), 0.3, { far: 140 });
+    put('dump', 'cardboard_box_01', dx + b(0.04), dz + b(1.55), b(0.465), -0.2, { far: 140 });
+    put('dump', 'cardboard_box_01', dx + b(0.5), dz - b(0.25), 0, 0, { far: 140 });
+    put('dump', 'barrel_03', dx, dz + b(2.32), 0, 0, { far: 140 });
+    made.push({ t: 'tins', room: 'dump', name: 'ammunition tins', at: [dx + b(0.46), 0, dz + b(0.85)], yaw: Math.PI / 2 + 0.2, n: 6 });
     // the net: from the keep's wall down to three poles; the tallest of them carries the floodlight that looks at the gate
     const z0 = 1.5, z1 = 5, xw = K.x1 + 0.04, xp = 6.5, f2: V3 = [xp, 2.6, z0];
     made.push({ t: 'sheet', stuff: 'net', room: 'dump', name: 'net over the dump', p: [[xw, 2.4, z0], [xw, 2.4, z1], [xp, 1.72, z1], [xp, 1.72, z0]], sag: 0.22 });
@@ -278,19 +306,16 @@ function lay(loose: Loose[]): Plan {
   }
 
   // ------------------------------------------------------------------ the towers
-  // (Of the fort as it stood on the mountain, whose towers were drums a body climbed inside. On the rim its towers
-  // are the kit's, which have no way up inside them: nothing is set on a tower nobody reaches, and what was on
-  // these three is not built until there is a way up.)
-  if (towers.length) {
+  {
     // NORTH-EAST, over the ramp and the north shelf: the sniper's nest, up on its platform. A low bench of boards with
     // the rifle on it, bags laid in three of the gaps of its rim, a net over the side of the field
     const ne = tower('north-east tower'), D = T.deck, rin = T.r - T.wall;
     const [bx, bz] = round(ne, 300, 1.72), yaw = -rad(300 + 90);
     made.push({ t: 'table', room: "sniper's nest", name: 'rifle bench', at: [bx, D, bz], yaw, w: 1, d: 0.36, h: 0.5 });
-    solids.push({ c: [bx, D + 0.25, bz], h: [0.5, 0.25, 0.18], yaw, surface: 'wood', name: 'rifle bench', room: "sniper's nest" });
+    solids.push({ c: [bx, D + b(0.25), bz], h: bh([0.5, 0.25, 0.18]), yaw, surface: 'wood', name: 'rifle bench', room: "sniper's nest" });
     const surf = { x: bx, z: bz, yaw, hx: 0.44, hz: 0.14, clear: 1 };
-    lies("sniper's nest", 4, surf, D + 0.5, -0.2, { arms: 'guns' });
-    lies("sniper's nest", 4, surf, D + 0.5, 0.26);
+    lies("sniper's nest", 4, surf, D + b(0.5), -0.2, { arms: 'guns' });
+    lies("sniper's nest", 4, surf, D + b(0.5), 0.26);
     const [tx, tz] = round(ne, 268, 1.85), [kx, kz] = round(ne, 332, 1.75);
     made.push({ t: 'tins', room: "sniper's nest", name: 'ammunition tins', at: [tx, D, tz], yaw: -rad(268 + 90), n: 3 });
     put("sniper's nest", 'folded_blanket', kx, kz, D, 0.8);
@@ -309,7 +334,7 @@ function lay(loose: Loose[]): Plan {
     for (const a of [140, 187, 234]) pole('bunk room', 'canvas pole', swAt(a, T.r - 0.25, 0.4), swAt(a, T.r - 0.25, 4.6));
     const [rx, rz] = round(sw, 250, 1.65), ryaw = -rad(250 + 90);
     made.push({ t: 'bedroll', room: 'bunk room', name: 'bedroll', at: [rx, 0.06, rz], yaw: ryaw });
-    lies('bunk room', 3, { x: rx, z: rz, yaw: ryaw, hx: 0.85, hz: 0.26, clear: 0.6 }, 0.17, 0.5);
+    lies('bunk room', 3, { x: rx, z: rz, yaw: ryaw, hx: 0.85, hz: 0.26, clear: 0.6 }, 0.06 + b(0.11), 0.5);
     const [fx, fz] = round(sw, 214, 1.6);
     put('bunk room', 'folded_blanket', fx, fz, 0.06, ryaw + 0.5);
     const lamp = swAt(285, rin - 0.25, 2.1);
@@ -322,14 +347,14 @@ function lay(loose: Loose[]): Plan {
     const [sx, sz] = round(nw, 235, 1.68), syaw = -rad(235 + 90), rim = nw.rim[Math.floor(222 / (360 / T.slots))];
     void nwAt;
     made.push({ t: 'table', room: 'signals tower', name: 'signals table', at: [sx, D, sz], yaw: syaw, w: 0.95, d: 0.45, h: 0.74 });
-    solids.push({ c: [sx, D + 0.37, sz], h: [0.475, 0.37, 0.225], yaw: syaw, surface: 'wood', name: 'signals table', room: 'signals tower' });
-    made.push({ t: 'set', kind: 'radio', room: 'signals tower', name: 'wireless set', at: [sx + 0.26 * Math.cos(syaw), D + 0.74, sz - 0.26 * Math.sin(syaw)], yaw: syaw + Math.PI });
+    solids.push({ c: [sx, D + b(0.37), sz], h: bh([0.475, 0.37, 0.225]), yaw: syaw, surface: 'wood', name: 'signals table', room: 'signals tower' });
+    made.push({ t: 'set', kind: 'radio', room: 'signals tower', name: 'wireless set', at: [sx + b(0.26) * Math.cos(syaw), D + b(0.74), sz - b(0.26) * Math.sin(syaw)], yaw: syaw + Math.PI });
     const ssurf = { x: sx, z: sz, yaw: syaw, hx: 0.42, hz: 0.18, clear: 1 };
-    lies('signals tower', 3, ssurf, D + 0.74, -0.37);
-    lies('signals tower', 3, ssurf, D + 0.74, -0.03);
+    lies('signals tower', 3, ssurf, D + b(0.74), -0.37);
+    lies('signals tower', 3, ssurf, D + b(0.74), -0.03);
     made.push({ t: 'whip', room: 'signals tower', name: 'aerial', at: nwAt(222, rin + 0.45, rim), h: 4.2 });
     const rimAt = (a: number) => nw.rim[Math.floor(a / (360 / T.slots)) % T.slots] + 0.04;
-    made.push({ t: 'cable', room: 'signals tower', name: 'wire to the keep', pts: [[sx, D + 0.78, sz], nwAt(210, rin - 0.05, D + 0.04), nwAt(170, rin - 0.05, D + 0.04), nwAt(128, rin - 0.05, D + 0.04), nwAt(126, rin + 0.05, rimAt(126)), nwAt(126, rin + 0.4, rimAt(126)), nwAt(100, rin + 0.45, rimAt(100)), nwAt(80, rin + 0.45, rimAt(80)), nwAt(62, rin + 0.5, rimAt(62)), [K.x0 - 0.04, B + 0.2, K.z0 + 0.6]], sag: 0.5 });
+    made.push({ t: 'cable', room: 'signals tower', name: 'wire to the keep', pts: [[sx, D + b(0.78), sz], nwAt(210, rin - 0.05, D + 0.04), nwAt(170, rin - 0.05, D + 0.04), nwAt(128, rin - 0.05, D + 0.04), nwAt(126, rin + 0.05, rimAt(126)), nwAt(126, rin + 0.4, rimAt(126)), nwAt(100, rin + 0.45, rimAt(100)), nwAt(80, rin + 0.45, rimAt(80)), nwAt(62, rin + 0.5, rimAt(62)), [K.x0 - 0.04, B + 0.2, K.z0 + 0.6]], sag: 0.5 });
   }
 
   // ------------------------------------------------------------------ the old village on the crest
@@ -345,8 +370,9 @@ function lay(loose: Loose[]): Plan {
         made.push({ t: 'grave', room: 'village', name: 'grave', at: [x, 0, z], yaw: turn + (k ? ((k * 0.37) % 0.3) - 0.15 : 0), sits: true, ...(k ? {} : { plumb: true }) });
       }
       // (a helmet on the first of them)
-      const hl = side * (sh.w / 2 + 2.2 + GRAVE.cross), [hx, hz] = [near.x + hl * c - 6 * s, near.z - hl * s - 6 * c];
-      put('village', 'helmet_m1', hx, hz, GRAVE.high - 0.03, near.rot + 1.2, { sits: true, far: 60 });
+      // (a grave is a body's: its cross is as far from its middle, and as tall, as it was)
+      const hl = side * (sh.w / 2 + 2.2 + b(GRAVE.cross)), [hx, hz] = [near.x + hl * c - 6 * s, near.z - hl * s - 6 * c];
+      put('village', 'helmet_m1', hx, hz, b(GRAVE.high - 0.03), near.rot + 1.2, { sits: true, far: 60 });
       // the picket: past the house furthest from the fort, where the path comes up: a half round of sandbags open to the fort, a fire ring, a crate
       const last = hs.reduce((a, b) => (Math.hypot(a.x, a.z) > Math.hypot(b.x, b.z) ? a : b)), lh = HOUSES[last.n % HOUSES.length], lc = Math.cos(last.rot), ls = Math.sin(last.rot);
       const out = Math.sign(last.x * lc - last.z * ls) || 1, px = last.x + out * (lh.w / 2 + 5.5) * lc, pz = last.z - out * (lh.w / 2 + 5.5) * ls, face = Math.atan2(pz, px);
@@ -398,7 +424,8 @@ export function postLoot(p: Place, _ground?: GroundAt, loose: Loose[] = castleLo
   return plan(local(p, loose)).spots.map((s) => {
     const [x, y, z] = castleAt(p, s.x, s.z, s.y), [sx, , sz] = castleAt(p, s.surf.x, s.surf.z);
     // (every place inside the walls is of the fourth step: the owner, 2026-10-13: "castle is T4 loot"; what lies in the hamlet before the gate is the hamlet's)
-    return { x: r3(x), y: r3(y) + 0.003, z: r3(z), usage: s.usage, building: s.room === 'village' ? 'hamlet' : 'castle', floor: false, tier: s.room === 'village' ? s.tier : 4, room: s.room, ...(s.arms ? { arms: s.arms } : {}), surf: { x: sx, z: sz, rot: p.rot + s.surf.yaw, hx: s.surf.hx * CASTLE_SCALE, hz: s.surf.hz * CASTLE_SCALE, clear: s.surf.clear * CASTLE_SCALE } };
+    // (a surface is a body's: its half sizes are metres of the world as they are said, whatever the fort's scale)
+    return { x: r3(x), y: r3(y) + 0.003, z: r3(z), usage: s.usage, building: s.room === 'village' ? 'hamlet' : 'castle', floor: false, tier: s.room === 'village' ? s.tier : 4, room: s.room, ...(s.arms ? { arms: s.arms } : {}), surf: { x: sx, z: sz, rot: p.rot + s.surf.yaw, hx: s.surf.hx, hz: s.surf.hz, clear: s.surf.clear } };
   });
 }
 

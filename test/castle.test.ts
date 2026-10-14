@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { KIT_LEVELS, KIT_MERLON, cutBox, inCut, kitMatrix, kitPoint, kitSolids } from '../src/sim/kit';
 import { castleDoor, castleKit } from '../src/sim/castle';
-import { CASTLE, CASTLE_TIERS, FURNITURE, LOOSE, OUTCROP, POSTERN, UNDER, castleAt, castleCuts, castleDark, castleGround, castleHomes, castleLamps, castleLocal, castleLoose, castleLoot, castleParts, castleProps, castleUnder, hatchLine, hatchWell, inCastle, looseLocal, looseParts, moundTop, squareTouches, stairShare, towerRadius, type Flight, type Place, type Tower, type V3 } from '../src/sim/castle';
+import { CASTLE, CASTLE_SCALE, CASTLE_TIERS, FURNITURE, LOOSE, OUTCROP, POSTERN, UNDER, castleAt, castleCuts, castleDark, castleGround, castleHomes, castleLamps, castleLocal, castleLoose, castleLoot, castleParts, castleProps, castleUnder, hatchLine, hatchWell, inCastle, looseLocal, looseParts, moundTop, squareTouches, stairShare, towerRadius, type Flight, type Place, type Tower, type V3 } from '../src/sim/castle';
 import { postProps } from '../src/sim/castle-post';
 import { PAINTS, PICTURES, SHEETS, STUFF, castleShape, type Sheet, type Skin, type Solid } from '../src/world/castle-shape';
 
@@ -330,28 +330,36 @@ ok('the ways in are open: the gate from the ramp, the two doors of the keep, the
 ok('what lies in it lies where a hand can reach: on a floor, on a table, on a shelf, never in a wall', () => {
   // (the fort's own: the post's places, which have a `room`, are its own file's to check)
   const loot = castleLoot(P).filter((l) => !('room' in l)), inside = loot.filter((l) => inCastle(P, l.x, l.y, l.z));
-  assert.ok(castleLoot(P).length > loot.length && castleLoot(P).every((l) => l.building === 'castle'), 'the places of the post are not among the fort’s');
+  // (2026-10-13, the owner's: what lies in the ruined houses before the gate is the hamlet's, by name, and not the fort's)
+  assert.ok(castleLoot(P).length > loot.length && castleLoot(P).every((l) => l.building === 'castle' || l.building === 'hamlet'), 'the places of the post are not among the fort’s');
   assert.ok(inside.length >= 36 && loot.length - inside.length >= 5, `${inside.length} in the fort, ${loot.length - inside.length} in its grounds`);
-  assert.ok(loot.every((l) => l.building === 'castle' && l.usage.length > 0));
+  assert.ok(loot.every((l) => l.building === (inCastle(P, l.x, l.y, l.z) ? 'castle' : 'hamlet') && l.usage.length > 0));
   // three steps of the map in one place, and the way from the first to the last is up: the houses, the fort, what is high in it
   // (the high step is what is hardest to come at: everything under the terrace, in the dark; and at the very top
   // the rack of guns in the upper room and the wall top over the roof)
   const top = (l: { x: number; y: number; z: number }) => {
     const [x, , y] = castleLocal(P, l.x, l.y, l.z);
-    return y < -0.5 || (Math.abs(y - 5.85 - 0.995) < 0.02 && x > 2.2) || Math.abs(y - K.band) < 0.05;
+    // (a rack's shelf is a body's height over its floor, whatever the fort's scale: 0.995 m of the world)
+    return y < -0.5 || (Math.abs(y - 5.85 - 0.995 / CASTLE_SCALE) < 0.02 && x > 2.2) || Math.abs(y - K.band) < 0.05;
   };
   for (const l of loot) assert.equal(l.tier, !inCastle(P, l.x, l.y, l.z) ? CASTLE_TIERS.grounds : top(l) ? CASTLE_TIERS.high : CASTLE_TIERS.fort, `a thing at ${castleLocal(P, l.x, l.y, l.z).map((v) => v.toFixed(1))}`);
   const high = loot.filter((l) => l.tier === CASTLE_TIERS.high), deep = high.filter((l) => l.y < P.y - 0.5);
   // (the vaults are the richest of it: the armoury, whose five racks always have a gun on them, and the aid post, which has what a dressing station had)
   const arms = loot.filter((l) => l.arms === 'guns'), medic = loot.filter((l) => l.usage.includes('Medic'));
-  assert.ok(high.length >= 30 && high.length <= 38 && deep.length >= 27 && arms.length === 6 && arms.filter((l) => l.y < P.y - 0.5).length === 5 && medic.length === 10, `${high.length} places of the high step, ${deep.length} of them under the terrace; ${arms.length} that always hold a gun; ${medic.length} of the aid post's`);
+  // (2026-10-13, the owner: "castle is T4 loot": the fort's own step is the high one now, so every place in it is of the high step; there were 30 to 38 when the fort's step was the third)
+  assert.ok(CASTLE_TIERS.fort === CASTLE_TIERS.high && high.length === inside.length && deep.length >= 27 && arms.length === 6 && arms.filter((l) => l.y < P.y - 0.5).length === 5 && medic.length === 10, `${high.length} places of the high step, ${deep.length} of them under the terrace; ${arms.length} that always hold a gun; ${medic.length} of the aid post's`);
   assert.ok(deep.every((l) => castleUnder(P, l.x, l.y + 0.5, l.z)) && medic.every((l) => l.y < P.y - 0.5 && castleLocal(P, l.x, l.y, l.z)[1] > 5.5));
   assert.ok(inside.every((l) => l.usage.includes('Military') || l.usage.includes('Medic')) && loot.filter((l) => !inCastle(P, l.x, l.y, l.z)).every((l) => l.usage.includes('Hunting')));
   for (const l of inside) {
     const [x, z, y] = castleLocal(P, l.x, l.y, l.z);
     // (a hand's breadth over where it lies there is nothing: furniture stands in what stops a body, so the look is from just over it)
     for (const s of boxes) if (!s.feet && !/table|rack|bunk|bench/.test(s.name)) assert.ok(clear(s, [x, y + 0.12, z]) > 0.02, `a thing at ${x.toFixed(1)}, ${y.toFixed(1)}, ${z.toFixed(1)} is in the ${s.name}`);
-    if (l.surf) assert.ok(FURNITURE.some((f) => Math.abs(f.y + (f.kind === 'table' ? 0.8 : f.kind === 'rack' ? 0.995 : 0.46) - y) < 0.01));
+    // (the board it lies on is a body's: so many metres of the world over its floor, and the thing within the board as it is drawn)
+    if (l.surf) assert.ok(FURNITURE.some((f) => Math.abs(f.y + (f.kind === 'table' ? 0.8 : f.kind === 'rack' ? 0.995 : 0.46) / CASTLE_SCALE - y) < 0.01));
+    if (l.surf) {
+      const dx = l.x - l.surf.x, dz = l.z - l.surf.z, c = Math.cos(l.surf.rot), s = Math.sin(l.surf.rot);
+      assert.ok(Math.abs(dx * c - dz * s) < l.surf.hx - 0.1 && Math.abs(dx * s + dz * c) < l.surf.hz + 1e-6, `a thing at ${x.toFixed(1)}, ${z.toFixed(1)} is off its board`);
+    }
   }
   // no two in one place
   for (let i = 0; i < loot.length; i++) for (let j = i + 1; j < loot.length; j++) assert.ok(Math.hypot(loot[i].x - loot[j].x, loot[i].y - loot[j].y, loot[i].z - loot[j].z) > 0.3);
@@ -389,7 +397,8 @@ ok('its loose pieces go where they are put, and what is theirs goes with them', 
   const bare = castleShape(castleGround, []);
   assert.ok(Math.max(...bare.near.stone.pos.filter((_, i) => i % 3 === 0)) < 30);
   // (nor of the hatch: with none set down there is no passage)
-  assert.ok(!bare.solids.some((q) => /hatch|passage (floor|roof|wall)$/.test((q as { name: string }).name)) && castleCuts(P, undefined, []).length === 1);
+  // (two cuts are left: the slot of the stair down, and the lower levels' own plan, which lowers nothing where the hill is as low as the fort assumes)
+  assert.ok(!bare.solids.some((q) => /hatch|passage (floor|roof|wall)$/.test((q as { name: string }).name)) && castleCuts(P, undefined, []).length === 2);
   assert.ok(castleShape(castleGround, [], false).near.rock.pos.length === 0);
 });
 
@@ -588,8 +597,10 @@ ok('the ways down and the ways out: a body has room down each of them, and all t
   assert.ok(dark(0.2, UF + 1.6, 1) > 0.75 && dark(-1, UF + 1.6, 6.2) > 0.9 && dark(-7.7, UF + 1.6, 2.5) < 0.35 && dark(7.4, UF + 1.6, rz) < 0.35 && dark(-1, UF + 1.2, -7) < 0.35 && dark(0, 1.6, 0) === 0 && dark(7, 1.6, -7) === 0);
   assert.ok(dark(mid[0], mid[1] + 1, mid[2]) > 0.9 && dark(L.foot[0], L.foot[1] + 1.6, L.foot[2]) < 0.6);
   // what the ground must have done to it: taken away under the slot of the stair, under the hatch's stairwell and along every length of its passage, and nowhere else
+  // (and, last of them, the lower levels' own plan, to under their floor: it lowers nothing where the hill is as low as the fort assumes; see `castleCuts`)
   const cuts = castleCuts(P);
-  assert.equal(cuts.length, 2 + way.length - 1);
+  assert.equal(cuts.length, 3 + way.length - 1);
+  assert.ok(cuts[cuts.length - 1].to < P.y + CASTLE_SCALE * (UF - CI.deep - 0.5) && cuts[cuts.length - 1].to > P.y + CASTLE_SCALE * C.foot.east, 'the lower levels are cut for deeper than the foot the fort assumes');
   assert.ok(cuts.every((c) => c.well.length === 4) && cuts[0].to < P.y + PS.deep - 0.5 && cuts[1].to < P.y + g - H.drop);
   const lowered = (x: number, z: number) => cuts.some((c) => squareTouches(c.well, Math.floor(x / 2) * 2, Math.floor(z / 2) * 2, 2));
   for (const a of [...way, L.foot, [(L.foot[0] + L.head[0]) / 2, 0, (L.foot[2] + L.head[2]) / 2] as V3]) assert.ok(lowered(castleAt(P, a[0], a[2])[0], castleAt(P, a[0], a[2])[2]), 'the ground is not taken away over the way out');

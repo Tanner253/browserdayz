@@ -13,7 +13,7 @@
 // at the top, to within a twelfth.
 
 import { clipOut, cutPoly, inCut, kitBlocks, kitMatrix, kitPoint, kitSolids, KIT_TOWER } from '../sim/kit';
-import { CASTLE, LOOSE, UNDER, castleGround, castleKit, castleParts, hatchLine, looseParts, moundTop, rough, towerRadius, type Apron, type Beam, type Body, type Box, type Vault, type Curtain, type Flight, type Loose, type Lump, type Mound, type Opening, type Paint, type Part, type Rail, type Slab, type Tower, type V3, type Wall } from '../sim/castle';
+import { CASTLE, LOOSE, UNDER, body, castleGround, castleKit, castleParts, hatchLine, looseParts, moundTop, rough, towerRadius, type Apron, type Beam, type Body, type Box, type Vault, type Curtain, type Flight, type Loose, type Lump, type Mound, type Opening, type Paint, type Part, type Rail, type Slab, type Tower, type V3, type Wall } from '../sim/castle';
 
 export type Quat = [number, number, number, number];
 /** what a thing sounds like underfoot and when it is hit */
@@ -399,7 +399,8 @@ function beamPart(p: Beam, o: Out, put: Put) {
 }
 
 /** how high a rail's top bar is over what it stands on, and how much higher than its line what stops a body goes */
-const RAIL = { top: 0.93, mid: 0.5, over: 1.05 };
+// (a body's: so high in metres of the world, whatever the fort's scale: see `body` in src/sim/castle.ts)
+const RAIL = { top: body(0.93), mid: body(0.5), over: body(1.05) };
 /**
  * Posts and two bars from `a` to `b`. What stops a body stands straight up from the line of it, whatever the
  * slope; and up a slope it is in short lengths, each no taller than the rail is there. (As one piece from the foot

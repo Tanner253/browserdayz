@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { KIT_LEVELS } from '../src/sim/kit';
-import { CASTLE, FURNITURE, UNDER, castleAt, castleLamps, castleLocal, castleLoose, castleLoot, castleParts, castleProps, inCastle, stairShare, type Flight, type Place, type Tower, type V3 } from '../src/sim/castle';
+import { CASTLE, CASTLE_SCALE, FURNITURE, UNDER, castleAt, castleLamps, castleLocal, castleLoose, castleLoot, castleParts, castleProps, inCastle, stairShare, type Flight, type Place, type Tower, type V3 } from '../src/sim/castle';
 import { POST, postBeacon, postLamps, postLights, postLoot, postMade, postProps, postRooms, postSolids, type Room } from '../src/sim/castle-post';
 import { castleShape, castleSky, type Solid } from '../src/world/castle-shape';
 import { postCounts, postShape, type Skin } from '../src/world/castle-post-shape';
@@ -19,6 +19,10 @@ const ok = (name: string, fn: () => void) => {
 };
 
 const P: Place = { x: 310, y: 240, z: -415, rot: 0.7 }, O: Place = { x: 0, y: 0, z: 0, rot: 0 };
+/** the fort is built so much bigger than its own measure; what is a body's is not, and in the fort's own measure is so much smaller */
+const S = CASTLE_SCALE;
+/** a place in the world of a fort that stands at nothing and is not turned, in the fort's own measure */
+const own = <Q extends { x: number; y: number; z: number }>(q: Q): Q => ({ ...q, x: q.x / S, y: q.y / S, z: q.z / S });
 const C = CASTLE, K = C.keep, R = K.room, T = C.tower, [, F1, F2] = K.floors, B = K.band;
 const models = JSON.parse(fs.readFileSync(new URL('../public/assets/manifest.json', import.meta.url), 'utf8')).models as Record<string, { min: number[]; max: number[]; tris: number }>;
 const parts = castleParts(), towers = parts.filter((p): p is Tower => p.t === 'tower'), flights = parts.filter((p): p is Flight => p.t === 'flight' && !p.low);
@@ -27,8 +31,9 @@ const fort = castleShape().solids.filter((s): s is Extract<Solid, { t: 'box' }> 
 /** a block on the plan: its middle, half its size, how it is turned, from how high to how high, and what it is */
 interface Block { x: number; z: number; hx: number; hz: number; yaw: number; y0: number; y1: number; name: string; room?: Room; mine: boolean }
 const stoodBlock = (q: { kind: string; x: number; y: number; z: number; rot: number }, name: string, mine: boolean, room?: Room): Block => {
-  const e = models[q.kind.split(/[#@]/)[0]], c = Math.cos(q.rot), s = Math.sin(q.rot), mx = (e.max[0] + e.min[0]) / 2, mz = (e.max[2] + e.min[2]) / 2;
-  return { x: q.x + mx * c + mz * s, z: q.z - mx * s + mz * c, hx: (e.max[0] - e.min[0]) / 2, hz: (e.max[2] - e.min[2]) / 2, yaw: q.rot, y0: q.y + e.min[1], y1: q.y + e.max[1], name, mine, room };
+  // (a thing off the shelf is the size its model is, in metres of the world: in the fort's own measure, which is a fifth smaller, it is `/ S` of that)
+  const e = models[q.kind.split(/[#@]/)[0]], c = Math.cos(q.rot), s = Math.sin(q.rot), mx = (e.max[0] + e.min[0]) / 2 / S, mz = (e.max[2] + e.min[2]) / 2 / S;
+  return { x: q.x + mx * c + mz * s, z: q.z - mx * s + mz * c, hx: (e.max[0] - e.min[0]) / 2 / S, hz: (e.max[2] - e.min[2]) / 2 / S, yaw: q.rot, y0: q.y + e.min[1] / S, y1: q.y + e.max[1] / S, name, mine, room };
 };
 /** everything of the post that takes up room, in the fort's own measure: what is off the shelf (as big as its model) and what is made and stops a body */
 const mine: Block[] = [
@@ -41,8 +46,9 @@ const mine: Block[] = [
 const spot = (q: { kind: string; x: number; y: number; z: number }) => `${q.kind} ${q.x.toFixed(2)} ${q.y.toFixed(2)} ${q.z.toFixed(2)}`;
 const ownProps = new Set(postProps(O).map(spot));
 const theirs: Block[] = [
-  ...FURNITURE.map((f): Block => ({ x: f.x, z: f.z, hx: f.w / 2, hz: f.d / 2, yaw: f.yaw, y0: f.y, y1: f.y + (f.kind === 'table' ? 0.8 : f.kind === 'bench' ? 0.45 : f.kind === 'bunk' ? 1.75 : 1.9), name: `the fort's ${f.kind}`, mine: false })),
-  ...castleProps(O).filter((q) => !ownProps.has(spot(q)) && inCastle(O, q.x, q.y + 0.3, q.z)).map((q) => stoodBlock(q, `the fort's ${q.kind}`, false)),
+  ...FURNITURE.map((f): Block => ({ x: f.x, z: f.z, hx: f.w / 2 / S, hz: f.d / 2 / S, yaw: f.yaw, y0: f.y, y1: f.y + (f.kind === 'table' ? 0.8 : f.kind === 'bench' ? 0.45 : f.kind === 'bunk' ? 1.75 : 1.9) / S, name: `the fort's ${f.kind}`, mine: false })),
+  // (what the fort gives is places in the world: here in its own measure, as everything else in this list is)
+  ...castleProps(O).filter((q) => !ownProps.has(spot(q)) && inCastle(O, q.x, q.y + 0.3, q.z)).map((q) => stoodBlock(own(q), `the fort's ${q.kind}`, false)),
 ];
 /** how far a spot of the plan is from a block (0: in it) */
 const off = (b: Block, x: number, z: number) => {
@@ -203,35 +209,39 @@ ok('nothing of it stands in the fort, in the fort\'s own things, or in anything 
 });
 
 ok('what lies in it lies ON something, at that thing\'s height, on the step of the map its room is', () => {
-  const loot = postLoot(O), made = postMade(), BG = POST.bag;
+  // (the places are places in the world; here in the fort's own measure, as the tops they lie on are. And every top
+  // is a body's: the height of a desk, a shelf, a table, a bedroll or a course of sandbags is so many metres of the
+  // world, which in the fort's own measure is `/ S` of it; and so is how far along it a hand reaches.)
+  const loot = postLoot(O).map(own), made = postMade(), BG = POST.bag;
   // the tops there are to lie on: desks and shelves off the shelf, and what is made (a bench, a table, a wall of sandbags, a bedroll)
   const tops: { x: number; z: number; y: number; r: number; what: string }[] = [];
   for (const q of postRooms()) {
     const e = models[q.kind];
-    if (q.kind === 'metal_office_desk') tops.push({ x: q.x, z: q.z, y: q.y + e.max[1], r: 1.05, what: 'desk' });
-    if (q.kind === 'Shelf_01') for (const lv of [0.14, 0.38, 0.66, 0.94, 1.22, 1.51, 1.79]) tops.push({ x: q.x, z: q.z, y: q.y + lv, r: 0.6, what: 'shelf' });
+    if (q.kind === 'metal_office_desk') tops.push({ x: q.x, z: q.z, y: q.y + e.max[1] / S, r: 1.05 / S, what: 'desk' });
+    if (q.kind === 'Shelf_01') for (const lv of [0.14, 0.38, 0.66, 0.94, 1.22, 1.51, 1.79]) tops.push({ x: q.x, z: q.z, y: q.y + lv / S, r: 0.6 / S, what: 'shelf' });
   }
   for (const m of made) {
-    if (m.t === 'table') tops.push({ x: m.at[0], z: m.at[2], y: m.at[1] + m.h, r: m.w / 2, what: m.name });
-    if (m.t === 'bedroll') tops.push({ x: m.at[0], z: m.at[2], y: m.at[1] + 0.11, r: 0.92, what: 'bedroll' });
-    if (m.t === 'bags' && !m.sits) tops.push({ x: (m.pts[0][0] + m.pts[1][0]) / 2, z: (m.pts[0][1] + m.pts[1][1]) / 2, y: m.y + m.courses * BG.course, r: Math.hypot(m.pts[1][0] - m.pts[0][0], m.pts[1][1] - m.pts[0][1]) / 2, what: m.name });
+    if (m.t === 'table') tops.push({ x: m.at[0], z: m.at[2], y: m.at[1] + m.h / S, r: m.w / 2 / S, what: m.name });
+    if (m.t === 'bedroll') tops.push({ x: m.at[0], z: m.at[2], y: m.at[1] + 0.11 / S, r: 0.92 / S, what: 'bedroll' });
+    if (m.t === 'bags' && !m.sits) tops.push({ x: (m.pts[0][0] + m.pts[1][0]) / 2, z: (m.pts[0][1] + m.pts[1][1]) / 2, y: m.y + (m.courses * BG.course) / S, r: Math.hypot(m.pts[1][0] - m.pts[0][0], m.pts[1][1] - m.pts[0][1]) / 2, what: m.name });
   }
   for (const l of loot) {
     const on = tops.find((t) => Math.abs(t.y - l.y) < 0.012 && Math.hypot(t.x - l.x, t.z - l.z) < t.r);
     assert.ok(on, `a thing of the ${l.room} at ${l.x.toFixed(2)}, ${l.y.toFixed(2)}, ${l.z.toFixed(2)} lies on nothing`);
-    assert.ok(!l.floor && l.surf && l.building === 'castle' && inCastle(O, l.x, l.y, l.z));
+    assert.ok(!l.floor && l.surf && l.building === 'castle' && inCastle(O, l.x * S, l.y * S, l.z * S));
     // (and the room it is in over it: its surface says how much)
     assert.ok(l.surf!.clear >= 0.24);
   }
-  // by the owner's steps: the command post and the sniper's nest are of the fourth, everything else of the third; the nest's bench always has a gun
-  for (const l of loot) assert.equal(l.tier, l.room === 'command post' || l.room === "sniper's nest" ? 4 : 3, `the step of a thing in the ${l.room}`);
+  // by the owner's step (2026-10-13: "castle is T4 loot"): every place of the post inside the walls is of the fourth; the nest's bench always has a gun
+  // (as first laid out the command post and the sniper's nest were of the fourth and the other eight of the third)
+  for (const l of loot) assert.equal(l.tier, 4, `the step of a thing in the ${l.room}`);
   const by = (t: number) => loot.filter((l) => l.tier === t).length;
-  assert.deepEqual([by(3), by(4), loot.length], [8, 4, 12]);
+  assert.deepEqual([by(3), by(4), loot.length], [0, 12, 12]);
   assert.deepEqual(loot.filter((l) => l.arms).map((l) => [l.room, l.arms]), [["sniper's nest", 'guns']]);
   assert.ok(loot.every((l) => l.usage.includes('Military')));
   // no two in one place, the fort's own among them; and none in what stops a body (but the thing it lies on)
-  const all = [...loot, ...castleLoot(O).filter((l) => !('room' in l))];
-  for (let i = 0; i < loot.length; i++) for (let j = i + 1; j < all.length; j++) assert.ok(Math.hypot(all[i].x - all[j].x, all[i].y - all[j].y, all[i].z - all[j].z) > 0.3, `two things in one place in the ${loot[i].room}`);
+  const all = [...loot, ...castleLoot(O).filter((l) => !('room' in l)).map(own)];
+  for (let i = 0; i < loot.length; i++) for (let j = i + 1; j < all.length; j++) assert.ok(Math.hypot(all[i].x - all[j].x, all[i].y - all[j].y, all[i].z - all[j].z) > 0.3 / S, `two things in one place in the ${loot[i].room}`);
   for (const l of loot) for (const b of mine) if (b.y1 > l.y + 0.1 && b.y0 < l.y + 0.1) assert.ok(off(b, l.x, l.z) > 0.02 || /desk|bench|table|Shelf/.test(b.name), `a thing of the ${l.room} lies in the ${b.name}`);
   // what is searched: the commander's locker, the two crates of the dump, the crate at the picket
   const searched = new Set(['wooden_crate_01', 'wooden_military_crate', 'old_military_crate', 'weapons_case', 'steel_locker', 'med_cabinet']);

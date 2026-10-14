@@ -3,8 +3,8 @@
 // reads them as they are (test/castle-post.test.ts). Each corner carries where it is, the way it faces, where on
 // its picture it is, its colour, and for the snow whether the sky is over it (the fort's own answer: `castleSky`).
 
-import { castleGround, type Loose } from '../sim/castle';
-import { GRAVE, POST, postMade, type Made } from '../sim/castle-post';
+import { CASTLE_SCALE, castleGround, type Loose } from '../sim/castle';
+import { BODILY, GRAVE, POST, postMade, type Made } from '../sim/castle-post';
 import { castleSky } from './castle-shape';
 
 type V3 = [number, number, number];
@@ -56,8 +56,12 @@ export class Skin {
   holds = 1;
   /** or it stays in patches a pace across (a tarpaulin the wind has had): the share of the cloth that keeps it, 0 for no patches */
   patchy = 0;
+  /** what is being made now is a body's, about this spot: each corner of it is set down nearer the spot by the fort's scale (see `postShape`) */
+  about: V3 | null = null;
   get triangles() { return this.pos.length / 9; }
   private put(p: V3, n: V3, u: [number, number], c: V3) {
+    const o = this.about;
+    if (o) p = [o[0] + (p[0] - o[0]) / CASTLE_SCALE, o[1] + (p[1] - o[1]) / CASTLE_SCALE, o[2] + (p[2] - o[2]) / CASTLE_SCALE];
     this.pos.push(p[0], p[1], p[2]);
     this.nrm.push(n[0], n[1], n[2]);
     this.uv.push(u[0], u[1]);
@@ -178,10 +182,17 @@ export function farMast(k: Skin, at: V3, h: number) {
 
 /** Everything of the post that is made by hand, as skins. @param g the ground over the terrace at a spot (for what stands on it) */
 export function postShape(made: Made[], g: (x: number, z: number) => number = castleGround): Skins {
-  const hard = new Skin(), cloth = new Skin(), net = new Skin(), glow = new Skin(), BG = POST.bag;
+  const hard = new Skin(), cloth = new Skin(), net = new Skin(), glow = new Skin(), skins = [hard, cloth, net, glow];
+  // (a sandbag is a body's: a wall of them is as long as its line, of bags the size a bag is)
+  const BG = { long: POST.bag.long / CASTLE_SCALE, wide: POST.bag.wide / CASTLE_SCALE, course: POST.bag.course / CASTLE_SCALE };
   let n = 0;
   for (const m of made) {
     n++;
+    // A BODY'S (see src/sim/castle-post.ts): it is made below at the size it is said, in metres; and the whole post
+    // is drawn a fifth bigger, with the fort. So each corner of it is set down that much nearer its own spot: its
+    // place is the fort's, its size its own.
+    const own: V3 | null = BODILY.has(m.t) && 'at' in m ? (m.t === 'grave' ? [m.at[0], g(m.at[0], m.at[2]), m.at[2]] : m.at) : null;
+    for (const k of skins) k.about = own;
     if (m.t === 'mast') {
       // three legs, a rung and a brace on each side every metre, banded red and white; aerials at its head; guys to their pegs
       const M = POST.mast, r = M.side / Math.sqrt(3), leg = (s: number, y: number): V3 => [m.at[0] + Math.cos(Math.PI / 2 + (s * Math.PI * 2) / 3) * r, m.at[1] + y, m.at[2] + Math.sin(Math.PI / 2 + (s * Math.PI * 2) / 3) * r];
@@ -426,6 +437,7 @@ export function postShape(made: Made[], g: (x: number, z: number) => number = ca
       hard.box(add(m.at, [0, 0.05, 0]), [1, 0, 0], UP, [0, 0, 1], [0.04, 0.05, 0.04], PAINT.drab);
       hard.tube(add(m.at, [0, 0.1, 0]), add(m.at, [0.12, m.h, 0.05]), 0.012, 0.004, 3, PAINT.iron);
     }
+    for (const k of skins) k.about = null;
   }
   return { hard, cloth, net, glow };
 }

@@ -15,7 +15,7 @@ import os from 'node:os';
 import path from 'node:path';
 import WebSocket from 'ws';
 import { PROTOCOL, type S2C } from '../src/net/protocol';
-import { CASTLE, UNDER, castleAt, castleLoose, castleUnder, hatchLine, inCastle, looseLocal } from '../src/sim/castle';
+import { CASTLE, CASTLE_SCALE, UNDER, castleAt, castleLoose, castleUnder, hatchLine, inCastle, looseLocal } from '../src/sim/castle';
 import { generateWorld, heightAt } from '../src/world/worldgen';
 
 const PORT = 8147;
@@ -42,7 +42,8 @@ const dark: [number, number, number][] = [[0.8, -6.1, UNDER.floor], [-5, -6.1, U
 // it leaves the fort. The ground over it is cut down for it and the fort lays earth back over the cut at the height
 // the ground had: so whoever walks it is under the ground as it is SEEN, and that is what is asked here.
 const hatch = castleLoose(P).find((l) => l.kind === 'hatch')!;
-const sally = hatchLine(looseLocal(P, [hatch])[0], seen(hatch.x, hatch.z) - P.y), way = sally.path as [number, number, number][];
+// (the ground at the hatch, over the terrace, in the fort's own measure: which is a fifth smaller than the world's)
+const sally = hatchLine(looseLocal(P, [hatch])[0], (seen(hatch.x, hatch.z) - P.y) / CASTLE_SCALE), way = sally.path as [number, number, number][];
 const passage: [number, number, number][] = [];
 for (let k = 0; k + 1 < way.length; k++) {
   const a = way[k], b = way[k + 1], n = Math.max(1, Math.round(Math.hypot(b[0] - a[0], b[2] - a[2]) / 1.5));
