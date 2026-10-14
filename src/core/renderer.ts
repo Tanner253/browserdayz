@@ -89,6 +89,20 @@ export interface QualitySettings {
 /** a picture of more points than this has its corners shaded at half size (see `resize`): 1920x1200 is under it, 2560x1440 over */
 const AO_WHOLE_UP_TO = 3.0e6;
 
+/**
+ * The sun's shadow maps draw most things with one material of three's own, and three chooses that material's shader
+ * again whenever the thing it is drawn on is of another sort than the last one was (one drawn many times over, one
+ * with bones, one plain): eighteen times a frame in the street, each a sixtieth of a millisecond, and its program
+ * swapped each time. Things drawn many times over, and things with bones, are each given one of their own: the same
+ * material three's is, so nothing is drawn otherwise (see `sortShadows`).
+ */
+const SHADOW_OWN = { many: new THREE.MeshDepthMaterial(), boned: new THREE.MeshDepthMaterial() };
+/** three gives a material that is seen through where its picture is (and the like) a shadow material of its own: those are left to it */
+const shadowOfItsOwn = (m: THREE.Material) => {
+  const s = m as THREE.MeshStandardMaterial;
+  return !!((s.clipShadows && s.clippingPlanes?.length) || (s.displacementMap && s.displacementScale !== 0) || (s.alphaMap && s.alphaTest > 0) || (s.map && s.alphaTest > 0) || s.alphaToCoverage);
+};
+
 export class Renderer {
   readonly renderer: THREE.WebGLRenderer;
   readonly scene = new THREE.Scene();
@@ -593,7 +607,23 @@ export class Renderer {
   }
 
   render(dt: number) {
+    if (this.shadowsSorted-- <= 0) this.sortShadows();
     this.renderer.info.reset();
     this.composer.render(dt);
+  }
+
+  /** frames until what has come into the world since is looked at for SHADOW_OWN (a look is a twentieth of a millisecond: once a second) */
+  private shadowsSorted = 0;
+  private sortShadows() {
+    this.shadowsSorted = 60;
+    this.scene.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh || !m.castShadow) return;
+      const had = m.customDepthMaterial;
+      // (a shadow material the game gave a thing for itself is its own)
+      if (had !== undefined && had !== SHADOW_OWN.many && had !== SHADOW_OWN.boned) return;
+      const own = (m as THREE.InstancedMesh).isInstancedMesh ? SHADOW_OWN.many : (m as THREE.SkinnedMesh).isSkinnedMesh ? SHADOW_OWN.boned : undefined;
+      m.customDepthMaterial = own && !Array.isArray(m.material) && !shadowOfItsOwn(m.material) ? own : undefined;
+    });
   }
 }

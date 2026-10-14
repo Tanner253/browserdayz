@@ -29,7 +29,12 @@ export function installHarness(g: Game) {
   const anyG = g as unknown as Record<string, any>;
   const realFrame = anyG.frame.bind(g);
   let frozen = false;
+  // (when the screen's own loop last ran a frame: while it runs, the pump below turns none of its own. It turned
+  // them as well, and every test with the tab in view ran two frames to each of the screen's: every frame time
+  // measured that way was the cost of two)
+  let looped = -Infinity;
   anyG.frame = (stamp?: number) => {
+    looped = performance.now();
     if (!frozen) realFrame(stamp);
   };
   const row: Avatar[] = [];
@@ -46,7 +51,7 @@ export function installHarness(g: Game) {
       if (now - last >= 15.5) {
         last = now;
         // (a frozen game stays frozen: whatever was drawn last, a contact sheet say, is left on the screen)
-        if (!frozen) realFrame();
+        if (!frozen && now - looped > 100) realFrame();
         for (const j of [...jobs]) j.each?.();
       }
       for (let k = jobs.length - 1; k >= 0; k--) {

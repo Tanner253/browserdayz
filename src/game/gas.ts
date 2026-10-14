@@ -4,6 +4,7 @@
 // as the eye goes in under it; and what the survivor is told, on the screen and in their ears.
 
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { audio } from '../core/audio';
 import { TOUCH } from '../core/device';
 import { GAS, breathe, cloudDepth, cloudEdge, freshLungs, type GasCloud, type GasZone } from '../sim/gas';
@@ -172,6 +173,17 @@ export class Gas {
     const [bw, bh] = SIGNS.board;
     const post = new THREE.BoxGeometry(0.07, SIGNS.post, 0.07), board = new THREE.BoxGeometry(bw, bh, 0.025);
     const near = (list: { x: number; z: number }[], x: number, zz: number, r: number) => list.some((o) => Math.abs(o.x - x) < r && Math.abs(o.z - zz) < r);
+    // (Every post, every board's edge and every board's face, each made one thing where they stand: thirty-five
+    // signs were seven things each to draw (a box of six faces is six), up to a hundred and fifty of a frame's draws
+    // for eight hundred triangles, and again in every shadow map.)
+    const posts: THREE.BufferGeometry[] = [], edges: THREE.BufferGeometry[] = [], faces: THREE.BufferGeometry[] = [];
+    // (the board's six faces in the box's own order: the fifth, looking down +z, is the one painted)
+    const ix = Array.from(board.index!.array), faceIx = ix.slice(24, 30), edgeIx = [...ix.slice(0, 24), ...ix.slice(30)];
+    const placed = (geo: THREE.BufferGeometry, m: THREE.Matrix4, index?: number[]) => {
+      const out = geo.clone().applyMatrix4(m);
+      if (index) out.setIndex(index);
+      return out;
+    };
     let made = 0;
     /** one of them stood at a place, its face turned the way `a` says (0 looks south, down +z): left out where something stands there already, or the ground falls away */
     const stand = (x: number, zz: number, a: number, clear = 9) => {
@@ -179,19 +191,16 @@ export class Gas {
       const y = this.ground(x, zz);
       if (near(world.trees, x, zz, 1.6) || near(world.rocks, x, zz, 2.2) || near(world.props, x, zz, 1.6) || near(world.buildings, x, zz, clear)) return;
       if (Math.abs(this.ground(x + 1, zz) - y) + Math.abs(this.ground(x, zz + 1) - y) > 0.7) return;
-      const sign = new THREE.Group();
-      const p = new THREE.Mesh(post, wood);
-      p.position.y = SIGNS.post / 2 - 0.25;
-      const b = new THREE.Mesh(board, [back, back, back, back, face, back]);
-      b.position.set(0, SIGNS.post - 0.25 - bh / 2 - 0.04, 0.05);
-      sign.add(p, b);
+      const sign = new THREE.Object3D();
       // (none of them quite straight)
       sign.position.set(x, y, zz);
       sign.rotation.set(Math.sin(k * 7.3) * 0.035, a + Math.sin(k * 3.1) * 0.12, Math.cos(k * 5.7) * 0.045, 'YXZ');
-      sign.traverse((o) => {
-        o.castShadow = o.receiveShadow = true;
-      });
-      this.scene.add(sign);
+      sign.updateMatrix();
+      const p = new THREE.Matrix4().makeTranslation(0, SIGNS.post / 2 - 0.25, 0).premultiply(sign.matrix);
+      const b = new THREE.Matrix4().makeTranslation(0, SIGNS.post - 0.25 - bh / 2 - 0.04, 0.05).premultiply(sign.matrix);
+      posts.push(placed(post, p));
+      edges.push(placed(board, b, edgeIx));
+      faces.push(placed(board, b, faceIx));
     };
     // round it, beyond the furthest it is seen, and facing out
     const edge = z.r * (1 + GAS.skirt), ring = edge + SIGNS.out;
@@ -220,6 +229,15 @@ export class Gas {
         stand(sx, sz, Math.atan2(sx - z.x, sz - z.z), 5);
         side = -side;
       }
+    }
+    for (const [list, mat] of [[posts, wood], [edges, back], [faces, face]] as const) {
+      const all = list.length ? mergeGeometries(list, false) : null;
+      if (!all) continue;
+      const mesh = new THREE.Mesh(all, mat);
+      mesh.castShadow = mesh.receiveShadow = true;
+      mesh.matrixAutoUpdate = false;
+      mesh.name = 'gas signs';
+      this.scene.add(mesh);
     }
   }
 

@@ -3014,7 +3014,7 @@ export class Buildings {
       scene.add(board);
     }
 
-    const doorMat = this.material('planks') as THREE.MeshStandardMaterial;
+    const doorMat = this.material('planks', ' doors') as THREE.MeshStandardMaterial;
     const handleMat = new THREE.MeshStandardMaterial({ color: 0x3a3a38, metalness: 0.9, roughness: 0.45 });
     this.atmo.register(handleMat);
     // (a container's leaves: painted as the shell is, once that has come; not drawn from further off than the shell)
@@ -3112,9 +3112,10 @@ export class Buildings {
     }
   }
 
-  private matCache = new Map<MatKey, THREE.Material>();
-  private material(key: MatKey): THREE.Material {
-    let m = this.matCache.get(key);
+  private matCache = new Map<string, THREE.Material>();
+  /** @param apart a paint of its own, the same in every way (the doors' leaves, drawn many times over, are not drawn with the walls' own: three chose a shader again each time it went from the one to the other) */
+  private material(key: MatKey, apart = ''): THREE.Material {
+    let m = this.matCache.get(key + apart);
     if (m) return m;
     if (key === 'glass') {
       m = new THREE.MeshStandardMaterial({ color: 0x1d2622, roughness: 0.04, metalness: 0.1, transparent: true, opacity: 0.32, depthWrite: false, envMapIntensity: 1.6 });
@@ -3137,7 +3138,7 @@ export class Buildings {
     // the picture: the rows are not seen for it. "we are re-using the same textures too much", 2026-10-11.)
     if (key !== 'glass' && MACRO.has(key)) this.atmo.register(m, macroTone, 'macro');
     else this.atmo.register(m);
-    this.matCache.set(key, m);
+    this.matCache.set(key + apart, m);
     return m;
   }
 

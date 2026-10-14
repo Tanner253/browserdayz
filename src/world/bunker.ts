@@ -306,6 +306,19 @@ function boxGeo(w: number, h: number, d: number, per = 2.6): THREE.BoxGeometry {
   return g;
 }
 
+/** a box's faces of one paint put together, one part each (a roof of two paints was six things to draw, one a face) */
+function byPaint(g: THREE.BoxGeometry, paints: THREE.Material[]): THREE.Material[] {
+  const ix = Array.from(g.index!.array), kinds = [...new Set(paints)], order: number[] = [];
+  g.clearGroups();
+  for (const [k, p] of kinds.entries()) {
+    const from = order.length;
+    for (let f = 0; f < 6; f++) if (paints[f] === p) order.push(...ix.slice(f * 6, f * 6 + 6));
+    g.addGroup(from, order.length - from, k);
+  }
+  g.setIndex(order);
+  return kinds;
+}
+
 /** the light a steady lamp is painted as throwing on the level's plan: how far it reaches (m), and how strong it is */
 const LAMP_POOL = 7.5;
 const LAMP_GLOW = 1.6;
@@ -384,7 +397,8 @@ export class BunkerSite {
     /** a block, from corner to corner in the bunker's own measure: drawn, and solid unless told not to be */
     const block = (r0: number, r1: number, f0: number, f1: number, y0: number, y1: number, m: THREE.Material | THREE.Material[], o: { solid?: boolean; shadow?: boolean; surface?: 'concrete' | 'metal'; /** its picture is painted for it: once across each face, whatever its size */ whole?: boolean } = {}) => {
       const w = Math.abs(r1 - r0), h = Math.abs(y1 - y0), d = Math.abs(f1 - f0);
-      const mesh = new THREE.Mesh(o.whole ? new THREE.BoxGeometry(w, h, d) : boxGeo(w, h, d), m);
+      const geo = o.whole ? new THREE.BoxGeometry(w, h, d) : boxGeo(w, h, d);
+      const mesh = new THREE.Mesh(geo, Array.isArray(m) ? byPaint(geo, m) : m);
       mesh.position.set((r0 + r1) / 2, (y0 + y1) / 2, (f0 + f1) / 2);
       mesh.castShadow = o.shadow ?? false;
       mesh.receiveShadow = true;
