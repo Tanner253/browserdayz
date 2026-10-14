@@ -6,10 +6,10 @@ import type { ItemInstance } from '../src/sim/items';
 import { VOICE } from '../src/sim/voice';
 import { WEAPON_RULES, hitDamage } from '../src/sim/combat';
 import { fallen } from '../src/sim/grenades';
-import { JEEP, SEATS } from '../src/sim/vehicles';
-import { HELI } from '../src/sim/heli';
+import { JEEP, RIDE_HEIGHT, SEATS, restState, type VState } from '../src/sim/vehicles';
+import { HELI, heliCrash } from '../src/sim/heli';
 import { type CorpseInfo, type KillInfo, F_DEAD } from '../src/net/protocol';
-import { CORPSE_LIFETIME, boxes, economy, issue, jeepsDue, locks, log, tellSeats, vehicles, type Veh } from './index';
+import { CORPSE_LIFETIME, boxes, economy, issue, jeepsDue, locks, log, tellSeats, vehicles, world, type Veh } from './index';
 import { TAG_FRESH_MS, carriedTags, lootedTags, tagSeen } from './tags';
 import { CHECK, dealt } from './checks';
 import { ADMIN, fellBlast } from './gate';
@@ -131,6 +131,7 @@ export function leaveSeat(c: Client, gone = false) {
   if (!at) {
     // (not in a seat, but perhaps still the one moving a jeep they got out of)
     if (gone) for (const v of vehicles.values()) if (v.sim === c.id) {
+      if (orphanHeli(v, c)) continue;
       v.sim = null;
       v.s = [v.s[0], v.s[1], v.s[2], v.s[3], v.s[4], v.s[5], v.s[6], 0, 0, 0, 0, 0];
       tellSeats(v, true);
@@ -149,12 +150,49 @@ export function leaveSeat(c: Client, gone = false) {
     return;
   }
   // The game that was moving it goes on doing so until it has rolled to a stop (see 'vrest'):
-  // unless that game is gone, and then it stops where it was last seen.
+  // unless that game is gone, and then it stops where it was last seen (a helicopter in the air: see orphanHeli).
+  if (gone && v.sim === c.id && orphanHeli(v, c)) return;
   if (gone && v.sim === c.id) {
     v.sim = null;
     v.s = [v.s[0], v.s[1], v.s[2], v.s[3], v.s[4], v.s[5], v.s[6], 0, 0, 0, 0, 0];
     tellSeats(v, true);
   } else tellSeats(v);
+}
+
+/** which way a vehicle's nose points, as a yaw, from how it is turned (the game's yaw: 0 looks down -z) */
+const yawOf = (s: VState) => {
+  const [x, y, z, w] = [s[3], s[4], s[5], s[6]];
+  return Math.atan2(2 * (x * z + w * y), 1 - 2 * (x * x + y * y));
+};
+
+/**
+ * A helicopter in the air whose pilot has left the game with nobody aboard, so that no game moves it any more: the
+ * game of whoever is nearest takes it over, and everybody sees it come down; with nobody near enough to see it, the
+ * server sets it down where it would have fallen, as wrecked as that fall wrecks one (the owner, 2026-10-14: "a solo
+ * pilot who disconnected would crash yes?"). @returns whether it was one, and was seen to
+ */
+function orphanHeli(v: Veh, by: Client): boolean {
+  if (v.k !== HELI.kind || v.goneAt) return false;
+  const [x, y, z] = v.s, ground = world.standAt(x, y, z), fall = y - RIDE_HEIGHT - ground;
+  if (fall < 1.5) return false;
+  let near: Client | null = null, best: number = HELI.handOver;
+  for (const o of clients.values()) {
+    if (o === by || !o.alive || o.asleep) continue;
+    const d = Math.hypot(o.pose[0] - x, o.pose[2] - z);
+    if (d < best) [near, best] = [o, d];
+  }
+  if (near) {
+    v.sim = near.id;
+    v.heard = Date.now();
+    tellSeats(v);
+    return true;
+  }
+  v.sim = null;
+  v.s = restState(x, ground, z, yawOf(v.s));
+  tellSeats(v, true);
+  hurtJeep(v, heliCrash(Math.sqrt(2 * 9.81 * fall)).jeep, by);
+  log(`the helicopter ${v.i} came down ${fall.toFixed(0)} m with nobody's game to move it`);
+  return true;
 }
 
 /** a jeep is hit: what it has left, and what follows from that */

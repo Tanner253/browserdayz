@@ -59,6 +59,8 @@ export const HELI = {
   crash: 6,
   /** a crash (m/s lost in one step) from which it is hurt, and from which it is wrecked and everybody in it killed (see heliCrash) */
   wreck: [6, 14] as [number, number],
+  /** how far off the nearest player may be for their game to take over one left in the air with nobody's game moving it (see orphanHeli in server/acts.ts), metres */
+  handOver: 600,
   /** litres a minute at full power (a jeep flat out burns JEEP.burn) */
   burn: 2.4,
   /** how far over the ground its skids are when its middle is where the vehicles' own middle is said to be (RIDE_HEIGHT) */
