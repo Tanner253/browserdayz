@@ -46,7 +46,10 @@ export function installHarness(g: Game) {
     pumping = true;
     let last = 0;
     while (jobs.length) {
-      await tick();
+      // (While the screen's own loop runs, the pump waits by the clock: going round as fast as messages go it kept
+      // the page's one thread busy between frames, and every frame rate measured with it was a third too low.)
+      if (performance.now() - looped < 100) await new Promise((r) => setTimeout(r, 15));
+      else await tick();
       const now = performance.now();
       if (now - last >= 15.5) {
         last = now;
