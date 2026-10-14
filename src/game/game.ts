@@ -86,6 +86,7 @@ import { jobsFor, progress as jobDone } from '../sim/jobs';
 import type { MenuSpot } from '../ui/hud';
 import { Lamps } from './lamps';
 import { BunkerSite, spotKey } from '../world/bunker';
+import { Cellars } from './cellars';
 import { BUNKER, bunkerCrates } from '../sim/bunker';
 import { CastleSite } from '../world/castle';
 import { CASTLE_SCALE, inCastle } from '../sim/castle';
@@ -146,7 +147,7 @@ export interface TimedAction {
 }
 
 /** bump when the map's loot points change: spawned loot from older saves is re-rolled */
-export const LOOT_REV = 22;
+export const LOOT_REV = 23;
 /** where a jeep's headlamps are on it: so far either side of its middle, so far over its middle, so far forward (it is 2.08 m to its nose) */
 export const HEADLAMP = { x: 0.5, y: 0.14, z: -2.12 };
 /** and the police car's: wider apart, lower, and further forward (it is 2.58 m to its nose) */
@@ -204,6 +205,8 @@ export class Game {
   bunker!: BunkerSite;
   /** the fort on the mountain (src/world/castle.ts): none, in a world that has no place for one */
   castle: CastleSite | null = null;
+  /** the basements: their bulbs, and the dark down them (src/game/cellars.ts) */
+  cellars!: Cellars;
   /** the jeep that burns before the fort's gate, for good (./wreck-fire.ts): none, in a world that has no fort */
   wreck: WreckFire | null = null;
   /** playing alone: seconds since this game was last inside it with its door open */
@@ -381,6 +384,7 @@ export class Game {
     // (whatever is got ready after the game has loaded is got ready for the lamps lit and for the lamps out)
     r.lighting = { lit: () => this.lamps.pool.visible, as: (lit) => this.lamps.as(lit) };
     this.bunker = new BunkerSite(world, atmo, r.scene, this.s.terrain.lid);
+    this.cellars = new Cellars(r.scene, world.basements ?? []);
     // (the fort: stood where the map says, on the ground as the map has it; the earth round its hatch is drawn as the ground is)
     // (and what it draws is got ready before it is shown, as the bunker's is: a dozen kinds of surface made in the frame it first came into sight stood the game still on the way up to it)
     if (world.castle) this.castle = new CastleSite(world.castle, atmo, r.scene, { ground: (x, z) => heightAt(world.surface, x, z), earth: this.s.terrain.lid ?? undefined, ready: (o) => r.ready(o) });

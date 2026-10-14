@@ -117,12 +117,30 @@ export class Physics {
     return this.world.intersectionWithShape(center, { x: 0, y: Math.sin(half), z: 0, w: Math.cos(half) }, shape, undefined, filterGroups) !== null;
   }
 
-  raycast(origin: { x: number; y: number; z: number }, dir: { x: number; y: number; z: number }, maxToi: number, filterGroups = SHOT_GROUPS, exclude?: RAPIER.Collider) {
+  /**
+   * The ground's collider, and where it is open: over a basement's steps (src/sim/basements.ts) it is not drawn, a
+   * ray goes on through it, and the player's controller does not meet it (see Player). Said by the terrain.
+   */
+  ground: RAPIER.Collider | null = null;
+  holes: ((x: number, z: number) => boolean) | null = null;
+
+  raycast(origin: { x: number; y: number; z: number }, dir: { x: number; y: number; z: number }, maxToi: number, filterGroups = SHOT_GROUPS, exclude?: RAPIER.Collider): { collider: RAPIER.Collider; toi: number; point: { x: number; y: number; z: number }; normal: { x: number; y: number; z: number }; tag: ColliderTag | undefined } | null {
     const ray = new RAPIER.Ray(origin, dir);
     const hit = this.world.castRayAndGetNormal(ray, maxToi, true, undefined, filterGroups, exclude, undefined);
     if (!hit) return null;
     const p = ray.pointAt(hit.timeOfImpact);
+    // (the ground where it is open: on through it, as if it were not there)
+    if (hit.collider === this.ground && this.holes?.(p.x, p.z) && exclude !== this.ground) {
+      const go = hit.timeOfImpact + 0.01, on = this.raycast({ x: origin.x + dir.x * go, y: origin.y + dir.y * go, z: origin.z + dir.z * go }, dir, maxToi - go, filterGroups, this.ground);
+      return on ? { ...on, toi: on.toi + go } : null;
+    }
     return { collider: hit.collider, toi: hit.timeOfImpact, point: p, normal: hit.normal, tag: this.tagOf(hit.collider) };
+  }
+
+  /** what the player's controller is to leave out where it stands: the ground, over a basement's open steps */
+  through(x: number, z: number): ((c: RAPIER.Collider) => boolean) | undefined {
+    const g = this.ground;
+    return g && this.holes?.(x, z) ? (c) => c !== g : undefined;
   }
 }
 

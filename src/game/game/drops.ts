@@ -457,7 +457,9 @@ export const dropsMethods = {
     this.castle?.update(dt, cam.position, atmo.night, (pos, burn, colour = CRESSET.colour, reach = CRESSET.reach) => this.lamps.glow(pos, colour, burn, reach));
     // (and the jeep that burns before its gate: its flames and its smoke. Its light is the fires' own lamp: see `fires.always`.)
     this.wreck?.update(dt, cam.position);
-    const under = this.nightSight ? 0 : Math.max(bunkerDark(this.bunker.place, cam.position.x, cam.position.y, cam.position.z), castleDark(this.s.world.castle, cam.position.x, cam.position.y, cam.position.z, (x, z) => heightAt(this.s.world.surface, x, z)));
+    // the basements: the bulbs near the eye, and the dark down them
+    this.cellars.update(cam.position, this.lamps);
+    const under = this.nightSight ? 0 : Math.max(bunkerDark(this.bunker.place, cam.position.x, cam.position.y, cam.position.z), castleDark(this.s.world.castle, cam.position.x, cam.position.y, cam.position.z, (x, z) => heightAt(this.s.world.surface, x, z)), this.cellars.dark(cam.position.x, cam.position.y, cam.position.z));
     atmo.cover.ground = { sun: 1 - under, sky: 1 - 0.994 * under };
     // (And it sees indoors as it sees out of doors: "admin night vision should make it day time in buildings as
     // well so i can see in the dark without flashlight", 2026-10-13. Under a roof the day's light is the little

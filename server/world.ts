@@ -17,6 +17,7 @@ import { fireSpots } from '../src/sim/fires';
 import { gasZone } from '../src/sim/gas';
 import { standAt } from '../src/sim/bridge';
 import { castleUnder, inCastle } from '../src/sim/castle';
+import { basementDeep, basementUnder } from '../src/sim/basements';
 
 export interface CrateSpot {
   cid: string;
@@ -102,6 +103,10 @@ export function buildWorldData(root: string) {
     castle: world.castle,
     /** whether a place is in the fort's lower levels or the passage out of them: under its terrace, and it may be under the ground, by right (as the bunker is) */
     castleUnder: (x: number, y: number, z: number) => castleUnder(world.castle, x, y, z, (gx, gz) => heightAt(world.surface, gx, gz)),
+    /** whether a place is down a basement (src/sim/basements.ts: said by the plan of the houses above): under the ground by right, as the bunker is */
+    basementUnder: (x: number, y: number, z: number) => basementUnder(world.basements, x, y, z),
+    /** whether a place is on a basement's second level: what is kept there is the best kept under a house */
+    basementDeep: (x: number, y: number, z: number) => basementDeep(world.basements, x, y, z),
     /** the bridges the road goes over */
     bridges: world.bridges,
     /** somewhere open and level to set a supply drop down */

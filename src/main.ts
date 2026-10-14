@@ -173,6 +173,8 @@ async function boot() {
   stage('buildings');
   const buildings = new Buildings(world, atmo);
   buildings.plan();
+  // (the basements' steps are open in the ground: the houses are planned after the ground is made)
+  terrain.openWells(world.basements ?? []);
   buildings.build(r.scene);
   ruins?.stand(world, atmo, r, terrain, buildings);
   // (the road and the works are far outside the fort's arena: not built for a wager)

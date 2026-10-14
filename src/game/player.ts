@@ -593,13 +593,15 @@ export class Player {
     if (this.grounded && this.vel.y < 0) this.vel.y = -PRESS;
 
     const pace = { x: this.vel.x * h, z: this.vel.z * h }, wasOnGround = this.grounded;
+    // (over a basement's open steps the ground is not there: see physics.through)
+    const at = this.collider.translation(), through = physics.through(at.x, at.z);
     const desired = { x: pace.x, y: this.vel.y * h, z: pace.z };
     // On steep open ground the controller is told it may climb what is under the feet and stand on it without
     // slipping: its own two limits are what made a wall of fifty degrees and a chute of fifty-eight, and what the
     // legs can do there is decided above. Everywhere else they are what they have always been.
     this.slopes(on ? Math.min(85, Math.max(CLIMB_MAX, degOf(on.rise) + 8)) : CLIMB_MAX, on ? 86 : SLIP_MIN, !on);
     const laid = this.grounded && this.vel.y < 0 ? (on ? this.alongSteep(desired, h, on) : this.alongGround(desired, h)) : 0;
-    this.kcc.computeColliderMovement(this.collider, desired, physics.R.QueryFilterFlags.EXCLUDE_SENSORS, PLAYER_GROUPS);
+    this.kcc.computeColliderMovement(this.collider, desired, physics.R.QueryFilterFlags.EXCLUDE_SENSORS, PLAYER_GROUPS, through);
     let mv = this.kcc.computedMovement();
     // Something stood in the way (a trunk, a wall, a crate). A step laid along a slope slides
     // round such things worse than a level one, and a rising one would carry the body up their
@@ -610,7 +612,7 @@ export class Player {
       desired.x = pace.x;
       desired.y = this.vel.y * h;
       desired.z = pace.z;
-      this.kcc.computeColliderMovement(this.collider, desired, physics.R.QueryFilterFlags.EXCLUDE_SENSORS, PLAYER_GROUPS);
+      this.kcc.computeColliderMovement(this.collider, desired, physics.R.QueryFilterFlags.EXCLUDE_SENSORS, PLAYER_GROUPS, through);
       mv = this.kcc.computedMovement();
       // (On steep ground the plain step is as often the worse of the two: its press, straight down, is a pull
       // back down the hill that a slow climb cannot make head against. Whichever got further is kept.)
@@ -621,7 +623,7 @@ export class Player {
       // never left standing in front of a body as a wall.
       if (on && Math.hypot(mv.x, mv.z) < laid * 0.5) {
         const n = on.n, len = Math.hypot(pace.x, pace.z), rise = -(n.x * pace.x + n.z * pace.z) / n.y, k = rise > 0 ? len / Math.hypot(len, rise) : 1;
-        this.kcc.computeColliderMovement(this.collider, { x: pace.x * k + n.x * 0.002, y: rise * k + n.y * 0.002, z: pace.z * k + n.z * 0.002 }, physics.R.QueryFilterFlags.EXCLUDE_SENSORS, PLAYER_GROUPS);
+        this.kcc.computeColliderMovement(this.collider, { x: pace.x * k + n.x * 0.002, y: rise * k + n.y * 0.002, z: pace.z * k + n.z * 0.002 }, physics.R.QueryFilterFlags.EXCLUDE_SENSORS, PLAYER_GROUPS, through);
         const m = this.kcc.computedMovement();
         if (Math.hypot(m.x, m.z) > Math.hypot(mv.x, mv.z)) {
           mv = m;
@@ -660,7 +662,7 @@ export class Player {
         const ways = [{ x: nx * into, z: nz * into, at: true }, ...(hard ? [{ x: pace.x - nx * into, z: pace.z - nz * into, at: false }] : [])];
         for (const go of ways) {
           if (climbed || Math.hypot(go.x, go.z) < want * 0.15) continue;
-          this.kcc.computeColliderMovement(this.collider, { x: go.x, y: this.vel.y * h, z: go.z }, physics.R.QueryFilterFlags.EXCLUDE_SENSORS, PLAYER_GROUPS);
+          this.kcc.computeColliderMovement(this.collider, { x: go.x, y: this.vel.y * h, z: go.z }, physics.R.QueryFilterFlags.EXCLUDE_SENSORS, PLAYER_GROUPS, through);
           const m = this.kcc.computedMovement(), far = Math.hypot(m.x, m.z);
           // (straight at it and up onto it; or, where the step came to nothing, whichever way gets furthest)
           const up = go.at && m.y > 0.03 && far > want * 0.2;

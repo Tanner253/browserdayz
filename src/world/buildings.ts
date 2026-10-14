@@ -16,6 +16,8 @@ import { BUILDING_FOOTPRINT, CELL, TOWN, WORLD_RES, WORLD_SIZE, bunkerPlace, hei
 import { bunkerAt, bunkerPlan, levelY } from '../sim/bunker';
 import { wreckUnder } from '../sim/bridge';
 import { castleLoot, castleProps } from '../sim/castle';
+import { frameToWorld, planBasements, type RoomKind } from '../sim/basements';
+import { buildBasement, roomVolume, type Kit } from './basement-build';
 import { flatsPlan, hospitalLobbyPlan, hospitalPlan, hospitalWingPlan, policeCellsPlan, policeGaragePlan, policeHqPlan } from './big-buildings';
 
 /** (`Gas` is not a kind of building: it is whatever stands under the gas, whatever else it is. See src/sim/gas.ts.) */
@@ -46,6 +48,12 @@ export interface LootPoint {
   /** the furniture surface this point sits on: world-space centre, yaw and usable half extents */
   surf?: { x: number; z: number; rot: number; hx: number; hz: number; /** free height above the surface */ clear: number };
 }
+
+/** what a basement's room keeps, by its kind (src/sim/basements.ts): a root cellar a village's, a vault the army's */
+const CELLAR_USAGE: Record<RoomKind, Usage[]> = {
+  stair: ['Village'], shaft: ['Village'], hall: ['Village'], root: ['Village', 'Farm'], closet: ['Village'], work: ['Industrial'],
+  store: ['Farm', 'Village'], bunk: ['Military', 'Hunting'], vault: ['Military'],
+};
 
 /** props that are searched as containers (loot is inside, never lying on top) */
 export const CRATE_KINDS = new Set(['wooden_crate_01', 'wooden_military_crate', 'old_military_crate', 'weapons_case']);
@@ -669,13 +677,13 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
           { id: 'old_bed_frame', x: 0.45, z: -1.25, rot: 0 },
           { id: 'old_bed_frame', x: 2.05, z: -1.25, rot: 0 },
           { id: 'painted_wooden_cabinet', x: -6.26, z: 1.2, rot: Math.PI / 2 },
-          { id: 'Shelf_01', x: -3.73, z: 2.26, rot: Math.PI },
+          { id: 'Shelf_01', x: -3.73, z: 2.14, rot: Math.PI },
           { id: 'WoodenTable_01', x: -0.9, z: 1.5, rot: 0 },
           { id: 'painted_wooden_chair_01', x: -1.3, z: 2.02, rot: Math.PI },
           { id: 'painted_wooden_chair_01', x: -0.5, z: 0.9, rot: 0 },
           { id: 'weapons_case', x: 2.8, z: 1.9, rot: 0 },
           // the lobby
-          { id: 'Shelf_01', x: 6.0, z: 0.78, rot: Math.PI },
+          { id: 'Shelf_01', x: 6.0, z: 0.66, rot: Math.PI },
           // the store room
           { id: 'steel_frame_shelves_01', x: 6.29, z: 1.64, rot: -Math.PI / 2, scale: 0.1 },
           { id: 'wooden_crate_01', x: 5.3, z: 1.95, rot: 0 },
@@ -684,8 +692,8 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
         ],
         loot: [
           [-5.95, 0.48, -0.85], [-4.35, 0.48, -0.85], [-2.75, 0.48, -0.85], [-1.15, 0.48, -0.85], [0.45, 0.48, -0.85], [2.05, 0.48, -0.85],
-          [-6.26, 1.2, 1.2], [-3.73, 0.44, 2.21], [-3.73, 1.24, 2.21], [-1.2, 0.57, 1.5], [-0.6, 0.57, 1.5],
-          [6.0, 0.44, 0.73], [6.0, 1.24, 0.73],
+          [-6.26, 1.2, 1.2], [-3.73, 0.44, 2.09], [-3.73, 1.24, 2.09], [-1.2, 0.57, 1.5], [-0.6, 0.57, 1.5],
+          [6.0, 0.44, 0.61], [6.0, 1.24, 0.61],
           [6.29, 0.14, 1.64], [6.29, 0.74, 1.64], [6.29, 1.34, 1.64],
           [-2.0, 0.02, 0.3], [1.0, 0.02, 0.9], [-5.0, 0.02, 1.0], [4.6, 0.02, -0.6],
         ],
@@ -702,12 +710,12 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
           { side: 'right', ext: 'planks_ext', int: 'planks', openings: [win(-0.4, 0.4, 1.0, 1.8)] },
         ],
         furniture: [
-          { id: 'Shelf_01', x: -0.9, z: -1.32, rot: 0 },
+          { id: 'Shelf_01', x: -0.9, z: -1.26, rot: 0 },
           { id: 'wooden_crate_01', x: 1.15, z: -1.0, rot: 0.25 },
           // (2026-10-13: a rack down the wall that has no window in it)
           { id: 'rack_small', x: -1.47, z: 0.35, rot: Math.PI / 2, on: [2] },
         ],
-        loot: [[-0.9, 0.44, -1.36], [-0.9, 1.24, -1.36], [1.15, 0.37, -1.0], [0.6, 0.02, 0.6]],
+        loot: [[-0.9, 0.44, -1.3], [-0.9, 1.24, -1.3], [1.15, 0.37, -1.0], [0.6, 0.02, 0.6]],
         usage: ['Farm', 'Industrial'],
       };
     case 'cabin':
@@ -811,7 +819,7 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
           { id: 'old_bed_frame', x: -4.8, z: 1.7, rot: 0 },
           { id: 'old_bed_frame', x: -2.6, z: -2.5, rot: 0 },
           { id: 'painted_wooden_cabinet', x: -3.7, z: -3.2, rot: 0 },
-          { id: 'Shelf_01', x: -2.2, z: 3.5, rot: Math.PI },
+          { id: 'Shelf_01', x: -2.2, z: 3.41, rot: Math.PI },
           { id: 'painted_wooden_chair_01', x: -3.5, z: 0.2, rot: 1.3 },
           // waiting room
           { id: 'metal_office_desk', x: 3.9, z: 1.4, rot: 0 },
@@ -827,7 +835,7 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
         ],
         loot: [
           [-4.8, 0.48, -2.1], [-4.8, 0.48, 2.1], [-2.6, 0.48, -2.1], [-3.7, 1.2, -3.2],
-          [-2.2, 0.44, 3.45], [-2.2, 1.24, 3.45],
+          [-2.2, 0.44, 3.36], [-2.2, 1.24, 3.36],
           [3.4, 0.81, 1.4], [4.4, 0.81, 1.4], [4.98, 0.56, -0.1], [4.98, 1.02, -0.1], [0.85, 1.2, -3.2],
           [2.6, 0.14, -3.28], [2.6, 0.74, -3.28], [2.6, 1.34, -3.28], [3.9, 0.14, -3.28], [3.9, 0.74, -3.28], [3.9, 1.34, -3.28],
           [5.03, 0.14, -2.2], [5.03, 0.74, -2.2], [5.03, 1.34, -2.2],
@@ -850,10 +858,13 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
         furniture: [
           { id: 'metal_office_desk', x: -1.9, z: 0.3, rot: 0 },
           { id: 'metal_office_desk', x: 0.15, z: 0.3, rot: 0 },
-          { id: 'Shelf_01', x: -2.4, z: -1.08, rot: 0 },
-          { id: 'Shelf_01', x: -1.3, z: -1.08, rot: 0 },
-          { id: 'Shelf_01', x: -0.2, z: -1.08, rot: 0 },
-          { id: 'Shelf_01', x: 0.9, z: -1.08, rot: 0 },
+          // (2026-10-14: "the white shelves sink into the walls, wherever we use them": a shelf is drawn by its middle, and these
+          // and the shed's, the huts', the clinic's and the barracks' stood with their backs in the wall. Each now clear of it,
+          // its places for things moved with it.)
+          { id: 'Shelf_01', x: -2.4, z: -0.96, rot: 0 },
+          { id: 'Shelf_01', x: -1.3, z: -0.96, rot: 0 },
+          { id: 'Shelf_01', x: -0.2, z: -0.96, rot: 0 },
+          { id: 'Shelf_01', x: 0.9, z: -0.96, rot: 0 },
           { id: 'steel_frame_shelves_01', x: -4.53, z: -0.4, rot: Math.PI / 2, scale: 0.1 },
           { id: 'steel_frame_shelves_01', x: 4.53, z: 0.0, rot: -Math.PI / 2, scale: 0.1 },
           { id: 'steel_frame_shelves_01', x: 4.53, z: 1.3, rot: -Math.PI / 2, scale: 0.1 },
@@ -874,7 +885,7 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
         ],
         loot: [
           [-2.4, 0.81, 0.3], [-1.4, 0.81, 0.3], [-0.35, 0.81, 0.3], [0.65, 0.81, 0.3],
-          [-2.4, 0.44, -1.02], [-2.4, 1.24, -1.02], [-1.3, 1.24, -1.02], [-0.2, 0.44, -1.02], [0.9, 0.44, -1.02], [0.9, 1.24, -1.02],
+          [-2.4, 0.44, -0.9], [-2.4, 1.24, -0.9], [-1.3, 1.24, -0.9], [-0.2, 0.44, -0.9], [0.9, 0.44, -0.9], [0.9, 1.24, -0.9],
           [-4.53, 0.14, -0.4], [-4.53, 0.74, -0.4], [-4.53, 1.34, -0.4],
           [4.53, 0.74, 0.0], [4.53, 1.34, 0.0], [4.53, 0.14, 1.3], [4.53, 0.74, 1.3],
           [2.3, 0.56, 2.1], [2.3, 1.02, 2.1],
@@ -903,7 +914,7 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
           { id: 'old_bed_frame', x: -0.8, z: -2.0, rot: 0 },
           { id: 'old_bed_frame', x: 0.8, z: -2.0, rot: 0 },
           { id: 'painted_wooden_cabinet', x: 2.5, z: -2.75, rot: 0 },
-          { id: 'Shelf_01', x: -3.45, z: 3.03, rot: Math.PI },
+          { id: 'Shelf_01', x: -3.45, z: 2.91, rot: Math.PI },
           { id: 'WoodenTable_01', x: -2.6, z: 1.4, rot: 0 },
           { id: 'painted_wooden_chair_01', x: -2.9, z: 2.15, rot: Math.PI },
           { id: 'painted_wooden_chair_01', x: -2.2, z: 0.7, rot: 0 },
@@ -922,7 +933,7 @@ function blueprint(type: BuildingPlot['type'], rng: RNG): Blueprint {
         loot: [
           [5.0, 0.02, 0.3], [4.9, 0.02, -1.6],
           [-5.6, 0.48, -1.6], [-4.0, 0.48, -1.6], [-2.4, 0.48, -1.6], [-0.8, 0.48, -1.6], [0.8, 0.48, -1.6],
-          [2.5, 1.2, -2.75], [-3.45, 0.44, 2.98], [-3.45, 1.24, 2.98], [-2.9, 0.57, 1.4], [-2.3, 0.57, 1.4],
+          [2.5, 1.2, -2.75], [-3.45, 0.44, 2.86], [-3.45, 1.24, 2.86], [-2.9, 0.57, 1.4], [-2.3, 0.57, 1.4],
           [6.03, 0.14, -2.0], [6.03, 0.74, -2.0], [6.03, 1.34, -2.0], [6.03, 0.14, -0.7], [6.03, 0.74, -0.7], [6.03, 1.34, -0.7],
           [4.5, 0.81, 2.35], [5.5, 0.81, 2.35],
           [-0.4, 0.02, 1.6], [2.2, 0.02, 0.6], [-4.8, 0.02, 0.2],
@@ -1515,6 +1526,44 @@ export class Buildings {
         this.world.props.push(q);
       }
     }
+    // And the basements under some of the houses and the storm cellars by some barns (src/sim/basements.ts): after
+    // the fort, the last of all, so that not one place on the map is renumbered for them.
+    this.planBasements(mark);
+  }
+
+  /**
+   * The basements: what they are made of (src/world/basement-build.ts), what stands in them, and their places for
+   * things, each of the kind its room is (a root cellar's is a village's, a vault's the army's) and on the step of the
+   * map its house is on, or one or two steps better down a hideaway, a vault or a second level. Kept on the world:
+   * the ground is told where it is open, and the server who may be down there.
+   */
+  private planBasements(mark: (points: LootPoint[]) => void) {
+    const list = planBasements(this.world);
+    this.world.basements = list;
+    const kit: Kit = {
+      box: (M, key, x0, x1, y0, y1, z0, z1, solid = true) => {
+        this.push(key, boxGeo(x0, x1, y0, y1, z0, z1, this.tile(key), M));
+        if (solid) this.collider((x1 - x0) / 2, (y1 - y0) / 2, (z1 - z0) / 2, M.clone().multiply(new THREE.Matrix4().makeTranslation((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2)), MATS[key].surface);
+      },
+      flight: (M, plot, st, y0, y1, key) => void this.flight(M, plot, st, y0, y1, undefined, key),
+    };
+    const points: LootPoint[] = [], better: number[] = [];
+    for (const b of list) {
+      buildBasement(this.world, b, kit);
+      for (const r of b.rooms) if (r.kind !== 'stair') this.interiors.push(roomVolume(b, r));
+      for (const t of b.things) {
+        const [x, z] = frameToWorld(b, t.x, t.z);
+        this.world.props.push({ kind: t.id, x, y: t.y, z, rot: b.rot + t.rot, scale: 1, far: 40 });
+      }
+      for (const s of b.spots) {
+        const [x, z] = frameToWorld(b, s.x, s.z);
+        points.push({ x, y: s.y, z, usage: CELLAR_USAGE[b.rooms[s.room].kind], building: b.plot, floor: s.floor });
+        better.push(b.better[s.room]);
+      }
+    }
+    mark(points);
+    points.forEach((p, i) => (p.tier = Math.min(4, (p.tier ?? 1) + better[i]) as Tier));
+    this.lootPoints.push(...points);
   }
 
   /**

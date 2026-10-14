@@ -301,7 +301,7 @@ const UNDER = { deep: 1.1, grace: 3, void: 10, off: 8 };
 export function underCheck(c: Client, now = Date.now()) {
   const [x, y, z] = c.pose;
   const b = world.bunker;
-  const down = c.alive && !c.seatAt && !c.power.clip && roleOf(c) !== 'admin' && now >= c.check.free && y < world.coverAt(x, z) - UNDER.deep && !(b && Math.hypot(x - b.x, z - b.z) < UNDER_BUNKER) && !world.castleUnder(x, y, z);
+  const down = c.alive && !c.seatAt && !c.power.clip && roleOf(c) !== 'admin' && now >= c.check.free && y < world.coverAt(x, z) - UNDER.deep && !(b && Math.hypot(x - b.x, z - b.z) < UNDER_BUNKER) && !world.castleUnder(x, y, z) && !world.basementUnder(x, y, z);
   if (!down) {
     c.underAt = 0;
     return;

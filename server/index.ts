@@ -257,8 +257,8 @@ function fillBox(b: Box) {
   const spec = CRATE_SPECS[b.crate ?? ''];
   if (!spec) return;
   const c = new Container(b.cid, spec.label, spec.w, spec.h, [], true);
-  // (a crate under the gas, or down in the bunker, is filled with the best of everything)
-  fillCrate(c, b.crate!, Math.random, inBunker(world.bunker, b.x, b.y + 0.5, b.z) ? 'bunker' : underGas(world.gas, b.x, b.y, b.z));
+  // (a crate under the gas, down in the bunker, or on a basement's second level, is filled with the best of everything)
+  fillCrate(c, b.crate!, Math.random, inBunker(world.bunker, b.x, b.y + 0.5, b.z) ? 'bunker' : underGas(world.gas, b.x, b.y, b.z) || world.basementDeep(b.x, b.y + 0.5, b.z));
   b.items = c.serialize().items;
   for (const it of b.items) issue(it);
   b.emptiedAt = -1;

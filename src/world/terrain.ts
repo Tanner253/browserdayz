@@ -7,6 +7,7 @@ import type { Atmosphere } from './atmosphere';
 import { CRAG_MOSS, KINDS, KIND_AT, KIND_NAMES, SNOW_GROUND, layGround, type Ground, type Kind } from './ground';
 import { BELT, FORT_SNOW, RUTS, SNOW_LIFT, snowNet, snowOn, snowPicture, snowThinsGrass, snowUniforms, tellSnow } from './snow';
 import { CELL, SNOW, WORLD_RES, WORLD_SIZE, heightAt, idx, seenGround, slopeAt, type World } from './worldgen';
+import { frameToWorld, inWell, type Basement } from '../sim/basements';
 
 // The paint as it was: four layers, in the order of the splat's channels (grass, forest floor, rock, gravel), and
 // the metres each was laid to a repeat. The paint as it is now has the kinds of src/world/ground.ts, each at the
@@ -270,6 +271,36 @@ export class Terrain {
   heightTex!: THREE.DataTexture;
   /** the ground's own paint, for a lid laid over a hole in the ground (see where it is made) */
   lid: THREE.MeshStandardMaterial | null = null;
+  /**
+   * Where a basement's steps go down (src/sim/basements.ts), the ground is not drawn: each opening a turned
+   * rectangle, its middle and its turn in `uWellA` (x, z, cos, sin), its half sizes in `uWellB`. Said by `openWells`
+   * once the houses have been planned, which is after the ground is made.
+   */
+  readonly wells = {
+    uWellA: { value: Array.from({ length: MAX_WELLS }, () => new THREE.Vector4()) },
+    uWellB: { value: Array.from({ length: MAX_WELLS }, () => new THREE.Vector4()) },
+    uWells: { value: 0 },
+  };
+
+  /** the basements' open steps: not drawn, no grass within a metre of them, and the ground's collider open there (see physics.holes) */
+  openWells(list: Basement[]) {
+    const n = Math.min(list.length, MAX_WELLS);
+    for (let i = 0; i < n; i++) {
+      const b = list[i], w = b.well, [cx, cz] = frameToWorld(b, (w.x0 + w.x1) / 2, (w.z0 + w.z1) / 2);
+      this.wells.uWellA.value[i].set(cx, cz, Math.cos(b.rot), Math.sin(b.rot));
+      this.wells.uWellB.value[i].set((w.x1 - w.x0) / 2, (w.z1 - w.z0) / 2, 0, 0);
+    }
+    this.wells.uWells.value = n;
+    const g = this.grassTex.image.data as Uint8Array, N = WORLD_RES, half = WORLD_SIZE / 2;
+    for (const b of list) {
+      const [x0, z0, x1, z1] = b.box;
+      for (let iz = Math.max(0, Math.floor((z0 + half) / CELL) - 1); iz <= Math.min(N - 1, Math.ceil((z1 + half) / CELL) + 1); iz++)
+        for (let ix = Math.max(0, Math.floor((x0 + half) / CELL) - 1); ix <= Math.min(N - 1, Math.ceil((x1 + half) / CELL) + 1); ix++)
+          if (inWell([b], -half + ix * CELL, -half + iz * CELL, 1)) g[idx(ix, iz)] = 0;
+    }
+    this.grassTex.needsUpdate = true;
+    physics.holes = (x, z) => inWell(list, x, z);
+  }
   splatTex!: THREE.DataTexture;
   grassTex!: THREE.DataTexture;
   macroTex!: THREE.DataTexture;
@@ -464,12 +495,13 @@ export class Terrain {
     }
     const mat = new THREE.MeshStandardMaterial({ roughness: 1, metalness: 0 });
     const paint = (shader: Parameters<Parameters<Atmosphere['register']>[1] & {}>[0]) => {
-      Object.assign(shader.uniforms, uniforms);
+      Object.assign(shader.uniforms, uniforms, this.wells);
       shader.vertexShader = shader.vertexShader
         .replace('#include <common>', '#include <common>\nvarying vec3 vTerrainPos;\nvarying vec3 vTerrainNormal;')
         .replace('#include <begin_vertex>', '#include <begin_vertex>\nvTerrainPos = (modelMatrix * vec4(position, 1.0)).xyz;\nvTerrainNormal = normal;');
       shader.fragmentShader = shader.fragmentShader
-        .replace('#include <common>', `#include <common>\n${OLD_PAINT ? TERRAIN_PARS : GROUND_PARS}`)
+        .replace('#include <common>', `#include <common>\n${OLD_PAINT ? TERRAIN_PARS : GROUND_PARS}\n${WELL_PARS}`)
+        .replace('#include <clipping_planes_fragment>', `${WELL_CUT}\n#include <clipping_planes_fragment>`)
         .replace('#include <map_fragment>', OLD_PAINT ? TERRAIN_SAMPLE : GROUND_SAMPLE)
         .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = tRough;')
         .replace('#include <normal_fragment_maps>', OLD_PAINT ? TERRAIN_NORMAL : GROUND_NORMAL)
@@ -502,7 +534,7 @@ export class Terrain {
     const hcm = new Float32Array(N * N);
     for (let ix = 0; ix < N; ix++) for (let iz = 0; iz < N; iz++) hcm[iz + ix * N] = heights[idx(ix, iz)];
     const desc = R.ColliderDesc.heightfield(N - 1, N - 1, hcm, { x: WORLD_SIZE, y: 1, z: WORLD_SIZE });
-    physics.addStatic(desc, 'grass', { x: 0, y: 0, z: 0 });
+    physics.ground = physics.addStatic(desc, 'grass', { x: 0, y: 0, z: 0 });
   }
 
   /** dominant surface for footsteps / bullet impacts */
@@ -530,6 +562,23 @@ export class Terrain {
     return snowOn(this.world, x, heightAt(H, x, z), z) > 0.5 && slopeAt(H, x, z) <= SNOW.slope;
   }
 }
+
+/** how many basements' openings the ground's shader can leave undrawn */
+const MAX_WELLS = 48;
+const WELL_PARS = /* glsl */ `
+uniform vec4 uWellA[${MAX_WELLS}];
+uniform vec4 uWellB[${MAX_WELLS}];
+uniform int uWells;
+`;
+/** (in the frame of each opening, as src/sim/basements.ts turns a point of the world: inside it, nothing is drawn) */
+const WELL_CUT = /* glsl */ `
+for (int i = 0; i < ${MAX_WELLS}; i++) {
+  if (i >= uWells) break;
+  vec2 d = vTerrainPos.xz - uWellA[i].xy;
+  vec2 l = vec2(d.x * uWellA[i].z - d.y * uWellA[i].w, d.x * uWellA[i].w + d.y * uWellA[i].z);
+  if (abs(l.x) < uWellB[i].x && abs(l.y) < uWellB[i].y) discard;
+}
+`;
 
 const TERRAIN_PARS = /* glsl */ `
 precision highp sampler2DArray;

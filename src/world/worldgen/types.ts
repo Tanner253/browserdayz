@@ -3,6 +3,7 @@
 
 import type { Bridge } from '../../sim/bridge';
 import type { FortPlace } from '../../sim/castle';
+import type { Basement } from '../../sim/basements';
 import type { BuildingPlot, SiteKind } from './layout';
 
 /** A small place away from the village: a couple of buildings in a clearing. */
@@ -90,6 +91,8 @@ export interface World {
   /** a ruined gatehouse across a road's end (src/world/gatehouse.ts): the road's end, on its surface, and which way the road was running there (about Y: at 0 it runs toward +z). Null in a world that has none: this one has none (the one there was stood under the mountain the fort has left). */
   gatehouse: { x: number; y: number; z: number; rot: number } | null;
   buildings: BuildingPlot[];
+  /** the basements under some of the houses, and the storm cellars by some barns: said by Buildings.plan (src/sim/basements.ts), after which the game and the server ask it */
+  basements?: Basement[];
   trees: Instance[];
   rocks: Instance[];
   props: Instance[];
