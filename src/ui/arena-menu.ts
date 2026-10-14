@@ -1,0 +1,201 @@
+// The Arena's own front (2026-10-14), its menu and the screens between matches. The owner: "pretend they are 2
+// completely different games and ecoststems. arena will need its own razzle dazzle for the main menu and UI/UX".
+// Red and steel where the Zone is gold; the fort turning behind it (src/game/game/drops.ts, menuCamera). It stands in
+// for the Zone's start screen on an /arena page (that one is hidden there), and follows what the game says of it
+// through HUD.onStartShown: the matches to play or watch before anything is joined, the wait for the other players,
+// and the pause in a match. A match is gone into the way the Zone's Deploy goes in: the match put in the page's
+// address, the name given, and the same Deploy pressed (src/net/client.ts, wagerQuery).
+import './arena-menu.css';
+import { ARENA, type LobbyInfo } from '../sim/arena';
+import { KITS } from '../sim/kits';
+import { arenaBase } from '../net/client';
+import { paidLine, platformPaid } from './platform';
+import type { HUD } from './hud';
+
+const esc = (t: string) => t.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
+const kitOf = (id: string) => KITS.find((k) => k.id === id);
+
+type Panel = 'play' | 'loadouts' | 'settings' | 'payouts';
+
+export class ArenaMenu {
+  private el: HTMLDivElement;
+  private q = <T extends HTMLElement>(s: string) => this.el.querySelector(s) as T;
+  private pick = { size: 1, kills: 5, loadout: 'assault' };
+  private panel: Panel = 'play';
+  private shown = false;
+  private listT = 0;
+  private asking = false;
+  private woken = false;
+
+  constructor(private hud: HUD) {
+    document.body.classList.add('arena-mode');
+    this.el = document.createElement('div');
+    this.el.id = 'arena-menu';
+    this.el.innerHTML = `
+      <header class="am-bar">
+        <span class="am-logo">ARE<span>NA</span></span>
+        <nav class="am-nav">
+          <button type="button" data-p="play" class="on">Play</button>
+          <button type="button" data-p="loadouts">Loadouts</button>
+          <button type="button" data-p="settings">Settings</button>
+          <button type="button" data-p="payouts">Payouts</button>
+        </nav>
+        <a class="am-zona" href="/zona">ZONA</a>
+      </header>
+      <main class="am-main">
+        <section class="am-p am-play on">
+          <div class="am-left">
+            <div class="am-hero"><b>ARENA</b><span>Team against team at Orlinoye. A round ends when one side has nobody left standing; the first side to the rounds chosen wins.</span></div>
+            <label class="am-name"><span>Your name</span><input maxlength="16" spellcheck="false" autocomplete="off" placeholder="Survivor"></label>
+            <h5>Matches <em class="am-state"></em></h5>
+            <div class="am-list"></div>
+          </div>
+          <div class="am-host">
+            <h5>Host a match</h5>
+            <div class="am-seg" data-k="size">${[1, 2, 3].map((n) => `<button type="button" data-v="${n}">${n}v${n}</button>`).join('')}</div>
+            <small class="am-cap">Rounds to win</small>
+            <div class="am-seg" data-k="kills">${ARENA.kills.map((n) => `<button type="button" data-v="${n}">${n}</button>`).join('')}</div>
+            <small class="am-cap">Loadout, everybody's, every round</small>
+            <div class="am-lo">${ARENA.loadouts.map((id) => `<button type="button" data-lo="${id}">${esc(kitOf(id)?.name ?? id)}</button>`).join('')}</div>
+            <button type="button" class="am-go">Host</button>
+            <button type="button" class="am-practice">Practice alone</button>
+            <p class="am-note">No money moves yet: matches are played for nothing.</p>
+          </div>
+        </section>
+        <section class="am-p am-loadouts">
+          <h5>The loadouts</h5>
+          <div class="am-kits">${ARENA.loadouts.map((id) => `<div class="am-kit"><b>${esc(kitOf(id)?.name ?? id)}</b><span>${esc(kitOf(id)?.does ?? '')}</span></div>`).join('')}</div>
+          <p class="am-note">The host picks one for the whole match. Guns only: they empty and are reloaded (R, or the trigger on an empty gun) from rounds that never run out. Nothing to loot, carry or fill.</p>
+        </section>
+        <section class="am-p am-settings"><button type="button" class="am-back">Back</button><div class="am-set-host"></div></section>
+        <section class="am-p am-payouts">
+          <h5>Arena payouts</h5>
+          <p class="am-pay-big">None yet.</p>
+          <p class="am-note">Matches are played for nothing for now. When real stakes come, the Arena keeps its own book of what it pays, apart from the Zone's dog tags.</p>
+          <div class="am-umb" hidden></div>
+        </section>
+      </main>
+      <div class="am-wait"><b>Waiting</b><span class="am-wait-text"></span><button type="button" class="am-leave">Leave</button></div>
+      <div class="am-pause"><b>Paused</b><span>The match goes on without you.</span><button type="button" class="am-resume">Resume</button><button type="button" class="am-pause-set">Settings</button><button type="button" class="am-leave">Leave the match</button></div>`;
+    // (inside the HUD, so that the settings it lends stay in it: HUD.settingsInto)
+    hud.root.appendChild(this.el);
+    this.drawPick();
+    this.el.addEventListener('click', (e) => this.click(e));
+    this.hud.onStartShown = (on, paused, text) => this.state(on, paused, text);
+    // (and what it is doing already, if it was shown before this was made)
+    const start = document.querySelector('#hud .hud-start');
+    if (start?.classList.contains('show')) this.state(true, start.classList.contains('paused'), '');
+    void platformPaid().then((p) => {
+      if (!p) return;
+      const n = this.q<HTMLElement>('.am-umb');
+      n.innerHTML = `<b>ZONA PvP</b> has paid <em>${p.paidSol.toFixed(3)} SOL</em> to players${paidLine(p).replace(/^.*players/, '')}: the Zone ${p.zona.toFixed(3)}, the Arena ${p.arena.toFixed(3)}.`;
+      n.hidden = false;
+    });
+  }
+
+  /** what the game says its start screen is doing: shown before anything is joined, waiting for players, paused in a match, or gone */
+  private state(on: boolean, paused: boolean, text: string) {
+    this.el.classList.toggle('show', on);
+    this.el.classList.toggle('paused', on && paused);
+    this.el.classList.toggle('waiting', on && !paused && !!text);
+    // (settings opened from the pause are only open while it is)
+    if (!(on && paused)) this.el.classList.remove('pset');
+    this.q<HTMLElement>('.am-wait-text').textContent = text.replace(/^Wager:/, 'Match:');
+    if (on && !paused && !text && !this.shown) {
+      this.shown = true;
+      this.q<HTMLInputElement>('.am-name input').value = this.hud.nameValue();
+      this.show('play');
+    }
+    if (!on) this.settings(false);
+  }
+
+  private show(p: Panel) {
+    this.panel = p;
+    for (const b of this.el.querySelectorAll<HTMLElement>('.am-nav button')) b.classList.toggle('on', b.dataset.p === p);
+    for (const s of this.el.querySelectorAll<HTMLElement>('.am-p')) s.classList.toggle('on', s.classList.contains(`am-${p}`));
+    this.settings(p === 'settings');
+    if (p === 'play') void this.list();
+  }
+
+  /** the Zone's own settings, lent to this menu while it shows them (HUD.settingsInto) */
+  private settings(on: boolean) {
+    this.hud.settingsInto(on ? this.q<HTMLElement>('.am-set-host') : null);
+  }
+
+  private drawPick() {
+    for (const s of this.el.querySelectorAll<HTMLElement>('.am-seg')) for (const b of s.querySelectorAll<HTMLElement>('button')) b.classList.toggle('on', Number(b.dataset.v) === this.pick[s.dataset.k as 'size' | 'kills']);
+    for (const b of this.el.querySelectorAll<HTMLElement>('.am-lo button')) b.classList.toggle('on', b.dataset.lo === this.pick.loadout);
+  }
+
+  /** the matches, as the arena has them: asked again every few seconds while they are looked at */
+  private async list() {
+    clearTimeout(this.listT);
+    if (this.panel !== 'play' || !this.el.classList.contains('show') || this.el.classList.contains('paused') || this.el.classList.contains('waiting')) return;
+    if (this.asking) return;
+    this.asking = true;
+    const state = this.q<HTMLElement>('.am-state'), box = this.q<HTMLElement>('.am-list');
+    // (the arena sleeps when nobody has played for a while, and takes up to a minute to wake: said, not left blank)
+    if (!this.woken) state.textContent = 'waking the arena…';
+    let lobbies: LobbyInfo[] | null = null;
+    try {
+      const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 70_000);
+      const r = await fetch(`${arenaBase()}/arena/lobbies`, { cache: 'no-store', signal: ctl.signal });
+      clearTimeout(t);
+      lobbies = r.ok ? ((await r.json()) as { lobbies: LobbyInfo[] }).lobbies : null;
+    } catch {
+      lobbies = null;
+    }
+    this.asking = false;
+    if (lobbies) this.woken = true;
+    state.textContent = lobbies ? `${lobbies.length} open or being played` : 'the arena cannot be reached: trying again';
+    if (lobbies) {
+      box.innerHTML = lobbies.length
+        ? lobbies.map((l) => {
+            const kit = esc(kitOf(l.loadout)?.name ?? l.loadout), fought = l.state === 'match';
+            const act = l.state === 'open' && l.have < l.size * 2 ? `<button type="button" data-join="${esc(l.id)}">Join</button>` : fought ? `<button type="button" class="watch" data-watch="${esc(l.id)}">Watch${l.watching ? ` · ${l.watching}` : ''}</button>` : '<i>full</i>';
+            return `<div class="am-row${fought ? ' fought' : ''}"><b>${esc(l.host)}</b><span>${l.size}v${l.size}</span><span>first to ${l.kills} · ${kit}</span><em>${fought && l.score ? `${l.score[0]} : ${l.score[1]}` : `${l.have} of ${l.size * 2} in`}</em>${act}</div>`;
+          }).join('')
+        : '<p class="am-none">None open just now. Host one, and it shows here for others to join.</p>';
+    }
+    this.listT = window.setTimeout(() => void this.list(), lobbies ? 4000 : 6000);
+  }
+
+  private click(e: MouseEvent) {
+    const b = (e.target as HTMLElement).closest('button') as HTMLButtonElement | null;
+    if (!b) return;
+    if (b.dataset.p) return this.show(b.dataset.p as Panel);
+    const seg = b.closest('.am-seg') as HTMLElement | null;
+    if (seg) {
+      this.pick[seg.dataset.k as 'size' | 'kills'] = Number(b.dataset.v);
+      return this.drawPick();
+    }
+    if (b.dataset.lo) {
+      this.pick.loadout = b.dataset.lo;
+      return this.drawPick();
+    }
+    if (b.dataset.join) return this.go({ wager: b.dataset.join });
+    if (b.dataset.watch) return this.go({ wager: b.dataset.watch, watch: '1' });
+    if (b.classList.contains('am-go')) return this.go({ wager: 'new', size: String(this.pick.size), kills: String(this.pick.kills), loadout: this.pick.loadout, stake: String(ARENA.stake[0]) });
+    if (b.classList.contains('am-practice')) return this.go({ wager: 'practice', loadout: this.pick.loadout });
+    if (b.classList.contains('am-resume')) return this.hud.deploy();
+    if (b.classList.contains('am-pause-set')) {
+      this.el.classList.add('pset');
+      return this.show('settings');
+    }
+    if (b.classList.contains('am-back')) {
+      this.el.classList.remove('pset');
+      return this.settings(false);
+    }
+    // (out of a match, or out of the wait for one: the Arena's page afresh)
+    if (b.classList.contains('am-leave')) return void location.assign('/arena');
+  }
+
+  /** into a match: put in the page's address, the name given, and Deploy pressed as the Zone presses it */
+  private go(q: Record<string, string>) {
+    const name = this.q<HTMLInputElement>('.am-name input').value.trim();
+    if (name) this.hud.setName(name);
+    history.replaceState(null, '', `/arena?${new URLSearchParams(q)}`);
+    clearTimeout(this.listT);
+    this.hud.deploy();
+  }
+}

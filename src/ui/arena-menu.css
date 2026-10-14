@@ -1,0 +1,86 @@
+/* ------------------------------------------------------------ the Arena's menu (src/ui/arena-menu.ts) */
+/* on an /arena page the Zone's start screen gives way to this one */
+body.arena-mode #hud .hud-start { display: none !important; }
+
+#arena-menu { position: fixed; inset: 0; z-index: 30; display: none; pointer-events: auto; color: #f1eee6; font-family: 'Barlow Condensed', sans-serif; --red: #ff4a36; --steel: #a9b3bd; background: linear-gradient(90deg, rgba(12, 4, 4, 0.94) 0%, rgba(12, 4, 4, 0.78) 48%, rgba(12, 4, 4, 0.25) 100%); }
+#arena-menu.show { display: block; }
+.am-bar { height: 58px; display: flex; align-items: center; gap: 26px; padding: 0 28px; border-bottom: 2px solid var(--red); background: rgba(0, 0, 0, 0.5); }
+.am-logo { font-size: 34px; font-weight: 800; font-style: italic; letter-spacing: 0.22em; }
+.am-logo span { color: var(--red); }
+.am-nav { display: flex; gap: 22px; }
+.am-nav button, .am-zona { background: none; border: none; border-bottom: 2px solid transparent; padding: 6px 0; color: #d9d4c8; font: 600 18px 'Barlow Condensed', sans-serif; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; text-decoration: none; }
+.am-nav button.on, .am-nav button:hover { color: #fff; border-color: #fff; }
+.am-zona { margin-left: auto; color: #ffd35a; border: 1px solid #ffd35a; padding: 6px 14px; font-size: 15px; }
+.am-zona::before { content: '\2190  '; }
+.am-zona:hover { background: #ffd35a; color: #101211; }
+
+.am-main { position: absolute; top: 58px; left: 0; right: 0; bottom: 0; overflow: auto; padding: 26px 28px; }
+.am-p { display: none; }
+.am-p.on { display: block; }
+.am-play.on { display: grid; grid-template-columns: minmax(0, 620px) 300px; gap: 30px; align-items: start; }
+.am-hero b { display: block; font-size: 84px; font-weight: 800; font-style: italic; letter-spacing: 0.16em; line-height: 0.9; text-shadow: 0 4px 30px rgba(255, 74, 54, 0.35); }
+.am-hero span { display: block; max-width: 520px; margin: 8px 0 16px; font-size: 18px; color: #d9d4c8; }
+.am-name { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+.am-name span, .am-cap { font: 600 11px 'JetBrains Mono', monospace; letter-spacing: 0.12em; text-transform: uppercase; color: #b9b3a6; }
+.am-name input { width: 220px; background: rgba(0, 0, 0, 0.55); border: 1px solid rgba(255, 255, 255, 0.3); color: #fff; font: 600 20px 'Barlow Condensed', sans-serif; letter-spacing: 0.06em; padding: 6px 10px; }
+.am-name input:focus { outline: none; border-color: var(--red); }
+#arena-menu h5 { font: 600 12px 'JetBrains Mono', monospace; letter-spacing: 0.16em; text-transform: uppercase; color: #ff9a8d; margin: 0 0 8px; }
+#arena-menu h5 em { font-style: normal; color: #b9b3a6; margin-left: 10px; letter-spacing: 0.06em; text-transform: none; }
+.am-list { display: flex; flex-direction: column; gap: 5px; }
+.am-row { display: grid; grid-template-columns: minmax(0, 1fr) 46px minmax(0, 1.4fr) 92px 92px; gap: 10px; align-items: center; padding: 8px 10px; background: rgba(255, 255, 255, 0.06); border-left: 3px solid var(--red); font-size: 17px; }
+.am-row.fought { border-color: var(--steel); }
+.am-row b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.am-row span:nth-of-type(2) { color: #cfc9bc; font-size: 15px; }
+.am-row em { font-style: normal; font: 600 12px 'JetBrains Mono', monospace; color: #cfc9bc; text-align: right; }
+.am-row button { font: 600 13px 'Barlow Condensed', sans-serif; letter-spacing: 0.12em; text-transform: uppercase; padding: 6px 0; background: #fff; color: #111; border: none; cursor: pointer; }
+.am-row button.watch { background: none; color: #fff; border: 1px solid var(--steel); }
+.am-row i { font-style: normal; color: #8a8578; text-align: center; }
+.am-none { color: #b9b3a6; font-size: 16px; padding: 10px 0; }
+
+.am-host { background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(255, 74, 54, 0.6); padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+.am-seg { display: flex; gap: 5px; }
+.am-seg button, .am-lo button { flex: 1; background: none; border: 1px solid #555; color: #e9e4d8; font: 600 16px 'Barlow Condensed', sans-serif; letter-spacing: 0.06em; padding: 5px 0; cursor: pointer; }
+.am-seg button.on { background: var(--red); border-color: var(--red); color: #fff; }
+.am-lo { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.am-lo button { text-transform: uppercase; font-size: 14px; letter-spacing: 0.1em; }
+.am-lo button.on { border-color: #fff; background: rgba(255, 255, 255, 0.14); }
+.am-go, .am-practice, .am-wait button, .am-pause button { font: 600 17px 'Barlow Condensed', sans-serif; letter-spacing: 0.16em; text-transform: uppercase; padding: 10px 0; cursor: pointer; border: 1px solid var(--red); }
+.am-go { margin-top: 6px; background: var(--red); color: #fff; }
+.am-practice { background: none; color: #fff; }
+.am-go:hover, .am-practice:hover, .am-row button:hover { filter: brightness(1.15); }
+.am-note { font: 12px 'JetBrains Mono', monospace; color: #9a9588; line-height: 1.5; margin: 6px 0 0; max-width: 640px; }
+
+.am-kits { display: grid; grid-template-columns: repeat(2, minmax(0, 340px)); gap: 10px; }
+.am-kit { background: rgba(0, 0, 0, 0.55); border-left: 3px solid var(--red); padding: 12px 14px; }
+.am-kit b { display: block; font-size: 24px; letter-spacing: 0.1em; text-transform: uppercase; }
+.am-kit span { font-size: 16px; color: #cfc9bc; }
+.am-pay-big { font-size: 46px; font-weight: 700; letter-spacing: 0.06em; margin: 0; }
+.am-umb { margin-top: 16px; max-width: 640px; padding: 10px 14px; background: #1d1b14; border-left: 3px solid #ffd35a; font-size: 17px; }
+.am-umb b { color: #ffd35a; letter-spacing: 0.06em; }
+.am-umb em { font-style: normal; color: #ffd35a; font-weight: 700; }
+
+/* the Zone's settings, lent: shown as they are on the Zone's sheet */
+.am-set-host { max-width: 760px; height: calc(100vh - 150px); display: flex; flex-direction: column; }
+.am-set-host .pane-gfx { display: flex !important; flex: 1; flex-direction: column; min-height: 0; }
+.am-back { display: none; margin-bottom: 10px; background: none; border: 1px solid #fff; color: #fff; font: 600 14px 'Barlow Condensed', sans-serif; letter-spacing: 0.14em; text-transform: uppercase; padding: 5px 16px; cursor: pointer; }
+
+/* waiting for the other players, and the pause in a match: a card of their own, the menu behind them put away */
+.am-wait, .am-pause { display: none; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); min-width: 380px; padding: 24px 28px; background: rgba(12, 12, 12, 0.94); border-top: 4px solid var(--red); flex-direction: column; align-items: stretch; gap: 10px; text-align: center; box-shadow: 0 18px 60px #000; }
+.am-wait b, .am-pause b { font-size: 40px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; }
+.am-wait span, .am-pause span { font: 13px 'JetBrains Mono', monospace; color: #cfc9bc; }
+.am-wait button, .am-pause button { background: none; color: #fff; }
+.am-pause .am-resume { background: var(--red); }
+#arena-menu.waiting .am-wait, #arena-menu.paused:not(.pset) .am-pause { display: flex; }
+#arena-menu.waiting .am-main, #arena-menu.waiting .am-nav, #arena-menu.paused .am-nav, #arena-menu.paused:not(.pset) .am-main { display: none; }
+#arena-menu.paused, #arena-menu.waiting { background: rgba(8, 3, 3, 0.55); }
+#arena-menu.pset .am-back { display: inline-block; }
+
+@media (max-width: 900px) {
+  .am-play.on { grid-template-columns: 1fr; }
+  .am-hero b { font-size: 56px; }
+  .am-row { grid-template-columns: minmax(0, 1fr) 40px 80px 80px; }
+  .am-row span:nth-of-type(2) { display: none; }
+  .am-kits { grid-template-columns: 1fr; }
+  .am-bar { gap: 14px; padding: 0 14px; }
+  .am-nav { gap: 12px; }
+}

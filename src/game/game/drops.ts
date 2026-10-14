@@ -472,10 +472,10 @@ export const dropsMethods = {
     const fort = CUT.arena ? world.castle : null;
     const c = fort ?? world.pois[0];
     const a = now * (fort ? 0.00005 : 0.000028) + 2.2;
-    const x = c.x + Math.cos(a) * (fort ? 58 : 128);
-    const z = c.z + Math.sin(a) * (fort ? 58 : 128);
+    const x = c.x + Math.cos(a) * (fort ? 80 : 128);
+    const z = c.z + Math.sin(a) * (fort ? 80 : 128);
     const ground = fort ? fort.y - 8 : heightAt(world.heights, c.x, c.z);
-    cam.position.set(x, Math.max(ground + (fort ? 30 : 44), heightAt(world.heights, x, z) + 20), z);
+    cam.position.set(x, Math.max(ground + 44, heightAt(world.heights, x, z) + (fort ? 30 : 20)), z);
     // the menu covers the left of the screen: keep the village in the right half
     const fx = c.x - x, fz = c.z - z;
     const len = Math.hypot(fx, fz) || 1;

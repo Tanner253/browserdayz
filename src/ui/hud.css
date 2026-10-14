@@ -5,7 +5,7 @@
   pointer-events: none;
   zoom: var(--ui-zoom, 1);
 }
-#hud.hidden > *:not(.hud-start):not(.hud-dead):not(.hud-esp):not(.hud-powers) {
+#hud.hidden > *:not(.hud-start):not(.hud-dead):not(.hud-esp):not(.hud-powers):not(#arena-menu):not(.hud-howto) {
   opacity: 0 !important;
 }
 .hud-cross {
@@ -1396,17 +1396,20 @@ body.touch .set-page .gfx-range { height: 30px; }
 .sm-close:hover { color: var(--ink); border-color: var(--ink-dim); }
 .start-pane { display: none; }
 .start-brief[data-tab='map'] .pane-map, .start-brief[data-tab='brief'] .pane-brief { display: block; }
-.start-brief[data-tab='wagers'] .pane-wagers { display: block; }
-.wg-note { color: var(--ink-dim); font-size: 13px; line-height: 1.5; margin: 0 0 14px; }
-.wg-list { display: grid; gap: 6px; margin-bottom: 18px; }
-.wg-none { color: var(--ink-dim); font-size: 13px; }
-.wg-row { display: grid; grid-template-columns: 1fr 2.2fr auto auto; gap: 12px; align-items: center; padding: 8px 10px; background: rgba(255, 255, 255, 0.04); border-radius: 4px; font-size: 13px; }
-.wg-row span { color: var(--ink-dim); }
-.wg-row em { font-style: normal; font-family: var(--mono); color: var(--ink-dim); }
-.wg-row i { font-style: normal; color: var(--ink-dim); font-size: 12px; }
-.wg-row button, .wg-host { padding: 5px 14px; background: rgba(233, 196, 120, 0.16); border: 1px solid rgba(233, 196, 120, 0.5); color: #e9c478; border-radius: 3px; cursor: pointer; font: inherit; }
-.wg-host { margin-top: 12px; padding: 8px 22px; }
-.wg-stake { width: 90px; background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.15); color: var(--ink); padding: 4px 6px; font: inherit; }
+/* How to play: a card over the screen (HUD.howTo), once on the first visit; its button is there only in a game (the Esc menu) */
+.sm-howto { display: none !important; }
+.hud-start.paused .sm-howto { display: inline-block !important; }
+/* the way across to the other game */
+.sm-arena { color: #ff4a36 !important; border: 1px solid rgba(255, 74, 54, 0.6); padding: 4px 12px !important; }
+.hud-howto { position: fixed; inset: 0; z-index: 40; display: none; place-items: center; background: rgba(5, 6, 6, 0.72); pointer-events: auto; }
+.hud-howto.on { display: grid; }
+.howto-card { width: min(980px, calc(100vw - 32px)); max-height: calc(100vh - 48px); overflow: auto; background: rgba(14, 16, 15, 0.97); border-top: 3px solid #ffd35a; padding: 20px 24px 22px; box-shadow: 0 18px 60px #000; }
+.howto-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.howto-head h2 { font-size: 28px; letter-spacing: 0.1em; text-transform: uppercase; color: #ffd35a; }
+.howto-x { background: none; border: none; color: rgba(233, 228, 216, 0.62); font-size: 28px; cursor: pointer; }
+.hud-howto .pane-brief { display: block; }
+@media (min-width: 900px) { .hud-howto .pane-brief { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 22px; align-items: start; } }
+.howto-ok { margin-top: 16px; padding: 10px 30px; background: #ffd35a; color: #101211; border: none; font: 600 15px 'Barlow Condensed', sans-serif; letter-spacing: 0.14em; text-transform: uppercase; cursor: pointer; }
 
 
 /* the map: the game's own picture of it, and marks that say what they are */
@@ -2167,3 +2170,4 @@ body.touch .hud-vitals .st-fig { font-size: 12px; }
 .hud-bleed i { display: flex; }
 .hud-bleed .hb-drop, .hud-bleed.low .hb-cut { display: none; }
 .hud-bleed.low .hb-drop { display: flex; }
+.rw-umb { margin: 0 0 14px; padding: 8px 12px; background: #1d1b14; border-left: 2px solid #ffd35a; font-size: 13px; color: #e9e4d8; }

@@ -49,6 +49,14 @@
     {
       "source": "/changelog",
       "destination": "/changelog/index.html"
+    },
+    {
+      "source": "/zona",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/arena",
+      "destination": "/index.html"
     }
   ],
   "functions": {

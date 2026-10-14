@@ -6,6 +6,8 @@ import { Strips } from './core/strips';
 import { physics, GLASS_GROUPS } from './core/physics';
 import { arenaCorners, cutToArena, nearArena } from './sim/arena';
 import { wagerQuery } from './net/client';
+import { modeOf, openDoor } from './ui/door';
+import { ArenaMenu } from './ui/arena-menu';
 import { DEATHS, DIED_AT, LEAN, TOUCH, bootDone, bootStage } from './core/device';
 import { generateWorld, heightAt } from './world/worldgen';
 import { Atmosphere } from './world/atmosphere';
@@ -110,6 +112,13 @@ async function boot() {
   if (import.meta.env.DEV && new URLSearchParams(location.search).has('castle')) return (await import('./dev/castle')).castlePage();
   // (`?post`: the same fort with the army's signals post stood on it, to be looked at)
   if (import.meta.env.DEV && new URLSearchParams(location.search).has('post')) return (await import('./dev/castle-post')).postPage();
+  // the door: which game, asked before anything is built (src/ui/door.ts); an address that says goes straight in
+  let mode = modeOf(!!wagerQuery());
+  if (!mode) {
+    stage('door');
+    mode = await openDoor();
+    history.replaceState(null, '', `/${mode}${location.hash}`);
+  }
   stage('renderer');
   const r = new Renderer(canvas);
   try {
@@ -135,8 +144,8 @@ async function boot() {
   // (`?ruins`: the ruined town stood on a plain of its own in a corner of the map, to be looked at and walked in the game as it is)
   const ruins = import.meta.env.DEV && new URLSearchParams(location.search).has('ruins') ? await import('./dev/ruins') : null;
   ruins?.lay(world);
-  // (a page for a wager builds the arena and what is seen over its wall, and nothing else: src/sim/arena.ts)
-  const arena = !!wagerQuery() && !!world.castle;
+  // (the Arena's page builds the arena and what is seen over its wall, and nothing else: src/sim/arena.ts)
+  const arena = mode === 'arena' && !!world.castle;
   if (arena) cutToArena(world);
   console.log(`worldgen ${(performance.now() - t0).toFixed(0)}ms, trees ${world.trees.length}, buildings ${world.buildings.length}${arena ? ' (cut to the arena)' : ''}`);
 
@@ -179,11 +188,12 @@ async function boot() {
   stage('game');
   const game = new Game({ r, world, atmo, terrain, veg, grass, buildings });
   await game.init((l) => stage(l, l));
-  // (a wager's arena: its fort made whole now, not as somebody comes near it)
+  // (a wager's arena: its fort made whole now, not as somebody comes near it; and the Arena's own menu over it)
   if (arena && game.castle) {
     stage('fort', 'building the fort');
     await game.castle.whole();
   }
+  if (arena) new ArenaMenu(game.hud);
   stage('last files');
   await assets.idle();
   // warm up shader programs before revealing the world
@@ -194,6 +204,8 @@ async function boot() {
   if (import.meta.env.DEV) (await import('./dev/harness')).installHarness(game);
   game.start();
   game.afterBoot();
+  // (the Zone's how to play, once, on a browser's first visit)
+  if (!arena) game.hud.howTo(false);
   B.done = true;
   B.stage = 'up';
   bootDone();

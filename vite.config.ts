@@ -105,7 +105,19 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     // `npm run server` runs the game server on :8080; the dev page talks to it through here
-    proxy: { '/ws': { target: 'ws://localhost:8080', ws: true }, '/healthz': 'http://localhost:8080', '/arena': { target: 'http://localhost:8090', ws: true } },
+    // (and the arena's list and matches to the local arena on :8090, or to the one ARENA_TARGET names, as the site's own
+    // page would reach it; the Arena's page itself, /arena, is the game's page)
+    proxy: {
+      '/ws': { target: 'ws://localhost:8080', ws: true },
+      '/healthz': 'http://localhost:8080',
+      '/arena': {
+        target: process.env.ARENA_TARGET ?? 'http://localhost:8090',
+        ws: true,
+        changeOrigin: !!process.env.ARENA_TARGET,
+        ...(process.env.ARENA_TARGET ? { headers: { origin: 'https://www.zonapvp.fun' } } : {}),
+        bypass: (req) => (req.headers.accept?.includes('text/html') ? '/index.html' : undefined),
+      },
+    },
   },
   // (Written for the browsers of the last few years, and for an iPhone back to iOS 15: built for 2022's language
   // alone, the game had six things in it that an iPhone older than iOS 16.4 cannot read, and on one of those it

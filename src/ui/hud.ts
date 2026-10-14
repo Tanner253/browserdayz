@@ -2,9 +2,6 @@
 // only when relevant. Plain DOM; updated once per frame with cheap diffs.
 
 import { offer, type Offer, type Pick, type Role } from '../net/orders';
-import { ARENA, type LobbyInfo } from '../sim/arena';
-import { KITS } from '../sim/kits';
-import { arenaBase } from '../net/client';
 import { fullWanted, reloadPage, wantFull } from '../core/leave';
 import type { Vitals } from '../game/player';
 import { BLOOD } from '../sim/blood';
@@ -232,11 +229,10 @@ export class HUD {
           <div class="sm-brand"><img src="/brand/zona-mark-plain.svg" alt=""><b>ZONA</b></div>
           <nav class="sm-nav start-tabs" aria-label="Menu">
             <button type="button" data-tab="play" class="on">Play</button>
-            <button type="button" data-tab="wagers">Wagers</button>
-            <button type="button" data-tab="map">Map</button>
-            <button type="button" data-tab="brief">How to play</button>
+            <button type="button" data-tab="howto" class="sm-howto">How to play</button>
             <button type="button" data-tab="gfx">Settings</button>
             <button type="button" data-tab="rewards" hidden>Rewards</button>
+            <a class="sm-out sm-arena" href="/arena">Arena</a>
             <a class="sm-out" href="/changelog/" target="_blank" rel="noopener">Changelog</a>
             <a class="sm-out sm-pay" href="/payouts" target="_blank" rel="noopener" title="Every payment made to players, each with its transaction"><span>Payouts</span><em></em></a>
           </nav>
@@ -298,7 +294,7 @@ export class HUD {
                 <div><b>The bunker</b><span>Under the hills across the map from the works: dark, and shut. A keycard from the gas opens its door, loudly: it stays open while anybody is inside. The shotgun is kept there and nowhere else.</span></div>
               </div>
             </div>
-            <div class="start-pane pane-wagers"></div>
+
             <div class="start-pane pane-gfx start-gfx">
               <div class="set-tabs" role="tablist" aria-label="Settings">
                 <kbd class="set-key" aria-hidden="true">Q</kbd>
@@ -442,10 +438,9 @@ export class HUD {
       const tab = (e.target as HTMLElement).closest('button')?.dataset.tab;
       if (!tab) return;
       if (tab === 'rewards') this.rewardsClicked();
+      else if (tab === 'howto') this.howTo(true);
       else this.sheet(tab);
     });
-    // (back from a wager's end with "Play again": the wagers open)
-    if (new URLSearchParams(location.search).get('tab') === 'wagers') this.sheet('wagers');
     (this.root.querySelector('.sm-close') as HTMLButtonElement).onclick = () => this.sheet('play');
     (this.root.querySelector('.sm-wallet') as HTMLButtonElement).onclick = () => this.rewardsClicked();
     window.addEventListener('keydown', (e) => {
@@ -678,6 +673,56 @@ export class HUD {
       this.el.start.classList.remove('enter');
       this.sheet('play');
     }
+    this.onStartShown(on, paused, text);
+  }
+
+  /** told whenever the start screen is shown or put away (the Arena's menu stands in for it there: src/ui/arena-menu.ts) */
+  onStartShown: (on: boolean, paused: boolean, text: string) => void = () => {};
+
+  /** Deploy (or Resume) pressed, as by the button: for the Arena's menu, whose own buttons go in the same way */
+  deploy() {
+    this.startClicked();
+  }
+
+  /**
+   * The settings lent to another screen (the Arena's menu), and given back (null): the very sheet, moved, so that
+   * what is set there is set here. Shown as the settings tab shows it, on its first page.
+   */
+  settingsInto(host: HTMLElement | null) {
+    const pane = this.root.querySelector('.pane-gfx') as HTMLElement, home = this.root.querySelector('.start-brief') as HTMLElement;
+    if (host) {
+      if (pane.parentElement === host) return;
+      this.setTab(SET_TABS[0][0]);
+      host.appendChild(pane);
+    } else if (pane.parentElement !== home) home.appendChild(pane);
+  }
+
+  /**
+   * How to play, as a card over the screen (the owner: "how to play should be a popup modal shown on first visit,
+   * and maybe an option at the esc menu once youre in the game"): the brief that was a tab, lent to the card.
+   * `asked`: from the button; otherwise only on this browser's first visit.
+   */
+  howTo(asked: boolean) {
+    const SEEN = 'zona-howto-seen';
+    try {
+      if (!asked && localStorage.getItem(SEEN)) return;
+      localStorage.setItem(SEEN, '1');
+    } catch {
+      if (!asked) return;
+    }
+    let card = this.root.querySelector('.hud-howto') as HTMLElement | null;
+    if (!card) {
+      card = document.createElement('div');
+      card.className = 'hud-howto';
+      card.innerHTML = '<div class="howto-card"><div class="howto-head"><h2>How to play</h2><button type="button" class="howto-x" aria-label="Close">&times;</button></div><div class="howto-body"></div><button type="button" class="howto-ok">Got it</button></div>';
+      this.root.appendChild(card);
+      (card.querySelector('.howto-body') as HTMLElement).appendChild(this.root.querySelector('.pane-brief') as HTMLElement);
+      card.addEventListener('click', (e) => {
+        const t = e.target as HTMLElement;
+        if (t === card || t.closest('.howto-x') || t.closest('.howto-ok')) card!.classList.remove('on');
+      });
+    }
+    card.classList.add('on');
   }
 
   /** Why the server will not have this player, said under the way in for as long as it is so ('' takes it away). */
@@ -704,8 +749,7 @@ export class HUD {
     card.dataset.tab = tab;
     this.toggle(this.el.start, 'sheet', tab !== 'play');
     for (const b of this.root.querySelectorAll<HTMLButtonElement>('.start-tabs button')) b.classList.toggle('on', b.dataset.tab === tab);
-    (card.querySelector('h2') as HTMLElement).textContent = { map: 'The map', brief: 'How to play', gfx: 'Settings', wagers: 'Wagers' }[tab] ?? '';
-    if (tab === 'wagers') void this.renderWagers();
+    (card.querySelector('h2') as HTMLElement).textContent = { map: 'The map', brief: 'How to play', gfx: 'Settings' }[tab] ?? '';
     // (the settings open on their first page; the page chosen is kept for as long as they stay open)
     if (tab === 'gfx') this.setTab(SET_TABS[0][0]);
     (this.root.querySelector('.mm-tip') as HTMLElement).classList.remove('on');
@@ -1233,69 +1277,6 @@ export class HUD {
       b.classList.toggle('on', on);
       b.setAttribute('aria-selected', String(on));
     }
-  }
-
-  // ---------------------------------------------------------------- wagers
-
-  /** what the host has chosen so far (src/sim/arena.ts) */
-  private wg = { size: 1, kills: 5, loadout: 'assault', stake: 0.05 };
-  private wgBound = false;
-
-  /**
-   * The wagers (2026-10-14: team against team in the fort, rounds as in CS:GO): those open and being fought, as the
-   * game server's arena has them, and a form to host one. Hosting or joining one sets it in the page's address and
-   * presses Deploy: the game goes in to the arena as it goes in to the open world (src/net/client.ts, wagerQuery).
-   */
-  private async renderWagers() {
-    const pane = this.root.querySelector('.pane-wagers') as HTMLElement, w = this.wg;
-    const esc = (t: string) => t.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
-    const kitName = (id: string) => KITS.find((k) => k.id === id)?.name ?? id;
-    let list: LobbyInfo[] | null = null;
-    try {
-      list = ((await (await fetch(`${arenaBase()}/arena/lobbies`, { cache: 'no-store' })).json()) as { lobbies: LobbyInfo[] }).lobbies;
-    } catch {
-      list = null;
-    }
-    const opt = (k: string, v: string | number, label: string, on: boolean) => `<button type="button" data-wk="${k}" data-wv="${v}"${on ? ' class="on"' : ''}>${label}</button>`;
-    const rows = list === null ? '<p class="wg-none">The arena cannot be reached just now.</p>'
-      : !list.length ? '<p class="wg-none">None open: host one.</p>'
-      : list.map((l) => `<div class="wg-row"><b>${esc(l.host)}</b><span>${l.size}v${l.size} · first to ${l.kills} · ${esc(kitName(l.loadout))} · ${l.stake} SOL</span><em>${l.state === 'match' && l.score ? `${l.score[0]} : ${l.score[1]}` : `${l.have}/${l.size * 2}`}</em>${l.state === 'open' && l.have < l.size * 2 ? `<button type="button" data-join="${esc(l.id)}">Join</button>` : l.state === 'match' ? `<button type="button" data-watch="${esc(l.id)}">Watch${l.watching ? ` · ${l.watching}` : ''}</button>` : '<i>full</i>'}</div>`).join('');
-    pane.innerHTML =
-      '<p class="wg-note">Team against team in the fort. A round ends when a side has nobody left standing; first to the rounds asked for wins. Every hit and every health point is the server&#39;s to say. In this first version the stake is shown, and nothing is paid.</p>' +
-      `<h4 class="set-h">Open wagers</h4><div class="wg-list">${rows}</div>` +
-      '<h4 class="set-h">Host a wager</h4>' +
-      `<div class="gfx-row"><span>Teams</span><div class="gfx-opts">${[1, 2, 3].map((n) => opt('size', n, `${n}v${n}`, w.size === n)).join('')}</div></div>` +
-      `<div class="gfx-row"><span>Rounds to win</span><div class="gfx-opts">${ARENA.kills.map((n) => opt('kills', n, String(n), w.kills === n)).join('')}</div></div>` +
-      `<div class="gfx-row"><span>Loadout<small>Everybody in the match gets it, every round</small></span><div class="gfx-opts">${ARENA.loadouts.map((id) => opt('loadout', id, kitName(id), w.loadout === id)).join('')}</div></div>` +
-      `<div class="gfx-row"><span>Stake, SOL<small>Each player's, from ${ARENA.stake[0]} to ${ARENA.stake[1]} (not paid yet)</small></span><div class="gfx-opts"><input class="wg-stake" type="number" min="${ARENA.stake[0]}" max="${ARENA.stake[1]}" step="0.01" value="${w.stake}"></div></div>` +
-      '<button type="button" class="wg-host">Host it</button> <button type="button" class="wg-host wg-practice">Practice alone</button>';
-    if (this.wgBound) return;
-    this.wgBound = true;
-    const go = (q: Record<string, string>) => {
-      const p = new URLSearchParams(location.search);
-      for (const [k, v] of Object.entries(q)) p.set(k, v);
-      // (loaded again for the wager: a page for one builds the arena alone, for its frames: src/sim/arena.ts, cutToArena)
-      location.assign(`${location.pathname}?${p}${location.hash}`);
-    };
-    pane.addEventListener('click', (e) => {
-      const b = (e.target as HTMLElement).closest('button') as HTMLButtonElement | null;
-      if (!b) return;
-      if (b.dataset.wk) {
-        const k = b.dataset.wk as 'size' | 'kills' | 'loadout', v = b.dataset.wv!;
-        (this.wg as Record<string, number | string>)[k] = k === 'loadout' ? v : Number(v);
-        return void this.renderWagers();
-      }
-      if (b.dataset.join) return go({ wager: b.dataset.join });
-      // (a match being played, watched: the owner, "we should allow anyone to spectate any live game")
-      if (b.dataset.watch) return go({ wager: b.dataset.watch, watch: '1' });
-      // (the arena alone, with the loadout chosen: to learn the fort and the guns)
-      if (b.classList.contains('wg-practice')) return go({ wager: 'practice', loadout: this.wg.loadout });
-      if (b.classList.contains('wg-host')) {
-        const stake = Number((pane.querySelector('.wg-stake') as HTMLInputElement).value);
-        this.wg.stake = Math.min(ARENA.stake[1], Math.max(ARENA.stake[0], Number.isFinite(stake) ? stake : ARENA.stake[0]));
-        go({ wager: 'new', size: String(this.wg.size), kills: String(this.wg.kills), loadout: this.wg.loadout, stake: String(this.wg.stake) });
-      }
-    });
   }
 
   // ---------------------------------------------------------------- chat

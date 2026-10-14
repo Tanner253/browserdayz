@@ -326,6 +326,7 @@ function page(book: Book, s: Snapshot, now: number): string {
       <span class="pill ${state[0]}">${state[1]}</span>
       <div class="big">${amount(book.paidLamports)} <span>SOL</span></div>
       <p class="under">paid to players${wallets ? ` · ${book.paid} ${book.paid === 1 ? 'tag' : 'tags'} · ${wallets}${partial ? '+' : ''} ${wallets === 1 ? 'wallet' : 'wallets'}` : ''}</p>
+      <p class="under">all of ZONA PvP, the Zone and the Arena together: the Arena's matches are played for nothing so far</p>
       <p class="lead">Take another player's dog tag, stay alive with it for fifteen minutes, and it is cashed in. This page is the whole account of what is paid for that: nothing is paid that is not listed here, and every payment listed here is a transaction on Solana that anybody can look up. ${esc(state[2])}</p>
       ${book.claimNote ? `<div class="note"><b>Collecting creator rewards did not work the last time it was tried</b>${esc(book.claimNote)}</div>` : ''}
     </div>
@@ -440,6 +441,10 @@ export async function show(request: Request, w: World = live()): Promise<Respons
   }
   const book = await cached(w, 'book', 20_000, async () => withOldEntries(w, await glanceBook(w.store)));
   const cache = { 'cache-control': 'public, s-maxage=20, stale-while-revalidate=60' };
+  // (what the whole platform has paid players, and since when: the one line every money screen of both games shows,
+  // the owner: "the entire platform is zonapvp so it should be aknowlsegd on each respective payouts screen". The
+  // Zone's tags alone so far; the arena's wagers are added here when they pay.)
+  if (format === 'total') return Response.json({ paidSol: sol(book.paidLamports), paid: book.paid, since: book.since, zona: sol(book.paidLamports), arena: 0 }, { headers: { 'cache-control': 'public, s-maxage=60, stale-while-revalidate=300' } });
   if (format === 'json') {
     // (a tag not paid yet goes by no name here: its reference is where the receipt of its payment will be. And a
     // wallet whose tags wait to be paid together is one row here as it is one line of the page: a row like any other

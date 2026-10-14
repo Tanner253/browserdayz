@@ -3,6 +3,7 @@
 // to the server with each tag the player cashes in, where it is listed for a reward.
 
 import { TAG_HOLD, TAG_HOLD_MIN } from '../sim/items';
+import { paidLine, platformPaid } from './platform';
 
 /** whether the wallet modal and the Rewards button are shown */
 export const REWARDS_UI = true;
@@ -135,6 +136,7 @@ export class RewardsModal {
           <svg viewBox="0 0 40 32" aria-hidden="true"><path d="M8 2h30l-6 7H2z" fill="currentColor"/><path d="M2 12.5h30l6 7H8z" fill="currentColor" opacity="0.8"/><path d="M8 23h30l-6 7H2z" fill="currentColor" opacity="0.6"/></svg>
           <p>Cashed-in tags are what creator rewards will be paid on, in SOL, to the wallet you enter here.<small>Payouts roll out shortly after launch</small></p>
         </div>
+        <p class="rw-umb" hidden></p>
         <div class="rw-row">
           <input class="rw-input" placeholder="Your Solana address" maxlength="44" spellcheck="false" autocomplete="off" aria-label="Solana wallet address">
           <button class="rw-save">Save address</button>
@@ -186,6 +188,13 @@ export class RewardsModal {
     this.input.focus();
     this.runClock();
     void this.showPay();
+    // (what the whole platform has paid, as every money screen of both games says it: src/ui/platform.ts)
+    void platformPaid().then((p) => {
+      if (!p) return;
+      const n = this.root.querySelector('.rw-umb') as HTMLElement;
+      n.textContent = `ZONA PvP has paid ${paidLine(p).replace(' paid to players', ' to players')}, the Zone and the Arena together.`;
+      n.hidden = false;
+    });
   }
 
   /**
