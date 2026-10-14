@@ -1293,6 +1293,10 @@ export class Door {
     // and what hangs on them, were each made again every frame, standing still: a third of all that was.)
     this.pivot.matrixAutoUpdate = false;
     this.pivot.updateMatrix();
+    // (A door of the game's own making is drawn from DoorBatch, and its hinge holds nothing: it is not put in the
+    // world (see `build`), where every frame's two walks over all there is went through four hundred of them. Its
+    // place in the world is kept here; a bullet hole hung on it puts it in the world, see Effects.decal.)
+    this.pivot.updateMatrixWorld();
     if (leaf) leaf.mesh.traverse((o) => {
       o.matrixAutoUpdate = false;
       o.updateMatrix();
@@ -1375,6 +1379,7 @@ export class Door {
     const q = this.baseQuat.clone().multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.angle));
     this.pivot.quaternion.copy(q);
     this.pivot.updateMatrix();
+    this.pivot.updateMatrixWorld();
     this.place();
     if (teleport) this.body.setRotation(q, true);
     else this.body.setNextKinematicRotation(q);
@@ -3032,7 +3037,8 @@ export class Buildings {
     for (const s of this.doorSpecs) {
       const d = new Door(s.m, s.w, s.h, doorMat, handleMat, s.id, s.leaf === undefined ? undefined : { mesh: hang(s.leaf), surface: 'metal' });
       if (s.open) d.setOpen(true, s.swing);
-      scene.add(d.pivot);
+      // (a hinge that holds nothing is kept out of the world: see the Door's constructor)
+      if (d.pivot.children.length) scene.add(d.pivot);
       this.doors.push(d);
     }
     new DoorBatch(scene, this.doors, doorMat, handleMat);

@@ -313,7 +313,7 @@ export class Effects {
   private _q = new THREE.Quaternion();
   private _s = new THREE.Vector3();
 
-  constructor(scene: THREE.Scene, atmo: Atmosphere) {
+  constructor(private scene: THREE.Scene, atmo: Atmosphere) {
     this.fire = new Flames(scene, atmo);
     this.blasts = new Blasts(scene, atmo, this.fire);
     for (let i = 0; i < MAX_P; i++) {
@@ -821,6 +821,8 @@ export class Effects {
       hole.applyMatrix4(new THREE.Matrix4().copy(attachTo.matrixWorld).invert().multiply(this._m));
       hole.renderOrder = 3;
       attachTo.add(hole);
+      // (a door's hinge that held nothing is kept out of the world until something hangs on it: see Door)
+      if (!attachTo.parent) this.scene.add(attachTo);
       this.attached.push(hole);
       if (this.attached.length > 60) this.attached.shift()!.removeFromParent();
       return;
