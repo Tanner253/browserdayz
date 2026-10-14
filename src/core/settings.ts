@@ -48,10 +48,31 @@ export const PHONE: Omit<Graphics, 'fpsLimit' | 'volume'> = { scale: 0.85, msaa:
 /** A film (trailer.html) or a picture asked for at full (`?gfx=ultra`) is made with everything at full, as they always were. */
 const FULL = typeof location !== 'undefined' && (location.pathname.endsWith('/trailer.html') || new URLSearchParams(location.search).get('gfx') === 'ultra');
 
-/** Medium on a computer (the owner, 2026-10-14: "make default performance setting medium"; it was everything at full); a phone starts on its own setting, and the menu has the rest either way. What a player has set is kept. (One the game has already failed to start on starts on the lowest: see LEAN.) */
-export const DEFAULT_GRAPHICS: Graphics = { ...(LEAN ? PRESETS.low : TOUCH ? PHONE : FULL ? PRESETS.ultra : PRESETS.medium), fpsLimit: 0, volume: 1 };
+/**
+ * What a computer plays on (the owner, 2026-10-14: "MOST people cant handle full quality; the setup i provide here
+ * is the best balance"): the whole of the screen's pixels, no smoothing of edges, no darkening of corners, low
+ * shadows, the middle of the foliage, no limit to the frames. It is none of the presets.
+ */
+export const BALANCED: Omit<Graphics, 'fpsLimit' | 'volume'> = { scale: 1, msaa: 0, ao: 'off', shadows: 'low', foliage: 'medium' };
+
+/** That on a computer; a phone starts on its own setting, and the menu has the rest either way. (One the game has already failed to start on starts on the lowest: see LEAN.) */
+export const DEFAULT_GRAPHICS: Graphics = { ...(LEAN ? PRESETS.low : TOUCH ? PHONE : FULL ? PRESETS.ultra : BALANCED), fpsLimit: 0, volume: 1 };
 
 const STORE = 'zona.gfx';
+/**
+ * Settings given to every computer once, over whatever it had kept (its volume aside): "even returning players.
+ * only once though... if they edit it and change it then it should save for them as they changed it". A browser that
+ * has had this round is not given it again; a later round would be a higher number.
+ */
+const ROUND = 'zona.gfx.round', THIS_ROUND = 1;
+
+function giveRound() {
+  if (FULL || TOUCH || LEAN || Number(localStorage.getItem(ROUND) ?? 0) >= THIS_ROUND) return;
+  const raw = JSON.parse(localStorage.getItem(STORE) ?? 'null') as Partial<Graphics> | null;
+  const volume = raw && typeof raw.volume === 'number' && raw.volume >= 0 && raw.volume <= 1 ? raw.volume : 1;
+  localStorage.setItem(STORE, JSON.stringify({ ...BALANCED, fpsLimit: 0, volume }));
+  localStorage.setItem(ROUND, String(THIS_ROUND));
+}
 
 /** the preset these settings amount to, or null when they were mixed by hand */
 export function presetOf(g: Graphics): PresetName | null {
@@ -64,6 +85,7 @@ export function presetOf(g: Graphics): PresetName | null {
 export function loadGraphics(): Graphics {
   const g = { ...DEFAULT_GRAPHICS };
   try {
+    giveRound();
     const raw = JSON.parse(localStorage.getItem(STORE) ?? 'null') as Partial<Graphics> | null;
     if (raw && typeof raw === 'object') {
       if (SCALES.includes(raw.scale as number)) g.scale = raw.scale as number;
