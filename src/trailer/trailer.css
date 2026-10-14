@@ -570,6 +570,36 @@ body.tr-menu9 .tr-gfx, body.tr-menu9 .tr-title, body.tr-menu9 .x8-grid, body.tr-
 /* (the Arena's screen in the film: its score bar, banners, kill feed and scoreboard; not whose health or rounds, which are a player's own and these shots are nobody's eyes) */
 .tr-cut11 .arena-hud .ah-hp, .tr-cut11 .arena-hud .ah-gun { display: none !important; }
 
+/* ===== the thirteenth film: the Arena, and the wagers coming (their screens made in the Arena's look; none is in the game yet) */
+.x13-stamp { z-index: 3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3vh; opacity: var(--o, 0); background: radial-gradient(ellipse at center, rgba(8, 4, 4, 0.35), rgba(8, 4, 4, 0.7)); }
+.x13-stamp .w13-stamp { transform: rotate(-7deg) scale(var(--s, 1)); display: flex; flex-direction: column; align-items: center; padding: 1.6vh 4vh 1.3vh; border: 1.1vh double #ff4a36; color: #ff4a36; background: rgba(10, 6, 6, 0.6); font: 800 13vh 'JetBrains Mono', monospace; letter-spacing: 0.16em; line-height: 1; }
+.x13-stamp .w13-stamp small { margin-top: 1.4vh; font-size: 3.6vh; letter-spacing: 0.42em; }
+.x13-stamp .w13-line { opacity: var(--l, 0); font-size: 4.2vh; font-weight: 800; font-stretch: condensed; letter-spacing: 0.34em; color: #f3efe6; text-shadow: 0 0.3vh 1.6vh rgba(0, 0, 0, 0.8); }
+.x13-pan { z-index: 3; left: 6.5vw !important; top: 50% !important; right: auto !important; bottom: auto !important; width: 44vw; transform: translateY(-50%); opacity: var(--o, 0); display: flex; flex-direction: column; gap: 1.5vh; padding: 3.2vh 3vw 3.4vh; background: rgba(10, 7, 7, 0.88); border: 0.3vh solid #ff4a36; box-shadow: 0 1.6vh 6vh rgba(0, 0, 0, 0.7); font: 600 2.9vh 'JetBrains Mono', monospace; letter-spacing: 0.06em; text-transform: uppercase; color: #ece7db; }
+.x13-pan .w13-h { white-space: nowrap; font: 800 5.6vh 'Barlow Condensed', sans-serif; font-stretch: condensed; letter-spacing: 0.12em; color: #fff; margin-bottom: 0.6vh; }
+.x13-pan .w13-h b { color: #ff4a36; }
+.x13-pan .w13-r { display: flex; justify-content: space-between; gap: 2vw; opacity: var(--r, 1); transform: translateX(calc((1 - var(--r, 1)) * -2vw)); border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 1vh; }
+.x13-pan .w13-r span:last-child { color: #ffd35a; }
+.x13-pan .w13-r.w13-big { font-size: 3.4vh; }
+.x13-pan .w13-r.w13-gold span { color: #ffd35a; font-weight: 800; }
+.x13-pan .w13-hint { font-size: 2.2vh; color: #a9a395; letter-spacing: 0.12em; }
+.x13-pan .w13-hint:last-child:not(.on) { opacity: 0.0; }
+.x13-pan .w13-hint.on { opacity: 1; color: #7fe08a; }
+.x13-pan .w13-go { align-self: flex-start; margin-top: 1vh; padding: 1.2vh 2.4vw; background: #ff4a36; color: #fff; font-weight: 800; letter-spacing: 0.16em; transition: none; }
+.x13-pan .w13-go.on { background: #fff; color: #ff4a36; transform: scale(0.96); }
+.x13-pan.full .w13-go { background: #3a3f3b; color: #a9a395; }
+.x13-pan.full .w13-go::after { content: ' · full'; }
+.x13-pan .w13-soon { position: absolute; right: 1.6vw; top: -2.4vh; background: rgba(10, 7, 7, 0.95); transform: rotate(-6deg); padding: 0.5vh 1vw; border: 0.5vh double #ff4a36; color: #ff4a36; font-size: 2vh; font-weight: 800; letter-spacing: 0.2em; }
+.x13-pot { z-index: 3; left: 0 !important; right: 0 !important; top: 9vh !important; bottom: auto !important; display: flex; flex-direction: column; align-items: center; gap: 1vh; opacity: var(--o, 0); pointer-events: none; }
+.x13-pot b { padding: 0.6vh 1.6vw; background: #ffd35a; color: #101211; font: 800 2.8vh 'JetBrains Mono', monospace; letter-spacing: 0.14em; box-shadow: 0 0.4vh 2vh rgba(0, 0, 0, 0.6); }
+.x13-pot .w13-step { order: 2; font: 800 2.2vh 'JetBrains Mono', monospace; letter-spacing: 0.24em; color: #fff; text-shadow: 0 0.2vh 1vh rgba(0, 0, 0, 0.9); }
+.x13-end { z-index: 3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.8vh; text-transform: uppercase; opacity: var(--o, 0); background: radial-gradient(ellipse at center, rgba(8, 3, 3, 0.55), rgba(8, 3, 3, 0.9)); }
+.x13-end .c13-name { font-size: 17vh; line-height: 0.9; font-weight: 800; font-style: italic; font-stretch: condensed; letter-spacing: 0.14em; color: #fff3d6; }
+.x13-end .c13-name span { color: #ff4a36; }
+.x13-end .c13-stamp { transform: rotate(-4deg); padding: 0.8vh 2.4vw; border: 0.7vh double #ff4a36; color: #ff4a36; font: 800 4.6vh 'JetBrains Mono', monospace; letter-spacing: 0.22em; }
+.x13-end .c13-how { font-size: 2.9vh; font-weight: 700; letter-spacing: 0.24em; color: #f3efe6; }
+.x13-end .c13-url { margin-top: 1.2vh; padding: 0.32em 1.1em 0.32em 1.44em; font-size: 5vh; font-weight: 800; font-stretch: condensed; letter-spacing: 0.3em; color: #fff; background: #ff4a36; box-shadow: 0 0.2em 1.6em rgba(0, 0, 0, 0.7); }
+
 /* ===== the twelfth film: what is new */
 .x12-title { z-index: 3; display: flex; flex-direction: column; justify-content: center; padding-left: 6.6vw; text-transform: uppercase; opacity: var(--o, 1); background: linear-gradient(90deg, rgba(4, 6, 8, 0.6), rgba(4, 6, 8, 0) 60%); }
 .x12-title .t12-kick { font-size: 2.5vh; font-weight: 700; letter-spacing: 0.62em; color: #ffd35a; white-space: nowrap; }

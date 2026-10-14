@@ -571,7 +571,13 @@ async function stage() {
   S.bullet.visible = S.trail.visible = false;
   g.s.r.scene.add(S.bullet, S.trail);
 
-  if (CUT === 12) {
+  if (CUT === 13) {
+    // (the thirteenth is thirty seconds of the Arena and the wagers coming to it: see shots13.ts)
+    const cut = await import('./shots13');
+    shots = cut.buildShots(S);
+    seconds = cut.seconds13();
+    ownScore = cut.score;
+  } else if (CUT === 12) {
     // (the twelfth is thirty seconds of what is new, much of it from the tenth and eleventh: see shots12.ts)
     const cut = await import('./shots12');
     shots = cut.buildShots(S);
