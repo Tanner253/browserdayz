@@ -22,3 +22,28 @@ export function keepKeysInFullScreen() {
     else kb.unlock?.();
   });
 }
+
+const FULL = 'zona.fullscreen';
+
+/** whether full screen is wanted (Settings, Game: off until somebody asks: the owner, "fullscreen might not be what the user wants by preference"), as this browser keeps it */
+export function fullWanted(): boolean {
+  try {
+    return localStorage.getItem(FULL) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function wantFull(on: boolean) {
+  try {
+    localStorage.setItem(FULL, on ? '1' : '0');
+  } catch {
+    /* private mode */
+  }
+  if (!on && document.fullscreenElement) document.exitFullscreen().catch(() => {});
+}
+
+/** full screen, if it is wanted: asked in the click that goes into the game (a browser gives it to nothing else) */
+export function fullIfWanted() {
+  if (fullWanted() && !document.fullscreenElement) document.documentElement.requestFullscreen?.({ navigationUI: 'hide' }).catch(() => {});
+}

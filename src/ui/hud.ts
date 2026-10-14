@@ -2,7 +2,7 @@
 // only when relevant. Plain DOM; updated once per frame with cheap diffs.
 
 import { offer, type Offer, type Pick, type Role } from '../net/orders';
-import { reloadPage } from '../core/leave';
+import { fullWanted, reloadPage, wantFull } from '../core/leave';
 import type { Vitals } from '../game/player';
 import { BLOOD } from '../sim/blood';
 import { bleedLevel } from './status';
@@ -1138,6 +1138,11 @@ export class HUD {
   private setGraphic(key: string, value: string) {
     const g = this.gfx;
     // (the numbers beside the status symbols are no setting of the picture's: kept by themselves, and nothing is drawn afresh for them)
+    // (full screen, likewise: kept by itself, and asked for the next time the game is clicked into)
+    if (key === 'full') {
+      wantFull(value === '1');
+      return this.renderGraphics();
+    }
     if (key === 'figures') {
       wantFigures(value === '1');
       this.status.figures = value === '1';
@@ -1188,7 +1193,9 @@ export class HUD {
     const c = controls();
     const pages: Record<SetTab, string> = {
       // (health, blood, food and water are symbols: whoever wants the numbers as well asks for them here)
-      game: row('Status: exact figures', 'figures', figuresWanted() ? 1 : 0, [[0, 'Off'], [1, 'On']], 'The numbers beside health, blood, food and water'),
+      game:
+        row('Status: exact figures', 'figures', figuresWanted() ? 1 : 0, [[0, 'Off'], [1, 'On']], 'The numbers beside health, blood, food and water') +
+        (TOUCH ? '' : row('Full screen', 'full', fullWanted() ? 1 : 0, [[0, 'Off'], [1, 'On']], 'Fills the screen when you click in, and keeps Ctrl + W from closing the tab (Chrome and Edge)')),
       controls:
         `<h4 class="set-h">${TOUCH ? 'Look' : 'Mouse'}</h4>` +
         slide(TOUCH ? 'Look sensitivity' : 'Mouse sensitivity', 'sens', c.sens, [SENS.least, SENS.most, SENS.step], `${c.sens.toFixed(2)}×`) +

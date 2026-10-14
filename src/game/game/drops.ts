@@ -3,6 +3,7 @@
 // Game.prototype as the file loads. Nothing in them was changed but `this: Game` said as the first parameter.)
 
 import * as THREE from 'three';
+import { fullIfWanted } from '../../core/leave';
 import { physics, SOLID_GROUPS } from '../../core/physics';
 import { assets } from '../../core/assets';
 import { audio } from '../../core/audio';
@@ -334,7 +335,7 @@ export const dropsMethods = {
         .requestFullscreen?.({ navigationUI: 'hide' })
         .then(() => orient?.lock?.('landscape'))
         .catch(() => {});
-    }
+    } else if (!TOUCH) fullIfWanted();
     // capture the mouse in the same click; play begins once we are in the world and locked
     if (!this.input.locked) this.input.lock();
     if (!this.started) {
