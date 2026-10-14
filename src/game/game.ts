@@ -88,6 +88,7 @@ import { BUNKER, bunkerCrates } from '../sim/bunker';
 import { CastleSite } from '../world/castle';
 import { CASTLE_SCALE, inCastle } from '../sim/castle';
 import { WreckFire } from './wreck-fire';
+import { helipads } from '../world/helipad';
 import { enterMethods } from './game/enter';
 import { onlineMethods } from './game/online';
 import { dropsMethods } from './game/drops';
@@ -405,6 +406,8 @@ export class Game {
     // the street lamps: where the head of each is
     for (const q of world.props) if (q.kind.startsWith('street_lamp')) this.streetLamps.push(new THREE.Vector3(q.x, q.y + 3.55 * (q.scale ?? 1), q.z));
     this.hearths = new Hearths(this.fires.spots);
+    // the helicopters' pads: on the hospital's roof, and by the fort (src/world/helipad.ts)
+    for (const pad of helipads(world, (m) => atmo.register(m))) r.scene.add(pad);
     progress('loading loot');
     this.loot = new LootManager(r.scene, atmo, buildings.lootPoints);
     this.airdrops = new Airdrops(r.scene, {
