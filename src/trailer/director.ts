@@ -450,6 +450,14 @@ async function stage() {
   g.input.unlock = () => {};
   // (the third cut's hero has a name, and the voice that goes with it)
   if (CUT === 3 || CUT === 4) setPlayerName('Sable');
+  // (the guns are built behind the menu now, Game.loaded: a film waits for them, its clock let run meanwhile, or its
+  // people stand with nothing in their hands)
+  g.buildBehind?.();
+  for (let i = 0; i < 1800 && g.isLoaded === false; i++) {
+    clock.advance(1000 / 60);
+    await realSleep(20);
+  }
+  if (g.isLoaded === false) console.log('[tr] the guns were not built in time');
   // the world: the game's own single-player one, from the same seed every take
   clock.reseed(7001);
   await g.enterOffline();
@@ -563,7 +571,13 @@ async function stage() {
   S.bullet.visible = S.trail.visible = false;
   g.s.r.scene.add(S.bullet, S.trail);
 
-  if (CUT === 10) {
+  if (CUT === 11) {
+    // (the eleventh is ten seconds of the Arena, on the ninth's band: see shots11.ts)
+    const cut = await import('./shots11');
+    shots = cut.buildShots(S);
+    seconds = cut.seconds11();
+    ownScore = cut.score;
+  } else if (CUT === 10) {
     // (the tenth is twenty seconds of the fort, scored from its own shots with the ninth's band: see shots10.ts)
     const cut = await import('./shots10');
     shots = cut.buildShots(S);

@@ -555,3 +555,17 @@ body.tr-menu9 .tr-gfx, body.tr-menu9 .tr-title, body.tr-menu9 .x8-grid, body.tr-
 .x10-end { z-index: 3; display: flex; flex-direction: column; align-items: flex-end; justify-content: flex-end; gap: 1vh; padding: 0 5.4vw 13.4vh 0; text-transform: uppercase; opacity: var(--o, 0); }
 .x10-end .e10-logo { font-size: 10vh; line-height: 0.9; font-weight: 800; font-stretch: condensed; letter-spacing: 0.2em; margin-right: -0.2em; color: #fff3d6; text-shadow: 0 0.04em 0.5em #000, 0 0 0.08em #000; }
 .x10-end .e10-url { padding: 0.32em 1.1em 0.32em 1.44em; font-size: 5.4vh; font-weight: 800; font-stretch: condensed; letter-spacing: 0.34em; color: #14110b; background: #ffd35a; box-shadow: 0 0.2em 1.6em rgba(0, 0, 0, 0.7); }
+
+/* ---- the eleventh film: the Arena (shots11.ts). Its red where the Zone's is gold, as the Arena's own screens are */
+.x11-title { z-index: 3; display: flex; flex-direction: column; justify-content: center; padding-left: 6.6vw; text-transform: uppercase; opacity: var(--o, 1); background: linear-gradient(90deg, rgba(10, 3, 3, 0.62), rgba(10, 3, 3, 0) 60%); }
+.x11-title .t11-kick { font-size: 2.5vh; font-weight: 700; letter-spacing: 0.62em; color: #ff8a7a; white-space: nowrap; }
+.x11-title .t11-name { margin-top: 0.8vh; font-size: 19vh; line-height: 0.9; font-weight: 800; font-style: italic; font-stretch: condensed; letter-spacing: 0.12em; color: #fff3d6; white-space: nowrap; }
+.x11-title .t11-name span, .x11-end .c11-name span { color: #ff4a36; }
+.x11-title .t11-line { margin-top: 1.6vh; font-size: 4.2vh; font-weight: 800; font-stretch: condensed; letter-spacing: 0.36em; color: #f3efe6; white-space: nowrap; }
+.x11-end { z-index: 3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.4vh; text-transform: uppercase; opacity: var(--o, 0); background: radial-gradient(ellipse at center, rgba(8, 3, 3, 0.55), rgba(8, 3, 3, 0.88)); }
+.x11-end .c11-name { font-size: 17vh; line-height: 0.9; font-weight: 800; font-style: italic; font-stretch: condensed; letter-spacing: 0.14em; color: #fff3d6; }
+.x11-end .c11-what { font-size: 4.6vh; font-weight: 800; font-stretch: condensed; letter-spacing: 0.34em; color: #f3efe6; }
+.x11-end .c11-how { font-size: 3vh; font-weight: 700; letter-spacing: 0.3em; color: #ff8a7a; }
+.x11-end .c11-url { margin-top: 1.6vh; padding: 0.32em 1.1em 0.32em 1.44em; font-size: 5vh; font-weight: 800; font-stretch: condensed; letter-spacing: 0.3em; color: #fff; background: #ff4a36; box-shadow: 0 0.2em 1.6em rgba(0, 0, 0, 0.7); }
+/* (the Arena's screen in the film: its score bar, banners, kill feed and scoreboard; not whose health or rounds, which are a player's own and these shots are nobody's eyes) */
+.tr-cut11 .arena-hud .ah-hp, .tr-cut11 .arena-hud .ah-gun { display: none !important; }
