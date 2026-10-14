@@ -825,6 +825,12 @@ export class Player {
     this.onFootstep(s);
   }
 
+  /** An arm of the body has pulled it along, crawling (Avatar.pull): the sound of it. */
+  pulled() {
+    if (this.dead || this.groundSpeed <= 0.15) return;
+    audio.crawl(this.surface() as Surface);
+  }
+
   /** what the feet would stand on at a spot: anything that stops this body, from knee height down */
   private groundBelow(x: number, z: number) {
     const hit = physics.raycast({ x, y: this.pos.y + 0.5, z }, { x: 0, y: -1, z: 0 }, 1.1, PLAYER_GROUPS, this.collider);

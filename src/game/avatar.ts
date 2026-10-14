@@ -674,6 +674,8 @@ export class Avatar {
   private phase = Math.random();
   /** a foot came down during the last update (see POSE.plant): the step that is heard */
   footfall = false;
+  /** crawling, an arm pulled the body along during the last update: the drag that is heard (two to a loop of `crawl`) */
+  pull = false;
   /** seconds since the last one */
   private sinceStep = 1;
   /** half strides gone by, counted from where a foot comes down: a whole number is passed as each one lands */
@@ -1838,7 +1840,9 @@ export class Avatar {
       w.crawl += lying * this.crawlK;
     }
     // (the crawl keeps time with the ground: a pull of the arms for so much of it, backwards when going backwards)
+    const pulled = this.crawlAt;
     this.crawlAt = (((this.crawlAt + (dt * speedNow * dirSign) / POSE.crawlStride) % 1) + 1) % 1;
+    this.pull = this.crawlK > 0.5 && speedNow > 0.15 && Math.floor(pulled * 2) !== Math.floor(this.crawlAt * 2);
     // --- and where in each. One stride clock for every stepping clip, so the same foot is
     // down in all of them and a blend of two is still a step.
     const rate: Record<Stride, number> = {

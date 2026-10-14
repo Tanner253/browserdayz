@@ -376,6 +376,7 @@ export const frameMethods = {
     // the step you hear and the bob you see are the body's own
     p.stride = this.avatar.stride;
     if (this.avatar.footfall) p.footfall();
+    if (this.avatar.pull) p.pulled();
     for (const d of this.dummies) {
       if (Math.abs(d.pos.x - interp.x) + Math.abs(d.pos.z - interp.z) < 260) d.update(dt);
     }

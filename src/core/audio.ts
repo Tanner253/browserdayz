@@ -1356,6 +1356,49 @@ export class AudioEngine {
   }
 
   /**
+   * A body dragged a pull along the ground on its front: cloth and kit scraping over what it lies on, softer than a
+   * step and longer. Somebody else's comes from where they are and dies away sooner than their steps would.
+   */
+  crawl(surface: Surface | 'grass' | 'dirt' | 'gravel' | 'snow', pos?: V3) {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    const out = this.out(pos, 3, 1.4);
+    const vol = pos ? 1.1 : 0.7;
+    const drag = (type: BiquadFilterType, freq: number, q: number, v: number, a: number, d: number, at = 0) => {
+      const n = this.noise(t + at, a + d + 0.02);
+      const f = this.filter(type, freq * (0.85 + Math.random() * 0.3), q);
+      const g = this.ctx.createGain();
+      this.env(g, t + at, v * vol, a, d);
+      n.connect(f).connect(g).connect(out);
+    };
+    switch (surface) {
+      case 'wood':
+        drag('bandpass', 600, 1.5, 0.35, 0.08, 0.3);
+        break;
+      case 'gravel':
+      case 'rock':
+        drag('bandpass', 2600, 1.2, 0.3, 0.06, 0.32);
+        drag('lowpass', 500, 1, 0.2, 0.05, 0.25, 0.05);
+        break;
+      case 'concrete':
+      case 'asphalt':
+        drag('bandpass', 1800, 1, 0.3, 0.07, 0.3);
+        break;
+      case 'metal':
+        drag('bandpass', 2200, 4, 0.25, 0.05, 0.3);
+        break;
+      case 'dirt':
+        drag('lowpass', 900, 0.8, 0.4, 0.08, 0.32);
+        break;
+      default: // grass, snow: a long swish and the body's weight in it
+        drag('highpass', 1800, 0.5, 0.22, 0.1, 0.35);
+        drag('lowpass', 420, 1, 0.22, 0.08, 0.3, 0.04);
+    }
+    // (and the cloth and what is carried, rubbing)
+    drag('bandpass', 3800, 2, 0.1, 0.04, 0.2, 0.06);
+  }
+
+  /**
    * Arm cutting through the air (punches, swings).
    * @param weight 0 = a fist, 1 = a bat or a crowbar: lower, longer and louder
    * @param pos somebody else's swing, heard from where they stand

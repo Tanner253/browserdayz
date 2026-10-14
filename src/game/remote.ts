@@ -466,6 +466,11 @@ export class RemotePlayer implements Damageable {
         audio.footstep((hit?.tag?.surface ?? 'grass') as Surface, speed * (this.crouched ? 0.4 : 1), this.pos);
       }
     }
+    // --- and somebody crawling: quieter than a step, and heard less far ("they can snake around with no audio", the owner, 2026-10-14)
+    if (this.alive && this.avatar.pull && this.pos.distanceTo(listener) < 30) {
+      const hit = physics.raycast({ x: this.pos.x, y: this.pos.y + 0.4, z: this.pos.z }, { x: 0, y: -1, z: 0 }, 1, SOLID_GROUPS);
+      audio.crawl((hit?.tag?.surface ?? 'grass') as Surface, this.pos);
+    }
   }
 
   dispose() {
