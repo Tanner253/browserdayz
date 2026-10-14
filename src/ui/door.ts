@@ -42,6 +42,7 @@ export function openDoor(): Promise<Mode> {
         <button type="button" class="door-card arena${last === 'arena' ? ' last' : ''}" data-mode="arena">
           <i class="door-bg"></i>
           ${last === 'arena' ? '<span class="door-last">Last played</span>' : ''}
+          <span class="door-stamp">Wagers<small>Coming soon</small></span>
           <span class="door-what">Team matches</span><span class="door-on" data-on="arena" hidden></span>
           <b>ARENA</b>
           <span class="door-say">Team against team at the fort, in rounds. Set loadouts, first to 3, 5 or 10. Watch any match being played.</span>

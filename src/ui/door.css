@@ -25,6 +25,9 @@
 .door-card.zona .door-go { background: #ffd35a; color: #101211; }
 .door-card.arena .door-go { background: #ff4a36; color: #fff; }
 .door-last { position: absolute !important; top: 16px; right: 16px; font: 600 11px 'JetBrains Mono', monospace; letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(255, 255, 255, 0.4); }
+/* the owner: "a wagers coming stamp on the arena main menu path head" */
+.door-stamp { position: absolute !important; top: 20px; left: 22px; transform: rotate(-7deg); display: flex; flex-direction: column; align-items: center; padding: 6px 14px 5px; border: 3px double #ff4a36; color: #ff4a36; background: rgba(10, 8, 8, 0.55); font: 800 22px 'JetBrains Mono', monospace; letter-spacing: 0.2em; line-height: 1; text-transform: uppercase; box-shadow: 0 0 0 1px rgba(255, 74, 54, 0.25); }
+.door-stamp small { margin-top: 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.28em; }
 .door-foot { display: flex; gap: 22px; margin-top: 4px; }
 .door-foot a { font: 12px 'JetBrains Mono', monospace; letter-spacing: 0.08em; text-transform: uppercase; color: #9a9588; text-decoration: none; }
 .door-foot a:hover { color: #e9e4d8; }
