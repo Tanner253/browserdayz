@@ -3055,54 +3055,68 @@ export class Buildings {
         for (const l of leaves) l.material = paint;
       });
     }
-    // the outsides that are models: each a copy of its model, painted as the walls are (in the weather, and before what grows)
+    // The outsides that are models, painted as the walls are (in the weather, and before what grows). (All the copies
+    // of one model are drawn at one go, a piece of it at a time: the five shanty mansions were thirty things to draw
+    // and are six, and every barrack, tent and house of one kind likewise. What is seen through stays a copy for each:
+    // see src/core/one-draw.ts.)
     const painted = new Map<THREE.Material, THREE.Material>();
+    const byModel = new Map<string, Buildings['shells']>();
     for (const sh of this.shells) {
-      void assets.model(sh.model).then((src) => {
-        const obj = src.clone();
-        obj.applyMatrix4(sh.m);
-        obj.traverse((o) => {
+      if (!byModel.has(sh.model)) byModel.set(sh.model, []);
+      byModel.get(sh.model)!.push(sh);
+    }
+    for (const [model, list] of byModel) {
+      void assets.model(model).then((src) => {
+        src.updateMatrixWorld(true);
+        const at = new THREE.Matrix4();
+        src.traverse((o) => {
           const m = o as THREE.Mesh;
           if (!m.isMesh) return;
-          m.castShadow = m.receiveShadow = true;
-          m.renderOrder = WALLS_FIRST;
-          const was = m.material as THREE.Material;
-          if (!painted.has(was)) {
-            // Its colour and its relief, and no more of what the download says of itself. (Its own word for how it
-            // shines, and the shade it has baked into it for the picture it was made for, made the brick house black
-            // indoors, where there is no sun and that shade took all the light there was.)
-            const src = was as THREE.MeshStandardMaterial;
-            const mine = new THREE.MeshStandardMaterial({ map: src.map, normalMap: src.normalMap, color: src.color, roughness: src.roughnessMap ? 0.9 : Math.max(0.6, src.roughness), metalness: 0, side: src.side, alphaTest: src.alphaTest, transparent: src.transparent, opacity: src.opacity });
-            // (seen along a street, a wall is seen at a slant: sharp at a slant as it is face on)
-            for (const t of [mine.map, mine.normalMap]) {
-              if (!t) continue;
-              t.anisotropy = assets.maxAnisotropy;
-              t.needsUpdate = true;
+          const paint = this.paintShell(painted, m.material as THREE.Material);
+          if (paint.transparent || list.length === 1) {
+            for (const sh of list) {
+              const one = new THREE.Mesh(m.geometry, paint);
+              one.matrixAutoUpdate = false;
+              one.matrix.multiplyMatrices(sh.m, m.matrixWorld);
+              one.castShadow = one.receiveShadow = true;
+              one.renderOrder = WALLS_FIRST;
+              one.name = m.name;
+              scene.add(one);
             }
-            mine.name = src.name;
-            // (which model's pictures these are, for when they are wanted at the size they came: see Assets.sharpen)
-            mine.userData.hi = src.userData.hi;
-            this.atmo.register(mine);
-            painted.set(was, mine);
+            return;
           }
-          m.material = painted.get(was)!;
+          const many = new THREE.InstancedMesh(m.geometry, paint, list.length);
+          if (!m.geometry.boundingSphere) m.geometry.computeBoundingSphere();
+          // (drawn into a view, or a shadow map, when one of the copies is in it: the copies stand all over the map,
+          // and the ball round all of them is in every one)
+          const balls = list.map((sh, i) => {
+            many.setMatrixAt(i, at.multiplyMatrices(sh.m, m.matrixWorld));
+            return m.geometry.boundingSphere!.clone().applyMatrix4(at);
+          });
+          many.intersectsFrustum = (f) => balls.some((b) => f.intersectsSphere(b));
+          many.computeBoundingSphere();
+          many.matrixAutoUpdate = false;
+          many.castShadow = many.receiveShadow = true;
+          many.renderOrder = WALLS_FIRST;
+          many.name = m.name;
+          scene.add(many);
         });
-        scene.add(obj);
-        if (sh.solid) {
+        for (const sh of list) {
+          if (!sh.solid) continue;
           // what stops a body and a shot is the model itself: every triangle of it, where it stands
-          obj.updateMatrixWorld(true);
           const verts: number[] = [], index: number[] = [], v = new THREE.Vector3();
-          obj.traverse((o) => {
+          src.traverse((o) => {
             const m = o as THREE.Mesh;
             if (!m.isMesh) return;
-            const at = m.geometry.getAttribute('position'), first = verts.length / 3;
-            for (let i = 0; i < at.count; i++) {
-              v.fromBufferAttribute(at, i).applyMatrix4(m.matrixWorld);
+            at.multiplyMatrices(sh.m, m.matrixWorld);
+            const pos = m.geometry.getAttribute('position'), first = verts.length / 3;
+            for (let i = 0; i < pos.count; i++) {
+              v.fromBufferAttribute(pos, i).applyMatrix4(at);
               verts.push(v.x, v.y, v.z);
             }
             const ix = m.geometry.getIndex();
             if (ix) for (let i = 0; i < ix.count; i++) index.push(first + ix.getX(i));
-            else for (let i = 0; i < at.count; i++) index.push(first + i);
+            else for (let i = 0; i < pos.count; i++) index.push(first + i);
           });
           physics.addStatic(physics.R.ColliderDesc.trimesh(new Float32Array(verts), new Uint32Array(index)), sh.solid, { x: 0, y: 0, z: 0 });
         }
@@ -3116,6 +3130,31 @@ export class Buildings {
         physics.addStaticQuat(physics.R.ColliderDesc.cuboid(bx, by, bz), 'metal', new THREE.Vector3(cx, cy, cz).applyMatrix4(m), q);
       }
     }
+  }
+
+  /**
+   * A model's paint, as the walls are painted: its colour and its relief, and no more of what the download says of
+   * itself. (Its own word for how it shines, and the shade it has baked into it for the picture it was made for, made
+   * the brick house black indoors, where there is no sun and that shade took all the light there was.) One for each
+   * paint of the download, however many copies of the model there are.
+   */
+  private paintShell(painted: Map<THREE.Material, THREE.Material>, was: THREE.Material): THREE.Material {
+    let mine = painted.get(was);
+    if (mine) return mine;
+    const src = was as THREE.MeshStandardMaterial;
+    const made = new THREE.MeshStandardMaterial({ map: src.map, normalMap: src.normalMap, color: src.color, roughness: src.roughnessMap ? 0.9 : Math.max(0.6, src.roughness), metalness: 0, side: src.side, alphaTest: src.alphaTest, transparent: src.transparent, opacity: src.opacity });
+    // (seen along a street, a wall is seen at a slant: sharp at a slant as it is face on)
+    for (const t of [made.map, made.normalMap]) {
+      if (!t) continue;
+      t.anisotropy = assets.maxAnisotropy;
+      t.needsUpdate = true;
+    }
+    made.name = src.name;
+    // (which model's pictures these are, for when they are wanted at the size they came: see Assets.sharpen)
+    made.userData.hi = src.userData.hi;
+    this.atmo.register(made);
+    painted.set(was, (mine = made));
+    return mine;
   }
 
   private matCache = new Map<string, THREE.Material>();
