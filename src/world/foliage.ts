@@ -31,6 +31,15 @@ export interface FoliageOpts {
    * 'solid': bark and stone, on what faces the sky and not on what stands upright.
    */
   snow?: 'leaf' | 'solid';
+  /**
+   * WHERE IT MEETS THE GROUND, for a thing seated in it (src/world/seat.ts; with `snow: 'solid'`): [how far over
+   * its lowest point the ground meets it, its model's own measure; how high snow is drifted against it, metres].
+   * The owner (2026-10-14): "half floating disconnected from the ground oobjects dont look good". A thing that
+   * stands in the ground is damp and dark at its foot, and where snow lies the snow is banked against it: no hard
+   * line between a brown stump and white ground. Painted from how high over its own foot a point of it is, which
+   * its model says: nothing is asked of the ground, and nothing more is drawn.
+   */
+  foot?: [number, number];
 }
 
 /**
@@ -58,9 +67,12 @@ export function foliagePatch(opts: FoliageOpts): { patch: ShaderPatch; lod: { va
   const sd = opts.sunDir ?? new THREE.Vector3(0, 1, 0);
   const sc = opts.sunColor ?? new THREE.Color(1, 1, 1);
   const f = (n: number) => n.toFixed(5);
+  // (a number of the material's own, not written into the shader: every stone has its own, and they are one program)
+  const foot = opts.foot && opts.snow === 'solid' ? { value: new THREE.Vector2(opts.foot[0], opts.foot[1]) } : null;
+  const footPars = foot ? '\nuniform vec2 uFoot;\nvarying float vFolOver;' : '';
 
   const patch: ShaderPatch = (shader) => {
-    Object.assign(shader.uniforms, wind, { uLod: lod }, opts.snow ? snowUniforms : null);
+    Object.assign(shader.uniforms, wind, { uLod: lod }, opts.snow ? snowUniforms : null, foot ? { uFoot: foot } : null);
     shader.vertexShader = shader.vertexShader
       .replace(
         '#include <common>',
@@ -70,7 +82,7 @@ uniform vec3 uWindDir;
 uniform float uWindStrength;
 varying float vLodDist;
 varying vec3 vFolWorld;
-varying vec3 vFolOrigin;`,
+varying vec3 vFolOrigin;${footPars}`,
       )
       .replace(
         '#include <begin_vertex>',
@@ -97,7 +109,9 @@ varying vec3 vFolOrigin;`,
   float fl = ${f(flutter)} * uWindStrength * (0.4 + h);
   float lp = dot(position, vec3(1.7, 2.3, 1.1));
   transformed += vec3(sin(uTime * 6.1 + lp), sin(uTime * 7.3 + lp * 1.3) * 0.6, cos(uTime * 5.7 + lp)) * fl;` : ''}
-  vFolWorld = (modelMatrix * vec4(instO + rot * transformed, 1.0)).xyz;
+  vFolWorld = (modelMatrix * vec4(instO + rot * transformed, 1.0)).xyz;${foot ? `
+  // (metres over where the ground meets it, up its own height: its size in the world is in how it is set down)
+  vFolOver = (position.y - uFoot.x) * length(rot[1]);` : ''}
 }`,
       );
     shader.fragmentShader = shader.fragmentShader
@@ -107,7 +121,7 @@ varying vec3 vFolOrigin;`,
 uniform vec4 uLod;
 varying float vLodDist;
 varying vec3 vFolWorld;
-varying vec3 vFolOrigin;${opts.snow ? SNOW_LIES : ''}`,
+varying vec3 vFolOrigin;${footPars}${opts.snow ? SNOW_LIES : ''}`,
       )
       .replace(
         '#include <clipping_planes_fragment>',
@@ -125,13 +139,18 @@ varying vec3 vFolOrigin;${opts.snow ? SNOW_LIES : ''}`,
         '#include <metalnessmap_fragment>',
         /* glsl */ `#include <metalnessmap_fragment>
 {
-  float lies = snowLies(vFolOrigin);
+  float lies = snowLies(vFolOrigin);${foot ? `
+  // Its foot (see \`foot\`): damp and dark for a hand or two up from the ground, by a ragged line and not a ruled one.
+  float footRag = 0.5 + 0.5 * sin(vFolWorld.x * 9.1 + vFolWorld.z * 7.3) * sin(vFolWorld.z * 11.7 - vFolWorld.x * 5.3);
+  diffuseColor.rgb *= 1.0 - 0.5 * (1.0 - smoothstep(0.0, 0.12 + 0.22 * footRag, vFolOver));` : ''}
   if (lies > 0.0) {
     float up = dot(normalize(vNormal), normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz));
     ${opts.snow === 'leaf' ? `
     float patchy = 0.5 + 0.5 * sin(vFolWorld.x * 3.1 + vFolWorld.y * 5.3) * sin(vFolWorld.z * 2.7 - vFolWorld.y * 4.1);
     float laid = lies * mix(0.5, 0.92, patchy) * (0.65 + 0.35 * abs(up));` : `
-    float laid = lies * smoothstep(0.3, 0.7, up);`}
+    float laid = lies * smoothstep(0.3, 0.7, up);`}${foot ? `
+    // (and where snow lies it is drifted against that foot, whichever way the foot faces)
+    laid = max(laid, lies * (1.0 - smoothstep(0.0, uFoot.y * (0.45 + 1.1 * footRag), vFolOver)));` : ''}
     diffuseColor.rgb = mix(diffuseColor.rgb, ${SNOW_PAINT}, laid);
     roughnessFactor = mix(roughnessFactor, 0.65, laid);
     metalnessFactor *= 1.0 - laid;

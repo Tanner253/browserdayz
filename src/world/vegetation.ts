@@ -7,9 +7,10 @@ import { CONTAINER, CRATE_KINDS, SEARCHED_KINDS, paintBlue } from './buildings';
 import { spotKey } from './bunker';
 import { assets, type TreeEntry } from '../core/assets';
 import { physics, type Surface } from '../core/physics';
-import { extractParts, groundParts, joinByPaint, type MeshPart } from '../core/gltf-utils';
+import { boundsOf, extractParts, groundParts, joinByPaint, type MeshPart } from '../core/gltf-utils';
 import { antiFirefly, SHADOW_FRUSTA, type Atmosphere } from './atmosphere';
 import { foliagePatch, setLodFade, wind, snowUniforms, SNOW_LIES, SNOW_PAINT } from './foliage';
+import { SEAT, footOf, groundLine, seat, seatKind } from './seat';
 import { heightAt, type Instance, type World } from './worldgen';
 import { BARREL } from '../sim/barrels';
 import { HUNG } from '../sim/crates';
@@ -152,6 +153,21 @@ function leanOn(world: World, it: Instance, hx: number, hz: number): [number, nu
   y -= clear;
   return [nose, roll, y];
 }
+/** every point of a thing's pieces, one after another: what its foot is told from (src/world/seat.ts) */
+function pointsOf(parts: { geometry: THREE.BufferGeometry }[]): Float32Array {
+  const all = parts.map((p) => p.geometry.getAttribute('position').array as Float32Array);
+  const out = new Float32Array(all.reduce((n, a) => n + a.length, 0));
+  let o = 0;
+  for (const a of all) { out.set(a, o); o += a.length; }
+  return out;
+}
+/** how a thing is turned as it is drawn: about, and laid to the ground if it is (what stops a body at it is turned the same) */
+function turnOf(it: Instance): THREE.Quaternion {
+  const q = new THREE.Quaternion().setFromAxisAngle(UP, it.rot);
+  return it.lean ? q.multiply(_lean.setFromEuler(_leanE.set(it.lean[0], 0, it.lean[1]))) : q;
+}
+/** the height its lowest point is drawn at: where it was seated, or where the plan has it */
+const footY = (it: Instance) => (it.lean ? it.lean[2] : it.y);
 
 class LodSet {
   levels: Level[] = [];
@@ -424,7 +440,8 @@ class Impostors {
     for (const t of trees) {
       const v = this.variants.get(t.kind);
       if (!v) continue;
-      this.all.push({ x: t.x, y: t.y, z: t.z, s: t.scale, v: v.row, r: t.rot });
+      // (the card stands where the tree it is a picture of is seated)
+      this.all.push({ x: t.x, y: footY(t), z: t.z, s: t.scale, v: v.row, r: t.rot });
     }
     const quad = new THREE.PlaneGeometry(1, 1);
     quad.translate(0, 0.5, 0);
@@ -654,7 +671,7 @@ export class Vegetation {
       metalness: 0,
       alphaToCoverage: true,
     });
-    const barkP = foliagePatch({ height: entry.height, sway: sway * 0.6, snow: 'solid' });
+    const barkP = foliagePatch({ height: entry.height, sway: sway * 0.6, snow: 'solid', foot: [SEAT.tree.more, SEAT.tree.drift] });
     const leafP = foliagePatch({
       height: entry.height,
       sway,
@@ -695,6 +712,8 @@ export class Vegetation {
     add(this.world.trees);
     add(this.world.rocks);
     add(this.world.props);
+    /** the ground that is seen: what a thing set down on it is seated in (src/world/seat.ts) */
+    const ground = (x: number, z: number) => heightAt(this.world.surface, x, z);
 
     // ---- trees
     const treeKinds = Object.keys(assets.trees);
@@ -717,6 +736,11 @@ export class Vegetation {
       const m0 = this.treeMaterials(e, true, sway);
       const m1 = this.treeMaterials(e, true, sway);
       const instances = byKind.get(k) ?? [];
+      // SEATED IN THE GROUND (src/world/seat.ts): by the ring its trunk ends in, on the lowest ground under that
+      // ring and a hand more. ("trees sometimes dont sit inthe ground properly when on a steep angle": a trunk
+      // stood by the ground at its middle hung its open end out of the hillside on the low side.)
+      const trunk = footOf(lod0.bark.getAttribute('position').array as Float32Array, 0, true);
+      for (const t of instances) t.lean = seat(ground, t, trunk, SEAT.tree);
       const set = new LodSet(instances, { cullRadius: Math.max(e.radius, e.height) * 0.8, shadowRadius: 34 }, k);
       // full-detail model up close, the simpler one beyond; a tree is then handed over to its
       // baked card (a bush has none, and is simply gone past 110 m)
@@ -745,7 +769,7 @@ export class Vegetation {
           // every one of them stood inside an unseen pillar four metres across)
           const r = Math.max(0.12, Math.min(e.trunkRadius, 0.5) * t.scale * 0.9);
           const h = Math.min(8, e.height * t.scale * 0.5);
-          physics.addStatic(physics.R.ColliderDesc.cylinder(h / 2, r), 'wood', { x: t.x, y: t.y + h / 2, z: t.z });
+          physics.addStatic(physics.R.ColliderDesc.cylinder(h / 2, r), 'wood', { x: t.x, y: footY(t) + h / 2, z: t.z });
         }
       }
       this.sets.push(set);
@@ -777,6 +801,8 @@ export class Vegetation {
           const p0 = pick(s0);
           // (the other container of the two: the same shell, in the blue of the other half of its picture)
           if (kind === CONTAINER.blue) for (const p of p0) paintBlue(p.geometry);
+          // (how far under its own ground line the model goes: what it was made to have in the earth)
+          const own = Math.max(0, -boundsOf(p0).min.y);
           const box = groundParts(p0);
           const p1 = s1 ? pick(s1, true) : null;
           if (p1) {
@@ -791,6 +817,12 @@ export class Vegetation {
           const isRock = id.startsWith('rock') || id.startsWith('boulder');
           const isFern = id.startsWith('fern') || id.startsWith('dry_branches');
           if (ON_ITS_WHEELS.has(id)) for (const it of instances) it.lean = leanOn(this.world, it, size.x / 2, size.z / 2);
+          // SEATED IN THE GROUND (src/world/seat.ts): a stone, a stump and a fallen trunk are laid to the ground under
+          // them, let down until all of their foot is in it and sunk by what is their kind's own. ("the tree stumps
+          // all around the castle look terrible and dont blend in with the ground at all. Same with some of the
+          // boulders around.") What stops a body at each, below, is turned and let down with it.
+          const how = seatKind(id), foot = how ? footOf(pointsOf(p0), own) : null;
+          if (how && foot) for (const it of instances) it.lean = seat(ground, it, foot, SEAT[how]);
           const set = new LodSet(instances, { cullRadius: Math.max(size.x, size.y, size.z), shadowRadius: 20 }, kind);
           // (drawn a paint at a time, not a piece at a time: see joinByPaint. What it is solid as, below, is still its pieces.)
           const mats = (parts: MeshPart[], fadeIn: [number, number] | null, fadeOut: [number, number] | null) =>
@@ -802,9 +834,11 @@ export class Vegetation {
               }
               // (snow lies on a fern and on a rock that stand above the snow line. Not on the other things stood about
               // the world: many of those are indoors, and a bed is not snowed on.)
-              const fp = foliagePatch(isFern ? { height: 1, sway: 0.05, flutter: 0.01, translucency: 0.25, sunDir: this.atmo.sunDir, sunColor: this.atmo.sunColor, snow: 'leaf' } : isRock ? { snow: 'solid' } : {});
+              // (And on whatever is seated in the ground, a stump and a fallen trunk with the rocks: they lie out
+              // of doors and nowhere else. Those are painted where they meet the ground too: see `foot` there.)
+              const fp = foliagePatch(isFern ? { height: 1, sway: 0.05, flutter: 0.01, translucency: 0.25, sunDir: this.atmo.sunDir, sunColor: this.atmo.sunColor, snow: 'leaf' } : how && foot ? { snow: 'solid', foot: [groundLine(foot, SEAT[how]), SEAT[how].drift] } : {});
               setLodFade(fp.lod, fadeIn, fadeOut);
-              this.atmo.register(m, fp.patch, `${isFern ? 'fern' : isRock ? 'rock' : 'prop'}`);
+              this.atmo.register(m, fp.patch, `${isFern ? 'fern' : how ? 'rock' : 'prop'}`);
               return { geometry: p.geometry, material: m as THREE.Material };
             });
           // Full detail up close, the far version (a few hundred triangles) beyond. How soon
@@ -838,7 +872,7 @@ export class Vegetation {
                 verts[v * 3 + 2] = posAttr.getZ(v) * it.scale;
               }
               const indices = idxAttr ? new Uint32Array(idxAttr.array) : new Uint32Array(posAttr.count).map((_, i) => i);
-              physics.addStatic(physics.R.ColliderDesc.trimesh(verts, indices), 'rock', { x: it.x, y: it.y, z: it.z }, it.rot);
+              physics.addStaticQuat(physics.R.ColliderDesc.trimesh(verts, indices), 'rock', { x: it.x, y: footY(it), z: it.z }, turnOf(it));
             }
           } else if (SOLID[id]) {
             const [surface, shrink] = SOLID[id];
@@ -850,7 +884,11 @@ export class Vegetation {
               // up from that as boards of their own: as one box the height of its head, it was a wall a bed long.)
               const low = id === 'old_bed_frame' ? (BED_TOP * it.scale) / 2 : hy;
               const deep = SOLID_DEPTH[id], dz = deep ? ((deep[0] + deep[1]) / 2) * it.scale : 0, half = deep ? ((deep[1] - deep[0]) / 2) * it.scale : hz * shrink;
-              const col = physics.addStatic(physics.R.ColliderDesc.cuboid(hx * shrink, low, half), surface, { x: it.x + Math.sin(it.rot) * dz, y: it.y + low, z: it.z + Math.cos(it.rot) * dz }, it.rot, drum);
+              // (what is seated in the ground stops a body where it is drawn: laid over and let down as it is)
+              const up = how && it.lean ? new THREE.Vector3(0, low, 0).applyQuaternion(turnOf(it)) : null;
+              const col = up
+                ? physics.addStaticQuat(physics.R.ColliderDesc.cuboid(hx * shrink, low, half), surface, { x: it.x + up.x, y: it.lean![2] + up.y, z: it.z + up.z }, turnOf(it))
+                : physics.addStatic(physics.R.ColliderDesc.cuboid(hx * shrink, low, half), surface, { x: it.x + Math.sin(it.rot) * dz, y: it.y + low, z: it.z + Math.cos(it.rot) * dz }, it.rot, drum);
               if (THIN.has(id)) physics.tagOf(col)!.thin = true;
               if (low < hy) {
                 for (const [end, tall] of [[-1, size.y], [1, size.y * 0.68]] as const) {
