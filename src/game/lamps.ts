@@ -32,6 +32,10 @@ const _s = new THREE.Vector3();
 export class Lamps {
   /** the real lights: in the scene only while something is lit */
   readonly pool = new THREE.Group();
+  /** whether the world may be lit so (the real lights in it, or out) without a shader made in the frame: the renderer's to say (Renderer.readyToLight) */
+  canLight: (lit: boolean) => boolean = () => true;
+  /** how long the real lights have waited to go in or out (see `update`) */
+  private waited = 0;
   private spots: THREE.SpotLight[] = [];
   private points: THREE.PointLight[] = [];
   private beams: Beam[] = [];
@@ -178,7 +182,14 @@ export class Lamps {
     const eye = cam.position;
     const lit = this.nBeams + this.nGlows + this.nFlares > 0;
     this.keep = lit ? 1.5 : Math.max(0, this.keep - dt);
-    this.pool.visible = this.keep > 0;
+    // (the real lights go in or out of the world when its shaders for that are made: see Renderer.readyToLight)
+    // (and never more than two and a half seconds late, whatever is still arriving to be got ready)
+    const want = this.keep > 0;
+    if (want === this.pool.visible) this.waited = 0;
+    else if (this.canLight(want) || (this.waited += dt) > 2.5) {
+      this.pool.visible = want;
+      this.waited = 0;
+    }
 
     const beams = this.beams.slice(0, this.nBeams), glows = this.glows.slice(0, this.nGlows);
     for (const b of beams) b.d2 = b.pos.distanceToSquared(eye);

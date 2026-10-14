@@ -392,15 +392,39 @@ export class Renderer {
     this.working = true;
     try {
       for (let job; (job = this.later.shift()); ) {
-        while (this.readying > 0) await new Promise((r) => setTimeout(r, LATER_APART));
-        const { programs, entries } = await this.write(job.drawn, job.lit, true);
+        this.laterNow = job.lit;
+        // (Behind what somebody waits to be shown, but not for ever: online something is always arriving, and the
+        // other lighting's shaders went unmade for minutes, to be made all at once, the whole world standing still,
+        // the first time a lamp came on: 5 to 7 seconds measured, passing a cellar's bulbs by day.)
+        const since = performance.now();
+        while (this.readying > 0 && !this.rushing && performance.now() - since < 1500) await new Promise((r) => setTimeout(r, LATER_APART));
+        const { programs, entries } = await this.write(job.drawn, job.lit, !this.rushing);
         await made(programs);
         if (!TRY.has('nolook')) await this.lookOver(programs);
-        if (!TRY.has('noahead')) await this.drawAhead(entries);
+        if (!TRY.has('noahead')) await this.drawAhead(this.rushing ? entries.map((e) => ({ ...e, low: false })) : entries);
       }
     } finally {
       this.working = false;
+      this.laterNow = null;
+      this.rushing = false;
     }
+  }
+  /** the lighting the job in hand is being got ready for (null: none in hand) */
+  private laterNow: boolean | null = null;
+  /** what is waiting for the other lighting is being got ready at once (see `readyToLight`) */
+  private rushing = false;
+
+  /**
+   * Whether the world can be drawn lit so (the lamps' real lights in it or not) without a shader being made in the
+   * frame: nothing that has come is still waiting to be got ready for that lighting. If something is, it is got
+   * ready now, ahead of everything and no longer spaced out, and the answer is yes when it is. (Lamps.update holds
+   * the real lights back until then: a lamp's light falls on things a moment late, where the world stood still.)
+   */
+  readyToLight(lit: boolean): boolean {
+    if (!this.lighting || (this.laterNow !== lit && !this.later.some((j) => j.lit === lit))) return true;
+    this.rushing = true;
+    void this.workLater();
+    return false;
   }
 
   /** what has been drawn with already: a shader, and the kind of shape it was drawn with (see `drawAhead`) */

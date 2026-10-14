@@ -383,6 +383,7 @@ export class Game {
     this.lamps = new Lamps(r.scene);
     // (whatever is got ready after the game has loaded is got ready for the lamps lit and for the lamps out)
     r.lighting = { lit: () => this.lamps.pool.visible, as: (lit) => this.lamps.as(lit) };
+    this.lamps.canLight = (lit) => r.readyToLight(lit);
     this.bunker = new BunkerSite(world, atmo, r.scene, this.s.terrain.lid);
     this.cellars = new Cellars(r.scene, world.basements ?? []);
     // (the fort: stood where the map says, on the ground as the map has it; the earth round its hatch is drawn as the ground is)
