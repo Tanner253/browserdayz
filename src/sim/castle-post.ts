@@ -268,11 +268,10 @@ function lay(loose: Loose[]): Plan {
     // breach it fell from: src/sim/castle.ts. The tents' mouths are a hand short of a body's width off the north walk's
     // middle, and the west one is clear of the way to the north-west tower's door: test/castle-post.test.ts.)
     const TN = POST.tent, hw = b(TN.half[0] * TN.scale), hd = b(TN.half[2] * TN.scale), tz = K.z0 - 0.015 - hd, mouth = tz - hd;
+    // (The tents themselves are gone, 2026-10-14: the owner, "that army tent is SO small its a joke ... maybe just remove
+    // it". The groundsheets they were pitched over stay where their mouths were, each with a thing on it.)
+    void hw;
     for (const x of [-5.5, -3.85]) {
-      // (its door is the model's own +z: a half turn, and it looks north, at the walk)
-      models.push({ room: 'terrace', name: 'tent', model: TN.model, at: [x, 0, tz], yaw: Math.PI, scale: TN.scale });
-      // (canvas on a frame: it stops a body and not a shot, a little inside its own walls, to the height of its eaves)
-      solids.push({ c: [x, b(0.45), tz + b(0.03)], h: [hw - b(0.08), b(0.45), hd - b(0.09)], yaw: 0, feet: true, surface: 'cloth', name: 'tent', room: 'terrace' });
       // a groundsheet out before its mouth, a hand over the paving (laid on it, the two were one face twice over), and a thing on it
       const g = b(0.04), z0 = mouth + b(0.06), z1 = mouth - b(0.66), sx = b(0.55);
       made.push({ t: 'sheet', stuff: 'tarp', room: 'terrace', name: 'groundsheet', p: [[x - sx, g, z0], [x + sx, g, z0], [x + sx, g, z1], [x - sx, g, z1]], sag: 0 });

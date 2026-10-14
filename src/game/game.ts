@@ -145,7 +145,7 @@ export interface TimedAction {
 }
 
 /** bump when the map's loot points change: spawned loot from older saves is re-rolled */
-export const LOOT_REV = 21;
+export const LOOT_REV = 22;
 /** where a jeep's headlamps are on it: so far either side of its middle, so far over its middle, so far forward (it is 2.08 m to its nose) */
 export const HEADLAMP = { x: 0.5, y: 0.14, z: -2.12 };
 /** and the police car's: wider apart, lower, and further forward (it is 2.58 m to its nose) */
@@ -1027,7 +1027,8 @@ export class Game {
   /** carrying a tag taken off somebody (the one round their own neck does not count): no jeep takes them (see Garage.use) */
   get tagged() {
     const me = publicId();
-    return !!this.inv.find((it) => (it.id === 'dogtag' && it !== this.inv.neck && it.pid !== me) || it.id === 'keycard');
+    // (a keycard went on foot too, until 2026-10-14: the owner, "players can drive a vehicle with bunker cards now its ok just not dogtags")
+    return !!this.inv.find((it) => it.id === 'dogtag' && it !== this.inv.neck && it.pid !== me);
   }
 
   /** the jeep the view was last behind (so going in and out of one is a move of the view, not a cut) */

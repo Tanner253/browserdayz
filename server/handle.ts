@@ -558,7 +558,8 @@ export function handle(c: Client, m: C2S) {
       if (Math.hypot(c.pose[0] - v.s[0], c.pose[1] - v.s[1], c.pose[2] - v.s[2]) > JEEP.reach + 3) return;
       // A tag taken off somebody is carried on foot, for fifteen minutes, with the map showing
       // everybody where: not driven round in circles.
-      if (takenTag(c) || carries(c.inv, 'keycard')) {
+      // (a keycard went on foot as well until 2026-10-14: "players can drive a vehicle with bunker cards now its ok just not dogtags")
+      if (takenTag(c)) {
         send(c, { t: 'tell', kind: 'warn', text: JEEP.noTag });
         return;
       }

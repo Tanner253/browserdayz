@@ -63,7 +63,7 @@ export const CORPSE_LIFETIME = 600; // seconds
 export const RECORD_LIFETIME = 400 * 24 * 3600 * 1000; // a logged-out character is remembered this long
 
 /** bump when loot points change: world loot from an older save is re-rolled */
-export const WORLD_REV = 24;
+export const WORLD_REV = 25;
 
 export const log = (...a: unknown[]) => console.log(new Date().toISOString().slice(11, 19), ...a);
 

@@ -90,11 +90,8 @@ ok('it is what was asked for: every room has its job, and what is off the shelf 
   assert.ok(mast && mast.t === 'mast' && mast.guys.length >= 3 && mast.at[1] === K.roof && mast.h === POST.mast.h);
   for (const [t, room] of [['bags', 'gate'], ['bags', 'roof'], ['sheet', 'dump'], ['sheet', 'roof'], ['sheet', 'terrace'], ['boards', 'terrace'], ['table', 'terrace'], ['cable', 'store'], ['pole', 'gate'], ['flood', 'terrace'], ['generator', 'store'], ['scope', 'roof'], ['map', 'command post'], ['grave', 'village'], ['bedroll', 'bunk room'], ['table', "sniper's nest"], ['set', 'signals tower']] as [string, Room][]) assert.ok(has(t, room), `no ${t} in the ${room}`);
   assert.equal(made.filter((m) => m.t === 'sheet' && m.stuff === 'net').length, 3);
-  // two tents on the terrace, the Army Camp's own model (2026-10-14: the hand-made ones were "too low quality"), at the size POST.tent says, which is the model's as it comes
-  const tents = postModels().filter((m) => m.room === 'terrace');
-  assert.ok(tents.length === 2 && tents.every((m) => m.model === 'tent_military' && models[m.model] && m.scale === POST.tent.scale));
-  const e = models[POST.tent.model];
-  assert.ok(Math.abs(e.max[0] - POST.tent.half[0]) < 0.01 && Math.abs(e.max[1] - POST.tent.half[1]) < 0.01 && Math.abs(e.max[2] - POST.tent.half[2]) < 0.01 && Math.abs(e.min[1]) < 0.01);
+  // no tents on the terrace any more (2026-10-14, the owner: "that army tent is SO small its a joke ... maybe just remove it"): their groundsheets stay
+  assert.equal(postModels().filter((m) => m.room === 'terrace').length, 0);
   // three drums of fuel in the store, which blow; the stove in the mess; the set on the desk
   assert.equal(postRooms().filter((q) => q.kind === 'Barrel_01' && q.room === 'store').length, 3);
   assert.ok(postRooms().some((q) => q.kind === 'wood_stove' && q.room === 'mess') && postRooms().some((q) => q.kind === 'vintage_radio_transceiver' && q.room === 'command post'));
