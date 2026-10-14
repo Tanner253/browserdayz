@@ -4,7 +4,7 @@
 // castle as its own wager map ... it has everything we need for a CODstyled map". Round 1 is the mode with no money;
 // the stake is shown and nothing is paid. The server decides every hit and every health point: no game's word on
 // either is taken, so a changed game cannot win a match.
-import { castleHomes, castleLoose, type FortPlace } from './castle';
+import { CASTLE_SCALE, castleAt, castleLocal, type FortPlace } from './castle';
 import type { HitZone } from './combat';
 import { F_CROUCH, F_PRONE, type Pose } from '../net/protocol';
 import { heightAt, type World } from '../world/worldgen';
@@ -20,8 +20,13 @@ export const ARENA = {
   grace: 30,
   /** seconds a lobby waits for a challenger before it is taken off the list */
   wait: 15 * 60,
-  /** how far out past the two ends the arena reaches, metres: further and they are put back at their own end */
-  margin: 45,
+  /** the arena: a square this many metres from the fort's middle each way, turned as the fort is (the owner: "a small
+   * map, like 100m x 100m, the castle would be perfect. think like a COD multiplayer TDM match map"); out of it, a
+   * player is put back at their own end */
+  half: 50,
+  /** the two ends, metres out from the fort's middle: before its gate, on the apron at the foot of its ramp; and
+   * behind it, below its back wall, on open ground clear of trees (assets-src/_wf/me/arena-ring.ts measured them) */
+  ends: [34, -28] as [number, number],
   /** the most matches the server runs at once */
   most: 40,
   /** SOL a stake may be (shown only, in round 1) */
@@ -44,27 +49,20 @@ export interface LobbyInfo {
 }
 
 /**
- * The two ends of the fort's arena, in the world: the apron before the fort's gate, at the foot of its ramp, and
- * the ruined village by the hatch's head, the furthest house from the gate. The fort, its walls and its passage
- * under the ground are between them. Each faces the other.
+ * The two ends of the fort's arena, in the world: before the fort's gate and behind its back wall (ARENA.ends), the
+ * fort between them. Each faces the other.
  */
 export function arenaEnds(world: World): { x: number; y: number; z: number; yaw: number }[] {
   const P = world.castle as FortPlace;
-  const homes = castleHomes(P, castleLoose(P));
-  const gate = homes[homes.length - 1];
-  const village = homes.slice(0, -1).sort((a, b) => Math.hypot(b.x - gate.x, b.z - gate.z) - Math.hypot(a.x - gate.x, a.z - gate.z))[0];
-  const ground = (x: number, z: number) => heightAt(world.surface, x, z);
-  const face = (a: { x: number; z: number }, b: { x: number; z: number }) => Math.atan2(-(b.x - a.x), -(b.z - a.z));
-  return [
-    { x: gate.x, y: ground(gate.x, gate.z), z: gate.z, yaw: face(gate, village) },
-    { x: village.x, y: ground(village.x, village.z), z: village.z, yaw: face(village, gate) },
-  ];
+  const at = ARENA.ends.map((m) => castleAt(P, m / CASTLE_SCALE, 0));
+  const face = (a: number[], b: number[]) => Math.atan2(-(b[0] - a[0]), -(b[2] - a[2]));
+  return at.map((p, i) => ({ x: p[0], y: heightAt(world.surface, p[0], p[2]), z: p[2], yaw: face(p, at[1 - i]) }));
 }
 
-/** the arena's middle and how far it reaches from it */
-export function arenaBounds(ends: { x: number; z: number }[]): { x: number; z: number; r: number } {
-  const x = (ends[0].x + ends[1].x) / 2, z = (ends[0].z + ends[1].z) / 2;
-  return { x, z, r: Math.hypot(ends[0].x - x, ends[0].z - z) + ARENA.margin };
+/** whether a place is in the arena: within ARENA.half of the fort's middle, each way, as the fort is turned */
+export function inArena(world: World, x: number, z: number): boolean {
+  const [lx, lz] = castleLocal(world.castle as FortPlace, x, 0, z);
+  return Math.abs(lx * CASTLE_SCALE) <= ARENA.half && Math.abs(lz * CASTLE_SCALE) <= ARENA.half;
 }
 
 /**

@@ -16,7 +16,7 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import type { IncomingMessage } from 'node:http';
 import type { Duplex } from 'node:stream';
 import { WebSocketServer, type WebSocket } from 'ws';
-import { ARENA, arenaBounds, arenaEnds, hitShapes, rayRod, type LobbyInfo } from '../src/sim/arena';
+import { ARENA, arenaEnds, hitShapes, inArena, rayRod, type LobbyInfo } from '../src/sim/arena';
 import { CASTLE_SCALE, castleAt, type FortPlace } from '../src/sim/castle';
 import { WEAPON_RULES, hitDamage } from '../src/sim/combat';
 import { shotOf } from '../src/sim/gunplay';
@@ -65,7 +65,6 @@ interface Lobby {
   round: number;
   between: boolean;
   ends: { x: number; y: number; z: number; yaw: number }[];
-  bounds: { x: number; z: number; r: number };
 }
 
 const lobbies = new Map<string, Lobby>();
@@ -134,8 +133,10 @@ function loadout(l: Lobby) {
   const kit = KITS.find((k) => k.id === l.loadout) ?? KITS[0];
   return {
     name: kit.name,
-    // (no medicine, food or drink: health is the server's in a wager, and a dressing would heal what only this game sees)
-    items: kit.things.filter((th) => !['food', 'drink', 'medical'].includes(ITEMS[th.id]?.category ?? '')).map((th) => {
+    // (the guns and nothing else, loaded, with what is fitted to them: no magazines, rounds, armour or clothes to see to.
+    // The owner: "lets strip the mags and the bullets and gear. lets make a simple fps shooter". They never run dry:
+    // see `endless` in setDown)
+    items: kit.things.filter((th) => ITEMS[th.id]?.category === 'weapon').map((th) => {
       const it = makeItem(th.id, th.qty);
       if (th.mag !== undefined) it.mag = th.mag;
       if (th.loaded !== undefined) it.loaded = th.loaded;
@@ -159,7 +160,8 @@ function setDown(l: Lobby) {
       f.health = 100;
       f.pose = [x, y, z, e.yaw, 0, 0];
       f.hist = [{ t: Date.now(), p: f.pose }];
-      send(f, { t: 'powers', god: false, hidden: false, clip: false, voidInv: false, voidTag: false });
+      // (endless: firing takes no round out of a gun, so nobody reloads: src/sim/powers.ts)
+      send(f, { t: 'powers', god: false, hidden: false, clip: false, voidInv: false, voidTag: false, endless: true });
       send(f, { t: 'put', x, y, z });
       send(f, { t: 'mend' });
       send(f, { t: 'kit', name: kit.name, items: kit.items });
@@ -282,10 +284,11 @@ function said(l: Lobby, f: Fighter, m: Record<string, unknown>) {
       if (!f.alive || l.between) return;
       const now = Date.now(), was = f.pose, dt = Math.max(0.05, (now - (f.hist[f.hist.length - 1]?.t ?? now)) / 1000);
       // (no faster than a body runs, with room for a line held up; and never out of the arena)
-      if (Math.hypot(p[0] - was[0], p[2] - was[2]) > 12 * dt + 3 || Math.hypot(p[0] - l.bounds.x, p[2] - l.bounds.z) > l.bounds.r) {
+      const out = !inArena(world, p[0], p[2]);
+      if (Math.hypot(p[0] - was[0], p[2] - was[2]) > 12 * dt + 3 || out) {
         const e = l.ends[f.side];
         send(f, { t: 'put', x: e.x, y: e.y, z: e.z });
-        if (Math.hypot(p[0] - l.bounds.x, p[2] - l.bounds.z) > l.bounds.r) send(f, { t: 'tell', text: 'Out of the arena: back to your end.', kind: 'warn' });
+        if (out) send(f, { t: 'tell', text: 'Out of the arena: back to your end.', kind: 'warn' });
         f.pose = [e.x, e.y, e.z, e.yaw, 0, 0];
       } else f.pose = p;
       f.hist.push({ t: now, p: f.pose });
@@ -357,7 +360,7 @@ export function arenaUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer)
         const lo = (ARENA.loadouts as readonly string[]).includes(q.get('loadout') ?? '') ? (q.get('loadout') as string) : ARENA.loadouts[0];
         const stake = Math.min(ARENA.stake[1], Math.max(ARENA.stake[0], Number(q.get('stake')) || ARENA.stake[0]));
         const ends = arenaEnds(world);
-        l = { id: Math.random().toString(36).slice(2, 8), host: name, hostKey: key, size, kills, loadout: lo, stake, opened: Date.now(), state: 'open', sides: [[], []], score: [0, 0], round: 0, between: false, ends, bounds: arenaBounds(ends) };
+        l = { id: Math.random().toString(36).slice(2, 8), host: name, hostKey: key, size, kills, loadout: lo, stake, opened: Date.now(), state: 'open', sides: [[], []], score: [0, 0], round: 0, between: false, ends };
         lobbies.set(l.id, l);
         log(`${l.id}: ${name} opens a ${size}v${size} wager, first to ${kills}, ${lo}`);
       } else {

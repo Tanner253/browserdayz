@@ -114,7 +114,7 @@ export function heliSpots(world: World): { x: number; y: number; z: number; yaw:
         if (near(trees, x, z, P.clear) || near(rocks, x, z, P.clear) || near(props, x, z, P.clear)) continue;
         if (world.buildings.some((b) => { const [w, dd] = BUILDING_FOOTPRINT[b.type]; return Math.hypot(b.x - x, b.z - z) < Math.hypot(w, dd) / 2 + P.building; })) continue;
         const y = heightAt(H, x, z);
-        const [lx, , lz] = castleLocal(fort, x, y, z);
+        const [lx, lz] = castleLocal(fort, x, y, z);
         if (inCastle(fort, x, y + 1, z) || !castleClear(local, lx, lz, fort.rock !== false, P.clear / CASTLE_SCALE) || near(stood, x, z, P.clear + 2)) continue;
         best = { x, z, d };
         break;

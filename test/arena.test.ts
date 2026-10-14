@@ -90,7 +90,8 @@ try {
   for (let round = 1; round <= 3; round++) {
     foe.pose = [ends[1].x, ends[1].y, ends[1].z, 0, 0, 0];
     host.pose = [ends[0].x, ends[0].y, ends[0].z, 0, 0, 0];
-    const tx = ends[0].x + (ends[1].x - ends[0].x) * 0.15, tz = ends[0].z + (ends[1].z - ends[0].z) * 0.15;
+    // (ten metres to the side of the host, on the open apron before the gate: toward the fort is the ramp and its rock, which stop a shot as they should)
+    const tx = ends[0].x + Math.cos(ends[0].yaw) * 10, tz = ends[0].z - Math.sin(ends[0].yaw) * 10;
     await foe.walk(tx, tz);
     host.say(ends[0].x, ends[0].z);
     await sleep(300);
