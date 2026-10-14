@@ -26,6 +26,8 @@ export class ArenaMenu {
   private listT = 0;
   private asking = false;
   private woken = false;
+  /** the matches as last asked for, and what was picked to go into: said on the Waiting card */
+  private lobbies: LobbyInfo[] = [];
 
   constructor(private hud: HUD) {
     document.body.classList.add('arena-mode');
@@ -77,7 +79,7 @@ export class ArenaMenu {
           <div class="am-umb" hidden></div>
         </section>
       </main>
-      <div class="am-wait"><b>Waiting</b><span class="am-wait-text"></span><button type="button" class="am-leave">Leave</button></div>
+      <div class="am-wait"><b>Waiting</b><em class="am-wait-what"></em><span class="am-wait-text"></span><button type="button" class="am-leave">Leave</button></div>
       <div class="am-pause"><b>Paused</b><span>The match goes on without you.</span><button type="button" class="am-resume">Resume</button><button type="button" class="am-pause-set">Settings</button><button type="button" class="am-leave">Leave the match</button></div>`;
     // (inside the HUD, so that the settings it lends stay in it: HUD.settingsInto)
     hud.root.appendChild(this.el);
@@ -152,7 +154,10 @@ export class ArenaMenu {
       lobbies = null;
     }
     this.asking = false;
-    if (lobbies) this.woken = true;
+    if (lobbies) {
+      this.woken = true;
+      this.lobbies = lobbies;
+    }
     state.textContent = lobbies ? `${lobbies.length} open or being played` : 'the arena cannot be reached: trying again';
     if (lobbies) {
       box.innerHTML = lobbies.length
@@ -179,10 +184,12 @@ export class ArenaMenu {
       this.pick.loadout = b.dataset.lo;
       return this.drawPick();
     }
-    if (b.dataset.join) return this.go({ wager: b.dataset.join });
-    if (b.dataset.watch) return this.go({ wager: b.dataset.watch, watch: '1' });
-    if (b.classList.contains('am-go')) return this.go({ wager: 'new', size: String(this.pick.size), kills: String(this.pick.kills), loadout: this.pick.loadout, stake: String(ARENA.stake[0]) });
-    if (b.classList.contains('am-practice')) return this.go({ wager: 'practice', loadout: this.pick.loadout });
+    const kit = (id: string) => kitOf(id)?.name ?? id;
+    const what = (l?: LobbyInfo) => (l ? `${l.host}'s match · ${l.size}v${l.size} · first to ${l.kills} · ${kit(l.loadout)}` : '');
+    if (b.dataset.join) return this.go({ wager: b.dataset.join }, what(this.lobbies.find((l) => l.id === b.dataset.join)));
+    if (b.dataset.watch) return this.go({ wager: b.dataset.watch, watch: '1' }, `Watching ${what(this.lobbies.find((l) => l.id === b.dataset.watch))}`);
+    if (b.classList.contains('am-go')) return this.go({ wager: 'new', size: String(this.pick.size), kills: String(this.pick.kills), loadout: this.pick.loadout, stake: String(ARENA.stake[0]) }, `Your match · ${this.pick.size}v${this.pick.size} · first to ${this.pick.kills} · ${kit(this.pick.loadout)}`);
+    if (b.classList.contains('am-practice')) return this.go({ wager: 'practice', loadout: this.pick.loadout }, `Practice · ${kit(this.pick.loadout)}`);
     if (b.classList.contains('am-resume')) return this.hud.deploy();
     if (b.classList.contains('am-pause-set')) {
       this.el.classList.add('pset');
@@ -197,7 +204,8 @@ export class ArenaMenu {
   }
 
   /** into a match: put in the page's address, the name given, and Deploy pressed as the Zone presses it */
-  private go(q: Record<string, string>) {
+  private go(q: Record<string, string>, what = '') {
+    this.q<HTMLElement>('.am-wait-what').textContent = what;
     const name = this.q<HTMLInputElement>('.am-name input').value.trim();
     if (name) this.hud.setName(name);
     history.replaceState(null, '', `/arena?${new URLSearchParams(q)}`);

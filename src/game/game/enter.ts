@@ -148,8 +148,9 @@ export const enterMethods = {
       if (waited) {
         // their turn, quite possibly while they were looking at something else
         audio.ui('open');
-        document.title = `Your turn! · ${this.title}`;
-        this.hud.note('A place came free: you are in', 'good');
+        document.title = `${wagerQuery() ? 'Match on!' : 'Your turn!'} · ${this.title}`;
+        // (the line's own word; a match that has its players needs none: its banner says the round)
+        if (!wagerQuery()) this.hud.note('A place came free: you are in', 'good');
       }
     } else {
       if (this.net.leftQueue) this.hud.note('You left the line: playing on your own', 'warn');

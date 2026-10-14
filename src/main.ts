@@ -119,6 +119,12 @@ async function boot() {
     mode = await openDoor();
     history.replaceState(null, '', `/${mode}${location.hash}`);
   }
+  // (the loading screen is the game's own: the Arena's says so)
+  if (mode === 'arena') {
+    (loading.querySelector('.load-title') as HTMLElement).textContent = 'ARENA';
+    (loading.querySelector('.load-sub') as HTMLElement).textContent = 'team matches at the fort · zona pvp';
+    loading.classList.add('arena');
+  }
   stage('renderer');
   const r = new Renderer(canvas);
   try {

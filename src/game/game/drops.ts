@@ -488,7 +488,9 @@ export const dropsMethods = {
     // the menu covers the left of the screen: keep the village in the right half
     const fx = c.x - x, fz = c.z - z;
     const len = Math.hypot(fx, fz) || 1;
-    cam.lookAt(c.x + (fz / len) * 34, ground + 7, c.z - (fx / len) * 34);
+    // (and the fort to the right, clear of the Arena menu's panels)
+    const aside = fort ? 52 : 34;
+    cam.lookAt(c.x + (fz / len) * aside, ground + 7, c.z - (fx / len) * aside);
     cam.fov = 50;
     cam.updateProjectionMatrix();
     cam.updateMatrixWorld();
