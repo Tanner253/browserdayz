@@ -124,6 +124,7 @@
         <p>Every update to the Zone, newest first, with pictures and film of what changed. The films in the older entries were made at the time and show the game as it was then.</p>
         <div class="jump">
           <a href="#roadmap">Roadmap</a>
+          <a href="#performance-boost">Performance boost</a>
           <a href="#smoother-frames">Smoother frames</a>
           <a href="#basements">Basements</a>
           <a href="#two-games">Two games, one door</a>
@@ -172,8 +173,26 @@
         </div>
       </section>
 
-      <article class="entry" id="smoother-frames">
+      <article class="entry" id="performance-boost">
         <div class="when"><time datetime="2026-10-14">14 Oct 2026</time><span class="tag">Latest</span></div>
+        <div>
+          <h2>Performance boost, and no more lamp freezes</h2>
+          <p class="lead">The second half of the day's work on frames: glass and buildings drawn in fewer goes, and an end to the freeze when a light first came on. Together with the update before it, up to 48% more frames than this morning, the same picture. And the helicopter comes down fast.</p>
+          <div class="media">
+            <figure class="wide"><img loading="lazy" src="/changelog/media/frames-boost.jpg" alt="A card titled Smoother frames: +48% more frames in the hospital street, 62 a second before and 92 after, online; the village crossroads from 84 to 121 frames a second, the hospital street from 62 to 92, the police HQ from 73 to 101; physics each step with another player near from 1.5 to 0.1 milliseconds; the longest freeze driving into town from 7.0 seconds to 0.08; pieces drawn each frame in the hospital street from 875 to 613" /><figcaption><b>This morning's game and this one,</b> both updates together, measured online on one laptop (an RTX 3070 Ti, 1920×1080, default settings). Yours will differ.</figcaption></figure>
+          </div>
+          <ul>
+            <li><b>No more lamp freezes:</b> the first time a light came on near you (a cellar bulb, the lamps at dusk, a gun light) the game could stop for five to seven seconds while it got ready to draw it. Now it gets ready first and the light comes on a moment later. The worst frame driving from the village into town went from 7.0 seconds to 0.08.</li>
+            <li><b>Glass drawn once:</b> windows, lenses and glasses seen from both sides were drawn twice, back and front, choosing how to draw them again each time. They are drawn in one go.</li>
+            <li><b>Buildings:</b> every copy of a building's model is drawn at one go, a piece at a time.</li>
+            <li><b>The crosshair:</b> the first time it showed, the game could stall for a quarter to four tenths of a second. Not now.</li>
+            <li><b>The helicopter:</b> hold C and it all but falls, still going the way it was, and slows itself in time for the ground (it came down at 6 m/s at most). Space climbs at 12 m/s, where it was 7. And it takes a quarter less to wreck than a car: 4,050 where a car takes 5,400.</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="entry" id="smoother-frames">
+        <div class="when"><time datetime="2026-10-14">14 Oct 2026</time></div>
         <div>
           <h2>Smoother frames, the same picture</h2>
           <p class="lead">The world is drawn in fewer pieces and worked out with less waste: the same picture, with less for your computer to do in every frame. And the basements are stocked as they were meant to be.</p>
