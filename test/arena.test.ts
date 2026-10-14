@@ -53,7 +53,8 @@ class Fighter {
 }
 
 const dir = mkdtempSync(path.join(os.tmpdir(), 'zona-arena-'));
-const server = spawn(process.execPath, [path.join('node_modules', 'tsx', 'dist', 'cli.mjs'), 'server/index.ts'], {
+// (the arena is a server of its own: arena/server.ts)
+const server = spawn(process.execPath, [path.join('node_modules', 'tsx', 'dist', 'cli.mjs'), 'arena/server.ts'], {
   env: { ...process.env, PORT: String(PORT), SITE_URL: 'http://127.0.0.1:9', DATA_DIR: dir, BOTCHECK: 'off', CHECKS: 'off', LINGER_S: '0', INFECTED: 'off' },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
@@ -113,6 +114,16 @@ try {
   const over = await host.until('kick', 8000);
   assert.match(String(over.reason), /Hosty won 3 to 0/);
   ok('first to three: the match is over, and both are told who won');
+
+  // practice: the arena alone, let in at once, never listed
+  const solo = new Fighter('Solo');
+  await solo.open('w=practice&loadout=marksman');
+  const ws0 = await solo.until('welcome');
+  assert.ok(ws0 && (await solo.until('kit')));
+  const listed = (await (await fetch(`http://127.0.0.1:${PORT}/arena/lobbies`)).json()) as { lobbies: { host: string }[] };
+  assert.ok(!listed.lobbies.some((l) => l.host === 'Solo'), 'a practice is listed');
+  ok('practice: the arena alone, let in at once with the loadout, and never listed');
+  solo.ws.close();
 
   // a shot at somebody behind the fort's own wall does not reach them
   assert.ok(!logged.includes('TypeError') && !logged.includes('ReferenceError'), 'the server wrote what looks like a crash');

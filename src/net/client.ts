@@ -39,6 +39,17 @@ export function wagerQuery(): string | null {
   return out.toString();
 }
 
+/**
+ * Where the wager arena is (arena/server.ts, a service of its own): `?arena=` on the page, or VITE_ARENA_URL when
+ * the site is built; on a development page its own host, which sends /arena on to the local arena (8090); else the
+ * arena's Render address. '' is this page's own host.
+ */
+export function arenaBase(): string {
+  const env = (import.meta as { env?: { VITE_ARENA_URL?: string; DEV?: boolean } }).env;
+  const q = new URLSearchParams(location.search).get('arena');
+  return (q || env?.VITE_ARENA_URL || (env?.DEV ? '' : 'https://zona-arena.onrender.com')).trim().replace(/\/$/, '');
+}
+
 /** the wager is over (or was never there to join): the page is the open world's again */
 export function leaveWager() {
   const q = new URLSearchParams(location.search);
@@ -47,11 +58,12 @@ export function leaveWager() {
 }
 
 function wsUrl(): string {
-  const remote = remoteServer();
-  const base = remote ? remote.replace(/^http/, 'ws') : `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`;
-  // (a wager is fought in the arena, on its own path)
+  const here = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`;
+  // (a wager is fought in the arena, a server of its own)
   const wager = wagerQuery();
-  return wager ? `${base}/arena?${wager}` : `${base}/ws`;
+  if (wager) return `${arenaBase() ? arenaBase().replace(/^http/, 'ws') : here}/arena?${wager}`;
+  const remote = remoteServer();
+  return `${remote ? remote.replace(/^http/, 'ws') : here}/ws`;
 }
 
 /** How many people are on the server right now, how many it holds and how many are waiting to get in (for the start screen). Null if it can't be reached. */
@@ -217,7 +229,8 @@ export class Net {
     this.kicked = '';
     this.kickedV = undefined;
     this.proofKey = '';
-    const remote = remoteServer();
+    // (the server asked first, which wakes one that sleeps: the arena on a free plan does, after fifteen quiet minutes)
+    const remote = wagerQuery() ? arenaBase() || null : remoteServer();
     if (remote) {
       // any answer at all means it is awake; the request itself is what wakes it
       const slow = setTimeout(() => onStatus('Waking the server… this can take a minute'), 3500);

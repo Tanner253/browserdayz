@@ -105,7 +105,7 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     // `npm run server` runs the game server on :8080; the dev page talks to it through here
-    proxy: { '/ws': { target: 'ws://localhost:8080', ws: true }, '/healthz': 'http://localhost:8080', '/arena': { target: 'http://localhost:8080', ws: true } },
+    proxy: { '/ws': { target: 'ws://localhost:8080', ws: true }, '/healthz': 'http://localhost:8080', '/arena': { target: 'http://localhost:8090', ws: true } },
   },
   // (Written for the browsers of the last few years, and for an iPhone back to iOS 15: built for 2022's language
   // alone, the game had six things in it that an iPhone older than iOS 16.4 cannot read, and on one of those it

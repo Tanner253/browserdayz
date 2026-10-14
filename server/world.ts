@@ -45,8 +45,6 @@ export function buildWorldData(root: string) {
   const under = bunkerPlace(world);
   if (under) for (const c of bunkerCrates(under)) crates.push({ cid: crateId(c.x, c.z), kind: c.kind, x: c.x, y: c.y, z: c.z });
   return {
-    /** the world itself, as generateWorld made it (the arena stands its fort's walls from it: server/arena.ts) */
-    generated: world,
     lootPoints: buildings.lootPoints,
     /** where every building stands, and how it is turned (nothing is buried under a floor) */
     buildings: world.buildings.map((q) => ({ type: q.type, x: q.x, z: q.z, rot: q.rot })),

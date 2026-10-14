@@ -11,5 +11,5 @@
     "noEmit": true,
     "types": ["node", "vite/client"]
   },
-  "include": ["server"]
+  "include": ["server", "arena"]
 }

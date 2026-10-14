@@ -4,7 +4,7 @@
 import { offer, type Offer, type Pick, type Role } from '../net/orders';
 import { ARENA, type LobbyInfo } from '../sim/arena';
 import { KITS } from '../sim/kits';
-import { remoteServer } from '../net/client';
+import { arenaBase } from '../net/client';
 import { fullWanted, reloadPage, wantFull } from '../core/leave';
 import type { Vitals } from '../game/player';
 import { BLOOD } from '../sim/blood';
@@ -1250,7 +1250,7 @@ export class HUD {
     const kitName = (id: string) => KITS.find((k) => k.id === id)?.name ?? id;
     let list: LobbyInfo[] | null = null;
     try {
-      list = ((await (await fetch(`${remoteServer() ?? ''}/arena/lobbies`, { cache: 'no-store' })).json()) as { lobbies: LobbyInfo[] }).lobbies;
+      list = ((await (await fetch(`${arenaBase()}/arena/lobbies`, { cache: 'no-store' })).json()) as { lobbies: LobbyInfo[] }).lobbies;
     } catch {
       list = null;
     }
@@ -1266,7 +1266,7 @@ export class HUD {
       `<div class="gfx-row"><span>Rounds to win</span><div class="gfx-opts">${ARENA.kills.map((n) => opt('kills', n, String(n), w.kills === n)).join('')}</div></div>` +
       `<div class="gfx-row"><span>Loadout<small>Everybody in the match gets it, every round</small></span><div class="gfx-opts">${ARENA.loadouts.map((id) => opt('loadout', id, kitName(id), w.loadout === id)).join('')}</div></div>` +
       `<div class="gfx-row"><span>Stake, SOL<small>Each player's, from ${ARENA.stake[0]} to ${ARENA.stake[1]} (not paid yet)</small></span><div class="gfx-opts"><input class="wg-stake" type="number" min="${ARENA.stake[0]}" max="${ARENA.stake[1]}" step="0.01" value="${w.stake}"></div></div>` +
-      '<button type="button" class="wg-host">Host it</button>';
+      '<button type="button" class="wg-host">Host it</button> <button type="button" class="wg-host wg-practice">Practice alone</button>';
     if (this.wgBound) return;
     this.wgBound = true;
     const go = (q: Record<string, string>) => {
@@ -1284,6 +1284,8 @@ export class HUD {
         return void this.renderWagers();
       }
       if (b.dataset.join) return go({ wager: b.dataset.join });
+      // (the arena alone, with the loadout chosen: to learn the fort and the guns)
+      if (b.classList.contains('wg-practice')) return go({ wager: 'practice', loadout: this.wg.loadout });
       if (b.classList.contains('wg-host')) {
         const stake = Number((pane.querySelector('.wg-stake') as HTMLInputElement).value);
         this.wg.stake = Math.min(ARENA.stake[1], Math.max(ARENA.stake[0], Number.isFinite(stake) ? stake : ARENA.stake[0]));

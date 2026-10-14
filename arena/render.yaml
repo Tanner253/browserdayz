@@ -1,0 +1,33 @@
+# Render Blueprint for the wager arena (arena/server.ts): a web service of its own, apart from the game server
+# (whose Blueprint is the render.yaml at the repository's root, and is not touched by this one).
+#
+# Deploy: Render dashboard -> New -> Blueprint -> this repository, and set the Blueprint Path to arena/render.yaml.
+# Then give its address to the site: VITE_ARENA_URL in Vercel (Production), e.g. https://zona-arena.onrender.com,
+# and deploy the site. (Without it the site looks for https://zona-arena.onrender.com.)
+#
+# It holds no keys and talks to nothing but the games that come to it. On the free plan it sleeps after 15 minutes
+# with nobody on it, and the first page to ask for it then waits about a minute while it wakes.
+services:
+  - type: web
+    name: zona-arena
+    runtime: node
+    plan: free
+    region: oregon
+    branch: main
+    # (no client to build: it runs the TypeScript as it is, with the game's own rules from src/)
+    buildCommand: npm ci --include=dev
+    startCommand: node --import tsx arena/server.ts
+    healthCheckPath: /healthz
+    autoDeploy: true
+    # (redeployed only when what it is made of changes)
+    buildFilter:
+      paths:
+        - arena/**
+        - src/sim/**
+        - src/world/**
+        - src/net/protocol.ts
+        - package.json
+        - package-lock.json
+    envVars:
+      - key: NODE_VERSION
+        value: "22"

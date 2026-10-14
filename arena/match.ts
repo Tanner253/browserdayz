@@ -1,8 +1,7 @@
 // The arena (2026-10-14): wager matches in the fort, team against team in rounds, as CS:GO has them (the owner:
 // "round based progression like cs:go ... once all the players of 1 team is dead the winner team is decided point
-// awarded then next round and reset"). It runs inside the game server's process, on its own path (/arena) and with
-// its own state: nothing of the open world is in it, and nothing of it is in the open world (the owner asked for a
-// free service: this costs nothing more). The rules are src/sim/arena.ts.
+// awarded then next round and reset"). It is a server of its own (arena/server.ts, deployed by arena/render.yaml):
+// nothing of the open world is in it, and nothing of it is in the open world. The rules are src/sim/arena.ts.
 //
 // THE SERVER DECIDES EVERY HIT AND EVERY HEALTH POINT. A game says where it is and where it shot; the server traces
 // each shot itself, through the fort's own walls (its solids, built here into a physics world of their own) and the
@@ -65,6 +64,8 @@ interface Lobby {
   round: number;
   between: boolean;
   ends: { x: number; y: number; z: number; yaw: number }[];
+  /** the arena alone, to learn it and the guns: never listed, nobody else let in, and no round ends */
+  practice?: boolean;
 }
 
 const lobbies = new Map<string, Lobby>();
@@ -183,6 +184,7 @@ function startMatch(l: Lobby) {
     } as unknown as S2C);
   }
   setDown(l);
+  if (l.practice) return;
   tellAll(l, `The wager is on: first to ${l.kills}. Round 1.`, 'good');
   log(`${l.id}: ${everyone(l).map((f) => f.name).join(', ')} begin, first to ${l.kills}, ${l.loadout}`);
 }
@@ -213,7 +215,7 @@ function roundOver(l: Lobby, winner: 0 | 1) {
 
 /** a side with nobody left standing (dead, or gone from the game) has lost the round */
 function checkRound(l: Lobby) {
-  if (l.state !== 'match' || l.between) return;
+  if (l.state !== 'match' || l.between || l.practice) return;
   for (const side of [0, 1] as const) if (l.sides[side].every((f) => !f.alive || f.gone)) return roundOver(l, side ? 0 : 1);
 }
 
@@ -314,7 +316,7 @@ function said(l: Lobby, f: Fighter, m: Record<string, unknown>) {
 /** the lobbies, as the menu's list has them */
 export function arenaList(): LobbyInfo[] {
   const now = Date.now();
-  return [...lobbies.values()].filter((l) => l.state !== 'over').map((l) => ({ id: l.id, host: l.host, kills: l.kills, loadout: l.loadout, stake: l.stake, size: l.size, have: everyone(l).filter((f) => !f.gone).length, state: l.state === 'open' ? 'open' : 'match', age: Math.round((now - l.opened) / 1000) }));
+  return [...lobbies.values()].filter((l) => l.state !== 'over' && !l.practice).map((l) => ({ id: l.id, host: l.host, kills: l.kills, loadout: l.loadout, stake: l.stake, size: l.size, have: everyone(l).filter((f) => !f.gone).length, state: l.state === 'open' ? 'open' : 'match', age: Math.round((now - l.opened) / 1000) }));
 }
 
 const wss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024 });
@@ -352,6 +354,20 @@ export function arenaUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer)
         tellAll(ll, `${ff.name} is back.`, 'info');
         return;
       }
+      if (w === 'practice') {
+        // the arena alone, at once: the map and the loadout to learn, nobody to wait for
+        if (lobbies.size >= ARENA.most) return turn('Every arena is taken: try again in a while.');
+        const lo = (ARENA.loadouts as readonly string[]).includes(q.get('loadout') ?? '') ? (q.get('loadout') as string) : ARENA.loadouts[0];
+        const ends = arenaEnds(world), pl: Lobby = { id: 'p' + Math.random().toString(36).slice(2, 8), host: name, hostKey: key, size: 1, kills: 0, loadout: lo, stake: 0, opened: Date.now(), state: 'open', sides: [[], []], score: [0, 0], round: 0, between: false, ends, practice: true };
+        lobbies.set(pl.id, pl);
+        const me: Fighter = { id: nextId++, ws, name, key, side: 0, pose: [ends[0].x, ends[0].y, ends[0].z, ends[0].yaw, 0, 0], hist: [], health: 100, alive: true, w: null, m: [], g: [], shots: [], rtt: 150, pingAt: 0, gone: 0 };
+        pl.sides[0].push(me);
+        f = me;
+        l = pl;
+        startMatch(pl);
+        send(me, { t: 'tell', text: 'Practice: the arena is yours. Try the guns and learn the ways round the fort.', kind: 'info' });
+        return;
+      }
       if (w === 'new') {
         if (lobbies.size >= ARENA.most) return turn('Every arena is taken: try again in a while.');
         if ([...lobbies.values()].some((x) => x.state === 'open' && x.hostKey === key)) return turn('You have a wager open already.');
@@ -386,6 +402,7 @@ export function arenaUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer)
     ws.on('close', () => {
       if (!f || !l) return;
       const me = f, lob = l;
+      if (lob.practice) return void lobbies.delete(lob.id);
       if (lob.state === 'open') {
         lob.sides[me.side] = lob.sides[me.side].filter((o) => o !== me);
         if (!everyone(lob).length) lobbies.delete(lob.id);

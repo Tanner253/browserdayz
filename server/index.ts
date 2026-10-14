@@ -6,7 +6,6 @@
 // hurts. Clients own their movement, aim and inventory.
 
 import http from 'node:http';
-import { arenaList, arenaUpgrade, startArena } from './arena';
 import { randomBytes } from 'node:crypto';
 import { existsSync, readFileSync, mkdirSync, writeFileSync, statSync, createReadStream } from 'node:fs';
 import path from 'node:path';
@@ -75,8 +74,6 @@ log('generating world…');
 const t0 = Date.now();
 
 export const world = buildWorldData(ROOT);
-// the arena, for wager matches: its own state, on its own path (server/arena.ts)
-void startArena(world.generated).catch((e) => log(`the arena did not start: ${e}`));
 
 log(`world ready in ${Date.now() - t0} ms: ${world.lootPoints.length} loot points, ${world.crates.length} crates, ${world.barrels.length} fuel drums, ${world.spawns.length} spawns`);
 
@@ -710,12 +707,6 @@ function serve(req: http.IncomingMessage, res: http.ServerResponse) {
     res.end(JSON.stringify({ ok: true, boot: BOOT, protocol: PROTOCOL, why: RESTART.why, kept: KEPT.how, saved: KEPT.last, players: [...clients.values()].filter((c) => !c.asleep).length, asleep: [...clients.values()].filter((c) => c.asleep).length, max: MAX_PLAYERS, queue: queue.length, uptime: Math.round(process.uptime()), checks: CHECKS, flagged, keptOff: BANS.temp.size, loot: economy.loot.size, places: new Set([...clients.values()].map((c) => c.ip)).size, unspoken: [...clients.values()].filter((c) => !c.spoke && !c.asleep).length, turned: TURNED, captcha: CAPTCHA_ON, ...(CAPTCHA_ON ? { captchaKey: CAPTCHA.site, captchaSays: SLIPS } : {}), botcheck: BOTCHECK.on, ...(BOTCHECK.on ? { ranges: RANGES } : {}) }));
     return;
   }
-  // the wagers open and being fought, for the menu's list (server/arena.ts)
-  if (url.pathname === '/arena/lobbies') {
-    res.writeHead(200, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'no-store' });
-    res.end(JSON.stringify({ lobbies: arenaList() }));
-    return;
-  }
   // whoever is about to deploy says so here first, and everything kept is written (see `deploying`)
   if (url.pathname === '/deploying') return void deploying(url, res);
   // the changelog page asks here for its hearts and comments, and gives them (see `news`)
@@ -831,7 +822,7 @@ server.on('upgrade', (req, socket, head) => {
   } catch {
     /* not an address at all */
   }
-  if (wanted !== '/ws' && wanted !== '/arena') {
+  if (wanted !== '/ws') {
     socket.destroy();
     return;
   }
@@ -841,7 +832,6 @@ server.on('upgrade', (req, socket, head) => {
     socket.destroy();
     return;
   }
-  if (wanted === '/arena') return void arenaUpgrade(req, socket, head);
   wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
 });
 

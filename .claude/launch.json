@@ -31,6 +31,15 @@
         "--strictPort"
       ],
       "port": 4173
+    },
+    {
+      "name": "zona-arena-local",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "tsx",
+        "arena/server.ts"
+      ],
+      "port": 8090
     }
   ]
 }
