@@ -8,7 +8,8 @@
 // the game makes that one itself until this is run again.
 //
 //   npm run icons        (the local game must be running: npm run dev)
-//   npm run icons -- http://localhost:5173/zona
+//   npm run icons -- http://localhost:5173/zona?gfx=ultra
+// (?gfx=ultra: drawn with everything at full, as they always were; a player starts on Medium)
 
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -19,7 +20,7 @@ import WebSocket from 'ws';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
 const OUT = path.join(ROOT, 'public', 'assets', 'icons');
-const address = process.argv[2] ?? 'http://localhost:5173/zona';
+const address = process.argv[2] ?? 'http://localhost:5173/zona?gfx=ultra';
 const PORT = 9341;
 const CHROME = ['C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', '/usr/bin/google-chrome', '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'].find((p) => fs.existsSync(p));
 if (!CHROME) throw new Error('no Chrome or Edge found');

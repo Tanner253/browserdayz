@@ -45,8 +45,11 @@ export const FPS_LIMITS = [30, 40, 60, 120, 0];
  */
 export const PHONE: Omit<Graphics, 'fpsLimit' | 'volume'> = { scale: 0.85, msaa: 2, ao: 'off', shadows: 'low', foliage: 'medium' };
 
-/** Everything at full on a computer; a phone starts on its own setting, and the menu has the rest either way. (One the game has already failed to start on starts on the lowest: see LEAN.) */
-export const DEFAULT_GRAPHICS: Graphics = { ...(LEAN ? PRESETS.low : TOUCH ? PHONE : PRESETS.ultra), fpsLimit: 0, volume: 1 };
+/** A film (trailer.html) or a picture asked for at full (`?gfx=ultra`) is made with everything at full, as they always were. */
+const FULL = typeof location !== 'undefined' && (location.pathname.endsWith('/trailer.html') || new URLSearchParams(location.search).get('gfx') === 'ultra');
+
+/** Medium on a computer (the owner, 2026-10-14: "make default performance setting medium"; it was everything at full); a phone starts on its own setting, and the menu has the rest either way. What a player has set is kept. (One the game has already failed to start on starts on the lowest: see LEAN.) */
+export const DEFAULT_GRAPHICS: Graphics = { ...(LEAN ? PRESETS.low : TOUCH ? PHONE : FULL ? PRESETS.ultra : PRESETS.medium), fpsLimit: 0, volume: 1 };
 
 const STORE = 'zona.gfx';
 
