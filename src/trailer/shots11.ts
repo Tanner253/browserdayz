@@ -9,9 +9,9 @@
 //   2  high behind the fort: red's two coming from their end; ROUND 1                       2 to 3.2
 //   3  up the ramp behind blue, into the gate; the one on the landing falls; the kill feed   3.2 to 5
 //   4  red's rifleman on the tower over the ramp, firing                                     5 to 6
-//   5  the yard from the doorway landing: ROUND WON                                          6 to 7
-//   6  the front from far off: VICTORY, the scoreboard                                       7 to 8
+//   6  the front from far off: VICTORY, the scoreboard                                       6 to 8
 //   7  the end card: what the Arena is, and where                                            8 to 10
+// (5, ROUND WON in the yard, was cut: the owner, "the guy still walks into the stair case rail/support ... just cut that scene")
 //
 // Its score is the ninth film's band (music9.ts), five bars of two seconds: the card, the fight twice, the brass for
 // the win, the end. The framework (the fort warmed, the rails, the look, the two who storm the gate, where the first
@@ -742,47 +742,20 @@ export function buildShots(S: Stage): Shot[] {
     after: () => beat(),
   });
 
-  // ============================================================ 5. in at the gate, the yard beyond: blue's two walk out of it, ROUND WON
-  /** blue's two, `t` seconds into the shot: walking from the yard toward the gate, their rifles down */
-  const yard = (t: number) => {
-    [[A(0), F(5.4, gz - 1.6, 0), F(7.6, gz - 0.7, 0)], [A(1), F(4.9, gz + 0.9, 0), F(7.1, gz + 0.4, 0)]].forEach(([a, f, to]) => {
-      const p = f as THREE.Vector3, q = to as THREE.Vector3, u = clamp01((t + 1) / 2.4);
-      (a as Actor).pos.lerpVectors(p, q, u);
-      // (looked for from just over the paving: from a man's height the ray found the stair flight over Volkov's way, and he flew up onto it)
-      (a as Actor).pos.y = under((a as Actor).pos.clone(), 0.3, 3) ?? p.y;
-      (a as Actor).yaw = yawTo(p, q);
-      (a as Actor).aim = false;
-      (a as Actor).sprint = false;
-    });
-  };
-  add(1, {
-    name: 'round won',
+  // ============================================================ 6. the front from the open ground: VICTORY, the scoreboard
+  // (the two seconds of the cut ROUND WON with it; blue's two stood out of sight in the yard, not left mid-run on the ramp)
+  add(2, {
+    name: 'victory',
     bars: false,
     hour: DAY,
     stage: async () => {
       stand(A(0), F(5.4, gz - 1.6, 0), 0, GUN, [], MODS);
       stand(A(1), F(4.9, gz + 0.9, 0), 0, GUN, [], MODS);
       await dressed();
-      await run(36, (k) => yard(-1 + k / 60));
-      says('gap', 7, 4, 3, true);
-    },
-    lead: (t) => yard(t),
-    tick: (t) => yard(t),
-    // (from the gate's passage, looking in: the tenth film's 'in the gate')
-    cam: (t) => hand({ p: F(9.6, gz - 0.25, H), l: F(6, gz - 1.0, m(1.9)), fov: 50 }, t, 0.3),
-    after: () => beat(),
-  });
-
-  // ============================================================ 6. the front from the open ground: VICTORY, the scoreboard
-  add(1, {
-    name: 'victory',
-    bars: false,
-    hour: DAY,
-    stage: async () => {
       await run(20);
       says('over', 8, 5, 3, true);
     },
-    cam: (t) => hand({ p: G(rx + 17, gz + 5.5, 6.5), l: F(4, 0, 6), fov: 40 }, t, 0.25),
+    cam: (t) => hand({ p: G(rx + 17 - t * 0.5, gz + 5.5, 6.5), l: F(4, 0, 6), fov: 40 }, t, 0.25),
     after: () => beat(),
   });
 

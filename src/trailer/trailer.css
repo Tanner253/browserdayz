@@ -569,3 +569,15 @@ body.tr-menu9 .tr-gfx, body.tr-menu9 .tr-title, body.tr-menu9 .x8-grid, body.tr-
 .x11-end .c11-url { margin-top: 1.6vh; padding: 0.32em 1.1em 0.32em 1.44em; font-size: 5vh; font-weight: 800; font-stretch: condensed; letter-spacing: 0.3em; color: #fff; background: #ff4a36; box-shadow: 0 0.2em 1.6em rgba(0, 0, 0, 0.7); }
 /* (the Arena's screen in the film: its score bar, banners, kill feed and scoreboard; not whose health or rounds, which are a player's own and these shots are nobody's eyes) */
 .tr-cut11 .arena-hud .ah-hp, .tr-cut11 .arena-hud .ah-gun { display: none !important; }
+
+/* ===== the twelfth film: what is new */
+.x12-title { z-index: 3; display: flex; flex-direction: column; justify-content: center; padding-left: 6.6vw; text-transform: uppercase; opacity: var(--o, 1); background: linear-gradient(90deg, rgba(4, 6, 8, 0.6), rgba(4, 6, 8, 0) 60%); }
+.x12-title .t12-kick { font-size: 2.5vh; font-weight: 700; letter-spacing: 0.62em; color: #ffd35a; white-space: nowrap; }
+.x12-title .t12-name { margin-top: 0.8vh; font-size: 17vh; line-height: 0.9; font-weight: 800; font-stretch: condensed; letter-spacing: 0.08em; color: #fff3d6; white-space: nowrap; }
+.x12-door { z-index: 3; display: flex; align-items: center; justify-content: center; opacity: var(--o, 0); background: rgba(6, 6, 6, 0.86); }
+.x12-door img { width: 78vw; max-height: 82vh; object-fit: contain; box-shadow: 0 1.4vh 6vh rgba(0, 0, 0, 0.8); transform: scale(calc(0.96 + var(--o, 0) * 0.04)); }
+.x12-end { z-index: 3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.6vh; text-transform: uppercase; opacity: var(--o, 0); background: radial-gradient(ellipse at center, rgba(4, 6, 8, 0.55), rgba(4, 6, 8, 0.9)); }
+.x12-end .c12-list { display: flex; gap: 2.4vw; font-size: 3.4vh; font-weight: 800; font-stretch: condensed; letter-spacing: 0.3em; color: #ffd35a; }
+.x12-end .c12-name { font-size: 19vh; line-height: 0.9; font-weight: 800; font-stretch: condensed; letter-spacing: 0.16em; color: #fff3d6; }
+.x12-end .c12-name em { font-style: normal; color: #ffd35a; }
+.x12-end .c12-url { margin-top: 1.2vh; padding: 0.32em 1.1em 0.32em 1.44em; font-size: 5vh; font-weight: 800; font-stretch: condensed; letter-spacing: 0.3em; color: #101211; background: #ffd35a; box-shadow: 0 0.2em 1.6em rgba(0, 0, 0, 0.7); }
