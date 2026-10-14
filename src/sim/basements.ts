@@ -136,7 +136,7 @@ const DRESS: Record<RoomKind, string[]> = {
   hall: ['?Barrel_01'],
   root: ['Shelf_01', 'Shelf_01', 'wooden_crate_01', 'Barrel_01', 'barrel_03', '?Shelf_01', '?cardboard_box_01', '?wooden_crate_01'],
   work: ['WoodenTable_01', 'rack_small', 'steel_locker', 'wooden_crate_01', '?metal_jerrycan_green', '?utility_box_01', '?Barrel_01'],
-  closet: ['Shelf_01', 'cardboard_box_01', '?wooden_crate_01', '?metal_jerrycan_green'],
+  closet: ['wooden_crate_01', 'Shelf_01', 'cardboard_box_01', '?metal_jerrycan_green'],
   bunk: ['old_bed_frame', 'old_bed_frame', 'steel_locker', 'WoodenTable_01', 'painted_wooden_chair_01', '?wooden_military_crate', '?cardboard_box_01'],
   store: ['rack_wide', 'wooden_crate_01', 'Shelf_01', 'barrel_03', 'cardboard_box_01', '?rack_small', '?Barrel_01', '?cardboard_box_01'],
   vault: ['weapons_case', 'steel_locker', 'wooden_military_crate', 'rack_small', '?old_military_crate'],

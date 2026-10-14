@@ -381,11 +381,19 @@ export interface EconomyEvents {
  */
 // ('hamlet': the ruined houses along the track to the fort, 2026-10-13: named apart from the fort so that the map
 // marks the fort as wide as the fort)
-export const APART = new Set(['castle', 'hamlet', 'wreck']);
+// ('cellar': every basement's places, 2026-10-14: "basements are missing loot". Part of their steps they shared those
+// steps' counts with every house, and stood empty.)
+export const APART = new Set(['castle', 'hamlet', 'wreck', 'cellar']);
 /** the most of a place apart's free places that are ever filled: a room with something on every surface is a shop */
 const APART_FILL = 0.85;
 /** and how many times its fair share it is stocked to, up to that: a place apart is somewhere worth the going to */
 const APART_RICH = 1.5;
+/**
+ * A place apart that is not stocked as the fort is: how many times its fair share, and how it leans (unsaid: APART_RICH
+ * and APART_LEAN, the fort's garrison store). The cellars are houses' stores, of every kind a house keeps, and well
+ * stocked, a reward for going down: their places are few against the map's, and at the fort's share they held little.
+ */
+const OWN: Record<string, { rich: number; lean: Record<string, number> }> = { cellar: { rich: 3, lean: {} } };
 /**
  * How a place apart's share leans, sort by sort (times its share; a sort not named, 1). 2026-10-13, after the owner
  * had played the fort: "the loot in the castle should be a bit better i think". It was stocked exactly as its step
@@ -457,7 +465,7 @@ export class Economy {
       if (!at) continue;
       const sum = (list: number[]) => list.reduce((a, i) => a + (this.liesAt(id, rule, i, t) ? this.pull(rule, i, t) : 0), 0);
       const mine = sum(here), theirs = sum(there);
-      if (mine > 0) fair.push([id, Math.min(at, (theirs > 0 ? (at * mine) / theirs : at) * APART_RICH * (APART_LEAN[id] ?? 1))]);
+      if (mine > 0) fair.push([id, Math.min(at, (theirs > 0 ? (at * mine) / theirs : at) * (OWN[place]?.rich ?? APART_RICH) * ((OWN[place]?.lean ?? APART_LEAN)[id] ?? 1))]);
     }
     // (What it is never without is taken out of the room there is first: `sure` of each sort. What each sort's share
     // comes to over that is its `spare`, and the spares fill what room is left, cut down alike if there is not

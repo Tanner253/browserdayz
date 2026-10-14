@@ -1533,7 +1533,8 @@ export class Buildings {
 
   /**
    * The basements: what they are made of (src/world/basement-build.ts), what stands in them, and their places for
-   * things, each of the kind its room is (a root cellar's is a village's, a vault's the army's) and on the step of the
+   * things, each of the kind its room is (a root cellar's is a village's, a vault's the army's), stocked apart from
+   * the rest of the map (`cellar` in src/sim/economy.ts: as part of it, they stood empty), on the step of the
    * map its house is on, or one or two steps better down a hideaway, a vault or a second level. Kept on the world:
    * the ground is told where it is open, and the server who may be down there.
    */
@@ -1557,7 +1558,7 @@ export class Buildings {
       }
       for (const s of b.spots) {
         const [x, z] = frameToWorld(b, s.x, s.z);
-        points.push({ x, y: s.y, z, usage: CELLAR_USAGE[b.rooms[s.room].kind], building: b.plot, floor: s.floor });
+        points.push({ x, y: s.y, z, usage: CELLAR_USAGE[b.rooms[s.room].kind], building: 'cellar', floor: s.floor });
         better.push(b.better[s.room]);
       }
     }
