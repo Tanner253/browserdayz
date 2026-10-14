@@ -447,7 +447,7 @@ ok('the canopy is built solid: not seen through, both faces of its cloth drawn, 
 
 // ------------------------------------------------------------------ the real server, players over the wire
 if (process.argv.includes('--server')) {
-  const PORT = 8163, SITE = 8164;
+  const PORT = 8205, SITE = 8206;
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
   let k = 0;
   class Player {

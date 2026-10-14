@@ -18,7 +18,7 @@ import { PROTOCOL, type S2C } from '../src/net/protocol';
 import { CASTLE, CASTLE_SCALE, UNDER, castleAt, castleLoose, castleUnder, hatchLine, inCastle, looseLocal } from '../src/sim/castle';
 import { generateWorld, heightAt } from '../src/world/worldgen';
 
-const PORT = 8147;
+const PORT = 8203;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const world = generateWorld();
 const ground = (x: number, z: number) => heightAt(world.heights, x, z);

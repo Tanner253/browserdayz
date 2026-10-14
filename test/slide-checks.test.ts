@@ -15,7 +15,7 @@ import { PROTOCOL, type S2C } from '../src/net/protocol';
 import { SLIDE } from '../src/sim/slopes';
 import { generateWorld, heightAt } from '../src/world/worldgen';
 
-const PORT = 8173;
+const PORT = 8209;
 /** the fastest the server lets anybody go on their own legs, m/s over the ground; what it lets go on top of that every time, metres; and the seconds of it that can be saved up (CHECK.foot, .grace and .carry in server/index.ts) */
 const FOOT = 9.5, GRACE = 3, CARRY = 2;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));

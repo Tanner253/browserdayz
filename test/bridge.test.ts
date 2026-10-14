@@ -21,7 +21,7 @@ import { RIDE_HEIGHT, jeepSpots, yawQuat } from '../src/sim/vehicles';
 import { LOOP, generateWorld, heightAt, inPlay, loopLine } from '../src/world/worldgen';
 import { bridgeBoxes } from '../src/world/bridge';
 
-const PORT = 8143;
+const PORT = 8201;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const world = generateWorld();
 const ground = (x: number, z: number) => heightAt(world.heights, x, z);

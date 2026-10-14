@@ -17,7 +17,7 @@ import { CRATE_SPECS, HUNG } from '../src/sim/crates';
 import { SEARCHED_KINDS } from '../src/world/buildings';
 import { buildWorldData } from '../server/world';
 
-const PORT = 8171;
+const PORT = 8207;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 let checks = 0;
 const ok = (name: string) => {
