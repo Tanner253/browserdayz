@@ -119,6 +119,108 @@ export function clipOut(poly: number[][], cut: Cut): number[][][] {
   return kept;
 }
 
+// ------------------------------------------------------------------ faces laid back to back
+
+/**
+ * FACES LAID BACK TO BACK (2026-10-13: "there is overlapping textures on the walls of the castles"). A kit's piece
+ * is put together of blocks that each have all their faces: a parapet is a block stood on the walk, and its
+ * underside is drawn in the very plane of the walk's top, which runs on under it; the ring of wall round a tower's
+ * platform lies on the platform the same way. The kit's stuff is drawn from both sides, so the two are one over the
+ * other to the hair wherever either is seen, and they are seen wherever a ruin has broken the block off or open:
+ * 170 m2 of the mountain fort flickered so. Of a piece's triangles, in the piece's own measure, one that faces
+ * straight down and lies (within `near`) on one that faces straight up has what lies on it taken away. What it lay
+ * on is left: it is what is seen from over it, and from under it too. A ceiling that is seen (a gate's passage, a
+ * lintel) lies on nothing, and is not touched. ONLY for stuff that is drawn from both sides: of stuff drawn from one
+ * side the two are never seen together, and the lower is all that is seen from under.
+ *
+ * @param pos the triangles' corners in the piece's own measure, nine numbers to a triangle
+ * @returns for each triangle that loses anything, by its number: the flat pieces left of it (none: all of it lay
+ *          on something), each corner said as how much of each of the triangle's own three corners it is
+ */
+export function backedOut(pos: ArrayLike<number>, near = 0.02): Map<number, V3[][]> {
+  const n = Math.floor(pos.length / 9), ups = new Map<number, number[]>(), downs: number[] = [], out = new Map<number, V3[][]>();
+  for (let t = 0; t < n; t++) {
+    const o = t * 9, ux = pos[o + 3] - pos[o], uy = pos[o + 4] - pos[o + 1], uz = pos[o + 5] - pos[o + 2], vx = pos[o + 6] - pos[o], vy = pos[o + 7] - pos[o + 1], vz = pos[o + 8] - pos[o + 2];
+    const gy = uz * vx - ux * vz, l = Math.hypot(uy * vz - uz * vy, gy, ux * vy - uy * vx);
+    if (l < 1e-10 || Math.abs(gy) < 0.9994 * l) continue;
+    if (gy < 0) downs.push(t);
+    else {
+      const k = Math.round(pos[o + 1] / near);
+      (ups.get(k) ?? ups.set(k, []).get(k)!).push(t);
+    }
+  }
+  if (!ups.size) return out;
+  const area = (poly: number[][]) => {
+    let s = 0;
+    for (let k = 1; k + 1 < poly.length; k++) s += (poly[k][0] - poly[0][0]) * (poly[k + 1][2] - poly[0][2]) - (poly[k + 1][0] - poly[0][0]) * (poly[k][2] - poly[0][2]);
+    return Math.abs(s) / 2;
+  };
+  const longest = (poly: number[][]) => Math.max(...poly.map((v, k) => Math.hypot(poly[(k + 1) % poly.length][0] - v[0], poly[(k + 1) % poly.length][2] - v[2])));
+  for (const t of downs) {
+    const o = t * 9, y = pos[o + 1], at = Math.round(y / near);
+    const x0 = Math.min(pos[o], pos[o + 3], pos[o + 6]), x1 = Math.max(pos[o], pos[o + 3], pos[o + 6]), z0 = Math.min(pos[o + 2], pos[o + 5], pos[o + 8]), z1 = Math.max(pos[o + 2], pos[o + 5], pos[o + 8]);
+    let rest: number[][][] = [[[pos[o], y, pos[o + 2], 1, 0, 0], [pos[o + 3], pos[o + 4], pos[o + 5], 0, 1, 0], [pos[o + 6], pos[o + 7], pos[o + 8], 0, 0, 1]]], took = false;
+    for (const u of [at - 1, at, at + 1].flatMap((k) => ups.get(k) ?? [])) {
+      const p = u * 9;
+      if (!rest.length) break;
+      if (Math.abs(pos[p + 1] - y) > near) continue;
+      if (Math.min(pos[p], pos[p + 3], pos[p + 6]) >= x1 || Math.max(pos[p], pos[p + 3], pos[p + 6]) <= x0 || Math.min(pos[p + 2], pos[p + 5], pos[p + 8]) >= z1 || Math.max(pos[p + 2], pos[p + 5], pos[p + 8]) <= z0) continue;
+      // (the one it lies on, as a cut: upright through its three sides, each of them facing away from its third corner)
+      const planes: Cut['planes'] = [];
+      for (let e = 0; e < 3; e++) {
+        const a = p + e * 3, b = p + ((e + 1) % 3) * 3, c = p + ((e + 2) % 3) * 3, len = Math.hypot(pos[b + 2] - pos[a + 2], pos[a] - pos[b]) || 1;
+        let nx = (pos[b + 2] - pos[a + 2]) / len, nz = (pos[a] - pos[b]) / len;
+        if (nx * (pos[c] - pos[a]) + nz * (pos[c + 2] - pos[a + 2]) > 0) [nx, nz] = [-nx, -nz];
+        planes.push([nx, 0, nz, nx * pos[a] + nz * pos[a + 2]]);
+      }
+      const cut: Cut = { planes, mid: [0, 0, 0], reach: 0 }, next: number[][][] = [];
+      for (const poly of rest) {
+        // (one that takes nothing of it is not let cut it into pieces)
+        const kept = clipOut(poly, cut);
+        if (area(poly) - kept.reduce((s, q) => s + area(q), 0) < 1e-7) next.push(poly);
+        else {
+          took = true;
+          next.push(...kept);
+        }
+      }
+      rest = next;
+    }
+    // (what is left is kept, down to a strip a hair wide: that is the sums' own error, where two it lay on met under it)
+    if (took) out.set(t, rest.filter((poly) => area(poly) > 1e-4 * longest(poly)).map((poly) => poly.map((v): V3 => [v[3], v[4], v[5]])));
+  }
+  return out;
+}
+
+/**
+ * A PIECE'S TRIANGLES AS THEY ARE STOOD in a layout, less what of them lay back to back in the piece (`backs`: see
+ * `backedOut`; null: nothing is taken) and less what the layout's cuts take out. Each corner that is left is handed
+ * to `put`, three to a triangle. A corner is a row of numbers whose first three are where it is in the layout's
+ * measure; the rest (which way it faces, where it is on a picture) are carried along and worked out for each new
+ * corner. `index`: which corners each triangle has, three to a triangle (null: the corners in threes, as they come).
+ * The one place this is done: whoever draws a layout and whoever counts what is drawn of it both ask here.
+ */
+export function standTriangles(corners: number[][], index: ArrayLike<number> | null, cuts: Cut[], backs: Map<number, V3[][]> | null, put: (corner: number[]) => void): void {
+  const count = index ? index.length : corners.length;
+  for (let t = 0; t + 2 < count; t += 3) {
+    const a = corners[index ? index[t] : t], b = corners[index ? index[t + 1] : t + 1], c = corners[index ? index[t + 2] : t + 2], left = backs?.get(t / 3);
+    let polys: number[][][] = left ? left.map((poly) => poly.map((w) => a.map((v, k) => v * w[0] + b[k] * w[1] + c[k] * w[2]))) : [[a, b, c]];
+    if (cuts.length && polys.length) {
+      // (only the cuts that could touch this triangle are tried on it)
+      const mx = (a[0] + b[0] + c[0]) / 3, my = (a[1] + b[1] + c[1]) / 3, mz = (a[2] + b[2] + c[2]) / 3;
+      const reach = Math.max(Math.hypot(a[0] - mx, a[1] - my, a[2] - mz), Math.hypot(b[0] - mx, b[1] - my, b[2] - mz), Math.hypot(c[0] - mx, c[1] - my, c[2] - mz));
+      for (const cut of cuts) {
+        if (Math.hypot(cut.mid[0] - mx, cut.mid[1] - my, cut.mid[2] - mz) > cut.reach + reach) continue;
+        polys = polys.flatMap((poly) => clipOut(poly, cut));
+      }
+    }
+    for (const poly of polys) for (let k = 1; k + 1 < poly.length; k++) {
+      put(poly[0]);
+      put(poly[k]);
+      put(poly[k + 1]);
+    }
+  }
+}
+
 // ------------------------------------------------------------------ where a piece's points go
 
 /** How a piece is stood: 16 numbers, a column at a time (as three.js has them). Its own measure is made bigger, tipped, turned and then moved, in that order. */

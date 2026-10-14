@@ -17,7 +17,7 @@
 import * as THREE from 'three';
 import { assets } from '../core/assets';
 import { breathe } from '../core/breathe';
-import { clipOut, kitMatrix, type KitPiece, type V3 } from '../sim/kit';
+import { backedOut, kitMatrix, standTriangles, type KitPiece, type V3 } from '../sim/kit';
 import type { ShaderPatch } from './atmosphere';
 import { SNOW_GROUND } from './ground';
 
@@ -34,8 +34,21 @@ export interface KitOptions {
   attr?: { name: string; of: (p: V3, n: V3) => [number, number] };
 }
 
-interface Part { geo: THREE.BufferGeometry; mat: THREE.MeshStandardMaterial; m: THREE.Matrix4 }
+interface Part { geo: THREE.BufferGeometry; mat: THREE.MeshStandardMaterial; m: THREE.Matrix4; backs: Map<number, V3[][]> | null }
 const parted = new WeakMap<THREE.Object3D, Map<string, Part[]>>();
+/** what of a shape's triangles lies back to back in it, where its stuff is drawn from both sides (see `backedOut`): worked out once for each shape of each piece, in the piece's own measure */
+function backsOf(geo: THREE.BufferGeometry, mat: THREE.Material, m: THREE.Matrix4): Map<number, V3[][]> | null {
+  if (mat.side !== THREE.DoubleSide) return null;
+  const P = geo.getAttribute('position'), I = geo.getIndex(), count = I ? I.count : P.count, pos = new Float64Array(count * 3), v = new THREE.Vector3();
+  for (let i = 0; i < count; i++) {
+    v.fromBufferAttribute(P, I ? I.getX(i) : i).applyMatrix4(m);
+    pos[i * 3] = v.x;
+    pos[i * 3 + 1] = v.y;
+    pos[i * 3 + 2] = v.z;
+  }
+  const backs = backedOut(pos);
+  return backs.size ? backs : null;
+}
 /** the shapes a piece is made of, each said from the piece's own origin */
 function partsOf(root: THREE.Object3D, id: string): Part[] {
   let known = parted.get(root);
@@ -49,7 +62,9 @@ function partsOf(root: THREE.Object3D, id: string): Part[] {
   parts = [];
   node.traverse((o) => {
     const mesh = o as THREE.Mesh;
-    if (mesh.isMesh) parts!.push({ geo: mesh.geometry, mat: mesh.material as THREE.MeshStandardMaterial, m: back.clone().multiply(mesh.matrixWorld) });
+    if (!mesh.isMesh) return;
+    const m = back.clone().multiply(mesh.matrixWorld);
+    parts!.push({ geo: mesh.geometry, mat: mesh.material as THREE.MeshStandardMaterial, m, backs: backsOf(mesh.geometry, mesh.material as THREE.Material, m) });
   });
   known.set(id, parts);
   return parts;
@@ -89,25 +104,14 @@ export async function kitMeshes(model: string, layout: KitPiece[], o: KitOptions
         n.fromBufferAttribute(N, i).applyMatrix3(turnOnly).normalize();
         corners.push([v.x, v.y, v.z, n.x, n.y, n.z, U ? U.getX(i) * repeat : 0, U ? U.getY(i) * repeat : 0]);
       }
-      const count = I ? I.count : P.count, cuts = p.cut ?? [];
-      for (let t = 0; t < count; t += 3) {
-        let polys: number[][][] = [[0, 1, 2].map((k) => corners[I ? I.getX(t + k) : t + k])];
-        if (cuts.length) {
-          // (only the cuts that could touch this triangle are tried on it)
-          const a = polys[0][0], b = polys[0][1], c = polys[0][2], mx = (a[0] + b[0] + c[0]) / 3, my = (a[1] + b[1] + c[1]) / 3, mz = (a[2] + b[2] + c[2]) / 3;
-          const reach = Math.max(Math.hypot(a[0] - mx, a[1] - my, a[2] - mz), Math.hypot(b[0] - mx, b[1] - my, b[2] - mz), Math.hypot(c[0] - mx, c[1] - my, c[2] - mz));
-          for (const cut of cuts) {
-            if (Math.hypot(cut.mid[0] - mx, cut.mid[1] - my, cut.mid[2] - mz) > cut.reach + reach) continue;
-            polys = polys.flatMap((poly) => clipOut(poly, cut));
-          }
-        }
-        for (const poly of polys) for (let k = 1; k + 1 < poly.length; k++) for (const q of [poly[0], poly[k], poly[k + 1]]) {
-          row.pos.push(q[0], q[1], q[2]);
-          row.nrm.push(q[3], q[4], q[5]);
-          row.uv.push(q[6], q[7]);
-          if (o.attr) row.extra.push(...o.attr.of([q[0], q[1], q[2]], [q[3], q[4], q[5]]));
-        }
-      }
+      // (what is left of each triangle when the faces laid back to back in the piece and the layout's cuts are out of it)
+      const to = row;
+      standTriangles(corners, I ? (I.array as ArrayLike<number>) : null, p.cut ?? [], part.backs, (q) => {
+        to.pos.push(q[0], q[1], q[2]);
+        to.nrm.push(q[3], q[4], q[5]);
+        to.uv.push(q[6], q[7]);
+        if (o.attr) to.extra.push(...o.attr.of([q[0], q[1], q[2]], [q[3], q[4], q[5]]));
+      });
     }
   }
   const meshes: THREE.Mesh[] = [];

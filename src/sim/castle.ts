@@ -467,9 +467,15 @@ function gaps(side: 'n' | 's' | 'e' | 'w'): [number, number, boolean][] {
 export function castleKit(): KitPiece[] {
   const C = CASTLE, U = UNDER, T = C.tower, ex = C.hx + C.parapet.thick / 2, ez = C.hz + C.parapet.thick / 2, xo = ex + WALL.out, zo = ez + WALL.out, y0 = -KIT_LEVELS.walk;
   const out: KitPiece[] = [];
+  // WHERE A PARAPET IS GONE IT IS CUT FROM A HAIR OVER THE WALK'S TOP, AND THE WALK'S TOP IS LEFT. The kit's walk is at
+  // 7.08486 in the piece's own measure (0.0049 here), and runs on under the parapet: cut from 0.004 it went with the
+  // parapet, and nothing was drawn underfoot in the gate's passage or along the north wall's gap: the eye went down
+  // the hollow wall to its footing. (It was cut so low to be rid of the parapet's underside, which lay in the walk's
+  // very plane and flickered: that is taken out of the piece itself now, see `backedOut` in the kit.)
+  const gone = 0.0055;
   /** the parapet of a side, cut where it is gone: across the whole of its thickness, from the walk up (a merlon: from the parapet's top up) */
   const top = (side: 'n' | 's' | 'e' | 'w'): Cut[] => gaps(side).map(([u0, u1, whole]) => {
-    const lo = whole ? KIT_LEVELS.parapet - KIT_LEVELS.walk - 0.02 : 0.004;
+    const lo = whole ? KIT_LEVELS.parapet - KIT_LEVELS.walk - 0.02 : gone;
     return side === 'n' ? cutBox(u0, u1, lo, 4, -ez - 0.2, -ez + 1.3) : side === 's' ? cutBox(u0, u1, lo, 4, ez - 1.3, ez + 0.2) : side === 'e' ? cutBox(ex - 1.3, ex + 0.2, lo, 4, u0, u1) : cutBox(-ex - 0.2, -ex + 1.3, lo, 4, u0, u1);
   });
   const wall = 'fort_wall_thin_straight_01', gh = GATEHOUSE.scale, gz = (C.gate.z0 + C.gate.z1) / 2, g0 = gz + ((KIT_GATE.z0 + KIT_GATE.z1) / 2) * gh;
@@ -477,7 +483,7 @@ export function castleKit(): KitPiece[] {
   out.push({ id: wall, name: 'south wall', at: [-WALL.half, y0, zo], turn: Math.PI / 2, cut: top('s') });
   out.push({ id: wall, name: 'west wall', at: [-xo, y0, -WALL.half], turn: 0, cut: [...top('w'), cutBox(-xo - 0.3, -U.x + 0.1, U.floor - 0.02, U.floor + 2.07, U.goat.z0, U.goat.z1)] });
   // (the east wall: its parapet is gone under the gatehouse, which stands in its place; and a length of it fell out to the cellars' floor)
-  out.push({ id: wall, name: 'east wall', at: [xo, y0, WALL.half], turn: Math.PI, cut: [...top('e'), cutBox(ex - 1.3, ex + 0.2, 0.004, 4, g0 - 7.41 * gh, g0), cutBox(U.x - 0.3, xo + 0.5, U.floor + 0.1, 4, U.rent.z0, U.rent.z1)] });
+  out.push({ id: wall, name: 'east wall', at: [xo, y0, WALL.half], turn: Math.PI, cut: [...top('e'), cutBox(ex - 1.3, ex + 0.2, gone, 4, g0 - 7.41 * gh, g0), cutBox(U.x - 0.3, xo + 0.5, U.floor + 0.1, 4, U.rent.z0, U.rent.z1)] });
   // the gatehouse: its foot is the east wall's top; the sill across its passage is taken out, and the ramp's boards run through
   out.push({ id: 'fort_wall_thin_gate_01', name: 'gatehouse', at: [ex, 0, g0], turn: Math.PI, scale: gh, cut: [cutBox(ex - WALL.deep * gh - 0.1, ex + 0.2, -0.05, (KIT_GATE.sill + 0.06) * gh + 0.02, g0 - KIT_GATE.z1 * gh - 0.02, g0 - KIT_GATE.z0 * gh + 0.02)] });
   // the foot of each tower: the kit's round tower, its platform level with the terrace. Taken out of it: its middle

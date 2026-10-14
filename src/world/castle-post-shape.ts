@@ -218,10 +218,13 @@ export function postShape(made: Made[], g: (x: number, z: number) => number = ca
         hard.tube(a, b, 0.014, 0.014, 3, PAINT.steel);
         for (const e of [a, b, mix(a, b, 0.3), mix(a, b, 0.7)]) hard.tube(add(e, [0, -0.45, 0]), add(e, [0, 0.45, 0]), 0.009, 0.009, 3, PAINT.steel);
       }
+      // (two guys come down to each peg, from two heights: the peg is made once. Made for each guy it was one block twice in one place.)
+      const pegs = new Set<string>();
       for (const guy of m.guys) {
-        const from: V3 = [m.at[0], m.at[1] + guy.from, m.at[2]];
+        const from: V3 = [m.at[0], m.at[1] + guy.from, m.at[2]], peg = guy.to.map((v) => v.toFixed(2)).join();
         hard.tube(from, guy.to, 0.007, 0.007, 3, PAINT.iron);
-        hard.box(add(guy.to, [0, 0.05, 0]), [1, 0, 0], UP, [0, 0, 1], [0.05, 0.05, 0.05], PAINT.iron);
+        if (!pegs.has(peg)) hard.box(add(guy.to, [0, 0.05, 0]), [1, 0, 0], UP, [0, 0, 1], [0.05, 0.05, 0.05], PAINT.iron);
+        pegs.add(peg);
       }
       hard.holds = 1;
     } else if (m.t === 'bags') {
