@@ -112,7 +112,7 @@ Admins only:
 
 ## Player slots
 
-`MAX_PLAYERS` on Render (24 now). Above it, players wait in the line.
+`MAX_PLAYERS` on Render (35 now). Above it, players wait in the line.
 
 ## Added on 12 October
 

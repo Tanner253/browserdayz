@@ -17,4 +17,4 @@ services:
       - key: NODE_VERSION
         value: "22"
       - key: MAX_PLAYERS
-        value: "24"
+        value: "35"
