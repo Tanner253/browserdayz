@@ -136,7 +136,10 @@ const DRESS: Record<RoomKind, string[]> = {
   hall: ['?Barrel_01'],
   root: ['Shelf_01', 'Shelf_01', 'wooden_crate_01', 'Barrel_01', 'barrel_03', '?Shelf_01', '?cardboard_box_01', '?wooden_crate_01'],
   work: ['WoodenTable_01', 'rack_small', 'steel_locker', 'wooden_crate_01', '?metal_jerrycan_green', '?utility_box_01', '?Barrel_01'],
-  closet: ['wooden_crate_01', 'Shelf_01', 'cardboard_box_01', '?metal_jerrycan_green'],
+  // (A crate in every closet waits for the next time the basements are laid out afresh: the order here is drawn from
+  // one roll of the dice for the whole basement, and a closet laid out otherwise moved everything after it, the
+  // places of things that lie in the basements now among them.)
+  closet: ['Shelf_01', 'cardboard_box_01', '?wooden_crate_01', '?metal_jerrycan_green'],
   bunk: ['old_bed_frame', 'old_bed_frame', 'steel_locker', 'WoodenTable_01', 'painted_wooden_chair_01', '?wooden_military_crate', '?cardboard_box_01'],
   store: ['rack_wide', 'wooden_crate_01', 'Shelf_01', 'barrel_03', 'cardboard_box_01', '?rack_small', '?Barrel_01', '?cardboard_box_01'],
   vault: ['weapons_case', 'steel_locker', 'wooden_military_crate', 'rack_small', '?old_military_crate'],
