@@ -4,7 +4,7 @@
 
 import * as THREE from 'three';
 import type RAPIER from '@dimforge/rapier3d-compat';
-import { physics, GLASS_GROUPS, HITBOX_GROUPS, SOLID_GROUPS, type Surface } from '../core/physics';
+import { physics, FreeZone, GLASS_GROUPS, HITBOX_GROUPS, SOLID_GROUPS, type Surface } from '../core/physics';
 import { audio } from '../core/audio';
 import type { Atmosphere } from '../world/atmosphere';
 import { F_AIM, F_BLEED, F_CROUCH, F_LIGHT, F_DANCE, F_DEAD, F_GROUND, F_GUARD, F_LEAN_L, F_LEAN_R, F_LIMP, F_PRONE, F_SIT, F_SURRENDER, type Act, type Pose } from '../net/protocol';
@@ -78,6 +78,8 @@ export class RemotePlayer implements Damageable {
   /** lying down (their game says so in its flags): the body lies, and so does what of it can be hit */
   private lying = false;
   private flat: RAPIER.Collider[] = [];
+  /** the zones the body bends, by their colliders (see placeZones) */
+  private loose = new Map<RAPIER.Collider, FreeZone>();
   /** the middle of the head, in the world, as of the last frame (null until the body has been seen) */
   private headAt: THREE.Vector3 | null = null;
   private ready = false;
@@ -95,24 +97,32 @@ export class RemotePlayer implements Damageable {
       physics.tag(c, { surface: 'flesh', owner: this, zone: z });
       list.push(c);
     };
+    // (the ones the body bends, put where its joints have them each frame (see placeZones), are colliders of their own: see FreeZone)
+    const bent = (list: RAPIER.Collider[], desc: RAPIER.ColliderDesc, at: { x: number; y: number; z: number }, z: HitZone) => {
+      const f = new FreeZone(desc.setCollisionGroups(HITBOX_GROUPS), at);
+      physics.tag(f.collider, { surface: 'flesh', owner: this, zone: z });
+      f.place(pose[0], pose[1], pose[2], pose[3]);
+      this.loose.set(f.collider, f);
+      list.push(f.collider);
+    };
     // measured on the body: x to its right, z behind it
-    zone(this.stand, R.ColliderDesc.ball(0.125).setTranslation(0, 1.64, -0.02), 'head');
+    bent(this.stand, R.ColliderDesc.ball(0.125), { x: 0, y: 1.64, z: -0.02 }, 'head');
     // (the body's box took the arms in with it, and a round through a forearm was a round through the chest: the
     // box is the trunk's width now, and the arms hang either side of it as boxes of their own)
-    zone(this.stand, R.ColliderDesc.cuboid(0.18, 0.31, 0.14).setTranslation(0, 1.21, 0), 'torso');
+    bent(this.stand, R.ColliderDesc.cuboid(0.18, 0.31, 0.14), { x: 0, y: 1.21, z: 0 }, 'torso');
     zone(this.stand, R.ColliderDesc.cuboid(0.055, 0.3, 0.09).setTranslation(-0.24, 1.2, 0), 'arms');
     zone(this.stand, R.ColliderDesc.cuboid(0.055, 0.3, 0.09).setTranslation(0.24, 1.2, 0), 'arms');
     zone(this.stand, R.ColliderDesc.cuboid(0.18, 0.45, 0.14).setTranslation(0, 0.45, 0.03), 'legs');
     // crouched it leans forward over one knee, hips well behind the head
-    zone(this.crouch, R.ColliderDesc.ball(0.125).setTranslation(-0.07, 1.03, -0.12), 'head');
-    zone(this.crouch, R.ColliderDesc.cuboid(0.17, 0.24, 0.2).setTranslation(-0.07, 0.72, 0.1), 'torso');
+    bent(this.crouch, R.ColliderDesc.ball(0.125), { x: -0.07, y: 1.03, z: -0.12 }, 'head');
+    bent(this.crouch, R.ColliderDesc.cuboid(0.17, 0.24, 0.2), { x: -0.07, y: 0.72, z: 0.1 }, 'torso');
     zone(this.crouch, R.ColliderDesc.cuboid(0.05, 0.22, 0.12).setTranslation(-0.29, 0.72, 0.06), 'arms');
     zone(this.crouch, R.ColliderDesc.cuboid(0.05, 0.22, 0.12).setTranslation(0.15, 0.72, 0.06), 'arms');
     zone(this.crouch, R.ColliderDesc.cuboid(0.25, 0.24, 0.3).setTranslation(-0.02, 0.24, 0.07), 'legs');
     // lying: put where the body lies each frame (see placeZones): the legs are behind the hips, not under them
-    zone(this.flat, R.ColliderDesc.ball(0.125), 'head');
-    zone(this.flat, R.ColliderDesc.cuboid(0.25, 0.31, 0.14), 'torso');
-    zone(this.flat, R.ColliderDesc.cuboid(0.2, 0.45, 0.14), 'legs');
+    bent(this.flat, R.ColliderDesc.ball(0.125), { x: 0, y: 0, z: 0 }, 'head');
+    bent(this.flat, R.ColliderDesc.cuboid(0.25, 0.31, 0.14), { x: 0, y: 0, z: 0 }, 'torso');
+    bent(this.flat, R.ColliderDesc.cuboid(0.2, 0.45, 0.14), { x: 0, y: 0, z: 0 }, 'legs');
     for (const c of [...this.crouch, ...this.flat]) c.setEnabled(false);
     // players can't walk through each other; shots are only stopped by the hit zones
     this.blocker = physics.world.createCollider(R.ColliderDesc.capsule(0.5, 0.27).setTranslation(0, 0.8, 0).setCollisionGroups(GLASS_GROUPS), this.body);
@@ -215,7 +225,21 @@ export class RemotePlayer implements Damageable {
    * stay under the hips: they do not go anywhere the feet do not.)
    */
   private placeZones() {
-    if (!this.alive || !this.avatar.frame(_head, _neck, _pelvis)) return;
+    if (this.alive && this.avatar.frame(_head, _neck, _pelvis)) this.bendZones();
+    // (the bent ones are colliders of their own: put where the body now is, bent this frame or not)
+    for (const c of this.lying ? this.flat : this.crouched ? this.crouch : this.stand) this.loose.get(c)?.place(this.pos.x, this.pos.y, this.pos.z, this.yaw);
+  }
+
+  /** a bent zone's place (and turn) on the body, in the body's own frame */
+  private bend(c: RAPIER.Collider, at: THREE.Vector3, turn?: { x: number; y: number; z: number; w: number }) {
+    const f = this.loose.get(c)!;
+    f.at.x = at.x;
+    f.at.y = at.y;
+    f.at.z = at.z;
+    if (turn) Object.assign(f.turn, { x: turn.x, y: turn.y, z: turn.z, w: turn.w });
+  }
+
+  private bendZones() {
     (this.headAt ??= new THREE.Vector3()).copy(_head);
     // into the body's own frame: x to its right, z behind it
     const c = Math.cos(this.yaw), s = Math.sin(this.yaw);
@@ -227,19 +251,16 @@ export class RemotePlayer implements Damageable {
       // the chest along the line from the hips to the neck, whichever way that lies; the legs on the same line, behind the hips
       const along = _along.copy(_neck).sub(_pelvis).normalize();
       const q = _lie.setFromUnitVectors(_up, along);
-      this.flat[0].setTranslationWrtParent(_head);
-      this.flat[2].setTranslationWrtParent(_legs.copy(_pelvis).addScaledVector(along, -0.48));
-      this.flat[2].setRotationWrtParent(q);
-      this.flat[1].setTranslationWrtParent(_pelvis.lerp(_neck, 0.54));
-      this.flat[1].setRotationWrtParent(q);
+      this.bend(this.flat[0], _head);
+      this.bend(this.flat[2], _legs.copy(_pelvis).addScaledVector(along, -0.48), q);
+      this.bend(this.flat[1], _pelvis.lerp(_neck, 0.54), q);
       return;
     }
     const set = this.crouched ? this.crouch : this.stand;
-    set[0].setTranslationWrtParent(_head);
+    this.bend(set[0], _head);
     // the chest: between the hips and the neck, and over to one side as far as the back is
     const roll = Math.atan2(_neck.x - _pelvis.x, _neck.y - _pelvis.y);
-    set[1].setTranslationWrtParent(_pelvis.lerp(_neck, 0.54));
-    set[1].setRotationWrtParent({ x: 0, y: 0, z: Math.sin(-roll / 2), w: Math.cos(-roll / 2) });
+    this.bend(set[1], _pelvis.lerp(_neck, 0.54), { x: 0, y: 0, z: Math.sin(-roll / 2), w: Math.cos(-roll / 2) });
   }
 
   private applyZones() {
@@ -444,7 +465,9 @@ export class RemotePlayer implements Damageable {
   dispose() {
     this.avatar.dispose();
     if (this.ready) {
-      for (const c of [...this.stand, ...this.crouch, this.blocker]) physics.tags.delete(c.handle);
+      for (const c of [...this.stand, ...this.crouch, ...this.flat, this.blocker]) physics.tags.delete(c.handle);
+      // (the bent zones are on no body: see FreeZone)
+      for (const c of this.loose.keys()) physics.world.removeCollider(c, false);
       physics.world.removeRigidBody(this.body);
     }
   }

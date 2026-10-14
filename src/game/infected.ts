@@ -7,7 +7,7 @@
 
 import * as THREE from 'three';
 import type RAPIER from '@dimforge/rapier3d-compat';
-import { physics, GLASS_GROUPS, HITBOX_GROUPS, PLAYER_GROUPS, SIGHT_GROUPS } from '../core/physics';
+import { physics, FreeZone, GLASS_GROUPS, HITBOX_GROUPS, PLAYER_GROUPS, SIGHT_GROUPS } from '../core/physics';
 import { audio } from '../core/audio';
 import type { Atmosphere } from '../world/atmosphere';
 import { BUILDING_FOOTPRINT, bunkerPlace, heightAt, type World } from '../world/worldgen';
@@ -89,6 +89,8 @@ export class Infected implements Damageable {
   private gone = false;
   private body!: RAPIER.RigidBody;
   private zones: RAPIER.Collider[] = [];
+  /** the head and the chest (the first two of `zones`): put where the bent body has them */
+  private free: FreeZone[] = [];
   private blocker!: RAPIER.Collider;
   private snaps: { t: number; s: IState }[] = [];
   private vel = new THREE.Vector3();
@@ -165,8 +167,16 @@ export class Infected implements Damageable {
       physics.tag(c, { surface: 'flesh', owner: this, zone: z });
       this.zones.push(c);
     };
-    zone(R.ColliderDesc.ball(0.13).setTranslation(0, 1.6, -0.06), 'head');
-    zone(R.ColliderDesc.cuboid(0.25, 0.31, 0.15).setTranslation(0, 1.18, -0.02), 'torso');
+    // (the head and the chest go where the bent body has them: colliders of their own, see FreeZone)
+    const free = (desc: RAPIER.ColliderDesc, at: { x: number; y: number; z: number }, zn: HitZone) => {
+      const f = new FreeZone(desc.setCollisionGroups(HITBOX_GROUPS), at);
+      physics.tag(f.collider, { surface: 'flesh', owner: this, zone: zn });
+      f.place(x, y, z, yaw);
+      this.free.push(f);
+      this.zones.push(f.collider);
+    };
+    free(R.ColliderDesc.ball(0.13), { x: 0, y: 1.6, z: -0.06 }, 'head');
+    free(R.ColliderDesc.cuboid(0.25, 0.31, 0.15), { x: 0, y: 1.18, z: -0.02 }, 'torso');
     zone(R.ColliderDesc.cuboid(0.18, 0.45, 0.14).setTranslation(0, 0.45, 0.03), 'legs');
     // nobody walks through one; shots are stopped only by the hit zones
     this.blocker = physics.world.createCollider(R.ColliderDesc.capsule(0.5, 0.27).setTranslation(0, 0.8, 0).setCollisionGroups(GLASS_GROUPS), this.body);
@@ -659,6 +669,7 @@ export class Infected implements Damageable {
       this.body.setNextKinematicTranslation(this.pos);
       const half = this.yaw / 2;
       this.body.setNextKinematicRotation({ x: 0, y: Math.sin(half), z: 0, w: Math.cos(half) });
+      for (const f of this.free) f.place(t.x, t.y, t.z, t.yaw);
     }
     if (far) return;
     // (where it is, is said every frame: only its pose is done less often. Moved with the pose, one across the
@@ -683,9 +694,9 @@ export class Infected implements Damageable {
           v.set(x * c - z * s, v.y - this.pos.y, x * s + z * c);
         }
         // (moved when they have moved two millimetres: a body standing and breathing shifts its head by less each frame)
-        if (!(_head.distanceToSquared(this.toldHead) < 4e-6)) this.zones[0].setTranslationWrtParent(this.toldHead.copy(_head));
+        if (!(_head.distanceToSquared(this.toldHead) < 4e-6)) this.bend(0, this.toldHead.copy(_head));
         _pelvis.lerp(_neck, 0.54);
-        if (!(_pelvis.distanceToSquared(this.toldChest) < 4e-6)) this.zones[1].setTranslationWrtParent(this.toldChest.copy(_pelvis));
+        if (!(_pelvis.distanceToSquared(this.toldChest) < 4e-6)) this.bend(1, this.toldChest.copy(_pelvis));
       }
       this.flinch = Math.max(0, this.flinch - dt * 4);
       if (this.flinch > 0) this.avatar.root.rotation.x += this.flinch * 0.06;
@@ -696,6 +707,15 @@ export class Infected implements Damageable {
         if (d < 45) audio.infected(this.mode >= I_CHASE ? 'growl' : 'groan', this.pos, d, this.i);
       }
     }
+  }
+
+  /** a head or a chest moved on the body (in its own frame): put where it is, with the body where the physics was last told it is */
+  private bend(k: number, at: THREE.Vector3) {
+    const f = this.free[k], t = this.told;
+    f.at.x = at.x;
+    f.at.y = at.y;
+    f.at.z = at.z;
+    f.place(t.x, t.y, t.z, t.yaw);
   }
 
   dispose() {

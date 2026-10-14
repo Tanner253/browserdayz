@@ -145,3 +145,38 @@ export class Physics {
 }
 
 export const physics = new Physics();
+
+/**
+ * A hit zone that a body bends (a head, a chest): a collider of its own, put where it is in the world, and not a
+ * collider on the body moved about on it. Rapier 0.21 makes the step after a collider is moved about its body
+ * (setTranslationWrtParent) cost a millisecond and a half however few are moved, and with anybody else in sight one
+ * was, every frame: measured 2026-10-14, one head moved so cost 1.43 ms a step, five colliders of their own put
+ * where they are 0.013 ms.
+ */
+export class FreeZone {
+  readonly collider: RAPIER.Collider;
+  /** where it is on its body, in the body's own frame (x to its right, z behind it) */
+  readonly at = { x: 0, y: 0, z: 0 };
+  /** and how it is turned there */
+  readonly turn = { x: 0, y: 0, z: 0, w: 1 };
+
+  /** @param desc its shape and groups (its place is `at`) */
+  constructor(desc: RAPIER.ColliderDesc, at: { x: number; y: number; z: number }) {
+    this.collider = physics.world.createCollider(desc);
+    Object.assign(this.at, at);
+  }
+
+  /** what it was last put at: its body's place and turn, and its own on the body (put there again, nothing is said) */
+  private was = new Float64Array(11).fill(NaN);
+
+  /** where it is now, its body at (x, y, z) turned `yaw` about the upright (as a body is turned by { 0, sin yaw/2, 0, cos yaw/2 }) */
+  place(x: number, y: number, z: number, yaw: number) {
+    const a = this.at, t = this.turn, w = this.was;
+    if (w[0] === x && w[1] === y && w[2] === z && w[3] === yaw && w[4] === a.x && w[5] === a.y && w[6] === a.z && w[7] === t.x && w[8] === t.y && w[9] === t.z && w[10] === t.w) return;
+    w.set([x, y, z, yaw, a.x, a.y, a.z, t.x, t.y, t.z, t.w]);
+    const c = Math.cos(yaw), s = Math.sin(yaw);
+    this.collider.setTranslation({ x: x + a.x * c + a.z * s, y: y + a.y, z: z - a.x * s + a.z * c });
+    const hy = Math.sin(yaw / 2), hw = Math.cos(yaw / 2);
+    this.collider.setRotation({ x: hw * t.x + hy * t.z, y: hw * t.y + hy * t.w, z: hw * t.z - hy * t.x, w: hw * t.w - hy * t.y });
+  }
+}
