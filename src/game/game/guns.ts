@@ -414,6 +414,8 @@ export const gunsMethods = {
   toggleMap(this: Game, open?: boolean, byEscape = false) {
     const want = open ?? !this.map.open;
     if (want === this.map.open) return;
+    // (no map in the arena: "this is gonna be more like CS:GO")
+    if (want && this.arenaHud) return;
     if (want) {
       this.map.show(this.player.pos.x, this.player.pos.z);
       this.input.uiMode = true;
@@ -437,6 +439,8 @@ export const gunsMethods = {
   toggleInventory(this: Game, open?: boolean, byEscape = false) {
     const want = open ?? !this.invUI.isOpen;
     if (want === this.invUI.isOpen) return;
+    // (nor pockets: Tab is the scoreboard there)
+    if (want && this.arenaHud) return;
     if (want) {
       this.openStash = this.nearbyStash();
       this.invUI.open(this.around(), this.openStash, this.player.vitals);

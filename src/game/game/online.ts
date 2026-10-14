@@ -361,8 +361,9 @@ export const onlineMethods = {
         y = Math.max(ground, roof ? roof.point.y : ground);
       }
       const pitch = p.pitch;
-      p.spawn(m.x, y + 0.1, m.z, p.yaw);
-      p.pitch = pitch;
+      // (the arena faces a body set down for a round toward the other end; anybody else keeps their own way)
+      p.spawn(m.x, y + 0.1, m.z, m.yaw ?? p.yaw);
+      p.pitch = m.yaw === undefined ? pitch : 0;
       p.landSoft();
       this.buriedT = 0;
       if (m.by) this.hud.note(`${m.by}, an admin, has moved you`, 'warn');
@@ -371,6 +372,9 @@ export const onlineMethods = {
       this.hud.note(m.text, m.kind);
       this.hud.chatLine('system', '', m.text);
     });
+    // (the arena's: the score and the kills, for its own screen)
+    net.on('score', (m) => this.arenaHud?.score(m));
+    net.on('kill', (m) => this.arenaHud?.kill(m));
     net.on('void', (m) => this.voidTags(m.uids));
     net.on('cashed', (m) => {
       const text = `${m.name} cashed in ${m.owner}'s dog tag.`;
@@ -392,6 +396,8 @@ export const onlineMethods = {
     net.onClose = (reason) => {
       this.paused = true;
       this.input.unlock();
+      // (a wager over, or the arena gone: its result, and where to go on to)
+      if (this.arenaHud) return void this.arenaHud.closed(reason);
       const said = this.restartSaid && performance.now() - this.restartSaid.at < 180_000 ? this.restartSaid : null;
       if (!said || this.net.refused) return void this.hud.fatal(reason);
       this.hud.fatal(`The server is restarting${said.why ? ` (${said.why})` : ''}. You are kept as you were. This page loads again by itself when the server is back.`);

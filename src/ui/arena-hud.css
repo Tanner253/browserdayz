@@ -1,0 +1,84 @@
+/* ------------------------------------------------------------ the arena's own screen (src/ui/arena-hud.ts) */
+/* the open world's HUD, put away in a wager: what is CS:GO's is kept (the sight, the hit marks, where a hit came from, talk) */
+#hud.arena .hud-hotbar, #hud.arena .hud-compass, #hud.arena .hud-bearing, #hud.arena .hud-area, #hud.arena .hud-vitals,
+#hud.arena .hud-stamina, #hud.arena .hud-arms, #hud.arena .hud-online, #hud.arena .hud-under, #hud.arena .hud-weapon,
+#hud.arena .hud-feed, #hud.arena .hud-powers, #hud.arena .hud-bleed, #hud.arena .hud-blooddrops, #hud.arena .hud-bleedfx,
+body.arena .hud-minimap { display: none !important; }
+
+.arena-hud { position: absolute; inset: 0; pointer-events: none; font-family: 'Barlow Condensed', sans-serif; color: #f1eee6; --us: #4aa3ff; --them: #ff4a36; --gold: #ffd35a; }
+.arena-hud .ah-top { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); display: flex; align-items: stretch; gap: 0; text-shadow: none; }
+.ah-team { display: flex; flex-direction: column; justify-content: center; gap: 3px; min-width: 120px; padding: 0 10px; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; color: #d9d4c8; }
+.ah-team.us { align-items: flex-end; text-align: right; }
+.ah-team.them { align-items: flex-start; }
+.ah-names { max-width: 190px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-shadow: 0 1px 3px #000; }
+.ah-pips { display: flex; gap: 4px; }
+.ah-pips i { width: 9px; height: 9px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.5); background: transparent; }
+.ah-team.us .ah-pips i.up { background: var(--us); border-color: var(--us); }
+.ah-team.them .ah-pips i.up { background: var(--them); border-color: var(--them); }
+.ah-n { min-width: 52px; display: grid; place-items: center; font-size: 34px; font-weight: 700; line-height: 1; padding: 4px 10px; }
+.ah-n.us { background: var(--us); color: #071322; }
+.ah-n.them { background: var(--them); color: #240604; }
+.ah-mid { display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(8, 9, 9, 0.82); padding: 3px 16px; min-width: 112px; }
+.ah-mid b { font-size: 18px; font-weight: 600; letter-spacing: 0.1em; }
+.ah-mid small { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.1em; color: #b9b3a6; }
+.arena-hud.practice .ah-n, .arena-hud.practice .ah-team { visibility: hidden; }
+
+.ah-feed { position: absolute; top: 14px; right: 16px; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.ah-kill { display: flex; align-items: center; gap: 8px; padding: 4px 10px; background: rgba(8, 9, 9, 0.72); font-size: 16px; font-weight: 600; letter-spacing: 0.03em; transition: opacity 0.6s; border: 1px solid transparent; }
+.ah-kill.me { border-color: var(--them); background: rgba(40, 6, 4, 0.75); }
+.ah-kill b.us { color: var(--us); }
+.ah-kill b.them { color: var(--them); }
+.ah-kill span { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #cfc9bc; text-transform: uppercase; letter-spacing: 0.06em; }
+.ah-kill em { font-style: normal; color: #fff; background: var(--them); padding: 0 4px; margin-left: 4px; }
+.ah-kill.out { opacity: 0; }
+
+.ah-banner { position: absolute; left: 0; right: 0; top: 24%; display: flex; flex-direction: column; align-items: center; opacity: 0; transform: scale(1.06); transition: opacity 0.35s, transform 0.35s; }
+.ah-banner.on { opacity: 1; transform: none; }
+.ah-banner b { font-size: 64px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; line-height: 1; text-shadow: 0 2px 18px rgba(0, 0, 0, 0.8); }
+.ah-banner small { margin-top: 6px; font-family: 'JetBrains Mono', monospace; font-size: 14px; letter-spacing: 0.2em; text-transform: uppercase; color: #e7e2d6; text-shadow: 0 1px 4px #000; }
+.ah-banner.won b { color: var(--gold); }
+.ah-banner.lost b { color: var(--them); }
+.arena-hud.over .ah-banner b { font-size: 96px; }
+
+.ah-spec { position: absolute; top: 74px; left: 50%; transform: translateX(-50%); display: none; flex-direction: column; align-items: center; font-size: 20px; font-weight: 600; letter-spacing: 0.24em; color: #fff; text-shadow: 0 1px 6px #000; }
+.ah-spec small { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.1em; color: #cfc9bc; }
+.arena-hud.spec .ah-spec { display: flex; }
+.arena-hud.over .ah-spec { display: none; }
+
+.ah-hp { position: absolute; left: 22px; bottom: 18px; display: flex; align-items: baseline; gap: 8px; padding: 4px 16px 4px 12px; background: linear-gradient(90deg, rgba(8, 9, 9, 0.75), rgba(8, 9, 9, 0)); }
+.ah-hp i { font-style: normal; font-size: 30px; font-weight: 700; color: #f1eee6; }
+.ah-hp b { font-size: 44px; font-weight: 700; line-height: 1; }
+.arena-hud.low .ah-hp b, .arena-hud.low .ah-hp i { color: var(--them); }
+.ah-gun { position: absolute; right: 22px; bottom: 18px; display: flex; flex-direction: column; align-items: flex-end; padding: 4px 12px 4px 18px; background: linear-gradient(270deg, rgba(8, 9, 9, 0.75), rgba(8, 9, 9, 0)); }
+.ah-gun small { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: #cfc9bc; }
+.ah-gun b { font-size: 40px; font-weight: 700; line-height: 1; }
+.arena-hud.nogun .ah-gun, .arena-hud.spec .ah-hp, .arena-hud.spec .ah-gun { display: none; }
+
+.ah-board { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -46%); display: none; gap: 14px; }
+.arena-hud.board .ah-board, .arena-hud.over .ah-board { display: flex; }
+.arena-hud.over .ah-board { top: 62%; }
+.ah-board table, .ah-cardboard table { border-collapse: collapse; min-width: 250px; background: rgba(8, 9, 9, 0.86); font-size: 17px; }
+.ah-board th, .ah-board td, .ah-cardboard th, .ah-cardboard td { padding: 5px 12px; text-align: left; }
+.ah-board th:not(:first-child), .ah-board td:not(:first-child), .ah-cardboard th:not(:first-child), .ah-cardboard td:not(:first-child) { text-align: right; width: 36px; font-family: 'JetBrains Mono', monospace; font-size: 13px; }
+.ah-board th, .ah-cardboard th { font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; border-bottom: 2px solid; }
+.ah-board th em, .ah-cardboard th em { font-style: normal; margin-left: 8px; }
+.ah-board table.us th, .ah-cardboard table.us th { border-color: var(--us); color: var(--us); }
+.ah-board table.them th, .ah-cardboard table.them th { border-color: var(--them); color: var(--them); }
+
+.ah-end { position: absolute; inset: 0; display: none; place-items: center; background: radial-gradient(ellipse at center, rgba(5, 6, 6, 0.55), rgba(5, 6, 6, 0.9)); pointer-events: auto; }
+.arena-hud.ended .ah-end { display: grid; }
+.arena-hud.ended .ah-board, .arena-hud.ended .ah-top, .arena-hud.ended .ah-hp, .arena-hud.ended .ah-gun, .arena-hud.ended .ah-spec { display: none; }
+.ah-card { min-width: 560px; padding: 26px 34px 24px; background: rgba(14, 15, 15, 0.95); border-top: 4px solid #8a8578; text-align: center; box-shadow: 0 18px 60px #000; }
+.ah-card.won { border-color: var(--gold); }
+.ah-card.lost { border-color: var(--them); }
+.ah-card h2 { font-size: 64px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; line-height: 1; }
+.ah-card.won h2 { color: var(--gold); }
+.ah-card.lost h2 { color: var(--them); }
+.ah-final { display: flex; justify-content: center; align-items: center; gap: 18px; margin: 12px 0 16px; font-size: 18px; letter-spacing: 0.06em; text-transform: uppercase; color: #d9d4c8; }
+.ah-final b { font-size: 40px; color: #fff; }
+.ah-cardboard { display: flex; justify-content: center; gap: 12px; }
+.ah-card p { margin: 14px 0 18px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #b9b3a6; }
+.ah-btns { display: flex; justify-content: center; gap: 12px; }
+.ah-btns button { font: 600 15px 'Barlow Condensed', sans-serif; letter-spacing: 0.14em; text-transform: uppercase; padding: 10px 26px; border: 1px solid #f1eee6; background: none; color: #f1eee6; cursor: pointer; }
+.ah-btns .ah-again { background: var(--them); border-color: var(--them); }
+.ah-btns button:hover { filter: brightness(1.15); }

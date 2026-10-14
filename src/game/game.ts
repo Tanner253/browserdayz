@@ -47,6 +47,7 @@ import { Garage } from './garage';
 import { Jeep } from './vehicle';
 import '../sim/vehicles';
 import { HUD } from '../ui/hud';
+import { ArenaHud } from '../ui/arena-hud';
 import '../ui/updates';
 import { InventoryUI } from '../ui/inventory-ui';
 import { Minimap } from '../ui/minimap';
@@ -1024,6 +1025,8 @@ export class Game {
   maxPlayers = 0;
   /** the server said it was about to restart: why, and when it said so (by this game's clock) */
   restartSaid: { why: string; at: number } | null = null;
+  /** in a wager, the arena's own screen over the HUD (src/ui/arena-hud.ts); null in the open world */
+  arenaHud: ArenaHud | null = null;
   /** carrying a tag taken off somebody (the one round their own neck does not count): no jeep takes them (see Garage.use) */
   get tagged() {
     const me = publicId();

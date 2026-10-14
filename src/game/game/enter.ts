@@ -3,11 +3,12 @@
 // Game.prototype as the file loads. Nothing in them was changed but `this: Game` said as the first parameter.)
 
 import { audio } from '../../core/audio';
-import { wagerQuery } from '../../net/client';
+import { wagerQuery, watching } from '../../net/client';
+import { ArenaHud } from '../../ui/arena-hud';
 import { reloadPage } from '../../core/leave';
 import { CUT } from '../../sim/arena';
 import { heightAt, inPlay } from '../../world/worldgen';
-import { makeItem, makeMag, type ItemInstance, TAG_OUT, tagOwner, TAG_HOLD_MIN, TAG_HOLD, tagClock } from '../../sim/items';
+import { ITEMS, makeItem, makeMag, type ItemInstance, TAG_OUT, tagOwner, TAG_HOLD_MIN, TAG_HOLD, tagClock } from '../../sim/items';
 import { refill, refilledWords } from '../../sim/powers';
 import { fillCrate } from '../../sim/crates';
 import { loadSave, type SaveData, writeSave } from '../../sim/save';
@@ -40,8 +41,13 @@ export const enterMethods = {
     let waited = false;
     // (a page whose world was cut down to a wager's arena, the wager over: loaded again, whole, for the open world)
     if (CUT.arena && !wagerQuery()) return void reloadPage();
-    // (in a wager the server alone says when anybody dies: src/sim/arena.ts)
+    // (in a wager the server alone says when anybody dies: src/sim/arena.ts; and the arena has its own screen)
     this.player.keepAlive = !!wagerQuery();
+    if (wagerQuery() && !this.arenaHud) {
+      this.arenaHud = new ArenaHud(this.hud.root, watching(), new URLSearchParams(location.search).get('wager') === 'practice');
+      // (over: back to the menu, the open world's page loaded again; to the wagers again, with their tab open)
+      this.arenaHud.onGo = (again) => location.assign(location.pathname + (again ? '?tab=wagers' : ''));
+    }
     this.net.onQueue = (pos, of, max) => {
       if (!waited) {
         waited = true;
@@ -162,8 +168,8 @@ export const enterMethods = {
     this.started = true;
     this.menu.dispose();
     this.hud.menuScene('', 0);
-    // out of the aerial shot and down into the character's eyes
-    this.director.flyIn();
+    // out of the aerial shot and down into the character's eyes (in a wager, straight in: a round starts in the eyes)
+    this.director.flyIn(wagerQuery() ? 0.001 : undefined);
     if (!this.weapons.equippedItem) {
       const slot = (['primary', 'secondary', 'holster'] as const).find((k) => this.inv.slots[k]);
       if (slot) this.weapons.equip(slot);
@@ -318,6 +324,11 @@ export const enterMethods = {
     for (const it of over) this.dropItem(it);
     this.weapons.validate();
     this.autoHot();
+    // (in the arena every round starts with the first gun in hand, as in CS:GO)
+    if (this.arenaHud && !m.adds) {
+      const i = this.inv.hot.findIndex((h, k) => !!h && !!ITEMS[this.inv.hotItem(k)?.id ?? '']?.weapon);
+      if (i >= 0) this.hot(i);
+    }
     this.inventoryChanged();
     this.meDirty = true;
     // (things given while the pockets are open are seen to arrive)

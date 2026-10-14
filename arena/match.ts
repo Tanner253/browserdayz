@@ -173,7 +173,7 @@ function setDown(l: Lobby) {
       f.hist = [{ t: Date.now(), p: f.pose }];
       // (endless: firing takes no round out of a gun, so nobody reloads: src/sim/powers.ts)
       send(f, { t: 'powers', god: false, hidden: false, clip: false, voidInv: false, voidTag: false, endless: true });
-      send(f, { t: 'put', x, y, z });
+      send(f, { t: 'put', x, y, z, yaw: e.yaw });
       send(f, { t: 'mend' });
       send(f, { t: 'kit', name: kit.name, items: kit.items });
       send(f, { t: 'hp', health: 100, bleeding: false });
@@ -232,7 +232,7 @@ function matchOver(l: Lobby, winner: 0 | 1) {
       f.alive = true;
       f.pose = [e.x, e.y, e.z, e.yaw, 0, 0];
       f.hist = [{ t: Date.now(), p: f.pose }];
-      send(f, { t: 'put', x: e.x, y: e.y, z: e.z });
+      send(f, { t: 'put', x: e.x, y: e.y, z: e.z, yaw: e.yaw });
     }
     f.health = 100;
     send(f, { t: 'powers', god: true, hidden: false, clip: false, voidInv: false, voidTag: false, endless: true });
@@ -344,7 +344,7 @@ function said(l: Lobby, f: Fighter, m: Record<string, unknown>) {
       const out = !inArena(world, p[0], p[2]);
       if (Math.hypot(p[0] - was[0], p[2] - was[2]) > 12 * dt + 3 || out) {
         const e = l.ends[f.side];
-        send(f, { t: 'put', x: e.x, y: e.y, z: e.z });
+        send(f, { t: 'put', x: e.x, y: e.y, z: e.z, yaw: e.yaw });
         if (out) send(f, { t: 'tell', text: 'Out of the arena: back to your end.', kind: 'warn' });
         f.pose = [e.x, e.y, e.z, e.yaw, 0, 0];
       } else f.pose = p;

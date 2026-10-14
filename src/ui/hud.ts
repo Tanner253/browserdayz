@@ -444,6 +444,8 @@ export class HUD {
       if (tab === 'rewards') this.rewardsClicked();
       else this.sheet(tab);
     });
+    // (back from a wager's end with "Play again": the wagers open)
+    if (new URLSearchParams(location.search).get('tab') === 'wagers') this.sheet('wagers');
     (this.root.querySelector('.sm-close') as HTMLButtonElement).onclick = () => this.sheet('play');
     (this.root.querySelector('.sm-wallet') as HTMLButtonElement).onclick = () => this.rewardsClicked();
     window.addEventListener('keydown', (e) => {
@@ -1257,7 +1259,7 @@ export class HUD {
     const opt = (k: string, v: string | number, label: string, on: boolean) => `<button type="button" data-wk="${k}" data-wv="${v}"${on ? ' class="on"' : ''}>${label}</button>`;
     const rows = list === null ? '<p class="wg-none">The arena cannot be reached just now.</p>'
       : !list.length ? '<p class="wg-none">None open: host one.</p>'
-      : list.map((l) => `<div class="wg-row"><b>${esc(l.host)}</b><span>${l.size}v${l.size} · first to ${l.kills} · ${esc(kitName(l.loadout))} · ${l.stake} SOL</span><em>${l.have}/${l.size * 2}</em>${l.state === 'open' && l.have < l.size * 2 ? `<button type="button" data-join="${esc(l.id)}">Join</button>` : '<i>being fought</i>'}</div>`).join('');
+      : list.map((l) => `<div class="wg-row"><b>${esc(l.host)}</b><span>${l.size}v${l.size} · first to ${l.kills} · ${esc(kitName(l.loadout))} · ${l.stake} SOL</span><em>${l.state === 'match' && l.score ? `${l.score[0]} : ${l.score[1]}` : `${l.have}/${l.size * 2}`}</em>${l.state === 'open' && l.have < l.size * 2 ? `<button type="button" data-join="${esc(l.id)}">Join</button>` : l.state === 'match' ? `<button type="button" data-watch="${esc(l.id)}">Watch${l.watching ? ` · ${l.watching}` : ''}</button>` : '<i>full</i>'}</div>`).join('');
     pane.innerHTML =
       '<p class="wg-note">Team against team in the fort. A round ends when a side has nobody left standing; first to the rounds asked for wins. Every hit and every health point is the server&#39;s to say. In this first version the stake is shown, and nothing is paid.</p>' +
       `<h4 class="set-h">Open wagers</h4><div class="wg-list">${rows}</div>` +
@@ -1284,6 +1286,8 @@ export class HUD {
         return void this.renderWagers();
       }
       if (b.dataset.join) return go({ wager: b.dataset.join });
+      // (a match being played, watched: the owner, "we should allow anyone to spectate any live game")
+      if (b.dataset.watch) return go({ wager: b.dataset.watch, watch: '1' });
       // (the arena alone, with the loadout chosen: to learn the fort and the guns)
       if (b.classList.contains('wg-practice')) return go({ wager: 'practice', loadout: this.wg.loadout });
       if (b.classList.contains('wg-host')) {

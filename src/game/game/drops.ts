@@ -8,6 +8,7 @@ import { physics, SOLID_GROUPS } from '../../core/physics';
 import { assets } from '../../core/assets';
 import { audio } from '../../core/audio';
 import { heightAt } from '../../world/worldgen';
+import { CUT } from '../../sim/arena';
 import { newUid, ITEMS, fittedOf, quietOf } from '../../sim/items';
 import { SLOT_ORDER } from '../../sim/inventory';
 import type { WorldLoot } from '../../sim/economy';
@@ -467,12 +468,14 @@ export const dropsMethods = {
   menuCamera(this: Game, now: number) {
     const { r, world } = this.s;
     const cam = r.camera;
-    const c = world.pois[0];
-    const a = now * 0.000028 + 2.2;
-    const x = c.x + Math.cos(a) * 128;
-    const z = c.z + Math.sin(a) * 128;
-    const ground = heightAt(world.heights, c.x, c.z);
-    cam.position.set(x, Math.max(ground + 44, heightAt(world.heights, x, z) + 20), z);
+    // (a page cut down to the arena circles its fort, closer: nothing else of the world is there to see)
+    const fort = CUT.arena ? world.castle : null;
+    const c = fort ?? world.pois[0];
+    const a = now * (fort ? 0.00005 : 0.000028) + 2.2;
+    const x = c.x + Math.cos(a) * (fort ? 58 : 128);
+    const z = c.z + Math.sin(a) * (fort ? 58 : 128);
+    const ground = fort ? fort.y - 8 : heightAt(world.heights, c.x, c.z);
+    cam.position.set(x, Math.max(ground + (fort ? 30 : 44), heightAt(world.heights, x, z) + 20), z);
     // the menu covers the left of the screen: keep the village in the right half
     const fx = c.x - x, fz = c.z - z;
     const len = Math.hypot(fx, fz) || 1;

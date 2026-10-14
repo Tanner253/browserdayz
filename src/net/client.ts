@@ -28,16 +28,20 @@ export function remoteServer(): string | null {
 }
 
 /**
- * The wager this page is for, as the arena asks it (src/sim/arena.ts, server/arena.ts): `?wager=new` with what the
- * host chose (size, kills, loadout, stake) to open one, `?wager=<id>` to join one. Null: the open world.
+ * The wager this page is for, as the arena asks it (src/sim/arena.ts, arena/match.ts): `?wager=new` with what the
+ * host chose (size, kills, loadout, stake) to open one, `?wager=<id>` to join one, and `&watch=1` to watch it being
+ * played. Null: the open world.
  */
 export function wagerQuery(): string | null {
   const q = new URLSearchParams(location.search), w = q.get('wager');
   if (!w) return null;
   const out = new URLSearchParams({ w });
-  for (const k of ['size', 'kills', 'loadout', 'stake']) if (q.get(k)) out.set(k, q.get(k)!);
+  for (const k of ['size', 'kills', 'loadout', 'stake', 'watch']) if (q.get(k)) out.set(k, q.get(k)!);
   return out.toString();
 }
+
+/** whether this page only watches a wager */
+export const watching = () => !!wagerQuery() && new URLSearchParams(location.search).has('watch');
 
 /**
  * Where the wager arena is (arena/server.ts, a service of its own): `?arena=` on the page, or VITE_ARENA_URL when

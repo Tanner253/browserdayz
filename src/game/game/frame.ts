@@ -9,6 +9,7 @@ import { audio } from '../../core/audio';
 import { NULL_INPUT } from '../../core/input';
 import { controls } from '../../core/keys';
 import { heightAt } from '../../world/worldgen';
+import { CUT } from '../../sim/arena';
 import { ITEMS } from '../../sim/items';
 import { SLOT_ORDER } from '../../sim/inventory';
 import { weightFelt } from '../../sim/powers';
@@ -343,8 +344,9 @@ export const frameMethods = {
     // until their people have arrived) the middle of the map from the air
     if (!this.started) {
       this.menuOn = true;
-      if (!this.menu.update(dt, cam)) this.menuCamera(now);
-      this.hud.menuScene(this.menu.caption, this.menu.fade);
+      // (a page cut down to the arena has none of the open world's scenes to show: its fort, from the air)
+      if (CUT.arena || !this.menu.update(dt, cam)) this.menuCamera(now);
+      this.hud.menuScene(CUT.arena ? '' : this.menu.caption, CUT.arena ? 0 : this.menu.fade);
       // (a long lens brings the far wood near: its trees are drawn as trees as far as the lens makes them large)
       this.s.veg.setReach(THREE.MathUtils.clamp(Math.tan((62 * Math.PI) / 360) / Math.tan((cam.fov * Math.PI) / 360), 1, 2.6));
     }
@@ -448,6 +450,8 @@ export const frameMethods = {
       if (held?.id === 'ar15' && (held.loaded ?? 0) < 4) Object.assign(held, { mag: 'mag_ar', loaded: 31 });
     }
     this.sendState(dt);
+    // (the arena's screen: health, the gun in hand, whether only looking on, and the scoreboard while Tab is held)
+    this.arenaHud?.tick(p.vitals.health, this.weapons.equippedItem?.id ?? null, this.powers.hidden, input.held('Tab'));
 
     // points of interest
     const here = world.pois.find((q) => Math.hypot(q.x - p.pos.x, q.z - p.pos.z) < q.radius);

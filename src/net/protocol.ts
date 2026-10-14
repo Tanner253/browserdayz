@@ -386,8 +386,9 @@ export type S2C =
   | { t: 'role'; role: 'admin' | 'mod' | null }
   /** a line from the server to this player alone, shown where talk is shown (what an order did, a list asked for) */
   | { t: 'sys'; text: string }
-  /** put somewhere by an admin (by themselves, or by `by`). With no height, it is on top of whatever is there */
-  | { t: 'put'; x: number; y?: number; z: number; by?: string }
+  /** put somewhere by an admin (by themselves, or by `by`). With no height, it is on top of whatever is there; `yaw`
+   * (the arena's only): facing that way */
+  | { t: 'put'; x: number; y?: number; z: number; by?: string; yaw?: number }
   /** made whole by an admin: health, food, water, the wound and the leg */
   | { t: 'mend' }
   /**
