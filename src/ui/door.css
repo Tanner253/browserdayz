@@ -5,6 +5,12 @@
 .door-top { display: flex; align-items: center; gap: 12px; }
 .door-top b { font-size: 34px; font-weight: 700; letter-spacing: 0.22em; }
 .door-top em { font-style: normal; color: #ffd35a; }
+/* the owner: "we need to make it clear this is PVP and NOT PVE" */
+.door-pvp { margin-top: -6px; font: 800 15px 'JetBrains Mono', monospace; letter-spacing: 0.42em; text-transform: uppercase; color: #f1eee6; }
+.door-pvp i { font-style: normal; color: #ff4a36; }
+.door-what em { font-style: normal; margin-right: 8px; padding: 2px 7px; color: #101211; background: #f1eee6; letter-spacing: 0.12em; }
+.door-card.zona .door-what em { background: #ffd35a; }
+.door-card.arena .door-what em { background: #ff4a36; color: #fff; }
 .door-paid { font: 600 12px 'JetBrains Mono', monospace; letter-spacing: 0.1em; text-transform: uppercase; color: #101211; background: #ffd35a; padding: 4px 12px; }
 .door-cards { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 8px; }
 .door-card { position: relative; min-height: min(62vh, 520px); border: 1px solid rgba(255, 255, 255, 0.16); overflow: hidden; cursor: pointer; display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-start; gap: 6px; padding: 26px 26px 24px; text-align: left; color: #f1eee6; font-family: inherit; background: #111; transition: transform 0.25s, border-color 0.25s; }

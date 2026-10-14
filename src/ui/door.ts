@@ -29,23 +29,24 @@ export function openDoor(): Promise<Mode> {
       <header class="door-top">
         <img src="/brand/zona-mark.svg" alt="" width="44" height="44"><b>ZONA <em>PvP</em></b>
       </header>
+      <div class="door-pvp">Player <i>vs</i> Player</div>
       <div class="door-paid" hidden></div>
       <div class="door-cards">
         <button type="button" class="door-card zona${last === 'zona' ? ' last' : ''}" data-mode="zona">
           <i class="door-bg"></i>
           ${last === 'zona' ? '<span class="door-last">Last played</span>' : ''}
-          <span class="door-what">Open-world survival</span><span class="door-on" data-on="zona" hidden></span>
+          <span class="door-what"><em>PvP</em> Open-world survival</span><span class="door-on" data-on="zona" hidden></span>
           <b>ZONA</b>
-          <span class="door-say">Loot, survive, kill. Take a dog tag from a kill, hold it ${TAG_HOLD_MIN} minutes, and get paid in SOL.</span>
+          <span class="door-say">Loot, survive, and kill other players. Take a dog tag from a player you kill, hold it ${TAG_HOLD_MIN} minutes, and get paid in SOL.</span>
           <span class="door-go">Enter Zona</span>
         </button>
         <button type="button" class="door-card arena${last === 'arena' ? ' last' : ''}" data-mode="arena">
           <i class="door-bg"></i>
           ${last === 'arena' ? '<span class="door-last">Last played</span>' : ''}
           <span class="door-stamp">Wagers<small>Coming soon</small></span>
-          <span class="door-what">Team matches</span><span class="door-on" data-on="arena" hidden></span>
+          <span class="door-what"><em>PvP</em> Team matches</span><span class="door-on" data-on="arena" hidden></span>
           <b>ARENA</b>
-          <span class="door-say">Team against team at the fort, in rounds. Set loadouts, first to 3, 5 or 10. Watch any match being played.</span>
+          <span class="door-say">Players against players, team against team at the fort, in rounds. Set loadouts, first to 3, 5 or 10. Watch any match being played.</span>
           <span class="door-go">Enter Arena</span>
         </button>
       </div>

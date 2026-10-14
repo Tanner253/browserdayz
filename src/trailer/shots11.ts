@@ -748,7 +748,8 @@ export function buildShots(S: Stage): Shot[] {
     [[A(0), F(5.4, gz - 1.6, 0), F(7.6, gz - 0.7, 0)], [A(1), F(4.9, gz + 0.9, 0), F(7.1, gz + 0.4, 0)]].forEach(([a, f, to]) => {
       const p = f as THREE.Vector3, q = to as THREE.Vector3, u = clamp01((t + 1) / 2.4);
       (a as Actor).pos.lerpVectors(p, q, u);
-      (a as Actor).pos.y = under((a as Actor).pos.clone(), 1.2, 3) ?? p.y;
+      // (looked for from just over the paving: from a man's height the ray found the stair flight over Volkov's way, and he flew up onto it)
+      (a as Actor).pos.y = under((a as Actor).pos.clone(), 0.3, 3) ?? p.y;
       (a as Actor).yaw = yawTo(p, q);
       (a as Actor).aim = false;
       (a as Actor).sprint = false;
