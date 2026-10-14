@@ -200,5 +200,5 @@ if (twice) {
 ws.close();
 quit();
 await sleep(300);
-try { fs.rmSync(profile, { recursive: true, force: true }); } catch { /* Chrome still letting go */ }
+try { fs.rmSync(profile, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 }); } catch { /* Chrome still letting go */ }
 process.exit(0);

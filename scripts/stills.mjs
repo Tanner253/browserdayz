@@ -299,5 +299,5 @@ if (want('banner')) {
 ws.close();
 quit();
 await sleep(300);
-try { fs.rmSync(profile, { recursive: true, force: true }); } catch { /* still letting go */ }
+try { fs.rmSync(profile, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 }); } catch { /* still letting go */ }
 process.exit(0);

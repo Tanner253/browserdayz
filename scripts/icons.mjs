@@ -91,4 +91,4 @@ const kept = new Set(Object.keys(index).map(fileOf));
 for (const f of fs.readdirSync(OUT)) if (f.endsWith('.webp') && !kept.has(f)) fs.rmSync(path.join(OUT, f));
 fs.writeFileSync(path.join(OUT, 'index.json'), JSON.stringify(index, null, 1) + '\n');
 console.log(`${Object.keys(index).length} pictures, ${(bytes / 1024).toFixed(0)} KB in all, in public/assets/icons`);
-try { fs.rmSync(profile, { recursive: true, force: true }); } catch { /* Chrome still letting go */ }
+try { fs.rmSync(profile, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 }); } catch { /* Chrome still letting go */ }

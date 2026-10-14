@@ -86,7 +86,7 @@ try {
   chrome.kill();
   await sleep(400);
   try {
-    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
   } catch {
     // Chrome still letting go of its profile
   }

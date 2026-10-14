@@ -28,4 +28,4 @@ const out = path.join(ROOT, 'marketing', `zona-${name}`);
 await sharp(big).resize(W, H).png({ compressionLevel: 9 }).toFile(`${out}.png`);
 await sharp(big).resize(W, H).jpeg({ quality: 92 }).toFile(`${out}.jpg`);
 console.log(`${out}.png  ${(fs.statSync(`${out}.png`).size / 1024).toFixed(0)} KB\n${out}.jpg  ${(fs.statSync(`${out}.jpg`).size / 1024).toFixed(0)} KB`);
-try { fs.rmSync(profile, { recursive: true, force: true }); } catch { /* Chrome still letting go */ }
+try { fs.rmSync(profile, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 }); } catch { /* Chrome still letting go */ }
