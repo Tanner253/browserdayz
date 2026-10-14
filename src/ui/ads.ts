@@ -3,10 +3,10 @@
 // everybody who looks at the door and leaves; going in is what an ad is for.
 // The account's tag and the Play conversion's label are not secrets: every page that carries them shows them.
 
-/** the account's Google tag, 'AW-' and its number ('' until the owner gives it: nothing is loaded) */
+/** the account's Google tag, 'AW-' and its number ('': nothing is loaded) */
 const TAG = 'AW-16543901565';
 /** the Play conversion: the tag, a slash and its label, as the conversion's event snippet says it */
-const PLAY = '';
+const PLAY = 'AW-16543901565/f8gwCJrZ2JwdEP3O39A9';
 
 type Gtag = (...a: unknown[]) => void;
 const w = window as unknown as { dataLayer?: unknown[]; gtag?: Gtag };
