@@ -13,7 +13,8 @@
 //   HALL           the mess: the wood stove and its flue, a pot, a shelf of stores under the stair
 //   STORE          the generator, drums of fuel beside the stair down (they blow), jerrycans, the switch box, and
 //                  cables out to the lamps and up to the mast
-//   TERRACE        two ridge tents in the lee of the keep, duckboards, a netted dump of crates, a flagpole, sandbags
+//   TERRACE        a bivouac behind the keep (two of the army's tents, groundsheets, a stack of crates, duckboards, the
+//                  mess table), a netted dump of crates, a flagpole, sandbags
 //                  either side of the gate and on the parapet where its merlons fell, two floodlights
 //   TOWERS         north-east a sniper's nest, south-west a bunk room behind canvas where its wall fell, north-west
 //                  the signals' own with its aerial and a wire to the keep; the south-east one is left a ruin
@@ -36,7 +37,7 @@ import { CASTLE, CASTLE_SCALE, HOUSES, LOOSE, body, castleAt, castleGround, cast
 // thing (the top of a desk, how far along it the wireless stands, how far before it the chair) is said
 // `body(metres)`. What is the place's stays the place's: the mast, a net from wall to poles, a cable's run.
 /** the kinds of thing made by hand that are a body's: each is made about its own spot at the size it is said, whatever the fort's scale */
-export const BODILY: ReadonlySet<string> = new Set(['tent', 'generator', 'scope', 'table', 'set', 'map', 'bedroll', 'grave', 'pot', 'tins', 'logs', 'board']);
+export const BODILY: ReadonlySet<string> = new Set(['generator', 'scope', 'table', 'set', 'map', 'bedroll', 'grave', 'pot', 'tins', 'logs', 'board']);
 
 export const POST = {
   name: 'Orlinoye',
@@ -46,8 +47,12 @@ export const POST = {
   mast: { h: 12, side: 0.52, bay: 1, light: 0.22 },
   /** a sandbag as it lies: long, wide, and how much a course of them adds to a wall's height */
   bag: { long: 0.54, wide: 0.36, course: 0.19 },
-  /** a ridge tent for two: along its ridge, across its foot, to its ridge */
-  tent: { long: 2.2, wide: 1.7, high: 1.25 },
+  /**
+   * THE ARMY'S TENT, the Army Camp's own model (`tent_military`: the owner's rule, real models), stood on the terrace
+   * at so much of the camp's size: a tent for two, 1.76 m across, 2.37 m deep and 1.1 m to its ridge. `half`: the
+   * model's own half width, height and half depth as it comes (its door is toward its own +z), in metres.
+   */
+  tent: { model: 'tent_military', scale: 0.28, half: [3.1409, 3.9166, 4.2284] as V3 },
   /** the lamps that burn on the generator: a floodlight's light and a bulb's (colour, how far it carries) */
   flood: { colour: [1, 0.96, 0.86] as V3, reach: 16 },
   bulb: { colour: [1, 0.8, 0.52] as V3, reach: 7 },
@@ -72,8 +77,6 @@ export type Made = Piece & (
   | { t: 'bags'; pts: [number, number][]; y: number; courses: number; sits?: boolean }
   /** cloth between four corners (in order round it), hanging so far in its middle: a camouflage net, a tarpaulin, a flag */
   | { t: 'sheet'; stuff: 'net' | 'tarp' | 'flag'; p: [V3, V3, V3, V3]; sag: number }
-  /** a ridge tent: the middle of its floor, which way its ridge runs, and which end is open (1: the far end of the ridge, -1: the near) */
-  | { t: 'tent'; at: V3; yaw: number; open: 1 | -1 }
   /** duckboards from one spot to another, so wide */
   | { t: 'boards'; a: V3; b: V3; w: number }
   /** a cable through these spots (or a pipe: `r` its half thickness); it hangs so far over the longest of its lengths */
@@ -121,7 +124,14 @@ export type PostLoot = CastleLoot & { room: Room };
 
 interface Spot { room: Room; x: number; z: number; y: number; tier: 3 | 4; usage: CastleLoot['usage']; arms?: 'guns'; surf: { x: number; z: number; yaw: number; hx: number; hz: number; clear: number } }
 
-interface Plan { stood: Stood[]; made: Made[]; solids: PostSolid[]; spots: Spot[]; lights: PostLight[] }
+/**
+ * A downloaded model that the post stands and draws itself, in the fort's own measure: so that the fort's snow lies
+ * on what of it is under the sky, which the world's things off the shelf have none of. Which model, the middle of its
+ * foot, how it is turned (its own +z then looks toward (sin, cos) of it), and how big (1: as it came, in metres of the world).
+ */
+export interface PostModel { room: Room; name: string; model: string; at: V3; yaw: number; scale: number }
+
+interface Plan { stood: Stood[]; made: Made[]; models: PostModel[]; solids: PostSolid[]; spots: Spot[]; lights: PostLight[] }
 
 const rad = (d: number) => (d * Math.PI) / 180;
 /** a grave: how far from its middle its cross stands (toward where it is turned from), and how tall the cross is */
@@ -132,7 +142,7 @@ const BODY: Record<string, V3> = { wood_stove: [0.34, 0.5, 0.27] };
 /** The whole of the post, in the fort's own measure. @param loose the fort's loose pieces, in its own measure (the village is among them) */
 function lay(loose: Loose[]): Plan {
   const C = CASTLE, K = C.keep, R = K.room, [, F1, F2] = K.floors, ROOF = K.roof, B = K.band, T = C.tower, BG = POST.bag;
-  const stood: Stood[] = [], made: Made[] = [], solids: PostSolid[] = [], spots: Spot[] = [], lights: PostLight[] = [];
+  const stood: Stood[] = [], made: Made[] = [], models: PostModel[] = [], solids: PostSolid[] = [], spots: Spot[] = [], lights: PostLight[] = [];
   const put = (room: Room, kind: string, x: number, z: number, y: number, rot = 0, o: Partial<Stood> = {}) => void stood.push({ kind, room, x, z, y, rot, far: 90, ...o });
   /** a body's measure, in the fort's own (see the head of this file); and half the size of a block that is a body's */
   const b = body, bh = (h: V3): V3 => [b(h[0]), b(h[1]), b(h[2])];
@@ -247,18 +257,41 @@ function lay(loose: Loose[]): Plan {
 
   // ------------------------------------------------------------------ the terrace
   {
-    // two ridge tents in the lee of the keep's north wall, their backs to it; a bedroll in each; duckboards before them
-    // (each tent the size a tent is, its back as near the wall as it was; the two a fifth further apart)
-    const TN = POST.tent, tz = K.z0 - 0.05 - b(TN.wide / 2);
-    for (const [x, open] of [[-0.4, 1], [-2.65, -1]] as [number, 1 | -1][]) {
-      made.push({ t: 'tent', room: 'terrace', name: 'tent', at: [x, 0, tz], yaw: 0, open });
-      // (canvas: it stops a body and not a shot; the mouth of it is left open for a hand)
-      solids.push({ c: [x - open * b(0.3), b(0.45), tz], h: bh([TN.long / 2 - 0.35, 0.45, TN.wide / 2 - 0.12]), yaw: 0, feet: true, surface: 'cloth', name: 'tent', room: 'terrace' });
-      made.push({ t: 'bedroll', room: 'terrace', name: 'bedroll', at: [x + open * b(0.12), 0, tz + b(0.1)], yaw: 0 });
-      lies('terrace', 3, { x: x + open * b(0.12), z: tz + b(0.1), yaw: 0, hx: 0.85, hz: 0.26, clear: 0.6 }, b(0.11), open * 0.62);
+    // THE BIVOUAC behind the keep (2026-10-14, played: "the green tents are too low quality, and hide loot spawns. and
+    // theres a rock ... clipping into it. this small area needs to be reworked"). Two tents drawn by hand stood half
+    // over the edge of the hole where the walk fell into the cistern, a thing on a bedroll inside each, the duckboards
+    // before them over the hole itself, and a merlon fallen from the breach in the side of the west one.
+    // Now: two of the army's own tents (POST.tent) side by side WEST of the hole, their backs to the keep's north wall
+    // and their mouths to the walk, a groundsheet before each mouth with a thing on it; between them and the hole a
+    // stack of the platoon's crates, duckboards to it from the walk; across the hole, by the floodlight, the mess
+    // table. All that lies here lies where whoever walks the terrace sees it and reaches it. (The merlon lies in the
+    // breach it fell from: src/sim/castle.ts. The tents' mouths are a hand short of a body's width off the north walk's
+    // middle, and the west one is clear of the way to the north-west tower's door: test/castle-post.test.ts.)
+    const TN = POST.tent, hw = b(TN.half[0] * TN.scale), hd = b(TN.half[2] * TN.scale), tz = K.z0 - 0.015 - hd, mouth = tz - hd;
+    for (const x of [-5.5, -3.85]) {
+      // (its door is the model's own +z: a half turn, and it looks north, at the walk)
+      models.push({ room: 'terrace', name: 'tent', model: TN.model, at: [x, 0, tz], yaw: Math.PI, scale: TN.scale });
+      // (canvas on a frame: it stops a body and not a shot, a little inside its own walls, to the height of its eaves)
+      solids.push({ c: [x, b(0.45), tz + b(0.03)], h: [hw - b(0.08), b(0.45), hd - b(0.09)], yaw: 0, feet: true, surface: 'cloth', name: 'tent', room: 'terrace' });
+      // a groundsheet out before its mouth, a hand over the paving (laid on it, the two were one face twice over), and a thing on it
+      const g = b(0.04), z0 = mouth + b(0.06), z1 = mouth - b(0.66), sx = b(0.55);
+      made.push({ t: 'sheet', stuff: 'tarp', room: 'terrace', name: 'groundsheet', p: [[x - sx, g, z0], [x + sx, g, z0], [x + sx, g, z1], [x - sx, g, z1]], sag: 0 });
+      lies('terrace', 3, { x, z: (z0 + z1) / 2, yaw: 0, hx: 0.48, hz: 0.3, clear: 1 }, g, 0);
     }
-    // (before their mouths: a hand off the tents' feet, as they were)
-    made.push({ t: 'boards', room: 'terrace', name: 'duckboards', a: [-3.6, 0, tz - b(TN.wide / 2 + 0.22)], b: [1, 0, tz - b(TN.wide / 2 + 0.22)], w: b(0.5) });
+    // the stack: a crate of the platoon's along the wall's foot, a smaller one on its keep end, a thing on the free end of it
+    const st = { x: -2.77, z: K.z0 - 0.02 - b(0.62) };
+    put('terrace', 'wooden_military_crate', st.x, st.z, 0, Math.PI / 2);
+    put('terrace', 'wooden_crate_01', st.x + b(0.02), st.z + b(0.15), b(0.465), Math.PI / 2 + 0.15);
+    lies('terrace', 3, { x: st.x, z: st.z - b(0.4), yaw: Math.PI / 2, hx: 0.2, hz: 0.2, clear: 0.6 }, b(0.465), 0);
+    // (duckboards from the walk to the stack, between the east tent and the lip of the hole)
+    made.push({ t: 'boards', room: 'terrace', name: 'duckboards', a: [st.x, 0, mouth - b(0.3)], b: [st.x, 0, st.z - b(0.66)], w: b(0.5) });
+    // the mess table, across the hole against the keep's wall by the floodlight, and two things on it
+    const tb = { x: 0.75, z: K.z0 - 0.02 - b(0.26) };
+    made.push({ t: 'table', room: 'terrace', name: 'mess table', at: [tb.x, 0, tb.z], yaw: 0, w: 1, d: 0.5, h: 0.74 });
+    solids.push({ c: [tb.x, b(0.37), tb.z], h: bh([0.5, 0.37, 0.25]), yaw: 0, surface: 'wood', name: 'mess table', room: 'terrace' });
+    const ts = { x: tb.x, z: tb.z, yaw: 0, hx: 0.44, hz: 0.2, clear: 1 };
+    lies('terrace', 3, ts, b(0.74), -0.24);
+    lies('terrace', 3, ts, b(0.74), 0.26);
     // the cables from the store: out of the small door, along the foot of the keep's east wall both ways. North: under the
     // stair, round the corner (and up it to the roof and the mast) and along the north wall to the floodlight by the tents
     // (a floodlight on legs of its own is as tall as it was: a body's)
@@ -383,7 +416,7 @@ function lay(loose: Loose[]): Plan {
       put('village', 'wooden_crate_01', px + Math.cos(face + 0.9) * 0.95, pz + Math.sin(face + 0.9) * 0.95, 0, 0.5, { sits: true, far: 140 });
     }
   }
-  return { stood, made, solids, spots, lights };
+  return { stood, made, models, solids, spots, lights };
 }
 
 let own: Plan | null = null;
@@ -395,6 +428,10 @@ const local = (p: Place, loose?: Loose[]) => (loose ? looseLocal(p, loose) : und
 /** What is made by hand, in the fort's own measure: for whoever draws it. */
 export function postMade(loose?: Loose[]): Made[] {
   return plan(loose).made;
+}
+/** The downloaded models the post stands and draws itself, in the fort's own measure: the army's tents (see `PostModel`). */
+export function postModels(loose?: Loose[]): PostModel[] {
+  return plan(loose).models;
 }
 /** What of the post stops a body, in the fort's own measure. (What is off the shelf and solid in the world's own list is the world's to make solid.) */
 export function postSolids(loose?: Loose[]): PostSolid[] {

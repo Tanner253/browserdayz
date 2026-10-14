@@ -14,10 +14,12 @@ import * as THREE from 'three';
 import { GLASS_GROUPS, WORLD_GROUPS, physics, type Surface } from '../core/physics';
 import { SHADOW_FRUSTA, type Atmosphere } from './atmosphere';
 import { CASTLE_SCALE, castleAt, castleGround, castleLoose, looseLocal, type GroundAt, type Loose, type Place } from '../sim/castle';
-import { POST, postLights, postMade, postSolids } from '../sim/castle-post';
+import { POST, postLights, postMade, postModels, postSolids } from '../sim/castle-post';
+import { assets } from '../core/assets';
 import { Skin, farMast, postShape } from './castle-post-shape';
 import { SNOW_ON_THE_MOUNTAIN } from './castle';
-import { stoneLook } from './kit';
+import { castleSky } from './castle-shape';
+import { kitMeshes, stoneLook } from './kit';
 
 function geometry(k: Skin): THREE.BufferGeometry {
   const g = new THREE.BufferGeometry();
@@ -195,6 +197,27 @@ export class PostSite {
       this.counts.near += skin.triangles;
       this.counts.draws++;
       if (name !== 'net') cast.push(skin);
+    }
+    // THE MODELS IT STANDS ITSELF (the army's tents): the model's own triangles and pictures, with the fort's snow on
+    // what of them the sky is over, as on the fort's own kit. (Their windows' glass was the kind that is seen through,
+    // which costs a second drawing of everything behind it whenever it is in sight: here it is a dull pane.)
+    const models = postModels(this.loose);
+    for (const model of new Set(models.map((m) => m.model))) {
+      try {
+        const root = await assets.model(model), id = root.name || (root.name = model);
+        const kit = await kitMeshes(model, models.filter((m) => m.model === model).map((m) => ({ id, at: m.at, turn: m.yaw, scale: m.scale / CASTLE_SCALE, body: false })), {
+          attr: { name: 'aSnow', of: (p, n) => [castleSky(p, n), 9] },
+          dress: (m, name) => (/glass/i.test(name) ? new THREE.MeshStandardMaterial({ color: 0x3b4140, roughness: 0.35, metalness: 0.05 }) : this.atmo.register(m, stoneLook({ snow, attr: 'aSnow', thin: 0.12 }), `castle post ${model} ${name}`)),
+        });
+        for (const mesh of kit.meshes) {
+          this.near.add(mesh);
+          mesh.castShadow = true;
+          this.counts.draws++;
+        }
+        this.counts.near += kit.triangles;
+      } catch {
+        // (a model that does not come is not drawn: what stops a body at it is the post's own, and stands)
+      }
     }
     // the glass of its lamps: drawn only after dusk, as bright as they burn
     this.glow = new THREE.Mesh(geometry(k.glow), this.glowPaint);

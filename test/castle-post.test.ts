@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { KIT_LEVELS } from '../src/sim/kit';
 import { CASTLE, CASTLE_SCALE, FURNITURE, UNDER, castleAt, castleLamps, castleLocal, castleLoose, castleLoot, castleParts, castleProps, inCastle, stairShare, type Flight, type Place, type Tower, type V3 } from '../src/sim/castle';
-import { POST, postBeacon, postLamps, postLights, postLoot, postMade, postProps, postRooms, postSolids, type Room } from '../src/sim/castle-post';
+import { POST, postBeacon, postLamps, postLights, postLoot, postMade, postModels, postProps, postRooms, postSolids, type Room } from '../src/sim/castle-post';
 import { castleShape, castleSky, type Solid } from '../src/world/castle-shape';
 import { postCounts, postShape, type Skin } from '../src/world/castle-post-shape';
 
@@ -38,8 +38,14 @@ const stoodBlock = (q: { kind: string; x: number; y: number; z: number; rot: num
 /** everything of the post that takes up room, in the fort's own measure: what is off the shelf (as big as its model) and what is made and stops a body */
 const mine: Block[] = [
   ...postRooms().filter((q) => !q.sits).map((q) => stoodBlock(q, q.kind, true, q.room)),
+  // (and the models it stands and draws itself, the tents: as big as each model is at the size it is stood)
+  ...postModels().map((m): Block => {
+    const e = models[m.model], k = m.scale / S, c = Math.cos(m.yaw), s = Math.sin(m.yaw), mx = ((e.max[0] + e.min[0]) / 2) * k, mz = ((e.max[2] + e.min[2]) / 2) * k;
+    return { x: m.at[0] + mx * c + mz * s, z: m.at[2] - mx * s + mz * c, hx: ((e.max[0] - e.min[0]) / 2) * k, hz: ((e.max[2] - e.min[2]) / 2) * k, yaw: m.yaw, y0: m.at[1] + e.min[1] * k, y1: m.at[1] + e.max[1] * k, name: m.name, room: m.room, mine: true };
+  }),
   // (but the body the post gives the stove, which the world gives none: the stove itself is in the list already)
-  ...postSolids().filter((s) => !s.sits && s.name !== 'stove').map((s): Block => ({ x: s.c[0], z: s.c[2], hx: s.h[0], hz: s.h[2], yaw: s.yaw, y0: s.c[1] - s.h[1], y1: s.c[1] + s.h[1], name: s.name, room: s.room, mine: true })),
+  // (nor what stops a body at a model it stands itself, a tent: the model, which is bigger, is in the list already)
+  ...postSolids().filter((s) => !s.sits && s.name !== 'stove' && !postModels().some((m) => m.name === s.name && m.room === s.room && Math.hypot(m.at[0] - s.c[0], m.at[2] - s.c[2]) < 0.5)).map((s): Block => ({ x: s.c[0], z: s.c[2], hx: s.h[0], hz: s.h[2], yaw: s.yaw, y0: s.c[1] - s.h[1], y1: s.c[1] + s.h[1], name: s.name, room: s.room, mine: true })),
 ];
 /** and the fort's own things: its furniture, and what it stood off the shelf */
 // (the fort's own: since the post was joined to the fort, what the fort gives holds the post's things too, and they are left out)
@@ -82,9 +88,13 @@ ok('it is what was asked for: every room has its job, and what is off the shelf 
   // the mast and its guys and its light; sandbags, nets, a tarpaulin, tents, duckboards, cables, the flagpole, floodlights, the generator
   const mast = made.find((m) => m.t === 'mast');
   assert.ok(mast && mast.t === 'mast' && mast.guys.length >= 3 && mast.at[1] === K.roof && mast.h === POST.mast.h);
-  for (const [t, room] of [['bags', 'gate'], ['bags', 'roof'], ['sheet', 'dump'], ['sheet', 'roof'], ['tent', 'terrace'], ['boards', 'terrace'], ['cable', 'store'], ['pole', 'gate'], ['flood', 'terrace'], ['generator', 'store'], ['scope', 'roof'], ['map', 'command post'], ['grave', 'village'], ['bedroll', 'bunk room'], ['table', "sniper's nest"], ['set', 'signals tower']] as [string, Room][]) assert.ok(has(t, room), `no ${t} in the ${room}`);
+  for (const [t, room] of [['bags', 'gate'], ['bags', 'roof'], ['sheet', 'dump'], ['sheet', 'roof'], ['sheet', 'terrace'], ['boards', 'terrace'], ['table', 'terrace'], ['cable', 'store'], ['pole', 'gate'], ['flood', 'terrace'], ['generator', 'store'], ['scope', 'roof'], ['map', 'command post'], ['grave', 'village'], ['bedroll', 'bunk room'], ['table', "sniper's nest"], ['set', 'signals tower']] as [string, Room][]) assert.ok(has(t, room), `no ${t} in the ${room}`);
   assert.equal(made.filter((m) => m.t === 'sheet' && m.stuff === 'net').length, 3);
-  assert.equal(made.filter((m) => m.t === 'tent').length, 2);
+  // two tents on the terrace, the Army Camp's own model (2026-10-14: the hand-made ones were "too low quality"), at the size POST.tent says, which is the model's as it comes
+  const tents = postModels().filter((m) => m.room === 'terrace');
+  assert.ok(tents.length === 2 && tents.every((m) => m.model === 'tent_military' && models[m.model] && m.scale === POST.tent.scale));
+  const e = models[POST.tent.model];
+  assert.ok(Math.abs(e.max[0] - POST.tent.half[0]) < 0.01 && Math.abs(e.max[1] - POST.tent.half[1]) < 0.01 && Math.abs(e.max[2] - POST.tent.half[2]) < 0.01 && Math.abs(e.min[1]) < 0.01);
   // three drums of fuel in the store, which blow; the stove in the mess; the set on the desk
   assert.equal(postRooms().filter((q) => q.kind === 'Barrel_01' && q.room === 'store').length, 3);
   assert.ok(postRooms().some((q) => q.kind === 'wood_stove' && q.room === 'mess') && postRooms().some((q) => q.kind === 'vintage_radio_transceiver' && q.room === 'command post'));
@@ -122,7 +132,8 @@ const ways: { name: string; spots: V3[] }[] = [];
   ways.push({ name: 'through the gate', spots: along([C.hx + 0.4, 0, gz], [C.hx - 2.5, 0, gz]) });
   ways.push({ name: 'the small door of the keep', spots: along([K.x1 + 1.5, 0, 0], [R.x1 - 1, 0, 0]) });
   ways.push({ name: 'the doorway of the hall', spots: along([K.x1 + 0.8, F1, 0], [R.x1 - 1, F1, 0]) });
-  ways.push({ name: 'through the breach', spots: along([-4.5, 0, -C.hz - 2], [-4.5, 0, -C.hz + 2.5]) });
+  // (to the north walk's middle, which the way through the breach comes in on: it went on half a pace past it, into whatever stood by the keep)
+  ways.push({ name: 'through the breach', spots: along([-4.5, 0, -C.hz - 2], [-4.5, 0, -C.hz + 2.1]) });
   ways.push({ name: 'from the scaffold onto the keep', spots: along([-1.3, B, K.z1 + 1], [-1.3, B, R.z1 - 0.6]) });
   // every flight of stairs, from a pace before its foot to a pace past its head
   for (const f of flights) {
@@ -219,10 +230,14 @@ ok('what lies in it lies ON something, at that thing\'s height, on the step of t
     const e = models[q.kind];
     if (q.kind === 'metal_office_desk') tops.push({ x: q.x, z: q.z, y: q.y + e.max[1] / S, r: 1.05 / S, what: 'desk' });
     if (q.kind === 'Shelf_01') for (const lv of [0.14, 0.38, 0.66, 0.94, 1.22, 1.51, 1.79]) tops.push({ x: q.x, z: q.z, y: q.y + lv / S, r: 0.6 / S, what: 'shelf' });
+    // (and the lid of a crate stood on the paving, a hand's breadth of slack in it for how the lid is drawn)
+    if (q.kind === 'wooden_military_crate' && q.room === 'terrace') tops.push({ x: q.x, z: q.z, y: q.y + e.max[1] / S + 0.004, r: e.max[0] / S, what: 'crate' });
   }
   for (const m of made) {
     if (m.t === 'table') tops.push({ x: m.at[0], z: m.at[2], y: m.at[1] + m.h / S, r: m.w / 2 / S, what: m.name });
     if (m.t === 'bedroll') tops.push({ x: m.at[0], z: m.at[2], y: m.at[1] + 0.11 / S, r: 0.92 / S, what: 'bedroll' });
+    // (a groundsheet: a sheet laid flat, all four corners at one height over the paving)
+    if (m.t === 'sheet' && m.name === 'groundsheet' && m.p.every((q) => Math.abs(q[1] - m.p[0][1]) < 1e-9)) tops.push({ x: (m.p[0][0] + m.p[2][0]) / 2, z: (m.p[0][2] + m.p[2][2]) / 2, y: m.p[0][1], r: Math.hypot(m.p[2][0] - m.p[0][0], m.p[2][2] - m.p[0][2]) / 2, what: 'groundsheet' });
     if (m.t === 'bags' && !m.sits) tops.push({ x: (m.pts[0][0] + m.pts[1][0]) / 2, z: (m.pts[0][1] + m.pts[1][1]) / 2, y: m.y + (m.courses * BG.course) / S, r: Math.hypot(m.pts[1][0] - m.pts[0][0], m.pts[1][1] - m.pts[0][1]) / 2, what: m.name });
   }
   for (const l of loot) {
@@ -236,16 +251,17 @@ ok('what lies in it lies ON something, at that thing\'s height, on the step of t
   // (as first laid out the command post and the sniper's nest were of the fourth and the other eight of the third)
   for (const l of loot) assert.equal(l.tier, 4, `the step of a thing in the ${l.room}`);
   const by = (t: number) => loot.filter((l) => l.tier === t).length;
-  assert.deepEqual([by(3), by(4), loot.length], [0, 12, 12]);
+  // (the bivouac behind the keep, 2026-10-14: a thing on each groundsheet, on the stack and two on the table, where two lay hidden in the tents)
+  assert.deepEqual([by(3), by(4), loot.length], [0, 15, 15]);
   assert.deepEqual(loot.filter((l) => l.arms).map((l) => [l.room, l.arms]), [["sniper's nest", 'guns']]);
   assert.ok(loot.every((l) => l.usage.includes('Military')));
   // no two in one place, the fort's own among them; and none in what stops a body (but the thing it lies on)
   const all = [...loot, ...castleLoot(O).filter((l) => !('room' in l)).map(own)];
   for (let i = 0; i < loot.length; i++) for (let j = i + 1; j < all.length; j++) assert.ok(Math.hypot(all[i].x - all[j].x, all[i].y - all[j].y, all[i].z - all[j].z) > 0.3 / S, `two things in one place in the ${loot[i].room}`);
   for (const l of loot) for (const b of mine) if (b.y1 > l.y + 0.1 && b.y0 < l.y + 0.1) assert.ok(off(b, l.x, l.z) > 0.02 || /desk|bench|table|Shelf/.test(b.name), `a thing of the ${l.room} lies in the ${b.name}`);
-  // what is searched: the commander's locker, the two crates of the dump, the crate at the picket
+  // what is searched: the commander's locker, the two crates of the dump, the two of the stack behind the keep, the crate at the picket
   const searched = new Set(['wooden_crate_01', 'wooden_military_crate', 'old_military_crate', 'weapons_case', 'steel_locker', 'med_cabinet']);
-  assert.deepEqual(postRooms().filter((q) => searched.has(q.kind)).map((q) => q.room).sort(), ['command post', 'dump', 'dump', 'village']);
+  assert.deepEqual(postRooms().filter((q) => searched.has(q.kind)).map((q) => q.room).sort(), ['command post', 'dump', 'dump', 'terrace', 'terrace', 'village']);
   // and turned with the fort it is all in the same places
   postLoot(P).forEach((l, i) => {
     const [x, z, y] = castleLocal(P, l.x, l.y, l.z);

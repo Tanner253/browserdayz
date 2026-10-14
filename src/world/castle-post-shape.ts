@@ -259,21 +259,6 @@ export function postShape(made: Made[], g: (x: number, z: number) => number = ca
       k.cloth(at, fine, fine, (u, v) => mul(base, 1 - spread / 2 + rnd(Math.floor(u * fine) + n * 7, Math.floor(v * fine)) * spread), m.stuff === 'net' ? 1.5 : 0.6);
       k.patchy = 0;
       k.holds = 1;
-    } else if (m.t === 'tent') {
-      // a ridge tent: two slopes, a shut end and an open one with its flaps drawn back; a pole at each end, a line and a peg at each corner
-      const TN = POST.tent, d = along(m.yaw), w = across(m.yaw), o: V3 = m.at, hl = TN.long / 2, hw = TN.wide / 2;
-      const P = (lx: number, lz: number, y: number): V3 => add(o, add(add(mul(d, lx), mul(w, lz)), [0, y, 0]));
-      const tone = (u: number, v: number) => mul(PAINT.canvas, 0.8 + rnd(Math.floor(u * 4) + n * 13, Math.floor(v * 3)) * 0.3);
-      for (const side of [-1, 1]) cloth.cloth((u, v) => add(P(-hl + u * TN.long, side * hw * (1 - v), TN.high * v), [0, -0.05 * Math.sin(Math.PI * u) * Math.sin(Math.PI * v), 0]), 4, 3, tone, 0.5);
-      const shut = -m.open * hl, mouth = m.open * hl;
-      cloth.face(P(shut, -hw, 0), P(shut, hw, 0), P(shut, 0, TN.high), mul(d, -m.open), mul(PAINT.canvas, 0.9));
-      for (const side of [-1, 1]) cloth.face(P(mouth, side * hw, 0), P(mouth + m.open * 0.12, side * hw * 0.42, 0), P(mouth, 0, TN.high), mul(d, m.open), mul(PAINT.canvas, 0.82));
-      for (const e of [-hl, hl]) hard.tube(P(e, 0, 0), P(e, 0, TN.high + 0.06), 0.02, 0.02, 4, PAINT.timber);
-      for (const e of [-1, 1]) for (const side of [-1, 1]) {
-        const peg = P(e * (hl + 0.25), side * (hw + 0.4), 0.02);
-        hard.tube(P(e * hl, side * hw * 0.5, TN.high * 0.5), peg, 0.004, 0.004, 3, PAINT.burlap);
-        hard.beam(add(peg, [0, -0.02, 0]), add(peg, [0, 0.14, 0]), 0.03, 0.03, PAINT.timber);
-      }
     } else if (m.t === 'boards') {
       // duckboards: in lengths of a pace and a half, each two runners and its slats, none quite in line with the next
       const run = sub(m.b, m.a), long = len(run), d = unit(run), w: V3 = unit(cross(d, UP)), panels = Math.max(1, Math.round(long / 1.5)), each = long / panels;

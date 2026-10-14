@@ -985,7 +985,9 @@ function layOut(): Part[] {
   }
 
   // and two lengths of it that came down inside: something to kneel behind, either side of the way in
-  lump(C.breach.x1 - 0.42, 0.36, -6.9, 0.6, 0.36, 0.4, 71, { paint: 'stone', blocky: true, name: 'fallen merlon' });
+  // (The east one lay inside, by the keep, in the side of a tent of the post: "theres a rock ... clipping into it",
+  // 2026-10-14. It lies in the breach it fell from now, at its east end, as the west one lies at the west end.)
+  lump(C.breach.x1 - 0.75, 0.36, -9.5, 0.6, 0.36, 0.4, 71, { paint: 'stone', blocky: true, name: 'fallen merlon' });
   lump(C.breach.x0 - 0.6, 0.33, -9.0, 0.55, 0.33, 0.42, 72, { paint: 'stone', blocky: true, name: 'fallen merlon' });
 
   // ---- what stands in the rooms, made of boards: tables, benches, a rack, bunks. (What is kept on each is in `castleLoot`.)
