@@ -22,7 +22,14 @@ export class ArenaHud {
   /** where to go once the match is over: the wagers again, or the menu */
   onGo: (again: boolean) => void = () => {};
 
-  constructor(hud: HTMLElement, private watch: boolean, practice: boolean) {
+  /** taken away, the HUD as it was before the match (back at the Arena's menu: Game.toArena) */
+  destroy() {
+    this.el.remove();
+    document.body.classList.remove('arena');
+    this.hud.classList.remove('arena');
+  }
+
+  constructor(private hud: HTMLElement, private watch: boolean, practice: boolean) {
     document.body.classList.add('arena');
     hud.classList.add('arena');
     this.el = document.createElement('div');
@@ -149,7 +156,7 @@ export class ArenaHud {
         <h2>${esc(head)}</h2>
         ${m ? `<div class="ah-final"><span>${esc(m.sides[0])}</span><b>${m.us} : ${m.them}</b><span>${esc(m.sides[1])}</span></div><div class="ah-cardboard">${this.boardHtml(m)}</div>` : ''}
         <p>${esc(reason)}</p>
-        <div class="ah-btns"><button type="button" class="ah-again">${this.watch ? 'Back to the Arena' : 'Play again'}</button><button type="button" class="ah-menu">Main menu</button></div>
+        <div class="ah-btns"><button type="button" class="ah-again">Back to the Arena</button><button type="button" class="ah-menu">ZONA PvP</button></div>
       </div>`;
     (end.querySelector('.ah-again') as HTMLElement).onclick = () => this.onGo(true);
     (end.querySelector('.ah-menu') as HTMLElement).onclick = () => this.onGo(false);

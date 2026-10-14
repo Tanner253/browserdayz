@@ -84,3 +84,6 @@ body.arena-mode #hud .hud-start { display: none !important; }
   .am-bar { gap: 14px; padding: 0 14px; }
   .am-nav { gap: 12px; }
 }
+/* the stake: there, and not to be set yet */
+.am-stake { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; border: 1px dashed #555; color: #77736a; cursor: not-allowed; font-size: 15px; }
+.am-stake em { font-style: normal; font: 600 10px 'JetBrains Mono', monospace; letter-spacing: 0.12em; text-transform: uppercase; color: #101211; background: #ffd35a; padding: 2px 6px; }

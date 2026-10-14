@@ -88,6 +88,25 @@ export const onlineMethods = {
     this.syncBack();
 
     const net = this.net;
+    // (what hears the server is set up once a page: a second match in the Arena comes in through the same)
+    if (!this.netWired) {
+      this.netWired = true;
+      this.wireNet();
+    }
+    this.maxPlayers = w.max;
+    this.hud.setLive(true);
+    this.hud.setNet('Online');
+    this.updateOnline();
+    // (Every kind of message has somebody to hear it now: what was said since the welcome is heard, in its order.
+    // Not in this breath but the next: whoever called this has still to say the game has begun, and what hears a
+    // message has only ever heard one in a game that had. What is said meanwhile is kept with the rest.)
+    setTimeout(() => net.listen(), 0);
+  },
+
+  /** Everything the game does with what the server says, set up once a page (see enterOnline). */
+  wireNet(this: Game) {
+    const { world, buildings } = this.s;
+    const net = this.net;
     const cam = () => this.s.r.camera;
     net.on('join', (m) => {
       void this.addRemote(m.p);
@@ -396,6 +415,8 @@ export const onlineMethods = {
     net.onClose = (reason) => {
       this.paused = true;
       this.input.unlock();
+      // (left by this player, from the Arena's menu: nothing to show, they are back at it already)
+      if (this.arenaLeaving) return void (this.arenaLeaving = false);
       // (a wager over, or the arena gone: its result, and where to go on to)
       if (this.arenaHud) return void this.arenaHud.closed(reason);
       const said = this.restartSaid && performance.now() - this.restartSaid.at < 180_000 ? this.restartSaid : null;
@@ -415,14 +436,6 @@ export const onlineMethods = {
       };
       window.setTimeout(look, 6000);
     };
-    this.maxPlayers = w.max;
-    this.hud.setLive(true);
-    this.hud.setNet('Online');
-    this.updateOnline();
-    // (Every kind of message has somebody to hear it now: what was said since the welcome is heard, in its order.
-    // Not in this breath but the next: whoever called this has still to say the game has begun, and what hears a
-    // message has only ever heard one in a game that had. What is said meanwhile is kept with the rest.)
-    setTimeout(() => net.listen(), 0);
   },
 
   /**

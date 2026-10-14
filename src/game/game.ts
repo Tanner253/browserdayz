@@ -1027,6 +1027,9 @@ export class Game {
   restartSaid: { why: string; at: number } | null = null;
   /** in a wager, the arena's own screen over the HUD (src/ui/arena-hud.ts); null in the open world */
   arenaHud: ArenaHud | null = null;
+  /** the server's messages have their handlers (once a page: wireNet); and this game is leaving an Arena match itself, so its connection's going is no result to show */
+  netWired = false;
+  arenaLeaving = false;
   /** carrying a tag taken off somebody (the one round their own neck does not count): no jeep takes them (see Garage.use) */
   get tagged() {
     const me = publicId();
@@ -1233,6 +1236,7 @@ export class Game {
 type Methods<T> = { [K in keyof T]: T[K] extends (this: Game, ...a: infer A) => infer R ? (...a: A) => R : never };
 export interface Game {
   join: Methods<typeof enterMethods>['join'];
+  toArena: Methods<typeof enterMethods>['toArena'];
   dress: Methods<typeof enterMethods>['dress'];
   onRange: Methods<typeof enterMethods>['onRange'];
   enterOffline: Methods<typeof enterMethods>['enterOffline'];
@@ -1253,6 +1257,7 @@ export interface Game {
   restore: Methods<typeof enterMethods>['restore'];
   save: Methods<typeof enterMethods>['save'];
   enterOnline: Methods<typeof onlineMethods>['enterOnline'];
+  wireNet: Methods<typeof onlineMethods>['wireNet'];
   around: Methods<typeof onlineMethods>['around'];
   bumpDummies: Methods<typeof onlineMethods>['bumpDummies'];
   updateOnline: Methods<typeof onlineMethods>['updateOnline'];

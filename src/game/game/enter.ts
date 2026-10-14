@@ -46,8 +46,8 @@ export const enterMethods = {
     if (wagerQuery() && !this.arenaHud) {
       this.arenaHud = new ArenaHud(this.hud.root, watching(), new URLSearchParams(location.search).get('wager') === 'practice');
       this.weapons.freeReload = true;
-      // (over: the Arena's menu again for another, or the door)
-      this.arenaHud.onGo = (again) => location.assign(again ? '/arena' : '/');
+      // (over: the Arena's menu again, as the page is, for another; or the door)
+      this.arenaHud.onGo = (again) => (again ? this.toArena() : location.assign('/'));
     }
     this.net.onQueue = (pos, of, max) => {
       if (!waited) {
@@ -136,6 +136,9 @@ export const enterMethods = {
     }
     // (asked twice and still turned away for it: not into the game)
     if (!welcome && this.net.wantsProof) return void notAPerson();
+    // (a wager not got into: given up while waiting, turned away, or the arena not reached. Back at the Arena's
+    // menu as it was, never into the world alone)
+    if (!welcome && wagerQuery()) return void this.toArena(this.net.leftQueue ? '' : this.net.refused || 'The arena could not be reached: try again in a minute.');
     this.hud.setQueue(null);
     document.title = this.title;
     if (welcome) {
@@ -177,6 +180,40 @@ export const enterMethods = {
     }
     if (this.input.locked) this.unpause();
     else this.hud.showStart(true, true, waited && welcome ? 'You are in: click to play' : '');
+  },
+
+  /**
+   * Back at the Arena's menu with the page as it is (the owner: "I should not have to redownload everything when
+   * ending a match, canceling fining a match etc... bad UX"): out of the match, or out of the wait for one, its
+   * people gone, and this player as before any match; the world, the fort and everything loaded stay. `note`: why,
+   * where it was not by the player's own choice.
+   */
+  toArena(this: Game, note = '') {
+    // (a connection still open is closed from here, and its going is not shown as a result: see onClose)
+    if (this.net.online) {
+      this.arenaLeaving = true;
+      this.net.leaveQueue();
+    }
+    this.arenaHud?.destroy();
+    this.arenaHud = null;
+    for (const r of this.remotes.values()) r.dispose();
+    this.remotes.clear();
+    this.weapons.take(null);
+    this.inv.clear();
+    this.powers = { god: false, hidden: false, clip: false, voidInv: false, voidTag: false, weightless: false, endless: false, bottomless: false };
+    this.player.god = false;
+    this.player.setFly(false);
+    this.carryPowers();
+    this.showPowers();
+    this.player.mend();
+    this.player.keepAlive = false;
+    this.joining = false;
+    this.started = false;
+    this.paused = true;
+    this.input.unlock();
+    history.replaceState(null, '', '/arena');
+    this.hud.showStart(true);
+    if (note) this.hud.note(note, 'warn');
   },
 
   /** What this player looks like follows from their name: body, first-person sleeves, inventory portrait. */

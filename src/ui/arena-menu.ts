@@ -57,6 +57,8 @@ export class ArenaMenu {
             <div class="am-seg" data-k="kills">${ARENA.kills.map((n) => `<button type="button" data-v="${n}">${n}</button>`).join('')}</div>
             <small class="am-cap">Loadout, everybody's, every round</small>
             <div class="am-lo">${ARENA.loadouts.map((id) => `<button type="button" data-lo="${id}">${esc(kitOf(id)?.name ?? id)}</button>`).join('')}</div>
+            <small class="am-cap">Stake</small>
+            <div class="am-stake" aria-disabled="true" title="Matches are played for nothing for now"><span>SOL a player</span><em>Coming soon</em></div>
             <button type="button" class="am-go">Host</button>
             <button type="button" class="am-practice">Practice alone</button>
             <p class="am-note">No money moves yet: matches are played for nothing.</p>
@@ -93,6 +95,9 @@ export class ArenaMenu {
     });
   }
 
+  /** out of the wait for a match (true), or out of a match: the game's to do (Game.toArena) */
+  onLeave: (waiting: boolean) => void = () => {};
+
   /** what the game says its start screen is doing: shown before anything is joined, waiting for players, paused in a match, or gone */
   private state(on: boolean, paused: boolean, text: string) {
     this.el.classList.toggle('show', on);
@@ -101,10 +106,11 @@ export class ArenaMenu {
     // (settings opened from the pause are only open while it is)
     if (!(on && paused)) this.el.classList.remove('pset');
     this.q<HTMLElement>('.am-wait-text').textContent = text.replace(/^Wager:/, 'Match:');
-    if (on && !paused && !text && !this.shown) {
+    // (here before any match, or back from one: the matches looked at again)
+    if (on && !paused && !text) {
+      if (!this.shown) this.q<HTMLInputElement>('.am-name input').value = this.hud.nameValue();
       this.shown = true;
-      this.q<HTMLInputElement>('.am-name input').value = this.hud.nameValue();
-      this.show('play');
+      this.show(this.panel === 'settings' ? 'play' : this.panel);
     }
     if (!on) this.settings(false);
   }
@@ -186,8 +192,8 @@ export class ArenaMenu {
       this.el.classList.remove('pset');
       return this.settings(false);
     }
-    // (out of a match, or out of the wait for one: the Arena's page afresh)
-    if (b.classList.contains('am-leave')) return void location.assign('/arena');
+    // (out of the wait for a match, or out of the match: back here, the page as it is)
+    if (b.classList.contains('am-leave')) return this.onLeave(this.el.classList.contains('waiting'));
   }
 
   /** into a match: put in the page's address, the name given, and Deploy pressed as the Zone presses it */

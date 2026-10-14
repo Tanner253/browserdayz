@@ -180,6 +180,7 @@ export class Net {
    */
   private held: S2C[] | null = null;
   private heldTill: ReturnType<typeof setTimeout> | null = null;
+  private pingT = 0;
   private kicked = '';
   private kickedV: number | undefined;
   private proofKey = '';
@@ -306,7 +307,9 @@ export class Net {
         if (m.t === 'welcome') {
           this.online = true;
           this.id = m.you;
-          setInterval(() => this.send({ t: 'ping', n: performance.now() }), 4000);
+          // (one a page: a second match in the Arena is a second connection, not a second clock)
+          clearInterval(this.pingT);
+          this.pingT = window.setInterval(() => this.send({ t: 'ping', n: performance.now() }), 4000);
           // (from this word on, what is said is kept for the game until it listens)
           this.held = [];
           if (this.heldTill) clearTimeout(this.heldTill);

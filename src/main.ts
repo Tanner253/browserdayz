@@ -193,7 +193,7 @@ async function boot() {
     stage('fort', 'building the fort');
     await game.castle.whole();
   }
-  if (arena) new ArenaMenu(game.hud);
+  if (arena) new ArenaMenu(game.hud).onLeave = (waiting) => (waiting ? game.net.leaveQueue() : game.toArena());
   stage('last files');
   await assets.idle();
   // warm up shader programs before revealing the world
