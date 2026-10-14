@@ -413,12 +413,19 @@ export const onlineMethods = {
       this.hud.restarting(this.restartSaid.why, m.in);
     });
     net.onClose = (reason) => {
-      this.paused = true;
-      this.input.unlock();
       // (left by this player, from the Arena's menu: nothing to show, they are back at it already)
       if (this.arenaLeaving) return void (this.arenaLeaving = false);
-      // (a wager over, or the arena gone: its result, and where to go on to)
-      if (this.arenaHud) return void this.arenaHud.closed(reason);
+      // (a wager over, or the arena gone: its result and where to go on to, up before the mouse is let go, so that
+      // its going is not taken for a pause; and any pause that was open put away, under the card)
+      if (this.arenaHud) {
+        this.arenaHud.closed(reason);
+        this.paused = true;
+        this.hud.showStart(false);
+        this.input.unlock();
+        return;
+      }
+      this.paused = true;
+      this.input.unlock();
       const said = this.restartSaid && performance.now() - this.restartSaid.at < 180_000 ? this.restartSaid : null;
       if (!said || this.net.refused) return void this.hud.fatal(reason);
       this.hud.fatal(`The server is restarting${said.why ? ` (${said.why})` : ''}. You are kept as you were. This page loads again by itself when the server is back.`);

@@ -22,6 +22,11 @@ export class ArenaHud {
   /** where to go once the match is over: the wagers again, or the menu */
   onGo: (again: boolean) => void = () => {};
 
+  /** the match is over and its card is up: the mouse is the card's (see Game's onLockChange) */
+  get ended() {
+    return this.el.classList.contains('ended');
+  }
+
   /** taken away, the HUD as it was before the match (back at the Arena's menu: Game.toArena) */
   destroy() {
     this.el.remove();

@@ -325,6 +325,8 @@ export const dropsMethods = {
   resume(this: Game) {
     // (on the bot check's range the game is still on its way in, and is being played all the same: Resume resumes)
     if (this.joining && !this.botCheck?.active) return;
+    // (an Arena match over: its card has the mouse, and nothing is resumed)
+    if (this.arenaHud?.ended) return;
     document.title = this.title;
     // keys must reach the game, not the name field
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();

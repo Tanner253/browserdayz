@@ -974,7 +974,10 @@ export class Game {
     this.input.onLockChange = (locked) => {
       if (locked) {
         if (this.started) this.unpause();
-      } else if (!this.invUI.isOpen && !this.map?.open && !this.adminUI?.isOpen && !this.player.dead && this.started) this.pause();
+      } else if (!this.invUI.isOpen && !this.map?.open && !this.adminUI?.isOpen && !this.player.dead && this.started && !this.arenaHud?.ended) this.pause();
+      // (an Arena match over: the mouse is let go for its result's card, which is no pause, and nothing takes it
+      // back. 2026-10-14, the owner: "when the match settlement ui shows up i am unable to interact with it, the
+      // escape menu pops up and when i go back to game i cant actually click or move my mouse on the ui")
     };
     // (and whoever is alive in a life is asked before the tab goes: Ctrl and W, the browser's own, is a helicopter
     // going down and forward. The game's own reloads are not asked about: src/core/leave.ts)
@@ -1004,7 +1007,7 @@ export class Game {
       // a second Escape, with the mouse still free, is the menu
       else if (this.awaitClick) {
         this.awaitClick = false;
-        if (this.started && !this.player.dead) this.pause();
+        if (this.started && !this.player.dead && !this.arenaHud?.ended) this.pause();
       }
     });
     this.director.update(0.016);
