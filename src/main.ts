@@ -87,7 +87,7 @@ const QUIET = 45;
     quiet = now === was ? quiet + 5 : 0;
     was = now;
     if (quiet !== QUIET) return;
-    B.say?.('Still loading. A slow or patchy connection is the usual cause: it carries on by itself, or you can reload and it picks up what it already has.');
+    // (reported, and no longer said on the screen: the owner, of its "Still loading ... Reload", "we need to get rid of this")
     tell('slow');
   }, 5000);
 }
