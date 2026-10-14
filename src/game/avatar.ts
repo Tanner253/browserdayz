@@ -33,7 +33,7 @@ const FP_BACK = 0.3;
 /** the limbs a bloodstain can sit on: it goes on whichever is nearest the hit */
 const WOUND_BONES: [string, string | null][] = [['pelvis', 'spine_01'], ['spine_01', 'spine_02'], ['spine_02', 'spine_03'], ['spine_03', 'neck_01'], ['neck_01', 'Head'], ['Head', null], ['upperarm_l', 'lowerarm_l'], ['upperarm_r', 'lowerarm_r'], ['lowerarm_l', 'hand_l'], ['lowerarm_r', 'hand_r'], ['thigh_l', 'calf_l'], ['thigh_r', 'calf_r'], ['calf_l', 'foot_l'], ['calf_r', 'foot_r'], ['foot_l', 'ball_l'], ['foot_r', 'ball_r']];
 
-const CLIPS = ['idle', 'walk', 'run', 'crouchIdle', 'crouchWalk', 'jumpStart', 'jumpLoop', 'jumpLand', 'death', 'deathFront', 'deathSide', 'hit', 'hitHead', 'dance', 'sit', 'armed', 'strike'] as const;
+const CLIPS = ['idle', 'walk', 'run', 'crouchIdle', 'crouchWalk', 'jumpStart', 'jumpLoop', 'jumpLand', 'death', 'deathFront', 'deathSide', 'hit', 'hitHead', 'dance', 'sit', 'armed', 'strike', 'proneDown', 'crawl'] as const;
 type Clip = (typeof CLIPS)[number];
 const STRIDES = ['walk', 'run', 'crouchWalk'] as const;
 type Stride = (typeof STRIDES)[number];
@@ -299,6 +299,11 @@ export const POSE = {
   leanHips: 0.1,
   /** how fast the death clip is played */
   deathRate: 1.15,
+  /** going down to lie (`proneDown`): the seconds of it over which the body comes down (its hips: crouched to 0.55, on the ground by 1.25), and how fast it is played back to get up */
+  lie: [0.55, 1.25] as [number, number],
+  rise: 1.25,
+  /** metres crawled to one whole loop of `crawl` (it is drawn on the spot) */
+  crawlStride: 0.9,
   /** the most the legs turn away from the chest when walking sideways, radians */
   maxTwist: 1.35,
   /** how much of the body a hit takes over at its peak */
@@ -638,6 +643,10 @@ export class Avatar {
   private prone = false;
   private proneT = 0;
   private crawl = 0;
+  /** seconds into going down (`proneDown`): forward while lying is asked for, back while getting up; and how much of a crawl */
+  private lieT = 0;
+  private crawlK = 0;
+  private crawlAt = 0;
   private thighs: THREE.Bone[] = [];
   /** how far sat down on the ground, 0..1; and the knees, with how each lies when the leg is straight */
   private groundT = 0;
@@ -946,7 +955,9 @@ export class Avatar {
     this.modelRoot = model;
     this.mixer = new THREE.AnimationMixer(driver);
     for (const name of CLIPS) {
-      const clip = gltf.animations.find((c) => c.name === name);
+      // (the infected's files have no lying down or crawling, and they never do either: a copy of the fall stands in)
+      const own = gltf.animations.find((c) => c.name === name);
+      const clip = own ?? (name === 'proneDown' || name === 'crawl' ? gltf.animations.find((c) => c.name === 'deathFront')?.clone() : undefined);
       if (!clip) throw new Error(`character has no "${name}" clip`);
       await breathe();
       const a = this.mixer.clipAction(clip);
@@ -1682,7 +1693,14 @@ export class Avatar {
     const mv = this.move;
     this.danceT += ((this.hold === 'dance' && !dead ? 1 : 0) - this.danceT) * ease(7);
     this.groundT += ((this.hold === 'sit' && !dead ? 1 : 0) - this.groundT) * ease(5);
-    this.proneT += ((this.prone && !dead ? 1 : 0) - this.proneT) * ease(6);
+    // Lying down is the movement made for it, at its own pace, from a crouch: from standing too (the owner, 2026-10-14:
+    // "we should play the crouch to prone even if proning from standing"); getting up is the same, back. Moving the
+    // while, it is hurried, so that a body is never drawn kneeling where the player already crawls or runs. `proneT`
+    // is how far down it has come: what the place it lies at, the hands on a gun and the eyes go by.
+    const lieEnd = this.dur.proneDown - 1e-3;
+    if (!dead) this.lieT = this.prone ? Math.min(lieEnd, this.lieT + dt * (speedNow > 0.3 ? 2 : 1)) : Math.max(0, this.lieT - dt * (speedNow > 1 ? 3 : POSE.rise));
+    this.proneT = dead ? this.proneT - this.proneT * ease(6) : THREE.MathUtils.smoothstep(this.lieT, POSE.lie[0], POSE.lie[1]);
+    this.crawlK += ((this.prone && !dead && this.lieT >= lieEnd && speedNow > 0.15 ? 1 : 0) - this.crawlK) * ease(8);
     this.handsT += ((this.hold === 'surrender' && !dead ? 1 : 0) - this.handsT) * ease(9);
     // eating, drinking, dressing a wound, waving, dancing: whatever was in the hands is put away for it
     this.seatT += ((this.seated && !dead ? 1 : 0) - this.seatT) * ease(9);
@@ -1798,6 +1816,8 @@ export class Avatar {
       deathSide: 0,
       hit: this.hitClip === 'hit' ? hit : 0,
       hitHead: this.hitClip === 'hitHead' ? hit : 0,
+      proneDown: 0,
+      crawl: 0,
       sit: 0,
       armed: 0,
       strike: 0,
@@ -1809,12 +1829,16 @@ export class Avatar {
       w.sit = st * rest;
     }
     w[this.deathClip] = down;
-    // lying down, alive: the fall forward's last moment is how the body lies, and everything else gives way to it
-    const pr = this.proneT * (1 - down);
-    if (pr > 0.001) {
-      for (const n of CLIPS) if (n !== 'hit' && n !== 'hitHead') w[n] *= 1 - pr;
-      w.deathFront += pr;
+    // lying down, alive: going down (its last moment is how the body lies) or crawling, and everything else gives way
+    // to it, from the first moment of it (it begins in a crouch); `pr` is how far down the body is
+    const pr = this.proneT * (1 - down), lying = Math.min(1, this.lieT / 0.15) * (1 - down);
+    if (lying > 0.001) {
+      for (const n of CLIPS) if (n !== 'hit' && n !== 'hitHead') w[n] *= 1 - lying;
+      w.proneDown += lying * (1 - this.crawlK);
+      w.crawl += lying * this.crawlK;
     }
+    // (the crawl keeps time with the ground: a pull of the arms for so much of it, backwards when going backwards)
+    this.crawlAt = (((this.crawlAt + (dt * speedNow * dirSign) / POSE.crawlStride) % 1) + 1) % 1;
     // --- and where in each. One stride clock for every stepping clip, so the same foot is
     // down in all of them and a blend of two is still a step.
     const rate: Record<Stride, number> = {
@@ -1856,7 +1880,8 @@ export class Avatar {
     for (const n of CLIPS) {
       const a = this.actions[n];
       a.setEffectiveWeight(w[n]);
-      if (n === 'deathFront' && pr > 0.001 && !dead) a.time = this.dur[n] - 1e-3;
+      if (n === 'proneDown') a.time = this.lieT;
+      else if (n === 'crawl') a.time = this.crawlAt * this.dur[n];
       else if (n === 'death' || n === 'deathFront' || n === 'deathSide') a.time = Math.min(this.downT, this.dur[n] - 1e-3);
       else if (n === 'hit' || n === 'hitHead') a.time = Math.min(Math.max(0, this.hitT), this.dur[n] - 1e-3);
       else if (n === 'jumpStart') a.time = Math.min(this.dur[n] - 1e-3, POSE.jump[0] + Math.max(0, this.jumpT));
@@ -1908,7 +1933,7 @@ export class Avatar {
     if (pr > 0.001) {
       // (the body lies forward of its feet: it is put back so that where the player is, is its chest)
       this.crawl += speed * dt * 2.4;
-      const going = Math.min(1, speed / 0.5) * pr;
+      const going = Math.min(1, speed / 0.5) * pr * (1 - this.crawlK);
       const sy = Math.sin(this.yaw), cy = Math.cos(this.yaw), back = (firstPerson ? PRONE.backOwn : PRONE.back) * pr;
       this.root.position.x += sy * back;
       this.root.position.z += cy * back;
@@ -2007,7 +2032,7 @@ export class Avatar {
         // and crawling, one knee and then the other drawn out to the side
         if (this.chest) this.turn(this.chest, _right, PRONE.chest * pr);
         for (const b of this.neck) this.turn(b, _right, (PRONE.head * pr) / this.neck.length);
-        const pull = Math.sin(this.crawl) * PRONE.knee * Math.min(1, speed / 0.5) * pr;
+        const pull = Math.sin(this.crawl) * PRONE.knee * Math.min(1, speed / 0.5) * pr * (1 - this.crawlK);
         if (this.thighs[0] && pull > 0) this.turn(this.thighs[0], UP, pull);
         if (this.thighs[1] && pull < 0) this.turn(this.thighs[1], UP, pull);
       }

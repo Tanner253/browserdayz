@@ -22,6 +22,7 @@ import { dedup, prune, mergeDocuments, unpartition, textureCompress, meshopt } f
 import { MeshoptEncoder } from 'meshoptimizer';
 import sharp from 'sharp';
 import { wearSuit } from './suit.mjs';
+import { runOf, giveRun } from './mixamo.mjs';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
 const SRC = path.join(ROOT, 'assets-src', 'characters', 'src');
@@ -881,6 +882,32 @@ for (const [name, source] of Object.entries(CLIPS)) {
     }
     writeClip(name, times, rot, hip, dur);
   }
+}
+
+// ---------------------------------------------------------------- going down to lie, and crawling
+// Two movements on a Mixamo skeleton, carried onto this one as the infected's running is (scripts/mixamo.mjs): "Crouch
+// To Prone" and "Prone Forward" by TarkovMarck, CC BY 4.0 (CREDITS.md), unpacked into assets-src/models/
+// anim_crouch_to_prone/ and anim_prone_forward/. The owner, 2026-10-14: "i added 2 animations for crouch to prone and
+// prone forward animations ... we should play the crouch to prone even if proning from standing". `proneDown` starts
+// with the hips where crouching has them and ends with them where lying always had them (the fall forward's last
+// moment, deathFront), the difference eased in along the way: the body lies where it always lay, and what is hit and
+// seen from its own eyes with it. `crawl` loops on the spot (the game moves the body), its hips where lying has them.
+if (!EMOTES && !INFECTED) {
+  const read = (dir) => io.read(path.join(ROOT, 'assets-src', 'models', dir, 'scene.gltf'));
+  const down = runOf(await read('anim_crouch_to_prone'), 'mixamorig:', false);
+  const crawl = runOf(await read('anim_prone_forward'), 'mixamorig:', true);
+  giveRun(doc, down, 'proneDown');
+  giveRun(doc, crawl, 'crawl');
+  total += down.dur + crawl.dur;
+  const hipsOf = (name) => root.listAnimations().find((a) => a.getName() === name).listChannels().find((c) => c.getTargetNode() === hipsB && c.getTargetPath() === 'translation').getSampler().getOutput().getArray();
+  const crouch = hipsOf('crouchIdle'), lie = hipsOf('deathFront'), dn = hipsOf('proneDown'), cr = hipsOf('crawl');
+  const n = dn.length / 3, L = lie.length - 3, E = dn.length - 3;
+  for (let f = 0; f < n; f++) {
+    const k = smooth(0, 1, f / (n - 1));
+    for (let j = 0; j < 3; j++) dn[f * 3 + j] += (crouch[j] - dn[j]) * (1 - k) + (lie[L + j] - dn[E + j]) * k;
+  }
+  const m = cr.length / 3, mean = [0, 1, 2].map((j) => cr.filter((_, i) => i % 3 === j).reduce((s, x) => s + x, 0) / m);
+  for (let f = 0; f < m; f++) for (let j = 0; j < 3; j++) cr[f * 3 + j] += lie[L + j] - mean[j];
 }
 
 // ================================================================ 4. write
