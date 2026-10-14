@@ -711,6 +711,14 @@ export const LOCAL_MODELS = {
   // where the lines meet to the top of the canopy, which is 8.1 m across; it stands on the point where its lines
   // meet, and that point is what the crate hangs from. Its fourth picture, for light of its own, is black all over
   // (every pixel of it nought): the game does not put it on the card.)
+  // The helicopter that brings a supply drop (2026-10-14, the owner: "i have added an animated helicopter for the
+  // airdrop (apache) make sure its nice and large"). Unpack assets-src/low_poly_apache_gunship.zip into
+  // assets-src/models/low_poly_apache_gunship/. Its loose Hellfire, which the download stands under its belly, is
+  // left out. Its two rotors are pieces of their own (`apache_rotor`, `apache_tail`), each with its origin on its
+  // hub, so the game turns them (the download's own turning is not used: the game's rotor runs at the rules' speed).
+  // 28 m over all, rotor included: some 27 m nose to tail, 1.7 times a real Apache (at 1.4 times it read as any
+  // helicopter would in the sky at ninety metres). Stood with its origin under the main rotor's hub, nose toward -z.
+  apache: { dir: 'low_poly_apache_gunship', only: /Gunship_material/, pivot: /^Rotor$/, hung: { rotor: /^Rotor_/, tail: /^Back_Rotor_/ }, rot: [0, Math.PI, 0], size: 28, tex: 1024, tags: ['prop'], changes: 'Its loose missile left out; its main and tail rotors made pieces of their own about their hubs (its own animation not used: the game turns them); turned nose to -z and stood under its main rotor; scaled to 28 m over all; textures re-encoded as WebP at the size they came; geometry compressed.' },
   parachute: { dir: 'army_parachute', solid: true, both: true, size: 12, tex: 4096, tags: ['prop'], changes: 'Made solid: drawn as a thing that is not seen through, where it came half clear, with the clearness taken out of its colour picture, and both faces of its cloth drawn; scaled to metres (twelve from where its lines meet to the top of the canopy) and stood on the point where its lines meet; textures re-encoded as WebP at the size they came; geometry compressed. In the game it is drawn narrow as it opens and laid over as it settles.' },
   // The frag grenade (2026-10-13: "i added a new frag grenade, it takes up 1x1 in the inventory"). Unpack
   // assets-src/frag_granade.zip into assets-src/models/frag_grenade/. A ball grenade with its fuse, lever, pin and

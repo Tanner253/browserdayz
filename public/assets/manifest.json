@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-13T23:34:34.175Z",
+ "generated": "2026-10-14T05:55:11.999Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr"
@@ -5520,6 +5520,26 @@
    "hi": "assets/models/hi/frag_grenade.glb",
    "hiBytes": 1532464,
    "hiCard": 64
+  },
+  "apache": {
+   "url": "assets/models/apache.glb",
+   "tags": [
+    "prop"
+   ],
+   "bytes": 150428,
+   "srcTris": 2907,
+   "tris": 2785,
+   "min": [
+    -9.6091,
+    0,
+    -9.6088
+   ],
+   "max": [
+    9.6065,
+    8.2812,
+    18.3912
+   ],
+   "lods": []
   }
  }
 }

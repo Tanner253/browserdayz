@@ -2,13 +2,11 @@
 // what is heard (2026-10-13). Where each is at any moment is not decided here: src/sim/airdrop.ts works it out
 // from the one line of numbers the server says a flight in, so every game draws the same thing in the same place.
 //
-// THERE IS NO HELICOPTER TO SEE YET ("we will add a 3d helicopter model in eventually so prepare for that"). What
-// there is: `Helicopter`, a thing of its own with a place, a heading, a speed, a lean into its turns, a nose that
-// goes down as it gathers way, a rotor that turns, and ONE place where a model is hung (`Helicopter.hang`). Until
-// there is one, all that is drawn of it is four lights, seen at dusk and by night and not by day: a red one under
-// it that flashes, a white one at its tail that does not, and one on each side (red to its left, green to its
-// right, as every aircraft has them: so which way it is going can be told in the dark). By day it is known by its
-// sound, and by the crate.
+// `Helicopter` is a thing of its own with a place, a heading, a speed, a lean into its turns, a nose that goes down
+// as it gathers way, rotors that turn, and ONE place where a model is hung (`Helicopter.hang`): since 2026-10-14 an
+// Apache, 1.7 times life size ("make sure its nice and large"). With it go four lights, seen at dusk and by night
+// and not by day: a red one under it that flashes, a white one at its tail that does not, and one on each wing tip
+// (red to its left, green to its right, as every aircraft has them: so which way it is going can be told in the dark).
 
 import * as THREE from 'three';
 import { audio, type RotorVoice } from '../core/audio';
@@ -16,13 +14,15 @@ import { AIRDROP, crateAt, flightTimes, heliAt, rotorAt, type Flight, type HeliA
 
 /** what is drawn of it, in one place */
 export const HELI_LOOK = {
-  /** the lights, in the helicopter's own metres: [to its right, up, toward its tail] and the colour of each (a Black Hawk is 15 m from nose to tail) */
+  /** the lights, in the helicopter's own metres: [to its right, up, toward its tail] and the colour of each: on the Apache (the model `apache`, 27 m nose to tail, its tail 17.9 m behind the hub): under its belly, at its tail, at its wing tips */
   lights: [
-    { at: [0, -1.5, -1], colour: [1, 0.08, 0.05], flash: true },
-    { at: [0, 1.4, 9], colour: [1, 0.96, 0.86], flash: false },
-    { at: [-1.7, -0.2, -1.5], colour: [1, 0.08, 0.05], flash: false },
-    { at: [1.7, -0.2, -1.5], colour: [0.1, 1, 0.3], flash: false },
+    { at: [0, -2.3, 0.6], colour: [1, 0.08, 0.05], flash: true },
+    { at: [0, 3.2, 17.8], colour: [1, 0.96, 0.86], flash: false },
+    { at: [-4.5, 0.5, -0.4], colour: [1, 0.08, 0.05], flash: false },
+    { at: [4.5, 0.5, -0.4], colour: [0.1, 1, 0.3], flash: false },
   ] as { at: [number, number, number]; colour: [number, number, number]; flash: boolean }[],
+  /** how far the model is let down from where it stands (its lowest point on its origin): the helicopter's origin is in its cabin, and the crate leaves it AIRDROP.belly metres under that, just under the belly */
+  sit: 2.4,
   /** the red one under it is lit for this long, once in this long: seconds */
   flash: [0.14, 1.1] as [number, number],
   /** how big a light is drawn, in pixels of the screen: from far, and from near (within `nearBy` metres) */
@@ -107,8 +107,15 @@ export class Helicopter {
   /** The one place a model is hung (see what it expects of one, above). */
   hang(model: THREE.Object3D, rotor?: THREE.Object3D, tail?: THREE.Object3D) {
     this.mount.add(model);
-    if (rotor) this.rotor.attach(rotor);
-    if (tail) this.tail.attach(tail);
+    // (each turning group is first stood on its own piece's hub: turned where it stood, at the helicopter's middle,
+    // a tail rotor fourteen metres back went round in a circle that size)
+    this.root.updateMatrixWorld(true);
+    for (const [group, piece] of [[this.rotor, rotor], [this.tail, tail]] as const) {
+      if (!piece) continue;
+      group.position.copy(this.mount.worldToLocal(piece.getWorldPosition(new THREE.Vector3())));
+      group.updateMatrixWorld(true);
+      group.attach(piece);
+    }
   }
 
   /**
@@ -157,6 +164,8 @@ export interface AirdropHost {
   crate: () => Promise<THREE.Object3D>;
   /** the canopy (the model `parachute`) */
   canopy: () => Promise<THREE.Object3D>;
+  /** the helicopter itself (the model `apache`, a copy: stood on its lowest point under its rotor's hub, its rotors pieces of their own) */
+  heli?: () => Promise<THREE.Object3D>;
   /** a thing that is lit is made known to the sky and the shadows before it is drawn */
   register: (o: THREE.Object3D) => void;
   /** things got ready to be drawn before they are seen: their shaders made, their pictures on the card (the renderer's `ready`) */
@@ -199,6 +208,7 @@ export class Airdrops {
     const was = f.age >= T.land;
     const l: Live = { f, T, t0: performance.now() - f.age * 1000, heli, voice: null, hung: null, asked: false, touched: was, stood: was };
     this.live.push(l);
+    void this.dress(l).catch(() => {});
     // (The canopy and the crate are fetched and got ready NOW, while the helicopter is still on its way: they were
     // fetched at the moment the crate was let go, and their shaders made in the frame they were first drawn in, with
     // everybody looking at the sky. Found by an independent reading, 2026-10-13.)
@@ -220,6 +230,21 @@ export class Airdrops {
 
   private clock(l: Live) {
     return this.held ?? (performance.now() - l.t0) / 1000;
+  }
+
+  /** The model put on a helicopter as it appears (far off: it is a small thing, fetched and made ready long before it is near). Without one, it is its lights and its sound. */
+  private async dress(l: Live) {
+    if (!this.host.heli) return;
+    const model = await this.host.heli();
+    if (!this.live.includes(l)) return;
+    model.position.y = -HELI_LOOK.sit;
+    model.traverse((o) => {
+      if ((o as THREE.Mesh).isMesh) (o as THREE.Mesh).castShadow = true;
+    });
+    this.host.register(model);
+    if (this.host.ready) await Promise.race([this.host.ready([model]), new Promise<void>((done) => setTimeout(done, 6000))]).catch(() => {});
+    if (!this.live.includes(l)) return;
+    l.heli.hang(model, model.getObjectByName('apache_rotor'), model.getObjectByName('apache_tail'));
   }
 
   private async hang(l: Live) {

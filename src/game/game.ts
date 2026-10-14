@@ -406,6 +406,7 @@ export class Game {
         return o;
       },
       canopy: async () => (await assets.model('parachute')).clone(),
+      heli: async () => (await assets.model('apache')).clone(),
       register: (o) => atmo.registerObject(o),
       ready: (o) => r.ready(o),
       landed: (f) => this.dropLanded(f),
