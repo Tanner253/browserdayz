@@ -250,7 +250,12 @@ export const frameMethods = {
 
     // the hot keys: each brings up what is on it (and puts it away again); X empties the hands
     // (not with a grenade's pin coming out, or out: those hands are spoken for until it has left them)
-    if (playing && !uiOpen && !typing && !p.dead && !this.cook) {
+    // (in a seat, Ctrl and a number is a seat of the vehicle, as in DayZ: the owner, "change vehicle position with
+    // ctrl 1-4, Or ctrl 1-2 for heli". The browser is kept from taking it for one of its tabs while seated.)
+    input.seatKeys = !!ride;
+    const seatKeys = !!ride && (input.held('ControlLeft') || input.held('ControlRight'));
+    if (playing && !uiOpen && !typing && !p.dead && seatKeys) HOT_CODES.slice(0, 4).forEach((k, i) => input.pressed(k) && this.garage.swap(i));
+    else if (playing && !uiOpen && !typing && !p.dead && !this.cook) {
       HOT_CODES.forEach((k, i) => {
         if (input.pressed(k)) this.hot(i);
       });
@@ -539,7 +544,7 @@ export const frameMethods = {
       spread: this.weapons.spread,
       lag: this.lagPx(),
       arms: this.weapons.armStamina,
-      ride: this.garage.ride && !p.dead ? { kmh: Math.abs(this.garage.ride.jeep.speed) * 3.6, fuel: this.garage.ride.jeep.fuel / JEEP.tank, hp: this.garage.ride.jeep.hp / JEEP.hp, driver: this.garage.ride.seat === 0 } : null,
+      ride: this.garage.ride && !p.dead ? { seats: this.garage.seatList(), kmh: Math.abs(this.garage.ride.jeep.speed) * 3.6, fuel: this.garage.ride.jeep.fuel / JEEP.tank, hp: this.garage.ride.jeep.hp / JEEP.hp, driver: this.garage.ride.seat === 0 } : null,
       scoped: this.weapons.scoped,
       sightless: this.weapons.sightless,
       glass: !!this.glass,

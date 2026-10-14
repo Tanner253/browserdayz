@@ -23,7 +23,7 @@ import type { Player } from './player';
 import type { RemotePlayer } from './remote';
 import { DRIVE, DRIVES, DRIVE_CAR, Jeep, groundOf, type Controls } from './vehicle';
 import { Heli } from './heli';
-import { HELI, heliSpots } from '../sim/heli';
+import { HELI, heliCrash, heliSpots, seatsOf } from '../sim/heli';
 
 /**
  * Where whoever sits in each seat has their feet, in the jeep's own frame (x to its right,
@@ -69,6 +69,8 @@ const SEATS_OF = [SEAT_AT, SEAT_CAR, SEAT_HELI];
 const ENGINE_AT: [number, number, number][] = [[0, 0.5, -1.45], [0, 0.22, -1.9], [0, 1.3, 0.9]];
 /** and what each is called, where a player is told what hurt them */
 const CALLED = ['jeep', 'police car', 'helicopter'];
+/** what each seat is called, on the panel that shows them (src/ui/hud.ts) */
+const SEAT_NAMES = [['Driver', 'Passenger', 'Back left', 'Back right'], ['Driver', 'Passenger', 'Back left', 'Back right'], ['Pilot', 'Co-pilot']];
 /** how bright the lamps burn while somebody is at the wheel */
 const LAMPS = 1.8;
 /** how much of the metal the model's paint is drawn with is kept (see fromModel) */
@@ -387,7 +389,7 @@ export class Garage {
   /** the seat a player standing here would take: the one whose door they are at, or the nearest free one */
   seatFor(j: Jeep, from: THREE.Vector3): number {
     let best = -1, bd = Infinity;
-    for (let k = 0; k < SEATS; k++) {
+    for (let k = 0; k < seatsOf(j.kind); k++) {
       if (j.seats[k] !== null) continue;
       const s = SEATS_OF[j.kind][k];
       const d = j.point(s[0] * 2.6, 0, s[2], _a).distanceTo(from) - (k === 0 ? 0.35 : 0);
@@ -427,6 +429,39 @@ export class Garage {
       if (seat === 0) j.setMode('sim');
     }
   }
+  /**
+   * Ctrl and a number, in a seat: into that seat of the same vehicle, if it is free (as in DayZ). Into the front
+   * seat, this game drives it (or flies it) from now on; out of it, a helicopter has nobody at its controls.
+   */
+  swap(seat: number) {
+    const r = this.ride;
+    if (!r || seat === r.seat || seat < 0 || seat >= seatsOf(r.jeep.kind) || r.jeep.wreck) return;
+    if (r.jeep.seats[seat] !== null) return this.h.note('That seat is taken', 'warn');
+    if (this.h.online()) {
+      if (performance.now() - this.asked < 300) return;
+      this.asked = performance.now();
+      this.h.net.send({ t: 'vswap', seat });
+    } else {
+      const j = r.jeep;
+      j.seats[r.seat] = null;
+      j.seats[seat] = 0;
+      r.seat = seat;
+      this.h.avatar.setSeat(true, SIT_OF[j.kind][seat]);
+      if (seat === 0) j.setMode('sim');
+    }
+  }
+
+  /** the seats of the vehicle this player is in, for the panel that shows them: what each is, who is in it */
+  seatList(): { name: string; who: string | null; me: boolean }[] | null {
+    const r = this.ride;
+    if (!r) return null;
+    const j = r.jeep, me = this.h.online() ? this.h.net.id : 0;
+    return SEAT_NAMES[j.kind].slice(0, seatsOf(j.kind)).map((name, k) => {
+      const id = j.seats[k], mine = k === r.seat || (id !== null && id === me && this.h.online());
+      return { name, me: mine, who: mine ? 'you' : id === null ? null : this.h.remotes.get(id)?.name ?? 'somebody' };
+    });
+  }
+
   /** a jeep this game was asked to stand up, once it is this game's to move */
   private flipDue: Jeep | null = null;
 
@@ -551,6 +586,7 @@ export class Garage {
       if (j.mode !== 'sim') continue;
       const driven = this.ride?.jeep === j && this.ride.seat === 0;
       if (driven) this.runDown(j, x, now);
+      this.nudge(j, now);
       // let go of, and stopped: it is nobody's to move any more
       if (!driven && j.atRest && !(online ? j.seats[0] !== null : false)) {
         if (online) h.net.send({ t: 'vrest', i: j.i, s: j.state() });
@@ -641,11 +677,33 @@ export class Garage {
     x.crashAt = now;
     if (this.h.online()) this.h.net.send({ t: 'vcrash', i: j.i, n: Math.round(hard * 10) / 10 });
     else {
-      const cost = crashDamage(hard);
+      const cost = j instanceof Heli ? heliCrash(hard) : crashDamage(hard);
       j.hp = Math.max(0, j.hp - cost.jeep);
       if (cost.people > 0 && this.ride?.jeep === j) this.h.hurt(cost.people, 'a crash');
     }
   }
+
+  /**
+   * A vehicle this game moves that runs into one standing parked, with nobody in it: that one is moved too, by this
+   * game, until it is at rest again (the owner, 2026-10-14: "Vehicles should have physics even with no passengers").
+   * Standing parked, a vehicle is a thing the world holds still for every game alike: one that was run into was a
+   * wall. The server hands it to this game ('vtake'); it is handed back at rest as any other is ('vrest').
+   */
+  private nudge(j: Jeep, now: number) {
+    if (j.vel.lengthSq() < 0.25) return;
+    for (const c of j.colliders) {
+      physics.world.contactPairsWith(c, (o) => {
+        const other = physics.tagOf(o)?.owner;
+        if (!(other instanceof Jeep) || other === j || other.mode !== 'parked' || other.wreck || other.seats.some((s) => s !== null)) return;
+        if (now - (this.taken.get(other.i) ?? -1e9) < 1500) return;
+        this.taken.set(other.i, now);
+        if (this.h.online()) this.h.net.send({ t: 'vtake', i: other.i });
+        else other.setMode('sim');
+      });
+    }
+  }
+  /** when this game last asked for each vehicle it ran into */
+  private taken = new Map<number, number>();
 
   /** whoever is in the way of a jeep this player is driving */
   private runDown(j: Jeep, x: Extra, now: number) {

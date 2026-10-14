@@ -6,11 +6,14 @@
 import { hospitalPlan } from '../world/big-buildings';
 import { CASTLE_SCALE, castleClear, castleLocal, castleLoose, castleProps, inCastle, looseLocal } from './castle';
 import { heightAt, inPlay, BUILDING_FOOTPRINT, type World } from '../world/worldgen';
+import { JEEP, SEATS } from './vehicles';
 
 export const HELI = {
   model: 'md500',
   /** the `k` of a VehicleInfo (0 the jeep, 1 the police car) */
   kind: 2,
+  /** its seats: the pilot's and the one beside it (the Defender is a two-seater; the owner: "ctrl 1-2 for heli") */
+  seats: 2,
   /** kg: an MD 500 with a pilot, a passenger and some fuel */
   mass: 1100,
   /** how its weight is spread, as a multiple of a solid box's (it is mostly cabin, and long in the tail) */
@@ -39,7 +42,8 @@ export const HELI = {
   coordinate: 0.8,
   /** the air: N per (m/s)^2 along its nose, its side and its up (it goes nose first; sideways and up and down it is a barn door) */
   drag: [7, 14, 1.9] as [number, number, number],
-  /** the highest it climbs, metres over the sea (the world's y): the server takes no word of a vehicle 500 m up (isVState) */
+  /** the highest it climbs over what is under it, metres, the ground rising and falling under it (the owner: "The max height above the ground for heli should be 100m, dynamic with geography. So the helicopter is shootable"); and over the sea, the world's y (the server takes no word of a vehicle 500 m up: isVState) */
+  agl: 100,
   ceiling: 440,
   /** m/s: never faster (the server holds every vehicle under 60: see isVState in server/index.ts) */
   top: 52,
@@ -53,6 +57,8 @@ export const HELI = {
   low: 1.5,
   /** m/s lost in one step that counts as a crash (a hard landing at four is not one) */
   crash: 6,
+  /** a crash (m/s lost in one step) from which it is hurt, and from which it is wrecked and everybody in it killed (see heliCrash) */
+  wreck: [6, 14] as [number, number],
   /** litres a minute at full power (a jeep flat out burns JEEP.burn) */
   burn: 2.4,
   /** how far over the ground its skids are when its middle is where the vehicles' own middle is said to be (RIDE_HEIGHT) */
@@ -121,4 +127,19 @@ export function heliSpots(world: World): { x: number; y: number; z: number; yaw:
     }
   }
   return out;
+}
+
+/** how many seats a vehicle of this kind (the `k` of a VehicleInfo) has: a helicopter two, a car SEATS */
+export const seatsOf = (k?: number) => (k === HELI.kind ? HELI.seats : SEATS);
+
+/**
+ * What a crash does to a helicopter and to everybody in it (a car's is crashDamage in src/sim/vehicles.ts): a hard
+ * landing dents it and shakes them; from HELI.wreck[1] up it is wrecked (it burns) and nobody in it lives. A fall from
+ * a hundred metres is twenty and more.
+ */
+export function heliCrash(hard: number): { jeep: number; people: number } {
+  const [from, all] = HELI.wreck;
+  if (hard >= all) return { jeep: JEEP.hp, people: 500 };
+  const k = Math.max(0, (hard - from) / (all - from));
+  return { jeep: Math.round(JEEP.hp * 0.6 * k), people: k > 0.3 ? Math.round(90 * k) : 0 };
 }

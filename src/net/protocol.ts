@@ -18,7 +18,7 @@ import type { IState, InfectedInfo } from '../sim/infected';
 // (36, 2026-10-13: the jacket and the trousers are things worn in `top` and `legs`, with the pockets inside them. A
 // page from before would say "nothing in my pockets" of a character that has them full, and the server would keep it.)
 // (38, 2026-10-14: a third kind of vehicle, the helicopter (`k` 2: src/sim/heli.ts): a page from before would draw it
-// as a jeep, in the air.)
+// as a jeep, in the air. And `vswap`, from one seat to another.)
 export const PROTOCOL = 38;
 
 /** chat channels: everyone on the server, or only players standing near the speaker */
@@ -185,6 +185,10 @@ export type C2S =
   /** getting into jeep number i (see src/sim/vehicles.ts), in this seat; and getting out of whatever we are in */
   | { t: 'vin'; i: number; seat: number }
   | { t: 'vout' }
+  /** from the seat this player is in to another free seat of the same vehicle (Ctrl and its number, as in DayZ) */
+  | { t: 'vswap'; seat: number }
+  /** a vehicle standing parked, with nobody in it, that a vehicle this game moves has run into: this game moves it too, until it is at rest */
+  | { t: 'vtake'; i: number }
   /** where the jeep this game is moving has got to, and when by this game's own clock (milliseconds) */
   | { t: 'v'; i: number; s: VState; at: number }
   /** it has come to rest: nobody need move it any more */

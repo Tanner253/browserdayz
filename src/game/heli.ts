@@ -33,7 +33,15 @@ const clamp = (x: number, a = -1, b = 1) => Math.min(b, Math.max(a, x));
  * skids 1.9 m apart). [half width, half height, half length, middle's y, middle's z]
  */
 const SHAPE = {
+  /**
+   * The cabin as a floor, a roof (the engine's housing over it) and a wall behind the seats, and nothing between:
+   * its glass stops nobody's shot (the owner: "Make sure players are killable/shoot able out of the heli"), as a
+   * car's open windows do. Whatever strikes the rest of it is the helicopter's own damage.
+   */
   cabin: [0.75, 0.83, 1.43, 0.63, -0.43],
+  floor: [0.75, 0.13, 1.43, -0.07, -0.43],
+  roof: [0.6, 0.13, 1.1, 1.33, -0.1],
+  back: [0.75, 0.83, 0.3, 0.63, 0.7],
   boom: [0.2, 0.25, 2.0, 0.95, 3.0],
   /** the skids: rods (radius, half length, middle's y, middle's z). (Boxes twelve centimetres thick, set on the ground by their middles, had their ends a hand's depth into ground that was not dead level, and were held down by it: the ground pushed them on through.) */
   skid: [0.1, 1.3, -0.7, -0.2],
@@ -72,7 +80,9 @@ export class Heli extends Jeep {
       this.colliders.push(c);
     };
     const box = (b: readonly number[], x = 0) => add(R.ColliderDesc.cuboid(b[0], b[1], b[2]).setTranslation(x, b[3], b[4]));
-    box(SHAPE.cabin);
+    box(SHAPE.floor);
+    box(SHAPE.roof);
+    box(SHAPE.back);
     box(SHAPE.boom);
     for (const x of [-SHAPE.skidApart, SHAPE.skidApart]) add(R.ColliderDesc.capsule(SHAPE.skid[1], SHAPE.skid[0]).setTranslation(x, SHAPE.skid[2], SHAPE.skid[3]).setRotation({ x: Math.SQRT1_2, y: 0, z: 0, w: Math.SQRT1_2 }));
     // (the model stands on the bottom of its skids: its middle is RIDE_HEIGHT over that)
@@ -118,8 +128,8 @@ export class Heli extends Jeep {
 
     // --- how far over what is under it its skids are: under its middle, and under each skid's two ends (on a slope
     // the ground under its middle is further down than under a skid, and it never knew it had landed)
-    const hit = physics.world.castRay(new physics.R.Ray(t, { x: 0, y: -1, z: 0 }), 40, true, undefined, SOLID_GROUPS, undefined, b);
-    let above = hit ? hit.timeOfImpact - RIDE_HEIGHT : 40;
+    const hit = physics.world.castRay(new physics.R.Ray(t, { x: 0, y: -1, z: 0 }), F.agl + 60, true, undefined, SOLID_GROUPS, undefined, b);
+    let above = hit ? hit.timeOfImpact - RIDE_HEIGHT : F.agl + 60;
     for (const [sx, sz] of SKID_ENDS) {
       _w.set(sx, SHAPE.skid[2] - SHAPE.skid[0] + 0.5, sz).applyQuaternion(_q).add(_v.set(t.x, t.y, t.z));
       const end = physics.world.castRay(new physics.R.Ray(_w, { x: 0, y: -1, z: 0 }), 3, true, undefined, SOLID_GROUPS, undefined, b);
@@ -141,7 +151,9 @@ export class Heli extends Jeep {
       if (down && liftIn <= 0) push = 0;
       else {
         // (coming down, slower the nearer the ground: a quarter of the rate in the last few metres)
-        const climb = liftIn > 0 && t.y < F.ceiling ? liftIn * F.climb : liftIn > 0 ? 0 : liftIn * F.sink * Math.min(1, Math.max(0.25, above / 12));
+        let climb = liftIn > 0 ? liftIn * F.climb : liftIn * F.sink * Math.min(1, Math.max(0.25, above / 12));
+        // (never more than F.agl over what is under it, the ground rising and falling: over a cliff's edge it settles down to it again)
+        climb = Math.max(-F.sink, Math.min(climb, Math.min(F.agl - above, F.ceiling - t.y) * 0.8));
         push = clamp((F.mass * (9.81 + F.hold * (climb - lv.y))) / Math.max(0.35, _u.y), 0, most);
       }
     }

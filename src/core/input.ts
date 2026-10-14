@@ -26,6 +26,9 @@ export class Input {
     this.via = via;
     this.releaseAll();
   }
+  /** in a vehicle's seat: Ctrl and a number is a seat (src/game/garage.ts, `swap`), not the browser's tab of that number */
+  seatKeys = false;
+
   private named(key: string) {
     const as = this.via.get(key);
     return as === undefined ? key : as;
@@ -36,7 +39,7 @@ export class Input {
       // typing in a text field (player name) is not game input
       if ((e.target as HTMLElement | null)?.tagName === 'INPUT') return;
       const k = this.named(e.code);
-      if (e.code === 'Tab' || e.code === 'Space' || e.code === 'Slash' || e.code.startsWith('Arrow') || k === 'Tab' || k === 'Space' || (e.ctrlKey && e.code === 'KeyW')) e.preventDefault();
+      if (e.code === 'Tab' || e.code === 'Space' || e.code === 'Slash' || e.code.startsWith('Arrow') || k === 'Tab' || k === 'Space' || (e.ctrlKey && e.code === 'KeyW') || (this.seatKeys && e.ctrlKey && /^Digit[1-4]$/.test(e.code))) e.preventDefault();
       if (e.repeat || !k) return;
       this.down.add(k);
       this.pressedSet.add(k);

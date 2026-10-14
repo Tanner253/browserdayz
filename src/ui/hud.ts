@@ -182,7 +182,7 @@ export class HUD {
       <div class="hud-vitals"></div>
       <div class="hud-arms"><div></div></div>
       <div class="hud-stamina"><div></div></div>
-      <div class="hud-ride"><b>0</b><small>km/h</small><div class="ride-bars"><div class="ride-fuel" title="fuel"><i></i></div><div class="ride-hp" title="what it has left in it"><i></i></div></div></div>
+      <div class="hud-ride"><b>0</b><small>km/h</small><div class="ride-bars"><div class="ride-fuel" title="fuel"><i></i></div><div class="ride-hp" title="what it has left in it"><i></i></div></div><div class="ride-seats"></div></div>
       <div class="hud-hotbar"></div>
       <div class="hud-chat">
         <div class="chat-log"></div>
@@ -1608,7 +1608,7 @@ export class HUD {
     /** what is left in the arms, 0..1 (see Weapons.armStamina) */
     arms: number;
     /** sat in a jeep: how fast it is going, and what it has left in the tank and in itself (0..1) */
-    ride?: { kmh: number; fuel: number; hp: number; driver: boolean } | null;
+    ride?: { kmh: number; fuel: number; hp: number; driver: boolean; seats?: { name: string; who: string | null; me: boolean }[] | null } | null;
     scoped: boolean;
     /** aimed with a gun that has no sights: the mark stays on the screen */
     sightless?: boolean;
@@ -1732,6 +1732,10 @@ export class HUD {
       hp.style.width = `${Math.round(s.ride.hp * 100)}%`;
       this.toggle(fuel.parentElement!, 'low', s.ride.fuel < 0.15);
       this.toggle(hp.parentElement!, 'low', s.ride.hp < 0.4);
+      // the seats, as DayZ shows them: each by what it is and who is in it, this player's own lit, Ctrl and its number to move to it
+      const esc = (t: string) => t.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
+      const seats = s.ride.seats ?? [];
+      this.set('rseats', e.ride.lastElementChild as HTMLElement, seats.map((q, k) => `<div class="${q.me ? 'me' : q.who === null ? 'free' : ''}"><kbd>Ctrl ${k + 1}</kbd><span>${q.name}</span><em>${q.who === null ? 'empty' : esc(q.who)}</em></div>`).join(''), 'html');
     }
 
     if (s.weapon) {

@@ -2,7 +2,7 @@
 // holds every vehicle to. How it flies is looked at in the game (assets-src/_wf/me/heli-fly.js: a test flight that
 // takes off, holds its height, goes, stops itself, turns and lands).   npx tsx test/heli.test.ts
 import assert from 'node:assert/strict';
-import { HELI, heliSpots, hospitalRoof } from '../src/sim/heli';
+import { HELI, heliSpots, hospitalRoof, seatsOf } from '../src/sim/heli';
 import { generateWorld, heightAt } from '../src/world/worldgen';
 import { inCastle } from '../src/sim/castle';
 import { buildWorldData } from '../server/world';
@@ -51,8 +51,16 @@ ok('the server stands them where the game does', () => {
 
 ok('it is never faster or higher than the server takes a vehicle\'s word for (isVState: under 60 m/s, under 500 m)', () => {
   assert.ok(HELI.top < 60 && HELI.ceiling < 500);
+  // (and never more than 100 m over the ground under it, so that it can be shot at: the owner's word)
+  assert.equal(HELI.agl, 100);
   // and it can lift itself, a passenger and some fuel, with some to spare
   assert.ok(HELI.lift > 1.3);
+});
+
+ok('two seats in a helicopter (pilot, co-pilot), four in a car', () => {
+  assert.equal(seatsOf(HELI.kind), 2);
+  assert.equal(seatsOf(0), 4);
+  assert.equal(seatsOf(1), 4);
 });
 
 console.log(`heli: ${n} passed`);

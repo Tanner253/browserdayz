@@ -1876,6 +1876,13 @@ body.touch .hud-start, body.touch .rw, body.touch .inv-wrap, body.touch .inv-col
 .ride-bars i { display: block; height: 100%; margin-left: auto; background: rgba(233, 228, 216, 0.8); }
 .ride-fuel i { background: rgba(233, 196, 120, 0.85); }
 .ride-bars > div.low i { background: #c8553d; }
+.ride-seats { margin-top: 10px; display: grid; gap: 3px; justify-items: end; font-size: 11px; letter-spacing: 0.06em; }
+.ride-seats > div { display: flex; gap: 8px; align-items: baseline; color: var(--ink-dim); }
+.ride-seats kbd { font-family: var(--mono); font-size: 10px; padding: 0 4px; border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 3px; opacity: 0.7; }
+.ride-seats span { text-transform: uppercase; }
+.ride-seats em { font-style: normal; min-width: 64px; text-align: left; color: var(--ink); }
+.ride-seats .free em { color: var(--ink-dim); opacity: 0.6; }
+.ride-seats .me span, .ride-seats .me em { color: #e9c478; }
 
 /* the survivor's own dog tag, under the character: worn, never carried */
 .inv-neck { display: flex; align-items: center; gap: 10px; margin: 8px 0 10px; padding: 6px 10px; border: 1px solid rgba(255, 255, 255, 0.07); background: rgba(0, 0, 0, 0.22); cursor: default; }

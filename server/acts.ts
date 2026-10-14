@@ -7,6 +7,7 @@ import { VOICE } from '../src/sim/voice';
 import { WEAPON_RULES, hitDamage } from '../src/sim/combat';
 import { fallen } from '../src/sim/grenades';
 import { JEEP, SEATS } from '../src/sim/vehicles';
+import { HELI } from '../src/sim/heli';
 import { type CorpseInfo, type KillInfo, F_DEAD } from '../src/net/protocol';
 import { CORPSE_LIFETIME, boxes, economy, issue, jeepsDue, locks, log, tellSeats, vehicles, type Veh } from './index';
 import { TAG_FRESH_MS, carriedTags, lootedTags, tagSeen } from './tags';
@@ -138,6 +139,15 @@ export function leaveSeat(c: Client, gone = false) {
   }
   const { v, seat } = at;
   v.seats[seat] = null;
+  // (A helicopter whose pilot is shot out of it, or who leaves the game, is not left to their game: whoever is still
+  // in it moves it from now on, so that it comes down for everybody as it falls, and they can take its controls.)
+  const aboard = v.seats.find((s) => s !== null);
+  if (v.k === HELI.kind && v.sim === c.id && aboard != null) {
+    v.sim = aboard;
+    v.heard = Date.now();
+    tellSeats(v);
+    return;
+  }
   // The game that was moving it goes on doing so until it has rolled to a stop (see 'vrest'):
   // unless that game is gone, and then it stops where it was last seen.
   if (gone && v.sim === c.id) {

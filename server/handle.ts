@@ -9,6 +9,7 @@ import { WEAPON_RULES, hitDamage } from '../src/sim/combat';
 import { THROWN, pullPin, letGo, judge } from '../src/sim/grenades';
 import { BARREL } from '../src/sim/barrels';
 import { JEEP, SEATS, carDamage, crashDamage } from '../src/sim/vehicles';
+import { HELI, heliCrash, seatsOf } from '../src/sim/heli';
 import { infectedDrop, INFECTED, guarded } from '../src/sim/infected';
 import { EMOTE, EMOTE_GAP, SHOUT_RANGE } from '../src/sim/emotes';
 import { bloodOf, bleedOf } from '../src/sim/blood';
@@ -553,7 +554,7 @@ export function handle(c: Client, m: C2S) {
     }
     case 'vin': {
       const v = vehicles.get(m.i);
-      if (!v || !c.alive || v.goneAt || c.seatAt || !Number.isInteger(m.seat) || m.seat < 0 || m.seat >= SEATS || v.seats[m.seat] !== null) return;
+      if (!v || !c.alive || v.goneAt || c.seatAt || !Number.isInteger(m.seat) || m.seat < 0 || m.seat >= seatsOf(v.k) || v.seats[m.seat] !== null) return;
       if (Math.hypot(c.pose[0] - v.s[0], c.pose[1] - v.s[1], c.pose[2] - v.s[2]) > JEEP.reach + 3) return;
       // A tag taken off somebody is carried on foot, for fifteen minutes, with the map showing
       // everybody where: not driven round in circles.
@@ -576,6 +577,33 @@ export function handle(c: Client, m: C2S) {
     }
     case 'vout': {
       leaveSeat(c);
+      return;
+    }
+    case 'vtake': {
+      // A parked vehicle with nobody in it that another has run into: the game of whoever ran into it moves it until it
+      // is at rest again (see 'vrest'), as a vehicle somebody got out of is moved by theirs. (Asked only by somebody
+      // close to it: their own vehicle is touching it.)
+      const v = vehicles.get(m.i);
+      if (!v || v.goneAt || !c.alive || v.sim !== null || v.seats.some((s) => s !== null)) return;
+      if (Math.hypot(c.pose[0] - v.s[0], c.pose[2] - v.s[2]) > 30) return;
+      v.sim = c.id;
+      v.heard = Date.now();
+      tellSeats(v);
+      return;
+    }
+    case 'vswap': {
+      // From one seat to another free one of the same vehicle. Whoever moves into the front seat drives it (or flies
+      // it) from now on; whoever moves out of it leaves it to their game until it is at rest, as a driver who got out
+      // does (a helicopter with nobody at the controls comes down).
+      const at = seatOf(c);
+      if (!at || !c.alive || at.v.goneAt || !Number.isInteger(m.seat) || m.seat < 0 || m.seat >= seatsOf(at.v.k) || at.v.seats[m.seat] !== null) return;
+      at.v.seats[at.seat] = null;
+      at.v.seats[m.seat] = c.id;
+      if (m.seat === 0) {
+        at.v.sim = c.id;
+        at.v.heard = Date.now();
+      }
+      tellSeats(at.v);
       return;
     }
     case 'v': {
@@ -639,7 +667,7 @@ export function handle(c: Client, m: C2S) {
       const v = vehicles.get(m.i);
       if (!v || v.sim !== c.id || v.goneAt || !num(m.n) || m.n <= 0) return;
       // the jeep takes it first; from a real smash, so does everybody in it
-      const cost = crashDamage(Math.min(40, m.n));
+      const cost = v.k === HELI.kind ? heliCrash(Math.min(40, m.n)) : crashDamage(Math.min(40, m.n));
       const riders = v.seats.slice();
       hurtJeep(v, cost.jeep, c);
       if (cost.people > 0) {
