@@ -205,19 +205,22 @@ export const LOOP = {
  *             far under the ground its last point lies (the track falls away from there at once, and a bed that
  *             begins a hand lower stands that much less over the ground on its way down). `eased`: over so many
  *             metres back from its end the brows and feet of its banks are rounded
- *   track   – the cart track from the road's end to the foot of the fort's ramp: the points it is drawn through
- *             (off the road's end and straight down its bank onto the bench, along the bench where it is level,
- *             through the hamlet and up onto the higher bench; then on behind the fort, round under its north
- *             wall and the rubble of its breach, between its north-east tower and the hill's foot, and onto the
- *             shelf: the fort is on the right hand and above all the way round); the most it
- *             climbs; over how many of its points either way (they are two metres apart) the ground's height is
- *             evened to make its bed [along the bench, and on its last `rise` metres]; over how many
- *             metres before its end it is level, at the height the ramp's boards come down to; `hill`: how far
- *             along it leaves the bench for the hill's foot behind the fort (from there it may climb one in five,
- *             and its banks are the first paces beside its bed and no more); half the width of its bed and how steep its banks stand (rise over run),
- *             each as [the least, the most] (it is never one width for long, and no two of its banks are of one
- *             angle); how far from its middle the ground is its banks' at the most; and how far from its
- *             middle it is trodden bare.
+ *   track   – the cart track from the road's end TO THE RUINED HOUSES, where it ends: the points it is drawn
+ *             through (off the road's end and straight down its bank onto the bench, along the bench where it is
+ *             level, and into the hamlet); the most it climbs; over how many of its points either way (they are
+ *             two metres apart) the ground's height is evened to make its bed; half the width of its bed and how
+ *             steep its banks stand (rise over run), each as [the least, the most] (it is never one width for
+ *             long, and no two of its banks are of one angle); how far from its middle the ground is its banks'
+ *             at the most; and how far from its middle it is trodden bare. `turn`: THE TURNING PLACE at its end,
+ *             between the two houses that face one another across it: so many metres about its last point the
+ *             ground is trampled and rutted every which way, where a cart was unloaded and turned. Paint and
+ *             wear: no yard is levelled for it.
+ *             (It went on, a hundred and forty metres more: behind the fort, round under its north wall and
+ *             onto the shelf by a ledge under the hill. The judge of how the place looks, 2026-10-13, of that
+ *             last third: an even ring round three sides of the fort, thirteen to twenty-four metres off its
+ *             walls, and then a made ledge, its bank one in one and a half; and the owner's standing words are
+ *             at the head of this. A cart never went up to that gate: the ramp is a foot bridge. So the track
+ *             stops where carts stopped, the ring's ground is the ground that was, and the garrison walked.)
  *   castle  – where the fort stands (src/sim/castle.ts, src/world/castle.ts). THE FORT AS IT WAS FIRST LAID OUT,
  *             WHOLE, A FIFTH BIGGER (2026-10-13, the owner, of the kit's plain walls that were stood on a levelled
  *             yard in its place: "the castle layout we had before was AMAZINg and dynamic and perfect all i
@@ -239,19 +242,51 @@ export const LOOP = {
  *             (On every bearing round its whole foot there are 20 m of ground before any fall, and no fall in
  *             them of more than 6 m, none steeper than 20 degrees. Toward the hill, north-east of it and beyond
  *             the ramp's foot, the ground RISES in those 20 m at up to 38 degrees: it is the hill's own foot.)
- *   foot    – a foot path down the bluff from the postern in the valley wall: paint and wear only, where there is
- *             one. THERE IS NONE: under that wall, and for a hundred metres either way, the first twenty metres
- *             of the bluff's fall are forty-two to fifty-five degrees, which a body is carried or slides down
- *             (src/sim/slopes.ts), and a path is painted only where a body can walk it both ways. The postern
- *             is a way out, down the bluff as the land lets a body go, and not a way in.
+ *   foot    – THE FOOT PATH, the one way up to the gate: from the turning place out through a fallen length of
+ *             the field wall, under the oak, and up the shelf's south flank to the foot of the ramp: sixty-odd
+ *             metres, the hillside as it is (eighteen to twenty-six degrees where it climbs). A trodden line:
+ *             PAINT AND WEAR ONLY, NO EARTH MOVED. Between the stone of the fallen wall and the firs it has three
+ *             metres to pass in, and takes the middle of them: eight and a half metres from the head of the
+ *             hatch's steps at the nearest, with the firs between (no line up this flank is wider of it: east
+ *             of the hatch the hill's foot stands at thirty-five to forty degrees). `apron`: the ground before the ramp's foot, trodden bare where
+ *             everybody who ever came stood and waited: its middle, and half its length and its breadth [along
+ *             the ramp's line, across it]. `doors`: so far from each house's door, at the most, the ground is
+ *             trodden toward the nearest of the ways.
+ *             (No line is trodden round to the back door or the breach. One was drawn to the back door, from the
+ *             turning place round under the west tower: with the foot path it made half a ring about the walls
+ *             on the plan, which is the thing that was taken away.)
+ *             (No foot path goes down the bluff from the postern: under that wall, and for a hundred metres
+ *             either way, the first twenty metres of the fall are forty-two to fifty-five degrees, which a body
+ *             is carried or slides down (src/sim/slopes.ts), and a path is painted only where a body can walk
+ *             it both ways.)
  *   wreck   – the helicopter that did not make it: on the bench north-west of the fort, in the trees outside its
  *             walls and in plain sight of their top, where a body can walk to it and back (the shelf under the
  *             valley wall, where it first lay, can only be slid down to): the middle of it, and which way it lies. Five places for things lie about it (src/world/buildings.ts).
- *   walls   – low dry-stone walls [from x, z, to x, z] about the houses along the track: each begins at a house's
- *             corner (or at another's end) and runs behind the houses, toward the next of them or round a yard.
- *             None of them across a way that is walked.
- *   seen    – no tree stands on the line from any of these places on the track to the gate (the road's end, and
- *             two places further in): the arch is in sight all the way.
+ *   walls   – low dry-stone walls [from x, z, to x, z] about the houses along the track: each begins AT a house's
+ *             wall (or at another's end) and runs behind the houses, toward the next of them or round a yard.
+ *             None of them across a way that is walked: where the foot path goes through one, that length of it
+ *             is down. How each is built is `wall`: told off in lengths of `step` metres, each lying to the
+ *             ground under it; its top `high` over the ground [the least, the most], changing slowly along it and
+ *             never by a step; and every `falls[0]` to `falls[1]` metres it has fallen for `gap[0]` to `gap[1]`
+ *             (a slant down to a course or two, not a doorway). (They were told off in level boxes of a pace
+ *             and three quarters, each of a height of its own: "their tops are stairs of one-metre squares and
+ *             read as battlements, and down a slope they are stairs of level boxes", the judge.)
+ *   seen    – no tree stands on the line from any of these places to the gate: [x, z], and how wide the open
+ *             line is where it comes to the fort (unsaid: the arch's own width and a little). The road's end
+ *             and two places on the track: the arch is in sight all the way. And three on the road, forty,
+ *             sixty and eighty metres before its end, where it stands a house's height over the bench and the
+ *             whole fort is before it: from there the line is as wide as the fort.
+ *   felled  – A FIELD OF FIRE (the judge, 2026-10-13: "from the valley it is not there": the fort stands sixty
+ *             metres back from the brink, behind the wood). A garrison fells what hides its enemy, so the wood
+ *             is felled in a wedge from under the fort's valley-side walls out to the brink and a little down
+ *             over it: from `from`, bearing `to` (west-south-west: at the village and the trader's), `long`
+ *             metres, and from `half[0]` metres either side of that line at the walls to `half[1]` at ninety
+ *             metres; its edge `ragged` metres in and out (no ride is ruled through a wood). Of the trees that
+ *             stood there, so many in a hundred left a stump (`stumps`), so many are a dead trunk still standing
+ *             (`trunks`), and `stands` are left alive, alone: the rest were grubbed out long ago.
+ *             It uncovers neither the hatch nor the back door: of 216 lines from the tower tops and parapets to
+ *             the head of the hatch's steps a tree stood on 212 before and stands on 212 after (they are the firs
+ *             by the curved wall, which are not in it), and the back door was in plain sight of the walls already.
  */
 export const MOUNTAIN = {
   road: [
@@ -267,22 +302,16 @@ export const MOUNTAIN = {
   track: {
     line: [
       [573.2, -196], [569.2, -197.2], [564.6, -198.3], [560, -199.7], [555.8, -202], [552.3, -205.8], [549.7, -211], [547.7, -217.5], [545.6, -224.5], [542.5, -231.5], [537.5, -238.5], [531, -245.5], [525, -252.5], [522, -260.5], [521.5, -269], [522, -279], [526, -289], [529.5, -297], [529.5, -305],
-      [526, -313], [521, -320.5], [516, -327], [511.6, -331.8], [508.5, -337], [506.5, -343.5], [504.8, -351.5], [503, -361.5], [500.58, -375.55],
-      // (2026-10-13, the fort back on its terrace under the shelf: on over the bench behind it, round under its north
-      // wall and the rubble of its breach, between its north-east tower and the hill's foot, onto the shelf and to the
-      // foot of the ramp. On the bench's own ground all the way: no line up the shelf's south flank is under one in three.)
-      [502.5, -386], [508.5, -396.5], [519, -403.5], [532, -405.5], [545, -403], [554, -396], [560, -385], [563, -377], [561, -370.5], [558.4, -365.4], [555.92, -360.1],
+      // (and it ends between the two houses that face one another across it, 185 m from the road's end: see `turn`)
+      [526, -313], [521, -320.5], [516, -327], [511.6, -331.8], [508.5, -337], [506.5, -343.5], [505.3, -349.6],
     ] as [number, number][],
     steep: 0.16,
-    evens: [4, 5] as [number, number],
-    rise: 48,
-    sill: 6,
+    evens: 4,
     bed: [2, 2.3] as [number, number],
     bank: [0.2, 0.31] as [number, number],
     reach: 15,
     worn: 1.75,
-    // (so far along it, it has left the bench for the foot of the hill behind the fort: from there its banks are a few paces of ground and no more)
-    hill: 262,
+    turn: 5.4,
   },
   castle: {
     name: 'Orlinoye', x: 537, z: -371, rot: (-35 * Math.PI) / 180, terrace: 100, foot: 1.5, clear: 9,
@@ -304,28 +333,42 @@ export const MOUNTAIN = {
       { kind: 'curved wall', n: 0, x: 562.41, z: -343.69, rot: -2.7751 },
       // the thin wall down the slope, where the plan has it: on the hillside south of the fort, from the shelf's flank down to the low ground
       { kind: 'long wall', n: 0, x: 543.1, z: -332.4, rot: (-35 * Math.PI) / 180 },
-      // the seven teeth of rock that stood BEHIND the fort, where the plan has them (the sixth a few paces nearer the
-      // fort, off the track). The thirteen about its front and its sides are not set down: the owner, 2026-10-13:
-      // "get rid of the rocks near the front". (The curved wall is set down again, above: not by the rock, which is not made, but by the hatch.)
-      { kind: 'rock', n: 13, x: 530.4, z: -394, rot: 21.49 }, { kind: 'rock', n: 14, x: 516.3, z: -376, rot: 23.19 }, { kind: 'rock', n: 15, x: 520.1, z: -388.7, rot: 24.89 }, { kind: 'rock', n: 16, x: 519.1, z: -396.7, rot: 26.59 }, { kind: 'rock', n: 17, x: 508.7, z: -387.1, rot: 28.29 }, { kind: 'rock', n: 18, x: 513.5, z: -391.5, rot: 29.99 }, { kind: 'rock', n: 19, x: 501.8, z: -397.1, rot: 31.69 },
+      // the seven teeth of rock that stood BEHIND the fort in the plan. The thirteen about its front and its sides are
+      // not set down: the owner, 2026-10-13: "get rid of the rocks near the front". (The curved wall is set down
+      // again, above: not by the rock, which is not made, but by the hatch.)
+      // AS TWO OUTCROPS NORTH OF IT, four teeth and three, each tooth against the next as rock breaks out of a
+      // bench: they stood one by one along the inside of the track's ring, a tooth every dozen paces, "like
+      // bollards" (the judge, 2026-10-13), and the ring is gone.
+      { kind: 'rock', n: 13, x: 517.6, z: -391.4, rot: 21.49 }, { kind: 'rock', n: 14, x: 520.3, z: -393, rot: 23.19 }, { kind: 'rock', n: 15, x: 518.4, z: -395.2, rot: 24.89 }, { kind: 'rock', n: 16, x: 522.9, z: -396.1, rot: 26.59 },
+      { kind: 'rock', n: 17, x: 530.6, z: -401.2, rot: 28.29 }, { kind: 'rock', n: 18, x: 533.3, z: -402.9, rot: 29.99 }, { kind: 'rock', n: 19, x: 531.1, z: -404.6, rot: 31.69 },
     ] as Loose[],
     // The firs by the curved wall, on the fort's side of the hatch: a clump such as the hillside has all about, left
     // standing where the ground round the fort was cleared ([x, z, which pine, how big]). They are what hides the
     // head of the hatch's steps from the top of the south-east tower: see the curved wall, above.
     firs: [[549.8, -344.6, 'pine_a', 1.18], [550.4, -346.8, 'pine_c', 1.05], [549.3, -342.5, 'pine_b', 1.1], [551.8, -349.5, 'pine_d', 1.2]] as [number, number, string, number][],
   },
-  foot: { line: [] as [number, number][] },
+  foot: {
+    line: [
+      [505.3, -349.6], [507.6, -345.6], [511, -342.2], [515, -340.9], [519.2, -340.6], [523.5, -339.8], [527.6, -339.6], [531.5, -340.3], [535.8, -341.8], [540, -344], [544.6, -346.6], [548, -348.6],
+      // (between the stone of the fallen wall and the firs, and up the last of the flank to the ramp's foot from beyond it: nobody steps onto a bridge over its rail)
+      [550.5, -350.4], [552.4, -353.1], [554.9, -355.6], [557.3, -357.6], [557.5, -359], [555.92, -360.1],
+    ] as [number, number][],
+    apron: { out: 3.9, half: [5, 4] as [number, number] },
+    doors: 14,
+  },
   // (2026-10-13: it follows the fort, which stands forty metres further east than it did: on the bench behind it still, north-west of its back wall)
   wreck: { x: 498, z: -421, rot: 0.9 },
   walls: [
-    // the nearest house on the valley's side: a yard behind it toward the fort, and a field wall on toward the next
-    [490.9, -354, 488.5, -362], [488.5, -362, 494.6, -363.6], [493.4, -345.4, 494.2, -337],
-    // the nearest on the hill's side: a yard behind it, and a wall on toward the next
-    [517.8, -352.7, 519.5, -360.5], [517.9, -344.3, 517.3, -336.5],
+    // the house west of the turning place: a yard behind it toward the fort, and a field wall from its other end to the house on the shoulder
+    [490, -354.7, 488.3, -362.6], [488.3, -362.6, 495.9, -364.7], [493, -344.3, 493.3, -329.7],
+    // the house east of it: a yard wall behind it, and a field wall south from its corner, down where the foot path goes through it
+    [518.5, -353.6, 520.3, -361.3], [518.6, -343.5, 517.3, -332.6],
     // the one on the shoulder over the track
-    [494.3, -329.1, 494.2, -333.4], [497.6, -320.7, 491.5, -317.5],
+    [497.2, -319.6, 490.7, -316.5],
   ] as [number, number, number, number][],
-  seen: [[573.2, -196], [537.5, -238.5], [526, -289]] as [number, number][],
+  wall: { step: 1.1, high: [0.8, 1.2] as [number, number], thick: [0.55, 0.7] as [number, number], falls: [7, 13] as [number, number], gap: [1.6, 3.2] as [number, number] },
+  seen: [[573.2, -196], [537.5, -238.5], [526, -289], [577, -156, 14], [582, -137, 14], [589, -118, 14]] as [number, number, number?][],
+  felled: { from: [527, -366] as [number, number], to: [-0.76, 0.65] as [number, number], long: 104, half: [15, 39] as [number, number], ragged: 5, stumps: 45, trunks: 8, stands: 4 },
   /**
    * The Zona about it (2026-10-13: "THE ZONA'S LINE must hold the fort, the track and the hamlet (a tag carried
    * there is not carried out)"). The rounds strung along the road end with the road; these take in the track, the
@@ -766,6 +809,19 @@ export interface POI {
   radius: number;
 }
 
+/**
+ * A way that is not a road: the points it is drawn through, [x, z] over the ground, and WHAT IT IS. `driven`: wheels
+ * come by it (a cart track: two ruts in the snow and its bed worn the width of an axle); not driven, it is only
+ * walked (a foot path: one trodden line, and no earth was ever moved for it). `faint`: few come by it (a broken
+ * line on the map, and less of everything in the snow). No way is faint today: the snow and the maps know the word.
+ */
+export interface Way { line: [number, number][]; driven: boolean; faint?: boolean }
+/**
+ * Ground worn bare that is no way of its own: a place (`line` is one spot: carts turned there, or feet stood about)
+ * or a few paces of trodden line (two spots and more: from a door to the way past it). Worn out to `r` metres from
+ * it. `driven`: wheels were there, and it is rutted every which way; else it is trampled by feet alone.
+ */
+export interface Worn { line: [number, number][]; r: number; driven: boolean }
 export interface World {
   heights: Float32Array;
   /** the ground as it is seen from above: `heights`, but for the roof of the bunker, which lies level with the ground about it over the hole the bunker stands in. What grows is drawn at this height. */
@@ -779,12 +835,14 @@ export interface World {
   roads: { points: Float32Array; width: number; /** a side street: its asphalt lies just under the road's where it leaves it, and breaks up at its far end */ side?: boolean; /** the road over a bridge: its two ends, on the deck. No asphalt is laid on the ground for it (see `bridges`) */ bridge?: boolean }[];
   /** the bridges the road goes over (see src/sim/bridge.ts): each is also a line of `roads` */
   bridges: Bridge[];
-  /** ways that are not roads: the cart track to the fort and the foot path under it, each a line of [x, z] over the ground. The maps draw them; nothing else reads them. */
-  paths: [number, number][][];
+  /** ways that are not roads, each saying what it is (see `Way`): the cart track from the road's end to the ruined houses, and the foot path on from there to the fort's ramp. The maps draw them, and the snow lies along them and is rutted or trodden by what each is (src/world/snow.ts). */
+  paths: Way[];
+  /** ground worn bare that is no way of its own (see `Worn`): where the carts turned at the track's end, the apron before the fort's ramp, the few paces from each door to the way past it. Paint and wear only. */
+  worn: Worn[];
   /** the helicopter that came down under the fort (see MOUNTAIN.wreck): the middle of it on the ground, and which way it lies. Null in a world that has none. */
   wreck: { x: number; y: number; z: number; rot: number } | null;
-  /** lengths of low dry-stone wall (src/world/gatehouse.ts draws them): the middle of each at its foot, which way it runs (about Y), how long, how high and how thick */
-  walls: { x: number; y: number; z: number; yaw: number; long: number; high: number; thick: number }[];
+  /** lengths of low dry-stone wall (src/world/gatehouse.ts draws them, and says what each number is: `WallPiece`): the middle of each at its foot, which way it runs (about Y), how long, how high and how thick; and how it lies to the ground it stands on */
+  walls: { x: number; y: number; z: number; yaw: number; long: number; high: number; thick: number; rise?: number; top?: number; down?: boolean }[];
   /** the fort on the valley's rim (see MOUNTAIN.castle): its middle, the height of its yard, and how it is turned, as src/sim/castle.ts wants a place said. Null in a world that has none. */
   castle: FortPlace | null;
   /** a ruined gatehouse across a road's end (src/world/gatehouse.ts): the road's end, on its surface, and which way the road was running there (about Y: at 0 it runs toward +z). Null in a world that has none: this one has none (the one there was stood under the mountain the fort has left). */
@@ -2789,7 +2847,7 @@ export function generateWorld(seed = WORLD_SEED): World {
   const bridges: Bridge[] = [];
   let gatehouse: World['gatehouse'] = null;
   let castle: World['castle'] = null;
-  const paths: World['paths'] = [];
+  const paths: World['paths'] = [], worns: World['worn'] = [];
   let wreck: World['wreck'] = null;
   const walls: World['walls'] = [];
   {
@@ -3206,13 +3264,11 @@ export function generateWorld(seed = WORLD_SEED): World {
         // How high it lies: the ground's own height under it, evened over a few paces only (a cart's wheels wear
         // a hump down and a hollow fills; they do not build a causeway: the roads' own rule evens fifty metres at
         // a time, and stood this bed a metre and a half over a dip), nowhere steeper than a cart is drawn up, and
-        // with no sudden change in its climb. Its two ends are the road's end and the yard. The last rise to the
-        // gate is evened over more: the bench's edge there stands steeper than a cart climbs, and a bed that
-        // followed it to its foot lay near a metre under the ground all the way up it; evened, it begins to
-        // climb a few paces sooner, half a metre over the ground at the foot and half a metre under it at the brow.
-        const raw = track.map(([x, z]) => heightAt(heights, x, z)), runs = runOf(track), whole = runs[runs.length - 1];
+        // with no sudden change in its climb. It begins at the road's end, at the road's height; where it ends,
+        // between the houses, its bed is the ground's own height and runs out into it.
+        const raw = track.map(([x, z]) => heightAt(heights, x, z)), runs = runOf(track);
         const ty = raw.map((_, k) => {
-          const n = Math.round(lerp(T.evens[0], T.evens[1], smoothstep(whole - T.rise - 12, whole - T.rise + 8, runs[k])));
+          const n = T.evens;
           let sum = 0, c = 0;
           for (let q = -n; q <= n; q++) {
             const w = 1 - Math.abs(q) / (n + 1);
@@ -3222,19 +3278,15 @@ export function generateWorld(seed = WORLD_SEED): World {
           return sum / c;
         });
         ty[0] = raw[0];
-        const held = (k: number) => k === 0 || whole - runs[k] < T.sill;
-        // (its end is the foot of the ramp: the height the ramp's boards come down to)
-        for (let k = 1; k < ty.length; k++) if (held(k)) ty[k] = F.terrace - CASTLE_SCALE * CASTLE.ramp.drop - 0.18;
+        ty[ty.length - 1] = raw[raw.length - 1];
         for (let pass = 0; pass < 5; pass++) {
           for (let again = 0; again < 2; again++) {
             const src = ty.slice();
-            for (let k = 1; k < ty.length - 1; k++) if (!held(k)) ty[k] = (src[k - 1] + 2 * src[k] + src[k + 1]) / 4;
+            for (let k = 1; k < ty.length - 1; k++) ty[k] = (src[k - 1] + 2 * src[k] + src[k + 1]) / 4;
           }
           // (the least climb that still comes to each end, and the most: between the two, as the ground has it)
-          // (on its last climb, round the fort onto the shelf, a little steeper than on the bench: one in five, as the land has it there)
-          const steep = (k: number) => lerp(T.steep, 0.2, smoothstep(T.hill - 6, T.hill + 6, runs[k]));
-          for (let k = 1; k < ty.length - 1; k++) if (!held(k)) ty[k] = clamp(ty[k], ty[k - 1] - steep(k) * (runs[k] - runs[k - 1]), ty[k - 1] + steep(k) * (runs[k] - runs[k - 1]));
-          for (let k = ty.length - 2; k > 0; k--) if (!held(k)) ty[k] = clamp(ty[k], ty[k + 1] - steep(k) * (runs[k + 1] - runs[k]), ty[k + 1] + steep(k) * (runs[k + 1] - runs[k]));
+          for (let k = 1; k < ty.length - 1; k++) ty[k] = clamp(ty[k], ty[k - 1] - T.steep * (runs[k] - runs[k - 1]), ty[k - 1] + T.steep * (runs[k] - runs[k - 1]));
+          for (let k = ty.length - 2; k > 0; k--) ty[k] = clamp(ty[k], ty[k + 1] - T.steep * (runs[k + 1] - runs[k]), ty[k + 1] + T.steep * (runs[k + 1] - runs[k]));
         }
         // (and its brows and its feet rounded once more: no sudden change in its climb)
         for (let again = 0; again < 3; again++) {
@@ -3260,13 +3312,10 @@ export function generateWorld(seed = WORLD_SEED): World {
           const r = tR[i], bed = lerp(T.bed[0], T.bed[1], 0.5 + 0.5 * n1.noise(r * 0.085 + 4.2, 11.7)), bank = lerp(T.bank[0], T.bank[1], 0.5 + 0.5 * n2.noise(r * 0.06 - 8.1, 3.9 + tS[i] * 5.3));
           // Its banks: beside the bed the ground stands no higher over it than a bank of that slope would, and lies
           // no lower under it. Where the ground was already within that, which is most of the way, it is not moved.
-          // (Not the road's own last metres, where it begins; nor the fort's own ground, where it ends.)
+          // (Not the road's own last metres, where it begins. Where it ends, between the houses, its bed ends at the
+          // ground's own height, and its banks round its end are the same few metres of ground eased to it: no yard is levelled there.)
           const out = Math.max(0, d - bed), b = heights[i];
-          // (Past the bench, where it goes round the fort under the hill's foot, the land beside it is a hillside: banks
-          // as easy as these, laid on that, took three metres off the hill fifteen metres from the bed. There its
-          // banks are the first paces beside the bed and no more, and stand as the hill stands.)
-          const hill = smoothstep(T.hill - 6, T.hill + 6, r);
-          moved[i] = (clamp(b, tH[i] - bank * out, tH[i] + bank * out) - b) * (1 - smoothstep(most - 5, most, d)) * smoothstep(0, 2, r) * smoothstep(0, 3, fortD[i]) * lerp(1, 1 - smoothstep(T.bed[1] + 1.5, T.bed[1] + 5, d), hill);
+          moved[i] = (clamp(b, tH[i] - bank * out, tH[i] + bank * out) - b) * (1 - smoothstep(most - 5, most, d)) * smoothstep(0, 2, r) * smoothstep(0, 3, fortD[i]);
           // (trodden bare: the paint's own edge wanders half a metre and fades)
           if (d < T.worn + 1.6) trackDist[i] = Math.min(trackDist[i], Math.max(0, d - (T.worn - 1.4)));
         }
@@ -3281,28 +3330,60 @@ export function generateWorld(seed = WORLD_SEED): World {
         }
         for (let i = 0; i < N * N; i++) if (moved[i]) heights[i] += moved[i];
       }
-      // The foot path down the bluff (see MOUNTAIN.foot): a trodden line and nothing else. And as much from each
-      // house's door to the track: where feet went most.
+      // WHAT IS WALKED (see MOUNTAIN.foot): the foot path from the turning place up the flank to the ramp's foot, and
+      // the few paces from each house's door to the nearest of the ways. Each a trodden line and nothing else: the
+      // ground's paint and no more. NO EARTH IS MOVED for any of them.
       const footD = new Float32Array(N * N).fill(1e9), houses = castleLoose(fort).filter((l) => l.kind === 'house'), foots: [number, number][][] = [];
+      const turnAt = track[track.length - 1], worn: Worn[] = [];
       {
-        const none = new Float32Array(N * N);
-        if (M.foot.line.length > 1) foots.push(catmullRom(M.foot.line, 2));
+        const none = new Float32Array(N * N), way = catmullRom(M.foot.line, 2), doors: [number, number][][] = [];
         for (const h of houses) {
-          const sh = HOUSES[h.n], c = Math.cos(h.rot), s = Math.sin(h.rot), lx = -sh.w / 2 + sh.w * 0.4 + 0.6, lz = (sh.door * sh.d) / 2, door: [number, number] = [h.x + lx * c + lz * s, h.z - lx * s + lz * c];
+          // (its door, in the wall as the wall stands: the houses are a fifth bigger than their own measure, as the fort is)
+          const sh = HOUSES[h.n], c = Math.cos(h.rot), s = Math.sin(h.rot), lx = (-sh.w / 2 + sh.w * 0.4 + 0.6) * CASTLE_SCALE, lz = ((sh.door * sh.d) / 2) * CASTLE_SCALE, door: [number, number] = [h.x + lx * c + lz * s, h.z - lx * s + lz * c];
           let to = track[0];
-          for (const q of track) if (Math.hypot(q[0] - door[0], q[1] - door[1]) < Math.hypot(to[0] - door[0], to[1] - door[1])) to = q;
-          foots.push([door, to]);
+          for (const q of [...track, ...way]) if (Math.hypot(q[0] - door[0], q[1] - door[1]) < Math.hypot(to[0] - door[0], to[1] - door[1])) to = q;
+          const far = Math.hypot(to[0] - door[0], to[1] - door[1]), t = Math.min(1, M.foot.doors / (far || 1));
+          doors.push([door, [lerp(door[0], to[0], t), lerp(door[1], to[1], t)]]);
         }
-        for (const q of foots) rasterLine(q, null, 6, footD, none);
-        for (let i = 0; i < N * N; i++) if (footD[i] < 2) trackDist[i] = Math.min(trackDist[i], footD[i] + 0.9);
-        // (And where the track leaves the road's end the ground is worn in a splay nine metres wide: carts turned
+        foots.push(way, ...doors);
+        // (how worn each is: the path bare for a pace's width, a door's line less)
+        for (const [lines, thin] of [[[way], 0.5], [doors, 0.9]] as [[number, number][][], number][]) {
+          const d = new Float32Array(N * N).fill(1e9);
+          for (const q of lines) rasterLine(q, null, 6, d, none);
+          for (let i = 0; i < N * N; i++) {
+            if (d[i] < 6) footD[i] = Math.min(footD[i], d[i]);
+            if (d[i] < 2.2) trackDist[i] = Math.min(trackDist[i], d[i] + thin);
+          }
+        }
+        for (const q of doors) worn.push({ line: q, r: 0.9, driven: false });
+        /** ground worn bare about a spot: all of it out to `r` metres along `ux, uz` and `across` metres the other way, less a ragged edge */
+        const bare = (x: number, z: number, r: number, across = r, ux = 1, uz = 0) => {
+          const R = Math.max(r, across) + 2.5;
+          for (let iz = Math.floor((z - R + half) / CELL); iz <= Math.ceil((z + R + half) / CELL); iz++)
+            for (let ix = Math.floor((x - R + half) / CELL); ix <= Math.ceil((x + R + half) / CELL); ix++) {
+              const dx = -half + ix * CELL - x, dz = -half + iz * CELL - z, d = Math.hypot((dx * ux + dz * uz) / r, (-dx * uz + dz * ux) / across) * Math.min(r, across) + 1.1 * n3.noise(ix * 0.7, iz * 0.7);
+              if (d < Math.min(r, across) + 0.1) trackDist[idx(ix, iz)] = Math.min(trackDist[idx(ix, iz)], Math.max(0, d - (Math.min(r, across) - 2.3)));
+            }
+        };
+        // (Where the track leaves the road's end the ground is worn in a splay nine metres wide: carts turned
         // there every way. Paint only: no earth is moved at the mouth.)
         const mx = (end[0] + track[4][0]) / 2 + 1.2, mz = (end[1] + track[4][1]) / 2 - 1.2;
-        for (let iz = Math.floor((mz - 7 + half) / CELL); iz <= Math.ceil((mz + 7 + half) / CELL); iz++)
-          for (let ix = Math.floor((mx - 7 + half) / CELL); ix <= Math.ceil((mx + 7 + half) / CELL); ix++) {
-            const d = Math.hypot(-half + ix * CELL - mx, -half + iz * CELL - mz) + 1.1 * n3.noise(ix * 0.7, iz * 0.7);
-            if (d < 5.5) trackDist[idx(ix, iz)] = Math.min(trackDist[idx(ix, iz)], Math.max(0, d - 3.2));
-          }
+        bare(mx, mz, 5.5);
+        worn.push({ line: [[mx, mz]], r: 5.5, driven: true });
+        // THE TURNING PLACE (see MOUNTAIN.track.turn): where the track ends between the houses, trampled and rutted
+        // from one doorstep to the other. A cart's length longer along the track than across it.
+        {
+          const [px, pz] = track[track.length - 4], l = Math.hypot(turnAt[0] - px, turnAt[1] - pz) || 1, ux = (turnAt[0] - px) / l, uz = (turnAt[1] - pz) / l;
+          bare(turnAt[0] - ux * 1.2, turnAt[1] - uz * 1.2, T.turn + 1.2, T.turn, ux, uz);
+          worn.push({ line: [[turnAt[0] - ux * 1.2, turnAt[1] - uz * 1.2]], r: T.turn, driven: true });
+        }
+        // THE APRON before the ramp's foot (see MOUNTAIN.foot.apron): out from the foot along the ramp's own line.
+        {
+          const C = CASTLE, x0 = C.hx + C.parapet.thick / 2 + Math.sqrt(C.ramp.len ** 2 - C.ramp.drop ** 2), gz = (C.gate.z0 + C.gate.z1) / 2, A = M.foot.apron;
+          const [ax, , az] = castleAt(fort, x0 + A.out / CASTLE_SCALE, gz), [bx, , bz] = castleAt(fort, x0, gz), l = Math.hypot(ax - bx, az - bz) || 1;
+          bare(ax, az, A.half[0], A.half[1], (ax - bx) / l, (az - bz) / l);
+          worn.push({ line: [[ax, az]], r: (A.half[0] + A.half[1]) / 2, driven: false });
+        }
       }
 
       // What grew or lay there: gone from the road, the track and the fort's place, from the houses along the track
@@ -3314,25 +3395,49 @@ export function generateWorld(seed = WORLD_SEED): World {
       });
       // (the gate: in the middle of the gap in the wall at the head of the ramp)
       const gateAt = castleAt(fort, CASTLE.hx, (CASTLE.gate.z0 + CASTLE.gate.z1) / 2);
+      // THE FIELD OF FIRE (see MOUNTAIN.felled): how far inside the felled wedge a spot is, metres (nothing or less:
+      // outside it). Its sides and its far end are no ruled lines: they lie a few metres in and out, as a wood's edge does.
+      const W = M.felled, wl = Math.hypot(W.to[0], W.to[1]), wx = W.to[0] / wl, wz = W.to[1] / wl;
+      const felledAt = (x: number, z: number) => {
+        const s = (x - W.from[0]) * wx + (z - W.from[1]) * wz, side = Math.abs(-(x - W.from[0]) * wz + (z - W.from[1]) * wx);
+        return Math.min(s, W.long + W.ragged * n2.noise(x * 0.05 + 7.3, z * 0.05) - s, lerp(W.half[0], W.half[1], s / 90) + W.ragged * n3.noise(x * 0.06, z * 0.06) - side);
+      };
+      // (what is left of a felled tree, by a row of numbers of its own: set down when the rest is done)
+      const rngF = new RNG(seed + 4423), left: Instance[] = [];
       for (const list of [trees, rocks, props]) {
         const clear = list === trees ? ROAD_W / 2 + 3.5 : ROAD_W / 2 + 2;
         for (let k = list.length - 1; k >= 0; k--) {
           const t = list[k], i = cell(t.x, t.z);
-          // (a tree, in the way of the gate from where it is looked at as somebody comes in)
-          const hides = list === trees && M.seen.some(([sx, sz]) => {
+          // (a tree, in the way of the fort from where it is looked at as somebody comes in: see MOUNTAIN.seen)
+          const hides = list === trees && M.seen.some(([sx, sz, wide = 2.5]) => {
             const dx = gateAt[0] - sx, dz = gateAt[2] - sz, u = clamp(((t.x - sx) * dx + (t.z - sz) * dz) / (dx * dx + dz * dz), 0, 1);
-            return Math.hypot(t.x - (sx + dx * u), t.z - (sz + dz * u)) < 3.5 + 2.5 * u;
+            return Math.hypot(t.x - (sx + dx * u), t.z - (sz + dz * u)) < 3.5 + wide * u;
           });
           // (how far from the track, the foot path and the fort it stands is measured from where it stands, not from the corner of the ground's net nearest it)
           const onTrack = tDist[i] < 12 && offLine(track, t.x, t.z) < (list === trees ? T.bed[1] + 2.4 : T.bed[1] + 1), onFoot = footD[i] < 5 && foots.some((q) => offLine(q, t.x, t.z) < 1.2);
           const atFort = footOf(t.x, t.z) < (list === trees ? F.clear : 2.5), atWreck = Math.hypot(t.x - M.wreck.x, t.z - M.wreck.z) < 7.5;
-          if (mtDist[i] < clear || onTrack || atFort || onFoot || atWreck || hides || inHouse(t.x, t.z, list === trees ? 2.5 : 1)) list.splice(k, 1);
-          else {
-            const moved = heightAt(heights, t.x, t.z) - heightAt(was, t.x, t.z);
-            if (moved) t.y += moved;
+          const atTurn = Math.hypot(t.x - turnAt[0], t.z - turnAt[1]) < T.turn + (list === trees ? 3 : 1.5);
+          if (mtDist[i] < clear || onTrack || atFort || onFoot || atTurn || atWreck || hides || inHouse(t.x, t.z, list === trees ? 2.5 : 1)) {
+            list.splice(k, 1);
+            continue;
           }
+          // (a tree in the wedge: felled, but for a bush, which hides no wall, and the few left standing alone. Of the
+          // felled, some left a stump and a few are a dead trunk still on its roots: on the ground as it is now)
+          if (list === trees && !t.kind.startsWith('bush') && felledAt(t.x, t.z) > 0) {
+            const roll = rngF.next() * 100, size = rngF.next();
+            if (roll >= W.stands) {
+              list.splice(k, 1);
+              const y = heightAt(heights, t.x, t.z) - 0.05;
+              if (roll < W.stands + W.trunks) left.push({ kind: 'dead_tree_trunk', x: t.x, y, z: t.z, rot: t.rot, scale: 0.9 + size * 0.4 });
+              else if (roll < W.stands + W.trunks + W.stumps) left.push({ kind: 'tree_stump_01', x: t.x, y, z: t.z, rot: t.rot, scale: 0.8 + size * 0.4 });
+              continue;
+            }
+          }
+          const moved = heightAt(heights, t.x, t.z) - heightAt(was, t.x, t.z);
+          if (moved) t.y += moved;
         }
       }
+      props.push(...left);
       // (the firs by the hatch: set down after the ground round the fort was cleared, which would have taken them; last of the trees)
       F.firs.forEach(([x, z, kind, scale], k) => void trees.push({ kind, x, y: heightAt(heights, x, z), z, rot: 0.9 + k * 2.1, scale }));
       // What is set down about the place. A row of numbers of its own, the same every time: nothing else on the map
@@ -3341,14 +3446,36 @@ export function generateWorld(seed = WORLD_SEED): World {
         const rngC = new RNG(seed + 4411), H = (x: number, z: number) => heightAt(heights, x, z);
         // The helicopter: on the hillside under the valley wall, where the wall's top looks down on it.
         wreck = { x: M.wreck.x, y: H(M.wreck.x, M.wreck.z), z: M.wreck.z, rot: M.wreck.rot };
-        // The dry-stone walls: told off in lengths of a pace or two, each on the ground at its own place and of its
-        // own height (a wall nobody has mended since: here it stands a metre and a quarter, there it is down to a course).
+        // THE DRY-STONE WALLS (see MOUNTAIN.walls, MOUNTAIN.wall): walls a farmer built and nobody has mended since.
+        // Each is a row of spots a pace apart along its line, and at each spot the ground's height and how high the
+        // wall stands over it there: that changes slowly along the wall and never by a step, comes down on a slant
+        // to a course or two where it has fallen, and to nothing where a way that is walked goes through it and at
+        // an end that is no house's. A length is what lies between two spots: its foot lies to the ground from one
+        // to the other and its top from one height to the other, so that neither is a stair.
+        const Q = M.wall, walked = foots.slice(0, 1);
+        // (where the last wall ended and how high it stood there: one that begins at that spot turns a corner, and begins at that height)
+        let ended: { x: number; z: number; high: number } | null = null;
         for (const [ax, az, bx, bz] of M.walls) {
-          const long = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.round(long / 1.7));
+          const long = Math.hypot(bx - ax, bz - az), n = Math.max(2, Math.round(long / Q.step)), phase = rngC.range(0, 40), thick = rngC.range(Q.thick[0], Q.thick[1]);
+          // (where it has fallen: the middle of each such stretch, metres along it, and half its length)
+          const fallen: [number, number][] = [];
+          for (let s = rngC.range(Q.falls[0] * 0.5, Q.falls[1]); s < long - 2; s += rngC.range(Q.falls[0], Q.falls[1])) fallen.push([s, rngC.range(Q.gap[0], Q.gap[1]) / 2]);
+          // (its far end, if no other wall begins there: it runs out)
+          const free = !M.walls.some((o) => Math.hypot(o[0] - bx, o[1] - bz) < 0.5);
+          const spots = Array.from({ length: n + 1 }, (_, k) => {
+            const s = (k / n) * long, x = lerp(ax, bx, k / n), z = lerp(az, bz, k / n);
+            let high = lerp(Q.high[0], Q.high[1], 0.5 + 0.5 * n1.noise(s * 0.16 + phase, phase * 1.7)) + 0.07 * n3.noise(s * 1.9 + phase, 4.4);
+            for (const [at, halfGap] of fallen) high = Math.min(high, lerp(0.24 + 0.1 * n3.noise(s * 0.9, phase), high, smoothstep(halfGap - 0.3, halfGap + 1, Math.abs(s - at))));
+            if (free) high *= smoothstep(-0.2, 1.8, long - s);
+            if (ended && Math.hypot(ended.x - ax, ended.z - az) < 0.5) high = lerp(ended.high, high, smoothstep(0, 2.4, s));
+            const off = Math.min(...walked.map((q) => offLine(q, x, z)));
+            return { x, z, g: H(x, z), high: high * smoothstep(1.3, 2.6, off) };
+          });
+          ended = { x: bx, z: bz, high: spots[n].high };
           for (let k = 0; k < n; k++) {
-            const high = rngC.chance(0.12) ? 0.45 : rngC.range(0.85, 1.28), t = (k + 0.5) / n, x = lerp(ax, bx, t), z = lerp(az, bz, t);
-            const ends = [H(lerp(ax, bx, k / n), lerp(az, bz, k / n)), H(lerp(ax, bx, (k + 1) / n), lerp(az, bz, (k + 1) / n))];
-            walls.push({ x, y: Math.min(...ends, H(x, z)), z, yaw: Math.atan2(-(bz - az), bx - ax), long: long / n, high: high + Math.abs(ends[0] - ends[1]) / 2, thick: rngC.range(0.55, 0.7) });
+            const a = spots[k], b = spots[k + 1], high = (a.high + b.high) / 2;
+            if (high < 0.1) continue;
+            walls.push({ x: (a.x + b.x) / 2, y: (a.g + b.g) / 2, z: (a.z + b.z) / 2, yaw: Math.atan2(-(bz - az), bx - ax), long: long / n, high, thick: thick * (high < 0.45 ? 1.25 : 1), rise: b.g - a.g, top: b.high - a.high, down: high < 0.45 });
           }
         }
       }
@@ -3405,9 +3532,9 @@ export function generateWorld(seed = WORLD_SEED): World {
       }
       // (a lesser road: a street's asphalt, which lies under the edge of the pass road's where it leaves it and breaks up where it stops)
       roads.push({ points: points(line, ys, line.length), width: M.wide, side: true });
-      // (the two ways that are walked: the track, and the foot path down the bluff)
-      paths.push(T.line);
-      if (M.foot.line.length > 1) paths.push(M.foot.line);
+      // (the ways that are not roads, each saying what it is: the track is driven, the foot path is walked)
+      paths.push({ line: T.line, driven: true }, { line: M.foot.line, driven: false });
+      worns.push(...worn);
     }
   }
 
@@ -3425,6 +3552,7 @@ export function generateWorld(seed = WORLD_SEED): World {
     roads,
     bridges,
     paths,
+    worn: worns,
     wreck,
     walls,
     gatehouse,

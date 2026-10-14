@@ -594,26 +594,78 @@ export function buildGatehouse(p: GatePlace, atmo: Atmosphere, scene: THREE.Scen
 }
 
 /**
- * A length of low dry-stone wall out in the world (`World.walls`: see MOUNTAIN.crest in the generator): the middle
- * of it at its foot, which way it runs, how long, how high and how thick.
+ * A length of low dry-stone wall out in the world (`World.walls`: see MOUNTAIN.walls in the generator): the middle
+ * of it at its foot, which way it runs, how long, how high (at its middle) and how thick.
+ *   rise – how much higher the ground is at its far end than at its near one: its foot lies to the ground from end
+ *          to end, and its top with it (unsaid: level)
+ *   top  – how much higher it stands over the ground at its far end than at its near one: its top's own slant over
+ *          and above the ground's (a wall comes down on a slant where it has fallen, and its next length begins at
+ *          the height this one ends at)
+ *   down – it has fallen here: a course or two is left, spread wider than the wall was
  */
-export interface WallPiece { x: number; y: number; z: number; yaw: number; long: number; high: number; thick: number }
+export interface WallPiece { x: number; y: number; z: number; yaw: number; long: number; high: number; thick: number; rise?: number; top?: number; down?: boolean }
 
-/** What stops a body of such walls: a level box to each length, founded as deep under the ground as the gatehouse is under its yard. */
-export function drystoneBoxes(walls: WallPiece[]): { x: number; y: number; z: number; hx: number; hy: number; hz: number; yaw: number }[] {
-  return walls.map((w) => ({ x: w.x, y: w.y + (w.high - FOOT) / 2, z: w.z, hx: w.long / 2, hy: (w.high + FOOT) / 2, hz: w.thick / 2, yaw: w.yaw }));
+/** how much narrower a dry-stone wall is at its top than at its foot: it is built with a batter, or it does not stand */
+const BATTER = 0.8;
+
+/**
+ * What stops a body of such walls: a box to each length, lying to the ground as the length does (`pitch`: how far
+ * its far end is raised, about its own z), founded as deep under the ground as the gatehouse is under its yard.
+ */
+export function drystoneBoxes(walls: WallPiece[]): { x: number; y: number; z: number; hx: number; hy: number; hz: number; yaw: number; pitch: number }[] {
+  return walls.map((w) => ({ x: w.x, y: w.y + (w.high - FOOT) / 2, z: w.z, hx: Math.hypot(w.long, w.rise ?? 0) / 2, hy: (w.high + FOOT) / 2, hz: w.thick / 2, yaw: w.yaw, pitch: Math.atan2(w.rise ?? 0, w.long) }));
 }
 
 /**
- * The low walls of the old village on the crest, stood in the world: the gatehouse's stone, block by block as its
- * own walls are (no two quite in line, each top the heart of a wall that broke there), all of them one shape to
- * draw, and a box to each for what stops a body. They are cover to somebody crouched and no more.
+ * The low walls about the ruined houses, stood in the world: the gatehouse's stone, all of them one shape to draw,
+ * and a box to each length for what stops a body. They are cover to somebody crouched and no more.
+ *
+ * WALLS A FARMER BUILT. They were level boxes of a pace and three quarters, each of a height of its own: and the
+ * judge of how the place looks said of them (2026-10-13) that "their tops are stairs of one-metre squares and read
+ * as battlements, and down a slope they are stairs of level boxes". So a length is no box: its foot lies to the
+ * ground from one end to the other (`rise`) and its top runs from the height the last length ended at to the height
+ * the next begins at (`top`), so that along the whole wall neither the foot nor the top has a step in it. It is
+ * narrower at its top than at its foot. What makes its top ragged is what does on a real one: a cope stone left
+ * lying here and there, each a stone's size and no bigger, turned as it fell; and where it has come down (`down`),
+ * the stones of it lying in the gap.
  */
 export function buildDrystone(walls: WallPiece[], atmo: Atmosphere, scene: THREE.Scene): void {
   if (!walls.length) return;
-  const shapes = walls.map((w, k) => {
-    const b: Block = { stuff: 'wall', c: [0, (w.high - FOOT) / 2 - DROP, 0], h: [w.long / 2 + 0.06, (w.high + FOOT) / 2, w.thick / 2], yaw: (hash(k, 11, 5) - 0.5) * 0.08, lean: (hash(k, 13, 5) - 0.5) * 0.06, tip: 0, tone: 0.88 + 0.2 * hash(k, 17, 5), open: true, cap: true, loose: true };
-    return shape(b, 1000 + k, new THREE.Matrix4().makeRotationY(w.yaw).setPosition(w.x, w.y + DROP, w.z));
+  const shapes: THREE.BufferGeometry[] = [], level = new THREE.Matrix4();
+  // (how far along its wall each length's middle is: the stone's courses run on from one length into the next)
+  let s = 0;
+  walls.forEach((w, k) => {
+    const last = walls[k - 1], joins = last && Math.abs(last.yaw - w.yaw) < 1e-6 && Math.hypot(last.x - w.x, last.z - w.z) < (last.long + w.long) / 2 + 0.2;
+    s = joins ? s + (last.long + w.long) / 2 : hash(k, 3, 5) * 40;
+    const rise = w.rise ?? 0, top = w.top ?? 0, to = new THREE.Matrix4().makeRotationY(w.yaw).setPosition(w.x - s * Math.cos(w.yaw), w.y + DROP, w.z + s * Math.sin(w.yaw));
+    const b: Block = { stuff: 'wall', c: [s, (w.high - FOOT) / 2 - DROP, 0], h: [w.long / 2 + 0.04, (w.high + FOOT) / 2, w.thick / 2], yaw: 0, lean: 0, tip: 0, tone: 0.9 + 0.16 * hash(k, 17, 5), open: true, cap: true, loose: false };
+    // (made level, then laid to the ground: every corner by how far along the length it is; and its upper corners
+    // by the top's own slant as well, and drawn in toward the wall's middle)
+    const g = shape(b, 1000 + k, level), pos = g.getAttribute('position'), mid = b.c[1];
+    for (let i = 0; i < pos.count; i++) {
+      const along = (pos.getX(i) - s) / w.long, upper = pos.getY(i) > mid;
+      pos.setY(i, pos.getY(i) + rise * along + (upper ? top * along : 0));
+      if (upper) pos.setZ(i, pos.getZ(i) * BATTER + (hash(k, 13, 5) - 0.5) * 0.05);
+    }
+    g.computeVertexNormals();
+    shapes.push(g.applyMatrix4(to));
+    /** the wall's top, in the length's own measure, so far along it from its middle */
+    const topAt = (x: number) => w.high - DROP + ((rise + top) * x) / w.long;
+    /** a stone lying loose: on the wall's top, or in the gap where it fell */
+    const stone = (n: number, x: number, z: number, y: number, size: number) => {
+      const hx = (0.15 + 0.13 * hash(k, 21 + n, 7)) * size, hy = (0.06 + 0.06 * hash(k, 23 + n, 7)) * size, hz = (0.13 + 0.1 * hash(k, 25 + n, 7)) * size;
+      shapes.push(shape({ stuff: 'wall', c: [s + x, y + hy - 0.03, z], h: [hx, hy, hz], yaw: (hash(k, 27 + n, 7) - 0.5) * 1.2, lean: (hash(k, 29 + n, 7) - 0.5) * 0.3 + Math.atan2(rise, w.long), tip: (hash(k, 31 + n, 7) - 0.5) * 0.3, tone: 0.84 + 0.26 * hash(k, 33 + n, 7), open: false, cap: false, loose: true }, 3000 + k * 8 + n, to));
+    };
+    if (w.down) {
+      // (fallen: what is left of it is strewn with its own stones, some of them rolled a little way out of its line)
+      for (let n = 0; n < 3; n++) {
+        const x = (hash(k, 41 + n, 9) - 0.5) * w.long * 0.9, out = n === 2 ? (hash(k, 43, 9) < 0.5 ? -1 : 1) * (w.thick * 0.5 + 0.15) : (hash(k, 45 + n, 9) - 0.5) * w.thick * 0.6;
+        stone(n, x, out, n === 2 ? -DROP + (rise * x) / w.long - 0.05 : topAt(x) - 0.02, 1.25);
+      }
+    } else if (hash(k, 51, 9) < 0.42) {
+      const x = (hash(k, 53, 9) - 0.5) * w.long * 0.7;
+      stone(0, x, (hash(k, 55, 9) - 0.5) * w.thick * 0.3, topAt(x), 1);
+    }
   });
   const geo = mergeGeometries(shapes, false);
   if (!geo) return;
@@ -625,5 +677,9 @@ export function buildDrystone(walls: WallPiece[], atmo: Atmosphere, scene: THREE
   mesh.matrixAutoUpdate = false;
   scene.add(mesh);
   if (!physics.world) return; // planning only: no collision world
-  for (const b of drystoneBoxes(walls)) physics.addStaticQuat(physics.R.ColliderDesc.cuboid(b.hx, b.hy, b.hz), 'rock', { x: b.x, y: b.y, z: b.z }, { x: 0, y: Math.sin(b.yaw / 2), z: 0, w: Math.cos(b.yaw / 2) });
+  for (const b of drystoneBoxes(walls)) {
+    // (turned about Y, then its far end raised about its own z: the two turns as one)
+    const sy = Math.sin(b.yaw / 2), cy = Math.cos(b.yaw / 2), sp = Math.sin(b.pitch / 2), cp = Math.cos(b.pitch / 2);
+    physics.addStaticQuat(physics.R.ColliderDesc.cuboid(b.hx, b.hy, b.hz), 'rock', { x: b.x, y: b.y, z: b.z }, { x: sy * sp, y: sy * cp, z: cy * sp, w: cy * cp });
+  }
 }

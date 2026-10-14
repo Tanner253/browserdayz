@@ -927,13 +927,14 @@ export class BigMap {
         g.stroke();
       }
     }
-    // the foot paths: a broken line, as a map draws a way that is walked and not driven
+    // the ways that are not roads, each as a map draws what it is (`Way`): a cart track in long strokes, a foot
+    // path in a finer broken line, as a way that is walked and not driven (and one few come by, finer still)
     g.strokeStyle = INK;
-    g.lineWidth = 1.6 * S;
-    g.setLineDash([4 * S, 3 * S]);
     for (const path of world.paths) {
+      g.lineWidth = (path.driven ? 1.9 : path.faint ? 1.1 : 1.4) * S;
+      g.setLineDash(path.driven ? [9 * S, 3 * S] : path.faint ? [2 * S, 4 * S] : [3 * S, 3 * S]);
       g.beginPath();
-      path.forEach(([x, z], i) => (i ? g.lineTo(X(x), Y(z)) : g.moveTo(X(x), Y(z))));
+      path.line.forEach(([x, z], i) => (i ? g.lineTo(X(x), Y(z)) : g.moveTo(X(x), Y(z))));
       g.stroke();
     }
     g.setLineDash([]);
