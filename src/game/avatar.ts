@@ -493,6 +493,8 @@ const _b = new THREE.Vector3();
 const _q1 = new THREE.Quaternion();
 const _q2 = new THREE.Quaternion();
 const _q3 = new THREE.Quaternion();
+// (for `curl`: a finger's parent's turn in the world carried down it, its inverse, and the line turned about seen from the parent)
+const _cq = new THREE.Quaternion(), _cq2 = new THREE.Quaternion(), _ch = new THREE.Quaternion(), _ca = new THREE.Vector3();
 const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3();
 const _m1 = new THREE.Matrix4();
 const _m2 = new THREE.Matrix4();
@@ -1312,10 +1314,25 @@ export class Avatar {
     const Lf = r.fingersLocal;
     const Lp = r.palmLocal.clone().sub(Lf.clone().multiplyScalar(r.palmLocal.dot(Lf))).normalize();
     const curlAxis = new THREE.Vector3().crossVectors(Lf, Lp).applyQuaternion(handWorld).normalize();
+    // (the hand's own turn in the world as it stands, read once)
+    const hand = r.hand.getWorldQuaternion(_ch);
     r.fingers.forEach((chain, fi) => {
       const c = curl[fi];
-      // (one figure closes the whole finger as a fist closes; three say each joint, for a finger laid round something with a shape of its own)
-      chain.forEach((bone, j) => this.turn(bone, curlAxis, typeof c === 'number' ? c * (j === 0 ? 0.8 : j === 1 ? 1.1 : 0.8) : c[j] ?? 0));
+      if (!chain.length) return;
+      // Each joint turned about the same line in the world, as `turn` did, worked out down the finger from the turns
+      // alone: `turn` walked up the whole body twice for every joint (thirty a pair of hands, every frame for every
+      // infected in sight). A turn about a line in the world is the same turn about that line seen from the joint's
+      // parent: the parent's own turn in the world is carried down the finger as each joint is turned.
+      const parent = chain[0].parent!;
+      const pw = parent === r.hand ? _cq.copy(hand) : parent.getWorldQuaternion(_cq);
+      chain.forEach((bone, j) => {
+        // (one figure closes the whole finger as a fist closes; three say each joint, for a finger laid round something with a shape of its own)
+        const a = typeof c === 'number' ? c * (j === 0 ? 0.8 : j === 1 ? 1.1 : 0.8) : c[j] ?? 0;
+        _ca.copy(curlAxis).applyQuaternion(_cq2.copy(pw).invert());
+        bone.quaternion.premultiply(_q1.setFromAxisAngle(_ca, a));
+        pw.multiply(bone.quaternion);
+      });
+      chain[0].updateMatrixWorld(true);
     });
   }
 

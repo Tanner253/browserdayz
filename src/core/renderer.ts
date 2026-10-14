@@ -97,6 +97,19 @@ const AO_WHOLE_UP_TO = 3.0e6;
  * material three's is, so nothing is drawn otherwise (see `sortShadows`).
  */
 const SHADOW_OWN = { many: new THREE.MeshDepthMaterial(), boned: new THREE.MeshDepthMaterial() };
+/**
+ * three works a skeleton's bones out once for each of its own frames, and counts a frame on between its walk over
+ * the scene and its drawing of the shadow maps: every body that casts a shadow had its bones worked out twice in the
+ * one drawing (127 skeletons a frame for 64 bodies' parts, with the horde about). Once a drawing (a call of three's
+ * render: nothing of the game's own runs between the two), and again for the next.
+ */
+let draws = 0;
+const skeletonUpdate = THREE.Skeleton.prototype.update;
+THREE.Skeleton.prototype.update = function onceADraw(this: THREE.Skeleton & { drawn?: number }) {
+  if (this.drawn === draws) return;
+  this.drawn = draws;
+  skeletonUpdate.call(this);
+};
 /** three gives a material that is seen through where its picture is (and the like) a shadow material of its own: those are left to it */
 const shadowOfItsOwn = (m: THREE.Material) => {
   const s = m as THREE.MeshStandardMaterial;
@@ -144,6 +157,12 @@ export class Renderer {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.info.autoReset = false;
+    // (see onceADraw)
+    const render = this.renderer.render.bind(this.renderer);
+    this.renderer.render = (scene, camera) => {
+      draws++;
+      render(scene, camera);
+    };
     this.vmCamera.layers.enableAll();
     this.buildComposer();
     this.resize();
