@@ -3,8 +3,8 @@
 Read `CLAUDE.md` first. This file says what is live, what is waiting, and what is next. Update it at every release.
 
 ## Live
-- `a245f71`, deployed 2026-10-14 02:07 UTC: PROTOCOL 37, WORLD_REV 24. The mountain fort Orlinoye (the a11ffe0 plan at 1.2 scale) on the valley's east rim, snow by place round it, the frag grenade and cooked throws, bigger packs, flat gun pictures.
-- Payouts: the "rule of five" has been on since 2026-10-14 02:20 UTC (0.01 SOL a tag, a wallet paid when five are due); every tag unpaid at that moment was cancelled (owner's decision). Check `/api/cashins?format=status`.
+- `bb275b6`, deployed 2026-10-14 08:10 UTC: PROTOCOL 38, WORLD_REV 25, LOOT_REV 22. The helicopters (the Apache on the supply drop; two MD-500s to fly, on the hospital roof and below the fort), the fort turned to the road with the jeep burning at its gate, everything seated in the ground; the terrace's tents taken out (the owner: too small); a keycard no longer keeps anybody out of a vehicle (only a taken tag does); the leave-the-tab question and the full screen setting; and the split of the five giant files.
+- Payouts: the "rule of five" has been on since 2026-10-14 02:20 UTC (0.01 SOL a tag, a wallet paid when five are due). Check `/api/cashins?format=status`.
 
 ## On `next`, not yet live (NOT deployed: on 2026-10-14 the owner said "we dont need to deploy either theres people on right now": ship it when they say, ideally when nobody is on)
 - The fort TURNED where it stands so its drawbridge faces the road (its turn is in `MOUNTAIN` in `src/world/worldgen.ts`: -75 degrees), the hill's foot run out before the gate (`MOUNTAIN.shoulder` in worldgen), the cart track up it to the gate, a lane to the ruined houses.
