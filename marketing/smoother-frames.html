@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ZONA: smoother frames</title>
+<!-- A card, 1600x900. Rendered to marketing/zona-smoother-frames.png by: node scripts/card.mjs smoother-frames
+     Every number was measured 2026-10-14 on one machine (an RTX 3070 Ti laptop), drawn at 1920x1080 at the game's
+     default settings, joined to a game server, 15 s settled at each place (assets-src/_wf/me/fps-now.js): the game as
+     it was that morning (9e868b9) and as it ships with this update. The physics step: with another player near, the
+     same stand-in measured on both (remote-zones.js). The freeze: the worst frame driving from the village
+     crossroads to the hospital at 15 m/s (drive-hitches.js), 5.2 to 7.0 s before, 67 to 75 ms after. The pieces
+     drawn: the renderer's own count of draws a frame in the hospital street, online. Say nothing here that those
+     runs did not measure. -->
+<style>
+  :root { --gold: #ffd35a; --ink: #f3efe6; --dim: #d8cfb8; --faint: rgba(243, 239, 230, 0.42); --dark: #0c0d0b; --line: rgba(243, 239, 230, 0.2); --was: rgba(243, 239, 230, 0.26); }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1600px; height: 900px; overflow: hidden; background: var(--dark); }
+  body { position: relative; font-family: 'Bahnschrift', 'Arial Narrow', 'Segoe UI', sans-serif; font-stretch: condensed; color: var(--ink); text-transform: uppercase;
+    background: radial-gradient(1200px 520px at 50% 0%, #20241c 0%, #0c0d0b 70%); }
+  .frame { position: absolute; inset: 14px; border: 2px solid var(--line); pointer-events: none; }
+  .logo { position: absolute; left: 48px; top: 36px; font-size: 58px; font-weight: 700; line-height: 0.9; letter-spacing: 0.16em; }
+  .logo small { display: block; margin-top: 9px; font-size: 13px; font-weight: 500; letter-spacing: 0.4em; color: var(--dim); }
+  .title { position: absolute; right: 48px; top: 34px; text-align: right; }
+  .title h1 { font-size: 64px; font-weight: 700; letter-spacing: 0.08em; line-height: 1; }
+  .title p { margin-top: 8px; font-size: 19px; font-weight: 500; letter-spacing: 0.22em; color: var(--dim); }
+  .title p b { color: var(--gold); font-weight: 600; }
+
+  .grid { position: absolute; left: 48px; right: 48px; top: 168px; bottom: 96px; display: grid; grid-template-columns: 372px 1fr 416px; gap: 16px; }
+  .c { position: relative; padding: 24px 26px; background: rgba(18, 20, 16, 0.92); border: 1px solid var(--line); }
+  .c > b { display: block; font-size: 15px; font-weight: 600; letter-spacing: 0.3em; color: var(--gold); }
+
+  .hero { display: flex; flex-direction: column; }
+  .hero .n { margin-top: 20px; font-size: 168px; font-weight: 700; letter-spacing: 0.01em; line-height: 0.86; color: var(--gold); }
+  .hero .n sup { font-size: 76px; vertical-align: top; position: relative; top: 14px; margin-left: 4px; }
+  .hero h2 { margin-top: 20px; font-size: 38px; font-weight: 700; letter-spacing: 0.05em; line-height: 1.04; }
+  .hero p { margin-top: 12px; font-size: 21px; font-weight: 500; letter-spacing: 0.07em; line-height: 1.3; color: var(--dim); }
+  .hero .also { margin-top: auto; padding-top: 18px; border-top: 1px solid var(--line); display: flex; align-items: baseline; gap: 16px; }
+  .hero .also i { font-style: normal; font-size: 62px; font-weight: 700; line-height: 0.9; color: var(--ink); }
+  .hero .also span { font-size: 18px; font-weight: 500; letter-spacing: 0.07em; line-height: 1.25; color: var(--dim); }
+
+  .rows { margin-top: 12px; display: flex; flex-direction: column; justify-content: space-between; height: calc(100% - 30px); }
+  .r { display: grid; grid-template-columns: 1fr 134px; column-gap: 20px; align-items: end; }
+  .r h3 { grid-column: 1 / 3; font-size: 21px; font-weight: 600; letter-spacing: 0.1em; line-height: 1; margin-bottom: 7px; }
+  .r h3 em { font-style: normal; color: var(--faint); letter-spacing: 0.1em; }
+  .bars { display: flex; flex-direction: column; gap: 4px; }
+  .bar { position: relative; height: 22px; }
+  .bar u { position: absolute; left: 0; top: 0; bottom: 0; text-decoration: none; background: var(--was); }
+  .bar.now u { background: var(--gold); }
+  .bar s { position: absolute; top: 0; bottom: 0; display: flex; align-items: center; padding-left: 9px; text-decoration: none; font-size: 17px; font-weight: 600; letter-spacing: 0.1em; color: var(--dim); white-space: nowrap; }
+  .bar.now s { color: var(--gold); }
+  .pc { text-align: right; font-size: 54px; font-weight: 700; letter-spacing: 0.02em; line-height: 0.92; }
+
+  .list { margin-top: 12px; display: flex; flex-direction: column; justify-content: space-between; height: calc(100% - 30px); }
+  .list div { padding-top: 11px; border-top: 1px solid var(--line); }
+  .list div:first-child { border-top: 0; padding-top: 0; }
+  .list h3 { font-size: 26px; font-weight: 700; letter-spacing: 0.05em; line-height: 1.05; }
+  .list p { margin-top: 5px; font-size: 18px; font-weight: 500; letter-spacing: 0.06em; line-height: 1.26; color: var(--dim); }
+
+  .foot { position: absolute; left: 48px; right: 48px; bottom: 36px; display: flex; justify-content: space-between; font-size: 17px; font-weight: 500; letter-spacing: 0.2em; color: var(--dim); }
+  .foot b { color: var(--gold); font-weight: 600; }
+</style>
+</head>
+<body>
+  <div class="frame"></div>
+  <div class="logo">ZONA<small>PvP survival shooter · free to play</small></div>
+  <div class="title"><h1>Smoother frames</h1><p>The same picture, with up to <b>48% more frames</b></p></div>
+  <div class="grid">
+    <div class="c hero">
+      <b>Frames · our test laptop</b>
+      <div class="n">+48<sup>%</sup></div>
+      <h2>More frames in the hospital street</h2>
+      <p>62 a second before, 92 after. Online, same street, same settings.</p>
+      <div class="also"><i>−30%</i><span>pieces drawn each frame there: 875 to 613</span></div>
+    </div>
+
+    <div class="c">
+      <b>Before · after · frames a second</b>
+      <div class="rows">
+        <div class="r"><h3>Village crossroads <em>· online</em></h3>
+          <div class="bars"><div class="bar"><u style="width:54.1%"></u><s style="left:54.1%">84 fps</s></div><div class="bar now"><u style="width:78%"></u><s style="left:78%">121 fps</s></div></div>
+          <div class="pc">+44%</div></div>
+        <div class="r"><h3>Hospital street <em>· online</em></h3>
+          <div class="bars"><div class="bar"><u style="width:40%"></u><s style="left:40%">62 fps</s></div><div class="bar now"><u style="width:59.3%"></u><s style="left:59.3%">92 fps</s></div></div>
+          <div class="pc">+48%</div></div>
+        <div class="r"><h3>Police HQ <em>· online</em></h3>
+          <div class="bars"><div class="bar"><u style="width:47.1%"></u><s style="left:47.1%">73 fps</s></div><div class="bar now"><u style="width:65.1%"></u><s style="left:65.1%">101 fps</s></div></div>
+          <div class="pc">+38%</div></div>
+        <div class="r"><h3>Physics each step <em>· another player near</em></h3>
+          <div class="bars"><div class="bar"><u style="width:78%"></u><s style="left:78%">1.5 ms</s></div><div class="bar now"><u style="width:5.2%"></u><s style="left:5.2%">0.1 ms</s></div></div>
+          <div class="pc">−93%</div></div>
+        <div class="r"><h3>Longest freeze <em>· driving into town</em></h3>
+          <div class="bars"><div class="bar"><u style="width:78%"></u><s style="left:78%">7.0 s</s></div><div class="bar now"><u style="width:1%"></u><s style="left:1%">0.08 s</s></div></div>
+          <div class="pc">−99%</div></div>
+      </div>
+    </div>
+
+    <div class="c">
+      <b>What changed</b>
+      <div class="list">
+        <div><h3>Fights don't drag</h3><p>Other players and the infected near you no longer slow the physics down.</p></div>
+        <div><h3>No more lamp freezes</h3><p>A light coming on near you, a cellar bulb or a gun light, could stop the game for seconds. Not now.</p></div>
+        <div><h3>The ground in big pieces</h3><p>Hills, signs, wells and buildings drawn together: hundreds fewer pieces a frame.</p></div>
+        <div><h3>Trees found faster</h3><p>The forest is sorted by squares of the map: only the woods near you are checked.</p></div>
+        <div><h3>Glass drawn once</h3><p>Windows, lenses and glasses are drawn in one go, not twice.</p></div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><span>14 Oct 2026 · zonapvp.fun</span><span>Measured on <b>one laptop</b>: RTX 3070 Ti · 1920×1080 · default settings · online · yours will differ</span></div>
+</body>
+</html>
