@@ -49,7 +49,7 @@ ZONA is a browser PvP survival shooter in the manner of DayZ, where a dog tag ta
 ## Traps that have cost real time
 - NEVER run `npm run assets`: it wrecks `public/assets/manifest.json`. Bring a model in as the last single model was (`node scripts/packs.mjs <id>`, `tier-now.mjs`, `lods.mjs`).
 - NEVER `git worktree remove` a copy that has a `node_modules` junction: it deleted the real packages once. Order: `cmd //c "rmdir <wt>\node_modules"`, check it is gone, `rm -rf <wt>`, `git worktree prune`.
-- Bash heredocs mangle backslashes and apostrophes: write scripts with the Write tool; run Python with `python -I`; Python's text mode writes CRLF on this machine: open files with `newline=''`.
+- Edit code with the Edit tool; the project's scripts are Node (`node`, `npx tsx`). Python is only an occasional helper for a multi-part patch or for reading JSON, never the default (when used: `python -I`, and open files with `newline=''`, as its text mode writes CRLF here). Bash heredocs mangle backslashes and apostrophes: write any script with the Write tool.
 - The card's heat: the owner, 2026-10-14, with one chat working at a time: "Don't concern yourself with temps ... dont need to pause or wait." Run headless games when needed; do not read the card first or wait for it to cool. (Still keep the Browser pane closed while the owner plays, and never start the game's sound in the pane.)
 - When the machine is slow, look for leftover processes of finished work (old `tsx` scripts, extra `vite` servers): one ran five hours unseen.
 - `git index.lock` can appear while several hands work: retry.
