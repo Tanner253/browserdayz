@@ -117,7 +117,7 @@ const DEFAULT_MINT = 'GvfAzdPF466PJsPJMzXQeX3TSqmJm9YxAG8xBJ6ypump';
  * To go back after it has begun, nothing here is touched: PAYOUT_RULES2_FROM=never puts the rule off, and what is
  * owed under it is then paid out as it stands (see `rules2From` in Config, and `needOf`).
  */
-export const RULES2_FROM = '';
+export const RULES2_FROM = '2026-10-14T02:20:00Z';
 
 const lamports = (sol: number) => BigInt(Math.round(sol * LAMPORTS));
 export const sol = (l: bigint | number) => Number(l) / LAMPORTS;
