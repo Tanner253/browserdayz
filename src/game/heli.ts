@@ -15,12 +15,14 @@
 // Every number is HELI's (src/sim/heli.ts). What it reports (VState) is a jeep's: its steer is how fast its rotor
 // turns (0..1), its throttle how hard the rotor pushes (0..1), so other games turn its rotors as this one does.
 import * as THREE from 'three';
-import { physics, groups, G_PLAYER, G_WORLD, SOLID_GROUPS } from '../core/physics';
+import { physics, groups, G_PLAYER, G_TRIGGER, G_WORLD, SOLID_GROUPS } from '../core/physics';
 import { HELI } from '../sim/heli';
 import { RIDE_HEIGHT, type VState } from '../sim/vehicles';
 import { Jeep, type Controls, type Ground } from './vehicle';
 
 const BODY_GROUPS = groups(G_WORLD, G_WORLD | G_PLAYER);
+/** what only the eye that looks for something to use meets (src/core/physics.ts, USE_GROUPS): not a shot, not a body */
+const LOOK_GROUPS = groups(G_TRIGGER, 0xffff);
 const UP = new THREE.Vector3(0, 1, 0);
 const _f = new THREE.Vector3(), _u = new THREE.Vector3(), _r = new THREE.Vector3(), _w = new THREE.Vector3(), _v = new THREE.Vector3();
 const _q = new THREE.Quaternion();
@@ -80,6 +82,11 @@ export class Heli extends Jeep {
       this.colliders.push(c);
     };
     const box = (b: readonly number[], x = 0) => add(R.ColliderDesc.cuboid(b[0], b[1], b[2]).setTranslation(x, b[3], b[4]));
+    // (The whole cabin, to be looked at and got into, and nothing else: its sides are open to shots, and a look at them
+    // went through them to nothing, so that "Fly" came and went as the eye moved over it. 2026-10-14.)
+    const look = physics.world.createCollider(R.ColliderDesc.cuboid(SHAPE.cabin[0], SHAPE.cabin[1], SHAPE.cabin[2]).setTranslation(0, SHAPE.cabin[3], SHAPE.cabin[4]).setSensor(true).setDensity(0).setCollisionGroups(LOOK_GROUPS), this.body);
+    physics.tag(look, { surface: 'metal', owner: this });
+    this.colliders.push(look);
     box(SHAPE.floor);
     box(SHAPE.roof);
     box(SHAPE.back);

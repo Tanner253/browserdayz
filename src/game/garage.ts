@@ -53,14 +53,13 @@ const SEAT_CAR: [number, number, number][] = [
   [0.4, -0.74, 0.56],
 ];
 /**
- * And in the helicopter (src/game/heli.ts), as the MD-500 is built: the pilot on the right, as in every American
- * helicopter, the other front seat beside them, the bench behind; feet on its floor half a metre over the skids.
+ * And in the helicopter (src/game/heli.ts), as the MD-500 is built: the pilot on the left, the co-pilot on the right;
+ * feet on its floor half a metre over the skids. (The pilot was on the right, as in a real one; the owner, 2026-10-14:
+ * "the fly/get in (copilot) interaction positions seem to be backwards to me".)
  */
 const SEAT_HELI: [number, number, number][] = [
-  [0.36, -0.28, -0.75],
   [-0.36, -0.28, -0.75],
-  [0.36, -0.28, 0.35],
-  [-0.36, -0.28, 0.35],
+  [0.36, -0.28, -0.75],
 ];
 /** how whoever sits in each seat sits: as the library drew it on a jeep's bench (see CAR_SIT) */
 const SIT_OF: (SeatPose | null)[][] = [[null, null, null, null], [CAR_SIT.front, CAR_SIT.front, CAR_SIT.back, CAR_SIT.back], [null, null, null, null]];
@@ -473,7 +472,9 @@ export class Garage {
     const fuel = hasCan && j.fuel < JEEP.tank - 0.5 ? ' <small>hold your jerrycan, and the left button, to pour it in</small>' : '';
     if (tagged) return `<small>${JEEP.noTag}</small>${fuel}`;
     if (seat < 0) return `<small>No free seat</small>${fuel}`;
-    return `<kbd>F</kbd>${seat === 0 ? (j instanceof Heli ? 'Fly' : 'Drive') : 'Get in'}${j.fuel <= 0 ? ' <small>the tank is empty</small>' : ''}${fuel}`;
+    // (and which seat it is: in a helicopter, the pilot's or the co-pilot's)
+    const which = j instanceof Heli ? ` <small>${SEAT_NAMES[j.kind][seat].toLowerCase()}</small>` : '';
+    return `<kbd>F</kbd>${seat === 0 ? (j instanceof Heli ? 'Fly' : 'Drive') : 'Get in'}${which}${j.fuel <= 0 ? ' <small>the tank is empty</small>' : ''}${fuel}`;
   }
 
   /** ten litres into the tank (the can has already left the pockets) */
@@ -549,9 +550,11 @@ export class Garage {
           steer: (input.held('KeyD') ? 1 : 0) - (input.held('KeyA') ? 1 : 0),
           hand: input.held('Space'),
         };
-        // (a helicopter's: Shift up and Z down (not Ctrl: Ctrl and W shuts the browser's tab), Q and E lean it)
+        // (a helicopter's: Space up and Ctrl down, as the owner asked (2026-10-14: "spacebar is not giving me
+        // throttle/lift", "ctrl should reduce throttle"); Shift and Z as well, Z for whoever finds Ctrl and W shuts the
+        // browser's tab. Q and E lean it.)
         if (j instanceof Heli) {
-          c.lift = (input.held('ShiftLeft') || input.held('ShiftRight') ? 1 : 0) - (input.held('KeyZ') ? 1 : 0);
+          c.lift = (input.held('Space') || input.held('ShiftLeft') || input.held('ShiftRight') ? 1 : 0) - (input.held('ControlLeft') || input.held('ControlRight') || input.held('KeyZ') ? 1 : 0);
           c.roll = (input.held('KeyE') ? 1 : 0) - (input.held('KeyQ') ? 1 : 0);
         }
       }
