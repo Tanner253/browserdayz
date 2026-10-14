@@ -168,6 +168,9 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 .hud-progress-bar { height: 3px; background: rgba(255, 255, 255, 0.12); }
 .hud-progress.idle .hud-progress-bar { display: none; }
 .hud-progress-bar div { height: 100%; background: var(--accent); }
+/* a fuse running down (a grenade with its pin out, in the hand): the bar and its words in the colour of a warning */
+.hud-progress.hot .hud-progress-bar div { background: var(--danger); }
+.hud-progress.hot .hud-progress-label { color: var(--danger); }
 
 .hud-compass {
   position: absolute;

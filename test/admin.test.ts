@@ -463,6 +463,12 @@ if (ALL) await withServer(async () => {
     // (two numbers could be how many and half a place, or a place: nothing is stood, and it is asked again)
     assert.match(await ann.order('/spawn jeep 230 215'), /how many \(up to 4\), and then/);
     assert.equal(late.got.slice(mark).filter((m) => m.t === 'v+').length, 2, 'an order that could not be read stood something');
+    // (A frag grenade of her own is on its way to the jeep from here: its pin and its throw, and four seconds of fuse
+    // by the server's count, which the orders below take. Its blast is believed when they have run and no sooner, and
+    // a car takes a grenade once: see test/grenades.test.ts. Until 2026-10-13 a stick grenade's blast was said seven
+    // times over the moment after the throw, and all seven were taken.)
+    ann.send({ t: 'pin', w: 'frag' });
+    ann.send({ t: 'nade', o: [200, jeep.v.s[1] + 1, 200], v: [0, 2, -6] });
     // (somebody who comes in afterwards is shown them, as any car)
     ann.send({ t: 'adm' });
     await sleep(700);
@@ -475,11 +481,9 @@ if (ALL) await withServer(async () => {
     assert.match(await ann.order('/delcar 99999'), /No car of that number/);
     assert.match(await ann.order('/delcar soon'), /takes away the car nearest you/);
 
-    // burned out (her own grenades: she is proof against them), and the wreck cleared away
+    // burned out (by the frag grenade thrown above, which is the end of a car: she is proof against it), and the wreck cleared away
     assert.match(await ann.order('/wrecks'), /No car is burned out/);
-    ann.send({ t: 'nade', o: [200, 1, 200], v: [0, 2, -6] });
-    await sleep(100);
-    for (let k = 0; k < 7; k++) ann.send({ t: 'vhit', i: jeep.v.i, w: 'grenade' });
+    ann.send({ t: 'vhit', i: jeep.v.i, w: 'frag' });
     await sleep(500);
     assert.ok(late.got.slice(mark).some((m) => m.t === 'vboom' && m.i === jeep.v.i), 'the jeep did not burn: there is no wreck to try the order on');
     ann.send({ t: 'adm' });

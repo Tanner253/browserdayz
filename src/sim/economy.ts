@@ -308,7 +308,11 @@ export const TYPES: Record<string, TypeRule> = {
   binoculars: { at: [2, 2, 2, 1, 1], lifetime: 3600, restock: 1200, usage: ['Military', 'Hunting', 'Police'] },
   compass: { at: [4, 4, 3, 0, 0], lifetime: 3600, restock: 1200, usage: ['Military', 'Hunting', 'Village', 'Shop'], favour: { Shop: 3 } },
   cigarettes: { at: [4, 10, 7, 0, 1], lifetime: 2400, restock: 600, usage: [...HOMES, 'Military', 'Industrial', 'Shop'], favour: { Shop: 2 } },
-  grenade: { at: [0, 3, 3, 5, 4], lifetime: 3600, restock: 1200, usage: ['Military'] },
+  // (The frag grenade, 2026-10-13: where the stick grenade is and rarer, from the third step up and never below
+  // it. One in Kamenka, two under the gas, two down the bunker, and half as long again coming back. Down the bunker
+  // every place is spoken for: its two are two of the stick grenade's four, which are two now.)
+  grenade: { at: [0, 3, 3, 5, 2], lifetime: 3600, restock: 1200, usage: ['Military'] },
+  frag: { at: [0, 0, 1, 2, 2], lifetime: 3600, restock: 1800, usage: ['Military'] },
   stash_kit: { at: [3, 3, 1, 0, 0], lifetime: 7200, restock: 1800, usage: ['Farm', 'Industrial', 'Hunting'] },
   // (a field radio: good for one supply drop called down where it is used. One at the army's; the trader sells them dear.)
   radio: { at: [0, 1, 1, 0, 0], lifetime: 7200, restock: 2400, usage: ['Military'] },

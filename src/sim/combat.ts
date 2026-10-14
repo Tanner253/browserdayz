@@ -39,9 +39,11 @@ const gunRules = (): Record<string, WeaponRule> =>
   );
 
 /**
- * The frag grenade's figures, for when it is a thing that can be thrown (2026-10-13: "does more damage as the stick
- * grenade", "2 stick grenades or 1 frag grenade blows up a car": a third more at its middle, a metre further, a whole
- * car). NOT among the rules below until then: a rule the server knows is one a doctored game may claim.
+ * The frag grenade's figures (2026-10-13: "does more damage as the stick grenade", "2 stick grenades or 1 frag
+ * grenade blows up a car": a third more at its middle, a metre further, a whole car). Among the rules below since
+ * it has been a thing that can be thrown (the item `frag`: src/sim/items.ts): until then it was kept out of them,
+ * a rule the server knows being one a doctored game may claim. What the server believes of a blast claimed by
+ * either grenade is in src/sim/grenades.ts.
  */
 export const FRAG_RULE: WeaponRule = { damage: 200, melee: false, range: 70, interval: 0, falloff: 1, blast: 10, car: 1 };
 
@@ -56,6 +58,7 @@ export const WEAPON_RULES: Record<string, WeaponRule> = {
   knife: { damage: 27, melee: true, range: 3.3, interval: 0.3, falloff: 1 },
   // (What they do to a car, 2026-10-13: "2 stick grenades or 1 frag grenade blows up a car".)
   grenade: { damage: 150, melee: false, range: 70, interval: 0, falloff: 1, blast: 9, car: 0.5 },
+  frag: FRAG_RULE,
   // a fuel drum somebody shot (see src/sim/barrels.ts): whoever fired may be a rifle shot away. (140 and 8 m until
   // 2026-10-13: "exploding barrels should have larger explosion SFX and do more damage", then "barrell blast radius
   // should be larger with damage gradient": more than a grenade's at its middle, and reaching half as far again,

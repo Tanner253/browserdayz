@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-11T19:31:29.770Z",
+ "generated": "2026-10-13T23:34:34.175Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr"
@@ -5490,6 +5490,36 @@
     0.065
    ],
    "lods": []
+  },
+  "frag_grenade": {
+   "url": "assets/models/frag_grenade.glb",
+   "tags": [
+    "loot"
+   ],
+   "bytes": 269724,
+   "srcTris": 7070,
+   "tris": 7070,
+   "min": [
+    -0.0348,
+    0,
+    -0.0318
+   ],
+   "max": [
+    0.0348,
+    0.089,
+    0.0318
+   ],
+   "lods": [
+    {
+     "url": "assets/models/frag_grenade_lod1.glb",
+     "tris": 1656,
+     "far": 2,
+     "of": "269724:1791934481242"
+    }
+   ],
+   "hi": "assets/models/hi/frag_grenade.glb",
+   "hiBytes": 1532464,
+   "hiCard": 64
   }
  }
 }

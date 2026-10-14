@@ -559,7 +559,16 @@ const D: ItemDef[] = [
   { id: 'radio', name: 'Field Radio', model: 'vintage_radio_transceiver', w: 4, h: 3, weight: 6.5, category: 'misc', desc: 'Military transceiver, good for one call: use it under open sky and a supply drop comes down where you stand. Everybody hears it called.', use: { verb: 'Call a drop on the', time: 5, sound: 'bandage' }, call: true },
   { id: 'cigarettes', name: 'Cigarettes', model: 'cigarette_pack', w: 1, h: 1, weight: 0.03, category: 'misc', stack: 5, desc: 'Kentucky Ace. A smoke steadies you: each one gives back 12 health.', use: { verb: 'Smoke', time: 4, health: 12, sound: 'smoke' } },
   { id: 'jerrycan', name: 'Jerrycan', model: 'metal_jerrycan_green', w: 2, h: 3, weight: 10, category: 'misc', desc: 'Ten litres of fuel, a quarter of a tank. Hold it, look at a jeep or a police car, and hold the left button to pour it in.' },
-  { id: 'grenade', name: 'Stick Grenade', model: 'stick_grenade', w: 1, h: 3, weight: 0.6, category: 'misc', desc: 'Pull the cord and throw. Four seconds, then everything within nine metres is hurt, you included.', use: { verb: 'Throw', time: 0.75, sound: 'bandage' }, throw: { fuse: 4, damage: 150, radius: 9 } },
+  // (Thrown by being cooked, 2026-10-13: "rework the grenade throwing mechanic so it functions more like PUBG or
+  // DAYZ or COD ... hold to cook the grenade for multiple seconds before throwing it". `use.time` is how long the
+  // hands take to get the cord pulled or the pin out; `throw.fuse` runs from that moment, in the hand or out of it.
+  // What each does to a body, to a car and how far is WEAPON_RULES in combat.ts, by the same name: `throw` says it
+  // again for the game's own blast, and test/grenades.test.ts holds the two to each other.)
+  { id: 'grenade', name: 'Stick Grenade', model: 'stick_grenade', w: 1, h: 3, weight: 0.6, category: 'misc', desc: 'Hold the button to pull the cord, let go to throw. Four seconds from the pull, in your hand or out of it, then everything within nine metres is hurt, you included.', use: { verb: 'Throw', time: 0.75, sound: 'bandage' }, throw: { fuse: 4, damage: 150, radius: 9 } },
+  // (The frag grenade, 2026-10-13: "i added a new frag grenade, it takes up 1x1 in the inventory and does more
+  // damage as the stick grenade". An M67, life size: 0.4 kg, where the stick grenade is 0.6. Its pin is out sooner
+  // than a cord is pulled.)
+  { id: 'frag', name: 'Frag Grenade', model: 'frag_grenade', w: 1, h: 1, weight: 0.4, category: 'misc', desc: 'A steel ball the size of a fist: one place in a pocket. Hold the button to pull the pin, let go to throw. Four seconds from the pull, in your hand or out of it, then everything within ten metres is hurt, and worse than by a stick grenade. One is the end of a car.', use: { verb: 'Throw', time: 0.6, sound: 'bandage' }, throw: { fuse: 4, damage: 200, radius: 10 } },
   // ---------------------------------------------------------------- identity
   {
     id: 'dogtag', name: 'Dog Tag', model: '@dogtag', scale: 1.5, w: 1, h: 1, weight: 0.02, category: 'misc',

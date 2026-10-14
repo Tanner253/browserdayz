@@ -213,7 +213,7 @@ const HANDLED: Record<string, Handling> = {
   weapon: 'gun', magazine: 'heavy', attachment: 'metal', melee: 'heavy', food: 'tin', drink: 'any', medical: 'soft', clothing: 'soft', tool: 'any', misc: 'any', stash: 'any',
   // ... and the ones that are not what the rest of their kind are
   bat: 'wood', apple: 'any', flask: 'tin', stim: 'any', stim_stamina: 'any', stim_combat: 'any', firstaid: 'any', helmet_k63: 'heavy', helmet_m1: 'heavy', gasmask: 'any',
-  jerrycan: 'tin', grenade: 'heavy', radio: 'heavy', dogtag: 'metal', flashlight: 'metal', stash_kit: 'heavy', black_bag: 'soft',
+  jerrycan: 'tin', grenade: 'heavy', frag: 'heavy', radio: 'heavy', dogtag: 'metal', flashlight: 'metal', stash_kit: 'heavy', black_bag: 'soft',
 };
 /** the recording a thing is handled with: [which, how loud against the rest] (`step_soft` is cloth: a hand on it, as a foot on carpet) */
 export const TAKEN: Record<Handling, [name: string, level: number]> = { any: ['take_any', 1], heavy: ['take_heavy', 1], gun: ['take_heavy', 1.15], metal: ['take_metal', 0.7], tin: ['take_tin', 1.1], wood: ['take_wood', 1.1], rounds: ['take_rounds', 0.8], soft: ['step_soft', 0.9] };

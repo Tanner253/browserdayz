@@ -150,6 +150,8 @@ export function installHarness(g: Game) {
       one('ammo_739', undefined, 30);
       one('ammo_556', undefined, 30);
       for (const id of ['box_739', 'box_739', 'box_556', 'box_556', 'red_dot', 'suppressor_739', 'bandage', 'bandage', 'stim', 'stim_stamina', 'beans', 'flask']) one(id);
+      // (and both grenades, two of each, on keys 8 and 9: hold the left button to cook one, let go to throw)
+      for (const id of ['frag', 'frag', 'grenade', 'grenade']) one(id);
       inv.hot = [];
       anyG.autoHot?.();
       const first = (id: string) => got.find((it) => it.id === id) ?? null;
@@ -157,6 +159,8 @@ export function installHarness(g: Game) {
       inv.bind(4, first('box_739'));
       inv.bind(5, first('bandage'));
       inv.bind(6, first('stim'));
+      inv.bind(7, first('frag'));
+      inv.bind(8, first('grenade'));
       g.player.vitals = { ...freshVitals(), energy: 100, water: 100 };
       g.weapons.validate();
       anyG.inventoryChanged();

@@ -17,7 +17,7 @@ import type { IState, InfectedInfo } from '../sim/infected';
 
 // (36, 2026-10-13: the jacket and the trousers are things worn in `top` and `legs`, with the pockets inside them. A
 // page from before would say "nothing in my pockets" of a character that has them full, and the server would keep it.)
-export const PROTOCOL = 36;
+export const PROTOCOL = 37;
 
 /** chat channels: everyone on the server, or only players standing near the speaker */
 /** `staff`: those with a role, to one another, wherever they are: nobody else is sent it */
@@ -134,7 +134,14 @@ export type C2S =
   | { t: 's'; p: Pose; w: string | null; m: string[]; n?: number }
   | { t: 'shot'; o: [number, number, number]; d: [number, number, number]; w: string; sup: boolean }
   | { t: 'swing' }
-  /** a grenade left the hand: where, and how fast */
+  /**
+   * The pin of a grenade is out (which grenade: its item), and its fuse runs from when the server hears this. And
+   * it has left the hand: from where, and how fast (not moving, at the end of its fuse: it went off in the hand).
+   * Which grenade that was and what is left of its fuse are the server's to say, not the game's: a `nade` with no
+   * `pin` before it is nothing. (See src/sim/grenades.ts. Until 2026-10-13 there was no `pin`: a grenade was a
+   * stick grenade, and its fuse ran from the throw.)
+   */
+  | { t: 'pin'; w: string }
   | { t: 'nade'; o: [number, number, number]; v: [number, number, number] }
   | { t: 'act'; a: Act; d: number }
   /** something called out, with the movement that goes with it (an id from src/sim/emotes.ts) */
@@ -247,7 +254,8 @@ export type S2C =
   | { t: 'ps'; s: [number, ...Pose, string | null, string[], (number | null)?][] }
   | { t: 'shot'; id: number; o: [number, number, number]; d: [number, number, number]; w: string; sup: boolean }
   | { t: 'swing'; id: number }
-  | { t: 'nade'; id: number; o: [number, number, number]; v: [number, number, number] }
+  /** somebody's grenade has left their hand: `w` is which (its item), `f` the seconds of fuse it has left by the server's count (none, and not moving: it went off in the hand, where they stand) */
+  | { t: 'nade'; id: number; o: [number, number, number]; v: [number, number, number]; w: string; f: number }
   | { t: 'act'; id: number; a: Act; d: number }
   | { t: 'emote'; id: number; e: string }
   /** fuel drum number i went up, set off by this player; and a new one has been stood in its place */

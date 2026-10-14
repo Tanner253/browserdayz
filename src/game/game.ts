@@ -21,6 +21,7 @@ import { refill, refilledWords, weightFelt } from '../sim/powers';
 import { Economy, type WorldLoot } from '../sim/economy';
 import { CRATE_RESTOCK, CRATE_SPECS, fillCrate } from '../sim/crates';
 import { WEAPON_RULES } from '../sim/combat';
+import { NADE, THROWN, fuseLeft, inHandDamage } from '../sim/grenades';
 import { shotOf } from '../sim/gunplay';
 import { BARREL } from '../sim/barrels';
 import { EMOTE, EMOTES, EMOTE_GAP, SAY_RANGE, SAY_TIME, voiceOf } from '../sim/emotes';
@@ -84,7 +85,7 @@ import { Lamps } from './lamps';
 import { BunkerSite, spotKey } from '../world/bunker';
 import { BUNKER, bunkerCrates, bunkerDark, inBunker } from '../sim/bunker';
 import { CRESSET, CastleSite } from '../world/castle';
-import { castleDark, castleUnder } from '../sim/castle';
+import { CASTLE_SCALE, castleDark, castleUnder, inCastle } from '../sim/castle';
 
 const _gasHead = new THREE.Vector3();
 /** how much of the view is left when aiming through a holographic sight (the plain sights leave 0.8 of it): nearer by a third again */
@@ -368,6 +369,8 @@ export class Game {
     // (the fort: stood where the map says, on the ground as the map has it; the earth round its hatch is drawn as the ground is)
     // (and what it draws is got ready before it is shown, as the bunker's is: a dozen kinds of surface made in the frame it first came into sight stood the game still on the way up to it)
     if (world.castle) this.castle = new CastleSite(world.castle, atmo, r.scene, { ground: (x, z) => heightAt(world.surface, x, z), earth: this.s.terrain.lid ?? undefined, ready: (o) => r.ready(o) });
+    // (a fall inside the fort is as long as its plan's: the speed of one a fifth shorter. See `landsAs`.)
+    this.player.landsAs = (x, y, z) => (inCastle(world.castle ?? null, x, y, z) ? 1 / Math.sqrt(CASTLE_SCALE) : 1);
     // Its door is loud: heard by everybody on the map, wherever they are, and from where it is. (It was heard
     // within two hundred and seventy metres and by nobody else.) Far off it is as late and as dull as a far
     // sound is, and is brought no nearer to the ear than a hundred and ten metres along the line to it: the
@@ -419,7 +422,7 @@ export class Game {
     this.loot.onPlaced = (l) => this.lootPlaced(l);
     this.grenades = new Grenades(r.scene, this.loot.models);
     await this.grenades.preload();
-    this.grenades.onExplode = (at, mine) => this.explode(at, mine);
+    this.grenades.onExplode = (at, mine, id) => this.explode(at, mine, id === 'frag' ? 'frag' : 'grenade');
     this.garage = new Garage({
       scene: r.scene,
       atmo,
@@ -782,7 +785,7 @@ export class Game {
         else if (q.name === GAS.place) spots.push(at(q, 'Under gas: you need a gas mask on to breathe here, and the masks are at the police station in the village.', 'gas', 4, undefined, true));
         else if (site?.kind === 'town') spots.push(at(q, SITE.town[0], 'town', 3, undefined, true));
         // (the fort on the mountain: named on the map, as the bunker and the works are; a place of the fourth step)
-        else if (world.castle && q.x === world.castle.x && q.z === world.castle.z) spots.push(at(q, "The Eagle's Nest: an old fort on the brow of the snow mountain, held to the last as the army's signals post. The road stops at the gatehouse under it: from there it is a climb on foot, in sight of its keep. Its vaults are dark.", 'army', 4, undefined, true));
+        else if (world.castle && q.x === world.castle.x && q.z === world.castle.z) spots.push(at(q, "The Eagle's Nest: an old fort on the east rim of the valley, in the snow under the mountain, held to the last as the army's signals post. A cart track leaves the end of the mountain road, passes the ruined houses and goes round under its walls to the ramp at its gate. Its vaults are dark.", 'army', 4, undefined, true));
         else if (site) spots.push(at(q, SITE[site.kind][0], site.kind === 'market' ? 'trader' : site.kind === 'depot' || site.kind === 'post' || site.kind === 'tents' ? 'army' : 'site', SITE[site.kind][1], SITE[site.kind][2], site.kind === 'tents'));
         else if (/checkpoint/i.test(q.name)) spots.push(at(q, 'Guard posts, a barracks and a watchtower. The track to the works starts here.', 'army', 2, 'Pistols and 9 mm, soft vests, grenades, the army\'s cases. Now and then an armoured vest or a helmet.', true));
         else spots.push(at(q, 'A cabin in the hills, with a fire ring to rest by. Something to fight with is always left here.', 'site', 1));
@@ -1651,9 +1654,12 @@ export class Game {
     });
     net.on('swing', (m) => this.remotes.get(m.id)?.swing());
     net.on('nade', (m) => {
-      this.grenades.throw(new THREE.Vector3(...m.o), new THREE.Vector3(...m.v), ITEMS.grenade.throw!.fuse - 0.75, false);
-      // the arm that threw it
-      this.remotes.get(m.id)?.avatar.swing(true);
+      // (which grenade, and what is left of its fuse, are the server's word: it heard the pin go, and counts from that)
+      const id = THROWN[m.w] ? m.w : 'grenade';
+      const left = typeof m.f === 'number' && Number.isFinite(m.f) ? THREE.MathUtils.clamp(m.f, 0, THROWN[id].fuse) : THROWN[id].fuse;
+      this.grenades.throw(new THREE.Vector3(...m.o), new THREE.Vector3(...m.v), left, false, id);
+      // the arm that threw it (one that went off in the hand was not thrown)
+      if (left > 0) this.remotes.get(m.id)?.avatar.swing(true);
     });
     net.on('act', (m) => this.remotes.get(m.id)?.act(m.a, m.d, cam().position));
     net.on('emote', (m) => {
@@ -2282,7 +2288,7 @@ export class Game {
       return;
     }
     // (a jeep that ran them down is 'jeep'; one that burned with them in it, or beside them, is 'fire')
-    const blast = m.w === 'grenade' || m.w === 'barrel' || m.w === 'fire';
+    const blast = !!WEAPON_RULES[m.w]?.blast || m.w === 'fire';
     const melee = !blast && !ITEMS[m.w]?.weapon;
     const sick = m.w === 'infected';
     p.damage(amount, sick ? 'the infected' : m.w === 'fire' ? 'a burning wreck' : m.w === 'jeep' ? 'being run down' : blast ? 'an explosion' : melee ? 'a beating' : 'gunshot wounds');
@@ -3068,6 +3074,16 @@ export class Game {
   private takeUp(item: ItemInstance, loose = false) {
     const def = ITEMS[item.id];
     if (this.player.dead || !def) return;
+    // (Nothing else is taken up by hands that are on a grenade's pin, or have a live one in them: see `cook`. A thing
+    // handed over that is carried nowhere is not lost for that: it goes into a pocket, or onto the ground.)
+    if (this.cook) {
+      if (loose) {
+        const left = this.inv.add(item);
+        if (left) this.dropItem(left);
+        this.inventoryChanged();
+      }
+      return;
+    }
     if (this.use) this.breakOff();
     this.stow();
     // (Taken straight off the ground or out of a crate with no room for it anywhere: it is in the hands and nowhere
@@ -3230,7 +3246,7 @@ export class Game {
     this.use = { label, t: 0, dur, sound, soundT: 0, done };
     this.weapons.beginUse(itemId, kind, dur);
     // (what everybody else sees of an injection is the hands at work on a wound, as with a dressing)
-    this.act(seen ?? (kind === 'inject' ? 'bandage' : kind === 'smoke' ? 'eat' : kind === 'swipe' ? 'open' : kind === 'unload' ? 'load' : kind), dur);
+    this.act(seen ?? (kind === 'inject' ? 'bandage' : kind === 'smoke' ? 'eat' : kind === 'swipe' || kind === 'live' ? 'open' : kind === 'unload' ? 'load' : kind), dur);
     // (a smoke is one sound from the lighter to the last breath of it, made once)
     if (sound === 'smoke') audio.ui('smoke');
   }
@@ -3334,6 +3350,11 @@ export class Game {
       this.use = null;
       this.act('stop');
     }
+    // (a grenade whose pin the hands were still at: they stop. One whose pin is out is no longer a thing to be placed.)
+    if (this.cook?.item === item) {
+      this.cook = null;
+      this.act('stop');
+    }
     this.loose = null;
     this.ready = null;
     this.inHand = null;
@@ -3388,7 +3409,7 @@ export class Game {
   /** @param now an injector already in the hand: the click that uses it */
   private useItem(item: ItemInstance, now = false) {
     const def = ITEMS[item.id];
-    if (!def.use || this.use || this.player.dead || this.weapons.working) return;
+    if (!def.use || this.use || this.cook || this.player.dead || this.weapons.working) return;
     if (def.look && performance.now() - this.glassDown < 150) return;
     const u = def.use;
     // (an empty bottle is kept, and says where it is filled)
@@ -3418,20 +3439,17 @@ export class Game {
       this.takeUp(item);
       return;
     }
-    // how the hands hold it while it is used: a smoke goes to the mouth, a grenade is worked with both
-    const kind: UseKind = def.throw || def.call ? 'open' : def.look ? 'drink' : u.sound;
-    const sound: TimedAction['sound'] = def.throw || def.look || def.call ? null : u.sound;
+    // (A grenade is not used over a time as other things are: its pin is pulled, and from then it is live. With the
+    // button that began it still down, it is held; chosen out of the pockets, it is thrown the moment the pin is out.)
+    if (def.throw) return this.pullPin(item, now);
+    // how the hands hold it while it is used: a smoke goes to the mouth, a radio is worked with both
+    const kind: UseKind = def.call ? 'open' : def.look ? 'drink' : u.sound;
+    const sound: TimedAction['sound'] = def.look || def.call ? null : u.sound;
     this.glass = 0;
-    this.startUse(def.throw ? 'Pulling the cord' : def.look ? 'Binoculars' : def.call ? 'Calling a drop in' : `${u.verb} ${def.name}`, u.time, item.id, kind, sound, () => {
+    this.startUse(def.look ? 'Binoculars' : def.call ? 'Calling a drop in' : `${u.verb} ${def.name}`, u.time, item.id, kind, sound, () => {
       if (def.call) {
         if (from) this.inv.add(item);
         this.callDrop(item);
-        return;
-      }
-      if (def.throw) {
-        this.consume(item, null);
-        this.inventoryChanged();
-        this.throwGrenade(def.throw);
         return;
       }
       if (def.look) {
@@ -3488,17 +3506,107 @@ export class Game {
   private markedSaid = -1e9;
   private pingSaid = -1e9;
 
-  /** The cord is pulled: it leaves the hand the way the player is looking, and everyone is told. */
-  private throwGrenade(spec: { fuse: number; damage: number; radius: number }) {
-    const cam = this.s.r.camera, p = this.player;
+  /**
+   * A grenade in the hands that are getting its pin out, or with its pin out (2026-10-13: "rework the grenade
+   * throwing mechanic so it functions more like PUBG or DAYZ or COD ... hold to cook the grenade for multiple
+   * seconds before throwing it"). The rules are src/sim/grenades.ts; this is the hands' side of them.
+   *   t      seconds since the hands began
+   *   live   seconds since the pin came out (less than nought: it is not out yet, and the other button or the
+   *          wheel still stops the hands with nothing lost). From nought on the grenade is no longer a thing
+   *          carried, the server has been told, and there is no putting the pin back: it leaves the hand when the
+   *          button is let go, with what is left of its fuse, or goes off in it.
+   *   button the button that began it is still down. Let go at any time, before the pin is out as well (a tap),
+   *          or never down at all (Throw, chosen in the pockets): it is thrown the moment the pin is out.
+   */
+  private cook: { item: ItemInstance; id: string; t: number; live: number; button: boolean } | null = null;
+
+  /** The hands begin on a grenade's pin (a stick grenade's cord). */
+  private pullPin(item: ItemInstance, button: boolean) {
+    const kind = THROWN[item.id];
+    if (!kind || this.cook || this.use || this.player.dead || this.weapons.working) return;
+    this.toggleInventory(false);
+    this.glass = 0;
+    this.ready = null;
+    this.holding = false;
+    this.cook = { item, id: item.id, t: 0, live: -1, button };
+    // (worked with both hands, as it was: the left has it, the right is at its pin; everybody near sees hands at work)
+    this.weapons.beginUse(item.id, 'open', kind.pull);
+    this.act('open', kind.pull);
+  }
+
+  /** Every frame there is a grenade in the hands being made live, or live: see `cook`. */
+  private cooking(dt: number, input: Input, uiOpen: boolean) {
+    const c = this.cook!, kind = THROWN[c.id], p = this.player;
+    c.t += dt;
+    if (c.button && (uiOpen || !input.held('Mouse0'))) c.button = false;
+    if (c.live < 0) {
+      const stop = (input.pressed('Mouse2') || input.wheel !== 0) && !uiOpen;
+      if (p.dead || stop || !this.mine(c.item)) {
+        if (stop) input.wheel = 0;
+        this.cook = null;
+        this.act('stop');
+        if (stop && !p.dead) this.hud.note('Cancelled', 'info');
+        // (a thing that was in the hands to begin with stays in them: only what the hands were doing with it stops)
+        if (this.inHand) this.rest();
+        else {
+          this.weapons.endUse();
+          this.settle();
+        }
+        return;
+      }
+      if (c.t < kind.pull) return;
+      // The pin is out. The fuse runs from here, by this game's count and by the server's from when it hears.
+      c.live = c.t - kind.pull;
+      this.consume(c.item, null);
+      this.inventoryChanged();
+      this.net.send({ t: 'pin', w: c.id });
+      // (in the one fist now, drawn back to throw: see 'live' in weapons.ts)
+      this.weapons.beginUse(c.id, 'live', kind.fuse);
+    } else c.live += dt;
+    // (whoever dies with one in their hand takes it with them: the dead hurt nobody in this game, and the server says the same)
+    if (p.dead) return this.emptyOfGrenade();
+    const left = fuseLeft(c.id, c.live);
+    if (left > 0 && c.button) return;
+    const cam = this.s.r.camera;
     const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
+    // where the hand is: a little ahead of the eye, to the right and below it
     const o = cam.position.clone().addScaledVector(dir, 0.5).add(new THREE.Vector3(0.18, -0.1, 0).applyQuaternion(cam.quaternion));
+    this.emptyOfGrenade();
+    if (left <= 0) {
+      // Held to the end of its fuse: it goes off in the hand. (Said to the server as a grenade that has left the
+      // hand and is not moving: it has counted the fuse itself, and knows what that means.)
+      this.net.send({ t: 'nade', o: o.toArray(), v: [0, 0, 0] });
+      this.explode(o, true, c.id === 'frag' ? 'frag' : 'grenade', undefined, true);
+      return;
+    }
     // thrown, not dropped: forward and up, plus whatever the thrower was doing
-    const v = dir.multiplyScalar(15).add(new THREE.Vector3(p.vel.x, 3.2 + Math.max(0, p.vel.y), p.vel.z));
-    this.grenades.throw(o, v, spec.fuse - 0.75, true);
+    const v = dir.multiplyScalar(NADE.speed).add(new THREE.Vector3(p.vel.x, NADE.lift + Math.max(0, p.vel.y), p.vel.z));
+    this.grenades.throw(o, v, left, true, c.id);
     this.net.send({ t: 'nade', o: o.toArray(), v: v.toArray() });
     this.avatar.swing(true);
     audio.whoosh(0.5);
+  }
+
+  /**
+   * What the line under the crosshair says of a grenade in the hands: the pin coming out, as anything the hands
+   * are at is shown; and then the fuse, a bar that runs DOWN, in red, with the seconds left beside it. (How long is
+   * left is the one thing whoever is cooking it has to know, and it is nowhere else: the grenade makes no sound.)
+   */
+  private cookShown(): { label: string; t: number; hot?: boolean } {
+    const c = this.cook!, kind = THROWN[c.id];
+    if (c.live < 0) return { label: c.id === 'grenade' ? 'Pulling the cord' : 'Pulling the pin', t: c.t / kind.pull };
+    const left = fuseLeft(c.id, c.live);
+    return { label: `${ITEMS[c.id].name} live · ${left.toFixed(1)} s`, t: left / kind.fuse, hot: true };
+  }
+
+  /** the grenade is out of the hands, thrown or gone off or gone with them: they are empty */
+  private emptyOfGrenade() {
+    this.cook = null;
+    if (this.inHand) this.rest();
+    else {
+      this.weapons.endUse();
+      this.settle();
+    }
   }
 
   // --- the wheel (hold T, see src/sim/emotes.ts)
@@ -3650,14 +3758,17 @@ export class Game {
   }
 
   /**
-   * Something has gone off somewhere in the world: a grenade, or a fuel drum.
+   * Something has gone off somewhere in the world: a grenade (the stick grenade, or the frag), or a fuel drum.
    * @param skip what went up, if it is still standing in the way of its own blast
+   * @param inHand a grenade of this player's own that was never thrown: it went off in the hand that held it
    */
-  private explode(at: THREE.Vector3, mine: boolean, what: 'grenade' | 'barrel' | 'jeep' = 'grenade', skip?: Barrel['collider']) {
+  private explode(at: THREE.Vector3, mine: boolean, what: 'grenade' | 'frag' | 'barrel' | 'jeep' = 'grenade', skip?: Barrel['collider'], inHand = false) {
     // (a jeep goes up as a drum of fuel does; online the server says who it reached)
     const jeep = what === 'jeep';
     const drum = what === 'barrel' || jeep;
-    const spec = drum ? { damage: WEAPON_RULES.barrel.damage, radius: WEAPON_RULES.barrel.blast! } : ITEMS.grenade.throw!;
+    // (what a blast does and how far is its rule's, by its name: the same figures the server reckons a hit by)
+    const rule = WEAPON_RULES[drum ? 'barrel' : what];
+    const spec = { damage: rule.damage, radius: rule.blast! };
     const p = this.player, cam = this.s.r.camera;
     const far = at.distanceTo(cam.position);
     this.effects.explode(at, jeep ? 'vehicle' : drum ? 'drum' : 'grenade');
@@ -3674,11 +3785,12 @@ export class Game {
     // your own body: this game decides it for your own grenade; another player's reaches you through the server
     if (mine && !p.dead && this.started && !(jeep && this.online)) {
       const chest = new THREE.Vector3(p.pos.x, p.pos.y + (p.crouched ? 0.6 : 1.1), p.pos.z);
-      const k = reach(chest);
+      // (in the hand: all of it, and no plate is between a hand and its owner. The server counts the same: `handBlast`.)
+      const k = inHand ? 1 : reach(chest);
       if (k > 0) {
-        let amount = spec.damage * k;
-        for (const a of this.inv.wear('armor')) amount *= a;
-        p.damage(amount, jeep ? 'a burning wreck' : drum ? 'a fuel drum you set off' : 'your own grenade');
+        let amount = inHand ? inHandDamage(what) : spec.damage * k;
+        if (!inHand) for (const a of this.inv.wear('armor')) amount *= a;
+        p.damage(amount, inHand ? 'a grenade held too long' : jeep ? 'a burning wreck' : drum ? 'a fuel drum you set off' : 'your own grenade');
         if (amount > 12) p.bleed(woundOf('blast'));
         this.hud.hitFrom(p.yaw - Math.atan2(p.pos.x - at.x, p.pos.z - at.z));
         this.meDirty = true;
@@ -3920,12 +4032,15 @@ export class Game {
     if (this.player.dead || !this.started || this.invUI.isOpen || this.shop.isOpen || this.garage.ride) return null;
     // (at it already: what stops it)
     if (this.use) return this.holding ? [{ on: 'l', hold: true, text: 'Let go to stop' }] : [{ on: 'r', text: 'Stop' }];
+    // (a grenade: until its pin is out the other button stops the hands; once it is out, only letting go is left)
+    if (this.cook) return this.cook.live < 0 ? [{ on: 'r', text: 'Stop' }] : this.cook.button ? [{ on: 'l', hold: true, text: 'Let go to throw', sub: 'the pin is out' }] : null;
     const item = this.inHand;
     if (!item) return null;
     const def = ITEMS[item.id];
     const hold = !this.touch;
     let act: HandAct | null = null, wheel = 'Put away';
-    if (def.mag) {
+    if (def.throw) act = { on: 'l', hold: true, text: item.id === 'grenade' ? 'Pull the cord' : 'Pull the pin', sub: 'hold to cook it · let go to throw' };
+    else if (def.mag) {
       const work = this.magWork(item);
       act = { on: 'l', hold, text: work === 'fill' ? 'Fill magazine' : 'Empty magazine', sub: work === 'fill' ? `${item.rounds ?? 0}/${def.mag.capacity} · ${this.inv.count(def.mag.ammo)} loose` : `${item.rounds ?? 0} in it` };
       wheel = work === 'fill' ? 'Empty it instead' : 'Fill it instead';
@@ -4357,7 +4472,7 @@ export class Game {
         if (!this.inv.hasRoom(item)) {
           // (No room for it. With the hands empty it is taken into them and carried nowhere, as in DayZ: eaten,
           // drunk or put on from there. A gun, a blade or a thing to wear needs a place of its own.)
-          const free = !this.weapons.equippedItem && !this.inHand && !this.use;
+          const free = !this.weapons.equippedItem && !this.inHand && !this.use && !this.cook;
           if (d.slot || d.weapon || d.melee || !free) {
             this.hud.note(d.slot ? `No free ${d.slot === 'long' ? 'weapon' : d.slot} slot and no room in your pockets` : 'No room: empty your hands (X) to pick it up in them, or find a vest or a bag', 'warn');
             return;
@@ -4766,7 +4881,8 @@ export class Game {
     this.unbury(dt, !!ride);
 
     // the hot keys: each brings up what is on it (and puts it away again); X empties the hands
-    if (playing && !uiOpen && !typing && !p.dead) {
+    // (not with a grenade's pin coming out, or out: those hands are spoken for until it has left them)
+    if (playing && !uiOpen && !typing && !p.dead && !this.cook) {
       HOT_CODES.forEach((k, i) => {
         if (input.pressed(k)) this.hot(i);
       });
@@ -4784,6 +4900,9 @@ export class Game {
       if (p.dead || !kept || (input.wheel !== 0 && !uiOpen)) this.putAway();
       else if (playing && !uiOpen && !typing && r.t > 0.3 && (input.pressed('Mouse0') || (input.held('Mouse0') && r.t > 0.55))) this.handFire(r.item);
     }
+
+    // a grenade: its pin coming out, and then live in the hand until the button is let go (see `cook`)
+    if (this.cook) this.cooking(dt, input, uiOpen);
 
     // timed item use (eat, drink, bandage, open a box): shown in the hands; the wheel or the other button breaks it off
     if (this.use) {
@@ -4834,7 +4953,7 @@ export class Game {
     // weapons + fov
     const fpLive = this.director.blend > 0.9;
     this.garage.frame(dt, now, physics.alpha, cam.position);
-    this.weapons.update(dt, input, cam, fpLive && !uiOpen && playing && !this.use && !this.ready && !typing && !this.glass && !this.wheelOn && !this.hold && !ride);
+    this.weapons.update(dt, input, cam, fpLive && !uiOpen && playing && !this.use && !this.ready && !this.cook && !typing && !this.glass && !this.wheelOn && !this.hold && !ride);
     this.grenades.update(dt);
     this.updateBarrels(dt);
     const kind = this.weapons.equippedItem ? ITEMS[this.weapons.equippedItem.id].weapon?.kind : undefined;
@@ -5067,7 +5186,7 @@ export class Game {
       fire: this.byFire,
       heading: !uiOpen ? heading : null,
       bearing: hasCompass,
-      progress: this.use ? { label: this.use.label, t: this.use.t / this.use.dur } : this.ready ? { label: `${ITEMS[this.ready.item.id].name}: ${this.touch ? 'fire to use it' : 'hold the left button to use it · its key again puts it away'}`, t: -1 } : null,
+      progress: this.cook ? this.cookShown() : this.use ? { label: this.use.label, t: this.use.t / this.use.dur } : this.ready ? { label: `${ITEMS[this.ready.item.id].name}: ${ITEMS[this.ready.item.id].throw ? (this.touch ? 'hold fire to cook it, let go to throw' : 'hold the left button to cook it, let go to throw · its key again puts it away') : this.touch ? 'fire to use it' : 'hold the left button to use it · its key again puts it away'}`, t: -1 } : null,
       boost: p.boost,
       hotbar: this.hotbar(),
       fps: this.fps,

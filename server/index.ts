@@ -31,6 +31,7 @@ import { RangeJudge, dealing, rangeOf, shotMisses, type RangeSpec } from '../src
 import { BUNKER, bunkerDark, inBunker } from '../src/sim/bunker';
 import { phaseOf } from '../src/sim/daynight';
 import { WEAPON_RULES, hitDamage, type HitZone } from '../src/sim/combat';
+import { THROWN, inHandDamage, judge, letGo, newThrower, overdue, pullPin, type Thrower, type Vec3 } from '../src/sim/grenades';
 import { BARREL } from '../src/sim/barrels';
 import { JEEP, POLICE_CAR, SEATS, carDamage, crashDamage, restState, type VehicleInfo, type VState } from '../src/sim/vehicles';
 import { Director, INFECTED, guarded, infectedDrop } from '../src/sim/infected';
@@ -895,7 +896,8 @@ function keep(c: Client, amount: number, zone: string, w: string) {
   // (A hit takes health; a wound takes blood, which is another thing: src/sim/blood.ts. A round takes a hundred of
   // it going in, and nearly always opens a wound, the infected and a blade often, a blast or a blow seldom; and a
   // wound bleeds by what made it and where, beside whatever others are open.)
-  const gun = !!ITEMS[w]?.weapon, blast = w === 'grenade' || w === 'barrel' || w === 'fire';
+  // (a blast: either grenade, a fuel drum, a car going up)
+  const gun = !!ITEMS[w]?.weapon, blast = !!WEAPON_RULES[w]?.blast || w === 'fire';
   if (gun) v.blood = Math.max(0, bloodOf(v) - BLOOD.shot);
   if (w !== 'crash' && Math.random() < (gun ? (a > 12 ? 0.85 : 0.4) : w === 'infected' ? INFECTED.bleed : 0.25)) {
     v.bleed = withWound(v.bleeding ? bleedOf(v) : 0, woundOf(gun ? 'shot' : w === 'infected' ? 'bite' : blast ? 'blast' : 'blunt', zone));
@@ -988,6 +990,27 @@ function standing(now: number) {
   }
 }
 setInterval(() => standing(Date.now()), 500);
+
+/**
+ * A grenade has gone off in the hand that held it (2026-10-13, with grenades that are cooked: "hold to cook the
+ * grenade for multiple seconds before throwing it", and one held too long goes off where it is). Everybody else is
+ * shown it where its holder stands. What it did to the holder their own game reckons, as it does for any grenade of
+ * its own; here it is counted among what they have taken, all of it and through no armour (`arms`: no plate is
+ * between a hand and its owner), so that whoever is still on their feet after it is found by `standing`, and
+ * whoever's game is not answering dies of it by the server's hand (`keep`). See src/sim/grenades.ts.
+ */
+function handBlast(c: Client, w: string, at: Vec3) {
+  broadcast({ t: 'nade', id: c.id, o: at, v: [0, 0, 0], w, f: 0 }, c);
+  if (c.alive && !c.power.god) dealt(c, inHandDamage(w), 'arms', w);
+}
+/** Four times a second: a pin that is out, a fuse that has run down, and nothing said of the grenade. It went off in the hand. */
+function inHands(now: number) {
+  for (const c of clients.values()) {
+    const went = c.nades.held ? overdue(c.nades, [c.pose[0], c.pose[1], c.pose[2]], now) : null;
+    if (went) handBlast(c, went.w, went.from);
+  }
+}
+setInterval(() => inHands(Date.now()), 250);
 
 /** What somebody says they carry, asked of the server's own list: an invented gun is written down once, and (enforcing) is not in the copy the server keeps of their pockets. */
 function pockets(c: Client) {
@@ -2757,9 +2780,8 @@ interface Client {
    * themselves is not found on them by whoever kills them), and no dog tag of their own is.
    */
   power: { god: boolean; hidden: boolean; clip: boolean; voidInv: boolean; voidTag: boolean; /** what they carry weighs nothing, and their gun spends no rounds: their own game's to honour (see `carryOrder`) */ weightless: boolean; endless: boolean; /** their inventory never fills: things are kept in their hold (see `carryOrder`) */ bottomless: boolean };
-  /** when this player last threw a grenade, and how many hits have been claimed for it */
-  lastNade: number;
-  nadeHits: number;
+  /** this player's grenades: the one whose pin is out in their hand, and those that have left it and not long gone off, with what each has been said to reach (src/sim/grenades.ts) */
+  nades: Thrower;
   /** the fuel drums this player has just set off, and how many hits have been claimed for each */
   blasts: { i: number; at: number; hits: number }[];
   lastEmote: number;
@@ -3159,6 +3181,8 @@ function kill(c: Client, cause: string, v = 0) {
   if (!c.alive) return;
   c.alive = false;
   c.logoutAt = 0;
+  // (a grenade with its pin out in their hand goes with them: nothing is said of it in their next life)
+  c.nades.held = null;
   // (a body left behind has nobody to come back to it: it is out of the world once it has fallen)
   if (c.asleep) setTimeout(() => drop(c), 3000);
   releaseLock(c);
@@ -3232,13 +3256,22 @@ function handle(c: Client, m: C2S) {
       if (c.alive) broadcast({ t: 'swing', id: c.id }, c);
       return;
     }
+    case 'pin': {
+      // (the pin of a grenade is out: its fuse runs from now, by this clock and nobody else's)
+      if (!c.alive || typeof m.w !== 'string' || !THROWN[m.w]) return;
+      if (pullPin(c.nades, m.w, Date.now()) === 'ok') stayOn(c, 'you pulled a pin');
+      return;
+    }
     case 'nade': {
       if (!c.alive || !isVec3(m.o) || !isVec3(m.v)) return;
-      // it has to leave from where the thrower is, at a speed an arm can give it
-      if (Math.hypot(m.o[0] - c.pose[0], m.o[2] - c.pose[2]) > 4 || Math.hypot(...m.v) > 40) return;
-      c.lastNade = Date.now();
-      c.nadeHits = 0;
-      broadcast({ t: 'nade', id: c.id, o: m.o, v: m.v }, c);
+      // It has to leave from where the thrower is, at a speed an arm can give it, and its pin has to be out. Which
+      // grenade it is and how much of its fuse is left are what the server heard and counted: the game is not
+      // asked, and everybody else is told the server's figure. (Until 2026-10-13 any game could say a grenade had
+      // been thrown, and every hit it then claimed in nine seconds was believed.)
+      const out = letGo(c.nades, m.o, m.v, [c.pose[0], c.pose[1], c.pose[2]], Date.now());
+      if (!out) return;
+      if (out.hand) handBlast(c, out.w, out.o);
+      else broadcast({ t: 'nade', id: c.id, o: out.o, v: m.v, w: out.w, f: out.left }, c);
       return;
     }
     case 'bunker': {
@@ -3339,10 +3372,12 @@ function handle(c: Client, m: C2S) {
         m.zone = 'torso';
         from = [world.barrels[best.q.i].x, world.barrels[best.q.i].z];
       } else if (rule.blast) {
-        // a grenade is not held when it goes off: it has to have been thrown in the last few
-        // seconds, and one grenade only reaches so many people
-        if (now - c.lastNade > 9000 || ++c.nadeHits > 12 || !num(m.dist)) return;
-        amount = hitDamage(m.w, 'torso', Math.max(0, m.dist));
+        // A grenade of theirs, gone off when the server's own count of its fuse says, no further from where it left
+        // the hand than it can have flown, and reaching this body for the first time: see `judge`. The game says how
+        // far off they were; it is believed no nearer than the grenade can have got.
+        const far = num(m.dist) ? judge(c.nades, m.w, `p${target.id}`, [target.pose[0], target.pose[1] + 1.1, target.pose[2]], m.dist, now) : null;
+        if (far === null) return;
+        amount = hitDamage(m.w, 'torso', far);
         m.zone = 'torso';
       } else if (m.w === 'jeep') {
         // run down: by whoever is at the wheel of a jeep that is right there, going fast enough
@@ -3390,10 +3425,12 @@ function handle(c: Client, m: C2S) {
       if (d > rule.range + 6) return;
       let amount: number;
       if (rule.blast) {
-        // something of theirs went off in the last few seconds: a grenade thrown, or a drum set off
-        const since = m.w === 'grenade' ? now - c.lastNade : Math.min(...c.blasts.map((q) => now - q.at), Infinity);
-        if (since > 9000 || !num(m.dist)) return;
-        amount = hitDamage(m.w, 'torso', Math.max(0, m.dist));
+        // something of theirs went off: a drum set off in the last few seconds, or a grenade, held to what any
+        // blast of a grenade is held to (when, where, and each of them once: `judge`)
+        if (!num(m.dist)) return;
+        const far = m.w === 'barrel' ? (Math.min(...c.blasts.map((q) => now - q.at), Infinity) > 9000 ? null : Math.max(0, m.dist)) : judge(c.nades, m.w, `i${m.i}`, [b.s[0], b.s[1] + 1.2, b.s[2]], m.dist, now);
+        if (far === null) return;
+        amount = hitDamage(m.w, 'torso', far);
         m.zone = 'torso';
       } else if (m.w === 'jeep') {
         // run down, by whoever is at the wheel of a jeep that is right there
@@ -3767,8 +3804,10 @@ function handle(c: Client, m: C2S) {
       if (d > rule.range + 6) return;
       const amount = carDamage(rule);
       if (rule.blast) {
-        // a grenade thrown or a drum set off in the last moments, near enough to reach it
-        const recent = m.w === 'barrel' ? c.blasts.some((q) => now - q.at < 4000) : now - c.lastNade < 9000;
+        // A drum set off in the last moments; or a grenade of theirs gone off when its fuse said, near enough to
+        // reach it (a car is reached from seven tenths as far as a body), which it takes once from each grenade.
+        // (It took one from every message that said so: one stick grenade, said twice, was the end of a car.)
+        const recent = m.w === 'barrel' ? c.blasts.some((q) => now - q.at < 4000) : judge(c.nades, m.w, `v${v.i}`, [v.s[0], v.s[1], v.s[2]], 0, now, rule.blast * 0.7) !== null;
         if (!recent) return;
       } else {
         if (c.w !== m.w || now - c.lastVHit < rule.interval * 700) return;
@@ -3884,7 +3923,7 @@ function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | null {
     heardAt: Date.now(), kept: false, asleep: 0, bled: 0, logoutAt: 0, logoutFrom: [0, 0],
     since: Date.now(), spoke: false, resumed: !!resume,
     inv: resume?.inv ?? null, vitals: resume?.vitals ?? null,
-    outAt: 0, underAt: 0, lastHit: 0, lastVHit: 0, seatAt: 0, lastNade: 0, nadeHits: 0, blasts: [], lastEmote: 0, lastChat: 0, lastHitBy: null, openCid: null, check: { at: Date.now(), carry: 0, owed: 0, heard: Date.now(), lag: 0, lagTill: 0, free: Date.now() + CHECK.free, high: 0, hovered: 0, flags: 0, said: 0, refused: [], hp: Math.min(100, resume?.vitals?.health ?? 100), hpAt: Date.now(), downAt: 0, unknown: new Set() }, activeAt: Date.now(), joinedAt: Date.now(), ip: ipOf.get(ws) ?? '', lifeAt: Date.now(), msgCount: 0, msgWindow: Date.now(),
+    outAt: 0, underAt: 0, lastHit: 0, lastVHit: 0, seatAt: 0, nades: newThrower(), blasts: [], lastEmote: 0, lastChat: 0, lastHitBy: null, openCid: null, check: { at: Date.now(), carry: 0, owed: 0, heard: Date.now(), lag: 0, lagTill: 0, free: Date.now() + CHECK.free, high: 0, hovered: 0, flags: 0, said: 0, refused: [], hp: Math.min(100, resume?.vitals?.health ?? 100), hpAt: Date.now(), downAt: 0, unknown: new Set() }, activeAt: Date.now(), joinedAt: Date.now(), ip: ipOf.get(ws) ?? '', lifeAt: Date.now(), msgCount: 0, msgWindow: Date.now(),
   };
   records.delete(key);
   KEPT.chars.delete(keyHash(key));

@@ -712,6 +712,13 @@ export const LOCAL_MODELS = {
   // meet, and that point is what the crate hangs from. Its fourth picture, for light of its own, is black all over
   // (every pixel of it nought): the game does not put it on the card.)
   parachute: { dir: 'army_parachute', solid: true, both: true, size: 12, tex: 4096, tags: ['prop'], changes: 'Made solid: drawn as a thing that is not seen through, where it came half clear, with the clearness taken out of its colour picture, and both faces of its cloth drawn; scaled to metres (twelve from where its lines meet to the top of the canopy) and stood on the point where its lines meet; textures re-encoded as WebP at the size they came; geometry compressed. In the game it is drawn narrow as it opens and laid over as it settles.' },
+  // The frag grenade (2026-10-13: "i added a new frag grenade, it takes up 1x1 in the inventory"). Unpack
+  // assets-src/frag_granade.zip into assets-src/models/frag_grenade/. A ball grenade with its fuse, lever, pin and
+  // ring: one material, three pictures of 2048. As it came its ball is 8.0 cm across, a quarter over life size: the
+  // M67 it is drawn from is 6.35 cm across the ball and 8.96 cm tall. Made 8.9 cm tall its ball is 6.35 cm: life
+  // size, beside a stick grenade that is 38 cm long with a head of 8 cm. Every triangle it came with, and its
+  // pictures at the size they came.
+  frag_grenade: { size: 0.089, tex: 2048, tags: ['loot'], changes: 'Scaled to life size (it came a quarter larger) and stood on the ground about its own middle; textures re-encoded as WebP at the size they came; geometry compressed.' },
 };
 
 /**

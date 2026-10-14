@@ -27,7 +27,8 @@ import { roundsSpent } from '../sim/powers';
 export type HitZone = 'head' | 'torso' | 'legs' | 'arms';
 /** damage multiplier per hit zone: bullets / melee */
 const ZONE_MULT: Record<HitZone, [number, number]> = { head: [3.2, 1.6], torso: [1, 1], legs: [0.6, 0.7], arms: [0.6, 0.7] };
-export type UseKind = 'eat' | 'drink' | 'bandage' | 'inject' | 'smoke' | 'open' | 'swipe' | 'load' | 'unload' | 'unbox';
+// ('live': a grenade with its pin out, in the one fist that is about to throw it: see LIVE)
+export type UseKind = 'eat' | 'drink' | 'bandage' | 'inject' | 'smoke' | 'open' | 'swipe' | 'load' | 'unload' | 'unbox' | 'live';
 const FIST = { damage: 14, range: 1.35, rate: 0.4, stamina: 5 };
 
 export type FireMode = 'semi' | 'auto';
@@ -371,6 +372,16 @@ export const HOLD = {
   kitBy: [-0.15, -0.5],
   kitTurn: [0.2, 0.5, 0.05],
 };
+
+/**
+ * A grenade with its pin out (see `cook` in game.ts), in the eye's space: in the right fist alone, the left having
+ * come away with the pin, held up on the right and drawn back a little to be thrown. It is not held still: the
+ * fist shakes, a little at first and more as the fuse runs down, which is what the hands say of how long is left
+ * (the line under the crosshair says it in figures).
+ *   at, turn – where it is, and how it is turned
+ *   shake    – how far it shakes when the pin has just come out, and at the end of the fuse, metres
+ */
+export const LIVE = { at: [0.17, -0.075, -0.4] as [number, number, number], turn: [0.3, -0.35, -0.25] as [number, number, number], shake: [0.0012, 0.006] as [number, number] };
 
 /**
  * A roll of dressing (the bandage, the splint tape), in the eye's space. It lies in the hollow of the left palm,
@@ -2553,8 +2564,11 @@ export class Weapons {
     // What is already in the hands stays in them: taken up to be used, worked on again (the next round into a
     // magazine), or let down to be held when the work is done. (Each of those brought it up from under the picture
     // afresh: a magazine being filled bobbed up from below for every round.)
-    if (h0 && h0.id === id && !h0.ending && (wait || h0.wait || h0.kind === kind)) {
-      if (!!h0.wait !== wait) {
+    // (And a grenade whose pin has just come out is the grenade the hands were at: it goes from the two of them to
+    // the one fist, and is not put away and brought up again.)
+    const armed = kind === 'live' && h0?.kind !== 'live';
+    if (h0 && h0.id === id && !h0.ending && (wait || h0.wait || h0.kind === kind || armed)) {
+      if (!!h0.wait !== wait || armed) {
         // (carried over from where it is, if it has been anywhere yet: it is made at the eye itself)
         h0.from = h0.age > 0.05 ? { pos: h0.root.position.clone(), quat: h0.root.quaternion.clone() } : undefined;
         h0.fromT = 0;
@@ -3774,6 +3788,12 @@ export class Weapons {
         pos.lerpVectors(h.from.pos, pos, k);
         rot.setFromQuaternion(h.from.quat.clone().slerp(new THREE.Quaternion().setFromEuler(rot), k));
       }
+    } else if (h.kind === 'live') {
+      // A grenade with its pin out: up on the right in the one fist, and shaking the more the less of its fuse is left.
+      const k = THREE.MathUtils.clamp(t / Math.max(0.05, h.dur), 0, 1);
+      const s = THREE.MathUtils.lerp(LIVE.shake[0], LIVE.shake[1], k * k);
+      pos.set(LIVE.at[0] + Math.sin(t * 37) * s, LIVE.at[1] + Math.sin(t * 29 + 1) * s, LIVE.at[2] + Math.sin(t * 23 + 2) * s * 0.5);
+      rot.set(LIVE.turn[0], LIVE.turn[1], LIVE.turn[2] + Math.sin(t * 31) * s * 6);
     } else {
       pos.set(H.work[0], H.work[1] + sy * H.workBy[0] + Math.sin(t * 9) * 0.004, H.work[2] + sy * H.workBy[1]);
       rot.set(0.45, 0.25 + Math.sin(t * 4.5) * 0.05, 0);

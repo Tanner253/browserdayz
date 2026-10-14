@@ -27,7 +27,8 @@ const WORTH: Record<string, number> = {
   // what is worn and carried
   boonie_hat: 18, chest_rig: 6, soft_vest: 12, armor_vest: 18, life_vest: 22, heavy_armor: 32, gasmask: 30, helmet_m1: 9, work_gloves: 3, rubber_boots: 3, sack_pack: 8, camping_pack: 14, suitcase: 20,
   flashlight: 5, binoculars: 10, compass: 4, watch: 6, patrol_cap: 4, fishermans_hat: 4, garden_gloves: 2,
-  cigarettes: 2, grenade: 15, stash_kit: 15, old_suitcase: 8, black_bag: 3, jerrycan: 8, radio: 35,
+  // (the frag grenade he buys, half as dear again as the stick grenade, and does not sell: it is found, from Kamenka on)
+  cigarettes: 2, grenade: 15, frag: 22, stash_kit: 15, old_suitcase: 8, black_bag: 3, jerrycan: 8, radio: 35,
 };
 
 /** what he has to sell, in the order it is shown */

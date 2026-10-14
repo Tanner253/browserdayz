@@ -2,14 +2,20 @@
 // and goes off when its fuse runs out. Everyone is told where it left the hand and how fast
 // (see the 'nade' message), and every game flies it through the same world, so it lands in
 // the same place for all of them.
+//
+// Its fuse does not begin here: it runs from when its pin came out, in the hand (see `cook` in
+// game.ts and src/sim/grenades.ts), and what is flown here is what was left of it at the throw.
 
 import * as THREE from 'three';
 import { physics, SOLID_GROUPS } from '../core/physics';
 import type { Surface } from '../core/physics';
 import { audio } from '../core/audio';
+import { NADE } from '../sim/grenades';
 import type { ItemModels } from './loot';
 
 interface Flying {
+  /** which grenade it is: its item (the stick grenade, the frag) */
+  id: string;
   obj: THREE.Object3D;
   pos: THREE.Vector3;
   vel: THREE.Vector3;
@@ -24,23 +30,28 @@ const RADIUS = 0.06;
 
 export class Grenades {
   private list: Flying[] = [];
-  private template: THREE.Object3D | null = null;
-  /** it went off: where, and whether it was the local player's */
-  onExplode: (at: THREE.Vector3, mine: boolean) => void = () => {};
+  /** it went off: where, whether it was the local player's, and which grenade it was */
+  onExplode: (at: THREE.Vector3, mine: boolean, id: string) => void = () => {};
 
   constructor(private scene: THREE.Scene, private models: ItemModels) {}
 
+  /** (the stick grenade's model is had before anybody throws one; the frag's is fetched when one is first near, as any thing's is) */
   async preload() {
-    this.template = (await this.models.get('grenade')).group;
+    await this.models.get('grenade');
   }
 
-  /** @param fuse seconds until it goes off, counted from the throw */
-  throw(origin: THREE.Vector3, velocity: THREE.Vector3, fuse: number, mine: boolean) {
-    if (!this.template) return;
-    const obj = this.template.clone();
+  /**
+   * @param fuse seconds until it goes off: what is left of its fuse as it leaves the hand
+   * @param id which grenade (the stick grenade, where it is not said)
+   */
+  throw(origin: THREE.Vector3, velocity: THREE.Vector3, fuse: number, mine: boolean, id = 'grenade') {
+    // (It is in the air from this moment whether or not its model has come: whoever threw it has had it in the
+    // hand, and has the model; anybody else may see nothing of it for the moment its file takes.)
+    const obj = new THREE.Group();
     obj.position.copy(origin);
     this.scene.add(obj);
-    this.list.push({ obj, pos: origin.clone(), vel: velocity.clone(), spin: new THREE.Vector3(9, 3, 6), fuse, mine, resting: false });
+    void this.models.get(id).then((tpl) => obj.add(tpl.group.clone()), () => {});
+    this.list.push({ id, obj, pos: origin.clone(), vel: velocity.clone(), spin: new THREE.Vector3(9, 3, 6), fuse, mine, resting: false });
   }
 
   update(dt: number) {
@@ -50,7 +61,7 @@ export class Grenades {
       if (g.fuse <= 0) {
         g.obj.removeFromParent();
         this.list.splice(i, 1);
-        this.onExplode(g.pos.clone().setY(g.pos.y + 0.1), g.mine);
+        this.onExplode(g.pos.clone().setY(g.pos.y + 0.1), g.mine, g.id);
         continue;
       }
       if (g.resting) continue;
@@ -59,7 +70,7 @@ export class Grenades {
       while (left > 0 && !g.resting) {
         const h = Math.min(left, 1 / 120);
         left -= h;
-        g.vel.y -= 9.81 * h;
+        g.vel.y -= NADE.fall * h;
         const step = g.vel.clone().multiplyScalar(h);
         const len = step.length();
         if (len < 1e-6) break;
@@ -69,6 +80,8 @@ export class Grenades {
           const n = new THREE.Vector3(hit.normal.x, hit.normal.y, hit.normal.z);
           g.pos.addScaledVector(dir, Math.max(0, hit.toi - RADIUS));
           // off the surface: most of the speed along it kept, a third of the speed into it returned
+          // (it never comes off anything faster than it struck it: what the server believes of how far a grenade
+          // can have gone rests on that. See `travel` in src/sim/grenades.ts.)
           const into = g.vel.dot(n);
           const speed = g.vel.length();
           g.vel.addScaledVector(n, -into).multiplyScalar(0.62).addScaledVector(n, -into * 0.32);

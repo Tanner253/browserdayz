@@ -1629,7 +1629,8 @@ export class HUD {
     heading: number | null;
     /** carrying a compass: the heading is also given in degrees */
     bearing: boolean;
-    progress: { label: string; t: number } | null;
+    /** `hot`: it is a fuse running down and not a thing getting done (a grenade with its pin out): drawn as a warning */
+    progress: { label: string; t: number; hot?: boolean } | null;
     hotbar: HotbarEntry[];
     fps: number;
     ping: number | null;
@@ -1753,6 +1754,7 @@ export class HUD {
       this.toggle(e.progress, 'show', true);
       // (nothing under way yet: words and no bar)
       this.toggle(e.progress, 'idle', s.progress.t < 0);
+      this.toggle(e.progress, 'hot', !!s.progress.hot);
       this.set('plabel', e.progress.firstElementChild as HTMLElement, s.progress.label);
       ((e.progress.lastElementChild as HTMLElement).firstElementChild as HTMLElement).style.width = `${Math.min(100, s.progress.t * 100)}%`;
     } else this.toggle(e.progress, 'show', false);

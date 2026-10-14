@@ -34,7 +34,8 @@ const CIVILIAN: Table = [
 export const UNDER_GAS: Table = [
   // (the pistols and their rounds a good deal less than they were: the rifles below have their share)
   ['box_762', 3], ['box_9mm', 1.8], ['ammo_762', 1.5], ['ammo_9mm', 0.8], ['mosin', 1.4], ['m9', 0.7], ['colt', 0.4],
-  ['boonie_hat', 2], ['life_vest', 2], ['pu_scope', 1.6], ['grenade', 1.5], ['firstaid', 1.2], ['aid_pouch', 0.3], ['bandage', 1.5], ['stim', 1], ['stim_stamina', 0.7], ['stim_combat', 0.35], ['blood_bag', 0.7], ['saline', 0.5],
+  // (the frag grenade, 2026-10-13: where the stick grenade is, a third as often; in none of the army's cases, which are of the second step)
+  ['boonie_hat', 2], ['life_vest', 2], ['pu_scope', 1.6], ['grenade', 1.5], ['frag', 0.5], ['firstaid', 1.2], ['aid_pouch', 0.3], ['bandage', 1.5], ['stim', 1], ['stim_stamina', 0.7], ['stim_combat', 0.35], ['blood_bag', 0.7], ['saline', 0.5],
   ['suppressor_9', 0.8], ['box_45', 0.8], ['rifle_wrap', 0.6], ['binoculars', 0.4], ['condensed', 0.8], ['thermos', 0.8], ['suitcase', 0.4],
   ['red_dot', 0.6], ['gun_light', 0.6], ['suppressor_762', 0.5], ['mag_m9_ext', 0.4], ['flask', 0.5], ['keycard', 0.5],
   // (2026-10-10: the two assault rifles and what feeds them)
@@ -52,7 +53,7 @@ const IN_BUNKER: Table = [
   ['benelli', 1.5], ['ammo_12', 3.2], ['box_12', 2.2], ['suppressor_12', 0.9], ['red_dot', 1.1], ['gun_light', 1.1],
   ['mosin', 1.1], ['pu_scope', 1.5], ['suppressor_762', 0.9], ['box_762', 2.2], ['ammo_762', 1.2],
   ['m9', 0.9], ['mag_m9_ext', 0.7], ['suppressor_9', 0.7], ['box_9mm', 1.8], ['deagle', 1.2], ['ammo_50', 2], ['box_50', 1], ['mag_deagle_ext', 0.6],
-  ['grenade', 1.8], ['boonie_hat', 1.8], ['life_vest', 1.8], ['heavy_armor', 0.5], ['helmet_k63', 0.35], ['suitcase', 0.7], ['firstaid', 1.8], ['aid_pouch', 0.4], ['bandage', 2.2], ['stim', 1.3], ['stim_stamina', 1], ['stim_combat', 0.5], ['blood_bag', 1.1], ['saline', 0.7], ['splint', 0.8],
+  ['grenade', 1.8], ['frag', 0.7], ['boonie_hat', 1.8], ['life_vest', 1.8], ['heavy_armor', 0.5], ['helmet_k63', 0.35], ['suitcase', 0.7], ['firstaid', 1.8], ['aid_pouch', 0.4], ['bandage', 2.2], ['stim', 1.3], ['stim_stamina', 1], ['stim_combat', 0.5], ['blood_bag', 1.1], ['saline', 0.7], ['splint', 0.8],
   ['flashlight', 0.9], ['flask', 0.9], ['condensed', 0.8], ['thermos', 0.6], ['water_jug', 0.7], ['beans', 0.7], ['sardines', 0.6],
   // (2026-10-10: the two assault rifles, their big magazines and what is fitted to them)
   ['ar15', 1.1], ['mag_ar', 1.4], ['mag_ar_60', 0.6], ['box_556', 1.8], ['ammo_556', 1.2], ['suppressor_556', 0.6], ['foregrip', 0.7],

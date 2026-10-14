@@ -77,6 +77,8 @@ What is not CC0 is listed first, with the credit its licence asks for.
   Changes made: Only these of its shapes are used here, brought to the size of a room three metres high and stood on the ground; textures re-encoded as WebP; geometry compressed.
 - This work is based on "Autopsy Lab - Assets" (https://sketchfab.com/3d-models/autopsy-lab-assets-5ceaaa4482a84774b9922366cfb228e7) by SeverDoes3D (https://sketchfab.com/SeverDoes3D) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
   Changes made: Only these of its shapes are used here, stood on the ground; textures re-encoded as WebP; geometry compressed.
+- This work is based on "Frag Granade" (https://sketchfab.com/3d-models/frag-granade-e715224c90e34b949939adaca382cd0e) by MB_Cre8 (https://sketchfab.com/MB_Cre81) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+  Changes made: Scaled to life size (it came a quarter larger) and stood on the ground about its own middle; textures re-encoded as WebP at the size they came; geometry compressed.
 - "Uaz-469" (https://skfb.ly/6x8RE) by Yo.Ri is licensed under Creative Commons Attribution (http://creativecommons.org/licenses/by/4.0/).
   Changes made: Scaled to metres and turned to face the way the game drives; each wheel re-centred on its own middle; textures re-encoded as WebP; geometry compressed.
 - This work is based on "Police car" (https://sketchfab.com/3d-models/police-car-9166b13b6ae341f4bfc093edb71d74f4) by Mateusz Woliński (https://sketchfab.com/jeandiz) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
