@@ -117,7 +117,13 @@ export function buildRoad(world: World, atmo: Atmosphere, scene: THREE.Scene) {
   diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.08, 1.02, 0.92), smoothstep(0.55, 0.9, vEdge));
   // Snow lies on it where it lies on the ground beside it (the mountain road climbs over the snow line): all over
   // its edges, and thinner in the two tracks wheels have kept open, where the asphalt shows dark and wet.
-  float lies = snowLies(vRoadP);
+  // Along the lower edge of a snowy PLACE (src/world/snow.ts) the ground's own line is broken up over thirty or
+  // forty metres, by a pattern this shader has not got: reckoned by its own, the asphalt lay white through bare
+  // ground for the length of that belt. So there the road is the last thing the snow lies on, as a road is: it
+  // is reckoned a dozen metres lower than it stands (all that the ground's ragged line can take off), and is dark
+  // and wet through the belt and white where the ground about it is all white. Nothing of this where no place is.
+  vec2 roadPlace = snowPlace(vRoadP.xz);
+  float lies = snowLies(vRoadP + vec3(0.0, -12.0 * smoothstep(0.0, 10.0, roadPlace.x), 0.0));
   if (lies > 0.0) {
     float track = 1.0 - smoothstep(0.07, 0.2, abs(vEdge - 0.38) + (crumble - 0.5) * 0.08);
     float laid = lies * (1.0 - 0.72 * track * (1.0 - 0.6 * smoothstep(0.75, 1.0, lies)));
