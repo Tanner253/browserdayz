@@ -41,8 +41,8 @@ export function wagerQuery(): string | null {
 
 /**
  * Where the wager arena is (arena/server.ts, a service of its own): `?arena=` on the page, or VITE_ARENA_URL when
- * the site is built; on a development page its own host, which sends /arena on to the local arena (8090); else the
- * arena's Render address. '' is this page's own host.
+ * the site is built (set in Vercel); on a development page its own host, which sends /arena on to the local arena
+ * (8090); else the arena's Render address. '' is this page's own host.
  */
 export function arenaBase(): string {
   const env = (import.meta as { env?: { VITE_ARENA_URL?: string; DEV?: boolean } }).env;

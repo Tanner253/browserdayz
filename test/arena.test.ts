@@ -1,4 +1,4 @@
-// Wager matches (server/arena.ts): a lobby opened, listed and joined; the server judging every shot itself and
+// Wager matches (arena/match.ts, served by arena/server.ts): a lobby opened, listed and joined; the server judging every shot itself and
 // holding every health point; a round won when a side has nobody left standing, both set down again, and the match
 // over at the kills asked for. The real server is started on a port of its own.   npx tsx test/arena.test.ts
 import assert from 'node:assert/strict';

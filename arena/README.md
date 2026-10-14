@@ -12,16 +12,19 @@ to nothing but the games that come to it. No money moves yet: the stake is shown
 
 What both sides share is in `src/`: the rules (`src/sim/arena.ts`), the protocol (`src/net/protocol.ts`, the same
 `PROTOCOL` as the game server), and the map (`src/world/`). The game finds the arena at `?arena=` on the page,
-else `VITE_ARENA_URL` (set when the site is built), else `https://zona-arena.onrender.com`.
+else `VITE_ARENA_URL` (set in Vercel, Production, and read when the site is built), else `https://zona-arena.onrender.com`.
 
 ## Run it locally
 The launch entry `zona-arena-local` (port 8090), beside `zona-dev`: the dev page sends `/arena` to it. Open the menu's
 Wagers tab; a second player needs a second browser or a private window (one browser is one player).
 
 ## Deploy
-1. Render: New, Blueprint, this repository, Blueprint Path `arena/render.yaml`. It deploys from `main` (a push to
-   `main` is made only by `node scripts/deploy.mjs`, which also publishes the site).
-2. Vercel: `VITE_ARENA_URL` = the service's address (e.g. `https://zona-arena.onrender.com`), then deploy the site.
+1. Render: New, Blueprint, this repository, Blueprint Path `arena/render.yaml` (or a Web Service by hand with what
+   that file says: no root directory, build `npm ci --include=dev`, start `node --import tsx arena/server.ts`, health
+   check `/healthz`, `NODE_VERSION` 22). It deploys from `main` (a push to `main` is made only by
+   `node scripts/deploy.mjs`, which also publishes the site).
+2. Vercel: `VITE_ARENA_URL` = the service's `.onrender.com` address (Production; set 2026-10-14), then deploy the
+   site. Nothing else is set anywhere: the arena holds no keys (`ORIGINS` only to let in pages from elsewhere).
 On the free plan it sleeps after 15 minutes with nobody on it; the first page to ask wakes it (about a minute).
 
 Environment: `PORT` (Render sets it; 8090 otherwise), `ORIGINS` (hosts whose pages may connect, comma between, on
