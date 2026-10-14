@@ -468,6 +468,15 @@ class Impostors {
       this.all.push({ x: t.x, y: footY(t), z: t.z, s: t.scale, v: v.row, r: t.rot });
     }
     this.cells = new Cells(this.all.flatMap((t) => [t.x, t.y, t.z]), this.all.length, 64, this.all.map((t) => t.s));
+    // every card as it goes into the buffers, square by square (see `update`)
+    this.packPos = new Float32Array(this.all.length * 4);
+    this.packVar = new Float32Array(this.all.length);
+    this.all.forEach((_, j) => {
+      const t = this.all[this.cells.idx[j]];
+      this.packPos.set([t.x, t.y, t.z, t.s], j * 4);
+      this.packVar[j] = t.v;
+    });
+    this.order = new Int32Array(this.all.length + this.cells.w * this.cells.h);
     const quad = new THREE.PlaneGeometry(1, 1);
     quad.translate(0, 0.5, 0);
     this.geo = new THREE.InstancedBufferGeometry();
@@ -513,6 +522,11 @@ class Impostors {
 
   private sig = 0;
   private cells!: Cells;
+  /** the cards' places and kinds in the order of `cells.idx`: a square's are a run of them */
+  private packPos!: Float32Array;
+  private packVar!: Float32Array;
+  /** what a frame draws, in order: a square whole (~its number), or one card (its place in the packed lists) */
+  private order!: Int32Array;
 
   /** from how far off the cards are drawn (they come in between the two) */
   reach(from: number, full: number) {
@@ -520,17 +534,16 @@ class Impostors {
   }
 
   update(cam: THREE.Vector3, frustum: THREE.Frustum, near: number) {
-    let n = 0;
+    let n = 0, m = 0;
     let sig = 0;
-    const p = this.iPos.array as Float32Array;
-    const v = this.iVar.array as Float32Array;
-    const { all, cells } = this;
+    const { all, cells, order, packPos, packVar } = this;
     if (!cells) return;
-    // (square by square, see Cells: a square wholly out of view is passed over, one wholly in it needs no tree's own
-    // test of the view, nor of the eye's nearness when the whole square is past it)
+    // (Square by square, see Cells: a square wholly out of view is passed over, one wholly in it needs no tree's own
+    // test of the view, nor of the eye's nearness when the whole square is past it, and goes into the buffers whole.
+    // What is to be drawn is known before anything is written: standing still, nothing is.)
     for (let k = 0; k < cells.w * cells.h; k++) {
-      const e = cells.start[k + 1];
-      if (cells.start[k] === e) continue;
+      const s = cells.start[k], e = cells.start[k + 1];
+      if (s === e) continue;
       const b = k * 7, r = 14 * cells.box[b + 6];
       _box.min.set(cells.box[b] - r, cells.box[b + 2] + 8 - r, cells.box[b + 4] - r);
       _box.max.set(cells.box[b + 1] + r, cells.box[b + 3] + 8 + r, cells.box[b + 5] + r);
@@ -538,8 +551,14 @@ class Impostors {
       const inView = boxInside(frustum, _box);
       const dy = Math.max(cells.box[b + 2] - cam.y, 0, cam.y - cells.box[b + 3]);
       const past = cells.near2(k, cam.x, cam.z) + dy * dy >= near * near;
-      for (let j = cells.start[k]; j < e; j++) {
-        const i = cells.idx[j], t = all[i];
+      if (inView && past) {
+        order[m++] = ~k;
+        n += e - s;
+        sig = (Math.imul(sig, 31) + ~k) | 0;
+        continue;
+      }
+      for (let j = s; j < e; j++) {
+        const t = all[cells.idx[j]];
         // (the same measure the model fades by: from the eye to the foot of the tree)
         if (!past) {
           const dx = t.x - cam.x, dy = t.y - cam.y, dz = t.z - cam.z;
@@ -550,17 +569,30 @@ class Impostors {
           _sphere.radius = 14 * t.s;
           if (!frustum.intersectsSphere(_sphere)) continue;
         }
-        p[n * 4] = t.x;
-        p[n * 4 + 1] = t.y;
-        p[n * 4 + 2] = t.z;
-        p[n * 4 + 3] = t.s;
-        v[n] = t.v;
+        order[m++] = j;
         n++;
-        sig = (Math.imul(sig, 31) + i) | 0;
+        sig = (Math.imul(sig, 31) + j) | 0;
       }
     }
     // the same trees as last frame, in the same order: the buffers are already right
     if (sig === this.sig && n === this.geo.instanceCount) return;
+    const p = this.iPos.array as Float32Array, v = this.iVar.array as Float32Array;
+    let w = 0;
+    for (let q = 0; q < m; q++) {
+      const o = order[q];
+      if (o < 0) {
+        const s = cells.start[~o], e = cells.start[~o + 1];
+        p.set(packPos.subarray(s * 4, e * 4), w * 4);
+        v.set(packVar.subarray(s, e), w);
+        w += e - s;
+      } else {
+        p[w * 4] = packPos[o * 4];
+        p[w * 4 + 1] = packPos[o * 4 + 1];
+        p[w * 4 + 2] = packPos[o * 4 + 2];
+        p[w * 4 + 3] = packPos[o * 4 + 3];
+        v[w++] = packVar[o];
+      }
+    }
     this.sig = sig;
     this.geo.instanceCount = n;
     this.iPos.clearUpdateRanges();
