@@ -392,14 +392,23 @@ function page(book: Book, s: Snapshot, now: number): string {
       <div class="rule"><h3>What a tag pays</h3><p>${s.fives ? `${flat} SOL, flat: the same whatever the treasury holds.` : `${pct}% of what the treasury holds at the moment it is paid, and never less than ${amount(s.floor)} SOL.`} The treasury is filled by the coin's creator rewards on pump.fun, collected automatically.</p></div>${
         s.fives && N > 1
           ? `
-      <div class="rule"><h3>Paid when ${N} are due</h3><p>A wallet is paid when ${N} of its tags are due, and then for all that are due at once: ${lot} SOL for ${N}, in one transaction that leaves a receipt for each tag. Fewer than ${N} wait, counted, on one line of the ledger ("3 of ${N}"), for as long as it takes: no tag is lost for waiting. A tag that is not paid (over the ${s.walletDayTags} a day, or traded) does not count toward the ${N}.</p></div>`
+      <div class="rule"><h3>Paid when ${N} are due</h3><p>A wallet is paid when ${N} of its tags are due, and then for all that are due at once: ${lot} SOL for ${N}, in one transaction that leaves a receipt for each tag. Fewer than ${N} wait, counted, on one line of the ledger ("3 of ${N}"), for as long as it takes: no tag is lost for waiting. A tag that is not paid (over the ${s.rolling ? `${s.walletTags24} in 24 hours` : `${s.walletDayTags} a day`}, or traded) does not count toward the ${N}.</p></div>`
           : ''
       }
-      <div class="rule"><h3>${s.walletDayTags} tags a wallet, a day</h3><p>One wallet is paid for the first ${s.walletDayTags} tags it cashes in on a day (days are counted in UTC). One cashed in after those, that day, is listed and not paid: it does not wait for tomorrow. And no more than ${Math.round(s.dayShare * 100)}% of the treasury leaves it in one day: a tag over that waits, and is paid when there is room.</p></div>
+      ${
+        s.rolling
+          ? `<div class="rule"><h3>${s.walletTags24 === N && s.fives ? `One payout of ${N} a day` : `${s.walletTags24} tags a wallet, in any 24 hours`}</h3><p>One wallet is paid for no more than ${s.walletTags24} tags cashed in in any 24 hours${s.walletTags24 === N && s.fives ? `: one payment of ${N}, and no second one until 24 hours after the first of them was cashed in` : ''}. One cashed in over that is listed and not paid: it does not wait for later. And no more than`
+          : `<div class="rule"><h3>${s.walletDayTags} tags a wallet, a day</h3><p>One wallet is paid for the first ${s.walletDayTags} tags it cashes in on a day (days are counted in UTC). One cashed in after those, that day, is listed and not paid: it does not wait for tomorrow. And no more than`
+      } ${Math.round(s.dayShare * 100)}% of the treasury leaves it in one day: a tag over that waits, and is paid when there is room.</p></div>
       <div class="rule"><h3>Trading tags is not paid</h3><p>When two players cash each other's tags inside a day, the first of the two is paid and the second is not. Killing a friend and being killed back earns one tag between you, not two.</p></div>
       <div class="rule"><h3>Paid once, and the chain sees to it</h3><p>Each payment leaves a receipt, an account of its own, and a second payment for the same tag cannot be made while that receipt stands. Each payment also carries a note, "ZONA dog tag" and the reference shown beside it here.</p></div>
       <div class="rule"><h3>No wallet, no payment</h3><p>A tag cashed in with no wallet given is listed and not paid. The wallet is asked for in the game, on the rewards window: add it before you cash a tag in.</p></div>
-      <div class="rule"><h3>What changed on 13 October 2026</h3><p>The treasury was paying out half as much again as came in. From 04:30 UTC a tag pays ${amount(s.floor)} SOL at least (it was 0.02), the limit of ${s.walletDayTags} a day is a limit and not a queue, and traded tags are not paid. Everything cashed in before then ${from2 ? 'was paid as it was promised, until the list was cleared (below)' : 'is paid as it was promised'}.</p></div>${
+${
+        s.rules3From
+          ? `      <div class="rule"><h3>What changes on 14 October 2026</h3><p>From ${s.rules3From.slice(11, 16)} UTC the limit is ${s.walletTags24} tags a wallet in any 24 hours, where it was ${s.walletDayTags} a UTC day, which left nobody able to come to ${N} in one day. Whatever was cashed in before then is judged as it was.</p></div>
+`
+          : ''
+      }      <div class="rule"><h3>What changed on 13 October 2026</h3><p>The treasury was paying out half as much again as came in. From 04:30 UTC a tag pays ${amount(s.floor)} SOL at least (it was 0.02), the limit of ${s.walletDayTags} a day is a limit and not a queue, and traded tags are not paid. Everything cashed in before then ${from2 ? 'was paid as it was promised, until the list was cleared (below)' : 'is paid as it was promised'}.</p></div>${
         !from2
           ? ''
           : `
