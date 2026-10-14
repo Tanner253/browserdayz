@@ -6,7 +6,7 @@
 import { RNG, Simplex, hash2, clamp, lerp, smoothstep } from '../core/noise';
 import { BUNKER, bunkerAt, type Place } from '../sim/bunker';
 import { wreckUnder, type Bridge } from '../sim/bridge';
-import { CASTLE, CASTLE_SCALE, HOUSES, castleAt, castleCuts, castleFoot, castleLocal, castleLoose, squareTouches, type FortPlace, type Loose } from '../sim/castle';
+import { CASTLE, CASTLE_SCALE, HOUSES, castleAt, castleCuts, castleFoot, castleHides, castleLocal, castleLoose, castleOpen, squareTouches, type FortPlace, type Loose } from '../sim/castle';
 
 export const WORLD_SEED = 1337;
 /**
@@ -293,13 +293,26 @@ export const MOUNTAIN = {
       // the hatch of the sally port: on the hillside under the shelf's edge, south of the gate's line and clear of the track
       // (its steps go down into the hillside, toward the gate's line; its passage bends six metres short of the ramp's foot and never comes under the track)
       { kind: 'hatch', n: 0, x: 553.3, z: -342, rot: Math.PI - (35 * Math.PI) / 180 },
+      // THE CURVED WALL, the plan's own, which hid the hatch from the walls in the plan (there a house's gable did):
+      // stood between the hatch and the fort, its round toward the fort, four to five metres from the middle of the
+      // hatch's steps and three and a half from its kerb. By itself it hides whoever is at the head of the steps from
+      // the gate wall's parapet and the keep's roof; from the top of the south-east tower, eleven metres over it,
+      // two lines in five still went over it, and the firs by it (`firs`, below) stop those. Measured line by line
+      // (36 eyes on the tower's top, the two parapets and the keep's roof; a body before the head of the steps, at
+      // it and on its third step; at the knee, the belt and the head): seen on 117 lines of 333 with neither, on 43
+      // with the wall alone, on none with both (a fir reckoned as a cone eleven metres tall, 2.2 m out at its lowest boughs).
+      { kind: 'curved wall', n: 0, x: 562.41, z: -343.69, rot: -2.7751 },
       // the thin wall down the slope, where the plan has it: on the hillside south of the fort, from the shelf's flank down to the low ground
       { kind: 'long wall', n: 0, x: 543.1, z: -332.4, rot: (-35 * Math.PI) / 180 },
       // the seven teeth of rock that stood BEHIND the fort, where the plan has them (the sixth a few paces nearer the
       // fort, off the track). The thirteen about its front and its sides are not set down: the owner, 2026-10-13:
-      // "get rid of the rocks near the front". Nor is the curved wall that held the path up beside the made rock.
+      // "get rid of the rocks near the front". (The curved wall is set down again, above: not by the rock, which is not made, but by the hatch.)
       { kind: 'rock', n: 13, x: 530.4, z: -394, rot: 21.49 }, { kind: 'rock', n: 14, x: 516.3, z: -376, rot: 23.19 }, { kind: 'rock', n: 15, x: 520.1, z: -388.7, rot: 24.89 }, { kind: 'rock', n: 16, x: 519.1, z: -396.7, rot: 26.59 }, { kind: 'rock', n: 17, x: 508.7, z: -387.1, rot: 28.29 }, { kind: 'rock', n: 18, x: 513.5, z: -391.5, rot: 29.99 }, { kind: 'rock', n: 19, x: 501.8, z: -397.1, rot: 31.69 },
     ] as Loose[],
+    // The firs by the curved wall, on the fort's side of the hatch: a clump such as the hillside has all about, left
+    // standing where the ground round the fort was cleared ([x, z, which pine, how big]). They are what hides the
+    // head of the hatch's steps from the top of the south-east tower: see the curved wall, above.
+    firs: [[549.8, -344.6, 'pine_a', 1.18], [550.4, -346.8, 'pine_c', 1.05], [549.3, -342.5, 'pine_b', 1.1], [551.8, -349.5, 'pine_d', 1.2]] as [number, number, string, number][],
   },
   foot: { line: [] as [number, number][] },
   // (2026-10-13: it follows the fort, which stands forty metres further east than it did: on the bench behind it still, north-west of its back wall)
@@ -812,6 +825,36 @@ export function heightAt(heights: Float32Array, x: number, z: number): number {
   const h11 = heights[idx(ix + 1, iz + 1)];
   if (fx + fz <= 1) return h00 + (h10 - h00) * fx + (h01 - h00) * fz;
   return h11 + (h01 - h11) * (1 - fx) + (h10 - h11) * (1 - fz);
+}
+
+/**
+ * THE GROUND AS IT IS DRAWN. `heights` is the ground a body stands on, let down where the fort's passage runs under
+ * it; drawn as that, the cut was a trench with a second sheet of earth laid over it by the fort ("the ground also
+ * has overlapping textures and physics because of the tunnel under ground"). So whoever draws the ground draws
+ * this instead: every corner at `heights`, but those of the squares the fort was told of (`FortLid`), which are
+ * drawn where the ground was before the cut: one sheet, the ground's own, with its own snow and paint. And of
+ * each square of the net (by the number of its lowest corner) whether it is NOT drawn:
+ *   1  a hatch's stairwell opens in it: the fort draws it, round the well;
+ *   2  it is wholly under the fort's own stone, between a corner drawn where the ground was and the cut: it would
+ *      slant down across the passage where that goes through the wall's foot, and nobody could see it but there.
+ * `open` is null, and `heights` the world's own, in a world with nothing cut. (The bunker's roof is not this: it
+ * is the bunker's own, drawn by the bunker over ground that is drawn as it is cut.)
+ */
+export function seenGround(world: World): { heights: Float32Array; open: Uint8Array | null } {
+  const lid = world.castle?.lid, N = WORLD_RES, half = WORLD_SIZE / 2;
+  if (!lid || !lid.squares.length) return { heights: world.heights, open: null };
+  const heights = world.heights.slice(), open = new Uint8Array(N * N), told = new Set<number>();
+  for (const s of lid.squares) {
+    const k = idx(Math.round((s.x + half) / CELL), Math.round((s.z + half) / CELL));
+    told.add(k);
+    if (s.open) open[k] = 1;
+    for (const i of [k, k + 1, k + N, k + N + 1]) heights[i] = world.surface[i];
+  }
+  for (const k of told) for (const i of [k, k + 1, k + N, k + N + 1]) {
+    if (heights[i] === world.heights[i]) continue;
+    for (const q of [i, i - 1, i - N, i - N - 1]) if (!told.has(q)) open[q] = 2;
+  }
+  return { heights, open };
 }
 
 export function slopeAt(heights: Float32Array, x: number, z: number): number {
@@ -3290,6 +3333,8 @@ export function generateWorld(seed = WORLD_SEED): World {
           }
         }
       }
+      // (the firs by the hatch: set down after the ground round the fort was cleared, which would have taken them; last of the trees)
+      F.firs.forEach(([x, z, kind, scale], k) => void trees.push({ kind, x, y: heightAt(heights, x, z), z, rot: 0.9 + k * 2.1, scale }));
       // What is set down about the place. A row of numbers of its own, the same every time: nothing else on the map
       // is told off differently for it.
       {
@@ -3322,17 +3367,40 @@ export function generateWorld(seed = WORLD_SEED): World {
       // not in the cut). The ground the fort is told of (`surface`, where the lid lies) is the ground as all of that
       // left it.
       {
-        const asItIs = heights.slice();
+        const asItIs = heights.slice(), down = new Set<number>();
         for (const cut of castleCuts(fort, (x, z) => heightAt(asItIs, x, z))) {
           const xs = cut.well.map((q) => q[0]), zs = cut.well.map((q) => q[1]);
           for (let iz = Math.floor((Math.min(...zs) + half) / CELL); iz <= Math.floor((Math.max(...zs) + half) / CELL); iz++)
             for (let ix = Math.floor((Math.min(...xs) + half) / CELL); ix <= Math.floor((Math.max(...xs) + half) / CELL); ix++) {
               if (!squareTouches(cut.well, -half + ix * CELL, -half + iz * CELL, CELL)) continue;
               for (const i of [idx(ix, iz), idx(ix + 1, iz), idx(ix, iz + 1), idx(ix + 1, iz + 1)]) {
-                if (heights[i] > cut.to && surface) surface[i] = asItIs[i];
+                if (heights[i] > cut.to && surface) {
+                  surface[i] = asItIs[i];
+                  down.add(i);
+                }
                 heights[i] = Math.min(heights[i], cut.to);
               }
             }
+        }
+        // WHAT IS SEEN AND STOOD ON WHERE IT WAS LET DOWN IS THE GROUND ITSELF (`FortLid`, in the fort's own file;
+        // `seenGround`, below). Every square with a corner that was let down is told to the fort, but those wholly
+        // under its own stone: asked at the square's corners and at a few spots within it, at the height the ground
+        // had. (And the ground the fort is told of is exactly the ground as it was at every corner of every such
+        // square, not only at the corners let down: where the mountain's shaping moved a corner by under two
+        // centimetres it was not told to `surface`, and a lid laid by one height over ground drawn by the other is
+        // two surfaces again.)
+        if (surface && down.size) {
+          const wells = castleOpen(fort), squares: { x: number; z: number; open: boolean; low: number }[] = [], had = new Set<number>();
+          for (const i of [...down].sort((a, b) => a - b)) for (const k of [i, i - 1, i - N, i - N - 1]) {
+            if (had.has(k)) continue;
+            had.add(k);
+            for (const c of [k, k + 1, k + N, k + N + 1]) if (!down.has(c)) surface[c] = asItIs[c];
+            const x = -half + (k % N) * CELL, z = -half + Math.floor(k / N) * CELL;
+            let seen = false;
+            for (let a = 0; a <= 4 && !seen; a++) for (let b = 0; b <= 4 && !seen; b++) seen = !castleHides(fort, x + (a * CELL) / 4, heightAt(asItIs, x + (a * CELL) / 4, z + (b * CELL) / 4), z + (b * CELL) / 4);
+            if (seen) squares.push({ x, z, open: wells.some((w) => squareTouches(w, x, z, CELL)), low: Math.min(heights[k], heights[k + 1], heights[k + N], heights[k + N + 1]) });
+          }
+          fort.lid = { cell: CELL, squares };
         }
       }
       // (a lesser road: a street's asphalt, which lies under the edge of the pass road's where it leaves it and breaks up where it stops)

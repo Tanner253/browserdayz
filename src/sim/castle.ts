@@ -154,7 +154,7 @@ export interface Opening { u0: number; u1: number; y0: number; y1: number; arch?
  * somebody walking it), from `y0` up to `top` (one height, or one for each of so many equal lengths of it, which
  * is a broken top), with openings said by how far along it they are.
  */
-export interface Wall extends Common { t: 'wall'; a: [number, number]; b: [number, number]; y0: number; top: number | number[]; thick: number; openings?: Opening[]; /** it stands over a way (its foot is in the air): its underside is seen, and is made. A wall that stands on something has none. */ soffit?: boolean }
+export interface Wall extends Common { t: 'wall'; a: [number, number]; b: [number, number]; y0: number; top: number | number[]; thick: number; openings?: Opening[]; /** it stands over a way (its foot is in the air): its underside is seen, and is made. A wall that stands on something has none. */ soffit?: boolean; /** what stops a body follows every step of its top, not only the big ones: a low wall that somebody steps over at its low end (a hatch's kerb) */ stepped?: boolean }
 /** a wall that leans: its face only, from the line `a` to `b` at the terrace down to `y0`, out by a metre for every `lean` down */
 /** (`sag`: a length of it that has fallen out, from so far along it to so far, down to this height) */
 export interface Curtain extends Common { t: 'curtain'; a: [number, number]; b: [number, number]; y0: number; lean: number; sag?: [number, number, number] }
@@ -196,7 +196,12 @@ export interface Lump extends Common { t: 'lump'; x: number; y: number; z: numbe
  * pieces of the plan in `wells` (each its corners [x, z], in order round it) and outside the fort's own walls,
  * lying as the ground lay; and none of it over `hole`, which is open to the sky (a stairwell).
  */
-export interface Apron extends Common { t: 'apron'; wells: [number, number][][]; hole: [number, number][]; reach: number }
+/**
+ * (`ways`: what is built under that ground and is a place to be, each by its plan and by the top of what is built
+ * there, its roof: on a world's own net the earth under the ground is solid everywhere else, down past the cut,
+ * and over each of these it is solid down to that top. See `FortLid`.)
+ */
+export interface Apron extends Common { t: 'apron'; wells: [number, number][][]; hole: [number, number][]; reach: number; ways?: { well: [number, number][]; top: number }[] }
 export type Part = Box | Slab | Beam | Rail | Flight | Wall | Curtain | Tower | Mound | Lump | Apron | Vault;
 
 // ------------------------------------------------------------------ where it is
@@ -1149,8 +1154,11 @@ export function hatchWells(l: { x: number; z: number; rot?: number }, g: number)
   return out;
 }
 
-/** @param g the ground where the piece stands, over the terrace (asked for the hatch, whose passage is made to its depth: the others stand on the ground piece by piece) */
-export function looseParts(l: Loose, g = castleGround(l.x, l.z)): Part[] {
+/**
+ * @param g the ground where the piece stands, over the terrace (asked for the hatch, whose passage is made to its depth: the others stand on the ground piece by piece)
+ * @param ground the ground at any spot, over the terrace (asked for the hatch, whose kerb stands on the ground all round its well): unsaid, level with `g`
+ */
+export function looseParts(l: Loose, g = castleGround(l.x, l.z), ground?: (x: number, z: number) => number): Part[] {
   const parts: Part[] = [], c = Math.cos(l.rot), s = Math.sin(l.rot);
   if (l.kind === 'hatch') {
     // A storm cellar's doorway: a low kerb of stone round a flight of steps into the ground, two leaves of boards
@@ -1177,15 +1185,35 @@ export function looseParts(l: Loose, g = castleGround(l.x, l.z)): Part[] {
     };
     const far = (side: number): V3 => [L.foot[0] + L.d[0] * reach(side), g, L.foot[2] + L.d[1] * reach(side)];
     // (of the passage's own rough stone, all of it: two stuffs are each bent their own way, and where a cheek of one met a wall of the other edge to edge a gap opened between them, a finger wide here and a hand there)
-    for (const side of [-1, 1]) parts.push({ t: 'wall', paint: 'base', tone: 0.92, name: 'hatch kerb', a: flat(side > 0 ? L.head : far(side), side * (w + 0.15)), b: flat(side > 0 ? far(side) : L.head, side * (w + 0.15)), y0: g - H.drop - 0.3, top: (side > 0 ? [0.14, 0.3, 0.46, 0.62, 0.78] : [0.78, 0.62, 0.46, 0.3, 0.14]).map((t) => g + t), thick: 0.3 });
-    parts.push({ t: 'wall', paint: 'base', tone: 0.92, name: 'hatch kerb', a: flat(back, w), b: flat(back, -w), y0: g - H.drop + H.tall, top: g + 0.8, thick: 0.3, soffit: true });
-    // the leaf that was thrown back, lying on the ground beside it; and the one that fell in, on the steps
+    // THE KERB HOLDS THE HILL BACK ALL ROUND. A hatch may be set down on a hillside with its steps going down into
+    // the rise (the world's is: the ground is two metres higher at the back of its well than at the head of its
+    // steps). A kerb as high as the ground at the hatch's own middle then stood a metre and more under the ground
+    // at the back, and between its top and the edge of the ground there was nothing: a dark slot round the well
+    // (seen, 2026-10-13). So each length of each cheek, and the wall across the back, stands on the ground AS IT IS
+    // WHERE THAT LENGTH IS: a foot over the highest of it at the head of the steps, knee high at the back.
+    // (in ten lengths to a cheek, each half a pace: in five, on a hill, each stood near half a metre over the last)
+    const gAt = (q: [number, number]) => (ground ? ground(q[0], q[1]) : g), RISE = [0.32, 0.32, 0.32, 0.32, 0.39, 0.46, 0.54, 0.62, 0.7, 0.78];
+    for (const side of [-1, 1]) {
+      const a = flat(side > 0 ? L.head : far(side), side * (w + 0.15)), b = flat(side > 0 ? far(side) : L.head, side * (w + 0.15)), up = side > 0 ? RISE : [...RISE].reverse();
+      const top = up.map((t, k) => Math.max(...[0, 0.5, 1].map((f) => gAt([a[0] + ((b[0] - a[0]) * (k + f)) / up.length, a[1] + ((b[1] - a[1]) * (k + f)) / up.length]))) + t);
+      parts.push({ t: 'wall', paint: 'base', tone: 0.92, name: 'hatch kerb', a, b, y0: g - H.drop - 0.3, top, thick: 0.3, stepped: true });
+    }
+    parts.push({ t: 'wall', paint: 'base', tone: 0.92, name: 'hatch kerb', a: flat(back, w), b: flat(back, -w), y0: g - H.drop + H.tall, top: Math.max(gAt(flat(back, w)), gAt(flat(back, 0)), gAt(flat(back, -w))) + 0.8, thick: 0.3, soffit: true });
+    // the leaf that was thrown back, lying on the ground beside it (as the ground lies there); and the one that fell in, on the steps
     const mid: V3 = [(L.head[0] + L.foot[0]) / 2, g, (L.head[2] + L.foot[2]) / 2];
-    parts.push({ t: 'slab', paint: 'timber', tone: 0.8, body: 'none', name: 'hatch leaf', p: [at(L.head, w + 0.45, 0.1), at(back, w + 0.45, 0.16), at(back, w + 1.15, 0.07), at(L.head, w + 1.15, 0.05)], thick: 0.05 });
+    const lie = (p: V3, across: number, up: number): V3 => [flat(p, across)[0], gAt(flat(p, across)) + up, flat(p, across)[1]];
+    parts.push({ t: 'slab', paint: 'timber', tone: 0.8, body: 'none', name: 'hatch leaf', p: [lie(L.head, w + 0.45, 0.1), lie(back, w + 0.45, 0.16), lie(back, w + 1.15, 0.07), lie(L.head, w + 1.15, 0.05)], thick: 0.05 });
     parts.push({ t: 'slab', paint: 'timber', tone: 0.75, body: 'none', name: 'hatch leaf', p: [at(mid, -w + 0.05, -H.drop / 2 + 0.2), at(L.foot, -w + 0.08, 0.22), at(L.foot, -0.05, 0.4), at(mid, 0.02, -H.drop / 2 + 0.38)], thick: 0.05 });
     // the ground's own earth, laid over everything the world cuts for it (the stairwell, and a strip along the
     // passage: ground cannot be walked under where it has been walked through): it lies as the ground lay
-    parts.push({ t: 'apron', paint: 'earth', name: 'hatch apron', wells: [shaftWell(), ...hatchWells(l, g).map((q) => q.well)], hole: hatchWell(l, g), reach: H.lid });
+    // (and what of the passage the earth must keep out of: each straight length of it out to the outer faces of its
+    // walls and a hand more, as far past each end as its walls go round a bend, and up to the top of its roof)
+    const ways = L.path.slice(0, -1).map((a0, k) => {
+      const b0 = L.path[k + 1], len = Math.hypot(b0[0] - a0[0], b0[2] - a0[2]), e = [(b0[0] - a0[0]) / len, (b0[2] - a0[2]) / len], m = w + 0.3;
+      const by = (q: V3, along: number, across: number): [number, number] => [q[0] + e[0] * along + e[1] * across, q[2] + e[1] * along - e[0] * across];
+      return { well: [by(a0, -m, -m), by(b0, m, -m), by(b0, m, m), by(a0, -m, m)], top: Math.max(a0[1], b0[1]) + H.tall + 0.32 };
+    });
+    parts.push({ t: 'apron', paint: 'earth', name: 'hatch apron', wells: [shaftWell(), ...hatchWells(l, g).map((q) => q.well)], hole: hatchWell(l, g), reach: H.lid, ways });
     // the passage: a floor, a roof and two walls to each straight length of it, from the foot of the steps to the stair under the fort
     const o = { paint: 'base' as Paint, roofed: true, tone: 0.8 };
     for (const [x, z, y] of passageLamps(L)) parts.push(...cresset(x, z, y, 0).map((q) => ({ ...q, roofed: true })));
@@ -1425,8 +1453,47 @@ export function squareTouches(well: [number, number][], x: number, z: number, si
  *   before – the open ground before its gate, where the garrison's dead stand ([x, z] in the world). Unsaid, the plan's.
  *   rock   – false: the ramp lands on ground of the land's own, and the rock it leaves from in the plan is not made
  *            (the owner, 2026-10-13: "get rid of the rocks near the front draw bridge ... make our own terrain").
+ *   lid    – what its cuts left of the ground's own net (see `FortLid`). Unsaid: the fort lays earth of its own
+ *            over what is cut, on squares of its own measure (the fort's own page, whose ground is laid square to it).
  */
-export type FortPlace = Place & { loose?: Loose[]; before?: [number, number]; rock?: boolean };
+export type FortPlace = Place & { loose?: Loose[]; before?: [number, number]; rock?: boolean; lid?: FortLid };
+
+/**
+ * ONE GROUND OVER WHAT IS CUT (the owner, 2026-10-13: "the ground also has overlapping textures and physics because
+ * of the tunnel under ground"). The ground is let down under the fort's passage (`castleCuts`), and something must
+ * be seen and stood on where it was. That is the ground ITSELF, on its own net: whoever draws the ground draws
+ * every square listed here at the height it had (`seenGround`, in the world's generator), with the ground's own
+ * snow, paint and grass, and the fort lays nothing over it. What the fort adds is only what the ground cannot do:
+ *   - under each square listed, what stops a body: the ground's collider is a skin that is let down there, so the
+ *     fort stands earth under each half of the square, its top exactly where the ground is drawn. SOLID EARTH: down
+ *     past the cut (`low`: the lowest any corner of the square was let down to), so that there is no room under the
+ *     ground that is not a room of the plan (measured, 2026-10-13: 92 m2 of standing room between a thin lid and
+ *     the cut ground, beside the passage); and over the passage itself, down to the top of its roof;
+ *   - in a square that is `open` (a hatch's stairwell opens in it), the ground draws nothing and the fort draws the
+ *     square round the well, on the ground's own corners and cut corner to corner as the ground is.
+ * `squares`: every square of the net (its lowest corner [x, z] in the world, `cell` metres a side) that has a corner
+ * that was let down and is not wholly under the fort's own stone (`castleHides`).
+ */
+export interface FortLid { cell: number; squares: { x: number; z: number; open: boolean; low: number }[] }
+
+/**
+ * Whether a spot of the ground is under the fort's own stone or inside its walls, where nobody sees the ground:
+ * within the outer faces of its walls (which lean: the face as it is at the height the ground has there; under
+ * the kit's wall, the footing's) or of a tower's foot. A hand's breadth short of the face: what lies in the face
+ * itself counts as seen.
+ * @param wy how high the ground is there
+ */
+export function castleHides(p: Place, wx: number, wy: number, wz: number): boolean {
+  const [x, z, y] = castleLocal(p, wx, wy, wz), C = CASTLE, SEEN = 0.12;
+  const out = y < -KIT_LEVELS.walk ? WALL.out + 0.12 : Math.min(WALL.out, Math.max(0, -y) / C.lean);
+  if (Math.abs(x) < C.hx + C.parapet.thick / 2 + out - SEEN && Math.abs(z) < C.hz + C.parapet.thick / 2 + out - SEEN) return true;
+  return Math.hypot(Math.abs(x) - C.hx, Math.abs(z) - C.hz) < towerRadius(y) - SEEN;
+}
+
+/** Each hatch's stairwell as a hole in the world's ground: its four corners [x, z], in order round it, kerb and all. (Open to the sky: nothing of the ground is drawn or stood on over it.) */
+export function castleOpen(p: FortPlace, loose?: Loose[]): [number, number][][] {
+  return looseLocal(p, loose ?? castleLoose(p)).filter((l) => l.kind === 'hatch').map((l) => hatchWell(l, 0).map(([x, z]): [number, number] => [castleAt(p, x, z)[0], castleAt(p, x, z)[2]]));
+}
 
 /**
  * How far outside the fort's foot a spot of the world is, in metres (nothing or less: under it). Its foot is all

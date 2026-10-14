@@ -13,11 +13,11 @@
 // at the top, to within a twelfth.
 
 import { clipOut, cutPoly, inCut, kitBlocks, kitMatrix, kitPoint, kitSolids, KIT_TOWER } from '../sim/kit';
-import { CASTLE, LOOSE, UNDER, body, castleGround, castleKit, castleParts, hatchLine, looseParts, moundTop, rough, towerRadius, type Apron, type Beam, type Body, type Box, type Vault, type Curtain, type Flight, type Loose, type Lump, type Mound, type Opening, type Paint, type Part, type Rail, type Slab, type Tower, type V3, type Wall } from '../sim/castle';
+import { CASTLE, CASTLE_SCALE, LOOSE, UNDER, body, castleAt, castleGround, castleKit, castleLocal, castleLoose, castleParts, hatchLine, looseLocal, looseParts, moundTop, rough, towerRadius, type FortPlace, type GroundAt, type Apron, type Beam, type Body, type Box, type Vault, type Curtain, type Flight, type Loose, type Lump, type Mound, type Opening, type Paint, type Part, type Rail, type Slab, type Tower, type V3, type Wall } from '../sim/castle';
 
 export type Quat = [number, number, number, number];
-/** what a thing sounds like underfoot and when it is hit */
-export type Surf = 'rock' | 'concrete' | 'wood' | 'metal';
+/** what a thing sounds like underfoot and when it is hit ('grass': it is the world's own ground, which says for itself what it is at each spot: the slabs under ground that was cut) */
+export type Surf = 'rock' | 'concrete' | 'wood' | 'metal' | 'grass';
 /**
  * What stops a body: a block (its middle, half its size each way, how it is turned), a shape drawn tight round
  * some points, or ground given as heights on a grid (`heights[iz * (nx + 1) + ix]`). `feet`: it stops a body and
@@ -571,7 +571,10 @@ function wallPart(w: Wall, o: Out, core: Out, put: Put, lod: number) {
 
   // ---- what stops a body: a block for each length between its openings and the steps of its top
   const hard = new Set<number>([0, L]);
-  for (let k = 1; k < tops.length; k++) if (Math.abs(tops[k] - tops[k - 1]) > 0.25) hard.add((k * L) / tops.length);
+  // (a low kerb's steps are each a block of their own, a hand under what it is said to be: its stones are drawn up to
+  // a fifth of a metre short of that, and one block as high as its highest step stopped a body in the air over its
+  // low end: measured at the hatch, 2026-10-13, a flat top 0.5 m over the drawn one)
+  for (let k = 1; k < tops.length; k++) if (w.stepped || Math.abs(tops[k] - tops[k - 1]) > 0.25) hard.add((k * L) / tops.length);
   for (const p of ops) hard.add(p.u0).add(p.u1);
   const hs = sorted(hard, 0.01);
   for (let i = 0; i + 1 < hs.length; i++) {
@@ -579,6 +582,7 @@ function wallPart(w: Wall, o: Out, core: Out, put: Put, lod: number) {
     // (over a length whose top is all at about one height: the highest of it)
     let top = -Infinity;
     for (let k = 0; k < tops.length; k++) if (((k + 1) * L) / tops.length > u0 + 0.01 && (k * L) / tops.length < u1 - 0.01) top = Math.max(top, tops[k]);
+    if (w.stepped) top -= 0.1;
     const spans: [number, number][] = [];
     let lo0 = w.y0;
     for (const p of opsAt(mid)) {
@@ -793,6 +797,95 @@ function apronPart(p: Apron, o: Out, put: Put, ground: (x: number, z: number) =>
     for (const tri of across) for (const piece of clipOut(tri.map((k): V3 => [c[k][0], 0, c[k][2]]), hole)) {
       const pts = piece.map((v): V3 => [v[0], ground(v[0], v[2]) + 0.03, v[2]]), faces = pts.map((v) => lean(v[0], v[2]));
       for (let k = 1; k + 1 < pts.length; k++) o.tri([pts[0], pts[k], pts[k + 1]], [pts[0], pts[k], pts[k + 1]].map((v): UV => [v[0], v[2]]), UP, p.tone ?? 1, [faces[0], faces[k], faces[k + 1]]);
+    }
+  }
+}
+
+/**
+ * The squares of a world's own net that the fort's cuts left to it (`FortLid` in the fort's own file), in the
+ * fort's own measure: how long a square's side is, which way the net's two ways run ([x, z], each a metre long),
+ * and each square by its lowest corner, with how far under the terrace the lowest of its corners was let down to.
+ */
+export interface LidNet { cell: number; ex: [number, number]; ez: [number, number]; squares: { x: number; z: number; open: boolean; low: number }[] }
+
+/**
+ * THE SAME where a world has stood the fort, whose ground draws itself over what was cut (`seenGround`, in the
+ * world's generator): nothing is laid over the ground at all. Under each half of each square the fort was told of,
+ * cut corner to corner as the ground is, earth stops a body: its top is the ground as it is drawn there, to the
+ * hair, and it is the ground to whoever treads on it or shoots at it. It is solid down past the cut: nothing is
+ * left hollow under the ground but the stairwell (open to the sky: no earth over it at all) and the passage, over
+ * each length of which the earth comes down to the top of its roof. And only in the squares a stairwell opens in,
+ * which the ground does not draw, the square is drawn here round the well: on the ground's own corners, in the
+ * ground's own two triangles, each corner facing as the ground's corner does (by the heights of the four next to
+ * it), so that it is the ground's own square with a hole in it.
+ */
+function lidPart(p: Apron, o: Out, put: Put, ground: (x: number, z: number) => number, net: LidNet) {
+  const S = net.cell, [ux, uz] = net.ex, [vx, vz] = net.ez;
+  /** what is hollow under the ground: the well first (`top` unsaid: open to the sky), then each length of the passage */
+  const hollow = [{ plan: p.hole, cut: cutPoly(p.hole, -1e3, 1e3), top: undefined as number | undefined }, ...(p.ways ?? []).map((w) => ({ plan: w.well, cut: cutPoly(w.well, -1e3, 1e3), top: w.top as number | undefined }))];
+  // (a corner of the net: where it is, and after that how much of each corner of its triangle a spot is, which is carried along as the triangle is cut)
+  const at = (x: number, z: number, k: number): number[] => [x, ground(x, z), z, k === 0 ? 1 : 0, k === 1 ? 1 : 0, k === 2 ? 1 : 0];
+  const faces = (x: number, z: number): V3 => {
+    const a = ground(x - ux * S, z - uz * S) - ground(x + ux * S, z + uz * S), b = ground(x - vx * S, z - vz * S) - ground(x + vx * S, z + vz * S);
+    return unit([a * ux + b * vx, 2 * S, a * uz + b * vz]);
+  };
+  /** whether a triangle and a piece of the plan have anything in common (two shapes with no dent are apart only if some side of one has all of the other beyond it) */
+  const meets = (tri: number[][], plan: [number, number][]) => {
+    const a = tri.map((v): [number, number] => [v[0], v[2]]);
+    for (const [m, n] of [[a, plan], [plan, a]]) for (let k = 0; k < m.length; k++) {
+      const [px, pz] = m[k], [qx, qz] = m[(k + 1) % m.length], nx = qz - pz, nz = px - qx;
+      const side = (pts: [number, number][]) => pts.map(([x, z]) => (x - px) * nx + (z - pz) * nz), own = side(m), other = side(n);
+      if (Math.max(...own) <= 1e-9 ? Math.min(...other) > 1e-9 : Math.max(...other) < -1e-9) return false;
+    }
+    return true;
+  };
+  /** what of a flat piece is in a cut (`clipOut` gives what is out of it) */
+  const within = (poly: number[][], planes: [number, number, number, number][]) => {
+    let rest = poly;
+    for (const [nx, ny, nz, d] of planes) {
+      const side = rest.map((v) => nx * v[0] + ny * v[1] + nz * v[2] - d), into: number[][] = [];
+      for (let i = 0; i < rest.length; i++) {
+        const a = rest[i], b = rest[(i + 1) % rest.length], sa = side[i], sb = side[(i + 1) % rest.length];
+        if (sa <= 0) into.push(a);
+        if (sa > 0 !== sb > 0) into.push(a.map((v, k) => v + ((b[k] - v) * sa) / (sa - sb)));
+      }
+      rest = into;
+      if (rest.length < 3) return [];
+    }
+    return rest;
+  };
+  /** earth under a piece of the ground, from the ground down to `to` (never thinner than a hand) */
+  const earth = (piece: number[][], to: number) => {
+    // (a sliver no wider than a finger is nothing to stand on, and no shape to draw tight round)
+    let twice = 0;
+    for (let k = 1; k + 1 < piece.length; k++) twice += Math.abs((piece[k][0] - piece[0][0]) * (piece[k + 1][2] - piece[0][2]) - (piece[k + 1][0] - piece[0][0]) * (piece[k][2] - piece[0][2]));
+    if (twice < 2e-3) return;
+    const foot = Math.min(to, Math.min(...piece.map((v) => v[1])) - 0.1);
+    put({ t: 'hull', pts: [...piece.map((v) => [v[0], v[1], v[2]]), ...piece.map((v) => [v[0], foot, v[2]])].flat(), feet: false, surface: 'grass', name: p.name ?? 'apron' });
+  };
+  for (const s of net.squares) {
+    const xz = [[s.x, s.z], [s.x + ux * S, s.z + uz * S], [s.x + vx * S, s.z + vz * S], [s.x + (ux + vx) * S, s.z + (uz + vz) * S]];
+    for (const tri of [[0, 2, 1], [1, 2, 3]]) {
+      const t = tri.map((c, k) => at(xz[c][0], xz[c][1], k));
+      // ---- what stops a body: solid, but over what is hollow
+      let solid: number[][][] = [t];
+      for (const h of hollow) {
+        if (!meets(t, h.plan)) continue;
+        const next: number[][][] = [];
+        for (const piece of solid) {
+          next.push(...clipOut(piece, h.cut));
+          if (h.top !== undefined) earth(within(piece, h.cut.planes), h.top);
+        }
+        solid = next;
+      }
+      for (const piece of solid) earth(piece, s.low - 0.3);
+      // ---- what is seen: only where the ground does not draw itself, and all of the square but the well
+      if (!s.open) continue;
+      const face = t.map((v) => faces(v[0], v[2]));
+      for (const piece of meets(t, p.hole) ? clipOut(t, hollow[0].cut) : [t]) {
+        const pts = piece.map((v): V3 => [v[0], v[1], v[2]]), n = piece.map((v) => unit(add(add(mul(face[0], v[3]), mul(face[1], v[4])), mul(face[2], v[5]))));
+        for (let k = 1; k + 1 < pts.length; k++) o.tri([pts[0], pts[k], pts[k + 1]], [pts[0], pts[k], pts[k + 1]].map((v): UV => [v[0], v[2]]), UP, p.tone ?? 1, [n[0], n[k], n[k + 1]]);
+      }
     }
   }
 }
@@ -1137,7 +1230,7 @@ function lifted(p: Part, g: number): Part {
   }
 }
 
-function emit(p: Part, of: (paint: Paint) => Out, solids: Solid[] | null, lod: number, ground: (x: number, z: number) => number, gaps: Gap[] = [], ways: Way[] = []) {
+function emit(p: Part, of: (paint: Paint) => Out, solids: Solid[] | null, lod: number, ground: (x: number, z: number) => number, gaps: Gap[] = [], ways: Way[] = [], lid?: LidNet) {
   const body: Body = p.body ?? 'all';
   const put: Put = (s) => void (solids && body !== 'none' && solids.push(s));
   const o = p.hidden ? VOID : of(p.paint);
@@ -1177,7 +1270,7 @@ function emit(p: Part, of: (paint: Paint) => Out, solids: Solid[] | null, lod: n
       return towerPart(p, o, of('timber'), of('base'), put, lod);
     case 'mound': return moundPart(p, o, put, lod, ground, ways);
     case 'lump': return lumpPart(p, o, put, lod);
-    case 'apron': return apronPart(p, o, put, ground);
+    case 'apron': return lid ? lidPart(p, o, put, ground, lid) : apronPart(p, o, put, ground);
     case 'vault': return vaultPart(p, o);
   }
 }
@@ -1196,6 +1289,19 @@ export function castleShape(ground: (x: number, z: number) => number = castleGro
   }
 }
 
+/**
+ * THE SAME, WHERE A WORLD HAS STOOD IT: on that world's ground (`ground`: how high it is at a spot of the world, as
+ * it was before anything was cut for the fort), with its loose pieces where that world set them down, and with what
+ * its cuts left of the ground's own net (`FortLid`). A piece at a time, as `castleShapeSteps` is. It is what
+ * CastleSite draws and stands; whoever counts what is drawn and stood on over the passage asks here too.
+ */
+export function castleShapeIn(P: FortPlace, ground?: GroundAt, loose?: Loose[], rock = P.rock !== false): Generator<Shape | undefined, Shape, void> {
+  const S = CASTLE_SCALE, c = Math.cos(P.rot), s = Math.sin(P.rot), L = ground && P.lid;
+  // (the world's net in the fort's own measure: a fifth smaller, and turned as the world is from where the fort stands)
+  const net: LidNet | undefined = L ? { cell: L.cell / S, ex: [c, s], ez: [-s, c], squares: L.squares.map((q) => ({ x: castleLocal(P, q.x, 0, q.z)[0], z: castleLocal(P, q.x, 0, q.z)[1], open: q.open, low: (q.low - P.y) / S })) } : undefined;
+  return castleShapeSteps(ground ? (x, z) => (ground(castleAt(P, x, z)[0], castleAt(P, x, z)[2]) - P.y) / S : undefined, looseLocal(P, loose ?? castleLoose(P)), rock, undefined, undefined, net);
+}
+
 /** For whoever looks the shape over piece by piece (which faces of two pieces lie in one plane): told of each piece as it is made from near, whether it is of the lower levels, and how long each sheet's row of corners was before it and after ([sheet by sheet, in SHEETS' order]) */
 export type Note = (part: Part, low: boolean, from: number[], to: number[]) => void;
 
@@ -1207,10 +1313,10 @@ export type Note = (part: Part, low: boolean, from: number[], to: number[]) => v
  * finished. After that it stops after every piece, handing over nothing; and at the end it hands over the whole.
  * The shape it makes is the one `castleShape` makes, to the last number.
  */
-export function* castleShapeSteps(ground: (x: number, z: number) => number = castleGround, loose: Loose[] = LOOSE, rock = true, tally?: Record<string, number>, note?: Note): Generator<Shape | undefined, Shape, void> {
+export function* castleShapeSteps(ground: (x: number, z: number) => number = castleGround, loose: Loose[] = LOOSE, rock = true, tally?: Record<string, number>, note?: Note, lid?: LidNet): Generator<Shape | undefined, Shape, void> {
   const sheets = () => Object.fromEntries(SHEETS.map((p) => [p, skin()])) as Record<Sheet, Skin>;
   const near = sheets(), under = sheets(), far = skin(), solids: Solid[] = [];
-  const all = [...castleParts().filter((p) => rock || !/outcrop|ramp head/.test(p.name ?? '')), ...loose.flatMap((l) => looseParts(l, ground(l.x, l.z)))].map((raw) => (raw.sits ? lifted(raw, ground(raw.sits[0], raw.sits[1])) : raw));
+  const all = [...castleParts().filter((p) => rock || !/outcrop|ramp head/.test(p.name ?? '')), ...loose.flatMap((l) => looseParts(l, ground(l.x, l.z), ground))].map((raw) => (raw.sits ? lifted(raw, ground(raw.sits[0], raw.sits[1])) : raw));
   // (where each hatch's passage goes through the foot of a wall, half way between its ends)
   const gaps: Gap[] = loose.filter((l) => l.kind === 'hatch').flatMap((l) => {
     // (along the last eight metres of its passage, by the fort)
@@ -1237,7 +1343,7 @@ export function* castleShapeSteps(ground: (x: number, z: number) => number = cas
   const close = (p: Part) => {
     // (`tally`, for whoever asks what it costs: how many triangles each kind of piece is drawn with from near, by its name)
     const to = p.low ? under : near, was = tally ? SHEETS.reduce((t, s) => t + to[s].pos.length, 0) : 0, from = note ? SHEETS.map((s) => to[s].pos.length) : [];
-    emit(p, (paint) => (p.low ? unders : nears)[paint], solids, 0, ground, gaps, ways);
+    emit(p, (paint) => (p.low ? unders : nears)[paint], solids, 0, ground, gaps, ways, lid);
     note?.(p, !!p.low, from, SHEETS.map((s) => to[s].pos.length));
     if (tally) {
       const key = `${p.low ? 'under' : 'near'} ${p.t} ${p.name ?? ''}`;

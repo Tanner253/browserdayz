@@ -3,12 +3,13 @@
 // `npx tsx test/expansion.test.ts`.
 
 import assert from 'node:assert/strict';
-import { ARMY_CAMP, BUNKER_AT, CELL, KAMENKA, LOOP, MOUNTAIN, NO_START, OUTLYING, PASS, PLAY_FIRST, TOWN, TRADE_AT, catmullRom, kamenkaQ, loopFence, loopLine, worldWithoutMountain, EXPANSION as E, PLAY_AREAS, PLAY_RADIUS, WORLD_RES, WORLD_SIZE, generateWorld, heightAt, inPlay, playOutline, slopeAt, BUILDING_FOOTPRINT } from '../src/world/worldgen';
+import { ARMY_CAMP, BUNKER_AT, CELL, KAMENKA, LOOP, MOUNTAIN, NO_START, OUTLYING, PASS, PLAY_FIRST, TOWN, TRADE_AT, catmullRom, kamenkaQ, loopFence, loopLine, worldWithoutMountain, EXPANSION as E, PLAY_AREAS, PLAY_RADIUS, WORLD_RES, WORLD_SIZE, generateWorld, heightAt, inPlay, playOutline, seenGround, slopeAt, BUILDING_FOOTPRINT } from '../src/world/worldgen';
 import { buildWorldData } from '../server/world';
 import { GAS, gasDepth, gasZone } from '../src/sim/gas';
 import { INFECTED, openGround } from '../src/sim/infected';
 import { deckWidth, onBridge, spanOf, wreckUnder } from '../src/sim/bridge';
-import { CASTLE, CASTLE_SCALE, castleAt, castleFoot, castleHomes, castleLocal } from '../src/sim/castle';
+import { CASTLE, CASTLE_SCALE, UNDER, castleAt, castleFoot, castleHomes, castleLocal, castleLoose, castleOpen, castleUnder, hatchLine, looseLocal } from '../src/sim/castle';
+import { castleShapeIn } from '../src/world/castle-shape';
 
 let n = 0;
 const ok = (name: string, fn: () => void) => {
@@ -448,7 +449,8 @@ ok('the east country: a town out of the valley by the road, two places far out, 
   assert.ok(planted.length > 5000 && planted.length < 15000, `${planted.length} trees out there`);
   for (const t of planted) {
     assert.ok(!onRoad(t.x, t.z, 5), 'a tree stands in the new road');
-    assert.ok(Math.abs(t.y - ground(t.x, t.z)) < 0.06, 'a tree is off the ground');
+    // (the ground as it is SEEN: over the fort's passage that is not the ground as it is let down under it, and a fir by the hatch stands on what is seen)
+    assert.ok(Math.abs(t.y - heightAt(world.surface, t.x, t.z)) < 0.06, 'a tree is off the ground');
   }
   // the Zona: the town is in it, joined to the valley over the road; the two far places are not
   assert.ok(inPlay(town.x, town.z));
@@ -670,6 +672,113 @@ ok('the fort is no trap for tags and no window on the end of the map: the line t
       top = Math.max(top, heightAt(world.heights, x, z));
     }
     if (s < near - 30) assert.ok(top > eye + 1, `from a tower's top the map ends in sight on bearing ${b / 2}: the ground stands no higher than ${top.toFixed(1)} m against an eye at ${eye.toFixed(1)}`);
+  }
+});
+
+ok('over the fort\'s passage there is one ground: one sheet drawn at every spot, what stops a body exactly there, and no room under it that is no room of the plan', () => {
+  // THE COUNT (the owner, 2026-10-13: "the ground also has overlapping textures and physics because of the tunnel
+  // under ground"). The ground was let down along the passage and a blanket of earth laid over it by the fort, on
+  // squares of the fort's own turned 35 degrees to the ground's: counted as here, 485 spots of 6081 had two sheets
+  // drawn, 382 had a top that stops a body standing over the ground that is seen (by up to 10.2 m: a lid over a
+  // trench), and under the lid at 189 spots there was half a metre and more of room (up to 6 m) that is no room of
+  // the plan. Now the ground draws itself there (`seenGround`) and the fort stands solid earth under it.
+  const fort = world.castle!, N = WORLD_RES, half = WORLD_SIZE / 2, S = CASTLE_SCALE;
+  const was = (x: number, z: number) => heightAt(world.surface, x, z), { heights: drawn, open } = seenGround(world);
+  assert.ok(fort.lid && fort.lid.squares.length > 40 && open, 'the world tells the fort of no ground over its cuts');
+  // (all of the fort is made, as the game makes it: the passage's own blocks are what is under the earth over it)
+  const steps = castleShapeIn(fort, was);
+  let step = steps.next();
+  while (!step.done) step = steps.next();
+  const shape = step.value, W = (x: number, y: number, z: number) => castleAt(fort, x, z, y);
+  // (what the fort draws of the ground: three corners to each, in the world; and the earth it stands: its top, corner by corner, and how far down it goes)
+  const E = shape.near.earth.pos, lids: number[][][] = [], tops: number[][][] = [], feet: number[] = [];
+  for (let i = 0; i < E.length; i += 9) lids.push([W(E[i], E[i + 1], E[i + 2]), W(E[i + 3], E[i + 4], E[i + 5]), W(E[i + 6], E[i + 7], E[i + 8])]);
+  for (const s of shape.solids) {
+    if (s.t !== 'hull' || s.name !== 'hatch apron') continue;
+    const n = s.pts.length / 6;
+    assert.equal(s.surface, 'grass', 'the earth over the passage is not the ground to whoever treads on it');
+    tops.push(Array.from({ length: n }, (_, k) => W(s.pts[k * 3], s.pts[k * 3 + 1], s.pts[k * 3 + 2])));
+    feet.push(W(0, s.pts[n * 3 + 1], 0)[1]);
+  }
+  const blocks = shape.solids.filter((s): s is Extract<typeof s, { t: 'box' }> => s.t === 'box');
+  const inBlock = (lx: number, ly: number, lz: number) => blocks.some((b) => {
+    const v = [lx - b.c[0], ly - b.c[1], lz - b.c[2]], [qx, qy, qz, qw] = [-b.q[0], -b.q[1], -b.q[2], b.q[3]];
+    const t = [2 * (qy * v[2] - qz * v[1]), 2 * (qz * v[0] - qx * v[2]), 2 * (qx * v[1] - qy * v[0])];
+    const r = [v[0] + qw * t[0] + qy * t[2] - qz * t[1], v[1] + qw * t[1] + qz * t[0] - qx * t[2], v[2] + qw * t[2] + qx * t[1] - qy * t[0]];
+    return Math.abs(r[0]) <= b.h[0] && Math.abs(r[1]) <= b.h[1] && Math.abs(r[2]) <= b.h[2];
+  });
+  /** how high a flat shape (its corners in order round it) is at a spot, or null where the spot is not over it */
+  const over = (poly: number[][], x: number, z: number): number | null => {
+    let sign = 0;
+    for (let k = 0; k < poly.length; k++) {
+      const a = poly[k], b = poly[(k + 1) % poly.length], t = (b[0] - a[0]) * (z - a[2]) - (b[2] - a[2]) * (x - a[0]);
+      if (Math.abs(t) < 1e-9) continue;
+      if (sign && Math.sign(t) !== sign) return null;
+      sign = Math.sign(t);
+    }
+    const [a, b] = poly;
+    for (let k = 2; k < poly.length; k++) {
+      const c = poly[k], n = [(b[1] - a[1]) * (c[2] - a[2]) - (b[2] - a[2]) * (c[1] - a[1]), (b[2] - a[2]) * (c[0] - a[0]) - (b[0] - a[0]) * (c[2] - a[2]), (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])];
+      if (Math.abs(n[1]) > 1e-9) return a[1] - (n[0] * (x - a[0]) + n[2] * (z - a[2])) / n[1];
+    }
+    return null;
+  };
+  const wells = castleOpen(fort), hatch = castleLoose(fort).find((l) => l.kind === 'hatch')!, L = hatchLine(looseLocal(fort, [hatch])[0], (was(hatch.x, hatch.z) - fort.y) / S);
+  const way = [L.head, ...L.path].map((q) => castleAt(fort, q[0], q[2]));
+  const offWay = (x: number, z: number) => {
+    let best = Infinity;
+    for (let k = 0; k + 1 < way.length; k++) {
+      const ex = way[k + 1][0] - way[k][0], ez = way[k + 1][2] - way[k][2], t = Math.min(1, Math.max(0, ((x - way[k][0]) * ex + (z - way[k][2]) * ez) / (ex * ex + ez * ez)));
+      best = Math.min(best, Math.hypot(x - way[k][0] - ex * t, z - way[k][2] - ez * t));
+    }
+    return best;
+  };
+  // on a net of one metre (set off from the ground's own, so that no spot lies on a seam) within 25 m of the fort's
+  // foot, of the passage and of the hatch: outside the fort and off the open stairwell
+  let spots = 0, covered = 0;
+  const two: string[] = [], none: string[] = [], proud: string[] = [], unheld: string[] = [], room: string[] = [];
+  for (let x = fort.x - 70.37; x < fort.x + 70; x += 1) for (let z = fort.z - 70.61; z < fort.z + 70; z += 1) {
+    const foot = castleFoot(fort, x, z);
+    if (foot <= 0 || (foot > 25 && offWay(x, z) > 25) || wells.some((w) => over(w.map(([wx, wz]) => [wx, 0, wz]), x, z) !== null)) continue;
+    spots++;
+    const at = `${x.toFixed(2)}, ${z.toFixed(2)}`, own = !open![Math.floor((z + half) / CELL) * N + Math.floor((x + half) / CELL)];
+    const laid = lids.map((t) => over(t, x, z)).filter((y): y is number => y !== null), sheets = (own ? 1 : 0) + laid.length;
+    if (sheets > 1) two.push(at);
+    if (sheets < 1) none.push(at);
+    if (sheets !== 1) continue;
+    // (what is seen there; and every top that stops a body there: the ground's own collider, which is `heights`, and the fort's earth)
+    const seen = own ? heightAt(drawn, x, z) : laid[0], under = tops.map((t, i) => (over(t, x, z) !== null ? i : -1)).filter((i) => i >= 0);
+    const stood = [heightAt(world.heights, x, z), ...under.map((i) => over(tops[i], x, z)!)];
+    if (Math.max(...stood) > seen + 0.01) proud.push(`${at} (${(Math.max(...stood) - seen).toFixed(2)} m)`);
+    if (!stood.some((y) => Math.abs(y - seen) <= 0.01)) unheld.push(at);
+    if (!under.length) continue;
+    covered++;
+    // (under the foot of the earth, how far down before anything stops a body: the ground as it was let down, or a block of the fort's)
+    const from = Math.min(...under.map((i) => feet[i])), cut = heightAt(world.heights, x, z);
+    let y = from - 0.02;
+    for (; y > cut && y > from - 6; y -= 0.05) {
+      const l = castleLocal(fort, x, y, z);
+      if (inBlock(l[0], l[2], l[1])) break;
+    }
+    if (from - Math.max(y, cut) >= 0.5) room.push(`${at} (${(from - Math.max(y, cut)).toFixed(2)} m)`);
+  }
+  assert.ok(spots > 5000 && covered > 150, `the count looked at ${spots} spots, ${covered} of them over the fort's earth`);
+  assert.equal(two.length, 0, `two sheets of ground are drawn at ${two.length} spots: ${two.slice(0, 5).join(' | ')}`);
+  assert.equal(none.length, 0, `no ground is drawn at ${none.length} spots: ${none.slice(0, 5).join(' | ')}`);
+  assert.equal(proud.length, 0, `something stops a body over the ground that is seen at ${proud.length} spots: ${proud.slice(0, 5).join(' | ')}`);
+  assert.equal(unheld.length, 0, `nothing stops a body where the ground is seen at ${unheld.length} spots: ${unheld.slice(0, 5).join(' | ')}`);
+  assert.equal(room.length, 0, `there is room under the ground that is no room of the plan at ${room.length} spots: ${room.slice(0, 5).join(' | ')}`);
+  // AND THE GROUND SHOWS IN NO PLACE TO BE. Where it is drawn as it was, over ground that was let down, it is drawn
+  // outside the fort's stone or in it: never in a room of the lower levels (inside their walls' inner faces, over
+  // the underside of their floor: of the stair's slot, in the slot), and never in the passage or on its stair.
+  const U = UNDER;
+  for (let x = fort.x - 45; x < fort.x + 45; x += 0.25) for (let z = fort.z - 45; z < fort.z + 45; z += 0.25) {
+    if (open![Math.floor((z + half) / CELL) * N + Math.floor((x + half) / CELL)] || Math.hypot(x - hatch.x, z - hatch.z) < 7) continue;
+    const y = heightAt(drawn, x, z), [lx, lz, ly] = castleLocal(fort, x, y, z), where = `${lx.toFixed(2)}, ${ly.toFixed(2)}, ${lz.toFixed(2)}`;
+    if (Math.abs(lx) < U.x + 0.45 && Math.abs(lz) < U.z + 0.45) {
+      const slot = lx > U.postern.x0 && lz > U.postern.head && lz < U.postern.end + 0.25;
+      assert.ok(Math.abs(lx) >= U.x || Math.abs(lz) >= U.z || ly < (slot ? U.postern.deep : U.floor - U.cistern.deep) - 0.3, `the ground is drawn in a room under the terrace, at ${where}`);
+    } else assert.ok(!castleUnder(fort, x, y, z, was), `the ground is drawn in the passage or on a stair, at ${where}`);
   }
 });
 

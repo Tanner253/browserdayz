@@ -23,8 +23,8 @@ import { GLASS_GROUPS, WORLD_GROUPS, physics } from '../core/physics';
 import { assets } from '../core/assets';
 import { breathe } from '../core/breathe';
 import { SHADOW_FRUSTA, type Atmosphere, type ShaderPatch } from './atmosphere';
-import { ARCADE, CASTLE, CASTLE_SCALE, LAMPS, UNDER, castleAt, castleLocal, castleUnder, castleDoor, castleKit, castleLamps, castleLoose, castleRocks, looseLocal, type FortPlace, type GroundAt, type Loose, type Place } from '../sim/castle';
-import { PICTURES, SHEETS, castleShapeSteps, castleSky, type Shape, type Sheet, type Skin, type Solid } from './castle-shape';
+import { ARCADE, CASTLE, CASTLE_SCALE, LAMPS, UNDER, castleAt, castleLocal, castleUnder, castleDoor, castleKit, castleLamps, castleRocks, type FortPlace, type GroundAt, type Loose, type Place } from '../sim/castle';
+import { PICTURES, SHEETS, castleShapeIn, castleSky, type Shape, type Sheet, type Skin, type Solid } from './castle-shape';
 import { kitMeshes, stoneLook, type StoneLook } from './kit';
 import { PostSite } from './castle-post';
 
@@ -317,11 +317,9 @@ export class CastleSite {
     if (o.snow !== undefined) this.snow = o.snow;
     // (Here, as the game starts: only what is seen from far off, and the earth over the cut ground. The rest of it is
     // made afterwards a piece at a time, between frames: see `make`.)
-    const steps = castleShapeSteps(
-      ground ? (x, z) => { const [wx, , wz] = castleAt(P, x, z); return (ground(wx, wz) - P.y) / CASTLE_SCALE; } : undefined,
-      looseLocal(P, o.loose ?? castleLoose(P)),
-      o.rock !== false,
-    );
+    // (On a world's own ground the ground draws itself over what was cut for the passage, and of the earth only the
+    // squares round the hatch's well are made here, with what stops a body over the rest: see `castleShapeIn`.)
+    const steps = castleShapeIn(P, ground, o.loose, o.rock !== false);
     const shape = steps.next().value as Shape;
     this.counts.far = shape.far.pos.length / 9;
 
@@ -347,9 +345,19 @@ export class CastleSite {
     all.add(this.far, this.farKit);
     if (o.earth && shape.near.earth.pos.length) {
       // (the earth laid over what the world cut for the sally port: it is drawn from the first and from any distance, with the ground's own paint, or the cut would be seen)
-      const lid = new THREE.Mesh(geometry(pack(shape.near.earth)), o.earth);
+      const earth = pack(shape.near.earth);
+      // (On a world's own ground this is the ground's own paint, and that paint reads the way a corner faces as a way
+      // in the WORLD: the ground's sheet is not turned. The fort is: its earth's corners are told to the paint turned
+      // back, or the square round the hatch is lit as if the hill faced thirty-five degrees round from where it does,
+      // a pale patch with a hard edge on a slope.)
+      if (ground && P.lid) {
+        const c = Math.cos(P.rot), s = Math.sin(P.rot), n = earth.nrm;
+        for (let i = 0; i < n.length; i += 3) [n[i], n[i + 2]] = [n[i] * c + n[i + 2] * s, -n[i] * s + n[i + 2] * c];
+      }
+      const lid = new THREE.Mesh(geometry(earth), o.earth);
       lid.name = 'castle:earth';
-      lid.receiveShadow = true;
+      // (it is the ground, where the ground does not draw itself: it shades what is under it as the ground does, or the sun comes down the hatch's steps through the hill)
+      lid.receiveShadow = lid.castShadow = true;
       lid.matrixAutoUpdate = false;
       all.add(lid);
       this.counts.draws++;
