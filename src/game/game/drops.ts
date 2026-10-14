@@ -8,7 +8,7 @@ import { physics, SOLID_GROUPS } from '../../core/physics';
 import { assets } from '../../core/assets';
 import { audio } from '../../core/audio';
 import { heightAt } from '../../world/worldgen';
-import { CUT } from '../../sim/arena';
+import { CUT } from '../../../arena/rules';
 import { newUid, ITEMS, fittedOf, quietOf } from '../../sim/items';
 import { SLOT_ORDER } from '../../sim/inventory';
 import type { WorldLoot } from '../../sim/economy';
@@ -327,6 +327,13 @@ export const dropsMethods = {
     if (this.joining && !this.botCheck?.active) return;
     // (an Arena match over: its card has the mouse, and nothing is resumed)
     if (this.arenaHud?.ended) return;
+    // (still building behind the menu, the guns: Deploy is remembered, and goes in the moment they are ready. The
+    // mouse is not taken yet: in the game it is, with a click)
+    if (!this.started && !this.isLoaded) {
+      this.wantIn = true;
+      this.hud.showStart(true, false, 'Loading…');
+      return;
+    }
     document.title = this.title;
     // keys must reach the game, not the name field
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();

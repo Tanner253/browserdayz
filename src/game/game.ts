@@ -507,7 +507,9 @@ export class Game {
 
     progress('loading weapons');
     this.weapons = new Weapons(r.vmScene, r.vmCamera, atmo, this.player, this.inv, this.effects);
-    await this.weapons.load();
+    // (built behind the menu, begun once the world is up and the menu shown (`buildBehind`, from src/main.ts), and
+    // what wants them is done when they are: `loaded`)
+    const guns = new Promise<void>((go) => (this.buildBehind = go)).then(() => this.weapons.load());
     this.weapons.mainCam = r.camera;
     this.weapons.itemModels = this.loot.models;
     // (a gun on the ground lies there with what is fitted to it: the copy of it that is seen in the hands)
@@ -516,7 +518,6 @@ export class Game {
       this.avatar.setSlung(obj);
       this.syncBack();
     };
-    this.weapons.setLook(lookFor(playerName()));
     this.weapons.resolveTarget = (owner) => (owner instanceof Dummy || owner instanceof RemotePlayer || owner instanceof Infected ? owner : null);
     this.weapons.onHit = (h) => this.onHit(h);
     // whoever is hit carries the blood on their clothes where it landed
@@ -551,17 +552,10 @@ export class Game {
       this.net.send({ t: 'swing' });
     };
     progress('compiling shaders');
-    this.weapons.precompile((scene, camera) => r.precompile(scene, camera));
     // (A loot model's materials are made ready when the model comes, off the frame: see ItemModels.onMade. They
-    // were all fetched and warmed here, before anybody could play.)
+    // were all fetched and warmed here, before anybody could play. The guns' are, once the guns are built: `loaded`.)
     const warm = new THREE.Group();
-    for (const id of Object.keys(ITEMS)) {
-      // every weapon as it looks in somebody's hands: the first armed player to walk
-      // into view must not cost a frame
-      const held = this.weapons.worldModel(id);
-      if (held) warm.add(held);
-    }
-    // (and one of each car, as it is painted for the world: see Garage.warmers)
+    // (one of each car, as it is painted for the world: see Garage.warmers)
     const cars = this.garage.warmers();
     for (const o of cars) warm.add(o);
     warm.position.copy(r.camera.position);
@@ -591,10 +585,31 @@ export class Game {
         if (hasSlotIcon(id)) icons[`slot:${id}`] = assets.url(`assets/icons/slot-${id}.webp`);
       } else stale.push(id);
     }
-    if (stale.length) {
-      if (import.meta.env.DEV) console.info(`${stale.length} item pictures are not kept, or are of what has changed: made here (npm run icons makes them again): ${stale.slice(0, 12).join(', ')}${stale.length > 12 ? '…' : ''}`);
-      Object.assign(icons, await renderIcons(r.renderer, this.loot.models, atmo.envMap, stale));
-    }
+    if (stale.length && import.meta.env.DEV) console.info(`${stale.length} item pictures are not kept, or are of what has changed: made here (npm run icons makes them again): ${stale.slice(0, 12).join(', ')}${stale.length > 12 ? '…' : ''}`);
+    // What is built behind the menu (see `loaded`): the guns; then, with them, how they look in the hands and in
+    // somebody else's (their shaders made off the frame, as a loot model's are), and any picture of a thing that is
+    // out of date (a gun's is drawn from the gun). Deploy pressed meanwhile goes in now.
+    this.loaded = guns
+      .then(async () => {
+        this.weapons.setLook(lookFor(playerName()));
+        this.weapons.precompile((scene, camera) => r.precompile(scene, camera));
+        const held = new THREE.Group();
+        for (const id of Object.keys(ITEMS)) {
+          const m = this.weapons.worldModel(id);
+          if (m) held.add(m);
+        }
+        await Promise.race([r.ready([held]), new Promise<void>((done) => setTimeout(done, 6000))]);
+        if (stale.length) Object.assign(icons, await renderIcons(r.renderer, this.loot.models, atmo.envMap, stale));
+        assets.releaseModels();
+      })
+      .catch((e) => console.error('what is built behind the menu', e))
+      .then(() => {
+        this.isLoaded = true;
+        if (this.wantIn) {
+          this.wantIn = false;
+          void this.join();
+        }
+      });
     const doll = await renderDoll(r.renderer, atmo.envMap, lookFor(playerName()));
 
     this.hud = new HUD(icons);
@@ -1030,6 +1045,18 @@ export class Game {
   restartSaid: { why: string; at: number } | null = null;
   /** in a wager, the arena's own screen over the HUD (src/ui/arena-hud.ts); null in the open world */
   arenaHud: ArenaHud | null = null;
+  /**
+   * What is built behind the menu rather than before it (the guns, their shaders, any inventory picture that is out
+   * of date): the menu is up while it is, and Deploy waits for it (`isLoaded`; pressed before, it is remembered in
+   * `wantIn` and goes in when it is). The owner, 2026-10-14: "can we download it while letting the user into the
+   * main menu etc and download it i nthe background", and "whatever is best for the UX without losing any
+   * functionality". Building every gun was 26 of the 44 seconds before the menu.
+   */
+  loaded!: Promise<void>;
+  isLoaded = false;
+  wantIn = false;
+  /** starts what is built behind the menu (called once the menu is shown) */
+  buildBehind: () => void = () => {};
   /** the server's messages have their handlers (once a page: wireNet); and this game is leaving an Arena match itself, so its connection's going is no result to show */
   netWired = false;
   arenaLeaving = false;

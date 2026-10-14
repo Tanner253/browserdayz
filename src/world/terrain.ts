@@ -265,7 +265,7 @@ const TILE_QUADS = 64;
 export class Terrain {
   /** the ground, as a group of tiles */
   mesh!: THREE.Group;
-  /** which tiles are drawn, by their corners in the world (null: all of them): a game cut down to a wager's arena draws only those within sight of it (src/sim/arena.ts, cutToArena) */
+  /** which tiles are drawn, by their corners in the world (null: all of them): a game cut down to a wager's arena draws only those within sight of it (arena/rules.ts, cutToArena) */
   only: ((x0: number, z0: number, x1: number, z1: number) => boolean) | null = null;
   heightTex!: THREE.DataTexture;
   /** the ground's own paint, for a lid laid over a hole in the ground (see where it is made) */

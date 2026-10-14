@@ -8,7 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import WebSocket from 'ws';
 import { PROTOCOL } from '../src/net/protocol';
-import { arenaEnds } from '../src/sim/arena';
+import { arenaEnds } from '../arena/rules';
 import { generateWorld, heightAt } from '../src/world/worldgen';
 
 const PORT = 8215;

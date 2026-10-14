@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <title>ZONA: roadmap</title>
-<!-- A card, 1600x900. Rendered to marketing/zona-roadmap.png by: node scripts/card.mjs roadmap
+<!-- A card, 1900x900 (six phases since 14 Oct 2026). Rendered to marketing/zona-roadmap.png by: node scripts/card.mjs roadmap 1900 900
      (and copied to public/changelog/media/roadmap.jpg, where the changelog shows it).
      What is ticked is in the game on the day in the footer: each line is an entry of the changelog
      (public/changelog/index.html). What is not ticked is a plan, and says so. When something ships, tick it
@@ -11,7 +11,7 @@
 <style>
   :root { --gold: #ffd35a; --ink: #f3efe6; --dim: #d8cfb8; --faint: rgba(243, 239, 230, 0.42); --dark: #0c0d0b; --line: rgba(243, 239, 230, 0.2); --ok: #9fc27a; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { width: 1600px; height: 900px; overflow: hidden; background: var(--dark); }
+  html, body { width: 1900px; height: 900px; overflow: hidden; background: var(--dark); }
   body { position: relative; font-family: 'Bahnschrift', 'Arial Narrow', 'Segoe UI', sans-serif; font-stretch: condensed; color: var(--ink); text-transform: uppercase;
     background: radial-gradient(1200px 520px at 50% 0%, #20241c 0%, #0c0d0b 70%); }
   .frame { position: absolute; inset: 14px; border: 2px solid var(--line); pointer-events: none; }
@@ -24,8 +24,8 @@
 
   /* the line the phases hang from: gold as far as the one being worked on */
   .rail { position: absolute; left: 48px; right: 48px; top: 163px; height: 2px; background: var(--line); }
-  .rail i { position: absolute; left: 0; top: 0; height: 2px; width: 70.9%; background: var(--gold); }
-  .row { position: absolute; left: 48px; right: 48px; top: 150px; bottom: 64px; display: grid; grid-template-columns: 1fr 1fr 1.12fr 1fr 1fr; gap: 14px; }
+  .rail i { position: absolute; left: 0; top: 0; height: 2px; width: 59.2%; background: var(--gold); }
+  .row { position: absolute; left: 48px; right: 48px; top: 150px; bottom: 64px; display: grid; grid-template-columns: 1fr 1fr 1.12fr 1fr 1fr 1fr; gap: 14px; }
   .phase { position: relative; display: flex; flex-direction: column; padding-top: 30px; }
   .dot { position: absolute; left: 50%; top: 0; width: 28px; height: 28px; margin-left: -14px; border-radius: 50%; background: var(--dark); border: 2px solid var(--faint); }
   .phase.done .dot { background: var(--gold); border-color: var(--gold); }
@@ -191,6 +191,24 @@
           <li>Cars that are mended; more vehicles</li>
           <li>More map: new towns, new sites</li>
           <li>Events through the seasons</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="phase later">
+      <div class="dot"></div>
+      <div class="box">
+        <div class="no">Phase 6 <b>Later</b></div>
+        <h2>The Arena</h2>
+        <p class="sub">Team matches; then real stakes, and more maps</p>
+        <div class="bar"><i style="width: 40%"></i></div>
+        <p class="count">2 of 5</p>
+        <ul>
+          <li class="done">Team matches at the fort</li>
+          <li class="done">Watch any match being played</li>
+          <li>Wagers in SOL between players</li>
+          <li>More Arena maps from the open world</li>
+          <li>The fort finished: hatch, walls, windows</li>
         </ul>
       </div>
     </section>

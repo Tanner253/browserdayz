@@ -4,7 +4,7 @@ import { Renderer } from './core/renderer';
 import { assets } from './core/assets';
 import { Strips } from './core/strips';
 import { physics, GLASS_GROUPS } from './core/physics';
-import { arenaCorners, cutToArena, nearArena } from './sim/arena';
+import { arenaCorners, cutToArena, nearArena } from '../arena/rules';
 import { wagerQuery } from './net/client';
 import { modeOf, openDoor } from './ui/door';
 import { ArenaMenu } from './ui/arena-menu';
@@ -144,7 +144,7 @@ async function boot() {
   // (`?ruins`: the ruined town stood on a plain of its own in a corner of the map, to be looked at and walked in the game as it is)
   const ruins = import.meta.env.DEV && new URLSearchParams(location.search).has('ruins') ? await import('./dev/ruins') : null;
   ruins?.lay(world);
-  // (the Arena's page builds the arena and what is seen over its wall, and nothing else: src/sim/arena.ts)
+  // (the Arena's page builds the arena and what is seen over its wall, and nothing else: arena/rules.ts)
   const arena = mode === 'arena' && !!world.castle;
   if (arena) cutToArena(world);
   console.log(`worldgen ${(performance.now() - t0).toFixed(0)}ms, trees ${world.trees.length}, buildings ${world.buildings.length}${arena ? ' (cut to the arena)' : ''}`);
@@ -193,16 +193,23 @@ async function boot() {
     stage('fort', 'building the fort');
     await game.castle.whole();
   }
-  if (arena) new ArenaMenu(game.hud).onLeave = (waiting) => (waiting ? game.net.leaveQueue() : game.toArena());
+  // (out of the wait for a match: still loading, the Deploy that waits for it is let go; connected, the place given up)
+  if (arena) new ArenaMenu(game.hud).onLeave = (waiting) => (!waiting ? game.toArena() : game.wantIn ? ((game.wantIn = false), game.hud.showStart(true)) : game.net.leaveQueue());
   stage('last files');
   await assets.idle();
   // warm up shader programs before revealing the world
   stage('shaders');
   r.precompile(r.scene, r.camera);
-  assets.releaseModels();
+  // (the models are let go once the guns are built too: Game.loaded)
   (window as unknown as Record<string, unknown>).__game = game;
   if (import.meta.env.DEV) (await import('./dev/harness')).installHarness(game);
   game.start();
+  // the guns, built behind the menu now it is up (Game.loaded), before the menu's own extras (the sky, the films);
+  // and how far that has got, said on the way in for whoever has pressed Deploy and waits for it (Game.wantIn)
+  game.buildBehind();
+  assets.onProgress = (d, t) => {
+    if (game.wantIn) game.hud.showStart(true, false, `Loading ${Math.min(99, Math.round((d / Math.max(t, 1)) * 100))}%`);
+  };
   game.afterBoot();
   // (the Zone's how to play, once, on a browser's first visit)
   if (!arena) game.hud.howTo(false);

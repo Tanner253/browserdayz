@@ -98,20 +98,20 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `effects.ts` | 944 | Impact / weapon effects: billboard particle pool (dust, debris, sparks, blood), bullet-hole decals, muzzle flash light. |
 | `fires.ts` | 297 | Campfires as the game has them (the rules are in src/sim/fires.ts): which fireplaces are alight and for how long yet, the ring of stones and wood that stands at each (cold, or burning), the flames and the smoke of... |
 | `flames.ts` | 645 | The flames of a fire: the ones that came with the campfire, moving the way they came, mended. |
-| `game.ts` | 1391 | The game: owns every system, runs the frame loop, and decides who is in charge of what. |
+| `game.ts` | 1426 | The game: owns every system, runs the frame loop, and decides who is in charge of what. |
 
 ## src/game/game/
 
 | file | lines | what it is |
 |---|---:|---|
-| `drops.ts` | 522 | The game: supply drops, targets when playing alone, and the flow of a life (death, respawn, pause). |
-| `enter.ts` | 607 | The game: entering the world (joining a server or playing alone, the bot check's range, dressing the player). |
+| `drops.ts` | 531 | The game: supply drops, targets when playing alone, and the flow of a life (death, respawn, pause). |
+| `enter.ts` | 644 | The game: entering the world (joining a server or playing alone, the bot check's range, dressing the player). |
 | `frame.ts` | 621 | The game: every frame (the main loop: input, the world, the camera, the sound, the HUD). |
 | `guns.ts` | 475 | The game: attachments and magazines. |
 | `hands.ts` | 546 | The game: inventory moves, the hot keys and the hands, and what an admin can do. |
 | `interact.ts` | 305 | The game: what is looked at and done with F (doors, containers, cars, fires, loot). |
 | `items.ts` | 645 | The game: using things (eating, healing, reading, the radio) and the emote wheel. |
-| `online.ts` | 621 | The game: multiplayer (what the server says, wired to what is done about it; other players, bodies, stashes). |
+| `online.ts` | 641 | The game: multiplayer (what the server says, wired to what is done about it; other players, bodies, stashes). |
 
 ## src/game/
 
@@ -144,13 +144,13 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 
 | file | lines | what it is |
 |---|---:|---|
-| `main.ts` | 223 |  |
+| `main.ts` | 230 |  |
 
 ## src/net/
 
 | file | lines | what it is |
 |---|---:|---|
-| `client.ts` | 368 | Client side of the game connection. |
+| `client.ts` | 371 | Client side of the game connection. |
 | `orders.ts` | 205 | The orders an admin or a mod can give on the game server, typed where talk is typed (2026-10-11). |
 | `protocol.ts` | 453 | Wire protocol between the game client and the server. |
 | `timeline.ts` | 122 | When a report of somebody else's player was TRUE, as against when it got here. |
@@ -160,7 +160,6 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | file | lines | what it is |
 |---|---:|---|
 | `airdrop.ts` | 476 | The supply drop comes by helicopter (2026-10-13: |
-| `arena.ts` | 174 | Wager matches (2026-10-14), their rules shared by the game and the arena server (arena/match.ts). |
 | `barrels.ts` | 31 | Fuel drums. The red barrels standing about the yards and sheds go up when a bullet finds them, and take whoever is standing near with them: a thing to shoot at instead of the man behind it, and a reason to look at... |
 | `blood.ts` | 96 | Blood, which is not health (2026-10-13). |
 | `bridge.ts` | 103 | The bridge on the loop road (2026-10-13: |
@@ -243,8 +242,8 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | file | lines | what it is |
 |---|---:|---|
 | `admin-ui.ts` | 1526 | The panel of somebody with a role (2026-10-11; laid out again 2026-10-12). |
-| `arena-hud.ts` | 158 | The arena's own screen (2026-10-14). |
-| `arena-menu.ts` | 202 | The Arena's own front (2026-10-14), its menu and the screens between matches. |
+| `arena-hud.ts` | 170 | The arena's own screen (2026-10-14). |
+| `arena-menu.ts` | 208 | The Arena's own front (2026-10-14), its menu and the screens between matches. |
 | `bigmap.ts` | 1247 | The map, opened large (M): a sheet as an army prints one. |
 | `door.ts` | 82 | The door (2026-10-14): zonapvp.fun asks what the visitor came for before anything is built. |
 | `hud.ts` | 1839 | A lean HUD: small vitals, a compass strip, a corner map (src/ui/minimap.ts), prompts only when relevant. |

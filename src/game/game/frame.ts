@@ -9,7 +9,7 @@ import { audio } from '../../core/audio';
 import { NULL_INPUT } from '../../core/input';
 import { controls } from '../../core/keys';
 import { heightAt } from '../../world/worldgen';
-import { CUT } from '../../sim/arena';
+import { CUT } from '../../../arena/rules';
 import { ITEMS, capacityOf } from '../../sim/items';
 import { SLOT_ORDER } from '../../sim/inventory';
 import { weightFelt } from '../../sim/powers';

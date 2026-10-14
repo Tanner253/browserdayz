@@ -1,6 +1,6 @@
 // The deploy, in the order that loses nothing: the site, then a save, and only then the server.
 //
-//   node scripts/deploy.mjs            the site, then the save, then the server
+//   node scripts/deploy.mjs            the site, then the save, then the server (or, the server untouched, the push alone)
 //   node scripts/deploy.mjs --site     the site alone (nothing restarts, so there is nothing to save)
 //   node scripts/deploy.mjs --server   the server alone (the site is out already)
 //   node scripts/deploy.mjs --dry      says what it would do and asks the live server what it holds; publishes nothing
@@ -90,6 +90,27 @@ try {
 }
 if (remote === head) {
   say('main is at this commit already: there is nothing to push');
+  process.exit(0);
+}
+
+// ---- whether this release touches the game server at all. Its host builds it only when a file it is made of has
+// changed: the Build Filter set on the host by the owner, 2026-10-14, these paths, which must be kept the same as
+// there. A release of the site or the arena alone leaves it running: nothing to save, and nobody put out. `main` is
+// pushed all the same, so that it is what is live. (`--server` goes the whole way regardless.)
+const ZONA = ['server', 'src/sim', 'src/world', 'src/net', 'src/core', 'package.json', 'package-lock.json', 'render.yaml'];
+const ARENA = ['arena', 'src/sim', 'src/world', 'src/net', 'src/core', 'package.json', 'package-lock.json'];
+const changed = (paths) => {
+  try {
+    return !!out(`git diff --name-only ${remote}..${head} -- ${paths.join(' ')}`);
+  } catch {
+    return true; // (not known: as if it is)
+  }
+};
+if (remote && !serverOnly && !changed(ZONA)) {
+  say('\n-- the game server is untouched by this release: its host leaves it running, so there is nothing to save');
+  run('git push origin HEAD:refs/heads/main');
+  if (branch !== 'main' && !dry) run('git branch -f main HEAD');
+  say(changed(ARENA) ? 'the arena is rebuilt by its host (a match being played ends)' : 'the arena is untouched too');
   process.exit(0);
 }
 

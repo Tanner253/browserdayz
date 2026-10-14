@@ -10,7 +10,7 @@ to nothing but the games that come to it. No money moves yet: the stake is shown
   shot itself through the fort's walls (a physics world of its own) to the others as they stood when it was fired.
 - `render.yaml`: its Render Blueprint, apart from the game server's (the `render.yaml` at the repository's root).
 
-What both sides share is in `src/`: the rules (`src/sim/arena.ts`), the protocol (`src/net/protocol.ts`, the same
+What both sides share is in `src/`: the rules (`arena/rules.ts`), the protocol (`src/net/protocol.ts`, the same
 `PROTOCOL` as the game server), and the map (`src/world/`). The game finds the arena at `?arena=` on the page,
 else `VITE_ARENA_URL` (set in Vercel, Production, and read when the site is built), else `https://zona-arena-1.onrender.com` (the service the owner made).
 

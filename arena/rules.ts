@@ -4,10 +4,36 @@
 // castle as its own wager map ... it has everything we need for a CODstyled map". Round 1 is the mode with no money;
 // the stake is shown and nothing is paid. The server decides every hit and every health point: no game's word on
 // either is taken, so a changed game cannot win a match.
-import { CASTLE_SCALE, castleAt, castleLocal, type FortPlace } from './castle';
-import type { HitZone } from './combat';
-import { F_CROUCH, F_PRONE, type Pose } from '../net/protocol';
-import { heightAt, type World } from '../world/worldgen';
+import { CASTLE_SCALE, castleAt, castleLocal, type FortPlace } from '../src/sim/castle';
+import type { HitZone } from '../src/sim/combat';
+import { ITEMS, capacityOf, makeItem, type ItemInstance } from '../src/sim/items';
+import { KITS } from '../src/sim/kits';
+import { F_CROUCH, F_PRONE, type Pose } from '../src/net/protocol';
+import { heightAt, type World } from '../src/world/worldgen';
+
+/**
+ * An Arena loadout: the guns of the kit (KITS, src/sim/kits.ts) and nothing else, each loaded, with what is fitted to
+ * it, less what the Arena leaves off (the owner, 2026-10-14: "for the loadout, no suppressors, no 60rnd mags"): no
+ * suppressor, and the gun's own magazine, full, in place of a drum or a long one. The arena server gives it to every
+ * player each round (arena/match.ts); the Arena's menu says what is in it. The Zone's kits are not touched.
+ */
+export function arenaLoadout(id: string): { name: string; items: ItemInstance[] } {
+  const kit = KITS.find((k) => k.id === id) ?? KITS[0];
+  const items = kit.things.filter((th) => ITEMS[th.id]?.category === 'weapon').map((th) => {
+    const it = makeItem(th.id, th.qty);
+    const own = ITEMS[th.id].weapon?.mag;
+    if (own) it.mag = own;
+    if (th.mods) it.mods = th.mods.filter((m) => !m.startsWith('suppressor'));
+    it.loaded = capacityOf(it);
+    return it;
+  });
+  return { name: kit.name, items };
+}
+
+/** what an Arena loadout is, in words: each gun, and what is fitted to it */
+export function arenaLoadoutSays(id: string): string {
+  return arenaLoadout(id).items.map((it) => `${ITEMS[it.id].name}${it.mods?.length ? ` with ${it.mods.map((m) => (ITEMS[m]?.name ?? m).toLowerCase()).join(', ')}` : ''}`).join('; ');
+}
 
 export const ARENA = {
   /** kills to win, as the host may choose */

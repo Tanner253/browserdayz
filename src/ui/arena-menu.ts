@@ -6,7 +6,7 @@
 // and the pause in a match. A match is gone into the way the Zone's Deploy goes in: the match put in the page's
 // address, the name given, and the same Deploy pressed (src/net/client.ts, wagerQuery).
 import './arena-menu.css';
-import { ARENA, type LobbyInfo } from '../sim/arena';
+import { ARENA, arenaLoadoutSays, type LobbyInfo } from '../../arena/rules';
 import { KITS } from '../sim/kits';
 import { arenaBase } from '../net/client';
 import { paidLine, platformPaid } from './platform';
@@ -66,7 +66,7 @@ export class ArenaMenu {
         </section>
         <section class="am-p am-loadouts">
           <h5>The loadouts</h5>
-          <div class="am-kits">${ARENA.loadouts.map((id) => `<div class="am-kit"><b>${esc(kitOf(id)?.name ?? id)}</b><span>${esc(kitOf(id)?.does ?? '')}</span></div>`).join('')}</div>
+          <div class="am-kits">${ARENA.loadouts.map((id) => `<div class="am-kit"><b>${esc(kitOf(id)?.name ?? id)}</b><span>${esc(arenaLoadoutSays(id))}</span></div>`).join('')}</div>
           <p class="am-note">The host picks one for the whole match. Guns only: they empty and are reloaded (R, or the trigger on an empty gun) from rounds that never run out. Nothing to loot, carry or fill.</p>
         </section>
         <section class="am-p am-settings"><button type="button" class="am-back">Back</button><div class="am-set-host"></div></section>

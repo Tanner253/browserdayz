@@ -28,7 +28,7 @@ export function remoteServer(): string | null {
 }
 
 /**
- * The wager this page is for, as the arena asks it (src/sim/arena.ts, arena/match.ts): `?wager=new` with what the
+ * The wager this page is for, as the arena asks it (arena/rules.ts, arena/match.ts): `?wager=new` with what the
  * host chose (size, kills, loadout, stake) to open one, `?wager=<id>` to join one, and `&watch=1` to watch it being
  * played. Null: the open world.
  */

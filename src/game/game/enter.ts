@@ -6,7 +6,7 @@ import { audio } from '../../core/audio';
 import { wagerQuery, watching } from '../../net/client';
 import { ArenaHud } from '../../ui/arena-hud';
 import { reloadPage } from '../../core/leave';
-import { CUT } from '../../sim/arena';
+import { CUT } from '../../../arena/rules';
 import { heightAt, inPlay } from '../../world/worldgen';
 import { ITEMS, makeItem, makeMag, type ItemInstance, TAG_OUT, tagOwner, TAG_HOLD_MIN, TAG_HOLD, tagClock } from '../../sim/items';
 import { refill, refilledWords } from '../../sim/powers';
@@ -41,7 +41,7 @@ export const enterMethods = {
     let waited = false;
     // (a page whose world was cut down to a wager's arena, the wager over: loaded again, whole, for the open world)
     if (CUT.arena && !wagerQuery()) return void reloadPage();
-    // (in a wager the server alone says when anybody dies: src/sim/arena.ts; and the arena has its own screen)
+    // (in a wager the server alone says when anybody dies: arena/rules.ts; and the arena has its own screen)
     this.player.keepAlive = !!wagerQuery();
     if (wagerQuery() && !this.arenaHud) {
       this.arenaHud = new ArenaHud(this.hud.root, watching(), new URLSearchParams(location.search).get('wager') === 'practice');

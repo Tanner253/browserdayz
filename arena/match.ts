@@ -1,7 +1,7 @@
 // The arena (2026-10-14): wager matches in the fort, team against team in rounds, as CS:GO has them (the owner:
 // "round based progression like cs:go ... once all the players of 1 team is dead the winner team is decided point
 // awarded then next round and reset"). It is a server of its own (arena/server.ts, deployed by arena/render.yaml):
-// nothing of the open world is in it, and nothing of it is in the open world. The rules are src/sim/arena.ts.
+// nothing of the open world is in it, and nothing of it is in the open world. The rules are arena/rules.ts.
 //
 // THE SERVER DECIDES EVERY HIT AND EVERY HEALTH POINT. A game says where it is and where it shot; the server traces
 // each shot itself, through the fort's own walls (its solids, built here into a physics world of their own) and the
@@ -15,7 +15,7 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import type { IncomingMessage } from 'node:http';
 import type { Duplex } from 'node:stream';
 import { WebSocketServer, type WebSocket } from 'ws';
-import { ARENA, arenaEnds, hitShapes, inArena, rayRod, type LobbyInfo } from '../src/sim/arena';
+import { ARENA, arenaEnds, arenaLoadout, hitShapes, inArena, rayRod, type LobbyInfo } from './rules';
 import { CASTLE_SCALE, castleAt, type FortPlace } from '../src/sim/castle';
 import { WEAPON_RULES, hitDamage } from '../src/sim/combat';
 import { shotOf } from '../src/sim/gunplay';
@@ -139,24 +139,12 @@ function poseAt(f: Fighter, at: number): Pose {
 
 const info = (f: Fighter) => ({ id: f.id, name: f.name, pose: f.pose, w: f.w, m: f.m, g: f.g, alive: f.alive });
 
-/** the loadout, every thing of it made here, as the admin's /kit makes one */
-function loadout(l: Lobby) {
-  const kit = KITS.find((k) => k.id === l.loadout) ?? KITS[0];
-  return {
-    name: kit.name,
-    // (the guns and nothing else, loaded, with what is fitted to them: no magazines, rounds, armour or clothes to see to.
-    // The owner: "lets strip the mags and the bullets and gear. lets make a simple fps shooter". They empty and are
-    // reloaded from a reserve that never ends: see setDown)
-    items: kit.things.filter((th) => ITEMS[th.id]?.category === 'weapon').map((th) => {
-      const it = makeItem(th.id, th.qty);
-      if (th.mag !== undefined) it.mag = th.mag;
-      if (th.loaded !== undefined) it.loaded = th.loaded;
-      if (th.mods) it.mods = [...th.mods];
-      if (th.rounds !== undefined) it.rounds = th.rounds;
-      return it;
-    }),
-  };
-}
+/**
+ * The loadout (arena/rules.ts, arenaLoadout): the guns and nothing else, loaded, with what is fitted to them, no
+ * magazines, rounds, armour or clothes to see to (the owner: "lets strip the mags and the bullets and gear. lets make
+ * a simple fps shooter"). They empty and are reloaded from a reserve that never ends: see setDown.
+ */
+const loadout = (l: Lobby) => arenaLoadout(l.loadout);
 const carries = (l: Lobby, w: string) => (KITS.find((k) => k.id === l.loadout) ?? KITS[0]).things.some((th) => th.id === w);
 
 /** each at their own end, a few paces apart from their side, alive, whole and with the loadout */
