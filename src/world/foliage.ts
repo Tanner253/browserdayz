@@ -5,6 +5,7 @@
 
 import * as THREE from 'three';
 import type { ShaderPatch } from './atmosphere';
+import { SNOW_LIFT, snowUniforms } from './snow';
 import { SNOW } from './worldgen';
 
 export const wind = {
@@ -32,12 +33,18 @@ export interface FoliageOpts {
   snow?: 'leaf' | 'solid';
 }
 
-/** where snow lies on what stands at `o` (a place in the world): the line is ragged over the ground, not level */
-export const SNOW_LIES = /* glsl */ `
+/**
+ * Where snow lies on what stands at `o` (a place in the world): the line is ragged over the ground, not level. By
+ * its height, or by its place (src/world/snow.ts: about the fort and along the track to it the ground is reckoned
+ * higher than it stands). A material that has this in its shader is handed `snowUniforms` with it; one that is not
+ * reads the rule by height alone.
+ */
+export const SNOW_LIES = /* glsl */ `${SNOW_LIFT}
 float snowLies(vec3 o) {
   float ragged = sin(o.x * 0.043) * 6.0 + sin(o.z * 0.057 + 1.3) * 6.0;
-  return smoothstep(${SNOW.from.toFixed(1)}, ${SNOW.full.toFixed(1)}, o.y + ragged);
+  return smoothstep(${SNOW.from.toFixed(1)}, ${SNOW.full.toFixed(1)}, o.y + ragged + snowLift(o.xz));
 }`;
+export { snowUniforms };
 /** snow, as paint: what the ground's own is (src/world/terrain.ts) */
 export const SNOW_PAINT = 'vec3(0.80, 0.83, 0.88)';
 
@@ -53,7 +60,7 @@ export function foliagePatch(opts: FoliageOpts): { patch: ShaderPatch; lod: { va
   const f = (n: number) => n.toFixed(5);
 
   const patch: ShaderPatch = (shader) => {
-    Object.assign(shader.uniforms, wind, { uLod: lod });
+    Object.assign(shader.uniforms, wind, { uLod: lod }, opts.snow ? snowUniforms : null);
     shader.vertexShader = shader.vertexShader
       .replace(
         '#include <common>',

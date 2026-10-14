@@ -7,6 +7,7 @@ import { assets } from '../core/assets';
 import { physics, SOLID_GROUPS, type Surface } from '../core/physics';
 import type { Atmosphere } from '../world/atmosphere';
 import { roadLift } from '../world/road';
+import { snowLift } from '../world/snow';
 import { SNOW, type World } from '../world/worldgen';
 import { AIR_AT, airGlsl, Blasts, type BlastKind } from './blast';
 import { Flames, type Fire } from './flames';
@@ -589,11 +590,13 @@ export class Effects {
    * Told once, by whoever made the world: what the ground is anywhere on it. A blast throws the ground it is on
    * and raises its dust, and what stops a body knows the open ground only as one thing: the road, the four
    * grounds the land is painted with and the snow on the heights are the world's to say (the same way a footstep
-   * and a tyre are told: the road first, then the land's own).
+   * and a tyre are told: the road first, then the land's own). Snow lies by height, or by place: about the fort
+   * and along its track the ground is reckoned higher than it stands (`snowLift`, src/world/snow.ts), and what
+   * goes off there throws snow as it would on the mountain.
    */
   world(terrain: { surfaceAt(x: number, z: number): 'grass' | 'dirt' | 'rock' | 'gravel' }, world: World) {
     const snowUp = 1 / Math.hypot(1, SNOW.slope);
-    this.blasts.groundAt = (x, y, z, up) => (roadLift(world, x, z) > 0 ? 'asphalt' : y > (SNOW.from + SNOW.full) / 2 && up > snowUp ? 'snow' : terrain.surfaceAt(x, z));
+    this.blasts.groundAt = (x, y, z, up) => (roadLift(world, x, z) > 0 ? 'asphalt' : y + snowLift(world, x, z) > (SNOW.from + SNOW.full) / 2 && up > snowUp ? 'snow' : terrain.surfaceAt(x, z));
     // (and how far the road's own surface stands over the ground that stops a body under it)
     this.blasts.liftAt = (x, z) => roadLift(world, x, z);
   }

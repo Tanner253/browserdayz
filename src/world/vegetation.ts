@@ -9,7 +9,7 @@ import { assets, type TreeEntry } from '../core/assets';
 import { physics, type Surface } from '../core/physics';
 import { extractParts, groundParts, joinByPaint, type MeshPart } from '../core/gltf-utils';
 import { antiFirefly, SHADOW_FRUSTA, type Atmosphere } from './atmosphere';
-import { foliagePatch, setLodFade, wind, SNOW_LIES, SNOW_PAINT } from './foliage';
+import { foliagePatch, setLodFade, wind, snowUniforms, SNOW_LIES, SNOW_PAINT } from './foliage';
 import { heightAt, type Instance, type World } from './worldgen';
 import { BARREL } from '../sim/barrels';
 import { HUNG } from '../sim/crates';
@@ -426,6 +426,8 @@ class Impostors {
         fogDensity: this.seconds,
         // (the cards were photographed by day: at night they are turned down with the rest)
         uDaylight: this.daylight,
+        // (where snow lies by place and not by height, src/world/snow.ts: a tree's card is told what the tree is)
+        ...snowUniforms,
       },
       defines: { NV: rows, USE_FOG: '', FOG_EXP2: '' },
       vertexShader: IMPOSTOR_VS,

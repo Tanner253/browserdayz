@@ -5,7 +5,8 @@ import { physics } from '../core/physics';
 import { Simplex } from '../core/noise';
 import type { Atmosphere } from './atmosphere';
 import { CRAG_MOSS, KINDS, KIND_AT, KIND_NAMES, SNOW_GROUND, layGround, type Ground, type Kind } from './ground';
-import { CELL, SNOW, WORLD_RES, WORLD_SIZE, idx, type World } from './worldgen';
+import { RUTS, SNOW_LIFT, snowNet, snowOn, snowRuts, snowThinsGrass, snowUniforms, tellSnow } from './snow';
+import { CELL, SNOW, WORLD_RES, WORLD_SIZE, heightAt, idx, slopeAt, type World } from './worldgen';
 
 // The paint as it was: four layers, in the order of the splat's channels (grass, forest floor, rock, gravel), and
 // the metres each was laid to a repeat. The paint as it is now has the kinds of src/world/ground.ts, each at the
@@ -283,6 +284,13 @@ export class Terrain {
     const N = WORLD_RES;
     const half = WORLD_SIZE / 2;
     const { heights, splat, grass } = this.world;
+    // Where snow lies by place and not by height (src/world/snow.ts: about the fort and along its track, wherever
+    // the world has them): told to every shader that asks where snow lies, before any of them is made; and no
+    // grass stands through it there, as none does on the mountain. `lifted`: how much higher each point of the
+    // net is reckoned to stand for it (nothing at all in a world with no such place).
+    tellSnow(this.world);
+    snowThinsGrass(this.world);
+    const lifted = snowNet(this.world);
 
     // --- geometry (diagonal matches parry's heightfield triangulation)
     const pos = new Float32Array(N * N * 3);
@@ -315,7 +323,7 @@ export class Terrain {
         const x1 = Math.min(tx + TILE_QUADS, N - 1), z1 = Math.min(tz + TILE_QUADS, N - 1);
         const index = new Uint32Array((x1 - tx) * (z1 - tz) * 6);
         let k = 0;
-        let lo = Infinity, hi = -Infinity;
+        let lo = Infinity, hi = -Infinity, snowTop = -Infinity;
         for (let iz = tz; iz < z1; iz++) {
           for (let ix = tx; ix < x1; ix++) {
             const a = idx(ix, iz), b = idx(ix + 1, iz), c = idx(ix, iz + 1), d = idx(ix + 1, iz + 1);
@@ -324,9 +332,12 @@ export class Terrain {
             index[k++] = b; index[k++] = c; index[k++] = d;
             lo = Math.min(lo, heights[a], heights[b], heights[c], heights[d]);
             hi = Math.max(hi, heights[a], heights[b], heights[c], heights[d]);
+            if (lifted) snowTop = Math.max(snowTop, heights[a] + lifted[a], heights[d] + lifted[d]);
           }
         }
         const geo = new THREE.BufferGeometry();
+        // (the highest the tile is reckoned to stand by the snow: its own top, or more where snow lies by place)
+        geo.userData.snowTop = Math.max(hi, snowTop);
         geo.setAttribute('position', posAttr);
         geo.setAttribute('normal', nrmAttr);
         geo.setIndex(new THREE.BufferAttribute(index, 1));
@@ -376,6 +387,7 @@ export class Terrain {
         uTile: { value: new THREE.Vector4(...TILE.map((v) => 1 / v)) },
         uWorld: { value: new THREE.Vector2(WORLD_SIZE, WORLD_RES) },
         uTint: { value: tint },
+        ...snowUniforms,
       };
     } else {
       // (the kinds of ground, and after them the one picture that is not a kind: the moss on the bank's slabs)
@@ -389,7 +401,20 @@ export class Terrain {
         return tex;
       });
       const snowIs = new THREE.Vector4(...SNOW_GROUND.colour, 0);
+      // The ruts in the snow on the track to the fort ("the snow tire paths you made"): a picture laid over the
+      // track that says how far across from its middle a spot is (`snowRuts`), read between its points. None in a
+      // world with no such track: the paint is then told of a ground no bigger than nothing, and never looks.
+      const ruts = snowRuts(this.world);
+      let rutsTex: THREE.DataTexture | null = null;
+      if (ruts) {
+        rutsTex = new THREE.DataTexture(ruts.data, ruts.w, ruts.h, THREE.RGBAFormat);
+        rutsTex.magFilter = rutsTex.minFilter = THREE.LinearFilter;
+        rutsTex.needsUpdate = true;
+      }
       uniforms = {
+        ...snowUniforms,
+        tRuts: { value: rutsTex },
+        uRutsBox: { value: ruts ? new THREE.Vector4(ruts.x, ruts.z, 1 / ruts.wide, 1 / ruts.deep) : new THREE.Vector4() },
         tColour: { value: made.colour },
         tRelief: { value: made.loud },
         tReliefQuiet: { value: made.soft },
@@ -407,7 +432,8 @@ export class Terrain {
       };
       // What is not waited for before play. The relief of the ground's pictures: sent for when the first frame has
       // been drawn, and laid in a layer at a time. And snow's own picture: sent for when the eye first comes within
-      // 140 m of ground high enough for snow to lie on (most who play never climb to it).
+      // 140 m of ground high enough for snow to lie on (most who play never climb to it), or of ground it lies on
+      // by place: the fort's and its track's, which is reckoned as high as that.
       let begun = false, snowAsked = false;
       this.later = (tile, camera) => {
         if (!begun) {
@@ -415,7 +441,7 @@ export class Terrain {
           setTimeout(() => void made.sharpen().then(() => (this.relief = 'sharp'), (e) => console.warn('ground relief', e)), 1200);
         }
         const box = tile.geometry.boundingBox;
-        if (snowAsked || !box || box.max.y < SNOW.from - 12 || box.distanceToPoint(camera.position) > 140) return;
+        if (snowAsked || !box || (tile.geometry.userData.snowTop ?? box.max.y) < SNOW.from - 12 || box.distanceToPoint(camera.position) > 140) return;
         snowAsked = true;
         void buildSnow(t[SNOW_GROUND.tex]).then((tex) => {
           uniforms.tSnow.value = tex;
@@ -480,6 +506,16 @@ export class Terrain {
     for (let c = 1; c < 4; c++) if (s[i + c] > s[i + best]) best = c;
     return (['grass', 'dirt', 'rock', 'gravel'] as const)[best];
   }
+
+  /**
+   * Whether snow lies on the ground at a spot: high enough or in a snowy place (src/world/snow.ts), and not on a
+   * cliff. For whoever treads there. (Nothing asks yet: a footstep is told the ground under the snow, on the
+   * mountain as at the fort, and the sound of a step in snow waits in src/core/audio.ts for somebody to say it.)
+   */
+  snowAt(x: number, z: number): boolean {
+    const H = this.world.heights;
+    return snowOn(this.world, x, heightAt(H, x, z), z) > 0.5 && slopeAt(H, x, z) <= SNOW.slope;
+  }
 }
 
 const TERRAIN_PARS = /* glsl */ `
@@ -498,6 +534,8 @@ varying vec3 vTerrainNormal;
 #define SNOW_FULL ${SNOW.full.toFixed(1)}
 // (the upward part of the ground's normal on the steepest slope snow lies on)
 #define SNOW_STEEP ${(1 / Math.hypot(1, SNOW.slope)).toFixed(3)}
+// (where snow lies by place: how much higher a spot is reckoned to stand than it does)
+${SNOW_LIFT}
 
 // rotate uv by a per-cell random angle; two overlapping cells are blended to kill tiling
 vec2 tRot(vec2 uv, float a) { float c = cos(a), s = sin(a); return mat2(c, -s, s, c) * uv; }
@@ -583,11 +621,12 @@ float tAO = tArmV.r;
 // 2026-10-13: "i want high elevation mountains to be snowcapped, and the surrounding area snowcapped"). Laid over
 // whatever the ground is, after its own colour has been reckoned and held down: held down with it, snow is grey.
 // Its line is ragged by the same slow pattern the grass is patched by, the stones still show through it a little
-// where it begins, and its own small relief is flattened as it thickens: a drift has none.
+// where it begins, and its own small relief is flattened as it thickens: a drift has none. (High enough, or in a
+// snowy place: about the fort and along its track the ground is reckoned higher than it stands, see snowLift.)
 {
   float up = normalize(vTerrainNormal).y;
   float ragged = (macro.r - 0.5) * 16.0 + (macro2.b - 0.5) * 5.0;
-  float lies = smoothstep(SNOW_FROM, SNOW_FULL, vTerrainPos.y + ragged) * smoothstep(SNOW_STEEP - 0.07, SNOW_STEEP + 0.05, up);
+  float lies = smoothstep(SNOW_FROM, SNOW_FULL, vTerrainPos.y + ragged + snowLift(vTerrainPos.xz)) * smoothstep(SNOW_STEEP - 0.07, SNOW_STEEP + 0.05, up);
   float thin = lies * (0.82 + 0.18 * smoothstep(0.0, 0.5, lies) * (1.0 - 0.5 * tArmV.r * (1.0 - lies)));
   vec3 snow = vec3(0.80, 0.83, 0.88) * (0.94 + 0.08 * macro2.g);
   diffuseColor.rgb = mix(diffuseColor.rgb, snow, thin);
@@ -636,6 +675,18 @@ varying vec3 vTerrainNormal;
 // (the upward part of the ground's normal on the steepest slope snow lies on)
 #define SNOW_STEEP ${(1 / Math.hypot(1, SNOW.slope)).toFixed(3)}
 #define SNOW_TILE ${(1 / SNOW_GROUND.size).toFixed(4)}
+// (where snow lies by place: how much higher a spot is reckoned to stand than it does)
+${SNOW_LIFT}
+// The ruts in the snow on the track to the fort (RUTS in src/world/snow.ts). tRuts: over the ground uRutsBox says
+// (its corner in x and z, and one over its size each way), how far across from the middle of the track a spot is
+// (as a share of twice RUT_REACH, a half added), which way "across" is in x and z (each halved, a half added),
+// and how much of a rut there is so far along the track.
+uniform sampler2D tRuts;
+uniform vec4 uRutsBox;
+#define RUT_REACH ${RUTS.reach.toFixed(2)}
+#define RUT_GAUGE ${RUTS.gauge.toFixed(3)}
+#define RUT_OPEN ${RUTS.wide[0].toFixed(3)}
+#define RUT_SHUT ${RUTS.wide[1].toFixed(3)}
 // (the noise that deals out a picture's copies is laid this many of the picture wide: its patches are then about one wide)
 #define GROUND_PATCH ${(1 / 60).toFixed(5)}
 
@@ -854,9 +905,12 @@ float tAO = tAlb.a;
 // (it costs nothing there). Within sixty metres it has form: the soft dimpled relief of its own picture, its hollows
 // bluer (they are lit by the sky and not the sun), and a broken edge where it thins: it lies in the ground's low
 // places first, and what stands proud of the ground (a stone, a tuft) shows through it.
+// High enough, or in a snowy place (2026-10-13, of the fort moved down to the valley's rim: "i want the area around
+// the castle and leaidng up tot the castle snowy, even if its lower elevation than the snow cap elevation"): there
+// the ground is reckoned higher than it stands (snowLift), and all the rest is as it is on the mountain.
 {
   float ragged = (macro.r - 0.5) * 16.0 + (macro2.b - 0.5) * 5.0;
-  float lies = smoothstep(SNOW_FROM, SNOW_FULL, vTerrainPos.y + ragged) * smoothstep(SNOW_STEEP - 0.07, SNOW_STEEP + 0.05, gN.y);
+  float lies = smoothstep(SNOW_FROM, SNOW_FULL, vTerrainPos.y + ragged + snowLift(vTerrainPos.xz)) * smoothstep(SNOW_STEEP - 0.07, SNOW_STEEP + 0.05, gN.y);
   float thin = lies * (0.82 + 0.18 * smoothstep(0.0, 0.5, lies) * (1.0 - 0.5 * tAO * (1.0 - lies)));
   vec3 snow = uSnowIs.rgb * (0.94 + 0.08 * macro2.g);
   vec3 snowLean = vec3(0.0);
@@ -874,10 +928,42 @@ float tAO = tAlb.a;
     vec3 T = vec3(1.0, 0.0, 0.0) - gN * gN.x, B = vec3(0.0, 0.0, -1.0) + gN * gN.z;
     snowLean = (normalize(T) * (sn.r * 2.0 - 1.0) + normalize(B) * (sn.g * 2.0 - 1.0)) * close * 0.7;
   }
+  // THE RUTS on the track to the fort ("the snow look on the castle was much nicer, with the snow tire paths you
+  // made"). The road up the mountain had them: two lines the wheels kept open, the road dark and wet in them. The
+  // track has them the same way: in each wheel's line most of the snow is gone (less of it where the snow is
+  // deepest) and the earth under it is dark and wet; what snow is left there, and for a hand either side, is
+  // pressed and grey; and the rut has sides, which the light catches. Only where a pixel is finer than a rut:
+  // from far off the track is white.
+  vec3 rutLean = vec3(0.0);
+  float rutWet = 0.0;
+  vec2 rutUv = (vTerrainPos.xz - uRutsBox.xy) * uRutsBox.zw;
+  if (lies > 0.0 && rutUv.x > 0.0 && rutUv.y > 0.0 && rutUv.x < 1.0 && rutUv.y < 1.0) {
+    vec4 rt = textureLod(tRuts, rutUv, 0.0);
+    vec2 across = rt.gb * 2.0 - 1.0;
+    // (how far across the track one pixel reaches here, metres)
+    float px = abs(dot(dPx, across)) + abs(dot(dPy, across));
+    float seen = rt.a * (1.0 - smoothstep(0.2, 0.5, px));
+    if (seen > 0.0) {
+      float s = (rt.r - 0.5) * 2.0 * RUT_REACH;
+      // (how far from the middle of the nearer wheel's line: the line itself wanders a finger's breadth)
+      float off = abs(abs(s) - RUT_GAUGE) + (macro2.g - 0.5) * 0.1;
+      float rut = (1.0 - smoothstep(RUT_OPEN, RUT_SHUT + px, off)) * seen;
+      float pressed = (1.0 - smoothstep(RUT_SHUT, RUT_SHUT + 0.3 + px, off)) * seen;
+      float wall = clamp((off - RUT_OPEN) / (RUT_SHUT - RUT_OPEN), 0.0, 1.0);
+      // (not of one depth all the way: here the wheels have gone through to the earth, there they have only pressed the snow)
+      float worn = 0.4 + 0.6 * smoothstep(0.3, 0.7, macro2.r);
+      rutWet = rut * lies * worn;
+      diffuseColor.rgb *= 1.0 - 0.6 * rutWet;
+      thin *= 1.0 - rut * worn * (1.0 - 0.25 * smoothstep(0.75, 1.0, lies));
+      snow *= 1.0 - 0.12 * pressed;
+      // (its sides lean in toward its own middle, from either side of it)
+      rutLean = vec3(across.x, 0.0, across.y) * (-sign(s) * sign(abs(s) - RUT_GAUGE) * 4.0 * wall * (1.0 - wall) * 0.9 * lies * seen * (1.0 - smoothstep(0.08, 0.25, px)));
+    }
+  }
   diffuseColor.rgb = mix(diffuseColor.rgb, snow, thin);
-  gLean = mix(gLean * (1.0 - 0.8 * thin), snowLean, thin);
-  tRough = mix(tRough, ${SNOW_GROUND.rough.toFixed(2)}, thin);
-  tAO = mix(tAO, 1.0, thin * 0.6);
+  gLean = mix(gLean * (1.0 - 0.8 * thin), snowLean, thin) + rutLean;
+  tRough = mix(mix(tRough, ${SNOW_GROUND.rough.toFixed(2)}, thin), 0.42, rutWet * 0.7);
+  tAO = mix(tAO, 1.0, thin * 0.6) * (1.0 - 0.2 * rutWet);
 }
 `;
 

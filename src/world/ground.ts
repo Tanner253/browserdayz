@@ -12,6 +12,7 @@
 // The pictures are Poly Haven's (scripts/assets.config.mjs TEXTURES); how they are drawn is src/world/terrain.ts.
 
 import { Simplex } from '../core/noise';
+import { snowNet } from './snow';
 import { CELL, SNOW, WORLD_RES, WORLD_SIZE, type World } from './worldgen';
 
 /** what a footstep or a bullet is told the ground is (the four the game has sounds for) */
@@ -143,6 +144,10 @@ export function layGround(world: World): Ground {
   const N = WORLD_RES, n = N * N, half = WORLD_SIZE / 2;
   const H = world.heights, S = world.splat;
   const cell = (x: number) => Math.round((x + half) / CELL);
+  // (How high a point is reckoned to stand where the kinds of ground go by the snow line: the grass dries toward
+  // it, and the moss of a wood's bank gives out under it. Its own height; and where snow lies by place and not by
+  // height, about the fort and along its track, as much higher as the snow reckons it: src/world/snow.ts.)
+  const lifted = snowNet(world), toSnow = lifted ? (i: number) => H[i] + lifted[i] : (i: number) => H[i];
 
   // --- hollows and knolls: the ground against the mean of the ground for some twenty metres about it
   const mean = evened(H, 6);
@@ -190,7 +195,7 @@ export function layGround(world: World): Ground {
   for (let iz = 1; iz < N - 1; iz++) for (let ix = 1; ix < N - 1; ix++) {
     const i = iz * N + ix, gx = (H[i + 1] - H[i - 1]) / (2 * CELL), gz = (H[i + N] - H[i - N]) / (2 * CELL), slope = Math.sqrt(gx * gx + gz * gz);
     const shade = Math.min(1, Math.max(0, (gx * sunX + gz * sunZ) * 2.2)), wooded = smooth(0.04, 0.25, pineWood[i] + broadWood[i]);
-    const m = Math.min(1, Math.max(wooded, shade * 0.8)) * (1 - smooth(SNOW.from - 70, SNOW.from - 25, H[i]));
+    const m = Math.min(1, Math.max(wooded, shade * 0.8)) * (1 - smooth(SNOW.from - 70, SNOW.from - 25, toSnow(i)));
     mossyAt[i] = m;
     faces[i] = (S[i * 4 + 2] / 255) * (1 - m) * smooth(0.9, 1.3, slope);
     crags[i] = (S[i * 4 + 2] / 255) * m * smooth(0.55, 0.9, slope);
@@ -246,7 +251,7 @@ export function layGround(world: World): Ground {
       // grass: three of them, by how wet the place is (a hollow is, a knoll is not, and a slow pattern of its own
       // over a hundred metres says the rest), drying toward the snow line
       const wet = 0.5 * (hollow - knoll) + 0.75 * m1 + 0.2 * m2;
-      const high = smooth(SNOW.from - 28, SNOW.from - 4, h);
+      const high = smooth(SNOW.from - 28, SNOW.from - 4, toSnow(i));
       const lush = smooth(0.15, 0.5, wet - high), dry = smooth(0.15, 0.5, -wet + high * 1.3);
       let grass = g;
       // what stands over grass sheds on it: litter under the crown, thinning out through twiggy grass into the meadow

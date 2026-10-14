@@ -8,7 +8,7 @@ import { heightAt, type World } from './worldgen';
 import { buildBridges } from './bridge';
 import { buildWreck } from './crest';
 import { buildDrystone, buildGatehouse } from './gatehouse';
-import { SNOW_LIES, SNOW_PAINT } from './foliage';
+import { SNOW_LIES, SNOW_PAINT, snowUniforms } from './foliage';
 
 /** the asphalt is a ribbon laid just above the ground, so the two never fight for the same pixels */
 const ROAD_LIFT = 0.035;
@@ -100,6 +100,8 @@ export function buildRoad(world: World, atmo: Atmosphere, scene: THREE.Scene) {
   atmo.register(
     mat,
     (shader) => {
+      // (snow lies on it by place as well as by height: the mountain road's last metres, where the track to the fort leaves it)
+      Object.assign(shader.uniforms, snowUniforms);
       shader.vertexShader = shader.vertexShader
         .replace('#include <common>', '#include <common>\nattribute float aEdge;\nvarying float vEdge;\nvarying vec2 vRoadW;\nvarying vec3 vRoadP;')
         .replace('#include <begin_vertex>', '#include <begin_vertex>\nvEdge = aEdge;\nvRoadW = position.xz;\nvRoadP = position;');
