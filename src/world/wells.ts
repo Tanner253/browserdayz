@@ -3,6 +3,7 @@
 // (the map's own materials), and solid: the wall and the posts stop a body and a shot.
 
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { assets } from '../core/assets';
 import { physics } from '../core/physics';
 import { WELL, type Well } from '../sim/wells';
@@ -30,24 +31,28 @@ export function buildWells(wells: Well[], atmo: Atmosphere, scene: THREE.Scene) 
   const rope = atmo.register(new THREE.MeshStandardMaterial({ color: 0x8a7a58, roughness: 1 })) as THREE.MeshStandardMaterial;
   const water = atmo.register(new THREE.MeshStandardMaterial({ color: 0x16242a, roughness: 0.06, metalness: 0.35, envMapIntensity: 1.8 })) as THREE.MeshStandardMaterial;
   const R = WELL.ring, T = 0.17, W = WELL.wall;
+  // (Every well's parts of one paint are one thing, where they stand: a well was fifteen things to draw, and again in
+  // every shadow map, for four hundred triangles.)
+  const byPaint = new Map<THREE.Material, THREE.BufferGeometry[]>();
+  const part = new THREE.Object3D();
   for (const w of wells) {
-    const group = new THREE.Group();
+    const group = new THREE.Object3D();
     group.position.set(w.x, w.y, w.z);
     group.rotation.y = w.rot;
+    group.updateMatrix();
     const add = (geo: THREE.BufferGeometry, m: THREE.Material, x = 0, y = 0, z = 0, rx = 0, rz = 0) => {
-      const mesh = new THREE.Mesh(geo, m);
-      mesh.position.set(x, y, z);
-      mesh.rotation.set(rx, 0, rz);
-      mesh.castShadow = mesh.receiveShadow = true;
-      group.add(mesh);
-      return mesh;
+      part.position.set(x, y, z);
+      part.rotation.set(rx, 0, rz);
+      part.updateMatrix();
+      if (!byPaint.has(m)) byPaint.set(m, []);
+      byPaint.get(m)!.push(geo.applyMatrix4(part.matrix.premultiply(group.matrix)));
     };
     // the wall (it goes a little way into the ground, which is never quite level), its inside going down into the dark, and its cap
     add(tiled(new THREE.CylinderGeometry(R, R + 0.03, W + 0.3, 28, 1, true), 2.4, 0.5), brick, 0, (W - 0.3) / 2);
     add(tiled(new THREE.CylinderGeometry(R - T, R - T, W + 2.4, 28, 1, true), 2.2, 1.3), inside, 0, (W - 2.4) / 2);
     add(tiled(new THREE.RingGeometry(R - T, R + 0.05, 28, 1), 2, 2), stone, 0, W, 0, -Math.PI / 2);
     // the water: an arm's length down
-    add(new THREE.CircleGeometry(R - T, 28), water, 0, W - 0.62, 0, -Math.PI / 2).receiveShadow = false;
+    add(new THREE.CircleGeometry(R - T, 28), water, 0, W - 0.62, 0, -Math.PI / 2);
     // two posts, the beam between their heads, and a roof of two leaves over it
     for (const side of [-1, 1]) add(tiled(new THREE.BoxGeometry(0.13, 2.45, 0.13), 0.1, 1.2), wood, side * (R + 0.08), 1.225);
     add(tiled(new THREE.BoxGeometry(R * 2 + 0.5, 0.11, 0.11), 1.1, 0.1), wood, 0, 2.42);
@@ -59,13 +64,17 @@ export function buildWells(wells: Well[], atmo: Atmosphere, scene: THREE.Scene) 
     add(new THREE.CylinderGeometry(0.011, 0.011, 0.62, 5), rope, 0.12, 1.36, 0);
     add(new THREE.CylinderGeometry(0.15, 0.12, 0.27, 14, 1, true), pail, 0.12, 0.93, 0);
     add(new THREE.CircleGeometry(0.12, 14), pail, 0.12, 0.8, 0, -Math.PI / 2);
-    group.traverse((o) => {
-      o.matrixAutoUpdate = false;
-      o.updateMatrix();
-    });
-    scene.add(group);
     physics.addStatic(physics.R.ColliderDesc.cylinder((W + 0.3) / 2, R + 0.03), 'concrete', { x: w.x, y: w.y + (W - 0.3) / 2, z: w.z });
     const c = Math.cos(w.rot), s = Math.sin(w.rot);
     for (const side of [-1, 1]) physics.addStatic(physics.R.ColliderDesc.cuboid(0.07, 1.23, 0.07), 'wood', { x: w.x + side * (R + 0.08) * c, y: w.y + 1.23, z: w.z - side * (R + 0.08) * s }, w.rot);
+  }
+  for (const [m, list] of byPaint) {
+    const mesh = new THREE.Mesh(mergeGeometries(list, false)!, m);
+    mesh.castShadow = true;
+    // (the water takes no shadow)
+    mesh.receiveShadow = m !== water;
+    mesh.matrixAutoUpdate = false;
+    mesh.name = 'wells';
+    scene.add(mesh);
   }
 }
