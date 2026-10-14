@@ -110,7 +110,9 @@ export default defineConfig({
     proxy: {
       '/ws': { target: 'ws://localhost:8080', ws: true },
       '/healthz': 'http://localhost:8080',
-      '/arena': {
+      // (only the arena server's own two: its socket, /arena?..., and its list, /arena/lobbies. Not what else is under
+      // /arena: arena/rules.ts is the game's own code, served here, and forwarded it stopped every page loading)
+      '^/arena(/lobbies)?(\\?.*)?$': {
         target: process.env.ARENA_TARGET ?? 'http://localhost:8090',
         ws: true,
         changeOrigin: !!process.env.ARENA_TARGET,
