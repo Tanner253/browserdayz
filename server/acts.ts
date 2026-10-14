@@ -1,0 +1,319 @@
+// The server: what happens to players and things (locks, voice, carried things, seats, jeeps hurt and blown up, bodies, a kill).
+// (One part of index.ts, cut out of it whole on 2026-10-14 so that it can be read and worked on alone: nothing in it was changed.)
+
+import { Container, BODY_GRID, HOLD, layOnBody, heldIn } from '../src/sim/inventory';
+import type { ItemInstance } from '../src/sim/items';
+import { VOICE } from '../src/sim/voice';
+import { WEAPON_RULES, hitDamage } from '../src/sim/combat';
+import { fallen } from '../src/sim/grenades';
+import { JEEP, SEATS } from '../src/sim/vehicles';
+import { type CorpseInfo, type KillInfo, F_DEAD } from '../src/net/protocol';
+import { CORPSE_LIFETIME, boxes, economy, issue, jeepsDue, locks, log, tellSeats, vehicles, type Veh } from './index';
+import { TAG_FRESH_MS, carriedTags, lootedTags, tagSeen } from './tags';
+import { CHECK, dealt } from './checks';
+import { ADMIN, fellBlast } from './gate';
+import { broadcast, cleanItem, clients, drop, send, type Client } from './players';
+import { scoreOf, sendBoard } from './queue';
+
+// ------------------------------------------------------------------ gameplay
+
+export function releaseLock(c: Client) {
+  if (c.openCid && locks.get(c.openCid) === c.id) {
+    locks.delete(c.openCid);
+    ajar(c.openCid, false);
+  }
+  c.openCid = null;
+}
+
+/**
+ * One of the map's containers is being searched, or no longer is: everybody is told, and whoever is near one that
+ * has doors sees them swing open, stand open and shut again (a locker: src/game/lockers.ts). Only of what is part of
+ * the map: a body, a drop and a stash have no doors. And nothing is said of what a vanished admin opens: a door
+ * that opens by itself is somebody.
+ */
+export function ajar(cid: string, open: boolean, by?: Client) {
+  if (boxes.get(cid)?.kind !== 'crate' || (open && by?.power.hidden)) return;
+  broadcast({ t: 'cdoor', cid, open });
+}
+
+/** The short public mark of a key, as a player's own game stamps it on their tag (publicId in src/net/client.ts: the same sum). */
+function pidOf(key: string): string {
+  let a = 2166136261, b = 5381;
+  for (let i = 0; i < key.length; i++) {
+    a = Math.imul(a ^ key.charCodeAt(i), 16777619);
+    b = (Math.imul(b, 33) ^ key.charCodeAt(i)) | 0;
+  }
+  return (a >>> 0).toString(36) + (b >>> 0).toString(36);
+}
+
+/**
+ * A piece of somebody's speech: passed on, with whose it is in front of it, to whoever is alive within earshot of
+ * them and to nobody else. Nothing is kept of it. One player sends no more than VOICE.rate pieces a second over
+ * time and no more than VOICE.burst at once, none bigger than VOICE.bytes; the dead say nothing.
+ */
+const said = new Map<number, { at: number; left: number }>();
+
+export function voice(c: Client, piece: Buffer) {
+  if (!c.alive || piece.length < 3 || piece.length > VOICE.bytes || (ADMIN.muted.get(c.key) ?? 0) > Date.now()) return;
+  const now = Date.now();
+  // (an allowance that fills at VOICE.rate a second and holds VOICE.burst: what comes all at once after a stop is passed on whole)
+  let k = said.get(c.id);
+  if (!k) said.set(c.id, (k = { at: now, left: VOICE.burst }));
+  k.left = Math.min(VOICE.burst, k.left + ((now - k.at) / 1000) * VOICE.rate);
+  k.at = now;
+  if (k.left < 1) return;
+  k.left--;
+  const out = Buffer.allocUnsafe(piece.length + 2);
+  out.writeUInt16LE(c.id & 0xffff, 0);
+  piece.copy(out, 2);
+  for (const o of clients.values()) {
+    if (o === c || !o.alive || o.ws.readyState !== 1) continue;
+    if (Math.hypot(o.pose[0] - c.pose[0], o.pose[1] - c.pose[1], o.pose[2] - c.pose[2]) > VOICE.range) continue;
+    o.ws.send(out, { binary: true });
+  }
+}
+
+/** an item the server knows this player is carrying (pockets, slots, worn bags) */
+export function findCarried(c: Client, uid: unknown): ItemInstance | null {
+  if (!c.inv || typeof uid !== 'string') return null;
+  const walk = (it: ItemInstance | null | undefined): ItemInstance | null => {
+    if (!it) return null;
+    if (it.uid === uid) return it;
+    for (const p of it.cargo ?? []) {
+      const hit = walk(p.item);
+      if (hit) return hit;
+    }
+    return null;
+  };
+  for (const it of Object.values(c.inv.slots)) {
+    const hit = walk(it);
+    if (hit) return hit;
+  }
+  for (const cont of c.inv.containers) {
+    for (const it of cont.items) {
+      const hit = walk(it);
+      if (hit) return hit;
+    }
+  }
+  return null;
+}
+
+/**
+ * A tag's clock belongs to whoever is carrying it alive. On a body it stops, and whoever
+ * takes the tag next starts from nothing: the one who died too, if they come back for it
+ * (the server's own clock for them was cleared when they died: see kill).
+ */
+function stopTagClocks(it: ItemInstance) {
+  if (it.id === 'dogtag') {
+    it.holder = undefined;
+    it.held = 0;
+  }
+  for (const p of it.cargo ?? []) stopTagClocks(p.item);
+}
+
+/** the jeep a player sits in, and which seat */
+export function seatOf(c: Client): { v: Veh; seat: number } | null {
+  if (!c.seatAt) return null;
+  for (const v of vehicles.values()) {
+    const seat = v.seats.indexOf(c.id);
+    if (seat >= 0) return { v, seat };
+  }
+  return null;
+}
+
+/** out of whatever they are sitting in (they got out, died, or are gone) */
+export function leaveSeat(c: Client, gone = false) {
+  const at = seatOf(c);
+  // (out of a jeep that is moving, a body goes on moving)
+  if (c.seatAt) c.check.free = Date.now() + CHECK.free;
+  c.seatAt = 0;
+  if (!at) {
+    // (not in a seat, but perhaps still the one moving a jeep they got out of)
+    if (gone) for (const v of vehicles.values()) if (v.sim === c.id) {
+      v.sim = null;
+      v.s = [v.s[0], v.s[1], v.s[2], v.s[3], v.s[4], v.s[5], v.s[6], 0, 0, 0, 0, 0];
+      tellSeats(v, true);
+    }
+    return;
+  }
+  const { v, seat } = at;
+  v.seats[seat] = null;
+  // The game that was moving it goes on doing so until it has rolled to a stop (see 'vrest'):
+  // unless that game is gone, and then it stops where it was last seen.
+  if (gone && v.sim === c.id) {
+    v.sim = null;
+    v.s = [v.s[0], v.s[1], v.s[2], v.s[3], v.s[4], v.s[5], v.s[6], 0, 0, 0, 0, 0];
+    tellSeats(v, true);
+  } else tellSeats(v);
+}
+
+/** a jeep is hit: what it has left, and what follows from that */
+export function hurtJeep(v: Veh, amount: number, by: Client) {
+  if (v.goneAt || amount <= 0) return;
+  v.hp = Math.max(0, v.hp - amount);
+  broadcast({ t: 'vhp', i: v.i, hp: Math.round(v.hp), by: by.id });
+  if (v.hp <= 0) return blowJeep(v, by.id);
+  // on fire: it goes up in a few seconds, and everybody in it knows it
+  if (v.hp <= JEEP.hp * JEEP.fireAt && !v.burnAt) {
+    v.burnAt = Date.now() + JEEP.fuse * 1000;
+    v.by = by.id;
+  }
+}
+
+export function blowJeep(v: Veh, byId: number) {
+  if (v.goneAt) return;
+  const now = Date.now();
+  v.hp = 0;
+  v.burnAt = 0;
+  v.goneAt = now + 120_000;
+  jeepsDue.set(v.home, now + (Number(process.env.JEEP_RESPAWN_S) || JEEP.respawn) * 1000);
+  const by = clients.get(byId);
+  broadcast({ t: 'vboom', i: v.i, by: byId });
+  // whoever is in it, and whoever is standing by it
+  const rule = WEAPON_RULES.barrel;
+  for (const c of clients.values()) {
+    if (!c.alive) continue;
+    const inside = v.seats.includes(c.id);
+    const d = Math.hypot(c.pose[0] - v.s[0], c.pose[1] + 1 - v.s[1], c.pose[2] - v.s[2]);
+    const amount = inside ? 400 : hitDamage('barrel', 'torso', Math.max(0, d - 1.5));
+    if (amount <= 0 || d > rule.blast! + 3 || c.power.god) continue;
+    if (by && by !== c) c.lastHitBy = { id: by.id, name: by.name, w: 'fire', zone: 'torso', dist: d, at: now };
+    const len = Math.max(0.001, Math.hypot(c.pose[0] - v.s[0], c.pose[2] - v.s[2]));
+    dealt(c, amount, 'torso', 'fire');
+    send(c, { t: 'dmg', from: byId, amount, zone: 'torso', w: 'fire', dir: [(c.pose[0] - v.s[0]) / len, 0, (c.pose[2] - v.s[2]) / len] });
+  }
+  for (const id of v.seats) {
+    const c = id === null ? undefined : clients.get(id);
+    if (c) c.seatAt = 0;
+  }
+  v.seats = Array(SEATS).fill(null);
+  v.sim = null;
+  v.s = [v.s[0], v.s[1], v.s[2], v.s[3], v.s[4], v.s[5], v.s[6], 0, 0, 0, 0, 0];
+  tellSeats(v, true);
+  log(`jeep #${v.i} burned out${by ? ` (${by.name})` : ''}`);
+}
+
+/**
+ * everything a character carried goes into a body that can be searched for a while
+ *
+ * What was worn lies in the body's grid as the thing it is, with what was in it still in it: the jacket with what
+ * was in its pockets and the trousers with theirs, as a pack always did (2026-10-13: "When i kill someone and i
+ * loot their body and i pick up their backpack it should bring all the loot with it ... it should be the same for
+ * all inventories"). The grid is BODY_GRID, which holds all a person can have on at once: it was 8x10, and pocket
+ * loot and taken tags that found no room were thrown on the ground round the body.
+ */
+function makeCorpse(c: Client, v: number): CorpseInfo | null {
+  const inv = c.inv;
+  const [x, , z, yaw] = c.pose;
+  const y = c.pose[1];
+  const uid = `corpse_${c.id}_${Date.now().toString(36)}`;
+  const box = new Container(uid, 'Body', BODY_GRID[0], BODY_GRID[1], [], true);
+  const spill: ItemInstance[] = [];
+  /** what is to lie in the grid: laid all at once, the biggest first, so that the small things fill what is left */
+  const laid: ItemInstance[] = [];
+  // Their own tag (one, however many they claim to carry): on the body to be taken and cashed in, unless they had
+  // only just arrived. Somebody alive less than TAG_FRESH leaves no tag of their own at all: not the one round
+  // their neck, and not an older one of theirs that they took back off their last body. (That one was left on
+  // them: whoever killed a player a minute after they started again found a tag, and one that paid.) What they
+  // took off other people is on the body as it always was.
+  // (It is known for theirs by the mark of their key on it, or by their name: by the name alone, somebody who
+  // came back under another name carried a tag that was nobody's, and it was left on them whenever they died.)
+  const mine = pidOf(c.key);
+  const own = inv ? carriedTags(inv).find((t) => !lootedTags.has(t.uid) && (t.pid === mine || (t.owner ?? '') === c.name)) : undefined;
+  const lived = Date.now() - c.lifeAt, fresh = lived < TAG_FRESH_MS;
+  // (and an admin who has chosen so leaves no tag of their own either, however long they lived; or nothing at all
+  // of what they carried but the tags they took off other people)
+  const noTag = fresh || c.power.voidTag, bare = c.power.voidInv;
+  /** a tag that is on a body whoever's body it is: one taken off somebody else */
+  const taken = (t: ItemInstance) => {
+    const from = lootedTags.get(t.uid);
+    return !!from && from.ownerKey !== c.key;
+  };
+  let older = 0;
+  const theirs = (it: ItemInstance) => {
+    if (it.id !== 'dogtag' || taken(it)) return false;
+    if (lootedTags.delete(it.uid)) older++;
+    return true;
+  };
+  /** their own tags out of a thing, and out of whatever is in it: a pocket is inside the jacket now, one further in than it was */
+  const shed = (it: ItemInstance) => {
+    if (!it.cargo) return;
+    it.cargo = it.cargo.filter((p) => !theirs(p.item));
+    for (const p of it.cargo) shed(p.item);
+  };
+  const put = (it: ItemInstance | null) => {
+    if (!it || (noTag && theirs(it))) return;
+    // (an admin who leaves nothing leaves the tags all the same, out of whatever they were carried in: the pockets were gone through thing by thing when they were the body's own)
+    if (bare && it.id !== 'dogtag') return void (it.cargo ?? []).forEach((p) => put(p.item));
+    if (noTag) shed(it);
+    stopTagClocks(it);
+    laid.push(it);
+  };
+  if (inv) {
+    for (const it of Object.values(inv.slots)) put(it);
+    for (const cont of inv.containers) if (cont.id !== HOLD) for (const s of cont.items) put(cleanItem(s));
+    spill.push(...layOnBody(box, laid));
+    // An admin's hold is nobody's on a body: a body has a body's room and no more. What was in it is laid after
+    // everything that was worn, in whatever of the grid that has left, and what finds no room there is gone: not
+    // thrown on the ground round the body, where forty rifles would lie for whoever came by. (An admin who leaves
+    // nothing when they die, which is how every admin begins, leaves none of this either: `put` sees to that.)
+    const held = heldIn(inv);
+    if (held.length) {
+      laid.length = 0;
+      for (const s of held) put(cleanItem(s));
+      const lost = layOnBody(box, laid);
+      log(`${c.name} died with ${held.length} things in an admin's hold: ${bare ? 'none of them is left (an admin, who chose so)' : `${laid.length - lost.length} lie on the body, and ${lost.length} found no room there and are gone`}`);
+    }
+    if (own && !noTag) lootedTags.set(own.uid, { owner: c.name, ownerKey: c.key, ownerIp: c.ip, livedMs: lived });
+    else if (own || older) {
+      log(`${c.name} left no dog tag: ${fresh ? `alive ${Math.round(lived / 1000)} s` : 'an admin, who chose so'}${older ? ` (nor ${older} older of their own, taken back)` : ''}`);
+      const by = c.lastHitBy && Date.now() - c.lastHitBy.at < 15000 ? clients.get(c.lastHitBy.id) : undefined;
+      if (by && by !== c) send(by, { t: 'tell', kind: 'info', text: fresh ? `No dog tag on ${c.name}: alive less than ${Math.round(TAG_FRESH_MS / 60000)} minutes.` : `No dog tag on ${c.name}: an admin, at work.` });
+    }
+    if (bare) log(`${c.name} left nothing they carried on their body: an admin, who chose so`);
+  }
+  for (const it of spill) {
+    const a = Math.random() * Math.PI * 2;
+    economy.drop(it, x + Math.cos(a) * 0.9, y, z + Math.sin(a) * 0.9, Math.random() * 6.28);
+  }
+  if (!box.items.length) return null;
+  // (what is on a body is in the world from now on, whatever it was before: it is whoever carried it that was asked)
+  for (const p of box.items) issue(p.item);
+  boxes.set(uid, { cid: uid, kind: 'corpse', w: BODY_GRID[0], h: BODY_GRID[1], items: box.serialize().items, x, y, z, rot: yaw, emptiedAt: -1, name: c.name, expires: economy.time + CORPSE_LIFETIME, v });
+  return { uid, x, y, z, rot: yaw, name: c.name, v };
+}
+
+export function kill(c: Client, cause: string, v = 0) {
+  if (!c.alive) return;
+  c.alive = false;
+  c.logoutAt = 0;
+  // A grenade with its pin out in their hand does not go with them: it falls where they fell, everybody else is
+  // shown it lying there with what is left of its fuse (their own game lets go of it by itself), and when that has
+  // run the server reckons whom it reached: see `fellBlast`. (It vanished, until the ruling of 2026-10-13.)
+  const fell = fallen(c.nades, [c.pose[0], c.pose[1], c.pose[2]], Date.now());
+  if (fell) {
+    broadcast({ t: 'nade', id: c.id, o: fell.from, v: [0, 0, 0], w: fell.w, f: fell.left }, c);
+    setTimeout(() => fellBlast(c, fell.w, fell.lies), fell.left * 1000);
+  }
+  // (a body left behind has nobody to come back to it: it is out of the world once it has fallen)
+  if (c.asleep) setTimeout(() => drop(c), 3000);
+  releaseLock(c);
+  leaveSeat(c);
+  const now = Date.now();
+  const by = c.lastHitBy && now - c.lastHitBy.at < 15000 ? c.lastHitBy : null;
+  const k: KillInfo = { id: c.id, name: c.name, by: by?.id ?? null, byName: by?.name ?? null, w: by?.w ?? cause, zone: by?.zone ?? null, dist: Math.round(by?.dist ?? 0), v };
+  const corpse = makeCorpse(c, v);
+  for (const k of [...tagSeen.keys()]) if (k.startsWith(`${c.key}|`)) tagSeen.delete(k);
+  c.inv = null;
+  c.vitals = null;
+  c.lastHitBy = null;
+  c.pose[5] |= F_DEAD;
+  broadcast({ t: 'death', k, corpse });
+  // a kill on the board for whoever did it (never for doing it to yourself)
+  const killer = by ? clients.get(by.id) : undefined;
+  if (killer && killer !== c) {
+    scoreOf(killer).kills++;
+    sendBoard();
+  }
+  log(by ? `${c.name} was killed by ${by.name} (${by.w}, ${k.dist} m)` : `${c.name} died (${cause})`);
+}
