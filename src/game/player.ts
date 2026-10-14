@@ -122,6 +122,8 @@ export class Player {
   dead = false;
   /** sitting in a jeep: carried, not walking (see Garage) */
   seated = false;
+  /** in a wager the server alone says when somebody dies (server/arena.ts): this game never lets its own health or blood go below the last of it */
+  keepAlive = false;
   /** externally supplied (weapons): ADS + weapon weight slow the player */
   aiming = false;
   weightKg = 0;
@@ -1052,7 +1054,10 @@ export class Player {
     this.lastCause = cause;
     audio.hurt();
     this.onDamage(amount, cause);
-    if (this.vitals.health <= 0) this.dead = true;
+    if (this.vitals.health <= 0) {
+      if (this.keepAlive) this.vitals.health = 1;
+      else this.dead = true;
+    }
   }
 
   /** Slow vitals simulation (seconds). */
@@ -1072,7 +1077,7 @@ export class Player {
         this.onClot();
       }
     } else this.bleedT = 0;
-    if (v.blood <= BLOOD.dead && !this.god) {
+    if (v.blood <= BLOOD.dead && !this.god && !this.keepAlive) {
       this.lastCause = 'blood loss';
       this.dead = true;
       return;
@@ -1142,7 +1147,7 @@ export class Player {
 
   private damageQuiet(a: number, cause: string) {
     if (this.god) return;
-    this.vitals.health = Math.max(0, this.vitals.health - a);
+    this.vitals.health = Math.max(this.keepAlive ? 1 : 0, this.vitals.health - a);
     if (this.vitals.health <= 0 && !this.dead) {
       this.lastCause = cause;
       this.dead = true;

@@ -1396,6 +1396,18 @@ body.touch .set-page .gfx-range { height: 30px; }
 .sm-close:hover { color: var(--ink); border-color: var(--ink-dim); }
 .start-pane { display: none; }
 .start-brief[data-tab='map'] .pane-map, .start-brief[data-tab='brief'] .pane-brief { display: block; }
+.start-brief[data-tab='wagers'] .pane-wagers { display: block; }
+.wg-note { color: var(--ink-dim); font-size: 13px; line-height: 1.5; margin: 0 0 14px; }
+.wg-list { display: grid; gap: 6px; margin-bottom: 18px; }
+.wg-none { color: var(--ink-dim); font-size: 13px; }
+.wg-row { display: grid; grid-template-columns: 1fr 2.2fr auto auto; gap: 12px; align-items: center; padding: 8px 10px; background: rgba(255, 255, 255, 0.04); border-radius: 4px; font-size: 13px; }
+.wg-row span { color: var(--ink-dim); }
+.wg-row em { font-style: normal; font-family: var(--mono); color: var(--ink-dim); }
+.wg-row i { font-style: normal; color: var(--ink-dim); font-size: 12px; }
+.wg-row button, .wg-host { padding: 5px 14px; background: rgba(233, 196, 120, 0.16); border: 1px solid rgba(233, 196, 120, 0.5); color: #e9c478; border-radius: 3px; cursor: pointer; font: inherit; }
+.wg-host { margin-top: 12px; padding: 8px 22px; }
+.wg-stake { width: 90px; background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.15); color: var(--ink); padding: 4px 6px; font: inherit; }
+
 
 /* the map: the game's own picture of it, and marks that say what they are */
 .mm { position: relative; width: min(100%, 580px, calc(100vh / var(--ui-zoom, 1) - 322px)); aspect-ratio: 1; margin: 0 auto; background: #1b1f17; border: 1px solid var(--line); }

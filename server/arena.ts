@@ -134,7 +134,8 @@ function loadout(l: Lobby) {
   const kit = KITS.find((k) => k.id === l.loadout) ?? KITS[0];
   return {
     name: kit.name,
-    items: kit.things.map((th) => {
+    // (no medicine, food or drink: health is the server's in a wager, and a dressing would heal what only this game sees)
+    items: kit.things.filter((th) => !['food', 'drink', 'medical'].includes(ITEMS[th.id]?.category ?? '')).map((th) => {
       const it = makeItem(th.id, th.qty);
       if (th.mag !== undefined) it.mag = th.mag;
       if (th.loaded !== undefined) it.loaded = th.loaded;
@@ -310,7 +311,7 @@ function said(l: Lobby, f: Fighter, m: Record<string, unknown>) {
 /** the lobbies, as the menu's list has them */
 export function arenaList(): LobbyInfo[] {
   const now = Date.now();
-  return [...lobbies.values()].filter((l) => l.state !== 'over').map((l) => ({ id: l.id, host: l.host, kills: l.kills, loadout: l.loadout, stake: l.stake, size: l.size, have: everyone(l).filter((f) => !f.gone).length, state: l.state === 'open' ? 'open' : 'match', age: Math.round((now - l.opened) / 1000) }) as LobbyInfo & { size: number; have: number });
+  return [...lobbies.values()].filter((l) => l.state !== 'over').map((l) => ({ id: l.id, host: l.host, kills: l.kills, loadout: l.loadout, stake: l.stake, size: l.size, have: everyone(l).filter((f) => !f.gone).length, state: l.state === 'open' ? 'open' : 'match', age: Math.round((now - l.opened) / 1000) }));
 }
 
 const wss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024 });

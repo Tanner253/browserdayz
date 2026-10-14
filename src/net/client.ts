@@ -27,10 +27,31 @@ export function remoteServer(): string | null {
   return base;
 }
 
+/**
+ * The wager this page is for, as the arena asks it (src/sim/arena.ts, server/arena.ts): `?wager=new` with what the
+ * host chose (size, kills, loadout, stake) to open one, `?wager=<id>` to join one. Null: the open world.
+ */
+export function wagerQuery(): string | null {
+  const q = new URLSearchParams(location.search), w = q.get('wager');
+  if (!w) return null;
+  const out = new URLSearchParams({ w });
+  for (const k of ['size', 'kills', 'loadout', 'stake']) if (q.get(k)) out.set(k, q.get(k)!);
+  return out.toString();
+}
+
+/** the wager is over (or was never there to join): the page is the open world's again */
+export function leaveWager() {
+  const q = new URLSearchParams(location.search);
+  for (const k of ['wager', 'size', 'kills', 'loadout', 'stake']) q.delete(k);
+  history.replaceState(null, '', `${location.pathname}${q.toString() ? '?' + q : ''}${location.hash}`);
+}
+
 function wsUrl(): string {
   const remote = remoteServer();
-  if (remote) return remote.replace(/^http/, 'ws') + '/ws';
-  return `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
+  const base = remote ? remote.replace(/^http/, 'ws') : `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`;
+  // (a wager is fought in the arena, on its own path)
+  const wager = wagerQuery();
+  return wager ? `${base}/arena?${wager}` : `${base}/ws`;
 }
 
 /** How many people are on the server right now, how many it holds and how many are waiting to get in (for the start screen). Null if it can't be reached. */
@@ -286,6 +307,8 @@ export class Net {
         // (on the bot check's range: the welcome comes when it is passed, however long that takes)
         if (m.t === 'range') clearTimeout(timer);
         if (m.t === 'kick') {
+          // (out of a wager, whatever the reason: the next Deploy is into the open world)
+          if (wagerQuery()) leaveWager();
           this.kicked = m.reason;
           this.kickedV = m.v;
           this.proofKey = typeof m.captcha === 'string' ? m.captcha : '';

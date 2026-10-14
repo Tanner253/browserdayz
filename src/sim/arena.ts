@@ -38,6 +38,9 @@ export interface LobbyInfo {
   state: 'open' | 'match';
   /** seconds since it was opened */
   age: number;
+  /** players a side, and how many are in so far */
+  size: number;
+  have: number;
 }
 
 /**

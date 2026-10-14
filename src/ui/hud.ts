@@ -2,6 +2,9 @@
 // only when relevant. Plain DOM; updated once per frame with cheap diffs.
 
 import { offer, type Offer, type Pick, type Role } from '../net/orders';
+import { ARENA, type LobbyInfo } from '../sim/arena';
+import { KITS } from '../sim/kits';
+import { remoteServer } from '../net/client';
 import { fullWanted, reloadPage, wantFull } from '../core/leave';
 import type { Vitals } from '../game/player';
 import { BLOOD } from '../sim/blood';
@@ -229,6 +232,7 @@ export class HUD {
           <div class="sm-brand"><img src="/brand/zona-mark-plain.svg" alt=""><b>ZONA</b></div>
           <nav class="sm-nav start-tabs" aria-label="Menu">
             <button type="button" data-tab="play" class="on">Play</button>
+            <button type="button" data-tab="wagers">Wagers</button>
             <button type="button" data-tab="map">Map</button>
             <button type="button" data-tab="brief">How to play</button>
             <button type="button" data-tab="gfx">Settings</button>
@@ -294,6 +298,7 @@ export class HUD {
                 <div><b>The bunker</b><span>Under the hills across the map from the works: dark, and shut. A keycard from the gas opens its door, loudly: it stays open while anybody is inside. The shotgun is kept there and nowhere else.</span></div>
               </div>
             </div>
+            <div class="start-pane pane-wagers"></div>
             <div class="start-pane pane-gfx start-gfx">
               <div class="set-tabs" role="tablist" aria-label="Settings">
                 <kbd class="set-key" aria-hidden="true">Q</kbd>
@@ -697,7 +702,8 @@ export class HUD {
     card.dataset.tab = tab;
     this.toggle(this.el.start, 'sheet', tab !== 'play');
     for (const b of this.root.querySelectorAll<HTMLButtonElement>('.start-tabs button')) b.classList.toggle('on', b.dataset.tab === tab);
-    (card.querySelector('h2') as HTMLElement).textContent = { map: 'The map', brief: 'How to play', gfx: 'Settings' }[tab] ?? '';
+    (card.querySelector('h2') as HTMLElement).textContent = { map: 'The map', brief: 'How to play', gfx: 'Settings', wagers: 'Wagers' }[tab] ?? '';
+    if (tab === 'wagers') void this.renderWagers();
     // (the settings open on their first page; the page chosen is kept for as long as they stay open)
     if (tab === 'gfx') this.setTab(SET_TABS[0][0]);
     (this.root.querySelector('.mm-tip') as HTMLElement).classList.remove('on');
@@ -1225,6 +1231,66 @@ export class HUD {
       b.classList.toggle('on', on);
       b.setAttribute('aria-selected', String(on));
     }
+  }
+
+  // ---------------------------------------------------------------- wagers
+
+  /** what the host has chosen so far (src/sim/arena.ts) */
+  private wg = { size: 1, kills: 5, loadout: 'assault', stake: 0.05 };
+  private wgBound = false;
+
+  /**
+   * The wagers (2026-10-14: team against team in the fort, rounds as in CS:GO): those open and being fought, as the
+   * game server's arena has them, and a form to host one. Hosting or joining one sets it in the page's address and
+   * presses Deploy: the game goes in to the arena as it goes in to the open world (src/net/client.ts, wagerQuery).
+   */
+  private async renderWagers() {
+    const pane = this.root.querySelector('.pane-wagers') as HTMLElement, w = this.wg;
+    const esc = (t: string) => t.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
+    const kitName = (id: string) => KITS.find((k) => k.id === id)?.name ?? id;
+    let list: LobbyInfo[] | null = null;
+    try {
+      list = ((await (await fetch(`${remoteServer() ?? ''}/arena/lobbies`, { cache: 'no-store' })).json()) as { lobbies: LobbyInfo[] }).lobbies;
+    } catch {
+      list = null;
+    }
+    const opt = (k: string, v: string | number, label: string, on: boolean) => `<button type="button" data-wk="${k}" data-wv="${v}"${on ? ' class="on"' : ''}>${label}</button>`;
+    const rows = list === null ? '<p class="wg-none">The arena cannot be reached just now.</p>'
+      : !list.length ? '<p class="wg-none">None open: host one.</p>'
+      : list.map((l) => `<div class="wg-row"><b>${esc(l.host)}</b><span>${l.size}v${l.size} · first to ${l.kills} · ${esc(kitName(l.loadout))} · ${l.stake} SOL</span><em>${l.have}/${l.size * 2}</em>${l.state === 'open' && l.have < l.size * 2 ? `<button type="button" data-join="${esc(l.id)}">Join</button>` : '<i>being fought</i>'}</div>`).join('');
+    pane.innerHTML =
+      '<p class="wg-note">Team against team in the fort. A round ends when a side has nobody left standing; first to the rounds asked for wins. Every hit and every health point is the server&#39;s to say. In this first version the stake is shown, and nothing is paid.</p>' +
+      `<h4 class="set-h">Open wagers</h4><div class="wg-list">${rows}</div>` +
+      '<h4 class="set-h">Host a wager</h4>' +
+      `<div class="gfx-row"><span>Teams</span><div class="gfx-opts">${[1, 2, 3].map((n) => opt('size', n, `${n}v${n}`, w.size === n)).join('')}</div></div>` +
+      `<div class="gfx-row"><span>Rounds to win</span><div class="gfx-opts">${ARENA.kills.map((n) => opt('kills', n, String(n), w.kills === n)).join('')}</div></div>` +
+      `<div class="gfx-row"><span>Loadout<small>Everybody in the match gets it, every round</small></span><div class="gfx-opts">${ARENA.loadouts.map((id) => opt('loadout', id, kitName(id), w.loadout === id)).join('')}</div></div>` +
+      `<div class="gfx-row"><span>Stake, SOL<small>Each player's, from ${ARENA.stake[0]} to ${ARENA.stake[1]} (not paid yet)</small></span><div class="gfx-opts"><input class="wg-stake" type="number" min="${ARENA.stake[0]}" max="${ARENA.stake[1]}" step="0.01" value="${w.stake}"></div></div>` +
+      '<button type="button" class="wg-host">Host it</button>';
+    if (this.wgBound) return;
+    this.wgBound = true;
+    const go = (q: Record<string, string>) => {
+      const p = new URLSearchParams(location.search);
+      for (const [k, v] of Object.entries(q)) p.set(k, v);
+      history.replaceState(null, '', `${location.pathname}?${p}${location.hash}`);
+      this.sheet('play');
+      (this.root.querySelector('.start-btn') as HTMLButtonElement).click();
+    };
+    pane.addEventListener('click', (e) => {
+      const b = (e.target as HTMLElement).closest('button') as HTMLButtonElement | null;
+      if (!b) return;
+      if (b.dataset.wk) {
+        const k = b.dataset.wk as 'size' | 'kills' | 'loadout', v = b.dataset.wv!;
+        (this.wg as Record<string, number | string>)[k] = k === 'loadout' ? v : Number(v);
+        return void this.renderWagers();
+      }
+      if (b.dataset.join) return go({ wager: b.dataset.join });
+      if (b.classList.contains('wg-host')) {
+        const stake = Number((pane.querySelector('.wg-stake') as HTMLInputElement).value);
+        this.wg.stake = Math.min(ARENA.stake[1], Math.max(ARENA.stake[0], Number.isFinite(stake) ? stake : ARENA.stake[0]));
+        go({ wager: 'new', size: String(this.wg.size), kills: String(this.wg.kills), loadout: this.wg.loadout, stake: String(this.wg.stake) });
+      }
+    });
   }
 
   // ---------------------------------------------------------------- chat
