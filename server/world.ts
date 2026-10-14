@@ -1,7 +1,7 @@
 // The server builds the same world the clients do, from the same code and seed, so
 // loot points, crates, doors and spawn points line up exactly without sending the map.
 
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { bunkerPlace, generateWorld, heightAt } from '../src/world/worldgen';
 import { BUNKER, bunkerAt, bunkerCrates, levelY } from '../src/sim/bunker';
@@ -11,6 +11,7 @@ import { crateId } from '../src/net/protocol';
 import { callSite, pickDropSite } from '../src/sim/drops';
 import { barrelSpots } from '../src/sim/barrels';
 import { JEEP, POLICE_CAR, jeepSpots, policeSpots } from '../src/sim/vehicles';
+import { HELI, heliSpots } from '../src/sim/heli';
 import { homeSpot, infectedHomes, type Home } from '../src/sim/infected';
 import { fireSpots } from '../src/sim/fires';
 import { gasZone } from '../src/sim/gas';
@@ -26,7 +27,9 @@ export interface CrateSpot {
 }
 
 export function buildWorldData(root: string) {
-  const manifestPath = [path.join(root, 'dist/assets/manifest.json'), path.join(root, 'public/assets/manifest.json')].find((p) => existsSync(p));
+  // (the newer of the built copy and the one in public/: the same after a build, and on a machine whose last build is
+  // older than the last model brought in, that model's things are not left out: 2026-10-14, the helicopters)
+  const manifestPath = [path.join(root, 'dist/assets/manifest.json'), path.join(root, 'public/assets/manifest.json')].filter((p) => existsSync(p)).sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)[0];
   if (!manifestPath) throw new Error('assets manifest not found (run the client build first)');
   // furniture sizes come from the model manifest; nothing is downloaded or rendered here
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as { models?: Record<string, unknown> };
@@ -65,6 +68,8 @@ export function buildWorldData(root: string) {
     jeeps: manifest.models?.[JEEP.model] || process.env.JEEPS === 'on' ? jeepSpots(world) : [],
     /** and the police cars, one beside each police station: none without the jeeps, or without a model of their own */
     cars: manifest.models?.[JEEP.model] && manifest.models?.[POLICE_CAR.model] ? policeSpots(world, jeepSpots(world)) : [],
+    /** and the helicopters (src/sim/heli.ts): on the hospital's roof and by the fort; none without the jeeps, or without a model of their own */
+    helis: manifest.models?.[JEEP.model] && manifest.models?.[HELI.model] ? heliSpots(world) : [],
     spawns: world.spawns,
     /** where the infected live, and somewhere to stand one about such a place (see src/sim/infected.ts) */
     homes: infectedHomes(world),

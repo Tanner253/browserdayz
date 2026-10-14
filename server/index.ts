@@ -24,6 +24,7 @@ import { RangeJudge, shotMisses } from '../src/sim/range';
 import { inBunker, BUNKER } from '../src/sim/bunker';
 import { BARREL } from '../src/sim/barrels';
 import { type VehicleInfo, POLICE_CAR, restState, JEEP, SEATS, type VState } from '../src/sim/vehicles';
+import { HELI } from '../src/sim/heli';
 import { Director } from '../src/sim/infected';
 import { type StoredItem, type S2C, PROTOCOL, type C2S } from '../src/net/protocol';
 import { Hearths } from '../src/sim/fires';
@@ -146,7 +147,7 @@ export const jeepsDue = new Map<number, number>();
 let nextVeh = 1;
 
 /** where every car stands when the world is new, by the number of its place: the jeeps, and after them the police cars */
-export const PARKS = [...world.jeeps.map((p) => ({ ...p, k: 0 })), ...world.cars.map((p) => ({ ...p, k: POLICE_CAR.kind }))];
+export const PARKS = [...world.jeeps.map((p) => ({ ...p, k: 0 })), ...world.cars.map((p) => ({ ...p, k: POLICE_CAR.kind })), ...world.helis.map((p) => ({ ...p, k: HELI.kind }))];
 
 export function standJeep(home: number): Veh {
   const p = PARKS[home];

@@ -1,5 +1,5 @@
 {
- "generated": "2026-10-14T05:55:11.999Z",
+ "generated": "2026-10-14T06:41:32.864Z",
  "hdri": {
   "background": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
   "env": "assets/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr"
@@ -5538,6 +5538,26 @@
     9.6065,
     8.2812,
     18.3912
+   ],
+   "lods": []
+  },
+  "md500": {
+   "url": "assets/models/md500.glb",
+   "tags": [
+    "vehicle"
+   ],
+   "bytes": 331260,
+   "srcTris": 1865,
+   "tris": 1865,
+   "min": [
+    -3.715,
+    0,
+    -3.245
+   ],
+   "max": [
+    3.645,
+    3.1032,
+    5.061
    ],
    "lods": []
   }

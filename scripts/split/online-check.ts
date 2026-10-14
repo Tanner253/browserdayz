@@ -2,7 +2,7 @@
 // It starts this tree's server on a port of its own (8193, `.env.local-server`, a data folder of its own: as
 // join-check.ts does, and for the same reasons), then has play.mjs open the dev page (5173: it must be running)
 // pointed at that server, join, and stand in the world a few seconds. Any page error or console error fails it.
-// Read the graphics card first (CLAUDE.md): PLAY_GL=swiftshader leaves it alone. PLAY_PORT defaults to 9361 here.
+// PLAY_GL=swiftshader draws on the processor instead of the card. PLAY_PORT defaults to 9361 here.
 import assert from 'node:assert/strict';
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';

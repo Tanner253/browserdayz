@@ -7,6 +7,7 @@ import { ITEMS, type ItemInstance, makeItem } from '../src/sim/items';
 import { WORLD_SIZE } from '../src/world/worldgen';
 import { comesFrom, flightTimes } from '../src/sim/airdrop';
 import { POLICE_CAR, restState } from '../src/sim/vehicles';
+import { HELI } from '../src/sim/heli';
 import { INFECTED } from '../src/sim/infected';
 import type { S2C } from '../src/net/protocol';
 import { ORDERS, written, entityBy, ENTITIES, GROUND } from '../src/net/orders';
@@ -171,7 +172,7 @@ function takeCar(c: Client, v: Veh): string {
   vehicles.delete(v.i);
   broadcast({ t: 'v-', i: v.i });
   log(`[admin] ${c.name} took away car ${v.i}${v.goneAt ? ' (burned out)' : ''} at ${v.s[0].toFixed(0)}, ${v.s[2].toFixed(0)}`);
-  return `Taken away: ${v.goneAt ? 'the burned-out car' : v.k === POLICE_CAR.kind ? 'the police car' : 'the jeep'}, number ${v.i}. (The cars of the map are back when the server next starts.)`;
+  return `Taken away: ${v.goneAt ? 'the burned-out car' : v.k === POLICE_CAR.kind ? 'the police car' : v.k === HELI.kind ? 'the helicopter' : 'the jeep'}, number ${v.i}. (The cars of the map are back when the server next starts.)`;
 }
 
 /**

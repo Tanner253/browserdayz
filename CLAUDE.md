@@ -30,7 +30,7 @@ ZONA is a browser PvP survival shooter in the manner of DayZ, where a dog tag ta
 ## Checking work
 - Type-check three ways and READ THE EXIT CODE: `npx tsc --noEmit; echo $?`, `npx tsc --noEmit -p tsconfig.server.json; echo $?`, `npx tsc --noEmit -p tsconfig.api.json; echo $?`. (A `| head` once hid an error that broke a Vercel build.)
 - Tests: `npx tsx test/<name>.test.ts`. The whole suite: `node scripts/test-all.mjs` (eight at a time; it refuses to start if two test files use one port, so give a new test ports of its own; whatever fails is run again alone and only that second result counts). NEVER run `test/devnet.test.ts` (it uses the public Solana devnet faucet and sends transactions).
-- A change meant to change nothing (moving code, tightening comments): `npx tsx scripts/split/fingerprint.ts <file.json>` before (writes the world's prints) and after (compares: generateWorld, the server's world, the fort, byte for byte); `npx tsx scripts/split/join-check.ts` (this tree's server boots on its own port and lets two players in); `npx tsx scripts/split/online-check.ts` (the game comes up online in headless Chrome with no page errors; read the card first).
+- A change meant to change nothing (moving code, tightening comments): `npx tsx scripts/split/fingerprint.ts <file.json>` before (writes the world's prints) and after (compares: generateWorld, the server's world, the fort, byte for byte); `npx tsx scripts/split/join-check.ts` (this tree's server boots on its own port and lets two players in); `npx tsx scripts/split/online-check.ts` (the game comes up online in headless Chrome with no page errors).
 - Anything seen must be looked at in the real game before it is called done (stumps set on the ground and gaps at stair heads went live because nobody looked). Things set on the ground are judged where they meet it.
 
 ## Deploying (only when the owner says so; when they say so, do it at once)
@@ -50,7 +50,7 @@ ZONA is a browser PvP survival shooter in the manner of DayZ, where a dog tag ta
 - NEVER run `npm run assets`: it wrecks `public/assets/manifest.json`. Bring a model in as the last single model was (`node scripts/packs.mjs <id>`, `tier-now.mjs`, `lods.mjs`).
 - NEVER `git worktree remove` a copy that has a `node_modules` junction: it deleted the real packages once. Order: `cmd //c "rmdir <wt>\node_modules"`, check it is gone, `rm -rf <wt>`, `git worktree prune`.
 - Bash heredocs mangle backslashes and apostrophes: write scripts with the Write tool; run Python with `python -I`; Python's text mode writes CRLF on this machine: open files with `newline=''`.
-- The graphics card (laptop RTX 3070 Ti, 8 GB) throttles at 88 C. Before any headless game read `nvidia-smi --query-gpu=utilization.gpu,temperature.gpu --format=csv,noheader` AS ITS OWN COMMAND and do not launch at 70% use or 84 C. Keep the Browser pane closed while the owner plays; never start the game's sound in the pane.
+- The card's heat: the owner, 2026-10-14, with one chat working at a time: "Don't concern yourself with temps ... dont need to pause or wait." Run headless games when needed; do not read the card first or wait for it to cool. (Still keep the Browser pane closed while the owner plays, and never start the game's sound in the pane.)
 - When the machine is slow, look for leftover processes of finished work (old `tsx` scripts, extra `vite` servers): one ran five hours unseen.
 - `git index.lock` can appear while several hands work: retry.
 

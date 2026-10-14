@@ -17,7 +17,9 @@ import type { IState, InfectedInfo } from '../sim/infected';
 
 // (36, 2026-10-13: the jacket and the trousers are things worn in `top` and `legs`, with the pockets inside them. A
 // page from before would say "nothing in my pockets" of a character that has them full, and the server would keep it.)
-export const PROTOCOL = 37;
+// (38, 2026-10-14: a third kind of vehicle, the helicopter (`k` 2: src/sim/heli.ts): a page from before would draw it
+// as a jeep, in the air.)
+export const PROTOCOL = 38;
 
 /** chat channels: everyone on the server, or only players standing near the speaker */
 /** `staff`: those with a role, to one another, wherever they are: nobody else is sent it */

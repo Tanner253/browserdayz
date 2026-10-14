@@ -719,6 +719,12 @@ export const LOCAL_MODELS = {
   // 28 m over all, rotor included: some 27 m nose to tail, 1.7 times a real Apache (at 1.4 times it read as any
   // helicopter would in the sky at ninety metres). Stood with its origin under the main rotor's hub, nose toward -z.
   apache: { dir: 'low_poly_apache_gunship', only: /Gunship_material/, pivot: /^Rotor$/, hung: { rotor: /^Rotor_/, tail: /^Back_Rotor_/ }, rot: [0, Math.PI, 0], size: 28, tex: 1024, tags: ['prop'], changes: 'Its loose missile left out; its main and tail rotors made pieces of their own about their hubs (its own animation not used: the game turns them); turned nose to -z and stood under its main rotor; scaled to 28 m over all; textures re-encoded as WebP at the size they came; geometry compressed.' },
+  // The helicopter a player flies (2026-10-14: "a new helicopter for users to use"). Unpack
+  // assets-src/md-500_defender_helicopter.zip into assets-src/models/md-500_defender_helicopter/. Its rotors are
+  // pieces of their own (`md500_rotor`, `md500_tail`), each with its origin on its hub, so the game turns them. It
+  // came in its own metres (6.9 m nose to tail, a rotor 7.4 m across: an MD 500 is 7 m and 8 m): kept so. Nose
+  // toward -z, stood with its origin under the main rotor's hub, its skids on y = 0.
+  md500: { dir: 'md-500_defender_helicopter', pivot: /^Top_rotor$/, hung: { rotor: /^Top_rotor_/, tail: /^Tail_Rotor_/ }, rot: [0, Math.PI, 0], scale: 1, tex: 1024, tags: ['vehicle'], changes: 'Its main and tail rotors made pieces of their own about their hubs (its own animation not used: the game turns them); turned nose to -z and stood under its main rotor; kept at the size it came; textures re-encoded as WebP at the size they came; geometry compressed.' },
   parachute: { dir: 'army_parachute', solid: true, both: true, size: 12, tex: 4096, tags: ['prop'], changes: 'Made solid: drawn as a thing that is not seen through, where it came half clear, with the clearness taken out of its colour picture, and both faces of its cloth drawn; scaled to metres (twelve from where its lines meet to the top of the canopy) and stood on the point where its lines meet; textures re-encoded as WebP at the size they came; geometry compressed. In the game it is drawn narrow as it opens and laid over as it settles.' },
   // The frag grenade (2026-10-13: "i added a new frag grenade, it takes up 1x1 in the inventory"). Unpack
   // assets-src/frag_granade.zip into assets-src/models/frag_grenade/. A ball grenade with its fuse, lever, pin and

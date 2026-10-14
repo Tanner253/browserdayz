@@ -127,6 +127,9 @@ export interface Controls {
   /** -1 (left) .. 1 */
   steer: number;
   hand: boolean;
+  /** a helicopter's (src/game/heli.ts): -1 (down) .. 1 (up), and -1 (lean left) .. 1 (right); `throttle` tips its nose, `steer` turns it round */
+  lift?: number;
+  roll?: number;
 }
 
 /** render jeeps driven elsewhere this far in the past: long enough that the report after the one being drawn has nearly always come */
@@ -145,7 +148,7 @@ interface Snap {
 export class Jeep {
   body!: RAPIER.RigidBody;
   colliders: RAPIER.Collider[] = [];
-  private ctrl!: RAPIER.DynamicRayCastVehicleController;
+  protected ctrl!: RAPIER.DynamicRayCastVehicleController;
   /** what is drawn: the body, and the four wheels (front left, front right, rear left, rear right) */
   readonly root = new THREE.Group();
   readonly wheels: THREE.Object3D[] = [];
@@ -175,10 +178,10 @@ export class Jeep {
   sim: number | null = null;
   /** it hit something: how hard (m/s lost in one step) */
   onCrash: (hard: number) => void = () => {};
-  private prevPos = new THREE.Vector3();
-  private prevQuat = new THREE.Quaternion();
-  private post = new THREE.Vector3();
-  private hasPost = false;
+  protected prevPos = new THREE.Vector3();
+  protected prevQuat = new THREE.Quaternion();
+  protected post = new THREE.Vector3();
+  protected hasPost = false;
   private snaps: Snap[] = [];
   /**
    * How far the clock of the game that is moving it is behind this one's, by the quickest
@@ -191,7 +194,7 @@ export class Jeep {
   private susp = [0, 0, 0, 0];
   private hard: THREE.Vector3[] = [];
   /** seconds it has been all but still (see atRest) */
-  private still = 0;
+  protected still = 0;
 
   /** @param d how it drives: the jeep's numbers, or another car's (see DRIVES) @param kind which car it is */
   constructor(public i: number, private groundAt: (x: number, z: number) => Ground, readonly d: typeof DRIVE = DRIVE, readonly kind = 0) {}
@@ -548,7 +551,7 @@ export class Jeep {
   private stoodQuat = new THREE.Quaternion();
   private settled = 0;
 
-  private draw(dt: number) {
+  protected draw(dt: number) {
     const D = this.d;
     this.root.position.copy(this.pos);
     this.root.quaternion.copy(this.quat);

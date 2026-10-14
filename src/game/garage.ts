@@ -5,7 +5,8 @@
 
 import * as THREE from 'three';
 import { assets } from '../core/assets';
-import { audio, type EngineVoice } from '../core/audio';
+import { audio, type EngineVoice, type RotorVoice } from '../core/audio';
+import { rotorAt } from '../sim/airdrop';
 import type { Input, MoveInput } from '../core/input';
 import { physics, SOLID_GROUPS } from '../core/physics';
 import type { Atmosphere, ShaderPatch } from '../world/atmosphere';
@@ -21,6 +22,8 @@ import type { Effects } from './effects';
 import type { Player } from './player';
 import type { RemotePlayer } from './remote';
 import { DRIVE, DRIVES, DRIVE_CAR, Jeep, groundOf, type Controls } from './vehicle';
+import { Heli } from './heli';
+import { HELI, heliSpots } from '../sim/heli';
 
 /**
  * Where whoever sits in each seat has their feet, in the jeep's own frame (x to its right,
@@ -49,19 +52,30 @@ const SEAT_CAR: [number, number, number][] = [
   [-0.4, -0.74, 0.56],
   [0.4, -0.74, 0.56],
 ];
+/**
+ * And in the helicopter (src/game/heli.ts), as the MD-500 is built: the pilot on the right, as in every American
+ * helicopter, the other front seat beside them, the bench behind; feet on its floor half a metre over the skids.
+ */
+const SEAT_HELI: [number, number, number][] = [
+  [0.36, -0.28, -0.75],
+  [-0.36, -0.28, -0.75],
+  [0.36, -0.28, 0.35],
+  [-0.36, -0.28, 0.35],
+];
 /** how whoever sits in each seat sits: as the library drew it on a jeep's bench (see CAR_SIT) */
-const SIT_OF: (SeatPose | null)[][] = [[null, null, null, null], [CAR_SIT.front, CAR_SIT.front, CAR_SIT.back, CAR_SIT.back]];
+const SIT_OF: (SeatPose | null)[][] = [[null, null, null, null], [CAR_SIT.front, CAR_SIT.front, CAR_SIT.back, CAR_SIT.back], [null, null, null, null]];
 /** the seats of each kind of car (the `k` of a VehicleInfo), and where its engine is, for the smoke */
-const SEATS_OF = [SEAT_AT, SEAT_CAR];
-const ENGINE_AT: [number, number, number][] = [[0, 0.5, -1.45], [0, 0.22, -1.9]];
+const SEATS_OF = [SEAT_AT, SEAT_CAR, SEAT_HELI];
+const ENGINE_AT: [number, number, number][] = [[0, 0.5, -1.45], [0, 0.22, -1.9], [0, 1.3, 0.9]];
 /** and what each is called, where a player is told what hurt them */
-const CALLED = ['jeep', 'police car'];
+const CALLED = ['jeep', 'police car', 'helicopter'];
 /** how bright the lamps burn while somebody is at the wheel */
 const LAMPS = 1.8;
 /** how much of the metal the model's paint is drawn with is kept (see fromModel) */
 const PAINT_METAL = 0.25;
-/** the view from behind it: how far back, how high the point it looks at is, and the widest it opens at speed */
+/** the view from behind it: how far back, how high the point it looks at is, and the widest it opens at speed (a helicopter's from further back and higher) */
 const VIEW = { back: 7.4, up: 2.15, fov: 1.1 };
+const VIEW_HELI = { back: 13, up: 3.2, fov: 1.12 };
 const SEND_HZ = 15;
 
 /** how far off a car that has a lighter copy is drawn with it, metres */
@@ -98,6 +112,8 @@ interface Extra {
   smoke: { owed: number };
   dust: { owed: number };
   voice: EngineVoice | null;
+  /** a helicopter's: the rotor's own sound (the supply drop's, src/sim/airdrop.ts), wound up and down with it */
+  rotor: RotorVoice | null;
   rpm: number;
   /** who this game has just run down with it, and when */
   hitAt: Map<number, number>;
@@ -126,6 +142,8 @@ export class Garage {
    * from any distance and again for every shadow: 2026-10-12.)
    */
   private protoCarFar: { body: THREE.Object3D; wheels: THREE.Object3D[] } | null = null;
+  /** the helicopter's model (see HELI): its body, and its main and tail rotors as `wheels`. Without it there is no helicopter. */
+  private protoHeli: { body: THREE.Object3D; wheels: THREE.Object3D[] } | null = null;
   private lods = new Map<Jeep, { near: THREE.Object3D[]; far: THREE.Object3D[]; isFar: boolean }>();
   private sendT = 0;
   /** a seat asked for and not yet given */
@@ -166,11 +184,12 @@ export class Garage {
         }
       }
     }
+    if (this.ready && assets.manifest.models[HELI.model]) this.protoHeli = fromHeli(await assets.model(HELI.model));
   }
 
   /** One jeep's worth of the model: the shapes are shared, the paint is its own (one burns black, another has its lamps on). */
   private make(kind = 0) {
-    const p = (kind === POLICE_CAR.kind && this.protoCar) || this.proto!;
+    const p = (kind === HELI.kind && this.protoHeli) || (kind === POLICE_CAR.kind && this.protoCar) || this.proto!;
     let body = p.body.clone(true), wheels = p.wheels.map((w) => w.clone(true));
     // (with a lighter copy: each of its five pieces is the whole one and the lighter one together, one of them shown)
     const pf = kind === POLICE_CAR.kind && this.protoCar ? this.protoCarFar : null;
@@ -220,7 +239,7 @@ export class Garage {
   warmers(): THREE.Object3D[] {
     if (!this.ready) return [];
     const out: THREE.Object3D[] = [];
-    for (const kind of this.protoCar ? [0, POLICE_CAR.kind] : [0]) {
+    for (const kind of [0, ...(this.protoCar ? [POLICE_CAR.kind] : []), ...(this.protoHeli ? [HELI.kind] : [])]) {
       const made = this.make(kind);
       // (its lighter copy, where it has one, is in the same pieces)
       out.push(made.body, ...made.wheels);
@@ -235,8 +254,10 @@ export class Garage {
 
   add(v: VehicleInfo) {
     if (!this.ready || this.jeeps.has(v.i)) return;
-    const kind = v.k === POLICE_CAR.kind && this.protoCar ? POLICE_CAR.kind : 0;
-    const j = new Jeep(v.i, this.groundAt, DRIVES[kind], kind);
+    // (a helicopter whose model this game cannot draw is not drawn as a jeep: it is left out)
+    if (v.k === HELI.kind && !this.protoHeli) return;
+    const kind = v.k === HELI.kind ? HELI.kind : v.k === POLICE_CAR.kind && this.protoCar ? POLICE_CAR.kind : 0;
+    const j = kind === HELI.kind ? new Heli(v.i, this.groundAt) : new Jeep(v.i, this.groundAt, DRIVES[kind], kind);
     const made = this.make(kind);
     j.build(this.h.scene, v.s, made);
     this.h.ready?.([made.body, ...made.wheels]);
@@ -244,7 +265,7 @@ export class Garage {
     j.hp = v.hp;
     j.fuel = v.fuel;
     this.jeeps.set(v.i, j);
-    this.extra.set(j, { lamps: made.lamps, lit: false, smoke: { owed: 0 }, dust: { owed: 0 }, voice: null, rpm: 0, hitAt: new Map(), crashAt: 0, dryAt: 0 });
+    this.extra.set(j, { lamps: made.lamps, lit: false, smoke: { owed: 0 }, dust: { owed: 0 }, voice: null, rotor: null, rpm: 0, hitAt: new Map(), crashAt: 0, dryAt: 0 });
     j.onCrash = (hard) => this.crashed(j, hard);
     if (v.hp <= 0) this.char(j);
     this.seats(v.i, v.seats, v.sim);
@@ -255,6 +276,7 @@ export class Garage {
     if (!j) return;
     if (this.ride?.jeep === j) this.out(false);
     this.extra.get(j)?.voice?.stop();
+    this.extra.get(j)?.rotor?.stop();
     this.extra.delete(j);
     this.lods.delete(j);
     this.jeeps.delete(i);
@@ -282,7 +304,7 @@ export class Garage {
     // milliseconds a frame, 2026-10-11.)
     if (this.parked) return this.parked;
     const jeeps = jeepSpots(this.h.world);
-    return (this.parked = [...jeeps.map((p) => ({ ...p, k: 0 })), ...policeSpots(this.h.world, jeeps).map((p) => ({ ...p, k: POLICE_CAR.kind }))]);
+    return (this.parked = [...jeeps.map((p) => ({ ...p, k: 0 })), ...policeSpots(this.h.world, jeeps).map((p) => ({ ...p, k: POLICE_CAR.kind })), ...(this.protoHeli ? heliSpots(this.h.world).map((p) => ({ ...p, k: HELI.kind })) : [])]);
   }
 
   private standAlone(p: { x: number; y: number; z: number; yaw: number; k: number }, home: number) {
@@ -416,7 +438,7 @@ export class Garage {
     const fuel = hasCan && j.fuel < JEEP.tank - 0.5 ? ' <small>hold your jerrycan, and the left button, to pour it in</small>' : '';
     if (tagged) return `<small>${JEEP.noTag}</small>${fuel}`;
     if (seat < 0) return `<small>No free seat</small>${fuel}`;
-    return `<kbd>F</kbd>${seat === 0 ? 'Drive' : 'Get in'}${j.fuel <= 0 ? ' <small>the tank is empty</small>' : ''}${fuel}`;
+    return `<kbd>F</kbd>${seat === 0 ? (j instanceof Heli ? 'Fly' : 'Drive') : 'Get in'}${j.fuel <= 0 ? ' <small>the tank is empty</small>' : ''}${fuel}`;
   }
 
   /** ten litres into the tank (the can has already left the pockets) */
@@ -434,7 +456,7 @@ export class Garage {
     this.lastYaw = j.yaw;
     p.yaw = j.yaw;
     p.pitch = -0.2;
-    this.pivot.copy(j.pos).setY(j.pos.y + VIEW.up);
+    this.pivot.copy(j.pos).setY(j.pos.y + (j instanceof Heli ? VIEW_HELI : VIEW).up);
     this.viewDist = 2.5;
   }
 
@@ -492,6 +514,11 @@ export class Garage {
           steer: (input.held('KeyD') ? 1 : 0) - (input.held('KeyA') ? 1 : 0),
           hand: input.held('Space'),
         };
+        // (a helicopter's: Shift up and Z down (not Ctrl: Ctrl and W shuts the browser's tab), Q and E lean it)
+        if (j instanceof Heli) {
+          c.lift = (input.held('ShiftLeft') || input.held('ShiftRight') ? 1 : 0) - (input.held('KeyZ') ? 1 : 0);
+          c.roll = (input.held('KeyE') ? 1 : 0) - (input.held('KeyQ') ? 1 : 0);
+        }
       }
       j.step(h, c);
     }
@@ -571,8 +598,8 @@ export class Garage {
   view = (cam: THREE.PerspectiveCamera, dt: number) => {
     const r = this.ride;
     if (!r) return;
-    const j = r.jeep, p = this.h.player;
-    _a.copy(j.pos).setY(j.pos.y + VIEW.up);
+    const j = r.jeep, p = this.h.player, V = j instanceof Heli ? VIEW_HELI : VIEW;
+    _a.copy(j.pos).setY(j.pos.y + V.up);
     if (this.pivot.distanceToSquared(_a) > 100) this.pivot.copy(_a);
     // it gets a little ahead of the view when it pulls away, and the view catches it up
     this.pivot.lerp(_a, 1 - Math.exp(-14 * dt));
@@ -580,8 +607,8 @@ export class Garage {
     _q.setFromEuler(new THREE.Euler(p.pitch, p.yaw, 0, 'YXZ'));
     _b.set(0, 0, 1).applyQuaternion(_q);
     // never from the far side of a wall, a tree or a hill
-    const hit = physics.world.castRay(new physics.R.Ray(this.pivot, _b), VIEW.back + 0.4, true, undefined, SOLID_GROUPS, undefined, j.body);
-    const want = hit ? Math.max(1.4, hit.timeOfImpact - 0.4) : VIEW.back;
+    const hit = physics.world.castRay(new physics.R.Ray(this.pivot, _b), V.back + 0.4, true, undefined, SOLID_GROUPS, undefined, j.body);
+    const want = hit ? Math.max(1.4, hit.timeOfImpact - 0.4) : V.back;
     this.viewDist = want < this.viewDist ? want : this.viewDist + (want - this.viewDist) * (1 - Math.exp(-5 * dt));
     cam.position.copy(this.pivot).addScaledVector(_b, this.viewDist);
     cam.quaternion.copy(_q);
@@ -591,7 +618,7 @@ export class Garage {
   /** how much wider the view is for the speed it is going */
   get fov() {
     const r = this.ride;
-    return r ? 1 + (VIEW.fov - 1) * THREE.MathUtils.smoothstep(Math.abs(r.jeep.speed), 6, 21) : 1;
+    return r ? 1 + ((r.jeep instanceof Heli ? VIEW_HELI : VIEW).fov - 1) * THREE.MathUtils.smoothstep(Math.abs(r.jeep.speed), 6, r.jeep instanceof Heli ? 45 : 21) : 1;
   }
 
   // ------------------------------------------------------------------ what it does to things
@@ -753,6 +780,7 @@ export class Garage {
   }
 
   private sound(j: Jeep, x: Extra, dt: number, near: boolean) {
+    if (j instanceof Heli) return this.rotorSound(j, x);
     const running = !j.wreck && near && (j.seats[0] !== null || Math.abs(j.speed) > 0.5) && j.fuel > 0;
     if (!running) {
       if (x.voice) {
@@ -769,6 +797,22 @@ export class Garage {
     const rpm = 850 + 3300 * THREE.MathUtils.clamp((v - lo) / (hi - lo), 0, 1) + Math.abs(j.throttle) * (j.grounded ? 250 : 1400);
     x.rpm += (rpm - x.rpm) * (1 - Math.exp(-(rpm > x.rpm ? 6 : 3.5) * dt));
     x.voice.set(j.pos, x.rpm, Math.abs(j.throttle), v, j.grounded ? j.slide : 0, j.ground === 'asphalt', this.ride?.jeep === j);
+  }
+
+  /** a helicopter's rotor, heard as the supply drop's is (by how far off it is, and coming or going), as loud and as high as it is turning fast */
+  private rotorSound(j: Heli, x: Extra) {
+    const rpm = j.mode === 'parked' ? 0 : j.steer, ear = this.h.player.pos;
+    const away = j.pos.distanceTo(ear);
+    if (j.wreck || rpm < 0.02 || away > 900) {
+      x.rotor?.stop();
+      x.rotor = null;
+      return;
+    }
+    x.rotor ??= audio.rotor();
+    if (!x.rotor) return;
+    const closing = away > 1 ? -_a.copy(j.pos).sub(ear).dot(j.vel) / away : 0;
+    const r = rotorAt(away, closing);
+    x.rotor.set(j.pos, r.gain * rpm * (0.6 + 0.4 * j.throttle), r.rate * (0.5 + 0.5 * rpm), r.cutoff);
   }
 }
 
@@ -938,4 +982,40 @@ function fromModel(scene: THREE.Group, kind = 0) {
   const body = new THREE.Group();
   body.add(root);
   return { body, wheels, radius, track, base };
+}
+
+/**
+ * The helicopter's model as the asset pipeline writes it (scripts/assets.config.mjs, `md500`): standing on the bottom
+ * of its skids at y = 0, the main rotor's hub over the origin, nose toward -z, its rotors pieces of their own
+ * (`md500_rotor`, `md500_tail`) each about its hub. They are lifted out to be turned; its glass is made glass, as a
+ * car's is. (Heli.build sets it down where the simulation's body is.)
+ */
+function fromHeli(scene: THREE.Group) {
+  const root = scene.clone(true);
+  const wheels = ['md500_rotor', 'md500_tail'].map((name) => {
+    const o = root.getObjectByName(name);
+    if (!o) throw new Error(`the helicopter's model has no ${name}`);
+    o.removeFromParent();
+    return o;
+  });
+  for (const part of [root, ...wheels]) {
+    part.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) return;
+      m.castShadow = m.receiveShadow = true;
+      const mat = m.material as THREE.MeshStandardMaterial;
+      if (mat.transparent || /glass/i.test(mat.name)) {
+        mat.transparent = true;
+        mat.opacity = 0.3;
+        mat.depthWrite = false;
+        mat.roughness = 0.08;
+        mat.metalness = 0;
+        m.castShadow = false;
+        m.renderOrder = 2;
+      }
+    });
+  }
+  const body = new THREE.Group();
+  body.add(root);
+  return { body, wheels };
 }
