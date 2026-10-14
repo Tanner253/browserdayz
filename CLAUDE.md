@@ -13,8 +13,9 @@ ZONA is a browser PvP survival shooter in the manner of DayZ, where a dog tag ta
 - Stack: Vite + TypeScript + three.js + Rapier (character controller), a Node `ws` server that shares `src/sim` with the game, Vercel functions in `api/`.
 
 ## Where things are
-- `src/game/` the game in the browser (`game.ts` is the main loop and wiring: very large), `src/world/` the world and how it is drawn (`worldgen.ts` makes the map: very large; `terrain.ts`, `snow.ts`, `seat.ts`, `vegetation.ts`, `castle*.ts` the mountain fort), `src/sim/` rules shared by game and server (items, economy and loot, `castle.ts` the fort's plan, grenades, fires, infected), `src/ui/`, `src/net/protocol.ts` (`PROTOCOL`).
-- `server/index.ts` the game server (very large). `api/` payouts (`api/_lib/payouts.ts`), cash-ins, admin, saves.
+`ARCHITECTURE.md` is the map: every file, its size and what it is (`node scripts/architecture.mjs` rebuilds it; do so after adding or moving a file). Look there before searching the tree.
+- `src/game/` the game in the browser (`game.ts` the Game class: its fields, its constructor, and a list of which file in `src/game/game/` each of its methods is in), `src/world/` the world and how it is drawn (`worldgen.ts` makes the map, its parts in `src/world/worldgen/`: `generate.ts` is one long function with an index of its stages at its head; `terrain.ts`, `snow.ts`, `seat.ts`, `vegetation.ts`, `castle*.ts` the mountain fort), `src/sim/` rules shared by game and server (items, economy and loot, `castle.ts` the fort's plan, grenades, fires, infected), `src/ui/`, `src/net/protocol.ts` (`PROTOCOL`).
+- `server/index.ts` the game server as it starts (what it does at start-up, in order; the world state; the loops; http and ws), its parts beside it in `server/` (`handle.ts` is every message a player sends, `admin.ts` every admin command). `api/` payouts (`api/_lib/payouts.ts`), cash-ins, admin, saves.
 - `test/*.test.ts` plain scripts run with tsx. `scripts/` deploy, cards, icons, films. `src/trailer/` + `scripts/film.mjs` the films.
 - `public/changelog/` the changelog page and its pictures; `marketing/` cards (`node scripts/card.mjs <name>`).
 - `assets-src/` (git-ignored, about 10 GB): downloaded packs and model sources. NEVER delete it; it exists only on this machine.
@@ -28,7 +29,8 @@ ZONA is a browser PvP survival shooter in the manner of DayZ, where a dog tag ta
 
 ## Checking work
 - Type-check three ways and READ THE EXIT CODE: `npx tsc --noEmit; echo $?`, `npx tsc --noEmit -p tsconfig.server.json; echo $?`, `npx tsc --noEmit -p tsconfig.api.json; echo $?`. (A `| head` once hid an error that broke a Vercel build.)
-- Tests: `npx tsx test/<name>.test.ts`. Never run two tests that start a server at once (they clash on ports). The whole suite: `sh $TEMP/zp/review/suite.sh <repo>` runs four at a time and then runs whatever failed again alone (only the second result counts). NEVER run `test/devnet.test.ts` (it uses the public Solana devnet faucet and sends transactions).
+- Tests: `npx tsx test/<name>.test.ts`. The whole suite: `node scripts/test-all.mjs` (eight at a time; it refuses to start if two test files use one port, so give a new test ports of its own; whatever fails is run again alone and only that second result counts). NEVER run `test/devnet.test.ts` (it uses the public Solana devnet faucet and sends transactions).
+- A change meant to change nothing (moving code, tightening comments): `npx tsx scripts/split/fingerprint.ts <file.json>` before (writes the world's prints) and after (compares: generateWorld, the server's world, the fort, byte for byte); `npx tsx scripts/split/join-check.ts` (this tree's server boots on its own port and lets two players in); `npx tsx scripts/split/online-check.ts` (the game comes up online in headless Chrome with no page errors; read the card first).
 - Anything seen must be looked at in the real game before it is called done (stumps set on the ground and gaps at stair heads went live because nobody looked). Things set on the ground are judged where they meet it.
 
 ## Deploying (only when the owner says so; when they say so, do it at once)
@@ -65,3 +67,6 @@ ZONA is a browser PvP survival shooter in the manner of DayZ, where a dog tag ta
 
 ## Code style
 Comments are prose that say WHY, with the owner's words quoted where they are the reason. Keep them tight. Match the file you are in.
+- Keep files under about 800 lines: split by feature as the 2026-10-14 split did (`scripts/split/cut.ts` moves top-level code, `scripts/split/methods.ts` moves a class's methods; both change no line of what they move), the old path re-exporting.
+- When you work in a file, tighten its comments as you go (comments were 17 to 38% of the big files: every read pays for them): keep the why and the owner's words, cut the rest. Never as a pass of its own over files you are not working in.
+- `Game` (src/game/game.ts and src/game/game/) holds some two hundred fields every feature reaches into. When a feature is worked on, move its own state into a class of its own (as `Garage`, `Airdrops`, `LootManager` are), one feature at a time; never as a rewrite of its own.
