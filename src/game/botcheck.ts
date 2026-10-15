@@ -11,6 +11,7 @@
 import * as THREE from 'three';
 import type RAPIER from '@dimforge/rapier3d-compat';
 import { assets } from '../core/assets';
+import { TOUCH } from '../core/device';
 import { physics, HITBOX_GROUPS } from '../core/physics';
 import type { Atmosphere } from '../world/atmosphere';
 import type { C2S } from '../net/protocol';
@@ -348,18 +349,23 @@ export class BotCheck {
   private show(done = false) {
     const ui = document.getElementById('ui');
     if (!ui) return;
+    // (On a phone, or any short screen, small and high, and the way to pass said only for the first seconds of each go:
+    // at full size it hid a third of a phone's screen, the owner, 2026-10-15: "the banner is so big on mobile you cant
+    // even play".)
+    const small = TOUCH || innerHeight < 520;
     if (!this.sign) {
       this.sign = document.createElement('div');
       this.sign.style.cssText =
-        'position:absolute;left:50%;top:5.5vh;transform:translateX(-50%);z-index:40;padding:12px 22px;text-align:center;pointer-events:none;background:rgba(12,13,11,0.82);border:1px solid rgba(243,239,230,0.25);' +
-        'color:#f3efe6;font-family:"Barlow Condensed","Arial Narrow",sans-serif;text-transform:uppercase;letter-spacing:0.1em;max-width:min(92vw,760px);';
+        `position:absolute;left:50%;top:${small ? '1.5vh' : '5.5vh'};transform:translateX(-50%);z-index:40;padding:${small ? '5px 14px' : '12px 22px'};text-align:center;pointer-events:none;background:rgba(12,13,11,0.82);border:1px solid rgba(243,239,230,0.25);` +
+        `color:#f3efe6;font-family:"Barlow Condensed","Arial Narrow",sans-serif;text-transform:uppercase;letter-spacing:0.1em;max-width:${small ? 'min(62vw,520px)' : 'min(92vw,760px)'};`;
       ui.appendChild(this.sign);
     }
     const left = Math.max(0, Math.ceil(this.secs - this.ms / 1000));
     const head = done ? 'Bot check passed' : !this.begun ? (this.h.playing() ? 'Bot check · setting up the course' : 'Bot check · click to begin') : `Bot check · ${this.fell.size} of ${this.need} down · ${left} s`;
     const how = `Bring down all ${this.need} figures, all round you: behind the walls, in the hut, beyond the catwalk. Walk the yard to find them, and hold your sights on each before you fire.`;
     const sub = done ? 'Going in.' : this.go > 1 ? `Not passed. A new course: go ${this.go} of 4. ${how}` : how;
-    const html = `<div style="font-size:24px;font-weight:700;color:${done ? '#9fe08a' : '#ffd35a'}">${head}</div><div style="margin-top:4px;font-size:15px;font-weight:500;color:#d8cfb8;letter-spacing:0.06em">${sub}</div>`;
+    const told = !small || done || !this.begun || this.ms < 6000;
+    const html = `<div style="font-size:${small ? 15 : 24}px;font-weight:700;color:${done ? '#9fe08a' : '#ffd35a'}">${head}</div>${told ? `<div style="margin-top:${small ? 2 : 4}px;font-size:${small ? 11 : 15}px;font-weight:500;color:#d8cfb8;letter-spacing:0.06em;line-height:1.25">${sub}</div>` : ''}`;
     if (this.sign.dataset.said !== html) {
       this.sign.dataset.said = html;
       this.sign.innerHTML = html;

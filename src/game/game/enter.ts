@@ -270,9 +270,13 @@ export const enterMethods = {
       this.director.flyIn(0.5);
       const slot = (['primary', 'secondary', 'holster'] as const).find((k) => this.inv.slots[k]);
       if (slot && !this.weapons.equippedItem) this.weapons.equip(slot);
-      // (the mouse was let go for the check before this one: the next click on the game takes it again)
-      if (this.input.locked) this.unpause();
-      else this.awaitClick = true;
+      // (the mouse was let go for the check before this one: the next click on the game takes it again. On a phone there
+      // is no mouse to take, and a tap is not that click: it waited paused, with no controls on the screen, for good. A
+      // player on Android, 2026-10-15: "I can get into the bot test but there is no way of moving/controlling".)
+      if (this.input.locked || this.input.touch) {
+        this.input.lock();
+        this.unpause();
+      } else this.awaitClick = true;
       return;
     }
     // (another go: a fresh magazine with the fresh course)
