@@ -437,7 +437,7 @@ export const ROLL = {
   // A bag is flat: on fingers curled as round a roll it sank onto them (the owner: "the fingers crop through the bag,
   // any way we can lift the bag up higher so it appears to sit in the hand"). It is held up off the palm by `lift`,
   // on fingers nearly straight.
-  bag: { lift: 0.035, curl: [0.12, 0.14, 0.16, 0.18] },
+  bag: { lift: 0.035, curl: [0.12, 0.14, 0.16, 0.18] as [number, number, number, number] },
 };
 
 /**

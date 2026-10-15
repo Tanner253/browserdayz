@@ -2,23 +2,23 @@
 // (One part of worldgen.ts, cut out of it whole on 2026-10-14 so that it can be read and worked on alone: nothing in it was changed.)
 //
 // THE STAGES, in the order they run (line numbers in this file: read only the stage you need):
-//      52  base heightfield
-//      90  road
-//      98  outlying places
-//     143  soften settlements
-//     165  road
-//     235  building plots
-//     390  masks
-//     466  splat + grass
-//     516  vegetation
-//     641  what was built later
-//     824  the first expansion
-//     985  the second expansion
-//    1095  the third expansion
-//    1415  a second clinic and a second shop in the village
-//    1485  the district hospital
-//    1595  the village laid out as a place is
-//    1844  the fourth expansion
+//     76  base heightfield
+//    115  road
+//    124  outlying places
+//    170  soften settlements
+//    193  road
+//    264  building plots
+//    420  masks
+//    497  splat + grass
+//    548  vegetation
+//    674  what was built later
+//    858  the first expansion
+//   1020  the second expansion
+//   1131  the third expansion
+//   1452  a second clinic and a second shop in the village
+//   1523  the district hospital
+//   1634  the village laid out as a place is
+//   1884  the fourth expansion
 
 import { Simplex, RNG, smoothstep, lerp, clamp, hash2 } from '../../core/noise';
 import { BUNKER } from '../../sim/bunker';
@@ -32,6 +32,29 @@ import { catmullRom, evenOut, heightAt, idx, slopeAt, soften } from './ground';
 // ------------------------------------------------------------------ generation
 
 export function generateWorld(seed = WORLD_SEED): World {
+  const run = worldStages(seed);
+  for (;;) {
+    const s = run.next();
+    if (s.done) return s.value;
+  }
+}
+
+/**
+ * generateWorld a stage at a time, with `between` awaited after each: the page goes on answering while the map is
+ * made (all in one, it was three and a half seconds of a page that answered nothing; the owner, 2026-10-14: "sometimes
+ * makes chrome say page is unresponsive"). The same stages in the same order: the same world.
+ */
+export async function generateWorldSoftly(between: () => Promise<unknown>, seed = WORLD_SEED): Promise<World> {
+  const run = worldStages(seed);
+  for (;;) {
+    const s = run.next();
+    if (s.done) return s.value;
+    await between();
+  }
+}
+
+/** the map made from its seed, giving way between its stages (each named) */
+function* worldStages(seed: number): Generator<string, World, void> {
   const N = WORLD_RES;
   const half = WORLD_SIZE / 2;
   const n1 = new Simplex(seed);
@@ -49,6 +72,7 @@ export function generateWorld(seed = WORLD_SEED): World {
     { name: "Hunter's Cabin", x: CABIN.x, z: CABIN.z, radius: 30 },
   ];
 
+  yield 'base heightfield';
   // --- base heightfield
   const base = (x: number, z: number) => {
     const r = Math.hypot(x, z) + n3.fbm(x * 0.004, z * 0.004, 3) * 40;
@@ -87,6 +111,7 @@ export function generateWorld(seed = WORLD_SEED): World {
   }
   soften(heights, edgeOf);
 
+  yield 'road';
   // --- road: its line is needed early, so nothing else is put in its way
   const path2 = catmullRom(OLD_ROAD, 4);
   const roadGap = (x: number, z: number) => {
@@ -95,6 +120,7 @@ export function generateWorld(seed = WORLD_SEED): World {
     return best;
   };
 
+  yield 'outlying places';
   // --- outlying places. New characters start on a ring out at the map's edge with nothing
   // in their hands: a ring of small places sits just inside it, one within a short run of
   // every start, and a few more lie between there and the village.
@@ -140,6 +166,7 @@ export function generateWorld(seed = WORLD_SEED): World {
   place('Field Depot', 'post', 4.36, [185, 170, 200, 215]);
   place('Quarry Dacha', 'dacha', 5.24, [190, 205, 175, 220]);
 
+  yield 'soften settlements';
   // --- soften settlements (village plateau, camp clearing)
   const flattenArea = (cx: number, cz: number, inner: number, outer: number, bumpy: number) => {
     const target = base(cx, cz);
@@ -162,6 +189,7 @@ export function generateWorld(seed = WORLD_SEED): World {
   flattenArea(CABIN.x, CABIN.z, 10, 30, 0.5);
   for (const st of sites) flattenArea(st.x, st.z, 20, 60, 0.35);
 
+  yield 'road';
   // --- road: spline through the village, height profile smoothed along its length
   // (The road runs 28 m past where the map once ended. Its height out there was read at that edge, the nearest
   // ground there was: it still is, to the same fraction of a cell, or the road's last 60 m would stand a metre off.)
@@ -232,6 +260,7 @@ export function generateWorld(seed = WORLD_SEED): World {
     }
   }
 
+  yield 'building plots';
   // --- building plots
   const buildings: BuildingPlot[] = [];
   const blocked: { x: number; z: number; r: number }[] = [];
@@ -387,6 +416,7 @@ export function generateWorld(seed = WORLD_SEED): World {
   // on the ground a pace around each building is its own
   for (const b of buildings) pad(b, 3.2, 2.2);
 
+  yield 'masks';
   // --- masks
   /** the floor of the expansion, once it has been cut (nothing, while the map is made as it first was) */
   let cleared: { x: number; z: number; r: number } | null = null;
@@ -463,6 +493,7 @@ export function generateWorld(seed = WORLD_SEED): World {
     return false;
   };
 
+  yield 'splat + grass';
   // --- splat + grass
   const splat = new Uint8Array(N * N * 4);
   const grass = new Uint8Array(N * N);
@@ -513,6 +544,7 @@ export function generateWorld(seed = WORLD_SEED): World {
   };
   for (let iz = 0; iz < N; iz++) for (let ix = 0; ix < N; ix++) paint(ix, iz);
 
+  yield 'vegetation';
   // --- vegetation
   const trees: Instance[] = [];
   const rocks: Instance[] = [];
@@ -638,6 +670,7 @@ export function generateWorld(seed = WORLD_SEED): World {
   }
   // (the first of them that anybody is still set down at is the one told to whoever asks for one: see `starts`, at the end)
 
+  yield 'what was built later';
   // --- what was built later: a clinic, a shop and a workshop in the village, a barracks at
   // the checkpoint, a workshop at each yard, and two new places half way in.
   //
@@ -821,6 +854,7 @@ export function generateWorld(seed = WORLD_SEED): World {
     for (const k of again) paint(k % N, Math.floor(k / N));
   }
 
+  yield 'the first expansion';
   // --- the first expansion: the Chemical Works, in a cirque cut into the hills behind the
   // checkpoint (see EXPANSION). Laid over everything above, by the same rule as what was
   // built later: its own dice, nothing that was there before moved or renumbered, and the
@@ -982,6 +1016,7 @@ export function generateWorld(seed = WORLD_SEED): World {
     for (const k of again) paint(k % N, Math.floor(k / N));
   }
 
+  yield 'the second expansion';
   // --- the second expansion: the bunker (see src/sim/bunker.ts), in a hollow cut into the
   // foot of the hills straight across the map from the works. By the same rule: nothing that
   // was there before is moved or renumbered, and the ground is touched only where it stands.
@@ -1092,6 +1127,7 @@ export function generateWorld(seed = WORLD_SEED): World {
       }
   }
 
+  yield 'the third expansion';
   // --- the third expansion (2026-10-10): the east country. The map grown to 1536 m gave a ring of upland
   // round the old one (planted above). Here the road is carried on out of the valley and a town is built on it,
   // Kamenka, of the buildings that were downloaded whole; and two places stand far out in the ring. By the
@@ -1412,6 +1448,7 @@ export function generateWorld(seed = WORLD_SEED): World {
     }
   }
 
+  yield 'a second clinic and a second shop in the village';
   // --- a second clinic and a second shop in the village (2026-10-11). Asked: "we should space out the police
   // station from the store from the medical clinic, theyre all right next to eachother, i think if we spaced them
   // out it would be more meaningful to their specific loot pools", and, when the first ones were moved to do it:
@@ -1482,6 +1519,7 @@ export function generateWorld(seed = WORLD_SEED): World {
     }
   }
 
+  yield 'the district hospital';
   // --- the district hospital, in Kamenka (2026-10-11): three floors and a roof, the biggest building there is
   // (src/world/big-buildings.ts). It stands on the east edge of the town's floor, behind the right-hand row of the
   // street, its long front to the street and its door opposite the way through between the plank house and the
@@ -1592,6 +1630,7 @@ export function generateWorld(seed = WORLD_SEED): World {
     });
   }
 
+  yield 'the village laid out as a place is';
   // --- the village laid out as a place is (2026-10-12). Asked: "we will need to make the building layout in the
   // village more tightly packed i presume, or add some cross streets like a real city would have. we should really
   // take some time here with the map layout and ensure high quality, the buildings are all facing the proper way
@@ -1841,6 +1880,7 @@ export function generateWorld(seed = WORLD_SEED): World {
       }
   }
 
+  yield 'the fourth expansion';
   // --- the fourth expansion (2026-10-13): the road made a loop (see LOOP). On out of the far end of Kamenka's
   // street, over a cleft on a bridge, west along the high ground south of the valley, round behind the works and
   // north along the high ground west of it, and down into the valley again by a second pass, onto the old road's

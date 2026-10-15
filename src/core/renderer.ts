@@ -24,6 +24,8 @@ interface Program { id: number; isReady(): boolean; usedTimes: number; getUnifor
 interface Ahead { o: THREE.Object3D; lit: boolean | null; keys: string[]; low: boolean }
 /** what is got ready for later (the other lighting): this long between one piece of it and the next, ms */
 const LATER_APART = 120;
+/** how many parts of the world are drawn ahead at a time while the game loads (see Renderer.drawWorldAhead) */
+const WORLD_AHEAD = 48;
 /** the layer a thing is on while it is drawn ahead (see Renderer.drawAhead): nothing else is on it */
 const AHEAD_LAYER = 29;
 /** development: parts of getting a thing ready left out, to see what each costs (?try=noother,noahead,nolook) */
@@ -421,6 +423,8 @@ export class Renderer {
    * the real lights back until then: a lamp's light falls on things a moment late, where the world stood still.)
    */
   readyToLight(lit: boolean): boolean {
+    // (the world as it stood at the start, still being got ready for it behind the menu: see `warming`)
+    if (this.lighting && this.otherAt === lit) return false;
     if (!this.lighting || (this.laterNow !== lit && !this.later.some((j) => j.lit === lit))) return true;
     this.rushing = true;
     void this.workLater();
@@ -580,23 +584,124 @@ export class Renderer {
   }
 
   /**
-   * While the game loads, with the screen that says so up: the whole world drawn once off the picture under each
-   * lighting (see `drawAhead` for why). What it costs was being paid in the first frames of the menu for the one
-   * lighting, and in the frame the first lamp was lit for the other.
+   * The world's shaders asked for a part of the scene at a time, a frame's spare time apart (with `extra`, things
+   * not in it): as the world is lit (null), or as it would be lit the other way. All in one, it was two to four
+   * seconds of a page that answered nothing.
+   * @param fine one of each kind of thing at a time, not a whole branch of the scene: behind the menu, where a
+   *   branch was a quarter to three quarters of a second of a menu that stood still
    */
-  drawWorldAhead() {
-    this.drawingAhead = true;
+  async compileSoftly(lit: boolean | null, extra: THREE.Object3D[] = [], fine = false) {
+    const tops = [...this.scene.children, ...extra];
+    const only = (o: THREE.Object3D) => ({ traverse: (f: (x: THREE.Object3D) => void) => f(o), traverseVisible: (f: (x: THREE.Object3D) => void) => f(o) }) as unknown as THREE.Object3D;
+    let parts = tops;
+    if (fine) {
+      // (one of each: what a shader is written for is the paint, the sort of thing, its shape, and whether shadows fall on it)
+      const one = new Map<string, THREE.Object3D>();
+      for (const top of tops) {
+        top.traverse((o) => {
+          const d = o as THREE.Mesh & THREE.InstancedMesh & THREE.SkinnedMesh & { isPoints?: boolean; isLine?: boolean; isSprite?: boolean; isBatchedMesh?: boolean };
+          if (!(d.isMesh || d.isPoints || d.isLine || d.isSprite) || !d.material) return;
+          const ms = Array.isArray(d.material) ? d.material : [d.material];
+          const key = `${ms.map((m) => m.uuid).join(',')}|${+!!d.isSkinnedMesh}${+!!d.isInstancedMesh}${+!!d.instanceColor}${+!!d.isBatchedMesh}${+!!d.isPoints}${+!!d.isLine}${+!!d.isSprite}${+d.receiveShadow}|${d.morphTargetInfluences?.length ?? 0}|${shapeOf(o)}`;
+          if (!one.has(key)) one.set(key, o);
+        });
+      }
+      parts = [...one.values()].map(only);
+    }
+    for (const o of parts) {
+      if (!this.rushing) await breathe();
+      const back = lit === null ? null : (this.lighting?.as(lit) ?? null);
+      const prev = this.renderer.getRenderTarget();
+      this.renderer.setRenderTarget(this.composer.inputBuffer);
+      try {
+        this.renderer.compile(o, this.camera, this.scene);
+      } finally {
+        this.renderer.setRenderTarget(prev);
+        back?.();
+      }
+    }
+  }
+
+  /**
+   * Every shader asked for so far made, waited for without holding the page (the card's own workers make them where
+   * it has them), and how many are made said as it goes. A shader drawn with before it is made is waited for there
+   * and then with nothing else let happen: the world drawn ahead at the start was 21 seconds of a page that answered
+   * nothing, most of it 264 shaders still being made (the owner, 2026-10-14: "sometimes makes chrome say page is
+   * unresponsive").
+   */
+  async settle(said?: (done: number, all: number) => void, most = 90_000) {
+    const ps = [...((this.renderer.info.programs ?? []) as unknown as Program[])];
+    const t0 = performance.now();
+    let was = -1;
+    for (;;) {
+      const done = ps.filter((p) => p.isReady()).length;
+      if (done !== was) said?.((was = done), ps.length);
+      if (done === ps.length || performance.now() - t0 > most) return;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+  }
+
+  /** the lighting the world is being got ready for behind the menu, from the start (see `warmOther`) */
+  private otherAt: boolean | null = null;
+  /**
+   * The world as it stood at the start is still being got ready for this lighting behind the menu: the lamps wait
+   * for it however long it takes (some seconds, once), and are not let in after their usual two and a half, when
+   * every shader of the world still to be made would be made in the one frame.
+   */
+  warming(lit: boolean) {
+    return this.otherAt === lit;
+  }
+  /**
+   * The world got ready for the lighting it is not lit by, behind the menu: its shaders were half of what a first
+   * visit waited for before the menu came (the owner, 2026-10-14: "the download and initial asset warming is taking
+   * too long causing bad UX"). Until it is done, a lamp's light is held back (see `readyToLight`).
+   * @param draw drawn once with each, off the picture, as well (not on a phone: see Game.init)
+   */
+  async warmOther(extra: THREE.Object3D[] = [], draw = true) {
+    if (!this.lighting) return;
+    const lit = !this.lighting.lit();
+    this.otherAt = lit;
     try {
-      if (this.lighting) this.drawOnce([], !this.lighting.lit(), true);
-      this.drawOnce([], null, true);
+      // (what is drawn ahead is what was there to be got ready: anything that comes the while is got ready as it comes)
+      const parts = this.worldParts();
+      await this.compileSoftly(lit, extra, true);
+      await this.settle();
+      if (draw) await this.drawWorldAhead(lit, 6, parts);
     } finally {
-      this.drawingAhead = false;
+      this.otherAt = null;
+    }
+  }
+
+  /**
+   * The whole world as it stands drawn once off the picture (see `drawAhead` for why), as it is lit (null) or lit as
+   * asked: at the start, with the screen that says so up, and for the other lighting behind the menu. Each shader is
+   * looked over first, and the world is drawn so many parts at a time, a frame's spare time apart. (In one, it was
+   * one and a half seconds of a page that answered nothing; and what it costs was paid in the first frames of the
+   * menu for the one lighting, and in the frame the first lamp was lit for the other.)
+   */
+  async drawWorldAhead(lit: boolean | null = null, per = WORLD_AHEAD, parts = this.worldParts()) {
+    await this.lookOver([...((this.renderer.info.programs ?? []) as unknown as Program[])]);
+    // (drawn so many at a time, each where it stands: at the start no frame has yet worked out where that is)
+    this.scene.updateMatrixWorld();
+    for (let i = 0; i < parts.length; i += per) {
+      if (!this.rushing) await breathe();
+      // (what has left the world since it was counted is not put back into it to be drawn)
+      const some = parts.slice(i, i + per).filter((o) => {
+        for (let t: THREE.Object3D | null = o; t; t = t.parent) if (t === this.scene) return t.visible;
+        return false;
+      });
+      this.drawingAhead = true;
+      try {
+        this.drawOnce(some, lit);
+      } finally {
+        this.drawingAhead = false;
+      }
     }
     // (and what was drawn with is known for drawn with: nothing of the world as it stood is drawn ahead again)
     const seen = new Set<THREE.Material>();
-    this.scene.traverse((o) => {
+    for (const o of parts) {
       const m = (o as THREE.Mesh).material;
-      if (!m || !o.visible) return;
+      if (!m) continue;
       const shape = shapeOf(o);
       for (const x of Array.isArray(m) ? m : [m]) {
         if (seen.has(x)) continue;
@@ -604,7 +709,17 @@ export class Renderer {
         const ps = (this.renderer.properties.get(x) as { programs?: Map<string, Program> }).programs;
         for (const p of ps?.values() ?? []) this.drawnWith.add(`${p.id}|${shape}`);
       }
+    }
+  }
+
+  /** every part of the world drawn as it stands (not what has nothing in it yet: see drawOnce) */
+  private worldParts() {
+    const parts: THREE.Object3D[] = [];
+    this.scene.traverseVisible((o) => {
+      const d = o as THREE.Mesh & { isPoints?: boolean; isLine?: boolean; isSprite?: boolean };
+      if ((d.isMesh || d.isPoints || d.isLine || d.isSprite) && !((o as THREE.InstancedMesh).isInstancedMesh && (o as THREE.InstancedMesh).count === 0)) parts.push(o);
     });
+    return parts;
   }
 
   private looked = new WeakSet<Program>();

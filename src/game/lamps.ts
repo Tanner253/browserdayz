@@ -34,6 +34,8 @@ export class Lamps {
   readonly pool = new THREE.Group();
   /** whether the world may be lit so (the real lights in it, or out) without a shader made in the frame: the renderer's to say (Renderer.readyToLight) */
   canLight: (lit: boolean) => boolean = () => true;
+  /** whether it must wait however long, past the usual two and a half seconds (Renderer.warming) */
+  held: (lit: boolean) => boolean = () => false;
   /** how long the real lights have waited to go in or out (see `update`) */
   private waited = 0;
   private spots: THREE.SpotLight[] = [];
@@ -115,17 +117,6 @@ export class Lamps {
   }
 
   /**
-   * The shaders are written once with the lamps in the scene and once without, while the game
-   * loads: neither the first nightfall nor the first light switched on is then a freeze.
-   * @param compile writes the shaders for the scene as it stands
-   */
-  warm(compile: () => void) {
-    this.pool.visible = true;
-    compile();
-    this.pool.visible = false;
-  }
-
-  /**
    * The world lit as asked for a moment (the real lights in it, or out of it), with the way back: so that the
    * shaders of a thing that comes after the game has loaded are written under both lightings (Renderer.ready),
    * as the world's own were (`warm`).
@@ -186,7 +177,7 @@ export class Lamps {
     // (and never more than two and a half seconds late, whatever is still arriving to be got ready)
     const want = this.keep > 0;
     if (want === this.pool.visible) this.waited = 0;
-    else if (this.canLight(want) || (this.waited += dt) > 2.5) {
+    else if (this.canLight(want) || ((this.waited += dt) > 2.5 && !this.held(want))) {
       this.pool.visible = want;
       this.waited = 0;
     }

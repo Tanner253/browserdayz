@@ -387,6 +387,7 @@ export class Game {
     // (whatever is got ready after the game has loaded is got ready for the lamps lit and for the lamps out)
     r.lighting = { lit: () => this.lamps.pool.visible, as: (lit) => this.lamps.as(lit) };
     this.lamps.canLight = (lit) => r.readyToLight(lit);
+    this.lamps.held = (lit) => r.warming(lit);
     this.bunker = new BunkerSite(world, atmo, r.scene, this.s.terrain.lid);
     this.cellars = new Cellars(r.scene, world.basements ?? []);
     // (the fort: stood where the map says, on the ground as the map has it; the earth round its hatch is drawn as the ground is)
@@ -518,7 +519,12 @@ export class Game {
     this.weapons = new Weapons(r.vmScene, r.vmCamera, atmo, this.player, this.inv, this.effects);
     // (built behind the menu, begun once the world is up and the menu shown (`buildBehind`, from src/main.ts), and
     // what wants them is done when they are: `loaded`)
-    const guns = new Promise<void>((go) => (this.buildBehind = go)).then(() => this.weapons.load());
+    const behind = new Promise<void>((go) => (this.buildBehind = go));
+    const guns = behind.then(() => this.weapons.load());
+    // (and beside them the world got ready for the lighting it is not lit by, the lamps' (Renderer.warmOther): part of
+    // what Deploy waits for, so that the card's last work on it is done in the menu and never in the game, where it
+    // was six seconds of a game that stood still, the first night)
+    const other = behind.then(() => r.warmOther(this.garage.warmers(), !TOUCH));
     this.weapons.mainCam = r.camera;
     this.weapons.itemModels = this.loot.models;
     // (a gun on the ground lies there with what is fitted to it: the copy of it that is seen in the hands)
@@ -569,12 +575,14 @@ export class Game {
     for (const o of cars) warm.add(o);
     warm.position.copy(r.camera.position);
     r.scene.add(warm);
-    r.precompile(r.scene, r.camera);
-    // (and once more with the lamps in the scene: see Lamps.warm)
-    this.lamps.warm(() => r.precompile(r.scene, r.camera));
+    // (asked for a part at a time, then made by the card's workers while the page goes on answering, and counted on
+    // the loading screen: all in one, then drawn with at once, it was 25 seconds in which the page answered nothing.
+    // The lamps' lighting is got ready behind the menu: see `other`, below.)
+    await r.compileSoftly(null);
+    await r.settle((d, n) => progress(`preparing graphics ${d}/${n}`));
     // (And drawn once with each, off the picture: see Renderer.drawAhead. Not on a phone, where the start is as
-    // it was: the whole world drawn twice over before the first frame is more than is asked of one there untried.)
-    if (!TOUCH) r.drawWorldAhead();
+    // it was: the whole world drawn over before the first frame is more than is asked of one there untried.)
+    if (!TOUCH) await r.drawWorldAhead();
     r.scene.remove(warm);
     // (their pictures are put on the card now, one to a frame's spare time: a car is in sight of where one comes in as often as not)
     void (async () => {
@@ -610,6 +618,7 @@ export class Game {
         await Promise.race([r.ready([held]), new Promise<void>((done) => setTimeout(done, 6000))]);
         if (stale.length) Object.assign(icons, await renderIcons(r.renderer, this.loot.models, atmo.envMap, stale));
         assets.releaseModels();
+        await other;
       })
       .catch((e) => console.error('what is built behind the menu', e))
       .then(() => {

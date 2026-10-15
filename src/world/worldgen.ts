@@ -8,4 +8,4 @@ export { worldWithoutMountain, mountainLine, doorRoad, loopLine, loopFence, PEAK
 export type { BuildingType, BuildingPlot, SiteKind } from './worldgen/layout';
 export type { Site, Instance, Solid, POI, Way, Worn, World } from './worldgen/types';
 export { idx, heightAt, seenGround, slopeAt, catmullRom } from './worldgen/ground';
-export { generateWorld } from './worldgen/generate';
+export { generateWorld, generateWorldSoftly } from './worldgen/generate';

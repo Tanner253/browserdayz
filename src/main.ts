@@ -10,7 +10,7 @@ import { modeOf, openDoor } from './ui/door';
 import { startAds } from './ui/ads';
 import { ArenaMenu } from './ui/arena-menu';
 import { DEATHS, DIED_AT, LEAN, TOUCH, bootDone, bootStage } from './core/device';
-import { generateWorld, heightAt } from './world/worldgen';
+import { generateWorldSoftly, heightAt } from './world/worldgen';
 import { Atmosphere } from './world/atmosphere';
 import { Terrain } from './world/terrain';
 import { Vegetation } from './world/vegetation';
@@ -149,7 +149,8 @@ async function boot() {
   stage('world', 'generating world');
   await frame();
   const t0 = performance.now();
-  const world = generateWorld();
+  // (a stage at a time, the page answering between them: see generateWorldSoftly)
+  const world = await generateWorldSoftly(frame);
   // (`?ruins`: the ruined town stood on a plain of its own in a corner of the map, to be looked at and walked in the game as it is)
   const ruins = import.meta.env.DEV && new URLSearchParams(location.search).has('ruins') ? await import('./dev/ruins') : null;
   ruins?.lay(world);
@@ -210,7 +211,8 @@ async function boot() {
   await assets.idle();
   // warm up shader programs before revealing the world
   stage('shaders');
-  r.precompile(r.scene, r.camera);
+  await r.compileSoftly(null);
+  await r.settle();
   // (the models are let go once the guns are built too: Game.loaded)
   (window as unknown as Record<string, unknown>).__game = game;
   if (import.meta.env.DEV) (await import('./dev/harness')).installHarness(game);
