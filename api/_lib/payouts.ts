@@ -137,7 +137,7 @@ export const RULES2_FROM = '2026-10-14T02:20:00Z';
 /** The moment of the third cut-over (see `rules3From`), written as RULES2_FROM is; PAYOUT_RULES3_FROM is asked first. */
 export const RULES3_FROM = '2026-10-14T22:00:00Z';
 /** The moment of the fourth (see `rules4From`), written as RULES2_FROM is; PAYOUT_RULES4_FROM is asked first. '': none yet. */
-export const RULES4_FROM = '';
+export const RULES4_FROM = '2026-10-15T17:30:00Z';
 /** a moment written in full, a day, a time and a zone (see `config`) */
 const MOMENT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/;
 
