@@ -10,6 +10,8 @@ import { paced, type Hits } from '../src/sim/hitclock';
 import { log } from './index';
 import { clients, send, type Client } from './players';
 import { scoreOf, sendBoard } from './queue';
+import { elite } from './elite';
+import { KEPT } from './keep';
 
 // ------------------------------------------------------------------ cashed-in tags
 //
@@ -146,11 +148,16 @@ function follow(entry: CashIn, key: string, attempt: number, began: number) {
   fetch(`${SITE_URL}/api/cashin?id=${entry.id}`, { method: 'POST', signal: AbortSignal.timeout(75_000) })
     .then(async (r) => {
       if (!r.ok) throw new Error(`${r.status}`);
-      const p = ((await r.json()) as { payout?: SitePayout }).payout;
+      const said = (await r.json()) as { payout?: SitePayout; top?: boolean }, p = said.payout;
       // (payouts not switched on: it is listed, and that is all)
       if (!p || p.state === 'off') return;
       if (p.state === 'paid') {
         log('PAID', entry.id, p.signature);
+        // (paid at the top rate, their name has the Elite's crown in chat; paid less, it has not: see elite.ts)
+        if (!!said.top !== elite.has(key)) {
+          elite.paid(key, !!said.top);
+          KEPT.dirty = true;
+        }
         say('good', `${Math.round((p.lamports ?? 0) / 1e5) / 1e4} SOL sent to ${entry.wallet.slice(0, 4)}…${entry.wallet.slice(-4)} for ${entry.owner}'s tag.`);
         // with this one seen to, the site collects its rewards if there are any and looks at whatever else is waiting
         fetch(`${SITE_URL}/api/tick`, { signal: AbortSignal.timeout(75_000) }).catch(() => {});

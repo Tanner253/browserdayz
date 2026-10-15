@@ -409,6 +409,12 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 .chat-line[data-ch='near'] i, .chat-line[data-ch='near'] b { color: #e9d98a; }
 .chat-line[data-ch='near'] span { color: #f3ecd0; }
 .chat-line[data-ch='system'] { color: var(--ink-faint); font-style: italic; font-size: 13px; }
+/* the Elite's crown by a name, and its word with the pointer on it (src/ui/elite-crown.ts) */
+.chat-elite { display: inline-block; width: 15px; height: 15px; margin-right: 5px; vertical-align: -2px; color: #ffd35a; filter: drop-shadow(0 0 3px rgba(255, 211, 90, 0.55)) drop-shadow(0 1px 1px #000); cursor: help; }
+.chat-elite svg { display: block; width: 100%; height: 100%; }
+.chat-tip { position: fixed; z-index: 60; display: none; max-width: 250px; transform: translateY(-100%); padding: 7px 10px; background: rgba(12, 13, 11, 0.94); border: 1px solid rgba(255, 211, 90, 0.45); color: var(--ink); font-size: 13px; line-height: 1.35; pointer-events: none; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5); }
+.chat-tip.show { display: block; }
+.chat-tip b { display: block; margin-bottom: 2px; color: #ffd35a; font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; }
 .chat-entry { display: none; align-items: center; gap: 8px; padding: 5px 8px; background: rgba(8, 10, 9, 0.78); border-left: 2px solid var(--ink-faint); pointer-events: auto; }
 .hud-chat.open .chat-entry { display: flex; }
 .chat-ch { font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; }

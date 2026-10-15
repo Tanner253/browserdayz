@@ -20,6 +20,7 @@ import { INFECTED } from '../sim/infected';
 import { GAS } from '../sim/gas';
 import { dogTag } from './dogtag';
 import { EmotesMenu } from './emotes-menu';
+import { crownEl, hideCrownTip } from './elite-crown';
 import { AO_MODES, DEFAULT_GRAPHICS, FPS_LIMITS, LEVELS, MSAA, PRESETS, SCALES, loadMix, presetOf, saveGraphics, saveMix, type Graphics, type PresetName } from '../core/settings';
 
 /**
@@ -1330,6 +1331,7 @@ export class HUD {
     if (!this.chatOpen) return;
     this.chatOpen = false;
     this.toggle(this.el.chat, 'open', false);
+    hideCrownTip();
     const box = this.root.querySelector('.chat-input') as HTMLInputElement;
     // (a password that was being typed is not left in the box, nor the box left a password's)
     if (this.passMode) {
@@ -1540,7 +1542,7 @@ export class HUD {
   /** every channel lands in the one log, tagged and coloured by channel */
   /** @param role whoever said it is an admin or a mod: it is written before their name */
   /** @param tint an admin's own colour for their tag (not said: the rainbow) */
-  chatLine(ch: ChatChannel | 'system' | 'pm', from: string, text: string, role?: Role | null, tint?: string) {
+  chatLine(ch: ChatChannel | 'system' | 'pm', from: string, text: string, role?: Role | null, tint?: string, elite?: boolean) {
     const log = this.root.querySelector('.chat-log') as HTMLElement;
     const n = document.createElement('div');
     n.className = 'chat-line';
@@ -1560,7 +1562,9 @@ export class HUD {
       tag.textContent = CHANNEL_LABEL[ch];
       const who = document.createElement('b');
       who.textContent = from;
-      n.append(tag, who);
+      n.append(tag);
+      if (elite) n.append(crownEl());
+      n.append(who);
     }
     const body = document.createElement('span');
     body.textContent = text;

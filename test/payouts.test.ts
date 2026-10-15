@@ -1225,6 +1225,31 @@ await test('a wallet asked about (?format=wallet): what it holds, its tier, what
   assert.equal(bad.status, 400);
 });
 
+await test('a five paid at the top rate is said to be (the game server crowns its player in chat); one paid less is not', async () => {
+  // "we should show the elite icon in the chat next to player names" (the owner, 2026-10-15)
+  const w = world(1, { ...FIVE, PAYOUT_RULES3_FROM: '2026-10-08T00:00:00Z', PAYOUT_RULES5_FROM: '2026-10-08T00:00:00Z' });
+  const coin = (n: number, tokens: bigint) => w.chain.tokens.set(b58(tokenAccount(address(wallet(n)), w.cfg.mint, TOKEN_2022_PROGRAM)), tokens * 10n ** 6n);
+  coin(434, 15_000_000n);
+  coin(435, 14_000_000n);
+  const known = new Map<string, Entry>();
+  const game = http.createServer((req, res) => {
+    const e = known.get((req.url ?? '').split('/')[2]);
+    res.writeHead(e ? 200 : 404, { 'content-type': 'application/json' }).end(JSON.stringify(e ?? {}));
+  });
+  await new Promise<void>((done) => game.listen(0, '127.0.0.1', done));
+  const fifth = async (n: number) => {
+    await cash(w, n, 4);
+    w.skip(1000);
+    const e = tag(w, n);
+    known.set(e.id, e);
+    return (await (await record(new Request(`https://site.test/api/cashin?id=${e.id}`, { method: 'POST' }), w, `http://127.0.0.1:${(game.address() as { port: number }).port}`)).json()) as { payout?: Outcome; top?: boolean };
+  };
+  const elite = await fifth(434), short = await fifth(435);
+  game.close();
+  assert.deepEqual([elite.payout?.state, elite.payout?.state === 'paid' && elite.payout.lamports, elite.top], ['paid', 25_000_000, true]);
+  assert.deepEqual([short.payout?.state, short.payout?.state === 'paid' && short.payout.lamports, 'top' in short], ['paid', 24_000_000, false]);
+});
+
 await test('a traded tag is not paid, and is not counted toward the five', async () => {
   const w = world(1, FIVES);
   await cash(w, 408, 4, { name: 'Ann', owner: 'Cy' });

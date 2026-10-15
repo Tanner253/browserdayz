@@ -34,7 +34,9 @@ export async function record(request: Request, w: World = live(), game = GAME): 
   // stops asking (it asks about a tag that is waiting every five minutes for a day: under the rule of five nearly
   // every tag waits, and that would be some three hundred calls for each of them).
   if (payout.state === 'waiting' && payout.parked) return Response.json({ ok: true, parked: payout }, { headers: { 'cache-control': 'no-store' } });
-  return Response.json({ ok: true, payout }, { headers: { 'cache-control': 'no-store' } });
+  // (paid at the top rate: the game server puts the Elite's crown by their name in its chat, see server/elite.ts)
+  const top = payout.state === 'paid' && BigInt(payout.lamports) >= w.cfg.tagMax;
+  return Response.json({ ok: true, payout, ...(top ? { top: true } : {}) }, { headers: { 'cache-control': 'no-store' } });
 }
 
 export const GET = (request: Request) => record(request);

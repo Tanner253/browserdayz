@@ -20,6 +20,7 @@ import { CARD_GRACE_MS, CASH_HOLD_MS, SAID_BY_ITSELF, bunkerDoor, cardSeen, carr
 import { CHECK, CHECKS, bodyCheck, buried, dealt, flag, gaitCheck, hillBetween, moveCheck, takenTag, touched, underCheck, zoneCheck } from './checks';
 import { ADMIN, LOGOUT_MS, LOGOUT_STIR, away, handBlast, keptOffNow, pockets, roleOf, stayOn } from './gate';
 import { KEPT, sys } from './keep';
+import { elite } from './elite';
 import { banId, command, login, offId } from './admin';
 
 /** how far a thing lying about may be from somebody for them to go through it with their pockets ('lopen'): their game shows what is within 2.3 m of them (Game.around), and the server's place for them is a step behind */
@@ -564,11 +565,12 @@ export function handle(c: Client, m: C2S) {
       const quiet = ADMIN.muted.get(c.key) ?? 0;
       if (quiet > now) return void sys(c, `You are muted for ${Math.ceil((quiet - now) / 60000)} more minutes: what you type and say reaches nobody.`);
       // (the word before a name: their role, in the colour they chose; or nothing, for an admin who has put the tag off)
-      const worn = ADMIN.tints.get(c.id), badge = worn === 'off' ? {} : { role: roleOf(c) ?? undefined, tint: worn };
+      // (and the Elite's crown, whatever their role: see elite.ts)
+      const worn = ADMIN.tints.get(c.id), crown = elite.has(c.key) ? { elite: true } : {}, badge = { ...(worn === 'off' ? {} : { role: roleOf(c) ?? undefined, tint: worn }), ...crown };
       if (m.ch === 'staff') {
         // those with a role, to one another, wherever they are: nobody else is sent it, or told that anything was said
         if (!roleOf(c)) return;
-        const out: S2C = { t: 'chat', ch: 'staff', from: c.name, text, role: roleOf(c) ?? undefined, ...(worn && worn !== 'off' ? { tint: worn } : {}) };
+        const out: S2C = { t: 'chat', ch: 'staff', from: c.name, text, role: roleOf(c) ?? undefined, ...(worn && worn !== 'off' ? { tint: worn } : {}), ...crown };
         for (const o of clients.values()) if (roleOf(o)) send(o, out);
         return;
       }

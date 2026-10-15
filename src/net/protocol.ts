@@ -332,7 +332,7 @@ export type S2C =
   | { t: 'corpse@'; corpse: CorpseInfo }
   | { t: 'door'; i: number; open: boolean; swing: number }
   | { t: 'spawn'; x: number; z: number; yaw: number }
-  | { t: 'chat'; ch?: ChatChannel; from: string; text: string; role?: 'admin' | 'mod'; /** an admin's own colour for their tag (not said: the rainbow) */ tint?: string }
+  | { t: 'chat'; ch?: ChatChannel; from: string; text: string; role?: 'admin' | 'mod'; /** an admin's own colour for their tag (not said: the rainbow) */ tint?: string; /** paid at the top rate: the Elite's crown by their name (server/elite.ts) */ elite?: boolean }
   /** somebody cashed in a dog tag: announced to everyone */
   | { t: 'cashed'; id: number; name: string; owner: string }
   /** these tags of yours are void: you carried them out of the Zona (see TAG_OUT) */
