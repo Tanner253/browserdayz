@@ -611,3 +611,13 @@ body.tr-menu9 .tr-gfx, body.tr-menu9 .tr-title, body.tr-menu9 .x8-grid, body.tr-
 .x12-end .c12-name { font-size: 19vh; line-height: 0.9; font-weight: 800; font-stretch: condensed; letter-spacing: 0.16em; color: #fff3d6; }
 .x12-end .c12-name em { font-style: normal; color: #ffd35a; }
 .x12-end .c12-url { margin-top: 1.2vh; padding: 0.32em 1.1em 0.32em 1.44em; font-size: 5vh; font-weight: 800; font-stretch: condensed; letter-spacing: 0.3em; color: #101211; background: #ffd35a; box-shadow: 0 0.2em 1.6em rgba(0, 0, 0, 0.7); }
+
+/* the fourteenth film's boards (shots14.ts): a gold line over one big figure and the facts under it */
+.x14-board { z-index: 3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2vh; text-transform: uppercase; opacity: var(--o, 0); background: radial-gradient(ellipse at center, rgba(4, 6, 8, 0.62), rgba(4, 6, 8, 0.88)); color: #f3efe6; }
+.x14-board .b14-kick { font-size: 2.6vh; font-weight: 700; letter-spacing: 0.5em; color: #ffd35a; white-space: nowrap; }
+.x14-board .b14-big { display: flex; align-items: baseline; gap: 1.2vw; font-stretch: condensed; }
+.x14-board .b14-big b { font-size: 22vh; line-height: 0.9; font-weight: 800; color: #fff3d6; }
+.x14-board .b14-big small { font-size: 7vh; font-weight: 800; letter-spacing: 0.12em; color: #ffd35a; }
+.x14-board .b14-row { display: flex; gap: 3.2vw; font-size: 3vh; font-weight: 600; letter-spacing: 0.16em; color: #d8cfb8; white-space: nowrap; }
+.x14-board .b14-row b { color: #fff3d6; }
+.x14-board .b14-list { display: flex; flex-direction: column; align-items: center; gap: 1.6vh; font-size: 5vh; font-weight: 800; font-stretch: condensed; letter-spacing: 0.14em; color: #fff3d6; }

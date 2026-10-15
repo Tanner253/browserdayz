@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ZONA: film 10 plan</title>
+<!-- The plan for the tenth film, for the owner's yes before anything is built: node scripts/card.mjs plan-film-10 -->
+<style>
+  :root { --gold: #ffd35a; --ink: #f3efe6; --dim: #d8cfb8; --faint: rgba(243, 239, 230, 0.45); --line: rgba(243, 239, 230, 0.2); --red: #ff7a5a; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1600px; height: 900px; overflow: hidden; }
+  body { position: relative; font-family: 'Bahnschrift', 'Arial Narrow', 'Segoe UI', sans-serif; font-stretch: condensed; color: var(--ink);
+    background: radial-gradient(1200px 520px at 50% 0%, #20241c 0%, #0c0d0b 70%); }
+  .frame { position: absolute; inset: 14px; border: 2px solid var(--line); pointer-events: none; }
+  .head { position: absolute; left: 48px; right: 48px; top: 34px; display: flex; justify-content: space-between; align-items: flex-end; }
+  .head h1 { font-size: 66px; font-weight: 700; letter-spacing: 0.08em; line-height: 0.9; text-transform: uppercase; }
+  .head h1 small { display: block; font-size: 16px; font-weight: 500; letter-spacing: 0.34em; color: var(--dim); margin-bottom: 8px; }
+  .head p { text-align: right; font-size: 19px; letter-spacing: 0.12em; color: var(--dim); text-transform: uppercase; line-height: 1.4; }
+  .head p b { color: var(--gold); font-weight: 600; }
+  .log { position: absolute; left: 48px; right: 48px; top: 150px; font-size: 20px; letter-spacing: 0.04em; color: var(--dim); }
+  .log b { color: var(--ink); }
+  .acts { position: absolute; left: 48px; right: 48px; top: 200px; bottom: 100px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .act { padding: 18px 20px; background: rgba(18, 20, 16, 0.92); border: 1px solid var(--line); display: flex; flex-direction: column; }
+  .act > i { font-style: normal; font-size: 14px; font-weight: 600; letter-spacing: 0.3em; color: var(--gold); text-transform: uppercase; }
+  .act h2 { margin-top: 6px; font-size: 30px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+  .act ol { margin-top: 10px; list-style: none; display: flex; flex-direction: column; gap: 9px; }
+  .act li { font-size: 17px; line-height: 1.24; letter-spacing: 0.02em; color: var(--dim); padding-left: 26px; position: relative; }
+  .act li::before { content: attr(data-n); position: absolute; left: 0; top: 1px; font-size: 13px; font-weight: 700; color: var(--gold); }
+  .act li b { color: var(--ink); font-weight: 600; }
+  .act li em { font-style: normal; color: var(--red); }
+  .act .shows { margin-top: auto; padding-top: 10px; border-top: 1px solid var(--line); font-size: 14px; letter-spacing: 0.08em; color: var(--faint); text-transform: uppercase; line-height: 1.4; }
+  .foot { position: absolute; left: 48px; right: 48px; bottom: 34px; display: flex; justify-content: space-between; font-size: 16px; letter-spacing: 0.14em; color: var(--dim); text-transform: uppercase; }
+  .foot b { color: var(--gold); font-weight: 600; }
+</style>
+</head>
+<body>
+  <div class="frame"></div>
+  <div class="head">
+    <h1><small>ZONA · film 10 · plan for your yes</small>What goes up</h1>
+    <p><b>About 2:00</b> · 1080p 60 · a new score<br>The real game, filmed frame by frame · nothing sped up</p>
+  </div>
+  <div class="log"><b>The story:</b> a supply drop falls by the fort. A pair in a jeep and a lone pilot race for it. The pilot is shot out of the sky, and the crash brings the infected. One of the pair is bleeding, and the other keeps them alive. They take the pilot's tag and get paid.</div>
+  <div class="acts">
+    <div class="act"><i>Act 1 · 0:00</i><h2>The drop</h2><ol>
+      <li data-n="1"><b>First frame:</b> Orlinoye in the snow at dawn. ZONA · WHAT GOES UP.</li>
+      <li data-n="2">The <b>Apache</b> comes in low over the valley, and the crate's <b>parachute</b> opens.</li>
+      <li data-n="3">Three people look up: the <b>pair</b> at the bridge, and the <b>loner</b> climbing out of a lamp-lit <b>cellar</b>.</li>
+      <li data-n="4">Through <b>binoculars</b>: the chute drifting down by the fort walls.</li>
+    </ol><div class="shows">Supply drop · fort · snow · basements · binoculars</div></div>
+    <div class="act"><i>Act 2 · 0:25</i><h2>The race</h2><ol>
+      <li data-n="5">The <b>jeep</b> on the loop road, over the <b>bridge</b>: three cameras on one drive.</li>
+      <li data-n="6">The loner on the <b>hospital roof</b>, in the <b>MD-500</b>: the rotor spins up at its own speed, and it lifts off over the town.</li>
+      <li data-n="7">Cockpit and chase view: up over the snow line at 100 km/h, the real HUD.</li>
+      <li data-n="8">The pair reach the crate under the walls and fill their packs.</li>
+    </ol><div class="shows">Loop road · bridge · flying · cockpit view · inventory</div></div>
+    <div class="act"><i>Act 3 · 0:55</i><h2>Shot down</h2><ol>
+      <li data-n="9">The helicopter comes in to land. The AK opens up, and <em>the pilot is hit</em>.</li>
+      <li data-n="10">It falls with him still <b>slumped in his seat</b>. It <b>crashes and burns</b> in the snow.</li>
+      <li data-n="11">The blast brings the <b>infected</b>. One of the pair is hit and <b>bleeding</b>.</li>
+      <li data-n="12">A <b>frag grenade, cooked</b>, the fuse ticking down, then thrown: the horde is gone. Behind the wreck, an <b>IV bag</b> keeps the bleeding one alive.</li>
+    </ol><div class="shows">Gunplay · crash · body rides it down · infected · frag · blood + IV</div></div>
+    <div class="act"><i>Act 4 · 1:25</i><h2>The payoff</h2><ol>
+      <li data-n="13">The pilot's body lies <b>beside the wreck</b>. His <b>dog tag</b> is taken.</li>
+      <li data-n="14">The tag is held and cashed in: <b>paid when five are due</b>, counted up from the <b>live payout figures</b>.</li>
+      <li data-n="15">Boards: <b>up to 48% more frames</b> (measured), the world in numbers, the <b>Arena</b>. Then <b>NEXT</b>: basements under every house, attics, animals, weather (shown as planned).</li>
+      <li data-n="16">End card: zonapvp.fun</li>
+    </ol><div class="shows">Dog tags · SOL payouts · performance · Arena · roadmap</div></div>
+  </div>
+  <div class="foot"><span>Cast as in the films before (Sable, Mira, Volkov) · every number read live as it is filmed</span><span>Your call: <b>this ending</b> (they stick together) or <b>a betrayal</b></span></div>
+</body>
+</html>
