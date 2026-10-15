@@ -83,7 +83,10 @@ async function withServer(mode: string, play: (log: () => string) => Promise<voi
   const dir = mkdtempSync(path.join(os.tmpdir(), 'zona-checks-'));
   // (the site it would report a cash-in to is nowhere: nothing in this test is paid, and nothing may be)
   const server: ChildProcess = spawn(process.execPath, [path.join('node_modules', 'tsx', 'dist', 'cli.mjs'), 'server/index.ts'], {
-    env: { ...process.env, PORT: String(PORT), SITE_URL: 'http://127.0.0.1:9', DATA_DIR: dir, INFECTED: 'off', LINGER_S: '0', CHECKS: mode, ...more },
+    // (each check's own refusals are what is watched here, a first minute's worth of them at a time: the handful that
+    // sends somebody back to the bot check in their first minute would take them out of the test first. That is
+    // test/probation.test.ts's.)
+    env: { ...process.env, PORT: String(PORT), SITE_URL: 'http://127.0.0.1:9', DATA_DIR: dir, INFECTED: 'off', LINGER_S: '0', CHECKS: mode, FIRST_FLAGS: '100000', ...more },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let logged = '';

@@ -33,7 +33,7 @@ import { Container } from '../sim/inventory';
 import { BUNKER, bunkerAt, bunkerLocal } from '../sim/bunker';
 import { BURY, noBurying } from '../sim/stash';
 import { RangeJudge, STRIP, clearShot, figureAt, rangeOf } from '../sim/range';
-import { BotCheck } from '../game/botcheck';
+import { BotCheck } from '../game/botcheck-strip';
 import { TOWN } from '../world/worldgen';
 import { F_PRONE } from '../net/protocol';
 import { CONTRACT, DISCORD, X_HANDLE } from '../ui/hud';

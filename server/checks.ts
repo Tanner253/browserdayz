@@ -3,13 +3,14 @@
 
 import { TAG_OUT, type ItemInstance } from '../src/sim/items';
 import { inPlay } from '../src/world/worldgen';
-import type { Pose } from '../src/net/protocol';
-import { SOAK, log, world, type Box } from './index';
+import { F_DANCE, F_SIT, F_SURRENDER, type Pose } from '../src/net/protocol';
+import { SOAK, log, vehicles, world, type Box } from './index';
 import { carriedTags, lootedTags, tagSeen, voided } from './tags';
-import { TURNED, keep, roleOf, stayOn } from './gate';
+import { TURNED, keep, keyHash, roleOf, shooters, stayOn } from './gate';
 import { KEPT } from './keep';
 import { putOff } from './admin';
-import { clients, send, type Client } from './players';
+import { clients, drop, send, type Client } from './players';
+import { AIR, FIRST } from './bodywatch';
 
 // ------------------------------------------------------------------ players
 
@@ -57,12 +58,13 @@ export const CHECKS = (['off', 'watch', 'enforce'].includes(process.env.CHECKS ?
  *   over  – how far past none the health the server allows somebody may go before they ought to be dead, and
  *   down  – how many ms they are given to say so themselves, as every honest game does
  *   strikes, ban – put off the server so many times inside an hour, and they are kept off it for so many hours
- *   fresh – ms after somebody is let in OFF THE BOT CHECK'S RANGE in which nothing their game says of where they
- *     are is weighed. The range stands four hundred metres up, and a game that had passed it went on saying it
- *     was there (or falling from there) until it had put its world together: held in the air for twelve
- *     seconds, put off; put off, the range again, and the same again; twice in an hour, kept off for six. Nobody
- *     had cheated. 2026-10-13: "this person was wrongfully banned". The game no longer waits up there; this is
- *     for a game that does all the same.
+ *   fresh – ms after somebody is let in OFF THE BOT CHECK'S RANGE in which what their game says of being up
+ *     where the range stood is not weighed. The range stands four hundred metres up, and a game that had passed
+ *     it went on saying it was there (or falling from there) until it had put its world together: held in the air
+ *     for twelve seconds, put off; put off, the range again, and the same again; twice in an hour, kept off for
+ *     six. Nobody had cheated. 2026-10-13: "this person was wrongfully banned". The game no longer waits up there;
+ *     this is for a game that does all the same. (Until 2026-10-15 nothing they said at all was weighed for half
+ *     a minute: a program had half its first minute free. "we need to detect bots within a minute of joining".)
  */
 export const CHECK = { foot: 9.5, seat: 64, carry: 2, lag: 12, lagFor: 5000, grace: 3, owe: 30, free: 2500, fresh: 30_000, kick: Number(process.env.CHECK_KICK) || 12, hill: 1.5, high: [30, 4], reach: 8, heal: 10, over: 15, down: 1500, strikes: 2, ban: 6 };
 
@@ -91,7 +93,34 @@ export function flag(c: Client, what: string, refuse = true): boolean {
       putOff(c, `the checks flagged them ${FLAGS_OUT} times (the last: ${what})`);
     });
   }
+  // (In their first minute, a handful of flags is enough: "we need to detect bots within a minute of joining". A
+  // person new to the world is flagged by a line that stalls now and then, and is let go a little for it; the
+  // programs of 2026-10-15 were flagged eighteen and thirty-five times in their first minute. Sent back to the bot
+  // check, not put off: a person loses nothing by it.)
+  else if (CHECKS === 'enforce' && c.check.flags === FIRST_FLAGS && now - c.joinedAt < FIRST) setImmediate(() => clients.has(c.id) && recheck(c, `flagged ${FIRST_FLAGS} times in their first minute (the last: ${what})`));
   return refuse && CHECKS === 'enforce';
+}
+
+/** in their first minute in the world, somebody flagged this many times is sent back to the bot check */
+const FIRST_FLAGS = Number(process.env.FIRST_FLAGS) || 8;
+
+/** Is a place up where the bot check's range stands, high over the middle of the map? (see CHECK.fresh) */
+const atRange = (p: Pose) => Math.hypot(p[0], p[2]) < 60 && p[1] > world.groundAt(p[0], p[2]) + 60;
+
+/**
+ * Sent back to the bot check (2026-10-15): taken off the server as with the proper leave, saved where they stood
+ * with everything they carried, their pass forgotten, and told to press Play: the course again, and back where they
+ * were. What a program cannot do, and a person can in a minute. Watching (CHECKS=watch), only written down.
+ */
+export function recheck(c: Client, why: string) {
+  const secs = ((Date.now() - c.joinedAt) / 1000).toFixed(0);
+  if (CHECKS !== 'enforce') return void log(`[check:${CHECKS}] ${c.name} would be sent back to the bot check, ${secs} s after coming in: ${why}`);
+  TURNED.recheck++;
+  log(`[check] ${c.name} is sent back to the bot check, ${secs} s after coming in: ${why}`);
+  shooters.delete(`${keyHash(c.key)}|${c.ip}`);
+  send(c, { t: 'kick', reason: 'A quick bot check before you go on. Press Play: when it is passed you are back where you stood, with everything you carried.' });
+  drop(c);
+  c.ws.close();
 }
 
 /** enforcing, somebody the checks have flagged this many times since they came in is put out of the server (FLAGS_OUT) */
@@ -105,7 +134,7 @@ const FLAGS_OUT = Number(process.env.FLAGS_OUT) || 50;
  */
 export function moveCheck(c: Client, to: Pose, now: number): boolean {
   const k = c.check;
-  if (CHECKS === 'off' || !c.alive || now < k.free || c.power.clip || roleOf(c) === 'admin') {
+  if (CHECKS === 'off' || !c.alive || now < k.free || c.power.clip || roleOf(c) === 'admin' || (now < k.ranged && atRange(to))) {
     k.at = now;
     k.heard = now;
     k.carry = 0;
@@ -333,6 +362,24 @@ export function underCheck(c: Client, now = Date.now()) {
  * a body walked by a program does not: see `handle`.)
  */
 const GAIT = { ms: 30_000, turns: 4, far: 20 };
+
+/**
+ * A body watched for a program walking it (server/bodywatch.ts): on nothing in the air, or to and fro on one spot
+ * doing nothing else. What it is told of the place is the server's: what is under them (the ground, a bridge, the
+ * fort), and whether anything they could be up on is near (the world's things, and the vehicles where they are now).
+ * @param said where their game says they are (taken or refused), @param n when that was so by its own clock
+ */
+export function bodyCheck(c: Client, was: Pose, said: Pose, n: number | undefined, now = Date.now()) {
+  if (CHECKS === 'off') return;
+  const k = c.check, [x, y, z] = said;
+  const free = !c.alive || !!c.seatAt || c.power.clip || roleOf(c) === 'admin' || now < k.free || (now < k.ranged && atRange(said));
+  const under = world.standAt(x, y, z), up = y - under > AIR.high;
+  const near = up && (world.supportNear(x, z) || [...vehicles.values()].some((v) => Math.hypot(v.s[0] - x, v.s[2] - z) < 7));
+  // (a dance, a sit, hands up: chosen, and the feet kept where they are, which the game's own emotes do)
+  const posed = (said[5] & (F_DANCE | F_SIT | F_SURRENDER)) !== 0 && Math.hypot(x - was[0], z - was[2]) < 0.3;
+  const v = k.body.see({ t: typeof n === 'number' && Number.isFinite(n) ? n : now, x, y, z, under, near, free, did: posed ? now : k.acted }, now);
+  if (v) recheck(c, v.why);
+}
 
 export function gaitCheck(c: Client, was: Pose, now = Date.now()) {
   if (CHECKS === 'off' || !c.alive || c.seatAt || c.power.clip || roleOf(c) === 'admin') return;

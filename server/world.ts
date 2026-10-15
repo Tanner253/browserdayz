@@ -18,6 +18,7 @@ import { gasZone } from '../src/sim/gas';
 import { standAt } from '../src/sim/bridge';
 import { castleUnder, inCastle } from '../src/sim/castle';
 import { basementDeep, basementUnder } from '../src/sim/basements';
+import { BUILDING_FOOTPRINT } from '../src/world/worldgen/layout';
 
 export interface CrateSpot {
   cid: string;
@@ -25,6 +26,36 @@ export interface CrateSpot {
   x: number;
   y: number;
   z: number;
+}
+
+/**
+ * Whatever a body could be up on, near a place (2026-10-15: bots "walking in the air"): every building (its stairs,
+ * its roof, its ladder), rock, tank, wall, crate, prop and the wreck, each as a ring of its reach and four metres more
+ * round its middle, kept in squares of 16 m. Whoever is within one of those rings may be standing on it, and is not
+ * asked how they are up off the ground. (Vehicles move: they are asked of separately.)
+ */
+function supports(world: ReturnType<typeof generateWorld>, crates: { x: number; z: number }[]) {
+  const CELL = 16, cells = new Map<string, [number, number, number][]>();
+  const add = (x: number, z: number, r: number) => {
+    for (let cx = Math.floor((x - r) / CELL); cx <= Math.floor((x + r) / CELL); cx++)
+      for (let cz = Math.floor((z - r) / CELL); cz <= Math.floor((z + r) / CELL); cz++) {
+        const k = `${cx},${cz}`;
+        (cells.get(k) ?? cells.set(k, []).get(k)!).push([x, z, r]);
+      }
+  };
+  const REACH = 4;
+  for (const b of world.buildings) {
+    const [w, d] = BUILDING_FOOTPRINT[b.type] ?? [12, 12];
+    add(b.x, b.z, Math.hypot(w, d) / 2 + REACH);
+  }
+  for (const r of world.rocks) add(r.x, r.z, 2.5 * Math.max(1, r.scale) + REACH);
+  for (const s of world.solids) add(s.x, s.z, s.r + REACH);
+  // (a wall as a ring round its middle that takes in its whole length: more than it reaches, never less)
+  for (const w of world.walls) add(w.x, w.z, w.long / 2 + REACH);
+  for (const p of world.props) add(p.x, p.z, 1 + REACH);
+  for (const c of crates) add(c.x, c.z, 1.5 + REACH);
+  if (world.wreck) add(world.wreck.x, world.wreck.z, 3 + REACH);
+  return (x: number, z: number) => (cells.get(`${Math.floor(x / CELL)},${Math.floor(z / CELL)}`) ?? []).some(([px, pz, r]) => (px - x) ** 2 + (pz - z) ** 2 <= r * r);
 }
 
 export function buildWorldData(root: string) {
@@ -109,6 +140,8 @@ export function buildWorldData(root: string) {
     basementDeep: (x: number, y: number, z: number) => basementDeep(world.basements, x, y, z),
     /** the bridges the road goes over */
     bridges: world.bridges,
+    /** whether anything a body could stand on, climb or be up is within reach of a place: see server/bodywatch.ts */
+    supportNear: supports(world, crates),
     /** somewhere open and level to set a supply drop down */
     dropSite: (rnd?: () => number, inside = false, avoid: { x: number; z: number }[] = []) => pickDropSite(world, rnd, inside, avoid),
     /** where a drop called on a radio comes down, for somebody standing at a place and facing a way */

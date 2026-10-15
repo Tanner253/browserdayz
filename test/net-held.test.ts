@@ -93,7 +93,7 @@ await ok('before the welcome nothing is kept back: the line, the range and a ref
   const coming = net.connect('Cy');
   await tick();
   const server = FakeSocket.last;
-  server.says({ t: 'range', seed: 1, turn: 0, go: 0 });
+  server.says({ t: 'range', turn: 0, go: 0, need: 6, secs: 60 });
   assert.deepEqual(heard, ['range']);
   server.says({ t: 'kick', reason: 'no' });
   assert.deepEqual(heard, ['range', 'kick no']);

@@ -26,7 +26,10 @@ import type { IState, InfectedInfo } from '../sim/infected';
 // (41, 2026-10-15: the emote pack and the new calls (src/sim/emotes.ts): a dance's clip told in the pose flags
 // (EMOTE_SHIFT), and calls a server from before turns away; a page from before would draw every one of the pack's
 // dances as its own.)
-export const PROTOCOL = 41;
+// (42, 2026-10-15: the bot check is the 360-degree course (src/sim/course.ts): the server deals a turn of the yard,
+// not a number the whole range could be worked out from, and shows the figures as they come into sight ('rfig');
+// the game says the height it stands at.)
+export const PROTOCOL = 42;
 
 /** chat channels: everyone on the server, or only players standing near the speaker */
 /** `staff`: those with a role, to one another, wherever they are: nobody else is sent it */
@@ -219,12 +222,12 @@ export type C2S =
   | { t: 'iatk'; i: number; to: number }
   | { t: 'ping'; n: number }
   /**
-   * On the bot check's range, before being let in (src/sim/range.ts): where the player stands and looks (the
-   * range's own x and z, the turn and the tilt), and a shot fired (from where, and along what); `n` is how long
-   * since the range was dealt, by the game's own count, in thousandths of a second; `g` is which go at it this
-   * is of (what was said of the go before, and comes late, is not taken for this one's).
+   * On the bot check's course, before being let in (src/sim/course.ts): where the player's feet are and where they
+   * look (the yard's own x, the height over its floor, z, the turn and the tilt), and a shot fired (from where, and
+   * along what); `n` is how long since the go began, by the game's own count, in thousandths of a second; `g` is
+   * which go it is (what was said of the go before, and comes late, is not taken for this one's).
    */
-  | { t: 'r'; p: [number, number, number, number]; n: number; g: number }
+  | { t: 'r'; p: [number, number, number, number, number]; n: number; g: number }
   | { t: 'rs'; o: [number, number, number]; d: [number, number, number]; n: number; g: number }
   /** on the range: it is built and the figures stand on it; the go's clock starts now (said once a go, and not waited for long) */
   | { t: 'rgo'; g: number }
@@ -379,10 +382,13 @@ export type S2C =
   | { t: 'iblk'; i: number; to: number }
   | { t: 'pong'; n: number }
   /**
-   * The bot check: a range is dealt (its number and the trying its dealing ended at are all of it: src/sim/range.ts
-   * `rangeOf`), `go` is which go at it this is. Nobody is in the world until it is passed.
+   * The bot check: a go at the course is dealt. All the game is told is the way the yard is turned (radians), how
+   * many figures there are and how long it has: where the figures are is the server's, shown as they come into
+   * sight (`rfig`). `go` is which go this is. Nobody is in the world until it is passed.
    */
-  | { t: 'range'; seed: number; turn: number; go: number }
+  | { t: 'range'; turn: number; go: number; need: number; secs: number }
+  /** on the course: the figures in the player's sight now (src/sim/course.ts `Sighting`: number, feet, pace, up) */
+  | { t: 'rfig'; f: [number, number, number, number, number, number, 0 | 1][] }
   /** on the range: the server has counted this figure down; and the range is passed (the welcome follows) */
   | { t: 'rhit'; i: number }
   | { t: 'rpass' }

@@ -21,8 +21,8 @@ import os from 'node:os';
 import path from 'node:path';
 import WebSocket from 'ws';
 import { PROTOCOL, type S2C } from '../src/net/protocol';
-import { rangeOf } from '../src/sim/range';
-import { playRange } from './range-player';
+import type { Sighting } from '../src/sim/course';
+import { playCourse } from './course-player';
 import { generateWorld, heightAt } from '../src/world/worldgen';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -74,19 +74,33 @@ class Conn {
     if (this.ws.readyState === 1) this.ws.send(JSON.stringify({ t: 's', p: [x, y, z, 0, 0, 8], w: null, m: [], n: Math.round(performance.now()) }));
   }
   /**
-   * Plays the range it has been dealt, as somebody honest does (test/range-player.ts), in real time over the wire.
+   * Plays the course it has been dealt, as somebody honest does (test/course-player.ts), in real time over the
+   * wire: shown the figures only as the server shows them.
    * @param browser what its browser says of itself @returns whether it was welcomed into the world
    */
   async shoot(browser: { wd: boolean; gl: string } = { wd: false, gl: 'ANGLE (NVIDIA, NVIDIA GeForce RTX 3070 Ti Direct3D11)' }): Promise<boolean> {
-    const dealt = [...this.got].reverse().find((m) => m.t === 'range') as { seed: number; turn: number; go: number } | undefined;
+    const dealt = [...this.got].reverse().find((m) => m.t === 'range') as { turn: number; go: number; secs: number } | undefined;
     if (!dealt) return false;
-    const spec = rangeOf(dealt.seed, dealt.turn), g = dealt.go, send = (m: unknown) => this.ws.readyState === 1 && this.ws.send(JSON.stringify(m));
+    const g = dealt.go, send = (m: unknown) => this.ws.readyState === 1 && this.ws.send(JSON.stringify(m));
     send({ t: 'renv', ...browser });
     send({ t: 'rgo', g });
     const t0 = Date.now(), r3 = (v: number) => +v.toFixed(4);
-    await playRange(spec, {
-      seen: (ms, x, z, yaw, pitch) => send({ t: 'r', p: [r3(x), r3(z), r3(yaw), r3(pitch)], n: ms, g }),
+    /** the last the server showed, and when it came */
+    let shown: Sighting[] = [], shownAt = 0, read = 0;
+    const sightings = () => {
+      for (; read < this.got.length; read++) {
+        const m = this.got[read];
+        if (m.t === 'rfig') {
+          shown = m.f as Sighting[];
+          shownAt = Date.now();
+        }
+      }
+      return Date.now() - shownAt < 300 ? shown : [];
+    };
+    await playCourse(dealt.turn, dealt.secs, {
+      seen: (ms, x, y, z, yaw, pitch) => send({ t: 'r', p: [r3(x), r3(y), r3(z), r3(yaw), r3(pitch)], n: ms, g }),
       shot: (ms, o, d) => send({ t: 'rs', o, d, n: ms, g }),
+      shown: () => sightings(),
       down: () => new Set(this.got.flatMap((m) => (m.t === 'rhit' ? [m.i] : []))),
       done: () => this.closed || this.got.some((m) => m.t === 'rpass' || m.t === 'welcome' || m.t === 'kick'),
       until: async (ms) => {

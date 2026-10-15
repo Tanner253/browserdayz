@@ -1,27 +1,30 @@
-// The bot check, as the player meets it: a walled yard with a firing line, walls of cover down it, and figures
-// walking to and fro behind them. The server deals it and the server judges it (src/sim/range.ts: read that first).
-// Here it is built from the number the server sent, the figures are walked by the same reckoning the judge uses,
-// and the server is told where the player stands and looks and what they fire. A figure goes down when the server
-// says it has counted it, and not before: what the player's own game thinks it hit is a flinch and no more.
+// The bot check, as the player meets it: a round yard high over the middle of the map, walls and a hut and a
+// catwalk in it, and six figures about it that the server walks and the server shows (src/sim/course.ts: read that
+// first). Here the yard is built as the server turned it, each figure is drawn where the server last said it was
+// and only while the server says it is in sight, and the server is told where the player stands and looks and what
+// they fire. A figure goes down when the server says it has counted it, and not before: what the player's own game
+// thinks it hit is a flinch and no more.
 //
-// The yard stands by itself high over the middle of the map, where nothing of the world is in the way. The player
-// is alone in it: they are not in the world, and nobody is told of them, until the server says they have passed.
+// (Until 2026-10-15 this was a strip with figures walking behind walls, worked out here from one number: so was it
+// worked out by the programs that walked through it. That strip is ./botcheck-strip.ts, kept for the ninth film.)
 
 import * as THREE from 'three';
 import type RAPIER from '@dimforge/rapier3d-compat';
 import { assets } from '../core/assets';
-import { physics, GLASS_GROUPS, HITBOX_GROUPS } from '../core/physics';
+import { physics, HITBOX_GROUPS } from '../core/physics';
 import type { Atmosphere } from '../world/atmosphere';
 import type { C2S } from '../net/protocol';
-import { BACK, STRIP, figureAt, rangeOf, type RangeSpec } from '../sim/range';
+import { BLOCKS, RAMP, YARD, fromPlan, type Sighting } from '../sim/course';
 import { Avatar } from './avatar';
 import { lookFor } from './look';
 import type { Damageable, HitZone } from './weapons';
 
-/** how far the yard reaches to either side and behind the player, and how high its walls stand */
-const SIDE = STRIP.half + 1, BEHIND = STRIP.deep + 0.9, WALL = 4.2;
 /** how often the server is told where the player stands and looks, a second */
 const TOLD_HZ = 20;
+/** a figure not heard of for this long is out of sight (ms) */
+const UNSEEN = 400;
+/** the ring wall's pieces */
+const RING_PIECES = 36;
 
 const _v = new THREE.Vector3();
 
@@ -35,13 +38,15 @@ function slab(w: number, h: number, d: number, tile = 3) {
   return g;
 }
 
-/** One of the figures that walk the range: a body, and the places a shot lands on it. It is hurt by nothing: the server says when it is down. */
+/** One of the figures of the yard: a body, and the places a shot lands on it. It is hurt by nothing: the server says when it is down. */
 class Figure implements Damageable {
   readonly name = 'Range figure';
   readonly avatar = new Avatar();
   readonly pos = new THREE.Vector3();
   ready = false;
   down = false;
+  /** where the server last said it was, its pace, whether it is up, and when that was heard (performance.now) */
+  said: { x: number; y: number; z: number; vx: number; vz: number; up: boolean; at: number } | null = null;
   private body!: RAPIER.RigidBody;
   private zones: RAPIER.Collider[] = [];
   private vel = new THREE.Vector3();
@@ -51,12 +56,14 @@ class Figure implements Damageable {
 
   async load(atmo: Atmosphere, scene: THREE.Scene) {
     await this.avatar.load(atmo, 0, false, lookFor(`range figure ${this.i}`));
+    this.avatar.root.visible = false;
     scene.add(this.avatar.root);
     const R = physics.R;
     this.body = physics.world.createRigidBody(R.RigidBodyDesc.kinematicPositionBased());
     const zone = (desc: RAPIER.ColliderDesc, z: HitZone) => {
       const c = physics.world.createCollider(desc.setCollisionGroups(HITBOX_GROUPS), this.body);
       physics.tag(c, { surface: 'flesh', owner: this, zone: z });
+      c.setEnabled(false);
       this.zones.push(c);
     };
     zone(R.ColliderDesc.ball(0.14).setTranslation(0, 1.64, 0), 'head');
@@ -71,16 +78,23 @@ class Figure implements Damageable {
     return false;
   }
 
-  walk(x: number, y: number, z: number, vx: number, dt: number) {
+  /** drawn where the server last said, carried on at its pace for a moment; out of sight when nothing has been said for a while */
+  walk(floor: number, now: number, dt: number) {
     if (!this.ready) return;
+    const s = this.said, shown = !!s && (this.down || now - s.at < UNSEEN);
+    if (this.avatar.root.visible !== shown) {
+      this.avatar.root.visible = shown;
+      for (const c of this.zones) c.setEnabled(shown && !this.down);
+    }
+    if (!shown || !s) return;
     if (!this.down) {
-      this.pos.set(x, y, z);
-      this.vel.set(vx, 0, 0);
-      // (facing the way it walks: the game's own turn, where none is along -z)
-      this.yaw = vx > 0 ? -Math.PI / 2 : Math.PI / 2;
+      const ahead = Math.min(0.25, (now - s.at) / 1000);
+      this.pos.set(s.x + s.vx * ahead, floor + s.y, s.z + s.vz * ahead);
+      this.vel.set(s.vx, 0, s.vz);
+      if (Math.hypot(s.vx, s.vz) > 0.05) this.yaw = Math.atan2(-s.vx, -s.vz);
       this.body.setNextKinematicTranslation(this.pos);
     } else this.vel.set(0, 0, 0);
-    this.avatar.update(dt, this.pos, this.vel, this.yaw, false, this.down);
+    this.avatar.update(dt, this.pos, this.vel, this.yaw, !this.down && !s.up, this.down);
   }
 
   fall() {
@@ -93,8 +107,10 @@ class Figure implements Damageable {
   stand() {
     if (!this.ready) return;
     this.down = false;
+    this.said = null;
+    this.avatar.root.visible = false;
     this.avatar.clearWounds();
-    for (const c of this.zones) c.setEnabled(true);
+    for (const c of this.zones) c.setEnabled(false);
   }
 
   dispose() {
@@ -112,8 +128,8 @@ export interface BotCheckHost {
   camera: THREE.Camera;
   /** how high the yard's floor stands, in the world */
   floor: number;
-  /** the player is put here, looking down the range */
-  place(x: number, y: number, z: number): void;
+  /** the player is put here, looking along `yaw` */
+  place(x: number, y: number, z: number, yaw: number): void;
   where(): THREE.Vector3;
   send(m: C2S): void;
   /** a thing made ready to be drawn before it is shown (Renderer.ready) */
@@ -123,20 +139,24 @@ export interface BotCheckHost {
 }
 
 export class BotCheck {
-  /** on the range now */
+  /** on the course now */
   active = false;
-  private spec: RangeSpec | null = null;
+  private turn = 0;
+  private need = 6;
+  private secs = 60;
   private go = 0;
   private t0 = 0;
   private told = 0;
+  /** the floor and the ring: built once */
   private yard: THREE.Group | null = null;
-  private walls: THREE.Group | null = null;
+  /** the walls, the hut, the catwalk and the blocks, turned as the server turned them: built for each go */
+  private lay: THREE.Group | null = null;
   private fixed: RAPIER.Collider[] = [];
-  private cover: RAPIER.Collider[] = [];
+  private laid: RAPIER.Collider[] = [];
   private figures: Figure[] = [];
   /** the figures the server has counted down this go (one may be counted before its body has been made here) */
   private fell = new Set<number>();
-  /** the go's clock is running: the server has been told the range stands */
+  /** the go's clock is running: the server has been told the course stands */
   private begun = false;
   private sign: HTMLElement | null = null;
   private mats: { wall: THREE.Material; floor: THREE.Material } | null = null;
@@ -144,78 +164,98 @@ export class BotCheck {
 
   constructor(private h: BotCheckHost) {}
 
-  /** how long since this range was dealt, as this game counts it (thousandths of a second) */
+  /** how long since this go began, as this game counts it (thousandths of a second) */
   private get ms() {
     return Math.round(performance.now() - this.t0);
   }
 
-  private block(desc: RAPIER.ColliderDesc, x: number, y: number, z: number, into: RAPIER.Collider[], groups?: number) {
-    const c = groups === undefined ? physics.addStatic(desc, 'concrete', { x, y: this.h.floor + y, z }) : physics.addStaticQuat(desc, 'concrete', { x, y: this.h.floor + y, z }, { x: 0, y: 0, z: 0, w: 1 }, undefined, groups);
-    into.push(c);
-  }
-
-  /** The yard itself: its floor, the walls round it, and the line the player keeps behind. Built once. */
-  private async build() {
-    const R = physics.R, y0 = this.h.floor;
+  private material() {
+    if (this.mats) return this.mats;
     const wall = assets.pbr('dirty_concrete'), floor = assets.pbr('concrete_floor_worn_001');
     const mat = (t: ReturnType<typeof assets.pbr>) => this.h.atmo.register(new THREE.MeshStandardMaterial({ map: t.map, normalMap: t.normalMap, roughnessMap: t.armMap, aoMap: t.armMap, metalness: 0, roughness: 1 }));
-    this.mats = { wall: mat(wall), floor: mat(floor) };
-    const yard = new THREE.Group();
-    const put = (w: number, h: number, d: number, x: number, y: number, z: number, m: THREE.Material) => {
-      const mesh = new THREE.Mesh(slab(w, h, d), m);
-      mesh.position.set(x, y0 + y, z);
-      mesh.castShadow = mesh.receiveShadow = true;
-      mesh.matrixAutoUpdate = false;
-      mesh.updateMatrix();
-      yard.add(mesh);
-      this.block(R.ColliderDesc.cuboid(w / 2, h / 2, d / 2), x, y, z, this.fixed);
-    };
-    const deep = BACK + BEHIND, mid = (BEHIND - BACK) / 2;
-    put(SIDE * 2 + 1, 1, deep + 1, 0, -0.5, mid, this.mats.floor);
-    put(0.5, WALL, deep + 1, -SIDE - 0.25, WALL / 2, mid, this.mats.wall);
-    put(0.5, WALL, deep + 1, SIDE + 0.25, WALL / 2, mid, this.mats.wall);
-    put(SIDE * 2 + 1, WALL, 0.5, 0, WALL / 2, -BACK - 0.25, this.mats.wall);
-    put(SIDE * 2 + 1, WALL, 0.5, 0, WALL / 2, BEHIND + 0.25, this.mats.wall);
-    // (the line: a kerb to the knee, and over it nothing a shot is stopped by but that no player walks through)
-    put(SIDE * 2, 0.55, 0.35, 0, 0.275, -0.75, this.mats.wall);
-    this.block(R.ColliderDesc.cuboid(SIDE, WALL / 2, 0.1), 0, WALL / 2, -0.75, this.fixed, GLASS_GROUPS);
+    return (this.mats = { wall: mat(wall), floor: mat(floor) });
+  }
+
+  /** a static box of the course, its middle at (x, y, z) of the yard (y from the floor), turned `q` */
+  private solid(w: number, h: number, d: number, x: number, y: number, z: number, q: THREE.Quaternion, into: RAPIER.Collider[]) {
+    into.push(physics.addStaticQuat(physics.R.ColliderDesc.cuboid(w / 2, h / 2, d / 2), 'concrete', { x, y: this.h.floor + y, z }, { x: q.x, y: q.y, z: q.z, w: q.w }));
+  }
+
+  /** The yard itself: its floor and the ring wall round it. Built once. */
+  private async build() {
+    const m = this.material(), y0 = this.h.floor, yard = new THREE.Group(), none = new THREE.Quaternion();
+    const floor = new THREE.Mesh(new THREE.CircleGeometry(YARD.r + YARD.thick + 0.5, 72).rotateX(-Math.PI / 2), m.floor);
+    const uv = floor.geometry.getAttribute('uv') as THREE.BufferAttribute;
+    for (let k = 0; k < uv.count; k++) uv.setXY(k, uv.getX(k) * 15, uv.getY(k) * 15);
+    floor.position.y = y0;
+    floor.receiveShadow = true;
+    yard.add(floor);
+    this.solid((YARD.r + 2) * 2, 1, (YARD.r + 2) * 2, 0, -0.5, 0, none, this.fixed);
+    // (the ring: pieces of wall set round the yard, each a little longer than its share so that they meet)
+    const mid = YARD.r + YARD.thick / 2, len = ((2 * Math.PI * mid) / RING_PIECES) * 1.04;
+    for (let k = 0; k < RING_PIECES; k++) {
+      const a = (k / RING_PIECES) * Math.PI * 2, x = Math.sin(a) * mid, z = Math.cos(a) * mid, q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), a);
+      const piece = new THREE.Mesh(slab(len, YARD.ring, YARD.thick), m.wall);
+      piece.position.set(x, y0 + YARD.ring / 2, z);
+      piece.quaternion.copy(q);
+      piece.castShadow = piece.receiveShadow = true;
+      yard.add(piece);
+      this.solid(len, YARD.ring, YARD.thick, x, YARD.ring / 2, z, q, this.fixed);
+    }
     await this.h.ready(yard).catch(() => {});
     this.h.scene.add(yard);
     this.yard = yard;
   }
 
-  /** The walls of cover of the range that has been dealt, in place of the last one's. */
-  private raise(spec: RangeSpec) {
+  /** The course's walls, hut, catwalk and blocks, turned as the server turned them, in place of the last go's. */
+  private raise(turn: number) {
     this.lower();
-    const R = physics.R, walls = new THREE.Group();
-    for (const c of spec.cover) {
-      const mesh = new THREE.Mesh(slab(c.w, c.h, c.d), this.mats!.wall);
-      mesh.position.set(c.x, this.h.floor + c.h / 2, c.z);
+    const m = this.material(), lay = new THREE.Group(), up = new THREE.Vector3(0, 1, 0), q = new THREE.Quaternion().setFromAxisAngle(up, turn);
+    lay.position.y = this.h.floor;
+    lay.rotation.y = turn;
+    for (const b of BLOCKS) {
+      const w = b.x1 - b.x0, h = b.y1 - b.y0, d = b.z1 - b.z0, cx = (b.x0 + b.x1) / 2, cz = (b.z0 + b.z1) / 2;
+      const mesh = new THREE.Mesh(slab(w, h, d), m.wall);
+      mesh.position.set(cx, (b.y0 + b.y1) / 2, cz);
       mesh.castShadow = mesh.receiveShadow = true;
-      walls.add(mesh);
-      this.block(R.ColliderDesc.cuboid(c.w / 2, c.h / 2, c.d / 2), c.x, c.h / 2, c.z, this.cover);
+      lay.add(mesh);
+      const [x, z] = fromPlan(turn, cx, cz);
+      this.solid(w, h, d, x, (b.y0 + b.y1) / 2, z, q, this.laid);
     }
-    this.h.scene.add(walls);
-    this.walls = walls;
+    // (the ramp: a slab whose top is the slope from the floor up to the catwalk's deck)
+    const run = RAMP.x1 - RAMP.x0, slope = Math.atan2(RAMP.top, run), long = Math.hypot(run, RAMP.top), thick = 0.3, wide = RAMP.z1 - RAMP.z0;
+    const nx = Math.sin(slope), ny = Math.cos(slope), cx = (RAMP.x0 + RAMP.x1) / 2 - nx * (thick / 2), cy = RAMP.top / 2 - ny * (thick / 2), cz = (RAMP.z0 + RAMP.z1) / 2;
+    const tilt = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -slope);
+    const ramp = new THREE.Mesh(slab(long, thick, wide), m.wall);
+    ramp.position.set(cx, cy, cz);
+    ramp.quaternion.copy(tilt);
+    ramp.castShadow = ramp.receiveShadow = true;
+    lay.add(ramp);
+    const [rx, rz] = fromPlan(turn, cx, cz);
+    this.solid(long, thick, wide, rx, cy, rz, q.clone().multiply(tilt), this.laid);
+    this.h.scene.add(lay);
+    this.lay = lay;
   }
 
   private lower() {
-    for (const c of this.cover) {
+    for (const c of this.laid) {
       physics.tags.delete(c.handle);
       physics.world.removeCollider(c, false);
     }
-    this.cover.length = 0;
-    if (this.walls) {
-      this.walls.removeFromParent();
-      this.walls.traverse((o) => (o as THREE.Mesh).geometry?.dispose());
-      this.walls = null;
+    this.laid.length = 0;
+    if (this.lay) {
+      this.lay.removeFromParent();
+      this.lay.traverse((o) => (o as THREE.Mesh).geometry?.dispose());
+      this.lay = null;
     }
   }
 
-  /** A range has been dealt by the server: it is built, the figures are stood up, and the player is put at its start. */
-  async deal(seed: number, turn: number, go: number) {
+  /** A go has been dealt by the server: the course is built as it is turned, the figures made ready, and the player put at its middle. */
+  async deal(turn: number, go: number, need: number, secs: number) {
     this.active = true;
-    this.spec = rangeOf(seed, turn);
+    this.turn = turn;
+    this.need = need;
+    this.secs = secs;
     this.go = go;
     this.fell.clear();
     this.begun = false;
@@ -225,15 +265,15 @@ export class BotCheck {
       this.saidEnv = true;
       this.h.send({ t: 'renv', ...browserSays() });
     }
-    this.h.place(STRIP.start[0], this.h.floor + 0.05, STRIP.start[1]);
+    this.h.place(0, this.h.floor + 0.05, 0, turn);
     this.show();
     if (!this.yard) await this.build();
-    if (!this.active || !this.spec || this.spec.seed !== seed) return;
-    this.raise(this.spec);
+    if (!this.active || this.go !== go) return;
+    this.raise(turn);
     for (const f of this.figures) f.stand();
     // (the figures are made the first time, one after another)
     const made: Promise<void>[] = [];
-    for (let i = this.figures.length; i < this.spec.figures.length; i++) {
+    for (let i = this.figures.length; i < need; i++) {
       const f = new Figure(i);
       this.figures.push(f);
       made.push(
@@ -243,35 +283,40 @@ export class BotCheck {
         }),
       );
     }
-    // (The go's clock starts when the range stands and the figures are on it, and the server is told so: on a
-    // slow machine that is some seconds, which were coming off the forty. Not waited for longer than twelve.)
+    // (The go's clock starts when the course stands and the figures are ready, and the server is told so: on a slow
+    // machine that is some seconds. Not waited for longer than twelve.)
     await Promise.race([Promise.all(made), new Promise((r) => setTimeout(r, 12_000))]);
     // (nor before the player has their hands on the game: the check before this one took the mouse from them, and
     // a click gives it back. Not waited for longer than six seconds more.)
     for (let k = 0; k < 60 && this.active && !this.h.playing(); k++) await new Promise((r) => setTimeout(r, 100));
-    if (!this.active || !this.spec || this.spec.seed !== seed || this.go !== go) return;
+    if (!this.active || this.go !== go) return;
     this.t0 = performance.now();
     this.begun = true;
     this.h.send({ t: 'rgo', g: go });
   }
 
-  /** Each frame on the range: the figures walked, the server told, the sign kept. */
-  update(dt: number) {
-    const spec = this.spec;
-    if (!this.active || !spec) return;
-    if (!this.begun) return void this.show();
-    const ms = this.ms;
-    spec.figures.forEach((f, i) => {
-      const p = figureAt(f, ms);
-      this.figures[i]?.walk(p.x, this.h.floor, p.z, p.vx, dt);
-    });
-    const at = this.h.where();
-    // (off the yard, by whatever way: back at the start)
-    if (at.y < this.h.floor - 3 || Math.abs(at.x) > SIDE + 2 || at.z < -BACK - 2 || at.z > BEHIND + 2) this.h.place(STRIP.start[0], this.h.floor + 0.05, STRIP.start[1]);
+  /** The server says what is in the player's sight, and where. */
+  sighted(f: Sighting[]) {
+    if (!this.active || !this.begun) return;
     const now = performance.now();
+    for (const [i, x, y, z, vx, vz, up] of f) {
+      const fig = this.figures[i];
+      if (fig) fig.said = { x, y, z, vx, vz, up: up === 1, at: now };
+    }
+  }
+
+  /** Each frame on the course: the figures drawn, the server told, the sign kept. */
+  update(dt: number) {
+    if (!this.active) return;
+    if (!this.begun) return void this.show();
+    const now = performance.now();
+    for (const f of this.figures) f.walk(this.h.floor, now, dt);
+    const at = this.h.where();
+    // (off the yard, by whatever way: back at its middle)
+    if (at.y < this.h.floor - 3 || Math.hypot(at.x, at.z) > YARD.r + 2) this.h.place(0, this.h.floor + 0.05, 0, this.turn);
     if (now - this.told >= 1000 / TOLD_HZ) {
       this.told = now;
-      this.tell(ms);
+      this.tell(this.ms);
     }
     this.show();
   }
@@ -280,12 +325,12 @@ export class BotCheck {
   private tell(ms: number) {
     const at = this.h.where();
     this.h.camera.getWorldDirection(_v);
-    this.h.send({ t: 'r', p: [+at.x.toFixed(3), +at.z.toFixed(3), +Math.atan2(-_v.x, -_v.z).toFixed(4), +Math.asin(THREE.MathUtils.clamp(_v.y, -1, 1)).toFixed(4)], n: ms, g: this.go });
+    this.h.send({ t: 'r', p: [+at.x.toFixed(3), +(at.y - this.h.floor).toFixed(3), +at.z.toFixed(3), +Math.atan2(-_v.x, -_v.z).toFixed(4), +Math.asin(THREE.MathUtils.clamp(_v.y, -1, 1)).toFixed(4)], n: ms, g: this.go });
   }
 
   /** A shot the player fired: told to the server, from where and along what. */
   shot(origin: THREE.Vector3, dir: THREE.Vector3) {
-    if (!this.active || !this.spec || !this.begun) return;
+    if (!this.active || !this.begun) return;
     const ms = this.ms;
     this.tell(ms - 1);
     this.h.send({ t: 'rs', o: [+origin.x.toFixed(3), +(origin.y - this.h.floor).toFixed(3), +origin.z.toFixed(3)], d: [+dir.x.toFixed(5), +dir.y.toFixed(5), +dir.z.toFixed(5)], n: ms, g: this.go });
@@ -299,7 +344,7 @@ export class BotCheck {
     this.show();
   }
 
-  /** what stands at the top of the screen while the range is on */
+  /** what stands at the top of the screen while the course is on */
   private show(done = false) {
     const ui = document.getElementById('ui');
     if (!ui) return;
@@ -307,13 +352,13 @@ export class BotCheck {
       this.sign = document.createElement('div');
       this.sign.style.cssText =
         'position:absolute;left:50%;top:5.5vh;transform:translateX(-50%);z-index:40;padding:12px 22px;text-align:center;pointer-events:none;background:rgba(12,13,11,0.82);border:1px solid rgba(243,239,230,0.25);' +
-        'color:#f3efe6;font-family:"Barlow Condensed","Arial Narrow",sans-serif;text-transform:uppercase;letter-spacing:0.1em;';
+        'color:#f3efe6;font-family:"Barlow Condensed","Arial Narrow",sans-serif;text-transform:uppercase;letter-spacing:0.1em;max-width:min(92vw,760px);';
       ui.appendChild(this.sign);
     }
-    const need = this.spec?.need ?? 4, left = Math.max(0, Math.ceil((this.spec?.secs ?? 30) - this.ms / 1000));
-    const head = done ? 'Bot check passed' : !this.begun ? (this.h.playing() ? 'Bot check · setting up the range' : 'Bot check · click to begin') : `Bot check · ${this.fell.size} of ${need} down · ${left} s`;
-    const how = `Bring down all ${need} figures that walk behind the walls. Move along the line to find them, and hold your sights on each before you fire.`;
-    const sub = done ? 'Going in.' : this.go > 1 ? `Not passed. A new range: go ${this.go} of 4. ${how}` : how;
+    const left = Math.max(0, Math.ceil(this.secs - this.ms / 1000));
+    const head = done ? 'Bot check passed' : !this.begun ? (this.h.playing() ? 'Bot check · setting up the course' : 'Bot check · click to begin') : `Bot check · ${this.fell.size} of ${this.need} down · ${left} s`;
+    const how = `Bring down all ${this.need} figures, all round you: behind the walls, in the hut, beyond the catwalk. Walk the yard to find them, and hold your sights on each before you fire.`;
+    const sub = done ? 'Going in.' : this.go > 1 ? `Not passed. A new course: go ${this.go} of 4. ${how}` : how;
     const html = `<div style="font-size:24px;font-weight:700;color:${done ? '#9fe08a' : '#ffd35a'}">${head}</div><div style="margin-top:4px;font-size:15px;font-weight:500;color:#d8cfb8;letter-spacing:0.06em">${sub}</div>`;
     if (this.sign.dataset.said !== html) {
       this.sign.dataset.said = html;
@@ -321,16 +366,15 @@ export class BotCheck {
     }
   }
 
-  /** Passed: said for a moment, as the range is taken away. */
+  /** Passed: said for a moment, as the course is taken away. */
   passed() {
     if (this.sign) this.show(true);
   }
 
-  /** The range is over, passed or not: everything of it is taken out of the world. */
+  /** The course is over, passed or not: everything of it is taken out of the world. */
   end() {
     if (!this.active && !this.yard && !this.sign) return;
     this.active = false;
-    this.spec = null;
     this.lower();
     for (const c of this.fixed) {
       physics.tags.delete(c.handle);

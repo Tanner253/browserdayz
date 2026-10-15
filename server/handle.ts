@@ -17,7 +17,7 @@ import { type C2S, F_DEAD, type S2C, ACTS, type Slung, F_GUARD, MAX_STAMINA, typ
 import { FIRE } from '../src/sim/fires';
 import { BARREL_RESPAWN, barrelsGone, boxes, cargoOf, doors, economy, hearths, horde, invented, isVState, issue, locks, log, stashItem, tellSeats, things, vehicles, world } from './index';
 import { CARD_GRACE_MS, CASH_HOLD_MS, SAID_BY_ITSELF, bunkerDoor, cardSeen, carriedTags, carries, isWallet, lootedTags, mayHit, namesOf, notEarned, pairPaidAt, recordCashIn, tagSeen, voided } from './tags';
-import { CHECK, CHECKS, buried, dealt, flag, gaitCheck, hillBetween, moveCheck, takenTag, touched, underCheck, zoneCheck } from './checks';
+import { CHECK, CHECKS, bodyCheck, buried, dealt, flag, gaitCheck, hillBetween, moveCheck, takenTag, touched, underCheck, zoneCheck } from './checks';
 import { ADMIN, LOGOUT_MS, LOGOUT_STIR, away, handBlast, keptOffNow, pockets, roleOf, stayOn } from './gate';
 import { KEPT, sys } from './keep';
 import { banId, command, login, offId } from './admin';
@@ -34,8 +34,8 @@ export function handle(c: Client, m: C2S) {
   // until 2026-10-13: anybody within reach of an infected was never away, however long their hands were off the
   // keys, and was never looked at by the check below.)
   if (!SAID_BY_ITSELF.has(m.t)) {
-    c.activeAt = Date.now();
-    // (and whoever is doing things is not a body being walked up and down: see gaitCheck)
+    c.activeAt = c.check.acted = Date.now();
+    // (and whoever is doing things is not a body being walked up and down: see gaitCheck, bodyCheck)
     c.check.gait = undefined;
   }
   switch (m.t) {
@@ -62,6 +62,7 @@ export function handle(c: Client, m: C2S) {
       zoneCheck(c);
       underCheck(c);
       gaitCheck(c, was);
+      bodyCheck(c, was, m.p, m.n);
       const w = typeof m.w === 'string' && ITEMS[m.w] ? m.w : null;
       c.w = w;
       c.m = Array.isArray(m.m) ? m.m.filter((x) => typeof x === 'string').slice(0, 4) : [];

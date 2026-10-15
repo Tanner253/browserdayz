@@ -3,7 +3,6 @@
 
 import { createHash, randomBytes } from 'node:crypto';
 import { ITEMS, makeItem, type ItemInstance } from '../src/sim/items';
-import { type RangeSpec, dealing, rangeOf } from '../src/sim/range';
 import { WEAPON_RULES } from '../src/sim/combat';
 import { type Vec3, inHandDamage, overdue, lyingBlast } from '../src/sim/grenades';
 import { carDamage } from '../src/sim/vehicles';
@@ -61,7 +60,7 @@ export const awake = () => {
 };
 
 /** what has been turned away, for /healthz: by what */
-export const TURNED = { address: 0, flood: 0, origin: 0, silent: 0, hover: 0, flags: 0, banned: 0, captcha: 0, range: 0 };
+export const TURNED = { address: 0, flood: 0, origin: 0, silent: 0, hover: 0, flags: 0, banned: 0, captcha: 0, range: 0, agent: 0, recheck: 0 };
 
 /** when each connection lately said hello, by where it came from: see `flooding` */
 const hellos = new Map<string, number[]>();
@@ -82,11 +81,13 @@ const HELLOS_A_MINUTE = Number(process.env.HELLOS_A_MINUTE) || 20;
 // without passing this bot check. the players character wont spawn in the game and they wont join the game server
 // until they pass this check")
 //
-// Whoever asks to come in is dealt a range first (src/sim/range.ts): they are nobody in the world while they are
-// on it, hold no place, and are seen by nobody. Their game says where its player stands and looks and what it
-// fires; the judge here says whether the figures went down, and whether it was a person that put them down. It
-// is asked of everybody, whatever role they have. Passed, it holds for a game at an address for BOTCHECK_HOURS
-// (six), so that a line that drops is not the range again; whoever the checks put off the server shoots it again.
+// Whoever asks to come in is dealt a go at the course first (src/sim/course.ts, since 2026-10-15; the strip before
+// it, src/sim/range.ts, was walked through by programs): they are nobody in the world while they are on it, hold
+// no place, and are seen by nobody. The server walks the figures and shows them as they come into sight; their
+// game says where its player stands and looks and what it fires; the judge here says whether the figures went
+// down, and whether it was a person that put them down. It is asked of everybody, whatever role they have.
+// Passed, it holds for a game at an address for BOTCHECK_HOURS (six), so that a line that drops is not the course
+// again; whoever the checks put off the server, or send back to it (`recheck`), does it again.
 // On wherever the host is Render, and wherever BOTCHECK says so ("off": never).
 export const BOTCHECK = {
   on: process.env.BOTCHECK ? process.env.BOTCHECK !== 'off' : !!process.env.RENDER,
@@ -97,6 +98,18 @@ export const BOTCHECK = {
   /** a go with the bot signature (RangeJudge.signed) is not passed; RANGE_SIG=watch: passed and written down; off: not asked */
   sig: (['off', 'watch', 'enforce'].includes(process.env.RANGE_SIG ?? '') ? process.env.RANGE_SIG : 'enforce') as 'off' | 'watch' | 'enforce',
 };
+
+/**
+ * Browsers not let in for how they name themselves (2026-10-15). Every connection of two waves of bots, the 12th's
+ * and the 15th's, named itself "Chrome/141.0.0.0" on Windows; in every log since the game opened (2026-10-01) no
+ * other connection did, none of theirs lasted a quarter of an hour, and no address of theirs came back another day.
+ * A real Chrome names its version the same way, so whoever it is, is told plainly to update it. One switch,
+ * REFUSE_AGENTS: what to look for, several parted by |, or "off", for the day they change it.
+ */
+export const REFUSE_AGENTS = (process.env.REFUSE_AGENTS ?? 'Chrome/141.0.0.0').split('|').map((s) => s.trim()).filter((s) => s && s !== 'off');
+
+/** what of REFUSE_AGENTS a browser's name has in it ('': nothing) */
+export const refusedAgent = (ua: string) => REFUSE_AGENTS.find((s) => ua.includes(s)) ?? '';
 
 /**
  * A browser as it names itself, in a few words for the log: its make and major version, and the system. (2026-10-15:
@@ -111,35 +124,6 @@ export function agentOf(ua: string): string {
 
 /** who has passed, and until when: by their game and where they play from */
 export const shooters = new Map<string, number>();
-
-/**
- * Ranges dealt ahead. Dealing one is a hundred tryings some of the time, a tenth of a second of this server's one
- * thread with everybody's game waiting on it: so a few are kept ready, each dealt a trying at a time between
- * other things, and whoever asks to come in is handed one.
- */
-const DEALT: RangeSpec[] = [];
-
-let dealingNow = false;
-
-export function dealAhead() {
-  if (dealingNow || !BOTCHECK.on || DEALT.length >= 8) return;
-  dealingNow = true;
-  const deal = dealing(1 + Math.floor(Math.random() * 2147483646));
-  const step = () => {
-    const s = deal.next();
-    if (!s.done) return void setImmediate(step);
-    DEALT.push(s.value);
-    dealingNow = false;
-    dealAhead();
-  };
-  setImmediate(step);
-}
-
-export const nextRange = (): RangeSpec => {
-  const spec = DEALT.shift() ?? rangeOf(1 + Math.floor(Math.random() * 2147483646));
-  dealAhead();
-  return spec;
-};
 
 export const RANGES = { dealt: 0, passed: 0, failed: 0, on: 0 };
 

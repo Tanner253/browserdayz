@@ -20,7 +20,7 @@ import { STOCK } from '../src/sim/trade';
 import { CRATE_SPECS, fillCrate, CRATE_RESTOCK } from '../src/sim/crates';
 import { News } from '../src/sim/news';
 import { underGas, gasEdge } from '../src/sim/gas';
-import { RangeJudge, shotMisses } from '../src/sim/range';
+import { CourseJudge, dealCourse } from '../src/sim/course';
 import { inBunker, BUNKER } from '../src/sim/bunker';
 import { BARREL } from '../src/sim/barrels';
 import { type VehicleInfo, POLICE_CAR, restState, JEEP, SEATS, type VState } from '../src/sim/vehicles';
@@ -30,7 +30,7 @@ import { type StoredItem, type S2C, PROTOCOL, type C2S } from '../src/net/protoc
 import { Hearths } from '../src/sim/fires';
 import { SITE_URL, addressOf, bunkerDoor, cashins, ipOf } from './tags';
 import { CHECK, CHECKS, flagged, takenTag } from './checks';
-import { ADMIN, BOTCHECK, CAPTCHA, CAPTCHA_ON, RANGES, SLIPS, TURNED, addressFull, agentOf, away, bannedFor, dealAhead, flooding, gone, goodSlip, inHands, keeping, keyHash, knownPerson, knownShooter, listOf, nextRange, personOf, persons, roleOf, shooters, standing } from './gate';
+import { ADMIN, BOTCHECK, CAPTCHA, CAPTCHA_ON, RANGES, SLIPS, TURNED, addressFull, agentOf, away, bannedFor, flooding, gone, goodSlip, inHands, keeping, keyHash, knownPerson, knownShooter, listOf, personOf, refusedAgent, persons, roleOf, shooters, standing } from './gate';
 import { KEEP_EVERY_MS, KEPT, PUBLIC_URL, deploying, keepBefore, keepNow, loadAdmin, loadKept, pause, reachedHere, sayRestart } from './keep';
 import { broadcast, cleanName, clients, join, num, records, round2, type Client } from './players';
 import { blowJeep, settleRiders, voice } from './acts';
@@ -351,7 +351,6 @@ export const SOAK = (() => {
   return { torso: best('armor'), head: best('head') };
 })();
 
-dealAhead();
 
 setInterval(() => keeping(Date.now()), 1000);
 
@@ -848,18 +847,18 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
   let waiting = false;
   /** Cloudflare is being asked whether the slip this connection gave is good */
   let asking = false;
-  /** on the bot check's range, and not yet anybody in the world: the judge of this go, when it was dealt, which go it is */
-  let range: { judge: RangeJudge; began: number; go: number; hello: Extract<C2S, { t: 'hello' }>; said: number; saidAt: number; dealtAt: number; begun: boolean } | null = null;
+  /** on the bot check's course, and not yet anybody in the world: the judge of this go, when it was dealt, which go it is */
+  let range: { judge: CourseJudge; began: number; go: number; hello: Extract<C2S, { t: 'hello' }>; said: number; saidAt: number; dealtAt: number; begun: boolean } | null = null;
   /** what this connection's browser has said of itself on the range */
   let browser: { wd: boolean; gl: string } | null = null;
   /** and how it names itself and what it draws with, for the range's lines in the log: a wave of programs says the same */
-  const agent = agentOf(String(req.headers['user-agent'] ?? ''));
+  const ua = String(req.headers['user-agent'] ?? ''), agent = agentOf(ua);
   const drawsWith = () => (browser ? `draws with "${browser.gl.replace(/[^\w ().,:/+-]/g, '').slice(0, 90)}"` : 'said nothing of what it draws with');
   /** into the world, or into the line for it */
   /** @param ranged they have this moment passed the bot check's range: see CHECK.fresh */
   const letIn = (h: Extract<C2S, { t: 'hello' }>, ranged = false) => {
     const fresh = (client: Client | null) => {
-      if (client && ranged) client.check.free = Date.now() + CHECK.fresh;
+      if (client && ranged) client.check.ranged = Date.now() + CHECK.fresh;
       return client;
     };
     if (mustWait(h)) {
@@ -870,9 +869,12 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
     } else c = fresh(join(ws, h));
   };
   let ranging: ReturnType<typeof setInterval> | null = null;
+  /** the figures in the player's sight, told to their game twenty times a second (src/sim/course.ts: the game is shown nothing else of them) */
+  let sighting: ReturnType<typeof setInterval> | null = null;
   const offRange = () => {
     if (ranging) clearInterval(ranging);
-    ranging = null;
+    if (sighting) clearInterval(sighting);
+    ranging = sighting = null;
     if (range) RANGES.on--;
     range = null;
   };
@@ -910,19 +912,19 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
         if (m.g === r.go && !r.begun && now - r.dealtAt < RANGE_BUILD) {
           r.begun = true;
           r.began = now;
-          r.judge = new RangeJudge(r.judge.spec, BOTCHECK.sig);
+          r.judge = new CourseJudge(r.judge.course, BOTCHECK.sig);
         }
       }
       // (of the go before this one, and late: nothing to this one)
       else if ((m.t === 'r' || m.t === 'rs') && m.g !== r.go) return;
-      else if (m.t === 'r' && Array.isArray(m.p) && m.p.length === 4) r.judge.seen(Number(m.n), Number(m.p[0]), Number(m.p[1]), Number(m.p[2]), Number(m.p[3]), at);
+      else if (m.t === 'r' && Array.isArray(m.p) && m.p.length === 5) r.judge.seen(Number(m.n), Number(m.p[0]), Number(m.p[1]), Number(m.p[2]), Number(m.p[3]), Number(m.p[4]), at);
       else if (m.t === 'rs' && Array.isArray(m.o) && Array.isArray(m.d) && m.o.length === 3 && m.d.length === 3) {
         const i = r.judge.shot(Number(m.n), m.o.map(Number), m.d.map(Number), at);
-        if (process.env.RANGE_DEBUG) log(`[range] shot at ${m.n} (server ${at}) from ${m.o.map((v: number) => Number(v).toFixed(2)).join(',')} along ${m.d.map((v: number) => Number(v).toFixed(3)).join(',')}: ${i >= 0 ? `figure ${i} down` : r.judge.why || 'landed on nothing'}; ${shotMisses(r.judge.spec, m.o.map(Number), m.d.map(Number), Number(m.n))}`);
+        if (process.env.RANGE_DEBUG) log(`[range] shot at ${m.n} (server ${at}) from ${m.o.map((v: number) => Number(v).toFixed(2)).join(',')} along ${m.d.map((v: number) => Number(v).toFixed(3)).join(',')}: ${i >= 0 ? `figure ${i} down` : r.judge.why || 'landed on nothing'}`);
         if (i >= 0) ws.send(JSON.stringify({ t: 'rhit', i } satisfies S2C));
         if (r.judge.passed && BOTCHECK.env && (!browser || browser.wd || /swiftshader|llvmpipe|softpipe|software|basic render/i.test(browser.gl))) {
           TURNED.range++;
-          log(`${cleanName(r.hello.name)} shot the range, in a browser that ${!browser ? 'said nothing of itself' : browser.wd ? 'a program is driving' : `draws with "${browser.gl}"`}: turned away`);
+          log(`${cleanName(r.hello.name)} shot the course, in a browser that ${!browser ? 'said nothing of itself' : browser.wd ? 'a program is driving' : `draws with "${browser.gl}"`}: turned away`);
           offRange();
           ws.send(JSON.stringify({ t: 'kick', reason: 'The bot check was not passed: this browser is being driven by a program, or has no graphics card to draw with.' } satisfies S2C));
           ws.close();
@@ -949,21 +951,41 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
         ws.close();
         return;
       }
+      // (a browser that names itself as the bots of 2026-10-12 and 2026-10-15 named theirs: told plainly, for the
+      // person on a year-old Chrome it may be, and not let in. REFUSE_AGENTS in gate.ts.)
+      const old = m.v === PROTOCOL ? refusedAgent(ua) : '';
+      if (old) {
+        TURNED.agent++;
+        log(`${cleanName(m.name)} is not let in: an out-of-date browser (${agent}, matched "${old}")`);
+        ws.send(JSON.stringify({ t: 'kick', reason: 'Your browser is out of date. Update Chrome (Menu, Help, About Google Chrome) or play in another browser, then press Play again.' } satisfies S2C));
+        ws.close();
+        return;
+      }
       const ip = ipOf.get(ws) ?? '', key = keyOf(m);
       // (Shown to be a person's browser, or not asked: now the range, for whoever has not lately passed it.
       // Not for somebody who is to be turned away whatever they shoot: they are told so at once, by `join`.)
       const enter = (h: Extract<C2S, { t: 'hello' }>) => {
         if (h.v !== PROTOCOL || knownShooter(key, ip) || bannedFor(key || 'nobody', ip) || addressFull(key, ip)) return void letIn(h);
         const deal = (go: number) => {
-          const spec = nextRange();
+          // (the server's own dice, from the system's: the game sees the yard's turn, and nothing it could work the
+          // figures' walks out from)
+          const bytes = randomBytes(4096);
+          let k = 0;
+          const course = dealCourse(() => (k + 4 > bytes.length ? Math.random() : bytes.readUInt32LE((k += 4) - 4) / 4294967296));
           if (range) RANGES.on--;
-          range = { judge: new RangeJudge(spec, BOTCHECK.sig), began: Date.now(), go, hello: h, said: 0, saidAt: 0, dealtAt: Date.now(), begun: false };
+          range = { judge: new CourseJudge(course, BOTCHECK.sig), began: Date.now(), go, hello: h, said: 0, saidAt: 0, dealtAt: Date.now(), begun: false };
           RANGES.on++;
           RANGES.dealt++;
-          ws.send(JSON.stringify({ t: 'range', seed: spec.seed, turn: spec.turn, go } satisfies S2C));
-          if (process.env.RANGE_DEBUG) log(`[range] dealt ${spec.seed} turn ${spec.turn}: ${JSON.stringify(spec.figures.map((f) => [+f.x.toFixed(2), f.z, +f.reach.toFixed(2), +f.secs.toFixed(2), +f.start.toFixed(3)]))}`);
+          ws.send(JSON.stringify({ t: 'range', turn: course.turn, go, need: course.need, secs: course.secs } satisfies S2C));
+          if (process.env.RANGE_DEBUG) log(`[range] dealt go ${go}, turned ${course.turn.toFixed(2)}`);
         };
         deal(1);
+        sighting = setInterval(() => {
+          const r = range;
+          if (!r || !r.begun || ws.readyState !== 1) return;
+          const f = r.judge.reveal(Date.now() - r.began);
+          if (f.length) ws.send(JSON.stringify({ t: 'rfig', f } satisfies S2C));
+        }, 50);
         ranging = setInterval(() => {
           const r = range;
           if (!r || ws.readyState !== 1) return void offRange();
