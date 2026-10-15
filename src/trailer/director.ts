@@ -549,7 +549,7 @@ async function stage() {
 
   // the cast
   // (the fourth cut borrows shots from the second, which counts on its six in their order, and has one more behind them)
-  const names = CUT === 3 ? ['Sable', 'Mira', 'Volkov', 'Kestrel', 'Dmitri', 'Oksana', 'Bear'] : CUT === 4 || CUT === 14 || CUT === 15 ? ['Volkov', 'Mira', 'Kestrel', 'Dmitri', 'Oksana', 'Bear', 'Sable'] : ['Volkov', 'Mira', 'Kestrel', 'Dmitri', 'Oksana', 'Bear'];
+  const names = CUT === 3 ? ['Sable', 'Mira', 'Volkov', 'Kestrel', 'Dmitri', 'Oksana', 'Bear'] : CUT === 4 || CUT === 14 || CUT === 15 || CUT === 16 ? ['Volkov', 'Mira', 'Kestrel', 'Dmitri', 'Oksana', 'Bear', 'Sable'] : ['Volkov', 'Mira', 'Kestrel', 'Dmitri', 'Oksana', 'Bear'];
   for (let i = 0; i < names.length; i++) {
     const a = new Actor(S, 900 + i, names[i]);
     await a.load();
@@ -571,7 +571,13 @@ async function stage() {
   S.bullet.visible = S.trail.visible = false;
   g.s.r.scene.add(S.bullet, S.trail);
 
-  if (CUT === 15) {
+  if (CUT === 16) {
+    // (the sixteenth is this week's five, for X, with a score of its own: see shots16.ts)
+    const cut = await import('./shots16');
+    shots = cut.buildShots(S);
+    seconds = cut.seconds16();
+    ownScore = cut.score;
+  } else if (CUT === 15) {
     // (the fifteenth is the emotes, on a stage of its own over the map: see shots15.ts)
     const cut = await import('./shots15');
     shots = cut.buildShots(S);
