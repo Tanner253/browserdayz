@@ -53,9 +53,17 @@ export const KEY_GROUPS: KeyGroup[] = ['Move', 'Fight', 'Gear', 'Talk'];
 export const SENS = { least: 0.2, most: 3, step: 0.05 };
 /** and how fast while aiming, as a multiple of what the game slows it to there by itself (sights, a scope, binoculars): 1 is the game as it was made */
 export const AIM = { least: 0.2, most: 2, step: 0.05 };
+/** how fast a controller's right stick turns the head, as a share of what the game was made with (src/core/gamepad.ts) */
+export const PAD_SENS = { least: 0.3, most: 3, step: 0.05 };
 export interface Controls {
   sens: number;
   aim: number;
+  /** played with a controller, laid out as Call of Duty's default (the owner, 2026-10-15: "make sure that the buttons
+   * map similar to default COD"; "settings to enable this in the settings menu") */
+  pad: boolean;
+  padSens: number;
+  /** the right stick pushed up looks down */
+  padInvert: boolean;
   /** what has been put on another key: the name it is asked for by, to the key that answers to it now */
   keys: Record<string, string>;
 }
@@ -64,7 +72,7 @@ const KEPT = /^(Escape|F\d+|Backquote|MetaLeft|MetaRight|ContextMenu|PrintScreen
 export const bindable = (key: string) => !KEPT.test(key);
 
 const STORE = 'zona.controls.v1';
-const DEFAULTS = (): Controls => ({ sens: 1, aim: 1, keys: {} });
+const DEFAULTS = (): Controls => ({ sens: 1, aim: 1, pad: false, padSens: 1, padInvert: false, keys: {} });
 
 export function loadControls(): Controls {
   const c = DEFAULTS();
@@ -73,6 +81,9 @@ export function loadControls(): Controls {
     if (raw && typeof raw === 'object') {
       if (typeof raw.sens === 'number' && raw.sens >= SENS.least && raw.sens <= SENS.most) c.sens = raw.sens;
       if (typeof raw.aim === 'number' && raw.aim >= AIM.least && raw.aim <= AIM.most) c.aim = raw.aim;
+      if (typeof raw.pad === 'boolean') c.pad = raw.pad;
+      if (typeof raw.padSens === 'number' && raw.padSens >= PAD_SENS.least && raw.padSens <= PAD_SENS.most) c.padSens = raw.padSens;
+      if (typeof raw.padInvert === 'boolean') c.padInvert = raw.padInvert;
       for (const a of ACTIONS) {
         const key = raw.keys?.[a.code];
         if (typeof key === 'string' && key && key !== a.code && bindable(key)) c.keys[a.code] = key;

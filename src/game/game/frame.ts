@@ -47,6 +47,8 @@ export const frameMethods = {
     const p = this.player;
     const cam = r.camera;
     const playing = this.started && !this.paused && !p.dead;
+    // (a controller presses its buttons before anything reads them)
+    this.pad?.update(dt);
 
     if (input.pressed('Tab') && playing) this.toggleInventory();
     if (this.awaitClick && (this.input.locked || !playing || this.invUI.isOpen)) this.awaitClick = false;

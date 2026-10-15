@@ -10,6 +10,7 @@ import { assets } from '../core/assets';
 import { audio } from '../core/audio';
 import { voiceOf } from '../sim/emotes';
 import { Input } from '../core/input';
+import { Gamepad } from '../core/gamepad';
 import { controls, translation, type Controls } from '../core/keys';
 import type { Atmosphere } from '../world/atmosphere';
 import type { Terrain } from '../world/terrain';
@@ -174,6 +175,8 @@ export const NIGHT_SIGHT = { indoors: 2.6, outdoors: 0.35 };
 
 export class Game {
   input: Input;
+  /** a controller, when one is switched on in the settings (src/core/gamepad.ts) */
+  pad: Gamepad | null = null;
   player: Player;
   avatar = new Avatar();
   director: CameraDirector;
@@ -716,6 +719,15 @@ export class Game {
     // (a call picked there is heard as it is called in the game)
     this.hud.emotes.onCall = (id) => audio.shout(id, undefined, 0, voiceOf(playerName()));
     this.hud.emotes.onClose = () => this.toggleEmotes(false);
+    this.pad = new Gamepad(this.input, {
+      on: () => controls().pad,
+      playing: () => this.started && !this.paused && !this.player.dead && !this.input.uiMode && !this.invUI?.isOpen && !this.map?.open && !this.shop?.isOpen && !this.adminUI?.isOpen && !this.hud.emotes.isOpen && !this.hud.chatOpen,
+      facing: () => !!this.focus,
+      riding: () => !!this.garage.ride,
+      look: () => ({ sens: controls().padSens, invert: controls().padInvert }),
+      mouseSens: () => controls().sens,
+      note: (text) => this.hud.note(text),
+    });
 
     // one physics step so placement queries see every collider
     physics.step(physics.fixedDt);
@@ -1026,7 +1038,7 @@ export class Game {
     this.input.onLockChange = (locked) => {
       if (locked) {
         if (this.started) this.unpause();
-      } else if (!this.invUI.isOpen && !this.map?.open && !this.adminUI?.isOpen && !this.player.dead && this.started && !this.arenaHud?.ended) this.pause();
+      } else if (!this.invUI.isOpen && !this.map?.open && !this.adminUI?.isOpen && !this.hud.emotes.isOpen && !this.player.dead && this.started && !this.arenaHud?.ended) this.pause();
       // (an Arena match over: the mouse is let go for its result's card, which is no pause, and nothing takes it
       // back. 2026-10-14, the owner: "when the match settlement ui shows up i am unable to interact with it, the
       // escape menu pops up and when i go back to game i cant actually click or move my mouse on the ui")

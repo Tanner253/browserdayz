@@ -329,14 +329,14 @@ ok('the one volume is kept where it always was: each of the five steps it used t
 
 ok('the sensitivity while aiming is kept with the controls; controls kept before there was one are read as they were, with it at 1 (the game as it was)', () => {
   kept.clear();
-  assert.deepEqual(loadControls(), { sens: 1, aim: 1, keys: {} });
+  assert.deepEqual(loadControls(), { sens: 1, aim: 1, pad: false, padSens: 1, padInvert: false, keys: {} });
   kept.set('zona.controls.v1', '{"sens":1.85,"keys":{"KeyQ":"KeyZ"}}');
-  assert.deepEqual(loadControls(), { sens: 1.85, aim: 1, keys: { KeyQ: 'KeyZ' } });
+  assert.deepEqual(loadControls(), { sens: 1.85, aim: 1, pad: false, padSens: 1, padInvert: false, keys: { KeyQ: 'KeyZ' } });
   kept.set('zona.controls.v1', '{"sens":0.6,"aim":0.75,"keys":{}}');
-  assert.deepEqual(loadControls(), { sens: 0.6, aim: 0.75, keys: {} });
+  assert.deepEqual(loadControls(), { sens: 0.6, aim: 0.75, pad: false, padSens: 1, padInvert: false, keys: {} });
   for (const aim of [AIM.least - 0.01, AIM.most + 0.01, 'fast']) {
     kept.set('zona.controls.v1', JSON.stringify({ sens: 2, aim, keys: {} }));
-    assert.deepEqual(loadControls(), { sens: 2, aim: 1, keys: {} });
+    assert.deepEqual(loadControls(), { sens: 2, aim: 1, pad: false, padSens: 1, padInvert: false, keys: {} });
   }
   assert.ok(AIM.least > 0 && AIM.least <= 1 && AIM.most >= 1 && SENS.least <= 1 && SENS.most >= 1, 'the game as it was made is not on the sliders');
 });

@@ -9,7 +9,7 @@ import { bleedLevel } from './status';
 import { StatusView, figuresWanted, symbol, wantFigures } from './status-view';
 import { BACK_SHORT, BACK_WHY, mountUpdates } from './updates';
 import { MAX_STAMINA, type ChatChannel } from '../net/protocol';
-import { ACTIONS, AIM, KEY_GROUPS, SENS, bind, bindable, controls, keyName, keyOf, relabel, setControls, shown, type Controls } from '../core/keys';
+import { ACTIONS, AIM, KEY_GROUPS, PAD_SENS, SENS, bind, bindable, controls, keyName, keyOf, relabel, setControls, shown, type Controls } from '../core/keys';
 import { GROUPS, type Group, type Mix } from '../core/audio';
 import { TOUCH } from '../core/device';
 import { EMOTE } from '../sim/emotes';
@@ -161,7 +161,7 @@ export class HUD {
       <div class="hud-acts"></div>
       <div class="hud-mark"></div>
       <div class="hud-says"></div>
-      <div class="hud-wheel">${wheelSvg(wheelSlots())}<i class="wheel-dot"></i><div class="wheel-mid"><b></b><span></span></div><span class="wheel-edit"><b>Click</b>Edit the wheel</span></div>
+      <div class="hud-wheel">${wheelSvg(wheelSlots())}<i class="wheel-dot"></i><div class="wheel-mid"><b></b><span></span></div></div>
       <div class="hud-progress"><div class="hud-progress-label"></div><div class="hud-progress-bar"><div></div></div></div>
       <div class="hud-compass"><div class="hud-compass-strip"></div><div class="hud-compass-needle"></div></div>
       <div class="hud-bearing"></div>
@@ -451,7 +451,7 @@ export class HUD {
       const r = e.target as HTMLInputElement;
       if (!r.classList?.contains('gfx-range')) return;
       const v = Number(r.value), said = r.nextElementSibling as HTMLElement, what = r.dataset.s ?? '';
-      if (what === 'sens' || what === 'aim') {
+      if (what === 'sens' || what === 'aim' || what === 'padSens') {
         const c = { ...controls(), [what]: v };
         setControls(c);
         this.keysChanged(c);
@@ -581,7 +581,8 @@ export class HUD {
     dot.setProperty('--x', at[0].toFixed(3));
     dot.setProperty('--y', at[1].toFixed(3));
     const e = pick >= 0 ? EMOTE[slots[pick]] : null;
-    this.set('wheelB', this.el.wheelB, e ? (e.id === held ? 'Stop' : e.say ?? e.label) : 'Move the mouse');
+    // (in the middle with nothing picked: a click opens Emotes, where the wheel is set; the owner: "just put the 'click to edit' in the center of the radial wheel")
+    this.set('wheelB', this.el.wheelB, e ? (e.id === held ? 'Stop' : e.say ?? e.label) : 'Click to edit');
     this.set('wheelS', this.el.wheelS, e ? 'let go of T' : last ? `tap T: ${last}` : 'let go to close');
   }
 
@@ -1192,6 +1193,13 @@ export class HUD {
       wantFull(value === '1');
       return this.renderGraphics();
     }
+    // (the controller: kept with the controls, src/core/keys.ts)
+    if (key === 'pad' || key === 'padInvert') {
+      const c = { ...controls(), [key]: value === '1' };
+      setControls(c);
+      this.keysChanged(c);
+      return this.renderGraphics();
+    }
     if (key === 'figures') {
       wantFigures(value === '1');
       this.status.figures = value === '1';
@@ -1248,7 +1256,14 @@ export class HUD {
       controls:
         `<h4 class="set-h">${TOUCH ? 'Look' : 'Mouse'}</h4>` +
         slide(TOUCH ? 'Look sensitivity' : 'Mouse sensitivity', 'sens', c.sens, [SENS.least, SENS.most, SENS.step], `${c.sens.toFixed(2)}×`) +
-        slide('Sensitivity while aiming', 'aim', c.aim, [AIM.least, AIM.most, AIM.step], `${c.aim.toFixed(2)}×`, 'Through sights, a scope or binoculars: a multiple of the first'),
+        slide('Sensitivity while aiming', 'aim', c.aim, [AIM.least, AIM.most, AIM.step], `${c.aim.toFixed(2)}×`, 'Through sights, a scope or binoculars: a multiple of the first') +
+        `<h4 class="set-h">Controller</h4>` +
+        row('Controller', 'pad', c.pad ? 1 : 0, [[0, 'Off'], [1, 'On']], 'A PlayStation or Xbox controller, its buttons as in Call of Duty') +
+        (c.pad
+          ? slide('Controller look speed', 'padSens', c.padSens, [PAD_SENS.least, PAD_SENS.most, PAD_SENS.step], `${c.padSens.toFixed(2)}×`) +
+            row('Invert look', 'padInvert', c.padInvert ? 1 : 0, [[0, 'Off'], [1, 'On']], 'The right stick pushed up looks down') +
+            `<p class="pad-map">R2 fire · L2 aim · ✕ jump · ○ crouch, held lie down · □ reload, or take, doors and search · △ next weapon, held empty hands · L3 sprint, aiming hold your breath · R3 light · L1 R1 lean · D-pad ↑ map, ↓ call-out wheel (held), ← single or automatic (held: drop), → look the gun over (held: talk) · touchpad inventory · options menu. In menus the left stick moves a cursor: ✕ clicks, ○ goes back, the right stick scrolls.</p>`
+          : ''),
       audio:
         loud('Master', 'volume', g.volume, 'Everything') +
         `<h4 class="set-h">Mix</h4>` +

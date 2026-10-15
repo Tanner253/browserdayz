@@ -18,6 +18,11 @@ export class Input {
   touch = false;
   /** set by UI screens that need the cursor (inventory, menus) */
   uiMode = false;
+  /**
+   * Played with a controller (src/core/gamepad.ts): as on a touch screen, there is no mouse to capture, and "locked"
+   * means the game has the screen. Let go of as soon as the mouse is clicked.
+   */
+  pad = false;
   onLockChange: (locked: boolean) => void = () => {};
   /** keys the player has put things on: each to the name the game asks for that thing by ('' for a key that now does nothing). See src/core/keys.ts. */
   private via = new Map<string, string>();
@@ -58,6 +63,15 @@ export class Input {
     el.addEventListener('mousedown', (e) => {
       // a tap also arrives as a mouse click: on a touch screen the buttons do the shooting
       if (this.touch) return;
+      // (the mouse again after a controller: the screen is taken properly, with the mouse captured)
+      if (this.pad) {
+        this.pad = false;
+        if (this.locked && !document.pointerLockElement) {
+          this.locked = false;
+          this.lock();
+          return;
+        }
+      }
       // clicking the game while the cursor is free captures it (the click is not a shot)
       if (!this.locked && !this.uiMode) {
         this.lock();
@@ -118,14 +132,14 @@ export class Input {
   /** Capture the mouse (call from a click or key press). */
   lock() {
     if (this.locked) return;
-    if (this.touch) return this.setLocked(true);
+    if (this.touch || this.pad) return this.setLocked(true);
     // raw (unaccelerated) mouse input like native shooters, where the browser supports it
     const r = this.el.requestPointerLock({ unadjustedMovement: true } as never) as unknown as Promise<void> | undefined;
     r?.catch?.(() => (this.el.requestPointerLock() as unknown as Promise<void> | undefined)?.catch?.(() => {}));
   }
 
   unlock() {
-    if (this.touch) {
+    if (this.touch || (this.pad && !document.pointerLockElement)) {
       if (this.locked) this.setLocked(false);
       return;
     }
