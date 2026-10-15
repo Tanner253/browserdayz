@@ -56,6 +56,8 @@ const SAVE_FILE = path.join(DATA_DIR, 'world.json');
 export const MAX_PLAYERS = Number(process.env.MAX_PLAYERS ?? 24);
 
 const TICK_HZ = 15;
+/** how long a game is given to build the bot check's range and say it stands ('rgo'), ms: a phone on its own connection included */
+const RANGE_BUILD = 60_000;
 
 export const CORPSE_LIFETIME = 600; // seconds
 
@@ -896,10 +898,13 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
       const at = now - r.began;
       if (m.t === 'renv') browser = { wd: m.wd === true, gl: String(m.gl ?? '').slice(0, 160) };
       // (The game has built the range and stood the figures on it: the go's clock starts here, and not when it
-      // was dealt. A slow machine is a dozen seconds at that, which were coming off its forty. Said once, and
-      // only in the first quarter of a minute: nobody is given a go that never ends.)
+      // was dealt. A slow machine is a dozen seconds at that, which were coming off its forty; a phone fetching the
+      // figures over its own connection, more. Said once, and only in the first minute (RANGE_BUILD): nobody is
+      // given a go that never ends. Until 2026-10-14 it was a quarter of a minute, and a phone that took longer was
+      // judged from when the range was dealt: everything it said was "long before now", and its go was over before
+      // it had fired.)
       else if (m.t === 'rgo') {
-        if (m.g === r.go && !r.begun && now - r.dealtAt < 15_000) {
+        if (m.g === r.go && !r.begun && now - r.dealtAt < RANGE_BUILD) {
           r.begun = true;
           r.began = now;
           r.judge = new RangeJudge(r.judge.spec);
@@ -959,6 +964,8 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
         ranging = setInterval(() => {
           const r = range;
           if (!r || ws.readyState !== 1) return void offRange();
+          // (a go's half minute is counted from when it begins: while the range is still being built, the minute it is allowed)
+          if (!r.begun && Date.now() - r.dealtAt < RANGE_BUILD) return;
           if (!r.judge.failed(Date.now() - r.began)) return;
           RANGES.failed++;
           log(`${cleanName(h.name)} did not pass go ${r.go} of the bot check: ${r.judge.report}`);

@@ -61,6 +61,16 @@ const play = (spec: RangeSpec, judge: RangeJudge, how: { walk?: boolean; follow?
     slowest = Math.max(slowest, took);
   }
   assert.ok(slowest < 26_000, `the slowest of them took ${(slowest / 1000).toFixed(0)} s of the thirty there are`);
+  // (and on a phone's connection: the go heard of 600 ms after the game began it, so that everything the game says
+  // comes in "early" by the server's count, and comes in up to half a second late on top of that, unevenly. Until
+  // 2026-10-14 three of those ended the go: "Mobile users are unable to play and pass the bot check we made".)
+  for (let seed = 1; seed <= 40; seed++) {
+    const spec = rangeOf(seed * 40503 + 7), judge = new RangeJudge(spec);
+    let k = 0;
+    const lag = () => -600 + ((k++ * 7919) % 500);
+    await playRange(spec, { seen: (ms, x, z, yaw, pitch) => judge.seen(ms, x, z, yaw, pitch, ms + lag()), shot: (ms, o, d) => void judge.shot(ms, o, d, ms + lag()), down: () => judge.down, done: () => judge.passed, until: () => {} }, {});
+    assert.ok(judge.passed && judge.wrong === 0, `range ${seed}, on a phone's connection: not passed (${judge.report})`);
+  }
   ok(`two hundred ranges played by walking, turning, following and firing: all passed (the slowest in ${(slowest / 1000).toFixed(0)} s)`);
 }
 

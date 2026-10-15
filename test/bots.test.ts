@@ -289,7 +289,14 @@ try {
     const blind = new Conn(E, 'Blind', '8.8.8.4');
     assert.equal(await blind.hello(), 'range');
     assert.ok(!(await blind.shoot({ wd: false, gl: 'ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero)), SwiftShader driver)' })), 'a browser with no graphics card was let in');
-    ok('the bot check: nobody in the world until its range is shot; who shoots it is in, and not asked again; not a browser a program drives');
+    // and a phone, eighteen seconds building the range before it says it stands (2026-10-14: "Mobile users are
+    // unable to play and pass the bot check we made"; past fifteen it was judged from the dealing, and failed)
+    const phone = new Conn(E, 'Phone', '8.8.8.5');
+    assert.equal(await phone.hello(), 'range');
+    await sleep(18_000);
+    assert.ok(await phone.shoot(), `a phone slow to build the range was not let in: ${phone.why()}\n${e.log().slice(-600)}`);
+    phone.leave();
+    ok('the bot check: nobody in the world until its range is shot; who shoots it is in, and not asked again; not a browser a program drives; a phone slow to build it is in');
   }
 
   // ---- and whoever has just passed it is not put off for still being where the range was (2026-10-13: "this person

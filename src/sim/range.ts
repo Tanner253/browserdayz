@@ -236,9 +236,16 @@ export class RangeJudge {
 
   constructor(readonly spec: RangeSpec) {}
 
-  /** the time a game puts to a thing has to be one it could have been said at: not after now, and not long before */
+  /**
+   * The time a game puts to a thing has to be one it could have been said at: not after now, and not long before.
+   * "Now" is the server's count from when it heard the go had begun, a trip over the wire after the game began its
+   * own: on a phone's connection that trip is a few hundred milliseconds and wanders, and every thing said came in
+   * "from the future" by more than the tenth and a half allowed until 2026-10-14, three of them ending the go (the
+   * owner: "Mobile users are unable to play and pass the bot check we made"). A second either way of the trip, and
+   * five seconds for a connection that stalls.
+   */
   private timely(ms: number, now: number) {
-    return Number.isFinite(ms) && ms <= now + 150 && ms >= now - 3000;
+    return Number.isFinite(ms) && ms <= now + 1000 && ms >= now - 5000;
   }
 
   /** Where the game says its player stands and looks, at `ms` by its own count; `now` is the server's count. */
