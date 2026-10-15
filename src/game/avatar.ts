@@ -58,7 +58,10 @@ export type Hold = NonNullable<Emote['hold']>;
  *   pivot   – where the gun hangs from the middle of the shoulders: up, and (negative) forward
  *   knee    – how far a knee is drawn out to the side at each pull of a crawl, radians
  */
-export const PRONE = { back: 1.2, backOwn: 1.62, up: 0.1, chest: 0.2, head: 0.95, pivot: [0.1, -0.3] as [number, number], knee: 0.5 };
+// (chest and head were 0.2 and 0.95 for the old lying pose, which lay face down: the owner's lying down of
+// 2026-10-14 (proneDown) lies with the head up already, and on top of it the head looked straight up at the sky.
+// "when prone the users head looks very odd from 3rd person like looking straight up")
+export const PRONE = { back: 1.2, backOwn: 1.62, up: 0.1, chest: 0, head: 0.12, pivot: [0.1, -0.3] as [number, number], knee: 0.5 };
 /** sat on the ground: how far the hips come down from the chair the sitting was drawn on, and how nearly straight the legs are laid (set by looking) */
 export const SIT = { drop: 0.4, legs: 0.92 };
 /**
@@ -2062,9 +2065,12 @@ export class Avatar {
         if (this.thighs[1] && pull < 0) this.turn(this.thighs[1], UP, pull);
       }
       if (lean) {
-        if (this.chest) this.turn(this.chest, _right, pitch * 0.45 * alive);
+        // (lying, the chest is on the ground and stays there: the head does all of the looking up and down, as far as
+        // a neck goes, so that somebody prone is seen to look where they look)
+        if (this.chest) this.turn(this.chest, _right, pitch * 0.45 * alive * (1 - pr));
         // and the head goes the rest of the way: you can see where somebody is looking
-        for (const b of this.neck) this.turn(b, _right, (pitch * POSE.headPitch * alive) / this.neck.length);
+        const look = THREE.MathUtils.lerp(pitch * POSE.headPitch, THREE.MathUtils.clamp(pitch * 0.85, -0.5, 0.6), pr);
+        for (const b of this.neck) this.turn(b, _right, (look * alive) / this.neck.length);
         if (held && this.armR && this.armL) {
           // The weapon hangs from the shoulders, wherever the clips have taken them: down
           // into a crouch, up and down with each stride.
