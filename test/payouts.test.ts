@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { TOKEN_2022_PROGRAM, address, b58, seeded, signed, tokenAccount } from '../api/_lib/solana';
-import { LOT_MAX, RULES2_FROM, RULES3_FROM, RULES4_FROM, claimIfDue, config, dueOf, handle, payment, price, readBook, refOf, snapshot, sweep, termsOf, type Book, type Entry, type Outcome } from '../api/_lib/payouts';
+import { LOT_MAX, RULES2_FROM, RULES3_FROM, RULES4_FROM, RULES5_FROM, claimIfDue, config, dueOf, handle, payment, price, readBook, refOf, snapshot, sweep, termsOf, type Book, type Entry, type Outcome } from '../api/_lib/payouts';
 import { record } from '../api/cashin';
 import { show } from '../api/cashins';
 import { MemoryStore, check } from '../api/_lib/store';
@@ -1194,7 +1194,7 @@ await test('from the fifth cut-over: a tag pays 0.001 SOL more for every million
   await cash(e, 424, 5);
   assert.equal(got(e, 424), SOL(0.05));
   // and none of it without a moment
-  assert.equal(config({}).rules5From, Infinity);
+  assert.deepEqual([config({}).rules5From, config({ PAYOUT_RULES5_FROM: 'never' }).rules5From], [RULES5_FROM ? Date.parse(RULES5_FROM) : Infinity, Infinity]);
 });
 
 await test('a traded tag is not paid, and is not counted toward the five', async () => {
