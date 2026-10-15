@@ -1871,18 +1871,29 @@ body.pad .tc { display: none; }
    except on the few pieces that are there to be tapped; hidden, it takes none.) */
 body.touch #hud { z-index: 7; }
 body.touch #hud.hidden .hud-hotbar, body.touch #hud.hidden .hud-minimap { pointer-events: none; }
-body.touch .hud-hotbar { left: 46%; bottom: 10px; display: grid; grid-template-columns: repeat(4, 74px); gap: 5px; pointer-events: auto; touch-action: manipulation; }
-body.touch .hb { width: 74px; height: 54px; background: rgba(10, 12, 11, 0.55); border-color: rgba(233, 228, 216, 0.22); }
+/* (One row along the foot, between the thumbs: five slots on a phone, more as the screen has room for them, all ten on a
+   tablet. Four across in three rows, it stood in the middle of the view, the owner, 2026-10-15: "fro mobile just how 5
+   slots in the hotbar at the bottom 1 row, more if larger size can handle it". What is in a slot not shown is reached by
+   the swap button and the pack, as before.) */
+body.touch .hud-hotbar { left: 46%; bottom: 8px; display: flex; gap: 4px; pointer-events: auto; touch-action: manipulation; }
+body.touch .hb { width: 62px; height: 50px; background: rgba(10, 12, 11, 0.55); border-color: rgba(233, 228, 216, 0.22); }
+body.touch .hud-hotbar > div.hb:nth-of-type(n + 6) { display: none; }
+@media (min-width: 820px) { body.touch .hud-hotbar > div.hb:nth-of-type(6) { display: block; } }
+@media (min-width: 900px) { body.touch .hud-hotbar > div.hb:nth-of-type(7) { display: block; } }
+@media (min-width: 1000px) { body.touch .hud-hotbar > div.hb:nth-of-type(8) { display: block; } }
+@media (min-width: 1100px) { body.touch .hud-hotbar > div.hb:nth-of-type(n + 9) { display: block; } }
 body.touch .hb.on { border-width: 2px; }
 body.touch .hb b { font-size: 12px; }
 body.touch .hb em { font-size: 13px; }
 body.touch .hb-gap { display: none; }
 /* (what the thumbs cover is moved out from under them: rounds over the bar, the body's state by the map) */
-body.touch .hud-weapon, body.touch .hud-ride { right: auto; left: 46%; bottom: 134px; transform: translateX(-50%); text-align: center; white-space: nowrap; }
-body.touch .hud-stamina { left: 46%; bottom: 196px; }
-body.touch .hud-arms { left: 46%; bottom: 204px; }
+body.touch .hud-weapon, body.touch .hud-ride { right: auto; left: 46%; bottom: 66px; transform: translateX(-50%); text-align: center; white-space: nowrap; }
+body.touch .hud-stamina { left: 46%; bottom: 122px; }
+body.touch .hud-arms { left: 46%; bottom: 130px; }
 body.touch .hud-fps { top: auto; right: auto; left: calc(8px + env(safe-area-inset-left)); bottom: 4px; }
 body.touch .hud-online { top: auto; right: auto; left: calc(8px + env(safe-area-inset-left)); bottom: 18px; }
+/* (and no further than where the one row of the hotbar begins: 46% less half of five slots) */
+body.touch .hud-online { max-width: calc(46vw - 180px - env(safe-area-inset-left)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* the map is in the top right corner, and takes a tap: big, and back again */
 body.touch .hud-minimap { top: 14px; left: auto; right: calc(16px + env(safe-area-inset-right)); width: 124px; height: 124px; pointer-events: auto; touch-action: manipulation; }
 body.touch .hud-minimap.big { top: 50%; left: 50%; right: auto; width: calc(min(86vh, 86vw) / var(--ui-zoom, 1)); height: calc(min(86vh, 86vw) / var(--ui-zoom, 1)); z-index: 8; }
