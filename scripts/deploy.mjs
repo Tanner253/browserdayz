@@ -55,6 +55,12 @@ if (out('git status --porcelain --untracked-files=no')) throw new Error('there a
 // (and a file nobody has added, where the site is built from: the site's upload takes whatever is in the folder)
 const stray = out('git status --porcelain --untracked-files=all -- public api src server scripts index.html vercel.json package.json');
 if (stray) throw new Error(`there are files here that are not in the repository, and the site would be built with them:\n${stray}`);
+// (the reason players are given for the restart is cut at 120 letters by the server: one of 127 went out as "...with
+// their he", 2026-10-15. Said in full or not sent.)
+if (!siteOnly) {
+  const why = String(JSON.parse(fs.readFileSync(new URL('../server/restart-note.json', import.meta.url), 'utf8')).why ?? '');
+  if (why.length > 120) throw new Error(`server/restart-note.json says ${why.length} letters and players are shown 120 of them: "${why.slice(0, 120)}". Make it shorter.`);
+}
 say(`publishing ${head.slice(0, 7)} (${branch}), protocol ${PROTOCOL}${dry ? '  [dry: nothing is published]' : ''}`);
 
 // ---- whether the live server can be made to save is asked before anything is published: found afterwards, the new
