@@ -746,6 +746,10 @@ export class Avatar {
   private uniforms?: LookUniforms;
   /** the body mesh, and the bones a wound can be pinned to (index into its skeleton, and the bone it runs to) */
   private skin?: THREE.SkinnedMesh;
+  /** where the middle of the head as drawn is, on the Head bone (its own frame); null: a hand's breadth up it (see `frame`) */
+  private headMid: THREE.Vector3 | null = null;
+  /** the same, for each body's file: worked out once */
+  private static headMids = new Map<string, THREE.Vector3 | null>();
   private woundBones: [number, THREE.Object3D | undefined][] = [];
   /** the pieces of the suit that are there only when what they are is worn */
   private pieces = new Map<string, THREE.Object3D>();
@@ -885,6 +889,7 @@ export class Avatar {
     this.chest = bone('spine_02');
     this.neck = ['neck_01', 'Head'].map(bone).filter((b): b is THREE.Bone => !!b);
     this.joints = { head: bone('Head') ?? undefined, neck: bone('neck_01') ?? undefined, pelvis: bone('pelvis') ?? undefined };
+    this.headMid = Avatar.headMidOf(file, this.skin);
     // (as the body rests, before anything has moved it, a leg is straight)
     this.knees = ['calf_l', 'calf_r'].map(bone).filter((b): b is THREE.Bone => !!b).map((b) => [b, b.quaternion.clone()]);
     this.thighs = ['thigh_l', 'thigh_r'].map(bone).filter((b): b is THREE.Bone => !!b);
@@ -1598,11 +1603,43 @@ export class Avatar {
     const j = this.joints;
     if (!j.head || !j.neck || !j.pelvis) return false;
     j.head.updateWorldMatrix(true, false);
-    // (the joint is at the base of the skull: the middle of the head is a hand's breadth up it)
-    head.setFromMatrixPosition(j.head.matrixWorld).addScaledVector(_a.setFromMatrixColumn(j.head.matrixWorld, 1).normalize(), 0.097);
+    // (the middle of the head as this body draws it; where that is not known, the joint is at the base of the skull
+    // and the middle of the head is a hand's breadth up it)
+    if (this.headMid) head.copy(this.headMid).applyMatrix4(j.head.matrixWorld);
+    else head.setFromMatrixPosition(j.head.matrixWorld).addScaledVector(_a.setFromMatrixColumn(j.head.matrixWorld, 1).normalize(), 0.097);
     neck.setFromMatrixPosition(j.neck.matrixWorld);
     pelvis.setFromMatrixPosition(j.pelvis.matrixWorld);
     return true;
+  }
+
+  /**
+   * Where the middle of the head as a body draws it is, on its Head bone: the middle of every point of its mesh that
+   * hangs mostly on the head, as it was bound. For the infected, whose heads are their own shapes on fitted skeletons:
+   * the hand's breadth up the bone that fits the player's own head put the ball that is shot at 4 to 8 cm off theirs,
+   * and a shot at the far side of a head went past it (the owner, 2026-10-14: "sometimes i shoot the zombie in the
+   * head but it doesnt register"; "the zombies head collisiosn does not actualyl fit perfectly on their head"). The
+   * player's body has its head as a piece of its own, and keeps the hand's breadth.
+   */
+  private static headMidOf(file: string, skin: THREE.SkinnedMesh | undefined): THREE.Vector3 | null {
+    if (Avatar.headMids.has(file)) return Avatar.headMids.get(file)!;
+    let mid: THREE.Vector3 | null = null;
+    const bones = skin?.skeleton.bones ?? [], hi = bones.findIndex((b) => b.name === 'Head');
+    if (skin && hi >= 0 && file !== 'survivor') {
+      const geo = skin.geometry, pos = geo.getAttribute('position'), si = geo.getAttribute('skinIndex'), sw = geo.getAttribute('skinWeight');
+      const inv = skin.skeleton.boneInverses[hi], v = new THREE.Vector3(), sum = new THREE.Vector3();
+      let n = 0;
+      for (let i = 0; i < pos.count; i++) {
+        let w = 0;
+        for (let k = 0; k < 4; k++) if (si.getComponent(i, k) === hi) w += sw.getComponent(i, k);
+        if (w < 0.5) continue;
+        sum.add(v.fromBufferAttribute(pos, i).applyMatrix4(skin.bindMatrix).applyMatrix4(inv));
+        n++;
+      }
+      // (a body with too little on its head to tell by keeps the hand's breadth)
+      if (n >= 200) mid = sum.divideScalar(n);
+    }
+    Avatar.headMids.set(file, mid);
+    return mid;
   }
 
   /** Lying down, or up again. */
