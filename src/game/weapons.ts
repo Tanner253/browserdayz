@@ -466,7 +466,14 @@ export const FILL_HANDS = {
   left: { at: [-0.01, -0.2, 0.024], fingers: [1, 0.05, 0.3], palm: [0, 0, 1], curl: [1.15, 1.2, 1.25, 1.3] as Curl, thumb: 0.7 },
   right: { reach: 0.075, under: 0.022, fingers: [-0.72, 0.3, -0.62], palm: [-0.25, -0.75, 0.6], curl: [0.55, 0.85, 1.15, 1.25] as Curl, thumb: 0.95, tuck: 0.15 },
   round: { size: 1.3, ahead: 0.008 },
+  // how much lower in the left hand the magazine sits than it was, the hands staying where they were: its mouth came
+  // up through the right hand's fingers, where they are to be on top of it with the round (the owner, 2026-10-15:
+  // "the solution is to reposition the height of the mag in the left hand")
+  drop: 0.035,
 };
+// (development: the page's own copy of these, to be tried other ways without building again: assets-src/_wf/me/mag-pose.js;
+// a script's own import of this file is another copy, and changing that changed nothing)
+if (import.meta.env.DEV && typeof window !== 'undefined') (window as unknown as { __fill?: unknown }).__fill = FILL_HANDS;
 
 export const LOAD = {
   rest: [0.105, -0.135, -0.42],
@@ -3813,7 +3820,7 @@ export class Weapons {
       const press = THREE.MathUtils.smoothstep(k, 0.7, 0.9), slide = THREE.MathUtils.smoothstep(k, 0.86, 1);
       fill = { reach, press: k < 0.3 ? 0 : press, slide: k < 0.3 ? 0 : slide, has: k >= 0.3 || first };
       // (it gives a little under the thumb)
-      pos.set(LOAD.at[0], LOAD.at[1] - Math.sin(press * Math.PI) * 0.005, LOAD.at[2]);
+      pos.set(LOAD.at[0], LOAD.at[1] - FILL_HANDS.drop - Math.sin(press * Math.PI) * 0.005, LOAD.at[2]);
       rot.set(LOAD.turn[0] + Math.sin(press * Math.PI) * 0.03, LOAD.turn[1], LOAD.turn[2]);
     } else if (h.kind === 'unbox' && !h.wait) {
       // A box of rounds: in the left hand before the chest; the right takes hold of its flap and pulls it back,
@@ -3983,9 +3990,10 @@ export class Weapons {
       const fingers = new THREE.Vector3(...R.fingers).applyQuaternion(inv).normalize();
       const palm = new THREE.Vector3(...R.palm).applyQuaternion(inv);
       palm.addScaledVector(fingers, -palm.dot(fingers)).normalize();
-      const tip = away.clone().lerp(mouth, fill.reach);
+      // (the right hand comes to where it came before the magazine was let down in the left: on top of its mouth now)
+      const tip = away.clone().lerp(mouth.clone().add(new THREE.Vector3(0, FILL_HANDS.drop, 0).applyQuaternion(inv)), fill.reach);
       right = { pos: tip.clone().addScaledVector(fingers, -R.reach).addScaledVector(palm, -R.under), fingers, palm, curl: R.curl, thumb: R.thumb, tuck: R.tuck };
-      left = { pos: new THREE.Vector3(L.at[0], sy * L.at[1], -(h.size.z / 2 + L.at[2])), fingers: new THREE.Vector3(...L.fingers).normalize(), palm: new THREE.Vector3(...L.palm).normalize(), curl: L.curl, thumb: L.thumb };
+      left = { pos: new THREE.Vector3(L.at[0], sy * L.at[1] + FILL_HANDS.drop, -(h.size.z / 2 + L.at[2])), fingers: new THREE.Vector3(...L.fingers).normalize(), palm: new THREE.Vector3(...L.palm).normalize(), curl: L.curl, thumb: L.thumb };
       if (h.round) {
         // (the round rides in the pinch, a little toward the eye of it so that it is seen there, and is gone from
         // sight when it is home)
