@@ -67,7 +67,7 @@ const RUN_MS = 5600;
  */
 async function siteStatus() {
   // (minTags: how many of a wallet's tags must be due before it is paid, when that is more than one; next: what is to change, and when)
-  const s = (await (await fetch('/api/cashins?format=status')).json()) as { on?: boolean; tagPays?: number | null; share?: number; floor?: number; due?: boolean; minTags?: number; next?: { from?: string; tagPays?: number; minTags?: number } | null };
+  const s = (await (await fetch('/api/cashins?format=status')).json()) as { on?: boolean; tagPays?: number | null; share?: number; floor?: number; due?: boolean; minTags?: number; next?: { from?: string; tagPays?: number; minTags?: number } | null; holder?: { from?: string; perM?: number; max?: number } | null };
   if (s.due) void fetch('/api/tick').catch(() => {});
   pays = s.on && typeof s.tagPays === 'number' ? s.tagPays : null;
   for (const f of told) f(pays);
@@ -211,7 +211,10 @@ export class RewardsModal {
       // (the figures are the site's own: api/_lib/payouts.ts. A flat pay, and a wallet paid when so many of its tags are due.)
       const n = typeof s.minTags === 'number' ? Math.round(s.minTags) : 1;
       if (s.share === 0) {
-        p.innerHTML = `A tag you cash in pays <b>${round(s.tagPays)} SOL</b>${n > 1 ? `, sent to the wallet you enter here when ${n} of your tags are due: <b>${round(s.tagPays * n)} SOL</b> for the ${n}, at once. Until then they wait, counted, and none is lost.` : ', sent to the wallet you enter here.'}${listed}`;
+        // (and more for holding the coin: api/_lib/payouts.ts, holderBonus)
+        const h = s.holder && typeof s.holder.perM === 'number' && typeof s.holder.max === 'number' && typeof s.holder.from === 'string' ? s.holder : null;
+        const more = h ? ` ${Date.now() >= Date.parse(h.from!) ? 'Holding $ZONA in that wallet pays more' : `From ${h.from!.slice(0, 16).replace('T', ' ')} UTC holding $ZONA in that wallet pays more`}: <b>+${round(h.perM!)} SOL</b> a tag for every 1,000,000 held, up to <b>${round(h.max!)} SOL</b> a tag.` : '';
+        p.innerHTML = `A tag you cash in pays <b>${round(s.tagPays)} SOL</b>${n > 1 ? `, sent to the wallet you enter here when ${n} of your tags are due: <b>${round(s.tagPays * n)} SOL</b> for the ${n}, at once. Until then they wait, counted, and none is lost.` : ', sent to the wallet you enter here.'}${more}${listed}`;
         return;
       }
       const next = s.next && typeof s.next.from === 'string' && /^\d{4}-\d\d-\d\dT\d\d:\d\d/.test(s.next.from) && typeof s.next.tagPays === 'number' && typeof s.next.minTags === 'number' ? s.next : null;

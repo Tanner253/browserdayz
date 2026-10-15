@@ -426,7 +426,12 @@ function page(book: Book, s: Snapshot, now: number): string {
           ? `<div class="rule"><h3>${s.walletTags24 === N && s.fives ? `One payout of ${N} ${s.hours === 24 ? 'a day' : `every ${s.hours} hours`}` : `${s.walletTags24} tags a wallet, in any ${s.hours} hours`}</h3><p>One wallet is paid for no more than ${s.walletTags24} tags cashed in in any ${s.hours} hours${s.walletTags24 === N && s.fives ? `: one payment of ${N}, all of them at once when the ${N}th is due, and no second one until ${s.hours} hours after the first of them was cashed in` : ''}. One cashed in over that is listed and not paid: it does not wait for later. And no more than`
           : `<div class="rule"><h3>${s.walletDayTags} tags a wallet, a day</h3><p>One wallet is paid for the first ${s.walletDayTags} tags it cashes in on a day (days are counted in UTC). One cashed in after those, that day, is listed and not paid: it does not wait for tomorrow. And no more than`
       } ${Math.round(s.dayShare * 100)}% of the treasury leaves it in one day: a tag over that waits, and is paid when there is room.</p></div>
-      <div class="rule"><h3>Trading tags is not paid</h3><p>When two players cash each other's tags inside a day, the first of the two is paid and the second is not. Killing a friend and being killed back earns one tag between you, not two.</p></div>
+      ${
+        s.rules5From && s.fives
+          ? `<div class="rule"><h3>Holding $ZONA pays more</h3><p>From ${new Date(s.rules5From).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', timeZone: 'UTC' })}, ${s.rules5From.slice(11, 16)} UTC, a tag pays ${s.holderPerM} SOL more for every 1,000,000 $ZONA its wallet holds, up to ${s.tagMax} SOL a tag in all (${Math.round((s.tagMax - s.flatPay / 1e9) / s.holderPerM)},000,000 held). What counts is the lower of what the wallet held when the tag was cashed in and when it is paid.</p></div>
+      `
+          : ''
+      }<div class="rule"><h3>Trading tags is not paid</h3><p>When two players cash each other's tags inside a day, the first of the two is paid and the second is not. Killing a friend and being killed back earns one tag between you, not two.</p></div>
       <div class="rule"><h3>Paid once, and the chain sees to it</h3><p>Each payment leaves a receipt, an account of its own, and a second payment for the same tag cannot be made while that receipt stands. Each payment also carries a note, "ZONA dog tag" and the reference shown beside it here.</p></div>
       <div class="rule"><h3>No wallet, no payment</h3><p>A tag cashed in with no wallet given is listed and not paid. The wallet is asked for in the game, on the rewards window: add it before you cash a tag in.</p></div>
 ${
@@ -477,7 +482,7 @@ export async function show(request: Request, w: World = live()): Promise<Respons
     // and `tagPays` is the flat figure. New: `minTags`, how many of a wallet's tags must be due before it is paid, 1
     // until the cut-over; and `next`, what is to change and when, while that is still to come.)
     const next = s.fives || !s.rules2From ? null : { from: s.rules2From, tagPays: sol(s.flatPay), minTags: s.minTags };
-    return Response.json({ on: s.mode === 'on' && !s.problem, tagPays: s.tagPays === null ? null : sol(s.tagPays), share: s.share, floor: sol(s.floor), treasury: s.treasury, due: s.due, minTags: s.fives ? s.minTags : 1, next }, { headers: { 'cache-control': 'public, s-maxage=30, stale-while-revalidate=120' } });
+    return Response.json({ on: s.mode === 'on' && !s.problem, tagPays: s.tagPays === null ? null : sol(s.tagPays), share: s.share, floor: sol(s.floor), treasury: s.treasury, due: s.due, minTags: s.fives ? s.minTags : 1, next, holder: s.rules5From && s.fives ? { from: s.rules5From, perM: s.holderPerM, max: s.tagMax } : null }, { headers: { 'cache-control': 'public, s-maxage=30, stale-while-revalidate=120' } });
   }
   const book = await cached(w, 'book', 20_000, async () => withOldEntries(w, await glanceBook(w.store)));
   const cache = { 'cache-control': 'public, s-maxage=20, stale-while-revalidate=60' };

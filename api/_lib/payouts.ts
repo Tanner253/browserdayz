@@ -34,7 +34,7 @@
 //   * the book could be lost and no tag would be paid twice because of it.
 
 import { createHash } from 'node:crypto';
-import { EMPTY_ACCOUNT_RENT, Keypair, LAMPORTS, SYSTEM_PROGRAM, WRAPPED_SOL, address, b58, closeTokenAccount, computeLimit, computePrice, memo, onCurve, receipt, same, seeded, signed, tokenAccount, transfer, unsigned, type Bytes, type Instruction, type Rpc, type Signed, type Status } from './solana.js';
+import { EMPTY_ACCOUNT_RENT, Keypair, LAMPORTS, SYSTEM_PROGRAM, TOKEN_2022_PROGRAM, TOKEN_PROGRAM, WRAPPED_SOL, address, b58, closeTokenAccount, computeLimit, computePrice, memo, onCurve, receipt, same, seeded, signed, tokenAccount, transfer, unsigned, type Bytes, type Instruction, type Rpc, type Signed, type Status } from './solana.js';
 import { claimCurve, claimPool, state as coinState, type CoinState } from './pump.js';
 import type { Store } from './store.js';
 
@@ -107,6 +107,19 @@ export interface Config {
    * 12 hours. Still a limit, not a queue. What was cashed in before is judged as it was. See `windowOf`.
    */
   rules4From: number;
+  /**
+   * The fifth cut-over (ms), the owner, 2026-10-15: "we should increase the amount we payout per tag based on the amount
+   * of supply in the users wallet ... maybe you could come up with a more realistic ratio" and "the max cap for a player
+   * per tag should be .025 sol". For a tag cashed in from this moment on, under the rule of five, it pays `holderPerM`
+   * more for every million of the coin its wallet holds, up to `tagMax` the tag in all. What counts is the lower of
+   * what the wallet held when the tag was cashed in (`held`, written then) and when it is paid: coins lent to it for a
+   * moment, or passed from one player's wallet to another's, count for nothing. See `holderBonus`.
+   */
+  rules5From: number;
+  /** lamports more a tag, for every million whole coins held (0.001 SOL) */
+  holderPerM: bigint;
+  /** the most a tag pays, with what is added for holding (0.025 SOL) */
+  tagMax: bigint;
   /** rewards are collected when at least this much is waiting */
   claimAt: bigint;
   /** what is bid per unit of work, in millionths of a lamport: enough to be taken up promptly */
@@ -136,6 +149,10 @@ const DEFAULT_MINT = 'GvfAzdPF466PJsPJMzXQeX3TSqmJm9YxAG8xBJ6ypump';
 export const RULES2_FROM = '2026-10-14T02:20:00Z';
 /** The moment of the third cut-over (see `rules3From`), written as RULES2_FROM is; PAYOUT_RULES3_FROM is asked first. */
 export const RULES3_FROM = '2026-10-14T22:00:00Z';
+/** The moment of the fifth (see `rules5From`), written as RULES2_FROM is; PAYOUT_RULES5_FROM is asked first. '': none yet. */
+export const RULES5_FROM = '';
+/** the coin's decimals: pump.fun's are six */
+const COIN_DECIMALS = 6n;
 /** The moment of the fourth (see `rules4From`), written as RULES2_FROM is; PAYOUT_RULES4_FROM is asked first. '': none yet. */
 export const RULES4_FROM = '2026-10-15T17:30:00Z';
 /** a moment written in full, a day, a time and a zone (see `config`) */
@@ -192,6 +209,8 @@ export function config(env: Record<string, string | undefined> = process.env): C
   const from3 = MOMENT.test(said3) ? Date.parse(said3) : NaN;
   const said4 = (env.PAYOUT_RULES4_FROM?.trim() ? env.PAYOUT_RULES4_FROM : RULES4_FROM).trim();
   const from4 = MOMENT.test(said4) ? Date.parse(said4) : NaN;
+  const said5 = (env.PAYOUT_RULES5_FROM?.trim() ? env.PAYOUT_RULES5_FROM : RULES5_FROM).trim();
+  const from5 = MOMENT.test(said5) ? Date.parse(said5) : NaN;
   const minTags = Math.round(num(env.PAYOUT_MIN_TAGS, 5, 1, 100));
   return {
     mode,
@@ -218,6 +237,10 @@ export function config(env: Record<string, string | undefined> = process.env): C
     walletTags24: Math.round(num(env.PAYOUT_WALLET_DAY_TAGS, minTags, 1, 1000)),
     // (never before the third, whose window it shortens)
     rules4From: Number.isFinite(from4) && Number.isFinite(from3) ? Math.max(rulesFrom, from3, from4) : Infinity,
+    // (never before the rule of five, whose flat pay it adds to)
+    rules5From: Number.isFinite(from5) && Number.isFinite(from2) ? Math.max(rulesFrom, from2, from5) : Infinity,
+    holderPerM: lamports(num(env.PAYOUT_HOLDER_SOL_PER_M, 0.001, 0, 1)),
+    tagMax: lamports(num(env.TAG_PAY_MAX_HOLDER_SOL, 0.025, 0.001, 1)),
     claimAt: lamports(num(env.CLAIM_MIN_SOL, 0.05, 0.001, 1000)),
     bid: Math.round(num(env.PRIORITY_MICROLAMPORTS, 20_000, 0, 5_000_000)),
   };
@@ -292,6 +315,8 @@ export interface Tag {
   name: string;
   owner: string;
   wallet: string;
+  /** what of the coin its wallet held when it was cashed in, in the coin's smallest unit (from the fifth cut-over: see `holderBonus`) */
+  held?: string;
 }
 export const tagOf = (e: Entry): Tag => ({ ref: refOf(e.id), at: e.at, name: e.name, owner: e.owner, wallet: e.wallet });
 
@@ -541,6 +566,7 @@ export function enter(book: Book, t: Tag, o: Outcome, day: string, five = false)
   if (!row) {
     row = { ref: t.ref, at: t.at, name: t.name, owner: t.owner, wallet: t.wallet, state: 'off' };
     if (five) row.rules = 2;
+    if (t.held !== undefined) row.held = t.held;
     book.rows.push(row);
     book.tags++;
   }
@@ -781,7 +807,26 @@ interface One {
   mine: string;
   amount: bigint;
 }
-const tagOfRow = (r: Row): Tag => ({ ref: r.ref, at: r.at, name: r.name, owner: r.owner, wallet: r.wallet });
+const tagOfRow = (r: Row): Tag => ({ ref: r.ref, at: r.at, name: r.name, owner: r.owner, wallet: r.wallet, ...(r.held !== undefined ? { held: r.held } : {}) });
+
+/** what of the coin a wallet holds now, in its smallest unit: its own account for the coin under either token program */
+async function coinsOf(w: World, who: Bytes): Promise<bigint> {
+  const mint = w.cfg.mint;
+  const [a, b] = await Promise.all([w.rpc.tokenBalance(tokenAccount(who, mint, TOKEN_2022_PROGRAM)), w.rpc.tokenBalance(tokenAccount(who, mint, TOKEN_PROGRAM))]);
+  return a + b;
+}
+
+/**
+ * What a tag is paid more for its wallet's holding of the coin (see `rules5From`): `holderPerM` for every million
+ * whole coins of the lower of what was held when it was cashed in and `now`, so long as the tag in all pays no more
+ * than `tagMax`. Nothing for a tag of before the fifth cut-over, or not under the rule of five.
+ */
+export function holderBonus(cfg: Pick<Config, 'rules5From' | 'holderPerM' | 'tagMax'>, t: Tag, five: boolean, base: bigint, now: bigint): bigint {
+  if (!five || Date.parse(t.at) < cfg.rules5From || t.held === undefined) return 0n;
+  const then = BigInt(t.held), held = then < now ? then : now;
+  const more = (held * cfg.holderPerM) / (1_000_000n * 10n ** COIN_DECIMALS), room = cfg.tagMax > base ? cfg.tagMax - base : 0n;
+  return more < room ? more : room;
+}
 
 /**
  * Pays a tag, or says why not, or finds that it has been paid already. Safe to call again
@@ -828,6 +873,11 @@ async function settle(w: World, t: Tag, at: { held: Held }, again = false): Prom
     return only({ state: 'skipped', why: 'not a wallet address' });
   }
   if (same(to, treasury)) return only({ state: 'skipped', why: 'not a wallet that can be paid' });
+  // (what its wallet holds of the coin, asked once and only where it counts: written on the tag the first time it is put down, see `holderBonus`)
+  let holding: Promise<bigint> | null = null;
+  const holds = () => (holding ??= coinsOf(w, to).catch(() => 0n));
+  if (had?.held !== undefined) t.held ??= had.held;
+  if (!had && five && Date.parse(t.at) >= cfg.rules5From) t.held = String(await holds());
 
   // --- the tags it goes with: those its last attempt was for, if it has been tried (before the second cut-over, itself alone)
   const one = (x: Tag, row: Row | undefined): One => ({ t: x, had: row, five: fives(cfg, x, row), tries: row?.tries ?? [], mine: b58(seeded(treasury, x.ref)), amount: 0n });
@@ -935,7 +985,14 @@ async function settle(w: World, t: Tag, at: { held: Held }, again = false): Prom
 
   // --- how much (what the first attempt set out to pay is what every later one pays), and whether the treasury can cover it
   let balance = await w.rpc.balance(treasury);
-  for (const m of lot) m.amount = m.tries.length && m.had?.lamports ? BigInt(m.had.lamports) : price(balance, termsOf(cfg, m.t.at, m.five));
+  for (const m of lot) {
+    if (m.tries.length && m.had?.lamports) {
+      m.amount = BigInt(m.had.lamports);
+      continue;
+    }
+    const base = price(balance, termsOf(cfg, m.t.at, m.five));
+    m.amount = base + (m.five && Date.parse(m.t.at) >= cfg.rules5From ? holderBonus(cfg, m.t, m.five, base, await holds()) : 0n);
+  }
   // (as many as one transaction carries in each)
   const packs: One[][] = [];
   for (let i = 0; i < lot.length; i += LOT_MAX) packs.push(lot.slice(i, i + LOT_MAX));
@@ -1347,6 +1404,10 @@ export interface Snapshot {
   /** the fourth cut-over, if there is one, and how many hours a wallet's tags are counted over now (12 from it, 24 before) */
   rules4From: string | null;
   hours: number;
+  /** the fifth cut-over, if there is one: SOL more a tag for every million of the coin held, and the most a tag pays */
+  rules5From: string | null;
+  holderPerM: number;
+  tagMax: number;
 }
 
 export async function snapshot(w: World): Promise<Snapshot> {
@@ -1354,7 +1415,7 @@ export async function snapshot(w: World): Promise<Snapshot> {
   // (what is said is what a tag cashed in at this moment is paid by)
   const fives = w.now() >= base.rules2From;
   const cfg = fives ? termsOf(base, iso(w.now()), true) : base;
-  const out: Snapshot = { mode: cfg.mode, problem: cfg.problem, treasury: cfg.treasury ? b58(cfg.treasury) : null, madeTheCoin: false, maker: null, balance: null, tagPays: null, share: cfg.share, floor: Number(cfg.floor), waiting: null, waitingNote: null, due: false, dayShare: cfg.dayShare, walletDayTags: cfg.walletDayTags, rules2From: Number.isFinite(base.rules2From) ? iso(base.rules2From) : null, fives, flatPay: Number(base.floor), minTags: base.minTags, rules3From: Number.isFinite(base.rules3From) ? iso(base.rules3From) : null, rolling: w.now() >= base.rules3From, walletTags24: base.walletTags24, rules4From: Number.isFinite(base.rules4From) ? iso(base.rules4From) : null, hours: windowOf(w.now(), base) / 3600_000 };
+  const out: Snapshot = { mode: cfg.mode, problem: cfg.problem, treasury: cfg.treasury ? b58(cfg.treasury) : null, madeTheCoin: false, maker: null, balance: null, tagPays: null, share: cfg.share, floor: Number(cfg.floor), waiting: null, waitingNote: null, due: false, dayShare: cfg.dayShare, walletDayTags: cfg.walletDayTags, rules2From: Number.isFinite(base.rules2From) ? iso(base.rules2From) : null, fives, flatPay: Number(base.floor), minTags: base.minTags, rules3From: Number.isFinite(base.rules3From) ? iso(base.rules3From) : null, rolling: w.now() >= base.rules3From, walletTags24: base.walletTags24, rules4From: Number.isFinite(base.rules4From) ? iso(base.rules4From) : null, hours: windowOf(w.now(), base) / 3600_000, rules5From: Number.isFinite(base.rules5From) ? iso(base.rules5From) : null, holderPerM: Number(base.holderPerM) / LAMPORTS, tagMax: Number(base.tagMax) / LAMPORTS };
   try {
     const s = await coin(w);
     // with no key given yet, the treasury is taken to be the wallet that made the coin

@@ -51,6 +51,8 @@ const utf8 = (s: string) => new TextEncoder().encode(s);
 
 export const SYSTEM_PROGRAM = new Uint8Array(32);
 export const TOKEN_PROGRAM = address('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
+/** the newer token program, whose coins pump.fun now makes (ZONA's among them) */
+export const TOKEN_2022_PROGRAM = address('TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb');
 export const ASSOCIATED_TOKEN_PROGRAM = address('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL');
 export const COMPUTE_BUDGET_PROGRAM = address('ComputeBudget111111111111111111111111111111');
 export const MEMO_PROGRAM = address('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr');

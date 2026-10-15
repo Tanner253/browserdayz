@@ -188,8 +188,10 @@ export class FakeChain {
     if (this.programOwned.has(k)) return { data: new Uint8Array(165), lamports: 2_039_280n, owner: address('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA') };
     return this.balances.has(k) ? { data: new Uint8Array(0), lamports: this.bal(who), owner: SYSTEM_PROGRAM } : null;
   }
-  async tokenBalance() {
-    return 0n;
+  /** what of a coin each token account holds (by its address): nothing unless a test says so */
+  tokens = new Map<string, bigint>();
+  async tokenBalance(account: Bytes) {
+    return this.tokens.get(b58(account)) ?? 0n;
   }
   async steady() {
     return this;
