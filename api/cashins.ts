@@ -139,9 +139,33 @@ function page(book: Book, s: Snapshot, now: number): string {
           : ['off', 'Automatic payouts are off', 'Tags are listed here as they are cashed in, and not paid by the machine.'];
   const chip = (r: Row) => (r.state === 'paid' ? '<em class="c paid">Paid</em>' : r.state === 'sending' ? '<em class="c go">Sending</em>' : r.state === 'waiting' ? '<em class="c go">Waiting</em>' : r.state === 'skipped' ? '<em class="c no">Not paid</em>' : '<em class="c no">Listed</em>');
   const account = (wallet: string) => `<a href="https://solscan.io/account/${esc(wallet)}" target="_blank" rel="noopener"><code>${esc(short(wallet))}</code></a>`;
+  // (a wallet paid for several tags at once, in one transaction (the rule of five), is one line: the payment, the tags
+  // it was for folded under it. The owner, 2026-10-15: "we shouldnt have a new row for each payment, put the
+  // transactions in a collapsable under the row")
+  const lotOf = new Map<string, Row[]>();
+  for (const r of listed) if (!isWaits(r) && r.state === 'paid' && r.signature) lotOf.set(r.signature, [...(lotOf.get(r.signature) ?? []), r]);
+  const drawn = new Set<string>();
   const rows = listed
+    .map((r) => {
+      if (isWaits(r) || !r.signature) return r;
+      const lot = lotOf.get(r.signature);
+      if (!lot || lot.length < 2) return r;
+      if (drawn.has(r.signature)) return null;
+      drawn.add(r.signature);
+      return lot;
+    })
+    .filter((r): r is Row | Waits | Row[] => r !== null)
     .map((r) =>
-      isWaits(r)
+      Array.isArray(r)
+        ? `<tr class="paid" data-s="paid">
+        <td>${when(r[0].paidAt ?? r[0].at)}</td>
+        <td><b>${esc(r[0].name)}</b></td>
+        <td><details class="lot"><summary>${r.length} tags</summary><ol>${r.map((x) => `<li>${when(x.at)} <b>${esc(x.owner)}</b>${x.receipt ? ` <a class="rc" href="https://solscan.io/account/${esc(x.receipt)}" target="_blank" rel="noopener" title="the receipt this tag's payment left on the chain: while it stands, this tag cannot be paid again">receipt</a>` : ''} <small>${esc(x.ref)}</small></li>`).join('')}</ol></details></td>
+        <td class="w">${r[0].wallet ? account(r[0].wallet) : '<i>none given</i>'}</td>
+        <td>${chip(r[0])}</td>
+        <td><b class="sol">${amount(r.reduce((n, x) => n + (x.lamports ?? 0), 0))} SOL</b> <a href="${tx(r[0].signature!)}" target="_blank" rel="noopener" title="one transaction for all ${r.length}">${esc(short(r[0].signature!))}</a></td>
+      </tr>`
+        : isWaits(r)
         ? // (one line for all of a wallet's tags that wait to be paid together: how far it has got, and what it is paid then)
           `<tr class="waiting" data-s="open">
         <td>${when(r.at)}</td>
@@ -286,6 +310,8 @@ function page(book: Book, s: Snapshot, now: number): string {
   i { color: var(--dim); }
   td small { margin-left: 6px; font: 11px var(--mono); color: var(--faint); }
   a.rc { font-size: 12px; color: var(--dim); text-decoration: underline; }
+  details.lot summary { cursor: pointer; white-space: nowrap; }
+  details.lot ol { margin: 6px 0 2px; padding-left: 18px; font-size: 13px; line-height: 1.5; }
   time { white-space: nowrap; font: 12.5px var(--mono); color: var(--dim); }
   .rules { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .rule { padding: 15px 16px; background: var(--panel); border: 1px solid var(--line); }

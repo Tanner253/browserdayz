@@ -1466,7 +1466,10 @@ await test('what people are told: the page before and after the moment, one line
   game.close();
   html = await page();
   assert.equal(html.split('of 5</em>').length - 1, 1);
-  assert.equal(html.split('<em class="c paid">Paid</em>').length - 1, 6);
+  // (the one paid alone, and the five paid in one transaction on one line, the tags folded under it)
+  assert.equal(html.split('<em class="c paid">Paid</em>').length - 1, 2);
+  assert.equal(html.split('<summary>5 tags</summary>').length - 1, 1);
+  assert.equal(html.split('<details class="lot">')[1]?.split('</details>')[0].split('<li>').length - 1, 5);
   assert.equal(html.split('data-s="open"').length - 1, 1);
   data = await json();
   assert.deepEqual([data.paid, data.owed, data.rows.filter((r) => r.state === 'paid' && r.signature && r.receipt).length], [6, { tags: 1, wallets: 1, sol: 0.01 }, 6]);
