@@ -100,6 +100,13 @@ export interface Config {
    */
   rules3From: number;
   walletTags24: number;
+  /**
+   * The fourth cut-over (ms), the owner, 2026-10-15: "the current payout system is tooo.. limitiing ... a player can
+   * cash out 5 tags every 12 hours / all 5 tags are cashed at once when 5/5 is achieved". For a tag cashed in from
+   * this moment on, the `walletTags24` are counted over the 12 hours before it, not the 24: one payment of five every
+   * 12 hours. Still a limit, not a queue. What was cashed in before is judged as it was. See `windowOf`.
+   */
+  rules4From: number;
   /** rewards are collected when at least this much is waiting */
   claimAt: bigint;
   /** what is bid per unit of work, in millionths of a lamport: enough to be taken up promptly */
@@ -129,6 +136,8 @@ const DEFAULT_MINT = 'GvfAzdPF466PJsPJMzXQeX3TSqmJm9YxAG8xBJ6ypump';
 export const RULES2_FROM = '2026-10-14T02:20:00Z';
 /** The moment of the third cut-over (see `rules3From`), written as RULES2_FROM is; PAYOUT_RULES3_FROM is asked first. */
 export const RULES3_FROM = '2026-10-14T22:00:00Z';
+/** The moment of the fourth (see `rules4From`), written as RULES2_FROM is; PAYOUT_RULES4_FROM is asked first. '': none yet. */
+export const RULES4_FROM = '2026-10-15T17:30:00Z';
 /** a moment written in full, a day, a time and a zone (see `config`) */
 const MOMENT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/;
 
@@ -181,6 +190,8 @@ export function config(env: Record<string, string | undefined> = process.env): C
   const from2 = MOMENT.test(said2) ? Date.parse(said2) : NaN;
   const said3 = (env.PAYOUT_RULES3_FROM?.trim() ? env.PAYOUT_RULES3_FROM : RULES3_FROM).trim();
   const from3 = MOMENT.test(said3) ? Date.parse(said3) : NaN;
+  const said4 = (env.PAYOUT_RULES4_FROM?.trim() ? env.PAYOUT_RULES4_FROM : RULES4_FROM).trim();
+  const from4 = MOMENT.test(said4) ? Date.parse(said4) : NaN;
   const minTags = Math.round(num(env.PAYOUT_MIN_TAGS, 5, 1, 100));
   return {
     mode,
@@ -205,6 +216,8 @@ export function config(env: Record<string, string | undefined> = process.env): C
     rules3From: Number.isFinite(from3) ? Math.max(rulesFrom, from3) : Infinity,
     // (one lot: what is set outside for the old limit, if anything, holds for this one too)
     walletTags24: Math.round(num(env.PAYOUT_WALLET_DAY_TAGS, minTags, 1, 1000)),
+    // (never before the third, whose window it shortens)
+    rules4From: Number.isFinite(from4) && Number.isFinite(from3) ? Math.max(rulesFrom, from3, from4) : Infinity,
     claimAt: lamports(num(env.CLAIM_MIN_SOL, 0.05, 0.001, 1000)),
     bid: Math.round(num(env.PRIORITY_MICROLAMPORTS, 20_000, 0, 5_000_000)),
   };
@@ -229,7 +242,9 @@ export function price(balance: bigint, cfg: Pick<Config, 'share' | 'floor' | 'ce
 }
 
 const OVER_DAY = (cfg: Config, t: Tag) =>
-  Date.parse(t.at) >= cfg.rules3From
+  Date.parse(t.at) >= cfg.rules4From
+    ? `this wallet had cashed in ${cfg.walletTags24} tags already in the 12 hours before: one payout of ${cfg.minTags} every 12 hours, and no more are paid to it until 12 hours after the first of those`
+    : Date.parse(t.at) >= cfg.rules3From
     ? `this wallet had cashed in ${cfg.walletTags24} tags already in the 24 hours before: one payout of ${cfg.minTags} a day, and no more are paid to it until 24 hours after the first of those`
     : `this wallet had cashed in ${cfg.walletDayTags} tags already that day: no more are paid to it for that day (the day is counted in UTC)`;
 /**
@@ -242,12 +257,14 @@ const OVER_DAY = (cfg: Config, t: Tag) =>
 export function overDay(book: Book, t: Tag, cfg: Config): boolean {
   const cashed = Date.parse(t.at), day = dayOf(cashed), rolling = cashed >= cfg.rules3From;
   const before = (r: Row) => Date.parse(r.at) < cashed || (r.at === t.at && r.ref < t.ref);
-  const near = (r: Row) => (rolling ? cashed - Date.parse(r.at) < TRADE_MS : dayOf(Date.parse(r.at)) === day);
+  const span = windowOf(cashed, cfg), near = (r: Row) => (rolling ? cashed - Date.parse(r.at) < span : dayOf(Date.parse(r.at)) === day);
   return book.rows.filter((r) => r.ref !== t.ref && r.wallet === t.wallet && near(r) && before(r) && (r.state === 'paid' || r.state === 'sending' || r.state === 'waiting')).length >= (rolling ? cfg.walletTags24 : cfg.walletDayTags);
 }
 
 /** how long after one player has cashed another's tag the other's cashing of theirs is not paid */
 export const TRADE_MS = 24 * 3600 * 1000;
+/** the hours over which a tag cashed in at `cashed` is counted with its wallet's others (see `overDay`): 12 from the fourth cut-over, 24 before */
+export const windowOf = (cashed: number, cfg: Pick<Config, 'rules4From'>) => (cashed >= cfg.rules4From ? 12 : 24) * 3600 * 1000;
 
 // ------------------------------------------------------------------ what is kept
 
@@ -1327,6 +1344,9 @@ export interface Snapshot {
   rules3From: string | null;
   rolling: boolean;
   walletTags24: number;
+  /** the fourth cut-over, if there is one, and how many hours a wallet's tags are counted over now (12 from it, 24 before) */
+  rules4From: string | null;
+  hours: number;
 }
 
 export async function snapshot(w: World): Promise<Snapshot> {
@@ -1334,7 +1354,7 @@ export async function snapshot(w: World): Promise<Snapshot> {
   // (what is said is what a tag cashed in at this moment is paid by)
   const fives = w.now() >= base.rules2From;
   const cfg = fives ? termsOf(base, iso(w.now()), true) : base;
-  const out: Snapshot = { mode: cfg.mode, problem: cfg.problem, treasury: cfg.treasury ? b58(cfg.treasury) : null, madeTheCoin: false, maker: null, balance: null, tagPays: null, share: cfg.share, floor: Number(cfg.floor), waiting: null, waitingNote: null, due: false, dayShare: cfg.dayShare, walletDayTags: cfg.walletDayTags, rules2From: Number.isFinite(base.rules2From) ? iso(base.rules2From) : null, fives, flatPay: Number(base.floor), minTags: base.minTags, rules3From: Number.isFinite(base.rules3From) ? iso(base.rules3From) : null, rolling: w.now() >= base.rules3From, walletTags24: base.walletTags24 };
+  const out: Snapshot = { mode: cfg.mode, problem: cfg.problem, treasury: cfg.treasury ? b58(cfg.treasury) : null, madeTheCoin: false, maker: null, balance: null, tagPays: null, share: cfg.share, floor: Number(cfg.floor), waiting: null, waitingNote: null, due: false, dayShare: cfg.dayShare, walletDayTags: cfg.walletDayTags, rules2From: Number.isFinite(base.rules2From) ? iso(base.rules2From) : null, fives, flatPay: Number(base.floor), minTags: base.minTags, rules3From: Number.isFinite(base.rules3From) ? iso(base.rules3From) : null, rolling: w.now() >= base.rules3From, walletTags24: base.walletTags24, rules4From: Number.isFinite(base.rules4From) ? iso(base.rules4From) : null, hours: windowOf(w.now(), base) / 3600_000 };
   try {
     const s = await coin(w);
     // with no key given yet, the treasury is taken to be the wallet that made the coin
