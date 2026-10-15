@@ -457,7 +457,7 @@ if (ALL) await withServer(async () => {
     assert.match(await ann.order('/spawn police 1 230 215'), /^Police car at 230, 215/);
     const cop = late.got.slice(mark).filter((m) => m.t === 'v+').pop() as Extract<S2C, { t: 'v+' }> | undefined;
     assert.ok(cop && cop.v.i !== jeep.v.i && cop.v.k === 1 && Math.abs(cop.v.s[0] - 230) < 0.01 && Math.abs(cop.v.s[2] - 215) < 0.01, 'a police car was not stood at the map numbers given');
-    assert.match(await ann.order('/spawn dragon'), /Stand what\? One of: jeep, police, infected/);
+    assert.match(await ann.order('/spawn dragon'), /Stand what\? One of: jeep, police, heli, infected/);
     assert.match(await ann.order('/spawn jeep 1 99999 0'), /off the map/);
     assert.match(await ann.order('/spawn jeep two'), /how many/);
     // (two numbers could be how many and half a place, or a place: nothing is stood, and it is asked again)
