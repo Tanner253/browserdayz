@@ -38,5 +38,7 @@ const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies(
 const doc = await io.read('public/assets/characters/emotes.glb');
 const clips = new Set(doc.getRoot().listAnimations().map((a) => a.getName()));
 for (const e of pack) ok(clips.has(e.clip!), `the built file has ${e.clip}`);
+// (every number in every track a number: one track of a single key once made the dab's whole upper body NaN)
+for (const a of doc.getRoot().listAnimations()) ok(a.listChannels().every((c) => [...c.getSampler()!.getOutput()!.getArray()!].every(Number.isFinite)), `every value of ${a.getName()} is a number`);
 
 console.log(`emotes: ${n} checks passed`);

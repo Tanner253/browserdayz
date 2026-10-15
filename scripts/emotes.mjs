@@ -118,6 +118,9 @@ function runOf(anim) {
   }
   const sample = (tr, time, size) => {
     const { t, v } = tr;
+    // (a track of one key is that key throughout: there is no next one to go toward, and going toward none was NaN,
+    // which took everything above the waist out of the dab, the clap and LOL)
+    if (t.length === 1) return size === 4 ? new THREE.Quaternion(...v.subarray(0, 4)) : new THREE.Vector3(...v.subarray(0, 3));
     let k = 0;
     while (k < t.length - 2 && t[k + 1] <= time) k++;
     const u = tr.step ? 0 : THREE.MathUtils.clamp((time - t[k]) / Math.max(1e-6, t[k + 1] - t[k]), 0, 1);

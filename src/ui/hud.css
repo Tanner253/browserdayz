@@ -1188,6 +1188,8 @@ body.touch .set-page .gfx-range { height: 30px; }
 }
 /* the cut from one scene behind it to the next */
 .sm-cut { position: absolute; inset: 0; z-index: 0; opacity: 0; background: #050706; pointer-events: none; }
+/* (not while the Emotes' survivor is seen through its sheet: the cut darkened him to black between two scenes) */
+.hud-start:has(.start-brief.em-hole) .sm-cut { opacity: 0 !important; }
 .sm-top, .sm-main, .sm-foot { position: relative; z-index: 1; }
 
 /* --- the bar along the top */
@@ -1419,13 +1421,22 @@ body.touch .set-page .gfx-range { height: 30px; }
 /* The menu's Emotes (src/ui/emotes-menu.ts): the wheel's eight slots and the survivor beside them doing what is picked;
    the list under, by kind. */
 .start-brief[data-tab='emotes'] .pane-emotes { display: block; }
-.em-top { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 16px; align-items: center; }
-.em-wheel { position: relative; width: 250px; height: 250px; }
-.em-slot { position: absolute; left: 50%; top: 50%; width: 94px; min-height: 40px; margin: -20px 0 0 -47px; padding: 4px 6px; transform: rotate(var(--a)) translateY(-96px) rotate(calc(-1 * var(--a))); font-size: 13px; font-weight: 600; line-height: 1.05; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink); background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 4px; cursor: pointer; }
+.em-top { display: grid; grid-template-columns: 290px minmax(0, 1fr); gap: 14px; align-items: center; }
+.em-wheel { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 58px); gap: 8px; width: 290px; }
+/* (the eight round the T as they are round the wheel, clockwise from the top) */
+.em-slot { min-height: 0; padding: 4px 6px; font-size: 13px; font-weight: 600; line-height: 1.05; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink); background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 4px; cursor: pointer; }
+.em-slot[data-slot='0'] { grid-area: 1 / 2; }
+.em-slot[data-slot='1'] { grid-area: 1 / 3; }
+.em-slot[data-slot='2'] { grid-area: 2 / 3; }
+.em-slot[data-slot='3'] { grid-area: 3 / 3; }
+.em-slot[data-slot='4'] { grid-area: 3 / 2; }
+.em-slot[data-slot='5'] { grid-area: 3 / 1; }
+.em-slot[data-slot='6'] { grid-area: 2 / 1; }
+.em-slot[data-slot='7'] { grid-area: 1 / 1; }
 .em-slot.call { border-color: rgba(255, 211, 90, 0.5); }
 .em-slot:hover { background: rgba(255, 255, 255, 0.1); }
 .em-slot.on { color: #141109; background: var(--brand); border-color: var(--brand); }
-.em-hub { position: absolute; left: 50%; top: 50%; display: grid; place-items: center; width: 44px; height: 44px; margin: -22px 0 0 -22px; font-family: var(--mono); font-size: 12px; font-style: normal; color: var(--ink-faint); border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 50%; }
+.em-hub { grid-area: 2 / 2; display: grid; place-items: center; width: 44px; height: 44px; margin: auto; font-family: var(--mono); font-size: 12px; font-style: normal; color: var(--ink-faint); border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 50%; }
 .em-preview { position: relative; height: 300px; border: 1px solid var(--line); border-radius: 4px; }
 .em-fig { position: absolute; inset: 0; cursor: grab; touch-action: none; }
 .em-cap { position: absolute; left: 12px; top: 10px; pointer-events: none; text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8); }
