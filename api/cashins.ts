@@ -428,7 +428,7 @@ function page(book: Book, s: Snapshot, now: number): string {
       } ${Math.round(s.dayShare * 100)}% of the treasury leaves it in one day: a tag over that waits, and is paid when there is room.</p></div>
       ${
         s.rules5From && s.fives
-          ? `<div class="rule"><h3>Holding $ZONA pays more</h3><p>From ${new Date(s.rules5From).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', timeZone: 'UTC' })}, ${s.rules5From.slice(11, 16)} UTC, a tag pays ${s.holderPerM} SOL more for every 1,000,000 $ZONA its wallet holds, up to ${s.tagMax} SOL a tag in all (${Math.round((s.tagMax - s.flatPay / 1e9) / s.holderPerM)},000,000 held). What counts is the lower of what the wallet held when the tag was cashed in and when it is paid.</p></div>
+          ? `<div class="rule"><h3>Holding $ZONA pays more</h3><p>From ${new Date(s.rules5From).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', timeZone: 'UTC' })}, ${s.rules5From.slice(11, 16)} UTC, a tag pays ${s.holderPerM} SOL more for every full 1,000,000 $ZONA its wallet holds (nothing under 1,000,000), up to ${s.tagMax} SOL a tag in all (${Math.round((s.tagMax - s.flatPay / 1e9) / s.holderPerM)},000,000 held). What counts is the lower of what the wallet held when the tag was cashed in and when it is paid.</p></div>
       `
           : ''
       }<div class="rule"><h3>Trading tags is not paid</h3><p>When two players cash each other's tags inside a day, the first of the two is paid and the second is not. Killing a friend and being killed back earns one tag between you, not two.</p></div>

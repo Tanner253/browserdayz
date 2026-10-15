@@ -1193,6 +1193,15 @@ await test('from the fifth cut-over: a tag pays 0.001 SOL more for every million
   coin(e, 424, 10);
   await cash(e, 424, 5);
   assert.equal(got(e, 424), SOL(0.05));
+  // under a million: nothing more; a million and a half: one million's worth (the owner: "minimum holder requirement is 1m tokens")
+  const f = world(1, env);
+  f.chain.tokens.set(b58(tokenAccount(address(wallet(425)), f.cfg.mint, TOKEN_2022_PROGRAM)), 999_999n * 10n ** 6n);
+  await cash(f, 425, 5);
+  assert.equal(got(f, 425), SOL(0.05));
+  const g = world(1, env);
+  g.chain.tokens.set(b58(tokenAccount(address(wallet(426)), g.cfg.mint, TOKEN_2022_PROGRAM)), 1_500_000n * 10n ** 6n);
+  await cash(g, 426, 5);
+  assert.equal(got(g, 426), SOL(0.055));
   // and none of it without a moment
   assert.deepEqual([config({}).rules5From, config({ PAYOUT_RULES5_FROM: 'never' }).rules5From], [RULES5_FROM ? Date.parse(RULES5_FROM) : Infinity, Infinity]);
 });
