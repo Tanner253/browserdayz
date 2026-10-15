@@ -120,7 +120,9 @@ export function buildShots(S: Stage): Shot[] {
       a.hide();
     }
     for (const k of ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ShiftLeft', 'Mouse0', 'Mouse2', 'AltLeft', 'KeyT']) S.key(k, false);
+    // (the game takes the wheel down only as it is let go of in play: here it is taken down by hand)
     g.wheelOn = false;
+    g.hud.wheel?.(false);
   };
   /** one of the cast stood in the street, dancing one of the pack's movements (or not) */
   const dancer = (i: number, p: THREE.Vector3, yaw: number, emote: string | null, gear: string[]) => {
@@ -238,7 +240,7 @@ export function buildShots(S: Stage): Shot[] {
   };
   add(4, 'drop', {
     name: 'dance',
-    flash: 1,
+    flash: 0.7,
     setup: async () => {
       S.parkMe();
       const face = yawTo(K(21, 0), K(9, 0));
@@ -309,8 +311,10 @@ export function buildShots(S: Stage): Shot[] {
         } else if (judge.why) say(`a shot not counted: ${judge.why}`);
       }
     };
-    await g.onRange(course.turn, 1, course.need, course.secs);
-    for (let k = 0; k < 300 && !g.botCheck?.begun; k++) await run(1);
+    // (the course waits on timers while it stands up, and the film's clock only goes when it is run: run while it does)
+    const up = g.onRange(course.turn, 1, course.need, course.secs);
+    for (let k = 0; k < 400 && !g.botCheck?.begun; k++) await run(3);
+    await Promise.race([up, wait(100)]);
     say(`the course stands: ${g.botCheck?.begun ? 'begun' : 'NOT begun'}, turned ${course.turn.toFixed(2)}`);
   };
   /** each frame on the course: the game shown what the server would show it */
@@ -391,7 +395,7 @@ export function buildShots(S: Stage): Shot[] {
   // from above first: the whole yard, every figure shown
   add(2, 'tense', {
     name: 'course from above',
-    flash: 0.8,
+    flash: 0.5,
     setup: async () => {
       await stand();
       g.player.setFly?.(true);

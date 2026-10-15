@@ -675,3 +675,7 @@ body.tr-menu9 .tr-gfx, body.tr-menu9 .tr-title, body.tr-menu9 .x8-grid, body.tr-
 .x16-end div { margin-top: 26px; padding: 14px 40px; font: 800 64px var(--trailer-font); letter-spacing: 0.04em; color: #141109; background: #ffd35a; border-radius: 6px; }
 .x16-end p { margin-top: 22px; font: 600 34px var(--trailer-font); color: rgba(242, 237, 226, 0.8); }
 .x16-end p strong { color: #ffd35a; }
+/* (the course brings up the how-to card: not in this film; and the shared board class pins things to the top) */
+body.tr-cut16 .hud-howto { display: none !important; }
+.x16-cap { top: auto; right: auto; }
+.x16-pad { top: auto; left: auto; }
