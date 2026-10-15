@@ -434,6 +434,10 @@ export const ROLL = {
   back: 0.085,
   under: 0.03,
   reach: 0.118,
+  // A bag is flat: on fingers curled as round a roll it sank onto them (the owner: "the fingers crop through the bag,
+  // any way we can lift the bag up higher so it appears to sit in the hand"). It is held up off the palm by `lift`,
+  // on fingers nearly straight.
+  bag: { lift: 0.035, curl: [0.12, 0.14, 0.16, 0.18] },
 };
 
 /**
@@ -3729,7 +3733,7 @@ export class Weapons {
       // A roll taken out and not yet used: in the right hand at rest, as anything small is.
     } else if (rolled) {
       // A roll (or a bag) in the left palm (see ROLL).
-      pos.set(ROLL.at[0], ROLL.at[1] + Math.sin(t * 2.3) * 0.003, ROLL.at[2]);
+      pos.set(ROLL.at[0], ROLL.at[1] + (h.kind === 'drip' ? ROLL.bag.lift : 0) + Math.sin(t * 2.3) * 0.003, ROLL.at[2]);
       rot.set(ROLL.turn[0], ROLL.turn[1], ROLL.turn[2] + Math.sin(t * 1.7) * 0.02);
     } else if (h.kind === 'bandage') {
       // A kit, open in the left hand, low and to the left. The right goes into it, comes out
@@ -3926,7 +3930,8 @@ export class Weapons {
       const tips = new THREE.Vector3(h.size.x / 2 - 0.004 + Math.sin(t * 9) * 0.003 * on, h.size.y / 2 + 0.004, 0.006);
       right = { pos: away.lerp(tips.addScaledVector(fingers, -ROLL.reach), on), fingers, palm: new THREE.Vector3(-0.1, -0.8, 0.6).applyQuaternion(inv).normalize(), curl: [0.4 + on * 0.25, 0.55 + on * 0.25, 0.95, 1.05], thumb: 0.9, tuck: 0.25 };
       // (the left is under it, its palm up: the roll lies in the hollow of it, the fingers a little closed beyond)
-      left = { pos: new THREE.Vector3(-0.012, -(h.size.y / 2 + ROLL.under), ROLL.back), fingers: new THREE.Vector3(0.14, 0.1, -0.98).normalize(), palm: new THREE.Vector3(0.05, 1, 0.05).normalize(), curl: [0.42, 0.46, 0.5, 0.55], thumb: 0.45, spread: 0.2 };
+      const bag = h.kind === 'drip';
+      left = { pos: new THREE.Vector3(-0.012, -(h.size.y / 2 + ROLL.under + (bag ? ROLL.bag.lift : 0)), ROLL.back), fingers: new THREE.Vector3(0.14, 0.1, -0.98).normalize(), palm: new THREE.Vector3(0.05, 1, 0.05).normalize(), curl: bag ? ROLL.bag.curl : [0.42, 0.46, 0.5, 0.55], thumb: 0.45, spread: 0.2 };
     } else if (h.kind === 'bandage' && !rolled) {
       // in and out of the kit, once every second and a half: over it with the fingers down, then away low on the right
       const k = (t % 1.5) / 1.5;
