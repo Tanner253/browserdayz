@@ -220,6 +220,8 @@ async function boot() {
   // (the models are let go once the guns are built too: Game.loaded)
   (window as unknown as Record<string, unknown>).__game = game;
   if (import.meta.env.DEV) (await import('./dev/harness')).installHarness(game);
+  // (F8: a flight recorded for the tests to fly again: src/dev/flight-record.ts)
+  if (import.meta.env.DEV) (await import('./dev/flight-record')).installFlightRecorder(game);
   game.start();
   // the guns, built behind the menu now it is up (Game.loaded), before the menu's own extras (the sky, the films);
   // and how far that has got, said on the way in for whoever has pressed Deploy and waits for it (Game.wantIn)
