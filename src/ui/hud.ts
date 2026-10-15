@@ -17,6 +17,7 @@ import { TIERS, type Tier } from '../sim/tiers';
 import { ITEMS, TAG_FRESH, TAG_HOLD_MIN } from '../sim/items';
 import { INFECTED } from '../sim/infected';
 import { GAS } from '../sim/gas';
+import { dogTag } from './dogtag';
 import { AO_MODES, DEFAULT_GRAPHICS, FPS_LIMITS, LEVELS, MSAA, PRESETS, SCALES, loadMix, presetOf, saveGraphics, saveMix, type Graphics, type PresetName } from '../core/settings';
 
 /**
@@ -247,14 +248,17 @@ export class HUD {
             <p class="start-sub">Players hunt you. So do the infected.</p>
             <p class="start-sub2">Take a dog tag off another player, stay alive ${TAG_HOLD_MIN} minutes, cash it in. Nobody has a tag in their first ${TAG_FRESH / 60} minutes alive, and a tag carried out of the Zona is void.</p>
             <div class="sm-enter">
-              <label class="sm-name tagplate">
-                <svg class="tagplate-chain" viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="52" fill="none" stroke="currentColor" stroke-width="5" stroke-dasharray="0.1 9" stroke-linecap="round"/></svg>
-                <span>Stamp your dog tag</span>
-                <input id="start-name" class="start-name" maxlength="16" spellcheck="false" autocomplete="off" enterkeyhint="go" placeholder="Survivor">
-                <i class="tagplate-meta"><b>ZONA</b><b>Survivor</b></i>
+              <label class="sm-name">
+                <span class="sm-name-label">Your name<em>over your head, on your dog tag</em></span>
+                <span class="sm-name-field">
+                  <svg class="sm-name-pen" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-4-4L4 16v4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M13.5 6.5l4 4" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+                  <input id="start-name" class="start-name" maxlength="16" spellcheck="false" autocomplete="off" enterkeyhint="go" placeholder="Type a name">
+                  <i class="sm-name-left">16</i>
+                </span>
               </label>
               <button class="start-btn" type="button"><span>Deploy</span></button>
               <button class="start-out" type="button">Log out</button>
+              <div class="sm-tag" title="Your dog tag: whoever kills you takes it"></div>
             </div>
             <div class="start-queue"><div class="sq-pos"></div><div class="sq-sub"></div><button class="sq-leave" type="button">Play on your own instead</button></div>
             <div class="start-online"></div>
@@ -419,13 +423,12 @@ export class HUD {
     });
     // the name: keys typed into it are not the game's, and Enter in it is the Deploy button
     const name = this.root.querySelector('.start-name') as HTMLInputElement;
-    // every letter is struck into the plate
-    const plate = this.root.querySelector('.tagplate') as HTMLElement;
-    name.addEventListener('input', () => {
-      plate.classList.remove('stamp');
-      void plate.offsetWidth;
-      plate.classList.add('stamp');
-    });
+    // every letter is struck into the tag beside it (src/ui/dogtag.ts), and how many more there is room for is said
+    dogTag(this.root.querySelector('.sm-tag') as HTMLElement, name);
+    const left = this.root.querySelector('.sm-name-left') as HTMLElement;
+    const count = () => (left.textContent = String(16 - name.value.length));
+    name.addEventListener('input', count);
+    count();
     name.addEventListener('keydown', (e) => {
       e.stopPropagation();
       if (e.key !== 'Enter' || e.repeat) return;
@@ -988,7 +991,10 @@ export class HUD {
   }
 
   setName(name: string) {
-    (this.root.querySelector('.start-name') as HTMLInputElement).value = name;
+    const input = this.root.querySelector('.start-name') as HTMLInputElement;
+    input.value = name;
+    // (set from outside, not typed: the tag and the count are told)
+    input.dispatchEvent(new Event('input'));
   }
 
   nameValue() {

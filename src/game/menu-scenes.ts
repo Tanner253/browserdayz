@@ -1070,7 +1070,13 @@ export class MenuScenes {
     };
   }
 
-  /** In at the gate of the works, under the gas, with a mask on. */
+  /**
+   * In along the track to the works, under the gas, with a mask on: over his shoulder, looking in. He walks into the
+   * green with the pistol low, stops, brings it up, and drops two of the infected who have not seen him with a
+   * quiet shot each; the rest go on as they were. (It was shot from inside the gate looking out, the gas and the
+   * works behind the lens and only trees in the picture, and him a speck and then a back. The owner, 2026-10-14: the
+   * scene "when the guy with pistol walks into the gas and shoots a zombie" did not look good.)
+   */
   private works(): Vignette | null {
     const z = gasZone(this.h.world.pois, (x, zz) => this.ground(x, zz));
     const site = this.h.world.sites.find((s) => s.name === GAS.place);
@@ -1079,45 +1085,64 @@ export class MenuScenes {
     const f = new THREE.Vector3(Math.sin(site.rot), 0, Math.cos(site.rot)), r = new THREE.Vector3(Math.cos(site.rot), 0, -Math.sin(site.rot));
     const at = (right: number, fwd: number) => new THREE.Vector3(site.x + r.x * right + f.x * fwd, 0, site.z + r.z * right + f.z * fwd);
     const man = this.men[2];
-    // [right, forward] of each of the infected: in from the gate, their backs to it
-    const STOOD: [number, number][] = [[0.4, 60], [-1.6, 63.5], [5.5, 64], [-4.5, 69], [7, 70]];
-    let shot = false;
+    /** where he comes from, where he stops, metres out along the track */
+    const FROM = 69, STOP = 59.5;
+    // [right, forward] of each of the infected: in the yard ahead of him, in the gas, not facing him
+    const STOOD: [number, number][] = [[0.8, 52], [-3, 49.5], [3.6, 47], [-1.2, 43], [5.2, 41.5]];
+    /** when he has it up, and when each shot is (at the first two of them) */
+    const UP = 4.6, SHOTS = [5.5, 6.7];
+    let fired = 0;
+    const stop = at(0, STOP);
     return {
-      // (Said short, as every caption here is. The foot of the menu has the contract address beside it, and a long
-      // caption takes that line's room: sixty letters is about what there is on a desk's screen.)
       caption: 'The Chemical Works · gas: nobody goes in without a mask',
       seconds: 9,
+      close: () => [man.kits.get('own')!.obj],
       setup: () => {
-        shot = false;
-        const a = at(1.5, 67);
+        fired = 0;
+        const a = at(0, FROM);
         this.put(man, a.x, a.z, Math.atan2(f.x, f.z));
-        man.aim = true;
         this.sick.forEach((s, k) => {
           const b = at(STOOD[k][0], STOOD[k][1]);
-          this.put(s, b.x, b.z, Math.atan2(f.x, f.z) + ((k * 1.7) % 1) - 0.5);
+          this.put(s, b.x, b.z, Math.atan2(f.x, f.z) + 0.9 * (((k * 1.7) % 1) - 0.5) + Math.PI * (k % 2));
           s.body.sick!.roused = 0;
         });
       },
       tick: (t, dt) => {
-        const a = at(1.5, 30);
-        this.go(man, a.x, a.z, 1.5, dt);
-        // they have not seen him: they shuffle on into the yard, the way they were facing
+        // in at a careful walk, slowing to where he stops; the gun low until then
+        if (t < UP) this.go(man, stop.x, stop.z, this.pace(man, stop, 1.35), dt);
+        else man.vel.set(0, 0, 0);
+        man.aim = t > UP - 0.35;
+        // they have not seen him: they wander the yard, slowly, each its own way
         this.sick.forEach((s, k) => {
-          const b = at(STOOD[k][0], 20);
-          this.go(s, b.x, b.z, 0.45, dt);
+          const b = at(STOOD[k][0] + Math.sin(k * 2.1) * 4, STOOD[k][1] - 6 + (k % 2) * 9);
+          this.go(s, b.x, b.z, 0.32, dt);
         });
-        const near = this.sick[0];
-        if (!shot && t > 5.4 && near && !near.dead) {
-          shot = true;
-          man.face(near.pos.x, near.pos.z);
-          this.fire(man, near);
+        if (fired < SHOTS.length && t > SHOTS[fired]) {
+          const near = this.sick[fired];
+          if (near && !near.dead) {
+            man.face(near.pos.x, near.pos.z);
+            this.fire(man, near);
+          }
+          fired++;
+        } else if (t > UP - 0.35 && fired < SHOTS.length) {
+          // (the gun comes round onto the next of them before it goes off)
+          const next = this.sick[fired];
+          if (next && !next.dead) {
+            const want = Math.atan2(-(next.pos.x - man.pos.x), -(next.pos.z - man.pos.z));
+            man.yaw += Math.atan2(Math.sin(want - man.yaw), Math.cos(want - man.yaw)) * Math.min(1, dt * 5);
+          }
         }
       },
       view: (t) => {
-        // inside the gate, low, looking back out at him as he comes up to it
-        const p = at(2.1, 53 - t * 0.22);
-        p.y = this.ground(p.x, p.z) + 1.3;
-        return this.lens(p, man.pos.clone().setY(man.pos.y + 1.4), 36, 0.3);
+        // over his left shoulder, a pace behind, looking in along the track at the yard ahead: he stands in the right
+        // of the picture, the gas and the works before him; it drifts in closer as he stops
+        const k = THREE.MathUtils.smoothstep(t, 0, 6);
+        const back = THREE.MathUtils.lerp(3.4, 2.5, k), left = THREE.MathUtils.lerp(1.5, 1.15, k);
+        const p = man.pos.clone().addScaledVector(f, back).addScaledVector(r, -left);
+        p.y = this.ground(p.x, p.z) + 1.62;
+        const ahead = man.pos.clone().addScaledVector(f, -9);
+        ahead.y = this.ground(ahead.x, ahead.z) + 1.25;
+        return this.lens(p, ahead, 46, 0.08);
       },
     };
   }
