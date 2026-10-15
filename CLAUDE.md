@@ -18,6 +18,7 @@ ZONA is a browser PvP survival shooter in the manner of DayZ, where a dog tag ta
 - `server/index.ts` the game server as it starts (what it does at start-up, in order; the world state; the loops; http and ws), its parts beside it in `server/` (`handle.ts` is every message a player sends, `admin.ts` every admin command). `api/` payouts (`api/_lib/payouts.ts`), cash-ins, admin, saves.
 - `test/*.test.ts` plain scripts run with tsx. `scripts/` deploy, cards, icons, films. `src/trailer/` + `scripts/film.mjs` the films.
 - `public/changelog/` the changelog page and its pictures; `marketing/` cards (`node scripts/card.mjs <name>`).
+- `progress/` (git-excluded, kept for the story, the owner 2026-10-15: "just for us and our story"): every plan, design picture and picture of work as it goes is saved here, never only in a scratch folder. Plan pages stay `marketing/plan-*.html` -> `zona-plan-*.png` (also excluded) so the card tool renders them.
 - `assets-src/` (git-ignored, about 10 GB): downloaded packs and model sources. NEVER delete it; it exists only on this machine.
 
 ## Running it
