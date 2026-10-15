@@ -169,6 +169,17 @@ export function giveRun(doc, run, clip = 'run') {
   }
   // (a hand lies as its forearm does)
   for (const s of ['_l', '_r']) if (laid.has(nodes.get(`lowerarm${s}`)) && nodes.get(`hand${s}`)) laid.set(nodes.get(`hand${s}`), laid.get(nodes.get(`lowerarm${s}`)));
+  // (and the fingers, where the other body says which way its lie (rig.dir, scripts/emotes.mjs): first as the hand is
+  // laid, so a finger keeps its roll on the hand, then along the other's)
+  if (run.rig.dir) {
+    for (const [, node] of mine) {
+      const there = run.rig.dir(node.getName()), kid = there && node.listChildren()[0];
+      if (!kid) continue;
+      const hand = laid.get(nodes.get(`hand${node.getName().slice(-2)}`)) ?? ID;
+      const here = at(kid).sub(at(node)).normalize().applyQuaternion(hand);
+      laid.set(node, new THREE.Quaternion().setFromUnitVectors(here, there).multiply(hand));
+    }
+  }
   const pelvis = nodes.get('pelvis');
   const hip = new Float32Array((run.frames + 1) * 3);
   const scale = (pelvis.getWorldMatrix()[13]) / run.hipsHigh;

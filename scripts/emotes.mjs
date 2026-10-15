@@ -103,7 +103,22 @@ const still = pose(restQ, restT, restS);
 const boundQ = still.map(rot);
 const pelvis = name.indexOf('pelvis');
 const hipsAt = new THREE.Vector3().setFromMatrixPosition(still[pelvis]);
-const rig = { name, at: (n) => new THREE.Vector3().setFromMatrixPosition(still[name.indexOf(n)]) };
+const rig = {
+  name,
+  at: (n) => new THREE.Vector3().setFromMatrixPosition(still[name.indexOf(n)]),
+  // Which way a finger's joint lies at rest, toward the next (giveRun lays ours the same way). The pack's hand rests a
+  // little closed and ours flat, and what is carried is each joint's turn from rest: unlaid, every dance was danced
+  // with our flat hand opened further, fingers bent back and fanned (the owner: "the fingers rest position on the dance
+  // animations all look terrible and unnatural"). The last of a finger's two joints has none after it: it lies along
+  // its own length, the way the one before reached it (a biped's bones run along their own axis).
+  dir: (n) => {
+    const i = name.indexOf(n);
+    if (i < 0 || !/^(thumb|index|middle|ring|pinky)_0[12]_[lr]$/.test(n)) return null;
+    const kid = joints.findIndex((_, k) => parent[k] === i);
+    if (kid >= 0) return new THREE.Vector3().setFromMatrixPosition(still[kid]).sub(new THREE.Vector3().setFromMatrixPosition(still[i])).normalize();
+    return restT[i].clone().normalize().applyQuaternion(boundQ[i]);
+  },
+};
 
 /** one of the pack's movements, read as scripts/mixamo.mjs's runOf reads one (what giveRun takes) */
 function runOf(anim) {
