@@ -31,7 +31,7 @@
 
 import type { AdminLists } from '../net/protocol';
 import { ENTITIES, type Entity, type Role } from '../net/orders';
-import { ITEMS } from '../sim/items';
+import { ITEMS, TAG_HOLD_MIN, tagClock, tagOwner } from '../sim/items';
 import { KITS } from '../sim/kits';
 import { CARRY_POWERS, type CarryPower } from '../sim/powers';
 import type { S2C } from '../net/protocol';
@@ -1257,7 +1257,11 @@ export class AdminUI {
     const tile = (it: ItemInstance, where: string) => {
       const d = ITEMS[it.id], t = el('div', 'adm-item adm-held');
       const count = d?.stack && it.qty > 1 ? `×${it.qty}` : it.loaded !== undefined ? `${it.loaded} in it` : it.rounds !== undefined ? `${it.rounds} rounds` : '';
-      t.title = `${d?.name ?? it.id}${count ? `  ·  ${count}` : ''}${it.mods?.length ? `  ·  ${it.mods.map((x) => ITEMS[x]?.name ?? x).join(', ')}` : ''}  ·  ${where}`;
+      // (a dog tag: whose it is, and how long before it cashes in, by what their game last said: 2026-10-14, the owner,
+      // "as admin when im investigating a players inventory and i hover my mouse over a dogtag ... i should see the
+      // timer on it for that tag, and who's tag it is (owner)")
+      const tag = it.id === 'dogtag' ? `  ·  ${tagOwner(it)}'s  ·  ${tagOwner(it) === p.name ? 'their own: never cashed in' : it.holder ? `cashes in in ${tagClock(it)}` : `not counting (cashes in after ${TAG_HOLD_MIN} min carried)`}` : '';
+      t.title = `${d?.name ?? it.id}${tag}${count ? `  ·  ${count}` : ''}${it.mods?.length ? `  ·  ${it.mods.map((x) => ITEMS[x]?.name ?? x).join(', ')}` : ''}  ·  ${where}`;
       const pic = this.pictures[it.id];
       if (pic) {
         const img = el('img');
