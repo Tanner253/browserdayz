@@ -92,7 +92,7 @@ export const EMOTES: Emote[] = [
   { id: 'sit', label: 'Sit down', kind: 'pose', hold: 'sit' },
 ];
 
-/** the wheel as it is until a player sets their own (the menu's Emotes): eight, clockwise from the top */
+/** the wheel as it is until a player sets their own (Emotes, opened from the wheel): eight, clockwise from the top */
 export const WHEEL_DEFAULT = ['hey', 'dontshoot', 'yes', 'no', 'bhangra', 'surrender', 'follow', 'help'];
 export const WHEEL_SLOTS = 8;
 

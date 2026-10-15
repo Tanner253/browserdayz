@@ -1,4 +1,4 @@
-// The emote wheel's eight slots as this player has set them (the menu's Emotes tab, src/ui/emotes-menu.ts), kept in
+// The emote wheel's eight slots as this player has set them (Emotes, opened from the wheel: src/ui/emotes-menu.ts), kept in
 // this browser. The owner, 2026-10-14: "we need to allow the user to assign which emote to which radial key".
 import { EMOTE, WHEEL_DEFAULT, WHEEL_SLOTS } from '../sim/emotes';
 

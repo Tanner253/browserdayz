@@ -196,7 +196,7 @@ export class Doll {
   private goal: number | null = null;
   /** seconds until a gun newly in the hands is looked over (-1: none is waiting to be) */
   private lookOver = -1;
-  /** an emote being shown (the menu's Emotes): what, how long since it was begun, how long since one played once ended */
+  /** an emote being shown (Emotes): what, how long since it was begun, how long since one played once ended */
   private performing: { e: Emote; t: number; over: number } | null = null;
   /** what hangs from the hand just now and is kept upright (null: nothing does) */
   private plumb: THREE.Object3D | null = null;
@@ -791,7 +791,7 @@ export class Doll {
 
   /** the body as it stands this moment: the game's own standing, with what is in its hands */
   /**
-   * Shown doing an emote, over and over, for as long as it is shown (the menu's Emotes, src/ui/emotes-menu.ts): a
+   * Shown doing an emote, over and over, for as long as it is shown (Emotes, src/ui/emotes-menu.ts): a
    * call's gesture again after a breath, a movement played once again after a moment, a dance kept up. null: none.
    */
   perform(e: Emote | null) {

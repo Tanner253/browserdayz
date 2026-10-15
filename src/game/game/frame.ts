@@ -89,7 +89,8 @@ export const frameMethods = {
       }
     }
     if (this.adminUI.isOpen && (!this.started || this.paused)) this.toggleAdmin(false);
-    const panels = this.invUI.isOpen || this.shop.isOpen || this.map.open || this.adminUI.isOpen;
+    if (this.hud.emotes.isOpen && (!playing || this.player.dead)) this.toggleEmotes(false);
+    const panels = this.invUI.isOpen || this.shop.isOpen || this.map.open || this.adminUI.isOpen || this.hud.emotes.isOpen;
     // (with the view off by itself, the body does nothing: as with a panel open, but that talk can still be typed)
     const uiOpen = panels || !!this.freecam;
     // Enter opens the chat box, and / opens it with an order begun; while typing the character stands still and the gun stays quiet
@@ -606,8 +607,8 @@ export const frameMethods = {
     r.render(dt);
     // (the figure in the inventory, laid over the game's picture where the page shows it: nothing, while that is shut)
     this.doll?.draw(dt);
-    // (and the menu's Emotes' survivor, doing what is picked there, made the first time it is opened)
-    if (this.hud.emotes.open()) {
+    // (and Emotes' survivor, doing what is picked there, made the first time it is opened)
+    if (this.hud.emotes.isOpen) {
       const fig = this.emoteDoll();
       fig.perform(EMOTE[this.hud.emotes.doing] ?? null);
       fig.draw(dt);

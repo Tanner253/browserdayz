@@ -209,6 +209,28 @@ export const handsMethods = {
     }, 400);
   },
 
+  /** Emotes (a click on the wheel, or the phone's ✎): the wheel's slots set over the game, the mouse free, as the panel is. */
+  toggleEmotes(this: Game, open?: boolean, byEscape = false) {
+    const em = this.hud.emotes;
+    const want = open ?? !em.isOpen;
+    if (want) {
+      if (!this.started || this.paused || this.player.dead || this.invUI.isOpen || this.shop.isOpen || this.map.open || this.adminUI.isOpen) return;
+      em.toggle(true);
+      this.input.uiMode = true;
+      this.input.unlock();
+      return;
+    }
+    if (!em.isOpen) return;
+    em.toggle(false);
+    this.input.uiMode = false;
+    if (byEscape && !this.input.touch) this.awaitClick = true;
+    else if (this.started && !this.paused) this.input.lock();
+    // (as the panel's: if the browser refuses the re-capture, the next click on the game takes it)
+    setTimeout(() => {
+      if (this.started && !this.paused && !em.isOpen && !this.invUI.isOpen && !this.shop.isOpen && !this.map.open && !this.adminUI.isOpen && !this.input.locked && !this.player.dead) this.awaitClick = true;
+    }, 400);
+  },
+
   /** The free camera (K): the view leaves the body where it stands and goes where it is flown. */
   toggleFreecam(this: Game, on = !this.freecam) {
     if (on === !!this.freecam || (on && this.role !== 'admin')) return;

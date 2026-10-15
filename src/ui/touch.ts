@@ -43,11 +43,13 @@ export interface TouchActions {
   swap(): void;
   /** something off the wheel, by its id */
   emote(id: string): void;
+  /** Emotes, where the eight are set */
+  editEmotes(): void;
   chat(): void;
 }
 
 /** the phone's emote buttons: the player's eight, as the wheel has them (src/ui/wheel-slots.ts) */
-const emoteButtons = (ids: string[]) => ids.map((id) => `<button class="tc-e" data-emote="${id}">${EMOTE[id]?.label ?? id}</button>`).join('');
+const emoteButtons = (ids: string[]) => ids.map((id) => `<button class="tc-e" data-emote="${id}">${EMOTE[id]?.label ?? id}</button>`).join('') + '<button class="tc-e tc-e-edit" data-edit>✎ Edit</button>';
 
 export class TouchControls {
   private root: HTMLDivElement;
@@ -100,9 +102,10 @@ export class TouchControls {
     list.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      const id = (e.target as HTMLElement).closest<HTMLElement>('.tc-e')?.dataset.emote;
+      const b = (e.target as HTMLElement).closest<HTMLElement>('.tc-e'), id = b?.dataset.emote;
       this.root.classList.remove('emo');
       if (id) this.on.emote(id);
+      else if (b?.dataset.edit !== undefined) this.on.editEmotes();
     });
   }
 

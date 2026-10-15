@@ -143,7 +143,7 @@ const SPLASHES = [
 
 export class HUD {
   root: HTMLDivElement;
-  /** the menu's Emotes: the wheel's slots set, each watched first (src/ui/emotes-menu.ts) */
+  /** Emotes: the wheel's slots set, each watched first; opened in the game from the wheel (src/ui/emotes-menu.ts) */
   readonly emotes = new EmotesMenu();
   private el: Record<string, HTMLElement> = {};
   private notes: HTMLDivElement;
@@ -161,7 +161,7 @@ export class HUD {
       <div class="hud-acts"></div>
       <div class="hud-mark"></div>
       <div class="hud-says"></div>
-      <div class="hud-wheel">${wheelSvg(wheelSlots())}<i class="wheel-dot"></i><div class="wheel-mid"><b></b><span></span></div></div>
+      <div class="hud-wheel">${wheelSvg(wheelSlots())}<i class="wheel-dot"></i><div class="wheel-mid"><b></b><span></span></div><span class="wheel-edit"><b>Click</b>Edit the wheel</span></div>
       <div class="hud-progress"><div class="hud-progress-label"></div><div class="hud-progress-bar"><div></div></div></div>
       <div class="hud-compass"><div class="hud-compass-strip"></div><div class="hud-compass-needle"></div></div>
       <div class="hud-bearing"></div>
@@ -218,7 +218,6 @@ export class HUD {
           <nav class="sm-nav start-tabs" aria-label="Menu">
             <button type="button" data-tab="play" class="on">Play</button>
             <button type="button" data-tab="howto" class="sm-howto">How to play</button>
-            <button type="button" data-tab="emotes">Emotes</button>
             <button type="button" data-tab="gfx">Settings</button>
             <button type="button" data-tab="rewards" hidden>Rewards</button>
             <a class="sm-out sm-arena" href="/arena">Arena</a>
@@ -316,7 +315,7 @@ export class HUD {
     }
     this.notes = this.root.querySelector('.hud-notes') as HTMLDivElement;
     for (const [k, sel] of [['wheel', '.hud-wheel'], ['wheelDot', '.wheel-dot'], ['wheelB', '.wheel-mid b'], ['wheelS', '.wheel-mid span'], ['says', '.hud-says']]) this.el[k] = this.root.querySelector(sel) as HTMLElement;
-    // (set again in the menu's Emotes: the wedges drawn afresh)
+    // (set again in Emotes: the wedges drawn afresh)
     onWheelSlots((ids) => this.el.wheel.querySelector('svg')?.replaceWith(document.createRange().createContextualFragment(wheelSvg(ids))));
     this.status = new StatusView(this.el.vitals);
     this.buildCompass();
@@ -435,7 +434,7 @@ export class HUD {
       else this.sheet(tab);
     });
     (this.root.querySelector('.sm-close') as HTMLButtonElement).onclick = () => this.sheet('play');
-    this.emotes.inSheet(this.root.querySelector('.start-brief') as HTMLElement);
+    this.root.append(this.emotes.root);
     (this.root.querySelector('.sm-wallet') as HTMLButtonElement).onclick = () => this.rewardsClicked();
     window.addEventListener('keydown', (e) => {
       // (Escape shuts an open sheet before it does anything else: the game's own Escape is the pause, and that is this menu)
@@ -744,7 +743,7 @@ export class HUD {
     card.dataset.tab = tab;
     this.toggle(this.el.start, 'sheet', tab !== 'play');
     for (const b of this.root.querySelectorAll<HTMLButtonElement>('.start-tabs button')) b.classList.toggle('on', b.dataset.tab === tab);
-    (card.querySelector('h2') as HTMLElement).textContent = { map: 'The map', brief: 'How to play', gfx: 'Settings', emotes: 'Emotes' }[tab] ?? '';
+    (card.querySelector('h2') as HTMLElement).textContent = { map: 'The map', brief: 'How to play', gfx: 'Settings' }[tab] ?? '';
     // (the settings open on their first page; the page chosen is kept for as long as they stay open)
     if (tab === 'gfx') this.setTab(SET_TABS[0][0]);
     (this.root.querySelector('.mm-tip') as HTMLElement).classList.remove('on');

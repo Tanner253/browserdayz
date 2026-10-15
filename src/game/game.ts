@@ -699,8 +699,8 @@ export class Game {
       shown: (on) => this.invUI.figureShown(on),
     });
     this.invUI.figure = this.doll;
-    // (and the menu's Emotes has the survivor beside its wheel, doing what is picked: empty-handed, dressed as the player
-    // is; asked for its own place on the page by src/ui/emotes-menu.ts)
+    // (and Emotes has the survivor beside its wheel, doing what is picked: empty-handed, dressed as the player is; asked
+    // for its own place on the page by src/ui/emotes-menu.ts)
     this.emoteDoll = () =>
       (this.emoteFig ??= new Doll(r, atmo, this.loot.models, {
         name: () => playerName(),
@@ -715,6 +715,7 @@ export class Game {
     this.hud.emotes.figure = { grab: () => this.emoteFig?.grab(), turn: (by) => this.emoteFig?.turn(by), drop: () => this.emoteFig?.drop() };
     // (a call picked there is heard as it is called in the game)
     this.hud.emotes.onCall = (id) => audio.shout(id, undefined, 0, voiceOf(playerName()));
+    this.hud.emotes.onClose = () => this.toggleEmotes(false);
 
     // one physics step so placement queries see every collider
     physics.step(physics.fixedDt);
@@ -788,6 +789,7 @@ export class Game {
         inventory: () => this.started && !this.player.dead && this.toggleInventory(),
         swap: () => inPlay() && (this.breakOff() || this.turnMagWork() || this.nextWeapon()),
         emote: (id) => inPlay() && this.emote(id),
+        editEmotes: () => inPlay() && this.toggleEmotes(true),
         chat: () => {
           if (!inPlay() || this.invUI.isOpen || this.hud.chatOpen) return;
           this.input.releaseAll();
@@ -1050,7 +1052,8 @@ export class Game {
     });
     window.addEventListener('keydown', (e) => {
       if (e.code !== 'Escape') return;
-      if (this.adminUI?.isOpen) this.toggleAdmin(false, true);
+      if (this.hud.emotes.isOpen) this.toggleEmotes(false, true);
+      else if (this.adminUI?.isOpen) this.toggleAdmin(false, true);
       else if (this.shop?.isOpen) this.shop.close();
       else if (this.map?.open) this.toggleMap(false, true);
       else if (this.invUI?.isOpen) this.toggleInventory(false, true);
@@ -1128,11 +1131,11 @@ export class Game {
   portraitN = 0;
   /** the survivor in the inventory window, alive (null until the game has loaded that far) */
   doll: Doll | null = null;
-  /** the menu's Emotes' survivor, made when first wanted */
+  /** Emotes' survivor, made when first wanted */
   emoteDoll: () => Doll = () => {
     throw new Error('the game is not made yet');
   };
-  /** a second of it for the menu's Emotes, made the first time that is opened (see `emoteDoll`) */
+  /** a second of it for Emotes, made the first time that is opened (see `emoteDoll`) */
   private emoteFig: Doll | null = null;
   gearKey = '';
 
@@ -1381,6 +1384,7 @@ export interface Game {
   adminSelf: Methods<typeof handsMethods>['adminSelf'];
   showPowers: Methods<typeof handsMethods>['showPowers'];
   toggleAdmin: Methods<typeof handsMethods>['toggleAdmin'];
+  toggleEmotes: Methods<typeof handsMethods>['toggleEmotes'];
   toggleFreecam: Methods<typeof handsMethods>['toggleFreecam'];
   deleteLooked: Methods<typeof handsMethods>['deleteLooked'];
   adminLook: Methods<typeof handsMethods>['adminLook'];

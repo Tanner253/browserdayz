@@ -1,12 +1,13 @@
-// The menu's Emotes: the eight slots of the wheel (hold T) set by the player, each thing there is to call out or do
-// watched first on the survivor (the owner, 2026-10-14: "we need to rethink how we have emotes setup and we need to
-// allow the user to assign which emote to which radial key i think which means we need an emote preview for the user
-// to watch"; "lets make sure the ui and emote wheel interaction and edit and everything is super intuitive"). The wheel is
-// the one held up in the game (wheelSvg): a wedge is clicked to choose it; anything in the list is played by the
-// survivor as soon as the pointer is on it, and a click puts it in the wedge chosen.
+// Emotes: the eight slots of the wheel (hold T) set by the player, each thing there is to call out or do watched
+// first on the survivor (the owner, 2026-10-14: "we need to allow the user to assign which emote to which radial key
+// ... we need an emote preview for the user to watch"; "lets make sure the ui and emote wheel interaction and edit and
+// everything is super intuitive"). Opened in the game, from the wheel (the owner, 2026-10-15: "emotes should be managed
+// in game not the main menu"; "edit button on the T wheel"): a sheet of its own over the game, the mouse free. The
+// wheel is the one held up in the game (wheelSvg): a wedge is clicked to choose it; anything in the list is played by
+// the survivor as soon as the pointer is on it, and a click puts it in the wedge chosen.
 //
 // The survivor is the inventory's (src/game/doll.ts), a second of it: drawn by the game's renderer into a hole cut in
-// this sheet, where the page's veil is made again behind it (see DollBox).
+// this sheet, where the sheet's veil is made again behind it (see DollBox).
 import { EMOTE, EMOTES, WHEEL_DEFAULT, type Emote } from '../sim/emotes';
 import type { DollBox } from '../game/doll';
 import { setWheelSlots, wheelSlots, wheelSvg } from './wheel-slots';
@@ -14,7 +15,12 @@ import { setWheelSlots, wheelSlots, wheelSvg } from './wheel-slots';
 const KINDS: [Emote['kind'], string][] = [['call', 'Calls'], ['dance', 'Dances'], ['gesture', 'Gestures'], ['pose', 'Poses']];
 
 export class EmotesMenu {
+  /** over the game: the sheet, and the dark round it */
+  readonly root: HTMLElement;
   readonly el: HTMLElement;
+  private on = false;
+  /** ✕ clicked: the game puts it away and takes the mouse back */
+  onClose?: () => void;
   private slot = 0;
   private kind: Emote['kind'] = 'call';
   /** what is in the slot chosen, or was just put there (see `doing` for what the survivor is doing) */
@@ -25,11 +31,16 @@ export class EmotesMenu {
   /** the survivor shown, turned by a drag across it (src/game/doll.ts) */
   figure: { grab(): void; turn(by: number): void; drop(): void } | null = null;
   private fig: HTMLElement;
-  private sheet: HTMLElement | null = null;
+  private sheet: HTMLElement;
 
   constructor() {
+    this.root = document.createElement('div');
+    this.root.className = 'em-over';
+    this.root.innerHTML = `<div class="em-sheet"><div class="em-head"><h2>Emotes</h2><button type="button" class="em-close" aria-label="Close">✕</button></div></div>`;
+    this.sheet = this.root.querySelector('.em-sheet') as HTMLElement;
+    this.root.querySelector('.em-close')!.addEventListener('click', () => this.onClose?.());
     this.el = document.createElement('div');
-    this.el.className = 'start-pane pane-emotes';
+    this.el.className = 'pane-emotes';
     this.el.innerHTML = `
       <ol class="em-steps"><li><b>1</b>Choose a slot on your wheel</li><li><b>2</b>Point at an emote to watch it, click to put it in</li></ol>
       <div class="em-top">
@@ -40,7 +51,8 @@ export class EmotesMenu {
         <div class="em-tabs">${KINDS.map(([k, label]) => `<button type="button" data-kind="${k}">${label}</button>`).join('')}</div>
         <div class="em-items"></div>
       </div>
-      <p class="em-hint">In the game: hold <b>T</b>, move the mouse toward a slot, let go. A tap of T says the last call again. <button type="button" class="em-reset">Back to the first eight</button></p>`;
+      <p class="em-hint">Hold <b>T</b>, move the mouse toward a slot, let go. A tap of T says the last call again. <button type="button" class="em-reset">Back to the first eight</button></p>`;
+    this.sheet.append(this.el);
     this.fig = this.el.querySelector('.em-fig') as HTMLElement;
     this.showing = wheelSlots()[0];
     // turned by a drag, as the inventory's is
@@ -97,10 +109,12 @@ export class EmotesMenu {
     this.render();
   }
 
-  /** the sheet it is in: the hole the survivor is seen through is cut in that */
-  inSheet(sheet: HTMLElement) {
-    this.sheet = sheet;
-    sheet.querySelector('.sm-sheet-head')!.after(this.el);
+  /** put up over the game, on the slot just used if there is one, or taken away */
+  toggle(on: boolean) {
+    this.on = on;
+    this.root.classList.toggle('show', on);
+    if (on) this.render();
+    else this.preview(null);
   }
 
   /** what is in the slot chosen, or what was just put there: shown, its list opened, a call heard */
@@ -162,14 +176,14 @@ export class EmotesMenu {
     this.el.querySelector('.em-preview')!.classList.toggle('trying', trying);
   }
 
-  /** whether it is open: the sheet on Emotes, and in sight */
-  open() {
-    return !!this.sheet && this.sheet.dataset.tab === 'emotes' && this.sheet.offsetParent !== null;
+  /** whether it is up and in sight */
+  get isOpen() {
+    return this.on && this.root.offsetParent !== null;
   }
 
   /** where the survivor stands, for the game's renderer (null: not open) */
   box(): DollBox | null {
-    if (!this.open() || !this.sheet) return null;
+    if (!this.isOpen) return null;
     const f = this.fig.getBoundingClientRect(), s = this.sheet.getBoundingClientRect();
     if (f.width < 16 || f.height < 16) return null;
     // (the sheet's own veil, as its stylesheet has it: one colour, its blur)
@@ -180,7 +194,6 @@ export class EmotesMenu {
   /** the hole in the sheet is open for exactly as long as the survivor is drawn in it */
   shown(on: boolean) {
     const s = this.sheet;
-    if (!s) return;
     s.classList.toggle('em-hole', on);
     if (!on) return;
     // (said in the sheet's own measure: the screen's, over the page's zoom)

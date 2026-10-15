@@ -67,7 +67,9 @@ assert.deepEqual(offer('/spawn zombie', 'admin', here)!.picks.map((p) => p.label
 assert.equal(offer('/spawn jeep 2', 'admin', here)!.picks.length, 0);
 assert.equal(entityBy('Zombie')?.id, 'infected');
 assert.equal(entityBy('car')?.kind, 'car');
-assert.equal(entityBy('helicopter'), null);
+// (the MD-500 is spawned as `heli`, by its other names too, since f6ae9bf)
+assert.equal(entityBy('helicopter')?.id, 'heli');
+assert.equal(entityBy('aeroplane'), null);
 assert.equal(new Set(ENTITIES.flatMap((e) => [e.id, ...(e.also ?? [])])).size, ENTITIES.flatMap((e) => [e.id, ...(e.also ?? [])]).length, 'two things answer to one word');
 for (const o of ['spawn', 'delcar', 'wrecks', 'delz']) {
   assert.ok(ORDERS.find((x) => x.name === o)?.admin, `/${o} is not an admin's alone`);

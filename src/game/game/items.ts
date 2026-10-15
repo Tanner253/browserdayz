@@ -439,9 +439,16 @@ export const itemsMethods = {
     at.x += input.mouseDX / WHEEL_REACH;
     at.y += input.mouseDY / WHEEL_REACH;
     if (at.length() > 1) at.normalize();
-    // the first entry is at the top, the rest follow clockwise (as the player has set them: the menu's Emotes)
+    // the first entry is at the top, the rest follow clockwise (as the player has set them in Emotes)
     const slots = wheelSlots(), n = slots.length;
     const pick = at.length() > WHEEL_PICK ? ((Math.round((Math.atan2(at.x, -at.y) / (Math.PI * 2)) * n) % n) + n) % n : -1;
+    // a click while it is up: Emotes, where its slots are set (the owner: "edit button on the T wheel"; the gun is quiet while the wheel is up)
+    if (ok && input.pressed('Mouse0')) {
+      this.wheelOn = false;
+      this.hud.wheel(false);
+      this.toggleEmotes(true);
+      return;
+    }
     if (!ok || !input.held('KeyT')) {
       this.wheelOn = false;
       // (a tap, the mouse left alone, is the last call again)
