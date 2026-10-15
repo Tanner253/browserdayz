@@ -621,3 +621,17 @@ body.tr-menu9 .tr-gfx, body.tr-menu9 .tr-title, body.tr-menu9 .x8-grid, body.tr-
 .x14-board .b14-row { display: flex; gap: 3.2vw; font-size: 3vh; font-weight: 600; letter-spacing: 0.16em; color: #d8cfb8; white-space: nowrap; }
 .x14-board .b14-row b { color: #fff3d6; }
 .x14-board .b14-list { display: flex; flex-direction: column; align-items: center; gap: 1.6vh; font-size: 5vh; font-weight: 800; font-stretch: condensed; letter-spacing: 0.14em; color: #fff3d6; }
+
+/* ---- the fifteenth film, "Emotes" (shots15.ts): club lettering over a stage of its own */
+.x15-title { inset: auto; left: 50%; top: 50%; z-index: 3; display: flex; flex-direction: column; align-items: center; text-align: center; text-transform: uppercase; white-space: nowrap; pointer-events: none; }
+.x15-title.x15-low { top: 78%; }
+.x15-title .t15-big { font-size: 15vh; font-weight: 800; font-style: italic; font-stretch: condensed; line-height: 0.9; letter-spacing: 0.04em; color: #fff; text-shadow: 0 0 2.2vh rgba(255, 47, 168, 0.9), 0 0 6vh rgba(47, 216, 255, 0.55), 0.5vh 0.5vh 0 #ff2fa8; }
+.x15-title.x15-low .t15-big { font-size: 8vh; }
+.x15-title .t15-kick { margin: 1.2vh 0; font-size: 2.6vh; font-weight: 700; letter-spacing: 0.55em; text-indent: 0.55em; color: #ffd35a; text-shadow: 0 0 1.2vh rgba(0, 0, 0, 0.9); }
+.x15-name { inset: auto; left: 5vw; bottom: 16vh; z-index: 3; pointer-events: none; }
+.x15-name span { display: inline-block; padding: 0.8vh 2vh 0.8vh 1.6vh; font-size: 5.4vh; font-weight: 800; font-style: italic; letter-spacing: 0.06em; text-transform: uppercase; color: #141109; background: linear-gradient(90deg, #ffd35a, #ff2fa8); clip-path: polygon(0 0, 100% 0, 96% 100%, 0 100%); }
+.x15-end { z-index: 4; display: flex; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(ellipse at 50% 50%, rgba(10, 4, 18, 0.55), rgba(4, 2, 8, 0.92)); pointer-events: none; }
+.x15-end img { width: 14vh; filter: drop-shadow(0 0 2vh rgba(255, 47, 168, 0.7)); }
+.x15-end .t15-logo { margin-top: 1.5vh; font-size: 18vh; font-weight: 800; line-height: 0.9; letter-spacing: 0.22em; text-indent: 0.22em; color: #fff; text-shadow: 0 0 3vh rgba(47, 216, 255, 0.6); }
+.x15-end .t15-url { margin-top: 2.4vh; font-size: 3.4vh; font-weight: 700; letter-spacing: 0.4em; text-indent: 0.4em; color: #ffd35a; }
+.x15-flash { z-index: 5; background: #fff; opacity: 0; pointer-events: none; }
