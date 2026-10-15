@@ -150,7 +150,7 @@ export const RULES2_FROM = '2026-10-14T02:20:00Z';
 /** The moment of the third cut-over (see `rules3From`), written as RULES2_FROM is; PAYOUT_RULES3_FROM is asked first. */
 export const RULES3_FROM = '2026-10-14T22:00:00Z';
 /** The moment of the fifth (see `rules5From`), written as RULES2_FROM is; PAYOUT_RULES5_FROM is asked first. '': none yet. */
-export const RULES5_FROM = '';
+export const RULES5_FROM = '2026-10-15T17:45:00Z';
 /** the coin's decimals: pump.fun's are six */
 const COIN_DECIMALS = 6n;
 /** The moment of the fourth (see `rules4From`), written as RULES2_FROM is; PAYOUT_RULES4_FROM is asked first. '': none yet. */
