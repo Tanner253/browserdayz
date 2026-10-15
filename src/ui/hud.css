@@ -1421,22 +1421,28 @@ body.touch .set-page .gfx-range { height: 30px; }
 /* The menu's Emotes (src/ui/emotes-menu.ts): the wheel's eight slots and the survivor beside them doing what is picked;
    the list under, by kind. */
 .start-brief[data-tab='emotes'] .pane-emotes { display: block; }
-.em-top { display: grid; grid-template-columns: 290px minmax(0, 1fr); gap: 14px; align-items: center; }
-.em-wheel { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 58px); gap: 8px; width: 290px; }
-/* (the eight round the T as they are round the wheel, clockwise from the top) */
-.em-slot { min-height: 0; padding: 4px 6px; font-size: 13px; font-weight: 600; line-height: 1.05; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink); background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 4px; cursor: pointer; }
-.em-slot[data-slot='0'] { grid-area: 1 / 2; }
-.em-slot[data-slot='1'] { grid-area: 1 / 3; }
-.em-slot[data-slot='2'] { grid-area: 2 / 3; }
-.em-slot[data-slot='3'] { grid-area: 3 / 3; }
-.em-slot[data-slot='4'] { grid-area: 3 / 2; }
-.em-slot[data-slot='5'] { grid-area: 3 / 1; }
-.em-slot[data-slot='6'] { grid-area: 2 / 1; }
-.em-slot[data-slot='7'] { grid-area: 1 / 1; }
-.em-slot.call { border-color: rgba(255, 211, 90, 0.5); }
-.em-slot:hover { background: rgba(255, 255, 255, 0.1); }
-.em-slot.on { color: #141109; background: var(--brand); border-color: var(--brand); }
-.em-hub { grid-area: 2 / 2; display: grid; place-items: center; width: 44px; height: 44px; margin: auto; font-family: var(--mono); font-size: 12px; font-style: normal; color: var(--ink-faint); border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 50%; }
+.em-steps { display: flex; flex-wrap: wrap; gap: 6px 22px; margin: 0 0 12px; padding: 0; list-style: none; font-size: 15px; color: var(--ink-dim); }
+.em-steps li { display: flex; align-items: center; gap: 8px; }
+.em-steps b { display: grid; place-items: center; width: 22px; height: 22px; font-size: 13px; color: #141109; background: var(--brand); border-radius: 50%; }
+.em-top { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 14px; align-items: center; }
+/* the wheel as it is held up in the game (wheelSvg), its wedges to click */
+.em-wheel { position: relative; width: 300px; height: 300px; }
+.em-svg, .em-svg svg { width: 100%; height: 100%; overflow: visible; }
+.em-svg path { fill: rgba(14, 16, 15, 0.74); stroke: var(--line); stroke-width: 1; transition: fill 0.1s, stroke 0.1s; }
+.em-svg text { font: 600 13px var(--font); letter-spacing: 0.06em; text-transform: uppercase; text-anchor: middle; dominant-baseline: central; fill: var(--ink); pointer-events: none; }
+.em-svg g { cursor: pointer; }
+.em-svg g:hover path { fill: rgba(255, 255, 255, 0.1); stroke: rgba(255, 255, 255, 0.4); }
+.em-svg g.on path { fill: var(--brand); stroke: var(--brand); }
+.em-svg g.on text { fill: #14120c; }
+.em-svg g.flash path { animation: em-flash 0.6s ease-out; }
+@keyframes em-flash { 0% { fill: #fff; } 100% { fill: var(--brand); } }
+.em-mid { position: absolute; left: 50%; top: 50%; display: grid; place-items: center; width: 92px; margin: -26px 0 0 -46px; pointer-events: none; }
+.em-mid small { font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-faint); }
+.em-mid b { font-size: 30px; line-height: 1; color: var(--brand); }
+.em-saved { position: absolute; left: 50%; bottom: 10px; padding: 5px 12px; font-size: 14px; font-style: normal; white-space: nowrap; color: #141109; background: var(--brand); border-radius: 3px; opacity: 0; transform: translateX(-50%); pointer-events: none; }
+.em-saved.on { animation: em-saved 2.2s ease both; }
+@keyframes em-saved { 0% { opacity: 0; transform: translate(-50%, 6px); } 12%, 75% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; } }
+.em-preview.trying { border-color: var(--brand); }
 .em-preview { position: relative; height: 300px; border: 1px solid var(--line); border-radius: 4px; }
 .em-fig { position: absolute; inset: 0; cursor: grab; touch-action: none; }
 .em-cap { position: absolute; left: 12px; top: 10px; pointer-events: none; text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8); }
@@ -1448,8 +1454,9 @@ body.touch .set-page .gfx-range { height: 30px; }
 .em-tabs button { padding: 2px 0; font-size: 15px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-dim); background: none; border: 0; border-bottom: 2px solid transparent; cursor: pointer; }
 .em-tabs button.on { color: var(--brand); border-bottom-color: var(--brand); }
 .em-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
-.em-item { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 7px 10px; font-size: 15px; text-align: left; color: var(--ink); background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 3px; cursor: pointer; }
+.em-item { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 8px 10px; font-size: 15px; text-align: left; color: var(--ink); background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 3px; cursor: pointer; }
 .em-item i { font-family: var(--mono); font-size: 10px; font-style: normal; white-space: nowrap; color: var(--ink-faint); }
+.em-item em { font-size: 12px; font-style: normal; white-space: nowrap; color: var(--brand); }
 .em-item:hover { border-color: rgba(255, 255, 255, 0.35); }
 .em-item.on { background: rgba(255, 255, 255, 0.1); }
 .em-item.in { color: var(--brand); border-color: var(--brand); }
@@ -1459,6 +1466,7 @@ body.touch .set-page .gfx-range { height: 30px; }
 /* (a phone: the wheel over the survivor, each the width of the sheet) */
 @media (max-width: 640px) {
   .em-top { grid-template-columns: minmax(0, 1fr); justify-items: center; }
+  .em-wheel { width: 260px; height: 260px; }
   .em-preview { width: 100%; height: 240px; }
   .em-items { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
 }

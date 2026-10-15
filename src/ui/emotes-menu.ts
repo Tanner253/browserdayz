@@ -1,13 +1,15 @@
 // The menu's Emotes: the eight slots of the wheel (hold T) set by the player, each thing there is to call out or do
 // watched first on the survivor (the owner, 2026-10-14: "we need to rethink how we have emotes setup and we need to
 // allow the user to assign which emote to which radial key i think which means we need an emote preview for the user
-// to watch"). Pick a slot, then pick from the list: it goes in the slot, and the survivor beside it does it.
+// to watch"; "lets make sure the ui and emote wheel interaction and edit and everything is super intuitive"). The wheel is
+// the one held up in the game (wheelSvg): a wedge is clicked to choose it; anything in the list is played by the
+// survivor as soon as the pointer is on it, and a click puts it in the wedge chosen.
 //
 // The survivor is the inventory's (src/game/doll.ts), a second of it: drawn by the game's renderer into a hole cut in
 // this sheet, where the page's veil is made again behind it (see DollBox).
-import { EMOTE, EMOTES, WHEEL_DEFAULT, WHEEL_SLOTS, type Emote } from '../sim/emotes';
+import { EMOTE, EMOTES, WHEEL_DEFAULT, type Emote } from '../sim/emotes';
 import type { DollBox } from '../game/doll';
-import { setWheelSlots, wheelSlots } from './wheel-slots';
+import { setWheelSlots, wheelSlots, wheelSvg } from './wheel-slots';
 
 const KINDS: [Emote['kind'], string][] = [['call', 'Calls'], ['dance', 'Dances'], ['gesture', 'Gestures'], ['pose', 'Poses']];
 
@@ -15,8 +17,9 @@ export class EmotesMenu {
   readonly el: HTMLElement;
   private slot = 0;
   private kind: Emote['kind'] = 'call';
-  /** what the survivor beside the wheel is doing (the slot's, until something else is picked) */
+  /** what is in the slot chosen, or was just put there (see `doing` for what the survivor is doing) */
   showing: string;
+  private hovered: string | null = null;
   /** a call picked: its words said (the game's own voice) */
   onCall?: (id: string) => void;
   /** the survivor shown, turned by a drag across it (src/game/doll.ts) */
@@ -28,15 +31,16 @@ export class EmotesMenu {
     this.el = document.createElement('div');
     this.el.className = 'start-pane pane-emotes';
     this.el.innerHTML = `
+      <ol class="em-steps"><li><b>1</b>Choose a slot on your wheel</li><li><b>2</b>Point at an emote to watch it, click to put it in</li></ol>
       <div class="em-top">
-        <div class="em-wheel" role="radiogroup" aria-label="Wheel slots">${Array.from({ length: WHEEL_SLOTS }, (_, i) => `<button type="button" class="em-slot" data-slot="${i}" style="--a:${(i / WHEEL_SLOTS) * 360}deg"></button>`).join('')}<i class="em-hub">T</i></div>
-        <div class="em-preview"><div class="em-fig"></div><div class="em-cap"><b></b><span></span></div><i class="em-turn">drag to turn</i></div>
+        <div class="em-wheel"><div class="em-svg"></div><div class="em-mid"><small>Slot</small><b></b></div></div>
+        <div class="em-preview"><div class="em-fig"></div><div class="em-cap"><b></b><span></span></div><i class="em-turn">drag to turn</i><i class="em-saved" aria-live="polite"></i></div>
       </div>
       <div class="em-lib">
         <div class="em-tabs">${KINDS.map(([k, label]) => `<button type="button" data-kind="${k}">${label}</button>`).join('')}</div>
         <div class="em-items"></div>
       </div>
-      <p class="em-hint">Click a slot, then pick: it goes in, and you see it done. In the game, hold <b>T</b>, aim at a slot, let go. <button type="button" class="em-reset">Back to the first eight</button></p>`;
+      <p class="em-hint">In the game: hold <b>T</b>, move the mouse toward a slot, let go. A tap of T says the last call again. <button type="button" class="em-reset">Back to the first eight</button></p>`;
     this.fig = this.el.querySelector('.em-fig') as HTMLElement;
     this.showing = wheelSlots()[0];
     // turned by a drag, as the inventory's is
@@ -54,9 +58,16 @@ export class EmotesMenu {
     const drop = () => this.figure?.drop();
     this.fig.addEventListener('pointerup', drop);
     this.fig.addEventListener('pointercancel', drop);
+    // the pointer on something in the list: the survivor does it at once, and stops when the pointer leaves the list
+    const items = this.el.querySelector('.em-items') as HTMLElement;
+    items.addEventListener('pointerover', (e) => {
+      const id = (e.target as HTMLElement).closest<HTMLElement>('.em-item')?.dataset.id;
+      if (id && id !== this.hovered) this.preview(id);
+    });
+    items.addEventListener('pointerleave', () => this.preview(null));
     this.el.addEventListener('click', (e) => {
       const t = e.target as HTMLElement;
-      const slot = t.closest<HTMLElement>('.em-slot')?.dataset.slot;
+      const slot = (t as Element).closest<SVGGElement>('.em-svg g')?.dataset.slot;
       if (slot !== undefined) {
         this.slot = Number(slot);
         this.show(wheelSlots()[this.slot]);
@@ -74,11 +85,13 @@ export class EmotesMenu {
         slots[this.slot] = id;
         setWheelSlots(slots);
         this.show(id);
+        this.saved(`${EMOTE[id]?.label ?? id} is in slot ${this.slot + 1}`);
         return;
       }
       if (t.closest('.em-reset')) {
         setWheelSlots([...WHEEL_DEFAULT]);
         this.show(WHEEL_DEFAULT[this.slot]);
+        this.saved('The first eight are back');
       }
     });
     this.render();
@@ -90,31 +103,63 @@ export class EmotesMenu {
     sheet.querySelector('.sm-sheet-head')!.after(this.el);
   }
 
+  /** what is in the slot chosen, or what was just put there: shown, its list opened, a call heard */
   private show(id: string) {
     this.showing = id;
+    this.hovered = null;
     const e = EMOTE[id];
-    if (e?.kind === 'call') this.kind = 'call';
-    else if (e) this.kind = e.kind;
+    if (e) this.kind = e.kind;
     if (e?.say) this.onCall?.(id);
     this.render();
   }
 
+  /** the pointer on one in the list (null: off the list): the survivor does that one meanwhile */
+  private preview(id: string | null) {
+    this.hovered = id;
+    this.caption();
+  }
+
+  /** what the survivor is doing now */
+  get doing() {
+    return this.hovered ?? this.showing;
+  }
+
+  /** said for a moment over the survivor: what was saved; and the wedge it went in flashes */
+  private saved(text: string) {
+    const el = this.el.querySelector('.em-saved') as HTMLElement;
+    el.textContent = `\u2713 ${text}`;
+    el.classList.remove('on');
+    void el.offsetWidth;
+    el.classList.add('on');
+    this.el.querySelector(`.em-svg g[data-slot="${this.slot}"]`)?.classList.add('flash');
+  }
+
   private render() {
     const slots = wheelSlots();
-    this.el.querySelectorAll<HTMLElement>('.em-slot').forEach((b, i) => {
-      const e = EMOTE[slots[i]];
-      b.textContent = e?.label ?? '';
-      b.classList.toggle('on', i === this.slot);
-      b.classList.toggle('call', e?.kind === 'call');
-    });
+    // the wheel as it is held up in the game, the chosen wedge lit
+    const svg = this.el.querySelector('.em-svg') as HTMLElement;
+    svg.innerHTML = wheelSvg(slots);
+    svg.querySelector(`g[data-slot="${this.slot}"]`)?.classList.add('on');
+    (this.el.querySelector('.em-mid b') as HTMLElement).textContent = String(this.slot + 1);
     this.el.querySelectorAll<HTMLElement>('[data-kind]').forEach((b) => b.classList.toggle('on', b.dataset.kind === this.kind));
-    const inSlot = slots[this.slot];
+    // each in the list says which slots it is in already
+    const where = (id: string) => slots.flatMap((s, i) => (s === id ? [i + 1] : []));
     (this.el.querySelector('.em-items') as HTMLElement).innerHTML = EMOTES.filter((e) => e.kind === this.kind)
-      .map((e) => `<button type="button" class="em-item${e.id === inSlot ? ' in' : ''}${e.id === this.showing ? ' on' : ''}" data-id="${e.id}">${e.label}${e.once ? '<i>once</i>' : e.hold ? '<i>until you move</i>' : ''}</button>`)
+      .map((e) => {
+        const at = where(e.id);
+        return `<button type="button" class="em-item${slots[this.slot] === e.id ? ' in' : ''}" data-id="${e.id}"><span>${e.label}</span>${at.length ? `<em>slot ${at.join(', ')}</em>` : `<i>${e.once ? 'once' : e.hold ? 'until you move' : 'call'}</i>`}</button>`;
+      })
       .join('');
-    const e = EMOTE[this.showing];
+    this.caption();
+  }
+
+  /** over the survivor: what it is doing, and whether that is what is in the slot */
+  private caption() {
+    const e = EMOTE[this.doing];
+    const trying = !!this.hovered && this.hovered !== wheelSlots()[this.slot];
     (this.el.querySelector('.em-cap b') as HTMLElement).textContent = e?.label ?? '';
-    (this.el.querySelector('.em-cap span') as HTMLElement).textContent = !e ? '' : e.say ? `called out: “${e.say}”` : e.once ? 'played once' : e.hold ? 'kept up until you move' : '';
+    (this.el.querySelector('.em-cap span') as HTMLElement).textContent = !e ? '' : (trying ? `click to put it in slot ${this.slot + 1} \u00b7 ` : '') + (e.say ? `called out: \u201c${e.say}\u201d` : e.once ? 'played once' : e.hold ? 'kept up until you move' : '');
+    this.el.querySelector('.em-preview')!.classList.toggle('trying', trying);
   }
 
   /** whether it is open: the sheet on Emotes, and in sight */

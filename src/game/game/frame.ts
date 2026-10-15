@@ -609,7 +609,7 @@ export const frameMethods = {
     // (and the menu's Emotes' survivor, doing what is picked there, made the first time it is opened)
     if (this.hud.emotes.open()) {
       const fig = this.emoteDoll();
-      fig.perform(EMOTE[this.hud.emotes.showing] ?? null);
+      fig.perform(EMOTE[this.hud.emotes.doing] ?? null);
       fig.draw(dt);
     } else this.hud.emotes.shown(false);
     this.perf.afterRender();

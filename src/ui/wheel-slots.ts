@@ -29,3 +29,21 @@ export function setWheelSlots(ids: string[]) {
 export function onWheelSlots(f: (ids: string[]) => void) {
   told.push(f);
 }
+
+/** the wheel: eight wedges round a hub, the first at the top and the rest clockwise (the player's slots: src/ui/wheel-slots.ts) */
+export function wheelSvg(slots: string[]) {
+  const n = slots.length, half = Math.PI / n - 0.022, r0 = 58, r1 = 152;
+  const pt = (r: number, a: number) => `${(Math.sin(a) * r).toFixed(1)} ${(-Math.cos(a) * r).toFixed(1)}`;
+  const wedges = slots.map((id, i) => {
+    const e = EMOTE[id];
+    const a = (i / n) * Math.PI * 2;
+    const d = `M${pt(r0, a - half)}L${pt(r1, a - half)}A${r1} ${r1} 0 0 1 ${pt(r1, a + half)}L${pt(r0, a + half)}A${r0} ${r0} 0 0 0 ${pt(r0, a - half)}Z`;
+    const [x, y] = pt(108, a).split(' ');
+    // two words go on two lines
+    const words = e.label.split(' ');
+    const lines = words.length > 2 ? [words.slice(0, 2).join(' '), words.slice(2).join(' ')] : words.length === 2 && e.label.length > 9 ? words : [e.label];
+    const text = lines.map((l, k) => `<text x="${x}" y="${(Number(y) + (k - (lines.length - 1) / 2) * 17).toFixed(1)}">${l}</text>`).join('');
+    return `<g class="${e.hold ? 'keeps' : ''}" data-slot="${i}"><path d="${d}"/>${text}</g>`;
+  });
+  return `<svg viewBox="-160 -160 320 320" aria-hidden="true">${wedges.join('')}</svg>`;
+}

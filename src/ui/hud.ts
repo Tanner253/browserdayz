@@ -13,7 +13,7 @@ import { ACTIONS, AIM, KEY_GROUPS, SENS, bind, bindable, controls, keyName, keyO
 import { GROUPS, type Group, type Mix } from '../core/audio';
 import { TOUCH } from '../core/device';
 import { EMOTE } from '../sim/emotes';
-import { onWheelSlots, wheelSlots } from './wheel-slots';
+import { onWheelSlots, wheelSlots, wheelSvg } from './wheel-slots';
 import { TIERS, type Tier } from '../sim/tiers';
 import { ITEMS, TAG_FRESH, TAG_HOLD_MIN } from '../sim/items';
 import { INFECTED } from '../sim/infected';
@@ -85,24 +85,6 @@ export const X_HANDLE = 'zonaSOL_';
 /** where its players talk to each other: the way in to the Discord, on the main menu */
 export const DISCORD = 'https://discord.com/invite/8ECdSH2vWE';
 export const CONTRACT = 'GvfAzdPF466PJsPJMzXQeX3TSqmJm9YxAG8xBJ6ypump';
-
-/** the wheel: eight wedges round a hub, the first at the top and the rest clockwise (the player's slots: src/ui/wheel-slots.ts) */
-function wheelSvg(slots: string[]) {
-  const n = slots.length, half = Math.PI / n - 0.022, r0 = 58, r1 = 152;
-  const pt = (r: number, a: number) => `${(Math.sin(a) * r).toFixed(1)} ${(-Math.cos(a) * r).toFixed(1)}`;
-  const wedges = slots.map((id, i) => {
-    const e = EMOTE[id];
-    const a = (i / n) * Math.PI * 2;
-    const d = `M${pt(r0, a - half)}L${pt(r1, a - half)}A${r1} ${r1} 0 0 1 ${pt(r1, a + half)}L${pt(r0, a + half)}A${r0} ${r0} 0 0 0 ${pt(r0, a - half)}Z`;
-    const [x, y] = pt(108, a).split(' ');
-    // two words go on two lines
-    const words = e.label.split(' ');
-    const lines = words.length > 2 ? [words.slice(0, 2).join(' '), words.slice(2).join(' ')] : words.length === 2 && e.label.length > 9 ? words : [e.label];
-    const text = lines.map((l, k) => `<text x="${x}" y="${(Number(y) + (k - (lines.length - 1) / 2) * 17).toFixed(1)}">${l}</text>`).join('');
-    return `<g class="${e.hold ? 'keeps' : ''}"><path d="${d}"/>${text}</g>`;
-  });
-  return `<svg viewBox="-160 -160 320 320" aria-hidden="true">${wedges.join('')}</svg>`;
-}
 
 /** an entry of the game's own changelog, as the menu's Updates panel lists it */
 interface LogEntry {
