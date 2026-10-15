@@ -388,6 +388,10 @@ export const HOLD = {
  *              along it from its middle the fist is (toward the handle's end). `fingers`: which way they point
  *              round the handle, in its own x and y. `fist`: how far behind the handle the wrist is, and how far
  *              to the palm's side of it. `curl`, `thumb`, `tuck`: how the fist is closed on it.
+ *              `rest`, `restTurn`: before its cord is pulled, held as a thing to hit with is, by the end of its handle
+ *              low on the right, head up and a little forward (the owner, 2026-10-15: "the stick grenade should be held
+ *              like a melee weapon, hand around the base of the grenade. the wind up animation can be the wind up for
+ *              the melee attack"): pulling the cord draws it from there up and back over the shoulder.
  */
 export const LIVE = {
   at: [0.17, -0.075, -0.4] as [number, number, number],
@@ -397,6 +401,8 @@ export const LIVE = {
     at: [0.19, -0.045, -0.47] as [number, number, number],
     turn: [-1.1, 0.12, -0.3] as [number, number, number],
     grip: -0.1,
+    rest: [0.205, -0.085, -0.46] as [number, number, number],
+    restTurn: [-1.5, 0.12, -0.28] as [number, number, number],
     fingers: [-0.45, 0.89] as [number, number],
     fist: [0.075, 0.03] as [number, number],
     curl: [1.1, 1.15, 1.2, 1.25] as [number, number, number, number],
@@ -3729,6 +3735,8 @@ export class Weapons {
     const rot = new THREE.Euler(0, 0, 0);
     /** a roll of dressing, not the kit (which is held and gone into another way: see HOLD.kit and ROLL) */
     const rolled = (h.kind === 'bandage' && Math.max(h.size.x, h.size.z) < 0.1) || h.kind === 'drip';
+    /** a grenade on a handle in the hand, its cord not yet pulled: held as a thing to hit with is (see LIVE.stick.rest) */
+    const stickRest = h.wait && h.kind !== 'live' && h.size.z > 0.2 && !!ITEMS[h.id]?.throw;
     const two = !h.wait && (h.kind === 'bandage' || h.kind === 'inject' || h.kind === 'open' || h.kind === 'load' || h.kind === 'unbox' || h.kind === 'drip' || (h.kind !== 'smoke' && Math.min(h.size.x, h.size.z) > 0.16));
     /** a magazine being filled: how far the right hand is from where it takes a round (0) to the magazine's mouth (1), how far the round is pressed in, and slid back */
     let fill: { reach: number; press: number; slide: number; has: boolean } | null = null;
@@ -3881,6 +3889,11 @@ export class Weapons {
         pos.lerpVectors(h.from.pos, pos, k);
         rot.setFromQuaternion(h.from.quat.clone().slerp(new THREE.Quaternion().setFromEuler(rot), k));
       }
+    } else if (stickRest) {
+      // A grenade on a handle, its cord not yet pulled: held as a thing to hit with is (see LIVE.stick.rest).
+      const S = LIVE.stick;
+      pos.set(S.rest[0] + Math.sin(h.age * 1.3) * 0.002, S.rest[1] + Math.sin(h.age * 1.9) * 0.003, S.rest[2]);
+      rot.set(S.restTurn[0], S.restTurn[1], S.restTurn[2]);
     } else if (h.kind === 'live') {
       // A grenade with its pin out: up on the right in the one fist, and shaking the more the less of its fuse is left.
       const k = THREE.MathUtils.clamp(t / Math.max(0.05, h.dur), 0, 1);
@@ -4033,7 +4046,7 @@ export class Weapons {
         thumb: 0.4,
       };
     }
-    if (h.kind === 'live' && h.size.z > 0.2) {
+    if ((h.kind === 'live' || stickRest) && h.size.z > 0.2) {
       // A fist round the end of its handle, the thumb's side toward its head. The handle runs through the middle of
       // the fist, so the wrist is set that far behind it and to the palm's side (as the fist round an injector is).
       const S = LIVE.stick;
