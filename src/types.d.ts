@@ -1,3 +1,6 @@
+/** when this build of the site was made (vite.config.ts) */
+declare const __BUILT__: string;
+
 declare module 'n8ao' {
   import type { Pass } from 'postprocessing';
   import type { Camera, Color, Scene } from 'three';

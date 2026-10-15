@@ -40,6 +40,17 @@
 .door-foot { display: flex; gap: 22px; margin-top: 4px; }
 .door-foot a { font: 12px 'JetBrains Mono', monospace; letter-spacing: 0.08em; text-transform: uppercase; color: #9a9588; text-decoration: none; }
 .door-foot a:hover { color: #e9e4d8; }
+.door-upd { font: 12px 'JetBrains Mono', monospace; letter-spacing: 0.08em; text-transform: uppercase; color: #6f6b60; }
+/* (on a computer only: a phone has the changelog a tap away and no room) */
+@media (hover: none), (max-width: 760px) { .door-upd { display: none; } }
+/* (A short screen, a phone on its side: the cards are no taller than what is in them, and what is in them begins at
+   their top, where the corner badges are, "Wagers, coming soon" over "Live now", the owner, 2026-10-15: "on mobile the
+   live sits overlapped with other text". The words begin under the badges there.) */
+@media (max-width: 760px), (max-height: 560px) {
+  .door-card { padding-top: 66px; }
+  .door-stamp { top: 12px; left: 14px; padding: 4px 10px 3px; font-size: 15px; }
+  .door-last { top: 12px; right: 12px; }
+}
 @media (max-width: 760px) {
   .door-cards { grid-template-columns: 1fr; }
   .door-card { min-height: 260px; padding: 20px; }

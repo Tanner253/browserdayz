@@ -51,9 +51,19 @@ export function openDoor(): Promise<Mode> {
           <span class="door-go">Enter Arena</span>
         </button>
       </div>
-      <footer class="door-foot"><a href="/changelog/" target="_blank" rel="noopener">Changelog</a><a href="/payouts" target="_blank" rel="noopener">Payouts</a></footer>
+      <footer class="door-foot"><a href="/changelog/" target="_blank" rel="noopener">Changelog</a><a href="/payouts" target="_blank" rel="noopener">Payouts</a><span class="door-upd" hidden></span></footer>
     </div>`;
   document.body.appendChild(el);
+  // (how long ago this build of the site was made, on a computer: the owner, 2026-10-15, "for pc add last updated n(time) ago")
+  const upd = el.querySelector('.door-upd') as HTMLElement;
+  const ago = () => {
+    const built = Date.parse(__BUILT__), m = Math.max(0, Math.round((Date.now() - built) / 60_000));
+    if (!Number.isFinite(built)) return;
+    upd.textContent = `Last updated ${m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 48 * 60 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`}`;
+    upd.hidden = false;
+    if (el.isConnected) setTimeout(ago, 60_000);
+  };
+  ago();
   // (true numbers, each from where it is kept, each left out where it cannot be had: the owner, offered these in
   // place of fake players to fill the count, "do 1 2 and 3")
   const stat = (s: string, text: string) => {

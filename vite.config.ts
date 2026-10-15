@@ -71,6 +71,8 @@ function siteVersion(): Plugin {
 }
 
 export default defineConfig({
+  // (when this build of the site was made: the door says how long ago, "last updated 2 h ago", see src/ui/door.ts)
+  define: { __BUILT__: JSON.stringify(new Date().toISOString()) },
   plugins: [
     // (the physics' engine shipped as a file of its own, not written into the script: cached compiled by the browser)
     physicsWasm(),
