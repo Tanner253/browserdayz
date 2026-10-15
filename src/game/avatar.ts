@@ -395,14 +395,23 @@ export const POSE = {
     reachRight: 0.6,
     // (A pistol at the ready and carried was a hand's width nearer the chest and off to the right: the left arm
     // went through the chest to get to it. In front of the middle of the body, at arm's length less a bend.)
+    // (Held too high, as the rifles were (the owner, 2026-10-14: "This pistol actually needs to be lowered, like the
+    // rifles needed before"; "no arm in the body, weapon positioned and held tilted when ads like real life"): at
+    // the ready it is a low ready, both hands out at the belt, the muzzle down at the ground ahead; aimed, it stays
+    // a little under the eye with the arms out and the head comes forward and down to the sights (`sighted`).)
     pistol: {
-      ready: { p: [0.02, -0.13, -0.4], r: [-0.25, 0, 0] },
+      ready: { p: [0.03, -0.27, -0.36], r: [-0.55, 0, 0] },
       // (At the eye it was 44 cm out: 6 cm further than the gun hand can reach and 10 further than the other. The
       // hands stopped short of it, behind its grip, wherever on it they were told to hold, and the pistol stood in
       // front of the fists that were meant to be round it. It is within reach, with a bend left in the elbows.)
-      aim: { p: [0.035, 0.115, -0.39], r: [0, 0, 0] },
-      carry: { p: [0.03, -0.26, -0.37], r: [-0.65, 0, 0] },
+      aim: { p: [0.035, 0.06, -0.39], r: [0, 0, 0] },
+      carry: { p: [0.03, -0.3, -0.34], r: [-0.75, 0, 0] },
     } as Stances,
+    /**
+     * Aimed, a pistol is brought into the eye's line by the head and not up to it: the chest a little forward over
+     * the arms, the head nodded down and pushed forward, so the eye sits behind the sights (radians, metres).
+     */
+    sighted: { lean: 0.08, nod: 0.2, forward: 0.03, down: 0.035 },
     /** the point the weapon hangs from, measured from midway between the shoulder joints: [up, back] */
     pivot: [0.04, -0.04] as [number, number],
     /** where the head is from that same point with the body standing, which is what `aim` was set for: [up, back] */
@@ -2027,6 +2036,18 @@ export class Avatar {
           // (under a visor that is down, only until its lower edge is on the top of the stock)
           if (g.under !== null) over = Math.min(over, _k6.set(c.plate, g.under, -0.1).applyMatrix4(_m1).sub(butt).dot(up) - held.sight[0] - 0.006);
           neck.getWorldPosition(_k6).addScaledVector(_right, c.crane[0] * k).addScaledVector(_fwd, c.crane[1] * k).addScaledVector(up, -THREE.MathUtils.clamp(over, 0, c.drop) * welded);
+          neck.position.copy(neck.parent.worldToLocal(_k6));
+          neck.updateMatrixWorld(true);
+        }
+      }
+      // Aiming a pistol, the head goes to the sights the same way, without a stock to lay it on: forward and down.
+      const sighted = held && !held.long ? this.aimT * (1 - pr) * hold * (1 - carry) * alive : 0;
+      if (sighted > 0.002 && this.neck.length) {
+        const c = POSE.hold.sighted, neck = this.neck[0];
+        if (this.chest) this.turn(this.chest, _right, -c.lean * sighted);
+        this.turn(this.neck[this.neck.length - 1], _right, -c.nod * sighted);
+        if (neck.parent) {
+          neck.getWorldPosition(_k6).addScaledVector(_fwd, c.forward * sighted).addScaledVector(UP, -c.down * sighted);
           neck.position.copy(neck.parent.worldToLocal(_k6));
           neck.updateMatrixWorld(true);
         }

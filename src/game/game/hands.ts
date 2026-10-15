@@ -423,6 +423,8 @@ export const handsMethods = {
     if (def.mag) return 'load';
     if (def.open) return 'unbox';
     if (def.throw || def.call || !def.use) return 'open';
+    // (a bag of blood or salt water is held up to run in, not worked on as a dressing is)
+    if (def.use.blood) return 'drip';
     return def.look ? 'drink' : def.use.sound;
   },
 

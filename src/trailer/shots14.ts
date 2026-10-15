@@ -21,6 +21,7 @@ import { HELI, heliSpots } from '../sim/heli';
 import { flightTimes, planFlight, type Flight } from '../sim/airdrop';
 import { ITEMS, makeItem } from '../sim/items';
 import { SEATS_OF } from '../game/garage';
+import { RIDE_HEIGHT } from '../sim/vehicles';
 
 /** how long the film is, seconds: said when its shots have been laid out */
 let total = 0;
@@ -538,14 +539,12 @@ export function buildShots(S: Stage): Shot[] {
 
   // ============================================================ ACT 2: THE RACE
   // ------------------------------------------------------------ 5. the jeep across the bridge
-  const ROAD_V = 15;
+  // (across the deck from one end to the other in the shot, and no further: off its far end the jeep was put on
+  // whatever a ray dropped there met first, and went up into the air)
+  const ROAD_V = 10.5;
   const crossing = (t: number) => {
-    const from = bridgeA.clone().addScaledVector(across, -24), s = 22 + ROAD_V * t;
-    const p = from.clone().addScaledVector(across, s);
-    // (on the deck between its ends, on the ground either side of it)
-    const deck = s > 24 - 2 && s < 24 + bridgeA.distanceTo(bridgeB) + 2;
-    p.y = deck ? bridgeA.y : G(p.x, p.z).y;
-    return p;
+    const len = bridgeA.distanceTo(bridgeB), s = Math.min(len - 1, 1.5 + ROAD_V * t);
+    return bridgeA.clone().addScaledVector(across, s).setY(bridgeA.y);
   };
   add(6, {
     name: 'road',
@@ -574,9 +573,10 @@ export function buildShots(S: Stage): Shot[] {
   let path: Rail | null = null;
   const makePath = () => {
     const r = new THREE.Vector3(ROOF.x, ROOF.y, ROOF.z), fort = F(0, 0), to = fort.clone().sub(r).setY(0).normalize();
+    // (a helicopter's middle is RIDE_HEIGHT over its skids: put at the roof's height, its skids were in the roof)
     const at = (along: number, up: number, over = 0) => {
       const x = r.x + to.x * along, z = r.z + to.z * along;
-      return new THREE.Vector3(x, Math.max(r.y + up, S.ground(x, z) + over), z);
+      return new THREE.Vector3(x, Math.max(r.y + RIDE_HEIGHT + up, S.ground(x, z) + RIDE_HEIGHT + over), z);
     };
     path = rail([at(0, 0.02), at(0, 3), at(4, 9), at(20, 18, 30), at(70, 30, 45), at(160, 40, 55), at(320, 45, 60), at(520, 45, 60)]);
     say(`pilot's way: ${path.len.toFixed(0)} m`);

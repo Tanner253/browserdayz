@@ -32,7 +32,7 @@ export const itemsMethods = {
     this.use = { label, t: 0, dur, sound, soundT: 0, done };
     this.weapons.beginUse(itemId, kind, dur);
     // (what everybody else sees of an injection is the hands at work on a wound, as with a dressing)
-    this.act(seen ?? (kind === 'inject' ? 'bandage' : kind === 'smoke' ? 'eat' : kind === 'swipe' || kind === 'live' ? 'open' : kind === 'unload' ? 'load' : kind), dur);
+    this.act(seen ?? (kind === 'inject' ? 'bandage' : kind === 'smoke' ? 'eat' : kind === 'swipe' || kind === 'live' ? 'open' : kind === 'unload' ? 'load' : kind === 'drip' ? 'bandage' : kind), dur);
     // (a smoke is one sound from the lighter to the last breath of it, made once)
     if (sound === 'smoke') audio.ui('smoke');
   },
@@ -214,8 +214,8 @@ export const itemsMethods = {
     // (A grenade is not used over a time as other things are: its pin is pulled, and from then it is live. With the
     // button that began it still down, it is held; chosen out of the pockets, it is thrown the moment the pin is out.)
     if (def.throw) return this.pullPin(item, now);
-    // how the hands hold it while it is used: a smoke goes to the mouth, a radio is worked with both
-    const kind: UseKind = def.call ? 'open' : def.look ? 'drink' : u.sound;
+    // how the hands hold it while it is used: a smoke goes to the mouth, a radio is worked with both, a bag of blood is held up
+    const kind: UseKind = def.call ? 'open' : def.look ? 'drink' : u.blood ? 'drip' : u.sound;
     const sound: TimedAction['sound'] = def.look || def.call ? null : u.sound;
     this.glass = 0;
     this.startUse(def.look ? 'Binoculars' : def.call ? 'Calling a drop in' : `${u.verb} ${def.name}`, u.time, item.id, kind, sound, () => {
