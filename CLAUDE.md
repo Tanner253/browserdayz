@@ -52,6 +52,7 @@ ZONA is a browser PvP survival shooter in the manner of DayZ, where a dog tag ta
 - NEVER `git worktree remove` a copy that has a `node_modules` junction: it deleted the real packages once. Order: `cmd //c "rmdir <wt>\node_modules"`, check it is gone, `rm -rf <wt>`, `git worktree prune`.
 - Edit code with the Edit tool; the project's scripts are Node (`node`, `npx tsx`). Python is only an occasional helper for a multi-part patch or for reading JSON, never the default (when used: `python -I`, and open files with `newline=''`, as its text mode writes CRLF here). Bash heredocs mangle backslashes and apostrophes: write any script with the Write tool.
 - The card's heat: the owner, 2026-10-14, with one chat working at a time: "Don't concern yourself with temps ... dont need to pause or wait." Run headless games when needed; do not read the card first or wait for it to cool. (Still keep the Browser pane closed while the owner plays, and never start the game's sound in the pane.)
+- Hands: our body's fingers rest FLAT, and a retarget carries each joint's turn from the source's rest, so lay fingers along the source's (`rig.dir` in scripts/emotes.mjs) and give every custom pose its own curl; never a fixed curl on top. Judge hands in third person in the game (`assets-src/_wf/me/emote-hands.js`). Memory note: hand-animation-lessons.
 - When the machine is slow, look for leftover processes of finished work (old `tsx` scripts, extra `vite` servers): one ran five hours unseen.
 - `git index.lock` can appear while several hands work: retry.
 
