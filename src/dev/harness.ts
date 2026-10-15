@@ -4,7 +4,9 @@
 
 import * as THREE from 'three';
 import { physics } from '../core/physics';
-import { heightAt } from '../world/worldgen';
+import { heightAt, TOWN } from '../world/worldgen';
+import { HELI, skidGround } from '../sim/heli';
+import { JEEP, restState } from '../sim/vehicles';
 import { makeItem, type ItemInstance } from '../sim/items';
 import { Avatar, POSE } from '../game/avatar';
 import { lookFor } from '../game/look';
@@ -547,7 +549,7 @@ export function installHarness(g: Game) {
       T.kit();
     }, 300);
   }
-  // (`?at=fort`, or `?at=x,z`: the local game begins there, for whoever is looking a place over. At the fort it is
+  // (`?at=fort`, `?at=kamenka`, or `?at=x,z`: the local game begins there, for whoever is looking a place over. At the fort it is
   // the way in from the road: half way between the fort and the nearest of the road, facing the gate. And `?admin`:
   // an admin's own tools that need no server, the free camera and the night sight, in a game played alone.)
   const Q = new URLSearchParams(location.search), at = Q.get('at');
@@ -569,6 +571,23 @@ export function installHarness(g: Game) {
         }
         const x = C.x + (rx - C.x) * 0.55, z = C.z + (rz - C.z) * 0.55;
         T.tp(x, z, Math.atan2(x - C.x, z - C.z));
+      } else if (at === 'kamenka') {
+        // (the start of the owner's test run, 2026-10-15: "spawn me in the village next to a helicopter", the same
+        // every time, for src/dev/flight-record.ts. The first level open ground out from the middle of Kamenka, the
+        // helicopter on it and the player ten metres off, facing it; played alone, as the run is played again.)
+        const cover = (x: number, z: number) => Math.max(heightAt(world.heights, x, z), heightAt(world.surface, x, z));
+        const clear = (x: number, z: number) =>
+          world.buildings.every((b: { x: number; z: number }) => Math.hypot(b.x - x, b.z - z) > 24) &&
+          [...world.trees, ...world.rocks, ...world.props].every((t: { x: number; z: number }) => Math.abs(t.x - x) > 9 || Math.abs(t.z - z) > 9) &&
+          [0, 1, 2, 3, 4, 5, 6, 7].every((a) => Math.abs(cover(x + Math.cos(a * 0.785) * 6.5, z + Math.sin(a * 0.785) * 6.5) - cover(x, z)) < 0.5);
+        let hx = TOWN.x, hz = TOWN.z;
+        found: for (let d = 0; d <= 160; d += 3) for (let a = 0; a < 24; a++) {
+          const x = TOWN.x + Math.cos(a * 0.2618) * d, z = TOWN.z + Math.sin(a * 0.2618) * d;
+          if (clear(x, z)) { hx = x; hz = z; break found; }
+        }
+        const yaw = Math.atan2(TOWN.x - hx, TOWN.z - hz), px = hx + Math.sin(yaw + 0.5) * 10, pz = hz + Math.cos(yaw + 0.5) * 10;
+        T.tp(px, pz, Math.atan2(px - hx, pz - hz));
+        if (!anyG.online) anyG.garage.add({ i: 9000, s: restState(hx, skidGround(cover, hx, hz, yaw), hz, yaw), hp: HELI.hp, fuel: JEEP.tank, seats: Array(HELI.seats).fill(null), sim: null, k: HELI.kind });
       } else {
         const [x, z] = at.split(',').map(Number);
         if (Number.isFinite(x) && Number.isFinite(z)) T.tp(x, z, 0);
