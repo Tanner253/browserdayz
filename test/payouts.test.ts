@@ -4,8 +4,8 @@
 
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { address, b58, seeded, signed } from '../api/_lib/solana';
-import { LOT_MAX, RULES2_FROM, RULES3_FROM, RULES4_FROM, claimIfDue, config, dueOf, handle, payment, price, readBook, refOf, snapshot, sweep, termsOf, type Book, type Entry, type Outcome } from '../api/_lib/payouts';
+import { TOKEN_2022_PROGRAM, address, b58, seeded, signed, tokenAccount } from '../api/_lib/solana';
+import { LOT_MAX, RULES2_FROM, RULES3_FROM, RULES4_FROM, RULES5_FROM, claimIfDue, config, dueOf, handle, payment, price, readBook, refOf, snapshot, sweep, termsOf, type Book, type Entry, type Outcome } from '../api/_lib/payouts';
 import { record } from '../api/cashin';
 import { show } from '../api/cashins';
 import { MemoryStore, check } from '../api/_lib/store';
@@ -1158,6 +1158,43 @@ await test('from 15 October: one payout of five every 12 hours, all five at once
   await cash(o, 414, 5);
   o.skip(13 * 3600 * 1000);
   assert.deepEqual(have((await cash(o, 414, 1))[0].o), ['skipped']);
+});
+
+await test('from the fifth cut-over: a tag pays 0.001 SOL more for every million of the coin its wallet holds, the lower of then and now, and never more than 0.025', async () => {
+  // "we should increase the amount we payout per tag based on the amount of supply in the users wallet" and "the max cap
+  // for a player per tag should be .025 sol" (the owner, 2026-10-15)
+  const env = { ...FIVE, PAYOUT_RULES3_FROM: '2026-10-08T00:00:00Z', PAYOUT_RULES5_FROM: '2026-10-08T00:00:00Z' };
+  const coin = (w: W, to: number, millions: number) => w.chain.tokens.set(b58(tokenAccount(address(wallet(to)), w.cfg.mint, TOKEN_2022_PROGRAM)), BigInt(millions) * 10n ** 12n);
+  // five million held throughout: 0.015 a tag
+  const a = world(1, env);
+  coin(a, 420, 5);
+  await cash(a, 420, 5);
+  assert.equal(got(a, 420), SOL(0.075));
+  // forty million: 0.025 a tag, and no more
+  const b = world(1, env);
+  coin(b, 421, 40);
+  await cash(b, 421, 5);
+  assert.equal(got(b, 421), SOL(0.125));
+  // held while four were cashed in, and gone before the fifth: what is held when they are paid, nothing
+  const c = world(1, env);
+  coin(c, 422, 10);
+  await cash(c, 422, 4);
+  coin(c, 422, 0);
+  await cash(c, 422, 1);
+  assert.equal(got(c, 422), SOL(0.05));
+  // bought just before the fifth: the four cashed in with none held are paid flat, the fifth more
+  const d = world(1, env);
+  await cash(d, 423, 4);
+  coin(d, 423, 10);
+  await cash(d, 423, 1);
+  assert.equal(got(d, 423), SOL(0.06));
+  // cashed in before the moment: flat, whatever is held
+  const e = world(1, { ...env, PAYOUT_RULES5_FROM: '2026-10-09T00:00:00Z' });
+  coin(e, 424, 10);
+  await cash(e, 424, 5);
+  assert.equal(got(e, 424), SOL(0.05));
+  // and none of it without a moment
+  assert.deepEqual([config({}).rules5From, config({ PAYOUT_RULES5_FROM: 'never' }).rules5From], [RULES5_FROM ? Date.parse(RULES5_FROM) : Infinity, Infinity]);
 });
 
 await test('a traded tag is not paid, and is not counted toward the five', async () => {
