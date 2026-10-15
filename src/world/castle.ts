@@ -576,18 +576,10 @@ export class CastleSite {
       caster.name = 'castle shadow';
       this.near.add(caster);
     }
-    // (got ready where it will stand, but not yet in the world: its first frame there then costs what any other does)
-    const hold = new THREE.Group();
-    hold.applyMatrix4(this.group.matrixWorld);
-    hold.add(this.near, this.under);
-    hold.updateMatrixWorld(true);
-    this.near.visible = this.under.visible = true;
-    await this.o.ready?.(hold).catch(() => {});
-    this.near.visible = this.under.visible = false;
-    this.group.add(this.near, this.under);
-    this.group.updateMatrixWorld(true);
-    if (this.o.fire) this.flames = this.fires.map((at) => Object.assign(this.o.fire!(at, CRESSET.size), { strength: 0 }));
-    else {
+    // (the cressets' own flames, where the game gives none, made before the rest is got ready and got ready with it:
+    // made after, their shader was made in the frame they were first seen in, 200 ms, flying over the fort)
+    if (!this.o.fire) {
+      this.group.updateMatrixWorld(true);
       // (brighter than white: it is the one thing in a vault that is a light, and the glare round it comes of that)
       const shape = new THREE.ConeGeometry(0.05, 0.19, 7), paint = new THREE.MeshBasicMaterial({ color: new THREE.Color(3.2, 1.5, 0.38) });
       shape.translate(0, 0.02, 0);
@@ -600,6 +592,17 @@ export class CastleSite {
         return flame;
       });
     }
+    // (got ready where it will stand, but not yet in the world: its first frame there then costs what any other does)
+    const hold = new THREE.Group();
+    hold.applyMatrix4(this.group.matrixWorld);
+    hold.add(this.near, this.under);
+    hold.updateMatrixWorld(true);
+    this.near.visible = this.under.visible = true;
+    await this.o.ready?.(hold).catch(() => {});
+    this.near.visible = this.under.visible = false;
+    this.group.add(this.near, this.under);
+    this.group.updateMatrixWorld(true);
+    if (this.o.fire) this.flames = this.fires.map((at) => Object.assign(this.o.fire!(at, CRESSET.size), { strength: 0 }));
     this.state = 'near';
   }
 

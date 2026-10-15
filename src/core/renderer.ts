@@ -21,7 +21,9 @@ import { oneDraw } from './one-draw';
 interface Program { id: number; isReady(): boolean; usedTimes: number; getUniforms(): unknown; getAttributes(): unknown }
 
 /** a part of a thing to be drawn once ahead of its being shown, as the world is lit or the other way, and what that is a first drawing with */
-interface Ahead { o: THREE.Object3D; lit: boolean | null; keys: string[]; low: boolean }
+interface Ahead { o: THREE.Object3D; lit: boolean | null; keys: string[]; low: boolean; tries?: number }
+/** how many frames a thing to be drawn ahead waits on its shaders being made before it is drawn whatever (see drawOnce) */
+const AHEAD_TRIES = 240;
 /** what is got ready for later (the other lighting): this long between one piece of it and the next, ms */
 const LATER_APART = 120;
 /** how many parts of the world are drawn ahead at a time while the game loads (see Renderer.drawWorldAhead) */
@@ -483,10 +485,17 @@ export class Renderer {
       const fresh = e.keys.some((k) => !this.drawnWith.has(k));
       if (fresh) {
         this.drawingAhead = true;
+        let drawn = true;
         try {
-          this.drawOnce([e.o], e.lit);
+          drawn = this.drawOnce([e.o], e.lit, false, (e.tries ?? 0) < AHEAD_TRIES);
         } finally {
           this.drawingAhead = false;
+        }
+        // (a shader it is drawn with is still being made: it waits its turn again, and the frame does not wait on it)
+        if (!drawn) {
+          e.tries = (e.tries ?? 0) + 1;
+          from.push(e);
+          return;
         }
         for (const k of e.keys) this.drawnWith.add(k);
         if (e.low) this.aheadLowAt = now;
@@ -496,8 +505,13 @@ export class Renderer {
     }
   };
 
-  /** These, drawn once into four pixels that are never shown: as the world is lit (null), or lit as asked. */
-  private drawOnce(list: THREE.Object3D[], lit: boolean | null, all = false) {
+  /**
+   * These, drawn once into four pixels that are never shown: as the world is lit (null), or lit as asked.
+   * @param ifMade only if every shader it would be drawn with is made, as it would be drawn (they are asked for if
+   *   not): false if one is not, and nothing drawn. One not made was made there and then, the frame waiting the
+   *   whole of it: a second, flying past a shotgun lying in the grass (2026-10-15).
+   */
+  private drawOnce(list: THREE.Object3D[], lit: boolean | null, all = false, ifMade = false): boolean {
     const R = this.renderer, scene = this.scene, cam = this.camera, inBuf = this.composer.inputBuffer;
     const target = (this.aheadTarget ??= new THREE.WebGLRenderTarget(4, 4, {
       samples: inBuf.samples,
@@ -570,6 +584,10 @@ export class Renderer {
     const back = lit === null ? null : (this.lighting?.as(lit) ?? null);
     try {
       R.setRenderTarget(target);
+      if (ifMade) {
+        const root = { traverse: (f: (x: THREE.Object3D) => void) => list.forEach((o) => o.traverse(f)), traverseVisible: (f: (x: THREE.Object3D) => void) => list.forEach((o) => o.traverseVisible(f)) } as unknown as THREE.Object3D;
+        if (programsOf(R, R.compile(root, cam, scene) as unknown as Set<THREE.Material>).some((p) => !p.isReady())) return false;
+      }
       R.render(scene, cam);
     } finally {
       R.setRenderTarget(prev);
@@ -581,6 +599,7 @@ export class Renderer {
       for (const l of lights) l.layers.disable(AHEAD_LAYER);
       for (let i = undo.length - 1; i >= 0; i--) undo[i]();
     }
+    return true;
   }
 
   /**

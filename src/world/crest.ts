@@ -22,13 +22,14 @@ export function wreckLie(world: Pick<World, 'heights'>, w: { x: number; z: numbe
 /**
  * The wreck stood in the world: drawn when its model has come, solid at once. Its model is sent for when the game is
  * up and not at the loading screen (1.4 MB that everybody waited for, of a thing in a hollow on a mountain where
- * nobody starts: found by an independent reading, 2026-10-13).
+ * nobody starts: found by an independent reading, 2026-10-13). Got ready to be drawn before it is put in (Renderer.ready):
+ * its shaders made in the frame it was first in sight were 720 ms of nothing moving, flying over the fort (2026-10-15).
  */
-export function buildWreck(world: World, scene: THREE.Scene): void {
+export function buildWreck(world: World, scene: THREE.Scene, ready?: (o: THREE.Object3D) => Promise<void>): void {
   const w = world.wreck;
   if (!w) return;
   const { y, nose } = wreckLie(world, w), ax = Math.sin(w.rot), az = Math.cos(w.rot);
-  assets.later(() => void assets.model('heli_wreck').then((got) => {
+  assets.later(() => void assets.model('heli_wreck').then(async (got) => {
     const model = got.clone();
     model.position.set(w.x, y, w.z);
     model.rotation.set(-nose, w.rot, 0, 'YXZ');
@@ -43,6 +44,7 @@ export function buildWreck(world: World, scene: THREE.Scene): void {
       m.material = paint;
     });
     model.name = 'crest:wreck';
+    await ready?.(model).catch(() => {});
     scene.add(model);
   }, (e) => console.warn('the wreck on the crest', e)));
   if (!physics.world) return; // planning only: no collision world

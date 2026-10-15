@@ -95,6 +95,9 @@ export const dropsMethods = {
       paint.color.multiplyScalar(2.6);
       m.material = paint;
     });
+    // (got ready to be drawn first, as the one on the crest is: see src/world/crest.ts)
+    await this.s.r.ready(model).catch(() => {});
+    if (this.drops.get(d.uid) !== entry) return;
     this.s.r.scene.add(model);
     // its body, as two boxes: the cabin and the tail boom
     const solid = [

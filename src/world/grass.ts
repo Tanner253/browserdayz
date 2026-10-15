@@ -187,6 +187,7 @@ reflectedLight.indirectSpecular *= 0.35;`,
     for (const l of this.levels) l.count = 0;
     let sig = 0;
     const cx = camera.position.x;
+    const cy = camera.position.y;
     const cz = camera.position.z;
     const r = this.radius;
     const x0 = Math.floor((cx - r) / PATCH) * PATCH;
@@ -196,10 +197,17 @@ reflectedLight.indirectSpecular *= 0.35;`,
       for (let px = x0; px <= cx + r; px += PATCH) {
         const dx = Math.max(Math.abs(px + PATCH / 2 - cx) - PATCH / 2, 0);
         const dz = Math.max(Math.abs(pz + PATCH / 2 - cz) - PATCH / 2, 0);
-        const d = Math.hypot(dx, dz);
-        if (d > r) continue;
+        if (Math.hypot(dx, dz) > r) continue;
         if (px < -half || pz < -half || px > half - PATCH || pz > half - PATCH) continue;
         const h = this.sampleH(px + PATCH / 2, pz + PATCH / 2);
+        // (How far it is from the eye, up included: from a helicopter the grass under it was drawn as thick as round
+        // a pair of feet, 3 to 5 ms of the card's frame at 140 m (2026-10-15). Standing, the eye's height moves each
+        // band out by a centimetre.)
+        const d = Math.hypot(dx, dz, Math.max(0, Math.abs(cy - h) - 1));
+        if (d > r) continue;
+        // (and none where none grows: a road, a yard, rock, snow. Every blade there was worked out all the same, to
+        // be drawn no taller than nothing)
+        if (this.bare(px, pz)) continue;
         this.box.min.set(px, h - 2, pz);
         this.box.max.set(px + PATCH, h + 2, pz + PATCH);
         if (!this.frustum.intersectsBox(this.box)) continue;
@@ -229,6 +237,18 @@ reflectedLight.indirectSpecular *= 0.35;`,
       l.mesh.instanceMatrix.addUpdateRange(0, l.count * 16);
       l.mesh.instanceMatrix.needsUpdate = true;
     }
+  }
+
+  /**
+   * Whether no blade of the patch can stand: the grass map, read as the shader reads it (blended between its
+   * points), is under the least that grows (the shader's smoothstep(0.05, ...)) at every point it is read between.
+   */
+  private bare(px: number, pz: number) {
+    const g = this.terrain.grassTex.image.data as Uint8Array, half = WORLD_SIZE / 2;
+    const i0 = Math.max(0, Math.floor((px + half) / CELL)), i1 = Math.min(WORLD_RES - 1, Math.ceil((px + PATCH + half) / CELL));
+    const j0 = Math.max(0, Math.floor((pz + half) / CELL)), j1 = Math.min(WORLD_RES - 1, Math.ceil((pz + PATCH + half) / CELL));
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) if (g[j * WORLD_RES + i] > 12) return false;
+    return true;
   }
 
   private sampleH(x: number, z: number) {
@@ -291,7 +311,10 @@ vec3 transformed;
   float density = texture2D(tGrass, uvW).r;
   vec4 macro = texture2D(tMacro, wp / 190.0);
   vec4 macro2 = texture2D(tMacro, wp / 23.0);
-  float dist = distance(wp, cameraPosition.xz);
+  // (the ground under the blade, read once: it was read twice, four texels a time, for every point of every blade)
+  float baseY = terrainH(wp);
+  // (and how far it is from the eye up included, as the patches are chosen: see Grass.update)
+  float dist = length(vec3(wp.x - cameraPosition.x, max(0.0, abs(cameraPosition.y - baseY) - 1.0), wp.y - cameraPosition.z));
   float edge = 1.0 - smoothstep(uRadius * 0.72, uRadius, dist);
   float keep = step(r2, density * 1.15);
   float tall = mix(0.35, 0.95, smoothstep(0.2, 0.9, macro2.g)) * mix(0.75, 1.15, macro.b);
@@ -308,13 +331,12 @@ vec3 transformed;
   // player pushes blades aside
   vec2 away = wp - uPlayer.xz;
   float pd = length(away);
-  float push = (1.0 - smoothstep(0.25, 1.1, pd)) * step(abs(uPlayer.y - terrainH(wp)), 2.5);
+  float push = (1.0 - smoothstep(0.25, 1.1, pd)) * step(abs(uPlayer.y - baseY), 2.5);
   vec2 bd1 = mix(bendDir, away / max(pd, 1e-3), push);
   bendDir = bd1 / max(length(bd1), 1e-3);
   bendAmt += push * 1.2;
   float bend = bendAmt * t * t;
   vec3 side = vec3(-dir.y, 0.0, dir.x);
-  float baseY = terrainH(wp);
   vec3 p = vec3(wp.x, baseY, wp.y);
   p += side * position.x * wid * (1.0 - t * 0.85);
   p.xz += bendDir * bend * hgt * 0.75;

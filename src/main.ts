@@ -183,7 +183,7 @@ async function boot() {
   buildings.build(r.scene);
   ruins?.stand(world, atmo, r, terrain, buildings);
   // (the road and the works are far outside the fort's arena: not built for a wager)
-  if (!arena) buildRoad(world, atmo, r.scene);
+  if (!arena) buildRoad(world, atmo, r.scene, (o) => r.ready(o));
   if (!arena) buildWorks(world, atmo, r.scene);
   buildWells(arena ? wellSpots(world).filter((w) => nearArena(world, w.x, w.z)) : wellSpots(world), atmo, r.scene);
   if (arena) {
