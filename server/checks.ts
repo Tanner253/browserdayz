@@ -374,10 +374,10 @@ export function bodyCheck(c: Client, was: Pose, said: Pose, n: number | undefine
   const k = c.check, [x, y, z] = said;
   const free = !c.alive || !!c.seatAt || c.power.clip || roleOf(c) === 'admin' || now < k.free || (now < k.ranged && atRange(said));
   const under = world.standAt(x, y, z), up = y - under > AIR.high;
-  const near = up && (world.supportNear(x, z) || [...vehicles.values()].some((v) => Math.hypot(v.s[0] - x, v.s[2] - z) < 7));
+  const by = world.supportNear(x, z), near = up && (by || [...vehicles.values()].some((v) => Math.hypot(v.s[0] - x, v.s[2] - z) < 7));
   // (a dance, a sit, hands up: chosen, and the feet kept where they are, which the game's own emotes do)
   const posed = (said[5] & (F_DANCE | F_SIT | F_SURRENDER)) !== 0 && Math.hypot(x - was[0], z - was[2]) < 0.3;
-  const v = k.body.see({ t: typeof n === 'number' && Number.isFinite(n) ? n : now, x, y, z, under, near, free, did: posed ? now : k.acted }, now);
+  const v = k.body.see({ t: typeof n === 'number' && Number.isFinite(n) ? n : now, x, y, z, under, near, by, free, did: posed ? now : k.acted }, now);
   if (v) recheck(c, v.why);
 }
 

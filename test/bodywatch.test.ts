@@ -33,7 +33,7 @@ function run(secs: number, at: (t: number) => { x: number; z: number; h?: number
     const t = k / 15, now = joined + t * 1000, p = at(t);
     if (p.did) did = now;
     const y = p.abs ?? ground(p.x, p.z) + (p.h ?? 0);
-    const b: Body = { t: 5_000_000 + t * 1000, x: p.x, y, z: p.z, under: ground(p.x, p.z), near: nearHouse(p.x, p.z), free: !!p.free, did };
+    const b: Body = { t: 5_000_000 + t * 1000, x: p.x, y, z: p.z, under: ground(p.x, p.z), near: nearHouse(p.x, p.z), by: nearHouse(p.x, p.z), free: !!p.free, did };
     const v = w.see(b, now);
     if (v) return { why: v.why, at: t };
   }
@@ -70,6 +70,19 @@ const SIX = 360;
     ['stands still watching a road', () => ({ x: 180, z: 180 })],
     // walks round a tree in circles, doing nothing else
     ['walks round and round a tree', (t) => ({ x: 190 + Math.sin(t / 2) * 3, z: 190 + Math.cos(t / 2) * 3 })],
+    // up a house's switchback stairs to the floor above, a flight of 4 m each way and 1.5 m up, turning at each landing,
+    // and round its rooms there, taking a thing now and then (2026-10-15: a player sent back for "26 m walked, 8
+    // turn-backs in 15 s", having gone up a house's stairs)
+    ['goes up switchback stairs and round the rooms above', (t) => {
+      const tri = (u: number, n: number) => n - Math.abs((u % (2 * n)) - n);
+      if (t < 12) return { x: HOUSE.x - 2 + tri(t * 1.4, 4), z: HOUSE.z + (Math.floor((t * 1.4) / 4) % 2), h: Math.min(6, t * 0.5) };
+      return { x: HOUSE.x - 4 + tri(t * 1.2, 7), z: HOUSE.z - 2 + Math.sin(t / 3) * 2, h: 6, did: t % 14 < 0.07 };
+    }],
+    // up the stairs and down again, and up again, doing nothing else for a minute
+    ['goes up and down a house\'s stairs', (t) => {
+      const tri = (u: number, n: number) => n - Math.abs((u % (2 * n)) - n);
+      return { x: HOUSE.x - 2 + tri(t * 1.4, 4), z: HOUSE.z, h: tri(t * 0.5, 6) };
+    }],
   ];
   for (const [what, at] of people) {
     const v = run(FIRST / 1000 + SIX, at);
@@ -89,6 +102,8 @@ const SIX = 360;
     ['paces to and fro', (t) => ({ x: 230 + Math.abs(((t * 4) % 10) - 5), z: 230 })],
     // hangs a few metres up and drifts
     ['hangs 4 m up and drifts', (t) => ({ x: 240 + Math.sin(t / 4) * 3, z: 240, h: 4 })],
+    // paces to and fro on the flat, five metres each way, up and down a hand's breadth (the ground's own rise)
+    ['paces to and fro on the flat', (t) => ({ x: 250 + Math.abs(((t * 4) % 10) - 5), z: 250, h: Math.sin(t) * 0.1 })],
   ];
   for (const [what, at] of bots) {
     const v = run(FIRST / 1000, at);
@@ -96,6 +111,20 @@ const SIX = 360;
     console.log(`      ${what}: sent back at ${v!.at.toFixed(0)} s (${v!.why})`);
   }
   ok(`the bots of 2026-10-15, sent back inside their first minute: ${bots.map(([w]) => w).join(', ')}`);
+}
+
+// ---- one pacing on one spot by a house, nothing done: by the gentler rules, sent back still, after a minute and a half of it
+{
+  const v = run(FIRST / 1000 + 240, (t) => ({ x: HOUSE.x + Math.abs(((t * 4) % 10) - 5), z: HOUSE.z + 7 }));
+  assert.ok(v && v.at > 60 && v.at <= 240, `a program pacing by a house was ${v ? `sent back at ${v.at.toFixed(0)} s` : 'never sent back'}`);
+  ok(`one pacing by a house is sent back by the gentler rules: at ${v!.at.toFixed(0)} s (${v!.why})`);
+}
+
+// ---- a sniper side to side behind cover in the open, watching a field and not firing, for two and a half minutes: not sent back
+{
+  const v = run(FIRST / 1000 + 150, (t) => (t < 70 ? { x: 100 + t * 2, z: 400 } : { x: 240 + Math.sin(t * 1.3) * 1.6, z: 400 }));
+  assert.equal(v, null, `a sniper peeking behind cover was sent back: ${v?.why} at ${v?.at.toFixed(0)} s`);
+  ok('a sniper peeking side to side behind cover for two and a half minutes is not sent back');
 }
 
 console.log(`\n${checks} checks passed`);
