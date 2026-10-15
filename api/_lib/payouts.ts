@@ -817,14 +817,15 @@ async function coinsOf(w: World, who: Bytes): Promise<bigint> {
 }
 
 /**
- * What a tag is paid more for its wallet's holding of the coin (see `rules5From`): `holderPerM` for every million
- * whole coins of the lower of what was held when it was cashed in and `now`, so long as the tag in all pays no more
+ * What a tag is paid more for its wallet's holding of the coin (see `rules5From`): `holderPerM` for every whole
+ * million coins of the lower of what was held when it was cashed in and `now`, so long as the tag in all pays no more
  * than `tagMax`. Nothing for a tag of before the fifth cut-over, or not under the rule of five.
  */
 export function holderBonus(cfg: Pick<Config, 'rules5From' | 'holderPerM' | 'tagMax'>, t: Tag, five: boolean, base: bigint, now: bigint): bigint {
   if (!five || Date.parse(t.at) < cfg.rules5From || t.held === undefined) return 0n;
   const then = BigInt(t.held), held = then < now ? then : now;
-  const more = (held * cfg.holderPerM) / (1_000_000n * 10n ** COIN_DECIMALS), room = cfg.tagMax > base ? cfg.tagMax - base : 0n;
+  // (for each whole million: nothing under one, the owner: "minimum holder requirement is 1m tokens for this to begin to kick in")
+  const more = (held / (1_000_000n * 10n ** COIN_DECIMALS)) * cfg.holderPerM, room = cfg.tagMax > base ? cfg.tagMax - base : 0n;
   return more < room ? more : room;
 }
 
