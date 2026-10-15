@@ -396,6 +396,8 @@ export const POSE = {
     bladeAim: 0.6,
     reachAim: 0.75,
     reachRight: 0.6,
+    /** how far both shoulders come forward to a pistol, radians (see GUN_ELBOW.pistolR) */
+    protract: 0.14,
     // (A pistol at the ready and carried was a hand's width nearer the chest and off to the right: the left arm
     // went through the chest to get to it. In front of the middle of the body, at arm's length less a bend.)
     // (Held too high, as the rifles were (the owner, 2026-10-14: "This pistol actually needs to be lowered, like the
@@ -403,12 +405,15 @@ export const POSE = {
     // the ready it is a low ready, both hands out at the belt, the muzzle down at the ground ahead; aimed, it stays
     // a little under the eye with the arms out and the head comes forward and down to the sights (`sighted`).)
     pistol: {
-      ready: { p: [0.03, -0.27, -0.36], r: [-0.55, 0, 0] },
+      // (And lower again, out at the belt, the muzzle further down, with the elbows down along the ribs and not out to
+      // the sides: the owner, 2026-10-14: "the arms and shoulders look weird in 3rd person when holding the pistol
+      // not ADS ... the shoulder profile looks too narrow when holding weapon in front". See GUN_ELBOW.pistolR.)
+      ready: { p: [0.03, -0.4, -0.46], r: [-0.72, 0, 0] },
       // (At the eye it was 44 cm out: 6 cm further than the gun hand can reach and 10 further than the other. The
       // hands stopped short of it, behind its grip, wherever on it they were told to hold, and the pistol stood in
       // front of the fists that were meant to be round it. It is within reach, with a bend left in the elbows.)
       aim: { p: [0.035, 0.06, -0.39], r: [0, 0, 0] },
-      carry: { p: [0.03, -0.3, -0.34], r: [-0.75, 0, 0] },
+      carry: { p: [0.03, -0.42, -0.43], r: [-0.85, 0, 0] },
     } as Stances,
     /**
      * Aimed, a pistol is brought into the eye's line by the head and not up to it: the chest a little forward over
@@ -549,6 +554,10 @@ export const GUN_ELBOW = {
   stockR: new THREE.Vector3(0.9, -0.5, -0.3), stockL: new THREE.Vector3(-0.5, -0.85, 0.05),
   // (aimed: the firing elbow down and close, the other under the gun)
   aimR: new THREE.Vector3(0.55, -0.8, -0.2), aimL: new THREE.Vector3(-0.35, -0.9, 0.05),
+  // (a pistol, held at the belt or out at the eye: the elbows down along the ribs and only a little out. Pointed out
+  // to the sides as for a long gun held in front, the forearms lay level across the chest and the shoulders were
+  // drawn in: "the arms and shoulders look weird in 3rd person when holding the pistol not ADS")
+  pistolR: new THREE.Vector3(1.2, -1, -0.05), pistolL: new THREE.Vector3(-1.2, -1, 0.05),
 };
 const _k6 = new THREE.Vector3(), _k7 = new THREE.Vector3(), _k8 = new THREE.Vector3();
 const _k1 = new THREE.Vector3(), _k2 = new THREE.Vector3(), _k3 = new THREE.Vector3(), _k4 = new THREE.Vector3(), _k5 = new THREE.Vector3();
@@ -1244,8 +1253,8 @@ export class Avatar {
     // Which way the elbow goes is said by the chest: its own right (the line of the shoulders) and its own up (the
     // line of the back), so that bladed, leaning and bent over, "out and down" is still out from these ribs and
     // down this side. Lying down, down is the ground. (Handed on as `reach` takes it: by the aim.)
-    const stock = !!this.held?.butt, mine = r === this.armR;
-    const e = _k4.copy(mine ? (stock ? GUN_ELBOW.stockR : GUN_ELBOW.r) : stock ? GUN_ELBOW.stockL : GUN_ELBOW.l);
+    const stock = !!this.held?.butt, mine = r === this.armR, pistol = !!this.held && !this.held.long;
+    const e = _k4.copy(mine ? (stock ? GUN_ELBOW.stockR : pistol ? GUN_ELBOW.pistolR : GUN_ELBOW.r) : stock ? GUN_ELBOW.stockL : pistol ? GUN_ELBOW.pistolL : GUN_ELBOW.l);
     // (a long gun carried at a run is across a square chest: the elbows as they are for a gun out in front)
     if (stock) e.lerp(mine ? GUN_ELBOW.aimR : GUN_ELBOW.aimL, this.aimT * (1 - this.proneT)).lerp(mine ? GUN_ELBOW.r : GUN_ELBOW.l, this.carryT);
     const up = this.joints.neck && this.spine[0] ? this.joints.neck.getWorldPosition(_k5).sub(this.spine[0].getWorldPosition(_k2)).normalize().lerp(UP, this.proneT).normalize() : _k5.copy(UP);
@@ -2242,6 +2251,13 @@ export class Avatar {
             }
           }
           this.heldPivot.updateMatrixWorld(true);
+          // (both shoulders drawn a little forward to a pistol held out in front, as shoulders are when the arms reach
+          // ahead of the chest: without it, from behind, the arms went in front of a back as narrow as the chest, and
+          // the shoulders looked pinched; see GUN_ELBOW.pistolR)
+          if (!long) {
+            if (this.collarL) this.turn(this.collarL, UP, -POSE.hold.protract * hold);
+            if (this.collarR) this.turn(this.collarR, UP, POSE.hold.protract * hold);
+          }
           // the leading shoulder comes forward to the gun
           if (blade && this.collarL) this.turn(this.collarL, UP, -THREE.MathUtils.lerp(POSE.hold.reach, POSE.hold.reachAim, weld) * (1 - carry) * hold);
           // A gun is held no further out than the hands that hold it can reach. The stances are said from the
