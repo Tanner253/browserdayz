@@ -174,8 +174,26 @@
         </div>
       </section>
 
-      <article class="entry" id="bot-course">
+      <article class="entry" id="faster-loading">
         <div class="when"><time datetime="2026-10-15">15 Oct 2026</time><span class="tag">Latest</span></div>
+        <div>
+          <h2>A quicker load, and more so the second time</h2>
+          <p class="lead">The map is now made beside the page rather than on it, and kept in your browser for your next visit. The physics engine is a file of its own, which the browser keeps ready.</p>
+          <div class="media">
+            <figure><img loading="lazy" src="/changelog/media/phone-read-upright.jpg" alt="A phone held upright showing Rotate your phone, ZONA plays in landscape, a Tap to turn the screen button, and under it: Or read, held upright: Changelog, Payouts" /><figcaption><b>On a phone held upright,</b> the changelog and the payouts are a tap away, with no need to turn it.</figcaption></figure>
+          </div>
+          <ul>
+            <li><b>Ready to play, a first visit:</b> 39.4 s where it was 42.2.</li>
+            <li><b>Coming back:</b> 18.6 s where it was 22.9.</li>
+            <li><b>The longest the page stood still</b> while loading: about 0.96 s where it was 1.0 to 1.2.</li>
+            <li>Measured on one laptop (an RTX 3070 Ti) over a line slowed to 50 Mbit/s with 40 ms of delay, two loads each, the first with nothing kept from before. Yours will differ.</li>
+            <li><b>Phones:</b> the screen that asks you to turn your phone now links the changelog and the payouts, which read fine held upright.</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="entry" id="bot-course">
+        <div class="when"><time datetime="2026-10-15">15 Oct 2026</time></div>
         <div>
           <h2>A harder bot check</h2>
           <p class="lead">Scripts were getting through the firing range at the door. It is a course now: six figures all round you, behind walls, in a hut and beyond a catwalk, to be walked to and brought down in a minute. Everything about it is decided by the server.</p>

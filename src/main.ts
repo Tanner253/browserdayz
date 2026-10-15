@@ -10,7 +10,8 @@ import { modeOf, openDoor } from './ui/door';
 import { startAds } from './ui/ads';
 import { ArenaMenu } from './ui/arena-menu';
 import { DEATHS, DIED_AT, LEAN, TOUCH, bootDone, bootStage } from './core/device';
-import { generateWorldSoftly, heightAt } from './world/worldgen';
+import { heightAt } from './world/worldgen';
+import { loadWorld } from './world/load-world';
 import { Atmosphere } from './world/atmosphere';
 import { Terrain } from './world/terrain';
 import { Vegetation } from './world/vegetation';
@@ -128,6 +129,10 @@ async function boot() {
     (loading.querySelector('.load-sub') as HTMLElement).textContent = 'team matches at the fort · zona pvp';
     loading.classList.add('arena');
   }
+  // The map, made on a worker of its own while everything else is fetched, and kept in the browser for the next
+  // visit (src/world/load-world.ts; from the performance branch of 2026-10-15). Where a worker cannot be had, the
+  // page makes it a stage at a time, as it did.
+  const worldReady = loadWorld();
   stage('renderer');
   const r = new Renderer(canvas);
   try {
@@ -149,8 +154,7 @@ async function boot() {
   stage('world', 'generating world');
   await frame();
   const t0 = performance.now();
-  // (a stage at a time, the page answering between them: see generateWorldSoftly)
-  const world = await generateWorldSoftly(frame);
+  const world = await worldReady;
   // (`?ruins`: the ruined town stood on a plain of its own in a corner of the map, to be looked at and walked in the game as it is)
   const ruins = import.meta.env.DEV && new URLSearchParams(location.search).has('ruins') ? await import('./dev/ruins') : null;
   ruins?.lay(world);

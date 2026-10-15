@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { defineConfig, type Plugin } from 'vite';
+import { physicsWasm } from './scripts/physics-wasm.ts';
 
 /**
  * Which version of each file under public/assets this is, by what is in it: assets/versions.json, made as the site
@@ -71,6 +72,8 @@ function siteVersion(): Plugin {
 
 export default defineConfig({
   plugins: [
+    // (the physics' engine shipped as a file of its own, not written into the script: cached compiled by the browser)
+    physicsWasm(),
     assetVersions(),
     siteVersion(),
     {

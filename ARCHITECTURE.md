@@ -152,7 +152,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 
 | file | lines | what it is |
 |---|---:|---|
-| `main.ts` | 243 |  |
+| `main.ts` | 247 |  |
 
 ## src/net/
 
@@ -239,6 +239,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `music3.ts` | 533 | The third trailer's score. |
 | `music8.ts` | 374 | The eighth film's score, and nothing of the other seven in it. |
 | `music9.ts` | 630 | The ninth film's score, and none of the other three bands in it. |
+| `reel.ts` | 168 | A ten-second film of the changelog alone, as a call to check it and follow the game being made (the owner, 2026-10-15: |
 | `shots.ts` | 843 | The trailer, shot by shot. |
 | `shots10.ts` | 896 | The tenth film: twenty seconds of the fort. |
 | `shots11.ts` | 781 | The eleventh film: ten seconds of the Arena (2026-10-14). |
@@ -320,6 +321,7 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `ground.ts` | 320 | What the ground is, place by place: the kinds of ground there are, and how much of each lies at every point of the world's net. |
 | `helipad.ts` | 68 | The pads the helicopters stand on (src/sim/heli.ts: on the hospital's roof, and by the fort): a painted circle and an H, as every pad has. |
 | `kit.ts` | 270 | A layout of a kit's pieces (src/sim/kit.ts), as things to draw: every piece of the layout put into ONE shape for each of the kit's materials, so a whole fort of them is two or three things to draw however many pieces... |
+| `load-world.ts` | 25 | The map is the same deterministic data on a worker; older browsers retain the staged path. |
 | `outline.ts` | 218 | The edge of the Zona as one line. |
 | `road.ts` | 154 | Asphalt ribbon draped over the terrain along the road spline. |
 | `ruins-shape.ts` | 553 | The shape of each piece of the ruined town, worked out from its parts (src/sim/ruins.ts): what is drawn, as triangles joined by what they are painted with, and what stops a body, as plain boxes, hulls and sheets. |
@@ -330,6 +332,8 @@ folders on 2026-10-14 (`src/game/game/`, `src/world/worldgen/`, `src/sim/castle/
 | `vegetation.ts` | 1034 | Instanced vegetation + scatter props with distance LODs, dithered transitions, baked tree impostors for the far field, and physics colliders. |
 | `wells.ts` | 81 | The wells as they stand in the world: a round brick wall, water a little way down it, two posts and a roof over a windlass, a bucket on its rope. |
 | `works.ts` | 192 | The chimney and the tanks of the Chemical Works (see EXPANSION in worldgen.ts). |
+| `world-cache.ts` | 77 |  |
+| `world.worker.ts` | 31 | Only plain world data crosses the worker boundary; its typed-array storage is transferred once. |
 | `worldgen.ts` | 12 | Deterministic world generation. |
 
 ## src/world/worldgen/
