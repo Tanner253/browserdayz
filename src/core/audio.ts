@@ -1369,7 +1369,9 @@ export class AudioEngine {
     if (!this.ready) return;
     const t = this.ctx.currentTime;
     const out = this.out(pos, 3, 1.4);
-    const vol = pos ? 1.1 : 0.7;
+    // (a third of what it was: long drags, two and a third a second at a full crawl, came to three times the sound of
+    // walking. The owner, 2026-10-14: walking quieter than running, crouched than walking, prone than crouched.)
+    const vol = pos ? 0.4 : 0.26;
     const drag = (type: BiquadFilterType, freq: number, q: number, v: number, a: number, d: number, at = 0) => {
       const n = this.noise(t + at, a + d + 0.02);
       const f = this.filter(type, freq * (0.85 + Math.random() * 0.3), q);
