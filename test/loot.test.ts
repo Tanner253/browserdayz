@@ -75,12 +75,16 @@ ok('every sort of thing has a rule, and gets what its rule says on every step it
   // (the jacket and the trousers everybody starts in lie nowhere: a spare of either is room for nothing)
   for (const id of Object.keys(ITEMS)) if (!['dogtag', 'watch', 'field_jacket', 'field_trousers'].includes(id)) assert.ok(TYPES[id], `${id} is kept nowhere`);
   for (const id of Object.keys(TYPES)) assert.ok(ITEMS[id], `a rule for ${id}, which there is no such thing as`);
-  const { ruled: on } = worlds[0];
-  for (const [id, rule] of Object.entries(TYPES)) for (const t of STEPS) {
+  const { ruled: on, e } = worlds[0];
+  for (const id of Object.keys(TYPES)) for (const t of STEPS) {
     // (a thing or two short where a step is nearly full, and never one too many beyond what is always left at an armed place)
-    const got = on(id, t), spare = guns.includes(id) || melee.includes(id) ? 40 : 0;
-    assert.ok(got >= rule.at[t - 1] - 1 && got <= rule.at[t - 1] + spare, `${id} on step ${t}: ${got}, and ${rule.at[t - 1]} are wanted`);
+    // (what is wanted: its count, or what its rate comes to on this map, see TypeRule.per)
+    const got = on(id, t), spare = guns.includes(id) || melee.includes(id) ? 40 : 0, want = e.kept(id, t);
+    assert.ok(got >= want - 1 && got <= want + spare, `${id} on step ${t}: ${got}, and ${want} are wanted`);
   }
+  // (the AR-15's rounds by a rate: some at most police and army places in the village and Kamenka, the owner, 2026-10-15:
+  // "someone with an AR needs to be able to loot reliable places for ammo not set spawns, just spawn frequency")
+  assert.ok(e.kept('ammo_556', 2) >= 20 && e.kept('ammo_556', 3) >= 8, `5.56 kept: ${e.kept('ammo_556', 2)} in the village, ${e.kept('ammo_556', 3)} in Kamenka`);
 });
 
 const kind = (p: (typeof points)[number], ...kinds: string[]) => kinds.some((k) => p.usage.includes(k as never));
@@ -129,7 +133,9 @@ ok('Kamenka is the submachine gun\'s; one AK and one AR-15 in the whole town, se
       assert.equal(on(gun, 1) + on(gun, 2), 0, `a ${gun} below Kamenka`);
       assert.equal(on(gun, 3), 1, `${on(gun, 3)} of ${gun} in Kamenka`);
       assert.equal(on(mag, 3), 1, `${on(mag, 3)} of ${mag} in Kamenka`);
-      assert.ok(on(rounds, 3) >= 2 && on(rounds, 3) <= on(rounds, 4) + 1, `${on(rounds, 3)} handfuls of ${rounds} in Kamenka, ${on(rounds, 4)} under the gas`);
+      // (but the AR-15's rounds, kept by a rate where the police and the army were: see TypeRule.per)
+      const most = TYPES[rounds].per ? Infinity : on(rounds, 4) + 1;
+      assert.ok(on(rounds, 3) >= 2 && on(rounds, 3) <= most, `${on(rounds, 3)} handfuls of ${rounds} in Kamenka, ${on(rounds, 4)} under the gas`);
       // ("more common in the T4")
       assert.ok(on(gun, 4) >= 3 && on(mag, 4) >= 3, `${on(gun, 4)} of ${gun} under the gas`);
       assert.ok(TYPES[gun].on![3]!.restock! >= 2400 && TYPES[mag].on![3]!.restock! >= 2400, `${gun} or its magazine is back in Kamenka inside forty minutes`);
@@ -187,14 +193,16 @@ ok('every calibre where the police and the army were, from the village on: heavy
       // (none two steps and more below its gun's but the pistols', which are everybody's; a little on the step below; most at home and above)
       if (home >= 4) {
         assert.ok(on(id, 1) <= 2, `${on(id, 1)} of ${id} on the outskirts`);
-        assert.ok(on(id, 2) <= 6 && on(id, 3) <= 6, `${id}: ${on(id, 2)} in the village and ${on(id, 3)} in Kamenka, of a gun of step ${home}`);
+        // (but the AR-15's, kept by a rate where the police and the army were: see above)
+        if (!TYPES[id].per) assert.ok(on(id, 2) <= 6 && on(id, 3) <= 6, `${id}: ${on(id, 2)} in the village and ${on(id, 3)} in Kamenka, of a gun of step ${home}`);
         // (and past the outskirts it is nobody's but the police's, the army's and a hunter's)
         for (const { id: it, p } of all) if (it === id && (p.tier === 2 || p.tier === 3)) assert.ok(kind(p, ...KEPT_GUNS, 'Hunting'), `${id} in ${p.building}`);
       }
       assert.ok(on(id, home) >= 4, `${on(id, home)} of ${id} on its gun's own step`);
     }
     // (sealed boxes of the rifles' rounds: one or so below the gas, and the bunker's guns' not below the gas at all)
-    for (const id of ['box_739', 'box_556']) assert.ok(on(id, 1) === 0 && on(id, 2) <= 2 && on(id, 3) <= 2 && on(id, 4) >= 2, `${id}: ${[1, 2, 3, 4].map((t) => on(id, t as Tier))}`);
+    // (the AR-15's boxes by a rate where the police and the army were, as its rounds are: see TypeRule.per)
+    for (const id of ['box_739', 'box_556']) assert.ok(on(id, 1) === 0 && (TYPES[id].per || (on(id, 2) <= 2 && on(id, 3) <= 2)) && on(id, 4) >= 2, `${id}: ${[1, 2, 3, 4].map((t) => on(id, t as Tier))}`);
     for (const id of ['box_12', 'box_50']) assert.equal(on(id, 1) + on(id, 2) + on(id, 3), 0, `a ${id} below the gas`);
   }
 });
@@ -316,7 +324,10 @@ ok('a looted spot, and the ground about it, is left alone for three minutes; and
   // It goes on for hours of the game's time, and what lay there at the start has gone with age by the end.)
   for (let n = 0; n < 12; n++) {
     // (of the sorts the rules say are back in the town inside ten minutes: its one AK is most of an hour coming, on purpose)
-    const now = lies().filter((q) => !sorts.has(q.item.id) && (TYPES[q.item.id].on?.[3]?.restock ?? Math.min(TYPES[q.item.id].restock, 420)) <= 600);
+    // (and none of which some are about to go with age inside the time looked at: a sort laid out all at once goes all at
+    // once, and its spots are kept from it for SAME_AGAIN, which is longer; that is its age, and not what is looked at here)
+    const ageing = (id: string) => lies().some((q) => q.item.id === id && e.time - q.spawnedAt > TYPES[id].lifetime - 800);
+    const now = lies().filter((q) => !sorts.has(q.item.id) && (TYPES[q.item.id].on?.[3]?.restock ?? Math.min(TYPES[q.item.id].restock, 420)) <= 600 && !ageing(q.item.id));
     const l = now[(n * 37 + 5) % now.length];
     const spot = l.point, id = l.item.id;
     sorts.add(id);

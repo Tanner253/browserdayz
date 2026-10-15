@@ -20,6 +20,13 @@ export interface TypeRule {
    * not found on the first two, wherever anybody looks.
    */
   at: [number, number, number, number, number];
+  /**
+   * Or as a rate: of the spots on each step where it can lie (its kinds of building, see `usage`), the share that are
+   * kept with one, so that the places it belongs to have it however many of them there are; the count is worked out
+   * from the map (Economy.kept), never less than `at`. The owner, 2026-10-15: "someone with an AR needs to be able to
+   * loot reliable places for ammo not set spawns, just spawn frequency ... based on tiers and cateogryu of building".
+   */
+  per?: [number, number, number, number, number];
   lifetime: number; // seconds
   restock: number; // seconds
   /** the kinds of building it lies in, on the first three steps (under the gas and in the bunker a thing lies wherever it will) */
@@ -183,8 +190,10 @@ export const TYPES: Record<string, TypeRule> = {
   // 7.39 and 5.56: the rifles'. Light where the army and the police were below the gas, heavier from the gas up.
   ammo_739: { at: [0, 4, 4, 5, 3], lifetime: 3600, restock: 180, usage: ARMY, favour: ARMOURY, qty: [0.25, 0.6], keep: SOON },
   box_739: { at: [0, 1, 1, 3, 2], lifetime: 3600, restock: 240, usage: ARMY, favour: ARMOURY, keep: SOON },
-  ammo_556: { at: [0, 4, 4, 4, 4], lifetime: 3600, restock: 180, usage: ARMY, favour: ARMOURY, qty: [0.25, 0.6], keep: SOON },
-  box_556: { at: [0, 1, 1, 2, 3], lifetime: 3600, restock: 240, usage: ARMY, favour: ARMOURY, keep: SOON },
+  // (the AR-15's rounds by a rate: one police or army spot in sixteen in the village, one in twelve in Kamenka, most of
+  // them at the police stations; a box in sixty and in forty. See `per`.)
+  ammo_556: { at: [0, 8, 8, 4, 4], per: [0, 1 / 16, 1 / 12, 0, 0], lifetime: 3600, restock: 180, usage: ARMY, favour: ARMOURY, qty: [0.25, 0.6], keep: SOON },
+  box_556: { at: [0, 2, 2, 2, 3], per: [0, 1 / 60, 1 / 40, 0, 0], lifetime: 3600, restock: 240, usage: ARMY, favour: ARMOURY, keep: SOON },
   // 12 gauge and .50: the bunker's guns'. A handful where the police and the army were, for whoever is going
   // down there ("you should be able to find high tier ammo in medium-high tier loot spots"); boxes from the gas up.
   ammo_12: { at: [0, 2, 2, 2, 7], lifetime: 3600, restock: 300, usage: ARMY, favour: ARMOURY, qty: [0.3, 0.7] },
@@ -442,8 +451,26 @@ export class Economy {
   ) {
     this.tier = points.map((p) => p.tier ?? (p.usage.includes('Bunker') ? 5 : p.usage.includes('Gas') ? 4 : p.usage.includes('East') ? 3 : 1));
     this.apart = points.map((p) => (APART.has(p.building) ? p.building : null));
+    // (a sort kept by a rate: its count on each step from the spots there it can lie at, see TypeRule.per)
+    for (const [id, rule] of Object.entries(TYPES)) {
+      if (!rule.per) continue;
+      const n = STEPS.map((t) => {
+        let spots = 0;
+        this.points.forEach((p, i) => {
+          if (this.tier[i] === t && this.apart[i] === null && !p.arms && !p.keeps && this.liesAt(id, rule, i, t)) spots++;
+        });
+        return Math.max(rule.at[t - 1], Math.round(rule.per![t - 1] * spots));
+      });
+      this.counts.set(id, n);
+    }
     this.places = [...new Set(this.apart.filter((a): a is string => a !== null))];
     for (const place of this.places) for (const t of STEPS) this.share(place, t);
+  }
+
+  private counts = new Map<string, number[]>();
+  /** how many of a sort are kept on a step: its `at`, or what its rate comes to on this map (see TypeRule.per) */
+  kept(id: string, t: Tier): number {
+    return this.counts.get(id)?.[t - 1] ?? TYPES[id].at[t - 1];
   }
 
   /** how strongly a spot draws a sort on a step: as `pickPoint` weighs it */
@@ -461,7 +488,7 @@ export class Economy {
     if (!here.length) return;
     const fair: [string, number][] = [];
     for (const [id, rule] of Object.entries(TYPES)) {
-      const at = rule.at[t - 1];
+      const at = this.kept(id, t);
       if (!at) continue;
       const sum = (list: number[]) => list.reduce((a, i) => a + (this.liesAt(id, rule, i, t) ? this.pull(rule, i, t) : 0), 0);
       const mine = sum(here), theirs = sum(there);
@@ -472,7 +499,7 @@ export class Economy {
     // enough of it.)
     const least = t === 4 ? APART_LEAST[place] ?? {} : {};
     const base = fair.map(([id, e]) => {
-      const sure = Math.min(least[id] ?? 0, TYPES[id].at[t - 1]);
+      const sure = Math.min(least[id] ?? 0, this.kept(id, t));
       return { id, sure, spare: Math.max(0, e - sure) };
     });
     const kept = base.reduce((a, s) => a + s.sure, 0), all = base.reduce((a, s) => a + s.spare, 0), most = Math.max(0, here.length * APART_FILL - kept), k = all > most ? most / all : 1;
@@ -687,7 +714,7 @@ export class Economy {
    */
   private calibres() {
     for (const t of [2, 3] as Tier[]) for (const [id, rule] of Object.entries(TYPES)) {
-      if (!id.startsWith('ammo_') || !rule.at[t - 1]) continue;
+      if (!id.startsWith('ammo_') || !this.kept(id, t)) continue;
       const free: number[] = [];
       this.points.forEach((p, i) => {
         if (this.tier[i] === t && this.apart[i] === null && !p.arms && !p.keeps && !this.pointBusy.has(i) && (p.usage.includes('Police') || p.usage.includes('Military')) && this.liesAt(id, rule, i, t)) free.push(i);
@@ -703,13 +730,13 @@ export class Economy {
     this.arm(true, 'map');
     this.calibres();
     // (what the whole map hangs on is put down first, while its few places are still free)
-    for (const id of FIRST) for (const t of STEPS) while (this.held(id, t) < TYPES[id].at[t - 1] && this.spawnType(id, -1, t));
+    for (const id of FIRST) for (const t of STEPS) while (this.held(id, t) < this.kept(id, t) && this.spawnType(id, -1, t));
     // interleave types so scarce ones still find free points
     const ids = Object.keys(TYPES);
     let progress = true;
     while (progress) {
       progress = false;
-      for (const id of ids) for (const t of STEPS) if (this.held(id, t) < TYPES[id].at[t - 1] && this.spawnType(id, -1, t)) progress = true;
+      for (const id of ids) for (const t of STEPS) if (this.held(id, t) < this.kept(id, t) && this.spawnType(id, -1, t)) progress = true;
     }
     // (and each place apart, to its own counts, out of its own places)
     this.arm(true, 'apart');
@@ -795,7 +822,7 @@ export class Economy {
     this.arm();
     for (const [id, rule] of Object.entries(TYPES)) {
       for (const t of STEPS) {
-        const want = rule.at[t - 1];
+        const want = this.kept(id, t);
         if (!want) continue;
         // (from Kamenka up every one that is gone is put back, and soon; below it, once a share of them is gone)
         const every = rule.on?.[t]?.restock;
