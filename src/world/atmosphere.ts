@@ -67,7 +67,9 @@ export const antiFirefly: ShaderPatch = (shader) => {
     );
 };
 
-const _dir = new THREE.Vector3();
+// (the sun's own turn, as three's cascades take it, and the eye seen from the sun: see Atmosphere.update)
+const _orient = new THREE.Matrix4(), _orientInv = new THREE.Matrix4();
+const _ORIGIN = new THREE.Vector3(), _UP = new THREE.Vector3(0, 1, 0), _eye = new THREE.Vector3(), _place = new THREE.Vector3(), _dir = new THREE.Vector3();
 
 /**
  * The frusta the sun's shadow maps are drawn through. Something meant to be drawn into the
@@ -137,6 +139,12 @@ export class Atmosphere {
   private aspect = 0;
   /** where the camera was, and which way it faced, when each cascade was last drawn */
   private drawn: { pos: THREE.Vector3; dir: THREE.Vector3 }[] = [];
+  /** the two wider cascades, round the eye: how far each reaches, and how far the eye may go before it is drawn again (see padCascades) */
+  private round: ({ reach: number; pad: number } | undefined)[] = [];
+  /** where each of those is now, seen from the sun (its middle, on whole texels) */
+  private sunAt: THREE.Vector3[] = [];
+  /** (development: the cascades fitted to the view as three fits them, as they were, to draw the same frame both ways: assets-src/_wf/me/shadow-ab.js) */
+  fitToView = false;
 
   constructor(
     private renderer: THREE.WebGLRenderer,
@@ -230,20 +238,56 @@ export class Atmosphere {
   }
 
   /**
-   * The two wider cascades are not redrawn every frame (see update), so each covers a
-   * little more ground than its slice of the view needs: a map that is a frame or two old
-   * still reaches the edges of the screen after the camera has moved on.
+   * The two wider cascades are centred on the eye, not on the slice of the view each covers (as three fits them):
+   * square to the sun, each reaches round the eye as far as its slice does at its furthest corner, whichever way the
+   * eye looks, and a few metres more. A map of one is as good after a turn as before it, and is drawn again only when
+   * the eye has gone those few metres, or in its turn for what moves (see update). Fitted to the slice, a turn of a
+   * few degrees left the map behind, so that in play, the view always turning, both were drawn every frame: 2 to 3 ms
+   * of the card's frame at the crossroads (2026-10-15, frozen against drawn, the view turning). The view being wide,
+   * the slice's own box was nearly as wide already: these are a few per cent wider, and the maps no softer to the eye.
    */
   private padCascades() {
-    this.csm.lights.forEach((l, i) => {
+    const csm = this.csm, cam = this.camera;
+    csm.lights.forEach((l, i) => {
       if (i === 0) return;
+      if (this.fitToView) {
+        const c = l.shadow.camera;
+        if (l.shadow.mapSize.x !== csm.shadowMapSize) {
+          l.shadow.mapSize.set(csm.shadowMapSize, csm.shadowMapSize);
+          l.shadow.map?.dispose();
+          l.shadow.map = null;
+        }
+        c.left *= 1.08;
+        c.right *= 1.08;
+        c.top *= 1.08;
+        c.bottom *= 1.08;
+        c.updateProjectionMatrix();
+        this.round[i] = undefined;
+        return;
+      }
+      const v = csm.frustums[i].vertices;
+      const reach = Math.max(...v.near.map((p) => p.length()), ...v.far.map((p) => p.length()));
+      // (the margin three adds to a cascade for the fade between cascades, as it works it out)
+      const far = Math.max(cam.far, csm.maxFar), depth = v.far[0].z / (far - cam.near);
+      const margin = csm.fade ? 0.25 * depth * depth * (far - cam.near) : 0;
+      const pad = i === 1 ? 1.5 : 4;
+      const half = reach + margin / 2 + pad;
       const c = l.shadow.camera;
-      const k = 1.08;
-      c.left *= k;
-      c.right *= k;
-      c.top *= k;
-      c.bottom *= k;
+      // (wider than the slice's own box by about a fifth, the map is drawn bigger by as much: each of its texels is the
+      // ground one was, and the shadows no softer; measured both ways, the same frozen frame, shadow-ab.js)
+      const fitted = (c.right - c.left) * 1.08;
+      const size = Math.min(4096, Math.ceil((csm.shadowMapSize * (2 * half)) / fitted / 16) * 16);
+      if (l.shadow.mapSize.x !== size) {
+        l.shadow.mapSize.set(size, size);
+        l.shadow.map?.dispose();
+        l.shadow.map = null;
+      }
+      c.left = c.bottom = -half;
+      c.right = c.top = half;
+      // (deep enough for everything within reach below the eye, with the sun's margin above it)
+      c.far = Math.max(900, 2 * reach + csm.lightMargin + 50);
       c.updateProjectionMatrix();
+      this.round[i] = { reach, pad };
     });
     this.drawn.length = 0;
   }
@@ -259,11 +303,10 @@ export class Atmosphere {
         l.shadow.map = null;
       }
     }
-    if (csm.maxFar !== far) {
-      csm.maxFar = far;
-      csm.updateFrustums();
-      this.padCascades();
-    }
+    // (the wider cascades' own sizes follow from it: see padCascades)
+    csm.maxFar = far;
+    csm.updateFrustums();
+    this.padCascades();
   }
 
   /** Brightest texel = sun. Also averages the horizon band for the fog colour. */
@@ -734,24 +777,47 @@ export class Atmosphere {
       this.csm.updateFrustums();
       this.padCascades();
     }
-    this.csm.update();
+    const csm = this.csm;
+    csm.update();
+    const cam = this.camera;
+    // (the two wider ones set round the eye, square to the sun, on whole texels of their maps so that what they
+    // show does not crawl as the eye goes: see padCascades. Three's own sun turned as it turns it.)
+    _orient.lookAt(_ORIGIN, csm.lightDirection, _UP);
+    _orientInv.copy(_orient).invert();
+    _eye.copy(cam.position).applyMatrix4(_orientInv);
+    for (let i = 1; i < csm.lights.length && !this.fitToView; i++) {
+      const l = csm.lights[i], c = l.shadow.camera, r = this.round[i];
+      if (!r) continue;
+      const texel = (c.right - c.left) / l.shadow.mapSize.x;
+      const at = (this.sunAt[i] ??= new THREE.Vector3());
+      at.set(Math.floor(_eye.x / texel) * texel, Math.floor(_eye.y / texel) * texel, _eye.z + r.reach + csm.lightMargin);
+      _place.copy(at).applyMatrix4(_orient);
+      l.position.copy(_place);
+      l.target.position.copy(_place).add(csm.lightDirection);
+    }
     // Shadows are the most expensive thing drawn: every caster again, once per cascade.
     // The nearest cascade is redrawn every frame. The two wider ones cover ground further
     // off, where a shadow a few frames old cannot be told from a fresh one, so they take
-    // turns: unless the camera has moved or turned enough to need them straight away.
-    const cam = this.camera;
-    cam.getWorldDirection(_dir);
+    // turns (for what moves in them): unless the eye has gone far enough to need them now.
+    // Turning never needs them: they are round the eye.
     this.frame++;
-    this.csm.lights.forEach((l, i) => {
+    if (this.fitToView) cam.getWorldDirection(_dir);
+    csm.lights.forEach((l, i) => {
       const s = l.shadow;
       s.autoUpdate = false;
-      const at = (this.drawn[i] ??= { pos: new THREE.Vector3(Infinity, 0, 0), dir: new THREE.Vector3() });
+      const drawn = (this.drawn[i] ??= { pos: new THREE.Vector3(Infinity, 0, 0), dir: new THREE.Vector3() });
       const turn = i === 1 ? this.frame % 2 === 0 : this.frame % 4 === 1;
-      const moved = at.pos.distanceToSquared(cam.position) > (i === 1 ? 0.5 : 4) || at.dir.dot(_dir) < (i === 1 ? 0.9986 : 0.9976);
-      if (i === 0 || turn || moved || !s.map) {
+      const now = this.sunAt[i], r = this.round[i];
+      // (development, as it was: fitted to the view, a turn of three or four degrees needed them drawn again)
+      const gone = this.fitToView
+        ? drawn.pos.distanceToSquared(cam.position) > (i === 1 ? 0.5 : 4) || drawn.dir.dot(_dir) < (i === 1 ? 0.9986 : 0.9976)
+        : !now || !r || Math.hypot(now.x - drawn.pos.x, now.y - drawn.pos.y) > r.pad * 0.9;
+      if (i === 0 || turn || gone || !s.map) {
         s.needsUpdate = true;
-        at.pos.copy(cam.position);
-        at.dir.copy(_dir);
+        if (this.fitToView) {
+          drawn.pos.copy(cam.position);
+          drawn.dir.copy(_dir);
+        } else if (now) drawn.pos.copy(now);
       }
     });
   }
