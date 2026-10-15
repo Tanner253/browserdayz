@@ -12,7 +12,8 @@ import type { Container } from '../../sim/inventory';
 import { WEAPON_RULES } from '../../sim/combat';
 import { THROWN, fuseLeft, NADE, inHandDamage } from '../../sim/grenades';
 import { BARREL } from '../../sim/barrels';
-import { EMOTE, EMOTE_GAP, voiceOf, EMOTES, SAY_TIME, SAY_RANGE } from '../../sim/emotes';
+import { EMOTE, EMOTE_GAP, voiceOf, SAY_TIME, SAY_RANGE } from '../../sim/emotes';
+import { wheelSlots } from '../../ui/wheel-slots';
 import { playerName } from '../../net/client';
 import { type Act, MAX_STAMINA } from '../../net/protocol';
 import { woundOf } from '../../sim/blood';
@@ -380,7 +381,9 @@ export const itemsMethods = {
     const e = EMOTE[id], p = this.player;
     if (!e || p.dead || this.use) return;
     if (e.hold) {
-      this.setHold(this.hold === e.hold ? null : e.hold);
+      // (picked again, it stops: one of the pack's dances is told from the body's own by its clip)
+      const on = this.hold === e.hold && (this.danced ?? null) === (e.clip ?? null);
+      this.setHold(on ? null : e.hold, e.clip ?? null);
       return;
     }
     const now = performance.now();
@@ -398,8 +401,10 @@ export const itemsMethods = {
     this.net.send({ t: 'emote', e: id });
   },
 
-  setHold(this: Game, h: Hold | null) {
-    if (h === this.hold) return;
+  /** @param clip one of the emote pack's movements, danced in place of the body's own dance (src/sim/emotes.ts) */
+  setHold(this: Game, h: Hold | null, clip: string | null = null) {
+    if (h !== 'dance') clip = null;
+    if (h === this.hold && clip === this.danced) return;
     const p = this.player;
     // (nobody dances crouched, or in the air)
     if (h && p.prone) return void this.hud.note('Get up first', 'warn');
@@ -409,12 +414,15 @@ export const itemsMethods = {
       return;
     }
     this.hold = h;
+    this.danced = clip;
     p.sat = h === 'sit';
     this.avatar.setHold(h);
+    this.avatar.setClip(clip, !!(clip && EMOTE[clip]?.once));
     if (h) {
       this.armsUntil = 0;
       this.avatar.emote(null);
-      this.hud.note(h === 'dance' ? 'Dancing · move to stop' : h === 'sit' ? 'Sat down · move to get up' : 'Hands up · move to stop');
+      // (one played once is over before it could be read)
+      if (!(clip && EMOTE[clip]?.once)) this.hud.note(h === 'dance' ? 'Dancing · move to stop' : h === 'sit' ? 'Sat down · move to get up' : 'Hands up · move to stop');
     }
   },
 
@@ -431,18 +439,18 @@ export const itemsMethods = {
     at.x += input.mouseDX / WHEEL_REACH;
     at.y += input.mouseDY / WHEEL_REACH;
     if (at.length() > 1) at.normalize();
-    // the first entry is at the top, the rest follow clockwise
-    const n = EMOTES.length;
+    // the first entry is at the top, the rest follow clockwise (as the player has set them: the menu's Emotes)
+    const slots = wheelSlots(), n = slots.length;
     const pick = at.length() > WHEEL_PICK ? ((Math.round((Math.atan2(at.x, -at.y) / (Math.PI * 2)) * n) % n) + n) % n : -1;
     if (!ok || !input.held('KeyT')) {
       this.wheelOn = false;
       // (a tap, the mouse left alone, is the last call again)
       if (ok) {
-        if (pick >= 0) this.emote(EMOTES[pick].id);
+        if (pick >= 0) this.emote(slots[pick]);
         else if (now - this.wheelSince < 220) this.emote(this.lastCall);
       }
     }
-    this.hud.wheel(this.wheelOn, pick, [at.x, at.y], this.hold, EMOTE[this.lastCall]?.say ?? '');
+    this.hud.wheel(this.wheelOn, pick, [at.x, at.y], this.danced ?? this.hold, EMOTE[this.lastCall]?.say ?? '');
   },
 
   /** The words people near have called out, over their heads: for whoever is close and can see them. */

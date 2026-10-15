@@ -15,6 +15,7 @@ import type { Atmosphere } from '../world/atmosphere';
 import { type Curl, bent, type Grips, type HandGrip } from './arms';
 import { BEARD, HAIR_STYLES, MAX_WOUNDS, loadCharacter, lookFor, lookPatch, lookUniforms, setLookUniforms, stainPatch, suitPatch, type BodyFile, type Look, type LookUniforms } from './look';
 import type { Emote } from '../sim/emotes';
+import { assets } from '../core/assets';
 import { INFECTED } from '../sim/infected';
 
 /** local player's full body: seen by the shadow cameras always, by the main camera only on the flight in from the menu */
@@ -536,6 +537,10 @@ const _qa = new THREE.Quaternion();
 const _qb = new THREE.Quaternion();
 const _euler = new THREE.Euler();
 const UP = new THREE.Vector3(0, 1, 0);
+/** the emote pack's movements on the player's skeleton (scripts/emotes.mjs): fetched the first time one is wanted, and kept */
+let emoteLib: Promise<Map<string, THREE.AnimationClip>> | null = null;
+const emoteClips = () => (emoteLib ??= assets.loadGLTF('assets/characters/emotes.glb').then((g) => new Map(g.animations.map((c) => [c.name, c]))));
+
 /**
  * Which way each elbow points with both hands on a gun: out from the body and down, the right a little forward.
  * (They pointed where they do for everything else an arm reaches to, nearly straight down and the right one
@@ -658,6 +663,12 @@ export class Avatar {
   private hold: Hold | null = null;
   // how far into the dance, and how far up the hands are, 0..1
   private danceT = 0;
+  /** one of the emote pack's movements, danced in place of the body's own dance (see `setClip`): how far into it */
+  private emo: { id: string; act: THREE.AnimationAction | null; t: number; once: boolean } | null = null;
+  private emoActs = new Map<string, THREE.AnimationAction>();
+  private emoLoading = false;
+  /** one of them played once has come to its end: whoever set it takes the dance off */
+  emoteOver = false;
   /** lying down (Z): asked for, how far gone, and the clock of the crawl; and the two thighs */
   /** how high the ground is at a place: what a body lying down lies to (the game says: see game.ts) */
   static ground: ((x: number, z: number) => number) | null = null;
@@ -1598,6 +1609,35 @@ export class Avatar {
   }
 
   /** Dancing, standing with the hands up, or neither. */
+  /**
+   * One of the emote pack's movements, danced (with setHold('dance')) in place of the body's own dance; null: the
+   * body's own. Played once (`once`) it stops on its last moment and says so (emoteOver).
+   */
+  setClip(id: string | null, once = false) {
+    if ((this.emo?.id ?? null) === id) return;
+    this.emo?.act?.setEffectiveWeight(0);
+    this.emoteOver = false;
+    this.emo = id ? { id, act: this.emoActs.get(id) ?? null, t: 0, once } : null;
+  }
+  /** the movement wanted, made an action of this body's own once the pack has come */
+  private loadEmote(id: string) {
+    this.emoLoading = true;
+    void emoteClips()
+      .then((lib) => {
+        const clip = lib.get(id);
+        if (!clip || !this.mixer) return;
+        const a = this.mixer.clipAction(clip);
+        // (scrubbed by hand, as every clip is: see update())
+        a.timeScale = 0;
+        a.setEffectiveWeight(0);
+        a.play();
+        this.emoActs.set(id, a);
+        if (this.emo?.id === id) this.emo.act = a;
+      })
+      .catch(() => {})
+      .finally(() => (this.emoLoading = false));
+  }
+
   setHold(hold: Hold | null) {
     this.hold = hold;
   }
@@ -1939,6 +1979,19 @@ export class Avatar {
     this.footfall = footfall && stepping > 0.35 && speedNow > 0.5 && this.sinceStep > 0.25;
     if (this.footfall) this.sinceStep = 0;
     this.clock += dt;
+    // (one of the pack's movements in place of the body's own dance, with all of the dance's weight: see setClip)
+    const emo = this.emo;
+    if (emo && this.mixer) {
+      if (!emo.act && !this.emoLoading) this.loadEmote(emo.id);
+      if (emo.act) {
+        const len = emo.act.getClip().duration;
+        emo.t += dt;
+        if (emo.once && emo.t >= len) this.emoteOver = true;
+        emo.act.time = emo.once ? Math.min(emo.t, len - 1e-3) : emo.t % len;
+        emo.act.setEffectiveWeight(w.dance);
+        w.dance = 0;
+      }
+    }
     for (const n of CLIPS) {
       const a = this.actions[n];
       a.setEffectiveWeight(w[n]);
@@ -2437,6 +2490,22 @@ export class Avatar {
           // the arm out straight the way they are looking, one finger along it
           const up = Math.sin(pitch);
           this.reach(R, at(0.6, -0.22 + up * 0.5, 0.2), dirOf(1, up, 0), dirOf(0, -1, 0), [0.05, 1.5, 1.6, 1.7], aimQ, wgt);
+        } else if (mv.kind === 'nod' || mv.kind === 'shake') {
+          // yes and no: the head, twice over (the hands left where they are)
+          const headBone = this.neck[this.neck.length - 1];
+          const s = Math.sin(k * (mv.kind === 'nod' ? 11 : 13));
+          this.turn(headBone, mv.kind === 'nod' ? _right : UP, (mv.kind === 'nod' ? -0.24 : 0.36) * s * wgt);
+        } else if (mv.kind === 'halt') {
+          // wait: the right hand held up and out, palm to whoever it is said to
+          this.reach(R, at(0.42, -0.04, 0.2), dirOf(0.15, 1, 0), dirOf(1, 0, 0), open, aimQ, wgt);
+        } else if (mv.kind === 'down') {
+          // get down: both hands out low, palms down, pressed down twice
+          const s = Math.abs(Math.sin(k * 7)) * 0.07;
+          for (const side of [1, -1]) this.reach(arm(side), at(0.34, -0.42 - s, side * 0.26), dirOf(1, 0, side * 0.15), dirOf(0, -1, 0), open, aimQ, wgt);
+        } else if (mv.kind === 'back') {
+          // behind you: the right thumb jerked back over the shoulder
+          const s = Math.sin(k * 9) * 0.04;
+          this.reach(R, at(0.08 + s, -0.02, 0.34), dirOf(-1, 0.35, 0.2), dirOf(0, 0, 1), [0.9, 1.4, 1.5, 1.6], aimQ, wgt);
         } else {
           // two fingers to the brow, and away
           const out = THREE.MathUtils.smoothstep(k, mv.dur * 0.45, mv.dur * 0.75);

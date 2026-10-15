@@ -8,6 +8,7 @@ import type { Renderer } from '../core/renderer';
 import { physics } from '../core/physics';
 import { assets } from '../core/assets';
 import { audio } from '../core/audio';
+import { voiceOf } from '../sim/emotes';
 import { Input } from '../core/input';
 import { controls, translation, type Controls } from '../core/keys';
 import type { Atmosphere } from '../world/atmosphere';
@@ -698,6 +699,22 @@ export class Game {
       shown: (on) => this.invUI.figureShown(on),
     });
     this.invUI.figure = this.doll;
+    // (and the menu's Emotes has the survivor beside its wheel, doing what is picked: empty-handed, dressed as the player
+    // is; asked for its own place on the page by src/ui/emotes-menu.ts)
+    this.emoteDoll = () =>
+      (this.emoteFig ??= new Doll(r, atmo, this.loot.models, {
+        name: () => playerName(),
+        worn: () => GEAR_SLOTS.map((s) => this.inv.slots[s]?.id).filter((x): x is string => !!x && GEAR_SHOWN.has(x)),
+        hands: () => null,
+        held: (id, mods) => this.makeHeld(id, mods),
+        back: () => '',
+        slung: () => [],
+        box: () => this.hud.emotes.box(),
+        shown: (on) => this.hud.emotes.shown(on),
+      }));
+    this.hud.emotes.figure = { grab: () => this.emoteFig?.grab(), turn: (by) => this.emoteFig?.turn(by), drop: () => this.emoteFig?.drop() };
+    // (a call picked there is heard as it is called in the game)
+    this.hud.emotes.onCall = (id) => audio.shout(id, undefined, 0, voiceOf(playerName()));
 
     // one physics step so placement queries see every collider
     physics.step(physics.fixedDt);
@@ -1111,6 +1128,12 @@ export class Game {
   portraitN = 0;
   /** the survivor in the inventory window, alive (null until the game has loaded that far) */
   doll: Doll | null = null;
+  /** the menu's Emotes' survivor, made when first wanted */
+  emoteDoll: () => Doll = () => {
+    throw new Error('the game is not made yet');
+  };
+  /** a second of it for the menu's Emotes, made the first time that is opened (see `emoteDoll`) */
+  private emoteFig: Doll | null = null;
   gearKey = '';
 
   /** the stashes whose models are still on their way, by their number: what is said of one meanwhile is not lost */
@@ -1236,6 +1259,8 @@ export class Game {
   calledAt = -1e9;
   /** what the body is keeping up (a dance, hands up), and until when the arms are busy with a call */
   hold: Hold | null = null;
+  /** with `hold` 'dance': which of the emote pack's movements is danced (null: the body's own dance) */
+  danced: string | null = null;
   armsUntil = 0;
   /** what the people near have just called out: who, the words, when */
   said = new Map<number, { text: string; at: number }>();

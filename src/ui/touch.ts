@@ -17,7 +17,8 @@
 //   Enter, Tab, Esc, M                                     chat, the pack, the menu, a tap on the map
 
 import type { Input } from '../core/input';
-import { EMOTES } from '../sim/emotes';
+import { EMOTE } from '../sim/emotes';
+import { onWheelSlots, wheelSlots } from './wheel-slots';
 
 /** joystick travel in pixels: the ring's radius */
 const R = 56;
@@ -44,6 +45,9 @@ export interface TouchActions {
   emote(id: string): void;
   chat(): void;
 }
+
+/** the phone's emote buttons: the player's eight, as the wheel has them (src/ui/wheel-slots.ts) */
+const emoteButtons = (ids: string[]) => ids.map((id) => `<button class="tc-e" data-emote="${id}">${EMOTE[id]?.label ?? id}</button>`).join('');
 
 export class TouchControls {
   private root: HTMLDivElement;
@@ -81,9 +85,10 @@ export class TouchControls {
       <button class="tc-b tc-swap" data-act="swap" aria-label="Next weapon">${icon('<path d="M4 8h13l-3-3M20 16H7l3 3"/>')}</button>
       <button class="tc-b tc-lean tc-lean-l" data-hold="KeyQ" aria-label="Lean left">${icon('<path d="M14 6l-6 6 6 6"/>')}</button>
       <button class="tc-b tc-lean tc-lean-r" data-hold="KeyE" aria-label="Lean right">${icon('<path d="M10 6l6 6-6 6"/>')}</button>
-      <div class="tc-emotes">${EMOTES.map((e) => `<button class="tc-e" data-emote="${e.id}">${e.label}</button>`).join('')}</div>
+      <div class="tc-emotes">${emoteButtons(wheelSlots())}</div>
       <button class="tc-b tc-close" data-act="inv">Close</button>`;
     document.getElementById('ui')!.appendChild(this.root);
+    onWheelSlots((ids) => ((this.root.querySelector('.tc-emotes') as HTMLElement).innerHTML = emoteButtons(ids)));
     this.base = this.root.querySelector('.tc-base') as HTMLElement;
     this.knob = this.root.querySelector('.tc-knob') as HTMLElement;
     this.act2 = this.root.querySelector('.tc-act2') as HTMLElement;

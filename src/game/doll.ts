@@ -31,6 +31,7 @@ import * as THREE from 'three';
 import { breathe } from '../core/breathe';
 import { LEAN } from '../core/device';
 import { made, programsOf, type Renderer } from '../core/renderer';
+import type { Emote } from '../sim/emotes';
 import { ITEMS } from '../sim/items';
 import type { Atmosphere } from '../world/atmosphere';
 import type { Grips } from './arms';
@@ -195,6 +196,8 @@ export class Doll {
   private goal: number | null = null;
   /** seconds until a gun newly in the hands is looked over (-1: none is waiting to be) */
   private lookOver = -1;
+  /** an emote being shown (the menu's Emotes): what, how long since it was begun, how long since one played once ended */
+  private performing: { e: Emote; t: number; over: number } | null = null;
   /** what hangs from the hand just now and is kept upright (null: nothing does) */
   private plumb: THREE.Object3D | null = null;
   /** what the figure has on that is hung on the body, and whether anything is in its hands (or on its way into them) */
@@ -787,8 +790,33 @@ export class Doll {
   // ------------------------------------------------------------ each frame
 
   /** the body as it stands this moment: the game's own standing, with what is in its hands */
+  /**
+   * Shown doing an emote, over and over, for as long as it is shown (the menu's Emotes, src/ui/emotes-menu.ts): a
+   * call's gesture again after a breath, a movement played once again after a moment, a dance kept up. null: none.
+   */
+  perform(e: Emote | null) {
+    if (this.performing?.e === e) return;
+    this.performing = e ? { e, t: 0, over: 0 } : null;
+    this.body.setHold(e?.hold ?? null);
+    this.body.setClip(e?.clip ?? null, !!e?.once);
+    this.body.emote(e?.move ?? null, e?.dur);
+  }
+
   private stand(dt: number) {
     if (this.lookOver >= 0 && (this.lookOver -= dt) < 0) this.body.act('check', 1.7);
+    const p = this.performing;
+    if (p) {
+      p.t += dt;
+      if (p.e.move && p.t >= (p.e.dur ?? 1.5) + 0.9) {
+        p.t = 0;
+        this.body.emote(p.e.move, p.e.dur);
+      }
+      if (p.e.clip && p.e.once && this.body.emoteOver && (p.over += dt) > 0.7) {
+        p.over = 0;
+        this.body.setClip(null);
+        this.body.setClip(p.e.clip, true);
+      }
+    }
     // (a thumb is laid for a body near the eye, and this one is as near as any: the game's eye is put at its feet for the asking)
     _eye.copy(Avatar.eye);
     Avatar.eye.copy(ORIGIN);
@@ -871,7 +899,7 @@ export class Doll {
     // frame. What lays the picture onto the page is three more, and those are drawn every frame either way, for the
     // world behind the veil does not stand still.
     this.owed += dt;
-    const again = this.stale || this.gripped || this.vel !== 0 || this.goal !== null || now < this.livelyTill || now - this.drawnAt >= STANDING_EVERY - 1;
+    const again = this.stale || this.gripped || this.vel !== 0 || this.goal !== null || now < this.livelyTill || !!this.performing || now - this.drawnAt >= STANDING_EVERY - 1;
     if (again) {
       this.follow();
       this.stand(Math.min(this.owed, 0.1));

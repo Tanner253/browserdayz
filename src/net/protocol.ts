@@ -23,7 +23,10 @@ import type { IState, InfectedInfo } from '../sim/infected';
 // rooms there, no open steps down and no loot places: it would see things lying in the earth under the houses.)
 // (40, 2026-10-14: a body killed in a helicopter rides it down ('ride' on a corpse, 'corpse@' when it is laid on the
 // ground): a page from before would draw it where it died, in the air, and never see it come down.)
-export const PROTOCOL = 40;
+// (41, 2026-10-15: the emote pack and the new calls (src/sim/emotes.ts): a dance's clip told in the pose flags
+// (EMOTE_SHIFT), and calls a server from before turns away; a page from before would draw every one of the pack's
+// dances as its own.)
+export const PROTOCOL = 41;
 
 /** chat channels: everyone on the server, or only players standing near the speaker */
 /** `staff`: those with a role, to one another, wherever they are: nobody else is sent it */

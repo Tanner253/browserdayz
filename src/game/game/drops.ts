@@ -14,6 +14,7 @@ import { SLOT_ORDER } from '../../sim/inventory';
 import type { WorldLoot } from '../../sim/economy';
 import { WEAPON_RULES } from '../../sim/combat';
 import { shotOf } from '../../sim/gunplay';
+import { EMOTE, EMOTE_SHIFT } from '../../sim/emotes';
 import { type S2C, F_CROUCH, F_SPRINT, F_AIM, F_GROUND, F_DEAD, F_BLEED, F_LEAN_R, F_LEAN_L, F_DANCE, F_SIT, F_PRONE, F_SURRENDER, F_SEAT, F_GUARD, F_LIMP, F_LIGHT, type Pose } from '../../net/protocol';
 import { BLOOD, woundOf } from '../../sim/blood';
 import { Dummy } from '../character';
@@ -203,7 +204,7 @@ export const dropsMethods = {
       // was watching saw a runner stop for a tick now and then)
       this.sendT = this.sendT > 2 / SEND_HZ ? 0 : this.sendT - 1 / SEND_HZ;
       const it = this.weapons.equippedItem;
-      const flags = (p.crouched ? F_CROUCH : 0) | (p.sprinting ? F_SPRINT : 0) | (this.weapons.aiming ? F_AIM : 0) | (p.grounded ? F_GROUND : 0) | (p.dead ? F_DEAD : 0) | (p.vitals.bleeding ? F_BLEED : 0) | (p.lean > 0.3 ? F_LEAN_R : p.lean < -0.3 ? F_LEAN_L : 0) | (this.hold === 'dance' ? F_DANCE : 0) | (this.hold === 'sit' ? F_SIT : 0) | (p.prone ? F_PRONE : 0) | (this.hold === 'surrender' ? F_SURRENDER : 0) | (this.garage.ride ? F_SEAT : 0) | (this.weapons.guarding ? F_GUARD : 0) | (p.vitals.broken ? F_LIMP : 0) | (this.lit && !this.garage.ride ? F_LIGHT : 0);
+      const flags = (p.crouched ? F_CROUCH : 0) | (p.sprinting ? F_SPRINT : 0) | (this.weapons.aiming ? F_AIM : 0) | (p.grounded ? F_GROUND : 0) | (p.dead ? F_DEAD : 0) | (p.vitals.bleeding ? F_BLEED : 0) | (p.lean > 0.3 ? F_LEAN_R : p.lean < -0.3 ? F_LEAN_L : 0) | (this.hold === 'dance' ? F_DANCE : 0) | (this.hold === 'sit' ? F_SIT : 0) | (p.prone ? F_PRONE : 0) | (this.hold === 'surrender' ? F_SURRENDER : 0) | (this.garage.ride ? F_SEAT : 0) | (this.weapons.guarding ? F_GUARD : 0) | (p.vitals.broken ? F_LIMP : 0) | (this.lit && !this.garage.ride ? F_LIGHT : 0) | (this.hold === 'dance' && this.danced ? (EMOTE[this.danced]?.n ?? 0) << EMOTE_SHIFT : 0);
       // With the pockets open (or the map, or a panel) the mouse is free and the head is not steered: it was told
       // to the server turned exactly as it had been, report after report. The server takes a body that goes to
       // and fro with its head held like a statue's for one walked by a program (`gaitCheck`), and put a player

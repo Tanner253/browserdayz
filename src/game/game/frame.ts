@@ -21,6 +21,7 @@ import { Stash, WorldItem } from '../loot';
 import { Jeep } from '../vehicle';
 import { JEEP } from '../../sim/vehicles';
 import { hpOf } from '../../sim/heli';
+import { EMOTE } from '../../sim/emotes';
 import { stage } from '../../sim/wells';
 import { TOUCH } from '../../core/device';
 import { hourAt, DAY } from '../../sim/daynight';
@@ -113,6 +114,8 @@ export const frameMethods = {
     }
     this.updateWheel(playing && !uiOpen && !typing && !TOUCH, now);
     // a dance, or hands that are up, ends with the first step, shot or anything else done
+    // (one of the pack's movements played once, at its end)
+    if (this.hold === 'dance' && this.danced && this.avatar.emoteOver) this.setHold(null);
     if (this.hold && (!playing || uiOpen || typing || !!this.use || !p.grounded || ['KeyW', 'KeyA', 'KeyS', 'KeyD'].some((k) => input.held(k)) || ['Space', 'KeyC', 'Mouse0', 'Mouse2', 'KeyR', 'KeyG'].some((k) => input.pressed(k)))) this.setHold(null);
     // and a wave with a trigger pulled or a sight raised
     if (this.armsUntil > now && (input.pressed('Mouse0') || input.pressed('Mouse2'))) {
@@ -603,6 +606,12 @@ export const frameMethods = {
     r.render(dt);
     // (the figure in the inventory, laid over the game's picture where the page shows it: nothing, while that is shut)
     this.doll?.draw(dt);
+    // (and the menu's Emotes' survivor, doing what is picked there, made the first time it is opened)
+    if (this.hud.emotes.open()) {
+      const fig = this.emoteDoll();
+      fig.perform(EMOTE[this.hud.emotes.showing] ?? null);
+      fig.draw(dt);
+    } else this.hud.emotes.shown(false);
     this.perf.afterRender();
     input.endFrame();
 

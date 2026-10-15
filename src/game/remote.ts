@@ -7,6 +7,7 @@ import type RAPIER from '@dimforge/rapier3d-compat';
 import { physics, FreeZone, GLASS_GROUPS, HITBOX_GROUPS, SOLID_GROUPS, type Surface } from '../core/physics';
 import { audio } from '../core/audio';
 import type { Atmosphere } from '../world/atmosphere';
+import { EMOTE_BY_N, EMOTE_MASK, EMOTE_SHIFT } from '../sim/emotes';
 import { F_AIM, F_BLEED, F_CROUCH, F_LIGHT, F_DANCE, F_DEAD, F_GROUND, F_GUARD, F_LEAN_L, F_LEAN_R, F_LIMP, F_PRONE, F_SIT, F_SURRENDER, type Act, type Pose } from '../net/protocol';
 import { SHOUT_RANGE, voiceOf, type Emote } from '../sim/emotes';
 import { ITEMS } from '../sim/items';
@@ -384,6 +385,9 @@ export class RemotePlayer implements Damageable {
       this.avatar.limping = this.alive && !!(b.p[5] & F_LIMP);
       this.bleeding = !!(b.p[5] & F_BLEED);
       this.avatar.setHold(b.p[5] & F_DANCE ? 'dance' : b.p[5] & F_SURRENDER ? 'surrender' : b.p[5] & F_SIT ? 'sit' : null);
+      // (and which of the emote pack's movements is danced, if one is: src/sim/emotes.ts)
+      const danced = b.p[5] & F_DANCE ? EMOTE_BY_N[(b.p[5] & EMOTE_MASK) >> EMOTE_SHIFT] : undefined;
+      this.avatar.setClip(danced?.clip ?? null, !!danced?.once);
       if (this.lying !== !!(b.p[5] & F_PRONE)) {
         this.lying = !this.lying;
         this.avatar.setProne(this.lying);
