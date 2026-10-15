@@ -464,7 +464,7 @@ export const ROLL = {
  */
 export const FILL_HANDS = {
   left: { at: [-0.01, -0.2, 0.024], fingers: [1, 0.05, 0.3], palm: [0, 0, 1], curl: [1.15, 1.2, 1.25, 1.3] as Curl, thumb: 0.7 },
-  right: { reach: 0.075, under: 0.022, fingers: [-0.72, 0.3, -0.62], palm: [-0.25, -0.75, 0.6], curl: [0.55, 0.85, 1.15, 1.25] as Curl, thumb: 0.95, tuck: 0.15 },
+  right: { reach: 0.12, under: 0.022, fingers: [-0.72, 0.3, -0.62], palm: [-0.25, -0.75, 0.6], curl: [0.55, 0.85, 1.15, 1.25] as Curl, thumb: 0.95, tuck: 0.15 },
   round: { size: 1.3, ahead: 0.008 },
   // how much lower in the left hand the magazine sits than it was, the hands staying where they were: its mouth came
   // up through the right hand's fingers, where they are to be on top of it with the round (the owner, 2026-10-15:
