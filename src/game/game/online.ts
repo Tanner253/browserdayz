@@ -562,6 +562,8 @@ export const onlineMethods = {
     const r = new RemotePlayer(p.id, p.name, this.makeHeld);
     this.remotes.set(p.id, r);
     await r.load(this.s.atmo, this.s.r.scene, p.pose);
+    // (gone again while their body was being made: see RemotePlayer.gone)
+    if (this.remotes.get(p.id) !== r) return;
     r.setWeapon(p.w, p.m);
     void this.wear(r.avatar, p.g ?? []);
     this.gearOf.set(p.id, p.g ?? []);

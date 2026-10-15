@@ -87,9 +87,17 @@ export class RemotePlayer implements Damageable {
   private heldKey = '';
 
   constructor(public id: number, public name: string, private makeHeld: HeldFactory) {}
+  /**
+   * Gone (they left, or this game did) while the body was still being made: it is let go when it is done, and never
+   * put in the world. It was put there all the same, posed by nothing and placed by nothing: a body standing in the
+   * shape it was made in at the middle of the map, a hand over the ground, with a blocker and hit zones where they
+   * had come in (a player saw one on 2026-10-15, after a restart had everybody coming in at once).
+   */
+  private gone = false;
 
   async load(atmo: Atmosphere, scene: THREE.Scene, pose: Pose) {
     await this.avatar.load(atmo, 0, false, lookFor(this.name));
+    if (this.gone) return void this.avatar.dispose();
     scene.add(this.avatar.root);
     const R = physics.R;
     this.body = physics.world.createRigidBody(R.RigidBodyDesc.kinematicPositionBased().setTranslation(pose[0], pose[1], pose[2]));
@@ -478,6 +486,7 @@ export class RemotePlayer implements Damageable {
   }
 
   dispose() {
+    this.gone = true;
     this.avatar.dispose();
     if (this.ready) {
       for (const c of [...this.stand, ...this.crouch, ...this.flat, this.blocker]) physics.tags.delete(c.handle);
@@ -491,16 +500,20 @@ export class RemotePlayer implements Damageable {
 /** A dead player's body lying where they fell. Purely visual: the game pairs it with a searchable container. */
 export class CorpseBody {
   private avatar = new Avatar();
+  /** taken away while it was still being made (see RemotePlayer.gone) */
+  private gone = false;
   /** @param name whose body it is: it is dressed the way they were */
   /** @param slope which way is up out of what it lies on (on a hillside it lies along the hill, not level in the air over it) */
   async load(atmo: Atmosphere, scene: THREE.Scene, x: number, y: number, z: number, yaw: number, name: string, variant = 0, slope?: THREE.Vector3) {
     await this.avatar.load(atmo, 0, false, lookFor(name));
+    if (this.gone) return void this.avatar.dispose();
     scene.add(this.avatar.root);
     this.avatar.layDown(variant);
     this.avatar.update(0, new THREE.Vector3(x, y, z), new THREE.Vector3(), yaw, false, true);
     if (slope && slope.y > 0.6 && slope.y < 0.9995) this.avatar.root.quaternion.premultiply(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), slope));
   }
   dispose() {
+    this.gone = true;
     this.avatar.dispose();
   }
 }
