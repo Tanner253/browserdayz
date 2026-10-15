@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { address, b58, seeded, signed } from '../api/_lib/solana';
-import { LOT_MAX, RULES2_FROM, RULES3_FROM, claimIfDue, config, dueOf, handle, payment, price, readBook, refOf, snapshot, sweep, termsOf, type Book, type Entry, type Outcome } from '../api/_lib/payouts';
+import { LOT_MAX, RULES2_FROM, RULES3_FROM, RULES4_FROM, claimIfDue, config, dueOf, handle, payment, price, readBook, refOf, snapshot, sweep, termsOf, type Book, type Entry, type Outcome } from '../api/_lib/payouts';
 import { record } from '../api/cashin';
 import { show } from '../api/cashins';
 import { MemoryStore, check } from '../api/_lib/store';
@@ -1130,6 +1130,34 @@ await test('from 14 October: one payout of five in any 24 hours, UTC midnight or
   m.skip(30 * 60 * 1000);
   const after = await cash(m, 411, 3);
   assert.deepEqual([...before, ...after].map((x) => have(x.o)), [['five', 1, 5], ['five', 2, 5], ['five', 3, 5], ['five', 4, 5], ['paid'], ['skipped']]);
+});
+
+await test('from 15 October: one payout of five every 12 hours, all five at once; a sixth inside them is not paid; the next five begin 12 hours after the first', async () => {
+  // "a player can cash out 5 tags every 12 hours / all 5 tags are cashed at once when 5/5 is achieved" (the owner, 2026-10-15)
+  assert.deepEqual([config({}).rules4From, config({ PAYOUT_RULES4_FROM: 'never' }).rules4From], [RULES4_FROM ? Date.parse(RULES4_FROM) : Infinity, Infinity]);
+  const w = world(1, { ...FIVE, PAYOUT_RULES3_FROM: '2026-10-08T00:00:00Z', PAYOUT_RULES4_FROM: '2026-10-08T00:00:00Z' });
+  const one = await cash(w, 412, 6);
+  assert.deepEqual(one.map((x) => have(x.o)), [['five', 1, 5], ['five', 2, 5], ['five', 3, 5], ['five', 4, 5], ['paid'], ['skipped']]);
+  assert.match(one[5].o.state === 'skipped' ? one[5].o.why : '', /had cashed in 5 tags already in the 12 hours before: one payout of 5 every 12 hours/);
+  // still inside the 12 hours: not paid
+  w.skip(6 * 3600 * 1000);
+  assert.deepEqual(have((await cash(w, 412, 1))[0].o), ['skipped']);
+  // 12 hours after the first five: the next five, one payment
+  w.skip(6 * 3600 * 1000);
+  const two = await cash(w, 412, 5);
+  assert.deepEqual(two.map((x) => have(x.o)), [['five', 1, 5], ['five', 2, 5], ['five', 3, 5], ['five', 4, 5], ['paid']]);
+  assert.deepEqual([got(w, 412), w.chain.handedIn.length], [SOL(0.1), 2]);
+  // five paid before the moment (24 hours then); 12 hours on, after it, the next five are paid where the 24 hours would have stopped them
+  const m = world(1, { ...FIVE, PAYOUT_RULES3_FROM: '2026-10-08T00:00:00Z', PAYOUT_RULES4_FROM: '2026-10-08T18:00:00Z' });
+  const first = await cash(m, 413, 5);
+  m.skip(12 * 3600 * 1000);
+  const next = await cash(m, 413, 5);
+  assert.deepEqual([...first, ...next].map((x) => have(x.o)).filter((h) => h[0] !== 'five'), [['paid'], ['paid']]);
+  // and one cashed before the moment is judged by the 24 hours still
+  const o = world(1, { ...FIVE, PAYOUT_RULES3_FROM: '2026-10-08T00:00:00Z', PAYOUT_RULES4_FROM: '2026-10-09T18:00:00Z' });
+  await cash(o, 414, 5);
+  o.skip(13 * 3600 * 1000);
+  assert.deepEqual(have((await cash(o, 414, 1))[0].o), ['skipped']);
 });
 
 await test('a traded tag is not paid, and is not counted toward the five', async () => {
