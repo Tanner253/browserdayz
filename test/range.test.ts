@@ -51,11 +51,11 @@ const clear = clearShot;
 const play = (spec: RangeSpec, judge: RangeJudge, how: { walk?: boolean; follow?: boolean; wait?: number } = {}) =>
   playRange(spec, { seen: (ms, x, z, yaw, pitch) => judge.seen(ms, x, z, yaw, pitch, ms + 60), shot: (ms, o, d) => void judge.shot(ms, o, d, ms + 65), down: () => judge.down, done: () => judge.passed, until: () => {} }, how);
 
-// ---- somebody honest passes, on every range of two hundred
+// ---- somebody honest passes, on every range of two hundred (with the bot signature enforced, as on the server)
 {
   let slowest = 0;
   for (let seed = 1; seed <= 200; seed++) {
-    const spec = rangeOf(seed * 40503 + 7), judge = new RangeJudge(spec);
+    const spec = rangeOf(seed * 40503 + 7), judge = new RangeJudge(spec, 'enforce');
     const took = await play(spec, judge);
     assert.ok(judge.passed, `range ${seed}: somebody who walked, looked and shot did not pass (${judge.down.size} of ${spec.need} down, last: ${judge.why || 'no reason'}, wrong ${judge.wrong})`);
     slowest = Math.max(slowest, took);
@@ -65,7 +65,7 @@ const play = (spec: RangeSpec, judge: RangeJudge, how: { walk?: boolean; follow?
   // comes in "early" by the server's count, and comes in up to half a second late on top of that, unevenly. Until
   // 2026-10-14 three of those ended the go: "Mobile users are unable to play and pass the bot check we made".)
   for (let seed = 1; seed <= 40; seed++) {
-    const spec = rangeOf(seed * 40503 + 7), judge = new RangeJudge(spec);
+    const spec = rangeOf(seed * 40503 + 7), judge = new RangeJudge(spec, 'enforce');
     let k = 0;
     const lag = () => -600 + ((k++ * 7919) % 500);
     await playRange(spec, { seen: (ms, x, z, yaw, pitch) => judge.seen(ms, x, z, yaw, pitch, ms + lag()), shot: (ms, o, d) => void judge.shot(ms, o, d, ms + lag()), down: () => judge.down, done: () => judge.passed, until: () => {} }, {});
@@ -159,6 +159,38 @@ const play = (spec: RangeSpec, judge: RangeJudge, how: { walk?: boolean; follow?
   // and time itself: nobody passes by waiting
   assert.ok(new RangeJudge(spec).failed(spec.secs * 1000 + 2000));
   ok('not passed: shots with no player behind them, shots through the cover, a leap from place to place, an aim that never moved, everything at once, a rifle swept along the range');
+}
+
+// ---- the programs of 2026-10-15, which passed the judge as it was: the head swinging whenever it is not aiming,
+// and a shot along the line to each figure as the turn to it begins. Fifty ranges: through with the signature not
+// asked, and not through with it enforced; watched, through and written down.
+{
+  const bot = async (spec: RangeSpec, judge: RangeJudge) => {
+    let now = 0;
+    await playRange(spec, { seen: (ms, x, z, yaw, pitch) => judge.seen(ms, x, z, yaw, pitch, ms + 60), shot: (ms, o, d) => void judge.shot(ms, o, d, ms + 65), down: () => judge.down, done: () => judge.passed || judge.failed(now), until: (ms) => void (now = ms) }, { bot: true });
+  };
+  // (it is a likeness and not a law: of the 81 goes by the programs that night, it caught 80)
+  let through = 0, stopped = 0, watched = 0, slipped = 0;
+  for (let seed = 1; seed <= 50; seed++) {
+    const spec = rangeOf(seed * 7919 + 11);
+    const off = new RangeJudge(spec, 'off');
+    await bot(spec, off);
+    if (off.passed) through++;
+    const on = new RangeJudge(spec, 'enforce');
+    await bot(spec, on);
+    if (on.passed) slipped++;
+    else if (on.down.size >= spec.need) {
+      assert.ok(on.failed(1000) && /the bot signature/.test(on.report), `range ${seed}: every figure down with the signature, and the go not over (${on.report})`);
+      stopped++;
+    }
+    const watch = new RangeJudge(spec, 'watch');
+    await bot(spec, watch);
+    if (watch.passed && /watched, not refused/.test(watch.report)) watched++;
+  }
+  assert.ok(through >= 45, `only ${through} of 50 goes by the programs got through the judge as it was: this is not how they played`);
+  // (this player is rougher than they were: it fires before its sights are on only when a figure happens to be in the clear)
+  assert.ok(stopped >= 30 && watched === stopped, `the signature stopped ${stopped}, let ${slipped} through, and watched ${watched} of 50`);
+  ok(`the programs of 2026-10-15: ${through} of 50 through the judge as it was; with the signature, ${stopped} stopped with every figure down, ${slipped} through; watched, ${watched} through and written down`);
 }
 
 console.log(`\n${checks} checks passed`);

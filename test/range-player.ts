@@ -22,15 +22,17 @@ export const aimAt = (ex: number, ez: number, tx: number, ty: number, tz: number
 
 /**
  * @param how walk: go on foot (or be there at once); follow: turn the head to the figure and keep it there (or
- *   never turn it at all); wait: a little longer before each shot
+ *   never turn it at all); wait: a little longer before each shot; bot: as the programs of 2026-10-15 played it,
+ *   the head swinging about whenever it is not aiming, and a shot fired along the line to each figure as the turn
+ *   to it begins (it lands, and is not counted: the sights were not on it)
  * @returns how long it took, ms
  */
-export async function playRange(spec: RangeSpec, io: RangeIO, how: { walk?: boolean; follow?: boolean; wait?: number } = {}): Promise<number> {
+export async function playRange(spec: RangeSpec, io: RangeIO, how: { walk?: boolean; follow?: boolean; wait?: number; bot?: boolean } = {}): Promise<number> {
   const walk = how.walk ?? true, follow = how.follow ?? true;
   let ms = 0, x = STRIP.start[0], z = STRIP.start[1], yaw = 0, pitch = 0;
-  const say = async () => {
+  const say = async (aiming = false) => {
     await io.until(ms);
-    io.seen(ms, x, z, yaw, pitch);
+    io.seen(ms, x, z, how.bot && !aiming ? yaw + Math.sin(ms / 110) * 0.5 : yaw, pitch);
   };
   const step = 50;
   for (let k = 0; k < 6; k++) {
@@ -71,6 +73,7 @@ export async function playRange(spec: RangeSpec, io: RangeIO, how: { walk?: bool
       await say();
     }
     // turn to it over half a second, and follow it for the rest
+    let eager = 0, eagerAt = -1e9;
     for (let t = 0; t < 900; t += step) {
       ms += step;
       const p = figureAt(spec.figures[b.i], ms), want = aimAt(x, z, p.x, 1.2, p.z), k = Math.min(1, (t + step) / 500);
@@ -78,14 +81,23 @@ export async function playRange(spec: RangeSpec, io: RangeIO, how: { walk?: bool
         yaw += Math.atan2(Math.sin(want.yaw - yaw), Math.cos(want.yaw - yaw)) * k;
         pitch += (want.pitch - pitch) * k;
       }
-      await say();
+      await say(t >= 300);
+      // (at whichever figure is in the clear, before the sights are on it)
+      const open = how.bot && t < 300 && eager < 3 && ms - eagerAt >= 100 ? spec.figures.findIndex((_, j) => clearShot(spec, j, x, z, ms + 5, io.down())) : -1;
+      if (open >= 0) {
+        eager++;
+        eagerAt = ms;
+        const q = figureAt(spec.figures[open], ms + 5), at = aimAt(x, z, q.x, 1.2, q.z);
+        await io.until(ms + 5);
+        io.shot(ms + 5, [x, EYE, z], lookOf(at.yaw, at.pitch));
+      }
     }
     ms += how.wait ?? 20;
     const p = figureAt(spec.figures[b.i], ms), a = aimAt(x, z, p.x, 1.2, p.z);
     if (follow) {
       yaw = a.yaw;
       pitch = a.pitch;
-      await say();
+      await say(true);
     }
     await io.until(ms + 5);
     io.shot(ms + 5, [x, EYE, z], lookOf(a.yaw, a.pitch));

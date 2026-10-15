@@ -234,7 +234,21 @@ export class RangeJudge {
   /** why the last shot that landed was not counted, if it was not: for the test, and for the server's log */
   why = '';
 
-  constructor(readonly spec: RangeSpec) {}
+  /** @param sign what is done with a go that carries the bot signature (`signed`): not passed ('enforce'), passed and written down ('watch'), not asked ('off') */
+  constructor(readonly spec: RangeSpec, readonly sign: 'enforce' | 'watch' | 'off' = 'off') {}
+
+  /**
+   * The bot signature, '' when the go does not carry it. (2026-10-15: "bots are making it inside the game past our
+   * bot checks". From 03:16 UTC a wave of programs passed the range: 81 goes, against 16 by people that night.
+   * They stand nearly still and turn about, 22 to 132 degrees for every metre walked (people 6 to 23), and they
+   * fire until the judge takes a shot, so that shots which landed and were not counted are 2 to 18 a go (people 0
+   * to 8, nearly all 0 to 3). Both together: 80 of the 81 bot goes, none of the people's. A stopgap: they will
+   * change how they move, and the course that replaces this range is the answer.)
+   */
+  get signed(): string {
+    const refused = this.landed - this.down.size, per = (this.turned * 180) / Math.PI / Math.max(1, this.walked);
+    return refused >= 2 && per >= 25 ? `the bot signature (${refused} shots landed and not counted, ${per.toFixed(0)} degrees turned for every metre walked)` : '';
+  }
 
   /**
    * The time a game puts to a thing has to be one it could have been said at: not after now, and not long before.
@@ -327,17 +341,18 @@ export class RangeJudge {
 
   /** how the go went, in a line: for the server's log */
   get report() {
-    return `${this.down.size} of ${this.spec.need} down, ${this.shots} shots (${this.landed} landed by the range), ${this.trail.length} tellings of where they stood, walked ${this.walked.toFixed(1)} m, turned ${((this.turned * 180) / Math.PI).toFixed(0)} degrees, ${this.wrong} things said that could not be so${this.why ? `; the last shot not counted: ${this.why}` : ''}`;
+    const signed = this.sign !== 'off' && this.down.size >= this.spec.need ? this.signed : '';
+    return `${this.down.size} of ${this.spec.need} down, ${this.shots} shots (${this.landed} landed by the range), ${this.trail.length} tellings of where they stood, walked ${this.walked.toFixed(1)} m, turned ${((this.turned * 180) / Math.PI).toFixed(0)} degrees, ${this.wrong} things said that could not be so${this.why ? `; the last shot not counted: ${this.why}` : ''}${signed ? `; ${signed}${this.sign === 'watch' ? ' (watched, not refused)' : ''}` : ''}`;
   }
 
-  /** every figure down, by somebody who walked the strip and looked about it: a person */
+  /** every figure down, by somebody who walked the strip and looked about it: a person (and not one with the bot signature, where it is enforced) */
   get passed() {
-    return this.wrong < 3 && this.down.size >= this.spec.need && this.walked >= 1 && this.turned >= 0.15;
+    return this.wrong < 3 && this.down.size >= this.spec.need && this.walked >= 1 && this.turned >= 0.15 && !(this.sign === 'enforce' && this.signed);
   }
 
-  /** over, and not passed: the time is up, too much was said that could not be so, or more was fired than anybody fires */
+  /** over, and not passed: the time is up, too much was said that could not be so, more was fired than anybody fires, or every figure is down with the bot signature */
   failed(now: number) {
     // (and nobody who is aiming fires four magazines in half a minute)
-    return !this.passed && (now > this.spec.secs * 1000 + 1500 || this.wrong >= 3 || this.shots > 120);
+    return !this.passed && (now > this.spec.secs * 1000 + 1500 || this.wrong >= 3 || this.shots > 120 || (this.down.size >= this.spec.need && this.sign === 'enforce' && !!this.signed));
   }
 }

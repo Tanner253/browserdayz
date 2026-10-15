@@ -94,7 +94,20 @@ export const BOTCHECK = {
   goes: 4,
   /** and the browser is asked what it is (BOTCHECK_ENV=off: not asked): one that says a program is driving it, or that draws with no graphics card, as a browser on a rented server does, has not passed whatever it shot */
   env: process.env.BOTCHECK_ENV !== 'off',
+  /** a go with the bot signature (RangeJudge.signed) is not passed; RANGE_SIG=watch: passed and written down; off: not asked */
+  sig: (['off', 'watch', 'enforce'].includes(process.env.RANGE_SIG ?? '') ? process.env.RANGE_SIG : 'enforce') as 'off' | 'watch' | 'enforce',
 };
+
+/**
+ * A browser as it names itself, in a few words for the log: its make and major version, and the system. (2026-10-15:
+ * every connection of a wave of bots said Chrome 141 on Windows, the players 152 to 155; nothing written down tied
+ * them together but the host's own request log.) Only what the patterns pick out is written, never the raw string.
+ */
+export function agentOf(ua: string): string {
+  const make = /\b(Edg|OPR|SamsungBrowser|Firefox|FxiOS|CriOS|Chrome)\/(\d+)/.exec(ua);
+  const system = ['Windows', 'Android', 'iPhone', 'iPad', 'Mac OS X', 'CrOS', 'Linux'].find((s) => ua.includes(s));
+  return `${make ? `${make[1]} ${make[2]}` : /Safari\//.test(ua) ? 'Safari' : ua ? 'another browser' : 'no browser named'} on ${system ?? 'another system'}`;
+}
 
 /** who has passed, and until when: by their game and where they play from */
 export const shooters = new Map<string, number>();

@@ -30,7 +30,7 @@ import { type StoredItem, type S2C, PROTOCOL, type C2S } from '../src/net/protoc
 import { Hearths } from '../src/sim/fires';
 import { SITE_URL, addressOf, bunkerDoor, cashins, ipOf } from './tags';
 import { CHECK, CHECKS, flagged, takenTag } from './checks';
-import { ADMIN, BOTCHECK, CAPTCHA, CAPTCHA_ON, RANGES, SLIPS, TURNED, addressFull, away, bannedFor, dealAhead, flooding, gone, goodSlip, inHands, keeping, keyHash, knownPerson, knownShooter, listOf, nextRange, personOf, persons, roleOf, shooters, standing } from './gate';
+import { ADMIN, BOTCHECK, CAPTCHA, CAPTCHA_ON, RANGES, SLIPS, TURNED, addressFull, agentOf, away, bannedFor, dealAhead, flooding, gone, goodSlip, inHands, keeping, keyHash, knownPerson, knownShooter, listOf, nextRange, personOf, persons, roleOf, shooters, standing } from './gate';
 import { KEEP_EVERY_MS, KEPT, PUBLIC_URL, deploying, keepBefore, keepNow, loadAdmin, loadKept, pause, reachedHere, sayRestart } from './keep';
 import { broadcast, cleanName, clients, join, num, records, round2, type Client } from './players';
 import { blowJeep, settleRiders, voice } from './acts';
@@ -852,6 +852,9 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
   let range: { judge: RangeJudge; began: number; go: number; hello: Extract<C2S, { t: 'hello' }>; said: number; saidAt: number; dealtAt: number; begun: boolean } | null = null;
   /** what this connection's browser has said of itself on the range */
   let browser: { wd: boolean; gl: string } | null = null;
+  /** and how it names itself and what it draws with, for the range's lines in the log: a wave of programs says the same */
+  const agent = agentOf(String(req.headers['user-agent'] ?? ''));
+  const drawsWith = () => (browser ? `draws with "${browser.gl.replace(/[^\w ().,:/+-]/g, '').slice(0, 90)}"` : 'said nothing of what it draws with');
   /** into the world, or into the line for it */
   /** @param ranged they have this moment passed the bot check's range: see CHECK.fresh */
   const letIn = (h: Extract<C2S, { t: 'hello' }>, ranged = false) => {
@@ -907,7 +910,7 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
         if (m.g === r.go && !r.begun && now - r.dealtAt < RANGE_BUILD) {
           r.begun = true;
           r.began = now;
-          r.judge = new RangeJudge(r.judge.spec);
+          r.judge = new RangeJudge(r.judge.spec, BOTCHECK.sig);
         }
       }
       // (of the go before this one, and late: nothing to this one)
@@ -927,7 +930,7 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
         }
         if (r.judge.passed) {
           const h = r.hello, key = keyOf(h);
-          log(`${cleanName(h.name)} passed the bot check in ${(at / 1000).toFixed(0)} s (go ${r.go}): ${r.judge.report}`);
+          log(`${cleanName(h.name)} passed the bot check in ${(at / 1000).toFixed(0)} s (go ${r.go}): ${r.judge.report} [${agent}, ${drawsWith()}]`);
           RANGES.passed++;
           offRange();
           if (key && BOTCHECK.ms) shooters.set(`${keyHash(key)}|${ipOf.get(ws) ?? ''}`, now + BOTCHECK.ms);
@@ -954,7 +957,7 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
         const deal = (go: number) => {
           const spec = nextRange();
           if (range) RANGES.on--;
-          range = { judge: new RangeJudge(spec), began: Date.now(), go, hello: h, said: 0, saidAt: 0, dealtAt: Date.now(), begun: false };
+          range = { judge: new RangeJudge(spec, BOTCHECK.sig), began: Date.now(), go, hello: h, said: 0, saidAt: 0, dealtAt: Date.now(), begun: false };
           RANGES.on++;
           RANGES.dealt++;
           ws.send(JSON.stringify({ t: 'range', seed: spec.seed, turn: spec.turn, go } satisfies S2C));
@@ -968,7 +971,7 @@ wss.on('connection', (ws, req: http.IncomingMessage) => {
           if (!r.begun && Date.now() - r.dealtAt < RANGE_BUILD) return;
           if (!r.judge.failed(Date.now() - r.began)) return;
           RANGES.failed++;
-          log(`${cleanName(h.name)} did not pass go ${r.go} of the bot check: ${r.judge.report}`);
+          log(`${cleanName(h.name)} did not pass go ${r.go} of the bot check: ${r.judge.report} [${agent}, ${drawsWith()}]`);
           if (r.go >= BOTCHECK.goes) {
             TURNED.range++;
             log(`${cleanName(h.name)} did not pass the bot check in ${BOTCHECK.goes} goes: turned away`);
