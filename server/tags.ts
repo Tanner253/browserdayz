@@ -6,6 +6,7 @@ import { randomBytes } from 'node:crypto';
 import type { WebSocket } from 'ws';
 import type { SerializedInventory } from '../src/sim/inventory';
 import { TAG_HOLD, TAG_FRESH, type ItemInstance } from '../src/sim/items';
+import { paced, type Hits } from '../src/sim/hitclock';
 import { log } from './index';
 import { clients, send, type Client } from './players';
 import { scoreOf, sendBoard } from './queue';
@@ -197,26 +198,13 @@ export function carries(inv: SerializedInventory | null, id: string): boolean {
   return found;
 }
 
-/**
- * When each shooter last hit each body. A hit is believed no oftener than the gun fires, of any ONE body: a shell
- * that lands on two is two hits a moment apart, and the second was thrown away with the first's clock until
- * 2026-10-13 (one clock a shooter). No more than three bodies inside one gap: what a spread of shot could reach.
- * @param target who or what was hit, in a word of its own ('p' + a player's id, 'i' + an infected's)
- */
-export const hitsBy = new Map<number, Map<string, number>>();
+/** When each shooter last hit each body, and when their next hit on it is due (see `paced`, src/sim/hitclock.ts). */
+export const hitsBy = new Map<number, Hits>();
 
 export function mayHit(c: Client, target: string, now: number, gap: number): boolean {
   let m = hitsBy.get(c.id);
   if (!m) hitsBy.set(c.id, (m = new Map()));
-  if (now - (m.get(target) ?? 0) < gap) return false;
-  let lately = 0;
-  for (const [k, t] of m) {
-    if (now - t > 5000) m.delete(k);
-    else if (now - t < gap) lately++;
-  }
-  if (lately >= 3) return false;
-  m.set(target, now);
-  return true;
+  return paced(m, target, now, gap);
 }
 
 /** what a game says without anybody at it doing anything (see `handle`) */
