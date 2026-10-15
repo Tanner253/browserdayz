@@ -1480,7 +1480,9 @@ export class AdminUI {
     const head = el('div', 'adm-tr head');
     for (const h of ['', 'Name', 'By', 'On', 'Why', '']) head.append(el('span', '', h));
     list.append(head);
-    for (const b of this.lists.bans) {
+    // (newest first: the server sends them in the order they were made, the bans and then whoever is kept off now;
+    // the owner, 2026-10-15: "admin panel bans should be sorted by most recent first")
+    for (const b of [...this.lists.bans].reverse()) {
       const r = el('div', 'adm-tr');
       // (Somebody the checks put off twice in an hour, or an admin timed out, is kept off for a while and is in this
       // list with the banned: lifted the same way. Marked, so that it is seen which they are: "people in this
