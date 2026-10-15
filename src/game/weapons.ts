@@ -450,11 +450,32 @@ export const ROLL = {
  *   away           – where the right hand takes the next round from
  *   down, back     – how far a round is pressed into the mouth, and slid back, metres
  */
+/**
+ * The hands on a magazine being filled (the owner, 2026-10-15: "the left hand should hold the magazine like a can of
+ * beans maybe, and the wrist is too bent on the right hand making it looks weird, and wheres the bullet in between the
+ * fingers of the right hand?").
+ *   left  – round it as round a can: the palm on its left face, the fingers round its front edge, the thumb round its
+ *           back. `at`: the wrist, toward its front (metres), up it (a share of its height), off its left face
+ *           (metres); which way the fingers point and the palm faces, in the magazine's own space (x its front, z
+ *           out of its right face)
+ *   right – a round pinched between the thumb and the first finger, the wrist in line with the forearm: the pinch is
+ *           `reach` along the fingers from the wrist and `under` the palm; which way they point, in the eye's space
+ *   round – how much bigger the round is drawn in the fingers, and how far toward the eye of the pinch it sits
+ */
+export const FILL_HANDS = {
+  left: { at: [-0.01, -0.2, 0.024], fingers: [1, 0.05, 0.3], palm: [0, 0, 1], curl: [1.15, 1.2, 1.25, 1.3] as Curl, thumb: 0.7 },
+  right: { reach: 0.075, under: 0.022, fingers: [-0.72, 0.3, -0.62], palm: [-0.25, -0.75, 0.6], curl: [0.55, 0.85, 1.15, 1.25] as Curl, thumb: 0.95, tuck: 0.15 },
+  round: { size: 1.3, ahead: 0.008 },
+};
+
 export const LOAD = {
   rest: [0.105, -0.135, -0.42],
   restTurn: [0.22, -0.55, 0.1],
   at: [-0.045, -0.095, -0.36],
-  turn: [0.3, 0.42, -0.1],
+  // (a quarter turn about its height from how it was: its mouth runs away from the eye, the rounds' noses forward,
+  // as a magazine is held to be filled; it was broadside on. The owner, 2026-10-15: "can we rotate the mag so that it
+  // is properly facing the right way currently its horizontal to the body but it should be perpendicular")
+  turn: [0.3, 0.42 + Math.PI / 2, -0.1],
   away: [0.19, -0.2, -0.37],
   down: 0.014,
   back: 0.02,
@@ -3956,16 +3977,21 @@ export class Weapons {
       const inv = h.root.quaternion.clone().invert();
       const away = new THREE.Vector3(LOAD.away[0], LOAD.away[1], LOAD.away[2]).sub(h.root.position).applyQuaternion(inv);
       const mouth = new THREE.Vector3(0.012 - fill.slide * LOAD.back, sy / 2 + 0.012 - fill.press * LOAD.down, 0.004);
-      // (The fingers come to it from the right, level, and the hand is that far behind their tips: beside the
-      // magazine and not over it, where it hid the whole of it from the eye.)
-      const fingers = new THREE.Vector3(-0.93, -0.22, -0.28).applyQuaternion(inv).normalize();
+      // (the right hand comes to it from the right as the forearm does, the round pinched at the thumb: the pinch is
+      // where the round is to go, and the wrist is that far back along the fingers and off the palm; see FILL_HANDS)
+      const R = FILL_HANDS.right, L = FILL_HANDS.left, P = FILL_HANDS.round;
+      const fingers = new THREE.Vector3(...R.fingers).applyQuaternion(inv).normalize();
+      const palm = new THREE.Vector3(...R.palm).applyQuaternion(inv);
+      palm.addScaledVector(fingers, -palm.dot(fingers)).normalize();
       const tip = away.clone().lerp(mouth, fill.reach);
-      right = { pos: tip.clone().addScaledVector(fingers, -0.085), fingers, palm: new THREE.Vector3(-0.1, -0.8, 0.6).applyQuaternion(inv).normalize(), curl: [0.45, 0.6, 0.95, 1.05], thumb: 0.95, tuck: 0.3 };
-      left = { pos: new THREE.Vector3(-(h.size.x / 2 + 0.012), -sy * 0.2, 0.05), fingers: new THREE.Vector3(0.5, 0.15, -0.85).normalize(), palm: new THREE.Vector3(0.75, 0.1, -0.65).normalize(), curl: [0.95, 1.0, 1.05, 1.1], thumb: 0.5 };
+      right = { pos: tip.clone().addScaledVector(fingers, -R.reach).addScaledVector(palm, -R.under), fingers, palm, curl: R.curl, thumb: R.thumb, tuck: R.tuck };
+      left = { pos: new THREE.Vector3(L.at[0], sy * L.at[1], -(h.size.z / 2 + L.at[2])), fingers: new THREE.Vector3(...L.fingers).normalize(), palm: new THREE.Vector3(...L.palm).normalize(), curl: L.curl, thumb: L.thumb };
       if (h.round) {
-        // (the round rides under the fingertips, and is gone from sight when it is home)
+        // (the round rides in the pinch, a little toward the eye of it so that it is seen there, and is gone from
+        // sight when it is home)
         h.round.visible = fill.has && fill.slide < 0.85;
-        h.round.position.copy(tip).add(new THREE.Vector3(0, -0.004, 0));
+        h.round.position.copy(tip).add(new THREE.Vector3(0, -0.004, P.ahead));
+        h.round.scale.setScalar(P.size);
         h.round.rotation.set(0, 0, THREE.MathUtils.lerp(-0.35, 0, fill.reach));
       }
     } else if (h.round) h.round.visible = false;
