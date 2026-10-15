@@ -13,7 +13,7 @@
 // the page (and the game, from the status) calls the housekeeping, api/tick.ts.
 
 import { live } from './_lib/live.js';
-import { cached, dueOf, editBook, freshBook, glanceBook, refOf, snapshot, sol, type Book, type Entry, type Row, type Snapshot, type World } from './_lib/payouts.js';
+import { cached, dueOf, editBook, freshBook, glanceBook, refOf, snapshot, sol, walletRate, type Book, type Entry, type Row, type Snapshot, type World } from './_lib/payouts.js';
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 /** an amount of SOL, to as many places as it needs and no more than four */
@@ -213,6 +213,50 @@ function page(book: Book, s: Snapshot, now: number): string {
   const partial = book.tags > book.rows.length;
   const tile = (big: string, label: string, small = '') => `<div class="tile"><b>${big}</b><span>${label}</span>${small ? `<small>${small}</small>` : ''}</div>`;
   const step = (n: string, head: string, big: string, text: string) => `<div class="step"><em>${n}</em><h3>${head}</h3><b>${big}</b><p>${text}</p></div>`;
+  // ---- the holder tiers (api/_lib/payouts.ts, rateOf), and the Elite: every wallet a tag has been paid at the top rate,
+  // with all it has been paid (the owner, 2026-10-15: "we should show off the players, how much theyve made, that are at
+  // MAX level ... to make it seem like theyre elite almost")
+  const holders = !!(s.rules5From && s.fives && s.tiers.length), topTier = s.tiers[s.tiers.length - 1];
+  // (what a tag pays is said as the range only once the rule has begun: before, the tiers are said with their moment, and the rest as it is)
+  const holdersNow = holders && Date.parse(s.rules5From!) <= now;
+  const maxL = Math.round(s.tagMax * 1e9);
+  const elite = holders
+    ? [...new Set(paidRows.filter((r) => (r.lamports ?? 0) >= maxL && r.at >= s.rules5From!).map((r) => r.wallet))]
+        .map((wl) => {
+          const mine = paidRows.filter((r) => r.wallet === wl).sort((a, b) => (a.at < b.at ? 1 : -1));
+          return { wallet: wl, name: mine[0]?.name ?? '', earned: mine.reduce((n, r) => n + (r.lamports ?? 0), 0), tags: mine.length };
+        })
+        .sort((a, b) => b.earned - a.earned)
+    : [];
+  const crown = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 7l4.5 4L12 4l4.5 7L21 7l-2 11H5L3 7zm2.3 13h13.4v2H5.3v-2z"/></svg>';
+  const tiersSection = holders
+    ? `
+  <section class="tiers" id="tiers">
+    <h2>Level up: play free, earn SOL, hold $ZONA, earn more <small>${Date.parse(s.rules5From!) <= now ? 'live' : `from ${s.rules5From!.slice(11, 16)} UTC`}</small></h2>
+    <div class="flow loop">
+      ${step('1', 'Play free', `${amount(s.tiers[0].perTag)} SOL a tag`, 'No coin needed. Take a dog tag, hold it fifteen minutes: it pays SOL.')}
+      ${step('2', 'Buy $ZONA', 'with what you earn', 'Put the SOL you win into $ZONA, in the wallet you are paid to.')}
+      ${step('3', 'Every tag pays more', `+${s.holderPerM} SOL per 1M`, `Each million $ZONA you hold adds ${s.holderPerM} SOL to every tag you cash in.`)}
+      ${step('4', `Reach ${esc(topTier.name)}`, `${amount(topTier.perTag)} SOL a tag`, `${topTier.from}M $ZONA held: ${Math.round((topTier.perTag / s.tiers[0].perTag) * 10) / 10}× the pay, and your name on the Elite board below.`)}
+    </div>
+    <div class="ladder">${s.tiers
+      .map((t, i) => `<div class="tier${i === s.tiers.length - 1 ? ' elite' : ''}" style="--k:${(i / (s.tiers.length - 1)).toFixed(2)}"><em>${i === s.tiers.length - 1 ? crown : ''}${esc(t.name)}</em><b>${amount(t.perTag)}<span>SOL a tag</span></b><small>${t.from ? `${t.from}M+ $ZONA held` : 'under 1M $ZONA'}</small><small>${amount(t.perTag * N)} SOL a payout of ${N}</small></div>`)
+      .join('')}</div>
+    <p class="tiers-how">+${s.holderPerM} SOL a tag for every full 1,000,000 $ZONA in the wallet you are paid to, from 1,000,000 up to ${topTier.from},000,000: ${amount(topTier.perTag)} SOL a tag at most. What counts is the lower of what that wallet held when the tag was cashed in and when it is paid.</p>
+    <div class="mine-box"><input id="mine-in" placeholder="Your Solana wallet: what do your tags pay?" maxlength="44" spellcheck="false" autocomplete="off" aria-label="Your Solana wallet"><button type="button" id="mine-go">Check</button><div id="mine-out" class="mine-out" aria-live="polite"></div></div>
+    <p class="buy"><span>$ZONA</span><code>${esc(s.mint)}</code><a class="cta" href="https://pump.fun/coin/${esc(s.mint)}" target="_blank" rel="noopener">Buy $ZONA</a></p>
+  </section>
+
+  <section class="elite-sec">
+    <h2>The Elite <small>paid at the top rate: ${topTier.from}M+ $ZONA held</small></h2>
+    ${
+      elite.length
+        ? `<ol class="elite">${elite.map((e) => `<li><span class="crown">${crown}</span><span class="who"><b>${esc(e.name || 'unnamed')}</b><small><a href="https://solscan.io/account/${esc(e.wallet)}" target="_blank" rel="noopener">${esc(short(e.wallet))}</a></small></span><b class="sol">${amount(e.earned)} SOL</b><small class="n">${e.tags} ${e.tags === 1 ? 'tag' : 'tags'}</small></li>`).join('')}</ol>`
+        : `<p class="none elite-none">${crown}No one has been paid at the Elite rate yet. Hold ${topTier.from},000,000 $ZONA and cash in a payout of ${N}: your name goes here, in gold.</p>`
+    }
+  </section>
+`
+    : '';
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -327,6 +371,41 @@ function page(book: Book, s: Snapshot, now: number): string {
     .board li { grid-template-columns: 18px 84px minmax(0, 1fr) auto; }
     .board small { display: none; }
   }
+  .loop { margin-bottom: 22px; }
+  .ladder { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+  .tier { padding: 14px 14px 15px; background: var(--panel); border: 1px solid var(--line); border-top: 3px solid color-mix(in srgb, var(--gold) calc(var(--k) * 100%), #5d594c); }
+  .tier em { display: flex; align-items: center; gap: 6px; font: 700 13px/1 var(--cond); font-style: normal; letter-spacing: 0.24em; text-transform: uppercase; color: var(--dim); }
+  .tier em svg { width: 16px; height: 16px; }
+  .tier b { display: block; margin-top: 10px; font: 800 36px/1 var(--cond); font-variant-numeric: tabular-nums; color: var(--ink); }
+  .tier b span { display: block; margin-top: 4px; font: 600 11px/1 var(--cond); letter-spacing: 0.2em; text-transform: uppercase; color: var(--dim); }
+  .tier small { display: block; margin-top: 8px; font-size: 12.5px; line-height: 1.3; color: var(--faint); }
+  .tier.elite { background: linear-gradient(180deg, rgba(255, 211, 90, 0.16), var(--panel) 70%); border-color: rgba(255, 211, 90, 0.5); box-shadow: 0 0 28px rgba(255, 211, 90, 0.12); }
+  .tier.elite em, .tier.elite b { color: var(--gold); }
+  .tiers-how { margin: 12px 0 0; font-size: 14px; line-height: 1.5; color: var(--dim); }
+  .mine-box { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  .mine-box input { flex: 1 1 320px; min-width: 0; padding: 11px 13px; background: var(--panel); border: 1px solid var(--line); color: var(--ink); font: 14px var(--mono); }
+  .mine-box input:focus { outline: none; border-color: var(--gold); }
+  .mine-box button { padding: 10px 20px; border: 0; background: var(--gold); color: #14110b; font: 700 15px/1 var(--cond); letter-spacing: 0.24em; text-transform: uppercase; cursor: pointer; }
+  .mine-out { flex-basis: 100%; min-height: 1.4em; font-size: 15px; line-height: 1.5; color: var(--dim); }
+  .mine-out b { color: var(--gold); }
+  .buy { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 14px 0 0; }
+  .buy span { font: 700 14px/1 var(--cond); letter-spacing: 0.24em; color: var(--dim); }
+  .buy code { font: 13px var(--mono); color: var(--ink); word-break: break-all; }
+  .elite { margin: 0; padding: 4px 16px; list-style: none; background: linear-gradient(180deg, rgba(255, 211, 90, 0.08), var(--panel)); border: 1px solid rgba(255, 211, 90, 0.42); }
+  .elite li { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto 64px; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .elite li:last-child { border-bottom: 0; }
+  .elite .crown, .elite-none svg { color: var(--gold); }
+  .elite .crown svg { width: 24px; height: 24px; display: block; }
+  .elite .who b { font: 700 21px/1 var(--cond); letter-spacing: 0.06em; color: var(--gold); }
+  .elite .who small { display: block; margin-top: 4px; font: 12px var(--mono); }
+  .elite .sol { font: 800 22px/1 var(--cond); font-variant-numeric: tabular-nums; }
+  .elite .n { font-size: 12.5px; color: var(--dim); text-align: right; }
+  .elite-none { display: flex; align-items: center; gap: 12px; padding: 16px 18px; border: 1px dashed rgba(255, 211, 90, 0.4); color: var(--dim); }
+  .elite-none svg { flex: none; width: 26px; height: 26px; }
+  @media (max-width: 900px) {
+    .ladder { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .tier.elite { grid-column: 1 / -1; }
+  }
   @media (max-width: 560px) {
     main { padding: 0 14px 50px; }
     .bar nav a:first-child { display: none; }
@@ -357,19 +436,20 @@ function page(book: Book, s: Snapshot, now: number): string {
       ${book.claimNote ? `<div class="note"><b>Collecting creator rewards did not work the last time it was tried</b>${esc(book.claimNote)}</div>` : ''}
     </div>
     <div class="tiles">
-      ${tile(s.tagPays === null ? '?' : `${amount(s.tagPays)} SOL`, 'a tag pays right now', s.fives ? `flat, whatever the treasury holds${N > 1 ? `: paid when a wallet has ${N} due` : ''}` : `${pct}% of the treasury, ${amount(s.floor)} at least`)}
+      ${holdersNow ? tile(`${amount(s.tiers[0].perTag)}–${amount(topTier.perTag)} SOL`, 'a tag pays, by $ZONA held', `<a href="#tiers">${esc(s.tiers[0].name)} ${amount(s.tiers[0].perTag)} up to ${esc(topTier.name)} ${amount(topTier.perTag)}: see the tiers</a>${N > 1 ? `. Paid when a wallet has ${N} due` : ''}`) : tile(s.tagPays === null ? '?' : `${amount(s.tagPays)} SOL`, 'a tag pays right now', s.fives ? `flat, whatever the treasury holds${N > 1 ? `: paid when a wallet has ${N} due` : ''}` : `${pct}% of the treasury, ${amount(s.floor)} at least`)}
       ${tile(s.balance === null ? '?' : `${amount(s.balance)} SOL`, 'in the treasury', s.treasury ? `<a href="https://solscan.io/account/${esc(s.treasury)}" target="_blank" rel="noopener">${esc(short(s.treasury))}</a>${s.madeTheCoin ? ', the wallet that made the coin' : ''}` : '')}
       ${tile(`${amount(book.claimedLamports)} SOL`, 'creator rewards collected', (s.waiting !== null ? `${amount(s.waiting)} waiting to be collected` : '') + (s.waitingNote ? `${s.waiting !== null ? '. ' : ''}${esc(s.waitingNote)}` : ''))}
       ${tile(String(open), open === 1 ? 'tag on its way or waiting' : 'tags on their way or waiting', waitTags ? `${waitTags} of them, ${amount(waitTags * s.flatPay)} SOL, owed to ${waits.length} ${waits.length === 1 ? 'wallet that is' : 'wallets that are'} ${s.fives ? `paid at ${N} due` : 'being paid now'}` : open ? 'Each is paid as soon as it can be' : 'Everything owed has been paid')}
     </div>
   </div>
 
+${tiersSection}
   <section>
     <h2>How the money moves</h2>
     <div class="flow">
       ${step('1', 'The coin is traded', 'Creator rewards', 'Every trade of the ZONA coin on pump.fun leaves a little for the wallet that made it.')}
       ${step('2', 'Collected by the machine', `${amount(book.claimedLamports)} SOL so far`, `Into one treasury wallet, automatically${s.balance === null ? '' : `. It holds ${amount(s.balance)} SOL now`}.`)}
-      ${step('3', 'You cash a tag in', `${s.tagPays === null ? (s.fives ? flat + ' SOL' : `${pct}%`) : `${amount(s.tagPays)} SOL`} a tag`, `Kill a player, take their tag, hold it fifteen minutes. ${s.fives ? `A tag pays ${flat} SOL, whatever the treasury holds.` : `A tag pays ${pct}% of the treasury, never less than ${amount(s.floor)} SOL.`}`)}
+      ${step('3', 'You cash a tag in', holdersNow ? `${amount(s.tiers[0].perTag)}–${amount(topTier.perTag)} SOL a tag` : `${s.tagPays === null ? (s.fives ? flat + ' SOL' : `${pct}%`) : `${amount(s.tagPays)} SOL`} a tag`, `Kill a player, take their tag, hold it fifteen minutes. ${holdersNow ? `A tag pays ${flat} SOL, and up to ${amount(topTier.perTag)} SOL to a wallet that holds $ZONA.` : s.fives ? `A tag pays ${flat} SOL, whatever the treasury holds.` : `A tag pays ${pct}% of the treasury, never less than ${amount(s.floor)} SOL.`}`)}
       ${step('4', 'Straight to your wallet', `${amount(book.paidLamports)} SOL paid`, s.fives && N > 1 ? `When ${N} of your tags are due: ${lot} SOL at once, with a receipt for each tag left on the chain. No tag is ever paid twice.` : 'Within a minute or so, with a receipt left on the chain: no tag is ever paid twice.')}
     </div>
   </section>
@@ -415,7 +495,7 @@ function page(book: Book, s: Snapshot, now: number): string {
   <section>
     <h2>The rules the machine pays by</h2>
     <div class="rules">
-      <div class="rule"><h3>What a tag pays</h3><p>${s.fives ? `${flat} SOL, flat: the same whatever the treasury holds.` : `${pct}% of what the treasury holds at the moment it is paid, and never less than ${amount(s.floor)} SOL.`} The treasury is filled by the coin's creator rewards on pump.fun, collected automatically.</p></div>${
+      <div class="rule"><h3>What a tag pays</h3><p>${holdersNow ? `${flat} SOL, and ${s.holderPerM} SOL more for every full 1,000,000 $ZONA the wallet holds, up to ${amount(topTier.perTag)} SOL (see the tiers above): the same whatever the treasury holds.` : s.fives ? `${flat} SOL, flat: the same whatever the treasury holds.` : `${pct}% of what the treasury holds at the moment it is paid, and never less than ${amount(s.floor)} SOL.`} The treasury is filled by the coin's creator rewards on pump.fun, collected automatically.</p></div>${
         s.fives && N > 1
           ? `
       <div class="rule"><h3>Paid when ${N} are due</h3><p>A wallet is paid when ${N} of its tags are due, and then for all that are due at once: ${lot} SOL for ${N}, in one transaction that leaves a receipt for each tag. Fewer than ${N} wait, counted, on one line of the ledger ("3 of ${N}"), for as long as it takes: no tag is lost for waiting. A tag that is not paid (over the ${s.rolling ? `${s.walletTags24} in ${s.hours} hours` : `${s.walletDayTags} a day`}, or traded) does not count toward the ${N}.</p></div>`
@@ -456,6 +536,27 @@ ${
 <footer><span>ZONA · PvP survival shooter · play to earn</span><span>As it stood at ${when(new Date(now).toISOString())}</span><span><a href="/">Back to the game</a></span></footer>
 <script>
   for (const t of document.querySelectorAll('time')) t.title = new Date(t.dateTime).toLocaleString();
+  // what a wallet's tags pay (api/cashins.ts ?format=wallet): the one given in the game on this device is asked about at once
+  (() => {
+    const inp = document.getElementById('mine-in'), go = document.getElementById('mine-go'), out = document.getElementById('mine-out');
+    if (!inp || !go || !out) return;
+    const fmt = (n) => Number(n).toLocaleString('en-US');
+    const gold = (t) => { const e = document.createElement('b'); e.textContent = t; return e; };
+    const ask = async () => {
+      const v = inp.value.trim();
+      if (!v) return;
+      out.textContent = 'Reading the wallet...';
+      try {
+        const r = await (await fetch('/api/cashins?format=wallet&w=' + encodeURIComponent(v))).json();
+        if (r.error) { out.textContent = r.error === 'not a wallet address' ? 'That is not a Solana wallet address.' : 'The wallet could not be read just now: try again in a moment.'; return; }
+        out.textContent = '';
+        out.append(gold(r.tier), ' · ' + fmt(r.held) + ' $ZONA held · your tags pay ', gold(r.perTag + ' SOL'), ' each, ' + r.payout + ' SOL a payout of ${N}. ' + (r.next ? fmt(r.next.more) + ' more $ZONA makes you ' + r.next.tier + ': ' + r.next.perTag + ' SOL a tag.' : 'The top rate.') + (r.tags ? ' Paid so far: ' + r.earned + ' SOL for ' + r.tags + (r.tags === 1 ? ' tag.' : ' tags.') : ''));
+      } catch { out.textContent = 'The wallet could not be read just now: try again in a moment.'; }
+    };
+    go.onclick = ask;
+    inp.onkeydown = (e) => { if (e.key === 'Enter') ask(); };
+    try { const saved = localStorage.getItem('zona.wallet'); if (saved) { inp.value = saved; ask(); } } catch {}
+  })();
   // the ledger, narrowed: by what became of a tag, and by a name or a wallet typed in
   (() => {
     const rows = [...document.querySelectorAll('#ledger tbody tr[data-s]')], buttons = [...document.querySelectorAll('.filters button')], find = document.querySelector('.filters input');
@@ -490,6 +591,37 @@ export async function show(request: Request, w: World = live()): Promise<Respons
   // the owner: "the entire platform is zonapvp so it should be aknowlsegd on each respective payouts screen". The
   // Zone's tags alone so far; the arena's wagers are added here when they pay.)
   if (format === 'total') return Response.json({ paidSol: sol(book.paidLamports), paid: book.paid, since: book.since, zona: sol(book.paidLamports), arena: 0 }, { headers: { 'cache-control': 'public, s-maxage=60, stale-while-revalidate=300' } });
+  if (format === 'wallet') {
+    // (a wallet's standing under the holder rule: what it holds of the coin, its tier, what a tag pays it, and what it has
+    // been paid: the payouts page's own wallet check, and the game's rewards window, so that neither says the floor when
+    // it is not what is paid. Read from the chain no more than once in 30 seconds a wallet.)
+    const who = (new URL(request.url).searchParams.get('w') ?? '').trim();
+    if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(who)) return Response.json({ error: 'not a wallet address' }, { status: 400 });
+    if (!s.rules5From || !s.fives) return Response.json({ error: 'no holder rule' }, { status: 404 });
+    let r: Awaited<ReturnType<typeof walletRate>>;
+    try {
+      r = await cached(w, `rate:${who}`, 30_000, () => walletRate(w, who));
+    } catch {
+      return Response.json({ error: 'the wallet could not be read' }, { status: 502 });
+    }
+    const mine = book.rows.filter((x) => x.wallet === who && x.state === 'paid');
+    const held = Number(r.held / 1_000_000n);
+    return Response.json(
+      {
+        wallet: who,
+        held,
+        millions: r.millions,
+        tier: r.tier,
+        max: r.max,
+        perTag: sol(Number(r.perTag)),
+        payout: sol(Number(r.perTag) * s.minTags),
+        next: r.next ? { tier: r.next.tier, from: r.next.from, perTag: sol(Number(r.next.perTag)), more: Math.max(0, r.next.from * 1_000_000 - held) } : null,
+        earned: sol(mine.reduce((n, x) => n + (x.lamports ?? 0), 0)),
+        tags: mine.length,
+      },
+      { headers: { 'cache-control': 'public, s-maxage=30, stale-while-revalidate=60' } },
+    );
+  }
   if (format === 'json') {
     // (a tag not paid yet goes by no name here: its reference is where the receipt of its payment will be. And a
     // wallet whose tags wait to be paid together is one row here as it is one line of the page: a row like any other

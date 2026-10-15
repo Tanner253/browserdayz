@@ -809,6 +809,38 @@ interface One {
 }
 const tagOfRow = (r: Row): Tag => ({ ref: r.ref, at: r.at, name: r.name, owner: r.owner, wallet: r.wallet, ...(r.held !== undefined ? { held: r.held } : {}) });
 
+/**
+ * The holder tiers, by millions of the coin held: names for the steps of `holderBonus`, the owner, 2026-10-15: "the payouts
+ * page should change, showing the new tiered system to inscentivzie new buyers, and also showing how much the player
+ * will earn in sol per tag". What a tag pays is set by the whole millions held, not by the tier: a tier is where it
+ * is said. The last is wherever a tag is paid the most (`tagMax`): "players ... that are at MAX level or prestige ...
+ * to make it seem like theyre elite almost".
+ */
+export const TIERS = [
+  { from: 0, name: 'Recruit' },
+  { from: 1, name: 'Soldier' },
+  { from: 5, name: 'Veteran' },
+  { from: 10, name: 'Commander' },
+  { from: 15, name: 'Elite' },
+] as const;
+
+/** what a tag pays a wallet holding `held` (smallest unit) under the holder rule, in lamports, and its tier, as `holderBonus` pays it */
+export function rateOf(cfg: Pick<Config, 'floor' | 'holderPerM' | 'tagMax'>, held: bigint) {
+  const millions = Number(held / (1_000_000n * 10n ** COIN_DECIMALS));
+  const top = cfg.holderPerM > 0n ? Number((cfg.tagMax - cfg.floor) / cfg.holderPerM) : 0;
+  const pays = (m: number) => { const more = BigInt(Math.min(m, top)) * cfg.holderPerM; return cfg.floor + (more < cfg.tagMax - cfg.floor ? more : cfg.tagMax - cfg.floor); };
+  const tiers = TIERS.map((t, i) => ({ ...t, from: i === TIERS.length - 1 ? top : t.from }));
+  const at = tiers.reduce((k, t, i) => (millions >= t.from ? i : k), 0);
+  const next = tiers[at + 1];
+  return { millions, tier: tiers[at].name, max: millions >= top, perTag: pays(millions), top, next: next ? { tier: next.name, from: next.from, perTag: pays(next.from) } : null, tiers: tiers.map((t) => ({ ...t, perTag: pays(t.from) })) };
+}
+
+/** a wallet's standing under the holder rule now: what it holds of the coin, and what a tag pays it (see api/cashins.ts, ?format=wallet) */
+export async function walletRate(w: World, who: string) {
+  const held = await coinsOf(w, address(who));
+  return { held, ...rateOf(w.cfg, held) };
+}
+
 /** what of the coin a wallet holds now, in its smallest unit: its own account for the coin under either token program */
 async function coinsOf(w: World, who: Bytes): Promise<bigint> {
   const mint = w.cfg.mint;
@@ -1409,6 +1441,9 @@ export interface Snapshot {
   rules5From: string | null;
   holderPerM: number;
   tagMax: number;
+  /** the coin, and its holder tiers as they stand (see `rateOf`) */
+  mint: string;
+  tiers: { name: string; from: number; perTag: number }[];
 }
 
 export async function snapshot(w: World): Promise<Snapshot> {
@@ -1416,7 +1451,7 @@ export async function snapshot(w: World): Promise<Snapshot> {
   // (what is said is what a tag cashed in at this moment is paid by)
   const fives = w.now() >= base.rules2From;
   const cfg = fives ? termsOf(base, iso(w.now()), true) : base;
-  const out: Snapshot = { mode: cfg.mode, problem: cfg.problem, treasury: cfg.treasury ? b58(cfg.treasury) : null, madeTheCoin: false, maker: null, balance: null, tagPays: null, share: cfg.share, floor: Number(cfg.floor), waiting: null, waitingNote: null, due: false, dayShare: cfg.dayShare, walletDayTags: cfg.walletDayTags, rules2From: Number.isFinite(base.rules2From) ? iso(base.rules2From) : null, fives, flatPay: Number(base.floor), minTags: base.minTags, rules3From: Number.isFinite(base.rules3From) ? iso(base.rules3From) : null, rolling: w.now() >= base.rules3From, walletTags24: base.walletTags24, rules4From: Number.isFinite(base.rules4From) ? iso(base.rules4From) : null, hours: windowOf(w.now(), base) / 3600_000, rules5From: Number.isFinite(base.rules5From) ? iso(base.rules5From) : null, holderPerM: Number(base.holderPerM) / LAMPORTS, tagMax: Number(base.tagMax) / LAMPORTS };
+  const out: Snapshot = { mode: cfg.mode, problem: cfg.problem, treasury: cfg.treasury ? b58(cfg.treasury) : null, madeTheCoin: false, maker: null, balance: null, tagPays: null, share: cfg.share, floor: Number(cfg.floor), waiting: null, waitingNote: null, due: false, dayShare: cfg.dayShare, walletDayTags: cfg.walletDayTags, rules2From: Number.isFinite(base.rules2From) ? iso(base.rules2From) : null, fives, flatPay: Number(base.floor), minTags: base.minTags, rules3From: Number.isFinite(base.rules3From) ? iso(base.rules3From) : null, rolling: w.now() >= base.rules3From, walletTags24: base.walletTags24, rules4From: Number.isFinite(base.rules4From) ? iso(base.rules4From) : null, hours: windowOf(w.now(), base) / 3600_000, rules5From: Number.isFinite(base.rules5From) ? iso(base.rules5From) : null, holderPerM: Number(base.holderPerM) / LAMPORTS, tagMax: Number(base.tagMax) / LAMPORTS, mint: b58(base.mint), tiers: rateOf(base, 0n).tiers.map((t) => ({ name: t.name, from: t.from, perTag: Number(t.perTag) })) };
   try {
     const s = await coin(w);
     // with no key given yet, the treasury is taken to be the wallet that made the coin

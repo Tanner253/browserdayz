@@ -1206,6 +1206,25 @@ await test('from the fifth cut-over: a tag pays 0.001 SOL more for every million
   assert.deepEqual([config({}).rules5From, config({ PAYOUT_RULES5_FROM: 'never' }).rules5From], [RULES5_FROM ? Date.parse(RULES5_FROM) : Infinity, Infinity]);
 });
 
+await test('a wallet asked about (?format=wallet): what it holds, its tier, what a tag pays it and what the next tier needs, as it is paid', async () => {
+  // "the payouts page should change, showing the new tiered system ... and also showing how much the player will earn in sol per tag" (the owner, 2026-10-15)
+  const w = world(1, { ...FIVE, PAYOUT_RULES3_FROM: '2026-10-08T00:00:00Z', PAYOUT_RULES5_FROM: '2026-10-08T00:00:00Z' });
+  const ask = async (n: number) => (await (await show(new Request(`http://localhost/api/cashins?format=wallet&w=${wallet(n)}`), w)).json()) as Record<string, unknown>;
+  const coin = (n: number, tokens: bigint) => w.chain.tokens.set(b58(tokenAccount(address(wallet(n)), w.cfg.mint, TOKEN_2022_PROGRAM)), tokens * 10n ** 6n);
+  coin(430, 7_500_000n);
+  assert.deepEqual(await ask(430), { wallet: wallet(430), held: 7_500_000, millions: 7, tier: 'Veteran', max: false, perTag: 0.017, payout: 0.085, next: { tier: 'Commander', from: 10, perTag: 0.02, more: 2_500_000 }, earned: 0, tags: 0 });
+  coin(431, 15_000_000n);
+  const top = await ask(431);
+  assert.deepEqual([top.tier, top.max, top.perTag, top.next], ['Elite', true, 0.025, null]);
+  assert.deepEqual([(await ask(432)).tier, (await ask(432)).perTag], ['Recruit', 0.01]);
+  // what it says is what is paid
+  await cash(w, 430, 5);
+  const after = await ask(430);
+  assert.deepEqual([after.earned, after.tags, got(w, 430)], [0.085, 5, SOL(0.085)]);
+  const bad = await show(new Request('http://localhost/api/cashins?format=wallet&w=nope'), w);
+  assert.equal(bad.status, 400);
+});
+
 await test('a traded tag is not paid, and is not counted toward the five', async () => {
   const w = world(1, FIVES);
   await cash(w, 408, 4, { name: 'Ann', owner: 'Cy' });
