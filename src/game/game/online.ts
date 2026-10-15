@@ -7,12 +7,12 @@ import { reloadPage } from '../../core/leave';
 import { physics, SOLID_GROUPS } from '../../core/physics';
 import { audio } from '../../core/audio';
 import { heightAt } from '../../world/worldgen';
-import { ITEMS, GEAR_SLOTS } from '../../sim/items';
+import { ITEMS, GEAR_SLOTS, holds } from '../../sim/items';
 import { BODY_GRID } from '../../sim/inventory';
 import { THROWN } from '../../sim/grenades';
 import { EMOTE } from '../../sim/emotes';
 import { playerName, remoteServer } from '../../net/client';
-import { type S2C, F_DEAD, type PlayerInfo, type Act, type StashInfo, type CorpseInfo } from '../../net/protocol';
+import { type S2C, F_DEAD, type PlayerInfo, type Act, type StashInfo, type CorpseInfo, type StoredItem } from '../../net/protocol';
 import { bloodOf, bleedOf } from '../../sim/blood';
 import { type Avatar, GEAR_SHOWN, facepiece, DEATH_REST } from '../avatar';
 import { lookFor } from '../look';
@@ -207,6 +207,8 @@ export const onlineMethods = {
     net.on('loot+', (m) => this.economy.inject(m.l));
     net.on('loot-', (m) => {
       this.economy.take(m.uid);
+      this.lying.delete(m.uid);
+      this.lyingSent.delete(m.uid);
       if (this.invUI.isOpen) this.invUI.refresh(this.around(), this.openStash);
     });
     net.on('denied', (m) => {
@@ -226,6 +228,29 @@ export const onlineMethods = {
       st.container.load({ items: m.items });
       st.known = true;
       if (this.openStash === st) this.invUI.setStashState('');
+    });
+    // (what lies within reach that holds things: see openLying)
+    const lay = (uid: string, items: StoredItem[]) => {
+      const l = this.economy.loot.get(uid);
+      if (!l) return null;
+      l.item.cargo = items.map(({ x, y, rot, ...it }) => ({ item: it, x, y, rot }));
+      return l;
+    };
+    net.on('ldata', (m) => {
+      if (!this.lying.has(m.uid) || !lay(m.uid, m.items)) return;
+      this.lying.set(m.uid, 'mine');
+      this.lyingSent.set(m.uid, JSON.stringify(m.items));
+      if (this.invUI.isOpen) this.invUI.refresh(this.around(), this.openStash);
+    });
+    net.on('lbusy', (m) => {
+      if (!this.lying.has(m.uid)) return;
+      this.lying.set(m.uid, 'busy');
+      if (this.invUI.isOpen) this.invUI.refresh(this.around(), this.openStash);
+    });
+    net.on('lcargo', (m) => {
+      // (as it is now, to whoever is not going through it: theirs is what they set)
+      if (this.lying.get(m.uid) === 'mine') return;
+      if (lay(m.uid, m.items) && this.invUI.isOpen) this.invUI.refresh(this.around(), this.openStash);
     });
     net.on('cbusy', (m) => {
       if (this.openStash?.uid !== m.cid) return;
@@ -460,6 +485,45 @@ export const onlineMethods = {
    */
   around(this: Game) {
     return this.garage.ride ? [] : this.loot.near(this.player.pos, 2.3);
+  },
+
+  /**
+   * What lies within reach that holds things (a pack, a vest, a jacket, a case) is gone through with the pockets, each
+   * shown open as what is worn is (the owner, 2026-10-15: "all inventories should be shown in vicinity pane when items
+   * are on the ground"). On a server each is asked for ('lopen'), and is this player's to go through when the server
+   * says so; somebody else going through one has it until they shut their pockets. Alone, every one is.
+   */
+  openLying(this: Game) {
+    const want = this.around().filter((w) => holds(w.loot.item.id)).map((w) => w.loot.uid);
+    const ask = want.filter((uid) => !this.lying.has(uid));
+    if (!ask.length) return;
+    for (const uid of ask) this.lying.set(uid, this.online ? 'wait' : 'mine');
+    if (this.online) this.net.send({ t: 'lopen', uids: ask });
+  },
+
+  /** the pockets shut: what was gone through is told as it is now, and let go of */
+  closeLying(this: Game) {
+    if (this.online && this.lying.size) {
+      this.syncLying();
+      this.net.send({ t: 'lclose' });
+    }
+    this.lying.clear();
+    this.lyingSent.clear();
+  },
+
+  /** what this player has changed in what lies about is told to the server: whole, as a crate's is, and only when it has changed */
+  syncLying(this: Game) {
+    if (!this.online) return;
+    for (const [uid, st] of this.lying) {
+      if (st !== 'mine') continue;
+      const l = this.economy.loot.get(uid);
+      if (!l) continue;
+      const items: StoredItem[] = (l.item.cargo ?? []).map((p) => ({ ...p.item, x: p.x, y: p.y, rot: p.rot }));
+      const said = JSON.stringify(items);
+      if (this.lyingSent.get(uid) === said) continue;
+      this.lyingSent.set(uid, said);
+      this.net.send({ t: 'lset', uid, items });
+    }
   },
 
   /** playing alone: the training dummies a jeep driven here has just gone into */

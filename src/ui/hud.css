@@ -712,6 +712,7 @@ body.touch .hud-acts { right: auto; left: 46%; bottom: 196px; transform: transla
 
 /* vicinity */
 .inv-ground { min-height: 150px; max-height: 38vh; overflow: auto; border: 1px dashed var(--line); padding: 5px; background: rgba(0, 0, 0, 0.18); }
+.inv-ground.inv-has-lying { max-height: none; } /* (what lies there open as grids: the column scrolls, not the list) */
 .inv-ground-row { display: flex; align-items: center; gap: 12px; padding: 4px 6px; cursor: grab; border-left: 2px solid transparent; }
 .inv-ground-row:hover { background: rgba(255, 255, 255, 0.05); border-left-color: var(--accent); }
 .g-name { font-size: 16px; line-height: 1.15; }

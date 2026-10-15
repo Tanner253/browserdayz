@@ -1,8 +1,8 @@
 // The server: handle, every message a player sends, checked and acted on.
 // (One part of index.ts, cut out of it whole on 2026-10-14 so that it can be read and worked on alone: nothing in it was changed.)
 
-import { holdOnlyEmpties } from '../src/sim/inventory';
-import { ITEMS, GEAR_SLOTS, makeItem, TAG_HOLD } from '../src/sim/items';
+import { bagGrid, holdOnlyEmpties } from '../src/sim/inventory';
+import { ITEMS, GEAR_SLOTS, holds, makeItem, TAG_HOLD, type ItemInstance } from '../src/sim/items';
 import { BURY, noBurying } from '../src/sim/stash';
 import { CALL } from '../src/sim/drops';
 import { WEAPON_RULES, hitDamage } from '../src/sim/combat';
@@ -13,7 +13,7 @@ import { HELI, heliCrash, seatsOf } from '../src/sim/heli';
 import { infectedDrop, INFECTED, guarded } from '../src/sim/infected';
 import { EMOTE, EMOTE_GAP, SHOUT_RANGE } from '../src/sim/emotes';
 import { bloodOf, bleedOf } from '../src/sim/blood';
-import { type C2S, F_DEAD, type S2C, ACTS, type Slung, F_GUARD, MAX_STAMINA, type StashInfo, CHAT_RANGE } from '../src/net/protocol';
+import { type C2S, F_DEAD, type S2C, ACTS, type Slung, F_GUARD, MAX_STAMINA, type StashInfo, type StoredItem, CHAT_RANGE } from '../src/net/protocol';
 import { FIRE } from '../src/sim/fires';
 import { BARREL_RESPAWN, barrelsGone, boxes, cargoOf, doors, economy, hearths, horde, invented, isVState, issue, locks, log, stashItem, tellSeats, things, vehicles, world } from './index';
 import { CARD_GRACE_MS, CASH_HOLD_MS, SAID_BY_ITSELF, bunkerDoor, cardSeen, carriedTags, carries, isWallet, lootedTags, mayHit, namesOf, notEarned, pairPaidAt, recordCashIn, tagSeen, voided } from './tags';
@@ -21,6 +21,11 @@ import { CHECK, CHECKS, bodyCheck, buried, dealt, flag, gaitCheck, hillBetween, 
 import { ADMIN, LOGOUT_MS, LOGOUT_STIR, away, handBlast, keptOffNow, pockets, roleOf, stayOn } from './gate';
 import { KEPT, sys } from './keep';
 import { banId, command, login, offId } from './admin';
+
+/** how far a thing lying about may be from somebody for them to go through it with their pockets ('lopen'): their game shows what is within 2.3 m of them (Game.around), and the server's place for them is a step behind */
+const LYING_REACH = 4;
+/** what is in a thing, as it is sent: each with its place in it */
+const storedOf = (item: ItemInstance): StoredItem[] => (item.cargo ?? []).map((p) => ({ ...p.item, x: p.x, y: p.y, rot: p.rot }));
 import { broadcast, cleanInventory, cleanItem, cleanStored, clients, isPose, isVec3, num, pickSpawn, records, send, type Client } from './players';
 import { ajar, findCarried, hurtJeep, kill, leaveSeat, releaseLock, seatOf } from './acts';
 import { scores } from './queue';
@@ -332,7 +337,73 @@ export function handle(c: Client, m: C2S) {
         send(c, { t: 'denied', uid: m.uid });
         return;
       }
+      // (not a pack somebody else is going through where it lies: what they took out of it would be in it still)
+      const holder = locks.get(`l:${m.uid}`);
+      if (holder !== undefined && holder !== c.id && clients.has(holder)) {
+        send(c, { t: 'denied', uid: m.uid });
+        return;
+      }
       if (c.seatAt || !economy.take(m.uid)) send(c, { t: 'denied', uid: m.uid });
+      else if (holder !== undefined) {
+        locks.delete(`l:${m.uid}`);
+        clients.get(holder)?.openLying.delete(m.uid);
+      }
+      return;
+    }
+    case 'lopen': {
+      // What lies within reach that holds things, gone through where it lies as a crate is: each is this player's to
+      // set while nobody else has it open (see 'lset'). Nothing from a seat, or from under the ground.
+      if (!Array.isArray(m.uids) || !c.alive || c.seatAt || buried(c)) return;
+      for (const uid of m.uids.slice(0, 16)) {
+        if (typeof uid !== 'string' || c.openLying.has(uid)) continue;
+        const l = economy.loot.get(uid);
+        if (!l || !holds(l.item.id) || Math.hypot(l.x - c.pose[0], l.z - c.pose[2]) > LYING_REACH) continue;
+        const holder = locks.get(`l:${uid}`);
+        if (holder !== undefined && holder !== c.id && clients.has(holder)) {
+          send(c, { t: 'lbusy', uid });
+          continue;
+        }
+        locks.set(`l:${uid}`, c.id);
+        c.openLying.add(uid);
+        send(c, { t: 'ldata', uid, items: storedOf(l.item) });
+      }
+      return;
+    }
+    case 'lset': {
+      if (typeof m.uid !== 'string' || locks.get(`l:${m.uid}`) !== c.id || c.seatAt || !c.alive) return;
+      const l = economy.loot.get(m.uid);
+      if (!l || !holds(l.item.id) || Math.hypot(l.x - c.pose[0], l.z - c.pose[2]) > LYING_REACH + 2) return;
+      let items = cleanStored(m.items);
+      if (CHECKS !== 'off') {
+        const made = items.filter((it) => [...things({ slots: { it }, active: null, containers: [] })].some(invented));
+        if (made.length && flag(c, `put ${ITEMS[made[0].id].name} in a ${ITEMS[l.item.id].name.toLowerCase()} lying there, which the server never put in the world`)) items = items.filter((it) => !made.includes(it));
+      }
+      // (laid as the thing's own grid lays them, by its own rules of what goes into it: what does not go, or has no
+      // room, is refused, and they are told what is in it after all)
+      const grid = bagGrid({ ...l.item, cargo: [] }, 1);
+      if (!grid) return;
+      let refused = false;
+      for (const s of items) {
+        const { x, y, rot, ...it } = s;
+        if (!grid.accepts(it) || !grid.place(it, x, y, rot)) refused = true;
+      }
+      if (refused) {
+        send(c, { t: 'ldata', uid: m.uid, items: storedOf(l.item) });
+        return;
+      }
+      l.item.cargo = grid.items;
+      for (const p of grid.items) issue(p.item);
+      // (gone through is used: a case kept between restarts starts its time again, see Economy's containerLife)
+      if (l.keptAt !== undefined) {
+        l.keptAt = Date.now();
+        KEPT.dirty = true;
+      }
+      broadcast({ t: 'lcargo', uid: m.uid, items: storedOf(l.item) });
+      return;
+    }
+    case 'lclose': {
+      for (const uid of c.openLying) if (locks.get(`l:${uid}`) === c.id) locks.delete(`l:${uid}`);
+      c.openLying.clear();
       return;
     }
     case 'drop': {
@@ -356,7 +427,7 @@ export function handle(c: Client, m: C2S) {
       }
       // (asked again for what they already have open, they are told what is in it and nothing is said of its doors)
       const again = c.openCid === m.cid && holder === c.id;
-      if (!again) releaseLock(c);
+      if (!again) releaseLock(c, false);
       locks.set(m.cid, c.id);
       c.openCid = m.cid;
       if (!again) ajar(m.cid, true, c);
@@ -380,7 +451,7 @@ export function handle(c: Client, m: C2S) {
       return;
     }
     case 'cclose': {
-      if (c.openCid === m.cid) releaseLock(c);
+      if (c.openCid === m.cid) releaseLock(c, false);
       return;
     }
     case 'bury': {

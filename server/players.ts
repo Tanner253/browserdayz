@@ -76,6 +76,8 @@ export interface Client {
   lastChat: number;
   lastHitBy: { id: number; name: string; w: string; zone: HitZone; dist: number; at: number } | null;
   openCid: string | null;
+  /** the things lying about that hold things which this player has open with their pockets ('lopen'): theirs to set while they do */
+  openLying: Set<string>;
   /** when they last moved, looked about or did anything (see kickIdle) */
   activeAt: number;
   joinedAt: number;
@@ -263,7 +265,7 @@ export function join(ws: WebSocket, m: Extract<C2S, { t: 'hello' }>): Client | n
     heardAt: Date.now(), hitAway: 0, kept: false, asleep: 0, bled: 0, logoutAt: 0, logoutFrom: [0, 0],
     since: Date.now(), spoke: false, resumed: !!resume,
     inv: resume?.inv ?? null, vitals: resume?.vitals ?? null,
-    outAt: 0, underAt: 0, lastHit: 0, lastVHit: 0, seatAt: 0, nades: newThrower(), blasts: [], lastEmote: 0, lastChat: 0, lastHitBy: null, openCid: null, check: { at: Date.now(), carry: 0, owed: 0, heard: Date.now(), lag: 0, lagTill: 0, free: Date.now() + CHECK.free, high: 0, hovered: 0, flags: 0, said: 0, refused: [], hp: Math.min(100, resume?.vitals?.health ?? 100), hpAt: Date.now(), downAt: 0, unknown: new Set(), ranged: 0, acted: Date.now(), body: new BodyWatch(Date.now()) }, activeAt: Date.now(), joinedAt: Date.now(), ip: ipOf.get(ws) ?? '', lifeAt: Date.now(), msgCount: 0, msgWindow: Date.now(),
+    outAt: 0, underAt: 0, lastHit: 0, lastVHit: 0, seatAt: 0, nades: newThrower(), blasts: [], lastEmote: 0, lastChat: 0, lastHitBy: null, openCid: null, openLying: new Set(), check: { at: Date.now(), carry: 0, owed: 0, heard: Date.now(), lag: 0, lagTill: 0, free: Date.now() + CHECK.free, high: 0, hovered: 0, flags: 0, said: 0, refused: [], hp: Math.min(100, resume?.vitals?.health ?? 100), hpAt: Date.now(), downAt: 0, unknown: new Set(), ranged: 0, acted: Date.now(), body: new BodyWatch(Date.now()) }, activeAt: Date.now(), joinedAt: Date.now(), ip: ipOf.get(ws) ?? '', lifeAt: Date.now(), msgCount: 0, msgWindow: Date.now(),
   };
   records.delete(key);
   KEPT.chars.delete(keyHash(key));

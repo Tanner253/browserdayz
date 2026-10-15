@@ -65,6 +65,8 @@ export interface InvActions {
   release(item: ItemInstance): void;
   /** what is in the hands */
   inHands(): ItemInstance | null;
+  /** a thing lying within reach that holds things: this player's to go through ('mine'), being asked for, somebody else's, or not opened (null). See Game.openLying */
+  lying(uid: string): 'wait' | 'mine' | 'busy' | null;
   changed(): void;
   sound(kind: 'pickup' | 'drop' | 'move'): void;
   /** a line said to the player */
@@ -827,11 +829,26 @@ export class InventoryUI {
       // (a bat is six cells tall and one wide: stood up in this little box its picture is a hair. Long things are laid on their side here.)
       ic.innerHTML = `<div class="inv-item-img fit${d.h > d.w ? ' lying' : ''}" style="background-image:url(${this.icons[w.loot.item.id] ?? ''})"></div>`;
       row.appendChild(ic);
-      // (a pack, a vest or a case lying there says whether anything is in it: it is taken with all of that, and it is not looked into where it lies)
+      // (a pack, a vest or a case lying there says whether anything is in it, and is gone through where it lies: see below)
       const extra = d.stack ? ` <span>×${w.loot.item.qty}</span>` : d.use?.sips ? ` <span>${w.loot.item.left ?? d.use.sips}/${d.use.sips}</span>` : d.weapon ? ` <span>${w.loot.item.loaded ?? 0}/${capacityOf(w.loot.item)}</span>` : holds(w.loot.item.id) ? ` <span>· ${w.loot.item.cargo?.length ? things(w.loot.item.cargo.length) : 'empty'}</span>` : '';
       row.insertAdjacentHTML('beforeend', `<div class="g-name">${itemName(w.loot.item)}${extra}<small>${kindOf(d)}</small></div>`);
       this.bindItem(row, { kind: 'ground', w, item: w.loot.item });
       ground.appendChild(row);
+      // What lies there that holds things is shown open under it, as what is worn is, and gone through there: taken
+      // out of, put into, moved about in (the owner, 2026-10-15: "all inventories should be shown in vicinity pane when
+      // items are on the ground / armor, clothes, bags doesnt matter, should show like it does in the inventory"). On a
+      // server it is this player's to go through once the server has said so, while nobody else is (Game.openLying).
+      if (holds(w.loot.item.id)) {
+        const st = this.actions.lying(w.loot.uid);
+        const bag = st === 'mine' ? this.bagOf(w.loot.item, 1) : null;
+        if (bag) {
+          const box = this.gridBox(bag);
+          box.classList.add('inv-bag', 'inv-lying');
+          ground.classList.add('inv-has-lying');
+          ground.appendChild(box);
+          this.openBags(ground, bag);
+        } else if (st) ground.insertAdjacentHTML('beforeend', `<div class="inv-empty inv-lying-note">${st === 'busy' ? 'Somebody else is going through it' : 'Opening…'}</div>`);
+      }
     }
     vic.appendChild(ground);
     if (this.stash) {

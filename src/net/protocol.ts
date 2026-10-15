@@ -29,7 +29,7 @@ import type { IState, InfectedInfo } from '../sim/infected';
 // (42, 2026-10-15: the bot check is the 360-degree course (src/sim/course.ts): the server deals a turn of the yard,
 // not a number the whole range could be worked out from, and shows the figures as they come into sight ('rfig');
 // the game says the height it stands at.)
-export const PROTOCOL = 42;
+export const PROTOCOL = 43;
 
 /** chat channels: everyone on the server, or only players standing near the speaker */
 /** `staff`: those with a role, to one another, wherever they are: nobody else is sent it */
@@ -176,6 +176,15 @@ export type C2S =
   | { t: 'copen'; cid: string }
   | { t: 'cset'; cid: string; items: StoredItem[] }
   | { t: 'cclose'; cid: string }
+  /**
+   * What lies within reach that holds things (a pack, a vest, a jacket, a case), opened with the pockets: each is the
+   * asker's to go through while no one else is (`ldata`, or `lbusy` for one somebody has), set whole as a crate is
+   * (`lset`), and shut with the pockets (`lclose`). The owner, 2026-10-15: "all inventories should be shown in vicinity
+   * pane when items are on the ground ... should show like it does in the inventory".
+   */
+  | { t: 'lopen'; uids: string[] }
+  | { t: 'lset'; uid: string; items: StoredItem[] }
+  | { t: 'lclose' }
   /** a stash put down, with whatever was in it while it was carried */
   /** a shovel put to a stash: it is buried, or dug up */
   | { t: 'bury'; uid: string; on: boolean }
@@ -296,6 +305,10 @@ export type S2C =
   | { t: 'denied'; uid: string }
   | { t: 'cdata'; cid: string; items: StoredItem[] }
   | { t: 'cbusy'; cid: string }
+  /** a thing lying within reach that holds things, opened ('lopen'): what is in it; or somebody else has it open; or what is in it now, set by whoever had it (to everybody) */
+  | { t: 'ldata'; uid: string; items: StoredItem[] }
+  | { t: 'lbusy'; uid: string }
+  | { t: 'lcargo'; uid: string; items: StoredItem[] }
   /**
    * One of the map's containers has been opened by somebody ('copen' was answered with what is in it), or they are
    * done with it: said to everybody, the one searching among them, so that a locker's doors are seen to swing open

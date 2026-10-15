@@ -443,6 +443,7 @@ export const gunsMethods = {
     if (want && this.arenaHud) return;
     if (want) {
       this.openStash = this.nearbyStash();
+      this.openLying();
       this.invUI.open(this.around(), this.openStash, this.player.vitals);
       if (this.garage.ride && this.loot.near(this.player.pos, 2.3).length) this.hud.note('Nothing is picked up from a seat: get out for it', 'info');
       if (this.online && this.openStash) {
@@ -458,6 +459,7 @@ export const gunsMethods = {
         this.syncOpenBox();
         this.net.send({ t: 'cclose', cid: this.openStash.uid });
       }
+      this.closeLying();
       this.invUI.close();
       this.input.uiMode = false;
       this.openStash = null;

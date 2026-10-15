@@ -63,6 +63,7 @@ export const frameMethods = {
       const sig = near.map((w) => w.loot.uid).join(',');
       if (sig !== this.vicinitySig) {
         this.vicinitySig = sig;
+        this.openLying();
         this.invUI.refresh(near, this.openStash);
       }
     }

@@ -18,12 +18,16 @@ import { scoreOf, sendBoard } from './queue';
 
 // ------------------------------------------------------------------ gameplay
 
-export function releaseLock(c: Client) {
+export function releaseLock(c: Client, lying = true) {
   if (c.openCid && locks.get(c.openCid) === c.id) {
     locks.delete(c.openCid);
     ajar(c.openCid, false);
   }
   c.openCid = null;
+  // (and the things lying about they had open with their pockets, unless it is only another crate being opened)
+  if (!lying) return;
+  for (const uid of c.openLying) if (locks.get(`l:${uid}`) === c.id) locks.delete(`l:${uid}`);
+  c.openLying.clear();
 }
 
 /**

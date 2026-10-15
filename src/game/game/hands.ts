@@ -65,6 +65,7 @@ export const handsMethods = {
     this.autoHot();
     this.meDirty = true;
     this.syncOpenBox();
+    this.syncLying();
     this.save();
   },
 

@@ -329,6 +329,12 @@ export class Game {
   /** houses, cars and the like painted with their own pictures when the eye is near them (see near.ts) */
   near!: Near;
   openStash: Stash | null = null;
+  /**
+   * What lies within reach that holds things, opened with the pockets (see Game.openLying): waiting on the server's
+   * word, this player's to go through, or somebody else's; and what of each was last told to the server.
+   */
+  lying = new Map<string, 'wait' | 'mine' | 'busy'>();
+  lyingSent = new Map<string, string>();
   indoors = false;
   inForest = false;
   deathInfo = '';
@@ -675,6 +681,7 @@ export class Game {
       hotIndex: (item) => this.inv.hotOf(item),
       hold: (item, loose) => this.takeUp(item, loose),
       inHands: () => this.inv.held() ?? this.inHand,
+      lying: (uid) => this.lying.get(uid) ?? null,
       release: (item) => this.release(item),
       changed: () => this.inventoryChanged(),
       sound: (k) => audio.ui(k),
@@ -1349,6 +1356,9 @@ export interface Game {
   enterOnline: Methods<typeof onlineMethods>['enterOnline'];
   wireNet: Methods<typeof onlineMethods>['wireNet'];
   around: Methods<typeof onlineMethods>['around'];
+  openLying: Methods<typeof onlineMethods>['openLying'];
+  closeLying: Methods<typeof onlineMethods>['closeLying'];
+  syncLying: Methods<typeof onlineMethods>['syncLying'];
   bumpDummies: Methods<typeof onlineMethods>['bumpDummies'];
   updateOnline: Methods<typeof onlineMethods>['updateOnline'];
   addRemote: Methods<typeof onlineMethods>['addRemote'];
