@@ -537,6 +537,8 @@ const _qa = new THREE.Quaternion();
 const _qb = new THREE.Quaternion();
 const _euler = new THREE.Euler();
 const UP = new THREE.Vector3(0, 1, 0);
+/** a hand at rest, as the emote pack's movements are danced with: how far each finger is closed, the first to the little (see `curl`) */
+const EMOTE_HANDS = [0.38, 0.5, 0.62, 0.74];
 /** the emote pack's movements on the player's skeleton (scripts/emotes.mjs): fetched the first time one is wanted, and kept */
 let emoteLib: Promise<Map<string, THREE.AnimationClip>> | null = null;
 const emoteClips = () => (emoteLib ??= assets.loadGLTF('assets/characters/emotes.glb').then((g) => new Map(g.animations.map((c) => [c.name, c]))));
@@ -2536,6 +2538,14 @@ export class Avatar {
       if (this.spine[1]) this.lean(this.spine[1], fwd, -drop * 0.13);
       const head = this.neck[this.neck.length - 1];
       if (head) this.lean(head, fwd, -drop * 0.08);
+    }
+    // Dancing one of the pack's movements: the hands at rest are a hand's at rest, the fingers a little closed, the
+    // little finger most, under whatever the movement does with them. The pack's hands rest so; this body's rest flat,
+    // and what was carried over is how far each finger moves from rest, so every dance was danced with flat hands
+    // (the owner, 2026-10-15: "the hands for all the animations do not look good, did we not get hand bones?").
+    const dancing = this.emo?.act ? this.danceT * (1 - down) : 0;
+    if (dancing > 0.02 && !firstPerson) {
+      for (const r of [this.armL, this.armR]) if (r) this.curl(r, EMOTE_HANDS.map((c) => c * dancing) as Curl, r.hand.getWorldQuaternion(_q3));
     }
     // (a thumb is not seen from across the street, nor on the body the eye is in)
     if (!firstPerson && this.root.position.distanceToSquared(Avatar.eye) < THUMB_SEEN * THUMB_SEEN) {
