@@ -243,8 +243,10 @@ export class Renderer {
     grain.blendMode.opacity.value = 0.045;
     const tone = new ToneMappingEffect({ mode: ToneMappingMode.AGX });
 
-    this.composer.addPass(new EffectPass(this.camera, this.bloom, this.chroma));
-    this.composer.addPass(new EffectPass(this.camera, tone, this.grade, this.contrast, this.vignette, grain));
+    // (One pass, not two, the library putting the colour fringe first as it did: the second read and wrote the whole
+    // picture again for nothing. The same picture to the last bit; 1.4 to 1.75 ms of the card's frame at 1800x1350, the
+    // crossroads and the hospital's street, 2026-10-15: assets-src/_wf/me/post-merge-ab.js.)
+    this.composer.addPass(new EffectPass(this.camera, this.bloom, this.chroma, tone, this.grade, this.contrast, this.vignette, grain));
   }
 
   /** The player changed a graphics option (Esc menu). */
