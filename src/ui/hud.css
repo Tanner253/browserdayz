@@ -1423,7 +1423,7 @@ body.touch .set-page .gfx-range { height: 30px; }
 .em-over.show { display: flex; }
 /* (never a scroll box itself: the veil's blur is not cut where the survivor stands inside one, and the survivor was
    seen frosted; the dark round it scrolls instead, when the screen is too small for it) */
-.em-sheet { width: min(1060px, 100%); margin: auto; padding: 18px 24px 20px; background: rgba(10, 12, 11, 0.82); backdrop-filter: blur(12px); border: 1px solid var(--line); border-top: 2px solid var(--brand); border-radius: 4px; }
+.em-sheet { width: min(1500px, 100%); margin: auto; padding: 18px 24px 20px; background: rgba(10, 12, 11, 0.82); backdrop-filter: blur(12px); border: 1px solid var(--line); border-top: 2px solid var(--brand); border-radius: 4px; }
 .em-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .em-head h2 { margin: 0; font-size: 22px; letter-spacing: 0.3em; text-transform: uppercase; }
 .em-close { width: 36px; height: 36px; font-size: 18px; color: var(--ink); background: none; border: 1px solid var(--line); border-radius: 3px; cursor: pointer; }
@@ -1431,9 +1431,12 @@ body.touch .set-page .gfx-range { height: 30px; }
 .em-steps { display: flex; flex-wrap: wrap; gap: 6px 22px; margin: 0 0 12px; padding: 0; list-style: none; font-size: 15px; color: var(--ink-dim); }
 .em-steps li { display: flex; align-items: center; gap: 8px; }
 .em-steps b { display: grid; place-items: center; width: 22px; height: 22px; font-size: 13px; color: #141109; background: var(--brand); border-radius: 50%; }
-.em-top { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 14px; align-items: center; }
+/* the wheel as big as the sheet's height allows on the left, the survivor narrow beside it (a body is not wide), and the
+   rest of the width for the list and its kinds (the owner: "the wheel can fill the entire window on the left side,
+   smaller preview, remaining space can be the options and tabbed categories") */
+.em-body { --emw: clamp(300px, min(34vw, 62vh), 520px); display: grid; grid-template-columns: var(--emw) clamp(200px, 15vw, 260px) minmax(0, 1fr); gap: 18px; align-items: stretch; }
 /* the wheel as it is held up in the game (wheelSvg), its wedges to click */
-.em-wheel { position: relative; width: 300px; height: 300px; }
+.em-wheel { position: relative; width: var(--emw); height: var(--emw); align-self: center; }
 .em-svg, .em-svg svg { width: 100%; height: 100%; overflow: visible; }
 .em-svg path { fill: rgba(14, 16, 15, 0.74); stroke: var(--line); stroke-width: 1; transition: fill 0.1s, stroke 0.1s; }
 .em-svg text { font: 600 13px var(--font); letter-spacing: 0.06em; text-transform: uppercase; text-anchor: middle; dominant-baseline: central; fill: var(--ink); pointer-events: none; }
@@ -1444,23 +1447,26 @@ body.touch .set-page .gfx-range { height: 30px; }
 .em-svg g.flash path { animation: em-flash 0.6s ease-out; }
 @keyframes em-flash { 0% { fill: #fff; } 100% { fill: var(--brand); } }
 .em-mid { position: absolute; left: 50%; top: 50%; display: grid; place-items: center; width: 92px; margin: -26px 0 0 -46px; pointer-events: none; }
+.em-zoom { position: absolute; right: 8px; top: 64px; display: grid; gap: 4px; }
+.em-zoom button { width: 30px; height: 30px; font-size: 18px; line-height: 1; color: var(--ink); background: rgba(10, 12, 11, 0.7); border: 1px solid var(--line); border-radius: 3px; cursor: pointer; }
+.em-zoom button:hover { border-color: var(--ink-dim); }
 .em-mid small { font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-faint); }
 .em-mid b { font-size: 30px; line-height: 1; color: var(--brand); }
 .em-saved { position: absolute; left: 50%; bottom: 10px; padding: 5px 12px; font-size: 14px; font-style: normal; white-space: nowrap; color: #141109; background: var(--brand); border-radius: 3px; opacity: 0; transform: translateX(-50%); pointer-events: none; }
 .em-saved.on { animation: em-saved 2.2s ease both; }
 @keyframes em-saved { 0% { opacity: 0; transform: translate(-50%, 6px); } 12%, 75% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; } }
 .em-preview.trying { border-color: var(--brand); }
-.em-preview { position: relative; height: 300px; border: 1px solid var(--line); border-radius: 4px; }
-.em-fig { position: absolute; inset: 0; cursor: grab; touch-action: none; }
-.em-cap { position: absolute; left: 12px; top: 10px; pointer-events: none; text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8); }
+.em-preview { position: relative; display: flex; flex-direction: column; min-height: var(--emw); border: 1px solid var(--line); border-radius: 4px; }
+.em-fig { position: relative; flex: 1; min-height: 240px; cursor: grab; touch-action: none; }
+.em-cap { min-height: 56px; padding: 10px 12px 6px; pointer-events: none; }
 .em-cap b { display: block; font-size: 22px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
 .em-cap span { font-size: 14px; color: var(--ink-dim); }
-.em-turn { position: absolute; right: 10px; bottom: 8px; font-family: var(--mono); font-size: 11px; font-style: normal; color: var(--ink-faint); pointer-events: none; }
-.em-lib { margin-top: 14px; }
+.em-turn { position: absolute; left: 0; right: 0; bottom: 8px; text-align: center; font-family: var(--mono); font-size: 11px; font-style: normal; color: var(--ink-faint); pointer-events: none; }
+.em-lib { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .em-tabs { display: flex; gap: 16px; margin-bottom: 10px; }
 .em-tabs button { padding: 2px 0; font-size: 15px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-dim); background: none; border: 0; border-bottom: 2px solid transparent; cursor: pointer; }
 .em-tabs button.on { color: var(--brand); border-bottom-color: var(--brand); }
-.em-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+.em-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); grid-auto-rows: min-content; gap: 6px; max-height: calc(var(--emw) - 40px); overflow: auto; }
 .em-item { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 8px 10px; font-size: 15px; text-align: left; color: var(--ink); background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 3px; cursor: pointer; }
 .em-item i { font-family: var(--mono); font-size: 10px; font-style: normal; white-space: nowrap; color: var(--ink-faint); }
 .em-item em { font-size: 12px; font-style: normal; white-space: nowrap; color: var(--brand); }
@@ -1472,9 +1478,9 @@ body.touch .set-page .gfx-range { height: 30px; }
 .em-reset { margin-left: 8px; font-size: 13px; color: var(--brand); text-decoration: underline; background: none; border: 0; cursor: pointer; }
 /* (a phone: the wheel over the survivor, each the width of the sheet) */
 @media (max-width: 640px) {
-  .em-top { grid-template-columns: minmax(0, 1fr); justify-items: center; }
-  .em-wheel { width: 260px; height: 260px; }
-  .em-preview { width: 100%; height: 240px; }
+  .em-body { --emw: 260px; grid-template-columns: minmax(0, 1fr); justify-items: center; }
+  .em-preview { width: 100%; min-height: 300px; }
+  .em-items { max-height: none; }
   .em-items { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
 }
 /* The hole the survivor is seen through, for exactly as long as it is drawn: the sheet's own dark and blur are laid

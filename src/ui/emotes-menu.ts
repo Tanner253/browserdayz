@@ -13,6 +13,9 @@ import type { DollBox } from '../game/doll';
 import { setWheelSlots, wheelSlots, wheelSvg } from './wheel-slots';
 
 const KINDS: [Emote['kind'], string][] = [['call', 'Calls'], ['dance', 'Dances'], ['gesture', 'Gestures'], ['pose', 'Poses']];
+/** the survivor in the preview: how much of its height the figure's own place takes as it opens (about half a metre
+ * left over its head for hands thrown up), how far down the soles are, and how much nearer or further it can be had */
+const ZOOM = { share: 0.76, foot: 0.96, least: 0.6, most: 1.7 };
 
 export class EmotesMenu {
   /** over the game: the sheet, and the dark round it */
@@ -43,13 +46,18 @@ export class EmotesMenu {
     this.el.className = 'pane-emotes';
     this.el.innerHTML = `
       <ol class="em-steps"><li><b>1</b>Choose a slot on your wheel</li><li><b>2</b>Point at an emote to watch it, click to put it in</li></ol>
-      <div class="em-top">
+      <div class="em-body">
         <div class="em-wheel"><div class="em-svg"></div><div class="em-mid"><small>Slot</small><b></b></div></div>
-        <div class="em-preview"><div class="em-fig"></div><div class="em-cap"><b></b><span></span></div><i class="em-turn">drag to turn</i><i class="em-saved" aria-live="polite"></i></div>
-      </div>
-      <div class="em-lib">
-        <div class="em-tabs">${KINDS.map(([k, label]) => `<button type="button" data-kind="${k}">${label}</button>`).join('')}</div>
-        <div class="em-items"></div>
+        <div class="em-preview">
+          <div class="em-cap"><b></b><span></span></div>
+          <div class="em-fig"></div>
+          <div class="em-zoom"><button type="button" data-zoom="-1" aria-label="Zoom out">−</button><button type="button" data-zoom="1" aria-label="Zoom in">+</button></div>
+          <i class="em-turn">drag to turn · scroll to zoom</i><i class="em-saved" aria-live="polite"></i>
+        </div>
+        <div class="em-lib">
+          <div class="em-tabs">${KINDS.map(([k, label]) => `<button type="button" data-kind="${k}">${label}</button>`).join('')}</div>
+          <div class="em-items"></div>
+        </div>
       </div>
       <p class="em-hint">Hold <b>T</b>, move the mouse toward a slot, let go. A tap of T says the last call again. <button type="button" class="em-reset">Back to the first eight</button></p>`;
     this.sheet.append(this.el);
@@ -70,6 +78,15 @@ export class EmotesMenu {
     const drop = () => this.figure?.drop();
     this.fig.addEventListener('pointerup', drop);
     this.fig.addEventListener('pointercancel', drop);
+    // and nearer or further by the mouse's wheel on it, or by − and + (the owner: "make sure the preview you can zoom in and out")
+    this.fig.addEventListener(
+      'wheel',
+      (e) => {
+        e.preventDefault();
+        this.zoomBy(e.deltaY < 0 ? 1 : -1);
+      },
+      { passive: false },
+    );
     // the pointer on something in the list: the survivor does it at once, and stops when the pointer leaves the list
     const items = this.el.querySelector('.em-items') as HTMLElement;
     items.addEventListener('pointerover', (e) => {
@@ -85,6 +102,8 @@ export class EmotesMenu {
         this.show(wheelSlots()[this.slot]);
         return;
       }
+      const zoom = t.closest<HTMLElement>('[data-zoom]')?.dataset.zoom;
+      if (zoom) return this.zoomBy(Number(zoom));
       const kind = t.closest<HTMLElement>('[data-kind]')?.dataset.kind as Emote['kind'] | undefined;
       if (kind) {
         this.kind = kind;
@@ -181,6 +200,12 @@ export class EmotesMenu {
     return this.on && this.root.offsetParent !== null;
   }
 
+  /** how near the survivor is seen: 1 as it opens, each step a tenth nearer or further */
+  private zoom = 1;
+  private zoomBy(steps: number) {
+    this.zoom = Math.min(ZOOM.most, Math.max(ZOOM.least, this.zoom * 1.1 ** steps));
+  }
+
   /** where the survivor stands, for the game's renderer (null: not open) */
   box(): DollBox | null {
     if (!this.isOpen) return null;
@@ -188,7 +213,12 @@ export class EmotesMenu {
     if (f.width < 16 || f.height < 16) return null;
     // (the sheet's own veil, as its stylesheet has it: one colour, its blur)
     const veil = { x: s.left, y: s.top, w: s.width, h: s.height, from: [10, 12, 11, 0.82], to: [10, 12, 11, 0.82], blur: 12, sat: 1, band: 0, thins: 0 };
-    return { x: f.left, y: f.top, w: f.width, h: f.height, cx: f.left, cy: f.top, cw: f.width, ch: f.height, veil };
+    // The figure's own place (the doll stands it in the middle of this, as tall as this: head to foot) is less than
+    // the preview, so that hands thrown up stay in it (the owner: "when doing some of the animations the hands go off
+    // the top of the preview"). Further off, the feet stay where they are; nearer, it closes on the middle of the body.
+    const k = ZOOM.share * this.zoom, w = f.width * k, h = f.height * k;
+    const foot = f.top + f.height * ZOOM.foot, mid = foot - (f.height * Math.min(k, ZOOM.share)) / 2;
+    return { x: f.left + (f.width - w) / 2, y: mid - h / 2, w, h, cx: f.left, cy: f.top, cw: f.width, ch: f.height, veil };
   }
 
   /** the hole in the sheet is open for exactly as long as the survivor is drawn in it */
