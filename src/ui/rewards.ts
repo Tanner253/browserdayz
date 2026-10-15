@@ -70,9 +70,24 @@ async function siteStatus() {
   const s = (await (await fetch('/api/cashins?format=status')).json()) as { on?: boolean; tagPays?: number | null; share?: number; floor?: number; due?: boolean; minTags?: number; next?: { from?: string; tagPays?: number; minTags?: number } | null; holder?: { from?: string; perM?: number; max?: number } | null };
   if (s.due) void fetch('/api/tick').catch(() => {});
   pays = s.on && typeof s.tagPays === 'number' ? s.tagPays : null;
+  // (what this player's own tags pay, by what the wallet they gave holds of the coin: the owner, 2026-10-15, "the ui
+  // shouldnt say .01 if im going to make more than .01". api/cashins.ts ?format=wallet)
+  mine = null;
+  const w = walletAddress();
+  if (pays !== null && s.holder && w) {
+    const r = (await (await fetch(`/api/cashins?format=wallet&w=${encodeURIComponent(w)}`)).json().catch(() => null)) as Rate | null;
+    if (r && typeof r.perTag === 'number' && typeof r.tier === 'string') {
+      mine = r;
+      pays = r.perTag;
+    }
+  }
   for (const f of told) f(pays);
   return s;
 }
+/** a wallet's standing under the holder rule, as the site says it (api/cashins.ts ?format=wallet) */
+interface Rate { tier: string; held: number; perTag: number; payout: number; max: boolean; next: { tier: string; perTag: number; more: number } | null }
+/** this player's wallet's, when they have given one and the site has said */
+let mine: Rate | null = null;
 /**
  * What a tag pays at this moment, in SOL, told to whoever wants it each time the site is asked (and at once, with
  * what was last heard): the Payouts button of the main menu says it. Nothing more is asked of the site for this
@@ -214,6 +229,13 @@ export class RewardsModal {
         // (and more for holding the coin: api/_lib/payouts.ts, holderBonus)
         const h = s.holder && typeof s.holder.perM === 'number' && typeof s.holder.max === 'number' && typeof s.holder.from === 'string' ? s.holder : null;
         const more = h ? ` ${Date.now() >= Date.parse(h.from!) ? 'Holding $ZONA in that wallet pays more' : `From ${h.from!.slice(0, 16).replace('T', ' ')} UTC holding $ZONA in that wallet pays more`}: <b>+${round(h.perM!)} SOL</b> a tag for every full 1,000,000 held (from 1,000,000), up to <b>${round(h.max!)} SOL</b> a tag.` : '';
+        if (mine) {
+          // (the player's own: their tier, what their tags pay, and what the next tier needs)
+          const fmt = (k: number) => Math.round(k).toLocaleString('en-US');
+          const next = mine.next ? ` <b>${fmt(mine.next.more)}</b> more $ZONA makes you ${mine.next.tier}: <b>${round(mine.next.perTag)} SOL</b> a tag.` : ' The top rate.';
+          p.innerHTML = `Your tags pay <b>${round(mine.perTag)} SOL</b> each: <b>${mine.tier}</b>, ${fmt(mine.held)} $ZONA in your wallet. ${n > 1 ? `Sent when ${n} are due: <b>${round(mine.payout)} SOL</b> for the ${n}, at once.` : ''}${next} Play free, earn SOL, hold $ZONA: every 1,000,000 adds ${h ? round(h.perM!) : '0.001'} SOL a tag, up to ${h ? round(h.max!) : '0.025'}.${listed}`;
+          return;
+        }
         p.innerHTML = `A tag you cash in pays <b>${round(s.tagPays)} SOL</b>${n > 1 ? `, sent to the wallet you enter here when ${n} of your tags are due: <b>${round(s.tagPays * n)} SOL</b> for the ${n}, at once. Until then they wait, counted, and none is lost.` : ', sent to the wallet you enter here.'}${more}${listed}`;
         return;
       }
@@ -260,6 +282,8 @@ export class RewardsModal {
       return;
     }
     write(WALLET, v);
+    // (what that wallet's tags pay, said everywhere it is said)
+    void siteStatus().catch(() => {});
     this.close();
   }
 }
