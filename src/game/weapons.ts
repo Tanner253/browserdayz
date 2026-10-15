@@ -8,7 +8,7 @@ import { physics, SHOT_GROUPS, type Surface } from '../core/physics';
 import { CRACK, audio } from '../core/audio';
 import type { Input } from '../core/input';
 import { extractParts, type MeshPart } from '../core/gltf-utils';
-import { ITEMS, capacityOf, chambered, fittedOf, handlingOf, hasMod, magFits, magRoom, nextMag, pieceShown, swapMag, type ItemInstance, type Slot, quietOf } from '../sim/items';
+import { ITEMS, isBag, capacityOf, chambered, fittedOf, handlingOf, hasMod, magFits, magRoom, nextMag, pieceShown, swapMag, type ItemInstance, type Slot, quietOf } from '../sim/items';
 import { suppressorGeometry } from './procedural';
 import { SLOT_ORDER, type PlayerInventory } from '../sim/inventory';
 import type { Atmosphere } from '../world/atmosphere';
@@ -424,17 +424,10 @@ export const LIVE = {
 const IN_HAND: Record<string, number> = { bandage: 1.8 };
 
 /**
- * A bag of blood or salt water being run in (the owner, 2026-10-14: "the blood bag does not sit in the hand
- * properly"): held up in front and to the left by its top edge, upright and face on, as a bag is hung to run; the
- * right hand squeezes it every `every` seconds. In the eye's space, and the bag's own (its length is its z).
+ * A roll of dressing in the left palm, and the right drawing lengths off it. A bag of blood or salt water being run
+ * in is held the same way (the owner, 2026-10-14: "it should be the same hand positions as the bandage"; held up by
+ * its edge and squeezed, the left hand was upside down and twisted).
  */
-export const DRIP = {
-  at: [-0.045, -0.075, -0.5] as [number, number, number],
-  turn: [-1.36, 0.18, 0.05] as [number, number, number],
-  every: 2.2,
-  squeeze: 0.07,
-};
-
 export const ROLL = {
   at: [-0.05, -0.088, -0.4] as [number, number, number],
   turn: [0.5, 0.3, -0.06] as [number, number, number],
@@ -2714,6 +2707,8 @@ export class Weapons {
             obj.rotation.y = Math.PI / 2;
             size.set(size.z, size.y, size.x);
           }
+          // (a bag of blood or salt water lies in the palm with its label the right way up to the one holding it)
+          if (isBag(id)) obj.rotation.y += Math.PI;
           obj.position.y = -size.y / 2;
           root.add(obj);
         }
@@ -3694,7 +3689,7 @@ export class Weapons {
     const pos = new THREE.Vector3(H.rest[0] + wide * H.restBy[0], H.rest[1] + sy * H.restBy[1], H.rest[2] + sy * H.restBy[2]);
     const rot = new THREE.Euler(0, 0, 0);
     /** a roll of dressing, not the kit (which is held and gone into another way: see HOLD.kit and ROLL) */
-    const rolled = h.kind === 'bandage' && Math.max(h.size.x, h.size.z) < 0.1;
+    const rolled = (h.kind === 'bandage' && Math.max(h.size.x, h.size.z) < 0.1) || h.kind === 'drip';
     const two = !h.wait && (h.kind === 'bandage' || h.kind === 'inject' || h.kind === 'open' || h.kind === 'load' || h.kind === 'unbox' || h.kind === 'drip' || (h.kind !== 'smoke' && Math.min(h.size.x, h.size.z) > 0.16));
     /** a magazine being filled: how far the right hand is from where it takes a round (0) to the magazine's mouth (1), how far the round is pressed in, and slid back */
     let fill: { reach: number; press: number; slide: number; has: boolean } | null = null;
@@ -3730,18 +3725,12 @@ export class Weapons {
       };
       rot.setFromQuaternion(turned(C.showAlong, C.showFace, new THREE.Quaternion()).slerp(turned(C.putAlong, C.putFace, new THREE.Quaternion()), reach));
       h.root.scale.setScalar(C.scale);
-    } else if (h.kind === 'bandage' && rolled && h.wait) {
+    } else if (rolled && h.wait) {
       // A roll taken out and not yet used: in the right hand at rest, as anything small is.
-    } else if (h.kind === 'bandage' && rolled) {
-      // A roll in the left palm (see ROLL).
+    } else if (rolled) {
+      // A roll (or a bag) in the left palm (see ROLL).
       pos.set(ROLL.at[0], ROLL.at[1] + Math.sin(t * 2.3) * 0.003, ROLL.at[2]);
       rot.set(ROLL.turn[0], ROLL.turn[1], ROLL.turn[2] + Math.sin(t * 1.7) * 0.02);
-    } else if (h.kind === 'drip' && !h.wait) {
-      // A bag being run in: held up by its top edge, face on, swaying a little; squeezed now and then (see DRIP).
-      const sq = Math.pow(Math.max(0, Math.sin(((t % DRIP.every) / DRIP.every) * Math.PI)), 3);
-      pos.set(DRIP.at[0] + Math.sin(t * 1.3) * 0.003, DRIP.at[1] + Math.sin(t * 2.1) * 0.004, DRIP.at[2]);
-      rot.set(DRIP.turn[0], DRIP.turn[1], DRIP.turn[2] + Math.sin(t * 1.1) * 0.03);
-      h.root.scale.set(1 - DRIP.squeeze * sq, 1, 1);
     } else if (h.kind === 'bandage') {
       // A kit, open in the left hand, low and to the left. The right goes into it, comes out
       // and goes down out of the picture to where the wound is, and comes back for more.
@@ -3938,13 +3927,6 @@ export class Weapons {
       right = { pos: away.lerp(tips.addScaledVector(fingers, -ROLL.reach), on), fingers, palm: new THREE.Vector3(-0.1, -0.8, 0.6).applyQuaternion(inv).normalize(), curl: [0.4 + on * 0.25, 0.55 + on * 0.25, 0.95, 1.05], thumb: 0.9, tuck: 0.25 };
       // (the left is under it, its palm up: the roll lies in the hollow of it, the fingers a little closed beyond)
       left = { pos: new THREE.Vector3(-0.012, -(h.size.y / 2 + ROLL.under), ROLL.back), fingers: new THREE.Vector3(0.14, 0.1, -0.98).normalize(), palm: new THREE.Vector3(0.05, 1, 0.05).normalize(), curl: [0.42, 0.46, 0.5, 0.55], thumb: 0.45, spread: 0.2 };
-    } else if (h.kind === 'drip' && !h.wait) {
-      // The left has the bag by its left edge, from the side (from above, the forearm crossed half the picture); the
-      // right is round its middle from the right, closing on it as it is squeezed.
-      const sq = Math.pow(Math.max(0, Math.sin(((t % DRIP.every) / DRIP.every) * Math.PI)), 3);
-      const top = h.size.z / 2, wide = h.size.x / 2;
-      left = { pos: new THREE.Vector3(-wide - 0.04, 0.015, top * 0.35), fingers: new THREE.Vector3(0.85, 0.15, -0.5).normalize(), palm: new THREE.Vector3(1, 0, 0.15).normalize(), curl: [0.6, 0.7, 0.8, 0.85], thumb: 0.6 };
-      right = { pos: new THREE.Vector3(wide + 0.045 - sq * 0.015, 0.015, -0.01), fingers: new THREE.Vector3(-0.85, 0.1, -0.5).normalize(), palm: new THREE.Vector3(-1, 0, 0.1).normalize(), curl: [0.35 + sq * 0.45, 0.4 + sq * 0.45, 0.45 + sq * 0.4, 0.5 + sq * 0.4], thumb: 0.4 + sq * 0.3, spread: 0.3 };
     } else if (h.kind === 'bandage' && !rolled) {
       // in and out of the kit, once every second and a half: over it with the fingers down, then away low on the right
       const k = (t % 1.5) / 1.5;

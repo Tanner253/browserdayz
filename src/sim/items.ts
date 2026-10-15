@@ -687,6 +687,12 @@ export function makeItem(id: string, qty?: number): ItemInstance {
 /** How often a gun put into the world has its magazine in it, and how full that is at most (a share of what it holds). */
 export const FOUND_WITH_MAG = { chance: 0.6, full: 0.6 };
 
+/** Is this a bag of blood or salt water, run into the arm? (a kit or a pouch gives blood too, but closes wounds as well) */
+export function isBag(id: string): boolean {
+  const u = ITEMS[id]?.use;
+  return !!u?.blood && !u.stopBleed;
+}
+
 /** Is this gun fed by a magazine that comes out? (the others by their own tube, a round at a time) */
 export function magFed(id: string): boolean {
   return !!ITEMS[id]?.weapon?.mag;

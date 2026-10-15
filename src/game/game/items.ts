@@ -7,7 +7,7 @@ import { physics, SIGHT_GROUPS, SOLID_GROUPS } from '../../core/physics';
 import { audio } from '../../core/audio';
 import type { Input } from '../../core/input';
 import type { Barrel } from '../../world/vegetation';
-import { type ItemInstance, ITEMS, makeItem, chambered, swapMag } from '../../sim/items';
+import { type ItemInstance, ITEMS, makeItem, chambered, swapMag, isBag } from '../../sim/items';
 import type { Container } from '../../sim/inventory';
 import { WEAPON_RULES } from '../../sim/combat';
 import { THROWN, fuseLeft, NADE, inHandDamage } from '../../sim/grenades';
@@ -214,8 +214,8 @@ export const itemsMethods = {
     // (A grenade is not used over a time as other things are: its pin is pulled, and from then it is live. With the
     // button that began it still down, it is held; chosen out of the pockets, it is thrown the moment the pin is out.)
     if (def.throw) return this.pullPin(item, now);
-    // how the hands hold it while it is used: a smoke goes to the mouth, a radio is worked with both, a bag of blood is held up
-    const kind: UseKind = def.call ? 'open' : def.look ? 'drink' : u.blood ? 'drip' : u.sound;
+    // how the hands hold it while it is used: a smoke goes to the mouth, a radio is worked with both, a bag of blood lies in the palm as a roll of dressing does
+    const kind: UseKind = def.call ? 'open' : def.look ? 'drink' : isBag(item.id) ? 'drip' : u.sound;
     const sound: TimedAction['sound'] = def.look || def.call ? null : u.sound;
     this.glass = 0;
     this.startUse(def.look ? 'Binoculars' : def.call ? 'Calling a drop in' : `${u.verb} ${def.name}`, u.time, item.id, kind, sound, () => {

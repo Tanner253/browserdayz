@@ -8,7 +8,7 @@ import { physics, SOLID_GROUPS, SHOT_GROUPS } from '../../core/physics';
 import { audio } from '../../core/audio';
 import type { Input } from '../../core/input';
 import { heightAt } from '../../world/worldgen';
-import { type ItemInstance, ITEMS } from '../../sim/items';
+import { type ItemInstance, ITEMS, isBag } from '../../sim/items';
 import { RemotePlayer } from '../remote';
 import type { UseKind } from '../weapons';
 import { WorldItem, Stash } from '../loot';
@@ -423,8 +423,8 @@ export const handsMethods = {
     if (def.mag) return 'load';
     if (def.open) return 'unbox';
     if (def.throw || def.call || !def.use) return 'open';
-    // (a bag of blood or salt water is held up to run in, not worked on as a dressing is)
-    if (def.use.blood) return 'drip';
+    // (a bag of blood or salt water: held as a roll of dressing is, in the left palm; see ROLL)
+    if (isBag(item.id)) return 'drip';
     return def.look ? 'drink' : def.use.sound;
   },
 
