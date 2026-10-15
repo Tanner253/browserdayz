@@ -1,6 +1,6 @@
 // The emotes (src/sim/emotes.ts): every call says something and does something; every one of the pack's movements has
 // a number of its own that fits the pose flags beside the others, and a clip in the built file
-// (public/assets/characters/emotes.glb, scripts/emotes.mjs); the wheel's first eight are all there.
+// (public/assets/characters/emotes.glb, scripts/emotes.mjs); the wheel's first sixteen are all there.
 import assert from 'node:assert/strict';
 import { NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
@@ -31,7 +31,7 @@ for (const e of pack) {
   ok((f & EMOTE_MASK) >> EMOTE_SHIFT === e.n && (f & ~EMOTE_MASK) === flags, `${e.id}'s number in the flags comes back as it went`);
 }
 
-ok(WHEEL_DEFAULT.length === WHEEL_SLOTS && WHEEL_DEFAULT.every((id) => !!EMOTE[id]), 'the first wheel is eight that are there');
+ok(WHEEL_DEFAULT.length === WHEEL_SLOTS && WHEEL_DEFAULT.every((id) => !!EMOTE[id]), 'the first wheel is sixteen that are there');
 
 await MeshoptDecoder.ready;
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.decoder': MeshoptDecoder });

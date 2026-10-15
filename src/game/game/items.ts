@@ -12,7 +12,7 @@ import type { Container } from '../../sim/inventory';
 import { WEAPON_RULES } from '../../sim/combat';
 import { THROWN, fuseLeft, NADE, inHandDamage } from '../../sim/grenades';
 import { BARREL } from '../../sim/barrels';
-import { EMOTE, EMOTE_GAP, voiceOf, SAY_TIME, SAY_RANGE } from '../../sim/emotes';
+import { EMOTE, EMOTE_GAP, WHEEL_RING, voiceOf, SAY_TIME, SAY_RANGE } from '../../sim/emotes';
 import { wheelSlots } from '../../ui/wheel-slots';
 import { playerName } from '../../net/client';
 import { type Act, MAX_STAMINA } from '../../net/protocol';
@@ -22,7 +22,7 @@ import type { UseKind } from '../weapons';
 import type { WorldItem } from '../loot';
 import { type Well, WELL } from '../../sim/wells';
 import { FIRE } from '../../sim/fires';
-import { WHEEL_PICK, WHEEL_REACH, type TimedAction, type Game } from '../game';
+import { WHEEL_OUTER, WHEEL_PICK, WHEEL_REACH, type TimedAction, type Game } from '../game';
 
 export const itemsMethods = {
   // ------------------------------------------------------------ item actions
@@ -440,8 +440,10 @@ export const itemsMethods = {
     at.y += input.mouseDY / WHEEL_REACH;
     if (at.length() > 1) at.normalize();
     // the first entry is at the top, the rest follow clockwise (as the player has set them in Emotes)
-    const slots = wheelSlots(), n = slots.length;
-    const pick = at.length() > WHEEL_PICK ? ((Math.round((Math.atan2(at.x, -at.y) / (Math.PI * 2)) * n) % n) + n) % n : -1;
+    // (two rings of eight: the way the mouse has gone says the wedge, how far it has gone says the ring)
+    const slots = wheelSlots(), per = WHEEL_RING, far = at.length();
+    const k = ((Math.round((Math.atan2(at.x, -at.y) / (Math.PI * 2)) * per) % per) + per) % per;
+    const pick = far > WHEEL_PICK ? Math.min(slots.length - 1, (far > WHEEL_OUTER ? per : 0) + k) : -1;
     // a click while it is up: Emotes, where its slots are set (the owner: "edit button on the T wheel"; the gun is quiet while the wheel is up)
     if (ok && input.pressed('Mouse0')) {
       this.wheelOn = false;

@@ -1,4 +1,4 @@
-// Emotes: the eight slots of the wheel (hold T) set by the player, each thing there is to call out or do watched
+// Emotes: the sixteen slots of the wheel (hold T) set by the player, each thing there is to call out or do watched
 // first on the survivor (the owner, 2026-10-14: "we need to allow the user to assign which emote to which radial key
 // ... we need an emote preview for the user to watch"; "lets make sure the ui and emote wheel interaction and edit and
 // everything is super intuitive"). Opened in the game, from the wheel (the owner, 2026-10-15: "emotes should be managed
@@ -59,7 +59,7 @@ export class EmotesMenu {
           <div class="em-items"></div>
         </div>
       </div>
-      <p class="em-hint">Hold <b>T</b>, move the mouse toward a slot, let go. A tap of T says the last call again. <button type="button" class="em-reset">Back to the first eight</button></p>`;
+      <p class="em-hint">Hold <b>T</b>, move the mouse toward a slot, a little for the inner ring and further for the outer, and let go. A tap of T says the last call again. <button type="button" class="em-reset">Back to the defaults</button></p>`;
     this.sheet.append(this.el);
     this.fig = this.el.querySelector('.em-fig') as HTMLElement;
     this.showing = wheelSlots()[0];
@@ -122,7 +122,7 @@ export class EmotesMenu {
       if (t.closest('.em-reset')) {
         setWheelSlots([...WHEEL_DEFAULT]);
         this.show(WHEEL_DEFAULT[this.slot]);
-        this.saved('The first eight are back');
+        this.saved('The defaults are back');
       }
     });
     this.render();

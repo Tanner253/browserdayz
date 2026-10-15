@@ -92,9 +92,15 @@ export const EMOTES: Emote[] = [
   { id: 'sit', label: 'Sit down', kind: 'pose', hold: 'sit' },
 ];
 
-/** the wheel as it is until a player sets their own (Emotes, opened from the wheel): eight, clockwise from the top */
-export const WHEEL_DEFAULT = ['hey', 'dontshoot', 'yes', 'no', 'bhangra', 'surrender', 'follow', 'help'];
-export const WHEEL_SLOTS = 8;
+/**
+ * The wheel as it is until a player sets their own (Emotes, opened from the wheel): sixteen, an inner eight and an
+ * outer eight, each clockwise from the top (the owner, 2026-10-15: "we have so many options to pick from but we need
+ * more slots to assign to can we double it?"). The inner eight are the eight there were.
+ */
+export const WHEEL_DEFAULT = ['hey', 'dontshoot', 'yes', 'no', 'bhangra', 'surrender', 'follow', 'help', 'here', 'thanks', 'wait', 'enemy', 'medic', 'loot', 'sit', 'shuffle'];
+export const WHEEL_SLOTS = 16;
+/** wedges to a ring */
+export const WHEEL_RING = 8;
 
 /** which of the pack's clips is being danced, in the pose flags: its number this many bits up (0: the body's own dance, or none) */
 export const EMOTE_SHIFT = 16;

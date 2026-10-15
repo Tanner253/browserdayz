@@ -1848,7 +1848,7 @@ body.touch .tc.ads { z-index: 8; }
 .tc.lamp .tc-top .tc-light { display: grid; }
 .tc.lit .tc-top .tc-light { color: #121413; background: var(--accent); border-color: var(--accent); }
 /* what can be called out: a list under the button that opens it */
-.tc-emotes { position: absolute; left: calc(12px + env(safe-area-inset-left)); top: 64px; display: none; grid-template-columns: repeat(2, 136px); gap: 6px; pointer-events: auto; touch-action: none; }
+.tc-emotes { position: absolute; left: calc(12px + env(safe-area-inset-left)); top: 64px; display: none; grid-template-columns: repeat(4, 124px); gap: 6px; pointer-events: auto; touch-action: none; }
 .tc.emo .tc-emotes { display: grid; }
 .tc-e { height: 42px; padding: 0 10px; font-family: var(--font); font-size: 14px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink); background: rgba(10, 12, 11, 0.82); border: 1.5px solid rgba(233, 228, 216, 0.34); }
 .tc-e-edit { grid-column: 1 / -1; color: var(--accent); border-color: var(--accent); }
@@ -1912,7 +1912,7 @@ body.touch .hud-start, body.touch .rw, body.touch .inv-wrap, body.touch .inv-col
   left: 50%;
   top: 50%;
   /* a good third of the height of the screen, whatever the screen */
-  --d: clamp(300px, 40vh, 460px);
+  --d: clamp(380px, 58vh, 640px);
   width: var(--d);
   height: var(--d);
   margin: calc(var(--d) / -2) 0 0 calc(var(--d) / -2);
@@ -1947,8 +1947,8 @@ body.touch .hud-start, body.touch .rw, body.touch .inv-wrap, body.touch .inv-col
   border-radius: 50%;
   background: var(--ink);
   box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.5);
-  /* --x and --y: where the mouse is from the middle, -1..1; it goes as far as the hub does */
-  transform: translate(calc(var(--x, 0) * var(--d) * 0.14), calc(var(--y, 0) * var(--d) * 0.14));
+  /* --x and --y: where the mouse is from the middle, -1..1; it goes out over the rings, so that which ring is picked can be seen */
+  transform: translate(calc(var(--x, 0) * var(--d) * 0.47), calc(var(--y, 0) * var(--d) * 0.47));
 }
 .wheel-mid {
   position: absolute;

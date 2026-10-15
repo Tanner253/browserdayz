@@ -165,7 +165,9 @@ export const HOT_CODES = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Dig
 /** the first key a thing to eat, drink or dress a wound with takes by itself when it is first picked up (the ones before it are the back's and the holster's) */
 export const HOT_FREE = 3;
 /** the wheel: how far the mouse travels from its middle to its rim (pixels), and how far out an entry is picked */
-export const WHEEL_REACH = 120, WHEEL_PICK = 0.35;
+export const WHEEL_REACH = 150, WHEEL_PICK = 0.24;
+/** and how far out the outer ring begins (the wheel's two rings: src/ui/wheel-slots.ts, RINGS) */
+export const WHEEL_OUTER = 0.6;
 export const SEND_HZ = 15;
 export const _drip = new THREE.Vector3();
 export const _still = new THREE.Vector3();
